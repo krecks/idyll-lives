@@ -21,7 +21,7 @@
  *   lot (build-mode edits don't rebuild it), merged into a handful of meshes (one per material)
  *   plus thin-instanced foliage and props (manifest models: `model.street.*` and the town's
  *   things, see `assets/packs/street/manifest.json`), a few dozen draw calls for the whole street.
- * - Blender-built models only (no downloads), plus a CC0 concrete texture for the sidewalks.
+ * - Models built in Blender (`.glb` files, downloaded like the rest), plus a CC0 concrete texture for the sidewalks.
  */
 
 import { Color3, Constants, DynamicTexture, Matrix, Quaternion, StandardMaterial, Vector3, type Light, type Material, type Mesh, type Scene } from './core';
@@ -32,7 +32,7 @@ import type { ViewRect } from '../types';
 import { Geo, type V3 } from './geometry';
 import type { HouseBuilder, SilhouetteSpec } from './house';
 import { encodeFinish, MaterialLibrary } from './materials';
-import { buildModel, placementVariation, type ModelTemplate } from './models';
+import { buildModel, placementVariation, withGlows, type ModelTemplate } from './models';
 import { perfEnd, perfStart, perfTime, perfTimeAsync } from '../../debug/perf';
 
 interface Rect {
@@ -83,8 +83,6 @@ const PROP = {
 } as const;
 /** A thin instance: x, z, scale across, scale up, yaw. */
 type Inst = [number, number, number, number, number];
-/** A template's meshes and its glows' (what hiding it hides). */
-const withGlows = (t: ModelTemplate): Mesh[] => [...t.meshes, ...(t.glows ?? []).map((g) => g.mesh)];
 /** Shop awnings: stripe colours. */
 const AWNINGS: [string, string][] = [['#2F6B4F', '#F2F0EA'], ['#B8322B', '#F2F0EA'], ['#2E5C8A', '#F2F0EA'], ['#C98F2E', '#F7EBD3'], ['#6B3E5E', '#F2E6EE']];
 /** What a placed object looks like and how big it is (the game's content), for public places seen from another lot. */

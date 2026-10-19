@@ -63,11 +63,12 @@ const env = assets.get('environment.sky', 'image');
 const lib = MaterialLibrary.for(scene).setAssets(assets);
 if (env?.url) await lib.loadEnvironment(env.url);
 scene.environmentIntensity = 0.9;
-const manifest = (await (await fetch(`${base}assets/manifest.json`)).json()) as { entries: Record<string, { type: string }> };
+// Every model the game knows, from the base manifest and the packs it lists (most models live in packs).
 const filter = params.get('filter');
-const keys = params.get('keys')?.split(',') ?? Object.keys(manifest.entries).filter((k) => manifest.entries[k].type === 'model' && (filter ? k.includes(filter) : /^model\.(tree|pine|bush|hedge|garden|flowers|flowerbed|plant)/.test(k)) && !k.endsWith('.far'));
+const keys = params.get('keys')?.split(',') ?? assets.keys('model').filter((k) => (filter ? k.includes(filter) : /^model\.(tree|pine|bush|hedge|garden|flowers|flowerbed|plant)/.test(k)) && !k.endsWith('.far'));
+if (keys.length === 0) console.warn(`[gallery] no models match ${filter ? `'${filter}'` : 'the default list'}`);
 
-const cols = Number(params.get('cols')) || Math.ceil(Math.sqrt(keys.length));
+const cols = Number(params.get('cols')) || Math.max(1, Math.ceil(Math.sqrt(keys.length)));
 const rows = Math.ceil(keys.length / cols);
 const templates = await Promise.all(keys.map((key) => buildModel(scene, key, assets.get(key, 'model'), [1, 1])));
 const outlines = templates.map((t) => t.outline ?? { minX: -0.5, maxX: 0.5, minZ: -0.5, maxZ: 0.5 });
@@ -110,6 +111,9 @@ keys.forEach((key, i) => {
     spots.push({ key, at: new Vector3(x, 0, z + Math.min(gap * 0.38, out.maxZ + 0.15)), el });
   }
 });
+
+// With nothing to show, frame an empty metre round the origin rather than infinities (NaN camera).
+if (keys.length === 0) Object.assign(box, { minX: -0.5, maxX: 0.5, minY: 0, maxY: 1, minZ: -0.5, maxZ: 0.5 });
 
 // Fronts face +z: from the front, a little to the right, at the models' middle height; as close
 // as keeps the sphere round them all in view (a single cup from about 1 m, a bed from about 5).

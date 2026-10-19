@@ -1,6 +1,6 @@
 # Slob: "Barely notices the dirt. Showers are optional."
 
-Pack: `web/public/content/packs/slob.json` · models: `web/public/assets/packs/slob/manifest.json`
+Pack: `web/public/content/packs/slob.json` · models: `web/public/assets/packs/pack_slob/manifest.json`
 
 ## What a slob wants
 Effort-free comfort: food without cooking, fun without leaving the couch, and just enough

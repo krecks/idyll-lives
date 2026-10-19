@@ -1,6 +1,6 @@
 # Energetic: content pack design note
 
-Pack: `web/public/content/packs/energetic.json` · models: `web/public/assets/packs/energetic/manifest.json`
+Pack: `web/public/content/packs/energetic.json` · models: `web/public/assets/packs/pack_energetic/manifest.json`
 
 **What the energetic resident wants:** to move. The trait already walks faster (×1.15), loses energy slower
 (×0.8), learns Endurance faster and dislikes `rest` (×0.8). The pack gives them sport to seek out, ways to

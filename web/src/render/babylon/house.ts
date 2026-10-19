@@ -35,12 +35,11 @@ import { Cut, facing, Geo, LOOK, type V3 } from './geometry';
 import { LAYER_SHADOW_ONLY } from './layers';
 import { MaterialLibrary } from './materials';
 import { addHipPolygon, area, convexHull, diagonalEnds, halfAt, halfCentroid, halfTriangle, postOutline, WallFrame, type P2 } from './slanted';
+import { WALL_HALF, WALL_HEIGHT } from './walls';
 
-export const WALL_HEIGHT = 2.8;
+export { WALL_HALF, WALL_HEIGHT };
 export const WALL_STUB = 0.35;
-const T = 0.07; // half wall thickness (sim-core WALL_THICKNESS / 2)
-/** Half a wall's thickness (m). */
-export const WALL_HALF = T;
+const T = WALL_HALF; // half wall thickness (sim-core WALL_THICKNESS / 2)
 const DOOR_HEIGHT = 2.1;
 const PLINTH = 0.32;
 // Window opening (matches sim-core `WINDOW_SILL` / `WINDOW_HEAD`); the glazed part is narrower

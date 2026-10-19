@@ -1,6 +1,6 @@
 # Foodie: content pack design note
 
-Pack: `web/public/content/packs/foodie.json` · models: `web/public/assets/packs/foodie/manifest.json`
+Pack: `web/public/content/packs/foodie.json` · models: `web/public/assets/packs/pack_foodie/manifest.json`
 
 **What the foodie wants:** to eat well and often, and to get better at cooking. The trait already
 makes hunger fall faster (×1.15) and fill faster (×1.2), likes `food`/`cooking` and learns Cooking

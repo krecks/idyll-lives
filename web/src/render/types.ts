@@ -182,6 +182,8 @@ export interface ResizeHandle {
 export interface PlacementGhost {
   /** Asset key of the model. */
   model: string;
+  /** Its kind (content object id): what shapes the box drawn if its model has no file or it fails. */
+  def?: string;
   /** Its parts' colours; absent: as made. */
   colors?: PartColors;
   /** Min corner (tiles) of the rotated footprint `w`×`d`. */

@@ -1,6 +1,6 @@
 # Nature Lover: content pack design note
 
-Pack: `web/public/content/packs/natureLover.json` · models: `web/public/assets/packs/natureLover/manifest.json`
+Pack: `web/public/content/packs/natureLover.json` · models: `web/public/assets/packs/pack_natureLover/manifest.json`
 
 **What the nature lover wants:** to be among living things and get their hands in the soil. The
 base trait only adds a small mood bonus and a strong `nature` preference (×3), but the base game

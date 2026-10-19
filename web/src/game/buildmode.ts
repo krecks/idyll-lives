@@ -40,6 +40,7 @@ interface BuildPreview {
   setPlacementGhost(
     ghost: {
       model: string;
+      def?: string;
       /** Its parts' colours; absent: as made. */
       colors?: PartColors;
       x: number;
@@ -733,7 +734,7 @@ export class BuildBuyInput {
     const at = used ? approachTile(p.def, p.x, p.z, p.rot, p.rot % 2 === 0 ? [p.w, p.d] : [p.d, p.w], this.standable(game.placing?.objectId ?? null)) : null;
     const [fx, fz] = at?.tile ?? frontTile(p.x, p.z, p.w, p.d, p.rot);
     const resize = this.resizeOf(p.def, p.size, p.tall);
-    this.preview.setPlacementGhost?.({ model: p.def.model, colors, x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset, lift: p.lift, w: p.w, d: p.d, resize, front: used ? { x: fx, z: fz, out: at?.out ?? p.rot % 4 } : undefined, valid: p.valid, wall: p.def.layer === 'wall' });
+    this.preview.setPlacementGhost?.({ model: p.def.model, def: p.def.id, colors, x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset, lift: p.lift, w: p.w, d: p.d, resize, front: used ? { x: fx, z: fz, out: at?.out ?? p.rot % 4 } : undefined, valid: p.valid, wall: p.def.layer === 'wall' });
     if (game.placeValid !== p.valid) game.placeValid = p.valid;
     if (game.placeHint !== p.reason) game.placeHint = p.reason;
   }
@@ -992,7 +993,7 @@ export class BuildBuyInput {
     const fit = this.fits(x, z, w, d, r.rot, r.id, r.def, tiles, offset, size);
     r.now = { cx, cz, ex, ez, tall, x, z, w, d, offset, size, valid: fit === true };
     const obj = game.objects.find((o) => o.id === r.id);
-    this.preview.setPlacementGhost?.({ model: r.def.model, colors: obj?.colors, x, z, rot: r.rot, turn: r.turn, offset, lift: r.lift, w, d, resize: this.resizeOf(r.def, size, tall), valid: r.now.valid });
+    this.preview.setPlacementGhost?.({ model: r.def.model, def: r.def.id, colors: obj?.colors, x, z, rot: r.rot, turn: r.turn, offset, lift: r.lift, w, d, resize: this.resizeOf(r.def, size, tall), valid: r.now.valid });
     if (game.placeValid !== r.now.valid) game.placeValid = r.now.valid;
     const hint = fit === true ? null : (fit ?? "There's no room for it that size");
     if (game.placeHint !== hint) game.placeHint = hint;

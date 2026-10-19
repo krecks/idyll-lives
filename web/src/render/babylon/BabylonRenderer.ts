@@ -66,6 +66,7 @@ import { Pose } from '../../core/snapshot';
 import { colorsKey, lowestStorey, objectCentre, storeyOfRow, storeyRow, storeyShown, type ItemPlacement, type StoreyLayout, type DiagonalWall, type FenceEdge, type MeshArrays, type ObjectPlacement, type Opening, type PartColors, type WallEdge, type WorldStructure } from '../../core/protocol';
 import type { RenderQuality } from '../quality';
 import type { VisemeTrack } from '../../voice/visemes';
+import type { ObjectDef } from '../../content/content';
 import { LOOK } from '../look';
 import type {
   BuildEffect,
@@ -101,13 +102,13 @@ import { fieldLayers, Street } from './street';
 import { MaterialLibrary, WINDOWLESS_RECTS } from './materials';
 import { refreshSoftLook, shadingFromSettings } from './softLook';
 import { Geo, LOOK as CUT } from './geometry';
-import { buildAhead, buildModel, motionsOf, paintColors, painted, placementVariation, prefetchModels, type ModelTemplate } from './models';
+import { buildModel, motionsOf, paintColors, painted, placementVariation, prefetchModels, withGlows, type ModelTemplate, type StandIn } from './models';
 import { compressedTextureFeatures, noteWebGpuFailed, webGpuFailed } from './loaders';
 import { Characters, MAX_CHARACTERS } from './characters';
 import { ItemLayer } from './items';
 import { Mirrors, type MirrorInstance } from './mirrors';
 import { ResizeHandles } from './handles';
-import { DECOR_MODELS, installNature, Landscape, natureDecor, setWind, Sky } from './nature';
+import { installNature, Landscape, natureDecor, setWind, Sky } from './nature';
 import { LAYER_ALL, LAYER_TOWN, LAYER_WORLD } from './layers';
 import { NightGrade } from './nightGrade';
 import { BuildEffects, writeMoving, type PopTarget } from './buildFx';
@@ -501,6 +502,8 @@ export class BabylonRenderer implements Renderer {
   // Build mode helpers.
   private ghostRoot!: TransformNode;
   private ghostKey = '';
+  /** Models whose file failed to load for the ghost this session: it's drawn as its box from then on. */
+  private readonly ghostUnfiled = new Set<string>();
   /** The model in hand (without its resizing). */
   private ghostModel = '';
   private ghostMeshes: Mesh[] = [];
@@ -975,7 +978,6 @@ export class BabylonRenderer implements Renderer {
     // Then the other lots' furniture downloads in the background (the camera may follow someone there).
     const elsewhere = world.objects.filter((o) => !this.inView(o.x + o.w / 2, o.z + o.d / 2, 0));
     prefetchModels(elsewhere.map((o) => this.objectModel(o)).filter((key) => this.deps.assets.has(key, 'model')).map((key) => this.deps.assets.get(key, 'model')));
-    this.warmTemplates(elsewhere);
     if (this.debug) console.info(`[render] setWorld ${(performance.now() - started).toFixed(1)} ms${lotBuilt ? '' : ' (lot kept)'}`);
   }
 
@@ -1319,7 +1321,7 @@ export class BabylonRenderer implements Renderer {
     }
     // A new thing in hand pops in; the same one resized just changes shape.
     const fresh = !this.ghostShown || ghost.model !== this.ghostModel;
-    if (ghost.model + resizeKey(ghost.resize) + colorsKey(ghost.colors) !== this.ghostKey) this.loadGhost(ghost.model, ghost.resize, ghost.colors);
+    if (ghostKeyOf(ghost.model, ghost.def, ghost.resize, ghost.colors) !== this.ghostKey) this.loadGhost(ghost.model, ghost.def, ghost.resize, ghost.colors);
     // Rotate about the footprint centre (moved by its offset), like placed objects. The turn takes the short way round.
     const centre = objectCentre(ghost);
     this.ghostGoal.set(centre.x, 0, centre.z);
@@ -2297,11 +2299,9 @@ export class BabylonRenderer implements Renderer {
     this.cameraPlaced = false;
     this.framedView = '';
     this.warmFrames = 0;
-    this.warmPass++;
   }
 
   dispose(): void {
-    this.warmPass++;
     this.onFailure = null;
     window.removeEventListener('resize', this.onResize);
     this.sizeWatch?.disconnect();
@@ -3920,37 +3920,14 @@ export class BabylonRenderer implements Renderer {
     const colors = this.objectColors(o);
     const id = `object:${key}${resizeKey(resize)}${colorsKey(colors)}`;
     if (colors && colorsKey(colors)) this.paintedTemplates.add(id);
-    return [id, () => buildModel(this.scene, key, painted(this.deps.assets.get(key, 'model'), colors), def?.footprint ?? [1, 1], { resize })];
+    // Without its file, a box in its place, so it can still be seen and clicked, until the game is
+    // reloaded. Shaped by the first kind built with this model; no two kinds share one today.
+    return [id, () => buildModel(this.scene, key, painted(this.deps.assets.get(key, 'model'), colors), def?.footprint ?? [1, 1], { resize, standIn: this.standInOf(def) })];
   }
 
-  /** Bumped by each world build: an older pass of `warmTemplates` stops. */
-  private warmPass = 0;
-
-  /**
-   * Builds the other lots' generated furniture and every kind of garden plant ahead, a few per
-   * idle moment, kept hidden until a lot uses them: walking onto a lot (the camera following
-   * someone) then needn't stop to build them. Models from files only download ahead
-   * (`prefetchModels`); they build when shown.
-   */
-  private warmTemplates(objects: readonly ObjectPlacement[]): void {
-    const pass = ++this.warmPass;
-    const queue = new Map<string, () => Promise<ModelTemplate>>();
-    const generated = (model: string) => !this.deps.assets.has(model, 'model') || !this.deps.assets.get(model, 'model')?.url;
-    for (const o of objects) {
-      if (!generated(this.objectModel(o))) continue;
-      const [key, build] = this.objectTemplate(o);
-      queue.set(key, build);
-    }
-    for (const model of DECOR_MODELS) if (generated(model)) queue.set(`deco:${model}`, () => this.decorModel(model));
-    const jobs = [...queue].filter(([key]) => !this.templates.has(key)).map(([key, build]) => () => {
-      if (this.templates.has(key)) return;
-      const t = build();
-      this.templates.set(key, t);
-      void t.then((template) => {
-        if (!this.templatesInUse.has(key)) for (const mesh of template.meshes) mesh.setEnabled(false);
-      });
-    });
-    buildAhead(jobs, () => pass === this.warmPass);
+  /** The box a kind of thing is drawn as without its model's file (`BuildOptions.standIn`). */
+  private standInOf(def: ObjectDef | undefined): StandIn {
+    return { layer: def?.layer, radius: this.deps.content.radius(def) };
   }
 
   /** Cached template by key; marks it as used by the world being built. */
@@ -3973,14 +3950,13 @@ export class BabylonRenderer implements Renderer {
       if (keep.has(key)) continue;
       void t.then((template) => {
         if (this.templatesInUse.has(key)) return;
-        const meshes = [...template.meshes, ...(template.glows ?? []).map((g) => g.mesh)];
         if (!this.paintedTemplates.has(key) || this.templates.get(key) !== t) {
-          for (const mesh of meshes) mesh.setEnabled(false);
+          for (const mesh of withGlows(template)) mesh.setEnabled(false);
           return;
         }
         this.templates.delete(key);
         this.paintedTemplates.delete(key);
-        for (const mesh of meshes) mesh.dispose(false, false);
+        for (const mesh of withGlows(template)) mesh.dispose(false, false);
       });
     }
     for (const key of [...this.templatesInUse]) if (!keep.has(key)) this.templatesInUse.delete(key);
@@ -4037,8 +4013,8 @@ export class BabylonRenderer implements Renderer {
   }
 
   /** Builds (once per model key) the preview meshes for buy mode: the thing itself, held up. */
-  private loadGhost(model: string, resize?: ObjectResize, colors?: PartColors): void {
-    const key = model + resizeKey(resize) + colorsKey(colors);
+  private loadGhost(model: string, kind: string | undefined, resize?: ObjectResize, colors?: PartColors): void {
+    const key = ghostKeyOf(model, kind, resize, colors);
     this.ghostKey = key;
     // Another thing: the old one goes now. The same thing resized keeps its old shape until the new one is built.
     if (model !== this.ghostModel) {
@@ -4047,7 +4023,14 @@ export class BabylonRenderer implements Renderer {
       this.ghostOwn = [];
     }
     this.ghostModel = model;
-    void buildModel(this.scene, `ghost:${key}`, painted(this.deps.assets.get(model, 'model'), colors), resize?.from ?? [1, 1], { resize }).then((template) => {
+    // Without its file, the box the placed thing would get. A file that failed for the ghost isn't
+    // fetched again for each step of a resize or a colour: the box is built straight away.
+    const def = kind === undefined ? undefined : this.deps.content.object(kind);
+    const entry = this.ghostUnfiled.has(model) ? undefined : painted(this.deps.assets.get(model, 'model'), colors);
+    void buildModel(this.scene, `ghost:${key}`, entry, resize?.from ?? def?.footprint ?? [1, 1], { resize, standIn: this.standInOf(def) }).then((template) => {
+      if (template.failed) this.ghostUnfiled.add(model);
+      // The ghost doesn't glow.
+      for (const glow of template.glows ?? []) glow.mesh.dispose(false, false);
       if (this.ghostKey !== key) {
         for (const mesh of template.meshes) mesh.dispose(false, false);
         return;
@@ -4535,6 +4518,11 @@ function copyPose(from: ArcRotateCamera, to: ArcRotateCamera): void {
   to.beta = from.beta;
   to.radius = from.radius;
   to.target.copyFrom(from.target);
+}
+
+/** Buy mode's ghost's key: its model, kind (the box it gets without its file), size and colours. */
+function ghostKeyOf(model: string, kind: string | undefined, resize?: ObjectResize, colors?: PartColors): string {
+  return `${model}|${kind ?? ''}${resizeKey(resize)}${colorsKey(colors)}`;
 }
 
 /** Ray vs axis-aligned box (slab test). Returns distance or Infinity. */

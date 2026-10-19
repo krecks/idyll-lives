@@ -91,7 +91,7 @@ fields) load unchanged: both mergers rename the keys first (`LEGACY_KEYS` in `pa
 |---|---|
 | `id` | Unique object id (camelCase). |
 | `name` | Shown in the catalog. |
-| `model` | Asset key of the 3D model (`model.<id>`). Art is registered separately in the asset manifest; a missing key logs a warning and draws nothing. |
+| `model` | Asset key of the 3D model (`model.<id>`). Art is registered separately in the asset manifest; a missing key (or a file that fails to load) draws a plain box in its place among the placed objects in view and as buy mode's copy in hand, until the game is reloaded; in the street's view of other lots (public places seen from elsewhere), in the town overview, as a carried item and in catalog pictures it is left out. A missing key also logs a warning. |
 | `icon` | Optional catalog icon key. Without one (or if the key is missing) the catalog shows a picture of the 3D model. |
 | `footprint` | `[width, depth]` in tiles, default `[1, 1]`. The resident uses it from the tile in front of the footprint's centre (local +z), which must be free (unless nobody uses it: no interactions; see `approach` for chairs). |
 | `price` | Buy-mode price in dollars. Without a price the object isn't sold (scenery). |

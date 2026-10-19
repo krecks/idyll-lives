@@ -3,8 +3,8 @@
 `bathroom.py` builds the five bathroom sinks, the five toilets, the four showers, the three baths and the three storage and mirror models (below) into `web/public/assets/models/bathroom/` and their entries
 in `packs/bathroom/manifest.json`: `model.sink` (`sink.glb`), `model.sinkPedestal` (`sinkPedestal.glb`),
 `model.vanityDouble` (`vanityDouble.glb`), `model.sinkVessel` (`sinkVessel.glb`) and `model.sinkConsole`
-(`sinkConsole.glb`). First made 2026-10-14. The pack is listed last in the base manifest's `packs`, so it
-overrides the base (`model.sink`), `catalog` and `catalog2` entries by key.
+(`sinkConsole.glb`). First made 2026-10-14. The pack is listed in the base manifest's `packs` and is the
+only manifest that defines these keys.
 
 ## Shared
 
