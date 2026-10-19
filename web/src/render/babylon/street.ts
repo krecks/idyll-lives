@@ -33,6 +33,7 @@ import { Geo, type V3 } from './geometry';
 import type { HouseBuilder, SilhouetteSpec } from './house';
 import { encodeFinish, MaterialLibrary } from './materials';
 import { buildModel, placementVariation, type ModelTemplate } from './models';
+import { perfEnd, perfStart, perfTime, perfTimeAsync } from '../../debug/perf';
 
 interface Rect {
   x: number;
@@ -540,6 +541,7 @@ export class Street {
     const paths = world.meta?.paths ?? [];
     const fields = world.meta?.world?.fields ?? [];
     const plots = this.layout(world, view, streets, paths);
+    await pace?.();
 
     const props = new Painter(new Geo());
     const glow = new Painter(new Geo());
@@ -567,7 +569,8 @@ export class Street {
       if ((L.kind !== 'house' && L.kind !== 'shop' && !home) || !L.house) continue;
       specs.push({ ...L.house, lot: L.plot, home, front: L.front, door: L.door, garage: L.kind === 'house' ? this.garage(L, blocked) : null, roof: L.plot.roof, storeys: L.plot.storeys });
     }
-    const sil = this.house.silhouettes(specs, world.openings ?? [], world);
+    const sil = perfTime('street: silhouettes', () => this.house.silhouettes(specs, world.openings ?? [], world));
+    await pace?.();
     if (this.layerMask !== undefined) for (const mesh of sil.meshes) mesh.layerMask = this.layerMask;
     this.meshes.push(...sil.meshes);
     this.casters.push(...sil.casters);
@@ -579,6 +582,7 @@ export class Street {
     }
 
     // ---- sidewalks, kerbs, centre line, kerbside furniture ------------------------------
+    const sidewalks = perfStart('street: sidewalks');
     for (const st of streets) {
       for (const side of [-1, 1] as const) {
         // side -1: the sidewalk along the street's min-z edge; +1: along its max-z edge.
@@ -711,7 +715,11 @@ export class Street {
       for (let x = st.x + 1; x + 2.4 < st.x + st.w - 1; x += 5) props.poly([[x, ROAD_Y + 0.005, zc - 0.06], [x + 2.4, ROAD_Y + 0.005, zc - 0.06], [x + 2.4, ROAD_Y + 0.005, zc + 0.06], [x, ROAD_Y + 0.005, zc + 0.06]], [0, 1, 0]);
     }
 
+    perfEnd(sidewalks);
+    await pace?.();
+
     // ---- gardens: cars, fences / hedges, flower beds -------------------------------------
+    const gardens = perfStart('street: gardens');
     const neighbour = (L: PlotLayout | undefined) => !!L && L.kind === 'house';
     for (const L of plots) {
       if (L.kind !== 'house' || !L.house) continue;
@@ -820,7 +828,11 @@ export class Street {
       }
     }
 
+    perfEnd(gardens);
+    await pace?.();
+
     // ---- public places seen from another lot: shops' awnings, the things in the open ------
+    const publicPlaces = perfStart('street: public places');
     for (const L of plots) {
       if (L.kind === 'shop' && L.house) {
         // A striped awning along the shop front, over the windows and the door.
@@ -859,7 +871,11 @@ export class Street {
       }
     }
 
+    perfEnd(publicPlaces);
+    await pace?.();
+
     // ---- meshes ---------------------------------------------------------------------------
+    const meshesSpan = perfStart('street: meshes');
     const add = (geo: Geo, name: string, material: Material, opts: { cast?: boolean; plain?: boolean; colors?: boolean } = {}) => {
       const mesh = geo.toMesh(name, this.scene, { colors: opts.colors ?? true, cut: false });
       if (!mesh) return;
@@ -887,6 +903,9 @@ export class Street {
     // room lights, or the clustered container holding them. Left out as soon as the meshes exist.
     const interior = this.scene.lights.filter((l) => l.name.startsWith('room') || l.name === 'lamps');
     this.lib.excludeFromLights(interior, new Set(this.meshes));
+    perfEnd(meshesSpan);
+    await pace?.();
+    const batchesSpan = perfStart('street: batches');
     const foliage: Mesh[] = [];
     const batches: [string, Inst[], boolean][] = [
       ...(Object.keys(FOLIAGE) as FoliageKind[]).map((kind): [string, Inst[], boolean] => [FOLIAGE[kind], plants[kind], kind === 'hedge']),
@@ -897,11 +916,12 @@ export class Street {
     this.glows = [];
     for (const [key, items, cast] of batches) {
       await pace?.();
-      const meshes = await this.instances(key, items, key === FOLIAGE.hedge, this.footprints.get(key));
+      const meshes = await perfTimeAsync(`street: batch ${key}`, () => this.instances(key, items, key === FOLIAGE.hedge, this.footprints.get(key), pace));
       this.lib.excludeFromLights(interior, new Set(meshes));
       foliage.push(...meshes);
       if (cast) this.casters.push(...meshes);
     }
+    perfEnd(batchesSpan);
     for (const mesh of this.meshes) mesh.freezeWorldMatrix();
     this.drawn = [...this.meshes, ...foliage];
     const lamps = this.lamps;
@@ -1053,19 +1073,23 @@ export class Street {
   }
 
   /** Thin instances of a model (`flat`: not scaled along z, hedges stretched along their run). */
-  private async instances(key: string, items: Inst[], flat = false, footprint: [number, number] = [1, 1]): Promise<Mesh[]> {
+  private async instances(key: string, items: Inst[], flat = false, footprint: [number, number] = [1, 1], pace?: () => Promise<void>): Promise<Mesh[]> {
     let template = this.templates.get(key);
     if (!template) {
       // The overview's street (on a layer of its own) is seen from afar: files' far versions.
       template = buildModel(this.scene, `street:${key}`, this.assets.has(key, 'model') ? (this.assets.get(key, 'model') as ModelEntry) : undefined, footprint, { far: this.layerMask !== undefined });
       this.templates.set(key, template);
     }
-    const t = await template;
+    const t = await perfTimeAsync(`street: model ${key}`, () => template);
+    await pace?.();
     const buf = new Float32Array(Math.max(1, items.length) * 16);
+    const matrices = perfStart(`street: matrices ${key}`);
     items.forEach(([x, z, s, sy, yaw], i) => {
       Matrix.ComposeToRef(this.tmpS.set(s, sy, flat ? 1 : s), Quaternion.RotationYawPitchRollToRef(yaw, 0, 0, this.tmpQ), this.tmpT.set(x, 0, z), this.tmpM);
       this.tmpM.copyToArray(buf, i * 16);
     });
+    perfEnd(matrices);
+    const meshSpan = perfStart(`street: instance meshes ${key}`);
     for (const mesh of t.meshes) {
       mesh.isPickable = false;
       mesh.receiveShadows = true;
@@ -1089,6 +1113,8 @@ export class Street {
       mesh.freezeWorldMatrix();
       this.glows.push({ mesh, colors });
     }
+    perfEnd(meshSpan);
+    await pace?.();
     return items.length ? t.meshes : [];
   }
 }

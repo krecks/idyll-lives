@@ -19,20 +19,29 @@
   let errorTitle = $state("Couldn't start the game");
   /** The game is loaded (usually already, prepared behind the menus); until then, a loading screen. */
   let ready = $state(false);
+  /** The game has been revealed (the fly-in from the menu is done): the HUD shows. */
+  let live = $state(false);
 
   onMount(() => {
     let left = false;
     const snapshot = $state.snapshot(settings);
     host
-      .prepare(app.request!, snapshot)
-      .then(() => {
-        if (!left) ready = true;
+      .prepare(app.request!, snapshot, false)
+      .then((s) => {
+        // Mount the HUD now, while the menu's camera flies in, rather than when the game appears.
+        if (!left) {
+          session = s;
+          ready = true;
+        }
       })
       .catch(() => {});
     host
       .start(app.request!, snapshot)
       .then((s) => {
-        if (!left) session = s;
+        if (!left) {
+          session = s;
+          live = true;
+        }
       })
       .catch((err: unknown) => {
         // Left (or replaced, e.g. by a dev hot reload) before it started: nothing went wrong.
@@ -72,7 +81,10 @@
 {#if session}
   <!-- An error in the interface: the crash screen, while the game (still running here) can be saved. -->
   <svelte:boundary onerror={interfaceFailed}>
-    <div class="scaled hud-root"><Hud /></div>
+    <div class="scaled hud-root" class:prelive={!live}><Hud /></div>
+    {#if app.loading}
+      <LoadingScreen progress={app.loading} />
+    {/if}
     {#if game.plannerOpen && game.mode === 'live'}<Planner />{/if}
     {#if game.mode === 'create'}<Creation />{/if}
     {#if game.customising}<CustomiseColours def={game.customising.def} objectId={game.customising.objectId} />{/if}
@@ -96,6 +108,10 @@
     position: absolute;
     inset: 0;
     pointer-events: none;
+  }
+  /* Built behind the menu's fly-in; shown when the game is revealed. */
+  .hud-root.prelive {
+    visibility: hidden;
   }
   /* An error starting the game: a small card over the scene. */
   .splash {

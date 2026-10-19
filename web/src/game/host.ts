@@ -13,6 +13,7 @@ import { BabylonRenderer } from '../render/babylon/BabylonRenderer';
 import type { Renderer } from '../render/types';
 import { qualityFromSettings, RESTART_KEYS, settings as liveSettings, type Settings } from '../settings/settings.svelte';
 import { app } from '../ui/app.svelte';
+import { perfTime, perfTimeAsync } from '../debug/perf';
 import { game, toast } from '../ui/state.svelte';
 import { basicReport, within } from '../debug/report';
 import { plainState } from '../debug/snapshot.svelte';
@@ -42,6 +43,8 @@ interface Entry {
   live: boolean;
   /** The session's scene is built and drawn (its progress reports end). */
   ready: boolean;
+  /** The session's own look (and the mirror's clip-plane shaders) has been drawn once. */
+  warmed: boolean;
   /** The session, once it exists. */
   instance?: GameSession;
 }
@@ -123,22 +126,45 @@ class GameHost {
    * Starts a session in the background (paused, no input). Calling again with the same
    * request returns the same session; a different request replaces it.
    */
-  prepare(request: StartRequest, settings: Settings): Promise<GameSession> {
+  prepare(request: StartRequest, settings: Settings, warm = true): Promise<GameSession> {
     const key = requestKey(request);
     // (Unless its simulation stopped while it waited behind the menus: then a new one.)
-    if (this.current?.key === key && this.current.instance?.alive !== false) return this.current.session;
+    if (this.current?.key === key && this.current.instance?.alive !== false) {
+      const entry = this.current;
+      const session = entry.session;
+      if (!warm || entry.warmed) return session;
+      // Prepared in the background without its own look drawn: draw it now, behind a loading screen.
+      return session.then(async (s) => {
+        if (entry.warmed) return s;
+        entry.warmed = true;
+        app.loading = { label: 'Warming up', value: 0.95 };
+        // Let the loading screen paint before the warm's long frame.
+        await new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+        await perfTimeAsync('host: warm', () => s.warm());
+        if (this.current === entry) app.loading = null;
+        return s;
+      });
+    }
     this.release();
     const previous = this.teardown;
-    const entry = { key, live: false, ready: false } as Entry;
+    const entry = { key, live: false, ready: false, warmed: warm } as Entry;
     app.loading = { label: 'Getting ready', value: 0 };
     entry.started = (async () => {
       const renderer = await this.rendererFor(settings);
       // One session at a time on the shared renderer: a replaced one must finish clearing it first.
       await previous;
       if (this.current !== entry) throw new Error('Replaced by another game.');
-      return startSession(renderer, this.canvas, this.overlay, request, settings, (label, value) => {
-        if (this.current === entry && !entry.ready) app.loading = { label, value };
-      });
+      return startSession(
+        renderer,
+        this.canvas,
+        this.overlay,
+        request,
+        settings,
+        (label, value) => {
+          if (this.current === entry && !entry.ready) app.loading = { label, value };
+        },
+        warm,
+      );
     })();
     entry.session = entry.started.then(async (s) => {
       entry.instance = s;
@@ -160,10 +186,10 @@ class GameHost {
 
   /** Prepares (or reuses) the session and makes it live: flies (or fades) from the menus into it. */
   async start(request: StartRequest, settings: Settings): Promise<GameSession> {
-    const pending = this.prepare(request, settings);
+    const pending = this.prepare(request, settings, true);
     const entry = this.current;
     if (entry) entry.live = true;
-    const session = await pending;
+    const session = await perfTimeAsync('host: prepare (start)', () => pending);
     const renderer = await this.renderer;
     if (!renderer || this.current !== entry) return session;
     this.played = session;
@@ -174,18 +200,18 @@ class GameHost {
       const meta = this.town?.world.meta;
       const same = request.kind === 'new' && !!meta && request.town.seed === meta.seed && request.town.width === this.town?.world.width;
       if (same && !reducedMotion()) {
-        await renderer.hideTown(FLY_IN);
+        await perfTimeAsync('host: fly in', () => renderer.hideTown(FLY_IN));
       } else {
         veiled = true;
-        await this.setVeil(true);
-        await renderer.hideTown(0);
-        await renderer.framesRendered(3);
+        await perfTimeAsync('host: veil', () => this.setVeil(true));
+        await perfTimeAsync('host: hide town', () => renderer.hideTown(0));
+        await perfTimeAsync('host: hide frames', () => renderer.framesRendered(3));
       }
     }
     this.town = null;
     app.liveBackdrop = false;
     if (this.current !== entry) return session;
-    session.reveal();
+    perfTime('host: reveal', () => session.reveal());
     if (veiled) void this.setVeil(false);
     return session;
   }

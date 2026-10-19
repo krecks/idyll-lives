@@ -33,6 +33,7 @@ import {
   Material,
   Matrix,
   Mesh,
+  MirrorTexture,
   MeshBuilder,
   PBRMaterial,
   PointLight,
@@ -56,6 +57,7 @@ import {
   type RenderTargetWrapper,
 } from './core';
 import { benchDiag } from '../../debug/benchFlags';
+import { perfEnd, perfPhase, perfRecord, perfStart, perfTime, perfTimeAsync } from '../../debug/perf';
 import type { FrameState } from '../../core/bridge';
 import { Pose } from '../../core/snapshot';
 import { colorsKey, lowestStorey, objectCentre, storeyOfRow, storeyRow, storeyShown, type ItemPlacement, type StoreyLayout, type DiagonalWall, type FenceEdge, type MeshArrays, type ObjectPlacement, type Opening, type PartColors, type WallEdge, type WorldStructure } from '../../core/protocol';
@@ -332,6 +334,9 @@ export class BabylonRenderer implements Renderer {
   /** Holds the game camera's pose while the overview drives the real camera. */
   private parked!: ArcRotateCamera;
   private warmFrames = 0;
+  /** The game's own look has been warmed once (the shaders are shared by the households). */
+  private gameWarmed = false;
+  private mirrorWarmed = false;
   private worldBuilding = false;
   /** When the running slice of a world build began (see `pace`). */
   private sliceStart = 0;
@@ -573,6 +578,20 @@ export class BabylonRenderer implements Renderer {
       }
     }
     this.engine ??= new Engine(canvas, false, { powerPreference: 'high-performance' });
+    if (this.webgpu && new URLSearchParams(location.search).has('profile')) {
+      // WebGPU builds a pipeline synchronously on first use: a slow one is a dropped frame, so name it.
+      const device = (this.webgpu as unknown as { _device?: { createRenderPipeline: (desc: { label?: string }) => unknown } })._device;
+      if (device) {
+        const create = device.createRenderPipeline.bind(device);
+        device.createRenderPipeline = (desc) => {
+          const start = performance.now();
+          const pipeline = create(desc);
+          const ms = performance.now() - start;
+          if (ms > 8) console.log(`[pipeline] ${ms.toFixed(0)} ms ${desc.label ?? ''}`);
+          return pipeline;
+        };
+      }
+    }
     // The drawing size follows the resolution setting and the device pixel ratio (not Babylon's
     // `adaptToDeviceRatio`, which would scale our own level again when the ratio changes).
     this.applyResolution();
@@ -590,6 +609,22 @@ export class BabylonRenderer implements Renderer {
     // Babylon's own clock (particles: the build effects' sparkles and dust) steps at most as far as the game's.
     Scene.MaxDeltaTime = MAX_FRAME_MS;
     const scene = (this.scene = new Scene(this.engine));
+    if (new URLSearchParams(location.search).has('profile')) {
+      // Where a slow frame's time goes: shadow/render targets, active-mesh evaluation, the draw phase.
+      const t: Record<string, number> = {};
+      scene.onBeforeAnimationsObservable.add(() => { t.anim = performance.now(); });
+      scene.onBeforeRenderObservable.add(() => { t.render = performance.now(); });
+      scene.onBeforeRenderTargetsRenderObservable.add(() => { t.targets = performance.now(); });
+      scene.onAfterRenderTargetsRenderObservable.add(() => { t.targetsEnd = performance.now(); });
+      scene.onBeforeDrawPhaseObservable.add(() => { t.draw = performance.now(); });
+      scene.onAfterDrawPhaseObservable.add(() => { t.drawEnd = performance.now(); });
+      scene.onAfterRenderObservable.add(() => {
+        const now = performance.now();
+        if (t.anim && now - t.anim > 40) {
+          console.log(`[stage] total ${(now - t.anim).toFixed(0)} anim ${(t.render - t.anim).toFixed(0)} targets ${(t.targetsEnd - t.targets).toFixed(0)} draw ${(t.drawEnd - t.draw).toFixed(0)} tail ${(now - t.drawEnd).toFixed(0)}`);
+        }
+      });
+    }
     // Picking is analytic (see `pick`); never let Babylon raycast the scene on pointer moves.
     scene.skipPointerMovePicking = true;
     scene.constantlyUpdateMeshUnderPointer = false;
@@ -641,6 +676,16 @@ export class BabylonRenderer implements Renderer {
     // Reflections show the game world (not the shadow-only copies or the overview).
     const q = this.quality;
     this.mirrors = new Mirrors(scene, { count: this.diag.has('nomirrors') ? 0 : q.mirrors, scale: q.mirrorScale, samples: q.msaaSamples, rate: q.mirrorRate }, (mesh) => (mesh.layerMask & LAYER_WORLD) !== 0);
+    if (new URLSearchParams(location.search).has('profile')) {
+      const render = MirrorTexture.prototype.render;
+      MirrorTexture.prototype.render = function (this: MirrorTexture, ...args: Parameters<typeof render>) {
+        const start = performance.now();
+        const result = render.apply(this, args);
+        const ms = performance.now() - start;
+        if (ms > 8) console.log(`[mirror] ${ms.toFixed(0)} ms ${this.name} ${this.getSize().width}x${this.getSize().height}`);
+        return result;
+      };
+    }
     this.motion.setAmbientRange(this.quality.ambientRange);
     this.handles = new ResizeHandles(scene, LAYER_WORLD);
     this.applyLook();
@@ -682,6 +727,8 @@ export class BabylonRenderer implements Renderer {
 
   private async buildOne(world: WorldStructure, view: ViewRect | null): Promise<void> {
     this.beginBuild();
+    this.gameWarmed = false;
+    this.mirrorWarmed = false;
     // (First: a storey in view the world no longer has is changed below, for this build to show.)
     this.worldBuilding = true;
     this.sliceStart = performance.now();
@@ -689,8 +736,10 @@ export class BabylonRenderer implements Renderer {
     try {
       this.storeys = { count: world.storeys ?? 1, lowest: lowestStorey(world), layout: { depth: world.depth, storeyDepth: world.storeyDepth, storeys: world.storeys, basement: world.basement } };
       if (this.storey >= this.storeys.count || this.storey < this.storeys.lowest) this.setStorey(this.storey);
-      await this.buildWorld(world, view);
-      await this.warmShaders(until);
+      perfPhase('render: build world');
+      await perfTimeAsync('render: buildWorld', () => this.buildWorld(world, view));
+      perfPhase('render: warm shaders');
+      await perfTimeAsync('render: warmShaders', () => this.warmShaders(until));
     } finally {
       this.worldBuilding = false;
       this.endBuild();
@@ -750,9 +799,12 @@ export class BabylonRenderer implements Renderer {
     // The residents' data downloads alongside the lot (it is first needed after it, in `buildSims`).
     void this.characters.init();
     // The landscape depends only on the town, not on which lot is viewed (and may be the overview's).
-    const nature = await this.useNature('world', world);
-    // No grass through floors of rooms built (or furniture bought) since the lawn was scattered.
-    nature.landscape.refreshLawn(world);
+    const nature = await perfTimeAsync('render: nature', async () => {
+      const n = await this.useNature('world', world);
+      // No grass through floors of rooms built (or furniture bought) since the lawn was scattered.
+      perfTime('nature: refreshLawn', () => n.landscape.refreshLawn(world));
+      return n;
+    });
     this.natureCasters = this.quality.landscapeShadows ? nature.casters : [];
     this.templatesInUse.clear();
     const lotKey = this.lotKeyOf(world, view);
@@ -763,10 +815,15 @@ export class BabylonRenderer implements Renderer {
       this.roofs = [];
       this.walls = this.wallsLow = null;
       const before = new Set(this.templatesInUse);
-      this.buildStreets(world);
-      await this.pace();
-      this.lotCasters = await this.buildLot(world);
-      await this.pace();
+      await perfTimeAsync('render: streets', async () => {
+        this.buildStreets(world);
+        await this.pace();
+      });
+      this.lotCasters = await perfTimeAsync('render: lot', async () => {
+        const casters = await this.buildLot(world);
+        await this.pace();
+        return casters;
+      });
       // The viewed lot's fences stand on the ground (hidden with it while the basement is in view); other lots' stay.
       const v = view;
       const onLot = (f: FenceEdge) => !!v && f.x >= v.x && f.z >= v.z && f.x + (f.axis === 'h' ? 1 : 0) <= v.x + v.w && f.z + (f.axis === 'v' ? 1 : 0) <= v.z + v.d;
@@ -787,14 +844,16 @@ export class BabylonRenderer implements Renderer {
     const houseCasters = this.lotCasters;
     this.placeRoomLights(world, view);
     await this.pace();
-    const streetCasters = await this.street.build(world, this.view, () => this.pace());
-    await this.buildObjects(world);
-    this.pullUpChairs(world);
-    this.hideHeld();
-    await this.pace();
-    await this.buildSims(world);
+    const streetCasters = await perfTimeAsync('render: street furniture', () => this.street.build(world, this.view, () => this.pace()));
+    await perfTimeAsync('render: objects', async () => {
+      await this.buildObjects(world);
+      this.pullUpChairs(world);
+      this.hideHeld();
+      await this.pace();
+    });
+    await perfTimeAsync('render: sims', () => this.buildSims(world));
     this.retireTemplates(new Set(this.templatesInUse));
-    const templates = await this.templateMeshes();
+    const templates = await perfTimeAsync('render: templates', () => this.templateMeshes());
 
     const notCasting = new Set(['floors', 'floorsTiled', 'floorsCarpet', 'floorsStone', 'streets', 'paths', 'fields', 'furrows', 'contactShadows', 'objectShadows', 'windows', 'windowsInner', 'plinth', 'wallsTiled']);
     this.baseCasters = [
@@ -2147,11 +2206,13 @@ export class BabylonRenderer implements Renderer {
       this.beginBuild();
       try {
         // Same seed and size can still be a new layout ("New neighbours"): re-fit the lawn to its houses.
-        const nature = await this.useNature('town', world);
-        nature.landscape.refreshLawn(world);
+        perfPhase('render: town nature');
+        const nature = await perfTimeAsync('render: town nature', () => this.useNature('town', world));
+        perfTime('nature: refreshLawn', () => nature.landscape.refreshLawn(world));
         // The camera keeps a clear view over the hills (and out of the mountains).
         overview.rig.ground = (x, z) => nature.landscape.heightAt(x, z);
-        await overview.build(world);
+        perfPhase('render: town overview');
+        await perfTimeAsync('render: town overview', () => overview.build(world, () => this.pace()));
         if (this.townHighlight) overview.setHighlight(this.townHighlight);
         // Interior lamps of the game's house never reach the overview.
         this.lib.excludeFromLights([...this.roomLights, ...(this.lampCluster ? [this.lampCluster] : [])], new Set<Mesh>(overview.meshes));
@@ -2249,6 +2310,7 @@ export class BabylonRenderer implements Renderer {
 
   private leaveTown(): void {
     const cam = this.camera;
+    perfPhase('render: live');
     this.townMode = false;
     this.applyDig();
     this.warmFrames = 0;
@@ -2305,6 +2367,7 @@ export class BabylonRenderer implements Renderer {
    * is drawn over it: compiles its shaders and pipelines while it is still hidden.
    */
   private warmWorld(): void {
+    const span = perfStart('render: warm world');
     this.warmFrames--;
     const cam = this.camera;
     const p = this.parked;
@@ -2327,6 +2390,76 @@ export class BabylonRenderer implements Renderer {
     cam.targetScreenOffset.copyFromFloats(w.ox, w.oy);
     this.updateShadowList();
     if (webgpu && snapshot) webgpu.snapshotRendering = true;
+    perfEnd(span);
+  }
+
+  /**
+   * Runs one game frame while the overview is up (the game is built behind the menus): the game's
+   * own lighting, cutaway and poses are applied and its world is drawn once, so the shaders and
+   * pipelines it needs are ready before it is first shown. The overview's look is put back after.
+   */
+  async warmGame(frame: FrameState): Promise<void> {
+    if (!this.townMode || this.gameWarmed) return;
+    this.gameWarmed = true;
+    const cam = this.camera;
+    const pose = [cam.alpha, cam.beta, cam.radius, cam.target.x, cam.target.y, cam.target.z, cam.targetScreenOffset.x, cam.targetScreenOffset.y] as const;
+    const lightMinute = this.lastLightMinute;
+    const minute = this.lastMinute;
+    const town = () => {
+      this.townMode = true;
+      this.sunShadows.setOverview(true);
+      [cam.alpha, cam.beta, cam.radius, cam.target.x, cam.target.y, cam.target.z, cam.targetScreenOffset.x, cam.targetScreenOffset.y] = pose;
+      cam.layerMask = LAYER_TOWN;
+      this.lastMinute = minute;
+      this.applyLighting(this.townMinute);
+      this.lastLightMinute = lightMinute;
+      this.applyDig();
+      this.updateCutaway();
+      this.updateShadowList();
+      this.pauseSnapshot();
+    };
+    // First the game's own state (lighting, cutaway, the shadow map's culling): the update is the
+    // costly part, so it runs in its own slice.
+    this.townMode = false;
+    // The game's cutaway is worked out from the game's own camera: put it where it will be when the
+    // game is shown (the parked pose), not where the overview's camera happens to be.
+    copyPose(this.parked, cam);
+    perfTime('render: warm game state', () => {
+      this.update(frame);
+      this.applyDig();
+      this.sunShadows.setOverview(false);
+      this.updateShadowList();
+    });
+    const gameMinute = this.lastMinute;
+    town();
+    // Then draw the world once with that look, in the next frame (a whole render is a slice of its own).
+    await new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+    if (!this.townMode) return;
+    this.townMode = false;
+    try {
+      copyPose(this.parked, cam);
+      // (The game's pose is the one the reflections are culled against, so they are ranked again here.)
+      this.mirrors.update(this.camera, null);
+      if (!this.mirrorWarmed) {
+        this.mirrorWarmed = true;
+        cam.layerMask = LAYER_WORLD;
+        this.scene.updateTransformMatrix();
+        // At its real size: the first live reflection at 512 would otherwise pay the same compile again.
+        this.mirrors.warm(0)();
+      }
+      perfTime('render: warm game draw', () => {
+        this.lastMinute = gameMinute;
+        this.applyLighting(gameMinute);
+        this.applyDig();
+        this.updateCutaway();
+        this.sunShadows.setOverview(false);
+        this.updateShadowList();
+        this.warmFrames = Math.max(1, this.warmFrames);
+        this.warmWorld();
+      });
+    } finally {
+      town();
+    }
   }
 
   /** Shadow casters of what is on screen: the overview, or the game world (its walls only with walls up). */
@@ -2349,18 +2482,20 @@ export class BabylonRenderer implements Renderer {
     if (!set) {
       const landscape = new Landscape(world, this.quality.lawnDensity);
       const created: NatureSet = { landscape, meshes: [], casters: [], only: new Map(), users: new Set(), pending: 0, ready: Promise.resolve() };
-      created.ready = landscape.build(this.scene, this.deps.assets, world).then((nature) => {
-        created.meshes = nature.meshes;
-        created.casters = nature.casters;
-        created.only = nature.only;
-        for (const mesh of nature.meshes) {
-          mesh.freezeWorldMatrix();
-          mesh.layerMask = 0;
-          // Dug away over a basement in view.
-          this.lib.digInto(mesh.material);
-          // `?diag=nonature`: without the woods, rocks and lawn (the terrain, water and roads stay).
-          if (this.diag.has('nonature') && mesh.hasThinInstances) mesh.setEnabled(false);
-        }
+      created.ready = landscape.build(this.scene, this.deps.assets, world, () => this.pace()).then((nature) => {
+        perfTime('nature: meshes', () => {
+          created.meshes = nature.meshes;
+          created.casters = nature.casters;
+          created.only = nature.only;
+          for (const mesh of nature.meshes) {
+            mesh.freezeWorldMatrix();
+            mesh.layerMask = 0;
+            // Dug away over a basement in view.
+            this.lib.digInto(mesh.material);
+            // `?diag=nonature`: without the woods, rocks and lawn (the terrain, water and roads stay).
+            if (this.diag.has('nonature') && mesh.hasThinInstances) mesh.setEnabled(false);
+          }
+        });
       });
       this.natures.set(key, (set = created));
     }
@@ -2417,6 +2552,8 @@ export class BabylonRenderer implements Renderer {
       else if (!this.frameWaiters.length) return;
     }
     const start = performance.now();
+    const waited = this.frameWaiters.length > 0;
+    const frameSpan = waited ? perfStart('render: frame (waited)') : null;
     const probe = this.probe;
     // Babylon asks for the next frame only after this one returns: a frame that throws must not
     // stop drawing for good. The first error is logged; many in a row count as broken.
@@ -2430,13 +2567,19 @@ export class BabylonRenderer implements Renderer {
       const dt = (this.frameDt = Math.min(this.engine.getDeltaTime(), MAX_FRAME_MS));
       this.paceKeys(dt);
       // The time of the refresh this frame is for: even steps, as the frames will show.
+      const tOn = performance.now();
       this.onFrame?.(this.pacer.frameTime || performance.now());
+      const onMs = performance.now() - tOn;
+      if (onMs > 20) perfRecord('render: onFrame', tOn, onMs, this.townMode ? 'town' : 'world');
       if (probe) updated = performance.now();
       if (this.townMode && this.overview) {
         this.townFrame(dt);
         if (this.warmFrames > 0 && !this.worldBuilding) this.warmWorld();
       }
+      const tScene = performance.now();
       this.scene.render();
+      const sceneMs = performance.now() - tScene;
+      if (sceneMs > 20) perfRecord('render: scene.render', tScene, sceneMs, this.townMode ? 'town' : 'world');
       this.failedFrames = 0;
     } catch (err) {
       if (this.failedFrames === 0) console.error('[render] a frame failed', err);
@@ -2444,6 +2587,7 @@ export class BabylonRenderer implements Renderer {
       return;
     }
     const end = performance.now();
+    if (end - start > 40) perfRecord('render: slow frame', start, end - start, this.townMode ? 'town' : 'world');
     this.cpuMs += (end - start - this.cpuMs) * 0.1;
     if (this.gpuWanted.size && this.webgpu) this.settleSpans();
     if (probe) {
@@ -2457,6 +2601,7 @@ export class BabylonRenderer implements Renderer {
       this.counts.residentsMs = this.characters?.updateMs ?? 0;
       probe.after(start, updated, end, this.counts);
     }
+    if (frameSpan) perfEnd(frameSpan);
     for (let i = this.frameWaiters.length - 1; i >= 0; i--) {
       const w = this.frameWaiters[i];
       if (--w.left <= 0) {
@@ -2526,6 +2671,17 @@ export class BabylonRenderer implements Renderer {
     // Physically, shadows block all direct sunlight; the environment fills them in.
     shadows.setDarkness(0);
     this.sunShadows = new SunShadows(shadows, this.scene);
+    if (new URLSearchParams(location.search).has('profile')) {
+      const map = shadows.getShadowMap()!;
+      const render = map.render.bind(map);
+      map.render = (useCameraPostProcess?: boolean, dumpForDebug?: boolean) => {
+        const start = performance.now();
+        const result = render(useCameraPostProcess, dumpForDebug);
+        const ms = performance.now() - start;
+        if (ms > 8) console.log(`[shadow] ${ms.toFixed(0)} ms casters ${map.renderList?.length ?? 0}`);
+        return result;
+      };
+    }
     if (this.diag.has('noshadows')) this.sun.shadowEnabled = false;
     // The game's map is drawn again only when something in it moved (see sunShadows.ts); with WebGPU
     // snapshot rendering (the menus' town) Babylon draws every render target each frame anyway.
@@ -3285,13 +3441,15 @@ export class BabylonRenderer implements Renderer {
     const shown = world.objects.filter((o) => (storeyShown(this.storeyOf(o.z), this.storey) || down(o)) && this.inView(o.x + o.w / 2, o.z - this.rowOf(this.storeyOf(o.z)) + o.d / 2, 0));
     // One template per model and size (things the player resized get their own).
     const byModel = Map.groupBy(shown, (o) => `${o.def}|${this.objectModel(o)}${resizeKey(this.objectResize(o))}${colorsKey(this.objectColors(o))}`);
-    // Generated models build as they're asked for: one at a time, so a build behind the overview can pause between them.
-    const pending: Promise<ModelTemplate>[] = [];
-    for (const list of byModel.values()) {
-      await this.pace();
-      pending.push(this.template(...this.objectTemplate(list[0])));
-    }
-    const templates = await Promise.all(pending);
+    const templates = await perfTimeAsync('render: object templates', async () => {
+      // Generated models build as they're asked for: one at a time, so a build behind the overview can pause between them.
+      const pending: Promise<ModelTemplate>[] = [];
+      for (const list of byModel.values()) {
+        await this.pace();
+        pending.push(this.template(...this.objectTemplate(list[0])));
+      }
+      return Promise.all(pending);
+    });
     // What each tile's top belongs to, for the things standing on tops.
     const tops = new Map<string, number>();
     for (const o of shown) {
@@ -3303,6 +3461,7 @@ export class BabylonRenderer implements Renderer {
     const mirrors: MirrorInstance[] = [];
     const moving: MovingObject[] = [];
     const glows: typeof this.glows = [];
+    const instances = perfStart('render: object instances');
     [...byModel.values()].forEach((list, n) => {
       const template = templates[n];
       const matrices = new Float32Array(list.length * 16);
@@ -3394,6 +3553,8 @@ export class BabylonRenderer implements Renderer {
         glows.push({ mesh, colors, rooms: list.map(roomOf), lamps, ids: list.map((o) => o.id), screen: !!screen });
       }
     });
+    perfEnd(instances);
+    const shadowsSpan = perfStart('render: object shadows');
     for (const g of this.glows) if (!glows.some((n) => n.mesh === g.mesh)) g.mesh.setEnabled(false);
     this.glows = glows;
     this.applyGlow();
@@ -3430,6 +3591,7 @@ export class BabylonRenderer implements Renderer {
     shadows.thinInstanceCount = shown.length;
     shadows.thinInstanceRefreshBoundingInfo(false);
     this.worldMeshes.push(shadows);
+    perfEnd(shadowsSpan);
   }
 
   /** An object's template key, and how to build it. */
@@ -3822,7 +3984,8 @@ export class BabylonRenderer implements Renderer {
    * nothing is waiting to draw) the build runs straight through.
    */
   private async pace(): Promise<void> {
-    if (!this.townMode || !this.worldBuilding || performance.now() - this.sliceStart < BUILD_SLICE_MS) return;
+    // A world or the overview is being built (behind a menu): let the frames it runs behind go on.
+    if ((!this.worldBuilding && this.builds === 0) || performance.now() - this.sliceStart < BUILD_SLICE_MS) return;
     await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
     this.sliceStart = performance.now();
   }
@@ -3857,7 +4020,10 @@ export class BabylonRenderer implements Renderer {
         // Effects are kept per render pass: the camera's, as the check is made for it.
         const pass = engine.currentRenderPassId;
         engine.currentRenderPassId = this.scene.activeCamera?.renderPassId ?? pass;
+        const t0 = performance.now();
         ready = (mat._storeEffectOnSubMeshes ? mat.isReadyForSubMesh(mesh, sub, instanced) : mat.isReady(mesh, instanced)) && ready;
+        const ms = performance.now() - t0;
+        if (ms > 20) perfRecord(`render: shader ${mat.name}`, t0, ms, mesh.name);
         for (const g of shadows) {
           for (const id of g.getShadowMap()?.renderPassIds ?? [pass]) {
             engine.currentRenderPassId = id;

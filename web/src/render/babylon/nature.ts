@@ -41,6 +41,7 @@ import type { Lighting } from './environment';
 import { MaterialLibrary } from './materials';
 import { buildModel } from './models';
 import { CountryRoads, ROAD_VERGE } from './roads';
+import { perfEnd, perfStart, perfTimeAsync } from '../../debug/perf';
 
 /**
  * How far the landscape extends beyond the town (metres): towns of older code, and worlds (which
@@ -280,13 +281,13 @@ export class Landscape {
     return h + (Math.min(h, bank) - h) * smoothstep(-BEACH * 1.5, -BEACH * 0.3, e);
   }
 
-  async build(scene: Scene, assets: AssetRegistry, world: WorldStructure): Promise<NatureResult> {
+  async build(scene: Scene, assets: AssetRegistry, world: WorldStructure, pace?: () => Promise<void>): Promise<NatureResult> {
     const meshes: Mesh[] = [];
     const casters: Mesh[] = [];
     const only = new Map<Mesh, 'game' | 'town'>();
-    meshes.push(this.terrain(scene));
-    if (this.land.water) meshes.push(this.water(scene));
-    meshes.push(...this.roads.build(scene));
+    meshes.push(await perfTimeAsync('nature: terrain', async () => this.terrain(scene, pace)));
+    if (this.land.water) meshes.push(await perfTimeAsync('nature: water', async () => this.water(scene)));
+    meshes.push(...(await perfTimeAsync('nature: roads', async () => this.roads.build(scene))));
     const add = ({ shared, whole, cells }: Instanced, casts = false) => {
       const groups = cells.flatMap((cell) => cell.meshes);
       meshes.push(...shared, ...whole, ...groups);
@@ -294,12 +295,12 @@ export class Landscape {
       for (const mesh of groups) only.set(mesh, 'game');
       if (casts) casters.push(...shared, ...whole);
     };
-    for (const forest of await this.forests(scene, assets)) add(forest, forest.casts);
-    for (const lawn of await this.lawns(scene, assets, world)) add(lawn);
+    for (const forest of await perfTimeAsync('nature: forests', () => this.forests(scene, assets, pace))) add(forest, forest.casts);
+    for (const lawn of await perfTimeAsync('nature: lawns', () => this.lawns(scene, assets, world, pace))) add(lawn);
     return { meshes, casters, only };
   }
 
-  private terrain(scene: Scene): Mesh {
+  private async terrain(scene: Scene, pace?: () => Promise<void>): Promise<Mesh> {
     const size = Math.max(this.w, this.d) + this.ring * 2;
     const segments = Math.min(TERRAIN_SEGMENTS, Math.round(size / TERRAIN_STEP));
     const ground = MeshBuilder.CreateGround('terrain', { width: size, height: size, subdivisions: segments, updatable: false }, scene);
@@ -321,7 +322,9 @@ export class Landscape {
     const crops = ['#C9B45C', '#7E6142', '#7A9C44', '#B5A35A', '#6C8A3C'].map((c) => Color3.FromHexString(c));
     const furrow = Color3.FromHexString('#5F4733');
     const tmp = new Color3();
+    let seen = 0;
     for (let i = 0, c = 0; i < positions.length; i += 3, c += 4) {
+      if (++seen % 4096 === 0) await pace?.();
       const x = positions[i];
       const z = positions[i + 2];
       const h = this.heightAt(x, z);
@@ -426,7 +429,7 @@ export class Landscape {
    * near the town are the full models and cast shadows; further ones use the low level of detail
    * (a file's own far version; a placeholder built coarser), which don't.
    */
-  private async forests(scene: Scene, assets: AssetRegistry): Promise<(Instanced & { casts: boolean })[]> {
+  private async forests(scene: Scene, assets: AssetRegistry, pace?: () => Promise<void>): Promise<(Instanced & { casts: boolean })[]> {
     const rand = mulberry32(this.seed ^ 0x5eed);
     const near = new Map<string, Matrix[]>();
     const far = new Map<string, Matrix[]>();
@@ -435,6 +438,7 @@ export class Landscape {
     const x0 = this.w / 2 - size / 2;
     const z0 = this.d / 2 - size / 2;
     for (let gx = 0; gx * spacing < size; gx++) {
+      if (gx % 4 === 0) await pace?.();
       for (let gz = 0; gz * spacing < size; gz++) {
         const x = x0 + (gx + rand()) * spacing;
         const z = z0 + (gz + rand()) * spacing;
@@ -485,7 +489,7 @@ export class Landscape {
       [far, false],
     ] as const) {
       for (const [key, list] of bucket) {
-        out.push({ ...(await instanced(scene, assets, key, list, casts ? 0 : 1, true, sector)), casts });
+        out.push({ ...(await instanced(scene, assets, key, list, casts ? 0 : 1, true, sector, pace)), casts });
       }
     }
     return out;
@@ -495,7 +499,7 @@ export class Landscape {
    * Grass tufts and wildflowers on the town's tiles. Every unpaved tile gets some; the ones
    * indoors or under furniture are hidden by `refreshLawn` (rooms and furniture change in build mode).
    */
-  private async lawns(scene: Scene, assets: AssetRegistry, world: WorldStructure): Promise<Instanced[]> {
+  private async lawns(scene: Scene, assets: AssetRegistry, world: WorldStructure, pace?: () => Promise<void>): Promise<Instanced[]> {
     const rand = mulberry32(this.seed ^ 0x1a3d);
     const covered = [...(world.meta?.streets ?? []), ...(world.meta?.paths ?? []), ...this.fields];
     const onPavement = (x: number, z: number) => covered.some((r) => x >= r.x && x < r.x + r.w && z >= r.z && z < r.z + r.d);
@@ -504,6 +508,7 @@ export class Landscape {
     const tuftTiles: number[] = [];
     const flowerTiles: number[] = [];
     for (let z = 0; z < groundDepth(world); z++) {
+      if (z % 4 === 0) await pace?.();
       for (let x = 0; x < world.width; x++) {
         const i = z * world.width + x;
         if (onPavement(x + 0.5, z + 0.5)) continue;
@@ -521,6 +526,7 @@ export class Landscape {
     }
     // Lawn detail around the town too, thinning out with distance.
     for (let n = 0; n < 5000; n++) {
+      if (n % 1000 === 0) await pace?.();
       const x = -APRON - 30 + rand() * (world.width + APRON * 2 + 60);
       const z = -APRON - 30 + rand() * (groundDepth(world) + APRON * 2 + 60);
       const dist = this.distanceToTown(x, z);
@@ -551,7 +557,7 @@ export class Landscape {
       // (Flowers are sparse: too few triangles for groups to pay.)
       ['model.flowers', thin(flowers), thin(flowerTiles), undefined],
     ] as const) {
-      const lawn = await instanced(scene, assets, key, matrices, 0, false, cell);
+      const lawn = await instanced(scene, assets, key, matrices, 0, false, cell, pace);
       // Every instance, in the parts drawn whole; then each group's.
       const groups = [{ meshes: [...lawn.shared, ...lawn.whole], indices: matrices.map((_, k) => k) }, ...lawn.cells];
       for (const { meshes, indices } of groups) {
@@ -645,9 +651,12 @@ async function instanced(
   lod: 0 | 1 = 0,
   fixed = true,
   cell?: (x: number, z: number) => string,
+  pace?: () => Promise<void>,
 ): Promise<Instanced> {
   if (matrices.length === 0) return { shared: [], whole: [], cells: [] };
-  const template = await buildModel(scene, key, assets.get(key, 'model'), [1, 1], { lod });
+  await pace?.();
+  const template = await perfTimeAsync(`nature: model ${key}`, () => buildModel(scene, key, assets.get(key, 'model'), [1, 1], { lod }));
+  await pace?.();
   const groups = new Map<string, number[]>();
   if (cell) {
     matrices.forEach((m, i) => {
@@ -672,16 +681,22 @@ async function instanced(
     return part;
   };
   const cells = split.length ? [...groups.values()].map((indices, c) => ({ meshes: split.map((mesh) => copy(mesh, c)), indices })) : [];
+  const span = perfStart(`nature: instances ${key}`);
   for (const { meshes, indices } of [{ meshes: template.meshes, indices: matrices.map((_, k) => k) }, ...cells]) {
     const buffer = new Float32Array(indices.length * 16);
-    indices.forEach((k, i) => matrices[k].copyToArray(buffer, i * 16));
+    for (let i = 0; i < indices.length; i++) {
+      if (i > 0 && i % 2048 === 0) await pace?.();
+      matrices[indices[i]].copyToArray(buffer, i * 16);
+    }
     for (const mesh of meshes) {
       mesh.thinInstanceSetBuffer('matrix', buffer, 16, fixed);
       mesh.thinInstanceRefreshBoundingInfo(false);
       mesh.receiveShadows = true;
       mesh.freezeWorldMatrix();
     }
+    await pace?.();
   }
+  perfEnd(span);
   return { shared: template.meshes.filter((mesh) => !split.includes(mesh)), whole: split, cells };
 }
 
