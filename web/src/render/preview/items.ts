@@ -19,7 +19,7 @@ import { colorsKey, type PartColors } from '../../core/protocol';
 import { buildModel, painted } from '../babylon/models';
 import { shadingFromSettings } from '../babylon/softLook';
 import type { ItemPreviews, ItemStage } from '../types';
-import { boxCorners, contactShadow, studioScene } from './itemScene';
+import { boxCorners, contactShadow, PICTURE_STAND_IN, studioScene } from './itemScene';
 import { ItemStageController } from './itemStage';
 
 /** Picture sizes in pixels (cards show ~80 CSS px; the detail's turntable ~200). */
@@ -30,6 +30,8 @@ const RELEASE_AFTER = 5000;
 /** Give up waiting for a model's materials (ms). */
 const READY_TIMEOUT = 8000;
 const TURNTABLE_CACHE = 24;
+/** A picture of a box (its model's file failed) is handed out again for this long (ms) before the model is drawn again, its file tried again. */
+const BOX_AGAIN_MS = 30_000;
 /** Three-quarter view from the front, a little to the side and above (radians). */
 const YAW = -0.62;
 const PITCH = 0.5;
@@ -81,6 +83,11 @@ class ItemThumbnails implements ItemPreviews {
   private running = false;
   private releaseTimer = 0;
   private store: Promise<Cache | null> | null = null;
+  /**
+   * Pictures of a box (the model's file failed), by job key: not kept, but the latest is handed out
+   * again for a while (`BOX_AGAIN_MS`); every one handed out is let go once the real one comes.
+   */
+  private readonly boxed = new Map<string, { urls: string[]; at: number; all: string[] }>();
 
   constructor(private readonly assets: AssetRegistry) {}
 
@@ -131,6 +138,21 @@ class ItemThumbnails implements ItemPreviews {
     }
   }
 
+  /**
+   * Pictures drawn for `key`: of a box (`boxed`), handed out again for a while, or the real one, which
+   * lets go of every box picture handed out before it (whoever showed one asks again, and now gets
+   * the real one).
+   */
+  private boxPictures(key: string, urls: string[], boxed: boolean): void {
+    const before = this.boxed.get(key);
+    if (boxed) {
+      this.boxed.set(key, { urls, at: performance.now(), all: [...(before?.all ?? []), ...urls] });
+      return;
+    }
+    for (const u of before?.all ?? []) URL.revokeObjectURL(u);
+    this.boxed.delete(key);
+  }
+
   /** Keeps what was drawn, even if whoever asked has gone meanwhile. */
   private remember(job: Job, urls: string[]): void {
     if (job.frames === 1) {
@@ -158,6 +180,9 @@ class ItemThumbnails implements ItemPreviews {
     colors?: PartColors,
   ): Promise<string[] | null> {
     if (this.unavailable) return Promise.resolve(null);
+    // A box drawn a moment ago is handed out again rather than drawn once more for each card.
+    const box = this.boxed.get(key);
+    if (box && performance.now() - box.at < BOX_AGAIN_MS) return Promise.resolve(box.urls);
     return new Promise((resolve) => {
       let job = this.queue.find((j) => j.key === key);
       if (!job) {
@@ -201,17 +226,23 @@ class ItemThumbnails implements ItemPreviews {
         const job = this.next();
         if (!job) continue;
         let encoded: Promise<string[] | null> = Promise.resolve(null);
+        let boxed = false;
         if (studio) {
           try {
             // The images are encoded while the next model is built.
-            encoded = (await studio.draw(job.model, this.assets, job.footprint, job.frames, job.size, job.colors))?.encoded ?? encoded;
+            const drawn = await studio.draw(job.model, this.assets, job.footprint, job.frames, job.size, job.colors);
+            encoded = drawn?.encoded ?? encoded;
+            boxed = !!drawn?.boxed;
           } catch (err) {
             console.warn(`[preview] thumbnail of ${job.model} failed`, err);
           }
         }
         void encoded.then(
           (urls) => {
-            if (urls) this.remember(job, urls);
+            // A box drawn for a file that failed is shown but not kept (here or between visits): the
+            // next request draws the thing again, with its file if it has come.
+            if (urls) this.boxPictures(job.key, urls, boxed);
+            if (urls && !boxed) this.remember(job, urls);
             for (const w of job.waiters) w(urls);
           },
           () => job.waiters.forEach((w) => w(null)),
@@ -331,10 +362,11 @@ class ItemStudio {
   /**
    * Builds `model` and draws it from `frames` angles around it. Resolves once drawn; `encoded`
    * (the image URLs, one per angle) settles later, so the next model can be built meanwhile.
+   * `boxed`: its file failed (to load or to build), and the picture is of a plain box in its place.
    */
-  async draw(model: string, assets: AssetRegistry, footprint: [number, number], frames: number, size: number, colors?: PartColors): Promise<{ encoded: Promise<string[]> } | null> {
+  async draw(model: string, assets: AssetRegistry, footprint: [number, number], frames: number, size: number, colors?: PartColors): Promise<{ encoded: Promise<string[]>; boxed: boolean } | null> {
     const entry = assets.has(model, 'model') ? assets.get(model, 'model') : undefined;
-    const template = await buildModel(this.scene, `thumb:${model}`, painted(entry, colors), footprint);
+    const template = await buildModel(this.scene, `thumb:${model}`, painted(entry, colors), footprint, { standIn: entry?.url ? PICTURE_STAND_IN : undefined });
     const meshes = template.meshes;
     try {
       const identity = Matrix.Identity().asArray() as unknown as Float32Array;
@@ -368,7 +400,7 @@ class ItemStudio {
         this.scene.render();
         urls.push(this.capture(size));
       }
-      return { encoded: Promise.all(urls) };
+      return { encoded: Promise.all(urls), boxed: !!template.boxed };
     } finally {
       for (const mesh of meshes) mesh.dispose(false, false);
     }

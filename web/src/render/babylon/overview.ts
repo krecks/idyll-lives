@@ -23,8 +23,9 @@ import { Geo, type V3 } from './geometry';
 import type { HouseBuilder } from './house';
 import { LAYER_TOWN } from './layers';
 import type { MaterialLibrary } from './materials';
-import { buildModel, placementVariation, type ModelTemplate } from './models';
+import { buildModel, placementVariation, standInOf, type ModelTemplate } from './models';
 import { fieldLayers, Street } from './street';
+import { TemplateCache } from './templateCache';
 
 /** Height that labels and fits allow for (roofs, chimneys, crowns). */
 const TOWN_HEIGHT = 7;
@@ -45,7 +46,7 @@ export class TownOverview {
   private readonly streets: [Street, Street];
   private current = 0;
   private ground: Mesh[] = [];
-  private readonly templates = new Map<string, Promise<ModelTemplate>>();
+  private readonly templates: TemplateCache<ModelTemplate>;
   private readonly templatesInUse = new Set<string>();
   private key = '';
   /** Shadow casters of the overview (without the landscape). */
@@ -79,6 +80,7 @@ export class TownOverview {
     private readonly lib: MaterialLibrary,
     camera: ArcRotateCamera,
   ) {
+    this.templates = new TemplateCache(scene);
     this.streets = [new Street(scene, assets, house, LAYER_TOWN), new Street(scene, assets, house, LAYER_TOWN)];
     const mat = (this.glowMaterial = new StandardMaterial('lotGlow', scene));
     // Unlit: the output is emissive x vertex colour x instance colour.
@@ -92,6 +94,21 @@ export class TownOverview {
     mat.fogEnabled = false;
     mat.zOffset = -6;
     this.rig = new OverviewCamera(camera);
+  }
+
+  /**
+   * A model file that failed has come: what was built without it (a box, or nothing) is built afresh
+   * when next asked for, and if the overview draws one, the next `build` builds the town again (even
+   * the same one; true). Called between builds.
+   */
+  invalidate(url: string): boolean {
+    const keys = this.templates.invalidate(url);
+    // Those the overview doesn't draw (hidden) go now; it's built again only for those it does.
+    this.templates.disposeStale(keys.filter((k) => !this.templatesInUse.has(k)));
+    let drawn = keys.some((k) => this.templatesInUse.has(k));
+    for (const street of this.streets) drawn = street.invalidate(url) || drawn;
+    if (drawn) this.key = '';
+    return drawn;
   }
 
   /** Builds the overview of `world` (kept when it is the same town); the previous one stays until it is done. */
@@ -115,6 +132,8 @@ export class TownOverview {
         if (!this.templatesInUse.has(key)) for (const mesh of template.meshes) mesh.setEnabled(false);
       });
     }
+    // The previous overview's boxes for files that have come since are drawn no more.
+    this.templates.disposeStale();
     this.templatesInUse.clear();
     const objectMeshes: Mesh[] = [];
     for (const [key, { template, matrices }] of objects) {
@@ -233,11 +252,10 @@ export class TownOverview {
     const at = new Vector3();
     for (const [key, list] of groups) {
       await pace?.();
-      let t = this.templates.get(key);
-      if (!t) {
+      const template = await this.templates.get(key, () => {
         const def = this.content.object(list[0].def);
-        // Seen from afar: a file's far version.
-        t = buildModel(this.scene, `town:${key}`, this.assets.get(key, 'model'), def?.footprint ?? [1, 1], { far: true }).then((template) => {
+        // Seen from afar: a file's far version; without a file, the box the lot draws.
+        return buildModel(this.scene, `town:${key}`, this.assets.get(key, 'model'), def?.footprint ?? [1, 1], { far: true, standIn: standInOf(this.content, def) }).then((template) => {
           for (const mesh of template.meshes) {
             mesh.layerMask = LAYER_TOWN;
             mesh.isPickable = false;
@@ -245,9 +263,7 @@ export class TownOverview {
           }
           return template;
         });
-        this.templates.set(key, t);
-      }
-      const template = await t;
+      });
       const matrices = new Float32Array(list.length * 16);
       const vary = this.assets.get(key, 'model')?.vary ?? 0;
       list.forEach((o, i) => {

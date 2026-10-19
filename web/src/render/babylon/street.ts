@@ -32,7 +32,8 @@ import type { ViewRect } from '../types';
 import { Geo, type V3 } from './geometry';
 import type { HouseBuilder, SilhouetteSpec } from './house';
 import { encodeFinish, MaterialLibrary } from './materials';
-import { buildModel, placementVariation, withGlows, type ModelTemplate } from './models';
+import { buildModel, placementVariation, withGlows, type ModelTemplate, type StandIn } from './models';
+import { TemplateCache } from './templateCache';
 import { perfEnd, perfStart, perfTime, perfTimeAsync } from '../../debug/perf';
 
 interface Rect {
@@ -86,7 +87,7 @@ type Inst = [number, number, number, number, number];
 /** Shop awnings: stripe colours. */
 const AWNINGS: [string, string][] = [['#2F6B4F', '#F2F0EA'], ['#B8322B', '#F2F0EA'], ['#2E5C8A', '#F2F0EA'], ['#C98F2E', '#F7EBD3'], ['#6B3E5E', '#F2E6EE']];
 /** What a placed object looks like and how big it is (the game's content), for public places seen from another lot. */
-export type ObjectLook = (def: string) => { model: string; footprint: [number, number] } | undefined;
+export type ObjectLook = (def: string) => { model: string; footprint: [number, number]; standIn: StandIn } | undefined;
 
 function hash(x: number, z: number, salt: number): number {
   let h = (Math.imul(Math.round(x * 10) | 0, 374761393) + Math.imul(Math.round(z * 10) | 0, 668265263) + Math.imul(salt, 2147483647)) | 0;
@@ -463,9 +464,12 @@ export class Street {
   private meshes: Mesh[] = [];
   private casters: Mesh[] = [];
   /** Thin-instanced models by key (foliage, props, public places' things), kept hidden between builds. */
-  private readonly templates = new Map<string, Promise<ModelTemplate>>();
-  /** Footprints of public places' things by model key (see `look`). */
+  private readonly templates: TemplateCache<ModelTemplate>;
+  /** Footprints of public places' things by model key, and the boxes they're drawn as without their files (see `look`). */
   private readonly footprints = new Map<string, [number, number]>();
+  private readonly standIns = new Map<string, StandIn>();
+  /** Keys of the templates the last build draws (see `invalidate`). */
+  private used = new Set<string>();
   private readonly glowMat: StandardMaterial;
   private readonly poolMat: StandardMaterial;
   /** What glows at night on the models drawn (a path light's lens: a template's `glows`), and each instance's strength. */
@@ -495,6 +499,7 @@ export class Street {
     private readonly look?: ObjectLook,
   ) {
     this.lib = MaterialLibrary.for(scene);
+    this.templates = new TemplateCache(scene);
     const glow = (this.glowMat = new StandardMaterial('streetLampGlass', scene));
     glow.disableLighting = true;
     glow.diffuseColor = Color3.Black();
@@ -886,6 +891,7 @@ export class Street {
         const look = this.look(o.def);
         if (indoors || !look) continue;
         this.footprints.set(look.model, look.footprint);
+        this.standIns.set(look.model, look.standIn);
         const c = objectCentre(o);
         const { turn, size } = placementVariation(this.assets.get(look.model, 'model')?.vary ?? 0, o.x, o.z);
         put(look.model, c.x, c.z, (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180 + turn, size);
@@ -935,14 +941,17 @@ export class Street {
     // Models from the last build that aren't used now are hidden.
     for (const [key, template] of this.templates) if (!batches.some(([k]) => k === key)) void template.then((t) => withGlows(t).forEach((m) => m.setEnabled(false)));
     this.glows = [];
+    this.used = new Set(batches.filter(([, items]) => items.length).map(([key]) => key));
     for (const [key, items, cast] of batches) {
       await pace?.();
-      const meshes = await perfTimeAsync(`street: batch ${key}`, () => this.instances(key, items, key === FOLIAGE.hedge, this.footprints.get(key), pace));
+      const meshes = await perfTimeAsync(`street: batch ${key}`, () => this.instances(key, items, key === FOLIAGE.hedge, this.footprints.get(key), this.standIns.get(key), pace));
       this.lib.excludeFromLights(interior, new Set(meshes));
       foliage.push(...meshes);
       if (cast) this.casters.push(...meshes);
     }
     perfEnd(batchesSpan);
+    // What files that came replace (the boxes) is drawn no more.
+    this.templates.disposeStale();
     for (const mesh of this.meshes) mesh.freezeWorldMatrix();
     this.drawn = [...this.meshes, ...this.windowMeshes, ...foliage];
     const lamps = this.lamps;
@@ -959,8 +968,23 @@ export class Street {
   }
   private drawn: Mesh[] = [];
 
+  /**
+   * A model file that failed has come: what was built without it (a box, or nothing) is built afresh
+   * when next asked for. If the street draws one, the next `build` rebuilds it (true); otherwise the
+   * old ones just go. Called between builds (one running holds the templates it was given).
+   */
+  invalidate(url: string): boolean {
+    const keys = this.templates.invalidate(url);
+    // (Those not drawn are hidden already.)
+    this.templates.disposeStale(keys.filter((k) => !this.used.has(k)));
+    if (!keys.some((k) => this.used.has(k))) return false;
+    this.key = '';
+    return true;
+  }
+
   /** Removes what was built (the foliage templates are kept, hidden, for the next build). */
   clear(): void {
+    this.used.clear();
     for (const mesh of this.meshes) mesh.dispose(false, false);
     this.meshes = [];
     this.casters = [];
@@ -968,11 +992,13 @@ export class Street {
     this.key = '';
     this.glows = [];
     this.dropWindows();
-    for (const template of this.templates.values()) {
+    for (const [, template] of this.templates) {
       void template.then((t) => {
         if (this.key === '') for (const mesh of withGlows(t)) mesh.setEnabled(false);
       });
     }
+    // Nothing drawn any more: the templates built again for files that came can go.
+    this.templates.disposeStale();
   }
 
   /** Neighbours' houses: their wall boxes (x0, z0, x1, z1 on the ground's grid lines). */
@@ -1146,14 +1172,13 @@ export class Street {
     g.poly([[x - r, y, z - r], [x + r, y, z - r], [x + r, y, z + r], [x - r, y, z + r]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
   }
 
-  /** Thin instances of a model (`flat`: not scaled along z, hedges stretched along their run). */
-  private async instances(key: string, items: Inst[], flat = false, footprint: [number, number] = [1, 1], pace?: () => Promise<void>): Promise<Mesh[]> {
-    let template = this.templates.get(key);
-    if (!template) {
-      // The overview's street (on a layer of its own) is seen from afar: files' far versions.
-      template = buildModel(this.scene, `street:${key}`, this.assets.has(key, 'model') ? (this.assets.get(key, 'model') as ModelEntry) : undefined, footprint, { far: this.layerMask !== undefined });
-      this.templates.set(key, template);
-    }
+  /**
+   * Thin instances of a model (`flat`: not scaled along z, hedges stretched along their run). A public
+   * place's thing without its file is its box (`standIn`); foliage and kerbside props are left out.
+   */
+  private async instances(key: string, items: Inst[], flat = false, footprint: [number, number] = [1, 1], standIn?: StandIn, pace?: () => Promise<void>): Promise<Mesh[]> {
+    // The overview's street (on a layer of its own) is seen from afar: files' far versions.
+    const template = this.templates.get(key, () => buildModel(this.scene, `street:${key}`, this.assets.has(key, 'model') ? (this.assets.get(key, 'model') as ModelEntry) : undefined, footprint, { far: this.layerMask !== undefined, standIn }));
     const t = await perfTimeAsync(`street: model ${key}`, () => template);
     await pace?.();
     const buf = new Float32Array(Math.max(1, items.length) * 16);
@@ -1187,6 +1212,8 @@ export class Street {
       mesh.freezeWorldMatrix();
       this.glows.push({ mesh, colors });
     }
+    // (In place of a box set aside for a file that came, if there was one: never both at once.)
+    this.templates.hideStale(key);
     perfEnd(meshSpan);
     await pace?.();
     return items.length ? t.meshes : [];

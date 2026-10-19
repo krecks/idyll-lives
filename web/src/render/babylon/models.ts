@@ -1,7 +1,9 @@
 /**
  * Builds renderable templates from asset entries: glTF files, or nothing when there's no file or
- * it doesn't load (a plain box for the lot's placed objects and buy mode's ghost, `BuildOptions.standIn`). Each template
- * is drawn with thin instances (one draw call per mesh, however many copies exist).
+ * it doesn't load (a plain box for things placed, held or pictured, `BuildOptions.standIn`). A file
+ * that fails is tried again in the background, and whoever drew the box builds it again once it
+ * comes (`onModelFileArrived`, `TemplateCache`). Each template is drawn with thin instances (one
+ * draw call per mesh, however many copies exist).
  *
  * Primitive parts (a character's limbs, the few parts a file can't carry) are merged per
  * (tint slot, finish) so a model costs one draw call per distinct finish. Boxes get rounded
@@ -39,13 +41,13 @@ import {
 import './loaders';
 import type { AbstractMesh, AnimationGroup, Material, Node } from './core';
 import { optimizedUrl } from '../../assets/registry';
-import { foreground, prefetch } from '../../assets/stream';
+import { background, foreground, prefetch } from '../../assets/stream';
 import { paintSlots } from '../../assets/paint';
 import type { ModelEntry, PrimitivePart, Vec3 } from '../../assets/types';
 import type { PartColors } from '../../core/protocol';
 import { DEFAULT_FINISH, encodeFinish, MaterialLibrary } from './materials';
 import { WALL_HALF, WALL_HEIGHT } from './walls';
-import type { ObjectDef } from '../../content/content';
+import type { Content, ObjectDef } from '../../content/content';
 
 export type TintSlot = NonNullable<PrimitivePart['tint']>;
 export type BoneName = NonNullable<PrimitivePart['bone']>;
@@ -74,8 +76,14 @@ export interface ModelTemplate {
    * the ones lit by use rather than by the room. Not in `meshes`: nothing else draws them.
    */
   glows?: { mesh: Mesh; part: number; screen?: boolean }[];
-  /** Its file failed to load (it's drawn as nothing, or the box asked for). */
-  failed?: boolean;
+  /**
+   * The files it was built without, as they failed to load: its far version (it's the full model
+   * then), or every one (it's drawn as nothing, or the box asked for). A cache builds it again when
+   * one of them comes (`TemplateCache.invalidate`).
+   */
+  failed?: string[];
+  /** It's the stand-in box (`BuildOptions.standIn`): its file is missing, or failed to load or to build. */
+  boxed?: boolean;
 }
 
 /** A template's meshes and its glows' (all it draws). */
@@ -193,17 +201,32 @@ export interface BuildOptions {
   resize?: Resize;
   /**
    * A plain box to draw when the model has no file or its file fails, so the thing stays in view and
-   * can be clicked: the lot's placed objects ask for one, and buy mode's copy of one in hand. Everything
-   * else (plants, the street, things residents carry, pictures) draws nothing then.
+   * can be clicked: placed objects ask for one (the lot's, public places' seen from another lot, the
+   * town's), buy mode's copy of one in hand, food and dishes, what residents carry, and the catalog's
+   * pictures. The landscape, foliage, kerbside props and the selection marker draw nothing then.
    */
   standIn?: StandIn;
+  /**
+   * False: a file that fails isn't tried again in the background for this build, as nothing would
+   * build it again when it comes (the landscape, the selection marker). Default true.
+   */
+  retry?: boolean;
 }
 
 /** What shapes a stand-in box: the thing's content layer and, on a top, its radius. */
 export interface StandIn {
-  layer: ObjectDef['layer'];
+  /** `item`: food, a dish, something in a hand: a small block (`ITEM_STAND_IN`). */
+  layer: ObjectDef['layer'] | 'item';
   /** Things on a top: the radius (m) of the disc they take (`Content.radius`). */
   radius: number;
+}
+
+/** The stand-in of an item on a top or in a hand: a block about 10 cm across. */
+export const ITEM_STAND_IN: StandIn = { layer: 'item', radius: 0.05 };
+
+/** The box a kind of thing is drawn as without its model's file (`BuildOptions.standIn`). */
+export function standInOf(content: Content, def: ObjectDef | undefined): StandIn {
+  return { layer: def?.layer, radius: content.radius(def) };
 }
 
 /** A player's resizing: its own size (metres across and deep, before turning) and how much taller. */
@@ -222,27 +245,48 @@ export async function buildModel(
   footprint: [number, number],
   options: BuildOptions = {},
 ): Promise<ModelTemplate> {
+  const failed: string[] = [];
   if (entry?.url) {
     // Far off, the far version (without moving parts); the full one if that fails.
     const far = (options.far || options.lod === 1) && entry.far ? entry.far : undefined;
+    const instead = (url: string) => (url === far ? 'the full model' : options.standIn ? 'a box' : 'nothing');
     for (const url of far ? [far, entry.url] : [entry.url]) {
+      let file: LoadedFile;
       try {
-        return await loadGltf(scene, name, entry, url, footprint, options.resize);
+        file = await loadFile(scene, url, options.retry !== false);
       } catch (err) {
-        console.warn(`[render] failed to load ${url}, using ${url === far ? 'the full model' : options.standIn ? 'a box' : 'nothing'}`, err);
+        // Only a file that didn't load is `failed` (and comes later, `onModelFileArrived`).
+        failed.push(url);
+        // (Once per file: each build of it tries it again, and a page of things may share one.)
+        if (!warnedFiles.has(url)) console.warn(`[render] failed to load ${url}, using ${instead(url)}`, err);
+        warnedFiles.add(url);
+        continue;
+      }
+      try {
+        const template = buildGltf(scene, name, entry, file, footprint, options.resize);
+        return failed.length ? { ...template, failed } : template;
+      } catch (err) {
+        // One that loads but can't be built won't build when tried again either: not `failed`.
+        if (!warnedFiles.has(url)) console.warn(`[render] failed to build ${name} from ${url}, using ${instead(url)}`, err);
+        warnedFiles.add(url);
       }
     }
   }
-  // No file (the registry said so, once per key) or it failed: nothing, or the box asked for. Either
-  // stays for as long as a cache keeps it (the renderer's: until the game is reloaded).
-  const template = options.standIn ? standIn(scene, name, options.resize?.size ?? footprint, options.standIn, options.resize) : { meshes: [], tints: [], bones: [], height: 0 };
-  return entry?.url ? { ...template, failed: true } : template;
+  // No file (the registry said so, once per key), it failed to load or to build: nothing, or the box
+  // asked for. A cache keeps either; one whose file failed to load is built again when it comes
+  // (`onModelFileArrived`).
+  const template: ModelTemplate = options.standIn ? { ...standIn(scene, name, options.resize?.size ?? footprint, options.standIn, options.resize), boxed: true } : { meshes: [], tints: [], bones: [], height: 0 };
+  return failed.length ? { ...template, failed } : template;
 }
+
+/** Files whose failure has been warned about (once per file for the page). */
+const warnedFiles = new Set<string>();
 
 /**
  * A plain neutral box standing in for a model (`BuildOptions.standIn`), placed as the model would be:
- * most of the footprint on the floor, a thin mat for a rug, a small block on a top, a panel at eye
- * height on the wall face, a block hanging from the ceiling; taller as the player made it.
+ * most of the footprint on the floor, a thin mat for a rug, a small block on a top (or a smaller one
+ * for an item: food, a dish, something in a hand), a panel at eye height on the wall face, a block
+ * hanging from the ceiling; taller as the player made it.
  */
 function standIn(scene: Scene, name: string, [w, d]: [number, number], { layer, radius }: StandIn, resize?: Resize): ModelTemplate {
   // Its height as the player changed it, never flat or inside out (things shrink by up to a metre).
@@ -252,7 +296,8 @@ function standIn(scene: Scene, name: string, [w, d]: [number, number], { layer, 
   // On the wall: its back on the wall's face.
   const face = -d / 2 + WALL_HALF;
   const part =
-    layer === 'surface' ? box([r, tall(r), r], [0, tall(r) / 2, 0])
+    layer === 'item' ? box([radius * 2, radius * 2, radius * 2], [0, radius, 0])
+    : layer === 'surface' ? box([r, tall(r), r], [0, tall(r) / 2, 0])
     : layer === 'rug' ? box([w * 0.9, 0.02, d * 0.9], [0, 0.01, 0])
     : layer === 'wall' ? box([w * 0.8, tall(0.6), 0.06], [0, 1.2 + tall(0.6) / 2, face + 0.03])
     : layer === 'ceiling' ? box([w * 0.5, tall(0.3), d * 0.5], [0, WALL_HEIGHT - tall(0.3) / 2, 0])
@@ -957,12 +1002,13 @@ function idle(fn: (deadline?: IdleDeadline) => void, timeout = 2000): void {
 
 /**
  * The build's compressed copy of the file if there is one; the file itself if that fails to load.
- * A model being built is wanted now: background downloads wait for it.
+ * A model being built is wanted `now`: background downloads wait for it. One tried again after it
+ * failed runs in the background slot it was given (`scheduleRetry`).
  */
-function importModel(url: string, scene: Scene): ReturnType<typeof ImportMeshAsync> {
+function importModel(url: string, scene: Scene, now: boolean): ReturnType<typeof ImportMeshAsync> {
   // Clips stay still: they're read (`readClips`), not played.
   const options = { pluginOptions: { gltf: { animationStartMode: 0 } } } as Parameters<typeof ImportMeshAsync>[2];
-  return foreground(async () => {
+  const load = async () => {
     const copy = optimizedUrl(url);
     if (copy === url) return ImportMeshAsync(url, scene, options);
     try {
@@ -971,7 +1017,8 @@ function importModel(url: string, scene: Scene): ReturnType<typeof ImportMeshAsy
       console.warn(`[render] compressed ${copy} failed, loading ${url}`, err);
       return ImportMeshAsync(url, scene, options);
     }
-  });
+  };
+  return now ? foreground(load) : load();
 }
 
 /**
@@ -999,24 +1046,142 @@ interface FilePiece {
   full?: VertexData;
 }
 
-/** Files imported per scene, by URL (they go with the scene). */
-const loadedFiles = new WeakMap<Scene, Map<string, Promise<LoadedFile>>>();
+/**
+ * After a file fails to load, how long (ms) until it's tried again in the background: each try that
+ * fails waits for the next, and after the last nothing more is tried (until the browser comes back
+ * online, when it starts over). Builds meanwhile still try it themselves, as ever.
+ */
+const RETRY_AFTER_MS = [5_000, 30_000, 120_000];
 
-function loadFile(scene: Scene, url: string): Promise<LoadedFile> {
-  const files = loadedFiles.get(scene) ?? new Map<string, Promise<LoadedFile>>();
-  loadedFiles.set(scene, files);
-  let file = files.get(url);
+/** A scene's imported files and the ones that failed (they go with the scene). */
+interface SceneFiles {
+  /** Imported (or being imported), by URL. A failed one is dropped, so the next build tries it again. */
+  files: Map<string, Promise<LoadedFile>>;
+  /** Failed to load, by URL: how many background tries have been made, and the next one's timer. */
+  failed: Map<string, { tries: number; timer?: ReturnType<typeof setTimeout> }>;
+  /** Told when a file that failed has come (`onModelFileArrived`). */
+  arrived: Set<(url: string) => void>;
+}
+
+const sceneFiles = new WeakMap<Scene, SceneFiles>();
+
+function filesOf(scene: Scene): SceneFiles {
+  const known = sceneFiles.get(scene);
+  if (known) return known;
+  const state: SceneFiles = { files: new Map(), failed: new Map(), arrived: new Set() };
+  sceneFiles.set(scene, state);
+  // Back online: what failed (in an outage, most likely) is tried again from the start.
+  const online = () => {
+    for (const [url, f] of state.failed) {
+      clearTimeout(f.timer);
+      f.timer = undefined;
+      f.tries = 0;
+      scheduleRetry(scene, state, url);
+    }
+  };
+  window.addEventListener('online', online);
+  scene.onDisposeObservable.addOnce(() => {
+    window.removeEventListener('online', online);
+    for (const f of state.failed.values()) clearTimeout(f.timer);
+    state.failed.clear();
+    state.arrived.clear();
+  });
+  return state;
+}
+
+/**
+ * Calls `fn` with a file's URL when it loads in `scene` after failing to (in a background try, or
+ * for any build): whatever was built without it (a box, or nothing) can be built again. Returns
+ * what stops it. A scene nobody listens to doesn't try its failed files in the background.
+ */
+export function onModelFileArrived(scene: Scene, fn: (url: string) => void): () => void {
+  const { arrived } = filesOf(scene);
+  arrived.add(fn);
+  return () => arrived.delete(fn);
+}
+
+/**
+ * Tells `scene`'s listeners (`onModelFileArrived`) again that the file at `url` has come: a template
+ * still being built when it came turned out to be built without it (`TemplateCache`).
+ */
+export function retellModelFileArrived(scene: Scene, url: string): void {
+  tellArrived(filesOf(scene), url);
+}
+
+/**
+ * The file at `url` as imported into `scene`, once. A failed import isn't kept, so each build tries
+ * it again (none is held back or failed at once because of an earlier failure), and for a build that
+ * asks (`retry`) it's tried in the background too (`scheduleRetry`). Only the import counts as the
+ * file failing, not a build from it (`buildFromFile`): a file that loads but can't be built isn't
+ * fetched again. A background try imports in the slot it was given (`now` false), not as a load
+ * someone waits for; a build that wants the file meanwhile shares the download already under way.
+ */
+function loadFile(scene: Scene, url: string, retry: boolean, now = true): Promise<LoadedFile> {
+  const state = filesOf(scene);
+  let file = state.files.get(url);
   if (!file) {
-    const loading = importFile(scene, url);
-    files.set(url, (file = loading));
-    // One that failed is tried again by the next build.
-    loading.catch(() => files.get(url) === loading && files.delete(url));
+    const loading = importFile(scene, url, now);
+    state.files.set(url, (file = loading));
+    // (Both outcomes are handled here; whoever asked handles the rejection it's given.)
+    loading.then(
+      () => fileArrived(state, url),
+      () => state.files.get(url) === loading && state.files.delete(url),
+    );
+  }
+  if (retry) {
+    file.catch(() => {
+      if (!state.failed.has(url)) state.failed.set(url, { tries: 0 });
+      scheduleRetry(scene, state, url);
+    });
   }
   return file;
 }
 
-async function importFile(scene: Scene, url: string): Promise<LoadedFile> {
-  const result = await importModel(url, scene);
+/** A file loaded: one that had failed isn't tried in the background any more, and the listeners are told. */
+function fileArrived(state: SceneFiles, url: string): void {
+  const f = state.failed.get(url);
+  if (!f) return;
+  clearTimeout(f.timer);
+  state.failed.delete(url);
+  tellArrived(state, url);
+}
+
+function tellArrived(state: SceneFiles, url: string): void {
+  for (const fn of [...state.arrived]) {
+    try {
+      fn(url);
+    } catch (err) {
+      console.error(`[render] building again with ${url} failed`, err);
+    }
+  }
+}
+
+/** Sets the next background try of a failed file, unless one is set already or none are left. */
+function scheduleRetry(scene: Scene, state: SceneFiles, url: string): void {
+  const f = state.failed.get(url);
+  if (!f || f.timer !== undefined || f.tries >= RETRY_AFTER_MS.length || !state.arrived.size || scene.isDisposed) return;
+  // A load under way (a build's, whichever: one that doesn't ask for tries too) is this try; if it
+  // fails, the next is set from here. Otherwise the try loads the file itself.
+  const sharedTry = () => {
+    const loading = state.files.get(url);
+    if (loading) loading.catch(() => scheduleRetry(scene, state, url));
+    return !!loading;
+  };
+  f.timer = setTimeout(() => {
+    f.timer = undefined;
+    f.tries++;
+    if (scene.isDisposed || !state.failed.has(url) || sharedTry()) return;
+    // It waits its turn behind what's on screen; by then the file may have come, or a build be loading it.
+    void background(async () => {
+      if (scene.isDisposed || !state.failed.has(url) || sharedTry()) return;
+      // `loadFile` notes the outcome (and sets the next try); the rejection itself is nobody's to handle.
+      await loadFile(scene, url, true, false).catch(() => {});
+    }).catch(() => {});
+  }, RETRY_AFTER_MS[f.tries]);
+}
+
+async function importFile(scene: Scene, url: string, now: boolean): Promise<LoadedFile> {
+  const result = await importModel(url, scene, now);
   for (const group of result.animationGroups) group.stop();
   // The nodes the clips move: each, with all below it, is a moving part.
   const moved = [...new Set(result.animationGroups.flatMap((g) => g.targetedAnimations.map((t) => t.target)))].filter((t): t is TransformNode => t instanceof TransformNode);
@@ -1188,8 +1353,8 @@ function fileMaterial(lib: MaterialLibrary, material: Material | null, ov: Mater
   return copy;
 }
 
-async function loadGltf(scene: Scene, name: string, entry: ModelEntry, url: string, footprint: [number, number], resize?: Resize): Promise<ModelTemplate> {
-  const file = await loadFile(scene, url);
+/** A template from a file imported (`loadFile`); throws if the build fails, having let go of what it made. */
+function buildGltf(scene: Scene, name: string, entry: ModelEntry, file: LoadedFile, footprint: [number, number], resize: Resize | undefined): ModelTemplate {
   // What the build makes, let go of if it throws part way. It runs without a break, so nothing else
   // adds meshes meanwhile.
   const made: AbstractMesh[] = [];
@@ -1204,7 +1369,7 @@ async function loadGltf(scene: Scene, name: string, entry: ModelEntry, url: stri
   }
 }
 
-/** `loadGltf` once the file is in. */
+/** `buildGltf`'s build. */
 function buildFromFile(scene: Scene, name: string, entry: ModelEntry, file: LoadedFile, footprint: [number, number], resize?: Resize): ModelTemplate {
   const extras = entry as ModelEntry & ModelExtras;
   const fit = extras.fit;

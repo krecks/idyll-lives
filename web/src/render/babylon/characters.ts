@@ -80,7 +80,8 @@ import { addLocal, addRotation, blendInto, makeAdditive, PoseScratch, qmul, rese
 import type { MaterialLibrary } from './materials';
 import { WALL_HEIGHT } from './house';
 import { LAYER_SHADOW_ONLY } from './layers';
-import { buildModel, paintColors, painted, type ModelTemplate } from './models';
+import { buildModel, ITEM_STAND_IN, onModelFileArrived, paintColors, painted, type ModelTemplate } from './models';
+import { TemplateCache } from './templateCache';
 
 /** Rows in the pose texture (= Sim capacity). */
 export const MAX_CHARACTERS = 64;
@@ -457,6 +458,8 @@ interface Prop {
   meshes: Mesh[];
   matrices: Float32Array;
   top: readonly [number, number, number];
+  /** The files it was built without (it's a small block then, `ModelTemplate.failed`). */
+  failed?: string[];
 }
 /**
  * A held guitar (`writeHeld`): where its body rests, from the spine's base (m, body scale 1: out to the
@@ -1055,9 +1058,11 @@ export class Characters {
   private readonly gaze = new Float32Array(2);
   /**
    * Things Sims carry (content `items`, by model) and tools on the station they cook at (`tool.*`):
-   * one template per model, one thin instance (matrix) per Sim row; null while loading.
+   * one template per model, one thin instance (matrix) per Sim row; null for a part its model doesn't have.
    */
-  private readonly props = new Map<string, Prop | null>();
+  private readonly props: TemplateCache<Prop | null>;
+  /** Stops listening for model files that come (`onModelFileArrived`). */
+  private readonly unlisten: () => void;
   /** Per Sim row: the model of what it carries and of the tool in front of it, as last drawn. */
   private readonly heldProp: (string | null)[] = new Array(MAX_CHARACTERS).fill(null);
   private readonly toolProp: (string | null)[] = new Array(MAX_CHARACTERS).fill(null);
@@ -1132,7 +1137,25 @@ export class Characters {
     private readonly lib: MaterialLibrary,
     /** For seats content describes (`seat`) and what can be sat or lain on. */
     private readonly content?: Content,
-  ) {}
+    /**
+     * Builds again the props drawn without a model file that came (the game's): the scene then tries
+     * failed files in the background (`onModelFileArrived`). Off for the preview studio and the debug pages.
+     */
+    refreshProps = false,
+  ) {
+    this.props = new TemplateCache(scene);
+    // A model file that failed has come: the props drawn without it (small blocks) are built again,
+    // and the blocks go once they are (hidden at once: the frame no longer moves them).
+    this.unlisten = refreshProps
+      ? onModelFileArrived(scene, (url) => {
+          const keys = this.props.invalidate(url);
+          if (!keys.length) return;
+          this.props.hideStale();
+          const dispose = () => this.props.disposeStale();
+          void Promise.all(keys.map((key) => this.props.get(key, () => this.buildProp(key)))).then(dispose, dispose);
+        })
+      : () => {};
+  }
 
   /** Loads the character set and creates the pose texture; false if unavailable. */
   async init(): Promise<boolean> {
@@ -1651,6 +1674,11 @@ export class Characters {
     });
   }
 
+  /** Stops listening for model files (the renderer goes; the scene's meshes go with it). */
+  dispose(): void {
+    this.unlisten();
+  }
+
   /** Removes the Sims (end of a session); meshes stay cached. */
   clear(): void {
     this.sims = [];
@@ -1666,6 +1694,8 @@ export class Characters {
       this.writeProp(this.leftProp, i, null);
       this.writeProp(this.rightProp, i, null);
     }
+    // Props built without their files are built (and their files tried) afresh in the next session.
+    this.props.dropFailed();
   }
 
   // --- carried things and tools ------------------------------------------------------------
@@ -1676,35 +1706,48 @@ export class Characters {
    * (`…@<colours>`: in those colours, `colorsKey`'s).
    */
   private prop(key: string): Prop | null {
-    const known = this.props.get(key);
+    const known = this.props.built(key);
     if (known !== undefined) return known;
-    this.props.set(key, null);
-    const at = key.indexOf('#');
-    const built =
-      at < 0
-        ? buildModel(this.scene, `prop:${key}`, this.assets.get(key, 'model'), [1, 1]).then((t) => ({ meshes: t.meshes, top: [0, 0, 0] as const }))
-        : this.partProp(key.slice(0, at), ...partColors(key.slice(at + 1)));
-    void built.then((p) => {
-      if (!p) return;
-      const matrices = new Float32Array(MAX_CHARACTERS * 16);
-      for (const mesh of p.meshes) {
-        mesh.isPickable = false;
-        mesh.thinInstanceSetBuffer('matrix', matrices, 16, false);
-        mesh.alwaysSelectAsActiveMesh = true;
-      }
-      this.props.set(key, { meshes: p.meshes, matrices, top: p.top });
-    });
+    void this.props.get(key, () => this.buildProp(key));
     return null;
+  }
+
+  /** Per frame: a prop nobody holds or works with isn't drawn (no draw call for its empty instances). */
+  private readonly showProp = (p: Prop | null, key: string): void => {
+    if (!p) return;
+    const used = this.heldProp.includes(key) || this.toolProp.includes(key) || this.leftProp.includes(key) || this.rightProp.includes(key);
+    for (const mesh of p.meshes) {
+      mesh.isVisible = used;
+      if (used) mesh.thinInstanceBufferUpdated('matrix');
+    }
+  };
+
+  /** Builds prop `key` (`prop`); without its file, a small block (it's built again when the file comes). */
+  private async buildProp(key: string): Promise<Prop | null> {
+    const at = key.indexOf('#');
+    const p =
+      at < 0
+        ? await buildModel(this.scene, `prop:${key}`, this.assets.get(key, 'model'), [1, 1], { standIn: ITEM_STAND_IN }).then((t) => ({ meshes: t.meshes, top: [0, 0, 0] as const, failed: t.failed }))
+        : await this.partProp(key.slice(0, at), ...partColors(key.slice(at + 1)));
+    if (!p) return null;
+    const matrices = new Float32Array(MAX_CHARACTERS * 16);
+    for (const mesh of p.meshes) {
+      mesh.isPickable = false;
+      mesh.thinInstanceSetBuffer('matrix', matrices, 16, false);
+      mesh.alwaysSelectAsActiveMesh = true;
+    }
+    return { meshes: p.meshes, matrices, top: p.top, failed: p.failed };
   }
 
   /**
    * Moving part `part` of model `model` on its own (a held instrument), in the part's own frame (its node's
    * origin and axes at rest), painted in `colors` as the object is; and its top (the highest point: a mop's
    * handle); null if the model has no such part (nothing is drawn, and nothing is hidden on
-   * the object either).
+   * the object either). Without the model's file, a small block in the hand.
    */
-  private async partProp(model: string, part: string, colors?: PartColors): Promise<{ meshes: Mesh[]; top: readonly [number, number, number] } | null> {
-    const t: ModelTemplate = await buildModel(this.scene, `prop:${model}#${part}`, painted(this.assets.get(model, 'model'), colors), [1, 1]);
+  private async partProp(model: string, part: string, colors?: PartColors): Promise<{ meshes: Mesh[]; top: readonly [number, number, number]; failed?: string[] } | null> {
+    const t: ModelTemplate = await buildModel(this.scene, `prop:${model}#${part}`, painted(this.assets.get(model, 'model'), colors), [1, 1], { standIn: ITEM_STAND_IN });
+    if (t.failed) return { meshes: t.meshes, top: [0, t.height, 0], failed: t.failed };
     const motion = t.motion;
     const j = motion?.names?.indexOf(part) ?? -1;
     const keep = t.meshes.filter((_, k) => j >= 0 && motion!.parts[k] === j);
@@ -1773,7 +1816,7 @@ export class Characters {
       this.placeFrame(right, i, f, 1);
       return;
     }
-    const top = this.props.get(held!.keys[0])?.top;
+    const top = this.props.built(held!.keys[0])?.top;
     if (!top) return;
     if (grip === 'guitar') {
       // Upright along its neck from where its body rests against the belly (in front of the spine's
@@ -1816,7 +1859,7 @@ export class Characters {
 
   /** How long the guitar Sim `rig` plays is for its size (`GUITAR`): 0 short (a ukulele) to 1 long (a guitar; also while it loads). */
   private guitarReach(rig: SimRig): number {
-    const top = this.props.get(rig.useObj?.held?.keys[0] ?? '')?.top;
+    const top = this.props.built(rig.useObj?.held?.keys[0] ?? '')?.top;
     return top ? clamp((top[1] * Math.min(1, rig.scale) / rig.scale - GUITAR.short) / (GUITAR.long - GUITAR.short), 0, 1) : 1;
   }
 
@@ -1838,7 +1881,7 @@ export class Characters {
   /** Sim row `i` draws prop `key` (null: none) in `slot`; the old one's matrix is cleared. */
   private writeProp(slot: (string | null)[], i: number, key: string | null): Float32Array | null {
     const old = slot[i];
-    if (old && old !== key) this.props.get(old)?.matrices.fill(0, i * 16, i * 16 + 16);
+    if (old && old !== key) this.props.built(old)?.matrices.fill(0, i * 16, i * 16 + 16);
     slot[i] = key;
     return key ? (this.prop(key)?.matrices ?? null) : null;
   }
@@ -2479,15 +2522,7 @@ export class Characters {
       b.mesh.thinInstanceBufferUpdated('matrix');
       b.mesh.thinInstanceBufferUpdated('blanketExt');
     }
-    // (A prop nobody holds or works with isn't drawn: no draw call for its empty instances.)
-    for (const [key, p] of this.props) {
-      if (!p) continue;
-      const used = this.heldProp.includes(key) || this.toolProp.includes(key) || this.leftProp.includes(key) || this.rightProp.includes(key);
-      for (const mesh of p.meshes) {
-        mesh.isVisible = used;
-        if (used) mesh.thinInstanceBufferUpdated('matrix');
-      }
-    }
+    this.props.forEachBuilt(this.showProp);
     this.pullChairs();
     this.upload();
     this.updateMs += (performance.now() - started - this.updateMs) * 0.1;

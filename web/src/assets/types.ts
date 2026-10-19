@@ -53,7 +53,12 @@ export interface PrimitivePart {
 
 export interface ModelEntry {
   type: 'model';
-  /** glTF/GLB file. A key without one, or a file that fails to load, draws nothing (a placed object and buy mode's ghost: a plain box, until the game is reloaded). */
+  /**
+   * glTF/GLB file. A key without one, or a file that fails to load, draws a plain box (things placed,
+   * held, carried or pictured; `BuildOptions.standIn`) or nothing (the landscape, foliage). A file that
+   * fails is tried again in the background and drawn once it comes, except the landscape's and the
+   * selection marker's (`BuildOptions.retry`): those stay out until the game is reloaded.
+   */
   url?: string;
   /**
    * Its far version (`<id>.far.glb`, about a quarter of the triangles, no moving parts), drawn

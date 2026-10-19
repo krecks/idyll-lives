@@ -16,7 +16,11 @@ import {
 } from '../babylon/core';
 import type { AssetRegistry } from '../../assets/registry';
 import { MaterialLibrary } from '../babylon/materials';
+import type { StandIn } from '../babylon/models';
 import { installNature } from '../babylon/nature';
+
+/** What a thing whose file fails is pictured as (`BuildOptions.standIn`): a plain box on its footprint. */
+export const PICTURE_STAND_IN: StandIn = { layer: 'floor', radius: 0.12 };
 
 /**
  * The product-shot scene item pictures (and the colour studio's stage) are drawn in: transparent
