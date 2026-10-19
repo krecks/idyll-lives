@@ -256,12 +256,14 @@ def ceilingFan():
         F.cyl('switch_cup', 0.1, 0.04, (0, 2.48, 0), M.white, verts=24, bevel=0.008)
         _bulb(F, 'ceilingFan', 0.09, (0, 2.46, 0), scale=(1, 1, 0.5), segments=20, rings=10)
     G.join(still, 'ceilingFan', origin=(0, 0, 0))
+    # The blades sweep a circle 0.975 m across (their tips' corners 0.488 m out), inside the 1 x 1 tile as
+    # they turn: from just outside the motor (0.135 m out) to 0.485 m.
     with G.new_parts() as rotor:
         for k in range(5):
             a = 72 * k
-            G.cube(f'blade{k}', (0.46, 0.13, 0.012), at=(0.37 * G.cosd(a), 0.37 * G.sind(a), 2.54),
+            G.cube(f'blade{k}', (0.35, 0.10, 0.012), at=(0.31 * G.cosd(a), 0.31 * G.sind(a), 2.54),
                    material=M.blade, rot=(10, 0, a), bevel=0.004)
-            G.cube(f'iron{k}', (0.15, 0.035, 0.015), at=(0.15 * G.cosd(a), 0.15 * G.sind(a), 2.548),
+            G.cube(f'iron{k}', (0.125, 0.035, 0.015), at=(0.1375 * G.cosd(a), 0.1375 * G.sind(a), 2.548),
                    material=M.white, rot=(0, 0, a), bevel=0.005)
     blades = G.hinged(G.join(rotor, 'blades'), F.at(0, 2.54, 0))
     G.settle(floor=False)
@@ -598,7 +600,7 @@ FAMILY = G.Family(
      _m('chandelier', chandelier, (0.94, 0.763, 0.897), [('brass', 'Body'), ('bulb', 'Globes')], floor=False),
      _m('pendantIndustrial', pendantIndustrial, (0.38, 0.874, 0.38), [('iron', 'Body'), ('industrial', 'Shade')],
         floor=False),
-     _m('ceilingFan', ceilingFan, (1.122, 0.385, 1.179), [('white', 'Body'), ('blade', 'Blades')], floor=False,
+     _m('ceilingFan', ceilingFan, (0.905, 0.385, 0.951), [('white', 'Body'), ('blade', 'Blades')], floor=False,
         motions=IDLE_FAN),
      _m('trackLights', trackLights, (0.94, 0.296, 0.19), [('white', 'Body'), ('iron', 'Shade')], floor=False),
      _m('paperLantern', paperLantern, (0.543, 1.001, 0.543), [('paper', 'Paper'), ('rib', 'Ribs')], floor=False,
