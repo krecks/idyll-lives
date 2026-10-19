@@ -95,13 +95,14 @@ export class TownOverview {
   }
 
   /** Builds the overview of `world` (kept when it is the same town); the previous one stays until it is done. */
-  async build(world: WorldStructure): Promise<boolean> {
+  async build(world: WorldStructure, pace?: () => Promise<void>): Promise<boolean> {
     const key = townKey(world);
     if (key === this.key) return false;
     const next = this.streets[1 - this.current];
-    const streetCasters = await next.build(world, null);
-    const ground = this.buildGround(world);
-    const objects = await this.buildObjects(world);
+    const streetCasters = await next.build(world, null, pace);
+    const ground = await this.buildGround(world, pace);
+    const objects = await this.buildObjects(world, pace);
+    await pace?.();
 
     // Swap: drop the previous overview, show the new one.
     this.streets[this.current].clear();
@@ -194,7 +195,7 @@ export class TownOverview {
   // ---- building ---------------------------------------------------------------------
 
   /** Road and garden paths / driveways, one flat mesh each. */
-  private buildGround(world: WorldStructure): Mesh[] {
+  private async buildGround(world: WorldStructure, pace?: () => Promise<void>): Promise<Mesh[]> {
     const out: Mesh[] = [];
     const layers: [string, { x: number; z: number; w: number; d: number }[] | undefined, string, number][] = [
       ['townStreets', world.meta?.streets, 'material.road', 0.012],
@@ -203,6 +204,7 @@ export class TownOverview {
     ];
     for (const [name, rects, material, y] of layers) {
       if (!rects?.length) continue;
+      await pace?.();
       const g = new Geo();
       for (const r of rects) g.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0]);
       const mesh = g.toMesh(name, this.scene);
@@ -217,7 +219,7 @@ export class TownOverview {
   }
 
   /** Outdoor objects of every lot (garden and park trees, benches, flower beds), one template per model. */
-  private async buildObjects(world: WorldStructure): Promise<Map<string, { template: ModelTemplate; matrices: Float32Array }>> {
+  private async buildObjects(world: WorldStructure, pace?: () => Promise<void>): Promise<Map<string, { template: ModelTemplate; matrices: Float32Array }>> {
     const W = world.width;
     const outdoor = (o: ObjectPlacement) => {
       for (let z = o.z; z < o.z + o.d; z++) for (let x = o.x; x < o.x + o.w; x++) if (world.rooms[z * W + x]) return false;
@@ -230,6 +232,7 @@ export class TownOverview {
     const scale = new Vector3();
     const at = new Vector3();
     for (const [key, list] of groups) {
+      await pace?.();
       let t = this.templates.get(key);
       if (!t) {
         const def = this.content.object(list[0].def);
@@ -255,6 +258,7 @@ export class TownOverview {
         m.copyToArray(matrices, i * 16);
       });
       out.set(key, { template, matrices });
+      await pace?.();
     }
     return out;
   }

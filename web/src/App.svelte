@@ -4,6 +4,7 @@
   import { menuScene } from './game/menuScene';
   import { BENCH } from './debug/benchFlags';
   import { watchLog } from './debug/log';
+  import { perfEnd, perfPhase, perfStart, perfTimeAsync } from './debug/perf';
   import { fetchState, loadDebugReport } from './debug/report';
   import { loadGameData } from './game/session';
   import { latestSave, UnloadableSave } from './persistence/saves';
@@ -74,13 +75,17 @@
    * compiled). Then the menu, which prepares the latest save behind it so "Continue" is quick.
    */
   async function boot() {
-    const step = (label: string, value: number) => (app.boot = { label, value });
+    const booted = perfStart('boot');
+    const step = (label: string, value: number) => {
+      app.boot = { label, value };
+      perfPhase(`boot: ${label}`);
+    };
     // `?bench=<scene>`: the benchmark's settings (for this page only) before anything reads them.
     const bench = BENCH ? await import('./debug/bench') : null;
     bench?.prepareBench();
     try {
       step('Loading game data', 0.05);
-      await loadGameData();
+      await perfTimeAsync('boot: loadGameData', loadGameData);
       app.dataReady = true;
     } catch (err) {
       console.error('[boot] the game data failed to load', err);
@@ -90,21 +95,37 @@
     try {
       const snapshot = $state.snapshot(settings);
       step('Starting the renderer', 0.15);
-      await within(host.rendererNow(snapshot));
+      await perfTimeAsync('boot: renderer', () => within(host.rendererNow(snapshot)));
       step('Building the neighbourhood', 0.3);
-      await within(
-        menuScene.showcaseDraft().then((draft) => {
-          menuScene.highlight({});
-          menuScene.shoot({ kind: 'menu' }, 2.4);
-          return menuScene.show(draft);
-        }),
-      );
+      const draft = (await perfTimeAsync('boot: menu town', () =>
+        within(
+          menuScene.showcaseDraft().then(async (draft) => {
+            menuScene.highlight({});
+            menuScene.shoot({ kind: 'menu' }, 2.4);
+            await menuScene.show(draft);
+            return draft;
+          }),
+        ),
+      )) as Awaited<ReturnType<typeof menuScene.showcaseDraft>> | undefined;
+      // The menu's household cards show portraits: draw them behind the loading screen, not on
+      // the first menu frames (each new look compiles a set of character shaders).
+      if (draft) {
+        step('Drawing portraits', 0.4);
+        await perfTimeAsync('boot: portraits', () =>
+          Promise.all(
+            draft.households.flatMap((h) =>
+              h.household.members.map((m) => services.previews?.portrait({ gender: m.gender, appearance: m.appearance }) ?? Promise.resolve(null)),
+            ),
+          ),
+        );
+      }
     } catch (err) {
       console.warn('[boot]', err);
     }
     step('Ready', 1);
+    perfEnd(booted);
     app.booting = false;
-    void loadGameView();
+    void perfTimeAsync('boot: game screen chunk', loadGameView);
     await openDebugReport();
     await bench?.runBench();
   }
@@ -189,10 +210,12 @@
     const play = app.playSlot === null ? null : app.playRequest(app.playSlot);
     const snapshot = $state.snapshot(settings);
     let cancelled = false;
-    // Let the screen's own entrance animation and the camera's glide finish first: building a
-    // session holds up the main thread for a moment, which shows as a hitch in a moving camera.
+    // On the main menu, let the entrance animation and the camera's glide finish first (the
+    // latest save is not urgent). Picking a home or a household is: start at once, the build
+    // yields between its slices so the camera keeps moving.
+    const settle = screen === 'menu';
     const timer = setTimeout(async () => {
-      await menuScene.settled();
+      if (settle) await menuScene.settled();
       if (cancelled) return;
       // (Not when the page starts straight into a game or the benchmark.)
       if (screen === 'menu' && !['debugReport', 'state', 'bench'].some((k) => new URLSearchParams(location.search).has(k))) {
@@ -201,7 +224,7 @@
           const latest = await latestSave().catch(() => undefined);
           if (cancelled || !latest || app.screen !== 'menu') return;
           try {
-            await host.prepare({ kind: 'load', saveId: latest.id }, snapshot);
+            await host.prepare({ kind: 'load', saveId: latest.id }, snapshot, false);
             return;
           } catch (err) {
             if (!(err instanceof UnloadableSave)) return;
@@ -215,7 +238,7 @@
       } else if (screen === 'play' && play) {
         await host.prepare(play, snapshot).catch(() => {});
       }
-    }, 500);
+    }, settle ? 500 : 250);
     return () => {
       cancelled = true;
       clearTimeout(timer);
@@ -256,6 +279,9 @@
     <PlayHousehold />
   {:else}
     <MainMenu />
+  {/if}
+  {#if app.loading}
+    <LoadingScreen progress={app.loading} />
   {/if}
 {/if}
 

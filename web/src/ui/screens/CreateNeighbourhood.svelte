@@ -37,20 +37,36 @@
   const world = (): NeighbourhoodDraft | null => app.world ?? (town && { ...town, households: [] });
 
   /** New neighbours in the same world (its streets and houses stay as they are). */
-  function generate(count?: number) {
+  async function generate(count?: number): Promise<void> {
     const empty = world();
     if (!templates || !empty) return;
-    town = populate(content, assets, templates, empty, count);
+    // New residents mean new portraits: draw them behind a loading screen, not on the visible
+    // household cards (each new look compiles a set of character shaders).
+    const previous = app.loading;
+    app.loading = { label: 'Moving the neighbours in', value: 0.9 };
+    await new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+    try {
+      town = populate(content, assets, templates, empty, count);
+      await Promise.all(
+        town.households.flatMap((h) =>
+          h.household.members.map((m) => services.previews?.portrait({ gender: m.gender, appearance: m.appearance }) ?? Promise.resolve(null)),
+        ),
+      );
+    } finally {
+      app.loading = previous;
+    }
   }
 
   function setNeighbours(count: number) {
-    generate(count);
+    void generate(count);
   }
 
   function rerollHousehold(i: number) {
     if (!town) return;
     const households = [...town.households];
-    households[i] = { ...households[i], household: randomHousehold(content, assets, households[i].household.members.length) };
+    // (A name no other household here has.)
+    const taken = households.filter((_, j) => j !== i).map((h) => h.household.name);
+    households[i] = { ...households[i], household: randomHousehold(content, assets, households[i].household.members.length, taken) };
     town = { ...town, households };
   }
 
@@ -71,8 +87,19 @@
     app.screen = 'create';
   }
 
-  /** The other path: take over a household that already lives here. */
+  /** The other path: take over a household that already lives here (the camera flies into their lot). */
   function play(slot: number) {
+    if (!town) return;
+    keep();
+    app.playSlot = slot;
+    const request = app.playRequest(slot);
+    if (!request) return;
+    menuScene.highlight({});
+    app.start(request);
+  }
+
+  /** A closer look at a household before playing it (a click on its card): who they are, their home and neighbours. */
+  function meet(slot: number) {
     if (!town) return;
     keep();
     app.playSlot = slot;
@@ -98,7 +125,7 @@
       app.screen = 'world';
       return;
     }
-    generate();
+    await generate();
     keep();
   });
 
@@ -195,7 +222,7 @@
               onmouseenter={() => (hover = h.slot)}
               onmouseleave={() => (hover = null)}
             >
-              <button class="pick" aria-label="Show the {h.household.name}s' home" onclick={() => select(h.slot)}>
+              <button class="pick" aria-label="Meet the {h.household.name}s" onclick={() => meet(h.slot)}>
                 <span class="faces">
                   {#each h.household.members as m (m.uid)}
                     <span class="face" title={m.name}><SimPreview appearance={lookAtAge(services.content, services.assets, m.appearance, m.age)} gender={m.gender} size={42} /></span>

@@ -12,6 +12,7 @@ import { services } from '../ui/services';
 import { host } from './host';
 import { generateNeighbourhood, loadTemplates, type NeighbourhoodDraft, type Templates } from './town';
 import { previewWorld } from './townPreview';
+import { perfPhase, perfTime, perfTimeAsync } from '../debug/perf';
 
 /** Golden hour on the title screen: low warm sun, long shadows, no lamps yet. */
 export const MENU_MINUTE = 18 * 60 + 20;
@@ -77,8 +78,10 @@ class MenuScene {
   /** The main menu's neighbourhood (generated once per visit to the page). */
   async showcaseDraft(): Promise<NeighbourhoodDraft> {
     if (this.showcase) return this.showcase;
-    const templates = (this.templates ??= await loadTemplates());
-    this.showcase ??= generateNeighbourhood(services.content, services.assets, templates, 'medium');
+    perfPhase('menu: showcase draft');
+    this.templates ??= await perfTimeAsync('menu: loadTemplates', loadTemplates);
+    const templates = this.templates;
+    this.showcase ??= perfTime('menu: generateNeighbourhood', () => generateNeighbourhood(services.content, services.assets, templates, 'medium'));
     return this.showcase;
   }
 
@@ -91,8 +94,10 @@ class MenuScene {
     if (draft === this.draft && home === this.home && this.renderer?.townShown) return;
     this.draft = draft;
     this.home = home;
-    const templates = (this.templates ??= await loadTemplates());
-    const world = this.world && this.worldOf === draft && this.worldHome === home ? this.world : previewWorld(services.content, templates, draft, home);
+    perfPhase('menu: show town');
+    this.templates ??= await perfTimeAsync('menu: loadTemplates', loadTemplates);
+    const templates = this.templates;
+    const world = this.world && this.worldOf === draft && this.worldHome === home ? this.world : perfTime('menu: previewWorld', () => previewWorld(services.content, templates, draft, home));
     const renderer = await host.rendererNow({ ...settings });
     if (this.draft !== draft || this.home !== home) return;
     this.world = world;
@@ -101,7 +106,7 @@ class MenuScene {
     this.attach(renderer);
     for (const [plot, label] of this.labels) this.anchor(plot, label);
     this.applyShot();
-    await host.showTown(world, MENU_MINUTE, { ...settings });
+    await perfTimeAsync('menu: showTown (renderer)', () => host.showTown(world, MENU_MINUTE, { ...settings }));
   }
 
   /** The town currently shown. */

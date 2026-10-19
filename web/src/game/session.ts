@@ -39,6 +39,7 @@ import { play } from '../ui/sfx';
 import { householdBonds, householdSpawns, lookAtStage, lookFromSeed, palette, type Appearance, type HouseholdDraft } from './household';
 import { PointerInput } from './input';
 import { assembleTown, loadTemplates, useTownContent, type NeighbourhoodDraft } from './town';
+import { perfEnd, perfPhase, perfStart, perfTime, perfTimeAsync } from '../debug/perf';
 import { UiMirror } from './uiUpdates';
 
 /** Click radius (CSS px) around a Sim's projected centre. */
@@ -85,6 +86,8 @@ const SLOW_MS = 25_000;
 const WARM_FRAMES = 3;
 /** Longest wait for the household's portraits before a prepared session counts as ready anyway. */
 const PORTRAIT_WAIT_MS = 8000;
+/** Longest wait for the first snapshot (its residents' looks) before warming the game's draw. */
+const FIRST_FRAME_WAIT_MS = 1500;
 /** After this long in the game, the catalog's pictures are drawn in idle moments (the catalog then opens with them). */
 const PREFETCH_PICTURES_MS = 4000;
 /** Story events the journal keeps: as many as the simulation does (`EVENT_LOG_CAPACITY`). */
@@ -109,6 +112,8 @@ export interface GameSession {
    * instant. Rejects if the simulation stops before that.
    */
   readonly ready: Promise<void>;
+  /** Compiles and draws the game's own look (the mirror's clip-plane shaders too), if not done yet. */
+  warm(): Promise<void>;
   /** Unpauses the game and attaches input. */
   reveal(): void;
   /** Ends the session; resolves once it has let go of the renderer, which is kept for the next one. */
@@ -121,8 +126,8 @@ export function loadGameData(): Promise<{ content: Content; assets: AssetRegistr
   const params = new URLSearchParams(location.search);
   const base = import.meta.env.BASE_URL;
   shared ??= Promise.all([
-    Content.load(`${base}content/base.json`),
-    AssetRegistry.load(`${base}assets/manifest.json`, params.getAll('pack')),
+    perfTimeAsync('data: content', () => Content.load(`${base}content/base.json`)),
+    perfTimeAsync('data: assets', () => AssetRegistry.load(`${base}assets/manifest.json`, params.getAll('pack'))),
   ]).then(([content, assets]) => {
     services.content = content;
     services.assets = assets;
@@ -144,10 +149,18 @@ export async function startSession(
   request: StartRequest,
   settings: Settings,
   progress: ProgressReport = () => {},
+  warm = true,
 ): Promise<GameSession> {
   const params = new URLSearchParams(location.search);
+  // Every loading step names the work in the perf report (a long task or a dropped frame then says which).
+  const report = progress;
+  progress = (label, value) => {
+    perfPhase(`session: ${label}`);
+    report(label, value);
+  };
+  const started = perfStart('session: start→ready');
   progress(request.kind === 'load' ? 'Reading your save' : 'Laying out the neighbourhood', 0.05);
-  const { content, assets } = await loadGameData();
+  const { content, assets } = await perfTimeAsync('session: loadGameData', loadGameData);
 
   let source: GameSource;
   let household: string;
@@ -156,13 +169,15 @@ export async function startSession(
   /** The game this is (its saves carry it): new at New game, the save's own when loading (a save from before games had one is a game of its own). */
   let gameId: string;
   if (request.kind === 'new') {
-    const templates = await loadTemplates();
-    const lot = assembleTown(content, templates, request.town, request.household, request.slot, { existing: request.existing, mode: request.mode, lifespan: request.lifespan });
+    const templates = await perfTimeAsync('session: loadTemplates', loadTemplates);
+    const lot = perfTime('session: assembleTown', () =>
+      assembleTown(content, templates, request.town, request.household, request.slot, { existing: request.existing, mode: request.mode, lifespan: request.lifespan }),
+    );
     source = { lot, seed: Number(params.get('seed')) || (Math.random() * 2 ** 31) >>> 0 };
     household = request.household.name.trim();
     gameId = crypto.randomUUID();
   } else {
-    saved = await readSave(request.saveId);
+    saved = await perfTimeAsync('session: readSave', () => readSave(request.saveId));
     if (!saved) throw new Error('That save no longer exists.');
     source = { save: saved.data };
     household = saved.household;
@@ -170,16 +185,28 @@ export async function startSession(
   }
 
   progress('Starting the simulation', 0.15);
-  const bridge = await SimBridge.start(content.json, source).catch(async (err: unknown) => {
+  const bridge = await perfTimeAsync('session: SimBridge.start', () => SimBridge.start(content.json, source)).catch(async (err: unknown) => {
     // A save the game can't open is set aside (kept if it's from a newer version, else removed).
     if (err instanceof SaveRefused && saved) throw new UnloadableSave(saved.id, err.problem, await refuseSave(saved, err.problem));
     throw err;
   });
+  // The first snapshot carries the household's residents (their clothes, hair and skin), so the
+  // warm-up draw must wait for it: without it the first live frame compiles their materials.
+  const firstFrame = async (): Promise<FrameState> => {
+    const until = performance.now() + FIRST_FRAME_WAIT_MS;
+    while (!bridge.hasSnapshot && performance.now() < until) {
+      bridge.sync(performance.now());
+      await new Promise<void>((resolve) => setTimeout(resolve, 8));
+    }
+    bridge.sync(performance.now());
+    return bridge.frame(performance.now());
+  };
   progress('Building the world', 0.3);
   // Hold the clock until the player actually enters the game.
   bridge.send({ type: 'setSpeed', speed: 0 });
   let resumeSpeed: number | null = null;
   let revealed = false;
+  let warmed = false;
   let disposed = false;
   /** The scene build in progress; disposing waits for it so it can't add to the next session's scene. */
   let building: Promise<unknown> = Promise.resolve();
@@ -191,6 +218,10 @@ export async function startSession(
     markReady = resolve;
     failReady = reject;
   });
+  void ready.then(
+    () => perfEnd(started),
+    () => perfEnd(started),
+  );
   /** `?debug`'s `__crash('render')`: every frame fails. */
   let failFrames = false;
 
@@ -685,7 +716,12 @@ export async function startSession(
     },
     buildBlueprint(id) {
       const saved = blueprints.list.find((b) => b.id === id);
-      if (saved) bridge.send({ type: 'buildBlueprint', household: game.home, blueprint: JSON.parse(saved.data) as unknown });
+      if (!saved) return;
+      try {
+        bridge.send({ type: 'buildBlueprint', household: game.home, blueprint: JSON.parse(saved.data) });
+      } catch (err) {
+        toast(err instanceof Error ? err.message : String(err));
+      }
     },
     setBuildTool(tool) {
       const wasBuilding = game.mode === 'build';
@@ -946,7 +982,7 @@ export async function startSession(
     for (const pass of [false, true]) {
       for (const s of w.sims) {
         const { seed, parents, voice } = (s.appearance as Seeded) ?? { seed: nameSeed(s.id, s.name) };
-        if (typeof seed !== 'number' || !!parents?.length !== pass) continue;
+        if (typeof seed !== 'number' || Boolean(parents?.length) !== pass) continue;
         const looks = (parents ?? []).map((p) => w.sims[p]?.appearance).filter((a) => a && (a as Seeded)?.seed === undefined);
         s.appearance = lookFromSeed(assets, s.gender, seed, looks);
         // Only the look comes from the seed: a voice stored with it is kept.
@@ -1015,17 +1051,30 @@ export async function startSession(
       }
     }
     const plot = viewPlot === null ? null : w.plots[viewPlot];
-    const build = renderer.setWorld(w, plot ? { x: plot.x, z: plot.z, w: plot.w, d: plot.d } : null);
+    const buildSpan = perfStart('session: renderer setWorld');
+    const build = renderer.setWorld(w, plot ? { x: plot.x, z: plot.z, w: plot.w, d: plot.d } : null).then((value) => {
+      perfEnd(buildSpan);
+      return value;
+    });
     building = build.catch(() => {});
     if (feedback?.effects.length) void build.then(() => feedback.effects.forEach((fx) => renderer.buildEffect(fx)), () => {});
     build
-      .then(() => {
+      .then(async () => {
         progress('Warming up', 0.75);
-        return renderer.framesRendered(WARM_FRAMES);
+        // Compile the game's own look (its lighting and cutaway) while the menu still covers it.
+        // (When the game is only prepared in the background, it waits until it is started: the
+        // mirror's clip-plane shaders take a long frame, which must not land on a visible menu.)
+        if (warm) {
+          warmed = true;
+          const frame = await perfTimeAsync('session: first frame', firstFrame);
+          if (frame) await perfTimeAsync('session: warm game', () => renderer.warmGame(frame));
+          else perfPhase('session: warm game (no frame)');
+        } else perfPhase('session: warm game (deferred)');
+        return perfTimeAsync('session: warm frames', () => renderer.framesRendered(WARM_FRAMES));
       })
       .then(() => {
         progress('Drawing portraits', 0.9);
-        return Promise.race([portraits, new Promise((resolve) => setTimeout(resolve, PORTRAIT_WAIT_MS))]);
+        return perfTimeAsync('session: portraits', () => Promise.race([portraits, new Promise((resolve) => setTimeout(resolve, PORTRAIT_WAIT_MS))]));
       })
       .then(() => {
         progress('Ready', 1);
@@ -1415,6 +1464,14 @@ export async function startSession(
       return bridge.alive;
     },
     ready,
+    async warm() {
+      if (warmed) return;
+      warmed = true;
+      const frame = await perfTimeAsync('session: first frame', firstFrame);
+      if (frame) await perfTimeAsync('session: warm game', () => renderer.warmGame(frame));
+      else perfPhase('session: warm game (no frame)');
+      await perfTimeAsync('session: warm frames', () => renderer.framesRendered(WARM_FRAMES));
+    },
     reveal() {
       if (revealed) return;
       revealed = true;
@@ -1446,6 +1503,7 @@ export async function startSession(
         if (home !== null && !game.plots[home]?.house) controls.setBuildTool(game.buildTool);
         else controls.setBuildTab('furnish');
       }
+      perfPhase(`session: reveal ${game.mode} ${game.buildTab} storey ${game.storey} walls ${game.wallMode}`);
       prefetchTimer = setTimeout(() => {
         // (Not while benchmarking: drawing the pictures would show in the measurements.)
         if (disposed || BENCH) return;
@@ -1518,6 +1576,7 @@ export async function startSession(
   session.applySettings(settings);
   if (import.meta.env.DEV) {
     // Test hook for automated browser checks; not present in production builds.
+    // SAFETY: the window object has no index signature in TypeScript; the hook is ours.
     (window as unknown as Record<string, unknown>).__osw = {
       simScreen(id: number) {
         const head = { x: 0, y: 0, z: 0 };

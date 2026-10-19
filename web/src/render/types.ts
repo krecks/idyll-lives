@@ -309,6 +309,11 @@ export interface Renderer {
   setLampsOff(off: ReadonlySet<number>): void;
   /** Called every frame before drawing; must not allocate. */
   update(frame: FrameState): void;
+  /**
+   * One game frame while the menus' overview is up: applies the game's own look and draws it once,
+   * so its shaders and pipelines are ready before the game is first shown.
+   */
+  warmGame(frame: FrameState): Promise<void>;
   /** Canvas-relative CSS pixel coordinates. */
   pick(x: number, y: number): PickResult;
   /**

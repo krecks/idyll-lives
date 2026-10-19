@@ -458,6 +458,39 @@ export class Mirrors {
     return this.pool.length;
   }
 
+  /**
+   * Draws the reflections once, so the clip-plane shader variants they need (and their render
+   * targets) are made before the game is shown. With `size`, the draw is at that size (the first
+   * full-size draw then only fills pixels). Returns the undo.
+   */
+  warm(size = 0): () => void {
+    const forced: Item[] = [];
+    let textures = this.reflecting;
+    // (The game's camera may not have a mirror in view yet: rank the first ones anyway.)
+    if (!textures.length) {
+      for (let i = 0; i < Math.min(this.items.length, this.pool.length); i++) {
+        const item = this.items[i];
+        if (item.slot >= 0) continue;
+        item.slot = i;
+        this.reflection(i);
+        forced.push(item);
+      }
+      textures = this.reflecting;
+    }
+    const saved: { texture: MirrorTexture; size: { width: number; height: number } }[] = [];
+    for (const texture of textures) {
+      const now = texture.getSize();
+      saved.push({ texture, size: { width: now.width, height: now.height } });
+      if (size > 0) texture.resize({ width: size, height: size });
+      texture.resetRefreshCounter();
+      texture.render();
+    }
+    return () => {
+      if (size > 0) for (const { texture, size: old } of saved) texture.resize(old);
+      for (const item of forced) item.slot = -1;
+    };
+  }
+
   get reflecting(): MirrorTexture[] {
     return this.items.filter((item) => item.slot >= 0).map((item) => this.pool[item.slot]?.texture).filter((t): t is MirrorTexture => !!t);
   }
