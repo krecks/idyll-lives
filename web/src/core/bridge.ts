@@ -306,6 +306,11 @@ export class SimBridge {
     this.fatalListeners.push(fn);
   }
 
+  /** Whether a snapshot has arrived (the first one can be later than `start`). */
+  get hasSnapshot(): boolean {
+    return this.hasData;
+  }
+
   /** Pulls the newest snapshot. Call once per rendered frame, before `frame()`. */
   sync(now: number): void {
     const fresh = this.reader ? this.reader.read(this.scratch) : this.pending;

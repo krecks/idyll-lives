@@ -97,15 +97,28 @@
       step('Starting the renderer', 0.15);
       await perfTimeAsync('boot: renderer', () => within(host.rendererNow(snapshot)));
       step('Building the neighbourhood', 0.3);
-      await perfTimeAsync('boot: menu town', () =>
+      const draft = (await perfTimeAsync('boot: menu town', () =>
         within(
-          menuScene.showcaseDraft().then((draft) => {
+          menuScene.showcaseDraft().then(async (draft) => {
             menuScene.highlight({});
             menuScene.shoot({ kind: 'menu' }, 2.4);
-            return menuScene.show(draft);
+            await menuScene.show(draft);
+            return draft;
           }),
         ),
-      );
+      )) as Awaited<ReturnType<typeof menuScene.showcaseDraft>> | undefined;
+      // The menu's household cards show portraits: draw them behind the loading screen, not on
+      // the first menu frames (each new look compiles a set of character shaders).
+      if (draft) {
+        step('Drawing portraits', 0.4);
+        await perfTimeAsync('boot: portraits', () =>
+          Promise.all(
+            draft.households.flatMap((h) =>
+              h.household.members.map((m) => services.previews?.portrait({ gender: m.gender, appearance: m.appearance }) ?? Promise.resolve(null)),
+            ),
+          ),
+        );
+      }
     } catch (err) {
       console.warn('[boot]', err);
     }
@@ -266,6 +279,9 @@
     <PlayHousehold />
   {:else}
     <MainMenu />
+  {/if}
+  {#if app.loading}
+    <LoadingScreen progress={app.loading} />
   {/if}
 {/if}
 

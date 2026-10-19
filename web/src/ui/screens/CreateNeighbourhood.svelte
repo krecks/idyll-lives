@@ -37,14 +37,28 @@
   const world = (): NeighbourhoodDraft | null => app.world ?? (town && { ...town, households: [] });
 
   /** New neighbours in the same world (its streets and houses stay as they are). */
-  function generate(count?: number) {
+  async function generate(count?: number): Promise<void> {
     const empty = world();
     if (!templates || !empty) return;
-    town = populate(content, assets, templates, empty, count);
+    // New residents mean new portraits: draw them behind a loading screen, not on the visible
+    // household cards (each new look compiles a set of character shaders).
+    const previous = app.loading;
+    app.loading = { label: 'Moving the neighbours in', value: 0.9 };
+    await new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+    try {
+      town = populate(content, assets, templates, empty, count);
+      await Promise.all(
+        town.households.flatMap((h) =>
+          h.household.members.map((m) => services.previews?.portrait({ gender: m.gender, appearance: m.appearance }) ?? Promise.resolve(null)),
+        ),
+      );
+    } finally {
+      app.loading = previous;
+    }
   }
 
   function setNeighbours(count: number) {
-    generate(count);
+    void generate(count);
   }
 
   function rerollHousehold(i: number) {
@@ -98,7 +112,7 @@
       app.screen = 'world';
       return;
     }
-    generate();
+    await generate();
     keep();
   });
 

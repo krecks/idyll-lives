@@ -1003,6 +1003,11 @@ export class Sky {
     return this.dome;
   }
 
+  /** The cloud band (when the sky has clouds): the mirror pass draws it too. */
+  get band(): Mesh | null {
+    return this.clouds;
+  }
+
   /** Camera layers the sky is drawn on (see layers.ts). */
   setLayerMask(mask: number): void {
     this.dome.layerMask = mask;

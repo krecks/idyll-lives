@@ -22,6 +22,7 @@ import {
   Color3,
   Color4,
   ColorCurves,
+  Effect,
   Constants,
   DefaultRenderingPipeline,
   DirectionalLight,
@@ -36,6 +37,7 @@ import {
   MirrorTexture,
   MeshBuilder,
   PBRMaterial,
+  Plane,
   PointLight,
   ClusteredLightContainer,
   Quaternion,
@@ -337,6 +339,7 @@ export class BabylonRenderer implements Renderer {
   /** The game's own look has been warmed once (the shaders are shared by the households). */
   private gameWarmed = false;
   private mirrorWarmed = false;
+  private skyMirrorWarmed = false;
   private worldBuilding = false;
   /** When the running slice of a world build began (see `pace`). */
   private sliceStart = 0;
@@ -578,6 +581,68 @@ export class BabylonRenderer implements Renderer {
       }
     }
     this.engine ??= new Engine(canvas, false, { powerPreference: 'high-performance' });
+    // Babylon disposes an effect when the last submesh that used it is disposed, even though the
+    // engine caches effects by shader and defines and the next world reuses the same variant. The
+    // mirror pass compiles a clip-plane variant of every material it reflects, and those are the
+    // expensive ones to lose when a household's world is torn down. Keep them alive: the cache
+    // entry is still there, so the next world's first reflection reuses it instead of recompiling.
+    if (!(Effect.prototype as unknown as { keepsClipPlanes?: boolean }).keepsClipPlanes) {
+      (Effect.prototype as unknown as { keepsClipPlanes?: boolean }).keepsClipPlanes = true;
+      const dispose = Effect.prototype.dispose;
+      Effect.prototype.dispose = function (this: Effect, ...args: Parameters<typeof dispose>) {
+        if (/^#define CLIPPLANE\d*\b/m.test(this.defines)) return;
+        return dispose.apply(this, args);
+      };
+    }
+    if (new URLSearchParams(location.search).has('profile')) {
+      // Which shader variant is being compiled (and how long it takes) when a frame is slow.
+      const process = Effect.prototype._processShaderCodeAsync;
+      const seen = new Map<string, string>();
+      let compilingFor = '';
+      const ready = PBRMaterial.prototype.isReadyForSubMesh;
+      PBRMaterial.prototype.isReadyForSubMesh = function (this: PBRMaterial, ...args: Parameters<typeof ready>) {
+        const before = compilingFor;
+        compilingFor = `${this.name} on ${args[0]?.name ?? ''}`;
+        try {
+          return ready.apply(this, args);
+        } finally {
+          compilingFor = before;
+        }
+      };
+      const readyStd = StandardMaterial.prototype.isReadyForSubMesh;
+      StandardMaterial.prototype.isReadyForSubMesh = function (this: StandardMaterial, ...args: Parameters<typeof readyStd>) {
+        const before = compilingFor;
+        compilingFor = `${this.name} on ${args[0]?.name ?? ''}`;
+        try {
+          return readyStd.apply(this, args);
+        } finally {
+          compilingFor = before;
+        }
+      };
+      Effect.prototype._processShaderCodeAsync = async function (this: Effect, ...args: Parameters<typeof process>) {
+        const start = performance.now();
+        const material = compilingFor;
+        try {
+          return await process.apply(this, args);
+        } finally {
+          const ms = performance.now() - start;
+          if (ms > 20) {
+            const key = (this as unknown as { _key: string })._key ?? '';
+            console.log(`[shader] ${ms.toFixed(0)} ms at ${start.toFixed(0)} ${this.name} mat ${material} defs ${this.defines.length} key ${key.slice(0, 140)}`);
+            const name = String(this.name);
+            const before = seen.get(name);
+            if (before) {
+              const now = this.defines.split('\n');
+              const old = before.split('\n');
+              const changed: string[] = [];
+              for (let i = 0; i < Math.max(now.length, old.length); i++) if (now[i] !== old[i]) changed.push(`${old[i] ?? ''} => ${now[i] ?? ''}`);
+              if (changed.length) console.log(`[shader-diff] ${name} ${changed.slice(0, 8).join(' | ')}`);
+            }
+            seen.set(name, this.defines);
+          }
+        }
+      };
+    }
     if (this.webgpu && new URLSearchParams(location.search).has('profile')) {
       // WebGPU builds a pipeline synchronously on first use: a slow one is a dropped frame, so name it.
       const device = (this.webgpu as unknown as { _device?: { createRenderPipeline: (desc: { label?: string }) => unknown } })._device;
@@ -682,7 +747,7 @@ export class BabylonRenderer implements Renderer {
         const start = performance.now();
         const result = render.apply(this, args);
         const ms = performance.now() - start;
-        if (ms > 8) console.log(`[mirror] ${ms.toFixed(0)} ms ${this.name} ${this.getSize().width}x${this.getSize().height}`);
+        if (ms > 8) console.log(`[mirror] ${ms.toFixed(0)} ms at ${start.toFixed(0)}-${(start + ms).toFixed(0)} ${this.name} ${this.getSize().width}x${this.getSize().height}`);
         return result;
       };
     }
@@ -2228,6 +2293,19 @@ export class BabylonRenderer implements Renderer {
       else {
         this.updateShadowList();
         this.resetSnapshot();
+      }
+      // The overview is on screen now, but its effects may still be compiling: the menu's first
+      // frames would then create their pipelines and drop frames. Warm them behind the loading
+      // screen instead (the build above skipped this, as `townMode` only turns on in `enterTown`).
+      this.beginBuild();
+      try {
+        await perfTimeAsync('render: menu warm shaders', () => this.warmShaders(performance.now() + TEXTURE_WAIT_MS));
+        // The mirror pass compiles clip-plane variants of the sky and cloud band, which exist once
+        // for the page: draw them into a tiny reflection now, behind the loading screen, so the
+        // first household's mirror does not pay that compile on its own loading screen.
+        await perfTimeAsync('render: menu warm mirror', () => this.warmSkyMirror());
+      } finally {
+        this.endBuild();
       }
     });
     this.townQueue = run.catch(() => {});
@@ -3988,6 +4066,24 @@ export class BabylonRenderer implements Renderer {
     if ((!this.worldBuilding && this.builds === 0) || performance.now() - this.sliceStart < BUILD_SLICE_MS) return;
     await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
     this.sliceStart = performance.now();
+  }
+
+  /** Draws the sky and cloud band once through a tiny mirror, compiling their clip-plane variants. */
+  private async warmSkyMirror(): Promise<void> {
+    if (this.skyMirrorWarmed) return;
+    this.skyMirrorWarmed = true;
+    const meshes = [this.skyDome.mesh, this.skyDome.band].filter((m): m is Mesh => !!m);
+    if (!meshes.length) return;
+    const texture = new MirrorTexture('warmMirror', { ratio: 0.03 }, this.scene, false, Constants.TEXTURETYPE_HALF_FLOAT);
+    texture.mirrorPlane = new Plane(0, 1, 0, 0);
+    texture.renderList = meshes;
+    texture.activeCamera = this.camera;
+    texture.refreshRate = 0;
+    try {
+      texture.render();
+    } finally {
+      texture.dispose();
+    }
   }
 
   /**

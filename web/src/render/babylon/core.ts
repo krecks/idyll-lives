@@ -37,6 +37,7 @@ export { PointLight } from '@babylonjs/core/Lights/pointLight';
 export { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator';
 export { ImportMeshAsync } from '@babylonjs/core/Loading/sceneLoader';
 export { ColorCurves } from '@babylonjs/core/Materials/colorCurves';
+export { Effect } from '@babylonjs/core/Materials/effect';
 export { ImageProcessingConfiguration } from '@babylonjs/core/Materials/imageProcessingConfiguration';
 export { Material } from '@babylonjs/core/Materials/material';
 export type { MaterialDefines } from '@babylonjs/core/Materials/materialDefines';

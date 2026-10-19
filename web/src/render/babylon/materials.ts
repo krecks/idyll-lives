@@ -685,6 +685,7 @@ export class MaterialLibrary {
   }
 
   private create(key: string, entry: MaterialEntry, options: SurfaceOptions): PBRMaterial {
+    if (new URLSearchParams(location.search).has('profile')) console.log(`[material] create ${key} ${options.variant ?? ''}`);
     const mat = new PBRMaterial(key, this.scene);
     mat.albedoColor = Color3.FromHexString(entry.color).toLinearSpace();
     const scale = entry.uvScale ?? 1;

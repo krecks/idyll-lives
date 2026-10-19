@@ -86,6 +86,8 @@ const SLOW_MS = 25_000;
 const WARM_FRAMES = 3;
 /** Longest wait for the household's portraits before a prepared session counts as ready anyway. */
 const PORTRAIT_WAIT_MS = 8000;
+/** Longest wait for the first snapshot (its residents' looks) before warming the game's draw. */
+const FIRST_FRAME_WAIT_MS = 1500;
 /** After this long in the game, the catalog's pictures are drawn in idle moments (the catalog then opens with them). */
 const PREFETCH_PICTURES_MS = 4000;
 /** Story events the journal keeps: as many as the simulation does (`EVENT_LOG_CAPACITY`). */
@@ -188,6 +190,17 @@ export async function startSession(
     if (err instanceof SaveRefused && saved) throw new UnloadableSave(saved.id, err.problem, await refuseSave(saved, err.problem));
     throw err;
   });
+  // The first snapshot carries the household's residents (their clothes, hair and skin), so the
+  // warm-up draw must wait for it: without it the first live frame compiles their materials.
+  const firstFrame = async (): Promise<FrameState> => {
+    const until = performance.now() + FIRST_FRAME_WAIT_MS;
+    while (!bridge.hasSnapshot && performance.now() < until) {
+      bridge.sync(performance.now());
+      await new Promise<void>((resolve) => setTimeout(resolve, 8));
+    }
+    bridge.sync(performance.now());
+    return bridge.frame(performance.now());
+  };
   progress('Building the world', 0.3);
   // Hold the clock until the player actually enters the game.
   bridge.send({ type: 'setSpeed', speed: 0 });
@@ -1048,7 +1061,7 @@ export async function startSession(
         // mirror's clip-plane shaders take a long frame, which must not land on a visible menu.)
         if (warm) {
           warmed = true;
-          const frame = bridge.frame(performance.now());
+          const frame = await perfTimeAsync('session: first frame', firstFrame);
           if (frame) await perfTimeAsync('session: warm game', () => renderer.warmGame(frame));
           else perfPhase('session: warm game (no frame)');
         } else perfPhase('session: warm game (deferred)');
@@ -1449,7 +1462,7 @@ export async function startSession(
     async warm() {
       if (warmed) return;
       warmed = true;
-      const frame = bridge.frame(performance.now());
+      const frame = await perfTimeAsync('session: first frame', firstFrame);
       if (frame) await perfTimeAsync('session: warm game', () => renderer.warmGame(frame));
       else perfPhase('session: warm game (no frame)');
       await perfTimeAsync('session: warm frames', () => renderer.framesRendered(WARM_FRAMES));
