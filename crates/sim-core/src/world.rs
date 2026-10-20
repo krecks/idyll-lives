@@ -275,6 +275,22 @@ impl ObjectInstance {
         reserved
     }
 
+    /// Takes a place on it for `sim` to sit while doing something else (eating, the phone, TV
+    /// from the sofa). A seat only while closed (a sofa bed) then can't be opened under them.
+    pub(crate) fn reserve_seat(&mut self, sim: u32, def: &crate::content::ObjectDef) -> bool {
+        let reserved = self.reserve(sim, def.slots);
+        if reserved && def.interactions.iter().any(|i| i.pose == Pose::Sit && i.when == Some(false)) {
+            self.closed_users |= 1 << sim;
+        }
+        reserved
+    }
+
+    /// Whether `inter`, a way to sit on it, is one now: open or closed as it wants (a sofa bed
+    /// pulled out is no seat).
+    pub fn seat_now(&self, inter: &crate::content::Interaction) -> bool {
+        inter.when.is_none_or(|w| w == self.open)
+    }
+
     pub(crate) fn release(&mut self, sim: u32) {
         self.closed_users &= !(1 << sim);
         for u in &mut self.users {
@@ -4363,8 +4379,8 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
     };
     // A place on the seat for the use (two housemates don't both sit on the same sofa).
     if let Some(seat) = reserved_seat.take() {
-        let slots = content.objects[objects[seat as usize].def].slots;
-        if objects[seat as usize].reserve(sim.id, slots) {
+        let def = &content.objects[objects[seat as usize].def];
+        if objects[seat as usize].reserve_seat(sim.id, def) {
             sim.use_seat = Some(seat);
         }
     }
@@ -4438,6 +4454,7 @@ fn seat_near_object(
     let sits = |o: &ObjectInstance| {
         content.objects[o.def].interactions.iter().any(|i| {
             i.pose == Pose::Sit
+                && o.seat_now(i)
                 && i.tags & rules.seat_tags != 0
                 && i.tags & rules.seat_avoid == 0
                 && !i.baby

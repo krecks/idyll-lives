@@ -257,6 +257,63 @@ fn nobody_opens_the_sofa_bed_under_someone_relaxing() {
     assert_eq!(using(&w, 0), Some(relax), "Ada keeps relaxing");
 }
 
+/// The shipped content with only a sofa bed, close enough to sit on with the phone; nobody
+/// choosing for themselves.
+fn sofa_bed_only() -> World {
+    const TOWN: &str = r#"{"width":12,"depth":10,
+        "plots":[{"name":"Home","x":0,"z":0,"w":12,"d":10,"entry":[6.5,9.5]}],
+        "households":[{"name":"Player","plot":0,"player":true}],
+        "objects":[{"def":"sofaBed","x":5,"z":1}],
+        "sims":[{"name":"Ada","traits":["bookworm"],"x":4.5,"z":4.5},{"name":"Bea","traits":["bookworm"],"x":7.5,"z":4.5}]}"#;
+    let mut w = World::from_json(&common::content(), TOWN, 1).unwrap();
+    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    w
+}
+
+/// The seat someone on the phone took (`Some(None)`: on it standing), if they're on it.
+fn phone_seat(w: &World, sim: usize) -> Option<Option<u32>> {
+    match w.sims[sim].current()?.task.kind {
+        TaskKind::Phone { seat, .. } => Some(seat),
+        _ => None,
+    }
+}
+
+fn browse(w: &World) -> usize {
+    w.content.phone.actions.iter().position(|a| a.id == "browse").unwrap()
+}
+
+#[test]
+fn nobody_opens_the_sofa_bed_under_someone_sitting_on_it_for_something_else() {
+    let mut w = sofa_bed_only();
+    w.apply(Command::Phone { sim: 0, action: browse(&w), contact: None }).unwrap();
+    assert!(until(&mut w, 1, |w| phone_seat(w, 0) == Some(Some(0))), "Ada sits on the sofa bed with her phone");
+    for id in ["doze", "pullOut"] {
+        let i = interaction(&w, 0, id);
+        let inter = &w.content.objects[w.objects[0].def].interactions[i];
+        assert!(!w.objects[0].allows(inter, 1), "no {id} for Bea");
+        let refused = w.apply(Command::Use { sim: 1, object: 0, interaction: i });
+        assert!(refused.is_err_and(|e| e.to_string().contains("someone is using")), "no {id} under the sitter");
+    }
+    // Tired, and left to herself: Bea doesn't pull it out under Ada either.
+    let e = energy(&w);
+    w.sims[1].needs[e] = 0.1;
+    w.apply(Command::SetAutonomy { enabled: true, household: Some(0) }).unwrap();
+    let opened = until(&mut w, 15, |w| w.objects[0].open);
+    assert!(!opened, "still folded");
+    assert_eq!(phone_seat(&w, 0), Some(Some(0)), "Ada still on her phone on it");
+}
+
+#[test]
+fn a_pulled_out_sofa_bed_is_no_seat() {
+    let mut w = sofa_bed_only();
+    let pull = interaction(&w, 0, "pullOut");
+    w.apply(Command::Use { sim: 1, object: 0, interaction: pull }).unwrap();
+    assert!(until(&mut w, 30, |w| w.objects[0].open && w.sims[1].current().is_none()), "pulled out");
+    w.apply(Command::Phone { sim: 0, action: browse(&w), contact: None }).unwrap();
+    assert!(until(&mut w, 1, |w| phone_seat(w, 0).is_some()), "Ada gets her phone out");
+    assert_eq!(phone_seat(&w, 0), Some(None), "standing, not on the bed");
+}
+
 #[test]
 fn a_couple_can_still_open_a_futon_together() {
     let (mut w, _) = shipped();

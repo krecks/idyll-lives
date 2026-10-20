@@ -451,7 +451,7 @@ pub(crate) fn start(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectI
         let (fx, fz) = ctx.index.links.approach_of(seat).unwrap_or_else(|| o.front_tile(content));
         if let Some(waypoints) = walk_route(ctx, sim, (fx, fz), [fx as f32 + 0.5, fz as f32 + 0.5]) {
             let o = &mut objects[seat as usize];
-            if o.reserve(sim.id, content.objects[o.def].slots) {
+            if o.reserve_seat(sim.id, &content.objects[o.def]) {
                 let task = Task { kind: TaskKind::Phone { action, contact, seat: Some(seat), answer: Answer::Pending }, ..task };
                 sim.pose = Pose::Stand;
                 sim.current = Some(Activity { task, phase: Phase::Routing { waypoints, next: 0 }, tags: act.tags });
@@ -478,7 +478,7 @@ fn seat_near(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<u32> {
         content.objects[o.def]
             .interactions
             .iter()
-            .any(|i| i.pose == Pose::Sit && i.tags & rules.seat_tags != 0 && i.tags & rules.seat_avoid == 0 && !i.baby)
+            .any(|i| i.pose == Pose::Sit && o.seat_now(i) && i.tags & rules.seat_tags != 0 && i.tags & rules.seat_avoid == 0 && !i.baby)
     };
     usable
         .iter()

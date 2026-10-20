@@ -662,7 +662,7 @@ fn go_to(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], o
         return false;
     };
     let o = &mut objects[obj as usize];
-    if !o.reserve(sim.id, content.objects[o.def].slots) {
+    if !o.reserve_seat(sim.id, &content.objects[o.def]) {
         return false;
     }
     sim.pose = Pose::Stand;
@@ -1106,10 +1106,11 @@ fn eat_seat(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<u32> {
         return Some(d.object);
     }
     let sits = |o: u32, tags: TagMask| {
-        content.objects[objects[o as usize].def]
+        let obj = &objects[o as usize];
+        content.objects[obj.def]
             .interactions
             .iter()
-            .any(|i| i.pose == Pose::Sit && i.tags & tags != 0 && i.tags & rules.seat_avoid == 0 && !i.baby)
+            .any(|i| i.pose == Pose::Sit && obj.seat_now(i) && i.tags & tags != 0 && i.tags & rules.seat_avoid == 0 && !i.baby)
     };
     let distance = |o: u32| {
         let (fx, fz) = approach(ctx, &objects[o as usize]);
