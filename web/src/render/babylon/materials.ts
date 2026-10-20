@@ -591,32 +591,23 @@ export interface SurfaceOptions {
 
 export class MaterialLibrary {
   private static readonly byScene = new WeakMap<Scene, MaterialLibrary>();
-  /** Scenes a disposed renderer let go: a late async build must not put one back in `byScene`. */
-  private static readonly forgotten = new WeakSet<Scene>();
 
   /** The library for `scene`; created on first use (without a registry, finishes fall back to matte). */
   static for(scene: Scene): MaterialLibrary {
     let lib = MaterialLibrary.byScene.get(scene);
     if (!lib) {
       lib = new MaterialLibrary(scene);
-      if (!MaterialLibrary.forgotten.has(scene)) MaterialLibrary.byScene.set(scene, lib);
+      // (A late async build for a disposed scene gets a library that isn't kept.)
+      if (!scene.isDisposed) MaterialLibrary.byScene.set(scene, lib);
     }
     return lib;
   }
 
-  /** Lets a scene and its library go: the weak entry must not outlive the renderer that made it. */
-  static forget(scene: Scene): void {
-    MaterialLibrary.byScene.get(scene)?.dispose();
-    MaterialLibrary.byScene.delete(scene);
-    MaterialLibrary.forgotten.add(scene);
-  }
-
-  /** Stops the work that outlives a scene (its environment load's timer and its refreeze observer). */
-  dispose(): void {
+  /** Stops the work that outlives the scene (its environment load's timer), as the scene is disposed. */
+  private dispose(): void {
     if (this.envTimer) clearTimeout(this.envTimer);
     this.envTimer = null;
     this.onRefrozen = null;
-    this.scene.onAfterRenderObservable.clear();
   }
 
   private assets: AssetRegistry | null = null;
@@ -656,6 +647,8 @@ export class MaterialLibrary {
 
   private constructor(private readonly scene: Scene) {
     this.dig = new DigState(scene);
+    // (The scene clears its own observers, the refreeze one below among them.)
+    scene.onDisposeObservable.addOnce(() => this.dispose());
     scene.onAfterRenderObservable.add(() => {
       if (this.refreezeFrames === 0 || --this.refreezeFrames > 0) return;
       for (const m of this.thawed) m.freeze();

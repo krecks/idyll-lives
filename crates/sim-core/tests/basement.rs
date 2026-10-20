@@ -88,7 +88,7 @@ fn house() -> World {
 /// they passed.
 fn walk_to_sit(w: &mut World, chair: u32) -> Vec<f32> {
     w.apply(Command::Use { sim: 0, object: chair, interaction: 0 }).unwrap();
-    let storey = w.storey_of(w.objects[w.object_index(chair).unwrap()].z);
+    let storey = w.storey_of(w.objects[w.index_of(chair).unwrap()].z);
     let mut heights = Vec::new();
     for _ in 0..20 * 60 * 5 {
         w.tick_once();
@@ -168,7 +168,7 @@ fn stairs_down_start_inside_the_house() {
     let stairs = buy(&mut w, "stairs", 9, 3 + DOWN, 0).unwrap();
     let s = w.stair_map().stairs[0];
     assert_eq!((s.bottom, s.top(), s.landing), ((9, 6 + DOWN), (9, 3 + DOWN), (9, 2)), "up to the ground floor");
-    assert_eq!(w.storey_of(w.objects[w.object_index(stairs).unwrap()].z), -1);
+    assert_eq!(w.storey_of(w.objects[w.index_of(stairs).unwrap()].z), -1);
     // The stairwell in the ground floor is open: nothing stands there.
     assert!(buy(&mut w, "chair", 9, 4, 0).is_err(), "the stairwell is open");
     let nav = sim_core::path::NavGrid { lot: &w.lot, blocked: w.blocked(), stairs: w.stair_map() };

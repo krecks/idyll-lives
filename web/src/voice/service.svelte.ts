@@ -90,8 +90,6 @@ const BENCH_VOICE: VoiceParams = { style: 'M1', pitch: 1, depth: 1, speed: 1 };
 let worker: Worker | null = null;
 /** The device to use next; null: Auto picks one when voices start. */
 let wantedDevice: VoiceDevice | null = null;
-/** Whether Auto chose the current device (so switching back to Auto keeps it); a manual choice clears it. */
-let autoChoice = false;
 let nextId = 1;
 const pending = new Map<number, { resolve: (c: Clip) => void; reject: (e: Error) => void }>();
 let waiters: { resolve: () => void; reject: (e: Error) => void }[] = [];
@@ -159,9 +157,6 @@ function onMessage(msg: FromVoiceWorker): void {
       void ensureVoice().catch(() => {});
     } else if (failedDevice === 'gpu' && settings.voices && !held && settings.voiceDevice === 'auto') {
       // Auto: the graphics card could not start the voices, so use the processor instead.
-      wantedDevice = 'cpu';
-      autoChoice = true;
-      voiceStatus.state = 'off';
       void ensureVoice('cpu').catch(() => {});
     }
   }
@@ -428,6 +423,8 @@ function readBench(): BenchResult | null {
  * card gets too slow, `stepDownVoice`). While the game has paused the voices for its session, nothing starts the engine here.
  */
 $effect.root(() => {
+  /** The effect's last choice was a manual device (coming back to Auto then lets Auto choose again). */
+  let manual = false;
   $effect(() => {
     const on = settings.voices;
     const mode = settings.voiceDevice;
@@ -440,22 +437,18 @@ $effect.root(() => {
       }
       if (paused) return;
       if (mode !== 'auto') {
-        autoChoice = false;
-        if (voiceStatus.device !== mode || voiceStatus.state === 'off' || voiceStatus.state === 'error') {
-          void ensureVoice(mode).catch(() => {});
-        }
+        manual = true;
+        // (Joins an engine already on that device.)
+        void ensureVoice(mode).catch(() => {});
         return;
       }
-      if (voiceStatus.state === 'off' || voiceStatus.state === 'error') {
+      const wasManual = manual;
+      manual = false;
+      // Start, or let Auto choose again after a manual device (an engine already on Auto's
+      // choice keeps running). A working engine Auto chose stays, so a card it stepped down from
+      // isn't picked again.
+      if (wasManual || voiceStatus.state === 'off' || voiceStatus.state === 'error') {
         wantedDevice = null;
-        autoChoice = true;
-        void ensureVoice().catch(() => {});
-      } else if (!autoChoice) {
-        // Coming back to Auto from a manual device: let Auto choose again (and keep a card it
-        // already stepped down from, if Auto chose it).
-        wantedDevice = null;
-        autoChoice = true;
-        unload();
         void ensureVoice().catch(() => {});
       }
     });
@@ -469,8 +462,6 @@ $effect.root(() => {
  */
 export async function stepDownVoice(): Promise<boolean> {
   if (settings.voiceDevice !== 'auto' || voiceStatus.device !== 'gpu') return false;
-  wantedDevice = 'cpu';
-  autoChoice = true;
   try {
     // (It stops the graphics card's engine first.)
     await ensureVoice('cpu');

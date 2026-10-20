@@ -47,5 +47,4 @@ jobs:
         run: |
           node --experimental-strip-types tools/housegen/sample.ts /tmp/houses.json
           node --experimental-transform-types tools/worlds/sample.ts /tmp/worlds.json
-          HOUSES=/tmp/houses.json cargo test -p sim-core --release --locked --test generated_houses -- --ignored
-          WORLDS=/tmp/worlds.json cargo test -p sim-core --release --locked --test generated_worlds -- --ignored
+          HOUSES=/tmp/houses.json WORLDS=/tmp/worlds.json cargo test -p sim-core --release --locked --test generated_houses --test generated_worlds -- --ignored

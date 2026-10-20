@@ -1072,15 +1072,11 @@ export class Characters {
   /** Scratch for `writeHeld`: a frame's axes and origin (x, y, z each). */
   private readonly frame3 = new Float32Array(12);
   /**
-   * Blankets: one quilt mesh per body (the base bodies', and each life stage's body as it loads, `addQuilt`),
-   * its instance for each Sim row in `rows` (a matrix) and `rowExt` (two numbers a row, `writeBlanket`); the
-   * covered rows of the Sims wearing that body packed afresh each frame into the drawn `matrices` / `ext`
-   * (`drawn` of them, `update`).
+   * Blankets: one quilt mesh per body (the base bodies', and each life stage's body as it loads, `addQuilt`);
+   * the covered Sims wearing that body packed afresh each frame into its drawn `matrices` (a matrix each) and
+   * `ext` (two numbers each), `drawn` of them (`writeBlanket`).
    */
-  private readonly blankets = new Map<
-    string,
-    BlanketShape & { rows: Float32Array; rowExt: Float32Array; matrices: Float32Array; ext: Float32Array; drawn: number; base: boolean }
-  >();
+  private readonly blankets = new Map<string, BlanketShape & { matrices: Float32Array; ext: Float32Array; drawn: number; base: boolean }>();
   /** The quilts' shared material, for the life stages' quilts made later. */
   private quilt: PBRMaterial | null = null;
   /** Per Sim row: head top (x, y, z) for speech bubbles and the selection marker. */
@@ -1571,7 +1567,6 @@ export class Characters {
     const bodies = new Set(this.sims.map((r) => r?.body.name));
     const rows = this.sims.length;
     for (const [name, b] of this.blankets) {
-      b.rows.fill(0);
       // `update` compacts the covered rows (a town of six must not draw 64 quilts' worth of triangles).
       b.mesh.thinInstanceCount = 0;
       // (A life stage's quilt only where someone has that body: no draw call for nobody.)
@@ -2275,6 +2270,7 @@ export class Characters {
     // Cuddles: who holds which baby (posed after them, in their arms).
     this.cuddles(frame, count, dt, gameRate, animRate);
 
+    for (const b of this.blankets.values()) b.drawn = 0;
     for (let oi = 0; oi < count; oi++) {
       const i = this.order[oi];
       const rig = this.sims[i];
@@ -2304,7 +2300,6 @@ export class Characters {
         if (this.visible[i]) {
           this.data.fill(0, this.row(i), this.row(i) + NB * 16);
           shadows.fill(0, i * 16, i * 16 + 16);
-          for (const b of this.blankets.values()) b.rows.fill(0, i * 16, i * 16 + 16);
         }
         if (rig) rig.cover = 0;
         this.visible[i] = 0;
@@ -2537,22 +2532,9 @@ export class Characters {
       this.data.fill(0, this.row(i), this.row(i) + NB * 16);
       shadows.fill(0, i * 16, i * 16 + 16);
     }
-    // A quilt is drawn only for the rows covered now, packed afresh each frame to the front of its own
-    // buffer: the thin instances cost the sleepers, not every resident in the town (and not the buffer's
-    // capacity). Only a row drawn now under its body's quilt counts (another quilt's row for it is left
-    // from before: hidden since, or a body it has grown out of).
-    for (const b of this.blankets.values()) b.drawn = 0;
-    for (let i = 0; i < count; i++) {
-      const rig = this.sims[i];
-      const b = rig && this.visible[i] ? this.blanketOf(rig) : undefined;
-      const o = i * 16;
-      if (!b || !b.rows[o + 15]) continue;
-      const d = b.drawn++;
-      for (let j = 0; j < 16; j++) b.matrices[d * 16 + j] = b.rows[o + j];
-      b.ext[d * 2] = b.rowExt[i * 2];
-      b.ext[d * 2 + 1] = b.rowExt[i * 2 + 1];
-    }
     for (const b of this.blankets.values()) {
+      // (Nobody under it now or last frame: nothing to upload.)
+      if (!b.drawn && !b.mesh.thinInstanceCount) continue;
       b.mesh.thinInstanceCount = b.drawn;
       b.mesh.thinInstanceBufferUpdated('matrix');
       b.mesh.thinInstanceBufferUpdated('blanketExt');
@@ -3920,11 +3902,14 @@ export class Characters {
   /**
    * Blanket over a Sim asleep in a bed: fitted to the slot (half of a double bed, or a single bed)
    * and to the bed's foot end, pulled up from the foot end over ~0.5 s once the Sim lies flat (and
-   * pushed back down as they get up); zero-scaled otherwise.
+   * pushed back down as they get up); not drawn otherwise. A quilt is drawn only for the Sims covered
+   * now, packed afresh each frame to the front of its buffer: the thin instances cost the sleepers, not
+   * every resident in the town (and not the buffer's capacity).
    */
   private writeBlanket(rig: SimRig, i: number, pose: number, dt: number, fresh: boolean): void {
-    const own = this.blankets.has(rig.body.name);
-    const blanket = this.blanketOf(rig);
+    // Its body's own quilt (a life stage's, draped over its own pose), else its family's base body's.
+    const own = this.blankets.get(rig.body.name);
+    const blanket = own ?? this.blankets.get(rig.body.family);
     if (!blanket) return;
     const bed = rig.bed;
     // Only once the body lies flat (the crossfade from sitting on the edge done): pulled up while the legs
@@ -3932,12 +3917,10 @@ export class Characters {
     const flat = rig.w > 0.97 || rig.cover > 0;
     const under = pose === Pose.Lie && LYING.has(rig.cur.key) && flat && !!bed && BLANKET_BEDS.has(bed.def) && (rig.tagKnown ? rig.tag === 'sleep' || rig.tag === 'nap' : true);
     rig.cover = fresh ? (under ? 1 : 0) : clamp(rig.cover + (under ? dt * 2 : -dt * 3), 0, 1);
-    const m = blanket.rows;
-    const o = i * 16;
-    if (rig.cover <= 0 || !bed) {
-      m.fill(0, o, o + 16);
-      return;
-    }
+    if (rig.cover <= 0 || !bed) return;
+    const d = blanket.drawn++;
+    const m = blanket.matrices;
+    const o = d * 16;
     const s = rig.scale;
     const fx = Math.sin(rig.yaw);
     const fz = Math.cos(rig.yaw);
@@ -3959,11 +3942,11 @@ export class Characters {
     const zs = own ? s : s * rig.size;
     const z0 = lieCentre(rig) - LIE_CENTRE * zs;
     // The quilt past the toes reaches the bed's foot end (local units, at the Sim's scale).
-    blanket.rowExt[i * 2] = clamp((foot - z0) / zs - blanket.footZ, -0.22, 1.2);
+    blanket.ext[d * 2] = clamp((foot - z0) / zs - blanket.footZ, -0.22, 1.2);
     const c = smooth(rig.cover);
     // Pulled up: the quilt from its foot end to this line (local z) at full height, the rest folded away
     // under it (`BlanketPlugin`), so nothing shows through it on the way up or down.
-    blanket.rowExt[i * 2 + 1] = c >= 1 ? -9 : blanket.footZ - (blanket.footZ - blanket.topZ + 0.02) * c;
+    blanket.ext[d * 2 + 1] = c >= 1 ? -9 : blanket.footZ - (blanket.footZ - blanket.topZ + 0.02) * c;
     const sx = (slot / BLANKET_WIDTH) * (0.9 + 0.1 * c);
     // Two Sims in one bed: offset the quilts a hair so their tops don't z-fight where they meet.
     const lift = (i % 2) * 0.004;
@@ -3986,11 +3969,6 @@ export class Characters {
     m[o + 15] = 1;
   }
 
-  /** The quilt over `rig` in bed: its body's own (a life stage's, draped over its own pose), else its family's base body's. */
-  private blanketOf(rig: SimRig) {
-    return this.blankets.get(rig.body.name) ?? this.blankets.get(rig.body.family);
-  }
-
   /** A body's quilt (`blankets`), draped over its lying pose, every row's instance hidden. */
   private addQuilt(body: BodyData, lying: { positions: Float32Array; chestZ: number; feetZ: number }): void {
     const shape = buildBlanket(this.scene, `simBlanket:${body.name}`, lying.positions, lying.chestZ, lying.feetZ, this.quilt!);
@@ -4000,9 +3978,7 @@ export class Characters {
     shape.mesh.thinInstanceSetBuffer('blanketExt', ext, 2, false);
     shape.mesh.thinInstanceCount = 0;
     shape.mesh.setEnabled(false);
-    const rows = new Float32Array(MAX_CHARACTERS * 16);
-    const rowExt = new Float32Array(MAX_CHARACTERS * 2);
-    this.blankets.set(body.name, { ...shape, rows, rowExt, matrices, ext, drawn: 0, base: body.name === body.family });
+    this.blankets.set(body.name, { ...shape, matrices, ext, drawn: 0, base: body.name === body.family });
   }
 
   /**

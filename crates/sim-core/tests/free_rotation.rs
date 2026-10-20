@@ -85,7 +85,7 @@ fn things_stand_anywhere_on_their_tiles() {
     let lamp = at(&w, 4, 4);
     assert_eq!(w.objects[lamp].offset, [-10, 7]);
     w.apply(Command::Undo { household: 0 }).unwrap();
-    let lamp = w.object_index(lamp_id).unwrap();
+    let lamp = w.index_of(lamp_id).unwrap();
     assert_eq!(w.objects[lamp].offset, [25, -50]);
 
     // Saved and loaded.

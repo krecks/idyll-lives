@@ -96,17 +96,19 @@ jobs:
           key: assets-${{ hashFiles('tools/assets/optimize.mjs', 'web/public/assets/**') }}
           restore-keys: assets-
 
-      # wasm-opt's results (keyed by each input's SHA-256), so a release doesn't spend a minute
-      # optimising the same wasm again, and the named artifact below comes from the same cache.
+      # wasm-opt's results (each entry keyed by its input's SHA-256, binaryen's version and the
+      # flags), so a release doesn't spend a minute optimising the same wasm again; the named
+      # artifact below keeps its own entries in the same folder.
       - uses: actions/cache@v4
         with:
-          path: web/.assets/wasm-opt
+          # (The two folders only: entries from before they existed stay behind.)
+          path: |
+            web/.assets/wasm-opt/release
+            web/.assets/wasm-opt/names
           # (A new key every run: a cache hit on the exact key is never saved again, so new wasm
           # builds' results would never be kept.)
-          key: wasm-opt-${{ hashFiles('tools/release/wasm-opt.mjs', 'web/pnpm-lock.yaml') }}-${{ github.run_id }}
-          restore-keys: |
-            wasm-opt-${{ hashFiles('tools/release/wasm-opt.mjs', 'web/pnpm-lock.yaml') }}-
-            wasm-opt-
+          key: wasm-opt-${{ github.run_id }}
+          restore-keys: wasm-opt-
 
       # The voice model and dictionary (about 400 MB from Hugging Face and GitHub, stored as
       # float16) and the language model (about 260 MB), kept between runs so a release doesn't

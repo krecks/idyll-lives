@@ -54,10 +54,7 @@ interface Entry {
 
 class GameHost {
   /** The canvas the current renderer draws on. It is replaced when the graphics API changes. */
-  get canvas(): HTMLCanvasElement {
-    return this.canvasEl;
-  }
-  private canvasEl: HTMLCanvasElement;
+  private canvas: HTMLCanvasElement;
   readonly overlay: HTMLDivElement;
   private readonly root: HTMLDivElement;
   /** Fades the canvas out and in when the scene changes completely (menu town <-> a saved game). */
@@ -85,12 +82,12 @@ class GameHost {
   constructor() {
     this.root = document.createElement('div');
     this.root.className = 'game-host';
-    this.canvasEl = sceneCanvas();
+    this.canvas = sceneCanvas();
     this.overlay = document.createElement('div');
     this.overlay.className = 'world-overlay';
     this.veil = document.createElement('div');
     this.veil.className = 'scene-veil';
-    this.root.append(this.canvasEl, this.veil, this.overlay);
+    this.root.append(this.canvas, this.veil, this.overlay);
   }
 
   /** Places the canvas in the page (once, behind every screen). */
@@ -104,8 +101,8 @@ class GameHost {
    */
   private freshCanvas(): void {
     const fresh = sceneCanvas();
-    this.canvasEl.replaceWith(fresh);
-    this.canvasEl = fresh;
+    this.canvas.replaceWith(fresh);
+    this.canvas = fresh;
   }
 
   /** The shared renderer (created on first use). */
@@ -323,7 +320,7 @@ class GameHost {
       // Drawing that broke for good can't be mended in place: the crash screen (or, after a GPU
       // reset, "Graphics were reset") offers to save and reload.
       renderer.onFailure = this.onRendererFailure;
-      await renderer.init(this.canvasEl);
+      await renderer.init(this.canvas);
       this.rendererBackend = settings.renderer;
       renderer.hold(this.covered);
       if (webGpuFailed() && settings.renderer !== 'webgl' && !this.toldFallback) {

@@ -17,7 +17,6 @@ import type { PopTarget } from '../babylon/buildFx';
 import { buildModel, motionsOf, painted, partPose, type ModelClip, type ModelTemplate, type Motions } from '../babylon/models';
 import { poseParts, restPoses } from '../babylon/objectMotion';
 import type { ItemStage } from '../types';
-import { MaterialLibrary } from '../babylon/materials';
 import { boxCorners, contactShadow, PICTURE_STAND_IN, studioScene } from './itemScene';
 
 const FOV = 0.5;
@@ -152,7 +151,6 @@ export class ItemStageController implements ItemStage {
     this.engine.stopRenderLoop(this.tick);
     this.resize.disconnect();
     this.canvas.remove();
-    MaterialLibrary.forget(this.scene);
     this.scene.dispose();
     this.engine.dispose();
   }

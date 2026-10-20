@@ -186,7 +186,7 @@ fn a_repeated_rotate_does_not_move_another_object() {
     let mut w = world();
     let rug = buy(&mut w, "rugRound", 2, 2);
     let lamp = buy(&mut w, "lamp", 11, 11);
-    let (x, z) = (w.objects[w.object_index(rug).unwrap()].x, w.objects[w.object_index(rug).unwrap()].z);
+    let (x, z) = (w.objects[w.index_of(rug).unwrap()].x, w.objects[w.index_of(rug).unwrap()].z);
     let rotate = Command::MoveObject { household: 0, object: rug, x, z, rot: 1, turn: None, offset: None, size: None, tall: None };
     w.apply(rotate.clone()).unwrap();
     w.apply(rotate).unwrap();
@@ -206,7 +206,7 @@ fn commands_for_an_object_that_moved_on_are_skipped() {
     let sofa = buy(&mut w, "sofa", 4, 4);
     w.apply(Command::Sell { household: 0, object: lamp }).unwrap();
     let before = (w.objects.clone(), w.households[0].funds, w.undo_steps(0));
-    let relax = interaction(&w, w.object_index(sofa).unwrap() as u32, "relax");
+    let relax = interaction(&w, w.index_of(sofa).unwrap() as u32, "relax");
     let stale = [
         Command::Sell { household: 0, object: lamp },
         Command::Recolor { household: 0, object: lamp, colors: [("body".into(), 0xD9483B)].into() },

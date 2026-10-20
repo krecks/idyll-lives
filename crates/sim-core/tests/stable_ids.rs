@@ -34,7 +34,7 @@ fn buy(w: &mut World, def: &str, x: i32, z: i32) -> u32 {
 }
 
 fn at(w: &World, id: u32) -> &sim_core::world::ObjectInstance {
-    &w.objects[w.object_index(id).expect("the object is there")]
+    &w.objects[w.index_of(id).expect("the object is there")]
 }
 
 fn task_object(kind: &TaskKind) -> Option<u32> {
@@ -72,7 +72,7 @@ fn moving_selling_and_reloading_keeps_every_other_id() {
     let loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();
     assert_eq!((at(&loaded, a).x, at(&loaded, a).z), (2, 4));
     assert_eq!((at(&loaded, c).x, at(&loaded, c).z), (6, 2));
-    assert!(loaded.object_index(b).is_none(), "the sold chair is gone");
+    assert!(loaded.index_of(b).is_none(), "the sold chair is gone");
 }
 
 #[test]

@@ -1062,12 +1062,6 @@ interface SceneFiles {
 
 const sceneFiles = new WeakMap<Scene, SceneFiles>();
 
-/** Drops the caches keyed by a scene that is going away (their values point back at it). */
-export function forgetModelScene(scene: Scene): void {
-  sceneFiles.delete(scene);
-  glowMaterials.delete(scene);
-}
-
 function filesOf(scene: Scene): SceneFiles {
   const known = sceneFiles.get(scene);
   if (known) return known;

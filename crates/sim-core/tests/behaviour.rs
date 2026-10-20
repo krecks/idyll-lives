@@ -339,7 +339,7 @@ fn an_order_holds_against_needs() {
         }
         w.apply(Command::Buy { household: h as u32, object: "tv".into(), at: None, colors: Default::default(), turn: None, offset: None, size: None, tall: None }).unwrap();
         let tv = w.objects.last().unwrap().stable;
-        let tv_at = w.object_index(tv).unwrap() as u32;
+        let tv_at = w.index_of(tv).unwrap() as u32;
         let sim = w.sims.iter().position(|s| s.household as usize == h).unwrap();
         let n = w.content.needs.len();
         w.sims[sim].needs[..n].fill(low);

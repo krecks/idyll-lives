@@ -133,8 +133,11 @@ export class SimBridge {
     const worker = new Worker(new URL('./sim.worker.ts', import.meta.url), { type: 'module' });
     return new Promise((resolve, reject) => {
       // A start that failed doesn't leave its worker (and the simulation's memory) behind.
-      const stalled = () => failed(new Error('The game took too long to start.'));
-      let timer = setTimeout(stalled, START_STALL_MS);
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const arm = () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => failed(new Error('The game took too long to start.')), START_STALL_MS);
+      };
       const failed = (err: Error) => {
         clearTimeout(timer);
         worker.terminate();
@@ -143,14 +146,13 @@ export class SimBridge {
       worker.onerror = (e) => failed(new Error(e.message || 'sim worker failed to start'));
       worker.onmessage = (e: MessageEvent<FromWorker>) => {
         const msg = e.data;
-        if (msg.type === 'starting') {
-          clearTimeout(timer);
-          timer = setTimeout(stalled, START_STALL_MS);
-        } else if (msg.type === 'ready') {
+        if (msg.type === 'starting') arm();
+        else if (msg.type === 'ready') {
           clearTimeout(timer);
           resolve(new SimBridge(worker, msg.layout, msg.shared, msg.catalog));
         } else if (msg.type === 'error') failed(msg.problem ? new SaveRefused(msg.problem, msg.message) : new Error(msg.message));
       };
+      arm();
       worker.postMessage({ type: 'init', content, source } satisfies ToWorker);
     });
   }

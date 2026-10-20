@@ -110,6 +110,11 @@
     if (gpuAvailable) return `Supertone's Supertonic 3, on this computer's graphics card: about ${Math.round(DOWNLOAD_MB)} MB, downloaded once.`;
     return settings.voiceDevice === 'gpu' ? 'No WebGPU here: choose Auto or Processor for voices.' : "No WebGPU here: Auto uses this computer's processor.";
   });
+  const DEVICE_HINT = {
+    auto: 'Auto uses the graphics card, and steps down to the processor if it is missing or too slow.',
+    gpu: 'The graphics card makes a line in a fraction of a second.',
+    cpu: 'The processor keeps up with speech, but uses more power than the graphics card.',
+  };
   const VERDICT = { good: 'smooth', ok: 'lines may start a moment late', slow: 'too slow here: voices may pause' };
   const benchText = $derived.by(() => {
     if (voiceStatus.benchmarking) return 'Testing…';
@@ -545,7 +550,7 @@
         {#if settings.voices}
           <SettingRow
             title="Runs on"
-            hint={settings.voiceDevice === 'auto' ? 'Auto uses the graphics card, and steps down to the processor if it is missing or too slow.' : settings.voiceDevice === 'gpu' ? 'The graphics card makes a line in a fraction of a second.' : 'The processor keeps up with speech, but uses more power than the graphics card.'}
+            hint={DEVICE_HINT[settings.voiceDevice]}
             details="The graphics card is much faster; Auto only moves to the processor when it has to, and says so."
           >
             <Segmented

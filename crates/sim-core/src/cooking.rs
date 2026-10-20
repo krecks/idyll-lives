@@ -1107,7 +1107,7 @@ fn eat_seat(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<u32> {
     }
     let sits = |o: u32, tags: TagMask| {
         let obj = &objects[o as usize];
-        obj.seats_now(&content.objects[obj.def]).any(|t| t & tags != 0 && t & rules.seat_avoid == 0)
+        obj.sits(&content.objects[obj.def], tags, rules.seat_avoid)
     };
     let distance = |o: u32| {
         let (fx, fz) = approach(ctx, &objects[o as usize]);

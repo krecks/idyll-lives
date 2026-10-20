@@ -315,7 +315,11 @@ export class VoiceDirector {
     const idleShare = f.idle ? f.idleSlow / f.idle : 0;
     // Only when speech makes it worse: a game that is slow anyway isn't the voices' fault.
     if (busyShare > SLOW_SHARE && busyShare > idleShare * 2) this.pause('frames');
-    Object.assign(f, { busy: 0, busySlow: 0, idle: 0, idleSlow: 0 });
+    this.resetFrames();
+  }
+
+  private resetFrames(): void {
+    Object.assign(this.frames, { busy: 0, busySlow: 0, idle: 0, idleSlow: 0 });
   }
 
   /**
@@ -338,15 +342,11 @@ export class VoiceDirector {
           }
           // Give the processor a clean window to prove itself.
           this.lateRun = 0;
-          Object.assign(this.frames, { busy: 0, busySlow: 0, idle: 0, idleSlow: 0 });
+          this.resetFrames();
           toast(
             "Resident voices are switching to this computer's processor: the graphics card was too slow.",
             6000,
           );
-        })
-        .catch(() => {
-          this.steppingDown = false;
-          if (!this.disposed) this.pauseForSession(why);
         });
       return;
     }

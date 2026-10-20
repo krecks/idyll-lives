@@ -171,7 +171,7 @@ fn object_ids_stay_valid_after_a_sell() {
     let (object, act) = row(&w, 0);
     assert_eq!(object, fridge as f32);
     assert_eq!(act, action(&w, "eat"), "still eating");
-    let used = &w.objects[w.object_index(fridge).unwrap()];
+    let used = &w.objects[w.index_of(fridge).unwrap()];
     assert_eq!((used.x, used.z), (x, z), "the same fridge");
     assert!(used.users().any(|u| u == 0));
     // The UI's list of what they do names it the same way.

@@ -46,20 +46,20 @@ export function compressedTextureFeatures(): { deviceDescriptor: GPUDeviceDescri
  * `initAsync`, and `device.destroy()` does not remove listeners, so the closure keeps the engine
  * (and its renderer) alive after a preset change. Remember it here so `dispose` can take it off.
  */
-type DeviceWithErrorListener = GPUDevice & { __llErrorListener?: EventListener };
 if (typeof GPUDevice !== 'undefined') {
+  const errorListeners = new WeakMap<GPUDevice, EventListener>();
   const add = GPUDevice.prototype.addEventListener;
-  GPUDevice.prototype.addEventListener = function (this: DeviceWithErrorListener, type: string, listener: EventListenerOrEventListenerObject | null, options?: boolean | AddEventListenerOptions) {
-    if (type === 'uncapturederror' && listener && typeof listener === 'function') this.__llErrorListener = listener;
+  GPUDevice.prototype.addEventListener = function (this: GPUDevice, type: string, listener: EventListenerOrEventListenerObject | null, options?: boolean | AddEventListenerOptions) {
+    if (type === 'uncapturederror' && listener && typeof listener === 'function') errorListeners.set(this, listener);
     return add.call(this, type, listener as EventListenerOrEventListenerObject, options);
   };
   // Every engine (ours, the previews') destroys its device: take the listener off there, whatever
   // disposed it, so the device's caches cannot keep the engine alive.
   const destroy = GPUDevice.prototype.destroy;
-  GPUDevice.prototype.destroy = function (this: DeviceWithErrorListener) {
-    const listener = this.__llErrorListener;
+  GPUDevice.prototype.destroy = function (this: GPUDevice) {
+    const listener = errorListeners.get(this);
     if (listener) this.removeEventListener('uncapturederror', listener);
-    delete this.__llErrorListener;
+    errorListeners.delete(this);
     return destroy.call(this);
   };
 }

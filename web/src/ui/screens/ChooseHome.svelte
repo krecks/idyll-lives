@@ -56,7 +56,8 @@
   });
   const sleepers = $derived(residents.couples * 2 + residents.adults + residents.children);
   const shortage = $derived(bedPlaces !== null && sleepers > bedPlaces ? { beds: bedPlaces, sleepers } : null);
-  let pending = $state<{ beds: number; sleepers: number } | null>(null);
+  /** Asking whether to move in anyway (`shortage` can't change while the dialog is open). */
+  let confirming = $state(false);
   const neighbours = $derived(
     selected
       ? town.households
@@ -100,7 +101,7 @@
 
   function moveIn() {
     if (shortage) {
-      pending = shortage;
+      confirming = true;
       return;
     }
     start();
@@ -109,7 +110,7 @@
   function start() {
     const request = selected && app.homeRequest(selected.index);
     if (!request) return;
-    pending = null;
+    confirming = false;
     menuScene.highlight({});
     app.start(request);
   }
@@ -211,7 +212,7 @@
               <dt>Your household</dt>
               <dd>{household.members.map((m) => m.name).join(', ')}</dd>
             </dl>
-            {#if shortage && lot === 'house'}
+            {#if shortage}
               <p class="shortage" role="status">
                 Only {shortage.beds} bed place{shortage.beds === 1 ? '' : 's'} for {shortage.sleepers} sleepers. You can still move in: they'll share a bed or sleep on the floor until you add beds.
               </p>
@@ -245,13 +246,13 @@
   </main>
 </div>
 
-{#if pending}
-  <Modal title="Not enough beds" onclose={() => (pending = null)} width={460}>
+{#if confirming && shortage}
+  <Modal title="Not enough beds" onclose={() => (confirming = false)} width={460}>
     <p>
-      {pending.sleepers} people are moving in, but this home has {pending.beds} bed place{pending.beds === 1 ? '' : 's'}. Extra residents will share a bed or sleep on the floor until you add beds.
+      {shortage.sleepers} people are moving in, but this home has {shortage.beds} bed place{shortage.beds === 1 ? '' : 's'}. Extra residents will share a bed or sleep on the floor until you add beds.
     </p>
     <div class="actions">
-      <button class="btn ghost" onclick={() => (pending = null)}>Cancel</button>
+      <button class="btn ghost" onclick={() => (confirming = false)}>Cancel</button>
       <button class="btn primary" onclick={start}>Move in anyway</button>
     </div>
   </Modal>

@@ -89,6 +89,14 @@ export interface QualitySettings {
    * shadow-map draws in the village orbit, at the cost of flat-looking people in direct sun.
    */
   characterShadows: boolean;
+  /**
+   * The lot's objects cast the sun's shadows from one merged mesh of their bodies (baked again as
+   * one moves or hides) rather than from every model's thin instances: the furniture costs one
+   * shadow draw, not a hundred. See-through things and moving parts cast from their own meshes.
+   */
+  mergedObjectShadows: boolean;
+  /** 1: the street's models' far versions, where they have one (fewer triangles); 0: full detail. */
+  streetLod: 0 | 1;
   /** WebGPU only: record draw commands once and replay them each frame (the menus' town). */
   snapshotRendering: boolean;
   /**
@@ -109,9 +117,9 @@ export interface RenderQuality extends QualitySettings {
 }
 
 export const QUALITY: Record<GraphicsPreset, QualitySettings> = {
-  low: { shadowMapSize: 1024, msaaSamples: 1, anisotropy: 4, clusteredLamps: false, mirrors: 1, mirrorScale: 0.4, mirrorRate: 10, lightingStep: 10, lawnDensity: 0.5, landscapeShadows: false, streetShadows: false, characterShadows: false, snapshotRendering: true, ambientRange: 0 },
-  medium: { shadowMapSize: 2048, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 1, mirrorScale: 0.5, mirrorRate: 30, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, streetShadows: true, characterShadows: true, snapshotRendering: true, ambientRange: 40 },
-  high: { shadowMapSize: 4096, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 2, mirrorScale: 0.75, mirrorRate: 0, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, streetShadows: true, characterShadows: true, snapshotRendering: true, ambientRange: 60 },
+  low: { shadowMapSize: 1024, msaaSamples: 1, anisotropy: 4, clusteredLamps: false, mirrors: 1, mirrorScale: 0.4, mirrorRate: 10, lightingStep: 10, lawnDensity: 0.5, landscapeShadows: false, streetShadows: false, characterShadows: false, mergedObjectShadows: true, streetLod: 1, snapshotRendering: true, ambientRange: 0 },
+  medium: { shadowMapSize: 2048, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 1, mirrorScale: 0.5, mirrorRate: 30, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, snapshotRendering: true, ambientRange: 40 },
+  high: { shadowMapSize: 4096, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 2, mirrorScale: 0.75, mirrorRate: 0, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, snapshotRendering: true, ambientRange: 60 },
 };
 
 export const GRAPHICS_PRESETS = Object.keys(QUALITY) as GraphicsPreset[];

@@ -102,14 +102,14 @@ import { fieldLayers, Street } from './street';
 import { MaterialLibrary, WINDOWLESS_BITS, type DarkTiles } from './materials';
 import { refreshSoftLook, shadingFromSettings } from './softLook';
 import { Geo, LOOK as CUT } from './geometry';
-import { buildModel, forgetModelScene, motionsOf, onModelFileArrived, paintColors, painted, placementVariation, prefetchModels, standInOf, withGlows, type ModelTemplate, type StandIn } from './models';
+import { buildModel, motionsOf, onModelFileArrived, paintColors, painted, placementVariation, prefetchModels, standInOf, withGlows, type ModelTemplate, type StandIn } from './models';
 import { TemplateCache } from './templateCache';
 import { compressedTextureFeatures, noteWebGpuFailed, webGpuFailed } from './loaders';
 import { Characters, MAX_CHARACTERS } from './characters';
 import { ItemLayer } from './items';
 import { Mirrors, type MirrorInstance } from './mirrors';
 import { ResizeHandles } from './handles';
-import { forgetWind, installNature, Landscape, natureDecor, setWind, Sky } from './nature';
+import { installNature, Landscape, natureDecor, setWind, Sky } from './nature';
 import { LAYER_ALL, LAYER_TOWN, LAYER_WORLD } from './layers';
 import { NightGrade } from './nightGrade';
 import { BuildEffects, writeMoving, type PopTarget } from './buildFx';
@@ -153,7 +153,9 @@ const SHADOW_EDGE_FADE = 0.15;
  * One body mesh's instances in the merged object shadow mesh (Low): its vertices (`pos`, local) and
  * world matrix, its instances' matrices, and the merged vertex its first instance starts at.
  */
-type ShadowPart = { pos: ArrayLike<number>; world: Matrix; matrices: Float32Array; count: number; first: number };
+type ShadowPart = { pos: ArrayLike<number>; world: Matrix; matrices: Float32Array; first: number };
+/** A body mesh to merge into the object shadow mesh, and its instances' matrices. */
+type ShadowSource = { mesh: Mesh; matrices: Float32Array };
 /**
  * Interior lights: the household's lamps first, then dim fills for rooms without one. With
  * clustered lighting (WebGPU, and WebGL2 with float blending) they live in one
@@ -827,7 +829,7 @@ export class BabylonRenderer implements Renderer {
     this.street = new Street(scene, this.deps.assets, this.house, undefined, true, (def) => {
       const d = this.deps.content.object(def);
       return d && { model: d.model ?? `model.${def}`, footprint: d.footprint ?? [1, 1], standIn: this.standInOf(d) };
-    }, this.quality.preset === 'low' ? 1 : 0);
+    }, this.quality.streetLod);
     // Wind sway and tint variation for foliage materials (hooks them as the models load).
     installNature(scene);
     await this.setupEnvironment();
@@ -1038,7 +1040,6 @@ export class BabylonRenderer implements Renderer {
       ...new Set([
         ...[...this.lotMeshes, ...this.worldMeshes].filter((m) => !notCasting.has(m.name) && !m.name.startsWith('silhouette') && !houseCasters.includes(m)),
         ...templates.filter((m) => !this.objectShadowSources.has(m)),
-        ...(this.objectShadowMerge ? [this.objectShadowMerge] : []),
         // Sims' small details (eyes, brows) don't cast sun shadows.
         ...(this.quality.characterShadows ? this.characters.casters() : []),
         ...(this.quality.streetShadows ? streetCasters : []),
@@ -2385,7 +2386,6 @@ export class BabylonRenderer implements Renderer {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    MaterialLibrary.forget(this.scene);
     this.onFailure = null;
     this.townTicket++;
     this.townListener = null;
@@ -2394,7 +2394,6 @@ export class BabylonRenderer implements Renderer {
     // Babylon's own loss handler keeps the engine (and its renderer) in a promise that may never
     // settle; `watchDeviceLoss` uses a WeakRef instead. Drop the hooks the engine still holds on us.
     this.engine.onContextLostObservable.clear();
-    this.engine.onResizeObservable.clear();
     this.engine.customAnimationFrameRequester = null;
     delete (this.engine as unknown as { _measureFps?: () => void })._measureFps;
     const debug = window as unknown as { __renderer?: unknown; __scene?: unknown };
@@ -2411,11 +2410,9 @@ export class BabylonRenderer implements Renderer {
     this.characters?.dispose();
     this.items?.dispose();
     this.overview?.dispose();
-    // The scene owns the meshes, materials and its own cleanup (file retries, observers); the
-    // engine alone does not dispose it. Drop the per-scene weak caches too: their values point
-    // back at the scene, so a weak entry can otherwise keep the whole renderer alive.
-    forgetModelScene(this.scene);
-    forgetWind(this.scene);
+    // The scene owns the meshes, materials and its own cleanup (file retries, the material
+    // library's timer, observers); the engine alone does not dispose it. (The per-scene caches are
+    // weak maps: their entries go with the scene.)
     this.scene.dispose();
     // (Babylon's WebGPU error listener on the device goes as the engine destroys it: `loaders`.)
     this.engine.dispose();
@@ -4034,8 +4031,9 @@ export class BabylonRenderer implements Renderer {
     const glows: typeof this.glows = [];
     // Low draws the objects' sun shadows from one merged mesh (their bodies, at rest) rather than
     // from every template's thin instances: the lot's furniture costs a draw, not a hundred.
-    const shadowSources: { mesh: Mesh; matrices: Float32Array; count: number }[] = [];
-    const objectShadowMeshes: Mesh[] = [];
+    const merge = this.quality.mergedObjectShadows;
+    const shadowSources: ShadowSource[] = [];
+    this.objectShadowSources.clear();
     const instances = perfStart('render: object instances');
     [...byModel.values()].forEach((list, n) => {
       const template = templates[n];
@@ -4114,9 +4112,9 @@ export class BabylonRenderer implements Renderer {
         mesh.receiveShadows = true;
         // (Something see-through still casts from its own thin instances; a moving part does not cast
         // on Low, where the merged mesh is the lot's one object caster.)
-        if (!mesh.material?.needAlphaBlending() && !mesh.material?.needAlphaTesting()) {
-          objectShadowMeshes.push(mesh);
-          if (part < 0) shadowSources.push({ mesh, matrices, count: list.length });
+        if (merge && !mesh.material?.needAlphaBlending() && !mesh.material?.needAlphaTesting()) {
+          this.objectShadowSources.add(mesh);
+          if (part < 0) shadowSources.push({ mesh, matrices });
         }
       });
       for (const { mesh, part, screen } of template.glows ?? []) {
@@ -4136,11 +4134,9 @@ export class BabylonRenderer implements Renderer {
     });
     perfEnd(instances);
     const shadowsSpan = perfStart('render: object shadows');
-    this.objectShadowSources.clear();
     this.objectShadowMerge = null;
     this.objectShadowParts.clear();
-    if (this.quality.preset === 'low' && shadowSources.length) {
-      for (const mesh of objectShadowMeshes) this.objectShadowSources.add(mesh);
+    if (shadowSources.length) {
       this.objectShadowMerge = this.mergeObjectShadows(shadowSources);
       if (this.objectShadowMerge) this.worldMeshes.push(this.objectShadowMerge);
     }
@@ -4189,17 +4185,18 @@ export class BabylonRenderer implements Renderer {
    * the template is left out of the shadow list, see `objectShadowSources`). Its layer mask keeps it
    * out of the camera's pass.
    */
-  private mergeObjectShadows(sources: { mesh: Mesh; matrices: Float32Array; count: number }[]): Mesh | null {
+  private mergeObjectShadows(sources: ShadowSource[]): Mesh | null {
     // (Only read: the template's own arrays, no copies.)
     const parts: (ShadowPart & { idx: ArrayLike<number> })[] = [];
     let vertices = 0;
     let indexCount = 0;
-    for (const { mesh, matrices, count } of sources) {
+    for (const { mesh, matrices } of sources) {
       const pos = mesh.getVerticesData(VertexBuffer.PositionKind, false, false);
       const idx = mesh.getIndices(false, false);
-      if (!pos || !idx || !count) continue;
+      if (!pos || !idx) continue;
+      const count = matrices.length / 16;
       // A one-part model keeps the part's own transform; a merged one's is already in its vertices.
-      parts.push({ pos, idx, world: mesh.computeWorldMatrix(true).clone(), matrices, count, first: vertices });
+      parts.push({ pos, idx, world: mesh.computeWorldMatrix(true).clone(), matrices, first: vertices });
       vertices += (pos.length / 3) * count;
       indexCount += idx.length * count;
     }
@@ -4209,7 +4206,7 @@ export class BabylonRenderer implements Renderer {
     let at = 0;
     for (const part of parts) {
       const n = part.pos.length / 3;
-      for (let i = 0; i < part.count; i++) {
+      for (let i = 0; i < part.matrices.length / 16; i++) {
         this.bakeShadowInstance(part, i, positions);
         const base = part.first + i * n;
         for (let k = 0; k < part.idx.length; k++) indices[at++] = base + part.idx[k];
@@ -4234,8 +4231,8 @@ export class BabylonRenderer implements Renderer {
     mesh.isPickable = false;
     mesh.receiveShadows = false;
     // The shadow map's custom list ignores layer masks; the camera's pass does not.
+    // (Its world matrix is frozen with the world's meshes, `buildWorld`.)
     mesh.layerMask = 0;
-    mesh.freezeWorldMatrix();
     return mesh;
   }
 
@@ -4266,7 +4263,6 @@ export class BabylonRenderer implements Renderer {
     const buffer = mesh.getVertexBuffer(VertexBuffer.PositionKind);
     const positions = this.objectShadowPositions;
     for (const part of parts) {
-      if (target.index >= part.count) continue;
       const [start, end] = this.bakeShadowInstance(part, target.index, positions);
       buffer?.updateDirectly(positions.subarray(start, end), start);
     }

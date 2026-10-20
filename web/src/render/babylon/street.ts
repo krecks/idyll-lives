@@ -497,7 +497,7 @@ export class Street {
     private readonly lived = false,
     /** Draws the outdoor things of public places outside the viewed lot (the game, not the overview, which draws every lot's). */
     private readonly look?: ObjectLook,
-    /** 1: the street's models' far versions (Low, and the overview), if they have one; 0: full detail. */
+    /** 1: the street's models' far versions, if they have one (`QualitySettings.streetLod`); 0: full detail. */
     private readonly lod: 0 | 1 = 0,
   ) {
     this.lib = MaterialLibrary.for(scene);

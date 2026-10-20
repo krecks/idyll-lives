@@ -855,7 +855,7 @@ export class BuildBuyInput {
     const r = this.resizing;
     const sel = game.furnishing && !game.placing && game.buySelection !== null ? (game.objects.find((o) => o.id === game.buySelection) ?? null) : null;
     const n = r?.now;
-    const key = r && n ? `r:${r.id}:${n.cx}:${n.cz}:${n.ex}:${n.ez}:${n.tall}:${r.handle}` : sel ? `s:${sel.id}:${sel.x}:${sel.z}:${sel.w}:${sel.d}:${sel.size}:${sel.tall ?? 0}:${offsetKey(sel.offset)}:${this.hotHandle}:${game.objects.length}` : '';
+    const key = r && n ? `r:${r.id}:${n.cx}:${n.cz}:${n.ex}:${n.ez}:${n.tall}:${r.handle}` : sel ? `s:${sel.id}:${sel.x}:${sel.z}:${sel.w}:${sel.d}:${sel.size}:${sel.tall ?? 0}:${offsetKey(sel.offset)}:${this.hotHandle}` : '';
     if (key === this.handlesKey) return;
     this.handlesKey = key;
     if (r && n) {

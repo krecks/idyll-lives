@@ -7,7 +7,7 @@
  */
 
 import init, { Game, LoadError } from './wasm-pkg/sim_wasm.js';
-import type { FromWorker, GameSource, LeanWorld, MeshArrays, SaveProblem, StartPhase, ToWorker, WorldStructure } from './protocol';
+import type { FromWorker, GameSource, LeanWorld, MeshArrays, SaveProblem, ToWorker, WorldStructure } from './protocol';
 import { createSharedSnapshot, SharedSnapshotWriter, type SnapshotLayout } from './snapshot';
 
 interface WorkerScope {
@@ -33,7 +33,8 @@ let memory: WebAssembly.Memory;
 let writer: SharedSnapshotWriter | null = null;
 let lastStructure = -1;
 let lastItems = -1;
-let lastLamps = '';
+let lastLampStructure = -1;
+let lastLights = -1;
 /** Lot version and region the renderer last got the lot (walls, rooms, meshes) for. */
 let lastLot = -1;
 let lastRegion = '';
@@ -107,9 +108,9 @@ scope.onmessage = (e) => {
 
 async function start(content: string, source: GameSource): Promise<void> {
   // Each phase says it's under way (the main thread gives up on a start only when it stalls).
-  starting('loading');
+  starting();
   memory = (await init({ module_or_path: fetchWasm() })).memory;
-  starting('building');
+  starting();
   try {
     game = 'save' in source ? Game.fromSave(content, source.save) : new Game(content, source.lot, source.seed);
   } catch (err) {
@@ -145,15 +146,15 @@ async function fetchWasm(): Promise<Response> {
       const now = performance.now();
       if (now - last >= START_PROGRESS_MS) {
         last = now;
-        starting('loading');
+        starting();
       }
     }
   })().catch(() => {});
   return response;
 }
 
-function starting(phase: StartPhase): void {
-  scope.postMessage({ type: 'starting', phase });
+function starting(): void {
+  scope.postMessage({ type: 'starting' });
 }
 
 /** Opens a save only to see whether it can be played (an imported file), then lets it go. */
@@ -248,9 +249,10 @@ function publish(): void {
   }
   const version = g.structure_version();
   // (Before the world, which the renderer builds with them.)
-  const lamps = `${version}:${g.lights_version()}`;
-  if (lamps !== lastLamps) {
-    lastLamps = lamps;
+  const lights = g.lights_version();
+  if (version !== lastLampStructure || lights !== lastLights) {
+    lastLampStructure = version;
+    lastLights = lights;
     scope.postMessage({ type: 'lamps', off: JSON.parse(g.lamps_off()) });
   }
   if (version !== lastStructure) {

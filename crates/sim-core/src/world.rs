@@ -86,7 +86,7 @@ pub struct ObjectInstance {
     /// Equal to the object's index in `World::objects` (internal; views and commands use `stable`).
     pub id: u32,
     /// The object's id for its whole life: it never changes when other objects are sold, moved or
-    /// reloaded. `World::object_index` turns it back into an index.
+    /// reloaded. `World::index_of` turns it back into an index.
     pub stable: u32,
     pub def: usize,
     /// Minimum corner of the rotated footprint.
@@ -294,6 +294,11 @@ impl ObjectInstance {
     /// out is no seat).
     pub fn seats_now<'a>(&'a self, def: &'a crate::content::ObjectDef) -> impl Iterator<Item = TagMask> + 'a {
         def.interactions.iter().filter(|i| i.pose == Pose::Sit && !i.baby && self.fits(i)).map(|i| i.tags)
+    }
+
+    /// Whether it is a seat now with a way to sit that has one of `want`'s tags and none of `avoid`'s.
+    pub fn sits(&self, def: &crate::content::ObjectDef, want: TagMask, avoid: TagMask) -> bool {
+        self.seats_now(def).any(|t| t & want != 0 && t & avoid == 0)
     }
 
     /// Takes on the state `old`, this object before it was lifted out and placed again, had: its
@@ -1492,11 +1497,11 @@ impl World {
     }
 
     /// The index in `World::objects` of the object with stable id `stable`, if it still exists.
-    pub fn object_index(&self, stable: u32) -> Option<usize> {
+    pub fn index_of(&self, stable: u32) -> Option<usize> {
         self.objects.iter().position(|o| o.stable == stable)
     }
 
-    /// The stable id of the object at `index` in `World::objects` (the inverse of `object_index`).
+    /// The stable id of the object at `index` in `World::objects` (the inverse of `index_of`).
     pub fn stable_of(&self, index: u32) -> Option<u32> {
         self.objects.get(index as usize).map(|o| o.stable)
     }
@@ -2781,7 +2786,7 @@ impl World {
         // A command names objects by their stable ids; the simulation works in indices.
         if let Some(object) = cmd.object_mut() {
             let stable = *object;
-            match self.object_index(stable) {
+            match self.index_of(stable) {
                 Some(i) => *object = i as u32,
                 None if stable < self.next_object_id => return Ok(()),
                 None => return Err(Error::new(format!("unknown object {stable}"))),
@@ -4459,7 +4464,7 @@ fn seat_near_object(
         .unwrap_or_else(|| objects[object as usize].front_tile(content));
     let target = [tx as f32 + 0.5, tz as f32 + 0.5];
     let sits = |o: &ObjectInstance| {
-        o.seats_now(&content.objects[o.def]).any(|t| t & rules.seat_tags != 0 && t & rules.seat_avoid == 0)
+        o.sits(&content.objects[o.def], rules.seat_tags, rules.seat_avoid)
     };
     objects
         .iter()

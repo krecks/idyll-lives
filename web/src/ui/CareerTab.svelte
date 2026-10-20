@@ -14,6 +14,7 @@
   const time = (hour: number) => clock((hour % 24) * 60, settings.clock24h);
   const skill = (id: string) => services.content.skill(id);
   const nextReady = $derived(job?.next ? job.next.requires.every((r) => r.have >= r.level) : false);
+  const retired = $derived(sim.pension !== undefined);
 
   /** Whole skill levels as a string, so suggestions only recompute when a level changes. */
   const skillKey = $derived(sim.skills.map((s) => Math.floor(s)).join(','));
@@ -23,7 +24,7 @@
    * can take without probation, ranked by how well the track uses the Sim's best skills.
    */
   const suggestions = $derived.by(() => {
-    if (!catalog || job) return [];
+    if (!catalog || job || retired) return [];
     const skills = skillKey.split(',').map(Number);
     const raw = sim.skills;
     const picks: { career: number; level: number; def: Level; category: string; score: number }[] = [];
@@ -124,11 +125,11 @@
   </div>
 {:else}
   <div class="job">
-    {#if sim.pension === undefined}
+    {#if !retired}
       <p class="pitch">{sim.name} is between jobs. Pick from {positions.toLocaleString()} positions in {catalog.categories.length} fields — skills unlock better grades and shorter weeks.</p>
     {/if}
     <button class="btn primary small" onclick={openBoard}>Browse {positions.toLocaleString()} jobs</button>
-    {#if sim.pension === undefined && suggestions.length}
+    {#if suggestions.length}
       <span class="eyebrow">Good fits</span>
       <ul class="suggest">
         {#each suggestions as s (s.career)}

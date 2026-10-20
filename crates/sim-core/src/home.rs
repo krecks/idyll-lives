@@ -674,7 +674,7 @@ impl World {
 
     /// Sells an object at home for part of what was spent on it (nothing in Creative). What
     /// stands on its top is sold with it.
-    pub fn sell(&mut self, household: u32, object: u32) -> Result<(), Error> {
+    pub(crate) fn sell(&mut self, household: u32, object: u32) -> Result<(), Error> {
         let (h, _) = self.home_object(household, object)?;
         let obj = &self.objects[object as usize];
         if self.content.objects[obj.def].price.is_none() {
@@ -789,7 +789,7 @@ impl World {
         result
     }
 
-    pub fn recolor(&mut self, household: u32, object: u32, colors: crate::world::Colors) -> Result<(), Error> {
+    pub(crate) fn recolor(&mut self, household: u32, object: u32, colors: crate::world::Colors) -> Result<(), Error> {
         self.home_object(household, object)?;
         self.objects[object as usize].colors = colors;
         self.structure_version = self.structure_version.wrapping_add(1);
@@ -798,7 +798,7 @@ impl World {
 
     /// A quick fix in Buy mode: as good as new, for a share of the price times how worn it is
     /// (free in Creative).
-    pub fn repair(&mut self, household: u32, object: u32) -> Result<(), Error> {
+    pub(crate) fn repair(&mut self, household: u32, object: u32) -> Result<(), Error> {
         let (h, _) = self.home_object(household, object)?;
         let obj = &self.objects[object as usize];
         let def = &self.content.objects[obj.def];
@@ -816,7 +816,7 @@ impl World {
     }
 
     /// Buys the next quality level for an object at home (Buy mode, instant). Returns the new quality.
-    pub fn upgrade(&mut self, household: u32, object: u32) -> Result<u8, Error> {
+    pub(crate) fn upgrade(&mut self, household: u32, object: u32) -> Result<u8, Error> {
         let (h, _) = self.home_object(household, object)?;
         let rules = &self.content.object_rules;
         let obj = &self.objects[object as usize];

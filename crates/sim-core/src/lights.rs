@@ -49,7 +49,7 @@ pub fn switchable(world: &World, def: usize) -> bool {
 }
 
 /// Switches one lamp; false if it was so already (or isn't a lamp).
-pub fn set(world: &mut World, object: u32, on: bool) -> bool {
+pub(crate) fn set(world: &mut World, object: u32, on: bool) -> bool {
     let Some(o) = world.objects.get(object as usize) else { return false };
     if !switchable(world, o.def) || o.off != on {
         return false;

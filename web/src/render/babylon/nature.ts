@@ -893,11 +893,6 @@ export function natureDecor(key: string, items: Decor, world?: WorldStructure, v
 /** Wind shared by every foliage material of a scene; `time` advances per frame. */
 const windState = new WeakMap<Scene, { time: number; strength: number }>();
 
-/** Drops the wind state of a scene that is going away. */
-export function forgetWind(scene: Scene): void {
-  windState.delete(scene);
-}
-
 /**
  * Per finish (primitive parts' `material`): x bend (per m^2 of height), y flutter amplitude (m),
  * z flutter speed, w flutter ramp (1/m).
