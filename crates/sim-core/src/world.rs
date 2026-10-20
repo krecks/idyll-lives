@@ -1358,10 +1358,9 @@ impl World {
             world.spawn_sim(s)?;
         }
         world.init_relationships(&lot_file.relationships)?;
-        // Babies come with a crib; a crowded home is reported to the player.
+        // Babies come with a crib (a crowded home is reported to the player as time starts).
         for h in 0..world.households.len() {
             crate::lifecycle::cribs_for_babies(&mut world, h);
-            crate::lifecycle::notify_missing_beds(&mut world, h);
         }
         world.make_storeys();
         world.refresh_rooms();
@@ -2497,6 +2496,13 @@ impl World {
         }
         self.refresh_reach();
         self.refresh_index();
+        // A new game's first step: the player hears of anyone without a bed (told as the world was
+        // made, it would be the story so far, which the view doesn't show as news).
+        if self.tick == 0 {
+            for h in 0..self.households.len() {
+                crate::lifecycle::notify_missing_beds(self, h);
+            }
+        }
         self.tick += 1;
         let tick = self.tick;
 

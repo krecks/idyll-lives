@@ -544,9 +544,10 @@ pub(crate) fn cribs_for_babies(w: &mut World, h: usize) {
     }
 }
 
-/// The player's household moved into a home with fewer bed places than people past the crib:
-/// tell them once, for each resident without a bed. The simulation's fallback is unchanged:
-/// they share a bed or sleep on the floor until the player buys one.
+/// The player's household starts in a home with fewer bed places than people past the crib:
+/// tell them once, for each resident without a bed (on the game's first step, so it's news to the
+/// view, not the story so far). The simulation's fallback is unchanged: they share a bed or sleep
+/// on the floor until the player buys one.
 pub(crate) fn notify_missing_beds(w: &mut World, h: usize) {
     let sleep = w.content.day_rhythm.sleep_tags;
     if sleep == 0 || !w.households[h].player {

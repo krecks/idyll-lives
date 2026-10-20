@@ -95,10 +95,22 @@ fn a_child_adopted_into_a_home_without_a_bed_for_them() {
 
 #[test]
 fn a_crowded_home_is_told_which_sleepers_have_no_bed() {
-    let w = World::from_json(CONTENT, CROWDED, 1).unwrap();
+    let mut w = World::from_json(CONTENT, CROWDED, 1).unwrap();
     assert_eq!(beds(&w, 0), 1, "one double bed");
-    let told: Vec<usize> = w.events.iter().filter(|e| e.kind == EventKind::NoBed).map(|e| e.a as usize).collect();
-    assert_eq!(told, [2, 3], "the two without a bed place are named");
+    let told = |w: &World| w.events.iter().filter(|e| e.kind == EventKind::NoBed).map(|e| e.a as usize).collect::<Vec<_>>();
+    // Not in the story the game starts with (the view takes that as history, not news).
+    assert!(told(&w).is_empty(), "not before time starts");
+    w.tick_once();
+    assert_eq!(told(&w), [2, 3], "the two without a bed place are named");
+    for _ in 0..10 {
+        w.tick_once();
+    }
+    assert_eq!(told(&w).len(), 2, "once");
+    // A game saved before time started tells them when it does.
+    let w = World::from_json(CONTENT, CROWDED, 1).unwrap();
+    let mut w = World::from_save_json(CONTENT, &w.save_json()).unwrap_or_else(|e| panic!("{e}"));
+    w.tick_once();
+    assert_eq!(told(&w), [2, 3]);
 }
 
 #[test]
