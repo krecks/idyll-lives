@@ -197,7 +197,8 @@ fn a_repeated_rotate_does_not_move_another_object() {
 }
 
 /// R2-04: every command by object id names the object itself, not a place in the list. One
-/// for an object that was sold is refused and changes nothing, not even the undo steps.
+/// for an object that was sold (a second click on Sell, a menu still open on it) is skipped: no
+/// error, and nothing changes, not even the undo steps.
 #[test]
 fn commands_for_an_object_that_moved_on_are_skipped() {
     let mut w = world();
@@ -216,7 +217,7 @@ fn commands_for_an_object_that_moved_on_are_skipped() {
     ];
     for cmd in stale {
         let what = format!("{cmd:?}");
-        assert!(w.apply(cmd).is_err(), "{what}");
+        assert!(w.apply(cmd).is_ok(), "{what}");
     }
     assert_eq!((w.objects.clone(), w.households[0].funds, w.undo_steps(0)), before, "nothing changed");
     assert!(w.sims[0].queue().next().is_none(), "nothing queued");

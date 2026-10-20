@@ -383,6 +383,20 @@ pub enum EdgeKind {
 }
 
 impl Command {
+    /// The object (stable id) this command names, if it names one.
+    pub fn object(&self) -> Option<u32> {
+        match *self {
+            Command::SwitchLamp { object, .. }
+            | Command::Use { object, .. }
+            | Command::Sell { object, .. }
+            | Command::MoveObject { object, .. }
+            | Command::Recolor { object, .. }
+            | Command::Upgrade { object, .. }
+            | Command::Repair { object, .. } => Some(object),
+            _ => None,
+        }
+    }
+
     /// The household whose home a build or buy edit changes (edits can be undone), if this is one.
     pub fn home_edit(&self) -> Option<u32> {
         match *self {

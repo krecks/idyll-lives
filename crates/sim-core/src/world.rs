@@ -2779,8 +2779,13 @@ impl World {
     }
 
     /// Applies a player command. Build and buy edits can be undone (`Command::Undo`) until time
-    /// moves on or the player gives the household another kind of order.
+    /// moves on or the player gives the household another kind of order. A command naming an
+    /// object that's gone since the view showed it (sold, undone: an id handed out before and
+    /// not there now) does nothing; an id never handed out is an error.
     pub fn apply(&mut self, cmd: Command) -> Result<(), Error> {
+        if cmd.object().is_some_and(|o| o < self.next_object_id && self.object_index(o).is_none()) {
+            return Ok(());
+        }
         let history = match cmd {
             Command::Undo { household } => Some(self.undo(household)),
             Command::Redo { household } => Some(self.redo(household)),
