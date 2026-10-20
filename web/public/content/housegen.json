@@ -352,6 +352,19 @@
     "count": [2, 6]
   },
 
+  "$residents": "A house is laid out the same whoever lives there; its furniture is for them. The biggest bedrooms first: a couple's gets a bed for two (`beds.couple`), an adult's any bed, a child's a child's bed (`beds.child`) and things from `childRoom`. Short of bedrooms, children share one (two child's beds, else a bunk bed), then adults (two `beds.single`; a `bunk` bed if they don't fit). A bedroom nobody sleeps in, and a playroom in a home without children, become a spare room by weight from `spareRoom` (`guest`: a bedroom with a single bed; else a room kind). Things of the `kidsOnly` content categories and groups (toys, kids' furniture, cribs) are only in homes with children. Garden doors and the rest of the layout don't change.",
+  "residents": {
+    "beds": {
+      "couple": ["bed", "bedDouble", "bedQueenUpholstered"],
+      "single": ["bedSingle", "bedDaybed"],
+      "child": ["kidsBed", "kidsBedCar", "bedSingle"],
+      "bunk": ["bedBunk"]
+    },
+    "childRoom": [{ "one": ["toyBox", "toyChest", "teddyBear", "dollHouse", "rockingHorse", "kidsBookshelf", "kidsDesk"], "count": [1, 2], "chance": 0.9 }],
+    "spareRoom": { "guest": 2, "study": 1, "hobby": 1 },
+    "kidsOnly": { "categories": ["kids"], "groups": ["toys"] }
+  },
+
   "$names": "House names: one word from each list.",
   "names": {
     "first": ["Birch", "Linden", "Rowan", "Hazel", "Juniper", "Alder", "Clover", "Meadow", "Brook", "Ivy", "Heather", "Holly", "Elder", "Laurel", "Briar", "Fern", "Sorrel", "Thistle"],

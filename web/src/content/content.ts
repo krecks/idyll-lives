@@ -326,6 +326,8 @@ export interface RoomKindDef {
   essentials?: string[][];
   size?: [number, number];
   exclusive?: boolean;
+  /** A room no kind's tags are offered in is of this kind if people pass through it (two doors or more, or stairs): a hallway. */
+  passage?: boolean;
 }
 
 /** A roof style (Build mode's Roof tool): the shape and, for pitched roofs, the pitch in degrees. */

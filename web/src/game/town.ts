@@ -14,8 +14,8 @@ import type { AssetRegistry } from '../assets/registry';
 import type { Content } from '../content/content';
 import type { GameKind, LandscapeParams, Lifespan, WorldLook } from '../core/protocol';
 import { fetchText } from '../content/content';
-import { householdBonds, householdSpawns, randomHousehold, type HouseholdDraft, type SimSpawn } from './household';
-import { generateHouse, objectInfos, random, type HouseGenConfig, type ObjectInfos } from './housegen';
+import { bedroomsNeeded, householdBonds, householdSpawns, randomHousehold, residentsOf, type HouseholdDraft, type SimSpawn } from './household';
+import { generateHouse, objectInfos, random, residentsKey, type HouseGenConfig, type ObjectInfos, type Residents } from './housegen';
 import { streetNames, WORLDS, worldName, worldTagline, type WorldKind } from './world';
 
 export type Wall = [number, number, number, number];
@@ -221,14 +221,16 @@ function shuffled<T>(list: readonly T[], rand: Rand = Math.random): T[] {
   return out;
 }
 
-export function houseTemplate(t: Templates, id: string): HouseTemplate | undefined {
+/** A house layout by id; a generated one furnished for `residents` (the layout is the same for anyone; undefined: nobody lives there). */
+export function houseTemplate(t: Templates, id: string, residents?: Residents): HouseTemplate | undefined {
   if (id.startsWith('gen:')) {
-    if (!generated.has(id)) {
+    const at = `${id}#${residentsKey(residents)}`;
+    if (!generated.has(at)) {
       const [, size, seed] = id.split(':');
-      const house = t.gen && t.info ? generateHouse(t.gen, t.info, lotDims(t, size as LotSize), t.plot, size, Number(seed), t.lampTiles, t.windowTiles) : null;
-      generated.set(id, house ?? undefined);
+      const house = t.gen && t.info ? generateHouse(t.gen, t.info, lotDims(t, size as LotSize), t.plot, size, Number(seed), t.lampTiles, t.windowTiles, residents) : null;
+      generated.set(at, house ?? undefined);
     }
-    return generated.get(id);
+    return generated.get(at);
   }
   return t.houses.find((h) => h.id === id);
 }
@@ -460,8 +462,13 @@ export function populate(content: Content, assets: AssetRegistry, t: Templates, 
   for (const slot of shuffled(houses).slice(0, wanted)) {
     if (residents >= MAX_NEIGHBOURS) break;
     const bedrooms = houseTemplate(t, slot.template)?.bedrooms ?? 1;
-    const size = Math.max(1, Math.min(4, bedrooms + Math.floor(Math.random() * 2), MAX_NEIGHBOURS - residents));
-    const household = randomHousehold(content, assets, size, [...taken]);
+    let size = Math.max(1, Math.min(4, bedrooms + Math.floor(Math.random() * 2), MAX_NEIGHBOURS - residents));
+    // A household that fits: a couple shares a bedroom, two children may, anyone else needs one.
+    let household = randomHousehold(content, assets, size, [...taken]);
+    for (let tries = 1; bedroomsNeeded(residentsOf(content, household)) > bedrooms && size > 1; tries++) {
+      if (tries % 6 === 0) size--;
+      household = randomHousehold(content, assets, size, [...taken]);
+    }
     taken.add(household.name);
     residents += household.members.length;
     households.push({ household, slot: slot.index });
@@ -628,9 +635,10 @@ export interface TownLayout {
 
 /**
  * Stamps every plot's house layout (or its public place: a park, a square, a shop) onto the town. `playerSlot` is left without a
- * driveway (it stays open for building); null gives every house one.
+ * driveway (it stays open for building); null gives every house one. Each generated house is
+ * furnished for its household (`player`: a new one moving in at `playerSlot`).
  */
-export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDraft, playerSlot: number | null): TownLayout {
+export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDraft, playerSlot: number | null, player?: HouseholdDraft): TownLayout {
   const walls: Wall[] = [];
   const doors: Door[] = [];
   const windows: Door[] = [];
@@ -687,8 +695,11 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
     const doorX = s.rotated ? px - 1 : px;
     paths.push(s.rotated ? { x: doorX, z: pz, w: 1, d: s.z + pd - pz } : { x: doorX, z: s.z, w: 1, d: pz - s.z });
   };
+  const living = new Map(town.households.map((h) => [h.slot, h.household]));
+  if (player && playerSlot !== null) living.set(playerSlot, player);
   const layoutOf = (s: PlotSlot) => {
-    const h = houseTemplate(t, s.template);
+    const who = living.get(s.index);
+    const h = houseTemplate(t, s.template, who && residentsOf(content, who));
     return h && onLot(t, h, s.lot, footprint);
   };
   const placeOf = (s: PlotSlot) => {
@@ -772,7 +783,7 @@ export function assembleTown(
   playerSlot: number,
   { existing = false, mode = 'living', lifespan = 'normal' }: AssembleOptions = {},
 ): string {
-  const { walls, doors, windows, objects, paths, fields, plots, storeys, basement } = layoutTown(content, t, town, playerSlot);
+  const { walls, doors, windows, objects, paths, fields, plots, storeys, basement } = layoutTown(content, t, town, playerSlot, existing ? undefined : player);
   const footprint = (def: string): [number, number] => content.object(def)?.footprint ?? [1, 1];
   const point = (s: PlotSlot, [x, z]: [number, number]): [number, number] => {
     const { width: pw, depth: pd } = lotDims(t, s.lot);

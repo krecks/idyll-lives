@@ -77,6 +77,26 @@ fn rooms_get_a_kind_and_scores() {
 }
 
 #[test]
+fn a_room_people_pass_through_is_a_hallway() {
+    let content = CONTENT.replace(r#"{"id":"living","tags":["lounge"],"size":[9,20]}"#, r#"{"id":"living","tags":["lounge"],"size":[9,20]},{"id":"hall","passage":true,"size":[2,6]}"#);
+    // A 2×4 hall with the front door and a door into a 3×4 room beside it, and an empty 3×3 room with one door.
+    let town = r#"{"width":16,"depth":12,
+        "plots":[{"name":"Home","x":0,"z":0,"w":16,"d":12,"entry":[2.5,11.5]}],
+        "households":[{"name":"Player","plot":0,"player":true}],
+        "walls":[[1,1,3,1],[1,5,3,5],[1,1,1,5],[3,1,3,5],
+                 [3,1,6,1],[3,5,6,5],[6,1,6,5],
+                 [8,1,11,1],[8,4,11,4],[8,1,8,4],[11,1,11,4]],
+        "doors":[{"x":1,"z":5,"axis":"x"},{"x":3,"z":2,"axis":"z"},{"x":9,"z":4,"axis":"x"}],
+        "objects":[{"def":"lamp","x":1,"z":1},{"def":"sofa","x":4,"z":2}]}"#;
+    let w = World::from_json(&content, town, 1).unwrap();
+    let hall = room(&w, 1, 3);
+    assert_eq!(kind(&w, hall), "hall", "nothing in it says what it is for, and it has two doors");
+    assert_eq!(hall.scores.function, 1.0);
+    assert_eq!(kind(&w, room(&w, 4, 3)), "living", "a room something in is for is that, doors or not");
+    assert_eq!(kind(&w, room(&w, 9, 2)), "none", "one door: a spare room");
+}
+
+#[test]
 fn scores_follow_the_house_as_it_changes() {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
     let before = room(&w, 1, 1).scores;

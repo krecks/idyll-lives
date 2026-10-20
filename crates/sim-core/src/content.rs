@@ -616,6 +616,9 @@ pub struct RoomKind {
     pub size: [f32; 2],
     /// A room can't be two exclusive kinds at once (a bed in the kitchen makes it `mixed`).
     pub exclusive: bool,
+    /// Else (no kind's tags offered in it), a room is of this kind if people pass through it:
+    /// two doors or more, or stairs (a hallway).
+    pub passage: bool,
 }
 
 /// How rooms are scored (content `roomRules`; see `rooms.rs`).
@@ -1774,6 +1777,8 @@ struct RoomKindRaw {
     size: Option<[f32; 2]>,
     #[serde(default)]
     exclusive: bool,
+    #[serde(default)]
+    passage: bool,
 }
 
 #[derive(Deserialize, Default)]
@@ -3331,6 +3336,7 @@ impl Content {
                     essentials: k.essentials.iter().map(|e| tag_mask(e, &ctx)).collect::<Result<Vec<_>, Error>>()?.into_iter().filter(|&m| m != 0).collect(),
                     size: k.size.unwrap_or([4.0, 9.0]),
                     exclusive: k.exclusive,
+                    passage: k.passage,
                 })
             })
             .collect::<Result<_, Error>>()?;

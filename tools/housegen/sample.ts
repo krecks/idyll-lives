@@ -3,13 +3,19 @@
  * and writes them as small town files, one house each, for the simulation to check
  * (`cargo test -p sim-core --test generated_houses -- --ignored`, reading HOUSES).
  *
+ * Each house is furnished for one of a few households in turn (empty, a couple, two friends, a
+ * family) and checked here against them all: the same layout for each, beds enough, no toys
+ * without children, no bathroom off the room the front door opens into, the front door into a
+ * shared room, no way through a bathroom, a laundry or a bedroom. Problems are listed (and the exit code is 1).
+ *
  * Run: node --experimental-strip-types tools/housegen/sample.ts out.json [houses per lot size]
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { register } from 'node:module';
 import type { ObjectDef } from '../../web/src/content/content.ts';
-import type { HouseGenConfig } from '../../web/src/game/housegen.ts';
+import type { HouseGenConfig, Residents } from '../../web/src/game/housegen.ts';
+import type { HouseTemplate } from '../../web/src/game/town.ts';
 
 // The game's modules import each other without extensions (Vite finds them); so does Node, with this.
 register(
@@ -37,16 +43,80 @@ const info = objectInfos({ object: (id) => byId.get(id), radius: (d) => Math.max
 const out = process.argv[2] ?? 'houses.json';
 const perSize = Number(process.argv[3] ?? 60);
 const towns: unknown[] = [];
-const stats = { tried: 0, made: 0, two: 0, basements: 0, value: 0, seats: 0, dining: 0, tops: 0, rooms: 0 };
+const households: [string, Residents | undefined][] = [
+  ['empty', undefined],
+  ['couple', { couples: 1, adults: 0, children: 0, babies: 0 }],
+  ['friends', { couples: 0, adults: 2, children: 0, babies: 0 }],
+  ['family', { couples: 1, adults: 0, children: 2, babies: 0 }],
+];
+const problems: string[] = [];
+const kidsOnly = cfg.residents?.kidsOnly;
+const forKids = (def: string) => {
+  const o = byId.get(def);
+  return !!o && !!(kidsOnly?.categories?.includes(o.category ?? '') || kidsOnly?.groups?.includes(o.group ?? ''));
+};
+const bedIds = new Set(Object.values(cfg.residents?.beds ?? {}).flat());
+const isBed = (def: string) => byId.get(def)?.group === 'beds' || bedIds.has(def);
+/** The layout alone (walls, doors, windows, rooms' places), to compare houses furnished for different households. */
+const layout = (h: HouseTemplate) =>
+  JSON.stringify([h.walls, h.doors, h.windows, h.upper?.walls, h.upper?.doors, h.basement?.walls, h.basement?.doors, ...[h.rooms, h.upper?.rooms, h.basement?.rooms].map((rs) => rs?.map((r) => [r.x, r.z, r.w, r.d]))]);
+/** What's wrong with house `h` (furnished for `who`). */
+function check(h: HouseTemplate, who: Residents | undefined): string[] {
+  const out: string[] = [];
+  const all = [...h.objects, ...(h.upper?.objects ?? []), ...(h.basement?.objects ?? [])];
+  const kids = !!who && who.children + who.babies > 0;
+  if (!kids && all.some((o) => forKids(o.def))) out.push(`things for children: ${[...new Set(all.filter((o) => forKids(o.def)).map((o) => o.def))].join(', ')}`);
+  if (who) {
+    const beds = all.filter((o) => isBed(o.def));
+    const doubles = beds.filter((o) => (byId.get(o.def)?.slots ?? 1) >= 2).length;
+    // Places to sleep (a bunk bed has two); short of bedrooms two share one, so two a room at most.
+    const places = beds.reduce((n, o) => n + (byId.get(o.def)?.slots ?? 1), 0);
+    const need = 2 * who.couples + who.adults + who.children;
+    if (places < Math.min(need, 2 * h.bedrooms)) out.push(`${places} places to sleep for ${need}`);
+    if (who.couples && doubles < who.couples) out.push('no bed for two for the couple');
+  }
+  // The front door: on the street wall (z = the house's front), the first door.
+  const front = h.doors[0];
+  const rooms = h.rooms ?? [];
+  const into = rooms.find((r) => front && r.x <= front.x && front.x < r.x + r.w && r.z === front.z);
+  if (!into || !['entry', 'living', 'kitchen', 'dining'].includes(into.kind)) out.push(`front door into ${into?.kind ?? 'nothing'}`);
+  if (rooms.some((r) => r.kind === 'entry') && into?.kind !== 'entry') out.push('an entrance hall the front door doesn\'t open into');
+  const touches = (a: { x: number; z: number; w: number; d: number }, d: { x: number; z: number; axis: string }) =>
+    d.axis === 'x' ? (d.z === a.z || d.z === a.z + a.d) && d.x >= a.x && d.x < a.x + a.w : (d.x === a.x || d.x === a.x + a.w) && d.z >= a.z && d.z < a.z + a.d;
+  for (const bath of rooms.filter((r) => r.kind === 'bathroom')) {
+    if (into && h.doors.slice(1).some((d) => touches(bath, d) && touches(into, d))) out.push(`bathroom off the ${into.kind} the front door opens into`);
+  }
+  // Nobody walks through a bathroom or a laundry, nor through a bedroom (but into its own
+  // bathroom): one door to anything else each, besides the bedroom's to its bathrooms.
+  for (const r of rooms.filter((r) => ['bathroom', 'laundry', 'bedroom'].includes(r.kind))) {
+    const ways = h.doors.filter((d) => touches(r, d)).filter((d) => !rooms.some((o) => o !== r && o.kind === 'bathroom' && r.kind === 'bedroom' && touches(o, d)));
+    if (ways.length > 1) out.push(`a way through the ${r.kind} at ${r.x},${r.z}`);
+  }
+  return out;
+}
+const stats = { tried: 0, made: 0, two: 0, basements: 0, value: 0, seats: 0, dining: 0, tops: 0, rooms: 0, backs: 0, gardenDoors: 0 };
 // Per room kind: how many, their floor in all, the biggest (tiles).
 const kinds = new Map<string, { n: number; area: number; most: number; long: number }>();
 // A farm lot's house is a large lot's (town.ts `houseLot`).
 for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => size !== 'farm')) {
   for (let seed = 1; seed <= perSize; seed++) {
     stats.tried++;
-    const h = generateHouse(cfg, info, lot, houses.plot, size, seed * 7919, baseFile.roomRules?.lampTiles, baseFile.roomRules?.windowTiles);
+    const variants = households.map(([name, who]) => [name, who, generateHouse(cfg, info, lot, houses.plot, size, seed * 7919, baseFile.roomRules?.lampTiles, baseFile.roomRules?.windowTiles, who)] as const);
+    if (variants.some(([, , v]) => !v !== !variants[0][2])) problems.push(`${size} ${seed * 7919}: made for some households, not others`);
+    for (const [name, who, v] of variants) {
+      if (!v) continue;
+      if (layout(v) !== layout(variants[0][2]!)) problems.push(`${size} ${seed * 7919} (${name}): another layout`);
+      for (const p of check(v, who)) problems.push(`${size} ${seed * 7919} (${name}): ${p}`);
+    }
+    const [household, , h] = variants[seed % variants.length];
     if (!h) continue;
     stats.made++;
+    // A garden door: in the back wall, else a side wall (none where the stairs and a room's only window take it).
+    const ground = h.rooms ?? [];
+    const [x0, x1, z0, z1] = [Math.min(...ground.map((r) => r.x)), Math.max(...ground.map((r) => r.x + r.w)), Math.min(...ground.map((r) => r.z)), Math.max(...ground.map((r) => r.z + r.d))];
+    const outer = h.doors.slice(1).filter((d) => (d.axis === 'x' ? d.z === z1 : d.x === x0 || d.x === x1) && d.z >= z0);
+    if (outer.length) stats.gardenDoors++;
+    if (outer.some((d) => d.axis === 'x')) stats.backs++;
     if (h.upper) stats.two++;
     if (h.basement) stats.basements++;
     const all = [...h.objects, ...(h.upper?.objects ?? []), ...(h.basement?.objects ?? [])];
@@ -75,6 +145,7 @@ for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => siz
     towns.push({
       size,
       seed: seed * 7919,
+      household,
       name: h.name,
       description: h.description,
       // The rooms as planned, on the lot (the storey above `depth` rows down, the basement after it, like the town).
@@ -107,6 +178,12 @@ writeFileSync(out, JSON.stringify(towns));
 console.log(`${stats.made} of ${stats.tried} houses made (${stats.two} with two storeys, ${stats.basements} with a basement) → ${out}`);
 const per = (n: number) => (n / Math.max(1, stats.made)).toFixed(1);
 console.log(`  per house: $${per(stats.value)} of things, ${per(stats.seats)} chairs at tables (${stats.dining} houses with some), ${per(stats.tops)} things on tops`);
+console.log(`  ${stats.gardenDoors} houses with a garden door (${stats.backs} in the back wall, the others in a side wall)`);
 console.log(`  ${per(stats.rooms)} rooms per house; by kind (count, mean and largest floor, longest side):`);
 for (const [k, v] of [...kinds].sort((a, b) => b[1].n - a[1].n)) console.log(`    ${k}: ${v.n}, ${(v.area / v.n).toFixed(1)} m², up to ${v.most} m², ${v.long} m long`);
 for (const t of towns.slice(0, 8) as { size: string; name: string; description: string }[]) console.log(`  ${t.size}: ${t.name} — ${t.description}`);
+if (problems.length) {
+  console.log(`${problems.length} problems:`);
+  for (const p of problems.slice(0, 60)) console.log(`  ${p}`);
+  process.exitCode = 1;
+}

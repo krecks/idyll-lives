@@ -5,8 +5,10 @@
  * bathroom or a second storey), then:
  * 1. the footprint is split into rooms (a guillotine plan: each cut divides the rooms left into
  *    two groups by the floor they want), so every room is a rectangle and the plan stays connected;
- * 2. doors join the rooms (a tree from the entrance, preferring doors onto the living room or
- *    kitchen), the front door faces the street; kitchen and living room may share an open space;
+ * 2. doors join the rooms (a tree from the entrance, the living room its hub where it can be,
+ *    no way through a bedroom, no bathroom off the room the front door opens into), the front
+ *    door faces the street and a garden door leads out of a shared room at the back (else at a
+ *    side); kitchen and living room may share an open space;
  * 3. two-storey houses get stairs along an outside wall of the living room, an upstairs hall over
  *    them, and the bedrooms and a bathroom off that hall; some houses get a basement: stairs down
  *    along a wall of the living room (or the entrance hall, the dining room, the kitchen), a hall
@@ -16,12 +18,14 @@
  *    stairs kept clear, every piece reachable), tables stand free with chairs round them, small
  *    things go on tops (counters, tables, shelves), floor lamps and such keep to corners and out
  *    of doorways, every room gets ceiling lights enough for all of it at night, and a few things
- *    (a patio set) go into the garden.
+ *    (a patio set) go into the garden, by the garden door. The furniture is for whoever lives
+ *    there (`Residents`): a couple's bed for two, a bed each for everyone else, toys only where
+ *    there are children, and spare bedrooms (and playrooms) as guest rooms, studies and such.
  *
- * Seeded: the same seed, lot size and config always give the same house, so a town keeps only
- * `gen:<lot size>:<seed>` per lot (see `town.ts`). Output is a `HouseTemplate` in the layouts'
- * frame (drawn for a medium lot, front to the street at z = 0), with `upper` for storey 1 and
- * `basement` for storey -1 (both on the same rows as the ground).
+ * Seeded: the same seed, lot size and config always give the same house (laid out the same for
+ * any residents), so a town keeps only `gen:<lot size>:<seed>` per lot (see `town.ts`). Output
+ * is a `HouseTemplate` in the layouts' frame (drawn for a medium lot, front to the street at
+ * z = 0), with `upper` for storey 1 and `basement` for storey -1 (both on the same rows as the ground).
  */
 
 import type { ObjectDef, SurfaceKind } from '../content/content';
@@ -44,7 +48,40 @@ export interface HouseGenConfig {
   /** Ceiling lights for rooms whose own `ceiling` slots have none (the upstairs hall, the basement's). */
   lights?: string[];
   basement?: BasementSpec;
+  /** How a house is furnished for the people living in it (see `Residents`). */
+  residents?: ResidentsSpec;
   names: { first: string[]; second: Record<string, string[]> };
+}
+
+/**
+ * Who lives in a house: `couples` (a bed for two), `adults` on their own and `children` (a bed
+ * each), `babies` (a crib, which the simulation brings). The layout never depends on it, only
+ * the furniture: undefined is an empty house.
+ */
+export interface Residents {
+  couples: number;
+  adults: number;
+  children: number;
+  babies: number;
+}
+
+/** A key for `residents` (empty: undefined). */
+export function residentsKey(r: Residents | undefined): string {
+  return r ? `${r.couples}.${r.adults}.${r.children}.${r.babies}` : '';
+}
+
+/**
+ * Furnishing for the residents: the beds bedrooms get (`couple`, `single` for a room two share,
+ * `child`, `bunk` for two children short of floor), what goes into a child's room besides
+ * (`childRoom`), what a bedroom nobody sleeps in becomes (`spareRoom`, by weight: `guest`, a
+ * bedroom with a single bed, else a room kind), and what only a home with children has (`kidsOnly`:
+ * content categories and groups; a playroom without children becomes a spare room too).
+ */
+interface ResidentsSpec {
+  beds: { couple: string[]; single: string[]; child: string[]; bunk?: string[] };
+  childRoom?: Slot[];
+  spareRoom: Record<string, number>;
+  kidsOnly: { categories?: string[]; groups?: string[] };
 }
 
 interface HouseClass {
@@ -179,6 +216,9 @@ export interface ObjectInfo extends Shape {
   overWindow?: boolean;
   /** A hob or a grill (stations `stove`, `grill`) or a sink (`dishes`, where hands are washed): no small things on its top. */
   keepClear: boolean;
+  /** Content category and group (`residents.kidsOnly`: things only for a home with children). */
+  category?: string;
+  group?: string;
 }
 
 /** Whether object type `o` is a hob, a grill or a sink (see `ObjectInfo.keepClear`). */
@@ -255,7 +295,7 @@ export function random(seed: number): () => number {
  * `lampTiles`: tiles a lamp lights at night unless its `light.tiles` says (content
  * `roomRules.lampTiles`); every room gets lights enough for all of it. `windowTiles`: tiles one window lights by day (`roomRules.windowTiles`).
  */
-export function generateHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: number; depth: number }, medium: { width: number }, lotSize: string, seed: number, lampTiles = 10, windowTiles = 6): HouseTemplate | null {
+export function generateHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: number; depth: number }, medium: { width: number }, lotSize: string, seed: number, lampTiles = 10, windowTiles = 6, residents?: Residents): HouseTemplate | null {
   // Rooms as narrow as their kind may be on this size of lot.
   const sized = (s: RoomSpec): RoomSpec => (s.minSideOn?.[lotSize] === undefined ? s : { ...s, minSide: s.minSideOn[lotSize] });
   cfg = { ...cfg, rooms: Object.fromEntries(Object.entries(cfg.rooms).map(([k, s]) => [k, sized(s)])) };
@@ -264,8 +304,8 @@ export function generateHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { wid
     // The basement draws numbers of its own: a house without one is laid out as it was before
     // there were any (as is one whose stairs down leave no room for its furniture, without them).
     const n = seed * 31 + attempt;
-    let house = attemptHouse(cfg, info, lot, lotSize, random(n), random(n ^ 0x5bd1e995), lampTiles, windowTiles);
-    if (house === 'basement') house = attemptHouse(cfg, info, lot, lotSize, random(n), null, lampTiles, windowTiles);
+    let house = attemptHouse(cfg, info, lot, lotSize, random(n), random(n ^ 0x5bd1e995), lampTiles, windowTiles, residents);
+    if (house === 'basement') house = attemptHouse(cfg, info, lot, lotSize, random(n), null, lampTiles, windowTiles, residents);
     if (!house || house === 'basement') continue;
     // Into the layouts' frame (centred on lots of other widths by `onLot`).
     const dx = -Math.floor((lot.width - medium.width) / 2);
@@ -306,7 +346,7 @@ function weighted(rng: () => number, weights: Record<string, number>): string | 
  * `belowRng`: the random numbers for the basement (null: no basement). `'basement'`: there's no
  * room for the house's furniture with the stairs down (it may do without a basement).
  */
-function attemptHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: number; depth: number }, lotSize: string, rng: () => number, belowRng: (() => number) | null, lampTiles: number, windowTiles: number): HouseTemplate | null | 'basement' {
+function attemptHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: number; depth: number }, lotSize: string, rng: () => number, belowRng: (() => number) | null, lampTiles: number, windowTiles: number, residents: Residents | undefined): HouseTemplate | null | 'basement' {
   const className = weighted(rng, cfg.lots[lotSize] ?? cfg.lots.medium ?? {});
   const cls = className ? cfg.classes[className] : undefined;
   if (!cls) return null;
@@ -364,13 +404,16 @@ function attemptHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: numb
     while (list.length > base && most(list) - capArea(cfg, list[list.length - 1]) >= floorOf(list) * ROOM_SLACK) list.pop();
   }
   // A floor that doesn't fall into rooms of their sizes: an extra room fewer, else a smaller house.
+  // Doors that don't work out (the bathroom only off the room the front door opens into): the same.
   let g: Floor | null = null;
   let house: Rect = { x: 0, z: front, w: W, d: D };
+  const openPlan = rng() < cfg.openPlan;
   for (let step = 0; step < 8; step++) {
     const slack = lot.width - 2 * margins.side - W;
     house = { x: margins.side + Math.floor(rng() * (slack + 1)), z: front, w: W, d: D };
-    g = floorPlan(cfg, rng, house, ground);
-    if (g && frontDoor(g, house, rng)) break;
+    const at = house;
+    g = floorPlan(cfg, rng, house, ground, (f) => frontDoor(f, at, rng) && connect(f, rng, openPlan));
+    if (g) break;
     g = null;
     if (ground.length > baseGround && step % 2 === 0) ground.pop();
     else if (W >= D && W > 6) W--;
@@ -378,7 +421,6 @@ function attemptHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: numb
     else break;
   }
   if (!g) return null;
-  connect(g, rng, rng() < cfg.openPlan);
 
   let up: Floor | null = null;
   if (two) {
@@ -390,6 +432,8 @@ function attemptHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: numb
     if (!up) return null;
   }
   const has = new Set([...ground, ...upstairs]);
+  // What the rooms become for the people living here (a draw of its own: the rest of the house is the same for anyone).
+  const fit = fitFor(cfg, info, random((rng() * 2 ** 32) >>> 0), [...g.rooms, ...(up?.rooms ?? [])], residents);
   // A basement, if the house gets one and it fits (fewer rooms down there if they don't); with
   // `belowRng` null, none.
   let basement: Floor | null = null;
@@ -406,18 +450,19 @@ function attemptHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: numb
     }
     const plans = [...Array.from({ length: n }, (_, i) => order.slice(0, n - i)), ...order.slice(n).map((k) => [k])].filter((p) => p.length);
     for (const kinds of plans) {
-      basement = basementFloor(cfg, info, belowRng, house, g, kinds, new Set([...has, ...kinds]), lampTiles);
+      basement = basementFloor(cfg, info, belowRng, house, g, kinds, new Set([...has, ...kinds]), lampTiles, fit);
       if (!basement) continue;
       below.push(...kinds);
       break;
     }
     for (const k of below) has.add(k);
   }
+  gardenDoor(g, house, rng);
   windows(cfg, rng, g, house, windowTiles);
   if (up) windows(cfg, rng, up, house, windowTiles);
   // A stairwell that leaves the ground floor without room for what must be there: try the house without a basement.
-  if (!furnish(cfg, info, rng, g, has, lampTiles)) return basement ? 'basement' : null;
-  if (up && !furnish(cfg, info, rng, up, has, lampTiles)) return null;
+  if (!furnish(cfg, info, rng, g, has, lampTiles, fit)) return basement ? 'basement' : null;
+  if (up && !furnish(cfg, info, rng, up, has, lampTiles, fit)) return null;
   garden(cfg, info, rng, g, house, lot);
 
   // Spawns in front of the front door.
@@ -488,15 +533,15 @@ function fits(cfg: HouseGenConfig, k: Kind, w: number, d: number): boolean {
   return Math.min(w, d) >= cfg.rooms[k].minSide && Math.min(w, d) <= a && Math.max(w, d) <= b;
 }
 
-/** Splits `rect` among `kinds` (a guillotine plan); null if they don't fit. */
-function floorPlan(cfg: HouseGenConfig, rng: () => number, rect: Rect, kinds: Kind[]): Floor | null {
+/** Splits `rect` among `kinds` (a guillotine plan) so that `doors` can join the rooms; null if they don't fit. */
+function floorPlan(cfg: HouseGenConfig, rng: () => number, rect: Rect, kinds: Kind[], doors: (f: Floor) => boolean): Floor | null {
   for (let tries = 0; tries < 60; tries++) {
     const order = [...kinds].sort(() => rng() - 0.5);
     const rooms = split(cfg, rng, rect, order);
     if (rooms) {
       const floor: Floor = { rooms, edges: new Map(), objects: [], fronts: [], keep: new Set(), taken: new Set() };
       walls(floor);
-      return floor;
+      if (doors(floor)) return floor;
     }
   }
   return null;
@@ -585,10 +630,14 @@ function door(f: Floor, rng: () => number, edges: string[]): boolean {
   return true;
 }
 
-/** The front door, from the street into the entry or the living room (else the kitchen, else any room but a bathroom). */
+/**
+ * The front door, from the street into the entrance hall (false if the house has one that isn't
+ * on the street) or the living room, else the kitchen or the dining room; never a bedroom or a bathroom.
+ */
 function frontDoor(f: Floor, house: Rect, rng: () => number): boolean {
   const facing = (r: Room) => r.z === house.z && r.w >= 2;
-  const entry = ['entry', 'living', 'kitchen'].map((k) => f.rooms.find((r) => r.kind === k && facing(r))).find((r) => r) ?? f.rooms.find((r) => !['bathroom', 'laundry'].includes(r.kind) && facing(r));
+  if (f.rooms.some((r) => r.kind === 'entry' && !facing(r))) return false;
+  const entry = ['entry', 'living', 'kitchen', 'dining'].map((k) => f.rooms.find((r) => r.kind === k && facing(r))).find((r) => r);
   if (!entry) return false;
   const edges = Array.from({ length: entry.w }, (_, i) => `h:${entry.x + i}:${house.z}`);
   return door(f, rng, edges);
@@ -596,8 +645,13 @@ function frontDoor(f: Floor, house: Rect, rng: () => number): boolean {
 
 const PUBLIC: RoomKind[] = ['entry', 'living', 'kitchen', 'dining'];
 
-/** Doors so every room can be reached: a tree from the entrance, through the living room and kitchen where possible. */
-function connect(f: Floor, rng: () => number, openPlan: boolean): void {
+/**
+ * Doors so every room can be reached: a tree from the entrance, the living room its hub where
+ * possible (else the other shared rooms), nobody walking through a bathroom, a laundry or a
+ * bedroom (but into its own bathroom), a bathroom never off the room the front door opens into and off the
+ * kitchen only if nothing else will do. False if some room can't be reached that way.
+ */
+function connect(f: Floor, rng: () => number, openPlan: boolean): boolean {
   const rooms = f.rooms;
   const entry = rooms.find((r) => sides([...f.edges].find(([, v]) => v === 'door')?.[0] ?? '').some(([x, z]) => inside(r, x, z)))!;
   const reached = new Set<Room>([entry]);
@@ -626,14 +680,58 @@ function connect(f: Floor, rng: () => number, openPlan: boolean): void {
         const edges = shared(from, to);
         if (edges.length === 0) continue;
         const open = edges.every((e) => !f.edges.has(e));
-        // Rooms open to each other need no door; bathrooms and bedrooms open off the shared rooms.
-        const score = (open ? 10 : 0) + (PUBLIC.includes(from.kind) ? 3 : 0) + (to.kind === 'bathroom' && from.kind === 'bedroom' ? -2 : 0) + rng();
+        // Nobody walks through a bathroom or a laundry, nor a bedroom but into its own bathroom.
+        if ((to.kind === 'bathroom' && from === entry) || from.kind === 'bathroom' || from.kind === 'laundry' || (from.kind === 'bedroom' && to.kind !== 'bathroom')) continue;
+        // Rooms open to each other need no door; the others open off the living room, else the other shared rooms.
+        const hub = from.kind === 'living' ? 5 : PUBLIC.includes(from.kind) ? 2 : 0;
+        const kitchen = to.kind === 'bathroom' && from.kind === 'kitchen' ? -4 : 0;
+        const score = (open ? 10 : 0) + hub + kitchen + rng();
         if (!best || score > best.score) best = { from, to, edges: edges.filter((e) => f.edges.has(e)), score };
       }
     }
-    if (!best) break;
+    if (!best) return false;
     if (best.edges.length) door(f, rng, best.edges);
     reached.add(best.to);
+  }
+  return true;
+}
+
+/**
+ * A second way out, into the back garden: a door in the back wall of the living room (else the
+ * dining room, else the kitchen), clear of the stairs and the corners, leaving the room outside
+ * wall for two windows at least (else one, the door at a corner if need be). With no such room at
+ * the back, in one's side wall (its back half if it can be). None if no shared room will do.
+ */
+function gardenDoor(f: Floor, house: Rect, rng: () => number): void {
+  const back = house.z + house.d;
+  const kept = (e: string) => f.edges.get(e) === 'wall' && !sides(e).some(([x, z]) => f.taken.has(key(x, z)));
+  // A room's outside walls (towards the street, the back, the left, the right), unit edges in order.
+  const walls = (r: Room): [string[], string[], string[], string[]] => [
+    r.z === house.z ? Array.from({ length: r.w }, (_, i) => `h:${r.x + i}:${house.z}`) : [],
+    r.z + r.d === back ? Array.from({ length: r.w }, (_, i) => `h:${r.x + i}:${back}`) : [],
+    r.x === house.x ? Array.from({ length: r.d }, (_, i) => `v:${house.x}:${r.z + i}`) : [],
+    r.x + r.w === house.x + house.w ? Array.from({ length: r.d }, (_, i) => `v:${house.x + house.w}:${r.z + i}`) : [],
+  ];
+  // Where a door may go along `wall` (not at its ends unless `corners`; along a side, its back half only if `half`).
+  const spots = (wall: string[], corners: boolean, half: boolean) =>
+    wall.filter((e, i) => kept(e) && (corners || wall.length <= 2 || (i > 0 && i < wall.length - 1)) && (!half || Number(e.split(':')[2]) >= house.z + house.d / 2));
+  const passes = [
+    { corners: false, windows: 2, side: false, half: false },
+    { corners: true, windows: 1, side: false, half: false },
+    { corners: false, windows: 1, side: true, half: true },
+    { corners: false, windows: 1, side: true, half: false },
+  ];
+  for (const { corners, windows, side, half } of passes) {
+    for (const kind of ['living', 'dining', 'kitchen']) {
+      for (const r of f.rooms.filter((r) => r.kind === kind)) {
+        const all = walls(r);
+        const free = all.flat().filter(kept);
+        const edges = (side ? [all[2], all[3]] : [all[1]]).flatMap((w) => spots(w, corners, half));
+        if (free.length - 1 < windows || !edges.length) continue;
+        door(f, rng, [pick(rng, edges)]);
+        return;
+      }
+    }
   }
 }
 
@@ -730,7 +828,7 @@ const BASEMENT_TRIES = [40, 400];
  * under the house; the basement as big as they allow. They're furnished here (`has`: the rooms the house has); only
  * once it all fits does the ground keep the stairwell and landing clear. Null if it doesn't.
  */
-function basementFloor(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, house: Rect, g: Floor, kinds: Kind[], has: Set<Kind>, lampTiles: number): Floor | null {
+function basementFloor(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, house: Rect, g: Floor, kinds: Kind[], has: Set<Kind>, lampTiles: number, fit: Fit): Floor | null {
   const [, len] = info(cfg.stairs)?.footprint ?? [1, 4];
   // Sizes the rooms fill side by side along the hall, each across the whole width (`row`).
   const longest = (k: Kind, w: number) => {
@@ -809,7 +907,7 @@ function basementFloor(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number
           for (const t of well) b.taken.add(t);
           b.keep.add(key(...at(u, foot)));
           for (let s = size.hz; s < size.hz + size.hd; s++) b.keep.add(key(...at(first ? u + 1 : u - 1, s)));
-          if (!furnish(cfg, info, rng, b, has, lampTiles)) continue;
+          if (!furnish(cfg, info, rng, b, has, lampTiles, fit)) continue;
           // The stairwell above, and its landing.
           for (const t of well) g.taken.add(t);
           g.keep.add(landing);
@@ -936,71 +1034,209 @@ function windows(cfg: HouseGenConfig, rng: () => number, f: Floor, house: Rect, 
 }
 
 /**
- * Furnishes each room: its counter run, the furniture that must come, its tables and chairs
- * (some only in houses with or without a room of some kind: `has`), the rest of its furniture,
- * small things on the tops, then things on the walls, ceiling and floor, and lights enough
- * (halls get only those). False if a piece that must come doesn't fit.
+ * What the rooms of a house become for the people living in it (`Residents`): per room, the
+ * recipes to try in turn before its own (`plans`; the house's planned rooms keep the kinds they
+ * were laid out as). `keep`: whether a thing belongs in the house (only a home with children has toys).
  */
-function furnish(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, f: Floor, has: Set<Kind>, lampTiles: number): boolean {
-  const shapes: Shapes = { object: info, radius: (d) => d?.radius ?? 0.12 };
-  for (const r of f.rooms) {
+interface Fit {
+  plans: Map<Room, Plan[]>;
+  keep: (o: ObjectInfo) => boolean;
+}
+
+/** A room furnished from `spec` as a room of `kind`. */
+interface Plan {
+  kind: Kind;
+  spec: RoomSpec;
+}
+
+/**
+ * Who sleeps where (config `residents`): the biggest bedrooms first, a couple's with a bed for
+ * two, an adult's with any bed, a child's with a child's bed and toys; short of bedrooms,
+ * children share one (two beds, else a bunk bed), then adults (two single beds, else a bunk bed); a bedroom
+ * nobody sleeps in is a guest room or a room of another kind (a study), as is a playroom in a
+ * home without children. An empty house (`residents` undefined) keeps its bedrooms as they are.
+ */
+function fitFor(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, rooms: Room[], residents: Residents | undefined): Fit {
+  const spec = cfg.residents;
+  const kids = !!residents && residents.children + residents.babies > 0;
+  const only = spec?.kidsOnly;
+  const keep = (o: ObjectInfo) => kids || !only || !(only.categories?.includes(o.category ?? '') || only.groups?.includes(o.group ?? ''));
+  const fit: Fit = { plans: new Map(), keep };
+  if (!spec) return fit;
+  const bedroom = cfg.rooms.bedroom;
+  const bedSlot = bedroom?.furniture.findIndex((s) => s.one.some((d) => info(d)?.group === 'beds')) ?? -1;
+  // A bedroom with `n` of these beds (and `more` things besides).
+  const withBeds = (beds: string[] | undefined, n = 1, more: Slot[] = []): Plan | null =>
+    beds?.length && bedSlot >= 0 ? { kind: 'bedroom', spec: { ...bedroom, furniture: [...bedroom.furniture.map((s, i) => (i === bedSlot ? { one: beds, count: [n, n] as [number, number] } : s)), ...more] } } : null;
+  const spare = (guest: boolean): Plan | null => {
+    const k = weighted(rng, Object.fromEntries(Object.entries(spec.spareRoom).filter(([k]) => (k === 'guest' ? guest : !!cfg.rooms[k]))));
+    return !k ? null : k === 'guest' ? withBeds(spec.beds.single) : { kind: k, spec: cfg.rooms[k] };
+  };
+  const set = (r: Room, plans: (Plan | null)[]) => fit.plans.set(r, plans.filter((p): p is Plan => !!p));
+  if (!kids) for (const r of rooms.filter((r) => r.kind === 'playroom')) set(r, [spare(false)]);
+  if (!residents) return fit;
+  type Sleeper = 'couple' | 'adults' | 'children' | 'adult' | 'child';
+  const sleepers: Sleeper[] = [...Array<Sleeper>(residents.couples).fill('couple'), ...Array<Sleeper>(residents.adults).fill('adult'), ...Array<Sleeper>(residents.children).fill('child')];
+  const bedrooms = rooms.filter((r) => r.kind === 'bedroom').sort((a, b) => b.w * b.d - a.w * a.d);
+  // Two of `one` into a room for two.
+  const pair = (one: Sleeper, two: Sleeper) => {
+    const i = sleepers.indexOf(one);
+    const j = sleepers.indexOf(one, i + 1);
+    if (j < 0) return false;
+    sleepers.splice(j, 1);
+    sleepers[i] = two;
+    return true;
+  };
+  while (sleepers.length > bedrooms.length && (pair('child', 'children') || pair('adult', 'adults')));
+  const order: Sleeper[] = ['couple', 'adults', 'children', 'adult', 'child'];
+  sleepers.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  const toys = spec.childRoom ?? [];
+  bedrooms.forEach((r, i) => {
+    const who = sleepers[i];
+    if (who === 'couple') set(r, [withBeds(spec.beds.couple)]);
+    else if (who === 'adults') set(r, [withBeds(spec.beds.single, 2), withBeds(spec.beds.bunk)]);
+    else if (who === 'children') set(r, [withBeds(spec.beds.child, 2, toys), withBeds(spec.beds.bunk, 1, toys), withBeds(spec.beds.single, 2)]);
+    else if (who === 'child') set(r, [withBeds(spec.beds.child, 1, toys)]);
+    else if (!who) set(r, [spare(true)]);
+  });
+  return fit;
+}
+
+/** What `furnish` may take back: everything placed on the floor and the tiles it took. */
+function snapshot(f: Floor): () => void {
+  const [objects, fronts, taken, keep, layers] = [[...f.objects], [...f.fronts], new Set(f.taken), new Set(f.keep), new Set(f.layers ?? [])];
+  return () => {
+    f.objects.splice(0, f.objects.length, ...objects);
+    f.fronts.splice(0, f.fronts.length, ...fronts);
+    f.taken = new Set(taken);
+    f.keep = new Set(keep);
+    f.layers = new Set(layers);
+  };
+}
+
+/**
+ * Furnishes each room (`furnishRoom`), each with random numbers of its own. Whether everything
+ * that must be in the rooms fits is up to their own recipes, so a house works out the same for
+ * anyone; then it's furnished again for who lives there (`fit`: each room from the first of its
+ * plans that fits, else its own recipe without what doesn't belong in the house). If a room
+ * won't do either way (rooms are not quite apart: a chair is reached from beside it, through an
+ * open wall), the floor as its own recipes had it, without what doesn't belong (nor what stood
+ * on that). False if a piece that must come doesn't fit.
+ */
+function furnish(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, f: Floor, has: Set<Kind>, lampTiles: number, fit: Fit): boolean {
+  const seed = (rng() * 2 ** 32) >>> 0;
+  const empty = snapshot(f);
+  for (const [i, r] of f.rooms.entries()) {
+    if (r.kind === 'hall') lights(cfg, info, f, r, lampTiles);
+    else if (!furnishRoom(cfg, info, random(seed + i), f, r, cfg.rooms[r.kind], has, lampTiles)) return false;
+  }
+  if (f.rooms.every((r) => !fit.plans.get(r)?.length) && f.objects.every((o) => fit.keep(info(o.def)!))) return true;
+  const own = snapshot(f);
+  empty();
+  const kept: ObjectInfos = (d) => {
+    const o = info(d);
+    return o && fit.keep(o) ? o : undefined;
+  };
+  for (const [i, r] of f.rooms.entries()) {
     if (r.kind === 'hall') {
       lights(cfg, info, f, r, lampTiles);
       continue;
     }
-    const spec = cfg.rooms[r.kind];
-    const sideOf = new Map<string, number>();
-    if (spec.run) {
-      const side = counterRun(f, r, info, rng, spec.run);
-      if (side === false) return false;
-      if (side !== undefined) sideOf.set('run', side);
+    const back = snapshot(f);
+    let done = false;
+    for (const plan of [...(fit.plans.get(r) ?? []), { kind: r.kind, spec: cfg.rooms[r.kind] }]) {
+      back();
+      if (furnishRoom(cfg, kept, random(seed + i), f, { ...r, kind: plan.kind }, plan.spec, has, lampTiles)) {
+        done = true;
+        break;
+      }
     }
-    const required = (slot: Slot) => slot.chance === undefined || slot.chance >= 1;
-    const furniture = (slot: Slot) => {
+    if (!done) {
+      own();
+      strip(f, info, fit);
+      return true;
+    }
+  }
+  return true;
+}
+
+/** Takes what doesn't belong in the house (`fit.keep`) off floor `f`, and the small things on its top. */
+function strip(f: Floor, info: ObjectInfos, fit: Fit): void {
+  const gone = f.objects.filter((o) => !fit.keep(info(o.def)!));
+  const under = new Set<string>();
+  for (const o of gone) {
+    const [fw, fd] = info(o.def)!.footprint;
+    const [w, d] = o.rot % 2 === 0 ? [fw, fd] : [fd, fw];
+    for (const t of tilesOf(o.x, o.z, w, d)) under.add(t);
+  }
+  for (let i = f.objects.length - 1; i >= 0; i--) {
+    const o = f.objects[i];
+    if (gone.includes(o) || (info(o.def)?.layer === 'surface' && under.has(key(o.x, o.z)))) {
+      f.objects.splice(i, 1);
+      f.fronts.splice(i, 1);
+    }
+  }
+}
+
+/**
+ * Furnishes room `r` from `spec`: its counter run, the furniture that must come, its tables and
+ * chairs (some only in houses with or without a room of some kind: `has`), the rest of its
+ * furniture, small things on the tops, then things on the walls, ceiling and floor, and lights
+ * enough. False if a piece that must come doesn't fit.
+ */
+function furnishRoom(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, f: Floor, r: Room, spec: RoomSpec, has: Set<Kind>, lampTiles: number): boolean {
+  const shapes: Shapes = { object: info, radius: (d) => d?.radius ?? 0.12 };
+  const sideOf = new Map<string, number>();
+  if (spec.run) {
+    const side = counterRun(f, r, info, rng, spec.run);
+    if (side === false) return false;
+    if (side !== undefined) sideOf.set('run', side);
+  }
+  const required = (slot: Slot) => slot.chance === undefined || slot.chance >= 1;
+  const furniture = (slot: Slot) => {
+    const count = slot.count ? between(rng, slot.count) : 1;
+    for (let n = 0; n < count; n++) {
+      if (!required(slot) && rng() >= (slot.chance ?? 1)) continue;
+      const options = slot.one.filter((d) => info(d)).sort(() => rng() - 0.5);
+      let done = false;
+      for (const def of options) {
+        const across = slot.opposite ? sideOf.get(slot.opposite) : undefined;
+        const prefer = across === undefined ? (slot.beside ? sideOf.get(slot.beside) : undefined) : (across + 2) % 4;
+        // Things nobody uses (a floor lamp, a vase on a stand) keep out of the way in doorways;
+        // one that must come goes wherever it fits if it has to.
+        const aside = !info(def)!.used;
+        const side = place(f, r, def, info(def)!, rng, prefer, aside) ?? (aside && required(slot) ? place(f, r, def, info(def)!, rng, prefer) : null);
+        if (side !== null) {
+          sideOf.set(def, side);
+          for (const o of slot.one) sideOf.set(o, side);
+          done = true;
+          break;
+        }
+      }
+      if (!done && required(slot)) return false;
+    }
+    return true;
+  };
+  // What must come first, then the tables (they want the middle of the room), then the rest.
+  for (const slot of spec.furniture) if (required(slot) && !furniture(slot)) return false;
+  for (const set of spec.dining ?? []) {
+    if ((set.ifRoom && !has.has(set.ifRoom)) || (set.unlessRoom && has.has(set.unlessRoom))) continue;
+    if (rng() < (set.chance ?? 1)) tableSet(f, r, info, rng, set);
+  }
+  for (const slot of spec.furniture) if (!required(slot)) furniture(slot);
+  for (const slot of spec.surfaces ?? []) onTops(f, r, shapes, info, rng, slot);
+  for (const layer of ['wall', 'ceiling', 'rug'] as const) {
+    for (const slot of spec[layer] ?? []) {
       const count = slot.count ? between(rng, slot.count) : 1;
       for (let n = 0; n < count; n++) {
-        if (!required(slot) && rng() >= (slot.chance ?? 1)) continue;
-        const options = slot.one.filter((d) => info(d)).sort(() => rng() - 0.5);
-        let done = false;
-        for (const def of options) {
-          const across = slot.opposite ? sideOf.get(slot.opposite) : undefined;
-          const prefer = across === undefined ? (slot.beside ? sideOf.get(slot.beside) : undefined) : (across + 2) % 4;
-          // Things nobody uses (a floor lamp, a vase on a stand) keep out of the way in doorways;
-          // one that must come goes wherever it fits if it has to.
-          const aside = !info(def)!.used;
-          const side = place(f, r, def, info(def)!, rng, prefer, aside) ?? (aside && required(slot) ? place(f, r, def, info(def)!, rng, prefer) : null);
-          if (side !== null) {
-            sideOf.set(def, side);
-            for (const o of slot.one) sideOf.set(o, side);
-            done = true;
-            break;
-          }
-        }
-        if (!done && required(slot)) return false;
-      }
-      return true;
-    };
-    // What must come first, then the tables (they want the middle of the room), then the rest.
-    for (const slot of spec.furniture) if (required(slot) && !furniture(slot)) return false;
-    for (const set of spec.dining ?? []) {
-      if ((set.ifRoom && !has.has(set.ifRoom)) || (set.unlessRoom && has.has(set.unlessRoom))) continue;
-      if (rng() < (set.chance ?? 1)) tableSet(f, r, info, rng, set);
-    }
-    for (const slot of spec.furniture) if (!required(slot)) furniture(slot);
-    for (const slot of spec.surfaces ?? []) onTops(f, r, shapes, info, rng, slot);
-    for (const layer of ['wall', 'ceiling', 'rug'] as const) {
-      for (const slot of spec[layer] ?? []) {
-        const count = slot.count ? between(rng, slot.count) : 1;
-        for (let n = 0; n < count; n++) {
-          if (rng() >= (slot.chance ?? 1)) continue;
-          const def = pick(rng, slot.one);
-          const fp = info(def)?.footprint;
-          if (fp) mount(cfg, info, f, r, def, fp, layer, rng, slot.over);
-        }
+        if (rng() >= (slot.chance ?? 1)) continue;
+        const def = pick(rng, slot.one);
+        const fp = info(def)?.footprint;
+        if (fp) mount(cfg, info, f, r, def, fp, layer, rng, slot.over);
       }
     }
-    lights(cfg, info, f, r, lampTiles);
   }
+  lights(cfg, info, f, r, lampTiles);
   return true;
 }
 
@@ -1515,7 +1751,12 @@ function garden(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, g: Fl
   const clear = (x: number, z: number) => x >= 0 && z >= 0 && x < lot.width && z < lot.depth && (x < house.x - 1 || x > house.x + house.w || z < house.z - 1 || z > house.z + house.d) && !g.taken.has(key(x, z));
   // Behind the house or to its sides (the front garden is left for the path and drive).
   const spot = (w: number, d: number): [number, number] => [Math.floor(rng() * (lot.width - w)), house.z + Math.floor(rng() * (lot.depth - house.z - d))];
-  // A table with chairs round it, with a clear tile round the chairs.
+  // Just outside the garden door, if there is one (else anywhere).
+  const back = house.z + house.d;
+  const gardenDoor = [...g.edges].find(([e, v]) => v === 'door' && e.startsWith('h:') && Number(e.split(':')[2]) === back)?.[0];
+  const doorX = gardenDoor ? Number(gardenDoor.split(':')[1]) : null;
+  const near = (w: number, d: number): [number, number] => (doorX === null ? spot(w, d) : [doorX - Math.floor(w / 2) + Math.floor(rng() * 5) - 2, back + 1 + Math.floor(rng() * 2)]);
+  // A table with chairs round it, with a clear tile round the chairs (by the garden door if it fits).
   for (const set of cfg.garden.sets ?? []) {
     if (rng() >= (set.chance ?? 1)) continue;
     const chairs = set.chairs.filter((d) => info(d));
@@ -1528,7 +1769,7 @@ function garden(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, g: Fl
     const [w, d] = rot ? [fd, fw] : [fw, fd];
     const seats = seatTiles(info(def)!, 0, 0, rot).slice(0, between(rng, set.seats));
     for (let tries = 0; tries < 30; tries++) {
-      const [x, z] = spot(w + 4, d + 4);
+      const [x, z] = tries < 15 ? near(w + 4, d + 4) : spot(w + 4, d + 4);
       const tiles = tilesOf(x, z, w + 4, d + 4);
       if (!tiles.every((t) => clear(...(t.split(':').map(Number) as [number, number])))) continue;
       for (const t of tiles) g.taken.add(t);

@@ -4,6 +4,7 @@ import type { AssetRegistry } from '../assets/registry';
 import type { Content, LifeStageDef } from '../content/content';
 import { GARMENTS, pickOutfit } from '../render/babylon/characters/outfit';
 import { chosenPreset, presetByName, presetsFor, VOICE_RANGE, type VoiceChoice } from '../voice/voices';
+import type { Residents } from './housegen';
 
 /** Hairstyles (character parts `hair.<style>`), and bald. */
 export const HAIR_STYLES = [
@@ -378,6 +379,32 @@ export function randomHousehold(
   }
   const names = content.names.last.filter((n) => !avoidNames.includes(n));
   return { name: pick(names.length ? names : content.names.last), members, bonds };
+}
+
+/** Who sleeps where in a household's home (`Residents`): partners share a bed, everyone else has one of their own (babies a crib). */
+export function residentsOf(content: Content, h: HouseholdDraft): Residents {
+  const paired = new Set<string>();
+  let couples = 0;
+  for (const b of h.bonds) {
+    if (b.preset !== 'partners' || paired.has(b.a) || paired.has(b.b)) continue;
+    const both = [b.a, b.b].map((u) => h.members.find((m) => m.uid === u));
+    if (!both.every((m) => m && content.isAdult(m.age))) continue;
+    paired.add(b.a).add(b.b);
+    couples++;
+  }
+  const r: Residents = { couples, adults: 0, children: 0, babies: 0 };
+  for (const m of h.members) {
+    if (paired.has(m.uid)) continue;
+    if (content.isAdult(m.age)) r.adults++;
+    else if (content.stageOf(m.age)?.baby) r.babies++;
+    else r.children++;
+  }
+  return r;
+}
+
+/** Bedrooms a household needs (`residentsOf`): one per couple and adult, one for every two children. */
+export function bedroomsNeeded(r: Residents): number {
+  return r.couples + r.adults + Math.ceil(r.children / 2);
 }
 
 export function bondBetween(h: HouseholdDraft, a: string, b: string): Bond | undefined {

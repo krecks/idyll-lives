@@ -86,6 +86,8 @@ struct Acc {
     outside: bool,
     decor: f32,
     tags: TagMask,
+    /// Stairs stand in it.
+    stairs: bool,
     floors: f32,
     faces: f32,
     covered_faces: f32,
@@ -302,13 +304,16 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
         if !o.broken() {
             acc.tags |= def.tags;
         }
+        acc.stairs |= def.stairs;
     }
 
     let mut out: Vec<(RoomInfo, Vec<(u32, f32)>)> = Vec::with_capacity(rooms.len() + gardens.len());
     for (id, a) in rooms.into_iter().enumerate().filter(|(_, a)| a.tiles > 0.0) {
         let id = id as u16;
         let kinds = &content.room_kinds;
-        let kind = kinds.iter().position(|k| a.tags & k.tags != 0);
+        // By what's done there, else whether it's a way through.
+        let passage = a.doors >= 2 || a.stairs;
+        let kind = kinds.iter().position(|k| a.tags & k.tags != 0).or_else(|| kinds.iter().position(|k| k.passage).filter(|_| passage));
         let exclusive = kinds.iter().filter(|k| k.exclusive && a.tags & k.tags != 0).count();
         let missing = kind.and_then(|k| kinds[k].essentials.iter().position(|&e| a.tags & e == 0));
         let [cramped, comfy] = kind.map_or([4.0, 9.0], |k| kinds[k].size);
