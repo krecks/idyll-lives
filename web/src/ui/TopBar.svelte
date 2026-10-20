@@ -46,7 +46,7 @@
 
   <div class="glass group center">
     <div class="time">
-      <span class="day">{WEEKDAYS[game.weekday]} · Day {game.day}</span>
+      <span class="day tabular">{WEEKDAYS[game.weekday]} · Day {game.day}</span>
       <span class="clock tabular">{clock(game.minute, settings.clock24h)}</span>
     </div>
     {#if game.mode !== 'live'}
@@ -137,14 +137,22 @@
 </header>
 
 <style>
+  /* Three columns, the middle one centred on the screen: the clock and speeds stay put when the
+     groups beside them change width (the funds as money comes and goes). */
   .bar {
     position: absolute;
     inset: var(--edge) var(--edge) auto;
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: start;
     gap: var(--gap);
     pointer-events: none;
+  }
+  .bar > .group:first-child {
+    justify-self: start;
+  }
+  .bar > .group:last-child {
+    justify-self: end;
   }
   .group {
     display: flex;
@@ -193,6 +201,9 @@
     flex-direction: column;
     line-height: 1.1;
     padding: 0 6px 0 10px;
+    /* As wide as "Mon · Day 99" or "12:00 AM", so the speeds beside it don't move as the day or the hour changes. */
+    min-width: 104px;
+    box-sizing: border-box;
   }
   .day {
     font-size: 11px;
