@@ -2,7 +2,7 @@
  * The graphics presets: Low, Medium and High (Settings › Performance › Graphics; `?quality=low|
  * medium|high` overrides the setting for testing). Medium is everyone's default and the game's
  * intended look. High is Medium with sharper sun shadows and two mirrors drawn every frame. Low is
- * Medium with modest trims for older laptops (integrated Intel graphics).
+ * Medium with heavier trims for older laptops (integrated Intel graphics): fewer draws and triangles.
  *
  * Every knob is in this one table. A new knob gets a field below, with what it does and what it
  * costs, and a value in each preset.
@@ -77,6 +77,18 @@ export interface QualitySettings {
    * and −0.5 ms GPU in the orbit view by day (Low, WebGPU).
    */
   landscapeShadows: boolean;
+  /**
+   * The street outside the viewed lot casts the sun's shadows: neighbours' houses and gardens,
+   * trees, parked cars, kerb furniture and public-place things. The lot's own house, garden and
+   * furniture always do. Low leaves the street out: fewer shadow-map draws (the street is mostly
+   * seen beyond the lot) at the cost of softer, flatter neighbours.
+   */
+  streetShadows: boolean;
+  /**
+   * The residents cast the sun's shadows. Low leaves them to their soft contact shadows: 38 fewer
+   * shadow-map draws in the village orbit, at the cost of flat-looking people in direct sun.
+   */
+  characterShadows: boolean;
   /** WebGPU only: record draw commands once and replay them each frame (the menus' town). */
   snapshotRendering: boolean;
   /**
@@ -97,9 +109,9 @@ export interface RenderQuality extends QualitySettings {
 }
 
 export const QUALITY: Record<GraphicsPreset, QualitySettings> = {
-  low: { shadowMapSize: 1024, msaaSamples: 1, anisotropy: 4, clusteredLamps: false, mirrors: 1, mirrorScale: 0.4, mirrorRate: 10, lightingStep: 10, lawnDensity: 0.5, landscapeShadows: false, snapshotRendering: true, ambientRange: 0 },
-  medium: { shadowMapSize: 2048, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 1, mirrorScale: 0.5, mirrorRate: 30, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, snapshotRendering: true, ambientRange: 40 },
-  high: { shadowMapSize: 4096, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 2, mirrorScale: 0.75, mirrorRate: 0, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, snapshotRendering: true, ambientRange: 60 },
+  low: { shadowMapSize: 1024, msaaSamples: 1, anisotropy: 4, clusteredLamps: false, mirrors: 1, mirrorScale: 0.4, mirrorRate: 10, lightingStep: 10, lawnDensity: 0.5, landscapeShadows: false, streetShadows: false, characterShadows: false, snapshotRendering: true, ambientRange: 0 },
+  medium: { shadowMapSize: 2048, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 1, mirrorScale: 0.5, mirrorRate: 30, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, streetShadows: true, characterShadows: true, snapshotRendering: true, ambientRange: 40 },
+  high: { shadowMapSize: 4096, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 2, mirrorScale: 0.75, mirrorRate: 0, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, streetShadows: true, characterShadows: true, snapshotRendering: true, ambientRange: 60 },
 };
 
 export const GRAPHICS_PRESETS = Object.keys(QUALITY) as GraphicsPreset[];

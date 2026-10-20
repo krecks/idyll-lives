@@ -13,6 +13,9 @@ All notable changes to Idyll Lives. Versions follow [semantic versioning](https:
 ### Settings
 - **Settings are versioned and migrated in order.** Values from a hand-edited, truncated or older file are put back in range (numbers, switches and choices) instead of being used as they are.
 
+### Graphics
+- **Low draws far less:** the village orbit by day falls from 447 draws and 5.1 M triangles a frame to 293 and 1.2 M, and from 12 long tasks to none (M3 Pro proxy, 1920×1080). The quilts and held things draw only their live rows instead of the whole town's capacity, the street uses its far models, the street and residents cast no sun shadows on Low, and one merged shadow caster replaces the lot's furniture templates. Medium is unchanged.
+
 ## 0.2.0 — 2026-10-13
 
 **Play it in your browser:** https://krecks.github.io/idyll-lives/

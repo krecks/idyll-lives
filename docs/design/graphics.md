@@ -1,12 +1,12 @@
 # Graphics settings and performance
 
-*Status: 0.2.0. Three presets (Low, Medium, High), Auto resolution and the paced frame rate cap are in. On the Intel laptops below, Medium's target is 30 fps. It hasn't been measured on Intel hardware: scaled from Mac measurements, 0.2.0's Medium is estimated at about 10–21 fps there by day (8–13 at night), so it probably falls short until someone measures it on a real laptop. Low is best effort. The release review has the findings behind this page ([release-0.2.0-review.md](../release-0.2.0-review.md), §2.5.1 and §3.5).*
+*Status: 0.3.0. Three presets (Low, Medium, High), Auto resolution and the paced frame rate cap are in. 0.3.0 cut Low's draws and triangles hard (below); it still hasn't been measured on Intel hardware. On the Intel laptops below, Medium's target is 30 fps; scaled from Mac measurements, 0.2.0's Medium is estimated at about 10–21 fps there by day (8–13 at night), so it probably falls short until someone measures it on a real laptop. Low is best effort. The release review has the findings behind this page ([release-0.2.0-review.md](../release-0.2.0-review.md), §2.5.1 and §3.5).*
 
 Code: `web/src/render/quality.ts` (the presets), `web/src/render/babylon/resolution.ts` (Auto resolution), `web/src/render/babylon/pacing.ts` (the FramePacer), `web/src/settings/settings.svelte.ts` (settings and their migration), `web/src/debug/bench.ts` and `benchFlags.ts` (the benchmark), `tools/bench/` (its runner).
 
 ## The presets
 
-Settings › Performance › Graphics. Medium is everyone's default and the game's intended look. High is Medium with sharper sun shadows and two mirrors drawn every frame. Low is Medium with modest trims for older laptops (integrated Intel graphics). A preset applies the next time a game starts or loads. `?quality=low|medium|high` overrides the setting for testing.
+Settings › Performance › Graphics. Medium is everyone's default and the game's intended look. High is Medium with sharper sun shadows and two mirrors drawn every frame. Low is Medium with trims for older laptops (integrated Intel graphics), including far fewer draws and triangles. A preset applies the next time a game starts or loads. `?quality=low|medium|high` overrides the setting for testing.
 
 Every knob is in one table, `QUALITY` in `quality.ts`; a new knob gets a field there with what it does and what it costs, and a value in each preset.
 
@@ -22,6 +22,8 @@ Every knob is in one table, `QUALITY` in `quality.ts`; a new knob gets a field t
 | `lightingStep` | 10 | 0.5 | 0.5 | Game minutes between lighting updates at speed 3 and up and in quiet hours (slower speeds: every half minute). Each update re-colours the sun, sky and lamps and can thaw the materials for a few frames: at speed 5 that was 20 updates a second, CPU p95 4.7–6 ms against 0.3–0.4 ms. On every preset the lighting also changes at most every 100 ms of real time, 10 times a second. |
 | `lawnDensity` | 0.5 | 1 | 1 | Share of the lawn's grass tufts and flowers drawn: 0.5 keeps every other one, always the same ones, standing where they did (24,245 of the landscape's 44,655 plants). With `landscapeShadows`, on Low by day: −0.29 M triangles, −6 shadow draws, −0.5 ms of GPU (WebGPU, orbit view). |
 | `landscapeShadows` | false | true | true | The woods round the town cast shadows. The lot's own garden trees, the street and the house always do. |
+| `streetShadows` | false | true | true | The street outside the viewed lot casts the sun's shadows: neighbours' houses and gardens, trees, parked cars, kerb furniture and public-place things. The lot's own house, garden and furniture always do. Low leaves the street out. |
+| `characterShadows` | false | true | true | The residents cast the sun's shadows. Low leaves them to their soft contact shadows: 38 fewer shadow-map draws in the village orbit. |
 | `ambientRange` | 0 | 40 | 60 | Metres from the camera within which things' ambient clips play (a ceiling fan, clock hands, a fountain's water: a model's `motions.idle`); further off, and on Low, they rest. Each moving thing rewrites its model's part buffers each frame (one upload per model, however many move); the sun's shadows aren't redrawn for them, their culling boxes stay the rest pose's, and no draw calls are added. 94 at once on a lot (a stress case: 94 scratch rocking chairs, each with a fan turning; WebGPU, M3 Pro, headless, 2026-10-14): 0.09 ms of CPU a frame for the clips and +0.15–0.3 ms for the frame's CPU; with Chrome's CPU throttled 4× (a stand-in for an older laptop's CPU): 0.2–0.35 ms and +0.4–0.6 ms. Not measured on Intel graphics hardware; Low keeps them off. |
 | `snapshotRendering` | true | true | true | WebGPU only: the menus' town records its draw commands once and replays them each frame. The game itself draws live. `?snapshot=0` turns it off. |
 
@@ -230,3 +232,20 @@ The table above this one (P1's sign-off) is 5f72a7c, before G3; G3 gives back ab
 - Many runs were noisy (load average 5–6); the wide view's culling A/B was inconclusive. The baselines' WebGPU runs stalled often (P1-16), so their fps is pessimistic.
 - Medium still looks the same: every change's shots differ from the build before in at most 0.12 % of pixels by more than 2 of 255, all on the far road (P1-17).
 - In live play the shadow map is still drawn every frame while residents are in view, from 152 draws after culling (the release review's §4).
+
+**0.3.0 Low-end pass** (M3 Pro proxy, 1920×1080, `?bench=village&quality=low&cam=orbit&res=1&cap=0&secs=8&warmup=4&hud=0`, no vsync, median of 3; WebGPU timestamp span, WebGL2 frame p50; the plan's target was an Intel HD 620-class laptop, which wasn't available, so the M3 is a proxy for the direction, not the absolute target):
+
+| Low, orbit | fps | GPU ms | draws (shadow) | triangles M (shadow) | long tasks |
+|---|---|---|---|---|---|
+| before, WebGPU day | 164.8 | 4.83 | 447 (172) | 5.07 (0.40) | 12, max 60 ms |
+| after, WebGPU day | 223.9 | 2.52 | 293 (18) | 1.24 (0.12) | 0 |
+| before, WebGPU night | 158.6 | 4.92 | 466 (183) | 5.11 (0.43) | 0 |
+| after, WebGPU night | 221.3 | 2.25 | 301 (18) | 1.24 (0.12) | 0 |
+| before, WebGL2 day | 203.5 | 6.47 | 447 (172) | 5.07 | — |
+| after, WebGL2 day | 325.5 | 3.34 | 293 (18) | 1.24 | — |
+
+- **What shipped:** the blanket and held-prop thin instances draw their live rows, not the buffer's `MAX_CHARACTERS` capacity (the quilt alone was 3.53 M triangles for six residents; now 0.06 M); the street's far models on Low (38 K triangles, was 128 K); no street or character sun shadows on Low; and one merged object-shadow mesh per lot, built from the static bodies at rest, replaces 117 template casters (moving parts and see-through things keep their own, or lose their sun shadow on Low).
+- **The result:** 34 % fewer draws and 76 % fewer triangles than this branch's pre-pass Low, 41 % fewer draws than the 493 the plan started from. The shadow pass fell from 159 draws to 18. It isn't a full half of 493; the remaining draws are the lot's furniture and residents, which need per-object picking, colours and poses.
+- Medium is unchanged: `streetShadows` and `characterShadows` are true, the street uses full detail, and no object-shadow merge is built. A medium run after the pass drew the same scene and was within the run-to-run noise of the 0.2.0 tables above.
+
+**Weak-GPU policy.** Low stays on WebGPU. The pass took the village orbit from 447 draws to 293 and removed the long tasks the old Low had on the proxy, so there is no measured saturation left to route around. WebGL2 remains the automatic fallback when WebGPU cannot start, and the manual switch under Settings › Performance › Troubleshooting; the game does not switch by GPU vendor or adapter name, because integrated covers both an M3 and an HD 620, and WebGL2 gives up clustered lamps and WebGPU's lower CPU cost. If an HD 620 still stalls at Low, the next step is to measure that adapter and consider a WebGL2 default for it, not to guess from the vendor string.

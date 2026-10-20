@@ -1564,11 +1564,14 @@ export class Characters {
     world.objects.forEach((o, j) => this.tables.has(o.id) && this.seatIds.set(this.objects[j], o.id));
     const beds = world.objects.some((o) => BLANKET_BEDS.has(o.def));
     const bodies = new Set(this.sims.map((r) => r?.body.name));
+    const rows = this.sims.length;
     for (const [name, b] of this.blankets) {
       b.matrices.fill(0);
       b.mesh.thinInstanceBufferUpdated('matrix');
+      // `update` compacts the covered rows (a town of six must not draw 64 quilts' worth of triangles).
+      b.mesh.thinInstanceCount = 0;
       // (A life stage's quilt only where someone has that body: no draw call for nobody.)
-      b.mesh.setEnabled(beds && (b.base || bodies.has(name)));
+      b.mesh.setEnabled(rows > 0 && beds && (b.base || bodies.has(name)));
     }
     this.texture.update(this.data);
     this.uploaded.set(this.data);
@@ -1726,7 +1729,10 @@ export class Characters {
     const used = this.heldProp.includes(key) || this.toolProp.includes(key) || this.leftProp.includes(key) || this.rightProp.includes(key);
     for (const mesh of p.meshes) {
       mesh.isVisible = used;
-      if (used) mesh.thinInstanceBufferUpdated('matrix');
+      if (used) {
+        mesh.thinInstanceCount = this.sims.length + this.ghosts.length;
+        mesh.thinInstanceBufferUpdated('matrix');
+      }
     }
   };
 
@@ -2526,7 +2532,21 @@ export class Characters {
       this.data.fill(0, this.row(i), this.row(i) + NB * 16);
       shadows.fill(0, i * 16, i * 16 + 16);
     }
+    // A quilt is drawn only for the rows covered now, packed to the front of the buffer: the thin
+    // instances cost the sleepers, not every resident in the town (and not the buffer's capacity).
     for (const b of this.blankets.values()) {
+      let n = 0;
+      for (let i = 0; i < count; i++) {
+        const o = i * 16;
+        if (!b.matrices[o + 15]) continue;
+        if (n !== i) {
+          b.matrices.copyWithin(n * 16, o, o + 16);
+          b.ext[n * 2] = b.ext[i * 2];
+          b.ext[n * 2 + 1] = b.ext[i * 2 + 1];
+        }
+        n++;
+      }
+      b.mesh.thinInstanceCount = n;
       b.mesh.thinInstanceBufferUpdated('matrix');
       b.mesh.thinInstanceBufferUpdated('blanketExt');
     }
@@ -3967,6 +3987,7 @@ export class Characters {
     const ext = new Float32Array(MAX_CHARACTERS * 2);
     shape.mesh.thinInstanceSetBuffer('matrix', matrices, 16, false);
     shape.mesh.thinInstanceSetBuffer('blanketExt', ext, 2, false);
+    shape.mesh.thinInstanceCount = 0;
     shape.mesh.setEnabled(false);
     this.blankets.set(body.name, { ...shape, matrices, ext, base: body.name === body.family });
   }

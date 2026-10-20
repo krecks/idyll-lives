@@ -497,6 +497,8 @@ export class Street {
     private readonly lived = false,
     /** Draws the outdoor things of public places outside the viewed lot (the game, not the overview, which draws every lot's). */
     private readonly look?: ObjectLook,
+    /** 1: the street's models' far versions (Low, and the overview), if they have one; 0: full detail. */
+    private readonly lod: 0 | 1 = 0,
   ) {
     this.lib = MaterialLibrary.for(scene);
     this.templates = new TemplateCache(scene);
@@ -1178,7 +1180,7 @@ export class Street {
    */
   private async instances(key: string, items: Inst[], flat = false, footprint: [number, number] = [1, 1], standIn?: StandIn, pace?: () => Promise<void>): Promise<Mesh[]> {
     // The overview's street (on a layer of its own) is seen from afar: files' far versions.
-    const template = this.templates.get(key, () => buildModel(this.scene, `street:${key}`, this.assets.has(key, 'model') ? (this.assets.get(key, 'model') as ModelEntry) : undefined, footprint, { far: this.layerMask !== undefined, standIn }));
+    const template = this.templates.get(key, () => buildModel(this.scene, `street:${key}`, this.assets.has(key, 'model') ? (this.assets.get(key, 'model') as ModelEntry) : undefined, footprint, { far: this.layerMask !== undefined, lod: this.lod, standIn }));
     const t = await perfTimeAsync(`street: model ${key}`, () => template);
     await pace?.();
     const buf = new Float32Array(Math.max(1, items.length) * 16);

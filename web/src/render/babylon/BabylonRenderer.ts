@@ -416,6 +416,13 @@ export class BabylonRenderer implements Renderer {
   /** Shadow casters without the house walls, and the walls (they cast only with walls up). */
   private baseCasters: Mesh[] = [];
   private wallCasters: Mesh[] = [];
+  /** Object body meshes whose sun shadows are in `objectShadowMerge` (Low), so they cast no shadow of their own. */
+  private objectShadowSources = new Set<Mesh>();
+  /** The low preset's one static shadow caster for the lot's objects (null on Medium and High). */
+  private objectShadowMerge: Mesh | null = null;
+  private readonly shadowMatrix = new Matrix();
+  private readonly shadowInstance = new Matrix();
+  private readonly shadowPoint = new Vector3();
   private wallMode: WallMode = 'down';
   /** Camera look bits for the cutaway (+x, -x, +z, -z). */
   private cutLook = -1;
@@ -803,7 +810,7 @@ export class BabylonRenderer implements Renderer {
     this.street = new Street(scene, this.deps.assets, this.house, undefined, true, (def) => {
       const d = this.deps.content.object(def);
       return d && { model: d.model ?? `model.${def}`, footprint: d.footprint ?? [1, 1], standIn: this.standInOf(d) };
-    });
+    }, this.quality.preset === 'low' ? 1 : 0);
     // Wind sway and tint variation for foliage materials (hooks them as the models load).
     installNature(scene);
     await this.setupEnvironment();
@@ -1013,10 +1020,11 @@ export class BabylonRenderer implements Renderer {
     this.baseCasters = [
       ...new Set([
         ...[...this.lotMeshes, ...this.worldMeshes].filter((m) => !notCasting.has(m.name) && !m.name.startsWith('silhouette') && !houseCasters.includes(m)),
-        ...templates,
+        ...templates.filter((m) => !this.objectShadowSources.has(m)),
+        ...(this.objectShadowMerge ? [this.objectShadowMerge] : []),
         // Sims' small details (eyes, brows) don't cast sun shadows.
-        ...this.characters.casters(),
-        ...streetCasters,
+        ...(this.quality.characterShadows ? this.characters.casters() : []),
+        ...(this.quality.streetShadows ? streetCasters : []),
       ]),
     ];
     this.wallCasters = houseCasters;
@@ -4008,6 +4016,10 @@ export class BabylonRenderer implements Renderer {
     const mirrors: MirrorInstance[] = [];
     const moving: MovingObject[] = [];
     const glows: typeof this.glows = [];
+    // Low draws the objects' sun shadows from one merged mesh (their bodies, at rest) rather than
+    // from every template's thin instances: the lot's furniture costs a draw, not a hundred.
+    const shadowSources: { mesh: Mesh; matrices: Float32Array; count: number }[] = [];
+    const objectShadowMeshes: Mesh[] = [];
     const instances = perfStart('render: object instances');
     [...byModel.values()].forEach((list, n) => {
       const template = templates[n];
@@ -4084,6 +4096,12 @@ export class BabylonRenderer implements Renderer {
         mesh.thinInstanceSetBuffer('matrix', part < 0 ? matrices : parts[part].matrices, 16, part < 0);
         mesh.thinInstanceRefreshBoundingInfo(false);
         mesh.receiveShadows = true;
+        // (Something see-through still casts from its own thin instances; a moving part does not cast
+        // on Low, where the merged mesh is the lot's one object caster.)
+        if (!mesh.material?.needAlphaBlending() && !mesh.material?.needAlphaTesting()) {
+          objectShadowMeshes.push(mesh);
+          if (part < 0) shadowSources.push({ mesh, matrices, count: list.length });
+        }
       });
       for (const { mesh, part, screen } of template.glows ?? []) {
         // Strengths per instance (`applyGlow`), by the room each stands in; on a moving part, its buffer.
@@ -4102,6 +4120,13 @@ export class BabylonRenderer implements Renderer {
     });
     perfEnd(instances);
     const shadowsSpan = perfStart('render: object shadows');
+    this.objectShadowSources.clear();
+    this.objectShadowMerge = null;
+    if (this.quality.preset === 'low' && shadowSources.length) {
+      for (const mesh of objectShadowMeshes) this.objectShadowSources.add(mesh);
+      this.objectShadowMerge = this.mergeObjectShadows(shadowSources);
+      if (this.objectShadowMerge) this.worldMeshes.push(this.objectShadowMerge);
+    }
     for (const g of this.glows) if (!glows.some((n) => n.mesh === g.mesh)) g.mesh.setEnabled(false);
     this.glows = glows;
     this.applyGlow();
@@ -4139,6 +4164,49 @@ export class BabylonRenderer implements Renderer {
     shadows.thinInstanceRefreshBoundingInfo(false);
     this.worldMeshes.push(shadows);
     perfEnd(shadowsSpan);
+  }
+
+  /**
+   * One mesh of every object body at rest, for the sun's shadow map on Low: a template's thin
+   * instances are baked into world-space triangles here (and the template is left out of the
+   * shadow list, see `objectShadowSources`). Its layer mask keeps it out of the camera's pass.
+   */
+  private mergeObjectShadows(sources: { mesh: Mesh; matrices: Float32Array; count: number }[]): Mesh | null {
+    const positions: number[] = [];
+    const indices: number[] = [];
+    for (const { mesh, matrices, count } of sources) {
+      const pos = mesh.getVerticesData(VertexBuffer.PositionKind, true, true);
+      const idx = mesh.getIndices(true, true);
+      if (!pos || !idx) continue;
+      // A one-part model keeps the part's own transform; a merged one's is already in its vertices.
+      const world = mesh.computeWorldMatrix(true);
+      for (let i = 0; i < count; i++) {
+        Matrix.FromArrayToRef(matrices, i * 16, this.shadowInstance);
+        world.multiplyToRef(this.shadowInstance, this.shadowMatrix);
+        const base = positions.length / 3;
+        for (let p = 0; p < pos.length; p += 3) {
+          Vector3.TransformCoordinatesFromFloatsToRef(pos[p], pos[p + 1], pos[p + 2], this.shadowMatrix, this.shadowPoint);
+          positions.push(this.shadowPoint.x, this.shadowPoint.y, this.shadowPoint.z);
+        }
+        for (let k = 0; k < idx.length; k++) indices.push(base + idx[k]);
+      }
+    }
+    if (!indices.length) return null;
+    const data = new VertexData();
+    data.positions = new Float32Array(positions);
+    data.indices = positions.length / 3 > 65535 ? new Uint32Array(indices) : new Uint16Array(indices);
+    const mesh = new Mesh('objectShadowsMerged', this.scene);
+    data.applyToMesh(mesh);
+    const material = new StandardMaterial('objectShadowsMerged', this.scene);
+    material.disableLighting = true;
+    material.backFaceCulling = false;
+    mesh.material = material;
+    mesh.isPickable = false;
+    mesh.receiveShadows = false;
+    // The shadow map's custom list ignores layer masks; the camera's pass does not.
+    mesh.layerMask = 0;
+    mesh.freezeWorldMatrix();
+    return mesh;
   }
 
   /** An object's template key, and how to build it. */
