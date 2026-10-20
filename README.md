@@ -32,7 +32,7 @@ The first `pnpm dev` or `pnpm build` downloads the voice model (398 MB as publis
 | `pnpm test:sim` | Run the Rust simulation tests |
 | `pnpm test:voice` | Run the voice crate's tests (needs `pnpm voice` for the dictionary) |
 | `pnpm check:voice` | Check the voices in Node against golden hashes (`tools/voice/check.mjs`) |
-| `pnpm check:llm` | Check the language model's prompts, cleaning and golden lines in Node (`tools/llm/check.mjs`; several minutes) |
+| `pnpm check:llm` | Check the language model's prompts, cleaning and golden lines in Node (`tools/llm/check.mjs`; several minutes). Run it by hand when a prompt, a cleaning rule or the model changes, not on every release |
 | `pnpm devices:llm` | Run the voices and language model's device test in Chromium (`tools/llm/devices.mjs`) |
 | `node ../tools/llm/bench.mjs` | Benchmark the language model on its own: the game's worker, model and prompts with no game around it (load, prompt, tokens a second, the game's five lines), cold and with the page reloaded; writes `bench-results/llm-*/` |
 | `pnpm assets` | Build or update the compressed asset copies (the build does this too) |

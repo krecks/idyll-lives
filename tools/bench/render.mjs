@@ -19,6 +19,8 @@
  *     --res 1                  render scale: 1, 0.5–1, or auto
  *     --secs 20 --warmup 5 --runs 1
  *     --throughput             no vsync and no frame-rate limit: frames as fast as they can be made
+ *     --hud 0|1                the game's interface during the run (default 0: measure the renderer;
+ *                              1 measures the interface too, which Build mode's catalog dominates)
  *     --extra 'k=v&k=v'        more URL flags for every run
  *     --out <dir>              default <repo>/bench-results/<time>/
  *   --shots <dir>              fixed poses, paused (`diag=freeze`, `hud=0`): one PNG per preset × backend × pose
@@ -98,6 +100,7 @@ const warmup = Number(flag('warmup', has('shots') ? '6' : '5'));
 const runs = Number(flag('runs', '1'));
 const extra = flag('extra', '');
 const throughput = has('throughput');
+const hud = flag('hud', '0');
 const headed = has('headed') || (!has('shots') && !has('headless'));
 const left = Number(flag('left', '2600'));
 const stamp = new Date().toISOString().replace(/\.\d+Z$/, '').replace(/[:T]/g, '-');
@@ -190,7 +193,7 @@ async function matrix() {
             for (const diag of diags) {
               const d = diag === 'none' ? '' : diag.replaceAll('+', ',');
               const label = [preset, backend, scenario, `cpu${throttle}`, diag, throughput ? 'fast' : 'vsync'].join('-');
-              const query = queryOf(preset, backend, [SCENARIOS[scenario] ?? scenario, d && `diag=${d}`, `secs=${secs}`, `warmup=${warmup}`, 'hud=1', `label=${label}`].filter(Boolean).join('&'));
+              const query = queryOf(preset, backend, [SCENARIOS[scenario] ?? scenario, d && `diag=${d}`, `secs=${secs}`, `warmup=${warmup}`, `hud=${hud}`, `label=${label}`].filter(Boolean).join('&'));
               n++;
               process.stdout.write(`[${n}/${total}] ${label} … `);
               let result;

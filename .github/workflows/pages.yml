@@ -96,6 +96,14 @@ jobs:
           key: assets-${{ hashFiles('tools/assets/optimize.mjs', 'web/public/assets/**') }}
           restore-keys: assets-
 
+      # wasm-opt's results (keyed by each input's SHA-256), so a release doesn't spend a minute
+      # optimising the same wasm again, and the named artifact below comes from the same cache.
+      - uses: actions/cache@v4
+        with:
+          path: web/.assets/wasm-opt
+          key: wasm-opt-${{ hashFiles('tools/release/wasm-opt.mjs', 'web/pnpm-lock.yaml') }}
+          restore-keys: wasm-opt-
+
       # The voice model and dictionary (about 400 MB from Hugging Face and GitHub, stored as
       # float16) and the language model (about 260 MB), kept between runs so a release doesn't
       # depend on those sites. The fetch scripts check every file's SHA-256 and fetch again what
@@ -149,15 +157,21 @@ jobs:
           echo "web/dist: $size MB"
           if [ "$size" -gt 900 ]; then echo "::error::web/dist is $size MB, over the 900 MB kept below Pages' 1 GB limit"; exit 1; fi
 
-      # The wasm as wasm-bindgen made it, with its function names, before wasm-opt: it shows what a
-      # function is called, but its function numbers don't match the site's optimised, stripped wasm
-      # (release review §4, P3-06): a crash stack from the site can't be read with it as it is.
+      # The site's own optimisations with the name section kept, so a crash stack from the site can
+      # be read with it (release review §4, P3-06). The wasm as wasm-bindgen made it has names but
+      # different function numbers, so it can't.
+      - name: Wasm with names (for crash stacks)
+        working-directory: web
+        run: |
+          mkdir -p .assets/wasm-names
+          cp src/core/wasm-pkg/sim_wasm_bg.wasm .assets/wasm-names/sim_wasm_bg.wasm
+          cp src/voice/wasm-pkg/voice_wasm_bg.wasm .assets/wasm-names/voice_wasm_bg.wasm
+          node ../tools/release/wasm-opt.mjs --names .assets/wasm-names/sim_wasm_bg.wasm .assets/wasm-names/voice_wasm_bg.wasm
+
       - uses: actions/upload-artifact@v4
         with:
           name: wasm-with-names-${{ github.sha }}
-          path: |
-            web/src/core/wasm-pkg/sim_wasm_bg.wasm
-            web/src/voice/wasm-pkg/voice_wasm_bg.wasm
+          path: web/.assets/wasm-names/*.wasm
           retention-days: 90
 
       - uses: actions/configure-pages@v5

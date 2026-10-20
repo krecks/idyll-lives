@@ -13,7 +13,11 @@
  * - About 48 s for the simulation on an M3 (binaryen.js is slow), so results are kept in
  *   `web/.assets/wasm-opt/` by the input's SHA-256 and a rebuild of the same wasm is instant.
  *
- *   node tools/release/wasm-opt.mjs <file.wasm>...   optimises the files in place
+ *   node tools/release/wasm-opt.mjs <file.wasm>...           optimises the files in place
+ *   node tools/release/wasm-opt.mjs --names <file.wasm>...   keeps the name section, for crash stacks
+ *
+ * The `--names` variant runs the same optimisations but leaves the names in, so its function
+ * numbers match the shipped wasm and a stack from the site can be read with it.
  */
 
 import { createHash } from 'node:crypto';
@@ -42,6 +46,8 @@ const FEATURES = [
   '--enable-call-indirect-overlong',
 ];
 export const FLAGS = [...FEATURES, '-O3', '--strip-debug', '--strip-producers'];
+/** The shipped optimisations without the name strip (CI's wasm-with-names artifact). */
+export const NAMED_FLAGS = [...FEATURES, '-O3', '-g', '--strip-producers'];
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
@@ -49,9 +55,9 @@ const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
  * Optimises `path` in place. Returns the sizes before and after, and whether the result came from
  * the cache. `name` groups cache entries (older ones of the same name are removed).
  */
-export async function optimizeWasm(path, name = basename(path).replace(/-[\w-]{8}\.wasm$|\.wasm$/, '')) {
+export async function optimizeWasm(path, name = basename(path).replace(/-[\w-]{8}\.wasm$|\.wasm$/, ''), flags = FLAGS) {
   const input = await readFile(path);
-  const key = sha256(Buffer.concat([input, Buffer.from(`\0binaryen ${VERSION}\0${FLAGS.join(' ')}`)])).slice(0, 16);
+  const key = sha256(Buffer.concat([input, Buffer.from(`\0binaryen ${VERSION}\0${flags.join(' ')}`)])).slice(0, 16);
   const cached = join(CACHE, `${name}-${key}.wasm`);
   let output = await readFile(cached).catch(() => null);
   const hit = output !== null;
@@ -59,7 +65,7 @@ export async function optimizeWasm(path, name = basename(path).replace(/-[\w-]{8
     await mkdir(CACHE, { recursive: true });
     for (const old of await readdir(CACHE)) if (old.startsWith(`${name}-`)) await rm(join(CACHE, old), { force: true });
     const tmp = `${cached}.part`;
-    await promisify(execFile)(process.execPath, [WASM_OPT, ...FLAGS, path, '-o', tmp], { maxBuffer: 1 << 26 });
+    await promisify(execFile)(process.execPath, [WASM_OPT, ...flags, path, '-o', tmp], { maxBuffer: 1 << 26 });
     output = await readFile(tmp);
     await rename(tmp, cached);
   }
@@ -69,12 +75,15 @@ export async function optimizeWasm(path, name = basename(path).replace(/-[\w-]{8
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const files = process.argv.slice(2);
-  if (!files.length) throw new Error('usage: node tools/release/wasm-opt.mjs <file.wasm>...');
+  const args = process.argv.slice(2);
+  const named = args[0] === '--names';
+  const files = named ? args.slice(1) : args;
+  if (!files.length) throw new Error('usage: node tools/release/wasm-opt.mjs [--names] <file.wasm>...');
   await Promise.all(
     files.map(async (file) => {
       const start = performance.now();
-      const { before, after, cached } = await optimizeWasm(file);
+      const cacheName = named ? `${basename(file).replace(/\.wasm$/, '')}-names` : undefined;
+      const { before, after, cached } = await optimizeWasm(file, cacheName, named ? NAMED_FLAGS : FLAGS);
       console.log(`wasm-opt ${file}: ${before} -> ${after} bytes${cached ? ' (cached)' : ''}, ${((performance.now() - start) / 1000).toFixed(1)} s`);
     }),
   );

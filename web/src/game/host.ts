@@ -53,13 +53,19 @@ interface Entry {
 }
 
 class GameHost {
-  readonly canvas: HTMLCanvasElement;
+  /** The canvas the current renderer draws on. It is replaced when the graphics API changes. */
+  get canvas(): HTMLCanvasElement {
+    return this.canvasEl;
+  }
+  private canvasEl: HTMLCanvasElement;
   readonly overlay: HTMLDivElement;
   private readonly root: HTMLDivElement;
   /** Fades the canvas out and in when the scene changes completely (menu town <-> a saved game). */
   private readonly veil: HTMLDivElement;
   private renderer: Promise<Renderer> | null = null;
   private rendererKey = '';
+  /** The graphics API the current renderer was made with (a change needs a new canvas). */
+  private rendererBackend: Settings['renderer'] | null = null;
   private current: Entry | null = null;
   /** The previous session letting go of the renderer; the next one starts after it. */
   private teardown: Promise<void> = Promise.resolve();
@@ -79,19 +85,31 @@ class GameHost {
   constructor() {
     this.root = document.createElement('div');
     this.root.className = 'game-host';
-    this.canvas = document.createElement('canvas');
-    this.canvas.className = 'scene';
-    this.canvas.tabIndex = -1;
+    this.canvasEl = document.createElement('canvas');
+    this.canvasEl.className = 'scene';
+    this.canvasEl.tabIndex = -1;
     this.overlay = document.createElement('div');
     this.overlay.className = 'world-overlay';
     this.veil = document.createElement('div');
     this.veil.className = 'scene-veil';
-    this.root.append(this.canvas, this.veil, this.overlay);
+    this.root.append(this.canvasEl, this.veil, this.overlay);
   }
 
   /** Places the canvas in the page (once, behind every screen). */
   mount(container: HTMLElement): void {
     if (this.root.parentElement !== container) container.appendChild(this.root);
+  }
+
+  /**
+   * A fresh canvas for a new graphics API: a canvas that has held a WebGPU context can't give a
+   * WebGL2 one (and the other way round), so switching backend in Troubleshooting replaces it.
+   */
+  private freshCanvas(): void {
+    const fresh = document.createElement('canvas');
+    fresh.className = 'scene';
+    fresh.tabIndex = -1;
+    this.canvasEl.replaceWith(fresh);
+    this.canvasEl = fresh;
   }
 
   /** The shared renderer (created on first use). */
@@ -254,7 +272,8 @@ class GameHost {
   /** Saves the game being played as a new save (if it still runs), then loads the page again. */
   async saveAndReload(): Promise<void> {
     const session = this.played;
-    if (session?.alive) await session.save(`${session.household} · Day ${game.day}`);
+    // The game's own autosaves, not a new manual save every time the crash screen is used.
+    if (session?.alive) await session.saveAutosave();
     location.reload();
   }
 
@@ -297,16 +316,19 @@ class GameHost {
     const key = JSON.stringify(RESTART_KEYS.map((k) => settings[k]));
     if (this.renderer && key === this.rendererKey) return this.renderer;
     const old = this.renderer;
+    const backendChanged = old !== null && this.rendererBackend !== settings.renderer;
     this.rendererKey = key;
     this.renderer = (async () => {
       (await old?.catch(() => null))?.dispose();
+      if (backendChanged) this.freshCanvas();
       const { content, assets } = await loadGameData();
       const params = new URLSearchParams(location.search);
       const renderer = new BabylonRenderer({ assets, content, backend: settings.renderer }, qualityFromSettings(settings, params));
       // Drawing that broke for good can't be mended in place: the crash screen (or, after a GPU
       // reset, "Graphics were reset") offers to save and reload.
       renderer.onFailure = this.onRendererFailure;
-      await renderer.init(this.canvas);
+      await renderer.init(this.canvasEl);
+      this.rendererBackend = settings.renderer;
       renderer.hold(this.covered);
       if (webGpuFailed() && settings.renderer !== 'webgl' && !this.toldFallback) {
         this.toldFallback = true;

@@ -162,6 +162,12 @@ const CLUSTERED_LIGHTS = 32;
 const DARK_LAMP_RANGE = 0.01;
 /** Brightness of a lamp at night (times its content `intensity`). */
 const LAMP_POWER = 7;
+/**
+ * Furthest reach (m) the lamp cluster bins: the largest bought lamp's range. Babylon's own default is
+ * 16 km, which puts every lamp in every tile it can see, so each PBR fragment loops over far more
+ * lamps than can light it. Room fill lights may reach further; their glow stops at this range.
+ */
+const LAMP_MAX_RANGE = 7;
 /** A room without a lamp gets this share of the light it had before lamps gave light. */
 const FILL_POWER = 0.35;
 /**
@@ -3077,7 +3083,10 @@ export class BabylonRenderer implements Renderer {
       if (clustered) light.falloffType = Light.FALLOFF_DEFAULT;
       this.roomLights.push(light);
     }
-    if (clustered) this.lampCluster = new ClusteredLightContainer('lamps', this.roomLights, this.scene);
+    if (clustered) {
+      this.lampCluster = new ClusteredLightContainer('lamps', this.roomLights, this.scene);
+      this.lampCluster.maxRange = LAMP_MAX_RANGE;
+    }
     if (this.diag.has('nolamps')) for (const light of this.lampCluster ? [this.lampCluster] : this.roomLights) light.setEnabled(false);
   }
 

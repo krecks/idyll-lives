@@ -21,7 +21,7 @@
     <dt>Voices and language model</dt>
     <dd>
       Residents speak with Supertonic 3 by Supertone (BigScience OpenRAIL-M), their mouths follow the Misaki dictionary by hexgrad (Apache-2.0), and the optional language model for their lines is LFM2.5-350M by Liquid AI (LFM Open License v1.0); they run on ONNX Runtime Web (MIT) and Tokenizers.js (Apache-2.0).
-      The voice model's licence binds everyone who plays: it and what it says may not be used to break the law, harm minors, spread harmful falsehoods or personal data, pass machine speech off as human, defame, harass, impersonate or discriminate against people, among the other uses <a href="{base}voice/supertonic-3/LICENSE" target="_blank" rel="noopener">its licence</a> forbids.
+      The voice model's licence binds everyone who plays: it and what it says may not be used to break the law, harm minors, spread harmful falsehoods or personal data, pass machine speech off as human, defame, harass, impersonate or discriminate against people, among the other uses <a href="{base}voice/supertonic-3/LICENSE.txt" target="_blank" rel="noopener">its licence</a> forbids.
     </dd>
     <dt>Open-source libraries</dt>
     <dd>

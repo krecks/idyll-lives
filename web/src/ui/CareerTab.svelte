@@ -99,7 +99,7 @@
     <div class="perf">
       <span class="muted row-between"><span>Performance</span><span class="tabular">{Math.round(job.performance)}%</span></span>
       <span class="track" role="progressbar" aria-label="Performance" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(job.performance)}>
-        <span style="width:{Math.min(100, job.performance)}%"></span>
+        <span style="transform:scaleX({Math.min(1, job.performance / 100)})"></span>
       </span>
     </div>
 
@@ -124,9 +124,11 @@
   </div>
 {:else}
   <div class="job">
-    <p class="pitch">{sim.name} is between jobs. Pick from {positions.toLocaleString()} positions in {catalog.categories.length} fields — skills unlock better grades and shorter weeks.</p>
+    {#if sim.pension === undefined}
+      <p class="pitch">{sim.name} is between jobs. Pick from {positions.toLocaleString()} positions in {catalog.categories.length} fields — skills unlock better grades and shorter weeks.</p>
+    {/if}
     <button class="btn primary small" onclick={openBoard}>Browse {positions.toLocaleString()} jobs</button>
-    {#if suggestions.length}
+    {#if sim.pension === undefined && suggestions.length}
       <span class="eyebrow">Good fits</span>
       <ul class="suggest">
         {#each suggestions as s (s.career)}
@@ -247,9 +249,11 @@
   }
   .track span {
     display: block;
+    width: 100%;
     height: 100%;
     background: var(--good);
-    transition: width var(--slow) var(--ease);
+    transform-origin: left;
+    transition: transform var(--slow) var(--ease);
   }
   .next {
     display: flex;

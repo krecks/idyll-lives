@@ -31,10 +31,11 @@ const FILES = [
   { path: 'tokenizer_config.json', sha256: 'e70cd070c2696bf1b0f1ad303c34502753670cca6f844637821cb1c37e6bea8d' },
   { path: 'onnx/model_q4.onnx', sha256: 'd1a705712e93aafaba1346b32245fa59e7857a46e2272003c0e8c524977e0de8' },
   { path: 'onnx/model_q4.onnx_data', sha256: '71ec6ad38a4c463dcb3dba671d06a1d9861be3a23e51290d818b95c0b7d2a5db', pack: true },
-  { path: 'LICENSE', from: LIQUID, sha256: '4d28ca14dedc0b3d0fcc2b3339f0e79931faa33874f3d24f522183a8fc70068c' },
+  // A .txt so a static host serves it as text and Credits' link shows it instead of downloading it.
+  { path: 'LICENSE', out: 'LICENSE.txt', from: LIQUID, sha256: '4d28ca14dedc0b3d0fcc2b3339f0e79931faa33874f3d24f522183a8fc70068c' },
 ];
 /** Files earlier versions put into the site that are no longer used. */
-const OBSOLETE = ['model_q4.onnx_data', 'config.json', 'model_i8.onnx', 'model_i8.onnx_data', 'model_q4f16.onnx', 'model_q4f16.onnx_data'];
+const OBSOLETE = ['LICENSE', 'model_q4.onnx_data', 'config.json', 'model_i8.onnx', 'model_i8.onnx_data', 'model_q4f16.onnx', 'model_q4f16.onnx_data'];
 
 /** SHA-256 of a file (of its unpacked contents if `packed`). */
 async function fileSha256(path, packed = false) {
@@ -79,10 +80,11 @@ await mkdir(OUT, { recursive: true });
 for (const name of OBSOLETE) await rm(OUT + name, { force: true });
 for (const file of FILES) {
   const name = file.path.replace('onnx/', '');
-  const out = file.pack ? `${OUT}${name}z` : OUT + name;
+  const saved = file.out ?? name;
+  const out = file.pack ? `${OUT}${name}z` : OUT + saved;
   if (await existing(out, file.sha256, file.pack)) continue;
-  console.log(`llm: downloading ${name}`);
-  await download(`${file.from ?? LFM}/${file.path}`, OUT + name, file.sha256);
+  console.log(`llm: downloading ${saved}`);
+  await download(`${file.from ?? LFM}/${file.path}`, OUT + saved, file.sha256);
   if (file.pack) {
     console.log(`llm: packing ${name}z`);
     await pack(OUT + name, out);

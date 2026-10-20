@@ -9,7 +9,9 @@
       // Cross-origin isolation where the host doesn't send the headers (GitHub Pages): a service
       // worker adds them (public/isolation-sw.js), and the page loads once more under it. Once
       // only: if the browser still won't isolate it (private windows), the game runs without.
-      if (!self.crossOriginIsolated && self.isSecureContext && 'serviceWorker' in navigator) {
+      // Once isolated, clear the flag: a later reload may try again if the worker was evicted.
+      if (self.crossOriginIsolated) sessionStorage.removeItem('littlelives.isolationReload');
+      else if (self.isSecureContext && 'serviceWorker' in navigator) {
         const again = 'littlelives.isolationReload';
         navigator.serviceWorker.register(new URL('isolation-sw.js', document.baseURI)).then(
           (registration) => {

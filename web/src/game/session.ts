@@ -100,6 +100,8 @@ const REPORT_PART_MS = 4000;
 export interface GameSession {
   /** Saves into `slotId` (a new slot when omitted). Returns the slot id. */
   save(name: string, slotId?: string): Promise<string>;
+  /** Saves into the older of the game's two autosaves (the crash screen's Save and reload). */
+  saveAutosave(): Promise<string>;
   applySettings(settings: Settings): void;
   /** Pauses for menus; `false` restores the previous speed. */
   setMenuPause(paused: boolean): void;
@@ -1512,6 +1514,9 @@ export async function startSession(
     },
     save(name, slotId) {
       return store(name, slotId ?? crypto.randomUUID(), false);
+    },
+    saveAutosave() {
+      return nextAutosaveId(gameId).then((id) => store(`${household} · Autosave`, id, true));
     },
     applySettings(s) {
       renderer.configure({

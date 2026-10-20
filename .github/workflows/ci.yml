@@ -1,0 +1,51 @@
+# Checks every push to main and every pull request: clippy (the release gate) and the simulation's
+# tests, then the ignored sample tests that need files made first. The heavy release work — the
+# wasm builds, models, web checks and Pages deploy — stays in pages.yml, run by hand or on a tag.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install
+          rustc --version
+          cargo clippy --version
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Simulation tests
+        run: cargo test -p sim-core --locked
+
+      # The generated_* tests are ignored because they need sample files; make them here so they
+      # run instead of passing without checking anything.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Generated houses and worlds
+        run: |
+          node --experimental-strip-types tools/housegen/sample.ts /tmp/houses.json
+          node --experimental-transform-types tools/worlds/sample.ts /tmp/worlds.json
+          HOUSES=/tmp/houses.json cargo test -p sim-core --release --locked --test generated_houses -- --ignored
+          WORLDS=/tmp/worlds.json cargo test -p sim-core --release --locked --test generated_worlds -- --ignored

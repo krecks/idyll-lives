@@ -21,10 +21,7 @@ const TICKS_PER_HOUR: u64 = (60.0 / MINUTES_PER_TICK) as u64;
 #[test]
 #[ignore]
 fn generated_worlds_are_livable() {
-    let Ok(path) = std::env::var("WORLDS") else {
-        eprintln!("set WORLDS to a file made by tools/worlds/sample.ts");
-        return;
-    };
+    let path = std::env::var("WORLDS").expect("set WORLDS to a file made by `node --experimental-transform-types tools/worlds/sample.ts worlds.json`");
     let worlds: Vec<serde_json::Value> = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
     let content = common::content();
     let mut failures = Vec::new();

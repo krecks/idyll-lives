@@ -36,10 +36,7 @@ fn cooks_or_washes(content: &sim_core::content::Content, def: &sim_core::content
 #[test]
 #[ignore]
 fn generated_houses_are_livable() {
-    let Ok(path) = std::env::var("HOUSES") else {
-        eprintln!("set HOUSES to a file made by tools/housegen/sample.ts");
-        return;
-    };
+    let path = std::env::var("HOUSES").expect("set HOUSES to a file made by `node --experimental-strip-types tools/housegen/sample.ts houses.json`");
     let houses: Vec<serde_json::Value> = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
     let content = common::content();
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web/public/content");

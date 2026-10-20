@@ -4,6 +4,22 @@ All notable changes to Idyll Lives. Versions follow [semantic versioning](https:
 
 ## Unreleased
 
+### Fixes
+- **The graphics API switch needs no reload:** Settings › Performance › Troubleshooting › Graphics API changes the drawing on the next start of the game, as its "Next load" badge says. A canvas that has held a WebGPU context can't give a WebGL2 one, so the new renderer gets a fresh canvas instead of failing to start.
+- **Save and reload saves over an autosave:** the crash screen's save goes into the older of the game's two autosaves, not into a new manual save on every crash.
+- **A slow start says so:** a game that takes more than 30 seconds to build its world now reports "The game took too long to start." instead of waiting on "Moving in…" for ever.
+- **Walks no longer jump at the start and the end:** at speeds 4 and 5 a walk's first and last step snapped, because only steps that moved in both snapshots were smoothed. A step that starts or ends standing now glides too.
+- **Retirees aren't told they're "between jobs"** or offered job suggestions: they have a pension and can still browse for work.
+- **Progress bars no longer make the browser lay out the page every frame:** the skills, needs, career and goal bars animate a transform instead of their width.
+- **Licence links show the licence:** the voice, dictionary and language-model licences end in `.txt`, so Credits' links open them instead of downloading them.
+- **Cross-origin isolation is retried:** the one-time reload flag is cleared once the page is isolated, so a page whose service worker was later evicted tries again on the next load.
+
+### Development
+- **Every push and pull request is checked:** a new `ci.yml` runs clippy, the simulation's tests and the sample-house and sample-world tests. The release build and Pages deploy stay in `pages.yml`.
+- **The generated-house and generated-world tests can't pass vacuously:** they require `HOUSES`/`WORLDS`, and CI makes the sample files first.
+- **The benchmark can measure the interface:** `tools/bench/render.mjs --hud 1` (the default is `0`, the renderer alone).
+- **Crash stacks from the site can be read:** CI's wasm artifact is now the site's own optimisations with the name section kept (`wasm-opt --names`), not the pre-optimisation wasm with different function numbers. `wasm-opt`'s results are cached between CI runs.
+
 ### Simulation
 - **Goals nobody can reach are refused at once:** the lot's walkable regions are labelled once per change to the house, and a resident asking for a way to another region is turned down before the search starts. No more flooding the whole town for a bed behind a wall.
 - **People are remembered too:** a resident who couldn't get to someone they meant to talk to or join doesn't try again for half a second; things and places keep the content's retry time.

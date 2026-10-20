@@ -2284,7 +2284,9 @@ export class Characters {
       let tz = cz;
       let th = ch;
       let tyaw = curr[o + k.yaw];
-      const walking = curr[o + k.moving] > 0 && prev[o + k.moving] > 0;
+      // A walk's first and last step: moving in one snapshot and standing in the other glides too,
+      // or the start and the end of every walk jump at speeds 4-5 (a step is 2.25 m at speed 4).
+      const walking = curr[o + k.moving] > 0 || prev[o + k.moving] > 0;
       if (walking ? Math.hypot(cx - prev[o + k.x], cz - pz) < reach : Math.abs(cx - prev[o + k.x]) + Math.abs(cz - pz) < SNAP_DISTANCE) {
         tx = prev[o + k.x] + (cx - prev[o + k.x]) * alpha;
         tz = pz + (cz - pz) * alpha;

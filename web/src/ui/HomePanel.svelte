@@ -146,7 +146,7 @@
               {#each ROOM_FACTORS as f, i (f)}
                 <span class="factor" class:weak={weak === f} title="{FACTOR_LABELS[f]}: {Math.round(r.scores[i] * 100)}">
                   <small>{FACTOR_LABELS[f]}</small>
-                  <span class="bar"><span style="width:{r.scores[i] * 100}%; background:{color(r.scores[i])}"></span></span>
+                  <span class="bar"><span style="transform:scaleX({r.scores[i]}); background:{color(r.scores[i])}"></span></span>
                 </span>
               {/each}
             </div>
@@ -289,8 +289,10 @@
   }
   .bar span {
     display: block;
+    width: 100%;
     height: 100%;
-    transition: width var(--slow) var(--ease);
+    transform-origin: left;
+    transition: transform var(--slow) var(--ease);
   }
   .note {
     color: var(--bad);

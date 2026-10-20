@@ -8,7 +8,7 @@
  *   and its four ONNX graphs with their weights stored as 16-bit floats (`fp16.mjs`: half the
  *   size, the same arithmetic; a `NOTICE` says so) and gzipped (`.onnxz`, unpacked by the
  *   browser): 398 MB as published, 185 MB here. https://huggingface.co/Supertone/supertonic-3
- * - Misaki's US English dictionaries (Apache-2.0, its licence goes along as `misaki-LICENSE`), for
+ * - Misaki's US English dictionaries (Apache-2.0, its licence goes along as `misaki-LICENSE.txt`), for
  *   mouth shapes: https://github.com/hexgrad/misaki
  *
  * Everything is pinned to a revision and checked against its SHA-256 (the converted graphs too:
@@ -58,13 +58,18 @@ const FILES = [
   ['voice_styles/M4.json', 'ca8eefad4fcd989c9379032ff3e50738adc547eeb5e221b82593a6d7b3bac303'],
   ['voice_styles/M5.json', 'dd22b92740314321f8ae11c5e87f8dd60d060f15dd3a632b5adf77f471f77af2'],
   ['LICENSE', '0d944a9110fed9a9602d60e0423a272903e7bd21ab060490774efc77c2275e9f'],
-].map(([path, sha256]) => ({ url: `${SUPERTONIC}/${path}`, out: path.split('/').pop(), sha256 }));
+].map(([path, sha256]) => ({
+  url: `${SUPERTONIC}/${path}`,
+  // A .txt so a static host serves it as text and Credits' link shows it instead of downloading it.
+  out: path === 'LICENSE' ? 'LICENSE.txt' : path.split('/').pop(),
+  sha256,
+}));
 /** Files earlier versions wrote that are no longer used (they would be copied into the build). */
 /** Files in the model's folder earlier versions wrote (the graphs as published). */
-const OBSOLETE_IN_MODEL = GRAPHS.map((g) => `${g.name}.onnx`);
-const OBSOLETE = ['pocket-en-2026-04', 'presets-2.pcm', 'presets-2.json', 'presets-2.stamp', 'presets-1.pcm', 'presets-1.json', 'presets-1.stamp', 'paradee-8m.onnx', 'paradee-8m-edit1.onnx', 'paradee-8m.json', 'kitten-nano-0.8-edit1.onnx', 'kitten-nano-0.8-edit2.onnx', 'kitten-nano-0.8-voices.f32'];
+const OBSOLETE_IN_MODEL = [...GRAPHS.map((g) => `${g.name}.onnx`), 'LICENSE'];
+const OBSOLETE = ['misaki-LICENSE', 'pocket-en-2026-04', 'presets-2.pcm', 'presets-2.json', 'presets-2.stamp', 'presets-1.pcm', 'presets-1.json', 'presets-1.stamp', 'paradee-8m.onnx', 'paradee-8m-edit1.onnx', 'paradee-8m.json', 'kitten-nano-0.8-edit1.onnx', 'kitten-nano-0.8-edit2.onnx', 'kitten-nano-0.8-voices.f32'];
 /** Misaki's licence (Apache-2.0: recipients get a copy), next to the dictionary made from it. */
-const LEXICON_LICENSE = { url: `${MISAKI_REPO}/LICENSE`, out: 'misaki-LICENSE', sha256: 'c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4' };
+const LEXICON_LICENSE = { url: `${MISAKI_REPO}/LICENSE`, out: 'misaki-LICENSE.txt', sha256: 'c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4' };
 const LEXICON = [
   { url: `${MISAKI}/us_gold.json`, sha256: 'dc414872a49a28ae6c141463d502fd945f3b2fde040484fdc47d00cc4612686f' },
   { url: `${MISAKI}/us_silver.json`, sha256: 'de8f67be911bb6c659187b4a65fd966b6a30e56350e0f790d763210b053ac475' },
@@ -93,7 +98,7 @@ async function existing(path, expected, packed = false) {
 
 /** What `NOTICE` says about the changed graphs (the licence asks for changes to be marked). */
 const NOTICE = `Supertonic 3 (Supertone Inc.), https://huggingface.co/Supertone/supertonic-3, revision 3cadd1ee.
-Licensed under the BigScience OpenRAIL-M licence (LICENSE), including its use restrictions.
+Licensed under the BigScience OpenRAIL-M licence (LICENSE.txt), including its use restrictions.
 
 Modified by Idyll Lives (tools/voice/fetch.mjs, tools/voice/fp16.mjs): in duration_predictor,
 text_encoder, vector_estimator and vocoder, every float32 weight of 1,024 values or more is stored

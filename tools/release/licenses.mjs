@@ -143,9 +143,9 @@ export function thirdPartyLicenses({ packageDirs, header }) {
   };
   const shipped = [asIs('@fontsource-variable/inter', 'the Inter font: assets/inter-*.woff2, its licence also in assets/inter-LICENSE.txt'), asIs('meshoptimizer', 'decoders/meshopt_decoder.js'), ...KEPT.map(kept)];
   const data = [
-    ['Supertonic 3 voice model (voice/supertonic-3/)', 'BigScience OpenRAIL-M', 'https://huggingface.co/Supertone/supertonic-3', 'web/public/voice/supertonic-3/LICENSE'],
-    ['Misaki US English dictionaries (voice/en-us.lexz)', 'Apache-2.0', 'https://github.com/hexgrad/misaki', 'web/public/voice/misaki-LICENSE'],
-    ['LFM2.5-350M language model (llm/lfm2.5-350m/)', 'LFM Open License v1.0', 'https://huggingface.co/LiquidAI/LFM2.5-350M', 'web/public/llm/lfm2.5-350m/LICENSE'],
+    ['Supertonic 3 voice model (voice/supertonic-3/)', 'BigScience OpenRAIL-M', 'https://huggingface.co/Supertone/supertonic-3', 'web/public/voice/supertonic-3/LICENSE.txt'],
+    ['Misaki US English dictionaries (voice/en-us.lexz)', 'Apache-2.0', 'https://github.com/hexgrad/misaki', 'web/public/voice/misaki-LICENSE.txt'],
+    ['LFM2.5-350M language model (llm/lfm2.5-350m/)', 'LFM Open License v1.0', 'https://huggingface.co/LiquidAI/LFM2.5-350M', 'web/public/llm/lfm2.5-350m/LICENSE.txt'],
   ].map(([name, license, url, file]) => {
     const path = join(ROOT, file);
     if (!existsSync(path)) throw new Error(`licenses: ${file} missing (run pnpm voice and pnpm llm)`);
