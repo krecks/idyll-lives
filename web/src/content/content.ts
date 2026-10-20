@@ -549,6 +549,7 @@ interface ContentFile {
   items?: ItemDef[];
   recipes?: RecipeDef[];
   phone?: { actions?: PhoneActionDef[] };
+  dayRhythm?: { sleepTags?: string[] };
   /** Further content files (relative to this one), merged key by key. */
   include?: string[];
 }
@@ -611,6 +612,8 @@ export class Content {
   readonly recipes: readonly RecipeDef[];
   /** What residents do on their phones, in the order phone commands index them. */
   readonly phoneActions: readonly PhoneActionDef[];
+  /** Interaction tags that count as sleep (`dayRhythm.sleepTags`; sim-core `DayRhythm::sleep_tags`): a bed is what has one. */
+  readonly sleepTags: readonly string[];
   private readonly itemById: Map<string, ItemDef>;
 
   private constructor(
@@ -660,6 +663,7 @@ export class Content {
     this.items = file.items ?? [];
     this.recipes = file.recipes ?? [];
     this.phoneActions = file.phone?.actions ?? [];
+    this.sleepTags = file.dayRhythm?.sleepTags ?? [];
     this.itemById = new Map(this.items.map((i) => [i.id, i]));
     this.freeRotation = new Set(file.objectRules?.freeRotation ?? []);
   }

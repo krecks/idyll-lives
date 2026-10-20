@@ -37,12 +37,15 @@
     app.emptyLot = lot === 'empty';
   });
   const house = $derived(templates && selected ? houseTemplate(templates, selected.template) : undefined);
-  /** Sleeping places in the house as it would be furnished for this household (empty lot: unknown). */
+  /**
+   * Sleeping places in the house as it would be furnished for this household (empty lot: unknown),
+   * counted as the simulation counts them (sim-core `lifecycle::beds`): a slot on anything with a sleep interaction.
+   */
   const bedPlaces = $derived.by(() => {
-    if (!templates || !selected || lot === 'empty') return null;
+    const sleep = services.content.sleepTags;
+    if (!templates || !selected || lot === 'empty' || !sleep.length) return null;
     const fitted = houseTemplate(templates, selected.template, residentsOf(services.content, household));
     if (!fitted) return null;
-    const sleep = services.content.activities.find((a) => a.sleep)?.tags ?? ['sleep'];
     const count = (objects: { def: string }[] | undefined) =>
       (objects ?? []).reduce((n, o) => {
         const def = services.content.object(o.def);
