@@ -253,8 +253,6 @@ export class BuildBuyInput {
   private grab: { dx: number; dz: number } | null = null;
   /** Buy: an owned object being resized by an arrow, until release. */
   private resizing: Resizing | null = null;
-  /** After an edit renumbers the picked object: what to pick again once the new structure arrives. */
-  private reselect: { def: string; x: number; z: number; rot: number } | null = null;
   /** What the shown arrows were made from (redrawn only when it changes). */
   private handlesKey = '';
   /** The arrow under the pointer. */
@@ -750,7 +748,7 @@ export class BuildBuyInput {
         return true;
       }
       if (placing.objectId !== null) {
-        // Put down where it was: nothing to send (a move renumbers it and is an undo step).
+        // Put down where it was: nothing to send (a move is an undo step).
         const was = game.objects.find((o) => o.id === placing.objectId);
         const same = was && was.x === p.x && was.z === p.z && was.rot === p.rot && (was.turn ?? 0) === p.turn && offsetKey(was.offset) === offsetKey(p.offset);
         if (!same) this.send({ type: 'moveObject', household: game.home, object: placing.objectId, x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset });
@@ -876,24 +874,13 @@ export class BuildBuyInput {
     this.preview.setResizeHandles?.(this.handlesFor(def, { ...this.frameOf(sel), rot: sel.rot, top: lift + box.height, bottom: lift + box.bottom }), this.hotHandle);
   }
 
-  /** A move sent from elsewhere (rotate, reset size): once it lands, the object it renumbered is picked again. */
-  reselectAt(at: { def: string; x: number; z: number; rot: number }): void {
-    this.reselect = at;
-  }
-
-  /** Before undo or redo (they renumber objects): an owned object in hand (carried, dragged or resized) goes back; a new purchase stays on the cursor. */
+  /** Before undo or redo (they may move or remove it): an owned object in hand (carried, dragged or resized) goes back; a new purchase stays on the cursor. */
   dropOwned(): void {
     if (this.resizing || this.dragging || game.placing?.objectId != null) this.cancel();
   }
 
-  /** A new structure arrived: picks again what an edit renumbered. */
+  /** A new structure arrived: the picked object's arrows follow it. */
   objectsChanged(): void {
-    const r = this.reselect;
-    if (r) {
-      const obj = game.objects.find((o) => o.def === r.def && o.x === r.x && o.z === r.z && o.rot === r.rot);
-      this.reselect = null;
-      if (obj && game.furnishing && !game.placing) game.buySelection = obj.id;
-    }
     this.handlesKey = '';
     this.syncHandles();
   }
@@ -1010,7 +997,6 @@ export class BuildBuyInput {
       const changed = n.size !== undefined && (n.cx !== r.cx || n.cz !== r.cz || n.ex !== r.ex || n.ez !== r.ez || n.tall !== r.tall);
       if (changed && n.valid && n.size) {
         this.send({ type: 'moveObject', household: game.home, object: r.id, x: n.x, z: n.z, rot: r.rot, offset: n.offset, size: n.size, tall: n.tall });
-        this.reselect = { def: r.def.id, x: n.x, z: n.z, rot: r.rot };
       }
       this.preview.setHeldObject?.(null, changed && n.valid);
       this.preview.setPlacementGhost?.(null);
@@ -1038,14 +1024,14 @@ export class BuildBuyInput {
     const same = !!p && !!was && was.x === p.x && was.z === p.z && was.rot === p.rot && offsetKey(was.offset) === offsetKey(p.offset);
     if (p?.valid && was && !same) {
       this.send({ type: 'moveObject', household: game.home, object: drag.id, x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset });
-      this.reselect = { def: was.def, x: p.x, z: p.z, rot: p.rot };
       this.preview.setHeldObject?.(null, true);
     } else {
       // Dropped where it can't go (or where it was): it goes back.
       if (p && !p.valid) game.placeRefused++;
       this.preview.setHeldObject?.(null);
-      game.buySelection = drag.id;
     }
+    // Picked either way (it keeps its id wherever it goes).
+    game.buySelection = drag.id;
     this.syncHandles();
     return true;
   }
@@ -1871,33 +1857,13 @@ const MAX_EDIT_EDGES = 40;
 export function editFeedback(prev: WorldStructure, next: WorldStructure): { effects: BuildEffect[]; sound: Sound | null } {
   const effects: BuildEffect[] = [];
   const sounds = new Set<Sound>();
-  // An object's id is its place in the list, and edits reorder it (selling shifts later ids
-  // down, moving re-adds an object at the end, undo puts things back), so match objects by what
-  // they are: first those unchanged (same look, same place), then the same kind of object among
-  // the rest (moved, turned, recoloured or upgraded); the same id wins a tie.
-  const before = new Map<number, ObjectPlacement>();
-  const left = new Set(prev.objects);
-  const key = (o: ObjectPlacement) => `${o.def}:${o.x}:${o.z}:${offsetKey(o.offset)}:${o.rot}:${o.turn ?? 0}:${colorsKey(o.colors)}:${o.quality}`;
-  const byKey = Map.groupBy(prev.objects, key);
-  for (const o of next.objects) {
-    const same = byKey.get(key(o));
-    if (!same?.length) continue;
-    const old = same.splice(Math.max(0, same.findIndex((p) => p.id === o.id)), 1)[0];
-    before.set(o.id, old);
-    left.delete(old);
-  }
-  for (const o of next.objects) {
-    if (before.has(o.id)) continue;
-    const kind = [...left].filter((p) => p.def === o.def);
-    const old = kind.find((p) => p.id === o.id) ?? kind[0];
-    if (!old) continue;
-    before.set(o.id, old);
-    left.delete(old);
-  }
+  // An object keeps its id for life: the same id before and after is the same object.
+  const before = new Map(prev.objects.map((o) => [o.id, o]));
+  const after = new Set(next.objects.map((o) => o.id));
   // Around where it stands (off the middle of its footprint, for things that stand anywhere on their tile).
   const rect = (o: ObjectPlacement) => ({ x: o.x + (o.offset?.[0] ?? 0) / 100, z: o.z + (o.offset?.[1] ?? 0) / 100, w: o.w, d: o.d });
   const added = next.objects.filter((o) => !before.has(o.id));
-  const removed = [...left];
+  const removed = prev.objects.filter((o) => !after.has(o.id));
   if (added.length + removed.length <= MAX_EDIT_OBJECTS) {
     for (const o of added) {
       effects.push({ kind: 'place', ...rect(o), objectId: o.id });

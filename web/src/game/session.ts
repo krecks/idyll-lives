@@ -624,12 +624,7 @@ export async function startSession(
         play('rotate');
       } else if (game.buySelection !== null) {
         const obj = game.objects.find((o) => o.id === game.buySelection);
-        if (obj) {
-          const turn = turned(obj.def, obj.rot, obj.turn ?? 0);
-          bridge.send({ type: 'moveObject', household: game.home, object: obj.id, x: obj.x, z: obj.z, ...turn });
-          // (A move renumbers it: the selection follows it to its new id.)
-          buildBuy.reselectAt({ def: obj.def, x: obj.x, z: obj.z, rot: turn.rot });
-        }
+        if (obj) bridge.send({ type: 'moveObject', household: game.home, object: obj.id, x: obj.x, z: obj.z, ...turned(obj.def, obj.rot, obj.turn ?? 0) });
       }
     },
     cancelPlacing() {
@@ -637,7 +632,7 @@ export async function startSession(
     },
     sell(objectId) {
       if (!game.furnishing && !buildBuy.stairsTool()) return;
-      // Selling what's in hand puts it down first (selling renumbers the objects after it).
+      // Selling what's in hand puts it down first.
       if (game.placing?.objectId === objectId) buildBuy.cancel();
       bridge.send({ type: 'sell', household: game.home, object: objectId });
       game.buySelection = null;
@@ -649,7 +644,7 @@ export async function startSession(
     undo() {
       // The step count follows a little later; don't send more undos than there are steps.
       if (game.mode !== 'build' || game.undoSteps <= 0) return;
-      // (It renumbers objects: something carried goes back first.)
+      // (It may move or remove things: something carried goes back first.)
       buildBuy.dropOwned();
       game.undoSteps--;
       game.buildStart = null;
@@ -681,7 +676,6 @@ export async function startSession(
       // Back to its kind's footprint from the same corner (the simulation refuses it if that doesn't fit).
       const [w, d] = def.footprint ?? [1, 1];
       bridge.send({ type: 'moveObject', household: game.home, object: obj.id, x: obj.x, z: obj.z, rot: obj.rot, offset: [0, 0], size: [w * 100, d * 100], tall: 0 });
-      buildBuy.reselectAt({ def: obj.def, x: obj.x, z: obj.z, rot: obj.rot });
     },
     /** The catalog: buy the next quality level (instant). */
     upgrade(objectId) {
@@ -1001,8 +995,8 @@ export async function startSession(
     if (feedback?.sound) play(feedback.sound);
     // Things the player just placed: the director looks out for their first use.
     if (game.mode === 'build' && world) {
-      const before = world.objects;
-      const added = w.objects.filter((o) => !before.some((b) => b.id === o.id && b.def === o.def));
+      const before = new Set(world.objects.map((o) => o.id));
+      const added = w.objects.filter((o) => !before.has(o.id));
       if (added.length) director.noteBuilt(added.map((o) => o.id), performance.now());
     }
     world = w;

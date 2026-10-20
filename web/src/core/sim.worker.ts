@@ -246,7 +246,7 @@ function publish(): void {
     scope.postMessage({ type: 'snapshot', data: copy, step: simSteps }, [copy.buffer]);
   }
   const version = g.structure_version();
-  // (Before the world, which the renderer builds with them; ids shift as objects go.)
+  // (Before the world, which the renderer builds with them.)
   const lamps = `${version}:${g.lights_version()}`;
   if (lamps !== lastLamps) {
     lastLamps = lamps;
