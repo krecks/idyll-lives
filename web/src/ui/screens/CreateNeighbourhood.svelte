@@ -248,7 +248,8 @@
 <style>
   .screen {
     position: relative;
-    height: 100vh;
+    /* (Viewport units count in the UI scale.) */
+    height: calc(100vh / var(--ui-scale));
     display: grid;
     grid-template-rows: auto 1fr;
     padding: 20px 28px 24px;
@@ -297,6 +298,8 @@
     min-height: 0;
     display: grid;
     grid-template-columns: 1fr minmax(400px, 480px);
+    /* One row as tall as the screen allows: a long side panel scrolls rather than stretching the town view. */
+    grid-template-rows: minmax(0, 1fr);
     gap: 24px;
   }
   .view {

@@ -18,7 +18,7 @@
 <div class="backdrop scaled">
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
   <div class="scrim" onclick={onclose}></div>
-  <div class="panel" role="dialog" aria-modal="true" aria-label={title} style="width:min({width}px, calc(100vw - 32px))">
+  <div class="panel" role="dialog" aria-modal="true" aria-label={title} style="width:min({width}px, calc(100vw / var(--ui-scale) - 32px))">
     <header>
       <h2>{title}</h2>
       <button class="close" aria-label="Close" onclick={onclose}><Icon name="icon.ui.close" size={16} /></button>

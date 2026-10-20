@@ -168,7 +168,7 @@ class MenuScene {
 
   /** Pins `el` above a plot (its house's roof); positioned every frame while shown. Returns a detach function. */
   pin(plot: number, el: HTMLElement): () => void {
-    const entry: Label = { el, x: 0, y: -1000, z: 0, px: NaN, py: NaN, shown: false, edge: false, w: 150, h: 40, sx: 0, sy: 0, order: 0 };
+    const entry: Label = { el, x: 0, y: -1000, z: 0, px: NaN, py: NaN, shown: false, crowded: false, edge: false, w: 150, h: 40, sx: 0, sy: 0, order: 0 };
     el.style.visibility = 'hidden';
     this.labels.set(plot, entry);
     this.anchor(plot, entry);
@@ -178,6 +178,10 @@ class MenuScene {
       if (tag) this.sizes.unobserve(tag);
       if (this.labels.get(plot) === entry) this.labels.delete(plot);
     };
+  }
+
+  private showLabel(label: Label): void {
+    label.el.style.visibility = label.shown && !label.crowded ? 'visible' : 'hidden';
   }
 
   /** Label anchor: above the middle of the house's roof (or the middle of the lot). */
@@ -273,7 +277,7 @@ class MenuScene {
       const visible = label.y > -100 && r.project(label.x, label.y, label.z, this.out);
       if (visible !== label.shown) {
         label.shown = visible;
-        label.el.style.visibility = visible ? 'visible' : 'hidden';
+        this.showLabel(label);
       }
       if (!visible) continue;
       label.sx = this.out.x;
@@ -323,6 +327,14 @@ class MenuScene {
           for (const cx of xs) for (const cy of ys) tryAt(cx, cy);
         }
       }
+      // Nowhere free (a small window, the town packed into a corner): this tag waits, hidden,
+      // rather than covering one that ranks higher. Its lot is still there to click, and listed.
+      const crowded = label.order > -1e5 && !free(x, y); // (never the selected or hovered lot's)
+      if (crowded !== label.crowded) {
+        label.crowded = crowded;
+        this.showLabel(label);
+      }
+      if (crowded) continue;
       done.push({ l: x - w / 2, t: y - h, r: x + w / 2, b: y });
       const edge = Math.abs(x - label.sx) > 2 || Math.abs(y - label.sy) > 2;
       if (edge !== label.edge) {
@@ -357,6 +369,8 @@ interface Label {
   px: number;
   py: number;
   shown: boolean;
+  /** No free spot this frame (a small window): hidden rather than drawn over another tag. */
+  crowded: boolean;
   /** Moved away from its lot (the stem is hidden). */
   edge: boolean;
   /** Tag size on screen (CSS pixels). */

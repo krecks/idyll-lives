@@ -87,7 +87,8 @@
 <style>
   .menu {
     position: relative;
-    height: 100vh;
+    /* (Viewport units count in the UI scale.) */
+    height: calc(100vh / var(--ui-scale));
     display: flex;
     align-items: center;
     color: #f6f2ea;

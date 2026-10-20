@@ -663,7 +663,8 @@
   }
   .cas {
     position: relative;
-    height: 100vh;
+    /* (Viewport units count in the UI scale.) */
+    height: calc(100vh / var(--ui-scale));
     display: grid;
     grid-template-rows: auto auto 1fr;
     padding: 20px 28px 24px;
