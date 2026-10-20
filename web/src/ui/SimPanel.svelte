@@ -214,11 +214,15 @@
     flex-direction: column;
     gap: 10px;
     width: 320px;
+    /* Short windows: no higher than the top bar; the card scrolls instead. */
+    max-height: calc(100% - var(--top) - var(--edge) - 88px);
     pointer-events: none;
   }
   .card {
     pointer-events: auto;
     animation: rise var(--slow) var(--ease);
+    min-height: 0;
+    overflow-y: auto;
   }
   @keyframes rise {
     from {

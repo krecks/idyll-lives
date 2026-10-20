@@ -99,6 +99,9 @@
     top: var(--top);
     right: var(--edge);
     width: 460px;
+    /* Short windows: it scrolls rather than running off the bottom. */
+    max-height: calc(100% - var(--top) - var(--edge));
+    overflow-y: auto;
     padding: 14px;
     display: flex;
     flex-direction: column;

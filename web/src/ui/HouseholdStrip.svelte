@@ -37,7 +37,7 @@
   {#if who}<SimPreview appearance={who.appearance} gender={who.gender} id={who.id} {size} />{/if}
 {/snippet}
 
-<section class="strip" aria-label="Household">
+<section class="strip" class:beside={game.journalOpen} aria-label="Household">
   {#if !game.occupied}
     <div class="card glass empty">
       <button class="main" title="Creation: a family to live here" onclick={() => services.controls.setMode('create')}>
@@ -52,19 +52,20 @@
   {/if}
   {#each household as s (s.id)}
     {@const action = doing(s)}
+    {@const now = action ? action.label : s.awayUntil !== null ? 'Working' : 'Taking a moment'}
     {@const need = low(s)}
     {@const away = s.plot !== home}
     <div class="card glass" class:active={game.inspected === s.id} class:away>
       <button
         class="main"
-        title="{s.name}: look closer (Tab). Double-click to follow."
+        title="{s.name} · {now}: look closer (Tab). Double-click to follow."
         onclick={() => services.controls.inspect(game.inspected === s.id ? null : s.id)}
         ondblclick={() => services.controls.follow(s.id)}
       >
         <span class="face" style="--mood:{needColor(s.mood)}">{@render face(s.id, 38)}</span>
         <span class="text">
           <span class="name">{s.name}</span>
-          <span class="doing">{action ? action.label : s.awayUntil !== null ? 'Working' : 'Taking a moment'}</span>
+          <span class="doing">{now}</span>
           <span class="where">{where(s)}</span>
         </span>
         {#if need}
@@ -106,10 +107,17 @@
     gap: 8px;
     pointer-events: none;
   }
+  /* Beside the open journal, not under it. */
+  .strip.beside {
+    right: calc(var(--edge) + var(--journal-width) + var(--gap));
+  }
+  /* Cards give up width when the strip is short of room, down to just the face (below). */
   .card {
     position: relative;
     pointer-events: auto;
-    width: 200px;
+    flex: 0 1 200px;
+    min-width: 50px;
+    container-type: inline-size;
     border-radius: var(--radius-md);
     overflow: hidden;
     transition:
@@ -126,7 +134,25 @@
     opacity: 0.82;
   }
   .card.empty {
-    width: 230px;
+    flex-basis: 230px;
+  }
+  /* Too narrow for words: the face (with its mood ring) and the bar of the day's progress; the
+     name and what they're doing are in the tooltip. */
+  @container (max-width: 120px) {
+    .text,
+    .need,
+    .today {
+      display: none;
+    }
+    .main {
+      justify-content: center;
+      padding: 8px 6px;
+    }
+    .go {
+      font-size: 0;
+      gap: 0;
+      padding: 0 4px;
+    }
   }
   .face.add {
     display: grid;

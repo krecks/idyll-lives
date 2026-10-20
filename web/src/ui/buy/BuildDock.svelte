@@ -76,9 +76,11 @@
     left: 50%;
     bottom: var(--edge);
     transform: translateX(-50%);
-    width: min(1400px, calc(100vw - 2 * var(--edge)));
-    /* Never reach the top bar. */
-    max-height: calc(100vh - 2 * var(--edge) - 64px);
+    /* (Of the HUD, not the viewport: viewport units ignore the interface scale.) */
+    width: min(1400px, calc(100% - 2 * var(--edge)));
+    container: dock / inline-size;
+    /* Never reach the top bar (two rows when narrow: --top follows it). */
+    max-height: calc(100% - var(--edge) - var(--top));
     padding: 8px 10px;
     display: flex;
     flex-direction: column;

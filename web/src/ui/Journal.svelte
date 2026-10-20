@@ -72,7 +72,7 @@
     top: var(--top);
     right: var(--edge);
     bottom: var(--edge);
-    width: 340px;
+    width: var(--journal-width);
     display: flex;
     flex-direction: column;
     gap: 10px;

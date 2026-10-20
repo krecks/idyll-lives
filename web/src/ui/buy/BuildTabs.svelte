@@ -14,7 +14,7 @@
 <div class="tabs" role="tablist" aria-label="Build mode">
   {#each tabs as t (t.id)}
     <button role="tab" aria-selected={game.buildTab === t.id} class:active={game.buildTab === t.id} title={t.title} onclick={() => services.controls.setBuildTab(t.id)}>
-      <Icon name={t.icon} size={15} /><span>{t.label}</span>
+      <Icon name={t.icon} size={15} /><span class="label">{t.label}</span>
     </button>
   {/each}
 </div>
@@ -48,5 +48,20 @@
     background: var(--accent);
     color: #fff;
     box-shadow: var(--shadow-sm);
+  }
+  /* A narrow dock (a small window or a large interface scale): icons only, so the row beside them
+     (search, sort, filters) still fits. */
+  @container dock (max-width: 820px) {
+    button {
+      padding: 0 9px;
+    }
+    .label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
   }
 </style>
