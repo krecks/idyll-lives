@@ -434,7 +434,7 @@ English file has about 1,000 lines, and the trait packs about 500 more for their
   and when the planner shows a thought (`thought`, per thought kind: `skipped`, `noPlace`,
   `kept`, `goal`, `roomLoved`, `roomDisliked`, `broken`, `accident`, `crying`).
 - **Later sources plug into the same pipeline:** the optional in-browser language model for
-  thoughts (see `PLAN.md`, "Smarter thoughts").
+  thoughts (see `docs/design/smarter-thoughts.md`).
 
 A group of lines is a list, or `{"lines": [...], "tone": ...}`; an object's `tone` applies to its
 `lines`. Tones (`happy`, `sad`, `angry`, `flirty`, `question`) adjust speed and pitch. `{name}` is
