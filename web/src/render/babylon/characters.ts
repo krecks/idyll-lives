@@ -1734,7 +1734,8 @@ export class Characters {
     for (const mesh of p.meshes) {
       mesh.isVisible = used;
       if (used) {
-        mesh.thinInstanceCount = this.sims.length + this.ghosts.length;
+        // (The `stress` ghosts' rigs are in `sims` already, in the rows after the residents'.)
+        mesh.thinInstanceCount = Math.min(this.sims.length, MAX_CHARACTERS);
         mesh.thinInstanceBufferUpdated('matrix');
       }
     }
