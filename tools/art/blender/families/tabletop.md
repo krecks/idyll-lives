@@ -20,10 +20,11 @@ Bath Bits) until checked in play, then go back to `tabletop` and their old group
 - **Player colour**: the main part's material, labelled `Body` (the cookie jar: its `Lid`); sets of like things (mugs,
   books, towels, blocks) list each one.
 
-## Parts kept for a use to come
+## Parts left decorative for 0.3.0
 
-The plan's "(+use)" items are built with that part on its own node, its origin where it would turn, so a clip can be
-added without remodelling (two draw calls until then):
+These are built with that part on its own node, its origin where it would turn, so a clip can be added without
+remodelling (two draw calls until then). Content rules forbid uses on things on a top, so 0.3.0 leaves them
+decorative:
 
 - `kettle`: the `lid`, hinged at its back edge (a lid lifts about Blender X).
 - `breadBin`: the `roll_top`, a half-tube shell round the bin's axis (it rolls back about Blender X).

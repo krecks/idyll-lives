@@ -10,6 +10,9 @@ All notable changes to Idyll Lives. Versions follow [semantic versioning](https:
 - **Walkers go round a change, or give up:** when a wall, door, stair or thing placed in their way changes the route they were walking, they work out a new one from where they stand. If there is none, they stop, and remember it if they chose it themselves.
 - Looks, repairs and crops no longer rebuild what walkers can reach or the objects-by-plot index; only changes to walking do.
 
+### Objects
+- **Ice cream from the freezer:** the fridge, built-in fridge and French-door fridge have "Get some ice cream", so their freezer doors and drawer open for a use instead of carrying a clip nobody played. The other modelled parts without a use stay decorative, documented in `docs/objects/open.md`.
+
 ### Settings
 - **Settings are versioned and migrated in order.** Values from a hand-edited, truncated or older file are put back in range (numbers, switches and choices) instead of being used as they are.
 

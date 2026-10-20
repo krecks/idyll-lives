@@ -2389,6 +2389,23 @@
           ]
         },
         {
+          "id": "frozenTreat",
+          "label": "Get some ice cream",
+          "anim": "fetch",
+          "minutes": 2,
+          "eat": {
+            "item": "iceCream",
+            "minutes": 6
+          },
+          "effects": {
+            "hunger": 0.12,
+            "fun": 0.18
+          },
+          "tags": [
+            "food"
+          ]
+        },
+        {
           "id": "meal",
           "label": "Make a meal",
           "recipe": "meal",
@@ -4024,6 +4041,14 @@
     {
       "id": "snack",
       "label": "Snack",
+      "model": "item.treatPlate",
+      "hold": "hand",
+      "emptyAs": "plateDirty",
+      "radius": 0.13
+    },
+    {
+      "id": "iceCream",
+      "label": "Ice cream",
       "model": "item.treatPlate",
       "hold": "hand",
       "emptyAs": "plateDirty",

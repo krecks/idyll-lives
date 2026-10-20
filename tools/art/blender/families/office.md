@@ -35,7 +35,8 @@ and its back the room. The chair is part of the still desk (no swivel) and its b
 - **Corner desk:** a white top filling its 2 × 2 tiles but for the front-right corner, cut on the diagonal (the
   old part's shape), on oak panels with a drawer pedestal. Static.
 - **Executive desk:** walnut on two pedestals of three drawers with brass handles, a green leather pad. Its middle
-  drawer is a part of its own but still: no use opens it yet (+use).
+  drawer is a part of its own but still: left decorative in 0.3.0, because its clip would need a seated use on the
+  desk.
 - **Desk chairs:** a seat, back and arms on a gas lift and five castors. The seat (everything above the lift) swivels
   15° and back (`swivel`, `hold` 0.6 s) as a resident sits (and, for the executive and desk chairs, writes or does
   homework), and carries them round with it (`ride`). Seats at the content's heights: 0.49, 0.48 and 0.47 m.

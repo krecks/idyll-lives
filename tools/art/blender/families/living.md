@@ -82,8 +82,8 @@ for the side, nesting and console tables). Still, but for two:
 - **Coffee table** (`drawer_open` for magazine, `hold` 2.5 s): a drawer in the front apron, a magazine in it,
   slides out 30 cm. It is 6 cm lower than the old part (that one had magazines on the top; they're in the
   drawer now).
-- **Nesting tables**: the small oak table is a part of its own (`small_table`), so a clip can pull it out once it
-  has a use.
+- **Nesting tables**: the small oak table is a part of its own (`small_table`), left decorative in 0.3.0: a clip
+  can pull it out once it has a use.
 - **Side table**: the model copies the catalog pack's `side_table` (oak with a drawer and a brass knob), which stood
   in front of the base manifest's version; the two differed before the model, as `check-glb` warned.
 - What stands on the tops (a plant, vases, magazines, a box) is plain finish, so it costs no draw call.
@@ -139,7 +139,7 @@ models' tops now start at the wall's face, 1–4 cm in front of the rectangles' 
 | `model.bookcaseCorner` | 0.90 × 1.90 × 0.34 m | 3,416 | 2 | Frame, Back | `book_out` (read) |
 | `model.cubeShelf` | 0.80 × 0.80 × 0.36 m | 1,476 | 2 | Frame, Back | — |
 | `model.ladderShelf` | 0.64 × 1.80 × 0.36 m | 2,340 | 3 | Frame, Shelves | — |
-| `model.displayCabinet` | 0.86 × 1.91 × 0.45 m | 2,580 | 3 | Frame, Back | — (door a part of its own) |
+| `model.displayCabinet` | 0.86 × 1.91 × 0.45 m | 2,580 | 3 | Frame, Back | — (door a part of its own, left decorative in 0.3.0) |
 
 `check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Seen in the gallery beside the
 old parts, on the clips bench (WebGPU), and in play: the bookshelf read at (`book_out` plays, held while reading),

@@ -138,11 +138,11 @@ a single object does is on its category page ([README.md](README.md)); this page
 - The ground's far versions are built but `nature.ts` never asks for them; `model.street.hedge` is built but unused.
 
 ### Content and sim
-- **Parts still with no use:** the executive desk's drawer (a clip plays only on the object used: it needs a seat's
-  use to play a clip on the desk it faces); the nesting tables' small table; the high chair's tray (the sim never
-  seats a baby in it); the laundry basket's lid (not built); the display cabinet's door; the kettle, bread bin and
-  laptop (content rules forbid uses on things on a top: sim work); the three freezers' `freezer_open` clips (no use
-  takes frozen food yet). Deferred from 0.3.0, except where a use was cheap to add.
+- **Parts with no use, left decorative for 0.3.0:** the executive desk's drawer (its clip would need a seated use
+  on the desk it faces); the nesting tables' small table; the high chair's tray (the sim never seats a baby in it);
+  the laundry basket's lid (not built); the display cabinet's door; the kettle, bread bin and laptop (content rules
+  forbid uses on things on a top: sim work). These are modelled parts without a clip, so no clip is orphaned. The
+  three freezers' `freezer_open` clips now play for "Get some ice cream".
 - **Uses end once every need they raise is full**, by design; it makes clips easy to miss in checks.
 - **Small things on tops:** 3 of 1800 sample houses have none, probably kitchens whose run has no plain counter.
 - **Residents didn't reach things in a crowded garden** once; a sim test of eleven in a row

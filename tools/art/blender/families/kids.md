@@ -26,9 +26,9 @@ are `_slab`s: an outline on a face's frame (`_plane`, `_board`), a few millimetr
   toward the foot while a resident sleeps or naps (`turn_down`). Both are in `BLANKET_BEDS`, so the game lays its
   quilt over the sleeper. The car's body, wheels and spoiler are
   still.
-- **High chair**: static. Its tray is a part of its own (no clip yet), so a "tray slides out" clip can come with a
-  use. Content can't give it one yet: a baby is only ever placed lying (`baby`, `care` are for a baby lying in an
-  object), so feeding a baby in the chair needs the sim first.
+- **High chair**: static, and left decorative in 0.3.0. Its tray is a part of its own (no clip yet), so a "tray
+  slides out" clip can come with a use. Content can't give it one yet: a baby is only ever placed lying (`baby`,
+  `care` are for a baby lying in an object), so feeding a baby in the chair needs the sim first.
 
 ## KD2: the toys
 

@@ -51,8 +51,8 @@ doors move at one speed, but each has its own angle:
 | `fridge_open` | `door_fridge` | 1.75 s | 0° → −102° (the tall door stops a little shorter) |
 
 The pack's `motions` plays `fridge_open` for the `fetch`, `cook` and `drink` animation tags (snacks, a
-meal's ingredients, a cold drink, putting dishes away), as the K1 fridges do, and holds it for 3.5 s. `freezer_open` plays for no use
-yet, because no interaction takes frozen food: that is `check-glb`'s one warning.
+meal's ingredients, a cold drink, putting dishes away), as the K1 fridges do, and holds it for 3.5 s.
+`freezer_open` plays for the `frozenTreat` use ("Get some ice cream").
 
 ## The sinks
 
@@ -68,8 +68,8 @@ tag covers both the `wash` and `washUp` interactions).
 | `model.farmhouseSink` | 1.000 × 1.253 × 0.670 m | 3,084 | 2 | apron-front basin, wooden worktop, plant and bottle |
 | `model.counterSinkDouble` | 2.000 × 1.265 × 0.660 m | 5,496 | 3 | two inset basins, a bridge tap each |
 
-`check-glb`: 0 failed; its warnings are the fridges' `freezer_open` clip, which no use plays, and 4 draw calls
-on the French-door and wine fridges. Khronos validator: 0 errors, 0 warnings.
+`check-glb`: 0 failed; its one remaining warning is 4 draw calls on the French-door and wine fridges.
+Khronos validator: 0 errors, 0 warnings.
 
 ## The K1 fridges
 
@@ -80,14 +80,14 @@ rack slide instead. The clip each use plays is in the pack's `motions`:
 | Model | Size (w × h × d) | Triangles | Draws | Moving parts | Clips (uses) |
 |---|---|---|---|---|---|
 | `model.fridgeMini` | 0.600 × 1.000 × 0.600 m | 2,194 | 2 | door | `fridge_open` 1.6 s (snack `fetch`, meal `cook`); `hold` 3 s |
-| `model.fridgeBuiltIn` | 0.840 × 2.025 × 0.656 m | 3,404 | 3 | fridge door, freezer door | `fridge_open` 1.75 s (fetch, cook, cold drink); `freezer_open` 1.75 s, unused |
-| `model.fridgeFrenchDoor` | 0.900 × 1.820 × 0.760 m | 2,756 | 4 | left door, right door, drawer | `fridge_open` 1.75 s (fetch, cook); `door_right` 1.75 s (cold drink); `freezer_open` 1.75 s, unused |
+| `model.fridgeBuiltIn` | 0.840 × 2.025 × 0.656 m | 3,404 | 3 | fridge door, freezer door | `fridge_open` 1.75 s (fetch, cook, cold drink); `freezer_open` 1.75 s (frozen treat) |
+| `model.fridgeFrenchDoor` | 0.900 × 1.820 × 0.760 m | 2,756 | 4 | left door, right door, drawer | `fridge_open` 1.75 s (fetch, cook); `door_right` 1.75 s (cold drink); `freezer_open` 1.75 s (frozen treat) |
 | `model.fridgeRetro` | 0.720 × 1.640 × 0.725 m | 1,920 | 3 | door; the chrome lever inside it (`G.attach`) | `lever` turns 30° out (0.3 s, `hold` 0.4), then `fridge_open` 1.75 s (`delay` 0.3; fetch, cook, cold drink) |
 | `model.fridgeMiniRetro` | 0.574 × 0.860 × 0.580 m | 3,975 | 2 | door (its handle, "MARIE" letters and unicorn sticker on it) | `fridge_open` 1.6 s (fetch, cook, cold drink); `hold` 3 s |
 | `model.wineFridge` | 1.000 × 0.950 × 0.660 m | 2,316 | 4 | glass door, top rack | `door_open` 1.5 s (wine `drink`); `hold` 2.5 s |
 
-The built-in's freezer door and the French-door freezer drawer carry clips no use plays yet, because no
-interaction takes frozen food: `check-glb` warns of both (as it does for `model.fridge`'s freezer).
+The built-in's freezer door and the French-door freezer drawer play `freezer_open` for "Get some ice
+cream"; `model.fridge`'s freezer door does the same.
 `fridgeFrenchDoor` and `wineFridge` take 4 draw calls (the most allowed, one per moving part plus the
 still body); the rest take 2 or 3. The five were built and exported on 2026-10-14 and sit in Validate ›
 Fridges until checked in play.
