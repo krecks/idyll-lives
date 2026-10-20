@@ -366,12 +366,12 @@ Live-site checks after tagging:
 ## 8. Open decisions
 
 - **Too-large household:** decided — warn and require confirmation, with shared/floor sleep and a `noBed` event.
-- **Low target:** what frame rate counts as acceptable on the weak-GPU target, and does WebGPU stay the default there?
-- **Stable ids:** does the save format bump to a new version, and what is the migration/rollback story?
-- **Auto voice:** must it ship in 0.3.0, or can it slip to 0.3.1?
-- **Polish:** which model/pose items are release-blocking, if any?
-- **`plan/future.md`:** restore, merge, or drop?
-- **Stashes:** keep or drop each, with a reason.
+- **Low target:** decided — no Intel HD 620 was available, so the M3 Pro is the proxy for direction, not an absolute target; Low stays on WebGPU, WebGL2 remains the automatic fallback and the manual switch, and an HD 620 is measured before any WebGL2 default for it (`docs/design/graphics.md`).
+- **Stable ids:** decided — save format 29, older saves migrate, ids are never reused, and moving an object keeps its id.
+- **Auto voice:** decided — shipped; Auto starts on the graphics card and steps down to the processor, then off.
+- **Polish:** decided — the weight bench's lie, a kiss between different heights, chair tuck reach, getting up from a chair, and the model details are deferred from 0.3.0 with reasons in `docs/objects/open.md`.
+- **`plan/future.md`:** dropped — pre-Blender, describes tooling that no longer exists; see §4.2.
+- **Stashes:** both dropped — one was already-merged work, the other only removed a debug assertion that still holds; see §4.2.
 
 ---
 
