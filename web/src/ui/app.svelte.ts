@@ -61,7 +61,7 @@ class AppState {
    */
   booting = $state(true);
   boot = $state.raw<Progress>({ label: 'Loading', value: 0 });
-  /** The loading screen over the menus or the game (null: none): a game being started (Play, Continue; one prepared unseen behind the menus shows none), or new neighbours. */
+  /** The loading screen over the menus or the game (null: none): a game being started (Play, Continue; one prepared unseen behind the menus shows none). */
   loading = $state.raw<Progress | null>(null);
 
   newGame(): void {
