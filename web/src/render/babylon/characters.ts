@@ -1254,7 +1254,13 @@ export class Characters {
     this.lib.adopt(this.quilt);
     for (const l of lying) this.addQuilt(l.body, l);
     this.ring = this.makeRing();
-    if (new URLSearchParams(location.search).has('debug')) Object.assign(window, { __characters: this, __stance: STANCE, __friendly: FRIENDLY });
+    if (new URLSearchParams(location.search).has('debug')) {
+      Object.assign(window, { __characters: this, __stance: STANCE, __friendly: FRIENDLY });
+      this.scene.onDisposeObservable.addOnce(() => {
+        const debug = window as unknown as { __characters?: unknown };
+        if (debug.__characters === this) delete debug.__characters;
+      });
+    }
     return true;
   }
 
@@ -1677,6 +1683,8 @@ export class Characters {
   /** Stops listening for model files (the renderer goes; the scene's meshes go with it). */
   dispose(): void {
     this.unlisten();
+    const debug = window as unknown as { __characters?: unknown };
+    if (debug.__characters === this) delete debug.__characters;
   }
 
   /** Removes the Sims (end of a session); meshes stay cached. */

@@ -41,6 +41,38 @@ export function compressedTextureFeatures(): { deviceDescriptor: GPUDeviceDescri
   return { deviceDescriptor: { requiredFeatures: ['texture-compression-bc', 'texture-compression-etc2', 'texture-compression-astc', 'timestamp-query'] } };
 }
 
+/**
+ * Babylon logs WebGPU's uncaptured errors with a listener on the GPUDevice. It is added inside
+ * `initAsync`, and `device.destroy()` does not remove listeners, so the closure keeps the engine
+ * (and its renderer) alive after a preset change. Remember it here so `dispose` can take it off.
+ */
+type DeviceWithErrorListener = GPUDevice & { __llErrorListener?: EventListener };
+if (typeof GPUDevice !== 'undefined') {
+  const add = GPUDevice.prototype.addEventListener;
+  GPUDevice.prototype.addEventListener = function (this: DeviceWithErrorListener, type: string, listener: EventListenerOrEventListenerObject | null, options?: boolean | AddEventListenerOptions) {
+    if (type === 'uncapturederror' && listener && typeof listener === 'function') this.__llErrorListener = listener;
+    return add.call(this, type, listener as EventListenerOrEventListenerObject, options);
+  };
+  // Every engine (ours, the previews') destroys its device: take the listener off there, whatever
+  // disposed it, so the device's caches cannot keep the engine alive.
+  const destroy = GPUDevice.prototype.destroy;
+  GPUDevice.prototype.destroy = function (this: DeviceWithErrorListener) {
+    const listener = this.__llErrorListener;
+    if (listener) this.removeEventListener('uncapturederror', listener);
+    delete this.__llErrorListener;
+    return destroy.call(this);
+  };
+}
+
+/** Removes the error listener Babylon put on `device`, before the device is destroyed. */
+export function forgetDeviceErrorListener(device: GPUDevice): void {
+  const withListener = device as DeviceWithErrorListener;
+  const listener = withListener.__llErrorListener;
+  if (!listener) return;
+  device.removeEventListener('uncapturederror', listener);
+  delete withListener.__llErrorListener;
+}
+
 /** WebGPU had an adapter but failed to start once this session: later engines use WebGL2 straight away. */
 let webGpuBroken = false;
 export const webGpuFailed = (): boolean => webGpuBroken;

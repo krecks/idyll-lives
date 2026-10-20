@@ -102,14 +102,14 @@ import { fieldLayers, Street } from './street';
 import { MaterialLibrary, WINDOWLESS_BITS, type DarkTiles } from './materials';
 import { refreshSoftLook, shadingFromSettings } from './softLook';
 import { Geo, LOOK as CUT } from './geometry';
-import { buildModel, motionsOf, onModelFileArrived, paintColors, painted, placementVariation, prefetchModels, standInOf, withGlows, type ModelTemplate, type StandIn } from './models';
+import { buildModel, forgetModelScene, motionsOf, onModelFileArrived, paintColors, painted, placementVariation, prefetchModels, standInOf, withGlows, type ModelTemplate, type StandIn } from './models';
 import { TemplateCache } from './templateCache';
-import { compressedTextureFeatures, noteWebGpuFailed, webGpuFailed } from './loaders';
+import { compressedTextureFeatures, forgetDeviceErrorListener, noteWebGpuFailed, webGpuFailed } from './loaders';
 import { Characters, MAX_CHARACTERS } from './characters';
 import { ItemLayer } from './items';
 import { Mirrors, type MirrorInstance } from './mirrors';
 import { ResizeHandles } from './handles';
-import { installNature, Landscape, natureDecor, setWind, Sky } from './nature';
+import { forgetWind, installNature, Landscape, natureDecor, setWind, Sky } from './nature';
 import { LAYER_ALL, LAYER_TOWN, LAYER_WORLD } from './layers';
 import { NightGrade } from './nightGrade';
 import { BuildEffects, writeMoving, type PopTarget } from './buildFx';
@@ -212,6 +212,29 @@ interface PlacedObject {
 }
 
 const MAX_SIMS = MAX_CHARACTERS;
+
+/**
+ * Babylon disposes an effect when the last submesh that used it is disposed, even though the engine
+ * caches effects by shader and defines and the next world reuses the same variant. The mirror pass
+ * compiles a clip-plane variant of every material it reflects, and those are the expensive ones to
+ * lose when a household's world is torn down. Keep them alive: the cache entry is still there, so
+ * the next world's first reflection reuses it instead of recompiling.
+ *
+ * Patching the prototype from `init` would close over that renderer and pin it (and its engine) for
+ * the life of the page, so the wrapper lives out here where it captures only the original method.
+ */
+function keepClipPlaneEffects(): void {
+  // SAFETY: `keepsClipPlanes` is our own marker on Babylon's runtime Effect class; its typings do not know it.
+  const proto = Effect.prototype as unknown as { keepsClipPlanes?: boolean };
+  if (proto.keepsClipPlanes) return;
+  proto.keepsClipPlanes = true;
+  const dispose = Effect.prototype.dispose;
+  Effect.prototype.dispose = function (this: Effect, ...args: Parameters<typeof dispose>) {
+    if (/^#define CLIPPLANE\d*\b/m.test(this.defines)) return;
+    return dispose.apply(this, args);
+  };
+}
+
 /** How far the road (and garden paths) is drawn beyond the viewed lot: the whole street. */
 const STREET_MARGIN = 500;
 /** Sims are drawn this far outside the lot (e.g. walking up the garden path). */
@@ -634,10 +657,11 @@ export class BabylonRenderer implements Renderer {
     // cost memory traffic (66 MB a frame at 1080p; screenshots without it are the same, P1-06).
     // The scene itself is smoothed in the post-processing pipeline (`msaaSamples`, or FXAA).
     if (!forceWebGL && !webGpuFailed() && (await WebGPUEngine.IsSupportedAsync)) {
-      const engine = new WebGPUEngine(canvas, { antialias: false, powerPreference: 'high-performance', ...compressedTextureFeatures() });
+      const engine = new WebGPUEngine(canvas, { antialias: false, powerPreference: 'high-performance', doNotHandleContextLost: true, ...compressedTextureFeatures() });
       try {
         await engine.initAsync();
         this.engine = this.webgpu = engine;
+        this.watchDeviceLoss(engine);
       } catch (err) {
         // An adapter but no device (a blocklisted driver, a device lost while starting): WebGL2,
         // for the rest of the session.
@@ -651,21 +675,7 @@ export class BabylonRenderer implements Renderer {
       }
     }
     this.engine ??= new Engine(canvas, false, { powerPreference: 'high-performance' });
-    // Babylon disposes an effect when the last submesh that used it is disposed, even though the
-    // engine caches effects by shader and defines and the next world reuses the same variant. The
-    // mirror pass compiles a clip-plane variant of every material it reflects, and those are the
-    // expensive ones to lose when a household's world is torn down. Keep them alive: the cache
-    // entry is still there, so the next world's first reflection reuses it instead of recompiling.
-    // SAFETY: `keepsClipPlanes` is our own marker on Babylon's runtime Effect class; its typings do not know it.
-    const effectProto = Effect.prototype as unknown as { keepsClipPlanes?: boolean };
-    if (!effectProto.keepsClipPlanes) {
-      effectProto.keepsClipPlanes = true;
-      const dispose = Effect.prototype.dispose;
-      Effect.prototype.dispose = function (this: Effect, ...args: Parameters<typeof dispose>) {
-        if (/^#define CLIPPLANE\d*\b/m.test(this.defines)) return;
-        return dispose.apply(this, args);
-      };
-    }
+    keepClipPlaneEffects();
     if (new URLSearchParams(location.search).has('profile')) {
       // Which shader variant is being compiled (and how long it takes) when a frame is slow.
       const process = Effect.prototype._processShaderCodeAsync;
@@ -2347,8 +2357,26 @@ export class BabylonRenderer implements Renderer {
   }
 
   dispose(): void {
+    if (this.disposed) return;
     this.disposed = true;
+    this.lib.onRefrozen = null;
+    MaterialLibrary.forget(this.scene);
     this.onFailure = null;
+    this.townTicket++;
+    this.townListener = null;
+    this.onFrame = null;
+    this.onView = null;
+    // Babylon's own loss handler keeps the engine (and its renderer) in a promise that may never
+    // settle; `watchDeviceLoss` uses a WeakRef instead. Drop the hooks the engine still holds on us.
+    this.engine.onContextLostObservable.clear();
+    this.engine.onResizeObservable.clear();
+    this.engine.customAnimationFrameRequester = null;
+    delete (this.engine as unknown as { _measureFps?: () => void })._measureFps;
+    if (typeof window !== 'undefined') {
+      const debug = window as unknown as { __renderer?: unknown; __scene?: unknown };
+      if (debug.__renderer === this) delete debug.__renderer;
+      if (debug.__scene === this.scene) delete debug.__scene;
+    }
     window.removeEventListener('resize', this.onResize);
     this.sizeWatch?.disconnect();
     this.unwatchPixelRatio?.();
@@ -2360,6 +2388,15 @@ export class BabylonRenderer implements Renderer {
     this.characters?.dispose();
     this.items?.dispose();
     this.overview?.dispose();
+    // The scene owns the meshes, materials and its own cleanup (file retries, observers); the
+    // engine alone does not dispose it. Drop the per-scene weak caches too: their values point
+    // back at the scene, so a weak entry can otherwise keep the whole renderer alive.
+    forgetModelScene(this.scene);
+    forgetWind(this.scene);
+    this.scene.dispose();
+    // Babylon's WebGPU error listener lives on the device, not the engine: take it off first.
+    const device = (this.engine as unknown as { _device?: GPUDevice })._device;
+    if (device) forgetDeviceErrorListener(device);
     this.engine.dispose();
   }
 
@@ -3316,9 +3353,10 @@ export class BabylonRenderer implements Renderer {
 
   /** Applies the look and the live options (post-processing, fog, resolution, ...). */
   private applyLook(): void {
+    if (this.disposed) return;
     const post = this.post;
-    if (post) {
-      const ip = post.imageProcessing;
+    const ip = post?.imageProcessing;
+    if (ip) {
       ip.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES;
       ip.contrast = LOOK.contrast;
       ip.vignetteWeight = LOOK.vignette;
@@ -4704,6 +4742,18 @@ export class BabylonRenderer implements Renderer {
           if (current()) this.resetSnapshot();
         });
       });
+    });
+  }
+
+  private watchDeviceLoss(engine: WebGPUEngine): void {
+    // Babylon's `device.lost.then(...)` closes over the engine, so a pending promise keeps a disposed
+    // renderer alive. Our handler only holds a weak reference; the device can still be watched.
+    // SAFETY: WebGPUEngine keeps its GPUDevice in the private `_device`.
+    const device = (engine as unknown as { _device?: { lost?: Promise<unknown> } })._device;
+    const self = new WeakRef(this);
+    void device?.lost?.then(() => {
+      const renderer = self.deref();
+      if (renderer && !renderer.disposed) renderer.onFailure?.('device');
     });
   }
 

@@ -19,6 +19,7 @@ import { colorsKey, type PartColors } from '../../core/protocol';
 import { buildModel, painted } from '../babylon/models';
 import { shadingFromSettings } from '../babylon/softLook';
 import type { ItemPreviews, ItemStage } from '../types';
+import { MaterialLibrary } from '../babylon/materials';
 import { boxCorners, contactShadow, PICTURE_STAND_IN, studioScene } from './itemScene';
 import { ItemStageController } from './itemStage';
 
@@ -407,6 +408,7 @@ class ItemStudio {
   }
 
   dispose(): void {
+    MaterialLibrary.forget(this.scene);
     this.scene.dispose();
     this.engine.dispose();
   }

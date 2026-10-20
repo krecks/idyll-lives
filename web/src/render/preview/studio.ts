@@ -199,6 +199,7 @@ export class Studio {
     if (this.disposed) return;
     this.disposed = true;
     this.engine.stopRenderLoop();
+    MaterialLibrary.forget(this.scene);
     this.scene.dispose();
     this.engine.dispose();
     this.canvas.remove();

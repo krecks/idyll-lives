@@ -10,7 +10,7 @@
 
 import type { WorldStructure } from '../core/protocol';
 import { BabylonRenderer } from '../render/babylon/BabylonRenderer';
-import type { Renderer } from '../render/types';
+import type { Renderer, RenderFailure } from '../render/types';
 import { qualityFromSettings, RESTART_KEYS, settings as liveSettings, type Settings } from '../settings/settings.svelte';
 import { app, type Progress } from '../ui/app.svelte';
 import { perfTime, perfTimeAsync } from '../debug/perf';
@@ -69,6 +69,10 @@ class GameHost {
   private played: GameSession | null = null;
   /** The player heard that WebGPU failed and WebGL2 draws instead. */
   private toldFallback = false;
+  /** One failure handler for every renderer: it must not close over the renderer it replaces. */
+  private readonly onRendererFailure = (why: RenderFailure, err?: unknown) => {
+    app.crashed(why === 'device' ? { kind: 'graphics', detail: 'The graphics device was lost.' } : { kind: 'render', detail: err instanceof Error ? err.message : String(err) });
+  };
   /** A full-screen menu covers the view (see `cover`). */
   private covered = false;
 
@@ -301,7 +305,7 @@ class GameHost {
       const renderer = new BabylonRenderer({ assets, content, backend: settings.renderer }, qualityFromSettings(settings, params));
       // Drawing that broke for good can't be mended in place: the crash screen (or, after a GPU
       // reset, "Graphics were reset") offers to save and reload.
-      renderer.onFailure = (why, err) => app.crashed(why === 'device' ? { kind: 'graphics', detail: 'The graphics device was lost.' } : { kind: 'render', detail: err instanceof Error ? err.message : String(err) });
+      renderer.onFailure = this.onRendererFailure;
       await renderer.init(this.canvas);
       renderer.hold(this.covered);
       if (webGpuFailed() && settings.renderer !== 'webgl' && !this.toldFallback) {

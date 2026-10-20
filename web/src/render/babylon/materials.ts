@@ -591,12 +591,32 @@ export interface SurfaceOptions {
 
 export class MaterialLibrary {
   private static readonly byScene = new WeakMap<Scene, MaterialLibrary>();
+  /** Scenes a disposed renderer let go: a late async build must not put one back in `byScene`. */
+  private static readonly forgotten = new WeakSet<Scene>();
 
   /** The library for `scene`; created on first use (without a registry, finishes fall back to matte). */
   static for(scene: Scene): MaterialLibrary {
     let lib = MaterialLibrary.byScene.get(scene);
-    if (!lib) MaterialLibrary.byScene.set(scene, (lib = new MaterialLibrary(scene)));
+    if (!lib) {
+      lib = new MaterialLibrary(scene);
+      if (!MaterialLibrary.forgotten.has(scene)) MaterialLibrary.byScene.set(scene, lib);
+    }
     return lib;
+  }
+
+  /** Lets a scene and its library go: the weak entry must not outlive the renderer that made it. */
+  static forget(scene: Scene): void {
+    MaterialLibrary.byScene.get(scene)?.dispose();
+    MaterialLibrary.byScene.delete(scene);
+    MaterialLibrary.forgotten.add(scene);
+  }
+
+  /** Stops the work that outlives a scene (its environment load's timer and its refreeze observer). */
+  dispose(): void {
+    if (this.envTimer) clearTimeout(this.envTimer);
+    this.envTimer = null;
+    this.onRefrozen = null;
+    this.scene.onAfterRenderObservable.clear();
   }
 
   private assets: AssetRegistry | null = null;
@@ -608,6 +628,8 @@ export class MaterialLibrary {
   /** Thawed only for their uniforms to be uploaded again (see `setEnvironmentIntensity`). */
   private readonly thawedUniforms = new Set<PBRMaterial>();
   private refreezeFrames = 0;
+  /** The environment load's fallback timer: it must not outlive the library (it holds the scene). */
+  private envTimer: ReturnType<typeof setTimeout> | null = null;
   private shadowMaterial: StandardMaterial | null = null;
   /** Anisotropic filtering of the surfaces' textures (the graphics preset's `anisotropy`; set before the first surface). */
   anisotropy = 8;
@@ -786,10 +808,12 @@ export class MaterialLibrary {
       const finish = (ok: boolean) => {
         if (done) return;
         done = true;
+        if (this.envTimer) clearTimeout(this.envTimer);
+        this.envTimer = null;
         if (!ok) console.warn(`[render] environment ${url} unavailable; using lights only`);
         resolve(ok);
       };
-      setTimeout(() => finish(false), 15000);
+      this.envTimer = setTimeout(() => finish(false), 15000);
       const download = () => fetch(url).then((res) => (res.ok ? res.arrayBuffer() : null));
       (earlySky(url)?.then((bytes) => bytes ?? download()) ?? download())
         .then((bytes) => {
