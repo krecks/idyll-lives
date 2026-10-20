@@ -295,9 +295,11 @@ class MenuScene {
       // The anchor (x, y) is the stem's foot: the box spans [x - w/2, x + w/2] x [y - h, y].
       const wx = clampX(label.sx, w);
       const wy = clampY(label.sy, h);
+      // Inside the town's part of the screen (a tag taller or wider than that has nowhere to go).
+      const inside = (x: number, y: number) => y - h >= area.top - 0.5 && y <= area.bottom + 0.5 && x - w / 2 >= area.left - 0.5 && x + w / 2 <= area.right + 0.5;
       const free = (x: number, y: number) => {
         const box = { l: x - w / 2, t: y - h, r: x + w / 2, b: y };
-        return !blocks.some((o) => overlaps(box, o)) && !done.some((o) => overlaps(box, o));
+        return inside(x, y) && !blocks.some((o) => overlaps(box, o)) && !done.some((o) => overlaps(box, o));
       };
       // Candidates: the wanted spot, and spots just beside every tag placed and every obstacle
       // (above, below, left, right and the diagonals); the free one nearest the lot wins.
@@ -329,7 +331,8 @@ class MenuScene {
       }
       // Nowhere free (a small window, the town packed into a corner): this tag waits, hidden,
       // rather than covering one that ranks higher. Its lot is still there to click, and listed.
-      const crowded = label.order > -1e5 && !free(x, y); // (never the selected or hovered lot's)
+      // (The selected or hovered lot's tag shows whatever it covers, unless the town has no room for it at all.)
+      const crowded = label.order > -1e5 ? !free(x, y) : !inside(x, y);
       if (crowded !== label.crowded) {
         label.crowded = crowded;
         this.showLabel(label);

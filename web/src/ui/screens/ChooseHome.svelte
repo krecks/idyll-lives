@@ -214,7 +214,10 @@
     position: relative;
     /* (Viewport units count in the UI scale.) */
     height: calc(100vh / var(--ui-scale));
+    container: setup / inline-size;
     display: grid;
+    /* As wide as the screen, whatever the header's buttons would like. */
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto 1fr;
     padding: 20px 28px 24px;
     gap: 14px;
@@ -260,6 +263,26 @@
     /* One row as tall as the screen allows: a long side panel scrolls rather than stretching the town view. */
     grid-template-rows: minmax(0, 1fr);
     gap: 24px;
+  }
+  /* Too narrow for the town beside the panel (a small window or a large UI scale): the town on
+     top, the panel under it. */
+  @container setup (max-width: 760px) {
+    .screen > header {
+      flex-wrap: wrap;
+      row-gap: 10px;
+    }
+    /* The title keeps a readable width; the buttons take the next line when they must. */
+    .screen > header .title {
+      flex: 1 1 300px;
+    }
+    main {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1.2fr) minmax(0, 1fr);
+      gap: 14px;
+    }
+    .details {
+      align-self: stretch;
+    }
   }
   .view {
     position: relative;
