@@ -35,6 +35,14 @@ const TOWN: &str = r#"{"width":24,"depth":12,
             {"name":"Cal","household":1,"x":16.5,"z":8.5,"age":30},{"name":"Dot","household":1,"x":17.5,"z":8.5,"age":1.99}],
     "relationships":[{"a":1,"b":0,"preset":"parent"},{"a":3,"b":2,"preset":"parent"}]}"#;
 
+/// Four grown-ups in a one-bedroom home with one double bed: two bed places, four sleepers.
+const CROWDED: &str = r#"{"width":12,"depth":12,
+    "plots":[{"name":"Home","x":0,"z":0,"w":12,"d":12,"entry":[5.5,11.5]}],
+    "households":[{"name":"Player","plot":0,"player":true}],
+    "objects":[{"def":"bigBed","x":2,"z":2}],
+    "sims":[{"name":"Ada","x":5.5,"z":5.5,"age":30},{"name":"Ben","x":6.5,"z":5.5,"age":30},
+            {"name":"Cal","x":7.5,"z":5.5,"age":30},{"name":"Dot","x":8.5,"z":5.5,"age":30}]}"#;
+
 fn beds(w: &World, from_x: i32) -> usize {
     w.objects.iter().filter(|o| o.x >= from_x && o.x < from_x + 12 && w.content.objects[o.def].id.ends_with("ed")).count()
 }
@@ -83,6 +91,14 @@ fn a_child_adopted_into_a_home_without_a_bed_for_them() {
     assert_eq!(beds(&w, 12), 2, "a bed for the child next door");
     w.apply(Command::Adopt { household: 0, child: true }).unwrap();
     assert_eq!(w.events.iter().filter(|e| e.kind == EventKind::NoBed).count(), 1, "the player is told");
+}
+
+#[test]
+fn a_crowded_home_is_told_which_sleepers_have_no_bed() {
+    let w = World::from_json(CONTENT, CROWDED, 1).unwrap();
+    assert_eq!(beds(&w, 0), 1, "one double bed");
+    let told: Vec<usize> = w.events.iter().filter(|e| e.kind == EventKind::NoBed).map(|e| e.a as usize).collect();
+    assert_eq!(told, [2, 3], "the two without a bed place are named");
 }
 
 #[test]

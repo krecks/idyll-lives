@@ -544,6 +544,24 @@ pub(crate) fn cribs_for_babies(w: &mut World, h: usize) {
     }
 }
 
+/// The player's household moved into a home with fewer bed places than people past the crib:
+/// tell them once, for each resident without a bed. The simulation's fallback is unchanged:
+/// they share a bed or sleep on the floor until the player buys one.
+pub(crate) fn notify_missing_beds(w: &mut World, h: usize) {
+    let sleep = w.content.day_rhythm.sleep_tags;
+    if sleep == 0 || !w.households[h].player {
+        return;
+    }
+    let Some(plot) = w.households[h].plot else { return };
+    let people: Vec<usize> = members(w, h)
+        .into_iter()
+        .filter(|&j| !w.content.life.baby(w.sims[j].age))
+        .collect();
+    for &i in people.iter().skip(beds(w, plot)) {
+        w.events.push(w.tick, EventKind::NoBed, i, i, None);
+    }
+}
+
 /// Child `i` is out of the crib (or came to live here past it) and needs a bed: with fewer bed
 /// places at home than people past the crib, a household the player doesn't play buys one (the
 /// cheapest, at the first good free spot, like `cribs_for_babies`) if that leaves a week's rent

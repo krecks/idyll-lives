@@ -236,6 +236,44 @@ fn nobody_closes_the_shipped_things_over_someone_using_them() {
 }
 
 #[test]
+fn nobody_opens_the_sofa_bed_under_someone_relaxing() {
+    let (mut w, _) = shipped();
+    let o = SOFA_BED as usize;
+    let relax = interaction(&w, SOFA_BED, "relax");
+    w.apply(Command::Use { sim: 0, object: SOFA_BED, interaction: relax }).unwrap();
+    assert!(
+        until(&mut w, 30, |w| using(w, 0) == Some(relax) && !w.objects[o].open),
+        "Ada relaxes on the closed sofa bed"
+    );
+    for id in ["doze", "pullOut"] {
+        let i = interaction(&w, SOFA_BED, id);
+        let refused = w.apply(Command::Use { sim: 1, object: SOFA_BED, interaction: i });
+        assert!(
+            refused.is_err_and(|e| e.to_string().contains("someone is using")),
+            "no {id} under the sitter"
+        );
+    }
+    assert!(!w.objects[o].open, "still folded");
+    assert_eq!(using(&w, 0), Some(relax), "Ada keeps relaxing");
+}
+
+#[test]
+fn a_couple_can_still_open_a_futon_together() {
+    let (mut w, _) = shipped();
+    let e = energy(&w);
+    w.sims[0].needs[e] = 0.4;
+    w.sims[1].needs[e] = 0.4;
+    let sleep = interaction(&w, FUTON, "sleep");
+    for sim in 0..2 {
+        w.apply(Command::Use { sim, object: FUTON, interaction: sleep }).unwrap();
+    }
+    assert!(
+        until(&mut w, 30, |w| w.objects[FUTON as usize].open && (0..2).all(|s| using(w, s) == Some(sleep))),
+        "both unfold it and get in together"
+    );
+}
+
+#[test]
 fn a_nap_pulls_out_the_bed_and_the_napper_puts_it_away() {
     for (object, nap, puts_away) in [(SOFA_BED, "doze", "foldAway"), (FUTON, "nap", "foldAway")] {
         let (mut w, _) = shipped();

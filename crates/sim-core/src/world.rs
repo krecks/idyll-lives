@@ -125,6 +125,10 @@ pub struct ObjectInstance {
     pub growth: f32,
     /// A lamp switched off (see `lights.rs`); bought on. Meaningless for other things.
     pub off: bool,
+    /// Residents whose current use needs it closed (bits by sim id), so opening it under them is
+    /// refused (`allows`). Derived from their tasks: set when the use reserves a slot, cleared
+    /// when it ends; not saved (a reloaded use starts again and sets it).
+    pub(crate) closed_users: u64,
 }
 
 /// A crop's stage, from its `growth`: what's offered (`when`: "ripe") and what the renderer
@@ -160,11 +164,13 @@ impl ObjectInstance {
     }
 
     /// Whether its state lets resident `me` do `inter` now: open or closed as the interaction
-    /// wants (`when`), and nothing closed on someone else using it (or on their way to).
+    /// wants (`when`), and nothing closed on, or opened under, someone else using it (or on their
+    /// way to). Opening is refused only when another occupant's use needs it to stay closed.
     pub fn allows(&self, inter: &crate::content::Interaction, me: u32) -> bool {
         inter.when.is_none_or(|w| w == self.open)
             && (!inter.ripe || self.ripe())
             && (inter.leaves != Some(false) || self.users().all(|u| u == me))
+            && (inter.leaves != Some(true) || self.closed_users & !(1 << me) == 0)
     }
 
     /// Whether `inter` would close it on someone other than `me` using it (or on their way to):
@@ -251,17 +257,23 @@ impl ObjectInstance {
     /// slots, or every one for a use that takes the whole object (`slot_of` is then the first).
     pub(crate) fn reserve_for(&mut self, sim: u32, def: &crate::content::ObjectDef, i: usize) -> bool {
         let range = def.slots_for(i);
-        if !def.interactions[i].whole {
-            return self.reserve_in(sim, range);
+        let reserved = if def.interactions[i].whole {
+            if !self.can_use_for(sim, def, i) {
+                return false;
+            }
+            self.users[range].fill(Some(sim));
+            true
+        } else {
+            self.reserve_in(sim, range)
+        };
+        if reserved && def.interactions[i].when == Some(false) {
+            self.closed_users |= 1 << sim;
         }
-        if !self.can_use_for(sim, def, i) {
-            return false;
-        }
-        self.users[range].fill(Some(sim));
-        true
+        reserved
     }
 
     pub(crate) fn release(&mut self, sim: u32) {
+        self.closed_users &= !(1 << sim);
         for u in &mut self.users {
             if *u == Some(sim) {
                 *u = None;
@@ -1325,9 +1337,10 @@ impl World {
             world.spawn_sim(s)?;
         }
         world.init_relationships(&lot_file.relationships)?;
-        // Babies come with a crib.
+        // Babies come with a crib; a crowded home is reported to the player.
         for h in 0..world.households.len() {
             crate::lifecycle::cribs_for_babies(&mut world, h);
+            crate::lifecycle::notify_missing_beds(&mut world, h);
         }
         world.make_storeys();
         world.refresh_rooms();
@@ -1479,6 +1492,7 @@ impl World {
             extent: layout.extent.unwrap_or(kind_size(self.content.objects[def].footprint)),
             tall: layout.tall,
             users: [None; MAX_SLOTS],
+            closed_users: 0,
             quality: 0,
             colors: Colors::new(),
             value: 0,
@@ -3838,6 +3852,15 @@ fn pick_autonomous(
             let watch = fillable & !fills & !urgent & if sleep { rhythm.wake_for } else { u32::MAX };
             let there = distance / walk_per_minute;
             let minutes = inter.minutes + there;
+            // A chosen use that doesn't fill an urgent need it would run out before the end of
+            // stops at once (`use_object`), then gets chosen again: don't choose it at all.
+            if !sleep
+                && !crate::planner::planned_now(content, sim, inter)
+                && urgent & fills == 0
+                && runs_out(sim, content, urgent, minutes, false, &inter.gain_per_minute, &[0.0; MAX_NEEDS], low * 0.5)
+            {
+                continue;
+            }
             if runs_out(sim, content, watch, minutes, sleep, &inter.gain_per_minute, &reach.map(|r| r + there), low)
                 || (!sleep && until_leave.is_some_and(|m| minutes > m))
             {

@@ -47,6 +47,7 @@
       "price": 240,
       "category": "living",
       "slots": 1,
+      "seat": { "height": 0.3, "forward": 0.05, "recline": 28 },
       "description": "A huge wipe-clean beanbag that swallows residents whole: cheap comfort, and a spot for a lazy afternoon snooze.",
       "interactions": [
         {
@@ -64,7 +65,7 @@
           "label": "Snooze in the beanbag",
           "anim": "nap",
           "minutes": 40,
-          "pose": "lie",
+          "pose": "sit",
           "autonomous": true,
           "effects": { "energy": 0.12, "comfort": 0.13 },
           "tags": ["rest", "nap"]

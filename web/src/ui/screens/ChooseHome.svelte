@@ -2,9 +2,11 @@
   import { onMount } from 'svelte';
   import { menuScene } from '../../game/menuScene';
   import { houseTemplate, loadTemplates, lotDims, vacantSlots, withLotSize, type LotSize, type PlotSlot, type Templates } from '../../game/town';
+  import { residentsOf } from '../../game/household';
   import { app } from '../app.svelte';
   import { money } from '../format';
   import Icon from '../Icon.svelte';
+  import Modal from '../kit/Modal.svelte';
   import Segmented from '../kit/Segmented.svelte';
   import TownStage, { type LotLabel } from '../kit/TownStage.svelte';
   import { services } from '../services';
@@ -35,6 +37,26 @@
     app.emptyLot = lot === 'empty';
   });
   const house = $derived(templates && selected ? houseTemplate(templates, selected.template) : undefined);
+  /** Sleeping places in the house as it would be furnished for this household (empty lot: unknown). */
+  const bedPlaces = $derived.by(() => {
+    if (!templates || !selected || lot === 'empty') return null;
+    const fitted = houseTemplate(templates, selected.template, residentsOf(services.content, household));
+    if (!fitted) return null;
+    const sleep = services.content.activities.find((a) => a.sleep)?.tags ?? ['sleep'];
+    const count = (objects: { def: string }[] | undefined) =>
+      (objects ?? []).reduce((n, o) => {
+        const def = services.content.object(o.def);
+        const sleeps = def?.interactions.some((i) => i.tags?.some((t) => sleep.includes(t))) ?? false;
+        return n + (sleeps ? (def?.slots ?? 1) : 0);
+      }, 0);
+    return count(fitted.objects) + count(fitted.upper?.objects) + count(fitted.basement?.objects);
+  });
+  const sleepers = $derived.by(() => {
+    const r = residentsOf(services.content, household);
+    return r.couples * 2 + r.adults + r.children;
+  });
+  const shortage = $derived(bedPlaces !== null && sleepers > bedPlaces ? { beds: bedPlaces, sleepers } : null);
+  let pending = $state<{ beds: number; sleepers: number } | null>(null);
   const neighbours = $derived(
     selected
       ? town.households
@@ -77,8 +99,17 @@
   }
 
   function moveIn() {
+    if (shortage) {
+      pending = shortage;
+      return;
+    }
+    start();
+  }
+
+  function start() {
     const request = selected && app.homeRequest(selected.index);
     if (!request) return;
+    pending = null;
     menuScene.highlight({});
     app.start(request);
   }
@@ -180,6 +211,11 @@
               <dt>Your household</dt>
               <dd>{household.members.map((m) => m.name).join(', ')}</dd>
             </dl>
+            {#if shortage && lot === 'house'}
+              <p class="shortage" role="status">
+                Only {shortage.beds} bed place{shortage.beds === 1 ? '' : 's'} for {shortage.sleepers} sleepers. You can still move in: they'll share a bed or sleep on the floor until you add beds.
+              </p>
+            {/if}
             {#if neighbours.length}
               <span class="eyebrow">Closest neighbours</span>
               <ul>
@@ -208,6 +244,18 @@
     </aside>
   </main>
 </div>
+
+{#if pending}
+  <Modal title="Not enough beds" onclose={() => (pending = null)} width={460}>
+    <p>
+      {pending.sleepers} people are moving in, but this home has {pending.beds} bed place{pending.beds === 1 ? '' : 's'}. Extra residents will share a bed or sleep on the floor until you add beds.
+    </p>
+    <div class="actions">
+      <button class="btn ghost" onclick={() => (pending = null)}>Cancel</button>
+      <button class="btn primary" onclick={start}>Move in anyway</button>
+    </div>
+  </Modal>
+{/if}
 
 <style>
   .screen {
@@ -354,6 +402,20 @@
     margin: 0;
     color: #4a5163;
     line-height: 1.5;
+  }
+  .shortage {
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--bad) 12%, transparent);
+    color: var(--bad);
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 18px;
   }
   dl {
     display: grid;

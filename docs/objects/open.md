@@ -113,18 +113,16 @@ a single object does is on its category page ([README.md](README.md)); this page
 ## Still open
 
 ### Residents
-- **The bean bag's "snooze"** (`slob.beanbag`, no `BEDS` entry) lies the resident flat at the default 0.5 m, over the
-  bag, with the legs in the air. It needs a reclined sit or a bed entry shaped to the bag.
 - **The weight bench's lie:** the legs stretch out past the bench's end in mid-air (a bench press would have the feet
-  on the floor either side).
+  on the floor either side). Deferred from 0.3.0: it needs a bespoke feet-down lie pose, not a data tweak.
 - **A kiss between residents of different heights:** the taller one's mouth meets the other's forehead. It needs the
-  taller one to bend and the shorter one to tilt the head up.
+  taller one to bend and the shorter one to tilt the head up. Deferred from 0.3.0: needs two-body procedural work.
 - Other children gather round a hug and stand right next to the pair.
 - **Chairs and tops the tuck doesn't reach:** an office chair at the standing desk (top 0.57 m over the seat), a kids'
   chair at a coffee table (the hands hover), a chair facing a desk with its own chair built in (laptop desk, kids'
-  desk) from behind.
+  desk) from behind. Deferred from 0.3.0: each needs its own reach/clip adjustment.
 - **Getting up from a chair:** the sim puts the resident on the tile in front at once, so `standUp` plays while they
-  glide back.
+  glide back. Deferred from 0.3.0 unless the stand-up animation is reworked.
 - **Climbers** who start at other offsets could still meet at the pole.
 - **`check_clips.ts` fails `jogAlong`** (loop seam, sliding feet; since before fbf8883).
 
@@ -143,23 +141,17 @@ a single object does is on its category page ([README.md](README.md)); this page
 - **Parts still with no use:** the executive desk's drawer (a clip plays only on the object used: it needs a seat's
   use to play a clip on the desk it faces); the nesting tables' small table; the high chair's tray (the sim never
   seats a baby in it); the laundry basket's lid (not built); the display cabinet's door; the kettle, bread bin and
-  laptop (content rules forbid uses on things on a top: sim work).
+  laptop (content rules forbid uses on things on a top: sim work); the three freezers' `freezer_open` clips (no use
+  takes frozen food yet). Deferred from 0.3.0, except where a use was cheap to add.
 - **Uses end once every need they raise is full**, by design; it makes clips easy to miss in checks.
 - **Small things on tops:** 3 of 1800 sample houses have none, probably kitchens whose run has no plain counter.
 - **Residents didn't reach things in a crowded garden** once; a sim test of eleven in a row
   (`crates/sim-core/tests/crowded_garden.rs`) couldn't reproduce it.
-- **The sofa bed can open under a sitter:** `ObjectInstance::allows` keeps a use from closing an object someone else
-  is on, but not from opening it. A second resident's doze (no `when`, `leaves: "open"`) unfolds the sofa bed while
-  another relaxes on it (`when: "closed"`). When the sitter gets up last, nothing folds it away, so relax isn't offered
-  until the player folds it or a lone doze ends. Refusing every opening under someone else would stop a couple going
-  to bed together on the wall bed or futon; the fix needs to know the other user's use.
 
 ### Models
-- **The sofa bed's mattress** is modelled at 0.44 m (`families/living.py` `SB_MATTRESS`, whose comment says it equals
-  `BEDS['sofaBed'].h`), but `characters.ts` lies its sleepers at 0.42: the two differ by 2 cm.
 - The entry console's mirror and hook board, and the spritz station's round mirror, hang in the air when the piece
   stands free; the party bar's "Back bar" colours the back cabinet, not the bottle shelves; bathers' shins go through
-  the front of the heart tub.
+  the front of the heart tub. Deferred from 0.3.0 unless the model is touched for another reason.
 - The power blender's blades loop was never built.
 
 ### Family notes out of date

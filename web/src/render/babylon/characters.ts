@@ -336,7 +336,7 @@ const BEDS: Record<string, Bed> = {
   bedCanopy: { h: 0.52 },
   bedDaybed: { h: 0.51 },
   // Head on the seat, the rest on the mattress pulled out in front (`bed_out`).
-  sofaBed: { h: 0.42, fwd: 0.6 },
+  sofaBed: { h: 0.44, fwd: 0.6 },
   // The 2-wide window seat and settee: dozed on along the cushion, head to its left, whichever slot (the nap
   // takes both, content `whole`).
   'gloomy.windowSeat': { h: 0.45, across: true },

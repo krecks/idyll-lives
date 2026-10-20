@@ -198,6 +198,41 @@ fn nobody_follows_someone_across_town_for_a_chat() {
     assert!(minutes <= 15, "Ann followed Bob for {minutes} minutes");
 }
 
+/// A TV and a toilet; the bladder is urgent, and a programme is long enough to run it out.
+const PRESSED: &str = r#"{
+    "needs":[{"id":"fun","label":"Fun","decayPerHour":0.05},{"id":"bladder","label":"Bladder","decayPerHour":0.1},
+             {"id":"energy","label":"Energy","decayPerHour":0.05}],
+    "autonomy":{"urgent":["bladder"],"urgentBelow":0.1},
+    "objects":[{"id":"tv","name":"TV","interactions":[
+        {"id":"watch","label":"Watch","minutes":60,"effects":{"fun":0.8}}]},
+      {"id":"toilet","name":"Toilet","interactions":[
+        {"id":"use","label":"Use","minutes":5,"effects":{"bladder":1.0}}]}]}"#;
+
+#[test]
+fn an_urgent_need_doesnt_choose_a_programme_it_would_stop_at_once() {
+    let lot = r#"{"width":12,"depth":12,
+        "plots":[{"name":"Home","x":0,"z":0,"w":12,"d":12,"entry":[5.5,11.5]}],
+        "households":[{"name":"Home","plot":0,"player":true}],
+        "objects":[{"def":"tv","x":2,"z":2,"rot":0},{"def":"toilet","x":8,"z":2,"rot":0}],
+        "sims":[{"name":"Ann","x":5.5,"z":7.5}]}"#;
+    let mut w = World::from_json(PRESSED, lot, 5).unwrap();
+    // Bored and about to burst: the TV is tempting, but watching it would be cut off at once.
+    w.sims[0].needs[..3].copy_from_slice(&[0.0, 0.05, 1.0]);
+    let (mut tv_starts, mut toilet, mut was) = (0, false, false);
+    for _ in 0..20 * 30 {
+        w.tick_once();
+        let using_tv = matches!(w.sims[0].current().map(|a| (&a.task.kind, &a.phase)),
+            Some((TaskKind::Use { object: 0, .. }, Phase::Using { .. })));
+        tv_starts += usize::from(using_tv && !was);
+        was = using_tv;
+        toilet |= matches!(w.sims[0].current().map(|a| (&a.task.kind, &a.phase)),
+            Some((TaskKind::Use { object: 1, .. }, Phase::Using { .. })));
+    }
+    eprintln!("Ann started watching {tv_starts} times; toilet {toilet}; bladder {:.2}", w.sims[0].needs[1]);
+    assert!(toilet && w.sims[0].needs[1] > 0.9, "Ann never dealt with the urgent need");
+    assert!(tv_starts <= 2, "Ann started watching {tv_starts} times in 30 minutes");
+}
+
 #[test]
 fn practising_with_nothing_else_to_do_doesnt_stutter() {
     let content = r#"{
