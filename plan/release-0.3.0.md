@@ -2,7 +2,7 @@
 
 - **Branch:** `release/0.3.0`
 - **Base:** `main` at `a6b7924`
-- **Status:** Draft
+- **Status:** Release candidate (0.3.0, 2026-10-20)
 - **Release type:** stability, performance and architecture; no new headline feature
 
 ## 1. Release intent
@@ -247,8 +247,8 @@ Do this before the release candidate, not after.
 
 ### 4.2 Resolve stashes and `plan/future.md`
 
-- `plan/future.md` is absent from the working tree but exists in the stash's parent commit. Decide: restore it, move its still-relevant items into `plan/release-0.3.0.md` / `PLAN.md`, or drop it.
-- Two stashes remain: an old merged-work stash and a WIP that only removes the `partner_of` debug assertion. Decide keep or drop; do not leave both unexplained.
+- `plan/future.md` is absent from the working tree but exists in the stash's parent commit. **Dropped (2026-10-20):** its only copy is from before the Blender pipeline and describes tooling that no longer exists (`tools/art/catalog2.py`); its still-relevant items are in `docs/objects/open.md` and the roadmap.
+- Two stashes remained. **Both dropped (2026-10-20):** the old one held local copies of work already merged (its own message says identical), and the WIP only removed `Relationships::partner_of`'s `debug_assert`, which is still in the code and passes the suite; removing it would hide an inconsistency rather than fix one.
 
 ### 4.3 Clean `docs/objects/open.md`
 

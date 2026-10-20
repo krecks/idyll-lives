@@ -51,7 +51,7 @@ doors move at one speed, but each has its own angle:
 | `fridge_open` | `door_fridge` | 1.75 s | 0° → −102° (the tall door stops a little shorter) |
 
 The pack's `motions` plays `fridge_open` for the `fetch`, `cook` and `drink` animation tags (snacks, a
-meal's ingredients, a cold drink, putting dishes away), as the K1 fridges do, and holds it for 3.5 s.
+meal's ingredients, a cold drink), as the K1 fridges do, and holds it for 3.5 s.
 `freezer_open` plays for the `frozenTreat` use ("Get some ice cream").
 
 ## The sinks

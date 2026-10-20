@@ -172,9 +172,9 @@ Pack authors: see [docs/content-packs.md](docs/content-packs.md). The look of th
 
 ## Versions and releasing
 
-The current version is **0.2.0**. One version number covers the whole game: `web/package.json` (shown in the main menu and Credits, with the commit it was built from), the Rust workspace in `Cargo.toml` and the workspace crates' entries in `Cargo.lock`. `node tools/release/version.mjs` prints it and fails if they differ (CI checks this); `node tools/release/version.mjs 0.3.0` sets all three. Each release is a git tag `vX.Y.Z` with notes in [CHANGELOG.md](CHANGELOG.md).
+The current version is **0.3.0**. One version number covers the whole game: `web/package.json` (shown in the main menu and Credits, with the commit it was built from), the Rust workspace in `Cargo.toml` and the workspace crates' entries in `Cargo.lock`. `node tools/release/version.mjs` prints it and fails if they differ (CI checks this); `node tools/release/version.mjs 0.3.0` sets all three. Each release is a git tag `vX.Y.Z` with notes in [CHANGELOG.md](CHANGELOG.md).
 
-Saves have their own format version, `SAVE_VERSION` in `crates/sim-core/src/save.rs`: 23 since 0.2.0 (0.1.0 wrote 17). Older saves are migrated when they load, and `crates/sim-core/tests/old_saves.rs` loads real saves from 0.1.0 and the build after it. A save from a newer version is kept and skipped, and a damaged one is removed with a notice.
+Saves have their own format version, `SAVE_VERSION` in `crates/sim-core/src/save.rs`: 29 since 0.3.0 (23 in 0.2.0; 0.1.0 wrote 17). Older saves are migrated when they load, and `crates/sim-core/tests/old_saves.rs` loads real saves from 0.1.0 and the build after it. A save from a newer version is kept and skipped, and a damaged one is removed with a notice.
 
 **Releasing** (`.github/workflows/pages.yml`):
 1. `node tools/release/version.mjs <x.y.z>` (it updates `Cargo.lock` too, so no `cargo build` is needed), and a `## <x.y.z> — <date>` section in CHANGELOG.md, with the date set by hand. Commit both on `main`, and `git push origin main`: the dry run builds what GitHub has.
@@ -186,9 +186,9 @@ Saves have their own format version, `SAVE_VERSION` in `crates/sim-core/src/save
    - The large files download in full, which only the live site can show: `llm/lfm2.5-350m/model_q4.onnx_dataz` returns 200 and is 255,530,880 bytes (gunzipped, its SHA-256 is the one in `tools/llm/fetch.mjs`), and `voice/supertonic-3/vector_estimator.onnxz` is 119,568,968 bytes.
 5. Publish the release notes: `gh release create v<x.y.z> --verify-tag --title "Idyll Lives <x.y.z>" --notes-file <the version's CHANGELOG section>`.
 
-**If a release goes wrong,** fix forward or redeploy the last good 0.2.x (`gh workflow run pages.yml --ref <tag> -f deploy=true`), not v0.1.0: 0.2.0 upgrades the browser's saves database to version 2, which v0.1.0 can't open, so it would list no saves and couldn't save. Nothing is lost; the saves come back with any 0.2.x.
+**If a release goes wrong,** fix forward, or redeploy the last good 0.3.x (`gh workflow run pages.yml --ref <tag> -f deploy=true`). 0.2.0 can't open 0.3.0's saves (format 29), and v0.1.0 can't open 0.2.0's database (version 2), so an older build would list no saves and couldn't save. Nothing is lost; the saves come back with any 0.3.x.
 
-Each CI run keeps a WASM with function names as an artifact for 90 days. It is the un-optimised file, so its function numbers don't match a crash stack from the site (whose WASM is optimised and stripped).
+Each CI run keeps the site's WASM with function names as an artifact for 90 days (`wasm-with-names-<sha>`). It runs the same optimisations as the site with the name section kept, so its function numbers match the shipped WASM and a crash stack from the site can be read with it.
 
 ## Licence
 

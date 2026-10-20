@@ -150,9 +150,9 @@ their teeth there, and the tall cabinet's upper door while one takes a fresh tow
 - **Wall things.** The mirror cabinet and the round mirror hang at their real height, their backs on the wall
   face: `G.settle(centre=False, floor=False)` and `floor=False` on their `Model`. `check-glb` warns that they
   float, which is right for a wall thing.
-- **Mirror glass from the file** (E6): a flat piece of the `mirror` material (`gloss`, `'front'`). Only the High
-  preset reflects live (`mirrors: 2`); on Medium and Low it's plain pale gloss, as the old parts' mirrors. It
-  was see-through `glass` at first, which showed the round mirror's brass backing and the cabinet's door.
+- **Mirror glass from the file** (E6): a flat piece of the `mirror` material (`gloss`, `'front'`). Every preset
+  reflects live: the nearest mirror on screen on Low and Medium, two on High (`mirrors: 2`). It was see-through
+  `glass` at first, which showed the round mirror's brass backing and the cabinet's door.
 - **Doors.** The mirror cabinet's mirrored door and the tall cabinet's upper door are parts of their own (`door`),
   hinged on their left edge. The mirror cabinet's swings open 100° (`door_open`, 0.8 s, the reflection with it)
   for the content's "Brush your teeth" (`brushTeeth`, `wash`, 4 minutes, hygiene; not autonomous, so generated

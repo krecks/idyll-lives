@@ -2,7 +2,11 @@
 
 All notable changes to Idyll Lives. Versions follow [semantic versioning](https://semver.org); each release is a git tag `vX.Y.Z`.
 
-## Unreleased
+## 0.3.0 — 2026-10-20
+
+**Play it in your browser:** https://krecks.github.io/idyll-lives/
+
+This release makes the game more reliable and cheaper to run, not broader. Every object now keeps an id of its own for life, so selling or moving furniture no longer shifts what follows it, and saves migrate. Low draws far less for older laptops, resident voices choose between the graphics card and the processor on their own, and the small things the 0.2.0 review found but left are fixed or explicitly deferred. There is no new headline feature.
 
 ### Fixes
 - **The graphics API switch needs no reload:** Settings › Performance › Troubleshooting › Graphics API changes the drawing on the next start of the game, as its "Next load" badge says. A canvas that has held a WebGPU context can't give a WebGL2 one, so the new renderer gets a fresh canvas instead of failing to start.

@@ -33,9 +33,7 @@ The contrast shower fills its tile with its own tiled walls, as the bathroom fam
 Not done, as the plan allows:
 - the blender's blades loop "L blades (E1)": they would turn inside the smoothie, which hides them, and a second
   moving part is one more draw;
-- the trampoline's "Until then U: dips once" interim: the E1 loop is built instead;
-- the hoop's net sways when the shooting starts (and again as the clip plays back at the end), not after each
-  shot: the game has no per-shot event.
+- the trampoline's "Until then U: dips once" interim: the E1 loop is built instead.
 
 Colour parts: the plan's "Frame, Pads" where they fit; the blender (a kitchen unit) and the shower take names
 that say what they colour: the blender `blend_cab` "Frame", `blend_door` "Doors", `motor` "Blender"; the shower

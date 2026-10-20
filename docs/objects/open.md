@@ -144,7 +144,7 @@ a single object does is on its category page ([README.md](README.md)); this page
   forbid uses on things on a top: sim work). These are modelled parts without a clip, so no clip is orphaned. The
   three freezers' `freezer_open` clips now play for "Get some ice cream".
 - **Uses end once every need they raise is full**, by design; it makes clips easy to miss in checks.
-- **Small things on tops:** 3 of 1800 sample houses have none, probably kitchens whose run has no plain counter.
+- **Small things on tops:** every one of the 180 sample houses has them.
 - **Residents didn't reach things in a crowded garden** once; a sim test of eleven in a row
   (`crates/sim-core/tests/crowded_garden.rs`) couldn't reproduce it.
 
@@ -154,17 +154,10 @@ a single object does is on its category page ([README.md](README.md)); this page
   the front of the heart tub. Deferred from 0.3.0 unless the model is touched for another reason.
 - The power blender's blades loop was never built.
 
-### Family notes out of date
-The category pages follow the code where these disagree: `families/bathroom.md` (only High reflecting live; the
-tall cabinet's colours, now Doors), `families/kitchen.md` (the fridge's door opening for putting dishes away: the
-fridge isn't a `cupboard` station), `families/pack_energetic.md` (the hoop net sways every 3.2 s, not only at the
-start).
-
 ### Tools
 - The lamp build (`_bulb`) checks only the light's height, not `at`.
 - `pnpm wasm` doesn't run in a worktree with a symlinked `node_modules` (pnpm's deps check); its cargo +
   wasm-bindgen command works.
-- `cargo clippy --all-targets -D warnings` fails on `items_after_test_module` in `world.rs`.
 
 ### Not looked at
 - The production build's frame time; the town overview at full night; far versions in the town overview.
