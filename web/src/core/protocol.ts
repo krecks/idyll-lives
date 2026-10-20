@@ -819,7 +819,12 @@ export interface SimThreadStats {
   memoryBytes: number;
 }
 
+/** How far a game's start has come: `loading` the simulation (repeated as it downloads), then `building` its world or opening its save. */
+export type StartPhase = 'loading' | 'building';
+
 export type FromWorker =
+  /** A start is under way (before `ready`). */
+  | { type: 'starting'; phase: StartPhase }
   | { type: 'ready'; layout: SnapshotLayout; shared: SharedArrayBuffer | null; catalog: Catalog }
   /** `full`: with the lot; otherwise a `LeanWorld` (the lot is as last sent). */
   | { type: 'world'; world: WorldStructure | LeanWorld; full: boolean }

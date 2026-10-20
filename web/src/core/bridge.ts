@@ -38,8 +38,11 @@ const CLOCK_RESET_STEPS = 2;
 const MAX_EXTRAPOLATION = 1.3;
 /** Longest wait for the worker's answer to a request (a save, the journal…). */
 const REQUEST_LIMIT_MS = 15_000;
-/** Longest a game may take to build its world before starting gives up (a hang would stay on "Moving in…"). */
-const START_LIMIT_MS = 30_000;
+/**
+ * Longest a start may go without progress before it gives up (a hang would stay on "Moving in…"):
+ * the worker reports each phase, and the download as it arrives, so only a stuck one runs out.
+ */
+const START_STALL_MS = 30_000;
 /** The worker sends something every 100 ms (UI updates); this long without a word, it has hung. */
 const SILENCE_LIMIT_MS = 8000;
 const WATCHDOG_MS = 1000;
@@ -130,7 +133,8 @@ export class SimBridge {
     const worker = new Worker(new URL('./sim.worker.ts', import.meta.url), { type: 'module' });
     return new Promise((resolve, reject) => {
       // A start that failed doesn't leave its worker (and the simulation's memory) behind.
-      const timer = setTimeout(() => failed(new Error('The game took too long to start.')), START_LIMIT_MS);
+      const stalled = () => failed(new Error('The game took too long to start.'));
+      let timer = setTimeout(stalled, START_STALL_MS);
       const failed = (err: Error) => {
         clearTimeout(timer);
         worker.terminate();
@@ -139,7 +143,10 @@ export class SimBridge {
       worker.onerror = (e) => failed(new Error(e.message || 'sim worker failed to start'));
       worker.onmessage = (e: MessageEvent<FromWorker>) => {
         const msg = e.data;
-        if (msg.type === 'ready') {
+        if (msg.type === 'starting') {
+          clearTimeout(timer);
+          timer = setTimeout(stalled, START_STALL_MS);
+        } else if (msg.type === 'ready') {
           clearTimeout(timer);
           resolve(new SimBridge(worker, msg.layout, msg.shared, msg.catalog));
         } else if (msg.type === 'error') failed(msg.problem ? new SaveRefused(msg.problem, msg.message) : new Error(msg.message));
@@ -435,6 +442,7 @@ export class SimBridge {
         if (msg.fatal) this.fail(msg.message);
         else for (const fn of this.errorListeners) fn(msg.message);
         break;
+      case 'starting':
       case 'ready':
         break;
     }

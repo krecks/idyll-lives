@@ -7,7 +7,7 @@
  */
 
 import init, { Game, LoadError } from './wasm-pkg/sim_wasm.js';
-import type { FromWorker, GameSource, LeanWorld, MeshArrays, SaveProblem, ToWorker, WorldStructure } from './protocol';
+import type { FromWorker, GameSource, LeanWorld, MeshArrays, SaveProblem, StartPhase, ToWorker, WorldStructure } from './protocol';
 import { createSharedSnapshot, SharedSnapshotWriter, type SnapshotLayout } from './snapshot';
 
 interface WorkerScope {
@@ -18,6 +18,8 @@ const scope = self as unknown as WorkerScope;
 
 const UI_INTERVAL_MS = 100;
 const STATS_INTERVAL_MS = 1000;
+/** While the wasm downloads, how often the main thread hears that it's still coming. */
+const START_PROGRESS_MS = 500;
 /**
  * Steps run back to back, at most, to catch up after one ran late. A longer backlog (a stall: a
  * slow step, the debugger, a busy machine) is dropped rather than run as a burst, which the
@@ -104,7 +106,10 @@ scope.onmessage = (e) => {
 };
 
 async function start(content: string, source: GameSource): Promise<void> {
-  memory = (await init()).memory;
+  // Each phase says it's under way (the main thread gives up on a start only when it stalls).
+  starting('loading');
+  memory = (await init({ module_or_path: fetchWasm() })).memory;
+  starting('building');
   try {
     game = 'save' in source ? Game.fromSave(content, source.save) : new Game(content, source.lot, source.seed);
   } catch (err) {
@@ -123,6 +128,31 @@ async function start(content: string, source: GameSource): Promise<void> {
   publish();
   postUi();
   runLoop(1000 / layout.ticksPerSecond);
+}
+
+/** The simulation's wasm, saying `loading` as it arrives (it still compiles while it downloads). */
+async function fetchWasm(): Promise<Response> {
+  const response = await fetch(new URL('./wasm-pkg/sim_wasm_bg.wasm', import.meta.url));
+  if (!response.ok || !response.body) return response;
+  let last = performance.now();
+  const body = response.body.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, out) {
+        const now = performance.now();
+        if (now - last >= START_PROGRESS_MS) {
+          last = now;
+          starting('loading');
+        }
+        out.enqueue(chunk);
+      },
+    }),
+  );
+  const type = response.headers.get('Content-Type');
+  return new Response(body, { status: response.status, statusText: response.statusText, headers: type ? { 'Content-Type': type } : {} });
+}
+
+function starting(phase: StartPhase): void {
+  scope.postMessage({ type: 'starting', phase });
 }
 
 /** Opens a save only to see whether it can be played (an imported file), then lets it go. */
