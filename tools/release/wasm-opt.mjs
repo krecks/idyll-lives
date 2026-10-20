@@ -63,7 +63,9 @@ export async function optimizeWasm(path, name = basename(path).replace(/-[\w-]{8
   const hit = output !== null;
   if (!output) {
     await mkdir(CACHE, { recursive: true });
-    for (const old of await readdir(CACHE)) if (old.startsWith(`${name}-`)) await rm(join(CACHE, old), { force: true });
+    // Exactly `name-<key>`: `sim_wasm_bg-names-<key>` is another name's entry, not an older `sim_wasm_bg` one.
+    const older = (file) => file.startsWith(`${name}-`) && /^[0-9a-f]{16}\.wasm(\.part)?$/.test(file.slice(name.length + 1));
+    for (const old of await readdir(CACHE)) if (older(old)) await rm(join(CACHE, old), { force: true });
     const tmp = `${cached}.part`;
     await promisify(execFile)(process.execPath, [WASM_OPT, ...flags, path, '-o', tmp], { maxBuffer: 1 << 26 });
     output = await readFile(tmp);
