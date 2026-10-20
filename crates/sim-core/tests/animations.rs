@@ -174,10 +174,25 @@ fn object_ids_stay_valid_after_a_sell() {
     let used = &w.objects[w.object_index(fridge).unwrap()];
     assert_eq!((used.x, used.z), (x, z), "the same fridge");
     assert!(used.users().any(|u| u == 0));
+    // The UI's list of what they do names it the same way.
+    let mut sync = sim_core::view::UiSync::new();
+    sync.inspect(Some(0));
+    let ui: serde_json::Value = serde_json::from_str(&sync.update_json(&w)).unwrap();
+    let ada = ui["sims"].as_array().unwrap().iter().find(|s| s["id"] == 0).unwrap();
+    assert_eq!(ada["actions"][0]["object"], fridge, "{}", ada["actions"]);
 
     // Selling the object in use stops the Sim.
     w.apply(Command::Sell { household: 0, object: fridge }).unwrap();
     assert_eq!(row(&w, 0), (-1.0, -1.0));
+
+    // A second click on Sell, or a menu still open on it: nothing happens, and no error.
+    let funds = w.households[0].funds;
+    w.apply(Command::Sell { household: 0, object: fridge }).expect("already sold: nothing to do");
+    w.apply(Command::Use { sim: 0, object: fridge, interaction: 0 }).expect("gone: nothing to do");
+    assert_eq!(w.households[0].funds, funds);
+    assert_eq!(row(&w, 0), (-1.0, -1.0));
+    // An id never handed out is still an error.
+    assert!(w.apply(Command::Sell { household: 0, object: 1000 }).is_err());
 }
 
 #[test]

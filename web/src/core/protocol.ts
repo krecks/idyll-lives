@@ -505,6 +505,7 @@ export interface WorldStructure {
 
 export interface ActionView {
   label: string;
+  /** The object it's done at (its stable id). */
   object: number | null;
   /** The other Sim, for social actions. */
   target: number | null;
