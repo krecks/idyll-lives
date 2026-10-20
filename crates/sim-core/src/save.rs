@@ -42,11 +42,14 @@
 //! wall bed folded down; absent: closed); 26 = a colour per part (`objects[].colors`, `#rrggbb` by
 //! the model's material name; an older file's `color` goes on the `body`); 27 = crops grow
 //! (`objects[].growth`: -1..0 fallow, 0..1 growing, 1 ripe; absent: ripe); 28 = lamps can be
-//! switched off (`objects[].off`; absent: on). Older files load. Saves
+//! switched off (`objects[].off`; absent: on); 29 = objects have a stable id (`objects[].id`)
+//! that doesn't change when other objects are sold or moved (absent: assigned on load), and
+//! `next_object_id` keeps ids from being reused after the highest one is sold. Older
+//! files load. Saves
 //! written before feelings were renamed from "moodlets" store them under `moodlets`; a serde
 //! alias still reads it.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -60,7 +63,7 @@ use crate::planner::{BlockResult, Goal, HomeWish, Outcome, Planner, Reason, Rout
 use crate::world::{GameMode, Household, Plot, Task, TaskKind, World};
 use crate::{Error, MINUTES_PER_TICK, clock::MAX_SPEED};
 
-pub const SAVE_VERSION: u32 = 28;
+pub const SAVE_VERSION: u32 = 29;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -94,6 +97,9 @@ pub struct SaveFile {
     pub seed: u32,
     pub lot: LotSave,
     pub objects: Vec<ObjectSave>,
+    /// The next stable object id (absent before v29: the highest saved id plus one).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_object_id: Option<u32>,
     pub sims: Vec<SimSave>,
     #[serde(default)]
     pub households: Vec<HouseholdSave>,
@@ -241,6 +247,9 @@ fn is_zero_u64(n: &u64) -> bool {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ObjectSave {
+    /// The object's stable id (absent before v29: assigned on load).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<u32>,
     pub def: String,
     pub x: i32,
     pub z: i32,
@@ -625,6 +634,7 @@ impl World {
             .objects
             .iter()
             .map(|o| ObjectSave {
+                id: Some(o.stable),
                 def: content.objects[o.def].id.clone(),
                 x: o.x,
                 z: o.z,
@@ -779,6 +789,7 @@ impl World {
                 floors: encode_floors(&self.lot, &self.content),
             },
             objects,
+            next_object_id: Some(self.next_object_id),
             sims,
             households: self
                 .households
@@ -978,6 +989,7 @@ impl World {
         // Object ids may change from the save's (an object left out, or tops placed last): tasks are remapped.
         // Things standing on tops go in once everything else stands.
         let mut object_ids = HashMap::new();
+        let mut stable_ids: HashMap<u32, Option<u32>> = HashMap::new();
         let on_top = |o: &ObjectSave| world.content.object_index(&o.def).is_some_and(|d| world.content.objects[d].layer == crate::content::Layer::Surface);
         let tops: Vec<bool> = save.objects.iter().map(on_top).collect();
         let order: Vec<usize> = (0..tops.len()).filter(|&i| !tops[i]).chain((0..tops.len()).filter(|&i| tops[i])).collect();
@@ -1011,8 +1023,27 @@ impl World {
                 world.objects[id as usize].off = o.off && world.content.objects[world.objects[id as usize].def].switch;
                 world.objects[id as usize].growth = finite(o.growth.unwrap_or(1.0), 1.0).clamp(-1.0, 1.0);
                 object_ids.insert(i as u32, id);
+                stable_ids.insert(id, o.id);
             }
         }
+        // Keep the saved stable ids where there is one; old saves and anything left out get
+        // fresh ones, never reusing an id.
+        let mut used: HashSet<u32> = HashSet::new();
+        let mut next = stable_ids.values().flatten().copied().max().map_or(0, |m| m + 1);
+        for (i, obj) in world.objects.iter_mut().enumerate() {
+            match stable_ids.get(&(i as u32)).copied().flatten() {
+                Some(id) if used.insert(id) => obj.stable = id,
+                _ => {
+                    while used.contains(&next) {
+                        next += 1;
+                    }
+                    obj.stable = next;
+                    used.insert(next);
+                    next += 1;
+                }
+            }
+        }
+        world.next_object_id = next.max(save.next_object_id.unwrap_or(0));
         for s in &save.sims {
             let spawn = SimSpawn {
                 name: s.name.clone(),

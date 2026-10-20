@@ -63,7 +63,7 @@ fn build(w: &mut World, edits: Vec<EdgeEdit>) -> Result<(), sim_core::Error> {
 
 fn buy(w: &mut World, def: &str, x: i32, z: i32, rot: i32) -> Result<u32, sim_core::Error> {
     w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, rot]), colors: Default::default(), turn: None, offset: None, size: None, tall: None })?;
-    Ok(w.objects.len() as u32 - 1)
+    Ok(w.objects.last().unwrap().stable)
 }
 
 fn height(w: &World, i: usize) -> f32 {
@@ -88,7 +88,7 @@ fn house() -> World {
 /// they passed.
 fn walk_to_sit(w: &mut World, chair: u32) -> Vec<f32> {
     w.apply(Command::Use { sim: 0, object: chair, interaction: 0 }).unwrap();
-    let storey = w.storey_of(w.objects[chair as usize].z);
+    let storey = w.storey_of(w.objects[w.object_index(chair).unwrap()].z);
     let mut heights = Vec::new();
     for _ in 0..20 * 60 * 5 {
         w.tick_once();
@@ -168,7 +168,7 @@ fn stairs_down_start_inside_the_house() {
     let stairs = buy(&mut w, "stairs", 9, 3 + DOWN, 0).unwrap();
     let s = w.stair_map().stairs[0];
     assert_eq!((s.bottom, s.top(), s.landing), ((9, 6 + DOWN), (9, 3 + DOWN), (9, 2)), "up to the ground floor");
-    assert_eq!(w.storey_of(w.objects[stairs as usize].z), -1);
+    assert_eq!(w.storey_of(w.objects[w.object_index(stairs).unwrap()].z), -1);
     // The stairwell in the ground floor is open: nothing stands there.
     assert!(buy(&mut w, "chair", 9, 4, 0).is_err(), "the stairwell is open");
     let nav = sim_core::path::NavGrid { lot: &w.lot, blocked: w.blocked(), stairs: w.stair_map() };
@@ -287,7 +287,7 @@ fn a_town_file_can_bring_a_basement() {
     assert_ne!(w.lot.room_at(6, 4 + UP), OUTDOORS);
     let s = w.stair_map().stairs[0];
     assert_eq!(s.landing, (9, 2), "up into the room on the ground");
-    let chair = w.objects.len() as u32 - 1;
+    let chair = w.objects.last().unwrap().stable;
     walk_to_sit(&mut w, chair);
     assert_eq!((w.sims[0].pose, w.storey_of(w.sims[0].tile().1)), (Pose::Sit, -1), "went down to sit");
 }

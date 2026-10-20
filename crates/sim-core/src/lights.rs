@@ -61,7 +61,7 @@ pub fn set(world: &mut World, object: u32, on: bool) -> bool {
 
 /// The lamps that are off (object ids), for the renderer.
 pub fn lamps_off(world: &World) -> Vec<u32> {
-    world.objects.iter().filter(|o| o.off && switchable(world, o.def)).map(|o| o.id).collect()
+    world.objects.iter().filter(|o| o.off && switchable(world, o.def)).map(|o| o.stable).collect()
 }
 
 /// The residents' rule (see the module notes); runs every `EVERY` ticks.

@@ -29,7 +29,7 @@ const TOWN: &str = r#"{"width":12,"depth":12,
 
 fn buy(w: &mut World, def: &str, x: i32, z: i32, rot: i32) -> Result<u32, sim_core::Error> {
     w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, rot]), colors: Default::default(), turn: None, offset: None, size: None, tall: None })?;
-    Ok(w.objects.len() as u32 - 1)
+    Ok(w.objects.last().unwrap().stable)
 }
 
 #[test]

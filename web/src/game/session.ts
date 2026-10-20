@@ -8,7 +8,7 @@ import { AssetRegistry } from '../assets/registry';
 import { Content } from '../content/content';
 import { SaveRefused, SimBridge, type FrameState } from '../core/bridge';
 import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, SocialEvent, WorldStructure } from '../core/protocol';
-import { lowestStorey, seenAt } from '../core/protocol';
+import { lowestStorey } from '../core/protocol';
 import { nextAutosaveId, readSave, refuseSave, UnloadableSave, writeSave, type SaveRecord } from '../persistence/saves';
 import { BENCH } from '../debug/benchFlags';
 import { recentLog } from '../debug/log';
@@ -510,7 +510,7 @@ export async function startSession(
     },
     useObject(objectId, interaction) {
       if (game.mode !== 'live') return;
-      bridge.send({ type: 'use', sim: game.selected, object: objectId, interaction, seen: seenAt(game.objects, objectId) });
+      bridge.send({ type: 'use', sim: game.selected, object: objectId, interaction });
       game.menu = null;
     },
     useItem(itemId, action) {
@@ -624,7 +624,7 @@ export async function startSession(
         const obj = game.objects.find((o) => o.id === game.buySelection);
         if (obj) {
           const turn = turned(obj.def, obj.rot, obj.turn ?? 0);
-          bridge.send({ type: 'moveObject', household: game.home, object: obj.id, x: obj.x, z: obj.z, ...turn, seen: seenAt(game.objects, obj.id) });
+          bridge.send({ type: 'moveObject', household: game.home, object: obj.id, x: obj.x, z: obj.z, ...turn });
           // (A move renumbers it: the selection follows it to its new id.)
           buildBuy.reselectAt({ def: obj.def, x: obj.x, z: obj.z, rot: turn.rot });
         }
@@ -637,12 +637,12 @@ export async function startSession(
       if (!game.furnishing && !buildBuy.stairsTool()) return;
       // Selling what's in hand puts it down first (selling renumbers the objects after it).
       if (game.placing?.objectId === objectId) buildBuy.cancel();
-      bridge.send({ type: 'sell', household: game.home, object: objectId, seen: seenAt(game.objects, objectId) });
+      bridge.send({ type: 'sell', household: game.home, object: objectId });
       game.buySelection = null;
       game.menu = null;
     },
     repair(objectId) {
-      bridge.send({ type: 'repair', household: game.home, object: objectId, seen: seenAt(game.objects, objectId) });
+      bridge.send({ type: 'repair', household: game.home, object: objectId });
     },
     undo() {
       // The step count follows a little later; don't send more undos than there are steps.
@@ -665,7 +665,7 @@ export async function startSession(
       bridge.send({ type: 'redo', household: game.home });
     },
     recolor(objectId, colors) {
-      bridge.send({ type: 'recolor', household: game.home, object: objectId, colors: colorValues(colors), seen: seenAt(game.objects, objectId) });
+      bridge.send({ type: 'recolor', household: game.home, object: objectId, colors: colorValues(colors) });
     },
     colorPlacing(colors) {
       if (!game.placing || game.placing.objectId !== null) return;
@@ -678,13 +678,13 @@ export async function startSession(
       if (!obj || !def) return;
       // Back to its kind's footprint from the same corner (the simulation refuses it if that doesn't fit).
       const [w, d] = def.footprint ?? [1, 1];
-      bridge.send({ type: 'moveObject', household: game.home, object: obj.id, x: obj.x, z: obj.z, rot: obj.rot, offset: [0, 0], size: [w * 100, d * 100], tall: 0, seen: seenAt(game.objects, obj.id) });
+      bridge.send({ type: 'moveObject', household: game.home, object: obj.id, x: obj.x, z: obj.z, rot: obj.rot, offset: [0, 0], size: [w * 100, d * 100], tall: 0 });
       buildBuy.reselectAt({ def: obj.def, x: obj.x, z: obj.z, rot: obj.rot });
     },
     /** The catalog: buy the next quality level (instant). */
     upgrade(objectId) {
       if (!game.furnishing) return;
-      bridge.send({ type: 'upgrade', household: game.home, object: objectId, seen: seenAt(game.objects, objectId) });
+      bridge.send({ type: 'upgrade', household: game.home, object: objectId });
       game.menu = null;
     },
     toggleEyedropper() {

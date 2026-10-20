@@ -338,7 +338,8 @@ fn an_order_holds_against_needs() {
             w.tick_once();
         }
         w.apply(Command::Buy { household: h as u32, object: "tv".into(), at: None, colors: Default::default(), turn: None, offset: None, size: None, tall: None }).unwrap();
-        let tv = w.objects.len() as u32 - 1;
+        let tv = w.objects.last().unwrap().stable;
+        let tv_at = w.object_index(tv).unwrap() as u32;
         let sim = w.sims.iter().position(|s| s.household as usize == h).unwrap();
         let n = w.content.needs.len();
         w.sims[sim].needs[..n].fill(low);
@@ -349,8 +350,8 @@ fn an_order_holds_against_needs() {
         for _ in 0..90 * sim_core::TICKS_PER_MINUTE {
             w.tick_once();
             match w.sims[sim].current().map(|a| (a.task.kind, &a.phase)) {
-                Some((TaskKind::Use { object, .. }, Phase::Using { .. })) if object == tv => watched += 1,
-                Some((TaskKind::Use { object, .. }, _)) if object == tv => {}
+                Some((TaskKind::Use { object, .. }, Phase::Using { .. })) if object == tv_at => watched += 1,
+                Some((TaskKind::Use { object, .. }, _)) if object == tv_at => {}
                 None if watched > 0 => break,
                 what => {
                     other = Some(format!("{what:?}"));

@@ -29,7 +29,7 @@ fn world() -> World {
 
 fn buy(w: &mut World, def: &str, x: i32, z: i32, rot: i32, size: Option<[u16; 2]>, tall: Option<i16>) -> Result<u32, sim_core::Error> {
     w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, rot]), colors: Default::default(), turn: None, offset: None, size, tall })?;
-    Ok(w.objects.len() as u32 - 1)
+    Ok(w.objects.last().unwrap().stable)
 }
 
 fn resize(w: &mut World, object: u32, x: i32, z: i32, size: [u16; 2], tall: i16) -> Result<(), sim_core::Error> {

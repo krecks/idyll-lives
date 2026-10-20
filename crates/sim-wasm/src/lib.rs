@@ -172,13 +172,10 @@ impl Game {
         self.snapshot.len()
     }
 
-    /// Applies a JSON-encoded `Command`. One that names an object by id with what the view
-    /// showed there (`seen`) is skipped when that id names another object by now.
+    /// Applies a JSON-encoded `Command`.
     pub fn command(&mut self, json: &str) -> Result<(), JsError> {
-        let (cmd, seen) = Command::from_json_seen(json).map_err(|e| JsError::new(&e.0))?;
-        if !self.world.apply_seen(cmd, seen.as_ref()).map_err(|e| JsError::new(&e.0))? {
-            console_debug(&format!("skipped (the object's id changed): {json}"));
-        }
+        let cmd = Command::from_json(json).map_err(|e| JsError::new(&e.0))?;
+        self.world.apply(cmd).map_err(|e| JsError::new(&e.0))?;
         snapshot::write(&self.world, &mut self.snapshot);
         Ok(())
     }

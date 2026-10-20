@@ -332,7 +332,7 @@ fn undoing_an_upgrade_takes_back_its_story() {
 fn a_colour_is_an_edit_and_goes_where_its_object_goes() {
     let mut w = world();
     buy(&mut w, "chair", 1, 1);
-    let chair = w.objects.len() as u32 - 1;
+    let chair = w.objects.last().unwrap().stable;
     let red: Colors = [("body".into(), 0xD9483B)].into();
     w.apply(Command::Recolor { household: 0, object: chair, colors: red.clone() }).unwrap();
     assert_eq!(w.objects[chair as usize].colors, red);

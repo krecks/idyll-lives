@@ -20,7 +20,7 @@ const TOWN: &str = r#"{"width":12,"depth":12,
 
 fn buy(w: &mut World, def: &str, x: i32, turn: u8) -> Result<u32, sim_core::Error> {
     w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, 1, 1]), colors: Default::default(), turn: Some(turn), offset: None, size: None, tall: None })?;
-    Ok(w.objects.len() as u32 - 1)
+    Ok(w.objects.last().unwrap().stable)
 }
 
 #[test]
@@ -53,7 +53,7 @@ fn decor_turns_freely_and_keeps_its_angle() {
 
 fn buy_at(w: &mut World, household: u32, def: &str, x: i32, z: i32, offset: [i8; 2]) -> Result<u32, sim_core::Error> {
     w.apply(Command::Buy { household, object: def.into(), at: Some([x, z, 0]), colors: Default::default(), turn: None, offset: Some(offset), size: None, tall: None })?;
-    Ok(w.objects.len() as u32 - 1)
+    Ok(w.objects.last().unwrap().stable)
 }
 
 #[test]
@@ -76,16 +76,16 @@ fn things_stand_anywhere_on_their_tiles() {
     assert_eq!((w.objects[at(&w, 4, 4)].offset, w.objects[at(&w, 4, 4)].turn), ([-10, 7], 15));
     assert_eq!((w.objects[at(&w, 2, 1)].offset, w.objects[at(&w, 2, 1)].turn), ([-50, 0], 0), "the vase is as it was");
     w.apply(Command::Undo { household: 0 }).unwrap();
-    let lamp = at(&w, 1, 1) as u32;
-    let mv = |offset| Command::MoveObject { household: 0, object: lamp, x: 4, z: 4, rot: 0, turn: None, offset, size: None, tall: None };
+    let lamp_id = w.objects[at(&w, 1, 1)].stable;
+    let mv = |offset| Command::MoveObject { household: 0, object: lamp_id, x: 4, z: 4, rot: 0, turn: None, offset, size: None, tall: None };
     w.apply(mv(None)).unwrap();
     let lamp = at(&w, 4, 4);
     assert_eq!(w.objects[lamp].offset, [25, -50]);
-    w.apply(Command::MoveObject { household: 0, object: lamp as u32, x: 4, z: 4, rot: 0, turn: None, offset: Some([-10, 7]), size: None, tall: None }).unwrap();
+    w.apply(Command::MoveObject { household: 0, object: lamp_id, x: 4, z: 4, rot: 0, turn: None, offset: Some([-10, 7]), size: None, tall: None }).unwrap();
     let lamp = at(&w, 4, 4);
     assert_eq!(w.objects[lamp].offset, [-10, 7]);
     w.apply(Command::Undo { household: 0 }).unwrap();
-    let lamp = w.objects.iter().position(|o| o.x == 4 && o.z == 4).unwrap();
+    let lamp = w.object_index(lamp_id).unwrap();
     assert_eq!(w.objects[lamp].offset, [25, -50]);
 
     // Saved and loaded.

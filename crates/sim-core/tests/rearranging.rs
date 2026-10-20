@@ -7,7 +7,6 @@
 
 mod common;
 
-use sim_core::command::Seen;
 use sim_core::world::TICKS_PER_DAY;
 use sim_core::{Command, World};
 
@@ -92,7 +91,7 @@ fn rearranging_homes_for_two_days_breaks_nothing() {
 }
 
 /// The same command sent twice before the view caught up (a held-down key, a double click):
-/// with what the view saw (`seen`), the second never moves anything else.
+/// the object's stable id means the second still names it, never something else.
 #[test]
 fn the_same_move_sent_twice_moves_nothing_else() {
     let mut w = town(7);
@@ -103,24 +102,21 @@ fn the_same_move_sent_twice_moves_nothing_else() {
         all.sort_unstable();
         all
     };
-    let mut skipped = 0;
     for _ in 0..200 {
         let things = owned(&w, plot);
         let o = &w.objects[things[rng.below(things.len())] as usize];
-        let (id, x, z) = (o.id, o.x, o.z);
-        let seen = Seen { def: w.content.objects[o.def].id.clone(), x, z };
+        let (id, x, z) = (o.stable, o.x, o.z);
         let others = layout(&w, (x, z));
         let turn = move_to(household, id, x, z, rng.below(4) as u8);
-        if w.apply_seen(turn.clone(), Some(&seen)) != Ok(true) {
+        if w.apply(turn.clone()).is_err() {
             continue;
         }
         // (A refusal is fine: the turn may not fit twice.)
-        skipped += usize::from(matches!(w.apply_seen(turn, Some(&seen)), Ok(false)));
+        let _ = w.apply(turn);
         assert_eq!(layout(&w, (x, z)), others, "something else moved");
         for _ in 0..rng.below(40) {
             w.tick_once();
         }
         common::check(&w);
     }
-    assert!(skipped > 50, "most second sends were skipped as stale: {skipped}");
 }

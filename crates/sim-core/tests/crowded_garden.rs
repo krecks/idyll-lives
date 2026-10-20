@@ -36,7 +36,7 @@ fn world(rot: i32) -> (String, String, Vec<u32>) {
     for id in ROW {
         let r = w.apply(Command::Buy { household: h, object: id.into(), at: Some([x, z, rot]), colors: Default::default(), turn: None, offset: None, size: None, tall: None });
         assert!(r.is_ok(), "{id} at {x},{z}: {r:?}");
-        ids.push(w.objects.len() as u32 - 1);
+        ids.push(w.objects.last().unwrap().stable);
         x += width(&w, id);
     }
     (w.save_json(), content, ids)

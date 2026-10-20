@@ -39,7 +39,7 @@ export interface SnapshotLayout {
     /** 1 = started the conversation, 2 = was approached, 3 = joined in and listens (`partner`: the one who started it), 0 = not talking. */
     role: number;
     away: number;
-    /** Object instance id (as in `WorldStructure.objects`) the Sim is using or walking to use, -1 = none. */
+    /** Stable object id (as in `WorldStructure.objects`) the Sim is using or walking to use, -1 = none. */
     object: number;
     /** Index into `actions` while using an object (not while walking to it) or talking, -1 = none. */
     action: number;

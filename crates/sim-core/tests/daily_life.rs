@@ -220,7 +220,7 @@ fn buying_selling_and_moving_objects() {
     assert!(w.buy(0, "rock", None, Default::default()).is_err(), "not for sale");
     w.apply(Command::MoveObject {
         household: 0,
-        object: id,
+        object: w.objects[id as usize].stable,
         x: 4,
         z: 3,
         rot: 2,
@@ -232,7 +232,7 @@ fn buying_selling_and_moving_objects() {
     .unwrap();
     let moved = w.objects.iter().find(|o| o.x == 4 && o.z == 3).unwrap();
     assert_eq!(moved.rot, 2);
-    let id = moved.id;
+    let id = moved.stable;
     w.apply(Command::Sell { household: 0, object: id }).unwrap();
     assert_eq!(w.households[0].funds, 700, "half back");
     assert_eq!(w.objects.len(), 3);

@@ -77,7 +77,8 @@ fn uses_object(t: &TaskKind, id: u32) -> bool {
 }
 
 /// Object `id` is gone: the task's object ids after it shift down by one (a recipe started
-/// from it goes on without).
+/// from it goes on without). Tasks hold indices into `World::objects` rather than stable ids,
+/// so this stays even though player-facing ids no longer move.
 fn shift_objects(t: &mut TaskKind, id: u32) {
     let shift = |o: &mut u32| {
         if *o > id {
@@ -747,6 +748,7 @@ impl World {
             self.keep_doorway_clear(old.def, x, z, rot, layout)?;
             let id = self.place_at_home(plot, old.def, x, z, rot, layout, old.colors.clone(), old.quality, old.value)?;
             let placed = &mut self.objects[id as usize];
+            placed.stable = old.stable;
             placed.turn = turn.unwrap_or(old.turn);
             placed.wear = old.wear;
             placed.open = old.open;
@@ -772,6 +774,7 @@ impl World {
                     .place_at_home(plot, r.def, x, z, (facing / 90) as u8, Layout { offset, ..Layout::of(r) }, r.colors.clone(), r.quality, r.value)
                     .map_err(|_| Error::new(format!("the {name} on it wouldn't fit there")))?;
                 let o = &mut self.objects[rid as usize];
+                o.stable = r.stable;
                 o.turn = if self.content.objects[r.def].turns { (facing % 90) as u8 } else { 0 };
                 o.wear = r.wear;
                 o.open = r.open;

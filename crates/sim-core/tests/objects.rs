@@ -6,7 +6,6 @@
 mod common;
 
 use sim_core::world::{Phase, TaskKind};
-use sim_core::command::Seen;
 use sim_core::{Command, MINUTES_PER_TICK, World};
 
 /// An open 16×14 plot with one resident.
@@ -24,7 +23,7 @@ fn world() -> World {
 fn buy(w: &mut World, def: &str, x: i32, z: i32) -> u32 {
     w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, 0]), colors: Default::default(), turn: None, offset: None, size: None, tall: None })
         .unwrap_or_else(|e| panic!("{def}: {e}"));
-    w.objects.len() as u32 - 1
+    w.objects.last().unwrap().stable
 }
 
 fn need(w: &World, id: &str) -> usize {
@@ -126,7 +125,7 @@ fn selling_a_fruit_bowl_or_a_rug_keeps_the_dinner_on_the_table() {
         let mut w = world();
         let rug = at.map(|[x, z, r]| {
             w.apply(Command::Buy { household: 0, object: extra.into(), at: Some([x, z, r]), colors: Default::default(), turn: None, offset: None, size: None, tall: None }).unwrap();
-            w.objects.len() as u32 - 1
+            w.objects.last().unwrap().stable
         });
         let table = buy(&mut w, "tableDining4", 5, 5);
         let meal = meal_on(&mut w, table);
@@ -134,7 +133,7 @@ fn selling_a_fruit_bowl_or_a_rug_keeps_the_dinner_on_the_table() {
             Some(r) => r,
             None => {
                 w.apply(Command::Buy { household: 0, object: extra.into(), at: None, colors: Default::default(), turn: None, offset: None, size: None, tall: None }).unwrap();
-                w.objects.len() as u32 - 1
+                w.objects.last().unwrap().stable
             }
         };
         let (o, (mx, mz)) = (&w.objects[thing as usize], w.items.get(meal).unwrap().at.tile());
@@ -158,7 +157,7 @@ fn moving_a_fruit_bowl_leaves_the_dinner_on_the_table() {
     let meal = meal_on(&mut w, table);
     let was = w.items.get(meal).unwrap().at;
     w.apply(Command::Buy { household: 0, object: "fruitBowl".into(), at: None, colors: Default::default(), turn: None, offset: None, size: None, tall: None }).unwrap();
-    let bowl = w.objects.len() as u32 - 1;
+    let bowl = w.objects.last().unwrap().stable;
     assert_eq!(sim_core::surface::host_of(&w.content, &w.objects, &w.objects[bowl as usize]), Some(table), "the bowl is on the table");
     let radius = w.content.objects[w.objects[bowl as usize].def].radius;
     let centre = w.objects[other as usize].centre(&w.content);
@@ -180,37 +179,33 @@ fn traits_give_their_starting_skills() {
     assert!(chef.is_some(), "some trait starts with cooking (base.json)");
 }
 
-/// R2-04 (known: commands by position aren't idempotent). Holding R in Build mode sends
-/// `moveObject` again with the id the view had (`session.ts:543`): the first rotates the rug and
-/// renumbers it last, the second moves whatever took its id (the lamp) onto the rug. With what
-/// the view saw at that id (`seen`), the second is skipped.
+/// R2-04: an object keeps its id, so a command sent twice before the view caught up still
+/// names the same object, not whatever took its place in the list.
 #[test]
 fn a_repeated_rotate_does_not_move_another_object() {
     let mut w = world();
     let rug = buy(&mut w, "rugRound", 2, 2);
     let lamp = buy(&mut w, "lamp", 11, 11);
-    let (x, z) = (w.objects[rug as usize].x, w.objects[rug as usize].z);
+    let (x, z) = (w.objects[w.object_index(rug).unwrap()].x, w.objects[w.object_index(rug).unwrap()].z);
     let rotate = Command::MoveObject { household: 0, object: rug, x, z, rot: 1, turn: None, offset: None, size: None, tall: None };
-    let seen = Seen { def: "rugRound".into(), x, z };
-    assert_eq!(w.apply_seen(rotate.clone(), Some(&seen)), Ok(true));
-    assert_eq!(w.apply_seen(rotate, Some(&seen)), Ok(false), "skipped: the lamp took the rug's id");
-    let lamp_now = w.objects.iter().find(|o| w.content.objects[o.def].id == "lamp").unwrap();
-    assert_eq!((lamp_now.x, lamp_now.z), (11, 11), "the lamp (id {lamp} before) stays where it was");
-    let rug_now = w.objects.iter().find(|o| w.content.objects[o.def].id == "rugRound").unwrap();
+    w.apply(rotate.clone()).unwrap();
+    w.apply(rotate).unwrap();
+    let lamp_now = w.objects.iter().find(|o| o.stable == lamp).unwrap();
+    assert_eq!((lamp_now.x, lamp_now.z), (11, 11), "the lamp stays where it was");
+    let rug_now = w.objects.iter().find(|o| o.stable == rug).unwrap();
     assert_eq!((rug_now.x, rug_now.z, rug_now.rot), (x, z, 1), "the rug turned once");
 }
 
-/// R2-04: every command by object id checks `seen` (selling, restyling, upgrading, repairing,
-/// using): a stale one changes nothing, not even the undo steps; one that matches goes ahead.
+/// R2-04: every command by object id names the object itself, not a place in the list. One
+/// for an object that was sold is refused and changes nothing, not even the undo steps.
 #[test]
 fn commands_for_an_object_that_moved_on_are_skipped() {
     let mut w = world();
     let lamp = buy(&mut w, "lamp", 1, 11);
     let sofa = buy(&mut w, "sofa", 4, 4);
-    let lamp_seen = Seen { def: "lamp".into(), x: 1, z: 11 };
     w.apply(Command::Sell { household: 0, object: lamp }).unwrap();
     let before = (w.objects.clone(), w.households[0].funds, w.undo_steps(0));
-    let relax = interaction(&w, sofa - 1, "relax");
+    let relax = interaction(&w, w.object_index(sofa).unwrap() as u32, "relax");
     let stale = [
         Command::Sell { household: 0, object: lamp },
         Command::Recolor { household: 0, object: lamp, colors: [("body".into(), 0xD9483B)].into() },
@@ -221,20 +216,17 @@ fn commands_for_an_object_that_moved_on_are_skipped() {
     ];
     for cmd in stale {
         let what = format!("{cmd:?}");
-        assert_eq!(w.apply_seen(cmd, Some(&lamp_seen)), Ok(false), "{what}");
+        assert!(w.apply(cmd).is_err(), "{what}");
     }
     assert_eq!((w.objects.clone(), w.households[0].funds, w.undo_steps(0)), before, "nothing changed");
     assert!(w.sims[0].queue().next().is_none(), "nothing queued");
-    // The sofa as the view shows it now: it goes ahead.
-    let sofa_seen = Seen { def: "sofa".into(), x: 4, z: 4 };
-    assert_eq!(w.apply_seen(Command::Use { sim: 0, object: sofa - 1, interaction: relax }, Some(&sofa_seen)), Ok(true));
+    // The sofa still has its own id: the same command goes ahead.
+    w.apply(Command::Use { sim: 0, object: sofa, interaction: relax }).unwrap();
     assert!(w.sims[0].queue().next().is_some(), "off to the sofa");
-    // From the UI: `seen` rides along in the command's JSON.
-    let json = r#"{"type":"sell","household":0,"object":0,"seen":{"def":"sofa","x":4,"z":4}}"#;
-    let (cmd, seen) = Command::from_json_seen(json).unwrap();
-    assert_eq!((cmd.object(), seen), (Some(0), Some(sofa_seen)));
-    let (_, seen) = Command::from_json_seen(r#"{"type":"sell","household":0,"object":0}"#).unwrap();
-    assert_eq!(seen, None);
+    // From the UI: the command's JSON carries the stable id and no `seen`.
+    let json = format!(r#"{{"type":"sell","household":0,"object":{sofa}}}"#);
+    let cmd = Command::from_json(&json).unwrap();
+    assert!(matches!(cmd, Command::Sell { object, .. } if object == sofa));
 }
 
 /// Ada's home and her friend Bo's next door (a fridge each, and a shower at Bo's).

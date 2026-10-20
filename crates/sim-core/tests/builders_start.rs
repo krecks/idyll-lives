@@ -89,14 +89,14 @@ fn creative_building_is_free_and_the_home_pays_no_bills() {
     let mut w = world("creative");
     w.apply(Command::Build { household: 0, edits: room() }).unwrap();
     w.apply(Command::Buy { household: 0, object: "chair".into(), at: Some([2, 2, 0]), colors: Default::default(), turn: None, offset: None, size: None, tall: None }).unwrap();
-    let chair = w.objects.len() as u32 - 1;
+    let chair = w.objects.last().unwrap().stable;
     w.apply(Command::Upgrade { household: 0, object: chair }).unwrap();
     assert_eq!(w.households[0].funds, 5000, "building, buying and upgrading cost nothing");
     w.apply(Command::Sell { household: 0, object: chair }).unwrap();
     assert_eq!(w.households[0].funds, 5000, "selling what was free brings nothing");
     // Undo still takes edits back.
     w.apply(Command::Undo { household: 0 }).unwrap();
-    assert_eq!(w.objects.len() as u32, chair + 1);
+    assert!(w.objects.iter().any(|o| o.stable == chair));
 
     // A family moves in: the player's home has no rent or bills, the neighbours still pay.
     w.apply(Command::MoveIn { household: 0, name: Some("Ito".into()), sims: vec![spawn("Kai", 6.5)], bonds: vec![] }).unwrap();

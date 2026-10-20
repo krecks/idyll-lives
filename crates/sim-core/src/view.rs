@@ -1644,7 +1644,7 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
         .map(|o| {
             let (w, d) = o.size(content);
             ObjectView {
-                id: o.id,
+                id: o.stable,
                 def: &content.objects[o.def].id,
                 x: o.x,
                 z: o.z,

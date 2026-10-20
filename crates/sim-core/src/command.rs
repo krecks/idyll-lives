@@ -406,39 +406,4 @@ impl Command {
         serde_json::from_str(json).map_err(|e| crate::Error::new(format!("invalid command: {e}")))
     }
 
-    /// A command and the `seen` it carries, if any (see `Seen`).
-    pub fn from_json_seen(json: &str) -> Result<(Self, Option<Seen>), crate::Error> {
-        let invalid = |e: serde_json::Error| crate::Error::new(format!("invalid command: {e}"));
-        let value: serde_json::Value = serde_json::from_str(json).map_err(invalid)?;
-        let seen = match value.get("seen") {
-            Some(v) if !v.is_null() => Some(Seen::deserialize(v).map_err(invalid)?),
-            _ => None,
-        };
-        Ok((Self::deserialize(value).map_err(invalid)?, seen))
-    }
-
-    /// The object a command names by id, which a `Seen` can check.
-    pub fn object(&self) -> Option<u32> {
-        match *self {
-            Command::Use { object, .. }
-            | Command::Sell { object, .. }
-            | Command::MoveObject { object, .. }
-            | Command::Recolor { object, .. }
-            | Command::Upgrade { object, .. }
-            | Command::Repair { object, .. } => Some(object),
-            _ => None,
-        }
-    }
-}
-
-/// The object a command by id was meant for, as the player's view showed it: its kind (content
-/// id) and tile. Object ids are places in `World::objects` that shift when anything before them
-/// is sold or moved, so a command sent before the view caught up (a held-down key, a second
-/// click) could name another object; `World::apply_seen` skips it then. The UI sends it as
-/// `seen` with `use`, `sell`, `moveObject`, `recolor`, `upgrade` and `repair`.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-pub struct Seen {
-    pub def: String,
-    pub x: i32,
-    pub z: i32,
 }

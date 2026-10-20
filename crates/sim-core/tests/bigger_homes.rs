@@ -59,7 +59,7 @@ fn build_room(w: &mut World, household: u32, x: i32, z: i32) {
     w.apply(Command::PaintFloor { household, tiles }).unwrap();
     w.apply(Command::SetRoof { household, style: 1, color: 1 }).unwrap();
     w.apply(Command::Buy { household, object: "chair".into(), at: Some([x + 1, z, 0]), colors: [("body".into(), 0x7A8FA6)].into(), turn: None, offset: None, size: None, tall: None }).unwrap();
-    let chair = w.objects.len() as u32 - 1;
+    let chair = w.objects.last().unwrap().stable;
     w.apply(Command::Upgrade { household, object: chair }).unwrap();
 }
 

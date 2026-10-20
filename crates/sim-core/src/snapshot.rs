@@ -53,8 +53,8 @@ pub mod sim {
     pub const ROLE: usize = 11;
     /// 1 while away from the map (at work).
     pub const AWAY: usize = 12;
-    /// Id of the object instance the Sim is using or walking to use (index into
-    /// `World::objects`, same as the structure's object ids), or -1.
+    /// Stable id of the object instance the Sim is using or walking to use (the structure's
+    /// object ids), or -1.
     pub const OBJECT: usize = 13;
     /// What the Sim is doing: index into `Content::animations` (layout `actions`), or -1.
     /// Set while using an object (not while walking to it) and in conversations ("talk").
@@ -110,6 +110,11 @@ impl Doing {
     }
 }
 
+/// A stable object id for the renderer, from an index into `World::objects`.
+fn stable(world: &World, index: u32) -> f32 {
+    world.objects.get(index as usize).map_or(-1.0, |o| o.stable as f32)
+}
+
 fn doing(world: &World, s: &Sim) -> Doing {
     if s.away_until.is_some() {
         return Doing::NOTHING;
@@ -117,7 +122,7 @@ fn doing(world: &World, s: &Sim) -> Doing {
     // Repairing: at the object, the tinker animation while at it.
     if let Some(Activity { task: Task { kind: TaskKind::Repair { object }, .. }, phase, .. }) = s.current() {
         let anim = world.content.object_rules.repair.anim.filter(|_| matches!(phase, Phase::Using { .. }));
-        return Doing::plain(*object as f32, anim);
+        return Doing::plain(stable(world, *object), anim);
     }
     // An accident's while on the spot (asleep on the floor, takeout).
     if let Some(Activity { task: Task { kind: TaskKind::Spot { accident }, .. }, .. }) = s.current() {
@@ -139,7 +144,7 @@ fn doing(world: &World, s: &Sim) -> Doing {
             .then(|| world.content.objects[o.def].interactions.iter().position(|i| i.recipe == Some(*recipe)))
             .flatten();
         return Doing {
-            object: o.id as f32,
+            object: o.stable as f32,
             action: r.steps.get(*step as usize).and_then(|s| s.anim).filter(|_| using).map_or(-1.0, |a| a as f32),
             def: o.def as f32,
             interaction: interaction.map_or(-1.0, |i| i as f32),
@@ -148,7 +153,7 @@ fn doing(world: &World, s: &Sim) -> Doing {
     // Eating: at the seat (or standing), the eat animation while at it.
     if let Some(Activity { task: Task { kind: TaskKind::Eat { seat, .. }, .. }, phase, .. }) = s.current() {
         let anim = world.content.cooking.eat_anim.filter(|_| matches!(phase, Phase::Using { .. }));
-        return Doing::plain(seat.map_or(-1.0, |o| o as f32), anim);
+        return Doing::plain(seat.map_or(-1.0, |o| stable(world, o)), anim);
     }
     // Clearing away: at the bin, the sink or the counter, scraping, washing or putting away.
     if let Some(Activity { task: Task { kind: TaskKind::Dishes { station, stage, .. }, .. }, phase, .. }) = s.current() {
@@ -159,12 +164,12 @@ fn doing(world: &World, s: &Sim) -> Doing {
             _ => rules.dishes_anim,
         };
         let anim = anim.filter(|_| matches!(phase, Phase::Using { .. }));
-        return Doing::plain(station.map_or(-1.0, |o| o as f32), anim);
+        return Doing::plain(station.map_or(-1.0, |o| stable(world, o)), anim);
     }
     // On the phone: on the seat (or standing), the phone animation while at it.
     if let Some(Activity { task: Task { kind: TaskKind::Phone { seat, .. }, .. }, phase, .. }) = s.current() {
         let anim = world.content.phone.anim.filter(|_| matches!(phase, Phase::Using { .. }));
-        return Doing::plain(seat.map_or(-1.0, |o| o as f32), anim);
+        return Doing::plain(seat.map_or(-1.0, |o| stable(world, o)), anim);
     }
     // Tidying up: no object, the clean animation while at it.
     if let Some(Activity { task: Task { kind: TaskKind::Clean { .. }, .. }, phase, .. }) = s.current() {
@@ -197,7 +202,7 @@ fn doing(world: &World, s: &Sim) -> Doing {
         _ => None,
     };
     Doing {
-        object: *object as f32,
+        object: obj.stable as f32,
         action: action.map_or(-1.0, |a| a as f32),
         def: obj.def as f32,
         interaction: *interaction as f32,

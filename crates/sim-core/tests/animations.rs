@@ -164,18 +164,19 @@ fn object_ids_stay_valid_after_a_sell() {
     use_object(&mut w, 1, 0);
     walk_up(&mut w);
     let (x, z) = (w.objects[1].x, w.objects[1].z);
+    let fridge = w.objects[1].stable;
 
-    // Selling an object listed before it shifts its id down by one.
-    w.apply(Command::Sell { household: 0, object: 0 }).unwrap();
+    // Selling an object listed before it doesn't change the fridge's id.
+    w.apply(Command::Sell { household: 0, object: w.objects[0].stable }).unwrap();
     let (object, act) = row(&w, 0);
-    assert_eq!(object, 0.0);
+    assert_eq!(object, fridge as f32);
     assert_eq!(act, action(&w, "eat"), "still eating");
-    let used = &w.objects[object as usize];
+    let used = &w.objects[w.object_index(fridge).unwrap()];
     assert_eq!((used.x, used.z), (x, z), "the same fridge");
     assert!(used.users().any(|u| u == 0));
 
     // Selling the object in use stops the Sim.
-    w.apply(Command::Sell { household: 0, object: 0 }).unwrap();
+    w.apply(Command::Sell { household: 0, object: fridge }).unwrap();
     assert_eq!(row(&w, 0), (-1.0, -1.0));
 }
 

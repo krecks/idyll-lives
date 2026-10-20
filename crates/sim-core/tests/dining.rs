@@ -93,7 +93,7 @@ fn a_chair_needs_one_free_side() {
     let err = buy(&mut w, "chair", 4, 3, 0).unwrap_err().to_string();
     assert!(err.contains("block"), "boxed in: {err}");
     let back = w.objects.iter().position(|o| (o.x, o.z) == (4, 2)).unwrap() as u32;
-    w.apply(Command::Sell { household: 0, object: back }).unwrap();
+    w.apply(Command::Sell { household: 0, object: w.objects[back as usize].stable }).unwrap();
     let chair = buy(&mut w, "chair", 4, 3, 0).expect("free behind it");
     // Now nothing may take that last free side.
     assert!(buy(&mut w, "crate", 4, 2, 0).is_err(), "the chair's last way in stays free");

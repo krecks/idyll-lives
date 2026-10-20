@@ -83,8 +83,11 @@ impl Layout {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ObjectInstance {
-    /// Equal to the object's index in `World::objects`.
+    /// Equal to the object's index in `World::objects` (internal; views and commands use `stable`).
     pub id: u32,
+    /// The object's id for its whole life: it never changes when other objects are sold, moved or
+    /// reloaded. `World::object_index` turns it back into an index.
+    pub stable: u32,
     pub def: usize,
     /// Minimum corner of the rotated footprint.
     pub x: i32,
@@ -1082,6 +1085,8 @@ pub struct World {
     pub mode: GameMode,
     pub lot: Lot,
     pub objects: Vec<ObjectInstance>,
+    /// The next stable object id (see `ObjectInstance::stable`); never reused.
+    pub(crate) next_object_id: u32,
     /// Food, plates and pots (see `items.rs`).
     pub items: crate::items::Items,
     /// Plot index per object (`None` when outside every plot).
@@ -1354,6 +1359,7 @@ impl World {
             mode: GameMode::Living,
             lot,
             objects: Vec::new(),
+            next_object_id: 0,
             items: Default::default(),
             object_plot: Vec::new(),
             object_index: ObjectIndex::default(),
@@ -1459,6 +1465,32 @@ impl World {
         }
     }
 
+    /// The index in `World::objects` of the object with stable id `stable`, if it still exists.
+    pub fn object_index(&self, stable: u32) -> Option<usize> {
+        self.objects.iter().position(|o| o.stable == stable)
+    }
+
+    /// A command names objects by their stable ids; the simulation works in indices.
+    fn resolve_objects(&self, cmd: Command) -> Result<Command, Error> {
+        let index = |object: u32| {
+            self.object_index(object)
+                .map(|i| i as u32)
+                .ok_or_else(|| Error::new(format!("unknown object {object}")))
+        };
+        Ok(match cmd {
+            Command::SwitchLamp { object, on } => Command::SwitchLamp { object: index(object)?, on },
+            Command::Use { sim, object, interaction } => Command::Use { sim, object: index(object)?, interaction },
+            Command::Sell { household, object } => Command::Sell { household, object: index(object)? },
+            Command::MoveObject { household, object, x, z, rot, turn, offset, size, tall } => {
+                Command::MoveObject { household, object: index(object)?, x, z, rot, turn, offset, size, tall }
+            }
+            Command::Recolor { household, object, colors } => Command::Recolor { household, object: index(object)?, colors },
+            Command::Upgrade { household, object } => Command::Upgrade { household, object: index(object)? },
+            Command::Repair { household, object } => Command::Repair { household, object: index(object)? },
+            other => other,
+        })
+    }
+
     pub fn place_object(&mut self, def_id: &str, x: i32, z: i32, rot: u8) -> Result<u32, Error> {
         let def = self
             .content
@@ -1482,6 +1514,7 @@ impl World {
     ) -> Result<ObjectInstance, Error> {
         let obj = ObjectInstance {
             id: self.objects.len() as u32,
+            stable: 0,
             def,
             x,
             z,
@@ -1664,6 +1697,8 @@ impl World {
         value: i64,
     ) -> Result<u32, Error> {
         let mut obj = self.check_fit(def, x, z, rot, layout)?;
+        obj.stable = self.next_object_id;
+        self.next_object_id = self.next_object_id.wrapping_add(1);
         obj.colors = colors;
         obj.quality = quality.min(self.content.object_rules.max_quality);
         obj.value = value;
@@ -2776,21 +2811,8 @@ impl World {
         Ok(())
     }
 
-    /// `apply` for a command from the player's view that names an object by id, with what the
-    /// view showed there (`seen`, see `command::Seen`): when the object at that id isn't that
-    /// one any more (ids shifted since), nothing happens and it returns `Ok(false)`.
-    pub fn apply_seen(&mut self, cmd: Command, seen: Option<&crate::command::Seen>) -> Result<bool, Error> {
-        if let (Some(seen), Some(id)) = (seen, cmd.object()) {
-            let same = self.objects.get(id as usize).is_some_and(|o| (o.x, o.z) == (seen.x, seen.z) && self.content.objects[o.def].id == seen.def);
-            if !same {
-                return Ok(false);
-            }
-        }
-        self.apply(cmd)?;
-        Ok(true)
-    }
-
     fn apply_command(&mut self, cmd: Command) -> Result<(), Error> {
+        let cmd = self.resolve_objects(cmd)?;
         match cmd {
             Command::SetSpeed { speed } => {
                 if speed > MAX_SPEED {
