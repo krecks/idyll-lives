@@ -22,8 +22,6 @@ extern "C" {
     fn report_panic(message: &str) -> Result<(), JsValue>;
     #[wasm_bindgen(js_namespace = console, js_name = error)]
     fn console_error(message: &str);
-    #[wasm_bindgen(js_namespace = console, js_name = debug)]
-    fn console_debug(message: &str);
 }
 
 /// Runs as the module starts. A panic aborts (`panic = "abort"`), and the trap only says
