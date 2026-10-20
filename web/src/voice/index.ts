@@ -10,8 +10,9 @@
  * Lines are hand-written (`lines.ts`), or written by a small language model from who the
  * resident is and what's going on (`talk/`, the `voiceWriter` setting), from what happened. With subtitles on, the speech bubble shows the line while it plays.
  *
- * Everyone speaks with Supertonic 3 on the GPU (`voices.ts`); babies don't speak. If lines keep
- * coming late or slow the frames, voices pause for the session.
+ * Everyone speaks with Supertonic 3 (`voices.ts`); babies don't speak. Auto runs it on the GPU
+ * and, if the card is missing or too slow, steps down to the processor with a message. If lines
+ * still keep coming late or slow the frames, voices pause for the session.
  *
  * Presentation only: nothing goes back to the simulation. Work per frame is a cheap check; the
  * snapshot is read about ten times a second.
@@ -28,7 +29,7 @@ import { game, toast } from '../ui/state.svelte';
 import { fill, loadLines, Lines, speechPieces, type Line } from './lines';
 import { playClip, updateVoiceVolume, type Playing } from './player';
 import { SAMPLE_RATE } from './protocol';
-import { hasClip, speak, unloadVoice, voiceReady, voiceStatus, type Clip } from './service.svelte';
+import { hasClip, speak, stepDownVoice, unloadVoice, voiceReady, voiceStatus, type Clip } from './service.svelte';
 import type { VisemeTrack } from './visemes';
 import { voiceFor, withTone, type VoiceParams } from './voices';
 import { scripted, type LineRequest } from './writer';
@@ -136,6 +137,8 @@ export class VoiceDirector {
   private dropped = 0;
   /** Speech came late or slowed the game: no voices for the rest of the session. */
   private paused = false;
+  /** Auto is moving the voices from the GPU to the processor; don't pause them meanwhile. */
+  private steppingDown = false;
   private lateRun = 0;
   private lastFrame = 0;
   /** Frames drawn while speech was being made, and those over `SLOW_FRAME_MS`; the same while not. */
@@ -315,7 +318,39 @@ export class VoiceDirector {
     Object.assign(f, { busy: 0, busySlow: 0, idle: 0, idleSlow: 0 });
   }
 
+  /**
+   * Speech is late or slow. Auto first steps the engine down to the processor (the card was too
+   * slow); if that is not the case, or it cannot start, voices pause for the session.
+   */
   private pause(why: 'late' | 'frames'): void {
+    if (this.paused || this.steppingDown) return;
+    if (settings.voiceDevice === 'auto' && voiceStatus.device === 'gpu') {
+      this.steppingDown = true;
+      void stepDownVoice()
+        .then((stepped) => {
+          this.steppingDown = false;
+          if (!stepped) {
+            this.pauseForSession(why);
+            return;
+          }
+          // Give the processor a clean window to prove itself.
+          this.lateRun = 0;
+          Object.assign(this.frames, { busy: 0, busySlow: 0, idle: 0, idleSlow: 0 });
+          toast(
+            "Resident voices are switching to this computer's processor: the graphics card was too slow.",
+            6000,
+          );
+        })
+        .catch(() => {
+          this.steppingDown = false;
+          this.pauseForSession(why);
+        });
+      return;
+    }
+    this.pauseForSession(why);
+  }
+
+  private pauseForSession(why: 'late' | 'frames'): void {
     if (this.paused) return;
     this.paused = true;
     unloadVoice();

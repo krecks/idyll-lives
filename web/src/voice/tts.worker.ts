@@ -1,9 +1,10 @@
 /**
  * Voice worker: turns lines of text into 24 kHz audio, one at a time, off the main thread.
- * Supertone's Supertonic 3 runs on ONNX Runtime Web, only on the GPU (WebGPU: a whole line in
- * a few large passes, about 30 times faster than it plays; docs/design/voices.md), and our
- * Rust/WASM (`crates/voice-wasm`) shapes the voices, finds the mouth shapes and reads the text
- * plain. `supertonic.ts` makes each line.
+ * Supertone's Supertonic 3 runs on ONNX Runtime Web, on the GPU (WebGPU: a whole line in a few
+ * large passes, about 30 times faster than it plays) or, in Auto's fallback, on the processor
+ * (WASM: about 2.5 times faster than it plays; docs/design/voices.md). Our Rust/WASM
+ * (`crates/voice-wasm`) shapes the voices, finds the mouth shapes and reads the text plain.
+ * `supertonic.ts` makes each line.
  *
  * Everything is self-hosted, fetched once and kept in the Cache API, so the next session starts
  * without downloading.
@@ -14,7 +15,7 @@ import { configureOrt, hasWebGpu, importOrt, ORT_WASM, sessionOptions } from '..
 import init, { Voice } from './wasm-pkg/voice_wasm.js';
 import wasmUrl from './wasm-pkg/voice_wasm_bg.wasm?url';
 import { parseStyle, STYLE_IDS, synthesizeLine, type Config, type Engine, type Phonemizer, type Session, type StyleFile } from './supertonic';
-import type { FromVoiceWorker, ToVoiceWorker } from './protocol';
+import type { FromVoiceWorker, ToVoiceWorker, VoiceDevice } from './protocol';
 import type { VoiceParams } from './voices';
 
 interface WorkerScope {
@@ -67,7 +68,7 @@ scope.onmessage = (e) => {
   const msg = e.data;
   if (msg.type === 'load') {
     if (!loading) {
-      loading = load(msg.base).catch((err) => {
+      loading = load(msg.base, msg.device).catch((err) => {
         loading = null;
         scope.postMessage({ type: 'error', message: String(err instanceof Error ? err.message : err) });
         throw err;
@@ -109,9 +110,9 @@ async function dropOldCaches(): Promise<void> {
 }
 
 /** Downloads (or takes from the cache) the runtime, our WASM, the model and its voices, and starts its sessions on the GPU. */
-async function load(base: string): Promise<void> {
+async function load(base: string, device: VoiceDevice): Promise<void> {
   const start = performance.now();
-  if (!(await hasWebGpu())) throw new Error('voices need a graphics card that supports WebGPU');
+  if (device === 'gpu' && !(await hasWebGpu())) throw new Error('voices need a graphics card that supports WebGPU');
   void dropOldCaches();
   const names = Object.keys(MODELS) as (keyof typeof MODELS)[];
   // `built`: imported through Vite. In dev their URLs aren't hashed, so a rebuilt wasm would
@@ -143,7 +144,7 @@ async function load(base: string): Promise<void> {
   const json = <T>(b: ArrayBuffer) => JSON.parse(new TextDecoder().decode(b)) as T;
   // No proxy worker (this is the worker); the runtime comes from our own download.
   const ort = await importOrt();
-  configureOrt(ort, ortWasm);
+  configureOrt(ort, ortWasm, device);
   const sessions = {} as Record<keyof typeof MODELS, Session>;
   // The runtime creates one WebGPU session at a time. The vector estimator's latent stays on the
   // GPU between its passes and goes straight into the vocoder; the other graphs hand back the few
@@ -151,7 +152,7 @@ async function load(base: string): Promise<void> {
   for (const [i, k] of names.entries()) {
     sessions[k] = (await ort.InferenceSession.create(
       new Uint8Array(models[i]),
-      sessionOptions(k === 'vector' ? 'gpu-buffer' : undefined),
+      sessionOptions(device, device === 'gpu' && k === 'vector' ? 'gpu-buffer' : undefined),
     )) as unknown as Session;
   }
   engine = {

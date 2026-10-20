@@ -13,6 +13,9 @@ All notable changes to Idyll Lives. Versions follow [semantic versioning](https:
 ### Settings
 - **Settings are versioned and migrated in order.** Values from a hand-edited, truncated or older file are put back in range (numbers, switches and choices) instead of being used as they are.
 
+### Voices
+- **Voices choose where they run:** Settings › Voices › Runs on is Auto, Graphics card or Processor. Auto uses the graphics card when WebGPU is there, starts on the processor when it isn't, and steps down from a card that cannot start the voices or turns out too slow, with a non-blocking message. A manual choice is never overridden. The processor keeps up with speech at about 2.5× real time, so a laptop without a usable graphics card can still hear its residents.
+
 ### Graphics
 - **Low draws far less:** the village orbit by day falls from 447 draws and 5.1 M triangles a frame to 293 and 1.2 M, and from 12 long tasks to none (M3 Pro proxy, 1920×1080). The quilts and held things draw only their live rows instead of the whole town's capacity, the street uses its far models, the street and residents cast no sun shadows on Low, and one merged shadow caster replaces the lot's furniture templates. Medium is unchanged.
 

@@ -64,7 +64,7 @@
     { id: 'camera', label: 'Camera & time', icon: 'icon.ui.watch', keys: ['directorDelay', 'directorPace', 'hideHudWhileWatching', 'autoSlow', 'skipQuietHours', 'pauseOnBlur'] },
     { id: 'interface', label: 'Interface', icon: 'icon.ui.display', keys: ['uiScale', 'catalogSize', 'clock24h', 'reducedMotion', 'showFps'] },
     { id: 'audio', label: 'Audio', icon: 'icon.ui.audio', keys: ['masterVolume', 'sound', 'worldSound', 'worldVolume', 'muteInBackground'] },
-    { id: 'voices', label: 'Voices', icon: 'icon.ui.voice', keys: ['voices', 'voiceVolume', 'voiceWriter', 'subtitles'] },
+    { id: 'voices', label: 'Voices', icon: 'icon.ui.voice', keys: ['voices', 'voiceDevice', 'voiceVolume', 'voiceWriter', 'subtitles'] },
     { id: 'controls', label: 'Controls', icon: 'icon.ui.move', keys: ['directControl', 'cameraSensitivity'] },
   ] as const satisfies readonly { id: string; label: string; icon: string; keys: readonly (keyof Settings)[] }[];
   type Page = (typeof pages)[number]['id'];
@@ -101,17 +101,20 @@
   const NEXT_LOAD = 'Next load';
 
 
+  const voiceRunsOn = $derived(voiceStatus.device === 'cpu' ? "this computer's processor" : "this computer's graphics card");
   const modelStatus = $derived.by(() => {
     if (voiceStatus.state === 'loading') return `Downloading… ${Math.round(voiceStatus.progress * 100)} %`;
     if (voiceStatus.state === 'error') return `Couldn't load the voice: ${voiceStatus.error}`;
-    return gpuAvailable ? `Supertone's Supertonic 3, on this computer's graphics card: about ${Math.round(DOWNLOAD_MB)} MB, downloaded once.` : 'No WebGPU here: voices need a graphics card that supports it.';
+    if (voiceStatus.state === 'ready') return `Supertone's Supertonic 3, on ${voiceRunsOn}.`;
+    if (settings.voiceDevice === 'cpu') return `Supertone's Supertonic 3, on this computer's processor: about ${Math.round(DOWNLOAD_MB)} MB, downloaded once.`;
+    return gpuAvailable ? `Supertone's Supertonic 3, on this computer's graphics card: about ${Math.round(DOWNLOAD_MB)} MB, downloaded once.` : "No WebGPU here: Auto uses this computer's processor.";
   });
   const VERDICT = { good: 'smooth', ok: 'lines may start a moment late', slow: 'too slow here: voices may pause' };
   const benchText = $derived.by(() => {
     if (voiceStatus.benchmarking) return 'Testing…';
     const b = voiceStatus.bench;
     if (!b) return 'How fast this computer makes speech while the game keeps drawing.';
-    return `${(b.lineMs / 1000).toFixed(1)} s per line, ${(1 / b.rtf).toFixed(1)}× real time, ${VERDICT[benchVerdict(b)]}`;
+    return `${b.device === 'cpu' ? 'On the processor' : 'On the graphics card'}: ${(b.lineMs / 1000).toFixed(1)} s per line, ${(1 / b.rtf).toFixed(1)}× real time, ${VERDICT[benchVerdict(b)]}`;
   });
   let sampleBusy = $state(false);
   let sampleCount = 0;
@@ -148,7 +151,7 @@
       const why = x.ran ? `${(x.lineMs / 1000).toFixed(1)} s a line${x.ok ? '' : ' (wrong text)'}.` : "It couldn't load.";
       return `Doesn't run well enough here, so residents say hand-written lines. ${why}${browserHint(x)}`;
     }
-    return `Runs on the GPU, voices too: ${(x.lineMs / 1000).toFixed(2)} s from asking for a line to hearing it.`;
+    return `Runs on the GPU: ${(x.lineMs / 1000).toFixed(2)} s from asking for a line to hearing it.`;
   });
   let writing = $state(false);
   let written = $state('');
@@ -539,11 +542,26 @@
           <Toggle label="Resident voices" bind:checked={settings.voices} />
         </SettingRow>
         {#if settings.voices}
+          <SettingRow
+            title="Runs on"
+            hint={settings.voiceDevice === 'auto' ? 'Auto uses the graphics card, and steps down to the processor if it is missing or too slow.' : settings.voiceDevice === 'gpu' ? 'The graphics card makes a line in a fraction of a second.' : 'The processor keeps up with speech, but uses more power than the graphics card.'}
+            details="The graphics card is much faster; Auto only moves to the processor when it has to, and says so."
+          >
+            <Segmented
+              label="Runs on"
+              bind:value={settings.voiceDevice}
+              options={[
+                { value: 'auto', label: 'Auto' },
+                { value: 'gpu', label: 'Graphics card' },
+                { value: 'cpu', label: 'Processor' },
+              ]}
+            />
+          </SettingRow>
           <SettingRow title="Voice volume">
             <input class="slider" type="range" min="0" max="1" step="0.05" aria-label="Voice volume" bind:value={settings.voiceVolume} />
             <output>{percent(settings.voiceVolume)}</output>
           </SettingRow>
-          <SettingRow title="Voice model" hint={modelStatus} details="Ten voices, five women's and five men's, each resident with their own pitch, depth and speed, children higher and smaller. Runs on the graphics card (WebGPU). Supertonic 3 is © Supertone, BigScience OpenRAIL-M licence (its use restrictions apply).">
+          <SettingRow title="Voice model" hint={modelStatus} details="Ten voices, five women's and five men's, each resident with their own pitch, depth and speed, children higher and smaller. Supertonic 3 is © Supertone, BigScience OpenRAIL-M licence (its use restrictions apply).">
             {#if voiceStatus.state === 'loading'}
               <Busy label="Downloading the voices" progress={voiceStatus.progress} />
             {:else}

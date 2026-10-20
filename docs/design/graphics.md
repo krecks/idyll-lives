@@ -104,7 +104,7 @@ The F3 overlay shows the measured rate and N ("Display 120 Hz ÷ 2"). Measured o
 
 ## Troubleshooting
 
-Settings › Performance › Troubleshooting › Graphics API: Auto uses WebGPU where there is one, WebGL2 otherwise; WebGL2 forces the fallback. `?renderer=webgl` does the same for one page. When WebGPU has an adapter but fails to start, the game draws with WebGL2 for the session and says so. Voices and the language model need WebGPU either way.
+Settings › Performance › Troubleshooting › Graphics API: Auto uses WebGPU where there is one, WebGL2 otherwise; WebGL2 forces the fallback. `?renderer=webgl` does the same for one page. When WebGPU has an adapter but fails to start, the game draws with WebGL2 for the session and says so. The language model needs WebGPU either way; voices use it when they can and otherwise run on the processor.
 
 ## The benchmark
 

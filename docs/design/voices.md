@@ -1,16 +1,17 @@
 # Resident voices
 
-*Plan for residents speaking their thoughts and conversations out loud. Status (0.2.0):
-residents speak with **Supertone's Supertonic 3** on the graphics card (WebGPU): ten bundled
-voices, each resident with their own pitch, depth and speed (in since 2026-10-12). 0.1.0 shipped
+*Plan for residents speaking their thoughts and conversations out loud. Status (0.3.0):
+residents speak with **Supertone's Supertonic 3** on the graphics card (WebGPU), or on the
+processor (WASM) when Auto steps down: ten bundled voices, each resident with their own pitch,
+depth and speed (in since 2026-10-12). 0.1.0 shipped
 KittenTTS nano (see "History: KittenTTS nano and Paradee-8M"). In between, on 2026-10-12 and
 never in a release, Kyutai's Pocket TTS spoke like a reference clip, so players could record
 their own voice, but on the CPU a line took 1–2 s and on WebGPU it was four times slower (see
 "History: Pocket TTS"). The sections "The model: Pocket TTS", "Voices" and "A resident's own
-voice" describe that model and are kept as history. Phases 1–4 are in, with the guards of phase
-6 that don't need Auto mode. Since 0.2.0 a voice-engine trap restarts the voice worker (at most 3
-times a session), and sound stops in a hidden tab. Measurements and research behind the choices
-are at the end.*
+voice" describe that model and are kept as history. Phases 1–6 are in. Since 0.2.0 a voice-engine
+trap restarts the voice worker (at most 3 times a session), and sound stops in a hidden tab.
+Since 0.3.0 Auto runs the voices on the graphics card and steps down to the processor when it is
+missing or too slow. Measurements and research behind the choices are at the end.*
 
 ## Built so far
 
@@ -25,8 +26,9 @@ are at the end.*
   duration predictor (how long a line lasts), text encoder, vector estimator (flow matching: 8
   passes turn noise into the line's latents) and vocoder (44.1 kHz). A whole line in a few large passes, which suits the GPU. The loop is
   ported from Supertone's reference code (`web/helper.js`). It runs in the voice worker on
-  **ONNX Runtime Web** 1.30.0, **only on WebGPU**: without it, voices are off (like the language
-  model). Lines are made one at a time; the Node checks run the same `supertonic.ts` (on the CPU).
+  **ONNX Runtime Web** 1.30.0, on WebGPU (the graphics card) or WASM (the processor, Auto's
+  fallback). Lines are made one at a time; the Node checks run the same `supertonic.ts` (on the
+  CPU).
 - **Deterministic:** the starting noise is ours, a hash of the voice, speed and text, so the
   same line in the same voice gives the same samples (bit-identical in the Node check, against
   golden hashes), which the clip cache relies on.
@@ -47,8 +49,8 @@ are at the end.*
 - **Measured (M3 Pro, Chrome, 2026-10-18):** lines of 1–5 sentences, spoken a piece at a time:
   the first sound 0.18–0.21 s after asking (6 passes, within a hair of 8; 4 passes: 0.12–0.14 s),
   a whole five-sentence line (10.5 s of audio) in 0.31 s, about 34× faster than it plays; frames
-  at 16.7 ms. On the CPU (two threads) it would be 0.7–1.0 s and 2.5× real time, still faster
-  than Pocket TTS, but voices run on the GPU only. The device test with LFM2.5: 0.42 s from
+  at 16.7 ms. On the CPU (two threads) a line takes 0.7–1.0 s and runs 2.5× real time: Auto's
+  fallback, still faster than Pocket TTS. The device test with LFM2.5: 0.42 s from
   asking for a line to hearing it (Pocket TTS on the CPU: 2.1 s); speech made in 0.10 of its
   length. The first line after loading takes about 0.2 s more (the GPU sets up its kernels). The
   same test on an M1 Pro (2026-10-18, 8 passes): 0.86 s and 0.24 of its length — the model alone
@@ -78,10 +80,17 @@ are at the end.*
 - **Loaded at launch:** the voice model loads when the game starts (while voices are on;
   `voice/service.svelte.ts`), the language model too while residents' lines are its own
   (`talk/talk.svelte.ts`), and both stay loaded; switching them off unloads them.
-- **Guards (`voice/index.ts`):** nothing new is said while the engine loads; voices pause for the
-  session (with a toast) after three lines in a row later than 4 s, or when making speech slows
-  the frames.
-- **Not yet:** Auto mode; blending voice styles for more than ten voices.
+- **Auto mode (`voice/service.svelte.ts`, `voice/index.ts`):** `voiceDevice` is `auto`, `gpu` or
+  `cpu`. Auto starts on the graphics card when WebGPU has an adapter, otherwise on the processor;
+  if the card cannot start the voices it tries the processor. When three lines in a row come
+  later than 4 s, or making speech slows the frames, Auto unloads the card's engine, starts the
+  processor one and says so in a toast (non-blocking); the frame counters get a clean window to
+  judge the processor. A manual `gpu` or `cpu` choice is never overridden. The choice is a
+  setting, so it persists.
+- **Guards (`voice/index.ts`):** nothing new is said while the engine loads; after Auto's step
+  down, voices pause for the session (with a toast) if speech still comes too late or slows the
+  frames.
+- **Not yet:** blending voice styles for more than ten voices.
 
 Residents speak with a text-to-speech model that runs **entirely in the browser**: no server, no
 API key, nothing leaves the player's computer.
@@ -316,15 +325,16 @@ acceptable size, we use it (or a fork) and add only steps 3 and 5.
 
 ## Settings
 
-A new **Audio** tab in Settings (`ui/screens/SettingsPanel.svelte`). "Sound effects" moves there
-from Interface. Everything applies live, so nothing is added to `RESTART_KEYS`.
+A **Voices** tab in Settings (`ui/screens/SettingsPanel.svelte`). Everything applies live, so
+nothing is added to `RESTART_KEYS`.
 
 | Row | Control | Notes |
 |---|---|---|
 | Resident voices | Toggle | Default off. |
 | Language | (hidden while English is the only one) | Comes back as a row when a second language ships. |
-| Voice model | Status | Pocket TTS, its state, and the download (about 173 MB). (The unused `voiceModel` setting was removed with Paradee; a stored one is dropped on load.) |
-| Try it | **Hear a sample** and **Speed test** | The speed test measures the model with the scene drawing: "1.6 s per line, 2.1× real time, lines may start a moment late" (M3 Pro, Chrome; "smooth" needs 1.5 s or less). A result over 3 s per line says voices may pause. |
+| Runs on | Auto / Graphics card / Processor | Auto uses the graphics card and steps down to the processor when it is missing or too slow. The choice applies live. |
+| Voice model | Status | Supertonic 3, its state, where it runs, and the download (about 217 MB). |
+| Try it | **Hear a sample** and **Speed test** | The speed test measures the model with the scene drawing: "On the graphics card: 0.4 s per line, 7.6× real time, smooth" (M3 Pro, Chrome; "smooth" needs 1.5 s or less). A result over 3 s per line says voices may pause. |
 | Voice volume | Slider | Separate from sound effects. |
 
 New keys in `settings.svelte.ts`:
@@ -339,8 +349,9 @@ voiceVolume: number;                      // 0.8
 The benchmark result is stored under its own localStorage key (`littlelives.voiceBench`), not in
 `Settings`, so "Reset to defaults" does not throw away a measurement.
 
-Turning voices on with English the first time: download the model (progress in the row), run the
-benchmark automatically, then speak. Until the model is ready, residents stay quiet.
+Turning voices on the first time: download the model (progress in the row), then speak. Until
+the model is ready, residents stay quiet. The speed test is optional; Auto does not wait for it,
+and the live watchdog steps down if the card turns out too slow while playing.
 
 ## Performance
 
@@ -349,42 +360,37 @@ benchmark automatically, then speak. Until the model is ready, residents stay qu
 | Work | Thread | Cost |
 |---|---|---|
 | Deciding who speaks, picking lines, playback | Main thread | Microseconds, event-driven (no per-frame work) |
-| Pocket TTS inference, shaping, mouth shapes | **Own module worker** (`voice/tts.worker.ts`) running `voice-wasm`, separate from the sim worker, lines one at a time | About 0.6–2.6 s per line on an M3 Pro (one thread), never blocks a frame; a new voice about 2.4 s once |
+| Supertonic 3 inference, shaping, mouth shapes | **Own module worker** (`voice/tts.worker.ts`) running `voice-wasm`, separate from the sim worker, lines one at a time | About 0.18–0.31 s per line on an M3 Pro's GPU, 0.7–1.0 s on two processor threads; never blocks a frame |
 
-- **Pocket TTS:** one thread, or two where the page is cross-origin isolated and there are six
-  cores or more (`voiceThreads`), leaving cores for the main thread, the sim worker and the
-  browser. A resident's voice is got ready when they start to be heard (selected, or in a
-  conversation), so the first line isn't the one that waits.
-- **Kokoro on the GPU** shares the GPU with rendering, so it is only chosen when the benchmark
-  shows frames stay smooth. Any WASM runtime files are self-hosted (bundled by Vite), following
-  the "self-host all assets" rule.
-- Model files load from Hugging Face by default (its CORS headers satisfy our COEP header) and
-  can be pointed at a self-hosted copy through the asset manifest. The browser cache keeps them.
+- **Graphics card (WebGPU):** a line in a few large passes, about 34× faster than it plays. It
+  shares the GPU with rendering; Auto steps down to the processor if that costs frames.
+- **Processor (WASM):** one thread, or two where the page is cross-origin isolated, leaving cores
+  for the main thread, the sim worker and the browser. About 2.5× faster than it plays.
+- **Auto:** starts on the card when WebGPU has an adapter and on the processor otherwise; a card
+  that cannot start the voices or turns out too slow hands over to the processor. Manual `gpu` and
+  `cpu` choices stay put.
+- Model files are self-hosted (bundled by Vite), following the "self-host all assets" rule. The
+  browser cache keeps them.
 
 ### Benchmark ("Test this computer")
 
 Runs from Settings, in the main menu (the live 3D town draws behind it, so contention is
 realistic) or in a game (speech pauses while it runs). It takes a few seconds.
 
-1. Download the model files being tested, if missing (progress shown). Kokoro is only tested if
-   it is downloaded or the player asks.
-2. For each available mode (KittenTTS on CPU; Kokoro on CPU, and on GPU if `navigator.gpu` gives
-   an adapter):
-   1. Load and say one warm-up line (measures cold start).
-   2. Say five fixed test lines of typical lengths (3, 8, 12, 20 and 30 words).
-   3. Record per line: time to finished clip and **real-time factor** (RTF = generation time ÷
-      audio length).
-   4. Meanwhile measure frame times with `requestAnimationFrame`: 2 s before as a baseline,
-      then during inference. Record the rise in 95th-percentile frame time and frames over 50 ms.
-3. Choose, per model:
-   - **GPU** (Kokoro only) if its median RTF ≤ 0.33 (a 3-second line ready within 1 s) **and**
-     frame time p95 rises ≤ 2 ms with no frames over 50 ms;
-   - otherwise **CPU** if its median RTF ≤ 0.5;
-   - otherwise the model is **too slow on this computer**: Auto falls back (Kokoro to KittenTTS,
-     KittenTTS to voices off) and the row says so. The player can still force a mode.
-4. Store `{ model, modelVersion, engineVersion, device, rtf, firstLineMs, frameP95RiseMs, cores,
-   gpuAdapter, date }`. The benchmark re-runs automatically when the model, the engine, the core
-   count or the GPU adapter changes.
+1. Load the engine on its current device, if needed (progress shown).
+2. Say one warm-up line, then three fixed test lines (3, 8 and 12 words).
+3. Record per line: time to the finished clip, and **real-time factor** (RTF = generation time ÷
+   audio length). Meanwhile measure frame times with `requestAnimationFrame` and keep the worst.
+4. Show the median line time, its multiple of real time, and a verdict: **smooth** (≤ 1.5 s a
+   line and no frame over 50 ms), **lines may start a moment late** (≤ 3 s), or **too slow here:
+   voices may pause**.
+5. Store `{ rtf, lineMs, worstFrameMs, cores, model, device, date }` in
+   `littlelives.voiceBench`, outside `Settings`. Older results without a device count as the
+   graphics card (the only device before 0.3.0); results from another model or core count are
+   dropped.
+
+The test does not choose the device by itself: Auto's live watchdog does, while the game plays.
+A player can force **Graphics card** or **Processor** and the result says which one was measured.
 
 ### Guards while playing
 
@@ -394,11 +400,10 @@ realistic) or in a game (speech pauses while it runs). It takes a few seconds.
   (except the conversation the player started).
 - **Live watchdog:** the scheduler tracks each line's RTF and the renderer's frame times
   (`game.stats`). If three lines in a row are late, or frame time rises past the budget while
-  inference runs, voices step down (as in the benchmark) for the session and a toast says why
-  once.
-- **No smaller model to step down to:** lines that come late or slow frames pause voices
-  (`voice/index.ts`: three lines in a row later than 4 s, or slowed frames), or leave them off
-  with the load error in Settings.
+  inference runs, Auto steps the engine down from the graphics card to the processor with a
+  toast. If the processor still cannot keep up, voices pause for the session with a toast
+  (`voice/index.ts`: three lines in a row later than 4 s, or slowed frames). A manual device
+  choice goes straight to the pause.
 - **Memory:** the worker is unloaded after 5 minutes without speech, and when voices are turned
   off. Its sessions take about 300 MB (the transformer's state is 49 MB in and out per frame);
   twelve prepared voices about 75 MB more. Finished clips are kept in an in-memory LRU cache
@@ -495,7 +500,7 @@ Web code lives in `web/src/voice/`, behind one small interface used by the game 
 | 3. Rules | Settings tab, `VoiceDirector` with the "who may speak" rules and guards, lines content, voice bus with panning. (Babble, a made-up language, was part of this phase from 0.14 to 0.19; removed in 0.20.) | Selecting a resident or starting a conversation makes them speak; nobody else does; no frame cost. |
 | 4. English | Download with progress, `VoiceSpec` (pitch, speed), clip cache, unloading, quiet while loading. | Selected residents speak English; residents sound different from each other. |
 | 5. Own engine | Planned for KittenTTS; with Pocket TTS (a transformer run frame by frame, 146 MB) ONNX Runtime Web stays. Streaming playback (a line starting after its first frames) is the next speed-up if slower computers need it. | |
-| 6. Benchmark | "Test this computer", Auto mode, re-run on change, live watchdog, F3 line; Kokoro-82M as the optional model (CPU and GPU). | Auto picks the right mode without frame drops; a slow machine steps down with a clear message. |
+| 6. Benchmark | "Test this computer", Auto mode (graphics card, processor fallback), live watchdog, F3 line. In 0.3.0. | Auto picks the right mode without frame drops; a slow machine steps down with a clear message. |
 | Later | Thoughts from the Planner (0.8) and from an in-browser language model; lip sync; persistent clip cache (IndexedDB, Opus via WebCodecs); a distilled male voice; more languages. | |
 
 Every phase keeps `pnpm check` clean and the frame-time budget checked, with voices on and off.

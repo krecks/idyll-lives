@@ -52,6 +52,11 @@ export interface Settings {
   voices: boolean;
   /** Language residents speak (English only, for now). */
   voiceLanguage: 'en';
+  /**
+   * Where the voice model runs: `auto` uses the graphics card and steps down to the processor
+   * when it is missing or too slow; `gpu` and `cpu` keep the player's choice. Applies live.
+   */
+  voiceDevice: 'auto' | 'cpu' | 'gpu';
   /** 0..1. */
   voiceVolume: number;
   /**
@@ -103,6 +108,7 @@ export const DEFAULT_SETTINGS: Settings = {
   directControl: 'inspect',
   voices: false,
   voiceLanguage: 'en',
+  voiceDevice: 'auto',
   voiceVolume: 0.8,
   voiceWriter: 'lines',
   subtitles: true,
@@ -208,6 +214,7 @@ function sanitize(s: Settings): Settings {
   s.directorPace = oneOf(s.directorPace, ['calm', 'lively'] as const, DEFAULT_SETTINGS.directorPace);
   s.directControl = oneOf(s.directControl, ['inspect', 'always'] as const, DEFAULT_SETTINGS.directControl);
   s.voiceLanguage = oneOf(s.voiceLanguage, ['en'] as const, DEFAULT_SETTINGS.voiceLanguage);
+  s.voiceDevice = oneOf(s.voiceDevice, ['auto', 'cpu', 'gpu'] as const, DEFAULT_SETTINGS.voiceDevice);
   s.voiceWriter = oneOf(s.voiceWriter, ['lines', 'llm'] as const, DEFAULT_SETTINGS.voiceWriter);
   s.catalogSize = oneOf(s.catalogSize, ['compact', 'expanded'] as const, DEFAULT_SETTINGS.catalogSize);
   if (!Array.isArray(s.tipsSeen) || s.tipsSeen.some((id) => typeof id !== 'string')) s.tipsSeen = [];
