@@ -33,12 +33,12 @@
 
 <header class="bar">
   <div class="glass group">
-    <span class="brand">{game.household || 'Idyll Lives'}</span>
+    <span class="brand" title={game.household || undefined}>{game.household || 'Idyll Lives'}</span>
     <div class="segmented" role="tablist" aria-label="Mode">
       {#each modes as mode (mode.id)}
         <button role="tab" aria-selected={mode.id === game.mode} class:active={mode.id === game.mode} title={mode.title} onclick={() => services.controls.setMode(mode.id)}>
           <Icon name={mode.icon} size={16} />
-          <span>{mode.label}</span>
+          <span class="label">{mode.label}</span>
         </button>
       {/each}
     </div>
@@ -145,14 +145,49 @@
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: start;
+    /* Narrow windows (or a large UI scale) compact the bar in steps, below. */
+    container-type: inline-size;
     gap: var(--gap);
     pointer-events: none;
   }
   .bar > .group:first-child {
+    grid-column: 1;
     justify-self: start;
   }
   .bar > .group:last-child {
+    grid-column: 3;
     justify-self: end;
+  }
+  .bar > .group.center {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  /* Too narrow for the three groups side by side: first Live and Build show only their icons,
+     then the household's name goes, and last the clock and speeds take a row of their own. The
+     widths: the groups at their widest (Build's middle group, the storey buttons on the right, a
+     name at its 140 px) and the gaps between them. */
+  @container (max-width: 1180px) {
+    .segmented .label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+  @container (max-width: 1110px) {
+    .brand {
+      display: none;
+    }
+  }
+  /* (Hud.svelte moves the panels below the bar at the same width.) */
+  @container (max-width: 980px) {
+    .bar > .group.center {
+      grid-column: 1 / -1;
+      grid-row: 2;
+      justify-self: center;
+    }
   }
   .group {
     display: flex;
@@ -162,6 +197,10 @@
     pointer-events: auto;
   }
   .brand {
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-weight: 700;
     letter-spacing: -0.02em;
     padding: 0 8px 0 10px;
