@@ -29,7 +29,7 @@ import { game, toast } from '../ui/state.svelte';
 import { fill, loadLines, Lines, speechPieces, type Line } from './lines';
 import { playClip, updateVoiceVolume, type Playing } from './player';
 import { SAMPLE_RATE } from './protocol';
-import { hasClip, speak, stepDownVoice, unloadVoice, voiceReady, voiceStatus, type Clip } from './service.svelte';
+import { hasClip, pauseVoice, resumeVoice, speak, stepDownVoice, voiceReady, voiceStatus, type Clip } from './service.svelte';
 import type { VisemeTrack } from './visemes';
 import { voiceFor, withTone, type VoiceParams } from './voices';
 import { scripted, type LineRequest } from './writer';
@@ -353,7 +353,7 @@ export class VoiceDirector {
   private pauseForSession(why: 'late' | 'frames'): void {
     if (this.paused) return;
     this.paused = true;
-    unloadVoice();
+    pauseVoice();
     if (llmStatus.state !== 'off') unloadLlm();
     toast(
       why === 'late'
@@ -365,6 +365,7 @@ export class VoiceDirector {
 
   dispose(): void {
     this.disposed = true;
+    if (this.paused) resumeVoice();
     for (const w of this.writing.values()) w.abort();
     this.writing.clear();
     this.stopAll();

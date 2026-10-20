@@ -109,6 +109,12 @@ const counters = {
 /** Times the engine broke and was started again this session (see `onMessage`). */
 const MAX_RESTARTS = 3;
 let restarts = 0;
+/** Times the engine was stopped on purpose (voices off, paused): an Auto start waiting on its graphics-card check is then void. */
+let stops = 0;
+/** Auto starts waiting on that check. */
+let checking = 0;
+/** The game paused the voices for its session: they don't start by themselves until it ends (a preview still starts them). */
+let held = $state(false);
 
 function post(msg: ToVoiceWorker): void {
   worker?.postMessage(msg);
@@ -148,12 +154,12 @@ function onMessage(msg: FromVoiceWorker): void {
     voiceStatus.state = 'error';
     // The engine broke making a line: a new worker takes over (the game only speaks while the
     // engine is ready; a preview starts one itself). A few times a session at most.
-    if (msg.restart && settings.voices && restarts < MAX_RESTARTS) {
+    if (msg.restart && settings.voices && !held && restarts < MAX_RESTARTS) {
       restarts++;
       console.warn('[voice] the voice engine failed; starting it again:', msg.message);
       voiceStatus.state = 'off';
       void ensureVoice().catch(() => {});
-    } else if (failedDevice === 'gpu' && settings.voices && settings.voiceDevice === 'auto') {
+    } else if (failedDevice === 'gpu' && settings.voices && !held && settings.voiceDevice === 'auto') {
       // Auto: the graphics card could not start the voices, so use the processor instead.
       wantedDevice = 'cpu';
       autoChoice = true;
@@ -169,31 +175,41 @@ function onMessage(msg: FromVoiceWorker): void {
  * graphics card when WebGPU is there and the processor when it is not.
  */
 export async function ensureVoice(device?: VoiceDevice): Promise<void> {
-  const target =
-    device ??
-    wantedDevice ??
-    (settings.voiceDevice === 'auto' ? ((await hasWebGpu()) ? 'gpu' : 'cpu') : settings.voiceDevice);
-  if (worker && voiceStatus.state === 'ready' && voiceStatus.device === target) return;
-  if (voiceStatus.state === 'loading' && voiceStatus.device === target) {
-    return new Promise((resolve, reject) => waiters.push({ resolve, reject }));
+  let target = device ?? chosenDevice();
+  if (!target) {
+    // Auto asks whether there is a graphics card. Meanwhile the voices may be switched off or
+    // paused (this start is then void), or another call may start the engine (join it).
+    const stopped = stops;
+    checking++;
+    let gpu: boolean;
+    try {
+      gpu = await hasWebGpu();
+    } finally {
+      checking--;
+    }
+    if (stops !== stopped) throw new Error('voice unloaded');
+    target = chosenDevice() ?? (gpu ? 'gpu' : 'cpu');
   }
-  if (worker && (voiceStatus.device !== target || voiceStatus.state === 'error' || voiceStatus.state === 'off')) {
-    unload();
+  if (worker && voiceStatus.device === target) {
+    if (voiceStatus.state === 'ready') return;
+    if (voiceStatus.state === 'loading') return new Promise((resolve, reject) => waiters.push({ resolve, reject }));
   }
+  if (worker) unload();
   wantedDevice = target;
-  if (!worker) {
-    worker = new Worker(new URL('./tts.worker.ts', import.meta.url), { type: 'module' });
-    worker.onmessage = (e: MessageEvent<FromVoiceWorker>) => onMessage(e.data);
-    worker.onerror = (e) => onMessage({ type: 'error', message: e.message || 'voice worker failed' });
-  }
-  if (voiceStatus.state !== 'loading') {
-    voiceStatus.progress = 0;
-    voiceStatus.error = '';
-    voiceStatus.state = 'loading';
-    voiceStatus.device = target;
-    post({ type: 'load', base: import.meta.env.BASE_URL, language: settings.voiceLanguage, device: target });
-  }
+  worker = new Worker(new URL('./tts.worker.ts', import.meta.url), { type: 'module' });
+  worker.onmessage = (e: MessageEvent<FromVoiceWorker>) => onMessage(e.data);
+  worker.onerror = (e) => onMessage({ type: 'error', message: e.message || 'voice worker failed' });
+  voiceStatus.progress = 0;
+  voiceStatus.error = '';
+  voiceStatus.state = 'loading';
+  voiceStatus.device = target;
+  post({ type: 'load', base: import.meta.env.BASE_URL, language: settings.voiceLanguage, device: target });
   return new Promise((resolve, reject) => waiters.push({ resolve, reject }));
+}
+
+/** The device already decided on (Auto's pick or fallback, or a manual choice); null: Auto has yet to pick. */
+function chosenDevice(): VoiceDevice | null {
+  return wantedDevice ?? (settings.voiceDevice === 'auto' ? null : settings.voiceDevice);
 }
 
 /** Whether the engine can speak now. */
@@ -300,13 +316,26 @@ export function voiceThreadStats(): VoiceThreadStats {
 export function unloadVoice(): void {
   unload();
   wantedDevice = null;
-  voiceStatus.state = 'off';
-  voiceStatus.progress = 0;
+  stops++;
 }
 
+/** The game paused the voices for its session: stops the engine and keeps it from starting by itself. */
+export function pauseVoice(): void {
+  held = true;
+  unloadVoice();
+}
+
+/** That session ended: the engine starts again if voices are on. */
+export function resumeVoice(): void {
+  held = false;
+}
+
+/** Stops the worker; the state is 'off' until the caller says otherwise. */
 function unload(): void {
   worker?.terminate();
   worker = null;
+  voiceStatus.state = 'off';
+  voiceStatus.progress = 0;
   voiceStatus.device = null;
   Object.assign(counters, {
     loadMs: 0,
@@ -405,22 +434,23 @@ function readBench(): BenchResult | null {
  * when they're switched off. A manual device choice restarts the engine on that device; Auto
  * picks one when it starts and otherwise keeps a working engine. The graphics preset is read
  * too, so changing it re-checks the choice (Auto steps down by itself if the card gets too slow).
+ * While the game has paused the voices for its session, nothing starts the engine here.
  */
 $effect.root(() => {
   $effect(() => {
     const on = settings.voices;
     const mode = settings.voiceDevice;
     const preset = settings.graphics;
+    const paused = held;
     untrack(() => {
       if (!on) {
-        if (worker || voiceStatus.state !== 'off') unloadVoice();
+        if (worker || voiceStatus.state !== 'off' || checking) unloadVoice();
         return;
       }
+      if (paused) return;
       if (mode !== 'auto') {
         autoChoice = false;
         if (voiceStatus.device !== mode || voiceStatus.state === 'off' || voiceStatus.state === 'error') {
-          wantedDevice = mode;
-          if (worker) unload();
           void ensureVoice(mode).catch(() => {});
         }
         return;
@@ -435,7 +465,6 @@ $effect.root(() => {
         wantedDevice = null;
         autoChoice = true;
         unload();
-        voiceStatus.state = 'off';
         void ensureVoice().catch(() => {});
       }
       void preset;
@@ -453,8 +482,6 @@ export async function stepDownVoice(): Promise<boolean> {
   wantedDevice = 'cpu';
   autoChoice = true;
   unload();
-  voiceStatus.state = 'off';
-  voiceStatus.progress = 0;
   try {
     await ensureVoice('cpu');
     return true;
