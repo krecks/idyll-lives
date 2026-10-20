@@ -383,21 +383,7 @@ pub enum EdgeKind {
 }
 
 impl Command {
-    /// The object (stable id) this command names, if it names one.
-    pub fn object(&self) -> Option<u32> {
-        match *self {
-            Command::SwitchLamp { object, .. }
-            | Command::Use { object, .. }
-            | Command::Sell { object, .. }
-            | Command::MoveObject { object, .. }
-            | Command::Recolor { object, .. }
-            | Command::Upgrade { object, .. }
-            | Command::Repair { object, .. } => Some(object),
-            _ => None,
-        }
-    }
-
-    /// The object id `object` reads, to rewrite (the same commands as `object`).
+    /// The object (stable id) this command names, if it names one, to rewrite.
     pub(crate) fn object_mut(&mut self) -> Option<&mut u32> {
         match self {
             Command::SwitchLamp { object, .. }

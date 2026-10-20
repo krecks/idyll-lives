@@ -152,7 +152,7 @@ async function load(base: string, device: VoiceDevice): Promise<void> {
   for (const [i, k] of names.entries()) {
     sessions[k] = (await ort.InferenceSession.create(
       new Uint8Array(models[i]),
-      sessionOptions(device, device === 'gpu' && k === 'vector' ? 'gpu-buffer' : undefined),
+      sessionOptions(device, k === 'vector' ? 'gpu-buffer' : undefined),
     )) as unknown as Session;
   }
   engine = {

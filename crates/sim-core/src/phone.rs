@@ -475,10 +475,7 @@ fn seat_near(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<u32> {
         None => ctx.index.usable_from(ctx.households[sim.household as usize].plot),
     };
     let sits = |o: &ObjectInstance| {
-        content.objects[o.def]
-            .interactions
-            .iter()
-            .any(|i| i.pose == Pose::Sit && o.seat_now(i) && i.tags & rules.seat_tags != 0 && i.tags & rules.seat_avoid == 0 && !i.baby)
+        o.seats_now(&content.objects[o.def]).any(|t| t & rules.seat_tags != 0 && t & rules.seat_avoid == 0)
     };
     usable
         .iter()

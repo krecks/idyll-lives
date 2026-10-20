@@ -209,6 +209,11 @@ fn members(w: &World, h: usize) -> Vec<usize> {
     (0..w.sims.len()).filter(|&i| w.sims[i].here() && w.sims[i].household as usize == h).collect()
 }
 
+/// Residents of household `h` who are here and past the crib (who need a bed).
+fn sleepers(w: &World, h: usize) -> Vec<usize> {
+    members(w, h).into_iter().filter(|&i| !w.content.life.baby(w.sims[i].age)).collect()
+}
+
 /// Beds (sleeping places) in the home on `plot`, broken ones too (whoever lives there fixes
 /// them; a house whose only bed broke while empty would otherwise never be lived in again).
 fn beds(w: &World, plot: u32) -> usize {
@@ -554,11 +559,7 @@ pub(crate) fn notify_missing_beds(w: &mut World, h: usize) {
         return;
     }
     let Some(plot) = w.households[h].plot else { return };
-    let people: Vec<usize> = members(w, h)
-        .into_iter()
-        .filter(|&j| !w.content.life.baby(w.sims[j].age))
-        .collect();
-    for &i in people.iter().skip(beds(w, plot)) {
+    for &i in sleepers(w, h).iter().skip(beds(w, plot)) {
         w.events.push(w.tick, EventKind::NoBed, i, i, None);
     }
 }
@@ -572,8 +573,7 @@ pub(crate) fn bed_for_child(w: &mut World, i: usize) {
     let h = w.sims[i].household as usize;
     let sleep = w.content.day_rhythm.sleep_tags;
     let Some(plot) = w.households[h].plot.filter(|_| sleep != 0) else { return };
-    let people = members(w, h).into_iter().filter(|&j| !w.content.life.baby(w.sims[j].age)).count();
-    if beds(w, plot) >= people {
+    if beds(w, plot) >= sleepers(w, h).len() {
         return;
     }
     if w.households[h].player {

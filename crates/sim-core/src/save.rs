@@ -1026,19 +1026,15 @@ impl World {
                 stable_ids.insert(id, o.id);
             }
         }
-        // Keep the saved stable ids where there is one; old saves and anything left out get
-        // fresh ones, never reusing an id.
+        // Keep the saved stable ids where there is one (once); old saves and anything else get
+        // fresh ones, past every saved id.
         let mut used: HashSet<u32> = HashSet::new();
         let mut next = stable_ids.values().flatten().copied().max().map_or(0, |m| m + 1);
         for (i, obj) in world.objects.iter_mut().enumerate() {
             match stable_ids.get(&(i as u32)).copied().flatten() {
                 Some(id) if used.insert(id) => obj.stable = id,
                 _ => {
-                    while used.contains(&next) {
-                        next += 1;
-                    }
                     obj.stable = next;
-                    used.insert(next);
                     next += 1;
                 }
             }

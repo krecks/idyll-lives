@@ -85,9 +85,7 @@ class GameHost {
   constructor() {
     this.root = document.createElement('div');
     this.root.className = 'game-host';
-    this.canvasEl = document.createElement('canvas');
-    this.canvasEl.className = 'scene';
-    this.canvasEl.tabIndex = -1;
+    this.canvasEl = sceneCanvas();
     this.overlay = document.createElement('div');
     this.overlay.className = 'world-overlay';
     this.veil = document.createElement('div');
@@ -105,9 +103,7 @@ class GameHost {
    * WebGL2 one (and the other way round), so switching backend in Troubleshooting replaces it.
    */
   private freshCanvas(): void {
-    const fresh = document.createElement('canvas');
-    fresh.className = 'scene';
-    fresh.tabIndex = -1;
+    const fresh = sceneCanvas();
     this.canvasEl.replaceWith(fresh);
     this.canvasEl = fresh;
   }
@@ -347,6 +343,14 @@ class GameHost {
     }
     return this.renderer;
   }
+}
+
+/** The canvas the world is drawn on. */
+function sceneCanvas(): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.className = 'scene';
+  canvas.tabIndex = -1;
+  return canvas;
 }
 
 function liveOptions(s: Settings) {

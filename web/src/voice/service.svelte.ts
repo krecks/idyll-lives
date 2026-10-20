@@ -111,8 +111,6 @@ const MAX_RESTARTS = 3;
 let restarts = 0;
 /** Times the engine was stopped on purpose (voices off, paused): an Auto start waiting on its graphics-card check is then void. */
 let stops = 0;
-/** Auto starts waiting on that check. */
-let checking = 0;
 /** The game paused the voices for its session: they don't start by themselves until it ends (a preview still starts them). */
 let held = $state(false);
 
@@ -180,13 +178,7 @@ export async function ensureVoice(device?: VoiceDevice): Promise<void> {
     // Auto asks whether there is a graphics card. Meanwhile the voices may be switched off or
     // paused (this start is then void), or another call may start the engine (join it).
     const stopped = stops;
-    checking++;
-    let gpu: boolean;
-    try {
-      gpu = await hasWebGpu();
-    } finally {
-      checking--;
-    }
+    const gpu = await hasWebGpu();
     if (stops !== stopped) throw new Error('voice unloaded');
     target = chosenDevice() ?? (gpu ? 'gpu' : 'cpu');
   }
@@ -442,7 +434,8 @@ $effect.root(() => {
     const paused = held;
     untrack(() => {
       if (!on) {
-        if (worker || voiceStatus.state !== 'off' || checking) unloadVoice();
+        // (Also voids an Auto start still asking about the graphics card.)
+        unloadVoice();
         return;
       }
       if (paused) return;
@@ -478,8 +471,8 @@ export async function stepDownVoice(): Promise<boolean> {
   if (settings.voiceDevice !== 'auto' || voiceStatus.device !== 'gpu') return false;
   wantedDevice = 'cpu';
   autoChoice = true;
-  unload();
   try {
+    // (It stops the graphics card's engine first.)
     await ensureVoice('cpu');
     return true;
   } catch {

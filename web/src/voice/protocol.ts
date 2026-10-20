@@ -1,10 +1,11 @@
 /** Messages between the main thread and the voice worker (`tts.worker.ts`). */
 
+import type { OrtDevice } from '../ml/ort';
 import type { LineTiming } from './supertonic';
 import type { VoiceParams } from './voices';
 
 /** Where the voice model runs: the graphics card (WebGPU), or the processor (WASM) as Auto's fallback. */
-export type VoiceDevice = 'cpu' | 'gpu';
+export type VoiceDevice = OrtDevice;
 
 export type ToVoiceWorker =
   /** `base`: the app's base URL, where `voice/` lives. */

@@ -64,15 +64,6 @@ if (typeof GPUDevice !== 'undefined') {
   };
 }
 
-/** Removes the error listener Babylon put on `device`, before the device is destroyed. */
-export function forgetDeviceErrorListener(device: GPUDevice): void {
-  const withListener = device as DeviceWithErrorListener;
-  const listener = withListener.__llErrorListener;
-  if (!listener) return;
-  device.removeEventListener('uncapturederror', listener);
-  delete withListener.__llErrorListener;
-}
-
 /** WebGPU had an adapter but failed to start once this session: later engines use WebGL2 straight away. */
 let webGpuBroken = false;
 export const webGpuFailed = (): boolean => webGpuBroken;

@@ -1414,8 +1414,7 @@ fn swap_in(w: &mut World, h: u32, old: u32, id: &str) -> Option<u32> {
     }
     // Put it back (and the money).
     if let Ok(back) = w.place_at_home(plot, o.def, o.x, o.z, o.rot, Layout::of(&o), o.colors.clone(), o.quality, o.value) {
-        let b = &mut w.objects[back as usize];
-        (b.stable, b.turn, b.wear, b.open, b.off, b.growth) = (o.stable, o.turn, o.wear, o.open, o.off, o.growth);
+        w.objects[back as usize].carry_state(&o);
     }
     w.households[hh].funds -= refund;
     None

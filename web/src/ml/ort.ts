@@ -36,7 +36,7 @@ export type OrtDevice = 'gpu' | 'cpu';
  * between threads, so a line still comes faster than it plays.
  */
 export function configureOrt(ort: OrtModule, wasmBinary: ArrayBuffer, device: OrtDevice = 'gpu'): void {
-  ort.env.wasm.numThreads = device === 'cpu' ? (crossOriginIsolated ? Math.min(2, navigator.hardwareConcurrency ?? 1) : 1) : 1;
+  ort.env.wasm.numThreads = device === 'cpu' && crossOriginIsolated ? Math.min(2, navigator.hardwareConcurrency ?? 1) : 1;
   ort.env.wasm.proxy = false;
   ort.env.wasm.wasmPaths = { wasm: ORT_WASM.url };
   ort.env.wasm.wasmBinary = wasmBinary;

@@ -748,12 +748,8 @@ impl World {
             self.keep_doorway_clear(old.def, x, z, rot, layout)?;
             let id = self.place_at_home(plot, old.def, x, z, rot, layout, old.colors.clone(), old.quality, old.value)?;
             let placed = &mut self.objects[id as usize];
-            placed.stable = old.stable;
+            placed.carry_state(&old);
             placed.turn = turn.unwrap_or(old.turn);
-            placed.wear = old.wear;
-            placed.open = old.open;
-            placed.off = old.off;
-            placed.growth = old.growth;
             let new_top = crate::surface::Top::of(&self.content, &self.objects[id as usize]);
             let turned = |o: &ObjectInstance| (o.rot as i32 * 90 + o.turn as i32).rem_euclid(360);
             let delta = turned(&self.objects[id as usize]) - turned(&old);
@@ -774,12 +770,8 @@ impl World {
                     .place_at_home(plot, r.def, x, z, (facing / 90) as u8, Layout { offset, ..Layout::of(r) }, r.colors.clone(), r.quality, r.value)
                     .map_err(|_| Error::new(format!("the {name} on it wouldn't fit there")))?;
                 let o = &mut self.objects[rid as usize];
-                o.stable = r.stable;
+                o.carry_state(r);
                 o.turn = if self.content.objects[r.def].turns { (facing % 90) as u8 } else { 0 };
-                o.wear = r.wear;
-                o.open = r.open;
-                o.off = r.off;
-                o.growth = r.growth;
                 placed.push((r.clone(), rid));
             }
             for (was, now) in placed {

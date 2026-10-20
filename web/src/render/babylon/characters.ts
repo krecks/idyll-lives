@@ -1690,8 +1690,6 @@ export class Characters {
   /** Stops listening for model files (the renderer goes; the scene's meshes go with it). */
   dispose(): void {
     this.unlisten();
-    const debug = window as unknown as { __characters?: unknown };
-    if (debug.__characters === this) delete debug.__characters;
   }
 
   /** Removes the Sims (end of a session); meshes stay cached. */

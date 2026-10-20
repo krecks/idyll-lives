@@ -104,7 +104,7 @@ import { refreshSoftLook, shadingFromSettings } from './softLook';
 import { Geo, LOOK as CUT } from './geometry';
 import { buildModel, forgetModelScene, motionsOf, onModelFileArrived, paintColors, painted, placementVariation, prefetchModels, standInOf, withGlows, type ModelTemplate, type StandIn } from './models';
 import { TemplateCache } from './templateCache';
-import { compressedTextureFeatures, forgetDeviceErrorListener, noteWebGpuFailed, webGpuFailed } from './loaders';
+import { compressedTextureFeatures, noteWebGpuFailed, webGpuFailed } from './loaders';
 import { Characters, MAX_CHARACTERS } from './characters';
 import { ItemLayer } from './items';
 import { Mirrors, type MirrorInstance } from './mirrors';
@@ -431,6 +431,8 @@ export class BabylonRenderer implements Renderer {
   private objectShadowSources = new Set<Mesh>();
   /** The low preset's one static shadow caster for the lot's objects (null on Medium and High). */
   private objectShadowMerge: Mesh | null = null;
+  /** `objectShadowMerge`'s material, one for the renderer (the world's meshes go without theirs). */
+  private objectShadowMaterial: StandardMaterial | null = null;
   /** Each body mesh's instances in `objectShadowMerge`, by their matrix buffer: baked again as an instance moves or hides (`writeInstance`). */
   private readonly objectShadowParts = new Map<Float32Array, ShadowPart[]>();
   /** `objectShadowMerge`'s vertex positions (world space). */
@@ -2383,7 +2385,6 @@ export class BabylonRenderer implements Renderer {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.lib.onRefrozen = null;
     MaterialLibrary.forget(this.scene);
     this.onFailure = null;
     this.townTicket++;
@@ -2396,11 +2397,9 @@ export class BabylonRenderer implements Renderer {
     this.engine.onResizeObservable.clear();
     this.engine.customAnimationFrameRequester = null;
     delete (this.engine as unknown as { _measureFps?: () => void })._measureFps;
-    if (typeof window !== 'undefined') {
-      const debug = window as unknown as { __renderer?: unknown; __scene?: unknown };
-      if (debug.__renderer === this) delete debug.__renderer;
-      if (debug.__scene === this.scene) delete debug.__scene;
-    }
+    const debug = window as unknown as { __renderer?: unknown; __scene?: unknown };
+    if (debug.__renderer === this) delete debug.__renderer;
+    if (debug.__scene === this.scene) delete debug.__scene;
     window.removeEventListener('resize', this.onResize);
     this.sizeWatch?.disconnect();
     this.unwatchPixelRatio?.();
@@ -2418,9 +2417,7 @@ export class BabylonRenderer implements Renderer {
     forgetModelScene(this.scene);
     forgetWind(this.scene);
     this.scene.dispose();
-    // Babylon's WebGPU error listener lives on the device, not the engine: take it off first.
-    const device = (this.engine as unknown as { _device?: GPUDevice })._device;
-    if (device) forgetDeviceErrorListener(device);
+    // (Babylon's WebGPU error listener on the device goes as the engine destroys it: `loaders`.)
     this.engine.dispose();
   }
 
@@ -4193,12 +4190,13 @@ export class BabylonRenderer implements Renderer {
    * out of the camera's pass.
    */
   private mergeObjectShadows(sources: { mesh: Mesh; matrices: Float32Array; count: number }[]): Mesh | null {
+    // (Only read: the template's own arrays, no copies.)
     const parts: (ShadowPart & { idx: ArrayLike<number> })[] = [];
     let vertices = 0;
     let indexCount = 0;
     for (const { mesh, matrices, count } of sources) {
-      const pos = mesh.getVerticesData(VertexBuffer.PositionKind, true, true);
-      const idx = mesh.getIndices(true, true);
+      const pos = mesh.getVerticesData(VertexBuffer.PositionKind, false, false);
+      const idx = mesh.getIndices(false, false);
       if (!pos || !idx || !count) continue;
       // A one-part model keeps the part's own transform; a merged one's is already in its vertices.
       parts.push({ pos, idx, world: mesh.computeWorldMatrix(true).clone(), matrices, count, first: vertices });
@@ -4227,10 +4225,12 @@ export class BabylonRenderer implements Renderer {
     const mesh = new Mesh('objectShadowsMerged', this.scene);
     // (Updatable: an instance hidden or moved is baked again in place, `bakeObjectShadow`.)
     data.applyToMesh(mesh, true);
-    const material = new StandardMaterial('objectShadowsMerged', this.scene);
-    material.disableLighting = true;
-    material.backFaceCulling = false;
-    mesh.material = material;
+    if (!this.objectShadowMaterial) {
+      this.objectShadowMaterial = new StandardMaterial('objectShadowsMerged', this.scene);
+      this.objectShadowMaterial.disableLighting = true;
+      this.objectShadowMaterial.backFaceCulling = false;
+    }
+    mesh.material = this.objectShadowMaterial;
     mesh.isPickable = false;
     mesh.receiveShadows = false;
     // The shadow map's custom list ignores layer masks; the camera's pass does not.

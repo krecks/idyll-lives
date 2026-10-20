@@ -134,21 +134,22 @@ async function start(content: string, source: GameSource): Promise<void> {
 async function fetchWasm(): Promise<Response> {
   const response = await fetch(new URL('./wasm-pkg/sim_wasm_bg.wasm', import.meta.url));
   if (!response.ok || !response.body) return response;
-  let last = performance.now();
-  const body = response.body.pipeThrough(
-    new TransformStream<Uint8Array, Uint8Array>({
-      transform(chunk, out) {
-        const now = performance.now();
-        if (now - last >= START_PROGRESS_MS) {
-          last = now;
-          starting('loading');
-        }
-        out.enqueue(chunk);
-      },
-    }),
-  );
-  const type = response.headers.get('Content-Type');
-  return new Response(body, { status: response.status, statusText: response.statusText, headers: type ? { 'Content-Type': type } : {} });
+  // A copy's arrival is the progress; the response itself goes to the compiler as it came, as the
+  // browser keeps compiled code only for a response with its URL.
+  void (async () => {
+    const reader = response.clone().body!.getReader();
+    let last = performance.now();
+    for (;;) {
+      const { done } = await reader.read();
+      if (done) return;
+      const now = performance.now();
+      if (now - last >= START_PROGRESS_MS) {
+        last = now;
+        starting('loading');
+      }
+    }
+  })().catch(() => {});
+  return response;
 }
 
 function starting(phase: StartPhase): void {

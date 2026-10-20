@@ -548,7 +548,7 @@ pub fn dining_seat(
         if o.broken() || !o.has_free_slot(def.slots) {
             continue;
         }
-        let sits = |mask: u64| def.interactions.iter().any(|i| i.pose == Pose::Sit && o.seat_now(i) && !i.baby && (mask == 0 || i.tags & mask != 0));
+        let sits = |mask: u64| o.seats_now(def).any(|t| mask == 0 || t & mask != 0);
         let (rank, table) = match links.table_of(id) {
             Some(t) if def.seat_at != 0 && sits(0) => (DiningRank::ChairAtTable, Some(t)),
             _ if def.surface.is_some() && food != 0 && sits(food) => (DiningRank::TableSeat, Some(id)),

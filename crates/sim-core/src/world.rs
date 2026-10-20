@@ -170,7 +170,7 @@ impl ObjectInstance {
     /// wants (`when`), and nothing closed on, or opened under, someone else using it (or on their
     /// way to). Opening is refused only when another occupant's use needs it to stay closed.
     pub fn allows(&self, inter: &crate::content::Interaction, me: u32) -> bool {
-        inter.when.is_none_or(|w| w == self.open)
+        self.fits(inter)
             && (!inter.ripe || self.ripe())
             && (inter.leaves != Some(false) || self.users().all(|u| u == me))
             && (inter.leaves != Some(true) || self.closed_users & !(1 << me) == 0)
@@ -180,7 +180,12 @@ impl ObjectInstance {
     /// the one reason `allows` says no that the player hears of when it comes up after an order
     /// (an order to open or close what someone else already did is done).
     fn closes_on_someone(&self, inter: &crate::content::Interaction, me: u32) -> bool {
-        inter.leaves == Some(false) && inter.when.is_none_or(|w| w == self.open) && self.users().any(|u| u != me)
+        inter.leaves == Some(false) && self.fits(inter) && self.users().any(|u| u != me)
+    }
+
+    /// Whether it's open or closed as `inter` wants (`when`).
+    fn fits(&self, inter: &crate::content::Interaction) -> bool {
+        inter.when.is_none_or(|w| w == self.open)
     }
 
     /// Its crop is ripe (see `growth`).
@@ -285,10 +290,16 @@ impl ObjectInstance {
         reserved
     }
 
-    /// Whether `inter`, a way to sit on it, is one now: open or closed as it wants (a sofa bed
-    /// pulled out is no seat).
-    pub fn seat_now(&self, inter: &crate::content::Interaction) -> bool {
-        inter.when.is_none_or(|w| w == self.open)
+    /// The tags of each way someone past the crib can sit on it as it is now (a sofa bed pulled
+    /// out is no seat).
+    pub fn seats_now<'a>(&'a self, def: &'a crate::content::ObjectDef) -> impl Iterator<Item = TagMask> + 'a {
+        def.interactions.iter().filter(|i| i.pose == Pose::Sit && !i.baby && self.fits(i)).map(|i| i.tags)
+    }
+
+    /// Takes on the state `old`, this object before it was lifted out and placed again, had: its
+    /// stable id, turn, wear, open or closed, on or off, and crop.
+    pub(crate) fn carry_state(&mut self, old: &ObjectInstance) {
+        (self.stable, self.turn, self.wear, self.open, self.off, self.growth) = (old.stable, old.turn, old.wear, old.open, old.off, old.growth);
     }
 
     pub(crate) fn release(&mut self, sim: u32) {
@@ -1483,15 +1494,6 @@ impl World {
     /// The index in `World::objects` of the object with stable id `stable`, if it still exists.
     pub fn object_index(&self, stable: u32) -> Option<usize> {
         self.objects.iter().position(|o| o.stable == stable)
-    }
-
-    /// A command names objects by their stable ids; the simulation works in indices.
-    fn resolve_objects(&self, mut cmd: Command) -> Result<Command, Error> {
-        if let Some(object) = cmd.object_mut() {
-            let stable = *object;
-            *object = self.object_index(stable).ok_or_else(|| Error::new(format!("unknown object {stable}")))? as u32;
-        }
-        Ok(cmd)
     }
 
     /// The stable id of the object at `index` in `World::objects` (the inverse of `object_index`).
@@ -2775,9 +2777,15 @@ impl World {
     /// moves on or the player gives the household another kind of order. A command naming an
     /// object that's gone since the view showed it (sold, undone: an id handed out before and
     /// not there now) does nothing; an id never handed out is an error.
-    pub fn apply(&mut self, cmd: Command) -> Result<(), Error> {
-        if cmd.object().is_some_and(|o| o < self.next_object_id && self.object_index(o).is_none()) {
-            return Ok(());
+    pub fn apply(&mut self, mut cmd: Command) -> Result<(), Error> {
+        // A command names objects by their stable ids; the simulation works in indices.
+        if let Some(object) = cmd.object_mut() {
+            let stable = *object;
+            match self.object_index(stable) {
+                Some(i) => *object = i as u32,
+                None if stable < self.next_object_id => return Ok(()),
+                None => return Err(Error::new(format!("unknown object {stable}"))),
+            }
         }
         let history = match cmd {
             Command::Undo { household } => Some(self.undo(household)),
@@ -2832,7 +2840,6 @@ impl World {
     }
 
     fn apply_command(&mut self, cmd: Command) -> Result<(), Error> {
-        let cmd = self.resolve_objects(cmd)?;
         match cmd {
             Command::SetSpeed { speed } => {
                 if speed > MAX_SPEED {
@@ -3850,6 +3857,15 @@ fn pick_autonomous(
             {
                 continue;
             }
+            let sleep = inter.tags & rhythm.sleep_tags != 0;
+            let fills = (0..content.needs.len()).filter(|&n| inter.total_gain[n] > 0.0).fold(0u32, |m, n| m | 1 << n);
+            let there = distance / walk_per_minute;
+            let minutes = inter.minutes + there;
+            // A chosen use that would stop at once for an urgent need (`use_object`), then get
+            // chosen again: don't choose it at all.
+            if !sleep && breaks_off(sim, content, urgent, fills, minutes, inter, low) && !crate::planner::planned_now(content, sim, inter) {
+                continue;
+            }
             // Better objects and more skilled Sims get more out of it, and know it.
             let boost = quality_boost(content, inter, obj.quality) * inter.skill_factor(&content.skill_rules, &sim.skills);
             let gains = ai::score_felt(needs, &felt, &inter.total_gain.map(|g| g * boost), distance);
@@ -3889,20 +3905,7 @@ fn pick_autonomous(
             // Not something long another need would run out before the end of, counting the way
             // there and from there to what fills it (only what would wake them counts for a
             // night's sleep): that first. Nor what they couldn't finish before leaving for work.
-            let sleep = inter.tags & rhythm.sleep_tags != 0;
-            let fills = (0..content.needs.len()).filter(|&n| inter.total_gain[n] > 0.0).fold(0u32, |m, n| m | 1 << n);
             let watch = fillable & !fills & !urgent & if sleep { rhythm.wake_for } else { u32::MAX };
-            let there = distance / walk_per_minute;
-            let minutes = inter.minutes + there;
-            // A chosen use that doesn't fill an urgent need it would run out before the end of
-            // stops at once (`use_object`), then gets chosen again: don't choose it at all.
-            if !sleep
-                && !crate::planner::planned_now(content, sim, inter)
-                && urgent & fills == 0
-                && runs_out(sim, content, urgent, minutes, false, &inter.gain_per_minute, &[0.0; MAX_NEEDS], low * 0.5)
-            {
-                continue;
-            }
             if runs_out(sim, content, watch, minutes, sleep, &inter.gain_per_minute, &reach.map(|r| r + there), low)
                 || (!sleep && until_leave.is_some_and(|m| minutes > m))
             {
@@ -4456,13 +4459,7 @@ fn seat_near_object(
         .unwrap_or_else(|| objects[object as usize].front_tile(content));
     let target = [tx as f32 + 0.5, tz as f32 + 0.5];
     let sits = |o: &ObjectInstance| {
-        content.objects[o.def].interactions.iter().any(|i| {
-            i.pose == Pose::Sit
-                && o.seat_now(i)
-                && i.tags & rules.seat_tags != 0
-                && i.tags & rules.seat_avoid == 0
-                && !i.baby
-        })
+        o.seats_now(&content.objects[o.def]).any(|t| t & rules.seat_tags != 0 && t & rules.seat_avoid == 0)
     };
     objects
         .iter()
@@ -4820,7 +4817,7 @@ fn use_object(
         let left = inter.minutes - elapsed;
         let drained = emptying
             || (urgent && planned)
-            || (chosen && pressing & fills == 0 && runs_out(sim, content, pressing, left, false, &inter.gain_per_minute, &[0.0; MAX_NEEDS], low * 0.5));
+            || (chosen && breaks_off(sim, content, pressing, fills, left, inter, low));
         let routine = sim.current.as_ref().is_some_and(|a| a.task.routine);
         // Practising a skill they still want to (as when choosing: at home or in a public place)
         // goes on for its time too, until practice gets boring; stopping it as soon as the needs
@@ -5044,6 +5041,12 @@ fn urgent_needs(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> u32 {
         .filter(|&n| !content.needs[n].room && rules.urgent & (1 << n) != 0 && sim.needs[n] < rules.urgent_below)
         .fold(0, |m, n| m | 1 << n);
     if low == 0 { 0 } else { home_needs(sim, ctx, objects, low, true) }
+}
+
+/// Whether something they chose themselves, `inter`, with `minutes` to go, stops for one of the
+/// `pressing` needs: one it doesn't fill (`fills`, bit per need) that would run out before then.
+fn breaks_off(sim: &Sim, content: &Content, pressing: u32, fills: u32, minutes: f32, inter: &crate::content::Interaction, low: f32) -> bool {
+    pressing != 0 && pressing & fills == 0 && runs_out(sim, content, pressing, minutes, false, &inter.gain_per_minute, &[0.0; MAX_NEEDS], low * 0.5)
 }
 
 /// Whether one of the needs in `mask` would run down below `floor` in `minutes` of something
