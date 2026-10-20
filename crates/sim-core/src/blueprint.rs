@@ -625,6 +625,7 @@ impl World {
                     .place_at_home(plot, o.def, o.x + dx, o.z + dz, o.rot, Layout::of(o), o.colors.clone(), o.quality, o.value)
                     .map_err(|_| Error::new(format!("there's no room for the {name} there")))?;
                 let placed = &mut self.objects[id as usize];
+                placed.stable = o.stable;
                 placed.turn = o.turn;
                 placed.offset = o.offset;
                 placed.wear = o.wear;

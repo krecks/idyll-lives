@@ -204,6 +204,26 @@ fn moving_a_room_carries_its_tables_and_what_stands_on_them() {
 }
 
 #[test]
+fn moving_a_room_keeps_the_ids_of_what_moves_with_it() {
+    let mut w = laid_table();
+    let key = |w: &World, o: &sim_core::world::ObjectInstance| {
+        let p = middle(&w.content, o);
+        (o.stable, o.def, (p[0] * 100.0).round() as i32, (p[1] * 100.0).round() as i32)
+    };
+    let mut before: Vec<_> = w.objects.iter().map(|o| key(&w, o)).map(|(s, d, x, z)| (s, d, x + 400, z)).collect();
+    w.apply(Command::MoveRoom { household: 0, x: 2, z: 2, dx: 4, dz: 0 }).unwrap();
+    let mut after: Vec<_> = w.objects.iter().map(|o| key(&w, o)).collect();
+    before.sort_unstable();
+    after.sort_unstable();
+    assert_eq!(after, before, "each thing keeps its id where it went");
+    // Bought afterwards: a new id, not one of theirs.
+    w.apply(Command::Buy { household: 0, object: "nightstand".into(), at: None, colors: Default::default(), turn: None, offset: None, size: None, tall: None })
+        .unwrap();
+    let stable = w.objects.last().unwrap().stable;
+    assert!(before.iter().all(|b| b.0 != stable), "{stable} is new");
+}
+
+#[test]
 fn decor_and_lamps_on_tops_count_in_their_room() {
     let mut w = laid_table();
     let room = |w: &World| {
