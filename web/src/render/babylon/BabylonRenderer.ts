@@ -150,6 +150,11 @@ const LIGHT_MIN_MS = 100;
 const SHADOW_MARGIN = 10;
 const SHADOW_EDGE_FADE = 0.15;
 /**
+ * One body mesh's instances in the merged object shadow mesh (Low): its vertices (`pos`, local) and
+ * world matrix, its instances' matrices, and the merged vertex its first instance starts at.
+ */
+type ShadowPart = { pos: ArrayLike<number>; world: Matrix; matrices: Float32Array; count: number; first: number };
+/**
  * Interior lights: the household's lamps first, then dim fills for rooms without one. With
  * clustered lighting (WebGPU, and WebGL2 with float blending) they live in one
  * `ClusteredLightContainer` (one light to the materials) and many lamps light at once
@@ -426,6 +431,10 @@ export class BabylonRenderer implements Renderer {
   private objectShadowSources = new Set<Mesh>();
   /** The low preset's one static shadow caster for the lot's objects (null on Medium and High). */
   private objectShadowMerge: Mesh | null = null;
+  /** Each body mesh's instances in `objectShadowMerge`, by their matrix buffer: baked again as an instance moves or hides (`writeInstance`). */
+  private readonly objectShadowParts = new Map<Float32Array, ShadowPart[]>();
+  /** `objectShadowMerge`'s vertex positions (world space). */
+  private objectShadowPositions = new Float32Array(0);
   private readonly shadowMatrix = new Matrix();
   private readonly shadowInstance = new Matrix();
   private readonly shadowPoint = new Vector3();
@@ -1503,6 +1512,7 @@ export class BabylonRenderer implements Renderer {
       mesh.thinInstanceBufferUpdated('matrix');
     }
     writeMoving(target);
+    this.bakeObjectShadow(target);
     this.sunShadows.moved();
     this.resetSnapshot();
   }
@@ -4131,6 +4141,7 @@ export class BabylonRenderer implements Renderer {
     const shadowsSpan = perfStart('render: object shadows');
     this.objectShadowSources.clear();
     this.objectShadowMerge = null;
+    this.objectShadowParts.clear();
     if (this.quality.preset === 'low' && shadowSources.length) {
       for (const mesh of objectShadowMeshes) this.objectShadowSources.add(mesh);
       this.objectShadowMerge = this.mergeObjectShadows(shadowSources);
@@ -4176,36 +4187,46 @@ export class BabylonRenderer implements Renderer {
   }
 
   /**
-   * One mesh of every object body at rest, for the sun's shadow map on Low: a template's thin
-   * instances are baked into world-space triangles here (and the template is left out of the
-   * shadow list, see `objectShadowSources`). Its layer mask keeps it out of the camera's pass.
+   * One mesh of every object body, for the sun's shadow map on Low: a template's thin instances
+   * are baked into world-space triangles here, and one again as it hides or moves (`bakeObjectShadow`;
+   * the template is left out of the shadow list, see `objectShadowSources`). Its layer mask keeps it
+   * out of the camera's pass.
    */
   private mergeObjectShadows(sources: { mesh: Mesh; matrices: Float32Array; count: number }[]): Mesh | null {
-    const positions: number[] = [];
-    const indices: number[] = [];
+    const parts: (ShadowPart & { idx: ArrayLike<number> })[] = [];
+    let vertices = 0;
+    let indexCount = 0;
     for (const { mesh, matrices, count } of sources) {
       const pos = mesh.getVerticesData(VertexBuffer.PositionKind, true, true);
       const idx = mesh.getIndices(true, true);
-      if (!pos || !idx) continue;
+      if (!pos || !idx || !count) continue;
       // A one-part model keeps the part's own transform; a merged one's is already in its vertices.
-      const world = mesh.computeWorldMatrix(true);
-      for (let i = 0; i < count; i++) {
-        Matrix.FromArrayToRef(matrices, i * 16, this.shadowInstance);
-        world.multiplyToRef(this.shadowInstance, this.shadowMatrix);
-        const base = positions.length / 3;
-        for (let p = 0; p < pos.length; p += 3) {
-          Vector3.TransformCoordinatesFromFloatsToRef(pos[p], pos[p + 1], pos[p + 2], this.shadowMatrix, this.shadowPoint);
-          positions.push(this.shadowPoint.x, this.shadowPoint.y, this.shadowPoint.z);
-        }
-        for (let k = 0; k < idx.length; k++) indices.push(base + idx[k]);
-      }
+      parts.push({ pos, idx, world: mesh.computeWorldMatrix(true).clone(), matrices, count, first: vertices });
+      vertices += (pos.length / 3) * count;
+      indexCount += idx.length * count;
     }
-    if (!indices.length) return null;
+    if (!indexCount) return null;
+    const positions = new Float32Array(vertices * 3);
+    const indices = vertices > 65535 ? new Uint32Array(indexCount) : new Uint16Array(indexCount);
+    let at = 0;
+    for (const part of parts) {
+      const n = part.pos.length / 3;
+      for (let i = 0; i < part.count; i++) {
+        this.bakeShadowInstance(part, i, positions);
+        const base = part.first + i * n;
+        for (let k = 0; k < part.idx.length; k++) indices[at++] = base + part.idx[k];
+      }
+      const list = this.objectShadowParts.get(part.matrices);
+      if (list) list.push(part);
+      else this.objectShadowParts.set(part.matrices, [part]);
+    }
+    this.objectShadowPositions = positions;
     const data = new VertexData();
-    data.positions = new Float32Array(positions);
-    data.indices = positions.length / 3 > 65535 ? new Uint32Array(indices) : new Uint16Array(indices);
+    data.positions = positions;
+    data.indices = indices;
     const mesh = new Mesh('objectShadowsMerged', this.scene);
-    data.applyToMesh(mesh);
+    // (Updatable: an instance hidden or moved is baked again in place, `bakeObjectShadow`.)
+    data.applyToMesh(mesh, true);
     const material = new StandardMaterial('objectShadowsMerged', this.scene);
     material.disableLighting = true;
     material.backFaceCulling = false;
@@ -4216,6 +4237,39 @@ export class BabylonRenderer implements Renderer {
     mesh.layerMask = 0;
     mesh.freezeWorldMatrix();
     return mesh;
+  }
+
+  /**
+   * Instance `i` of a body mesh in the merged shadow mesh's `positions`, as its matrix stands now: a thin
+   * instance draws as `instance × mesh world`. (One hidden, scaled to nothing, is every vertex in one
+   * point: no triangles, no shadow.) Returns the range of `positions` written.
+   */
+  private bakeShadowInstance(part: ShadowPart, i: number, positions: Float32Array): [number, number] {
+    Matrix.FromArrayToRef(part.matrices, i * 16, this.shadowInstance);
+    this.shadowInstance.multiplyToRef(part.world, this.shadowMatrix);
+    const { pos } = part;
+    const start = (part.first + (i * pos.length) / 3) * 3;
+    for (let p = 0; p < pos.length; p += 3) {
+      Vector3.TransformCoordinatesFromFloatsToRef(pos[p], pos[p + 1], pos[p + 2], this.shadowMatrix, this.shadowPoint);
+      positions[start + p] = this.shadowPoint.x;
+      positions[start + p + 1] = this.shadowPoint.y;
+      positions[start + p + 2] = this.shadowPoint.z;
+    }
+    return [start, start + pos.length];
+  }
+
+  /** On Low: an object instance written anew (hidden, shown, moved) casts from where it is now in the merged shadow mesh. */
+  private bakeObjectShadow(target: PopTarget): void {
+    const parts = this.objectShadowParts.get(target.matrices);
+    const mesh = this.objectShadowMerge;
+    if (!parts || !mesh || mesh.isDisposed()) return;
+    const buffer = mesh.getVertexBuffer(VertexBuffer.PositionKind);
+    const positions = this.objectShadowPositions;
+    for (const part of parts) {
+      if (target.index >= part.count) continue;
+      const [start, end] = this.bakeShadowInstance(part, target.index, positions);
+      buffer?.updateDirectly(positions.subarray(start, end), start);
+    }
   }
 
   /** An object's template key, and how to build it. */
