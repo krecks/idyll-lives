@@ -930,18 +930,20 @@ export async function startSession(
     await writeSave(record);
     return id;
   };
+  /** Saves into the older of the game's two autosaves. */
+  const storeAutosave = async () => store(`${household} · Autosave`, await nextAutosaveId(gameId), true);
   /** When the game last autosaved (or started). */
   let autosavedAt = -Infinity;
   let autosaveFailed = false;
   /**
-   * Autosaves the game being played into the older of its two autosaves; a failure is told once.
+   * Autosaves the game being played (`storeAutosave`); a failure is told once.
    * Not once the simulation stopped: there's nothing to save, and the crash screen says so.
    */
   const autosave = async () => {
     if (!revealed || disposed || stoppedWith !== null) return;
     autosavedAt = performance.now();
     try {
-      await store(`${household} · Autosave`, await nextAutosaveId(gameId), true);
+      await storeAutosave();
     } catch (err) {
       console.warn('[save] autosave failed', err);
       if (autosaveFailed) return;
@@ -1509,9 +1511,7 @@ export async function startSession(
     save(name, slotId) {
       return store(name, slotId ?? crypto.randomUUID(), false);
     },
-    saveAutosave() {
-      return nextAutosaveId(gameId).then((id) => store(`${household} · Autosave`, id, true));
-    },
+    saveAutosave: storeAutosave,
     applySettings(s) {
       renderer.configure({
         resolution: s.resolution,
