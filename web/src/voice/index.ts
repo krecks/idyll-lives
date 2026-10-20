@@ -329,6 +329,9 @@ export class VoiceDirector {
       void stepDownVoice()
         .then((stepped) => {
           this.steppingDown = false;
+          // The session ended meanwhile: pausing now would hold the voices off for the next one
+          // (nothing would resume them).
+          if (this.disposed) return;
           if (!stepped) {
             this.pauseForSession(why);
             return;
@@ -343,7 +346,7 @@ export class VoiceDirector {
         })
         .catch(() => {
           this.steppingDown = false;
-          this.pauseForSession(why);
+          if (!this.disposed) this.pauseForSession(why);
         });
       return;
     }

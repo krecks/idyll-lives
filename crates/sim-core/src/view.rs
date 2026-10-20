@@ -990,7 +990,7 @@ fn dish(world: &World, held: Option<crate::items::Held>, item: Option<u32>, plat
 fn task_view(world: &World, task: &Task, phase: Option<&Phase>, held: Option<crate::items::Held>) -> ActionView {
     let content = &world.content;
     // The view names objects by stable id.
-    let stable = |object: u32| world.objects.get(object as usize).map(|o| o.stable);
+    let stable = |object: u32| world.stable_of(object);
     let (label, object, target, minutes) = match task.kind {
         TaskKind::Use { object, interaction } => {
             let inter = &content.objects[world.objects[object as usize].def].interactions[interaction];

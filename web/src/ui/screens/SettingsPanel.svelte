@@ -107,7 +107,8 @@
     if (voiceStatus.state === 'error') return `Couldn't load the voice: ${voiceStatus.error}`;
     if (voiceStatus.state === 'ready') return `Supertone's Supertonic 3, on ${voiceRunsOn}.`;
     if (settings.voiceDevice === 'cpu') return `Supertone's Supertonic 3, on this computer's processor: about ${Math.round(DOWNLOAD_MB)} MB, downloaded once.`;
-    return gpuAvailable ? `Supertone's Supertonic 3, on this computer's graphics card: about ${Math.round(DOWNLOAD_MB)} MB, downloaded once.` : "No WebGPU here: Auto uses this computer's processor.";
+    if (gpuAvailable) return `Supertone's Supertonic 3, on this computer's graphics card: about ${Math.round(DOWNLOAD_MB)} MB, downloaded once.`;
+    return settings.voiceDevice === 'gpu' ? 'No WebGPU here: choose Auto or Processor for voices.' : "No WebGPU here: Auto uses this computer's processor.";
   });
   const VERDICT = { good: 'smooth', ok: 'lines may start a moment late', slow: 'too slow here: voices may pause' };
   const benchText = $derived.by(() => {

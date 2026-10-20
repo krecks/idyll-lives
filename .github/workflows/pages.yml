@@ -101,8 +101,12 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: web/.assets/wasm-opt
-          key: wasm-opt-${{ hashFiles('tools/release/wasm-opt.mjs', 'web/pnpm-lock.yaml') }}
-          restore-keys: wasm-opt-
+          # (A new key every run: a cache hit on the exact key is never saved again, so new wasm
+          # builds' results would never be kept.)
+          key: wasm-opt-${{ hashFiles('tools/release/wasm-opt.mjs', 'web/pnpm-lock.yaml') }}-${{ github.run_id }}
+          restore-keys: |
+            wasm-opt-${{ hashFiles('tools/release/wasm-opt.mjs', 'web/pnpm-lock.yaml') }}-
+            wasm-opt-
 
       # The voice model and dictionary (about 400 MB from Hugging Face and GitHub, stored as
       # float16) and the language model (about 260 MB), kept between runs so a release doesn't

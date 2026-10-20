@@ -124,7 +124,6 @@ class MenuScene {
   private applyShot(): void {
     const world = this.world;
     const renderer = this.renderer?.deref();
-    if (!renderer) return;
     if (!world || !renderer || !this.wanted) return;
     const { shot, duration } = this.wanted;
     this.bounds = shot.kind === 'overview' || shot.kind === 'lot' ? shot.frame : null;

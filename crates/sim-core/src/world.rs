@@ -1486,24 +1486,17 @@ impl World {
     }
 
     /// A command names objects by their stable ids; the simulation works in indices.
-    fn resolve_objects(&self, cmd: Command) -> Result<Command, Error> {
-        let index = |object: u32| {
-            self.object_index(object)
-                .map(|i| i as u32)
-                .ok_or_else(|| Error::new(format!("unknown object {object}")))
-        };
-        Ok(match cmd {
-            Command::SwitchLamp { object, on } => Command::SwitchLamp { object: index(object)?, on },
-            Command::Use { sim, object, interaction } => Command::Use { sim, object: index(object)?, interaction },
-            Command::Sell { household, object } => Command::Sell { household, object: index(object)? },
-            Command::MoveObject { household, object, x, z, rot, turn, offset, size, tall } => {
-                Command::MoveObject { household, object: index(object)?, x, z, rot, turn, offset, size, tall }
-            }
-            Command::Recolor { household, object, colors } => Command::Recolor { household, object: index(object)?, colors },
-            Command::Upgrade { household, object } => Command::Upgrade { household, object: index(object)? },
-            Command::Repair { household, object } => Command::Repair { household, object: index(object)? },
-            other => other,
-        })
+    fn resolve_objects(&self, mut cmd: Command) -> Result<Command, Error> {
+        if let Some(object) = cmd.object_mut() {
+            let stable = *object;
+            *object = self.object_index(stable).ok_or_else(|| Error::new(format!("unknown object {stable}")))? as u32;
+        }
+        Ok(cmd)
+    }
+
+    /// The stable id of the object at `index` in `World::objects` (the inverse of `object_index`).
+    pub fn stable_of(&self, index: u32) -> Option<u32> {
+        self.objects.get(index as usize).map(|o| o.stable)
     }
 
     pub fn place_object(&mut self, def_id: &str, x: i32, z: i32, rot: u8) -> Result<u32, Error> {

@@ -112,7 +112,7 @@ impl Doing {
 
 /// A stable object id for the renderer, from an index into `World::objects`.
 fn stable(world: &World, index: u32) -> f32 {
-    world.objects.get(index as usize).map_or(-1.0, |o| o.stable as f32)
+    world.stable_of(index).map_or(-1.0, |s| s as f32)
 }
 
 fn doing(world: &World, s: &Sim) -> Doing {

@@ -432,15 +432,13 @@ function readBench(): BenchResult | null {
 /**
  * Loaded from the start while voices are on (the game launching, or switching them on); unloaded
  * when they're switched off. A manual device choice restarts the engine on that device; Auto
- * picks one when it starts and otherwise keeps a working engine. The graphics preset is read
- * too, so changing it re-checks the choice (Auto steps down by itself if the card gets too slow).
- * While the game has paused the voices for its session, nothing starts the engine here.
+ * picks one when it starts and otherwise keeps a working engine (it steps down by itself if the
+ * card gets too slow, `stepDownVoice`). While the game has paused the voices for its session, nothing starts the engine here.
  */
 $effect.root(() => {
   $effect(() => {
     const on = settings.voices;
     const mode = settings.voiceDevice;
-    const preset = settings.graphics;
     const paused = held;
     untrack(() => {
       if (!on) {
@@ -467,7 +465,6 @@ $effect.root(() => {
         unload();
         void ensureVoice().catch(() => {});
       }
-      void preset;
     });
   });
 });
@@ -486,7 +483,9 @@ export async function stepDownVoice(): Promise<boolean> {
     await ensureVoice('cpu');
     return true;
   } catch {
-    voiceStatus.state = 'off';
+    // The processor's engine failed to start: stop it, unless something took over since (a
+    // restart, or the voices switched off).
+    if (voiceStatus.state === 'error') unload();
     return false;
   }
 }

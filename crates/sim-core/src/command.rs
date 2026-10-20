@@ -397,6 +397,20 @@ impl Command {
         }
     }
 
+    /// The object id `object` reads, to rewrite (the same commands as `object`).
+    pub(crate) fn object_mut(&mut self) -> Option<&mut u32> {
+        match self {
+            Command::SwitchLamp { object, .. }
+            | Command::Use { object, .. }
+            | Command::Sell { object, .. }
+            | Command::MoveObject { object, .. }
+            | Command::Recolor { object, .. }
+            | Command::Upgrade { object, .. }
+            | Command::Repair { object, .. } => Some(object),
+            _ => None,
+        }
+    }
+
     /// The household whose home a build or buy edit changes (edits can be undone), if this is one.
     pub fn home_edit(&self) -> Option<u32> {
         match *self {
