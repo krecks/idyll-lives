@@ -12,7 +12,7 @@ import type { WorldStructure } from '../core/protocol';
 import { BabylonRenderer } from '../render/babylon/BabylonRenderer';
 import type { Renderer } from '../render/types';
 import { qualityFromSettings, RESTART_KEYS, settings as liveSettings, type Settings } from '../settings/settings.svelte';
-import { app } from '../ui/app.svelte';
+import { app, type Progress } from '../ui/app.svelte';
 import { perfTime, perfTimeAsync } from '../debug/perf';
 import { game, toast } from '../ui/state.svelte';
 import { basicReport, within } from '../debug/report';
@@ -40,9 +40,12 @@ interface Entry {
   started: Promise<GameSession>;
   /** Resolves once the session's scene is built and drawn. */
   session: Promise<GameSession>;
+  /** Being started (Play, Continue): its loading shows. Prepared behind the menus, it loads unseen. */
   live: boolean;
   /** The session's scene is built and drawn (its progress reports end). */
   ready: boolean;
+  /** Where its loading is (shown as the loading screen once it is live). */
+  progress: Progress;
   /** The session's own look (and the mirror's clip-plane shaders) has been drawn once. */
   warmed: boolean;
   /** The session, once it exists. */
@@ -137,7 +140,7 @@ class GameHost {
       return session.then(async (s) => {
         if (entry.warmed) return s;
         entry.warmed = true;
-        app.loading = { label: 'Warming up', value: 0.95 };
+        if (entry.live) app.loading = { label: 'Warming up', value: 0.95 };
         // Let the loading screen paint before the warm's long frame.
         await new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
         await perfTimeAsync('host: warm', () => s.warm());
@@ -147,8 +150,7 @@ class GameHost {
     }
     this.release();
     const previous = this.teardown;
-    const entry = { key, live: false, ready: false, warmed: warm } as Entry;
-    app.loading = { label: 'Getting ready', value: 0 };
+    const entry = { key, live: false, ready: false, warmed: warm, progress: { label: 'Getting ready', value: 0 } } as Entry;
     entry.started = (async () => {
       const renderer = await this.rendererFor(settings);
       // One session at a time on the shared renderer: a replaced one must finish clearing it first.
@@ -161,7 +163,9 @@ class GameHost {
         request,
         settings,
         (label, value) => {
-          if (this.current === entry && !entry.ready) app.loading = { label, value };
+          if (this.current !== entry || entry.ready) return;
+          entry.progress = { label, value };
+          if (entry.live) app.loading = entry.progress;
         },
         warm,
       );
@@ -188,7 +192,11 @@ class GameHost {
   async start(request: StartRequest, settings: Settings): Promise<GameSession> {
     const pending = this.prepare(request, settings, true);
     const entry = this.current;
-    if (entry) entry.live = true;
+    if (entry) {
+      entry.live = true;
+      // Still loading (prepared behind the menus, or not at all): from now on, the loading screen says so.
+      if (!entry.ready) app.loading = entry.progress;
+    }
     const session = await perfTimeAsync('host: prepare (start)', () => pending);
     const renderer = await this.renderer;
     if (!renderer || this.current !== entry) return session;
