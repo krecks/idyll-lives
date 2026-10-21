@@ -183,7 +183,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `crates/sim-core/src/conversation.rs` (`engage`: `sims[i].pos = spot`, the spot at the social's `distance` from the target; the talk starts within `distance + ENGAGE_SLACK + 0.6`, up to 2.4 m for a chat)
 - **Evidence:** Code read while fixing A-social-04: as a social starts, the actor is put at the social's distance from the one talked to, up to about 1.4 m from where they stopped, in one tick, and the renderer slides them there; the same kind of slide as the joiner's was. Walk the last bit (as `take_place` now does), or start the talk where they stand when they're near enough.
-- **Status:** open
+- **Status:** fixed (COMMIT)
+- **After:** the step is walked in the renderer: sim-core still moves the one starting the talk to the talking distance in one tick (`engage`), and the renderer's walk-in (`characters.ts` `WALK_IN`, A-residents-13) draws them walking it (0.6 m in 0.8 s at 0.8 of the walk's pace) before `talk` starts. `fixes/sweep-render/talk/talk.json` (Ada 3 m from Ben: she walks up to 2 m off, then sim-core's 0.58 m step at 2078 ms is walked 2121–2855 ms, `talk` from 3029), `talk-after.png`.
 - **Source:** fix: sound-social
 
 ### I-social-07 — Nobody talks over a meal: eating, a resident is never talked to

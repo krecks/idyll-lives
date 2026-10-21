@@ -414,6 +414,20 @@ Why some entries are as they are:
   desk clips, or for an instrument, the toilet, a bath or the dressing table (`NO_FEET_UP`). The sim doesn't
   know: an armchair with one in front is sat in from beside it (sim-core `approach_tiles`).
 
+### Walking in
+
+sim-core moves a standing resident onto a seat, into a shower, up to someone they start talking to or onto the spot
+it stands them at in one tick. Drawn, a step of more than 0.25 m is walked (characters.ts `WALK_IN`, `walksIn`): the
+`walk` clip at 0.8 of its pace for the body, from where they were drawn to where they will stand, then a turn to the
+way sim-core faces them, and only then the seat's `sitDown` or the use's clips. The Sim is already there (the seat
+is found, a chair pulled in, from the place sim-core gave them); only its drawing is on the way. To or from a tile
+behind a chair built into its table or desk (a top sat at by a use of its own, `builtIn`), the step goes round a
+corner 0.55 m to the chair's side (`cornerOf`), and so does rising off it (`riseViaX`). A shower with a door
+(`WALK_WAIT`: the base `shower`) is waited at until the door has slid open (0.7 s), walked into through its opening
+and out the same way as the use ends, when it opens again; the towel goes on once they are in. Not walked: a baby,
+one held, a resident on directions, using a thing from inside (`STEP_IN`), rising, on a bunk's ladder, out of bed, into
+a bath or a seat with the legs out.
+
 ## Where things are
 
 | What | Files |

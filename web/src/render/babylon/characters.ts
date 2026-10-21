@@ -88,6 +88,7 @@ import { SHOT } from './characters/clips/shot';
 import FURNITURE from './characters/furniture.json';
 import { feetDown, legTurn, perch, SEAT_FIT, seatSize, type LegSide } from './characters/seatFit';
 import { furthestAhead, nearestAhead, type TableRoom } from './tableTuck';
+import { seatsItself } from '../../game/surfaces';
 import { addLocal, addRotation, blendInto, makeAdditive, PoseScratch, qmul, resetAdditive, rotate, sampleClip, skin, type Additive, type Placement } from './characters/pose';
 import type { MaterialLibrary } from './materials';
 import { WALL_HEIGHT } from './house';
@@ -364,6 +365,19 @@ const LANE_SYNC = 0.4;
 /** Stepping in (m/s, game time) and out again (s). */
 const STEP_IN_SPEED = 1.05;
 const STEP_OUT_S = 1.1;
+/**
+ * Walking in (`Characters.walksIn`): a step of more than `min` m that sim-core makes a standing resident take in one
+ * tick (onto a seat, into a shower, up to someone to talk to or the spot it stands them at) is walked, at `pace` of
+ * the walk's own speed for the body, then they turn to the way sim-core faces them (up to `turn` s). Round a built-in
+ * chair (`cornerOf`), to or from a tile behind it, by a corner `side` m to its side.
+ */
+const WALK_IN = { min: 0.25, pace: 0.8, turn: 0.8, side: 0.55 };
+/**
+ * Showers with a door: seconds of standing while it slides open before stepping in (`in`), and when the use ends
+ * before stepping out (`out`; `motions` `door_open`), through the opening (`door`: its middle, m to the shower's
+ * right of its middle and ahead of it).
+ */
+const WALK_WAIT: Record<string, { in: number; out: number; door: readonly [number, number] }> = { shower: { in: 0.7, out: 0.7, door: [0.21, 0.45] } };
 /** Over a rim (`StepIn.over`): up on it from this far (m) either side. */
 const STEP_OVER = 0.3;
 
@@ -1182,6 +1196,33 @@ interface SimRig {
   rising: boolean;
   riseX: number;
   riseZ: number;
+  /** Rising off a built-in chair to a tile behind it: the corner beside the chair the step goes round (`cornerOf`; NaN: straight). */
+  riseViaX: number;
+  riseViaZ: number;
+  /**
+   * Walking in (`WALK_IN`): sim-core moves a standing resident onto a seat, into a shower or up to the place it
+   * stands them at in one step; drawn, they walk there from where they were (`walkX`, `walkZ`; round the corner
+   * `viaX`, `viaZ` beside a built-in chair, NaN without), after `walkWait` s standing (a shower's door opening),
+   * then turn to the way sim-core faces them (`walkYaw`). `walkT`: the seconds since it began (-1: not walking);
+   * `walkS`: the metres walked of the way, `walkL` its length when last drawn, `walkEX`, `walkEZ` its end and
+   * `walkPX`, `walkPZ` where they were last drawn; `walkTurn`: the seconds turned there; `walkDown`: sitting down
+   * still to come once there.
+   */
+  walkT: number;
+  walkS: number;
+  walkL: number;
+  walkX: number;
+  walkZ: number;
+  viaX: number;
+  viaZ: number;
+  walkEX: number;
+  walkEZ: number;
+  walkPX: number;
+  walkPZ: number;
+  walkWait: number;
+  walkYaw: number;
+  walkTurn: number;
+  walkDown: boolean;
   sitX: number;
   sitZ: number;
   /**
@@ -1293,6 +1334,8 @@ interface PlacedObject {
   lift: number;
   /** Something to sit or lie on (a seat or a bed, by its interactions or the tables above). */
   restful: boolean;
+  /** A top sat at by a use of its own (a dining set, a desk with its chair built in: `seatsItself`): its chairs don't move (`cornerOf`). */
+  builtIn: boolean;
   /**
    * A bed's bedding (`QUILT_PART`), whose colour its sleepers' quilts take: the colour the player gave
    * it, else `key` (`<model>#<part>`) for the file's own (`beddingColours`); null for anything else.
@@ -1894,6 +1937,23 @@ export class Characters {
         rising: false,
         riseX: 0,
         riseZ: 0,
+        riseViaX: NaN,
+        riseViaZ: NaN,
+        walkT: -1,
+        walkS: 0,
+        walkL: Infinity,
+        walkX: 0,
+        walkZ: 0,
+        viaX: NaN,
+        viaZ: NaN,
+        walkEX: 0,
+        walkEZ: 0,
+        walkPX: 0,
+        walkPZ: 0,
+        walkWait: 0,
+        walkYaw: 0,
+        walkTurn: 0,
+        walkDown: false,
         sitX: 0,
         sitZ: 0,
         inside: null,
@@ -1977,7 +2037,7 @@ export class Characters {
       const stool = FOOTSTOOLS[o.def];
       const made = def?.footprint ?? [1, 1];
       const footstool = stool ? { hw: (stool[0] / 2) * (o.size ? o.size[0] / (made[0] * 100) : 1), hd: (stool[1] / 2) * (o.size ? o.size[1] / (made[1] * 100) : 1), yaw: ((o.rot * 90 + (o.turn ?? 0)) * Math.PI) / 180 } : null;
-      return { def: o.def, rot: o.rot, seat: { ...seat, h: seat.h + lift }, stand, held, lift, restful, quilt: BLANKET_BEDS.has(o.def) ? this.beddingOf(o.def, def?.model, o.colors) : null, footstool, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
+      return { def: o.def, rot: o.rot, seat: { ...seat, h: seat.h + lift }, stand, held, lift, restful, builtIn: !!def?.surface && seatsItself(def), quilt: BLANKET_BEDS.has(o.def) ? this.beddingOf(o.def, def?.model, o.colors) : null, footstool, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
     });
     this.footstools = this.objects.filter((o) => o.footstool);
     world.objects.forEach((o, j) => this.objectById.set(o.id, this.objects[j]));
@@ -2959,11 +3019,19 @@ export class Characters {
       if (moving || dist > SNAP_DISTANCE || !rig.visible) {
         rig.x = gx;
         rig.z = gz;
+        rig.walkT = -1;
       } else {
-        // Settle into seats / beds / next to objects instead of popping.
-        const f = 1 - Math.exp(-dt * 9);
-        rig.x += dx * f;
-        rig.z += dz * f;
+        // A step sim-core takes in one tick, walked (`WALK_IN`): drawn along the way (`walkPlace`), the Sim already there.
+        if (rig.walkT < 0 && dist > WALK_IN.min && this.walksIn(rig, i, pose, useObj, gx, gz)) this.startWalk(rig, pose, useObj, gx, gz, tyaw);
+        if (rig.walkT >= 0) {
+          rig.x = gx;
+          rig.z = gz;
+        } else {
+          // Settle into seats / beds / next to objects instead of popping.
+          const f = 1 - Math.exp(-dt * 9);
+          rig.x += dx * f;
+          rig.z += dz * f;
+        }
       }
       let faceYaw = tyaw;
       // Into bed from its side: facing out on its edge, then turned to lie along it as they lie back; out
@@ -3014,6 +3082,12 @@ export class Characters {
             if (pick > 0) rig.audience = this.sims[groups[leader * 3 + pick]] ?? null;
           }
         } else faceYaw = Math.atan2(partnerRig.x - rig.x, partnerRig.z - rig.z);
+      }
+      // Walking in: along the way, then turned to the way they end up facing.
+      if (rig.walkT >= 0) {
+        rig.walkYaw = faceYaw;
+        const ahead = this.walkAhead(rig);
+        if (!Number.isNaN(ahead)) faceYaw = ahead;
       }
       const dyaw = wrapAngle(faceYaw - rig.yaw);
       // Walkers turn as quickly as the game runs (up to 10x): sped up, the corners of their way come sooner.
@@ -3070,7 +3144,7 @@ export class Characters {
         this.pA.set(set.sourcePelvis);
       }
       // Clothes for what they're doing: pyjamas in bed for the night, a towel in the bath ...
-      const worn = rig.outfits?.[this.wearFor(rig, pose, moving, w, useObj, tag)];
+      const worn = rig.outfits?.[this.wearFor(rig, pose, moving || rig.walkT >= 0 || dist > WALK_IN.min, w, useObj, tag)];
       if (worn && worn !== rig.worn) this.wear(rig, i, worn);
       // Hand pose: the clips clench fists; open them according to the activity.
       blendInto(this.qA, this.pA, set.sourceRestQ, this.pA, rig.hands, this.fingerMask);
@@ -3110,12 +3184,13 @@ export class Characters {
       pl.y = rootY + rig.floorY;
       pl.z = at.z + Math.cos(at.yaw) * rootFwd;
       this.stepPlace(rig, pl, step);
+      if (rig.walkT >= 0) this.walkPlace(rig, pl, at.x + Math.sin(rig.walkYaw) * rootFwd, at.z + Math.cos(rig.walkYaw) * rootFwd, step);
       if (pose === Pose.Sit) [rig.sitX, rig.sitZ] = [pl.x, pl.z];
       else if (rig.rising && rig.cur.key.startsWith('standUp')) {
-        // Rising off a seat where it is, then stepping off to the tile sim-core put them on (`rising`).
+        // Rising off a seat where it is, then stepping off to the tile sim-core put them on (`rising`), round a
+        // built-in chair's side to a tile behind it (`riseViaX`).
         const k = smooth(clamp((rig.cur.time / rig.cur.clip!.duration - 0.25) / 0.5, 0, 1));
-        pl.x = lerp(rig.riseX, pl.x, k);
-        pl.z = lerp(rig.riseZ, pl.z, k);
+        alongWay(pl, rig.riseX, rig.riseZ, rig.riseViaX, rig.riseViaZ, pl.x, pl.z, k);
       }
       pl.scale = rig.scale;
       pl.head = rig.head;
@@ -3150,7 +3225,7 @@ export class Characters {
       shadows[m + 5] = 1;
       shadows[m + 10] = r;
       // (Under them inside a thing they use from inside, and on its floor: `STEP_IN`; rising off a seat.)
-      const stepped = !!rig.inside || rig.outT >= 0 || (rig.rising && rig.cur.key.startsWith('standUp'));
+      const stepped = !!rig.inside || rig.outT >= 0 || rig.walkT >= 0 || (rig.rising && rig.cur.key.startsWith('standUp'));
       shadows[m + 12] = stepped ? pl.x : rig.x;
       shadows[m + 13] = 0.02 + (stepped ? pl.y : rig.floorY);
       shadows[m + 14] = stepped ? pl.z : rig.z;
@@ -3322,7 +3397,8 @@ export class Characters {
       else key = 'sit';
       if (floor) key = `sit${floor}`;
       const down = `sitDown${floor}`;
-      if (rig.lastPose === Pose.Stand && rig.cur.key !== down) {
+      // (Walked in to the seat first, `WALK_IN`: sitting down once there.)
+      if ((rig.lastPose === Pose.Stand || rig.walkDown) && rig.cur.key !== down) {
         key = down;
         rig.actTime = 0;
       } else if (rig.cur.key === down && rig.cur.time < rig.cur.clip!.duration - 0.3) {
@@ -3530,6 +3606,7 @@ export class Characters {
       // (Off a seat: rising where it is, then stepping off to the tile: `riseX`.)
       rig.rising = rig.lastPose === Pose.Sit;
       [rig.riseX, rig.riseZ] = [rig.sitX, rig.sitZ];
+      [rig.riseViaX, rig.riseViaZ] = rig.rising && rig.useObj?.builtIn ? this.cornerOf(rig.useObj, rig.sitX, rig.sitZ, rig.yaw, rig.tx, rig.tz) : [NaN, NaN];
     } else if (rig.cur.key === up && !moving && pose === Pose.Stand && rig.cur.time < rig.cur.clip!.duration - 0.25) {
       key = up;
     }
@@ -3552,6 +3629,19 @@ export class Characters {
       const t = rig.cur.key === 'standUp' ? rig.cur.time / rig.cur.clip!.duration : 0;
       rootFwd = edge * (1 - smooth(clamp((t - 0.3) / 0.6, 0, 1)));
     }
+    // Walking in (`WALK_IN`): standing while a door opens, walking, then standing while turned to face the right way;
+    // the seat's height and the use's clips once there.
+    if (rig.walkT >= 0) {
+      const walking = rig.walkT >= rig.walkWait && rig.walkS < rig.walkL;
+      key = walking ? 'walk' : 'idle';
+      rate = walking ? WALK_IN.pace * (dt > 0 ? step / dt : 1) : 1;
+      repeat = false;
+      fade = 0.25;
+      rootY = 0;
+      pitch = 0;
+      upper = '';
+      hands = HANDS.relaxed;
+    } else if (rig.walkDown && rig.cur.key.startsWith('sitDown')) rig.walkDown = false;
     // (A little quicker at slow game speeds than the animation; still while paused.)
     rig.hands += (hands - rig.hands) * (1 - Math.exp(-(step * 5 + dt * 1.2)));
 
@@ -3649,6 +3739,87 @@ export class Characters {
     const a = rig.prev.frame ?? rig;
     const b = rig.cur.frame ?? rig;
     return { x: lerp(a.x, b.x, w), z: lerp(a.z, b.z, w), yaw: a.yaw + wrapAngle(b.yaw - a.yaw) * w };
+  }
+
+  /**
+   * Whether the step sim-core just had a standing resident take in one tick (to `gx`, `gz`) is walked (`WALK_IN`):
+   * sitting down (not into a bath or a seat with the legs out) or standing at a new place, not a baby or one held,
+   * not on directions, nor using a thing from inside (`STEP_IN`), rising, climbing a bunk's ladder or out of bed.
+   */
+  private walksIn(rig: SimRig, i: number, pose: number, useObj: PlacedObject | null | undefined, gx: number, gz: number): boolean {
+    if (rig.body.stage === 'baby' || this.heldBy[i] >= 0 || rig.dir || rig.inside || rig.outT >= 0 || rig.rising || rig.fromBed || rig.cur.key.startsWith('bunk')) return false;
+    if (pose === Pose.Stand) return rig.lastPose === Pose.Stand && !RISING.has(rig.cur.key);
+    // (Sat down a moment ago: the snapshot's glide onto the seat had only just begun.)
+    if (pose !== Pose.Sit || !(rig.lastPose === Pose.Stand || (rig.cur.key.startsWith('sitDown') && rig.cur.time < 0.3))) return false;
+    const seat = (this.objectAt(gx, gz) ?? useObj)?.seat;
+    return !seat?.along && !seat?.legsOut;
+  }
+
+  /** Starts walking in (`walksIn`) from where they are drawn to `gx`, `gz` (a seat's: round a built-in chair, `cornerOf`). */
+  private startWalk(rig: SimRig, pose: number, useObj: PlacedObject | null | undefined, gx: number, gz: number, yaw: number): void {
+    rig.walkT = 0;
+    rig.walkS = 0;
+    rig.walkL = Infinity;
+    rig.walkTurn = 0;
+    rig.walkYaw = yaw;
+    [rig.walkX, rig.walkZ] = [rig.x, rig.z];
+    [rig.walkPX, rig.walkPZ] = [rig.x, rig.z];
+    [rig.walkEX, rig.walkEZ] = [gx, gz];
+    rig.walkDown = pose === Pose.Sit;
+    // (Into a shower with a door, or out of it as the use ends: once it has slid open.)
+    const shower = pose !== Pose.Stand ? null : useObj ? useObj : rig.useObj;
+    const door = shower ? WALK_WAIT[shower.def] : undefined;
+    rig.walkWait = !door ? 0 : useObj ? door.in : door.out;
+    const seat = pose === Pose.Sit ? (this.objectAt(gx, gz) ?? useObj) : null;
+    [rig.viaX, rig.viaZ] = seat?.builtIn ? this.cornerOf(seat, gx, gz, yaw, rig.x, rig.z) : [NaN, NaN];
+    if (door && shower) {
+      // (Through its doorway, in and out.)
+      const f = (shower.rot * Math.PI) / 2;
+      const [right, ahead] = door.door;
+      [rig.viaX, rig.viaZ] = [shower.cx + Math.cos(f) * right + Math.sin(f) * ahead, shower.cz - Math.sin(f) * right + Math.cos(f) * ahead];
+    }
+  }
+
+  /** The way a resident walking in faces now (`walkPlace`): along the way (to its corner, then its end), NaN once there. */
+  private walkAhead(rig: SimRig): number {
+    if (rig.walkS >= rig.walkL) return NaN;
+    const corner = !Number.isNaN(rig.viaX) && rig.walkS < Math.hypot(rig.viaX - rig.walkX, rig.viaZ - rig.walkZ);
+    const [x, z] = corner ? [rig.viaX, rig.viaZ] : [rig.walkEX, rig.walkEZ];
+    const [dx, dz] = [x - rig.walkPX, z - rig.walkPZ];
+    return Math.hypot(dx, dz) > 0.05 ? Math.atan2(dx, dz) : NaN;
+  }
+
+  /**
+   * Walking in (`WALK_IN`): drawn where they stand while waiting, along the way to (`ex`, `ez`: where they are
+   * drawn once there, facing `walkYaw`) while walking, there while turning to face that way; then done.
+   */
+  private walkPlace(rig: SimRig, pl: Placement, ex: number, ez: number, step: number): void {
+    rig.walkT += step;
+    [rig.walkEX, rig.walkEZ] = [ex, ez];
+    const via = !Number.isNaN(rig.viaX);
+    const first = via ? Math.hypot(rig.viaX - rig.walkX, rig.viaZ - rig.walkZ) : 0;
+    rig.walkL = via ? first + Math.hypot(ex - rig.viaX, ez - rig.viaZ) : Math.hypot(ex - rig.walkX, ez - rig.walkZ);
+    if (rig.walkT >= rig.walkWait && rig.walkS < rig.walkL) {
+      rig.walkS = Math.min(rig.walkL, rig.walkS + step * WALK_IN.pace * this.clip('walk').speed * rig.body.pelvisScale * rig.scale);
+    } else if (rig.walkS >= rig.walkL) {
+      rig.walkTurn += step;
+      if (rig.walkTurn >= WALK_IN.turn || Math.abs(wrapAngle(rig.walkYaw - rig.yaw)) < 0.05) rig.walkT = -1;
+    }
+    alongWay(pl, rig.walkX, rig.walkZ, rig.viaX, rig.viaZ, ex, ez, rig.walkL > 0 ? rig.walkS / rig.walkL : 1);
+    [rig.walkPX, rig.walkPZ] = [pl.x, pl.z];
+  }
+
+  /**
+   * The corner beside a built-in chair (its seat at `sx`, `sz`, facing `yaw`, on `obj`: a dining set's, a desk's)
+   * that a step to or from a tile behind it (`tx`, `tz`) goes round, `WALK_IN.side` m to the chair's side away from
+   * the set's middle; NaN with the tile not behind it.
+   */
+  private cornerOf(obj: PlacedObject, sx: number, sz: number, yaw: number, tx: number, tz: number): [number, number] {
+    const [fx, fz] = [Math.sin(yaw), Math.cos(yaw)];
+    const [rx, rz] = [fz, -fx];
+    if ((tx - sx) * fx + (tz - sz) * fz > -0.25) return [NaN, NaN];
+    const side = Math.sign((sx - obj.cx) * rx + (sz - obj.cz) * rz) || Math.sign((tx - sx) * rx + (tz - sz) * rz) || 1;
+    return [sx + rx * side * WALK_IN.side, sz + rz * side * WALK_IN.side];
   }
 
   /** The size of `STEP_IN` entry `into` for this resident's height: [height, clips, where]. */
@@ -5639,4 +5810,25 @@ function clampHeight(h: number | undefined): number {
 /** Build (appearance `build`, slim 0.85 .. broad 1.2; missing in older saves: 1). */
 function clampBuild(b: number | undefined): number {
   return typeof b === 'number' && Number.isFinite(b) ? Math.min(1.2, Math.max(0.85, b)) : 1;
+}
+
+/** Puts `pl` `k` (0..1) of the way from (`ax`, `az`) to (`cx`, `cz`), round the corner (`bx`, `bz`) on the way (NaN: straight). */
+function alongWay(pl: Placement, ax: number, az: number, bx: number, bz: number, cx: number, cz: number, k: number): void {
+  if (Number.isNaN(bx)) {
+    pl.x = lerp(ax, cx, k);
+    pl.z = lerp(az, cz, k);
+    return;
+  }
+  const a = Math.hypot(bx - ax, bz - az);
+  const b = Math.hypot(cx - bx, cz - bz);
+  const s = k * (a + b);
+  if (s <= a) {
+    const u = a > 0 ? s / a : 1;
+    pl.x = lerp(ax, bx, u);
+    pl.z = lerp(az, bz, u);
+  } else {
+    const v = b > 0 ? (s - a) / b : 1;
+    pl.x = lerp(bx, cx, v);
+    pl.z = lerp(bz, cz, v);
+  }
 }

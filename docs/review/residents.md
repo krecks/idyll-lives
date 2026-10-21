@@ -419,7 +419,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters.ts` (the settle into a seat: `rig.x` eased to sim-core's slot at 9/s while `sitDown` plays)
 - **Evidence:** `bench-results/review/fixes/positions/play/computerDesk-wall-in-200.png` (the desk's back to the wall: come from beside it, G-51, the sitter slides 1.5 m along behind the desk onto the chair in the first 0.3 s of sitting down), `bench-results/review/fixes/positions/play/exerciseBike-in-200.png` (half a metre sideways onto the saddle). Now that seats are come to from their side or behind (G-51) the slide no longer goes through the work, but it is still a slide: the other half of A-residents-01. A short walk-in to the seat's front before `sitDown` (the walk clip at the walk's pace, then the turn) would close it.
-- **Status:** open
+- **Status:** fixed (COMMIT)
+- **After:** sitting down is walked: the renderer draws the resident walking (the `walk` clip, 0.8 of its pace) from where they were to the seat's front, turned round there, and only then plays `sitDown` (`characters.ts` `WALK_IN`, `walksIn`, `walkPlace`); from a tile behind a built-in chair round its side (`cornerOf`). `fixes/sweep-render/walk/strip-desk-wall-in.png` (the computer desk against the wall, from beside it: walking along behind the desk 200–1000 ms, sat by 2200; was `fixes/positions/play/computerDesk-wall-in-200.png`'s slide), `strip-dining.png` (the dining table's built-in chair from behind it, round its side), `strip-bike-chair.png` (onto the exercise bike's saddle from beside it, walked; a loose chair from beside the table). Also the shower (A-bathroom-05) and the talk (A-social-05).
 - **Source:** fix: positions
 
 ### A-residents-14 — Rising off a chair that can't move steps back through it
@@ -429,7 +430,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters.ts` (`rising`: the step from the seat to the tile sim-core put them on, in the second half of `standUp`); chairs built into tables and desks (`diningTable`, the desks, `places` come to from behind)
 - **Evidence:** `bench-results/review/fixes/positions/play-headed/diningTable-headed-up-700.png` (headed, timed): risen at the seat, the sitter steps back to the tile behind the table's chair through the chair's back. A chair pulled up to a table is pushed back as they rise (`tuckOut`); one built into the model isn't, so the step passes through it. A step sideways round it (to the tile beside), or the chair part moved back as the loose chairs are, would close it.
-- **Status:** open
+- **Status:** fixed (COMMIT)
+- **After:** rising off a chair built into its table or desk (`builtIn`: a top sat at by a use of its own) to a tile behind it, the step goes round a corner 0.55 m to the chair's side away from the set's middle (`cornerOf`, `riseViaX`) instead of through its back. `fixes/sweep-render/walk/strip-dining.png` (`diningTable-up-150` … `-1500`: up at the seat, then out past the chair's side to the tile; was `fixes/positions/play-headed/diningTable-headed-up-700.png`). Headless, but the shots are timed after the cancel as the positions fix's were; not re-timed headed.
 - **Source:** fix: positions
 
 ### M-residents-01 — Heads are about half a head bigger than the rubric's ratios at every stage
