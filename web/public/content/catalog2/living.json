@@ -494,7 +494,7 @@
       "group": "seating",
       "decor": 0.3,
       "seat": {
-        "height": 0.48,
+        "height": 0.46,
         "forward": 0.05
       },
       "description": "A spindle-back rocker with a cushion. Rock and read.",
