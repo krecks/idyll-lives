@@ -42,7 +42,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `cheerful.jukebox` Sunburst jukebox | 1x1 · floor | dance:dance | living / — | Body, Trim | Use | `record`: a record swings up into place for dance, and `spin` turns its label (a part inside it) while the dance lasts. |
+| `cheerful.jukebox` Sunburst jukebox | 1x1 · floor | dance:dance listen:listen | living / — | Body, Trim | Use | `record`: a record swings up into place for dance, and `spin` turns its label (a part inside it) while the dance lasts. Pick a song and listen, from a seat within 4 m (`seatNear`); the record clip plays only for dance. |
 | `cheerful.karaokeMachine` Spotlight karaoke machine | 1x1 · floor | sing:sing | hobbies / — | Body, Trim, Rug | Use | `mic_up`: the microphone rises on its stand for sing. |
 | `cheerful.mocktailCart` Fizz & sunshine mocktail cart | 1x1 · floor | mix:drink | kitchen / — | Body, Trim, Frame | Use | `shake`: the shaker tips for mix. |
 | `cheerful.rainbowHammock` Rainbow hammock | 2x1 · floor | swing:relax doze:nap | outdoor / — | Body, Trim, Pillow | Loop (E1) | `sway`: the sling rocks 5° each way while swung in or dozed in, and the resident rides it (`ride`), lain across it (`BEDS` `across`). |
@@ -276,7 +276,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `neat.steamMopDock` Steam mop dock | 1x1 · floor | mop:clean | kitchen / — | Body, Mop | Use | `mop_off`: the mop leaves its dock for mop and is drawn in the resident's hands, pushed over the floor (content `held`). |
-| `neat.laundryCenter` Stacked laundry centre | 2x1 · floor | laundry:clean fold:clean | bathroom / — | Body, Washer & dryer | Use | `door_open`: the washer door swings for laundry and fold. |
+| `neat.laundryCenter` Stacked laundry centre | 2x1 · floor | laundry:clean fold:clean | bathroom / — | Body, Washer & dryer | Use | `door_open`: the washer door swings for laundry and fold. Folding is 20 minutes (was 60). |
 | `neat.rainShowerTower` Rainfall steam shower | 1x1 · floor | steamShower:shower | bathroom / — | Body, Bench | Use | `water_on`: the rain grows for steamShower. |
 | `neat.organizerDesk` Label-and-sort organizer desk | 2x1 · floor | sort:write ledger:write | office / — | Body, Wood, Chair | Use | `drawer_open`: a bin slides out of the hutch for sort and ledger. Written at on its own chair with the hands on the top (`NEAR_DESKS`, `sitHandsNear`; `SEATS`), not through its front. |
 | `neat.robotVacuumDock` Robot vacuum and dock | 1x1 · floor | program:type | living / — | Body, Trim, Rug | Use | `vacuum_out`: the robot rolls 60 cm out of its dock, turns and rolls back for program (`hold` 2 s). Program from a seat within 4 m (`seatNear`), else standing. |
@@ -295,7 +295,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `outgoing.partyBar` Home party bar | 2x1 · floor | mixDrinks:drink soda:drink | kitchen / — | Body, Upholstery, Back bar | Use | `tap`: the beer tap lever pulls for mixDrinks and soda (`hold` 2 s). |
+| `outgoing.partyBar` Home party bar | 2x1 · floor | mixDrinks:drink soda:drink barDrink:drink | kitchen / — | Body, Upholstery, Back bar | Use | `tap`: the beer tap lever pulls for mixDrinks and soda (`hold` 2 s). Have a drink at the bar, sat on its stools facing the counter (content `seat` 0.74 m, forward 0.5, `facing: back`). |
 | `outgoing.conversationSectional` Conversation sectional | 2x2 · floor | hangOut:relax | living / — | Body, Upholstery | Use | `sink_in`: the seat cushions press down for hangOut. |
 | `outgoing.karaokeStage` Karaoke stage | 2x1 · floor | practise:sing perform:sing | hobbies / — | Body, Speakers | Use | `mic_up`: the mic stands rise for practise and perform. Sung up on the stage, between the mics (content `stand`, 0.146 m). |
 | `outgoing.videoCallNook` Video-call corner | 1x1 · floor | call:phone | office / — | Body, Upholstery, Wood | Use | `ring_light`: the ring light swings up for call. |

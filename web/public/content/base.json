@@ -2438,6 +2438,19 @@
             "cooking": 0.25,
             "creativity": 0.04
           }
+        },
+        {
+          "id": "coldDrink",
+          "label": "Pour a cold drink",
+          "anim": "drink",
+          "minutes": 5,
+          "effects": {
+            "comfort": 0.05,
+            "fun": 0.04
+          },
+          "tags": [
+            "food"
+          ]
         }
       ],
       "price": 600,
@@ -2464,6 +2477,19 @@
           "minutes": 2,
           "effects": {
             "hygiene": 0.04
+          },
+          "tags": [
+            "hygiene",
+            "handwash"
+          ]
+        },
+        {
+          "id": "brushTeeth",
+          "label": "Brush your teeth",
+          "anim": "wash",
+          "minutes": 3,
+          "effects": {
+            "hygiene": 0.03
           },
           "tags": [
             "hygiene",
@@ -2598,6 +2624,21 @@
             "rest",
             "lounge"
           ]
+        },
+        {
+          "id": "doze",
+          "label": "Doze off",
+          "anim": "nap",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "energy": 0.1,
+            "comfort": 0.1
+          },
+          "tags": [
+            "rest",
+            "nap"
+          ]
         }
       ],
       "price": 500,
@@ -2727,6 +2768,24 @@
           "tags": [
             "lounge"
           ]
+        },
+        {
+          "id": "read",
+          "label": "Read a book",
+          "anim": "read",
+          "minutes": 45,
+          "pose": "sit",
+          "effects": {
+            "fun": 0.35
+          },
+          "tags": [
+            "entertainment",
+            "reading"
+          ],
+          "skills": {
+            "intelligence": 0.08,
+            "writing": 0.04
+          }
         }
       ],
       "price": 300,
@@ -3198,7 +3257,7 @@
     },
     {
       "id": "mirror",
-      "name": "Standing mirror",
+      "name": "Cheval mirror",
       "model": "model.mirror",
       "footprint": [
         1,
@@ -3222,6 +3281,21 @@
           ],
           "skills": {
             "charisma": 0.22
+          }
+        },
+        {
+          "id": "primp",
+          "label": "Check the mirror",
+          "anim": "look",
+          "minutes": 5,
+          "effects": {
+            "comfort": 0.03
+          },
+          "tags": [
+            "lounge"
+          ],
+          "skills": {
+            "charisma": 0.04
           }
         }
       ]

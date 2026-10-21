@@ -54,7 +54,7 @@
           "id": "fold",
           "label": "Practise precision folding",
           "anim": "clean",
-          "minutes": 60,
+          "minutes": 20,
           "pose": "stand",
           "autonomous": true,
           "effects": { "fun": 0.1 },

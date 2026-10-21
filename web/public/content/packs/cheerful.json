@@ -57,6 +57,17 @@
           "tags": ["music", "entertainment"],
           "skills": { "dexterity": 0.06, "endurance": 0.05 },
           "feeling": "cheerful.upbeat"
+        },
+        {
+          "id": "listen",
+          "label": "Pick a song and listen",
+          "anim": "listen",
+          "seatNear": 4,
+          "minutes": 30,
+          "pose": "stand",
+          "autonomous": true,
+          "effects": { "fun": 0.35, "comfort": 0.05 },
+          "tags": ["entertainment", "music"]
         }
       ]
     },

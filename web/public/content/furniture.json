@@ -191,6 +191,19 @@
           "skills": {
             "cooking": 0.1
           }
+        },
+        {
+          "id": "coldDrink",
+          "label": "Get a cold drink",
+          "anim": "drink",
+          "minutes": 5,
+          "effects": {
+            "comfort": 0.05,
+            "fun": 0.04
+          },
+          "tags": [
+            "food"
+          ]
         }
       ]
     },
@@ -1182,7 +1195,7 @@
       "price": 900,
       "category": "living",
       "group": "seating",
-      "slots": 2,
+      "slots": 3,
       "description": "A long, deep sofa with soft cushions: very comfortable, and good for a doze.",
       "interactions": [
         {
@@ -1994,6 +2007,10 @@
       "category": "bedroom",
       "group": "beds",
       "slots": 2,
+      "seat": {
+        "height": 0.4,
+        "forward": 0.68
+      },
       "description": "A low platform with a firm futon: the cheapest double, if not the comfiest.",
       "interactions": [
         {
@@ -2047,6 +2064,21 @@
           "autonomous": false,
           "when": "open",
           "leaves": "closed"
+        },
+        {
+          "id": "relax",
+          "label": "Sit and relax",
+          "anim": "relax",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.5
+          },
+          "tags": [
+            "rest",
+            "lounge"
+          ],
+          "when": "closed"
         }
       ]
     },
@@ -2282,6 +2314,21 @@
           "skills": {
             "charisma": 0.18
           }
+        },
+        {
+          "id": "primp",
+          "label": "Check the mirror",
+          "anim": "look",
+          "minutes": 5,
+          "effects": {
+            "comfort": 0.03
+          },
+          "tags": [
+            "lounge"
+          ],
+          "skills": {
+            "charisma": 0.04
+          }
         }
       ]
     },
@@ -2496,6 +2543,19 @@
             "hygiene",
             "handwash"
           ]
+        },
+        {
+          "id": "brushTeeth",
+          "label": "Brush your teeth",
+          "anim": "wash",
+          "minutes": 3,
+          "effects": {
+            "hygiene": 0.03
+          },
+          "tags": [
+            "hygiene",
+            "handwash"
+          ]
         }
       ]
     },
@@ -2521,6 +2581,19 @@
           "minutes": 2,
           "effects": {
             "hygiene": 0.05
+          },
+          "tags": [
+            "hygiene",
+            "handwash"
+          ]
+        },
+        {
+          "id": "brushTeeth",
+          "label": "Brush your teeth",
+          "anim": "wash",
+          "minutes": 3,
+          "effects": {
+            "hygiene": 0.03
           },
           "tags": [
             "hygiene",
@@ -3098,6 +3171,18 @@
       ],
       "price": 1900,
       "category": "office",
+      "surface": {
+        "height": 0.75,
+        "kind": "desk",
+        "size": [
+          1.7,
+          0.44
+        ],
+        "at": [
+          0,
+          0.24
+        ]
+      },
       "description": "Two screens, a glowing keyboard and a fast tower. Games are more fun the better the player (Dexterity); from Dexterity 3 a win leaves them sharp.",
       "interactions": [
         {
@@ -3187,6 +3272,45 @@
           "tags": [
             "lounge"
           ]
+        },
+        {
+          "id": "write",
+          "label": "Write at the desk",
+          "anim": "write",
+          "minutes": 60,
+          "pose": "sit",
+          "needsTable": true,
+          "effects": {
+            "fun": 0.15,
+            "comfort": 0.1
+          },
+          "tags": [
+            "training",
+            "creative"
+          ],
+          "skills": {
+            "writing": 0.2,
+            "creativity": 0.04
+          }
+        },
+        {
+          "id": "homework",
+          "label": "Do homework at the desk",
+          "anim": "write",
+          "minutes": 45,
+          "pose": "sit",
+          "needsTable": true,
+          "homework": 7,
+          "effects": {
+            "fun": -0.05
+          },
+          "tags": [
+            "study"
+          ],
+          "skills": {
+            "intelligence": 0.1,
+            "writing": 0.05
+          }
         }
       ]
     },

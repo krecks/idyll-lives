@@ -159,6 +159,19 @@
             "hygiene",
             "handwash"
           ]
+        },
+        {
+          "id": "brushTeeth",
+          "label": "Brush your teeth",
+          "anim": "wash",
+          "minutes": 3,
+          "effects": {
+            "hygiene": 0.03
+          },
+          "tags": [
+            "hygiene",
+            "handwash"
+          ]
         }
       ]
     },
@@ -183,6 +196,19 @@
           "minutes": 2,
           "effects": {
             "hygiene": 0.04
+          },
+          "tags": [
+            "hygiene",
+            "handwash"
+          ]
+        },
+        {
+          "id": "brushTeeth",
+          "label": "Brush your teeth",
+          "anim": "wash",
+          "minutes": 3,
+          "effects": {
+            "hygiene": 0.03
           },
           "tags": [
             "hygiene",
@@ -264,7 +290,38 @@
       "layer": "wall",
       "decor": 0.4,
       "description": "A round mirror in a brass frame, hung from a strap.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "primp",
+          "label": "Check the mirror",
+          "anim": "look",
+          "minutes": 5,
+          "effects": {
+            "comfort": 0.03
+          },
+          "tags": [
+            "lounge"
+          ],
+          "skills": {
+            "charisma": 0.04
+          }
+        },
+        {
+          "id": "speech",
+          "label": "Practise a speech",
+          "anim": "talk",
+          "minutes": 30,
+          "effects": {
+            "social": 0.05
+          },
+          "tags": [
+            "training"
+          ],
+          "skills": {
+            "charisma": 0.18
+          }
+        }
+      ]
     },
     {
       "id": "laundryBasket",

@@ -24,7 +24,7 @@ footprint (`SEATS`), facing the wall, the screen towards them. A separate chair 
 | `computerDesk` Computer desk | 2x1 · floor | code:type write:type markets:type browse:type homework:type | office / — | Top, Frame, Drawers, Keyboard tray, Chair | Use | `tray_out`: the keyboard tray slides out 15 cm for code, write, markets, browse and homework. |
 | `deskWriting` Writing desk | 2x1 · floor | write:write homework:write | office / — | Top, Frame, Drawers, Chair | Use | `drawer_open` for write and homework; `hold` 2.5 s. |
 | `deskLaptop` Laptop desk | 1x1 · floor | browse:type code:type write:type homework:type | office / — | Top, Frame, Drawer, Laptop, Chair | Use | `lid_open`: the laptop opens from shut to 110° for browse, code, write and homework. |
-| `computerGaming` Gaming PC | 2x1 · floor | game:play code:type browse:type | office / — | Desk, PC & monitors, Lights, Chair | Loop (E1) | `fans`: the case fans spin while played (E1). |
+| `computerGaming` Gaming PC | 2x1 · floor | game:play code:type browse:type | office / — | Desk, PC & monitors, Lights, Chair | Loop (E1) | `fans`: the case fans spin while played (E1). Its top is a 1.70 × 0.44 m `desk` surface at 0.75 m (content `surface`), as the other computer desks'. |
 
 **In play** (signed off 2026-10-17):
 - Each in all four facings (against the north, west and east walls and standing free), every part a distinct colour
@@ -52,7 +52,7 @@ footprint (`SEATS`), facing the wall, the screen towards them. A separate chair 
 |---|---|---|---|---|---|---|
 | `chairExecutive` Executive chair | 1x1 · floor | sit:sit write:write homework:write | office / chairs | Frame, Seat | Use | `swivel`: the seat turns 15° and back for sit, write and homework. Pulled in to the desk or table it faces while sat on, as far as the knees fit under it: written at with the hands on the top (reaching further where a drawer pedestal stops it). |
 | `chairTask` Desk chair | 1x1 · floor | sit:sit write:write homework:write | office / chairs | Frame, Seat, Back | Use | `swivel`. Pulled in to the desk or table it faces while sat on, as far as the knees fit under it: written at with the hands on the top (reaching further where a drawer pedestal stops it). |
-| `officeChair` Office chair | 1x1 · floor | sit:sit | office / — | Frame, Seat | Use | `swivel`. Pulled in to the desk or table it faces while sat on, as far as the knees fit under it. |
+| `officeChair` Office chair | 1x1 · floor | sit:sit write:write homework:write | office / — | Frame, Seat | Use | `swivel`. Pulled in to the desk or table it faces while sat on, as far as the knees fit under it. Write and homework at a desk it faces (`needsTable`), as the desk chairs. |
 
 **In play** (signed off 2026-10-17):
 - Each standing free and sat on in all four facings: the seat swivels and shuts after its `hold` (0.6 s), by day and

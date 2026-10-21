@@ -17,9 +17,9 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `sofa` Sofa | 2x1 · floor | relax:relax | living / seating | Upholstery, Cushions, Frame, Legs, Pillow, Second pillow | Use | `sink_in`: the seat cushions settle 2 cm while sat on (relax, doze; T0 `squash`). |
+| `sofa` Sofa | 2x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions, Frame, Legs, Pillow, Second pillow | Use | `sink_in`: the seat cushions settle 2 cm while sat on (relax, doze; T0 `squash`). Doze off, as the other sofas. |
 | `loveseat` Loveseat | 2x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions, Legs, Pillow | Use | `sink_in`. |
-| `sofaThree` Three-seat sofa | 3x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions, Legs, Pillows, Throw | Use | `sink_in`. |
+| `sofaThree` Three-seat sofa | 3x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions, Legs, Pillows, Throw | Use | `sink_in`. Three residents at once (`slots: 3`, was 2). |
 | `sofaDesign` Designer sofa | 2x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions, Frame, Legs | Use | `sink_in`. |
 | `sofaThreeSeat` Three-seater sofa | 3x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions, Legs, Pillow, Second pillow | Use | `sink_in`. |
 | `sofaBed` Sofa bed | 2x1 · floor | relax:relax doze:nap pullOut:fetch foldAway:fetch | living / seating | Upholstery, Cushions, Legs, Bedding, Pillow, Second pillow | Held open | `bed_out`: the mattress pulls out forward from under the seat for doze and "Pull out the bed" and stays out until "Fold the bed away" (relax only while folded); `beds` height 0.44 and `fwd` 0.6 (head on the seat; `cargo check-glb` measures the mattress pulled out at 0.44); pulling it out and folding it away the resident stands 1 m further back, clear of the mattress (`STAND_BACK`). |
@@ -46,7 +46,7 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `armchair` Armchair | 1x1 · floor | sit:sit | living / seating | Upholstery, Cushion, Frame, Legs, Pillow | Use | `sink_in`. |
+| `armchair` Armchair | 1x1 · floor | sit:sit read:read | living / seating | Upholstery, Cushion, Frame, Legs, Pillow | Use | `sink_in`. Read a book sitting, as the leather and wingback chairs. |
 | `armchairLounge` Lounge chair | 1x1 · floor | sit:sit | living / seating | Upholstery, Cushions, Legs | Use | `sink_in`. |
 | `armchairLeather` Leather armchair | 1x1 · floor | sit:sit read:read | living / seating | Frame, Upholstery | Use | `sink_in`. |
 | `armchairDesign` Designer lounge chair | 1x1 · floor | relax:relax doze:nap | living / seating | Frame, Upholstery, Base | Static | Static (moulded shell). |

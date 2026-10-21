@@ -35,8 +35,8 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `fridge` Fridge | 1x1 · floor | snack:fetch frozenTreat:fetch meal:cook gourmet:cook | kitchen / appliances | Body, Handles, Plinth & badge, Inside | Use | `fridge_open`: the tall fridge door below swings 102° for snack, meal and gourmet; `hold` 3.5 s. The freezer door above swings 118° (`freezer_open`) for frozenTreat. |
-| `fridgeMini` Mini fridge | 1x1 · floor | snack:fetch meal:cook | kitchen / appliances | Body, Handles, Plinth | Use | `fridge_open`: the door swings 100° on its hinge for snack and meal; `hold` 3 s. |
+| `fridge` Fridge | 1x1 · floor | snack:fetch frozenTreat:fetch meal:cook gourmet:cook coldDrink:drink | kitchen / appliances | Body, Handles, Plinth & badge, Inside | Use | `fridge_open`: the tall fridge door below swings 102° for snack, meal and gourmet; `hold` 3.5 s. The freezer door above swings 118° (`freezer_open`) for frozenTreat. Has the other fridges' cold drink (2026-10-21). |
+| `fridgeMini` Mini fridge | 1x1 · floor | snack:fetch meal:cook coldDrink:drink | kitchen / appliances | Body, Handles, Plinth | Use | `fridge_open`: the door swings 100° on its hinge for snack and meal; `hold` 3 s. Has a cold drink, as the retro mini fridge. |
 | `fridgeBuiltIn` Built-in fridge | 1x1 · floor | snack:fetch frozenTreat:fetch meal:cook gourmet:cook coldDrink:drink | kitchen / appliances | Panels, Handles | Use | `fridge_open`: the tall fridge door swings for snack, meal, gourmet and coldDrink; the freezer door below opens (`freezer_open`) for frozenTreat. |
 | `fridgeFrenchDoor` French-door fridge | 1x1 · floor | snack:fetch frozenTreat:fetch meal:cook gourmet:cook coldDrink:drink | kitchen / appliances | Body, Handles, Plinth | Use | `fridge_open`: both upper doors swing out (-100° / +100°) for snack, meal, gourmet; `door_right` (the right door only) for coldDrink. The freezer drawer slides out 35 cm (`freezer_open`) for frozenTreat. |
 | `fridgeRetro` Retro fridge | 1x1 · floor | snack:fetch meal:cook coldDrink:drink | kitchen / appliances | Body, Handle, Trim | Use | `lever`: the chrome lever (a part inside the door) turns 30° out, then `fridge_open` (`delay` 0.3 s): the rounded door swings 100°; snack, meal, coldDrink. |
@@ -101,10 +101,10 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 |---|---|---|---|---|---|---|
 | `counter` Kitchen counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Worktop, Handles | Use | `drawer_open`: the top drawer slides out 25 cm for sandwich; `hold` 1.5 s. |
 | `counterCorner` Corner counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Worktop, Handles | Use | `drawer_open`, as the counter. |
-| `counterEnd` Counter end with shelves | 1x1 · floor | — | kitchen / counters | Cabinet, Worktop, Handles | Static | Static (open end shelves). |
-| `counterCornerOuter` Outer corner counter | 1x1 · floor | — | kitchen / counters | Cabinet, Worktop, Handles | Static | Static. |
-| `counterDrawers` Drawer counter | 1x1 · floor | — | kitchen / counters | Cabinet, Worktop, Handles | Use | `drawer_open`: the top drawer slides out 25 cm while clean things are put away in it (`fetch` at its `prep` station, `hold` 1.5 s). |
-| `counterOpenShelf` Open-shelf counter | 1x1 · floor | — | kitchen / counters | Cabinet, Worktop | Static | Static. |
+| `counterEnd` Counter end with shelves | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Worktop, Handles | Static | Static (open end shelves). A sandwich, as the other counters. |
+| `counterCornerOuter` Outer corner counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Worktop, Handles | Static | Static. A sandwich, as the other counters. |
+| `counterDrawers` Drawer counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Worktop, Handles | Use | `drawer_open`: the top drawer slides out 25 cm while clean things are put away in it (`fetch` at its `prep` station, `hold` 1.5 s). A sandwich, as the other counters. |
+| `counterOpenShelf` Open-shelf counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Worktop | Static | Static. A sandwich, as the other counters. |
 | `butcherBlock` Butcher block | 1x1 · floor | sandwich:cook | kitchen / counters | Base, Block, Top | Use | `drawer_open`: the knife drawer slides out for sandwich. |
 | `counterMarble` Marble counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Marble top, Handles | Use | `drawer_open` for sandwich. |
 
@@ -148,9 +148,9 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `kitchenIsland` Kitchen island | 2x1 · floor | sandwich:cook breakfast:eat | kitchen / counters | Cabinet, Worktop | Use | `drawer_open`: a drawer slides out for sandwich (not for breakfast). Breakfast is eaten on a stool at its back, or any seat within 3 m (`seatNear`), else standing. |
-| `islandSmall` Small island | 1x1 · floor | — | kitchen / islands | Cabinet, Worktop | Static | Static. |
-| `islandLong` Long island | 3x1 · floor | — | kitchen / islands | Cabinet, Worktop | Static | Static. |
-| `barSegment` Bar counter | 1x1 · floor | — | kitchen / islands | Cabinet, Worktop | Static | Static. |
+| `islandSmall` Small island | 1x1 · floor | sandwich:cook breakfast:eat | kitchen / islands | Cabinet, Worktop | Static | Static. A sandwich, and breakfast on a stool or seat within 3 m (`seatNear`), as the kitchen island. |
+| `islandLong` Long island | 3x1 · floor | sandwich:cook breakfast:eat | kitchen / islands | Cabinet, Worktop | Static | Static. A sandwich, and breakfast on a stool or seat within 3 m (`seatNear`), as the kitchen island. |
+| `barSegment` Bar counter | 1x1 · floor | — | kitchen / islands | Cabinet, Worktop | Static | Static. High bar stools seat at it (the counter stools at counters, G-07). |
 | `barEnd` Bar end | 1x1 · floor | — | kitchen / islands | Cabinet, Worktop | Static | Static. |
 
 **In play** (signed off 2026-10-16):

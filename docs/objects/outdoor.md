@@ -30,7 +30,7 @@ none.
 | `patioChair` Patio chair | 1x1 · floor | sit:sit coffee:drink | outdoor / seating | Frame, Cushion | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
 | `adirondackChair` Adirondack chair | 1x1 · floor | relax:relax | outdoor / seating | Chair | Static | Static. |
 | `benchGarden3` Garden bench | 3x1 · floor | sit:sit | outdoor / seating | Frame, Slats | Static | Static. |
-| `outdoorBar` Outdoor bar | 2x1 · floor | — | outdoor / seating | Body, Counter, Foot rail | Static | Static. |
+| `outdoorBar` Outdoor bar | 2x1 · floor | — | outdoor / seating | Body, Counter, Foot rail | Static | Static. A high bar stool pulled up to it offers Have a drink at the bar (`stoolBarHigh`, `seatAt: bar`). |
 | `parasol` Parasol | 1x1 · floor | — | outdoor / seating | Canopy, Pole, Edge | Ambient (E2) | Open; `stir`: the canopy stirs in the wind, ambient (not on Low). (+use) it folds. |
 
 **In play** (signed off 2026-10-17):
