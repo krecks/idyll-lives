@@ -74,6 +74,7 @@ import { FACE_KEYS, FaceMixer, NEUTRAL, type Face } from './characters/face';
 import { ENERGY_RATE, type VisemeTrack } from '../../voice/visemes';
 import { outfitFor, writeOutfit, type OutfitParams } from './characters/outfit';
 import { BLANKET_WIDTH, blanketMaterial, buildBlanket, type BlanketShape } from './characters/blanket';
+import { SLIDE } from './characters/clips/rides';
 import { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } from './characters/clips/street';
 import { BOULDER, FOOS, FOOS_LANES, POOL, SMASH, YOGA_AT } from './characters/clips/games';
 // The seat and bed tables (`SEATS`, `BEDS`, `BUNKS` and their defaults) are data, read by `cargo check-glb` and
@@ -219,6 +220,8 @@ const STEP_IN: Record<string, StepIn> = {
   phoneBooth: { by: [[0, ['phone'], { to: -0.04, up: 0.12 }]], wait: 1, back: 0.25, out: 0.25 },
   // Side by side on the net (0.9 m wide, from -0.75 m), each round over the deck and down the pole.
   climbingFrame: { by: CLIMB.map(({ clip, min, fit }) => [min, CLIMB_LANES.map((_, lane) => climbClip(clip, lane)), fit] as const), lanes: CLIMB_LANES, perLane: true },
+  // A round from the run-out's foot: round to the ladder, up it, down the chute and back (`clips/rides.ts`).
+  slide: { by: SLIDE.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
   // Games and sport up against the thing (`clips/games.ts`): bent over the pool table's long rail (two players, a
   // lane each), at a pair of the foosball rods, at the plate stack and the crate, up on the bouldering wall's crash
   // mat, and on the yoga mat's front end, facing along it.
