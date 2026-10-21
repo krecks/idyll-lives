@@ -330,7 +330,7 @@ const STEP_IN: Record<string, StepIn> = {
   // Kneeling at the low train table's edge, the hands on its track and its little town, a lane each (clips/low.ts).
   trainTable: { by: KNEEL_TABLE.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: KNEEL_LANES, tag: 'play' },
   // Into the shelter at the timetable's end, on the back glass past the bench.
-  busStop: { by: [[0, [], { to: 0.2 }]], lanes: [-0.95] },
+  busStop: { by: [[0, [], { to: 0.05 }]], lanes: [-0.95] },
   // At the feeder's post, at its back left, clear of the bird bath: its house filled from a scoop (clips/reach.ts).
   'kind.songbirdFeeder': { by: FEEDER.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: [-0.2], tag: 'garden' },
   // At the microwave on the counter's right, the hands at its door.

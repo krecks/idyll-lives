@@ -157,7 +157,7 @@
       "name": "Garden bench",
       "model": "model.benchGarden3",
       "footprint": [
-        3,
+        2,
         1
       ],
       "price": 280,
@@ -203,7 +203,7 @@
       "outdoors": true,
       "decor": 0.3,
       "seat": {
-        "height": 0.55,
+        "height": 0.52,
         "forward": 0.04
       },
       "description": "A swing seat for two hanging from a wooden frame.",

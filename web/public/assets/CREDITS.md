@@ -265,7 +265,8 @@ canopy stirs in the wind (`stir`); the rest are still.
 The outdoor loungers and swings (`models/outdoor/sunLounger.glb`, `hammock.glb`, `porchSwing.glb`, `swingSet.glb`,
 `hotTubCedar.glb`, same pack and family) are built the same way (glTF, original, CC0). The lounger's back reclines
 for sunbathing, the hammock and the swings sway with whoever is on them, and the hot tub's cover folds back for a
-soak while the water bubbles.
+soak and hangs behind it while the water bubbles. The patio things, the hammock, the swings, the hot tub and the
+grill were rebuilt to real sizes (2026-10-21).
 
 The play and yard things (`models/yard/sandbox.glb`, `bikeRack.glb`, `raisedBed.glb`, `shedSmall.glb`,
 `greenhouse.glb`, `compostBin.glb`, `rainBarrel.glb`, `clothesline.glb`, `firewoodStack.glb`, each with its
@@ -418,7 +419,8 @@ town overview, override pack `packs/playground/manifest.json`) is built in Blend
 plank, the spring rider's horse and the merry-go-round's platform go round while they are played on, carrying their
 riders; the hoop's net swishes after a shot and a pawn moves on the chess table; the slide, the climbing frame and the
 ping-pong table are static. The chess table was rebuilt with a stool either side, its players facing each other
-(2026-10-21).
+(2026-10-21); the slide (headroom on its deck), the spring rider, the merry-go-round, the hoop, the ping-pong table
+and the chess table were rebuilt to real sizes the same day.
 
 The farm (`models/farm/barn.glb`, `silo.glb`, `tractor.glb`, `hayBale.glb`, `hayStack.glb`, `scarecrow.glb`,
 `trough.glb`, `coop.glb`, each with a `.far.glb` for the town overview, override pack `packs/farm/manifest.json`) is

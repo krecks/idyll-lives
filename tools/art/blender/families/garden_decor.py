@@ -5,6 +5,7 @@
 # time near the camera (`flow`, ambient: the jet bubbling up, rings on the basins); the rest are still.
 #
 # Run:  cargo art garden_decor [--only gnome] [--preview]
+import math
 import os
 import sys
 
@@ -21,6 +22,10 @@ M = G.Palette(
     stone=('#B9B2A6', 'matte'),
     stone_dark=('#8F887C', 'matte'),
     stone_warm=('#C6BCA9', 'matte'),
+    rock=('#8A847A', 'matte'),          # the boulders: weathered grey-brown stone, darker than the dressed stone
+    rock_dark=('#6F6A62', 'matte'),
+    rock_warm=('#968A78', 'matte'),
+    fleck=('#5C5852', 'matte'),         # their mottle: darker facets (plain, so no more draws)
     water=('#6FA8C0', 'gloss'),         # opaque, like the old parts' water
     moss=('#5E8A3C', 'foliage'),
     leaf=('#4E7A34', 'foliage'),

@@ -4,15 +4,21 @@ The outdoor things. One pack, `packs/outdoor/manifest.json`. Each model is built
 old part stood (`F`, game axes), so seat heights (content `seat`) and table tops (content `surface`)
 stay where the game has them; models that stand off the middle of their footprint say so with `centre=`.
 
+2026-10-21 (authenticity review, Phase 4): the park bench's and the picnic table's heights, the bistro set's
+chairs, the garden bench, the hammock, the porch swing's seat, the swing set's frame, the hot tub's cover and bench
+and the grill's height and glow were rebuilt to real sizes (`docs/review/outdoor.md`, `systems.md` M-outdoor-01).
+
 ## OU1. Patio seating and tables (Validate › Patio)
 
 Built 2026-10-14; they sat in Validate › Patio until signed off (back to Outdoor › Seating).
 
 - **Park bench** (`bench`): cast-iron ends (legs, arm with a rounded end and a scroll, a stretcher, feet), four
-  seat slats at 0.47 m and three back slats leaning 8°.
-- **Folding bistro set** (`patioSet`): a slatted table on crossed iron legs (top at 0.72 m, where the content's
-  `surface` is) between two folding chairs facing it; a cup and a jug on the table.
-- **Picnic table** (`picnicTable`): five planks at 0.63 m, a two-plank bench each side, A-frames with bearers,
+  seat slats (their top at 0.45 m, `seats.bench`) and three back slats leaning 8°.
+- **Folding bistro set** (`patioSet`): a slatted table on iron legs crossed at its sides (top at 0.72 m, where the
+  content's `surface` is), between two folding chairs facing each other across it, their seats' fronts 4 cm under
+  its edges (content `places` at ±0.43 m; the legs clear of the sitters' knees); a cup and a jug on the table.
+- **Picnic table** (`picnicTable`): five planks, their top at 0.73 m (content `surface`), a two-plank bench each
+  side at 0.44 m (`seats.picnicTable`; 0.29 m between bench and top), A-frames with bearers,
   a centre cleat and braces; a red gingham cloth, a basket and two cups.
 - **Garden chair** (`gardenChair`) and **Adirondack chair** (`adirondackChair`): one slatted frame (seat sloping
   back, wide arms, stringers, braces); the garden chair is white with five parallel back slats and a top rail
@@ -22,7 +28,8 @@ Built 2026-10-14; they sat in Validate › Patio until signed off (back to Outdo
 - **Teak patio table** (`patioTable4`): five planks at 0.74 m on aprons, square legs and a low stretcher,
   centred on the content's top (−0.43 to 0.35 deep).
 - **Patio chair** (`patioChair`): a bent green-iron frame, three back slats and a seat cushion (Frame, Cushion).
-- **Garden bench** (`benchGarden3`): three seat and three back slats on three iron frames, arms at the ends.
+- **Garden bench** (`benchGarden3`): three seat and three back slats, 1.9 m long, on three iron frames, arms at the
+  ends; on two tiles, its three sitters 0.67 m apart (it was 2.7 m on three).
 - **Outdoor bar** (`outdoorBar`): a teak body with twenty front slats, a lighter counter at 1.06 m (the content's
   bar top), a back shelf and a steel foot rail (Body, Counter, Foot rail).
 - **Parasol** (`parasol`): a weighted base and pole, an octagonal canopy on eight ribs and struts, with a valance.
@@ -33,14 +40,14 @@ Built 2026-10-14; they sat in Validate › Patio until signed off (back to Outdo
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
 | bench | 1.74 × 0.89 × 0.53 | 2468 | 2 | Frame, Slats |
-| patioSet | 0.60 × 0.93 × 1.86 | 2952 | 2 | Frame, Slats |
-| picnicTable | 2.50 × 0.96 × 1.62 | 2908 | 3 | Frame, Planks, Cloth |
+| patioSet | 0.60 × 0.93 × 1.42 | 3088 | 2 | Frame, Slats |
+| picnicTable | 2.50 × 1.06 × 1.62 | 2908 | 3 | Frame, Planks, Cloth |
 | gardenChair | 0.84 × 1.04 × 0.76 | 2320 | 1 | Chair |
 | patioTableRound | 0.82 × 0.73 × 0.82 | 1624 | 1 | Frame, Top, Tiles |
 | patioTable4 | 1.60 × 0.74 × 0.79 | 1728 | 1 | Frame, Top |
 | patioChair | 0.46 × 0.93 × 0.45 | 1336 | 2 | Frame, Cushion |
 | adirondackChair | 0.88 × 1.10 × 0.79 | 2160 | 1 | Chair |
-| benchGarden3 | 2.70 × 0.91 × 0.60 | 2712 | 2 | Frame, Slats |
+| benchGarden3 | 1.91 × 0.91 × 0.60 | 2712 | 2 | Frame, Slats |
 | outdoorBar | 2.00 × 1.06 × 0.89 | 3052 | 2 | Body, Counter, Foot rail |
 | parasol | 2.21 × 2.46 × 2.21 | 1376 | 3 | Canopy, Pole, Edge |
 
@@ -58,28 +65,34 @@ Built 2026-10-14; they sat in Validate › Loungers until signed off (back to Ou
 - **Sun lounger** (`sunLounger`): a slatted frame, a seat cushion and a beach towel; the back is its own part, an
   upholstered pad and pillow hinged at the seat's end, raised 35°. `recline` lowers it 30° (nearly flat) for
   sunbathe and doze, so the lying resident (`BEDS` 0.35 m) lies along it; it rises again after.
-- **Hammock** (`hammock`): a wooden stand; the sling (a sagging striped mesh, spreader bars, ropes, a pillow) is
-  hinged on the line through the hooks (1.1 m). `sway` rocks it ±8° in 2 s, a loop for swing and doze, and the
-  resident rides it (`ride`). They lie in the sling's dip (`characters.ts` `BEDS.hammock.sling`, its heights
-  from `_sling`: 0.6 m in the middle, 0.86 at the spreader bars ±0.66, the pillow 0.5 towards the head), the
-  head raised onto the pillow, knees up and the feet inside the spreader bar. A changed sling needs those numbers
-  changed too; the two pack hammocks have theirs.
-- **Porch swing** (`porchSwing`): an A-frame; the slatted seat with arms, cushion and chains swings from the beam,
+- **Hammock** (`hammock`): a 2.8 m wooden stand on its 1 × 3 tiles (Q-07; it was 1.86 m on 1 × 2, lain in
+  folded); the sling (a sagging striped mesh 0.74 m wide, spreader bars, ropes, a pillow) is hinged on the line
+  through the hooks (1.1 m). `sway` rocks it ±8° in 2 s, a loop for swing and doze, and the resident rides it
+  (`ride`). They lie in the sling's dip (`furniture.json` `beds.hammock.sling`, its heights from `_sling` and
+  `SLING_*`: 0.52 m in the middle, 0.84 at the spreader bars ±0.98, the pillow 0.78 towards the head), the head
+  on the pillow and the feet inside the spreader bar. A changed sling needs those numbers changed too; the two pack
+  hammocks have theirs.
+- **Porch swing** (`porchSwing`): an A-frame; the slatted seat with arms, cushion (its top 0.52 m, the content's
+  `seat`; 5 cm lower than it was) and chains swings from the beam,
   `swing` ±10° in 2 s while sat in, ridden. Chains are plain satin, so the seat stays one draw call.
-- **Swing set** (`swingSet`): a round-timber A-frame; both seats and their chains are one part, `swing` ±20° in
+- **Swing set** (`swingSet`): a round-timber A-frame, its legs splayed ±0.72 m at the foot (2 × 2 tiles; it was
+  ±0.42 on 2 × 1, too upright for seats swinging 20°); both seats and their chains are one part, `swing` ±20° in
   1.6 s while played on, ridden.
 - **Cedar hot tub** (`hotTubCedar`): banded staves with grooves, a rim and a step; the water with bubbles is its own
-  part (`bubbles`: a whole turn in 2 s, a loop while soaking); the cover is hinged at the back and `cover_off`
-  lifts it 105° to stand behind the tub. It is the model's `open` clip too: soaking leaves the tub open (content
-  `leaves`), so the cover stays up until a resident puts it back on.
+  part (`bubbles`: a whole turn in 2 s, a loop while soaking); a bench runs round the inside wall at 0.35 m under
+  the water (`seats.hotTubCedar`). `cover_off` (1.5 s) folds the cover back on its seam (one part, squashed to half
+  its depth and twice its thickness about its back edge: two halves would be a fourth draw), lifts it, turns it
+  down behind the tub and lowers it to hang there on its folded edge, as on a cover lifter, its round edge just off
+  the ground (before, it stood on end in the air behind the tub). It is the model's `open` clip too: soaking
+  leaves the tub open (content `leaves`), so the cover stays off until a resident puts it back on.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
 | sunLounger | 0.62 × 0.76 × 1.87 | 2428 | 3 | Frame, Cushions, Towel |
-| hammock | 0.70 × 1.15 × 1.86 | 1372 | 3 | Frame, Fabric, Stripes |
+| hammock | 1.00 × 1.20 × 2.80 | 1420 | 3 | Frame, Fabric, Stripes |
 | porchSwing | 1.92 × 2.06 × 0.91 | 2536 | 3 | Seat, Frame, Chains, Cushion |
-| swingSet | 1.92 × 1.97 × 0.91 | 1060 | 2 | Frame, Seats |
-| hotTubCedar | 1.89 × 0.92 × 1.90 | 3508 | 3 | Cedar, Cover |
+| swingSet | 1.92 × 1.98 × 1.51 | 1060 | 2 | Frame, Seats |
+| hotTubCedar | 1.89 × 0.92 × 1.90 | 3636 | 3 | Cedar, Cover |
 
 `check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
 
@@ -92,9 +105,10 @@ and soaking in the hot tub (cover up, water bubbling; the cover stayed up after 
 Built 2026-10-16; they sat in Validate › Grills until signed off (back to Outdoor › Cooking).
 
 - **Charcoal grill** (`grill`): an enamelled kettle on three legs, wheels on the back two, a wire rack and an ash
-  catcher; inside, a bed of red coals and a grate with burgers and sausages. The lid (with a vent and a front
-  handle) is hinged at the back of the rim: `lid_open` swings it up 95° for the whole of cook. The coals don't glow
-  at night: a glow's copy of the faces showed through the shut lid.
+  catcher; inside, a bed of red coals and a grate with burgers and sausages. The rim is at 0.79 m and the grate at
+  0.77 (a 57 cm kettle's; they were 0.99 and 0.97, at the cook's elbow), 1.04 m with the lid. The lid (with a vent
+  and a front handle) is hinged at the back of the rim: `lid_open` swings it up 95° for the whole of cook. The coals
+  glow at night (`coal_hot`): the glow's copy no longer shows through the shut lid (`models.ts` `glowMesh`).
 - **Gas grill station** (`grillStation`): a stainless cart on a plinth, two doors with bar handles and a control
   panel's chrome knobs, under a dark counter at 0.9 m (the content's `surface`); a chopping board with a tray of
   patties on the left, a bottle and a pepper mill at the back right, off the surface. The grill in the middle (a dark
@@ -109,7 +123,7 @@ Built 2026-10-16; they sat in Validate › Grills until signed off (back to Outd
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| grill | 0.64 × 1.24 × 0.63 | 4396 | 2 | Body, Lid |
+| grill | 0.64 × 1.04 × 0.63 | 4396 | 2 | Body, Lid |
 | grillStation | 1.66 × 1.20 × 0.66 | 3576 | 3 | Cart, Hood |
 | firePit | 0.93 × 0.62 × 0.91 | 2488 | 3 | Bowl, Stones |
 

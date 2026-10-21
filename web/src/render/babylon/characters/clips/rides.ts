@@ -1,6 +1,6 @@
 /**
  * Rides and climbs at things: a child's round on the slide (`STEP_IN` in characters.ts: round to its ladder,
- * up it, in under the bar onto the deck, sat at the top holding the hoop, down the chute on the back, off at
+ * up it, in onto the deck on hands and knees, sat at the top holding the arch, down the chute on the back, off at
  * the run-out and back round to the front), the upper bunk's ladder (characters.ts `BUNK_LADDER`: up it and
  * onto the mattress getting into bed, down it getting up), and the rides sat astride with the hands on the
  * grips (characters.ts `RIDES`): the rocking horse and the spring rider, the seesaw, the merry-go-round and the
@@ -277,14 +277,15 @@ function walk(r: Round, path: readonly Vec[], t0: number, t1: number, o: { first
 /**
  * The slide (playground, `model.slide`): a ladder up the back of its tower, its rails from the ground 0.94 m
  * behind the middle to the deck's back edge (1.42 m up, 0.7 m behind) 0.5 m apart, five rungs 0.237 m apart; the
- * deck's top 1.43 m up, 0.72 m to 0.28 m behind the middle, a bar across its back at 1.86 m and the roof's eaves
- * 1.93 m up; a hoop over the chute's mouth (0.27 m round its middle, 1.43 m up, 0.27 m behind the middle); the
+ * deck's top 1.43 m up, 0.72 m to 0.28 m behind the middle, open at its back between the ladder's handrails, the
+ * roof's eaves 2.46 m up; an arch over the chute's mouth (0.27 m either side of its middle, rising 0.55 m from
+ * 1.43 m up, 0.27 m behind the middle); the
  * chute from the deck's front (1.43 m up, 0.29 m behind) down a smoothstep to its run-out, 0.28 m up and
  * level at 0.95 m in front, its floor 2.5 cm thick.
  */
 const SLIDE_LADDER = { rail: 0.25, foot: -0.94, top: [1.42, -0.7] as const, rung: 0.2367, rungs: 5 };
 const SLIDE_DECK = 1.43;
-const SLIDE_HOOP = { y: 1.43, z: -0.27, r: 0.27 };
+const SLIDE_HOOP = { y: 1.43, z: -0.27, r: 0.27, rise: 0.55 };
 const CHUTE = { top: [1.43, -0.29] as const, end: [0.28, 0.95] as const, floor: 0.025 };
 /** The chute's floor (m up) at a depth `z` (m in front of the middle). */
 function chuteY(z: number): number {
@@ -312,9 +313,9 @@ const SLIDE_S = 14;
 /**
  * A round on the slide, from standing at the run-out's foot facing it: round its right side to the ladder
  * (the walk on the left of the way, clear of the chute), hands onto the rails and up the five rungs, hand and
- * foot in turn; ducking under the bar across the deck's back, hands onto the deck, a knee up and in on hands
- * and knees; sat at the top, the legs into the chute, holding the hoop, a look down; a push, lain back under the
- * hoop, down the chute on the back (the body on its floor, the legs ahead along it), sat up on the run-out, the
+ * foot in turn; the chest down between the handrails, hands onto the deck, a knee up and in on hands and knees
+ * (as when a bar crossed the deck's back: the tower has standing room now, M-community-07); sat at the top, the legs
+ * into the chute, holding the arch, a look down; a push, lain back under the arch, down the chute on the back (the body on its floor, the legs ahead along it), sat up on the run-out, the
  * feet down, up off it, and a turn round back to where the round began.
  */
 function slidePose(fit: SlideFit): (p: number) => PoseSpec {
@@ -369,7 +370,7 @@ function slidePose(fit: SlideFit): (p: number) => PoseSpec {
       r.grab(other, t, palm(other, Math.min(1.7, reachY(rung(i)[0]) + 0.05 * s)), { from: t - dm * 0.3 });
       r.grab(side, t + dm * 0.4, palm(side, Math.min(1.68, reachY(rung(i)[0]) + 0.15 * s)), { from: t + dm * 0.05 });
     }
-    // 3. Over the top: the chest down under the bar, hands onto the deck, a knee up onto it and the other, in on
+    // 3. Over the top: the chest down between the handrails, hands onto the deck, a knee up onto it and the other, in on
     // hands and knees to sit at the front.
     const o0 = c1;
     const o1 = 0.55;
@@ -401,7 +402,7 @@ function slidePose(fit: SlideFit): (p: number) => PoseSpec {
     r.step('l', tk(0.6), legOut('l', zSit + 0.72 * s), { from: tk(0.25), pitch: -20, knee: 1 });
     r.step('r', tk(0.7), legOut('r', zSit + 0.72 * s), { from: tk(0.35), pitch: -20, knee: 1 });
     r.body(tk(0.75), { at: sitAt, hip: 28, bend: 12, nod: 8 });
-    const hoop = (side: Side, a: number): Vec => C((side === 'l' ? -1 : 1) * SLIDE_HOOP.r * Math.cos((a * Math.PI) / 180), SLIDE_HOOP.y + SLIDE_HOOP.r * Math.sin((a * Math.PI) / 180), SLIDE_HOOP.z - 0.03);
+    const hoop = (side: Side, a: number): Vec => C((side === 'l' ? -1 : 1) * SLIDE_HOOP.r * Math.cos((a * Math.PI) / 180), SLIDE_HOOP.y + SLIDE_HOOP.rise * Math.sin((a * Math.PI) / 180), SLIDE_HOOP.z - 0.03);
     r.grab('l', tk(0.8), hoop('l', 35), { from: tk(0.45), elbow: 0 });
     r.grab('r', tk(0.85), hoop('r', 35), { from: tk(0.5), elbow: 0 });
     r.body(t1, { nod: 20 });
@@ -700,7 +701,7 @@ function horsePose(f: RideFit): (p: number) => PoseSpec {
 }
 
 /**
- * The spring rider (playground, `model.springRider`, a child's): its saddle 0.78 m up, the handles' ends 0.16 m
+ * The spring rider (playground, `model.springRider`, a child's): its saddle 0.62 m up, the handles' ends 0.16 m
  * either side, 0.15 m over it and 0.28 m ahead, the foot pegs 0.19 m either side, 0.28 m under it and 0.1 m
  * ahead. Astride, the feet on the pegs, the hands on the handles.
  */

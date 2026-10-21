@@ -84,7 +84,6 @@ M = G.Palette(
     barrel=('#3F6E4A', 'satin'),         # the main part
     barrel_dark=('#35603F', 'satin'),
     brass=('#B8925A', 'metal'),
-    pipe=('#8E959B', 'metal'),
     can=('#9EA7AD', 'metal'),            # a galvanised watering can
     # the washing line
     posts=('#B9BCBE', 'metal'),
@@ -754,8 +753,10 @@ def compostBin():
     return objs
 
 
-# --- the rain barrel (1x1): a ribbed green barrel under a downpipe, a brass tap ------------------------------
-RB_Z = -0.15
+# --- the rain barrel (1x1): a ribbed green barrel with a lid and its inlet, a brass tap ------------------------
+# Free-standing, so no downpipe (Q-06): one ended in mid-air wherever the barrel stood. It stands in the middle of its
+# tile (it stood 0.15 m back, the pipe against the wall).
+RB_Z = 0.0
 
 
 def rainBarrel():
@@ -772,14 +773,6 @@ def rainBarrel():
         _rod('tap_nose', (0, 0.17, RB_Z + 0.355), (0, 0.13, RB_Z + 0.37), 0.014, M.brass, verts=low(8, 5))
         F.cyl('tap_body', 0.025, 0.05, (0, 0.2, RB_Z + 0.33), M.brass, verts=low(10, 6))
         F.box('tap_lever', 0.08, 0.012, 0.02, (0, 0.23, RB_Z + 0.33), M.brass, bevel=0.004)
-        # the downpipe behind, its shoe turned into the lid
-        pz = -0.42
-        F.cyl('downpipe', 0.04, 1.08, (0, 1.56, pz), M.pipe, verts=low(12, 6))
-        for y in (1.3, 1.9):
-            F.cyl(_name('pipe_clip'), 0.046, 0.04, (0, y, pz), M.pipe, verts=low(12, 6))
-        _rod('pipe_elbow', (0, 1.04, pz), (0, 0.98, RB_Z - 0.1), 0.04, M.pipe, verts=low(12, 6))
-        F.sphere('pipe_knee', 0.042, (0, 1.03, pz), M.pipe, segments=low(12, 6), rings=low(8, 4))
-        F.cyl('pipe_top', 0.05, 0.03, (0, 2.1, pz), M.pipe, verts=low(12, 6))
     return G.settle([G.join_all('rainBarrel')], centre=False)
 
 
@@ -910,7 +903,7 @@ FAMILY = G.Family(
      G.Model('compostBin', compostBin, size=(0.84, 0.775, 0.792), centre=(0, -0.08), key='model.compostBin', far=G.far_of(compostBin),
              motions={'uses': {'compost': 'lid_open'}, 'hold': 2},
              paint=[('bin', 'Bin')]),
-     G.Model('rainBarrel', rainBarrel, size=(0.606, 2.115, 0.703), centre=(0, -0.118), key='model.rainBarrel', far=G.far_of(rainBarrel),
+     G.Model('rainBarrel', rainBarrel, size=(0.606, 0.97, 0.686), centre=(0, 0.04), key='model.rainBarrel', far=G.far_of(rainBarrel),
              paint=[('barrel', 'Barrel')]),
      G.Model('clothesline', clothesline, size=(2.76, 1.805, 0.763), centre=(0, 0.031), key='model.clothesline', far=G.far_of(clothesline),
              motions={'uses': {'washing': 'washing'}, 'open': 'washing'},
