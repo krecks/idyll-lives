@@ -39,6 +39,7 @@
         {
           "id": "laundry",
           "label": "Wash and press the laundry",
+          "workOn": "laundry",
           "anim": "clean",
           "sound": "washer",
           "minutes": 45,

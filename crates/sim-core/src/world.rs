@@ -707,6 +707,9 @@ pub struct Sim {
     pub(crate) buffs: Vec<usize>,
     /// Money the household owes for interactions started this tick (settled by `life::update`).
     pub(crate) pending_spend: i64,
+    /// What they took up to work on this tick (`WorkOn` bits: a load of washing), settled with
+    /// the household by `life::update`.
+    pub(crate) worked: u8,
     pub pos: [f32; 2],
     pub yaw: f32,
     pub pose: Pose,
@@ -1145,7 +1148,14 @@ pub struct Household {
     pub expecting: Option<Expecting>,
     /// The day a babysitter was booked for (see `life::childcare`).
     pub sitter_day: Option<u32>,
+    /// Loads of washing waiting: dirty (piling up as content `laundry` says), and washed, to
+    /// dry and fold (`content::WorkOn`).
+    pub laundry: [f32; 2],
 }
+
+/// Loads of washing a new household has waiting, dirty and washed (one of each: there's always
+/// a bag of washing on moving in).
+pub const LAUNDRY_AT_START: f32 = 1.0;
 
 /// A household expecting a baby: the parents and the day it's due.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -1342,6 +1352,8 @@ pub(crate) struct Ctx<'a> {
     pub day: u32,
     pub minute: f32,
     pub tick: u64,
+    /// What each household has to work on (`work_waiting`), by household.
+    pub work: &'a [u8],
 }
 
 impl Ctx<'_> {
@@ -1425,6 +1437,7 @@ impl World {
                 routines: Vec::new(),
                 expecting: None,
                 sitter_day: None,
+                laundry: [LAUNDRY_AT_START; 2],
             }]
         } else {
             lot_file
@@ -1441,6 +1454,7 @@ impl World {
                     routines: Vec::new(),
                     expecting: None,
                     sitter_day: None,
+                    laundry: [LAUNDRY_AT_START; 2],
                 })
                 .collect()
         };
@@ -1766,12 +1780,13 @@ impl World {
     /// The tile a resident stands on to use `obj`, as things stand now (see
     /// `surface::approach_tile`; residents deciding what to do use `Links`).
     pub(crate) fn approach_tile(&self, obj: &ObjectInstance) -> (i32, i32) {
-        crate::surface::approach_tile(&self.content, &self.nav(), obj)
+        self.approach_tiles(obj).first().copied().unwrap_or_else(|| obj.front_tile(&self.content))
     }
 
-    /// Every tile a resident may use `obj` from, as things stand now (see `surface::approach_tiles`).
+    /// Every tile a resident may use `obj` from, as things stand now (see `surface::use_tiles`:
+    /// a thing on a top from beside its top).
     pub(crate) fn approach_tiles(&self, obj: &ObjectInstance) -> Vec<(i32, i32)> {
-        crate::surface::approach_tiles(&self.content, &self.nav(), obj).collect()
+        crate::surface::use_tiles(&self.content, &self.objects, &self.nav(), obj)
     }
 
     /// What is walkable now.
@@ -1950,6 +1965,7 @@ impl World {
             mods,
             buffs: Vec::new(),
             pending_spend: 0,
+            worked: 0,
             pos: [*x, *z],
             yaw: 0.0,
             pose: Pose::Stand,
@@ -2668,6 +2684,7 @@ impl World {
         self.briefs = briefs;
         crate::lod::plan(self);
         let hour = crate::clock::hour(tick);
+        let work = self.work_waiting();
         {
             let World {
                 content,
@@ -2713,6 +2730,7 @@ impl World {
                 day: crate::clock::day(tick),
                 minute: crate::clock::minute_of_day(tick),
                 tick,
+                work: &work,
             };
             // (In lots nobody watches, only those whose turn it is; see `lod.rs`.)
             for sim in sims.iter_mut().filter(|s| s.here() && s.steps > 0) {
@@ -2900,6 +2918,38 @@ impl World {
             self.structure_version = self.structure_version.wrapping_add(1);
             self.rooms_need_clean_rescore();
         }
+        self.pile_laundry(minutes);
+    }
+
+    /// Dirty washing piles up over `minutes`: each household's, as much as content `laundry` says
+    /// for each of its residents in town, up to the most it says.
+    fn pile_laundry(&mut self, minutes: f32) {
+        let Some(rules) = self.content.laundry else { return };
+        for s in self.sims.iter().filter(|s| s.here()) {
+            if let Some(h) = self.households.get_mut(s.household as usize) {
+                h.laundry[0] = (h.laundry[0] + rules.per_day * minutes / 1440.0).min(rules.most);
+            }
+        }
+    }
+
+    /// What each household has to work on (`WorkOn` bits, by household): dirty dishes or food
+    /// gone off of theirs, a load of dirty washing, a load washed.
+    pub(crate) fn work_waiting(&self) -> Vec<u8> {
+        use crate::content::WorkOn;
+        let mut work: Vec<u8> = self
+            .households
+            .iter()
+            .map(|h| {
+                let has = |kind: WorkOn, loads: f32| if loads >= 1.0 { kind.bit() } else { 0 };
+                has(WorkOn::Laundry, h.laundry[0]) | has(WorkOn::Washed, h.laundry[1])
+            })
+            .collect();
+        for it in self.items.list.iter().filter(|it| it.to_clear(&self.content)) {
+            if let Some(w) = work.get_mut(it.household as usize) {
+                *w |= WorkOn::Dishes.bit();
+            }
+        }
+        work
     }
 
     /// Applies a player command. Build and buy edits can be undone (`Command::Undo`) until time
@@ -3168,6 +3218,20 @@ impl World {
                         Unfit::TooBig => format!("{} is too big for the {thing}", s.name),
                         Unfit::NoHomework => format!("{} has no homework to do", s.name),
                         Unfit::TooYoungToCare => format!("{} is too young to look after a baby", s.name),
+                    }));
+                }
+                // Its conditions, as free will keeps them: stargazing after dark under open sky,
+                // washing up with dishes to wash.
+                let work = self.work_waiting().get(s.household as usize).copied().unwrap_or(0);
+                if let Some(why) = unmet(&self.lot, crate::clock::hour(self.tick), obj, &self.content, inter, work) {
+                    let label = inter.label.to_lowercase();
+                    return Err(Error::new(match why {
+                        Unmet::Hours => {
+                            let [from, to] = inter.hours.unwrap_or_default();
+                            format!("{} can only {label} from {} to {}", s.name, clock_time(from), clock_time(to))
+                        }
+                        Unmet::Sky => format!("{} can only {label} under open sky: the {thing} has to stand outside", s.name),
+                        Unmet::Nothing(w) => format!("{}: {}", inter.label, w.none()),
                     }));
                 }
                 if inter.cares() && !obj.users().any(|u| self.sims.get(u as usize).is_some_and(|b| self.content.life.baby(b.age))) {
@@ -3843,6 +3907,42 @@ pub(crate) fn unfit(content: &Content, age: f32, inter: &crate::content::Interac
     (inter.cares() && !life.adult(age)).then_some(Unfit::TooYoungToCare)
 }
 
+/// A condition of a use that isn't met now (`unmet`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Unmet {
+    /// Not at this hour (content `hours`).
+    Hours,
+    /// Not under a roof (content `sky`).
+    Sky,
+    /// Nothing to work on (content `workOn`).
+    Nothing(crate::content::WorkOn),
+}
+
+/// Which of `inter`'s conditions isn't met now (None: they all are): the hours of the day it
+/// starts in, open sky over `obj`, and something to work on (`work`: what the resident's
+/// household has, `World::work_waiting`). Free will and the player's orders keep them alike.
+pub(crate) fn unmet(lot: &Lot, hour: f32, obj: &ObjectInstance, content: &Content, inter: &crate::content::Interaction, work: u8) -> Option<Unmet> {
+    if inter.hours.is_some_and(|h| !crate::content::in_hours(h, hour)) {
+        return Some(Unmet::Hours);
+    }
+    if inter.sky && obj.tiles(content).any(|(x, z)| lot.room_at(x, z) != crate::lot::OUTDOORS) {
+        return Some(Unmet::Sky);
+    }
+    inter.work_on.filter(|w| work & w.bit() == 0).map(Unmet::Nothing)
+}
+
+/// An hour of the day (0..24) as the clock shows it: `20:00`, `5:30`.
+fn clock_time(hour: f32) -> String {
+    let minutes = (hour * 60.0).round() as u32 % 1440;
+    format!("{}:{:02}", minutes / 60, minutes % 60)
+}
+
+/// `unmet` for `sim` during a step.
+fn conditions_met(ctx: &Ctx, sim: &Sim, obj: &ObjectInstance, inter: &crate::content::Interaction) -> bool {
+    let work = ctx.work.get(sim.household as usize).copied().unwrap_or(0);
+    unmet(ctx.nav.lot, ctx.hour, obj, ctx.content, inter, work).is_none()
+}
+
 /// Whether `sim` (of `age`) could only take the upper bunk of `obj` (the lower one someone
 /// else's) and may not (`ObjectDef::upper_stages`): an elder, say.
 pub(crate) fn upper_barred(content: &Content, obj: &ObjectInstance, sim: u32, age: f32) -> bool {
@@ -3910,8 +4010,11 @@ fn missing_requirement<'a>(
     (0..content.tags.len()).find(|&i| missing & (1 << i) != 0).map(|i| content.tags[i].as_str())
 }
 
-fn requirements_met(ctx: &Ctx, objects: &[ObjectInstance], object: u32, inter: &crate::content::Interaction) -> bool {
+/// Whether `sim` could start `inter` on `object` now as far as what it requires and its
+/// conditions go (`missing_requirement`, `unmet`).
+fn requirements_met(ctx: &Ctx, sim: &Sim, objects: &[ObjectInstance], object: u32, inter: &crate::content::Interaction) -> bool {
     missing_requirement(ctx.content, ctx.object_plot, Some(ctx.index), objects, object, inter).is_none()
+        && conditions_met(ctx, sim, &objects[object as usize], inter)
 }
 
 /// What a Sim chooses to do on their own. `from_seat`: sitting, only a word with someone sitting
@@ -4036,7 +4139,7 @@ fn pick_autonomous(
                 || unfit(content, sim.age, inter).is_some()
                 || upper_barred(content, obj, sim.id, sim.age)
                 || (inter.needs_table && !at_table)
-                || !requirements_met(ctx, objects, obj.id, inter)
+                || !requirements_met(ctx, sim, objects, obj.id, inter)
                 || !obj.allows(inter, sim.id)
                 || !obj.can_use_for(sim.id, &content.objects[obj.def], i)
             {
@@ -4454,10 +4557,11 @@ pub(crate) fn prefer_factor(prefer: Prefer, rel: &social::Relationship, chemistr
 fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut crate::items::Items) {
     let content = ctx.content;
     let nav = &ctx.nav;
-    // Nothing their age isn't for, however it was chosen (`unfit`; an order was refused already).
+    // Nothing their age isn't for, nor out of its hours, under a roof or with nothing to work
+    // on, however it was chosen (`unfit`, `unmet`; an order was refused already).
     if let TaskKind::Use { object, interaction } = task.kind
         && let Some(o) = objects.get(object as usize)
-        && content.objects[o.def].interactions.get(interaction).is_some_and(|i| unfit(content, sim.age, i).is_some())
+        && content.objects[o.def].interactions.get(interaction).is_some_and(|i| unfit(content, sim.age, i).is_some() || !conditions_met(ctx, sim, o, i))
     {
         return;
     }
@@ -4511,7 +4615,15 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             if !obj.allows(inter, sim.id) {
                 return;
             }
-            if inter.seat_near > 0.0 {
+            // Sitting to use a thing on a top: on a seat pulled up to the top, if one is free
+            // (else on one near, `seatNear`, else they stand at it).
+            // (Standing too, when the top has chairs all round: they sit down at it.)
+            let on_top = content.objects[obj.def].layer == Layer::Surface;
+            let boxed_in = || ctx.index.links.host_of(object).is_some_and(|h| crate::surface::rider_tiles(content, objects, nav, obj, h).is_empty());
+            if on_top && (inter.pose == Pose::Sit || boxed_in()) {
+                reserved_seat = crate::surface::seat_at_top(content, objects, &ctx.index.links, object, sim.id, content.life.stage(sim.age));
+            }
+            if inter.seat_near > 0.0 && reserved_seat.is_none() {
                 reserved_seat = seat_near_object(sim, ctx, objects, object, inter);
             }
             // From the tile by the slot they'll get, when it has a place of its own (`places`).
@@ -5118,7 +5230,7 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
         // Nor is something opened that someone opened on the way, or closed on someone in it.
         let inter = &content.objects[objects[object as usize].def].interactions[interaction];
         if objects[object as usize].broken()
-            || !requirements_met(ctx, objects, object, inter)
+            || !requirements_met(ctx, sim, objects, object, inter)
             || !objects[object as usize].allows(inter, sim.id)
         {
             // (An order to close it on someone who got there first: the player is told.)
@@ -5136,6 +5248,10 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
             return;
         }
         sim.pending_spend += cost.max(0);
+        // A load of washing taken up as the use starts (`life::update` settles it).
+        if let Some(w) = inter.work_on {
+            sim.worked |= w.bit();
+        }
     }
     let Some(act) = sim.current.as_mut() else {
         return;
@@ -5191,7 +5307,10 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
         } => {
             let obj = &objects[object as usize];
             let inter = &content.objects[obj.def].interactions[interaction];
-            let c = obj.centre(content);
+            // A thing on a top is used at its top: standing, facing it, unless they sat down at
+            // a seat pulled up to the top.
+            let on_top = content.objects[obj.def].layer == Layer::Surface;
+            let c = if on_top { crate::surface::middle(content, obj) } else { obj.centre(content) };
             if let Some(seat) = sim.use_seat {
                 // Watching from the sofa: sit on the seat, facing the way it faces, and step
                 // back off where they came from (see `end_activity`).
@@ -5201,7 +5320,7 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
                 sim.pos = s.slot_position(content, slot);
                 sim.yaw = s.slot_yaw(content, slot);
                 sim.pose = Pose::Sit;
-            } else if inter.pose == Pose::Stand && !inter.inside {
+            } else if (inter.pose == Pose::Stand || on_top) && !inter.inside {
                 // At their slot's own place, come to its tile (the end of a ping-pong table),
                 // facing the way it says; else facing the thing.
                 let slot = obj.slot_of(sim.id).unwrap_or(0);
@@ -5214,7 +5333,8 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
                 } else {
                     sim.yaw = (c[0] - sim.pos[0]).atan2(c[1] - sim.pos[1]);
                 }
-                sim.pose = inter.pose;
+                // (A thing on a top is used standing whatever its pose, without a seat.)
+                sim.pose = Pose::Stand;
             } else {
                 // Onto the seat or bed, or into the shower, facing the way it faces (or its
                 // slot's place does); they step back off where they came from (see `end_activity`).
@@ -5303,7 +5423,7 @@ fn home_needs(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], mask: u32, free:
         for (_, i) in def.interactions.iter().enumerate().filter(startable).filter(|(_, i)| {
             i.autonomous && !i.cares() && i.recipe.is_none_or(possible)
                 && unfit(ctx.content, sim.age, i).is_none()
-                && requirements_met(ctx, objects, o.id, i)
+                && requirements_met(ctx, sim, objects, o.id, i)
         }) {
             found |= i.fills() & mask;
         }
@@ -5366,7 +5486,7 @@ fn reach(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], usable: &[u32], per_m
         let fills = content.objects[o.def]
             .interactions
             .iter()
-            .filter(|i| i.autonomous && !i.baby && !i.cares() && requirements_met(ctx, objects, o.id, i) && unfit(content, sim.age, i).is_none())
+            .filter(|i| i.autonomous && !i.baby && !i.cares() && requirements_met(ctx, sim, objects, o.id, i) && unfit(content, sim.age, i).is_none())
             .fold(0, |m, i| m | i.fills());
         if fills == 0 {
             continue;
@@ -5488,7 +5608,7 @@ fn nearest(
                 fits(&def.interactions[i])
                     && unfit(content, sim.age, &def.interactions[i]).is_none()
                     && !upper_barred(content, o, sim.id, sim.age)
-                    && requirements_met(ctx, objects, o.id, &def.interactions[i])
+                    && requirements_met(ctx, sim, objects, o.id, &def.interactions[i])
                     && o.allows(&def.interactions[i], sim.id)
                     && o.can_use_for(sim.id, def, i)
             })?;

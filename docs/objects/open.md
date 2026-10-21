@@ -142,11 +142,12 @@ a single object does is on its category page ([README.md](README.md)); this page
 ### Content and sim
 - **Parts with no use, left decorative for 0.3.0:** the executive desk's drawer (its clip would need a seated use
   on the desk it faces); the nesting tables' small table; the high chair's tray (the sim never seats a baby in it);
-  the laundry basket's lid (not built); the display cabinet's door; the kettle, bread bin and laptop (content rules
-  forbid uses on things on a top: sim work). These are modelled parts without a clip, so no clip is orphaned. The
-  three freezers' `freezer_open` clips now play for "Get some ice cream".
+  the laundry basket's lid (not built); the display cabinet's door; the kettle's lid, the bread bin's roll-top and
+  the laptop's lid (they have uses since G-63, used at their top; no clip yet). These are modelled parts without a
+  clip, so no clip is orphaned. The three freezers' `freezer_open` clips now play for "Get some ice cream".
 - **Uses end once every need they raise is full**, by design; it makes clips easy to miss in checks.
-- **Small things on tops:** every one of the 180 sample houses has them.
+- **Small things on tops:** every one of the 180 sample houses has them; since G-63 the kettle, the toaster and the
+  rest with uses are used where they stand.
 - **Residents didn't reach things in a crowded garden** once; a sim test of eleven in a row
   (`crates/sim-core/tests/crowded_garden.rs`) couldn't reproduce it.
 
