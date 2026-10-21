@@ -165,6 +165,8 @@ const STATIONS: Station[] = [
   // Seats
   { label: 'sofa', def: 'sofa', tag: 'sit', pose: P.Sit },
   { label: 'tv sofa', def: 'sofaThree', tag: 'watch', pose: P.Sit, female: true },
+  { label: 'texting on the sofa', def: 'sofa', tag: 'phoneScreen', pose: P.Sit, female: true },
+  { label: 'a call on the sofa', def: 'sofa', tag: 'phone', pose: P.Sit },
   { label: 'dining chair', def: 'diningChair', tag: 'sit', pose: P.Sit, female: true },
   { label: 'bar stool', def: 'barStool', tag: 'sit', pose: P.Sit },
   { label: 'office chair', def: 'officeChair', tag: 'sit', pose: P.Sit, female: true },

@@ -256,15 +256,18 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | carry, carryOne | yes | 1.1 | the upper body while carrying something in both hands / on the right palm (`held`, content `hold`) |
 | lie | yes | 2.4 | lying (turned flat by the runtime, played at a third of the speed) |
 | babyLieAsleep, babyLieAwake | yes | 9, 6 | a baby lying in the crib, asleep (still, quick breaths, a twitch) or awake (kicking, waving, turning the head); legs drawn up, hands by the head; turned flat like `lie`, played at full speed |
-| foldArms | yes | 2.5 | watching, relaxing, idle variations |
+| foldArms | yes | 2.5 | watching, relaxing, idle variations; unamused at a joke that fell flat, unmoved by an apology or a compliment |
 | yes / no | no / yes | 2.5 | listening, arguing |
-| phone, lantern | yes | 2.93, 2.5 | the phone; reading (a book at the chest) |
+| phone, lantern | yes | 2.93, 2.5 | a call, the phone at the ear; reading (a book at the chest) |
+| phoneText | yes | 3.0 | texting and scrolling (`ACTIONS.phoneScreen`, content `phone.actions[].anim`): the phone held in both hands before the chest, the head bowed over it, the thumbs tapping and swiping; the upper body of it seated |
+| compliment, deepTalk, flirt, sweetTalk, argue, insult, apologize, joke, introduce, askPartner, breakUp, prank | yes | 3, 4, 3.2, 3.4, 2.2, 2.4, 3.4, 2.8, 3, 3.2, 3, 2.6 | the socials' own gestures on a speaker's turn (`GESTURES`, `clips/social.ts`): an open hand offered and two claps; the fingertips together, then the chin on the hand; a hand in the hair, the other on the hip; the hands clasped at the heart, a reach to the other's arm; palms up, then a chopping hand; a dismissive flick; a hand on the heart, then open palms; the story told with the hands, then the arms thrown wide; a hand to the chest, then held out to shake; hands clasped low, then held out; a hand to the brow, then both sweeping apart; a creep, "boo!" with clawed hands, a laugh |
+| laugh, shrug, rebuffed, refuse | yes | 2, 2.4, 2.6, 2.4 | how a social is taken (`GESTURES`, `REFUSED`): laughing at a joke that landed (the head back, a hand on the belly, bent over once); a teller's shrug at a joke that fell flat; turned down (the shoulders dropped, the head bowed aside, a hand to the neck); turning down a hug or a kiss (leaning away, the head turned aside, a hand up, palm out, a step back) |
 | rail | yes | 2.5 | the telescope |
 | push | yes | 2.67 | mopping, vacuuming |
 | water, harvest, plant, kneel, crouch | yes, yes, no, yes, yes | 3.8, 2.5, 2.77, 5.2, 2.93 | gardening, smelling flowers |
 | pick | yes | 3.0 | picking herbs from a waist-high planter |
 | dance | yes | 1.0 | dancing, fitness games |
-| punchJab, punchCross, hit | no | 0.87, 1.0, 0.33 | heavy bags and fights |
+| punchJab, punchCross, hit | no | 0.87, 1.0, 0.33 | heavy bags and fights (the attacker's punches aimed at the other's head at any two heights by the runtime, `AIM`) |
 | wave | no | 2.2 | the household creator's greetings |
 | fountainDrink181, 163, 147, 129, 112 | yes | 3 | bent over a drinking fountain's spout, sipping from its water (a size per height, in cm; the smaller two on tiptoe at the water's falling end); `STEP_IN` steps them up to it |
 | climb172a, 147a, 112a; climb172b, 147b, 112b | yes | 13 | a round on the climbing frame: up its rope net three ropes, hands and feet in turn, over the edge onto the deck, ducking under the roof across it to the fireman's pole, round the pole and down it (hands and legs round it), and back round to the net; a size per height (cm), and one per lane of the net (`a`, `b`: the second waits on the deck for the first to slide) |
