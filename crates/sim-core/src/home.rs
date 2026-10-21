@@ -427,13 +427,16 @@ impl World {
             .zip(&after.0)
             .enumerate()
             .all(|(i, (b, a))| Some(i as u32) == skip || !*b || *a);
-        // No Sim at home gets shut in.
+        // No Sim at home gets shut in, nor one in bed or sitting down where they'll get up.
         let sims_ok = self.sims.iter().all(|s| {
-            let (x, z) = s.tile();
-            let gz = self.ground_z(z);
-            let on_plot = x >= p.x && gz >= p.z && x < p.x + p.w && gz < p.z + p.d;
-            let i = self.lot.tile_index(x, z);
-            s.away_until.is_some() || !on_plot || !before.1[i] || after.1[i]
+            [Some(s.tile()), s.seated_from].into_iter().flatten().all(|(x, z)| {
+                let gz = self.ground_z(z);
+                let on_plot = x >= p.x && gz >= p.z && x < p.x + p.w && gz < p.z + p.d;
+                s.away_until.is_some() || !on_plot || !self.lot.in_bounds(x, z) || {
+                    let i = self.lot.tile_index(x, z);
+                    !before.1[i] || after.1[i]
+                }
+            })
         });
         objects_ok && sims_ok
     }

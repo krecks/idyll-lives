@@ -384,6 +384,34 @@ fn empty_rooms_can_be_closed_before_their_door_goes_in() {
 }
 
 #[test]
+fn a_resident_in_bed_cant_be_shut_in_where_they_get_up() {
+    use sim_core::command::{EdgeAxis, EdgeEdit, EdgeKind};
+    use sim_core::content::Pose;
+    let mut w = world();
+    w.autonomy = false;
+    // Bo goes to bed, then Ada beside him; the tile she lay down from is where she'll get up.
+    let mut from = None;
+    for sim in [1, 0] {
+        w.apply(Command::Use { sim, object: 0, interaction: 0 }).unwrap();
+        for _ in 0..sim_core::TICKS_PER_MINUTE * 20 {
+            if w.sims[sim as usize].pose == Pose::Lie {
+                break;
+            }
+            from = Some(w.sims[sim as usize].tile());
+            w.tick_once();
+        }
+        assert_eq!(w.sims[sim as usize].pose, Pose::Lie, "in bed");
+    }
+    let (x, z) = from.unwrap();
+    let edge = |axis, x, z| EdgeEdit::new(axis, x, z, EdgeKind::Wall);
+    // Walls round it but on the bed's side, the bed still reached at its front (Bo's side).
+    assert_eq!((x, z), (2, 3), "in front of the bed's second slot");
+    let cage = [edge(EdgeAxis::V, x, z), edge(EdgeAxis::V, x + 1, z), edge(EdgeAxis::H, x, z + 1)];
+    let err = w.build(0, &cage).unwrap_err();
+    assert!(err.to_string().contains("shut a resident"), "walls round ({x}, {z}): {err}");
+}
+
+#[test]
 fn windows_go_into_walls_cost_money_and_never_let_sims_through() {
     use sim_core::command::{EdgeAxis, EdgeEdit, EdgeKind};
     use sim_core::lot::Edge;
