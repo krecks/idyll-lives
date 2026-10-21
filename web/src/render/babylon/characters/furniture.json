@@ -44,7 +44,7 @@
     "slob.gamingRecliner": { "h": 0.45, "fwd": 0, "front": 0.32 },
     "couchPotato.recliner": { "h": 0.45, "fwd": 0, "front": 0.28 },
     "bookworm.firesideLounge": { "h": 0.45, "fwd": 0, "front": 0.29 },
-    "fireplaceElectric": { "h": 0.14, "fwd": 0.3, "back": true },
+    "fireplaceElectric": { "h": 0.14, "fwd": 0.36, "back": true },
     "dressingTable": { "h": 0.45, "fwd": 0.22, "back": true },
     "toiletCompact": { "h": 0.43, "fwd": -0.13 },
     "toiletSmart": { "h": 0.44, "fwd": -0.06 },

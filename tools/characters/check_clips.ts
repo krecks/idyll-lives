@@ -23,6 +23,8 @@
  *   reach the floor; on each deep seat (furniture.json `seats` with a `front`), with the hips moved forward
  *   as the runtime does (`perch`), the knees clear its front; and the other seated clips (and the seated
  *   ends of sitDown / standUp) keep `sit`'s pelvis;
+ * - on the floor (`sitFloor` on a 0.14 m floor cushion, fitted with `seatDrop`), no knee or ankle goes under
+ *   the floor and the ankles lie on it or on the other foot (within 15 cm), and sitDownFloor / standUpFloor end and start there;
  * - `lie` lies straight and down: knees nearly straight and not above the hips, the ankles 5 cm
  *   below the pelvis (the legs on the mattress, not floating), the hands 5 cm in front of the body;
  * - the baby's lying clips keep the baby on the mattress and inside the crib: no joint more than
@@ -69,12 +71,14 @@ const { bake } = await import('../../web/src/render/babylon/characters/clips/dsl
 const { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } = await import('../../web/src/render/babylon/characters/clips/street.ts');
 const { BOULDER, FOOS, POOL, SMASH } = await import('../../web/src/render/babylon/characters/clips/games.ts');
 const { feetDown, legTurn, perch, SEAT_FIT, seatSize } = await import('../../web/src/render/babylon/characters/seatFit.ts');
+const { FLOOR_SEAT } = await import('../../web/src/render/babylon/characters/clips/seated.ts');
 /** Seats whose top ends short of a child's knees (characters.ts `Seat.front`, `perch`). */
 const DEEP: [string, any][] = Object.entries(JSON.parse(readFileSync(new URL('../../web/src/render/babylon/characters/furniture.json', import.meta.url), 'utf8')).seats).filter(([, s]: [string, any]) => s.front !== undefined) as [string, any][];
 
 /** Every clip the runtime plays (characters.ts ACTIONS / choose, reactions.ts) and whether it loops. */
 const RUNTIME: Record<string, boolean> = {
   idle: true, talk: true, walk: true, jog: true, jogAlong: true, sit: true, sitTalk: true, sitDown: false, standUp: false, sitHands: true, sitHandsNear: true, sitHandsFar: true,
+  sitFloor: true, sitDownFloor: false, standUpFloor: false,
   interact: false, pickUp: false, dance: true, punchJab: false, punchCross: false, hit: false, kneel: true, crouch: true,
   eat: false, water: true, harvest: true, pick: true, foldArms: true, no: true, yes: false, phone: true, rail: true, spell: true,
   push: true, plant: false, lantern: true, babyLieAsleep: true, babyLieAwake: true,
@@ -90,6 +94,7 @@ const PHASE2: Record<string, boolean> = { lie: true, chop: true, stir: true, fli
 /** Lengths (s) from the plan's clip table; within 15%. */
 const LENGTH: Record<string, number> = {
   idle: 2.5, talk: 2.9, walk: 1.1, jog: 0.7, jogAlong: 0.7, sit: 1.7, sitTalk: 2.9, sitDown: 1.33, standUp: 1.07, sitHands: 1.7, sitHandsNear: 1.7, sitHandsFar: 1.7, interact: 2.0, pickUp: 0.87,
+  sitFloor: 1.7, sitDownFloor: 1.6, standUpFloor: 1.47,
   dance: 1.0, punchJab: 0.87, punchCross: 1.0, hit: 0.33, kneel: 5.2, crouch: 2.9, eat: 1.33, water: 3.8, harvest: 2.5, pick: 3, plant: 2.8, foldArms: 2.5,
   yes: 2.5, no: 2.5, phone: 2.9, lantern: 2.5, rail: 2.5, spell: 2.1, push: 2.7, babyLieAsleep: 9, babyLieAwake: 6,
   fountainDrink181: 3, fountainDrink163: 3, fountainDrink147: 3, fountainDrink129: 3, fountainDrink112: 3, climb172a: 13, climb147a: 13, climb112a: 13, climb172b: 13, climb147b: 13, climb112b: 13,
@@ -386,6 +391,26 @@ function checkSeatedAndLying(sk: Skeleton, restAnkle: number): void {
           if (short > 0) fail(sk, 'sit', 'deep', id, `sit: on ${id} the ${side} knee is ${(short * 100).toFixed(0)} cm short of clearing its front (the shin in the cushion)`);
         }
       }
+    }
+  }
+  // On the floor (a floor cushion): the knees and ankles over the floor, the ankles on it; the floor clips' ends there.
+  const floor = clips.get('sitFloor');
+  if (floor && sk.seatDrop !== undefined) {
+    const w = fk(floor, 0, sk);
+    const root = FLOOR_SEAT - (w[bone.pelvis][1] - sk.seatDrop);
+    for (const side of ['l', 'r']) {
+      for (const [j, what] of [['calf', 'knee'], ['foot', 'ankle']]) {
+        const y = w[bone[`${j}_${side}`]][1] + root;
+        if (y < 0.02) fail(sk, 'sitFloor', 'floor', `${j}_${side}`, `sitFloor: the ${side} ${what} is ${((0.02 - y) * 100).toFixed(0)} cm into the floor`);
+        if (j === 'foot' && y > 0.15) fail(sk, 'sitFloor', 'floor', `${j}_${side}`, `sitFloor: the ${side} ankle is ${(y * 100).toFixed(0)} cm up, on neither the floor nor the other foot`);
+      }
+    }
+    for (const [name, f] of [['sitDownFloor', -1], ['standUpFloor', 0]] as [string, number][]) {
+      const c = clips.get(name);
+      if (!c) continue;
+      const p = fk(c, f < 0 ? c.frames - 1 : f, sk)[bone.pelvis];
+      const d = Math.hypot(p[0] - w[bone.pelvis][0], p[1] - w[bone.pelvis][1], p[2] - w[bone.pelvis][2]);
+      if (d > 0.01) fail(sk, name, 'seated', 'pelvis', `${name}: the seated pelvis is ${(d * 100).toFixed(1)} cm from sitFloor's`);
     }
   }
   // Lying: legs nearly straight, hands in front of the body (the lengths on the reference skeleton,
