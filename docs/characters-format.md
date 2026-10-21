@@ -9,7 +9,8 @@ clips and the runtime (`web/src/render/babylon/characters*`). Everything here is
 cargo characters build                                # writes web/public/assets/characters, then checks it
 cargo characters check [set dir]                      # the set against this contract
 cargo characters diff <a> <b>                         # two sets, within the quantisation
-node --experimental-strip-types tools/characters/check_clips.ts   # the clips against the rig
+node --experimental-strip-types tools/characters/check_clips.ts   # the clips against the rig (see Checking clips)
+cd web && pnpm check:clips                            # the same on both bodies at every life stage (CI)
 ```
 
 The build is deterministic (seeded noise only): the same code gives the same bytes.
@@ -267,6 +268,20 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | wave | no | 2.2 | the household creator's greetings |
 | fountainDrink181, 163, 147, 129, 112 | yes | 3 | bent over a drinking fountain's spout, sipping from its water (a size per height, in cm; the smaller two on tiptoe at the water's falling end); `STEP_IN` steps them up to it |
 | climb172a, 147a, 112a; climb172b, 147b, 112b | yes | 13 | a round on the climbing frame: up its rope net three ropes, hands and feet in turn, over the edge onto the deck, ducking under the roof across it to the fireman's pole, round the pole and down it (hands and legs round it), and back round to the net; a size per height (cm), and one per lane of the net (`a`, `b`: the second waits on the deck for the first to slide) |
+
+### Checking clips
+
+`tools/characters/check_clips.ts [rig.json] [--body male|female|all] [--stage <stage>[,…]|all]
+[--update-baseline]` bakes the clips as the runtime does and checks loop flags, NaNs, loop seams,
+lengths, sliding feet, the seated pelvis and feet, `lie` and the baby's clips (the list is in its
+header). The default is the reference: `male` at `youngAdult`, plus `baby` for the baby's clips.
+Each body and stage plays the clips on its own skeleton (`restT`, the pelvis motion and ground
+speed scaled by `pelvisScale`, `walk`'s hip roll), the sized clips at the size its height picks,
+babies only their own; the height slider, build, head size, stoop and the runtime's fits to seats
+and beds are not covered. The known failures are in `tools/characters/clip-baseline.json`: they
+print as `known` and don't fail, one that no longer fails prints as `fixed` (take it out), and only
+a new one exits 1. `--update-baseline` rewrites the file for the bodies and stages checked. CI runs
+`pnpm check:clips` (in `web/`: `--body all --stage all`).
 
 In dev, editing a clip file re-bakes the clips in place (Vite HMR).
 

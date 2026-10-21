@@ -19,7 +19,8 @@ From the repo root:
 cargo characters build [out]     # about 6 s; writes the set, then checks it
 cargo characters check [set dir] # the set against the contract only
 cargo characters diff <a> <b>    # two sets against each other, within the quantisation
-node --experimental-strip-types tools/characters/check_clips.ts [rig.json]
+node --experimental-strip-types tools/characters/check_clips.ts [rig.json] [--body male|female|all] [--stage <stage>[,…]|all] [--update-baseline]
+cd web && pnpm check:clips       # check_clips on both bodies at every life stage, as CI runs it
 ```
 
 - The build is deterministic (seeded noise only). After a code change that shouldn't touch the
@@ -30,7 +31,11 @@ node --experimental-strip-types tools/characters/check_clips.ts [rig.json]
   cuts, stage heights, the seat drop, eyes in their sockets and uncovered, hair clear of the head,
   bounded morphs.
 - `check_clips.ts` fails on NaNs, seams in loops, sliding feet, lengths more than 15% off the
-  runtime's, seated clips that leave the seat, and a crooked `lie`.
+  runtime's, seated clips that leave the seat or feet off the floor, and a crooked `lie`, on the
+  bodies (`--body`, default `male`) and life stages (`--stage`, default `youngAdult,baby`) asked
+  for; what a stage reproduces is in its header and in docs/characters-format.md (Checking clips).
+  The failures known today are in `clip-baseline.json`: they print as `known`, one that is fixed
+  prints as `fixed` (take it out, or `--update-baseline`), and only a new one fails.
 
 ## Where to change what
 

@@ -124,7 +124,9 @@ a single object does is on its category page ([README.md](README.md)); this page
 - **Getting up from a chair:** the sim puts the resident on the tile in front at once, so `standUp` plays while they
   glide back. Deferred from 0.3.0 unless the stand-up animation is reworked.
 - **Climbers** who start at other offsets could still meet at the pole.
-- **`check_clips.ts` fails `jogAlong`** (loop seam, sliding feet; since before fbf8883).
+- **`jogAlong` has a seam** where its loop wraps (`calf_r`, `foot_r`; since before fbf8883). Its feet don't slide:
+  `check_clips.ts` had tested them as standing still. This and the clips' failures on other bodies and life stages
+  are the known ones in `tools/characters/clip-baseline.json`.
 
 ### Rendering
 - **The town map's backdrop** blocks the world like the old pie menu's did (left as a panel).

@@ -147,7 +147,7 @@ Tools:
 - Debug states (`?state=<name>`): `DUMP_STATES=1 cargo test -p sim-core --test check_states` writes `bathroom-check`,
   `needy-check`, `office-night` and `town-things` (all 36 community and farm things); `--test play_checks` writes
   `family-check` (`generated-<i>` with `--ignored`, `HOUSES=…`, `PICK=…`). Scripts must send `setAutonomy` off.
-- Residents' clips: `node --experimental-strip-types tools/characters/check_clips.ts` (`tools/characters/README.md`);
+- Residents' clips: `node --experimental-strip-types tools/characters/check_clips.ts`, or `pnpm check:clips` for every body and stage (`tools/characters/README.md`);
   the poses per action are the table in `web/src/render/babylon/characters.ts`.
 - Several agents at once: one worktree each, its own port and scratch folder (`tools/bench/README.md`), one CPU core
   each. In a shared checkout, build a commit from `HEAD` plus your own hunks, and write a shared file only after the
