@@ -28,6 +28,8 @@ their backs on the wall face (game depth -0.43).
 - Each basin has painted shoulders from its floor up to the worktop, so the cabinet's colour never shows as the basin.
 - Since the authenticity review (2026-10-21, G-15): the washer steps in to the basin (`STAND_BACK`), the toes at it
   and the hands over the water, not a step back.
+- Since the authenticity review (G-43): two at the double vanity stand one at each basin, facing it (`stand_spot`),
+  not one inside the other.
 
 ## B1. Toilets (5)
 

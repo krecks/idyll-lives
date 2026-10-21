@@ -43,6 +43,10 @@ footprint (`SEATS`), facing the wall, the screen towards them. A separate chair 
   the seat and back). An office chair at the standing desk isn't pulled in (its top is 0.57 m over the seat) and its
   hands stay short of it. A chair facing the laptop desk from behind can't come in (the desk's own chair is there)
   and reaches over it. Neither pairing is set up by anything.
+- Since the authenticity review (G-51): the desks (computer, writing, laptop, gaming) are sat at from behind the
+  chair (`approach: behind`), else, with their back to a wall, from beside them, along the back of the desk; only
+  with both blocked from the front, through the desk as before. Standing up they rise at the chair and step back off
+  it to that tile in the second half of the stand-up.
 
 ## O2. Desk chairs (3)
 

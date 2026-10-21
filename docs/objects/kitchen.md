@@ -39,6 +39,7 @@ and heat up leftovers. Coffee is left to anyone (not an age rule yet).
   things off sinks.
 - Since the authenticity review (G-15): at the farmhouse and double sinks the washer steps in (`STAND_BACK` -0.45),
   the hands in the basin under the tap.
+- Since the authenticity review (G-43): two at the double sink stand one at each basin, facing it.
 
 ## K1. Fridges (7)
 
@@ -184,6 +185,10 @@ and heat up leftovers. Coffee is left to anyone (not an age rule yet).
   housegen sets the stools (they have none of their own). Their tops are bare; housegen sets things on them.
 - A stool at an island's back or a bar is drawn pulled in to it while sat on (see K8).
 - Nothing needed fixing.
+- Since the authenticity review (G-43): two at an island (the base, the chef's island, the party bar) stand one in
+  front of each half, a cook at a station the same; a cook waiting for a busy station steps aside to a free tile
+  beside the spot they used (not on a station's spot), so the next one there doesn't stand inside them
+  (I-systems-10).
 
 ## K7. Dining tables (13)
 
@@ -217,6 +222,8 @@ and heat up leftovers. Coffee is left to anyone (not an age rule yet).
 - Tops are at the content's `surface.height`: 0.75 m (1.06 m for the high café table, 0.76 m for the glass set,
   0.765 m for the dining table and the farmhouse set); tabletop things stand on them.
 - Nothing needed fixing.
+- Since the authenticity review (G-51): the bistro table's chair is sat on from behind it (`approach: behind`), else
+  beside it, not through the table.
 
 ## K8. Chairs and stools (12)
 

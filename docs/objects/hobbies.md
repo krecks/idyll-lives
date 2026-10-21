@@ -38,6 +38,8 @@ table face the room, as tables do.
   presser and handwheel, the pot and wheel and the scrapbook below (`fixes/motions/g1718/play-stage.jsonl`).
 - The ukulele and both guitars leave their stands for strum, jam and practise and are back on the stand when the use
   ends; the drum kit's cymbals stop with the use. The digital piano is still.
+- Since the authenticity review (G-51): the digital piano's bench and the drum kit's throne are sat at from behind
+  (`approach: behind`), else from beside them; only with both blocked from the front, through the keys or the toms.
 - The acoustic guitar's and ukulele's soundboard has its own colour, "Top"; "Body" (back and sides) and "Body & neck"
   say what they colour. The electric's "Guitar" colours its whole body. Rechecked from front and back, on the stand
   and played in all four facings; in the colour studio "In use" shows the empty stand.
@@ -63,7 +65,9 @@ table face the room, as tables do.
   not left hanging 25 cm over the balls (`fixes/motions/g1718/views/pool-end-t99.png`).
 - The chess table's and jigsaw table's second colour is "Chair" and "Stool": it colours the chess chair and the
   jigsaw stool; the chessboard's rim is the table's wood.
-- The darts are thrown from the tile in front of the board, half a metre from the wall.
+- The darts are thrown from the oche (G-55, since 2026-10-21): the dartboard's one `places` stands the thrower
+  2.24 m out from its middle, two tiles out, the toe line 2.37 m from the board's face; before, from the tile in
+  front, 1.4 m from it.
 - Played with their own resident clips (G-26, `characters/clips/games.ts`): darts are thrown (`dartThrow`: side-on,
   aim, throw, the hand following to the board, three darts and a step back to read the score); pool is a cue stroke
   bent over the long rail, the left hand bridging on the cloth (`poolShot*`, a size per height, `STEP_IN` up to the
@@ -71,6 +75,14 @@ table face the room, as tables do.
   The cue isn't in the hands yet (props in hand, G-70): it is mimed.
 - With the cutaway dropping its wall, the dartboard hides with the wall and can still be used.
 - Since the authenticity review (G-05): the chess table's chair is sat on at its pad (0.475).
+- Since the authenticity review (G-43): the pool players stand on the table's two long sides, diagonally across
+  it (`places` at the near rail's left and the far rail's right, facing in), and the foosball players on its two
+  long sides facing each other (`STEP_IN` `sides`: the cue stroke and the rods are played from either side, each
+  at the lane nearest them); a side that can't be stood on sends them to the front, side by side in the lanes.
+  The foosball table's handles are all on its front (M-hobbies-07), so the far player turns rods with no handles
+  until the model is rebuilt.
+- Since the authenticity review (G-51): the chess and jigsaw tables are sat at from behind their chair and stool
+  (`approach: behind`), else from beside them, and only with both blocked from the front, through the table.
 
 ## H3. Crafts and science (7)
 
@@ -94,3 +106,5 @@ table face the room, as tables do.
 - At rest the pottery wheel's lump sits lower than a full pot.
 - Since the authenticity review (G-05, G-15): the sewing table's chair at its pad (0.475); at the chemistry bench,
   pushed back on its tile, the experimenter steps in (`STAND_BACK` -0.35), the hands on the top.
+- Since the authenticity review (G-51): the sewing and craft tables and the pottery wheel are sat at from behind
+  the seat (`approach: behind`), else from beside it; only with both blocked from the front, through the work.

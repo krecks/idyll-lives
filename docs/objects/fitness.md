@@ -36,3 +36,6 @@ the object's colours, so there are never two.
   hands from about 1.0 s on (the `sitDown` clip less its last 0.35 s), never missing.
 - The treadmill's belt runs slower than a jog: faster blurs at the fastest game speed. The loop jumps home each round
   under the motor hood and rear roller cap, where it doesn't show.
+- Since the authenticity review (G-51): the exercise bike is got onto from its side (`approach: side`, the side
+  nearer them first), not through its handlebars and flywheel; the weight bench from its side too. A rider still
+  glides the half metre onto the saddle while sitting down (no straddle clip).

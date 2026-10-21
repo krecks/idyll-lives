@@ -39,6 +39,8 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 - The wall bed folds down and up, and is slept in under the game's blanket; the last one up folds it away. Its
   lying pose was checked with the other beds (heels and buttocks about 4 cm into the mattress, legs on it).
 - Where the old parts had no frame (the `sofa_run` sofas, the sofa bed), there is no Frame colour part.
+- Since the authenticity review (G-51): the chaise is got onto from its side (`approach: side`), not over its leg
+  rest; the wall bed, folded down, is got into from beside each sleeper's half, not over its foot.
 
 ## L2. Armchairs and small seats (11)
 

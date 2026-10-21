@@ -45,6 +45,9 @@ pulled up to the kids' table before the dining table (a seat made for their age 
 - Since the authenticity review (G-14, G-05): "Feed the baby" lifts the baby out and holds them, as the cuddle does
   (`anim: cuddle`), not the gardening kneel at the rail (the bottle is the props wave's); the high chair's content
   seat 0.60, its mesh's.
+- Since the authenticity review (G-43, G-51): the carer at the crib stands in front of the baby (the crib half, slot
+  0) in every facing, facing it, not by facing in front of the changing table or the crib; the kids' bed and the race
+  car bed are got into from their side (`approach: side`), sitting on the edge first.
 
 ## KD2. Toys (10)
 
@@ -74,6 +77,8 @@ pulled up to the kids' table before the dining table (a seat made for their age 
 - Known, not changed: the toy box's player stands at its front corner.
 - Since the authenticity review (G-14): the toy box and the toy chest are played at kneeling on the floor (`kneel`),
   the train table crouched at its edge (`crouch`), not standing with the hands out over them.
+- Since the authenticity review (G-43): two at the train table crouch one in front of each half (`stand_spot`), not
+  one inside the other.
 
 ## KD3. Kids' study and art (6)
 
@@ -102,3 +107,5 @@ pulled up to the kids' table before the dining table (a seat made for their age 
   own). The kids' chair at a coffee table (top 0.11 m over the seat) gets the desk hands, hovering over it, and a
   desk chair facing the kids' desk from behind can't come in (the desk's own chair is there) and reaches over it;
   nothing sets either up.
+- Since the authenticity review (G-51): the kids' desk is sat at from behind its chair (`approach: behind`), else
+  beside it, not through the desk.

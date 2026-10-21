@@ -45,10 +45,17 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
   flatter). Getting up from the daybed was only half seen.
 - The four-poster's duvet foot stands 1.5 cm past the mattress's end, so it doesn't flicker. The daybed's back
   cushions are thin and close to the back, so a sleeper's shoulder and hip stay out of them.
-- Known, not changed: two residents getting up from the same bed stand on the same spot for a moment (sim). The oak
+- Known, not changed (until G-51, below): two residents getting up from the same bed stand on the same spot for a moment (sim). The oak
   double's "Headboard" colours its teak slats; the posts and rails go with the frame. The daybed's back runs along
   a long side, so stood head end to the wall (as built) it doesn't read as a sofa.
 - Since the authenticity review (G-04): the daybed's sleeper gets the quilt (`BLANKET_BEDS`), as the other beds do.
+- Since the authenticity review (G-51): every bed here but the futon (a sofa by day, sat on from the front) is got
+  into from its side (`approach: side`): the sleeper
+  comes to the tile beside their own half, by the foot row of the middle (a double's two on its two sides, a single's
+  from the side nearer them, the bunk's from its ladder side), sits on the edge facing out 0.2 m in from it
+  (`SIDE_IN`), and turns to lie along it as they lie back; getting up, sim-core turns them out to that side and they
+  sit up there and step off (the two of a double on their own sides, not on one spot). With both sides blocked they
+  get in over the foot (`LIE_ENTRY`), as before. The bunk's upper sleeper still gets in as before (the ladder: G-44).
 
 ## BR2. Nightstands and small storage (8)
 
