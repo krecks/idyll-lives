@@ -3977,6 +3977,23 @@
       "interactions": []
     },
     {
+      "id": "curtainsWide",
+      "name": "Wide curtains",
+      "model": "model.curtainsWide",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 110,
+      "category": "decor",
+      "overWindow": true,
+      "group": "textiles",
+      "layer": "wall",
+      "decor": 0.6,
+      "description": "A window-length pair on a long rod, for a wide window.",
+      "interactions": []
+    },
+    {
       "id": "curtainsLong",
       "name": "Floor-length curtains",
       "model": "model.curtainsLong",
@@ -4279,7 +4296,7 @@
       },
       "seat": {
         "height": 0.42,
-        "forward": 0.02
+        "forward": 0.36
       },
       "description": "A real fire under a mantel. It lights the room at night, and warming up by it leaves residents cosy.",
       "interactions": [
