@@ -3588,18 +3588,13 @@
       ],
       "price": 45,
       "category": "fitness",
-      "seat": {
-        "height": 0.03,
-        "forward": 0.0
-      },
       "description": "A mat, a block and a bottle of water. Yoga stretches the body and calms the mind.",
       "interactions": [
         {
           "id": "yoga",
           "label": "Do yoga",
-          "anim": "meditate",
+          "anim": "exercise",
           "minutes": 30,
-          "pose": "sit",
           "effects": {
             "comfort": 0.2,
             "fun": 0.1

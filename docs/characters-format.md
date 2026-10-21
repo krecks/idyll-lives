@@ -268,6 +268,13 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | wave | no | 2.2 | the household creator's greetings |
 | fountainDrink181, 163, 147, 129, 112 | yes | 3 | bent over a drinking fountain's spout, sipping from its water (a size per height, in cm; the smaller two on tiptoe at the water's falling end); `STEP_IN` steps them up to it |
 | climb172a, 147a, 112a; climb172b, 147b, 112b | yes | 13 | a round on the climbing frame: up its rope net three ropes, hands and feet in turn, over the edge onto the deck, ducking under the roof across it to the fireman's pole, round the pole and down it (hands and legs round it), and back round to the net; a size per height (cm), and one per lane of the net (`a`, `b`: the second waits on the deck for the first to slide) |
+| dartThrow | yes | 7.2 | darts (`ACTIONS.play` at the `dartboard`): side-on at the line, three throws (aim, the forearm back, through, the hand following to the board), a step back to read the score and in again; the first dart goes as the board's darts grow in |
+| pingPong | yes | 1.8 | table tennis (`ACTIONS.play` at the `pingPongTable`): the ready stance, a forehand and a backhand, the bat mimed in a closed hand |
+| poolShot172, 147, 112 | yes | 8 | the pool table (`STEP_IN`, a lane each for two): bent over the long rail as far as the height needs, the left hand bridging on the cloth, two practice strokes and the shot, then up to chalk the cue (mimed); a size per height (cm) |
+| foosball172, 147, 112 | yes | 3.2 | the foosball table (`STEP_IN`, a pair of rods each for two): hands on two handles, the wrists turning the rods (the right in time with the table's moving rods) and sliding them; a size per height |
+| smashPlate172, 147, 112 | yes | 3.4 | the plate-smash bin (`STEP_IN`): a plate taken from the stack (mimed), up over the right shoulder and thrown overarm down into the crate; a size per height |
+| boulder172, 147, 112 | yes | 16 | the bouldering wall (`STEP_IN`, up on its crash mat): hands to the start holds, the feet onto the low ones, up the wall's holds hand and foot in turn to the top, a drop to the mat onto bent knees; the route scaled to the size and put on the model's nearest holds |
+| yoga | yes | 48 | a yoga flow on the mat (`STEP_IN` onto its front end, open hands): mountain, hands to the heart, upward salute, forward fold, half lift, a short downward dog (heels pedalling), a lunge up to warrior I, back to the dog, a child's pose, sitting on the heels, up through a squat |
 
 ### Checking clips
 

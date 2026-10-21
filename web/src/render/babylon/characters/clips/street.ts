@@ -24,7 +24,7 @@ export interface Size<F extends Fit = Fit> {
 }
 const REF_HEIGHT = 1.77;
 /** The sizes of `name` for these shares of the reference body's size (the tallest first), each fitted by `fit`. */
-function sizes<F extends Fit>(name: string, shares: readonly number[], fit: (s: number) => F): Size<F>[] {
+export function sizes<F extends Fit>(name: string, shares: readonly number[], fit: (s: number) => F): Size<F>[] {
   return shares.map((s, i) => ({
     clip: `${name}${Math.round(s * REF_HEIGHT * 100)}`,
     min: i < shares.length - 1 ? ((s + shares[i + 1]) / 2) * REF_HEIGHT : 0,
