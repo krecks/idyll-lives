@@ -550,7 +550,8 @@ impl ObjectInstance {
     }
 
     /// Pairs of neighbouring tiles that must not have a wall between them: inside the
-    /// footprint, and from the footprint to the front tile.
+    /// footprint, and from the footprint to the front tile (not for a seat behind the work,
+    /// `Approach::Behind`: a desk may stand with its screen to a wall).
     pub(crate) fn wall_edges(
         &self,
         content: &Content,
@@ -572,7 +573,8 @@ impl ObjectInstance {
             2 => (front.0, front.1 + 1),
             _ => (front.0 + 1, front.1),
         };
-        inside.chain(std::iter::once(((bx, bz), front)))
+        let behind = content.objects[self.def].approach == crate::content::Approach::Behind;
+        inside.chain((!behind).then_some(((bx, bz), front)))
     }
 }
 

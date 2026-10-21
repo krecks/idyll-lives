@@ -47,6 +47,10 @@ footprint (`SEATS`), facing the wall, the screen towards them. A separate chair 
   chair (`approach: behind`), else, with their back to a wall, from beside them, along the back of the desk; only
   with both blocked from the front, through the desk as before. Standing up they rise at the chair and step back off
   it to that tile in the second half of the stand-up.
+- Since I-systems-14 (2026-10-22): a desk may stand with its screen to a wall, the usual way, the chair in the room.
+  Build mode keeps a tile behind or beside it free to sit down from (or its front, if that can be stood on), not the
+  one beyond the screen, and no longer says "Faces a wall" for it (sim `approach_tiles`, `wall_edges`;
+  `surfaces.ts` `approachCandidates`, `buildmode.ts`).
 
 ## O2. Desk chairs (3)
 

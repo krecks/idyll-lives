@@ -682,7 +682,8 @@ export class BuildBuyInput {
       [fx, fz + 1],
       [fx + 1, fz],
     ][rot % 4];
-    if (this.wallBetween(back[0], back[1], fx, fz)) return 'Faces a wall';
+    // (A desk, sat at from behind, may have its screen to a wall: sim-core `wall_edges`.)
+    if (def.approach !== 'behind' && this.wallBetween(back[0], back[1], fx, fz)) return 'Faces a wall';
     return moving !== null || (def.price !== undefined && game.affords(def.price)) ? true : null;
   }
 

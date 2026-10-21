@@ -351,13 +351,17 @@ pub fn approach_tile(content: &Content, nav: &NavGrid, obj: &ObjectInstance) -> 
 /// when the house it's in is turned round; a seat whose front can't be stood on, from the tiles
 /// left and right of it that can first: an armchair with a footstool in front of it is sat in
 /// from beside it); for seats used from around, each tile in front of, behind, left and right of its
-/// middle that can be stood on, on the same storey with no wall or fence between.
+/// middle that can be stood on, on the same storey with no wall or fence between; for a seat behind
+/// the work (`Approach::Behind`: a desk, sat at from behind it), the tiles behind, left and right
+/// of it that can be stood on, then its front if it can be (a desk may stand with its screen to a
+/// wall).
 pub fn approach_tiles<'a>(
     content: &Content,
     nav: &'a NavGrid,
     obj: &ObjectInstance,
 ) -> impl Iterator<Item = (i32, i32)> + 'a {
     let around = content.objects[obj.def].approach == Approach::Around;
+    let behind = content.objects[obj.def].approach == Approach::Behind;
     let front = obj.front_tile(content);
     let (w, d) = obj.size(content);
     let (x, z) = (obj.x, obj.z);
@@ -370,7 +374,7 @@ pub fn approach_tiles<'a>(
         ((x - 1, cz), (x, cz)),
     ];
     let r = (obj.rot % 4) as usize;
-    let order = [r, (r + 2) % 4, (r + 3) % 4, (r + 1) % 4];
+    let order = if behind { [(r + 2) % 4, (r + 3) % 4, (r + 1) % 4, r] } else { [r, (r + 2) % 4, (r + 3) % 4, (r + 1) % 4] };
     let storey = nav.stairs.storey(z);
     let standable = move |(t, inner): ((i32, i32), (i32, i32))| stands_by(nav, storey, t, inner);
     // The other middle tile along an even front edge (the front tile is the lower of the two).
@@ -379,14 +383,15 @@ pub fn approach_tiles<'a>(
         1 | 3 if d % 2 == 0 => Some(((sides[r].0.0, sides[r].0.1 + 1), (sides[r].1.0, sides[r].1.1 + 1))),
         _ => None,
     };
-    let instead = twin.filter(|&t| !around && !standable(sides[r]) && standable(t)).map(|(t, _)| t);
+    let instead = twin.filter(|&t| !around && !behind && !standable(sides[r]) && standable(t)).map(|(t, _)| t);
     // (A seat with its front taken, a footstool there: from its left or right first, else still the front.)
     let seat = content.objects[obj.def].interactions.iter().any(|i| i.pose == Pose::Sit);
-    let from_side = !around && instead.is_none() && seat && !standable(sides[r]);
-    let only_front = (!around).then_some(front);
-    let skip = if around { 0 } else if from_side { 2 } else { 4 };
-    let beside = order.into_iter().skip(skip).map(move |i| sides[i]).filter_map(move |s| standable(s).then_some(s.0));
-    let (front_first, front_last) = if from_side { (None, only_front) } else { (only_front, None) };
+    let from_side = !around && !behind && instead.is_none() && seat && !standable(sides[r]);
+    // (A desk's front only if it can be stood on: it may have its screen to a wall.)
+    let only_front = (!around && !(behind && !standable(sides[r]))).then_some(front);
+    let (skip, take) = if around || behind { (0, 4 - behind as usize) } else if from_side { (2, 2) } else { (4, 0) };
+    let beside = order.into_iter().skip(skip).take(take).map(move |i| sides[i]).filter_map(move |s| standable(s).then_some(s.0));
+    let (front_first, front_last) = if from_side || behind { (None, only_front) } else { (only_front, None) };
     instead.into_iter().chain(front_first).chain(beside).chain(front_last)
 }
 
