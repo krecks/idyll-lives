@@ -12013,6 +12013,11 @@
     "towelStack",
     "perfumeTray",
     "deskOrganiser",
-    "selectionMarker"
+    "selectionMarker",
+    "spiceRack",
+    "potRail",
+    "kitchenShelf",
+    "coatStand",
+    "chickenCoop"
   ]
 }

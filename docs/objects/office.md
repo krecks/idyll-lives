@@ -20,7 +20,7 @@ footprint (`SEATS`), facing the wall, the screen towards them. A separate chair 
 | `deskSimple` Simple desk | 2x1 · floor | — | office / desks | Top, Frame, Drawers | Static | Static. |
 | `deskCorner` Corner desk | 2x2 · floor | — | office / desks | Top, Frame, Drawers | Static | Static. |
 | `deskStanding` Standing desk | 1x1 · floor | browse:type code:type | office / desks | Top, Frame, Shelf | Use | `tray_out`: the keyboard shelf slides out for browse and code. (A rising top would leave the things on it behind.) Its 1.05 m top is a `shelf` for what stands on it: no chair or stool is pulled up to it (the desk chairs' write and homework need a desk top). |
-| `deskExecutive` Executive desk | 2x1 · floor | — | office / desks | Top, Frame, Drawers, Handles, Desk pad | Static | Static. (+use) a drawer slides out. |
+| `deskExecutive` Executive desk | 2x1 · floor | — | office / desks | Top, Frame, Drawers, Handles, Desk pad | Static | Static. (+use) a drawer slides out. Its drawer stays a still part by decision (Q-19). |
 | `computerDesk` Computer desk | 2x1 · floor | code:type write:type markets:type browse:type homework:type | office / — | Top, Frame, Drawers, Keyboard tray, Chair | Use | `tray_out`: the keyboard tray slides out 15 cm for code, write, markets, browse and homework. |
 | `deskWriting` Writing desk | 2x1 · floor | write:write homework:write | office / — | Top, Frame, Drawers, Chair | Use | `drawer_open` for write and homework; `hold` 2.5 s. |
 | `deskLaptop` Laptop desk | 1x1 · floor | browse:type code:type write:type homework:type | office / — | Top, Frame, Drawer, Laptop, Chair | Use | `lid_open`: the laptop opens from shut to 110° for browse, code, write and homework. |

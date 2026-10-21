@@ -54,7 +54,7 @@ cutaway drops it, from either side.
 | `bustMarble` Marble bust | 1x1 · floor | admire:look | decor / ornaments | Bust, Plinth | Static | Static. |
 | `statueCat` Cat statue | 1x1 · floor | — | decor / ornaments | Body | Static | Static. |
 | `statueHorse` Bronze horse | 1x1 · floor | — | decor / ornaments | Body | Static | Static. |
-| `coatRack` Coat stand | 1x1 · floor | — | decor / ornaments | Body | Static | Static. |
+| `coatRack` Coat stand | 1x1 · floor | — | decor / ornaments | Body | Static | Static. Decor by decision (Q-19: kind `coatStand` marked decor); it carries its coat and hat. |
 | `hangingPlant` Hanging plant | 1x1 · ceiling | water:water | decor / ornaments | Pot, Cord | Use | `sway`: the pot sways 5° and settles for water (`hold` 0.8 s, one sway). |
 | `fireplace` Fireplace | 2x1 · floor | relax:relax | decor / ornaments | Surround, Mantel | Use | `flames`: the flames grow on the logs for relax (gloss; the light is the content's). |
 

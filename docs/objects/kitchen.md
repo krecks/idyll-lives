@@ -127,9 +127,9 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 | `wallCabinetGlass` Glazed wall cabinet | 1x1 · wall | — | kitchen / counters | Cabinet, Handles | Use | Glass doors (`glass` finish). `door_open`: the right door opens as the wall cabinet's (each glazed door costs two draws). |
 | `wallCabinetCorner` Wall cabinet with end shelves | 1x1 · wall | — | kitchen / counters | Cabinet, Handles | Use | `door_open`: the door opens as the wall cabinet's. |
 | `rangeHood` Cooker hood | 1x1 · wall | — | kitchen / counters | Hood, Trim | Static | Static. |
-| `spiceRack` Spice rack | 1x1 · wall | — | kitchen / counters | Rack | Static | Static. |
-| `potRail` Pot rail | 1x1 · wall | — | kitchen / counters | Rail, Pots | Static | Static. |
-| `kitchenShelfWall` Kitchen wall shelves | 1x1 · wall | — | kitchen / counters | Shelves, Brackets | Static | Static. |
+| `spiceRack` Spice rack | 1x1 · wall | — | kitchen / counters | Rack | Static | Static. Decor by decision (Q-19: kind marked decor). |
+| `potRail` Pot rail | 1x1 · wall | — | kitchen / counters | Rail, Pots | Static | Static. Decor by decision (Q-19: kind marked decor). |
+| `kitchenShelfWall` Kitchen wall shelves | 1x1 · wall | — | kitchen / counters | Shelves, Brackets | Static | Static. Decor by decision (Q-19: kind marked decor). |
 | `trashCan` Pedal bin | 1x1 · floor | — | kitchen / counters | Bin, Lid | Use | `lid_open`: the pedal lid lifts 75° while a plate is scraped in (`clean` at its `bin` station, `hold` 1 s). |
 | `recyclingBins` Recycling bins | 1x1 · floor | sortRecycling:clean | kitchen / counters | Left bin, Middle bin, Right bin (each with its lid), Handles | Use | `lid0_open`, `lid1_open`, `lid2_open`: the three lids lift one after another (0.6 s apart, each 80° in 0.5 s, `hold` 0.9 s) for "Sort the recycling". |
 

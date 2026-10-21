@@ -177,9 +177,9 @@ not decor: a real one is used, so an object of that kind with no use is a possib
 | `larder` | Tall larder / pantry cupboard | 0.4–0.9 × 1.8–2.3 × 0.55–0.65 |  | take out a snack or ingredients; put the shopping away | snack 1–3 | door 95–110°, pullOutTravel 0.4–0.55 m | en1116, neufert | `pantry` `pantryTall` `foodie.deliPantry` |
 | `wallCabinet` | Kitchen wall cabinet | 0.3–1 × 0.35–0.95 × 0.3–0.37 |  | take out plates, glasses or food; put clean dishes away | putAway 1–5 | door 95–110°, liftUp 90–107° | en1116, blum | `wallCabinet` `wallCabinetGlass` `wallCabinetCorner` |
 | `cookerHood` | Cooker hood (chimney) | 0.6–1 × 0.5–1.1 × 0.45–0.55 |  | extract steam while cooking; light the hob |  |  | en1116, neufert | `rangeHood` |
-| `kitchenShelf` | Wall shelves for a kitchen | 0.5–1.2 × 0.2–0.8 × 0.15–0.35 |  | take a jar or a mug; show things off |  |  | neufert | `kitchenShelfWall` |
-| `spiceRack` | Wall spice rack | 0.3–0.8 × 0.15–0.6 × 0.06–0.15 |  | take a spice while cooking |  |  | neufert | `spiceRack` |
-| `potRail` | Wall rail with hanging pans and utensils | 0.6–1.2 × 0.3–0.6 × 0.05–0.25 |  | take a pan or utensil while cooking |  |  | neufert | `potRail` |
+| `kitchenShelf` | Wall shelves for a kitchen | 0.5–1.2 × 0.2–0.8 × 0.15–0.35 |  | take a jar or a mug; show things off *(decor)* |  |  | neufert | `kitchenShelfWall` |
+| `spiceRack` | Wall spice rack | 0.3–0.8 × 0.15–0.6 × 0.06–0.15 |  | take a spice while cooking *(decor)* |  |  | neufert | `spiceRack` |
+| `potRail` | Wall rail with hanging pans and utensils | 0.6–1.2 × 0.3–0.6 × 0.05–0.25 |  | take a pan or utensil while cooking *(decor)* |  |  | neufert | `potRail` |
 | `kitchenIsland` | Kitchen island | 0.9–3 × 0.85–1 × 0.6–1.2 | top 85–100 | prepare food; eat a quick breakfast on stools; chat while cooking | breakfast 10–20, prep 5–20 | door 95–110°, drawerTravel 0.4–0.55 m | en1116, neufert | `kitchenIsland` `islandSmall` `islandLong` `foodie.chefsIsland` |
 | `barCounter` | Bar-height counter | 0.6–3 × 1–1.15 × 0.4–0.9 | top 100–110 | have a drink on a bar stool; mix drinks; eat a quick bite | drink 10–30 |  | dimStools, neufert | `barSegment` `barEnd` `outdoorBar` `outgoing.partyBar` |
 | `cooker` | Freestanding cooker (hob and oven, 50-76 cm) | 0.5–0.77 × 0.85–1 × 0.55–0.7 | top 85–95 | cook on the hob; bake or roast in the oven | cook 10–60, bake 20–60 | ovenDoorDrop 85–95°, hobLid 80–95° | aoCookers, en1116 | `stoveElectric` `stoveGas` |
@@ -394,7 +394,7 @@ not decor: a real one is used, so an object of that kind with no use is a possib
 | `floorVase` | Tall floor vase or urn | 0.2–0.5 × 0.4–1.2 × 0.2–0.5 |  | decorate a corner *(decor)* |  |  | neufert | `vaseTall` `urnPorcelain` |
 | `pedestalOrnament` | Ornament on a plinth (vase, bust, statue) | 0.3–0.7 × 0.8–1.7 × 0.3–0.7 |  | look at it *(decor)* | admire 1–5 |  | neufert | `vasePedestal` `bustMarble` `statueHorse` |
 | `statueSmall` | Small statue / garden ornament | 0.15–0.6 × 0.2–0.8 × 0.15–0.6 |  | look at it; pat it for luck *(decor)* | pat 0–2 |  | neufert | `statueCat` `garden.gnome` |
-| `coatStand` | Coat stand | 0.4–0.65 × 1.65–1.95 × 0.4–0.65 |  | hang up a coat and hat | hangCoat 0–1 |  | neufert | `coatRack` |
+| `coatStand` | Coat stand | 0.4–0.65 × 1.65–1.95 × 0.4–0.65 |  | hang up a coat and hat *(decor)* | hangCoat 0–1 |  | neufert | `coatRack` |
 | `hangingPlant` | Hanging plant from the ceiling | 0.25–0.6 × 0.4–1.2 × 0.25–0.6 |  | water it | water 1–5 |  | rhsPlants | `hangingPlant` |
 | `givingJar` | Charity jar on a stand | 0.25–0.5 × 0.8–1.2 × 0.25–0.5 |  | drop in some change | donate 0–2 |  | neufert | `kind.givingJar` |
 | `terrarium` | Terrarium on a stand | 0.3–0.6 × 0.8–1.3 × 0.3–0.6 |  | mist the plants; look at the little forest | mist 2–10 |  | neufert, rhsPlants | `natureLover.mossTerrarium` |
@@ -524,7 +524,7 @@ not decor: a real one is used, so an object of that kind with no use is a possib
 | `hayStack` | Stack of small square hay bales | 1–2.5 × 0.7–2 × 0.45–1.2 |  | sit on it; feed animals *(decor)* |  |  | neufert | `farm.hayStack` |
 | `scarecrow` | Scarecrow | 0.8–1.6 × 1.5–2.2 × 0.2–0.6 |  | keep birds off the crops *(decor)* |  |  | neufert | `farm.scarecrow` |
 | `trough` | Water trough | 1.2–2.5 × 0.4–0.7 × 0.5–0.9 |  | water the animals *(decor)* |  |  | neufert | `farm.trough` |
-| `chickenCoop` | Chicken coop with run | 1.2–2.5 × 1–2 × 1–2.5 |  | collect eggs; feed the hens | collectEggs 2–10 | lid 80–110° | neufert | `farm.coop` |
+| `chickenCoop` | Chicken coop with run | 1.2–2.5 × 1–2 × 1–2.5 |  | collect eggs; feed the hens *(decor)* | collectEggs 2–10 | lid 80–110° | neufert | `farm.coop` |
 
 ### Tabletop
 

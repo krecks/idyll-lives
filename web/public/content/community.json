@@ -1099,8 +1099,29 @@
       "group": "farm",
       "outdoors": true,
       "decor": 0.25,
+      "slots": 2,
+      "seat": {
+        "height": 0.45,
+        "forward": 0.25
+      },
       "description": "Three square bales stacked up: a step, a seat, a fort.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit on the hay bales",
+          "anim": "sit",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.25,
+            "fun": 0.05
+          },
+          "tags": [
+            "lounge",
+            "outdoors"
+          ]
+        }
+      ]
     },
     {
       "id": "farm.scarecrow",
