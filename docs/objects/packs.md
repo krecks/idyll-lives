@@ -283,6 +283,8 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 - pickSnack needs a ripe crop (`when: ripe`, `leaves: picked`; the bed takes two game days to ripen, content
   `grows`). Its `harvest` was seen playing and shutting when the ripe crop was picked, but not caught in a picture.
 - Picked, the bed loses its fruit and keeps its plants.
+- Since the authenticity review (G-68): tending brings the crop on (`tends` 0.15); "Pick something fresh" stays a
+  nibble eaten at the bed (the shortcut Q-18 keeps), unlike the other beds' harvests, which go to the fridge.
 - The veggie bed, the potting bench and the glasshouse take 4 draws.
 
 ## P13. Neat (6)
