@@ -273,7 +273,7 @@ Causes shared beyond this ledger, moved at the consolidation (2026-10-21): I-gar
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/trees.py:311-325` (`lemon_tree`: the crown at 1.85 m); `trees.py:345` (`size=(1.288, 2.374, 1.344)`)
 - **Evidence:** `cargo review sizes`: H 2.374 > 2.2 (`pottedTree` 0.8–2.0 m, +10 %). A potted citrus kept indoors or on a terrace is about 1–2 m with its pot; at 2.37 m its crown is above an adult's head (`sheets/obj-garden.lemonTree.png`, `extra/close/s-garden.lemonTree-pick.png`), which is also why the lemon picked is out of reach (I-garden-05). Lower the crown by 0.3–0.4 m.
-- **Status:** open
+- **Status:** open (fix: blender-trees left it for after G-68, which rebuilds the fruit trees' fruit as ripeness parts: lower the crown 0.38 m on top of it, the picked lemon staying at 1.62 m; the numbers in `bench-results/review/fixes/blender-trees/log.md`)
 - **Source:** wave: garden
 
 ### M-garden-05 — The maple is the oak's crown, and the magnolia's blooms are balls, some floating off it
