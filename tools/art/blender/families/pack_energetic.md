@@ -17,17 +17,17 @@ The contrast shower fills its tile with its own tiled walls, as the bathroom fam
 | `trampoline` | the mat, a shallow dish from the springs in with its origin at its rim: `bounce` deepens the dip five times (the middle from 0.58 to 0.50 m, where the bouncing feet land, content `stand.height`) and back, 0.625 s, a loop at the residents' 1.6 bounces a second | `bounce` (loop) |
 | `streetballHoop` | the net (crossing cords and two rings), pivoting on the rim: `swish` sways it 9° either way and home (`G.rock`, 1 s), after each shot: 1.4 s into the use, then every 3.2 s (`delay`, `every`) | `shoot` |
 | `powerBlender` | the jug's lid: `lid` lifts it 9 cm (0.5 s), `hold` 1 s, then it settles back; the smoothie: `blades` swirls it once a second from the lid back on, `every` 0.9 s | `blend` |
-| `contrastShower` | the rain: a 5 × 5 grid of streams under the square head, scaled to nothing: `water_on` grows them down (0.5 s) | `rinse` |
+| `contrastShower` | the rain: a 5 × 5 grid of streams under the square head, scaled to nothing: `water_on` grows them down (0.5 s); the glass door across the middle of the front, hinged on its right: `door_open` swings it 95° out (0.8 s), `hold` 1.5 s and `out` 1.5 s, letting the bather in and out (2026-10-21: the door was in the still body; a fourth draw, Q-05; no handle, to keep the door one draw) | `rinse` |
 | `recoveryPod` | the tinted canopy and its rim, hinged at the head end, standing open 40° at rest: `canopy` lowers it over the resident (1.2 s) and lifts it after | `recover` |
 
-**Draw calls: 3 each (the hoop 2).**
+**Draw calls: 3 each (the hoop 2; the blender and the shower 4).**
 - The wall is one still node: its plywood and timber `wood`, the holds and frame plain, the crash mat `fabric`.
 - The bike's seat and backrest are the body's `fabric`, the cranks plain.
 - The trampoline's pad is the body's `fabric`, the mat plain matte.
 - The hoop is all plain, the net plain.
 - The blender's jug and its two glasses are `glass` (the smoothies show through); the fruit bowl and board plain
   satin; the lid plain.
-- The shower's glass panels are `glass`, the towel plain satin; the rain plain gloss.
+- The shower's fixed glass panes are `glass`, the towel plain satin; the rain plain gloss; the door all glass, a part of its own (the fourth draw, Q-05).
 - The pod is all plain on its still body; the canopy part takes its `glass` and its plain rim (2 draws).
 
 The blender's blades loop (2026-10-21, review A-packs-02): the blades would turn inside the smoothie, which hides
@@ -49,7 +49,7 @@ that say what they colour: the blender `blend_cab` "Frame", `blend_door` "Doors"
 | `model.energetic.trampoline` | 1.90 × 0.63 × 1.90 m | 3,420 | 3 | Frame, Pads, Mat |
 | `model.energetic.streetballHoop` | 0.86 × 2.83 × 0.89 m | 3,668 | 2 | Frame, Pads, Base |
 | `model.energetic.powerBlender` | 0.82 × 1.32 × 0.63 m | 3,972 | 3 | Frame, Doors, Blender |
-| `model.energetic.contrastShower` | 0.90 × 2.15 × 0.90 m | 2,944 | 3 | Frame, Tiles, Mat |
+| `model.energetic.contrastShower` | 0.90 × 2.15 × 0.90 m | 3,064 | 4 | Frame, Tiles, Mat |
 | `model.energetic.recoveryPod` | 0.86 × 1.18 × 1.86 m | 2,900 | 3 | Frame, Pads, Boots |
 
 `check-glb`: 7 models, 0 failed, 2 warnings, both by design:
