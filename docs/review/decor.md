@@ -125,7 +125,8 @@ Notes: the lead "curtains off-centre on the stage window" is closed. The stage's
 - **Fix class:** code
 - **Where:** `web/public/content/furniture.json:4087` (`light`, `switch: false`); `web/src/render/babylon/house.ts:222` (a light with `switch: false` has no lamp id, so it follows the room's fill rule, `BabylonRenderer.ts:3622`); `tools/art/blender/families/decor.py:889` (`motions.uses.relax → flames`)
 - **Evidence:** By code: the firelight (range 4, power 0.8) comes up at dusk in any room with someone awake and goes out when they sleep, while the flames are drawn only during "Warm up by the fire"; between, the grate shows embers (`decor/extra/fireplace-night-unused.png`, a room whose only resident, the baby, sleeps: no firelight). A real fire is lit by someone, burns for hours, and its light and flames go together. A "light the fire" use (or the flames following the light) is missing. Not shot: an awake room at night with nobody at the fire.
-- **Status:** open
+- **Status:** fixed (0eaa3ba7)
+- **After:** fires (content `light.fire`: `fireplace`, `firePit`, `fireplaceElectric`) switch as lamps do (Light the fire / Put out the fire); nobody lights one for coming in, sitting down by it in the dark lights it, it goes out with the room's lamps as the last one awake leaves and burns down by morning (`lights.rs`, `world.rs` `arrive`; sim tests `lamps.rs` `a_fire_is_lit_to_sit_by_and_burns_down_by_morning`, `a_fire_sat_by_in_daylight_isnt_lit`). Its flames (its uses' clips) burn while it's lit at night, with the firelight and the embers' glow (`objectMotion.ts` `burns`): `fixes/lighting/webgpu-medium/fireplace-cut.png`, `fireplace-up.png`, `firepit-lit.png`.
 - **Source:** wave: decor
 
 ### I-decor-04 — The coat stand has nothing to hang
@@ -135,7 +136,8 @@ Notes: the lead "curtains off-centre on the stage window" is closed. The stage's
 - **Fix class:** decision
 - **Where:** `web/public/content/furniture.json:4022` (`coatRack`, `interactions: []`)
 - **Evidence:** A coat stand's one use is hanging a coat and a hat coming in; the reference doesn't mark the kind as decor (`coatStand`: "hang up a coat and hat"), and `cargo review uses` flags it. Residents have no outerwear to take off, so a use would be a mime (I-held-01). Decide: decor (it carries a coat and a hat already, `decor.py:611`) or a "hang up your coat" use on coming home.
-- **Status:** open
+- **Status:** fixed (198e90d9): decor (Q-19)
+- **After:** `coatStand` is a decor kind; the stand carries its coat and hat.
 - **Source:** wave: decor
 
 ### A-decor-01 — The grandfather clock's pendulum hangs still, and its trunk door never opens
@@ -145,7 +147,8 @@ Notes: the lead "curtains off-centre on the stage window" is closed. The stage's
 - **Fix class:** motion
 - **Where:** `tools/art/blender/families/decor.py:8-9` ("the grandfather clock's trunk door and pendulum are still, so the hands keep it within 4 draw calls") and `:374`
 - **Evidence:** `decor/clips/clips-grandfatherClock-all-t99.png`: the hands turn with the game's time, the pendulum (behind the glazed trunk door) never swings; a running longcase clock's pendulum swings all the time (about 1 s a beat). The model's own docstring says the door opens to wind it, but no clip does (`motions` has only `clock`). The draw-call budget is the reason given; a pendulum swing is one more rotating part.
-- **Status:** open
+- **Status:** fixed (abfc32d9), the pendulum; the trunk door stays still
+- **After:** the pendulum is its own part and swings ±4°, a beat each 0.8 s, all the time near the camera (`pendulum`, `idle`, `G.rock`), seen through the door's window (`fixes/motions/g1718/views/clock-t0.4.png`). The draw it takes comes from the case: polished satin walnut, not the textured wood (4 draws). The trunk door doesn't open: a fifth draw would be over the budget, and the clock is wound at its dial (the docstring no longer says the door opens to wind it).
 - **Source:** wave: decor
 
 ### M-decor-01 — The bronze horse reads as dark wood

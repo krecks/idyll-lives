@@ -54,11 +54,11 @@ Played with the `phone` clip, sitting on a `lounge` seat within 5 m when one is 
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| Joining in (walking over, taking a place) | n/a | A-social-04 | OK | Free will on after Ada and Ben start a chat (`review-group`): lonely Gus walks over and takes the third place within 2 s; Cal and Dee, as lonely, start a talk of their own instead. A-social-04 S3 code (the last metre or two into the place is a jump, `take_place`) | `social/sheets/group.png` |
+| Joining in (walking over, taking a place) | n/a | A-social-04 | OK | Free will on after Ada and Ben start a chat (`review-group`): lonely Gus walks over and takes the third place within 2 s; Cal and Dee, as lonely, start a talk of their own instead. A-social-04 S3 code (the last metre or two into the place is a jump, `take_place`; fixed d7735fc0: walked) | `social/sheets/group.png` |
 | Roles: speaker and listeners | n/a | OK | OK | The one speaking talks, the other two listen with the idle and now and then a nod (`Anim.Talk`: `yes` on a good outcome) | `social/sheets/group.png` |
 | Glances between members | n/a | OK | n/a | The speaker looks at the one talked to and now and then at a listener (`characters.ts:793`, `audience`); the listeners at the speaker. From stills only | `social/sheets/group.png`, `systems/scenes/group-top.png` |
 | Spacing and facing in the group | n/a | OK | OK | Three in a triangle 1.0 m a side, each turned to the group's middle (`open_up`), on `review-group` and `group-talk` alike; A-social-02 S3 code (seeded; not seen) | `social/sheets/group.png`, `systems/scenes/grouptalk-00.png` |
-| Talking seated (`sitTalk`) | n/a | n/a | I-social-06 | I-social-06 S3 code (nobody ever talks seated: a social stands both up) | `residents/strip-sitTalk.png` (pilot) |
+| Talking seated (`sitTalk`) | n/a | n/a | I-social-06 | I-social-06 S3 code (nobody ever talks seated: a social stands both up; fixed d7735fc0, but for meals: I-social-07) | `residents/strip-sitTalk.png` (pilot) |
 | Leaving a conversation | n/a | OK | OK | When the chat ends the listener stays for the leader's next social with someone there or goes (Gus and Ben start a deep talk of their own; Ada goes to cook) | `systems/scenes/group-late-01.png` |
 
 ## Findings
@@ -156,7 +156,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `crates/sim-core/src/conversation.rs:756-776` (`engage`: `end_activity` on the target), `crates/sim-core/src/world.rs:5289-5300` (`end_activity`: back to standing); the seated clip exists (`characters.ts:2581`, `sitTalk`)
 - **Evidence:** Socials happen only standing: the one talked to drops what they do and stands, and a conversation can't start from a seat, so two on a sofa or a family at the dinner table never talk, and `sitTalk` (`residents/strip-sitTalk.png`, pilot) is seen only on `poses.html`. People talk most sitting down: over a meal, on the sofa, at the café table.
-- **Status:** open
+- **Status:** fixed (d7735fc0), but for meals (I-social-07)
+- **After:** someone sitting at a use (the sofa, an armchair, a coffee at the table, watching from the sofa) who is talked to keeps their seat, turned the way it faces (the head turns), and carries on afterwards; called from across the room they stay put and the caller walks over. People sitting within 2.5 m of each other talk, or listen in, from their seats (`conversation::from_seat`; nothing closer than talking: a hug or a kiss still gets them up), and go back to what they sat down to do. Sim tests: `group_talk.rs` `two_on_the_sofa_talk_from_their_seats_and_a_third_walks_over_to_listen`, `calling_out.rs` `someone_on_the_sofa_stays_sitting_when_called_and_is_walked_over_to`. In play (`?state=group-seated`, `group-seated-lonely`; `bench-results/review/fixes/sound-social/group/`): R1 and R2 talk on the sofa, `sitTalk` and `sit` in turn (`group-seated-talk.png`); R0 walks over to R1 on the sofa and talks standing while R1 stays sitting (`group-seated-lonely-standing-to-seated.png`). Eating residents still aren't talked to: I-social-07.
 - **Source:** wave: cross-cutting (code read; every pair run stood up first)
 
 ### A-social-04 — Someone joining a group jumps the last metre or two into their place
@@ -166,5 +167,26 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `crates/sim-core/src/conversation.rs:476-483` (the joiner stops once within `JOIN_RANGE` 2.6 m of the pair's middle) and `:537-575` (`take_place`: `sims[j].pos = p`, the chosen spot set at once)
 - **Evidence:** The joiner walks until within 2.6 m of the middle of the two talking, then is put on a spot about 1 m from each of them in one tick, up to 1.5–2 m away, and the renderer slides them there. `review-group` (`systems/scenes/scenes.log`): Gus covers 3.4 m in the 1.6 s between two shots at speed 1, about a metre more than a walk does. The shots are too far apart to see the slide itself (a timed, headed check would). Route the joiner to the spot instead.
-- **Status:** open
+- **Status:** fixed (d7735fc0)
+- **After:** `take_place` routes the joiner to the spot (`Sim::join_spot`) and settles them only within 0.3 m of it; sitting, they listen from their seat. Both group tests now assert the joiner moves no more than 0.35 m a tick (a walk is 0.075 m): before the fix the same tests measured jumps of 1.55 and 1.69 m. A headed, timed look is still to do. The actor's own step to the talking distance as a talk starts is A-social-05.
 - **Source:** wave: cross-cutting (code read, with the positions logged)
+
+### A-social-05 — The one starting a talk steps up to their talking distance in one tick
+
+- **Severity:** S3
+- **Rubric:** A4
+- **Fix class:** code
+- **Where:** `crates/sim-core/src/conversation.rs` (`engage`: `sims[i].pos = spot`, the spot at the social's `distance` from the target; the talk starts within `distance + ENGAGE_SLACK + 0.6`, up to 2.4 m for a chat)
+- **Evidence:** Code read while fixing A-social-04: as a social starts, the actor is put at the social's distance from the one talked to, up to about 1.4 m from where they stopped, in one tick, and the renderer slides them there; the same kind of slide as the joiner's was. Walk the last bit (as `take_place` now does), or start the talk where they stand when they're near enough.
+- **Status:** open
+- **Source:** fix: sound-social
+
+### I-social-07 — Nobody talks over a meal: eating, a resident is never talked to
+
+- **Severity:** S3
+- **Rubric:** I11, I1
+- **Fix class:** code
+- **Where:** `crates/sim-core/src/world.rs` (`available_for_social`: `TaskKind::Eat` is never available; `from_seat` starts only from a sitting `Use`)
+- **Evidence:** Left from I-social-06 (fixed for sofas, chairs and the coffee at a table): the family eating at the dinner table still eat in silence, as the eaters can't be talked to and don't talk from their seats. A talk over a meal would pause the eating (or run beside it) and keep the plate in front of them.
+- **Status:** open
+- **Source:** fix: sound-social

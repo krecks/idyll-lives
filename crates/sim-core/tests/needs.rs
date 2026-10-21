@@ -8,10 +8,11 @@ mod common;
 use sim_core::world::{Phase, TaskKind};
 use sim_core::{Command, MINUTES_PER_TICK, World, clock, life};
 
-/// One house plot: a toilet and a sink, a home cinema, a fridge and a bed.
+/// One house plot: a toilet and a sink, a home cinema (against the wall behind them all), a fridge and a bed.
 const TOWN: &str = r#"{"width":16,"depth":12,
     "plots":[{"name":"Home","x":0,"z":0,"w":16,"d":10,"entry":[8.5,9.5]}],
     "households":[{"name":"Home","plot":0,"player":true}],
+    "walls":[[0,1,16,1]],
     "objects":[{"def":"toilet","x":5,"z":1,"rot":0},{"def":"sink","x":7,"z":1,"rot":0},
                {"def":"homeCinema","x":9,"z":1,"rot":0},{"def":"fridge","x":13,"z":1,"rot":0},
                {"def":"bed","x":1,"z":1,"rot":0}],

@@ -2200,7 +2200,7 @@
     },
     "garden.poppies": {
       "interactions": {
-        "smell": [
+        "admire": [
           "Red as can be.",
           "Such papery petals.",
           "Poppies always look so happy."
@@ -2209,7 +2209,7 @@
     },
     "garden.marigolds": {
       "interactions": {
-        "smell": [
+        "admire": [
           "Marigolds! Like little suns.",
           "Bright orange. I love it.",
           "They keep the bugs away."
@@ -2245,7 +2245,7 @@
     },
     "garden.forgetMeNots": {
       "interactions": {
-        "smell": [
+        "admire": [
           "Forget me not. I won't.",
           "Tiny and blue.",
           "Such little flowers."

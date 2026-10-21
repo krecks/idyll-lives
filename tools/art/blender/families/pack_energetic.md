@@ -16,7 +16,7 @@ The contrast shower fills its tile with its own tiled walls, as the bathroom fam
 | `spinBike` | the cranks, pedals and axle in the flywheel's hub: `pedals` turns them once a second, a loop; `ride: pedals` is not set (the rider sits on the still seat) | `ride` (loop) |
 | `trampoline` | the mat, a shallow dish from the springs in with its origin at its rim: `bounce` deepens the dip five times (the middle from 0.58 to 0.50 m, where the bouncing feet land, content `stand.height`) and back, 0.625 s, a loop at the residents' 1.6 bounces a second | `bounce` (loop) |
 | `streetballHoop` | the net (crossing cords and two rings), pivoting on the rim: `swish` sways it 9° either way and home (`G.rock`, 1 s), after each shot: 1.4 s into the use, then every 3.2 s (`delay`, `every`) | `shoot` |
-| `powerBlender` | the jug's lid: `lid` lifts it 9 cm (0.5 s), `hold` 1 s, then it settles back | `blend` |
+| `powerBlender` | the jug's lid: `lid` lifts it 9 cm (0.5 s), `hold` 1 s, then it settles back; the smoothie: `blades` swirls it once a second from the lid back on, `every` 0.9 s | `blend` |
 | `contrastShower` | the rain: a 5 × 5 grid of streams under the square head, scaled to nothing: `water_on` grows them down (0.5 s) | `rinse` |
 | `recoveryPod` | the tinted canopy and its rim, hinged at the head end, standing open 40° at rest: `canopy` lowers it over the resident (1.2 s) and lifts it after | `recover` |
 
@@ -30,9 +30,12 @@ The contrast shower fills its tile with its own tiled walls, as the bathroom fam
 - The shower's glass panels are `glass`, the towel plain satin; the rain plain gloss.
 - The pod is all plain on its still body; the canopy part takes its `glass` and its plain rim (2 draws).
 
+The blender's blades loop (2026-10-21, review A-packs-02): the blades would turn inside the smoothie, which hides
+them, so the smoothie itself swirls: it is a part of its own (with streaks of orange, apple and lime down its side
+and bits at its top, so the turn shows through the glass jug), turned once a second (`blades`, `G.spin`) from the lid
+back on (`delay` 1.5 s) till the blend ends (`every` 0.9 s, a hair under its round). It is the fourth draw.
+
 Not done, as the plan allows:
-- the blender's blades loop "L blades (E1)": they would turn inside the smoothie, which hides them, and a second
-  moving part is one more draw;
 - the trampoline's "Until then U: dips once" interim: the E1 loop is built instead.
 
 Colour parts: the plan's "Frame, Pads" where they fit; the blender (a kitchen unit) and the shower take names

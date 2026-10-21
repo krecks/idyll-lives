@@ -1,5 +1,5 @@
 {
-  "$comment": "Energetic pack: sport gear for residents who are always on the move. A bouldering wall and a screen spin bike train Strength and Endurance (strong riders get an Endorphin rush), a trampoline and streetball hoop turn exercise into fun, a power blender and contrast shower soften the cost of all that sweat, and the premium recovery pod finally gets an energetic resident to rest. New tag: sport. Check with: cargo run -q -p sim-core --example check_pack -- web/public/content/packs/energetic.json",
+  "$comment": "Energetic pack: sport gear for residents who are always on the move. A bouldering wall and a screen recumbent bike train Strength and Endurance (strong riders get an Endorphin rush), a trampoline and streetball hoop turn exercise into fun, a power blender and contrast shower soften the cost of all that sweat, and the premium recovery pod finally gets an energetic resident to rest. New tag: sport. Check with: cargo run -q -p sim-core --example check_pack -- web/public/content/packs/energetic.json",
   "objects": [
     {
       "id": "energetic.boulderingWall",
@@ -27,13 +27,13 @@
     },
     {
       "id": "energetic.spinBike",
-      "name": "Interactive spin bike",
+      "name": "Interactive recumbent bike",
       "model": "model.energetic.spinBike",
       "footprint": [1, 2],
       "price": 1250,
       "category": "fitness",
       "slots": 1,
-      "description": "A heavy-flywheel bike with a route screen. Builds Endurance; the fitter the rider, the more fun the ride, and riders with Endurance 4+ finish on an Endorphin rush.",
+      "description": "A low recumbent bike with a backrest, a heavy flywheel and a route screen. Builds Endurance; the fitter the rider, the more fun the ride, and riders with Endurance 4+ finish on an Endorphin rush.",
       "interactions": [
         {
           "id": "ride",
@@ -115,6 +115,7 @@
           "id": "blend",
           "label": "Blend a power smoothie",
           "anim": "cook",
+          "sound": "none",
           "minutes": 4,
           "eat": { "item": "smoothie", "minutes": 6 },
           "pose": "stand",

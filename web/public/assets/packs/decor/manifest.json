@@ -237,10 +237,10 @@
           "finish": "material.finish.satin"
         },
         "walnut": {
-          "finish": "material.finish.wood"
+          "finish": "material.finish.satin"
         },
         "walnut_dark": {
-          "finish": "material.finish.wood"
+          "finish": "material.finish.satin"
         }
       },
       "motions": {
@@ -248,7 +248,8 @@
           "hour": "hour_hand",
           "minute": "minute_hand",
           "at": 610
-        }
+        },
+        "idle": "pendulum"
       },
       "paint": [
         {

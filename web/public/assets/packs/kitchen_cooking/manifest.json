@@ -18,13 +18,17 @@
         "grate": {
           "finish": "material.finish.satin"
         },
+        "heat": {
+          "finish": "material.finish.gloss"
+        },
         "hob": {
           "finish": "material.finish.gloss"
         }
       },
       "motions": {
         "uses": {
-          "cook": "knob_on",
+          "cook": "burner_on",
+          "stir": "burner_on",
           "bake": {
             "clip": "oven_open",
             "hold": 3.0
@@ -79,6 +83,7 @@
         "uses": {
           "cook": "burner_on",
           "gourmet": "burner_on",
+          "stir": "burner_on",
           "bake": {
             "clip": "oven_open",
             "hold": 3.0
@@ -168,6 +173,7 @@
         "uses": {
           "cook": "burner_on",
           "gourmet": "burner_on",
+          "stir": "burner_on",
           "bake": {
             "clip": "oven_open",
             "hold": 3.0
@@ -217,7 +223,8 @@
       },
       "motions": {
         "uses": {
-          "cook": "burner_on"
+          "cook": "burner_on",
+          "stir": "burner_on"
         }
       },
       "paint": [
@@ -266,10 +273,22 @@
       },
       "motions": {
         "uses": {
-          "reheat": "door_open"
-        },
-        "loops": {
-          "reheat": "turntable"
+          "reheat": [
+            "door_open",
+            {
+              "clip": "turntable",
+              "delay": 2.2,
+              "every": 1.9
+            }
+          ],
+          "bake": [
+            "door_open",
+            {
+              "clip": "turntable",
+              "delay": 2.2,
+              "every": 1.9
+            }
+          ]
         },
         "hold": 1.2
       },
@@ -420,9 +439,9 @@
       },
       "motions": {
         "uses": {
-          "dishes": "door_open"
-        },
-        "hold": 2.5
+          "dishes": "door_open",
+          "wash": "door_open"
+        }
       },
       "paint": [
         {
@@ -464,9 +483,9 @@
       },
       "motions": {
         "uses": {
-          "dishes": "door_open"
-        },
-        "hold": 2.5
+          "dishes": "door_open",
+          "wash": "door_open"
+        }
       },
       "paint": [
         {

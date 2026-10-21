@@ -557,8 +557,8 @@ if (what === 'play') {
       if (d.layer === 'surface') return null;
       if (d.outdoors) return [x, 22, 0];
       if (d.layer === 'wall') return d.overWindow ? [4, 14, 1] : [x, 18 - dd, 2];
-      // Against the back wall what fills its height (a wall bed, a wardrobe); the rest in the middle.
-      return d.fillsWall ? [x, 18 - dd, 2] : [x, 12 - Math.floor(dd / 2), 0];
+      // Against the back wall what fills its height (a wardrobe) or stands against a wall (a wall bed); the rest in the middle.
+      return d.fillsWall || d.againstWall ? [x, 18 - dd, 2] : [x, 12 - Math.floor(dd / 2), 0];
     }, def);
 
   /**

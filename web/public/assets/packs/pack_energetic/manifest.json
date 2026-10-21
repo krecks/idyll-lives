@@ -282,7 +282,14 @@
       },
       "motions": {
         "uses": {
-          "blend": "lid"
+          "blend": [
+            "lid",
+            {
+              "clip": "blades",
+              "delay": 1.5,
+              "every": 0.9
+            }
+          ]
         },
         "hold": 1.0
       },

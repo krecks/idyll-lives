@@ -175,13 +175,13 @@ Family: `tools/art/blender/families/trees.py`.
 | `garden.maple` Maple tree | M-garden-05 | I-garden-02 | I-garden-02 | M-garden-05 S3 model; I-garden-02 S2 clip | `sheets/obj-garden.maple.png` |
 | `garden.birch` Silver birch | OK | I-garden-02 | I-garden-02 | I-garden-02 S2 clip | `sheets/obj-garden.birch.png` |
 | `garden.cherry` Cherry blossom tree | OK | I-garden-02 | I-garden-02 | I-garden-02 S2 clip | `sheets/obj-garden.cherry.png` |
-| `garden.apple` Apple tree | OK | I-garden-02, I-garden-05 | I-garden-02, I-garden-05, I-garden-10 | I-garden-05 S2 clip; I-garden-02 S2 clip; I-garden-10 S3 decision | `sheets/obj-garden.apple.png`, `extra/close/s-garden.apple-pick.png`, `extra/s-garden.apple-pick.png` |
+| `garden.apple` Apple tree | OK | I-garden-02, I-garden-05 | I-garden-02, I-garden-05, I-garden-10, I-garden-11 | I-garden-05 S2 clip; I-garden-11 S3 decision (fix: clips-standing); I-garden-02 S2 clip; I-garden-10 S3 decision | `sheets/obj-garden.apple.png`, `extra/close/s-garden.apple-pick.png`, `extra/s-garden.apple-pick.png` |
 | `garden.japaneseMaple` Japanese maple | M-garden-01 | I-garden-02 | M-garden-01, I-garden-02 | M-garden-01 S2 model (widened); I-garden-02 S2 clip; I-held-01 S2 code (held ledger) | `sheets/obj-garden.japaneseMaple.png`, `extra/close/s-jm-willow.png` |
 | `garden.magnolia` Magnolia | M-garden-05 | I-garden-02 | I-garden-02, I-garden-08 | M-garden-05 S3 model; I-garden-02 S2 clip; I-garden-08 S3 content | `sheets/obj-garden.magnolia.png` |
 | `garden.willow` Weeping willow | M-garden-02 | I-garden-02 | I-garden-02 | M-garden-02 S2 model; I-garden-02 S2 clip | `sheets/obj-garden.willow.png`, `extra/close/s-jm-willow.png` |
 | `garden.spruce` Blue spruce | M-garden-01 | n/a | OK | M-garden-01 S2 model (widened) | `sheets/obj-garden.spruce.png` |
 | `garden.cypress` Italian cypress | M-garden-03 | n/a | OK | M-garden-03 S3 model | `sheets/obj-garden.cypress.png` |
-| `garden.lemonTree` Potted lemon tree | M-garden-04 | I-garden-05 | I-garden-05, I-garden-10 | M-garden-04 S3 model; I-garden-05 S2 clip; I-garden-10 S3 decision; I-held-01 S2 code (held ledger) | `sheets/obj-garden.lemonTree.png`, `extra/close/s-garden.lemonTree-pick.png` |
+| `garden.lemonTree` Potted lemon tree | M-garden-04 | I-garden-05 | I-garden-05, I-garden-10, I-garden-11 | M-garden-04 S3 model; I-garden-05 S2 clip; I-garden-11 S3 decision (fix: clips-standing); I-garden-10 S3 decision; I-held-01 S2 code (held ledger) | `sheets/obj-garden.lemonTree.png`, `extra/close/s-garden.lemonTree-pick.png` |
 
 Notes:
 - **Sizes:** the broad trees are 4.5–8.2 m tall and 3.5–5.5 m across, the size of a garden tree a few decades old; the small ones (Japanese maple 3.7, cherry 5.5 m) and the apple on dwarfing stock (5.6 m) too. Out of range: the cypress's width (M-garden-03) and the lemon tree's height (M-garden-04).
@@ -310,7 +310,8 @@ Causes shared beyond this ledger, moved at the consolidation (2026-10-21): I-gar
 - **Fix class:** decision
 - **Where:** `web/public/content/garden.json:1870` (`garden.cacti`) and `:1912` (`garden.succulents`): no `layer`, so floor; `tools/art/blender/families/plants.py:288-334`
 - **Evidence:** `sheets/obj-garden.cacti.png`, `sheets/obj-garden.succulents.png`: three pots 0.3–0.5 m high and a 0.62 m bowl 0.17 m high stand on the floor tile, ankle high, where real ones sit on a sill, a shelf or a table. The tabletop catalog has small pots that do (`potSucculent`, `potCactus`, `catalog2/tabletop.json:379`, `layer: surface`). Either make these two surface things (the bowl then needs to shrink to about 0.3 m) or keep them as floor pots by design.
-- **Status:** open
+- **Status:** won't fix (Q-08: floor pots by design)
+- **After:** The tabletop catalogue has the small pots that stand on tops.
 - **Source:** wave: garden
 
 ### I-garden-03 — moved to systems.md
@@ -324,7 +325,8 @@ Causes shared beyond this ledger, moved at the consolidation (2026-10-21): I-gar
 - **Fix class:** clip
 - **Where:** `web/public/content/garden.json:221-223` (apple `pick`: `anim: eat`) and `:416-418` (lemon `pick`: `anim: eat`); `web/src/render/babylon/characters.ts:457` (`ACTIONS.eat.stand`: `eat`, `idle`); `tools/art/blender/families/trees.py:191` (the picked apple at 2.95 m, 1.95 m in front of the trunk) and `:311-325` (the lemon in a crown at 1.85 m)
 - **Evidence:** `extra/close/s-garden.apple-pick.png`: the resident stands at the trunk with the eating clip, the hand at the mouth and empty, for 15 minutes; the apple the `pick` clip shrinks hangs on its own in the air about 1.2 m above her head, never reached. `extra/close/s-garden.lemonTree-pick.png`: the same at the lemon tree, the lemon in the crown above her. No clip reaches up into a tree (the `pick` clip is fitted to the waist-high herb trough). The fix is a reach-up-and-twist pick, then the eat clip with the fruit in hand (the fruit prop is I-held-01, held ledger).
-- **Status:** open
+- **Status:** fixed (5bd8a29c, 1abb80cf)
+- **After:** picking is its own clip: a look up, the right hand up to the fruit (on tiptoe if high), the left steadying the bough, a twist off and down to the chest, then eating it (`pickApple*`, `pickLemon*` in three sizes, `clips/uses.ts`; `STEP_IN` for the `eat` use only, so the apple tree's shade use is as it was). The apple tree's picked apple hangs within reach now (1.84 m up, 0.7 m out from the trunk on a stalk from the crown's underside, was 2.95 m and 1.95 m out; `trees.py`), and both trees' `pick` clips wait 1.6 s for the hand (`PICK_DELAY`). Grown-ups and teens have the hand at the fruit; children reach up short of it (I-garden-11). `bench-results/review/fixes/clips-standing/``sheet-pick.png` (before the apple came down 6 cm: the teen short of it), `sheet-pick2.png`, `play/pick-*`, `strips/sheets/pick*`.
 - **Source:** wave: garden
 
 ### I-garden-06 — Smelling is a crouch for every flower, also for waist-high ones
@@ -345,7 +347,8 @@ Causes shared beyond this ledger, moved at the consolidation (2026-10-21): I-gar
 - **Fix class:** content
 - **Where:** `web/public/content/garden.json:1007-1009` (sunflowers `admire`: `anim: look`); `web/src/render/babylon/characters.ts:3377-3381` (`look` lowers the head 0.2 rad at any object but the telescope)
 - **Evidence:** `sheets/obj-garden.sunflowers.png` (admire): the resident stands at the bed with the head tipped down while the flower heads are at 1.6–2.1 m. The cherry's and the magnolia's uses take `anim: admire`, which looks up into the crown (`characters.ts:3371-3376`); the sunflowers want the same.
-- **Status:** open
+- **Status:** fixed (a45e65a2)
+- **After:** `anim: admire`: the head tips up to the flower heads (`bench-results/review/fixes/content/g10/after-garden.sunflowers-admire-00.png`).
 - **Source:** wave: garden
 
 ### I-garden-08 — Every flower bed is "water" and "smell": scentless flowers are smelled, and none can be cut for a vase
@@ -355,7 +358,8 @@ Causes shared beyond this ledger, moved at the consolidation (2026-10-21): I-gar
 - **Fix class:** content
 - **Where:** `web/public/content/garden.json:1052` (poppies `smell`, `feeling: garden.sweetScent`), `:1098` (marigolds), `:1282` (forget-me-nots), `:337-339` (magnolia "Smell the magnolia": `anim: admire`); the cut-flower uses would go beside the tulips', daffodils', lilies', cosmos' and daisies' (`:869`, `:915`, `:1190`, `:1328`, `:961`)
 - **Evidence:** `cargo review uses` (`tables/uses-garden.md`): the 11 beds have the same two uses. Poppies and forget-me-nots have no scent to speak of and marigolds' is sharp, yet each gives "Sweet scent". The magnolia's smell is looking up at flowers about 3 m above the nose (`sheets/obj-garden.magnolia.png`). The reference's real uses for a bed (`reference.json` `flowerBed`: water, smell, pick a few) include cutting, which the game has nowhere: the meadow's "Pick a wildflower" is the only picking. Make the scentless beds' second use "Admire" (anim `look`), relabel the magnolia's "Admire the magnolia", and decide at triage whether cut flowers (for a vase) are wanted.
-- **Status:** open
+- **Status:** fixed (a45e65a2); cut flowers later (Q-18)
+- **After:** Poppies, marigolds and forget-me-nots: "Admire the …" (`look`), no Sweet scent feeling; the magnolia's reads "Admire the magnolia". Played on `review-garden`.
 - **Source:** wave: garden
 
 ### I-garden-09 — The bonsai is pruned for 45 minutes standing, stooped over a knee-high table
@@ -369,4 +373,14 @@ Causes shared beyond this ledger, moved at the consolidation (2026-10-21): I-gar
 - **Source:** wave: garden
 
 ### I-garden-10 — moved to systems.md
+
+### I-garden-11 — A child can't reach the fruit it picks
+
+- **Severity:** S3
+- **Rubric:** I3, A1
+- **Fix class:** decision
+- **Where:** `tools/art/blender/families/trees.py` (`apple`: the picked apple at 1.84 m; `lemon_tree`: the lemon at 1.62 m); `web/src/render/babylon/characters/clips/uses.ts` (`PICK_APPLE`, `PICK_LEMON`: the child's size reaches up as far as it can)
+- **Evidence:** `bench-results/review/fixes/clips-standing/sheet-pick.png` (right column): with G-21's pick a child of 1.1 m reaches up on tiptoe to about 1.45 m, the apple 0.4 m and the lemon 0.2 m above the hand, while the fruit shrinks away. Grown-ups and teens reach it. Real children pick the low fruit or are lifted up. A lower fruit of its own for a child (a second part the child's size picks), or picking only from 1.3 m up (an age or height rule, G-45's), are the choices.
+- **Status:** open
+- **Source:** fix: clips-standing
 

@@ -130,7 +130,8 @@ Measured: the dressing table's top 0.76 (72–78) and its pouf's seat 0.45 (42�
 - **Fix class:** decision
 - **Where:** `tools/art/blender/families/bedroom.py:153-161` (`bed`: headboard 1.90 m, base 1.82, mattress 1.72 × 1.78); `web/public/content/base.json:2479` (`name: "Double bed"`); `tools/art/blender/families/bedroom.py:250-268` (`bedFuton`: seat and back 1.86 wide, headboard 1.96); `web/public/content/furniture.json:1968` (`bedFuton`, kind `bedLow` in `docs/review/reference.json`)
 - **Evidence:** `sizes-bedroom.md`: 1.90 × 1.13 × 1.88 against a double's 1.35–1.60 m (±10 %: 1.76). Its 1.72 m mattress is a king's (`bedKing` is 1.98 wide, the other `bedDouble` 1.62 with a 1.56 mattress). It fills its 2 × 2 footprint, which may be why. Either call it a king (content name and `reference.json` kind) or narrow it to a double; the mattress height 0.58 m is right (`BEDS.bed`, `furniture.json:53`) and sleepers lie well on it (`play/bed-sleep-02.png`). Its 1.78 m long mattress is short for 1.90–2.00 m beds, as for every bed in the family (`bedroom.py:161`, `:190`, `:322`). Widened (bedroom wave): the futon is 1.96 wide with a 1.86 m mattress (`bedroom/sheets/obj-bedFuton.png`), 19 % over the `bedLow` double's 1.65; it fills its 2 × 2 the same way. Futons come king-size, so the decision is the same: name or kind, or narrower.
-- **Status:** confirmed and widened (bedroom wave)
+- **Status:** fixed (b3f6b82d)
+- **After:** "King-size bed" (kind `bedKing`) and "King futon" (`bedLow`, now to 1.95 m wide): `cargo review sizes` bedroom 10 → 8 outside.
 - **Source:** pilot; widened in wave: bedroom
 
 ### M-bedroom-02 — Two nightstands and the tall chest are as deep as their tile
@@ -162,7 +163,8 @@ Measured: the dressing table's top 0.76 (72–78) and its pouf's seat 0.45 (42�
 - **Fix class:** motion
 - **Where:** `tools/art/blender/families/bedroom.py:121-127` (`_turn_down`: the flap, one rigid part, `G.swing` 180° about its fold in `SECONDS` = 1.0, `:75`, with a `G.squash`); `tools/art/blender/families/kids.py:275-285` (the kids' beds, the same)
 - **Evidence:** `bedroom/clips/clips-bed-all-t0.5.png`: half way, the top third of the duvet stands upright across the head of the bed, a flat panel about 0.45 m high in front of the pillows; the same on `bedSingle`, `bedBunk` (both duvets), `bedKing`, `bedDouble`, `bedQueenUpholstered` and `bedCanopy` (`bedroom/clips/clips-*-all-t0.5.png`). A duvet is turned back by a hand and folds as cloth, never upright. It shows for about half of the 1 s clip each time someone gets into or out of bed, at the head end, before the game's quilt covers it. A clip that slides and folds the flap low (or two hinged halves) would read as cloth. Other items: `kidsBed`, `kidsBedCar` (kids ledger).
-- **Status:** open
+- **Status:** fixed (abfc32d9)
+- **After:** as the flap turns over it is gathered along the bed to a fifth of its length half way and springs out again as it lies down (a scale there and back on the same clip, `ROLL`), so half way it is a low roll at the fold, not a 0.45 m board: `fixes/motions/g1718/clips-bed-all-t0.5.png`, `clips-bedBunk-all-t0.5.png`, `views/bunk-t0.5.png` and the other beds' and the kids' beds' (`clips-kidsBed-all-t0.5.png`, `clips-kidsBedCar-all-t0.5.png`). Folded, it is where it was (under the game's quilt).
 - **Source:** wave: bedroom (lead from Phase 0.9 "Seen (not reviewed)")
 
 ### A-bedroom-02 — The upper bunk's sleeper sits down in mid-air: no climb up the ladder
@@ -200,7 +202,8 @@ Measured: the dressing table's top 0.76 (72–78) and its pouf's seat 0.45 (42�
 - **Fix class:** content
 - **Where:** `web/public/content/furniture.json:1980` (`bedFuton` interactions: sleep, nap, unfold, fold away); `web/public/content/catalog2/bedroom.json:159` (`bedDaybed`: sleep, nap)
 - **Evidence:** `bedroom/sheets/obj-bedFuton.png` (folded, a sofa on a platform), `bedroom/sheets/obj-bedDaybed.png` (a back and two arms). Each is a sofa by day; folded, the futon's only use is to unfold it. The sofa bed has relax and doze (`catalog2/living.json`); a "Sit down" or "Relax" (the futon's with `when: closed`) on each would be the missing use.
-- **Status:** open
+- **Status:** fixed in part (eaca9ed8): the futon; the daybed needs a renderer seat row
+- **After:** Folded, the futon offers "Sit and relax" on its front edge (content `seat` 0.40 m, forward 0.68: `bench-results/review/fixes/content/g09/seat68-bedFuton-relax-00.png`). The daybed is sat on lengthways, which content `seat` can't say (a `seats` row with `along` in `characters/furniture.json`).
 - **Source:** wave: bedroom
 
 ### I-bedroom-04 — "Pick an outfit" changes nothing: the resident keeps the same clothes
@@ -220,7 +223,8 @@ Measured: the dressing table's top 0.76 (72–78) and its pouf's seat 0.45 (42�
 - **Fix class:** content
 - **Where:** `web/public/content/catalog2/bedroom.json:273` (`nightstandDrawers` `outfit`)
 - **Evidence:** `bedroom/play/chunk2/nightstandDrawers-outfit-01.png`: "Pick an outfit" from a 0.60 m nightstand's top drawer. A bedside drawer holds a book, glasses or a snack, not the day's clothes (`reference.md` `nightstand`: put a lamp, a book and a glass by the bed; a midnight snack from the drawer, as `slob.snackNightstand`). A "Read in bed" or a snack use, or no use (decor, as the other three), fits.
-- **Status:** open
+- **Status:** fixed (eaca9ed8)
+- **After:** The outfit is gone; "Grab a snack from the drawer" (fetched, eaten sitting). The drawer clip is keyed to the old `outfit` use in `bedroom_storage.py` (`DRAWER_USE`): it opens again once the key is `snack` and the family is rebuilt (`cargo review uses` flags the key meanwhile).
 - **Source:** wave: bedroom
 
 ### I-bedroom-06 — The mirrors share out their two uses, and two of them have one name
@@ -230,7 +234,8 @@ Measured: the dressing table's top 0.76 (72–78) and its pouf's seat 0.45 (42�
 - **Fix class:** content
 - **Where:** `web/public/content/base.json:3194-3207` (`mirror` "Standing mirror": speech only); `web/public/content/furniture.json:2239-2254` (`mirrorWall`: speech only); `web/public/content/catalog2/bedroom.json:498-512` (`mirrorFloor` "Standing mirror": primp only)
 - **Evidence:** `bedroom/sheets/obj-mirrorFloor.png`, `obj-mirrorWall.png`, `play/mirror-speech-*.png` (pilot): every mirror is for checking yourself, and any can be practised at (`reference.md` `mirrorStanding`, `mirrorWall`: check your look; practise a speech). The cheval mirror and the wall mirror offer only the speech, the other standing mirror only "Check the mirror". Both standing mirrors are called "Standing mirror" in the catalog. Fix: all three get both uses (primp 5, speech 30), and the cheval mirror a name of its own. (The pilot passed `mirror` as OK, leaving the outfit check to the wardrobe; checking yourself in a mirror is a use of its own.)
-- **Status:** open
+- **Status:** fixed (eaca9ed8, 1222c510)
+- **After:** All three mirrors check the look (5 min, standing straight: `idle`) and practise a speech (30); the base one is the "Cheval mirror".
 - **Source:** wave: bedroom
 
 ### I-bedroom-07 — Getting ready at the dressing table is sitting with the hands in the lap
@@ -263,3 +268,13 @@ Measured: the dressing table's top 0.76 (72–78) and its pouf's seat 0.45 (42�
 - **Evidence:** `fixes/rides/bunk-up-child.png` (t 0.1 to 0.86): the upper duvet's flap folds back the moment the use starts, about 6 s before its sleeper, now climbing the ladder (G-44, `bunkUp`), gets onto the mattress, and stands folded up beside them while they crawl in and sit. Someone turns their own duvet back once in bed. The upper slot's turn-down wants a delay of the climb's length (`bunkUp`, 7 s at speed 1), as the moving parts in time with the use (G-17) do.
 - **Status:** open
 - **Source:** fix: rides (G-44)
+
+### I-bedroom-08 — At a mirror the resident looks down, not at the glass
+
+- **Severity:** S3
+- **Rubric:** I3, A1
+- **Fix class:** renderer-table
+- **Where:** `web/src/render/babylon/characters.ts:3378` (`talk`, `look`, `listen` tip the head 0.2 rad down at any object but the telescope)
+- **Evidence:** "Practise a speech" (`anim: talk`) at every mirror tips the head down to the object, as at a plant or a bird bath; a mirror is looked into at eye height. "Check the mirror" was `look` (the same tip) and is `idle` now (1222c510); the speech wants the head level at a mirror (by def, or a `mirror` anim).
+- **Status:** open
+- **Source:** fix: content

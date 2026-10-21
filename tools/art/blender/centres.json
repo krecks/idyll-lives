@@ -386,7 +386,7 @@
   "model.paperLantern": [0.0, 0.0],
   "model.parasol": [0.0, 0.0],
   "model.parkBench": [0.0, -0.036],
-  "model.parkChessTable": [0.0, 0.02],
+  "model.parkChessTable": [0.0, 0.0],
   "model.patioChair": [0.0, 0.042],
   "model.patioSet": [0.0, 0.05],
   "model.patioTable4": [0.0, -0.04],
@@ -489,7 +489,6 @@
   "model.street.busSign": [0.0, 0.0163],
   "model.street.flowerTub": [0.0, 0.0],
   "model.street.flowers": [0.0, 0.0],
-  "model.street.hedge": [0.0, 0.0],
   "model.street.pathLight": [0.0, 0.0],
   "model.street.planter": [0.0, 0.0],
   "model.street.pot": [0.0, 0.0],
@@ -575,5 +574,6 @@
   "model.yogaMat": [0.025, -0.295],
   "tool.board": [0.0, 0.0],
   "tool.grillFood": [-0.015, -0.005],
+  "tool.mixingBowl": [0.0, 0.0029],
   "tool.pan": [0.0, 0.0575]
 }

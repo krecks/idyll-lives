@@ -78,6 +78,9 @@ M = G.Palette(
     chocolate=('#4A2C1C', 'satin'),
     cupcake_case=('#E58FA8', 'satin'),
     icing=('#F8E4EA', 'satin'),
+    mixing=('#D9DCD6', 'gloss'),     # the mixing bowl's glaze
+    batter=('#EBCB8C', 'satin'),
+    spoon=('#C49A62', 'satin'),      # a wooden spoon (plain, so the bowl stays one draw)
     # leftovers
     smear=('#64452B', 'matte'),
     smear_sauce=('#94401F', 'matte'),
@@ -586,8 +589,19 @@ def grillFood():
     return done('grillFood')
 
 
-def I(id, build, size, key, centre=(0.0, 0.0)):
-    return G.Model(id, build, size=size, key=key, centre=centre,
+def mixingBowl():
+    """On the counter while batter is mixed or pastry made (`mix`): a deep glazed bowl of batter, a wooden
+    spoon standing in it, leaning on the far rim (+depth: away from the cook, as the pan's handle)."""
+    lathe('bowl', [(0, 0), (0.07, 0), (0.085, 0.01), (0.13, 0.11), (0.124, 0.113), (0.117, 0.1), (0, 0.075)],
+          [M.mixing, M.mixing, M.mixing, M.mixing, M.mixing, M.batter], segments=20)
+    lump('batter_swirl', 0.05, (0.015, 0.07, -0.01), M.batter, scale=(1, 0.25, 1), seed=3.5, noise=0.15)
+    G.rod('spoon_handle', F.at(0.0, 0.07, 0.02), F.at(0.03, 0.27, 0.13), 0.007, material=M.spoon, verts=8)
+    ball('spoon_bowl', 0.022, (-0.002, 0.07, 0.012), M.spoon, scale=(1, 0.35, 1.4))
+    return done('mixingBowl')
+
+
+def I(id, build, size, key, centre=(0.0, 0.0), code=False):
+    return G.Model(id, build, size=size, key=key, centre=centre, code=code,
                    tolerance=3 if os.environ.get('HELD_MEASURE') else 0.02)
 
 
@@ -615,6 +629,7 @@ FAMILY = G.Family(
         # the handle reaches 2 cm further back than the old part's crossbar: the pan stays on its middle
         I('pan', pan, (0.28, 0.061, 0.395), 'tool.pan', centre=(0.0, 0.0575)),
         I('grillFood', grillFood, (0.29, 0.045, 0.135), 'tool.grillFood', centre=(-0.015, -0.005)),
+        I('mixingBowl', mixingBowl, (0.26, 0.273, 0.266), 'tool.mixingBowl', centre=(0.0, 0.0029), code=True),
     ],
     comment='Blender-built things residents carry and cook with (tools/art/blender/families/held.py): the '
             'models of content `items` and the props drawn on a station while cooking. Listed in the base '

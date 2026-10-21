@@ -2368,7 +2368,9 @@
     "stir",
     "flip",
     "serve",
-    "cuddle"
+    "cuddle",
+    "bake",
+    "mix"
   ],
   "objects": [
     {
@@ -2450,6 +2452,19 @@
             "cooking": 0.25,
             "creativity": 0.04
           }
+        },
+        {
+          "id": "coldDrink",
+          "label": "Pour a cold drink",
+          "anim": "drink",
+          "minutes": 5,
+          "effects": {
+            "comfort": 0.05,
+            "fun": 0.04
+          },
+          "tags": [
+            "food"
+          ]
         }
       ],
       "price": 600,
@@ -2481,6 +2496,19 @@
             "hygiene",
             "handwash"
           ]
+        },
+        {
+          "id": "brushTeeth",
+          "label": "Brush your teeth",
+          "anim": "wash",
+          "minutes": 3,
+          "effects": {
+            "hygiene": 0.03
+          },
+          "tags": [
+            "hygiene",
+            "handwash"
+          ]
         }
       ],
       "price": 180,
@@ -2489,7 +2517,7 @@
     },
     {
       "id": "bed",
-      "name": "Double bed",
+      "name": "King-size bed",
       "model": "model.bed",
       "footprint": [
         2,
@@ -2545,6 +2573,7 @@
           "id": "use",
           "label": "Use toilet",
           "anim": "toilet",
+          "endSound": "flush",
           "minutes": 5,
           "after": "handwash",
           "pose": "sit",
@@ -2610,6 +2639,21 @@
             "rest",
             "lounge"
           ]
+        },
+        {
+          "id": "doze",
+          "label": "Doze off",
+          "anim": "nap",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "energy": 0.1,
+            "comfort": 0.1
+          },
+          "tags": [
+            "rest",
+            "nap"
+          ]
         }
       ],
       "price": 500,
@@ -2619,6 +2663,9 @@
     },
     {
       "id": "tv",
+      "provides": [
+        "screen"
+      ],
       "name": "Television",
       "model": "model.tv",
       "footprint": [
@@ -2632,6 +2679,7 @@
           "anim": "watch",
           "minutes": 60,
           "seatNear": 4,
+          "seatFacing": "front",
           "broadcast": 0.35,
           "broadcastRange": 6,
           "effects": {
@@ -2660,6 +2708,7 @@
           "id": "read",
           "label": "Read a book",
           "anim": "read",
+          "seatNear": 4,
           "minutes": 45,
           "effects": {
             "fun": 0.45
@@ -2677,6 +2726,7 @@
           "id": "study",
           "label": "Study",
           "anim": "read",
+          "seatNear": 4,
           "minutes": 60,
           "effects": {
             "fun": 0.1
@@ -2694,6 +2744,7 @@
           "id": "homework",
           "label": "Do homework",
           "anim": "read",
+          "seatNear": 4,
           "minutes": 45,
           "homework": 6,
           "effects": {
@@ -2733,6 +2784,24 @@
           "tags": [
             "lounge"
           ]
+        },
+        {
+          "id": "read",
+          "label": "Read a book",
+          "anim": "read",
+          "minutes": 45,
+          "pose": "sit",
+          "effects": {
+            "fun": 0.35
+          },
+          "tags": [
+            "entertainment",
+            "reading"
+          ],
+          "skills": {
+            "intelligence": 0.08,
+            "writing": 0.04
+          }
         }
       ],
       "price": 300,
@@ -3210,7 +3279,7 @@
     },
     {
       "id": "mirror",
-      "name": "Standing mirror",
+      "name": "Cheval mirror",
       "model": "model.mirror",
       "footprint": [
         1,
@@ -3234,6 +3303,21 @@
           ],
           "skills": {
             "charisma": 0.22
+          }
+        },
+        {
+          "id": "primp",
+          "label": "Check the mirror",
+          "anim": "idle",
+          "minutes": 5,
+          "effects": {
+            "comfort": 0.03
+          },
+          "tags": [
+            "lounge"
+          ],
+          "skills": {
+            "charisma": 0.04
           }
         }
       ]
@@ -3353,6 +3437,10 @@
       "category": "kitchen",
       "group": "dining",
       "slots": 2,
+      "places": [
+        { "at": [-0.5, -0.19] },
+        { "at": [0.5, -0.19] }
+      ],
       "surface": {
         "height": 0.765,
         "kind": "table",
@@ -3636,7 +3724,7 @@
     {"id": "wood.oak", "label": "Oak boards", "finish": "wood", "color": "#FFFFFF", "price": 6},
     {"id": "wood.honey", "label": "Honey pine", "finish": "wood", "color": "#F2D6A8", "price": 6},
     {"id": "wood.walnut", "label": "Walnut boards", "finish": "wood", "color": "#9C7458", "price": 8},
-    {"id": "wood.whitewashed", "label": "Whitewashed wood", "finish": "wood", "color": "#F4EFE6", "price": 8},
+    {"id": "wood.whitewashed", "label": "Whitewashed wood", "finish": "whitewash", "color": "#F4EFE6", "price": 8},
     {"id": "tile.white", "label": "White tiles", "finish": "tile", "color": "#F4F4F2", "price": 5},
     {"id": "tile.sand", "label": "Sand tiles", "finish": "tile", "color": "#E6DCCB", "price": 5},
     {"id": "tile.terracotta", "label": "Terracotta tiles", "finish": "tile", "color": "#D9967A", "price": 7},
@@ -4198,6 +4286,10 @@
           ],
           "minutes": 20,
           "anim": "stir",
+          "animAt": {
+            "oven": "bake",
+            "microwave": "bake"
+          },
           "optional": true
         }
       ]
@@ -4447,7 +4539,8 @@
             "oven"
           ],
           "minutes": 25,
-          "anim": "stir"
+          "anim": "bake",
+          "sound": "none"
         }
       ]
     },
@@ -4487,7 +4580,7 @@
             "prep"
           ],
           "minutes": 15,
-          "anim": "chop",
+          "anim": "mix",
           "optional": true,
           "holds": "prepBowl"
         },
@@ -4497,7 +4590,8 @@
             "oven"
           ],
           "minutes": 35,
-          "anim": "stir"
+          "anim": "bake",
+          "sound": "none"
         }
       ]
     },
@@ -4531,12 +4625,12 @@
           "holds": "ingredients"
         },
         {
-          "label": "Roll the pastry",
+          "label": "Make the pastry",
           "at": [
             "prep"
           ],
           "minutes": 15,
-          "anim": "chop",
+          "anim": "mix",
           "optional": true,
           "holds": "prepBowl"
         },
@@ -4546,7 +4640,8 @@
             "oven"
           ],
           "minutes": 30,
-          "anim": "stir"
+          "anim": "bake",
+          "sound": "none"
         }
       ]
     },

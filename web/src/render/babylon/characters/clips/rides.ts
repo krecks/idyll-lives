@@ -720,9 +720,9 @@ function springPose(f: RideFit): (p: number) => PoseSpec {
 
 /**
  * The seesaw (playground, `model.seesaw`, a child's or a teen's): a seat at each end of the plank, 0.56 m up, the
- * rider facing along it to the middle (characters.ts `RIDES` `face`), its handle bar 0.28 m ahead, 0.26 m over the
- * seat, the grips 0.1 m either side; the plank 0.24 m wide. Astride the plank, the feet down either side of it,
- * tucked up clear of the ground at the low end (the plank tips 12 deg).
+ * rider at its slot's place 0.78 m out facing along it to the middle (content `places`: the two face each other),
+ * its handle bar 0.31 m ahead, 0.26 m over the seat, the grips 0.1 m either side; the plank 0.24 m wide. Astride
+ * the plank, the feet down either side of it, tucked up clear of the ground at the low end (the plank tips 12 deg).
  */
 export const RIDE_SEESAW = rideSizes('rideSeesaw', 1, 2);
 function seesawPose(f: RideFit): (p: number) => PoseSpec {
@@ -730,42 +730,49 @@ function seesawPose(f: RideFit): (p: number) => PoseSpec {
   const feet: Vec = f.s > 0.7 ? [-0.2, -0.38, 0.05] : [-0.17, -0.34, 0.12];
   return (p) =>
     astride({
-      lean: 10 + 3 * Math.sin(p * TAU),
+      lean: 12 + 3 * Math.sin(p * TAU),
       nod: -4,
       breath: p,
       feet: onRide(f, feet),
       knees: 0.6,
-      hands: [onRide(f, [-0.1, 0.26, 0.28]), onRide(f, [0.1, 0.26, 0.28])],
+      hands: [onRide(f, [-0.1, 0.26, 0.31]), onRide(f, [0.1, 0.26, 0.31])],
       pronate: 80,
     });
 }
 
 /**
- * The merry-go-round (playground, `model.merryGoRound`, a child's or a teen's): sat on its platform (0.26 m up),
- * holding one of its four bent rails, which comes down beside a rider 0.25 m to one side (`side`: the near hand
- * on it at the shoulder, the far hand across the body under it). Near the middle the legs lie out ahead on the
- * platform, the knees up; at its edge (`edge`) they hang over it, the feet down by the ground.
+ * The merry-go-round (playground, `model.merryGoRound`, a child's or a teen's): sat on its platform (0.26 m up) at
+ * a slot's place, 0.7 m out from its middle facing in (content `places`), between two of its four bent rails,
+ * which run on the diagonals from the column's top (0.9 m up) out to 0.78 m and down to the platform. Leant in,
+ * a hand on each rail where it comes down beside them (`roundGrip`: m out along the rail, for the size's reach),
+ * the legs out ahead towards the middle, the knees up.
  */
 export const RIDE_ROUND = rideSizes('rideRound', 1, 2);
-/** The clip of a merry-go-round size for a rider at its edge or not, with the rail on their left or right. */
-export const roundClip = (clip: string, edge: boolean, side: Side): string => `${clip}${edge ? 'Edge' : 'In'}${side.toUpperCase()}`;
-function roundPose(f: RideFit, edge: boolean, side: Side): (p: number) => PoseSpec {
-  const k = side === 'l' ? -1 : 1;
-  const teen = f.s > 0.7;
-  const feet: Vec = edge ? (teen ? [-0.11, -0.19, 0.3] : [-0.1, -0.2, 0.14]) : teen ? [-0.1, 0.05, 0.4] : [-0.1, 0.05, 0.38];
-  const near = onRide(f, [k * 0.25, 0.36, 0.02]);
-  const far = onRide(f, [k * 0.21, 0.25, 0.06]);
+const ROUND = { place: 0.7, seat: 0.26, top: 0.9, out: 0.78, column: 0.05, foot: 0.25 };
+/** How far out along a rail (m from the middle) a rider of size `s` holds it: further down it for a child's shorter arms. */
+const roundGrip = (s: number) => (s > 0.7 ? 0.66 : 0.6);
+/** The rail's height (m) where it is `r` m out from the middle (the model's curve: level at the column, down at its end). */
+function roundRailY(r: number): number {
+  const u = Math.sqrt(Math.max(0, (ROUND.out - r) / (ROUND.out - ROUND.column)));
+  return ROUND.top - (ROUND.top - ROUND.foot) * (1 - u) * (1 - u);
+}
+function roundPose(f: RideFit): (p: number) => PoseSpec {
+  const r = roundGrip(f.s);
+  // The rails on the rider's left and right, out along the diagonals (m from the seat's point, the rider's frame).
+  const side = r / Math.SQRT2;
+  const grip = (k: number): Vec => onRide(f, [k * side, roundRailY(r) - ROUND.seat, ROUND.place - side]);
+  const feet: Vec = f.s > 0.7 ? [-0.11, 0.08, 0.42] : [-0.1, 0.06, 0.36];
   return (p) =>
     astride({
-      lean: 6 + 2 * Math.sin(p * TAU),
-      nod: -2,
+      lean: 16 + 2 * Math.sin(p * TAU),
+      nod: -6,
       breath: p,
       feet: onRide(f, feet),
-      knees: 0.1,
-      up: edge ? 0.2 : 1,
-      toes: edge ? 15 : -10,
-      hands: side === 'l' ? [near, far] : [far, near],
-      pronate: 30,
+      knees: 0.15,
+      up: 1,
+      toes: -10,
+      hands: [grip(-1), grip(1)],
+      pronate: 20,
     });
 }
 
@@ -806,9 +813,7 @@ export function rideClips(): ClipDef[] {
     ...RIDE_HORSE.map(({ clip, fit }) => cycle(clip, { seconds: 2.4, loop: true }, horsePose(fit))),
     ...RIDE_SPRING.map(({ clip, fit }) => cycle(clip, { seconds: 2, loop: true }, springPose(fit))),
     ...RIDE_SEESAW.map(({ clip, fit }) => cycle(clip, { seconds: 2.8, loop: true }, seesawPose(fit))),
-    ...RIDE_ROUND.flatMap(({ clip, fit }) =>
-      [false, true].flatMap((edge) => (['l', 'r'] as const).map((side) => cycle(roundClip(clip, edge, side), { seconds: 2.4, loop: true }, roundPose(fit, edge, side)))),
-    ),
+    ...RIDE_ROUND.map(({ clip, fit }) => cycle(clip, { seconds: 2.4, loop: true }, roundPose(fit))),
     ...RIDE_SWING.map(({ clip, fit }) => cycle(clip, { seconds: SWING_S, loop: true }, swingPose(fit))),
   ];
 }

@@ -26,8 +26,8 @@ pulled up to the kids' table before the dining table (a seat made for their age 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `crib` Crib | 2x1 · floor | lie:sleep feed:cuddle change:clean play:play cuddle:cuddle | kids / — | Frame, Bedding, Mobile | Use | `side_down`: the front rail slides down 25 cm for feed, change and cuddle, and back up. L `mobile`: the mobile turns slowly while a grown-up plays with the baby (E1, `loops.play`). |
-| `kidsBed` Kids' bed | 1x2 · floor | sleep:sleep nap:nap | kids / — | Frame, Bedding | Use | `turn_down`, as the beds. |
-| `kidsBedCar` Race car bed | 1x2 · floor | sleep:sleep nap:nap | kids / — | Car body, Bedding | Use | `turn_down`; the car body is static. |
+| `kidsBed` Kids' bed | 1x2 · floor | sleep:sleep nap:nap | kids / — | Frame, Bedding | Use | `turn_down`, as the beds (rolling over low half way, 2026-10-21). |
+| `kidsBedCar` Race car bed | 1x2 · floor | sleep:sleep nap:nap | kids / — | Car body, Bedding | Use | `turn_down`, as the beds; the car body is static. |
 | `highChair` High chair | 1x1 · floor | — | kids / — | Frame, Bedding | Static | Static. (+use) the tray slides out. It has no use or sit yet; its `seatAt` would pull it in to the table it faces while sat on, as far as the knees fit under it. |
 
 **In play** (signed off 2026-10-16):
@@ -53,7 +53,7 @@ pulled up to the kids' table before the dining table (a seat made for their age 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `toyBox` Toy box | 1x1 · floor | play:play | kids / — | Body, Lid | Use | `lid_open`: the lid swings up 100° for play; `hold` 2 s. |
-| `toyChest` Toy chest | 1x1 · floor | play:play | kids / — | Body, Trim | Use | `lid_open`. |
+| `toyChest` Toy chest | 1x1 · floor | play:play | kids / — | Body, Trim | Use | `lid_open`. Its text no longer says the lid is open (it opens only for play). |
 | `dollHouse` Doll house | 1x1 · floor | dolls:tend | kids / — | Walls, Roof | Use | `front_open`: the front wall swings 120° on its side hinge for the whole of dolls. |
 | `rockingHorse` Rocking horse | 1x1 · floor | ride:play | kids / — | Body, Trim | Loop (E1) | `rock`: rocks ±12° while ridden (E1), the rider riding it. Ridden astride, the hands on the handle (`rideHorse112`). |
 | `playTent` Play tent | 1x1 · floor | play:play | kids / — | Canvas, Poles | Use | `flap_open`: the door flap rolls up for play. |
@@ -82,7 +82,7 @@ pulled up to the kids' table before the dining table (a seat made for their age 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `kidsDesk` Kids' desk | 1x1 · floor | homework:write drawing:write | kids / — | Frame, Top, Chair | Use | `drawer_open`: the pencil drawer slides out for homework and drawing; `hold` 2 s. Its chair is part of the desk. |
-| `kidsTable` Kids' table | 1x1 · floor | — | kids / — | Frame, Top | Static | Static. |
+| `kidsTable` Kids' table | 1x1 · floor | — | kids / — | Frame, Top | Static | Static. Its text says blue legs, as built. |
 | `kidsChair` Kids' chair | 1x1 · floor | sit:sit draw:write homework:write | kids / — | Frame, Seat | Static | Static. Pulled in to the low table it faces while sat on (`seatAt` `low`), as far as the knees fit under it: written at with the hands on the top. |
 | `kidsBookshelf` Picture-book shelf | 1x1 · floor | read:read | kids / — | Frame, Top | Use | `book_out`: a picture book tips out 20° for read. |
 | `kidsChalkboard` Chalkboard easel | 1x1 · floor | draw:paint | kids / — | Frame, Board | Use | `drawing`: a chalk drawing grows on the board for draw. |

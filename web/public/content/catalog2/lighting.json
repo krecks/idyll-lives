@@ -61,6 +61,7 @@
       "layer": "surface",
       "decor": 0.45,
       "light": {
+        "aim": "down",
         "range": 2.5,
         "intensity": 0.6,
         "height": 0.3,
@@ -130,6 +131,7 @@
       "group": "floor",
       "decor": 0.7,
       "light": {
+        "aim": "down",
         "range": 4.5,
         "intensity": 1.0,
         "height": 1.5,
@@ -178,6 +180,7 @@
       "group": "floor",
       "decor": 0.4,
       "light": {
+        "aim": "ceiling",
         "range": 4.5,
         "intensity": 0.9,
         "height": 1.78,
@@ -201,6 +204,7 @@
       "layer": "ceiling",
       "decor": 0.3,
       "light": {
+        "aim": "down",
         "range": 5.0,
         "intensity": 1.0,
         "height": 2.5,

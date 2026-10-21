@@ -1,7 +1,8 @@
 # The garden decor (`model.garden.gnome`, `birdbath`, `fountain`, `lantern`, `wheelbarrow`, `boulder`).
 #
 # Built at their real size, in Blender axes (front -Y), each stood on the floor and centred by
-# `G.settle`; the sizes are the old parts', within each model's tolerance.
+# `G.settle`; the sizes are the old parts', within each model's tolerance. The fountain's water moves all the
+# time near the camera (`flow`, ambient: the jet bubbling up, rings on the basins); the rest are still.
 #
 # Run:  cargo art garden_decor [--only gnome] [--preview]
 import os
@@ -86,9 +87,21 @@ def fountain():
     G.cylinder('water2', 0.185, 0.012, at=(0, 0, 0.735), material=M.water, verts=32)
     G.revolve('finial', [(0, 0.74), (0.06, 0.76), (0.05, 0.86), (0.04, 0.90), (0, 0.92)], material=M.stone, segments=20)
     G.sphere('knob', 0.055, at=(0, 0, 0.945), material=M.stone)
-    G.cylinder('jet', 0.018, 0.13, at=(0, 0, 1.02), material=M.water, verts=12)
-    G.sphere('drop', 0.028, at=(0, 0, 1.095), material=M.water, scale=(1, 1, 1.3))
-    return G.settle([G.join_all('fountain')])
+    body = G.join(G.meshes(), 'fountain', origin=(0, 0, 0))
+    # The water moves all the time (`flow`, ambient): the jet bubbles up from the knob and falls back, and a ring
+    # on each basin's water swells out from where the water falls and settles back.
+    with G.new_parts() as jet:
+        G.cylinder('jet', 0.018, 0.13, at=(0, 0, 1.02), material=M.water, verts=12)
+        G.sphere('drop', 0.028, at=(0, 0, 1.095), material=M.water, scale=(1, 1, 1.3))
+    jet = G.join(jet, 'jet', origin=(0, 0, 0.955))
+    with G.new_parts() as rings:
+        G.torus('ripple2', 0.1, 0.006, at=(0, 0, 0.742), material=M.water, major_segments=24, minor_segments=4)
+        G.torus('ripple', 0.24, 0.007, at=(0, 0, 0.298), material=M.water, major_segments=32, minor_segments=4)
+    rings = G.join(rings, 'ripples', origin=(0, 0, 0.3))
+    objs = G.settle([body, jet, rings])
+    G.squash(jet, 'flow', (1, 1, 1.35), seconds=1.2, back=True)
+    G.squash(rings, 'flow', (1.4, 1.4, 1), seconds=1.2, back=True)
+    return objs
 
 
 # The lantern's hexagons are regular and turned as the old part's (Babylon cylinders): corners to the
@@ -166,7 +179,7 @@ FAMILY = G.Family(
              paint=[('hat', 'Hat'), ('tunic', 'Tunic'), ('wood_dark', 'Belt')]),
      G.Model('birdbath', birdbath, size=(0.68, 0.935, 0.68), tolerance=TOLERANCE,
              paint=[('stone', 'Bowl & column'), ('stone_dark', 'Plinth')]),
-     G.Model('fountain', fountain, size=(0.92, 1.17, 0.92), tolerance=TOLERANCE,
+     G.Model('fountain', fountain, size=(0.92, 1.17, 0.92), tolerance=TOLERANCE, motions={'idle': 'flow'},
              paint=[('stone', 'Fountain'), ('stone_dark', 'Plinth')]),
      G.Model('lantern', lantern, size=(0.54, 1.035, 0.468), tolerance=TOLERANCE,
              paint=[('stone', 'Lantern'), ('stone_dark', 'Base')]),

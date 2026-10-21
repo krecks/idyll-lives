@@ -28,7 +28,17 @@
         "prep"
       ],
       "description": "The last base unit of a run: a door at the front and open shelves on its end for bowls and jars.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "sandwich",
+          "label": "Make a sandwich",
+          "recipe": "sandwich",
+          "anim": "cook",
+          "tags": [
+            "food"
+          ]
+        }
+      ]
     },
     {
       "id": "counterCornerOuter",
@@ -57,7 +67,17 @@
         "prep"
       ],
       "description": "A counter with doors on two sides, for the corner where a run turns out into the room.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "sandwich",
+          "label": "Make a sandwich",
+          "recipe": "sandwich",
+          "anim": "cook",
+          "tags": [
+            "food"
+          ]
+        }
+      ]
     },
     {
       "id": "counterDrawers",
@@ -86,7 +106,17 @@
         "prep"
       ],
       "description": "Four deep drawers under a worktop: pans, cutlery, tea towels.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "sandwich",
+          "label": "Make a sandwich",
+          "recipe": "sandwich",
+          "anim": "cook",
+          "tags": [
+            "food"
+          ]
+        }
+      ]
     },
     {
       "id": "counterOpenShelf",
@@ -115,7 +145,17 @@
         "prep"
       ],
       "description": "An oak base unit with open shelves: plates and bowls on show.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "sandwich",
+          "label": "Make a sandwich",
+          "recipe": "sandwich",
+          "anim": "cook",
+          "tags": [
+            "food"
+          ]
+        }
+      ]
     },
     {
       "id": "butcherBlock",
@@ -262,7 +302,7 @@
           0.02
         ]
       },
-      "description": "A tall counter with a slatted front and a brass foot rail. Line a few up and pull up bar stools.",
+      "description": "A tall counter with a slatted front and a brass foot rail. Line a few up and pull up high bar stools.",
       "interactions": []
     },
     {
@@ -318,7 +358,32 @@
         "prep"
       ],
       "description": "A one-tile island with cupboards behind and an overhang in front for a stool or two.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "sandwich",
+          "label": "Make a sandwich",
+          "recipe": "sandwich",
+          "anim": "cook",
+          "tags": [
+            "food"
+          ]
+        },
+        {
+          "id": "breakfast",
+          "label": "Have breakfast at the island",
+          "anim": "eat",
+          "seatNear": 3,
+          "minutes": 20,
+          "effects": {
+            "hunger": 0.3,
+            "comfort": 0.1
+          },
+          "tags": [
+            "food",
+            "lounge"
+          ]
+        }
+      ]
     },
     {
       "id": "islandLong",
@@ -348,7 +413,32 @@
         "prep"
       ],
       "description": "Three metres of worktop to cook on, with cupboards on one side and room for stools on the other.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "sandwich",
+          "label": "Make a sandwich",
+          "recipe": "sandwich",
+          "anim": "cook",
+          "tags": [
+            "food"
+          ]
+        },
+        {
+          "id": "breakfast",
+          "label": "Have breakfast at the island",
+          "anim": "eat",
+          "seatNear": 3,
+          "minutes": 20,
+          "effects": {
+            "hunger": 0.3,
+            "comfort": 0.1
+          },
+          "tags": [
+            "food",
+            "lounge"
+          ]
+        }
+      ]
     },
     {
       "id": "pantryTall",
@@ -401,6 +491,9 @@
         "oven"
       ],
       "description": "Two ovens one above the other at a comfortable height: roasts and bakes. Baking trains Cooking.",
+      "sounds": {
+        "stir": "none"
+      },
       "interactions": [
         {
           "id": "roast",
@@ -868,6 +961,10 @@
         "dishes"
       ],
       "description": "A dishwasher with a stainless door, under a worktop.",
+      "sounds": {
+        "clean": "crockery",
+        "wash": "crockery"
+      },
       "interactions": [
         {
           "id": "dishes",

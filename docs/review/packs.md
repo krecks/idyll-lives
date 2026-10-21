@@ -454,7 +454,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** motion
 - **Where:** `tools/art/blender/families/pack_energetic.py:343`, `web/public/content/packs/energetic.json:105`
 - **Evidence:** The blender is used but its blades never turn. Review: its motions are `{"uses": {"blend": "lid"}, "hold": 1.0}` only (manifest); `packs/sheets/obj-energetic.powerBlender.png`: the lid lifts, nothing spins.
-- **Status:** confirmed
+- **Status:** fixed (abfc32d9)
+- **After:** the smoothie in the jug is a part of its own with fruit streaks and bits, and swirls once a second (`blades`) from the lid back on (`delay` 1.5 s) till the blend ends (`every` 0.9 s); the blades themselves stay hidden in it, its fourth draw (`fixes/motions/g1718/views/blender-t0.3.png`, `play-stage.jsonl`).
 - **Source:** `docs/objects/open.md` Still open › Models; wave: packs
 
 ### M-packs-04 — The chef's island's stools are chair height under a counter
@@ -514,7 +515,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** decision
 - **Where:** `tools/art/blender/families/pack_energetic.py:192` (`spinBike`: a bucket seat with a back at 0.45, the pedals forward), `web/public/content/packs/energetic.json:29`
 - **Evidence:** `packs/sheets/obj-energetic.spinBike.png`, `packs/sheets/age-energetic.spinBike.png`: a low seat with a backrest and pedals out in front. A spin bike is upright (saddle 0.75–1.05, `reference.md` `exerciseBike`, which is why the sizes table flags the seat). The rider pedals right on it at every stage; rename it (recumbent bike) or rebuild it upright.
-- **Status:** open
+- **Status:** fixed (b3f6b82d)
+- **After:** "Interactive recumbent bike", new kind `recumbentBike` (seat 0.40–0.60): inside.
 - **Source:** wave: packs
 
 ### M-packs-10 — The fireside lounge's flue and hood stand behind the chairs, away from the fire
@@ -565,7 +567,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** motion
 - **Where:** `tools/art/blender/families/pack_neat.py:447` (`laundryCenter`: `door_open`, no `hold`), `pack_kind.py:512` (`neighbourlyOven`: `oven_open`, no `hold`), `pack_natureLover.py:648` (`glasshouse`: `door_open`, no `hold`)
 - **Evidence:** `packs/play/chunk2/neat.laundryCenter-laundry-01.png` and `-fold-01.png`: the washer's porthole is open through the 45-minute wash and the hour's folding (play.jsonl: `door_open` at its end, 0.79/0.79, in every shot); `packs/play/rerun1/kind.neighbourlyOven-familyPie-01.png`: the oven door down through the 48- and 53-minute bakes; `packs/play/chunk4/natureLover.glasshouse-orchids-01.png`: the door open while the plants are tended and while the resident sits inside. The same family's other doors shut after a moment (`hold`: the microwave cart's 1.5, the chef's stove's 3.0, the sauna's 1.5). A washer and an oven are shut while they run.
-- **Status:** open
+- **Status:** fixed (d2c9f0de; the oven 2dcc4ea0)
+- **After:** the laundry centre's porthole shuts 2.5 s into the wash and the folding (`hold`; `fixes/motions/g1718/play-stage.jsonl`: open at +0.8 s, shut by +3.3 s); the neighbourly oven's door drops only for the bake step and shuts after 3 s (`fixes/motions/recipes/pie-neighbourlyOven.json`, `-05.png`); the glasshouse door lets the resident in, shuts behind them (1.5 s) and opens again for 1.5 s to let them out, the roof vent open while they're in (`fixes/motions/g1718/play-garden.jsonl`).
 - **Source:** wave: packs (play.jsonl clip times)
 
 ### A-packs-04 — The nap pod's hood closes onto the sitter's head
@@ -596,7 +599,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/packs/couchPotato.json:116` (`couchPotato.recliner`: no `seat`), `web/public/content/packs/slob.json:159` (`slob.gamingRecliner`: no `seat`); `web/src/render/babylon/characters.ts:228` (`seatOf`: `recline` from content `seat.recline`, as `slob.beanbag` has at `slob.json:50`)
 - **Evidence:** `packs/play/chunk1/couchPotato.recliner-recline-02.png`, `packs/sheets/obj-slob.gamingRecliner.png` (play): the `recline` ride clip leans the chair back and lifts the footrest ("Feet up. Way up."), while the resident sits straight up with the feet on the floor in front of the footrest: the ride carries nothing (A10). A content `seat` with `recline` (and the legs out on the footrest) is the existing mechanism. Also likely on the living room's `recliner` (`catalog2/living.json:436`, no `seat`; living ledger, not reviewed here).
-- **Status:** open
+- **Status:** fixed (0cc15781)
+- **After:** Content `seat` with `legs: out` and `recline` 20 (Cloud Nine) and 22 (gaming recliner); the living room's recliner `legs: out` (it already rode its 25° tip): leant back, the legs out along the raised footrest (`bench-results/review/fixes/content/recliner-before/`, `bench-results/review/fixes/content/g02/after-*recliner*`).
 - **Source:** wave: packs
 
 ### I-packs-01 — At the quilt table and the candlelit table the legs come out through the front
@@ -616,7 +620,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/packs/couchPotato.json:184` (`fitnessGame`), `cheerful.json:149` (`sunriseLamp`), `outgoing.json:63` (`karaokeStage`): no `stand` surface; the mechanism as `energetic.json:58` (`trampoline`: `"stand": {"height": 0.5, ...}`) and `lazy.json:169` (`vibePlate`)
 - **Evidence:** `packs/sheets/obj-couchPotato.fitnessGame.png` (play): the workout is danced on the floor to the left of the balance board; `packs/sheets/obj-cheerful.sunriseLamp.png`, `packs/extra/night/night-cheerful.sunriseLamp-stretch-01.png`: stretches beside the mat; `packs/sheets/obj-outgoing.karaokeStage.png`: the singer stands on the floor in front of the stage's edge, the two mics 0.4 m behind her. Each thing's point is the surface it has.
-- **Status:** open
+- **Status:** fixed (0cc15781)
+- **After:** `stand` on the fitness game (0.115 m, the board), the sunrise lamp (0.008, the mat) and the karaoke stage (0.146, the deck): on the stage between the mics, on the mat, on the board (`bench-results/review/fixes/content/g02/after-outgoing.karaokeStage-practise-01.png`, `…sunriseLamp…`, `…fitnessGame…`). The board is 0.2 m in front of the object's middle, so the player stands on its back half; a stand offset would need code.
 - **Source:** wave: packs
 
 ### I-packs-03 — Bouldering on the floor beside the crash mat
@@ -673,7 +678,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/packs/slob.json:76` (`snackNightstand`: `midnightSnack` `pose: sit`, no `seat`, so `defaultSeat` 0.45 on its own top, `furniture.json:51`)
 - **Evidence:** `packs/play/chunk2/slob.snackNightstand-midnightSnack-01.png`: the resident sits on top of the 0.45 m nightstand for 8 minutes. A snack from the nightstand is reached for from the bed, or taken standing; a `stand` pose (or `seatNear` for the bed) fits.
-- **Status:** open
+- **Status:** fixed (9a5cc144)
+- **After:** `pose: stand`: the snack is eaten standing beside the nightstand, not on its top.
 - **Source:** wave: packs
 
 ### I-packs-08 — Primping at the vanity on foot; its stool is never sat on
@@ -683,7 +689,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/packs/romantic.json:101` (`vanity`: `primp` `pose: stand`, no `seat`); compare `web/src/render/babylon/characters/furniture.json:31` (`dressingTable`: seated facing the mirror, `back: true`)
 - **Evidence:** `packs/sheets/obj-romantic.vanity.png` (play): 20 minutes standing beside the pink pouf, half a metre from the mirror. A vanity is sat at, facing the mirror; the base `dressingTable` already does it.
-- **Status:** open
+- **Status:** fixed (0cc15781)
+- **After:** Seat 0.44 m, forward 0.17, `facing: back`, primp `pose: sit`: sat on the pouf facing the mirror (`bench-results/review/fixes/content/g02/after-romantic.vanity-primp-01.png`).
 - **Source:** wave: packs
 
 ### I-packs-09 — The glasshouse's orchids are tended from outside the door
@@ -693,7 +700,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/packs/natureLover.json:229` (`glasshouse`: `orchids` stands at the front, no `inside`; `unwind` sits inside)
 - **Evidence:** `packs/play/chunk4/natureLover.glasshouse-orchids-01.png`: for an hour the resident stands outside the open door, the plants on the shelves a metre in. `unwind` already takes them inside to the bench.
-- **Status:** open
+- **Status:** fixed (0cc15781)
+- **After:** `orchids` has `inside: true`: tended from inside, beside the shelves (`bench-results/review/fixes/content/g02/after-natureLover.glasshouse-orchids-01.png`).
 - **Source:** wave: packs
 
 ### I-packs-10 — Video calls are played as a phone at the ear
@@ -724,7 +732,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/packs/loner.json:109` (`bonsaiBench`), `romantic.json:160` (`roseArbourSwing` `tendRoses`), `foodie.json:102` (`cookbookLectern`, and `web/src/render/babylon/characters.ts:475`: `ACTIONS.read` holds a book that isn't there), `energetic.json:80` (`streetballHoop`)
 - **Evidence:** `packs/sheets/obj-loner.bonsaiBench.png`: the pruner stands at the bench's left corner by the soil bag, not at the tree in the middle; `packs/sheets/obj-romantic.roseArbourSwing.png` (tendRoses): the roses are on the posts and the top, the hands at the seat cushion; `packs/sheets/obj-foodie.cookbookLectern.png`: a step off the lectern, reading a mimed book at the chest beside the open one; `packs/sheets/obj-energetic.streetballHoop.png`: shooting from under the board, at the pole. Slot offsets (`slot_position`, `approach`) or a lectern-reading hand pose.
-- **Status:** open
+- **Status:** open (needs code: G-62's per-slot place or a stand offset; the lectern's reading hand pose is a clip)
+- **After:** Not fixed in the content band: content has no field that moves a standing user along an object (slot positions are spread across the width; `stand` has no offset).
 - **Source:** wave: packs
 
 ### I-packs-13 — Smashing plates is a boxing combination in the air
@@ -745,7 +754,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/packs/slob.json:159` (`gamingRecliner` `marathon`: `anim: play`, no `seatNear` or `requires` for a screen)
 - **Evidence:** `packs/sheets/obj-slob.gamingRecliner.png` (play): 90 minutes of `sitHands` gaming into the air; the set has side tables and a headset stand but no screen, and the use doesn't ask for a TV in front of it.
-- **Status:** open
+- **Status:** fixed (9a5cc144)
+- **After:** Marathon `requires: ["screen"]`; the TVs, the home cinema and the cinema wall `provides: ["screen"]`. Alone: "needs a working object on this lot that provides screen"; with a TV it plays. A screen *in front of* the recliner needs a place condition (G-64).
 - **Source:** wave: packs
 
 ### I-packs-15 — The robot vacuum only peeks out of its dock
@@ -755,7 +765,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** motion
 - **Where:** `tools/art/blender/families/pack_neat.py:343` (`robotVacuumDock`: `vacuum_out` slides it out and back), `:457`
 - **Evidence:** `packs/sheets/obj-neat.robotVacuumDock.png`: the robot slides a little way out and back; it never goes round the room or its rug, and the use is 45 minutes of the owner programming it on foot (I-packs-05). A loop that drives the robot round the rug while the use lasts would read as cleaning.
-- **Status:** open
+- **Status:** fixed (abfc32d9)
+- **After:** `vacuum_round` (a loop, new `G.path`, 5 s a round at 0.25 m/s) drives the robot 18 cm out of the dock, round a 14 cm circle in front of it, facing the way it goes, and back in, while the program use lasts (`fixes/motions/g1718/views/robot-t1.2.png`, `-t2.5.png`, `play-stage.jsonl`). Programming it still takes 45 minutes on foot (I-packs-05).
 - **Source:** wave: packs
 
 ### I-packs-16 — Missing obvious uses: the jukebox can't be listened to; the party bar's stools are never sat on
@@ -765,7 +776,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/packs/cheerful.json:40` (`jukebox`: `dance` only), `outgoing.json:5` (`partyBar`: `mixDrinks`, `soda`, both standing)
 - **Evidence:** `packs/sheets/obj-cheerful.jukebox.png`: picking a song and listening, the jukebox's first use, isn't offered (the record cabinet and the gramophone have `listen`). `packs/sheets/obj-outgoing.partyBar.png`: the bar is built with two stools for its guests but both uses stand at the guest side; a seated drink at the bar is missing.
-- **Status:** open
+- **Status:** fixed (eaca9ed8)
+- **After:** The jukebox's "Pick a song and listen" (`seatNear` 4); the party bar's "Have a drink at the bar", sat on its stools facing the counter (seat 0.74, forward 0.5, `facing: back`: `bench-results/review/fixes/content/g09/fwd50-outgoing.partyBar-barDrink-00.png`). The jukebox's record clip plays only for dance (a manifest key).
 - **Source:** wave: packs
 
 ### I-packs-17 — The sauna-goer's feet poke through the shut glass door
@@ -785,7 +797,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/packs/neat.json:30` (`laundryCenter` `fold`: 60 minutes)
 - **Evidence:** `tables/uses-packs.md`: 6× the `clean` median (10). The wash (45) is a machine's cycle and fine; folding a load is 10–20 minutes. The only `clean` outlier of the packs that isn't a different kind of job.
-- **Status:** open
+- **Status:** fixed (eaca9ed8)
+- **After:** Folding is 20 minutes; `cargo review uses` no longer flags it. Balance and soak as I-bathroom-06.
 - **Source:** wave: packs (`cargo review uses`)
 
 ### I-packs-19 — A blender, a cheese board, a microwave and a pie sizzle; a story plays music

@@ -223,3 +223,30 @@ fn layout_lists_the_content_animations() {
     assert_eq!(layout["sim"]["objectDef"], sim::OBJECT_DEF);
     assert_eq!(layout["sim"]["interaction"], sim::INTERACTION);
 }
+
+#[test]
+fn walkers_tell_where_their_way_goes() {
+    let mut w = world();
+    let at = |w: &World| {
+        let mut out = vec![0.0; snapshot::CAPACITY];
+        snapshot::write(w, &mut out);
+        let o = HEADER_LEN;
+        let f = |k: usize| out[o + k];
+        ([f(sim::X), f(sim::Z)], [f(sim::WAY_X), f(sim::WAY_Z)], [f(sim::AHEAD_X), f(sim::AHEAD_Z)])
+    };
+    // Standing: all three where she stands.
+    let (pos, way, ahead) = at(&w);
+    assert!(way == pos && ahead == pos);
+    // Walking 4 m straight along x: the way and the look ahead are on that line, 1.5 m on.
+    w.apply(Command::MoveTo { sim: 0, x: 10.5, z: 8.5 }).unwrap();
+    for _ in 0..10 {
+        w.tick_once();
+    }
+    let (pos, way, ahead) = at(&w);
+    assert!(w.sims[0].is_moving());
+    assert!((way[0] - 10.5).abs() < 0.01 && (way[1] - 8.5).abs() < 0.01, "{way:?}");
+    let on = (ahead[0] - pos[0]).hypot(ahead[1] - pos[1]);
+    assert!((on - snapshot::AHEAD).abs() < 0.01 && (ahead[1] - 8.5).abs() < 0.01, "{pos:?} {ahead:?}");
+    let layout: serde_json::Value = serde_json::from_str(&snapshot::layout_json(&w.content)).unwrap();
+    assert_eq!(layout["sim"]["aheadZ"], sim::AHEAD_Z);
+}

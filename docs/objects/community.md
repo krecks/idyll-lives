@@ -27,13 +27,13 @@ rides.
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `slide` Playground slide | 1x2 · floor | slide:play | community / play | Frame, Slide, Roof | Static | Static. Gone down in rounds (`slide125`/`112`/`99` by height, `STEP_IN` at the run-out's foot): round to the ladder and up it, in under the bar onto the deck, sat at the top holding the hoop, down the chute lain back, off at the run-out and back round. |
-| `climbingFrame` Climbing frame | 2x2 · floor | climb:exercise | community / play | Frame, Roof, Net | Static | Static. Climbed round: up its rope net, across the deck (ducking under the roof) and down the fireman's pole, then back round to the net (`climb172a`/`147a`/`112a` by height, `b` for the second lane: two side by side, the second waiting on the deck for the first to slide). |
-| `seesaw` Seesaw | 3x1 · floor | seesaw:play | community / play | Frame, Seats, Plank | Loop (E1) | `seesaw`: the plank tips ±12° while two play (E1). Ridden astride, facing along it to the middle (the two face each other), the hands on the handle bar (`rideSeesaw147`/`112`). |
+| `climbingFrame` Climbing frame | 2x2 · floor | climb:exercise | community / play | Frame, Roof, Net | Static | Static. Climbed round: up its rope net, across the deck (ducking under the roof) and down the fireman's pole, then back round to the net (`climb172a`/`147a`/`112a` by height, `b` for the second lane: two side by side, the second waiting on the deck for the first to slide; one who steps in while someone goes round waits at their lane until that round is back at its start, so the two stay in step, G-25). |
+| `seesaw` Seesaw | 3x1 · floor | seesaw:play | community / play | Frame, Seats, Plank | Loop (E1) | `seesaw`: the plank tips ±12° while two play (E1). The two ride at the two ends, facing each other over the handles (content `places`). Ridden astride, the hands on the handle bar (`rideSeesaw147`/`112`). |
 | `springRider` Spring rider | 1x1 · floor | ride:play | community / play | Horse, Saddle, Spring | Loop (E1) | `rock` on its spring while ridden (E1). Ridden astride, the feet on the pegs, the hands on the handles (`rideSpring112`). |
-| `merryGoRound` Merry-go-round | 2x2 · floor | spin:play | community / play | Platform, Rails, Stripes | Loop (E1) | `spin` while ridden (E1). Sat on the platform holding the rail beside them, the legs out on it or over its edge (`rideRound147`/`112`, `In`/`Edge`, `L`/`R`). |
+| `merryGoRound` Merry-go-round | 2x2 · floor | spin:play | community / play | Platform, Rails, Stripes | Loop (E1) | `spin` while ridden (E1). Four sit round the platform between the rails, facing the column (content `places`). Leant in, a hand on the rail either side, the legs out towards the column (`rideRound147`/`112`). |
 | `basketballHoop` Basketball hoop | 1x1 · floor | shoot:exercise | community / play | Frame, Backboard, Hoop | Use | `swish`: the net sways after each shot (1.4 s into the use, then every 3.2 s: `delay`, `every`). |
-| `pingPongTable` Ping-pong table | 2x1 · floor | pingPong:play | community / play | Table, Legs | Static | Static. |
-| `parkChessTable` Park chess table | 1x1 · floor | chess:play | community / play | Table, Stools | Use | `move`: a pawn slides one square for chess. |
+| `pingPongTable` Ping-pong table | 2x1 · floor | pingPong:play | community / play | Table, Legs | Static | Static. The two players stand at the two ends, facing each other across the net (content `places`, off its tiles; a blocked end is played from the front). |
+| `parkChessTable` Park chess table | 1x1 · floor | chess:play | community / play | Table, Stools | Use | `move`: a pawn slides one square for chess. A stool either side, the players facing each other across the board (content `places`; rebuilt 2026-10-21, the stools were both behind it). |
 
 **In play** (signed off 2026-10-16):
 - Checked in the yard of the check house in all four facings: the slide gone down, the ping-pong table played at;
@@ -70,7 +70,7 @@ rides.
 | `postBox` Post box | 1x1 · floor | post:write | community / street | Box | Use | `flap`: the slot flap swings in for post (`hold` 1 s). |
 | `noticeBoard` Notice board | 1x1 · floor | read:read | community / street | Frame | Static | Static. |
 | `phoneBooth` Phone box | 1x1 · floor | call:phone | community / street | Kiosk | Use | `door_open`: the door opens out (`delay` 0.3 s), the caller steps inside and it shuts behind them (`hold` 2.4 s); it opens again to let them out (`out` 1.6 s). |
-| `fountainTown` Town fountain | 3x3 · floor | wish:look sitBy:relax | community / street | Stone | Ambient (E2) | `water_run`: the water runs all the time, ambient (not on Low). |
+| `fountainTown` Town fountain | 3x3 · floor | wish:look sitBy:relax | community / street | Stone | Ambient (E2) | `water_run`: the water runs all the time, ambient (not on Low). Its text says square, as built. |
 | `townStatue` Founder's statue | 2x2 · floor | admire:admire | community / street | Statue | Static | Static. |
 
 **In play** (signed off 2026-10-16):
@@ -137,10 +137,10 @@ rides.
 | `farm.silo` Grain silo | 3x3 · floor | — | community / farm | Paint, Roof | Static | Static. |
 | `farm.tractor` Little tractor | 2x4 · floor | — | community / farm | Paint, Wheels | Static | Static. |
 | `farm.hayBale` Round hay bale | 1x1 · floor | — | community / farm | Twine | Static | Static. |
-| `farm.hayStack` Stack of hay bales | 2x1 · floor | — | community / farm | Twine | Static | Static. |
+| `farm.hayStack` Stack of hay bales | 2x1 · floor | sit:sit | community / farm | Twine | Static | Static. Sit on the hay bales, two at once on the lower bales' front edges (content `seat` 0.45 m, forward 0.25; 2026-10-21, Q-19). |
 | `farm.scarecrow` Scarecrow | 1x1 · floor | — | community / farm | Shirt, Trousers, Hat | Ambient (E2) | `sway`: a slow sway, ambient (not on Low). |
 | `farm.trough` Water trough | 2x1 · floor | — | community / farm | Paint | Static | Static. |
-| `farm.coop` Chicken coop | 2x2 · floor | — | community / farm | Paint, Roof, Trim | Night (E3) | `close`: the hatch slides shut at night (held from dusk) and is open by day. |
+| `farm.coop` Chicken coop | 2x2 · floor | — | community / farm | Paint, Roof, Trim | Night (E3) | `close`: the hatch slides shut at night (held from dusk) and is open by day. Decor by decision (Q-19: kind `chickenCoop` marked decor); hens and eggs would be new behaviour. |
 
 **In play** (signed off 2026-10-16):
 - All looked at in four facings by day, at night and on Low WebGL, and together on the `town-things` lot, near and

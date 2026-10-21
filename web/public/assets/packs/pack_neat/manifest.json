@@ -137,7 +137,8 @@
         "uses": {
           "laundry": "door_open",
           "fold": "door_open"
-        }
+        },
+        "hold": 2.5
       },
       "paint": [
         {
@@ -323,10 +324,9 @@
         }
       },
       "motions": {
-        "uses": {
-          "program": "vacuum_out"
-        },
-        "hold": 2
+        "loops": {
+          "program": "vacuum_round"
+        }
       },
       "paint": [
         {

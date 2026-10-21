@@ -34,6 +34,7 @@ cutaway drops it, from either side.
 - Each hung on all four walls of the living room (the 2-wide abstract canvas on the bathroom's and bedroom's plain
   walls, where two plain tiles side by side are free of windows), walls up, by day and at night, on WebGPU and
   WebGL2, Medium and Low, every part coloured.
+- Since 2026-10-21 (review A-decor-01) the grandfather clock's pendulum swings (`fixes/motions/g1718/views/clock-t0.4.png`).
 - A resident admires the oil painting and the abstract canvas facing it (the "look" pose).
 - The wall clock's hands keep the game's time (ten past ten in the morning, ten to ten at night). Its case's well
   ends behind the face, so the face shows white by default and "Face" colours it.
@@ -49,14 +50,14 @@ cutaway drops it, from either side.
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `grandfatherClock` Grandfather clock | 1x1 · floor | wind:tinker | decor / ornaments | Case, Face | Clock (`motions.clock`) | `hour_hand`, `minute_hand`: the hands tell the game's time. The case door and the pendulum are still, to stay within 4 draws (`families/decor.md`). |
+| `grandfatherClock` Grandfather clock | 1x1 · floor | wind:tinker | decor / ornaments | Case, Face | Clock (`motions.clock`) + ambient | `hour_hand`, `minute_hand`: the hands tell the game's time. `pendulum`: the pendulum swings ±4° behind the trunk door's window, a beat each 0.8 s, all the time near the camera (`idle`, not on Low; 2026-10-21). The case is a polished satin walnut, not the textured wood, so it stays within 4 draws; its trunk door is still (it's wound at the dial) (`families/decor.md`). |
 | `vaseTall` Tall vase | 1x1 · floor | — | decor / ornaments | Body | Static | Static. |
 | `urnPorcelain` Porcelain urn | 1x1 · floor | — | decor / ornaments | Body | Static | Static. |
 | `vasePedestal` Vase on a pedestal | 1x1 · floor | — | decor / ornaments | Vase, Pedestal | Static | Static. |
 | `bustMarble` Marble bust | 1x1 · floor | admire:look | decor / ornaments | Bust, Plinth | Static | Static. |
 | `statueCat` Cat statue | 1x1 · floor | — | decor / ornaments | Body | Static | Static. |
 | `statueHorse` Bronze horse | 1x1 · floor | — | decor / ornaments | Body | Static | Static. |
-| `coatRack` Coat stand | 1x1 · floor | — | decor / ornaments | Body | Static | Static. |
+| `coatRack` Coat stand | 1x1 · floor | — | decor / ornaments | Body | Static | Static. Decor by decision (Q-19: kind `coatStand` marked decor); it carries its coat and hat. |
 | `hangingPlant` Hanging plant | 1x1 · ceiling | water:water | decor / ornaments | Pot, Cord | Use | `sway`: the pot sways 5° and settles for water (`hold` 0.8 s, one sway). |
 | `fireplace` Fireplace | 2x1 · floor | relax:relax | decor / ornaments | Surround, Mantel | Use | `flames`: the flames grow on the logs for relax (gloss; the light is the content's). |
 
@@ -66,8 +67,9 @@ cutaway drops it, from either side.
   keeping the game's time.
 - The hanging plant, watered, sways out and settles after its `hold`.
 - The fireplace has a raised hearth bench (content `seat`: height 0.42, forward 0.02): a resident warming up sits on
-  it with the flames growing behind her and dying down when she gets up. Its `light` (height 0.7, `switch: false`:
-  residents don't switch it) lights the room at night.
+  it, the flames growing behind her. Its `light` (height 0.7, `fire: true`) is a fire's: sitting down by it in the
+  dark lights it (or the player's Light the fire), and then its light, its embers' glow and its flames burn together
+  until the last one awake leaves the room, or the morning (`lights.rs`; I-decor-03). Bought unlit.
 - The horse statue is a bronze horse standing on an oak plinth (model and its name and description agree); the pedestal vase is blue.
 
 ## D3. Textiles (6)

@@ -171,7 +171,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Where:** `tools/art/blender/families/bathroom.py:156` (`h = 0.92`, the worktop and basin rim); `web/public/content/base.json:2449` (`category: bathroom`, `stations: ["dishes"]`); `web/public/content/housegen.json:96` (`sink` in 3 of 4 kitchen runs)
 - **Evidence:** `sheets/obj-sink.png`, `sheets/kitchen-sinks.png` (generated-49, -82, -84: the same unit in a counter run beside the cooker). Its rim is 0.92 m: 1 cm over a washbasin's 0.76–0.91 (`reference.json` `basinPedestal`), inside a kitchen sink's 0.85–0.95. As a vanity unit with doors it reads right in both rooms; the strict rule only fails it as a basin. Decide which kind it is (and so which range applies), or split it into a kitchen sink and a bathroom basin.
   Bathroom wave: `cargo review sizes` now reads this top as 0.88 m: the tops of the painted shoulders under the worktop (`bathroom.py:169-173`), not the 0.92 m worktop. A tool artefact; the 0.92 m stands.
-- **Status:** open
+- **Status:** fixed (b3f6b82d)
+- **After:** One kind for the base sink, `kitchenSink` (0.85–1.00 m): its 0.92 m rim is inside, and it reads right in both rooms.
 - **Source:** pilot
 
 ### A-bathroom-01 — The shower's glass door never opens: the resident walks through it
@@ -220,7 +221,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** motion
 - **Where:** `tools/art/blender/families/laundry.py:226` (`LAUNDRY = {'uses': {'laundry': 'door_open'}, 'hold': 2.5, 'loops': {'laundry': 'drum_spin'}}`, the same for both machines)
 - **Evidence:** `bathroom/play/chunk2/play.jsonl` and `chunk4-redo/play.jsonl` (clip events): on the washer `door_open` and `drum_spin` start in the same frame (4162 ms) and the drum goes round behind the open door for its 2.5 s hold; a washer won't turn until it is shut. On the dryer ("Fold the laundry", 20 min) the door opens and the drum tumbles the washing for the whole use (`bathroom/play/chunk2/laundryDryer-laundry-01.png`: the drum's washing turning while the resident stands at it to fold), where folding means the drum has stopped and the washing is out. Fix: the washer's spin after its door shuts (a delay, or a loop that waits for the door); the dryer's use opens the door with no spin.
-- **Status:** open
+- **Status:** fixed (d2c9f0de)
+- **After:** the washer's drum turns from the moment its door has shut (`delay` 3.5 s, `every` 1.1 s, a turn each 1.2 s, till the wash ends): `fixes/motions/g1718/play-stage.jsonl`, `door_open` back at rest at +4.96 s, `drum_spin` from +4.97 s; the dryer opens its door to take the washing out and its drum stays still (no `drum_spin` clip).
 - **Source:** wave: bathroom
 
 ### A-bathroom-04 — Bathers sit 10–12 cm above the tub's floor
@@ -252,7 +254,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/furniture.json:2530-2540` (`mirrorCabinet` `brushTeeth`: `anim: wash`, no `handwash` tag, `autonomous: false`); no basin has it: `furniture.json:2457` (`sinkPedestal`), `:2485` (`vanityDouble`, whose description at `:2497` promises "no more queueing to brush your teeth"), `catalog2/bath.json:137` (`sinkVessel`), `:166` (`sinkConsole`), `base.json:2449` (`sink`, I-kitchen-02); `tools/art/blender/families/bathroom.py:1052` (`door_open`, `hold: 1.5`)
 - **Evidence:** `bathroom/play/chunk1/mirrorCabinet-brushTeeth-01.png`: on a bare wall the resident stands a tile out (1.27 m from the cabinet's front) for 4 minutes, hands working at the chest, empty; the door swings open by itself as the use starts, out of reach. Hung over a pedestal sink (`bathroom/extra/mirror-over-sink/mirrorCabinet-brushTeeth-01.png`) they stand at the basin, but the tap stays off (no `handwash` tag: no `water_on`, no tap sound, `world.ts:191`) and the hands still hold no brush (I-held-01, held ledger). The real use is the basin's, the mirror above it a help: today the one object with "Brush your teeth" is the cabinet, needing no basin anywhere (I16), and residents never choose it (`autonomous: false`), so nobody brushes their teeth unless told to. The pedestal sink even has a cup and toothbrush modelled on its deck (`bathroom.py:213-214`). Fix: `brushTeeth` on the basins (`wash`, the tap running), at least the vanity's two slots; the cabinet's door then opens for the basin's use under it, or the cabinet keeps a "take out toiletries" use.
-- **Status:** open
+- **Status:** fixed (eaca9ed8)
+- **After:** "Brush your teeth" on the five basins (3 min, hygiene 0.03, tags `hygiene` and `handwash` after Wash hands, so a toilet's follow-up still washes hands): the tap runs (`water_on`) and sounds; residents choose it. With hygiene 0.05 the busy-player soak had no birth in exactly its 120-hour window (bisected to this use); at 0.03 all four soak tests pass. Balance (180 days): median weekly savings 369 → 395, richest 12 742 → 14 520, grades 1.2/2 → 1.3/3, all inside the targets. The cabinet keeps its own use; nothing is held in hand (G-70).
 - **Source:** wave: bathroom (from the evidence's "Seen (not reviewed)"; extra run `bathroom/extra/mirror-over-sink/`)
 
 ### I-bathroom-07 — Doing the laundry is a stand at the running machine
@@ -272,5 +275,6 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/catalog2/bath.json:254` and `:267` (`mirrorRound`: `interactions: []`)
 - **Evidence:** `bathroom/sheets/obj-mirrorRound.png`. The wall mirror (`furniture.json:2239`, "check your look, or practise a speech") and the standing mirror (`base.json:3194`) both have "Practise a speech"; the round mirror, hung at the same height for the same look in the mirror, has nothing (`tables/uses-bathroom.md` flags "no use"). Not decor in the §9 sense: its siblings have the use.
-- **Status:** open
+- **Status:** fixed (eaca9ed8, 1222c510)
+- **After:** The round mirror checks the look and practises a speech (`bench-results/review/fixes/content/g12/after-mirrorRound-*.png`); `cargo review uses` no longer flags it.
 - **Source:** wave: bathroom (`cargo review uses` against the mirrors' siblings)

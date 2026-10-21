@@ -278,13 +278,18 @@
       },
       "motions": {
         "uses": {
-          "listen": "tray",
-          "dance": "tray"
+          "listen": {
+            "clip": "pulse",
+            "every": 0.45
+          },
+          "dance": {
+            "clip": "pulse",
+            "every": 0.45
+          }
         },
-        "hold": 1.2,
         "loops": {
-          "listen": "pulse",
-          "dance": "pulse"
+          "listen": "record",
+          "dance": "record"
         }
       },
       "paint": [

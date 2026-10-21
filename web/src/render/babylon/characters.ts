@@ -72,11 +72,12 @@ import { loadCharacterSet, loadStage, type BodyData, type CharacterSet, type Cli
 import { APPEARANCE_TEXELS, CharacterPlugin, MORPH_TEXELS, type CharacterSurface, type MorphBinding } from './characters/material';
 import { FACE_KEYS, FaceMixer, NEUTRAL, type Face } from './characters/face';
 import { ENERGY_RATE, type VisemeTrack } from '../../voice/visemes';
-import { outfitFor, writeOutfit, type OutfitParams } from './characters/outfit';
-import { BLANKET_WIDTH, blanketMaterial, buildBlanket, type BlanketShape } from './characters/blanket';
-import { BUNK_DOWN, BUNK_UP, RIDE_HORSE, RIDE_ROUND, RIDE_SEESAW, RIDE_SPRING, RIDE_SWING, roundClip, SLIDE } from './characters/clips/rides';
+import { outfitFor, SHELL_BITS, WEARS, writeOutfit, type OutfitFit, type OutfitParams, type Wear } from './characters/outfit';
+import { BLANKET_WIDTH, blanketMaterial, buildBlanket, quiltTint, type BlanketShape } from './characters/blanket';
+import { BUNK_DOWN, BUNK_UP, RIDE_HORSE, RIDE_ROUND, RIDE_SEESAW, RIDE_SPRING, RIDE_SWING, SLIDE } from './characters/clips/rides';
 import { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } from './characters/clips/street';
 import { BOULDER, FOOS, FOOS_LANES, POOL, SMASH, YOGA_AT } from './characters/clips/games';
+import { EYEPIECE, PICK_APPLE, PICK_LEMON, SHOWER_CHILD } from './characters/clips/uses';
 // The seat and bed tables (`SEATS`, `BEDS`, `BUNKS` and their defaults) are data, read by `cargo check-glb` and
 // `cargo review` too; what their entries mean and why some are as they are: docs/characters-format.md "Seats and beds".
 import FURNITURE from './characters/furniture.json';
@@ -85,7 +86,8 @@ import { addLocal, addRotation, blendInto, makeAdditive, PoseScratch, qmul, rese
 import type { MaterialLibrary } from './materials';
 import { WALL_HEIGHT } from './house';
 import { LAYER_SHADOW_ONLY } from './layers';
-import { buildModel, ITEM_STAND_IN, onModelFileArrived, paintColors, painted, type ModelTemplate } from './models';
+import { buildModel, fileColour, ITEM_STAND_IN, onModelFileArrived, paintColors, painted, type ModelTemplate } from './models';
+import { paintSlots } from '../../assets/paint';
 import { TemplateCache } from './templateCache';
 
 /** Rows in the pose texture (= Sim capacity). */
@@ -99,6 +101,11 @@ const YOUNG_STAGES = new Set(['baby', 'child', 'teen']);
 const FACE_PARTS: readonly string[] = ['eyes', 'brows', 'lashes', 'teeth', 'tongue'];
 
 /** The body's skin chunks a Sim wearing `parts` shows (those no worn garment hides completely). */
+/** A part's shell category as a `SHELL_BITS` bit (`top.jacket`, `lod.bottom.skirt`, `shoes.boots` ...); 0 for anything else. */
+function shellBit(part: string): number {
+  const kind = /^(?:lod\.)?(top|bottom|shoes)\./.exec(part)?.[1] as keyof typeof SHELL_BITS | undefined;
+  return kind ? SHELL_BITS[kind] : 0;
+}
 function skinChunks(body: BodyData, parts: readonly string[]): string[] {
   return Object.entries(body.bodyChunks)
     .filter(([, hiders]) => !hiders.some((h) => parts.includes(h)))
@@ -134,14 +141,20 @@ const WALK_PER_TICK = 0.075;
 const WALK_FASTEST = 1.5;
 const WALK_SLACK = 1.2;
 /**
- * The walk and jog cycles play matched to the ground speed, up to this many times their own pace
- * (faster, they would only flicker; the feet slide instead). A walker who would need the walk
- * faster jogs along (`jogAlong`), and walks again below `JOG_BACK` of it.
+ * The walk, jog and run cycles play matched to the ground speed, up to this many times their own pace
+ * (faster, they would only flicker; the feet slide instead). A walker who would need the walk faster
+ * jogs along (`jogAlong`), one who would need the jog faster runs (`runAlong`, game speeds 3 and up,
+ * children from 2), each going back to the slower gait below `JOG_BACK` of its switch. The run, the
+ * last, goes on to `RUN_MAX_RATE` (about six strides a second): adults and teens keep their feet on
+ * the ground at speed 3 (15 m/s; children run at up to 13 m/s there), and at speeds 4 and 5 (45 and
+ * 90 m/s) no gait could.
  */
 const GAIT_MAX_RATE = 3;
+const RUN_MAX_RATE = 4;
 const JOG_BACK = 0.8;
-/** Locomotion cycles (they play in real time at the matched rate, and change into each other in step). */
-const GAITS = new Set(['walk', 'jogAlong']);
+/** Locomotion cycles, slowest first (they play in real time at the matched rate, and change into each other in step). */
+const GEARS = ['walk', 'jogAlong', 'runAlong'];
+const GAITS = new Set(GEARS);
 const DEFAULT_FADE = 0.25;
 
 /**
@@ -204,7 +217,8 @@ const CROUCH_SHOULDER = 0.55;
  * clip `delay`s so that they stand `back` m back from the tile's middle first, clear of the door), and
  * `out` seconds after the use before stepping
  * out (the door opening again, `out` in its motions). `perLane`: the clips are one per lane, not a sequence (each
- * lane's round goes its own way: the climbing frame's, round to its pole and back).
+ * lane's round goes its own way: the climbing frame's, round to its pole and back). `tag`: only for that use
+ * (its action tag), the object's other uses as usual.
  */
 interface StepIn {
   by: readonly (readonly [height: number, clip: readonly string[], at: { to: number; up?: number }])[];
@@ -213,7 +227,10 @@ interface StepIn {
   back?: number;
   out?: number;
   perLane?: boolean;
+  tag?: string;
 }
+/** Eating a picked fruit (after the pick), bite by bite. */
+const EAT_FRUIT = ['eat', 'idle', 'eat', 'idle', 'eat', 'idle'];
 const STEP_IN: Record<string, StepIn> = {
   drinkingFountain: { by: FOUNTAIN.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
   // Onto its floor (the plinth, 12 cm), facing the phone at the back.
@@ -242,9 +259,16 @@ const STEP_IN: Record<string, StepIn> = {
   'cheerful.karaokeMachine': { by: [[0, [], { to: 0.45 }]], lanes: [0.18] },
   // Up on the stage, each at a mic stand.
   'outgoing.karaokeStage': { by: [[0, [], { to: 0.36, up: 0.146 }]], lanes: [-0.36, 0.36] },
+  // Bent down to the eyepiece of the tube aimed up (clips/uses.ts), from nearer than the tile.
+  telescope: { by: EYEPIECE.map(({ clip, min, fit }) => [min, [clip], fit] as const), tag: 'look' },
+  // Picking the fruit hanging at the front (clips/uses.ts, fitted to where it hangs), then eating it.
+  'garden.apple': { by: PICK_APPLE.map(({ clip, min, fit }) => [min, [clip, ...EAT_FRUIT], fit] as const), tag: 'eat' },
+  'garden.lemonTree': { by: PICK_LEMON.map(({ clip, min, fit }) => [min, [clip, ...EAT_FRUIT], fit] as const), tag: 'eat' },
 };
 /** One clip played alone (`StepIn.perLane`), by name. */
 const LANE_SEQ = new Map<string, readonly string[]>();
+/** How far (s) into someone else's round on the same thing one stepped in may still start theirs (`inTurn`). */
+const LANE_SYNC = 0.4;
 /** Stepping in (m/s, game time) and out again (s). */
 const STEP_IN_SPEED = 1.05;
 const STEP_OUT_S = 1.1;
@@ -327,6 +351,25 @@ const BUNKS: Record<string, readonly number[]> = FURNITURE.bunks;
 /** Beds whose sleepers get a blanket (pack hammocks, sofas and nap pods don't). */
 const BLANKET_BEDS = new Set(['bed', 'lazy.snoozecloudBed', 'bedSingle', 'bedBunk', 'bedFuton', 'bedKing', 'bedDouble', 'bedQueenUpholstered', 'bedCanopy', 'kidsBed', 'kidsBedCar', 'wallBed', 'bedDaybed']);
 /**
+ * The part of a bed whose colour its sleepers' quilts take (`PlacedObject.quilt`): the one the player
+ * paints as its "Bedding", else this (the futon's own quilt, a throw).
+ */
+const QUILT_PART: Record<string, string> = { bedFuton: 'quilt_oat', wallBed: 'throw', 'lazy.snoozecloudBed': 'throw' };
+/**
+ * The thighs' turn forward from the hips (rad) in `sit` (clips/seated.ts), that the shells' seated corrective is
+ * made for (crates/tools/src/characters/clothes.rs `SIT_FLEX`, 76°): `writeSit` weighs it by the thighs' own.
+ */
+const SIT_FLEX = (76 * Math.PI) / 180;
+/** The thighs' turn (rad, their mean) below which the shells keep their standing shape (`writeSit`). */
+const SIT_FROM = (15 * Math.PI) / 180;
+/** A quilt's colour until its bed's file says (sRGB). */
+const QUILT_COLOUR = '#E7E0D4';
+/**
+ * What is worn in the water (`wearFor`) where it isn't a towel (every shower, bath and tub is): swimwear in
+ * the hot tubs and the cold plunge; and a towel where the use isn't a bath or a shower (the sauna).
+ */
+const BATH_WEAR: Record<string, Wear> = { hotTubCedar: 'swim', whirlpoolTub: 'swim', 'hotHeaded.coldPlunge': 'swim', 'loner.soloSauna': 'towel' };
+/**
  * Two sleepers' quilts in a wide bed (`writeBlanket`): each this much (m) wider on each side than half the bed
  * and moved this much towards its middle, so they overlap by four times it over the middle.
  */
@@ -352,26 +395,21 @@ function slingTop(sling: NonNullable<Bed['sling']>, d: number): number {
 const LIE_ENTRY = 0.55;
 /**
  * Rides, sat astride with the hands on the grips whatever the use (`clips/rides.ts`): the clip for the rider's
- * height (`sizes`; on the merry-go-round, `round`, by where they sit on it too: at its edge or not, its rail on
- * their left or right), facing along it to its middle (`face`: the seesaw's riders face each other over its
- * handles), and in time with its loop (`sync`: the swing's pumping legs). Each ride carries its rider with it
- * (`ObjectMotion.ride`).
+ * height (`sizes`), in time with the ride's loop (`sync`: the swing's pumping legs). Where each rider sits and
+ * faces is its slot's place (content `places`: the seesaw's two at its ends facing each other, the
+ * merry-go-round's four round it facing in); each ride carries its rider with it (`ObjectMotion.ride`).
  */
 interface Ride {
   sizes: readonly { clip: string; min: number }[];
-  round?: boolean;
-  face?: 'middle';
   sync?: boolean;
 }
 const RIDES: Record<string, Ride> = {
   rockingHorse: { sizes: RIDE_HORSE },
   springRider: { sizes: RIDE_SPRING },
-  seesaw: { sizes: RIDE_SEESAW, face: 'middle' },
-  merryGoRound: { sizes: RIDE_ROUND, round: true },
+  seesaw: { sizes: RIDE_SEESAW },
+  merryGoRound: { sizes: RIDE_ROUND },
   swingSet: { sizes: RIDE_SWING, sync: true },
 };
-/** The merry-go-round's rails (`RIDES` `round`): where they come down beside its riders, m to its right and ahead of its middle (either way), and how far out its edge riders sit. */
-const ROUND_RAILS = { at: 0.5, edge: 0.75 };
 /**
  * The upper bunk's ladder (`BUNKS`): getting into the upper bunk the sleeper climbs up it from the tile in front
  * of the foot end and lies down (`up`), and getting up climbs back down it to the tile (`down`: sim-core keeps
@@ -461,20 +499,22 @@ interface Prop {
  * front, to the right, up; `upShort` more for a short one, held higher), and how far up the instrument
  * that is (its share of the instrument's height). Instruments `short` m long and shorter (for the
  * player's size: a ukulele) are held as short, `long` and longer (a guitar) as long, between them in
- * between (`guitarReach`).
+ * between (`guitarReach`). The strumming clips are fitted to it (clips/uses.ts `GUITAR_BODY`): its neck goes
+ * from there to the left hand, out to the left across the body.
  */
 const GUITAR = { out: 0.17, right: 0.08, up: -0.03, upShort: 0.12, body: 0.27, short: 0.7, long: 1.15 };
 /**
- * The player's arms (rad, `activityPose`), for a long instrument and a short one: the left upper arm out
- * and up, its elbow bent and the forearm turned in to the neck; the right the same over the body.
+ * Playing a guitar or a ukulele (clips/uses.ts: held across the body, the neck to the left; `strumShort`
+ * for a short one, `guitarReach` under a half).
  */
-const GUITAR_ARMS = {
-  long: { leftOut: -0.55, leftUp: -0.55, leftBend: -1.1, leftIn: 0.5, rightOut: 0.2, rightUp: -0.2, rightBend: -0.75, rightIn: -0.9 },
-  short: { leftOut: -0.45, leftUp: -0.3, leftBend: -1.25, leftIn: 0.9, rightOut: 0.2, rightUp: -0.25, rightBend: -0.95, rightIn: -0.9 },
-};
-/** A use sequence of the idle alone (curling dumbbells and playing a guitar on top, `activityPose`), and of pushing (a mop). */
+const STRUM: readonly string[] = ['strum'];
+const STRUM_SHORT: readonly string[] = ['strumShort'];
+/** A use sequence of the idle alone (curling dumbbells on top, `activityPose`), and of pushing (a mop). */
 const IDLE_ONLY: readonly string[] = ['idle'];
 const PUSH_ONLY: readonly string[] = ['push'];
+/** Showering (`ACTIONS.shower`), a grown-up's and a child's. */
+const SHOWER_ONLY: readonly string[] = ['shower'];
+const SHOWER_SMALL: readonly string[] = ['showerChild'];
 /** Crouched down (to hug the teddy, `HUGGED`). */
 const CROUCH_ONLY: readonly string[] = ['crouch'];
 /**
@@ -483,6 +523,8 @@ const CROUCH_ONLY: readonly string[] = ['crouch'];
  * through its front.
  */
 const NEAR_DESKS = new Set(['gloomy.journalDesk', 'neat.organizerDesk', 'romantic.letterBureau', 'hotHeaded.grudgeJournal']);
+/** Ovens under a hob, near the floor: baking (`bake`) bends down to them. */
+const LOW_OVENS = new Set(['stoveElectric', 'stoveGas', 'rangeCooker', 'chefStove', 'kind.neighbourlyOven']);
 /** Seated objects whose activity uses the hands on a desk / keys. */
 const SIT_HANDS = new Set(['computerDesk', 'piano']);
 /** Standing object use: clip sequence (looped). */
@@ -520,7 +562,7 @@ const HANDS = {
 /**
  * Animation per action tag (`layout.actions`, from the content's `animations`):
  * - `stand`: clip sequence while standing at the object (looped; looping clips play ~4 s per step);
- *   a function picks one by object def;
+ *   a function picks one by object def (and the resident's height);
  * - `sit`: seated clip (default `sit`), or a function of the object def;
  * - `upper`: upper-body layer while seated (`eat` and `drink` play now and then), or a function of the
  *   object def ('' for none);
@@ -528,7 +570,7 @@ const HANDS = {
  * Procedural layers on top (reclining, instruments, gazes, ...) are in `activityPose`.
  */
 interface ActionAnim {
-  stand?: readonly string[] | ((def: string) => readonly string[]);
+  stand?: readonly string[] | ((def: string, height: number) => readonly string[]);
   sit?: string | ((def: string) => string);
   upper?: string | ((def: string) => string);
   hands?: number | ((def: string) => number);
@@ -557,7 +599,8 @@ const ACTIONS: Record<string, ActionAnim> = {
   },
   // (Seated at the dressing table, getting ready: a hand up at the hair, the phone clip's.)
   wash: { stand: ['spell', 'interact'], upper: (def) => (def === 'dressingTable' ? 'phone' : ''), hands: HANDS.relaxed },
-  shower: { stand: ['spell', 'interact', 'idle'], hands: HANDS.open },
+  // Washing the hair, turning round, soaping, rinsing (clips/uses.ts; a child turns only the chest).
+  shower: { stand: (_, height) => (height < SHOWER_CHILD ? SHOWER_SMALL : SHOWER_ONLY), hands: HANDS.open },
   bath: { hands: HANDS.open },
   toilet: { hands: HANDS.relaxed },
   sleep: { hands: HANDS.open },
@@ -634,7 +677,8 @@ const ACTIONS: Record<string, ActionAnim> = {
     hands: HANDS.grip,
   },
   look: {
-    stand: (def) => (def === 'telescope' ? ['rail'] : ['idle', 'foldArms']),
+    // (At the telescope bent down to its eyepiece: `STEP_IN`.)
+    stand: ['idle', 'foldArms'],
     hands: HANDS.relaxed,
   },
   // Down to low flowers, leaning in to tall ones / up into a tree's crown (`activityPose` turns the head).
@@ -654,10 +698,15 @@ const ACTIONS: Record<string, ActionAnim> = {
   stir: { stand: ['stir', 'interact', 'stir'], hands: HANDS.hold },
   flip: { stand: ['flip', 'interact', 'flip'], hands: HANDS.grip },
   serve: { stand: ['pickUp', 'idle'], hands: HANDS.hold },
+  // Batter stirred in a mixing bowl, pastry made (the bowl is drawn on the counter).
+  mix: { stand: ['stir', 'interact', 'stir'], hands: HANDS.hold },
+  // A dish put in the oven or the microwave, then watched, bending to look in now and then: down to
+  // a cooker's oven, at chest height to an oven tower's, a pizza oven's mouth or a microwave.
+  bake: { stand: (def) => (LOW_OVENS.has(def) ? ['pickUp', 'idle', 'foldArms', 'idle'] : ['interact', 'idle', 'foldArms', 'idle']), hands: HANDS.relaxed },
 };
 
-/** The prop drawn on a station's top while a Sim works there (by action tag; `tool.*` models). */
-const STATION_PROPS: Record<string, string> = { chop: 'tool.board', stir: 'tool.pan', flip: 'tool.grillFood' };
+/** The prop drawn on a station's top while a Sim works there (by action tag; `tool.*` models). Nothing for a bake: the dish is in the oven. */
+const STATION_PROPS: Record<string, string> = { chop: 'tool.board', stir: 'tool.pan', flip: 'tool.grillFood', mix: 'tool.mixingBowl' };
 /**
  * Where on a station its prop goes, by object def and action tag (else the top's middle, a little towards the
  * cook): m to its right and forward of its middle (its own frame), and the height it stands at. The pan on the
@@ -865,10 +914,9 @@ interface SimRig {
   liftW: number;
   /** Where the feet step in towards the crib (m, along the facing). */
   cuddleStep: number;
-  /** Day clothes and pyjamas (switched when the Sim lies down in bed). */
-  day: OutfitParams | null;
-  night: OutfitParams | null;
-  asleep: boolean;
+  /** Its clothes for each `Wear` (`wearFor`; null: a ghost), and the ones written to its row (null: none yet). */
+  outfits: Record<Wear, OutfitParams> | null;
+  worn: OutfitParams | null;
   /** Finger openness (see HANDS), smoothed. */
   hands: number;
   /** Seconds in the current step of a use sequence. */
@@ -999,6 +1047,11 @@ interface PlacedObject {
   lift: number;
   /** Something to sit or lie on (a seat or a bed, by its interactions or the tables above). */
   restful: boolean;
+  /**
+   * A bed's bedding (`QUILT_PART`), whose colour its sleepers' quilts take: the colour the player gave
+   * it, else `key` (`<model>#<part>`) for the file's own (`beddingColours`); null for anything else.
+   */
+  quilt: { key: string; colour?: string } | null;
   cx: number;
   cz: number;
   minX: number;
@@ -1017,6 +1070,8 @@ interface PartMesh {
   detail: number;
   /** Drawn on Sims near the camera, far from it (the low-detail body and clothes), or always. */
   range: Range;
+  /** A shell's category (`SHELL_BITS`; 0: not a shell), left out for the Sims whose clothes now don't draw it (`bare`). */
+  shell: number;
 }
 
 const enum Range {
@@ -1135,9 +1190,13 @@ export class Characters {
    * the covered Sims wearing that body packed afresh each frame into its drawn `matrices` (a matrix each) and
    * `ext` (two numbers each), `drawn` of them (`writeBlanket`).
    */
-  private readonly blankets = new Map<string, BlanketShape & { matrices: Float32Array; ext: Float32Array; drawn: number; base: boolean }>();
+  private readonly blankets = new Map<string, BlanketShape & { matrices: Float32Array; ext: Float32Array; tint: Float32Array; drawn: number; base: boolean }>();
   /** The quilts' shared material, for the life stages' quilts made later. */
   private quilt: PBRMaterial | null = null;
+  /** The beds' bedding colours as their files have them, by `PlacedObject.quilt` key (null: still loading, or none). */
+  private readonly beddingColours = new Map<string, string | null>();
+  /** Per Sim row: the shells its clothes now leave out (`OutfitParams.bare`, `faceDetail`). */
+  private readonly bare = new Uint8Array(MAX_CHARACTERS);
   /** Per Sim row: head top (x, y, z) for speech bubbles and the selection marker. */
   readonly heads = new Float32Array(MAX_CHARACTERS * 3);
   /** Per Sim row: where they stand (x, z), drawn or not (NaN while away). */
@@ -1454,6 +1513,7 @@ export class Characters {
     this.ghosts = [];
     this.data.fill(0);
     this.visible.fill(0);
+    this.bare.fill(0);
     const groups = new Map<string, SimInfo[]>();
     const push = (key: string, s: SimInfo) => {
       const list = groups.get(key) ?? [];
@@ -1490,7 +1550,7 @@ export class Characters {
       const who = `${s.name}|${s.generation ?? 0}|${s.gender}|${stage ?? ''}|${body.name}|${outfitId}`;
       const old = kept[s.id];
       // The same rig carries on (pyjamas: `asleep` is worked out again, and the outfit for it written, when next posed).
-      const rig: SimRig = old && (keep === 'rows' || old.who === who) ? Object.assign(old, { who, body, scale, size, head, stoop, build, asleep: false }) : {
+      const rig: SimRig = old && (keep === 'rows' || old.who === who) ? Object.assign(old, { who, body, scale, size, head, stoop, build, worn: null }) : {
         id: s.id,
         who,
         floorY: 0,
@@ -1537,9 +1597,8 @@ export class Characters {
         holdW: 0,
         liftW: 0,
         cuddleStep: 0,
-        day: null,
-        night: null,
-        asleep: false,
+        outfits: null,
+        worn: null,
         hands: HANDS.relaxed,
         stepTime: 0,
         emotion: 0,
@@ -1589,10 +1648,10 @@ export class Characters {
         speechSeg: 0,
       };
       this.sims[s.id] = rig;
-      rig.day = outfitFor(outfitId, s.gender, s.appearance, body);
-      rig.night = outfitFor(outfitId, s.gender, s.appearance, body, true);
-      rig.skirt = rig.day.parts.includes('bottom.skirt');
-      writeOutfit(rig.day, this.data, this.row(s.id) + set.bones.length * 16);
+      // (Day clothes until posed: `wearFor` then picks again.)
+      const fit = this.outfitFit(base);
+      rig.outfits = Object.fromEntries(WEARS.map((wear) => [wear, outfitFor(outfitId, s.gender, s.appearance, body, wear, fit)])) as Record<Wear, OutfitParams>;
+      this.wear(rig, s.id, rig.outfits.day);
     }
     for (const p of this.meshes.values()) p.mesh.setEnabled(false);
     for (const p of this.shadowMeshes.values()) p.mesh.setEnabled(false);
@@ -1627,7 +1686,7 @@ export class Characters {
       const stand = def?.stand ? { h: def.stand.height + lift, motion: def.stand.motion } : null;
       const paint = def?.held ? colorsKey(paintColors(this.assets.get(def.model, 'model'), o.colors)) : '';
       const held = def?.held ? { keys: [def.held.part].flat().map((part) => `${def.model}#${part}${paint ? `@${paint}` : ''}`), grip: def.held.grip } : null;
-      return { def: o.def, rot: o.rot, seat: { ...seat, h: seat.h + lift }, stand, held, lift, restful, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
+      return { def: o.def, rot: o.rot, seat: { ...seat, h: seat.h + lift }, stand, held, lift, restful, quilt: BLANKET_BEDS.has(o.def) ? this.beddingOf(o.def, def?.model, o.colors) : null, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
     });
     world.objects.forEach((o, j) => this.objectById.set(o.id, this.objects[j]));
     this.seatIds.clear();
@@ -1637,7 +1696,9 @@ export class Characters {
     const rows = this.sims.length;
     for (const [name, b] of this.blankets) {
       // `update` compacts the covered rows (a town of six must not draw 64 quilts' worth of triangles).
+      // With none, hidden: Babylon draws a mesh with no thin instances once as it is (at the origin).
       b.mesh.thinInstanceCount = 0;
+      b.mesh.isVisible = false;
       // (A life stage's quilt only where someone has that body: no draw call for nobody.)
       b.mesh.setEnabled(rows > 0 && beds && (b.base || bodies.has(name)));
     }
@@ -1902,11 +1963,13 @@ export class Characters {
     if (grip === 'guitar') {
       // Upright along its neck from where its body rests against the belly (in front of the spine's
       // base, a little to the right) to the left hand; its face to the front.
+      // (Out from the spine as far as the body's size: a child's belly is nearer it; clips/uses.ts `GUITAR_BODY`.)
       const t = this.scratch.worldT;
       const g = GUITAR;
-      const bx = t[B.spine_01 * 3] + (fx * g.out + fz * g.right) * s;
-      const by = t[B.spine_01 * 3 + 1] + (g.up + g.upShort * (1 - this.guitarReach(rig))) * s;
-      const bz = t[B.spine_01 * 3 + 2] + (fz * g.out - fx * g.right) * s;
+      const k = s * rig.size;
+      const bx = t[B.spine_01 * 3] + (fx * g.out + fz * g.right) * k;
+      const by = t[B.spine_01 * 3 + 1] + (g.up + g.upShort * (1 - this.guitarReach(rig))) * k;
+      const bz = t[B.spine_01 * 3 + 2] + (fz * g.out - fx * g.right) * k;
       unit(lx - bx, ly - by, lz - bz);
       const yx = UNIT[0];
       const yy = UNIT[1];
@@ -2446,12 +2509,6 @@ export class Characters {
         // dressing table's mirror, an upright piano); or along it (`Seat.along`: a bath), turned a quarter.
         if (seat?.back) faceYaw = wrapAngle(tyaw + Math.PI);
         else if (seat?.along) faceYaw = wrapAngle(tyaw + (seat.along * Math.PI) / 2);
-        // A ride sat facing along it to its middle (`RIDES` `face`: the seesaw's riders face each other).
-        const ride = useObj && RIDES[useObj.def];
-        if (useObj && ride?.face) {
-          const f = (useObj.rot * Math.PI) / 2;
-          faceYaw = wrapAngle(f + ((tx - useObj.cx) * Math.cos(f) - (tz - useObj.cz) * Math.sin(f) > 0 ? -1 : 1) * (Math.PI / 2));
-        }
       }
       // Cuddling: turned to the baby in the crib.
       const cuddled = rig.cuddleT >= 0 && rig.cuddleBaby >= 0 ? this.sims[rig.cuddleBaby] : null;
@@ -2531,12 +2588,9 @@ export class Characters {
         this.qA.set(set.sourceRestQ);
         this.pA.set(set.sourcePelvis);
       }
-      // Pyjamas in bed.
-      const asleep = pose === Pose.Lie && LYING.has(rig.cur.key) && w > 0.5 && (!rig.tagKnown || rig.tag === 'sleep' || rig.tag === 'nap');
-      if (asleep !== rig.asleep && rig.day && rig.night) {
-        rig.asleep = asleep;
-        writeOutfit(asleep ? rig.night : rig.day, this.data, this.row(i) + NB * 16);
-      }
+      // Clothes for what they're doing: pyjamas in bed for the night, a towel in the bath ...
+      const worn = rig.outfits?.[this.wearFor(rig, pose, moving, w, useObj, tag)];
+      if (worn && worn !== rig.worn) this.wear(rig, i, worn);
       // Hand pose: the clips clench fists; open them according to the activity.
       blendInto(this.qA, this.pA, set.sourceRestQ, this.pA, rig.hands, this.fingerMask);
 
@@ -2583,6 +2637,7 @@ export class Characters {
       if (ride) this.riding(ride);
       if (inArms > 0) this.cradled(rig, this.heldBy[i], inArms);
       skin(set, rig.body, this.qA, this.pA, this.add, pl, this.scratch, this.data, this.row(i), this.headTmp);
+      this.writeSit(rig, i);
       if (rig.cuddleBaby >= 0 && rig.liftW > 0) this.writeCradle(i);
       this.writeBlanket(rig, i, pose, dt, appeared);
       this.writeCarried(rig, i, item);
@@ -2612,6 +2667,7 @@ export class Characters {
     }
     if (this.ghosts.length) this.poseGhosts(count, dt, time);
     this.faceDetail(count + this.ghosts.length);
+    if (this.shadowsBare) this.bareShadows();
     this.writeRing(this.reducedMotion ? 0 : now * 0.001);
     for (let i = count + this.ghosts.length; i < MAX_CHARACTERS; i++) {
       if (!this.visible[i]) continue;
@@ -2623,8 +2679,11 @@ export class Characters {
       // (Nobody under it now or last frame: nothing to upload.)
       if (!b.drawn && !b.mesh.thinInstanceCount) continue;
       b.mesh.thinInstanceCount = b.drawn;
+      // (None: not drawn at all, rather than once as it is, at the origin.)
+      b.mesh.isVisible = b.drawn > 0;
       b.mesh.thinInstanceBufferUpdated('matrix');
       b.mesh.thinInstanceBufferUpdated('blanketExt');
+      b.mesh.thinInstanceBufferUpdated('blanketTint');
     }
     this.props.forEachBuilt(this.showProp);
     this.pullChairs();
@@ -2759,7 +2818,7 @@ export class Characters {
       if (social) key = speaking(pair, role, time) ? 'sitTalk' : 'sit';
       else if (ride) {
         // Astride a ride, the hands on its grips (`RIDES`).
-        key = this.rideClip(rig, obj!, ride);
+        key = this.sizedClip(rig, ride.sizes);
         hands = HANDS.grip;
       } else if (act?.sit) key = typeof act.sit === 'function' ? act.sit(rig.useDef) : act.sit;
       else if (!known && obj && SIT_HANDS.has(obj.def)) key = 'sitHands';
@@ -2780,13 +2839,14 @@ export class Characters {
       }
     } else if (moving) {
       // Walking, the cycle matched to the ground speed; faster than the walk can step (a sped-up
-      // game, short legs), jogging along.
+      // game, short legs), jogging along, and faster than that running (`GEARS`): the slowest gait
+      // that needn't go faster than its pace, a slower one than now only well within it.
       const legs = rig.body.pelvisScale * rig.scale;
-      const walk = rig.speed / (set.clips.get('walk')!.speed * legs);
-      const jog = set.clips.get('jogAlong');
-      const jogging = !!jog && walk > GAIT_MAX_RATE * (rig.cur.key === 'jogAlong' ? JOG_BACK : 1);
-      key = jogging ? 'jogAlong' : 'walk';
-      rate = clamp(jogging ? rig.speed / (jog!.speed * legs) : walk, 0.35, GAIT_MAX_RATE);
+      const now = GEARS.indexOf(rig.cur.key);
+      let gear = 0;
+      while (gear < GEARS.length - 1 && set.clips.has(GEARS[gear + 1]) && rig.speed / (set.clips.get(GEARS[gear])!.speed * legs) > GAIT_MAX_RATE * (gear < now ? JOG_BACK : 1)) gear++;
+      key = GEARS[gear];
+      rate = clamp(rig.speed / (set.clips.get(key)!.speed * legs), 0.35, gear === GEARS.length - 1 ? RUN_MAX_RATE : GAIT_MAX_RATE);
       fade = GAITS.has(rig.cur.key) ? 0.3 : 0.2;
       hands = HANDS.relaxed;
       rig.useObj = null;
@@ -2853,7 +2913,7 @@ export class Characters {
       rig.useDef = obj?.def ?? '';
       rig.useObj = obj ?? null;
       // Used from inside or up against it (`STEP_IN`): the clip for their height.
-      const into = known && obj ? STEP_IN[obj.def] : undefined;
+      const into = known && obj && (!STEP_IN[obj.def]?.tag || STEP_IN[obj.def].tag === tag) ? STEP_IN[obj.def] : undefined;
       const fitted = into ? this.stepSeq(rig, into) : undefined;
       // (Bouncing and vibrating on the equipment, content `stand`: the idle with `activityPose` on top.)
       const seq = fitted?.length
@@ -2861,13 +2921,17 @@ export class Characters {
         : known
         ? obj && HUGGED[obj.def]
           ? CROUCH_ONLY
-          : obj?.stand?.motion || obj?.held?.grip === 'pair' || obj?.held?.grip === 'guitar'
+          : obj?.held?.grip === 'guitar'
+          ? this.guitarReach(rig) < 0.5
+            ? STRUM_SHORT
+            : STRUM
+          : obj?.stand?.motion || obj?.held?.grip === 'pair'
           ? IDLE_ONLY
           : obj?.held?.grip === 'pole'
             ? PUSH_ONLY
           : act?.stand
             ? typeof act.stand === 'function'
-              ? act.stand(useObj?.def ?? '')
+              ? act.stand(useObj?.def ?? '', rig.body.height * rig.scale)
               : act.stand
             : undefined
         : obj
@@ -3034,20 +3098,6 @@ export class Characters {
     }
   }
 
-  /** The clip of `ride` (`RIDES`) for this rider: by their height, and on the merry-go-round by where they sit. */
-  private rideClip(rig: SimRig, obj: PlacedObject, ride: Ride): string {
-    const clip = this.sizedClip(rig, ride.sizes);
-    if (!ride.round) return clip;
-    const f = (obj.rot * Math.PI) / 2;
-    const [dx, dz] = [rig.tx - obj.cx, rig.tz - obj.cz];
-    // (Where the hips are: the slot, and the seat's forward offset from it.)
-    const right = dx * Math.cos(f) - dz * Math.sin(f);
-    const ahead = dx * Math.sin(f) + dz * Math.cos(f) + obj.seat.fwd;
-    // (The nearest rail: on the rider's right if it's further right than they sit.)
-    const rail = Math.sign(right || 1) * ROUND_RAILS.at;
-    return roundClip(clip, Math.hypot(right, ahead) > ROUND_RAILS.edge, rail > right ? 'r' : 'l');
-  }
-
   /** The clip of `sizes` (the bunk's ladder, `BUNK_LADDER`; a ride's, `RIDES`) for this resident's height. */
   private sizedClip(rig: SimRig, sizes: readonly { clip: string; min: number }[]): string {
     const h = rig.body.height * rig.scale;
@@ -3119,12 +3169,32 @@ export class Characters {
     rig.inDX = Math.cos(f) * across * k;
     rig.inDZ = -Math.sin(f) * across * k;
     // (Waiting to step in, standing about.)
-    if (k <= 0) return [fwd, y, into.wait ? 'idle' : key, 1];
-    if (k >= 1) return [fwd, y, key, 1];
+    if (k <= 0) return [fwd, y, into.wait || into.perLane ? 'idle' : key, 1];
+    // (Already there, or as good as: no steps.) Waiting for their turn, the use's sequence holds too.
+    if (k >= 1 || way < 0.05) {
+      if (rig.cur.key === key || this.inTurn(rig, into)) return [fwd, y, key, 1];
+      rig.stepTime = 0;
+      return [fwd, y, 'idle', 1];
+    }
     // Walking, the cycle matched to the step's pace (the walk runs on real time).
     const legs = rig.body.pelvisScale * rig.scale;
     const rate = dt > 0 ? ((way / span) * (step / dt)) / (this.clip('walk').speed * legs) : 1;
     return [fwd, y, 'walk', clamp(rate, 0.35, GAIT_MAX_RATE)];
+  }
+
+  /**
+   * Whether `rig`, stepped in to `into`, may start its round (`StepIn.perLane`): the lanes' rounds keep out
+   * of each other's way only in step (the climbing frame's second lane waits on the deck while the first
+   * slides down the pole), so with someone already going round, it waits standing at its lane until their
+   * round comes back to its start (`LANE_SYNC` s into it).
+   */
+  private inTurn(rig: SimRig, into: StepIn): boolean {
+    if (!into.perLane) return true;
+    for (const r of this.sims) {
+      if (!r || r === rig || r.inside !== into || r.useId !== rig.useId || !LANE_SEQ.has(r.cur.key) || !r.cur.clip) continue;
+      if (r.cur.time % r.cur.clip.duration > LANE_SYNC) return false;
+    }
+    return true;
   }
 
   /** The use of a thing used from inside (`STEP_IN`) is over: back out to the tile in front after its `out` seconds (`stepPlace`); none when drawn afresh. */
@@ -3574,25 +3644,6 @@ export class Characters {
           addRotation(add, B.Head, 1, 0, 0, 0.12);
         }
         break;
-      case 'music':
-        if (grip === 'guitar') {
-          // A guitar across the body (`writeHeld`): the left arm out to its neck, the right forearm over
-          // its body, strumming; the head bent to the strings, nodding with the music.
-          const { long: a, short: b } = GUITAR_ARMS;
-          const k = this.guitarReach(rig);
-          const strum = Math.sin(time * 7 + seed);
-          addRotation(add, B.upperarm_l, 0, 0, 1, lerp(b.leftOut, a.leftOut, k));
-          addRotation(add, B.upperarm_l, 1, 0, 0, lerp(b.leftUp, a.leftUp, k));
-          addRotation(add, B.lowerarm_l, 1, 0, 0, lerp(b.leftBend, a.leftBend, k));
-          addRotation(add, B.lowerarm_l, 0, 1, 0, lerp(b.leftIn, a.leftIn, k));
-          addRotation(add, B.upperarm_r, 0, 0, 1, lerp(b.rightOut, a.rightOut, k));
-          addRotation(add, B.upperarm_r, 1, 0, 0, lerp(b.rightUp, a.rightUp, k) + 0.06 * strum);
-          addRotation(add, B.lowerarm_r, 1, 0, 0, lerp(b.rightBend, a.rightBend, k));
-          addRotation(add, B.lowerarm_r, 0, 1, 0, lerp(b.rightIn, a.rightIn, k) + 0.12 * strum);
-          addRotation(add, B.Head, 1, 0, 0, 0.25 + Math.sin(time * 3.5 + seed) * 0.04);
-          addRotation(add, B.Head, 0, 1, 0, 0.15);
-        }
-        break;
       case 'relax': {
         const hugged = HUGGED[def];
         if (!hugged) break;
@@ -3617,7 +3668,7 @@ export class Characters {
       case 'look':
       case 'listen':
         // Talking to a plant, looking at a bird bath: eyes down to the object.
-        if (def && def !== 'telescope' && key !== 'rail') addRotation(add, B.Head, 1, 0, 0, 0.2);
+        if (def && def !== 'telescope') addRotation(add, B.Head, 1, 0, 0, 0.2);
         break;
       case 'exercise':
         if (rig.useObj?.stand?.motion === 'bounce') {
@@ -4051,6 +4102,96 @@ export class Characters {
   }
 
   /**
+   * What a Sim wears now (`Wear`): pyjamas for a night's sleep (lying in a bed, `sleep`), the shoes off
+   * for a nap on a bed (a thing slept in; on a sofa or a lounger, or outdoors, the day clothes stay as they
+   * are), a towel in the shower and sat in a bath (swimwear in a hot tub, `BATH_WEAR`), else the day clothes.
+   * They change as they lie back (the crossfade half done), sit down in the water or stop under the shower.
+   */
+  private wearFor(rig: SimRig, pose: number, moving: boolean, w: number, useObj: PlacedObject | null | undefined, tag: string): Wear {
+    if (moving) return 'day';
+    if (pose === Pose.Lie) {
+      if (!LYING.has(rig.cur.key) || w <= 0.5) return 'day';
+      // (A lying Sim whose use isn't known is taken to sleep, as its face and its quilt are.)
+      if (!rig.tagKnown || tag === 'sleep') return 'night';
+      return tag === 'nap' && rig.bed && this.sleptIn(rig.bed.def) ? 'rest' : 'day';
+    }
+    const def = useObj?.def ?? '';
+    const water = BATH_WEAR[def] ?? (tag === 'bath' || tag === 'shower' ? 'towel' : null);
+    return water && (pose === Pose.Sit || tag === 'shower') ? water : 'day';
+  }
+
+  /** Things slept in (a use tagged `sleep`: beds, the crib), by def (`wearFor`). */
+  private readonly beds = new Map<string, boolean>();
+  private sleptIn(def: string): boolean {
+    let bed = this.beds.get(def);
+    if (bed === undefined) this.beds.set(def, (bed = !!this.content?.object(def)?.interactions.some((x) => x.tags?.includes('sleep'))));
+    return bed;
+  }
+
+  /** Puts `worn` (one of its `outfits`) on Sim `i`: its appearance texels, and the shells it doesn't draw (`bare`). */
+  private wear(rig: SimRig, i: number, worn: OutfitParams): void {
+    rig.worn = worn;
+    writeOutfit(worn, this.data, this.row(i) + this.set!.bones.length * 16);
+    if (this.bare[i] !== worn.bare) this.shadowsBare = true;
+    this.bare[i] = worn.bare;
+    rig.skirt = worn.parts.includes('bottom.skirt') && !(worn.bare & SHELL_BITS.bottom);
+  }
+
+  /**
+   * How far Sim `i`'s thighs are turned forward from its hips, from its skinning matrices just written (0 at
+   * rest .. 1 as `sit` has them, `SIT_FLEX`; both thighs' mean, at its body's size): appearance texel 4 b, how much
+   * of the shells' seated corrective it wears (a skirt on the lap, not standing out round the seat; material.ts).
+   */
+  private writeSit(rig: SimRig, i: number): void {
+    const set = this.set!;
+    const d = this.data;
+    const row = this.row(i);
+    const p = row + set.bone.pelvis * 16;
+    let flex = 0;
+    for (const thigh of [set.bone.thigh_l, set.bone.thigh_r]) {
+      // The thigh's rest down (0, -1, 0) as posed, in the pelvis' rest frame (columns: the matrices are column-major).
+      const o = row + thigh * 16;
+      const y = -(d[p + 4] * d[o + 4] + d[p + 5] * d[o + 5] + d[p + 6] * d[o + 6]);
+      const z = -(d[p + 8] * d[o + 4] + d[p + 9] * d[o + 5] + d[p + 10] * d[o + 6]);
+      flex += Math.max(0, Math.atan2(z, -y));
+    }
+    // (From `SIT_FROM`: a stride's swing of the legs leaves the skirt as it hangs.)
+    d[row + set.bones.length * 16 + 18] = clamp((flex / 2 - SIT_FROM) / (SIT_FLEX - SIT_FROM), 0, 1) * rig.size;
+  }
+
+  /** Someone's `bare` changed: the shells' shadow copies are drawn again for the Sims that wear them now (`bareShadows`). */
+  private shadowsBare = false;
+
+  /**
+   * The shells' shadow copies drawn for the Sims whose clothes now draw them (the drawn shells are left out
+   * per frame, `faceDetail`; the shadow copies keep their rows, so only when someone's `bare` changes).
+   */
+  private bareShadows(): void {
+    this.shadowsBare = false;
+    for (const pm of this.shadowMeshes.values()) {
+      if (!pm.shell || !pm.mesh.isEnabled()) continue;
+      const ids = [...pm.all.filter((_, j) => j % 4 === 0)].filter((id) => !(pm.shell & this.bare[id]));
+      if (ids.length === pm.mesh.thinInstanceCount && ids.every((id, j) => pm.settings[j * 4] === id)) continue;
+      // (Nobody: not drawn, its rows kept.)
+      if (ids.length) {
+        const settings = new Float32Array(ids.length * 4);
+        ids.forEach((id, j) => (settings[j * 4] = settings[j * 4 + 1] = id));
+        pm.mesh.thinInstanceSetBuffer('bakedVertexAnimationSettingsInstanced', settings, 4, true);
+        pm.settings = settings;
+      }
+      pm.mesh.thinInstanceCount = ids.length;
+      pm.mesh.isVisible = ids.length > 0;
+    }
+  }
+
+  /** A base body's heights for the towel and swimwear (`OutfitFit`), from its joints at rest. */
+  private outfitFit(base: BodyData): OutfitFit {
+    const set = this.set!;
+    const y = (bone: string) => Matrix.FromArray(base.inverseBind, set.bone[bone] * 16).invert().m[13];
+    return { chest: (y('spine_03') + y('upperarm_l')) / 2, hip: y('thigh_l'), knee: y('calf_l') };
+  }
+
+  /**
    * Blanket over a Sim asleep in a bed: fitted to the slot (half of a double bed, or a single bed)
    * and to the bed's foot end, pulled up from the foot end over ~0.5 s once the Sim lies flat (and
    * pushed back down as they get up); not drawn otherwise. A quilt is drawn only for the Sims covered
@@ -4099,6 +4240,8 @@ export class Characters {
     // under it (`BlanketPlugin`), so nothing shows through it on the way up or down.
     blanket.ext[d * 2 + 1] = c >= 1 ? -9 : blanket.footZ - (blanket.footZ - blanket.topZ + 0.02) * c;
     const sx = (slot / BLANKET_WIDTH) * (0.9 + 0.1 * c);
+    // In the bed's own bedding colour.
+    quiltTint(bed.quilt?.colour ?? (bed.quilt && this.beddingColours.get(bed.quilt.key)) ?? QUILT_COLOUR, blanket.tint, d * 3);
     // Two Sims in one bed: offset the quilts a hair so their tops don't z-fight where they meet.
     const lift = (i % 2) * 0.004;
     // Rows: x axis, y axis, z axis, translation (Babylon row-vector layout).
@@ -4125,11 +4268,34 @@ export class Characters {
     const shape = buildBlanket(this.scene, `simBlanket:${body.name}`, lying.positions, lying.chestZ, lying.feetZ, this.quilt!);
     const matrices = new Float32Array(MAX_CHARACTERS * 16);
     const ext = new Float32Array(MAX_CHARACTERS * 2);
+    const tint = new Float32Array(MAX_CHARACTERS * 3);
     shape.mesh.thinInstanceSetBuffer('matrix', matrices, 16, false);
     shape.mesh.thinInstanceSetBuffer('blanketExt', ext, 2, false);
+    shape.mesh.thinInstanceSetBuffer('blanketTint', tint, 3, false);
     shape.mesh.thinInstanceCount = 0;
+    shape.mesh.isVisible = false;
     shape.mesh.setEnabled(false);
-    this.blankets.set(body.name, { ...shape, matrices, ext, drawn: 0, base: body.name === body.family });
+    this.blankets.set(body.name, { ...shape, matrices, ext, tint, drawn: 0, base: body.name === body.family });
+  }
+
+  /**
+   * A bed's bedding (`PlacedObject.quilt`): the part `QUILT_PART` names or its "Bedding", in the colour the
+   * player gave it, else the file's own (looked up once per model, `beddingColours`); null without one.
+   */
+  private beddingOf(id: string, model: string | undefined, colors: PartColors | undefined): PlacedObject['quilt'] {
+    const entry = model ? this.assets.get(model, 'model') : undefined;
+    const part = QUILT_PART[id] ?? paintSlots(entry).find((s) => s.label === 'Bedding')?.material;
+    if (!part) return null;
+    const key = `${model}#${part}`;
+    const colour = colors?.[part];
+    if (!colour && !this.beddingColours.has(key)) {
+      this.beddingColours.set(key, null);
+      fileColour(this.scene, entry, part).then(
+        (c) => this.beddingColours.set(key, c ?? null),
+        () => this.beddingColours.delete(key),
+      );
+    }
+    return { key, colour };
   }
 
   /**
@@ -4380,7 +4546,7 @@ export class Characters {
     mesh.doNotSyncBoundingInfo = true;
     mesh.freezeWorldMatrix();
     const range = shadow ? Range.Always : part.startsWith('lod.') ? Range.Far : part === 'body' || /^(body|top|bottom|shoes)\./.test(part) ? Range.Near : Range.Always;
-    const pm: PartMesh = { mesh, settings: new Float32Array(0), all: new Float32Array(0), detail: shadow ? 0 : (DETAIL_PX[part] ?? 0), range };
+    const pm: PartMesh = { mesh, settings: new Float32Array(0), all: new Float32Array(0), detail: shadow ? 0 : (DETAIL_PX[part] ?? 0), range, shell: shellBit(part) };
     meshes.set(key, pm);
     if (!shadow) this.parts.set(mesh, pm);
     return pm;
@@ -4457,6 +4623,7 @@ export class Characters {
         const id = all[j];
         if (px[id] < pm.detail) continue;
         if (ranged && (far[id] === 1) === near) continue;
+        if (pm.shell & this.bare[id]) continue;
         if (out[n * 4] !== id) {
           out[n * 4] = out[n * 4 + 1] = id;
           changed = true;

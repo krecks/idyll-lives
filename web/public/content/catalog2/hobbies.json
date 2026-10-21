@@ -22,6 +22,7 @@
           "id": "drum",
           "label": "Play the drums",
           "anim": "music",
+          "sound": "drums",
           "minutes": 30,
           "pose": "sit",
           "effects": {
@@ -40,6 +41,7 @@
           "id": "practise",
           "label": "Practise drum rolls",
           "anim": "music",
+          "sound": "drums",
           "minutes": 60,
           "pose": "sit",
           "effects": {

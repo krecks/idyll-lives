@@ -120,8 +120,8 @@ export class Geo {
     else this.idx.push(a, c, b);
   }
 
-  /** Uploads the geometry into a new static mesh (null when empty). */
-  toMesh(name: string, scene: Scene, options: { colors?: boolean; cut?: boolean } = {}): Mesh | null {
+  /** Uploads the geometry into a new static mesh (null when empty); `updatable` to change its vertices later. */
+  toMesh(name: string, scene: Scene, options: { colors?: boolean; cut?: boolean; updatable?: boolean } = {}): Mesh | null {
     if (this.empty) return null;
     const mesh = new Mesh(name, scene);
     const data = new VertexData();
@@ -130,7 +130,7 @@ export class Geo {
     data.uvs = new Float32Array(this.uv);
     data.indices = this.pos.length / 3 > 65535 ? new Uint32Array(this.idx) : new Uint16Array(this.idx);
     if (options.colors) data.colors = new Float32Array(this.col);
-    data.applyToMesh(mesh, false);
+    data.applyToMesh(mesh, options.updatable ?? false);
     if (options.cut) mesh.setVerticesData(WALL_CUT_KIND, new Float32Array(this.cut), false, 4);
     if (options.colors && this.col.some((v, i) => i % 4 === 3 && v < 1)) mesh.hasVertexAlpha = true;
     return mesh;

@@ -175,10 +175,14 @@ export class Landscape {
   /** Each model's plants as built, to build again when a file they were built without comes (`rebuild`). */
   private batches: Batch[] = [];
 
-  /** `lawnDensity`: the share of the lawn's tufts and flowers drawn (Low: half). */
+  /**
+   * `lawnDensity`: the share of the lawn's tufts and flowers drawn (Low: half); `lawnLod` 1 draws
+   * them in their far versions (Low, as the street's models: `QualitySettings.streetLod`).
+   */
   constructor(
     world: WorldStructure,
     private readonly lawnDensity = 1,
+    private readonly lawnLod: 0 | 1 = 0,
   ) {
     this.seed = world.meta?.seed ?? 1;
     this.w = world.width;
@@ -581,8 +585,9 @@ export class Landscape {
       // (Flowers are sparse: too few triangles for groups to pay.)
       ['model.flowers', thin(flowers), thin(flowerTiles), undefined],
     ] as const) {
-      const built = await instanced(scene, assets, key, matrices, 0, false, cell, pace);
-      this.batches.push(batch({ key, matrices, lod: 0, fixed: false, cell, tiles }, false, built));
+      const lod = this.lawnLod;
+      const built = await instanced(scene, assets, key, matrices, lod, false, cell, pace);
+      this.batches.push(batch({ key, matrices, lod, fixed: false, cell, tiles }, false, built));
       this.lawn.push(...lawnLayers(built, matrices, tiles));
     }
     this.refreshLawn(world);

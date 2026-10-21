@@ -38,6 +38,7 @@
           "id": "soak",
           "label": "Soak in the tub",
           "anim": "bath",
+          "sound": "bathSoak",
           "minutes": 45,
           "pose": "sit",
           "effects": { "comfort": 0.8, "hygiene": 0.25, "fun": 0.15 },

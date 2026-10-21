@@ -112,8 +112,11 @@ fields) load unchanged: both mergers rename the keys first (`LEGACY_KEYS` in `pa
 | `bunk` | Bunk beds (2 `slots`): both sleepers lie in the middle of the bed's width, the second on the upper bunk (heights per object in `render/babylon/characters/furniture.json`, `bunks`). Its model can play a clip per bunk (`motions.uses` with `slot`: docs/design/objects.md, "Moving parts"). |
 | `stages` | Who may use it at their age: life stages (`life.stages` ids), `["child"]` for the kids' furniture and the toddler rides, `["youngAdult", "adult", "elder"]` for wine. For every interaction without `stages` of its own (or a recipe's, below). The player's order fails ("Dee is too young to pour a glass of wine", "Ada is too big for the rocking horse"), residents never choose it, and the pie menu greys it out; a seat (a `sit` interaction) out of their stages is no seat for them to eat, phone or watch TV on. Within a rank, a diner takes a seat made for their age first (a seat whose stages leave someone out: a child has a snack at the kids' table). An unknown id or an empty list is an error. Default: every stage but a baby's (and for a `baby` interaction, a baby's). |
 | `upperStages` | Bunk beds: the life stages that may take the upper bunk (base game: not an elder). With the lower bunk taken by someone else, anyone else is refused ("Gran is too old for the top bunk") and doesn't choose it. Only with `bunk`. Default: everyone who may use the bed. |
-| `slots` | How many residents use it at once, 1 to 4 (double bed, sofa, a long sofa for 3, a merry-go-round for 4), spread across its width. Default 1. |
+| `slots` | How many residents use it at once, 1 to 4 (double bed, sofa, a long sofa for 3, a merry-go-round for 4), spread across its width, facing its front (unless `places` puts them). Default 1. |
+| `places` | Where each slot's user sits, lies or stands and which way they face, one a slot: `[{"at": [-0.3, 0.7], "facing": 180}, {"at": [-0.3, -0.7]}]` (a picnic table's two, across it from each other). `at`: metres off the footprint's middle, to the object's right and front, before turning (a resized object moves them out with its size); within 1.5 m of the footprint. `facing`: degrees from the object's front towards its right (90 faces its right, 180 its back, -90 its left; default 0). A resident takes the free slot whose place is nearest them. Sitting or lying, they walk to the first tile off the footprint behind their place (round to a picnic table's far bench) and sit or lie at it, the seat's `forward` then measured along their facing (give the depth in `at` and keep `forward` 0); standing, they walk to a place off the footprint and stand on it (the two ends of a ping-pong table). A tile that can't be stood on (a wall, furniture) sends them to the object's own tile in front, as without places. Floor things only, not a `bunk`. Default: spread across its width, facing its front. |
 | `light` | Lamps: `{"range": 4.5, "intensity": 1, "height": 1.55, "tiles": 10}` makes it a light at night (reach in metres, relative brightness, bulb height; `at`: `[x, z]`, where the bulb is off the middle of its footprint, metres in its own frame before turning, for a lamp whose shade isn't over its middle (an arc lamp, a lamp at one end of its table), default `[0, 0]`; `tiles`: floor it lights fully as its room's light is scored, default `roomRules.lampTiles`: a chandelier ~25, a ceiling light ~16, a floor lamp ~10, a sconce ~5, a table lamp ~4–6; `switch`: `false` for a light nobody switches, a fire: it is lit every night. Other lamps can be switched off, one by one by the player, and a room's all together by residents coming and going after dark; one that's off gives no light and its shade no glow). |
+| `sounds` | What's done at it sounds like (looks only, the renderer's world sounds), by animation tag: `{"stir": "none"}` (an oven: a bake doesn't fry), `{"wash": "crockery"}` (a dishwasher: dishes go in without a running tap). For its uses without a `sound` and the cooking steps done at it as a station. Keys: `sizzle`, `chop`, `shower`, `tap`, `washUp`, `bathFill`, `bathSoak`, `washer`, `dryer`, `crockery`, `fountain`, `tv`, `music`, `drums` (`web/src/audio/world.ts` `LOOPS`), or `none` for silence. Default: by the animation (`ACTION_SOUNDS`). |
+| `ambient` | A world sound it makes by itself, used or not, while its lot is looked at (a key as for `sounds`): `"fountain"`. A broken one is silent. |
 | `stations` | Cooking stations it is (see [Cooking](#cooking)): `["ingredients"]` for a fridge or pantry, `["prep"]` for a counter or island, `["stove", "oven"]` for a cooker, `["grill"]`, `["microwave"]`, `["dishes"]` for a sink or dishwasher, `["cupboard"]` for a wall cabinet, sideboard or china cabinet (clean things are put away there). Recipe steps happen at stations. A station with no interactions (a wall cabinet) is used only while the tile in front of it is free. |
 | `provides` | Things it provides while it works, for interactions elsewhere on the same lot that list them in `requires`: `["coffee"]` for a coffee machine. A broken object provides nothing. |
 | `stores` | Fridges: keeps leftovers. Food served where no surface is free goes in, and keeps longer there (`cooking.storedSpoilHours`). Default `false`. |
@@ -156,6 +159,7 @@ fields) load unchanged: both mergers rename the keys first (`LEGACY_KEYS` in `pa
 | `skills` | Skill id → levels gained per hour of use (before the per-level slowdown). |
 | `pose` | `stand` (default), `sit` or `lie`. |
 | `seatNear` | Sit on a free seat within this many metres of the object before using it, if there is one (watching TV from the sofa). The resident walks to the seat, sits facing the way it faces, and uses the object from there; the seat is reserved while they do. Seats are sitting interactions with a `cooking.seatTags` tag and no `seatAvoid` tag. Default 0 (use the object standing in front of it). |
+| `seatFacing` | With `seatNear`: only a seat that looks at the object, within 60° of straight ahead (the place they would take on it, see `places`): `front` from in front of it too, within 60° of the way it faces (a screen: no sofa with its back to the TV, none behind it); `around` from any side (a fire pit). With no seat like that near, it is used as `pose` says (standing). Default: any seat near. |
 | `inside` | Used standing on the object rather than in front of it: the resident steps in onto its centre (or its slot), facing the way it faces, and steps back out where they came from when done (the same as sitting down and getting up). Every shower has it. Default `false`. |
 | `autonomous` | `false` = only when the player asks. Default `true`. |
 | `stages` | Who may take it at their age (life-stage ids), as the object's `stages` (above), which it overrides: the party bar's *Mix drinks for everyone* is for grown-ups, its soda for anyone. Default: its recipe's `stages`, else its object's. A `baby` interaction can't name another stage. Two rules hold whatever the stages: `homework` is done only by pupils (an order fails with "… has no homework to do"), and `care` only by grown-ups ("… is too young to look after a baby"), with a baby there ("there's no baby in the crib"). |
@@ -173,6 +177,8 @@ fields) load unchanged: both mergers rename the keys first (`LEGACY_KEYS` in `pa
 | `feeling` | Feeling id granted when the interaction finishes after at least half its `minutes` (not when cancelled early). |
 | `feelingMinSkill` | Only grant `feeling` if the resident's whole level in `skill` is at least this (needs `skill` and `feeling`). Default 0. |
 | `dirt` | Mess each use leaves on the tiles around the object (0..1). Default: by tag, `roomRules.dirt` (cooking 0.12, food 0.06, bathroom 0.05, hygiene 0.04). |
+| `sound` | What it sounds like while it lasts (looks only): a world sound key (as for the object's `sounds`), `"chop"` for a cheese board, or `"none"` (toast doesn't fry). Default: the object's `sounds` for its `anim`, else by `anim`. Not for a `recipe`: its steps sound by the station they're done at (and a step's own `sound`). |
+| `endSound` | A sound played once as it ends: `"flush"` (toilets). |
 
 ### How the multipliers stack
 
@@ -311,9 +317,11 @@ voices pick their lines by them.
 | `idle` | standing at an object with nothing better to show (donation jar) |
 | `fetch` | taking ingredients out of the fridge or pantry (a recipe's first step) |
 | `chop` | preparing food on a counter (a chopping board is drawn on its top) |
-| `stir` | cooking on the stove or baking (a pan is drawn on it) |
+| `stir` | cooking on the stove (a pan is drawn on it) |
 | `flip` | grilling (food is drawn on the grill) |
 | `serve` | putting a dish down |
+| `mix` | mixing batter or making pastry on a counter (a mixing bowl is drawn on its top) |
+| `bake` | putting a dish in the oven or the microwave and watching it (nothing drawn: it's inside) |
 
 **Adding an animation:** reuse a tag whenever one is close enough; the characters need a
 clip for every tag. If you must add one, append it to a top-level `"animations"` list in
@@ -693,7 +701,8 @@ the home needs a sink or dishwasher).
   "steps": [
     { "label": "Get ingredients", "at": ["ingredients"], "minutes": 3, "anim": "fetch", "holds": "ingredients" },
     { "label": "Prep", "at": ["prep"], "minutes": 10, "anim": "chop", "optional": true, "holds": "prepBowl" },
-    { "label": "Cook", "at": ["stove", "oven", "microwave"], "minutes": 20, "anim": "stir", "optional": true }
+    { "label": "Cook", "at": ["stove", "oven", "microwave"], "minutes": 20, "anim": "stir",
+      "animAt": { "oven": "bake", "microwave": "bake" }, "optional": true }
   ]
 }]
 ```
@@ -709,7 +718,7 @@ the home needs a sink or dishwasher).
 | `eatNow` | The cook eats it at once (a sandwich): no dish is served. |
 | `outdoor` | A barbecue: outdoor stations first, served on an outdoor table. |
 | `stages` | Who may cook it (life-stage ids), for every interaction that starts it without `stages` of its own (see the interactions' `stages`). Base game: a recipe with a hot step (stove, oven, grill) is for teens and up; the sandwich for anyone. |
-| `steps` | In order: `at` (stations, the first preferred; the one clicked is used when it's one of them), `minutes`, `anim`, `label`, `optional` (done without when the home has none: the dish is a little plainer, and its minutes are spent at the next step that has a station, or, with none after it, at the last one that has: no counter means chopping by the stove, a fridge-only kitchen makes the whole meal at the fridge) and `holds` (an item carried away from it). |
+| `steps` | In order: `at` (stations, the first preferred; the one clicked is used when it's one of them), `minutes`, `anim`, `animAt` (another `anim` at some of its stations, `{"oven": "bake"}`: the station object's first kind in `at` decides, so a cooker, a stove and an oven, stirs on its hob; the station's moving parts play by this tag, as they do by an interaction's id), `label`, `optional` (done without when the home has none: the dish is a little plainer, and its minutes are spent at the next step that has a station, or, with none after it, at the last one that has: no counter means chopping by the stove, a fridge-only kitchen makes the whole meal at the fridge) and `holds` (an item carried away from it), and `sound` (looks only: what it sounds like over the station's `sounds`, `"none"` for a bake, which a cooker's hob would otherwise sizzle). |
 
 Residents choose a recipe only if their home has a station for every step that isn't
 optional; a long recipe tempts them less, a hungry family more, and food already made hardly

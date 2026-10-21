@@ -226,7 +226,7 @@ Performance budget: a sim tick under **1 ms for 8 residents** and under **3 ms f
 
 **As built (0.3.0)**, where it differs from the plan above:
 - **Shadows:** one sun shadow map over a fixed area round the lot, 1024, 2048 or 4096 by preset. It draws only the casters that can reach that area (about 150 shadow draws by day in the village, from 242), and only when something in it changed: the light, the casters, a thing placed or moved, roofs and storeys, or a resident's pose. Paused, in Build mode and behind menus it isn't drawn at all; in live play, with residents in view, it still is every frame, as they breathe. On Low (0.3.0) the residents, the street and the woods cast no sun shadows, and the lot's furniture casts from one merged mesh: one shadow draw instead of about a hundred.
-- **Lamps:** clustered, up to 32, on Medium and High; the four nearest the biggest rooms on Low.
+- **Lamps:** clustered, up to 32, on Medium and High; the four nearest the biggest rooms on Low. They are spot lights: a shade sends its light down, up, out from its wall or off the ceiling (content `light.aim`), the rest light all round. The lamps don't light the landscape; the garden's lamps cast pools of light on the lawn instead (`gardenPools.ts`), as the street's do.
 - **Effects:** no ambient occlusion (removed in 0.2.0), bloom or tilt-shift. There is ACES tone mapping, a vignette and a night grade ([docs/design/look.md](docs/design/look.md)).
 - **No GPU culling:** there are no compute shaders or `drawIndirect`. Culling is Babylon's frustum culling on the CPU, and build effects use CPU particles.
 - **Snapshot rendering** replays only the menus' town; the game draws live.

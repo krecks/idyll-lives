@@ -93,6 +93,9 @@
       "category": "kitchen",
       "slots": 1,
       "description": "A roomy counter and oven for baking pies and treats to share; better bakers feed the family better, and Cooking 4+ bakes leave residents glowing and extra charming.",
+      "sounds": {
+        "stir": "none"
+      },
       "interactions": [
         {
           "id": "familyPie",
@@ -240,6 +243,10 @@
       "price": 700,
       "category": "living",
       "slots": 2,
+      "places": [
+        { "at": [-0.5, 0], "facing": 45 },
+        { "at": [0.5, 0], "facing": -45 }
+      ],
       "description": "A low table with two cushions and an always-warm teapot where two residents share tea and talk; charming hosts (Charisma 2+) come away warm-hearted.",
       "interactions": [
         {

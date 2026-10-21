@@ -642,12 +642,14 @@ export class BuildBuyInput {
     if (layer === 'ceiling' && def.hangsLow && over((o) => on(o, 'floor'))) return 'Hangs too low over the furniture there';
     if (layer === 'floor' && def.fillsWall && over((o) => on(o, 'wall', 'ceiling'))) return 'Too tall for what hangs there';
     if (layer === 'floor' && over((o) => !!o.hangsLow)) return 'Something hangs too low there';
-    if (layer === 'wall') {
+    // On a wall, or built to stand against one (`againstWall`): its back all along a wall.
+    if (layer === 'wall' || (layer === 'floor' && def.againstWall)) {
       const backs: { axis: Axis; x: number; z: number }[] = [];
       for (let tx = x; tx < x + w; tx++) if (rot % 4 === 0 || rot % 4 === 2) backs.push({ axis: 'h', x: tx, z: rot % 4 === 0 ? z : z + d });
       for (let tz = z; tz < z + d; tz++) if (rot % 4 === 1 || rot % 4 === 3) backs.push({ axis: 'v', x: rot % 4 === 1 ? x : x + w, z: tz });
-      if (!backs.every((e) => ['wall', 'window'].includes(this.edgeState(e)))) return 'Hangs on a wall';
-      if (!def.overWindow && backs.some((e) => this.edgeState(e) === 'window')) return 'Not over a window';
+      const hangs = layer === 'wall';
+      if (!backs.every((e) => ['wall', 'window'].includes(this.edgeState(e)))) return hangs ? 'Hangs on a wall' : 'Stands against a wall';
+      if (!def.overWindow && backs.some((e) => this.edgeState(e) === 'window')) return hangs ? 'Not over a window' : 'Not against a window';
     }
     // Something nobody uses needn't be reached (a picture, a rug, a table chairs go all round);
     // a chair pulled up to a table is used from any free side.
@@ -712,7 +714,7 @@ export class BuildBuyInput {
     const home = this.home();
     return ({ tile: [tx, tz], inner: [ix, iz] }) =>
       !!home && tx >= home.x && tz >= home.z && tx < home.x + home.w && tz < home.z + home.d &&
-      !this.taken('floor', tx, tz, moving) && !this.takenBy(tx, tz, moving, (o) => !!o.hangsLow) && !this.diagonals.has(`${tx}:${tz}`) && !this.wallBetween(ix, iz, tx, tz);
+      !this.taken('floor', tx, tz, moving) && !this.takenBy(tx, tz, moving, (o) => !!o.hangsLow || !!o.headHeight) && !this.diagonals.has(`${tx}:${tz}`) && !this.wallBetween(ix, iz, tx, tz);
   }
 
   /** Whether a wall (with or without a door or window) stands between two neighbouring tiles. */

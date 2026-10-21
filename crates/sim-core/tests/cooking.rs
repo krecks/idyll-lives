@@ -230,14 +230,55 @@ fn a_dishwasher_does_the_washing_up_too() {
         });
     }
     let mut washing = false;
+    let dishwasher = w.objects[SINK as usize].def as f32;
     for _ in 0..(120.0 / sim_core::MINUTES_PER_TICK) as u32 {
         w.tick_once();
-        washing |= w.sims.iter().any(|s| {
-            s.current().is_some_and(|a| matches!(a.task.kind, TaskKind::Dishes { station: Some(SINK), .. }) && matches!(a.phase, Phase::Using { .. }))
-        });
+        for (i, s) in w.sims.iter().enumerate() {
+            if s.current().is_some_and(|a| matches!(a.task.kind, TaskKind::Dishes { station: Some(SINK), .. }) && matches!(a.phase, Phase::Using { .. })) {
+                washing = true;
+                // The renderer tells a dishwasher from a sink by it (its door, its sound).
+                assert_eq!(row(&w, i)[snapshot::sim::OBJECT_DEF], dishwasher, "the station's kind");
+            }
+        }
     }
     assert!(washing, "washed up at the dishwasher");
     assert!(w.items.list.is_empty(), "left: {:?}", w.items.list);
+}
+
+#[test]
+fn a_step_has_its_own_animation_at_some_stations() {
+    // A meal cooked in the microwave is put in, not stirred (`animAt`); on a cooker's hob it's stirred.
+    let content = CONTENT
+        .replace(r#""stir","flip","sit"]"#, r#""stir","flip","sit","bake"]"#)
+        .replace(
+            r#"{"label":"Cook","at":["stove","microwave"],"minutes":20,"anim":"stir","optional":true}"#,
+            r#"{"label":"Cook","at":["stove","microwave"],"minutes":20,"anim":"stir","animAt":{"microwave":"bake"},"optional":true}"#,
+        )
+        .replace(r#"{"id":"dishwasher","#, r#"{"id":"microwave","name":"Microwave","price":100,"stations":["microwave"]},{"id":"dishwasher","#);
+    let anim = |w: &World, name: &str| w.content.animations.iter().position(|a| a == name).unwrap() as f32;
+    let seen = |kitchen: &str| {
+        let mut w = World::from_json(&content, &town(kitchen, 1), 3).unwrap();
+        w.autonomy = false;
+        w.sims[0].needs = [1.0; 8];
+        order(&mut w, 0, FRIDGE, "meal");
+        let cooker = w.objects[2].stable as f32;
+        let mut seen = Vec::new();
+        for _ in 0..(60.0 / sim_core::MINUTES_PER_TICK) as u32 {
+            w.tick_once();
+            let r = row(&w, 0);
+            if r[snapshot::sim::OBJECT] == cooker && r[snapshot::sim::ACTION] >= 0.0 && !seen.contains(&r[snapshot::sim::ACTION]) {
+                seen.push(r[snapshot::sim::ACTION]);
+            }
+        }
+        (seen, anim(&w, "bake"), anim(&w, "stir"))
+    };
+    let (microwave, bake, _) = seen(&KITCHEN.replace(r#""def":"stove""#, r#""def":"microwave""#));
+    assert_eq!(microwave, [bake], "put in the microwave");
+    let (stove, _, stir) = seen(KITCHEN);
+    assert_eq!(stove, [stir], "stirred on the hob");
+    // `animAt` names one of the step's stations.
+    let bad = content.replace(r#""animAt":{"microwave":"bake"}"#, r#""animAt":{"grill":"bake"}"#);
+    assert!(World::from_json(&bad, &town(KITCHEN, 1), 3).is_err());
 }
 
 #[test]

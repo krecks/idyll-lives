@@ -270,17 +270,20 @@
       "description": "A walnut bedside chest with three drawers.",
       "interactions": [
         {
-          "id": "outfit",
-          "label": "Pick an outfit",
-          "anim": "clean",
-          "minutes": 10,
+          "id": "snack",
+          "label": "Grab a snack from the drawer",
+          "anim": "fetch",
+          "minutes": 2,
+          "eat": {
+            "item": "snack",
+            "minutes": 6
+          },
           "effects": {
-            "comfort": 0.05
+            "hunger": 0.2
           },
           "tags": [
-            "lounge"
-          ],
-          "autonomous": false
+            "food"
+          ]
         }
       ]
     },
@@ -511,7 +514,7 @@
         {
           "id": "primp",
           "label": "Check the mirror",
-          "anim": "look",
+          "anim": "idle",
           "minutes": 5,
           "effects": {
             "comfort": 0.03
@@ -521,6 +524,21 @@
           ],
           "skills": {
             "charisma": 0.04
+          }
+        },
+        {
+          "id": "speech",
+          "label": "Practise a speech",
+          "anim": "talk",
+          "minutes": 30,
+          "effects": {
+            "social": 0.05
+          },
+          "tags": [
+            "training"
+          ],
+          "skills": {
+            "charisma": 0.18
           }
         }
       ]

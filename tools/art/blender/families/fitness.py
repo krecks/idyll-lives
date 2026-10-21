@@ -52,7 +52,8 @@ def _dumbbell(F, name, x, y, z, w, along='x'):
 
 
 # --- the treadmill: belt along the depth, the console at the back; the runner faces the back -------------
-SLAT = 0.1       # the slats' pitch: the belt's loop moves them one on
+SLAT = 0.3       # the slats' pitch: the belt's loop moves them one on
+BELT_SECONDS = 0.13   # one slat on in 0.13 s (the clip, 4 frames at 30 a second): 2.25 m/s, a run
 HOOD = -0.63     # the motor hood's front edge (the belt comes out from under it)
 CAP = 0.80       # the rear roller cap's front edge (the belt goes under it)
 CON, TILT = (0, 1.3, -0.58), -35   # the console's middle, tilted back to face the runner
@@ -85,19 +86,20 @@ def treadmill():
         F.cyl('bottle', 0.035, 0.18, (0.39, 1.0, -0.68), M.bottle, verts=14, bevel=0.01)
         F.cyl('bottle_cap', 0.022, 0.03, (0.39, 1.1, -0.68), M.dark, verts=12)
     G.join(still, 'body', origin=(0, 0, 0))
-    # The slats: from just under the hood to just short of the cap, so one slat on they are still hidden.
+    # The slats: the first under the hood, the last one slat short of the cap's far edge, so one slat on (the loop)
+    # the first comes out from under the hood where the second was and the last goes under the cap.
     with G.new_parts() as parts:
-        z = HOOD - 0.05
+        last = CAP + 0.105 - SLAT
         k = 0
-        while z + SLAT <= CAP + 0.04:
-            F.box(f'slat{k}', 0.54, 0.004, 0.03, (0, 0.154, z), M.slat)
-            z += SLAT
+        while last - k * SLAT > HOOD - SLAT:
+            F.box(f'slat{k}', 0.54, 0.004, 0.03, (0, 0.154, last - k * SLAT), M.slat)
             k += 1
     slats = G.join(parts, 'slats')
     G.settle(centre=False)
-    # Back towards the rear (game +z) at 0.4 m/s: slower than a jog, but faster blurs the slats, which move a
-    # third of their pitch a frame at 30 frames a second even at the fastest game speed (2.5x).
-    G.scroll(slats, 'belt_run', (0, -SLAT, 0), seconds=0.25)
+    # Back towards the rear (game +z) at a running pace, 2.25 m/s (a slat each 0.13 s, `BELT_SECONDS`): a
+    # long pitch keeps each frame's move under half of it, so the slats are seen going back, not jittering, at
+    # 60 frames a second up to the fastest game speed (2.5x: 9 cm a frame of the 30).
+    G.scroll(slats, 'belt_run', (0, -SLAT, 0), seconds=BELT_SECONDS)
     return G.meshes()
 
 

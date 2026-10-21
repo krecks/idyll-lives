@@ -407,7 +407,8 @@ town overview, override pack `packs/playground/manifest.json`) is built in Blend
 `tools/art/blender/families/playground.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The seesaw's
 plank, the spring rider's horse and the merry-go-round's platform go round while they are played on, carrying their
 riders; the hoop's net swishes after a shot and a pawn moves on the chess table; the slide, the climbing frame and the
-ping-pong table are static.
+ping-pong table are static. The chess table was rebuilt with a stool either side, its players facing each other
+(2026-10-21).
 
 The farm (`models/farm/barn.glb`, `silo.glb`, `tractor.glb`, `hayBale.glb`, `hayStack.glb`, `scarecrow.glb`,
 `trough.glb`, `coop.glb`, each with a `.far.glb` for the town overview, override pack `packs/farm/manifest.json`) is
@@ -438,10 +439,10 @@ shuts behind the caller, and the town fountain's water runs near the camera (`wa
 litter bin, the bus shelter, the notice board and the founder's statue are static.
 
 The street's dressing props (`models/street/bench.glb`, `planter.glb`, `flowerTub.glb`, `sign.glb`, `busSign.glb`,
-`pot.glb`, `pathLight.glb`, `hedge.glb`, `flowers.glb`, each with a `.far.glb` for the town overview, override pack
+`pot.glb`, `pathLight.glb`, `flowers.glb`, each with a `.far.glb` for the town overview, override pack
 `packs/street/manifest.json`) are built in Blender by `tools/art/blender/families/street.py` on `gamekit` and exported
 as `.glb` (glTF, original, CC0): the kerbside bench, the planter with its little tree, the flower tub, the street-name
-and bus-stop signs, the door pot, the garden path light (its lens glows at night), the street hedge and the flower
+and bus-stop signs, the door pot, the garden path light (its lens glows at night) and the flower
 clump. All are static; their leaves and flowers sway in the wind.
 
 The garden things and lights (`models/garden_things/pond.glb`, `planterBox.glb`, `birdhouse.glb`,
@@ -467,7 +468,7 @@ cassette door tips open, and the electric fire's flames grow while a resident wa
 The things residents carry and cook with (`models/held/*.glb`: the bag of shopping, the prep bowl, the stew pot and
 the dirty pot, the tasting board, the grill platter and the dirty platter, the pizza, the baking tray and the dirty
 tray, the pie, the plates of stew, pizza, treats, pie and a sandwich, the dirty plate, and the chopping board, the
-pan and the food on the grill that stand on a station while a resident cooks; override pack
+pan, the mixing bowl and the food on the grill that stand on a station while a resident cooks; override pack
 `packs/held/manifest.json`, over the `item.*` and `tool.*` keys) are built in Blender by
 `tools/art/blender/families/held.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). They are still.
 
@@ -491,7 +492,7 @@ expressions of TalkingHead by Mika Suominen (MIT, https://github.com/met4citizen
 
 ## Street and gardens (`street/`)
 
-The neighbourhood dressing (`render/babylon/street.ts`: sidewalks, kerbs, streetlights, mailboxes, hydrants, bins, cars, picket fences, flower beds; neighbour porches, chimneys and garages in `house.ts`) is built from primitives in code (original, CC0). The hedge and flower-clump models are Blender-built (`packs/street`, above). Only the sidewalk surface is third-party:
+The neighbourhood dressing (`render/babylon/street.ts`: sidewalks, kerbs, streetlights, mailboxes, hydrants, bins, cars, picket fences, flower beds; neighbour porches, chimneys and garages in `house.ts`) is built from primitives in code (original, CC0). The flower-clump models are Blender-built (`packs/street`, above); the hedges are the plants pack's (`models/plants/hedge.glb`). Only the sidewalk surface is third-party:
 
 | File | Used for | Source asset | Authors | URL | Licence |
 |---|---|---|---|---|---|

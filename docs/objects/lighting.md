@@ -9,15 +9,30 @@ The light itself is the content's `light` (height, range, intensity, tiles); the
 from, and must put its bulb at its `light.height`. `_bulb` asserts each bulb within 25 cm of
 `light.height` (most are within 8 cm); it doesn't check `at`. Across, the light is at the footprint's middle unless
 the content's `light.at` [x, z] (object frame) moves it: the arc lamp's (0.245, 0.2) and the table lamp's (−0.12, 0)
-put it at their shade in every facing. The wall lights keep theirs at the middle, 13–38 cm out from the bulb, which
-gives the warm pool on the wall and floor.
+put it at their shade in every facing. The wall lights keep theirs at the middle, 13–38 cm out from the bulb.
+
+Where the light goes is the content's `light.aim` (the renderer's room lights are spot lights): `down` under a shade
+that sends it down (the pendant's dome, the industrial pendant, the track heads, the swing-arm lamp, the arc lamp,
+the banker's lamp: full below, about half 30–45° off, next to none side-on, so no disc up the wall behind), `up`
+for the sconce's open cup (a wash up the wall above it), `out` for the outdoor bulkhead (away from its wall and
+down: nothing behind the wall, so not the floor inside) and `ceiling` for the uplighter (its light comes off the
+ceiling, 30 cm under it, over the lamp, reaching 1.5 m further: the room lit from above, not a pool round its
+foot). The rest light all round. A lamp's light still passes through walls into the next room (lights kept to their
+room are not done).
 
 Lamps switch on and off (`crates/sim-core/src/lights.rs`): the player per lamp (click: Turn on / Turn off), residents
-per room, on when someone awake comes into a dark room, off when the last one leaves or sleeps. The shades,
+per room, on when someone awake comes into a dark room, off when the last one leaves or sleeps. A lamp bought comes
+off (Q-11): it goes on with the rest as someone comes in, or by a click. The shades,
 diffusers, globes, the paper and the candle's flame glow (E8) from dusk while their lamp is on, never by day; metal
 shades (the industrial pendant, the swing-arm lamp, the arc lamp, the banker's lamp) glow only on a white liner just
-inside. The ceiling fan's blades turn (`blades_turn`, once in 2.5 s) and the paper lantern sways (`sway`, 2.5° in
-2 s), both ambient (E2): near the camera, not on Low.
+inside. The ceiling fan's blades turn (`blades_turn`, once in 2.5 s) while its light is switched on, and the paper
+lantern sways (`sway`, 2.5° in 2 s) while it's on (to drop in the Blender wave: a paper globe indoors hangs still),
+both ambient (E2): near the camera, not on Low.
+
+The ring chandelier and the industrial pendant hang at head height (content `headHeight`, Q-12): nobody walks under
+them, though furniture (a dining table) goes under. The pendant lamp and the paper lantern still hang 3–16 cm over a
+man's head; their shorter drop is the Blender wave's (M-lighting-05). A wall can't come down where it would leave a
+ceiling lamp outdoors (M-lighting-01).
 
 ## LT1. Ceiling lights (7)
 
@@ -26,7 +41,7 @@ inside. The ceiling fan's blades turn (`blades_turn`, once in 2.5 s) and the pap
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `ceilingPendant` Pendant lamp | 1x1 · ceiling | — | lighting / ceiling | Body, Shade | Static | Static. The shade glows at night (E8). |
-| `ceilingLight` Ceiling light | 1x1 · ceiling | — | lighting / ceiling | Body, Shade | Static | Static. The diffuser glows at night. |
+| `ceilingLight` Lantern pendant | 1x1 · ceiling | — | lighting / ceiling | Body, Shade | Static | Static. The diffuser glows at night. Renamed from "Ceiling light": a lantern on a stem (kind `pendantLamp`, Q-08). |
 | `chandelier` Ring chandelier | 1x1 · ceiling | — | lighting / ceiling | Body, Globes | Static | Static. The globes glow at night. |
 | `pendantIndustrial` Industrial pendant | 1x1 · ceiling | — | lighting / ceiling | Body, Shade | Static | Static. Only the white liner inside the dome glows at night. |
 | `ceilingFan` Ceiling fan | 1x1 · ceiling | — | lighting / ceiling | Body, Blades | Ambient (E2) | `blades_turn`: the blades turn slowly (E2). |

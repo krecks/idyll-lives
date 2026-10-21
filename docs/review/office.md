@@ -88,7 +88,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/catalog2/office.json:65` (`deskStanding` `surface.kind: "desk"`), against `office.json:176` and `:252` (`chairExecutive`, `chairTask` `seatAt: ["desk", "table"]`, whose `needsTable` uses accept any `desk` top, `crates/sim-core/src/surface.rs:402` `faced_table`); `web/src/render/babylon/tableTuck.ts`
 - **Evidence:** `office/extra/standing-chairTask-write-01.png`: the adult on the desk chair beside the standing desk "writes at the desk" with her hands under the 1.05 m top at chest height (seat 0.48; the reference `deskStanding` top 0.95–1.25 is for standing). `office/extra/side-officeChair-sit-01.png`: the office chair beside it, the top at chest height (sit only, I-office-03). A real standing desk is used standing, or with a drafting stool at about 0.7 m; a sit-stand desk would come down to 0.72–0.76. Fix: give the standing desk a kind of its own (or `counter`) that desk chairs don't `seatAt`, or make it sit-stand.
-- **Status:** confirmed and widened (from `docs/objects/open.md` L121)
+- **Status:** fixed (543c6121)
+- **After:** The standing desk's top is a `shelf` (things still stand on it; no seat tucks under it): `chairTask@11,12,3 --with deskStanding@10,12,0` write and homework say "needs a table".
 - **Source:** `docs/objects/open.md` Still open › Residents; `plan/release-0.3.0.md` §1.4 and §8 (deferred); wave: office/kids (`check.mjs play --objects chairTask@11,12,3 --with deskStanding@10,12,0 --use write`)
 
 ### I-office-01 — A chair facing the laptop desk is used from behind its built-in chair
@@ -102,7 +103,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/tableTuck.ts`
 - **Evidence:** A chair that faces a desk with its own chair built in (the laptop desk, and the kids' desk: I-kids-02) is tucked in from behind and doesn't reach the top. Deferred from 0.3.0. Wave check: buying a desk chair on the laptop desk's (and the kids' desk's) front tile, facing it, is refused by the game, "that would block the way", on both tries (`office/extra/play-gaps.jsonl`). Beside the desk, facing its end, the chair isn't pulled in and the resident writes at the end of the top with a hand on its edge (`office/extra/laptop-chairTask-write-01.png`): believable enough, not filed.
-- **Status:** confirmed and widened (kitchen wave: on the dining sets; closed for the desks, where a chair can no longer stand on the front tile)
+- **Status:** open (renderer code: `tableTuck.ts`, or the sets' own chairs)
+- **After:** Not fixed in the content band: a chair facing a dining set with its own chairs built in still passes `needsTable`; telling those sets apart needs code.
 - **Source:** `docs/objects/open.md` Still open › Residents; `plan/release-0.3.0.md` §1.4; wave: office/kids (`check.mjs play --objects-file gaps.txt`)
 
 ### I-office-02 — The executive desk's drawer has no use
@@ -114,7 +116,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** decision
 - **Where:** `tools/art/blender/families/office.py:524-529` (the middle drawer, a still part of its own), `web/public/content/catalog2/office.json:111` (`deskExecutive`, `interactions: []`)
 - **Evidence:** A modelled part with no clip, left decorative for 0.3.0: its clip would need a seated use on the desk it faces. Wave: `office/play/pair-chairExecutive/chairExecutive-write-01.png`, the drawer stays shut while the executive chair's `write` runs at the desk. The writing desk's drawer, by contrast, slides out to the sitter (`drawer_open`).
-- **Status:** confirmed
+- **Status:** won't fix (Q-19: the drawer stays a still part)
+- **After:** Decor by decision.
 - **Source:** `docs/objects/open.md` Still open › Content and sim; `plan/release-0.3.0.md` §2.5; wave: office/kids
 
 ### M-office-01 — The corner desk is a square slab with one corner cut, not an L
@@ -134,7 +137,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/furniture.json:3144-3174` (`officeChair`: `seatAt: ["desk", "table"]` at `:3155`, but only the `sit` interaction), against `web/public/content/catalog2/office.json:240-315` (`chairTask`'s `write` and `homework`, `needsTable`); `web/public/content/housegen.json:76` and `:195` (generated homes put the office chair at a `deskSimple` or `deskCorner` as its chair)
 - **Evidence:** `office/extra/gaps-officeChair-9-13-2-sit-01.png`: the office chair pulled up to the simple desk offers only "Sit down"; the resident sits with her hands in her lap. The other two desk chairs (`chairTask`, `chairExecutive`) have "Write at the desk" and "Do homework at the desk" there. The desks of the second catalogue (`deskSimple`, `deskCorner`, `deskExecutive`) have no uses of their own, so a generated home that gave its desk an office chair (half the time, `housegen.json:76`, `:195`) has a desk nobody can work at. An office chair's one real use is sitting at a desk.
-- **Status:** open
+- **Status:** fixed (eaca9ed8)
+- **After:** Write and homework at a desk it faces (`needsTable`), as the desk chairs: played at the simple desk (`bench-results/review/fixes/content/g09/after-officeChair-write-00.png`).
 - **Source:** wave: office/kids
 
 ### I-office-04 — Planning on the whiteboard is done from 1.4 m away, the hands in the air
@@ -155,5 +159,6 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/furniture.json:3074` (`computerGaming`: no `surface`), against `furniture.json:2926` and `:2989` (the writing and laptop desks' `surface`, `kind: "desk"`)
 - **Evidence:** `cargo review sizes` measures its top at 0.75 m ("no content `surface`", `tables/sizes-office.md`); its siblings, the computer, writing and laptop desks, declare one, so a lamp, a mug or a plant can stand on them but not on the gaming desk (1.7 × 0.44 m of top, the monitors at the back).
-- **Status:** open
+- **Status:** fixed (eaca9ed8)
+- **After:** A `desk` surface, 1.70 × 0.44 m at 0.75 m (at [0, 0.24]), as the other computer desks'.
 - **Source:** wave: office/kids

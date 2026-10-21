@@ -35,8 +35,8 @@ What it covers: the house parts built in code: walls, doors and windows, coverin
 | `oak` Natural oak | M-houses-03 | n/a | OK | M-houses-03 S3 code: dark walnut-brown, not oak | `houses/extra/door-oak.png`, `houses/extra/textures.png` |
 | `halfGlass` Half-glazed | OK | n/a | OK | solid to 1.05 m, glazed above between 0.1 m stiles | `houses/extra/door-halfGlass.png` |
 | `glass` French glass | OK | n/a | OK | glazed from 0.22 m in a dark 0.08 m frame with a rail at 1.1 m; a single French door | `houses/extra/door-glass.png` |
-| Front door swing | n/a | A-houses-01, A-houses-02 | A-houses-01 | A-houses-01 S2 code (seeded; confirmed and widened); A-houses-02 S3 code. Hinge on the jamb, swings 90° into the house (real 90–110°), eased, 0.45 s: right at speed 1 (fully open 0.6 m before the resident) | `houses/extra/swing1-in-1.png`, `houses/extra/swing1-past-0.png`, `houses/extra/swing-in-0.png` |
-| Bathroom door swing | n/a | A-houses-01 | A-houses-01 | A-houses-01 S2 code: shut while the bathroom is in use, but swings open for anyone walking past | `houses/extra/sheet-bath.png`, `houses/extra/bath-passer-open-0.png` |
+| Front door swing | n/a | A-houses-01, A-houses-02 | A-houses-01 | A-houses-01 S2 code (seeded; confirmed and widened); A-houses-02 S3 code; both fixed (e04bc6c0): opens only for someone going through, ahead of them at any speed. Hinge on the jamb, swings 90° into the house (real 90–110°), eased, 0.45 s: right at speed 1 (fully open 0.6 m before the resident) | `houses/extra/swing1-in-1.png`, `houses/extra/swing1-past-0.png`, `houses/extra/swing-in-0.png` |
+| Bathroom door swing | n/a | A-houses-01 | A-houses-01 | A-houses-01 S2 code: shut while the bathroom is in use, but swings open for anyone walking past. Fixed (e04bc6c0): passers-by leave it shut (`fixes/town/doors/bath-passer-0.png`) | `houses/extra/sheet-bath.png`, `houses/extra/bath-passer-open-0.png` |
 | A door beside a diagonal wall (part swing, or slides into the wall) | OK | OK | OK | Opens as far as the diagonal lets it; under 60° it slides into the wall as a pocket door, its edge showing at the jamb (`house.ts:1879-1901`): what a builder would do; code only, no state has one | none (code only) |
 | Door frames, sills and handles (all styles) | OK | n/a | n/a | Casings 0.1 m round the opening, head board to 2.32 m; a brass handle on both faces at 1.0–1.05 m, 7–12 cm from the edge away from the hinge (`house.ts:1973-1975`; real lever 0.9–1.05 m); no threshold (level entry) | `houses/extra/door-panel.white.png`, `houses/extra/door-glass.png` |
 
@@ -186,7 +186,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/house.ts:1960` (`panel`: one box the size of the leaf)
 - **Evidence:** All four panel styles (`panel`, `panel.white`, `panel.red`, `panel.blue`) are a plain slab with a knob (`houses/extra/door-panel.png`, `door-panel.white.png`, `door-panel.red.png`, `door-panel.blue.png`), while the neighbours' shell doors right across the street have four raised panels (`house.ts:1666-1671`, `town/views/03-neighbour-2-sycamore-h13.png`). The style's name promises the panels the shells have; the same four raised boards on both faces of the leaf would do.
-- **Status:** open
+- **Status:** fixed (8e0f83c2)
+- **After:** the painted and oak leaves have four raised panels on both faces, a shade lighter than the leaf, as the neighbours' doors (`house.ts` `leaf`): `fixes/town/houses/door-panel.white.png`, `door-panel.red.png`, `door-panel.blue.png`, against `houses/extra/door-panel.white.png`. Triangles only: the panels are in the leaf's own bucket.
 - **Source:** wave: houses
 
 ### M-houses-03 — The "Natural oak" door is dark walnut
@@ -196,7 +197,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/house.ts:1959` (the oak leaf on the door wood, untinted), `web/public/assets/manifest.json:1164` (`material.door`: `textures/door_wood`)
 - **Evidence:** The door wood texture is a dark brown walnut-like grain (`houses/extra/textures.png`, second tile), so the oak door reads dark red-brown, darker than the walnut floor (`houses/extra/door-oak.png`, `houses/extra/sheet-doors.png`). Natural oak is light gold, as the oak panelling and oak boards show. The game has an oak texture (`textures/wood_oak`); the oak leaf could use it, or the door wood could be lightened and stained per style.
-- **Status:** open
+- **Status:** fixed (8e0f83c2)
+- **After:** the oak leaf is drawn on the oak grain the oak panelling uses (`material.finish.wood`, `textures/wood_oak`), in a light golden oak (`OAK` #D4B48A), and in the panelling's bucket (one draw fewer where both are used): `fixes/town/houses/door-oak.png` against `houses/extra/door-oak.png`. `material.door` and `textures/door_wood` are now unused: M-houses-08.
 - **Source:** wave: houses
 
 ### M-houses-04 — Wallpapers read as paint, whitewashed wood as plain pine
@@ -206,7 +208,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** content
 - **Where:** `web/public/assets/manifest.json:1144` (`material.wall.interior`: `textures/wallpaper/albedo.jpg`), `web/public/content/base.json:3600-3603` (the four wallpapers), `base.json:3621` (`wood.whitewashed`, `#F4EFE6` on the floor wood)
 - **Evidence:** The wallpaper texture is a pale grey mottle with no pattern, the same kind as the plaster's (`houses/extra/textures.png`, first and last tiles), so linen, mint, lilac and rose wallpaper look like four more paints (`houses/extra/covers-west-b.png`, `covers-east-a.png`). And a covering's colour multiplies its texture, so the near-white tint of "Whitewashed wood" over the mid-tone pine floor (`textures.png`, third tile) leaves it looking like the oak boards beside it (`houses/extra/floors-all.png`, the fourth wood square). A wallpaper texture with a faint stripe or print, and a pale wood texture (or a whitewash blend) for the whitewashed floor, fix both.
-- **Status:** open
+- **Status:** fixed (8e0f83c2)
+- **After:** without a new texture: wallpaper is drawn with faint stripes 12.5 cm apart along the wall (`materials.ts` `PatternPlugin` `stripes`, over the wallpaper texture, fading out where they would be finer than a pixel or two), and "Whitewashed wood" has a finish of its own (`whitewash`: the floor wood limed pale, its boards still showing; `base.json`, `content.ts`, the swatch in `LookPicker.svelte`). The wallpaper bucket was already its own draw; a whitewashed floor is one more draw only in a house that has one. `fixes/town/covers/wallpaper-in.png`, `wallpaper-out-a.png`, `floors-whitewash.png` (oak, whitewashed, walnut, whitewashed). Note: the wave's `houses.mjs` sent covering indices 0-based where `paint` and `paintFloor` take them 1-based (0 is the automatic look), so its covering and floor shots show each covering one place later than their labels say; the finding stands (the wallpaper texture has no pattern).
 - **Source:** wave: houses
 
 ### M-houses-05 — Two-storey neighbours' chimneys are built inside the house
@@ -216,7 +219,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/house.ts:1776` and `:1783` (`chimney`: from `WALL_HEIGHT` to one storey's ridge, with the 34° `PITCH`), against `:1612` and `:1679` (the shell's roof starts at `tall`, the storeys' height)
 - **Evidence:** The chimney's height is worked out for a one-storey house. On a two-storey shell the roof's eaves are at 5.6 m, so a stack topping out at the first storey's ridge plus 0.85 m stands inside the house: none of the two-storey shells in the village has a chimney (`town/views/04-neighbour-4-sycamore-garage-h13.png`, `town/views/09-willow-street-h13.png`, `town/extra/views-05-08.png`), while about 60 % of the one-storey ones do (`house.ts:1680`) (`town/views/03-neighbour-2-sycamore-h13.png`). Passing the shell's base height and the scheme's pitch fixes it.
-- **Status:** open
+- **Status:** fixed (8e0f83c2)
+- **After:** the chimney is worked out from the shell's own eaves (`tall`) and its roof's pitch (`chimney(…, base)`, `s.pitch`): two-storey neighbours get one too, standing 0.75 m over their ridge (`fixes/town/views/04-neighbour-4-sycamore-garage-h13.png`, top right, against `town/views/04-neighbour-4-sycamore-garage-h13.png`).
 - **Source:** wave: houses
 
 ### M-houses-06 — Garages are too narrow for the cars parked in front of them
@@ -226,7 +230,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/street.ts:1131-1140` (`garage`: the driveway's width plus 0.3 m, at least 2.7 m), `web/src/render/babylon/house.ts:1690` (door: the garage's width less 0.7 m)
 - **Evidence:** A garage here is 2.7–3.3 m wide outside (2.56–3.16 m inside) with a door 2.0–2.6 m wide; a real single garage is at least 3.0 m inside with a 2.3–2.5 m door (2.13 m at the least). The street's cars are 1.74–1.88 m wide, 2.0–2.1 m over their mirrors (`street.ts:205-214`, `:308`), so in the narrowest garages they wouldn't go through the door (`town/views/09-willow-street-h13.png`, the brown garage with the white estate in front). A floor of 3.2 m outside (door 2.5 m), or no garage where the drive is too narrow, keeps them believable.
-- **Status:** open
+- **Status:** fixed (76d38b46)
+- **After:** a garage is at least `GARAGE_WIDTH` 3.14 m between its wall lines (3 m inside), moved off the drive's middle if it must to clear the house and the plot's edge, and not built where there is no room for that (`street.ts` `garage`); its door is 2.4-2.5 m, centred (`house.ts`). The white estate now has room to drive in (`fixes/town/views/13-garage-willow-h13.png`, `09-willow-street-h13.png`, against `town/views/09-willow-street-h13.png`); a narrow drive keeps its car and loses the garage (`04-neighbour-4-sycamore-garage-h13.png`). Renderer only: no lot moves.
 - **Source:** wave: houses
 
 ### M-houses-07 — A stairwell railing's balusters stand 116 mm apart
@@ -236,5 +241,17 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/house.ts:1348` (balusters 24 mm thick every 0.14 m)
 - **Evidence:** The gaps between balusters are 116 mm; a guard in a home lets no 100 mm sphere through (Approved Document K; IRC 4 in). Only visible close up (`houses/extra/stairs.png`, second tile). Every 0.12 m (96 mm gaps) is enough.
-- **Status:** open
+- **Status:** fixed (8e0f83c2)
+- **After:** the balusters are spaced evenly between the posts, as many as keep the gaps under 100 mm: seven a metre, 92 mm apart (`house.ts` railing). Checked in code; the stairwell close-up wasn't taken again.
 - **Source:** wave: houses
+
+### M-houses-08 — The door wood texture and `material.door` are left unused
+
+- **Severity:** S3
+- **Rubric:** M13
+- **Fix class:** code
+- **Where:** `crates/tools/src/tex.rs:462` (`door_wood`, Wood066, `Op::Rot90`) and `:625` (`material.door`), `web/public/assets/manifest.json:1164`, `web/public/assets/textures/door_wood/`, `web/public/assets/CREDITS.md:29`
+- **Evidence:** Since G-57 the oak door leaf is drawn on the oak panelling's grain (`material.finish.wood`); nothing in `web/src` names `material.door` any more, so the 1024 px door wood set is built and shipped for nothing (never loaded). Dropping it goes through the texture tool: its `HOUSE_SETS` entry and `material.door` (and the fixture `tests/fixtures/tex/materials.json`), then `Op::Rot90`, which only it uses.
+- **Status:** open
+- **Source:** fix: town
+
