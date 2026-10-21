@@ -300,7 +300,9 @@ never one that's already running) and drive Playwright headless with full Chrome
 
 - **Gallery.** `/gallery.html?keys=model.<id>&cols=4` shows the models from the front right, as close as
   frames them, at their middle height (so things on a wall are in view). `&alpha=…&beta=…&radius=…` and
-  `&target=1.4` (the height looked at; `&target=x,y,z` a point) move the camera.
+  `&target=1.4` (the height looked at; `&target=x,y,z` a point) move the camera. `&scale=adult` (or
+  `child`, `all`) stands residents beside each model for scale; `&camera=game` looks from as far as
+  players do (the game's Live camera).
 - **Clips bench.** `/clips.html?keys=model.<id>` plays every clip of the model in turn, as the game plays
   it: a use's clip opens, holds and closes; a loop goes round; an ambient clip plays all the time. A
   button per clip plays only that one (`&clip=<name>`); `&t=0.5` holds every clip at 0.5 s for a

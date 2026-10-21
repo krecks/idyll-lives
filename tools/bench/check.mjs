@@ -9,6 +9,8 @@
  *   gallery   the gallery (`/gallery.html`)
  *               --keys model.sofa,model.lamp   which models (required)
  *               --cols 4  --alpha 0.97 --beta 1.15 --radius 4 --target 1.4   the gallery's camera
+ *               --scale adult|child|all   residents beside each model, for scale
+ *               --camera game   the game's Live camera: one picture per model, aimed at it
  *   clips     the clips bench (`/clips.html`) held at set times, one picture per time
  *               --keys model.fridge (required)  --clip door_open  --times 0,0.3,0.6,1,99
  *               --colors body:#c46b4a  --target 1.6  --alpha/--beta/--radius
@@ -149,12 +151,21 @@ const camera = () => ({ alpha: flag('alpha'), beta: flag('beta'), radius: flag('
 if (what === 'gallery') {
   const keys = need('keys');
   const name = `gallery-${keys.replace(/model\./g, '').replace(/,/g, '+')}`.slice(0, 120);
-  const params = { keys, cols: flag('cols'), ...camera() };
+  const params = { keys, cols: flag('cols'), scale: flag('scale'), camera: flag('camera'), ...camera() };
   const page = await newPage();
   await page.goto(pageUrl('/gallery.html', params));
   await page.waitForFunction(() => window.__ready === true, null, { timeout: 60_000 });
   await settle(page, 1500);
-  await shot(page, name, { kind: 'model' });
+  if (flag('camera') === 'game') {
+    // As far off as players see things: aimed at each model in turn.
+    for (const [n, key] of keys.split(',').entries()) {
+      await page.evaluate((i) => window.__gallery.aim(i), n);
+      await settle(page, 500);
+      await shot(page, `gallery-game-${key.replace(/^model\./, '')}`, { kind: 'model', key, camera: 'game' });
+    }
+  } else {
+    await shot(page, name, { kind: 'model' });
+  }
 }
 
 if (what === 'clips') {

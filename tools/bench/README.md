@@ -42,7 +42,7 @@ you started yourself. Pictures, and `<what>.json` with what each one shows, go t
 
 | Check | Does |
 |---|---|
-| `gallery` | `/gallery.html?keys=…` from the front right. `--alpha --beta --radius --target --cols` |
+| `gallery` | `/gallery.html?keys=…` from the front right. `--alpha --beta --radius --target --cols`; `--scale adult\|child\|all` stands residents beside each model; `--camera game` takes one picture per model with the game's Live camera aimed at it |
 | `clips` | `/clips.html?keys=…` held at each of `--times` (default `0,0.3,0.6,1,99`; 99 is open), one picture each. `--clip --colors --target` |
 | `play` | Opens `?state=<--state, default bathroom-check>&debug`, adds money, buys `--object` at `--at x,z,rot` (`--turn`, `--colors`), sends `--use` (an interaction id or index) for `--sim`, waits up to `--wait` s until `__sims()` says the resident is at it and using it, then takes `--shots` pictures `--every` ms, logging the resident's pose and the clips playing on it. The camera follows the resident (`--radius`, `--beta`, `--alpha`, `--y`). |
 
@@ -51,9 +51,30 @@ Common options: `--quality low|medium|high` (`?quality=`), `--renderer webgl`, `
 
 ```sh
 node tools/bench/check.mjs gallery --port 5227 --keys model.dartboard,model.tableClock
+node tools/bench/check.mjs gallery --port 5227 --keys model.fridge,model.diningChair --scale all --camera game
 node tools/bench/check.mjs clips --port 5227 --keys model.fridge --clip door_open --times 0,0.2,0.4,99
 node tools/bench/check.mjs play --port 5227 --object toiletClassic --at 23,14,0 --use use --shots 6 --every 500
 node tools/bench/check.mjs play --port 5227 --object toiletClassic --at 24,17,1 --state office-night --renderer webgl --quality low
+```
+
+## Debug pages
+
+Dev-only pages on the dev server (not in the build); each sets `window.__ready` once it's drawn, and the
+flags are at the top of its file in `web/src/debug/`. The ones the review uses:
+
+| Page | Flags |
+|---|---|
+| `/gallery.html` | `keys=model.a,model.b` (or `filter=`), `cols`, `gap`, `labels=0`, `alpha`, `beta`, `radius`, `target`. `scale=adult` stands a man and a woman on each model's own left (the right of the picture, away from the camera), facing the camera (the game's `Characters`, at the idle), `scale=child` a child, `scale=all` a woman, a teen, a child and an elder (at most 64 residents: the first models get them). `camera=game` is the game's Live camera as a game starts (radius 24, beta 0.86, its 0.7 lens) aimed at the floor under the first model, or under `at=<key or index>`; `__gallery.aim(n)` aims it at model n. |
+| `/poses.html` | `only=`, `seats=`, `focus=`, `clip=`, `strip=N` (the clip held at N times on a man, a woman, a child, a teen and an elder), `bottom=`, `manual`. `stage=baby\|child\|teen\|youngAdult\|adult\|elder` puts everyone placed at that stage where sim-core lets the stage take the place (a baby only lies in a crib; children and teens don't care for a baby, flirt or kiss), with the game's look for it (an elder's stoop and grey hair); with `strip`, the rows are a man and a woman at that stage. |
+| `/characters.html` | `stage=child` or `stage=all`, `hair=all`, `tops=all`, `face=moods`, `clip=walk&t=0.4`, `view=side` (more in `characters.ts`). |
+| `/clips.html` | `keys=`, `clip=`, `t=` (99: open), `colors=`, `target=` (see `check.mjs clips`). |
+
+```
+/gallery.html?keys=model.fridge,model.diningChair,model.bed&scale=all
+/gallery.html?keys=model.fridge,model.diningChair,model.bed&scale=adult&camera=game&at=model.bed
+/poses.html?stage=child
+/poses.html?strip=8&clip=sitDown
+/poses.html?seats=sofa,diningChair&stage=elder
 ```
 
 ## States for checks
