@@ -376,6 +376,6 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** clip
 - **Where:** `web/src/render/babylon/characters.ts` (`ACTIONS.relax`: `stand: ['idle', 'foldArms']`), `web/public/content/furniture.json` (`firePit` `relax`, `anim: relax`)
 - **Evidence:** `bench-results/review/fixes/slots/play/firePit-0*.png`: since G-01 those without a chair stand round the pit facing it, idling or with the arms folded for 30 minutes. People at a fire hold their hands out to it now and then, or rub them. A standing warm-up clip (the hands out to the fire, palms in, in turns with rubbing them), picked by object as G-26 picks the game clips.
-- **Status:** fixed (COMMIT)
+- **Status:** fixed (38165d6e)
 - **After:** a standing warm-up clip, `warmHands` (`clips/uses.ts`, 7 s: leant a little towards the fire, both hands held out over it palms down to the flames, turned now and then, then brought together and rubbed, and out again), picked for *Warm up by the fire* on foot at the fire pit (`ACTIONS.relax.stand` by object, `WARM_AT`); elsewhere relaxing on foot is the idle and the folded arms as before. `fixes/sweep-render/warm/firePit-night-firePit-relax-01.png` (22:19: the hands out over the flames, was `fixes/slots/play/firePit-0*.png`'s folded arms), `firePit-firePit-relax-0*.png` (by day), `strip-man.png` (poses.html `clip=warmHands&strip=8`: held out 0–4/8, rubbed 5–6/8).
 - **Source:** fix: slots
