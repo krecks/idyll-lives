@@ -4943,6 +4943,11 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
             }
         } else {
             let used = sim.current.as_ref().map(|a| a.task);
+            if let Some(Task { kind: TaskKind::Use { object, interaction }, .. }) = used
+                && !given_up
+            {
+                leaves_at_end(sim, content, &mut objects[object as usize], interaction);
+            }
             end_activity(sim, content, objects);
             if let Some(task) = used
                 && let TaskKind::Use { object, interaction } = task.kind
@@ -5075,7 +5080,9 @@ fn use_object(
             && inter.trains_skills()
             && access(ctx, sim, ctx.object_plot[obj.id as usize]) == Access::Full
             && training_interest(sim, content, inter) > MIN_AUTONOMY_SCORE;
-        elapsed >= inter.minutes || (any_gain && satisfied && !planned && !routine && !practising) || drained
+        // A job that changes the thing as the hands go (hanging out the washing, a harvest) goes on to its end.
+        let job = inter.gradual || inter.picks;
+        elapsed >= inter.minutes || (any_gain && satisfied && !planned && !routine && !practising && !job) || drained
     };
     // Homework done: better at school (by how much of it they did).
     if done && inter.homework > 0.0 && content.life.stage_at(sim.age).is_some_and(|s| s.school) {
@@ -5212,16 +5219,12 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
                 sim.pose = inter.pose;
             }
             act.phase = Phase::Using { elapsed: 0.0 };
-            // Opened or closed as the use starts (a wall bed folds down as they lie down).
-            if let Some(open) = inter.leaves
+            // Opened or closed as the use starts (a wall bed folds down as they lie down); what
+            // the hands do through it, once it's done (`leaves_at_end`).
+            if let Some(open) = inter.leaves.filter(|_| !inter.gradual)
                 && objects[object as usize].open != open
             {
                 objects[object as usize].open = open;
-                sim.reshaped = true;
-            }
-            // A crop picked as the harvest starts: it lies fallow, then grows again.
-            if inter.picks && objects[object as usize].growth >= 0.0 {
-                objects[object as usize].growth = -1.0;
                 sim.reshaped = true;
             }
             // Sitting down by a fire in the dark, they light it (see `lights.rs`).
@@ -5231,6 +5234,25 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
                 sim.lit = true;
             }
         }
+    }
+}
+
+/// A use done that changed the object as the hands went (`Interaction::gradual`, a crop's
+/// `picks`): now it is so. The washing is out on the line (or in); the crop is picked, and lies
+/// fallow, then grows again.
+fn leaves_at_end(sim: &mut Sim, content: &Content, o: &mut ObjectInstance, interaction: usize) {
+    let Some(inter) = content.objects[o.def].interactions.get(interaction) else {
+        return;
+    };
+    if let Some(open) = inter.leaves.filter(|_| inter.gradual)
+        && o.open != open
+    {
+        o.open = open;
+        sim.reshaped = true;
+    }
+    if inter.picks && o.growth >= 0.0 {
+        o.growth = -1.0;
+        sim.reshaped = true;
     }
 }
 

@@ -81,12 +81,15 @@ interface ClipState {
   /** Seconds it opens again for when the use ends (`out`), and whether it is doing so. */
   out?: number;
   leaving?: boolean;
+  /** Played along with the use (`over`): which way, and how far through the use is (0..1). */
+  over?: 1 | -1;
+  progress?: number;
   /**
    * Opens and closes (a use's, or held open), goes round while used (`loops`), plays from rest to rest
-   * every so often while used (`repeat`), goes round always (`idle`), or is held where a crop's stage
-   * (`growth`) or the game's time (`clock`) has it.
+   * every so often while used (`repeat`), goes round always (`idle`), is held where a crop's stage
+   * (`growth`) or the game's time (`clock`) has it, or where the use has got to (`over`).
    */
-  kind: 'use' | 'loop' | 'repeat' | 'idle' | 'growth' | 'clock';
+  kind: 'use' | 'loop' | 'repeat' | 'idle' | 'growth' | 'clock' | 'over';
 }
 
 /** A clip a use wants this frame. */
@@ -101,6 +104,9 @@ interface Wanted {
   every?: number;
   /** Seconds it opens again for when the use ends. */
   out?: number;
+  /** Played along with the use (`UseClip.over`), and how far through it is. */
+  over?: 1 | -1;
+  progress?: number;
   kind: 'use' | 'loop';
 }
 
@@ -270,13 +276,17 @@ export class ObjectMotion {
         const clip = o.motion.clips.get(name);
         if (!clip) continue;
         const state = clips.get(name);
-        if (state?.use === want.use) continue;
-        // A new use: open (again, from its delay on), go round, or start its rounds.
+        if (state?.use === want.use) {
+          state.progress = want.progress;
+          continue;
+        }
+        // A new use: open (again, from its delay on), go round, start its rounds, or go along with it.
         const start = this.clock + (want.delay ?? 0);
         const until = want.hold === undefined ? Infinity : start + want.hold;
-        const kind = want.every ? 'repeat' : want.kind;
-        if (state) Object.assign(state, { use: want.use, until, start, every: want.every, out: want.out, leaving: false, kind });
-        else clips.set(name, { clip, time: 0, use: want.use, until, start, every: want.every, out: want.out, kind });
+        const kind = want.over ? 'over' : want.every ? 'repeat' : want.kind;
+        const along = { over: want.over, progress: want.progress };
+        if (state) Object.assign(state, { use: want.use, until, start, every: want.every, out: want.out, leaving: false, kind, ...along });
+        else clips.set(name, { clip, time: 0, use: want.use, until, start, every: want.every, out: want.out, kind, ...along });
       }
       for (const [name, state] of clips) {
         const d = state.clip.duration;
@@ -291,6 +301,20 @@ export class ObjectMotion {
             drifted = true;
           }
           continue;
+        }
+        if (state.kind === 'over') {
+          if (state.use !== '' && wanted?.get(name)?.use === state.use) {
+            // Where the use has got to.
+            const p = Math.min(Math.max(state.progress ?? 0, 0), 1);
+            const time = (state.over === -1 ? 1 - p : p) * d;
+            if (time !== state.time) changed = true;
+            state.time = time;
+            continue;
+          }
+          // Over: as an ordinary clip now, held open if the object is so. One played to its end stays there a moment
+          // (the crop squashed away while its growth clip goes on to picked) before it plays back.
+          const linger = state.over === 1 ? 1 : 0;
+          Object.assign(state, { kind: 'use', use: '', start: this.clock, until: this.clock + linger, leaving: linger > 0, over: undefined });
         }
         if (state.kind === 'growth') {
           // On towards where the stage has it.
@@ -429,11 +453,14 @@ export class ObjectMotion {
       if (!clips && !loop) continue;
       const use = `${curr[o + k.id]}:${act}:${interaction}`;
       const wanted = this.wanted.get(id) ?? new Map<string, Wanted>();
+      const progress = k.progress === undefined ? undefined : curr[o + k.progress];
       let slot: number | undefined;
-      for (const { clip, hold, delay, every, out, slot: only } of clips ?? []) {
+      for (const { clip, hold, delay, every, out, slot: only, over } of clips ?? []) {
         // A clip for one slot (a bunk's duvet): only for the resident there.
         if (only !== undefined && only !== (slot ??= object.slotOf?.(curr[o + k.x], curr[o + k.z]) ?? 0)) continue;
-        wanted.set(clip, { use, hold, delay, every, out, kind: 'use' });
+        // (Along with the use only where the snapshot says how far it is.)
+        const along = over && progress !== undefined && progress >= 0 ? over : undefined;
+        wanted.set(clip, { use, hold, delay, every, out, over: along, progress, kind: 'use' });
       }
       if (loop) wanted.set(loop, { use, kind: 'loop' });
       this.wanted.set(id, wanted);

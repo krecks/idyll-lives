@@ -275,7 +275,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `natureLover.veggieBed` Raised veggie bed | 2x1 · floor | tendVeggies:tend pickSnack:eat | garden / edibles | Wood, Posts & rails | Use | `harvest`: a lettuce presses down into the soil for pickSnack. `grow` follows the crop's stage (E4); `rustle` sways the plants every 2.4 s while tended. |
+| `natureLover.veggieBed` Raised veggie bed | 2x1 · floor | tendVeggies:tend pickSnack:eat | garden / edibles | Wood, Posts & rails | Use | `harvest`: a lettuce presses down into the soil along pickSnack (`over`), picked as it ends (G-50). `grow` follows the crop's stage (E4); `rustle` sways the plants every 2.4 s while tended. |
 | `natureLover.pottingBench` Potting bench | 2x1 · floor | potSeedlings:tinker tieBouquet:tinker | hobbies / — | Wood, Frame | Use | `seedling`: a seedling grows in a pot for potSeedlings; `bouquet`: a tied bouquet grows on the worktop for tieBouquet. |
 | `natureLover.birdFeeder` Bird feeder post | 1x1 · floor | birdwatch:look | outdoor / — | Wood, Roof | Use | `bird`: a bird appears for birdwatch. |
 | `natureLover.gardenHammock` Garden hammock | 2x1 · floor | swing:relax doze:nap | outdoor / — | Wood, Fabric, Stripes | Loop (E1) | `sway`: the sling rocks 8° each way while swung in or dozed in, and the resident rides it (`ride`), lain across it (`BEDS` `across`). |

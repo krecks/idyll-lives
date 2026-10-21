@@ -182,6 +182,7 @@ mod tests {
             when: None,
             leaves: None,
             close_after: false,
+            gradual: false,
             ripe: false,
             picks: false,
         }

@@ -540,7 +540,8 @@
             "outdoors"
           ],
           "when": "closed",
-          "leaves": "open"
+          "leaves": "open",
+          "gradual": true
         },
         {
           "id": "takeIn",
@@ -557,7 +558,8 @@
             "outdoors"
           ],
           "when": "open",
-          "leaves": "closed"
+          "leaves": "closed",
+          "gradual": true
         }
       ]
     },

@@ -499,7 +499,7 @@ fn named_finish(name: &str) -> Option<J> {
     if !head.is_empty() && lower { Some(J::Obj(vec![("finish".into(), J::Str(format!("material.finish.{tail}")))])) } else { None }
 }
 
-/// [(use, {clip, hold, delay, every, slot, out})] for each clip an entry's `motions.uses` plays (a clip,
+/// [(use, {clip, hold, delay, every, slot, out, over})] for each clip an entry's `motions.uses` plays (a clip,
 /// {clip, ...} or a list of them).
 fn uses(motions: &J) -> Vec<(String, J)> {
     let mut out = Vec::new();
@@ -570,7 +570,8 @@ fn loops(motions: &J) -> R<HashSet<String>> {
 }
 
 /// What's wrong with the fields of an entry's `motions` (objectMotion.ts): a use's `delay` and `hold` are
-/// seconds (0 or more), `every` and `out` more than 0, `slot` a slot number; `clock` names its hands' clips.
+/// seconds (0 or more), `every` and `out` more than 0, `slot` a slot number, `over` 1 or -1 (along with the use,
+/// forward or back); `clock` names its hands' clips.
 fn motions_errors(motions: &J) -> Vec<String> {
     let mut errors = Vec::new();
     for (name, u) in uses(motions) {
@@ -589,13 +590,18 @@ fn motions_errors(motions: &J) -> Vec<String> {
                 errors.push(format!("`motions.uses` {name}: {k} {} is no number of seconds above 0", repr(v)));
             }
         }
+        if let Some(over) = u.get("over")
+            && !matches!(over, J::Int(1 | -1))
+        {
+            errors.push(format!("`motions.uses` {name}: over {} is neither 1 nor -1", repr(over)));
+        }
         // (An int, not a bool.)
         if let Some(slot) = u.get("slot")
             && !matches!(slot, J::Int(i) if *i >= 0)
         {
             errors.push(format!("`motions.uses` {name}: slot {} is no slot (0, 1, ...)", repr(slot)));
         }
-        let mut unknown: Vec<&str> = u.entries().unwrap_or(&[]).iter().map(|(k, _)| k.as_str()).filter(|k| !["clip", "hold", "delay", "every", "slot", "out"].contains(k)).collect();
+        let mut unknown: Vec<&str> = u.entries().unwrap_or(&[]).iter().map(|(k, _)| k.as_str()).filter(|k| !["clip", "hold", "delay", "every", "slot", "out", "over"].contains(k)).collect();
         unknown.sort();
         if !unknown.is_empty() {
             errors.push(format!("`motions.uses` {name}: unknown {}", unknown.join(", ")));

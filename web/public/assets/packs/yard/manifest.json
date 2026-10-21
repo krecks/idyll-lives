@@ -119,7 +119,10 @@
       "motions": {
         "growth": "grow",
         "uses": {
-          "harvest": "harvest",
+          "harvest": {
+            "clip": "harvest",
+            "over": 1
+          },
           "tend": {
             "clip": "rustle",
             "delay": 0.6,
@@ -370,7 +373,14 @@
       },
       "motions": {
         "uses": {
-          "washing": "washing"
+          "washing": {
+            "clip": "washing",
+            "over": 1
+          },
+          "takeIn": {
+            "clip": "washing",
+            "over": -1
+          }
         },
         "open": "washing"
       },

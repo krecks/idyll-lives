@@ -8,8 +8,8 @@ use crate::world::{Activity, MAX_SIMS, Phase, Sim, Task, TaskKind, World};
 use crate::{TICKS_PER_SECOND, clock};
 
 pub const HEADER_LEN: usize = 9;
-/// Floats per Sim (all 28 used).
-pub const SIM_STRIDE: usize = 28;
+/// Floats per Sim (all 29 used).
+pub const SIM_STRIDE: usize = 29;
 pub const CAPACITY: usize = HEADER_LEN + MAX_SIMS * SIM_STRIDE;
 
 pub mod header {
@@ -94,13 +94,19 @@ pub mod sim {
     /// opens a door or a gate only for someone about to go through it.
     pub const AHEAD_X: usize = 26;
     pub const AHEAD_Z: usize = 27;
+    /// How far through what they're doing at `OBJECT` they are, 0..1 (a use's minutes, a
+    /// recipe step's), while at it; else -1. The renderer plays a clip along with it (the washing
+    /// hung out piece by piece, a crop picked).
+    pub const PROGRESS: usize = 28;
 }
 
 /// How far ahead along their way `sim::AHEAD_X` looks, in metres.
 pub const AHEAD: f32 = 1.5;
 
 // Every field fits in a Sim's row.
-const _: () = assert!(sim::HEIGHT < SIM_STRIDE && sim::INTERACTION < SIM_STRIDE && sim::RECIPE < SIM_STRIDE && sim::CALL < SIM_STRIDE && sim::AHEAD_Z < SIM_STRIDE);
+const _: () = assert!(
+    sim::HEIGHT < SIM_STRIDE && sim::INTERACTION < SIM_STRIDE && sim::RECIPE < SIM_STRIDE && sim::CALL < SIM_STRIDE && sim::AHEAD_Z < SIM_STRIDE && sim::PROGRESS < SIM_STRIDE
+);
 const _: () = assert!(header::ITEMS_VERSION < HEADER_LEN);
 
 /// What a Sim does for the snapshot; see `sim::OBJECT`, `sim::ACTION`, `sim::OBJECT_DEF` and
@@ -228,6 +234,26 @@ fn doing(world: &World, s: &Sim) -> Doing {
     }
 }
 
+/// How far through a use or a recipe's step a Sim at it is (`sim::PROGRESS`), else -1.
+fn progress(world: &World, s: &Sim) -> f32 {
+    if s.away_until.is_some() {
+        return -1.0;
+    }
+    let Some(Activity { task, phase: Phase::Using { elapsed }, .. }) = s.current() else {
+        return -1.0;
+    };
+    let minutes = match task.kind {
+        TaskKind::Use { object, interaction } => world
+            .objects
+            .get(object as usize)
+            .and_then(|o| world.content.objects[o.def].interactions.get(interaction))
+            .map_or(0.0, |i| i.minutes),
+        TaskKind::Cook { minutes, .. } => f32::from(minutes),
+        _ => return -1.0,
+    };
+    if minutes > 0.0 { (elapsed / minutes).clamp(0.0, 1.0) } else { 1.0 }
+}
+
 /// The waypoint a Sim walks to and where their way is `AHEAD` metres on (`sim::WAY_X`,
 /// `sim::AHEAD_X`), both where they stand when they aren't walking.
 fn way_ahead(world: &World, s: &Sim) -> ([f32; 2], [f32; 2]) {
@@ -307,6 +333,7 @@ pub fn write(world: &World, out: &mut [f32]) {
         let (way, ahead) = way_ahead(world, s);
         [o[sim::WAY_X], o[sim::WAY_Z]] = way;
         [o[sim::AHEAD_X], o[sim::AHEAD_Z]] = ahead;
+        o[sim::PROGRESS] = progress(world, s);
     }
     // Conversations: write the shared state into every participant's row.
     for (i, s) in world.sims.iter().enumerate() {
@@ -361,6 +388,7 @@ pub fn layout_json(content: &Content) -> String {
             "objectDef": sim::OBJECT_DEF, "interaction": sim::INTERACTION,
             "held": sim::HELD, "recipe": sim::RECIPE, "call": sim::CALL,
             "wayX": sim::WAY_X, "wayZ": sim::WAY_Z, "aheadX": sim::AHEAD_X, "aheadZ": sim::AHEAD_Z,
+            "progress": sim::PROGRESS,
         },
         "actions": content.animations,
         "items": content.items.iter().map(|i| &i.id).collect::<Vec<_>>(),

@@ -159,9 +159,15 @@ pub struct Interaction {
     /// Only offered while the object's crop is ripe (content `when`: "ripe"; see
     /// `ObjectInstance::growth`).
     pub ripe: bool,
-    /// Picks the crop as the use starts (content `leaves`: "picked"): it lies fallow, then is
-    /// planted again and grows (see `ObjectDef::grows`).
+    /// Picks the crop (content `leaves`: "picked"): it lies fallow, then is planted again and
+    /// grows (see `ObjectDef::grows`). Picking takes the hands the whole use: the crop goes when
+    /// it ends, not as it starts.
     pub picks: bool,
+    /// What it `leaves` comes about through the use, as the hands get there, and is so once it
+    /// ends (content `gradual`): the washing hung out piece by piece, or taken in. The renderer
+    /// plays the object's clip along with the use (a model's `motions.uses` entry with `over`).
+    /// Without it, what it leaves is so as the use starts (a wall bed folded down to lie in).
+    pub gradual: bool,
 }
 
 impl Interaction {
@@ -2285,6 +2291,9 @@ struct InteractionRaw {
     leaves: Option<OpenState>,
     #[serde(default)]
     close_after: bool,
+    /// What it leaves comes about through the use (see `Interaction::gradual`).
+    #[serde(default)]
+    gradual: bool,
 }
 
 /// An object's state for `when` and `leaves` (see `ObjectInstance::open`), or its crop's
@@ -2829,7 +2838,11 @@ impl Content {
                     close_after: it.close_after,
                     ripe: it.when == Some(OpenState::Ripe),
                     picks: it.leaves == Some(OpenState::Picked),
+                    gradual: it.gradual,
                 });
+                if it.gradual && !matches!(it.leaves, Some(OpenState::Open | OpenState::Closed)) {
+                    return Err(Error::new(format!("{ctx}: `gradual` is for a use that leaves it open or closed")));
+                }
                 if it.close_after
                     && (it.leaves != Some(OpenState::Open)
                         || !obj.interactions.iter().any(|i| i.leaves == Some(OpenState::Closed)))

@@ -66,6 +66,8 @@ export interface SnapshotLayout {
     wayZ?: number;
     aheadX?: number;
     aheadZ?: number;
+    /** How far through what they do at `object` they are, 0..1 (a use's minutes, a recipe step's), while at it; else -1 (missing in older layouts). */
+    progress?: number;
   };
   /** Animation tags from content (`animations` in base.json), named by `sim.action`. */
   actions: string[];
