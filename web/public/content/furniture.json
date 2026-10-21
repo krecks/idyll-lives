@@ -508,7 +508,7 @@
       "description": "A counter with a toaster and a blender: toast for a quick bite, a smoothie for a little energy.",
       "surface": {
         "height": 0.95,
-        "kind": "bar",
+        "kind": "counter",
         "size": [
           1.0,
           0.62
@@ -849,7 +849,6 @@
       "description": "A tall stool for the counter or the island.",
       "approach": "around",
       "seatAt": [
-        "bar",
         "counter"
       ],
       "interactions": [

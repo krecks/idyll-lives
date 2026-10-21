@@ -626,8 +626,8 @@
       "group": "desk",
       "layer": "surface",
       "decor": 0.2,
-      "radius": 0.3,
-      "description": "A flat monitor with a keyboard and mouse. It stands on a table, counter, desk or shelf.",
+      "radius": 0.23,
+      "description": "A flat monitor with a keyboard and mouse. It stands on a table, a counter or a desk deep enough for the keyboard.",
       "interactions": []
     },
     {

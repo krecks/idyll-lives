@@ -103,9 +103,9 @@
         { "one": ["plant", "lamp", "sideboard", "trashCan"], "chance": 0.4 }
       ],
       "dining": [
-        { "tables": ["kitchenIsland", "islandLong"], "chairs": ["stoolCounter", "stoolBarHigh", "barStool"], "seats": [2, 3], "oneSide": true, "ifRoom": "dining" },
+        { "tables": ["kitchenIsland", "islandLong"], "chairs": ["stoolCounter", "barStool"], "seats": [2, 3], "oneSide": true, "ifRoom": "dining" },
         { "tables": ["tableDining4", "tableDining4", "tableSquare2", "tableRound4", "tableDining6", "tableFarmhouse6", "tableBistroRound"], "chairs": ["chairWood", "chairUpholstered", "chairModern", "chairWindsor", "chairBentwood", "diningChair"], "seats": [2, 6], "unlessRoom": "dining", "chance": 0.95 },
-        { "tables": ["kitchenIsland", "islandLong"], "chairs": ["stoolCounter", "stoolBarHigh", "barStool"], "seats": [2, 3], "oneSide": true, "unlessRoom": "dining", "chance": 0.4 }
+        { "tables": ["kitchenIsland", "islandLong"], "chairs": ["stoolCounter", "barStool"], "seats": [2, 3], "oneSide": true, "unlessRoom": "dining", "chance": 0.4 }
       ],
       "surfaces": [
         { "on": ["counter"], "of": ["kitchenIsland", "islandLong", "islandSmall"], "one": ["fruitBowl", "cakeStand", "mugs"], "count": [1, 2] },

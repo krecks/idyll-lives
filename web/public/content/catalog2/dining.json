@@ -647,14 +647,13 @@
       "group": "dining",
       "approach": "around",
       "seatAt": [
-        "counter",
-        "bar"
+        "counter"
       ],
       "seat": {
         "height": 0.68,
         "forward": 0.05
       },
-      "description": "A stool at counter height for the island or the bar.",
+      "description": "A stool at counter height for the counter or the island.",
       "interactions": [
         {
           "id": "sit",
@@ -700,8 +699,7 @@
       "group": "dining",
       "approach": "around",
       "seatAt": [
-        "bar",
-        "counter"
+        "bar"
       ],
       "seat": {
         "height": 0.8,
