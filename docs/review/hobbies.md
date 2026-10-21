@@ -289,7 +289,8 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Fix class:** code
 - **Where:** `crates/sim-core/src/world.rs:357-365` (`front_tile`: a standing user stops on the tile in front); `crates/sim-core/src/content.rs:340-346` (`Approach`: `Front` or `Around`, no distance)
 - **Evidence:** `hobbies/play/c1/play.jsonl` (`dartboard` at `[10, 17, 2]` on the back wall, the thrower at z 16.5) and `hobbies/extra/side-dartboard-darts-00.png`: the face is about 1.43 m from the thrower; the throw line is 2.37 m from the face (`reference.md` `darts`). `docs/objects/hobbies.md` says "thrown from the tile in front of the board, half a metre from the wall", which is neither. An approach distance (two tiles out) is new behaviour; the renderer's `STAND_BACK` (`characters.ts:160`) could step them back 0.9 m in the meantime.
-- **Status:** open
+- **Status:** fixed (36198175, 0d20c5c9)
+- **After:** the dartboard has one place, the oche (`places` `[0, 2.24]` facing 180, on a wall thing now, up to 2 m out): the thrower stands two tiles out, 2.61 m from the board's face, the toe line 2.37 m from it. `bench-results/review/fixes/positions/play/dartboard-01.png` (z 15.26, the face at 17.87) against `hobbies/extra/side-dartboard-darts-00.png` (1.43 m); sim test `tests/positions.rs` `darts_are_thrown_from_the_oche`. With that tile blocked they throw from the front, as before.
 - **Source:** wave: hobbies
 
 ### I-hobbies-07 — moved to systems.md

@@ -40,7 +40,7 @@ pulled up to the kids' table before the dining table (a seat made for their age 
   the body); the car bed's quilt ends at its bonnet (`BEDS` `foot`).
 - The high chair is still in all four facings. Nobody can eat from it: feeding a baby in a chair needs the sim first
   (a baby is only ever placed lying).
-- Known, not changed: the carer at the crib stands or kneels in different spots by facing, once a tile out in front
+- Known, not changed (until G-43, below): the carer at the crib stands or kneels in different spots by facing, once a tile out in front
   of the changing table (slot positions and the shared "tend" pose).
 - Since the authenticity review (G-14, G-05): "Feed the baby" lifts the baby out and holds them, as the cuddle does
   (`anim: cuddle`), not the gardening kneel at the rail (the bottle is the props wave's); the high chair's content
