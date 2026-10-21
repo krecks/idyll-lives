@@ -46,7 +46,7 @@ primitive parts). The town overview draws them too.
 | `model.pine` | 6.03 × 9.20 × 6.05 m | 328 | 122 | 2 |
 | `model.spruce` | 5.19 × 10.50 × 5.15 m | 440 | 164 | 2 |
 | `model.cypress` | 1.01 × 7.95 × 1.02 m | 1,636 | 450 | 2 |
-| `model.garden.lemonTree` | 1.29 × 2.37 × 1.34 m | 1,736 | 698 | 4 |
+| `model.garden.lemonTree` | 1.29 × 1.99 × 1.34 m | 1,736 | 698 | 4 |
 
 `check-glb`: 12 models, 0 failed; its one warning is the lemon tree's 4 draw calls. The sizes were held to the
 old parts' bounds as they were built (those bounds counted each turned blob's or cone's whole box: the
@@ -76,6 +76,8 @@ picked apple at 1.84, 0.7 m out), cherry 2.77, maple 3.19, oak 3.90, birch 4.66.
 - **Magnolia:** its blooms are upright goblets (`GOBLET`, revolved), three over each clump of the upper crown, each
   set where a line out from its clump's middle leaves the crown (a ray cast), so none stands off it. `crown` returns
   its clumps for this.
+- **Potted lemon tree** (M-garden-04): trunk and crown 0.38 m lower (crown middle 1.47 m), two metres tall in all;
+  the picked lemon stays at 1.62 m, on the crown's front, as `FRUIT.lemon` in `clips/uses.ts` has it.
 - The trunks the shade sit leans on are as they were (`furniture.json` `seats` rows unchanged).
 
 ## Rebuild
