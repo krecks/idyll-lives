@@ -13,6 +13,13 @@ stools keep their seat height (`seats` in `web/src/render/babylon/characters/fur
 nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wall cabinets and the dining storage are
 `cupboard` stations and open a door while it happens, the drawer counter its top drawer.
 
+**Who uses them** (content `stages`, 2026-10-21, G-45): the wine fridge's *Pour a glass of wine*, the bar cart's *Mix a
+drink* and the party bar's *Mix drinks for everyone* are for young adults and up (a child or a teen is refused, "Dee
+is too young to pour a glass of wine", never picks them, and sees them greyed out; the party bar's soda is anyone's).
+Every recipe with a hot step (meal, gourmet, tasting menu, both barbecues, pizza, baked treats, pie; recipe `stages`)
+is cooked by teens and up, wherever it is started (a fridge, a stove, an oven, a grill); a child may make a sandwich
+and heat up leftovers. Coffee is left to anyone (not an age rule yet).
+
 ## Kitchen sinks (2)
 
 - **Family:** `tools/art/blender/families/kitchen.py`

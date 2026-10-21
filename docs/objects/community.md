@@ -15,6 +15,11 @@ Moving parts: the seesaw, spring rider and merry-go-round loop while ridden (E1)
 the scarecrow sways (ambient, E2, off on Low); the coop's hatch shuts at night (E3); the rest open, drop or slide for
 their uses. The climbing frame has no clip of its own: the resident's clips climb round it.
 
+**Who uses them** (content `stages`, 2026-10-21, G-45): the spring rider, the slide and the climbing frame are a
+child's; the seesaw and the merry-go-round a child's or a teen's. Grown-ups and elders are refused ("Ada is too big
+for the spring rider"), never pick them, and see them greyed out. The climbing frame is tagged `toys` like the other
+rides.
+
 ## CM1. Playground (8)
 
 - **Family:** `tools/art/blender/families/playground.py`
