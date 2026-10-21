@@ -25,7 +25,7 @@ use std::path::{Path, PathBuf};
 
 /// The reference table, from the checkout's root.
 pub const REFERENCE: &str = "docs/review/reference.json";
-/// How far (×) from the median `minutes` of uses with the same first tag a use's duration may be before it is
+/// How far (×) from the median `minutes` of uses with the same animation a use's duration may be before it is
 /// flagged (owner decision: today's short durations are by design, only outliers are).
 pub const DURATION_SPREAD: f32 = 3.0;
 
@@ -126,6 +126,8 @@ pub struct Object {
     /// Where it is used from: `front`, or `around` (any free tile beside it).
     pub approach: &'static str,
     pub uses: Vec<Use>,
+    /// It gives light (content `light`): switching it on and off is a use of its own, by the player and residents.
+    pub lamp: bool,
     /// The animation tags cooking plays at it as a station (content `stations`): its recipe steps', and washing
     /// up, scraping plates and putting things away (`cooking.dishesAnim`, `scrapeAnim`, `putAwayAnim`).
     pub station_anims: BTreeSet<String>,
@@ -228,6 +230,7 @@ pub fn objects(dir: &Path) -> Result<Vec<Object>, String> {
                 sim_core::content::Approach::Around => "around",
             },
             uses,
+            lamp: raw.get("light").is_some_and(|l| !l.is_null()),
             station_anims: strs(&raw["stations"]).iter().flat_map(|s| at_station.get(s).into_iter().flatten().cloned()).collect(),
         });
     }
@@ -295,7 +298,7 @@ pub fn sound_of(sounds: &BTreeMap<String, String>, object: &str, u: &Use) -> Opt
 /// What looks wrong in an object's uses (`cargo review uses`).
 #[derive(Debug, Clone, PartialEq)]
 pub enum Flag {
-    /// No use at all, and its kind isn't decor.
+    /// No use at all, it isn't a lamp, and its kind isn't decor.
     NoUse,
     /// A use's animation that `ACTIONS` has no entry for (the resident stands idle at it).
     NoAction { using: String, anim: String },
@@ -303,8 +306,8 @@ pub enum Flag {
     MotionKey { key: String },
     /// A use that opens or closes the object (`when`, `leaves`) on a model without `motions.open`.
     NoOpen { using: String },
-    /// A use's minutes more than `DURATION_SPREAD` times from the median of the uses that share its first tag.
-    Duration { using: String, minutes: f32, tag: String, median: f32 },
+    /// A use's minutes more than `DURATION_SPREAD` times from the median of the uses like it (`like_key`).
+    Duration { using: String, minutes: f32, like: String, median: f32 },
 }
 
 impl Flag {
@@ -325,7 +328,7 @@ impl Flag {
             Flag::NoAction { using, anim } => format!("{using}: anim `{anim}` has no `ACTIONS` entry"),
             Flag::MotionKey { key } => format!("`motions` key `{key}` is no use or anim of it"),
             Flag::NoOpen { using } => format!("{using} opens or closes it, but its model has no `motions.open`"),
-            Flag::Duration { using, minutes, tag, median } => format!("{using}: {minutes} min, the median for `{tag}` {median} min"),
+            Flag::Duration { using, minutes, like, median } => format!("{using}: {minutes} min, the median for `{like}` {median} min"),
         }
     }
 }
@@ -333,29 +336,35 @@ impl Flag {
 /// The columns of `Flag::column`, in order.
 pub const FLAG_COLUMNS: [&str; 5] = ["no use", "anim not in ACTIONS", "motions key", "opens, no motions.open", "duration"];
 
-/// The median of each first tag's uses' minutes, over `objects`.
+/// What a use's duration is compared with: the uses with the same animation (a night's sleep with sleeps, a nap
+/// with naps; a first tag lumps them together), else with the same first tag.
+pub fn like_key(u: &Use) -> Option<&str> {
+    if u.anim.is_empty() { u.tags.first().map(String::as_str) } else { Some(u.anim.as_str()) }
+}
+
+/// The median minutes of the uses of each `like_key`, over `objects`.
 pub fn tag_medians(objects: &[Object]) -> BTreeMap<String, f32> {
-    let mut by_tag: BTreeMap<String, Vec<f32>> = BTreeMap::new();
+    let mut by_like: BTreeMap<String, Vec<f32>> = BTreeMap::new();
     for u in objects.iter().flat_map(|o| &o.uses) {
-        if let Some(tag) = u.tags.first() {
-            by_tag.entry(tag.clone()).or_default().push(u.minutes);
+        if let Some(like) = like_key(u) {
+            by_like.entry(like.to_string()).or_default().push(u.minutes);
         }
     }
-    by_tag
+    by_like
         .into_iter()
-        .map(|(tag, mut m)| {
+        .map(|(like, mut m)| {
             m.sort_by(f32::total_cmp);
             let n = m.len();
-            (tag, if n % 2 == 1 { m[n / 2] } else { (m[n / 2 - 1] + m[n / 2]) / 2.0 })
+            (like, if n % 2 == 1 { m[n / 2] } else { (m[n / 2 - 1] + m[n / 2]) / 2.0 })
         })
         .collect()
 }
 
 /// What looks wrong in `object`'s uses: `motions` is its model's (None: none), `actions` the renderer's action
-/// tags, `medians` the minutes per first tag (`tag_medians`), and `decor` whether its kind expects no use.
+/// tags, `medians` the minutes per `like_key` (`tag_medians`), and `decor` whether its kind expects no use.
 pub fn use_flags(object: &Object, motions: Option<&Value>, actions: &BTreeSet<String>, medians: &BTreeMap<String, f32>, decor: bool) -> Vec<Flag> {
     let mut out = Vec::new();
-    if object.uses.is_empty() && !decor {
+    if object.uses.is_empty() && !object.lamp && !decor {
         out.push(Flag::NoUse);
     }
     for u in &object.uses {
@@ -379,10 +388,10 @@ pub fn use_flags(object: &Object, motions: Option<&Value>, actions: &BTreeSet<St
         }
     }
     for u in &object.uses {
-        let Some(tag) = u.tags.first() else { continue };
-        let Some(&median) = medians.get(tag) else { continue };
+        let Some(like) = like_key(u) else { continue };
+        let Some(&median) = medians.get(like) else { continue };
         if median > 0.0 && (u.minutes > median * DURATION_SPREAD || u.minutes * DURATION_SPREAD < median) {
-            out.push(Flag::Duration { using: u.id.clone(), minutes: u.minutes, tag: tag.clone(), median });
+            out.push(Flag::Duration { using: u.id.clone(), minutes: u.minutes, like: like.to_string(), median });
         }
     }
     out

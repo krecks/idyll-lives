@@ -107,6 +107,8 @@ fn catalogue() -> (Vec<Object>, BTreeMap<String, Value>, BTreeSet<String>) {
     fridge.station_anims = ["stir".to_string()].into();
     let mut sink = object("sink", "kitchen", "sinks");
     sink.uses = vec![using("wash", "wash", 2.0, &["food"]), using("polish", "buff", 6.0, &["food"])];
+    let mut table = object("table", "dining", "tables");
+    table.uses = vec![using("dine", "eat", 15.0, &["food"]), using("lunch", "eat", 20.0, &["food"])];
     let vase = object("vase", "decor", "ornaments");
     let crate_ = object("crate", "decor", "boxes");
     let mut crop = object("tomatoes", "garden", "edibles");
@@ -117,15 +119,16 @@ fn catalogue() -> (Vec<Object>, BTreeMap<String, Value>, BTreeSet<String>) {
         ("model.fridge".to_string(), json!({ "uses": { "fetch": "door", "stir": "door", "drink": "door" }, "loops": { "feast": "hum", "dance": "spin" } })),
     ]);
     let actions: BTreeSet<String> = ["relax", "nap", "fetch", "eat", "wash", "harvest"].iter().map(|s| s.to_string()).collect();
-    (vec![sofa, fridge, sink, vase, crate_, crop], motions, actions)
+    (vec![sofa, fridge, sink, table, vase, crate_, crop], motions, actions)
 }
 
 #[test]
 fn each_uses_flag() {
     let (objects, motions, actions) = catalogue();
     let medians = review::tag_medians(&objects);
-    assert_eq!(medians["food"], 6.0, "5, 90, 2, 6, 6: the middle one");
-    assert_eq!(medians["rest"], 30.0);
+    // By animation: the eats 15, 20, 90 (the middle one); the fetches 5 and 2.
+    assert_eq!(medians["eat"], 20.0);
+    assert_eq!(medians["fetch"], 3.5);
     let flags = |id: &str, decor: bool| {
         let o = objects.iter().find(|o| o.id == id).unwrap();
         review::use_flags(o, motions.get(&o.model), &actions, &medians, decor)
@@ -133,17 +136,21 @@ fn each_uses_flag() {
     // Opens with `leaves` but its model has no `motions.open`.
     assert_eq!(flags("sofaBed", false), [Flag::NoOpen { using: "doze".into() }]);
     // A key that is a use's id (`feast`), an anim (`fetch`) or a station's anim (`stir`) is fine; `drink` and
-    // `dance` aren't. 90 minutes is over 3 × the median of `food`, 6.
+    // `dance` aren't. 90 minutes is over 3 × the median of `eat`, 20.
     assert_eq!(flags("fridge", false), [
         Flag::MotionKey { key: "drink".into() },
         Flag::MotionKey { key: "dance".into() },
-        Flag::Duration { using: "feast".into(), minutes: 90.0, tag: "food".into(), median: 6.0 },
+        Flag::Duration { using: "feast".into(), minutes: 90.0, like: "eat".into(), median: 20.0 },
     ]);
-    // `buff` isn't in ACTIONS; 2 minutes is 3 × under 6 only by a hair: 2 * 3 = 6, not under.
+    // `buff` isn't in ACTIONS; `wash` and `buff` are the only uses like them.
     assert_eq!(flags("sink", false), [Flag::NoAction { using: "polish".into(), anim: "buff".into() }]);
     // No use: flagged unless its kind is decor.
     assert_eq!(flags("crate", false), [Flag::NoUse]);
     assert_eq!(flags("vase", true), []);
+    // A lamp is switched: no flag.
+    let mut lamp = object("lamp", "lighting", "lamps");
+    lamp.lamp = true;
+    assert_eq!(review::use_flags(&lamp, None, &actions, &medians, false), []);
     // `when: ripe` is a crop's, not an open state.
     assert_eq!(flags("tomatoes", false), []);
     assert_eq!(Flag::NoUse.column(), review::FLAG_COLUMNS[0]);
@@ -154,7 +161,7 @@ fn each_uses_flag() {
     let (text, files) = review::uses(&objects, &motions, &actions, &sounds, Some(&r));
     assert!(text.contains("| kitchen | 2 | 2 | 0 | 1 | 2 | 0 | 1 |"), "{text}");
     assert!(text.contains("| decor | 2 | 1 | 1 | 0 | 0 | 0 | 0 |"), "{text}");
-    assert!(text.contains("| **all** | 6 | 4 | 1 | 1 | 2 | 1 | 1 |"), "{text}");
+    assert!(text.contains("| **all** | 7 | 4 | 1 | 1 | 2 | 1 | 1 |"), "{text}");
     let living = &files["uses-living.md"];
     assert!(living.contains("| `sofaBed` sofaBed | armchair | relax:relax<br>doze:nap<br>pullOut:fetch | stand<br>stand<br>stand | 30<br>30<br>2 |"), "{living}");
     assert!(living.contains("| uses doze→bed_out, pullOut→bed_out |"), "{living}");
