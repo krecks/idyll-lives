@@ -3,7 +3,7 @@
 `living.py` builds the living room's models into `web/public/assets/models/living/` and their entries in
 `packs/living/manifest.json`: the fold-down wall bed (`model.wallBed`), the sofa bed (`model.sofaBed`), the ten
 L1 sofas and sectionals, the eleven L2 armchairs and small seats, the nine L3 coffee and side tables and the L6
-staircase (`model.stairs`). Built 2026-10-14; they sit in Validate › Sofas, Armchairs and Coffee Tables until checked in play.
+staircase (`model.stairs`). Built 2026-10-14; they sat in Validate › Sofas, Armchairs and Coffee Tables until checked in play.
 
 ## The sofas and sectionals (L1)
 
@@ -147,8 +147,8 @@ all nine bought in the house across the four facings, coloured, on WebGPU by day
 
 ## The staircase (L6)
 
-Built 2026-10-16; in Validate › Stairs until signed off (back to Living › Stairs). Build mode's Stairs tool and the
-house generator place it (`cfg.stairs`), not the buy catalog, which leaves stairs out: the Validate group shows empty.
+Built 2026-10-16; they sat in Validate › Stairs until signed off (back to Living › Stairs). Build mode's Stairs tool and the
+house generator place it (`cfg.stairs`), not the buy catalog, which leaves stairs out: the Validate group showed empty.
 
 - **Steps where the old ones are**: 14 steps of 0.2 m up and 4/14 m deep over the 1 × 4 footprint, the first
   starting at the front edge, the top of the last (2.8 m, house.ts `WALL_HEIGHT`) level with the floor above at the

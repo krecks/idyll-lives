@@ -2,7 +2,7 @@
 
 `pack_cheerful.py` builds the six P2 cheerful models into `web/public/assets/models/pack_cheerful/` and their
 entries in `packs/pack_cheerful/manifest.json`, an override pack listed in the base manifest. Built
-2026-10-14; they sit in Validate › Cheerful until checked in play.
+2026-10-14; they sat in Validate › Cheerful until checked in play.
 
 Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
 with one moving part. Flat shapes (the jukebox's arch, the lamp's hills, the booth's pleated curtains, the hammock's

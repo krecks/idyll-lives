@@ -361,6 +361,13 @@ Live-site checks after tagging:
 - LLM file is 255,530,880 bytes; voice file is 119,568,968 bytes.
 - The “new version” path works after a redeploy.
 
+**Results on `c31e646` (2026-10-21, M3 Pro):**
+
+- Pass: clippy, `sim-core` (621 tests across the gate's suites, none failed), `ll-tools`, tickbench, `voice`, `pnpm check:voice`, `check`, `lint` and `build` (`web/dist` 626 MB, under CI's 900 MB).
+- Pass: `generated_houses` and `generated_worlds` on fresh samples, and all four `soak` runs.
+- Pass: `render.mjs --preview`, Low, Medium and High × WebGPU and WebGL2 × orbit by day and night; every run started and drew (Low by day on WebGPU: 280 draws, 267 fps).
+- **Fail: `century` seed 11** (both detail levels): the town falls to 6–7 residents for about 60 game hours (days 95 and 123 of 200) against the test's floor of 8, then recovers to 16–17. Seeds 7 and 19 pass. It starts with 731b16e (ice cream): a new food choice changes the run's course, and the seed-11 town already bottomed out at 9–10 before it. No resident is stuck and nothing crashes; at the release base `a6b7924` the same seed failed differently (a resident idle for hours), which the branch fixed.
+
 ---
 
 ## 8. Open decisions

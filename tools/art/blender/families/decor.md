@@ -1,7 +1,7 @@
 # Decor — notes
 
 `decor.py` builds the 22 decor models into `web/public/assets/models/decor/` and their entries in
-`packs/decor/manifest.json`: wall art and clocks (D1), ornaments (D2) and textiles (D3). Built 2026-10-14; they sit in Validate ›
+`packs/decor/manifest.json`: wall art and clocks (D1), ornaments (D2) and textiles (D3). Built 2026-10-14; they sat in Validate ›
 Wall Decor, Ornaments and Textiles until checked in play.
 
 Each is built where the game places it (`F`, game axes):

@@ -1,5 +1,7 @@
 # Release review for v0.2.0
 
+*A record of 0.2.0, kept as it was. What became of §4 ("found but not fixed") in 0.3.0, fixed, deferred or dropped, is in [plan/release-0.3.0.md](../plan/release-0.3.0.md) §4 (Workstream 3) and the CHANGELOG's 0.3.0 section.*
+
 The pre-release review for 0.2.0 started on 2026-10-13 from `main` at 4cde174, which is 136 commits after v0.1.0. It covers animations, objects and items, bugs, performance and release readiness. Each finding has a location, a severity, a description and a proposed fix.
 
 **Status (2026-10-13):** the review is done and its fixes are merged into `main`.

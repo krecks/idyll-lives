@@ -6,7 +6,7 @@ lamp (`model.streetLamp`), the long park bench (`model.parkBench`), the drinking
 the litter bin (`model.litterBin`), the bus shelter (`model.busStop`), the post box (`model.postBox`), the notice board
 (`model.noticeBoard`), the phone box (`model.phoneBooth`), the town fountain (`model.fountainTown`) and the founder's
 statue (`model.townStatue`). The street dressing props (`model.street.*`) are not part of it. Built
-2026-10-14; they sit in Validate › Street until checked in play.
+2026-10-14; they sat in Validate › Street until checked in play.
 
 They stand on the town's park lots (`web/public/content/houses.json` `parks`) and can be bought for a garden. Each is
 built in the game's axes (`F`) where the game places it, at the content's heights:

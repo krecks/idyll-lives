@@ -126,7 +126,7 @@ the left, middle and right bin (each with its lid) and the handles.
 
 `check-glb`: 0 failed; its warnings are the wall cabinets, the range hood, the spice rack, the pot rail and the
 wall shelf floating above their origins (wall things), and 4 draw calls on the glass wall cabinet and the recycling
-bins. Khronos glTF validator: 0 errors, 0 warnings each. The eight K4 counters sit in Validate › Counters, the
+bins. Khronos glTF validator: 0 errors, 0 warnings each. The eight K4 counters sat in Validate › Counters, the
 eleven K5 things in
 Validate › Kitchen Storage and the five K6 islands and bars in Validate › Islands & Bars, until
 checked in play.

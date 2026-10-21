@@ -3,7 +3,7 @@
 `laundry.py` builds the six B4 laundry models into `web/public/assets/models/laundry/` and their entries in
 `packs/laundry/manifest.json`: the washing machine (`model.laundryWasher`), the tumble dryer
 (`model.laundryDryer`), the towel rail (`model.towelRail`), the towel ladder (`model.towelLadder`), the laundry
-basket (`model.laundryBasket`) and the bath mat (`model.bathMat`). Built 2026-10-14; they sit in Validate › Laundry
+basket (`model.laundryBasket`) and the bath mat (`model.bathMat`). Built 2026-10-14; they sat in Validate › Laundry
 until checked in play.
 
 Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its

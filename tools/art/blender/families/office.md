@@ -4,7 +4,7 @@
 entries in `packs/office/manifest.json`: the desks (`model.deskSimple`, `deskCorner`, `deskStanding`, `deskExecutive`,
 `computerDesk`, `deskWriting`, `deskLaptop`, `computerGaming`), the desk chairs (`model.chairExecutive`, `chairTask`,
 `officeChair`) and the storage and boards (`model.filingCabinet`, `whiteboard`, `corkboard`). Built
-2026-10-14; they sit in Validate › Desks, Office Chairs and Office Storage until checked in play.
+2026-10-14; they sat in Validate › Desks, Office Chairs and Office Storage until checked in play.
 
 Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
 except the corner desk, which is centred. Backs against the wall stop at its face (game depth −0.43, −0.93 two tiles

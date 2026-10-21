@@ -2,7 +2,7 @@
 
 `pack_romantic.py` builds the six P15 romantic models into `web/public/assets/models/pack_romantic/` and their
 entries in `packs/pack_romantic/manifest.json`, an override pack listed in the base manifest. Built
-2026-10-14; they sit in Validate › Romantic until checked in play.
+2026-10-14; they sat in Validate › Romantic until checked in play.
 
 Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
 Seats keep the old part's: the diners and the writer at 0.45 on the footprint's middle line, the bathers at

@@ -48,7 +48,7 @@ old part (`catalog.double_vanity`) has none either.
 ## B1 — the toilets
 
 `model.toilet` (`toilet.glb`), `model.toiletCompact`, `model.toiletSmart`, `model.toiletClassic` and
-`model.toiletWallHung`, built 2026-10-14. They sit in Validate › Toilets until checked in play.
+`model.toiletWallHung`, built 2026-10-14. They sat in Validate › Toilets until checked in play.
 
 - **Against the wall, not centred.** The game sits a resident at the footprint's middle plus the seat's
   `fwd` (characters.ts `SEATS`, else the content's `seat`), so each toilet is built where the game places it:
@@ -83,7 +83,7 @@ errors, 0 warnings each.
 
 ## B2 — the showers
 
-`model.shower`, `model.showerStall`, `model.showerWalkIn` and `model.showerRain`, built 2026-10-14. They sit in
+`model.shower`, `model.showerStall`, `model.showerWalkIn` and `model.showerRain`, built 2026-10-14. They sat in
 Validate › Showers until checked in play.
 
 - **They fill their tile**, their backs on the wall's face (game depth -0.43; `centre=` 2–3.5 cm forward of
@@ -114,7 +114,7 @@ Validate › Showers until checked in play.
 
 ## B3 — the baths
 
-`model.bathtub`, `model.bathtubClawfoot` and `model.bathtubFreestanding`, built 2026-10-14. They sit in
+`model.bathtub`, `model.bathtubClawfoot` and `model.bathtubFreestanding`, built 2026-10-14. They sat in
 Validate › Baths until checked in play.
 
 - **2 × 1 tiles, centred.** The resident sits along the tub, back at the end without the taps and legs out
@@ -143,7 +143,7 @@ Validate › Baths until checked in play.
 
 ## B5 — bathroom storage and mirrors
 
-`model.mirrorCabinet`, `model.mirrorRound` and `model.bathCabinetTall`, built 2026-10-14. They sit in
+`model.mirrorCabinet`, `model.mirrorRound` and `model.bathCabinetTall`, built 2026-10-14. They sat in
 Validate › Bathroom Storage until checked in play. The mirror cabinet's door opens while a resident brushes
 their teeth there, and the tall cabinet's upper door while one takes a fresh towel; the round mirror is still.
 

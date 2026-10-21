@@ -1,9 +1,10 @@
 # Look
 
 *Design notes for how Idyll Lives looks. Inspired by classic life-simulation games, described
-here on our own terms. Status: 0.2.0. This is the Medium graphics preset, everyone's default; Low
-and High change a few things (softer or sharper shadows, fewer lamps, half the lawn and no woods'
-shadows on Low, two mirrors reflecting every frame on High), listed in
+here on our own terms. Status: 0.3.0. This is the Medium graphics preset, everyone's default; Low
+and High change a few things (softer or sharper shadows, fewer lamps, half the lawn, no shadows
+from the woods, the street or the residents and the street's far models on Low, two mirrors
+reflecting every frame on High), listed in
 [graphics.md](graphics.md).*
 
 The world has one look: soft, painterly shading with golden-hour light and blue moonlit nights.
@@ -72,7 +73,8 @@ server `?look=soft|classic` overrides the setting.
 |---|---|
 | Houses | `house.ts` generates walls from the simulation layout: siding or brick per house, interior paint per room, a tiled wainscot in bathrooms, a stone plinth, corner boards, a frieze, baseboards, windows with muntins, shutters and sills, door casings, painted doors, and gable or hip roofs (34° pitch, 0.4 m overhang, closed gables). |
 | Cutaway | Done on the GPU. Each wall vertex stores which view directions it hides, and the vertex shader lowers it to a 0.35 m stub. Roofs show only with walls up and when not zoomed in. |
-| Night interiors | Every lamp gives warm light (clustered lighting, up to 32 lamps) on Medium and High; on Low only the four nearest the biggest rooms do, the storey in view first. A room with no lamp gets a dim fill. When everyone in a room is asleep its lights go out and its windows stop glowing. Windows glow from outside at night only. |
+| Night interiors | Every lamp gives warm light (clustered lighting, up to 32 lamps) on Medium and High; on Low only the four nearest the biggest rooms do, the storey in view first. A room with no lamp gets a dim fill. Lamps switch on and off (the player per lamp, residents per room as they come and go); a room whose lamps are all off goes dark at the windows. When everyone in a room is asleep its lights go out and its windows stop glowing, and a neighbour's windows glow only while one of its residents is home and up. Windows glow from outside at night only. |
+| Sunlight indoors | The sun comes in through windows and doorways only: walls cast in every wall mode under a shadow-only ceiling. A room without windows is dark by day, as a basement is, and its lamps light it day and night. |
 | Garden | A bright yellow-green lawn, foundation shrubs, lot trees, clouds and a sun glow in the sky. |
 | Selection marker | A small marker over the selected resident. Its colour follows their mood through a five-step palette (`marker` in `look.ts`). |
 | Residents | Made in code (`cargo characters`): smooth, slightly toy-like bodies (an adult's head about 1/6.5 of the height, hands and feet a little large) from a cage of rounded cross-sections, subdivided once, with a low-detail copy for far residents and shadows. Women and men are separate bodies; each life stage, from a baby to an elder, has its own proportions, and a build slider makes anyone slimmer or broader. The head never deforms: eyelids, brows, lips, teeth, tongue and the beard are small shapes moved by morphs (ARKit face units for moods, one whole-face recipe per emotion adapted from TalkingHead's expressions; idle micro-expressions; blinks and lids following the gaze; visemes for lip sync). Eyes are drawn by the shader (iris in the resident's eye colour, pupil, catchlight) and turn on bones. Eleven hairstyles, bald and a beard, built from caps, curtains, lobes and tails, in flat colour with soft clump bands; long hair and tails follow the neck and shoulders. Clothes are painted on the body by its shader (tops, bottoms and shoes in the creator's colours, with soft edges), with shells only where the silhouette needs them (jackets and suits, collars, skirts, soles and boot cuffs). Skin takes the creator's tone, warmed as real skin reflects, deep tones keeping enough value for their features to read; cavities deepen with age. Clips are made in code (`characters/clips`) with arm and leg IK: residents stand relaxed with the weight drifting from leg to leg, walk with planted feet and a hip sway (more in women), sit back onto seats, lie under a blanket, and carry dishes on their palms. See `tools/characters/README.md`. |

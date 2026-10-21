@@ -89,7 +89,7 @@ rack slide instead. The clip each use plays is in the pack's `motions`:
 The built-in's freezer door and the French-door freezer drawer play `freezer_open` for "Get some ice
 cream"; `model.fridge`'s freezer door does the same.
 `fridgeFrenchDoor` and `wineFridge` take 4 draw calls (the most allowed, one per moving part plus the
-still body); the rest take 2 or 3. The five were built and exported on 2026-10-14 and sit in Validate ›
+still body); the rest take 2 or 3. The five were built and exported on 2026-10-14 and sat in Validate ›
 Fridges until checked in play.
 
 ## Rebuild

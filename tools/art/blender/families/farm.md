@@ -4,7 +4,7 @@
 entries in `packs/farm/manifest.json`: the red barn (`model.farm.barn`), the grain silo (`model.farm.silo`), the
 little tractor (`model.farm.tractor`), the round hay bale (`model.farm.hayBale`), the stack of hay bales
 (`model.farm.hayStack`), the scarecrow (`model.farm.scarecrow`), the water trough (`model.farm.trough`) and the
-chicken coop (`model.farm.coop`). Built 2026-10-14; they sit in Validate › Farm until checked in play.
+chicken coop (`model.farm.coop`). Built 2026-10-14; they sat in Validate › Farm until checked in play.
 
 They stand on the farm lots of farm worlds, placed by id in `web/src/game/town.ts` `farmstead` (the farmyard behind
 the house, hay on the fallow field, a scarecrow in a crop row), not by category or group. Each is built in the game's

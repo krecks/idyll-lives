@@ -2,7 +2,7 @@
 
 `pack_natureLover.py` builds the seven P12 nature lover models into `web/public/assets/models/pack_natureLover/`
 and their entries in `packs/pack_natureLover/manifest.json`, a pack listed in the base manifest's `packs`
-(the trait's only model manifest). Built 2026-10-14; they sit in Validate › Nature Lover until checked in
+(the trait's only model manifest). Built 2026-10-14; they sat in Validate › Nature Lover until checked in
 play.
 
 Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),

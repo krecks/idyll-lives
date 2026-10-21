@@ -2,7 +2,7 @@
 
 `pack_bookworm.py` builds the six P1 bookworm models into `web/public/assets/models/pack_bookworm/` and their
 entries in `packs/pack_bookworm/manifest.json`, an override pack listed in the base manifest. Built
-2026-10-14; they sit in Validate › Bookworm until checked in play.
+2026-10-14; they sat in Validate › Bookworm until checked in play.
 
 Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
 with one moving part. Pack families write to a pack of their own (`pack_<trait>`), keyed `model.<trait>.<id>`, so

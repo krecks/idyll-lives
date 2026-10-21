@@ -2,7 +2,7 @@
 
 `bedroom.py` builds the nine beds of BR1 into `web/public/assets/models/bedroom/` and their entries in
 `packs/bedroom/manifest.json`: `model.bed`, `model.bedSingle`, `model.bedBunk`, `model.bedFuton`, `model.bedKing`,
-`model.bedDouble`, `model.bedQueenUpholstered`, `model.bedCanopy` and `model.bedDaybed`. Built 2026-10-14; they sit in Validate › Beds until checked in play (back to Bedroom › Beds).
+`model.bedDouble`, `model.bedQueenUpholstered`, `model.bedCanopy` and `model.bedDaybed`. Built 2026-10-14; they sat in Validate › Beds until checked in play (back to Bedroom › Beds).
 
 ## Shared
 

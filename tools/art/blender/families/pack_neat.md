@@ -1,7 +1,7 @@
 # Neat pack — notes
 
 `pack_neat.py` builds the six P13 neat models into `web/public/assets/models/pack_neat/` and their entries in
-`packs/pack_neat/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sit in
+`packs/pack_neat/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sat in
 Validate › Neat until checked in play.
 
 Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),

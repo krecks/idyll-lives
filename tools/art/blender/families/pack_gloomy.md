@@ -1,7 +1,7 @@
 # Gloomy pack — notes
 
 `pack_gloomy.py` builds the six P7 gloomy models into `web/public/assets/models/pack_gloomy/` and their entries in
-`packs/pack_gloomy/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sit in
+`packs/pack_gloomy/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sat in
 Validate › Gloomy until checked in play.
 
 Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),

@@ -87,7 +87,7 @@ Its blender lid lifts for `blend` (the jug blades need E1).
 The coffee machine and both dishwashers take 3 draw calls; the breakfast counter takes 4 (its three
 moving parts each cost one). `check-glb`: 31 models, 0 failed; its four warnings are those same draw counts
 (the stove, the range cooker, the microwave, the breakfast counter). Khronos glTF validator: 0 errors, 0 warnings
-each). The ten sit in Validate › Cookers and
+each). The ten sat in Validate › Cookers and
 Validate › Appliances until checked in play.
 
 ## Rebuild

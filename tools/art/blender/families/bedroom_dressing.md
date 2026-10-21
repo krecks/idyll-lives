@@ -3,7 +3,7 @@
 `bedroom_dressing.py` builds the bedroom's mirrors and dressing table (BR4) into
 `web/public/assets/models/bedroom_dressing/` and their entries in `packs/bedroom_dressing/manifest.json`:
 `model.mirror` (`mirror.glb`, the cheval mirror), `model.dressingTable` (`dressingTable.glb`), `model.mirrorWall`
-(`mirrorWall.glb`) and `model.mirrorFloor` (`mirrorFloor.glb`). Built 2026-10-14. They sit in Validate › Dressing
+(`mirrorWall.glb`) and `model.mirrorFloor` (`mirrorFloor.glb`). Built 2026-10-14. They sat in Validate › Dressing
 until checked in play.
 
 ## Shared

@@ -1,7 +1,7 @@
 # Lighting — notes
 
 `lighting.py` builds the 21 lamps of docs/objects/lighting.md into `web/public/assets/models/lighting/` and their
-entries in `packs/lighting/manifest.json`. Built 2026-10-14; they sit in Validate ›
+entries in `packs/lighting/manifest.json`. Built 2026-10-14; they sat in Validate ›
 Ceiling Lights, Wall Lights, Floor Lamps and Table Lamps until signed off.
 
 - **LT1, ceiling:** `ceilingPendant`, `ceilingLight`, `chandelier`, `pendantIndustrial`, `ceilingFan`,

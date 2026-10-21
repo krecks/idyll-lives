@@ -3,7 +3,7 @@
 `fitness.py` builds the five F1 home gym models into `web/public/assets/models/fitness/` and their entries in
 `packs/fitness/manifest.json`: the treadmill (`model.treadmill`), the weight bench (`model.weightBench`), the
 exercise bike (`model.exerciseBike`), the yoga mat (`model.yogaMat`) and the dumbbell rack (`model.dumbbells`).
-Built 2026-10-14; they sit in Validate › Fitness until checked in play.
+Built 2026-10-14; they sat in Validate › Fitness until checked in play.
 
 Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`,
 except the bike, which is centred).

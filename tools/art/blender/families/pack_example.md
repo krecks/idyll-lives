@@ -3,7 +3,7 @@
 `pack_example.py` builds the two P5 example-pack models (`content/packs/example.json`) into
 `web/public/assets/models/pack_example/` and their entries in `packs/pack_example/manifest.json`, an override pack
 listed after the base manifest's own. Their keys are the existing `model.chefStove` and `model.whirlpoolTub`.
-Built 2026-10-14; they sit in Validate › Example until checked in play (back to Kitchen and Wellness).
+Built 2026-10-14; they sat in Validate › Example until checked in play (back to Kitchen and Wellness).
 
 Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
 The stove's back is on the wall's face (depth −0.43; the old part's sat 2.5 cm into the wall). The tub keeps the

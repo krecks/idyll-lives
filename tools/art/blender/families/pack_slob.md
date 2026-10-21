@@ -1,7 +1,7 @@
 # Slob pack — notes
 
 `pack_slob.py` builds the six P16 slob models into `web/public/assets/models/pack_slob/` and their entries in
-`packs/pack_slob/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sit in
+`packs/pack_slob/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sat in
 Validate › Slob until checked in play.
 
 Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),

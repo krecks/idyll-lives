@@ -2,7 +2,7 @@
 
 `pack_hotHeaded.py` builds the six P8 hot-headed models into `web/public/assets/models/pack_hotHeaded/` and their
 entries in `packs/pack_hotHeaded/manifest.json`, an override pack listed in the base manifest. Built
-2026-10-14; they sit in Validate › Hot Headed until checked in play.
+2026-10-14; they sat in Validate › Hot Headed until checked in play.
 
 Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
 Seats stay where the renderer puts residents: the drum throne's top at 0.47 (default seat), the zafu pressed to 0.40

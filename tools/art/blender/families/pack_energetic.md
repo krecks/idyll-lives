@@ -2,7 +2,7 @@
 
 `pack_energetic.py` builds the seven P4 energetic models into `web/public/assets/models/pack_energetic/` and their
 entries in `packs/pack_energetic/manifest.json`, an override pack listed in the base manifest. Built
-2026-10-14; they sit in Validate › Energetic until checked in play.
+2026-10-14; they sat in Validate › Energetic until checked in play.
 
 Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
 The contrast shower stood 2 cm into the wall; it is centred on its `Model` `centre` now (`G.settle()`), its back on

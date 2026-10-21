@@ -2,33 +2,58 @@
 
 All notable changes to Idyll Lives. Versions follow [semantic versioning](https://semver.org); each release is a git tag `vX.Y.Z`.
 
-## 0.3.0 — 2026-10-20
+## 0.3.0 — 2026-10-21
 
 **Play it in your browser:** https://krecks.github.io/idyll-lives/
 
-This release makes the game more reliable and cheaper to run, not broader. Every object now keeps an id of its own for life, so selling or moving furniture no longer shifts what follows it, and saves migrate. Low draws far less for older laptops, resident voices choose between the graphics card and the processor on their own, and the small things the 0.2.0 review found but left are fixed or explicitly deferred. There is no new headline feature.
+In this release every object in the game is a model built in Blender, and many of them move as they are used: doors, drawers and lids open, beds fold out, grills lift their lids and clocks tell the time. Styles are gone; you give the parts of what you own a colour of your own instead. Light behaves as in a real house: the sun comes in only through windows and doorways, a room without windows needs its lamps, and residents switch lamps on and off. Generated houses are furnished for the household who lives there. Underneath, every object keeps an id of its own for life, Low draws far less, voices choose between the graphics card and the processor on their own, and the small things the 0.2.0 review left are fixed or explicitly deferred.
+
+### New
+- **Every object built in Blender:** the furniture, appliances, plants, the street's props, the things residents carry and cook with, the lawn's tufts and wildflowers and the woods' rocks are glTF models made with the game's Blender toolkit, each within a triangle and draw-call budget, with a far version where they are seen from afar. The code-built models stay as fallbacks, and a model file that fails to load is drawn as a box and tried again.
+- **Things move as they're used:** fridge and freezer doors, cupboards, drawers, wardrobes and lids open for what a resident takes out or puts away; the futon, the sofa bed and a new fold-down wall bed open to sleep in and stay open until someone folds them up; the hot tub's cover comes off and goes back on after a soak. Grill lids and hoods lift, the fire pit's flames grow, TV screens glow, the cinema screen unrolls, the jukebox's record spins, the hoops' nets swish, crops grow from planted to ripe and picked, curtains close at night, and the wall, grandfather and alarm clocks show the game's time. A few things move on their own near the camera.
+- **Residents hold what they use:** the barbell is pressed lying down, a dumbbell goes in each hand, the guitar and ukulele come off their stands and the steam mop is pushed over the floor. Riders pedal in time with the bike's cranks, recliners and the Adirondack chair tip their sitters back, and clean things go into the nearest cupboard or counter.
+- **Colours instead of styles:** Modern, Cozy and Minimal are gone. Things marked "Any colour" take a colour on each of their parts, from the palette or any colour of your own, chosen in a colour studio that shows the item in use too (a fridge's inside). Recolouring what you own is free and can be undone.
+- **Lamps switch on and off:** click a lamp to turn it on or off. Residents switch a room's lamps on as they come in after dark and off as the last one leaves. A lamp's light comes from its shade.
+- **A softer look:** every lit surface is shaded with a wide, soft ramp in the light's own colour, a cool fill from the sky in the shade and a soft rim. Settings › Performance › Shading › Classic brings back the old shading, at once.
+- **Sunlight through windows:** the sun comes in only through windows and doorways, whichever way the walls are shown. A room without windows is dark by day and lit by its lamps. Neighbours' windows go dark when they go to bed.
+- **Doors swing:** front doors and bathroom doors stand shut and swing open as someone walks up to them. A door beside a diagonal wall opens only as far as the wall lets it, or slides into the wall.
+- **Mirrors on every preset:** Low and Medium keep one reflection of the nearest mirror and draw it again when the camera, a resident in it or the room changes; High draws two every frame, as before.
+- **Homes for who lives there:** generated houses are furnished for their household. Partners share a bed and everyone else has one of their own; cribs, toys and children's furniture are only in homes with children; spare bedrooms become a guest room, a study or a hobby room. The front door opens into the hall, the living room, the kitchen or the dining room, never a bedroom, nobody walks through a bathroom or a bedroom to get somewhere, and a garden door leads to the patio. Neighbours are picked to fit their house.
+- **Too few beds:** moving a household into a home with fewer beds than residents asks first ("Not enough beds"). They can still move in, and you're told who has no bed of their own when the game starts.
+- **Starting a game:** **Play** on a household's card in the neighbourhood starts the game in their home, and the card opens the household's details. Every household in a town has its own family name. A household is prepared while you choose, so the game starts without a long loading screen.
+
+### Changes
+- **Furniture can't be resized for now:** moving parts don't follow a resize yet. Something resized in an older save keeps its size, and "Reset size" takes it back. Doors and windows still resize.
 
 ### Fixes
+- **A sofa bed no longer opens under someone sitting on it:** a resident relaxing, eating or watching TV on it keeps their seat, and an opened sofa bed is no longer offered as a seat.
+- **An urgent need no longer cuts everything short:** a resident no longer starts, over and over, an activity their urgent need would stop at once.
+- **Poses:** the bean bag's snoozer sits up, sleepers lie on the mattress with their heads on the pillow and their legs under the quilt, two sleepers' quilts meet in the middle of a double bed, a hug or a kiss steps in until the two meet, a chair is pulled in to its desk or table with the hands on the top, bathers sit along the tub, the climbing frame is climbed and the phone box's door shuts behind its caller.
 - **The graphics API switch needs no reload:** Settings › Performance › Troubleshooting › Graphics API changes the drawing on the next start of the game, as its "Next load" badge says. A canvas that has held a WebGPU context can't give a WebGL2 one, so the new renderer gets a fresh canvas instead of failing to start.
 - **Save and reload saves over an autosave:** the crash screen's save goes into the older of the game's two autosaves, not into a new manual save on every crash.
-- **A slow start says so:** a game that takes more than 30 seconds to build its world now reports "The game took too long to start." instead of waiting on "Moving in…" for ever.
+- **A stuck start says so:** a start that makes no progress for 30 seconds now reports "The game took too long to start." instead of waiting on "Moving in…" for ever. A slow download or a big town that keeps making progress isn't given up.
 - **Walks no longer jump at the start and the end:** at speeds 4 and 5 a walk's first and last step snapped, because only steps that moved in both snapshots were smoothed. A step that starts or ends standing now glides too.
 - **Retirees aren't told they're "between jobs"** or offered job suggestions: they have a pension and can still browse for work.
 - **Progress bars no longer make the browser lay out the page every frame:** the skills, needs, career and goal bars animate a transform instead of their width.
 - **Licence links show the licence:** the voice, dictionary and language-model licences end in `.txt`, so Credits' links open them instead of downloading them.
 - **Cross-origin isolation is retried:** the one-time reload flag is cleared once the page is isolated, so a page whose service worker was later evicted tries again on the next load.
+- **Interface:** right-clicking the game no longer opens the browser's menu (except in text fields); with an object's or a resident's menu open the camera still turns, pans and zooms; the top bar, the HUD and the menus fit small windows and large interface scales, and the new-game screens stack on narrow windows. A new game's first story event shows in the feed.
+- **Building:** nothing stands off its tile through a wall, straight or diagonal; only curtains hang over a window; things stand with their backs on the wall's face, not in it; every kitchen worktop is 0.95 m high, so a run of counters lines up.
 
 ### Development
 - **Every push and pull request is checked:** a new `ci.yml` runs clippy, the simulation's tests and the sample-house and sample-world tests. The release build and Pages deploy stay in `pages.yml`.
+- **The tools are Rust:** `cargo art` builds objects in Blender, `cargo check-glb` gates every model file (size, triangles, draws, clips, far versions), and `cargo content`, `cargo characters` and `cargo tex` replace the Python scripts. Python is left only inside Blender. How to build an object is in `docs/design/objects.md` and `tools/art/blender/README.md`.
+- **Checking in a browser:** `tools/bench/check.mjs` takes the model gallery, the clips bench (`/clips.html`) and buy-and-use pictures headless with its own server; the simulation's tests write named game states (`DUMP_STATES=1`, opened with `?state=<name>`); `?debug` adds `__sims()`, `__addFunds`, `__camera` and following.
 - **The generated-house and generated-world tests can't pass vacuously:** they require `HOUSES`/`WORLDS`, and CI makes the sample files first.
 - **The benchmark can measure the interface:** `tools/bench/render.mjs --hud 1` (the default is `0`, the renderer alone).
 - **Crash stacks from the site can be read:** CI's wasm artifact is now the site's own optimisations with the name section kept (`wasm-opt --names`), not the pre-optimisation wasm with different function numbers. `wasm-opt`'s results are cached between CI runs.
 
 ### Simulation
+- **Every object keeps an id of its own for life:** commands, the view, the renderer and saves name objects by a stable id instead of their place in the list, so selling, moving or undoing one thing (or moving a whole room) can't retarget another, and a menu left open on something sold does nothing.
 - **Goals nobody can reach are refused at once:** the lot's walkable regions are labelled once per change to the house, and a resident asking for a way to another region is turned down before the search starts. No more flooding the whole town for a bed behind a wall.
 - **People are remembered too:** a resident who couldn't get to someone they meant to talk to or join doesn't try again for half a second; things and places keep the content's retry time.
 - **Walkers go round a change, or give up:** when a wall, door, stair or thing placed in their way changes the route they were walking, they work out a new one from where they stand. If there is none, they stop, and remember it if they chose it themselves.
-- Looks, repairs and crops no longer rebuild what walkers can reach or the objects-by-plot index; only changes to walking do.
+- Looks, repairs and crops no longer rebuild what walkers can reach or the objects-by-plot index; only changes to walking do, and rooms are rebuilt only when the lot's layout changes.
 
 ### Objects
 - **Ice cream from the freezer:** the fridge, built-in fridge and French-door fridge have "Get some ice cream", so their freezer doors and drawer open for a use instead of carrying a clip nobody played. The other modelled parts without a use stay decorative, documented in `docs/objects/open.md`.
@@ -38,9 +63,15 @@ This release makes the game more reliable and cheaper to run, not broader. Every
 
 ### Voices
 - **Voices choose where they run:** Settings › Voices › Runs on is Auto, Graphics card or Processor. Auto uses the graphics card when WebGPU is there, starts on the processor when it isn't, and steps down from a card that cannot start the voices or turns out too slow, with a non-blocking message. A manual choice is never overridden. The processor keeps up with speech at about 2.5× real time, so a laptop without a usable graphics card can still hear its residents.
+- **Voices are about a quarter faster on the graphics card:** the voice model's working data stays on the card between passes, and six passes replace eight, sounding the same. On an M3 Pro a warm line takes about 185 ms instead of 233.
 
 ### Graphics
-- **Low draws far less:** the village orbit by day falls from 447 draws and 5.1 M triangles a frame to 293 and 1.2 M, and from 12 long tasks to none (M3 Pro proxy, 1920×1080). The quilts and held things draw only their live rows instead of the whole town's capacity, the street uses its far models, the street and residents cast no sun shadows on Low, and one merged shadow caster replaces the lot's furniture templates. Medium is unchanged.
+- **Low draws far less:** the village orbit by day falls from 447 draws and 5.1 M triangles a frame to 293 and 1.2 M, and from 12 long tasks to none (M3 Pro proxy, 1920×1080). The quilts and held things draw only their live rows instead of the whole town's capacity, the street uses its far models, the street and residents cast no sun shadows on Low, and one merged shadow caster replaces the lot's furniture templates.
+- **Less drawn everywhere:** props nobody holds aren't drawn, a reflection draws only what its glass shows and only the residents in it, and the graphics-preset switch no longer keeps the old renderer in memory.
+
+### Compatibility
+- **Saves:** the save format is version 29 (0.2.0 wrote 23, 0.1.0 wrote 17); saves from 0.2.0 and 0.1.0 load and play on. Their objects get stable ids, their styles are dropped (every object shows its own model, in its colours as made) and lamps start switched on. A 0.2.0 build can't open a 0.3.0 save.
+- **Runs on:** desktop Chrome, Edge, Brave or Safari with WebGPU; other browsers use the WebGL2 fallback. The language model needs WebGPU; voices run on the processor without it. Tested on Apple Silicon Macs in Chrome. There is no frame-rate target for particular machines: Low is for older laptops, best effort, and hasn't been measured on Intel graphics.
 
 ## 0.2.0 — 2026-10-13
 

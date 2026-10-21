@@ -1,7 +1,7 @@
 # Foodie pack — notes
 
 `pack_foodie.py` builds the six P6 foodie models into `web/public/assets/models/pack_foodie/` and their entries in
-`packs/pack_foodie/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sit in
+`packs/pack_foodie/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sat in
 Validate › Foodie until checked in play.
 
 Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),

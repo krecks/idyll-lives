@@ -6,7 +6,7 @@ stay where the game has them; models that stand off the middle of their footprin
 
 ## OU1. Patio seating and tables (Validate › Patio)
 
-Built 2026-10-14; they sit in Validate › Patio until signed off (back to Outdoor › Seating).
+Built 2026-10-14; they sat in Validate › Patio until signed off (back to Outdoor › Seating).
 
 - **Park bench** (`bench`): cast-iron ends (legs, arm with a rounded end and a scroll, a stretcher, feet), four
   seat slats at 0.47 m and three back slats leaning 8°.
@@ -53,7 +53,7 @@ round table), and having a picnic at the picnic table, by day and on into the ni
 
 ## OU2. Loungers, swings and the hot tub (Validate › Loungers)
 
-Built 2026-10-14; in Validate › Loungers until signed off (back to Outdoor › Seating; the swing set to Outdoor › Play).
+Built 2026-10-14; they sat in Validate › Loungers until signed off (back to Outdoor › Seating; the swing set to Outdoor › Play).
 
 - **Sun lounger** (`sunLounger`): a slatted frame, a seat cushion and a beach towel; the back is its own part, an
   upholstered pad and pillow hinged at the seat's end, raised 35°. `recline` lowers it 30° (nearly flat) for
@@ -89,7 +89,7 @@ and soaking in the hot tub (cover up, water bubbling; the cover stayed up after 
 
 ## OU3. Grills and fire (Validate › Grills)
 
-Built 2026-10-16; in Validate › Grills until signed off (back to Outdoor › Cooking).
+Built 2026-10-16; they sat in Validate › Grills until signed off (back to Outdoor › Cooking).
 
 - **Charcoal grill** (`grill`): an enamelled kettle on three legs, wheels on the back two, a wire rack and an ash
   catcher; inside, a bed of red coals and a grate with burgers and sausages. The lid (with a vent and a front

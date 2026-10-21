@@ -1,7 +1,7 @@
 # Yard (`families/yard.py`)
 
 The OU4 play and yard things (docs/objects/outdoor.md). One pack, `packs/yard/manifest.json`,
-models in `models/yard/`. Built 2026-10-16; they sit in Validate › Yard until signed off (the sandpit and the bike
+models in `models/yard/`. Built 2026-10-16; they sat in Validate › Yard until signed off (the sandpit and the bike
 rack back to Outdoor › Play, the rest to Outdoor › Yard).
 
 The plan names `outdoor.py` as the family; these nine are a family of their own so that three tasks (OU3, OU4, OU5)

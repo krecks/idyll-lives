@@ -35,10 +35,10 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `fridge` Fridge | 1x1 · floor | snack:fetch meal:cook gourmet:cook | kitchen / appliances | Body, Handles, Plinth & badge, Inside | Use | `fridge_open`: the tall fridge door below swings 102° for snack, meal and gourmet; `hold` 3.5 s. The freezer door above has `freezer_open` (118°), unused until a use takes frozen food. |
+| `fridge` Fridge | 1x1 · floor | snack:fetch frozenTreat:fetch meal:cook gourmet:cook | kitchen / appliances | Body, Handles, Plinth & badge, Inside | Use | `fridge_open`: the tall fridge door below swings 102° for snack, meal and gourmet; `hold` 3.5 s. The freezer door above swings 118° (`freezer_open`) for frozenTreat. |
 | `fridgeMini` Mini fridge | 1x1 · floor | snack:fetch meal:cook | kitchen / appliances | Body, Handles, Plinth | Use | `fridge_open`: the door swings 100° on its hinge for snack and meal; `hold` 3 s. |
-| `fridgeBuiltIn` Built-in fridge | 1x1 · floor | snack:fetch meal:cook gourmet:cook coldDrink:drink | kitchen / appliances | Panels, Handles | Use | `fridge_open`: the tall fridge door swings for snack, meal, gourmet and coldDrink; the freezer door below gets `freezer_open`, unused until a use takes frozen food. |
-| `fridgeFrenchDoor` French-door fridge | 1x1 · floor | snack:fetch meal:cook gourmet:cook coldDrink:drink | kitchen / appliances | Body, Handles, Plinth | Use | `fridge_open`: both upper doors swing out (-100° / +100°) for snack, meal, gourmet; `door_right` (the right door only) for coldDrink. The freezer drawer `freezer_open` slides out 35 cm, unused until a use takes frozen food. |
+| `fridgeBuiltIn` Built-in fridge | 1x1 · floor | snack:fetch frozenTreat:fetch meal:cook gourmet:cook coldDrink:drink | kitchen / appliances | Panels, Handles | Use | `fridge_open`: the tall fridge door swings for snack, meal, gourmet and coldDrink; the freezer door below opens (`freezer_open`) for frozenTreat. |
+| `fridgeFrenchDoor` French-door fridge | 1x1 · floor | snack:fetch frozenTreat:fetch meal:cook gourmet:cook coldDrink:drink | kitchen / appliances | Body, Handles, Plinth | Use | `fridge_open`: both upper doors swing out (-100° / +100°) for snack, meal, gourmet; `door_right` (the right door only) for coldDrink. The freezer drawer slides out 35 cm (`freezer_open`) for frozenTreat. |
 | `fridgeRetro` Retro fridge | 1x1 · floor | snack:fetch meal:cook coldDrink:drink | kitchen / appliances | Body, Handle, Trim | Use | `lever`: the chrome lever (a part inside the door) turns 30° out, then `fridge_open` (`delay` 0.3 s): the rounded door swings 100°; snack, meal, coldDrink. |
 | `fridgeMiniRetro` Retro mini fridge | 1x1 · floor | snack:fetch meal:cook coldDrink:drink | kitchen / appliances | Body, Handle & feet, Trim | Use | `fridge_open`: the pastel door with its unicorn sticker swings 100° on its hinge; snack, meal, coldDrink. `hold` 3 s. |
 | `wineFridge` Wine fridge | 1x1 · floor | wine:drink | kitchen / appliances | Body, Door frame | Use | `door_open`: the glass door swings and the top rack slides out 15 cm for wine; `hold` 2.5 s. |
@@ -47,8 +47,8 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 - Every use (snack, meal, gourmet, cold drink, wine) opens its door clip and shuts it after its `hold`; the retro
   fridge pulls its lever first, the French-door fridge opens only its right door for a cold drink.
 - Gourmet also needs a stove and a counter (its prep and cook steps); checked with both bought.
-- The three freezers (`model.fridge`, the built-in, the French-door) carry clips no use plays: no interaction takes
-  frozen food yet (`cargo check-glb` warns of each).
+- The three freezers (`model.fridge`, the built-in, the French-door) open for "Get some ice cream" (`frozenTreat`,
+  0.3.0); not part of the 2026-10-16 sign-off.
 - The colour studio's "In use" opens the door, so the fridge's "Inside" colour can be seen.
 
 ## K2. Cookers (6)

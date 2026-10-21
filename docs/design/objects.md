@@ -1,12 +1,12 @@
 # How to build a new object
 
-*Status: the standard proposed for 0.3.0, written from the review of the first Blender models
-(the six garden decor models, branch `v0.3/garden-decor`, 2026-10-13). From 0.3.0 every object's
-model is built in Blender and exported as glTF: all 541 were built and signed off in play by 2026-10-17
-([docs/objects/](../objects/README.md)). Files now resize, are picked by what's drawn, load
-once per scene and can have [moving parts](#moving-parts) (branch `v0.3/object-motion`); the rest of
-[Before Blender is the standard](#before-blender-is-the-standard) is still to do. The toolkit and
-the step-by-step are in [tools/art/blender/](../../tools/art/blender/README.md).*
+*Status: the standard since 0.3.0, written from the review of the first Blender models (the six
+garden decor models, 2026-10-13). Every object's model is built in Blender and exported as glTF:
+all 541 were built and signed off in play by 2026-10-17 ([docs/objects/](../objects/README.md)).
+Files resize, are picked by what's drawn, load once per scene and can have
+[moving parts](#moving-parts); what is left of
+[Before Blender is the standard](#before-blender-is-the-standard) is quantised geometry. The toolkit
+and the step-by-step are in [tools/art/blender/](../../tools/art/blender/README.md).*
 
 An object is three things, joined by keys:
 
@@ -89,11 +89,11 @@ gate below, so the review does.
 
 ## Budgets
 
-Measured on 813 primitive models as the game's loader builds them (LOD 0), and set so that a
-Blender model costs what a primitive one does today. Every object kind is drawn with thin
+Measured on the 813 primitive models that came before Blender, as the game's loader built them
+(LOD 0), and set so that a Blender model costs what a primitive one did. Every object kind is drawn with thin
 instances, so these costs are per kind of object in view, plus the triangles of each copy.
 
-| Largest side | Placeholders today: triangles (median / 90th pct.) | Target | Most (`cargo check-glb` fails above) |
+| Largest side | Primitive models: triangles (median / 90th pct.) | Target | Most (`cargo check-glb` fails above) |
 |---|---|---|---|
 | under 0.35 m | 1,326 / 3,048 | 1,500 | 3,000 |
 | 0.35–1 m | 3,688 / 9,116 | 4,000 | 8,000 |
@@ -104,17 +104,17 @@ instances, so these costs are per kind of object in view, plus the triangles of 
   of) aim for half the target: the town overview draws every lot's outdoor objects at full detail.
 - **Draw calls:** one per finish group (below). Aim for 1–3, at most 4. Each also draws once more
   in the sun's shadow map, which in live play is redrawn every frame while residents are in view
-  (graphics.md). Map every material to a finish: six garden models took 30 draws unmapped, 9 mapped.
+  (graphics.md; on Low a still part shares the lot's one merged shadow draw). Map every material to a finish: six garden models took 30 draws unmapped, 9 mapped.
 - **Textures:** none by default; the finishes bring their own tiling textures. A texture of its
   own (a painting, a label) is one per object, at most 512 px a side (1024 for something over
   2.5 m), PNG or JPEG in the file; the build turns it into KTX2.
 - **Download:** follows from the triangles: about 12 bytes a triangle after `optimize.mjs`
   (the six garden models: 445 KB as exported, 280 KB in the build). Untextured models export
   without UVs.
-- **The presets** draw the same models. Low trims shadows, the lawn and lamps, not objects, and on
-  the M3 Low is limited by geometry (graphics.md), so these budgets are set for Low; Medium and High
-  have room to spare. There is no level of detail for objects
-  yet (below).
+- **The presets** draw the same models on the lot. Low trims shadows (the lot's still objects cast
+  from one merged mesh), the lawn and lamps, and draws the street's far versions, but not the lot's
+  objects; on the M3 Low is limited by geometry (graphics.md), so these budgets are set for Low;
+  Medium and High have room to spare. Objects on the lot have no level of detail (below).
 
 ## Materials, finishes, tints, styles and quality
 
@@ -187,7 +187,7 @@ room has.
   give every other part its own material named for what it is, and list in `paint` only what's worth
   colouring (not drains, water or food). Each combination of colours in use is a template of its own:
   a few more draw calls per combination on a lot, the file still loaded once. Colours never change
-  price or quality. Primitive models take no colour.
+  price or quality.
 - **Resizing** is switched off in Buy mode for now (`RESIZING` in `web/src/game/buildmode.ts`): a model's
   moving parts don't follow a resize well (a fridge stretched wide, a wall bed). It works for files and
   will come back for the objects it suits, decided per object.
@@ -208,7 +208,7 @@ room has.
 - **Far versions:** a model's entry may name a second file, `"far": "../../models/<family>/<id>.far.glb"`,
   at about a quarter of the triangles and standing still (no moving parts). It is drawn where the
   model is only seen from afar: the town overview behind the menus (its gardens and street,
-  `BuildOptions.far`) and the far woods (`lod` 1). A model without one is drawn whole there. In gamekit,
+  `BuildOptions.far`), the far woods (`lod` 1) and, on Low, the street in play (`streetLod`). A model without one is drawn whole there. In gamekit,
   `G.Model(..., far=0.25)` writes it from the model at rest (joined, decimated to that share, without
   what only shows while it moves), or `far=build_function` builds one of its own; `cargo check-glb`
   checks it (still, the same size, at most half the triangles). Give one to what is placed by the
@@ -333,9 +333,8 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   While a part moves, its kind's buffer is rewritten each frame and the shadows are redrawn (not for
   ambient clips or clock hands); nothing is done while all are still.
 - **Resizing** moves each part's hinge with its edge, so a wider fridge's door still turns on its side.
-- **Not yet:** the freezer door, which no use
-  opens (no interaction takes frozen food), and tiles that free up while an object is closed (a folded
-  wall bed still takes all its tiles).
+- **Not yet:** tiles that free up while an object is closed (a folded wall bed still takes all its
+  tiles). The fridges' freezer doors open for "Get some ice cream" (0.3.0).
 
 ## Export settings
 

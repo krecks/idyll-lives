@@ -1,7 +1,7 @@
 # Objects: decisions to review, and what is still open
 
 The calls taken while the objects were built, checked and fixed (2026-10-14 to 2026-10-17), for the user to review,
-and what is known not to be right yet. Each decision is reversible; its commit on `v0.3/object-motion` says how. What
+and what is known not to be right yet. Each decision is reversible; its commit says how. What
 a single object does is on its category page ([README.md](README.md)); this page collects what cuts across them.
 
 ## Decisions to review

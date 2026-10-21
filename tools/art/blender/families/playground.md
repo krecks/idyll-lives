@@ -4,7 +4,7 @@
 in `packs/playground/manifest.json`: the slide (`model.slide`), the climbing frame (`model.climbingFrame`), the seesaw
 (`model.seesaw`), the spring rider (`model.springRider`), the merry-go-round (`model.merryGoRound`), the basketball
 hoop (`model.basketballHoop`), the ping-pong table (`model.pingPongTable`) and the park chess table
-(`model.parkChessTable`). Built 2026-10-14; they sit in Validate › Playground until checked in play.
+(`model.parkChessTable`). Built 2026-10-14; they sat in Validate › Playground until checked in play.
 
 Each is built where the game places it (`F`, game axes) and stood on the floor without moving it across
 (`G.settle(centre=False)`, `centre=` on its `Model`), so the seats stay where `community.json` seats the riders. Town

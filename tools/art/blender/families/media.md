@@ -3,7 +3,7 @@
 `media.py` builds the eight L4 living-room media models (docs/objects/living.md) into `web/public/assets/models/media/` and
 their entries in `packs/media/manifest.json`, a pack listed in the base manifest's `packs` and the only manifest
 that defines these keys (`tv`, the old `tv_set`; `tvWall`, `tvRetro`, `homeCinema`, `stereo`, `boombox`,
-`tvStandLow`, `fireplaceElectric`). Built 2026-10-16; they sit
+`tvStandLow`, `fireplaceElectric`). Built 2026-10-16; they sat
 in Validate › Media until checked in play.
 
 Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`), its

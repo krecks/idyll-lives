@@ -2,7 +2,7 @@
 
 `hobbies.py` builds the nineteen hobby models (docs/objects/hobbies.md, H1–H3) into `web/public/assets/models/hobbies/`
 and their entries in `packs/hobbies/manifest.json`. Built 2026-10-14;
-they sit in Validate › Music, Games and Crafts until checked in play.
+they sat in Validate › Music, Games and Crafts until checked in play.
 
 Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
 `Model`), so seats and stools stay where the game seats residents. The dartboard hangs at its real height

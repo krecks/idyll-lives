@@ -1,7 +1,7 @@
 # Kind pack — notes
 
 `pack_kind.py` builds the six P9 kind models into `web/public/assets/models/pack_kind/` and their entries in
-`packs/pack_kind/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sit in
+`packs/pack_kind/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sat in
 Validate › Kind until checked in play.
 
 Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).

@@ -1,7 +1,7 @@
 # Lazy pack — notes
 
 `pack_lazy.py` builds the six P10 lazy models into `web/public/assets/models/pack_lazy/` and their entries in
-`packs/pack_lazy/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sit in
+`packs/pack_lazy/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sat in
 Validate › Lazy until checked in play.
 
 Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).

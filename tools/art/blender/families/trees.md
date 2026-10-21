@@ -3,7 +3,7 @@
 `trees.py` builds the G5 trees into `web/public/assets/models/trees/` and their entries in
 `packs/trees/manifest.json`: the oak (`model.tree`), maple, silver birch, cherry blossom, apple, Japanese maple,
 magnolia and weeping willow (`model.tree.*`), the pine, blue spruce and Italian cypress (`model.pine`, `model.spruce`,
-`model.cypress`) and the potted lemon tree (`model.garden.lemonTree`). Built 2026-10-14; they sit in Validate › Trees until checked in play. The
+`model.cypress`) and the potted lemon tree (`model.garden.lemonTree`). Built 2026-10-14; they sat in Validate › Trees until checked in play. The
 shapes and helpers (`lump`, `tube`, `dots`, `sprigs`, `far_of`) come from `plants.py`.
 
 ## How a tree is made

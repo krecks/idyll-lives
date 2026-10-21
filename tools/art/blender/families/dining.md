@@ -105,7 +105,7 @@ it costs no draw call. The bar cart's trays, bottles and wine glasses are `glass
 validator: 0 errors, 0 warnings each. Seen in the gallery next to their files (WebGPU), the clips bench (WebGPU and
 WebGL2), the pose bench (`/poses.html?seats=…`: a man and a woman on every chair, stool, bench and set) and in play
 (stools sat on with the swivel playing, WebGPU and WebGL2; the bar cart's shake; the oak and bistro sets sat at;
-the storage against the wall). All 29 sit in Validate › Tables, Chairs and Dining Storage until signed off.
+the storage against the wall). All 29 sat in Validate › Tables, Chairs and Dining Storage until signed off.
 
 ## Rebuild
 

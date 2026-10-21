@@ -3,7 +3,7 @@
 `bedroom_storage.py` builds the bedroom's nightstands and small storage (BR2) and its wardrobes and drawers (BR3)
 into `web/public/assets/models/bedroom_storage/` and their entries in `packs/bedroom_storage/manifest.json`, keyed
 by the existing `model.<id>` keys. Built
-2026-10-14. They sit in Validate › Nightstands and Validate › Wardrobes until checked in play.
+2026-10-14. They sat in Validate › Nightstands and Validate › Wardrobes until checked in play.
 
 ## Shared
 

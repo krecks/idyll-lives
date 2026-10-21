@@ -3,7 +3,7 @@
 `plants.py` builds the G1 houseplants into `web/public/assets/models/plants/` and their entries in
 `packs/plants/manifest.json`: the potted plant (`model.plant`), the monstera, fiddle-leaf fig, snake plant, cactus
 trio, succulent bowl, fern on a stand, parlour palm, orchid and bonsai (`model.garden.*`). Built 2026-10-14; they
-sit in Validate › Houseplants until checked in play. The G2 flowers followed the same day (below, in Validate ›
+sat in Validate › Houseplants until checked in play. The G2 flowers followed the same day (below, in Validate ›
 Flowers), then the G3 shrubs (Validate › Shrubs) and the G4 edibles (Validate › Edibles).
 
 ## How a plant is made
