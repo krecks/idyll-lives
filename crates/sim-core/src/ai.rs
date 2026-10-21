@@ -184,6 +184,10 @@ mod tests {
             ripe: false,
             picks: false,
             spare: false,
+            tends: 0.0,
+            yields: None,
+            carried: false,
+            at_slot: false,
         }
     }
 

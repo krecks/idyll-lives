@@ -562,7 +562,7 @@ pub(crate) fn hungry_housemates(sim: &Sim, ctx: &Ctx, r: &RecipeDef) -> usize {
 }
 
 /// Whether a serving of `r` would do them good (at least half of it).
-fn hungry_for(sim: &Sim, content: &Content, r: &RecipeDef) -> bool {
+pub(crate) fn hungry_for(sim: &Sim, content: &Content, r: &RecipeDef) -> bool {
     (0..content.needs.len()).any(|n| r.effects[n] > 0.1 && sim.needs[n] + r.effects[n] * 0.5 <= 1.0)
 }
 
@@ -1640,7 +1640,8 @@ pub(crate) fn settle(w: &mut World) {
         let s = &w.sims[i];
         let Some(held) = s.held else { continue };
         let going_on = match &s.current {
-            Some(a) => chain(&a.task.kind),
+            // (A harvest on its way to the fridge too, `carry.rs`.)
+            Some(a) => chain(&a.task.kind) || matches!(a.task.kind, TaskKind::Carry { baby: None, .. }),
             None => s.queue.front().is_some_and(|t| matches!(t.kind, TaskKind::Cook { .. })),
         };
         if s.here() && going_on {

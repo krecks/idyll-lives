@@ -334,7 +334,7 @@ FAMILY = G.Family(
      G.Model('birch', birch, size=(3.446, 8.184, 3.293), key='model.tree.birch', tolerance=TOLERANCE, far=far_of(birch)),
      G.Model('cherry', cherry, size=(5.251, 5.454, 5.14), key='model.tree.blossom', tolerance=TOLERANCE, far=far_of(cherry)),
      G.Model('apple', apple, size=(4.467, 5.569, 4.378), key='model.tree.fruit', tolerance=TOLERANCE, far=far_of(apple),
-             motions={'uses': {'pick': 'pick'}}),
+             motions={'uses': {'pick': 'pick', 'harvest': 'pick'}}),
      G.Model('japaneseMaple', japanese_maple, size=(3.894, 3.722, 4.025), key='model.tree.japaneseMaple', tolerance=TOLERANCE,
              far=far_of(japanese_maple), motions={'uses': {'shape': 'trim'}}),
      G.Model('magnolia', magnolia, size=(4.1, 4.948, 3.805), key='model.tree.magnolia', tolerance=TOLERANCE, far=far_of(magnolia)),

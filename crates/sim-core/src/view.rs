@@ -1070,6 +1070,20 @@ fn task_view(world: &World, task: &Task, phase: Option<&Phase>, held: Option<cra
             let label = content.phone.actions.get(action).map_or_else(String::new, |a| a.label.clone());
             (label, None, contact, crate::phone::length(content, action, answer))
         }
+        // "Carry the baby to the high chair" (the UI adds who), "Put the garden vegetables in the
+        // fridge".
+        TaskKind::Carry { baby, to, .. } => {
+            let name = world.objects.get(to as usize).map_or_else(String::new, |o| content.objects[o.def].name.to_lowercase());
+            let label = match baby {
+                Some(_) => format!("Carry the baby to the {name}"),
+                None => {
+                    let what = held.map_or_else(|| "harvest".to_owned(), |h| content.items[h.def].label.to_lowercase());
+                    format!("Put the {what} in the {name}")
+                }
+            };
+            let minutes = if baby.is_some() { crate::carry::LIFT_MINUTES } else { crate::carry::STOW_MINUTES };
+            (label, world.stable_of(to), baby, minutes)
+        }
     };
     let progress = match phase {
         Some(Phase::Using { elapsed }) | Some(Phase::Conversing { elapsed, .. }) => (elapsed / minutes).min(1.0),

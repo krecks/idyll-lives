@@ -71,7 +71,7 @@ const { BOULDER, FOOS, POOL, SMASH } = await import('../../web/src/render/babylo
 const RUNTIME: Record<string, boolean> = {
   idle: true, talk: true, walk: true, jog: true, jogAlong: true, sit: true, sitTalk: true, sitDown: false, standUp: false, sitHands: true, sitHandsNear: true, sitHandsFar: true,
   interact: false, pickUp: false, dance: true, punchJab: false, punchCross: false, hit: false, kneel: true, crouch: true,
-  eat: false, water: true, harvest: true, pick: true, foldArms: true, no: true, yes: false, phone: true, rail: true, spell: true,
+  eat: false, water: true, harvest: true, pick: true, pickHigh: true, foldArms: true, no: true, yes: false, phone: true, rail: true, spell: true,
   push: true, plant: false, lantern: true, babyLieAsleep: true, babyLieAwake: true,
   // The drinking fountain and the climbing frame, in sizes (and the frame's in lanes: characters.ts STEP_IN, clips/street.ts).
   fountainDrink181: true, fountainDrink163: true, fountainDrink147: true, fountainDrink129: true, fountainDrink112: true,
@@ -85,7 +85,7 @@ const PHASE2: Record<string, boolean> = { lie: true, chop: true, stir: true, fli
 /** Lengths (s) from the plan's clip table; within 15%. */
 const LENGTH: Record<string, number> = {
   idle: 2.5, talk: 2.9, walk: 1.1, jog: 0.7, jogAlong: 0.7, sit: 1.7, sitTalk: 2.9, sitDown: 1.33, standUp: 1.07, sitHands: 1.7, sitHandsNear: 1.7, sitHandsFar: 1.7, interact: 2.0, pickUp: 0.87,
-  dance: 1.0, punchJab: 0.87, punchCross: 1.0, hit: 0.33, kneel: 5.2, crouch: 2.9, eat: 1.33, water: 3.8, harvest: 2.5, pick: 3, plant: 2.8, foldArms: 2.5,
+  dance: 1.0, punchJab: 0.87, punchCross: 1.0, hit: 0.33, kneel: 5.2, crouch: 2.9, eat: 1.33, water: 3.8, harvest: 2.5, pick: 3, pickHigh: 3.2, plant: 2.8, foldArms: 2.5,
   yes: 2.5, no: 2.5, phone: 2.9, lantern: 2.5, rail: 2.5, spell: 2.1, push: 2.7, babyLieAsleep: 9, babyLieAwake: 6,
   fountainDrink181: 3, fountainDrink163: 3, fountainDrink147: 3, fountainDrink129: 3, fountainDrink112: 3, climb172a: 13, climb147a: 13, climb112a: 13, climb172b: 13, climb147b: 13, climb112b: 13,
   dartThrow: 7.2, pingPong: 1.8, yoga: 48,

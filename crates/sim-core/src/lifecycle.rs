@@ -534,13 +534,13 @@ fn random_character(w: &mut World) -> (Vec<String>, Vec<String>) {
 /// free one (story: a crib arrived). Babies with no room for a crib stay with their parents.
 pub(crate) fn cribs_for_babies(w: &mut World, h: usize) {
     let Some(plot) = w.households[h].plot else { return };
-    let Some(crib) = w.content.objects.iter().position(|d| d.price.is_some() && d.interactions.iter().any(|it| it.baby)) else { return };
+    let Some(crib) = w.content.objects.iter().position(|d| d.price.is_some() && d.interactions.iter().any(|it| it.baby_bed())) else { return };
     let babies = members(w, h).into_iter().filter(|&i| w.content.life.baby(w.sims[i].age)).count();
     let cribs = w
         .objects
         .iter()
         .zip(&w.object_plot)
-        .filter(|(o, p)| **p == Some(plot) && w.content.objects[o.def].interactions.iter().any(|it| it.baby))
+        .filter(|(o, p)| **p == Some(plot) && w.content.objects[o.def].interactions.iter().any(|it| it.baby_bed()))
         .count();
     for _ in cribs..babies {
         if w.deliver(h as u32, crib).is_none() {

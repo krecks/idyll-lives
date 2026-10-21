@@ -72,6 +72,7 @@ fn uses_object(t: &TaskKind, id: u32) -> bool {
         TaskKind::Use { object, .. } | TaskKind::Repair { object } => object == id,
         TaskKind::Cook { station, .. } | TaskKind::Dishes { station, .. } => station == Some(id),
         TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => seat == Some(id),
+        TaskKind::Carry { from, to, .. } => from == id || to == id,
         _ => false,
     }
 }
@@ -95,6 +96,10 @@ fn shift_objects(t: &mut TaskKind, id: u32) {
         }
         TaskKind::Dishes { station, .. } => station.iter_mut().for_each(shift),
         TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => seat.iter_mut().for_each(shift),
+        TaskKind::Carry { from, to, .. } => {
+            shift(from);
+            shift(to);
+        }
         _ => {}
     }
 }

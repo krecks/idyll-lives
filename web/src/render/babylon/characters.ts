@@ -505,6 +505,8 @@ const VIDEO_CALLS = new Set(['outgoing.videoCallNook', 'cheerful.partyBooth']);
 const WAIST_HIGH = new Set(['greenhouse', 'foodie.herbGarden', 'compostBin']);
 /** Crops picked down at the soil (strawberries, pumpkins, a meadow's flowers): the `plant` clip's crouch, not the bend over a bush. */
 const LOW_CROPS = new Set(['garden.strawberries', 'garden.pumpkins', 'garden.meadow']);
+/** Fruit trees (content `grows`): their fruit picked reaching up into the crown (`pickHigh`). */
+const FRUIT_TREES = new Set(['garden.apple', 'garden.lemonTree']);
 /** Flowers that bloom above about 0.7 m, smelt leaning in standing, a bloom held to the nose (`pick`), not crouched under. */
 const TALL_FLOWERS = new Set(['garden.cosmos', 'garden.flowerBox', 'garden.lavender', 'garden.lilies', 'garden.lupins', 'garden.roses', 'garden.wheelbarrow']);
 /** Toys played with down on the floor at the box (`kneel`, as the play mat and the doll house). */
@@ -585,7 +587,11 @@ const ACTIONS: Record<string, ActionAnim> = {
   // The baby picked up out of the crib and held (`CUDDLE`).
   cuddle: { stand: ['idle'], hands: HANDS.relaxed },
   // (From the waist-high herb planter, standing; low crops crouched down to the soil.)
-  harvest: { stand: (def) => (def === 'garden.herbs' ? ['pick'] : LOW_CROPS.has(def) ? ['plant', 'kneel'] : ['harvest', 'plant']), hands: HANDS.hold },
+  // (Fruit picked up in a tree's crown, `pickHigh`.)
+  harvest: {
+    stand: (def) => (def === 'garden.herbs' ? ['pick'] : FRUIT_TREES.has(def) ? ['pickHigh'] : LOW_CROPS.has(def) ? ['plant', 'kneel'] : ['harvest', 'plant']),
+    hands: HANDS.hold,
+  },
   prune: { stand: ['interact', 'spell', 'interact'], hands: HANDS.grip },
   garden: {
     // (The bird feeder's box on its post: reached for standing at it.)

@@ -1,5 +1,5 @@
 /**
- * Gardening: watering, harvesting, picking herbs from a planter, planting, kneeling to weed, crouching to smell flowers. Feet
+ * Gardening: watering, harvesting, picking herbs from a planter and fruit from a tree, planting, kneeling to weed, crouching to smell flowers. Feet
  * stay planted (leg IK); hands are placed by arm IK at the plants and the soil in front.
  */
 
@@ -57,6 +57,23 @@ function pickPose(p: number): PoseSpec {
     body,
     { at: [-0.2, 0.88, 0.46], pronate: 70, hand: wrist('l', 5, 0) },
     { at: [-0.08 + 0.02 * draw, 0.86 - 0.03 * pinch + 0.09 * draw, 0.5 - 0.06 * draw], pronate: 40 + 30 * pinch, hand: wrist('r', 10 + 15 * draw, 0) },
+  );
+}
+
+/**
+ * Picking fruit from a tree (the apple tree's crown, a potted lemon tree's): standing under it, looking up,
+ * the right hand reaching up into the branches, twisting a fruit off and bringing it down to the left hand
+ * holding the gathered ones at the hip, twice a loop.
+ */
+function pickHighPose(p: number): PoseSpec {
+  const n = (p * 2) % 1;
+  const reach = bump(n, 0.04, 0.5, 0.16);
+  const twist = bump(n, 0.36, 0.5, 0.05);
+  const body = stand({ breath: p, lean: -4 * reach, shift: 0.15, twist: 4, head: [-14 - 18 * reach, 4, 0] });
+  return hands(
+    body,
+    { at: [-0.12, 0.98, 0.22], pronate: -30, hand: wrist('l', 30, 0) },
+    { at: [0.14, 1.18 + 0.62 * reach, 0.3 + 0.1 * reach], pronate: 40 + 60 * twist, hand: wrist('r', 10 + 20 * twist, 0) },
   );
 }
 
@@ -120,6 +137,7 @@ export function gardenClips(): ClipDef[] {
     cycle('water', { seconds: 114 / 30, loop: true }, waterPose),
     cycle('harvest', { seconds: 2.5, loop: true }, harvestPose),
     cycle('pick', { seconds: 3, loop: true }, pickPose),
+    cycle('pickHigh', { seconds: 3.2, loop: true }, pickHighPose),
     clip('plant', { seconds: 83 / 30, loop: false }, [
       [0, rest],
       [0.14, () => plantKey(0.14, 0.42, knee(-1), knee(1), 30), 'smooth'],

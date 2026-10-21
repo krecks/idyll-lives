@@ -154,7 +154,8 @@
       },
       "motions": {
         "uses": {
-          "pick": "pick"
+          "pick": "pick",
+          "harvest": "pick"
         }
       },
       "far": "../../models/trees/apple.far.glb"

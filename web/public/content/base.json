@@ -4198,6 +4198,22 @@
       "radius": 0.13
     },
     {
+      "id": "gardenProduce",
+      "label": "Garden produce",
+      "model": "item.ingredients",
+      "hold": "both",
+      "serving": "freshPlate",
+      "radius": 0.15
+    },
+    {
+      "id": "freshPlate",
+      "label": "Something fresh from the garden",
+      "model": "item.treatPlate",
+      "hold": "hand",
+      "emptyAs": "plateDirty",
+      "radius": 0.13
+    },
+    {
       "id": "plateDirty",
       "label": "Dirty plate",
       "model": "item.plateDirty",

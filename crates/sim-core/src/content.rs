@@ -164,12 +164,41 @@ pub struct Interaction {
     /// `tags`, what the room is for), and residents sleep in it only with no other bed free for
     /// them.
     pub spare: bool,
+    /// Brings the object's crop on (content `tends`: weeding and watering): a use done to the
+    /// end grows it this share of its way from planted to ripe at once (less for one cut
+    /// short), while it grows.
+    pub tends: f32,
+    /// A harvest's produce (content `yields`): food carried in to the home's fridge and put away
+    /// (with no fridge, eaten sitting down as `eats`); see `Yield`.
+    pub yields: Option<Yield>,
+    /// Done with the baby carried here from their crib (content `carried`: feeding at the high
+    /// chair), and back after: a grown-up doing the crib's care of the same id by day does it
+    /// here instead, when this is free (`carry.rs`).
+    pub carried: bool,
+    /// Done standing in front of the place the resident takes on the object (content `atSlot`):
+    /// a crib's changing table beside it, not the cot.
+    pub at_slot: bool,
+}
+
+/// A harvest's produce (content `yields`): `servings` of a food item (that of `recipe`, a hidden
+/// recipe made for it, as for `eat`: eating a serving gives the use's own gains), put in the
+/// fridge.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Yield {
+    pub recipe: usize,
+    pub servings: u8,
 }
 
 impl Interaction {
     /// Whether this looks after a baby lying in the object.
     pub fn cares(&self) -> bool {
         self.care.iter().any(|&g| g > 0.0)
+    }
+
+    /// The place a baby lies, asleep or awake (a crib's): where babies are put, not a high
+    /// chair they're carried to.
+    pub fn baby_bed(&self) -> bool {
+        self.baby && self.pose == Pose::Lie
     }
 
     /// Whether someone in life stage `stage` (`LifeRules::stage`) may take it (`stages`).
@@ -2228,6 +2257,27 @@ struct InteractionRaw {
     /// A spare bed's night (see `Interaction::spare`).
     #[serde(default)]
     spare: bool,
+    /// Brings the crop on (see `Interaction::tends`).
+    #[serde(default)]
+    tends: f32,
+    /// A harvest's produce, put in the fridge (see `Interaction::yields`).
+    #[serde(default)]
+    yields: Option<YieldRaw>,
+    /// Done with the baby carried here (see `Interaction::carried`).
+    #[serde(default)]
+    carried: bool,
+    /// Done in front of their own place on it (see `Interaction::at_slot`).
+    #[serde(default)]
+    at_slot: bool,
+}
+
+/// An interaction's `yields`: the food item, how many servings, and how long eating one takes.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct YieldRaw {
+    pub item: String,
+    pub servings: u8,
+    pub minutes: f32,
 }
 
 /// An object's state for `when` and `leaves` (see `ObjectInstance::open`), or its crop's
@@ -2651,6 +2701,9 @@ impl Content {
                     Some(_) if recipe.is_some() => {
                         return Err(Error::new(format!("{ctx}: `eat` and `recipe` don't go together")));
                     }
+                    Some(_) if it.yields.is_some() => {
+                        return Err(Error::new(format!("{ctx}: `eat` and `yields` don't go together")));
+                    }
                     Some(e) => {
                         let mut eaten = [0.0; MAX_NEEDS];
                         for (own, eat) in own_gain.iter_mut().zip(eaten.iter_mut()).filter(|(g, _)| **g > 0.0) {
@@ -2661,6 +2714,32 @@ impl Content {
                     }
                     None => None,
                 };
+                // A harvest's produce: what it gives comes from eating a serving of it later (as
+                // `eat`), and residents weigh it all the same.
+                let yields = match &it.yields {
+                    Some(_) if recipe.is_some() => {
+                        return Err(Error::new(format!("{ctx}: `yields` and `recipe` don't go together")));
+                    }
+                    Some(y) if y.servings == 0 => return Err(Error::new(format!("{ctx}: yields: servings must be at least 1"))),
+                    Some(y) => {
+                        let mut eaten = [0.0; MAX_NEEDS];
+                        for (own, eat) in own_gain.iter_mut().zip(eaten.iter_mut()).filter(|(g, _)| **g > 0.0) {
+                            *eat = std::mem::take(own);
+                        }
+                        recipes.push(crate::cooking::eat_recipe(&ctx, &it.label, &items, &y.item, y.minutes, eaten)?);
+                        Some(Yield { recipe: recipes.len() - 1, servings: y.servings })
+                    }
+                    None => None,
+                };
+                if !(0.0..=1.0).contains(&it.tends) {
+                    return Err(Error::new(format!("{ctx}: tends must be 0..=1")));
+                }
+                if it.tends > 0.0 && obj.grows.is_none() {
+                    return Err(Error::new(format!("{ctx}: `tends` brings a crop on: the object needs `grows`")));
+                }
+                if it.carried && (it.care.values().all(|&g| g <= 0.0) || !obj.interactions.iter().any(|i| i.baby)) {
+                    return Err(Error::new(format!("{ctx}: `carried` is for a baby's care (`care`) where a baby has a place (`baby`)")));
+                }
                 let after = match it.after.as_deref() {
                     Some(t) => 1 << lookup(&tag_index, t, &ctx, "tag")?,
                     None => 0,
@@ -2763,6 +2842,10 @@ impl Content {
                     ripe: it.when == Some(OpenState::Ripe),
                     picks: it.leaves == Some(OpenState::Picked),
                     spare: it.spare,
+                    tends: it.tends,
+                    yields,
+                    carried: it.carried,
+                    at_slot: it.at_slot,
                 });
                 if it.close_after
                     && (it.leaves != Some(OpenState::Open)

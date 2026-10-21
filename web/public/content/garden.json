@@ -86,6 +86,18 @@
       }
     },
     {
+      "id": "garden.freshLemons",
+      "label": "Fresh lemons",
+      "emotion": "inspired",
+      "mood": 0.05,
+      "hours": 6,
+      "effects": {
+        "skillGain": {
+          "cooking": 1.2
+        }
+      }
+    },
+    {
       "id": "garden.zen",
       "label": "Zen",
       "emotion": "focused",
@@ -210,20 +222,25 @@
       "id": "garden.apple",
       "name": "Apple tree",
       "model": "model.tree.fruit",
+      "grows": {
+        "days": 3,
+        "fallow": 0
+      },
       "price": 240,
       "category": "garden",
       "freeRotation": true,
       "group": "trees",
       "outdoors": true,
-      "description": "A compact fruit tree. Pick a fresh apple whenever someone is peckish; good gardeners get more out of it.",
+      "description": "A compact fruit tree. In fruit, an apple picked for someone peckish, or the lot picked for the fridge; then it fruits again in a few days. Good gardeners get more out of it.",
       "interactions": [
         {
           "id": "pick",
+          "when": "ripe",
           "label": "Pick an apple",
           "anim": "eat",
-          "minutes": 15,
+          "minutes": 10,
           "effects": {
-            "hunger": 0.25,
+            "hunger": 0.15,
             "fun": 0.05
           },
           "tags": [
@@ -238,6 +255,35 @@
           },
           "feeling": "garden.homegrown",
           "feelingMinSkill": 3
+        },
+        {
+          "id": "harvest",
+          "when": "ripe",
+          "leaves": "picked",
+          "yields": {
+            "item": "gardenProduce",
+            "servings": 3,
+            "minutes": 6
+          },
+          "label": "Pick the apples",
+          "anim": "harvest",
+          "minutes": 20,
+          "effects": {
+            "hunger": 0.15,
+            "fun": 0.05
+          },
+          "tags": [
+            "food",
+            "nature",
+            "garden",
+            "outdoors"
+          ],
+          "skill": "gardening",
+          "skills": {
+            "gardening": 0.15
+          },
+          "feeling": "garden.homegrown",
+          "feelingMinSkill": 2
         },
         {
           "id": "shade",
@@ -406,40 +452,42 @@
       "id": "garden.lemonTree",
       "name": "Potted lemon tree",
       "model": "model.garden.lemonTree",
+      "grows": {
+        "days": 3,
+        "fallow": 0
+      },
       "price": 260,
       "category": "garden",
       "freeRotation": true,
       "group": "trees",
-      "description": "A little lemon tree in a terracotta pot, happy indoors or out. Pick a lemon for a fresh boost.",
+      "description": "A little lemon tree in a terracotta pot, happy indoors or out. Its lemons, picked ripe, make a cook of anyone for a while.",
       "interactions": [
         {
           "id": "pick",
-          "label": "Pick a lemon",
-          "anim": "eat",
-          "minutes": 15,
+          "when": "ripe",
+          "leaves": "picked",
+          "label": "Pick lemons",
+          "anim": "harvest",
+          "minutes": 10,
           "effects": {
-            "hunger": 0.1,
-            "fun": 0.08,
-            "energy": 0.05
+            "fun": 0.06
           },
           "tags": [
-            "food",
-            "nature",
             "garden",
-            "outdoors"
+            "nature",
+            "cooking"
           ],
-          "skill": "gardening",
           "skills": {
             "gardening": 0.1
           },
-          "feeling": "garden.homegrown",
-          "feelingMinSkill": 3
+          "feeling": "garden.freshLemons"
         },
         {
           "id": "water",
           "label": "Water the plant",
           "anim": "water",
           "minutes": 5,
+          "tends": 0.1,
           "effects": {
             "fun": 0.03
           },
@@ -1466,13 +1514,14 @@
       "freeRotation": true,
       "group": "edibles",
       "outdoors": true,
-      "description": "Rows of lettuce, carrots and cabbages. Harvest a fresh, free meal; good gardeners get more out of it.",
+      "description": "Rows of lettuce, carrots and cabbages. Weeding and watering bring it on; the harvest goes in the fridge, and good gardeners get more out of it.",
       "interactions": [
         {
           "id": "tend",
           "label": "Weed and water",
           "anim": "tend",
           "minutes": 30,
+          "tends": 0.15,
           "effects": {
             "fun": 0.1,
             "hygiene": -0.1
@@ -1491,11 +1540,16 @@
           "id": "harvest",
           "when": "ripe",
           "leaves": "picked",
+          "yields": {
+            "item": "gardenProduce",
+            "servings": 2,
+            "minutes": 8
+          },
           "label": "Harvest vegetables",
           "anim": "harvest",
           "minutes": 20,
           "effects": {
-            "hunger": 0.45,
+            "hunger": 0.3,
             "hygiene": -0.05
           },
           "tags": [
@@ -1532,6 +1586,7 @@
           "label": "Tie up and water",
           "anim": "tend",
           "minutes": 30,
+          "tends": 0.15,
           "effects": {
             "fun": 0.1,
             "hygiene": -0.1
@@ -1550,11 +1605,16 @@
           "id": "harvest",
           "when": "ripe",
           "leaves": "picked",
+          "yields": {
+            "item": "gardenProduce",
+            "servings": 2,
+            "minutes": 8
+          },
           "label": "Pick tomatoes",
           "anim": "harvest",
           "minutes": 20,
           "effects": {
-            "hunger": 0.3,
+            "hunger": 0.2,
             "hygiene": -0.05
           },
           "tags": [
@@ -1584,13 +1644,14 @@
       "freeRotation": true,
       "group": "edibles",
       "outdoors": true,
-      "description": "A low bed of strawberries: a sweet snack straight from the garden.",
+      "description": "A low bed of strawberries: sweet berries picked for the fridge.",
       "interactions": [
         {
           "id": "tend",
           "label": "Weed and water",
           "anim": "tend",
           "minutes": 30,
+          "tends": 0.15,
           "effects": {
             "fun": 0.1,
             "hygiene": -0.1
@@ -1609,11 +1670,16 @@
           "id": "harvest",
           "when": "ripe",
           "leaves": "picked",
+          "yields": {
+            "item": "gardenProduce",
+            "servings": 2,
+            "minutes": 8
+          },
           "label": "Pick strawberries",
           "anim": "harvest",
           "minutes": 20,
           "effects": {
-            "hunger": 0.25,
+            "hunger": 0.15,
             "fun": 0.1
           },
           "tags": [
@@ -1697,6 +1763,7 @@
           "label": "Weed and water",
           "anim": "tend",
           "minutes": 30,
+          "tends": 0.15,
           "effects": {
             "fun": 0.1,
             "hygiene": -0.1
@@ -1715,11 +1782,16 @@
           "id": "harvest",
           "when": "ripe",
           "leaves": "picked",
+          "yields": {
+            "item": "gardenProduce",
+            "servings": 3,
+            "minutes": 8
+          },
           "label": "Harvest a pumpkin",
           "anim": "harvest",
           "minutes": 20,
           "effects": {
-            "hunger": 0.5,
+            "hunger": 0.25,
             "hygiene": -0.05
           },
           "tags": [

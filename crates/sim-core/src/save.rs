@@ -1382,7 +1382,8 @@ impl World {
             },
             // (Eating and washing up start again from what's there after loading; a few minutes
             // on the phone are simply over, and so is listening in on a conversation.)
-            TaskKind::Answer { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. } | TaskKind::Phone { .. } | TaskKind::Join { .. } => return None,
+            // (Nor is a carry: a baby is back in the crib after a load, a harvest put down.)
+            TaskKind::Answer { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. } | TaskKind::Phone { .. } | TaskKind::Join { .. } | TaskKind::Carry { .. } => return None,
         })
     }
 }
