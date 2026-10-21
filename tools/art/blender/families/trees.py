@@ -408,21 +408,21 @@ def cypress():
 # ---- in a pot -----------------------------------------------------------------------------------------
 
 def lemon_tree():
-    """Potted lemon tree: a terracotta pot, a slim trunk and a round crown hung with lemons, all picked at once
-    (they shrink away, `ripen`); picked bare, no lemons until it fruits again."""
+    """Potted lemon tree: a terracotta pot, a slim trunk and a round crown hung with lemons, two metres tall in all (the
+    picked one at the front 1.62 m up), all picked at once (they shrink away, `ripen`); picked bare, no lemons until it fruits again."""
     P = palette(['#3A6A30', '#467838', '#548640', '#62944A'], fruit='#F2D23C', fruit2='#F5DC50', fruit3='#E8C42E')
     rng = random.Random(86)
     top = pot(P, 0.3, 0.5, r_bottom=0.22, rim=0.016)
-    tube('trunk', [(0, 0, top - 0.02), (0.04, 0.02, 1.45)], 0.035, 0.02, P.bark, verts=6)
-    crown('crown', rng, (0, 0, 1.85), (0.66, 0.66, 0.56), 10, shades(P, 4), size=0.62, core=0.8)
+    tube('trunk', [(0, 0, top - 0.02), (0.04, 0.02, 1.07)], 0.035, 0.02, P.bark, verts=6)
+    crown('crown', rng, (0, 0, 1.47), (0.66, 0.66, 0.56), 10, shades(P, 4), size=0.62, core=0.8)
     still = G.join_all('lemonTree')
     at = (0.1, -0.6, 1.62)
 
     def fruit():
-        dots(rng, 12, (0, 0, 1.85), (0.66, 0.66, 0.56), 0.13, [P.fruit, P.fruit2, P.fruit3], 'lemon', band=(-0.6, 0.6),
+        dots(rng, 12, (0, 0, 1.47), (0.66, 0.66, 0.56), 0.13, [P.fruit, P.fruit2, P.fruit3], 'lemon', band=(-0.6, 0.6),
              out=0.92, flat=1.25, segments=low(6, 5), rings=low(4, 3))
         lump('picked_lemon', 0.07, at, P.fruit, scale=(1, 1, 1.3), segments=8, rings=5, noise=0.05)
-    return _fruiting('lemon', still, (0, 0, 1.85), fruit)
+    return _fruiting('lemon', still, (0, 0, 1.47), fruit)
 
 
 # (width, height, depth) as measured. A tree's far version may differ from it by up to `TOLERANCE`.
@@ -444,7 +444,7 @@ FAMILY = G.Family(
      G.Model('pine', pine, size=(6.031, 9.2, 6.054), key='model.pine', tolerance=TOLERANCE, far=far_of(pine)),
      G.Model('spruce', spruce, size=(5.188, 10.5, 5.154), key='model.spruce', tolerance=TOLERANCE, far=far_of(spruce)),
      G.Model('cypress', cypress, size=(1.012, 7.95, 1.025), key='model.cypress', tolerance=TOLERANCE, far=far_of(cypress)),
-     G.Model('lemonTree', lemon_tree, size=(1.288, 2.374, 1.344), key='model.garden.lemonTree', tolerance=TOLERANCE, far=far_of(lemon_tree),
+     G.Model('lemonTree', lemon_tree, size=(1.288, 1.994, 1.344), key='model.garden.lemonTree', tolerance=TOLERANCE, far=far_of(lemon_tree),
              paint=[('body', 'Pot')], motions={'growth': 'ripen'})],
     comment='Blender-built trees (tools/art/blender/families/trees.py): the G5 garden trees, the woods\' '
             'oaks, maples, birches, pines and spruces, and the potted lemon tree. Listed in the base '
