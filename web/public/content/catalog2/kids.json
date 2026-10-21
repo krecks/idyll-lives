@@ -33,6 +33,9 @@
       ],
       "price": 40,
       "category": "kids",
+      "stages": [
+        "child"
+      ],
       "freeRotation": true,
       "approach": "around",
       "seatAt": [
@@ -42,7 +45,7 @@
         "height": 0.31,
         "forward": 0.05
       },
-      "description": "A small blue chair. At a low table it is for drawing and homework.",
+      "description": "A small blue chair for a child. At a low table it is for drawing, homework and a snack.",
       "interactions": [
         {
           "id": "sit",
@@ -141,6 +144,9 @@
       ],
       "price": 110,
       "category": "kids",
+      "stages": [
+        "child"
+      ],
       "freeRotation": true,
       "description": "A yellow chest with its lid open: balls, blocks and a bear.",
       "interactions": [
@@ -172,6 +178,9 @@
       ],
       "price": 130,
       "category": "kids",
+      "stages": [
+        "child"
+      ],
       "freeRotation": true,
       "decor": 0.3,
       "description": "A canvas teepee with bunting and a soft mat inside.",
@@ -270,6 +279,9 @@
       ],
       "price": 180,
       "category": "kids",
+      "stages": [
+        "child"
+      ],
       "freeRotation": true,
       "description": "A round pit full of coloured balls.",
       "interactions": [
@@ -299,6 +311,9 @@
       ],
       "price": 60,
       "category": "kids",
+      "stages": [
+        "child"
+      ],
       "freeRotation": true,
       "seat": {
         "height": 0.24,
@@ -332,6 +347,9 @@
       ],
       "price": 420,
       "category": "kids",
+      "stages": [
+        "child"
+      ],
       "decor": 0.3,
       "description": "A bright red race car to sleep in, wheels and all.",
       "interactions": [

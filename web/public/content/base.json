@@ -1612,6 +1612,18 @@
       "requires": {
         "maxFriendship": -35
       },
+      "stages": [
+        "teen",
+        "youngAdult",
+        "adult",
+        "elder"
+      ],
+      "targetStages": [
+        "teen",
+        "youngAdult",
+        "adult",
+        "elder"
+      ],
       "acceptance": {
         "base": 1.0
       },
@@ -4137,6 +4149,12 @@
       "id": "meal",
       "label": "Make a meal",
       "item": "mealPot",
+      "stages": [
+        "teen",
+        "youngAdult",
+        "adult",
+        "elder"
+      ],
       "servings": [
         1,
         4
@@ -4182,6 +4200,12 @@
       "id": "gourmet",
       "label": "Cook a gourmet meal",
       "item": "mealPot",
+      "stages": [
+        "teen",
+        "youngAdult",
+        "adult",
+        "elder"
+      ],
       "servings": [
         2,
         4
@@ -4225,6 +4249,12 @@
       "id": "tastingMenu",
       "label": "Cook a tasting menu",
       "item": "tastingBoard",
+      "stages": [
+        "teen",
+        "youngAdult",
+        "adult",
+        "elder"
+      ],
       "servings": [
         2,
         4
@@ -4269,6 +4299,12 @@
       "id": "bbq",
       "label": "Grill dinner",
       "item": "grillPlatter",
+      "stages": [
+        "teen",
+        "youngAdult",
+        "adult",
+        "elder"
+      ],
       "servings": [
         1,
         4
@@ -4313,6 +4349,12 @@
       "id": "bbqFeast",
       "label": "Grill a barbecue feast",
       "item": "grillPlatter",
+      "stages": [
+        "teen",
+        "youngAdult",
+        "adult",
+        "elder"
+      ],
       "servings": [
         2,
         6
@@ -4357,6 +4399,12 @@
       "id": "pizza",
       "label": "Bake a wood-fired pizza",
       "item": "pizza",
+      "stages": [
+        "teen",
+        "youngAdult",
+        "adult",
+        "elder"
+      ],
       "servings": [
         2,
         4
@@ -4401,6 +4449,12 @@
       "id": "bakedTreats",
       "label": "Bake treats",
       "item": "bakingTray",
+      "stages": [
+        "teen",
+        "youngAdult",
+        "adult",
+        "elder"
+      ],
       "servings": [
         2,
         6
@@ -4445,6 +4499,12 @@
       "id": "pie",
       "label": "Bake a family pie",
       "item": "pieDish",
+      "stages": [
+        "teen",
+        "youngAdult",
+        "adult",
+        "elder"
+      ],
       "servings": [
         2,
         6

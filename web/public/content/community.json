@@ -367,6 +367,9 @@
       ],
       "price": 520,
       "category": "community",
+      "stages": [
+        "child"
+      ],
       "group": "play",
       "outdoors": true,
       "description": "Up the ladder, down the slide. And again. And again.",
@@ -397,6 +400,9 @@
       ],
       "price": 900,
       "category": "community",
+      "stages": [
+        "child"
+      ],
       "group": "play",
       "slots": 2,
       "outdoors": true,
@@ -415,6 +421,7 @@
           "tags": [
             "entertainment",
             "fitness",
+            "toys",
             "outdoors"
           ],
           "skills": {
@@ -434,6 +441,10 @@
       ],
       "price": 340,
       "category": "community",
+      "stages": [
+        "child",
+        "teen"
+      ],
       "group": "play",
       "slots": 2,
       "outdoors": true,
@@ -471,6 +482,9 @@
       ],
       "price": 160,
       "category": "community",
+      "stages": [
+        "child"
+      ],
       "freeRotation": true,
       "group": "play",
       "outdoors": true,
@@ -506,6 +520,10 @@
       ],
       "price": 780,
       "category": "community",
+      "stages": [
+        "child",
+        "teen"
+      ],
       "group": "play",
       "slots": 4,
       "outdoors": true,

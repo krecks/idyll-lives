@@ -1927,6 +1927,12 @@
       ],
       "price": 650,
       "category": "bedroom",
+      "upperStages": [
+        "child",
+        "teen",
+        "youngAdult",
+        "adult"
+      ],
       "group": "beds",
       "slots": 2,
       "bunk": true,
@@ -2669,6 +2675,9 @@
       ],
       "price": 80,
       "category": "kids",
+      "stages": [
+        "child"
+      ],
       "freeRotation": true,
       "description": "Blocks, balls and odds and ends. Children love it; grown-ups rarely play on their own.",
       "interactions": [
@@ -2798,6 +2807,9 @@
       ],
       "price": 150,
       "category": "kids",
+      "stages": [
+        "child"
+      ],
       "freeRotation": true,
       "description": "Giddy-up!",
       "interactions": [
@@ -2827,6 +2839,9 @@
       ],
       "price": 180,
       "category": "kids",
+      "stages": [
+        "child"
+      ],
       "freeRotation": true,
       "description": "A small desk and chair for homework and drawings.",
       "surface": {
