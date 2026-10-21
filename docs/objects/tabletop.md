@@ -11,7 +11,7 @@ Twenty of them have uses (G-63): the appliances and screens, food and drink, boo
 on a top is used from the floor beside its top (`surface::rider_tiles`: in front of the counter, desk or table it
 stands on, else at the top's side), standing and facing it; a use with `"pose": "sit"` (the laptop, monitor, books,
 tea set, mugs, wine, blocks) takes a chair pulled up to that top if one is free, else a seat within `seatNear`, else
-it is done standing. The other nineteen are decor (the chopping board, the alarm clock, the globe and the
+it is done standing; at a top with chairs all round, any use is done from one of its chairs. The other nineteen are decor (the chopping board, the alarm clock, the globe and the
 ornaments, towels, soap and the like). Food, drink, books, plants and toys don't wear (`wearPerUse: 0`); the
 appliances and screens do. No use has a clip yet: one draw call where it can (wood `satin`, towels and the teddy
 `matte`), a second only for glass that is seen through (the cookie jar, the wine glasses, the snow globe), and the

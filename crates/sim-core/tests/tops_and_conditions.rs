@@ -170,6 +170,26 @@ fn a_laptop_on_a_desk_is_used_sitting_at_it_or_standing_without_a_chair() {
 }
 
 #[test]
+fn at_a_top_with_chairs_all_round_they_sit_down_to_use_it() {
+    let mut w = world();
+    // The desk between two counters, its chair in front, the wall behind: no side free.
+    let buy = |w: &mut World, def: &str, x: i32, z: i32| {
+        w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, 0]), colors: Default::default(), turn: None, offset: None, size: None, tall: None }).unwrap();
+    };
+    let laptop = w.objects[object(&w, "laptop", 0) as usize].stable;
+    w.apply(Command::Sell { household: 0, object: laptop }).unwrap();
+    buy(&mut w, "counter", 4, 1);
+    buy(&mut w, "counter", 6, 1);
+    buy(&mut w, "kettle", 5, 1);
+    let chair = object(&w, "chair", 0);
+    let kettle = object(&w, "kettle", 1);
+    assert_eq!(w.objects[kettle as usize].x, 5);
+    order(&mut w, "kettle", 1).unwrap();
+    assert!(until_using(&mut w, "kettle", 30.0));
+    assert_eq!((w.sims[0].use_seat, w.sims[0].pose), (Some(chair), Pose::Sit), "sat at the desk for it");
+}
+
+#[test]
 fn free_will_uses_things_on_tops() {
     let mut w = world();
     w.autonomy = true;

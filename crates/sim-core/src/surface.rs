@@ -108,7 +108,7 @@ impl Links {
                 }
             }
         }
-        let table = objects
+        let table: Vec<Option<u32>> = objects
             .iter()
             .map(|o| {
                 let at = |x: i32, z: i32| {
@@ -119,11 +119,16 @@ impl Links {
             })
             .collect();
         let host: Vec<Option<u32>> = objects.iter().map(|o| host_of(content, objects, o)).collect();
+        let base: Vec<(i32, i32)> = objects.iter().map(|o| approach_tile(content, nav, o)).collect();
+        // A thing on a top with no free side: from a seat pulled up to the top, else the top's.
         let approach = objects
             .iter()
             .map(|o| match host[o.id as usize] {
-                Some(h) => rider_tiles(content, objects, nav, o, h).first().copied().unwrap_or_else(|| approach_tile(content, nav, &objects[h as usize])),
-                None => approach_tile(content, nav, o),
+                Some(h) => rider_tiles(content, objects, nav, o, h).first().copied().unwrap_or_else(|| {
+                    let seat = table.iter().position(|t| *t == Some(h));
+                    base[seat.unwrap_or(h as usize)]
+                }),
+                None => base[o.id as usize],
             })
             .collect();
         Self { table, approach, host }
@@ -427,12 +432,21 @@ pub fn rider_tiles(content: &Content, objects: &[ObjectInstance], nav: &NavGrid,
 }
 
 /// Every tile a resident may use `obj` from, best first (`approach_tiles`; for a thing on a
-/// top, `rider_tiles`, else its top's).
+/// top, `rider_tiles`; with the top's sides all taken, the tiles of the seats pulled up to it,
+/// as they sit down to use it there, else the top's).
 pub fn use_tiles(content: &Content, objects: &[ObjectInstance], nav: &NavGrid, obj: &ObjectInstance) -> Vec<(i32, i32)> {
     match host_of(content, objects, obj) {
         Some(h) => {
             let tiles = rider_tiles(content, objects, nav, obj, h);
-            if tiles.is_empty() { approach_tiles(content, nav, &objects[h as usize]).collect() } else { tiles }
+            if !tiles.is_empty() {
+                return tiles;
+            }
+            let seats: Vec<(i32, i32)> = objects
+                .iter()
+                .filter(|s| faced_table(content, objects, nav, s.id) == Some(h))
+                .flat_map(|s| approach_tiles(content, nav, s).collect::<Vec<_>>())
+                .collect();
+            if seats.is_empty() { approach_tiles(content, nav, &objects[h as usize]).collect() } else { seats }
         }
         None => approach_tiles(content, nav, obj).collect(),
     }

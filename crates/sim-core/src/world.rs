@@ -4463,7 +4463,10 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             }
             // Sitting to use a thing on a top: on a seat pulled up to the top, if one is free
             // (else on one near, `seatNear`, else they stand at it).
-            if inter.pose == Pose::Sit && content.objects[obj.def].layer == Layer::Surface {
+            // (Standing too, when the top has chairs all round: they sit down at it.)
+            let on_top = content.objects[obj.def].layer == Layer::Surface;
+            let boxed_in = || ctx.index.links.host_of(object).is_some_and(|h| crate::surface::rider_tiles(content, objects, nav, obj, h).is_empty());
+            if on_top && (inter.pose == Pose::Sit || boxed_in()) {
                 reserved_seat = crate::surface::seat_at_top(content, objects, &ctx.index.links, object, sim.id, content.life.stage(sim.age));
             }
             if inter.seat_near > 0.0 && reserved_seat.is_none() {
