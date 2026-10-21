@@ -8,7 +8,7 @@
 # settled with `centre=False` (`centre=` on each Model). Their tops are the content's `surface` heights.
 # The BR3 pieces open for a resident choosing an outfit: a drawer slides out 30 cm (`drawer_open`), or
 # the doors swing out 100 degrees (`doors_open`, `door_open`) onto a rail of clothes. Of the BR2 pieces,
-# the three-drawer nightstand's top drawer slides out for an outfit too, the chest's lid lifts for a
+# the three-drawer nightstand's top drawer slides out for a midnight snack, the chest's lid lifts for a
 # blanket and the hamper's while the washing is sorted; the rest are static.
 #
 # Run:  cargo art bedroom_storage [--preview]
@@ -49,6 +49,8 @@ M = G.Palette(
     book2=('#B5653F', 'matte'),      # more books
     book3=('#E3D5B8', 'matte'),
     cream=('#EFE5D3', 'gloss'),      # a mug
+    tin=('#4E7A7F', 'gloss'),        # a biscuit tin in the nightstand's drawer
+    wrapper=('#C65D52', 'satin'),    # chocolate bars
     box=('#C9B79C', 'matte'),        # storage boxes on a wardrobe
     box2=('#E6DFD3', 'matte'),
     chrome=('#C9CCCF', 'chrome'),    # a hanging rail
@@ -203,20 +205,24 @@ def nightstandLamp():
 
 
 # --- the modern nightstand: white, an oak top and legs, a drawer over an open niche of books -----------
+# 0.47 m deep, as the classic one (it was 0.63, as deep as its tile and past the pillows: M-bedroom-02).
+NS_FRONT, NS_TOP = 0.0, (0.46, -0.20)    # the case's front; the top's depth and middle
+
+
 def nightstandModern():
     with G.new_parts() as still:
-        front, back = 0.16, -0.42
+        front, back = NS_FRONT, -0.42
         for sx in (-1, 1):
-            for z in (-0.37, 0.11):
+            for z in (-0.37, front - 0.05):
                 F.cone(f'leg{sx}{z}', 0.018, 0.013, 0.125, (sx * 0.23, 0.0625, z), M.oak, verts=12)
         _shell(0.56, 0.12, 0.53, back, front, M.white, name='case')
-        F.box('shelf', 0.52, 0.02, 0.56, (0, 0.37, (back + front) / 2 + 0.01), M.white)
-        F.box('drawer_case', 0.52, 0.14, 0.54, (0, 0.45, (back + front) / 2 - 0.01), M.white)
+        F.box('shelf', 0.52, 0.02, front - back - 0.02, (0, 0.37, (back + front) / 2 + 0.01), M.white)
+        F.box('drawer_case', 0.52, 0.14, front - back - 0.04, (0, 0.45, (back + front) / 2 - 0.01), M.white)
         F.box('drawer', 0.52, 0.135, 0.02, (0, 0.445, front + 0.01), M.white, bevel=0.005)
         _bar('pull', 0.12, 0.014, (0, 0.49, front + 0.03), M.iron, d=0.016)
-        F.box('top', 0.58, 0.03, 0.6, (0, 0.545, -0.13), M.oak, bevel=0.008)
-        _books('niche_book', -0.22, 0.14, -0.1, 5, h=0.19, d=0.16)
-        F.box('niche_box', 0.14, 0.09, 0.16, (0.15, 0.185, -0.08), M.box, bevel=0.01)
+        F.box('top', 0.58, 0.03, NS_TOP[0], (0, 0.545, NS_TOP[1]), M.oak, bevel=0.008)
+        _books('niche_book', -0.22, 0.14, -0.2, 5, h=0.19, d=0.16)
+        F.box('niche_box', 0.14, 0.09, 0.16, (0.15, 0.185, -0.18), M.box, bevel=0.01)
     G.join(still, 'nightstandModern', origin=(0, 0, 0))
     G.settle(centre=False)
 
@@ -238,21 +244,22 @@ def nightstandRound():
 
 
 # --- the three-drawer nightstand: walnut, three drawers with brass bars; the top one a part of its own ---
+# 0.47 m deep, as the modern one; a midnight snack in the top drawer (the use `snack`).
 def nightstandDrawers():
-    front, back = 0.16, -0.42
+    front, back = NS_FRONT, -0.42
     with G.new_parts() as still:
-        F.box('plinth', 0.52, 0.05, 0.54, (0, 0.025, (back + front) / 2 - 0.01), M.walnut, bevel=0.004)
-        F.box('case', 0.56, 0.52, 0.58, (0, 0.31, (back + front) / 2), M.walnut, bevel=0.008)
-        F.box('top', 0.58, 0.03, 0.6, (0, 0.585, -0.13), M.walnut, bevel=0.008)
+        F.box('plinth', 0.52, 0.05, front - back - 0.04, (0, 0.025, (back + front) / 2 - 0.01), M.walnut, bevel=0.004)
+        F.box('case', 0.56, 0.52, front - back, (0, 0.31, (back + front) / 2), M.walnut, bevel=0.008)
+        F.box('top', 0.58, 0.03, NS_TOP[0], (0, 0.585, NS_TOP[1]), M.walnut, bevel=0.008)
         for i, y in enumerate((0.335, 0.185)):
             F.box(f'drawer{i}', 0.52, 0.135, 0.02, (0, y, front + 0.01), M.walnut, bevel=0.005)
             _bar(f'pull{i}', 0.12, 0.014, (0, y + 0.02, front + 0.03), M.brass, d=0.016)
         _gap('drawer', 0.52, 0.135, 0, 0.485, front, M.plinth)
     G.join(still, 'nightstandDrawers', origin=(0, 0, 0))
-    # the top drawer with folded clothes in it, sliding out while a resident picks an outfit
-    drawer = _drawer('drawer', 0.52, 0.135, 0, 0.485, front, 0.44, M.walnut,
+    # the top drawer with snacks and a paperback in it, sliding out while a resident takes a snack
+    drawer = _drawer('drawer', 0.52, 0.135, 0, 0.485, front, 0.36, M.walnut,
                      pulls=[(_bar, ('pull_top', 0.12, 0.014, (0, 0.505, front + 0.03), M.brass, 0.016))],
-                     contents=lambda x, y, z: _drawer_clothes(x, y, z, 0.44, 0.34))
+                     contents=_drawer_snacks)
     G.settle(centre=False)
     G.slide(drawer, 'drawer_open', (0, -PULL, 0), seconds=DRAWER_SECONDS)
 
@@ -335,6 +342,15 @@ def benchBedEnd():
     G.settle(centre=False)
 
 
+def _drawer_snacks(x, y, z):
+    """A nightstand drawer's midnight snacks, bottom at `y` round (x, z): a biscuit tin, two chocolate bars
+    and a paperback."""
+    F.cyl('tin', 0.07, 0.07, (x - 0.12, y + 0.035, z), M.tin, verts=16, bevel=0.006)
+    for i, dx in enumerate((0.03, 0.07)):
+        F.box(f'bar{i}', 0.05, 0.015, 0.16, (x + dx, y + 0.0075 + 0.015 * i, z + 0.02 * i), M.wrapper, bevel=0.004)
+    F.box('paperback', 0.12, 0.025, 0.18, (x + 0.18, y + 0.0125, z - 0.02), M.book3, bevel=0.004)
+
+
 # --- BR3: the dresser: oak, two small drawers over two wide ones; the middle (wide) one slides out -------
 def _drawer_clothes(x, y, z, w=1.2, d=0.36):
     """Folded clothes in a drawer: stacks across its width, bottom at `y`."""
@@ -386,7 +402,9 @@ def _wardrobe_inside(w, y0, y1, back, front, rail_y, split=True):
           verts=10, rot=(0, 90, 0))
     n = 5 if split else max(3, int(w / 0.16))
     _hanging('shirt', -w / 2 + 0.1, hang_x1 - 0.08, rail_y, zc, n, depth=min(0.42, d - 0.1))
-    F.box('folded_box', 0.3, 0.2, 0.3, (-w / 4 if split else -w / 4, rail_y + 0.23, zc), M.box, bevel=0.01)
+    # a box on the hat shelf, under the carcass's top and inside its side (it came through both)
+    bw = min(0.3, w / 2 - 0.06)
+    F.box('folded_box', bw, 0.13, 0.3, (-w / 4, rail_y + 0.13 + 0.065, zc), M.box, bevel=0.01)
     if split:
         F.box('divider', 0.02, y1 - y0 - 0.04, d - 0.02, (0, (y0 + y1) / 2, zc - 0.01), M.white)
         for i, y in enumerate((y0 + 0.45, y0 + 0.9, y0 + 1.35)):
@@ -418,20 +436,24 @@ def wardrobe():
 
 
 # --- the tall chest of drawers: linen-white, five drawers with brass bars, on a dark plinth --------------
+# 0.51 m deep (it was 0.66, as deep as its tile: M-bedroom-02).
+CHEST_FRONT = 0.04
+
+
 def chestOfDrawers():
-    front = 0.185
+    front = CHEST_FRONT
     with G.new_parts() as still:
-        F.box('plinth', 0.82, 0.06, 0.58, (0, 0.03, (WALL + front) / 2 - 0.01), M.plinth, bevel=0.004)
+        F.box('plinth', 0.82, 0.06, front - WALL - 0.04, (0, 0.03, (WALL + front) / 2 - 0.01), M.plinth, bevel=0.004)
         F.box('case', 0.86, 1.07, front - WALL, (0, 0.595, (WALL + front) / 2), M.linen, bevel=0.008)
-        F.box('top', 0.88, 0.03, 0.63, (0, 1.145, (WALL + 0.2) / 2), M.linen, bevel=0.008)
+        F.box('top', 0.88, 0.03, front + 0.015 - WALL, (0, 1.145, (WALL + front + 0.015) / 2), M.linen, bevel=0.008)
         for i, y in enumerate((0.179, 0.387, 0.803, 1.011)):
             F.box(f'drawer{i}', 0.815, 0.194, 0.02, (0, y, front + 0.01), M.linen, bevel=0.006)
             _bar(f'pull{i}', 0.16, 0.014, (0, y + 0.031, front + 0.03), M.brass)
         _gap('drawer', 0.815, 0.194, 0, 0.595, front, M.plinth)
     G.join(still, 'chestOfDrawers', origin=(0, 0, 0))
-    drawer = _drawer('drawer', 0.815, 0.194, 0, 0.595, front, 0.5, M.linen,
+    drawer = _drawer('drawer', 0.815, 0.194, 0, 0.595, front, 0.42, M.linen,
                      pulls=[(_bar, ('pull_mid', 0.16, 0.014, (0, 0.626, front + 0.03), M.brass))],
-                     contents=lambda x, y, z: _drawer_clothes(x, y, z, 0.72, 0.4))
+                     contents=lambda x, y, z: _drawer_clothes(x, y, z, 0.72, 0.34))
     G.settle(centre=False)
     G.slide(drawer, 'drawer_open', (0, -PULL, 0), seconds=DRAWER_SECONDS)
 
@@ -462,19 +484,24 @@ def dresserLow():
 
 
 # --- the single wardrobe: white, one door hinged on the left with a brass bar, a rail of shirts ----------
+# 0.60 m wide, its door 0.58 (it was 0.90, with a door as wide as a room's: M-bedroom-03).
+WS_W = 0.6
+
+
 def wardrobeSingle():
     back, front = WALL, 0.14
+    w = WS_W
     with G.new_parts() as still:
-        F.box('plinth', 0.86, 0.05, 0.53, (0, 0.025, (back + front) / 2 - 0.01), M.plinth, bevel=0.004)
-        _shell(0.9, 0.05, 2.04, back, front, M.white, t=0.022, name='case')
-        _wardrobe_inside(0.9, 0.05, 2.04, back, front, 1.74, split=False)
-        F.box('box_top', 0.3, 0.24, 0.3, (-0.2, 2.16, -0.2), M.box, bevel=0.012)
+        F.box('plinth', w - 0.04, 0.05, 0.53, (0, 0.025, (back + front) / 2 - 0.01), M.plinth, bevel=0.004)
+        _shell(w, 0.05, 2.04, back, front, M.white, t=0.022, name='case')
+        _wardrobe_inside(w, 0.05, 2.04, back, front, 1.74, split=False)
+        F.box('box_top', 0.3, 0.24, 0.3, (-0.1, 2.16, -0.2), M.box, bevel=0.012)
     G.join(still, 'wardrobeSingle', origin=(0, 0, 0))
     with G.new_parts() as parts:
-        F.box('door', 0.88, 1.97, 0.02, (0, 1.045, front + 0.01), M.white, bevel=0.006)
-        F.box('door_panel', 0.7, 1.72, 0.006, (0, 1.045, front + 0.023), M.white, bevel=0.003)
-        _bar('handle', 0.02, 0.5, (0.36, 1.1, front + 0.035), M.brass, d=0.024)
-    door = G.hinged(G.join(parts, 'door'), F.at(-0.44, 1.045, front + 0.01))
+        F.box('door', w - 0.02, 1.97, 0.02, (0, 1.045, front + 0.01), M.white, bevel=0.006)
+        F.box('door_panel', w - 0.16, 1.72, 0.006, (0, 1.045, front + 0.023), M.white, bevel=0.003)
+        _bar('handle', 0.02, 0.5, (w / 2 - 0.06, 1.1, front + 0.035), M.brass, d=0.024)
+    door = G.hinged(G.join(parts, 'door'), F.at(-(w - 0.02) / 2, 1.045, front + 0.01))
     G.settle(centre=False)
     G.swing(door, 'door_open', 100, seconds=DOOR_SECONDS)
 
@@ -521,19 +548,20 @@ def _key(id):
 
 
 DRAWER_USE = {'uses': {'outfit': 'drawer_open'}, 'hold': DRAWER_HOLD}
+SNACK_DRAWER = {'uses': {'snack': 'drawer_open'}, 'hold': DRAWER_HOLD}   # the three-drawer nightstand's snack
 
 FAMILY = G.Family(
     'bedroom_storage', M,
-    # BR2: the three-drawer nightstand's top drawer slides out for an outfit, the chest's lid lifts for a
+    # BR2: the three-drawer nightstand's top drawer slides out for a snack, the chest's lid lifts for a
     # blanket and the hamper's while the washing is sorted
     [G.Model('nightstand', nightstand, size=(0.54, 0.66, 0.468), key=_key('nightstand'), centre=(0, -0.1958),
              paint=[('oak', 'Body'), ('brass', 'Handles')]),
-     G.Model('nightstandModern', nightstandModern, size=(0.58, 0.56, 0.628), key=_key('nightstandModern'),
-             centre=(0, -0.116), paint=[('white', 'Body'), ('iron', 'Handles')]),
+     G.Model('nightstandModern', nightstandModern, size=(0.58, 0.56, 0.468), key=_key('nightstandModern'),
+             centre=(0, -0.196), paint=[('white', 'Body'), ('iron', 'Handles')]),
      G.Model('nightstandRound', nightstandRound, size=(0.54, 0.57, 0.56), key=_key('nightstandRound'),
              centre=(0, -0.0498), paint=[('clay', 'Body'), ('brass', 'Handles')]),
-     G.Model('nightstandDrawers', nightstandDrawers, size=(0.58, 0.6, 0.628), key=_key('nightstandDrawers'),
-             centre=(0, -0.116), motions=DRAWER_USE, paint=[('walnut', 'Body'), ('brass', 'Handles')]),
+     G.Model('nightstandDrawers', nightstandDrawers, size=(0.58, 0.6, 0.468), key=_key('nightstandDrawers'),
+             centre=(0, -0.196), motions=SNACK_DRAWER, paint=[('walnut', 'Body'), ('brass', 'Handles')]),
      G.Model('nightstandLamp', nightstandLamp, size=(0.54, 1.08, 0.468), key=_key('nightstandLamp'),
              centre=(0, -0.1958), paint=[('oak', 'Body'), ('shade', 'Shade')]),
      G.Model('cedarChest', cedarChest, size=(0.974, 0.505, 0.52), key=_key('cedarChest'),
@@ -549,11 +577,11 @@ FAMILY = G.Family(
              motions={'uses': {'outfit': 'doors_open'}, 'hold': DOOR_HOLD},
              # (the white carcass is its body; the birch doors are their own part)
              paint=[('white', 'Body'), ('birch', 'Doors'), ('brass', 'Handles')]),
-     G.Model('chestOfDrawers', chestOfDrawers, size=(0.88, 1.16, 0.655), key=_key('chestOfDrawers'),
-             centre=(0, -0.1025), motions=DRAWER_USE, paint=[('linen', 'Body'), ('brass', 'Handles')]),
+     G.Model('chestOfDrawers', chestOfDrawers, size=(0.88, 1.16, 0.51), key=_key('chestOfDrawers'),
+             centre=(0, -0.175), motions=DRAWER_USE, paint=[('linen', 'Body'), ('brass', 'Handles')]),
      G.Model('dresserLow', dresserLow, size=(1.82, 0.8, 0.635), key=_key('dresserLow'), centre=(0, -0.1125),
              motions=DRAWER_USE, paint=[('oak', 'Body'), ('iron', 'Handles')]),
-     G.Model('wardrobeSingle', wardrobeSingle, size=(0.9, 2.28, 0.617), key=_key('wardrobeSingle'),
+     G.Model('wardrobeSingle', wardrobeSingle, size=(0.6, 2.28, 0.617), key=_key('wardrobeSingle'),
              centre=(0, -0.1215), motions={'uses': {'outfit': 'door_open'}, 'hold': DOOR_HOLD},
              paint=[('white', 'Body'), ('brass', 'Handles')]),
      G.Model('armoire', armoire, size=(1.86, 2.109, 0.628), key=_key('armoire'), centre=(0, -0.1162),
