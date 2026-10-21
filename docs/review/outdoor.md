@@ -294,7 +294,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/furniture.json:4478-4481` (`firePit` `seat`: height 0.38, forward 0.38: on the capstones, facing out), `:4485-4489` (`relax`, `pose: sit`)
 - **Evidence:** `play/chunk1/firePit-relax-01.png`, `sheets/age-firePit.png` (child, teen, adult, elder), `extra/night/sheet-fire.png`: the resident sits on the capstone rim of a burning pit, legs out over the grass, the flames a hand's breadth behind their back, for half an hour. Nobody sits on a lit fire pit's wall; people sit on chairs or log benches round it, facing the fire, about a metre off. Drop the `seat` and use the fire from a seat nearby (`seatNear`, as the TV does) or standing in front of it facing in; or give the model a log bench (`model`).
-- **Status:** open
+- **Status:** fixed (aac64b84, 278de962)
+- **After:** the pit's `seat` is gone; *Warm up by the fire* is used from a seat within 3 m that faces the pit (`seatNear: 3`, `seatFacing: around`: a garden chair round it), else standing at one of four places round it 0.85 m from its middle, facing the fire (`slots: 4`, `places`), four at once. At night with a garden chair facing it and four residents: one in the chair, three standing round it facing in (`bench-results/review/fixes/slots/play/firePit-0*.png`; `bench-results/review/fixes/slots/poses/poses-default-firePit_relax.png`), against `play/chunk1/firePit-relax-01.png`. Sim test `tests/slots.rs` (`round_the_fire_pit_from_a_chair_facing_it_or_standing_facing_in`). Standing, it is the `relax` stand clip, arms folded (I-outdoor-09). Not re-run at every stage (`--sim`): on foot each stage plays its own stand clip, with no seat height left to fit.
 - **Source:** outdoor wave (lead; Phase 0 "Seen")
 
 ### I-outdoor-02 — Dozing outdoors, and on a sofa bed or window seat, puts the resident in pyjamas
@@ -354,3 +355,13 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Evidence:** `sheets/obj-outdoorBar.png`. A bar's use is a drink on a stool at it. A stool pulled up offers only "sit", while the patio chair at a table has "Have a coffee" (`needsTable`, `catalog2/outdoor.json:93-110`). A drink use on the bar stool with `needsTable` (kitchen ledger: `barStool`) gives the indoor bar counters (`barSegment`, `barEnd`) the same.
 - **Status:** open
 - **Source:** outdoor wave
+
+### I-outdoor-09 — Warming up by the fire on foot is standing with the arms folded
+
+- **Severity:** S3
+- **Rubric:** I3 (A1)
+- **Fix class:** clip
+- **Where:** `web/src/render/babylon/characters.ts` (`ACTIONS.relax`: `stand: ['idle', 'foldArms']`), `web/public/content/furniture.json` (`firePit` `relax`, `anim: relax`)
+- **Evidence:** `bench-results/review/fixes/slots/play/firePit-0*.png`: since G-01 those without a chair stand round the pit facing it, idling or with the arms folded for 30 minutes. People at a fire hold their hands out to it now and then, or rub them. A standing warm-up clip (the hands out to the fire, palms in, in turns with rubbing them), picked by object as G-26 picks the game clips.
+- **Status:** open
+- **Source:** fix: slots

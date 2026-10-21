@@ -359,6 +359,16 @@ Seeded from earlier docs first; add new findings after them in the same form.
 
 ### I-community-13 — moved to residents.md
 
+### I-community-14 — The park chess players' knees meet under the table
+
+- **Severity:** S3
+- **Rubric:** I2, M6
+- **Fix class:** model
+- **Where:** `tools/art/blender/families/playground.py` (`parkChessTable`: a 1 × 1 tile, the stools at x = ±0.42 m), `web/public/content/community.json` (`parkChessTable` `places`)
+- **Evidence:** `bench-results/review/fixes/slots/play/parkChessTable-side-0*.png`, `parkChessTable-0*.png`: since G-62 the two face each other across the board, but on one tile their hips are 0.84 m apart: the knees meet under the 0.48 m top and the hands at the board's middle, the heads about 0.4 m apart. Real park chess tables seat the players about 1.1 m apart (a 0.7 m top). A 2 × 1 footprint (the stools at ±0.6, moving the park lots' tables), or a narrower seated clip for board games.
+- **Status:** open
+- **Source:** fix: slots
+
 ### Pointers to findings in other ledgers
 
 What this wave saw of causes filed elsewhere, carried into those findings at the consolidation (2026-10-21):

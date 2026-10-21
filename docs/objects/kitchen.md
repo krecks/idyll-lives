@@ -167,10 +167,10 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `diningTable` Dining table | 2x1 · floor | coffee:drink | kitchen / dining | Top, Legs | Static | Static. |
+| `diningTable` Dining table | 2x1 · floor | coffee:drink | kitchen / dining | Top, Legs | Static | Static. Its two places (content `places`) are the two chairs as built, side by side; facing across waits for its rebuild (G-39). |
 | `bistroSet` Bistro table | 1x1 · floor | breakfast:eat coffee:drink | kitchen / dining | Top, Frame, Seats | Static | Static. |
-| `diningGlass` Glass dining table | 2x1 · floor | breakfast:eat coffee:drink | kitchen / dining | Top, Legs | Static | Static; glass top. |
-| `diningOak` Farmhouse dining table | 2x1 · floor | breakfast:eat coffee:drink dinner:eat | kitchen / dining | Top, Legs | Static | Static. |
+| `diningGlass` Glass dining table | 2x1 · floor | breakfast:eat coffee:drink | kitchen / dining | Top, Legs | Static | Static; glass top. Its places are its two chairs as built, side by side (G-39 rebuilds it to face across). |
+| `diningOak` Farmhouse dining table | 2x1 · floor | breakfast:eat coffee:drink dinner:eat | kitchen / dining | Top, Legs | Static | Static. Its places are its two chairs as built, side by side (G-39 rebuilds it to face across). |
 | `tableSquare2` Square table for two | 1x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
 | `tableBistroRound` Round bistro table | 1x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
 | `tableDining4` Dining table for four | 2x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |

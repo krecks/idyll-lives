@@ -192,7 +192,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 | `kind.neighbourlyOven` Neighbourly baking counter | 2x1 · floor | familyPie:cook treatsToShare:cook | kitchen / — | Body, Fabric, Cupboards | Use | `oven_open` for familyPie and treatsToShare. |
 | `kind.givingJar` Community giving jar | 1x1 · floor | donate:idle | decor / — | Body, Fabric | Use | `coin`: a coin slides into the slot for donate. |
 | `kind.knittingRocker` Gift-knitting rocker | 1x1 · floor | knitGift:tinker rock:relax | hobbies / — | Body, Fabric | Loop (E1) | `rock`: the chair rocks ±5° on its rockers with the knitter riding it (`ride`) for knitGift and rock (E1). |
-| `kind.welcomeTeaTable` Welcome tea table | 2x1 · floor | shareTea:drink | living / — | Body, Fabric, Second pouf, Rug | Use | `pour`: the teapot tips for shareTea (`hold` 1.5 s). |
+| `kind.welcomeTeaTable` Welcome tea table | 2x1 · floor | shareTea:drink | living / — | Body, Fabric, Second pouf, Rug | Use | `pour`: the teapot tips for shareTea (`hold` 1.5 s). The two on the poufs turn 45° to each other (content `places`; facing across waits for G-39). |
 | `kind.songbirdFeeder` Songbird feeding station | 1x1 · floor | refill:garden watchBirds:look | outdoor / — | Body, Fabric, Roof | Use | `lid_open` for refill; `bird`: birds appear for watchBirds. |
 | `kind.hearthSettee` Hearthside quilted settee | 2x1 · floor | curlUp:relax quiltNap:nap | living / — | Body, Fabric | Use | `sink_in` for curlUp and quiltNap. The napper lies along the seat between the arms, head at the lantern's end (`BEDS` 0.44, `across`); the nap takes both places (`whole`): it starts only on an empty settee, and nobody sits beside the napper. |
 
@@ -315,7 +315,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `romantic.candlelitTable` Candlelit bistro table | 2x1 · floor | candlelitDinner:eat shareDessert:eat | kitchen / — | Body, Fabric, Tablecloth | Use | `candles`: the candle flames grow for candlelitDinner and shareDessert. |
+| `romantic.candlelitTable` Candlelit bistro table | 2x1 · floor | candlelitDinner:eat shareDessert:eat | kitchen / — | Body, Fabric, Tablecloth | Use | `candles`: the candle flames grow for candlelitDinner and shareDessert. Its places are its two chairs as built, side by side (G-39 rebuilds it to face across). |
 | `romantic.heartTub` Heart-shaped petal tub | 2x2 · floor | petalBath:bath | bathroom / — | Body, Fabric | Use | `fill`: the water rises with petals for petalBath. |
 | `romantic.vanity` Rose-gold vanity | 1x1 · floor | primp:wash | bedroom / — | Body, Fabric, Rose gold | Use | `drawer_open` for primp (`hold` 2 s); the mirror is mirror glass (E6). |
 | `romantic.gramophone` Moonlight gramophone | 1x1 · floor | listen:listen waltz:dance | living / — | Body, Horn | Use | `needle`: the tone arm swings onto the record for listen and waltz. `platter` spins the record while it plays (E1). |

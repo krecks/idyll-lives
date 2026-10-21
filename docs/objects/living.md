@@ -114,7 +114,9 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 - Screens glow while on, brighter at night (the TV and wall TV while watched, the home cinema's screen while down,
   the bench TV while up), and the fire lights the room.
 - *Watch TV* sits the resident on a free sofa or armchair within 4 m when there is one (`seatNear`), facing the way
-  the seat does; the seat is reserved while they watch. With no seat free they stand in front of it as before.
+  the seat does; the seat is reserved while they watch. Only a seat that looks at the screen from in front of it
+  counts (`seatFacing: front`, 2026-10-21): not a sofa with its back to the TV, nor one behind it. With no seat
+  like that free they stand in front of it as before.
 - Residents in the same room (or within 6 m, `broadcast`) hear the TV too: they get 35% of its fun while they eat,
   drink coffee or do something else. The screen flickers whenever someone is watching, day or night (`prefers-reduced-motion`
   holds it steady); the TV's own sound loop plays as before.

@@ -23,12 +23,12 @@ their uses. The climbing frame has no clip of its own: the resident's clips clim
 |---|---|---|---|---|---|---|
 | `slide` Playground slide | 1x2 · floor | slide:play | community / play | Frame, Slide, Roof | Static | Static. |
 | `climbingFrame` Climbing frame | 2x2 · floor | climb:exercise | community / play | Frame, Roof, Net | Static | Static. Climbed round: up its rope net, across the deck (ducking under the roof) and down the fireman's pole, then back round to the net (`climb172a`/`147a`/`112a` by height, `b` for the second lane: two side by side, the second waiting on the deck for the first to slide). |
-| `seesaw` Seesaw | 3x1 · floor | seesaw:play | community / play | Frame, Seats, Plank | Loop (E1) | `seesaw`: the plank tips ±12° while two play (E1). |
+| `seesaw` Seesaw | 3x1 · floor | seesaw:play | community / play | Frame, Seats, Plank | Loop (E1) | `seesaw`: the plank tips ±12° while two play (E1). The two ride at the two ends, facing each other over the handles (content `places`). |
 | `springRider` Spring rider | 1x1 · floor | ride:play | community / play | Horse, Saddle, Spring | Loop (E1) | `rock` on its spring while ridden (E1). |
-| `merryGoRound` Merry-go-round | 2x2 · floor | spin:play | community / play | Platform, Rails, Stripes | Loop (E1) | `spin` while ridden (E1). |
+| `merryGoRound` Merry-go-round | 2x2 · floor | spin:play | community / play | Platform, Rails, Stripes | Loop (E1) | `spin` while ridden (E1). Four sit round the platform between the rails, facing the column (content `places`). |
 | `basketballHoop` Basketball hoop | 1x1 · floor | shoot:exercise | community / play | Frame, Backboard, Hoop | Use | `swish`: the net sways after each shot (1.4 s into the use, then every 3.2 s: `delay`, `every`). |
-| `pingPongTable` Ping-pong table | 2x1 · floor | pingPong:play | community / play | Table, Legs | Static | Static. |
-| `parkChessTable` Park chess table | 1x1 · floor | chess:play | community / play | Table, Stools | Use | `move`: a pawn slides one square for chess. |
+| `pingPongTable` Ping-pong table | 2x1 · floor | pingPong:play | community / play | Table, Legs | Static | Static. The two players stand at the two ends, facing each other across the net (content `places`, off its tiles; a blocked end is played from the front). |
+| `parkChessTable` Park chess table | 1x1 · floor | chess:play | community / play | Table, Stools | Use | `move`: a pawn slides one square for chess. A stool either side, the players facing each other across the board (content `places`; rebuilt 2026-10-21, the stools were both behind it). |
 
 **In play** (signed off 2026-10-16):
 - Checked in the yard of the check house in all four facings: the slide gone down, the ping-pong table played at;

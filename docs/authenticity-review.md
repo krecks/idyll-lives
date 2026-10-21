@@ -336,6 +336,7 @@ S3: 4 in [social.md](review/social.md).
 | I-kitchen-05 | S2 | renderer-table | Every Cook step is stirring a frying pan, at a microwave, an oven tower or for a bake | G-16 |
 | I-living-05 | S2 | code | Watching TV takes the nearest seat even when it faces away from the screen | G-47 |
 | I-outdoor-07 | S2 | code | Sets for two seat their pair side by side: the bistro set takes one, the picnic table two on one bench | G-62 |
+| I-systems-12 | S2 | code | Sitting on a thing moved off its tile's middle sits beside it (fix: slots, fixed) | G-62 |
 | I-systems-01 | S2 | renderer-table | Cooking props are drawn at a station's middle: on the gas grill station, on the grate | G-08 |
 | I-systems-04 | S2 | code | Nothing stops a child using a stove | G-45 |
 | I-systems-10 | S2 | code | A cook waiting for a busy station stands where they are, and the next one stands inside them | G-43 |
