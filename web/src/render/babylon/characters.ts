@@ -417,7 +417,7 @@ const LYING = new Set<string>(['lie', BABY_LIE.asleep, BABY_LIE.awake]);
  * over the rail (rad, for a grown-up of `height` m; taller ones bend further), `arms` the arms'
  * angle forward of it.
  */
-const CUDDLE = { pick: 2.6, put: 2.4, rail: 0.44, reach: 0.22, clear: 0.52, lean: 0.9, height: 1.7, arms: 0.4 };
+const CUDDLE = { pick: 2.6, put: 2.4, rail: 0.25, reach: 0.22, clear: 0.52, lean: 0.9, height: 1.7, arms: 0.4 };
 /**
  * The held baby: its middle forward of the forearms' (body scale of the one holding them) and its
  * back above them (its own); its head end raised (rad) and turned towards the one holding them.

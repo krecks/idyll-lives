@@ -1625,7 +1625,7 @@ fn seat_of(object: &J, furniture: &Furniture) -> Option<Seat> {
 /// - its seat (`seat_of`), at each of its hips' points (the worst reported);
 /// - its top (content `surface`: at its `at`, else the middle);
 /// - its mattress (furniture.json `bunks`, `beds`, else `defaultBed` for one lain on; a hammock's sling at its
-///   low point), `fwd` forward, at each slot (in the middle for one lain on across), held open if it opens;
+///   low point), `fwd` forward, at each slot (in the middle for one lain on across, but a baby's at its slot), held open if it opens;
 ///   with `every_slot` false at slot 0 only (`cargo review sizes`: a crib's slot 1 is its changing table);
 /// - its lamp's light (content `light`, only with an `at`: the shade).
 fn heights(g: &Glb, entry: &J, object: &J, furniture: &Furniture, every_slot: bool) -> R<Vec<Height>> {
@@ -1704,7 +1704,9 @@ fn heights(g: &Glb, entry: &J, object: &J, furniture: &Furniture, every_slot: bo
                     (Some(b), None) => (number(Some(b), "h", 0.5), "furniture.json `beds`"),
                     (None, _) => (number(Some(&furniture.default_bed), "h", 0.5), "furniture.json `defaultBed`"),
                 };
-                let across = bed.and_then(|b| b.get("across")).is_some_and(J::truthy);
+                // (A baby lies at its slot, on its back along the bed, even on one lain on across: characters.ts.)
+                let baby = object.get("interactions").and_then(J::list).is_some_and(|l| l.iter().any(|i| i.get("baby").is_some_and(J::truthy)));
+                let across = !baby && bed.and_then(|b| b.get("across")).is_some_and(J::truthy);
                 let slots = slot_points(object, fwd);
                 let n = if every_slot { slots.len() } else { 1 };
                 let points: Vec<[f64; 2]> = if across { vec![[0.0, fwd]] } else { slots.into_iter().take(n).collect() };
