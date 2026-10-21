@@ -135,6 +135,16 @@ Not tied to one row: I-held-01.
 - **Status:** open
 - **Source:** wave: held
 
+### M-held-03 — The food bought in town borrows the plate models
+
+- **Severity:** S3
+- **Rubric:** M6, I7
+- **Fix class:** model
+- **Where:** `web/public/content/base.json` items `iceCreamCone`, `crisps`, `fruit`, `pastry` (`item.treatPlate`), `hotDog`, `shopSandwich` (`item.sandwich`); new models in `tools/art/blender/families/held.py`
+- **Evidence:** seen while fixing G-67 (no run of its own): the food fetched at the ice cream cart, the snack machine, the market stall, the bakery case, the hot dog stand and the grocery shelf is now carried to a bench or a café table and eaten there, so it is drawn: an ice cream, a packet of crisps, a piece of fruit and a pastry as the plate of cookies and a cupcake, a hot dog as a filled sandwich. A cone, a packet, an apple, a pastry in a paper bag and a hot dog in its bun would fix it, with M-held-01's small models.
+- **Status:** open
+- **Source:** fix: cooking
+
 ### I-held-02 — Baking is played as frying: a pan comes out at the oven
 
 > Consolidation (2026-10-21): closed as a duplicate of I-kitchen-05 (systems ledger), which takes its items and evidence.
