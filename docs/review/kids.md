@@ -81,3 +81,13 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Evidence:** As I-office-01: a chair facing a desk with its own chair built in is tucked in from behind. Deferred from 0.3.0.
 - **Status:** seeded (from `docs/objects/open.md` L121)
 - **Source:** `docs/objects/open.md` Still open › Residents; `plan/release-0.3.0.md` §1.4
+
+### I-kids-03 — Care uses run on an empty crib, and an adult takes the crib's "lie" use
+
+- **Severity:** S2
+- **Rubric:** I1, I6
+- **Fix class:** content
+- **Where:** `crib` in `web/public/content/base.json` (or wherever the crib is defined), `crates/sim-core/src/world.rs` (baby and care uses)
+- **Evidence:** Phase 0 runner test on `review-stage` (`play6/` in the runner agent's scratch folder): an adult resident fed, changed and played with an empty crib, and accepted the crib's `lie` use.
+- **Status:** open (found in Phase 0; confirm in the pilot)
+- **Source:** `check.mjs play --state review-stage --objects crib --use all`
