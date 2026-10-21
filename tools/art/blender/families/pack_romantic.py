@@ -14,6 +14,7 @@ import os
 import sys
 
 import bpy
+from mathutils import Matrix
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -113,41 +114,55 @@ def _velvet_chair(F, x, z=0.0, frame=None, seat=None):
             F.cone(_name('chair_leg'), 0.012, 0.018, 0.36, (x + dx, 0.18, z + dz), frame, verts=8)
 
 
-# --- the candlelit bistro table (2x1): two diners side by side at x = +-0.5, the table before them ------------
-CANDLES = ((-0.12, 0.33, 0.26), (0.12, 0.33, 0.22))   # (x, depth, candle height)
+# --- the candlelit bistro table (2x1): a diner at each end (x = +-0.62, z = 0.1) facing in across the top -------
+TZ = 0.1                                                   # the table's and the diners' depth (content `places`)
+CANDLES = ((0, TZ - 0.2, 0.26), (0, TZ + 0.2, 0.22))       # (x, depth, candle height): either side of their sightline
+
+
+def _end_chair(F, x, z):
+    """A slipper chair at the table's end, seat centred on (x, z), its sitter facing in (+x from the left end, -x from
+    the right): built facing the front, then turned a quarter about its seat's middle."""
+    with G.new_parts() as parts:
+        _velvet_chair(F, 0.0, 0.0)
+    bpy.context.view_layer.update()                     # the last part's matrix is set only on an update
+    turn = Matrix.Translation(F.at(x, 0, z)) @ Matrix.Rotation(math.radians(-90 if x < 0 else 90), 4, 'Z')
+    for o in parts:
+        o.matrix_world = turn @ o.matrix_world
 
 
 def candlelitTable():
     F = G.GameFrame()
     top = 0.775
     with G.new_parts() as still:
-        F.box('table_top', 1.62, 0.03, 0.3, (0, 0.745, 0.29), M.oak, bevel=0.008)
-        F.box('cloth', 1.68, 0.012, 0.32, (0, 0.766, 0.29), M.cloth, bevel=0.004)
-        F.box('cloth_front', 1.68, 0.2, 0.012, (0, 0.67, 0.449), M.cloth)
-        for x in (-0.84, 0.84):
-            F.box(_name('cloth_side'), 0.012, 0.2, 0.32, (x, 0.67, 0.29), M.cloth)
-        F.box('runner', 1.7, 0.004, 0.12, (0, 0.774, 0.3), M.runner)
-        for x in (-0.78, 0.78):
-            F.cone(_name('table_leg'), 0.02, 0.014, 0.73, (x, 0.365, 0.2), M.body, verts=10)
+        # a 0.8 x 0.72 top under a cloth that drops 12 cm all round, clear of the diners' knees
+        F.box('table_top', 0.8, 0.03, 0.72, (0, 0.745, TZ), M.oak, bevel=0.008)
+        F.box('cloth', 0.86, 0.012, 0.78, (0, 0.766, TZ), M.cloth, bevel=0.004)
         for s in (-1, 1):
-            x = s * 0.5
-            F.cyl(_name('plate'), 0.13, 0.012, (x, 0.782, 0.26), M.porcelain, verts=22)
-            G.torus(_name('plate_rim'), 0.122, 0.005, at=F.at(x, 0.788, 0.26), material=M.gold, major_segments=22,
+            F.box(_name('cloth_front'), 0.86, 0.12, 0.012, (0, 0.71, TZ + s * 0.39), M.cloth)
+            F.box(_name('cloth_side'), 0.012, 0.12, 0.78, (s * 0.43, 0.71, TZ), M.cloth)
+        F.box('runner', 0.12, 0.004, 0.8, (0, 0.774, TZ), M.runner)
+        for x in (-0.36, 0.36):
+            for dz in (-0.3, 0.3):
+                F.cone(_name('table_leg'), 0.02, 0.014, 0.73, (x, 0.365, TZ + dz), M.body, verts=10)
+        for s in (-1, 1):
+            x = s * 0.22
+            F.cyl(_name('plate'), 0.13, 0.012, (x, 0.782, TZ), M.porcelain, verts=22)
+            G.torus(_name('plate_rim'), 0.122, 0.005, at=F.at(x, 0.788, TZ), material=M.gold, major_segments=22,
                     minor_segments=4)
             G.revolve(_name('dessert'), [(0, 0), (0.05, 0), (0.045, 0.04), (0.02, 0.055), (0, 0.055)],
-                      at=F.at(x, 0.788, 0.26), material=M.dessert, segments=12)
-            F.sphere(_name('berry'), 0.012, (x, 0.85, 0.26), M.rose, segments=8, rings=6)
-            for dx in (-0.16, 0.16):
-                F.box(_name('cutlery'), 0.012, 0.004, 0.17, (x + dx, 0.778, 0.26), M.gold)
-            _wine_glass(F, x + s * 0.2, top, 0.38)
-            _velvet_chair(F, x, 0.0)
+                      at=F.at(x, 0.788, TZ), material=M.dessert, segments=12)
+            F.sphere(_name('berry'), 0.012, (x, 0.85, TZ), M.rose, segments=8, rings=6)
+            for dz in (-0.16, 0.16):
+                F.box(_name('cutlery'), 0.17, 0.004, 0.012, (x, 0.778, TZ + dz), M.gold)
+            _wine_glass(F, x - s * 0.1, top, TZ - s * 0.22)          # at the diner's right hand
+            _end_chair(F, s * 0.62, TZ)
         for x, z, h in CANDLES:
             _candle(F, x, z, top, h)
         G.revolve('bud_vase', [(0, 0), (0.025, 0), (0.03, 0.05), (0.012, 0.13), (0.015, 0.18), (0, 0.17)],
-                  at=F.at(0, top, 0.37), material=M.glassy, segments=12)
-        G.rod('stem', F.at(0, 0.86, 0.37), F.at(0.01, 1.06, 0.37), 0.005, material=M.leaf, verts=6)
-        _rose(F, 0.01, 1.08, 0.37, 0.045)
-        for x, z in ((-0.3, 0.38), (0.25, 0.4), (-0.05, 0.22), (0.38, 0.33)):
+                  at=F.at(0, top, TZ), material=M.glassy, segments=12)
+        G.rod('stem', F.at(0, 0.86, TZ), F.at(0.01, 1.04, TZ), 0.005, material=M.leaf, verts=6)
+        _rose(F, 0.01, 1.06, TZ, 0.045)
+        for x, z in ((-0.08, TZ + 0.3), (0.1, TZ - 0.32), (-0.3, TZ - 0.25), (0.28, TZ + 0.27)):
             F.sphere(_name('petal'), 0.025, (x, 0.778, z), M.rose, scale=(1.2, 0.9, 0.25), segments=8, rings=4)
     G.join(still, 'body', origin=(0, 0, 0))
     # The two flames, joined with their origin on the shorter wick and built full size, then flattened:
@@ -156,7 +171,7 @@ def candlelitTable():
         for x, z, h in CANDLES:
             _flame(F, x, top + 0.06 + h, z, 1.1)
     low = min(h for _, _, h in CANDLES)
-    flames = G.join(flames, 'flames', origin=F.at(0, top + 0.05 + low, 0.33))   # flattened inside the wax at rest
+    flames = G.join(flames, 'flames', origin=F.at(0, top + 0.05 + low, TZ))   # flattened inside the wax at rest
     flames.scale[2] = 0.001
     objs = G.settle(centre=False)
     G.grow(flames, 'candles', seconds=0.6)
@@ -473,8 +488,8 @@ def roseArbourSwing():
 
 FAMILY = G.Family(
     'pack_romantic', M,
-    [G.Model('candlelitTable', candlelitTable, size=(1.7, 1.116, 0.736), key='model.romantic.candlelitTable',
-             centre=(0, 0.087), motions={'uses': {'candlelitDinner': 'candles', 'shareDessert': 'candles'}},
+    [G.Model('candlelitTable', candlelitTable, size=(1.802, 1.096, 0.8), key='model.romantic.candlelitTable',
+             centre=(0, 0.1), motions={'uses': {'candlelitDinner': 'candles', 'shareDessert': 'candles'}},
              paint=[('body', 'Body'), ('fabric', 'Fabric'), ('cloth', 'Tablecloth')]),
      G.Model('heartTub', heartTub, size=(1.865, 0.784, 1.817), key='model.romantic.heartTub',
              centre=(-0.017, 0.004), motions={'uses': {'petalBath': 'fill'}},

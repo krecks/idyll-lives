@@ -3446,19 +3446,19 @@
       "group": "dining",
       "slots": 2,
       "places": [
-        { "at": [-0.5, -0.19] },
-        { "at": [0.5, -0.19] }
+        { "at": [-0.62, 0.1], "facing": 90 },
+        { "at": [0.62, 0.1], "facing": -90 }
       ],
       "surface": {
-        "height": 0.765,
+        "height": 0.76,
         "kind": "table",
         "size": [
-          1.62,
-          0.38
+          0.84,
+          0.75
         ],
         "at": [
           0,
-          0.26
+          0.1
         ]
       },
       "interactions": [

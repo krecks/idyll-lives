@@ -53,7 +53,7 @@ espresso machine on a top, the foodie espresso bar) and every *Have a coffee* at
 | `fridgeFrenchDoor` French-door fridge | 1x1 · floor | snack:fetch frozenTreat:fetch meal:cook gourmet:cook coldDrink:drink | kitchen / appliances | Body, Handles, Plinth | Use | `fridge_open`: both upper doors swing out (-100° / +100°) for snack, meal, gourmet; `door_right` (the right door only) for coldDrink. The freezer drawer slides out 35 cm (`freezer_open`) for frozenTreat. |
 | `fridgeRetro` Retro fridge | 1x1 · floor | snack:fetch meal:cook coldDrink:drink | kitchen / appliances | Body, Handle, Trim | Use | `lever`: the chrome lever (a part inside the door) turns 30° out, then `fridge_open` (`delay` 0.3 s): the rounded door swings 100°; snack, meal, coldDrink. |
 | `fridgeMiniRetro` Retro mini fridge | 1x1 · floor | snack:fetch meal:cook coldDrink:drink | kitchen / appliances | Body, Handle & feet, Trim | Use | `fridge_open`: the pastel door with its unicorn sticker swings 100° on its hinge; snack, meal, coldDrink. `hold` 3 s. |
-| `wineFridge` Wine fridge | 1x1 · floor | wine:drink | kitchen / appliances | Body, Door frame | Use | `door_open`: the glass door swings and the top rack slides out 15 cm for wine; `hold` 2.5 s. |
+| `wineFridge` Wine fridge | 1x1 · floor | wine:drink | kitchen / appliances | Body, Door frame | Use | `door_open`: the framed smoked-glass door (the bottles show through it) swings for wine, `hold` 2.5 s; once it is open its top shelf of bottles slides out 15 cm (`rack_out`, `delay` 0.9, `hold` 0.9). |
 
 **In play** (signed off 2026-10-16):
 - Every use (snack, meal, gourmet, cold drink, wine) opens its door clip and shuts it after its `hold`; the retro
@@ -101,8 +101,8 @@ espresso machine on a top, the foodie espresso bar) and every *Have a coffee* at
 |---|---|---|---|---|---|---|
 | `coffeeMachine` Coffee machine | 1x1 · floor | espresso:drink | kitchen / appliances | Cabinet, Worktop, Machine | Use | Provides `coffee`; `brew`: a cup slides under the spout and a thin coffee stream grows for espresso. |
 | `breakfastCounter` Breakfast counter | 1x1 · floor | toast:cook smoothie:cook | kitchen / appliances | Counter, Toaster, Blender | Use | `toast_down`: the toaster's carriage (lever and toast, one part) slides 5 cm down for toast and pops up at the end. `blend` for smoothie: the blender lid lifts. L `blades`: the smoothie under the lid swirls while it blends (E1). Its 0.95 m top is a `counter` (counter stools tuck under it). |
-| `dishwasher` Dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | `door_open`: the door drops 85° and the lower rack slides out 30 cm for dishes and for clearing away at it (the `wash` tag), open for the whole loading. Only with dirty dishes (`workOn`). |
-| `dishwasherCompact` Stainless dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | `door_open`, as the dishwasher. Only with dirty dishes (`workOn`). |
+| `dishwasher` Dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | A 60 cm dishwasher beside a 40 cm cupboard under one worktop (G-32). `door_open`: its door drops 85° and the lower rack slides out 30 cm for dishes and for clearing away at it (the `wash` tag), open for the whole loading. Only with dirty dishes (`workOn`). |
+| `dishwasherCompact` Stainless dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | A slimline 45 cm dishwasher beside a 55 cm stack of three drawers (G-32). `door_open`, as the dishwasher. Only with dirty dishes (`workOn`). |
 
 **In play** (signed off 2026-10-16):
 - The dishwashers' doors drop 0.44 m into the tile in front: the loader stands 15 cm further back while using either
@@ -124,7 +124,7 @@ espresso machine on a top, the foodie espresso bar) and every *Have a coffee* at
 |---|---|---|---|---|---|---|
 | `counter` Kitchen counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Worktop, Handles | Use | `drawer_open`: the top drawer slides out 25 cm for sandwich; `hold` 1.5 s. |
 | `counterCorner` Corner counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Worktop, Handles | Use | `drawer_open`, as the counter. |
-| `counterEnd` Counter end with shelves | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Worktop, Handles | Static | Static (open end shelves). A sandwich, as the other counters. |
+| `counterEnd` Counter end with shelves | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Worktop, Handles | Static | Static (open end shelves under one worktop with the unit). A sandwich, as the other counters. |
 | `counterCornerOuter` Outer corner counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Worktop, Handles | Static | Static. A sandwich, as the other counters. |
 | `counterDrawers` Drawer counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Worktop, Handles | Use | `drawer_open`: the top drawer slides out 25 cm while clean things are put away in it (`fetch` at its `prep` station, `hold` 1.5 s). A sandwich, as the other counters. |
 | `counterOpenShelf` Open-shelf counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Worktop | Static | Static. A sandwich, as the other counters. |
@@ -195,10 +195,10 @@ espresso machine on a top, the foodie espresso bar) and every *Have a coffee* at
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `diningTable` Dining table | 2x1 · floor | coffee:drink | kitchen / dining | Top, Legs | Static | Static. Its two places (content `places`) are the two chairs as built, side by side; facing across waits for its rebuild (G-39). |
+| `diningTable` Dining table | 2x1 · floor | coffee:drink | kitchen / dining | Top, Legs | Static | Static. A chair at each end of a 0.84 × 0.75 top: its two (content `places` `[±0.62, 0.1]`, facing ±90) face each other across it (G-39). |
 | `bistroSet` Bistro table | 1x1 · floor | breakfast:eat coffee:drink | kitchen / dining | Top, Frame, Seats | Static | Static. |
-| `diningGlass` Glass dining table | 2x1 · floor | breakfast:eat coffee:drink | kitchen / dining | Top, Legs | Static | Static; glass top. Its places are its two chairs as built, side by side (G-39 rebuilds it to face across). |
-| `diningOak` Farmhouse dining table | 2x1 · floor | breakfast:eat coffee:drink dinner:eat | kitchen / dining | Top, Legs | Static | Static. Its places are its two chairs as built, side by side (G-39 rebuilds it to face across). |
+| `diningGlass` Glass dining table | 2x1 · floor | breakfast:eat coffee:drink | kitchen / dining | Top, Legs | Static | Static; a 0.9 × 0.8 glass top on two sleds along its sides, a chair at each end: its two face each other across it (G-39). |
+| `diningOak` Farmhouse dining table | 2x1 · floor | breakfast:eat coffee:drink dinner:eat | kitchen / dining | Top, Legs | Static | Static; a 0.9 × 0.8 oak top with breadboard ends, a chair at each end: its two face each other across it (G-39). |
 | `tableSquare2` Square table for two | 1x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
 | `tableBistroRound` Round bistro table | 1x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
 | `tableDining4` Dining table for six | 2x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. Renamed from "Dining table for four": 1.84 m seats six (kind `diningTable6`, Q-08). |
@@ -238,7 +238,7 @@ espresso machine on a top, the foodie espresso bar) and every *Have a coffee* at
 | `chairWindsor` Windsor chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
 | `chairBentwood` Bentwood chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
 | `chairFolding` Folding chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
-| `chairArm` Carver chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
+| `chairArm` Carver chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static; the cushion at 0.475, sat on at 0.47 as a dining chair (G-30). Pulled in to the table it faces while sat on, as far as the knees fit under it. |
 | `benchDining` Dining bench | 2x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
 
 **In play** (signed off 2026-10-16):

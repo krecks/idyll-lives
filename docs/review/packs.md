@@ -536,7 +536,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/pack_romantic.py:120` (`candlelitTable`: a narrow top, both `_velvet_chair`s on its back edge), `web/public/content/packs/romantic.json:5` (`slots` 2)
 - **Evidence:** `packs/sheets/obj-romantic.candlelitTable.png`, `packs/sheets/age-romantic.candlelitTable.png`, `packs/extra/night/night-romantic.candlelitTable-candlelitDinner-01.png`: a long, about 0.4 m deep top with both chairs behind it facing the room, the place settings side by side. A dinner for two faces across the table. The same pattern as the base dining table (M-kitchen-01, kitchen ledger).
-- **Status:** open
+- **Status:** fixed (346158ba)
+- **After:** Rebuilt for two facing each other (G-39): a slipper chair at each end of a 0.8 × 0.72 top under a cloth that drops 12 cm all round, gold legs at its corners, a place setting before each, the two candles either side of their sightline and the rose between them; content `places` `[±0.62, 0.1]` facing ±90. Two residents at the candlelit dinner sit across it, candles lit (`fixes/blender-kitchen/play/two-romantic.candlelitTable-candlelitDinner-r0-*.png`; `poses/poses-adult-f3*.png`, `poses-child-f3*.png`). 3 draws; `cargo review sizes` inside (its H 1.116 was the rose: lowered 2 cm).
 - **Source:** wave: packs
 
 ### M-packs-12 — Three things are bigger than their kind: the floor cushion, the soaking tub's rim, the bedside stack
@@ -610,7 +611,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/pack_lazy.py:213` (`quiltTable`: a solid quilt skirt to the floor in front of the bench), `pack_romantic.py:120` (`candlelitTable`: the deep front apron); `web/public/content/packs/lazy.json:102`, `romantic.json:5`
 - **Evidence:** `packs/play/chunk3/lazy.quiltTable-tuckIn-01.png`, `packs/sheets/age-lazy.quiltTable.png`: the sitter's shins and feet stick out of the front of the red quilt at every stage but the child (the bench is at the back, the table about 0.9 m deep). `packs/play/chunk4/romantic.candlelitTable-candlelitDinner-01.png`, `packs/sheets/age-romantic.candlelitTable.png`: the diner's legs pass through the table to its near side. A kotatsu is sat at with the legs under the quilt, so the knees need room under the top and the feet must stay inside.
-- **Status:** open
+- **Status:** fixed in part (346158ba): the candlelit table; the quilt table is open (`pack_lazy.py`, outside the kitchen Blender fix's families)
+- **After:** Candlelit table: rebuilt with G-39 (M-packs-11), a chair at each end; the cloth drops 12 cm all round (bottom at 0.65), so the diners' knees go under the top and their feet stay under it, nothing through the cloth (`fixes/blender-kitchen/poses/poses-adult-f3-side.png`, `poses-child-f3-side.png`, `play/two-romantic.candlelitTable-candlelitDinner-r0-side.png`).
 - **Source:** wave: packs (leads from the evidence index's "Seen")
 
 ### I-packs-02 — Exercise and singing next to the board, the mat and the stage, not on them
@@ -722,7 +724,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/pack_kind.py:341` (`welcomeTeaTable`: a pouf either side of the table, both sitters facing the front); `tools/art/blender/families/pack_couchPotato.py:425` (`lavaLamp`: the lamp behind the chair's shoulder)
 - **Evidence:** `packs/sheets/age-kind.welcomeTeaTable.png`, `packs/play/chunk5/kind.welcomeTeaTable-shareTea-01.png`: host and guest sit side-on to the table between them, both facing the room, not each other. `packs/extra/night/night-couchPotato.lavaLamp-zoneOut-00.png`: "Ooh, the blobs" with the lamp behind the sitter's head.
-- **Status:** open
+- **Status:** fixed in part (346158ba): the tea table; the lava lamp is open (`pack_couchPotato.py`, a family outside the kitchen Blender fix's)
+- **After:** Tea table (G-39): the poufs (40 cm across) stand at ±0.75 either side of a lower (top 0.36), narrower (0.4 × 0.56 m) table, the ferns at the back between them; content `places` `[±0.75, 0]` facing ±90 (was ±0.5 turned 45°). Host and guest face each other straight across the tea set, the knees stopping short of the table's ends and the feet before them (`fixes/blender-kitchen/poses/poses-adult-f4*.png`, `poses-child-f4*.png`; two residents sharing tea in play: `play/two-kind.welcomeTeaTable-shareTea-r0-*.png`, sims at x ±0.75, yaw ∓90°); the teapot still pours (`clips/clips-kind.welcomeTeaTable-all-t1.png`). 3 draws. The sizes table measures the whole set as a `lowTable` (W 1.94, the poufs' 0.45 a "seat" over a floor cushion's 0.15): the kind, not the model (tooling). Not done: the lava lamp behind the sitter's shoulder.
 - **Source:** wave: packs
 
 ### I-packs-12 — Worked from the object's edge, not at the part: the bonsai, the roses, the lectern, the hoop
