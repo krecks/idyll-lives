@@ -113,7 +113,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `tools/art/blender/families/kids.py:443-464`, `web/public/content/catalog2/dining.json:744` (`highChair`, no `interactions`)
 - **Evidence:** A modelled part with no clip, left decorative for 0.3.0. A baby is never seated in the high chair, so nothing could use the tray. Wave: `kids/play/c1/highChair-no-uses.png` and `kids/play/child-c1/highChair-no-uses.png`: no uses for anyone. A baby is fed in the crib instead (I-kids-04). Seating a baby in it at a table, fed by an adult, is new behaviour.
-- **Status:** confirmed
+- **Status:** fixed (ba8bbd91)
+- **After:** The high chair seats a baby (*Sit in the high chair*, `baby`, pose sit, in its middle) and offers *Feed the baby* (`carried`). By day a grown-up's *Feed the baby* at the crib, with a high chair free on the lot, becomes a carry (`carry.rs`): over to the crib, the baby lifted out as the cuddle lifts them (`fixes/babies-crops/baby/feed-01-lifted-from-crib.png`), carried cradled in the arms (`feed-02-carried.png`; the baby's panel reads "In the arms"), laid into the high chair at the table (`feed-03-into-high-chair.png`), fed from beside it, stepped in to it (`feed-04-fed-in-high-chair.png`, the `feed` clips), then carried back to the cot (`feed-05-carried-back.png`); against `kids/play/c1/highChair-no-uses.png`. At night the feed stays at the crib, in the arms; dropped (the order cancelled) or left there when its 45 minutes are up, the baby is back in the crib. `review-baby` (`play` on it, or `fixes/babies-crops/baby/feed-log.txt`); sim tests `tests/high_chair.rs`. The tray stays fixed (its slide-out clip needs the model). The spoon is the props wave's (G-70).
 - **Source:** `docs/objects/open.md` Still open › Content and sim; `plan/release-0.3.0.md` §2.5; wave: office/kids
 
 ### I-kids-02 — A chair facing the kids' desk is used from behind its built-in chair
@@ -148,7 +149,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `crates/sim-core/src/content.rs:273-276` (slot 0 the baby's, the carers' slots by the changing table); `crates/sim-core/src/world.rs:322` (`slot_position`); `web/src/render/babylon/characters.ts:502-505` (`ACTIONS.clean`: `interact`, `spell`)
 - **Evidence:** `sheets/crib-care.png` (top right, `scenes/crib-elder-change-02.png`): the carer stands at the cot and works the hands over the rail at the lying baby for 10 minutes; the pad on the changing chest beside it (0.865 m, inside the 0.85–0.95 range) stays empty. A nappy is changed with the baby lying on the changing pad. Moving the baby to the pad and back (as `cuddle` lifts them) is new behaviour.
-- **Status:** open
+- **Status:** fixed (ba8bbd91)
+- **After:** *Change the baby* is `atSlot`: the carer stands in front of the changing table (the crib's carers' slot), facing the pad, with its own animation tag (`change`). The renderer (`CHANGE`, render only as the cuddle) turns them to the cot, lifts the baby out (`fixes/babies-crops/baby/change-01-lifting-from-cot.png`), lays them across the pad and works at them there (`change-02-on-the-pad.png`, against `scenes/crib-elder-change-02.png`), and near the end lifts them back into the cot. The sim keeps the baby in the cot's slot throughout. Sim test `the_baby_is_changed_at_the_changing_table`.
 - **Source:** pilot
 
 ### M-kids-01 — The cot's mattress is square
