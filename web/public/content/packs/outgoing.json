@@ -20,6 +20,7 @@
           "autonomous": true,
           "effects": { "fun": 0.32, "hunger": 0.08, "social": 0.04, "bladder": -0.08 },
           "tags": ["party", "entertainment"],
+          "stages": ["youngAdult", "adult", "elder"],
           "skills": { "charisma": 0.06 },
           "skill": "charisma",
           "feeling": "outgoing.lifeOfTheParty",

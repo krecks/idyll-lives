@@ -805,6 +805,11 @@
       ],
       "price": 450,
       "category": "kitchen",
+      "stages": [
+        "youngAdult",
+        "adult",
+        "elder"
+      ],
       "group": "appliances",
       "surface": {
         "height": 0.95,

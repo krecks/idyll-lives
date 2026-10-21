@@ -231,7 +231,7 @@ pub(crate) struct ItemRaw {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct RecipeRaw {
-    id: String,
+    pub(crate) id: String,
     label: String,
     item: String,
     #[serde(default = "one_serving")]
@@ -249,6 +249,10 @@ pub(crate) struct RecipeRaw {
     #[serde(default)]
     outdoor: bool,
     steps: Vec<StepRaw>,
+    /// Life-stage ids that may cook it, for every interaction that starts it without `stages`
+    /// of its own (see `Interaction::stages`): cooking at a hot stove is for teens and up.
+    #[serde(default)]
+    pub(crate) stages: Option<Vec<String>>,
 }
 
 fn one_serving() -> [u8; 2] {
@@ -1105,12 +1109,13 @@ fn eat_seat(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<u32> {
             !obj.broken() && obj.can_use(sim.id, content.objects[obj.def].slots)
         })
         .collect();
-    if let Some(d) = surface::dining_seat(content, objects, &ctx.index.links, &candidates, sim.pos) {
+    let stage = content.life.stage(sim.age);
+    if let Some(d) = surface::dining_seat(content, objects, &ctx.index.links, &candidates, sim.pos, stage) {
         return Some(d.object);
     }
     let sits = |o: u32, tags: TagMask| {
         let obj = &objects[o as usize];
-        obj.sits(&content.objects[obj.def], tags, rules.seat_avoid)
+        obj.sits(&content.objects[obj.def], stage, tags, rules.seat_avoid)
     };
     let distance = |o: u32| {
         let (fx, fz) = approach(ctx, &objects[o as usize]);

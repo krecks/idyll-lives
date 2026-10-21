@@ -851,6 +851,11 @@
       ],
       "price": 180,
       "category": "kitchen",
+      "stages": [
+        "youngAdult",
+        "adult",
+        "elder"
+      ],
       "group": "cabinets",
       "decor": 0.4,
       "description": "Two glass tiers on brass castors with bottles and glasses.",

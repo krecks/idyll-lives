@@ -10,6 +10,15 @@ table's track is a ring, so the train can go round it.
 Kids' seats and beds keep their heights (`seats`, `beds` in `web/src/render/babylon/characters/furniture.json`; tops in
 `TOPS`). Toys a child holds in the hand are drawn by the character, not the object.
 
+**Who uses them** (content `stages`, 2026-10-21, G-45): the race car bed, rocking horse, kids' chair, kids' desk,
+kids' bean bag, ball pit, play tent, toy box and toy chest are a child's (`"stages": ["child"]`): a grown-up, a teen
+or an elder is refused ("Ada is too big for the rocking horse"), never picks them on their own, and the pie menu greys
+them out; a kids' chair is no seat for them. The crib's *Lie in the crib* is a baby's; its feed, change, play and
+cuddle are a grown-up's, with the baby in it ("Dee is too young to look after a baby", "there's no baby in the
+crib"). Homework anywhere is a pupil's. The kids' bed (a single bed's mattress), the doll house, train table, play
+mat, teddy, easels, chalkboard and picture books stay anyone's: grown-ups use them too. A child eats at a kids' chair
+pulled up to the kids' table before the dining table (a seat made for their age first, I-kids-08).
+
 ## KD1. Baby and kids' beds (4)
 
 - **Family:** `tools/art/blender/families/kids.py`

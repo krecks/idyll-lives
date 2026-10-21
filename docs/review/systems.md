@@ -153,7 +153,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** decision
 - **Where:** `crates/sim-core/src/world.rs`
 - **Evidence:** By design. It makes uses (and their clips) short and easy to miss in checks: a reviewer should lower the needs first. Cross-cutting wave: every `review-*` state sets the needs to 0.5 for this reason; on `review-baby` (the grown-ups' needs full) the feed and change ended as soon as the baby's needs were up.
-- **Status:** confirmed
+- **Status:** won't fix (by design, Q-22)
+- **After:** Phase 4 (2026-10-21): kept as designed (owner decision Q-22, G-13); review states keep setting the needs to 0.5 so a use lasts. No code change.
 - **Source:** `docs/objects/open.md` Still open › Content and sim
 
 ### I-systems-03 — With neither a sink nor a bin, dirty plates pile up on the floor
@@ -179,7 +180,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `crates/sim-core/src/content.rs` (interactions have no age rule); `crates/sim-core/src/conversation.rs:63` (`social_allowed`: the relationship, and for romance both grown up; nothing for a fight)
 - **Evidence:** A known gap named in the rubric. Hard age rules are new behaviour: filed as `code`, planned separately (§9, decision 3). Cross-cutting wave: the one age rule that exists outside free will is the phone's (`phone.fromStage`: the child is refused, "too young for a phone", `social/scenes/scenes.log`). A teen starts a fight with a child (`social/sheets/fights.png`, A-social-03 for the punches), and an adult could the same (only the relationship is checked). The kids' chair takes any stage (`kids/sheets/age-kidsChair.png`), the residents ledger's seat fit row.
-- **Status:** confirmed and widened
+- **Status:** fixed (697544c2, 742572df, d2027317)
+- **After:** Objects, recipes and interactions take `stages` (life-stage ids; `docs/content-packs.md`), kept by free will and the player's orders alike (`world::unfit`). Every recipe with a hot step (meal, gourmet, tasting menu, both barbecues, pizza, baked treats, pie) is teens and up wherever it is started: the child is refused at the gas range ("Dee is too young to cook dinner", "… bake treats"), the teen cooks (`fixes/age-rules/play-child.jsonl`, `teen-stoveGas-*.png`); the sandwich and reheating stay anyone's. The weight bench, dumbbells, cold plunge and sauna are teens and up; the standing desk too ("Dee is too young to browse the web", `play-child-play.jsonl`). Socials take `stages`/`targetStages`: *Start a fight* is teens and up on both sides, never offered or chosen with a child (`tests/age_rules.rs` `nobody_starts_a_fight_with_a_child`). The upper bunk (`upperStages`) is not an elder's ("Gran is too old for the top bunk"). A kids' chair is no seat for a grown-up. Paths under `bench-results/review/fixes/age-rules/`.
 - **Source:** `plan/authenticity-review.md` §3.3 (I6) and §9 (decision 3); wave: cross-cutting
 
 ### I-systems-05 — No privacy: the bathroom door is renderer-only
@@ -248,6 +250,16 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Status:** open
 - **Source:** wave: cross-cutting
 
+### I-systems-11 — Young children make and drink coffee
+
+- **Severity:** S3
+- **Rubric:** I6
+- **Fix class:** content
+- **Where:** `web/public/content/furniture.json` (`coffeeMachine.espresso` "Make a coffee"), `packs/foodie.json` (`foodie.espressoBar` espresso, latte art), every *Have a coffee* at a chair or table (`requires: ["coffee"]`, about 15 objects in `base.json`, `furniture.json`, `community.json`, `catalog2/dining.json`, `catalog2/outdoor.json`)
+- **Evidence:** I-kitchen-06's lesser case, left out of G-45 on purpose: with the age rules in place (`stages`), nothing yet keeps a child of 8 from a 10-minute espresso ("perked up") or a coffee at the table, on free will too. A teen with a coffee is ordinary, a young child is not. Fix: `"stages": ["teen", "youngAdult", "adult", "elder"]` on these interactions (the machine's and every *Have a coffee*), many lines across files other groups edit; or decide coffee stays anyone's (a game simplification).
+- **Status:** open
+- **Source:** fix: age-rules
+
 ### A-systems-02 — The washing appears on the line in 1.5 s at the start of a 20-minute hang-out
 
 > Consolidation (2026-10-21): closed as a duplicate of A-outdoor-02 (systems ledger), which takes its items and evidence.
@@ -287,7 +299,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
   - The reverse: the 8-year-old types at the standing desk's 1.05 m top, the keyboard shelf at her chin (`office/extra/child-deskStanding-browse-01.png`).
   - Homework by adults on every homework use in these two ledgers: `computerDesk`, `deskWriting`, `deskLaptop`, `chairTask`, `chairExecutive`, `kidsDesk`, `kidsChair` (`office/play/c1/deskWriting-homework-01.png`, `office/play/pair-chairTask/chairTask-homework-01.png`).
   - Toys (toy box, toy chest, doll house, train table, play mat, teddy, easels, picture books) are not counted: grown-ups play with them in life too.
-- **Status:** confirmed and widened (pilot; office/kids wave)
+- **Status:** fixed (697544c2, 742572df)
+- **After:** A direct order keeps the rules free will keeps, and the new life-stage rules (`stages`), with the game's refusal toast; a refused order is never queued, and a use their age isn't for never starts however it was chosen (`start_task`). On `review-stage` (`fixes/age-rules/play-adult.jsonl`, `play-child.jsonl`, `play-teen.jsonl`): the adult is refused the crib's *Lie* ("Ada is too big for the crib") and does feed, change, play and cuddle (`adult-crib-feed-*.png`); the child and the teen are refused the care ("Dee is too young to look after a baby", "Cal is too young …") and the crib. An empty crib's care is refused ("there's no baby in the crib"); homework by a grown-up is refused ("Ada has no homework to do"; `tests/age_rules.rs`). The kids' furniture is a child's: the adult is refused the race car bed, rocking horse, kids' bean bag, ball pit, play tent, toy box and kids' desk ("Ada is too big for the rocking horse"), the child uses them (`child-kidsBedCar-*.png`, `child-rockingHorse-*.png`, `child-ballPit-*.png`, `child-kidsChair-sit-*.png`); the kids' chair is no seat for a grown-up to eat or phone on. The reverse: the child is refused the standing desk. The pie menu greys out what the selected resident's age isn't for (`Content.mayUse`; type-checked, not shot). Toys grown-ups use too (doll house, train table, play mat, teddy, easels, picture books) and the kids' bed stay anyone's. Paths under `bench-results/review/fixes/age-rules/`.
 - **Source:** `check.mjs play --state review-stage --objects crib --use all` (Phase 0 and pilot, adult, teen, elder); pilot `scripts/scenes.mjs` childcare; wave: office/kids (Phase 0.9 `play/c1`, `play/child-c1`, poses; `check.mjs play --objects deskStanding --sim 3`)
 
 ### I-kitchen-06 — Children pour wine and mix cocktails
@@ -299,7 +312,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Fix class:** code
 - **Where:** `web/public/content/catalog2/kitchen.json:799` (`wineFridge` "Pour a glass of wine": tags `food, lounge`, autonomous), `web/public/content/catalog2/dining.json:845` (`barCart` "Mix a drink": `food, lounge, party`); `crates/sim-core/src/world.rs:3832-3856` (free will's tests on a use: baby, table, requirements, homework for pupils, care for adults; nothing on the user's stage otherwise), `:2981` (`Command::Use`, I-kids-03)
 - **Evidence:** `kitchen/extra/play-child/child-wineFridge-wine-01.png`: Dee (8) "Pour a glass of wine", sipping at the open wine fridge; `child-barCart-mix-01.png`: the same child mixing a drink at the bar cart, the shaker tipping (`kitchen/extra/play-child/play-child.jsonl`: both `using`). These were direct uses, but free will has no stage rule for either, so a child picks them for comfort and fun on their own; a teen too. A lesser case of the same, by the same missing rule (not run): nothing keeps a child of 8 from a 10-minute espresso at the coffee machine (`furniture.json:464`, feeling "perked up"). Age rules are new behaviour (§9 decision 3): filed as `code`. Related: I-systems-04 (systems ledger: a child at a stove) and I-kids-03 (systems ledger: a direct use skips the rules free will keeps).
-- **Status:** open
+- **Status:** fixed (697544c2, 742572df)
+- **After:** The wine fridge, the bar cart and the party bar's *Mix drinks for everyone* are for young adults and up (`stages`). On `review-stage` the child is refused both ("Dee is too young to pour a glass of wine", "… to mix a drink"; `fixes/age-rules/play-child.jsonl`), the teen the wine (`play-teen.jsonl`), and the adult pours and mixes (`adult-wineFridge-wine-*.png`, `adult-barCart-mix-*.png`); free will never picks them for a child or a teen (`tests/age_rules.rs` `free_will_never_picks_what_their_age_is_not_for`). The party bar's soda stays anyone's. Coffee is left to anyone: filed as I-systems-11. Paths under `bench-results/review/fixes/age-rules/`.
 - **Source:** wave: kitchen (`check.mjs play --sim 3`)
 
 ### I-community-04 — Adults and elders ride the spring horse, the seesaw and the merry-go-round and climb the fort
@@ -311,7 +325,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Fix class:** code
 - **Where:** no age rule on a use (`crates/sim-core/src/content.rs`, see I-systems-04); free will only weights `toys` down for teens to elders (`web/public/content/base.json:3662-3668`, `tagPreference` toys 0.4 / 0.15, multiplied in `content.rs:727`); the climbing frame isn't tagged `toys` (`web/public/content/community.json:415-419`: entertainment, fitness, outdoors)
 - **Evidence:** `sheets/obj-springRider.png` (`play/springRider-ride-01.png`): the adult sits on a 1.1 m horse meant for toddlers, knees up round its head; `sheets/obj-seesaw.png`, `sheets/obj-merryGoRound.png`, `sheets/obj-slide.png`, `sheets/obj-climbingFrame.png` (`play/climbingFrame-climb-01.png`): the adult on each, ducking under the fort's roof; `sheets/age-springRider.png`, `sheets/age-seesaw.png`: an elder on them too. Free will offers the spring rider, the seesaw, the slide and the merry-go-round to adults at 15 % weight, and the climbing frame at full weight, since it carries no `toys` tag; a direct use offers them all (I-kids-03, kids ledger). An adult on a toddler's spring horse is the rubric's S1 ("an adult using a child's thing as if it fitted"). Two parts: the `toys` tag on the climbing frame (content, now), and an age rule for the toddler rides (new behaviour, `code`, §9 decision 3). Widens I-systems-04 (systems ledger) from the stove to the playground.
-- **Status:** open
+- **Status:** fixed (697544c2, 742572df)
+- **After:** The spring rider, slide and climbing frame are a child's, the seesaw and merry-go-round a child's or a teen's (`stages`), and the climbing frame is tagged `toys`. On `town-things` the adult is refused all five ("Ada is too big for the spring rider", "… the playground slide", "… the climbing frame"; `fixes/age-rules/play-town-adult.jsonl`); on `review-stage` the child rides each (`child-play-springRider-ride-*.png`, `child-play-seesaw-*.png`, `child-play-slide-*.png`, `child-play-climbingFrame-*.png`, `child-play-merryGoRound-*.png`) and the teen takes the seesaw but is refused the spring rider (`play-teen.jsonl`). There is no toddler stage (a child is 2–12, drawn at one size), so the toddler rides are the child stage's. Paths under `bench-results/review/fixes/age-rules/`.
 - **Source:** community wave (play, Phase 0)
 
 ### I-hobbies-07 — Two residents at a two-player table stand in one spot, inside each other

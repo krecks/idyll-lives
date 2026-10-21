@@ -145,6 +145,7 @@
       "footprint": [1, 2],
       "price": 2600,
       "category": "bathroom",
+      "stages": ["teen", "youngAdult", "adult", "elder"],
       "slots": 1,
       "description": "An insulated ice-bath tub with a chiller. A bracing plunge ($8 of ice and filtering) washes, wakes and soothes at once, and leaves even the hottest head in an ice-cold calm for hours.",
       "interactions": [

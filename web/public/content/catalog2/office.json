@@ -59,6 +59,12 @@
       ],
       "price": 650,
       "category": "office",
+      "stages": [
+        "teen",
+        "youngAdult",
+        "adult",
+        "elder"
+      ],
       "group": "desks",
       "surface": {
         "height": 1.05,

@@ -178,7 +178,7 @@ fn diners_pick_a_chair_at_a_table_then_a_dining_set_then_anywhere_comfy() {
     let links = Links::new(&w.content, &w.objects, &nav(&w));
     // From right next to the sofa, the chair at the table is still the best place to eat.
     let from = [8.5, 9.5];
-    let pick = |candidates: &[u32]| dining_seat(&w.content, &w.objects, &links, candidates, from).unwrap();
+    let pick = |candidates: &[u32]| dining_seat(&w.content, &w.objects, &links, candidates, from, 0).unwrap();
     let all = [table, chair, set, sofa, toilet];
     let best = pick(&all);
     assert_eq!((best.object, best.rank, best.table), (chair, DiningRank::ChairAtTable, Some(table)));
@@ -188,7 +188,7 @@ fn diners_pick_a_chair_at_a_table_then_a_dining_set_then_anywhere_comfy() {
     assert_eq!(next.spot.map(|s| s.host), Some(set), "on the set's own top");
     let last = pick(&[table, sofa, toilet]);
     assert_eq!((last.object, last.rank), (sofa, DiningRank::AnySeat));
-    assert!(dining_seat(&w.content, &w.objects, &links, &[table, toilet], from).is_none(), "not on the toilet");
+    assert!(dining_seat(&w.content, &w.objects, &links, &[table, toilet], from, 0).is_none(), "not on the toilet");
 }
 
 #[test]

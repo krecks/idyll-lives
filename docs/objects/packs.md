@@ -95,6 +95,8 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 | `energetic.recoveryPod` Recovery pod | 1x2 · floor | recover:relax | fitness / — | Frame, Pads, Boots | Use | `canopy`: the canopy lowers over them for recover and lifts after. |
 
 **In play** (signed off 2026-10-17):
+- The wall is climbed on (G-26: `boulder*`, a size per height, `STEP_IN` up onto the crash mat): hands to the start
+  holds, the feet onto the low ones, up the model's holds hand and foot in turn to the top, a drop onto the mat.
 - The wall is still (looked at in all facings, climbed); the pedals turn, the mat dips with the bouncer, the net
   sways after each shot, the blender lid lifts and settles, the rain grows, the canopy lowers and lifts. Nothing
   needed fixing.
@@ -174,12 +176,14 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 | `hotHeaded.thunderDrums` Thunder drum kit | 2x1 · floor | drum:music | hobbies / — | Body | Loop (E1) | `cymbals`: the crash and the ride rock on their stands while drumming (E1). |
 | `hotHeaded.coolDownCushion` Cool-down meditation cushion | 1x1 · floor | countToTen:meditate breathe:meditate | decor / — | Body | Use | `sink_in`: the zafu presses down to the 0.40 m seat for countToTen and breathe. |
 | `hotHeaded.grudgeJournal` Grudge-to-gratitude writing desk | 1x1 · floor | writeItOut:write | office / — | Body | Use | `drawer_open` for writeItOut. Written at on its own chair with the hands on the top (`NEAR_DESKS`, `sitHandsNear`; `SEATS`), not through its front. |
-| `hotHeaded.coldPlunge` Glacier cold-plunge tub | 1x2 · floor | plunge:bath | bathroom / — | Body | Use | `cover_off`: the slatted cover rolls back into its housing on the back rim for plunge. |
+| `hotHeaded.coldPlunge` Glacier cold-plunge tub | 1x2 · floor | plunge:bath | bathroom / — | Body | Use | `cover_off`: the slatted cover rolls back into its housing on the back rim for plunge. Teens and up (`stages`, G-45). |
 
 **In play** (signed off 2026-10-17):
 - Every clip plays and shuts: the bag swings while pounded, the bin's lid holds 1 s, the cymbals shake, the zafu
   sinks for both meditations, the drawer opens, the cover rolls off. Nothing needed fixing.
 - At the grudge desk the hands rest on the top (`sitHandsNear`).
+- Smashing plates (G-26: `smashPlate*`, a size per height, `STEP_IN` up to the stool): a plate taken from the stack
+  (mimed) and thrown overarm down into the crate.
 - Each model has one colour part, Body: the bag, the crate, the shells, the zafu, the desk's wood, the cedar
   cladding.
 
@@ -236,7 +240,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 | `loner.shortwaveRadio` Shortwave radio desk | 1x1 · floor | airwaves:phone tune:tinker | office / — | Body, Wood, Seat | Use | `dial`: the tuning dial turns for tune; for airwaves the antenna extends, then the dial turns. |
 | `loner.puzzleTable` Jigsaw puzzle table | 1x1 · floor | piece:play newPuzzle:play | hobbies / — | Body, Wood | Use | `pieces`: a patch of puzzle grows for piece and newPuzzle. |
 | `loner.bonsaiBench` Bonsai potting bench | 1x1 · floor | shape:prune tend:water | hobbies / — | Body, Wood, Pot | Use | `trim`: a twig shrinks away for shape; `mist` nods the twig while tended (a loop). |
-| `loner.soloSauna` Cedar sauna for one | 1x2 · floor | sweat:relax | bathroom / — | Wood, Trim | Use | `door_open`: the door opens and shuts behind them (`hold` 1.5 s) for sweat. |
+| `loner.soloSauna` Cedar sauna for one | 1x2 · floor | sweat:relax | bathroom / — | Wood, Trim | Use | `door_open`: the door opens and shuts behind them (`hold` 1.5 s) for sweat. Teens and up (`stages`, G-45). |
 | `loner.deliveryHatch` No-knock delivery hatch | 1x1 · floor | order:fetch treat:fetch | kitchen / — | Body, Wood | Use | `hatch`: the hatch opens for order and treat; `hold` 2 s. |
 
 **In play** (signed off 2026-10-17):

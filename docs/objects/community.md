@@ -15,6 +15,11 @@ Moving parts: the seesaw, spring rider and merry-go-round loop while ridden (E1)
 the scarecrow sways (ambient, E2, off on Low); the coop's hatch shuts at night (E3); the rest open, drop or slide for
 their uses. The climbing frame has no clip of its own: the resident's clips climb round it.
 
+**Who uses them** (content `stages`, 2026-10-21, G-45): the spring rider, the slide and the climbing frame are a
+child's; the seesaw and the merry-go-round a child's or a teen's. Grown-ups and elders are refused ("Ada is too big
+for the spring rider"), never pick them, and see them greyed out. The climbing frame is tagged `toys` like the other
+rides.
+
 ## CM1. Playground (8)
 
 - **Family:** `tools/art/blender/families/playground.py`
@@ -32,6 +37,8 @@ their uses. The climbing frame has no clip of its own: the resident's clips clim
 
 **In play** (signed off 2026-10-16):
 - Checked in the yard of the check house in all four facings: the slide gone down, the ping-pong table played at;
+  table tennis is a rally of forehands and backhands (`pingPong`, G-26), the bat mimed in a closed hand (props in hand:
+  G-70; where the players stand: G-62);
   the seesaw, spring rider and merry-go-round loops go round with the rider on them and finish their round when the
   use ends; the hoop's net swishes after each shot; a pawn slides for chess. Every part coloured in buy and in the
   colour studio.
