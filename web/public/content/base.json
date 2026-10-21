@@ -2065,7 +2065,9 @@
     "babysitter": "{a}'s household paid {money} for a babysitter for {b}",
     "stayedHome": "{a} stayed home from work to look after {b}",
     "noBed": "{a} has no bed of their own: buy one for them",
-    "notClosed": "{a} didn't close the {object}: someone else got in first"
+    "notClosed": "{a} didn't close the {object}: someone else got in first",
+    "playedAlone": "{a} had nobody free to play with at the {object}, so practised alone",
+    "noPartner": "{a} had nobody free to play with at the {object}"
   },
   "activities": [
     {

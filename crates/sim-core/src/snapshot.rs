@@ -240,9 +240,11 @@ fn doing(world: &World, s: &Sim) -> Doing {
         return Doing::NOTHING;
     };
     let inter = &world.content.objects[obj.def].interactions[*interaction];
-    // A baby lying awake in the crib isn't shown asleep.
+    // A baby lying awake in the crib isn't shown asleep; nor anyone waiting at a game for two for
+    // the one they play with as playing (`partners::hold`: a seesaw doesn't rock with one).
     let action = match phase {
         Phase::Using { .. } if inter.baby_bed() && s.awake_in_crib(&world.content, clock::hour(world.tick)) => None,
+        Phase::Using { .. } if s.partner_wait > 0 => None,
         Phase::Using { .. } => inter.anim,
         _ => None,
     };

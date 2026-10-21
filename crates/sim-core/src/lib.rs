@@ -26,6 +26,7 @@ pub mod lot;
 pub mod mesh;
 pub mod pack;
 pub mod phone;
+pub mod partners;
 pub mod path;
 pub mod planner;
 pub mod rng;

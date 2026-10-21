@@ -204,6 +204,15 @@ pub struct Interaction {
     /// Only with something to work on (content `workOn`): washing up with dirty dishes,
     /// the laundry with washing to do.
     pub work_on: Option<WorkOn>,
+    /// A game for two (content `partner`, on an object with two places): the seesaw, ping-pong,
+    /// a game of pool. Whoever starts it fetches someone free nearby to play (`partners.rs`), who
+    /// goes to the other place; it starts once both are there, gives both what it gives, and is
+    /// over for both when either stops. With nobody free it isn't started.
+    pub partner: bool,
+    /// What the player's order to play it does with nobody free (content `alone`: a use of the
+    /// same object, by id; index into its `interactions`): trick shots at the pool table, a
+    /// chess problem. Without one the order is refused.
+    pub alone: Option<usize>,
 }
 
 /// Something a use works on (content `workOn`), which must be there for it to start.
@@ -2440,6 +2449,12 @@ struct InteractionRaw {
     /// Something it works on (see `Interaction::work_on`).
     #[serde(default)]
     work_on: Option<WorkOn>,
+    /// A game for two (see `Interaction::partner`).
+    #[serde(default)]
+    partner: bool,
+    /// The use done instead with nobody to play (see `Interaction::alone`).
+    #[serde(default)]
+    alone: Option<String>,
 }
 
 /// Content `laundry` (see `LaundryRules`).
@@ -3041,7 +3056,29 @@ impl Content {
                     hours: it.hours,
                     sky: it.sky,
                     work_on: it.work_on,
+                    partner: it.partner,
+                    alone: None,
                 });
+                // A game for two: at an object with two places, one each, used there as any use.
+                if it.partner
+                    && (obj.slots != 2
+                        || obj.interactions.iter().any(|i| i.baby)
+                        || it.whole
+                        || it.inside
+                        || it.seat_near > 0.0
+                        || it.recipe.is_some()
+                        || it.eat.is_some()
+                        || it.yields.is_some()
+                        || it.carried
+                        || it.needs_table)
+                {
+                    return Err(Error::new(format!(
+                        "{ctx}: a game for two (`partner`) is played at an object with two places (`slots`: 2), one each (no whole, inside, seatNear, recipe, eat, yields, carried or needsTable)"
+                    )));
+                }
+                if it.alone.is_some() && !it.partner {
+                    return Err(Error::new(format!("{ctx}: `alone` is what's done with nobody to play: it needs `partner`")));
+                }
                 if it.fetch.is_some() && it.requires.is_empty() {
                     return Err(Error::new(format!("{ctx}: `fetch` fetches what it `requires`: it requires nothing")));
                 }
@@ -3070,6 +3107,19 @@ impl Content {
                 if (it.when == Some(OpenState::Ripe) || it.leaves == Some(OpenState::Picked)) && obj.grows.is_none() {
                     return Err(Error::new(format!("{ctx}: \"ripe\" and \"picked\" are a crop's: give the object `grows`")));
                 }
+            }
+            // A game's use for one (`alone`): another of this object's, not a game, done where
+            // the game is (the same pose, so the place they're going to stays theirs).
+            for (k, it) in obj.interactions.iter().enumerate() {
+                let Some(alone) = &it.alone else { continue };
+                let ctx = format!("{}.{}", obj.id, it.id);
+                let Some(a) = interactions.iter().position(|i| &i.id == alone) else {
+                    return Err(Error::new(format!("{ctx}: `alone` names no use of '{}': '{alone}'", obj.id)));
+                };
+                if interactions[a].partner || interactions[a].pose != interactions[k].pose {
+                    return Err(Error::new(format!("{ctx}: `alone` is a use for one (no `partner`), done in the same pose as the game")));
+                }
+                interactions[k].alone = Some(a);
             }
             if object_index.insert(obj.id.clone(), objects.len()).is_some() {
                 return Err(Error::new(format!("duplicate object id '{}'", obj.id)));
@@ -4434,6 +4484,27 @@ mod tests {
         refused(&|c| c["objects"][0]["interactions"][0]["hours"] = json!([20, 25]), "fridge.snack: `hours`");
         refused(&|c| c["objects"][0]["interactions"][0]["workOn"] = json!("laundry"), "fridge.snack: `workOn` laundry needs content `laundry`");
         refused(&|c| c["laundry"] = json!({"perDay": 0, "most": 4}), "laundry: `perDay` above 0");
+        // A game for two: two places, and its use for one another of the object's, alike.
+        refused(&|c| c["objects"][1]["interactions"][0]["partner"] = json!(true), "tv.watch: a game for two (`partner`) is played at an object with two places");
+        refused(&|c| c["objects"][1]["interactions"][0]["alone"] = json!("watch"), "tv.watch: `alone` is what's done with nobody to play: it needs `partner`");
+        let game = |alone: &str, pose: &str| {
+            let alone = alone.to_owned();
+            let pose = pose.to_owned();
+            move |c: &mut serde_json::Value| {
+                c["objects"][1]["slots"] = json!(2);
+                c["objects"][1]["interactions"][0]["partner"] = json!(true);
+                c["objects"][1]["interactions"][0]["alone"] = json!(alone);
+                c["objects"][1]["interactions"].as_array_mut().unwrap().push(json!({"id":"solo","label":"Solo","minutes":10,"pose":pose,"effects":{"fun":0.1}}));
+            }
+        };
+        refused(&game("nothing", "stand"), "tv.watch: `alone` names no use of 'tv': 'nothing'");
+        refused(&game("watch", "stand"), "tv.watch: `alone` is a use for one (no `partner`), done in the same pose as the game");
+        refused(&game("solo", "sit"), "tv.watch: `alone` is a use for one");
+        let mut c: serde_json::Value = serde_json::from_str(CONTENT).unwrap();
+        game("solo", "stand")(&mut c);
+        let content = Content::from_json(&c.to_string()).unwrap();
+        let tv = content.objects.iter().find(|o| o.id == "tv").unwrap();
+        assert!(tv.interactions[0].partner && tv.interactions[0].alone == Some(1) && !tv.interactions[1].partner);
         refused(
             &|c| {
                 c["objects"][1]["layer"] = json!("surface");
