@@ -267,6 +267,11 @@ const STAND_BACK: Record<string, number> = {
  * (`at`, m: the bear's neck).
  */
 const HUGGED: Record<string, { reach: number; at: number }> = { teddyBear: { reach: 0.58, at: 0.6 } };
+/**
+ * Things talked to, looked at or listened to (`talk`, `look`, `listen`) with the head level, not tipped down to
+ * them: the telescope (its eyepiece clips), and the mirrors, looked into at eye height (a speech practised).
+ */
+const LEVEL_GAZE = new Set(['telescope', 'mirror', 'mirrorWall', 'mirrorRound', 'mirrorFloor']);
 /** Crouched (the `crouch` clip): the shoulders' height for a body's standing height. */
 const CROUCH_SHOULDER = 0.55;
 
@@ -4244,8 +4249,8 @@ export class Characters {
       case 'talk':
       case 'look':
       case 'listen':
-        // Talking to a plant, looking at a bird bath: eyes down to the object.
-        if (def && def !== 'telescope') addRotation(add, B.Head, 1, 0, 0, 0.2);
+        // Talking to a plant, looking at a bird bath: eyes down to the object (into a mirror, level: `LEVEL_GAZE`).
+        if (def && !LEVEL_GAZE.has(def)) addRotation(add, B.Head, 1, 0, 0, 0.2);
         break;
       case 'exercise':
         if (rig.useObj?.stand?.motion === 'bounce') {

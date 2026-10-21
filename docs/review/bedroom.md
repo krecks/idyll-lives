@@ -280,5 +280,6 @@ Measured: the dressing table's top 0.76 (72â€“78) and its pouf's seat 0.45 (42â€
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters.ts:3378` (`talk`, `look`, `listen` tip the head 0.2 rad down at any object but the telescope)
 - **Evidence:** "Practise a speech" (`anim: talk`) at every mirror tips the head down to the object, as at a plant or a bird bath; a mirror is looked into at eye height. "Check the mirror" was `look` (the same tip) and is `idle` now (1222c510); the speech wants the head level at a mirror (by def, or a `mirror` anim).
-- **Status:** open
+- **Status:** fixed (COMMIT)
+- **After:** at the mirrors (`mirror`, `mirrorWall`, `mirrorRound`, `mirrorFloor`) the speech's head stays level, looking into the glass (`characters.ts` `LEVEL_GAZE`, with the telescope); at a plant or a bird bath it still tips down. `fixes/sweep-render/mirror/side-mirrorWall-speech-00.png` (side on: the head level at the wall mirror), `mirror-mirror-speech-01.png`.
 - **Source:** fix: content
