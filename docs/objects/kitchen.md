@@ -18,7 +18,8 @@ drink* and the party bar's *Mix drinks for everyone* are for young adults and up
 is too young to pour a glass of wine", never picks them, and sees them greyed out; the party bar's soda is anyone's).
 Every recipe with a hot step (meal, gourmet, tasting menu, both barbecues, pizza, baked treats, pie; recipe `stages`)
 is cooked by teens and up, wherever it is started (a fridge, a stove, an oven, a grill); a child may make a sandwich
-and heat up leftovers. Coffee is left to anyone (not an age rule yet).
+and heat up leftovers. Coffee is for teens and up (I-systems-11): making one at the coffee machine (and the small
+espresso machine on a top, the foodie espresso bar) and every *Have a coffee* at a table or chair.
 
 ## Kitchen sinks (2)
 

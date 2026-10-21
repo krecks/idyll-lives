@@ -93,6 +93,12 @@
           "id": "coffee",
           "requires": ["coffee"],
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",
