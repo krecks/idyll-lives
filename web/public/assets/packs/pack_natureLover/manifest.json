@@ -432,8 +432,22 @@
       },
       "motions": {
         "uses": {
-          "unwind": "door_open",
-          "orchids": "door_open"
+          "unwind": [
+            {
+              "clip": "door_open",
+              "hold": 1.5,
+              "out": 1.5
+            },
+            "vent_open"
+          ],
+          "orchids": [
+            {
+              "clip": "door_open",
+              "hold": 1.5,
+              "out": 1.5
+            },
+            "vent_open"
+          ]
         }
       },
       "paint": [

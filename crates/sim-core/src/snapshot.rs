@@ -8,8 +8,8 @@ use crate::world::{Activity, MAX_SIMS, Phase, Sim, Task, TaskKind, World};
 use crate::{TICKS_PER_SECOND, clock};
 
 pub const HEADER_LEN: usize = 9;
-/// Floats per Sim (all 23 used).
-pub const SIM_STRIDE: usize = 24;
+/// Floats per Sim (all 28 used).
+pub const SIM_STRIDE: usize = 28;
 pub const CAPACITY: usize = HEADER_LEN + MAX_SIMS * SIM_STRIDE;
 
 pub mod header {
@@ -39,7 +39,8 @@ pub mod sim {
     pub const MOVING: usize = 5;
     /// Social interaction index + 1 while in a conversation (as actor, target or listener), else 0.
     pub const SOCIAL: usize = 6;
-    /// 0 = undecided/hidden, 1 = went well, 2 = went badly (revealed halfway through).
+    /// 0 = undecided/hidden, 1 = went well, 2 = went badly (revealed halfway through; at once for
+    /// a hug or a kiss, which the body answers).
     pub const OUTCOME: usize = 7;
     /// Conversation partner's id (for a listener, the one who started it), or -1.
     pub const PARTNER: usize = 8;
@@ -86,10 +87,21 @@ pub mod sim {
     pub const RECIPE: usize = 22;
     /// Calling out someone's name (to talk; see `conversation.rs`): their id + 1, else 0.
     pub const CALL: usize = 23;
+    /// While walking, the waypoint they're walking to (`YAW` faces it); else where they stand.
+    pub const WAY_X: usize = 24;
+    pub const WAY_Z: usize = 25;
+    /// While walking, where their way is `AHEAD` metres on from where they are (or its end;
+    /// not past a step onto another storey); else where they stand. With `WAY_X`, the renderer
+    /// opens a door or a gate only for someone about to go through it.
+    pub const AHEAD_X: usize = 26;
+    pub const AHEAD_Z: usize = 27;
 }
 
+/// How far ahead along their way `sim::AHEAD_X` looks, in metres.
+pub const AHEAD: f32 = 1.5;
+
 // Every field fits in a Sim's row.
-const _: () = assert!(sim::HEIGHT < SIM_STRIDE && sim::INTERACTION < SIM_STRIDE && sim::RECIPE < SIM_STRIDE && sim::CALL < SIM_STRIDE);
+const _: () = assert!(sim::HEIGHT < SIM_STRIDE && sim::INTERACTION < SIM_STRIDE && sim::RECIPE < SIM_STRIDE && sim::CALL < SIM_STRIDE && sim::AHEAD_Z < SIM_STRIDE);
 const _: () = assert!(header::ITEMS_VERSION < HEADER_LEN);
 
 /// What a Sim does for the snapshot; see `sim::OBJECT`, `sim::ACTION`, `sim::OBJECT_DEF` and
@@ -129,20 +141,20 @@ fn doing(world: &World, s: &Sim) -> Doing {
     if let Some(Activity { phase: Phase::Knocking { .. }, .. }) = s.current() {
         return Doing::plain(world, None, world.content.visits.door.as_ref().and_then(|d| d.knock_anim));
     }
-    // Cooking: at the station, the step's animation while at it (the recipe was started from
-    // an interaction of `origin`: that's the interaction shown while at it).
+    // Cooking: at the station, the step's animation for that station while at it (a meal put in
+    // the oven, stirred on a hob; the recipe was started from an interaction of `origin`: that's
+    // the interaction shown while at it).
     if let Some(Activity { task: Task { kind: TaskKind::Cook { recipe, step, station, origin, .. }, .. }, phase, .. }) = s.current() {
         let Some(o) = station.and_then(|o| world.objects.get(o as usize)) else {
             return Doing::NOTHING;
         };
         let r = &world.content.recipes[*recipe];
+        let def = &world.content.objects[o.def];
         let using = matches!(phase, Phase::Using { .. });
-        let interaction = (*origin == Some(o.id))
-            .then(|| world.content.objects[o.def].interactions.iter().position(|i| i.recipe == Some(*recipe)))
-            .flatten();
+        let interaction = (*origin == Some(o.id)).then(|| def.interactions.iter().position(|i| i.recipe == Some(*recipe))).flatten();
         return Doing {
             object: o.stable as f32,
-            action: r.steps.get(*step as usize).and_then(|s| s.anim).filter(|_| using).map_or(-1.0, |a| a as f32),
+            action: r.steps.get(*step as usize).and_then(|s| s.anim_for(def.stations)).filter(|_| using).map_or(-1.0, |a| a as f32),
             def: o.def as f32,
             interaction: interaction.map_or(-1.0, |i| i as f32),
         };
@@ -152,7 +164,8 @@ fn doing(world: &World, s: &Sim) -> Doing {
         let anim = world.content.cooking.eat_anim.filter(|_| matches!(phase, Phase::Using { .. }));
         return Doing::plain(world, *seat, anim);
     }
-    // Clearing away: at the bin, the sink or the counter, scraping, washing or putting away.
+    // Clearing away: at the bin, the sink or the counter, scraping, washing or putting away (the
+    // station's kind too: washing at a dishwasher sounds unlike a sink's running tap).
     if let Some(Activity { task: Task { kind: TaskKind::Dishes { station, stage, .. }, .. }, phase, .. }) = s.current() {
         let rules = &world.content.cooking;
         let anim = match stage {
@@ -161,11 +174,13 @@ fn doing(world: &World, s: &Sim) -> Doing {
             _ => rules.dishes_anim,
         };
         let anim = anim.filter(|_| matches!(phase, Phase::Using { .. }));
-        return Doing::plain(world, *station, anim);
+        let def = station.and_then(|o| world.objects.get(o as usize)).map_or(-1.0, |o| o.def as f32);
+        return Doing { def, ..Doing::plain(world, *station, anim) };
     }
-    // On the phone: on the seat (or standing), the phone animation while at it.
-    if let Some(Activity { task: Task { kind: TaskKind::Phone { seat, .. }, .. }, phase, .. }) = s.current() {
-        let anim = world.content.phone.anim.filter(|_| matches!(phase, Phase::Using { .. }));
+    // On the phone: on the seat (or standing), the action's animation while at it.
+    if let Some(Activity { task: Task { kind: TaskKind::Phone { seat, action, .. }, .. }, phase, .. }) = s.current() {
+        let phone = &world.content.phone;
+        let anim = phone.actions.get(*action).map_or(phone.anim, |a| a.anim).filter(|_| matches!(phase, Phase::Using { .. }));
         return Doing::plain(world, *seat, anim);
     }
     // Tidying up: no object, the clean animation while at it.
@@ -204,6 +219,32 @@ fn doing(world: &World, s: &Sim) -> Doing {
         def: obj.def as f32,
         interaction: *interaction as f32,
     }
+}
+
+/// The waypoint a Sim walks to and where their way is `AHEAD` metres on (`sim::WAY_X`,
+/// `sim::AHEAD_X`), both where they stand when they aren't walking.
+fn way_ahead(world: &World, s: &Sim) -> ([f32; 2], [f32; 2]) {
+    let Some(Activity { phase: Phase::Routing { waypoints, next }, .. }) = s.current() else {
+        return (s.pos, s.pos);
+    };
+    let storey = world.storey_of(s.pos[1].floor() as i32);
+    let Some(&way) = waypoints.get(*next).filter(|wp| world.storey_of(wp[1].floor() as i32) == storey) else {
+        return (s.pos, s.pos);
+    };
+    let (mut at, mut left) = (s.pos, AHEAD);
+    for &wp in &waypoints[*next..] {
+        if world.storey_of(wp[1].floor() as i32) != storey {
+            break;
+        }
+        let d = (wp[0] - at[0]).hypot(wp[1] - at[1]);
+        if d >= left {
+            let k = left / d;
+            return (way, [at[0] + (wp[0] - at[0]) * k, at[1] + (wp[1] - at[1]) * k]);
+        }
+        left -= d;
+        at = wp;
+    }
+    (way, at)
 }
 
 /// Writes the snapshot into `out`, which must hold at least `CAPACITY` floats.
@@ -256,20 +297,27 @@ pub fn write(world: &World, out: &mut [f32]) {
             Some(Activity { task: Task { kind: TaskKind::Social { target, .. }, .. }, phase: Phase::Calling { .. }, .. }) => *target as f32 + 1.0,
             _ => 0.0,
         };
+        let (way, ahead) = way_ahead(world, s);
+        [o[sim::WAY_X], o[sim::WAY_Z]] = way;
+        [o[sim::AHEAD_X], o[sim::AHEAD_Z]] = ahead;
     }
     // Conversations: write the shared state into every participant's row.
     for (i, s) in world.sims.iter().enumerate() {
         let Some((t, social, success, progress)) = s.conversation(&world.content) else {
             continue;
         };
-        let outcome = if progress < 0.5 {
+        // A hug or a kiss is answered at once, by the body (a refused one is leant away from); talk
+        // halfway through.
+        let def = &world.content.socials[social];
+        let reveal = if matches!(crate::social::ANIMATIONS.get(def.anim as usize - 1), Some(&("hug" | "kiss"))) { 0.0 } else { 0.5 };
+        let outcome = if progress < reveal {
             0.0
         } else if success {
             1.0
         } else {
             2.0
         };
-        let anim = world.content.socials[social].anim as f32;
+        let anim = def.anim as f32;
         let talk = world.content.talk_anim.map_or(-1.0, |a| a as f32);
         // Those listening in (a group conversation) have the one who started it as partner.
         let listeners = world.sims.iter().filter(|l| l.listening_to() == Some(i as u32)).map(|l| (l.id as usize, i, 3.0));
@@ -309,6 +357,7 @@ pub fn layout_json(content: &Content) -> String {
             "mood": sim::MOOD, "thought": sim::THOUGHT, "thoughtSubject": sim::THOUGHT_SUBJECT, "height": sim::HEIGHT,
             "objectDef": sim::OBJECT_DEF, "interaction": sim::INTERACTION,
             "held": sim::HELD, "recipe": sim::RECIPE, "call": sim::CALL,
+            "wayX": sim::WAY_X, "wayZ": sim::WAY_Z, "aheadX": sim::AHEAD_X, "aheadZ": sim::AHEAD_Z,
         },
         "actions": content.animations,
         "items": content.items.iter().map(|i| &i.id).collect::<Vec<_>>(),

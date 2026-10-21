@@ -230,24 +230,34 @@ fn the_renderer_tables_are_read_from_its_source() {
     let world = "const ACTION_SOUNDS: Record<string, LoopKind> = {\n  cook: 'sizzle',\n  // The cooking steps.\n  chop: 'chop',\n  wash: 'tap',\n};\n";
     let sounds = review::action_sounds(world).unwrap();
     assert_eq!(sounds.len(), 3);
-    // `soundOf`'s two cases: washing (up, or at a basin) and the washing machine.
+    // `soundOf`'s washing: up, or at a basin.
+    let thing = Object::default();
     let mut u = using("washUp", "wash", 5.0, &[]);
-    assert_eq!(review::sound_of(&sounds, "sink", &u).as_deref(), Some("washUp"));
+    assert_eq!(review::sound_of(&sounds, &thing, &u).as_deref(), Some("washUp"));
     u.id = "wash".into();
-    assert_eq!(review::sound_of(&sounds, "dressingTable", &u), None);
+    assert_eq!(review::sound_of(&sounds, &thing, &u), None);
     u.tags = vec!["handwash".into()];
-    assert_eq!(review::sound_of(&sounds, "sink", &u).as_deref(), Some("tap"));
-    let laundry = using("laundry", "clean", 60.0, &[]);
-    assert_eq!(review::sound_of(&sounds, "neat.laundryCenter", &laundry).as_deref(), Some("washer"));
-    assert_eq!(review::sound_of(&sounds, "mop", &laundry), None);
-    assert_eq!(review::sound_of(&sounds, "stove", &using("cook", "chop", 5.0, &[])).as_deref(), Some("chop"));
+    assert_eq!(review::sound_of(&sounds, &thing, &u).as_deref(), Some("tap"));
+    assert_eq!(review::sound_of(&sounds, &thing, &using("cook", "chop", 5.0, &[])).as_deref(), Some("chop"));
+    // By the thing: the use's own sound, else the object's for the animation, `none` for silence.
+    let mut laundry = using("laundry", "clean", 60.0, &[]);
+    assert_eq!(review::sound_of(&sounds, &thing, &laundry), None);
+    laundry.sound = Some("washer".into());
+    assert_eq!(review::sound_of(&sounds, &thing, &laundry).as_deref(), Some("washer"));
+    let oven = Object { sounds: [("cook".to_string(), "none".to_string())].into(), ..Object::default() };
+    let mut bake = using("bake", "cook", 30.0, &[]);
+    assert_eq!(review::sound_of(&sounds, &thing, &bake).as_deref(), Some("sizzle"));
+    assert_eq!(review::sound_of(&sounds, &oven, &bake), None);
+    // A recipe sounds by its steps at the object's stations.
+    bake.steps_here = Some(vec![("chop".into(), None), ("cook".into(), None), ("stir".into(), Some("none".into()))]);
+    assert_eq!(review::sound_of(&sounds, &oven, &bake).as_deref(), Some("chop"));
 }
 
 #[test]
 fn the_shipped_content_reads() {
     let paths = Paths::repo();
     let objects = review::objects(Path::new(&paths.content)).unwrap();
-    assert_eq!(objects.len(), 541);
+    assert_eq!(objects.len(), 542);
     let by = |id: &str| objects.iter().find(|o| o.id == id).unwrap();
     let sofa = by("sofaBed");
     assert_eq!((sofa.page.as_str(), sofa.group.as_str(), sofa.model.as_str(), sofa.slots), ("living", "seating", "model.sofaBed", 2));
@@ -257,6 +267,9 @@ fn the_shipped_content_reads() {
     assert!(doze.effects.iter().any(|(n, g)| n == "energy" && (*g - 0.1).abs() < 1e-6), "{:?}", doze.effects);
     assert_eq!(by("gloomy.journalDesk").page, "packs", "a pack's objects are on packs.md");
     assert!(by("fridge").station_anims.contains("fetch"), "{:?}", by("fridge").station_anims);
+    assert_eq!(by("toilet").uses[0].end_sound.as_deref(), Some("flush"));
+    assert_eq!(by("fountainTown").ambient.as_deref(), Some("fountain"));
+    assert_eq!(by("wallOven").sounds.get("stir").map(String::as_str), Some("none"));
     let motions = review::motions(Path::new(&paths.assets)).unwrap();
     assert_eq!(motions["model.sofaBed"]["open"], "bed_out");
     let root = ll_tools::checkglb::repo_root();
@@ -265,6 +278,6 @@ fn the_shipped_content_reads() {
     let sounds = review::action_sounds(&std::fs::read_to_string(format!("{root}/web/src/audio/world.ts")).unwrap()).unwrap();
     assert_eq!(sounds.get("shower").map(String::as_str), Some("shower"));
     let (text, files) = review::uses(&objects, &motions, &actions, &sounds, None);
-    assert!(text.contains("| **all** | 541 |"), "{text}");
+    assert!(text.contains("| **all** | 542 |"), "{text}");
     assert_eq!(files.len(), 15);
 }

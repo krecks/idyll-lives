@@ -127,7 +127,8 @@ Not tied to one row: M-lighting-01, M-lighting-02 (every lamp).
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/lighting.py:26` (`GLOW = {'glow': '#FFD9A0'}`, one glow colour for every shade); `web/src/render/babylon/BabylonRenderer.ts:4627` (`applyGlow`)
 - **Evidence:** `lighting/sheets/obj-lampBanker.png` (day: a green glass shade; night: cream), `lighting/sheets/obj-lampMushroom.png` (orange by day, cream at night), `lighting/extra/lampBanker-night-bought.png`. A lit coloured glass or enamel shade keeps its colour, brighter (a banker's lamp is green lit); a white fabric or paper shade goes cream, as these all do. A glow tinted by the shade's own colour for the coloured ones would do.
-- **Status:** open
+- **Status:** fixed (4029f842)
+- **After:** the coloured glass shades glow in their own colour: the banker's lamp's green shade `#4FB27A` over its white liner (cream), the mushroom lamp's coral cap `#FFAA78` (`fixes/blender-decor/lampBanker-night.png`, `lampMushroom-night.png`; before: `lighting/extra/lampBanker-night-bought.png`). The white and paper shades keep the cream `GLOW`.
 - **Source:** wave: lighting
 
 ### M-lighting-04 — The "ceiling light" is a lantern pendant 0.6 m deep, not a ceiling light
@@ -137,7 +138,8 @@ Not tied to one row: M-lighting-01, M-lighting-02 (every lamp).
 - **Fix class:** decision
 - **Where:** `tools/art/blender/families/lighting.py:185` (`ceilingLight`: a 0.36 m frosted cube on a 0.28 m stem), `web/public/content/furniture.json:4142`
 - **Evidence:** `lighting/sheets/obj-ceilingLight.png`; `cargo review sizes`: H 0.60 against the reference's flush ceiling light 0.05–0.30. What is drawn is a square lantern pendant (its docstring says so); what a buyer of a "Ceiling light" expects is a flush or semi-flush fitting. Either rename it (and its kind to `pendantLamp`, inside whose range it is) or build a flush one.
-- **Status:** open
+- **Status:** fixed (b3f6b82d)
+- **After:** "Lantern pendant", kind `pendantLamp`: lighting 1 → 0 outside.
 - **Source:** wave: lighting
 
 ### M-lighting-05 — Pendants hang at head height where residents walk under them
@@ -147,7 +149,8 @@ Not tied to one row: M-lighting-01, M-lighting-02 (every lamp).
 - **Fix class:** decision
 - **Where:** `tools/art/blender/families/lighting.py:173` (`ceilingPendant`, dome bottom about 1.86 m), `:235` (`pendantIndustrial`, 1.93), `:297` (`paperLantern`, globe bottom 1.80), `:205` (`chandelier`, ring 2.04); `crates/sim-core/src/home.rs:491` ("Residents walk under pictures and lamps"); the adult man is 1.77 m (`crates/tools/src/characters/rig.rs:81`)
 - **Evidence:** `cargo review sizes` (H from the 2.8 m ceiling: 0.95, 0.87, 1.00, 0.76), `lighting/gallery/gallery-ceilingPendant.png`, `lighting/gallery/gallery-paperLantern.png`. The reference (`pendant`) gives at least 2.1 m clear where people walk, or 0.75–0.9 m over a dining table (bottom 1.5–1.65 m); these hang between, 3–16 cm over a man's crown, and nothing keeps residents from walking under (they are not `hangsLow`). Decide per lamp: a shorter drop (walk-under) or `hangsLow` (over a table only, as the hanging plant).
-- **Status:** open
+- **Status:** fixed (05970ca3, 4029f842)
+- **After:** Q-12: the ring chandelier and the industrial pendant are `headHeight` (content): nobody walks under them, furniture still goes under (a dining table, a sofa), not furniture as tall as the wall (sim test `layers.rs` `a_lamp_at_head_height_hangs_over_a_table_not_over_heads`; generated houses take their floor from walking and use another kind where one would block the way). Blender wave (4029f842): the pendant lamp and the paper lantern hang a 0.69 m drop, their lowest point 2.11 and 2.12 m up (the renderer's `objectBox` bottoms; was 1.85 and 1.80), 0.34 m over the adult man's 1.77 m, the reference's 2.1 m where people walk; `light.height` 2.16 and 2.37 (`fixes/blender-decor/ceilingPendant-under.png`, `paperLantern-under.png`, at night `ceilingPendant-night.png`, `paperLantern-night.png`; `cargo review sizes` H 0.69 and 0.68, ok).
 - **Source:** wave: lighting
 
 ### M-lighting-06 — The arc lamp's arc doesn't reach past its own tile
@@ -157,7 +160,7 @@ Not tied to one row: M-lighting-01, M-lighting-02 (every lamp).
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/lighting.py:423` (`ARC`: from the base at `(-0.3, -0.3)` to the shade at `(0.22, 0.18)`), `:427`; `web/public/content/catalog2/lighting.json:120` (footprint 1 × 1, `light.at` `[0.245, 0.2]`)
 - **Evidence:** `lighting/sheets/obj-lampFloorArc.png`: the shade hangs about 0.7 m from the base, over the same tile. An arc lamp exists to reach 1.2–2 m over a sofa or a table from behind it (the reference's use, "light a sofa or a table from above", W up to 1.8 m); this one has to stand beside the sofa, where a plain floor lamp would. A 2-tile reach (footprint 1 × 1 with the shade over the next tile, as things hung over others are) needs the sim to allow it.
-- **Status:** open
+- **Status:** open (the Blender wave left it, 2026-10-21: a shade over the next tile needs the sim to allow a floor thing to reach over a neighbouring tile, kept off walkways, as G-40 says; a longer arc inside its own tile would still stand beside the sofa)
 - **Source:** wave: lighting
 
 ### M-lighting-07 — The table lamp's light is 10 cm above its shade
@@ -167,7 +170,8 @@ Not tied to one row: M-lighting-01, M-lighting-02 (every lamp).
 - **Fix class:** content
 - **Where:** `web/public/content/furniture.json:4337` (`tableLamp` `light.height` 0.95)
 - **Evidence:** `cargo check-glb` heights warning: "light 0.95 m, outside the lamp there (its model 0.13 to 0.85 m at x -0.12)": the shade's top is 0.85 m, so the light shines from the air above it. At night the pool looks right (`lighting/night/c1/tableLamp-no-uses.png`), but the light's height sets where the wall disc lands. About 0.75 (inside the shade) fixes it.
-- **Status:** open
+- **Status:** fixed (a920f174)
+- **After:** `tableLamp` `light.height` 0.75, inside the shade (0.13–0.85 m); its heights warning gone.
 - **Source:** wave: lighting
 
 ### I-lighting-01 — moved to systems.md
@@ -179,5 +183,16 @@ Not tied to one row: M-lighting-01, M-lighting-02 (every lamp).
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/objectMotion.ts:239` (an `idle` clip plays whenever the camera is near, whatever the object's state); `tools/art/blender/families/lighting.py:248` (`ceilingFan`, `blades_turn` idle), `:297` (`paperLantern`, `sway` idle)
 - **Evidence:** `lighting/extra/ceilingFan-night-bought.png`; after `switchLamp` off, the fan's `blades_turn` clip still runs (its time 0.2 then 0.9 s, 0.7 s apart: `decor/extra/extra.json`), and it turns by day in an empty house. A real fan has its own switch (pull cord or wall) and stops; the content has one switch, for the light. The paper lantern's sway goes on day and night indoors, where a paper globe hangs still without a draught. The fan's clip following its switch (on: turning) and the lantern's sway kept for open windows or dropped would do.
-- **Status:** open
+- **Status:** fixed (0eaa3ba7, 4029f842)
+- **After:** a lamp's `idle` clip goes round only while it is switched on (`objectMotion.ts`): the fan's blades stop with its light off (in the browser, `blades_turn` absent bought off, turning 1.5 → 2.2 s once switched on, gone when off again). Blender wave (4029f842): the paper lantern hangs still, one joined node with no clip (`sway`, `IDLE_SWAY` and its manifest `motions` gone).
 - **Source:** wave: lighting
+
+### M-lighting-08 — A lamp's light passes through walls into the next room
+
+- **Severity:** S3
+- **Rubric:** M10
+- **Fix class:** code
+- **Where:** `web/src/render/babylon/BabylonRenderer.ts` (`setupLights`: the room lights have no shadows and no room of their own), `web/src/render/babylon/house.ts` (`placeLights`)
+- **Evidence:** the part of M-lighting-02 its fix left: a lamp near a wall lights the floor and furniture of the room behind it within its reach (4–7 m); aimed lamps (`light.aim`, G-60) leak less, all-round ones (a floor lamp, a fire) as before. Keeping a light to its room needs a per-room mask in the cluster's shader or shadows per lamp, both new renderer work with a frame cost to measure first.
+- **Status:** open
+- **Source:** fix: lighting

@@ -104,6 +104,57 @@ class VertexTweaksPlugin extends MaterialPluginBase {
   }
 }
 
+/**
+ * A pattern over a surface's texture, in the fragment shader (no texture or draw of its own):
+ * - `stripes`: wallpaper's faint stripes, 12.5 cm apart along the wall (by world position, so
+ *   walls along x and z both get them), fading out where they'd be finer than a pixel or two.
+ * - `whitewash`: wood limed pale, its grain still showing (the tint multiplies a mid-tone wood).
+ */
+export type SurfacePattern = 'stripes' | 'whitewash';
+/** How much darker (linear albedo) wallpaper's darker stripes are. */
+const STRIPE_DEPTH = 0.12;
+
+class PatternPlugin extends MaterialPluginBase {
+  constructor(
+    material: Material,
+    private readonly pattern: SurfacePattern,
+  ) {
+    // (Its own defines: an effect is shared by materials with the same defines.)
+    super(material, 'Pattern', 210, { PATTERN_STRIPES: false, PATTERN_WHITEWASH: false }, true, false);
+    this._enable(true);
+  }
+
+  override getClassName(): string {
+    return 'PatternPlugin';
+  }
+
+  override isCompatible(): boolean {
+    return true;
+  }
+
+  override prepareDefines(defines: MaterialDefines): void {
+    defines.PATTERN_STRIPES = this.pattern === 'stripes';
+    defines.PATTERN_WHITEWASH = this.pattern === 'whitewash';
+  }
+
+  override getCustomCode(shaderType: string, shaderLanguage?: ShaderLanguage): Nullable<{ [pointName: string]: string }> {
+    if (shaderType !== 'fragment') return null;
+    const [v3, at, fade] = shaderLanguage === ShaderLanguage.WGSL ? ['vec3f', 'let stripeAt = (fragmentInputs.vPositionW.x + fragmentInputs.vPositionW.z) * 8.0;', 'let stripeFade'] : ['vec3', 'float stripeAt = (vPositionW.x + vPositionW.z) * 8.0;', 'float stripeFade'];
+    return {
+      CUSTOM_FRAGMENT_UPDATE_ALBEDO: [
+        '#ifdef PATTERN_STRIPES',
+        at,
+        `${fade} = clamp(1.5 - fwidth(stripeAt) * 3.0, 0.0, 1.0);`,
+        `surfaceAlbedo = surfaceAlbedo * (1.0 - ${STRIPE_DEPTH} * stripeFade * smoothstep(0.35, 0.65, 0.5 + 0.5 * cos(6.2831853 * stripeAt)));`,
+        '#endif',
+        '#ifdef PATTERN_WHITEWASH',
+        `surfaceAlbedo = ${v3}(1.0) - (${v3}(1.0) - mix(surfaceAlbedo, ${v3}(dot(surfaceAlbedo, ${v3}(0.3, 0.59, 0.11))), 0.3)) * 0.65;`,
+        '#endif',
+      ].join('\n'),
+    };
+  }
+}
+
 /** Cutaway state shared by every wall material of a scene (set by the renderer). */
 export class WallCutState {
   /** 1 where the camera looks along +x, -x, +z, -z (matches `LOOK` bits in geometry.ts). */
@@ -587,6 +638,8 @@ export interface SurfaceOptions {
   cutaway?: boolean;
   /** A separate copy of the surface under this name (e.g. one per room, for its own emissive glow). */
   variant?: string;
+  /** A pattern drawn over its texture (`PatternPlugin`). */
+  pattern?: SurfacePattern;
 }
 
 export class MaterialLibrary {
@@ -666,7 +719,7 @@ export class MaterialLibrary {
 
   /** A textured surface from a manifest `material` entry (walls, floors, roads, terrain). */
   surface(key: string, options: SurfaceOptions = {}): PBRMaterial {
-    const id = `${key}|${options.vertexColors ? 'vc' : ''}|${options.doubleSided ? '2s' : ''}|${options.planarUV ? 'xz' : ''}|${options.cutaway ? 'cut' : ''}|${options.variant ?? ''}`;
+    const id = `${key}|${options.vertexColors ? 'vc' : ''}|${options.doubleSided ? '2s' : ''}|${options.planarUV ? 'xz' : ''}|${options.cutaway ? 'cut' : ''}|${options.variant ?? ''}|${options.pattern ?? ''}`;
     let mat = this.cache.get(id);
     if (!mat) {
       const entry = this.assets?.get(key, 'material') ?? { type: 'material', color: '#DDDDDD' };
@@ -884,6 +937,7 @@ export class MaterialLibrary {
     mat.maxSimultaneousLights = MAX_LIGHTS;
     if (options.vertexColors || options.planarUV) new VertexTweaksPlugin(mat, { srgbColors: options.vertexColors, planarUV: options.planarUV });
     if (options.cutaway) new WallCutPlugin(mat, this.wallCut);
+    if (options.pattern) new PatternPlugin(mat, options.pattern);
     new UndergroundPlugin(mat, this.dig);
     applySoftLook(mat);
     this.lit.add(mat);

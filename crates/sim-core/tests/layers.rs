@@ -1,7 +1,8 @@
 //! Things on a wall, the ceiling or the floor's surface (content `layer`) take no floor space:
 //! a picture over a sofa, a lamp over a table, a rug under a bed. Only things on the same layer
-//! can't overlap; a picture needs a wall behind it, a ceiling lamp a room. Bunk beds put their
-//! two sleepers in the middle of the bed.
+//! can't overlap; a picture needs a wall behind it, a ceiling lamp a room (and walls can't come
+//! down from round it). A lamp at head height takes the floor from walking, not from furniture;
+//! what stands against a wall needs one. Bunk beds put their two sleepers in the middle of the bed.
 
 mod common;
 
@@ -82,16 +83,18 @@ fn a_lamp_left_without_a_ceiling_doesnt_spoil_the_save() {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
     buy(&mut w, "sofa", 2, 1, 0).unwrap();
     buy(&mut w, "pendant", 5, 4, 0).unwrap();
-    // Taking down a stretch of the right wall opens the room to the garden: the lamp, which
-    // building lets stay, now hangs where there is no ceiling.
+    // Taking down a stretch of the right wall would open the room to the garden, leaving the
+    // lamp where there is no ceiling: building refuses (`a_wall_taken_down_leaves_…`).
     let open = sim_core::command::EdgeEdit {
         axis: sim_core::command::EdgeAxis::V, x: 9, z: 3, kind: sim_core::command::EdgeKind::Open, cover: None, form: None, style: None, sill: None, head: None,
     };
-    w.apply(Command::Build { household: 0, edits: vec![open] }).unwrap();
-    assert_eq!(w.lot.room_at(5, 4), sim_core::lot::OUTDOORS, "the room is open to the outdoors");
-    assert_eq!(w.objects.len(), 2);
-    // The save loads, without the lamp that can't hang there; the rest stays.
-    let loaded = World::from_save_json(CONTENT, &w.save_json()).expect("the save loads");
+    assert!(w.apply(Command::Build { household: 0, edits: vec![open] }).is_err());
+    assert_ne!(w.lot.room_at(5, 4), sim_core::lot::OUTDOORS, "the room still stands");
+    // A save with a lamp outdoors all the same (from before that rule) loads without it; the rest stays.
+    let mut save: serde_json::Value = serde_json::from_str(&w.save_json()).unwrap();
+    let lamp = save["objects"].as_array_mut().unwrap().iter_mut().find(|o| o["def"] == "pendant").unwrap();
+    lamp["x"] = 10.into();
+    let loaded = World::from_save_json(CONTENT, &save.to_string()).expect("the save loads");
     let defs: Vec<&str> = loaded.objects.iter().map(|o| loaded.content.objects[o.def].id.as_str()).collect();
     assert_eq!(defs, ["sofa"]);
 }
@@ -118,6 +121,8 @@ const TALL: &str = r#"{
       {"id":"pendant","name":"Pendant","price":50,"layer":"ceiling","interactions":[]},
       {"id":"wardrobe","name":"Wardrobe","price":100,"fillsWall":true,"interactions":[]},
       {"id":"plant","name":"Hanging plant","price":50,"layer":"ceiling","hangsLow":true,"interactions":[]},
+      {"id":"chandelier","name":"Chandelier","price":50,"layer":"ceiling","headHeight":true,"interactions":[]},
+      {"id":"ladder","name":"Towel ladder","price":40,"againstWall":true,"interactions":[]},
       {"id":"rug","name":"Rug","price":50,"layer":"rug","interactions":[]}],
     "economy":{"startingFunds":5000}}"#;
 
@@ -198,8 +203,54 @@ fn a_plant_hanging_low_takes_the_floor_under_it() {
 }
 
 #[test]
+fn a_lamp_at_head_height_hangs_over_a_table_not_over_heads() {
+    let mut w = World::from_json(TALL, WINDOWS, 1).unwrap();
+    let free = |w: &World, x: i32, z: i32| !w.blocked()[w.lot.tile_index(x, z)];
+    buy(&mut w, "chandelier", 5, 4, 0).unwrap();
+    assert!(!free(&w, 5, 4), "nobody walks under it");
+    buy(&mut w, "sofa", 4, 4, 0).expect("furniture goes under it");
+    assert!(buy(&mut w, "wardrobe", 5, 3, 0).is_ok(), "beside it, a wardrobe is fine");
+    assert!(buy(&mut w, "chandelier", 5, 3, 0).unwrap_err().to_string().contains("hang into the wardrobe"), "not over one");
+    buy(&mut w, "sofa", 2, 3, 0).unwrap();
+    buy(&mut w, "chandelier", 3, 3, 0).expect("it hangs over the sofa too");
+    assert!(buy(&mut w, "chandelier", 7, 5, 0).unwrap_err().to_string().contains("standing there"), "not on Ada's head");
+    let loaded = World::from_save_json(TALL, &w.save_json()).unwrap();
+    assert!(!free(&loaded, 3, 3) && !free(&loaded, 5, 4), "loaded, it still takes its tiles");
+}
+
+#[test]
+fn what_stands_against_a_wall_needs_one() {
+    let mut w = World::from_json(TALL, WINDOWS, 1).unwrap();
+    let err = buy(&mut w, "ladder", 5, 4, 0).unwrap_err().to_string();
+    assert_eq!(err, "that stands against a wall: put its back to one");
+    let err = buy(&mut w, "ladder", 3, 1, 0).unwrap_err().to_string();
+    assert_eq!(err, "that can't stand against a window");
+    buy(&mut w, "ladder", 7, 1, 0).expect("back to the top wall");
+    buy(&mut w, "ladder", 1, 4, 1).expect("or to the left one");
+    // Its wall can't come down, nor become a window, behind it.
+    use sim_core::command::EdgeKind;
+    for kind in [EdgeKind::Open, EdgeKind::Window] {
+        let err = w.apply(edge(kind, 7)).unwrap_err().to_string();
+        assert!(err.contains("towel ladder stands against that wall"), "{err}");
+    }
+    w.apply(edge(EdgeKind::Window, 6)).expect("beside it, a window goes in");
+}
+
+#[test]
+fn a_wall_taken_down_leaves_no_ceiling_lamp_outdoors() {
+    let mut w = World::from_json(TALL, WINDOWS, 1).unwrap();
+    buy(&mut w, "pendant", 6, 4, 0).unwrap();
+    use sim_core::command::EdgeKind;
+    let err = w.apply(edge(EdgeKind::Open, 6)).unwrap_err().to_string();
+    assert_eq!(err, "the pendant would be left outdoors: move it first");
+    assert!(w.lot.room_at(6, 4) != sim_core::lot::OUTDOORS, "the wall still stands");
+    w.apply(Command::Sell { household: 0, object: w.objects.len() as u32 - 1 }).unwrap();
+    w.apply(edge(EdgeKind::Open, 6)).expect("with the lamp gone, it comes down");
+}
+
+#[test]
 fn the_flags_are_for_their_own_layers() {
-    for (flag, layer) in [("overWindow", "floor"), ("fillsWall", "wall"), ("hangsLow", "floor")] {
+    for (flag, layer) in [("overWindow", "floor"), ("fillsWall", "wall"), ("hangsLow", "floor"), ("headHeight", "floor"), ("againstWall", "wall")] {
         let content = format!(r#"{{"needs":[{{"id":"energy","label":"Energy"}}],"objects":[{{"id":"x","name":"X","layer":"{layer}","{flag}":true,"interactions":[]}}]}}"#);
         let err = World::from_json(&content, WINDOWS, 1).err().map(|e| e.to_string()).unwrap_or_default();
         assert!(err.contains(flag), "{flag} on the {layer}: {err}");

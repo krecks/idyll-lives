@@ -267,7 +267,7 @@
           0.02
         ]
       },
-      "description": "A teak bar for the garden; pull up bar stools.",
+      "description": "A teak bar for the garden; pull up high bar stools.",
       "interactions": []
     },
     {
@@ -424,6 +424,7 @@
           "id": "tend",
           "label": "Tend the seedlings",
           "anim": "tend",
+          "inside": true,
           "minutes": 45,
           "effects": {
             "fun": 0.15,
@@ -443,6 +444,7 @@
           "id": "harvest",
           "label": "Pick tomatoes",
           "anim": "harvest",
+          "inside": true,
           "minutes": 20,
           "effects": {
             "hunger": 0.4
@@ -620,6 +622,7 @@
           "id": "birdwatch",
           "label": "Watch the birds",
           "anim": "look",
+          "seatNear": 6,
           "minutes": 20,
           "effects": {
             "fun": 0.12,

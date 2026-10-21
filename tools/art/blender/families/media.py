@@ -12,7 +12,7 @@
 #   tvRetro            the rabbit ears turn 20° and extend (`antenna`, for watch);
 #   tvStandLow         the TV rises 60 cm out of the bench's lift (`tv_up`, for watch, back down at the end);
 #   homeCinema         the projector screen unrolls from its case on the wall (`screen_down`, watch and film);
-#   stereo             the CD tray slides out and back (`tray`, hold 1.2 s), the woofers pulse (`pulse`, E1 loop);
+#   stereo             the record turns on the turntable (`record`, a loop) and the woofers pulse (`pulse`, `every`);
 #   boombox            the cassette door tips open and shuts (`cassette`, hold 1.2 s);
 #   fireplaceElectric  the flames grow from the log bed (`flames`, for relax; gloss, glowing at night).
 #
@@ -327,9 +327,6 @@ def stereo():
                   rot=(0, 3 if i == len(RECORDS) - 1 else 0, 0), bevel=0.002)
         # the turntable on top
         F.box('plinth', 0.4, 0.07, 0.32, (0, 0.635, z), M.stereo_wood, bevel=0.01)
-        F.cyl('platter', 0.15, 0.02, (-0.03, 0.68, z), M.stereo_dark, verts=32)
-        F.cyl('vinyl', 0.145, 0.006, (-0.03, 0.693, z), M.vinyl, verts=32)
-        F.cyl('vinyl_label', 0.045, 0.008, (-0.03, 0.694, z), M.label, verts=16)
         F.cyl('arm_base', 0.02, 0.02, (0.15, 0.68, z - 0.1), M.steel, verts=12)
         _rod('tonearm', (0.15, 0.7, z - 0.1), (0.06, 0.7, z + 0.04), 0.006, M.steel)
         # the speakers: oak boxes, dark baffles, a tweeter (the woofers pulse)
@@ -340,12 +337,16 @@ def stereo():
             _front_cyl(f'tweeter{s}', 0.022, 0.008, x, 0.79, z + 0.085, M.grille, verts=12)
             _front_cyl(f'surround{s}', 0.058, 0.004, x, 0.685, z + 0.084, M.grille, verts=24)
     G.join(still, 'stereo', origin=(0, 0, 0))
-    # the CD tray, in the player at rest, with a disc on it
-    with G.new_parts() as tray:
-        F.box('tray', 0.15, 0.012, 0.15, (-0.26, 0.206, z + 0.075), M.stereo_dark, bevel=0.003)
-        F.box('tray_lip', 0.16, 0.016, 0.004, (-0.26, 0.21, z + 0.152), M.stereo_dark)
-        F.cyl('cd_disc', 0.058, 0.002, (-0.26, 0.2135, z + 0.075), M.disc, verts=24)
-    tray = G.join(tray, 'tray')
+    # the record on the turntable: the platter, the vinyl and its label, with a stripe on the label so its turn
+    # shows; it goes round at 33 rpm while the music plays (`record`, a loop)
+    px, py = -0.03, 0.68
+    with G.new_parts() as record:
+        F.cyl('platter', 0.15, 0.02, (px, py, z), M.stereo_dark, verts=32)
+        F.cyl('vinyl', 0.145, 0.006, (px, 0.693, z), M.vinyl, verts=32)
+        F.cyl('vinyl_label', 0.045, 0.008, (px, 0.694, z), M.label, verts=16)
+        F.box('label_stripe', 0.05, 0.002, 0.012, (px + 0.012, 0.6985, z), M.vinyl)
+        F.box('vinyl_sheen', 0.07, 0.001, 0.008, (px - 0.085, 0.6965, z + 0.03), M.disc, rot=(0, 20, 0))
+    record = G.join(record, 'record', origin=F.at(px, py, z))
     # the woofers' cones, one part, its origin on the baffles' face: they pulse forward and back
     with G.new_parts() as cones:
         for s in (-1, 1):
@@ -354,7 +355,7 @@ def stereo():
             F.sphere(f'cap{s}', 0.02, (x, 0.685, z + 0.097), M.cone, scale=(1, 0.5, 1), segments=12, rings=6)
     cones = G.join(cones, 'cones', origin=F.at(0, 0.685, z + 0.082))
     G.settle(centre=False)
-    G.slide(tray, 'tray', (0, -0.11, 0), seconds=0.6)
+    G.spin(record, 'record', turns=1, seconds=1.8)
     G.squash(cones, 'pulse', (1, 1.6, 1), seconds=0.5, back=True)
 
 
@@ -456,7 +457,7 @@ def fireplace_electric():
         for i, (x, length, turn) in enumerate(((-0.2, 0.42, 4), (0.2, 0.4, -5), (0.0, 0.36, 0))):
             y = LOG_Y + (0.03 if i == 2 else 0.0)
             F.cyl(f'log{i}', 0.04, length, (x, y, LOG_Z - (0.03 if i == 2 else 0.0)), M.logs, rot=(0, 90, turn), verts=12)
-        # the floor cushion in front, where residents sit facing the fire (characters.ts SEATS: 0.14 high, 0.3 out)
+        # the floor cushion in front, where residents sit cross-legged facing the fire (furniture.json seats: 0.14 high, the hips 0.36 out)
         F.box('cushion', 0.56, 0.12, 0.4, (0, 0.07, HEARTH_Z), M.hearth_cushion, bevel=0.05, bevel_segments=4)
         F.box('cushion_piping', 0.5, 0.014, 0.34, (0, 0.13, HEARTH_Z), M.hearth_piping, bevel=0.006)
         F.cyl('cushion_button', 0.016, 0.012, (0, 0.137, HEARTH_Z), M.hearth_piping, verts=10)
@@ -497,8 +498,9 @@ FAMILY = G.Family(
              motions={'uses': {'watch': 'screen_down', 'film': 'screen_down'}},
              paint=[('cinema_unit', 'Body'), ('cinema_oak', 'Trim')]),
      G.Model('stereo', stereo, key='model.stereo', size=(0.92, 0.84, 0.42), centre=(0, -0.22),
-             motions={'uses': {'listen': 'tray', 'dance': 'tray'}, 'hold': 1.2,
-                      'loops': {'listen': 'pulse', 'dance': 'pulse'}},
+             # while the music plays the record turns (a loop) and the woofers pulse (`every` a hair under their beat)
+             motions={'uses': {use: {'clip': 'pulse', 'every': 0.45} for use in ('listen', 'dance')},
+                      'loops': {'listen': 'record', 'dance': 'record'}},
              paint=[('stereo_wood', 'Body'), ('stereo_dark', 'Trim')]),
      G.Model('boombox', boombox, key='model.boombox', size=(0.6, 0.95, 0.44),
              motions={'uses': {'listen': 'cassette'}, 'hold': 1.2},

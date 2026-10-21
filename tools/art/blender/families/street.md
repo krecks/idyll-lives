@@ -1,7 +1,7 @@
 # Street (`families/street.py`)
 
 The street's dressing props (`model.street.*`): the kerbside bench, the planter with its little tree, the flower tub,
-the street-name sign, the bus-stop sign, the door pot, the garden path light, the street hedge and the flower clump.
+the street-name sign, the bus-stop sign, the door pot, the garden path light and the flower clump.
 One pack, `packs/street/manifest.json`, models in `models/street/`. Built 2026-10-16. They aren't buyable: no content entry, no Validate group.
 
 `render/babylon/street.ts` draws them as thin instances (`PROP`, `FOLIAGE`): benches, planters and flower tubs along
@@ -12,7 +12,7 @@ built where the game places it (game axes, `F`), at its size within 2 %; the ben
 off their middle as the old parts do (`G.settle(centre=False)` and `centre=`).
 
 Nothing moves: no clips. The leaves and flowers are on the `foliage` finish, as the old parts' were, so the nature
-shader sways and tints them (the planter's crown, the tub's and the pot's plants, the hedge, the flower clump). The
+shader sways and tints them (the planter's crown, the tub's and the pot's plants, the flower clump). The
 planter's trunk is plain `satin` (`trunk`), not `bark`, so the planter stays two draws.
 
 ## Night
@@ -38,11 +38,10 @@ bevels, no lettering, timetable lines or bus picture, half the flowers of the cl
 | `busSign` | 0.46 × 2.63 × 0.11 m | 700 | 208 | 1 | a blue flag with a white face and a little blue bus on both sides, on top of the pole (the pole no longer runs across its faces), and the timetable in a case |
 | `pot` | 0.43 × 0.87 × 0.42 m | 704 | 296 | 2 | a terracotta pot with a rim, soil, a clipped leafy ball with a smaller one on top |
 | `pathLight` | 0.18 × 0.56 × 0.18 m | 308 | 140 | 1 (+1 at night) | a dark bollard on a flared foot, a frosted lens between four thin bars, a flat cap |
-| `hedge` | 1.28 × 1.02 × 0.63 m | 540 | 138 | 1 | a clipped block with three softer lumps on top |
 | `flowers` | 0.59 × 0.34 × 0.53 m | 860 | 288 | 1 | three leafy clumps and fourteen little flowers in seven colours |
 
-`model.street.hedge` is drawn nowhere today: street.ts's `FOLIAGE.hedge` is `model.hedge` (plants.py's
-`streetHedge`). It is built anyway, so nothing of the old part is left.
+The street's hedges are `model.hedge` (plants.py's `streetHedge`, street.ts's `FOLIAGE.hedge`): the pack's own hedge,
+which nothing drew, was dropped (2026-10-21, authenticity review M-town-02).
 
 Against the old parts on the street beside the viewed lot (the village bench scene): 11 draws for the props instead
 of 13 (the path light's glass and the planter's bark are gone), and a third of the triangles per copy or less (the

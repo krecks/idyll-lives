@@ -4,8 +4,9 @@
 #
 # The washer and the dryer stand against the wall where the game places them, built in place (`F`, game
 # axes). Each has two moving parts: the round door, hinged on its left, which swings open while a resident
-# loads it (`door_open`, held 2.5 s), and the drum's face behind the glass, which turns for the whole use
-# (`drum_spin`, a loop). The rail hangs on the wall at its real height; the rest are still.
+# loads or empties it (`door_open`, held 2.5 s), and the drum's face behind the glass, which on the washer
+# turns once the door has shut, for the rest of the wash (`drum_spin`, `every` its turn); the dryer's stays
+# still while its washing is taken out to fold. The rail hangs on the wall at its real height; the rest are still.
 #
 # Run:  cargo art laundry [--only laundryWasher] [--preview]
 import os
@@ -123,7 +124,8 @@ def _machine(dryer):
     door = _door(F, ring)
     G.settle(centre=False)
     G.swing(door, 'door_open', 110, seconds=1.0)
-    G.spin(drum, 'drum_spin', turns=1, seconds=1.2, axis='Y')
+    if not dryer:
+        G.spin(drum, 'drum_spin', turns=1, seconds=1.2, axis='Y')
     return G.meshes()
 
 
@@ -223,14 +225,19 @@ def bathMat():
     return G.meshes()
 
 
-LAUNDRY = {'uses': {'laundry': 'door_open'}, 'hold': 2.5, 'loops': {'laundry': 'drum_spin'}}
+# The washer's door opens for the washing to go in and shuts (`hold`; `door_open` takes 1.0 s each way), and
+# only then its drum goes round, a turn each 1.2 s (`every` a hair under it, so no pause between turns) till the
+# wash ends. Folding at the dryer opens its
+# door to take the washing out: the drum stays still.
+WASH = {'uses': {'laundry': ['door_open', {'clip': 'drum_spin', 'delay': 3.5, 'every': 1.1}]}, 'hold': 2.5}
+FOLD = {'uses': {'laundry': 'door_open'}, 'hold': 2.5}
 
 FAMILY = G.Family(
     'laundry', M,
     [G.Model('laundryWasher', laundryWasher, size=(0.6, 0.98, 0.65), key='model.laundryWasher', centre=(0, -0.105),
-             motions=LAUNDRY, paint=[('body', 'Body'), ('door', 'Door'), ('panel', 'Panel')]),
+             motions=WASH, paint=[('body', 'Body'), ('door', 'Door'), ('panel', 'Panel')]),
      G.Model('laundryDryer', laundryDryer, size=(0.6, 1.08, 0.65), key='model.laundryDryer', centre=(0, -0.105),
-             motions=LAUNDRY, paint=[('body', 'Body'), ('door_dryer', 'Door'), ('panel', 'Panel')]),
+             motions=FOLD, paint=[('body', 'Body'), ('door_dryer', 'Door'), ('panel', 'Panel')]),
      G.Model('towelRail', towelRail, size=(0.73, 0.595, 0.098), key='model.towelRail', centre=(0, -0.381), floor=False,
              paint=[('chrome', 'Rail'), ('towel', 'Towels'), ('towel2', 'Hand towel')]),
      G.Model('towelLadder', towelLadder, size=(0.52, 1.707, 0.359), key='model.towelLadder', centre=(0, -0.25),
@@ -241,8 +248,8 @@ FAMILY = G.Family(
              paint=[('mat', 'Mat'), ('mat_pile', 'Pile')])],
     comment='Blender-built laundry models (tools/art/blender/families/laundry.py). Listed in the base '
             'manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw call '
-            'per finish group. The washer and the dryer open their door (`door_open`) and turn their drum '
-            '(`drum_spin`) while a resident does the laundry.',
+            'per finish group. The washer and the dryer open their door (`door_open`) while a resident loads '
+            'or empties them, and the washer turns its drum (`drum_spin`) once the door has shut.',
 )
 
 if __name__ == '__main__':

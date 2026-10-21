@@ -629,7 +629,7 @@ impl World {
             if unreachable(self) > shut_in {
                 return Err(Error::new("that would shut someone or something in"));
             }
-            self.storeys_stand(plot)
+            self.storeys_stand(plot).and_then(|()| self.walls_still_hold(plot))
         })();
         if let Err(e) = result {
             self.restore(before);

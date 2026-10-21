@@ -53,13 +53,13 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
 | `garden.tulips` Tulips | 1x1 · floor | water:water smell:smell | garden / flowers | Bed | Static | Static. |
 | `garden.daffodils` Daffodils | 1x1 · floor | water:water smell:smell | garden / flowers | Bed, Petals | Static | Static. |
 | `garden.daisies` Daisies | 1x1 · floor | water:water smell:smell | garden / flowers | Bed, Petals | Static | Static. |
-| `garden.sunflowers` Sunflowers | 1x1 · floor | water:water admire:look | garden / flowers | Bed, Petals | Static | Static. |
-| `garden.poppies` Poppies | 1x1 · floor | water:water smell:smell | garden / flowers | Bed, Petals | Static | Static. |
-| `garden.marigolds` Marigolds | 1x1 · floor | water:water smell:smell | garden / flowers | Bed | Static | Static. |
+| `garden.sunflowers` Sunflowers | 1x1 · floor | water:water admire:admire | garden / flowers | Bed, Petals | Static | Static. Admired looking up at the heads (`anim: admire`), not down at the soil. |
+| `garden.poppies` Poppies | 1x1 · floor | water:water admire:look | garden / flowers | Bed, Petals | Static | Static. Admired (`look`), not smelled: no scent, no Sweet scent feeling. |
+| `garden.marigolds` Marigolds | 1x1 · floor | water:water admire:look | garden / flowers | Bed | Static | Static. Admired (`look`), not smelled: no Sweet scent feeling. |
 | `garden.pansies` Pansies | 1x1 · floor | water:water smell:smell | garden / flowers | Bed | Static | Static; each face on a thin stem over the leaves. |
 | `garden.lilies` Lilies | 1x1 · floor | water:water smell:smell | garden / flowers | Bed | Static | Static. |
 | `garden.lupins` Lupins | 1x1 · floor | water:water smell:smell | garden / flowers | Bed | Static | Static. |
-| `garden.forgetMeNots` Forget-me-nots | 1x1 · floor | water:water smell:smell | garden / flowers | Bed | Static | Static. |
+| `garden.forgetMeNots` Forget-me-nots | 1x1 · floor | water:water admire:look | garden / flowers | Bed | Static | Static. Admired (`look`), not smelled: no Sweet scent feeling. |
 | `garden.cosmos` Cosmos | 1x1 · floor | water:water smell:smell | garden / flowers | Bed | Static | Static. |
 | `garden.meadow` Wildflower meadow | 1x1 · floor | pickFlower:harvest | garden / flowers | — | Use | `pick`: one flower (a white daisy) shrinks away for pickFlower and grows back after. |
 | `garden.geraniums` Potted geraniums | 1x1 · floor | water:water smell:smell | garden / flowers | Pot, Flowers | Static | Static. |
@@ -73,6 +73,9 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
 - The geraniums' "Flowers" colours all six clusters (all on the painted material).
 - Each pansy face stands on a thin stem over its leaves, at the same size and draw calls.
 - Known, not changed: the marigolds' back poms sit a little above the leaves, but read as one mass of flowers.
+- Since the authenticity review (G-14): flowers that bloom above about 0.7 m (cosmos, the flower box, lavender,
+  lilies, lupins, roses, the wheelbarrow) are smelt standing, a bloom held to the nose (`pick`); the low beds and pots
+  are still crouched to.
 
 ## G3. Shrubs (11)
 
@@ -123,6 +126,8 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
   watering too, rather than standing a tile off.
 - "Bed" colours each bed (the raised bed's and the planter's boards).
 - Not watched: growing back from picked over the days.
+- Since the authenticity review (G-14): strawberries and pumpkins are picked crouched down at the soil (`plant`,
+  `kneel`); the staked tomatoes are tied up and watered standing (`harvest`, `water`).
 
 ## G5. Trees (12)
 
@@ -135,17 +140,23 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
 | `garden.maple` Maple tree | 1x1 · floor | shade:relax | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). |
 | `garden.birch` Silver birch | 1x1 · floor | shade:relax | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). |
 | `garden.cherry` Cherry blossom tree | 1x1 · floor | shade:relax admire:admire | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). |
-| `garden.apple` Apple tree | 1x1 · floor | pick:eat shade:relax | garden / trees | — | Use | `pick`: an apple at the front shrinks away for pick. |
+| `garden.apple` Apple tree | 1x1 · floor | pick:eat shade:relax | garden / trees | — | Use | `pick`: an apple at the front, 1.84 m up and 0.7 m out under the crown, shrinks away 1.6 s into pick, as the picker's hand closes on it (`pickApple*` by height, then eating it; G-21). A child reaches up short of it (I-garden-11). |
 | `garden.japaneseMaple` Japanese maple | 1x1 · floor | shade:relax shape:prune | garden / trees | — | Use | `trim`: the top sprigs shrink away for shape. |
-| `garden.magnolia` Magnolia | 1x1 · floor | shade:relax smell:admire | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). |
+| `garden.magnolia` Magnolia | 1x1 · floor | shade:relax smell:admire | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). Its blossom use reads "Admire the magnolia" (looking up). |
 | `garden.willow` Weeping willow | 1x1 · floor | shade:relax | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). |
 | `garden.spruce` Blue spruce | 1x1 · floor | — | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). |
 | `garden.cypress` Italian cypress | 1x1 · floor | — | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). |
-| `garden.lemonTree` Potted lemon tree | 1x1 · floor | pick:eat water:water | garden / trees | Pot | Use | `pick`: a lemon at the front shrinks away. |
+| `garden.lemonTree` Potted lemon tree | 1x1 · floor | pick:eat water:water | garden / trees | Pot | Use | `pick`: a lemon at the front (1.62 m up) shrinks away 1.6 s into pick, in the picker's hand (`pickLemon*` by height, then eating it; G-21). |
 
 **In play** (signed off 2026-10-17):
-- Checked outdoors (the lemon tree also close up): relaxed under in the shade (standing by the trunk), admired
-  (cherry), smelled (magnolia), watered (lemon tree).
+- Checked outdoors (the lemon tree also close up): relaxed under in the shade, admired (cherry), smelled
+  (magnolia), watered (lemon tree).
+- "Relax in the shade" (G-22, 2026-10-21) is a sit (`"pose": "sit"`): on the ground against the trunk, leant back,
+  the legs out long (`sitGround`), at each tree's own distance from its trunk (`furniture.json` `seats`, `shade`:
+  the oak and willow 0.58 m, the maple 0.5, the cherry 0.46, the apple 0.42, the magnolia and Japanese maple 0.4, the
+  birch 0.36), on the trunk's front or a side, whichever the sun's light falls towards as they sit down (the crown's
+  shadow; never behind, which would mean walking through the trunk). Trees so count as seats outdoors (a phone
+  call, a snack). Known, not changed: it is still offered at night (I16, G-64).
 - The apple and the lemon tree each lose their front fruit for "Pick" (`pick`), the Japanese maple its top sprigs
   for "Shape the maple" (`trim`), in all four facings, shutting after the use.
 - Known, not changed: two tiles from the house the pine's and spruce's crowns (6 m and 5.6 m across on a one-tile

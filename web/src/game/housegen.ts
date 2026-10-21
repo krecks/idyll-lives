@@ -214,6 +214,10 @@ export interface ObjectInfo extends Shape {
   fillsWall?: boolean;
   /** Belongs over a window (content `overWindow`): only such things hang on one. */
   overWindow?: boolean;
+  /** Built to stand back to a wall (content `againstWall`): only with plain wall all along its back. */
+  againstWall?: boolean;
+  /** Hangs from the ceiling at head height (content `headHeight`): nobody walks under it (its tiles are taken from the floor's way through). */
+  headHeight?: boolean;
   /** A hob or a grill (stations `stove`, `grill`) or a sink (`dishes`, where hands are washed): no small things on its top. */
   keepClear: boolean;
   /** Content category and group (`residents.kidsOnly`: things only for a home with children). */
@@ -1287,15 +1291,21 @@ function lights(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, lampT
       mount(cfg, info, f, r, def, info(def)!.footprint, 'ceiling', rng, undefined, [r.x + ((i + 0.5) * r.w) / across - 0.5, r.z + ((j + 0.5) * r.d) / rows - 0.5]);
     }
   }
-  // Shares with no free ceiling: wherever there's room.
-  while (lit() < tiles) if (!mount(cfg, info, f, r, def, info(def)!.footprint, 'ceiling', rng)) return;
+  // Shares with no free ceiling: wherever there's room (and where a lamp at head height would be
+  // in the way everywhere, another kind).
+  const others = kinds.filter((d) => d !== def && !info(d)!.headHeight).sort((a, b) => need(a) - need(b));
+  while (lit() < tiles) if (![def, ...others].some((d) => mount(cfg, info, f, r, d, info(d)!.footprint, 'ceiling', rng))) return;
 }
 
-/** Takes a ceiling light down again (and frees its ceiling tiles). */
+/** The floor tiles a lamp at head height took from walking (`mount`), freed when it comes down. */
+const hungLow = new WeakMap<Placement, string[]>();
+
+/** Takes a ceiling light down again (and frees its ceiling tiles, and the floor a lamp at head height took). */
 function unhang(f: Floor, info: ObjectInfos, o: Placement): void {
   const at = f.objects.indexOf(o);
   f.objects.splice(at, 1);
   f.fronts.splice(at, 1);
+  for (const t of hungLow.get(o) ?? []) f.taken.delete(t);
   const [fw, fd] = info(o.def)?.footprint ?? [1, 1];
   const [w, d] = o.rot % 2 === 0 ? [fw, fd] : [fd, fw];
   for (let dz = 0; dz < d; dz++) for (let dx = 0; dx < w; dx++) f.layers?.delete(`ceiling:${key(o.x + dx, o.z + dz)}`);
@@ -1568,11 +1578,13 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
       for (let dz = 0; dz < d; dz++) for (let dx = 0; dx < w; dx++) stairs.add(key(o.x + dx, o.z + dz));
     }
   }
+  // A lamp at head height takes the floor under it from walking: never a doorway's or a front's.
+  const low = layer === 'ceiling' && !!info(def)?.headHeight;
   const fits = (x: number, z: number, w: number, d: number, rot: number) => {
     for (let dz = 0; dz < d; dz++) {
       for (let dx = 0; dx < w; dx++) {
         const t = key(x + dx, z + dz);
-        if (!inside(r, x + dx, z + dz) || stairs.has(t) || layers.has(`${layer}:${t}`)) return false;
+        if (!inside(r, x + dx, z + dz) || stairs.has(t) || layers.has(`${layer}:${t}`) || (low && f.keep.has(t))) return false;
       }
     }
     const [frx, frz] = frontTile(x, z, w, d, rot);
@@ -1581,12 +1593,17 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
   };
   const take = (x: number, z: number, w: number, d: number, rot: number) => {
     for (let dz = 0; dz < d; dz++) for (let dx = 0; dx < w; dx++) layers.add(`${layer}:${key(x + dx, z + dz)}`);
-    f.objects.push({ def, x, z, rot });
+    const placed = { def, x, z, rot };
+    f.objects.push(placed);
     f.fronts.push(used ? [frontTile(x, z, w, d, rot)] : null);
-    // ...and a way to it.
-    if (used && !reachable(f, r)) {
+    const under = low ? tilesOf(x, z, w, d).filter((t) => !f.taken.has(t)) : [];
+    for (const t of under) f.taken.add(t);
+    if (under.length) hungLow.set(placed, under);
+    // ...and a way to it (and round what hangs at head height).
+    if ((used || under.length) && !reachable(f, r)) {
       f.objects.pop();
       f.fronts.pop();
+      for (const t of under) f.taken.delete(t);
       for (let dz = 0; dz < d; dz++) for (let dx = 0; dx < w; dx++) layers.delete(`${layer}:${key(x + dx, z + dz)}`);
       return false;
     }
@@ -1638,7 +1655,10 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
     spots.sort((a, b) => Math.hypot(a[0] - cx, a[1] - cz) - Math.hypot(b[0] - cx, b[1] - cz));
     for (const [x, z, rot] of spots) {
       const [w, d] = rot % 2 === 0 ? [fw, fd] : [fd, fw];
-      if (fits(x, z, w, d, rot)) return take(x, z, w, d, rot);
+      if (!fits(x, z, w, d, rot)) continue;
+      if (take(x, z, w, d, rot)) return true;
+      // (Only a lamp at head height that would block the way looks further.)
+      if (!low) return false;
     }
     return false;
   }
@@ -1657,7 +1677,7 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
  * `aside` (things nobody uses: a floor lamp): in a corner if it can be, and never next to the
  * tile inside a door (it would make the way in a squeeze).
  */
-function place(f: Floor, r: Room, def: string, { footprint: [fw, fd] }: ObjectInfo, rng: () => number, prefer?: number, aside = false): number | null {
+function place(f: Floor, r: Room, def: string, { footprint: [fw, fd], againstWall }: ObjectInfo, rng: () => number, prefer?: number, aside = false): number | null {
   // Tiles round the tiles inside the room's doors.
   const doorway = new Set<string>();
   if (aside) {
@@ -1690,10 +1710,14 @@ function place(f: Floor, r: Room, def: string, { footprint: [fw, fd] }: ObjectIn
   // Out of the way: corners first, whichever side they're on.
   const corner = (s: Spot) => Number((s.x === r.x || s.x + s.w === r.x + r.w) && (s.z === r.z || s.z + s.d === r.z + r.d));
   const spots = aside ? [...walls()].sort((a, b) => corner(b) - corner(a)) : walls();
+  // What's built to stand against a wall (content `againstWall`) has plain wall all along its back.
+  const walled = (side: number, x: number, z: number, w: number, d: number) =>
+    (side === 0 || side === 2 ? Array.from({ length: w }, (_, i) => `h:${x + i}:${side === 0 ? z : z + d}`) : Array.from({ length: d }, (_, i) => `v:${side === 3 ? x : x + w}:${z + i}`)).every((e) => f.edges.get(e) === 'wall');
   for (const { side, rot, w, d, x, z } of spots) {
     const tiles = tilesOf(x, z, w, d);
     const front = frontTile(x, z, w, d, rot);
     if (!inside(r, front[0], front[1])) continue;
+    if (againstWall && !walled(side, x, z, w, d)) continue;
     if (aside && tiles.some((t) => doorway.has(t))) continue;
     if (tiles.some((t) => f.taken.has(t) || f.keep.has(t)) || f.taken.has(key(front[0], front[1]))) continue;
     const n = f.objects.length;

@@ -9,7 +9,7 @@
 # take their measured `centre`.
 #
 # Small and seen several at once: one draw call each (every finish a plain one), two for the wooden boards
-# (the chopping board, the tasting board, the pizza's board: `wood`), and 240 to 510 triangles.
+# (the chopping board, the tasting board, the pizza's board: `wood`), and 210 to 510 triangles.
 #
 # Run:  cargo art held [--only mealPot] [--preview]
 #       HELD_MEASURE=1 … --preview   prints where each is built and its size, to copy into its `I(...)` line
@@ -78,6 +78,9 @@ M = G.Palette(
     chocolate=('#4A2C1C', 'satin'),
     cupcake_case=('#E58FA8', 'satin'),
     icing=('#F8E4EA', 'satin'),
+    mixing=('#D9DCD6', 'gloss'),     # the mixing bowl's glaze
+    batter=('#EBCB8C', 'satin'),
+    spoon=('#C49A62', 'satin'),      # a wooden spoon (plain, so the bowl stays one draw)
     # leftovers
     smear=('#64452B', 'matte'),
     smear_sauce=('#94401F', 'matte'),
@@ -85,6 +88,24 @@ M = G.Palette(
     burnt=('#3F3022', 'matte'),
     residue=('#6B4A30', 'matte'),
     crumb=('#D9B98A', 'matte'),
+    melt=('#E9C9B4', 'matte'),       # melted ice cream in the bowl
+    smear_filling=('#6E2A2E', 'matte'),
+    # the quick foods (review M-held-01): ice cream, toast, a smoothie, noodles, takeout
+    vanilla=('#F6EBC8', 'satin'),
+    strawberry=('#F0A3B2', 'satin'),
+    choc_ice=('#7A4E34', 'satin'),
+    toast=('#D39A55', 'matte'),
+    toast_crust=('#94602F', 'matte'),
+    butter=('#F6E08E', 'satin'),
+    glass=('#DDE8EA', 'gloss'),      # a tumbler's glass, opaque (plain: one draw)
+    smoothie=('#C85A86', 'satin'),   # berry, seen through the glass
+    smoothie_top=('#D97AA0', 'satin'),
+    straw=('#F2F0EA', 'satin'),
+    paper=('#F4F2EC', 'matte'),      # the noodle pail's white card
+    paper_red=('#C8402E', 'matte'),
+    noodle=('#E7C97E', 'satin'),
+    chopstick=('#D8B887', 'satin'),
+    fries=('#E9BF55', 'satin'),
 )
 
 # Built in the game's axes (x, height, depth; front +depth), as the old parts are.
@@ -536,6 +557,155 @@ def plateDirty():
     return done('plateDirty')
 
 
+# --- the quick foods, each its own (review M-held-01: they borrowed the plates and the prep bowl) -----------------
+def _dessert_bowl():
+    """A glazed dessert bowl 12.5 cm across and 5 cm deep, its inside floor at 1.2 cm."""
+    lathe('bowl', [(0, 0), (0.035, 0), (0.04, 0.006), (0.062, 0.05), (0.058, 0.052), (0.054, 0.044), (0, 0.012)],
+          [M.bowl, M.bowl, M.bowl, M.bowl, M.bowl, M.china_well], segments=16)
+
+
+def _spoon(at, yaw, tilt, name='spoon'):
+    """A steel dessert spoon, its bowl at the game point `at`, the handle out along `yaw` (degrees from +x)
+    rising at `tilt` degrees."""
+    x, y, z = at
+    a, t = math.radians(yaw), math.radians(tilt)
+    end = (x + 0.11 * math.cos(a) * math.cos(t), y + 0.11 * math.sin(t), z - 0.11 * math.sin(a) * math.cos(t))
+    G.rod(f'{name}_handle', F.at(x, y, z), F.at(*end), 0.003, material=M.steel, verts=5)
+    ball(f'{name}_bowl', 0.012, (x, y, z), M.steel, scale=(1, 0.35, 1.4), seg=8, rings=4)
+
+
+def iceCream():
+    """A dessert bowl of ice cream from the freezer: three scoops (vanilla, strawberry, chocolate) and a spoon."""
+    _dessert_bowl()
+    for i, (x, z, m, s) in enumerate(((-0.018, 0.012, M.vanilla, 1.0), (0.02, 0.008, M.strawberry, 0.95),
+                                      (0.0, -0.022, M.choc_ice, 0.9))):
+        lump(f'scoop{i}', 0.03 * s, (x, 0.03, z), m, scale=(1, 0.85, 1), seed=1.3 + i, subdivisions=2, noise=0.12)
+    _spoon((0.025, 0.07, 0.03), 35, 15)
+    return done('iceCream')
+
+
+def bowlDirty():
+    """The dessert bowl eaten from: a film of melted ice cream in the bottom and the spoon left in it."""
+    _dessert_bowl()
+    disc('melt', 0.07, 0.002, (0.004, 0.012, 0.0), M.melt, verts=10, depth=0.06, yaw=15)
+    disc('melt_choc', 0.03, 0.002, (-0.012, 0.0135, -0.01), M.choc_ice, verts=8, depth=0.02, yaw=-30)
+    _spoon((0.012, 0.022, 0.012), 30, 32)
+    return done('bowlDirty')
+
+
+def toast():
+    """A plate of toast: a slice cut corner to corner, toasted golden on top with darker crusts, a pat of butter
+    melting on each half."""
+    plate()
+    a = [(-0.055, -0.05), (0.055, -0.05), (-0.055, 0.05)]
+    b = [(0.055, -0.05), (0.055, 0.05), (-0.055, 0.05)]
+    nx, nz = 0.05, 0.055
+    n = math.hypot(nx, nz)
+    for half, pts, cut, sign in (('a', a, 1, -1), ('b', b, 2, 1)):
+        off = (sign * nx / n * 0.01, sign * nz / n * 0.01)
+        sides = [M.bread if k == cut else M.toast_crust for k in range(3)]
+        prism(f'slice_{half}', pts, WELL, WELL + 0.013, M.toast, M.toast_crust, sides=sides, at=off)
+        cx = sum(p[0] for p in pts) / 3 + off[0]
+        cz = sum(p[1] for p in pts) / 3 + off[1]
+        box(f'butter_{half}', 0.018, 0.005, 0.016, (cx, WELL + 0.0155, cz), M.butter, yaw=20 if sign > 0 else -10,
+            bevel=0.002)
+    return done('toast')
+
+
+def smoothie():
+    """A tall tumbler of berry smoothie, 8 cm across and 14 cm high (about 0.4 L), with a paper straw."""
+    lathe('glass', [(0, 0), (0.03, 0), (0.031, 0.008), (0.039, 0.12), (0.04, 0.14), (0.037, 0.14), (0.036, 0.12),
+                    (0, 0.12)],
+          [M.glass, M.glass, M.smoothie, M.glass, M.glass, M.glass, M.smoothie_top], segments=16)
+    G.rod('straw', F.at(0.008, 0.1, 0.004), F.at(0.026, 0.195, 0.016), 0.0035, material=M.straw, verts=6)
+    return done('smoothie')
+
+
+def noodles():
+    """A takeaway noodle pail of white card with a red band, noodles and spring onion heaped in its top and a
+    pair of chopsticks standing in it."""
+    # a square pail, 7 cm across at its foot and 10 at its mouth, 10 cm high (corners at r = side / sqrt 2)
+    r0, r1, h = 0.0495, 0.0707, 0.1
+    r = lambda y: r0 + (r1 - r0) * y / h  # noqa: E731
+    lathe('pail', [(0, 0), (r0, 0), (r(0.05), 0.05), (r(0.068), 0.068), (r1, h), (r1 - 0.004, h), (0, 0.086)],
+          [M.paper, M.paper, M.paper_red, M.paper, M.paper, M.noodle], segments=4, rot=(0, 0, 45))
+    for i, (x, z, yaw) in enumerate(((-0.02, 0.01, 10), (0.015, -0.012, 70), (0.0, 0.022, 130), (0.022, 0.018, 40))):
+        roll(f'noodle{i}', 0.004, 0.06, M.noodle, (x, 0.092, z), yaw=yaw, segments=5)
+    for i, (x, z) in enumerate(((-0.01, -0.02), (0.02, 0.0), (-0.025, 0.02))):
+        chunk(f'onion{i}', 0.008, (x, 0.098, z), M.lettuce, yaw=30 * i)
+    for i, dx in enumerate((-0.006, 0.006)):
+        G.rod(f'chopstick{i}', F.at(0.01 + dx, 0.06, -0.005), F.at(0.035 + dx * 2, 0.27, -0.03), 0.0035,
+              material=M.chopstick, verts=5)
+    return done('noodles')
+
+
+def takeout():
+    """An open kraft takeaway box, its lid standing up at the back: a burger and a heap of fries."""
+    box('tray', 0.19, 0.045, 0.14, (0, 0.0225, 0), M.kraft, bevel=0.003)
+    box('tray_inside', 0.18, 0.002, 0.13, (0, 0.0455, 0), M.kraft_inside)
+    # the lid, hinged on the tray's back edge and opened past upright (110 degrees), leaning back
+    lean = math.radians(20)
+    box('lid', 0.19, 0.14, 0.006, (0, 0.045 + 0.07 * math.cos(lean), -0.07 - 0.07 * math.sin(lean)), M.kraft_fold,
+        tilt=(-20, 0), bevel=0.002)
+    # the burger
+    bx, bz, y = -0.04, 0.005, 0.0465
+    disc('bun_base', 0.085, 0.016, (bx, y, bz), M.bun_base, verts=12)
+    disc('patty', 0.09, 0.016, (bx, y + 0.016, bz), M.patty, verts=12)
+    box('cheese', 0.072, 0.003, 0.072, (bx, y + 0.0335, bz), M.cheese, yaw=45)
+    lump('lettuce', 0.045, (bx, y + 0.033, bz), M.lettuce, scale=(1.1, 0.18, 1.1), seed=2.2, noise=0.25)
+    lathe('bun_top', [(0, 0), (0.043, 0), (0.044, 0.008), (0.035, 0.026), (0.018, 0.034), (0, 0.036)],
+          [M.bun_base, M.bun, M.bun, M.bun, M.bun], at=(bx, y + 0.04, bz), segments=12)
+    # the fries, heaped beside it
+    for i in range(9):
+        a = 37 * i
+        box(f'fry{i}', 0.07, 0.008, 0.008, (0.05 + 0.012 * math.cos(math.radians(a * 3)), y + 0.004 + 0.007 * (i % 3),
+                                            0.01 + 0.03 * math.sin(math.radians(a * 2))), M.fries, yaw=a, tilt=(0, 8 * (i % 2)))
+    return done('takeout')
+
+
+# --- the dishes emptied, each the dish that went in (review M-held-02) ----------------------------------------------
+def _serving_board():
+    """The tasting board's board: 35 by 24 cm with a tab handle."""
+    box('board', 0.35, 0.028, 0.24, (-0.025, 0.014, 0), M.board_dark, bevel=0.005)
+    box('tab', 0.052, 0.028, 0.08, (0.174, 0.014, 0), M.board_dark, bevel=0.005)
+
+
+def boardDirty():
+    """The tasting board or cheese board cleared: a cheese rind, a bare grape stalk, cracker crumbs and a smear."""
+    _serving_board()
+    disc('smear', 0.14, 0.0015, (-0.06, 0.028, 0.0), M.grease, verts=10, depth=0.08, yaw=12)
+    prism('rind', [(-0.14, -0.05), (-0.11, -0.04), (-0.135, -0.02)], 0.028, 0.04, M.cheese, M.cheese)
+    G.rod('stalk', F.at(0.08, 0.034, -0.02), F.at(0.12, 0.034, -0.035), 0.003, material=M.leaf, verts=4)
+    G.rod('stalk_twig', F.at(0.1, 0.034, -0.027), F.at(0.11, 0.034, -0.005), 0.002, material=M.leaf, verts=4)
+    for i, (x, z) in enumerate(((-0.02, 0.05), (0.03, 0.07), (-0.09, 0.06), (0.05, -0.06), (0.0, -0.03))):
+        chunk(f'crumb{i}', 0.008, (x, 0.031, z), M.cracker, yaw=33 * i)
+    return done('boardDirty')
+
+
+def pizzaBoardDirty():
+    """The pizza's round board after it: crust ends left at the edge, a grease smear and crumbs."""
+    lathe('board', [(0, 0), (0.2, 0), (0.2, 0.02), (0, 0.02)], M.peel, segments=20)
+    disc('grease', 0.15, 0.0015, (-0.01, 0.02, 0.01), M.grease, verts=12, depth=0.11, yaw=10)
+    disc('sauce', 0.06, 0.0015, (0.05, 0.0213, -0.04), M.smear_sauce, verts=8, depth=0.03, yaw=-25)
+    for i, (a, length) in enumerate(((30, 0.06), (150, 0.05), (250, 0.055))):
+        c, s = math.cos(math.radians(a)), math.sin(math.radians(a))
+        roll(f'crust{i}', 0.009, length, M.dough_baked, (0.13 * c, 0.029, 0.13 * s), yaw=a + 90, segments=6)
+    for i, (x, z) in enumerate(((-0.05, 0.04), (0.03, 0.08), (0.08, 0.02), (-0.02, -0.07))):
+        chunk(f'crumb{i}', 0.008, (x, 0.0235, z), M.crumb, yaw=40 * i)
+    return done('pizzaBoardDirty')
+
+
+def pieDishDirty():
+    """The pie dish emptied: a red smear of filling over the bottom, pastry crumbs against its sides."""
+    lathe('dish', [(0, 0), (0.135, 0), (0.166, 0.057), (0.168, 0.061), (0.158, 0.063), (0.128, 0.01), (0, 0.01)],
+          [M.dish, M.dish, M.dish, M.dish, M.dish, M.residue], segments=20)
+    disc('filling', 0.16, 0.002, (0.01, 0.01, 0.0), M.smear_filling, verts=12, depth=0.12, yaw=20)
+    for i, a in enumerate((20, 95, 170, 230, 300)):
+        c, s = math.cos(math.radians(a)), math.sin(math.radians(a))
+        chunk(f'pastry{i}', 0.014, (0.115 * c, 0.016, 0.115 * s), M.pastry_baked, yaw=a, tilt=(15, 10))
+    return done('pieDishDirty')
+
+
 # --- tools: on the station while a resident cooks ---------------------------------------------------------------
 def board():
     """The chopping board: a carrot half chopped into rounds, chopped greens and the knife."""
@@ -586,8 +756,19 @@ def grillFood():
     return done('grillFood')
 
 
-def I(id, build, size, key, centre=(0.0, 0.0)):
-    return G.Model(id, build, size=size, key=key, centre=centre,
+def mixingBowl():
+    """On the counter while batter is mixed or pastry made (`mix`): a deep glazed bowl of batter, a wooden
+    spoon standing in it, leaning on the far rim (+depth: away from the cook, as the pan's handle)."""
+    lathe('bowl', [(0, 0), (0.07, 0), (0.085, 0.01), (0.13, 0.11), (0.124, 0.113), (0.117, 0.1), (0, 0.075)],
+          [M.mixing, M.mixing, M.mixing, M.mixing, M.mixing, M.batter], segments=20)
+    lump('batter_swirl', 0.05, (0.015, 0.07, -0.01), M.batter, scale=(1, 0.25, 1), seed=3.5, noise=0.15)
+    G.rod('spoon_handle', F.at(0.0, 0.07, 0.02), F.at(0.03, 0.27, 0.13), 0.007, material=M.spoon, verts=8)
+    ball('spoon_bowl', 0.022, (-0.002, 0.07, 0.012), M.spoon, scale=(1, 0.35, 1.4))
+    return done('mixingBowl')
+
+
+def I(id, build, size, key, centre=(0.0, 0.0), code=False):
+    return G.Model(id, build, size=size, key=key, centre=centre, code=code,
                    tolerance=3 if os.environ.get('HELD_MEASURE') else 0.02)
 
 
@@ -611,10 +792,20 @@ FAMILY = G.Family(
         I('pieSlice', pieSlice, (0.288, 0.059, 0.288), 'item.pieSlice'),
         I('sandwich', sandwich, (0.288, 0.064, 0.288), 'item.sandwich'),
         I('plateDirty', plateDirty, (0.288, 0.017, 0.288), 'item.plateDirty'),
+        I('iceCream', iceCream, (0.176, 0.101, 0.124), 'item.iceCream', centre=(0.0258, 0.0)),
+        I('bowlDirty', bowlDirty, (0.157, 0.083, 0.124), 'item.bowlDirty', centre=(0.0164, 0.0)),
+        I('toast', toast, (0.288, 0.027, 0.288), 'item.toast'),
+        I('smoothie', smoothie, (0.08, 0.196, 0.08), 'item.smoothie'),
+        I('noodles', noodles, (0.1, 0.271, 0.1), 'item.noodles'),
+        I('takeout', takeout, (0.192, 0.177, 0.19), 'item.takeout', centre=(0.001, -0.025)),
+        I('boardDirty', boardDirty, (0.4, 0.04, 0.24), 'item.boardDirty'),
+        I('pizzaBoardDirty', pizzaBoardDirty, (0.4, 0.038, 0.4), 'item.pizzaBoardDirty'),
+        I('pieDishDirty', pieDishDirty, (0.336, 0.063, 0.336), 'item.pieDishDirty'),
         I('board', board, (0.34, 0.055, 0.24), 'tool.board'),
         # the handle reaches 2 cm further back than the old part's crossbar: the pan stays on its middle
         I('pan', pan, (0.28, 0.061, 0.395), 'tool.pan', centre=(0.0, 0.0575)),
         I('grillFood', grillFood, (0.29, 0.045, 0.135), 'tool.grillFood', centre=(-0.015, -0.005)),
+        I('mixingBowl', mixingBowl, (0.26, 0.273, 0.266), 'tool.mixingBowl', centre=(0.0, 0.0029), code=True),
     ],
     comment='Blender-built things residents carry and cook with (tools/art/blender/families/held.py): the '
             'models of content `items` and the props drawn on a station while cooking. Listed in the base '

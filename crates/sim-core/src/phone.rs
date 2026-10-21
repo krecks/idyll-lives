@@ -58,6 +58,9 @@ pub struct PhoneAction {
     pub message: bool,
     /// After a yes, a visit (none: just the talk).
     pub meet: Option<Meet>,
+    /// Animation tag while at it (content `anim`; default the phone's `anim`): texting and
+    /// scrolling look at the screen, a call holds it to the ear.
+    pub anim: Option<usize>,
     pub autonomous: bool,
     pub autonomy_weight: f32,
     pub prefer: Prefer,
@@ -136,6 +139,8 @@ pub(crate) struct PhoneActionRaw {
     message: bool,
     #[serde(default)]
     meet: Option<Meet>,
+    #[serde(default)]
+    anim: Option<String>,
     #[serde(default = "yes")]
     autonomous: bool,
     #[serde(default = "one")]
@@ -176,13 +181,14 @@ pub(crate) fn parse(raw: &PhoneRaw, ix: &Indices, animations: &[String], stages:
         // Everyone but babies.
         None => stages.iter().find(|s| !s.baby).map_or(0.0, |s| s.from),
     };
+    let tag = |a: &str, ctx: &str| {
+        animations
+            .iter()
+            .position(|x| x == a)
+            .ok_or_else(|| Error::new(format!("{ctx}.anim: unknown anim '{a}' (declare it in \"animations\")")))
+    };
     let anim = match &raw.anim {
-        Some(a) => Some(
-            animations
-                .iter()
-                .position(|x| x == a)
-                .ok_or_else(|| Error::new(format!("phone.anim: unknown anim '{a}' (declare it in \"animations\")")))?,
-        ),
+        Some(a) => Some(tag(a, "phone")?),
         None => animations.iter().position(|x| x == "phone"),
     };
     // (Seat tags content doesn't have are left out.)
@@ -211,6 +217,10 @@ pub(crate) fn parse(raw: &PhoneRaw, ix: &Indices, animations: &[String], stages:
             contact: a.contact,
             message: a.message,
             meet: a.meet,
+            anim: match &a.anim {
+                Some(t) => Some(tag(t, &ctx)?),
+                None => anim,
+            },
             autonomous: a.autonomous,
             autonomy_weight: a.autonomy_weight.max(0.0),
             prefer: a.prefer,
@@ -448,10 +458,15 @@ pub(crate) fn start(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectI
     let task = Task { kind: TaskKind::Phone { action, contact, seat: None, answer: Answer::Pending }, ..task };
     if let Some(seat) = seat_near(sim, ctx, objects) {
         let o = &objects[seat as usize];
-        let (fx, fz) = ctx.index.links.approach_of(seat).unwrap_or_else(|| o.front_tile(content));
+        let def = &content.objects[o.def];
+        let slot = o.pick_slot(sim.id, 0..def.slots as usize, Some((def, sim.pos)));
+        let (fx, fz) = slot
+            .and_then(|k| crate::surface::slot_approach(content, &ctx.nav, o, k))
+            .or_else(|| ctx.index.links.approach_of(seat))
+            .unwrap_or_else(|| o.front_tile(content));
         if let Some(waypoints) = walk_route(ctx, sim, (fx, fz), [fx as f32 + 0.5, fz as f32 + 0.5]) {
             let o = &mut objects[seat as usize];
-            if o.reserve_seat(sim.id, &content.objects[o.def]) {
+            if o.reserve_seat(sim.id, &content.objects[o.def], sim.pos) {
                 let task = Task { kind: TaskKind::Phone { action, contact, seat: Some(seat), answer: Answer::Pending }, ..task };
                 sim.pose = Pose::Stand;
                 sim.current = Some(Activity { task, phase: Phase::Routing { waypoints, next: 0 }, tags: act.tags });
@@ -497,8 +512,9 @@ pub(crate) fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &[ObjectInstance]) {
     if let Some(o) = seat.map(|s| &objects[s as usize]) {
         // They stand back up where they came from (see `end_activity`).
         sim.seated_from = Some(sim.tile());
-        sim.pos = o.slot_position(ctx.content, o.slot_of(sim.id).unwrap_or(0));
-        sim.yaw = o.yaw();
+        let slot = o.slot_of(sim.id).unwrap_or(0);
+        sim.pos = o.slot_position(ctx.content, slot);
+        sim.yaw = o.slot_yaw(ctx.content, slot);
         sim.pose = Pose::Sit;
     }
     if let Some(act) = sim.current.as_mut() {

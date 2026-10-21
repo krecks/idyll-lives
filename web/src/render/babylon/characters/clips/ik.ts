@@ -188,6 +188,12 @@ export interface LegOptions {
   pole?: Vec;
   /** The foot's world rotation (DSL Euler; default level: the sole flat, toes forward). */
   foot?: Rot;
+  /**
+   * Solved as if the hip joint were this much further out to its side of the pelvis (m, its frame): for a
+   * clip played on hips wider for their legs than the reference's (a child's), so that a planted foot stays
+   * put while the hips turn over it there.
+   */
+  wide?: number;
 }
 
 /**
@@ -201,7 +207,7 @@ export function footIK(side: 'l' | 'r', ankle: Vec, spec: PoseSpec, o: LegOption
   const K = ref.joint(`calf_${side}`);
   const A = ref.joint(`foot_${side}`);
   const pelvis = world(spec, 'pelvis');
-  const root = world(spec, `thigh_${side}`).p;
+  const root = addV(world(spec, `thigh_${side}`).p, apply(pelvis.r, [sx * (o.wide ?? 0), 0, 0]));
   const { r1, bend } = twoBone(root, addV(A, ankle), ref.thigh, ref.shin, norm(sub(K, H)), norm(sub(A, K)), [1, 0, 0], o.pole ?? [0.12 * sx, 0, 1]);
   const calf = axisAngle([1, 0, 0], bend);
   const foot = mul(tr(mul(r1, calf)), euler(o.foot ?? [0, 0, 0]));

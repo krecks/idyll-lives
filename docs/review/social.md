@@ -42,11 +42,11 @@ Played with the `phone` clip, sitting on a `lounge` seat within 5 m when one is 
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| `text` Text (10 min) | n/a | OK | I-social-04 | I-social-04 S2 clip (texting is a call at the ear); I-social-01 S2 code (confirmed) | `social/scenes/phone-text-01.png` |
+| `text` Text (10 min) | n/a | OK | I-social-04 | I-social-04 S2 clip (texting is a call at the ear; fixed: the phone in front, `phoneScreen`); I-social-01 S2 code (confirmed) | `social/scenes/phone-text-01.png` |
 | `call` Call (25 min) | n/a | OK | I-social-01 | I-social-01 S2 code (confirmed: the hand at the ear holds nothing) | `social/scenes/phone-call-01.png` |
-| `invite` Invite over (5 min) | n/a | OK | I-social-04 | I-social-04 S2 clip; I-social-01 S2 code | `social/scenes/visit-*.png` |
-| `askOver` Ask to come over (5 min) | n/a | OK | I-social-04 | I-social-04 S2 clip; I-social-01 S2 code (not run: `meet: there`, the same clip as `invite`) | `social/scenes/phone-call-01.png` |
-| `browse` Scroll the phone (20 min) | n/a | OK | I-social-04 | I-social-04 S2 clip (scrolling is a call at the ear); I-social-01 S2 code. The child is refused ("too young for a phone"), teen, adult and elder scroll | `social/sheets/phone.png` |
+| `invite` Invite over (5 min) | n/a | OK | OK | I-social-01 S2 code (a call: at the ear is right; I-social-04 was filed here too) | `social/scenes/visit-*.png` |
+| `askOver` Ask to come over (5 min) | n/a | OK | OK | I-social-01 S2 code (a call, at the ear; not run: `meet: there`, the same clip as `invite`) | `social/scenes/phone-call-01.png` |
+| `browse` Scroll the phone (20 min) | n/a | OK | I-social-04 | I-social-04 S2 clip (scrolling is a call at the ear; fixed: the phone in front, `phoneScreen`); I-social-01 S2 code. The child is refused ("too young for a phone"), teen, adult and elder scroll | `social/sheets/phone.png` |
 
 ## Group conversations (6)
 
@@ -54,11 +54,11 @@ Played with the `phone` clip, sitting on a `lounge` seat within 5 m when one is 
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| Joining in (walking over, taking a place) | n/a | A-social-04 | OK | Free will on after Ada and Ben start a chat (`review-group`): lonely Gus walks over and takes the third place within 2 s; Cal and Dee, as lonely, start a talk of their own instead. A-social-04 S3 code (the last metre or two into the place is a jump, `take_place`) | `social/sheets/group.png` |
+| Joining in (walking over, taking a place) | n/a | A-social-04 | OK | Free will on after Ada and Ben start a chat (`review-group`): lonely Gus walks over and takes the third place within 2 s; Cal and Dee, as lonely, start a talk of their own instead. A-social-04 S3 code (the last metre or two into the place is a jump, `take_place`; fixed d7735fc0: walked) | `social/sheets/group.png` |
 | Roles: speaker and listeners | n/a | OK | OK | The one speaking talks, the other two listen with the idle and now and then a nod (`Anim.Talk`: `yes` on a good outcome) | `social/sheets/group.png` |
 | Glances between members | n/a | OK | n/a | The speaker looks at the one talked to and now and then at a listener (`characters.ts:793`, `audience`); the listeners at the speaker. From stills only | `social/sheets/group.png`, `systems/scenes/group-top.png` |
 | Spacing and facing in the group | n/a | OK | OK | Three in a triangle 1.0 m a side, each turned to the group's middle (`open_up`), on `review-group` and `group-talk` alike; A-social-02 S3 code (seeded; not seen) | `social/sheets/group.png`, `systems/scenes/grouptalk-00.png` |
-| Talking seated (`sitTalk`) | n/a | n/a | I-social-06 | I-social-06 S3 code (nobody ever talks seated: a social stands both up) | `residents/strip-sitTalk.png` (pilot) |
+| Talking seated (`sitTalk`) | n/a | n/a | I-social-06 | I-social-06 S3 code (nobody ever talks seated: a social stands both up; fixed d7735fc0, but for meals: I-social-07) | `residents/strip-sitTalk.png` (pilot) |
 | Leaving a conversation | n/a | OK | OK | When the chat ends the listener stays for the leader's next social with someone there or goes (Gus and Ben start a deep talk of their own; Ada goes to cook) | `systems/scenes/group-late-01.png` |
 
 ## Findings
@@ -74,7 +74,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters.ts:346` (`EMBRACE`), `:2654-2658` (`Anim.Kiss`: `idle` and a step in), `:3125-3129` (the kiss layer: a lean and a head tilt, nothing for the height or the arms)
 - **Evidence:** The taller one's mouth meets the shorter one's forehead. The taller one needs to bend and the shorter one to tilt the head up: two-body procedural work. Deferred from 0.3.0. Cross-cutting wave: `social/pairs/kiss-adultF-yaM-back.png` (Ben 1.77 m, Ada 1.67 m): his mouth is at her brow, 10 cm apart in height is enough; `social/pairs/kiss-elder-adult-01.png` (Gus, stooped, and Ada) meet nearer the mouth. In every kiss, and the 30 minutes of `tryForBaby`, both stand with the arms hanging at their sides, touching only at the face (`social/sheets/romance.png`); the hug beside it already holds the other (`hugArms`). A kiss holds the other at the waist or the shoulders.
-- **Status:** confirmed and widened
+- **Status:** fixed (43ca1cc1, 2d887ff9)
+- **After:** the kiss meets at the lips at any two heights (`KISS_FIT`: the taller bends and bows the head, the shorter lifts the face, with the look at the other's head), the taller's arms round the waist, the shorter's up round the shoulders: Ada 1.67 and Ben 1.77 both ways, Gus (elder) and Ada (`bench-results/review/fixes/clips-social/sheets/romance.png`, `pairs/kiss-adultF-yaM-00.png`, `pairs/kiss-yaM-adultF-01.png`, `pairs/kiss-elder-adult-01.png`; before `social/pairs/kiss-adultF-yaM-back.png`). `tryForBaby` plays the same kiss.
 - **Source:** `docs/objects/open.md` Still open › Residents; `plan/release-0.3.0.md` §1.4 and §8 (deferred); wave: cross-cutting
 
 ### A-social-02 — Other children gather round a hug, right next to the pair
@@ -106,7 +107,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters.ts:2611-2665` (`choose`: the outcome is read only for `Anim.Talk`, as the listener's `yes` / `no`; hug, kiss, flirt and laugh play the same whatever it is), `:3110-3120` (the laugh layer on both of them); the outcome is in the snapshot already (`k.outcome`, `:2245`)
 - **Evidence:** `social/sheets/fails.png` (`review-social-fail`, every roll failed): a refused hug, adult–child and teen–child, is the two standing 0.6 m apart with the arms down for the shortened 1.6 minutes, no step in and no step back; a refused kiss the same; a failed flirt is the accepted one. `social/pairs/fail-joke-ya-adult-01.png`: Ada, who can't stand Ben, tips her head back and laughs at his joke with him, under a "bad" bubble. Only the face (`EXPRESSIONS`) and the bubble (`bubbles.ts:167` `iconFor`) say it went badly. A refused hug is a step back with the hands up, a refused kiss a turn of the head, a flat joke a blank face.
-- **Status:** open
+- **Status:** fixed (43ca1cc1, 2d887ff9)
+- **After:** the snapshot shows a hug's or a kiss's outcome from the start (the body answers it; talk still halfway, conversation.rs test `a_refused_hug_shows_at_once_a_chat_halfway_through`). A refused hug or kiss: the one asked leans away, the head turned aside, a hand up palm out, and steps back 0.14 m (`refuse`), the one who asked drops the shoulders and bows the head, a hand to the neck (`rebuffed`), with put-off and sad faces (`bench-results/review/fixes/clips-social/sheets/fails.png`: adult–child, teen–child, young adult–adult; before `social/sheets/fails.png`). A joke that falls flat: the listener folds the arms with a bored face, the teller shrugs (`bench-results/review/fixes/clips-social/sheets/flat-joke.png`, before `social/pairs/fail-joke-ya-adult-01.png`); one that lands is laughed at (`laugh`: the head back, a hand on the belly), the teller laughing along between turns. A flirt or sweet talk turned down: `rebuffed` and folded arms (`GESTURES`). Note: in `review-social-fail` the joke still lands on most tries (`joke` acceptance base 0.6); the flat one came from retrying, the teller walked elsewhere first, until the `bad` bubble showed.
 - **Source:** wave: cross-cutting
 
 ### I-social-03 — Most socials are the chat's talk with nothing of their own
@@ -116,7 +118,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** clip
 - **Where:** `web/src/render/babylon/characters.ts:2617-2635` (`Anim.Talk`, `Anim.Laugh`, `Anim.Flirt`, `Anim.Argue` all `talk` / `idle` / `no`), `:3121-3124` (the flirt's head tilt); `web/public/content/base.json:1085` (`socials`: introduce, compliment, askPartner and apologize are `talk`, prank is `laugh`)
 - **Evidence:** `social/sheets/talks.png`, `social/sheets/romance.png`, `social/sheets/fights.png`: introducing oneself, a compliment, asking to be partners and apologising are the same talk as a chat, with no handshake, no hand on the heart, no bow of the head; a prank is the joke's laugh with nothing played on the other; flirting and sweet talk are the talk with the head tilted; insults, an argument and a break-up a faster talk with head shakes. The face changes with each (`EXPRESSIONS`). Related: A-residents-07 (no body language for feelings, residents ledger). Small gestures per social (a handshake for `introduce`, a shrug and open hands for `apologize`, a point for `insult`) would tell them apart at the game camera.
-- **Status:** open
+- **Status:** fixed (43ca1cc1, 2d887ff9)
+- **After:** each main social has its own looping body clip on the speaker's turn (`GESTURES`, `clips/social.ts`): compliment (an open hand offered, two light claps), deep talk (fingertips together, then the chin on the hand), flirt (a hand in the hair, the other on the hip), sweet talk (the hands at the heart, a reach to the other's arm), argue (palms up, a chopping hand), insult (a dismissive flick), apologize (a hand on the heart, then open palms), joke (the story in the hands, the arms thrown wide), introduce (a hand to the chest, then out to shake), ask to be partners (hands clasped, then held out), break up (a hand to the brow, both sweeping apart), prank (a creep and "boo!") (`bench-results/review/fixes/clips-social/sheets/talks.png`, `sheets/romance.png`; the bench sheets in the log; before `social/sheets/talks.png`). Chat keeps `talk`.
 - **Source:** wave: cross-cutting
 
 ### A-social-03 — Fist fights are aimed at the attacker's own height: a teen punches over a child's head
@@ -126,7 +129,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** clip
 - **Where:** `web/src/render/babylon/characters.ts:2636-2647` (`Anim.Fight`: `punchJab` / `punchCross` / `hit` at the clip's heights, a step in and back; nothing for the partner's height, as the hug has `shoulderDrop`), `:3144-3160` (the lean and the guard)
 - **Evidence:** `social/sheets/fights.png`: Cal (teen, 1.51 m) against Dee (child, 1.09 m) throws his punches at his own chest height, a head above hers, from 1.2 m off; she guards a face nobody aims at. Young adult against teen and elder against young adult land near the face. Who may fight whom is I-systems-04's (systems ledger, widened: nothing stops a teen or an adult starting a fight with a child, `conversation.rs:63` `social_allowed` checks only the relationship and, for romance, age).
-- **Status:** open
+- **Status:** fixed (43ca1cc1, 2d887ff9)
+- **After:** the attacker's punches are aimed at the other's head (`AIM`: the arms lowered or raised to it, the back bent over a shorter one): young adult on teen, adult on teen, elder on young adult (`bench-results/review/fixes/clips-social/pairs/fight-ya-teen-01.png`, `fight-adult-teen-01.png`, `fight-elder-ya-01.png`; before `social/sheets/fights.png`). Teen on child is no longer allowed (G-45).
 - **Source:** wave: cross-cutting
 
 ### I-social-04 — Every phone action is a call: texting and scrolling hold the phone to the ear
@@ -136,7 +140,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** clip
 - **Where:** `web/public/content/base.json:1912` (`phone.anim: "phone"`, one animation for all five actions); `web/src/render/babylon/characters.ts:530` (`ACTIONS.phone`: `phone`, upper `phone`); `web/src/render/babylon/characters/clips/idle.ts:132` (`phonePose`: the right hand at the ear, the left arm across the waist)
 - **Evidence:** `social/sheets/phone.png`: "Scroll the phone" and "Text" are the call pose, hand to the ear, the head nodding as if listening, for 10 and 20 minutes; only `call` (and `invite`, `askOver`, short calls) fit it. The objects that use `phone` get the same: a video call at the nook's laptop is held to the ear in front of the screen, and so is the shortwave radio (`systems/sheets/act-phone-meditate-idle.png`). Texting and scrolling look down at a phone held in front at chest height, thumbs moving (the reading clip `lantern`'s arms are close). A per-action `anim` (content) and a "phone in hand" clip.
-- **Status:** open
+- **Status:** fixed (43ca1cc1, 2d887ff9)
+- **After:** a phone action's own `anim` (content `phone.actions[].anim`; tests/phone.rs `texting_and_scrolling_look_at_the_screen_a_call_is_at_the_ear`): texting and scrolling play `phoneScreen`, the phone held in both hands before the chest, the head bowed, the thumbs tapping and swiping (`phoneText`; seated as the upper body); calls, invitations and asking over stay at the ear (`bench-results/review/fixes/clips-social/sheets/phone.png`, `sheets/phone-sofa.png`; before `social/sheets/phone.png`). The phone itself is still mimed (I-social-01, G-70).
 - **Source:** wave: cross-cutting
 
 ### I-social-05 — "Try for a baby" is a 30-minute standing kiss, wherever the two happen to be
@@ -156,7 +161,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `crates/sim-core/src/conversation.rs:756-776` (`engage`: `end_activity` on the target), `crates/sim-core/src/world.rs:5289-5300` (`end_activity`: back to standing); the seated clip exists (`characters.ts:2581`, `sitTalk`)
 - **Evidence:** Socials happen only standing: the one talked to drops what they do and stands, and a conversation can't start from a seat, so two on a sofa or a family at the dinner table never talk, and `sitTalk` (`residents/strip-sitTalk.png`, pilot) is seen only on `poses.html`. People talk most sitting down: over a meal, on the sofa, at the café table.
-- **Status:** open
+- **Status:** fixed (d7735fc0), but for meals (I-social-07)
+- **After:** someone sitting at a use (the sofa, an armchair, a coffee at the table, watching from the sofa) who is talked to keeps their seat, turned the way it faces (the head turns), and carries on afterwards; called from across the room they stay put and the caller walks over. People sitting within 2.5 m of each other talk, or listen in, from their seats (`conversation::from_seat`; nothing closer than talking: a hug or a kiss still gets them up), and go back to what they sat down to do. Sim tests: `group_talk.rs` `two_on_the_sofa_talk_from_their_seats_and_a_third_walks_over_to_listen`, `calling_out.rs` `someone_on_the_sofa_stays_sitting_when_called_and_is_walked_over_to`. In play (`?state=group-seated`, `group-seated-lonely`; `bench-results/review/fixes/sound-social/group/`): R1 and R2 talk on the sofa, `sitTalk` and `sit` in turn (`group-seated-talk.png`); R0 walks over to R1 on the sofa and talks standing while R1 stays sitting (`group-seated-lonely-standing-to-seated.png`). Eating residents still aren't talked to: I-social-07.
 - **Source:** wave: cross-cutting (code read; every pair run stood up first)
 
 ### A-social-04 — Someone joining a group jumps the last metre or two into their place
@@ -166,5 +172,26 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `crates/sim-core/src/conversation.rs:476-483` (the joiner stops once within `JOIN_RANGE` 2.6 m of the pair's middle) and `:537-575` (`take_place`: `sims[j].pos = p`, the chosen spot set at once)
 - **Evidence:** The joiner walks until within 2.6 m of the middle of the two talking, then is put on a spot about 1 m from each of them in one tick, up to 1.5–2 m away, and the renderer slides them there. `review-group` (`systems/scenes/scenes.log`): Gus covers 3.4 m in the 1.6 s between two shots at speed 1, about a metre more than a walk does. The shots are too far apart to see the slide itself (a timed, headed check would). Route the joiner to the spot instead.
-- **Status:** open
+- **Status:** fixed (d7735fc0)
+- **After:** `take_place` routes the joiner to the spot (`Sim::join_spot`) and settles them only within 0.3 m of it; sitting, they listen from their seat. Both group tests now assert the joiner moves no more than 0.35 m a tick (a walk is 0.075 m): before the fix the same tests measured jumps of 1.55 and 1.69 m. A headed, timed look is still to do. The actor's own step to the talking distance as a talk starts is A-social-05.
 - **Source:** wave: cross-cutting (code read, with the positions logged)
+
+### A-social-05 — The one starting a talk steps up to their talking distance in one tick
+
+- **Severity:** S3
+- **Rubric:** A4
+- **Fix class:** code
+- **Where:** `crates/sim-core/src/conversation.rs` (`engage`: `sims[i].pos = spot`, the spot at the social's `distance` from the target; the talk starts within `distance + ENGAGE_SLACK + 0.6`, up to 2.4 m for a chat)
+- **Evidence:** Code read while fixing A-social-04: as a social starts, the actor is put at the social's distance from the one talked to, up to about 1.4 m from where they stopped, in one tick, and the renderer slides them there; the same kind of slide as the joiner's was. Walk the last bit (as `take_place` now does), or start the talk where they stand when they're near enough.
+- **Status:** open
+- **Source:** fix: sound-social
+
+### I-social-07 — Nobody talks over a meal: eating, a resident is never talked to
+
+- **Severity:** S3
+- **Rubric:** I11, I1
+- **Fix class:** code
+- **Where:** `crates/sim-core/src/world.rs` (`available_for_social`: `TaskKind::Eat` is never available; `from_seat` starts only from a sitting `Use`)
+- **Evidence:** Left from I-social-06 (fixed for sofas, chairs and the coffee at a table): the family eating at the dinner table still eat in silence, as the eaters can't be talked to and don't talk from their seats. A talk over a meal would pause the eating (or run beside it) and keep the plate in front of them.
+- **Status:** open
+- **Source:** fix: sound-social

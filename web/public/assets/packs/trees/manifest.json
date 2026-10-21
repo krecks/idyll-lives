@@ -154,7 +154,10 @@
       },
       "motions": {
         "uses": {
-          "pick": "pick"
+          "pick": {
+            "clip": "pick",
+            "delay": 1.6
+          }
         }
       },
       "far": "../../models/trees/apple.far.glb"
@@ -357,7 +360,10 @@
       },
       "motions": {
         "uses": {
-          "pick": "pick"
+          "pick": {
+            "clip": "pick",
+            "delay": 1.6
+          }
         }
       },
       "paint": [

@@ -6,8 +6,8 @@
  * The top follows the creator's outfit colour; shoes keep their own unless one is chosen. Garments
  * and colours chosen in the household creator (`appearance.top`, `bottom`, `shoes`, `bottomColor`,
  * `shoesColor`) are worn as chosen; whatever is missing (Sims from older saves) is picked
- * deterministically from the Sim's id, so a Sim always wears the same clothes. Pyjamas recolour
- * the same garments. Babies wear a romper instead of a skirt (`ROMPER`).
+ * deterministically from the Sim's id, so a Sim always wears the same clothes. Pyjamas, a towel and
+ * swimwear are painted the same way (`Wear`). Babies wear a romper instead of a skirt (`ROMPER`).
  */
 
 import type { Appearance } from '../../../game/household';
@@ -75,6 +75,8 @@ export interface OutfitParams {
   scalp: number;
   /** Coverage cuts: top sleeve / hem / crew / scoop, bottom waist / leg, shoe height. */
   cuts: [number, number, number, number, number, number, number];
+  /** The shells not drawn with it (`SHELL_BITS`): the day clothes draw all theirs (0). */
+  bare: number;
 }
 
 function hash(n: number): number {
@@ -117,8 +119,66 @@ function skinColour(hex: string | undefined): [number, number, number] {
 
 const OFF = -10;
 
-/** Day outfit (or pyjamas when `sleep`: the same garments, recoloured). */
-export function outfitFor(id: number, gender: string, appearance: Appearance | null | undefined, body: BodyData, sleep = false): OutfitParams {
+/**
+ * What a Sim wears for what it does (characters.ts `wearFor`): its `day` clothes; pyjamas for a
+ * night's sleep in bed (`night`: a long top and trousers in a sleep colour); its day clothes with the
+ * shoes off for a nap on a bed (`rest`); a towel in the shower, the bath and the sauna (`towel`: wrapped
+ * under the arms, or round the hips for a man); swimwear in a hot tub (`swim`: a swimsuit, or trunks).
+ * All are painted on the body; the shells the day clothes have (a jacket, a skirt, the soles) are drawn
+ * only with the day clothes (`bare`), so a change of clothes adds nothing to draw.
+ */
+export type Wear = 'day' | 'night' | 'rest' | 'towel' | 'swim';
+export const WEARS: readonly Wear[] = ['day', 'night', 'rest', 'towel', 'swim'];
+
+/** Shell categories (`OutfitParams.bare`, as the shells' fields: 0 top, 1 bottom, 2 shoes) as bits. */
+export const SHELL_BITS = { top: 1, bottom: 2, shoes: 4 } as const;
+const ALL_SHELLS = SHELL_BITS.top | SHELL_BITS.bottom | SHELL_BITS.shoes;
+
+/** A base body's heights at rest (m, its fields' heights) the bath clothes are cut by: under the arms, the hips' and the knees' joints. */
+export interface OutfitFit {
+  chest: number;
+  hip: number;
+  knee: number;
+}
+
+const TOWELS = ['#F2EFE8', '#CFE0E6', '#E9D8C4', '#D8E3CF'];
+const SWIMWEAR = ['#1F3A5F', '#B23A48', '#2E6E65', '#D98E04', '#3B3B58', '#C45A7A'];
+
+/** The outfit for `wear` (`fit`: the base body's, for the towel and swimwear). */
+export function outfitFor(id: number, gender: string, appearance: Appearance | null | undefined, body: BodyData, wear: Wear = 'day', fit?: OutfitFit): OutfitParams {
+  const day = dayOutfit(id, gender, appearance, body, wear === 'night');
+  if (wear === 'day') return day;
+  const c = [...day.cuts] as OutfitParams['cuts'];
+  // Barefoot.
+  c[6] = OFF;
+  if (wear === 'rest') return { ...day, cuts: c, bare: SHELL_BITS.shoes };
+  const cut = (g: string) => body.garments[g] ?? {};
+  if (wear === 'night') {
+    // A long top and trousers.
+    const t = cut('top.long');
+    const b = cut('bottom.trousers');
+    return { ...day, cuts: [t.sleeve ?? c[0], t.hem ?? c[1], t.crew ?? OFF, t.scoop ?? OFF, b.waist ?? c[4], b.leg ?? c[5], OFF], over: 0, bare: ALL_SHELLS };
+  }
+  const waist = cut('bottom.trousers').waist ?? 1;
+  const f = fit ?? { chest: waist + 0.25, hip: waist - 0.15, knee: waist - 0.5 };
+  const thigh = f.hip - f.knee;
+  const r = (k: number) => hash(id * 31 + k);
+  const male = gender === 'male';
+  if (wear === 'towel') {
+    const towel = hexToLinear(pick(TOWELS, r(10)), TOWELS[0]);
+    // The bottom's cut alone: from under the arms (round the hips) to mid-thigh (above the knees).
+    const [top, hem] = male ? [waist + 0.01, f.knee + 0.15 * thigh] : [f.chest, f.knee + 0.6 * thigh];
+    return { ...day, bottom: towel, cuts: [OFF, 10, OFF, OFF, top, hem, OFF], over: 0, bare: ALL_SHELLS };
+  }
+  const suit = hexToLinear(pick(SWIMWEAR, r(11)), SWIMWEAR[0]);
+  // Trunks; or a swimsuit, the tank top's cut down to the top of the legs.
+  if (male) return { ...day, bottom: suit, cuts: [OFF, 10, OFF, OFF, waist - 0.03, f.knee + 0.65 * thigh, OFF], over: 0, bare: ALL_SHELLS };
+  const t = cut('top.tank');
+  return { ...day, top: suit, cuts: [t.sleeve ?? -0.62, f.hip - 0.035, t.crew ?? OFF, t.scoop ?? 0, OFF, 10, OFF], over: 0, bare: ALL_SHELLS };
+}
+
+/** Day outfit (or its colours as pyjamas, `sleep`). */
+function dayOutfit(id: number, gender: string, appearance: Appearance | null | undefined, body: BodyData, sleep: boolean): OutfitParams {
   const r = (k: number) => hash(id * 31 + k);
   const has = (p: string) => p in body.garments;
   const skin = skinColour(appearance?.skin);
@@ -177,6 +237,7 @@ export function outfitFor(id: number, gender: string, appearance: Appearance | n
     eyes: hexToLinear(appearance?.eyes ?? EYE_COLOURS[Math.floor(r(9) * EYE_COLOURS.length)], '#6B4226'),
     scalp: appearance?.hairStyle === 'none' ? 0 : 1,
     cuts,
+    bare: 0,
   };
 }
 

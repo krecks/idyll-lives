@@ -212,7 +212,8 @@ Not tied to one row: I-tabletop-04, I-tabletop-06.
 - **Where:** `monitor` in `web/public/content/catalog2/tabletop.json` (`radius`); the disc test for things on tops in `crates/sim-core/src/surface.rs` (refused at `crates/sim-core/src/world.rs:1652`)
 - **Evidence:** Things on tops are discs. The monitor's radius is 0.30 plus a 0.04 margin, but the stage's counter top is 0.62 deep (0.31 each way), so it fits at no offset ("would hang over the edge"). It also fits on no standard 0.66 counter and on none of the computer, writing, laptop, standing or kids' desks, though its description says it stands on a counter or desk; only `deskSimple` takes it. `laptopClosed` (radius 0.19) fits. Shots: `tabletop/play/c3-monitor/monitor-on-deskSimple.png`.
   Activities wave: the play run's two buys on the counter were refused (`tabletop/index.md` Problems), the desk shot places it. The model itself is right (0.54 × 0.46 × 0.335, a 24-inch screen with keyboard and mouse); the disc is the screen's width, not its 0.33 m depth.
-- **Status:** confirmed (activities wave)
+- **Status:** fixed (543c6121)
+- **After:** Radius 0.23 (half its 0.46 m depth with the keyboard): bought on the stage counter (`bench-results/review/fixes/content/g07/after-monitor-no-uses.png`), on the standing, simple and executive desks at their tops' middles; refused on the 0.38–0.42 m deep computer and writing desks. Its text says so.
 - **Source:** play runner agent, tooling round
 
 ### I-tabletop-06 — Sat at a table or desk to use a thing on it, the resident leaves the chair pushed out
@@ -232,7 +233,8 @@ Not tied to one row: I-tabletop-04, I-tabletop-06.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/tabletop.py:98` (`flame=('#FFD27A', 'gloss'),  # gloss, never emissive`), `:509`, `:888`
 - **Evidence:** `tabletop/sheets/obj-candlesticks.png` (by day: two yellow flames on the counter), `tabletop/extra/candlesticks-night.png` (22:00 by the sim's clock: the flames are dark grey, nothing lit round them). Real candles are lit for an evening, and then they are the brightest thing on the table. Either unlit wicks (decor) or a flame that glows at night as lamp shades do (`lighting.py:33` gives the lantern's flame a `glow`).
-- **Status:** open
+- **Status:** fixed (1c55d5ef)
+- **After:** by day the candles show dark wicks, no flame (`fixes/blender-decor/clips/clips-candlesticks-all-t0.png`); from dusk the two flames rise out of the candles' tops (`lit`, the model's `night` clip, held open dusk to dawn: `clips-candlesticks-all-t99.png`) and glow (`#FFC46A`, as the lantern's flame) while the room's lights are on (`candlesticks-night-room-lit.png`). In a room whose lights are off the flames stand unlit (`candlesticks-night.png`): the glow follows the room, the night clip the clock. Two draws (the flames a part of their own).
 - **Source:** wave: tabletop
 
 ### M-tabletop-02 — The alarm clock is half again a real one's height
@@ -242,5 +244,16 @@ Not tied to one row: I-tabletop-04, I-tabletop-06.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/tabletop.py:658` (`tableClock`), `:903` (size 0.153 × 0.228 × 0.063)
 - **Evidence:** `cargo review sizes`: H 0.228 against the reference's 0.08–0.15 (0.165 with the ±10 %); a twin-bell alarm clock stands 12–18 cm with its bells. On the counter it is as tall as the kettle (`tabletop/play/c2/tableClock-no-uses.png`). Its case is 0.148 across (`R = 0.074`, `:659`), a real one's 9–12 cm; the case drawn about 0.11 across would bring it to 0.17.
-- **Status:** open
+- **Status:** fixed (1c55d5ef)
+- **After:** built at 0.72 of its first size: the case 10.7 cm across, 0.11 × 0.16 × 0.05 m in all (`cargo review sizes`: ok, was H 0.228; `fixes/blender-decor/gallery/gallery-tableClock.png`). Its hands still tell the time (`clips-tableClock-all-t99.png`).
 - **Source:** wave: tabletop
+
+### M-tabletop-03 — At night the candles' flames stand on their wicks in a dark room
+
+- **Severity:** S3
+- **Rubric:** M10, I15
+- **Fix class:** code
+- **Where:** `web/src/render/babylon/objectMotion.ts:225` (a `night` clip is held open by the lamps' level, dusk to dawn, whatever the room); `tools/art/blender/families/tabletop.py` (`candlesticks`, `motions.night: lit`)
+- **Evidence:** after M-tabletop-01's fix the flames rise out of the candles from dusk and glow while the room's lights are on (`fixes/blender-decor/candlesticks-night-room-lit.png`); in a room whose lights are out (nobody awake there, `review-stage-night`) the flames still stand on the wicks, unlit and dull (`fixes/blender-decor/candlesticks-night.png`). Real candles are lit by someone and blown out when they leave or go to bed. A night clip that follows the room's lights (as the shade glow does), or the candles lit as a fire is (content `light.fire`, a use), would do.
+- **Status:** open
+- **Source:** fix: blender-decor

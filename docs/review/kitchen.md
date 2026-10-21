@@ -311,7 +311,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/base.json:2363` (`fridge`: no `coldDrink`), `:2580` (`sofa`: no `doze`), `:2704` (`armchair`: no `read`), `:2449` (`sink`: no `brushTeeth`)
 - **Evidence:** Every other full fridge has "Get a cold drink" (`fridgeBuiltIn`, `fridgeFrenchDoor`, `fridgeRetro`); `loveseat`, `sofaThree`, `sofaDesign`, `sofaThreeSeat` have `doze`; `armchairLeather` and `armchairWingback` have `read`; `mirrorCabinet` has "Brush your teeth". The starter-house versions are the plainest in use, though they are what every new household has. The real uses (`reference.json`: fridge "get a snack or a drink", sofa "doze off", armchair "read", basin "brush teeth") are listed in the I1 table of each ledger.
-- **Status:** open
+- **Status:** fixed (eaca9ed8)
+- **After:** The base fridge's cold drink, the sofa's doze, the armchair's sitting read and the sink's "Brush your teeth" (3 min): each played (`bench-results/review/fixes/content/g09/`). Balance and soak: see I-bathroom-06.
 - **Source:** pilot (`cargo review uses` tables against `reference.json` `uses`)
 
 ### M-kitchen-02 — Both dishwashers are a metre wide
@@ -331,7 +332,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** decision
 - **Where:** `tools/art/blender/families/dining.py:965` (`tableDining4` 1.84 m), `:967` (`tableDining6` 2.84), `:969` (`tableBanquet8` 3.84), `:971` (`tableRound4` 1.52 across), `:975` (`tableFarmhouse6` 2.86), `:1004` (`sideboard` 0.668 deep, 1.10 m high with its vase), `:1006` (`buffet` 0.668 deep); `kitchen_cooking.py:447` (`wallOven` 0.70 wide), `:451` (`rangeCooker` 1.58 × 1.13); `kitchen_counters.py:740`, `:742` (`barSegment`, `barEnd` 0.89 deep); `kitchen.py:724` (`fridgeMini` 1.00 high)
 - **Evidence:** `bench-results/review/tables/sizes-kitchen.md` (each over the reference range plus 10 %): the table "for four" is 1.84 m long (a four-seat table is 1.20–1.60; 1.84 seats six), the tables "for six" 2.84–2.86 (1.60–2.20: they seat eight to ten), the banquet table 3.84 (2.20–3.00), the round table 1.52 m across (0.90–1.25: it seats six); the sideboard and buffet are as deep as a kitchen base unit, 0.67 m (0.40–0.55); the oven tower is 0.70 m wide (0.58–0.62, 3 % past the tolerance), the range cooker 1.58 m (0.90–1.10; real ones reach 1.5 m but are rare), the bars 0.89 m deep (0.40–0.75), the mini fridge 1.00 m high with its board on top (0.50–0.88). Each takes its footprint minus a margin; side by side with the chairs and residents (`kitchen/sheets/obj-tableBanquet8.png`, `obj-tableDining4.png`) they read as large, not wrong. Decide whether whole-tile sizes are the style here (then widen the reference ranges for these kinds) or whether the names change ("table for six" for the 1.84 m one) or the models shrink inside their tiles.
-- **Status:** open
+- **Status:** fixed (b3f6b82d)
+- **After:** Tables named by their seats ("Dining table for six" 1.84 m, "for eight" 2.84, the farmhouse table for eight, the banquet table for twelve, the round table for six; kinds `diningTable6`, `diningTable8`, new `diningTable12` and `roundTable6`); whole-tile sideboards, oven tower, range cooker and bars widened in `reference.json`: kitchen 24 → 13 outside. The sideboard's H 1.10 is its vase (tooling) and the mini fridge's 1.00 m is not in Q-08's list.
 - **Source:** wave: kitchen (`cargo review sizes`)
 
 ### M-kitchen-04 — The built-in fridge is a free-standing fridge with a dispenser
@@ -341,7 +343,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** decision
 - **Where:** `tools/art/blender/families/kitchen.py:334` (`_fridgeBuiltIn`), `:727` (size 0.84 × 2.025 × 0.656); `web/public/content/furniture.json:198` (name "Built-in fridge")
 - **Evidence:** `kitchen/sheets/obj-fridgeBuiltIn.png`: a 0.84 m wide, 2.03 m tall white cabinet with a fridge door over a freezer door, long bar handles and a water dispenser panel on the door; it stands free like the other fridges. An integrated fridge is 0.58–0.62 m wide behind a kitchen-unit door with no dispenser (`reference.json` `fridgeIntegrated`; sizes table "W 0.840 > 0.682"). As a counter-depth bottom-freezer fridge (`fridgeAmerican` 0.83–0.92 wide) it is inside every range. Decide: rename it (and move it to that kind), or rebuild it as an integrated 60 cm unit with a cabinet front and no dispenser.
-- **Status:** open
+- **Status:** fixed (b3f6b82d)
+- **After:** "Counter-depth fridge", kind `fridgeAmerican`: inside every range.
 - **Source:** wave: kitchen
 
 ### M-kitchen-05 — The carver chair's seat is 4 cm higher than a dining chair's
@@ -374,7 +377,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** motion
 - **Where:** `web/public/assets/packs/kitchen_cooking/manifest.json:398`, `:442` (`dishwasher`, `dishwasherCompact` motions: `uses: {dishes: door_open}`, `hold 2.5`); `web/src/render/babylon/objectMotion.ts:413` (clips keyed by interaction id or animation tag); `crates/sim-core/src/snapshot.rs:156` (clearing away is `Doing::plain`: no interaction, tag `wash`); `web/src/audio/world.ts:189` (`wash` with no object def: the washing-up water)
 - **Evidence:** `kitchen/extra/meal-fridge-stoveGas.json` and `-15.png`, `-17.png`: with a dishwasher as the lot's only `dishes` station, the dirty plate (98.4–103.1 s) and the scraped pot (113.1–118.1 s) are each "washed" at it for 5 s with the `wash` clip (hands working at the shut door, holding the plate) and no clip on the dishwasher at all; the sound is a running tap. On its own use "Load the dishwasher" the door drops and the rack slides out, then shuts 2.5 s in (its `hold`; `kitchen/play/c1/play.jsonl`: closing from +2.5 s), while the load lasts 10 game minutes (10 s at speed 1, longer at the slower paces): for most of it the loader works at a shut door. Add `wash` to both dishwashers' `uses` (or key the dishes station), drop the `hold` or make it the use's length, and give clearing away at a dishwasher its own sound (or none).
-- **Status:** open
+- **Status:** fixed (2dcc4ea0)
+- **After:** both dishwashers open for `wash` too and hold their door open for the whole use: clearing a plate and the pot away at one opens it (`fixes/motions/recipes/meal-fridge-stoveGas.json`: `door_open` 100.6–105.4 s and 115.4–120.6 s, `-15.png`, `-17.png`), and "Load the dishwasher" keeps it open its 10 minutes (`fixes/motions/g16/play-g16.jsonl`: open from +1.4 s to +10.1 s). The snapshot gives the dishes station's kind, so clearing away at a dishwasher is silent (`audio/world.ts`), a sink's still the washing-up water.
 - **Source:** wave: kitchen (`scratch/scene.mjs` recipe scene, `check.mjs play`)
 
 ### A-kitchen-02 — moved to systems.md
@@ -386,8 +390,19 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** motion
 - **Where:** `web/public/assets/packs/kitchen/manifest.json:140` (`counterSinkDouble` motions: `wash → water_on`, one clip that grows both streams)
 - **Evidence:** `kitchen/play/c2/counterSinkDouble-wash-01.png`, `kitchen/clips/clips-counterSinkDouble-all-t99.png`: one resident at the left bowl, water running from both bridge taps. The sink has two slots; the motions support a clip per slot (`slot`, as the bunk bed's duvets), so each tap could run for the person at its bowl.
-- **Status:** open
+- **Status:** fixed (d2c9f0de)
+- **After:** each bowl's stream is its own clip (`water_on_0` at -x, `water_on_1` at +x), played for the resident in that slot: one resident washing runs only their tap (`fixes/motions/g1718/play-stage.jsonl`: `water_on_0` alone for wash and washUp; `stage-counterSinkDouble-wash-*.png`).
 - **Source:** wave: kitchen
+
+### A-kitchen-04 — On a bar or counter stool the feet hang in the air, not on the footrest
+
+- **Severity:** S3
+- **Rubric:** A1, A5
+- **Fix class:** renderer-table
+- **Where:** `web/src/render/babylon/characters.ts` (`seatLegs`: the feet go down to the floor, or hang where it's out of reach), `web/src/render/babylon/characters/furniture.json` (`seats.barStool` 0.72; `stoolCounter`, `stoolBarHigh` content seats 0.68, 0.80)
+- **Evidence:** `bench-results/review/fixes/clips-seated/stools/poses-seats-default-0[0-2]-*-side.png`: since G-20's leg fit, a grown-up on the three stools sits with the shins hanging and the feet in the air a few centimetres over the stretcher ring; before it the clip's feet were in the air too. People on a bar stool rest the feet on its footrest ring (or one on the floor). A footrest height per stool (`seats` `rest`, m: the floor `seatLegs` puts the feet on) would put them there; the rings are at about 0.25–0.3 m.
+- **Status:** open
+- **Source:** fix: clips-seated
 
 ### I-kitchen-03 — moved to residents.md
 
@@ -404,7 +419,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/furniture.json:784` (`kitchenIsland` "Have breakfast at the island": no `pose`, `approach` front, `slots 2`)
 - **Evidence:** `kitchen/play/c5/kitchenIsland-breakfast-01.png`: the resident stands at the island's cupboard side for 20 minutes, eating from empty hands with the eat clip. The island's worktop overhangs its back for stools (`docs/objects/kitchen.md` K6; a stool at the back is pulled in to it, `kitchen/extra/seats/seats-barStool-drink-01.png`), which is where a quick breakfast at an island is eaten (`reference.json` `kitchenIsland`: "eat a quick breakfast on stools"). Make it a stool's use when one stands at the island's back (`seatNear`, as the TV's watch), or sit at the back.
-- **Status:** open
+- **Status:** fixed (9a5cc144)
+- **After:** Breakfast `seatNear` 3: eaten on the stool at the island's back (`bench-results/review/fixes/content/g03/after-kitchenIsland-breakfast-00.png`); 2.5 m missed it (the stool's approach tile is 3 m from the island's front tile).
 - **Source:** wave: kitchen
 
 ### I-kitchen-08 — Kitchen pieces without the uses their siblings have
@@ -414,7 +430,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/furniture.json:147` (`fridgeMini`: snack and meal, no `coldDrink`); `web/public/content/catalog2/kitchen.json:5` (`counterEnd`), `:34` (`counterCornerOuter`), `:63` (`counterDrawers`), `:92` (`counterOpenShelf`), `:295` (`islandSmall`), `:324` (`islandLong`): `prep` stations with no use
 - **Evidence:** `bench-results/review/tables/uses-kitchen.md`. The mini fridge is the one fridge for cold drinks above all, and the retro mini fridge beside it has "Pour a cold drink"; the four counters and two islands are prep stations for a meal but don't offer "Make a sandwich", which the counter, the corner counter, the butcher block, the marble counter and the kitchen island do, and the islands lack the kitchen island's breakfast. A player who buys a run of the plainer counters gets no sandwich from it. The same pattern as I-kitchen-02 for the base set.
-- **Status:** open
+- **Status:** fixed (eaca9ed8)
+- **After:** The mini fridge's cold drink; a sandwich on the counter end, the outer corner, the drawer and open-shelf counters and both islands, and the islands' breakfast (`seatNear` 3). All played (`bench-results/review/fixes/content/g09/`). `cargo review uses` flags the copies' 9 and 5 minutes as their siblings' are (short by design).
 - **Source:** wave: kitchen (`cargo review uses`)
 
 ### I-kitchen-09 — The cooking wall takes no part in cooking
@@ -424,7 +441,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** decision
 - **Where:** `web/public/content/furniture.json:768` (`rangeHood`), `web/public/content/catalog2/kitchen.json:967` (`spiceRack`), `:983` (`potRail`), `:999` (`kitchenShelfWall`): no use, no station; not `decor` kinds in `docs/review/reference.json`
 - **Evidence:** `kitchen/sheets/obj-rangeHood.png`, `obj-spiceRack.png`, `obj-potRail.png`, `obj-kitchenShelfWall.png`. The hood has a light strip and a filter but stays dark and silent while someone cooks on the hob under it; the spice rack, the pot rail's pans and the shelves' jars are never reached for, though the recipes take a pan and the cook stirs one. Owner default: decor stays decor. Decide whether the hood comes on (its light and a fan's hum) while the hob below is in use, and whether the rack, rail and shelves become optional recipe stations (a spice taken during the Cook step), or stay decor (then mark their kinds `decor` in `reference.json`).
-- **Status:** open
+- **Status:** fixed (198e90d9) for the spice rack, pot rail and shelves (decor, Q-19); the hood's light and hum later
+- **After:** Their kinds are `decor` in `reference.json`: `cargo review uses` no longer flags them. The range hood keeps its flag until its light and hum come with the hob (polish, code).
 - **Source:** wave: kitchen (I1)
 
 ### I-kitchen-10 — Breakfast and dinner at a dining set come from nowhere
@@ -477,7 +495,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/furniture.json:838` (`barStool` `seatAt: [bar, counter]`, seat 0.72), `web/public/content/catalog2/dining.json:638` (`stoolCounter` `[counter, bar]`, 0.68), `:691` (`stoolBarHigh` `[bar, counter]`, 0.80)
 - **Evidence:** Counters and islands are 0.95 m, bars and the high café table 1.06 m (content `surface`). A seat 25–30 cm under the top fits (`reference.json`: counter stools for 0.90–0.95 m tops, bar stools for 1.02–1.07). The 0.68–0.72 m stools at a 1.06 m bar sit 34–38 cm under it (the top at the chest), and the 0.80 m high stool at a 0.95 m counter sits 15 cm under it, where the thighs don't fit under an overhang (the tuck stops the knees short instead). Housegen and players can pair either. Let `barStool` and `stoolCounter` seat at `counter`, and `stoolBarHigh` at `bar`.
-- **Status:** open
+- **Status:** fixed (543c6121)
+- **After:** `barStool` and `stoolCounter` seat at `counter` only, `stoolBarHigh` at `bar` only; the breakfast counter's 0.95 m top is a `counter`; generated islands get counter stools only. Play: the counter stool's drink at a counter and the high stool's at a bar run; the bar stool at a bar and the high stool at a counter say "needs a table" (`bench-results/review/fixes/content/g07/`).
 - **Source:** wave: kitchen (content against the reference)
 
 ## Evidence for findings in other ledgers

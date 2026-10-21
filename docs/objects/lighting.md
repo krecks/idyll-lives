@@ -9,15 +9,31 @@ The light itself is the content's `light` (height, range, intensity, tiles); the
 from, and must put its bulb at its `light.height`. `_bulb` asserts each bulb within 25 cm of
 `light.height` (most are within 8 cm); it doesn't check `at`. Across, the light is at the footprint's middle unless
 the content's `light.at` [x, z] (object frame) moves it: the arc lamp's (0.245, 0.2) and the table lamp's (−0.12, 0)
-put it at their shade in every facing. The wall lights keep theirs at the middle, 13–38 cm out from the bulb, which
-gives the warm pool on the wall and floor.
+put it at their shade in every facing. The wall lights keep theirs at the middle, 13–38 cm out from the bulb.
+
+Where the light goes is the content's `light.aim` (the renderer's room lights are spot lights): `down` under a shade
+that sends it down (the pendant's dome, the industrial pendant, the track heads, the swing-arm lamp, the arc lamp,
+the banker's lamp: full below, about half 30–45° off, next to none side-on, so no disc up the wall behind), `up`
+for the sconce's open cup (a wash up the wall above it), `out` for the outdoor bulkhead (away from its wall and
+down: nothing behind the wall, so not the floor inside) and `ceiling` for the uplighter (its light comes off the
+ceiling, 30 cm under it, over the lamp, reaching 1.5 m further: the room lit from above, not a pool round its
+foot). The rest light all round. A lamp's light still passes through walls into the next room (lights kept to their
+room are not done).
 
 Lamps switch on and off (`crates/sim-core/src/lights.rs`): the player per lamp (click: Turn on / Turn off), residents
-per room, on when someone awake comes into a dark room, off when the last one leaves or sleeps. The shades,
+per room, on when someone awake comes into a dark room, off when the last one leaves or sleeps. A lamp bought comes
+off (Q-11): it goes on with the rest as someone comes in, or by a click. The shades,
 diffusers, globes, the paper and the candle's flame glow (E8) from dusk while their lamp is on, never by day; metal
-shades (the industrial pendant, the swing-arm lamp, the arc lamp, the banker's lamp) glow only on a white liner just
-inside. The ceiling fan's blades turn (`blades_turn`, once in 2.5 s) and the paper lantern sways (`sway`, 2.5° in
-2 s), both ambient (E2): near the camera, not on Low.
+shades (the industrial pendant, the swing-arm lamp, the arc lamp) glow only on a white liner just inside; coloured
+glass keeps its colour lit (the banker's lamp's green shade glows green over its white liner, the mushroom lamp's cap
+coral: M-lighting-03, 2026-10-21). The ceiling fan's blades turn (`blades_turn`, once in 2.5 s) while its light is switched on, ambient (E2): near the camera, not on Low. The paper lantern hangs still (its `sway`
+went, 2026-10-21: a paper globe indoors hangs still without a draught; A-lighting-01).
+
+The ring chandelier and the industrial pendant hang at head height (content `headHeight`, Q-12): nobody walks under
+them, though furniture (a dining table) goes under. The pendant lamp and the paper lantern hang clear of heads: their lowest point
+2.11 and 2.12 m up (a 0.69 m drop from the 2.8 m ceiling; the reference's 2.1 m where people walk; was 1.85 and 1.80,
+M-lighting-05, 2026-10-21), their `light.height` 2.16 and 2.37. A wall can't come down where it would leave a
+ceiling lamp outdoors (M-lighting-01).
 
 ## LT1. Ceiling lights (7)
 
@@ -25,19 +41,18 @@ inside. The ceiling fan's blades turn (`blades_turn`, once in 2.5 s) and the pap
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `ceilingPendant` Pendant lamp | 1x1 · ceiling | — | lighting / ceiling | Body, Shade | Static | Static. The shade glows at night (E8). |
-| `ceilingLight` Ceiling light | 1x1 · ceiling | — | lighting / ceiling | Body, Shade | Static | Static. The diffuser glows at night. |
+| `ceilingPendant` Pendant lamp | 1x1 · ceiling | — | lighting / ceiling | Body, Shade | Static | Static, its dome's rim 2.12 m up (walked under). The shade glows at night (E8). |
+| `ceilingLight` Lantern pendant | 1x1 · ceiling | — | lighting / ceiling | Body, Shade | Static | Static. The diffuser glows at night. Renamed from "Ceiling light": a lantern on a stem (kind `pendantLamp`, Q-08). |
 | `chandelier` Ring chandelier | 1x1 · ceiling | — | lighting / ceiling | Body, Globes | Static | Static. The globes glow at night. |
 | `pendantIndustrial` Industrial pendant | 1x1 · ceiling | — | lighting / ceiling | Body, Shade | Static | Static. Only the white liner inside the dome glows at night. |
 | `ceilingFan` Ceiling fan | 1x1 · ceiling | — | lighting / ceiling | Body, Blades | Ambient (E2) | `blades_turn`: the blades turn slowly (E2). |
 | `trackLights` Track lights | 1x1 · ceiling | — | lighting / ceiling | Body, Shade | Static | Static. The heads' liners and lenses glow at night. |
-| `paperLantern` Paper lantern | 1x1 · ceiling | — | lighting / ceiling | Paper, Ribs | Ambient (E2) | `sway`: a slow sway (E2). The paper glows at night. |
+| `paperLantern` Paper lantern | 1x1 · ceiling | — | lighting / ceiling | Paper, Ribs | Static | Static, hanging still, its globe's bottom 2.12 m up (walked under). The paper glows at night. |
 
 **In play** (signed off 2026-10-16):
 - Hung in the living room (camera at 2.1 m) in all four facings, nothing floating or cut.
 - At night each lights a pool on the floor under it and its shade glows; by day none glows.
-- The fan's `blades_turn` and the lantern's `sway` run all the time near the camera on WebGPU, day and night, and
-  are off on Low.
+- The fan's `blades_turn` runs near the camera on WebGPU while its light is on, and is off on Low.
 - The industrial pendant's green dome looks black from above at night (only its liner glows, inside), as intended.
 - Nothing needed fixing.
 
@@ -89,8 +104,8 @@ inside. The ceiling fan's blades turn (`blades_turn`, once in 2.5 s) and the pap
 | `tableLamp` Table lamp | 1x1 · floor | — | lighting / table | Base, Shade, Table | Static | Static. A lamp on its own oak side table; the shade glows at night and the light is at it (`light.at`). |
 | `lampTableRound` Ginger-jar lamp | 1x1 · surface | — | lighting / table | Base, Shade | Static | Static. The shade glows at night. |
 | `lampTableSquare` Square table lamp | 1x1 · surface | — | lighting / table | Base, Shade | Static | Static. The shade glows at night. |
-| `lampBanker` Banker's lamp | 1x1 · surface | — | lighting / table | Base, Shade | Static | Static. The shade's liner glows at night. |
-| `lampMushroom` Mushroom lamp | 1x1 · surface | — | lighting / table | Base, Shade | Static | Static. The cap glows at night. |
+| `lampBanker` Banker's lamp | 1x1 · surface | — | lighting / table | Base, Shade | Static | Static. At night the green glass shade glows green, its white liner cream. |
+| `lampMushroom` Mushroom lamp | 1x1 · surface | — | lighting / table | Base, Shade | Static | Static. The coral glass cap glows coral at night. |
 | `lampLantern` Candle lantern | 1x1 · surface | — | lighting / table | Base, Glass | Static | Static. The flame glows at night. |
 
 **In play** (signed off 2026-10-16):
@@ -105,3 +120,4 @@ inside. The ceiling fan's blades turn (`blades_turn`, once in 2.5 s) and the pap
 - A top under a lit lamp is washed almost white at night: the light is 30–45 cm above it and the shade casts no
   shadow (renderer; seen, not changed).
 - The lantern's "Glass" tints faintly, as glass does.
+- Since the authenticity review (G-05): the table lamp's light is at 0.75 m, inside its shade (it was 0.95, over it).

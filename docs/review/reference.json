@@ -1071,7 +1071,7 @@
       ],
       "d": [
         0.4,
-        0.75
+        0.9
       ],
       "surface": [
         1,
@@ -1141,18 +1141,18 @@
       ]
     },
     "rangeCooker": {
-      "label": "Range cooker (90-110 cm)",
+      "label": "Range cooker (90-150 cm)",
       "w": [
         0.9,
-        1.1
+        1.6
       ],
       "h": [
         0.9,
-        1
+        1.15
       ],
       "d": [
         0.6,
-        0.65
+        0.76
       ],
       "surface": [
         0.9,
@@ -1186,7 +1186,7 @@
       "label": "Tall housing with built-in oven(s)",
       "w": [
         0.58,
-        0.62
+        0.72
       ],
       "h": [
         1.95,
@@ -1473,6 +1473,38 @@
         "neufert"
       ]
     },
+    "diningTable12": {
+      "label": "Banquet table for ten to twelve",
+      "w": [
+        3,
+        4
+      ],
+      "h": [
+        0.71,
+        0.78
+      ],
+      "d": [
+        0.9,
+        1.2
+      ],
+      "surface": [
+        0.71,
+        0.76
+      ],
+      "uses": [
+        "host a big family dinner"
+      ],
+      "minutes": {
+        "dinner": [
+          45,
+          150
+        ]
+      },
+      "sources": [
+        "dimDiningTables",
+        "neufert"
+      ]
+    },
     "roundTable4": {
       "label": "Round dining table for four",
       "w": [
@@ -1493,6 +1525,39 @@
       ],
       "uses": [
         "eat a meal",
+        "play cards"
+      ],
+      "minutes": {
+        "meal": [
+          15,
+          40
+        ]
+      },
+      "sources": [
+        "dimDiningTables",
+        "neufert"
+      ]
+    },
+    "roundTable6": {
+      "label": "Round dining table for six",
+      "w": [
+        1.3,
+        1.6
+      ],
+      "h": [
+        0.71,
+        0.78
+      ],
+      "d": [
+        1.3,
+        1.6
+      ],
+      "surface": [
+        0.71,
+        0.76
+      ],
+      "uses": [
+        "eat a family meal",
         "play cards"
       ],
       "minutes": {
@@ -1961,7 +2026,7 @@
       ]
     },
     "sideboard": {
-      "label": "Sideboard / buffet",
+      "label": "Sideboard / buffet (to a base unit's depth: whole-tile style)",
       "w": [
         1.2,
         2
@@ -1972,7 +2037,7 @@
       ],
       "d": [
         0.4,
-        0.55
+        0.68
       ],
       "surface": [
         0.7,
@@ -3424,14 +3489,14 @@
       ]
     },
     "bedLow": {
-      "label": "Low platform / futon double bed",
+      "label": "Low platform / futon bed, double to king",
       "w": [
         1.35,
-        1.65
+        1.95
       ],
       "h": [
         0.15,
-        0.8
+        1
       ],
       "d": [
         1.95,
@@ -6314,6 +6379,38 @@
       ],
       "uses": [
         "cycle",
+        "follow a ride on the screen"
+      ],
+      "minutes": {
+        "cycle": [
+          20,
+          60
+        ]
+      },
+      "sources": [
+        "dimExBike"
+      ]
+    },
+    "recumbentBike": {
+      "label": "Recumbent exercise bike (seat with a back, pedals in front)",
+      "w": [
+        0.55,
+        0.75
+      ],
+      "h": [
+        1,
+        1.4
+      ],
+      "d": [
+        1.3,
+        1.75
+      ],
+      "seat": [
+        0.4,
+        0.6
+      ],
+      "uses": [
+        "cycle sitting back",
         "follow a ride on the screen"
       ],
       "minutes": {
@@ -11287,7 +11384,7 @@
   "ids": {
     "fridge": "fridge",
     "fridgeRetro": "fridge",
-    "fridgeBuiltIn": "fridgeIntegrated",
+    "fridgeBuiltIn": "fridgeAmerican",
     "fridgeFrenchDoor": "fridgeAmerican",
     "fridgeMini": "fridgeMini",
     "fridgeMiniRetro": "fridgeMini",
@@ -11344,12 +11441,12 @@
     "cafeTable": "diningTable2",
     "patioTableRound": "diningTable2",
     "diningTable": "diningTable4",
-    "tableDining4": "diningTable4",
+    "tableDining4": "diningTable6",
     "patioTable4": "diningTable4",
-    "tableDining6": "diningTable6",
-    "tableFarmhouse6": "diningTable6",
-    "tableBanquet8": "diningTable8",
-    "tableRound4": "roundTable4",
+    "tableDining6": "diningTable8",
+    "tableFarmhouse6": "diningTable8",
+    "tableBanquet8": "diningTable12",
+    "tableRound4": "roundTable6",
     "tableSquare8": "squareTable8",
     "bistroSet": "diningSetSmall",
     "patioSet": "diningSetSmall",
@@ -11451,7 +11548,7 @@
     "fireplaceElectric": "electricFire",
     "bedSingle": "bedSingle",
     "bedDaybed": "bedSingle",
-    "bed": "bedDouble",
+    "bed": "bedKing",
     "bedDouble": "bedDouble",
     "bedKing": "bedKing",
     "bedQueenUpholstered": "bedKing",
@@ -11483,7 +11580,7 @@
     "mirrorRound": "mirrorWall",
     "laundryHamper": "laundryHamper",
     "laundryBasket": "laundryHamper",
-    "sink": "basinPedestal",
+    "sink": "kitchenSink",
     "sinkPedestal": "basinPedestal",
     "sinkVessel": "basinPedestal",
     "sinkConsole": "basinPedestal",
@@ -11581,7 +11678,7 @@
     "treadmill": "treadmill",
     "weightBench": "weightBench",
     "exerciseBike": "exerciseBike",
-    "energetic.spinBike": "exerciseBike",
+    "energetic.spinBike": "recumbentBike",
     "yogaMat": "yogaMat",
     "dumbbells": "dumbbellRack",
     "hotHeaded.heavyBag": "heavyBag",
@@ -11598,6 +11695,7 @@
     "wallClock": "wallClock",
     "wallShelf": "wallShelf",
     "curtains": "curtains",
+    "curtainsWide": "curtains",
     "curtainsLong": "curtainsLong",
     "rugRound": "rug",
     "rugLarge": "rug",
@@ -11639,7 +11737,7 @@
     "ceilingPendant": "pendantLamp",
     "pendantIndustrial": "pendantLamp",
     "paperLantern": "pendantLamp",
-    "ceilingLight": "ceilingLight",
+    "ceilingLight": "pendantLamp",
     "trackLights": "ceilingLight",
     "chandelier": "chandelier",
     "ceilingFan": "ceilingFan",
@@ -11715,7 +11813,6 @@
     "garden.topiary": "clippedShrub",
     "garden.hedge": "clippedShrub",
     "model.hedge": "clippedShrub",
-    "model.street.hedge": "clippedShrub",
     "model.bush.small": "clippedShrub",
     "garden.hydrangea": "floweringShrub",
     "garden.roses": "floweringShrub",
@@ -11916,6 +12013,11 @@
     "towelStack",
     "perfumeTray",
     "deskOrganiser",
-    "selectionMarker"
+    "selectionMarker",
+    "spiceRack",
+    "potRail",
+    "kitchenShelf",
+    "coatStand",
+    "chickenCoop"
   ]
 }

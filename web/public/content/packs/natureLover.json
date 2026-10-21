@@ -253,6 +253,7 @@
           "anim": "water",
           "minutes": 60,
           "pose": "stand",
+          "inside": true,
           "autonomous": true,
           "effects": { "fun": 0.2 },
           "tags": ["training", "nature", "garden"],

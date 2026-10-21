@@ -262,7 +262,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters/furniture.json:48` (`SEATS.gardenChair` 0.40); `tools/art/blender/families/outdoor.py:244-245` (`_slatted_chair` seat slats, 0.40–0.42 sloping, their tops about 0.43)
 - **Evidence:** `cargo check-glb` heights warning (`model.gardenChair seat 0.40 m … the model 0.434 m there: 3.4 cm higher`). The mesh is inside the range (30–48), so the table row is what is off; in play the thighs hide it (`sheets/obj-gardenChair.png`). Set `SEATS.gardenChair.h` to 0.43.
-- **Status:** open
+- **Status:** fixed (a920f174)
+- **After:** `seats.gardenChair` 0.43; its heights warning gone (`fixes/tables/play-b/b-gardenChair-sit-01.png`).
 - **Source:** outdoor wave (T1 warning)
 
 ### A-outdoor-01 — The hot tub's open cover stands upright, floating above and behind the tub
@@ -284,7 +285,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** motion
 - **Where:** `tools/art/blender/families/garden_decor.py:77-92` (`fountain`: a still jet and drop, no clip; `no `motions` in its `G.Model`, `:163-175`); `web/src/audio/world.ts:34` (`ACTION_SOUNDS`: nothing for `listen` or the fountain)
 - **Evidence:** `sheets/obj-garden.fountain.png`: the jet is a static blue rod with a drop on it, the basins flat; "Listen to the water" (20 minutes) plays to silence. The pond has its ripple (`idle`) and the parasol its stir; a fountain's moving water is what makes it one. An ambient clip (water rings in the basins, a pulsing jet) and a water sound. The sound part widens I-bathroom-04 (systems ledger).
-- **Status:** open
+- **Status:** fixed (abfc32d9), the water; its sound is fixed with I-bathroom-04 (54139115): the fountain runs by itself, `ambient: fountain`
+- **After:** `flow` (ambient, `idle`): the jet bubbles up and falls back and a ring swells out on each basin's water and settles, 1.2 s a round, all the time near the camera (`fixes/motions/g1718/views/fountain-t0.6.png`, `clips-garden.fountain-all-t*.png`). It still plays to silence (G-53).
 - **Source:** outdoor wave
 
 ### I-outdoor-01 — Warming up by the fire pit is sitting on its rim, back to the flames
@@ -294,7 +296,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/furniture.json:4478-4481` (`firePit` `seat`: height 0.38, forward 0.38: on the capstones, facing out), `:4485-4489` (`relax`, `pose: sit`)
 - **Evidence:** `play/chunk1/firePit-relax-01.png`, `sheets/age-firePit.png` (child, teen, adult, elder), `extra/night/sheet-fire.png`: the resident sits on the capstone rim of a burning pit, legs out over the grass, the flames a hand's breadth behind their back, for half an hour. Nobody sits on a lit fire pit's wall; people sit on chairs or log benches round it, facing the fire, about a metre off. Drop the `seat` and use the fire from a seat nearby (`seatNear`, as the TV does) or standing in front of it facing in; or give the model a log bench (`model`).
-- **Status:** open
+- **Status:** fixed (aac64b84, 278de962)
+- **After:** the pit's `seat` is gone; *Warm up by the fire* is used from a seat within 3 m that faces the pit (`seatNear: 3`, `seatFacing: around`: a garden chair round it), else standing at one of four places round it 0.85 m from its middle, facing the fire (`slots: 4`, `places`), four at once. At night with a garden chair facing it and four residents: one in the chair, three standing round it facing in (`bench-results/review/fixes/slots/play/firePit-0*.png`; `bench-results/review/fixes/slots/poses/poses-default-firePit_relax.png`), against `play/chunk1/firePit-relax-01.png`. Sim test `tests/slots.rs` (`round_the_fire_pit_from_a_chair_facing_it_or_standing_facing_in`). Standing, it is the `relax` stand clip, arms folded (I-outdoor-09). Not re-run at every stage (`--sim`): on foot each stage plays its own stand clip, with no seat height left to fit.
 - **Source:** outdoor wave (lead; Phase 0 "Seen")
 
 ### I-outdoor-02 — Dozing outdoors, and on a sofa bed or window seat, puts the resident in pyjamas
@@ -330,7 +333,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/catalog2/outdoor.json:416-455` (`greenhouse` `tend`, `harvest`: no `inside`); `crates/sim-core/src/content.rs:86-88` (`inside`: used standing on the object, as the shower)
 - **Evidence:** `sheets/obj-greenhouse.png` (`play/chunk7-greenhouse-wide/greenhouse-tend-01.png`, `greenhouse-harvest-01.png`): the door swings open and the resident works on the grass in front of it, a metre from the nearest plant. A 2 × 3 greenhouse has a path down its middle (`clips/clips-greenhouse-all-t99.png`) that a gardener stands in. `inside: true` puts them on the centre, the path; check the door clip still reads with someone in it.
-- **Status:** open
+- **Status:** fixed (0cc15781)
+- **After:** `inside: true` on tend and harvest: the gardener steps in onto the path between the benches; the door clip still plays (`bench-results/review/fixes/content/g02/after-greenhouse-tend-01.png`).
 - **Source:** outdoor wave (Phase 0 "Seen")
 
 ### I-outdoor-06 — Birds are watched from arm's length, and the feeder and bath are never refilled
@@ -340,7 +344,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/garden.json:2155-2158` (`garden.birdbath` `birdwatch`, `look`, standing at the front tile); `web/public/content/catalog2/outdoor.json:613-616` (`birdFeederPole` `birdwatch`)
 - **Evidence:** `sheets/obj-garden.birdbath.png`, `sheets/obj-birdFeederPole.png`: the watcher stands half a metre from the bath and a metre from the feeders for 20 minutes, close enough to put any bird off. Birds are watched from a seat or window a few metres away (`seatNear`, as I-living-03 proposes for reading). Filling the feeder with seed and topping up the bath (reference `birdFeeder` refill 2–10) are the real upkeep uses and are missing; at triage, a short refill use or none.
-- **Status:** open
+- **Status:** fixed (9a5cc144)
+- **After:** Birdwatch at the bird bath and the feeders takes a seat within 6 m (`seatNear`): watched from the bench (record `pose: sit`). Refilling the feeder and the bath: not added (a mime without props, G-70).
 - **Source:** outdoor wave
 
 ### I-outdoor-07 — moved to systems.md
@@ -352,5 +357,16 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/catalog2/outdoor.json:240-265` (`outdoorBar`, no uses: "pull up bar stools"); `web/public/content/furniture.json:838-860` (`barStool`: `seatAt` bar, only `sit`)
 - **Evidence:** `sheets/obj-outdoorBar.png`. A bar's use is a drink on a stool at it. A stool pulled up offers only "sit", while the patio chair at a table has "Have a coffee" (`needsTable`, `catalog2/outdoor.json:93-110`). A drink use on the bar stool with `needsTable` (kitchen ledger: `barStool`) gives the indoor bar counters (`barSegment`, `barEnd`) the same.
-- **Status:** open
+- **Status:** fixed (543c6121, eaca9ed8)
+- **After:** A high bar stool pulled up to the outdoor bar has "Have a drink at the bar" (`stoolBarHigh`, `seatAt: bar`, played); the bars' texts say high bar stools.
 - **Source:** outdoor wave
+
+### I-outdoor-09 — Warming up by the fire on foot is standing with the arms folded
+
+- **Severity:** S3
+- **Rubric:** I3 (A1)
+- **Fix class:** clip
+- **Where:** `web/src/render/babylon/characters.ts` (`ACTIONS.relax`: `stand: ['idle', 'foldArms']`), `web/public/content/furniture.json` (`firePit` `relax`, `anim: relax`)
+- **Evidence:** `bench-results/review/fixes/slots/play/firePit-0*.png`: since G-01 those without a chair stand round the pit facing it, idling or with the arms folded for 30 minutes. People at a fire hold their hands out to it now and then, or rub them. A standing warm-up clip (the hands out to the fire, palms in, in turns with rubbing them), picked by object as G-26 picks the game clips.
+- **Status:** open
+- **Source:** fix: slots

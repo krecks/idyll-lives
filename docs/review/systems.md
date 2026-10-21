@@ -72,9 +72,9 @@ The crib (`base.json`), `babyWakes` and the cuddle lift (`characters.ts`).
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| Front door: who opens it and when | n/a | A-houses-01 | OK | Shut; swings in as she walks up to it, open while she passes, shut behind her (`bathroom-check`); a visitor knocking stands still, so it stays shut until the host walks out. A-houses-01 S3 code (systems ledger, confirmed: by nearness, no hand) | `systems/sheets/doors.png` |
+| Front door: who opens it and when | n/a | A-houses-01 | OK | Shut; swings in as she walks up to it, open while she passes, shut behind her (`bathroom-check`); a visitor knocking stands still, so it stays shut until the host walks out. A-houses-01 S3 code (systems ledger, confirmed: by nearness, no hand). Fixed (e04bc6c0): only for someone going through it | `systems/sheets/doors.png`, `fixes/town/doors/swing1-past-0.png` |
 | Bathroom door: shut while in use | n/a | A-houses-01 | I-systems-05 | Opens as she walks in, shuts behind her and stays shut on the toilet and at the basin (from above, `systems/sheets/doors-top.png`). I-systems-05 S3 code (confirmed and widened: the drawing only; every other inside door stands open always) | `systems/sheets/doors-top.png` |
-| Garden door to the patio | n/a | A-houses-01 | OK | A door with outdoors on one side is a "front" door (`house.ts:293`, `:760`): shut, opening as someone passes, like the front door (code read; not shot apart) | `systems/sheets/doors.png` |
+| Garden door to the patio | n/a | A-houses-01 | OK | A door with outdoors on one side is a "front" door (`house.ts:293`, `:760`): shut, opening as someone passes, like the front door (code read; not shot apart). Fixed (e04bc6c0): opens only for someone going through, as the front door | `systems/sheets/doors.png` |
 
 ## Objects that open (6)
 
@@ -143,7 +143,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters.ts:546` (`STATION_PROPS`) and `:2097` (`writeTool`)
 - **Evidence:** The chopping board and the food are drawn at the station's middle, a little towards the cook. On `grillStation` that is the grate, so the chopping happens on the grill. Cross-cutting wave: `outdoor/play/chunk5-kitchen/grillStation-cook-01.png` and `grillStation-feast-01.png` (the outdoor wave's runs): the orange board lies over the burning grate while the station's own wooden prep board, at its right end, stays bare. The kettle grill (`bbq`) and kitchen counters are right (`systems/sheets/cook-bbq-1.png`, `cook-meal-1.png`).
-- **Status:** confirmed and widened (cross-cutting wave; the kitchen wave at the hobs)
+- **Status:** fixed (65278fa4)
+- **After:** `STATION_SPOTS` (`writeTool`): the pan on the burner each cooker's clip lights (the gas range's flame, the range cooker's middle ring, the hob counter's hot ring, measured from those parts; the electric cooker's front ring on the turning knob's side) and the grill station's chopping board on its free counter, off the grate (`fixes/tables/play-b/b-stoveGas-cook-*.png`, `b-rangeCooker-cook-*.png`, `b-cooktopCounter-cook-*.png`, `b-grillStation-cook-*.png`). Its own prep board keeps its tray of patties.
 - **Source:** `docs/objects/open.md` Still open › Rendering; `plan/authenticity-review.md` §3.3 (I13); wave: cross-cutting
 
 ### I-systems-02 — Uses end once every need they raise is full
@@ -365,7 +366,9 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Fix class:** code
 - **Where:** `crates/sim-core/src/world.rs:321-333` (`slot_position`: slots spread across the width, all facing the object's front); `web/public/content/furniture.json:4504` (`patioSet`: no `slots`), `:4574` (`picnicTable` `slots: 2`)
 - **Evidence:** The bistro set has two chairs facing each other and one slot: a second resident can't join a coffee (`sheets/obj-patioSet.png`, the near chair stays empty). The picnic table's two ("picnics for two", its description) sit on the back bench 1.5 m apart, both facing the far bench (`extra/picnic-top/top-picnicTable-picnic-01.png` for slot 0's place). A couple at a table sit across from each other. Slots with their own place and facing (or the second slot turned round) are new behaviour. The base dining table has the same side-by-side seating (M-kitchen-01, kitchen ledger).
-- **Status:** confirmed and widened (consolidation: I-community-02 merged; raised to S2)
+- **Status:** fixed (aac64b84, b4dfcfc2)
+- **After:** a slot can have its own place and facing (content `places`, one a slot: metres off the footprint's middle and degrees from its front; `slot_position`, `slot_yaw`); a resident takes the free place nearest them and comes to it from the tile behind it (`surface::slot_approach`), or stands at it when it's off the footprint; the renderer follows the sim's facing and `slotPlace` (`objectMotion.ts`, `poses.ts`). Given real places: the seesaw's two ride at the ends facing each other, the merry-go-round's four sit round it facing in, the park chess players face each other across the board (the table rebuilt with a stool either side), the ping-pong players stand at the two ends, the picnic table's two sit one on each bench across the cloth, the bistro set (`patioSet`) now takes two, one a chair, facing each other, the tea table's two turn 45° to each other. `bench-results/review/fixes/slots/poses/poses-default-*.png` (one sitter a slot, real footprints), `bench-results/review/fixes/slots/play/<id>-0*.png` (two to four residents in play: `picnicTable`, `seesaw`, `merryGoRound`, `parkChessTable`, `parkChessTable-side`, `pingPongTable`, `patioSet`, `kind.welcomeTeaTable`), against `outdoor/sheets/obj-patioSet.png`, `outdoor/extra/picnic-top/top-picnicTable-picnic-01.png`, `community/extra/poses/rides-child.png`, `community/extra/poses/chess-adult.png`, `sheets/obj-pingPongTable.png`. Sim tests `tests/slots.rs`. Still to do: the base dining table, the glass and farmhouse sets and the candlelit table keep their places as built, side by side (`diningOak-0*.png`), until G-39 rebuilds them (below); astride on the seesaw is G-23 (the shins go down through the plank); a partner is G-65; the chess players' knees meet on the one-tile table (I-community-14).
+  G-39 must: build `diningTable`, `diningGlass`, `diningOak` and `romantic.candlelitTable` (2 × 1) with a chair at each end facing in across a top about 0.8–0.9 m long, and change their `places` to about `[-0.62, 0.1]` facing 90 and `[0.62, 0.1]` facing -90 (measured from the new chairs; the furniture.json `seats` `fwd` stays 0) and their `surface` `size`/`at` to the new top; and give the tea table its poufs either side of a lower, narrower table, so its places can face straight across (now ±45°).
 - **Source:** outdoor wave
 
 ### A-hobbies-01 — Residents walk through the table, the wheel or the drum kit to a seat behind it
@@ -389,7 +392,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Fix class:** code
 - **Where:** `crates/sim-core/src/world.rs:4463` (`seat_near_object`: the nearest free seat within `seatNear` metres, by path distance from the TV's front tile; no facing or sight check), called at `:4299`
 - **Evidence:** `check.mjs play --objects homeCinema,tvWall@9,17,2 --with sofa@9,15,2` (`living/extra/tv-seat/`): the sofa faces the home cinema (rot 2, towards −z) and its back is to the wall TV on the back wall. For the home cinema the watcher sits on it facing the screen, right; for the wall TV she takes the same sofa and watches the hour with her back to the screen (`living/extra/tv-seat/seat-tvWall-watch-01.png`, pose `sit` at 10.5, 15.5). Any sofa or chair within 4 m counts, whichever way it faces (a dining chair at the table behind, an armchair turned away). Only the five living screens use `seatNear` (`tv`, `tvWall`, `tvRetro`, `homeCinema`, `tvStandLow`); a fix (a seat whose front looks towards the screen, else the standing fallback of I-living-03) would carry over to reading if I-living-03 gives the books `seatNear`.
-- **Status:** open
+- **Status:** fixed (aac64b84, 1224f373)
+- **After:** a `seatNear` use with `seatFacing` takes only a seat whose place looks at the thing (within 60°) and, for a screen (`front`), one in front of it (within 60° of the way it faces); the six screen uses have `seatFacing: front` (`tv`, `tvWall`, `tvRetro`, `tvStandLow`, both of `homeCinema`'s). With the wall TV at (9, 17) facing −z, a sofa nearer it with its back to it and one further off facing it, the watcher takes the one facing it (`bench-results/review/fixes/slots/play/tvWall-seat-0*.png`, against `living/extra/tv-seat/seat-tvWall-watch-01.png`); with none facing it, they stand (Q-14). Sim tests `tests/slots.rs` (`watching_tv_takes_the_seat_that_faces_the_screen`, `with_no_seat_facing_it_the_tv_is_watched_standing`). The readers' `seatNear` (G-03) can take `around` or no `seatFacing`.
 - **Source:** wave: living (extra play run)
 
 ### M-bathroom-03 — Wall-backed floor things can stand in the middle of a room
@@ -403,7 +407,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Fix class:** code
 - **Where:** `web/public/content/catalog2/bath.json:38` (`toiletWallHung`), `:223` (`towelLadder`); `web/public/content/furniture.json:2301` (`toiletSmart`): floor layer, nothing ties them to a wall; `crates/sim-core/src/content.rs:263` (`fillsWall` keeps the wall above clear, it doesn't require one)
 - **Evidence:** `bathroom/play/chunk2/towelLadder-no-uses.png` (the ladder leans 10.7° on nothing, mid-room), `bathroom/play/chunk4-redo/toiletWallHung-use-00.png` and `bathroom/play/chunk1/toiletSmart-use-01.png` (the boxed-in cistern panel, 1.1–1.2 m tall, stands free with the bowl hung off it). Each is built with its back on the wall face (game depth −0.43) and reads right only there; the blender README's traps say no content fact says a thing stands against a wall. A placement rule (a content `againstWall`, refused away from one, like a wall thing) is new behaviour. It would serve every floor model built to the wall face in the other ledgers too (fridges, counters, wardrobes), though those read as merely pulled out; these three look broken.
-- **Status:** confirmed and widened (consolidation: M-living-07 merged)
+- **Status:** fixed (05970ca3)
+- **After:** content `againstWall` on `toiletWallHung`, `toiletSmart`, `towelLadder`, `wallBed`, `ladderShelf` and `homeCinema` (`content.rs`, `world.rs` `check_fit`): refused mid-room ("that stands against a wall: put its back to one") or against a window, and its wall can't come down or become a door or window under it (sim test `layers.rs` `what_stands_against_a_wall_needs_one`; build mode, the house generator and `check.mjs`'s stage spots follow; generated houses and worlds pass). The packs' wall-hung parts (Q-06) stay with G-36.
 - **Source:** wave: bathroom (from the evidence's "Seen (not reviewed)")
 
 ### M-lighting-01 — Removing a wall can leave a ceiling lamp outdoors
@@ -416,7 +421,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Where:** `crates/sim-core/src/home.rs:475` (the "needs a ceiling" refusal)
 - **Evidence:** Building lets a wall's removal leave a ceiling lamp outdoors (or something upstairs outside a room). It hangs there until the game is loaded again, which leaves it out and loses its value.
   Activities wave: on `review-stage`, a `ceilingPendant` at `(12, 8, 0)` inside the room, then `build` with the front wall's segments at `x = 11, 12` (`z = 6`) set `open`: no refusal and no toast, the room stops being one (its tiled floor is drawn as grass, the kitchen and the crib now stand outdoors) and the pendant hangs from nothing in the open (`lighting/extra/ceiling-before.png`, `lighting/extra/ceiling-after-wall-open.png`; `decor/extra/extra.json`). Not checked: the reload that drops it.
-- **Status:** confirmed (activities wave)
+- **Status:** fixed (05970ca3)
+- **After:** a build that would leave a ceiling lamp outdoors (or something upstairs or in the basement outside a room) is refused, "the pendant would be left outdoors: move it first", and so is moving a room that would (`home.rs` `walls_still_hold`; sim test `layers.rs` `a_wall_taken_down_leaves_no_ceiling_lamp_outdoors`). A save from before with one outdoors still loads without it (`a_lamp_left_without_a_ceiling_doesnt_spoil_the_save`).
 - **Source:** `docs/release-0.2.0-review.md` §4 (new, Z1), target 0.2.1, not in the 0.3.0 notes
 
 ### I-kitchen-04 — Cooks chop with the crate in both hands and stir holding the bowl
@@ -448,7 +454,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
   - Oven tower: the pan is drawn at 0.9 m through the shut lower oven door, the cook stirring at the tower's face (`kitchen/extra/meal-fridge-wallOven-06.png`).
   - Baking and roasting: "Bake treats" at the electric and gas cookers and the range, and "Roast dinner" and "Bake treats" at the oven tower, open the oven door for 3 s at the start and then stir a pan of vegetables on the hob or at the tower while the oven stands empty (`kitchen/play/c5/stoveElectric-bake-01.png`, `wallOven-roast-01.png`, `rangeCooker-bake-01.png`). The Mix step of baking chops on a board (`chop`).
   The steps need their own tags at an oven and a microwave (a tray slid in, a dish put in and the door shut), with props of their own (`item.bakingTray` and the pie dish exist as items) and their own clips on the station. Shared beyond this ledger: the packs' ovens use the same recipes (`web/public/content/packs/foodie.json:150`, the pizza oven's `pizza`; `packs/kind.json:100`, `:119`, the neighbourly oven's `pie` and `bakedTreats`), for the packs and cross-cutting waves.
-- **Status:** confirmed and widened (consolidation: I-held-02 and I-systems-06 merged)
+- **Status:** fixed (2dcc4ea0)
+- **After:** the steps have tags of their own: `bake` for the Bake steps (pizza, treats, pie) and for a meal's Cook step in an oven or a microwave (content `animAt`, chosen by the station's kind: a cooker still stirs on its hob), `mix` for Mix and the pie's pastry ("Make the pastry"). At an oven or the microwave the resident puts the dish in and watches it (bending to a cooker's oven), no pan drawn, and the station's door opens (`fixes/motions/recipes/meal-fridge-microwave-06.png`, `meal-fridge-wallOven-06.png`, `bake-stoveElectric-05.png`, `pie-neighbourlyOven-05.png`, `pizza-pizzaOven-*`, `practise-chefStove-*`: the logs show `bake` and the door, `.json`); mixing is stirred in a mixing bowl (new `tool.mixingBowl`) on the counter (`bake-stoveElectric-03.png`). The bowl of batter carried to the oven is G-49's (hands).
 - **Source:** wave: kitchen (`scratch/scene.mjs` recipe scenes, play shots)
 
 ### A-kitchen-02 — The hob, the oven and the microwave don't work when the meal was started somewhere else
@@ -460,7 +467,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Fix class:** motion
 - **Where:** `web/public/assets/packs/kitchen_cooking/manifest.json:5`, `:49`, `:103`, `:141`, `:192`, `:238` (the cookers' and the microwave's `motions.uses` keyed by their own use ids: `cook`, `gourmet`, `bake`, `roast`, `reheat`); `crates/sim-core/src/snapshot.rs:140` (at a station that isn't the recipe's origin the interaction is -1, so only the step's tag, `stir`, reaches the renderer); `web/src/render/babylon/objectMotion.ts:413`
 - **Evidence:** `kitchen/extra/meal-fridge-stoveGas.json`: "Make a meal" started at the fridge, cooked on the gas range from 42.2 to 62.3 s with the `stir` clip and the pan drawn on its hob; no clip on the range moves (no `burner_on` flame, no knob), against `kitchen/play/c5/stoveGas-cook-01.png` where "Cook dinner" chosen at the range itself lights the ring. The same with only a microwave (`meal-fridge-microwave.json`: no `door_open`, no turntable) and only an oven tower (`meal-fridge-wallOven.json`: no `oven_open`). Free will chooses among every recipe use on every station object (the fridge's meal and gourmet, the counters' sandwich, the cookers' cook and bake: `world.rs:3894-3906`), so many meals are cooked on a cold hob. Also seen: the electric cooker's `knob_on` only turns a knob: its ring never glows, where the hob counter's does (`kitchen/clips/clips-stoveElectric-all-t99.png` against `clips-cooktopCounter-all-t99.png`). Key the hob clips by the `stir` tag as well (and the oven's by a bake step's own tag, I-kitchen-05), and give the electric cooker a glowing ring.
-- **Status:** open
+- **Status:** fixed (2dcc4ea0)
+- **After:** every cooker's hob clip plays for `stir` too, the ovens' for `bake`, the microwave's door and plate for `bake` (the plate turning once the door has shut), the chef's stove's and the pack ovens' likewise. A meal started at the fridge lights the gas range's ring (`fixes/motions/recipes/meal-fridge-stoveGas.json`: `burner_on` 44.7–64.7 s, `-05.png`), opens the microwave and turns its plate (`meal-fridge-microwave.json`, `-06.png`) and the tower's oven (`meal-fridge-wallOven.json`); the electric cooker's front ring glows red with its knob (`burner_on`, `meal-fridge-stoveElectric-06.png`, `fixes/motions/g16/clips-stoveElectric-all-t99.png`).
 - **Source:** wave: kitchen (`scratch/scene.mjs` recipe scenes)
 
 ### I-held-04 — Whole dishes never leave the station
@@ -525,7 +533,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Where:** `web/src/audio/world.ts:34` (`ACTION_SOUNDS`: no `toilet`, `run` or `tinker`); `:193` (`clean` sounds only for a washer)
 - **Evidence:** `cargo review uses` Sound column (`—` for `toilet`, `treadmill`, `workbench`) and `world.ts`: no flush after the toilet, no belt hum or footfalls on the treadmill, no tools at the workbench. The shower, tap, TV and piano have theirs. Listed as missing, as I9 asks; the sounds are synthesised in code (no sound files).
   Bathroom wave: the same for all five toilets (`toiletCompact`, `toiletSmart`, `toiletClassic`, `toiletWallHung`: Sound `—`, `tables/uses-bathroom.md`), and for the tumble dryer, whose drum turns silently while the washer's runs with the `washer` loop (`world.ts:193` matches `washer|laundryCent` only).
-- **Status:** confirmed and widened (bathroom wave: all five toilets and the dryer; consolidation: I-hobbies-09, I-kitchen-12 and I-packs-19 merged)
+- **Status:** fixed (54139115) for the sounds the repo can make; the rest are listed below as sounds to make (art). Before: confirmed and widened (bathroom wave: all five toilets and the dryer; consolidation: I-hobbies-09, I-kitchen-12 and I-packs-19 merged)
+- **After:** a use's sound comes from the thing, by key (content `sound`, `endSound`, a recipe step's `sound`, the object's `sounds` by animation and `ambient`; `docs/content-packs.md`), else the old tag map; `cargo review uses` reads the same. The toilets flush once as the use ends; the dryer tumbles (`dryer`); the dishwasher is loaded with crockery and cutlery (`crockery`, also when clearing away into it); the stone and town fountains run by themselves while their lot is looked at (`fountain`); the drinking fountain runs (`tap`); the drum kits play a beat (`drums`); the smart speaker's story is a voice (`tv`); the cheese board chops; the hot tubs, whirlpool and cold plunge lap (`bathSoak`) instead of filling; karaoke plays its backing track (`music`). Toast, smoothies, the blender, the microwave and the microwave cart, and every bake step (also a cooker's oven half) are silent instead of frying. New sounds are synthesised like the rest (water.ts: flush, fountain, dryer, crockery; world.ts: drums). Evidence: `bench-results/review/fixes/sound-social/sounds/sounds.log` (the page's `soundOf` for every object named, and a live run: toilet → `flush` once, dryer, washer, dishwasher, drums heard while used; microwave and toast silent; both fountains heard with nobody at them), `sounds/uses-sound-diff.txt` (the Sound column before and after). Still to make (art, for later): the treadmill (belt, footfalls), the exercise and spin bikes, the workbench and bike-rack tools, pool, foosball and ping-pong balls, darts, the arcade cabinets, the sewing machine, the pottery wheel, the chemistry bench's bubbling, the coffee machines, the blender's motor, the microwave's hum and ping, the toaster's pop, an oven's fan, the pizza oven's fire, the fridge door, the bin lid, the vending machines, the phone box, the basketball, singing, a bowed cello (it plays the plucked tune), the punch bag and smash bin. Not done: the headed listening check (the WAVs are with the evidence).
 - **Source:** pilot; wave: bathroom
 
 ### A-houses-01 — House doors open by nearness, not by hand
@@ -541,7 +550,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
   - Walking along the front wall outside, 0.7 m off it, past the door and not through it, Ada opens the front door fully (`swing1-past-0.png`; "swing1 past": open 0 → 1 as she passes x 4.5 → 5.4).
   - A bathroom built in the back corner: with Ada in there (on the toilet, then standing by it) the door stays shut; Ben walking along the hall past it, 0.7 m off, swings it wide open on her (`sheet-bath.png`, `bath-passer-open-0.png`; "bathPass": 0 → 1 at 1 m from the door). That breaks the one privacy the renderer gives (`I-systems-05`, systems ledger) and is what raises this to S2.
   - The cheap part, short of hands on handles: open a door only for a mover heading through it (their next path step crosses the doorway), and keep an engaged bathroom's door shut for everyone but someone leaving it.
-- **Status:** confirmed and widened
+- **Status:** fixed (e04bc6c0): the cheap part (Q-03); doors opened by hand stay new behaviour (decision 3)
+- **After:** the snapshot tells each walker's way ahead (`snapshot.rs` `WAY_X`, `AHEAD_X`: the waypoint they walk to and the point 1.5 m on), and `swingDoors` opens a door only when that way crosses its doorway, or someone stands in it (`goingThrough`); open, it waits to shut until nobody walking is within 1.1 m (the leaf would sweep through them). On `review-stage` (`fixes/town/doors/doors.jsonl`): Ada walking along the front wall outside 0.7 m off, past the door, leaves it shut (open 0 throughout, `fixes/town/doors/swing1-past-0.png`, against `houses/extra/swing1-past-0.png`); walking in at speed 1 it opens from 1.5 m out and stands fully open before she reaches it. A bathroom in use: Ben walking the hall 0.7 m off it leaves it shut (open 0, `fixes/town/doors/bath-passer-0.png`, against `houses/extra/bath-passer-open-0.png`); Ada going in and coming out opens it for her (`bath-in-1.png`, `bath-leave-0.png`), and it shuts behind her while she is in there (`bath-occupied-shut.png`). One way the cheap part goes past the decision's words: someone walking into an engaged bathroom (the sim lets them: no privacy, I-systems-05, G-72) still has it open for them rather than walking through the shut leaf; passers-by never do.
 - **Source:** `plan/authenticity-review.md` §3.2 (A12) and §9 (decision 3); wave: houses (shared with the systems ledger's "Front door: who opens it and when" and "Bathroom door: shut while in use" rows)
 
 ### A-houses-02 — At the faster speeds residents walk through a door that has hardly opened
@@ -553,7 +563,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/BabylonRenderer.ts:188` (`DOOR_SWING` 0.45 s), `:3781` (the step is real frame time, not game time)
 - **Evidence:** At speed 1 the front door is fully open 0.6 m before Ada reaches it (`houses/extra/swing1-in-1.png`; "swing1 in"). At speed 3 she crosses the 2.6 m the door watches in about 0.3 s of real time, while the door takes 0.45 s: she is through it at 19 % open and the leaf shuts behind her at once (`houses/extra/swing-in-0.png`, her body through the near-shut leaf; "swing in": open 0.19 at z 5.7, 0.11 when she is inside). Scaling the swing by the game's speed (as walkers' turning is, `characters.ts:2324`), or the reach by the walker's speed, keeps the door ahead of her.
-- **Status:** open
+- **Status:** fixed (e04bc6c0)
+- **After:** the swing keeps pace with the game (`DOOR_SWING` over the game's rate, up to 10x, as walkers' turns), and opening for the way 1.5 m ahead gives it about a second's walk of lead at any speed. At speed 3 the front door is fully open when Ada is 0.3 m short of the doorway (open 1 at z 5.7, where it was 0.19; `fixes/town/doors/swing-in-0.png` against `houses/extra/swing-in-0.png`).
 - **Source:** wave: houses
 
 ### A-town-02 — Gates never open: residents walk through the shut leaf
@@ -565,7 +576,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/fences.ts:42` and `:110` (`gate()`: one still mesh with the fences, the leaf drawn shut); `crates/sim-core/src/command.rs:389` (a gate is walked through); `web/src/render/babylon/BabylonRenderer.ts:3778` (`swingDoors` turns only house doors)
 - **Evidence:** On `review-stage` a picket gate in a run of fences: Ada walks through it, her body passing through the shut leaf (`town/extra/gate-walk-0.png` … `gate-walk-2.png`, `town/extra/sheet-fences.png`; `houses/extra/houses.jsonl` "gate"). The house's front door swings for her on the same lot. Swinging the leaf as `swingDoors` swings a front door (hinge on a post, a quarter turn away from the walker) is new behaviour (§9, decision 3).
-- **Status:** open
+- **Status:** fixed (e04bc6c0)
+- **After:** a gate's leaf swings a quarter turn about its hinge post, away from the one coming through, by `goingThrough` as doors do, and shuts the way it opened once they're clear (`fences.ts` `swingGate`): it moves its vertices in the fences' one mesh, so it costs no draw. On `review-stage`, a picket gate in a run of fence: open from 0.7 m out as Ada walks in, fully open as she passes (`fixes/town/doors/gate-in-1.png` against `town/extra/gate-walk-1.png`), shut behind her; the same on the way back (`gate-out-*.png`); walking along the fence past it, it stays shut (`gate-past-0.png`).
 - **Source:** wave: town
 
 ### M-lighting-02 — Every lamp is a bare point light: the uplighter lights the floor, wall lights throw a disc, and light goes through walls
@@ -582,7 +594,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
   - `lampBanker` and the lamps on tops: a disc up the wall behind them (`lighting/extra/lampBanker-night-bought.png`), where a banker's lamp lights the desk under its shade.
   - `wallLightOutdoor` on the outside of the back wall, walls cut away: the fitting isn't drawn, its light lands on the inside floor by the wall (`lighting/night/extra/wallLightOutdoor-outside-on.png`; walls up, the wall is lit outside, `…-outside-on-wallsup.png`).
   Shared beyond this ledger: every content `light` is drawn so, also `nightstandLamp` (bedroom), `fireplace` (decor), `fireplaceElectric` (living), `lampPost`, `stringLights`, `firePit`, `garden.lantern` (outdoor, garden) and `streetLamp` (community). Directional lamps (a spot or a cone per kind) and lights kept to their room would be new renderer behaviour.
-- **Status:** open
+- **Status:** fixed in part (0eaa3ba7); light kept to its room filed as M-lighting-08
+- **After:** the room lights are spot lights and content `light.aim` sends a shade's light one way: `down` (pendant, industrial pendant, track lights, swing-arm, arc and banker's lamps: no disc up the wall, `fixes/lighting/webgpu-medium/banker-cut.png`, `pendant-cut.png`), `up` (the sconce: a wash up the wall above it, `sconce-cut.png`), `out` (the bulkhead: nothing behind its wall, the inside floor dark, `bulkhead-inside.png`; a pool on the lawn in front, `bulkhead-cut.png`, `bulkhead-up.png`) and `ceiling` (the uplighter: from 30 cm under the ceiling, the room lit from above rather than a pool round its foot, `uplighter-cut.png`, `uplighter-up.png`). The same in `webgl-medium`, `webgpu-low`, `webgl-low`. Same draws and lights; GPU within noise on Low and Medium (`fixes/lighting/perf`). Lights still pass through walls into the next room (M-lighting-08).
 - **Source:** wave: lighting (leads "the uplighter lights the floor, not the ceiling" and "the outside bulkhead's light reaches the inside floor with walls cut away", both confirmed)
 
 ### I-lighting-01 — A lamp bought is on, at night in an empty room too
@@ -594,7 +607,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Fix class:** decision
 - **Where:** `crates/sim-core/src/world.rs:129` ("A lamp switched off …; bought on"), `:1553` (`off: false`); `crates/sim-core/src/lights.rs:3-10` (residents switch only on coming and going)
 - **Evidence:** `lighting/extra/lamp-night-bought.png`: on `review-stage-night` (22:00 by the sim's clock), a floor lamp bought in the room while everyone is in the front yard (and the baby asleep) comes on and stays on; nobody came or left, so no rule switches it. The same by day: a lamp bought at noon in a room nobody uses is lit when dusk comes. A new real lamp is off until someone switches it on. Decide: off when bought (and residents switch it on as they come in), or on (the player sees the lamp work). Covers every lamp in this ledger and the other ledgers' (`nightstandLamp` and the rest named in M-lighting-02).
-- **Status:** open
+- **Status:** fixed (0eaa3ba7)
+- **After:** Q-11: a lamp (or a fire) bought comes switched off (`home.rs` `buy_at`); it goes on with the room's as someone comes in after dark, or by a click (sim test `lamps.rs` `a_lamp_bought_is_off_until_someone_comes_in`; in the browser the bought lamp is in `lampsOff`, `{E}/*/*.json`). A lot's and a house's own lamps still start on.
 - **Source:** wave: lighting (lead "a newly bought lamp is already on", confirmed)
 
 ### M-outdoor-01 — Night glow draws through other parts: the grill's coals through its shut lid
@@ -608,5 +622,37 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/models.ts:73` (`glows`), `tools/art/blender/families/outdoor.py:64`
 - **Evidence:** A glowing material draws through the parts in front of it. `outdoor.py:64` now builds the grill's hot coals with no glow "which would show through its shut lid", so the grill may be worked round while the renderer still has the fault for other models. `extra/night/sheet-fire.png`: the grill cooking at 22:00 with the lid up shows dull red coals and no light on the cook; the fire pit beside it glows.
-- **Status:** confirmed (outdoor wave)
+- **Status:** fixed (0f7cf80f); the grill's coals glowing again is the Blender wave's
+- **After:** the glow copy no longer takes a slope-scaled depth offset (`models.ts` `glowMesh`: `zOffsetUnits` -4 instead of `zOffset` -2). With the grill's coals made to glow for the check (a local manifest edit, not kept), the shut lid showed red specks of the coals from 9 m before (`fixes/lighting/webgpu-medium/grill-far-glowing-coals-before.png`) and none after (`grill-far-glowing-coals.png`, `grill-shut.png` in each folder); shades glow as before, no z-fighting. Not shot: the lid open (cooking needs the kitchen's ingredients on the stage). Giving `coal_hot` its glow back (`outdoor.py:64` and the manifest) is a model change for the Blender wave (G-35).
 - **Source:** `docs/objects/open.md` Still open › Rendering; `plan/authenticity-review.md` §3.1 (M10); outdoor wave (night run)
+
+### I-systems-12 — A housemate cooking a meal nobody needs can't hear a call
+
+- **Severity:** S3
+- **Rubric:** I16, I2
+- **Fix class:** code
+- **Where:** `crates/sim-core/src/world.rs:885` (cooking, eating and washing up are never interrupted); `crates/sim-core/tests/calling_out.rs`
+- **Evidence:** With every need at 1.0 at 9:00, free will sent the called housemate to cook a full meal at the fridge (`TaskKind::Cook`, recipe `meal`) once the base armchair had its sitting read (G-09); a cook can't heed a call, so `calling_out` failed ("B never heard A"). Before, the same housemate picked the bookshelf's read. Two things: a meal is cooked for a fed household at mid-morning, and someone at the hob can't so much as turn to their name. The test now gives B a little fun to fill (d0bbe6ff), which keeps its point (a call heard and answered) off the content's order.
+- **Status:** open
+- **Source:** fix: content
+
+### I-systems-13 — Sitting on a thing moved off its tile's middle sits beside it
+
+- **Severity:** S2
+- **Rubric:** I3 (A1)
+- **Fix class:** code
+- **Where:** `crates/sim-core/src/world.rs` (`slot_position`: from the footprint's middle, without the object's `offset`); `web/src/render/babylon/objectMotion.ts` (`slotOf`, the same)
+- **Evidence:** found while fixing G-62 (code reading, not shot): anything but stairs stands up to half a tile off its footprint's middle (`offset`, placed with Shift), and the renderer draws it there (`protocol.ts` `objectCentre`), but the sim put its sitters and sleepers at the footprint's middle, up to 0.5 m off the seat or the mattress.
+- **Status:** fixed (aac64b84)
+- **After:** `slot_position` starts from the middle as drawn (the offset included), for places and the spread alike; `slotOf` likewise. Not shot.
+- **Source:** fix: slots
+
+### A-systems-03 — At an object that is two stations, the recipe's own clip plays for every step there
+
+- **Severity:** S3
+- **Rubric:** A10, I13
+- **Fix class:** motion
+- **Where:** `crates/sim-core/src/snapshot.rs` (`doing`, Cooking: at the recipe's origin the snapshot gives its interaction for every step done at that object); `web/src/render/babylon/objectMotion.ts` (`findUses`: a clip keyed by the interaction id wins over the step's tag); `tools/art/blender/families/pack_foodie.py` (`chefsIsland`: `{'uses': {'tastingMenu': 'drawer_open'}}`), `outdoor.py` (`grillStation`: `hood_up` for cook and feast)
+- **Evidence:** seen in the code and content while fixing G-16 (no run): the chef's island is a `prep` and a `stove` station, so "Cook a tasting menu" chosen at it preps and cooks there, and both steps play the drawer (`drawer_open`, `hold` 2.5) and nothing on its hob (it has no hob clip, so a tasting menu is cooked on a cold hob, as A-kitchen-02 was); the grill station ([`grill`, `prep`]) lifts its hood for the prep step as for the grilling. The neighbourly oven had the same fault (its oven open while the pastry was made on its worktop) and was fixed by keying its clip by the `bake` step's tag (2dcc4ea0). Key such objects' clips by the step tags (`chop`/`mix`, `stir`, `flip`) and give the island's hob a burner clip.
+- **Status:** open
+- **Source:** fix: motions

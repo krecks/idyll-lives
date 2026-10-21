@@ -57,6 +57,17 @@
           "tags": ["music", "entertainment"],
           "skills": { "dexterity": 0.06, "endurance": 0.05 },
           "feeling": "cheerful.upbeat"
+        },
+        {
+          "id": "listen",
+          "label": "Pick a song and listen",
+          "anim": "listen",
+          "seatNear": 4,
+          "minutes": 30,
+          "pose": "stand",
+          "autonomous": true,
+          "effects": { "fun": 0.35, "comfort": 0.05 },
+          "tags": ["entertainment", "music"]
         }
       ]
     },
@@ -74,6 +85,7 @@
           "id": "sing",
           "label": "Sing your heart out",
           "anim": "sing",
+          "sound": "music",
           "minutes": 60,
           "pose": "stand",
           "autonomous": true,
@@ -149,6 +161,7 @@
       "id": "cheerful.sunriseLamp",
       "name": "Sunrise stretch lamp",
       "model": "model.cheerful.sunriseLamp",
+      "stand": { "height": 0.008 },
       "footprint": [1, 1],
       "price": 240,
       "category": "bedroom",

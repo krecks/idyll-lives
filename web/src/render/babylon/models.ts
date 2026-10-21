@@ -889,7 +889,7 @@ export interface UseClip {
   delay?: number;
   /** Plays again every so many seconds while the use lasts, from rest to rest each time (a net swishing after each shot). */
   every?: number;
-  /** Only for the resident in this slot (content `slots`, from 0 along the object's x, as sim-core's `slot_position`; a bunk's 1 is the upper one). */
+  /** Only for the resident in this slot (content `slots`, from 0: the one nearest its place, `slotOf`, as sim-core's `slot_position` has them; a bunk's 1 is the upper one). */
   slot?: number;
   /** Opens again for so many seconds when the use ends (a phone box's door letting the caller out). */
   out?: number;
@@ -924,6 +924,17 @@ export function painted(entry: ModelEntry | undefined, colors: PartColors | unde
   const materials = { ...((entry as ModelEntry & ModelExtras).materials ?? {}) };
   for (const [name, color] of Object.entries(shown)) materials[name] = { ...(materials[name] ?? namedFinish(name) ?? materials['*']), color };
   return { ...entry, materials } as ModelEntry;
+}
+
+/**
+ * The colour (sRGB hex) `entry`'s file gives its material `name`, as made (before the player paints
+ * it), from the file as `scene` imported it (shared with its builds); undefined without one.
+ */
+export async function fileColour(scene: Scene, entry: ModelEntry | undefined, name: string): Promise<string | undefined> {
+  if (!entry?.url) return undefined;
+  const file = await loadFile(scene, entry.url);
+  const material = file.pieces.find((p) => p.material?.name === name)?.material;
+  return material instanceof PBRMaterial ? material.albedoColor.toGammaSpace().toHexString() : undefined;
 }
 
 /** A model entry's `motions`, if it has any. */
@@ -1534,6 +1545,8 @@ function fileMirror(data: VertexData, { lo, hi }: { lo: number[]; hi: number[] }
 
 /** The material glows are drawn with: unlit, added to what's behind, coloured per vertex and per instance. */
 const glowMaterials = new WeakMap<Scene, StandardMaterial>();
+/** How far (depth-buffer steps) a glow is drawn in front of the faces it lights. */
+const GLOW_DEPTH_STEPS = -4;
 
 /**
  * One mesh of the glowing faces (`MaterialOverride.glow`), each piece in its glow colour, a hair in
@@ -1551,7 +1564,11 @@ function glowMesh(scene: Scene, name: string, pieces: { data: VertexData; color:
     material.alphaMode = Constants.ALPHA_ADD;
     material.alpha = 0.999;
     material.disableDepthWrite = true;
-    material.zOffset = -2;
+    // Its faces are the lit ones again, so it only has to win their own depth: a few steps of the
+    // depth buffer, not a slope-scaled offset, which at a glancing angle (or from far off) pulled a
+    // glow through the parts in front of it (the grill's coals through its shut lid).
+    material.zOffset = 0;
+    material.zOffsetUnits = GLOW_DEPTH_STEPS;
     // Both sides (a shade glows inside too; the faces' winding varies with the file's handedness).
     material.backFaceCulling = false;
     material.fogEnabled = false;

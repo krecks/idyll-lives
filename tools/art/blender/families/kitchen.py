@@ -276,10 +276,12 @@ def counterSinkDouble():
         Fk.cyl('pot', 0.06, 0.14, (0.05, 1.03, -0.36), M.plant, verts=14)
         Fk.sphere('herb', 0.07, (0.05, 1.14, -0.36), M.plant, segments=10, rings=6, scale=(1, 1.2, 1))
     G.join(still, 'body', origin=(0, 0, 0))
+    # Each bowl's tap runs for the one washing at it (`water_on_<slot>`): slot 0 is the bowl at -x, 1 at +x, as
+    # sim-core spreads the two slots along the width (objectMotion.ts `slotOf`).
     waters = [_water(Fk, (x, 1.17, -0.18), 0.89) for x in (-0.42, 0.42)]
     G.settle()
-    for water in waters:
-        G.grow(water, 'water_on', seconds=0.4)
+    for slot, water in enumerate(waters):
+        G.grow(water, f'water_on_{slot}', seconds=0.4)
     return G.meshes()
 
 
@@ -747,7 +749,7 @@ FAMILY = G.Family(
              paint=[('body', 'Cabinet'), ('wood', 'Worktop'), ('porcelain', 'Basin'), ('chrome', 'Tap & handles'),
                     ('trim', 'Plinth')]),
      G.Model('counterSinkDouble', counterSinkDouble, size=(2.0, 1.265, 0.66), key='model.counterSinkDouble', centre=(0, -0.10),
-             motions={'uses': {'wash': 'water_on'}},
+             motions={'uses': {'wash': [{'clip': f'water_on_{slot}', 'slot': slot} for slot in (0, 1)]}},
              paint=[('body', 'Cabinets'), ('stone', 'Worktop'), ('metal', 'Basins'), ('chrome', 'Tap & handles'),
                     ('trim', 'Plinth')])],
     comment='Blender-built kitchen models (tools/art/blender/families/kitchen.py). Listed in the base '

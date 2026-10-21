@@ -19,12 +19,12 @@ footprint (`SEATS`), facing the wall, the screen towards them. A separate chair 
 |---|---|---|---|---|---|---|
 | `deskSimple` Simple desk | 2x1 · floor | — | office / desks | Top, Frame, Drawers | Static | Static. |
 | `deskCorner` Corner desk | 2x2 · floor | — | office / desks | Top, Frame, Drawers | Static | Static. |
-| `deskStanding` Standing desk | 1x1 · floor | browse:type code:type | office / desks | Top, Frame, Shelf | Use | `tray_out`: the keyboard shelf slides out for browse and code. (A rising top would leave the things on it behind.) Teens and up only (`stages`): its 1.05 m top is out of a child's reach. |
-| `deskExecutive` Executive desk | 2x1 · floor | — | office / desks | Top, Frame, Drawers, Handles, Desk pad | Static | Static. (+use) a drawer slides out. |
+| `deskStanding` Standing desk | 1x1 · floor | browse:type code:type | office / desks | Top, Frame, Shelf | Use | `tray_out`: the keyboard shelf slides out for browse and code. (A rising top would leave the things on it behind.) Teens and up only (`stages`). Its 1.05 m top is a `shelf` for what stands on it: no chair or stool is pulled up to it (the desk chairs' write and homework need a desk top). |
+| `deskExecutive` Executive desk | 2x1 · floor | — | office / desks | Top, Frame, Drawers, Handles, Desk pad | Static | Static. (+use) a drawer slides out. Its drawer stays a still part by decision (Q-19). |
 | `computerDesk` Computer desk | 2x1 · floor | code:type write:type markets:type browse:type homework:type | office / — | Top, Frame, Drawers, Keyboard tray, Chair | Use | `tray_out`: the keyboard tray slides out 15 cm for code, write, markets, browse and homework. |
 | `deskWriting` Writing desk | 2x1 · floor | write:write homework:write | office / — | Top, Frame, Drawers, Chair | Use | `drawer_open` for write and homework; `hold` 2.5 s. |
 | `deskLaptop` Laptop desk | 1x1 · floor | browse:type code:type write:type homework:type | office / — | Top, Frame, Drawer, Laptop, Chair | Use | `lid_open`: the laptop opens from shut to 110° for browse, code, write and homework. |
-| `computerGaming` Gaming PC | 2x1 · floor | game:play code:type browse:type | office / — | Desk, PC & monitors, Lights, Chair | Loop (E1) | `fans`: the case fans spin while played (E1). |
+| `computerGaming` Gaming PC | 2x1 · floor | game:play code:type browse:type | office / — | Desk, PC & monitors, Lights, Chair | Loop (E1) | `fans`: the case fans spin while played (E1). Its top is a 1.70 × 0.44 m `desk` surface at 0.75 m (content `surface`), as the other computer desks'. |
 
 **In play** (signed off 2026-10-17):
 - Each in all four facings (against the north, west and east walls and standing free), every part a distinct colour
@@ -52,7 +52,7 @@ footprint (`SEATS`), facing the wall, the screen towards them. A separate chair 
 |---|---|---|---|---|---|---|
 | `chairExecutive` Executive chair | 1x1 · floor | sit:sit write:write homework:write | office / chairs | Frame, Seat | Use | `swivel`: the seat turns 15° and back for sit, write and homework. Pulled in to the desk or table it faces while sat on, as far as the knees fit under it: written at with the hands on the top (reaching further where a drawer pedestal stops it). |
 | `chairTask` Desk chair | 1x1 · floor | sit:sit write:write homework:write | office / chairs | Frame, Seat, Back | Use | `swivel`. Pulled in to the desk or table it faces while sat on, as far as the knees fit under it: written at with the hands on the top (reaching further where a drawer pedestal stops it). |
-| `officeChair` Office chair | 1x1 · floor | sit:sit | office / — | Frame, Seat | Use | `swivel`. Pulled in to the desk or table it faces while sat on, as far as the knees fit under it. |
+| `officeChair` Office chair | 1x1 · floor | sit:sit write:write homework:write | office / — | Frame, Seat | Use | `swivel`. Pulled in to the desk or table it faces while sat on, as far as the knees fit under it. Write and homework at a desk it faces (`needsTable`), as the desk chairs. |
 
 **In play** (signed off 2026-10-17):
 - Each standing free and sat on in all four facings: the seat swivels and shuts after its `hold` (0.6 s), by day and
@@ -84,3 +84,5 @@ footprint (`SEATS`), facing the wall, the screen towards them. A separate chair 
   the board while the resident plans at it, and is wiped as the clip plays back. The corkboard is still.
 - Colour studio: the cabinet and its handles; each board and its frame (the whiteboard's marker tray goes with the
   frame); "In use" opens the drawer and fills the board.
+- Since the authenticity review (G-15): planning on the whiteboard is done stepped up to it (`STEP_IN`, 0.5 m from its
+  face), the hands at the board's foot; a raised-arm stroke is a clip still to make.

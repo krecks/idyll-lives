@@ -12,6 +12,12 @@
 //! people): a `Join` task walks them over, finds them a place around the pair, and they listen,
 //! filling their needs like the one talked to. When a social goes well, everyone there grows a
 //! little closer. They stay for the leader's next social with someone there, and go otherwise.
+//! Someone joining walks to their place in the group.
+//!
+//! People sitting stay sitting for a talk: the one talked to on the sofa or at the table keeps
+//! their seat (and carries on with what they sat down to do afterwards), and people sitting near
+//! each other talk, or listen in, from their seats (`from_seat`), without getting up. Only what
+//! takes them closer than talking does (a hug, a kiss, a fight: `SEATED_DISTANCE`) gets them up.
 
 use crate::{MINUTES_PER_TICK, TICKS_PER_SECOND};
 use crate::content::{Content, MAX_NEEDS, Pose, stage_in};
@@ -50,6 +56,19 @@ const DOOR_MUFFLE: f32 = 6.0;
 const HEAR_TICKS: u32 = TICKS_PER_SECOND / 2;
 /// How long someone calling out stands there before the two walk over to meet.
 const CALL_TICKS: u32 = TICKS_PER_SECOND * 3 / 2;
+/// How far apart two people sitting can talk from their seats: along a sofa, across a table,
+/// from an armchair to the sofa beside it.
+pub(crate) const SEAT_RANGE: f32 = 2.5;
+/// Socials done this close or closer (a hug, a kiss, a fight) need them on their feet; a talk
+/// (`SocialDef::distance` 1 m) doesn't.
+pub(crate) const SEATED_DISTANCE: f32 = 0.9;
+/// How often someone sitting thinks of a word with those sitting near them, and the chance
+/// they do, each time, if anything they'd say comes to mind (`from_seat`).
+pub(crate) const SEAT_TALK_TICKS: u32 = (5.0 / MINUTES_PER_TICK) as u32;
+pub(crate) const SEAT_TALK_CHANCE: f32 = 0.5;
+/// Someone joining in this close to their place in the group settles into it; further off,
+/// they walk there (`take_place`).
+const SETTLE: f32 = 0.3;
 
 pub fn duration(s: &SocialDef, success: bool) -> f32 {
     if success {
@@ -347,8 +366,11 @@ pub(crate) fn update(w: &mut World) {
                 } else if ticks == HEAR_TICKS {
                     // They hear their name: whatever they were doing (on their own), they turn to
                     // the one calling. Too busy to (in the bathroom, already talking): over to
-                    // them to wait, as for anyone busy.
-                    if sims[t].available_for_social(content) {
+                    // them to wait, as for anyone busy. Sitting down, they stay sitting, and the
+                    // one calling comes over.
+                    if sims[t].available_for_social(content) && keeps_seat(&sims[t], s) {
+                        set_phase(&mut sims[i], Phase::Calling { ticks: ticks + 1 });
+                    } else if sims[t].available_for_social(content) {
                         end_activity(&mut sims[t], content, objects);
                         sims[t].heeding = Some(i as u32);
                         sims[t].yaw = facing(sims[t].pos, sims[i].pos);
@@ -370,6 +392,14 @@ pub(crate) fn update(w: &mut World) {
                 // About to drop (or burst) themselves: the talk would break off at once.
                 if sims[i].pressed(content) {
                     end_activity(&mut sims[i], content, objects);
+                } else if sims[i].paused.is_some() {
+                    // From the seat: with them sitting there, or not at all (back to what they sat
+                    // down to do).
+                    if gap <= SEAT_RANGE + 0.3 && sims[t].available_for_social(content) {
+                        engage(content, &nav, relationships, events, rng, objects, sims, i, t, social, tick);
+                    } else {
+                        end_activity(&mut sims[i], content, objects);
+                    }
                 } else if walking && gap > s.distance + ENGAGE_SLACK {
                     // Got to the middle first: wait for them to get there too.
                     sims[i].yaw = facing(sims[i].pos, sims[t].pos);
@@ -466,7 +496,9 @@ pub(crate) fn update(w: &mut World) {
             .map(|(t, social, ..)| (t as usize, social));
         match (state, talk) {
             (Joining::Routing { goal }, Some((t, _))) => {
-                if dist(sims[j].pos, middle(sims, l, t)) <= JOIN_RANGE {
+                if sims[j].join_spot.is_some() {
+                    // (On their way to their place in the group: they take it on getting there.)
+                } else if dist(sims[j].pos, middle(sims, l, t)) <= JOIN_RANGE {
                     set_phase(&mut sims[j], Phase::Waiting { ticks: 0 });
                 } else if dist(goal, sims[l].pos) > REPATH_DISTANCE {
                     chase(&nav, reach, &walk, sims, j, l, content, objects);
@@ -478,12 +510,17 @@ pub(crate) fn update(w: &mut World) {
                 }
             }
             (Joining::Waiting(_), Some((t, _))) => {
-                if dist(sims[j].pos, middle(sims, l, t)) > JOIN_RANGE + 0.6 {
+                // (Listening in from their seat: only to a talk beside them.)
+                let seated = sims[j].paused.is_some();
+                let off = dist(sims[j].pos, middle(sims, l, t));
+                if seated && off > SEAT_RANGE + 0.6 {
+                    end_activity(&mut sims[j], content, objects);
+                } else if off > JOIN_RANGE + 0.6 {
                     chase(&nav, reach, &walk, sims, j, l, content, objects);
                 } else if group(sims, content, l).len() >= MAX_GROUP {
                     end_activity(&mut sims[j], content, objects);
                 } else {
-                    take_place(&nav, relationships, events, sims, content, j, l, t, tick);
+                    take_place(&nav, reach, &walk, relationships, events, sims, content, j, l, t, tick);
                 }
             }
             (Joining::Waiting(ticks), None) => {
@@ -501,6 +538,30 @@ pub(crate) fn update(w: &mut World) {
             (Joining::Listening(_), None) => set_phase(&mut sims[j], Phase::Waiting { ticks: 0 }),
         }
     }
+}
+
+/// Whether `sim`, talked to with `s`, stays in their seat: sitting at something they carry on
+/// with afterwards (the sofa, a coffee at the table; or talking from it themselves), for a
+/// social they needn't get up for.
+fn keeps_seat(sim: &Sim, s: &SocialDef) -> bool {
+    let sitting = sim.paused.is_some() || sim.current.as_ref().is_some_and(|a| matches!((a.task.kind, &a.phase), (TaskKind::Use { .. }, Phase::Using { .. })));
+    sim.pose == Pose::Sit && sitting && s.distance >= SEATED_DISTANCE
+}
+
+/// Someone sitting talks to someone sitting near (`task`, a social), or listens in on a talk
+/// beside them (a `Join`), from their seat (`World::step_sim`'s `pick_autonomous` with
+/// `from_seat`): what they sat down to do waits (`Sim::paused`) until it's over.
+pub(crate) fn from_seat(sim: &mut Sim, task: Task, content: &Content, briefs: &[crate::world::SimBrief]) {
+    let tags = match task.kind {
+        TaskKind::Social { social, .. } => content.socials[social].tags,
+        TaskKind::Join { leader } => briefs.get(leader as usize).and_then(|b| b.conversing).map_or(0, |(_, social)| content.socials[social].tags),
+        _ => return,
+    };
+    sim.paused = sim.current.take();
+    // (Right there: no calling out, no walking over.)
+    sim.called = true;
+    sim.social_waited = 0;
+    sim.current = Some(Activity { task, phase: Phase::Waiting { ticks: 0 }, tags });
 }
 
 /// Everyone in the conversation `l` leads: `l`, the one talked to, then those listening in.
@@ -536,10 +597,14 @@ fn regrouping(sims: &[Sim], l: usize, j: usize) -> bool {
 }
 
 /// `j` joins in on the conversation `l` is having with `t`: a free spot around the two (to one
-/// side of them first, then all round); everyone there then faces the middle of the group.
+/// side of them first, then all round), walked to (`join_spot`) unless they're already there;
+/// there, everyone faces the middle of the group. Sitting (listening in from their seat), they
+/// stay where they are.
 #[allow(clippy::too_many_arguments)]
-fn take_place(
+fn take_place<'a>(
     nav: &NavGrid,
+    reach: &crate::path::Reach,
+    walk: &impl Fn(&Sim, (i32, i32)) -> Grounds<'a>,
     rels: &mut Relationships,
     events: &mut EventLog,
     sims: &mut [Sim],
@@ -574,10 +639,20 @@ fn take_place(
             && nav.line_walkable(from, p)
             && others.iter().all(|&m| dist(sims[m].pos, p) >= GROUP_SPACING)
     });
-    // (Nowhere free: they listen from where they are.)
+    // (Nowhere free, or sitting: they listen from where they are.)
+    let spot = spot.filter(|_| sims[j].pose == Pose::Stand);
     if let Some(p) = spot {
+        if dist(from, p) > SETTLE {
+            // Over to it on foot; they take it on getting there (`update`, again here).
+            let tile = (p[0].floor() as i32, p[1].floor() as i32);
+            if let Some(waypoints) = route(nav, Some(reach), from, sims[j].tile(), tile, p, Some(&walk(&sims[j], tile))) {
+                sims[j].join_spot = Some(p);
+                return set_phase(&mut sims[j], Phase::Routing { waypoints, next: 0 });
+            }
+        }
         sims[j].pos = p;
     }
+    sims[j].join_spot = None;
     for &m in &others {
         if !rels.get(j, m).met {
             rels.get_mut(j, m).met = true;
@@ -595,9 +670,15 @@ fn take_place(
 /// leaving too.
 fn open_up(sims: &mut [Sim], content: &Content, l: usize, t: usize) {
     let members = group(sims, content, l);
+    // (Those sitting stay turned the way their seat faces: their heads turn, `characters.ts`.)
+    let standing = |sims: &[Sim], m: usize| sims[m].pose == Pose::Stand;
     if members.len() <= 2 {
-        sims[l].yaw = facing(sims[l].pos, sims[t].pos);
-        sims[t].yaw = facing(sims[t].pos, sims[l].pos);
+        if standing(sims, l) {
+            sims[l].yaw = facing(sims[l].pos, sims[t].pos);
+        }
+        if standing(sims, t) {
+            sims[t].yaw = facing(sims[t].pos, sims[l].pos);
+        }
         return;
     }
     let count = members.len() as f32;
@@ -605,7 +686,7 @@ fn open_up(sims: &mut [Sim], content: &Content, l: usize, t: usize) {
     let centre = [sum[0] / count, sum[1] / count];
     for m in members {
         // (Someone right on the middle, as can't happen with everyone apart: they stay as they are.)
-        if dist(sims[m].pos, centre) > 0.05 {
+        if standing(sims, m) && dist(sims[m].pos, centre) > 0.05 {
             sims[m].yaw = facing(sims[m].pos, centre);
         }
     }
@@ -773,8 +854,13 @@ fn engage(
     let s = &content.socials[social];
     let success = rng.next_f32() < acceptance_chance(content, rels, &sims[i], &sims[t], s);
     // The target drops whatever (autonomous, interruptible) thing it was doing (walking over to
-    // meet them, if they called).
-    end_activity(&mut sims[t], content, objects);
+    // meet them, if they called); sitting down, they stay sitting, turned the way they sit, and
+    // carry on afterwards (what they're doing waits while they talk: `step_sim`).
+    let seated = keeps_seat(&sims[t], s);
+    // (Talking to someone themselves from their seat: they're back at what they sat down to do.)
+    if !seated || sims[t].paused.is_some() {
+        end_activity(&mut sims[t], content, objects);
+    }
     sims[t].heeding = None;
     sims[t].engaged_with = Some(i as u32);
 
@@ -801,11 +887,16 @@ fn engage(
             .map(|a| at([a.sin(), a.cos()]))
             .find(|&p| open(p))
     };
-    if let Some(spot) = spot {
-        sims[i].pos = spot;
+    // (Talking from their seat, the actor stays on it, turned the way it faces.)
+    if sims[i].pose != Pose::Sit {
+        if let Some(spot) = spot {
+            sims[i].pos = spot;
+        }
+        sims[i].yaw = facing(sims[i].pos, tp);
     }
-    sims[i].yaw = facing(sims[i].pos, tp);
-    sims[t].yaw = facing(tp, sims[i].pos);
+    if !seated {
+        sims[t].yaw = facing(tp, sims[i].pos);
+    }
     set_phase(
         &mut sims[i],
         Phase::Conversing {
@@ -1042,7 +1133,9 @@ mod tests {
           {"id":"askPartner","label":"Ask to be partners","minutes":5,"tags":["social","romantic"],"autonomous":false,
            "requires":{"minRomance":30,"partners":false},"acceptance":{"base":1.0},"success":{"effect":"becomePartners"}},
           {"id":"fight","label":"Fight","minutes":5,"tags":["social","mean"],"animation":"fight","autonomous":false,
-           "acceptance":{"base":1.0},"success":{"friendship":-20,"targetFriendship":-20,"effect":"fight","loserFeeling":"lost"}}],
+           "acceptance":{"base":1.0},"success":{"friendship":-20,"targetFriendship":-20,"effect":"fight","loserFeeling":"lost"}},
+          {"id":"hug","label":"Hug","minutes":4,"tags":["social","friendly"],"animation":"hug","autonomous":false,
+           "acceptance":{"base":0.0}}],
         "bondPresets":{"roommates":{"friendship":20},"partners":{"friendship":50,"romance":70,"partners":true}},
         "socialRules":{"defaultBond":"roommates","romanticTags":["romantic"],"jealousyFeeling":"jealous","heartbreakFeeling":"heartbroken"}}"#;
 
@@ -1462,5 +1555,36 @@ mod tests {
         assert_eq!(listeners(&w, 0), 1);
         let loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();
         assert!(loaded.sims[2].current.is_none() && loaded.sims[2].queue.is_empty());
+    }
+
+    /// The snapshot's `OUTCOME` for Sim `i`, ticking on until the two are in the social.
+    fn outcome_shown(w: &World, i: usize) -> f32 {
+        let mut out = vec![0.0; crate::snapshot::CAPACITY];
+        crate::snapshot::write(w, &mut out);
+        out[crate::snapshot::HEADER_LEN + i * crate::snapshot::SIM_STRIDE + crate::snapshot::sim::OUTCOME]
+    }
+
+    #[test]
+    fn a_refused_hug_shows_at_once_a_chat_halfway_through() {
+        // A hug is answered by the body, from the start (the renderer's step back, `characters.ts`).
+        let mut w = town(r#"{"name":"A","x":5.5,"z":5.5},{"name":"B","x":7.5,"z":5.5}"#, "");
+        w.autonomy = false;
+        let hug = w.content.social_index("hug").unwrap();
+        w.apply(Command::Social { sim: 0, target: 1, social: hug }).unwrap();
+        let mut seen = None;
+        for _ in 0..TICKS_PER_SECOND * 5 {
+            w.tick_once();
+            if let Some((_, _, success, progress)) = w.sims[0].conversation(&w.content) {
+                seen = Some((success, progress, outcome_shown(&w, 0), outcome_shown(&w, 1)));
+                break;
+            }
+        }
+        let (success, progress, a, b) = seen.expect("A never started the hug");
+        assert!(!success && progress < 0.1, "refused, just begun: {progress}");
+        assert_eq!((a, b), (2.0, 2.0), "the refusal shows from the start");
+        // A chat's outcome shows only halfway through (the answer after the opener).
+        let w = chatting("");
+        assert!(w.sims[0].conversation(&w.content).is_some_and(|c| c.3 < 0.5));
+        assert_eq!(outcome_shown(&w, 1), 0.0);
     }
 }

@@ -28,14 +28,18 @@ espresso machine on a top, the foodie espresso bar) and every *Have a coffee* at
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `farmhouseSink` Farmhouse sink | 1x1 · floor | wash:wash washUp:wash | kitchen / counters | Cabinet, Worktop, Basin, Tap & handles, Plinth | Use | `water_on`: the stream grows from the gooseneck tap into the apron-front basin in 0.4 s, runs for the whole use and retracts as it ends. washUp only with dirty dishes to wash (`workOn`). |
-| `counterSinkDouble` Double sink | 2x1 · floor | wash:wash washUp:wash | kitchen / counters | Cabinets, Worktop, Basins, Tap & handles, Plinth | Use | `water_on`, as the farmhouse sink: both bridge taps run together (two slots). washUp only with dirty dishes to wash (`workOn`). |
+| `counterSinkDouble` Double sink | 2x1 · floor | wash:wash washUp:wash | kitchen / counters | Cabinets, Worktop, Basins, Tap & handles, Plinth | Use | `water_on_0`, `water_on_1`: each bridge tap runs for the one washing at its bowl (`slot`; 2026-10-21: one washer ran both). washUp only with dirty dishes to wash (`workOn`). |
 
 **In play** (signed off 2026-10-16):
 - Checked with the bathroom sinks, the first group: bought in all four facings, every part coloured (through `buy` and
   in the colour studio), washed at and washed up at, by day and at night, on WebGPU and WebGL2, on Medium and Low.
 - `water_on` has no `hold`: it plays for the `wash` tag (both `wash` and `washUp`) and stops when the use ends.
+- Since 2026-10-21 (review A-kitchen-03) the double sink runs only the tap of the bowl in use (`slot` 0 at -x, 1 at
+  +x: `fixes/motions/g1718/play-stage.jsonl`).
 - Both are `dishes` stations: a cleared plate is rinsed here between the bin and the cupboard. Housegen keeps small
   things off sinks.
+- Since the authenticity review (G-15): at the farmhouse and double sinks the washer steps in (`STAND_BACK` -0.45),
+  the hands in the basin under the tap.
 
 ## K1. Fridges (7)
 
@@ -43,9 +47,9 @@ espresso machine on a top, the foodie espresso bar) and every *Have a coffee* at
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `fridge` Fridge | 1x1 · floor | snack:fetch frozenTreat:fetch meal:cook gourmet:cook | kitchen / appliances | Body, Handles, Plinth & badge, Inside | Use | `fridge_open`: the tall fridge door below swings 102° for snack, meal and gourmet; `hold` 3.5 s. The freezer door above swings 118° (`freezer_open`) for frozenTreat. |
-| `fridgeMini` Mini fridge | 1x1 · floor | snack:fetch meal:cook | kitchen / appliances | Body, Handles, Plinth | Use | `fridge_open`: the door swings 100° on its hinge for snack and meal; `hold` 3 s. |
-| `fridgeBuiltIn` Built-in fridge | 1x1 · floor | snack:fetch frozenTreat:fetch meal:cook gourmet:cook coldDrink:drink | kitchen / appliances | Panels, Handles | Use | `fridge_open`: the tall fridge door swings for snack, meal, gourmet and coldDrink; the freezer door below opens (`freezer_open`) for frozenTreat. |
+| `fridge` Fridge | 1x1 · floor | snack:fetch frozenTreat:fetch meal:cook gourmet:cook coldDrink:drink | kitchen / appliances | Body, Handles, Plinth & badge, Inside | Use | `fridge_open`: the tall fridge door below swings 102° for snack, meal and gourmet; `hold` 3.5 s. The freezer door above swings 118° (`freezer_open`) for frozenTreat. Has the other fridges' cold drink (2026-10-21). |
+| `fridgeMini` Mini fridge | 1x1 · floor | snack:fetch meal:cook coldDrink:drink | kitchen / appliances | Body, Handles, Plinth | Use | `fridge_open`: the door swings 100° on its hinge for snack and meal; `hold` 3 s. Has a cold drink, as the retro mini fridge. |
+| `fridgeBuiltIn` Counter-depth fridge | 1x1 · floor | snack:fetch frozenTreat:fetch meal:cook gourmet:cook coldDrink:drink | kitchen / appliances | Panels, Handles | Use | `fridge_open`: the tall fridge door swings for snack, meal, gourmet and coldDrink; the freezer door below opens (`freezer_open`) for frozenTreat. Renamed from "Built-in fridge": a free-standing counter-depth fridge with a dispenser (kind `fridgeAmerican`, Q-08). |
 | `fridgeFrenchDoor` French-door fridge | 1x1 · floor | snack:fetch frozenTreat:fetch meal:cook gourmet:cook coldDrink:drink | kitchen / appliances | Body, Handles, Plinth | Use | `fridge_open`: both upper doors swing out (-100° / +100°) for snack, meal, gourmet; `door_right` (the right door only) for coldDrink. The freezer drawer slides out 35 cm (`freezer_open`) for frozenTreat. |
 | `fridgeRetro` Retro fridge | 1x1 · floor | snack:fetch meal:cook coldDrink:drink | kitchen / appliances | Body, Handle, Trim | Use | `lever`: the chrome lever (a part inside the door) turns 30° out, then `fridge_open` (`delay` 0.3 s): the rounded door swings 100°; snack, meal, coldDrink. |
 | `fridgeMiniRetro` Retro mini fridge | 1x1 · floor | snack:fetch meal:cook coldDrink:drink | kitchen / appliances | Body, Handle & feet, Trim | Use | `fridge_open`: the pastel door with its unicorn sticker swings 100° on its hinge; snack, meal, coldDrink. `hold` 3 s. |
@@ -65,22 +69,29 @@ espresso machine on a top, the foodie espresso bar) and every *Have a coffee* at
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `stoveElectric` Electric cooker | 1x1 · floor | cook:cook bake:cook | kitchen / appliances | Body, Knobs, Hob | Use | `oven_open`: the oven door drops 85° on its bottom hinge for bake; `knob_on`: the front-left knob turns 90° for cook. |
-| `stoveGas` Gas range | 1x1 · floor | cook:cook gourmet:cook bake:cook | kitchen / appliances | Body, Knobs, Hob | Use | `oven_open` for bake (door drops); `burner_on` for cook and gourmet: a knob turns and a ring of blue flame (gloss, not emissive) grows on the front burner, the `water_on` way. |
-| `wallOven` Oven tower | 1x1 · floor | roast:cook bake:cook | kitchen / appliances | Tower, Handles | Use | `oven_open`: the upper oven door drops and its tray slides out 10 cm for roast and bake. |
-| `rangeCooker` Range cooker | 2x1 · floor | cook:cook gourmet:cook bake:cook | kitchen / appliances | Body, Knobs & rail, Hob | Use | `oven_open`: the left oven door drops for bake; `burner_on` (knob and flame ring) for cook and gourmet. |
-| `cooktopCounter` Hob counter | 1x1 · floor | cook:cook | kitchen / appliances | Cabinet, Worktop, Hob | Use | `burner_on`: a knob turns and the front-right ceramic ring glows red (grown from nothing, as a flame) for cook. |
-| `microwave` Microwave counter | 1x1 · floor | reheat:cook | kitchen / appliances | Cabinet, Worktop, Microwave | Use | `door_open`: the microwave door swings open and shuts again (`hold` 1.2 s) for reheat. L `turntable`: the glass plate turns while it heats (E1). |
+| `stoveElectric` Electric cooker | 1x1 · floor | cook:cook bake:cook | kitchen / appliances | Body, Knobs, Hob | Use | `oven_open`: the oven door drops 85° on its bottom hinge for bake (and any `bake` step), shut after 3 s; `burner_on`: the front-left knob turns 90° and the front ring on its side glows red for cook (and any `stir` step: a meal started at the fridge). 4 draws. |
+| `stoveGas` Gas range | 1x1 · floor | cook:cook gourmet:cook bake:cook | kitchen / appliances | Body, Knobs, Hob | Use | `oven_open` for bake and any `bake` step (door drops); `burner_on` for cook, gourmet and any `stir` step: a knob turns and a ring of blue flame (gloss, not emissive) grows on the front burner, the `water_on` way. |
+| `wallOven` Oven tower | 1x1 · floor | roast:cook bake:cook | kitchen / appliances | Tower, Handles | Use | `oven_open`: the upper oven door drops and its tray slides out 10 cm for roast, bake and any `bake` step (a meal cooked in it is put in, `animAt`), shut after 3 s. |
+| `rangeCooker` Range cooker | 2x1 · floor | cook:cook gourmet:cook bake:cook | kitchen / appliances | Body, Knobs & rail, Hob | Use | `oven_open`: the left oven door drops for bake and any `bake` step; `burner_on` (knob and flame ring) for cook, gourmet and any `stir` step. |
+| `cooktopCounter` Hob counter | 1x1 · floor | cook:cook | kitchen / appliances | Cabinet, Worktop, Hob | Use | `burner_on`: a knob turns and the front-right ceramic ring glows red (grown from nothing, as a flame) for cook and any `stir` step. |
+| `microwave` Microwave counter | 1x1 · floor | reheat:cook | kitchen / appliances | Cabinet, Worktop, Microwave | Use | `door_open`: the microwave door swings open and shuts again (`hold` 1.2 s) for reheat and a meal's `bake` step (a meal cooked in it, `animAt`). `turntable`: once the door has shut (`delay` 2.2 s) the glass plate turns, every 2 s while it heats. |
 
 **In play** (signed off 2026-10-16):
 - Each use run as a recipe (fridge, then a counter, then the cooker): the flame rings and the electric cooker's knob
   for cook and gourmet, the oven doors for bake and roast, the hob counter's hot ring, the microwave's door and
   turntable for reheat.
-- The hob clips (`knob_on`, `burner_on`) last the whole use; `oven_open` shuts after its `hold` (3 s). Each shuts
+- The hob clip (`burner_on`) lasts the whole use; `oven_open` shuts after its `hold` (3 s). Each shuts
   when the resident moves on.
+- Since 2026-10-21 (G-16) the clips play by the cooking step's tag too, so a meal started at the fridge lights the hob
+  (`stir`), and a bake or a meal put in an oven or a microwave (`bake`, the meal's `animAt`) opens its door; the
+  resident bends to a cooker's oven or stands at the tower's and the microwave, with no pan drawn. The Mix step and the
+  pie's pastry (`mix`) are stirred in a mixing bowl (`tool.mixingBowl`) on the counter. Recipe runs:
+  `bench-results/review/fixes/motions/recipes/`.
 - Each oven has a dark cavity inside its door and the microwave is hollow, so an open door shows an oven, not a block.
-- Not right yet: at the microwave the resident's hands reach for the cabinet below, not the door (the shared `cook`
-  pose).
+- Since the authenticity review (G-08, G-15): the pan stands on the burner the cooker's clip lights (`STATION_SPOTS`:
+  the gas range's flame, the range cooker's middle ring, the hob counter's hot ring; the electric cooker's front ring
+  on the turning knob's side); the microwave is used stepped up to it on the counter's right (`STEP_IN`), the hands at
+  its door, not at the cabinet below.
 
 ## K3. Small appliances and dishwashers (4)
 
@@ -89,8 +100,8 @@ espresso machine on a top, the foodie espresso bar) and every *Have a coffee* at
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `coffeeMachine` Coffee machine | 1x1 · floor | espresso:drink | kitchen / appliances | Cabinet, Worktop, Machine | Use | Provides `coffee`; `brew`: a cup slides under the spout and a thin coffee stream grows for espresso. |
-| `breakfastCounter` Breakfast counter | 1x1 · floor | toast:cook smoothie:cook | kitchen / appliances | Counter, Toaster, Blender | Use | `toast_down`: the toaster's carriage (lever and toast, one part) slides 5 cm down for toast and pops up at the end. `blend` for smoothie: the blender lid lifts. L `blades`: the smoothie under the lid swirls while it blends (E1). |
-| `dishwasher` Dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | `door_open`: the door drops 85° and the lower rack slides out 30 cm for dishes; `hold` 2.5 s (loading), then it closes. Only with dirty dishes (`workOn`). |
+| `breakfastCounter` Breakfast counter | 1x1 · floor | toast:cook smoothie:cook | kitchen / appliances | Counter, Toaster, Blender | Use | `toast_down`: the toaster's carriage (lever and toast, one part) slides 5 cm down for toast and pops up at the end. `blend` for smoothie: the blender lid lifts. L `blades`: the smoothie under the lid swirls while it blends (E1). Its 0.95 m top is a `counter` (counter stools tuck under it). |
+| `dishwasher` Dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | `door_open`: the door drops 85° and the lower rack slides out 30 cm for dishes and for clearing away at it (the `wash` tag), open for the whole loading. Only with dirty dishes (`workOn`). |
 | `dishwasherCompact` Stainless dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | `door_open`, as the dishwasher. Only with dirty dishes (`workOn`). |
 
 **In play** (signed off 2026-10-16):
@@ -99,7 +110,11 @@ espresso machine on a top, the foodie espresso bar) and every *Have a coffee* at
 - The breakfast counter keeps 4 draw calls: the toaster's lever and toast are one part, and the smoothie swirls
   (`blades`, a loop) under the lifted lid.
 - The coffee machine's cup and stream, the toaster and both dishwashers' doors and racks play and shut as they should.
+- Since 2026-10-21 (G-16) a plate or a pot cleared away at a dishwasher opens its door (the `wash` tag) and makes no
+  sound (it was the washing-up water); the door stays open for the whole load.
 - Coffee at the dining tables and chairs needs a working coffee machine on the same lot (`requires` / `provides`).
+- Since the authenticity review (G-15): toast and smoothies at the breakfast counter are made stepped in (`STAND_BACK`
+  -0.3), the hands on the top, with no squat to the floor.
 
 ## K4. Base counters (8)
 
@@ -109,10 +124,10 @@ espresso machine on a top, the foodie espresso bar) and every *Have a coffee* at
 |---|---|---|---|---|---|---|
 | `counter` Kitchen counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Worktop, Handles | Use | `drawer_open`: the top drawer slides out 25 cm for sandwich; `hold` 1.5 s. |
 | `counterCorner` Corner counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Worktop, Handles | Use | `drawer_open`, as the counter. |
-| `counterEnd` Counter end with shelves | 1x1 · floor | — | kitchen / counters | Cabinet, Worktop, Handles | Static | Static (open end shelves). |
-| `counterCornerOuter` Outer corner counter | 1x1 · floor | — | kitchen / counters | Cabinet, Worktop, Handles | Static | Static. |
-| `counterDrawers` Drawer counter | 1x1 · floor | — | kitchen / counters | Cabinet, Worktop, Handles | Use | `drawer_open`: the top drawer slides out 25 cm while clean things are put away in it (`fetch` at its `prep` station, `hold` 1.5 s). |
-| `counterOpenShelf` Open-shelf counter | 1x1 · floor | — | kitchen / counters | Cabinet, Worktop | Static | Static. |
+| `counterEnd` Counter end with shelves | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Worktop, Handles | Static | Static (open end shelves). A sandwich, as the other counters. |
+| `counterCornerOuter` Outer corner counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Worktop, Handles | Static | Static. A sandwich, as the other counters. |
+| `counterDrawers` Drawer counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Worktop, Handles | Use | `drawer_open`: the top drawer slides out 25 cm while clean things are put away in it (`fetch` at its `prep` station, `hold` 1.5 s). A sandwich, as the other counters. |
+| `counterOpenShelf` Open-shelf counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Worktop | Static | Static. A sandwich, as the other counters. |
 | `butcherBlock` Butcher block | 1x1 · floor | sandwich:cook | kitchen / counters | Base, Block, Top | Use | `drawer_open`: the knife drawer slides out for sandwich. |
 | `counterMarble` Marble counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Marble top, Handles | Use | `drawer_open` for sandwich. |
 
@@ -135,9 +150,9 @@ espresso machine on a top, the foodie espresso bar) and every *Have a coffee* at
 | `wallCabinetGlass` Glazed wall cabinet | 1x1 · wall | — | kitchen / counters | Cabinet, Handles | Use | Glass doors (`glass` finish). `door_open`: the right door opens as the wall cabinet's (each glazed door costs two draws). |
 | `wallCabinetCorner` Wall cabinet with end shelves | 1x1 · wall | — | kitchen / counters | Cabinet, Handles | Use | `door_open`: the door opens as the wall cabinet's. |
 | `rangeHood` Cooker hood | 1x1 · wall | — | kitchen / counters | Hood, Trim | Static | Static. |
-| `spiceRack` Spice rack | 1x1 · wall | — | kitchen / counters | Rack | Static | Static. |
-| `potRail` Pot rail | 1x1 · wall | — | kitchen / counters | Rail, Pots | Static | Static. |
-| `kitchenShelfWall` Kitchen wall shelves | 1x1 · wall | — | kitchen / counters | Shelves, Brackets | Static | Static. |
+| `spiceRack` Spice rack | 1x1 · wall | — | kitchen / counters | Rack | Static | Static. Decor by decision (Q-19: kind marked decor). |
+| `potRail` Pot rail | 1x1 · wall | — | kitchen / counters | Rail, Pots | Static | Static. Decor by decision (Q-19: kind marked decor). |
+| `kitchenShelfWall` Kitchen wall shelves | 1x1 · wall | — | kitchen / counters | Shelves, Brackets | Static | Static. Decor by decision (Q-19: kind marked decor). |
 | `trashCan` Pedal bin | 1x1 · floor | — | kitchen / counters | Bin, Lid | Use | `lid_open`: the pedal lid lifts 75° while a plate is scraped in (`clean` at its `bin` station, `hold` 1 s). |
 | `recyclingBins` Recycling bins | 1x1 · floor | sortRecycling:clean | kitchen / counters | Left bin, Middle bin, Right bin (each with its lid), Handles | Use | `lid0_open`, `lid1_open`, `lid2_open`: the three lids lift one after another (0.6 s apart, each 80° in 0.5 s, `hold` 0.9 s) for "Sort the recycling". Only after a meal, with something to clear (`workOn`). |
 
@@ -148,6 +163,8 @@ espresso machine on a top, the foodie espresso bar) and every *Have a coffee* at
   (not autonomous, so generated houses play as before).
 - "Left bin" and "Right bin" are left and right as seen from the front.
 - The hood, spice rack, pot rail and wall shelves are still; looked at on all four walls.
+- Since the authenticity review (G-15): putting dishes away in a wall cabinet is a reach at the counter (`interact`),
+  with no squat to the floor; a reach up to its doors is a clip still to make.
 
 ## K6. Islands and bars (5)
 
@@ -155,10 +172,10 @@ espresso machine on a top, the foodie espresso bar) and every *Have a coffee* at
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `kitchenIsland` Kitchen island | 2x1 · floor | sandwich:cook breakfast:eat | kitchen / counters | Cabinet, Worktop | Use | `drawer_open`: a drawer slides out for sandwich (not for breakfast: residents sit at it). |
-| `islandSmall` Small island | 1x1 · floor | — | kitchen / islands | Cabinet, Worktop | Static | Static. |
-| `islandLong` Long island | 3x1 · floor | — | kitchen / islands | Cabinet, Worktop | Static | Static. |
-| `barSegment` Bar counter | 1x1 · floor | — | kitchen / islands | Cabinet, Worktop | Static | Static. |
+| `kitchenIsland` Kitchen island | 2x1 · floor | sandwich:cook breakfast:eat | kitchen / counters | Cabinet, Worktop | Use | `drawer_open`: a drawer slides out for sandwich (not for breakfast). Breakfast is eaten on a stool at its back, or any seat within 3 m (`seatNear`), else standing. |
+| `islandSmall` Small island | 1x1 · floor | sandwich:cook breakfast:eat | kitchen / islands | Cabinet, Worktop | Static | Static. A sandwich, and breakfast on a stool or seat within 3 m (`seatNear`), as the kitchen island. |
+| `islandLong` Long island | 3x1 · floor | sandwich:cook breakfast:eat | kitchen / islands | Cabinet, Worktop | Static | Static. A sandwich, and breakfast on a stool or seat within 3 m (`seatNear`), as the kitchen island. |
+| `barSegment` Bar counter | 1x1 · floor | — | kitchen / islands | Cabinet, Worktop | Static | Static. High bar stools seat at it (the counter stools at counters, G-07). |
 | `barEnd` Bar end | 1x1 · floor | — | kitchen / islands | Cabinet, Worktop | Static | Static. |
 
 **In play** (signed off 2026-10-16):
@@ -175,18 +192,18 @@ espresso machine on a top, the foodie espresso bar) and every *Have a coffee* at
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `diningTable` Dining table | 2x1 · floor | coffee:drink | kitchen / dining | Top, Legs | Static | Static. |
+| `diningTable` Dining table | 2x1 · floor | coffee:drink | kitchen / dining | Top, Legs | Static | Static. Its two places (content `places`) are the two chairs as built, side by side; facing across waits for its rebuild (G-39). |
 | `bistroSet` Bistro table | 1x1 · floor | breakfast:eat coffee:drink | kitchen / dining | Top, Frame, Seats | Static | Static. |
-| `diningGlass` Glass dining table | 2x1 · floor | breakfast:eat coffee:drink | kitchen / dining | Top, Legs | Static | Static; glass top. |
-| `diningOak` Farmhouse dining table | 2x1 · floor | breakfast:eat coffee:drink dinner:eat | kitchen / dining | Top, Legs | Static | Static. |
+| `diningGlass` Glass dining table | 2x1 · floor | breakfast:eat coffee:drink | kitchen / dining | Top, Legs | Static | Static; glass top. Its places are its two chairs as built, side by side (G-39 rebuilds it to face across). |
+| `diningOak` Farmhouse dining table | 2x1 · floor | breakfast:eat coffee:drink dinner:eat | kitchen / dining | Top, Legs | Static | Static. Its places are its two chairs as built, side by side (G-39 rebuilds it to face across). |
 | `tableSquare2` Square table for two | 1x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
 | `tableBistroRound` Round bistro table | 1x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
-| `tableDining4` Dining table for four | 2x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
-| `tableDining6` Dining table for six | 3x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
-| `tableBanquet8` Banquet table | 4x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
-| `tableRound4` Round pedestal table | 2x2 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
+| `tableDining4` Dining table for six | 2x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. Renamed from "Dining table for four": 1.84 m seats six (kind `diningTable6`, Q-08). |
+| `tableDining6` Dining table for eight | 3x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. Renamed from "Dining table for six": 2.84 m seats eight (kind `diningTable8`). |
+| `tableBanquet8` Banquet table | 4x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. Seats twelve (kind `diningTable12`). |
+| `tableRound4` Round pedestal table | 2x2 · floor | — | kitchen / dining | Top, Legs | Static | Static. 1.52 m across: seats six (kind `roundTable6`). |
 | `tableSquare8` Square table for eight | 2x2 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
-| `tableFarmhouse6` Farmhouse table | 3x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
+| `tableFarmhouse6` Farmhouse table | 3x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. 2.86 m: seats eight (kind `diningTable8`). |
 | `tableBarHigh` High café table | 1x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
 
 **In play** (signed off 2026-10-16):
@@ -208,9 +225,9 @@ espresso machine on a top, the foodie espresso bar) and every *Have a coffee* at
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `barStool` Bar stool | 1x1 · floor | sit:sit drink:drink | kitchen / dining | Frame, Seat | Use | `swivel`: the seat turns 20° toward the resident and back, for sit and drink. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
-| `stoolCounter` Counter stool | 1x1 · floor | sit:sit drink:drink | kitchen / dining | Frame, Seat | Use | `swivel`, as the bar stool. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
-| `stoolBarHigh` High bar stool | 1x1 · floor | sit:sit drink:drink | kitchen / dining | Frame, Seat | Use | `swivel`, as the bar stool. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
+| `barStool` Bar stool | 1x1 · floor | sit:sit drink:drink | kitchen / dining | Frame, Seat | Use | `swivel`: the seat turns 20° toward the resident and back, for sit and drink. Pulled in to the table it faces while sat on, as far as the knees fit under it. Seats at counters and islands only (`seatAt: counter`, seat 0.72 m under a 0.95 m top), not at 1.06 m bars. |
+| `stoolCounter` Counter stool | 1x1 · floor | sit:sit drink:drink | kitchen / dining | Frame, Seat | Use | `swivel`, as the bar stool. Pulled in to the table it faces while sat on, as far as the knees fit under it. Seats at counters and islands only (`seatAt: counter`, seat 0.68 m). |
+| `stoolBarHigh` High bar stool | 1x1 · floor | sit:sit drink:drink | kitchen / dining | Frame, Seat | Use | `swivel`, as the bar stool. Pulled in to the table it faces while sat on, as far as the knees fit under it. Seats at bars and the high café table only (`seatAt: bar`, seat 0.80 m under a 1.06 m top); generated islands no longer get it. |
 | `diningChair` Dining chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static: the sitting pose is fitted to the seat, so the chair stays put. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
 | `chairWood` Wooden chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
 | `chairUpholstered` Upholstered chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Upholstery | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
@@ -255,5 +272,5 @@ espresso machine on a top, the foodie espresso bar) and every *Have a coffee* at
 - The bar cart's shaker lifts and tips towards the resident for "Mix a drink" and shuts after its `hold` (1.5 s).
 - The china cabinet's hutch back is the body's colour outside (blue only inside), so it reads standing free or with
   the wall cut away.
-- Not right yet: at the china cabinet the resident reaches low (the shared `fetch` pose) while the glazed door above
-  opens.
+- Not right yet: at the china cabinet the resident reaches at the waist while the glazed door above opens (a reach-up
+  clip still to make; since the authenticity review, G-15, at least no squat to the floor).

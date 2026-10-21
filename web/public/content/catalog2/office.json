@@ -68,7 +68,7 @@
       "group": "desks",
       "surface": {
         "height": 1.05,
-        "kind": "desk",
+        "kind": "shelf",
         "size": [
           0.96,
           0.63
