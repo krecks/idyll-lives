@@ -911,6 +911,7 @@
       "stations": [
         "cupboard"
       ],
+      "reach": 1.45,
       "footprint": [
         1,
         1

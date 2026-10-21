@@ -11,7 +11,9 @@ the resident is still busy. Water grows from the tap (`water_on`) for the whole 
 their heights (the content's `surface`; every kitchen worktop is 0.95 m); chairs and
 stools keep their seat height (`seats` in `web/src/render/babylon/characters/furniture.json`). Clean things are put away in the
 nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wall cabinets and the dining storage are
-`cupboard` stations and open a door while it happens, the drawer counter its top drawer.
+`cupboard` stations and open a door while it happens, the drawer counter its top drawer. A cupboard's `reach` (the wall
+cabinets' bottom shelf, 1.47 m; the china cabinet's knob, 1.45 m) keeps a child, whose hand reaches about 1.3 m, to a
+counter or a low cupboard (I-kitchen-15).
 
 **Who uses them** (content `stages`, 2026-10-21, G-45): the wine fridge's *Pour a glass of wine*, the bar cart's *Mix a
 drink* and the party bar's *Mix drinks for everyone* are for young adults and up (a child or a teen is refused, "Dee
@@ -167,8 +169,8 @@ espresso machine on a top, the foodie espresso bar) and every *Have a coffee* at
 - Since the authenticity review (G-15): putting dishes away in a wall cabinet is done stepped up to the worktop under it
   (`STEP_IN`, `putAway`, `putAwayGlass`, `putAwayCorner` in three sizes, clips/reach.ts): up on tiptoe to the pulls of the
   doors that open, drawing them open along their swing, the stack lifted from the worktop onto the bottom shelf, and a
-  door pushed shut as it closes. A child, who can't reach a wall cupboard, puts the stack on the worktop's back under
-  it, looking up (I-kitchen-15).
+  door pushed shut as it closes. A child, who can't reach a wall cupboard, is no longer sent to one: the sim gives
+  them the nearest counter or low cupboard instead (the cabinets' `reach`, I-kitchen-15).
 
 ## K6. Islands and bars (5)
 
@@ -284,4 +286,4 @@ espresso machine on a top, the foodie espresso bar) and every *Have a coffee* at
   the wall cut away.
 - Since the authenticity review (G-15): at the china cabinet the resident steps up to it, opens the glazed door at its
   knob and puts the stack from the base's top onto the hutch's middle shelf (`putAwayHutch`, clips/reach.ts); a child
-  puts it on the base's top.
+  isn't sent to it (its `reach`, 1.45 m, I-kitchen-15).

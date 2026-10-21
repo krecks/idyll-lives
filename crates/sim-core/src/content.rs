@@ -406,6 +406,10 @@ pub struct ObjectDef {
     /// toilet's cistern box, a wall bed, a ladder leaning on the wall): it needs plain wall all
     /// along its back, and that wall can't come down (nor become a window or a door) under it.
     pub against_wall: bool,
+    /// How high a hand goes to use it as a station (content `reach`, m: a wall cupboard's
+    /// bottom shelf; 0, within anyone's reach): someone who can't reach that high goes to
+    /// another station (`LifeStage::reach`).
+    pub reach: f32,
 }
 
 impl ObjectDef {
@@ -771,6 +775,18 @@ pub struct LifeStage {
     pub baby: bool,
     /// Goes to school on school days.
     pub school: bool,
+    /// Their size against a grown-up's (content `scale`, which the renderer draws them at).
+    pub scale: f32,
+}
+
+/// How high a grown-up's hand reaches standing (m): a wall cupboard's top shelf.
+pub const ADULT_REACH: f32 = 2.1;
+
+impl LifeStage {
+    /// How high their hand reaches standing (m): a 1.1 m child about 1.3 m.
+    pub fn reach(&self) -> f32 {
+        ADULT_REACH * self.scale
+    }
 }
 
 impl LifeRules {
@@ -792,6 +808,11 @@ impl LifeRules {
     /// A baby at `age`.
     pub fn baby(&self, age: f32) -> bool {
         self.stage_at(age).is_some_and(|s| s.baby)
+    }
+
+    /// How high a hand reaches at `age` (m; a grown-up's without stages).
+    pub fn reach(&self, age: f32) -> f32 {
+        self.stage_at(age).map_or(ADULT_REACH, LifeStage::reach)
     }
 
     /// The age adults start at.
@@ -1933,6 +1954,8 @@ struct LifeStageRaw {
     baby: bool,
     #[serde(default)]
     school: bool,
+    #[serde(default)]
+    scale: Option<f32>,
 }
 
 #[derive(Deserialize)]
@@ -2282,6 +2305,8 @@ struct ObjectRaw {
     head_height: bool,
     #[serde(default, rename = "againstWall")]
     against_wall: bool,
+    #[serde(default)]
+    reach: f32,
 }
 
 /// A slot's place: `{"at": [-0.3, 0.7], "facing": 180}` (m off the middle, to its right and front;
@@ -3280,6 +3305,7 @@ impl Content {
                 hangs_low: obj.hangs_low,
                 head_height: obj.head_height,
                 against_wall: obj.against_wall,
+                reach: obj.reach.max(0.0),
             });
         }
 
@@ -3361,6 +3387,7 @@ impl Content {
                 adult: st.adult.unwrap_or(!st.baby && !st.school),
                 baby: st.baby,
                 school: st.school,
+                scale: st.scale.filter(|s| s.is_finite() && *s > 0.0).unwrap_or(1.0),
             });
         }
         let start_age = raw.life.start_age.unwrap_or([25.0, 50.0]);

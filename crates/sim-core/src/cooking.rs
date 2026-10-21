@@ -629,7 +629,8 @@ enum Found {
 /// recipe was started from first, then (for outdoor recipes) outdoor ones or (otherwise)
 /// indoor ones, then by the step's order of stations, then the nearest (`nearest`: the nearest
 /// before the order, which only settles a tie). A station nobody uses otherwise (no
-/// interactions: a wall cabinet) needs the tile in front of it free.
+/// interactions: a wall cabinet) needs the tile in front of it free, and one higher than they
+/// reach (a wall cupboard for a child) is passed over.
 #[allow(clippy::too_many_arguments)]
 fn find_station(
     sim: &Sim,
@@ -650,10 +651,11 @@ fn find_station(
     if sim.visiting.is_some() {
         return Found::Missing;
     }
+    let reach = content.life.reach(sim.age);
     for &o in home_objects(ctx, sim.household).iter().chain(origin.iter()) {
         let obj = &objects[o as usize];
         let def = &content.objects[obj.def];
-        if def.stations & mask == 0 || obj.broken() || access(ctx, sim, ctx.object_plot[o as usize]) != Access::Full {
+        if def.stations & mask == 0 || def.reach > reach || obj.broken() || access(ctx, sim, ctx.object_plot[o as usize]) != Access::Full {
             continue;
         }
         if !obj.can_use(sim.id, def.slots) {

@@ -272,3 +272,22 @@ fn clean_things_go_in_a_wall_cabinet_over_the_counter_and_the_nearest_cupboard_o
     w.apply(Command::UseItem { sim: 0, item: pot, action: ItemAction::Clear }).unwrap();
     assert_eq!(clearing(&mut w, 0, 120.0), [(2, SINK), (3, sideboard)]);
 }
+
+#[test]
+fn a_child_leaves_the_clean_things_on_the_counter_under_a_wall_cabinet_out_of_reach() {
+    // The wall cabinet's bottom shelf (`reach` 1.47 m) is over a child's head (a hand up to
+    // about 1.3 m): the counter under it has them. A teenager reaches it.
+    let kitchen = format!(r#"{},{{"def":"wallCabinet","x":2,"z":0,"rot":0}}"#, KITCHEN.replace(r#""z":1"#, r#""z":0"#));
+    let cupboard = 4;
+    for (age, put) in [(8.0, COUNTER), (15.0, cupboard)] {
+        let mut w = world_with(&common::content(), &kitchen);
+        w.sims[0].age = age;
+        let at = table(&w);
+        let pot = put_on(&mut w, at, "mealPot", 2, 0);
+        // (After school.)
+        w.tick = sim_core::clock::tick_at(0, 17.0 * 60.0).unwrap();
+        w.apply(Command::UseItem { sim: 0, item: pot, action: ItemAction::Clear }).unwrap();
+        assert_eq!(clearing(&mut w, 0, 120.0), [(2, SINK), (3, put)], "age {age}");
+        assert_eq!(w.sims[0].held, None, "age {age}: put away");
+    }
+}
