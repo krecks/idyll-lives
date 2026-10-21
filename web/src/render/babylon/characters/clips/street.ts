@@ -23,12 +23,24 @@ export interface Size<F extends Fit = Fit> {
   fit: F;
 }
 export const REF_HEIGHT = 1.77;
-/** The sizes of `name` for these shares of the reference body's size (the tallest first), each fitted by `fit`. */
+/**
+ * A body's legs for its height, over the reference's (rig.json `pelvisScale` / height): a child's are 0.9 of a
+ * grown-up's share (a child of 1.12 m has the legs of a grown-up's 1.01 m), a teen's and a grown-up's the same; in
+ * between from 1.25 m to 1.4 m.
+ */
+export function legShare(height: number): number {
+  return 0.9 + 0.1 * Math.min(1, Math.max(0, (height - 1.25) / 0.15));
+}
+/**
+ * The sizes of `name` for these shares of the reference body's height (the tallest first), each fitted by `fit` to
+ * the height's share and then scaled by its legs (`s`, `legShare`): the runtime moves a clip's pelvis by the body's
+ * `pelvisScale`, so the clip's metres are the object's over the legs' share, not the height's (A-residents-12).
+ */
 export function sizes<F extends Fit>(name: string, shares: readonly number[], fit: (s: number) => F): Size<F>[] {
   return shares.map((s, i) => ({
     clip: `${name}${Math.round(s * REF_HEIGHT * 100)}`,
     min: i < shares.length - 1 ? ((s + shares[i + 1]) / 2) * REF_HEIGHT : 0,
-    fit: fit(s),
+    fit: { ...fit(s), s: s * legShare(s * REF_HEIGHT) },
   }));
 }
 

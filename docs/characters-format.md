@@ -264,6 +264,10 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
   and its own pelvis. Lying plays `lie` turned flat on the mattress (`LIE_*`);
   the blanket is fitted to `lie` too. A baby lying (in the crib) plays its own clips the same way,
   `babyLieAsleep` or `babyLieAwake`, centred on the mattress.
+- Clips in sizes (`street.ts` `sizes`: things at fixed heights, the size picked by the resident's height) are fitted
+  by the legs: a size's metres are the object's over its height's share of the reference times `legShare` (a child's
+  legs are 0.9 of a grown-up's for the height, from 1.25 m up to 1.4 m in between), as the runtime moves the clip's
+  pelvis by the body's `pelvisScale` (A-residents-12; the rides in `rides.ts` were already).
 - Carried things sit on the palms (`grip`): the right one, or between both.
 - Every name the runtime plays, with its loop flag and length (seconds; the runtime sequences
   object use, sitting down and standing up on these lengths):
