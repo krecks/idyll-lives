@@ -26,7 +26,7 @@
       "decor": 0.4,
       "light": {
         "range": 8.0,
-        "intensity": 1.3,
+        "intensity": 3.0,
         "height": 3.5,
         "tiles": 30
       },

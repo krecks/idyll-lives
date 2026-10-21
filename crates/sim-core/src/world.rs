@@ -126,7 +126,8 @@ pub struct ObjectInstance {
     /// A crop's growth (its kind `grows`; see `GrowthStage`): -1..0 lying fallow after it was
     /// picked, 0..1 planted and growing, 1 ripe. Bought ripe. Meaningless for other things.
     pub growth: f32,
-    /// A lamp switched off (see `lights.rs`); bought on. Meaningless for other things.
+    /// A lamp (or a fire) switched off (see `lights.rs`); bought off, on with a lot or a house's
+    /// file. Meaningless for other things.
     pub off: bool,
     /// Residents whose current use needs it closed (bits by sim id), so opening it under them is
     /// refused (`allows`). Derived from their tasks: set when the use reserves a slot, cleared
@@ -701,6 +702,9 @@ pub struct Sim {
     /// Opened or closed an object this tick (`Interaction::leaves`): how the house looks
     /// changed (applied after the step).
     pub(crate) reshaped: bool,
+    /// Lit a fire this tick (sat down by one in the dark: see `lights.rs`): the lamps' state
+    /// changed (applied after the step).
+    pub(crate) lit: bool,
     /// When they last woke someone crying (a baby), or were woken by a crying baby (a
     /// grown-up), as a tick (0: never; see `World::wake_for_crying_babies`).
     pub(crate) night_woken: u64,
@@ -1884,6 +1888,7 @@ impl World {
             planner: Default::default(),
             mess: None,
             reshaped: false,
+            lit: false,
             care_out: None,
             night_woken: 0,
             conceived: None,
@@ -2224,6 +2229,9 @@ impl World {
                 // An object opened or closed: how it looks changes.
                 self.structure_version = self.structure_version.wrapping_add(1);
                 self.rooms_need_clean_rescore();
+            }
+            if std::mem::take(&mut self.sims[i].lit) {
+                self.lights_version = self.lights_version.wrapping_add(1);
             }
             if let Some(news) = self.sims[i].news.take() {
                 // Broken or mended: what the house offers and how it looks change.
@@ -4990,6 +4998,12 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
             if inter.picks && objects[object as usize].growth >= 0.0 {
                 objects[object as usize].growth = -1.0;
                 sim.reshaped = true;
+            }
+            // Sitting down by a fire in the dark, they light it (see `lights.rs`).
+            let o = &objects[object as usize];
+            if o.off && content.objects[o.def].fire && (crate::lights::dark_at(ctx.minute) || ctx.nav.stairs.storey(o.z) < 0) {
+                objects[object as usize].off = false;
+                sim.lit = true;
             }
         }
     }

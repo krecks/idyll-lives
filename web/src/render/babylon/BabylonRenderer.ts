@@ -38,7 +38,7 @@ import {
   MeshBuilder,
   PBRMaterial,
   Plane,
-  PointLight,
+  SpotLight,
   ClusteredLightContainer,
   Quaternion,
   Scene,
@@ -114,6 +114,7 @@ import { LAYER_ALL, LAYER_TOWN, LAYER_WORLD } from './layers';
 import { NightGrade } from './nightGrade';
 import { BuildEffects, writeMoving, type PopTarget } from './buildFx';
 import { tableRooms } from './tableTuck';
+import { GardenPools, type GardenPool } from './gardenPools';
 import { ObjectMotion, restPoses, slotOf, type MovingObject } from './objectMotion';
 import { TownOverview } from './overview';
 import { GameCameraRig } from './cameraRig';
@@ -170,11 +171,23 @@ const DARK_LAMP_RANGE = 0.01;
 /** Brightness of a lamp at night (times its content `intensity`). */
 const LAMP_POWER = 7;
 /**
+ * A room light's cone: a whole turn for a lamp lighting all round (the cluster takes a cone whose
+ * half-angle's cosine is below 0 as a point light; the glTF falloff, with the inner cone as wide,
+ * as no cone), half a turn for one whose shade sends it one way (`RoomLight.dir`): full along it,
+ * about half 30–45° off it and next to none side-on.
+ */
+const ALL_ROUND = Math.PI * 2;
+const SHADED = Math.PI;
+/**
  * Furthest reach (m) the lamp cluster bins: the largest bought lamp's range. Babylon's own default is
  * 16 km, which puts every lamp in every tile it can see, so each PBR fragment loops over far more
  * lamps than can light it. Room fill lights may reach further; their glow stops at this range.
  */
 const LAMP_MAX_RANGE = 7;
+/** A garden lamp's pool of light on the lawn (`gardenPool`): its middle's brightness per `intensity / height²` (the street lamp's 0.3, the street's own up to 0.6), at most this, and at least this wide (m). */
+const POOL_GAIN = 1.2;
+const POOL_MAX = 0.4;
+const POOL_RADIUS_MIN = 1.5;
 /** A room without a lamp gets this share of the light it had before lamps gave light. */
 const FILL_POWER = 0.35;
 /**
@@ -500,9 +513,11 @@ export class BabylonRenderer implements Renderer {
   /** WebGPU: per frame, its first pass's start and last pass's end (ns; see `spanPasses`), and the latest whole frames (ms). */
   private readonly gpuSpans = new Map<number, [bigint, bigint]>();
   private readonly gpuRecent: number[] = [];
-  private readonly roomLights: PointLight[] = [];
+  private readonly roomLights: SpotLight[] = [];
   /** Holds the room lights when lighting is clustered (null: forward lights). */
   private lampCluster: ClusteredLightContainer | null = null;
+  /** Pools of lamplight on the lawn under the garden's lamps (the ground isn't lit by the lamps themselves). */
+  private gardenPools: GardenPools | null = null;
   /** What each interior light is lighting (null: unused). */
   private roomLightUse: (RoomLight | null)[] = [];
   /** Per interior light: 1 on, 0 out (its room is dark), eased between. */
@@ -1181,6 +1196,7 @@ export class BabylonRenderer implements Renderer {
     for (const id of off) if (!this.lampOn.has(id)) this.lampOn.set(id, first ? 0 : 1);
     this.lampsOff = off;
     this.lampsSettled = false;
+    this.motion.setLampsOff(off);
     this.findUnlitRooms();
     if (this.lightsShort && this.lastWorld) {
       this.placeRoomLights(this.lastWorld, this.view);
@@ -2801,9 +2817,10 @@ export class BabylonRenderer implements Renderer {
   }
 
   /**
-   * Interior lamps never light the landscapes kept (keeps their shaders simple), nor the plants
-   * being built again for them (`NatureSet.coming`). Only when that changes: setting the lists
-   * marks every material dirty.
+   * Interior lamps never light the landscapes kept (keeps their shaders simple: lit by the lamp
+   * cluster, the ground alone cost 1.1–1.5 ms of GPU a frame at night on Medium), nor the plants
+   * being built again for them (`NatureSet.coming`); the garden's lamps light the lawn with pools
+   * instead (`placeGardenPools`). Only when that changes: setting the lists marks every material dirty.
    */
   private excludeLandscape(): void {
     const landscape = new Set([...[...this.natures.values()].flatMap((n) => [...n.meshes, ...n.coming]), this.skyDome.mesh]);
@@ -3069,10 +3086,13 @@ export class BabylonRenderer implements Renderer {
     // snapshot rendering (the menus' town) Babylon draws every render target each frame anyway.
 
     // Warm interior lamps; always enabled (so shaders never recompile) and dimmed to zero by
-    // day. Clustered where the engine supports it: then dozens light at once.
+    // day. Clustered where the engine supports it: then dozens light at once. Spot lights, so a
+    // shade can send the light one way (`RoomLight.dir`); those lighting all round have a cone of
+    // a whole turn, which the cluster takes as a point light (and the glTF falloff as no cone).
     const wanted = new URLSearchParams(location.search).get('lights');
     const make = (i: number) => {
-      const light = new PointLight(`room${i}`, new Vector3(0, HIDDEN_Y, 0), this.scene);
+      const light = new SpotLight(`room${i}`, new Vector3(0, HIDDEN_Y, 0), new Vector3(0, -1, 0), ALL_ROUND, 1, this.scene);
+      light.innerAngle = ALL_ROUND;
       light.falloffType = Light.FALLOFF_GLTF;
       light.range = DARK_LAMP_RANGE;
       light.intensity = 0;
@@ -3095,6 +3115,7 @@ export class BabylonRenderer implements Renderer {
       this.lampCluster.maxRange = LAMP_MAX_RANGE;
     }
     if (this.diag.has('nolamps')) for (const light of this.lampCluster ? [this.lampCluster] : this.roomLights) light.setEnabled(false);
+    else this.gardenPools = new GardenPools(this.scene);
   }
 
   private setupPostProcessing(): void {
@@ -3612,11 +3633,20 @@ export class BabylonRenderer implements Renderer {
     lights.sort((a, b) => off(a) - off(b) || away(a.z) - away(b.z));
     this.lightsShort = lights.length > this.roomLights.length;
     this.lotLamps = lights.filter((l) => l.kind === 'lamp');
+    this.gardenPools?.set(lights.filter((l) => l.kind === 'lamp' && l.room === 0 && this.storeyOf(l.z) === 0).map((l) => gardenPool(l, this.rowOf(0))));
+    this.applyGardenPools();
     this.findUnlitRooms();
     this.roomLightUse = this.roomLights.map((light, i) => {
       const l = lights[i];
       if (l) light.position.set(l.x, l.y + this.storeyOf(l.z) * WALL_HEIGHT, l.z - this.rowOf(this.storeyOf(l.z)));
       else light.position.y = HIDDEN_Y;
+      // A shade's side (`aim`): half a turn about its direction; all round, a whole turn.
+      if (l?.dir) light.direction.set(l.dir[0], l.dir[1], l.dir[2]);
+      const cone = l?.dir ? SHADED : ALL_ROUND;
+      if (light.angle !== cone) {
+        light.angle = cone;
+        light.innerAngle = l?.dir ? 0 : ALL_ROUND;
+      }
       return l ?? null;
     });
     this.roomLightOn = this.roomLightUse.map((use) => (use?.lamp !== undefined ? (this.lampOn.get(use.lamp) ?? 1) : use && this.fillOut(use.room) ? 0 : 1));
@@ -4102,7 +4132,12 @@ export class BabylonRenderer implements Renderer {
           // (Its glow, if any, goes with the body: springing into place, held in buy mode.)
           pop: { meshes: [...template.meshes.filter((_, j) => !motion || motion.parts[j] < 0), ...glowOf(-1)], matrices, index: i, ...(partCount ? { moving: { parts, poses: restPoses(partCount) } } : {}) },
         });
-        if (motion && motions) moving.push({ id: o.id, target: this.placed[this.placed.length - 1].pop, motion, motions, interactions: (def?.interactions ?? []).map((it) => it.id), open: !!o.open, stage: o.growth, slotOf: slotOf(o, def) });
+        if (motion && motions) {
+          // A lamp's fan turns while it's on; a fire's flames (its uses' clips) burn while it's lit.
+          const light = def?.light;
+          const burns = light?.fire ? [...new Set(Object.values(motions.uses).flatMap((clips) => clips.map((c) => c.clip)))] : undefined;
+          moving.push({ id: o.id, target: this.placed[this.placed.length - 1].pop, motion, motions, interactions: (def?.interactions ?? []).map((it) => it.id), open: !!o.open, stage: o.growth, slotOf: slotOf(o, def), lamp: !!light && light.switch !== false, burns });
+        }
         // Mirrors on a moving part (a mirror cabinet's door) follow that part's buffer.
         for (const [part, surfaces] of Map.groupBy(template.mirrors ?? [], (s) => s.part ?? -1)) {
           mirrors.push({ surfaces, matrices: part >= 0 && parts[part] ? parts[part].matrices : matrices, index: i });
@@ -4630,6 +4665,7 @@ export class BabylonRenderer implements Renderer {
    */
   private applyGlow(): void {
     const level = this.townMode ? 0 : Math.min(1, Math.max(0, (this.lampsLevel - 0.35) / 0.5));
+    this.applyGardenPools();
     for (const g of this.glows) {
       if (g.screen) {
         this.writeScreenGlow(g);
@@ -4648,6 +4684,12 @@ export class BabylonRenderer implements Renderer {
       g.mesh.thinInstanceBufferUpdated('color');
       g.mesh.setEnabled(lit);
     }
+  }
+
+  /** The garden's pools of lamplight, as bright as its lamps are now (with the shades' glow). */
+  private applyGardenPools(): void {
+    const level = this.townMode ? 0 : Math.min(1, Math.max(0, (this.lampsLevel - 0.35) / 0.5));
+    this.gardenPools?.update(level, (lamp) => (lamp === undefined ? 1 : (this.lampOn.get(lamp) ?? 1)), this.lampColor);
   }
 
   /**
@@ -4948,6 +4990,21 @@ export class BabylonRenderer implements Renderer {
  * crossing 1 still goes through the setter, as does everything should Babylon rename the field.
  */
 /** Smoothstep: eases 0..1 in and out. */
+/**
+ * Where a garden lamp's light lands on the lawn (`GardenPools`): round its foot, as far as twice
+ * its height (within its reach; a wall light aimed out, a smaller one in front of its wall, its
+ * edge at the wall), as bright in the middle as its light there, `intensity / height²`, scaled to
+ * the pools' look and capped (a fire pit's). `row`: the ground storey's first lot row.
+ */
+function gardenPool(l: RoomLight, row: number): GardenPool {
+  const h = Math.max(l.y, 0.5);
+  const out = !!l.dir && l.dir[1] < 0 && Math.hypot(l.dir[0], l.dir[2]) > 0.1;
+  const radius = Math.min(Math.max((out ? 1.2 : 2) * h, POOL_RADIUS_MIN), l.range ?? 4.5);
+  const along = out ? (radius * 0.9) / Math.hypot(l.dir![0], l.dir![2]) : 0;
+  const strength = Math.min(((l.power ?? 1) * POOL_GAIN) / (h * h), POOL_MAX);
+  return { x: l.x + (l.dir?.[0] ?? 0) * along, y: 0, z: l.z - row + (l.dir?.[2] ?? 0) * along, radius, strength, lamp: l.lamp };
+}
+
 function ease(t: number): number {
   return t * t * (3 - 2 * t);
 }

@@ -161,6 +161,9 @@ export interface RecipeDef {
   steps: RecipeStep[];
 }
 
+/** Where a lamp's shade sends its light (content `light.aim`; see `ObjectDef.light`). */
+export type LightAim = 'down' | 'up' | 'out' | 'ceiling';
+
 /** What kind of top a surface is (sim-core `content::SurfaceKind`): which seats tuck under it. */
 export type SurfaceKind = 'table' | 'bar' | 'counter' | 'desk' | 'low' | 'shelf';
 
@@ -194,9 +197,13 @@ export interface ObjectDef {
    * Gives light at night (lamps, lanterns): reach in metres, relative brightness, height of the bulb,
    * where the bulb is off the middle (`at`: metres, x and z in the object's own frame, before
    * turning; default the middle), and the floor it lights fully as its room is scored (tiles;
-   * default `roomRules.lampTiles`).
+   * default `roomRules.lampTiles`). `aim`: where its shade sends the light (default all round):
+   * `down` (a pendant's dome, a desk lamp), `up` (a sconce's open cup: a wash up the wall), `out`
+   * (a wall light: away from its wall and down, none behind it) or `ceiling` (an uplighter: up
+   * at the ceiling, which lights the room). `switch: false`: no switch, lit every night; `fire`:
+   * a fire, lit to sit by (sim-core `lights.rs`), its flames burning while it's lit.
    */
-  light?: { range?: number; intensity?: number; height?: number; at?: [number, number]; tiles?: number; switch?: boolean };
+  light?: { range?: number; intensity?: number; height?: number; at?: [number, number]; tiles?: number; switch?: boolean; fire?: boolean; aim?: LightAim };
   /** Turns freely (at any angle, for looks); default: 1×1 objects of `objectRules.freeRotation` categories. */
   freeRotation?: boolean;
   /**

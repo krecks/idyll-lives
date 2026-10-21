@@ -549,7 +549,7 @@ impl World {
             || lot.v_edge(ux + 1, uz) == Edge::Door
     }
 
-    /// Furniture on the floor (not pictures, ceiling lamps, rugs, things on tops or stairs)
+    /// Furniture on the floor (not pictures, ceiling lamps up out of the way, rugs, things on tops or stairs)
     /// doesn't go just inside a door, where it would make the way through a squeeze: a lamp
     /// nobody needs to reach could otherwise stand anywhere that leaves the rest reachable.
     fn keep_doorway_clear(&self, def: usize, x: i32, z: i32, rot: u8, layout: Layout) -> Result<(), Error> {
@@ -668,6 +668,12 @@ impl World {
         // A crop bought new is just planted: it ripens over its days.
         if self.content.objects[def].grows.is_some() {
             self.objects[id as usize].growth = 0.0;
+        }
+        // A lamp (or a fire) comes switched off: residents switch it on as they come in when
+        // it's dark, or the player does (see `lights.rs`).
+        if crate::lights::switchable(self, def) {
+            self.objects[id as usize].off = true;
+            self.lights_version = self.lights_version.wrapping_add(1);
         }
         self.pay(h, price);
         Ok(id)

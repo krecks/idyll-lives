@@ -4091,7 +4091,7 @@
         "intensity": 0.8,
         "height": 0.7,
         "tiles": 6,
-        "switch": false
+        "fire": true
       },
       "seat": {
         "height": 0.42,
@@ -4132,6 +4132,7 @@
       "layer": "ceiling",
       "decor": 0.3,
       "light": {
+        "aim": "down",
         "range": 5.0,
         "intensity": 1.0,
         "height": 1.9,
@@ -4203,6 +4204,7 @@
       "layer": "ceiling",
       "decor": 0.4,
       "light": {
+        "aim": "down",
         "range": 5.0,
         "intensity": 1.0,
         "height": 1.9,
@@ -4248,6 +4250,7 @@
       "layer": "wall",
       "decor": 0.3,
       "light": {
+        "aim": "up",
         "range": 3.5,
         "intensity": 0.7,
         "height": 1.8,
@@ -4270,6 +4273,7 @@
       "layer": "wall",
       "decor": 0.3,
       "light": {
+        "aim": "down",
         "range": 3.5,
         "intensity": 0.8,
         "height": 1.7,
@@ -4292,8 +4296,9 @@
       "layer": "wall",
       "decor": 0.2,
       "light": {
+        "aim": "out",
         "range": 5.0,
-        "intensity": 0.9,
+        "intensity": 1.6,
         "height": 2.0,
         "tiles": 8
       },
@@ -4477,7 +4482,7 @@
         "intensity": 0.8,
         "height": 0.5,
         "tiles": 8,
-        "switch": false
+        "fire": true
       },
       "seat": {
         "height": 0.38,

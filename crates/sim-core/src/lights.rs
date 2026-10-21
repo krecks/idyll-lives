@@ -1,18 +1,23 @@
 //! Lamps switched on and off (`ObjectInstance::off`).
 //!
 //! Each lamp (an object with a content `light` that doesn't say `"switch": false`) is on or
-//! off on its own: the player turns one on or off with a click (`Command::SwitchLamp`). Residents
-//! switch a room's lamps together, as at the switch by the door, on two moments only (so what the
-//! player set stays until someone comes or goes):
+//! off on its own: the player turns one on or off with a click (`Command::SwitchLamp`). One
+//! bought comes switched off. Residents switch a room's lamps together, as at the switch by the
+//! door, on two moments only (so what the player set stays until someone comes or goes):
 //! - someone awake comes into a room when it's dark (night, or always in the basement and in a
 //!   room without windows) and none of its lamps is on: they all go on; the same as night falls
 //!   on a room with someone awake in it;
 //! - the last one awake leaves a room, or goes to sleep in it: its lamps go off.
 //!
+//! A fire (content `light.fire`: a fireplace, a fire pit) is switched as a lamp is, but nobody
+//! lights it just for coming in: whoever sits down by it in the dark lights it (`world::arrive`),
+//! or the player does. It goes out with the room's lamps when the last one awake leaves, and a
+//! fire still burning has burnt down when the morning comes.
+//!
 //! Only at home where the household has free will (and in public places): with it off, the
-//! lights stay as the player left them. Outdoors (the garden's lanterns) is the player's. The
-//! renderer shows a lamp that's off with no light and no glow; by day only the basement's and
-//! windowless rooms' lamps show.
+//! lights stay as the player left them (fires still burn down). Outdoors (the garden's lanterns)
+//! is the player's. The renderer shows a lamp that's off with no light and no glow (a fire with
+//! no flames either); by day only the basement's and windowless rooms' lamps show.
 //! Room scores count the lamps a room has, on or off (they're how well it can be lit).
 //! A lamp moved (alone, on a top or with its room), undone or redone stays on or off as it was.
 
@@ -97,6 +102,13 @@ pub(crate) fn update(world: &mut World) {
             switch_room(world, room, false);
         }
     }
+    // Morning: the fires left burning have burnt down.
+    if watch.primed && watch.dark && !dark {
+        let fires: Vec<u32> = world.objects.iter().filter(|o| !o.off && world.content.objects[o.def].fire).map(|o| o.id).collect();
+        for id in fires {
+            set(world, id, false);
+        }
+    }
     watch.awake = awake;
     watch.dark = dark;
     watch.lot_version = lot_version;
@@ -105,9 +117,9 @@ pub(crate) fn update(world: &mut World) {
 }
 
 /// Whether `room` is dark: it is night (or the room is in the basement, or has no windows) and
-/// none of its lamps is on.
+/// none of its lamps is on (a fire burning there isn't lit for its light).
 fn room_dark(world: &World, room: u16, night: bool) -> bool {
-    let mut lamps = lamps_in(world, room).peekable();
+    let mut lamps = lamps_in(world, room).filter(|&id| !world.content.objects[world.objects[id as usize].def].fire).peekable();
     let Some(&first) = lamps.peek() else { return false };
     let o = &world.objects[first as usize];
     let below = world.stairs.storey(o.z) < 0;
@@ -127,9 +139,10 @@ fn lamps_in(world: &World, room: u16) -> impl Iterator<Item = u32> + '_ {
     }).map(|o| o.id)
 }
 
-/// A resident switches every lamp in `room`, unless the household living there has free will off.
+/// A resident switches every lamp in `room`, unless the household living there has free will off
+/// (and puts out a fire there, but doesn't light one).
 fn switch_room(world: &mut World, room: u16, on: bool) {
-    let lamps: Vec<u32> = lamps_in(world, room).collect();
+    let lamps: Vec<u32> = lamps_in(world, room).filter(|&id| !on || !world.content.objects[world.objects[id as usize].def].fire).collect();
     let Some(&first) = lamps.first() else { return };
     let o = &world.objects[first as usize];
     let plot = world.plot_at(o.x, o.z);
