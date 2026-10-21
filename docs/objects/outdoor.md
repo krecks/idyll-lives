@@ -122,7 +122,7 @@ none.
 | `garden.pond` Garden pond | 2x2 · floor | fish:look feedFish:garden | outdoor / decor | Stones | Use + Ambient | `fish`: a koi rises 4 cm to the surface, turning, held for feedFish; `surface` (up and down, 2.4 s) every 7 s while watching (fish); `ripple` ambient (E2). Opaque gloss water, reeds still (satin): 3 draws, 4408 tris. |
 | `planterBox` Planter box | 1x1 · floor | water:water | outdoor / decor | Box | Static | Static: plank trough, leaves on `foliage` (wind, tint), flowers; far version (`far_of`). 3 draws, 3752 tris. |
 | `birdhouse` Birdhouse | 1x1 · floor | — | outdoor / decor | House, Roof | Static | Static. 2 draws, 1028 tris. |
-| `birdFeederPole` Bird feeders | 1x1 · floor | birdwatch:look | outdoor / decor | Pole, Feeders | Use | `bird`: a blue tit appears on the second perch for birdwatch, held while watching; the robin is always there. 3 draws, 2932 tris. |
+| `birdFeederPole` Bird feeders | 1x1 · floor | birdwatch:look | outdoor / decor | Pole, Feeders | Use | `bird`: a blue tit appears on the second perch for birdwatch, held while watching; the robin is always there. 3 draws, 2932 tris. Birds watched from a seat within 6 m (`seatNear`), else standing. |
 | `dogHouse` Dog house | 1x1 · floor | — | outdoor / decor | House, Roof | Static | Static: name plate REX, bowl. 2 draws, 2224 tris. |
 | `sundial` Sundial | 1x1 · floor | — | outdoor / decor | Plinth, Dial | Static | Static. 1 draw, 1316 tris. |
 | `steppingStones` Stepping stones | 1x3 · rug | — | outdoor / decor | Stones | Static | Static, flat: 4 cm slabs that show on the lawn. 1 draw, 320 tris. |
@@ -146,7 +146,7 @@ These six have no group code of their own.
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `garden.gnome` Garden gnome | 1x1 · floor | pat:tend | outdoor / decor | Hat, Tunic, Belt | Static | Static: a gnome with a red hat, white beard and a tunic bell. |
-| `garden.birdbath` Bird bath | 1x1 · floor | birdwatch:look | outdoor / decor | Bowl & column, Plinth | Static | Static: plinth, tapering column and a shallow bowl of water, a small bird on the rim. |
+| `garden.birdbath` Bird bath | 1x1 · floor | birdwatch:look | outdoor / decor | Bowl & column, Plinth | Static | Static: plinth, tapering column and a shallow bowl of water, a small bird on the rim. Birds watched from a seat within 6 m (`seatNear`), else standing. |
 | `garden.fountain` Stone fountain | 1x1 · floor | wish:look listen:relax | outdoor / decor | Fountain, Plinth | Static | Static: a two-tier fountain, its water opaque and still. |
 | `garden.lantern` Stone lantern | 1x1 · floor | — | outdoor / lights | Lantern, Base | Static | Static: a Japanese stone lantern; its fire box is lit at night (the content's `light`). |
 | `garden.wheelbarrow` Wheelbarrow planter | 1x1 · floor | water:water smell:smell | outdoor / decor | Tray, Handles, Legs & tyre | Static | Static: a green wheelbarrow full of flowers and leaves. |

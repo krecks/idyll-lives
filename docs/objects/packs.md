@@ -23,11 +23,11 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `bookworm.readingNook` Window-seat reading nook | 2x1 · floor | curlUp:read | living / — | Wood, Fabric, Cushions | Use | `sink_in`: the window-seat cushion settles for curlUp. |
-| `bookworm.libraryWall` Rare-books library wall | 2x1 · floor | research:read browse:read | office / — | Wood, Ladder | Use | `ladder`: the rolling ladder slides 40 cm along its rail for research and browse. |
+| `bookworm.libraryWall` Rare-books library wall | 2x1 · floor | research:read browse:read | office / — | Wood, Ladder | Use | `ladder`: the rolling ladder slides 40 cm along its rail for research and browse. Research and browse are read on a seat within 4 m (`seatNear`), else standing. |
 | `bookworm.writingBureau` Writer's bureau | 1x1 · floor | draft:write letter:write | office / — | Wood, Fabric, Chair | Use | `fall_front`: the writing flap drops 90° towards the writer for draft and letter, and closes after. The writer sits on its chair facing the bureau and the wall (`seat.facing: "back"`). |
-| `bookworm.teaTrolley` Book-club tea trolley | 1x1 · floor | brew:drink | kitchen / — | Wood, Fabric, Frame | Use | `pour`: the teapot tips 30° for brew; `hold` 1.5 s. |
+| `bookworm.teaTrolley` Book-club tea trolley | 1x1 · floor | brew:drink | kitchen / — | Wood, Fabric, Frame | Use | `pour`: the teapot tips 30° for brew; `hold` 1.5 s. The tea is had on a seat within 3 m (`seatNear`), else standing. |
 | `bookworm.firesideLounge` Fireside reading lounge | 2x2 · floor | readByFire:read readAloud:read | living / — | Wood, Fabric, Rug | Use | `flames`: the fire grows in the grate for readByFire and readAloud. |
-| `bookworm.bedsideStack` Bedside book stack | 1x1 · floor | chapter:read | bedroom / — | Wood, Fabric, Drawers | Use | `book_up`: the top book lifts and opens for chapter. |
+| `bookworm.bedsideStack` Bedside book stack | 1x1 · floor | chapter:read | bedroom / — | Wood, Fabric, Drawers | Use | `book_up`: the top book lifts and opens for chapter. The chapter is read on a seat within 3 m (`seatNear`), else standing. |
 
 **In play** (signed off 2026-10-17):
 - Every clip plays and shuts: the nook's cushion, the library ladder, the bureau's flap, the teapot, the fire for
@@ -61,7 +61,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `couchPotato.cinemaWall` Grand cinema wall | 2x1 · floor | marathon:watch channelSurf:watch | living / — | Body, Upholstery, Curtains | Use | `curtains`: the side curtains slide apart for marathon and channelSurf. The screen is on the wall at the back, the twin recliners in front facing it (content `seat.facing: "back"`), two sitters at once. |
+| `couchPotato.cinemaWall` Grand cinema wall | 2x1 · floor | marathon:watch channelSurf:watch | living / — | Body, Upholstery, Curtains | Use | `curtains`: the side curtains slide apart for marathon and channelSurf. The screen is on the wall at the back, the twin recliners in front facing it (content `seat.facing: "back"`), two sitters at once. Provides `screen`. |
 | `couchPotato.gameConsole` Pixel Arcade console | 1x1 · floor | play:play speedrun:play | hobbies / — | Body, Upholstery, Cushion | Use | `tray`: the disc tray slides out and back for play and speedrun (`hold` 1.5 s). The screen and shelf are on the wall at the back, the loveseat in front facing it (content `seat.facing: "back"`); the tray slides towards the players. |
 | `couchPotato.recliner` Cloud Nine power recliner | 1x1 · floor | recline:relax doze:nap | living / — | Body, Upholstery, Throw | Use | `recline`: the back tips and the footrest rises for recline and doze; the sitter rides the back (`ride`), leant back 20° with the legs out on the footrest (content `seat`). |
 | `couchPotato.snackFridge` Sofa-side snack fridge | 1x1 · floor | snack:fetch takeout:fetch | kitchen / — | Body, Upholstery | Use | `fridge_open`: the door swings for snack and takeout. |
@@ -144,7 +144,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `gloomy.recordCabinet` Midnight record cabinet | 1x1 · floor | listen:listen newAlbum:listen | living / — | Body, Trim | Use | `lid_open`: the lid lifts for listen and newAlbum. `platter_spin` turns the platter while it plays (E1). |
+| `gloomy.recordCabinet` Midnight record cabinet | 1x1 · floor | listen:listen newAlbum:listen | living / — | Body, Trim | Use | `lid_open`: the lid lifts for listen and newAlbum. `platter_spin` turns the platter while it plays (E1). Listened to from a seat within 4 m (`seatNear`), else standing. |
 | `gloomy.cello` Nocturne cello | 1x1 · floor | practise:music lament:music | hobbies / — | Body, Trim, Cello | Use | `off_stand`: the cello comes off its stand to between the player's knees for practise and lament. |
 | `gloomy.journalDesk` Candlelit writing desk | 2x1 · floor | journal:write poetry:write | office / — | Body, Trim | Use | `candle`: the candle flame grows for journal and poetry; it glows at night. Written at on its own chair with the hands on the top (`NEAR_DESKS`, `sitHandsNear`; `SEATS`), not through its front. |
 | `gloomy.rainLamp` Rainfall lamp | 1x1 · floor | watchRain:look | decor / — | Body, Trim | Use | `rain`: the rain strands grow for watchRain. `ripple` swells the pool's ripples all the time, near the camera (E2). |
@@ -215,7 +215,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 | `lazy.quiltTable` Heated quilt table | 2x1 · floor | tuckIn:relax doze:nap | living / — | Body, Upholstery, Poufs | Use | `quilt`: the quilt edge lifts for tuckIn and doze. Both sit on a pouf at the table, legs under the quilt (doze a sitting nap). |
 | `lazy.deliveryLocker` Doorstep delivery locker | 1x1 · floor | takeout:fetch noodles:fetch | kitchen / — | Body, Doors, Trim | Use | `door_open`: a locker door opens for takeout and noodles; `hold` 2 s. |
 | `lazy.vibePlate` Effortless vibration plate | 1x1 · floor | shake:exercise | fitness / — | Body, Trim, Deck | Loop (E1) | `shake`: the deck rocks ±3° four times a second under the resident (E1; content `stand.height` 0.12). |
-| `lazy.smartHub` Smart-home command hub | 1x1 · floor | program:type story:listen | office / — | Body, Speaker | Use | `screen_up`: the tablet tilts up for program and story. |
+| `lazy.smartHub` Smart-home command hub | 1x1 · floor | program:type story:listen | office / — | Body, Speaker | Use | `screen_up`: the tablet tilts up for program and story. Program and story from a seat within 4 m (`seatNear`), else standing. |
 
 **In play** (signed off 2026-10-17):
 - Every clip plays and shuts.
@@ -279,7 +279,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 | `neat.laundryCenter` Stacked laundry centre | 2x1 · floor | laundry:clean fold:clean | bathroom / — | Body, Washer & dryer | Use | `door_open`: the washer door swings for laundry and fold. |
 | `neat.rainShowerTower` Rainfall steam shower | 1x1 · floor | steamShower:shower | bathroom / — | Body, Bench | Use | `water_on`: the rain grows for steamShower. |
 | `neat.organizerDesk` Label-and-sort organizer desk | 2x1 · floor | sort:write ledger:write | office / — | Body, Wood, Chair | Use | `drawer_open`: a bin slides out of the hutch for sort and ledger. Written at on its own chair with the hands on the top (`NEAR_DESKS`, `sitHandsNear`; `SEATS`), not through its front. |
-| `neat.robotVacuumDock` Robot vacuum and dock | 1x1 · floor | program:type | living / — | Body, Trim, Rug | Use | `vacuum_out`: the robot rolls 60 cm out of its dock, turns and rolls back for program (`hold` 2 s). |
+| `neat.robotVacuumDock` Robot vacuum and dock | 1x1 · floor | program:type | living / — | Body, Trim, Rug | Use | `vacuum_out`: the robot rolls 60 cm out of its dock, turns and rolls back for program (`hold` 2 s). Program from a seat within 4 m (`seatNear`), else standing. |
 | `neat.entryConsole` Tidy entry console | 1x1 · floor | tidy:clean | decor / — | Body, Wood | Use | `tray`: the key tray drawer slides out for tidy. |
 
 **In play** (signed off 2026-10-17):
@@ -318,7 +318,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 | `romantic.candlelitTable` Candlelit bistro table | 2x1 · floor | candlelitDinner:eat shareDessert:eat | kitchen / — | Body, Fabric, Tablecloth | Use | `candles`: the candle flames grow for candlelitDinner and shareDessert. |
 | `romantic.heartTub` Heart-shaped petal tub | 2x2 · floor | petalBath:bath | bathroom / — | Body, Fabric | Use | `fill`: the water rises with petals for petalBath. |
 | `romantic.vanity` Rose-gold vanity | 1x1 · floor | primp:wash (sit) | bedroom / — | Body, Fabric, Rose gold | Use | `drawer_open` for primp (`hold` 2 s), sat on the pouf facing the mirror (content `seat.facing: "back"`); the mirror is mirror glass (E6). |
-| `romantic.gramophone` Moonlight gramophone | 1x1 · floor | listen:listen waltz:dance | living / — | Body, Horn | Use | `needle`: the tone arm swings onto the record for listen and waltz. `platter` spins the record while it plays (E1). |
+| `romantic.gramophone` Moonlight gramophone | 1x1 · floor | listen:listen waltz:dance | living / — | Body, Horn | Use | `needle`: the tone arm swings onto the record for listen and waltz. `platter` spins the record while it plays (E1). Listen is from a seat within 4 m (`seatNear`), else standing; waltz stands. |
 | `romantic.letterBureau` Love-letter bureau | 1x1 · floor | writeLetter:write writePoem:write | office / — | Body, Fabric | Use | `fall_front`: the writing flap drops for writeLetter and writePoem. Written at on its own chair with the hands on the top (`NEAR_DESKS`, `sitHandsNear`; `SEATS`), not through its front. |
 | `romantic.roseArbourSwing` Rose-arbour swing | 2x1 · floor | swing:relax tendRoses:prune | outdoor / — | Body, Fabric | Loop (E1) | `swing`: the swing rocks with its riders (`ride`) while swung in (E1); U `cut`: a bloom shrinks away for tendRoses. |
 
@@ -337,10 +337,10 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 |---|---|---|---|---|---|---|
 | `slob.microwaveCart` Late-night microwave cart | 1x1 · floor | nuke:cook invent:cook | kitchen / — | Body | Use | `door_open`: the microwave door opens and shuts for nuke and invent (`hold` 1.5 s). |
 | `slob.beanbag` Crumb-proof beanbag | 1x1 · floor | flop:relax snooze:nap | living / — | Body | Use | `squash` for flop and snooze. |
-| `slob.snackNightstand` Snack-stash nightstand | 1x1 · floor | midnightSnack:eat | bedroom / — | Body, Top | Use | `drawer_open` for midnightSnack, eaten sitting on its padded top. |
+| `slob.snackNightstand` Snack-stash nightstand | 1x1 · floor | midnightSnack:eat | bedroom / — | Body, Top | Use | `drawer_open` for midnightSnack, eaten standing beside it (not sitting on its top, 2026-10-21). |
 | `slob.spritzStation` Spritz & go station | 1x1 · floor | spritz:wash | bathroom / — | Body | Use | `spritz`: the spray bottle tips for spritz. |
 | `slob.arcadeCabinet` Pixel-blaster arcade cabinet | 1x1 · floor | chaseHighScore:play quickRound:play | hobbies / — | Body, Sides | Loop (E1) | `joystick`: the joystick waggles side to side while playing (E1). |
-| `slob.gamingRecliner` Command-couch gaming recliner | 2x1 · floor | marathon:play armrestSoda:drink | living / — | Body, Stripes | Use | `recline` for marathon, the sitter riding the back (`ride`), leant back 22° with the legs out on the footrest (content `seat`); `cup_out`: the cup holder swings out for armrestSoda. |
+| `slob.gamingRecliner` Command-couch gaming recliner | 2x1 · floor | marathon:play armrestSoda:drink | living / — | Body, Stripes | Use | `recline` for marathon, the sitter riding the back (`ride`), leant back 22° with the legs out on the footrest (content `seat`); `cup_out`: the cup holder swings out for armrestSoda. Marathon needs a working TV on the lot (`requires: screen`; a screen in front of it needs a place condition, G-64). |
 
 **In play** (signed off 2026-10-17):
 - Every clip plays and shuts: the microwave door, the beanbag for flop and snooze, the drawer, the bottle, the

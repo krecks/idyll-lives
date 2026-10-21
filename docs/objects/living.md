@@ -75,9 +75,9 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `coffeeTable` Coffee table | 2x1 · floor | magazine:read | living / tables | Wood, Knob | Use | `drawer_open`: the drawer slides out 30 cm with a magazine for magazine; `hold` 2.5 s. |
-| `coffeeTableGlass` Glass coffee table | 2x1 · floor | magazine:read | living / tables | Frame, Glass | Static | Static; glass top. |
-| `coffeeTableMarble` Marble side table | 1x1 · floor | magazine:read | living / tables | Top, Base | Static | Static. |
+| `coffeeTable` Coffee table | 2x1 · floor | magazine:read | living / tables | Wood, Knob | Use | `drawer_open`: the drawer slides out 30 cm with a magazine for magazine; `hold` 2.5 s. The magazine is read on a seat within 2 m (`seatNear`), else standing. |
+| `coffeeTableGlass` Glass coffee table | 2x1 · floor | magazine:read | living / tables | Frame, Glass | Static | Static; glass top. The magazine is read on a seat within 2 m (`seatNear`), else standing. |
+| `coffeeTableMarble` Marble side table | 1x1 · floor | magazine:read | living / tables | Top, Base | Static | Static. The magazine is read on a seat within 2 m (`seatNear`), else standing. |
 | `sideTable` Side table | 1x1 · floor | — | living / tables | Wood, Knob | Static | Static. |
 | `coffeeTableRound` Round coffee table | 1x1 · floor | — | living / tables | Top, Base | Static | Static. |
 | `coffeeTableLong` Long coffee table | 2x1 · floor | — | living / tables | Top, Legs | Static | Static. |
@@ -100,13 +100,13 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `tv` Television | 1x1 · floor | watch:watch | living / media | Body, Trim | Static | Static: a slim set on its stand on an oak unit, a soundbar; the screen flickers while watched (E8). 2 draws. |
-| `tvWall` Flat-screen TV | 2x1 · wall | watch:watch | living / media | Body, Trim | Static | Static: a thin panel on a bracket, a soundbar under it, on the wall face; the screen flickers while watched. 1 draw. |
-| `tvRetro` Portable TV | 1x1 · floor | watch:watch | living / media | Body, Trim | Use | `antenna`: the rabbit-ear antennae turn 20° and stretch 1.6× up for watch; the tube flickers while watched. |
-| `homeCinema` Home cinema | 2x1 · floor | watch:watch film:watch | living / media | Body, Trim | Use | `screen_down`: the projector screen unrolls from its case on the wall for watch and film, and rolls up at the end; a short-throw projector on the unit; the screen flickers while down and watched. |
-| `stereo` Stereo system | 1x1 · floor | listen:listen dance:dance | living / media | Body, Trim | Use | `tray`: the tray of the CD player under the amplifier slides out and back (`hold` 1.2 s) for listen and dance; the woofers `pulse` (E1 loop). 4 draws (the loop's part). |
-| `boombox` Boombox | 1x1 · floor | listen:listen | living / media | Body, Trim | Use | `cassette`: the cassette door tips 32° open from its foot for listen and shuts; `hold` 1.2 s. |
-| `tvStandLow` Low TV bench | 2x1 · floor | watch:watch | living / media | Bench, TV | Use | `tv_up`: the TV rises 60 cm out of a lift hood at the bench's back for watch (0.8 m high at rest, its lid closing the hood), and sinks back at the end; it flickers while up and watched. |
+| `tv` Television | 1x1 · floor | watch:watch | living / media | Body, Trim | Static | Static: a slim set on its stand on an oak unit, a soundbar; the screen flickers while watched (E8). 2 draws. Provides `screen` (the gaming recliner's marathon needs one). |
+| `tvWall` Flat-screen TV | 2x1 · wall | watch:watch | living / media | Body, Trim | Static | Static: a thin panel on a bracket, a soundbar under it, on the wall face; the screen flickers while watched. 1 draw. Provides `screen`. |
+| `tvRetro` Portable TV | 1x1 · floor | watch:watch | living / media | Body, Trim | Use | `antenna`: the rabbit-ear antennae turn 20° and stretch 1.6× up for watch; the tube flickers while watched. Provides `screen`. |
+| `homeCinema` Home cinema | 2x1 · floor | watch:watch film:watch | living / media | Body, Trim | Use | `screen_down`: the projector screen unrolls from its case on the wall for watch and film, and rolls up at the end; a short-throw projector on the unit; the screen flickers while down and watched. Provides `screen`. |
+| `stereo` Stereo system | 1x1 · floor | listen:listen dance:dance | living / media | Body, Trim | Use | `tray`: the tray of the CD player under the amplifier slides out and back (`hold` 1.2 s) for listen and dance; the woofers `pulse` (E1 loop). 4 draws (the loop's part). Listened to from a seat within 4 m (`seatNear`), else standing; dance stands. |
+| `boombox` Boombox | 1x1 · floor | listen:listen | living / media | Body, Trim | Use | `cassette`: the cassette door tips 32° open from its foot for listen and shuts; `hold` 1.2 s. Listened to from a seat within 4 m (`seatNear`), else standing. |
+| `tvStandLow` Low TV bench | 2x1 · floor | watch:watch | living / media | Bench, TV | Use | `tv_up`: the TV rises 60 cm out of a lift hood at the bench's back for watch (0.8 m high at rest, its lid closing the hood), and sinks back at the end; it flickers while up and watched. Provides `screen`. |
 | `fireplaceElectric` Electric fireplace | 2x1 · floor | relax:relax | living / media | Surround, Firebox | Use | `flames`: five tongues grow from the log bed for relax (gloss, not emissive; the light is the content's); the embers glow at night, the flames while lit. A floor cushion in front, and `characters/furniture.json` `seats` sits the resident on it facing the fire. |
 
 **In play** (signed off 2026-10-16):
@@ -128,12 +128,12 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `bookshelf` Bookshelf | 1x1 · floor | read:read study:read homework:read | living / shelves | Frame, Back | Use | `book_out`: a red book on the third shelf tips out 25° for read, study and homework, and back at the end. Its back is on the wall face. |
-| `bookcaseLow` Low bookcase | 1x1 · floor | read:read | living / shelves | Frame, Back | Use | `book_out`. Top 0.9 (content `surface`); a back panel. |
-| `bookcaseWide` Library bookcase | 2x1 · floor | read:read study:read homework:read | living / shelves | Frame, Back | Use | `book_out`. Brass knobs on the cupboard doors. |
+| `bookshelf` Bookshelf | 1x1 · floor | read:read study:read homework:read | living / shelves | Frame, Back | Use | `book_out`: a red book on the third shelf tips out 25° for read, study and homework, and back at the end. Its back is on the wall face. Read, study and homework are done on a seat within 4 m (`seatNear`), else standing (Q-14). |
+| `bookcaseLow` Low bookcase | 1x1 · floor | read:read | living / shelves | Frame, Back | Use | `book_out`. Top 0.9 (content `surface`); a back panel. Read on a seat within 4 m (`seatNear`), else standing. |
+| `bookcaseWide` Library bookcase | 2x1 · floor | read:read study:read homework:read | living / shelves | Frame, Back | Use | `book_out`. Brass knobs on the cupboard doors. Read, study and homework on a seat within 4 m (`seatNear`), else standing. |
 | `shelvingIndustrial` Industrial shelving | 2x1 · floor | — | living / shelves | Frame, Shelves | Static | Static. Top 1.83 (content `surface`); boards 53 cm deep, back on the wall face. |
-| `bookcaseTall` Tall bookcase | 1x1 · floor | read:read study:read | living / shelves | Frame, Back | Use | `book_out`. A dark walnut back. |
-| `bookcaseCorner` Corner bookcase | 1x1 · floor | read:read | living / shelves | Frame, Back | Use | `book_out`. Quarter-round open end shelves to the wall. |
+| `bookcaseTall` Tall bookcase | 1x1 · floor | read:read study:read | living / shelves | Frame, Back | Use | `book_out`. A dark walnut back. Read and study on a seat within 4 m (`seatNear`), else standing. |
+| `bookcaseCorner` Corner bookcase | 1x1 · floor | read:read | living / shelves | Frame, Back | Use | `book_out`. Quarter-round open end shelves to the wall. Read on a seat within 4 m (`seatNear`), else standing. |
 | `cubeShelf` Cube shelf | 1x1 · floor | — | living / shelves | Frame, Back | Static | Static. Top 0.8 (content `surface`); 36 cm deep, back on the wall face. |
 | `ladderShelf` Ladder shelf | 1x1 · floor | — | living / shelves | Frame, Shelves | Static | Static; no back, its top on the wall face. |
 | `displayCabinet` Display cabinet | 1x1 · floor | — | living / shelves | Frame, Back | Static | Static; the brass-framed glass door is a part of its own (`door`, origin on its left hinge), still. (+use) the door swings. |

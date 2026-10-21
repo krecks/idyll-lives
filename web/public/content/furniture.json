@@ -822,6 +822,7 @@
           "id": "breakfast",
           "label": "Have breakfast at the island",
           "anim": "eat",
+          "seatNear": 3,
           "minutes": 20,
           "effects": {
             "hunger": 0.3,
@@ -1438,6 +1439,7 @@
           "id": "magazine",
           "label": "Flip through a magazine",
           "anim": "read",
+          "seatNear": 2,
           "minutes": 15,
           "effects": {
             "fun": 0.15
@@ -1475,6 +1477,7 @@
           "id": "magazine",
           "label": "Flip through a magazine",
           "anim": "read",
+          "seatNear": 2,
           "minutes": 15,
           "effects": {
             "fun": 0.15
@@ -1512,6 +1515,7 @@
           "id": "magazine",
           "label": "Flip through a magazine",
           "anim": "read",
+          "seatNear": 2,
           "minutes": 15,
           "effects": {
             "fun": 0.15
@@ -1548,6 +1552,9 @@
     },
     {
       "id": "tvWall",
+      "provides": [
+        "screen"
+      ],
       "name": "Flat-screen TV",
       "model": "model.tvWall",
       "footprint": [
@@ -1580,6 +1587,9 @@
     },
     {
       "id": "tvRetro",
+      "provides": [
+        "screen"
+      ],
       "name": "Portable TV",
       "model": "model.tvRetro",
       "footprint": [
@@ -1611,6 +1621,9 @@
     },
     {
       "id": "homeCinema",
+      "provides": [
+        "screen"
+      ],
       "name": "Home cinema",
       "model": "model.homeCinema",
       "footprint": [
@@ -1676,6 +1689,7 @@
           "id": "listen",
           "label": "Listen to music",
           "anim": "listen",
+          "seatNear": 4,
           "minutes": 30,
           "effects": {
             "fun": 0.35,
@@ -1719,6 +1733,7 @@
           "id": "listen",
           "label": "Listen to music",
           "anim": "listen",
+          "seatNear": 4,
           "minutes": 30,
           "effects": {
             "fun": 0.3,
@@ -1761,6 +1776,7 @@
           "id": "read",
           "label": "Read a book",
           "anim": "read",
+          "seatNear": 4,
           "minutes": 45,
           "effects": {
             "fun": 0.4
@@ -1795,6 +1811,7 @@
           "id": "read",
           "label": "Read a book",
           "anim": "read",
+          "seatNear": 4,
           "minutes": 45,
           "effects": {
             "fun": 0.5
@@ -1812,6 +1829,7 @@
           "id": "study",
           "label": "Study",
           "anim": "read",
+          "seatNear": 4,
           "minutes": 60,
           "effects": {
             "fun": 0.1
@@ -1830,6 +1848,7 @@
           "id": "homework",
           "label": "Do homework",
           "anim": "read",
+          "seatNear": 4,
           "minutes": 45,
           "homework": 6,
           "effects": {

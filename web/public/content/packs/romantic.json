@@ -137,6 +137,7 @@
           "id": "listen",
           "label": "Listen to love songs",
           "anim": "listen",
+          "seatNear": 4,
           "minutes": 45,
           "pose": "stand",
           "autonomous": true,

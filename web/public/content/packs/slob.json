@@ -87,7 +87,7 @@
           "label": "Raid the snack drawer",
           "anim": "eat",
           "minutes": 8,
-          "pose": "sit",
+          "pose": "stand",
           "autonomous": true,
           "effects": { "hunger": 0.25, "comfort": 0.05 },
           "tags": ["food", "cozy"]
@@ -170,6 +170,7 @@
           "id": "marathon",
           "label": "Gaming marathon",
           "anim": "play",
+          "requires": ["screen"],
           "minutes": 90,
           "pose": "sit",
           "autonomous": true,

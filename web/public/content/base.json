@@ -2607,6 +2607,9 @@
     },
     {
       "id": "tv",
+      "provides": [
+        "screen"
+      ],
       "name": "Television",
       "model": "model.tv",
       "footprint": [
@@ -2648,6 +2651,7 @@
           "id": "read",
           "label": "Read a book",
           "anim": "read",
+          "seatNear": 4,
           "minutes": 45,
           "effects": {
             "fun": 0.45
@@ -2665,6 +2669,7 @@
           "id": "study",
           "label": "Study",
           "anim": "read",
+          "seatNear": 4,
           "minutes": 60,
           "effects": {
             "fun": 0.1
@@ -2682,6 +2687,7 @@
           "id": "homework",
           "label": "Do homework",
           "anim": "read",
+          "seatNear": 4,
           "minutes": 45,
           "homework": 6,
           "effects": {

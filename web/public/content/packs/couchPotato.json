@@ -37,6 +37,7 @@
   "objects": [
     {
       "id": "couchPotato.cinemaWall",
+      "provides": ["screen"],
       "name": "Grand cinema wall",
       "model": "model.couchPotato.cinemaWall",
       "seat": { "height": 0.45, "forward": 0.05, "facing": "back" },

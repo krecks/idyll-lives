@@ -137,6 +137,7 @@
           "id": "program",
           "label": "Program a cleaning route",
           "anim": "type",
+          "seatNear": 4,
           "minutes": 45,
           "pose": "stand",
           "autonomous": true,

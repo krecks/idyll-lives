@@ -811,6 +811,9 @@
     },
     {
       "id": "tvStandLow",
+      "provides": [
+        "screen"
+      ],
       "name": "Low TV bench",
       "model": "model.tvStandLow",
       "footprint": [
@@ -859,6 +862,7 @@
           "id": "read",
           "label": "Read a book",
           "anim": "read",
+          "seatNear": 4,
           "minutes": 45,
           "effects": {
             "fun": 0.4
@@ -876,6 +880,7 @@
           "id": "study",
           "label": "Study",
           "anim": "read",
+          "seatNear": 4,
           "minutes": 60,
           "effects": {
             "fun": 0.1
@@ -911,6 +916,7 @@
           "id": "read",
           "label": "Read a book",
           "anim": "read",
+          "seatNear": 4,
           "minutes": 45,
           "effects": {
             "fun": 0.4

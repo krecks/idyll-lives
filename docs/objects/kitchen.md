@@ -147,7 +147,7 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `kitchenIsland` Kitchen island | 2x1 · floor | sandwich:cook breakfast:eat | kitchen / counters | Cabinet, Worktop | Use | `drawer_open`: a drawer slides out for sandwich (not for breakfast: residents sit at it). |
+| `kitchenIsland` Kitchen island | 2x1 · floor | sandwich:cook breakfast:eat | kitchen / counters | Cabinet, Worktop | Use | `drawer_open`: a drawer slides out for sandwich (not for breakfast). Breakfast is eaten on a stool at its back, or any seat within 3 m (`seatNear`), else standing. |
 | `islandSmall` Small island | 1x1 · floor | — | kitchen / islands | Cabinet, Worktop | Static | Static. |
 | `islandLong` Long island | 3x1 · floor | — | kitchen / islands | Cabinet, Worktop | Static | Static. |
 | `barSegment` Bar counter | 1x1 · floor | — | kitchen / islands | Cabinet, Worktop | Static | Static. |

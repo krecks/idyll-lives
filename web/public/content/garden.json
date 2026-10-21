@@ -2155,6 +2155,7 @@
           "id": "birdwatch",
           "label": "Watch the birds",
           "anim": "look",
+          "seatNear": 6,
           "minutes": 20,
           "effects": {
             "fun": 0.12,
