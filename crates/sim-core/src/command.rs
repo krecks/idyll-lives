@@ -97,6 +97,14 @@ pub enum Command {
         household: u32,
         amount: i64,
     },
+    /// Sets a resident's skill (content `skills` id) to `level`, within 0 and the most there is.
+    /// For tests and checks in the browser (`check.mjs play --skills`, through `?debug`'s
+    /// `__send`); no menu sends it.
+    SetSkill {
+        sim: u32,
+        skill: String,
+        level: f32,
+    },
     /// Queue an interaction on an object for a Sim.
     Use {
         sim: u32,

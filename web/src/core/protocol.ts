@@ -12,6 +12,8 @@ export type Command =
   | { type: 'setPlayerMoves'; enabled: boolean }
   /** Tests and `?debug` only (`__addFunds`): money for a household (negative takes it away, down to 0). */
   | { type: 'addFunds'; household: number; amount: number }
+  /** Tests and `?debug` only (`check.mjs play --skills`): a resident's skill set to a level. */
+  | { type: 'setSkill'; sim: number; skill: string; level: number }
   | { type: 'adopt'; household: number; child: boolean }
   /** "Skip quiet hours": time-lapse while the player's household sleeps or is at work. */
   | { type: 'setAutoFast'; enabled: boolean }

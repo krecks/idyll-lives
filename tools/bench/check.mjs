@@ -21,17 +21,25 @@
  *             framing the object, then sells it and goes on to the next, all on one page. In the
  *             page, every animation frame, it logs the clips playing on the object
  *             (`__renderer.motion`) and the resident's pose and animation (`__sims()`). One JSON
- *             line per use goes to `<out>/play.jsonl`.
+ *             line per use goes to `<out>/play-<run>.jsonl`.
  *               --objects toilet,fridge@23,14,0   which objects (`def` or `def@x,z,rot`), or
- *               --objects-file <path>   one a line (`#` comments). Without a place: on
- *                 `review-stage` a free spot for its layer and footprint (tools/bench/README.md),
+ *               --objects-file <path>   one a line (`#` comments), each
+ *                 `def[@x,z,rot | @existing] [with helper[@x,z,rot] helper…]`. Without a place: on
+ *                 a `review-*` state a free spot for its layer and footprint (tools/bench/README.md),
  *                 else `--at`, else wherever the game finds room
+ *               --with deskSimple@10,13,2,…   helpers for every object: bought first, kept while its
+ *                 uses run, sold after (a desk at a chair, a table for café chairs); a line's own
+ *                 `with …` adds to them
+ *               --use-existing crib,garden.tomatoes   the state's own (the first of each kind: the
+ *                 crib with the baby, `review-garden`'s ripe crops), run first, never sold
+ *               --skills cooking=5,creativity=3   the resident's skills, set as the state opens
  *               --use all|<id>|<index>   (default all)  --sim 0  --colors body:12  --turn 0
  *               --state bathroom-check  --shots 3 --every 1000 (ms)  --wait 60 (s, from the use
  *                 sent to the resident using it)
  *               --walk 3 (speed walking there, at most 3 = 10×)  --speed 1 (from 3 tiles off)
- *               --radius --beta --alpha --y (the camera; default from the object's size and facing)
- *               --hour 12 (the renderer's light only; the state sets the clock)
+ *               --radius --beta --alpha --y (the camera; default from the model's size and facing)
+ *               --hour 12 (the renderer's light only; the state sets the clock; on a `*-night`
+ *                 state none, the light the sim's clock gives; `--hour state` for none anywhere)
  *               --free-will (leave it on: with `needy-check`, to watch them go on their own)
  *             The old single object: --object deskSimple --at 23,14,0 (corner and rot) --use sit
  *               (default 0) --shots 6 --every 500; the camera follows the resident as before.
@@ -50,13 +58,15 @@
  *
  *   Common:  --port <n> (its own Vite, --strictPort: a port in use is an error, never someone
  *            else's server) | --url http://localhost:<n>;  --out <dir> (default
- *            <repo>/bench-results/check-<time>);  --quality low|medium|high;  --renderer webgl;
+ *            <repo>/bench-results/check-<time>);  --name <run> (the run's log is
+ *            `<what>-<run>.json`, default the time it started, so runs into one `--out` keep theirs;
+ *            given, `play`'s pictures start with it too);  --quality low|medium|high;  --renderer webgl;
  *            --size 1280x800;  --extra 'k=v&k=v' (more URL flags);  --headed (a window: only to
  *            measure timing).
  *
  * The setup fails loudly: the wasm and the asset manifest are fetched through the server first
  * (each must answer 200), and every HTTP error, failed request, page error and console error is
- * logged with the job it happened in (`<what>.json`, `play.jsonl`).
+ * logged with the job it happened in (`<what>-<run>.json`, `play-<run>.jsonl`).
  *
  * Needs `pnpm wasm` first (play), and Playwright: `PLAYWRIGHT=<path to playwright/index.mjs>` if it
  * isn't installed in web/, `CHROME=<executable>` for a browser of your own (Chrome or Chrome for
@@ -99,12 +109,14 @@ const base = url ?? `http://localhost:${port}`;
 const stamp = new Date().toISOString().replace(/\.\d+Z$/, '').replace(/[:T]/g, '-');
 const out = flag('out', what === 'sheet' ? join(resolve(need('dir')), 'sheets') : join(ROOT, 'bench-results', `check-${stamp}`));
 mkdirSync(out, { recursive: true });
+/** This run's name: its log files are `<what>-<run>.json(l)`, never another run's. */
+const run = flag('name')?.replace(/[^A-Za-z0-9_.-]+/g, '_') ?? `${stamp}-${process.pid}`;
 const [width, height] = flag('size', '1280x800').split('x').map(Number);
 /** URL flags every page gets. */
 const common = new URLSearchParams(flag('extra', ''));
 if (flag('quality')) common.set('quality', flag('quality'));
 if (flag('renderer')) common.set('renderer', flag('renderer'));
-const log = { what, args, setup: {}, jobs: [], shots: [] };
+const log = { what, run, args, setup: {}, jobs: [], shots: [] };
 const started = Date.now();
 const since = () => Math.round((Date.now() - started) / 100) / 10;
 
@@ -181,6 +193,14 @@ function pageHelpers() {
     const text = document.body?.innerText ?? '';
     return LOADING.find((l) => text.includes(l)) ?? null;
   };
+  // The game's toasts as they come (a buy or a use refused says why there, for a few seconds).
+  const toasts = [];
+  new MutationObserver(() => {
+    for (const el of document.querySelectorAll('.toast:not([data-check-seen])')) {
+      el.setAttribute('data-check-seen', '');
+      if (toasts.length < 500) toasts.push({ t: performance.now(), text: el.textContent.trim() });
+    }
+  }).observe(document, { childList: true, subtree: true });
   /** Most changes logged per clip and for the resident (a loop's rounds would go on). */
   const MAX_EVENTS = 200;
   let w = null;
@@ -210,11 +230,68 @@ function pageHelpers() {
     w.last = key;
     if (using && w.usingAt === null) w.usingAt = t;
     if (s.doing || s.queue.length || using) w.busyAt = t;
-    // Fast while walking there, the use's own speed from a few tiles off (fast skips short uses).
-    if (w.slowedAt === null && (using || Math.hypot(s.x - w.near.x, s.z - w.near.z) < w.near.r)) {
+    // Fast while walking there, the use's own speed from a few tiles off (fast skips short uses);
+    // a cook's steps at the fridge and the counter first go fast too (they aren't at it yet).
+    if (w.slowedAt === null && (using || (s.object === w.id && Math.hypot(s.x - w.near.x, s.z - w.near.z) < w.near.r))) {
       window.__send({ type: 'setSpeed', speed: w.near.speed });
       w.slowedAt = t;
     }
+  }
+  /**
+   * An object's body as drawn: its vertices in the world, x, y, z flat (at most 50,000 a mesh),
+   * through its instance's matrix; null when it isn't drawn (yet). Its vertices, not its meshes'
+   * boxes: a box turned with the model is far bigger than a round crown.
+   */
+  function points(id) {
+    const pop = window.__renderer?.placed?.find((p) => p.id === id)?.pop;
+    if (!pop?.matrices) return null;
+    const m = pop.matrices.subarray(pop.index * 16, pop.index * 16 + 16);
+    const all = [];
+    for (const mesh of pop.meshes) {
+      const v = mesh.getVerticesData?.('position');
+      if (!v) continue;
+      const step = 3 * Math.max(1, Math.floor(v.length / 3 / 50_000));
+      for (let i = 0; i < v.length; i += step) {
+        const [x, y, z] = [v[i], v[i + 1], v[i + 2]];
+        all.push(x * m[0] + y * m[4] + z * m[8] + m[12], x * m[1] + y * m[5] + z * m[9] + m[13], x * m[2] + y * m[6] + z * m[10] + m[14]);
+      }
+    }
+    return all.length ? all : null;
+  }
+  /** The corners of what `points` gives (`lo`, `hi`: x, y, z), or null. */
+  function bounds(id) {
+    const p = points(id);
+    if (!p) return null;
+    const lo = [Infinity, Infinity, Infinity];
+    const hi = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < p.length; i++) {
+      lo[i % 3] = Math.min(lo[i % 3], p[i]);
+      hi[i % 3] = Math.max(hi[i % 3], p[i]);
+    }
+    return { lo, hi };
+  }
+  /**
+   * How far off the game camera at `alpha`, `beta` looking at `target` has to stand for all of
+   * the object to be in the picture, inside the share `keep` of it across and up (the HUD covers
+   * the top and the bottom); 0 when it isn't drawn. The camera stands at target + r (cos α sin β,
+   * cos β, sin α sin β).
+   */
+  function fit(id, { target, alpha, beta, keep = [0.9, 0.75] }) {
+    const p = points(id);
+    const cam = window.__scene?.activeCamera;
+    if (!p || !cam) return 0;
+    const [sa, ca, sb, cb] = [Math.sin(alpha), Math.cos(alpha), Math.sin(beta), Math.cos(beta)];
+    const tanUp = Math.tan(cam.fov / 2) * keep[1];
+    const tanAcross = Math.tan(cam.fov / 2) * (innerWidth / innerHeight) * keep[0];
+    let r = 0;
+    for (let i = 0; i < p.length; i += 3) {
+      const [x, y, z] = [p[i] - target[0], p[i + 1] - target[1], p[i + 2] - target[2]];
+      const toward = x * ca * sb + y * cb + z * sa * sb;
+      const up = -x * ca * cb + y * sb - z * sa * cb;
+      const across = -x * sa + z * ca;
+      r = Math.max(r, toward + Math.abs(up) / tanUp, toward + Math.abs(across) / tanAcross);
+    }
+    return r;
   }
   const frame = () => {
     if (w) {
@@ -229,6 +306,11 @@ function pageHelpers() {
   requestAnimationFrame(frame);
   window.__check = {
     loading,
+    bounds,
+    fit,
+    /** The page's clock now, and the toasts' texts since such a time. */
+    now: () => performance.now(),
+    toasts: (since = 0) => toasts.filter((x) => x.t >= since).map((x) => x.text),
     watch(o) {
       w = { ...o, t0: performance.now(), frames: 0, clips: {}, resident: [], last: '', usingAt: null, slowedAt: null, busyAt: 0, errors: [] };
     },
@@ -278,8 +360,14 @@ function pageUrl(path, params) {
   return `${base}${path}?${q}`;
 }
 
+/** Whether a picture of an earlier run was written over (said once). */
+let overwrote = false;
 async function shot(page, name, extra = {}) {
   const file = join(out, `${name}.png`);
+  if (!overwrote && existsSync(file) && !log.shots.some((s) => s.file === file)) {
+    overwrote = true;
+    console.warn(`check: ${file} was there from an earlier run and is written over (--name <run> keeps both)`);
+  }
   await page.screenshot({ path: file });
   log.shots.push({ file, ...extra });
   console.log(file);
@@ -348,23 +436,53 @@ if (what === 'clips') {
 
 if (what === 'play') {
   const state = flag('state', 'bathroom-check');
-  const batch = Boolean(flag('objects') || flag('objects-file'));
-  /** Each thing to buy: its content id and, if given, where (`[x, z, rot]`). */
-  const parse = (line) => {
-    const [def, at] = line.split('@').map((s) => s.trim());
-    return { def, at: at ? at.split(',').map(Number) : flag('at') ? flag('at').split(',').map(Number) : null };
+  const batch = Boolean(flag('objects') || flag('objects-file') || flag('use-existing'));
+  /** `x,z,rot` as numbers (null: none given); anything else stops the run. */
+  const place = (text, line) => {
+    if (!text) return null;
+    const at = text.split(',').map(Number);
+    if (at.length !== 3 || at.some((n) => !Number.isInteger(n))) fail(`'${text}' in '${line}' isn't a place: x,z,rot`);
+    return at;
   };
-  // `--objects a,b@23,14,0,c`: the numbers after an `@` belong to it.
-  const objects = () =>
-    flag('objects')
-      .split(',')
-      .reduce((all, part) => (/^-?[\d.]+$/.test(part.trim()) && all.length && all.at(-1).includes('@') ? (all[all.length - 1] += `,${part}`) : all.push(part), all), []);
+  // `a,b@23,14,0,c` (or with spaces between, for helpers): the numbers after an `@` belong to it.
+  const items = (text, by = ',') =>
+    text
+      .split(by)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .reduce((all, part) => (/^-?[\d.]+$/.test(part) && all.length && all.at(-1).includes('@') ? (all[all.length - 1] += `,${part}`) : all.push(part), all), []);
+  /** A helper (`def` or `def@x,z,rot`): where the game finds room without a place. */
+  const helper = (item, line) => {
+    const [def, at] = item.split('@');
+    return { def, at: place(at, line) };
+  };
+  const withAll = items(flag('with', '')).map((h) => helper(h, '--with'));
+  /**
+   * Each thing to use: its content id; where (`[x, z, rot]`, if given) or `existing` (the state's
+   * own); and its helpers (`with`), the line's after `--with`'s.
+   */
+  const parse = (line) => {
+    const [main, ...more] = line.split(/\s+with\s+/);
+    const [def, at] = main.split('@').map((s) => s.trim());
+    const helpers = [...withAll, ...more.flatMap((m) => items(m, /[\s,]+/)).map((h) => helper(h, line))];
+    if (at === 'existing') return { def, existing: true, at: null, helpers };
+    return { def, at: place(at, line) ?? place(flag('at'), '--at'), helpers };
+  };
   const things = batch
-    ? (flag('objects-file') ? readFileSync(flag('objects-file'), 'utf8').split('\n') : objects())
-        .map((l) => l.replace(/#.*/, '').trim())
-        .filter(Boolean)
-        .map(parse)
-    : [{ def: need('object'), at: flag('at', '23,14,0').split(',').map(Number) }];
+    ? [
+        ...items(flag('use-existing', '')).map((def) => parse(`${def}@existing`)),
+        ...(flag('objects-file') ? readFileSync(flag('objects-file'), 'utf8').split('\n') : items(flag('objects', '')))
+          .map((l) => l.replace(/#.*/, '').trim())
+          .filter(Boolean)
+          .map(parse),
+      ]
+    : [{ def: need('object'), at: place(flag('at', '23,14,0'), '--at'), helpers: withAll }];
+  /** `--skills cooking=5,creativity=3`: the resident's, set each time the state opens. */
+  const skills = items(flag('skills', '')).map((p) => {
+    const [skill, level] = p.split('=');
+    if (!skill || !Number.isFinite(Number(level))) fail(`'${p}' in --skills isn't <skill>=<level>`);
+    return { skill, level: Number(level) };
+  });
   const sim = num('sim', 0);
   const which = flag('use', batch ? 'all' : '0');
   const shots = num('shots', batch ? 3 : 6);
@@ -377,8 +495,14 @@ if (what === 'play') {
   const follow = !batch || has('follow');
   const colors = flag('colors') ? Object.fromEntries(flag('colors').split(',').map((p) => p.split(':')).map(([k, v]) => [k, Number(v)])) : undefined;
   const turn = num('turn', 0);
-  const hour = flag('hour', batch ? '12' : undefined);
-  const records = join(out, 'play.jsonl');
+  // A night state's light is its clock's (a fixed noon would light the night up).
+  const hourFlag = flag('hour', batch && !/-night$/.test(state) ? '12' : undefined);
+  const hour = hourFlag === 'state' ? undefined : hourFlag;
+  /** The stage's states (`review-stage`, `-night`, `review-garden`): the same free spots. */
+  const stage = state.startsWith('review-');
+  /** Pictures of a named run start with its name. */
+  const prefix = flag('name') ? `${run}-` : '';
+  const records = join(out, `play-${run}.jsonl`);
   writeFileSync(records, '');
   const write = (record) => appendFileSync(records, JSON.stringify(record) + '\n');
 
@@ -394,10 +518,14 @@ if (what === 'play') {
     await page.waitForFunction(() => typeof window.__sims === 'function' && window.__world?.() && window.__sims().length > 0, null, { timeout: 90_000 });
     await loaded();
     await settle(page, 1500);
-    await page.evaluate((freeWill) => {
+    const unknown = await page.evaluate(({ freeWill, sim, skills }) => {
       window.__send({ type: 'setAutonomy', enabled: freeWill, household: 0 });
       window.__addFunds(1_000_000);
-    }, has('free-will'));
+      const known = window.__content.skills.map((s) => s.id);
+      for (const s of skills) if (known.includes(s.skill)) window.__send({ type: 'setSkill', sim, skill: s.skill, level: s.level });
+      return skills.map((s) => s.skill).filter((s) => !known.includes(s));
+    }, { freeWill: has('free-will'), sim, skills });
+    if (unknown.length) fail(`no skill ${unknown.join(', ')} in the content`);
     const s = await resident();
     if (!s) throw new Error(`no resident ${sim} in ${state}`);
     park = [s.x, s.z];
@@ -419,7 +547,7 @@ if (what === 'play') {
     await page.evaluate(() => window.__send({ type: 'setSpeed', speed: 1 }));
   }
 
-  /** Where `def` goes by default on `review-stage` (`check_states.rs`), by its layer and footprint; null: anywhere free. */
+  /** Where `def` goes by default on the `review-*` states (`check_states.rs`), by its layer and footprint; null: anywhere free. */
   const stageSpot = (def) =>
     page.evaluate((id) => {
       const d = window.__content.object(id);
@@ -433,7 +561,12 @@ if (what === 'play') {
       return d.fillsWall ? [x, 18 - dd, 2] : [x, 12 - Math.floor(dd / 2), 0];
     }, def);
 
-  /** The object's footprint middle, its facing and layer, for the camera (null: gone). */
+  /**
+   * The object's footprint middle, its facing and layer, and for the camera the model's bounds as
+   * drawn (null: gone). `bounds`: its body's corners (`__check.bounds`: a tree's crown reaches well
+   * past its footprint); `box`: its height and bottom (`objectBox`); either null when it isn't
+   * drawn yet.
+   */
   const placed = (id) =>
     page.evaluate((id) => {
       const o = window.__world().objects.find((x) => x.id === id);
@@ -441,28 +574,50 @@ if (what === 'play') {
       const d = window.__content.object(o.def);
       const [fw, fd] = d?.footprint ?? [1, 1];
       const [w, dd] = o.rot % 2 ? [fd, fw] : [fw, fd];
-      return { x: o.x, z: o.z, rot: o.rot, open: Boolean(o.open), mid: [o.x + w / 2, o.z + dd / 2], size: [w, dd], layer: d?.layer ?? 'floor' };
+      const box = window.__renderer?.objectBox?.(id) ?? null;
+      return { x: o.x, z: o.z, rot: o.rot, open: Boolean(o.open), growth: o.growth ?? null, mid: [o.x + w / 2, o.z + dd / 2], size: [w, dd], layer: d?.layer ?? 'floor', box, bounds: window.__check.bounds(id), fov: window.__scene?.activeCamera?.fov ?? 0.7 };
     }, id);
+
+  /** Models up to this tall (m) are looked at from the usual height; taller ones at their middle. */
+  const TALL = 1.6;
 
   /**
    * Frames the object (not the resident): its footprint's middle, from in front and a little to
-   * the side, as far off as its size needs. Set again before each picture (the intro's tween and
-   * the game's own watching move the camera).
+   * the side, as far off as its size needs and the model's bounds as drawn (a tree's crown, a
+   * wardrobe, a shower: never cut off), a tall one looked at halfway up. Without bounds (not
+   * drawn yet) its height from `objectBox`, else a guess from the footprint. Set again before each
+   * picture (the intro's tween and the game's own watching move the camera). The view.
    */
   async function aim(id, use) {
-    if (follow) return;
+    if (follow) return null;
     const p = await placed(id);
-    if (!p) return;
-    const { mid, size, layer, rot } = p;
+    if (!p) return null;
+    const { mid, size, layer, rot, box, bounds, fov } = p;
     // The way it faces (rot 0: +z), so the camera stands in front, 0.7 rad round to the side (the
     // resident at it hides less of it).
     const facing = [Math.PI / 2, 0, -Math.PI / 2, Math.PI][rot % 4];
-    const y = num('y', layer === 'wall' ? 1.3 : layer === 'ceiling' ? 1.9 : use?.pose === 'lie' ? 0.5 : 0.7);
-    const view = { alpha: num('alpha', facing + 0.7), beta: num('beta', layer === 'ceiling' ? 1.3 : 0.95), radius: num('radius', Math.max(3.2, 1.2 * Math.max(...size) + 2.4)), target: [mid[0], y, mid[1]] };
-    await page.evaluate((view) => {
+    const alpha = num('alpha', facing + 0.7);
+    const beta = num('beta', layer === 'ceiling' ? 1.3 : 0.95);
+    const [bottom, height, from] = bounds ? [bounds.lo[1], bounds.hi[1], 'bounds'] : box ? [box.bottom, box.height, 'box'] : [0, layer === 'floor' ? 1 + 0.5 * Math.max(...size) : 0.8, 'guess'];
+    const tall = layer !== 'ceiling' && height - bottom > TALL;
+    const usual = layer === 'wall' ? 1.3 : layer === 'ceiling' ? 1.9 : use?.pose === 'lie' ? 0.5 : 0.7;
+    const target = [mid[0], num('y', tall ? (bottom + height) / 2 : usual), mid[1]];
+    // At least as far as the footprint needs (with room for the resident at it); further when the
+    // model's vertices need it (`__check.fit`), or without them a tall one's height as seen from
+    // `beta`. (The game camera never comes nearer than its own limit, 6.)
+    const near = Math.max(3.2, 1.2 * Math.max(...size) + 2.4);
+    const across = 0.5 * ((height - bottom) * Math.sin(beta) + Math.max(...size) * Math.abs(Math.cos(beta)));
+    const fit = bounds ? await page.evaluate((a) => window.__check.fit(a.id, a), { id, target, alpha, beta }) : tall ? (1.4 * across) / Math.tan(fov / 2) : 0;
+    const view = { alpha, beta, radius: num('radius', Math.max(near, fit)), target };
+    // The pose the camera takes (its radius within its limits, as from its next frame).
+    const took = await page.evaluate((view) => {
       window.__controls.follow(null);
-      window.__camera(view);
+      const pose = window.__camera(view);
+      const cam = window.__scene?.activeCamera;
+      return { ...pose, radius: Math.min(Math.max(pose.radius, cam?.lowerRadiusLimit ?? 0), cam?.upperRadiusLimit ?? Infinity) };
     }, view);
+    const round = (v) => v.map((x) => +x.toFixed(2));
+    return { alpha: +took.alpha.toFixed(3), beta: +took.beta.toFixed(3), radius: +took.radius.toFixed(2), target: round(took.target), height: +height.toFixed(2), bottom: +bottom.toFixed(2), from, ...(bounds ? { bounds: { lo: round(bounds.lo), hi: round(bounds.hi) } } : {}) };
   }
 
   /** The resident as `__sims()` has them (null: not there). */
@@ -475,7 +630,7 @@ if (what === 'play') {
   /** Buys `def` (at `at`, or where the game finds room); its id and where it stands, or an error. */
   async function buy(def, at) {
     await loaded();
-    const before = await page.evaluate(() => window.__world().objects.map((o) => o.id));
+    const [before, sent] = await page.evaluate(() => [window.__world().objects.map((o) => o.id), window.__check.now()]);
     await page.evaluate(
       ({ def, at, colors, turn }) => window.__send({ type: 'buy', household: 0, object: def, ...(at ? { at } : {}), ...(colors ? { colors } : {}), ...(turn ? { turn } : {}) }),
       { def, at, colors, turn },
@@ -484,7 +639,11 @@ if (what === 'play') {
       .waitForFunction(({ def, before }) => window.__world().objects.find((o) => o.def === def && !before.includes(o.id))?.id, { def, before }, { timeout: 10_000 })
       .then((h) => h.jsonValue())
       .catch(() => null);
-    if (id === null) return { error: `not bought: ${def}${at ? ` at ${at}` : ''} (is the spot free? on screen: ${await screenText()})` };
+    if (id === null) {
+      // The game's own reason, from its toast.
+      const said = await page.evaluate((sent) => window.__check.toasts(sent), sent);
+      return { error: `not bought: ${def}${at ? ` at ${at}` : ''} (${said.length ? `the game: ${said.join('; ')}` : `is the spot free? on screen: ${await screenText()}`})` };
+    }
     const where = await placed(id);
     // A late or misplaced buy puts the wrong thing in a plausible picture: say so.
     const mismatch = at && (where.x !== at[0] || where.z !== at[1] || where.rot !== at[2]) ? `stands at ${where.x},${where.z},${where.rot}, not ${at}` : null;
@@ -538,17 +697,20 @@ if (what === 'play') {
   /**
    * One use: watched from the frame it's sent, walking fast and slowing down near the object, up
    * to `cap` ms until the resident is using it, then `shots` pictures `every` ms apart framing the
-   * object, then stopped. One record in `play.jsonl`.
+   * object, then stopped. One record in `play-<run>.jsonl`.
    */
   async function runUse(thing, bought, use, attempt, helper = null) {
-    const name = `${slug(thing.def)}-${slug(use.id)}`;
-    const record = { object: thing.def, id: bought.id, at: [bought.where.x, bought.where.z, bought.where.rot], use: use.id, index: use.index, label: use.label, pose: use.pose ?? null, anim: use.anim ?? null, attempt, ...(helper ? { helper } : {}), outcome: null, shots: [], errors: [] };
+    // (A kind used twice in a run, in two places: the place in its pictures' names too.)
+    const twice = things.filter((t) => t.def === thing.def).length > 1 ? `-${bought.where.x}-${bought.where.z}-${bought.where.rot}` : '';
+    const name = `${prefix}${slug(thing.def)}${twice}-${slug(use.id)}`;
+    const record = { object: thing.def, id: bought.id, at: [bought.where.x, bought.where.z, bought.where.rot], use: use.id, index: use.index, label: use.label, pose: use.pose ?? null, anim: use.anim ?? null, attempt, ...(helper ? { helper } : {}), ...about(thing, bought), outcome: null, shots: [], errors: [] };
     const j = startJob(`${thing.def}/${use.id}`, { attempt });
     const t0 = Date.now();
     await loaded();
     const bg = await background(bought.id);
     record.before = await resident();
     const near = { x: bought.where.mid[0], z: bought.where.mid[1], r: 3 + Math.max(...bought.where.size) / 2, speed };
+    const sent = await page.evaluate(() => window.__check.now());
     await page.evaluate(
       ({ id, sim, interaction, walk, near, follow, view }) => {
         window.__check.watch({ id, sim, near });
@@ -574,10 +736,12 @@ if (what === 'play') {
       .catch((err) => `error: ${err.message.split('\n')[0]}`);
     record.usingAfter = (await page.evaluate(() => window.__check.watched()?.usingAt)) ?? null;
     if (record.outcome !== 'using') record.screen = await screenText();
+    // What the game said meanwhile (a use refused: "needs a table", "isn't ripe yet").
+    record.toasts = await page.evaluate((sent) => window.__check.toasts(sent), sent);
     if (record.outcome === 'using' && !helper) {
       for (let i = 0; i < shots; i++) {
         await loaded();
-        await aim(bought.id, use);
+        record.view = (await aim(bought.id, use)) ?? undefined;
         await settle(page, 120);
         const info = await page.evaluate(
           ({ sim, id }) => {
@@ -595,7 +759,7 @@ if (what === 'play') {
           },
           { sim, id: bought.id },
         );
-        const file = await shot(page, batch ? `${name}-${String(i).padStart(2, '0')}` : `play-${thing.def}-${bought.where.x}-${bought.where.z}-${bought.where.rot}-${String(i).padStart(2, '0')}`, info);
+        const file = await shot(page, batch ? `${name}-${String(i).padStart(2, '0')}` : `${prefix}play-${thing.def}-${bought.where.x}-${bought.where.z}-${bought.where.rot}-${String(i).padStart(2, '0')}`, info);
         record.shots.push({ file, ...info });
         if (i < shots - 1) await settle(page, every);
       }
@@ -631,22 +795,61 @@ if (what === 'play') {
     if (by) await runUse(thing, bought, by, attempt, want ? 'open' : 'close');
   }
 
-  /** Buys `thing`, runs `uses` (those `pick` keeps), sells it. The uses that failed. */
+  /** What a record says of how its object was set up: the state's own, its helpers, the skills given. */
+  const about = (thing, bought) => ({
+    ...(thing.existing ? { existing: true } : {}),
+    ...(bought.with?.length ? { with: bought.with } : {}),
+    ...(skills.length ? { skills: Object.fromEntries(skills.map((s) => [s.skill, s.level])) } : {}),
+  });
+
+  /** The state's own `def` (the first of its kind): its id and where it stands, or an error. */
+  async function existing(def) {
+    await loaded();
+    const id = await page.evaluate((def) => window.__world().objects.find((o) => o.def === def)?.id ?? null, def);
+    if (id === null) return { error: `no ${def} in ${state} (--use-existing takes what the state has)` };
+    return { id, where: await placed(id) };
+  }
+
+  /** Sells what was bought for one object, the last bought first; whether each went is logged. */
+  async function sellAll(ids) {
+    for (const { def, id } of [...ids].reverse()) if (!(await sell(id))) noteError(`not sold: ${def} (${id})`);
+  }
+
+  /**
+   * Buys `thing`'s helpers, then `thing` (or takes the state's own), runs `uses` (those `pick`
+   * keeps), sells what it bought. The uses that failed.
+   */
   async function runObject(thing, pick, attempt) {
     startJob(`${thing.def} (buy)`, { attempt });
-    if (!(await page.evaluate((def) => Boolean(window.__content.object(def)), thing.def))) {
-      noteError(`no object '${thing.def}' in the content`);
-      write({ object: thing.def, use: null, attempt, outcome: 'unknown object' });
+    const missing = await page.evaluate((defs) => defs.filter((d) => !window.__content.object(d)), [thing.def, ...thing.helpers.map((h) => h.def)]);
+    if (missing.length) {
+      noteError(`no object '${missing.join("', '")}' in the content`);
+      write({ object: thing.def, use: null, attempt, outcome: 'unknown object', unknown: missing });
       return { failed: [], bought: false, unknown: true };
     }
-    const at =thing.at ?? (state === 'review-stage' ? await stageSpot(thing.def) : null);
-    const bought = await buy(thing.def, at);
+    // The helpers first (a desk, a table), where asked or wherever the game finds room.
+    const helpers = [];
+    for (const h of thing.helpers) {
+      const got = await buy(h.def, h.at);
+      if (got.error) {
+        noteError(got.error);
+        write({ object: thing.def, use: null, attempt, outcome: 'helper not bought', helper: h.def, at: h.at, errors: [got.error] });
+        await sellAll(helpers);
+        return { failed: null, bought: false };
+      }
+      if (got.mismatch) noteError(got.mismatch);
+      helpers.push({ def: h.def, id: got.id, at: [got.where.x, got.where.z, got.where.rot] });
+    }
+    const at = thing.existing ? null : (thing.at ?? (stage ? await stageSpot(thing.def) : null));
+    const bought = thing.existing ? await existing(thing.def) : await buy(thing.def, at);
     if (bought.error) {
       noteError(bought.error);
-      write({ object: thing.def, use: null, at, attempt, outcome: 'not bought', errors: [bought.error] });
+      write({ object: thing.def, use: null, at, attempt, outcome: thing.existing ? 'not there' : 'not bought', errors: [bought.error] });
+      await sellAll(helpers);
       return { failed: null, bought: false };
     }
     if (bought.mismatch) noteError(bought.mismatch);
+    bought.with = helpers.map((h) => `${h.def}@${h.at.join(',')}`);
     const uses = await usesOf(thing.def);
     const chosen = uses.filter(pick);
     if (!chosen.length) {
@@ -654,24 +857,29 @@ if (what === 'play') {
       const offered = uses.map((u) => u.id);
       await aim(bought.id);
       await settle(page, 300);
-      const file = await shot(page, `${slug(thing.def)}-${uses.length ? 'no-such-use' : 'no-uses'}`);
-      write({ object: thing.def, id: bought.id, at: [bought.where.x, bought.where.z, bought.where.rot], use: which, attempt, outcome: uses.length ? 'no such use' : 'no uses', offers: offered, shots: [{ file }] });
+      const view = await aim(bought.id);
+      await settle(page, 300);
+      const file = await shot(page, `${prefix}${slug(thing.def)}-${uses.length ? 'no-such-use' : 'no-uses'}`);
+      write({ object: thing.def, id: bought.id, at: [bought.where.x, bought.where.z, bought.where.rot], use: which, attempt, ...about(thing, bought), outcome: uses.length ? 'no such use' : 'no uses', offers: offered, view, shots: [{ file }] });
       console.warn(uses.length ? `${thing.def} has no interaction '${which}' (it offers: ${offered.join(', ')})` : `${thing.def} has no uses: one picture`);
     }
     const failed = [];
     for (const use of chosen) {
-      // A crop bought new is just planted: its "when ripe" uses aren't offered.
-      if (use.when === 'ripe') {
-        write({ object: thing.def, use: use.id, index: use.index, attempt, outcome: 'skipped', reason: 'only when ripe (bought new, a crop is just planted)' });
+      // A crop bought new is just planted, one picked lies fallow: its "when ripe" uses aren't
+      // offered (`review-garden`'s are ripe: `--use-existing`).
+      if (use.when === 'ripe' && (await placed(bought.id))?.growth !== 2) {
+        const reason = thing.existing ? 'only when ripe (not ripe now)' : 'only when ripe (bought new, a crop is just planted: --use-existing it on review-garden)';
+        write({ object: thing.def, use: use.id, index: use.index, attempt, ...about(thing, bought), outcome: 'skipped', reason });
         continue;
       }
       await ready(thing, bought, uses, use.when === 'open' ? true : use.when === 'closed' ? false : undefined, attempt);
       const record = await runUse(thing, bought, use, attempt);
       if (record.outcome !== 'using') failed.push({ ...use, outcome: record.outcome });
     }
-    // Shut what a use left open (a wall bed folded down), then sell it.
+    // Shut what a use left open (a wall bed folded down), then sell it (not the state's own) and
+    // its helpers.
     await ready(thing, bought, uses, false, attempt);
-    if (!(await sell(bought.id))) noteError(`not sold: ${thing.def} (${bought.id})`);
+    await sellAll([...helpers, ...(thing.existing ? [] : [{ def: thing.def, id: bought.id }])]);
     await goPark();
     return { failed, bought: true };
   }
@@ -874,6 +1082,7 @@ if (what === 'sheet') {
   console.log(`${folder}: ${ids.length} objects, ${count('obj-')} object sheets, ${count('age-')} age sheets in ${out}${log.without.length ? `; no pictures for ${log.without.join(', ')}` : ''}`);
 }
 
-writeFileSync(join(out, `${what}.json`), JSON.stringify(log, null, 2));
+writeFileSync(join(out, `${what}-${run}.json`), JSON.stringify(log, null, 2));
+console.log(`check: ${join(out, `${what}-${run}.json`)}`);
 await browser.close();
 vite?.kill();

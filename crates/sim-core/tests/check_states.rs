@@ -22,7 +22,13 @@
 //!   windows, a crib and a counter, the rest free floor and wall) and a garden behind it, for
 //!   buying one thing after another to look at in use (`check.mjs play --objects`). One resident
 //!   per life stage, free will off, needs at 0.5, on a Saturday morning (the children home).
-//!   Its free spots are at `STAGE_ROOM` below and in `tools/bench/README.md`.
+//!   Its free spots are at `STAGE_ROOM` below and in `tools/bench/README.md`. A small kitchen
+//!   along the right wall (the counter, a fridge and a coffee machine) for cooking and coffee.
+//! - `review-stage-night`: the same stage at 22:00, the clock set rather than run; the lamps as
+//!   the game leaves them (with free will off nobody switches one; a lamp bought comes on).
+//! - `review-garden`: the same stage with every crop kind (content `grows`) in a row at the back
+//!   of the garden, ripe (a crop comes ripe with a lot), for their "when ripe" uses
+//!   (`check.mjs play --use-existing <def>`).
 
 mod common;
 
@@ -209,24 +215,39 @@ fn town_things_lot() {
 /// the middle `(10 - w/2, 12 - d/2, 0)`, the back wall inside `(10 - w/2, 18 - d, 2)`, the left
 /// wall `(4, 8..=12, 1)` and its windows `(4, 14..=15, 1)`, the right wall `(16 - d, 10..=16, 3)`,
 /// the front wall `(7..=12, 6, 0)`, the back wall outside `(4..=15, 18, 0)`, and the garden
-/// `(10 - w/2, 22, 0)` (free from z = 19 to 31, and from x = 18 to 31 beside the room).
+/// `(10 - w/2, 22, 0)` (free from z = 19 to 31, and from x = 18 to 31 beside the room; on
+/// `review-garden` to z = 27, its crops at `GARDEN_ROW`). The kitchen stands at `(15, 7..=9, 3)`,
+/// out of them all.
 const STAGE_ROOM: (i32, i32, i32, i32) = (4, 6, 16, 18);
+/// `review-garden`'s row of crops, facing the house, one every `GARDEN_STEP` tiles from x = 2.
+const GARDEN_ROW: i32 = 29;
+const GARDEN_STEP: i32 = 3;
 
-#[test]
-fn review_stage() {
+/// `review-stage` with `more` objects, on Saturday at `hour` (see the module's docs).
+fn stage(more: &[Value], hour: f32) -> World {
     let merged = common::content();
     let (x0, z0, x1, z1) = STAGE_ROOM;
     let (w, d) = (32, 32);
     // One resident per life stage (`content.life`): an adult first, the one checks use by
     // default; the baby by the crib, the rest in the front yard, out of the room.
     let sim = |name: &str, gender: &str, age: f32, x: f64, z: f64| json!({"name": name, "gender": gender, "age": age, "traits": ["cheerful"], "x": x, "z": z});
+    // A crib for the baby; a counter for things that stand on a top, and beside it along the
+    // right wall a fridge and a coffee machine (cooking at a stove bought, coffee at a table),
+    // all facing -x.
+    let mut objects = vec![
+        json!({"def": "crib", "x": 13, "z": z0, "rot": 0}),
+        json!({"def": "counter", "x": x1 - 1, "z": 7, "rot": 3}),
+        json!({"def": "fridge", "x": x1 - 1, "z": 8, "rot": 3}),
+        json!({"def": "coffeeMachine", "x": x1 - 1, "z": 9, "rot": 3}),
+    ];
+    let fixed = objects.len();
+    objects.extend(more.iter().cloned());
     let lot = json!({
         "width": w, "depth": d,
         "walls": [[x0, z0, x1, z0], [x1, z0, x1, z1], [x1, z1, x0, z1], [x0, z1, x0, z0]],
         "doors": [{"x": 5, "z": z0, "axis": "x"}],
         "windows": [{"x": x0, "z": 14, "axis": "z"}, {"x": x0, "z": 15, "axis": "z"}],
-        // A crib for the baby, and a counter for things that stand on a top.
-        "objects": [{"def": "crib", "x": 13, "z": z0, "rot": 0}, {"def": "counter", "x": x1 - 1, "z": 7, "rot": 3}],
+        "objects": objects,
         "plots": [{"name": "Home", "x": 0, "z": 0, "w": w, "d": d, "entry": [w as f64 / 2.0, 1.5]}],
         "households": [{"name": "The Stages", "plot": 0, "player": true, "funds": FUNDS}],
         "sims": [sim("Ada", "female", 40.0, 20.5, 3.5), sim("Ben", "male", 22.0, 21.5, 3.5), sim("Cal", "male", 15.0, 22.5, 3.5),
@@ -237,7 +258,7 @@ fn review_stage() {
         ],
     });
     let mut world = World::from_json(&merged, &lot.to_string(), 7).unwrap();
-    assert_eq!(world.objects.len(), 2, "the crib and the counter load where they were put");
+    assert_eq!(world.objects.len(), fixed + more.len(), "the crib, the kitchen and the rest load where they were put");
     for s in world.sims.iter_mut() {
         s.job = None;
         s.job_search_from = u32::MAX;
@@ -245,14 +266,14 @@ fn review_stage() {
     world.households[0].free_will = false;
     // Saturday (day 6), so the children aren't at school: the clock is set rather than run, as
     // five days would age everyone two and a half years (two days a year).
-    world.tick = clock::tick_at(6, 10.0 * 60.0).unwrap();
+    world.tick = clock::tick_at(6, hour * 60.0 - 5.0).unwrap();
     assert_eq!(clock::weekday(clock::day(world.tick)), 5);
     for _ in 0..(5.0 / MINUTES_PER_TICK) as u32 {
         world.tick_once();
     }
     free_up(&mut world);
     for i in 0..world.sims.len() {
-        // Half full: a use that fills a need lasts long enough to watch (at 0.8 a toilet's is
+        // Half full: a use that fills one lasts long enough to watch (at 0.8 a toilet's is
         // over in a second), and a long run of them still doesn't wear anyone out.
         set_needs(&mut world, i, 0.5, &[]);
     }
@@ -269,5 +290,75 @@ fn review_stage() {
     let room = world.room_at_tile(10, 12).expect("a room");
     assert!(!room.garden && room.tiles == 144.0 && room.doors == 1 && room.windows == 2, "{:?}", (room.garden, room.tiles, room.doors, room.windows));
     assert!(world.room_at_tile(10, 22).is_some_and(|r| r.garden), "the garden behind");
+    world
+}
+
+/// Resident `sim` is given use `id` of the stage's first `def` (the command is taken and the
+/// use queued), and lets it go again.
+fn takes(w: &mut World, sim: u32, def: &str, id: &str) {
+    let o = w.objects.iter().find(|o| w.content.objects[o.def].id == def).unwrap_or_else(|| panic!("a {def}"));
+    let interaction = w.content.objects[o.def].interactions.iter().position(|i| i.id == id).unwrap_or_else(|| panic!("{def} offers '{id}'"));
+    let object = o.stable;
+    w.apply(Command::Use { sim, object, interaction }).unwrap_or_else(|e| panic!("{def} / {id}: {e}"));
+    let s = &w.sims[sim as usize];
+    assert!(s.current().is_some() || s.queue().next().is_some(), "{def} / {id} queued");
+    w.apply(Command::Cancel { sim, index: 0 }).unwrap();
+}
+
+#[test]
+fn review_stage() {
+    let mut world = stage(&[], 10.0);
     common::dump_state(&world, "review-stage");
+    // The kitchen works without anything bought: a coffee from the machine, a meal from the fridge.
+    takes(&mut world, 0, "coffeeMachine", "espresso");
+    takes(&mut world, 0, "fridge", "meal");
+    // `check.mjs play --skills`: a skill set for a check (`Command::SetSkill`), within its range.
+    let cooking = world.content.skill_index("cooking").unwrap();
+    let max = world.content.skill_rules.max_level;
+    world.apply(Command::SetSkill { sim: 0, skill: "cooking".into(), level: 5.0 }).unwrap();
+    assert_eq!(world.sims[0].skills[cooking], 5.0);
+    world.apply(Command::SetSkill { sim: 0, skill: "cooking".into(), level: max + 3.0 }).unwrap();
+    assert_eq!(world.sims[0].skills[cooking], max);
+    assert!(world.apply(Command::SetSkill { sim: 0, skill: "juggling".into(), level: 1.0 }).is_err());
+    assert!(world.apply(Command::SetSkill { sim: 99, skill: "cooking".into(), level: 1.0 }).is_err());
+}
+
+#[test]
+fn review_stage_night() {
+    let world = stage(&[], 22.0);
+    let hour = clock::hour(world.tick);
+    assert!(sim_core::lights::dark_at(hour * 60.0) && hour >= 22.0, "after dark: {hour}");
+    common::dump_state(&world, "review-stage-night");
+}
+
+#[test]
+fn review_garden() {
+    let merged: Value = serde_json::from_str(&common::content()).unwrap();
+    // Every kind of crop, in a row at the back of the garden facing the house.
+    let mut crops = Vec::new();
+    let mut x = 2;
+    for o in merged["objects"].as_array().unwrap().iter().filter(|o| o.get("grows").is_some()) {
+        let fw = o["footprint"].as_array().map_or(1, |f| f[0].as_i64().unwrap() as i32);
+        assert!(fw < GARDEN_STEP, "{} fits its place in the row", o["id"]);
+        crops.push(json!({"def": o["id"], "x": x, "z": GARDEN_ROW, "rot": 2}));
+        x += GARDEN_STEP;
+    }
+    assert!(crops.len() >= 6 && x <= 32, "every crop in one row: {}", crops.len());
+    let mut world = stage(&crops, 10.0);
+    let ripe: Vec<(String, String)> = world
+        .objects
+        .iter()
+        .filter(|o| world.content.objects[o.def].grows.is_some())
+        .map(|o| {
+            let d = &world.content.objects[o.def];
+            assert!(o.ripe(), "{} ripe", d.id);
+            (d.id.clone(), d.interactions.iter().find(|i| i.ripe).unwrap_or_else(|| panic!("{} has a 'when ripe' use", d.id)).id.clone())
+        })
+        .collect();
+    assert_eq!(ripe.len(), crops.len());
+    common::dump_state(&world, "review-garden");
+    // Each one's "when ripe" use is offered.
+    for (def, id) in &ripe {
+        takes(&mut world, 0, def, id);
+    }
 }
