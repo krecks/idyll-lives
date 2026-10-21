@@ -1,7 +1,7 @@
 # Idyll Lives — Authenticity Review Plan (models, animations, interactions)
 
 - **Base:** `main` at `e725166` (v0.3.0)
-- **Status:** In progress (pilot done; owner checkpoint passed 2026-10-21; tooling round before waves 2–6)
+- **Status:** In progress: review done, triage done (2026-10-21), Phase 4 fixes under way (`docs/authenticity-review.md` §11)
 - **Output:** `docs/authenticity-review.md` (findings, fixes, leftovers, laid out like `docs/release-0.2.0-review.md`) plus one ledger per category in `docs/review/`
 
 ## 1. Intent

@@ -419,7 +419,7 @@ In all: 72 groups.
 | G-42 | Blender | Seated skirts and jackets drape. | M-residents-02 | S3 | model | M | — |
 | G-43 | code | Two bodies in one place: standing users of shared things. | I-hobbies-07, I-community-08, I-systems-10 | S1 | code | M | Better with `play --sims` (tooling) |
 | G-44 | code | Climb the bunk bed's ladder. | A-bedroom-02 | S1 | code, clip | M | Q-02; who may take the upper bunk: G-45 |
-| G-45 | code | Age rules: who may use what, also on a direct use. **New behaviour — filed only, planned later.** | I-kids-03, I-kitchen-06, I-community-04, I-systems-04, I-kids-08 | S1 | code, content | L | Q-01: it needs the age-rule behaviour the owner put off (decision 3) |
+| G-45 | code | Age rules: who may use what, also on a direct use. **Fix now (owner, 2026-10-21).** | I-kids-03, I-kitchen-06, I-community-04, I-systems-04, I-kids-08 | S1 | code, content | L | Q-01: it needs the age-rule behaviour the owner put off (decision 3) |
 | G-46 | code | Blankets, pyjamas and bath clothes. | M-bedroom-04, A-bedroom-04, I-bedroom-01, I-bathroom-03 | S2 | code (one decision) | M | Q-10 (bath clothes) |
 | G-47 | code | The seat for watching faces the screen. | I-living-05 | S2 | code | S | — |
 | G-48 | code | Doors and gates open for the one going through. | A-houses-01, A-houses-02, A-town-02 | S2 | code | M | Q-03; doors by hand stay new behaviour (decision 3) |
@@ -436,14 +436,14 @@ In all: 72 groups.
 | G-59 | code | Town leftovers: far ground models, the unused hedge. | M-town-01, M-town-02 | S3 | code (decision) | S | Q-09 |
 | G-60 | code | Lamps: where their light goes, when they are on, the fan and the fire. | M-lighting-02, M-community-06, I-lighting-01, A-lighting-01, I-decor-03 | S3 | code (one decision) | L | Q-11 (a lamp bought on or off) |
 | G-61 | code | A night on the sofa bed. | I-living-04 | S2 | decision | M | Q-15 |
-| G-62 | code | A place and a facing per slot. *New behaviour: its own planned item.* | I-outdoor-07 | S2 | code | L | Then G-39 |
-| G-63 | code | Uses on things that stand on tops. *New behaviour: its own planned item.* | I-tabletop-01, I-tabletop-04 | S2 | code | L | Q-20 |
-| G-64 | code | Conditions: a time, a place, something to work on. *New behaviour: its own planned item.* | I-hobbies-03, I-kitchen-11, I-bathroom-07 | S2 | code | L | — |
-| G-65 | code | Two-player things need a partner. *New behaviour: its own planned item.* | I-community-03, I-hobbies-01 | S2 | code (decision) | L | G-43, G-62; Q-16 |
-| G-66 | code | Babies at the high chair and the changing table. *New behaviour: its own planned item.* | I-kids-01, I-kids-05 | S2 | code | L | — |
-| G-67 | code | Food: who sells it, where it comes from, where it is eaten. *New behaviour: its own planned item.* | I-community-09, I-community-10, I-kitchen-10, I-systems-03 | S2 | code (decisions) | L | Q-17 |
-| G-68 | code | Crops: sowing, tending that helps, harvests to the kitchen. *New behaviour: its own planned item.* | I-systems-08, I-garden-10 | S3 | code (decisions) | L | Q-18 |
-| G-69 | code | Pairings: feet up on a footstool, changing outfit. *New behaviour: its own planned item.* | I-living-07, I-bedroom-04 | S3 | code | L | — |
+| G-62 | code | A place and a facing per slot. *New behaviour, fixed in this Phase 4 (owner, 2026-10-21).* | I-outdoor-07 | S2 | code | L | Then G-39 |
+| G-63 | code | Uses on things that stand on tops. *New behaviour, fixed in this Phase 4 (owner, 2026-10-21).* | I-tabletop-01, I-tabletop-04 | S2 | code | L | Q-20 |
+| G-64 | code | Conditions: a time, a place, something to work on. *New behaviour, fixed in this Phase 4 (owner, 2026-10-21).* | I-hobbies-03, I-kitchen-11, I-bathroom-07 | S2 | code | L | — |
+| G-65 | code | Two-player things need a partner. *New behaviour, fixed in this Phase 4 (owner, 2026-10-21).* | I-community-03, I-hobbies-01 | S2 | code (decision) | L | G-43, G-62; Q-16 |
+| G-66 | code | Babies at the high chair and the changing table. *New behaviour, fixed in this Phase 4 (owner, 2026-10-21).* | I-kids-01, I-kids-05 | S2 | code | L | — |
+| G-67 | code | Food: who sells it, where it comes from, where it is eaten. *New behaviour, fixed in this Phase 4 (owner, 2026-10-21).* | I-community-09, I-community-10, I-kitchen-10, I-systems-03 | S2 | code (decisions) | L | Q-17 |
+| G-68 | code | Crops: sowing, tending that helps, harvests to the kitchen. *New behaviour, fixed in this Phase 4 (owner, 2026-10-21).* | I-systems-08, I-garden-10 | S3 | code (decisions) | L | Q-18 |
+| G-69 | code | Pairings: feet up on a footstool, changing outfit. *New behaviour, fixed in this Phase 4 (owner, 2026-10-21).* | I-living-07, I-bedroom-04 | S3 | code | L | — |
 | G-70 | code | Props in hand: book, cup, cutlery, phone, tools, the shaker, the cue. **New behaviour — filed only, planned later.** | I-held-01, I-social-01, I-kitchen-13, I-hobbies-05, I-community-11 | S2 | code | L | The coin toss half of I-community-11 is a table change |
 | G-71 | code | Body language and turning on the spot. **New behaviour — filed only, planned later.** | A-residents-07, A-residents-08 | S2 | code | L | — |
 | G-72 | code | Privacy: a private flag, a shut door, a place for a baby. **New behaviour — filed only, planned later.** | I-systems-05, I-social-05 | S3 | code (decision) | L | G-48; Q-21 |
@@ -535,14 +535,14 @@ Every fix follows plan §7.4: a rebuild passes `cargo art <family>`, `cargo chec
 
 **5c. Code: new behaviour, each its own planned item**
 
-1. **G-62** (S2, L) A place and a facing per slot. *New behaviour: its own planned item.* Files: `world.rs:321-333` (`slot_position`), `characters.ts:240-249` (`Seat`), content slots. Verify: `poses.html` with real footprints; two at the picnic table, seesaw, merry-go-round, park chess, ping-pong.
-2. **G-63** (S2, L) Uses on things that stand on tops. *New behaviour: its own planned item.* Files: `content.rs:2738` (the rule), `world.rs` (using a thing on a top from its counter), `catalog2/tabletop.json`. Verify: sim tests; `cargo review uses` (20 "no use" flags go); play the kettle and toaster on a generated kitchen.
-3. **G-64** (S2, L) Conditions: a time, a place, something to work on. *New behaviour: its own planned item.* Files: `content.rs:70` (`Interaction`: an hour, sky or condition field), `world.rs` free will, `base.json:1797-1809` (the night schedule). Verify: sim tests (stargazing only after dark under open sky; washing up only with dishes); `cargo review uses`.
-4. **G-65** (S2, L) Two-player things need a partner. *New behaviour: its own planned item.* Files: `content.rs:70` (a partner condition on an interaction), `world.rs` (pairing two users). Verify: sim tests; two at the seesaw, ping-pong, park chess, foosball.
-5. **G-66** (S2, L) Babies at the high chair and the changing table. *New behaviour: its own planned item.* Files: `content.rs:273-276`, `world.rs:322`, `characters.ts` (`CUDDLE`-style lift), `catalog2/dining.json:744`. Verify: `review-baby`; sim tests `babies`.
-6. **G-67** (S2, L) Food: who sells it, where it comes from, where it is eaten. *New behaviour: its own planned item.* Files: `world.rs:3689-3712` (`requires`), `community.json` sales, `furniture.json` breakfasts, `cooking.rs`. Verify: the café, shop and stall runs; sim tests.
-7. **G-68** (S3, L) Crops: sowing, tending that helps, harvests to the kitchen. *New behaviour: its own planned item.* Files: `world.rs:2765-2786` (`grow`), `content.rs:2064-2074` (`fallow`), `garden.json`, `catalog2/outdoor.json:342`. Verify: sim tests on growth; `review-garden` play.
-8. **G-69** (S3, L) Pairings: feet up on a footstool, changing outfit. *New behaviour: its own planned item.* Files: `furniture.json:1389`, `catalog2/living.json:572`; `outfit.ts:120` (`outfitFor`). Verify: play the armchair with a pouf in front; the wardrobe's outfit changes the clothes.
+1. **G-62** (S2, L) A place and a facing per slot. *New behaviour, fixed in this Phase 4 (owner, 2026-10-21).* Files: `world.rs:321-333` (`slot_position`), `characters.ts:240-249` (`Seat`), content slots. Verify: `poses.html` with real footprints; two at the picnic table, seesaw, merry-go-round, park chess, ping-pong.
+2. **G-63** (S2, L) Uses on things that stand on tops. *New behaviour, fixed in this Phase 4 (owner, 2026-10-21).* Files: `content.rs:2738` (the rule), `world.rs` (using a thing on a top from its counter), `catalog2/tabletop.json`. Verify: sim tests; `cargo review uses` (20 "no use" flags go); play the kettle and toaster on a generated kitchen.
+3. **G-64** (S2, L) Conditions: a time, a place, something to work on. *New behaviour, fixed in this Phase 4 (owner, 2026-10-21).* Files: `content.rs:70` (`Interaction`: an hour, sky or condition field), `world.rs` free will, `base.json:1797-1809` (the night schedule). Verify: sim tests (stargazing only after dark under open sky; washing up only with dishes); `cargo review uses`.
+4. **G-65** (S2, L) Two-player things need a partner. *New behaviour, fixed in this Phase 4 (owner, 2026-10-21).* Files: `content.rs:70` (a partner condition on an interaction), `world.rs` (pairing two users). Verify: sim tests; two at the seesaw, ping-pong, park chess, foosball.
+5. **G-66** (S2, L) Babies at the high chair and the changing table. *New behaviour, fixed in this Phase 4 (owner, 2026-10-21).* Files: `content.rs:273-276`, `world.rs:322`, `characters.ts` (`CUDDLE`-style lift), `catalog2/dining.json:744`. Verify: `review-baby`; sim tests `babies`.
+6. **G-67** (S2, L) Food: who sells it, where it comes from, where it is eaten. *New behaviour, fixed in this Phase 4 (owner, 2026-10-21).* Files: `world.rs:3689-3712` (`requires`), `community.json` sales, `furniture.json` breakfasts, `cooking.rs`. Verify: the café, shop and stall runs; sim tests.
+7. **G-68** (S3, L) Crops: sowing, tending that helps, harvests to the kitchen. *New behaviour, fixed in this Phase 4 (owner, 2026-10-21).* Files: `world.rs:2765-2786` (`grow`), `content.rs:2064-2074` (`fallow`), `garden.json`, `catalog2/outdoor.json:342`. Verify: sim tests on growth; `review-garden` play.
+8. **G-69** (S3, L) Pairings: feet up on a footstool, changing outfit. *New behaviour, fixed in this Phase 4 (owner, 2026-10-21).* Files: `furniture.json:1389`, `catalog2/living.json:572`; `outfit.ts:120` (`outfitFor`). Verify: play the armchair with a pouf in front; the wardrobe's outfit changes the clothes.
 
 **5d. Code: new behaviour, filed only, planned later (owner decision 3)**
 
@@ -552,7 +552,7 @@ Every fix follows plan §7.4: a rebuild passes `cargo art <family>`, `cargo chec
 
 ## 5. Decisions for the owner
 
-Every `decision` finding (31) and every question a fix group raises, each as a choice with a recommendation. Nothing waits on them but the groups named.
+Every `decision` finding (31) and every question a fix group raises, each as a choice with a recommendation. **The owner accepted every recommendation on 2026-10-21** (§11.1).
 
 **Who may use what, and the S1s that need new code**
 
@@ -742,8 +742,87 @@ Only a person can check these, on hardware no agent had or at timings shots can'
 
 The owner's decision per group: fix now, a later release, or won't fix (with the reason). S1 groups are fix now unless the owner says otherwise.
 
+Triage with the owner on 2026-10-21:
+
+- **Scope:** every group but the new behaviour decision 3 names: G-01 to G-69 are fixed in this Phase 4, including the S3-only groups; G-70 (props in hand), G-71 (body language, turning on the spot) and G-72 (privacy), and doors opened by hand, are planned later.
+- **Age rules now:** the owner chose the full age rules (G-45) in this Phase 4, not the two-step recommendation.
+- **G-62 to G-69:** the eight new-behaviour items the consolidation marked as their own items are brought into this Phase 4 too.
+- **Decisions:** every recommendation in §5 is accepted as written. Where a recommendation assumed a group would wait, the group's own fix now takes its place: Q-16 (chess and foosball practise alone) becomes the fallback when no partner is free, now that G-65 gives them partners; Q-18 keeps the crop shortcuts it names and G-68 builds the rest.
+
 | Group | Decision | Release | Notes |
 |---|---|---|---|
+| G-01 | fix now | Phase 4 | |
+| G-02 | fix now | Phase 4 | |
+| G-03 | fix now | Phase 4 | |
+| G-04 | fix now | Phase 4 | |
+| G-05 | fix now | Phase 4 | |
+| G-06 | fix now | Phase 4 | |
+| G-07 | fix now | Phase 4 | |
+| G-08 | fix now | Phase 4 | |
+| G-09 | fix now | Phase 4 | |
+| G-10 | fix now | Phase 4 | |
+| G-11 | fix now | Phase 4 | |
+| G-12 | fix now | Phase 4 | |
+| G-13 | fix now | Phase 4 | |
+| G-14 | fix now | Phase 4 | |
+| G-15 | fix now | Phase 4 | |
+| G-16 | fix now | Phase 4 | |
+| G-17 | fix now | Phase 4 | |
+| G-18 | fix now | Phase 4 | |
+| G-19 | fix now | Phase 4 | |
+| G-20 | fix now | Phase 4 | |
+| G-21 | fix now | Phase 4 | |
+| G-22 | fix now | Phase 4 | |
+| G-23 | fix now | Phase 4 | |
+| G-24 | fix now | Phase 4 | |
+| G-25 | fix now | Phase 4 | |
+| G-26 | fix now | Phase 4 | |
+| G-27 | fix now | Phase 4 | |
+| G-28 | fix now | Phase 4 | |
+| G-29 | fix now | Phase 4 | |
+| G-30 | fix now | Phase 4 | |
+| G-31 | fix now | Phase 4 | |
+| G-32 | fix now | Phase 4 | |
+| G-33 | fix now | Phase 4 | |
+| G-34 | fix now | Phase 4 | |
+| G-35 | fix now | Phase 4 | |
+| G-36 | fix now | Phase 4 | |
+| G-37 | fix now | Phase 4 | |
+| G-38 | fix now | Phase 4 | |
+| G-39 | fix now | Phase 4 | |
+| G-40 | fix now | Phase 4 | |
+| G-41 | fix now | Phase 4 | |
+| G-42 | fix now | Phase 4 | |
+| G-43 | fix now | Phase 4 | |
+| G-44 | fix now | Phase 4 | |
+| G-45 | fix now | Phase 4 | The owner chose the full age rules now (2026-10-21), overriding decision 3 for age rules only. |
+| G-46 | fix now | Phase 4 | |
+| G-47 | fix now | Phase 4 | |
+| G-48 | fix now | Phase 4 | The cheap part (Q-03): open for the one going through; doors opened by hand stay later. |
+| G-49 | fix now | Phase 4 | |
+| G-50 | fix now | Phase 4 | |
+| G-51 | fix now | Phase 4 | |
+| G-52 | fix now | Phase 4 | |
+| G-53 | fix now | Phase 4 | |
+| G-54 | fix now | Phase 4 | |
+| G-55 | fix now | Phase 4 | |
+| G-56 | fix now | Phase 4 | |
+| G-57 | fix now | Phase 4 | |
+| G-58 | fix now | Phase 4 | |
+| G-59 | fix now | Phase 4 | |
+| G-60 | fix now | Phase 4 | |
+| G-61 | fix now | Phase 4 | |
+| G-62 | fix now | Phase 4 | New behaviour the owner brought into this Phase 4 (2026-10-21). |
+| G-63 | fix now | Phase 4 | New behaviour the owner brought into this Phase 4 (2026-10-21). |
+| G-64 | fix now | Phase 4 | New behaviour the owner brought into this Phase 4 (2026-10-21). |
+| G-65 | fix now | Phase 4 | New behaviour the owner brought into this Phase 4 (2026-10-21). |
+| G-66 | fix now | Phase 4 | New behaviour the owner brought into this Phase 4 (2026-10-21). |
+| G-67 | fix now | Phase 4 | New behaviour the owner brought into this Phase 4 (2026-10-21). |
+| G-68 | fix now | Phase 4 | New behaviour the owner brought into this Phase 4 (2026-10-21). |
+| G-69 | fix now | Phase 4 | New behaviour the owner brought into this Phase 4 (2026-10-21). |
+| G-70 | later | after this review | New behaviour the owner put off (decision 3): planned separately. |
+| G-71 | later | after this review | New behaviour the owner put off (decision 3): planned separately. |
+| G-72 | later | after this review | New behaviour the owner put off (decision 3): planned separately. |
 
 ### 11.2 Re-check
 
