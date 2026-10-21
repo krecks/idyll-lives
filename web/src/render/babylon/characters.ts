@@ -312,7 +312,7 @@ interface Bed {
 /** Bunk beds (content `bunk`): mattress tops of the lower and the upper bunk, `[lower, upper]`. */
 const BUNKS: Record<string, readonly number[]> = FURNITURE.bunks;
 /** Beds whose sleepers get a blanket (pack hammocks, sofas and nap pods don't). */
-const BLANKET_BEDS = new Set(['bed', 'lazy.snoozecloudBed', 'bedSingle', 'bedBunk', 'bedFuton', 'bedKing', 'bedDouble', 'bedQueenUpholstered', 'bedCanopy', 'kidsBed', 'kidsBedCar', 'wallBed']);
+const BLANKET_BEDS = new Set(['bed', 'lazy.snoozecloudBed', 'bedSingle', 'bedBunk', 'bedFuton', 'bedKing', 'bedDouble', 'bedQueenUpholstered', 'bedCanopy', 'kidsBed', 'kidsBedCar', 'wallBed', 'bedDaybed']);
 /**
  * Two sleepers' quilts in a wide bed (`writeBlanket`): each this much (m) wider on each side than half the bed
  * and moved this much towards its middle, so they overlap by four times it over the middle.
@@ -478,16 +478,19 @@ const HANDS = {
  * - `stand`: clip sequence while standing at the object (looped; looping clips play ~4 s per step);
  *   a function picks one by object def;
  * - `sit`: seated clip (default `sit`), or a function of the object def;
- * - `upper`: upper-body layer while seated (`eat` and `drink` play now and then);
+ * - `upper`: upper-body layer while seated (`eat` and `drink` play now and then), or a function of the
+ *   object def ('' for none);
  * - `hands`: finger pose.
  * Procedural layers on top (reclining, instruments, gazes, ...) are in `activityPose`.
  */
 interface ActionAnim {
   stand?: readonly string[] | ((def: string) => readonly string[]);
   sit?: string | ((def: string) => string);
-  upper?: string;
+  upper?: string | ((def: string) => string);
   hands?: number;
 }
+/** Calls made to a screen (`phone`): talked to it, hands free, not with a phone at the ear. */
+const VIDEO_CALLS = new Set(['outgoing.videoCallNook', 'cheerful.partyBooth']);
 /** Wall cupboards: things put away up in them (no squat to the floor). */
 const WALL_CUPBOARDS = new Set(['wallCabinet', 'wallCabinetGlass', 'wallCabinetCorner', 'chinaCabinet']);
 const ACTIONS: Record<string, ActionAnim> = {
@@ -500,7 +503,8 @@ const ACTIONS: Record<string, ActionAnim> = {
     sit: 'sitHands',
     hands: HANDS.hold,
   },
-  wash: { stand: ['spell', 'interact'], hands: HANDS.relaxed },
+  // (Seated at the dressing table, getting ready: a hand up at the hair, the phone clip's.)
+  wash: { stand: ['spell', 'interact'], upper: (def) => (def === 'dressingTable' ? 'phone' : ''), hands: HANDS.relaxed },
   shower: { stand: ['spell', 'interact', 'idle'], hands: HANDS.open },
   bath: { hands: HANDS.open },
   toilet: { hands: HANDS.relaxed },
@@ -523,7 +527,7 @@ const ACTIONS: Record<string, ActionAnim> = {
         ? ['punchJab', 'punchCross']
         : def.includes('fitnessGame')
           ? ['dance', 'punchJab', 'punchCross']
-          : def.includes('streetball')
+          : def.includes('streetball') || def === 'basketballHoop'
             ? ['pickUp', 'interact']
             : // Climbing and stretching (and, `choose`, bouncing and vibrating): the idle with `activityPose` on top.
               def.includes('boulder') || def.includes('sunrise')
@@ -536,8 +540,8 @@ const ACTIONS: Record<string, ActionAnim> = {
   lift: { stand: ['pickUp'], hands: HANDS.grip },
   dance: { stand: ['dance'], hands: HANDS.relaxed },
   talk: { stand: ['talk'], hands: HANDS.relaxed },
-  // The phone clip's hand at the mouth reads as a microphone.
-  sing: { stand: ['talk'], upper: 'phone', hands: HANDS.hold },
+  // At the mic stand (`STEP_IN`), the hands free.
+  sing: { stand: ['talk'], hands: HANDS.relaxed },
   clean: {
     stand: (def) => (def.includes('Mop') || def.includes('Vacuum') ? ['push'] : def.includes('laundry') ? ['spell', 'interact', 'pickUp'] : ['interact', 'spell']),
     hands: HANDS.hold,
@@ -569,7 +573,7 @@ const ACTIONS: Record<string, ActionAnim> = {
   // Down to low flowers / up into a tree's crown (`activityPose` turns the head).
   smell: { stand: ['crouch'], hands: HANDS.relaxed },
   admire: { stand: ['idle', 'foldArms'], hands: HANDS.relaxed },
-  phone: { stand: ['phone'], upper: 'phone', hands: HANDS.hold },
+  phone: { stand: ['phone'], sit: (def) => (VIDEO_CALLS.has(def) ? 'sitTalk' : 'sit'), upper: (def) => (VIDEO_CALLS.has(def) ? '' : 'phone'), hands: HANDS.hold },
   listen: { stand: ['idle', 'foldArms'], hands: HANDS.open },
   meditate: { stand: ['idle'], hands: HANDS.open },
   // (A coin into the giving jar.)
@@ -2655,7 +2659,7 @@ export class Characters {
       rootFwd += this.tuckIn(rig, obj, seat, key !== 'sitDown', step, fresh);
       if (key === 'sitHands' && rig.tuckFar) key = 'sitHandsFar';
       if (!social) {
-        const up = known ? act?.upper : obj?.def === 'diningTable' ? 'eat' : undefined;
+        const up = known ? (typeof act?.upper === 'function' ? act.upper(rig.useDef) : act?.upper) : obj?.def === 'diningTable' ? 'eat' : undefined;
         // Eating / drinking now and then; holding a book or phone throughout.
         if (up === 'eat' || up === 'drink') upper = Math.floor((rig.actTime + rig.seed * 9) / 4) % 3 === 0 ? up : '';
         else if (up) upper = up;
