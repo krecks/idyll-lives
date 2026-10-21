@@ -177,19 +177,6 @@ impl Img {
         Img { px, ..self.clone() }
     }
 
-    /// `transpose(ROTATE_90)`: a quarter turn counter-clockwise.
-    pub fn rotate90(&self) -> Img {
-        let (w, h, ch) = (self.h, self.w, self.ch);
-        let mut px = vec![0u8; w * h * ch];
-        for y in 0..h {
-            for x in 0..w {
-                let s = (x * self.w + (self.w - 1 - y)) * ch;
-                px[(y * w + x) * ch..][..ch].copy_from_slice(&self.px[s..s + ch]);
-            }
-        }
-        Img { w, h, ch, px }
-    }
-
     /// `crop((x, y, x + w, y + h))` inside the image.
     pub fn crop(&self, x: usize, y: usize, w: usize, h: usize) -> Img {
         let px = (y..y + h).flat_map(|r| self.row(r)[x * self.ch..(x + w) * self.ch].iter().copied()).collect();
@@ -413,9 +400,7 @@ mod tests {
     }
 
     #[test]
-    fn rotate_and_flip() {
-        let im = Img { w: 2, h: 1, ch: 1, px: vec![1, 2] };
-        assert_eq!(im.rotate90(), Img { w: 1, h: 2, ch: 1, px: vec![2, 1] });
+    fn flip() {
         let tall = Img { w: 1, h: 2, ch: 1, px: vec![1, 2] };
         assert_eq!(tall.flip_tb().px, [2, 1]);
     }

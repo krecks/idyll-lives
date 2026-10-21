@@ -340,7 +340,6 @@ pub fn grey_detail(im: &Img, target: f64, contrast: f64, flatten: f32) -> Img {
 #[derive(Clone, Copy)]
 enum Op {
     FlipV,
-    Rot90,
     Stagger(&'static [usize], u32),
     Stack2V,
 }
@@ -375,16 +374,6 @@ fn orient(im: Img, op: Op, normal: bool) -> Img {
             if normal {
                 let inv: [u8; 256] = std::array::from_fn(|v| 255 - v as u8);
                 Img::merge([&im.channel(0), &im.channel(1).point(&inv), &im.channel(2)])
-            } else {
-                im
-            }
-        }
-        Op::Rot90 => {
-            // 90 deg counter-clockwise: tangent-space (x, y) -> (-y, x).
-            let im = im.rotate90();
-            if normal {
-                let inv: [u8; 256] = std::array::from_fn(|v| 255 - v as u8);
-                Img::merge([&im.channel(1).point(&inv), &im.channel(0), &im.channel(2)])
             } else {
                 im
             }
@@ -448,7 +437,7 @@ const fn set(name: &'static str, kind: &'static str, src: &'static str, albedo: 
     HouseSet { name, kind, src, albedo, normal, grey, ops }
 }
 
-const HOUSE_SETS: [HouseSet; 11] = [
+const HOUSE_SETS: [HouseSet; 10] = [
     set("siding_wood", "acg", "WoodSiding009", 1024, 1024, Some((0.68, 1.0, 0.0)), &[Op::Stack2V, Op::Stagger(&SIDING_CUTS, 7), Op::FlipV]),
     set("brick", "ph", "red_brick_03", 1024, 1024, None, &[]),
     set("roof_shingles", "ph", "grey_roof_tiles_02", 1024, 1024, Some((0.6, 1.0, 0.0)), &[Op::FlipV]),
@@ -459,7 +448,6 @@ const HOUSE_SETS: [HouseSet; 11] = [
     set("wallpaper", "acg", "Plaster001", 1024, 512, Some((0.75, 0.6, 0.0)), &[]),
     set("painted_wood", "acg", "PaintedWood008A", 512, 512, Some((0.75, 0.45, 0.0)), &[]),
     set("grass_lush", "acg", "Grass004", 1024, 1024, Some((0.7, 1.0, 40.0)), &[]),
-    set("door_wood", "acg", "Wood066", 1024, 1024, None, &[Op::Rot90]),
 ];
 
 /// Roughness remap (arm G, min..max -> lo..hi): the scanned maps of these read too glossy.
@@ -622,7 +610,6 @@ pub fn materials() -> J {
         ("material.floor.carpet", surf("#FFFFFF", "carpet", 1.0, &[("roughness", i(1)), ("normalStrength", f(0.8))])),
         ("material.wall.interior", surf("#FFFFFF", "wallpaper", 0.5, &[("roughness", i(1)), ("normalStrength", f(0.5))])),
         ("material.trim", surf("#FFFFFF", "painted_wood", 1.0, &[("roughness", i(1)), ("normalStrength", f(0.6))])),
-        ("material.door", surf("#FFFFFF", "door_wood", 1.0, &[("roughness", i(1)), ("normalStrength", f(0.6))])),
     ];
     for (k, v) in house {
         e.set(k, v);

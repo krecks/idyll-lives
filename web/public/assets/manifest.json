@@ -1161,16 +1161,6 @@
       "roughness": 1,
       "normalStrength": 0.6
     },
-    "material.door": {
-      "type": "material",
-      "color": "#FFFFFF",
-      "texture": "textures/door_wood/albedo.jpg",
-      "normal": "normal.jpg",
-      "arm": "arm.jpg",
-      "uvScale": 1.0,
-      "roughness": 1,
-      "normalStrength": 0.6
-    },
     "material.finish.hair": {
       "type": "material",
       "color": "#FFFFFF",
