@@ -289,6 +289,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 
 ### A-residents-02 — `check_clips.ts` fails `jogAlong`: a loop seam and sliding feet
 
+> Phase 0: the sliding feet were the checker testing a moving clip as if standing; with the ground-speed check they pass. The loop seam (calf_r 29.1°, foot_r 21.7°) is real.
+
 - **Severity:** S3
 - **Rubric:** A1, A3
 - **Fix class:** clip
@@ -356,3 +358,33 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Evidence:** Residents turn in place without stepping. A turn-on-the-spot clip is new behaviour: filed only, planned separately (§9, decision 3).
 - **Status:** seeded (from `plan/authenticity-review.md` §9)
 - **Source:** `plan/authenticity-review.md` §3.2 (A4) and §9 (decision 3)
+
+### A-residents-09 — Seated feet don't reach the floor for children, teens and elder women
+
+- **Severity:** S2
+- **Rubric:** A1, A5
+- **Fix class:** clip
+- **Where:** `web/src/render/babylon/characters/clips/` (sit), `web/src/render/babylon/characters.ts` (seat fit per stage)
+- **Evidence:** `pnpm check:clips` (`tools/characters/clip-baseline.json`): a child on the 0.31 m kids' chair has the feet 7 cm (male) and 8 cm (female) off the floor; a teen on a 0.45 m seat 7 cm and 9 cm; an elder woman on a 0.45 m seat 5 cm. Adults pass.
+- **Status:** open (found in Phase 0)
+- **Source:** `tools/characters/check_clips.ts --body all --stage all`
+
+### A-residents-10 — A child's feet slide in `jog` and on the climbing frame
+
+- **Severity:** S3
+- **Rubric:** A1, A5
+- **Fix class:** clip
+- **Where:** `web/src/render/babylon/characters/clips/` (jog, climb)
+- **Evidence:** `pnpm check:clips`: a child's right foot slides 1.5 cm in `jog` (both bodies); the left foot slides 1.3–1.9 cm in `climb112a`/`climb112b`, and an elder woman's 1.1 cm in `climb172a`.
+- **Status:** open (found in Phase 0)
+- **Source:** `tools/characters/check_clips.ts --body all --stage all`
+
+### A-residents-11 — An elder woman on the TV sofa loses her shins
+
+- **Severity:** S2
+- **Rubric:** A1, A5
+- **Fix class:** clip
+- **Where:** `web/src/render/babylon/characters.ts` (seat fit per stage), sofa seat in `web/src/render/babylon/characters/furniture.json`
+- **Evidence:** `poses.html?stage=elder`: the woman on the TV sofa has no shins and her boots stand apart on the floor; the adult version is fine. Shots: `poses-tvsofa-elder.png` against `poses-tvsofa-default.png` (Phase 0 gallery agent's scratch folder).
+- **Status:** open (found in Phase 0)
+- **Source:** Phase 0.7b check of `poses.html?stage=`
