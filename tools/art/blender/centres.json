@@ -426,7 +426,7 @@
   "model.pouf": [0.0, 0.0],
   "model.printFramed": [0.0, -0.415],
   "model.puzzleTable": [0.0025, 0.0155],
-  "model.rainBarrel": [0.0, -0.118],
+  "model.rainBarrel": [0.0, 0.04],
   "model.raisedBed": [0.0, 0.0],
   "model.rangeCooker": [0.0, -0.0525],
   "model.rangeHood": [0.0, -0.1725],
