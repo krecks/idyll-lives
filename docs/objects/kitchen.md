@@ -37,7 +37,7 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 |---|---|---|---|---|---|---|
 | `fridge` Fridge | 1x1 · floor | snack:fetch frozenTreat:fetch meal:cook gourmet:cook coldDrink:drink | kitchen / appliances | Body, Handles, Plinth & badge, Inside | Use | `fridge_open`: the tall fridge door below swings 102° for snack, meal and gourmet; `hold` 3.5 s. The freezer door above swings 118° (`freezer_open`) for frozenTreat. Has the other fridges' cold drink (2026-10-21). |
 | `fridgeMini` Mini fridge | 1x1 · floor | snack:fetch meal:cook coldDrink:drink | kitchen / appliances | Body, Handles, Plinth | Use | `fridge_open`: the door swings 100° on its hinge for snack and meal; `hold` 3 s. Has a cold drink, as the retro mini fridge. |
-| `fridgeBuiltIn` Built-in fridge | 1x1 · floor | snack:fetch frozenTreat:fetch meal:cook gourmet:cook coldDrink:drink | kitchen / appliances | Panels, Handles | Use | `fridge_open`: the tall fridge door swings for snack, meal, gourmet and coldDrink; the freezer door below opens (`freezer_open`) for frozenTreat. |
+| `fridgeBuiltIn` Counter-depth fridge | 1x1 · floor | snack:fetch frozenTreat:fetch meal:cook gourmet:cook coldDrink:drink | kitchen / appliances | Panels, Handles | Use | `fridge_open`: the tall fridge door swings for snack, meal, gourmet and coldDrink; the freezer door below opens (`freezer_open`) for frozenTreat. Renamed from "Built-in fridge": a free-standing counter-depth fridge with a dispenser (kind `fridgeAmerican`, Q-08). |
 | `fridgeFrenchDoor` French-door fridge | 1x1 · floor | snack:fetch frozenTreat:fetch meal:cook gourmet:cook coldDrink:drink | kitchen / appliances | Body, Handles, Plinth | Use | `fridge_open`: both upper doors swing out (-100° / +100°) for snack, meal, gourmet; `door_right` (the right door only) for coldDrink. The freezer drawer slides out 35 cm (`freezer_open`) for frozenTreat. |
 | `fridgeRetro` Retro fridge | 1x1 · floor | snack:fetch meal:cook coldDrink:drink | kitchen / appliances | Body, Handle, Trim | Use | `lever`: the chrome lever (a part inside the door) turns 30° out, then `fridge_open` (`delay` 0.3 s): the rounded door swings 100°; snack, meal, coldDrink. |
 | `fridgeMiniRetro` Retro mini fridge | 1x1 · floor | snack:fetch meal:cook coldDrink:drink | kitchen / appliances | Body, Handle & feet, Trim | Use | `fridge_open`: the pastel door with its unicorn sticker swings 100° on its hinge; snack, meal, coldDrink. `hold` 3 s. |
@@ -173,12 +173,12 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 | `diningOak` Farmhouse dining table | 2x1 · floor | breakfast:eat coffee:drink dinner:eat | kitchen / dining | Top, Legs | Static | Static. |
 | `tableSquare2` Square table for two | 1x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
 | `tableBistroRound` Round bistro table | 1x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
-| `tableDining4` Dining table for four | 2x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
-| `tableDining6` Dining table for six | 3x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
-| `tableBanquet8` Banquet table | 4x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
-| `tableRound4` Round pedestal table | 2x2 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
+| `tableDining4` Dining table for six | 2x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. Renamed from "Dining table for four": 1.84 m seats six (kind `diningTable6`, Q-08). |
+| `tableDining6` Dining table for eight | 3x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. Renamed from "Dining table for six": 2.84 m seats eight (kind `diningTable8`). |
+| `tableBanquet8` Banquet table | 4x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. Seats twelve (kind `diningTable12`). |
+| `tableRound4` Round pedestal table | 2x2 · floor | — | kitchen / dining | Top, Legs | Static | Static. 1.52 m across: seats six (kind `roundTable6`). |
 | `tableSquare8` Square table for eight | 2x2 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
-| `tableFarmhouse6` Farmhouse table | 3x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
+| `tableFarmhouse6` Farmhouse table | 3x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. 2.86 m: seats eight (kind `diningTable8`). |
 | `tableBarHigh` High café table | 1x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
 
 **In play** (signed off 2026-10-16):

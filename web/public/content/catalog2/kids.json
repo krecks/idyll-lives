@@ -20,7 +20,7 @@
           0.64
         ]
       },
-      "description": "A low table with legs in four colours; little chairs pull up to it.",
+      "description": "A low table on sturdy blue legs; little chairs pull up to it.",
       "interactions": []
     },
     {
@@ -142,7 +142,7 @@
       "price": 110,
       "category": "kids",
       "freeRotation": true,
-      "description": "A yellow chest with its lid open: balls, blocks and a bear.",
+      "description": "A yellow chest of balls, blocks and a bear: the lid comes up for play.",
       "interactions": [
         {
           "id": "play",

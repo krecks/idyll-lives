@@ -87,7 +87,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `energetic.boulderingWall` Home bouldering wall | 2x1 · floor | climb:exercise | fitness / — | Frame, Pads, Panel | Static | Static (the holds are the shape). |
-| `energetic.spinBike` Interactive spin bike | 1x2 · floor | ride:exercise | fitness / — | Frame, Pads, Flywheel | Loop (E1) | `pedals`: the cranks and pedals turn once a second while riding (E1); the rider sits on the still seat. |
+| `energetic.spinBike` Interactive recumbent bike | 1x2 · floor | ride:exercise | fitness / — | Frame, Pads, Flywheel | Loop (E1) | `pedals`: the cranks and pedals turn once a second while riding (E1); the rider sits on the still seat. Renamed from "Interactive spin bike": a recumbent (kind `recumbentBike`, Q-08). |
 | `energetic.trampoline` Rebound trampoline | 2x2 · floor | bounce:exercise | outdoor / — | Frame, Pads, Mat | Loop (E1) | `bounce`: the mat dips under the bouncer's feet while bounced on (E1), 1.6 times a second (content `stand.height` 0.5). |
 | `energetic.streetballHoop` Streetball hoop | 1x1 · floor | shoot:exercise | outdoor / — | Frame, Pads, Base | Use | `swish`: the net sways after each shot (1.4 s into the use, then every 3.2 s: `delay`, `every`). |
 | `energetic.powerBlender` Power blender station | 1x1 · floor | blend:cook | kitchen / — | Frame, Doors, Blender | Use | `lid`: the jug lid lifts and settles for blend (`hold` 1 s). The blades don't turn (the smoothie hides them). |

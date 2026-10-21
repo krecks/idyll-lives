@@ -61,7 +61,7 @@ their uses. The climbing frame has no clip of its own: the resident's clips clim
 | `postBox` Post box | 1x1 · floor | post:write | community / street | Box | Use | `flap`: the slot flap swings in for post (`hold` 1 s). |
 | `noticeBoard` Notice board | 1x1 · floor | read:read | community / street | Frame | Static | Static. |
 | `phoneBooth` Phone box | 1x1 · floor | call:phone | community / street | Kiosk | Use | `door_open`: the door opens out (`delay` 0.3 s), the caller steps inside and it shuts behind them (`hold` 2.4 s); it opens again to let them out (`out` 1.6 s). |
-| `fountainTown` Town fountain | 3x3 · floor | wish:look sitBy:relax | community / street | Stone | Ambient (E2) | `water_run`: the water runs all the time, ambient (not on Low). |
+| `fountainTown` Town fountain | 3x3 · floor | wish:look sitBy:relax | community / street | Stone | Ambient (E2) | `water_run`: the water runs all the time, ambient (not on Low). Its text says square, as built. |
 | `townStatue` Founder's statue | 2x2 · floor | admire:admire | community / street | Statue | Static | Static. |
 
 **In play** (signed off 2026-10-16):

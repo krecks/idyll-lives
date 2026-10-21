@@ -209,7 +209,7 @@
     },
     {
       "id": "fridgeBuiltIn",
-      "name": "Built-in fridge",
+      "name": "Counter-depth fridge",
       "model": "model.fridgeBuiltIn",
       "stations": [
         "ingredients"
@@ -223,7 +223,7 @@
       "category": "kitchen",
       "fillsWall": true,
       "group": "appliances",
-      "description": "A tall fridge-freezer behind cabinet doors that match the kitchen. Plenty of fresh food: bigger snacks, fuller meals and a cold drink.",
+      "description": "A tall counter-depth fridge-freezer, the freezer below and a water dispenser in the door. Plenty of fresh food: bigger snacks, fuller meals and a cold drink.",
       "interactions": [
         {
           "id": "snack",
@@ -1353,7 +1353,7 @@
     },
     {
       "id": "armchairDesign",
-      "name": "Designer lounge chair",
+      "name": "Executive lounge chair",
       "model": "model.armchairDesign",
       "footprint": [
         1,
@@ -1363,7 +1363,7 @@
       "category": "living",
       "group": "seating",
       "decor": 0.8,
-      "description": "A mid-century swivel chair in leather and bent wood. Sinking into it leaves residents feeling at home.",
+      "description": "A high-backed swivel chair in padded leather on a chrome five-star base. Sinking into it leaves residents feeling at home.",
       "interactions": [
         {
           "id": "relax",
@@ -1503,7 +1503,7 @@
     },
     {
       "id": "coffeeTableMarble",
-      "name": "Marble side table",
+      "name": "Round marble coffee table",
       "model": "model.coffeeTableMarble",
       "footprint": [
         1,
@@ -1513,7 +1513,7 @@
       "category": "living",
       "group": "tables",
       "decor": 0.5,
-      "description": "A round marble top on bent steel legs.",
+      "description": "A round marble top on a brass pedestal, at coffee-table height.",
       "surface": {
         "height": 0.42,
         "kind": "low",
@@ -1602,7 +1602,7 @@
       "provides": [
         "screen"
       ],
-      "name": "Portable TV",
+      "name": "Console TV",
       "model": "model.tvRetro",
       "footprint": [
         1,
@@ -1611,7 +1611,7 @@
       "price": 150,
       "category": "living",
       "group": "media",
-      "description": "A little old TV on a low cabinet. It still works (mostly).",
+      "description": "An old television in a wooden console on legs, rabbit ears on top. It still works (mostly).",
       "interactions": [
         {
           "id": "watch",
@@ -1997,7 +1997,7 @@
     },
     {
       "id": "bedFuton",
-      "name": "Futon bed",
+      "name": "King futon",
       "model": "model.bedFuton",
       "footprint": [
         2,
@@ -2011,7 +2011,7 @@
         "height": 0.4,
         "forward": 0.68
       },
-      "description": "A low platform with a firm futon: the cheapest double, if not the comfiest.",
+      "description": "A low platform with a firm king-size futon: the cheapest big bed, if not the comfiest. Folded, it is a deep sofa.",
       "interactions": [
         {
           "id": "sleep",
@@ -4282,7 +4282,7 @@
     },
     {
       "id": "ceilingLight",
-      "name": "Ceiling light",
+      "name": "Lantern pendant",
       "model": "model.ceilingLight",
       "footprint": [
         1,
@@ -4300,7 +4300,7 @@
         "height": 2.3,
         "tiles": 20
       },
-      "description": "A simple square ceiling light.",
+      "description": "A frosted square lantern on a short stem from the ceiling.",
       "interactions": []
     },
     {

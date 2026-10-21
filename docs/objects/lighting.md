@@ -26,7 +26,7 @@ inside. The ceiling fan's blades turn (`blades_turn`, once in 2.5 s) and the pap
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `ceilingPendant` Pendant lamp | 1x1 · ceiling | — | lighting / ceiling | Body, Shade | Static | Static. The shade glows at night (E8). |
-| `ceilingLight` Ceiling light | 1x1 · ceiling | — | lighting / ceiling | Body, Shade | Static | Static. The diffuser glows at night. |
+| `ceilingLight` Lantern pendant | 1x1 · ceiling | — | lighting / ceiling | Body, Shade | Static | Static. The diffuser glows at night. Renamed from "Ceiling light": a lantern on a stem (kind `pendantLamp`, Q-08). |
 | `chandelier` Ring chandelier | 1x1 · ceiling | — | lighting / ceiling | Body, Globes | Static | Static. The globes glow at night. |
 | `pendantIndustrial` Industrial pendant | 1x1 · ceiling | — | lighting / ceiling | Body, Shade | Static | Static. Only the white liner inside the dome glows at night. |
 | `ceilingFan` Ceiling fan | 1x1 · ceiling | — | lighting / ceiling | Body, Blades | Ambient (E2) | `blades_turn`: the blades turn slowly (E2). |

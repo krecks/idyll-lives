@@ -49,7 +49,7 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 | `armchair` Armchair | 1x1 · floor | sit:sit read:read | living / seating | Upholstery, Cushion, Frame, Legs, Pillow | Use | `sink_in`. Read a book sitting, as the leather and wingback chairs. |
 | `armchairLounge` Lounge chair | 1x1 · floor | sit:sit | living / seating | Upholstery, Cushions, Legs | Use | `sink_in`. |
 | `armchairLeather` Leather armchair | 1x1 · floor | sit:sit read:read | living / seating | Frame, Upholstery | Use | `sink_in`. |
-| `armchairDesign` Designer lounge chair | 1x1 · floor | relax:relax doze:nap | living / seating | Frame, Upholstery, Base | Static | Static (moulded shell). |
+| `armchairDesign` Executive lounge chair | 1x1 · floor | relax:relax doze:nap | living / seating | Frame, Upholstery, Base | Static | Static (moulded shell). Renamed from "Designer lounge chair", its text now the model's (chrome five-star base, no bent wood). |
 | `armchairWingback` Wingback armchair | 1x1 · floor | sit:sit read:read | living / seating | Upholstery, Cushion, Legs | Use | `sink_in`. |
 | `recliner` Recliner | 1x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions & footrest | Use | `recline`: the seat and back tip 25° and the footrest swings up 80° for relax and doze; the resident reclines with it (`ride`), the legs out on the footrest (content `seat.legs: "out"`). |
 | `rockingChair` Rocking chair | 1x1 · floor | relax:relax read:read | living / seating | Wood, Cushion | Loop (E1) | `rock`: rocks ±6° while sat in (E1), the rider with it. |
@@ -77,13 +77,13 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 |---|---|---|---|---|---|---|
 | `coffeeTable` Coffee table | 2x1 · floor | magazine:read | living / tables | Wood, Knob | Use | `drawer_open`: the drawer slides out 30 cm with a magazine for magazine; `hold` 2.5 s. The magazine is read on a seat within 2 m (`seatNear`), else standing. |
 | `coffeeTableGlass` Glass coffee table | 2x1 · floor | magazine:read | living / tables | Frame, Glass | Static | Static; glass top. The magazine is read on a seat within 2 m (`seatNear`), else standing. |
-| `coffeeTableMarble` Marble side table | 1x1 · floor | magazine:read | living / tables | Top, Base | Static | Static. The magazine is read on a seat within 2 m (`seatNear`), else standing. |
+| `coffeeTableMarble` Round marble coffee table | 1x1 · floor | magazine:read | living / tables | Top, Base | Static | Static. The magazine is read on a seat within 2 m (`seatNear`), else standing. Renamed from "Marble side table" (a coffee-table top on a brass pedestal). |
 | `sideTable` Side table | 1x1 · floor | — | living / tables | Wood, Knob | Static | Static. |
 | `coffeeTableRound` Round coffee table | 1x1 · floor | — | living / tables | Top, Base | Static | Static. |
 | `coffeeTableLong` Long coffee table | 2x1 · floor | — | living / tables | Top, Legs | Static | Static. |
 | `nestingTables` Nesting tables | 1x1 · floor | — | living / tables | Top, Small table, Legs | Static | Static. (+use) the small table slides out: it is a part of its own (`small_table`). |
 | `sideTableRound` Round side table | 1x1 · floor | — | living / tables | Top, Base | Static | Static. |
-| `consoleTable` Console table | 2x1 · floor | — | living / tables | Top, Legs, Baskets | Static | Static. |
+| `consoleTable` Console table | 2x1 · floor | — | living / tables | Top, Legs, Baskets | Static | Static. Its text no longer says slim (0.56 m deep). |
 
 **In play** (signed off 2026-10-16):
 - Each standing free in all four facings (the console table against a wall, and free at 180°). The coffee table's
@@ -102,7 +102,7 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 |---|---|---|---|---|---|---|
 | `tv` Television | 1x1 · floor | watch:watch | living / media | Body, Trim | Static | Static: a slim set on its stand on an oak unit, a soundbar; the screen flickers while watched (E8). 2 draws. Provides `screen` (the gaming recliner's marathon needs one). |
 | `tvWall` Flat-screen TV | 2x1 · wall | watch:watch | living / media | Body, Trim | Static | Static: a thin panel on a bracket, a soundbar under it, on the wall face; the screen flickers while watched. 1 draw. Provides `screen`. |
-| `tvRetro` Portable TV | 1x1 · floor | watch:watch | living / media | Body, Trim | Use | `antenna`: the rabbit-ear antennae turn 20° and stretch 1.6× up for watch; the tube flickers while watched. Provides `screen`. |
+| `tvRetro` Console TV | 1x1 · floor | watch:watch | living / media | Body, Trim | Use | `antenna`: the rabbit-ear antennae turn 20° and stretch 1.6× up for watch; the tube flickers while watched. Provides `screen`. Renamed from "Portable TV": a wooden console set on legs. |
 | `homeCinema` Home cinema | 2x1 · floor | watch:watch film:watch | living / media | Body, Trim | Use | `screen_down`: the projector screen unrolls from its case on the wall for watch and film, and rolls up at the end; a short-throw projector on the unit; the screen flickers while down and watched. Provides `screen`. |
 | `stereo` Stereo system | 1x1 · floor | listen:listen dance:dance | living / media | Body, Trim | Use | `tray`: the tray of the CD player under the amplifier slides out and back (`hold` 1.2 s) for listen and dance; the woofers `pulse` (E1 loop). 4 draws (the loop's part). Listened to from a seat within 4 m (`seatNear`), else standing; dance stands. |
 | `boombox` Boombox | 1x1 · floor | listen:listen | living / media | Body, Trim | Use | `cassette`: the cassette door tips 32° open from its foot for listen and shuts; `hold` 1.2 s. Listened to from a seat within 4 m (`seatNear`), else standing. |

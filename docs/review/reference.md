@@ -121,7 +121,14 @@ The kind each of these got, and why. Reviewers can move an object to another kin
 | Object | Kind | Why |
 |---|---|---|
 | `stoveGas` Gas range (six flames, 1 tile) | `cooker` | A six-burner range is usually 90 cm (`rangeCooker`); on one tile it is read as a 76 cm (30 in) range. |
-| `coffeeTableMarble` "Marble side table" | `coffeeTable` | Its top is at 0.42 m, coffee-table height, not side-table height. |
+| `coffeeTableMarble` "Round marble coffee table" (was "Marble side table") | `coffeeTable` | Its top is at 0.42 m, coffee-table height, not side-table height; renamed to match (G-11). |
+| `bed` "King-size bed" (was "Double bed"), `bedFuton` "King futon" | `bedKing`, `bedLow` | 1.90–1.96 m wide, a king's width: renamed rather than narrowed (Q-08); `bedLow` takes king futons (to 1.95 m). |
+| `fridgeBuiltIn` "Counter-depth fridge" (was "Built-in fridge") | `fridgeAmerican` | 0.84 m wide, free-standing, with a dispenser: a counter-depth bottom-freezer fridge, not an integrated one (Q-08). |
+| `ceilingLight` "Lantern pendant" (was "Ceiling light") | `pendantLamp` | A 0.36 m frosted lantern on a stem, 0.6 m deep: a pendant, not a flush fitting (Q-08). |
+| `energetic.spinBike` "Interactive recumbent bike" | `recumbentBike` | A low seat with a back and the pedals in front (Q-08). |
+| `sink` (base) | `kitchenSink` | The same vanity unit stands in kitchens and bathrooms; its 0.92 m rim is a kitchen sink's, and reads right in both (Q-08). |
+| `tableDining4` "for six", `tableDining6` and `tableFarmhouse6` "for eight", `tableBanquet8` (twelve), `tableRound4` (six) | `diningTable6`, `diningTable8`, `diningTable12`, `roundTable6` | Built to fill their tiles: named by the seats they take (Q-08). |
+| `sideboard`, `buffet`, `wallOven`, `rangeCooker`, `barSegment`, `barEnd`, `outdoorBar` | `sideboard`, `ovenTower`, `rangeCooker`, `barCounter` | Whole-tile pieces are the style: the ranges are widened to take them (Q-08). |
 | `wineFridge`, `dishwasher`, `dishwasherCompact` | `wineCooler`, `dishwasher` | Built in under a worktop, so the kind includes the worktop (h and top 0.85–1.00). |
 | `microwave`, `coffeeMachine`, `breakfastCounter`, `energetic.powerBlender`, `slob.microwaveCart`, `foodie.espressoBar` | `counterAppliance` | A base unit or trolley with the appliance on top: the worktop range plus the appliance's height. |
 | `barStool` "A tall stool for the counter or the island" | `counterStool` | The game's counters and islands are 0.95 m, so this is a counter stool, not a bar stool. |
@@ -157,14 +164,14 @@ not decor: a real one is used, so an object of that kind with no use is a possib
 | Kind | Real thing | W × H × D (m) | Functional (cm) | Uses | Minutes | Mechanisms | Sources | Objects |
 |---|---|---|---|---|---|---|---|---|
 | `fridge` | Fridge-freezer, freestanding | 0.54–0.7 × 1.45–2.01 × 0.55–0.75 |  | get a snack or a drink; take out ingredients to cook; put the shopping away | snack 1–3, coldDrink 1–3 | fridgeDoor 90–125°, freezerDoor 90–120° | dimFridges, lgFridges, samsungFit, electroluxFit | `fridge` `fridgeRetro` |
-| `fridgeIntegrated` | Integrated fridge-freezer in a tall housing | 0.58–0.62 × 1.77–2.3 × 0.55–0.65 |  | get a snack or a drink; take out ingredients to cook | snack 1–3 | fridgeDoor 90–115°, freezerDoor 90–115° | en1116, lgFridges, blum | `fridgeBuiltIn` |
-| `fridgeAmerican` | American-style / French-door fridge | 0.83–0.92 × 1.7–1.85 × 0.65–0.91 |  | get a snack or a drink; take out ingredients to cook; get ice from the dispenser | snack 1–3 | fridgeDoor 90–125°, freezerDrawerTravel 0.4–0.6 m | dimFridges, samsungFit | `fridgeFrenchDoor` |
+| `fridgeIntegrated` | Integrated fridge-freezer in a tall housing | 0.58–0.62 × 1.77–2.3 × 0.55–0.65 |  | get a snack or a drink; take out ingredients to cook | snack 1–3 | fridgeDoor 90–115°, freezerDoor 90–115° | en1116, lgFridges, blum |  |
+| `fridgeAmerican` | American-style / French-door fridge | 0.83–0.92 × 1.7–1.85 × 0.65–0.91 |  | get a snack or a drink; take out ingredients to cook; get ice from the dispenser | snack 1–3 | fridgeDoor 90–125°, freezerDrawerTravel 0.4–0.6 m | dimFridges, samsungFit | `fridgeBuiltIn` `fridgeFrenchDoor` |
 | `fridgeMini` | Mini / under-counter fridge | 0.4–0.6 × 0.5–0.88 × 0.45–0.62 |  | get a snack or a cold drink | snack 1–3 | fridgeDoor 90–120° | lgFridges, en1116 | `fridgeMini` `fridgeMiniRetro` `couchPotato.snackFridge` |
 | `wineCooler` | Under-counter wine cooler under a worktop | 0.3–0.6 × 0.82–1 × 0.55–0.65 | top 85–100 | take out a bottle; pour a glass | wine 2–10 | door 90–110° | en1116, lgFridges | `wineFridge` |
 | `dishwasher` | Built-in dishwasher under a worktop (45 or 60 cm) | 0.45–0.6 × 0.82–1 × 0.55–0.65 | top 85–100 | load dirty dishes; unload clean dishes | load 5–15 | doorDrop 80–95°, rackTravel 0.35–0.55 m | dimDishwasher, en1116 | `dishwasher` `dishwasherCompact` |
 | `baseCabinet` | Kitchen base unit with worktop | 0.3–1.2 × 0.85–1 × 0.55–0.65 | top 85–100 | prepare and chop food; make a sandwich; store pans and food | sandwich 3–10, prep 5–20 | door 95–110°, drawerTravel 0.4–0.55 m | en1116, dimKitchen, blum | `counter` `counterCorner` `counterEnd` `counterCornerOuter` `counterDrawers` `counterOpenShelf` `butcherBlock` `counterMarble` `cooktopCounter` |
 | `counterAppliance` | Worktop or trolley with a countertop appliance on it (microwave, coffee machine, toaster, blender) | 0.45–1 × 1.05–1.45 × 0.4–0.65 | top 85–100 | reheat food; make a coffee; make toast; blend a smoothie | reheat 2–5, espresso 1–5, toast 3–5, smoothie 2–5 | microwaveDoor 90–130° | en1116, microwave, neufert | `microwave` `coffeeMachine` `breakfastCounter` `energetic.powerBlender` `slob.microwaveCart` `foodie.espressoBar` |
-| `kitchenSink` | Kitchen sink unit (single bowl or apron front) | 0.6–1.2 × 0.85–1.3 × 0.55–0.65 | top 85–100 | wash hands; wash up by hand; fill a pan or kettle | wash 1–2, washUp 10–30 | tapLever 30–90° | en1116, neufert | `farmhouseSink` |
+| `kitchenSink` | Kitchen sink unit (single bowl or apron front) | 0.6–1.2 × 0.85–1.3 × 0.55–0.65 | top 85–100 | wash hands; wash up by hand; fill a pan or kettle | wash 1–2, washUp 10–30 | tapLever 30–90° | en1116, neufert | `farmhouseSink` `sink` |
 | `kitchenSinkDouble` | Double-bowl sink run | 0.8–2 × 0.85–1.3 × 0.55–0.65 | top 85–100 | wash hands; wash up by hand; rinse in one bowl, wash in the other | wash 1–2, washUp 10–30 |  | en1116, neufert | `counterSinkDouble` |
 | `kitchenRun` | Run of base units with a built-in oven or hob | 1.2–2.4 × 0.85–1 × 0.55–0.65 | top 85–100 | prepare food; bake in the oven; cook on the hob | bake 20–60 | ovenDoorDrop 85–95°, door 95–110° | en1116, aoCookers | `kind.neighbourlyOven` |
 | `larder` | Tall larder / pantry cupboard | 0.4–0.9 × 1.8–2.3 × 0.55–0.65 |  | take out a snack or ingredients; put the shopping away | snack 1–3 | door 95–110°, pullOutTravel 0.4–0.55 m | en1116, neufert | `pantry` `pantryTall` `foodie.deliPantry` |
@@ -174,10 +181,10 @@ not decor: a real one is used, so an object of that kind with no use is a possib
 | `spiceRack` | Wall spice rack | 0.3–0.8 × 0.15–0.6 × 0.06–0.15 |  | take a spice while cooking |  |  | neufert | `spiceRack` |
 | `potRail` | Wall rail with hanging pans and utensils | 0.6–1.2 × 0.3–0.6 × 0.05–0.25 |  | take a pan or utensil while cooking |  |  | neufert | `potRail` |
 | `kitchenIsland` | Kitchen island | 0.9–3 × 0.85–1 × 0.6–1.2 | top 85–100 | prepare food; eat a quick breakfast on stools; chat while cooking | breakfast 10–20, prep 5–20 | door 95–110°, drawerTravel 0.4–0.55 m | en1116, neufert | `kitchenIsland` `islandSmall` `islandLong` `foodie.chefsIsland` |
-| `barCounter` | Bar-height counter | 0.6–3 × 1–1.15 × 0.4–0.75 | top 100–110 | have a drink on a bar stool; mix drinks; eat a quick bite | drink 10–30 |  | dimStools, neufert | `barSegment` `barEnd` `outdoorBar` `outgoing.partyBar` |
+| `barCounter` | Bar-height counter | 0.6–3 × 1–1.15 × 0.4–0.9 | top 100–110 | have a drink on a bar stool; mix drinks; eat a quick bite | drink 10–30 |  | dimStools, neufert | `barSegment` `barEnd` `outdoorBar` `outgoing.partyBar` |
 | `cooker` | Freestanding cooker (hob and oven, 50-76 cm) | 0.5–0.77 × 0.85–1 × 0.55–0.7 | top 85–95 | cook on the hob; bake or roast in the oven | cook 10–60, bake 20–60 | ovenDoorDrop 85–95°, hobLid 80–95° | aoCookers, en1116 | `stoveElectric` `stoveGas` |
-| `rangeCooker` | Range cooker (90-110 cm) | 0.9–1.1 × 0.9–1 × 0.6–0.65 | top 90–95 | cook on many burners at once; bake or roast in the ovens | cook 10–60, bake 20–60 | ovenDoorDrop 85–95° | aoCookers | `rangeCooker` `chefStove` |
-| `ovenTower` | Tall housing with built-in oven(s) | 0.58–0.62 × 1.95–2.3 × 0.55–0.65 |  | bake or roast | bake 20–60, roast 45–120 | ovenDoorDrop 85–95° | en1116, aoCookers | `wallOven` |
+| `rangeCooker` | Range cooker (90-150 cm) | 0.9–1.6 × 0.9–1.15 × 0.6–0.76 | top 90–95 | cook on many burners at once; bake or roast in the ovens | cook 10–60, bake 20–60 | ovenDoorDrop 85–95° | aoCookers | `rangeCooker` `chefStove` |
+| `ovenTower` | Tall housing with built-in oven(s) | 0.58–0.72 × 1.95–2.3 × 0.55–0.65 |  | bake or roast | bake 20–60, roast 45–120 | ovenDoorDrop 85–95° | en1116, aoCookers | `wallOven` |
 | `pizzaOven` | Wood-fired pizza oven on a stand | 0.8–1.6 × 1.2–2.2 × 0.8–1.4 | top 90–110 | light the fire; bake pizza on the hearth; warm up by the fire | bakePizza 2–5, fireUp 20–45 | door 0–90° | neufert | `foodie.pizzaOven` |
 | `pedalBin` | Kitchen pedal bin | 0.25–0.45 × 0.4–0.8 × 0.25–0.45 |  | throw rubbish away; take the bag out | empty 1–3 | lid 70–100° | neufert | `trashCan` |
 | `recyclingBins` | Recycling bins (sorted) | 0.4–0.9 × 0.4–0.9 × 0.3–0.6 |  | sort the recycling | sortRecycling 1–5 | lid 70–100° | neufert | `recyclingBins` |
@@ -187,10 +194,12 @@ not decor: a real one is used, so an object of that kind with no use is a possib
 | Kind | Real thing | W × H × D (m) | Functional (cm) | Uses | Minutes | Mechanisms | Sources | Objects |
 |---|---|---|---|---|---|---|---|---|
 | `diningTable2` | Small table for two (square, round, bistro, café) | 0.6–0.9 × 0.71–0.78 × 0.6–0.9 | top 71–76 | eat a meal; have a coffee; chat across the table | meal 15–40, coffee 10–30 |  | dimDiningTables, dimCafeTables, neufert | `tableSquare2` `tableBistroRound` `cafeTable` `patioTableRound` |
-| `diningTable4` | Dining table for four | 1.2–1.6 × 0.71–0.78 × 0.75–1 | top 71–76 | eat a meal; have a coffee; do homework or a puzzle | meal 15–40, dinner 30–60 |  | dimDiningTables, neufert, atus | `diningTable` `tableDining4` `patioTable4` |
-| `diningTable6` | Dining table for six | 1.6–2.2 × 0.71–0.78 × 0.85–1.1 | top 71–76 | eat a family meal; host a dinner | dinner 30–90 |  | dimDiningTables, neufert | `tableDining6` `tableFarmhouse6` |
-| `diningTable8` | Long dining table for eight to ten | 2.2–3 × 0.71–0.78 × 0.9–1.2 | top 71–76 | host a dinner party | dinner 45–120 |  | dimDiningTables, neufert | `tableBanquet8` |
-| `roundTable4` | Round dining table for four | 0.9–1.25 × 0.71–0.78 × 0.9–1.25 | top 71–76 | eat a meal; play cards | meal 15–40 |  | dimDiningTables, neufert | `tableRound4` |
+| `diningTable4` | Dining table for four | 1.2–1.6 × 0.71–0.78 × 0.75–1 | top 71–76 | eat a meal; have a coffee; do homework or a puzzle | meal 15–40, dinner 30–60 |  | dimDiningTables, neufert, atus | `diningTable` `patioTable4` |
+| `diningTable6` | Dining table for six | 1.6–2.2 × 0.71–0.78 × 0.85–1.1 | top 71–76 | eat a family meal; host a dinner | dinner 30–90 |  | dimDiningTables, neufert | `tableDining4` |
+| `diningTable8` | Long dining table for eight to ten | 2.2–3 × 0.71–0.78 × 0.9–1.2 | top 71–76 | host a dinner party | dinner 45–120 |  | dimDiningTables, neufert | `tableDining6` `tableFarmhouse6` |
+| `diningTable12` | Banquet table for ten to twelve | 3–4 × 0.71–0.78 × 0.9–1.2 | top 71–76 | host a big family dinner | dinner 45–150 |  | dimDiningTables, neufert | `tableBanquet8` |
+| `roundTable4` | Round dining table for four | 0.9–1.25 × 0.71–0.78 × 0.9–1.25 | top 71–76 | eat a meal; play cards | meal 15–40 |  | dimDiningTables, neufert |  |
+| `roundTable6` | Round dining table for six | 1.3–1.6 × 0.71–0.78 × 1.3–1.6 | top 71–76 | eat a family meal; play cards | meal 15–40 |  | dimDiningTables, neufert | `tableRound4` |
 | `squareTable8` | Large square dining table for eight | 1.4–1.8 × 0.71–0.78 × 1.4–1.8 | top 71–76 | host a dinner | dinner 45–120 |  | dimDiningTables, neufert | `tableSquare8` |
 | `diningSetSmall` | Bistro or folding set: small table with one or two chairs | 0.6–1.3 × 0.78–1 × 0.6–1.3 | seat 42–48, top 71–76 | eat breakfast; have a coffee | breakfast 10–25, coffee 10–30 | foldingChair 0–90° | dimCafeTables, dimSideChairs | `bistroSet` `patioSet` |
 | `diningSet` | Dining table with its chairs (two to four places) | 1.2–2 × 0.78–1 × 0.75–1.8 | seat 42–48, top 71–76 | eat a meal; have a coffee; a dinner for two | breakfast 10–25, dinner 30–60, candlelitDinner 45–120 |  | dimDiningTables, dimSideChairs, neufert | `diningGlass` `diningOak` `romantic.candlelitTable` |
@@ -203,7 +212,7 @@ not decor: a real one is used, so an object of that kind with no use is a possib
 | `counterStool` | Counter-height stool (for 90-95 cm worktops) | 0.35–0.5 × 0.6–1.05 × 0.35–0.5 | seat 58–71 | sit at a kitchen counter or island; have a drink | sit 5–30, drink 10–30 | swivel 0–360° | dimStools | `barStool` `stoolCounter` |
 | `barStoolHigh` | Bar-height stool (for 102-107 cm bars) | 0.35–0.5 × 0.74–1.15 × 0.35–0.5 | seat 74–81 | sit at a bar; have a drink | drink 10–30 |  | dimStools | `stoolBarHigh` |
 | `highChair` | Baby high chair | 0.5–0.65 × 0.85–1.05 × 0.55–0.8 | seat 50–60 | feed a baby or toddler at the table | feed 10–30 | trayTravel 0.05–0.2 m | ikeaAntilop | `highChair` |
-| `sideboard` | Sideboard / buffet | 1.2–2 × 0.7–0.95 × 0.4–0.55 | top 70–95 | store plates and table linen; serve from the top | putAway 1–5 | door 95–110°, drawerTravel 0.3–0.45 m | dimDressers, neufert | `sideboard` `buffet` |
+| `sideboard` | Sideboard / buffet (to a base unit's depth: whole-tile style) | 1.2–2 × 0.7–0.95 × 0.4–0.68 | top 70–95 | store plates and table linen; serve from the top | putAway 1–5 | door 95–110°, drawerTravel 0.3–0.45 m | dimDressers, neufert | `sideboard` `buffet` |
 | `displayCabinet` | Glazed display / china cabinet | 0.6–1.2 × 1.6–2.1 × 0.35–0.5 |  | show off china and glass; take out the good plates | putAway 1–5 | door 95–110° | neufert, dimArmoires | `chinaCabinet` `displayCabinet` |
 | `trolley` | Bar cart / tea trolley | 0.6–0.95 × 0.75–1 × 0.4–0.55 | top 75–95 | mix a drink; serve tea; wheel it to the guests | mix 3–10, brew 5–15 |  | neufert | `barCart` `bookworm.teaTrolley` `cheerful.mocktailCart` |
 
@@ -250,10 +259,10 @@ not decor: a real one is used, so an object of that kind with no use is a possib
 | Kind | Real thing | W × H × D (m) | Functional (cm) | Uses | Minutes | Mechanisms | Sources | Objects |
 |---|---|---|---|---|---|---|---|---|
 | `bedSingle` | Single bed (90 x 190-200) | 0.9–1.05 × 0.4–1.1 × 1.9–2.15 | mattress 45–60 | sleep; nap; sit on the edge | sleep 420–540, nap 10–30 |  | bedSizes, dimBedFrames, ikeaHemnesDaybed | `bedSingle` `bedDaybed` |
-| `bedDouble` | Double bed (135-140 x 190-200) | 1.35–1.6 × 0.4–1.2 × 1.9–2.2 | mattress 45–60 | sleep; nap; read in bed | sleep 420–540, nap 10–30 |  | bedSizes, dimBedFrames | `bed` `bedDouble` |
-| `bedKing` | King or queen bed (150-180 x 200) | 1.5–1.95 × 0.4–1.4 × 2–2.3 | mattress 45–65 | sleep; nap; lie in | sleep 420–540, nap 10–30, lieIn 30–90 | headRaise 0–60° | bedSizes, dimBedFrames | `bedKing` `bedQueenUpholstered` `lazy.snoozecloudBed` |
+| `bedDouble` | Double bed (135-140 x 190-200) | 1.35–1.6 × 0.4–1.2 × 1.9–2.2 | mattress 45–60 | sleep; nap; read in bed | sleep 420–540, nap 10–30 |  | bedSizes, dimBedFrames | `bedDouble` |
+| `bedKing` | King or queen bed (150-180 x 200) | 1.5–1.95 × 0.4–1.4 × 2–2.3 | mattress 45–65 | sleep; nap; lie in | sleep 420–540, nap 10–30, lieIn 30–90 | headRaise 0–60° | bedSizes, dimBedFrames | `bed` `bedKing` `bedQueenUpholstered` `lazy.snoozecloudBed` |
 | `bedCanopy` | Four-poster double or king bed | 1.5–2 × 1.8–2.4 × 2–2.3 | mattress 50–70 | sleep; draw the curtains | sleep 420–540, nap 10–30 |  | bedSizes, dimBedFrames, neufert | `bedCanopy` |
-| `bedLow` | Low platform / futon double bed | 1.35–1.65 × 0.15–0.8 × 1.95–2.15 | mattress 15–40 | sleep; fold the futon away by day | sleep 420–540, nap 10–30 |  | bedSizes, neufert | `bedFuton` |
+| `bedLow` | Low platform / futon bed, double to king | 1.35–1.95 × 0.15–1 × 1.95–2.15 | mattress 15–40 | sleep; fold the futon away by day | sleep 420–540, nap 10–30 |  | bedSizes, neufert | `bedFuton` |
 | `bunkBed` | Bunk bed (two 90 x 200 berths) | 0.95–1.05 × 1.5–1.8 × 1.95–2.15 | mattress 30–45 | sleep (two people, one above the other); climb the ladder | sleep 420–540, nap 10–30 |  | ikeaSvarta | `bedBunk` |
 | `wallBed` | Fold-down wall bed (double) | 1.5–1.75 × 2–2.3 × 0.4–2.2 | mattress 45–60 | fold it down to sleep; fold it up to free the floor | sleep 420–540, nap 10–30, foldDown 1–2 | fold 85–95° | bedSizes, neufert | `wallBed` |
 | `kidsBed` | Junior bed with guard rail (70 x 140-160) | 0.75–0.95 × 0.4–1 × 1.45–2.1 | mattress 25–50 | a child sleeps; bedtime story | sleep 540–720, nap 30–90 |  | ikeaKritter, aasm | `kidsBed` `kidsBedCar` |
@@ -276,7 +285,7 @@ not decor: a real one is used, so an object of that kind with no use is a possib
 | Kind | Real thing | W × H × D (m) | Functional (cm) | Uses | Minutes | Mechanisms | Sources | Objects |
 |---|---|---|---|---|---|---|---|---|
 | `toilet` | WC (close-coupled or wall-hung) | 0.35–0.52 × 0.4–0.85 × 0.48–0.76 | seat 40–48.5 | use the toilet; flush; wash hands after | use 2–10 | lid 95–110°, seatRing 95–110° | ada604, dimToilets | `group toilets` |
-| `basinPedestal` | Washbasin (pedestal, vessel, console) | 0.45–1 × 0.76–1.15 × 0.35–0.6 | top 76–91 | wash hands and face; brush teeth; shave | wash 1–3, brushTeeth 2–3 | tapLever 30–90° | dimBasin, dimVanities | `sink` `sinkPedestal` `sinkVessel` `sinkConsole` |
+| `basinPedestal` | Washbasin (pedestal, vessel, console) | 0.45–1 × 0.76–1.15 × 0.35–0.6 | top 76–91 | wash hands and face; brush teeth; shave | wash 1–3, brushTeeth 2–3 | tapLever 30–90° | dimBasin, dimVanities | `sinkPedestal` `sinkVessel` `sinkConsole` |
 | `vanityDouble` | Double vanity unit | 1.2–1.8 × 0.76–1.15 × 0.45–0.6 | top 76–91 | two people wash and brush at once | wash 1–3, brushTeeth 2–3 | drawerTravel 0.3–0.45 m | dimVanities, dimBasin | `vanityDouble` |
 | `mirrorCabinet` | Mirrored bathroom wall cabinet | 0.4–1 × 0.55–0.8 × 0.1–0.2 |  | brush teeth in front of it; take out toiletries | brushTeeth 2–3 | door 95–110° | neufert, dimVanities | `mirrorCabinet` |
 | `bathtub` | Bathtub (built-in or freestanding) | 1.5–1.8 × 0.5–0.65 × 0.7–0.85 |  | take a bath; bath a child; shower over the bath | bath 15–45 |  | bathSizes, dimBathClear | `bathtub` `bathtubFreestanding` |
@@ -361,7 +370,8 @@ not decor: a real one is used, so an object of that kind with no use is a possib
 |---|---|---|---|---|---|---|---|---|
 | `treadmill` | Treadmill | 0.6–0.95 × 1.2–1.55 × 1.5–2.15 |  | walk or run; warm up | run 20–60 | incline 0–15° | treadmill | `treadmill` |
 | `weightBench` | Weight bench with bar | 0.6–1.8 × 0.4–1.4 × 1.2–2 | seat 40–48 | bench press; lift weights | lift 20–60 | backrest 0–85° | neufert | `weightBench` |
-| `exerciseBike` | Exercise / spin bike | 0.45–0.65 × 1–1.45 × 0.85–1.4 | seat 75–105 | cycle; follow a ride on the screen | cycle 20–60 |  | dimExBike | `exerciseBike` `energetic.spinBike` |
+| `exerciseBike` | Exercise / spin bike | 0.45–0.65 × 1–1.45 × 0.85–1.4 | seat 75–105 | cycle; follow a ride on the screen | cycle 20–60 |  | dimExBike | `exerciseBike` |
+| `recumbentBike` | Recumbent exercise bike (seat with a back, pedals in front) | 0.55–0.75 × 1–1.4 × 1.3–1.75 | seat 40–60 | cycle sitting back; follow a ride on the screen | cycle 20–60 |  | dimExBike | `energetic.spinBike` |
 | `yogaMat` | Yoga mat | 0.6–0.7 × 0.003–0.15 × 1.7–1.9 | seat 0–3 | do yoga; stretch | yoga 15–60 |  | neufert | `yogaMat` |
 | `dumbbellRack` | Dumbbell rack | 0.5–1.2 × 0.6–1 × 0.3–0.6 |  | lift dumbbells | lift 15–45 |  | neufert | `dumbbells` |
 | `heavyBag` | Free-standing punching bag | 0.4–0.7 × 1.5–1.9 × 0.4–0.7 |  | punch and kick | pound 10–45 | sway 0–25° | neufert | `hotHeaded.heavyBag` |
@@ -404,8 +414,8 @@ not decor: a real one is used, so an object of that kind with no use is a possib
 | `tableLamp` | Table lamp | 0.12–0.45 × 0.15–0.7 × 0.12–0.45 |  | switch it on and off; read by it |  |  | neufert | `lampTableRound` `lampTableSquare` `lampBanker` `lampMushroom` `lampLantern` |
 | `lampOnTable` | Lamp standing on its own side table | 0.35–0.65 × 0.8–1.25 × 0.35–0.6 |  | switch it on and off |  |  | neufert, dimNightstands | `tableLamp` |
 | `noveltyLamp` | Mood lamp (lava, rain, sunrise) | 0.15–0.6 × 0.3–1.6 × 0.15–0.6 |  | watch it glow; wake up to it | zoneOut 5–30 |  | neufert | `couchPotato.lavaLamp` `gloomy.rainLamp` `cheerful.sunriseLamp` |
-| `pendantLamp` | Pendant lamp on a cord or chain | 0.2–0.7 × 0.3–1.2 × 0.2–0.7 |  | switch it on and off |  |  | pendant, neufert | `ceilingPendant` `pendantIndustrial` `paperLantern` |
-| `ceilingLight` | Flush ceiling light or track | 0.2–1.2 × 0.05–0.3 × 0.2–0.6 |  | switch it on and off |  | spotTilt 0–90° | neufert | `ceilingLight` `trackLights` |
+| `pendantLamp` | Pendant lamp on a cord or chain | 0.2–0.7 × 0.3–1.2 × 0.2–0.7 |  | switch it on and off |  |  | pendant, neufert | `ceilingPendant` `pendantIndustrial` `paperLantern` `ceilingLight` |
+| `ceilingLight` | Flush ceiling light or track | 0.2–1.2 × 0.05–0.3 × 0.2–0.6 |  | switch it on and off |  | spotTilt 0–90° | neufert | `trackLights` |
 | `chandelier` | Chandelier | 0.5–1 × 0.4–1 × 0.5–1 |  | switch it on and off |  |  | pendant, neufert | `chandelier` |
 | `ceilingFan` | Ceiling fan with light | 0.9–1.4 × 0.25–0.6 × 0.9–1.4 |  | switch the fan or light on |  | blades 60–250 rpm | neufert | `ceilingFan` |
 | `wallLight` | Wall light (sconce, swing arm, bulkhead) | 0.1–0.4 × 0.15–0.5 × 0.08–0.8 |  | switch it on and off; swing it over to read |  | armSwing 0–180° | neufert | `wallSconce` `wallLampArm` `wallLightOutdoor` |

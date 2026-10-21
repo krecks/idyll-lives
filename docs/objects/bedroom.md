@@ -18,10 +18,10 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `bed` Double bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`: the top third of the duvet folds back toward the foot as they get in (sleep, nap) and back up when they get up, under the game's blanket. |
+| `bed` King-size bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`: the top third of the duvet folds back toward the foot as they get in (sleep, nap) and back up when they get up, under the game's blanket. Renamed from "Double bed": 1.90 m wide with a 1.72 m mattress, a king (reference kind `bedKing`, Q-08). |
 | `bedSingle` Single bed | 1x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`. |
 | `bedBunk` Bunk bed | 1x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down` on the lower bunk, `turn_down_upper` on the upper, each for its own sleeper (`slot`); the ladder is static. |
-| `bedFuton` Futon bed | 2x2 · floor | sleep:sleep nap:nap unfold:fetch foldAway:fetch relax:relax | bedroom / beds | Frame, Headboard, Bedding | Held open | `unfold`: the back folds flat into a bed while slept in (C1: `leaves: open` on sleep, nap and Unfold, as the wall bed); Fold away closes it. Folded, a sofa: Sit and relax on its front edge (`when: closed`, content `seat` 0.40 m, forward 0.68). |
+| `bedFuton` King futon | 2x2 · floor | sleep:sleep nap:nap unfold:fetch foldAway:fetch relax:relax | bedroom / beds | Frame, Headboard, Bedding | Held open | `unfold`: the back folds flat into a bed while slept in (C1: `leaves: open` on sleep, nap and Unfold, as the wall bed); Fold away closes it. Folded, a sofa: Sit and relax on its front edge (`when: closed`, content `seat` 0.40 m, forward 0.68). Renamed from "Futon bed": a king-size futon, 1.96 m wide (kind `bedLow`, now to 1.95 m, Q-08). |
 | `bedKing` Upholstered king bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`. |
 | `bedDouble` Double bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`. |
 | `bedQueenUpholstered` Upholstered queen bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`. |

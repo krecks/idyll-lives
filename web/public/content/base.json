@@ -2503,7 +2503,7 @@
     },
     {
       "id": "bed",
-      "name": "Double bed",
+      "name": "King-size bed",
       "model": "model.bed",
       "footprint": [
         2,
