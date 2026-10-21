@@ -301,7 +301,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Where:** `tools/art/blender/families/dining.py:259` (`diningTable`: the top 1.62 × 0.38 at `y = 0.765`, both chairs behind it at `z = -0.2`); `web/public/content/base.json:3327` (`surface.size [1.62, 0.38]`, `slots 2`); widened: `web/public/content/furniture.json:945` (`diningGlass`, `surface.size [1.7, 0.62]`), `:1005` (`diningOak`, `[1.76, 0.66]`), both built in `dining.py` with their two chairs on one long side
 - **Evidence:** `gallery-all/gallery-diningTable.png`, `sheets/seat-diningM.png`, `scenes/dining-coffee-02.png`. The top is 0.38 m deep (a dining table is 0.75–1.0 m, `reference.json` `diningTable4`), with two chairs side by side along one long edge and nothing across: it reads as a console or a breakfast bar, not a table people eat at facing each other. Its top is 0.765 m, 5 mm over the 0.71–0.76 range (inside measuring noise, but the strict rule says out). The sizes table's "H 1.03 > 0.86" is the chair backs, not the table (the kind's height range is for a table alone).
   Kitchen wave: the glass set (top 0.62 m deep) and the farmhouse set (0.66 m) have the same layout, both chairs along the back edge, side by side, nothing across (`kitchen/sheets/obj-diningGlass.png`, `kitchen/sheets/obj-diningOak.png`); a couple at breakfast or dinner sits shoulder to shoulder facing the room. Their tops are deeper than the base table's but still under the 0.75 m a table for two people facing each other needs (the reference's `diningSet` 0.75–1.8 m overall depth is met only with the chairs). With the 5 mm tolerance the 0.765 m tops are now inside.
-- **Status:** confirmed and widened (kitchen wave: `diningGlass`, `diningOak`)
+- **Status:** fixed (346158ba)
+- **After:** The three sets are rebuilt for two facing each other (G-39): a chair at each end of a top 0.84 × 0.75 m (the dining table) or 0.9 × 0.8 m (glass, farmhouse), 0.76 high (the strict range now), centred 0.1 m forward; content `places` `[±0.62, 0.1]` facing ±90 (`fwd` 0), `surface` the new tops. In play two residents sit across each set (`fixes/blender-kitchen/play/two-diningTable-coffee-r0-*.png`, `two-diningGlass-breakfast-*`, `two-diningOak-dinner-r0-*`, turned: `-r1-*`; sims at x ±0.62, yaw ∓90°), knees under the top, at every stage in the pose bench (`poses/poses-adult-f0..2*.png`, `poses-child-*`); a meal cooked at the stove is eaten at the base table and cleared to the dishwasher (`recipes/meal-stoveGas-dishwasher-diningTable-*.png`, errors 0). `cargo review sizes`: the glass and farmhouse sets inside but for the top's 1 mm (0.761, within the 5 mm tolerance); the base table's "H (table) 1.03" is its vase of flowers (tooling: the sizes table counts what stands on a top). The farmhouse set's text says a table for two.
 - **Source:** pilot; wave: kitchen
 
 ### I-kitchen-02 — The base set lacks the second uses its siblings have
@@ -322,7 +323,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/kitchen_cooking.py:423` (`dishwasher`: `w=1.0`, a 0.90 m door), `:429` (`dishwasherCompact`: `w=1.0`), sizes at `:472`, `:476`
 - **Evidence:** `kitchen/sheets/obj-dishwasher.png`, `kitchen/clips/clips-dishwasher-all-t99.png`, `kitchen/sheets/obj-dishwasherCompact.png`. The whole 1 m front is the dishwasher's door (0.90 × 0.72 m), dropping open across the full tile; real dishwashers are 45 or 60 cm wide (`reference.json` `dishwasher` 0.45–0.60, sizes table "W 1.000 > 0.660"). The wine fridge in the same 1 m unit is built right: a 45 cm cooler beside a drawer stack (`kitchen.py:674`). Open, the door reads as an oven's or a chest freezer's lid. A 60 cm dishwasher with a 40 cm cabinet or drawer beside it would keep the tile.
-- **Status:** open
+- **Status:** fixed (42528540)
+- **After:** `dishwasher`: a 60 cm machine (door 0.58 m) beside a 40 cm cupboard, a drawer over a door; `dishwasherCompact`: a slimline 45 cm machine (door 0.43 m) beside a 55 cm stack of three drawers; one worktop, 3 draws each (`fixes/blender-kitchen/gallery/gallery-dishwasher*.png`, `clips/clips-dishwasher*-all-t99.png`). Played: "Load the dishwasher" opens only the machine's door (`play/single-dishwasher*-dishes-0*.png`), and clearing away after a meal loads the plate and the pot through it (`recipes/meal-stoveGas-dishwasher-diningTable-15.png`, `meal-stoveElectric-dishwasherCompact-diningOak-15.png`). The sizes table still says "W 1.000" for both: it measures the whole unit, as for the wine fridge (tooling).
 - **Source:** wave: kitchen (`cargo review sizes`, sheets)
 
 ### M-kitchen-03 — Tables, storage and cookers built to fill whole tiles run past the real range
@@ -354,7 +356,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/dining.py:676` (`chairArm`: cushion centred at `y 0.49`, 6 cm thick: top 0.52); `web/public/content/catalog2/dining.json:530` (`seat.height 0.5`)
 - **Evidence:** Sizes table "seat 0.521 > 0.480 (0.42–0.48)"; heights check "seat 0.50 m (content), the model 0.521 m there: 2.1 cm higher" (`agent-rust/heights.txt`). A carver sits at the head of the same table as the side chairs, whose seats are 0.46–0.48 m (`reference.json` `carverChair` 42–48 cm): at 0.52 m the knees come within 20 cm of a 0.75 m top. The sitter is placed 2 cm into the cushion, which reads as a soft seat (`kitchen/extra/seats/seats-chairArm-coffee-01.png`); the height itself is the problem. Lower the seat and cushion by 4 cm (cushion top 0.48, content 0.47).
-- **Status:** open
+- **Status:** fixed (346158ba)
+- **After:** The board and cushion 4 cm lower (board top 0.425, cushion top 0.475; the front legs, back pad and arm posts with them, the arms still 18 cm over the cushion), content `seat.height` 0.47. `cargo review sizes`: the carver's seat inside 0.42–0.48 (it was "seat 0.521 > 0.480"); `cargo check-glb` no heights warning. Sat at a table for its coffee (`fixes/blender-kitchen/play/single-chairArm-coffee-0*.png`, `gallery/gallery-chairArm.png`).
 - **Source:** wave: kitchen (`cargo review sizes`, heights check)
 
 ### M-kitchen-06 — Small faults on the wine fridge, the French-door fridge and the counter end
@@ -367,7 +370,11 @@ Seeded from earlier docs first; add new findings after them in the same form.
   - Wine fridge: the "smoked-glass" door draws as an opaque black panel, closed, so the bottles behind it never show (`kitchen/sheets/obj-wineFridge.png`, gallery); a wine cooler's selling point is its glass door. The part that slides out with the door is the top of the drawer stack beside the cooler, which reads as the counter's drawer, not a wine rack (`kitchen/extra/play-child/child-wineFridge-wine-01.png`, `kitchen/clips/clips-wineFridge-all-t99.png`).
   - French-door fridge: with one door open for a cold drink, the closed door looks set back behind the side panel's edge, inside the body, rather than flush with the front (`kitchen/play/c6/fridgeFrenchDoor-coldDrink-01.png`).
   - Counter end: a seam line crosses the worktop about a quarter in, where the end shelves meet the cabinet (`kitchen/play/c2/counterEnd-no-uses.png`).
-- **Status:** open
+- **Status:** fixed (39659c10)
+- **After:**
+  - Wine fridge: the door was a solid dark slab with the glass laid on its front, so nothing showed through; it is a frame round a pane of smoked `glass` now, and the bottles show closed (`fixes/blender-kitchen/gallery/gallery-wineFridge.png`). What slides out is the top shelf of bottles inside the cooler, 15 cm, once the door is open (`rack_out`, `delay` 0.9, `hold` 0.9: in before the door shuts; `clips/clips-wineFridge-all-t99.png`; in play the clip log has it start at the door's 0.9 s, `play/play-single.jsonl`, `single-wineFridge-wine-02.png`); the drawer stack beside it is still.
+  - French-door fridge: the cabinet's sides, top and bottom come forward 5 cm to the doors' backs (they stood 5 cm off it), so the shut door sits flush on it with the other open (`play/single-fridgeFrenchDoor-coldDrink-02.png`, `clips/clips-fridgeFrenchDoor-all-t99.png`).
+  - Counter end: one worktop over the unit and the open end (`gallery/gallery-counterEnd.png`).
 - **Source:** wave: kitchen (evidence agent's "Seen" notes, checked against the sheets)
 
 ### A-kitchen-01 — The dishwasher stays shut while it is loaded
@@ -487,6 +494,17 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Status:** fixed (543c6121)
 - **After:** `barStool` and `stoolCounter` seat at `counter` only, `stoolBarHigh` at `bar` only; the breakfast counter's 0.95 m top is a `counter`; generated islands get counter stools only. Play: the counter stool's drink at a counter and the high stool's at a bar run; the bar stool at a bar and the high stool at a counter say "needs a table" (`bench-results/review/fixes/content/g07/`).
 - **Source:** wave: kitchen (content against the reference)
+
+### A-kitchen-04 — The freezers no longer open for ice cream
+
+- **Severity:** S3
+- **Rubric:** A9, I3
+- **Fix class:** motion
+- **Where:** `tools/art/blender/families/kitchen.py:729-745` (`fridge`, `fridgeBuiltIn`, `fridgeFrenchDoor` `motions`: no `frozenTreat`), `web/public/assets/packs/kitchen/manifest.json` (written from them by d2c9f0de)
+- **Evidence:** `cargo check-glb`: "clip 'freezer_open' plays for no use" on all three. "Get some ice cream" (`frozenTreat`, `anim: fetch`) opened the fridge door, not the freezer (`fixes/blender-kitchen/play/play-single.jsonl`, `fridgeFrenchDoor`/`frozenTreat`: `fridge_open`). 731b16e1 had added `frozenTreat: freezer_open` to the pack by hand (I-kitchen-01, closed in 0.3.0); the family script never had it, so the G-17 rebuild (d2c9f0de) wrote the pack without it and its comment said the freezers' clips played for no use.
+- **Status:** fixed (39659c10)
+- **After:** `FRIDGE_USES` in the family script gives the three `frozenTreat: freezer_open` (the interaction before its `fetch` tag); played: each opens its freezer for it (`play/play-freezer.jsonl`: `played freezer_open` on all three); the gate's three warnings gone. Only the pack changes.
+- **Source:** fix: blender-kitchen
 
 ## Evidence for findings in other ledgers
 
