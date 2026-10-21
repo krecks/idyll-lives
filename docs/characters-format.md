@@ -430,9 +430,11 @@ is found, a chair pulled in, from the place sim-core gave them); only its drawin
 behind a chair built into its table or desk (a top sat at by a use of its own, `builtIn`), the step goes round a
 corner 0.55 m to the chair's side (`cornerOf`), and so does rising off it (`riseViaX`). A shower with a door
 (`WALK_WAIT`: the base `shower`) is waited at until the door has slid open (0.7 s), walked into through its opening
-and out the same way as the use ends, when it opens again; the towel goes on once they are in. Not walked: a baby,
-one held, a resident on directions, using a thing from inside (`STEP_IN`), rising, on a bunk's ladder, out of bed, into
-a bath or a seat with the legs out.
+and out the same way as the use ends, when it opens again; the towel goes on once they are in and stays on until they
+are out (`toweled`: while stepping out and `TOWEL_OUT`, 0.8 s, after). Not walked: a baby, one held, a resident on
+directions, using a thing from inside (`STEP_IN`), rising, on a bunk's ladder, out of bed, into a bath or a seat with
+the legs out, and onto a seat in a frame sat astride (pedals: the bikes; `STRADDLED`: the rocking horse, the spring
+rider, the seesaw), which they settle onto as before rather than walk through.
 
 ## Where things are
 

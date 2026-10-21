@@ -552,6 +552,8 @@ interface Ride {
   sizes: readonly { clip: string; min: number }[];
   sync?: boolean;
 }
+/** Rides sat astride, in a frame (`walksIn`: not walked onto). */
+const STRADDLED = new Set(['rockingHorse', 'springRider', 'seesaw']);
 const RIDES: Record<string, Ride> = {
   rockingHorse: { sizes: RIDE_HORSE },
   springRider: { sizes: RIDE_SPRING },
@@ -683,6 +685,8 @@ const STRUM_SHORT: readonly string[] = ['strumShort'];
 /** A use sequence of the idle alone (curling dumbbells on top, `activityPose`), and of pushing (a mop). */
 const IDLE_ONLY: readonly string[] = ['idle'];
 const PUSH_ONLY: readonly string[] = ['push'];
+/** Seconds the towel stays on after a shower without a step out of it (`toweled`). */
+const TOWEL_OUT = 0.8;
 /** Things stood on holding their grips (content `stand`): the vibration plate, its clip in a size per height (`PLATE_HOLD`). */
 const GRIPPED: Record<string, readonly { clip: string; min: number }[]> = { 'lazy.vibePlate': PLATE_HOLD };
 /** Relaxing on foot (`ACTIONS.relax`): standing about, the arms folded now and then; at a fire (`WARM_AT`), the hands held out to it and rubbed. */
@@ -1230,6 +1234,13 @@ interface SimRig {
   walkYaw: number;
   walkTurn: number;
   walkDown: boolean;
+  /**
+   * Out of the shower in the towel (`wearFor`): the seconds since the use in it ended (-1: not), the towel kept while
+   * they step out (`walkT`) and `TOWEL_OUT` s more without a step.
+   */
+  toweled: number;
+  /** The shower they were last under (`toweled`), for its door as they step out (`startWalk`). */
+  shower: PlacedObject | null;
   sitX: number;
   sitZ: number;
   /**
@@ -1961,6 +1972,8 @@ export class Characters {
         walkYaw: 0,
         walkTurn: 0,
         walkDown: false,
+        toweled: -1,
+        shower: null,
         sitX: 0,
         sitZ: 0,
         inside: null,
@@ -3151,7 +3164,14 @@ export class Characters {
         this.pA.set(set.sourcePelvis);
       }
       // Clothes for what they're doing: pyjamas in bed for the night, a towel in the bath ...
-      const worn = rig.outfits?.[this.wearFor(rig, pose, moving || rig.walkT >= 0 || dist > WALK_IN.min, w, useObj, tag)];
+      let wear = this.wearFor(rig, pose, moving || rig.walkT >= 0 || dist > WALK_IN.min, w, useObj, tag);
+      // (Out of the shower in the towel: dressed once they're out, `toweled`.)
+      if (wear === 'towel' && tag === 'shower') [rig.toweled, rig.shower] = [0, useObj ?? null];
+      else if (rig.toweled >= 0) {
+        rig.toweled = moving || (rig.walkT < 0 && rig.toweled > TOWEL_OUT) ? -1 : rig.walkT >= 0 ? 0 : rig.toweled + dt * animRate;
+        if (rig.toweled >= 0 && pose === Pose.Stand) wear = 'towel';
+      }
+      const worn = rig.outfits?.[wear];
       if (worn && worn !== rig.worn) this.wear(rig, i, worn);
       // Hand pose: the clips clench fists; open them according to the activity.
       blendInto(this.qA, this.pA, set.sourceRestQ, this.pA, rig.hands, this.fingerMask);
@@ -3770,8 +3790,11 @@ export class Characters {
     if (pose === Pose.Stand) return rig.lastPose === Pose.Stand && !RISING.has(rig.cur.key);
     // (Sat down a moment ago: the snapshot's glide onto the seat had only just begun.)
     if (pose !== Pose.Sit || !(rig.lastPose === Pose.Stand || (rig.cur.key.startsWith('sitDown') && rig.cur.time < 0.3))) return false;
-    const seat = (this.objectAt(gx, gz) ?? useObj)?.seat;
-    return !seat?.along && !seat?.legsOut;
+    const obj = this.objectAt(gx, gz) ?? useObj;
+    const seat = obj?.seat;
+    // (Nor onto a seat in a frame, sat astride: a bike's saddle, a rocking horse; walked to, the legs would go
+    // through it. They settle onto it as before: `STRADDLED`.)
+    return !seat?.along && !seat?.legsOut && !seat?.pedals && !STRADDLED.has(obj?.def ?? '');
   }
 
   /** Starts walking in (`walksIn`) from where they are drawn to `gx`, `gz` (a seat's: round a built-in chair, `cornerOf`). */
@@ -3786,7 +3809,8 @@ export class Characters {
     [rig.walkEX, rig.walkEZ] = [gx, gz];
     rig.walkDown = pose === Pose.Sit;
     // (Into a shower with a door, or out of it as the use ends: once it has slid open.)
-    const shower = pose !== Pose.Stand ? null : useObj ? useObj : rig.useObj;
+    // (Stepping out: the shower they were under, the use's end and their step out of it may come a tick apart.)
+    const shower = pose !== Pose.Stand ? null : useObj ? useObj : rig.toweled >= 0 && rig.shower ? rig.shower : rig.useObj;
     const door = shower ? WALK_WAIT[shower.def] : undefined;
     rig.walkWait = !door ? 0 : useObj ? door.in : door.out;
     const seat = pose === Pose.Sit ? (this.objectAt(gx, gz) ?? useObj) : null;

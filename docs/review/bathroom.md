@@ -302,6 +302,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters.ts` (`wearFor`: the towel only while the use's tag is `shower`; the walk out, `WALK_WAIT`)
 - **Evidence:** `fixes/sweep-render/shower/shower-out-0.png` … `-900.png`: as the use ends the towel gives way to the day clothes at once, while the bather still stands under the head waiting 0.7 s for the door, then walks out dressed. Someone steps out in the towel and dresses outside (or the shower's walk out keeps the towel until they are clear of it).
-- **Status:** open
+- **Status:** fixed (COMMIT)
+- **After:** the towel stays on as they step out (`characters.ts` `toweled`, set while under the shower): through the 0.7 s wait for the door and the walk out, and 0.8 s once on the tile (`TOWEL_OUT`), then the day clothes. The step out now also finds its shower from the one they were under (`Characters.shower`): the use's end and the sim's step back to the tile can come a tick apart, and with the use gone the walk-out had lost its door wait. `fixes/sweep-render/shower2/strip-out.png` (`shower-out-0` … `-3200`: in the towel waiting while the door opens, 0–700 ms, walking out in it 1100–2000, on the tile at 2600; was `fixes/sweep-render/shower/shower-out-*`'s day clothes inside), `strip-later.png` (dressed by 3600 ms).
 - **Source:** fix: sweep-render (A-bathroom-05's re-check)
 
