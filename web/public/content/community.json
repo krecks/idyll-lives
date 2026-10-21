@@ -576,6 +576,10 @@
       "freeRotation": true,
       "group": "play",
       "slots": 2,
+      "places": [
+        { "at": [-0.45, 1], "facing": 156 },
+        { "at": [0.45, 1], "facing": -156 }
+      ],
       "outdoors": true,
       "description": "A hoop on a steel pole with a proper backboard. Shoot around alone or with a friend.",
       "interactions": [
