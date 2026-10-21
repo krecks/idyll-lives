@@ -117,7 +117,8 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/hobbies.py:1098-1101` (`workbench`: the top at 0.762 + 0.0175 = 0.78 m, on two drawer pedestals with a kneehole)
 - **Evidence:** `sheets/obj-workbench.png`, `play/workbench-tinker-01.png`: a worker stands at a 0.78 m top (a workbench is 0.85–0.95 m, `reference.json` `workbench`: you work standing, over the top). The twin steel pedestals with a kneehole and drawer pulls read as a teacher's desk with a drill and a vice on it; a workbench has an open frame or a cupboard base, a thick top and often a tool board. The sizes table can't measure the top ("no top to measure": the content has no `surface`); the height here is from the family script and the shot.
-- **Status:** open
+- **Status:** fixed (8b6b2364)
+- **After:** a 5 cm butcher-block top at 0.90 m on an open frame of square posts with rails and a slatted shelf (a crate of offcuts, a paint can), the back posts carrying a hardboard tool board with a saw, a square, screwdrivers, a spanner, pliers, a mallet and a tape (`hobbies.py` `workbench`, `BENCH_TOP`); `cargo review sizes`: top 0.90, inside 0.85–0.95 (`crates/tools/tests/checkglb.rs` now expects it). `bench-results/review/fixes/blender-hobbies/gallery/gallery-workbench.png`, `play/adult-workbench-tinker-01.png`, `play/child-workbench-tinker-01.png`.
 - **Source:** pilot
 
 ### M-hobbies-02 — The chess table's top is 46 × 40 cm, with one chair
@@ -127,7 +128,8 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/hobbies.py:707` (`top` 0.46 × 0.40 at 0.725 m), `:719` (one `_chair`)
 - **Evidence:** `sizes-hobbies.md`: W 0.46 < 0.54 (0.60–1.60 ±10 %). The board (0.37 m) nearly fills a pedestal top that leaves no room for taken pieces or a second player's elbows (`sheets/obj-chessTable.png`). Its top height (0.74 m) and seat (0.475 m pad, `SEATS.chessTable` 0.46) are fine.
-- **Status:** open
+- **Status:** fixed (8b6b2364)
+- **After:** a 0.64 × 0.48 m top (the board 0.37 in its middle) with two taken pieces each side, a wider apron and foot; the top 0.74 and the seat 0.475 as they were (`cargo review sizes`: in range). Still one chair: a partner across the board needs a second place and a deeper footprint (G-65). 4,400 triangles (`check-glb` warns: the aim is 4,000 at 0.92 m). `fixes/blender-hobbies/gallery/gallery-chessTable.png`, `play/adult-chessTable-chess-01.png`, `poses/poses-seats-*.png`.
 - **Source:** pilot
 
 ### I-hobbies-01 — The chess table seats one: chess is a game for two
@@ -173,7 +175,8 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/hobbies.py:491-515` (`_acoustic`: body to 0.67 m, nut at 1.106, head to about 1.29 m), `:443-465` (`_electric`: nut at 1.036, head to about 1.19 m), `:521` and `:471` (the stands' yokes at 1.0 and 0.82 m)
 - **Evidence:** `hobbies/sheets/obj-guitarAcoustic.png`, `hobbies/sheets/obj-guitarElectric.png` (gallery): on its stand the acoustic reaches a woman's shoulder and stands taller than the child; `sizes-hobbies.md` H 1.485 and 1.381 m against 1.32 (`guitarOnStand` 0.95–1.2 ±10 %). A dreadnought is about 1.04 m long with a 0.645 m scale, a solid-body electric about 0.99 m with 0.648; here the scale lengths (bridge to nut) are 0.97 and 0.95 m, so the necks are half as long again, and the frets (spaced for a 0.64 m scale, `_frets`) bunch up the board. The ukulele (0.65 m, a tenor) is in range. Held, the guitar is scaled to the player only below adult size (`writeHeld`, `characters.ts:1773`), so adults hold the long one.
-- **Status:** open
+- **Status:** fixed (8b6b2364)
+- **After:** a 1.05 m dreadnought (a 0.51 m body 0.40 across the lower bout, the neck meeting it at the 14th fret, a 0.645 m scale) on a stand 1.16 m high with it, and a 0.90 m solid body (a 0.648 m scale) on one 1.00 m high, their feet in the cradle 0.12 m up (`cargo review sizes`: in range). Held, they are long guitars (`characters.ts` `GUITAR.long` 0.9, was 1.15, so both still strum, not the ukulele's short hold). `fixes/blender-hobbies/gallery/gallery-guitarAcoustic.png`, `gallery-guitarElectric.png`, `play/adult-guitar*-*.png`.
 - **Source:** wave: hobbies
 
 ### M-hobbies-04 — The digital piano's keys are 10 cm higher than the piano's, and half as wide again
@@ -183,7 +186,8 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/hobbies.py:536-541` (`keyboardDigital`: case top 0.83, keys 0.825–0.845 m, 21 white keys 3.9 cm apart across 0.8 m)
 - **Evidence:** `hobbies/extra/kb-side2.png` (side view, seated): the hands rise to the keys at chest height; the base piano's keys are at 0.748 m (`:360`), a digital piano's at 0.72–0.76 m with its bench at 0.46–0.56. Its keys are 3.9 cm wide (a real white key is 2.35 cm, the piano's 2.3), so the 0.9 m case holds three octaves: a "digital piano" (`reference.json` `digitalPiano` 1.3–1.45 m wide, 88 keys) reads as a children's keyboard on an X-stand (`hobbies/sheets/obj-keyboardDigital.png`). `sizes-hobbies.md` W 0.90 < 1.17. A playing height 10 cm out is the size of error §4 rates S2 (a counter 10 cm low).
-- **Status:** open
+- **Status:** fixed (8b6b2364)
+- **After:** a console digital piano on 2 × 1 (content footprint): 88 keys, 52 white at 2.35 cm (1.22 m of keys, 1.39 m overall), their tops at 0.745 m as the upright's, on two side panels with a pedal board and a music rest, a bench at 0.48 m; it stands with its back on the wall like the upright, the player facing it (content `seat` 0.48, `forward` 0.18, `facing: back`; the `seats` row dropped). The hands on the keys (`fixes/blender-hobbies/play/adult-keyboardDigital-play-01.png`, `child-keyboardDigital-play-01.png`, `poses/poses-seats-*.png`); `cargo review sizes`: in range.
 - **Source:** wave: hobbies
 
 ### M-hobbies-05 — The drum kit is squeezed onto one tile
@@ -193,7 +197,8 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/hobbies.py:606-663` (`drumKit`; footprint `[1, 1]` at `web/public/content/catalog2/hobbies.json:5`)
 - **Evidence:** `sizes-hobbies.md`: 0.98 × 0.89 m against 1.2–2.0 × 1.0–1.8 (±10 %: W 0.978 < 1.08, D 0.885 < 0.90). The pieces are the right sizes (a 0.5 m kick, 0.24–0.36 m toms and snare) but packed: the toms sit on the kick, the hi-hat and snare crowd the throne and the floor tom sits under the ride (`hobbies/clips/clips-drumKit-all-t99.png`). It reads as a drum kit from the camera; a 2 × 2 footprint would let it spread.
-- **Status:** open
+- **Status:** fixed (8b6b2364)
+- **After:** spread over 2 × 2 (content footprint, `seat.forward` -0.4): a 22" kick to the front with a 10" and a 12" tom on a mount on it, the snare and the hi-hat at the drummer's left, a 16" floor tom at the right, a 16" crash and a 20" ride on boom stands, 1.73 × 1.24 × 1.17 m (`cargo review sizes`: in range). `fixes/blender-hobbies/gallery/gallery-drumKit.png`, `play/adult-drumKit-drum-01.png`, `clips/clips-drumKit-all-t*.png`.
 - **Source:** wave: hobbies
 
 ### M-hobbies-06 — The pool table's rails are 3 cm over a regulation table's
@@ -203,7 +208,8 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/hobbies.py:742` (`BED = 0.785`, the cloth), `:756` (`rail_long` 0.15 high at 0.745: top 0.82 m)
 - **Evidence:** the rails' top is 0.82 m and the cloth 0.785 m; a pool table is 0.74–0.79 m to the top of the rail (`reference.json` `poolTable` top 74–79, WPA), so the rail is 3 cm over, the cloth inside. `sizes-hobbies.md` measures 0.77 ("no content `surface`"), the middle of the bed, not the rail a player leans on. Close inspection only.
-- **Status:** open
+- **Status:** fixed (8b6b2364)
+- **After:** the whole table 3.5 cm lower: the cloth at 0.75 m, the rails' top at 0.785 (`hobbies.py` `BED`, `RAIL_TOP`); the pool clip's cloth follows (`clips/games.ts` `BED` 0.75), the rack hung 3.5 cm lower too. `fixes/blender-hobbies/clips/clips-poolTable-all-t99.png`, `play/adult-poolTable-pool-01.png`.
 - **Source:** wave: hobbies
 
 ### M-hobbies-07 — The foosball table has four rods, every handle on the front
@@ -213,7 +219,8 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/hobbies.py:811-819` (`_rod_men`: the handle at depth 0.46, the front, for every rod), `:847-854` (four rods: two still, two moving)
 - **Evidence:** `hobbies/clips/clips-foosball-all-t99.png`, `hobbies/extra/two-foosball-v1.png` (top view): four rods of three men, all four handles to the front. A real table has eight rods (goalie, defence, midfield, attack each side) with each team's handles on its own long side, the players facing each other. With handles on one side a second player can't oppose the first (I-hobbies-01, I-hobbies-07).
-- **Status:** open
+- **Status:** fixed (8b6b2364)
+- **After:** eight rods 15 cm apart, from the left goal blue's goalie, defence, red's attack, the two teams' five midfielders, blue's attack, red's defence and goalie; blue's handles to the front, red's short at the back (inside the wall's face). The two players' lanes are at blue's goalie and defence and at its midfield and attack (`clips/games.ts` `FOOS_LANES` -0.45, 0.075, a clip each with the hands 0.15 and 0.3 m apart: `foosClip`, `FOOS_HANDS`; `characters.ts` `STEP_IN` `square`: they now face the table squarely at their lane, not its middle, which put the hands 27° off the handles). `fixes/blender-hobbies/play/adult-foosball-foosball-01.png`, `clips/clips-foosball-all-t99.png`; `pnpm check:clips` 0 new.
 - **Source:** wave: hobbies
 
 ### M-hobbies-08 — The sewing machine faces its sewer mirrored: needle on the right, handwheel on the left
@@ -223,7 +230,8 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/hobbies.py:1216-1217` (`NEEDLE_X = -0.12`, `WHEEL` at x 0.212), `:1233-1235` (pillar at +0.155, head at the needle)
 - **Evidence:** the sewer sits on the chair at the back facing +z, so their right is game −x: the needle head is on their right and the pillar and handwheel on their left (`hobbies/extra/side2-sewingTable-sew-01.png`; `hobbies/clips/clips-sewingTable-all-t99.png` shows it from the front, the way a sewer would see it from their chair). On every domestic machine the needle is on the sewer's left and the handwheel on the right, the cloth fed towards them. Mirroring x fixes it.
-- **Status:** open
+- **Status:** closed (not a defect)
+- **After:** checked in play from behind the sewer (`bench-results/review/fixes/blender-hobbies/behind-sewingTable-sew.png`): the needle and the cloth are on her left, the handwheel on her right, as on a real machine. A resident facing +z has their right at game +x (the corner desk's chair and its sitter, `places`, line up only so); the evidence was read from the front. The model is unchanged.
 - **Source:** wave: hobbies
 
 ### M-hobbies-09 — The sewing and chess chairs' seats are 1.5 cm under their pads
@@ -324,7 +332,8 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/hobbies.py:1365` (`base`: a drum 0.33 m in radius and 0.36 m tall, centred 0.12 m ahead of the middle), `:1376` (the stool at −0.3, shifted 0.02)
 - **Evidence:** `hobbies/extra/side3.png` (side view, seated): the potter sits on the stool with the thighs level and the knees and shins inside the drum; from the front the legs vanish into it (`hobbies/sheets/obj-potteryWheel.png`, play). The drum's back is at about −0.19 m, the knees about 0.45 m ahead of the hips at −0.28. A real wheel's body is low and narrow under a splash pan the knees go either side of (or a cabinet with knee room), the potter leaning over the head. The hands on the pot are right.
-- **Status:** open
+- **Status:** fixed (8b6b2364)
+- **After:** a narrow, low motor body (0.26 m wide) set forward on four feet, a 0.48 m splash pan on a column, the pedal by the right foot; the potter sits with the knees apart either side of the pan (`characters.ts` `activityPose`, `tinker` at the pottery wheel, as the cello's), the shins either side of the body, the hands on the pot. `fixes/blender-hobbies/play/adult-potteryWheel-throw-01.png`, `child-potteryWheel-throw-01.png`, `poses/poses-seats-*.png`.
 - **Source:** wave: hobbies
 
 ### I-hobbies-11 — The experimenter stands a stride off the chemistry bench
@@ -337,3 +346,13 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Status:** fixed (0c5e889e)
 - **After:** `STAND_BACK.chemistrySet` -0.35: at the bench, the hands on its top among the flasks (`fixes/tables/play-a/a-chemistrySet-experiment-01.png`).
 - **Source:** wave: hobbies
+
+### M-hobbies-10 — The piano's content seat is 2 cm under its bench
+
+- **Severity:** S3
+- **Rubric:** M2
+- **Fix class:** content
+- **Where:** `web/public/content/base.json:3393` (`piano` `seat.height` 0.47); the bench's top 0.49 m (`tools/art/blender/families/hobbies.py` `piano`: `bench_top` 0.05 at 0.465)
+- **Evidence:** `cargo check-glb model.piano`: "seat 0.47 m (content `seat`), the model 0.490 m there (x 0.00, depth 0.23): 2.0 cm higher", past the owner's 1 cm tolerance: the pianist sits 2 cm into the cushion. A piano bench is 0.48–0.51 m, so the content's number is the one to move (0.49). Found by the Blender wave's gate run, not in play.
+- **Status:** open
+- **Source:** fix: blender-hobbies
