@@ -427,6 +427,11 @@ interface Seat {
    * sides is in the crown's shadow then (`shadeSide`), `fwd` from the trunk's middle.
    */
   shade?: boolean;
+  /**
+   * A footrest the feet go on where the floor is out of their reach (a bar stool's ring): `[h, fwd]`, its top's height
+   * (m) and how far forward of the footprint's middle its front is (m); the balls of the feet on it (`seatLegs`).
+   */
+  rest?: readonly number[];
 }
 /**
  * Mattress / bench top height (m) for lying, and how far forward of the footprint's middle the
@@ -472,6 +477,8 @@ const FOOTSTOOLS: Record<string, readonly number[]> = FURNITURE.footstools;
  * knees not drawn right up), slid forward in the seat up to `slide` m for it, slouching back `slouch` rad a metre
  * slid. Not for what is done with the hands or the legs on a seat (`NO_FEET_UP`).
  */
+/** On a footrest (`Seat.rest`): the ankle this far (m, for the reference height) behind its front, the ball of the foot on it. */
+const REST_BACK = 0.09;
 const FEET_UP = { heel: 0.14, edge: 0.03, ankle: 0.075, side: 0.3, reach: 0.995, near: 0.6, slide: 0.18, slouch: 1.4 };
 const NO_FEET_UP = new Set(['music', 'meditate', 'toilet', 'bath', 'wash']);
 /** Beds whose sleepers get a blanket (pack hammocks, sofas and nap pods don't). */
@@ -4364,14 +4371,21 @@ export class Characters {
     const B = this.set!.bone;
     const s = rig.scale;
     const w = smooth(rig.w);
-    const floor = fit.ankle - (rig.cur.rootY - (rig.useObj?.lift ?? 0)) / s;
+    const lift = rig.useObj?.lift ?? 0;
+    const floor = fit.ankle - (rig.cur.rootY - lift) / s;
     const out = stretch ? SEAT_FIT.stretch * seatSize(rig.body.height) : 0;
     const turns = rig.seatTurn;
+    // A footrest (`Seat.rest`): the ankles `REST_BACK` behind its front and as high over it as standing.
+    const rest = rig.useObj?.seat.rest;
+    const restY = rest ? fit.ankle + (rest[0] + lift - rig.cur.rootY) / s : 0;
+    const restZ = rest ? (rest[1] - REST_BACK * seatSize(rig.body.height) - rig.cur.rootFwd) / s : 0;
     for (const [k, side, thigh, calf, foot] of [
       [0, fit.l, B.thigh_l, B.calf_l, B.foot_l],
       [4, fit.r, B.thigh_r, B.calf_r, B.foot_r],
     ] as const) {
-      const [y, z] = feetDown(side, floor, out * (k ? 0.85 : 1));
+      let [y, z] = feetDown(side, floor, out * (k ? 0.85 : 1));
+      // (Hanging over the floor, onto the footrest if they reach it.)
+      if (rest && y > floor + 0.01 && Math.hypot(restY - side.hy, restZ - side.hz) < side.l1 + side.l2 - 0.01) [y, z] = [restY, restZ - (k ? 0.02 : 0)];
       const turn = this.legTo(side, y, z);
       // The foot about as level as in the clip, its toes dropping a little where it hangs.
       const hang = y > floor + 0.01 ? 0.25 : 0;

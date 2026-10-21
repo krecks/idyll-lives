@@ -408,7 +408,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters.ts` (`seatLegs`: the feet go down to the floor, or hang where it's out of reach), `web/src/render/babylon/characters/furniture.json` (`seats.barStool` 0.72; `stoolCounter`, `stoolBarHigh` content seats 0.68, 0.80)
 - **Evidence:** `bench-results/review/fixes/clips-seated/stools/poses-seats-default-0[0-2]-*-side.png`: since G-20's leg fit, a grown-up on the three stools sits with the shins hanging and the feet in the air a few centimetres over the stretcher ring; before it the clip's feet were in the air too. People on a bar stool rest the feet on its footrest ring (or one on the floor). A footrest height per stool (`seats` `rest`, m: the floor `seatLegs` puts the feet on) would put them there; the rings are at about 0.25–0.3 m.
-- **Status:** open
+- **Status:** fixed (COMMIT)
+- **After:** `furniture.json` `seats` gives the three stools a `rest` (the ring's top and front, from `dining.py` `_stool`: 0.278 / 0.187 bar, 0.259 / 0.237 counter, 0.302 / 0.237 high); `seatLegs` puts each ankle `REST_BACK` (9 cm) behind the ring's front and a standing ankle's height over it where the feet would hang and the legs reach it. `fixes/sweep-render/stools/adult-0.png` against `fixes/clips-seated/stools/poses-seats-default-00-barStool-side.png` (the feet on the ring, the knees bent up, was hanging in front of it), `adult-1.png`, `adult-2.png`, `teen-*.png`, `elder-*.png`; `child-*.png`: a child's legs don't reach, they hang as before.
 - **Source:** fix: clips-seated
 
 ### I-kitchen-03 — moved to residents.md

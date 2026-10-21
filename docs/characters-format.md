@@ -390,6 +390,9 @@ Why some entries are as they are:
 - `gardenChair`: on its slats' tops (0.43), against its slanted back, `recline` 0.314 rad (18°; the Adirondack
   chair's content `seat.recline` is in degrees).
 - `chessTable`, `sewingTable`, `hotHeaded.thunderDrums`: their chairs' and the drum stool's pads (0.475).
+- `barStool`, `stoolCounter`, `stoolBarHigh`: a foot ring (`rest`: its top's height and how far forward its front is);
+  where the feet hang over the floor, they go on it instead, the balls of the feet on its front (`REST_BACK`), if the
+  legs reach it (a child's still hang).
 - `weightBench`: lifting, the feet down on the floor either side of the bench, `feet` m out from its middle
   (`benchLegs`).
 - `kidsBedCar`: the race car's mattress ends at its bonnet, 34 cm short of the footprint's end (`foot`).
