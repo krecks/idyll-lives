@@ -926,6 +926,17 @@ export function painted(entry: ModelEntry | undefined, colors: PartColors | unde
   return { ...entry, materials } as ModelEntry;
 }
 
+/**
+ * The colour (sRGB hex) `entry`'s file gives its material `name`, as made (before the player paints
+ * it), from the file as `scene` imported it (shared with its builds); undefined without one.
+ */
+export async function fileColour(scene: Scene, entry: ModelEntry | undefined, name: string): Promise<string | undefined> {
+  if (!entry?.url) return undefined;
+  const file = await loadFile(scene, entry.url);
+  const material = file.pieces.find((p) => p.material?.name === name)?.material;
+  return material instanceof PBRMaterial ? material.albedoColor.toGammaSpace().toHexString() : undefined;
+}
+
 /** A model entry's `motions`, if it has any. */
 export function motionsOf(entry: ModelEntry | undefined): Motions | undefined {
   const m = (entry as (ModelEntry & ModelExtras) | undefined)?.motions;

@@ -10,9 +10,12 @@
 //! - `bottom.skirt`: an A-line loft from the waistband to above the knees, swinging with the thighs;
 //! - `shoes.*`: a sole under each foot (darker), and a cuff round the shin at the top of `boots`.
 //!
+//! Seated, the jacket and the skirt lie on the lap rather than keep the flare they hang with: their
+//! tone carries a seated corrective the runtime adds as the thighs turn forward (`seated_tone`).
+//!
 //! Contract: `garment_cuts(family, P)`: every id of `contract::garments`, in order, with its cut;
 //! `build_clothes(family, stage, cuts)`: `top.jacket`, `lod.top.jacket`, ... (pos, nor, idx (CCW
-//! out), dense, fields (hem distance, flag, category, 0), tone).
+//! out), dense, fields (hem distance, flag, category, 0), tone (the seated corrective, xyz)).
 //!
 //! Cut keys (metres on the base body's fields): top `sleeve` (sleeve parameter), `hem`, `crew` /
 //! `scoop`, `over` (its hem is below the waistband: painted over the bottom); bottom `waist`,
@@ -23,7 +26,7 @@ use std::sync::Arc;
 
 use serde::Serialize;
 
-use super::body::{fields_of, region, surface, topology, tris};
+use super::body::{fields_of, region, seated_pose, surface, topology, tris};
 use super::contract::garments;
 use super::garments::{ARM_M, BOTTOM, FLAG_SKIRT, FLAG_SOLE, Landmarks, SHOES, TOP};
 use super::head::head_frame;
@@ -32,7 +35,7 @@ use super::kdtree::KdTree;
 use super::meshops::{Src, boundary_edges, clip_by_field, smooth_normals};
 use super::np::{PI, clip, linspace, linspace_open, mean, percentile, py_mod, py_round, radians, sign, smoothstep, unique};
 use super::rig::{BASE_STAGE, NB, b, proportions};
-use super::{Cache, Dense, Mesh, V3, v3};
+use super::{Cache, Dense, M3, Mesh, V3, v3};
 
 fn shoe_colour(name: &str) -> &'static str {
     match name {
@@ -242,29 +245,36 @@ fn jacket(family: &str, stage: &str, gid: &str, lod: bool) -> Mesh {
     let k = h / 1.7;
     // Lift: thicker over the hips (the flare of the hem) and a little looser on the sleeves.
     let hem = cut.hem.unwrap();
-    let mut pos: Vec<V3> = (0..pos.len())
-        .map(|i| {
-            let flare = smoothstep(hem + 0.14, hem, lay.hem_y[i]);
-            let taper = smoothstep(SHELL_SLEEVE, SHELL_SLEEVE - 0.24, lay.sleeve[i]);
-            let lift = (jacket_lift(gid) + 0.012 * flare) * k * taper;
-            pos[i] + nor[i] * lift
-        })
-        .collect();
     let cuts = garment_cuts(family, &surface(family, BASE_STAGE).p);
-    if cuts.contains("bottom.skirt") {
-        // The hem lies over a skirt (it is a shell too).
-        pos = over_skirt(&pos, family, stage, &cuts, 0.005 * k);
-    }
-    let n0 = pos.len();
     let skip: Vec<bool> = lay.sleeve.iter().map(|&v| v > SHELL_SLEEVE - 0.06).collect();
-    let (pos, idx, verts) = rim(&pos, &nor, &lay.idx, 0.6 * jacket_lift(gid) * k, &skip);
+    // `flared`: as it hangs standing; else as it lies seated (no flare, over the skirt as that lies).
+    let shape = |flared: bool| {
+        let mut pos: Vec<V3> = (0..pos.len())
+            .map(|i| {
+                let flare = if flared { smoothstep(hem + 0.14, hem, lay.hem_y[i]) } else { 0.0 };
+                let taper = smoothstep(SHELL_SLEEVE, SHELL_SLEEVE - 0.24, lay.sleeve[i]);
+                let lift = (jacket_lift(gid) + 0.012 * flare) * k * taper;
+                pos[i] + nor[i] * lift
+            })
+            .collect();
+        if cuts.contains("bottom.skirt") {
+            // The hem lies over a skirt (it is a shell too).
+            pos = over_skirt(&pos, family, stage, &cuts, 0.005 * k, !flared);
+        }
+        let n0 = pos.len();
+        let (pos, idx, verts) = rim(&pos, &nor, &lay.idx, 0.6 * jacket_lift(gid) * k, &skip);
+        (pos, idx, verts, n0)
+    };
+    let (pos, idx, verts, n0) = shape(true);
     let nor_all = smooth_normals(&pos, &idx);
     let mut d = shell_dense(&lay.src, dense);
     let extra: Vec<Dense> = verts.iter().map(|&v| d[v]).collect();
     d.extend(extra);
     let n = pos.len();
     let fields = (0..n).map(|i| [if i < n0 { 0.05 } else { 0.0 }, 0.0, TOP, 0.0]).collect();
-    Mesh { pos, nor: nor_all, idx, dense: d, fields, tone: vec![[0.0; 4]; n], ..Mesh::default() }
+    let clear = if cuts.contains("bottom.skirt") { JACKET_CLEAR } else { SKIRT_CLEAR };
+    let tone = seated_tone(family, stage, &pos, &d, &shape(false).0, clear * k);
+    Mesh { pos, nor: nor_all, idx, dense: d, fields, tone, ..Mesh::default() }
 }
 
 /// Triangles turned to face away from a vertical axis through `centre` (x, z) where most don't.
@@ -412,12 +422,14 @@ fn surface_tris(family: &str) -> Arc<Vec<usize>> {
     tris(family)
 }
 
-/// The skirt's rows (heights), axis z, angles and radii (rows x segs).
+/// The skirt's rows (heights), axis z, angles and radii (rows x segs); `hug`: the radii without the
+/// flare (the body's sections with their hollows bridged, plus the ease), where it lies seated.
 struct SkirtProfile {
     ys: Vec<f64>,
     cz: f64,
     ang: Vec<f64>,
     r: Vec<Vec<f64>>,
+    hug: Vec<Vec<f64>>,
 }
 
 static SKIRTS: Cache<(String, String, u64, usize, usize), SkirtProfile> = Cache::new();
@@ -463,13 +475,38 @@ fn skirt_profile(family: &str, stage: &str, waist: f64, segs: usize, rows: usize
         let t = linspace(0.0, 1.0, rows);
         let top: Vec<f64> = r[0].iter().map(|v| v + 0.006 * k).collect();
         let hem: Vec<f64> = (0..segs).map(|j| r.iter().map(|row| row[j]).fold(f64::NEG_INFINITY, f64::max) + 0.05 * k).collect();
-        let r = (0..rows).map(|i| (0..segs).map(|j| (r[i][j] + 0.006 * k).max(top[j] + (hem[j] - top[j]) * clip((t[i] - 0.2) / 0.8, 0.0, 1.0).powf(0.9))).collect()).collect();
-        SkirtProfile { ys, cz, ang, r }
+        let flared: Vec<Vec<f64>> = (0..rows).map(|i| (0..segs).map(|j| (r[i][j] + 0.006 * k).max(top[j] + (hem[j] - top[j]) * clip((t[i] - 0.2) / 0.8, 0.0, 1.0).powf(0.9))).collect()).collect();
+        let hug = (0..rows).map(|i| bridged(&r[i], 2.0 * PI / segs as f64).iter().zip(&flared[i]).map(|(h, f)| (h + 0.006 * k).min(*f)).collect()).collect();
+        SkirtProfile { ys, cz, ang, r: flared, hug }
     })
 }
 
-/// Points pushed out from the pelvis' axis to lie `lift` outside the skirt where it is.
-fn over_skirt(pos: &[V3], family: &str, stage: &str, cuts: &Cuts, lift: f64) -> Vec<V3> {
+/// A ring of radii (`step` rad apart, round the whole ring) with its hollows bridged: each no less
+/// than where the chord between its neighbours crosses its ray (the cloth spans the gap between the legs).
+fn bridged(r: &[f64], step: f64) -> Vec<f64> {
+    let n = r.len();
+    let c = step.cos();
+    let mut out = r.to_vec();
+    for _ in 0..n {
+        let mut moved = false;
+        for j in 0..n {
+            let (a, bb) = (out[(j + n - 1) % n], out[(j + 1) % n]);
+            let chord = 2.0 * a * bb * c / (a + bb).max(1e-9);
+            if chord > out[j] + 1e-9 {
+                out[j] = chord;
+                moved = true;
+            }
+        }
+        if !moved {
+            break;
+        }
+    }
+    out
+}
+
+/// Points pushed out from the pelvis' axis to lie `lift` outside the skirt where it is (as it lies
+/// seated with `hug`).
+fn over_skirt(pos: &[V3], family: &str, stage: &str, cuts: &Cuts, lift: f64, hug: bool) -> Vec<V3> {
     let sp = skirt_profile(family, stage, cuts.get("bottom.skirt").unwrap().waist.unwrap(), SKIRT_SEGS, SKIRT_ROWS);
     let (ys, cz, na) = (&sp.ys, sp.cz, sp.ang.len());
     let ny = ys.len();
@@ -483,7 +520,7 @@ fn over_skirt(pos: &[V3], family: &str, stage: &str, cuts: &Cuts, lift: f64) -> 
             let yi = clip((ys[0] - q.y) / (ys[0] - ys[ny - 1]) * (ny - 1) as f64, 0.0, (ny - 1) as f64);
             let i0 = (yi.floor() as usize).min(ny - 2);
             let g = yi - i0 as f64;
-            let rr = |ii: usize, jj: usize| sp.r[ii % ny][jj % na];
+            let rr = |ii: usize, jj: usize| if hug { sp.hug[ii % ny][jj % na] } else { sp.r[ii % ny][jj % na] };
             let rv = 0.0 + (1.0 - g) * (1.0 - f) * rr(i0, j0) + (1.0 - g) * f * rr(i0, j0 + 1) + g * (1.0 - f) * rr(i0 + 1, j0) + g * f * rr(i0 + 1, j0 + 1);
             let inside = q.y <= ys[0] + 0.03 && q.y >= ys[ny - 1];
             let need = if inside { (rv + lift - r).max(0.0) } else { 0.0 };
@@ -499,13 +536,17 @@ fn skirt_shell(family: &str, stage: &str, cuts: &Cuts, segs: usize, rows: usize)
     let (ys, cz, ang) = (&sp.ys, sp.cz, &sp.ang);
     let k = proportions(family, stage).h / 1.7;
     let (yb0, yb1) = (ys[0], ys[rows - 1]);
-    let g: Vec<Vec<V3>> = (0..rows).map(|i| (0..segs).map(|j| v3(ang[j].sin() * sp.r[i][j], ys[i], cz + ang[j].cos() * sp.r[i][j])).collect()).collect();
-    // Hem: a band turned up inside the bottom edge (the cloth's thickness).
-    let hem_in: Vec<V3> = (0..segs).map(|j| g[rows - 1][j] - v3(ang[j].sin(), 0.0, ang[j].cos()) * 0.004 * k + v3(0.0, 0.012 * k, 0.0)).collect();
-    let (mut pos, mut idx) = strip(&g, true);
-    let (hp, hi) = strip(&[g[rows - 1].clone(), hem_in], true);
-    pos.extend(hp);
-    idx.extend(hi.iter().map(|&i| i + rows * segs));
+    let shape = |r: &[Vec<f64>]| {
+        let g: Vec<Vec<V3>> = (0..rows).map(|i| (0..segs).map(|j| v3(ang[j].sin() * r[i][j], ys[i], cz + ang[j].cos() * r[i][j])).collect()).collect();
+        // Hem: a band turned up inside the bottom edge (the cloth's thickness).
+        let hem_in: Vec<V3> = (0..segs).map(|j| g[rows - 1][j] - v3(ang[j].sin(), 0.0, ang[j].cos()) * 0.004 * k + v3(0.0, 0.012 * k, 0.0)).collect();
+        let (mut pos, mut idx) = strip(&g, true);
+        let (hp, hi) = strip(&[g[rows - 1].clone(), hem_in], true);
+        pos.extend(hp);
+        idx.extend(hi.iter().map(|&i| i + rows * segs));
+        (pos, idx)
+    };
+    let (pos, idx) = shape(&sp.r);
     let n = pos.len();
     let tl = linspace(0.0, 1.0, rows);
     let t: Vec<f64> = (0..n).map(|i| if i < rows * segs { tl[i / segs] } else { 1.0 }).collect();
@@ -521,13 +562,87 @@ fn skirt_shell(family: &str, stage: &str, cuts: &Cuts, segs: usize, rows: usize)
             d[pv] = 1.0 - tw;
             d
         })
-        .collect();
+        .collect::<Vec<Dense>>();
     let fields = (0..n).map(|i| [(1.0 - t[i]) * (yb0 - yb1), FLAG_SKIRT, BOTTOM, 0.0]).collect();
     let body_n = (rows - 1) * segs * 6;
     let tri = outward(&pos[..rows * segs], idx[..body_n].to_vec(), (0.0, cz));
     let tri = if tri != idx[..body_n] { flip(&idx) } else { idx };
     let nor = smooth_normals(&pos, &tri);
-    Mesh { pos, idx: tri, nor, dense, fields, tone: vec![[0.0; 4]; n], ..Mesh::default() }
+    // Seated, it lies on the thighs: without its flare, and clear of the skin.
+    let tone = seated_tone(family, stage, &pos, &dense, &shape(&sp.hug).0, SKIRT_CLEAR * k);
+    Mesh { pos, idx: tri, nor, dense, fields, tone, ..Mesh::default() }
+}
+
+/// The thighs' turn forward from the hips (degrees) the seated corrective is made for: the `sit`
+/// clip's (clips/seated.ts), which the runtime weighs it by (characters.ts `SIT_FLEX`).
+const SIT_FLEX: f64 = 76.0;
+/// Seated, how far (m) a shell keeps off the skin at least: the skirt, and a jacket (over it).
+const SKIRT_CLEAR: f64 = 0.005;
+const JACKET_CLEAR: f64 = 0.008;
+
+/// A body seated (`seated_pose`): its skin skinned so, the skin's normals, a tree of its vertices,
+/// and the seat's height (the lowest skin under the hips, as `seat_drop` has it).
+struct Seated {
+    pose: Vec<(M3, V3)>,
+    pos: Vec<V3>,
+    nor: Vec<V3>,
+    tree: KdTree,
+    seat: f64,
+}
+
+static SEATED: Cache<(String, String), Seated> = Cache::new();
+
+fn seated(family: &str, stage: &str) -> Arc<Seated> {
+    SEATED.get((family.to_string(), stage.to_string()), || {
+        let s = surface(family, stage);
+        let pose = seated_pose(&s.p, SIT_FLEX);
+        let pos: Vec<V3> = s.pos.iter().zip(&s.dense).map(|(q, d)| skinned(&pose, *q, d).0).collect();
+        let nor = smooth_normals(&pos, &tris(family));
+        let tree = KdTree::new(&pos);
+        let hips = ["pelvis", "thigh_l", "thigh_r", "spine_01"].map(b);
+        let seat = pos.iter().zip(&s.dense).filter(|(_, d)| hips.iter().map(|&i| d[i]).sum::<f64>() > 0.6).map(|(q, _)| q.y).fold(f64::INFINITY, f64::min);
+        Seated { pose, pos, nor, tree, seat }
+    })
+}
+
+/// `q` with weights `d` skinned by `pose`, and the blend of the bones' rotations there.
+fn skinned(pose: &[(M3, V3)], q: V3, d: &Dense) -> (V3, M3) {
+    let mut p = V3::zeros();
+    let mut a = M3::zeros();
+    for (bi, (r, t)) in pose.iter().enumerate() {
+        if d[bi] != 0.0 {
+            p += (r * q + t) * d[bi];
+            a += r * d[bi];
+        }
+    }
+    (p, a)
+}
+
+/// A shell's seated corrective (its `tone` xyz, m in its rest space; w 0): what moves each vertex from
+/// where the seated pose skins it to where `hug` (its shape as it lies seated, the same vertices) is
+/// skinned, pushed out to `clear` off the seated skin where it would sink in. The runtime adds it as
+/// far as the thighs are turned forward (`sitW`, characters.ts), so seated the skirt lies on the lap
+/// and the jacket's hem on it, rather than standing out round the seat as they hang standing.
+fn seated_tone(family: &str, stage: &str, pos: &[V3], dense: &[Dense], hug: &[V3], clear: f64) -> Vec<[f64; 4]> {
+    let st = seated(family, stage);
+    pos.iter()
+        .zip(hug)
+        .zip(dense)
+        .map(|((q, h), d)| {
+            let (now, a) = skinned(&st.pose, *q, d);
+            let (mut to, _) = skinned(&st.pose, *h, d);
+            // Out of the skin, and no lower than the seat (the cloth sat on lies on it).
+            let j = st.tree.nearest(&to);
+            let off = (to - st.pos[j]).dot(&st.nor[j]);
+            if off < clear {
+                to += st.nor[j] * (clear - off);
+            }
+            to.y = to.y.max(st.seat + clear);
+            let delta = a.try_inverse().map_or(V3::zeros(), |inv| inv * (to - now));
+            // (Nothing to move: exactly zero, so the shells that don't move keep a zero tone.)
+            if delta.norm() < 1e-5 { [0.0; 4] } else { [delta.x, delta.y, delta.z, 0.0] }
+        })
+        .collect()
 }
 
 /// A closed prism: the outline (x, z) from y0 to y1, capped (counter-clockwise outside).

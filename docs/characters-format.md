@@ -157,6 +157,15 @@ clump bands (0..1), w reserved. The eyelids take the tone of the skin they lie o
 stage uses the base stage's tone; the shader deepens the cavities with the resident's age
 (appearance texel 4 g).
 
+The jacket, suit and skirt shells use their tone's xyz for their seated shape instead (m, in the
+rest space, before skinning; w 0): what moves each vertex from where a seated pose (`seated_pose`
+with the thighs turned 76° forward, as `sit` has them) skins it to where its seated shape is skinned
+(the skirt without its flare, its hollows between the legs bridged, the jacket without its hem's
+flare), out of the seated skin and no lower than the seat (`seated_tone`, clothes.rs). The runtime
+adds it as far as the thighs are turned forward (`writeSit`: from 15° to 76°, the mean of both, at
+the body's size; appearance texel 4 b), so a seated skirt lies on the lap and the jacket's hem on it
+instead of standing out round the seat as they hang standing.
+
 ## Clothes
 
 Clothes are painted on the body by its shader. Each garment's cut (metres on the base body's
@@ -173,6 +182,16 @@ paints the thighs (the shell hangs over them). Babies don't wear skirts (the she
 their drawn-up, spread legs): a baby whose outfit has one wears `bottom.shorts` in the top's colour,
 a romper (outfit.ts).
 
+What a resident wears changes with what it does (`Wear`, outfit.ts; characters.ts `wearFor`): its day
+clothes; pyjamas for a night's sleep in bed (a `sleep` use lying down: the `top.long` and
+`bottom.trousers` cuts in a sleep colour, barefoot); the day clothes barefoot for a nap on something
+slept in; a towel under a shower and sat in a bath (the bottom's cut alone, from under the arms, or
+round a man's hips, to the thigh); swimwear in a hot tub (a swimsuit, the `top.tank` cut down to the
+top of the legs, or trunks). Only the day clothes draw their shells: the others leave them out by the
+resident's row (`bare`), so a change of clothes draws nothing more. The towel's and swimwear's heights
+come from the base body's joints at rest (`OutfitFit`: under the arms half way between `spine_03` and
+`upperarm_l`, the hips and the knees).
+
 Garment ids per family (outfit.ts):
 
 - male: `top.tee top.vneck top.polo top.long top.shirt top.jacket top.suit`, `bottom.trousers bottom.shorts bottom.suit`;
@@ -187,7 +206,7 @@ Garment ids per family (outfit.ts):
 | 1 | top colour | top: hem |
 | 2 | bottom colour | top: crew cut |
 | 3 | hair colour (plain) | top: scoop cut |
-| 4 | r = 1 if the top is `over` the bottom; g = age (0 young, 0.4 adult, 1 elder) | bottom: waist |
+| 4 | r = 1 if the top is `over` the bottom; g = age (0 young, 0.4 adult, 1 elder); b = how far the shells take their seated shape (0..1, at the body's size; below) | bottom: waist |
 | 5 | skin reference (1) | bottom: leg cut |
 | 6 | shoe colour | shoes: top height |
 | 7 | eye colour | 1 if the resident wears hair (the scalp takes the hair colour) |

@@ -707,10 +707,12 @@ fn rx(a: f64) -> M3 {
     M3::new(1.0, 0.0, 0.0, 0.0, c, -s, 0.0, s, c)
 }
 
-/// Seated (thighs forward, shins down): the pelvis joint's height above the lowest skin under the hips.
-fn seat_drop(body: &Mesh, p: &[V3; NB]) -> f64 {
-    let up = rx(radians(-90.0));
-    let down = rx(radians(90.0));
+/// Seated (thighs turned `flex` degrees forward about the hips, a quarter turn for `seat_drop`; shins
+/// straight down from the knees; every other bone at rest): each bone's skinning transform
+/// `x -> R x + t` (seat_drop; the shells' seated corrective, clothes.rs).
+pub fn seated_pose(p: &[V3; NB], flex: f64) -> Vec<(M3, V3)> {
+    let up = rx(radians(-flex));
+    let down = rx(radians(flex));
     let mut mats: Vec<(M3, V3)> = vec![(M3::identity(), V3::zeros()); NB];
     for sd in ["l", "r"] {
         let (jt, jk) = (p[b(&format!("thigh_{sd}"))], p[b(&format!("calf_{sd}"))]);
@@ -721,6 +723,12 @@ fn seat_drop(body: &Mesh, p: &[V3; NB]) -> f64 {
             mats[b(&format!("{bn}_{sd}"))] = (r, knee - r * jk);
         }
     }
+    mats
+}
+
+/// Seated (`seated_pose`): the pelvis joint's height above the lowest skin under the hips.
+fn seat_drop(body: &Mesh, p: &[V3; NB]) -> f64 {
+    let mats = seated_pose(p, 90.0);
     let n = body.pos.len();
     let mut out = vec![V3::zeros(); n];
     for (bi, (r, t)) in mats.iter().enumerate() {
