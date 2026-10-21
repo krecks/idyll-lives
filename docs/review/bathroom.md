@@ -220,7 +220,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** motion
 - **Where:** `tools/art/blender/families/laundry.py:226` (`LAUNDRY = {'uses': {'laundry': 'door_open'}, 'hold': 2.5, 'loops': {'laundry': 'drum_spin'}}`, the same for both machines)
 - **Evidence:** `bathroom/play/chunk2/play.jsonl` and `chunk4-redo/play.jsonl` (clip events): on the washer `door_open` and `drum_spin` start in the same frame (4162 ms) and the drum goes round behind the open door for its 2.5 s hold; a washer won't turn until it is shut. On the dryer ("Fold the laundry", 20 min) the door opens and the drum tumbles the washing for the whole use (`bathroom/play/chunk2/laundryDryer-laundry-01.png`: the drum's washing turning while the resident stands at it to fold), where folding means the drum has stopped and the washing is out. Fix: the washer's spin after its door shuts (a delay, or a loop that waits for the door); the dryer's use opens the door with no spin.
-- **Status:** open
+- **Status:** fixed (d2c9f0de)
+- **After:** the washer's drum turns from the moment its door has shut (`delay` 3.5 s, `every` 1.1 s, a turn each 1.2 s, till the wash ends): `fixes/motions/g1718/play-stage.jsonl`, `door_open` back at rest at +4.96 s, `drum_spin` from +4.97 s; the dryer opens its door to take the washing out and its drum stays still (no `drum_spin` clip).
 - **Source:** wave: bathroom
 
 ### A-bathroom-04 — Bathers sit 10–12 cm above the tub's floor

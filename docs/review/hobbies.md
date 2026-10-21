@@ -244,7 +244,8 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Fix class:** motion
 - **Where:** `tools/art/blender/families/hobbies.py:1452-1494` (`FAMILY` motions: `fallboard`, `move`, `pieces`, `presser`/`handwheel`, `clay`/`wheel`, `book_open`, `cymbals`, none with a `delay`); compare `tools/art/blender/families/fitness.py:276` (`bar_off` with `delay: BAR_DELAY`, 0.8 s, for the same reason)
 - **Evidence:** `hobbies/play/c1/play.jsonl` `clips`: each clip's `first` is 0–17 ms after `using`, which for a seated use is when `sitDown` starts (about 1 s; `characters.ts:2585`). So the chess pawn slides (0.8 s) and the jigsaw patch spreads (1.2 s) before a hand is near the board, and the presser foot drops, the pot rises, the scrapbook opens and the cymbals rock while the resident is still lowering onto the seat (and, A-hobbies-01, still passing through the table). A `delay` of about 0.9 s on each, as the weight bench has, puts them at the hands. Close watching only.
-- **Status:** open
+- **Status:** fixed (d2c9f0de)
+- **After:** each starts 0.9 s in (`SIT`, `delay`), the loops (cymbals, handwheel, wheel) now repeating uses from then (`every` 0.9 s): `fixes/motions/g1718/play-stage.jsonl`, the piano's `fallboard` first moving at +0.93 s, the cymbals at +0.93 s, the pawn at +0.93 s, the jigsaw patch at +0.92 s, and the sewing table's, the pottery wheel's and the scrapbook's the same.
 - **Source:** wave: hobbies
 
 ### A-hobbies-03 — The pool rack floats 25 cm over the balls for the whole game
@@ -254,7 +255,8 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Fix class:** motion
 - **Where:** `tools/art/blender/families/hobbies.py:801` (`G.slide(rack, 'rack_off', (0, 0, 0.25))`: Blender z, straight up); `:1467-1468` (`rack_off` for `pool` and `trickShots`, held until the use ends)
 - **Evidence:** `hobbies/sheets/obj-poolTable.png` (play), `hobbies/extra/two.png`: the triangle hangs in mid-air above the racked balls for the 30 or 60 minutes. Racking lifts the triangle off and puts it away (on the rail, a hook or under the table). Slide it up and over onto the head rail, or squash it away (`G.squash`); the balls would want to break too (I-hobbies-05).
-- **Status:** open
+- **Status:** fixed (abfc32d9)
+- **After:** `rack_off` (new `G.path`, 1.4 s) lifts the triangle 14 cm off the balls, carries it over the foot rail and hangs it upright by its apex on the table's foot end, out of the play, for the whole game (`fixes/motions/g1718/views/pool-end-t99.png`, `-t0.6.png`, `clips-poolTable-all-t*.png`). The balls still don't break (I-hobbies-05).
 - **Source:** wave: hobbies
 
 ### I-hobbies-04 — Darts, pool and foosball are played with the same hand-weaving clip

@@ -329,7 +329,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** motion
 - **Where:** `tools/art/blender/families/media.py:300` (`stereo`), `:344`–`:357` (`tray`, the only use clip); `web/public/content/furniture.json:1663` ("put a record on, or dance")
 - **Evidence:** The stereo is a hi-fi cabinet with a turntable and a record on top, the amplifier and a CD player below, and records in the shelf (`living/sheets/obj-stereo.png`). "Listen to music" and "Dance" slide out the CD tray under the amplifier for 1.2 s and pulse the woofers; the record on top, the thing the description puts on, never turns and its lid or arm never moves. The platter spinning while music plays (a loop, as the woofers) would match the description; the tray could stay.
-- **Status:** open
+- **Status:** fixed (abfc32d9)
+- **After:** the record (platter, vinyl and label, a stripe on the label) turns at 33 rpm while the music plays (`record`, a loop) and the woofers pulse (`every` 0.45 s); the CD tray is still now, as its part's draw went to the record (4 draws: `fixes/motions/g1718/views/stereo-t0.5.png`, `play-stage.jsonl`).
 - **Source:** wave: living
 
 ### I-living-09 — The three-seat sofa seats two

@@ -453,7 +453,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** motion
 - **Where:** `tools/art/blender/families/pack_energetic.py:343`, `web/public/content/packs/energetic.json:105`
 - **Evidence:** The blender is used but its blades never turn. Review: its motions are `{"uses": {"blend": "lid"}, "hold": 1.0}` only (manifest); `packs/sheets/obj-energetic.powerBlender.png`: the lid lifts, nothing spins.
-- **Status:** confirmed
+- **Status:** fixed (abfc32d9)
+- **After:** the smoothie in the jug is a part of its own with fruit streaks and bits, and swirls once a second (`blades`) from the lid back on (`delay` 1.5 s) till the blend ends (`every` 0.9 s); the blades themselves stay hidden in it, its fourth draw (`fixes/motions/g1718/views/blender-t0.3.png`, `play-stage.jsonl`).
 - **Source:** `docs/objects/open.md` Still open › Models; wave: packs
 
 ### M-packs-04 — The chef's island's stools are chair height under a counter
@@ -563,7 +564,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** motion
 - **Where:** `tools/art/blender/families/pack_neat.py:447` (`laundryCenter`: `door_open`, no `hold`), `pack_kind.py:512` (`neighbourlyOven`: `oven_open`, no `hold`), `pack_natureLover.py:648` (`glasshouse`: `door_open`, no `hold`)
 - **Evidence:** `packs/play/chunk2/neat.laundryCenter-laundry-01.png` and `-fold-01.png`: the washer's porthole is open through the 45-minute wash and the hour's folding (play.jsonl: `door_open` at its end, 0.79/0.79, in every shot); `packs/play/rerun1/kind.neighbourlyOven-familyPie-01.png`: the oven door down through the 48- and 53-minute bakes; `packs/play/chunk4/natureLover.glasshouse-orchids-01.png`: the door open while the plants are tended and while the resident sits inside. The same family's other doors shut after a moment (`hold`: the microwave cart's 1.5, the chef's stove's 3.0, the sauna's 1.5). A washer and an oven are shut while they run.
-- **Status:** open
+- **Status:** fixed (d2c9f0de; the oven 2dcc4ea0)
+- **After:** the laundry centre's porthole shuts 2.5 s into the wash and the folding (`hold`; `fixes/motions/g1718/play-stage.jsonl`: open at +0.8 s, shut by +3.3 s); the neighbourly oven's door drops only for the bake step and shuts after 3 s (`fixes/motions/recipes/pie-neighbourlyOven.json`, `-05.png`); the glasshouse door lets the resident in, shuts behind them (1.5 s) and opens again for 1.5 s to let them out, the roof vent open while they're in (`fixes/motions/g1718/play-garden.jsonl`).
 - **Source:** wave: packs (play.jsonl clip times)
 
 ### A-packs-04 — The nap pod's hood closes onto the sitter's head
@@ -749,7 +751,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** motion
 - **Where:** `tools/art/blender/families/pack_neat.py:343` (`robotVacuumDock`: `vacuum_out` slides it out and back), `:457`
 - **Evidence:** `packs/sheets/obj-neat.robotVacuumDock.png`: the robot slides a little way out and back; it never goes round the room or its rug, and the use is 45 minutes of the owner programming it on foot (I-packs-05). A loop that drives the robot round the rug while the use lasts would read as cleaning.
-- **Status:** open
+- **Status:** fixed (abfc32d9)
+- **After:** `vacuum_round` (a loop, new `G.path`, 5 s a round at 0.25 m/s) drives the robot 18 cm out of the dock, round a 14 cm circle in front of it, facing the way it goes, and back in, while the program use lasts (`fixes/motions/g1718/views/robot-t1.2.png`, `-t2.5.png`, `play-stage.jsonl`). Programming it still takes 45 minutes on foot (I-packs-05).
 - **Source:** wave: packs
 
 ### I-packs-16 — Missing obvious uses: the jukebox can't be listened to; the party bar's stools are never sat on
