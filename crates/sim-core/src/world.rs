@@ -252,15 +252,15 @@ impl ObjectInstance {
 
     /// Takes one of the slots in `range` for `sim` (keeps the one it already has).
     pub(crate) fn reserve_in(&mut self, sim: u32, range: std::ops::Range<usize>) -> bool {
-        self.reserve_near(sim, range, None)
+        self.reserve_near(sim, range, None, 0)
     }
 
-    /// Takes the slot `pick_slot` gives `sim` in `range` (`near`: see there).
-    fn reserve_near(&mut self, sim: u32, range: std::ops::Range<usize>, near: Option<(&crate::content::ObjectDef, [f32; 2])>) -> bool {
+    /// Takes the slot `pick_slot` gives `sim` in `range` (`near`, `prefer`: see there).
+    fn reserve_near(&mut self, sim: u32, range: std::ops::Range<usize>, near: Option<(&crate::content::ObjectDef, [f32; 2])>, prefer: u32) -> bool {
         if self.slot_of(sim).is_some() {
             return true;
         }
-        match self.pick_slot(sim, range, near) {
+        match self.pick_slot(sim, range, near, prefer) {
             Some(k) => {
                 self.users[k] = Some(sim);
                 true
@@ -269,14 +269,18 @@ impl ObjectInstance {
         }
     }
 
-    /// The slot in `range` `sim` gets: theirs already, else a free one; of a kind whose slots
-    /// have their places (`near`: its def, and where `sim` is now), the one nearest them, else
-    /// the first.
-    pub(crate) fn pick_slot(&self, sim: u32, range: std::ops::Range<usize>, near: Option<(&crate::content::ObjectDef, [f32; 2])>) -> Option<usize> {
+    /// The slot in `range` `sim` gets: theirs already, else a free one, one of `prefer`'s (a
+    /// mask of slots: the sofa's seat with a footstool in front, `footstool_slots`) if one is
+    /// free; of a kind whose slots have their places (`near`: its def, and where `sim` is now),
+    /// the one nearest them, else the first.
+    pub(crate) fn pick_slot(&self, sim: u32, range: std::ops::Range<usize>, near: Option<(&crate::content::ObjectDef, [f32; 2])>, prefer: u32) -> Option<usize> {
         if let Some(k) = self.slot_of(sim) {
             return Some(k);
         }
-        let mut free = range.filter(|&k| self.users[k].is_none());
+        let open = |k: &usize| self.users[*k].is_none();
+        let preferred = |k: &usize| *k < 32 && prefer & (1 << *k) != 0;
+        let some_preferred = range.clone().filter(open).any(|k| preferred(&k));
+        let mut free = range.filter(open).filter(|k| !some_preferred || preferred(k));
         match near.filter(|(def, _)| !def.places.is_empty()) {
             Some((def, from)) => free.min_by(|&a, &b| {
                 let d = |k| {
@@ -292,7 +296,7 @@ impl ObjectInstance {
     /// Takes a place for `sim` (now at `from`) for interaction `i` of `def` (see `can_use_for`):
     /// one of its slots (`pick_slot`), or every one for a use that takes the whole object
     /// (`slot_of` is then the first).
-    pub(crate) fn reserve_for(&mut self, sim: u32, def: &crate::content::ObjectDef, i: usize, from: [f32; 2]) -> bool {
+    pub(crate) fn reserve_for(&mut self, sim: u32, def: &crate::content::ObjectDef, i: usize, from: [f32; 2], prefer: u32) -> bool {
         let range = def.slots_for(i);
         let reserved = if def.interactions[i].whole {
             if !self.can_use_for(sim, def, i) {
@@ -301,25 +305,25 @@ impl ObjectInstance {
             self.users[range].fill(Some(sim));
             true
         } else {
-            self.reserve_near(sim, range, Some((def, from)))
+            self.reserve_near(sim, range, Some((def, from)), prefer)
         };
         self.kept_closed(sim, reserved, def.interactions[i].when == Some(false))
     }
 
     /// The slot `reserve_for` would give `sim` (at `from`) for interaction `i` of `def`.
-    pub(crate) fn slot_for(&self, sim: u32, def: &crate::content::ObjectDef, i: usize, from: [f32; 2]) -> Option<usize> {
+    pub(crate) fn slot_for(&self, sim: u32, def: &crate::content::ObjectDef, i: usize, from: [f32; 2], prefer: u32) -> Option<usize> {
         let range = def.slots_for(i);
         if def.interactions[i].whole {
             return Some(range.start);
         }
-        self.pick_slot(sim, range, Some((def, from)))
+        self.pick_slot(sim, range, Some((def, from)), prefer)
     }
 
     /// Takes a place on it for `sim` (now at `from`) to sit while doing something else (eating,
     /// the phone, TV from the sofa). A seat only while closed (a sofa bed) then can't be opened
     /// under them.
-    pub(crate) fn reserve_seat(&mut self, sim: u32, def: &crate::content::ObjectDef, from: [f32; 2]) -> bool {
-        let reserved = self.reserve_near(sim, 0..def.slots as usize, Some((def, from)));
+    pub(crate) fn reserve_seat(&mut self, sim: u32, def: &crate::content::ObjectDef, from: [f32; 2], prefer: u32) -> bool {
+        let reserved = self.reserve_near(sim, 0..def.slots as usize, Some((def, from)), prefer);
         self.kept_closed(sim, reserved, def.interactions.iter().any(|i| i.pose == Pose::Sit && i.when == Some(false)))
     }
 
@@ -4006,6 +4010,38 @@ fn conditions_met(ctx: &Ctx, sim: &Sim, obj: &ObjectInstance, inter: &crate::con
     unmet(ctx.nav.lot, ctx.hour, obj, ctx.content, inter, work).is_none()
 }
 
+/// The slots of seat `seat` (a mask, for `ObjectInstance::pick_slot`) with a footstool in front
+/// (content `footstool`: a pouf, an ottoman), where the feet go up on it (the renderer's
+/// `footstoolFor`): its middle 0.3–1.2 m ahead of the seat's place and at most 0.35 m to one
+/// side. Someone sitting down alone takes that seat.
+pub(crate) fn footstool_slots(content: &Content, objects: &[ObjectInstance], seat: u32) -> u32 {
+    let o = &objects[seat as usize];
+    let def = &content.objects[o.def];
+    if def.slots < 2 || def.footstool || !def.interactions.iter().any(|i| i.pose == Pose::Sit) {
+        return 0;
+    }
+    let a = o.angle();
+    let (fwd, right) = ([a.sin(), a.cos()], [a.cos(), -a.sin()]);
+    let stools: Vec<[f32; 2]> = objects
+        .iter()
+        .filter(|s| content.objects[s.def].footstool && !s.broken())
+        .map(|s| {
+            let c = s.centre(content);
+            [c[0] + s.offset[0] as f32 / 100.0, c[1] + s.offset[1] as f32 / 100.0]
+        })
+        .collect();
+    (0..(def.slots as usize).min(32)).fold(0, |mask, k| {
+        let p = o.place_at(def, k);
+        let before = stools.iter().any(|s| {
+            let d = [s[0] - p[0], s[1] - p[1]];
+            let ahead = d[0] * fwd[0] + d[1] * fwd[1];
+            let side = d[0] * right[0] + d[1] * right[1];
+            (0.3..=1.2).contains(&ahead) && side.abs() <= 0.35
+        });
+        if before { mask | 1 << k } else { mask }
+    })
+}
+
 /// Whether `sim` (of `age`) could only take the upper bunk of `obj` (the lower one someone
 /// else's) and may not (`ObjectDef::upper_stages`): an elder, say.
 pub(crate) fn upper_barred(content: &Content, obj: &ObjectInstance, sim: u32, age: f32) -> bool {
@@ -4735,14 +4771,15 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             // From the tile by the slot they'll get (round to its place, `places`; onto a bed
             // from the side, `seat_approach`), or to their own spot along the front of a thing
             // used standing (`stand_spot`).
-            let slot = obj.slot_for(sim.id, &content.objects[obj.def], interaction, sim.pos);
+            let footstool = if inter.pose == Pose::Sit { footstool_slots(content, objects, object) } else { 0 };
+            let slot = obj.slot_for(sim.id, &content.objects[obj.def], interaction, sim.pos, footstool);
             let spot = slot
                 .filter(|_| reserved_seat.is_none() && inter.pose == Pose::Stand && !inter.inside && !inter.carried && !inter.at_slot).and_then(|k| crate::surface::stand_spot(content, nav, obj, k, inter.whole || inter.leaves.is_some()));
             let t = match reserved_seat {
                 Some(seat) => {
                     let s = &objects[seat as usize];
                     let def = &content.objects[s.def];
-                    s.pick_slot(sim.id, 0..def.slots as usize, Some((def, sim.pos)))
+                    s.pick_slot(sim.id, 0..def.slots as usize, Some((def, sim.pos)), footstool_slots(content, objects, seat))
                         .and_then(|k| crate::surface::seat_approach(content, nav, s, k, sim.pos))
                         .or_else(|| ctx.index.links.approach_of(seat))
                         .unwrap_or_else(|| s.front_tile(content))
@@ -4861,7 +4898,8 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
     // A place on the seat for the use (two housemates don't both sit on the same sofa).
     if let Some(seat) = reserved_seat.take() {
         let def = &content.objects[objects[seat as usize].def];
-        if objects[seat as usize].reserve_seat(sim.id, def, sim.pos) {
+        let footstool = footstool_slots(content, objects, seat);
+        if objects[seat as usize].reserve_seat(sim.id, def, sim.pos, footstool) {
             sim.use_seat = Some(seat);
         }
     }
@@ -4885,8 +4923,10 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
         }
     }
     if let TaskKind::Use { object, interaction } = task.kind {
+        let sit = content.objects[objects[object as usize].def].interactions[interaction].pose == Pose::Sit;
+        let footstool = if sit { footstool_slots(content, objects, object) } else { 0 };
         let obj = &mut objects[object as usize];
-        if !obj.reserve_for(sim.id, &content.objects[obj.def], interaction, sim.pos) {
+        if !obj.reserve_for(sim.id, &content.objects[obj.def], interaction, sim.pos, footstool) {
             if let Some(seat) = sim.use_seat.take() {
                 objects[seat as usize].release(sim.id);
             }
@@ -4968,7 +5008,7 @@ fn seat_near_object(
     let faces = |o: &ObjectInstance| {
         let Some(facing) = inter.seat_facing else { return true };
         let def = &content.objects[o.def];
-        let Some(slot) = o.pick_slot(sim.id, 0..def.slots as usize, Some((def, sim.pos))) else { return false };
+        let Some(slot) = o.pick_slot(sim.id, 0..def.slots as usize, Some((def, sim.pos)), footstool_slots(content, objects, o.id)) else { return false };
         let at = o.slot_position(content, slot);
         let yaw = o.slot_yaw(content, slot);
         let to = [middle[0] - at[0], middle[1] - at[1]];

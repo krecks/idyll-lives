@@ -591,6 +591,7 @@
     },
     {
       "id": "ottoman",
+      "footstool": true,
       "name": "Tufted ottoman",
       "model": "model.ottoman",
       "footprint": [

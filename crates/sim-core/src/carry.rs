@@ -326,7 +326,7 @@ pub(crate) fn after_step(w: &mut World) {
                 baby.carried_by = None;
                 let o = &mut objects[object as usize];
                 let def = &content.objects[o.def];
-                if !o.reserve_for(b, def, interaction, baby.pos) {
+                if !o.reserve_for(b, def, interaction, baby.pos, 0) {
                     continue;
                 }
                 let inter = &def.interactions[interaction];

@@ -711,7 +711,7 @@ fn go_to(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], o
     // (A seat of its own: round to it, `seat_approach`; at a station, their own spot along it,
     // `stand_spot`: two cooks at an island side by side.)
     let def = &content.objects[o.def];
-    let slot = o.pick_slot(sim.id, 0..def.slots as usize, Some((def, sim.pos)));
+    let slot = o.pick_slot(sim.id, 0..def.slots as usize, Some((def, sim.pos)), 0);
     let seat = matches!(task.kind, TaskKind::Eat { .. });
     let spot = slot.filter(|_| !seat).and_then(|k| surface::stand_spot(content, &ctx.nav, o, k, false));
     let (fx, fz) = match spot {
@@ -723,7 +723,7 @@ fn go_to(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], o
         return false;
     };
     let o = &mut objects[obj as usize];
-    if !o.reserve_seat(sim.id, &content.objects[o.def], sim.pos) {
+    if !o.reserve_seat(sim.id, &content.objects[o.def], sim.pos, 0) {
         return false;
     }
     sim.pose = Pose::Stand;

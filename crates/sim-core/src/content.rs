@@ -410,6 +410,9 @@ pub struct ObjectDef {
     /// bottom shelf; 0, within anyone's reach): someone who can't reach that high goes to
     /// another station (`LifeStage::reach`).
     pub reach: f32,
+    /// A footstool (content `footstool`: a pouf, an ottoman): someone sitting down alone on a
+    /// sofa takes the seat with one in front (`world::footstool_slots`).
+    pub footstool: bool,
 }
 
 impl ObjectDef {
@@ -2307,6 +2310,8 @@ struct ObjectRaw {
     against_wall: bool,
     #[serde(default)]
     reach: f32,
+    #[serde(default)]
+    footstool: bool,
 }
 
 /// A slot's place: `{"at": [-0.3, 0.7], "facing": 180}` (m off the middle, to its right and front;
@@ -3306,6 +3311,7 @@ impl Content {
                 head_height: obj.head_height,
                 against_wall: obj.against_wall,
                 reach: obj.reach.max(0.0),
+                footstool: obj.footstool,
             });
         }
 

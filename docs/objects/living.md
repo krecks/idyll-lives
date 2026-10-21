@@ -72,7 +72,9 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
   pouf or an ottoman in front of them, within reach and nobody on it, puts their feet up on it: the legs out,
   the heels on its top, turned to it if it's a little to one side (characters.ts `footstoolFor`, `feetUp`;
   `docs/characters-format.md`). An armchair with one in front of it is sat in from beside it. The recliner
-  doesn't pair: its own footrest comes up (`legs: out`), nor do the chaise, the tubs and the bikes.
+  doesn't pair: its own footrest comes up (`legs: out`), nor do the chaise, the tubs and the bikes. Someone
+  sitting down on a sofa on their own takes the seat with the footstool in front (content `footstool` on the pouf
+  and the ottoman, the sim's `footstool_slots`, I-living-10); the next one takes another seat.
 - The recliner's back and seat tip back with the sitter riding them and the footrest swings up for relax and doze,
   the sitter's legs out along it (2026-10-21);
   the rocking chair rocks with its rider for relax and read and stops after; the bean bag flattens for flop (a

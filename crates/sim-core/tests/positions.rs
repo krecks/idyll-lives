@@ -3,8 +3,8 @@
 //! table's two long sides), and the one user of a thing two tiles wide at its middle; a carer at
 //! the crib in front of the baby; a dart thrower at the oche; a visitor at the front door,
 //! facing it. Beds are got into from the side (and out of on that side, facing away), a desk's
-//! chair from behind or beside it, a bike from its side, a sofa's end seat from in front of it.
-//! And every shipped thing several use at once standing keeps its users apart.
+//! chair from behind or beside it, a bike from its side, a sofa's end seat from in front of it;
+//! someone on their own on a sofa takes the seat with the footstool in front. And every shipped thing several use at once standing keeps its users apart.
 
 mod common;
 
@@ -37,6 +37,8 @@ const CONTENT: &str = r#"{
       {"id":"bike","name":"Exercise bike","approach":"side",
        "interactions":[{"id":"cycle","label":"Cycle","minutes":30,"pose":"sit","effects":{"fun":0.1},"tags":["lounge"]}]},
       {"id":"sofa3","name":"Sofa","footprint":[3,1],"slots":3,
+       "interactions":[{"id":"sit","label":"Sit","minutes":30,"pose":"sit","effects":{"fun":0.1},"tags":["lounge"]}]},
+      {"id":"ottoman","name":"Ottoman","footstool":true,
        "interactions":[{"id":"sit","label":"Sit","minutes":30,"pose":"sit","effects":{"fun":0.1},"tags":["lounge"]}]},
       {"id":"box","name":"Box"}]}"#;
 
@@ -259,6 +261,29 @@ fn a_bike_is_got_onto_from_its_side_and_a_sofas_end_seat_from_in_front_of_it() {
     let mut tiles = from.to_vec();
     tiles.sort();
     assert_eq!(tiles, [(5, 7), (6, 7), (7, 7)], "each in front of their own seat");
+}
+
+#[test]
+fn someone_alone_on_a_sofa_takes_the_seat_with_the_footstool_in_front() {
+    // The ottoman in front of the sofa's third seat: Ada, on her own, sits there; Bea, after
+    // her, in the first.
+    let sofa = r#"{"def":"sofa3","x":5,"z":6,"rot":0},{"def":"ottoman","x":7,"z":7,"rot":0}"#;
+    let mut w = world("", sofa, r#"{"name":"Ada","x":2.5,"z":12.5},{"name":"Bea","x":6.5,"z":12.5}"#);
+    all_use(&mut w, &[0], 0, 0);
+    assert_eq!(w.objects[0].users[2], Some(0), "Ada before the footstool: {:?}", w.objects[0].users);
+    all_use(&mut w, &[1], 0, 0);
+    assert_eq!(w.objects[0].users[0], Some(1), "Bea in the first seat: {:?}", w.objects[0].users);
+    // Turned round (its front to -z), the ottoman in front of the seat at x 7.5.
+    let sofa = r#"{"def":"sofa3","x":5,"z":6,"rot":2},{"def":"ottoman","x":7,"z":5,"rot":0}"#;
+    let mut w = world("", sofa, r#"{"name":"Ada","x":2.5,"z":1.5}"#);
+    all_use(&mut w, &[0], 0, 0);
+    let seat = (0..3).find(|&k| w.objects[0].users[k] == Some(0)).unwrap();
+    let at = w.objects[0].slot_position(&w.content, seat);
+    assert!(near(at, [7.5, 6.5], 0.1), "Ada before the footstool: seat {seat} at {at:?}");
+    // No footstool: the first seat.
+    let mut w = world("", r#"{"def":"sofa3","x":5,"z":6,"rot":0}"#, r#"{"name":"Ada","x":2.5,"z":12.5}"#);
+    all_use(&mut w, &[0], 0, 0);
+    assert_eq!(w.objects[0].users[0], Some(0));
 }
 
 /// A house with its front door on the street side: the walls round 2..12 × 1..8, the door at

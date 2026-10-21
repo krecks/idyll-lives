@@ -459,14 +459,15 @@ pub(crate) fn start(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectI
     if let Some(seat) = seat_near(sim, ctx, objects) {
         let o = &objects[seat as usize];
         let def = &content.objects[o.def];
-        let slot = o.pick_slot(sim.id, 0..def.slots as usize, Some((def, sim.pos)));
+        let footstool = crate::world::footstool_slots(content, objects, seat);
+        let slot = o.pick_slot(sim.id, 0..def.slots as usize, Some((def, sim.pos)), footstool);
         let (fx, fz) = slot
             .and_then(|k| crate::surface::seat_approach(content, &ctx.nav, o, k, sim.pos))
             .or_else(|| ctx.index.links.approach_of(seat))
             .unwrap_or_else(|| o.front_tile(content));
         if let Some(waypoints) = walk_route(ctx, sim, (fx, fz), [fx as f32 + 0.5, fz as f32 + 0.5]) {
             let o = &mut objects[seat as usize];
-            if o.reserve_seat(sim.id, &content.objects[o.def], sim.pos) {
+            if o.reserve_seat(sim.id, &content.objects[o.def], sim.pos, footstool) {
                 let task = Task { kind: TaskKind::Phone { action, contact, seat: Some(seat), answer: Answer::Pending }, ..task };
                 sim.pose = Pose::Stand;
                 sim.current = Some(Activity { task, phase: Phase::Routing { waypoints, next: 0 }, tags: act.tags });

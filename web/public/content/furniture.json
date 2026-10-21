@@ -1472,6 +1472,7 @@
     },
     {
       "id": "pouf",
+      "footstool": true,
       "name": "Leather pouf",
       "model": "model.pouf",
       "footprint": [
