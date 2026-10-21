@@ -163,8 +163,11 @@ and heat up leftovers. Coffee is left to anyone (not an age rule yet).
   (not autonomous, so generated houses play as before).
 - "Left bin" and "Right bin" are left and right as seen from the front.
 - The hood, spice rack, pot rail and wall shelves are still; looked at on all four walls.
-- Since the authenticity review (G-15): putting dishes away in a wall cabinet is a reach at the counter (`interact`),
-  with no squat to the floor; a reach up to its doors is a clip still to make.
+- Since the authenticity review (G-15): putting dishes away in a wall cabinet is done stepped up to the worktop under it
+  (`STEP_IN`, `putAway`, `putAwayGlass`, `putAwayCorner` in three sizes, clips/reach.ts): up on tiptoe to the pulls of the
+  doors that open, drawing them open along their swing, the stack lifted from the worktop onto the bottom shelf, and a
+  door pushed shut as it closes. A child, who can't reach a wall cupboard, puts the stack on the worktop's back under
+  it, looking up (I-kitchen-15).
 
 ## K6. Islands and bars (5)
 
@@ -278,5 +281,6 @@ and heat up leftovers. Coffee is left to anyone (not an age rule yet).
 - The bar cart's shaker lifts and tips towards the resident for "Mix a drink" and shuts after its `hold` (1.5 s).
 - The china cabinet's hutch back is the body's colour outside (blue only inside), so it reads standing free or with
   the wall cut away.
-- Not right yet: at the china cabinet the resident reaches at the waist while the glazed door above opens (a reach-up
-  clip still to make; since the authenticity review, G-15, at least no squat to the floor).
+- Since the authenticity review (G-15): at the china cabinet the resident steps up to it, opens the glazed door at its
+  knob and puts the stack from the base's top onto the hutch's middle shelf (`putAwayHutch`, clips/reach.ts); a child
+  puts it on the base's top.

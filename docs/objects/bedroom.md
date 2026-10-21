@@ -24,7 +24,7 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 |---|---|---|---|---|---|---|
 | `bed` King-size bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`: the top third of the duvet folds back toward the foot as they get in (sleep, nap) and back up when they get up, under the game's blanket; half way it is gathered low, as cloth rolls, not a board standing up (2026-10-21). Renamed from "Double bed": 1.90 m wide with a 1.72 m mattress, a king (reference kind `bedKing`, Q-08). |
 | `bedSingle` Single bed | 1x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`. |
-| `bedBunk` Bunk bed | 1x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down` on the lower bunk, `turn_down_upper` on the upper, each for its own sleeper (`slot`); the ladder is static. The upper bunk is not an elder's (`upperStages`: with the lower bunk taken, an elder is refused, "too old for the top bunk"). |
+| `bedBunk` Bunk bed | 1x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down` on the lower bunk, `turn_down_upper` on the upper, each for its own sleeper (`slot`); the ladder is static. The upper bunk is not an elder's (`upperStages`: with the lower bunk taken, an elder is refused, "too old for the top bunk"). Its sleeper climbs the ladder from the tile in front and in through the gap in the guard rail (`bunkUp172`/`147`/`112`), and back down it getting up (`bunkDown…`, sim-core waiting for them); the lower bunk is got into from its foot as any bed. |
 | `bedFuton` King futon | 2x2 · floor | sleep:sleep nap:nap unfold:fetch foldAway:fetch relax:relax | bedroom / beds | Frame, Headboard, Bedding | Held open | `unfold`: the back folds flat into a bed while slept in (C1: `leaves: open` on sleep, nap and Unfold, as the wall bed); Fold away closes it. Folded, a sofa: Sit and relax on its front edge (`when: closed`, content `seat` 0.40 m, forward 0.68). Renamed from "Futon bed": a king-size futon, 1.96 m wide (kind `bedLow`, now to 1.95 m, Q-08). |
 | `bedKing` Upholstered king bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`. |
 | `bedDouble` Double bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`. |
@@ -117,5 +117,7 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
   its `hold`.
 - The wall mirror hides with its wall when the wall is cut down for the camera (each wall thing knows which views
   drop its wall, `BabylonRenderer.ts`).
-- Since the authenticity review (G-04): getting ready at the dressing table, a hand comes up to the hair (the phone
-  clip's upper body, seated), not resting in the lap. A brush stroke or a hand prop is the clip and props waves'.
+- Since the authenticity review (G-04): getting ready at the dressing table is brushing the hair in the mirror
+  (`brushHair`, clips/self.ts, the seated upper body): four strokes from the crown down the right side, the head
+  tilting into each, then the left hand smoothing the other side; the brush is mimed in the closed hand (a hand prop is
+  I-held-01's).

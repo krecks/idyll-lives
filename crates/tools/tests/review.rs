@@ -257,7 +257,7 @@ fn the_renderer_tables_are_read_from_its_source() {
 fn the_shipped_content_reads() {
     let paths = Paths::repo();
     let objects = review::objects(Path::new(&paths.content)).unwrap();
-    assert_eq!(objects.len(), 541);
+    assert_eq!(objects.len(), 542);
     let by = |id: &str| objects.iter().find(|o| o.id == id).unwrap();
     let sofa = by("sofaBed");
     assert_eq!((sofa.page.as_str(), sofa.group.as_str(), sofa.model.as_str(), sofa.slots), ("living", "seating", "model.sofaBed", 2));
@@ -278,6 +278,6 @@ fn the_shipped_content_reads() {
     let sounds = review::action_sounds(&std::fs::read_to_string(format!("{root}/web/src/audio/world.ts")).unwrap()).unwrap();
     assert_eq!(sounds.get("shower").map(String::as_str), Some("shower"));
     let (text, files) = review::uses(&objects, &motions, &actions, &sounds, None);
-    assert!(text.contains("| **all** | 541 |"), "{text}");
+    assert!(text.contains("| **all** | 542 |"), "{text}");
     assert_eq!(files.len(), 15);
 }

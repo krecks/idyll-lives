@@ -457,7 +457,7 @@ def fireplace_electric():
         for i, (x, length, turn) in enumerate(((-0.2, 0.42, 4), (0.2, 0.4, -5), (0.0, 0.36, 0))):
             y = LOG_Y + (0.03 if i == 2 else 0.0)
             F.cyl(f'log{i}', 0.04, length, (x, y, LOG_Z - (0.03 if i == 2 else 0.0)), M.logs, rot=(0, 90, turn), verts=12)
-        # the floor cushion in front, where residents sit facing the fire (characters.ts SEATS: 0.14 high, 0.3 out)
+        # the floor cushion in front, where residents sit cross-legged facing the fire (furniture.json seats: 0.14 high, the hips 0.36 out)
         F.box('cushion', 0.56, 0.12, 0.4, (0, 0.07, HEARTH_Z), M.hearth_cushion, bevel=0.05, bevel_segments=4)
         F.box('cushion_piping', 0.5, 0.014, 0.34, (0, 0.13, HEARTH_Z), M.hearth_piping, bevel=0.006)
         F.cyl('cushion_button', 0.016, 0.012, (0, 0.137, HEARTH_Z), M.hearth_piping, verts=10)

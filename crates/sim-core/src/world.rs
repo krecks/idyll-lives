@@ -25,6 +25,9 @@ pub(crate) const PERSON_UNREACHABLE_TICKS: u64 = 10;
 pub(crate) const WALK_SPEED: f32 = 1.5 / TICKS_PER_SECOND as f32;
 /// Idle time before a Sim picks something on its own.
 const AUTONOMY_DELAY_TICKS: u32 = TICKS_PER_SECOND;
+/// Getting up from the upper bunk: the time to climb down its ladder (the renderer's `bunkDown`, 6.5 s), in
+/// which they do nothing else (`Sim::ladder_ticks`).
+pub(crate) const LADDER_DOWN_TICKS: u32 = 13 * TICKS_PER_SECOND / 2;
 const MIN_AUTONOMY_SCORE: f32 = 0.01;
 /// A baby with a need below this cries for someone (and lies awake in the crib).
 const BABY_CRIES_BELOW: f32 = 0.3;
@@ -789,6 +792,9 @@ pub struct Sim {
     pub(crate) practice_fatigue: f32,
     /// No nap until this tick (the last one was too recent; see `DayRhythm::nap_cooldown_hours`).
     pub(crate) nap_until: u64,
+    /// Up from the upper bunk: the ticks left climbing down its ladder, doing nothing else meanwhile
+    /// (`LADDER_DOWN_TICKS`). Not saved: a load finds them down already.
+    pub(crate) ladder_ticks: u32,
     /// The first day this Sim looks for work again (after quitting or being let go).
     pub job_search_from: u32,
     /// Routines, goals and how planned blocks went (see `planner`).
@@ -1994,6 +2000,7 @@ impl World {
             skill_ups: 0,
             practice_fatigue: 0.0,
             nap_until: 0,
+            ladder_ticks: 0,
             job_search_from: 0,
             planner: Default::default(),
             mess: None,
@@ -3725,6 +3732,12 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
         } else if sim.current.is_none() {
             return;
         }
+    }
+
+    // Climbing down from the upper bunk: nothing else until they're off its ladder.
+    if sim.ladder_ticks > 0 && sim.current.is_none() {
+        sim.ladder_ticks = sim.ladder_ticks.saturating_sub(sim.steps);
+        return;
     }
 
     // Player commands interrupt whatever the Sim chose on its own.
@@ -5559,7 +5572,8 @@ fn accident(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], a: usize) 
 }
 
 /// Stops what they're doing: the object they used (or cooked at, sat at to eat, washed up at)
-/// is free again, and they stand up in front of it (or step out of the shower). What they carry is put down after the step
+/// is free again, and they stand up in front of it (or step out of the shower; climbing down from
+/// the upper bunk first: `Sim::ladder_ticks`). What they carry is put down after the step
 /// (`cooking::after_step`).
 pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [ObjectInstance]) {
     sim.join_spot = None;
@@ -5580,6 +5594,10 @@ pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [Obje
     }
     let held = sim.current.take().and_then(|act| held_object(act.task.kind));
     if let Some(o) = held.map(|o| o as usize).filter(|&o| o < objects.len()) {
+        // Up from the upper bunk (its second slot, see `ObjectInstance::slot_position`): down its ladder first.
+        if sim.pose == Pose::Lie && content.objects[objects[o].def].bunk && objects[o].users[1] == Some(sim.id) {
+            sim.ladder_ticks = LADDER_DOWN_TICKS;
+        }
         objects[o].release(sim.id);
         if sim.pose != Pose::Stand || sim.seated_from.is_some() {
             let (fx, fz) = sim.seated_from.unwrap_or_else(|| objects[o].front_tile(content));

@@ -58,9 +58,9 @@ pulled up to the kids' table before the dining table (a seat made for their age 
 | `toyBox` Toy box | 1x1 · floor | play:play | kids / — | Body, Lid | Use | `lid_open`: the lid swings up 100° for play; `hold` 2 s. |
 | `toyChest` Toy chest | 1x1 · floor | play:play | kids / — | Body, Trim | Use | `lid_open`. Its text no longer says the lid is open (it opens only for play). |
 | `dollHouse` Doll house | 1x1 · floor | dolls:tend | kids / — | Walls, Roof | Use | `front_open`: the front wall swings 120° on its side hinge for the whole of dolls. |
-| `rockingHorse` Rocking horse | 1x1 · floor | ride:play | kids / — | Body, Trim | Loop (E1) | `rock`: rocks ±12° while ridden (E1), the rider riding it. |
-| `playTent` Play tent | 1x1 · floor | play:play | kids / — | Canvas, Poles | Use | `flap_open`: the door flap rolls up for play. |
-| `ballPit` Ball pit | 1x1 · floor | jump:play | kids / — | Pit, Rim | Loop (E1) | `bounce`: a few balls bob while played in (E1). |
+| `rockingHorse` Rocking horse | 1x1 · floor | ride:play | kids / — | Body, Trim | Loop (E1) | `rock`: rocks ±12° while ridden (E1), the rider riding it. Ridden astride, the hands on the handle (`rideHorse112`). |
+| `playTent` Play tent | 1x1 · floor | play:play | kids / — | Canvas, Poles | Use | `flap_open`: the door flap rolls up for play; the child crawls in and out through it (`STEP_IN`, `tentPlay112`). |
+| `ballPit` Ball pit | 1x1 · floor | jump:play | kids / — | Pit, Rim | Loop (E1) | `bounce`: a few balls bob while played in (E1); the child steps in over the rim (`STEP_IN` `over`, `ballPit112`). |
 | `trainTable` Train table | 2x1 · floor | trains:play | kids / — | Table, Train | Loop (E1) | `train`: the train runs round its ring of track (E1, a `spin` about the ring's middle). |
 | `playMat` Play mat | 1x1 · floor | blocks:tend | kids / — | Mat | Use | `blocks`: a tower of three blocks grows on the mat for blocks. |
 | `teddyBear` Giant teddy bear | 1x1 · floor | hug:relax | kids / — | Fur, Bow | Use | `squish`: the bear squashes a little for hug (T0 `squash`). The hugger crouches to it, arms round its neck, cheek on its head (`characters.ts` `HUGGED`). |
@@ -75,10 +75,20 @@ pulled up to the kids' table before the dining table (a seat made for their age 
 - The teddy's hugger crouches in, arms round its neck and cheek on its head, while it squishes (`hugArms`, shared
   with the social hug, with the teddy keeping the default `wrap`).
 - Known, not changed: the toy box's player stands at its front corner.
+- Played in from inside (G-22, 2026-10-21; characters.ts `STEP_IN`, clips/play.ts): "Jump in the ball pit" steps in
+  over the rim to the pit's middle, wades and jumps in the balls, sits down in them tossing balls up and gets up
+  again, the legs hidden in the balls (the child faces the pit's back, the way they stepped in); "Play in the tent"
+  kneels at the open flap, crawls in, sits back on the heels to play on the mat, and crawls back out each round
+  (24 s). A beanbag or the kids' chair sits the child with the feet on the floor (G-20).
 - Since the authenticity review (G-14): the toy box and the toy chest are played at kneeling on the floor (`kneel`),
-  the train table crouched at its edge (`crouch`), not standing with the hands out over them.
-- Since the authenticity review (G-43): two at the train table crouch one in front of each half (`stand_spot`), not
-  one inside the other.
+  not standing with the hands out over them; at the train table the players kneel up at its edge, a lane each (the
+  ring of track, the little town: `STEP_IN`, `kneelTable177`/`147`/`112`, clips/low.ts), the right hand pushing the
+  engine along the track and the left on the top, now and then moving a tree.
+- Since the authenticity review (G-04): a child on the kids' chair at the coffee table bends over it with both hands on
+  its top, drawing (`sitHandsLow177`/`147`/`112`, clips/low.ts: a top less than `LOW_TOP`, 0.2 m for a body of the
+  reference height, over the seat).
+- Since the authenticity review (G-43): two at the train table come to the tile in front of their own half
+  (`stand_spot`) and kneel at the lane on their side, not both from one spot.
 
 ## KD3. Kids' study and art (6)
 

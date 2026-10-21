@@ -164,7 +164,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 | `gloomy.cello` Nocturne cello | 1x1 · floor | practise:music lament:music | hobbies / — | Body, Trim, Cello | Use | `off_stand`: the cello comes off its stand to between the player's knees for practise and lament. |
 | `gloomy.journalDesk` Candlelit writing desk | 2x1 · floor | journal:write poetry:write | office / — | Body, Trim | Use | `candle`: the candle flame grows for journal and poetry; it glows at night. Written at on its own chair with the hands on the top (`NEAR_DESKS`, `sitHandsNear`; `SEATS`), not through its front. |
 | `gloomy.rainLamp` Rainfall lamp | 1x1 · floor | watchRain:look | decor / — | Body, Trim | Use | `rain`: the rain strands grow for watchRain. `ripple` swells the pool's ripples all the time, near the camera (E2). |
-| `gloomy.windowSeat` Brooding window seat | 2x1 · floor | brood:look doze:nap | living / — | Body, Cushion, Trim | Use | `sink_in` for brood and doze. The dozer lies along the cushion, head on the left pillow (`BEDS` 0.45, `across`); the doze takes both places (`whole`): it starts only on an empty seat, and nobody sits beside the dozer. |
+| `gloomy.windowSeat` Brooding window seat | 2x1 · floor | brood:look doze:nap | living / — | Body, Cushion, Trim | Use | `sink_in` for brood and doze. The dozer lies curled up on the side along the cushion, facing the room, the head on a pillow (`BEDS` 0.45, `across`; `lieCurl`, `CURLED_BEDS`: 1.3 m between the pillows is short to lie flat, since the authenticity review, G-04); the doze takes both places (`whole`): it starts only on an empty seat, and nobody sits beside the dozer. |
 | `gloomy.soakingTub` Moonstone soaking tub | 2x2 · floor | soak:bath | bathroom / — | Body, Trim | Use | `fill`: the water rises for soak. |
 
 **In play** (signed off 2026-10-17):
@@ -230,8 +230,10 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 - The coin stays in the jar while the resident is at it and comes back up into the slot when the use ends.
 - The tea table's two poufs colour apart (Fabric, Second pouf); the settee's cushions take its Body colour.
 - Since the authenticity review (G-05, G-15): the hearth settee's napper lies on its cushion (0.36); the feeder is
-  filled stepped in to its post (`STEP_IN`, clear of the bird bath), the hands at the post (a reach up to the box is a
-  clip still to make); a coin goes into the giving jar from beside it (`interact`).
+  filled stepped in to its post (`STEP_IN`, clear of the bird bath, for the refill only): the left hand steadies the
+  house and the scoop (mimed) is tipped twice over its open top (`fillFeeder177`/`147`, clips/reach.ts); a child
+  (`fillFeeder112`) tips it onto the seed tray, as high as they reach. A coin goes into the giving jar from beside it
+  (`interact`).
 
 ## P10. Lazy (6)
 

@@ -140,9 +140,9 @@ Family: `tools/art/blender/families/kitchen_counters.py`.
 |---|---|---|---|---|---|
 | `pantry` Pantry cupboard | OK | OK | OK | | `kitchen/sheets/obj-pantry.png`, `kitchen/play/c1/pantry-snack-01.png` |
 | `pantryTall` Tall larder | OK | OK | OK | | `kitchen/sheets/obj-pantryTall.png` |
-| `wallCabinet` Wall cabinets | OK | OK | I-kitchen-03 | I-kitchen-03 S2 renderer-table | `kitchen/sheets/obj-wallCabinet.png`, `kitchen/extra/putaway-wallCabinet-05.png` |
-| `wallCabinetGlass` Glazed wall cabinet | OK | OK | I-kitchen-03 | I-kitchen-03 S2 renderer-table | `kitchen/sheets/obj-wallCabinetGlass.png` |
-| `wallCabinetCorner` Wall cabinet with end shelves | OK | OK | I-kitchen-03 | I-kitchen-03 S2 renderer-table | `kitchen/sheets/obj-wallCabinetCorner.png` |
+| `wallCabinet` Wall cabinets | OK | OK | I-kitchen-03, I-kitchen-15 | I-kitchen-03 S2 renderer-table; I-kitchen-15 S3 code (a child out of reach) | `kitchen/sheets/obj-wallCabinet.png`, `kitchen/extra/putaway-wallCabinet-05.png` |
+| `wallCabinetGlass` Glazed wall cabinet | OK | OK | I-kitchen-03, I-kitchen-15 | I-kitchen-03 S2 renderer-table; I-kitchen-15 S3 code | `kitchen/sheets/obj-wallCabinetGlass.png` |
+| `wallCabinetCorner` Wall cabinet with end shelves | OK | OK | I-kitchen-03, I-kitchen-15 | I-kitchen-03 S2 renderer-table; I-kitchen-15 S3 code | `kitchen/sheets/obj-wallCabinetCorner.png` |
 | `rangeHood` Cooker hood | OK | n/a | I-kitchen-09 | I-kitchen-09 S3 decision | `kitchen/sheets/obj-rangeHood.png`, `kitchen/play/c1/rangeHood-no-uses.png` |
 | `spiceRack` Spice rack | OK | n/a | I-kitchen-09 | I-kitchen-09 S3 decision | `kitchen/sheets/obj-spiceRack.png` |
 | `potRail` Pot rail | OK | n/a | I-kitchen-09 | I-kitchen-09 S3 decision | `kitchen/sheets/obj-potRail.png` |
@@ -260,7 +260,7 @@ Family: `tools/art/blender/families/dining.py`.
 |---|---|---|---|---|---|
 | `sideboard` Walnut sideboard | M-kitchen-03 | OK | OK | M-kitchen-03 S3 decision | `kitchen/sheets/obj-sideboard.png`, `kitchen/clips/clips-sideboard-all-t99.png` |
 | `buffet` Painted buffet | M-kitchen-03 | OK | OK | M-kitchen-03 S3 decision | `kitchen/sheets/obj-buffet.png` |
-| `chinaCabinet` China cabinet | OK | OK | I-kitchen-03 | I-kitchen-03 S2 renderer-table | `kitchen/sheets/obj-chinaCabinet.png`, `kitchen/clips/clips-chinaCabinet-all-t99.png` |
+| `chinaCabinet` China cabinet | OK | OK | I-kitchen-03, I-kitchen-15 | I-kitchen-03 S2 renderer-table; I-kitchen-15 S3 code | `kitchen/sheets/obj-chinaCabinet.png`, `kitchen/clips/clips-chinaCabinet-all-t99.png` |
 | `barCart` Bar cart | OK | I-kitchen-13 | I-kitchen-13, I-kitchen-06 | I-kitchen-13 S3 code; I-kitchen-06 S1 code | `kitchen/sheets/obj-barCart.png`, `kitchen/play/c4/barCart-mix-01.png`, `kitchen/extra/play-child/child-barCart-mix-01.png` |
 
 Real uses against the content's (I1):
@@ -394,6 +394,16 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **After:** each bowl's stream is its own clip (`water_on_0` at -x, `water_on_1` at +x), played for the resident in that slot: one resident washing runs only their tap (`fixes/motions/g1718/play-stage.jsonl`: `water_on_0` alone for wash and washUp; `stage-counterSinkDouble-wash-*.png`).
 - **Source:** wave: kitchen
 
+### A-kitchen-04 — On a bar or counter stool the feet hang in the air, not on the footrest
+
+- **Severity:** S3
+- **Rubric:** A1, A5
+- **Fix class:** renderer-table
+- **Where:** `web/src/render/babylon/characters.ts` (`seatLegs`: the feet go down to the floor, or hang where it's out of reach), `web/src/render/babylon/characters/furniture.json` (`seats.barStool` 0.72; `stoolCounter`, `stoolBarHigh` content seats 0.68, 0.80)
+- **Evidence:** `bench-results/review/fixes/clips-seated/stools/poses-seats-default-0[0-2]-*-side.png`: since G-20's leg fit, a grown-up on the three stools sits with the shins hanging and the feet in the air a few centimetres over the stretcher ring; before it the clip's feet were in the air too. People on a bar stool rest the feet on its footrest ring (or one on the floor). A footrest height per stool (`seats` `rest`, m: the floor `seatLegs` puts the feet on) would put them there; the rings are at about 0.25–0.3 m.
+- **Status:** open
+- **Source:** fix: clips-seated
+
 ### I-kitchen-03 — moved to residents.md
 
 ### I-kitchen-04 — moved to systems.md
@@ -487,6 +497,16 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Status:** fixed (543c6121)
 - **After:** `barStool` and `stoolCounter` seat at `counter` only, `stoolBarHigh` at `bar` only; the breakfast counter's 0.95 m top is a `counter`; generated islands get counter stools only. Play: the counter stool's drink at a counter and the high stool's at a bar run; the bar stool at a bar and the high stool at a counter say "needs a table" (`bench-results/review/fixes/content/g07/`).
 - **Source:** wave: kitchen (content against the reference)
+
+### I-kitchen-15 — A child is sent to put the dishes away in a wall cupboard out of reach
+
+- **Severity:** S3
+- **Rubric:** I2, I3
+- **Fix class:** code
+- **Where:** `web/public/content/base.json:4031` (`putAwayMinutes`, `putAwayAnim: fetch`, `putAwayAt: [cupboard, prep]`); `crates/sim-core/src/cooking.rs:90`, `:1280` (`put_away_order`, `find_station`: the nearest `cupboard` or `prep` station, a wall cabinet over a counter first on a tie, whoever is clearing); the cupboards: `wallCabinet`, `wallCabinetGlass`, `wallCabinetCorner` (their pulls at 1.56–1.6 m, the bottom shelf 1.47 m over a 0.95 m worktop), `chinaCabinet` (the hutch's knob 1.45 m)
+- **Evidence:** `fixes/clips-reach/putaway/child-putaway-wallCabinet-07..09.png`, `child-putaway-chinaCabinet-08.png` (the 8-year-old clearing a snack's plate, washed at the farmhouse sink): the put-away step goes to the wall cabinet over the sink, whose bottom shelf is 1.47 m up and half a metre in from the worktop's front; a 1.1 m child reaches about 1.35 m straight up, so the reach-up clip's child size (`putAway112`) can only put the stack on the worktop's back under it while the doors open overhead. Real children leave it on the side, use a step stool, or put it in a low cupboard or drawer. Pick a station within reach for the resident's height (a base cupboard, a drawer, the worktop: `prep`), or an age rule for wall cupboards (G-45).
+- **Status:** open
+- **Source:** fix: clips-reach
 
 ## Evidence for findings in other ledgers
 

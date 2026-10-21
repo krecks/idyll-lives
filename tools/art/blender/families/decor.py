@@ -88,8 +88,8 @@ M = G.Palette(
     marble=('#EDEBE6', 'satin'),
     concrete=('#9A9893', 'matte'),
     concrete_dark=('#6E6C68', 'matte'),
-    bronze=('#6E4F35', 'metal'),
-    bronze_dark=('#5A3F2A', 'metal'),
+    bronze=('#A47B45', 'metal'),       # a golden cast bronze, bright on its edges (not the plinth's wood)
+    bronze_dark=('#55583E', 'metal'),  # the mane and tail: a dark green patina
     coat=('#3E5470', 'fabric'),
     scarf=('#B5653F', 'fabric'),
     hat=('#C9B79C', 'fabric'),
@@ -678,6 +678,8 @@ def hangingPlant():
 
 # --- D2: the fireplace ------------------------------------------------------------------------------------
 HEARTH = 0.42   # the raised hearth's top: the content's `seat` height, where residents warming up sit
+HEARTH_FRONT = 0.45   # its front edge, game depth: 0.46 m in front of the firebox's opening (at the tile's middle),
+                      # so a resident sitting on its edge (content `seat.forward` 0.36) has the fire behind her
 
 
 def fireplace():
@@ -698,8 +700,9 @@ def fireplace():
         F.box('mantel', 1.96, 0.07, 0.48, (0, 1.285, WALL + 0.24), M.oak, bevel=0.01)
         for side in (-1, 1):
             F.box(f'corbel{side}', 0.12, 0.08, 0.06, (side * 0.8, 1.21, WALL + 0.43), M.oak, bevel=0.008)
-        # the raised hearth: a stone bench along the front, the firebox's floor; residents warming up sit on it
-        F.box('hearth', 1.96, HEARTH, 0.57, (0, HEARTH / 2, WALL + 0.285), M.hearth, bevel=0.01)
+        # the raised hearth: a stone bench from the wall out to 0.46 m in front of the opening, the firebox's floor;
+        # residents warming up sit on its front edge, their backs to the fire (a real raised hearth runs 0.4-0.5 m out)
+        F.box('hearth', 1.96, HEARTH, HEARTH_FRONT - WALL, (0, HEARTH / 2, (HEARTH_FRONT + WALL) / 2), M.hearth, bevel=0.01)
         F.box('surround_lintel', 1.08, 0.1, 0.03, (0, top + 0.05, WALL + 0.415), M.surround, bevel=0.008)
         for side in (-1, 1):
             F.box(f'surround_jamb{side}', 0.1, top - HEARTH, 0.03, (side * 0.49, (top + HEARTH) / 2, WALL + 0.415), M.surround, bevel=0.008)
@@ -783,12 +786,20 @@ def _curtains(w, top, bottom, gathered):
     return G.meshes()
 
 
+# A window's opening is its edges less 0.12 m at each end (house.ts WIN_INSET): 0.76 m over one edge, 1.76 m over
+# two. A rail runs past it, so the open curtains stack on the wall beside the glass, not over it: each pair's
+# `w` is the opening plus its two gathered panels (rails 1.22 and 2.38 m, 0.1-0.2 m past the footprint each side).
+# The window-height pairs hang from above the head (2.1 m) to just under the sill (0.9 m).
 def curtains():
-    return _curtains(0.86, 2.45, 1.0, 0.2)
+    return _curtains(1.16, 2.45, 0.85, 0.2)
+
+
+def curtainsWide():
+    return _curtains(2.32, 2.45, 0.85, 0.3)
 
 
 def curtainsLong():
-    return _curtains(1.8, 2.55, 0.04, 0.34)
+    return _curtains(2.32, 2.55, 0.04, 0.3)
 
 
 # --- D3: rugs ---------------------------------------------------------------------------------------------
@@ -891,12 +902,14 @@ FAMILY = G.Family(
      G.Model('coatRack', coatRack, size=(0.431, 1.788, 0.355), key='model.coatRack', paint=[('oak', 'Body')]),
      G.Model('hangingPlant', hangingPlant, size=(0.46, 1.83, 0.46), key='model.hangingPlant', floor=False,
              motions={'uses': {'water': 'sway'}, 'hold': 0.8}, paint=[('pot_white', 'Pot'), ('cord', 'Cord')]),
-     G.Model('fireplace', fireplace, size=(1.96, 2.8, 0.57), key='model.fireplace', centre=(0, -0.145),
+     G.Model('fireplace', fireplace, size=(1.96, 2.8, 0.88), key='model.fireplace', centre=(0, 0.01),
              motions={'uses': {'relax': 'flames'}}, paint=[('surround', 'Surround'), ('oak', 'Mantel')]),
      # D3. Textiles
-     G.Model('curtains', curtains, size=(0.988, 1.524, 0.104), key='model.curtains', centre=(0, -0.378),
+     G.Model('curtains', curtains, size=(1.288, 1.674, 0.104), key='model.curtains', centre=(0, -0.378),
              floor=False, motions={'night': 'close'}, paint=[('linen', 'Fabric'), ('rail', 'Rail')]),
-     G.Model('curtainsLong', curtainsLong, size=(1.928, 2.584, 0.104), key='model.curtainsLong', centre=(0, -0.378),
+     G.Model('curtainsWide', curtainsWide, size=(2.448, 1.674, 0.104), key='model.curtainsWide', centre=(0, -0.378),
+             floor=False, motions={'night': 'close'}, paint=[('linen', 'Fabric'), ('rail', 'Rail')]),
+     G.Model('curtainsLong', curtainsLong, size=(2.448, 2.584, 0.104), key='model.curtainsLong', centre=(0, -0.378),
              floor=False, motions={'night': 'close'}, paint=[('linen', 'Fabric'), ('rail', 'Rail')]),
      G.Model('rugRound', rugRound, size=(1.9, 0.019, 1.9), key='model.rugRound', paint=[('rug', 'Rug')]),
      G.Model('rugLarge', rugLarge, size=(2.85, 0.019, 1.85), key='model.rugLarge', paint=[('rug', 'Rug')]),

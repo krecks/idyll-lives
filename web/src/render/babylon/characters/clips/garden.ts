@@ -61,7 +61,7 @@ function pickPose(p: number): PoseSpec {
 }
 
 /** Kneeling on both knees, sitting back a little; hands pull weeds in turn and toss them aside. */
-function kneelBody(t: number, lean: number, twist: number, head: Vec): PoseSpec {
+export function kneelBody(t: number, lean: number, twist: number, head: Vec): PoseSpec {
   const body: PoseSpec = {
     move: [0, -0.455 + 0.004 * Math.sin(t * TAU * 3), -0.01],
     pelvis: [8, 0, 0],

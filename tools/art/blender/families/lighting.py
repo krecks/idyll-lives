@@ -7,8 +7,8 @@
 # The light itself is the content's `light`; each lamp's bulb is placed near its `light.height` (asserted
 # against the content JSON). The shades, diffusers and bulbs glow at night (`glow`, E8); nothing glows by
 # day. Ceiling things hang from 2.8 m and wall things have their back on the wall face, both at their real
-# height (`floor=False`). Two clips, both ambient (`idle`): the ceiling fan's blades turn, the paper lantern
-# sways. The rest are still.
+# height (`floor=False`). One clip, ambient (`idle`): the ceiling fan's blades turn while it's on. The rest are
+# still (the paper lantern's sway went, 2026-10-21: a paper globe indoors hangs still).
 #
 # Run:  cargo art lighting [--only chandelier] [--preview]
 import json
@@ -59,9 +59,9 @@ M = G.Palette(
     jar=('#3E6E9A', 'gloss'),
     stone=('#E7E3DC', 'matte'),
     square_shade=('#EFE8DA', 'fabric', GLOW),
-    banker=('#2F6B4F', 'gloss'),
+    banker=('#2F6B4F', 'gloss', {'glow': '#4FB27A'}),   # green glass: lit, it glows green, not cream
     porcelain=('#F2F0EA', 'gloss'),
-    cap=('#E9A07B', 'gloss', GLOW),
+    cap=('#E9A07B', 'gloss', {'glow': '#FFAA78'}),      # coral glass: lit, it glows coral
     candle=('#F4EBD8', 'satin'),
     glass=('#DCE6EA', 'glass'),
 )
@@ -170,13 +170,16 @@ DOME = [[0.5, -0.5], [0.47, 0.0], [0.36, 0.3], [0.14, 0.47], [0, 0.5], [0, 0.42]
 
 
 # --- LT1: the ceiling lights -----------------------------------------------------------------------------
+# The two pendants residents walk under hang clear of their heads: their lowest point 2.1 m up (a room's
+# 2.8 m ceiling, a 0.7 m drop; the reference's least clearance where people walk). The chandelier and the
+# industrial pendant hang lower, over a table or a sofa only (content `headHeight`, Q-12).
 def ceilingPendant():
     F = G.GameFrame()
     with G.new_parts():
-        _hang(F, 'ceilingPendant', 2.13)
-        F.cyl('socket', 0.03, 0.05, (0, 2.11, 0), M.brass, verts=14)
-        _lathe(F, 'dome', 0.43, 0.24, (0, 1.98, 0), DOME, M.dome, segments=32)
-        _bulb(F, 'ceilingPendant', 0.04, (0, 1.9, 0), scale=(1, 1, 1.2))
+        _hang(F, 'ceilingPendant', 2.39)
+        F.cyl('socket', 0.03, 0.05, (0, 2.37, 0), M.brass, verts=14)
+        _lathe(F, 'dome', 0.43, 0.24, (0, 2.24, 0), DOME, M.dome, segments=32)
+        _bulb(F, 'ceilingPendant', 0.04, (0, 2.16, 0), scale=(1, 1, 1.2))
     G.join_all('ceilingPendant')
     G.settle(floor=False)
     return G.meshes()
@@ -295,21 +298,20 @@ def trackLights():
 
 
 def paperLantern():
-    """A paper globe on wire ribs, hanging from a white cord. It sways (`sway`, ambient)."""
+    """A paper globe on wire ribs, hanging still from a white cord (a paper globe indoors hangs still: no
+    draught), its bottom 2.1 m up."""
     F = G.GameFrame()
-    with G.new_parts() as still:
+    y = 2.37   # the globe's middle
+    with G.new_parts():
         F.cyl('canopy', 0.04, 0.02, (0, CEILING - 0.01, 0), M.white, verts=14, bevel=0.004)
-    G.join(still, 'paperLantern', origin=(0, 0, 0))
-    with G.new_parts() as hung:
-        G.rod('cord', F.at(0, CEILING - 0.02, 0), F.at(0, 2.29, 0), 0.004, material=M.white, verts=6)
-        F.cyl('cap', 0.04, 0.012, (0, 2.305, 0), M.white, verts=14)
-        _bulb(F, 'paperLantern', 0.27, (0, 2.05, 0), material=M.paper, scale=(1, 1, 0.93), segments=24, rings=14)
-        for k, y in enumerate((1.85, 1.93, 2.01, 2.09, 2.17, 2.25)):
-            r = 0.27 * math.sqrt(max(0.0, 1 - ((y - 2.05) / (0.27 * 0.93)) ** 2)) + 0.002
-            G.torus(f'rib{k}', r, 0.003, at=F.at(0, y, 0), material=M.rib, major_segments=28, minor_segments=4)
-    lantern = G.hinged(G.join(hung, 'lantern'), F.at(0, CEILING - 0.02, 0))
+        G.rod('cord', F.at(0, CEILING - 0.02, 0), F.at(0, y + 0.24, 0), 0.004, material=M.white, verts=6)
+        F.cyl('cap', 0.04, 0.012, (0, y + 0.255, 0), M.white, verts=14)
+        _bulb(F, 'paperLantern', 0.27, (0, y, 0), material=M.paper, scale=(1, 1, 0.93), segments=24, rings=14)
+        for k, dy in enumerate((-0.2, -0.12, -0.04, 0.04, 0.12, 0.2)):
+            r = 0.27 * math.sqrt(max(0.0, 1 - (dy / (0.27 * 0.93)) ** 2)) + 0.002
+            G.torus(f'rib{k}', r, 0.003, at=F.at(0, y + dy, 0), material=M.rib, major_segments=28, minor_segments=4)
+    G.join_all('paperLantern')
     G.settle(floor=False)
-    G.rock(lantern, 'sway', 2.5, seconds=2.0, axis='X')
     return G.meshes()
 
 
@@ -588,7 +590,6 @@ def lampLantern():
 
 
 IDLE_FAN = {'idle': 'blades_turn'}
-IDLE_SWAY = {'idle': 'sway'}
 
 
 def _m(id, build, size, paint, **kw):
@@ -597,7 +598,7 @@ def _m(id, build, size, paint, **kw):
 
 FAMILY = G.Family(
     'lighting', M,
-    [_m('ceilingPendant', ceilingPendant, (0.43, 0.948, 0.43), [('brass', 'Body'), ('dome', 'Shade')], floor=False),
+    [_m('ceilingPendant', ceilingPendant, (0.43, 0.688, 0.43), [('brass', 'Body'), ('dome', 'Shade')], floor=False),
      _m('ceilingLight', ceilingLight, (0.36, 0.6, 0.36), [('iron', 'Body'), ('panel', 'Shade')], floor=False),
      _m('chandelier', chandelier, (0.94, 0.763, 0.897), [('brass', 'Body'), ('bulb', 'Globes')], floor=False),
      _m('pendantIndustrial', pendantIndustrial, (0.38, 0.874, 0.38), [('iron', 'Body'), ('industrial', 'Shade')],
@@ -605,8 +606,7 @@ FAMILY = G.Family(
      _m('ceilingFan', ceilingFan, (0.905, 0.385, 0.951), [('white', 'Body'), ('blade', 'Blades')], floor=False,
         centre=(-0.0326, 0), motions=IDLE_FAN),   # its box's middle; the blades' axis is on the tile's
      _m('trackLights', trackLights, (0.94, 0.296, 0.19), [('white', 'Body'), ('iron', 'Shade')], floor=False),
-     _m('paperLantern', paperLantern, (0.543, 1.001, 0.543), [('paper', 'Paper'), ('rib', 'Ribs')], floor=False,
-        motions=IDLE_SWAY),
+     _m('paperLantern', paperLantern, (0.543, 0.681, 0.543), [('paper', 'Paper'), ('rib', 'Ribs')], floor=False),
      _m('wallSconce', wallSconce, (0.2, 0.25, 0.27), [('brass', 'Body'), ('shade', 'Shade')], floor=False,
         centre=(0, -0.295)),
      _m('wallLampArm', wallLampArm, (0.2, 0.296, 0.424), [('iron', 'Body'), ('shade_metal', 'Shade')], floor=False,
@@ -627,8 +627,8 @@ FAMILY = G.Family(
      _m('lampLantern', lampLantern, (0.16, 0.373, 0.16), [('iron', 'Base'), ('glass', 'Glass')])],
     comment='Blender-built lamps (tools/art/blender/families/lighting.py). Listed in the base manifest\'s '
             'packs. The materials map onto the game\'s finishes so a model costs one draw call per finish '
-            'group. Shades, diffusers and bulbs glow at night (`glow`); the ceiling fan\'s blades turn and '
-            'the paper lantern sways all the time near the camera (`idle`).',
+            'group. Shades, diffusers and bulbs glow at night (`glow`); the ceiling fan\'s blades turn while it is '
+            'on, near the camera (`idle`).',
 )
 
 if __name__ == '__main__':
