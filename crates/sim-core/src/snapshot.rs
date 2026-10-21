@@ -244,7 +244,7 @@ fn doing(world: &World, s: &Sim) -> Doing {
     // the one they play with as playing (`partners::hold`: a seesaw doesn't rock with one).
     let action = match phase {
         Phase::Using { .. } if inter.baby_bed() && s.awake_in_crib(&world.content, clock::hour(world.tick)) => None,
-        Phase::Using { .. } if s.partner_wait > 0 => None,
+        Phase::Using { elapsed } if inter.partner && (s.partner_wait > 0 || *elapsed == 0.0) => None,
         Phase::Using { .. } => inter.anim,
         _ => None,
     };
