@@ -18,6 +18,11 @@
 //!   (`community.json`: street, play, food, farm and shops, in rows by group facing the
 //!   street, the shops against a wall at the back), beside a home plot with a small house. The
 //!   resident stands at the lot's front, free will off, needs at 0.8. Look with `__showPlot(1)`.
+//! - `review-stage`: an empty home lot with one walled room of 12 × 12 tiles (a door, two
+//!   windows, a crib and a counter, the rest free floor and wall) and a garden behind it, for
+//!   buying one thing after another to look at in use (`check.mjs play --objects`). One resident
+//!   per life stage, free will off, needs at 0.5, on a Saturday morning (the children home).
+//!   Its free spots are at `STAGE_ROOM` below and in `tools/bench/README.md`.
 
 mod common;
 
@@ -196,4 +201,73 @@ fn town_things_lot() {
     free_up(&mut world);
     set_needs(&mut world, 0, 0.8, &[]);
     common::dump_state(&world, "town-things");
+}
+
+/// `review-stage`'s room: walls from `(x0, z0)` to `(x1, z1)`, a door in the front wall (low z,
+/// toward the street) and two windows in the left one. Free spots for a thing of footprint
+/// `[w, d]` (as `tools/bench/check.mjs` places them by default and the README lists): the floor in
+/// the middle `(10 - w/2, 12 - d/2, 0)`, the back wall inside `(10 - w/2, 18 - d, 2)`, the left
+/// wall `(4, 8..=12, 1)` and its windows `(4, 14..=15, 1)`, the right wall `(16 - d, 10..=16, 3)`,
+/// the front wall `(7..=12, 6, 0)`, the back wall outside `(4..=15, 18, 0)`, and the garden
+/// `(10 - w/2, 22, 0)` (free from z = 19 to 31, and from x = 18 to 31 beside the room).
+const STAGE_ROOM: (i32, i32, i32, i32) = (4, 6, 16, 18);
+
+#[test]
+fn review_stage() {
+    let merged = common::content();
+    let (x0, z0, x1, z1) = STAGE_ROOM;
+    let (w, d) = (32, 32);
+    // One resident per life stage (`content.life`): an adult first, the one checks use by
+    // default; the baby by the crib, the rest in the front yard, out of the room.
+    let sim = |name: &str, gender: &str, age: f32, x: f64, z: f64| json!({"name": name, "gender": gender, "age": age, "traits": ["cheerful"], "x": x, "z": z});
+    let lot = json!({
+        "width": w, "depth": d,
+        "walls": [[x0, z0, x1, z0], [x1, z0, x1, z1], [x1, z1, x0, z1], [x0, z1, x0, z0]],
+        "doors": [{"x": 5, "z": z0, "axis": "x"}],
+        "windows": [{"x": x0, "z": 14, "axis": "z"}, {"x": x0, "z": 15, "axis": "z"}],
+        // A crib for the baby, and a counter for things that stand on a top.
+        "objects": [{"def": "crib", "x": 13, "z": z0, "rot": 0}, {"def": "counter", "x": x1 - 1, "z": 7, "rot": 3}],
+        "plots": [{"name": "Home", "x": 0, "z": 0, "w": w, "d": d, "entry": [w as f64 / 2.0, 1.5]}],
+        "households": [{"name": "The Stages", "plot": 0, "player": true, "funds": FUNDS}],
+        "sims": [sim("Ada", "female", 40.0, 20.5, 3.5), sim("Ben", "male", 22.0, 21.5, 3.5), sim("Cal", "male", 15.0, 22.5, 3.5),
+                 sim("Dee", "female", 8.0, 23.5, 3.5), sim("Gus", "male", 70.0, 24.5, 3.5), sim("Eve", "female", 0.5, 13.5, 7.5)],
+        "relationships": [
+            {"a": 1, "b": 0, "preset": "parent"}, {"a": 2, "b": 0, "preset": "parent"}, {"a": 3, "b": 0, "preset": "parent"},
+            {"a": 5, "b": 0, "preset": "parent"}, {"a": 0, "b": 4, "preset": "parent"},
+        ],
+    });
+    let mut world = World::from_json(&merged, &lot.to_string(), 7).unwrap();
+    assert_eq!(world.objects.len(), 2, "the crib and the counter load where they were put");
+    for s in world.sims.iter_mut() {
+        s.job = None;
+        s.job_search_from = u32::MAX;
+    }
+    world.households[0].free_will = false;
+    // Saturday (day 6), so the children aren't at school: the clock is set rather than run, as
+    // five days would age everyone two and a half years (two days a year).
+    world.tick = clock::tick_at(6, 10.0 * 60.0).unwrap();
+    assert_eq!(clock::weekday(clock::day(world.tick)), 5);
+    for _ in 0..(5.0 / MINUTES_PER_TICK) as u32 {
+        world.tick_once();
+    }
+    free_up(&mut world);
+    for i in 0..world.sims.len() {
+        // Half full: a use that fills a need lasts long enough to watch (at 0.8 a toilet's is
+        // over in a second), and a long run of them still doesn't wear anyone out.
+        set_needs(&mut world, i, 0.5, &[]);
+    }
+    // Every life stage, each at home.
+    let life = &world.content.life;
+    let stages: Vec<&str> = world.sims.iter().map(|s| life.stage_at(s.age).unwrap().id.as_str()).collect();
+    assert_eq!(stages, ["adult", "youngAdult", "teen", "child", "elder", "baby"]);
+    assert_eq!(life.stages.len(), stages.len(), "one resident per stage");
+    for (i, s) in world.sims.iter().enumerate() {
+        assert!(s.away_until.is_none(), "resident {i} at home");
+    }
+    assert_eq!(world.sims[5].pose, sim_core::content::Pose::Lie, "Eve is in the crib");
+    // The room is closed: one room of 144 tiles with its door and windows, the garden round it.
+    let room = world.room_at_tile(10, 12).expect("a room");
+    assert!(!room.garden && room.tiles == 144.0 && room.doors == 1 && room.windows == 2, "{:?}", (room.garden, room.tiles, room.doors, room.windows));
+    assert!(world.room_at_tile(10, 22).is_some_and(|r| r.garden), "the garden behind");
+    common::dump_state(&world, "review-stage");
 }
