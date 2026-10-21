@@ -9,9 +9,10 @@ a single object does is on its category page ([README.md](README.md)); this page
 ### Engine and rules
 - **Lamps** switch per lamp for the player (click: Turn on / Turn off), per room for residents, instantly (nobody
   walks to the switch): on when someone awake comes into a dark room (19:00–06:30, or a basement), off when the
-  last one leaves or sleeps. Fires (`light.switch: false`) and garden lamps aren't residents' to switch; with free
-  will off, lamps stay as the player left them. Room scores count every lamp. Save v28 (`lights.rs`). A lamp switched
-  off stays off when moved, with its room or on a top, and through undo and redo.
+  last one leaves or sleeps. A lamp bought is off (Q-11). Fires (`light.fire`) are lit by someone who sits down by
+  them; garden lamps (`light.switch: false`) aren't residents' to switch. With free will off, lamps stay as the
+  player left them. Room scores count every lamp. Save v28 (`lights.rs`). A lamp switched off stays off when moved,
+  with its room or on a top, and through undo and redo.
 - **A lamp's light** sits at its shade (content `light.at` [x, z], object frame): the arc, table and nightstand lamps.
   The wall lights keep theirs out from the wall (at the bulb they lost the warm pool on the wall), the fireplaces in
   front of the fire.
@@ -48,7 +49,7 @@ a single object does is on its category page ([README.md](README.md)); this page
 - **Held things** are drawn in the object's colours; the weight bench's bar leaves its hooks 0.8 s in.
 - **Seats facing the object's back** (`seat.facing: "back"`): the dressing table, the piano, the writing bureau, the
   cinema wall and the game console; the console's sitters sit 8 cm further back, so their knees clear the shelf. The
-  digital piano and sewing table face the room (they read as tables).
+  sewing table faces the room (it reads as a table); the digital piano, rebuilt as an upright, faces the wall (G-29).
 - **Chairs at a separate table** are drawn pulled in by up to 0.45 m while sat on (`tableTuck.ts`; the sim's
   positions don't change), overlapping into the table's tile; a plain "sit" on a dining chair pulls it in too. The
   executive chair comes in only 6 cm (its desk's pedestals are where the knees go): the writer leans in further
@@ -56,7 +57,7 @@ a single object does is on its category page ([README.md](README.md)); this page
 - **Lying:** heels sink about as deep as the buttocks (4–5 cm into the mattress) and the calves and thighs touch the
   top or stand 1–2 cm proud (a straight leg can't lie flatter without bending the knee backwards). Children lie on
   the mattress (`lieBack` scaled by size), so their heads sink 3.6 cm into the pillow, as grown-ups' do.
-- **Bathers** sit along the tub; the sofa bed's user stands 1 m back; the lazy pack's doze and power nap are sitting
+- **Bathers** sit on the tub's floor with their legs inside it (G-06); the sofa bed's user stands 1 m back; the lazy pack's doze and power nap are sitting
   naps; the leather armchair reads sitting down.
 - **Hugs:** each steps in until the chests meet, the arms round the other's back; a grown-up hugging a child bends
   over (hands on the child's shoulders) rather than crouching, whose knees would push the child back. The teddy is
@@ -86,12 +87,11 @@ a single object does is on its category page ([README.md](README.md)); this page
 - **Mirrors reflect on every preset:** the nearest on screen on Low (1024×512, 10 a second) and Medium (4× MSAA, 30 a
   second), redrawn only when something it shows changes; two live on High. Medium with a mirror in view and
   something moving costs about 6 % fps and 1 ms CPU on the M3.
-- **Kept at 4 draws:** the washer and dryer, the phone box, the potting bench, the grandfather clock (hands moving,
-  door and pendulum still), the jukebox, the bunk, the greenhouse, the stereo, and the eight pack models `chefStove`,
+- **Kept at 4 draws:** the washer and dryer, the phone box, the potting bench, the grandfather clock (hands and pendulum
+  moving, the door still), the base and pack showers (their sliding doors, Q-05), the jukebox, the bunk, the greenhouse, the stereo, and the eight pack models `chefStove`,
   `whirlpoolTub`, `pizzaOven`, `recordCabinet`, `lavaLamp`, `soloSauna`, `glasshouse`, `veggieBed`.
 - **Kept as they are:** pictures as flat shapes (a texture would double their draws); one sitter sinking every sofa
-  cushion; pillows not following; the foosball's two rods; the curtains stretching to close; standing mirrors
-  upright; the base shower's sliding door shut; the retired `@modern`/`@cozy`/`@minimal` style variants.
+  cushion; pillows not following; the curtains stretching to close; standing mirrors upright; the retired `@modern`/`@cozy`/`@minimal` style variants.
 - **Colour parts:** the wardrobe has three (Body, Doors, Handles); the sewing table's legs, apron and drawer have
   their own (Legs); the acoustic guitar and ukulele have a "Top"; the books and bookends list Book 1–5; the garden
   decor has colour parts; flowers are colourable only where their petals are one colour.
@@ -113,59 +113,97 @@ a single object does is on its category page ([README.md](README.md)); this page
 
 ## Still open
 
+The authenticity review (2026-10-21 to 22, [docs/authenticity-review.md](../authenticity-review.md)) fixed most of
+what this list held; those items are under "Fixed by the authenticity review" below, with their finding ids. What
+it left is here, with its id; §9 of the review says what each would take.
+
 ### Residents
-- **The weight bench's lie:** the legs stretch out past the bench's end in mid-air (a bench press would have the feet
-  on the floor either side). Deferred from 0.3.0: it needs a bespoke feet-down lie pose, not a data tweak.
-- **A kiss between residents of different heights:** the taller one's mouth meets the other's forehead. It needs the
-  taller one to bend and the shorter one to tilt the head up. Deferred from 0.3.0: needs two-body procedural work.
-- Other children gather round a hug and stand right next to the pair.
-- **Chairs and tops the tuck doesn't reach:** an office chair at the standing desk (top 0.57 m over the seat), a kids'
-  chair at a coffee table (the hands hover), a chair facing a desk with its own chair built in (laptop desk, kids'
-  desk) from behind. Deferred from 0.3.0: each needs its own reach/clip adjustment.
-- **Getting up from a chair:** the sim puts the resident on the tile in front at once, so `standUp` plays while they
-  glide back. Deferred from 0.3.0 unless the stand-up animation is reworked.
+- **No props in hand** (G-70): books, cups, cutlery, the phone, the cue, the bats and the bar cart's shaker are
+  mimed, and the coin isn't tossed into the fountain (I-held-01, I-social-01, I-hobbies-05, I-kitchen-13,
+  I-community-11). New behaviour, planned separately.
+- **No body language, no turning on the spot** (G-71): only the face shows feelings, and residents turn in place to
+  face a thing, without steps (A-residents-07, A-residents-08). New behaviour, planned separately.
+- **A child can't reach the fruit it picks** (I-garden-11): the picked apple hangs at 1.84 m, the lemon at 1.62 m.
+  The owner's decision (the review recommends low fruit, built with I-garden-12's crown).
+- Other children gather round a hug and stand right next to the pair (A-social-02, not reproduced).
 - **Feet slide at game speeds 4 and 5** (56–78 % of the way: 45 and 90 m/s, faster than any gait steps without
   strobing); at speed 3 the run (`runAlong`) keeps grown-ups' and teens' feet on the ground, children slide 11–14 %
-  (G-25). The clips' known failures on other bodies and life stages (the seated feet) are in
-  `tools/characters/clip-baseline.json`.
+  (A-residents-03, G-25). The clip check's baseline (`tools/characters/clip-baseline.json`) is empty.
 
 ### Rendering
 - **The town map's backdrop** blocks the world like the old pie menu's did (left as a panel).
-- **Night glow draws through other parts** of a model (the grill's coals through its shut lid).
-- **Stairs seen from some basement views** lose part of their top end (a renderer cut-away, not the model).
-- **Cooking props** (chopping board, food) are drawn at a station's middle, which on `grillStation` is the grate.
-- **Wall things shown while one is held** float over lowered walls (pictures on outside walls too).
+- **Light through walls on Low:** on Medium and High a clustered lamp lights only its own room (M-lighting-08);
+  Low's four forward lamps aren't masked, and tiles split by a diagonal wall aren't on any preset.
+- **Stairs seen from some basement views** lose part of their top end (a renderer cut-away, not the model; M-living-02,
+  not checked).
+- **Wall things shown while one is held** float over lowered walls (pictures on outside walls too; M-houses-01, not
+  checked).
 - **Mirrors on High** log an occasional `GL_INVALID_VALUE: glGetProgramiv`; not reproduced in 5 runs, probably
   Babylon's parallel shader compile.
 - **`partBox`** draws spheres and tori up to 5 % / 2.5 % bigger than Babylon's meshes (never smaller).
 
 ### Content and sim
-- **Parts with no use, left decorative for 0.3.0:** the executive desk's drawer (its clip would need a seated use
-  on the desk it faces); the nesting tables' small table; the high chair's tray (the sim never seats a baby in it);
-  the laundry basket's lid (not built); the display cabinet's door; the kettle's lid, the bread bin's roll-top and
-  the laptop's lid (they have uses since G-63, used at their top; no clip yet). These are modelled parts without a
-  clip, so no clip is orphaned. The three freezers' `freezer_open` clips now play for "Get some ice cream".
-- **Uses end once every need they raise is full**, by design; it makes clips easy to miss in checks.
-- **Small things on tops:** every one of the 180 sample houses has them; since G-63 the kettle, the toaster and the
-  rest with uses are used where they stand.
+- **No privacy** (G-72): a bathroom in use opens for anyone walking in (else they'd walk through its shut door), and
+  "Try for a baby" is a 30-minute standing kiss wherever the two are (I-systems-05, I-social-05). New behaviour.
+- **Nobody serves in town** (I-community-09): the carts, the stall, the bakery case and the café are self-serve, and
+  their labels say so; vendors are later (Q-17).
+- **Laundry:** the resident stands at the washer for its whole wash and folds at the dryer with empty hands; the
+  basket plays no part (I-bathroom-07: a timed machine is new behaviour).
+- **The daybed can't be sat on by day:** it needs a lengthways seat row (`along`) in `characters/furniture.json`
+  (I-bedroom-03; the folded futon has its sit).
+- **Worked from the edge:** the bonsai bench, the rose arbour's roses, the cookbook lectern and the streetball hoop
+  are used from the object's edge, not at the part (I-packs-12; `places` can fix it now, and the lectern wants a
+  reading hand pose).
+- **Sounds still to make** (I-bathroom-04): the treadmill and bikes, the workbench, the ball games and darts, the
+  arcade, the sewing machine, the pottery wheel, the coffee machines, the blender's motor, the microwave, the
+  toaster, an oven's fan, the pizza oven, the fridge door, the bin lid, the vending machines, the phone box, the
+  basketball, singing, a bowed cello, the punch bag and the smash bin. The new sounds still want a headed listen.
+- **Later, as polish:** the range hood's light and hum while the hob below is in use (Q-19); flowers cut for a vase
+  (Q-18).
+- **Parts with no use, left decorative:** the executive desk's drawer (I-office-02, won't fix); the nesting tables'
+  small table and the display cabinet's door (decor, decision 4); the laundry basket's lid (not built). These are
+  modelled parts without a clip, so no clip is orphaned.
+- **Uses end once every need they raise is full**, by design (I-systems-02); it makes clips easy to miss in checks.
 - **Residents didn't reach things in a crowded garden** once; a sim test of eleven in a row
-  (`crates/sim-core/tests/crowded_garden.rs`) couldn't reproduce it.
+  (`crates/sim-core/tests/crowded_garden.rs`) couldn't reproduce it (I-garden-01, not checked).
 
 ### Models
-- The entry console's mirror and hook board, and the spritz station's round mirror, hang in the air when the piece
-  stands free; the party bar's "Back bar" colours the back cabinet, not the bottle shelves; bathers' shins go through
-  the front of the heart tub. Deferred from 0.3.0 unless the model is touched for another reason.
-- The power blender's blades loop was never built.
+- **The home chess table seats one**, so chess at home stays *Practise chess*: it needs a 1 × 2 table with a chair at
+  each end, `places` facing each other and a *Play chess* use with `partner` (M-hobbies-11).
+- **The apple tree's crown is out of reach:** only its front apple hangs within reach, so *Pick the apples* reaches
+  into the air; the crown down to about 2.6 m or low apples at 1.4–1.9 m (I-garden-12, `trees.md`).
+- **Food from town on a plate:** crisps, the stall's fruit and the pastry use the treat plate; a cone or paper cup,
+  a hot dog in its bun, a crisp packet, an apple and a bagged pastry are to be made (M-held-03, `held.md`).
+- **The arc lamp's arc stops at its own tile:** the sim allows a shade over the next tile (`overhang`) once the model
+  reaches it (M-lighting-06, `lighting.md`).
+- **One part where two would fold or move apart**, to stay within four draws: the hot tub's cover folds back as one
+  squashed part, not two halves (A-outdoor-01); the washing comes down onto the line all together (A-outdoor-02);
+  the grandfather clock's trunk door stays shut (A-decor-01).
+- **Parts with a use but no clip:** the high chair's tray (babies sit in it since G-66), the kettle's lid, the bread
+  bin's roll-top and the laptop's lid (used at their top since G-63); the bakery case's door is on the baker's side.
 
 ### Tools
 - The lamp build (`_bulb`) checks only the light's height, not `at`.
 - `pnpm wasm` doesn't run in a worktree with a symlinked `node_modules` (pnpm's deps check); its cargo +
   wasm-bindgen command works.
+- The review's tooling leftovers (`cargo review sizes`' measuring, `check.mjs play` with one resident, the debug
+  states) are in [docs/authenticity-review.md](../authenticity-review.md) §7.
 
 ### Not looked at
 - The production build's frame time; the town overview at full night; far versions in the town overview.
 - The held things that no recipe in the test house makes (the tasting board, pizza, pie, slices, sandwich, grill
   platter); a meal from the fridge eaten at a pulled-in chair (eating was checked with the café's cake).
+
+### Fixed by the authenticity review
+- **Residents:** the weight bench's feet-down bench press (A-fitness-01); a kiss between different heights
+  (A-social-01); the tuck at the standing desk, the kids' chair at a coffee table and a chair facing a desk with its
+  own (A-office-01, A-kids-01, I-office-01); getting up from a chair at the seat (A-residents-01, A-residents-14).
+- **Rendering:** night glow through other parts, the grill's coals (M-outdoor-01); cooking props at a station's
+  middle (I-systems-01).
+- **Content and sim:** small things on tops are used where they stand (I-tabletop-01, I-tabletop-04); the high
+  chair is used (I-kids-01).
+- **Models:** the entry console's and the spritz station's mirrors on back boards (M-packs-01, M-packs-02); the party
+  bar's back bar (M-packs-03); bathers' shins in the heart tub (A-packs-01); the power blender's blades (A-packs-02).
 
 ## Notes on the sim
 
