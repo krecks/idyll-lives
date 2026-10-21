@@ -155,7 +155,7 @@ const DEFAULT_SEAT: Seat = FURNITURE.defaultSeat;
  * How far back (m) a Sim stands from the middle of the tile in front while using an object whose
  * clip opens something across that tile: a dishwasher's door drops 0.44 m into it; a sofa bed's
  * mattress, pulled out or folded away, reaches half a metre past it. Negative: steps in to a thing
- * smaller than its tile (the herb planter, 0.46 m deep, is picked from as from a counter), or to
+ * smaller than its tile (the herb planters, 0.4–0.46 m deep, are picked from as from a counter), or to
  * the part used: the toes at a basin or a sink's cabinet, the hands over the water; up to the toaster and
  * the blender on a counter, the chemistry bench pushed back on its tile, the clock's trunk door, the
  * giving jar. Back from the statue, to look up at it.
@@ -165,6 +165,7 @@ const STAND_BACK: Record<string, number> = {
   dishwasherCompact: 0.15,
   sofaBed: 1,
   'garden.herbs': -0.5,
+  'foodie.herbGarden': -0.5,
   sink: -0.35,
   sinkPedestal: -0.5,
   sinkConsole: -0.45,
@@ -491,6 +492,14 @@ interface ActionAnim {
 }
 /** Calls made to a screen (`phone`): talked to it, hands free, not with a phone at the ear. */
 const VIDEO_CALLS = new Set(['outgoing.videoCallNook', 'cheerful.partyBooth']);
+/** Waist-high things tended standing, leaning in (the herb planter's `pick`): the greenhouse's staging, the herb trough, the compost bin. */
+const WAIST_HIGH = new Set(['greenhouse', 'foodie.herbGarden', 'compostBin']);
+/** Crops picked down at the soil (strawberries, pumpkins, a meadow's flowers): the `plant` clip's crouch, not the bend over a bush. */
+const LOW_CROPS = new Set(['garden.strawberries', 'garden.pumpkins', 'garden.meadow']);
+/** Flowers that bloom above about 0.7 m, smelt leaning in standing, a bloom held to the nose (`pick`), not crouched under. */
+const TALL_FLOWERS = new Set(['garden.cosmos', 'garden.flowerBox', 'garden.lavender', 'garden.lilies', 'garden.lupins', 'garden.roses', 'garden.wheelbarrow']);
+/** Toys played with down on the floor at the box (`kneel`, as the play mat and the doll house). */
+const FLOOR_TOYS = new Set(['toyBox', 'toyChest']);
 /** Wall cupboards: things put away up in them (no squat to the floor). */
 const WALL_CUPBOARDS = new Set(['wallCabinet', 'wallCabinetGlass', 'wallCabinetCorner', 'chinaCabinet']);
 const ACTIONS: Record<string, ActionAnim> = {
@@ -517,7 +526,8 @@ const ACTIONS: Record<string, ActionAnim> = {
   // (A notice board or a timetable is read looking at it, not at a book in the hands.)
   read: { stand: (def) => (def === 'noticeBoard' || def === 'busStop' ? ['idle'] : ['lantern']), upper: 'lantern', hands: HANDS.hold },
   watch: { stand: ['foldArms', 'idle'], hands: HANDS.open },
-  play: { stand: ['spell'], sit: 'sitHands', hands: HANDS.keys },
+  // Toys down on the floor at the box; crouched at the low train table, the hands at its track.
+  play: { stand: (def) => (FLOOR_TOYS.has(def) ? ['kneel'] : def === 'trainTable' ? ['crouch'] : ['spell']), sit: 'sitHands', hands: HANDS.keys },
   // Keys and drums on the desk-hands clip; a cello is held upright between the knees.
   music: { stand: ['spell'], sit: (def) => (def.includes('cello') ? 'sit' : 'sitHands'), hands: HANDS.keys },
   paint: { stand: ['spell', 'interact', 'spell'], hands: HANDS.hold },
@@ -548,11 +558,17 @@ const ACTIONS: Record<string, ActionAnim> = {
   },
   // Gardening, by task (older content and packs: `garden`).
   water: { stand: ['water'], hands: HANDS.hold },
-  tend: { stand: ['kneel'], hands: HANDS.relaxed },
+  // Kneeling at the soil; a waist-high thing leant over standing, the staked tomatoes tied up standing, a
+  // raised bed's soil bent over.
+  tend: {
+    stand: (def) =>
+      WAIST_HIGH.has(def) ? ['pick'] : def === 'garden.tomatoes' ? ['harvest', 'water'] : def === 'raisedBed' || def === 'natureLover.veggieBed' ? ['harvest'] : ['kneel'],
+    hands: HANDS.relaxed,
+  },
   // The baby picked up out of the crib and held (`CUDDLE`).
   cuddle: { stand: ['idle'], hands: HANDS.relaxed },
-  // (From the waist-high herb planter, standing.)
-  harvest: { stand: (def) => (def === 'garden.herbs' ? ['pick'] : ['harvest', 'plant']), hands: HANDS.hold },
+  // (From the waist-high herb planter, standing; low crops crouched down to the soil.)
+  harvest: { stand: (def) => (def === 'garden.herbs' ? ['pick'] : LOW_CROPS.has(def) ? ['plant', 'kneel'] : ['harvest', 'plant']), hands: HANDS.hold },
   prune: { stand: ['interact', 'spell', 'interact'], hands: HANDS.grip },
   garden: {
     // (The bird feeder's box on its post: reached for standing at it.)
@@ -570,8 +586,8 @@ const ACTIONS: Record<string, ActionAnim> = {
     stand: (def) => (def === 'telescope' ? ['rail'] : ['idle', 'foldArms']),
     hands: HANDS.relaxed,
   },
-  // Down to low flowers / up into a tree's crown (`activityPose` turns the head).
-  smell: { stand: ['crouch'], hands: HANDS.relaxed },
+  // Down to low flowers, leaning in to tall ones / up into a tree's crown (`activityPose` turns the head).
+  smell: { stand: (def) => (TALL_FLOWERS.has(def) ? ['pick'] : ['crouch']), hands: HANDS.relaxed },
   admire: { stand: ['idle', 'foldArms'], hands: HANDS.relaxed },
   phone: { stand: ['phone'], sit: (def) => (VIDEO_CALLS.has(def) ? 'sitTalk' : 'sit'), upper: (def) => (VIDEO_CALLS.has(def) ? '' : 'phone'), hands: HANDS.hold },
   listen: { stand: ['idle', 'foldArms'], hands: HANDS.open },
