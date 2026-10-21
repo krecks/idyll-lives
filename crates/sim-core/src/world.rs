@@ -2816,6 +2816,7 @@ impl World {
                 | Command::SetLifespan { .. }
                 | Command::SetPlayerMoves { .. }
                 | Command::AddFunds { .. }
+                | Command::SetSkill { .. }
                 | Command::SetAutonomy { .. }
                 | Command::SetAutoFast { .. }
                 | Command::SetRoutines { .. }
@@ -2946,6 +2947,14 @@ impl World {
             Command::AddFunds { household, amount } => {
                 let h = self.households.get_mut(household as usize).ok_or_else(|| Error::new(format!("unknown household {household}")))?;
                 h.funds = (h.funds + amount).max(0);
+            }
+            Command::SetSkill { sim, skill, level } => {
+                self.sim(sim)?;
+                let s = self.content.skill_index(&skill).ok_or_else(|| Error::new(format!("unknown skill '{skill}'")))?;
+                let level = if level.is_finite() { level.clamp(0.0, self.content.skill_rules.max_level) } else { 0.0 };
+                let sim = &mut self.sims[sim as usize];
+                sim.skills[s] = level;
+                sim.planner.recheck = true;
             }
             Command::Adopt { household, child } => {
                 crate::lifecycle::adopt(self, household, child)?;
