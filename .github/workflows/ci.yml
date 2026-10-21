@@ -1,6 +1,7 @@
 # Checks every push to main and every pull request: clippy (the release gate) and the simulation's
-# tests, then the ignored sample tests that need files made first. The heavy release work — the
-# wasm builds, models, web checks and Pages deploy — stays in pages.yml, run by hand or on a tag.
+# tests, then the ignored sample tests that need files made first, the tools' tests and the
+# residents' clip check. The heavy release work — the wasm builds, models, web checks and Pages
+# deploy — stays in pages.yml, run by hand or on a tag.
 name: CI
 
 on:
@@ -37,12 +38,16 @@ jobs:
       - name: Simulation tests
         run: cargo test -p sim-core --locked
 
-      # The generated_* tests are ignored because they need sample files; make them here so they
-      # run instead of passing without checking anything.
+      # pnpm only runs the clip check's script below: nothing is installed, as it needs no packages.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.22.0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
 
+      # The generated_* tests are ignored because they need sample files; make them here so they
+      # run instead of passing without checking anything.
       - name: Generated houses and worlds
         # Optimised for speed, but without the release build's fat LTO (minutes, for two test binaries).
         env:
@@ -52,3 +57,18 @@ jobs:
           node --experimental-strip-types tools/housegen/sample.ts /tmp/houses.json
           node --experimental-transform-types tools/worlds/sample.ts /tmp/worlds.json
           HOUSES=/tmp/houses.json WORLDS=/tmp/worlds.json cargo test -p sim-core --release --locked --test generated_houses --test generated_worlds -- --ignored
+
+      # The residents' clips on both bodies at every life stage; the known failures are in
+      # tools/characters/clip-baseline.json, so only a new one fails.
+      - name: Clip check
+        working-directory: web
+        run: pnpm --config.verify-deps-before-run=false check:clips
+
+      # The repo's tools (crates/tools): a fresh character build against the committed set and its
+      # checks, the object gate over every shipped model (no Blender), and the content and texture
+      # tools. Release, as the character build is slow unoptimised (without fat LTO, as above).
+      - name: Tool tests
+        env:
+          CARGO_PROFILE_RELEASE_LTO: 'false'
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '16'
+        run: cargo test -p ll-tools --release --locked
