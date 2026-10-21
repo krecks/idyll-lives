@@ -274,6 +274,10 @@ fn shipped_content_keeps_the_kids_things_the_alcohol_and_the_stove_to_their_ages
     }
     only("counter", "sandwich", &everyone);
     only("deskStanding", "browse", &cooks);
+    // The loaded bar, the adult dumbbells, the ice bath and the sauna: teens and up.
+    for (obj, it) in [("weightBench", "lift"), ("dumbbells", "lift"), ("hotHeaded.coldPlunge", "plunge"), ("loner.soloSauna", "sweat")] {
+        only(obj, it, &cooks);
+    }
     // A pupil's homework is anyone's to take by stage; the pupils-only rule is the code's.
     only("bookshelf", "homework", &everyone);
     // The upper bunk: not an elder's.

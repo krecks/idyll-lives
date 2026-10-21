@@ -2997,6 +2997,12 @@
       ],
       "price": 480,
       "category": "fitness",
+      "stages": [
+        "teen",
+        "youngAdult",
+        "adult",
+        "elder"
+      ],
       "description": "Builds Strength.",
       "interactions": [
         {

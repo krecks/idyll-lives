@@ -3632,6 +3632,12 @@
       ],
       "price": 160,
       "category": "fitness",
+      "stages": [
+        "teen",
+        "youngAdult",
+        "adult",
+        "elder"
+      ],
       "description": "Eight dumbbells on a rack: lifting builds Strength.",
       "interactions": [
         {

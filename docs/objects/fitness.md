@@ -3,7 +3,7 @@
 The five F1 home gym models are built by `families/fitness.py` (notes: `fitness.md`): the treadmill's belt
 (`belt_run`, `G.scroll`), the bike's pedals (`pedals_turn`) and the yoga mat (`unroll`) move. Runners jog on the
 treadmill's belt (`characters.ts`, content `stand.height`), riders' feet stay on the pedals (content `seat.pedals`),
-and yoga is done sitting cross-legged on the unrolled mat (content `pose: sit`, `seat`).
+and yoga is done sitting cross-legged on the unrolled mat (content `pose: sit`, `seat`). The weight bench and the dumbbell rack are for teens and up (content `stages`, G-45): a child is refused ("too young to …") and never lifts on their own.
 
 Lifting holds the weight (content `held`): the bench's bar and one pair of the rack's dumbbells are parts of their
 own, hidden while in use (T0 `squash` to 0: `bar_off`, `pair_off`), and the game draws that part in the hands, in
