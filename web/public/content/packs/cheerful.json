@@ -149,6 +149,7 @@
       "id": "cheerful.sunriseLamp",
       "name": "Sunrise stretch lamp",
       "model": "model.cheerful.sunriseLamp",
+      "stand": { "height": 0.008 },
       "footprint": [1, 1],
       "price": 240,
       "category": "bedroom",

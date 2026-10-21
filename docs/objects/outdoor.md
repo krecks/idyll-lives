@@ -96,7 +96,7 @@ none.
 | `bikeRack` Bike rack | 2x1 · floor | tuneUp:tinker | outdoor / play | Rack, Bike | Use + Loop | `wheel_up`: the bike tips up 8.5° on its front tyre, its back axle onto the stand's cradle; `wheel_turn`: the back wheel turns while tuned up (E1 loop). Far version. |
 | `raisedBed` Raised vegetable bed | 2x1 · floor | tend:tend harvest:harvest | outdoor / yard | Bed | Growth + Use | `grow` (E4): lettuces, carrots and tomato bushes ripe at rest, the bed bare when picked, seedlings when planted; `harvest`: the crop is picked away (the stage then goes to picked); `rustle`: tending sways the plants every 2.4 s, on top of the stage. Far version. |
 | `shedSmall` Garden shed | 2x2 · floor | potter:tinker | outdoor / yard | Wood, Roof, Door | Use | `door_open`: the ledged door swings 100° out for the whole of potter, the dark inside with a bench and tools behind. The door is a colour part of its own (one plain draw). Far version. |
-| `greenhouse` Greenhouse | 2x3 · floor | tend:tend harvest:harvest | outdoor / yard | Frame, Wall | Use | `door_open`: the glass door swings 70° and the roof vent lifts 25° for tend and harvest. 4 draws (plain, glass, door, vent), as the nature lover's glasshouse. Far version. |
+| `greenhouse` Greenhouse | 2x3 · floor | tend:tend harvest:harvest | outdoor / yard | Frame, Wall | Use | `door_open`: the glass door swings 70° and the roof vent lifts 25° for tend and harvest, worked from the path down its middle (`inside`). 4 draws (plain, glass, door, vent), as the nature lover's glasshouse. Far version. |
 | `compostBin` Compost bin | 1x1 · floor | compost:tend | outdoor / yard | Bin | Use | `lid_open`: the slatted lid lifts 75° for compost; `hold` 2 s. Far version. |
 | `rainBarrel` Rain barrel | 1x1 · floor | — | outdoor / yard | Barrel | Static | Static: ribbed barrel, brass tap, the downpipe into its lid. Far version. |
 | `clothesline` Washing line | 3x1 · floor | washing:clean takeIn:clean | outdoor / yard | Posts, Washing | Use + Open | `washing`: the washing comes down from the line (1.5 s) and is the `open` clip (C1): it stays out until taken in. Far version (washing in). |
@@ -105,7 +105,7 @@ none.
 **In play** (signed off 2026-10-17):
 - Each checked in four facings: the sand castle rises for a sandcastle; the bike tips onto its stand and its back
   wheel turns for a tune-up; the shed's door opens for pottering, the dark inside showing; the greenhouse's door and
-  roof vent open for tend and harvest; the compost lid is up for 2 s.
+  roof vent open for tend and harvest, the gardener stepping in onto the path between the benches (`inside`, 2026-10-21); the compost lid is up for 2 s.
 - The raised bed's plants rustle every 2.4 s while tended. A new bed is planted, so harvest isn't offered until it
   is ripe; a ripe bed is harvested, the crop picked away and the bed left at picked.
 - The washing comes down onto the line for "Hang out the washing", stays out after, and "Take the washing in"

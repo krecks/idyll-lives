@@ -63,6 +63,7 @@
       "id": "outgoing.karaokeStage",
       "name": "Karaoke stage",
       "model": "model.outgoing.karaokeStage",
+      "stand": { "height": 0.146 },
       "footprint": [2, 1],
       "price": 680,
       "category": "hobbies",

@@ -51,7 +51,7 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 | `armchairLeather` Leather armchair | 1x1 · floor | sit:sit read:read | living / seating | Frame, Upholstery | Use | `sink_in`. |
 | `armchairDesign` Designer lounge chair | 1x1 · floor | relax:relax doze:nap | living / seating | Frame, Upholstery, Base | Static | Static (moulded shell). |
 | `armchairWingback` Wingback armchair | 1x1 · floor | sit:sit read:read | living / seating | Upholstery, Cushion, Legs | Use | `sink_in`. |
-| `recliner` Recliner | 1x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions & footrest | Use | `recline`: the seat and back tip 25° and the footrest swings up 80° for relax and doze; the resident reclines with it (`ride`). |
+| `recliner` Recliner | 1x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions & footrest | Use | `recline`: the seat and back tip 25° and the footrest swings up 80° for relax and doze; the resident reclines with it (`ride`), the legs out on the footrest (content `seat.legs: "out"`). |
 | `rockingChair` Rocking chair | 1x1 · floor | relax:relax read:read | living / seating | Wood, Cushion | Loop (E1) | `rock`: rocks ±6° while sat in (E1), the rider with it. |
 | `pouf` Leather pouf | 1x1 · floor | sit:sit | living / seating | Leather, Buttons, Legs | Use | `sink_in`. |
 | `ottoman` Tufted ottoman | 1x1 · floor | sit:sit | living / seating | Upholstery, Buttons, Feet | Use | `sink_in`. |
@@ -62,7 +62,8 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 - Each standing free, sat on in all four facings, by day and at night, on WebGPU and WebGL2, Medium and Low, every
   colour part its own colour. `sink_in` plays and holds while sat on (sit, and read on the leather and wingback
   chairs) and shuts when the resident gets up.
-- The recliner's back and seat tip back with the sitter riding them and the footrest swings up for relax and doze;
+- The recliner's back and seat tip back with the sitter riding them and the footrest swings up for relax and doze,
+  the sitter's legs out along it (2026-10-21);
   the rocking chair rocks with its rider for relax and read and stops after; the bean bag flattens for flop (a
   sitting flop at seat 0.3 m, not a lie); the designer lounge chair is still.
 - The leather armchair's "Read a book" is a sitting read (`"pose": "sit"`, as the wingback's), so the reader sits in

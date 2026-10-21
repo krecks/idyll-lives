@@ -159,6 +159,7 @@
       "id": "slob.gamingRecliner",
       "name": "Command-couch gaming recliner",
       "model": "model.slob.gamingRecliner",
+      "seat": { "height": 0.45, "forward": -0.02, "legs": "out", "recline": 22 },
       "footprint": [2, 1],
       "price": 2600,
       "category": "living",

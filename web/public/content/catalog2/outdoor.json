@@ -418,6 +418,7 @@
           "id": "tend",
           "label": "Tend the seedlings",
           "anim": "tend",
+          "inside": true,
           "minutes": 45,
           "effects": {
             "fun": 0.15,
@@ -437,6 +438,7 @@
           "id": "harvest",
           "label": "Pick tomatoes",
           "anim": "harvest",
+          "inside": true,
           "minutes": 20,
           "effects": {
             "hunger": 0.4
