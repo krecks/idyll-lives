@@ -144,7 +144,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters.ts:193` (`STEP_IN`: no entry for the whiteboard, so the user stays on the tile in front); `characters.ts:480` (`ACTIONS.paint`: `spell`, `interact`, hands at chest height); `web/public/content/catalog2/office.json:317-346` (`whiteboard`, wall layer, `plan`); `tools/art/blender/families/office.py:575-579` (the board 1.11–1.69 m up on the wall's face)
 - **Evidence:** `office/play/c1/whiteboard-plan-01.png`: the sim stands the resident at (10.5, 16.5) and the board's face is at z 17.92 (`office/play/c1/play.jsonl`), 1.4 m away; she makes the `paint` strokes at chest height in the air while the plan draws itself on the board. The child does the same, lower (`office/extra/child-whiteboard-plan-01.png`). Writing on a wall board is done at arm's length (about 0.4–0.5 m), the hand on the board at shoulder to head height. A `STEP_IN` entry (step up to the board, `to` about 0.45 m from the wall) with a raised-arm clip would place it; the clip is the `clip` half of the fix.
-- **Status:** open
+- **Status:** fixed (0c5e889e)
+- **After:** `STEP_IN.whiteboard`: stepped up to 0.5 m from the board's face, the paint strokes at its foot (`fixes/tables/play-a/a-whiteboard-plan-01.png`). The raised-arm stroke at shoulder to head height is the clip half (resident-clip wave).
 - **Source:** wave: office/kids
 
 ### I-office-05 — The gaming PC's desk has no surface: nothing can be put on it

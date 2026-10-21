@@ -67,6 +67,8 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
   sitting flop at seat 0.3 m, not a lie); the designer lounge chair is still.
 - The leather armchair's "Read a book" is a sitting read (`"pose": "sit"`, as the wingback's), so the reader sits in
   the chair while its cushion sinks.
+- Since the authenticity review (G-05): the lounge chair's seat is 0.44 (its cushion 0.45, sat a centimetre into), the
+  rocking chair's 0.46 (its cushion); the bean bag's 0.30 stays, sunk into on purpose.
 
 ## L3. Coffee and side tables (9)
 

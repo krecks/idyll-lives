@@ -334,7 +334,8 @@ Causes shared beyond this ledger, moved at the consolidation (2026-10-21): I-gar
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters.ts:527-528` (`ACTIONS.smell.stand`: `crouch` for every def); `clips/garden.ts:103-108` (`crouchPose`: the pelvis 0.42 m down, the head about 0.8 m up)
 - **Evidence:** `sheets/obj-garden.flowerBox.png` (smell): the resident crouches under the petunia trough, whose flowers are at 0.73 m, her head level with its side; `sheets/obj-garden.lilies.png`, `obj-garden.lupins.png`, `obj-garden.cosmos.png`: she crouches to the stems of flowers 0.9–1.0 m tall, below their heads. Fine for the low beds (tulips to pansies) and the pots. For things whose flowers are above about 0.7 m, a standing lean-in (the `pick` clip's lean without the hands, or `idle` with the head bent) fits.
-- **Status:** open
+- **Status:** fixed (425486ee)
+- **After:** `ACTIONS.smell` by def (`TALL_FLOWERS`): cosmos, the flower box, lavender, lilies, lupins, roses and the wheelbarrow smelt standing, a bloom held to the nose (`pick`); the low beds and pots still crouched to (`fixes/tables/play-a/a-garden.lilies-smell-01.png`, `a-garden.flowerBox-smell-01.png`, `a-garden.tulips-smell-01.png`).
 - **Source:** wave: garden
 
 ### I-garden-07 — "Admire the sunflowers" looks down at the soil under 2 m flowers

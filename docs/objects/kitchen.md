@@ -35,6 +35,8 @@ and heat up leftovers. Coffee is left to anyone (not an age rule yet).
 - `water_on` has no `hold`: it plays for the `wash` tag (both `wash` and `washUp`) and stops when the use ends.
 - Both are `dishes` stations: a cleared plate is rinsed here between the bin and the cupboard. Housegen keeps small
   things off sinks.
+- Since the authenticity review (G-15): at the farmhouse and double sinks the washer steps in (`STAND_BACK` -0.45),
+  the hands in the basin under the tap.
 
 ## K1. Fridges (7)
 
@@ -78,8 +80,10 @@ and heat up leftovers. Coffee is left to anyone (not an age rule yet).
 - The hob clips (`knob_on`, `burner_on`) last the whole use; `oven_open` shuts after its `hold` (3 s). Each shuts
   when the resident moves on.
 - Each oven has a dark cavity inside its door and the microwave is hollow, so an open door shows an oven, not a block.
-- Not right yet: at the microwave the resident's hands reach for the cabinet below, not the door (the shared `cook`
-  pose).
+- Since the authenticity review (G-08, G-15): the pan stands on the burner the cooker's clip lights (`STATION_SPOTS`:
+  the gas range's flame, the range cooker's middle ring, the hob counter's hot ring; the electric cooker's front ring
+  on the turning knob's side); the microwave is used stepped up to it on the counter's right (`STEP_IN`), the hands at
+  its door, not at the cabinet below.
 
 ## K3. Small appliances and dishwashers (4)
 
@@ -99,6 +103,8 @@ and heat up leftovers. Coffee is left to anyone (not an age rule yet).
   (`blades`, a loop) under the lifted lid.
 - The coffee machine's cup and stream, the toaster and both dishwashers' doors and racks play and shut as they should.
 - Coffee at the dining tables and chairs needs a working coffee machine on the same lot (`requires` / `provides`).
+- Since the authenticity review (G-15): toast and smoothies at the breakfast counter are made stepped in (`STAND_BACK`
+  -0.3), the hands on the top, with no squat to the floor.
 
 ## K4. Base counters (8)
 
@@ -147,6 +153,8 @@ and heat up leftovers. Coffee is left to anyone (not an age rule yet).
   (not autonomous, so generated houses play as before).
 - "Left bin" and "Right bin" are left and right as seen from the front.
 - The hood, spice rack, pot rail and wall shelves are still; looked at on all four walls.
+- Since the authenticity review (G-15): putting dishes away in a wall cabinet is a reach at the counter (`interact`),
+  with no squat to the floor; a reach up to its doors is a clip still to make.
 
 ## K6. Islands and bars (5)
 
@@ -254,5 +262,5 @@ and heat up leftovers. Coffee is left to anyone (not an age rule yet).
 - The bar cart's shaker lifts and tips towards the resident for "Mix a drink" and shuts after its `hold` (1.5 s).
 - The china cabinet's hutch back is the body's colour outside (blue only inside), so it reads standing free or with
   the wall cut away.
-- Not right yet: at the china cabinet the resident reaches low (the shared `fetch` pose) while the glazed door above
-  opens.
+- Not right yet: at the china cabinet the resident reaches at the waist while the glazed door above opens (a reach-up
+  clip still to make; since the authenticity review, G-15, at least no squat to the floor).

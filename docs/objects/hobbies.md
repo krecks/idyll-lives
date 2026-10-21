@@ -63,6 +63,7 @@ table face the room, as tables do.
   rail, a lane each for two); the foosball rods are turned at their handles (`foosball*`, at a pair of rods each).
   The cue isn't in the hands yet (props in hand, G-70): it is mimed.
 - With the cutaway dropping its wall, the dartboard hides with the wall and can still be used.
+- Since the authenticity review (G-05): the chess table's chair is sat on at its pad (0.475).
 
 ## H3. Crafts and science (7)
 
@@ -84,3 +85,5 @@ table face the room, as tables do.
 - The sewing table's "Table" colours its top and chair; "Legs" colours its legs, apron and drawer (dark wood as
   made).
 - At rest the pottery wheel's lump sits lower than a full pot.
+- Since the authenticity review (G-05, G-15): the sewing table's chair at its pad (0.475); at the chemistry bench,
+  pushed back on its tile, the experimenter steps in (`STAND_BACK` -0.35), the hands on the top.

@@ -156,9 +156,30 @@ const DEFAULT_SEAT: Seat = FURNITURE.defaultSeat;
  * How far back (m) a Sim stands from the middle of the tile in front while using an object whose
  * clip opens something across that tile: a dishwasher's door drops 0.44 m into it; a sofa bed's
  * mattress, pulled out or folded away, reaches half a metre past it. Negative: steps in to a thing
- * smaller than its tile (the herb planter, 0.46 m deep, is picked from as from a counter).
+ * smaller than its tile (the herb planters, 0.4–0.46 m deep, are picked from as from a counter), or to
+ * the part used: the toes at a basin or a sink's cabinet, the hands over the water; up to the toaster and
+ * the blender on a counter, the chemistry bench pushed back on its tile, the clock's trunk door, the
+ * giving jar. Back from the statue, to look up at it.
  */
-const STAND_BACK: Record<string, number> = { dishwasher: 0.15, dishwasherCompact: 0.15, sofaBed: 1, 'garden.herbs': -0.5 };
+const STAND_BACK: Record<string, number> = {
+  dishwasher: 0.15,
+  dishwasherCompact: 0.15,
+  sofaBed: 1,
+  'garden.herbs': -0.5,
+  'foodie.herbGarden': -0.5,
+  sink: -0.35,
+  sinkPedestal: -0.5,
+  sinkConsole: -0.45,
+  sinkVessel: -0.45,
+  vanityDouble: -0.45,
+  farmhouseSink: -0.45,
+  counterSinkDouble: -0.45,
+  breakfastCounter: -0.3,
+  chemistrySet: -0.35,
+  grandfatherClock: -0.6,
+  'kind.givingJar': -0.4,
+  townStatue: 0.8,
+};
 /**
  * Things hugged (the giant teddy, sitting on the floor): the hugger crouches down to it this far (m) from
  * the middle of the tile in front and wraps the arms round it
@@ -173,13 +194,14 @@ const CROUCH_SHOULDER = 0.55;
  * Things used from inside or right up against them, while sim-core stands their users on the tile in front
  * (`stepIn`): they step up to the object (walking) and use it there, and step back out to the tile when
  * done (`stepOut`). `by`: by the user's height (m, the tallest first), the clip played there instead of
- * the action's, and where: the feet `to` m from the object's middle (along its facing), `up` m above the
- * ground (the clips in `street.ts` are fitted to the drinking fountain and the climbing frame for each
- * size), and at one of `lanes`, m to the object's right of its middle: the first no one else using it has
- * taken (sim-core stands everyone using it on the same tile in front, of a 2-wide thing the one with the
- * lower x or z: the climbing frame's net side or its pole's, by its facing). `wait`: seconds into the use
- * before stepping in (the phone box's door opening first; its clip `delay`s so that they stand `back` m
- * back from the tile's middle first, clear of the door), and `out` seconds after the use before stepping
+ * the action's (none: the action's own, up at the part used), and where: the feet `to` m from the object's
+ * middle (along its facing), `up` m above the ground (the clips in `street.ts` are fitted to the drinking
+ * fountain and the climbing frame for each size), and at one of `lanes`, m to the object's right of its
+ * middle: the first no one else using it has taken (sim-core stands everyone using it on the same tile in
+ * front, of a 2-wide thing the one with the lower x or z: the climbing frame's net side or its pole's, by
+ * its facing). `wait`: seconds into the use before stepping in (the phone box's door opening first; its
+ * clip `delay`s so that they stand `back` m back from the tile's middle first, clear of the door), and
+ * `out` seconds after the use before stepping
  * out (the door opening again, `out` in its motions). `perLane`: the clips are one per lane, not a sequence (each
  * lane's round goes its own way: the climbing frame's, round to its pole and back).
  */
@@ -205,6 +227,18 @@ const STEP_IN: Record<string, StepIn> = {
   'hotHeaded.smashBin': { by: SMASH.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
   'energetic.boulderingWall': { by: BOULDER.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: [0] },
   yogaMat: { by: [[0, ['yoga'], YOGA_AT]] },
+  // Up to the board on the wall (its face 0.42 m behind the middle), the hands at it.
+  whiteboard: { by: [[0, [], { to: 0.1 }]] },
+  // Into the shelter at the timetable's end, on the back glass past the bench.
+  busStop: { by: [[0, [], { to: 0.2 }]], lanes: [-0.95] },
+  // At the feeder's post, at its back left, clear of the bird bath.
+  'kind.songbirdFeeder': { by: [[0, [], { to: 0.25 }]], lanes: [-0.2] },
+  // At the microwave on the counter's right, the hands at its door.
+  microwave: { by: [[0, [], { to: 0.55 }]], lanes: [-0.2] },
+  // At the mic stand, singing into it.
+  'cheerful.karaokeMachine': { by: [[0, [], { to: 0.45 }]], lanes: [0.18] },
+  // Up on the stage, each at a mic stand.
+  'outgoing.karaokeStage': { by: [[0, [], { to: 0.36, up: 0.146 }]], lanes: [-0.36, 0.36] },
 };
 /** One clip played alone (`StepIn.perLane`), by name. */
 const LANE_SEQ = new Map<string, readonly string[]>();
@@ -251,6 +285,8 @@ interface Seat {
   back?: boolean;
   /** Legs stretched out along the seat (a chaise). */
   legsOut?: boolean;
+  /** With `legsOut`: the room (m) ahead of the hips for the legs (a short tub): the heels stop there, the knees drawn up. */
+  room?: number;
   /**
    * Facing along the object, a quarter turn from its front: towards its right (1) or its left (-1), `fwd`
    * then being along that way (a bath, sat in lengthways).
@@ -286,7 +322,7 @@ interface Bed {
 /** Bunk beds (content `bunk`): mattress tops of the lower and the upper bunk, `[lower, upper]`. */
 const BUNKS: Record<string, readonly number[]> = FURNITURE.bunks;
 /** Beds whose sleepers get a blanket (pack hammocks, sofas and nap pods don't). */
-const BLANKET_BEDS = new Set(['bed', 'lazy.snoozecloudBed', 'bedSingle', 'bedBunk', 'bedFuton', 'bedKing', 'bedDouble', 'bedQueenUpholstered', 'bedCanopy', 'kidsBed', 'kidsBedCar', 'wallBed']);
+const BLANKET_BEDS = new Set(['bed', 'lazy.snoozecloudBed', 'bedSingle', 'bedBunk', 'bedFuton', 'bedKing', 'bedDouble', 'bedQueenUpholstered', 'bedCanopy', 'kidsBed', 'kidsBedCar', 'wallBed', 'bedDaybed']);
 /**
  * Two sleepers' quilts in a wide bed (`writeBlanket`): each this much (m) wider on each side than half the bed
  * and moved this much towards its middle, so they overlap by four times it over the middle.
@@ -452,26 +488,41 @@ const HANDS = {
  * - `stand`: clip sequence while standing at the object (looped; looping clips play ~4 s per step);
  *   a function picks one by object def;
  * - `sit`: seated clip (default `sit`), or a function of the object def;
- * - `upper`: upper-body layer while seated (`eat` and `drink` play now and then);
+ * - `upper`: upper-body layer while seated (`eat` and `drink` play now and then), or a function of the
+ *   object def ('' for none);
  * - `hands`: finger pose, or a function of the object def.
  * Procedural layers on top (reclining, instruments, gazes, ...) are in `activityPose`.
  */
 interface ActionAnim {
   stand?: readonly string[] | ((def: string) => readonly string[]);
   sit?: string | ((def: string) => string);
-  upper?: string;
+  upper?: string | ((def: string) => string);
   hands?: number | ((def: string) => number);
 }
+/** Calls made to a screen (`phone`): talked to it, hands free, not with a phone at the ear. */
+const VIDEO_CALLS = new Set(['outgoing.videoCallNook', 'cheerful.partyBooth']);
+/** Waist-high things tended standing, leaning in (the herb planter's `pick`): the greenhouse's staging, the herb trough, the compost bin. */
+const WAIST_HIGH = new Set(['greenhouse', 'foodie.herbGarden', 'compostBin']);
+/** Crops picked down at the soil (strawberries, pumpkins, a meadow's flowers): the `plant` clip's crouch, not the bend over a bush. */
+const LOW_CROPS = new Set(['garden.strawberries', 'garden.pumpkins', 'garden.meadow']);
+/** Flowers that bloom above about 0.7 m, smelt leaning in standing, a bloom held to the nose (`pick`), not crouched under. */
+const TALL_FLOWERS = new Set(['garden.cosmos', 'garden.flowerBox', 'garden.lavender', 'garden.lilies', 'garden.lupins', 'garden.roses', 'garden.wheelbarrow']);
+/** Toys played with down on the floor at the box (`kneel`, as the play mat and the doll house). */
+const FLOOR_TOYS = new Set(['toyBox', 'toyChest']);
+/** Wall cupboards: things put away up in them (no squat to the floor). */
+const WALL_CUPBOARDS = new Set(['wallCabinet', 'wallCabinetGlass', 'wallCabinetCorner', 'chinaCabinet']);
 const ACTIONS: Record<string, ActionAnim> = {
   eat: { stand: ['eat', 'idle'], upper: 'eat', hands: HANDS.hold },
   // Sips from a cup, spaced out.
   drink: { stand: ['drink', 'idle', 'idle'], upper: 'drink', hands: HANDS.hold },
   cook: {
-    stand: ['spell', 'interact', 'spell', 'pickUp'],
+    // (At an appliance on a counter, the microwave, the toaster: at it, not down at the floor.)
+    stand: (def) => (def === 'microwave' || def === 'breakfastCounter' ? ['spell', 'interact'] : ['spell', 'interact', 'spell', 'pickUp']),
     sit: 'sitHands',
     hands: HANDS.hold,
   },
-  wash: { stand: ['spell', 'interact'], hands: HANDS.relaxed },
+  // (Seated at the dressing table, getting ready: a hand up at the hair, the phone clip's.)
+  wash: { stand: ['spell', 'interact'], upper: (def) => (def === 'dressingTable' ? 'phone' : ''), hands: HANDS.relaxed },
   shower: { stand: ['spell', 'interact', 'idle'], hands: HANDS.open },
   bath: { hands: HANDS.open },
   toilet: { hands: HANDS.relaxed },
@@ -481,12 +532,15 @@ const ACTIONS: Record<string, ActionAnim> = {
   relax: { stand: ['idle', 'foldArms'], hands: HANDS.open },
   type: { stand: ['spell'], sit: 'sitHands', hands: HANDS.keys },
   write: { stand: ['interact', 'spell'], sit: (def) => (NEAR_DESKS.has(def) ? 'sitHandsNear' : 'sitHands'), hands: HANDS.hold },
-  read: { stand: ['lantern'], upper: 'lantern', hands: HANDS.hold },
+  // (A notice board or a timetable is read looking at it, not at a book in the hands.)
+  read: { stand: (def) => (def === 'noticeBoard' || def === 'busStop' ? ['idle'] : ['lantern']), upper: 'lantern', hands: HANDS.hold },
   watch: { stand: ['foldArms', 'idle'], hands: HANDS.open },
   // Darts thrown and the table-tennis bat swung (mimed, closed hands: `clips/games.ts`); the pool table and the foosball
-  // rods have their clips in `STEP_IN`; other games (the arcade's panel, toys) the hands busy at it.
+  // rods have their clips in `STEP_IN`; toys down on the floor at the box; crouched at the low train table, the hands at
+  // its track; other games (the arcade's panel) the hands busy at it.
   play: {
-    stand: (def) => (def === 'dartboard' ? ['dartThrow'] : def === 'pingPongTable' ? ['pingPong'] : ['spell']),
+    stand: (def) =>
+      def === 'dartboard' ? ['dartThrow'] : def === 'pingPongTable' ? ['pingPong'] : FLOOR_TOYS.has(def) ? ['kneel'] : def === 'trainTable' ? ['crouch'] : ['spell'],
     sit: 'sitHands',
     hands: (def) => (def === 'dartboard' || def === 'pingPongTable' || def === 'poolTable' || def === 'foosball' ? HANDS.grip : HANDS.keys),
   },
@@ -500,7 +554,7 @@ const ACTIONS: Record<string, ActionAnim> = {
         ? ['punchJab', 'punchCross']
         : def.includes('fitnessGame')
           ? ['dance', 'punchJab', 'punchCross']
-          : def.includes('streetball')
+          : def.includes('streetball') || def === 'basketballHoop'
             ? ['pickUp', 'interact']
             : // Stretching (and, `choose`, bouncing and vibrating): the idle with `activityPose` on top.
               def.includes('sunrise')
@@ -513,26 +567,35 @@ const ACTIONS: Record<string, ActionAnim> = {
   lift: { stand: ['pickUp'], hands: HANDS.grip },
   dance: { stand: ['dance'], hands: HANDS.relaxed },
   talk: { stand: ['talk'], hands: HANDS.relaxed },
-  // The phone clip's hand at the mouth reads as a microphone.
-  sing: { stand: ['talk'], upper: 'phone', hands: HANDS.hold },
+  // At the mic stand (`STEP_IN`), the hands free.
+  sing: { stand: ['talk'], hands: HANDS.relaxed },
   clean: {
     stand: (def) => (def.includes('Mop') || def.includes('Vacuum') ? ['push'] : def.includes('laundry') ? ['spell', 'interact', 'pickUp'] : ['interact', 'spell']),
     hands: HANDS.hold,
   },
   // Gardening, by task (older content and packs: `garden`).
   water: { stand: ['water'], hands: HANDS.hold },
-  tend: { stand: ['kneel'], hands: HANDS.relaxed },
+  // Kneeling at the soil; a waist-high thing leant over standing, the staked tomatoes tied up standing, a
+  // raised bed's soil bent over.
+  tend: {
+    stand: (def) =>
+      WAIST_HIGH.has(def) ? ['pick'] : def === 'garden.tomatoes' ? ['harvest', 'water'] : def === 'raisedBed' || def === 'natureLover.veggieBed' ? ['harvest'] : ['kneel'],
+    hands: HANDS.relaxed,
+  },
   // The baby picked up out of the crib and held (`CUDDLE`).
   cuddle: { stand: ['idle'], hands: HANDS.relaxed },
-  // (From the waist-high herb planter, standing.)
-  harvest: { stand: (def) => (def === 'garden.herbs' ? ['pick'] : ['harvest', 'plant']), hands: HANDS.hold },
+  // (From the waist-high herb planter, standing; low crops crouched down to the soil.)
+  harvest: { stand: (def) => (def === 'garden.herbs' ? ['pick'] : LOW_CROPS.has(def) ? ['plant', 'kneel'] : ['harvest', 'plant']), hands: HANDS.hold },
   prune: { stand: ['interact', 'spell', 'interact'], hands: HANDS.grip },
   garden: {
-    stand: (def) => (def === 'plant' || def.includes('Terrarium') || def.includes('bonsai') ? ['water'] : ['harvest', 'plant']),
+    // (The bird feeder's box on its post: reached for standing at it.)
+    stand: (def) =>
+      def === 'plant' || def.includes('Terrarium') || def.includes('bonsai') ? ['water'] : def === 'kind.songbirdFeeder' ? ['interact', 'spell'] : ['harvest', 'plant'],
     hands: HANDS.hold,
   },
   tinker: {
-    stand: ['interact', 'spell', 'pickUp'],
+    // (The longcase clock wound at its trunk door, its weights' chains: no stoop to the floor.)
+    stand: (def) => (def === 'grandfatherClock' ? ['interact', 'spell'] : ['interact', 'spell', 'pickUp']),
     sit: 'sitHands',
     hands: HANDS.grip,
   },
@@ -540,18 +603,19 @@ const ACTIONS: Record<string, ActionAnim> = {
     stand: (def) => (def === 'telescope' ? ['rail'] : ['idle', 'foldArms']),
     hands: HANDS.relaxed,
   },
-  // Down to low flowers / up into a tree's crown (`activityPose` turns the head).
-  smell: { stand: ['crouch'], hands: HANDS.relaxed },
+  // Down to low flowers, leaning in to tall ones / up into a tree's crown (`activityPose` turns the head).
+  smell: { stand: (def) => (TALL_FLOWERS.has(def) ? ['pick'] : ['crouch']), hands: HANDS.relaxed },
   admire: { stand: ['idle', 'foldArms'], hands: HANDS.relaxed },
-  phone: { stand: ['phone'], upper: 'phone', hands: HANDS.hold },
+  phone: { stand: ['phone'], sit: (def) => (VIDEO_CALLS.has(def) ? 'sitTalk' : 'sit'), upper: (def) => (VIDEO_CALLS.has(def) ? '' : 'phone'), hands: HANDS.hold },
   listen: { stand: ['idle', 'foldArms'], hands: HANDS.open },
   meditate: { stand: ['idle'], hands: HANDS.open },
-  idle: { stand: ['idle'], hands: HANDS.relaxed },
+  // (A coin into the giving jar.)
+  idle: { stand: (def) => (def === 'kind.givingJar' ? ['interact', 'idle'] : ['idle']), hands: HANDS.relaxed },
   // A visitor at the front door: a knock, then waiting.
   knock: { stand: ['interact', 'idle'], hands: HANDS.relaxed },
   // Cooking, step by step (content `recipes`): ingredients from the fridge, chopping on the board,
   // stirring the pan, turning things on the grill, putting a dish down.
-  fetch: { stand: ['interact', 'pickUp', 'idle'], hands: HANDS.hold },
+  fetch: { stand: (def) => (WALL_CUPBOARDS.has(def) ? ['interact', 'idle'] : ['interact', 'pickUp', 'idle']), hands: HANDS.hold },
   chop: { stand: ['chop', 'interact', 'chop'], hands: HANDS.grip },
   stir: { stand: ['stir', 'interact', 'stir'], hands: HANDS.hold },
   flip: { stand: ['flip', 'interact', 'flip'], hands: HANDS.grip },
@@ -560,6 +624,20 @@ const ACTIONS: Record<string, ActionAnim> = {
 
 /** The prop drawn on a station's top while a Sim works there (by action tag; `tool.*` models). */
 const STATION_PROPS: Record<string, string> = { chop: 'tool.board', stir: 'tool.pan', flip: 'tool.grillFood' };
+/**
+ * Where on a station its prop goes, by object def and action tag (else the top's middle, a little towards the
+ * cook): m to its right and forward of its middle (its own frame), and the height it stands at. The pan on the
+ * burner the cooker's clip lights (its flame or hot ring); the grill station's chopping on its free counter, off
+ * the grate.
+ */
+const STATION_SPOTS: Record<string, Partial<Record<string, readonly [x: number, z: number, y: number]>>> = {
+  stoveGas: { stir: [-0.26, 0.02, 0.9] },
+  // (No ring lights on it: the front one on the side of the knob that turns.)
+  stoveElectric: { stir: [-0.16, -0.02, 0.9] },
+  rangeCooker: { stir: [0, 0.03, 0.915] },
+  cooktopCounter: { stir: [0.16, -0.22, 0.955] },
+  grillStation: { chop: [0.6, -0.05, 0.905] },
+};
 /** How far (m, body scale) below the palms' centres a carried thing's base rests. */
 const HOLD_DROP = 0.02;
 /** The palm centre's offset from the wrist (left hand, body scale) for sets without `grip`. */
@@ -2108,12 +2186,19 @@ export class Characters {
 
   /**
    * The tool on the station Sim row `i` cooks at (a chopping board, a pan, food on the grill; by
-   * action tag): on its top, a little towards the cook.
+   * action tag): at its spot (`STATION_SPOTS`), else on its top, a little towards the cook.
    */
   private writeTool(rig: SimRig, i: number, tag: string, station: PlacedObject | null | undefined): void {
     const key = station ? (STATION_PROPS[tag] ?? null) : null;
     const m = this.writeProp(this.toolProp, i, key);
     if (!m || !station) return;
+    const spot = STATION_SPOTS[station.def]?.[tag];
+    if (spot) {
+      const f = (station.rot * Math.PI) / 2;
+      const [x, z, y] = spot;
+      this.placeProp(m, i, station.cx + x * Math.cos(f) + z * Math.sin(f), rig.floorY + y, station.cz - x * Math.sin(f) + z * Math.cos(f), rig.yaw, 1);
+      return;
+    }
     const def = this.content?.object(station.def);
     const top = def?.surface?.height ?? this.content?.cooking.defaultSurfaceHeight ?? 0.9;
     const dx = rig.x - station.cx;
@@ -2607,7 +2692,7 @@ export class Characters {
       rootFwd += this.tuckIn(rig, obj, seat, key !== 'sitDown', step, fresh);
       if (key === 'sitHands' && rig.tuckFar) key = 'sitHandsFar';
       if (!social) {
-        const up = known ? act?.upper : obj?.def === 'diningTable' ? 'eat' : undefined;
+        const up = known ? (typeof act?.upper === 'function' ? act.upper(rig.useDef) : act?.upper) : obj?.def === 'diningTable' ? 'eat' : undefined;
         // Eating / drinking now and then; holding a book or phone throughout.
         if (up === 'eat' || up === 'drink') upper = Math.floor((rig.actTime + rig.seed * 9) / 4) % 3 === 0 ? up : '';
         else if (up) upper = up;
@@ -2688,9 +2773,10 @@ export class Characters {
       rig.useObj = obj ?? null;
       // Used from inside or up against it (`STEP_IN`): the clip for their height.
       const into = known && obj ? STEP_IN[obj.def] : undefined;
+      const fitted = into ? this.stepSeq(rig, into) : undefined;
       // (Bouncing and vibrating on the equipment, content `stand`: the idle with `activityPose` on top.)
-      const seq = into
-        ? this.stepSeq(rig, into)
+      const seq = fitted?.length
+        ? fitted
         : known
         ? obj && HUGGED[obj.def]
           ? CROUCH_ONLY
@@ -3239,7 +3325,7 @@ export class Characters {
     if (pose === Pose.Sit && key !== 'sitDown') {
       const seat = rig.useObj?.seat;
       if (seat?.pedals) this.pedal(rig, seat.pedals);
-      else if (seat?.legsOut) this.legsOut(rig);
+      else if (seat?.legsOut) this.legsOut(rig, seat.room);
       switch (rig.tag) {
         case 'sit':
           // Just sitting: upright, but against a slanted back (`recline`).
@@ -3471,13 +3557,15 @@ export class Characters {
 
   /**
    * Legs out along the seat (content `seat.legs`: a chaise): nearly straight, the heels on it, the toes up;
-   * leant back against the back, the head up to look along the legs.
+   * leant back against the back, the head up to look along the legs. In a short tub (`Seat.room`) the heels
+   * stop at its end and the knees come up.
    */
-  private legsOut(rig: SimRig): void {
+  private legsOut(rig: SimRig, room = Infinity): void {
     const fits = this.legFits.get(rig.body.name)?.get(rig.cur.key);
     if (!fits) return;
     const B = this.set!.bone;
     const w = smooth(rig.w);
+    const reach = room / rig.scale;
     addRotation(this.add, B.spine_01, 1, 0, 0, -0.2 * w);
     addRotation(this.add, B.spine_02, 1, 0, 0, -0.08 * w);
     addRotation(this.add, B.Head, 1, 0, 0, 0.18 * w);
@@ -3486,7 +3574,7 @@ export class Characters {
       [fits.r, B.thigh_r, B.calf_r, B.foot_r, 0.93],
     ] as const) {
       // The ankles a heel's height above the seat, the hips' joints being higher (`seatDrop`).
-      const turn = this.legTo(fit, fit.hy - LEGS_OUT_DROP, fit.hz + (fit.l1 + fit.l2) * bend);
+      const turn = this.legTo(fit, fit.hy - LEGS_OUT_DROP, fit.hz + Math.min((fit.l1 + fit.l2) * bend, reach));
       addRotation(this.add, thigh, 1, 0, 0, turn[0] * w);
       addRotation(this.add, calf, 1, 0, 0, turn[1] * w);
       addRotation(this.add, foot, 1, 0, 0, -(turn[0] + turn[1]) * 0.25 * w);

@@ -167,7 +167,8 @@ Not tied to one row: M-lighting-01, M-lighting-02 (every lamp).
 - **Fix class:** content
 - **Where:** `web/public/content/furniture.json:4337` (`tableLamp` `light.height` 0.95)
 - **Evidence:** `cargo check-glb` heights warning: "light 0.95 m, outside the lamp there (its model 0.13 to 0.85 m at x -0.12)": the shade's top is 0.85 m, so the light shines from the air above it. At night the pool looks right (`lighting/night/c1/tableLamp-no-uses.png`), but the light's height sets where the wall disc lands. About 0.75 (inside the shade) fixes it.
-- **Status:** open
+- **Status:** fixed (a920f174)
+- **After:** `tableLamp` `light.height` 0.75, inside the shade (0.13–0.85 m); its heights warning gone.
 - **Source:** wave: lighting
 
 ### I-lighting-01 — moved to systems.md

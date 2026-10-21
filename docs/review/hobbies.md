@@ -232,7 +232,8 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters/furniture.json:7` (`chessTable` h 0.46), `:45` (`sewingTable` h 0.46); the pad's top 0.475 m (`tools/art/blender/families/hobbies.py:261`, `_chair`)
 - **Evidence:** `sizes-hobbies.md` measures both seats at 0.48 (0.475 in the family script); the renderer sits the resident at 0.46, 1.5 cm into the pad, outside the 1 cm tolerance the owner approved after the pilot (the pilot's M-hobbies-02 found the chess seat "fine" before that). One number each; neither content has a `seat` the heights check could compare.
-- **Status:** open
+- **Status:** fixed (a920f174)
+- **After:** `seats.chessTable` and `sewingTable` 0.475, the pads' tops (`fixes/tables/play-b/b-chessTable-chess-01.png`, `b-sewingTable-sew-01.png`).
 - **Source:** wave: hobbies
 
 ### A-hobbies-01 — moved to systems.md
@@ -329,5 +330,6 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters.ts:160` (`STAND_BACK`, where a negative value steps the user in: `garden.herbs` −0.5; nothing for `chemistrySet`); the bench pushed back on its tile, `tools/art/blender/families/hobbies.py:1488` (`centre` −0.18, the top 0.5 m deep)
 - **Evidence:** `hobbies/extra/side1.png` (side): the resident stands about 0.6 m off the bench's front edge; reaching (`interact`) only the fingertips get to the edge (`hobbies/extra/stand3.png`, beside the pilot's workbench and easel, where the hands are on the work), never the flasks or the microscope at the back. A child stands as far off, the top at her head (`hobbies/extra/child2.png`). About −0.35 in `STAND_BACK` brings them to the bench.
-- **Status:** open
+- **Status:** fixed (0c5e889e)
+- **After:** `STAND_BACK.chemistrySet` -0.35: at the bench, the hands on its top among the flasks (`fixes/tables/play-a/a-chemistrySet-experiment-01.png`).
 - **Source:** wave: hobbies

@@ -4350,7 +4350,7 @@
       "light": {
         "range": 3.5,
         "intensity": 0.8,
-        "height": 0.95,
+        "height": 0.75,
         "at": [
           -0.12,
           0

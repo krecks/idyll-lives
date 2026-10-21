@@ -54,6 +54,8 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 - The hammock is lain across its 2x1 sling; the hammock's throw is left out.
 - The jukebox takes 4 draws (the spinning label is a part inside the record, so it swings up with it).
 - The booth's curtain is gathered along its rail, not hinged: swung, it would sweep through the backrest.
+- Since the authenticity review (G-04): the karaoke singer steps up to the machine's mic stand (`STEP_IN`), the hands
+  free; the party booth's video party is talked to the laptop (`sitTalk`), not a phone at the ear.
 
 ## P3. Couch potato (6)
 
@@ -139,6 +141,8 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 - The chef's island's top is at 0.9 m (content `surface.height`), its own height; the other kitchen worktops are
   0.95 m. Its stools' legroom runs right through under the drawer bank.
 - The herb garden has no worktop; its second colour part is the pots.
+- Since the authenticity review (G-14): the herb trough is tended standing at it, leaning in (`pick`, `STAND_BACK`
+  -0.5), not kneeling.
 
 ## P7. Gloomy (6)
 
@@ -164,6 +168,8 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
   up. Two sitters still fit for brood.
 - At the journal desk the writer's hands rest on the top (`sitHandsNear`), not under its apron; the apron runs only
   along the far edge and the ends.
+- Since the authenticity review (G-06): the soaking tub's bather sits on its floor at the back, the knees drawn up
+  inside (`Seat.room`).
 
 ## P8. Hot-headed (6)
 
@@ -186,6 +192,9 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
   (mimed) and thrown overarm down into the crate.
 - Each model has one colour part, Body: the bag, the crate, the shells, the zafu, the desk's wood, the cedar
   cladding.
+- Since the authenticity review (G-05, G-06): the plunger sits on the tub's floor at the back, the knees up and the
+  feet inside its front wall (`Seat.room`); the drum stool is sat on at its pad (0.475), the cool-down cushion at its
+  top (0.45).
 
 ## P9. Kind (6)
 
@@ -207,6 +216,9 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
   "someone is using the hearthside quilted settee" while someone sits there; two can still sit for curlUp.
 - The coin stays in the jar while the resident is at it and comes back up into the slot when the use ends.
 - The tea table's two poufs colour apart (Fabric, Second pouf); the settee's cushions take its Body colour.
+- Since the authenticity review (G-05, G-15): the hearth settee's napper lies on its cushion (0.36); the feeder is
+  filled stepped in to its post (`STEP_IN`, clear of the bird bath), the hands at the post (a reach up to the box is a
+  clip still to make); a coin goes into the giving jar from beside it (`interact`).
 
 ## P10. Lazy (6)
 
@@ -312,6 +324,8 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 - Seen, not changed: the party bar's "Back bar" colours the low back cabinet, not the bottle shelves above it. Its
   flutes and tap handle are on the Body material, so they take the Body colour.
 - Nothing glows at night (the dance floor's tiles and the photo wall's string lights could take a `glow`).
+- Since the authenticity review (G-04): the video call is talked to the screen (`sitTalk`), the hands free; on the
+  karaoke stage each singer steps up onto it to a mic stand (`STEP_IN`, the lyrics screen ahead).
 
 ## P15. Romantic (6)
 
@@ -332,6 +346,8 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 - At the letter bureau the hands rest on the top (`sitHandsNear`).
 - Known: seated bathers in the heart tub put their shins through the front of the shell where the heart narrows
   (the 0.35 m seat pose).
+- Since the authenticity review (G-06): the two bathers sit on the heart tub's floor at the back, the knees drawn up,
+  the feet inside its front wall (`Seat.room`).
 
 ## P16. Slob (6)
 

@@ -435,7 +435,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters.ts:501` (`ACTIONS.sing`: `talk` with the `phone` clip's hand at the mouth as a microphone)
 - **Evidence:** `systems/sheets/act-dance-sing-listen.png` (`packs/play/chunk3/cheerful.karaokeMachine-sing-01.png`, `packs/play/chunk4/outgoing.karaokeStage-perform-01.png`): at the karaoke machine the singer stands to one side of its mic stand, an empty hand held to the mouth; on the karaoke stage they stand at the front edge, the two mic stands behind them. A singer at a stand sings into it, hands on the stand or free; a karaoke singer holds the machine's microphone (a prop: I-held-01's family).
-- **Status:** open
+- **Status:** fixed (0c5e889e)
+- **After:** `STEP_IN` steps the singer up to the karaoke machine's mic stand (lane 0.18) and onto the stage to one of its two stands (`up` 0.146), the hands free (`ACTIONS.sing` without the dead seated `phone` layer): `fixes/tables/play-a/a-cheerful.karaokeMachine-sing-01.png`, `a-outgoing.karaokeStage-perform-01.png`. The machine's microphone in the hand is the props wave's.
 - **Source:** wave: cross-cutting
 
 ### I-residents-03 — Standing uses with no reach to the part used: the bird feeder, the giving jar, the statue
@@ -445,7 +446,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters.ts:514-517` (`ACTIONS.garden`: `water` for the feeder), `:529` (`admire`: `idle`, `foldArms`), `:533` (`idle`)
 - **Evidence:** `systems/sheets/act-write-garden-bath.png`, `systems/sheets/act-phone-meditate-idle.png` (the packs and community waves' play shots): "Refill the feeder" is the watering clip at knee height beside the bird bath, a metre under the 1.5 m feeder box; "Donate" at the giving jar stands by it with the hands at the sides; "Admire the statue" stands with the face to its plinth, the statue 2 m over the head, never looked up at. The pond's "Feed the fish" and the shop counter's treat (served across it) fit. A reach to the part's height (`STEP_IN`-style sizes, or the `look` entry's head tilt) would fix each.
-- **Status:** open
+- **Status:** fixed (0c5e889e)
+- **After:** The feeder: `STEP_IN` to its post (lane -0.2, clear of the bird bath) and `ACTIONS.garden` by def (`interact`, `spell`), the hands at the post at chest height, no longer at knee height by the bird bath (`fixes/tables/play-b/b-kind.songbirdFeeder-*.png`); the box at 1.5 m wants a reach-up clip. The giving jar: stepped in (`STAND_BACK` -0.4), a coin in (`interact`) (`play-a/a-kind.givingJar-donate-*.png`). The statue: admired from 0.8 m further back, looking up at it (`STAND_BACK` 0.8).
 - **Source:** wave: cross-cutting
 
 Moved here at the consolidation (2026-10-21) from the ledgers they were first seen in, ids unchanged: the blankets and pyjamas, getting into bed, the bath outfit, and the `ACTIONS` entries and clips used by objects in several ledgers. Pilot evidence in them stays relative to `bench-results/review/pilot/`, the waves' to `bench-results/review/`, as in the ledgers they came from.
@@ -539,7 +541,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
   - Microwave, toaster, blender: "Heat up leftovers", "Make toast" and "Blend a smoothie" (`anim: cook`) are worked at the cabinet below while the microwave door (1.0–1.25 m) or the toaster's lever opens by itself on the top (`kitchen/play/c1/microwave-reheat-01.png`, `breakfastCounter-toast-01.png`); `docs/objects/kitchen.md` K2 already notes it for the microwave.
   - Putting clean dishes away (`fetch`) in a wall cabinet: its doors open at 1.44–2.2 m while the hands stay at the waist over the sink below (`kitchen/extra/putaway-wallCabinet-05.png`); the same for the three wall cabinets and the china cabinet's glazed top (K9 "Not right yet"); `pickUp` bends to the floor in it.
   Items: `farmhouseSink`, `counterSinkDouble`, `sink` (bathroom ledger), `microwave`, `breakfastCounter`, `wallCabinet`, `wallCabinetGlass`, `wallCabinetCorner`, `chinaCabinet`. A reach to the worktop (the `chop` clip's arms, without the board) for the sinks and appliances, and a reach up for the wall cupboards, by object def as `look` does, would fix all of them.
-- **Status:** open
+- **Status:** fixed (0c5e889e)
+- **After:** Sinks: `STAND_BACK` -0.45 (farmhouse, double), -0.35 (base sink): the hands in the basin (`fixes/tables/play-a/a-farmhouseSink-washUp-01.png`). Microwave: `STEP_IN` to it on the counter's right, the hands at its door; breakfast counter stepped in; neither squats to the floor (`ACTIONS.cook` by def). Wall cupboards and the china cabinet: `fetch` without the squat (`WALL_CUPBOARDS`). A reach up to a wall cupboard's doors needs a clip (resident-clip wave).
 - **Source:** wave: kitchen (play shots, `scratch/scene.mjs` put-away scene)
 
 ### I-garden-04 — Harvesting and tending don't follow the plant's height: the hand stops half a metre above low crops, and the tomatoes are tied up kneeling at the soil
@@ -556,7 +559,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
   - Harvest: `extra/harvest/s-garden.strawberries-harvest.png` and `s-garden.pumpkins-harvest.png`: the resident stands bent a little with the hand at the knees, 0.4–0.5 m above berries at 0.07 m and pumpkins at 0.2 m; nothing is touched. At the veg patch (0.4 m, `s-garden.vegPatch-harvest.png`) the hand is at the box's rim; at the tomatoes (1.2 m) it is in the plant, which is right. The meadow's "Pick a wildflower" plays the same clip over a 0.5 m patch (`play/c3/garden.meadow-pickFlower-01.png`). Low crops want the crouch the `plant` clip already has (`garden.ts:110-135`), or a deeper harvest pose.
   - Tend: "Tie up and water" at the tomatoes is the weeding kneel (`play/c3/garden.tomatoes-tend-01.png`): right while planted, wrong at a ripe, staked 1.2 m plant, which is tied up standing.
   - The same entries play at the outdoor ledger's `raisedBed` (hand at its rim, fine) and the packs ledger's `natureLover.veggieBed` (`tendVeggies`).
-- **Status:** confirmed and widened (consolidation: I-outdoor-04 and I-packs-06 merged)
+- **Status:** fixed (425486ee)
+- **After:** `ACTIONS.tend` and `harvest` by def: strawberries and pumpkins picked crouched at the soil (`plant`, `kneel`), the meadow's flower too; the staked tomatoes tied up and watered standing (`harvest`, `water`); the greenhouse staging, the compost bin and the herb trough tended standing, leaning in (`pick`); the raised beds bent over (`harvest`). `fixes/tables/play-a/a-compostBin-compost-01.png`, `a-foodie.herbGarden-tendHerbs-01.png`, `play-b/b-foodie.herbGarden-*.png`, `play-garden/`.
 - **Source:** wave: garden
 
 ### I-garden-02 — "Relax in the shade" is half an hour standing by the trunk

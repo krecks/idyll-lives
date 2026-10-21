@@ -292,7 +292,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters.ts:481-493` (`ACTIONS.exercise`: `jog` for every def but bags, the fitness game, boulders and `streetball`; `basketballHoop` falls through to `jog`); `tools/art/blender/families/playground.py:423` (the ball a still part on the ground)
 - **Evidence:** `sheets/obj-basketballHoop.png` (`play/basketballHoop-shoot-01.png`), `sheets/age-basketballHoop.png` (`play/child/basketballHoop-shoot-01.png`): the adult and the child jog on the spot at the ballast base, right under the backboard, for 40 minutes, the ball lying on the grass beside them; the net swishes every 3.2 s with no shot. The pack's `energetic.streetballHoop` already gets `pickUp` and `interact` (picking the ball up, a throw). Giving `basketballHoop` the same is a table change; a shot clip from 2–4 m out, with the ball held (I-held-01), is the real fix.
-- **Status:** open
+- **Status:** fixed (3cd0bf87)
+- **After:** `basketballHoop` takes the streetball hoop's `pickUp`, `interact` (`ACTIONS.exercise`): the ball picked up and reached with at the hoop, no jogging (`fixes/tables/play-a/a-basketballHoop-shoot-01.png`). A shot from 2–4 m out with the ball held is still the clip and props waves' (I-held-01).
 - **Source:** community wave (play)
 
 ### I-community-06 — Ping-pong is the hands-at-the-waist mime, the bats left on the table
@@ -313,7 +314,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters.ts:475` (`ACTIONS.read`: `lantern`, the book held at the chest, head down); `tools/art/blender/families/street_furniture.py:235` (the timetable on the back glass at x = -0.95 m, 1.45 m up)
 - **Evidence:** `sheets/obj-noticeBoard.png` (`play/shops-town/noticeBoard-read-01.png`): the reader stands before the board looking down at an open book that isn't there, not up at the notices. `sheets/obj-busStop.png` (`play/busStop-timetable-01.png`): the same pose on the tile in front of the shelter's middle, a metre to the side of the timetable and the bench between them. Reading a board is looking at it: `look` (or `read` chosen by object, as `look` is for the telescope) for boards; the timetable reader needs `approach` or a step in to the timetable's end.
-- **Status:** open
+- **Status:** fixed (0c5e889e)
+- **After:** `ACTIONS.read` by def: the notice board and the timetable are read looking at them (`idle`), not at a book; `STEP_IN.busStop` steps the reader into the shelter to the timetable's end (lane -0.95).
 - **Source:** community wave (play)
 
 ### I-community-08 — moved to systems.md
