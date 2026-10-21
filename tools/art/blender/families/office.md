@@ -6,8 +6,7 @@ entries in `packs/office/manifest.json`: the desks (`model.deskSimple`, `deskCor
 `officeChair`) and the storage and boards (`model.filingCabinet`, `whiteboard`, `corkboard`). Built
 2026-10-14; they sat in Validate › Desks, Office Chairs and Office Storage until checked in play.
 
-Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
-except the corner desk, which is centred. Backs against the wall stop at its face (game depth −0.43, −0.93 two tiles
+Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`). Backs against the wall stop at its face (game depth −0.43, −0.93 two tiles
 deep), so the simple, standing and executive desks' tops are 3 cm shallower than their content `surface` rectangle
 at the back. Desk tops are at the content's `surface` height: 0.74 (catalog2), 0.75 (the old part), 1.05 standing.
 
@@ -32,8 +31,14 @@ and its back the room. The chair is part of the still desk (no swivel) and its b
 - **Standing desk:** a keyboard shelf under the front slides 20 cm out to the standing resident (`tray_out`) for
   browse and code. Telescoping legs, the monitor on a stand at the back, the height buttons under the front right.
 - **Simple desk:** oak on hairpin legs, a drawer box under the right. Static.
-- **Corner desk:** a white top filling its 2 × 2 tiles but for the front-right corner, cut on the diagonal (the
-  old part's shape), on oak panels with a drawer pedestal. Static.
+- **Corner desk:** an L of two 0.7 m wings of white laminate along the back and the left of its 2 × 2 tiles (a room's
+  corner), the inner corner cut on the diagonal, on oak end panels and a modesty panel, a drawer pedestal under each
+  wing, and its own swivel chair (still) in the inner corner, turned to face the corner, both wings in reach:
+  content `places` `[0.11, 0.11]` facing -135, `seat` 0.44, write and homework as at the writing desk; its
+  `surface` is the back wing (1.86 × 0.7 m). 2026-10-21, review M-office-01: it was a 1.86 m square slab with one
+  corner cut, read as an island, a chair facing it from the front tiles at its edge or its front panel; generated
+  studies now take it on its own (`housegen.json`), not as a desk set with a chair. `_turned` sets the joined part
+  to Euler mode: a part whose first piece is a rod (`G.rod`) is in quaternion mode, which ignored the chair's turn.
 - **Executive desk:** walnut on two pedestals of three drawers with brass handles, a green leather pad. Its middle
   drawer is a part of its own but still: left decorative in 0.3.0, because its clip would need a seated use on the
   desk.
@@ -50,7 +55,7 @@ and its back the room. The chair is part of the still desk (no swivel) and its b
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
 | `model.deskSimple` | 1.50 × 0.74 × 0.69 m | 1,488 | 2 | Top, Frame, Drawers |
-| `model.deskCorner` | 1.86 × 0.74 × 1.86 m | 1,324 | 2 | Top, Frame, Drawers |
+| `model.deskCorner` | 1.86 × 1.01 × 1.86 m | 4,784 | 2 | Top, Frame, Drawers, Chair |
 | `model.deskStanding` | 0.96 × 1.54 × 0.63 m | 2,604 | 3 | Top, Frame, Shelf |
 | `model.deskExecutive` | 1.80 × 0.75 × 0.77 m | 2,624 | 2 | Top, Frame, Drawers, Handles, Desk pad |
 | `model.computerDesk` | 1.54 × 1.22 × 0.87 m | 6,728 | 3 | Top, Frame, Drawers, Keyboard tray, Chair |

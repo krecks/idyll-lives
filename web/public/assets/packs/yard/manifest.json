@@ -314,9 +314,6 @@
         },
         "brass": {
           "finish": "material.finish.metal"
-        },
-        "pipe": {
-          "finish": "material.finish.metal"
         }
       },
       "paint": [

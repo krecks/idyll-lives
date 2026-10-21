@@ -25,10 +25,10 @@ pulled up to the kids' table before the dining table (a seat made for their age 
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `crib` Crib | 2x1 · floor | lie:sleep feed:cuddle change:clean play:play cuddle:cuddle | kids / — | Frame, Bedding, Mobile | Use | `side_down`: the front rail slides down 25 cm for feed, change and cuddle, and back up. L `mobile`: the mobile turns slowly while a grown-up plays with the baby (E1, `loops.play`). |
+| `crib` Crib | 2x1 · floor | lie:sleep feed:cuddle change:change play:play cuddle:cuddle | kids / — | Frame, Bedding, Mobile | Use | `side_down`: the front rail slides down 25 cm for feed, change and cuddle, and back up. L `mobile`: the mobile turns slowly while a grown-up plays with the baby (E1, `loops.play`). An oblong cot (a 1.18 × 0.58 m mattress), the baby lying along it (`beds.crib` `across`), since 2026-10-21 (G-40: square). |
 | `kidsBed` Kids' bed | 1x2 · floor | sleep:sleep nap:nap | kids / — | Frame, Bedding | Use | `turn_down`, as the beds (rolling over low half way, 2026-10-21). |
 | `kidsBedCar` Race car bed | 1x2 · floor | sleep:sleep nap:nap | kids / — | Car body, Bedding | Use | `turn_down`, as the beds; the car body is static. |
-| `highChair` High chair | 1x1 · floor | — | kids / — | Frame, Bedding | Static | Static. (+use) the tray slides out. It has no use or sit yet; its `seatAt` would pull it in to the table it faces while sat on, as far as the knees fit under it. |
+| `highChair` High chair | 1x1 · floor | sit:sit feed:feed | kids / — | Frame, Bedding | Static | Static. (+use) the tray slides out. *Sit in the high chair* is a baby's (`baby`, put in by a carer, `carried`); *Feed the baby* is done from beside it. Its legs splay to 0.54 m each way since 2026-10-21 (G-40). |
 
 **In play** (signed off 2026-10-16):
 - Against the four walls of the family house's living room: the crib's front rail slides down for feed, change and
@@ -38,8 +38,14 @@ pulled up to the kids' table before the dining table (a seat made for their age 
 - The kids' bed and race car bed turn their duvet down for sleep and nap, a child lying in them under the game's
   quilt, and shut when the use ends. A child lies on the mattress, legs level with its top (`lieBack` scales with
   the body); the car bed's quilt ends at its bonnet (`BEDS` `foot`).
-- The high chair is still in all four facings. Nobody can eat from it: feeding a baby in a chair needs the sim first
-  (a baby is only ever placed lying).
+- The high chair is still in all four facings.
+- Since the authenticity review (G-66, 2026-10-21): by day "Feed the baby" at the crib, with a high chair on the lot,
+  is done at the high chair: the grown-up lifts the baby out of the cot (the cuddle's lift), carries them in the arms
+  (`CARRY`), lays them into the high chair, feeds them standing in beside it (`STAND_BACK` -0.5, `interact`/`spell`)
+  and carries them back to the cot; at night the feed stays at the crib, in the arms. "Change the baby" is done at
+  the changing table (`atSlot`): the carer stands in front of it, lifts the baby out of the cot onto the pad (laid
+  across it, `CHANGE`), works at them there and lays them back in the cot near the end (render only, as the cuddle).
+  `play --state review-baby` (fixes/babies-crops).
 - Known, not changed: the carer at the crib stands or kneels in different spots by facing, once a tile out in front
   of the changing table (slot positions and the shared "tend" pose).
 - Since the authenticity review (G-14, G-05): "Feed the baby" lifts the baby out and holds them, as the cuddle does
@@ -55,10 +61,10 @@ pulled up to the kids' table before the dining table (a seat made for their age 
 | `toyBox` Toy box | 1x1 · floor | play:play | kids / — | Body, Lid | Use | `lid_open`: the lid swings up 100° for play; `hold` 2 s. |
 | `toyChest` Toy chest | 1x1 · floor | play:play | kids / — | Body, Trim | Use | `lid_open`. Its text no longer says the lid is open (it opens only for play). |
 | `dollHouse` Doll house | 1x1 · floor | dolls:tend | kids / — | Walls, Roof | Use | `front_open`: the front wall swings 120° on its side hinge for the whole of dolls. |
-| `rockingHorse` Rocking horse | 1x1 · floor | ride:play | kids / — | Body, Trim | Loop (E1) | `rock`: rocks ±12° while ridden (E1), the rider riding it. |
-| `playTent` Play tent | 1x1 · floor | play:play | kids / — | Canvas, Poles | Use | `flap_open`: the door flap rolls up for play; the child crawls in and out through it (`STEP_IN`, `tentPlay112`). |
-| `ballPit` Ball pit | 1x1 · floor | jump:play | kids / — | Pit, Rim | Loop (E1) | `bounce`: a few balls bob while played in (E1); the child steps in over the rim (`STEP_IN` `over`, `ballPit112`). |
-| `trainTable` Train table | 2x1 · floor | trains:play | kids / — | Table, Train | Loop (E1) | `train`: the train runs round its ring of track (E1, a `spin` about the ring's middle). |
+| `rockingHorse` Rocking horse | 1x1 · floor | ride:play | kids / — | Body, Trim | Loop (E1) | `rock`: rocks ±12° while ridden (E1), the rider riding it. Ridden astride, the hands on the handle (`rideHorse112`). |
+| `playTent` Play tent | 1x1 · floor | play:play | kids / — | Canvas, Poles | Use | `flap_open`: the door flap rolls up for play. `flap_open`: the door flap rolls up for play; the child crawls in and out through it (`STEP_IN`, `tentPlay112`). |
+| `ballPit` Ball pit | 1x1 · floor | jump:play | kids / — | Pit, Rim | Loop (E1) | `bounce`: a few balls bob while played in (E1). `bounce`: a few balls bob while played in (E1); the child steps in over the rim (`STEP_IN` `over`, `ballPit112`). |
+| `trainTable` Train table | 2x1 · floor | trains:play | kids / — | Table, Train | Loop (E1) | `train`: the train runs round its ring of track (E1, a `spin` about the ring's middle). 1.24 m long since 2026-10-21 (G-40: 1.8). |
 | `playMat` Play mat | 1x1 · floor | blocks:tend | kids / — | Mat | Use | `blocks`: a tower of three blocks grows on the mat for blocks. |
 | `teddyBear` Giant teddy bear | 1x1 · floor | hug:relax | kids / — | Fur, Bow | Use | `squish`: the bear squashes a little for hug (T0 `squash`). The hugger crouches to it, arms round its neck, cheek on its head (`characters.ts` `HUGGED`). |
 | `beanBagKids` Kids' bean bag | 1x1 · floor | flop:relax | kids / — | Bag | Use | `squash`: the bag flattens 15% while sat on (T0 `squash`). |
@@ -78,7 +84,12 @@ pulled up to the kids' table before the dining table (a seat made for their age 
   kneels at the open flap, crawls in, sits back on the heels to play on the mat, and crawls back out each round
   (24 s). A beanbag or the kids' chair sits the child with the feet on the floor (G-20).
 - Since the authenticity review (G-14): the toy box and the toy chest are played at kneeling on the floor (`kneel`),
-  the train table crouched at its edge (`crouch`), not standing with the hands out over them.
+  not standing with the hands out over them; at the train table the players kneel up at its edge, a lane each (the
+  ring of track, the little town: `STEP_IN`, `kneelTable177`/`147`/`112`, clips/low.ts), the right hand pushing the
+  engine along the track and the left on the top, now and then moving a tree.
+- Since the authenticity review (G-04): a child on the kids' chair at the coffee table bends over it with both hands on
+  its top, drawing (`sitHandsLow177`/`147`/`112`, clips/low.ts: a top less than `LOW_TOP`, 0.2 m for a body of the
+  reference height, over the seat).
 
 ## KD3. Kids' study and art (6)
 

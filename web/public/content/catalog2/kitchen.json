@@ -266,6 +266,7 @@
         {
           "id": "washUp",
           "label": "Wash the dishes",
+          "workOn": "dishes",
           "anim": "wash",
           "minutes": 15,
           "effects": {
@@ -969,6 +970,7 @@
         {
           "id": "dishes",
           "label": "Run the dishwasher",
+          "workOn": "dishes",
           "anim": "clean",
           "minutes": 10,
           "effects": {
@@ -1015,6 +1017,7 @@
         {
           "id": "sortRecycling",
           "label": "Sort the recycling",
+          "workOn": "dishes",
           "anim": "clean",
           "minutes": 4,
           "effects": {

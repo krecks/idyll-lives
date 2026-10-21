@@ -38,16 +38,62 @@
       "price": 420,
       "category": "office",
       "group": "desks",
+      "places": [{ "at": [0.11, 0.11], "facing": -135 }],
+      "seat": {
+        "height": 0.44
+      },
       "surface": {
         "height": 0.74,
         "kind": "desk",
         "size": [
           1.86,
-          1.86
+          0.7
+        ],
+        "at": [
+          0,
+          -0.58
         ]
       },
-      "description": "A big white corner desk with a drawer unit: room for two to work.",
-      "interactions": []
+      "description": "A white L-shaped desk for a room's corner, two drawer units and its own swivel chair in the corner, both wings in reach: room to spread out.",
+      "interactions": [
+        {
+          "id": "write",
+          "label": "Write",
+          "anim": "write",
+          "minutes": 60,
+          "pose": "sit",
+          "effects": {
+            "fun": 0.15,
+            "comfort": 0.1
+          },
+          "tags": [
+            "training",
+            "creative"
+          ],
+          "skills": {
+            "writing": 0.2,
+            "creativity": 0.04
+          }
+        },
+        {
+          "id": "homework",
+          "label": "Do homework",
+          "anim": "write",
+          "minutes": 45,
+          "pose": "sit",
+          "homework": 7,
+          "effects": {
+            "fun": -0.05
+          },
+          "tags": [
+            "study"
+          ],
+          "skills": {
+            "intelligence": 0.1,
+            "writing": 0.05
+          }
+        }
+      ]
     },
     {
       "id": "deskStanding",

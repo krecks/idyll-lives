@@ -192,6 +192,15 @@ resident's row (`bare`), so a change of clothes draws nothing more. The towel's 
 come from the base body's joints at rest (`OutfitFit`: under the arms half way between `spine_03` and
 `upperarm_l`, the hips and the knees).
 
+The day clothes are one of the resident's outfits (sim-core `Sim::outfit`, in the snapshot's `sims[].outfit`):
+0 is the one made in the creator, as `appearance` has it; the others (`OUTFITS`, three in all) are picked from
+the id (outfit.ts `spareLook`: garments as `pickOutfit` picks a new resident's, a top or a bottom other than
+the creator's, and a top in another colour from `palette.outfit`), skin and hair as they are. A use with
+`changesOutfit` (the wardrobes and chests of drawers' "Pick an outfit") puts on the next one halfway through,
+with the doors or the drawer open, and the resident walks off in it; it is kept, and saved, until they change
+again. Pyjamas, the towel and swimwear are made from whichever outfit is worn. Its shells change with it (the
+world is drawn again for it, as for a cupboard opened).
+
 Garment ids per family (outfit.ts):
 
 - male: `top.tee top.vneck top.polo top.long top.shirt top.jacket top.suit`, `bottom.trousers bottom.shorts bottom.suit`;
@@ -312,6 +321,21 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | ballPit112 | yes | 12 | the ball pit (`STEP_IN`, over its rim, `over`): wading and a jump in the balls, down to sit in them tossing balls up, up again; a child's size (clips/play.ts) |
 | tentPlay112 | yes | 24 | the play tent (`STEP_IN`): down on hands and knees at its door, crawling in, sitting back on the heels to play on its mat, crawling back out; a child's size |
 | yoga | yes | 48 | a yoga flow on the mat (`STEP_IN` onto its front end, open hands): mountain, hands to the heart, upward salute, forward fold, half lift, a short downward dog (heels pedalling), a lunge up to warrior I, back to the dog, a child's pose, sitting on the heels, up through a squat |
+| slide125, 112, 99 | yes | 14 | a round on the slide (`STEP_IN` at the run-out's foot; `clips/rides.ts`): round its right side to the ladder, up the five rungs hand and foot in turn, ducking under the bar onto the deck on hands and knees, sat at the top holding the hoop, lain back under it and down the chute on the back (the body on the chute's floor, the legs ahead along it), sat up on the run-out, up off it and a turn back to the start; a child's sizes (cm), fitted by the legs (a child's `pelvisScale`, 0.51 of the height); a planted foot pivots on its ball as the body turns over it |
+| bunkUp172, 147, 112; bunkDown172, 147, 112 | no | 7, 6.5 | the upper bunk's ladder (`BUNK_LADDER`, getting into the bed's second slot and up from it): from the tile in front round the foot end to the ladder, up its four rungs, onto the mattress on hands and knees through the gap in the guard rail, sat with the legs swung round and lain back, ending in the `lie` pose (the pelvis turned flat in the clip, so the fade to `lie` is short); down the same way backwards and a walk round to the tile, sim-core waiting for them (`LADDER_DOWN_TICKS`); placed in the bed's frame (`Player.frame`); a size per height (grown-up, teen, child) |
+| rideHorse112, rideSpring112 | yes | 2.4, 2 | astride the rocking horse and the spring rider (`RIDES`, a child's): the thighs either side of the barrel, the hands on the handles, the feet down by the rockers or on the pegs; the ride's `ride` part rocks them |
+| rideSeesaw147, 112 | yes | 2.8 | astride the seesaw's end, facing along it to the middle (its slot's place, content `places`), the hands on the handle bar, the feet tucked clear of the ground |
+| rideRound147, 112 | yes | 2.4 | sat on the merry-go-round's platform at a slot's place, facing in between two rails: leant in, a hand on each rail, the legs out towards the column, the knees up |
+| rideSwing172, 147, 112 | yes | 1.6 | the swing: both hands on the chains, pumping in time with the swing (`RIDES` `sync`: the clip held to its loop): leant back with the legs out on the way forward, tucked under the seat on the way back |
+| putAway177, 147, 112; putAwayGlass…, putAwayCorner…, putAwayHutch… | yes | 3.2 | clean things put away (`fetch`, `STEP_IN` up to the worktop under the wall cabinet, the glazed and the corner one, and to the china cabinet): up on tiptoe to the pulls of the doors that open, drawn open along their swing, the stack lifted from the worktop onto the shelf, a door pushed shut as the model's closes; the smallest size (a child, who can't reach) puts it on the worktop's back, looking up. Reaching up (clips/reach.ts `upFor`): on tiptoe, the shoulder lifted and leant in as far as the hands need |
+| windClock177, 147, 112 | yes | 4.5 | the grandfather clock wound (`tinker`, `STEP_IN`): the key into each winding hole under the 1.77 m dial for four turns of the wrist, the other hand on the hood; the smallest pulls the weights' chains hand over hand in the trunk |
+| fillFeeder177, 147, 112 | yes | 4 | the songbird feeder refilled (`garden`, `STEP_IN` at its post): the scoop (mimed) tipped twice over the house's open top, the other hand steadying it; the smallest tips it onto the seed tray |
+| writeBoard177, 147, 112 | yes | 6 | planning on the whiteboard (`STEP_IN` up to it): three lines written at shoulder to head height, the marker off the board between words, the weight and the head with the hand |
+| hoopShot177, 147, 112 | yes | 3.2 | "Shoot some hoops" (`STEP_IN` back out on the court, 2.5 m from the hoop's middle, walked to backwards): dribbles, the gather, the dip, a jump shot let go at the top towards the 2.94 m rim, the follow-through held; the smallest heaves it two-handed from the chest; the ball mimed. The round is the net's `swish` period |
+| sitHandsLow177, 147, 112 | yes | 5 | seated at a top less than `LOW_TOP` (0.2 m for the reference height) over the seat (the kids' chair at the coffee table, `tuckLow`): bent well over it, the left hand flat on it, the right drawing; `sit`'s pelvis |
+| kneelTable177, 147, 112 | yes | 6 | at the train table (`play`, `STEP_IN`, a lane each): kneeling up at its edge, leant in, the right hand pushing the engine along the track and the left on the top, now and then sitting back for a look |
+| brushHair | yes | 5 | getting ready at the dressing table (the seated upper body, `ACTIONS.wash`): four brush strokes from the crown down the right side, the head tilting into each, then the left hand smoothing the other side |
+| lieCurl | yes | 2.4 | dozing on a bed too short to lie on flat (`CURLED_BEDS`: the window seat): curled up on the left side facing the room, the knees drawn up, the head on the pillow on the left forearm; turned flat like `lie` |
 
 ### Checking clips
 
@@ -336,7 +360,7 @@ In dev, editing a clip file re-bakes the clips in place (Vite HMR).
 ## Seats and beds
 
 `web/src/render/babylon/characters/furniture.json` holds where residents sit and lie, by object id: `seats`
-(`SEATS`), `defaultSeat`, `beds` (`BEDS`), `defaultBed` and `bunks` (`BUNKS`). `characters.ts` reads it with its
+(`SEATS`), `defaultSeat`, `beds` (`BEDS`), `defaultBed`, `bunks` (`BUNKS`) and `footstools` (`FOOTSTOOLS`). `characters.ts` reads it with its
 `Seat` and `Bed` types (the fields are documented there); `cargo check-glb` measures the meshes against it and
 `cargo review sizes` against real-world sizes. An object in `seats` takes that seat over the content's `seat`
 (`seatOf`); one in neither sits at `defaultSeat`. Heights are m above the floor, `fwd` m forward of the footprint's
@@ -376,6 +400,14 @@ Why some entries are as they are:
 - `gloomy.windowSeat`, `kind.hearthSettee` (2 wide): dozed on along the cushion, head to its left, whichever slot
   (the nap takes both, content `whole`).
 - `bunks.bedBunk`: the lower and the upper mattress tops, `[lower, upper]` (content `bunk`).
+- `footstools`: things a seated resident puts their feet up on (`FOOTSTOOLS`, `footstoolFor`, `feetUp`): their
+  tops' width and depth as made (m, before turning; resized, they scale), the top at their seat's height. A
+  resident sitting (`sit`, `sitTalk`) on anything else, facing a footstool in front of them that nobody sits on,
+  its near half within the legs' reach (`FEET_UP`: the heels 0.14 m in from its edge, up to 0.3 m to one side,
+  the legs turned to it), has the legs out with the heels on it. Not on a seat with its own legs out or
+  pedals (the recliner's footrest, a chaise, a tub, a bike), facing a seat's back, pulled up to a table, at the
+  desk clips, or for an instrument, the toilet, a bath or the dressing table (`NO_FEET_UP`). The sim doesn't
+  know: an armchair with one in front is sat in from beside it (sim-core `approach_tiles`).
 
 ## Where things are
 

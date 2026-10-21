@@ -117,7 +117,9 @@ def streetLamp():
 
 # --- the long park bench: wooden slats on three cast-iron supports --------------------------------------------
 SEAT = 0.45          # the content's `seat.height`; the seat runs centred on depth 0 (`seat.forward` 0)
-BENCH_LEGS = (-1.36, 0.0, 1.36)
+# 2.5 m on its three tiles, its three sitters a metre apart (it was 2.86 m, past a long bench's 1.8-2.5)
+BENCH_LONG = 2.5
+BENCH_LEGS = (-1.21, 0.0, 1.21)
 
 
 def parkBench():
@@ -133,15 +135,15 @@ def parkBench():
             for z in (0.2, -0.25):
                 F.box(f'foot{x}{z}', 0.06, 0.03, 0.1, (x, 0.015, z), frame, bevel=0.008)
         for s in (-1, 1):
-            x = s * 1.36
+            x = s * BENCH_LEGS[2]
             G.rod(f'arm{s}', F.at(x, 0.66, -0.25), F.at(x, 0.66, 0.2), 0.022, material=frame, verts=8)
             G.rod(f'arm_post{s}', F.at(x, 0.4, 0.16), F.at(x, 0.66, 0.19), 0.02, material=frame, verts=8)
             F.sphere(f'arm_scroll{s}', 0.032, (x, 0.66, 0.21), frame, segments=10, rings=6)
-        for k, z in enumerate((-0.165, -0.055, 0.055, 0.165)):
-            F.box(f'slat{k}', 2.86, 0.035, 0.09, (0, SEAT - 0.0175, z), M.wood, bevel=0.008)
+        for k, z in enumerate((-0.17, -0.085, 0.0, 0.085, 0.17)):
+            F.box(f'slat{k}', BENCH_LONG, 0.035, 0.072, (0, SEAT - 0.0175, z), M.wood, bevel=0.008)
         for k, y in enumerate((0.6, 0.72, 0.84)):
             z = -0.2 - (y - 0.42) * 0.1 / 0.48 + 0.03
-            F.box(f'back{k}', 2.86, 0.085, 0.03, (0, y, z), M.wood, bevel=0.008, rot=(-12, 0, 0))
+            F.box(f'back{k}', BENCH_LONG, 0.085, 0.03, (0, y, z), M.wood, bevel=0.008, rot=(-12, 0, 0))
     G.join_all('parkBench')
     G.settle(centre=False)
     return G.meshes()
@@ -205,43 +207,48 @@ def litterBin():
 
 
 # --- the bus shelter: a glazed frame with a bench for three -------------------------------------------------
-SHELTER_SEAT = 0.46   # the content's `seat.height`; the bench is centred at `seat.forward` -0.16
+SHELTER_SEAT = 0.46   # the content's `seat.height`
+SHELTER_BENCH = -0.31  # the bench's middle, its two slats either side (the content's `seat.forward` -0.3: the front one)
+# The posts' depths: 1.2 m deep under the roof on its one tile, a shelter's depth (it was 0.98 m, the bench filling it).
+SHELTER_BACK, SHELTER_FRONT = -0.55, 0.55
 
 
 def busStop():
     M = _palette(body=('#5C6168', 'metal'))
     F = G.GameFrame()
     frame = M.body
+    back, front = SHELTER_BACK, SHELTER_FRONT
+    mid, deep = (back + front) / 2, front - back
     with G.new_parts():
         for x in (-1.42, 1.42):
-            for z in (-0.4, 0.38):
+            for z in (back, front):
                 F.box(f'post{x}{z}', 0.07, 2.36, 0.07, (x, 1.18, z), frame, bevel=0.01)
-        F.box('roof', 2.98, 0.06, 0.98, (0, 2.39, 0), frame, bevel=0.015)
-        F.box('fascia', 2.98, 0.12, 0.03, (0, 2.38, 0.475), frame, bevel=0.008)
-        F.box('roof_top', 2.9, 0.04, 0.9, (0, 2.44, -0.01), frame, bevel=0.015)
+        F.box('roof', 2.98, 0.06, deep + 0.1, (0, 2.39, mid), frame, bevel=0.015)
+        F.box('fascia', 2.98, 0.12, 0.03, (0, 2.38, front + 0.035), frame, bevel=0.008)
+        F.box('roof_top', 2.9, 0.04, deep + 0.02, (0, 2.44, mid - 0.01), frame, bevel=0.015)
         # the glazing: the back and the right-hand end, in rails
-        F.box('glass_back', 2.78, 1.9, 0.015, (0, 1.27, -0.4), M.glass)
-        F.box('glass_side', 0.015, 1.9, 0.7, (1.42, 1.27, -0.02), M.glass)
+        F.box('glass_back', 2.78, 1.9, 0.015, (0, 1.27, back), M.glass)
+        F.box('glass_side', 0.015, 1.9, deep - 0.08, (1.42, 1.27, mid), M.glass)
         for y in (0.3, 2.24):
-            F.box(f'rail_back{y}', 2.8, 0.05, 0.05, (0, y, -0.4), frame, bevel=0.008)
-            F.box(f'rail_side{y}', 0.05, 0.05, 0.72, (1.42, y, -0.02), frame, bevel=0.008)
+            F.box(f'rail_back{y}', 2.8, 0.05, 0.05, (0, y, back), frame, bevel=0.008)
+            F.box(f'rail_side{y}', 0.05, 0.05, deep - 0.06, (1.42, y, mid), frame, bevel=0.008)
         # the bench: two slats on brackets from the back rail
-        for k, z in enumerate((-0.085, -0.245)):
+        for k, z in enumerate((SHELTER_BENCH + 0.08, SHELTER_BENCH - 0.08)):
             F.box(f'slat{k}', 2.5, 0.035, 0.15, (0, SHELTER_SEAT - 0.0175, z), M.wood, bevel=0.008)
         for x in (-1.0, 0.0, 1.0):
-            F.box(f'bracket{x}', 0.05, 0.04, 0.34, (x, 0.42, -0.21), frame, bevel=0.006)
-            F.box(f'bracket_leg{x}', 0.05, 0.42, 0.05, (x, 0.21, -0.34), frame, bevel=0.006)
+            F.box(f'bracket{x}', 0.05, 0.04, 0.34, (x, 0.42, SHELTER_BENCH - 0.05), frame, bevel=0.006)
+            F.box(f'bracket_leg{x}', 0.05, 0.42, 0.05, (x, 0.21, SHELTER_BENCH - 0.18), frame, bevel=0.006)
         # the timetable on the back glass
-        F.box('timetable_frame', 0.56, 0.78, 0.03, (-0.95, 1.45, -0.38), frame, bevel=0.008)
-        F.box('timetable', 0.5, 0.68, 0.01, (-0.95, 1.43, -0.362), M.paper)
-        F.box('timetable_head', 0.5, 0.08, 0.012, (-0.95, 1.73, -0.36), M.blue)
+        F.box('timetable_frame', 0.56, 0.78, 0.03, (-0.95, 1.45, back + 0.02), frame, bevel=0.008)
+        F.box('timetable', 0.5, 0.68, 0.01, (-0.95, 1.43, back + 0.038), M.paper)
+        F.box('timetable_head', 0.5, 0.08, 0.012, (-0.95, 1.73, back + 0.04), M.blue)
         for k in range(6):
-            F.box(f'times{k}', 0.4, 0.014, 0.004, (-0.95, 1.6 - 0.08 * k, -0.356), M.dark)
+            F.box(f'times{k}', 0.4, 0.014, 0.004, (-0.95, 1.6 - 0.08 * k, back + 0.044), M.dark)
         # the stop's flag on the roof, at the front right
-        F.box('flag_pole', 0.05, 0.2, 0.05, (1.18, 2.53, 0.44), frame)
-        F.box('flag', 0.6, 0.34, 0.04, (1.18, 2.72, 0.44), M.blue, bevel=0.015)
-        F.box('flag_face', 0.44, 0.2, 0.046, (1.18, 2.72, 0.44), M.paper, bevel=0.01)
-        F.box('flag_bus', 0.22, 0.09, 0.05, (1.18, 2.73, 0.44), M.blue, bevel=0.012)
+        F.box('flag_pole', 0.05, 0.2, 0.05, (1.18, 2.53, front - 0.02), frame)
+        F.box('flag', 0.6, 0.34, 0.04, (1.18, 2.72, front - 0.02), M.blue, bevel=0.015)
+        F.box('flag_face', 0.44, 0.2, 0.046, (1.18, 2.72, front - 0.02), M.paper, bevel=0.01)
+        F.box('flag_bus', 0.22, 0.09, 0.05, (1.18, 2.73, front - 0.02), M.blue, bevel=0.012)
     G.join_all('busStop')
     G.settle(centre=False)
     return G.meshes()
@@ -508,13 +515,13 @@ FAMILY = G.Family(
     'street_furniture', PALETTES,
     [G.Model('streetLamp', streetLamp, size=(0.657, 4.24, 0.467), key='model.streetLamp', far=FAR,
              paint=[('body', 'Lamp post')]),
-     G.Model('parkBench', parkBench, size=(2.86, 0.907, 0.572), key='model.parkBench', centre=(0, -0.036), far=FAR,
+     G.Model('parkBench', parkBench, size=(2.5, 0.907, 0.572), key='model.parkBench', centre=(0, -0.036), far=FAR,
              paint=[('body', 'Frame')]),
      G.Model('drinkingFountain', drinkingFountain, size=(0.56, 1.093, 0.56), key='model.drinkingFountain', far=_far(drinkingFountain),
              motions={'uses': {'drink': 'water_on'}}, paint=[('body', 'Pillar')]),
      G.Model('litterBin', litterBin, size=(0.474, 0.97, 0.582), key='model.litterBin', centre=(0, -0.034), far=FAR,
              paint=[('body', 'Bin')]),
-     G.Model('busStop', busStop, size=(2.98, 2.89, 0.98), key='model.busStop', far=FAR,
+     G.Model('busStop', busStop, size=(2.98, 2.89, 1.205), key='model.busStop', far=FAR,
              paint=[('body', 'Frame')]),
      G.Model('postBox', postBox, size=(0.5, 1.529, 0.524), key='model.postBox', far=FAR,
              motions={'uses': {'post': 'flap'}, 'hold': 1}, paint=[('body', 'Box')]),

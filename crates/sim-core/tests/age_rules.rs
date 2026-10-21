@@ -206,6 +206,69 @@ fn an_elder_doesnt_climb_to_the_upper_bunk() {
     order(&mut w, ADA, "bunk", 0).unwrap();
 }
 
+#[test]
+fn up_from_the_upper_bunk_they_climb_down_its_ladder_before_anything_else() {
+    use sim_core::content::Pose;
+    let mut w = world();
+    let bunk = object(&w, "bunk", 0);
+    let energy = w.content.needs.iter().position(|n| n.id == "energy").unwrap();
+    let lying = |w: &World, sim: u32| w.objects[bunk as usize].users().any(|u| u == sim) && w.sims[sim as usize].pose == Pose::Lie;
+    for (sim, slot) in [(DEE, 0), (ADA, 1)] {
+        w.sims[sim as usize].needs[energy] = 0.2;
+        order(&mut w, sim, "bunk", 0).unwrap();
+        for _ in 0..2000 {
+            if lying(&w, sim) {
+                break;
+            }
+            w.tick_once();
+        }
+        assert!(lying(&w, sim) && w.objects[bunk as usize].users[slot] == Some(sim), "{sim} in bunk {slot}");
+    }
+    // Both rested: Dee is up out of the lower bunk and off at once; Ada climbs down from the upper one first.
+    for sim in [DEE, ADA] {
+        w.sims[sim as usize].needs[energy] = 1.0;
+    }
+    for _ in 0..200 {
+        if !lying(&w, DEE) && !lying(&w, ADA) {
+            break;
+        }
+        w.tick_once();
+    }
+    assert!(!lying(&w, DEE) && !lying(&w, ADA), "both up");
+    order(&mut w, DEE, "rider", 0).unwrap();
+    order(&mut w, ADA, "wine", 0).unwrap();
+    let mut waited = 0;
+    while w.sims[ADA as usize].current().is_none() && waited < 400 {
+        w.tick_once();
+        waited += 1;
+        if waited == 10 {
+            assert!(w.sims[DEE as usize].current().is_some(), "Dee is on her way");
+        }
+    }
+    assert!((110..=140).contains(&waited), "Ada was off the ladder after {waited} ticks");
+    // Woken by the player (the sleep cancelled) it's the same.
+    for (sim, slot) in [(DEE, 0), (ADA, 1)] {
+        w.apply(Command::Cancel { sim, index: 0 }).unwrap();
+        w.sims[sim as usize].needs[energy] = 0.2;
+        order(&mut w, sim, "bunk", 0).unwrap();
+        for _ in 0..2000 {
+            if lying(&w, sim) {
+                break;
+            }
+            w.tick_once();
+        }
+        assert!(lying(&w, sim) && w.objects[bunk as usize].users[slot] == Some(sim), "{sim} back in bunk {slot}");
+    }
+    w.apply(Command::Cancel { sim: ADA, index: 0 }).unwrap();
+    order(&mut w, ADA, "wine", 0).unwrap();
+    let mut waited = 0;
+    while w.sims[ADA as usize].current().is_none() && waited < 400 {
+        w.tick_once();
+        waited += 1;
+    }
+    assert!((110..=140).contains(&waited), "woken, Ada was off the ladder after {waited} ticks");
+}
+
 const DINING: &str = r#"{
     "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.02}],
     "tags":["food","lounge"],

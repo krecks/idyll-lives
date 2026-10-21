@@ -546,11 +546,12 @@ function farmstead(content: Content, t: Templates, slot: PlotSlot, rand: Rand): 
     }
   }
   // Hay on the fallow field.
-  if (has('farm.hayBale') && fallow.d >= 3) {
+  const [bw, bd] = footprint('farm.hayBale');
+  if (has('farm.hayBale') && fallow.d >= bd + 2) {
     for (let k = 0, n = 3 + Math.floor(rand() * 4); k < n; k++) {
-      const x = fallow.x + 1 + Math.floor(rand() * Math.max(1, fallow.w - 2));
-      const z = fallow.z + 1 + Math.floor(rand() * Math.max(1, fallow.d - 2));
-      if (free({ x, z, w: 1, d: 1 })) put('farm.hayBale', x, z, Math.floor(rand() * 4));
+      const x = fallow.x + 1 + Math.floor(rand() * Math.max(1, fallow.w - 1 - bw));
+      const z = fallow.z + 1 + Math.floor(rand() * Math.max(1, fallow.d - 1 - bd));
+      if (free({ x, z, w: bw, d: bd })) put('farm.hayBale', x, z, Math.floor(rand() * 4));
     }
   }
 

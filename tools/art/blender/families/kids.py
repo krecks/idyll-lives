@@ -289,8 +289,17 @@ def _turn_down(top, half, z_top, z_foot, drape, material):
 
 
 # --- KD1: the crib and its changing table ------------------------------------------------------------------
-CRIB_X = -0.5     # the crib's middle: the baby lies here (slot 0 of the 2 x 1)
-CRIB_TOP = 0.56   # the mattress top (characters.ts BEDS.crib)
+# An oblong cot, a 1.18 x 0.58 m mattress (a 60 x 120 cot's; review M-kids-01: it was 0.80 m square) running
+# across the left of the 2 x 1 tiles, its back on the wall's face, and a changing chest at the right. The baby lies
+# along it (characters/furniture.json `beds.crib` `across`) at slot 0 (game x -0.5), the carers reach in over the
+# front rail (characters.ts `CUDDLE.rail`).
+CRIB_X = -0.5     # where the baby lies (slot 0 of the 2 x 1)
+CRIB_TOP = 0.56   # the mattress top (characters/furniture.json beds.crib)
+COT_X = (-0.955, 0.275)    # the cot's end posts (game x)
+COT_Z = (-0.405, 0.225)    # its back and front posts (game depth): the back on the wall's face
+COT_MID = (sum(COT_X) / 2, sum(COT_Z) / 2)
+COT_LEN = COT_X[1] - COT_X[0] - 0.05     # between the posts
+COT_DEP = COT_Z[1] - COT_Z[0] - 0.05
 
 
 def _spindles(name, a, b, along, material, n, y=0.69, h=0.42):
@@ -298,35 +307,35 @@ def _spindles(name, a, b, along, material, n, y=0.69, h=0.42):
     for i in range(n):
         t = a + (b - a) * (i + 0.5) / n
         x, z = (t, along[1]) if along[0] == 'x' else (along[1], t)
-        F.box(f'{name}{i}', 0.022, h, 0.022, (x, y, z), material, bevel=0.005)
+        F.box(f'{name}{i}', 0.022, h, 0.022, (x, y, z), material, bevel=0.005, bevel_segments=1)
 
 
 def _crib_rails(name, z):
     """A long side's top and bottom rails and spindles, between the posts."""
-    F.box(f'{name}_top', 0.79, 0.04, 0.04, (CRIB_X, 0.9, z), M.crib, bevel=0.01)
-    F.box(f'{name}_bottom', 0.79, 0.04, 0.04, (CRIB_X, 0.47, z), M.crib, bevel=0.01)
-    _spindles(f'{name}_spindle', CRIB_X - 0.385, CRIB_X + 0.385, ('x', z), M.crib, 7)
+    F.box(f'{name}_top', COT_LEN + 0.01, 0.04, 0.04, (COT_MID[0], 0.9, z), M.crib, bevel=0.01)
+    F.box(f'{name}_bottom', COT_LEN + 0.01, 0.04, 0.04, (COT_MID[0], 0.47, z), M.crib, bevel=0.01)
+    _spindles(f'{name}_spindle', COT_X[0] + 0.03, COT_X[1] - 0.03, ('x', z), M.crib, 11)
 
 
 def _changing_table():
-    x, z = 0.5, -0.2
+    x, z, w = 0.635, -0.18, 0.62
     for sx in (-1, 1):
         for sz in (-1, 1):
-            F.box(f'foot{sx}{sz}', 0.05, 0.04, 0.05, (x + sx * 0.35, 0.02, z + sz * 0.21), M.crib, bevel=0.008)
-    F.box('chest', 0.78, 0.74, 0.5, (x, 0.41, z), M.crib, bevel=0.012)
+            F.box(f'foot{sx}{sz}', 0.05, 0.04, 0.05, (x + sx * (w / 2 - 0.04), 0.02, z + sz * 0.21), M.crib, bevel=0.008)
+    F.box('chest', w - 0.02, 0.74, 0.5, (x, 0.41, z), M.crib, bevel=0.012)
     for i, y in enumerate((0.16, 0.4, 0.64)):
-        F.box(f'drawer{i}', 0.72, 0.21, 0.015, (x, y, z + 0.2575), M.crib_wood, bevel=0.006)
+        F.box(f'drawer{i}', w - 0.08, 0.21, 0.015, (x, y, z + 0.2575), M.crib_wood, bevel=0.006)
         G.sphere(f'knob{i}', 0.018, at=F.at(x, y, z + 0.272), material=M.crib, scale=(1, 0.7, 1), segments=12, rings=8)
-    F.box('chest_top', 0.82, 0.025, 0.52, (x, 0.7925, z), M.crib_wood, bevel=0.006)
-    F.box('pad', 0.7, 0.06, 0.42, (x, 0.835, z + 0.01), M.crib_bedding, bevel=0.025, bevel_segments=3)
-    F.box('guard_back', 0.8, 0.08, 0.025, (x, 0.845, z - 0.245), M.crib, bevel=0.008)
+    F.box('chest_top', w + 0.02, 0.025, 0.52, (x, 0.7925, z), M.crib_wood, bevel=0.006)
+    F.box('pad', w - 0.08, 0.06, 0.42, (x, 0.835, z + 0.01), M.crib_bedding, bevel=0.025, bevel_segments=3)
+    F.box('guard_back', w, 0.08, 0.025, (x, 0.845, z - 0.245), M.crib, bevel=0.008)
     for s in (-1, 1):
-        F.box(f'guard{s}', 0.025, 0.08, 0.5, (x + s * 0.39, 0.845, z), M.crib, bevel=0.008)
+        F.box(f'guard{s}', 0.025, 0.08, 0.5, (x + s * (w / 2 - 0.01), 0.845, z), M.crib, bevel=0.008)
 
 
 def _mobile():
     """The mobile: a hub on the arm's end, four arms and a toy on a string under each, turning about the hub."""
-    hx, hy, hz = CRIB_X, 0.975, -0.24   # over the head end, clear of arms reaching in over the front rail
+    hx, hy, hz = CRIB_X, 0.975, -0.17   # over the baby, clear of arms reaching in over the front rail
     with G.new_parts() as parts:
         F.cyl('hub', 0.03, 0.025, (hx, hy, hz), M.mobile, verts=16)
         toys = (M.mobile, M.mobile_pink, M.mobile_blue, M.mobile_pink)
@@ -345,31 +354,35 @@ def _mobile():
 
 
 def crib():
-    for x in (CRIB_X - 0.42, CRIB_X + 0.42):
-        for z in (-0.44, 0.44):
+    cx, cz = COT_MID
+    for x in COT_X:
+        for z in COT_Z:
             F.box(f'post{x}{z}', 0.05, 0.92, 0.05, (x, 0.46, z), M.crib, bevel=0.012)
             G.sphere(f'cap{x}{z}', 0.025, at=F.at(x, 0.93, z), material=M.crib, segments=12, rings=8)
-    F.box('platform', 0.84, 0.04, 0.84, (CRIB_X, 0.44, 0), M.crib, bevel=0.008)
-    F.box('mattress', 0.8, 0.1, 0.8, (CRIB_X, CRIB_TOP - 0.05, 0), M.crib_bedding, bevel=0.03, bevel_segments=3)
-    F.box('blanket', 0.56, 0.035, 0.2, (CRIB_X, CRIB_TOP + 0.015, 0.25), M.crib_blanket, bevel=0.014, bevel_segments=3)
-    F.box('blanket_stripe', 0.565, 0.036, 0.03, (CRIB_X, CRIB_TOP + 0.015, 0.2), M.mobile_blue, bevel=0.01)
-    _crib_rails('back', -0.44)
-    for x in (CRIB_X - 0.42, CRIB_X + 0.42):
-        F.box(f'end_top{x}', 0.04, 0.04, 0.83, (x, 0.9, 0), M.crib, bevel=0.01)
-        F.box(f'end_bottom{x}', 0.04, 0.04, 0.83, (x, 0.47, 0), M.crib, bevel=0.01)
-        _spindles(f'end{x}', -0.39, 0.39, ('z', x), M.crib, 6)
+    F.box('platform', COT_LEN + 0.04, 0.04, COT_DEP + 0.04, (cx, 0.44, cz), M.crib, bevel=0.008)
+    F.box('mattress', COT_LEN, 0.1, COT_DEP, (cx, CRIB_TOP - 0.05, cz), M.crib_bedding, bevel=0.03, bevel_segments=3)
+    # the blanket folded at the foot end (the baby's head to the left, characters.ts `BEDS` `across`)
+    F.box('blanket', 0.2, 0.035, COT_DEP - 0.08, (COT_X[1] - 0.17, CRIB_TOP + 0.015, cz), M.crib_blanket, bevel=0.014,
+          bevel_segments=3)
+    F.box('blanket_stripe', 0.03, 0.036, COT_DEP - 0.075, (COT_X[1] - 0.22, CRIB_TOP + 0.015, cz), M.mobile_blue,
+          bevel=0.01)
+    _crib_rails('back', COT_Z[0])
+    for x in COT_X:
+        F.box(f'end_top{x}', 0.04, 0.04, COT_DEP + 0.03, (x, 0.9, cz), M.crib, bevel=0.01)
+        F.box(f'end_bottom{x}', 0.04, 0.04, COT_DEP + 0.03, (x, 0.47, cz), M.crib, bevel=0.01)
+        _spindles(f'end{x}', COT_Z[0] + 0.03, COT_Z[1] - 0.03, ('z', x), M.crib, 5)
     # the mobile's arm, clamped to the back rail
-    G.rod('arm_up', F.at(CRIB_X, 0.9, -0.44), F.at(CRIB_X, 1.0, -0.44), 0.008, material=M.mobile, verts=8)
-    G.rod('arm_over', F.at(CRIB_X, 1.0, -0.44), F.at(CRIB_X, 1.0, -0.24), 0.008, material=M.mobile, verts=8)
-    G.rod('arm_drop', F.at(CRIB_X, 1.0, -0.24), F.at(CRIB_X, 0.985, -0.24), 0.006, material=M.mobile, verts=8)
+    G.rod('arm_up', F.at(CRIB_X, 0.9, COT_Z[0]), F.at(CRIB_X, 1.0, COT_Z[0]), 0.008, material=M.mobile, verts=8)
+    G.rod('arm_over', F.at(CRIB_X, 1.0, COT_Z[0]), F.at(CRIB_X, 1.0, -0.17), 0.008, material=M.mobile, verts=8)
+    G.rod('arm_drop', F.at(CRIB_X, 1.0, -0.17), F.at(CRIB_X, 0.985, -0.17), 0.006, material=M.mobile, verts=8)
     _changing_table()
     _still('body')
 
     with G.new_parts() as parts:
-        _crib_rails('front', 0.44)
+        _crib_rails('front', COT_Z[1])
     side = G.join(parts, 'front_rail')
     mobile = _mobile()
-    _place(forward=0.035)   # the back posts on the wall's face, the front ones on the tile's edge
+    _place()   # built in place: the back posts on the wall's face
     G.slide(side, 'side_down', (0, 0, -0.25), seconds=0.9)
     G.spin(mobile, 'mobile', turns=1, seconds=6.0, axis='Z')
     return G.meshes()
@@ -443,9 +456,10 @@ def kidsBedCar():
 
 # --- KD1: the high chair -------------------------------------------------------------------------------------
 def highChair():
+    # the legs splayed wide at the floor, 0.54 m each way, so it can't tip (review M-kids-04: 0.44 x 0.47)
     for sx in (-1, 1):
-        for zf, zt in ((-0.16, -0.07), (0.28, 0.17)):
-            G.rod(f'leg{sx}{zf}', F.at(sx * 0.205, 0.0, zf), F.at(sx * 0.14, 0.57, zt), 0.0175, material=M.chair_legs,
+        for zf, zt in ((-0.2, -0.07), (0.32, 0.17)):
+            G.rod(f'leg{sx}{zf}', F.at(sx * 0.25, 0.0, zf), F.at(sx * 0.14, 0.57, zt), 0.0175, material=M.chair_legs,
                   verts=10)
     F.box('footrest', 0.36, 0.025, 0.1, (0, 0.32, 0.23), M.chair_white, bevel=0.008)
     F.box('seat', 0.38, 0.05, 0.36, (0, 0.58, 0.05), M.chair_white, bevel=0.015)
@@ -740,7 +754,8 @@ def ballPit():
 
 
 # --- KD2: the train table ------------------------------------------------------------------------------------
-RING_X, RING_Z, RING_R = 0.42, 0.02, 0.3
+RING_X, RING_Z, RING_R = 0.26, 0.02, 0.28
+TRAIN_W = 1.24    # the table's length: a train table is 0.9-1.3 m (review M-kids-02: it was 1.8)
 TABLE_TOP = 0.44
 
 
@@ -761,12 +776,12 @@ def _engine(name, x, z):
 def trainTable():
     for sx in (-1, 1):
         for sz in (-1, 1):
-            F.box(f'leg{sx}{sz}', 0.06, 0.36, 0.06, (sx * 0.82, 0.18, sz * 0.34), M.train_table, bevel=0.01)
-    F.box('frame', 1.8, 0.06, 0.84, (0, 0.38, 0), M.train_table, bevel=0.012)
-    F.box('grass', 1.76, 0.03, 0.8, (0, 0.425, 0), M.grass, bevel=0.006)
+            F.box(f'leg{sx}{sz}', 0.06, 0.36, 0.06, (sx * (TRAIN_W / 2 - 0.08), 0.18, sz * 0.34), M.train_table, bevel=0.01)
+    F.box('frame', TRAIN_W, 0.06, 0.84, (0, 0.38, 0), M.train_table, bevel=0.012)
+    F.box('grass', TRAIN_W - 0.04, 0.03, 0.8, (0, 0.425, 0), M.grass, bevel=0.006)
     for s in (-1, 1):
-        F.box(f'lip_x{s}', 1.8, 0.03, 0.02, (0, 0.425, s * 0.41), M.train_table, bevel=0.006)
-        F.box(f'lip_z{s}', 0.02, 0.03, 0.8, (s * 0.89, 0.425, 0), M.train_table, bevel=0.006)
+        F.box(f'lip_x{s}', TRAIN_W, 0.03, 0.02, (0, 0.425, s * 0.41), M.train_table, bevel=0.006)
+        F.box(f'lip_z{s}', 0.02, 0.03, 0.8, (s * (TRAIN_W / 2 - 0.01), 0.425, 0), M.train_table, bevel=0.006)
     # the ring of wooden track, with two grooves
     G.revolve('track', [(RING_R - 0.04, 0), (RING_R + 0.04, 0), (RING_R + 0.04, 0.012), (RING_R - 0.04, 0.012),
                         (RING_R - 0.04, 0)], at=F.at(RING_X, TABLE_TOP - 0.002, RING_Z), material=M.track, segments=40,
@@ -775,12 +790,12 @@ def trainTable():
         G.torus(f'groove{r}', r, 0.003, at=F.at(RING_X, TABLE_TOP + 0.0105, RING_Z), material=M.track_groove,
                 major_segments=40, minor_segments=4)
     # the town: a station, a pond, a road and trees
-    F.box('station', 0.2, 0.1, 0.12, (-0.45, TABLE_TOP + 0.05, -0.22), M.toy_yellow, bevel=0.006)
-    F.box('station_roof', 0.24, 0.02, 0.16, (-0.45, TABLE_TOP + 0.11, -0.22), M.toy_red, bevel=0.006)
-    F.box('station_door', 0.05, 0.07, 0.004, (-0.45, TABLE_TOP + 0.035, -0.158), M.house_door)
-    F.cyl('pond', 0.15, 0.006, (-0.18, TABLE_TOP + 0.003, 0.15), M.water, scale=(1.3, 1, 1), verts=24)
-    F.box('road', 0.5, 0.004, 0.08, (-0.5, TABLE_TOP + 0.002, -0.08), M.track_groove)
-    for k, (x, z, h) in enumerate(((-0.78, -0.28, 0.2), (-0.66, -0.31, 0.16), (-0.8, 0.26, 0.18), (0.82, -0.3, 0.16))):
+    F.box('station', 0.2, 0.1, 0.12, (-0.4, TABLE_TOP + 0.05, -0.22), M.toy_yellow, bevel=0.006)
+    F.box('station_roof', 0.24, 0.02, 0.16, (-0.4, TABLE_TOP + 0.11, -0.22), M.toy_red, bevel=0.006)
+    F.box('station_door', 0.05, 0.07, 0.004, (-0.4, TABLE_TOP + 0.035, -0.158), M.house_door)
+    F.cyl('pond', 0.13, 0.006, (-0.3, TABLE_TOP + 0.003, 0.17), M.water, scale=(1.3, 1, 1), verts=24)
+    F.box('road', 0.3, 0.004, 0.08, (-0.4, TABLE_TOP + 0.002, -0.06), M.track_groove)
+    for k, (x, z, h) in enumerate(((-0.55, -0.3, 0.2), (-0.2, -0.33, 0.16), (-0.55, 0.3, 0.18), (0.55, -0.33, 0.16))):
         F.cyl(f'trunk{k}', 0.012, 0.04, (x, TABLE_TOP + 0.02, z), M.trunk, verts=8)
         F.cone(f'tree{k}', 0.05, 0.0, h, (x, TABLE_TOP + 0.04 + h / 2, z), M.tree, verts=10)
     _still('body')
@@ -1097,7 +1112,7 @@ FAMILY = G.Family(
     'kids', M,
     [
         # KD1
-        G.Model('crib', crib, size=(1.855, 1.008, 0.93), key='model.crib', centre=(-0.0175, 0.035),
+        G.Model('crib', crib, size=(1.935, 1.008, 0.69), key='model.crib', centre=(-0.0125, -0.095),
                 motions={'uses': {'feed': 'side_down', 'change': 'side_down', 'cuddle': 'side_down'},
                          # the mobile turns for an awake baby, while someone plays with them; not all night
                          'loops': {'play': 'mobile'}},
@@ -1106,7 +1121,7 @@ FAMILY = G.Family(
                 motions=TURN_DOWN, paint=[('kids_frame', 'Frame'), ('kids_bedding', 'Bedding')]),
         G.Model('kidsBedCar', kidsBedCar, size=(0.985, 0.775, 1.916), key='model.kidsBedCar', centre=(0.0, 0.028),
                 motions=TURN_DOWN, paint=[('car', 'Car body'), ('car_bedding', 'Bedding')]),
-        G.Model('highChair', highChair, size=(0.444, 0.943, 0.474), key='model.highChair', centre=(0.0, 0.0599),
+        G.Model('highChair', highChair, size=(0.533, 0.945, 0.554), key='model.highChair', centre=(0.0, 0.06),
                 paint=[('chair_white', 'Frame'), ('chair_cushion', 'Bedding')]),
         # KD2
         G.Model('toyBox', toyBox, size=(0.82, 0.51, 0.802), key='model.toyBox', centre=(0.0, -0.0389),
@@ -1121,7 +1136,7 @@ FAMILY = G.Family(
                 motions={'uses': {'play': 'flap_open'}}, paint=[('canvas', 'Canvas'), ('poles', 'Poles')]),
         G.Model('ballPit', ballPit, size=(0.93, 0.47, 0.93), key='model.ballPit', centre=(0.0, 0.035),
                 motions={'loops': {'jump': 'bounce'}}, paint=[('pit', 'Pit'), ('pit_rim', 'Rim')]),
-        G.Model('trainTable', trainTable, size=(1.8, 0.68, 0.84), key='model.trainTable', centre=(0.0, 0.0),
+        G.Model('trainTable', trainTable, size=(1.24, 0.68, 0.84), key='model.trainTable', centre=(0.0, 0.0),
                 motions={'loops': {'trains': 'train'}}, paint=[('train_table', 'Table'), ('train', 'Train')]),
         G.Model('playMat', playMat, size=(0.92, 0.204, 0.92), key='model.playMat', centre=(0.0, 0.03),
                 motions={'uses': {'blocks': 'blocks'}}, paint=[('mat', 'Mat')]),

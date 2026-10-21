@@ -108,28 +108,28 @@
       "type": "model",
       "url": "../../models/bedroom_storage/nightstandDrawers.glb",
       "materials": {
+        "book3": {
+          "finish": "material.finish.matte"
+        },
         "brass": {
           "finish": "material.finish.metal"
-        },
-        "cloth1": {
-          "finish": "material.finish.satin"
-        },
-        "cloth2": {
-          "finish": "material.finish.satin"
-        },
-        "cloth3": {
-          "finish": "material.finish.satin"
         },
         "plinth": {
           "finish": "material.finish.satin"
         },
+        "tin": {
+          "finish": "material.finish.gloss"
+        },
         "walnut": {
+          "finish": "material.finish.satin"
+        },
+        "wrapper": {
           "finish": "material.finish.satin"
         }
       },
       "motions": {
         "uses": {
-          "outfit": "drawer_open"
+          "snack": "drawer_open"
         },
         "hold": 2.5
       },
@@ -323,8 +323,7 @@
       "motions": {
         "uses": {
           "outfit": "drawer_open"
-        },
-        "hold": 2.5
+        }
       },
       "paint": [
         {
@@ -378,8 +377,7 @@
       "motions": {
         "uses": {
           "outfit": "doors_open"
-        },
-        "hold": 3.0
+        }
       },
       "paint": [
         {
@@ -425,8 +423,7 @@
       "motions": {
         "uses": {
           "outfit": "drawer_open"
-        },
-        "hold": 2.5
+        }
       },
       "paint": [
         {
@@ -471,8 +468,7 @@
       "motions": {
         "uses": {
           "outfit": "drawer_open"
-        },
-        "hold": 2.5
+        }
       },
       "paint": [
         {
@@ -507,9 +503,6 @@
         "cloth3": {
           "finish": "material.finish.satin"
         },
-        "cloth4": {
-          "finish": "material.finish.satin"
-        },
         "plinth": {
           "finish": "material.finish.satin"
         },
@@ -520,8 +513,7 @@
       "motions": {
         "uses": {
           "outfit": "door_open"
-        },
-        "hold": 3.0
+        }
       },
       "paint": [
         {
@@ -569,8 +561,7 @@
       "motions": {
         "uses": {
           "outfit": "doors_open"
-        },
-        "hold": 3.0
+        }
       },
       "paint": [
         {

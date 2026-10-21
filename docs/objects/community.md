@@ -26,14 +26,14 @@ rides.
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `slide` Playground slide | 1x2 · floor | slide:play | community / play | Frame, Slide, Roof | Static | Static. |
+| `slide` Playground slide | 1x2 · floor | slide:play | community / play | Frame, Slide, Roof | Static | Static. Gone down in rounds (`slide125`/`112`/`99` by height, `STEP_IN` at the run-out's foot): round to the ladder and up it, in onto the deck on hands and knees, sat at the top holding the arch, down the chute lain back, off at the run-out and back round. The tower stands 1 m clear over the deck (its eaves 2.46 m up), open at the back between the ladder's handrails, an arch rising 0.55 m over the chute's mouth. |
 | `climbingFrame` Climbing frame | 2x2 · floor | climb:exercise | community / play | Frame, Roof, Net | Static | Static. Climbed round: up its rope net, across the deck (ducking under the roof) and down the fireman's pole, then back round to the net (`climb172a`/`147a`/`112a` by height, `b` for the second lane: two side by side, the second waiting on the deck for the first to slide; one who steps in while someone goes round waits at their lane until that round is back at its start, so the two stay in step, G-25). |
-| `seesaw` Seesaw | 3x1 · floor | seesaw:play | community / play | Frame, Seats, Plank | Loop (E1) | `seesaw`: the plank tips ±12° while two play (E1). The two ride at the two ends, facing each other over the handles (content `places`). |
-| `springRider` Spring rider | 1x1 · floor | ride:play | community / play | Horse, Saddle, Spring | Loop (E1) | `rock` on its spring while ridden (E1). |
-| `merryGoRound` Merry-go-round | 2x2 · floor | spin:play | community / play | Platform, Rails, Stripes | Loop (E1) | `spin` while ridden (E1). Four sit round the platform between the rails, facing the column (content `places`). |
-| `basketballHoop` Basketball hoop | 1x1 · floor | shoot:exercise | community / play | Frame, Backboard, Hoop | Use | `swish`: the net sways after each shot (1.4 s into the use, then every 3.2 s: `delay`, `every`). |
-| `pingPongTable` Ping-pong table | 2x1 · floor | pingPong:play | community / play | Table, Legs | Static | Static. The two players stand at the two ends, facing each other across the net (content `places`, off its tiles; a blocked end is played from the front). |
-| `parkChessTable` Park chess table | 1x1 · floor | chess:play | community / play | Table, Stools | Use | `move`: a pawn slides one square for chess. A stool either side, the players facing each other across the board (content `places`; rebuilt 2026-10-21, the stools were both behind it). |
+| `seesaw` Seesaw | 3x1 · floor | seesaw:play | community / play | Frame, Seats, Plank | Loop (E1) | `seesaw`: the plank tips ±12° while two play (E1). The two ride at the two ends, facing each other over the handles (content `places`). Ridden astride, the hands on the handle bar (`rideSeesaw147`/`112`). |
+| `springRider` Spring rider | 1x1 · floor | ride:play | community / play | Horse, Saddle, Spring | Loop (E1) | `rock` on its spring while ridden (E1). Its saddle 0.62 m up. Ridden astride, the feet on the pegs, the hands on the handles (`rideSpring112`). |
+| `merryGoRound` Merry-go-round | 2x2 · floor | spin:play | community / play | Platform, Rails, Stripes | Loop (E1) | `spin` while ridden (E1). Its deck 0.26 m up, where the riders sit. Four sit round the platform between the rails, facing the column (content `places`). Leant in, a hand on the rail either side, the legs out towards the column (`rideRound147`/`112`). |
+| `basketballHoop` Basketball hoop | 1x1 · floor | shoot:exercise | community / play | Frame, Backboard, Hoop | Use | `swish`: the net sways after each shot (1.4 s into the use, then every 3.2 s: `delay`, `every`). The rim at 3.05 m on a 1.2 × 0.8 m board. |
+| `pingPongTable` Ping-pong table | 3x2 · floor | pingPong:play | community / play | Table, Legs | Static | Static. Full size (2.74 × 1.525 m, its top 0.76 m up). The two players stand at the two ends, facing each other across the net (content `places`, off its tiles; a blocked end is played from the front). |
+| `parkChessTable` Park chess table | 2x1 · floor | chess:play | community / play | Table, Stools | Use | `move`: a pawn slides one square for chess. A stool either side, the players facing each other across the board (content `places`, 1.2 m apart over a 0.7 m top; rebuilt 2026-10-21, the stools were both behind it). |
 
 **In play** (signed off 2026-10-16):
 - Checked in the yard of the check house in all four facings: the slide gone down, the ping-pong table played at;
@@ -53,8 +53,11 @@ rides.
   `characters/clips/street.ts`). The second lane's climber waits on the deck for the first to slide, so two who
   start together don't meet at the pole. Checked for a man, a woman and a child, two children at once, by day and
   on Low WebGL2 at night.
-- Since the authenticity review (G-04): "Shoot some hoops" picks the ball up and reaches with it (the streetball
-  hoop's `pickUp`, `interact`), not jogging on the spot; a shot from out on the court is a clip still to make.
+- Since the authenticity review (G-04): "Shoot some hoops" is shot from out on the court: the shooter steps back 1.5 m
+  (2.5 m from the hoop's middle, a lane each for two, `STEP_IN`) and plays `hoopShot177`/`147`/`112` (clips/shot.ts):
+  dribbles, a gather, a jump shot let go at the top with the wrist flicked through, the follow-through held; a child
+  heaves it two-handed from the chest. The ball is mimed (props in hand, I-held-01); the streetball hoop still picks
+  its ball up (`pickUp`, `interact`).
 
 ## CM2. Street furniture (10)
 
@@ -63,10 +66,10 @@ rides.
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `streetLamp` Street lamp | 1x1 · floor | — | community / street | Lamp post | Static | Static. The lantern lights at night (E8); far version (E7). |
-| `parkBench` Long park bench | 3x1 · floor | sit:sit feedBirds:sit | community / street | Frame | Static | Static. |
+| `parkBench` Long park bench | 3x1 · floor | sit:sit feedBirds:sit | community / street | Frame | Static | Static. 2.5 m long. |
 | `drinkingFountain` Drinking fountain | 1x1 · floor | drink:drink | community / street | Pillar | Use | `water_on`: the water arc grows for drink; the drinker steps up and bends over the spout (`fountainDrink<cm>` by height). |
 | `litterBin` Litter bin | 1x1 · floor | — | community / street | Bin | Static | Static. |
-| `busStop` Bus shelter | 3x1 · floor | wait:sit timetable:read | community / street | Frame | Static | Static. |
+| `busStop` Bus shelter | 3x1 · floor | wait:sit timetable:read | community / street | Frame | Static | Static. 1.2 m deep, the bench at the back. |
 | `postBox` Post box | 1x1 · floor | post:write | community / street | Box | Use | `flap`: the slot flap swings in for post (`hold` 1 s). |
 | `noticeBoard` Notice board | 1x1 · floor | read:read | community / street | Frame | Static | Static. |
 | `phoneBooth` Phone box | 1x1 · floor | call:phone | community / street | Kiosk | Use | `door_open`: the door opens out (`delay` 0.3 s), the caller steps inside and it shuts behind them (`hold` 2.4 s); it opens again to let them out (`out` 1.6 s). |
@@ -135,8 +138,8 @@ rides.
 |---|---|---|---|---|---|---|
 | `farm.barn` Red barn | 6x6 · floor | — | community / farm | Paint, Roof, Trim | Static | Static; its far version built by hand (E7). |
 | `farm.silo` Grain silo | 3x3 · floor | — | community / farm | Paint, Roof | Static | Static. |
-| `farm.tractor` Little tractor | 2x4 · floor | — | community / farm | Paint, Wheels | Static | Static. |
-| `farm.hayBale` Round hay bale | 1x1 · floor | — | community / farm | Twine | Static | Static. |
+| `farm.tractor` Little tractor | 2x4 · floor | — | community / farm | Paint, Wheels | Static | Static. A compact tractor, 1.62 m wide. |
+| `farm.hayBale` Round hay bale | 2x2 · floor | — | community / farm | Twine | Static | Static. 1.2 m across. |
 | `farm.hayStack` Stack of hay bales | 2x1 · floor | sit:sit | community / farm | Twine | Static | Static. Sit on the hay bales, two at once on the lower bales' front edges (content `seat` 0.45 m, forward 0.25; 2026-10-21, Q-19). |
 | `farm.scarecrow` Scarecrow | 1x1 · floor | — | community / farm | Shirt, Trousers, Hat | Ambient (E2) | `sway`: a slow sway, ambient (not on Low). |
 | `farm.trough` Water trough | 2x1 · floor | — | community / farm | Paint | Static | Static. |

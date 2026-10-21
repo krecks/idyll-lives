@@ -5,17 +5,27 @@
 # time near the camera (`flow`, ambient: the jet bubbling up, rings on the basins); the rest are still.
 #
 # Run:  cargo art garden_decor [--only gnome] [--preview]
+import math
 import os
 import sys
 
+import bpy
+from mathutils import Matrix, Vector
+
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gamekit as G  # noqa: E402
+from ground import _cut, _lump  # noqa: E402  (the woods' rock's cuts and roughening)
 
 M = G.Palette(
     stone=('#B9B2A6', 'matte'),
     stone_dark=('#8F887C', 'matte'),
     stone_warm=('#C6BCA9', 'matte'),
+    rock=('#8A847A', 'matte'),          # the boulders: weathered grey-brown stone, darker than the dressed stone
+    rock_dark=('#6F6A62', 'matte'),
+    rock_warm=('#968A78', 'matte'),
+    fleck=('#5C5852', 'matte'),         # their mottle: darker facets (plain, so no more draws)
     water=('#6FA8C0', 'gloss'),         # opaque, like the old parts' water
     moss=('#5E8A3C', 'foliage'),
     leaf=('#4E7A34', 'foliage'),
@@ -36,6 +46,10 @@ M = G.Palette(
     flower_yellow=('#F2C14E', 'satin'),
     flower_white=('#F4F0F2', 'satin'),
     glow=('#FFE6A8', 'satin'),          # the lantern's fire box; the content's `light` lights it at night
+    rock=('#7A756C', 'matte'),          # the boulders: weathered greys, darker than the dressed stone
+    rock_dark=('#605C55', 'matte'),
+    rock_warm=('#8A8174', 'matte'),
+    lichen=('#BDB894', 'matte'),
 )
 
 
@@ -157,16 +171,57 @@ def wheelbarrow():
     return G.settle([G.join_all('wheelbarrow')])
 
 
+def _stone(name, radius, at, material, scale, seed, top, fractures, subdivisions=3):
+    """A weathered stone `top` high: a boulder roughened (as the woods' rock, families/ground.py), faces split off
+    flat by `fractures` (direction, depth in from its outside, metres), and its foot cut off flat where it goes into
+    the lawn, so it sits broad and heavy in it, not on it."""
+    o = G.boulder(name, radius, at=(at[0], at[1], 0), material=material, scale=(1, 1, 1), seed=seed, noise=0.3,
+                  subdivisions=subdivisions)
+    _lump(o, 0.1, 4.0, seed)
+    o.data.transform(Matrix.Diagonal((*scale, 1.0)))
+    for direction, depth in fractures:
+        n = Vector(direction).normalized()
+        reach = max(v.co.dot(n) for v in o.data.vertices)
+        _cut(o, o.matrix_world @ (n * (reach - depth)), n)
+    o.location.z = top - max(v.co.z for v in o.data.vertices)
+    bpy.context.view_layer.update()
+    return _cut(o, (0, 0, 0), (0, 0, -1))
+
+
+def _on_top(points, sink):
+    """Where lines straight down through `points` (x, y) first meet what is built so far, `sink` below it."""
+    for o in bpy.context.scene.objects:
+        o.data.update()
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    depsgraph.update()
+    hits = [bpy.context.scene.ray_cast(depsgraph, Vector((x, y, 5)), Vector((0, 0, -1)), distance=10)[:2] for x, y in points]
+    return [at - Vector((0, 0, sink)) for hit, at in hits if hit]
+
+
 def boulder():
-    G.boulder('boulder_main', 0.40, at=(0, 0, 0), material=M.stone, scale=(1.05, 0.9, 0.62), seed=0.4)
-    G.boulder('boulder_side', 0.17, at=(0.30, -0.20, 0), material=M.stone_dark, scale=(1.0, 0.8, 0.85), seed=2.1)
-    G.boulder('boulder_small', 0.10, at=(-0.36, 0.20, 0), material=M.stone_warm, scale=(1.0, 0.8, 1.0), seed=4.2)
-    # moss on top and a few tufts around the base
-    G.boulder('moss', 0.22, at=(-0.06, -0.04, 0.41), material=M.moss, scale=(1.5, 0.75, 0.20), seed=7.3, noise=0.35)
-    G.boulder('moss2', 0.13, at=(0.24, 0.14, 0.16), material=M.moss, scale=(1.3, 0.75, 0.25), seed=9.1, noise=0.4)
-    for i, (x, y) in enumerate([(0.38, 0.04), (-0.40, 0.08), (0.10, 0.33), (-0.16, -0.33)]):
-        G.boulder(f'tuft{i}', 0.09, at=(x, y, 0), material=M.leaf, scale=(1.6 if i > 1 else 0.7, 0.7 if i > 1 else 1.6, 0.6),
-               seed=i * 2.3, noise=0.45)
+    """Three weathered garden stones, broader than tall, in three greys: rough, faces split off flat, their feet cut
+    flat where they sink into the lawn; moss in patches on the shaded tops and in the crack between the two big
+    ones, pale lichen on the faces, tufts of grass round them."""
+    # The two smaller stones huddle on one side of the big one (front and back of it, they read as a head and a tail).
+    _stone('boulder_main', 0.34, (-0.06, 0.02), M.rock, (1.12, 0.94, 0.86), 0.4, 0.43,
+           [((0.1, -0.05, 1), 0.07), ((0.35, -0.2, 1), 0.05), ((-0.9, 0.3, 0.35), 0.06), ((0.2, 1, 0.1), 0.05),
+            ((0.6, -0.8, 0.25), 0.05), ((-0.5, -0.9, 0.1), 0.04)])
+    _stone('boulder_side', 0.21, (0.3, 0.17), M.rock_dark, (1.0, 0.92, 0.8), 2.1, 0.24, [((0.5, -0.6, 1), 0.03),
+                                                                                       ((1, 0.2, 0.3), 0.04)])
+    _stone('boulder_small', 0.13, (0.26, -0.27), M.rock_warm, (1.05, 0.85, 0.75), 4.2, 0.12, [((0.3, -0.4, 1), 0.02)],
+           subdivisions=2)
+    moss = _on_top([(-0.14, 0.12), (0.02, 0.18), (0.32, 0.24)], 0.03)
+    lichen = _on_top([(0.08, -0.08), (-0.28, -0.1), (0.26, -0.27)], 0.012)
+    for i, at in enumerate(moss):
+        G.boulder(f'moss{i}', (0.1, 0.07, 0.06)[i], at=tuple(at), material=M.moss, scale=(1.3, 1.0, 0.45), seed=7.3 + i, noise=0.45,
+                  subdivisions=2)
+    for i, at in enumerate(lichen):
+        G.boulder(f'lichen{i}', (0.06, 0.05, 0.035)[i], at=tuple(at), material=M.lichen, scale=(1.3, 1.0, 0.25), seed=3.1 + i,
+                  noise=0.35, subdivisions=2)
+    G.boulder('moss_crack', 0.08, at=(0.19, 0.06, 0), material=M.moss, scale=(0.8, 1.3, 0.8), seed=9.1, noise=0.4, subdivisions=2)
+    for i, (x, y) in enumerate([(0.42, 0.0), (-0.38, 0.06), (0.0, 0.33), (-0.14, -0.3), (0.06, -0.36)]):
+        G.boulder(f'tuft{i}', 0.08, at=(x, y, 0), material=M.leaf, scale=(1.6 if i % 2 else 0.8, 0.8 if i % 2 else 1.6, 0.65),
+                  seed=i * 2.3, noise=0.45, subdivisions=2)
     return G.settle([G.join_all('boulder')])
 
 
@@ -185,8 +240,8 @@ FAMILY = G.Family(
              paint=[('stone', 'Lantern'), ('stone_dark', 'Base')]),
      G.Model('wheelbarrow', wheelbarrow, size=(0.587, 0.754, 1.036), tolerance=TOLERANCE,
              paint=[('paint', 'Tray'), ('wood', 'Handles'), ('metal_dark', 'Legs & tyre')]),
-     G.Model('boulder', boulder, size=(0.903, 0.515, 0.848), tolerance=TOLERANCE,
-             paint=[('stone', 'Large boulder'), ('stone_dark', 'Middle boulder'), ('stone_warm', 'Small boulder')])],
+     G.Model('boulder', boulder, size=(1.008, 0.471, 0.922), tolerance=TOLERANCE,
+             paint=[('rock', 'Large boulder'), ('rock_dark', 'Middle boulder'), ('rock_warm', 'Small boulder')])],
     pack='gardenDecor',
     comment='Blender-built garden decor (tools/art/blender/families/garden_decor.py): a gnome, a bird '
             'bath, a two-tier fountain, a stone lantern, a wheelbarrow planter and boulders. Listed in '

@@ -45,8 +45,9 @@ The rain barrel and the log store are still.
   bags at the back. Colour parts: Frame, Wall.
 - **The compost bin**: corner posts, slats with gaps on the sides and back, three front boards (the top one lifted
   out) in guide battens, the heap with peel and greens on top.
-- **The rain barrel**: a ribbed green barrel with two hoops and a lid, a brass tap and lever, the downpipe behind
-  with clips, its shoe turned into the lid.
+- **The rain barrel**: a ribbed green barrel with two hoops and a lid with its inlet, a brass tap and lever, in the
+  middle of its tile. No downpipe (Q-06, 2026-10-21): a free-standing barrel's pipe ended in mid-air at 2.1 m, and
+  0.7 m under the eaves against a wall.
 - **The washing line**: two galvanised T-posts with braces and the three lines; a wicker basket of folded washing.
 - **The log store**: the black iron rack (the old part's) under a pent roof of iron sheet (the "Shelter"),
   stacked with logs in brick bond, their pale ends to the front.
@@ -74,7 +75,7 @@ built, then dropped: the gate warned the models stood 7 cm off the old parts' ce
 | shedSmall | 1.98 × 2.37 × 1.91 | 4552 | 1548 | 3 | Wood, Roof, Door |
 | greenhouse | 1.81 × 2.40 × 2.84 | 6444 | 2304 | 4 | Frame, Wall |
 | compostBin | 0.84 × 0.78 × 0.79 | 3040 | 436 | 3 | Bin |
-| rainBarrel | 0.61 × 2.12 × 0.70 | 2044 | 748 | 1 | Barrel |
+| rainBarrel | 0.61 × 0.97 × 0.69 | 1656 | 612 | 1 | Barrel |
 | clothesline | 2.76 × 1.80 × 0.76 | 4972 | 684 | 3 | Posts, Washing |
 | firewoodStack | 1.00 × 1.10 × 0.38 | 2220 | 548 | 2 | Shelter |
 

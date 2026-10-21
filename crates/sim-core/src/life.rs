@@ -175,6 +175,16 @@ pub(crate) fn update(w: &mut World) {
         // Interactions started this tick are paid from the Sim's own household (guests too).
         let spend = std::mem::take(&mut w.sims[i].pending_spend);
         w.households[w.sims[i].household as usize].funds -= spend;
+        // A load of washing washed (it waits to be dried), or dried and folded.
+        let worked = std::mem::take(&mut w.sims[i].worked);
+        let laundry = &mut w.households[w.sims[i].household as usize].laundry;
+        if worked & crate::content::WorkOn::Laundry.bit() != 0 && laundry[0] >= 1.0 {
+            laundry[0] -= 1.0;
+            laundry[1] = (laundry[1] + 1.0).min(w.content.laundry.map_or(1.0, |l| l.most));
+        }
+        if worked & crate::content::WorkOn::Washed.bit() != 0 {
+            laundry[1] = (laundry[1] - 1.0).max(0.0);
+        }
         if let Some(transition) = w.sims[i].transition.take() {
             apply_transition(w, i, transition);
         }
@@ -415,7 +425,7 @@ fn takes_off(w: &World, task: &TaskKind, home: u32) -> bool {
             w.content.phone.actions.get(action).is_some_and(|a| a.meet == Some(crate::phone::Meet::There))
                 && matches!(answer, crate::phone::Answer::Pending | crate::phone::Answer::Yes)
         }
-        TaskKind::GoHome | TaskKind::Answer { .. } | TaskKind::Spot { .. } | TaskKind::Cook { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. } => false,
+        TaskKind::GoHome | TaskKind::Answer { .. } | TaskKind::Spot { .. } | TaskKind::Cook { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. } | TaskKind::Carry { .. } => false,
     }
 }
 
@@ -522,7 +532,7 @@ fn childcare(w: &mut World, b: usize) {
     }
     // The baby's crib (or the home's), for what caring for them takes.
     let content = &w.content;
-    let is_crib = |o: &crate::world::ObjectInstance| content.objects[o.def].interactions.iter().any(|i| i.baby);
+    let is_crib = |o: &crate::world::ObjectInstance| content.objects[o.def].interactions.iter().any(|i| i.baby_bed());
     let crib = w
         .objects
         .iter()

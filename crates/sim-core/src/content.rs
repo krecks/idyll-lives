@@ -162,12 +162,106 @@ pub struct Interaction {
     /// Picks the crop as the use starts (content `leaves`: "picked"): it lies fallow, then is
     /// planted again and grows (see `ObjectDef::grows`).
     pub picks: bool,
+    /// Changing clothes (content `changesOutfit`: at a wardrobe, a chest of drawers): halfway
+    /// through, the resident is in their next outfit (`Sim::outfit`), and the use lasts its
+    /// time even with the needs it fills full.
+    pub changes_outfit: bool,
+    /// A spare bed's night (content `spare`, on a `dayRhythm.sleepTags` use: a sofa bed pulled
+    /// out for a guest): it doesn't make the room a bedroom (its tags aren't the object's
+    /// `tags`, what the room is for), and residents sleep in it only with no other bed free for
+    /// them.
+    pub spare: bool,
+    /// Brings the object's crop on (content `tends`: weeding and watering): a use done to the
+    /// end grows it this share of its way from planted to ripe at once (less for one cut
+    /// short), while it grows.
+    pub tends: f32,
+    /// A harvest's produce (content `yields`): food carried in to the home's fridge and put away
+    /// (with no fridge, eaten sitting down as `eats`); see `Yield`.
+    pub yields: Option<Yield>,
+    /// Done with the baby carried here from their crib (content `carried`: feeding at the high
+    /// chair), and back after: a grown-up doing the crib's care of the same id by day does it
+    /// here instead, when this is free (`carry.rs`).
+    pub carried: bool,
+    /// Done standing in front of the place the resident takes on the object (content `atSlot`):
+    /// a crib's changing table beside it, not the cot.
+    pub at_slot: bool,
+    /// Only started between these hours of the day (content `hours`: `[from, to]`, 0..24; past
+    /// midnight when `from` is later than `to`): stargazing after dark. Free will and the
+    /// player's orders keep it alike (`world::unmet`), as all the conditions below.
+    pub hours: Option<[f32; 2]>,
+    /// Only under open sky (content `sky`): the object stands outdoors, every tile of it.
+    pub sky: bool,
+    /// Only with something to work on (content `workOn`): washing up with dirty dishes,
+    /// the laundry with washing to do.
+    pub work_on: Option<WorkOn>,
+}
+
+/// Something a use works on (content `workOn`), which must be there for it to start.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum WorkOn {
+    /// Dirty dishes or food gone off, the household's, to clear away (`ItemInstance::to_clear`).
+    Dishes,
+    /// A load of the household's dirty washing (`Household::laundry`, content `laundry`): the
+    /// use washes it, and it waits to be dried (`Washed`).
+    Laundry,
+    /// A load the household washed (`Household::washed`): the use dries and folds it.
+    Washed,
+}
+
+impl WorkOn {
+    pub const ALL: [WorkOn; 3] = [WorkOn::Dishes, WorkOn::Laundry, WorkOn::Washed];
+
+    /// Its bit in a mask of what there is to work on (`world::work_waiting`).
+    pub fn bit(self) -> u8 {
+        1 << self as u8
+    }
+
+    /// What there is none of, as the player is told.
+    pub fn none(self) -> &'static str {
+        match self {
+            WorkOn::Dishes => "there are no dishes to wash",
+            WorkOn::Laundry => "there's no washing to do",
+            WorkOn::Washed => "there's no washed laundry to dry",
+        }
+    }
+}
+
+/// Whether `hour` (0..24) is in the window `[from, to]` (past midnight when `from` > `to`).
+pub fn in_hours(window: [f32; 2], hour: f32) -> bool {
+    let [from, to] = window;
+    if from <= to { (from..to).contains(&hour) } else { hour >= from || hour < to }
+}
+
+/// Dirty washing piling up (content `laundry`): what the laundry's uses work on
+/// (`WorkOn::Laundry`, `WorkOn::Washed`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LaundryRules {
+    /// Loads of washing each resident at home makes a day.
+    pub per_day: f32,
+    /// Most loads that pile up (dirty, and washed waiting to dry, each).
+    pub most: f32,
+}
+
+/// A harvest's produce (content `yields`): `servings` of a food item (that of `recipe`, a hidden
+/// recipe made for it, as for `eat`: eating a serving gives the use's own gains), put in the
+/// fridge.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Yield {
+    pub recipe: usize,
+    pub servings: u8,
 }
 
 impl Interaction {
     /// Whether this looks after a baby lying in the object.
     pub fn cares(&self) -> bool {
         self.care.iter().any(|&g| g > 0.0)
+    }
+
+    /// The place a baby lies, asleep or awake (a crib's): where babies are put, not a high
+    /// chair they're carried to.
+    pub fn baby_bed(&self) -> bool {
+        self.baby && self.pose == Pose::Lie
     }
 
     /// Whether someone in life stage `stage` (`LifeRules::stage`) may take it (`stages`).
@@ -305,6 +399,12 @@ pub struct ObjectDef {
 }
 
 impl ObjectDef {
+    /// Whether building must leave a way to it: it has uses, and doesn't stand on a top (a
+    /// kettle is reached as its counter is; nothing is refused for the way to it).
+    pub fn reached(&self) -> bool {
+        !self.interactions.is_empty() && self.layer != Layer::Surface
+    }
+
     /// Off the floor and out of the way: residents walk under (or over) it (a picture, a ceiling
     /// lamp, a rug), unless it hangs low or at head height.
     pub fn walked_under(&self) -> bool {
@@ -1418,6 +1518,9 @@ pub struct Content {
     /// Everyone's smartphone: who has one and what they do with it (content `phone`; see
     /// `phone.rs`).
     pub phone: crate::phone::PhoneRules,
+    /// How dirty washing piles up (content `laundry`; None: it never does, and nothing works
+    /// on it).
+    pub laundry: Option<LaundryRules>,
     object_index: HashMap<String, usize>,
 }
 
@@ -1515,6 +1618,8 @@ struct ContentFile {
     recipes: Vec<crate::cooking::RecipeRaw>,
     #[serde(default)]
     phone: crate::phone::PhoneRaw,
+    #[serde(default)]
+    laundry: Option<LaundryRaw>,
 }
 
 #[derive(Deserialize)]
@@ -2285,6 +2390,50 @@ struct InteractionRaw {
     leaves: Option<OpenState>,
     #[serde(default)]
     close_after: bool,
+    /// Changing clothes (see `Interaction::changes_outfit`).
+    #[serde(default)]
+    changes_outfit: bool,
+    /// A spare bed's night (see `Interaction::spare`).
+    #[serde(default)]
+    spare: bool,
+    /// Brings the crop on (see `Interaction::tends`).
+    #[serde(default)]
+    tends: f32,
+    /// A harvest's produce, put in the fridge (see `Interaction::yields`).
+    #[serde(default)]
+    yields: Option<YieldRaw>,
+    /// Done with the baby carried here (see `Interaction::carried`).
+    #[serde(default)]
+    carried: bool,
+    /// Done in front of their own place on it (see `Interaction::at_slot`).
+    #[serde(default)]
+    at_slot: bool,
+    /// Hours of the day it may start in (see `Interaction::hours`).
+    #[serde(default)]
+    hours: Option<[f32; 2]>,
+    /// Only under open sky (see `Interaction::sky`).
+    #[serde(default)]
+    sky: bool,
+    /// Something it works on (see `Interaction::work_on`).
+    #[serde(default)]
+    work_on: Option<WorkOn>,
+}
+
+/// Content `laundry` (see `LaundryRules`).
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LaundryRaw {
+    per_day: f32,
+    most: f32,
+}
+
+/// An interaction's `yields`: the food item, how many servings, and how long eating one takes.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct YieldRaw {
+    pub item: String,
+    pub servings: u8,
+    pub minutes: f32,
 }
 
 /// An object's state for `when` and `leaves` (see `ObjectInstance::open`), or its crop's
@@ -2708,6 +2857,9 @@ impl Content {
                     Some(_) if recipe.is_some() => {
                         return Err(Error::new(format!("{ctx}: `eat` and `recipe` don't go together")));
                     }
+                    Some(_) if it.yields.is_some() => {
+                        return Err(Error::new(format!("{ctx}: `eat` and `yields` don't go together")));
+                    }
                     Some(e) => {
                         let mut eaten = [0.0; MAX_NEEDS];
                         for (own, eat) in own_gain.iter_mut().zip(eaten.iter_mut()).filter(|(g, _)| **g > 0.0) {
@@ -2718,6 +2870,32 @@ impl Content {
                     }
                     None => None,
                 };
+                // A harvest's produce: what it gives comes from eating a serving of it later (as
+                // `eat`), and residents weigh it all the same.
+                let yields = match &it.yields {
+                    Some(_) if recipe.is_some() => {
+                        return Err(Error::new(format!("{ctx}: `yields` and `recipe` don't go together")));
+                    }
+                    Some(y) if y.servings == 0 => return Err(Error::new(format!("{ctx}: yields: servings must be at least 1"))),
+                    Some(y) => {
+                        let mut eaten = [0.0; MAX_NEEDS];
+                        for (own, eat) in own_gain.iter_mut().zip(eaten.iter_mut()).filter(|(g, _)| **g > 0.0) {
+                            *eat = std::mem::take(own);
+                        }
+                        recipes.push(crate::cooking::eat_recipe(&ctx, &it.label, &items, &y.item, y.minutes, eaten)?);
+                        Some(Yield { recipe: recipes.len() - 1, servings: y.servings })
+                    }
+                    None => None,
+                };
+                if !(0.0..=1.0).contains(&it.tends) {
+                    return Err(Error::new(format!("{ctx}: tends must be 0..=1")));
+                }
+                if it.tends > 0.0 && obj.grows.is_none() {
+                    return Err(Error::new(format!("{ctx}: `tends` brings a crop on: the object needs `grows`")));
+                }
+                if it.carried && (it.care.values().all(|&g| g <= 0.0) || !obj.interactions.iter().any(|i| i.baby)) {
+                    return Err(Error::new(format!("{ctx}: `carried` is for a baby's care (`care`) where a baby has a place (`baby`)")));
+                }
                 let after = match it.after.as_deref() {
                     Some(t) => 1 << lookup(&tag_index, t, &ctx, "tag")?,
                     None => 0,
@@ -2829,7 +3007,24 @@ impl Content {
                     close_after: it.close_after,
                     ripe: it.when == Some(OpenState::Ripe),
                     picks: it.leaves == Some(OpenState::Picked),
+                    changes_outfit: it.changes_outfit,
+                    spare: it.spare,
+                    tends: it.tends,
+                    yields,
+                    carried: it.carried,
+                    at_slot: it.at_slot,
+                    hours: it.hours,
+                    sky: it.sky,
+                    work_on: it.work_on,
                 });
+                if let Some(h) = it.hours
+                    && (!h.iter().all(|v| (0.0..=24.0).contains(v)) || h[0] == h[1])
+                {
+                    return Err(Error::new(format!("{ctx}: `hours` is [from, to], two different hours of the day (0 to 24)")));
+                }
+                if matches!(it.work_on, Some(WorkOn::Laundry | WorkOn::Washed)) && raw.laundry.is_none() {
+                    return Err(Error::new(format!("{ctx}: `workOn` laundry needs content `laundry` (how the washing piles up)")));
+                }
                 if it.close_after
                     && (it.leaves != Some(OpenState::Open)
                         || !obj.interactions.iter().any(|i| i.leaves == Some(OpenState::Closed)))
@@ -2857,7 +3052,8 @@ impl Content {
             if obj.price.is_some_and(|p| p < 0) {
                 return Err(Error::new(format!("object '{}': negative price", obj.id)));
             }
-            let offered = interactions.iter().fold(0, |m: TagMask, it| m | it.tags);
+            // (A spare bed's night doesn't make its room a bedroom.)
+            let offered = interactions.iter().filter(|it| !it.spare).fold(0, |m: TagMask, it| m | it.tags);
             let mut provides = 0;
             for t in &obj.provides {
                 provides |= 1 << tag_index[t.as_str()];
@@ -2895,12 +3091,18 @@ impl Content {
                     return Err(Error::new(format!("object '{}': `{flag}` is for things on {on}", obj.id)));
                 }
             }
+            if layer == Layer::Surface && (obj.footprint != [1, 1] || obj.slots != 1 || obj.stairs) {
+                return Err(Error::new(format!("object '{}': things on a surface are 1×1, with one slot", obj.id)));
+            }
+            // A thing on a top is used from beside its top (`surface::rider_tiles`), standing, at
+            // a seat pulled up to the top or on one near (`seatNear`): not lain on, stood in,
+            // cooked at as a station or dined at.
             if layer == Layer::Surface
-                && (obj.footprint != [1, 1] || obj.slots != 1 || used || obj.stairs)
+                && let Some(it) = interactions.iter().find(|i| i.pose == Pose::Lie || i.inside || i.whole || i.baby || i.cares() || i.needs_table || i.recipe.is_some())
             {
                 return Err(Error::new(format!(
-                    "object '{}': things on a surface are 1×1, with one slot and no interactions",
-                    obj.id
+                    "{}.{}: a thing on a surface is used standing or sitting at its top (no lie, inside, whole, baby, care, needsTable or recipe)",
+                    obj.id, it.id
                 )));
             }
             let surface = match &obj.surface {
@@ -3373,6 +3575,9 @@ impl Content {
                 Ok(out)
             };
         let sleep_tags = tag_mask(&dr.sleep_tags, "dayRhythm.sleepTags")?;
+        if let Some((o, i)) = objects.iter().find_map(|o: &ObjectDef| o.interactions.iter().find(|i| i.spare && i.tags & sleep_tags == 0).map(|i| (o, i))) {
+            return Err(Error::new(format!("{}.{}: `spare` is for a night's sleep (a `dayRhythm.sleepTags` tag)", o.id, i.id)));
+        }
         let mut slept = [0.0f32; MAX_NEEDS];
         for inter in objects.iter().flat_map(|o: &ObjectDef| &o.interactions).filter(|i| i.tags & sleep_tags != 0) {
             for (n, g) in inter.total_gain.iter().enumerate() {
@@ -3725,6 +3930,11 @@ impl Content {
         let (activities, planner, goals) =
             crate::planner::parse(&raw.activities, &raw.planner, &raw.goals, &tag_index, &feelings)?;
         let phone = crate::phone::parse(&raw.phone, &ix, &animations, &life.stages)?;
+        let laundry = match &raw.laundry {
+            Some(l) if l.per_day > 0.0 && l.per_day.is_finite() && l.most >= 1.0 && l.most.is_finite() => Some(LaundryRules { per_day: l.per_day, most: l.most }),
+            Some(_) => return Err(Error::new("laundry: `perDay` above 0 and `most` at least 1 (loads)")),
+            None => None,
+        };
         Ok(Self {
             needs,
             objects,
@@ -3767,6 +3977,7 @@ impl Content {
             items,
             recipes,
             phone,
+            laundry,
             object_index,
         })
     }
@@ -4175,6 +4386,18 @@ mod tests {
         refused(&|c| c["accidents"] = json!([{"id": "doze", "need": "fun", "cooldownHours": 1e39}]), "accident 'doze': times must be numbers");
         refused(&|c| c["dayRhythm"] = json!({"babyWakes": {"cooldownMinutes": 1e39}}), "dayRhythm.babyWakes.cooldownMinutes");
         refused(&|c| c["cooking"] = json!({"inviteMinutes": 1e39}), "cooking.inviteMinutes must be a number");
+        refused(&|c| c["objects"][0]["interactions"][0]["hours"] = json!([20, 20]), "fridge.snack: `hours` is [from, to]");
+        refused(&|c| c["objects"][0]["interactions"][0]["hours"] = json!([20, 25]), "fridge.snack: `hours`");
+        refused(&|c| c["objects"][0]["interactions"][0]["workOn"] = json!("laundry"), "fridge.snack: `workOn` laundry needs content `laundry`");
+        refused(&|c| c["laundry"] = json!({"perDay": 0, "most": 4}), "laundry: `perDay` above 0");
+        refused(
+            &|c| {
+                c["objects"][1]["layer"] = json!("surface");
+                c["objects"][1]["footprint"] = json!([1, 1]);
+                c["objects"][1]["interactions"][0]["pose"] = json!("lie");
+            },
+            "a thing on a surface is used standing or sitting at its top",
+        );
         // (Each of these on its own is fine.)
         let mut c: serde_json::Value = serde_json::from_str(CONTENT).unwrap();
         c["objectRules"] = json!({"resale": 1.0, "upgradeCost": 0.0});

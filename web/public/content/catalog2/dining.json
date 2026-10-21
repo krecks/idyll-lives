@@ -243,6 +243,12 @@
           "id": "coffee",
           "requires": ["coffee"],
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",
@@ -297,6 +303,12 @@
           "id": "coffee",
           "requires": ["coffee"],
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",
@@ -350,6 +362,12 @@
           "id": "coffee",
           "requires": ["coffee"],
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",
@@ -404,6 +422,12 @@
           "id": "coffee",
           "requires": ["coffee"],
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",
@@ -458,6 +482,12 @@
           "id": "coffee",
           "requires": ["coffee"],
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",
@@ -511,6 +541,12 @@
           "id": "coffee",
           "requires": ["coffee"],
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",
@@ -565,6 +601,12 @@
           "id": "coffee",
           "requires": ["coffee"],
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",
@@ -619,6 +661,12 @@
           "id": "coffee",
           "requires": ["coffee"],
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",
@@ -757,8 +805,36 @@
         "height": 0.6,
         "forward": 0.05
       },
-      "description": "A tall chair for the littlest diner, with arms, a cushion and a footrest. Put it at a table.",
-      "interactions": []
+      "description": "A tall chair for the littlest diner, with arms, a cushion and a footrest. Put it at a table: a grown-up carries the baby over from the crib and feeds them in it.",
+      "slots": 2,
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit in the high chair",
+          "anim": "sit",
+          "minutes": 45,
+          "pose": "sit",
+          "baby": true,
+          "autonomous": false,
+          "tags": [
+            "rest"
+          ]
+        },
+        {
+          "id": "feed",
+          "label": "Feed the baby",
+          "anim": "feed",
+          "minutes": 15,
+          "care": {
+            "hunger": 0.8,
+            "social": 0.1
+          },
+          "tags": [
+            "care"
+          ],
+          "carried": true
+        }
+      ]
     },
     {
       "id": "sideboard",

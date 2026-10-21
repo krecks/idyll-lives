@@ -108,13 +108,13 @@ export function arms(b: PoseSpec, l: Hand | null, r: Hand | null): PoseSpec {
 }
 
 /** A hand held open (the clip's own fingers: the rest pose, not `GRIP`). */
-function open(side: 'l' | 'r'): PoseSpec {
+export function open(side: 'l' | 'r'): PoseSpec {
   const z: Rot = [0, 0, 0];
   return { [`fingers_01_${side}`]: z, [`fingers_02_${side}`]: z, [`thumb_01_${side}`]: [0, 0, 6], [`thumb_02_${side}`]: z } as PoseSpec;
 }
 
 /** The ankle raised on tiptoe by `tip` m (the heel up about the ball of the foot, 0.17 m ahead), and the foot's pitch for it (deg). */
-function tiptoe(tip: number): [Vec, number] {
+export function tiptoe(tip: number): [Vec, number] {
   const a = Math.asin(Math.min(0.9, tip / 0.17));
   return [[0, tip, -0.17 * (1 - Math.cos(a))], (a * 180) / Math.PI];
 }
@@ -179,14 +179,14 @@ function dartPose(p: number): PoseSpec {
 // --- pool ---------------------------------------------------------------------------------------
 
 /**
- * The pool table (`model.poolTable`): the cloth 0.785 m up, the long rails' outer faces 0.7 m out from the
+ * The pool table (`model.poolTable`): the cloth 0.75 m up (the rails 0.785), the long rails' outer faces 0.7 m out from the
  * middle. A shot from the long side: bent over the rail (as far as the body's height needs, the chin a hand
  * over the cue), the left hand bridging on the cloth, the right forearm hanging from the elbow; two practice
  * strokes, a slow back swing and the stroke through, then up to watch the balls and chalk the cue.
  */
 type PoolFit = Fit;
 export const POOL: Size<PoolFit>[] = sizes('poolShot', [0.97, 0.83, 0.63], (s) => ({ s, to: 0.72 + 0.32 * s }));
-const BED = 0.785;
+const BED = 0.75;
 const POOL_S = 8;
 /** The stroke (m along the cue, + through): two practice strokes, the back swing, the shot. */
 const STROKE: Key<number>[] = [
@@ -256,21 +256,26 @@ function poolPose(fit: PoolFit): (p: number) => PoseSpec {
 // --- foosball -----------------------------------------------------------------------------------
 
 /**
- * The foosball table (`model.foosball`): the rods' handles 0.84 m up, at 0.46 m out from the middle, rods at
- * 0.45 and 0.15 m either side of it; a player at a pair of them (`STEP_IN` lanes 0.3 m either side). Hands
+ * The foosball table (`model.foosball`): eight rods 0.15 m apart, the front team's handles 0.84 m up and 0.46 m out
+ * from the middle, at -0.525 and -0.375 m (goalie and defence) and -0.075 and 0.225 m (midfield and attack); a
+ * player at each pair (`STEP_IN` lanes, a clip each: `foosClip`, the hands `FOOS_HANDS` either side). Hands
  * round the two handles, the wrists turning the rods (the right snapping kicks in time with the table's
  * moving rods, 0.8 s a round; the left blocking), the rods slid in and out; the head over the game.
  */
 type FoosFit = Fit;
 export const FOOS: Size<FoosFit>[] = sizes('foosball', [0.97, 0.83, 0.63], (s) => ({ s, to: 0.47 + 0.33 * s }));
-export const FOOS_LANES = [-0.3, 0.3] as const;
+export const FOOS_LANES = [-0.45, 0.075] as const;
+/** Half the spacing of each lane's two handles (m). */
+const FOOS_HANDS = [0.075, 0.15] as const;
+/** The clip of size `clip` for lane `lane` (an index of `FOOS_LANES`). */
+export const foosClip = (clip: string, lane: number): string => `${clip}${'ab'[lane]}`;
 const FOOS_S = 3.2;
 
-function foosPose(fit: FoosFit): (p: number) => PoseSpec {
+function foosPose(fit: FoosFit, lane: number): (p: number) => PoseSpec {
   const { s, to } = fit;
   const hy = 0.84 / s;
   const hz = (to - 0.47) / s;
-  const hx = 0.15 / s;
+  const hx = FOOS_HANDS[lane] / s;
   return (p) => {
     const t = p * FOOS_S;
     const kick = Math.sin((t / 0.8) * TAU);
@@ -541,11 +546,11 @@ function boulderPose(fit: BoulderFit): (p: number) => PoseSpec {
  * to the heart, an upward salute, a forward fold, a half lift, the fold again, the hands walked out to a
  * downward dog (the heels pedalling), the right foot stepped up to a lunge and up into warrior I, back down
  * to the dog, the knees down, a child's pose, sitting up on the heels a while, then up through a squat. The
- * mat is short for the dog and the warrior (0.9 m: its length is a model fix, G-40): the dog is a short one.
+ * mat is 1.8 m long on its 1 x 2 tiles, the flow in its middle: the dog is a short one.
  */
 const YOGA_S = 48;
-/** Where the yogi stands (`STEP_IN`): the ankles 0.3 m out from the mat's middle, its front end, on its top. */
-export const YOGA_AT = { to: 0.3, up: 0.012 };
+/** Where the yogi stands (`STEP_IN`): the ankles 0.4 m out from the mat's middle (it runs from -0.93 to 0.87 m), on its top, so the flow from the squat behind to the dog's hands ahead is on the mat. */
+export const YOGA_AT = { to: 0.4, up: 0.012 };
 interface YogaPose extends Body {
   hl: Vec;
   hr: Vec;
@@ -679,7 +684,7 @@ export function gameClips(): ClipDef[] {
     cycle('pingPong', { seconds: PONG_S, loop: true }, pongPose),
     cycle('yoga', { seconds: YOGA_S, loop: true, hands: 'open' }, yogaPose),
     ...POOL.map(({ clip, fit }) => cycle(clip, { seconds: POOL_S, loop: true }, poolPose(fit))),
-    ...FOOS.map(({ clip, fit }) => cycle(clip, { seconds: FOOS_S, loop: true }, foosPose(fit))),
+    ...FOOS.flatMap(({ clip, fit }) => FOOS_LANES.map((_, lane) => cycle(foosClip(clip, lane), { seconds: FOOS_S, loop: true }, foosPose(fit, lane)))),
     ...SMASH.map(({ clip, fit }) => cycle(clip, { seconds: SMASH_S, loop: true }, smashPose(fit))),
     ...BOULDER.map(({ clip, fit }) => cycle(clip, { seconds: BOULDER_S, loop: true }, boulderPose(fit))),
   ];

@@ -194,6 +194,8 @@ pub fn check(w: &World) {
                 TaskKind::Use { object, .. } | TaskKind::Repair { object } => object == o.id,
                 TaskKind::Cook { station, .. } | TaskKind::Dishes { station, .. } => station == Some(o.id),
                 TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => seat == Some(o.id),
+                // (Beside the crib, lifting the baby out of it.)
+                TaskKind::Carry { from, stage: 0, .. } => from == o.id,
                 _ => false,
             }) || (s.use_seat == Some(o.id)
                 && doing
@@ -212,10 +214,11 @@ pub fn check(w: &World) {
             assert!(host.is_some_and(|h| h < o.id), "object {} stands on nothing before it ({host:?})", o.id);
         }
     }
-    // Only cooks, people eating and people washing up carry things (the rest put them down).
+    // Only cooks, people eating and washing up, and harvesters on their way to the fridge carry things
+    // (the rest put them down).
     for s in &w.sims {
         if s.held.is_some() {
-            let chain = |k: &TaskKind| matches!(k, TaskKind::Cook { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. });
+            let chain = |k: &TaskKind| matches!(k, TaskKind::Cook { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. } | TaskKind::Carry { baby: None, .. });
             assert!(
                 match s.current() {
                     Some(a) => chain(&a.task.kind),
@@ -286,6 +289,7 @@ fn task_refs(w: &World, i: usize, kind: &TaskKind, doing: &str) {
         TaskKind::Phone { action, contact, seat, .. } => {
             action < c.phone.actions.len() && contact.is_none_or(|t| (t as usize) < n) && object(seat)
         }
+        TaskKind::Carry { baby, from, to, .. } => baby.is_none_or(|b| (b as usize) < n && b as usize != i) && object(Some(from)) && object(Some(to)),
     };
     assert!(ok, "{name} {doing} {kind:?}, which names something that isn't there ({} objects)", w.objects.len());
 }
@@ -407,6 +411,7 @@ fn doing(kind: &TaskKind) -> Doing {
         TaskKind::Eat { stage, .. } => Doing(12, stage as u32, 0),
         TaskKind::Dishes { stage, .. } => Doing(13, stage as u32, 0),
         TaskKind::Phone { action, .. } => Doing(14, action as u32, 0),
+        TaskKind::Carry { to, stage, .. } => Doing(15, to, stage as u32),
     }
 }
 

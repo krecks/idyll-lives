@@ -7,7 +7,7 @@ What it covers: the 39 objects of [docs/objects/tabletop.md](../objects/tabletop
 - **Rubric:** [plan/authenticity-review.md §3](../../plan/authenticity-review.md#3-rubrics); real-world ranges in [reference.md](reference.md). Finding format and severities: [README.md](README.md#writing-a-finding).
 - **Columns:** M, A and I take `OK`, a finding id or `n/a`; `—` is pending. Findings lists the ids filed against the row, with severity and fix class; Shots names the evidence files.
 - **Seeded findings** (`Status: seeded`) are known issues copied in from earlier docs. Confirm or close them; don't file them again.
-- **How these were judged.** No tabletop thing has a use (content rule, `crates/sim-core/src/content.rs:2738`: things on a surface are 1 × 1 "with one slot and no interactions"), so A is `n/a` but for the clock's hands, and I is about coverage (I1) alone. M5 was judged on the play shots on the stage's counter (`tabletop/play/`), which are about Build-mode zoom: at the default Live camera (radius 24) a 9 cm mug is a few pixels, as the real thing would be. The gallery stands them on the ground beside the residents, which is why the index found the espresso machine and the mixer "knee high"; on the counter they are right.
+- **How these were judged.** (Phase 0–3; since G-63 twenty of them have uses, I-tabletop-01.) No tabletop thing had a use (content rule, `crates/sim-core/src/content.rs:2738`: things on a surface are 1 × 1 "with one slot and no interactions"), so A is `n/a` but for the clock's hands, and I is about coverage (I1) alone. M5 was judged on the play shots on the stage's counter (`tabletop/play/`), which are about Build-mode zoom: at the default Live camera (radius 24) a 9 cm mug is a few pixels, as the real thing would be. The gallery stands them on the ground beside the residents, which is why the index found the espresso machine and the mixer "knee high"; on the counter they are right.
 - **Sizes** (`cargo review sizes`): five outside ±10 %. Artefacts: `standMixer` D 0.17 (it stands side-on, profile to the front, so W and D swap; across, 0.17 against a real 0.20–0.24 is 1 cm under the band), `cuttingBoard` H 0.106 (the loaf and tomatoes on it), `candlesticks` D 0.066 (the bases, 6 mm), `monitor` D 0.335 (5 mm). Real: `tableClock` H 0.228 (M-tabletop-02).
 
 ## TT1. Kitchenware (11)
@@ -32,17 +32,17 @@ Family: `tools/art/blender/families/tabletop.py`.
 
 | Item | Real uses | Content uses (minutes) | Verdict |
 |---|---|---|---|
-| `kettle` | boil water for tea or coffee | none | missing (I-tabletop-01) |
-| `toaster` | make toast | none | missing (I-tabletop-01) |
-| `blender` | blend a smoothie or soup | none | missing (I-tabletop-01) |
-| `standMixer` | mix dough or batter (baking) | none | missing (I-tabletop-01) |
-| `espressoMachineSmall` | pull a shot, steam milk | none, though the stage's floor coffee machine has "make a coffee" | missing (I-tabletop-01) |
+| `kettle` | boil water for tea or coffee | tea (8) | OK (I-tabletop-01 fixed) |
+| `toaster` | make toast | toast (4, eaten 8) | OK (I-tabletop-01 fixed) |
+| `blender` | blend a smoothie or soup | smoothie (3, drunk 5) | OK (I-tabletop-01 fixed) |
+| `standMixer` | mix dough or batter (baking) | practise baking (30) | OK (I-tabletop-01 fixed; nothing is baked, a practice use as Q-16) |
+| `espressoMachineSmall` | pull a shot, steam milk | espresso (10, teens and up) | OK (I-tabletop-01 fixed) |
 | `knifeBlock` | take a knife | none | OK (decor; cooking's chopping is the counter's) |
 | `utensilCrock` | take a spoon or spatula | none | OK (decor) |
 | `cuttingBoard` | chop vegetables | none | OK: not plainly missing, chopping is the counter station's step in cooking (I13) |
-| `breadBin` | take out bread for a sandwich or toast | none | missing (I-tabletop-01) |
+| `breadBin` | take out bread for a sandwich or toast | sandwich (5, eaten 10) | OK (I-tabletop-01 fixed) |
 | `spiceJars` | season food | none | OK (decor) |
-| `cookieJar` | sneak a biscuit | none | missing (I-tabletop-01) |
+| `cookieJar` | sneak a biscuit | biscuit (2) | OK (I-tabletop-01 fixed) |
 
 ## TT2. Tableware (7)
 
@@ -62,12 +62,12 @@ Family: `tools/art/blender/families/tabletop.py`.
 
 | Item | Real uses | Content uses (minutes) | Verdict |
 |---|---|---|---|
-| `fruitBowl` | take a piece of fruit | none | missing (I-tabletop-01) |
+| `fruitBowl` | take a piece of fruit | fruit (2) | OK (I-tabletop-01 fixed) |
 | `plateSet` | lay the table | none | OK (decor) |
 | `cakeStand` | cut a slice | none | OK (decor, as the reference has it) |
-| `teapotSet` | pour a cup of tea | none | missing (I-tabletop-01) |
-| `mugs` | have a hot drink | none | missing (I-tabletop-01) |
-| `wineGlasses` | pour a glass | none | missing (I-tabletop-01) |
+| `teapotSet` | pour a cup of tea | tea (20, sat) | OK (I-tabletop-01 fixed) |
+| `mugs` | have a hot drink | hot drink (15, sat) | OK (I-tabletop-01 fixed) |
+| `wineGlasses` | pour a glass | wine (10, sat, young adults and up) | OK (I-tabletop-01 fixed) |
 | `candlesticks` | light the candles | none; drawn lit, day and night | OK (decor); the lit look is M-tabletop-01 |
 
 ## TT3. Books and small plants (7)
@@ -88,13 +88,13 @@ Family: `tools/art/blender/families/tabletop.py`.
 
 | Item | Real uses | Content uses (minutes) | Verdict |
 |---|---|---|---|
-| `bookStack` | pick one up and read it | none | missing (I-tabletop-01; the bookshelf has read) |
-| `booksUpright` | pick one up and read it | none | missing (I-tabletop-01) |
+| `bookStack` | pick one up and read it | read (45, sat) | OK (I-tabletop-01 fixed) |
+| `booksUpright` | pick one up and read it | read (45, sat) | OK (I-tabletop-01 fixed) |
 | `vaseFlowers` | change the water | none | OK (decor) |
 | `vaseSmall` | change the water | none | OK (decor) |
-| `potSucculent` | water it now and then | none | missing (I-tabletop-01; the floor `plant` and `hangingPlant` have water) |
-| `potCactus` | water it now and then | none | missing (I-tabletop-01) |
-| `potSmall` | water it | none | missing (I-tabletop-01) |
+| `potSucculent` | water it now and then | water (3) | OK (I-tabletop-01 fixed; as the floor `plant`) |
+| `potCactus` | water it now and then | water (3) | OK (I-tabletop-01 fixed) |
+| `potSmall` | water it | water (3) | OK (I-tabletop-01 fixed) |
 
 ## TT4. Small ornaments (6)
 
@@ -145,16 +145,16 @@ Family: `tools/art/blender/families/tabletop.py`.
 | `towelStack` | take a towel | none | OK (decor) |
 | `perfumeTray` | dab on some scent | none | OK (decor) |
 | `deskOrganiser` | take a pen, file a paper | none | OK (decor) |
-| `laptopClosed` | open it and work, browse, play | none | missing (I-tabletop-01) |
-| `monitor` | work or play at the screen | none, and it fits on almost no top (I-tabletop-05) | missing (I-tabletop-01) |
-| `stuffedToy` | cuddle it, play with it (children) | none | missing (I-tabletop-01) |
-| `toyBlocks` | stack them (children) | none | missing (I-tabletop-01) |
+| `laptopClosed` | open it and work, browse, play | browse (45), code (60), write (60), homework (45), all sat | OK (I-tabletop-01 fixed; used closed) |
+| `monitor` | work or play at the screen | browse (45), code (60), homework (45), sat; it still fits on almost no top (I-tabletop-05) | OK (I-tabletop-01 fixed) |
+| `stuffedToy` | cuddle it, play with it (children) | play (15, children) | OK (I-tabletop-01 fixed) |
+| `toyBlocks` | stack them (children) | blocks (30, sat, children) | OK (I-tabletop-01 fixed) |
 
 ## Findings
 
 Seeded from earlier docs first; add new findings after them in the same form.
 
-Not tied to one row: I-tabletop-04.
+Not tied to one row: I-tabletop-04, I-tabletop-06.
 
 ### I-tabletop-01 — No thing on a top can be used, though 20 of them are plainly for using
 
@@ -168,7 +168,8 @@ Not tied to one row: I-tabletop-04.
   - food and drink to take: `breadBin`, `cookieJar`, `fruitBowl` (a snack), `teapotSet`, `mugs`, `wineGlasses` (a drink);
   - books, small plants and toys: `bookStack`, `booksUpright` (read), `potSucculent`, `potCactus`, `potSmall` (water: the floor `plant` and `hangingPlant` have it), `stuffedToy`, `toyBlocks` (a child's play).
   The 3 others are not plainly missing: `tableClock` (the sim has no alarms), `globe` (spinning it is a gesture), `cuttingBoard` (chopping is the counter's step in cooking). The 16 with no flag are decor by the reference. Every shot is a "no uses" record (`tabletop/play/c1/`, `c2/`). The appliances are the worst: a kettle, toaster and espresso machine on every generated kitchen's counter (I-tabletop-04) and never touched. Owner decision 3 makes the sim work (using a thing on a top, standing at its counter) a `code` finding.
-- **Status:** confirmed and widened (activities wave: one cause, the content rule; I-tabletop-02 and I-tabletop-03 merged into it)
+- **Status:** fixed (ed77dc36, 5209bd53)
+- **After:** The content rule is gone (G-63): things on a top keep 1 × 1 and one slot and may have uses, used from the floor beside their top (`surface::rider_tiles`: in front of the counter, desk or table, else at its side), standing and facing them; a sit use takes a free chair pulled up to that top, else a seat within `seatNear`, else is done standing; at a top with chairs all round, from one of its chairs. All 20 got uses after their siblings (Uses column of `docs/objects/tabletop.md`; the "Real uses" tables above): tea at the kettle, toast, a smoothie, practise baking at the mixer, a coffee (teens and up), a sandwich, a biscuit, fruit, tea from the tea set, a hot drink, wine (young adults and up), reading both books, watering the three plants, the laptop's browse/code/write/homework, the monitor's browse/code/homework, the teddy and the blocks (children). Food, drink, books, plants and toys don't wear. On `review-stage` each is used at the counter at (15,7), the resident standing in front of it at (14.5, 7.5) facing it (`fixes/tops-conditions/play-tops-adult.jsonl`, `tops-adult-kettle-tea-01.png`, `tops-adult-toaster-toast-00.png`); the tea set sat at a table with a chair (`tops-adult-teapotSet-tea-01.png`), the laptop sat on the desk chair (`tops-adult-laptopClosed-browse-01.png`); the child plays with the teddy and the blocks (`play-tops-child.jsonl`). The monitor wasn't shot (it can't be bought where the play runner puts it, I-tabletop-05). `cargo review uses`: the tabletop "no use" flags are the three decor ones (chopping board, alarm clock, globe); the toaster's and blender's 3–4 minutes are flagged against the cook median, as the breakfast counter's same uses (by design). The laptop is used closed and no tabletop use has a clip yet (the kettle's lid, the bread bin's roll-top, the laptop's lid are modelled for one). Sim tests: `tests/tops_and_conditions.rs`. Paths under `bench-results/review/fixes/tops-conditions/`.
 - **Source:** `docs/objects/open.md` Still open › Content and sim; `plan/release-0.3.0.md` §2.5; widened in wave: tabletop
 
 ### I-tabletop-02 — The bread bin has no use
@@ -199,7 +200,8 @@ Not tied to one row: I-tabletop-04.
 - **Where:** `web/src/game/housegen.ts`
 - **Evidence:** Every one of the 180 sample houses has small things on tops. With the rule against uses on things on a top (I-tabletop-01), they are decor in every home.
   Activities wave: confirmed by the rule (`content.rs:2738`); not re-counted in houses. It is the reach of I-tabletop-01: whether generated kitchens should keep a kettle and a toaster nobody uses, or the fix of I-tabletop-01 comes first.
-- **Status:** confirmed (activities wave, by the content rule)
+- **Status:** fixed (ed77dc36, 5209bd53)
+- **After:** Decided by Q-20 (keep them) and fixed with I-tabletop-01: the generated kitchens' kettle and toaster, and every other thing on a top with a use, are used where they stand. In `generated-82` the house's own toaster and fruit bowl are used at the island they stand on (`fixes/tops-conditions/play-generated-82.jsonl`, `generated-82-toaster-toast-01.png`). Over the 180 sample houses (`tools/housegen/sample.ts`) and 24 sample worlds every used thing on a top can be reached (`tests/generated_houses.rs`, `generated_worlds.rs`, `--ignored`, now through `surface::use_tiles`): the one boxed in (a fruit bowl on a square table with three chairs and a wall) is used from one of its chairs.
 - **Source:** `docs/objects/open.md` Still open › Content and sim
 
 ### I-tabletop-05 — The monitor fits on no counter and on almost no desk
@@ -213,6 +215,16 @@ Not tied to one row: I-tabletop-04.
 - **Status:** fixed (543c6121)
 - **After:** Radius 0.23 (half its 0.46 m depth with the keyboard): bought on the stage counter (`bench-results/review/fixes/content/g07/after-monitor-no-uses.png`), on the standing, simple and executive desks at their tops' middles; refused on the 0.38–0.42 m deep computer and writing desks. Its text says so.
 - **Source:** play runner agent, tooling round
+
+### I-tabletop-06 — Sat at a table or desk to use a thing on it, the resident leaves the chair pushed out
+
+- **Severity:** S3
+- **Rubric:** I3 (A1)
+- **Fix class:** code
+- **Where:** the renderer's chair tuck (`web/src/render/babylon/characters.ts` `tuckIn`, `TUCK`, and the seat it finds, `seatUnder`); the sim seats them through `Sim::use_seat` (`surface::seat_at_top`, G-63)
+- **Evidence:** `fixes/tops-conditions/tops-adult-teapotSet-tea-01.png`: pouring tea from the tea set, Ada sits on the wooden chair a hand's width back from the square table, hands in her lap; `tops-adult-laptopClosed-browse-01.png`: at the laptop on the desk, the office chair stays about 0.4 m out, her hands reaching. Shot 2–4 s into the use, well after the tuck's ease-in. A chair pulled up to a table is shuffled in for a meal; a use of a thing on the top, done from that chair, isn't. Cause not traced (whether `tuckIn` sees the chair as the seat when the use is the thing on the top's).
+- **Status:** open
+- **Source:** fix: tops-conditions
 
 ### M-tabletop-01 — The candles are drawn lit all day, and at night they don't glow
 

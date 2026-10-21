@@ -192,7 +192,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/outdoor.py:153` (seat slats at 0.47 m, 3.5 cm thick: top 0.49); `web/src/render/babylon/characters/furniture.json:5` (`SEATS.bench` 0.45)
 - **Evidence:** `cargo check-glb` heights warning (`model.bench seat 0.45 m … the model 0.491 m there: 4.1 cm higher`) and `sizes-outdoor.md` (seat 0.491 > 0.48, the top of the 0.42–0.48 range). In play (`play/bench-sit-01.png`, `sheets/seat-benchF.png`) the thighs hide the 4 cm the pelvis sinks into the slats, so it reads as seated; it fails the strict range by 1 cm and the three-way check by 4 cm. Lowering the slats to 0.45 fixes both; raising `SEATS.bench` alone would leave the seat out of range.
-- **Status:** open
+- **Status:** fixed (b4306968)
+- **After:** the slats' top at 0.45 m (`BENCH_SEAT`), where `seats.bench` puts the sitter; `cargo check-glb` quiet for `model.bench` and `cargo review sizes` has it in range (`fixes/blender-outdoor/check-glb.txt`, `sizes.txt`); two sitters at every stage `fixes/blender-outdoor/poses/poses-seats-*-bench.png`, in play `play/garden-bench-sit-0*.png`.
 - **Source:** pilot (T1 warning, sizes table)
 
 ### M-outdoor-03 — The picnic table is 7 cm low at the top and 2 cm low on the benches
@@ -202,7 +203,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/outdoor.py:200` (top planks at 0.61, 4 cm: top 0.63) and `:203` (bench planks at 0.38: top 0.40); `web/public/content/furniture.json:4577` (`surface.height` 0.63); `web/src/render/babylon/characters/furniture.json:47` (`SEATS.picnicTable` 0.40)
 - **Evidence:** `tables/sizes-outdoor.md` (top 0.643 < 0.70, seat 0.400 < 0.42; reference `picnicTable` top 70–78, seat 42–48). The three ways agree with each other, so the check is quiet, but both heights are out of range, the top by 7 cm, and the gap between bench and top (0.23 m) is about 7 cm short of a real one's 0.28–0.32: the picnicker's knees and the table top nearly meet (`sheets/obj-picnicTable.png`, `extra/picnic-top/top-picnicTable-picnic-01.png`). Raise the top to about 0.73 and the benches to 0.44, with the content `surface` and `SEATS` row.
-- **Status:** open
+- **Status:** fixed (b4306968)
+- **After:** the top at 0.73 m and the benches at 0.44 (content `surface` 0.73, `seats.picnicTable` 0.44), 0.29 m between them; `cargo review sizes`: seat 0.45, top 0.74, in range (its H 1.06 is the basket on the top). The two across the cloth with their knees under it: `fixes/blender-outdoor/poses/poses-seats-*-picnicTable_picnic.png` (adult, child, elder), in play `play/garden-picnicTable-picnic-0*.png`.
 - **Source:** outdoor wave (sizes table)
 
 ### M-outdoor-04 — The charcoal grill's bowl stands 20 cm high: the grate at 0.97 m
@@ -212,7 +214,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/outdoor.py:627` (`KETTLE_R, KETTLE_RIM = 0.3, 0.99`, "old part"), `:635-636` (bowl from 0.64), `:646` (grate at 0.965), `:659` (legs from 0.68)
 - **Evidence:** The rim is at 0.99 m and the grate at 0.965, the lid's top at 1.24 (`sizes-outdoor.md`: H 1.242 > 1.21). A 57 cm kettle grill's rim is at about 0.75–0.8 m and it stands about 1.0–1.07 m with its lid (reference `kettleGrill` 0.9–1.1 m, top 70–80). In play the rim is at the cook's elbow (`sheets/obj-grill.png`, `play/chunk5-kitchen/grill-cook-01.png`), the height of the gas station's counter. Shorten the legs by about 0.2 m. (The sizes table's "top 0.71" is a wrong point, not the grate.)
-- **Status:** open
+- **Status:** fixed (b4306968)
+- **After:** the rim at 0.79 m and the grate at 0.77, 1.04 m with the lid (a 57 cm kettle's), the legs 0.2 m shorter; the coals glow at night again (`coal_hot`, M-outdoor-01's fix in the renderer). `fixes/blender-outdoor/gallery/gallery-grill.png`, `clips/clips-grill-all-t99.png`. `cargo review sizes`' "top 0.69" is still a point on the bowl, not the grate. Not shot cooking at night (it needs the kitchen's ingredients on the stage).
 - **Source:** outdoor wave (sizes table, `outdoor.py`)
 
 ### M-outdoor-05 — The hammock is 1.86 m long: residents lie in it folded, as in a sling chair
@@ -222,7 +225,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/outdoor.py:481-499` (stand base 1.86 m, posts at ±0.89; `_sling('sling', 0.62, 0.66, 0.6, 0.86, …)`: a bed 1.32 m long and 0.62 wide); `web/public/content/furniture.json:4703` (footprint 1 × 2); `web/src/render/babylon/characters/furniture.json:67` (`BEDS.hammock` sling)
 - **Evidence:** `sizes-outdoor.md` (0.70 × 1.86 against a stand hammock's 1–1.6 × 2.7–4 m). An adult (1.75 m) on a 1.32 m sling lies in a V, knees up and head high (`sheets/obj-hammock.png`, `play/chunk2/hammock-doze-01.png`); the elder sits up in it (`sheets/age-hammock.png`, `play/chunk9-lie-elder/hammock-swing-01.png`). The packs' hammocks, lain across a longer bed, read right in the same pose shots (`poses/poses-only-hammock-default.png`). A longer stand and bed (footprint 1 × 3, about 2.8 m) is the fix.
-- **Status:** open
+- **Status:** fixed (b4306968)
+- **After:** Q-07: a 2.8 m stand on 1 × 3 tiles (content `footprint`), a 1.96 m bed between the spreader bars 0.74 m wide (`beds.hammock` sling: low 0.52, end 0.84, half 0.98, the pillow 0.78 towards the head). Lain in at full length, the legs out along the sling, at every stage: `fixes/blender-outdoor/poses/poses-beds-*-hammock_*.png`, in play `play/garden-hammock-swing-0*.png`; `cargo review sizes` in range. Generated houses and worlds checked (CI's `generated_houses`, `generated_worlds`). The packs' hammocks (M-packs-06) are the packs wave's.
 - **Source:** outdoor wave (sizes table, Phase 0 "Seen")
 
 ### M-outdoor-06 — The rain barrel's downpipe ends in mid-air, wherever the barrel stands
@@ -232,7 +236,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** decision
 - **Where:** `tools/art/blender/families/yard.py:776-782` (`downpipe` up to 2.10 m behind the barrel, a collar on top); `web/public/content/catalog2/outdoor.json:495-509` (a floor object, any tile)
 - **Evidence:** On the lawn the pipe stands free and stops at 2.1 m (`play/chunk3/rainBarrel-no-uses.png`). Against the house's back wall (`extra/wall/wall-rainBarrel-no-uses.png`, `rainBarrel@8,18,0`) it stops 0.7 m under the eaves of a 2.8 m storey, with no gutter, and in the cut-away view stands over the lowered wall. A downpipe comes down from a gutter. Either drop the pipe (a barrel with a lid inlet, as under a shed's gutter) or run it to the roof and require a wall behind: the owner's call. `sizes-outdoor.md`'s H 2.115 is the pipe; the barrel is 0.96.
-- **Status:** open
+- **Status:** fixed (d09f7f52)
+- **After:** Q-06: the downpipe is gone; a lidded barrel with its inlet in the middle of its tile, 0.97 m high (`fixes/blender-outdoor/gallery/gallery-rainBarrel.png`).
 - **Source:** outdoor wave (lead; Phase 0 "Seen")
 
 ### M-outdoor-07 — The garden boulders read as eggs, not rock
@@ -242,7 +247,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/garden_decor.py:147-158` (`boulder`: three `G.boulder`s with the default low noise, scaled to smooth spheroids, pale `stone`, flat moss pads on top)
 - **Evidence:** `sheets/obj-garden.boulder.png`: smooth, pale, rounded, egg-shaped stones with moss lying on them as flat green discs; from the game camera they read as eggs or a toy turtle, not weathered stones. Real garden boulders are faceted and flat-bottomed, wider than tall, darker and mottled, with moss in their cracks. More noise and flattening, a darker mottled finish, and the stones sunk a little into the grass.
-- **Status:** open
+- **Status:** fixed (d81aded7)
+- **After:** three stones broader than tall (1.01 × 0.47 × 0.92 m, inside `boulders`), roughened and split into flat faces, their feet cut flat where they go into the lawn (the woods' rock's cuts, `ground.py`), in darker greys (their own `rock` materials; the other decor keeps its dressed `stone`), moss in patches on the tops and in the crack between the two big ones, pale lichen on the faces, the two small stones on one side so the group reads as a heap, not a shell with a head and a tail (`bench-results/review/fixes/blender-trees/gallery/gallery-garden.boulder.png`, `gallery-game/gallery-game-garden.boulder.png`). Its colour parts are now `rock`, `rock_dark`, `rock_warm` (labels unchanged).
 - **Source:** outdoor wave (lead; Phase 0 "Seen")
 
 ### M-outdoor-08 — Overall sizes outside the range: a long bench, a narrow swing frame, a deep bar, a high swing seat, a bistro set pulled apart
@@ -252,7 +258,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/outdoor.py:341` (`benchGarden3` slats 2.7 m), `:510` (`_a_frame` legs at ±0.42 m, shared by the porch swing and the swing set), `:367` (`outdoorBar` counter 0.88 deep), `:538` (`porchSwing` cushion top 0.565), `:191-192` (`patioSet` chairs centred at −0.62 and +0.72 round a table from 0.03 to 0.57)
 - **Evidence:** `sizes-outdoor.md`: the garden bench is 2.70 m for three (range 1.2–1.9; 0.9 m a person); the swing set is 0.91 deep (1.2–2.2), its A-frames too upright for seats swinging 20°; the outdoor bar is 0.89 deep (0.40–0.75); the porch swing's seat is 0.571 (42–55; content 0.55). The bistro set is 1.86 m deep (0.6–1.3) because its chairs stand 46 cm back from the table's edges: the sitter's knees are well short of it (`sheets/obj-patioSet.png`). Each reads as its thing; side by side with real ones they're off.
-- **Status:** open
+- **Status:** fixed (b4306968)
+- **After:** the garden bench is 1.9 m on 2 × 1 tiles (its three sitters spread 0.67 m apart); the swing set's legs splay ±0.72 m at the foot on 2 × 2 tiles (1.51 m deep); the porch swing's cushion is at 0.52 m (content `seat` 0.52); the bistro set's chairs face each other across the table, their seats 4 cm under its edges (1.42 m deep; `places` ±0.43, the legs crossed at its sides clear of the knees). The outdoor bar's 0.89 m is now inside the reference (`barCounter` 0.40–0.90), not changed. `cargo review sizes`: all four in range; `fixes/blender-outdoor/gallery/`, `poses/poses-seats-*-{benchGarden3,porchSwing,patioSet_coffee}.png`, `play/garden-*.png`.
 - **Source:** outdoor wave (sizes table)
 
 ### M-outdoor-09 — The garden chair's sitter is put 3.4 cm into the slats
@@ -273,7 +280,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/outdoor.py:590-597` (the cover one rigid disc, `G.hinged(… F.at(0, 0.84, -TUB_R - 0.02))`, `G.swing(cover, 'cover_off', -105, …)`); `:568-569` (the staves' inside: a floor at 0.12, no bench); `web/src/render/babylon/characters/furniture.json:37` (`SEATS.hotTubCedar` 0.35)
 - **Evidence:** `clips/clips-hotTubCedar-all-t99.png`, `play/chunk2/hotTubCedar-soak-01.png`: opened, the 1.9 m cover stands on end behind the tub, its lower edge clear of the rim, a grey disc hanging in the air above the soaker. A hot tub's cover folds in half on its seam (the model has the seam, `cover_seam`) and lies back over a lifter or on the ground beside the tub. While rebuilding it: the sitter is placed at 0.35 over a floor at 0.12 with no bench under them, hidden only by the opaque water; a bench ring at 0.35 would make the three heights agree.
-- **Status:** open
+- **Status:** fixed (b4306968)
+- **After:** `cover_off` (1.5 s) folds the cover back on its seam (one part, squashed to half its depth and twice its thickness about its back edge: two halves would be a fourth draw, as the shower door's, Q-05), lifts it, turns it down behind the tub and lowers it to hang there on its folded edge as on a lifter, its round edge just off the ground; a bench runs round the inside at 0.35 m under the soakers, so `seats.hotTubCedar` is on it (the heights warning gone). `fixes/blender-outdoor/clips/clips-hotTubCedar-cover_off-t*.png`, in play `play/garden-hotTubCedar-soak-0*.png`, `poses/poses-seats-*-hotTubCedar_soak.png`.
 - **Source:** outdoor wave (lead; Phase 0 "Seen")
 
 ### A-outdoor-02 — moved to systems.md

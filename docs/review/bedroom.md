@@ -141,7 +141,8 @@ Measured: the dressing table's top 0.76 (72–78) and its pouf's seat 0.45 (42�
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/bedroom_storage.py:206-222` (`nightstandModern`: case from −0.42 to 0.16, top 0.60 deep), `:241-258` (`nightstandDrawers`: the same), `:421-437` (`chestOfDrawers`: case to 0.185, top 0.63); sizes at `:531`, `:535`, `:552`
 - **Evidence:** `sizes-bedroom.md`: the modern and the three-drawer nightstand are 0.628 m deep against a nightstand's 0.30–0.50 (±10 %: 0.55), the tall chest 0.655 against 0.40–0.55 (0.605). The classic nightstand is 0.47 and the drum 0.56 (`bedroom/sheets/obj-nightstandModern.png`, `obj-nightstandDrawers.png`, `obj-chestOfDrawers.png`): beside a bed, the two are deeper than the bed's own headboard-to-pillow run and reach past the pillows. Taking them to about 0.45 (nightstands) and 0.50 (the chest) against the wall keeps their tile.
-- **Status:** open
+- **Status:** fixed (dca59e66)
+- **After:** The modern and the three-drawer nightstands are 0.47 m deep (the classic one's), the tall chest 0.51, their backs on the wall; the content surfaces follow (0.58 × 0.46, 0.88 × 0.48). `cargo review sizes` bedroom: 4 outside, none of the three (`fixes/blender-rooms/gallery/gallery-nightstandModern.png`, `gallery-nightstandDrawers.png`, `gallery-chestOfDrawers.png`; `play/rooms-chestOfDrawers-outfit-*.png`).
 - **Source:** wave: bedroom
 
 ### M-bedroom-03 — The single wardrobe's one door is 0.88 m wide
@@ -151,7 +152,8 @@ Measured: the dressing table's top 0.76 (72–78) and its pouf's seat 0.45 (42�
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/bedroom_storage.py:465-480` (`wardrobeSingle`: carcass 0.90, `door` 0.88 × 1.97 hinged at −0.44)
 - **Evidence:** `sizes-bedroom.md`: W 0.90 against a single wardrobe's 0.50–0.80 (±10 %: 0.88). The one door is as wide as a room door (0.8–0.9 m, M17) and nearly as tall (`bedroom/sheets/obj-wardrobeSingle.png`); single wardrobe doors are 0.40–0.60 m (`ikeaPax`). Swung out 100° it sweeps most of the tile in front, where the resident stands (`bedroom/play/chunk2/wardrobeSingle-outfit-01.png`). A 0.60 m carcass, or two doors, reads as the thing.
-- **Status:** open
+- **Status:** fixed (dca59e66)
+- **After:** A 0.60 m carcass with a 0.58 m door (the description's "narrow white wardrobe"); its box on the hat shelf no longer comes up through the top and the side (nor the double wardrobe's through its top): `fixes/blender-rooms/gallery/gallery-wardrobeSingle.png`, `clips/clips-wardrobeSingle-all-t99.png`, `play/rooms-wardrobeSingle-outfit-01.png`.
 - **Source:** wave: bedroom
 
 ### M-bedroom-04 — moved to residents.md
@@ -174,7 +176,8 @@ Measured: the dressing table's top 0.76 (72–78) and its pouf's seat 0.45 (42�
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters.ts:2526-2541` (a bunk's second sleeper gets `bedH` = the upper mattress, 1.38 m; getting in is `sitDown` with `rootY = rig.bedH − …` at `LIE_ENTRY`, `:304`, from the tile in front, as on any bed); `tools/art/blender/families/bedroom.py:225-229` (the ladder, static, at the foot end on the right); `web/src/render/babylon/characters/furniture.json:81` (`bunks.bedBunk` [0.44, 1.38])
 - **Evidence:** `bedroom/extra/bunk-two-02.png`: with someone asleep below, a second resident (the elder) sent to sleep walks to the foot end and sits down 1.4 m above the floor on nothing, facing out, the legs through the upper bunk's end board; then lies on the upper duvet (`bunk-two-05.png`) and the quilt comes (`bunk-two-09.png`). Getting up, they drop the same way. Nobody uses the ladder. A climb (up the ladder, then in over the side) is new behaviour. Related: anyone may take the upper bunk, an elder or a small child too (no age rule, I-systems-04, systems ledger).
-- **Status:** open
+- **Status:** fixed (6a1438d5, 1768f8b0)
+- **After:** the upper bunk's sleeper walks from the tile round the foot end to the ladder, climbs its four rungs, crawls in through the gap in the guard rail, sits with the legs swung round and lies back into `lie` (`bunkUp172`/`147`/`112`); woken, the same way down and a walk round to the tile (`bunkDown…`), sim-core keeping them at the bed meanwhile (`Sim::ladder_ticks`, sim test `up_from_the_upper_bunk_they_climb_down_its_ladder_before_anything_else`). Shots, the lower bunk's sleeper in already: `fixes/rides/bunk-up-child.png`, `bunk-up-child-close.png`, `bunk-down-child.png`, `bunk-up-adult-down-teen.png` (the adult up, the teen down). The lower bunk as before. The duvet's turn-down comes early: A-bedroom-06.
 - **Source:** wave: bedroom (`bedroom/extra/scenes.mjs` phase `bunk`, `review-stage`, residents 0 and 4)
 
 ### A-bedroom-03 — moved to residents.md
@@ -212,7 +215,8 @@ Measured: the dressing table's top 0.76 (72–78) and its pouf's seat 0.45 (42�
 - **Fix class:** code
 - **Where:** `web/public/content/furniture.json:2162`, `:2191` (`dresser`, `wardrobe` `outfit`), `web/public/content/catalog2/bedroom.json:273`, `:314`, `:355`, `:384`, `:414` (`nightstandDrawers`, `chestOfDrawers`, `dresserLow`, `wardrobeSingle`, `armoire`); `web/src/render/babylon/characters/outfit.ts:120` (`outfitFor`: the day outfit is fixed by the resident's id and appearance)
 - **Evidence:** `bedroom/play/chunk1/dresser-outfit-01.png`, `wardrobe-outfit-01.png`, `bedroom/play/chunk2/armoire-outfit-01.png`: the drawer or doors open, the resident works at the clothes for 10 minutes, the doors shut and they walk off dressed as before (comfort +0.05). Picking an outfit is changing into it. Changing the day outfit (from the wardrobe's clothes, or a pick from the creator's choices) is new behaviour.
-- **Status:** open
+- **Status:** fixed (5f4411b9)
+- **After:** "Pick an outfit" (content `changesOutfit`, on all six) puts the resident in their next outfit halfway through, the doors or the drawer open for the whole use now (no `hold`, `bedroom_storage.py`), and they walk off in it: the creator's, then two made from the id (`outfit.ts` `spareLook`: other garments, another top colour), in turn, kept and saved until they change again (`Sim::outfit`, save v31; `tests/outfits.rs`). `fixes/pairings/outfit/`: at the wardrobe in the creator's green top and navy capris (`after-wardrobe-outfit-01.png`), the white top and brown trousers from halfway (`-05`), leaving in them (`-07`); then at the dresser from those (`after-dresser-outfit-02.png`, the drawer out) into the yellow top and black shorts (`-06`). The use lasts its 10 minutes with comfort full. Not done: choosing which outfit. Before: `fixes/pairings/before/wardrobe-outfit-01.png`.
 - **Source:** wave: bedroom
 
 ### I-bedroom-05 — An outfit from the bedside drawer
@@ -223,7 +227,7 @@ Measured: the dressing table's top 0.76 (72–78) and its pouf's seat 0.45 (42�
 - **Where:** `web/public/content/catalog2/bedroom.json:273` (`nightstandDrawers` `outfit`)
 - **Evidence:** `bedroom/play/chunk2/nightstandDrawers-outfit-01.png`: "Pick an outfit" from a 0.60 m nightstand's top drawer. A bedside drawer holds a book, glasses or a snack, not the day's clothes (`reference.md` `nightstand`: put a lamp, a book and a glass by the bed; a midnight snack from the drawer, as `slob.snackNightstand`). A "Read in bed" or a snack use, or no use (decor, as the other three), fits.
 - **Status:** fixed (eaca9ed8)
-- **After:** The outfit is gone; "Grab a snack from the drawer" (fetched, eaten sitting). The drawer clip is keyed to the old `outfit` use in `bedroom_storage.py` (`DRAWER_USE`): it opens again once the key is `snack` and the family is rebuilt (`cargo review uses` flags the key meanwhile).
+- **After:** The outfit is gone; "Grab a snack from the drawer" (fetched, eaten sitting). The drawer clip is keyed to the old `outfit` use in `bedroom_storage.py` (`DRAWER_USE`): it opens again once the key is `snack` and the family is rebuilt (`cargo review uses` flags the key meanwhile). Re-keyed (dca59e66): the drawer slides out for the snack with a biscuit tin, chocolate and a paperback in it (`fixes/blender-rooms/play/rooms-nightstandDrawers-snack-01.png`, `play-rooms.jsonl`: `drawer_open` 4151–7102 ms).
 - **Source:** wave: bedroom
 
 ### I-bedroom-06 — The mirrors share out their two uses, and two of them have one name
@@ -244,8 +248,8 @@ Measured: the dressing table's top 0.76 (72–78) and its pouf's seat 0.45 (42�
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters.ts:465` (`ACTIONS.wash`: `stand` clips only, no `sit`, so the seated default `sit` plays); `web/public/content/furniture.json:2219` (`dressingTable` `getReady`: `anim: wash`, `pose: sit`)
 - **Evidence:** `bedroom/extra/pose-dressingTable-getReady.png` (`poses.html?seats=dressingTable:getReady`), `bedroom/play/chunk1/dressingTable-getReady-01.png`, `bedroom/sheets/age-dressingTable.png`: on the pouf facing the mirror for 15 minutes with the hands resting low, the drawer open beside the knee. Getting ready is the hands at the hair and face. A seated clip with the hands up (as `phone`'s hand to the head, or a brush stroke) on `getReady`, chosen by object as `look` and `harvest` are, is a table change; a hand prop is I-held-01's.
-- **Status:** fixed (3cd0bf87)
-- **After:** `ACTIONS.wash.upper` by def: seated at the dressing table the `phone` clip's upper body brings a hand up to the hair (`fixes/tables/play-a/a-dressingTable-getReady-01.png`). A brush stroke clip and a hand prop stay with the clip and props waves.
+- **Status:** fixed (3cd0bf87, 0f613d59)
+- **After:** `ACTIONS.wash.upper` by def: seated at the dressing table the `phone` clip's upper body brings a hand up to the hair (`fixes/tables/play-a/a-dressingTable-getReady-01.png`). A brush stroke clip and a hand prop stay with the clip and props waves. Then (fix: clips-reach) the brush stroke: `brushHair` (clips/self.ts) as the seated upper body, the hand closed (`HANDS.grip`): four strokes from the crown down the right side, the head tilting into each, then the left hand smoothing the other side (`fixes/clips-reach/poses/poses-dressingTable-getReady-strokes.png`, `play-a/a-dressingTable-getReady-01.png`, `play-teen/`, `play-child/`, `play-elder/`; `compare/I-bedroom-07.png`). The brush itself is I-held-01's.
 - **Source:** wave: bedroom
 
 ### A-bedroom-05 — The daybed's quilt hangs down through its front rail
@@ -257,6 +261,17 @@ Measured: the dressing table's top 0.76 (72–78) and its pouf's seat 0.45 (42�
 - **Evidence:** `fixes/tables/play-a/a-bedDaybed-sleep-01.png`: the quilt's sides drop past the mattress's edges as on an open bed, so on the front side it hangs down between the rail's spindles to below the mattress, and at the back it runs into the back. A bed with sides wants the quilt tucked in at the mattress's edges (no side drop), as a cot's would be.
 - **Status:** open
 - **Source:** fix: tables (G-04 re-check, 2026-10-21)
+
+### A-bedroom-06 — The upper bunk's duvet turns down while its sleeper is still at the foot of the ladder
+
+- **Severity:** S3
+- **Rubric:** A2, A4
+- **Fix class:** motion
+- **Where:** `web/public/assets/packs/bedroom/manifest.json` (`model.bedBunk` `motions.uses.sleep`: `turn_down_upper` for slot 1, played as the use starts); `tools/art/blender/families/bedroom.py:219` (`bedBunk`: `_turn_down(upper, 'turn_down_upper', …)`)
+- **Evidence:** `fixes/rides/bunk-up-child.png` (t 0.1 to 0.86): the upper duvet's flap folds back the moment the use starts, about 6 s before its sleeper, now climbing the ladder (G-44, `bunkUp`), gets onto the mattress, and stands folded up beside them while they crawl in and sit. Someone turns their own duvet back once in bed. The upper slot's turn-down wants a delay of the climb's length (`bunkUp`, 7 s at speed 1), as the moving parts in time with the use (G-17) do.
+- **Status:** fixed (ac62888a)
+- **After:** `turn_down_upper` waits 5 s (`delay`): on the ladder the duvet lies flat (`fixes/blender-rooms/bunk/upper-v-03.png`, `-04.png`, the child 2.6–4.3 s into `bunkUp112`); it is folded back as they sit up on the mattress (`upper-v-07.png`, 6.2 s) and the quilt comes as they lie (`upper-v-09.png`).
+- **Source:** fix: rides (G-44)
 
 ### I-bedroom-08 — At a mirror the resident looks down, not at the glass
 

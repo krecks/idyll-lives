@@ -72,7 +72,10 @@ The trees (`models/trees/oak.glb`, `maple.glb`, `birch.glb`, `cherry.glb`, `appl
 `magnolia.glb`, `willow.glb`, `pine.glb`, `spruce.glb`, `cypress.glb`, `lemonTree.glb`, each with its far version,
 override pack `packs/trees/manifest.json`) are built in Blender by `tools/art/blender/families/trees.py` on `gamekit`
 and exported as `.glb` (glTF, original, CC0). They stand on the lots and in the woods, whose far trees draw the far
-versions. An apple or a lemon shrinks away while it is picked, the Japanese maple's stray sprigs while it is shaped.
+versions. An apple or a lemon shrinks away while it is picked, the Japanese maple's stray sprigs while it is shaped. The pine, spruce, Japanese maple, willow, cypress, maple and magnolia were rebuilt for the authenticity review
+(G-38, 2026-10-21): crowns over head height, the willow's streamers, a slim cypress, a maple of its own and the
+magnolia's goblets; with them the bonsai's stand, the rose bush, azalea, meadow and strawberries (`plants.py`) and
+the garden boulders (`garden_decor.py`), all original and CC0.
 
 The kitchen fridge (`models/kitchen/fridge.glb`, override pack `packs/kitchen/manifest.json`) is built in
 Blender by `tools/art/blender/families/kitchen.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
@@ -92,7 +95,7 @@ The sofas and sectionals (`models/living/sofa.glb`, `loveseat.glb`, `sofaThree.g
 The armchairs and small seats (`models/living/armchair.glb`, `armchairLounge.glb`, `armchairLeather.glb`,
 `armchairDesign.glb`, `armchairWingback.glb`, `recliner.glb`, `rockingChair.glb`, `pouf.glb`, `ottoman.glb`,
 `floorCushion.glb`, `beanBag.glb`, same pack) are built the same way (glTF, original, CC0). Their seats sink in, the
-recliner tips back with its footrest up, the rocking chair rocks with whoever sits in it, and the bean bag squashes;
+recliner tips back onto its head cushion with its footrest up, the rocking chair rocks with whoever sits in it, and the bean bag squashes;
 the designer lounge chair is still.
 
 The coffee and side tables (`models/living/coffeeTable.glb`, `coffeeTableGlass.glb`, `coffeeTableMarble.glb`,
@@ -121,7 +124,8 @@ its lid (`lid_up`) while a resident uses it.
 
 The bathroom showers (`models/bathroom/shower.glb`, `showerStall.glb`, `showerWalkIn.glb`, `showerRain.glb`, override
 pack `packs/bathroom/manifest.json`) are built in Blender by `tools/art/blender/families/bathroom.py` on `gamekit` and
-exported as `.glb` (glTF, original, CC0). Each rains from its head (`water_on`) while a resident showers.
+exported as `.glb` (glTF, original, CC0). Each rains from its head (`water_on`) while a resident showers; the
+shower's glass door slides open to let them in and out, and the stall's curtain is drawn across while they shower.
 
 The bathroom baths (`models/bathroom/bathtub.glb`, `bathtubClawfoot.glb`, `bathtubFreestanding.glb`, override pack
 `packs/bathroom/manifest.json`) are built in Blender by `tools/art/blender/families/bathroom.py` on `gamekit` and
@@ -261,7 +265,8 @@ canopy stirs in the wind (`stir`); the rest are still.
 The outdoor loungers and swings (`models/outdoor/sunLounger.glb`, `hammock.glb`, `porchSwing.glb`, `swingSet.glb`,
 `hotTubCedar.glb`, same pack and family) are built the same way (glTF, original, CC0). The lounger's back reclines
 for sunbathing, the hammock and the swings sway with whoever is on them, and the hot tub's cover folds back for a
-soak while the water bubbles.
+soak and hangs behind it while the water bubbles. The patio things, the hammock, the swings, the hot tub and the
+grill were rebuilt to real sizes (2026-10-21).
 
 The play and yard things (`models/yard/sandbox.glb`, `bikeRack.glb`, `raisedBed.glb`, `shedSmall.glb`,
 `greenhouse.glb`, `compostBin.glb`, `rainBarrel.glb`, `clothesline.glb`, `firewoodStack.glb`, each with its
@@ -372,8 +377,9 @@ gets ready.
 The bedroom nightstands and small storage (`models/bedroom_storage/nightstand.glb`, `nightstandModern.glb`,
 `nightstandRound.glb`, `nightstandDrawers.glb`, `nightstandLamp.glb`, `cedarChest.glb`, `laundryHamper.glb`,
 `benchBedEnd.glb`, override pack `packs/bedroom_storage/manifest.json`) are built in Blender by
-`tools/art/blender/families/bedroom_storage.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). They are
-static; the nightstand lamp's shade glows at night.
+`tools/art/blender/families/bedroom_storage.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The
+three-drawer nightstand's top drawer slides out with a midnight snack in it, the chest's and the hamper's lids lift;
+the rest are static, and the nightstand lamp's shade glows at night.
 
 The bedroom wardrobes and drawers (`models/bedroom_storage/dresser.glb`, `wardrobe.glb`, `chestOfDrawers.glb`,
 `dresserLow.glb`, `wardrobeSingle.glb`, `armoire.glb`, same pack) are built in Blender by
@@ -413,7 +419,8 @@ town overview, override pack `packs/playground/manifest.json`) is built in Blend
 plank, the spring rider's horse and the merry-go-round's platform go round while they are played on, carrying their
 riders; the hoop's net swishes after a shot and a pawn moves on the chess table; the slide, the climbing frame and the
 ping-pong table are static. The chess table was rebuilt with a stool either side, its players facing each other
-(2026-10-21).
+(2026-10-21); the slide (headroom on its deck), the spring rider, the merry-go-round, the hoop, the ping-pong table
+and the chess table were rebuilt to real sizes the same day.
 
 The farm (`models/farm/barn.glb`, `silo.glb`, `tractor.glb`, `hayBale.glb`, `hayStack.glb`, `scarecrow.glb`,
 `trough.glb`, `coop.glb`, each with a `.far.glb` for the town overview, override pack `packs/farm/manifest.json`) is

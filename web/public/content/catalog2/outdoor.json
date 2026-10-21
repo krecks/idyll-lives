@@ -93,6 +93,12 @@
           "id": "coffee",
           "requires": ["coffee"],
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",
@@ -151,7 +157,7 @@
       "name": "Garden bench",
       "model": "model.benchGarden3",
       "footprint": [
-        3,
+        2,
         1
       ],
       "price": 280,
@@ -197,7 +203,7 @@
       "outdoors": true,
       "decor": 0.3,
       "seat": {
-        "height": 0.55,
+        "height": 0.52,
         "forward": 0.04
       },
       "description": "A swing seat for two hanging from a wooden frame.",
@@ -317,13 +323,14 @@
       "group": "yard",
       "outdoors": true,
       "decor": 0.3,
-      "description": "Lettuces, carrots and tomatoes in a raised bed. Harvest a fresh, free meal; good gardeners get more out of it.",
+      "description": "Lettuces, carrots and tomatoes in a raised bed. Weeding and watering bring it on; the harvest goes in the fridge, and good gardeners get more out of it.",
       "interactions": [
         {
           "id": "tend",
           "label": "Weed and water",
           "anim": "tend",
           "minutes": 30,
+          "tends": 0.15,
           "effects": {
             "fun": 0.1,
             "hygiene": -0.1
@@ -342,11 +349,16 @@
           "id": "harvest",
           "when": "ripe",
           "leaves": "picked",
+          "yields": {
+            "item": "gardenProduce",
+            "servings": 2,
+            "minutes": 8
+          },
           "label": "Harvest vegetables",
           "anim": "harvest",
           "minutes": 20,
           "effects": {
-            "hunger": 0.45,
+            "hunger": 0.3,
             "hygiene": -0.05
           },
           "tags": [
@@ -528,6 +540,7 @@
         {
           "id": "washing",
           "label": "Hang out the washing",
+          "workOn": "washed",
           "anim": "clean",
           "minutes": 20,
           "effects": {

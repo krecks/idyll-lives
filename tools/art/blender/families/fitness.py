@@ -105,6 +105,7 @@ def treadmill():
 
 # --- the weight bench: a padded bench, a rack with the bar at the head end, dumbbells by the feet ----------
 BAR = (0, 1.02, -0.72)   # the bar's middle on the J-hooks
+PAD_TOP = 0.44           # the pad's top (characters/furniture.json `beds.weightBench`)
 # `bar_off` waits while the lifter sits down on the bench (characters.ts: the `sitDown` clip but its last
 # 0.35 s, 0.98 s), so the bar leaves the hooks as the game starts drawing it in the hands, lying back.
 BAR_DELAY = 0.8
@@ -113,18 +114,17 @@ BAR_DELAY = 0.8
 def weightBench():
     F = G.GameFrame(shift=0.02)   # 2 cm forward of its old part: the rack's back on the wall's face
     with G.new_parts() as parts:
-        F.box('pad', 0.3, 0.09, 1.22, (0, 0.455, -0.12), M.pads, bevel=0.03)
-        F.box('board', 0.27, 0.02, 1.18, (0, 0.4, -0.12), M.dark, bevel=0.005)
-        F.box('beam', 0.12, 0.06, 1.2, (0, 0.36, -0.12), M.frame, bevel=0.012)
+        # A flat bench, its pad at 0.44 m (a bench-press bench is 0.43–0.45, so the lifter's feet reach the floor
+        # either side; review M-fitness-01: 0.50, with leg rollers at its foot where the shins would come down).
+        top = PAD_TOP
+        F.box('pad', 0.3, 0.09, 1.22, (0, top - 0.045, -0.12), M.pads, bevel=0.03)
+        F.box('board', 0.27, 0.02, 1.18, (0, top - 0.1, -0.12), M.dark, bevel=0.005)
+        F.box('beam', 0.12, 0.06, 1.2, (0, top - 0.14, -0.12), M.frame, bevel=0.012)
         for z in (0.4, -0.62):
-            F.box(f'post{z}', 0.08, 0.34, 0.08, (0, 0.18, z), M.frame, bevel=0.012)
+            F.box(f'post{z}', 0.08, top - 0.15, 0.08, (0, (top - 0.15) / 2, z), M.frame, bevel=0.012)
             F.box(f'feet{z}', 0.5, 0.05, 0.08, (0, 0.025, z), M.frame, bevel=0.012)
             for s in (-1, 1):
                 F.box(f'cap{z}{s}', 0.04, 0.052, 0.085, (s * 0.25, 0.026, z), M.dark, bevel=0.01)
-        F.box('arm', 0.06, 0.32, 0.06, (0, 0.4, 0.62), M.frame, bevel=0.01)
-        G.rod('roller_bar', F.at(-0.28, 0.32, 0.64), F.at(0.28, 0.32, 0.64), 0.02, material=M.chrome, verts=10)
-        for s in (-1, 1):
-            F.cyl(f'roller{s}', 0.06, 0.16, (s * 0.2, 0.32, 0.64), M.pads, rot=(0, 90, 0), verts=16, bevel=0.015)
         for s in (-1, 1):   # the rack's uprights, feet and J-hooks
             F.box(f'upright{s}', 0.06, 1.2, 0.06, (s * 0.36, 0.6, -0.8), M.frame, bevel=0.01)
             F.box(f'base{s}', 0.06, 0.05, 0.4, (s * 0.36, 0.025, -0.75), M.frame, bevel=0.01)
@@ -192,17 +192,18 @@ def exerciseBike():
 
 
 # --- the yoga mat: rolled up at the back with a block and a bottle; it unrolls to the front -----------------
-MAT_W, MAT_L, MAT_T = 0.62, 0.9, 0.016   # the mat, flat (the house's floor is drawn 1 cm up)
+MAT_W, MAT_L, MAT_T = 0.62, 1.8, 0.016   # the mat, flat (the house's floor is drawn 1 cm up): a full 1.8 m mat
+                                         # on a 1 x 2 footprint (review M-fitness-02: it unrolled to 0.9)
 ROLL_R = 0.065                           # the roll's radius
-BACK = -0.45                             # the mat's back edge (game depth)
+BACK = -0.93                             # the mat's back edge (game depth): on the wall's face
 
 
 def yogaMat():
     F = G.GameFrame()
     with G.new_parts() as still:
-        F.box('block', 0.15, 0.12, 0.24, (0.41, 0.06, -0.3), M.block, bevel=0.025)
-        F.cyl('bottle', 0.035, 0.2, (-0.4, 0.1, -0.32), M.bottle, verts=14, bevel=0.01)
-        F.cyl('bottle_cap', 0.022, 0.035, (-0.4, 0.215, -0.32), M.dark, verts=12)
+        F.box('block', 0.15, 0.12, 0.24, (0.41, 0.06, BACK + 0.15), M.block, bevel=0.025)
+        F.cyl('bottle', 0.035, 0.2, (-0.4, 0.1, BACK + 0.13), M.bottle, verts=14, bevel=0.01)
+        F.cyl('bottle_cap', 0.022, 0.035, (-0.4, 0.215, BACK + 0.13), M.dark, verts=12)
     G.join(still, 'body', origin=(0, 0, 0))
     # The roll lies at the back, its origin on the floor under its axis: it shrinks onto the floor as it goes.
     roll_z = BACK + ROLL_R
@@ -210,10 +211,11 @@ def yogaMat():
         F.cyl('roll', ROLL_R, MAT_W, (0, ROLL_R, roll_z), M.mat, rot=(0, 90, 0), verts=24, bevel=0.004)
         F.cyl('roll_core', ROLL_R * 0.45, MAT_W + 0.002, (0, ROLL_R, roll_z), M.dark, rot=(0, 90, 0), verts=16)
     roll = G.hinged(G.join(parts, 'roll'), F.at(0, 0, roll_z))
-    # The flat mat, its origin on its back edge, built full and squeezed to nothing for rest.
+    # The flat mat, its origin under the roll's axis, built full and squeezed to nothing for rest: inside the roll,
+    # out of sight (its back edge showed as a strip).
     with G.new_parts() as parts:
         F.box('mat', MAT_W, MAT_T, MAT_L, (0, MAT_T / 2, BACK + MAT_L / 2), M.mat, bevel=0.002)
-    mat = G.hinged(G.join(parts, 'mat'), F.at(0, 0, BACK))
+    mat = G.hinged(G.join(parts, 'mat'), F.at(0, 0, roll_z))
     mat.scale[1] = 0.001
     G.settle()      # on its Model centre: the back on the wall face
     left = 0.12   # what is left of the roll at the front end: a curled edge
@@ -225,6 +227,10 @@ def yogaMat():
 
 
 # --- the dumbbell rack: two tilted shelves of hex dumbbell pairs on A-frames, a rubber mat in front ---------
+# The rack stands back on the wall's face and its rubber mat fills the front of the tile, where the lifter steps
+# in to stand (characters.ts `STAND_BACK`; review I-fitness-02: they stood on the tile in front, the mat empty
+# between them and the rack).
+RACK_SHIFT = -0.1
 SHELVES = ((0.32, -0.08), (0.56, -0.17))   # the shelves' (height, depth): the lower, then the upper
 LIFTED = (1, 0)                            # the pair lifted: the upper shelf's left pair
 
@@ -235,7 +241,7 @@ def _bell(k, i):
 
 
 def dumbbells():
-    F = G.GameFrame()
+    F = G.GameFrame(shift=RACK_SHIFT)   # the rack back against the wall's face, the mat in front of it
     with G.new_parts() as parts:
         for s in (-1, 1):
             G.rod(f'leg_back{s}', F.at(s * 0.36, 0.0, -0.3), F.at(s * 0.36, 0.7, -0.22), 0.02, material=M.frame, verts=8)
@@ -249,7 +255,7 @@ def dumbbells():
                 if (k, i // 2) != LIFTED:
                     w = _bell(k, i)
                     _dumbbell(F, f'dumbbell{k}{i}', -0.27 + i * 0.18, y + 0.012 + w / 2, z, w)
-        F.box('floor_mat', 0.6, 0.012, 0.36, (0, 0.006, 0.2), M.dark, bevel=0.004)
+        G.GameFrame().box('floor_mat', 0.7, 0.014, 0.48, (0, 0.007, 0.26), M.dark, bevel=0.004)
     G.join(parts, 'body', origin=(0, 0, 0))
     # The lifted pair, each its own part with its origin at its middle: hidden while lifted (`pair_off`), the
     # game drawing one in each hand (content `held`).
@@ -278,9 +284,9 @@ FAMILY = G.Family(
              motions={'uses': {'lift': {'clip': 'bar_off', 'delay': BAR_DELAY}}}, paint=[('frame', 'Frame'), ('pads', 'Pads')]),
      G.Model('exerciseBike', exerciseBike, size=(0.53, 1.107, 0.9), centre=(0, 0.02), key='model.exerciseBike',
              motions={'loops': {'cycle': 'pedals_turn'}}, paint=FRAME_PADS),
-     G.Model('yogaMat', yogaMat, size=(0.919, 0.233, 0.27), key='model.yogaMat', centre=(0.025, -0.295),
+     G.Model('yogaMat', yogaMat, size=(0.919, 0.233, 0.27), key='model.yogaMat', centre=(0.025, BACK + 0.135),
              motions={'uses': {'yoga': 'unroll'}}, paint=[('mat', 'Mat')]),
-     G.Model('dumbbells', dumbbells, size=(0.77, 0.717, 0.71), key='model.dumbbells', centre=(0, 0.025),
+     G.Model('dumbbells', dumbbells, size=(0.77, 0.717, 0.93), key='model.dumbbells', centre=(0, 0.035),
              motions={'uses': {'lift': 'pair_off'}}, paint=[('frame', 'Rack'), ('plate', 'Weights')])],
     comment='Blender-built home gym (tools/art/blender/families/fitness.py). Listed in the base '
             'manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw call '
