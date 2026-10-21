@@ -63,7 +63,15 @@
     "patioSet": { "h": 0.44, "fwd": -0.62 },
     "picnicTable": { "h": 0.4, "fwd": -0.68 },
     "gardenChair": { "h": 0.4, "fwd": -0.083, "recline": 0.3141592653589793 },
-    "swingSet": { "h": 0.5, "fwd": 0 }
+    "swingSet": { "h": 0.5, "fwd": 0 },
+    "tree": { "h": 0, "fwd": 0.58, "shade": true },
+    "garden.maple": { "h": 0, "fwd": 0.5, "shade": true },
+    "garden.birch": { "h": 0, "fwd": 0.36, "shade": true },
+    "garden.cherry": { "h": 0, "fwd": 0.46, "shade": true },
+    "garden.apple": { "h": 0, "fwd": 0.42, "shade": true },
+    "garden.japaneseMaple": { "h": 0, "fwd": 0.4, "shade": true },
+    "garden.magnolia": { "h": 0, "fwd": 0.4, "shade": true },
+    "garden.willow": { "h": 0, "fwd": 0.58, "shade": true }
   },
   "defaultSeat": { "h": 0.45, "fwd": 0 },
   "beds": {

@@ -2872,6 +2872,7 @@
           "id": "shade",
           "label": "Relax in the shade",
           "anim": "relax",
+          "pose": "sit",
           "minutes": 30,
           "effects": {
             "comfort": 0.18,

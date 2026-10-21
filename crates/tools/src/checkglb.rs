@@ -1324,6 +1324,8 @@ const SAME: f64 = 0.005;
 /// below the seat's height (a cushion's rounded front), and how far the model's may be from what the table says.
 const FRONT_DROP: f64 = 0.06;
 const FRONT_OFF: f64 = 0.03;
+/// A seat this low (m) is the ground (furniture.json `seats` `shade`: against a tree's trunk), not the model's to measure.
+const GROUND: f64 = 0.02;
 
 /// furniture.json: where residents sit and lie on each object (characters.ts `SEATS`, `BEDS`, `BUNKS` and their
 /// defaults). An object in `seats` takes that seat over the content's `seat` (characters.ts `seatOf`).
@@ -1684,10 +1686,11 @@ fn heights(g: &Glb, entry: &J, object: &J, furniture: &Furniture, every_slot: bo
         out.push(Height { what, expected, source, at, open, mesh, span: None, disagrees });
     };
 
-    // Seated.
+    // Seated (not on the ground: against a tree's trunk, nothing of the model's is sat on).
     let mut seat_front = None;
     if let Some(seat) = seat
         && let Some(s) = &rest
+        && seat.h > GROUND
     {
         height("seat", seat.h, seat.source.into(), &seat.points, s, None, seat.disagrees);
         // Where its top ends in front (the shins clear of a deep cushion: characters.ts `perch`), the worst point.
