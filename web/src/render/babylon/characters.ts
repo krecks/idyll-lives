@@ -75,7 +75,7 @@ import { ENERGY_RATE, type VisemeTrack } from '../../voice/visemes';
 import { outfitFor, SHELL_BITS, WEARS, writeOutfit, type OutfitFit, type OutfitParams, type Wear } from './characters/outfit';
 import { BLANKET_WIDTH, blanketMaterial, buildBlanket, quiltTint, type BlanketShape } from './characters/blanket';
 import { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } from './characters/clips/street';
-import { BOULDER, FOOS, FOOS_LANES, POOL, SMASH, YOGA_AT } from './characters/clips/games';
+import { BOULDER, FOOS, FOOS_LANES, foosClip, POOL, SMASH, YOGA_AT } from './characters/clips/games';
 import { EYEPIECE, PICK_APPLE, PICK_LEMON, SHOWER_CHILD } from './characters/clips/uses';
 // The seat and bed tables (`SEATS`, `BEDS`, `BUNKS` and their defaults) are data, read by `cargo check-glb` and
 // `cargo review` too; what their entries mean and why some are as they are: docs/characters-format.md "Seats and beds".
@@ -171,7 +171,7 @@ const DEFAULT_SEAT: Seat = FURNITURE.defaultSeat;
  * mattress, pulled out or folded away, reaches half a metre past it. Negative: steps in to a thing
  * smaller than its tile (the herb planters, 0.4–0.46 m deep, are picked from as from a counter), or to
  * the part used: the toes at a basin or a sink's cabinet, the hands over the water; up to the toaster and
- * the blender on a counter, the chemistry bench pushed back on its tile, the clock's trunk door, the
+ * the blender on a counter, the chemistry bench pushed back on its tile, onto the dumbbell rack's mat, the clock's trunk door, the
  * giving jar. Back from the statue, to look up at it.
  */
 const STAND_BACK: Record<string, number> = {
@@ -189,6 +189,7 @@ const STAND_BACK: Record<string, number> = {
   counterSinkDouble: -0.45,
   breakfastCounter: -0.3,
   chemistrySet: -0.35,
+  dumbbells: -0.6,
   grandfatherClock: -0.6,
   'kind.givingJar': -0.4,
   townStatue: 0.8,
@@ -217,7 +218,9 @@ const CROUCH_SHOULDER = 0.55;
  * `out` seconds after the use before stepping
  * out (the door opening again, `out` in its motions). `perLane`: the clips are one per lane, not a sequence (each
  * lane's round goes its own way: the climbing frame's, round to its pole and back). `tag`: only for that use
- * (its action tag), the object's other uses as usual.
+ * (its action tag), the object's other uses as usual. `square`: they face the way the object faces, squared to it
+ * at their lane, not turned to its middle as sim-core stands them (off to one side that turned the step in and the
+ * hands at a foosball's handles 27° off).
  */
 interface StepIn {
   by: readonly (readonly [height: number, clip: readonly string[], at: { to: number; up?: number }])[];
@@ -227,6 +230,7 @@ interface StepIn {
   out?: number;
   perLane?: boolean;
   tag?: string;
+  square?: boolean;
 }
 /** Eating a picked fruit (after the pick), bite by bite. */
 const EAT_FRUIT = ['eat', 'idle', 'eat', 'idle', 'eat', 'idle'];
@@ -240,7 +244,7 @@ const STEP_IN: Record<string, StepIn> = {
   // lane each), at a pair of the foosball rods, at the plate stack and the crate, up on the bouldering wall's crash
   // mat, and on the yoga mat's front end, facing along it.
   poolTable: { by: POOL.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: [-0.55, 0.55] },
-  foosball: { by: FOOS.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: FOOS_LANES },
+  foosball: { by: FOOS.map(({ clip, min, fit }) => [min, FOOS_LANES.map((_, lane) => foosClip(clip, lane)), fit] as const), lanes: FOOS_LANES, perLane: true, square: true },
   'hotHeaded.smashBin': { by: SMASH.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
   'energetic.boulderingWall': { by: BOULDER.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: [0] },
   yogaMat: { by: [[0, ['yoga'], YOGA_AT]] },
@@ -473,7 +477,7 @@ interface Prop {
  * between (`guitarReach`). The strumming clips are fitted to it (clips/uses.ts `GUITAR_BODY`): its neck goes
  * from there to the left hand, out to the left across the body.
  */
-const GUITAR = { out: 0.17, right: 0.08, up: -0.03, upShort: 0.12, body: 0.27, short: 0.7, long: 1.15 };
+const GUITAR = { out: 0.17, right: 0.08, up: -0.03, upShort: 0.12, body: 0.27, short: 0.7, long: 0.9 };
 /**
  * Playing a guitar or a ukulele (clips/uses.ts: held across the body, the neck to the left; `strumShort`
  * for a short one, `guitarReach` under a half).
@@ -2463,6 +2467,8 @@ export class Characters {
         if (seat?.back) faceYaw = wrapAngle(tyaw + Math.PI);
         else if (seat?.along) faceYaw = wrapAngle(tyaw + (seat.along * Math.PI) / 2);
       }
+      // Up against a thing at a lane, squared to it (`StepIn.square`).
+      if (pose === Pose.Stand && useObj && STEP_IN[useObj.def]?.square) faceYaw = wrapAngle((useObj.rot * Math.PI) / 2 + Math.PI);
       // Cuddling: turned to the baby in the crib.
       const cuddled = rig.cuddleT >= 0 && rig.cuddleBaby >= 0 ? this.sims[rig.cuddleBaby] : null;
       if (cuddled) faceYaw = Math.atan2(curr[H + cuddled.id * S + k.x] - rig.x, this.groundRow(curr[H + cuddled.id * S + k.z]) - rig.z);
@@ -3510,6 +3516,13 @@ export class Characters {
           } else {
             // Keys: swaying with the music.
             addRotation(add, B.spine_02, 0, 0, 1, Math.sin(time * 1.1 + seed) * 0.04);
+          }
+          break;
+        case 'tinker':
+          if (def === 'potteryWheel') {
+            // Knees apart either side of the splash pan, as potters sit, the wheel head between them.
+            addRotation(add, B.thigh_l, 0, 1, 0, -0.55);
+            addRotation(add, B.thigh_r, 0, 1, 0, 0.55);
           }
           break;
       }

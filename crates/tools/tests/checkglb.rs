@@ -73,7 +73,8 @@ fn the_review_measures_the_pilots_cases() {
     assert_eq!(crib.at[0], -0.5, "slot 0");
     assert!((crib.mesh.unwrap() - 0.56).abs() < 0.01, "{:?}", crib.mesh);
     let (_, workbench) = of("workbench").top.unwrap();
-    assert!((workbench - 0.78).abs() < 0.01, "{workbench}");
+    // A standing height since G-29 (review M-hobbies-01: it was a desk at 0.78).
+    assert!((workbench - 0.90).abs() < 0.01, "{workbench}");
     let (_, sink) = of("sink").top.unwrap();
     // The base sink is a kitchen sink unit since G-11 (reference kind `kitchenSink`): its worktop, not a basin rim.
     assert!((0.85..=1.0).contains(&sink), "{sink}");

@@ -42,7 +42,6 @@
     "deskLaptop": { "h": 0.44, "fwd": -0.17 },
     "computerGaming": { "h": 0.44, "fwd": -0.17 },
     "officeChair": { "h": 0.47, "fwd": -0.04 },
-    "keyboardDigital": { "h": 0.45, "fwd": -0.2 },
     "sewingTable": { "h": 0.475, "fwd": -0.22 },
     "patioSet": { "h": 0.44, "fwd": 0 },
     "picnicTable": { "h": 0.4, "fwd": 0 },
@@ -53,7 +52,7 @@
   "beds": {
     "bed": { "h": 0.58 },
     "crib": { "h": 0.56 },
-    "weightBench": { "h": 0.5 },
+    "weightBench": { "h": 0.44 },
     "bedSingle": { "h": 0.5 },
     "bedBunk": { "h": 0.44 },
     "bedFuton": { "h": 0.4 },

@@ -65,7 +65,9 @@ registerHooks({
 const { clipDefs } = await import('../../web/src/render/babylon/characters/clips/index.ts');
 const { bake } = await import('../../web/src/render/babylon/characters/clips/dsl.ts');
 const { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } = await import('../../web/src/render/babylon/characters/clips/street.ts');
-const { BOULDER, FOOS, POOL, SMASH } = await import('../../web/src/render/babylon/characters/clips/games.ts');
+const { BOULDER, FOOS, FOOS_LANES, foosClip, POOL, SMASH } = await import('../../web/src/render/babylon/characters/clips/games.ts');
+/** The foosball's clips, one per lane in each size (characters.ts STEP_IN). */
+const FOOS_LANED = FOOS.flatMap(({ clip, min }: any) => FOOS_LANES.map((_: number, lane: number) => ({ clip: foosClip(clip, lane), min })));
 const { EYEPIECE, PICK_APPLE, PICK_LEMON, SHOWER_CHILD } = await import('../../web/src/render/babylon/characters/clips/uses.ts');
 
 /** Every clip the runtime plays (characters.ts ACTIONS / choose, reactions.ts) and whether it loops. */
@@ -79,7 +81,7 @@ const RUNTIME: Record<string, boolean> = {
   climb172a: true, climb147a: true, climb112a: true, climb172b: true, climb147b: true, climb112b: true,
   // Games and sport at things (characters.ts ACTIONS, STEP_IN; clips/games.ts), the sized ones in each size.
   dartThrow: true, pingPong: true, yoga: true,
-  ...Object.fromEntries([POOL, FOOS, SMASH, BOULDER].flatMap((sizes: any[]) => sizes.map(({ clip }: any) => [clip, true]))),
+  ...Object.fromEntries([POOL, FOOS_LANED, SMASH, BOULDER].flatMap((sizes: any[]) => sizes.map(({ clip }: any) => [clip, true]))),
   // The telescope's eyepiece and the fruit trees, in sizes (characters.ts STEP_IN, clips/uses.ts); the shower, a child's without the turn.
   eyepiece181: true, eyepiece163: true, eyepiece147: true, eyepiece129: true, eyepiece112: true,
   pickApple177: false, pickApple147: false, pickApple112: false, pickLemon177: false, pickLemon147: false, pickLemon112: false,
@@ -94,7 +96,7 @@ const LENGTH: Record<string, number> = {
   yes: 2.5, no: 2.5, phone: 2.9, lantern: 2.5, rail: 2.5, spell: 2.1, push: 2.7, babyLieAsleep: 9, babyLieAwake: 6,
   fountainDrink181: 3, fountainDrink163: 3, fountainDrink147: 3, fountainDrink129: 3, fountainDrink112: 3, climb172a: 13, climb147a: 13, climb112a: 13, climb172b: 13, climb147b: 13, climb112b: 13,
   dartThrow: 7.2, pingPong: 1.8, yoga: 48,
-  ...Object.fromEntries(([[POOL, 8], [FOOS, 3.2], [SMASH, 3.4], [BOULDER, 16]] as [any[], number][]).flatMap(([sizes, s]) => sizes.map(({ clip }: any) => [clip, s]))),
+  ...Object.fromEntries(([[POOL, 8], [FOOS_LANED, 3.2], [SMASH, 3.4], [BOULDER, 16]] as [any[], number][]).flatMap(([sizes, s]) => sizes.map(({ clip }: any) => [clip, s]))),
   eyepiece181: 6, eyepiece163: 6, eyepiece147: 6, eyepiece129: 6, eyepiece112: 6, pickApple177: 3.3, pickApple147: 3.3, pickApple112: 3.3, pickLemon177: 3.3, pickLemon147: 3.3, pickLemon112: 3.3,
   shower: 14, showerChild: 14,
 };
@@ -112,7 +114,8 @@ const STAGES = ['baby', 'child', 'teen', 'youngAdult', 'adult', 'elder'];
 const SIZED: { min: number; clips: string[] }[][] = [
   FOUNTAIN.map(({ clip, min }: any) => ({ min, clips: [clip] })),
   CLIMB.map(({ clip, min }: any) => ({ min, clips: CLIMB_LANES.map((_: number, lane: number) => climbClip(clip, lane)) })),
-  ...[POOL, FOOS, SMASH, BOULDER].map((sizes: any[]) => sizes.map(({ clip, min }: any) => ({ min, clips: [clip] }))),
+  FOOS.map(({ clip, min }: any) => ({ min, clips: FOOS_LANES.map((_: number, lane: number) => foosClip(clip, lane)) })),
+  ...[POOL, SMASH, BOULDER].map((sizes: any[]) => sizes.map(({ clip, min }: any) => ({ min, clips: [clip] }))),
   ...[EYEPIECE, PICK_APPLE, PICK_LEMON].map((sizes) => sizes.map(({ clip, min }: any) => ({ min, clips: [clip] }))),
   [{ min: SHOWER_CHILD, clips: ['shower'] }, { min: 0, clips: ['showerChild'] }],
 ];

@@ -3478,13 +3478,18 @@
       "name": "Digital piano",
       "model": "model.keyboardDigital",
       "footprint": [
-        1,
+        2,
         1
       ],
       "price": 650,
       "category": "hobbies",
       "group": "music",
-      "description": "A slim keyboard on a stand with a bench: piano practice for a smaller room and budget.",
+      "seat": {
+        "height": 0.48,
+        "forward": 0.18,
+        "facing": "back"
+      },
+      "description": "A console digital piano, 88 weighted keys and three pedals, with a bench: piano practice without the upright's price.",
       "interactions": [
         {
           "id": "play",
@@ -3754,7 +3759,7 @@
       "model": "model.yogaMat",
       "footprint": [
         1,
-        1
+        2
       ],
       "price": 45,
       "category": "fitness",

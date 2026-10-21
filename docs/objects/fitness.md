@@ -18,10 +18,10 @@ the object's colours, so there are never two.
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `treadmill` Treadmill | 1x2 · floor | run:run | fitness / — | Frame, Pads | Loop (E1) | `belt_run`: the belt's slats (30 cm apart) run back at 2.25 m/s, a running pace, under the runner for the whole run (E1; 0.4 m/s, a walk, before 2026-10-21). |
-| `weightBench` Weight bench | 1x2 · floor | lift:lift | fitness / — | Frame, Pads | Use | `bar_off`: the bar on the rack shrinks away 0.8 s into the lift (`BAR_DELAY`), as the lifter lies back and the game draws it in the hands (content `held`). |
+| `weightBench` Weight bench | 1x2 · floor | lift:lift | fitness / — | Frame, Pads | Use | `bar_off`: the bar on the rack shrinks away 0.8 s into the lift (`BAR_DELAY`), as the lifter lies back and the game draws it in the hands (content `held`). A flat bench, its pad at 0.44 m (`beds.weightBench`), no leg roller, since 2026-10-21 (G-24: 0.50). |
 | `exerciseBike` Exercise bike | 1x1 · floor | cycle:exercise | fitness / — | Frame, Pads | Loop (E1) | `pedals_turn`: the cranks and pedals turn once every 1.2 s while cycled, the rider's feet on them (E1). |
-| `yogaMat` Yoga mat | 1x1 · floor | yoga:exercise | fitness / — | Mat | Use | `unroll`: the rolled mat unrolls flat for yoga and rolls up again at the end. |
-| `dumbbells` Dumbbell rack | 1x1 · floor | lift:lift | fitness / — | Rack, Weights | Use | `pair_off`: one pair leaves the rack for lift, as the weight bench; the game draws it in the hands in the rack's "Weights" colour. |
+| `yogaMat` Yoga mat | 1x2 · floor | yoga:exercise | fitness / — | Mat | Use | `unroll`: the rolled mat unrolls flat for yoga and rolls up again at the end. A full 1.8 m mat since 2026-10-21 (G-40: 0.9 m on one tile); the flow on it from 0.4 m in front of its middle (`YOGA_AT`). |
+| `dumbbells` Dumbbell rack | 1x1 · floor | lift:lift | fitness / — | Rack, Weights | Use | `pair_off`: one pair leaves the rack for lift, as the weight bench; the game draws it in the hands in the rack's "Weights" colour. The rack on the wall's face and its mat filling the front of the tile, where the lifter steps in (`STAND_BACK`), since 2026-10-21 (G-31: they stood off it). |
 
 **In play** (signed off 2026-10-17):
 - Each bought on free floor in all four facings and against the north wall, and used there: the belt loops under the
