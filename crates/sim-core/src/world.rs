@@ -393,7 +393,8 @@ impl ObjectInstance {
     /// the way the object faces.
     pub fn slot_yaw(&self, content: &Content, slot: usize) -> f32 {
         match content.objects[self.def].places.get(slot) {
-            Some(p) => self.angle() + p.facing,
+            // (Wrapped: a place facing back on an object turned three quarters is past a whole turn.)
+            Some(p) => (self.angle() + p.facing).rem_euclid(std::f32::consts::TAU),
             None => self.yaw(),
         }
     }

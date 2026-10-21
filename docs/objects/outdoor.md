@@ -21,15 +21,15 @@ none.
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `bench` Park bench | 2x1 · floor | sit:sit | outdoor / seating | Frame, Slats | Static | Static. |
-| `patioSet` Folding bistro set | 1x2 · floor | coffee:drink sit:sit | outdoor / seating | Frame, Slats | Static | Static. For two: one on each chair, facing each other across the table (content `places`; the far chair reached from behind it). |
-| `picnicTable` Picnic table | 3x2 · floor | picnic:eat coffee:drink | outdoor / seating | Frame, Planks, Cloth | Static | Static. The two sit across the cloth, one on each bench, facing each other (content `places`; the far bench reached from behind it). |
+| `bench` Park bench | 2x1 · floor | sit:sit | outdoor / seating | Frame, Slats | Static | Static. Its slats' top at 0.45 m, where the sitter is put. |
+| `patioSet` Folding bistro set | 1x2 · floor | coffee:drink sit:sit | outdoor / seating | Frame, Slats | Static | Static. For two: one on each chair, facing each other across the table (content `places`, ±0.43 m; the far chair reached from behind it), the chairs' seats 4 cm under its edges, its legs crossed at its sides clear of their knees. |
+| `picnicTable` Picnic table | 3x2 · floor | picnic:eat coffee:drink | outdoor / seating | Frame, Planks, Cloth | Static | Static. Its top at 0.73 m, the benches at 0.44. The two sit across the cloth, one on each bench, facing each other (content `places`; the far bench reached from behind it). |
 | `gardenChair` Garden chair | 1x1 · floor | sit:sit | outdoor / seating | Chair | Static | Static. |
 | `patioTableRound` Round patio table | 1x1 · floor | — | outdoor / seating | Frame, Top, Tiles | Static | Static. |
 | `patioTable4` Teak patio table | 2x1 · floor | — | outdoor / seating | Frame, Top | Static | Static. |
 | `patioChair` Patio chair | 1x1 · floor | sit:sit coffee:drink | outdoor / seating | Frame, Cushion | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
 | `adirondackChair` Adirondack chair | 1x1 · floor | relax:relax | outdoor / seating | Chair | Static | Static. |
-| `benchGarden3` Garden bench | 3x1 · floor | sit:sit | outdoor / seating | Frame, Slats | Static | Static. |
+| `benchGarden3` Garden bench | 2x1 · floor | sit:sit | outdoor / seating | Frame, Slats | Static | Static. 1.9 m long, its three sitters 0.67 m apart. |
 | `outdoorBar` Outdoor bar | 2x1 · floor | — | outdoor / seating | Body, Counter, Foot rail | Static | Static. A high bar stool pulled up to it offers Have a drink at the bar (`stoolBarHigh`, `seatAt: bar`). |
 | `parasol` Parasol | 1x1 · floor | — | outdoor / seating | Canopy, Pole, Edge | Ambient (E2) | Open; `stir`: the canopy stirs in the wind, ambient (not on Low). (+use) it folds. |
 
@@ -55,10 +55,10 @@ none.
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `sunLounger` Sun lounger | 1x2 · floor | sunbathe:relax doze:nap | outdoor / seating | Frame, Cushions, Towel | Use | `recline`: the back lowers 30° for sunbathe and doze. |
-| `hammock` Hammock | 1x2 · floor | swing:relax doze:nap | outdoor / seating | Frame, Fabric, Stripes | Loop (E1) | `sway`: swings ±8° while lain in (E1). |
-| `porchSwing` Porch swing | 2x1 · floor | swing:relax | outdoor / seating | Seat, Frame, Chains, Cushion | Loop (E1) | `swing`: the seat swings ±10° while sat in (E1). |
-| `swingSet` Swing set | 2x1 · floor | swing:play | outdoor / play | Frame, Seats | Loop (E1) | `swing`: the seat swings while played (E1). Both hands on the chains, the legs pumping in time with it (`rideSwing172`/`147`/`112`). |
-| `hotTubCedar` Cedar hot tub | 2x2 · floor | soak:bath coverOn:fetch | outdoor / seating | Cedar, Cover | Use + Loop | `cover_off`: the cover slides off and folds back for soak and stays off (C1) until "Put the cover on" (`coverOn`); `bubbles`: the water bubbles while soaking (E1). |
+| `hammock` Hammock | 1x3 · floor | swing:relax doze:nap | outdoor / seating | Frame, Fabric, Stripes | Loop (E1) | `sway`: swings ±8° while lain in (E1). A 2.8 m stand, a 1.96 m bed: lain in at full length. |
+| `porchSwing` Porch swing | 2x1 · floor | swing:relax | outdoor / seating | Seat, Frame, Chains, Cushion | Loop (E1) | `swing`: the seat swings ±10° while sat in (E1). Its cushion's top at 0.52 m. |
+| `swingSet` Swing set | 2x2 · floor | swing:play | outdoor / play | Frame, Seats | Loop (E1) | `swing`: the seat swings while played (E1). Both hands on the chains, the legs pumping in time with it (`rideSwing172`/`147`/`112`). |
+| `hotTubCedar` Cedar hot tub | 2x2 · floor | soak:bath coverOn:fetch | outdoor / seating | Cedar, Cover | Use + Loop | `cover_off`: the cover folds back on its seam and hangs behind the tub, as on a lifter, for soak and stays off (C1) until "Put the cover on" (`coverOn`); `bubbles`: the water bubbles while soaking (E1). |
 
 **In play** (signed off 2026-10-17):
 - Each checked in four facings: the lounger's back lowers for sunbathe and doze and comes up after; the hammock's
@@ -77,7 +77,7 @@ none.
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `grill` Charcoal grill | 1x1 · floor | cook:cook | outdoor / cooking | Body, Lid | Use | `lid_open`, the lid swings up 95° on its back hinge for the whole of cook, over red coals and food on the grate (no night glow on the coals: it showed through the shut lid). |
+| `grill` Charcoal grill | 1x1 · floor | cook:cook | outdoor / cooking | Body, Lid | Use | `lid_open`, the lid swings up 95° on its back hinge for the whole of cook, over red coals and food on the grate (the coals aglow at night). Its rim at 0.79 m, the grate at 0.77. |
 | `grillStation` Gas grill station | 2x1 · floor | cook:cook feast:cook | outdoor / cooking | Cart, Hood | Use | `hood_up`, the barrel hood swings up 75° for cook and feast; the counter at the content's 0.9 m. |
 | `firePit` Fire pit | 1x1 · floor | relax:relax | outdoor / cooking | Bowl, Stones | Use | `flames`, tongues grow on the logs for relax, aglow at night with the embers (the light is the content's); warmed up at from a seat within 3 m that faces it (`seatNear`, `seatFacing: around`: a garden chair round it), else standing at one of four places round it, facing the fire (content `places`); never on its rim. |
 
@@ -106,7 +106,7 @@ none.
 | `shedSmall` Garden shed | 2x2 · floor | potter:tinker | outdoor / yard | Wood, Roof, Door | Use | `door_open`: the ledged door swings 100° out for the whole of potter, the dark inside with a bench and tools behind. The door is a colour part of its own (one plain draw). Far version. |
 | `greenhouse` Greenhouse | 2x3 · floor | tend:tend harvest:harvest | outdoor / yard | Frame, Wall | Use | `door_open`: the glass door swings 70° and the roof vent lifts 25° for tend and harvest, worked from the path down its middle (`inside`). 4 draws (plain, glass, door, vent), as the nature lover's glasshouse. Far version. |
 | `compostBin` Compost bin | 1x1 · floor | compost:tend | outdoor / yard | Bin | Use | `lid_open`: the slatted lid lifts 75° for compost; `hold` 2 s. Far version. |
-| `rainBarrel` Rain barrel | 1x1 · floor | — | outdoor / yard | Barrel | Static | Static: ribbed barrel, brass tap, the downpipe into its lid. Far version. |
+| `rainBarrel` Rain barrel | 1x1 · floor | — | outdoor / yard | Barrel | Static | Static: ribbed barrel with a lid and its inlet, brass tap; no downpipe (Q-06). Far version. |
 | `clothesline` Washing line | 3x1 · floor | washing:clean takeIn:clean | outdoor / yard | Posts, Washing | Use + Open | `washing`: the washing comes down from the line (1.5 s) and is the `open` clip (C1): it stays out until taken in. Far version (washing in). |
 | `firewoodStack` Log store | 1x1 · floor | — | outdoor / yard | Shelter | Static | Static: the iron rack under a pent iron roof, logs ends out. Far version. |
 
@@ -160,7 +160,7 @@ These six have no group code of their own.
 | `garden.fountain` Stone fountain | 1x1 · floor | wish:look listen:relax | outdoor / decor | Fountain, Plinth | Ambient | `flow`: the water moves all the time near the camera (`idle`, not on Low): the jet bubbles up and falls back and a ring swells out on each basin, 1.2 s a round (2026-10-21; it was still). Its sound is G-53's. |
 | `garden.lantern` Stone lantern | 1x1 · floor | — | outdoor / lights | Lantern, Base | Static | Static: a Japanese stone lantern; its fire box is lit at night (the content's `light`). |
 | `garden.wheelbarrow` Wheelbarrow planter | 1x1 · floor | water:water smell:smell | outdoor / decor | Tray, Handles, Legs & tyre | Static | Static: a green wheelbarrow full of flowers and leaves. |
-| `garden.boulder` Garden boulders | 1x1 · floor | — | outdoor / decor | Large boulder, Middle boulder, Small boulder | Static | Static: three weathered stones, moss on top and tufts round the base. |
+| `garden.boulder` Garden boulders | 1x1 · floor | — | outdoor / decor | Large boulder, Middle boulder, Small boulder | Static | Static: three weathered, faceted stones, flat-bottomed and mottled, moss in the cracks and tufts round the base. |
 
 **In play** (signed off 2026-10-17):
 - Checked in the north yard in four facings with their uses: pat the gnome, watch the birds, listen to the water and
