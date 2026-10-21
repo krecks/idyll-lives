@@ -17,8 +17,8 @@ their backs on the wall face (game depth -0.43).
 |---|---|---|---|---|---|---|
 | `sink` Sink | 1x1 · floor | wash:wash brushTeeth:wash | bathroom / sinks | Cabinet, Worktop, Basin, Tap & handles, Plinth | Use | `water_on`: the stream grows from the gooseneck into the inset basin in 0.4 s, runs for the whole use and retracts as it ends. Brush your teeth (3 min, the tap running and its sound: `handwash` tag after Wash hands, so a toilet's follow-up still washes hands). |
 | `sinkPedestal` Pedestal sink | 1x1 · floor | wash:wash brushTeeth:wash | bathroom / sinks | Pedestal, Basin & cup, Tap | Use | `water_on`, as the sink. Brush your teeth, the tap running. |
-| `vanityDouble` Double vanity | 2x1 · floor | wash:wash brushTeeth:wash | bathroom / sinks | Cabinet, Worktop, Basins, Taps & handles, Plinth | Use | `water_on`: both taps run together (two slots). No mirrors of its own: the player hangs one above it. Brush your teeth at either basin, the taps running. |
-| `sinkVessel` Vessel sink | 1x1 · floor | wash:wash brushTeeth:wash | bathroom / sinks | Vanity, Worktop, Bowl, Tap, Shelf & legs, Towels | Use | `water_on` into the raised bowl. Brush your teeth, the tap running. |
+| `vanityDouble` Double vanity | 2x1 · floor | wash:wash brushTeeth:wash | bathroom / sinks | Cabinet, Worktop, Basins, Taps & handles, Plinth | Use | `water_on`: both taps run together (two slots). No mirrors of its own: the player hangs one above it. Brush your teeth at either basin, the taps running. The bowls stand on a 0.76 m worktop, their rims at 0.88 m (they were at 1.00 m, M-bathroom-02). |
+| `sinkVessel` Vessel sink | 1x1 · floor | wash:wash brushTeeth:wash | bathroom / sinks | Vanity, Worktop, Bowl, Tap, Shelf & legs, Towels | Use | `water_on` into the raised bowl. Brush your teeth, the tap running. The bowl stands on a 0.76 m worktop, its rim at 0.88 m (it was at 1.02 m, M-bathroom-02). |
 | `sinkConsole` Console sink | 1x1 · floor | wash:wash brushTeeth:wash | bathroom / sinks | Basin, Legs & tap, Towel | Use | `water_on`, as the sink. Brush your teeth, the tap running. |
 
 **In play** (signed off 2026-10-16):
@@ -57,8 +57,8 @@ their backs on the wall face (game depth -0.43).
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `shower` Shower | 1x1 · floor | shower:shower | bathroom / bathing | Tray, Frame, Head & tap, Tiles | Use | `water_on`: a rain of thin streams grows down from the head for the whole use. The sliding door stays shut: a moving glass door would be a 4th draw call. |
-| `showerStall` Shower stall | 1x1 · floor | shower:shower | bathroom / bathing | Tray, Rail, Head & tap, Curtain, Tiles | Use | `water_on`, slanted from the wall head onto the resident. |
+| `shower` Shower | 1x1 · floor | shower:shower | bathroom / bathing | Tray, Frame, Head & tap, Tiles | Use | `water_on`: a rain of thin streams grows down from the head for the whole use, 2 s in. The sliding glass door (`door_open`, its own part: the 4th draw call, Q-05) slides open behind the fixed panel as the use starts, shuts after 1.5 s and opens again for 1.5 s as the use ends (`out`). The resident is already inside as it opens (A-bathroom-05). |
+| `showerStall` Shower stall | 1x1 · floor | shower:shower | bathroom / bathing | Tray, Rail, Head & tap, Curtain, Tiles | Use | `water_on`, slanted from the wall head onto the resident, 1.8 s in. The curtain's front (`curtain_draw`, its own part, plain satin: still 3 draws) is drawn across from the right corner 1 s in and back as the use ends; the side's curtain hangs closed. |
 | `showerWalkIn` Walk-in rain shower | 1x1 · floor | shower:shower | bathroom / bathing | Floor, Frame, Head & tap, Wall | Use | `water_on` from a wide rain head. |
 | `showerRain` Rain shower | 1x1 · floor | shower:shower | bathroom / bathing | Tray, Frame, Head & tap, Walls | Use | `water_on` from the ceiling rose. |
 
@@ -70,7 +70,9 @@ their backs on the wall face (game depth -0.43).
 - `water_on` (0.5 s) grows the rain as the use starts, holds it for the whole use and shuts it as it ends.
 - The colour studio frames a moving part by its posed vertices, so the stall (whose rain grows from nothing and is
   turned for the slant) draws at rest and in use.
-- Three draw calls each: the tray, walls and metal; the glass (the stall's curtain); the rain.
+- Three draw calls each: the tray, walls and metal; the glass (the stall's curtain); the rain. Since 2026-10-21 the
+  base shower's sliding door is a fourth (Q-05) and the stall's curtain front its own part, plain satin, so the
+  stall keeps three (body, curtain, rain).
 - Under the water the resident wears a towel, barefoot (`wearFor`, `outfit.ts` `towel`: wrapped under the arms, a
   man's round the hips), not the day clothes; they dress again as they step out. The packs' showers do the same.
 

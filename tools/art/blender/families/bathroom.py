@@ -8,7 +8,8 @@
 # Each sink is one still body (cabinet / basin / pedestal / legs) plus one moving part: a stream of
 # water (`water`) that grows from the tap's spout into the basin while a resident washes (`motions`).
 # Each toilet is one still body plus its lid, which lifts while a resident uses it; each shower one still
-# body plus its rain, which grows down from the head while a resident showers; each bath one still body plus
+# body plus its rain, which grows down from the head while a resident showers (and the base shower's sliding
+# glass door, the stall's curtain front, each a part of its own); each bath one still body plus
 # its tap's stream and its water, which fills while a resident bathes.
 # Built to the old part's size, in its numbers: the parts are placed in game axes (`F`).
 #
@@ -54,11 +55,12 @@ M = G.Palette(
     tile=('#E4ECEC', 'satin'),       # wall tiles
     grout=('#C8D3D4', 'satin'),      # the grout between them
     glass=('#DCE6E8', 'glass'),      # screens and doors (see-through: its own draw call)
+    grip=('#7E9096', 'glass'),       # the shower door's grip, smoked glass (drawn with the door's glass)
     frame=('#D0D3D6', 'chrome'),     # a screen's frame, a curtain rail
     fittings=('#D0D3D6', 'chrome'),  # heads, risers and mixers
     frame_dark=('#2B2C2E', 'metal'),     # a black screen frame
     fittings_dark=('#2B2C2E', 'metal'),  # a black rain head and mixer
-    curtain=('#CFE0E4', 'fabric'),   # the stall's curtain
+    curtain=('#CFE0E4', 'satin'),    # the stall's curtain: polyester, plain (the moving front costs no extra draw)
     slate=('#C9C6C0', 'matte'),      # the walk-in shower's stone floor
     slate_wall=('#C9C6C0', 'matte'),  # and its stone wall
     groove=('#AFACA6', 'matte'),     # the joints in the stone wall
@@ -226,21 +228,22 @@ def sinkPedestal():
 def vanityDouble():
     F = G.GameFrame(shift=0.152)
     with G.new_parts() as still:
+        # the worktop at 0.76 m, so the bowls standing on it have their rims at 0.88 (a basin's 0.76-0.91)
         F.box('plinth', 1.86, 0.06, 0.5, (0, 0.03, -0.17), M.trim, bevel=0.006)
-        F.box('cabinet', 1.86, 0.78, 0.52, (0, 0.45, -0.17), M.body, bevel=0.012)
-        F.box('top', 1.9, 0.04, 0.56, (0, 0.86, -0.15), M.stone, bevel=0.008)
+        F.box('cabinet', 1.86, 0.66, 0.52, (0, 0.39, -0.17), M.body, bevel=0.012)
+        F.box('top', 1.9, 0.04, 0.56, (0, 0.74, -0.15), M.stone, bevel=0.008)
         for i, x in enumerate((-0.68, -0.23, 0.23, 0.68)):
-            F.box(f'door{i}', 0.43, 0.62, 0.02, (x, 0.44, 0.1), M.body, bevel=0.008)
-            F.box(f'door_panel{i}', 0.33, 0.52, 0.012, (x, 0.44, 0.112), M.body, bevel=0.004)
-            _bar(F, f'handle{i}', x + (0.16 if i < 2 else -0.16), 0.34, 0.56, 0.1, M.chrome, stand=0.016)
+            F.box(f'door{i}', 0.43, 0.5, 0.02, (x, 0.38, 0.1), M.body, bevel=0.008)
+            F.box(f'door_panel{i}', 0.33, 0.4, 0.012, (x, 0.38, 0.112), M.body, bevel=0.004)
+            _bar(F, f'handle{i}', x + (0.16 if i < 2 else -0.16), 0.4, 0.58, 0.1, M.chrome, stand=0.016)
         for s in (-1, 1):
             x = s * 0.48
-            _basin(F, f'basin{s}', x, -0.12, 0.88, 1.0, 0.5, 0.38, material=M.porcelain, wall=0.018)
-            F.cyl(f'drain{s}', 0.03, 0.012, (x, 0.895, -0.1), M.dark, verts=12)
-            F.cyl(f'tap_base{s}', 0.04, 0.03, (x, 0.9, -0.35), M.chrome, verts=14)
-            _gooseneck(F, f'tap{s}', x, 0.9, -0.35, -0.22, 1.1, M.chrome, tip_y=1.04)
+            _basin(F, f'basin{s}', x, -0.12, 0.76, 0.88, 0.5, 0.38, material=M.porcelain, wall=0.018)
+            F.cyl(f'drain{s}', 0.03, 0.012, (x, 0.775, -0.1), M.dark, verts=12)
+            F.cyl(f'tap_base{s}', 0.04, 0.03, (x, 0.78, -0.35), M.chrome, verts=14)
+            _gooseneck(F, f'tap{s}', x, 0.78, -0.35, -0.22, 0.98, M.chrome, tip_y=0.92)
     G.join(still, 'body', origin=(0, 0, 0))
-    waters = [_water(F, (x, 1.04, -0.22), 0.895) for x in (-0.48, 0.48)]
+    waters = [_water(F, (x, 0.92, -0.22), 0.775) for x in (-0.48, 0.48)]
     G.settle()
     for water in waters:
         G.grow(water, 'water_on', seconds=0.4)
@@ -251,20 +254,21 @@ def vanityDouble():
 def sinkVessel():
     F = G.GameFrame(shift=0.2)
     with G.new_parts() as still:
-        F.box('vanity', 0.8, 0.52, 0.5, (0, 0.56, -0.21), M.body, bevel=0.012)
-        F.box('top', 0.84, 0.04, 0.54, (0, 0.84, -0.2), M.stone, bevel=0.008)
+        # the worktop at 0.76 m, so the bowl on it has its rim at 0.88 (a basin's 0.76-0.91)
+        F.box('vanity', 0.8, 0.42, 0.5, (0, 0.51, -0.21), M.body, bevel=0.012)
+        F.box('top', 0.84, 0.04, 0.54, (0, 0.74, -0.2), M.stone, bevel=0.008)
         F.box('shelf', 0.7, 0.025, 0.42, (0, 0.18, -0.21), M.wood, bevel=0.004)
         for x in (-0.38, 0.38):
             for z in (-0.43, 0.01):
                 F.box(f'leg{x}{z}', 0.025, 0.18, 0.025, (x, 0.09, z), M.wood, bevel=0.003)
-        _basin(F, 'bowl', 0, -0.18, 0.86, 1.02, 0.44, 0.36, material=M.porcelain, wall=0.018)
-        F.cyl('drain', 0.028, 0.012, (0, 0.875, -0.18), M.dark, verts=12)
-        F.cyl('tap_base', 0.035, 0.03, (0, 0.86, -0.42), M.blackmetal, verts=12)
-        spout = _gooseneck(F, 'tap', 0, 0.86, -0.42, -0.26, 1.14, M.blackmetal, r=0.02, tip_y=1.08)
+        _basin(F, 'bowl', 0, -0.18, 0.76, 0.88, 0.44, 0.36, material=M.porcelain, wall=0.018)
+        F.cyl('drain', 0.028, 0.012, (0, 0.775, -0.18), M.dark, verts=12)
+        F.cyl('tap_base', 0.035, 0.03, (0, 0.76, -0.42), M.blackmetal, verts=12)
+        spout = _gooseneck(F, 'tap', 0, 0.76, -0.42, -0.26, 1.04, M.blackmetal, r=0.02, tip_y=0.98)
         F.box('towel0', 0.36, 0.06, 0.24, (-0.15, 0.225, -0.06), M.towel, bevel=0.02)
         F.box('towel1', 0.36, 0.06, 0.24, (0.2, 0.225, -0.06), M.towel, bevel=0.02)
     G.join(still, 'body', origin=(0, 0, 0))
-    water = _water(F, spout, 0.875)
+    water = _water(F, spout, 0.775)
     G.settle()
     G.grow(water, 'water_on', seconds=0.4)
     return G.meshes()
@@ -541,6 +545,12 @@ def _post(F, name, x, z, y0, y1, material, t=0.025):
     F.box(name, t, y1 - y0, t, (x, (y0 + y1) / 2, z), material, bevel=0.004)
 
 
+# The base shower's sliding door goes this far left (Blender +x is the game's -x), behind the fixed panel;
+# the stall's front curtain is gathered to this part of its length at rest.
+SHOWER_SLIDE = 0.41
+STALL_GATHER = 0.32
+
+
 def shower():
     F = G.GameFrame()
     top = 2.15
@@ -548,16 +558,14 @@ def shower():
         F.box('tray', 0.9, 0.058, 0.9, (0, 0.029, 0), M.tray, bevel=0.015)
         F.cyl('drain', 0.04, 0.006, (0.1, 0.06, 0.1), M.fittings, verts=16)
         _tiled_walls(F, -0.45, 0.45, -0.45, 0.45, 0.058, top)
-        # a glass side, and a fixed panel with a sliding door in front
+        # a glass side, and a fixed panel in front (the sliding door, inside it, is its own part)
         F.box('glass_side', 0.01, 2.0, 0.83, (0.435, 1.09, -0.005), M.glass)
         F.box('glass_fixed', 0.46, 2.0, 0.01, (-0.195, 1.09, 0.437), M.glass)
-        F.box('glass_door', 0.44, 1.98, 0.01, (0.205, 1.08, 0.423), M.glass)
         _post(F, 'post_front', 0.435, 0.435, 0.058, top, M.frame)
         _post(F, 'post_back', 0.435, -0.42, 0.058, top, M.frame)
         F.box('rail_front', 0.87, 0.03, 0.03, (0.015, top - 0.015, 0.435), M.frame, bevel=0.004)
         F.box('rail_side', 0.03, 0.03, 0.84, (0.435, top - 0.015, 0.0), M.frame, bevel=0.004)
         F.box('rail_bottom', 0.87, 0.02, 0.03, (0.015, 0.068, 0.435), M.frame, bevel=0.004)
-        F.box('door_handle', 0.02, 0.4, 0.02, (0.03, 1.05, 0.405), M.frame, bevel=0.006)
         # a riser with a hand shower, a mixer, and the overhead head on an arm from the wall
         F.cyl('riser', 0.012, 0.8, (-0.1, 1.3, -0.39), M.fittings, verts=10)
         for y in (0.9, 1.7):
@@ -570,8 +578,16 @@ def shower():
         G.rod('arm', F.at(0, 2.02, -0.415), F.at(0, 2.02, -0.15), 0.011, material=M.fittings, verts=10)
         F.cyl('head', 0.12, 0.022, (0, 2.0, -0.15), M.fittings, verts=28, bevel=0.006)
     G.join(still, 'body', origin=(0, 0, 0))
+    # the sliding door, inside the fixed panel on the right: it slides left behind it to let the resident in
+    # and out (`door_open`). All glass, its grip a bar of smoked glass on the inside by its leading edge,
+    # so the door is one draw call (Q-05: the shower's fourth).
+    with G.new_parts() as parts:
+        F.box('glass_door', 0.44, 1.98, 0.01, (0.205, 1.08, 0.423), M.glass)
+        F.box('door_grip', 0.025, 0.4, 0.025, (0.37, 1.05, 0.404), M.grip, bevel=0.006)
+    door = G.join(parts, 'door', origin=F.at(0.205, 1.08, 0.423))
     rain = _rain(F, (0, 1.988, -0.15), 0.095, 0.06)
     G.settle()
+    G.slide(door, 'door_open', (SHOWER_SLIDE, 0, 0), seconds=0.7)
     G.grow(rain, 'water_on', seconds=0.5)
     return G.meshes()
 
@@ -600,14 +616,13 @@ def showerStall():
         F.box('tray', 0.9, 0.08, 0.9, (0, 0.04, 0), M.tray, bevel=0.03)
         F.cyl('drain', 0.04, 0.006, (0.05, 0.081, 0.05), M.fittings, verts=16)
         _tiled_walls(F, -0.45, 0.45, -0.45, 0.45, 0.08, 2.08, t=0.04, size=0.25)
-        # an L-shaped rail at the open sides, and the curtain drawn along the side and part of the front
+        # an L-shaped rail at the open sides; the curtain hangs along the whole side, and its front is its own part
         G.rod('rail_side', F.at(0.42, rail, -0.41), F.at(0.42, rail, 0.42), 0.011, material=M.frame, verts=10)
         G.rod('rail_front', F.at(-0.41, rail, 0.42), F.at(0.42, rail, 0.42), 0.011, material=M.frame, verts=10)
         F.sphere('rail_corner', 0.014, (0.42, rail, 0.42), M.frame, segments=10, rings=6)
         F.cyl('rail_mount_side', 0.025, 0.012, (0.42, rail, -0.405), M.frame, rot=(90, 0, 0), verts=12)
         F.cyl('rail_mount_front', 0.025, 0.012, (-0.405, rail, 0.42), M.frame, rot=(0, 90, 0), verts=12)
-        _pleats(F, (0.42, -0.4), (0.42, 0.16), 0.22, rail - 0.03, 9)
-        _pleats(F, (0.4, 0.42), (0.12, 0.42), 0.22, rail - 0.03, 5)
+        _pleats(F, (0.42, -0.4), (0.42, 0.4), 0.22, rail - 0.03, 13)
         # a riser on the back wall with a tilted head, a mixer lever, a caddy with bottles
         F.cyl('riser', 0.015, 0.75, (-0.2, 1.575, -0.39), M.fittings, verts=10)
         G.rod('arm', F.at(-0.2, 1.94, -0.39), F.at(-0.2, 1.97, -0.33), 0.012, material=M.fittings, verts=10)
@@ -618,8 +633,16 @@ def showerStall():
         F.cyl('bottle0', 0.025, 0.14, (0.1, 1.227, -0.36), M.teal, verts=12)
         F.cyl('bottle1', 0.03, 0.11, (0.18, 1.212, -0.36), M.bottle, verts=12)
     G.join(still, 'body', origin=(0, 0, 0))
+    # the front of the curtain, built drawn across the front and gathered into the right corner at rest
+    # (scaled along the rail about the corner): drawn across once the resident is in (`curtain_draw`, a
+    # grow along the rail), back as the use ends
+    with G.new_parts() as parts:
+        _pleats(F, (0.41, 0.42), (-0.41, 0.42), 0.22, rail - 0.03, 14)
+    curtain = G.join(parts, 'curtain', origin=F.at(0.41, rail, 0.42))
+    curtain.scale[0] = STALL_GATHER
     rain = _rain(F, (-0.2, 1.935, -0.3), 0.045, 0.08, rings=1, towards=(-0.05, 0.085, -0.02))
     G.settle()
+    G.grow(curtain, 'curtain_draw', seconds=0.9, axis='X')
     G.grow(rain, 'water_on', seconds=0.5)
     return G.meshes()
 
@@ -997,6 +1020,11 @@ def bathCabinetTall():
 TOILET = {'uses': {'toilet': 'lid_up'}}
 BATH = {'uses': {'bath': [{'clip': 'tap_on', 'hold': BATH_TAP + BATH_FILL}, 'fill']}}
 SHOWER = {'uses': {'shower': 'water_on'}}
+# The base shower's door slides open as the resident steps in, shuts behind them, and opens again to let them
+# out; the water comes on once it's shut. The stall's curtain is drawn across once they're in, back at the end.
+SHOWER_DOOR = {'uses': {'shower': [{'clip': 'door_open', 'hold': 1.5, 'out': 1.5},
+                                   {'clip': 'water_on', 'delay': 2.0}]}}
+SHOWER_CURTAIN = {'uses': {'shower': [{'clip': 'curtain_draw', 'delay': 1.0}, {'clip': 'water_on', 'delay': 1.8}]}}
 
 FAMILY = G.Family(
     'bathroom', M,
@@ -1007,11 +1035,11 @@ FAMILY = G.Family(
      G.Model('sinkPedestal', sinkPedestal, size=(0.56, 1.060, 0.464), key='model.sinkPedestal', centre=(0, -0.195),
              motions={'uses': {'wash': 'water_on'}},
              paint=[('body', 'Pedestal'), ('porcelain', 'Basin & cup'), ('chrome', 'Tap')]),
-     G.Model('vanityDouble', vanityDouble, size=(1.90, 1.122, 0.562), key='model.vanityDouble', centre=(0, -0.149),
+     G.Model('vanityDouble', vanityDouble, size=(1.90, 1.002, 0.562), key='model.vanityDouble', centre=(0, -0.149),
              motions={'uses': {'wash': 'water_on'}},
              paint=[('body', 'Cabinet'), ('stone', 'Worktop'), ('porcelain', 'Basins'), ('chrome', 'Taps & handles'),
                     ('trim', 'Plinth')]),
-     G.Model('sinkVessel', sinkVessel, size=(0.84, 1.165, 0.540), key='model.sinkVessel', centre=(0, -0.16),
+     G.Model('sinkVessel', sinkVessel, size=(0.84, 1.060, 0.540), key='model.sinkVessel', centre=(0, -0.16),
              motions={'uses': {'wash': 'water_on'}},
              paint=[('body', 'Vanity'), ('stone', 'Worktop'), ('porcelain', 'Bowl'), ('blackmetal', 'Tap'),
                     ('wood', 'Shelf & legs'), ('towel', 'Towels')]),
@@ -1031,9 +1059,9 @@ FAMILY = G.Family(
      G.Model('toiletWallHung', toiletWallHung, size=(0.6, 1.1, 0.665), key='model.toiletWallHung',
              centre=(0, -0.0975), motions=TOILET,
              paint=[('porcelain', 'Bowl'), ('seat', 'Seat & lid'), ('boxing', 'Cistern')]),
-     G.Model('shower', shower, size=(0.9, 2.15, 0.9), key='model.shower', centre=(0, 0.02), motions=SHOWER,
+     G.Model('shower', shower, size=(0.9, 2.15, 0.9), key='model.shower', centre=(0, 0.02), motions=SHOWER_DOOR,
              paint=[('tray', 'Tray'), ('frame', 'Frame'), ('fittings', 'Head & tap'), ('tile', 'Tiles')]),
-     G.Model('showerStall', showerStall, size=(0.9, 2.08, 0.9), key='model.showerStall', centre=(0, 0.02), motions=SHOWER,
+     G.Model('showerStall', showerStall, size=(0.9, 2.08, 0.9), key='model.showerStall', centre=(0, 0.02), motions=SHOWER_CURTAIN,
              paint=[('tray', 'Tray'), ('frame', 'Rail'), ('fittings', 'Head & tap'), ('curtain', 'Curtain'),
                     ('tile', 'Tiles')]),
      G.Model('showerWalkIn', showerWalkIn, size=(0.92, 2.26, 0.92), key='model.showerWalkIn', centre=(0, 0.03), motions=SHOWER,
