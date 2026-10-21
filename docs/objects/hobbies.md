@@ -57,6 +57,11 @@ table face the room, as tables do.
 - The chess table's and jigsaw table's second colour is "Chair" and "Stool": it colours the chess chair and the
   jigsaw stool; the chessboard's rim is the table's wood.
 - The darts are thrown from the tile in front of the board, half a metre from the wall.
+- Played with their own resident clips (G-26, `characters/clips/games.ts`): darts are thrown (`dartThrow`: side-on,
+  aim, throw, the hand following to the board, three darts and a step back to read the score); pool is a cue stroke
+  bent over the long rail, the left hand bridging on the cloth (`poolShot*`, a size per height, `STEP_IN` up to the
+  rail, a lane each for two); the foosball rods are turned at their handles (`foosball*`, at a pair of rods each).
+  The cue isn't in the hands yet (props in hand, G-70): it is mimed.
 - With the cutaway dropping its wall, the dartboard hides with the wall and can still be used.
 
 ## H3. Crafts and science (7)

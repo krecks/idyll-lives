@@ -302,7 +302,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** clip
 - **Where:** `web/src/render/babylon/characters.ts:477` (`ACTIONS.play`: `spell`); `tools/art/blender/families/playground.py:455-459` (the two bats are still parts of the table)
 - **Evidence:** `sheets/obj-pingPongTable.png` (`play/pingPongTable-pingPong-01.png`), `sheets/age-pingPongTable.png`: the player stands at the table's side by the net and works the hands at waist height for 30 minutes; both bats lie on the table and the ball sits still. Table tennis is a quick forehand and backhand with a bat in the hand. A swing clip and a bat prop (as the weights bench lifts its bar, `held`) are needed; where the players stand is I-community-02.
-- **Status:** open
+- **Status:** fixed (4366ec55, 83d53185)
+- **After:** a rally of forehands (the chest turning back, through and up across) and backhands, in the ready stance, knees bent (`pingPong`, `ACTIONS.play` by object; closed hand on the bat's line): `bench-results/review/fixes/clips-games/after-pingPongTable-pingPong-0*.png`. The bats in hand are G-70, the players at the ends G-62, a partner G-65.
 - **Source:** community wave (play)
 
 ### I-community-07 — The notice board and the bus timetable are read like a book in the hands

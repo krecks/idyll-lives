@@ -91,7 +91,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** clip
 - **Where:** `web/public/content/furniture.json:3585` (`yoga`: `anim: meditate`, `pose: sit`); `web/src/render/babylon/characters.ts:532` (`ACTIONS.meditate`: the idle) and `:3269-3285` (the cross-legged layer)
 - **Evidence:** `fitness/play/c1/yogaMat-yoga-01.png`: the resident sits cross-legged on the mat with the hands on the knees, breathing, eyes shut, for the whole 30 minutes; the content's description says "Yoga stretches the body". A sitting meditation is one part of a yoga session, so it reads as yoga at a glance; a careful player sees no pose ever change. A short sequence of held poses (downward dog, warrior, a forward fold, then the seated end) is new resident clips, and wants the full-length mat (M-fitness-02). The same `meditate` anim is used by `hotHeaded.json:93`, `:104`, where a meditation is what is meant.
-- **Status:** open
+- **Status:** fixed (4366ec55, 83d53185)
+- **After:** a 48 s flow on the unrolled mat from its front end (`yoga`, `STEP_IN`; content `anim: exercise`, standing, the mat's `seat` gone): mountain, the hands to the heart, an upward salute, a forward fold, a half lift, the hands walked out to a short downward dog (heels pedalling), a lunge up to warrior I, back to the dog, a child's pose, sitting on the heels, up through a squat; open hands. `bench-results/review/fixes/clips-games/after-yogaMat-yoga-0*.png`, `child-yogaMat-yoga-0*.png`. The dog and lunge overhang the 0.9 m mat (G-40, M-fitness-02); the cool-down cushion keeps the seated meditation.
 - **Source:** wave: fitness
 
 ### I-fitness-02 — The lifter curls beside the rack's rubber mat, not on it

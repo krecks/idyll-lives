@@ -187,7 +187,7 @@ Family: `tools/art/blender/families/pack_hotHeaded.py`.
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
 | `hotHeaded.heavyBag` Heavy punching bag | OK | OK | I-bathroom-04 | I-bathroom-04 S3 code (systems ledger: no thud) | `packs/sheets/obj-hotHeaded.heavyBag.png` |
-| `hotHeaded.smashBin` Plate-smash bin | OK | I-packs-13 | I-packs-13 | I-packs-13 S3 clip | `packs/sheets/obj-hotHeaded.smashBin.png` |
+| `hotHeaded.smashBin` Plate-smash bin | OK | I-packs-13 | I-packs-13, I-packs-20 | I-packs-13 S3 clip; I-packs-20 S3 model | `packs/sheets/obj-hotHeaded.smashBin.png` |
 | `hotHeaded.thunderDrums` Thunder drum kit | M-packs-13 | OK | OK | M-packs-13 S3 renderer-table | `packs/sheets/obj-hotHeaded.thunderDrums.png`, `packs/sheets/age-hotHeaded.thunderDrums.png` |
 | `hotHeaded.coolDownCushion` Cool-down meditation cushion | M-packs-12, M-packs-13 | OK | OK | M-packs-12 S3 model; M-packs-13 S3 renderer-table | `packs/sheets/obj-hotHeaded.coolDownCushion.png`, `packs/sheets/age-hotHeaded.coolDownCushion.png` |
 | `hotHeaded.grudgeJournal` Grudge-to-gratitude writing desk | M-packs-08 | OK | OK | M-packs-08 S3 model | `packs/sheets/obj-hotHeaded.grudgeJournal.png` |
@@ -625,7 +625,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** clip
 - **Where:** `web/src/render/babylon/characters.ts:490` (`ACTIONS.exercise`: `idle` for `boulder`) and `:3384` (`activityPose`: climbing in place); `web/public/content/packs/energetic.json:5`
 - **Evidence:** `packs/play/chunk2/energetic.boulderingWall-climb-01.png`, `packs/sheets/obj-energetic.boulderingWall.png`: for an hour the climber stands on the floor off the end of the mat, reaching for holds overhead in turn; the feet never leave the floor and the hands don't touch the wall. Climbing needs the body on the wall (a rise up the panel and back, the hands and feet on holds).
-- **Status:** confirmed and widened (consolidation: I-residents-01 merged)
+- **Status:** fixed (4366ec55, 83d53185)
+- **After:** climbed on the wall (`boulder172/147/112`, `STEP_IN` up onto the crash mat at the wall's middle): hands to the start holds, the feet onto the low ones, up the model's own holds hand and foot in turn to the top (the route scaled per size, each place on the nearest hold), a look down and a drop onto the mat with bent knees; the climbing-in-place layer is gone. `bench-results/review/fixes/clips-games/after-energetic.boulderingWall-climb-0*.png`, the child's `child-energetic.boulderingWall-climb-0*.png`.
 - **Source:** wave: packs
 
 ### I-packs-04 — On the vibration plate the resident turns their back to the handlebar
@@ -729,7 +730,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** clip
 - **Where:** `web/src/render/babylon/characters.ts:483` (`ACTIONS.exercise`: `punchJab`, `punchCross` for `smash`)
 - **Evidence:** `packs/sheets/obj-hotHeaded.smashBin.png` (play): the resident jabs at nothing beside the plate stack; no plate is picked up or thrown. A pick-up then an overarm throw into the bin reads (the plate is I-held-01, held ledger).
-- **Status:** open
+- **Status:** fixed (4366ec55, 83d53185)
+- **After:** a plate taken from the stack (bent to it as far as the height needs), up over the right shoulder and thrown overarm down into the crate, a look in after it (`smashPlate172/147/112`, `STEP_IN` up to the stool): `bench-results/review/fixes/clips-games/after-hotHeaded.smashBin-smash-0*.png`, `child-hotHeaded.smashBin-smash-0*.png`. The plate is mimed (G-70); the lid shuts on the thrower after 1 s (new: I-packs-20).
 - **Source:** wave: packs
 
 ### I-packs-14 — A gaming marathon in the recliner with no screen to play on
@@ -793,3 +795,13 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Evidence:** `tables/uses-packs.md` Sound column: every `cook`-tagged use sounds like frying, so the smoothie, the cold cheese board, the microwave and the oven bake all sizzle; the smart speaker's story plays the music loop. The sound follows the clip's tag, not the thing. Missing sounds (singing, the punch bag, the arcade) are I-bathroom-04's (systems ledger). Shared beyond this ledger: any `cook` use away from a hob (31 in the other content files).
 - **Status:** closed (duplicate of I-bathroom-04)
 - **Source:** wave: packs
+
+### I-packs-20 — The smash bin's lid shuts after a second while plates are thrown in for 20 minutes
+
+- **Severity:** S3
+- **Rubric:** I7, A10
+- **Fix class:** model
+- **Where:** `tools/art/blender/families/pack_hotHeaded.py:450` (`motions={'uses': {'smash': 'lid_open'}, 'hold': 1}`: the lid opens for 1 s at the use's start, then closes)
+- **Evidence:** `bench-results/review/fixes/clips-games/after-hotHeaded.smashBin-smash-01.png` to `-03.png`, `child-hotHeaded.smashBin-smash-01.png` to `-03.png`: with the new throw (I-packs-13) every plate goes down onto the shut lid; only the first frame has it open. The lid wants to stay up while the use lasts (no `hold`), or to open with each throw (`every` 3.4 s, the clip's length).
+- **Status:** open
+- **Source:** fix: clips-games

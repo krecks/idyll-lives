@@ -95,6 +95,8 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 | `energetic.recoveryPod` Recovery pod | 1x2 · floor | recover:relax | fitness / — | Frame, Pads, Boots | Use | `canopy`: the canopy lowers over them for recover and lifts after. |
 
 **In play** (signed off 2026-10-17):
+- The wall is climbed on (G-26: `boulder*`, a size per height, `STEP_IN` up onto the crash mat): hands to the start
+  holds, the feet onto the low ones, up the model's holds hand and foot in turn to the top, a drop onto the mat.
 - The wall is still (looked at in all facings, climbed); the pedals turn, the mat dips with the bouncer, the net
   sways after each shot, the blender lid lifts and settles, the rain grows, the canopy lowers and lifts. Nothing
   needed fixing.
@@ -180,6 +182,8 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 - Every clip plays and shuts: the bag swings while pounded, the bin's lid holds 1 s, the cymbals shake, the zafu
   sinks for both meditations, the drawer opens, the cover rolls off. Nothing needed fixing.
 - At the grudge desk the hands rest on the top (`sitHandsNear`).
+- Smashing plates (G-26: `smashPlate*`, a size per height, `STEP_IN` up to the stool): a plate taken from the stack
+  (mimed) and thrown overarm down into the crate.
 - Each model has one colour part, Body: the bag, the crate, the shells, the zafu, the desk's wood, the cedar
   cladding.
 

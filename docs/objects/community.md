@@ -32,6 +32,8 @@ their uses. The climbing frame has no clip of its own: the resident's clips clim
 
 **In play** (signed off 2026-10-16):
 - Checked in the yard of the check house in all four facings: the slide gone down, the ping-pong table played at;
+  table tennis is a rally of forehands and backhands (`pingPong`, G-26), the bat mimed in a closed hand (props in hand:
+  G-70; where the players stand: G-62);
   the seesaw, spring rider and merry-go-round loops go round with the rider on them and finish their round when the
   use ends; the hoop's net swishes after each shot; a pawn slides for chess. Every part coloured in buy and in the
   colour studio.
