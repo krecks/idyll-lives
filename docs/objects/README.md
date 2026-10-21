@@ -180,11 +180,12 @@ time; fix them before the next large check.
 - Worktree vite: the git-ignored wasm packages must be *copied* into the worktree (a symlink is refused with 403 and
   the sim, font and environment light silently fail: "lights only" pictures). Vite needs a wrapper config that adds
   the main checkout's `node_modules` to `server.fs.allow` **and** its own `cacheDir`: the shared `node_modules/.vite`
-  is re-optimised by every agent's server (ENOTEMPTY at start, reloads mid-run, lost environment maps). Better still,
-  the repo's `vite.config.ts` could do both when `node_modules` is a symlink.
+  is re-optimised by every agent's server (ENOTEMPTY at start, reloads mid-run, lost environment maps). *Done
+  (2026-10-21):* the repo's `vite.config.ts` does both when `node_modules` is a symlink (`web/.vite-cache`).
 - Setup must fail loudly: fetch the wasm through the new server (expect 200) and load the check house once
   (`__sims()` answers, no "using lights only") before any run; the runner should record HTTP ≥ 400 and console
-  errors per job.
+  errors per job. *Done:* `check.mjs` fetches the wasm and manifest first, and logs HTTP errors, failed requests,
+  page and console errors ("lights only" too) per job.
 - The agent sandbox refuses `bash script.sh`, `cd … &&` chains, `$VAR` in command or option position and loops
   calling bash: ship setup as plain commands, with absolute paths, and a node launcher that sets PORT/PLAYWRIGHT/CHROME
   itself.
@@ -193,21 +194,27 @@ time; fix them before the next large check.
 
 **The runner**
 - Reuse one page for many jobs (sell, buy the next facing): a fresh page cost 10–75 s under load; reuse made jobs
-  5–15 s.
+  5–15 s. *Done:* `play --objects` / `--objects-file`, `gallery --each`, `clips --each`.
 - Wait for every loading text ("Moving in", "Getting ready", "Drawing portraits", "Building the world", "Warming up")
   before buying and again before each shot; time out `goto` at 90 s; count the cap from page ready and from when the
-  use is sent.
-- Walk fast and slow down only within a few tiles of the object (never above 10×: 30× skips short uses).
-- Sample clips in the page every animation frame, not from node every 100 ms (short clips were missed).
+  use is sent. *Done.*
+- Walk fast and slow down only within a few tiles of the object (never above 10×: 30× skips short uses). *Done*
+  (`--walk`, `--speed`).
+- Sample clips in the page every animation frame, not from node every 100 ms (short clips were missed). *Done*
+  (`__check.watch`, the resident's pose and animation too).
 - Ignore always-running clips (`idle`, `growth`, `night`, clock hands) for at-it / picture / shut; know held-open
-  things (`motions.open`) and close them with a `then=<use>`.
+  things (`motions.open`) and close them with a `then=<use>`. *Done:* `played` leaves them out; a use's `when` is set up
+  with the object's own opening or closing use, and what is left open is shut before it is sold.
 - Frame the object, not the resident: clear the follow (`__controls.follow(null)`), aim at the footprint's middle with
   a radius from its size, re-aim just before the shot (the intro tween and the game's auto-watch override it); a back
-  view; walls kept up for wall things or an uncut wall chosen.
+  view; walls kept up for wall things or an uncut wall chosen. *Done* but the back view: from in front and to the side,
+  so the cutaway keeps a wall thing's wall up.
 - Print the resident's needs (a use ends when its need is full: toilets, swings, sunbathing), with
-  `drain=<need>:<level>` and `cancel=<s>`. Shots less than about 0.8 s apart freeze the game between them.
+  `drain=<need>:<level>` and `cancel=<s>`. *Partly done:* needs before and after each use are logged, and
+  `review-stage` starts them at 0.5; no `drain` yet. Shots less than about 0.8 s apart freeze the game between them.
 - Record what each shot shows (object found, its facing, colours set) and flag mismatches: a late buy once put the
-  wrong facing's object in a plausible picture.
+  wrong facing's object in a plausible picture. *Done* but colours: each picture logs the object's place and facing,
+  and a buy that stands elsewhere is an error.
 - Generate the jobs from content + manifest (main use = first with a clip, extra runs only for uses whose pose, anim
   or clip differ, outdoor things to the yard, radius from the footprint), and a report per group from the results.
 
