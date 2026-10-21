@@ -238,7 +238,7 @@ Family: `tools/art/blender/families/pack_lazy.py`.
 | `lazy.napPod` Daydream nap pod | A-packs-04 | A-packs-04 | OK | A-packs-04 S2 model | `packs/sheets/obj-lazy.napPod.png`, `packs/play/chunk3/lazy.napPod-powerNap-01.png` |
 | `lazy.quiltTable` Heated quilt table | OK | I-packs-01 | I-packs-01 | I-packs-01 S2 model | `packs/sheets/obj-lazy.quiltTable.png`, `packs/play/chunk3/lazy.quiltTable-tuckIn-01.png`, `packs/sheets/age-lazy.quiltTable.png` |
 | `lazy.deliveryLocker` Doorstep delivery locker | OK | OK | OK | | `packs/sheets/obj-lazy.deliveryLocker.png` |
-| `lazy.vibePlate` Effortless vibration plate | I-packs-04 | I-packs-04 | I-packs-04 | I-packs-04 S2 model | `packs/sheets/obj-lazy.vibePlate.png`, `packs/play/chunk3/lazy.vibePlate-shake-02.png` |
+| `lazy.vibePlate` Effortless vibration plate | I-packs-04 | I-packs-04, I-packs-22 | I-packs-04 | I-packs-04 S2 model; I-packs-22 S3 clip | `packs/sheets/obj-lazy.vibePlate.png`, `packs/play/chunk3/lazy.vibePlate-shake-02.png` |
 | `lazy.smartHub` Smart-home command hub | OK | OK | I-packs-05, I-packs-19 | I-packs-05 S2 content; I-packs-19 S3 code | `packs/sheets/obj-lazy.smartHub.png` |
 
 ### Real uses against the content's (I1)
@@ -336,7 +336,7 @@ Family: `tools/art/blender/families/pack_outgoing.py`.
 | `outgoing.conversationSectional` Conversation sectional | OK | OK | OK | | `packs/sheets/obj-outgoing.conversationSectional.png`, `packs/sheets/age-outgoing.conversationSectional.png` |
 | `outgoing.karaokeStage` Karaoke stage | M-packs-07 | OK | I-packs-02, I-bathroom-04 | M-packs-07 S2 model; I-packs-02 S2 content; I-bathroom-04 S3 code (systems ledger: no sound) | `packs/sheets/obj-outgoing.karaokeStage.png`, `packs/extra/night/night-outgoing.karaokeStage-practise-01.png` |
 | `outgoing.videoCallNook` Video-call corner | M-packs-07 | OK | I-packs-10 | M-packs-07 S2 model; I-packs-10 S3 renderer-table | `packs/sheets/obj-outgoing.videoCallNook.png`, `packs/extra/night/night-outgoing.videoCallNook-call-01.png` |
-| `outgoing.danceFloor` Light-up dance floor | M-packs-07 | OK | OK | M-packs-07 S2 model | `packs/sheets/obj-outgoing.danceFloor.png`, `packs/extra/night/night-outgoing.danceFloor-dance-01.png` |
+| `outgoing.danceFloor` Light-up dance floor | M-packs-07 | OK | I-packs-21 | M-packs-07 S2 model; I-packs-21 S2 content | `packs/sheets/obj-outgoing.danceFloor.png`, `packs/extra/night/night-outgoing.danceFloor-dance-01.png` |
 | `outgoing.photoWall` Party photo wall | OK | OK | OK | | `packs/sheets/obj-outgoing.photoWall.png` |
 
 ### Real uses against the content's (I1)
@@ -411,7 +411,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/pack_neat.py:384` (`entryConsole`), `web/public/content/packs/neat.json:153`; `tools/art/blender/families/pack_kind.py:184-191` (`neighbourlyOven`: `shelf` and three jars at 1.5 m, `WALL + 0.1`), `web/public/content/packs/kind.json:81`
 - **Evidence:** `packs/sheets/obj-neat.entryConsole.png`: the hook board stands beside the mirror over nothing; against a wall it reads as hung. `packs/sheets/obj-kind.neighbourlyOven.png` (gallery, clips): the jar shelf floats 0.6 m over the worktop with nothing behind it on free floor. `slob.spritzStation` is the same cause (M-packs-02). Deferred from 0.3.0 unless the model is touched for another reason; both could get a back panel or a post, or be wall-only.
-- **Status:** confirmed and widened
+- **Status:** fixed (0ff6cf97, 0b118edb)
+- **After:** Back panels (Q-06): the entry console's mirror (flat now) and hook board hang on a birch back panel with posts and a cap rising from its top to 1.8 m; the baking counter's jar shelf stands on a sage beadboard back rising from the worktop's back, capped at 1.63 m. Both read as one piece free of a wall (`fixes/blender-packs/gallery/gallery-neat.entryConsole.png`, `gallery-kind.neighbourlyOven.png`, `play/day-neat.entryConsole-tidy-01.png`). 3 draws each.
 - **Source:** `docs/objects/open.md` Still open › Models; `plan/release-0.3.0.md` §1.4; wave: packs
 
 ### M-packs-02 — The spritz station's round mirror hangs in the air when it stands free
@@ -421,7 +422,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/pack_slob.py:232`, `web/public/content/packs/slob.json:98`
 - **Evidence:** As M-packs-01. Deferred from 0.3.0 unless the model is touched for another reason. Review: `packs/sheets/obj-slob.spritzStation.png`: the round mirror floats over the bottle shelf and the towel panel at its side hangs on nothing.
-- **Status:** confirmed
+- **Status:** fixed (dfac8172)
+- **After:** The round mirror hangs on a purple back board rising from the top to 1.62 m (Q-06) and the green towel on a chrome bar under the top's front edge (`fixes/blender-packs/gallery/gallery-slob.spritzStation.png`, `play/day-slob.spritzStation-spritz-01.png`). 3 draws.
 - **Source:** `docs/objects/open.md` Still open › Models; `plan/release-0.3.0.md` §1.4; wave: packs
 
 ### M-packs-03 — The party bar's "Back bar" colours the back cabinet, not the bottle shelves
@@ -431,7 +433,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/pack_outgoing.py:137`, `web/public/content/packs/outgoing.json:5`
 - **Evidence:** The colour part named "Back bar" paints the cabinet behind, not the shelves a buyer would expect. Deferred from 0.3.0. Review: `back_cabinet` is `M.wood` (`pack_outgoing.py:141`), the shelves `M.oak` (`:148`), and the paint list names `wood` "Back bar" (`:473`); `packs/sheets/obj-outgoing.partyBar.png`.
-- **Status:** confirmed
+- **Status:** fixed (e4769357)
+- **After:** The bottle shelves and the back cabinet's top are `wood` too, so "Back bar" colours the whole back bar; the counter top and the cabinet doors stay oak (`fixes/blender-packs/gallery/gallery-outgoing.partyBar.png`). 3 draws.
 - **Source:** `docs/objects/open.md` Still open › Models; `plan/release-0.3.0.md` §1.4; wave: packs
 
 ### A-packs-01 — Bathers' shins go through the front of the heart tub
@@ -465,7 +468,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/pack_foodie.py:577-579` (`_stool`: seat at 0.45), `:638-639`; `web/public/content/packs/foodie.json:174` (`surface.height` 0.9, `slots` 2)
 - **Evidence:** `packs/sheets/age-foodie.chefsIsland.png`, `packs/play/rerun1/foodie.chefsIsland-barBite-01.png`: a 0.45 m seat under a 0.90 m worktop puts the top at the sitter's chest, 45 cm over the seat (a desk is 28–30 cm over its chair). Counter stools for a 0.90–0.95 top are 0.58–0.71 (`reference.md`, Seats). The sizes table can't see it: the kind has no stool line.
-- **Status:** open
+- **Status:** fixed (db55d69b)
+- **After:** Counter stools: the seats at 0.65 (25 cm under the 0.9 top), foot rings at 0.3, set back to depth −0.235 so the knees go under the top's back overhang; `furniture.json` `foodie.chefsIsland` 0.65, fwd −0.235 (was the default 0.45 at the middle). `cargo check-glb`: no heights warning (`fixes/blender-packs/poses/focus-foodie.chefsIsland-*.png`, `side-chefsIsland-adult.png`, `play/day-foodie.chefsIsland-barBite-01.png`). Still 3 draws: the stools are plain satin oak now, for the island's new hot ring (A-systems-03).
 - **Source:** wave: packs
 
 ### M-packs-05 — The organizer desk and the love-letter bureau turn their backs to the room
@@ -475,7 +479,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/pack_neat.py:291-326` (`organizerDesk`: the top at depth 0.28, the modesty panel at 0.44 on the front, the chair at −0.12 behind); `tools/art/blender/families/pack_romantic.py:353` (`letterBureau`); `web/public/content/packs/romantic.json:64` (no `seat.facing`); against `web/public/content/packs/bookworm.json:64` (`writingBureau`: `"facing": "back"`)
 - **Evidence:** `packs/sheets/obj-neat.organizerDesk.png` (gallery, game camera and clips are all a plain 1.6 × 1.25 m birch board: the hutch's cubbies, the bins, the ledger and the label maker face the wall), `packs/sheets/age-neat.organizerDesk.png` (only the sitters' heads over the board). From the game camera it can't be named (M5). `packs/sheets/obj-romantic.letterBureau.png`: the same with the bureau's pink-framed back. A bureau stands with its back to the wall and the writer facing it, as the pack's own `bookworm.writingBureau` does (`facing: back`); the desk the same, or with its hutch facing the sitter in the room.
-- **Status:** open
+- **Status:** fixed (0ff6cf97, 1ec6792c)
+- **After:** Both turned round: their backs on the wall, the hutch (bins, labels, ledger, label maker; the pigeonholes and the fall-front) on the desk's back facing the sitter and the room, the chair in front, the sitter facing the wall (`furniture.json` `back`: the desk fwd 0.21, the bureau 0.25). Named from the game camera now (`fixes/blender-packs/gallery/gallery-neat.organizerDesk.png`, `gallery-romantic.letterBureau.png`, `play/day-neat.organizerDesk-sort-01.png`, `day-romantic.letterBureau-writeLetter-01.png`, `poses/focus-neat.organizerDesk-*.png`, `focus-romantic.letterBureau-*.png`). 3 draws each.
 - **Source:** wave: packs
 
 ### M-packs-06 — The hammocks' 1.88 m frames: grown-ups lie with the knees up
@@ -485,7 +490,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** decision
 - **Where:** `tools/art/blender/families/pack_cheerful.py:424-434` (`rainbowHammock`: `SLING_END, SLING_LOW`), `pack_natureLover.py:354-359` (`gardenHammock`: hooks at x 0.88); `web/src/render/babylon/characters/furniture.json:68-69` (`beds`, `across`, `sling`); `web/public/content/packs/cheerful.json:116`, `natureLover.json:144` (2 × 1 footprints)
 - **Evidence:** `packs/sheets/age-cheerful.rainbowHammock.png`, `packs/sheets/age-natureLover.gardenHammock.png`: the adult, the teen and the elder lie with the knees bent up and the feet at the far post; only the child fits. A hammock on a stand is 2.7–4 m long (`reference.md` `hammock`; space-saving stands 2.4–2.8). A 2 × 1 footprint can't hold one: a 3 × 1 footprint (model and content), a sitting-swinging pose, or accepting the knees is the owner's call.
-- **Status:** open
+- **Status:** fixed (9e8bfe3b, 14de632d)
+- **After:** Q-07: both stand on 3 × 1 (content footprints), their slings 2 m between the spreader bars at ±1.0 (stands 2.84 and 2.88 m), `furniture.json` `sling` half 1.015 / 1.0, head 0.75 / 0.76: the adult, the teen and the elder lie near flat, the feet short of the bar (`fixes/blender-packs/poses/beds-adult.png`, `beds-teen.png`, `beds-elder.png`, `beds-child.png`; `play/day-cheerful.rainbowHammock-swing-01.png`, `day-natureLover.gardenHammock-doze-01.png`). 3 draws each.
 - **Source:** wave: packs
 
 ### M-packs-07 — Things that glow in life stay dark at night; the mood lamps light nothing
@@ -495,7 +501,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** model (glow materials); content (`light`)
 - **Where:** `tools/art/blender/families/pack_couchPotato.py:90` (`wax`, no `glow`), `pack_cheerful.py:26-27` (`amber`, `sunny`: the jukebox's arch and bubble tubes) and `:44` (`lyrics`), `pack_slob.py:37` (`screen_lit`), `pack_outgoing.py:34` (`screen`), `:51` (`ring`), `:58-59` (`tile_a`, `tile_b`), `pack_romantic.py:40-41` (`flame`, `flame_core`); `web/public/content/packs/couchPotato.json:207`, `gloomy.json:150`, `cheerful.json:149` (the three lamps: no `light`)
 - **Evidence:** `packs/extra/night/` (`review-stage-night`, 22:18–00:16): the lava lamp's wax is dark red (`night-couchPotato.lavaLamp-zoneOut-00.png`), the "glowing retro jukebox" (its description) is a dark red box (`night-cheerful.jukebox-dance-01.png`), the arcade screen is unlit (`night-slob.arcadeCabinet-chaseHighScore-01.png`), the karaoke screen and the video-call ring light and laptop are dark (`night-outgoing.karaokeStage-practise-01.png`, `night-outgoing.videoCallNook-call-01.png`), the dance floor's tiles are flat colour (`night-outgoing.danceFloor-dance-01.png`), and the candlelit table's candles show no flame (`night-romantic.candlelitTable-candlelitDinner-01.png`). The cinema screen, the sunrise disc, the fire and the journal desk's candle do glow (their materials have `glow`). None of the three mood lamps (lava, rain, sunrise) has a content `light`, so none lights the room or can be switched (a lamp you can switch counts as a use).
-- **Status:** open
+- **Status:** fixed (9b47587c, 9e8bfe3b, dfac8172, e4769357, 1ec6792c, dd1a7325, 209a7ef0)
+- **After:** Glow materials, no emissive: the lava lamp's glass and wax, the jukebox's arch bands and bubble tubes, the rain lamp's canopy light, pool and rain, the arcade's marquee and the photo wall's bulbs glow at night; the arcade's, the karaoke machine's and stage's (with their lyrics) and the laptop's screens, the ring light and the dance floor's tiles while they're used (`screen`); the candles' flames (the candlelit table's, the heart tub's, the bureau's) at night. The three mood lamps have a content `light` (lava 2 m at 0.85, rain 2.5 m at 1.3, sunrise 2.5 m at 1.25), switched as lamps: off, no light and no glow, as a base lamp (`fixes/blender-packs/night/night-cheerful.jukebox-dance-01.png`, `night-outgoing.danceFloor-dance-01.png`, `night2-slob.arcadeCabinet-chaseHighScore-01.png`, `night2-cheerful.karaokeMachine-sing-01.png`, `night-outgoing.karaokeStage-practise-01.png`, `night-outgoing.videoCallNook-call-01.png`, `night3-romantic.candlelitTable-candlelitDinner-01.png`; switched on: `lamp-on-couchPotato.lavaLamp.png`, `lamp-on-gloomy.rainLamp.png`, `lamp-on-cheerful.sunriseLamp.png`). A lamp bought on `review-stage-night` comes off (the base floor lamp too), so the use shots `night-*Lamp-*` show them dark. Draws unchanged.
 - **Source:** wave: packs (`check.mjs play --state review-stage-night`)
 
 ### M-packs-08 — Two writing desks' tops are 1–2 cm over desk height
@@ -505,7 +512,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/pack_gloomy.py:245` (`journalDesk`, top 0.78), `pack_hotHeaded.py:323` (`grudgeJournal`, top 0.77)
 - **Evidence:** `tables/sizes-packs.md`: top 0.780 and 0.770 against a desk's 0.72–0.76 (5 mm tolerance on tops). `neat.organizerDesk` (0.762) is inside. With seats at 0.46–0.47 the gap to the top (31–32 cm) is still within a desk's; only side by side would anyone see it. `packs/sheets/obj-gloomy.journalDesk.png`, `packs/sheets/obj-hotHeaded.grudgeJournal.png`.
-- **Status:** open
+- **Status:** fixed (dd1a7325, 757fe0e3)
+- **After:** The journal desk's top at 0.75 (was 0.78), the grudge desk's at 0.745 (was 0.76, the journal on it 0.77), what stands on them lowered with them; seats unchanged (0.46). `cargo review sizes` flags neither (`fixes/blender-packs/gallery/gallery-gloomy.journalDesk.png`, `gallery-hotHeaded.grudgeJournal.png`).
 - **Source:** wave: packs
 
 ### M-packs-09 — The "spin bike" is a recumbent bike
@@ -526,7 +534,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/pack_bookworm.py:388` (`firesideLounge`)
 - **Evidence:** `packs/extra/night/night-bookworm.firesideLounge-readByFire-01.png`, `packs/sheets/obj-bookworm.firesideLounge.png`: a black suspended hood and flue rise between and behind the two wing chairs while the fire burns in a bowl on a pedestal in front of them; a hood draws smoke only right over the fire.
-- **Status:** open
+- **Status:** fixed (c430e812)
+- **After:** It was over the grate, 0.8 m up: the hood now hangs right over it, its rim at 0.6 (the flames reach 0.47), the flue down to it from the ceiling, so it reads as the fire's hood in front of the chairs (`fixes/blender-packs/night/night-bookworm.firesideLounge-readByFire-01.png`, `gallery/gallery-bookworm.firesideLounge.png`).
 - **Source:** wave: packs
 
 ### M-packs-11 — The candlelit table for two seats both diners side by side
@@ -547,7 +556,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/pack_hotHeaded.py:281` (`coolDownCushion`), `pack_gloomy.py:417` (`soakingTub`), `pack_bookworm.py:443` (`bedsideStack`)
 - **Evidence:** `tables/sizes-packs.md`: the meditation "cushion" is a 0.45 m pouf (a zafu is 0.08–0.22; `packs/sheets/obj-hotHeaded.coolDownCushion.png`), which reads as a pouf to sit cross-legged on; the soaking tub's rim is 0.92 m (0.5–0.8; an ofuro is deep, but this has no step to climb over; `packs/sheets/obj-gloomy.soakingTub.png`); the bedside stack is a 0.85 m wide chest (a nightstand is 0.35–0.66; `packs/sheets/obj-bookworm.bedsideStack.png`).
-- **Status:** open
+- **Status:** fixed (757fe0e3, c430e812); the soaking tub not a fault
+- **After:** The cushion is a real zafu, 0.38 across and 10 cm high on its 8 cm zabuton, pressed to a 0.17 seat (`furniture.json`), so it is sat on cross-legged by the floor clips (`fixes/blender-packs/poses/focus-hotHeaded.coolDownCushion-*.png`, `play/day-hotHeaded.coolDownCushion-breathe-01.png`). The bedside stack's chest is 0.6 wide with four drawers (model 0.63 with the floor pile in front). The soaking tub's rim is at 0.66: the 0.92 the sizes table reads is the whole model's height, the fern on its ledge (as the whirlpool tub's, judged a bundle); not changed. `cargo review sizes` still flags the cushion's mat (W, D 0.90) and the stack's lamp and pile (H, D): the bundle, not the parts.
 - **Source:** wave: packs
 
 ### M-packs-13 — The drum stool, the meditation pouf and the quilted settee don't match their renderer heights
@@ -579,7 +589,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/pack_lazy.py:170-204` (`HOOD` centre at 0.95, radius 0.48; `hood` swings 60° forward)
 - **Evidence:** `packs/play/chunk3/lazy.napPod-powerNap-01.png`, `packs/sheets/obj-lazy.napPod.png`: with the hood over, an adult's head goes up into the hood shell; the seat (0.45) puts a seated adult's crown at about 1.3 m, inside the 0.95 + 0.48 m sphere the hood turns on. A child clears it (`packs/sheets/age-lazy.napPod.png`). `loner.quietPod`'s shell clears the head.
-- **Status:** open
+- **Status:** fixed (2c0c1de5)
+- **After:** The egg is 1.54 m tall (was 1.42) and the hood turns about a point 1.05 m up with a 0.5 m radius (was 0.95, 0.48): about 12 cm clear of a grown-up's crown when it is over; everything 5 cm forward, its back on the wall face (`furniture.json` fwd 0.05, front 0.42) (`fixes/blender-packs/poses/focus-lazy.napPod-*.png`, `side-napPod-adult.png`, `play/day-lazy.napPod-powerNap-01.png`). 3 draws.
 - **Source:** wave: packs
 
 ### A-packs-05 — Dozing on the window seat: face down, across the cushion, the head at the glass
@@ -611,8 +622,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/pack_lazy.py:213` (`quiltTable`: a solid quilt skirt to the floor in front of the bench), `pack_romantic.py:120` (`candlelitTable`: the deep front apron); `web/public/content/packs/lazy.json:102`, `romantic.json:5`
 - **Evidence:** `packs/play/chunk3/lazy.quiltTable-tuckIn-01.png`, `packs/sheets/age-lazy.quiltTable.png`: the sitter's shins and feet stick out of the front of the red quilt at every stage but the child (the bench is at the back, the table about 0.9 m deep). `packs/play/chunk4/romantic.candlelitTable-candlelitDinner-01.png`, `packs/sheets/age-romantic.candlelitTable.png`: the diner's legs pass through the table to its near side. A kotatsu is sat at with the legs under the quilt, so the knees need room under the top and the feet must stay inside.
-- **Status:** fixed in part (346158ba): the candlelit table; the quilt table is open (`pack_lazy.py`, outside the kitchen Blender fix's families)
-- **After:** Candlelit table: rebuilt with G-39 (M-packs-11), a chair at each end; the cloth drops 12 cm all round (bottom at 0.65), so the diners' knees go under the top and their feet stay under it, nothing through the cloth (`fixes/blender-kitchen/poses/poses-adult-f3-side.png`, `poses-child-f3-side.png`, `play/two-romantic.candlelitTable-candlelitDinner-r0-side.png`).
+- **Status:** fixed (346158ba: the candlelit table; 2c0c1de5: the quilt table)
+- **After:** Candlelit table: rebuilt with G-39 (M-packs-11), a chair at each end; the cloth drops 12 cm all round (bottom at 0.65), so the diners' knees go under the top and their feet stay under it, nothing through the cloth (`fixes/blender-kitchen/poses/poses-adult-f3-side.png`, `poses-child-f3-side.png`, `play/two-romantic.candlelitTable-candlelitDinner-r0-side.png`). Quilt table: a 0.5 m deep top with the quilt draped hollow over its front and ends to the floor (legs inside), the poufs back at depth −0.2 and the hips on them (`furniture.json` `lazy.quiltTable` fwd −0.2; they were at the footprint's middle, 12 cm in front of the poufs): the legs go in under the quilt from the back and the feet stay inside at every stage (`fixes/blender-packs/poses/focus-lazy.quiltTable-adult.png`, `-elder.png`, `-child.png`, `side-quilt-adult.png`, `play/day-lazy.quiltTable-tuckIn-01.png`). 3 draws.
 - **Source:** wave: packs (leads from the evidence index's "Seen")
 
 ### I-packs-02 — Exercise and singing next to the board, the mat and the stage, not on them
@@ -646,7 +657,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/pack_lazy.py:315-316` (`column` and `handlebar` at depth −0.22 to −0.3, the plate's back)
 - **Evidence:** `packs/play/chunk3/lazy.vibePlate-shake-02.png`, `packs/sheets/obj-lazy.vibePlate.png`: the stander faces the object's front, so the column and console are behind them and the bar sticks out at the hip; the hands hold nothing. On a real plate you face the console and hold the bar. The column belongs at the front, or the stander faces the back.
-- **Status:** open
+- **Status:** fixed (2c0c1de5)
+- **After:** The stander faces the object's back (they step on from the tile in front facing in, as on the treadmill), where the column was; it was the bar that missed them: 30 cm ahead at hip height. Now the column stands at the plate's far end with the handlebar at 1.1 m and its arms reaching back to grips either side of the stander's hands (`fixes/blender-packs/play/day-lazy.vibePlate-shake-01.png`, `gallery/gallery-lazy.vibePlate.png`). The hands closing on the grips is a clip (the jog's arm swing): not done.
 - **Source:** wave: packs
 
 ### I-packs-05 — Long sit-down uses done standing at the object (the packs' share of I-living-03)
@@ -724,8 +736,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/pack_kind.py:341` (`welcomeTeaTable`: a pouf either side of the table, both sitters facing the front); `tools/art/blender/families/pack_couchPotato.py:425` (`lavaLamp`: the lamp behind the chair's shoulder)
 - **Evidence:** `packs/sheets/age-kind.welcomeTeaTable.png`, `packs/play/chunk5/kind.welcomeTeaTable-shareTea-01.png`: host and guest sit side-on to the table between them, both facing the room, not each other. `packs/extra/night/night-couchPotato.lavaLamp-zoneOut-00.png`: "Ooh, the blobs" with the lamp behind the sitter's head.
-- **Status:** fixed in part (346158ba): the tea table; the lava lamp is open (`pack_couchPotato.py`, a family outside the kitchen Blender fix's)
-- **After:** Tea table (G-39): the poufs (40 cm across) stand at ±0.75 either side of a lower (top 0.36), narrower (0.4 × 0.56 m) table, the ferns at the back between them; content `places` `[±0.75, 0]` facing ±90 (was ±0.5 turned 45°). Host and guest face each other straight across the tea set, the knees stopping short of the table's ends and the feet before them (`fixes/blender-kitchen/poses/poses-adult-f4*.png`, `poses-child-f4*.png`; two residents sharing tea in play: `play/two-kind.welcomeTeaTable-shareTea-r0-*.png`, sims at x ±0.75, yaw ∓90°); the teapot still pours (`clips/clips-kind.welcomeTeaTable-all-t1.png`). 3 draws. The sizes table measures the whole set as a `lowTable` (W 1.94, the poufs' 0.45 a "seat" over a floor cushion's 0.15): the kind, not the model (tooling). Not done: the lava lamp behind the sitter's shoulder.
+- **Status:** fixed (346158ba: the tea table; 9b47587c: the lava lamp)
+- **After:** Tea table (G-39): the poufs (40 cm across) stand at ±0.75 either side of a lower (top 0.36), narrower (0.4 × 0.56 m) table, the ferns at the back between them; content `places` `[±0.75, 0]` facing ±90 (was ±0.5 turned 45°). Host and guest face each other straight across the tea set, the knees stopping short of the table's ends and the feet before them (`fixes/blender-kitchen/poses/poses-adult-f4*.png`, `poses-child-f4*.png`; two residents sharing tea in play: `play/two-kind.welcomeTeaTable-shareTea-r0-*.png`, sims at x ±0.75, yaw ∓90°); the teapot still pours (`clips/clips-kind.welcomeTeaTable-all-t1.png`). 3 draws. The sizes table measures the whole set as a `lowTable` (W 1.94, the poufs' 0.45 a "seat" over a floor cushion's 0.15): the kind, not the model (tooling). Lava lamp: the side table stands at the pouf's front right and the pouf (and its lean) is turned 50° to face it; content `places` `[−0.04, −0.03]` facing 50, so the sitter watches the blobs and comes to it from its left (`fixes/blender-packs/play/day-couchPotato.lavaLamp-zoneOut-01.png`, `night/night2-couchPotato.lavaLamp-zoneOut-01.png`, `poses/focus-couchPotato.lavaLamp-*.png`). 4 draws, as before.
 - **Source:** wave: packs
 
 ### I-packs-12 — Worked from the object's edge, not at the part: the bonsai, the roses, the lectern, the hoop
@@ -790,7 +802,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/pack_loner.py:344` (`soloSauna`: the bench and the door at `FRONT`), `web/public/content/packs/loner.json:140`
 - **Evidence:** `packs/play/chunk4/loner.soloSauna-sweat-02.png`: with the door shut again (`hold: 1.5`, play.jsonl `door_open` 0/0.79), the seated adult's shoes stand at and past the glass. The bench needs to sit further back, or the cabin to be deeper in front of it.
-- **Status:** open
+- **Status:** fixed (055a72e6)
+- **After:** The door stands at depth 0.7 (was 0.42), the cabin 1.64 m deep, so the seated bather's feet stay inside the shut glass at every stage (`fixes/blender-packs/poses/focus-loner.soloSauna-adult.png`, `-elder.png`, `-child.png`, `play/day-loner.soloSauna-sweat-01.png`); the door opens again to let them out (`out` 1.5) and the roof's back is on the wall face. 4 draws, as before.
 - **Source:** wave: packs
 
 ### I-packs-18 — Folding one load takes an hour
@@ -823,5 +836,26 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/pack_hotHeaded.py:450` (`motions={'uses': {'smash': 'lid_open'}, 'hold': 1}`: the lid opens for 1 s at the use's start, then closes)
 - **Evidence:** `bench-results/review/fixes/clips-games/after-hotHeaded.smashBin-smash-01.png` to `-03.png`, `child-hotHeaded.smashBin-smash-01.png` to `-03.png`: with the new throw (I-packs-13) every plate goes down onto the shut lid; only the first frame has it open. The lid wants to stay up while the use lasts (no `hold`), or to open with each throw (`every` 3.4 s, the clip's length).
-- **Status:** open
+- **Status:** fixed (757fe0e3)
+- **After:** No `hold`: the lid stands open while plates are thrown in and shuts when the use ends; nothing moved, so `clips/games.ts`' smash clips still fit (`fixes/blender-packs/play/day-hotHeaded.smashBin-smash-01.png`).
 - **Source:** fix: clips-games
+
+### I-packs-21 — The light-up dance floor is danced beside, not on
+
+- **Severity:** S2
+- **Rubric:** I2
+- **Fix class:** content
+- **Where:** `web/public/content/packs/outgoing.json:138` (`danceFloor`: no `stand`, 2 slots); the mechanism as I-packs-02's (`stand` on the karaoke stage)
+- **Evidence:** `fixes/blender-packs/night/night-outgoing.danceFloor-dance-01.png`: the dancer stands on the floor in front of the platform's edge while its tiles light up behind her; the floor (tiles at about 5 cm) is the thing danced on. Two dancers also need a place each on it (G-62 `places` for standing users stand off the footprint, so `stand` with two slots may need code).
+- **Status:** open
+- **Source:** fix: blender-packs
+
+### I-packs-22 — The vibration plate's user jogs beside the grips instead of holding them
+
+- **Severity:** S3
+- **Rubric:** I3, A1
+- **Fix class:** clip
+- **Where:** `web/src/render/babylon/characters.ts` (`ACTIONS.exercise`: `jog` for `vibePlate`)
+- **Evidence:** `fixes/blender-packs/play/day-lazy.vibePlate-shake-01.png`: the grips now reach back to the stander's hands (I-packs-04), but the `jog` clip swings the arms past them; standing on a plate, the hands hold the bar and the body stays still while the deck shakes (a hold-the-grips idle with `buzz`).
+- **Status:** open
+- **Source:** fix: blender-packs
