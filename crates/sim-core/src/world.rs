@@ -359,7 +359,8 @@ impl ObjectInstance {
     }
 
     /// Where a Sim sits, lies or stands in `slot`: at its place (content `places`), else spread
-    /// across the object's width, in the middle of its depth.
+    /// across the object's width, in the middle of its depth (but a baby in the middle of a seat
+    /// for one, a high chair, whose other places are the carers' beside it).
     pub fn slot_position(&self, content: &Content, slot: usize) -> [f32; 2] {
         self.place_at(&content.objects[self.def], slot)
     }
@@ -372,6 +373,9 @@ impl ObjectInstance {
             self.x as f32 + w as f32 / 2.0 + self.offset[0] as f32 / 100.0,
             self.z as f32 + d as f32 / 2.0 + self.offset[1] as f32 / 100.0,
         ];
+        if slot == 0 && def.places.is_empty() && def.interactions.iter().any(|i| i.baby && !i.baby_bed()) {
+            return c;
+        }
         if let Some(p) = def.places.get(slot) {
             // Its place, turned with it (a freely turned one too: the place is on its model) and
             // moved out with its size.
@@ -633,6 +637,16 @@ pub enum TaskKind {
         seat: Option<u32>,
         answer: crate::phone::Answer,
     },
+    /// Carrying something to `to` and putting it there (`carry.rs`): a baby (`baby`), first over
+    /// to them in `from` and lifting them out (stage 0), then carrying them to `to` and putting
+    /// them in (stage 1: the high chair to be fed, or back to a crib); or, `baby` none, what's in
+    /// their hands (a harvest) to the fridge `to` (stage 1; `from` is `to`).
+    Carry {
+        baby: Option<u32>,
+        from: u32,
+        to: u32,
+        stage: u8,
+    },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -797,6 +811,12 @@ pub struct Sim {
     pub(crate) conceived: Option<u32>,
     /// Care given this tick: the baby it's for and what it fills (applied after the step).
     pub(crate) care_out: Option<(u32, [f32; MAX_NEEDS])>,
+    /// A baby lifted out of their place or put in one this tick (applied after the step,
+    /// `carry::after_step`).
+    pub(crate) carry_out: Option<crate::carry::CarryOut>,
+    /// A baby in someone's arms: who carries them (`carry.rs`). In no place meanwhile, they go
+    /// where the one carrying them goes. Not saved (after a load they're back in the crib).
+    pub carried_by: Option<u32>,
     /// Opened or closed an object this tick (`Interaction::leaves`), or changed clothes
     /// (`Interaction::changes_outfit`): how the house or they look changed (applied after the
     /// step).
@@ -2013,6 +2033,8 @@ impl World {
             reshaped: false,
             lit: false,
             care_out: None,
+            carry_out: None,
+            carried_by: None,
             night_woken: 0,
             conceived: None,
             news: None,
@@ -2101,6 +2123,7 @@ impl World {
         let with_them = |t: &Task| match t.kind {
             TaskKind::Social { target, .. } | TaskKind::Join { leader: target } | TaskKind::Answer { guest: target } => target == id,
             TaskKind::Phone { contact, .. } => contact == Some(id),
+            TaskKind::Carry { baby, .. } => baby == Some(id),
             _ => false,
         };
         let World { sims, content, objects, households, .. } = self;
@@ -2749,6 +2772,7 @@ impl World {
         }
         self.broadcast();
         self.apply_messes();
+        crate::carry::after_step(self);
         self.wake_for_crying_babies();
         conversation::update(self);
         crate::phone::update(self);
@@ -3540,7 +3564,7 @@ fn wake_hour(sim: &Sim, ctx: &Ctx) -> f32 {
 
 /// Whether it is night for this Sim (time to be in bed): their planned sleep, else the usual
 /// day rhythm.
-fn is_night(sim: &Sim, ctx: &Ctx) -> bool {
+pub(crate) fn is_night(sim: &Sim, ctx: &Ctx) -> bool {
     let routines = &ctx.households[sim.household as usize].routines;
     if let Some(night) = crate::planner::planned_night(ctx.content, sim, routines, ctx.day, ctx.minute) {
         return night;
@@ -3837,9 +3861,12 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
             start_task(sim, task, ctx, objects, items);
         } else {
             sim.idle_ticks = sim.idle_ticks.saturating_add(sim.steps);
-            // Babies don't choose anything: they lie in a crib and are cared for.
+            // Babies don't choose anything: they lie in a crib and are cared for (or are in
+            // someone's arms, `carry.rs`).
             if content.life.baby(sim.age) {
-                if let Some(task) = crib_for(sim, ctx, objects) {
+                if sim.carried_by.is_none()
+                    && let Some(task) = crib_for(sim, ctx, objects)
+                {
                     start_task(sim, task, ctx, objects, items);
                 }
                 return;
@@ -3958,6 +3985,26 @@ fn conditions_met(ctx: &Ctx, sim: &Sim, obj: &ObjectInstance, inter: &crate::con
 pub(crate) fn upper_barred(content: &Content, obj: &ObjectInstance, sim: u32, age: f32) -> bool {
     let def = &content.objects[obj.def];
     def.bunk && !stage_in(def.upper_stages, content.life.stage(age)) && obj.users[0].is_some_and(|u| u != sim)
+}
+
+/// Whether one of `usable` is a bed free for `sim` tonight that isn't a spare one
+/// (`Interaction::spare`): working, a place on it free for them (or theirs), for their age, and
+/// not one they couldn't get to a moment ago.
+fn has_bed(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], usable: &[u32]) -> bool {
+    let content = ctx.content;
+    usable.iter().map(|&o| &objects[o as usize]).any(|o| {
+        let def = &content.objects[o.def];
+        !o.broken()
+            && !sim.couldnt_reach(o.id, ctx.tick)
+            && def.interactions.iter().enumerate().any(|(i, inter)| {
+                inter.tags & content.day_rhythm.sleep_tags != 0
+                    && !inter.spare
+                    && !inter.baby
+                    && o.can_use_for(sim.id, def, i)
+                    && unfit(content, sim.age, inter).is_none()
+                    && !upper_barred(content, o, sim.id, sim.age)
+            })
+    })
 }
 
 /// What the player may have `sim` use on `plot`: as `access`, but their own home and public
@@ -4094,6 +4141,8 @@ fn pick_autonomous(
     let minding = crate::life::minding_baby(sim, ctx);
     let own = ctx.households[sim.household as usize].plot;
     let stranded = short & !fillable & content.autonomy.urgent;
+    // A spare bed's night (a sofa bed's) only for someone with no other bed free.
+    let bedded = has_bed(sim, ctx, objects, usable);
     for obj in usable
         .iter()
         .map(|&o| &objects[o as usize])
@@ -4146,6 +4195,7 @@ fn pick_autonomous(
             // Dining at a table only with a table to dine at.
             // (Nor one that takes the whole thing while someone else is on it.)
             if inter.baby
+                || (inter.spare && bedded)
                 || unfit(content, sim.age, inter).is_some()
                 || upper_barred(content, obj, sim.id, sim.age)
                 || (inter.needs_table && !at_table)
@@ -4575,6 +4625,10 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
     {
         return;
     }
+    // A crib's care done by day where the baby is carried to (the high chair's feed, `carry.rs`).
+    if let Some(carry) = crate::carry::instead(sim, &task, ctx, objects) {
+        return crate::carry::start(sim, carry, ctx, objects);
+    }
     // A recipe isn't made where it was picked: the cook goes round its stations, starting with
     // the first (see `cooking.rs`).
     if let TaskKind::Use { object, interaction } = task.kind
@@ -4592,6 +4646,7 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             return crate::cooking::start(sim, task, ctx, objects, items);
         }
         TaskKind::Phone { .. } => return crate::phone::start(sim, task, ctx, objects),
+        TaskKind::Carry { .. } => return crate::carry::start(sim, task, ctx, objects),
         TaskKind::Use {
             object,
             interaction,
@@ -4646,11 +4701,17 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
                         .or_else(|| ctx.index.links.approach_of(seat))
                         .unwrap_or_else(|| s.front_tile(content))
                 }
-                None => obj
-                    .slot_for(sim.id, &content.objects[obj.def], interaction, sim.pos)
-                    .and_then(|k| crate::surface::slot_approach(content, nav, obj, k))
-                    .or_else(|| ctx.index.links.approach_of(object))
-                    .unwrap_or_else(|| obj.front_tile(content)),
+                // (A baby's care at the high chair from beside it; the change at the crib's
+                // changing table, in front of it.)
+                None if inter.carried => crate::carry::care_spot(ctx, obj),
+                None => {
+                    let slot = obj.slot_for(sim.id, &content.objects[obj.def], interaction, sim.pos);
+                    slot.filter(|_| inter.at_slot)
+                        .and_then(|k| crate::carry::slot_front(ctx, obj, k))
+                        .or_else(|| slot.and_then(|k| crate::surface::slot_approach(content, nav, obj, k)))
+                        .or_else(|| ctx.index.links.approach_of(object))
+                        .unwrap_or_else(|| obj.front_tile(content))
+                }
             };
             let tags = inter.tags;
             ([t.0 as f32 + 0.5, t.1 as f32 + 0.5], t, tags)
@@ -5012,6 +5073,13 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                         let share = def.interactions.get(interaction).map_or(1.0, |it| (elapsed / it.minutes.max(1.0)).min(1.0));
                         let wear = def.wear_per_use * share * (1.0 - rules.wear_per_quality * f32::from(o.quality));
                         o.wear = (o.wear + wear.max(0.0)).min(1.0);
+                        // Weeded and watered: the crop comes on (only while it grows).
+                        let tends = def.interactions.get(interaction).map_or(0.0, |it| it.tends);
+                        if tends > 0.0 && (0.0..1.0).contains(&o.growth) && def.grows.is_some() {
+                            let before = o.growth_stage();
+                            o.growth = (o.growth + tends * share).min(1.0);
+                            sim.reshaped |= o.growth_stage() != before;
+                        }
                         if !was && o.broken() {
                             sim.news = Some(News::Broke(object));
                         }
@@ -5058,15 +5126,22 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                     let task = act.task;
                     crate::phone::using(sim, content, task, elapsed, minutes)
                 }
-                _ => unreachable!("only Use, Repair, Spot, Clean, Cook, Eat, Dishes and Phone tasks have a Using phase"),
+                TaskKind::Carry { .. } => crate::carry::using(sim, elapsed),
+                _ => unreachable!("only Use, Repair, Spot, Clean, Cook, Eat, Dishes, Phone and Carry tasks have a Using phase"),
             }
         }
         // Conversations are driven by `conversation::update`, which sees both Sims.
         Phase::Calling { .. } | Phase::Waiting { .. } | Phase::Conversing { .. } => false,
     };
     if finished {
+        // A carry's moment of lifting, putting in or away: on to what comes next.
+        if sim.current.as_ref().is_some_and(|a| matches!(a.task.kind, TaskKind::Carry { .. })) {
+            crate::carry::step_done(sim, ctx, objects, items);
+            if sim.current.is_some() {
+                return;
+            }
         // A recipe's step, eating, washing up: on to what comes next.
-        if sim.current.as_ref().is_some_and(|a| crate::cooking::chain(&a.task.kind)) {
+        } else if sim.current.as_ref().is_some_and(|a| crate::cooking::chain(&a.task.kind)) {
             let ate = sim.current.as_ref().is_some_and(|a| matches!(a.task.kind, TaskKind::Eat { stage: 1, .. }));
             crate::cooking::step_done(sim, ctx, objects, items);
             if sim.current.is_some() {
@@ -5091,6 +5166,16 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                     if sim.current.is_some() {
                         return;
                     }
+                } else if let Some(y) = inter.yields.filter(|_| !given_up) {
+                    // A harvest: its produce carried in to the fridge (`carry.rs`).
+                    let quality = content.object_rules.quality_factor(o.quality) * inter.skill_factor(&content.skill_rules, &sim.skills);
+                    crate::carry::harvested(sim, task, y, quality, ctx, objects, items);
+                    if sim.current.is_some() {
+                        return;
+                    }
+                } else if inter.carried {
+                    // Fed in the high chair: back to the crib in the arms.
+                    sim.follow_up = crate::carry::carry_back(sim, task, ctx, objects, object);
                 } else if inter.after != 0 {
                     // (Not after a use given up the moment it began: no hands to wash after a toilet
                     // visit that didn't happen.)
@@ -5174,11 +5259,14 @@ fn use_object(
         }
     }
     let sleep = inter.tags & rhythm.sleep_tags != 0;
-    let done = if inter.baby {
+    let done = if inter.baby_bed() {
         // A baby lies in the crib until they grow out of it (`lifecycle.rs`), asleep or awake:
         // needing something doesn't get them up (they can't: they cry, and a carer comes), nor
         // does being rested.
         false
+    } else if inter.baby {
+        // Left in the high chair (`carry.rs`): back in the crib once its time is up.
+        elapsed >= inter.minutes
     } else if sleep && crate::planner::planned_now(content, sim, inter) {
         // A planned night's sleep lasts the block unless a need that wakes people gets urgent.
         wakes
@@ -5318,6 +5406,7 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
         TaskKind::Social { .. } | TaskKind::Join { .. } => act.phase = Phase::Waiting { ticks: 0 },
         TaskKind::Cook { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. } => crate::cooking::arrive(sim, ctx, objects, items),
         TaskKind::Phone { .. } => crate::phone::arrive(sim, ctx, objects),
+        TaskKind::Carry { .. } => crate::carry::arrive(sim, ctx, objects),
         TaskKind::Use {
             object,
             interaction,
@@ -5326,8 +5415,13 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
             let inter = &content.objects[obj.def].interactions[interaction];
             // A thing on a top is used at its top: standing, facing it, unless they sat down at
             // a seat pulled up to the top.
+            // (Facing the place they work at: a crib's changing table, not its middle.)
             let on_top = content.objects[obj.def].layer == Layer::Surface;
-            let c = if on_top { crate::surface::middle(content, obj) } else { obj.centre(content) };
+            let c = match obj.slot_of(sim.id).filter(|_| inter.at_slot) {
+                Some(k) => obj.slot_position(content, k),
+                None if on_top => crate::surface::middle(content, obj),
+                None => obj.centre(content),
+            };
             if let Some(seat) = sim.use_seat {
                 // Watching from the sofa: sit on the seat, facing the way it faces, and step
                 // back off where they came from (see `end_activity`).
@@ -5725,6 +5819,8 @@ pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [Obje
 fn held_object(kind: TaskKind) -> Option<u32> {
     match kind {
         TaskKind::Use { object, .. } | TaskKind::Repair { object } => Some(object),
+        // (Beside the crib, lifting the baby out.)
+        TaskKind::Carry { from, stage: 0, .. } => Some(from),
         TaskKind::Cook { station, .. } | TaskKind::Dishes { station, .. } => station,
         TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => seat,
         _ => None,
@@ -5738,7 +5834,7 @@ fn crib_for(sim: &mut Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<Task
     let (object, interaction) = ctx.index.on(home).iter().find_map(|&o| {
         let o = &objects[o as usize];
         let def = &content.objects[o.def];
-        let i = def.interactions.iter().position(|it| it.baby)?;
+        let i = def.interactions.iter().position(|it| it.baby_bed())?;
         let taken = o.users().any(|u| ctx.briefs.get(u as usize).is_some_and(|b| b.baby));
         (!o.broken() && !taken && o.can_use_for(sim.id, def, i)).then_some((o.id, i))
     })?;

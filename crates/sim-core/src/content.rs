@@ -166,6 +166,25 @@ pub struct Interaction {
     /// through, the resident is in their next outfit (`Sim::outfit`), and the use lasts its
     /// time even with the needs it fills full.
     pub changes_outfit: bool,
+    /// A spare bed's night (content `spare`, on a `dayRhythm.sleepTags` use: a sofa bed pulled
+    /// out for a guest): it doesn't make the room a bedroom (its tags aren't the object's
+    /// `tags`, what the room is for), and residents sleep in it only with no other bed free for
+    /// them.
+    pub spare: bool,
+    /// Brings the object's crop on (content `tends`: weeding and watering): a use done to the
+    /// end grows it this share of its way from planted to ripe at once (less for one cut
+    /// short), while it grows.
+    pub tends: f32,
+    /// A harvest's produce (content `yields`): food carried in to the home's fridge and put away
+    /// (with no fridge, eaten sitting down as `eats`); see `Yield`.
+    pub yields: Option<Yield>,
+    /// Done with the baby carried here from their crib (content `carried`: feeding at the high
+    /// chair), and back after: a grown-up doing the crib's care of the same id by day does it
+    /// here instead, when this is free (`carry.rs`).
+    pub carried: bool,
+    /// Done standing in front of the place the resident takes on the object (content `atSlot`):
+    /// a crib's changing table beside it, not the cot.
+    pub at_slot: bool,
     /// Only started between these hours of the day (content `hours`: `[from, to]`, 0..24; past
     /// midnight when `from` is later than `to`): stargazing after dark. Free will and the
     /// player's orders keep it alike (`world::unmet`), as all the conditions below.
@@ -224,10 +243,25 @@ pub struct LaundryRules {
     pub most: f32,
 }
 
+/// A harvest's produce (content `yields`): `servings` of a food item (that of `recipe`, a hidden
+/// recipe made for it, as for `eat`: eating a serving gives the use's own gains), put in the
+/// fridge.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Yield {
+    pub recipe: usize,
+    pub servings: u8,
+}
+
 impl Interaction {
     /// Whether this looks after a baby lying in the object.
     pub fn cares(&self) -> bool {
         self.care.iter().any(|&g| g > 0.0)
+    }
+
+    /// The place a baby lies, asleep or awake (a crib's): where babies are put, not a high
+    /// chair they're carried to.
+    pub fn baby_bed(&self) -> bool {
+        self.baby && self.pose == Pose::Lie
     }
 
     /// Whether someone in life stage `stage` (`LifeRules::stage`) may take it (`stages`).
@@ -2359,6 +2393,21 @@ struct InteractionRaw {
     /// Changing clothes (see `Interaction::changes_outfit`).
     #[serde(default)]
     changes_outfit: bool,
+    /// A spare bed's night (see `Interaction::spare`).
+    #[serde(default)]
+    spare: bool,
+    /// Brings the crop on (see `Interaction::tends`).
+    #[serde(default)]
+    tends: f32,
+    /// A harvest's produce, put in the fridge (see `Interaction::yields`).
+    #[serde(default)]
+    yields: Option<YieldRaw>,
+    /// Done with the baby carried here (see `Interaction::carried`).
+    #[serde(default)]
+    carried: bool,
+    /// Done in front of their own place on it (see `Interaction::at_slot`).
+    #[serde(default)]
+    at_slot: bool,
     /// Hours of the day it may start in (see `Interaction::hours`).
     #[serde(default)]
     hours: Option<[f32; 2]>,
@@ -2376,6 +2425,15 @@ struct InteractionRaw {
 struct LaundryRaw {
     per_day: f32,
     most: f32,
+}
+
+/// An interaction's `yields`: the food item, how many servings, and how long eating one takes.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct YieldRaw {
+    pub item: String,
+    pub servings: u8,
+    pub minutes: f32,
 }
 
 /// An object's state for `when` and `leaves` (see `ObjectInstance::open`), or its crop's
@@ -2799,6 +2857,9 @@ impl Content {
                     Some(_) if recipe.is_some() => {
                         return Err(Error::new(format!("{ctx}: `eat` and `recipe` don't go together")));
                     }
+                    Some(_) if it.yields.is_some() => {
+                        return Err(Error::new(format!("{ctx}: `eat` and `yields` don't go together")));
+                    }
                     Some(e) => {
                         let mut eaten = [0.0; MAX_NEEDS];
                         for (own, eat) in own_gain.iter_mut().zip(eaten.iter_mut()).filter(|(g, _)| **g > 0.0) {
@@ -2809,6 +2870,32 @@ impl Content {
                     }
                     None => None,
                 };
+                // A harvest's produce: what it gives comes from eating a serving of it later (as
+                // `eat`), and residents weigh it all the same.
+                let yields = match &it.yields {
+                    Some(_) if recipe.is_some() => {
+                        return Err(Error::new(format!("{ctx}: `yields` and `recipe` don't go together")));
+                    }
+                    Some(y) if y.servings == 0 => return Err(Error::new(format!("{ctx}: yields: servings must be at least 1"))),
+                    Some(y) => {
+                        let mut eaten = [0.0; MAX_NEEDS];
+                        for (own, eat) in own_gain.iter_mut().zip(eaten.iter_mut()).filter(|(g, _)| **g > 0.0) {
+                            *eat = std::mem::take(own);
+                        }
+                        recipes.push(crate::cooking::eat_recipe(&ctx, &it.label, &items, &y.item, y.minutes, eaten)?);
+                        Some(Yield { recipe: recipes.len() - 1, servings: y.servings })
+                    }
+                    None => None,
+                };
+                if !(0.0..=1.0).contains(&it.tends) {
+                    return Err(Error::new(format!("{ctx}: tends must be 0..=1")));
+                }
+                if it.tends > 0.0 && obj.grows.is_none() {
+                    return Err(Error::new(format!("{ctx}: `tends` brings a crop on: the object needs `grows`")));
+                }
+                if it.carried && (it.care.values().all(|&g| g <= 0.0) || !obj.interactions.iter().any(|i| i.baby)) {
+                    return Err(Error::new(format!("{ctx}: `carried` is for a baby's care (`care`) where a baby has a place (`baby`)")));
+                }
                 let after = match it.after.as_deref() {
                     Some(t) => 1 << lookup(&tag_index, t, &ctx, "tag")?,
                     None => 0,
@@ -2921,6 +3008,11 @@ impl Content {
                     ripe: it.when == Some(OpenState::Ripe),
                     picks: it.leaves == Some(OpenState::Picked),
                     changes_outfit: it.changes_outfit,
+                    spare: it.spare,
+                    tends: it.tends,
+                    yields,
+                    carried: it.carried,
+                    at_slot: it.at_slot,
                     hours: it.hours,
                     sky: it.sky,
                     work_on: it.work_on,
@@ -2960,7 +3052,8 @@ impl Content {
             if obj.price.is_some_and(|p| p < 0) {
                 return Err(Error::new(format!("object '{}': negative price", obj.id)));
             }
-            let offered = interactions.iter().fold(0, |m: TagMask, it| m | it.tags);
+            // (A spare bed's night doesn't make its room a bedroom.)
+            let offered = interactions.iter().filter(|it| !it.spare).fold(0, |m: TagMask, it| m | it.tags);
             let mut provides = 0;
             for t in &obj.provides {
                 provides |= 1 << tag_index[t.as_str()];
@@ -3482,6 +3575,9 @@ impl Content {
                 Ok(out)
             };
         let sleep_tags = tag_mask(&dr.sleep_tags, "dayRhythm.sleepTags")?;
+        if let Some((o, i)) = objects.iter().find_map(|o: &ObjectDef| o.interactions.iter().find(|i| i.spare && i.tags & sleep_tags == 0).map(|i| (o, i))) {
+            return Err(Error::new(format!("{}.{}: `spare` is for a night's sleep (a `dayRhythm.sleepTags` tag)", o.id, i.id)));
+        }
         let mut slept = [0.0f32; MAX_NEEDS];
         for inter in objects.iter().flat_map(|o: &ObjectDef| &o.interactions).filter(|i| i.tags & sleep_tags != 0) {
             for (n, g) in inter.total_gain.iter().enumerate() {

@@ -323,13 +323,14 @@
       "group": "yard",
       "outdoors": true,
       "decor": 0.3,
-      "description": "Lettuces, carrots and tomatoes in a raised bed. Harvest a fresh, free meal; good gardeners get more out of it.",
+      "description": "Lettuces, carrots and tomatoes in a raised bed. Weeding and watering bring it on; the harvest goes in the fridge, and good gardeners get more out of it.",
       "interactions": [
         {
           "id": "tend",
           "label": "Weed and water",
           "anim": "tend",
           "minutes": 30,
+          "tends": 0.15,
           "effects": {
             "fun": 0.1,
             "hygiene": -0.1
@@ -348,11 +349,16 @@
           "id": "harvest",
           "when": "ripe",
           "leaves": "picked",
+          "yields": {
+            "item": "gardenProduce",
+            "servings": 2,
+            "minutes": 8
+          },
           "label": "Harvest vegetables",
           "anim": "harvest",
           "minutes": 20,
           "effects": {
-            "hunger": 0.45,
+            "hunger": 0.3,
             "hygiene": -0.05
           },
           "tags": [

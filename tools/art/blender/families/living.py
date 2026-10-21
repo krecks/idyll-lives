@@ -1364,7 +1364,7 @@ FAMILY = G.Family(
                     ('throw', 'Throw'), ('inside', 'Inside & shelves'), ('metal', 'Handle')]),
      G.Model('sofaBed', sofa_bed, key='model.sofaBed', size=(1.86, 0.83, 0.83), centre=(0, -0.015),
              # Out while the sofa bed is open, from the moment a use that opens it starts.
-             motions={'uses': {'doze': 'bed_out', 'pullOut': 'bed_out'}, 'open': 'bed_out'},
+             motions={'uses': {'doze': 'bed_out', 'sleep': 'bed_out', 'pullOut': 'bed_out'}, 'open': 'bed_out'},
              paint=[('upholstery', 'Upholstery'), ('cushion', 'Cushions'), ('legs', 'Legs'), ('bedding', 'Bedding'),
                     ('pillow_rose', 'Pillow'), ('pillow_cream', 'Second pillow')]),
      # L6: the staircase (placed by build mode's Stairs tool and the house generator)

@@ -535,13 +535,13 @@ fn random_character(w: &mut World) -> (Vec<String>, Vec<String>) {
 /// free one (story: a crib arrived). Babies with no room for a crib stay with their parents.
 pub(crate) fn cribs_for_babies(w: &mut World, h: usize) {
     let Some(plot) = w.households[h].plot else { return };
-    let Some(crib) = w.content.objects.iter().position(|d| d.price.is_some() && d.interactions.iter().any(|it| it.baby)) else { return };
+    let Some(crib) = w.content.objects.iter().position(|d| d.price.is_some() && d.interactions.iter().any(|it| it.baby_bed())) else { return };
     let babies = members(w, h).into_iter().filter(|&i| w.content.life.baby(w.sims[i].age)).count();
     let cribs = w
         .objects
         .iter()
         .zip(&w.object_plot)
-        .filter(|(o, p)| **p == Some(plot) && w.content.objects[o.def].interactions.iter().any(|it| it.baby))
+        .filter(|(o, p)| **p == Some(plot) && w.content.objects[o.def].interactions.iter().any(|it| it.baby_bed()))
         .count();
     for _ in cribs..babies {
         if w.deliver(h as u32, crib).is_none() {
@@ -582,7 +582,7 @@ pub(crate) fn bed_for_child(w: &mut World, i: usize) {
         return;
     }
     let bed = (0..w.content.objects.len())
-        .filter(|&d| w.content.objects[d].interactions.iter().any(|it| it.tags & sleep != 0 && !it.baby))
+        .filter(|&d| w.content.objects[d].interactions.iter().any(|it| it.tags & sleep != 0 && !it.baby && !it.spare))
         .filter_map(|d| w.content.objects[d].price.map(|p| (p, d)))
         .min();
     let reserve = crate::life::weekly_costs(w, h).map_or(0, |(rent, bills)| rent + bills);

@@ -181,27 +181,60 @@ def cherry():
 # where the picked fruit hangs): it shrinks away as the hand closes on it, this long into the use.
 PICK_DELAY = 1.6
 
+# A fruit tree's fruit follows its ripeness (content `grows`, G-68): the fruit hung over the crown and the one at the
+# front a resident picks (`pick`: it shrinks away) are moving parts with one growth clip, `ripen` (`motions.growth`,
+# G.stages): in fruit at rest; picked bare, and growing its fruit again, none (they shrink into the crown's middle).
+BARE = dict(picked=0.001, growing=0.001, planted=0.001)
+
+
+def _fruiting(name, still, crown_mid, fruit, picked=None, at=None):
+    """The still part, and the fruit `fruit()` hangs over the crown (origin `crown_mid`) as a moving part
+    following the tree's ripeness; with `picked`, the one at the front it makes (origin `at`) a second one that
+    also shrinks away while it's picked (an apple picked to eat). The far version all one still part, in fruit."""
+    if LOW[0]:
+        fruit()
+        if picked:
+            picked()
+        return G.settle([G.join_all(still.name)])
+    with G.new_parts() as parts:
+        fruit()
+    hung = G.join(parts, f'{name}_fruit', origin=crown_mid)
+    if not picked:
+        G.settle([still, hung])
+        G.stages(hung, 'ripen', **BARE)
+        return [still, hung]
+    with G.new_parts() as parts:
+        picked()
+    front = G.join(parts, f'{name}_part', origin=at)
+    G.settle([still, hung, front])
+    G.squash(front, 'pick', 0.001, seconds=0.8)
+    G.stages(hung, 'ripen', **BARE)
+    G.stages(front, 'ripen', **BARE)
+    return [still, hung, front]
+
 
 def apple():
     """Apple tree: a short trunk, a round crown hung with red and yellow apples; one at the front, on a twig under the
     crown's front within reach of a grown-up and of a teen on tiptoe (1.84 m up), which a resident picks (it shrinks
-    away)."""
+    away); picked bare, no apples until it fruits again (`ripen`)."""
     P = palette(['#52803A', '#629040', '#74A048', '#86AE52', '#98BC5E'])
     rng = random.Random(15)
     trunk(P, 2.1, 0.4, taper=0.7)
     limbs(P, rng, (0, 0, 1.9), [xy(t) for t in ([1.3, 3.1, 0.4], [-1.2, 3.0, -0.4], [0.2, 3.3, -1.3], [-0.2, 3.2, 1.2])], 0.2)
     crown('crown', rng, (0, 0, 3.6), (2.2, 2.2, 1.65), 12, shades(P), size=0.64, spread=0.76, core=0.84)
-    dots(rng, low(18, 8), (0, 0, 3.6), (2.2, 2.2, 1.65), 0.2, [P.fruit, P.fruit2, P.fruit3, P.fruit4], 'apple',
-         band=(-0.65, 0.55), out=0.9, flat=1.0, segments=low(6, 5), rings=low(4, 3))
     still = G.join_all('apple')
     at = (-0.05, -0.7, 1.84)
+
+    def fruit():
+        dots(rng, low(18, 8), (0, 0, 3.6), (2.2, 2.2, 1.65), 0.2, [P.fruit, P.fruit2, P.fruit3, P.fruit4], 'apple',
+             band=(-0.65, 0.55), out=0.9, flat=1.0, segments=low(6, 5), rings=low(4, 3))
 
     def picked():
         lump('picked_apple', 0.11, at, P.fruit, segments=8, rings=5, noise=0.05)
         # On its stalk, hanging from a twig out of the crown's underside (about 2.05 m up there: a stalk 0.3 m long).
         tube('picked_stalk', [(at[0], at[1], at[2] + 0.09), (at[0] + 0.01, at[1] + 0.02, at[2] + 0.32)], 0.012, 0.009, P.stalk,
              verts=4)
-    return _with_part('apple_part', still, picked, (at[0], at[1], at[2] + 0.1), 'pick')
+    return _fruiting('apple', still, (0, 0, 3.6), fruit, picked, (at[0], at[1], at[2] + 0.1))
 
 
 def japanese_maple():
@@ -317,19 +350,21 @@ def cypress():
 # ---- in a pot -----------------------------------------------------------------------------------------
 
 def lemon_tree():
-    """Potted lemon tree: a terracotta pot, a slim trunk and a round crown hung with lemons; one at the front,
-    which a resident picks (it shrinks away)."""
+    """Potted lemon tree: a terracotta pot, a slim trunk and a round crown hung with lemons, all picked at once
+    (they shrink away, `ripen`); picked bare, no lemons until it fruits again."""
     P = palette(['#3A6A30', '#467838', '#548640', '#62944A'], fruit='#F2D23C', fruit2='#F5DC50', fruit3='#E8C42E')
     rng = random.Random(86)
     top = pot(P, 0.3, 0.5, r_bottom=0.22, rim=0.016)
     tube('trunk', [(0, 0, top - 0.02), (0.04, 0.02, 1.45)], 0.035, 0.02, P.bark, verts=6)
     crown('crown', rng, (0, 0, 1.85), (0.66, 0.66, 0.56), 10, shades(P, 4), size=0.62, core=0.8)
-    dots(rng, 12, (0, 0, 1.85), (0.66, 0.66, 0.56), 0.13, [P.fruit, P.fruit2, P.fruit3], 'lemon', band=(-0.6, 0.6),
-         out=0.92, flat=1.25, segments=low(6, 5), rings=low(4, 3))
     still = G.join_all('lemonTree')
     at = (0.1, -0.6, 1.62)
-    return _with_part('lemon_part', still, lambda: lump('picked_lemon', 0.07, at, P.fruit, scale=(1, 1, 1.3), segments=8, rings=5,
-                                                        noise=0.05), (at[0], at[1], at[2] + 0.09), 'pick')
+
+    def fruit():
+        dots(rng, 12, (0, 0, 1.85), (0.66, 0.66, 0.56), 0.13, [P.fruit, P.fruit2, P.fruit3], 'lemon', band=(-0.6, 0.6),
+             out=0.92, flat=1.25, segments=low(6, 5), rings=low(4, 3))
+        lump('picked_lemon', 0.07, at, P.fruit, scale=(1, 1, 1.3), segments=8, rings=5, noise=0.05)
+    return _fruiting('lemon', still, (0, 0, 1.85), fruit)
 
 
 # (width, height, depth) as measured. A tree's far version may differ from it by up to `TOLERANCE`.
@@ -342,7 +377,8 @@ FAMILY = G.Family(
      G.Model('birch', birch, size=(3.446, 8.184, 3.293), key='model.tree.birch', tolerance=TOLERANCE, far=far_of(birch)),
      G.Model('cherry', cherry, size=(5.251, 5.454, 5.14), key='model.tree.blossom', tolerance=TOLERANCE, far=far_of(cherry)),
      G.Model('apple', apple, size=(4.467, 5.569, 4.378), key='model.tree.fruit', tolerance=TOLERANCE, far=far_of(apple),
-             motions={'uses': {'pick': {'clip': 'pick', 'delay': PICK_DELAY}}}),
+             motions={'uses': {'pick': {'clip': 'pick', 'delay': PICK_DELAY}, 'harvest': {'clip': 'pick', 'delay': PICK_DELAY}},
+                      'growth': 'ripen'}),
      G.Model('japaneseMaple', japanese_maple, size=(3.894, 3.722, 4.025), key='model.tree.japaneseMaple', tolerance=TOLERANCE,
              far=far_of(japanese_maple), motions={'uses': {'shape': 'trim'}}),
      G.Model('magnolia', magnolia, size=(4.1, 4.948, 3.805), key='model.tree.magnolia', tolerance=TOLERANCE, far=far_of(magnolia)),
@@ -351,12 +387,12 @@ FAMILY = G.Family(
      G.Model('spruce', spruce, size=(5.601, 10.2, 5.567), key='model.spruce', tolerance=TOLERANCE, far=far_of(spruce)),
      G.Model('cypress', cypress, size=(2.12, 7.95, 2.05), key='model.cypress', tolerance=TOLERANCE, far=far_of(cypress)),
      G.Model('lemonTree', lemon_tree, size=(1.288, 2.374, 1.344), key='model.garden.lemonTree', tolerance=TOLERANCE, far=far_of(lemon_tree),
-             paint=[('body', 'Pot')], motions={'uses': {'pick': {'clip': 'pick', 'delay': PICK_DELAY}}})],
+             paint=[('body', 'Pot')], motions={'growth': 'ripen'})],
     comment='Blender-built trees (tools/art/blender/families/trees.py): the G5 garden trees, the woods\' '
             'oaks, maples, birches, pines and spruces, and the potted lemon tree. Listed in the base '
             'manifest\'s packs. Leaves are on `foliage` and trunks on `bark`, which the nature shader '
             'sways and tints. Each has a far version (`far`), which the far woods and the town overview '
-            'draw. Clips: an apple or a lemon shrinks away while it is picked, the Japanese maple\'s stray '
+            'draw. Clips: an apple shrinks away while it is picked, the fruit follows the tree\'s ripeness (picked bare, the lemons all go), the Japanese maple\'s stray '
             'sprigs while it is shaped.',
 )
 

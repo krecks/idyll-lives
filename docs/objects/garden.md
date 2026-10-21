@@ -121,6 +121,11 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
 - The four crops are bought new at the planted stage and were tended (kneeling at the bed) in all four facings.
 - Grown at speed through their stages: `grow` is held at planted (1.5 s), growing (1.0) and ripe (0). Harvested, the
   clip plays on to picked (0.5), the crop shrinking away while the resident picks and the plants staying.
+- Since the authenticity review (G-68, 2026-10-21): "Weed and water" brings a growing crop on (content `tends` 0.15 of
+  its way), and a harvest no longer fills hunger at the bed: the produce (`gardenProduce`, a bag of vegetables, 2
+  servings, the pumpkins 3) is carried in both hands to the home's fridge and put away, eaten later at a table like
+  leftovers; a hungry harvester has a serving then and there, and with no fridge they sit down and eat one. The
+  patches still replant themselves after lying fallow (Q-18's shortcut). `fixes/babies-crops/garden/patch-*.png`.
 - "Pick fresh herbs" is a standing reach into the planter (`pick`), the basil shrinking under the hands; other crops
   still kneel. The resident steps in to the waist-high planter (`STAND_BACK` -0.5 in `characters.ts`) for every use,
   watering too, rather than standing a tile off.
@@ -140,13 +145,13 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
 | `garden.maple` Maple tree | 1x1 · floor | shade:relax | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). |
 | `garden.birch` Silver birch | 1x1 · floor | shade:relax | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). |
 | `garden.cherry` Cherry blossom tree | 1x1 · floor | shade:relax admire:admire | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). |
-| `garden.apple` Apple tree | 1x1 · floor | pick:eat shade:relax | garden / trees | — | Use | `pick`: an apple at the front, 1.84 m up and 0.7 m out under the crown, shrinks away 1.6 s into pick, as the picker's hand closes on it (`pickApple*` by height, then eating it; G-21). A child reaches up short of it (I-garden-11). |
+| `garden.apple` Apple tree | 1x1 · floor | pick:eat harvest:harvest shade:relax | garden / trees | — | Growth + Use | `ripen` (`motions.growth`, G-68): the apples over the crown in fruit (ripe), gone once picked bare and while it fruits again (content `grows`, 3 days). `pick`: an apple at the front, 1.84 m up and 0.7 m out under the crown, shrinks away 1.6 s into pick (and harvest), as the picker's hand closes on it (`pickApple*` by height, then eating it; G-21; the harvest reaches up into the crown, `pickHigh`). A child reaches up short of it (I-garden-11). 4 draws. |
 | `garden.japaneseMaple` Japanese maple | 1x1 · floor | shade:relax shape:prune | garden / trees | — | Use | `trim`: the top sprigs shrink away for shape. |
 | `garden.magnolia` Magnolia | 1x1 · floor | shade:relax smell:admire | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). Its blossom use reads "Admire the magnolia" (looking up). |
 | `garden.willow` Weeping willow | 1x1 · floor | shade:relax | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). |
 | `garden.spruce` Blue spruce | 1x1 · floor | — | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). |
 | `garden.cypress` Italian cypress | 1x1 · floor | — | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). |
-| `garden.lemonTree` Potted lemon tree | 1x1 · floor | pick:eat water:water | garden / trees | Pot | Use | `pick`: a lemon at the front (1.62 m up) shrinks away 1.6 s into pick, in the picker's hand (`pickLemon*` by height, then eating it; G-21). |
+| `garden.lemonTree` Potted lemon tree | 1x1 · floor | pick:harvest water:water | garden / trees | Pot | Growth | `ripen` (`motions.growth`, G-68): the lemons in fruit, gone once picked (all at once, the front one with them) and while it fruits again (content `grows`, 3 days). "Pick lemons" is picked with `pickLemon*` by height (G-21's, without the eating after). |
 
 **In play** (signed off 2026-10-17):
 - Checked outdoors (the lemon tree also close up): relaxed under in the shade, admired (cherry), smelled
@@ -157,6 +162,11 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
   birch 0.36), on the trunk's front or a side, whichever the sun's light falls towards as they sit down (the crown's
   shadow; never behind, which would mean walking through the trunk). Trees so count as seats outdoors (a phone
   call, a snack). Known, not changed: it is still offered at night (I16, G-64).
+- Since the authenticity review (G-68, 2026-10-21): the fruit trees ripen (`grows`, 3 days, no fallow). In fruit, "Pick
+  an apple" (eaten standing, the shortcut kept) leaves the tree in fruit; "Pick the apples" picks it bare and the
+  apples (3 servings) go to the fridge as a harvest does; "Pick lemons" picks the lemon tree bare for Fresh lemons (a
+  cooking boost, not hunger), and watering brings them on (`tends` 0.1). `fixes/babies-crops/garden/apple-*.png`
+  (before G-21's apple came down).
 - The apple and the lemon tree each lose their front fruit for "Pick" (`pick`), the Japanese maple its top sprigs
   for "Shape the maple" (`trim`), in all four facings, shutting after the use.
 - Known, not changed: two tiles from the house the pine's and spruce's crowns (6 m and 5.6 m across on a one-tile
