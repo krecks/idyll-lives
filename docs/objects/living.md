@@ -8,7 +8,7 @@ its rider (`rock`, E1); the coffee table's drawer opens for a magazine. The wall
 open (C1: content `leaves: open`, the clip held while the object is open), as the sofa bed and the futon
 (`bedroom.md`) are.
 
-Seats keep their height and depth (`SEATS` in `web/src/render/babylon/characters.ts`, content `seat`); a seat that
+Seats keep their height and depth (`seats` in `web/src/render/babylon/characters/furniture.json`, content `seat`); a seat that
 moves while sat on keeps the sitting pose believable. Shelf and table tops are the content `surface` heights.
 
 ## L1. Sofas and sectionals (12)
@@ -22,7 +22,7 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 | `sofaThree` Three-seat sofa | 3x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions, Legs, Pillows, Throw | Use | `sink_in`. |
 | `sofaDesign` Designer sofa | 2x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions, Frame, Legs | Use | `sink_in`. |
 | `sofaThreeSeat` Three-seater sofa | 3x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions, Legs, Pillow, Second pillow | Use | `sink_in`. |
-| `sofaBed` Sofa bed | 2x1 · floor | relax:relax doze:nap pullOut:fetch foldAway:fetch | living / seating | Upholstery, Cushions, Legs, Bedding, Pillow, Second pillow | Held open | `bed_out`: the mattress pulls out forward from under the seat for doze and "Pull out the bed" and stays out until "Fold the bed away" (relax only while folded); `BEDS` height 0.42 and `fwd` 0.6 (head on the seat); pulling it out and folding it away the resident stands 1 m further back, clear of the mattress (`STAND_BACK`). |
+| `sofaBed` Sofa bed | 2x1 · floor | relax:relax doze:nap pullOut:fetch foldAway:fetch | living / seating | Upholstery, Cushions, Legs, Bedding, Pillow, Second pillow | Held open | `bed_out`: the mattress pulls out forward from under the seat for doze and "Pull out the bed" and stays out until "Fold the bed away" (relax only while folded); `beds` height 0.44 and `fwd` 0.6 (head on the seat; `cargo check-glb` measures the mattress pulled out at 0.44); pulling it out and folding it away the resident stands 1 m further back, clear of the mattress (`STAND_BACK`). |
 | `wallBed` Fold-down wall bed | 2x3 · floor | sleep:sleep nap:nap foldDown:fetch foldUp:fetch | living / seating | Cabinet, Bed frame, Mattress, Pillows, Throw, Inside & shelves, Handle | Held open | `bed_down`: the bed turns down 90° on a hinge at the cabinet's foot to fill the footprint in front, for sleep, nap and "Fold down", and stays down while open; "Fold up" closes it. In `BLANKET_BEDS`; `BEDS` height 0.46. |
 | `sectionalMiddle` Sectional: middle seat | 1x1 · floor | relax:relax doze:nap | living / sectionals | Upholstery, Cushions, Legs | Use | `sink_in`. |
 | `sectionalArmLeft` Sectional: left arm | 1x1 · floor | relax:relax doze:nap | living / sectionals | Upholstery, Cushions, Legs | Use | `sink_in`. |
@@ -106,7 +106,7 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 | `stereo` Stereo system | 1x1 · floor | listen:listen dance:dance | living / media | Body, Trim | Use | `tray`: the tray of the CD player under the amplifier slides out and back (`hold` 1.2 s) for listen and dance; the woofers `pulse` (E1 loop). 4 draws (the loop's part). |
 | `boombox` Boombox | 1x1 · floor | listen:listen | living / media | Body, Trim | Use | `cassette`: the cassette door tips 32° open from its foot for listen and shuts; `hold` 1.2 s. |
 | `tvStandLow` Low TV bench | 2x1 · floor | watch:watch | living / media | Bench, TV | Use | `tv_up`: the TV rises 60 cm out of a lift hood at the bench's back for watch (0.8 m high at rest, its lid closing the hood), and sinks back at the end; it flickers while up and watched. |
-| `fireplaceElectric` Electric fireplace | 2x1 · floor | relax:relax | living / media | Surround, Firebox | Use | `flames`: five tongues grow from the log bed for relax (gloss, not emissive; the light is the content's); the embers glow at night, the flames while lit. A floor cushion in front, and `characters.ts` `SEATS` sits the resident on it facing the fire. |
+| `fireplaceElectric` Electric fireplace | 2x1 · floor | relax:relax | living / media | Surround, Firebox | Use | `flames`: five tongues grow from the log bed for relax (gloss, not emissive; the light is the content's); the embers glow at night, the flames while lit. A floor cushion in front, and `characters/furniture.json` `seats` sits the resident on it facing the fire. |
 
 **In play** (signed off 2026-10-16):
 - Against the north, west and east walls and free at 180° (the wall TV on window-free walls): watched, listened to,

@@ -218,7 +218,7 @@ pub fn accessor(g: &Glb, index: &J) -> R<Option<Vec<Vec<Num>>>> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     /// A .glb of `json` and `bin`, each chunk padded to 4 bytes as the format wants.

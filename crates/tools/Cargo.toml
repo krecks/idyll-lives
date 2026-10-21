@@ -1,6 +1,6 @@
 [package]
 name = "ll-tools"
-description = "The repo's command-line tools: the resident generator, the object gate and Blender runner, the content editor and the texture scripts. Never shipped."
+description = "The repo's command-line tools: the resident generator, the object gate and Blender runner, the content editor, the texture scripts and the authenticity review. Never shipped."
 edition.workspace = true
 version.workspace = true
 license.workspace = true
@@ -13,4 +13,5 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg"]
 nalgebra = "0.35"
 regex = "1"
 similar = "3"
+sim-core = { path = "../sim-core" }
 ureq = "3"

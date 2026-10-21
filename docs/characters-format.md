@@ -226,8 +226,8 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
   runtime adds no stance corrections of its own (only the arms a little out over a skirt and an
   elder's stoop), so a clip looks in game as it was authored.
 - Seated clips share `sit`'s pelvis. The runtime fits it to each body and seat: the pelvis joint
-  goes `seatDrop` above the seat's surface and at the seat's forward offset (`SEATS` in
-  characters.ts, or the content's `seat`). Lying plays `lie` turned flat on the mattress (`LIE_*`);
+  goes `seatDrop` above the seat's surface and at the seat's forward offset (`SEATS`, from
+  characters/furniture.json, or the content's `seat`). Lying plays `lie` turned flat on the mattress (`LIE_*`);
   the blanket is fitted to `lie` too. A baby lying (in the crib) plays its own clips the same way,
   `babyLieAsleep` or `babyLieAwake`, centred on the mattress.
 - Carried things sit on the palms (`grip`): the right one, or between both.
@@ -284,6 +284,34 @@ a new one exits 1. `--update-baseline` rewrites the file for the bodies and stag
 `pnpm check:clips` (in `web/`: `--body all --stage all`).
 
 In dev, editing a clip file re-bakes the clips in place (Vite HMR).
+
+## Seats and beds
+
+`web/src/render/babylon/characters/furniture.json` holds where residents sit and lie, by object id: `seats`
+(`SEATS`), `defaultSeat`, `beds` (`BEDS`), `defaultBed` and `bunks` (`BUNKS`). `characters.ts` reads it with its
+`Seat` and `Bed` types (the fields are documented there); `cargo check-glb` measures the meshes against it and
+`cargo review sizes` against real-world sizes. An object in `seats` takes that seat over the content's `seat`
+(`seatOf`); one in neither sits at `defaultSeat`. Heights are m above the floor, `fwd` m forward of the footprint's
+middle, `recline` in radians.
+
+Why some entries are as they are:
+- Chairs at desks and tables (`chessTable`, `computerDesk`, `diningTable`, the 0.20 dining sets and desks) sit in the
+  back half of the footprint, facing the work surface. The pack writing desks (`gloomy.journalDesk`,
+  `neat.organizerDesk`, `romantic.letterBureau`, `hotHeaded.grudgeJournal`) are their own chairs (`NEAR_DESKS`): the
+  hands on the top or the flap, in front of the hutch.
+- `fireplaceElectric` sits on the floor cushion in front of the fire, facing it (`back`).
+- Baths (`bathtub`, `bathtubClawfoot`, `bathtubFreestanding`): along the tub, the back at the end without the taps,
+  the legs out along it towards them (`along`, `legsOut`).
+- `gardenChair`: against its slanted back, `recline` 0.314 rad (18°; the Adirondack chair's content `seat.recline`
+  is in degrees).
+- `kidsBedCar`: the race car's mattress ends at its bonnet, 34 cm short of the footprint's end (`foot`).
+- Hammocks (`hammock`, `cheerful.rainbowHammock`, `natureLover.gardenHammock`): lain in the sagging sling (`sling`,
+  from their models' builds).
+- `bedDouble`, `bedQueenUpholstered`, `bedCanopy`: their mattress tops; `bedDaybed` its daybed top.
+- `sofaBed`: the head on the seat, the rest on the mattress pulled out in front (`bed_out`, `fwd`).
+- `gloomy.windowSeat`, `kind.hearthSettee` (2 wide): dozed on along the cushion, head to its left, whichever slot
+  (the nap takes both, content `whole`).
+- `bunks.bedBunk`: the lower and the upper mattress tops, `[lower, upper]` (content `bunk`).
 
 ## Where things are
 

@@ -75,6 +75,9 @@ import { ENERGY_RATE, type VisemeTrack } from '../../voice/visemes';
 import { outfitFor, writeOutfit, type OutfitParams } from './characters/outfit';
 import { BLANKET_WIDTH, blanketMaterial, buildBlanket, type BlanketShape } from './characters/blanket';
 import { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } from './characters/clips/street';
+// The seat and bed tables (`SEATS`, `BEDS`, `BUNKS` and their defaults) are data, read by `cargo check-glb` and
+// `cargo review` too; what their entries mean and why some are as they are: docs/characters-format.md "Seats and beds".
+import FURNITURE from './characters/furniture.json';
 import { furthestAhead, nearestAhead, type TableRoom } from './tableTuck';
 import { addLocal, addRotation, blendInto, makeAdditive, PoseScratch, qmul, resetAdditive, rotate, sampleClip, skin, type Additive, type Placement } from './characters/pose';
 import type { MaterialLibrary } from './materials';
@@ -145,63 +148,8 @@ const DEFAULT_FADE = 0.25;
  * towards its front; `recline`: leant back against a slanted back (rad, `Seat.recline`); `along`, `legsOut`:
  * as `Seat`'s.
  */
-const SEATS: Record<string, Seat> = {
-  sofa: { h: 0.44, fwd: -0.087 },
-  armchair: { h: 0.42, fwd: -0.013 },
-  bench: { h: 0.45, fwd: -0.03 },
-  toilet: { h: 0.43, fwd: -0.13 },
-  // Chairs at desks and tables sit in the back half of the footprint, facing the work surface.
-  chessTable: { h: 0.46, fwd: -0.2 },
-  computerDesk: { h: 0.44, fwd: -0.17 },
-  diningTable: { h: 0.46, fwd: -0.19 },
-  // Content packs.
-  'gloomy.soakingTub': { h: 0.25, fwd: 0 },
-  'romantic.heartTub': { h: 0.35, fwd: -0.36 },
-  'hotHeaded.coldPlunge': { h: 0.35, fwd: 0 },
-  'hotHeaded.coolDownCushion': { h: 0.4, fwd: 0 },
-  // Their own chairs at the writing desks (`NEAR_DESKS`): the hands on the top or the flap, in front of the hutch.
-  'gloomy.journalDesk': { h: 0.46, fwd: 0 },
-  'neat.organizerDesk': { h: 0.45, fwd: -0.08 },
-  'romantic.letterBureau': { h: 0.45, fwd: -0.06 },
-  'hotHeaded.grudgeJournal': { h: 0.46, fwd: -0.03 },
-  // The 0.20 catalogue (content/furniture.json).
-  barStool: { h: 0.72, fwd: 0 },
-  bistroSet: { h: 0.46, fwd: -0.19 },
-  diningGlass: { h: 0.46, fwd: -0.22 },
-  diningOak: { h: 0.46, fwd: -0.22 },
-  diningChair: { h: 0.46, fwd: 0 },
-  loveseat: { h: 0.44, fwd: -0.07 },
-  sofaThree: { h: 0.44, fwd: -0.09 },
-  sofaDesign: { h: 0.42, fwd: -0.07 },
-  armchairLounge: { h: 0.42, fwd: -0.04 },
-  armchairLeather: { h: 0.44, fwd: -0.02 },
-  armchairDesign: { h: 0.45, fwd: -0.013 },
-  pouf: { h: 0.46, fwd: 0 },
-  // On the floor cushion in front of the fire, facing it.
-  fireplaceElectric: { h: 0.14, fwd: 0.3, back: true },
-  dressingTable: { h: 0.45, fwd: 0.22, back: true },
-  toiletCompact: { h: 0.43, fwd: -0.13 },
-  toiletSmart: { h: 0.44, fwd: -0.06 },
-  // In the bath, along the tub: the back at the end without the taps, the legs out along it towards them.
-  bathtub: { h: 0.25, fwd: -0.42, along: -1, legsOut: true },
-  bathtubClawfoot: { h: 0.28, fwd: -0.38, along: -1, legsOut: true },
-  bathtubFreestanding: { h: 0.27, fwd: -0.4, along: 1, legsOut: true },
-  hotTubCedar: { h: 0.35, fwd: 0 },
-  rockingHorse: { h: 0.56, fwd: 0 },
-  kidsDesk: { h: 0.36, fwd: -0.2 },
-  deskWriting: { h: 0.44, fwd: -0.17 },
-  deskLaptop: { h: 0.44, fwd: -0.17 },
-  computerGaming: { h: 0.44, fwd: -0.17 },
-  officeChair: { h: 0.47, fwd: -0.04 },
-  keyboardDigital: { h: 0.45, fwd: -0.2 },
-  sewingTable: { h: 0.46, fwd: -0.22 },
-  patioSet: { h: 0.44, fwd: -0.62 },
-  picnicTable: { h: 0.4, fwd: -0.68 },
-  // Against its back, slanted 22 degrees (as the Adirondack chair's, content `seat.recline`).
-  gardenChair: { h: 0.4, fwd: -0.083, recline: (18 * Math.PI) / 180 },
-  swingSet: { h: 0.5, fwd: 0 },
-};
-const DEFAULT_SEAT: Seat = { h: 0.45, fwd: 0 };
+const SEATS = FURNITURE.seats as Record<string, Seat>;
+const DEFAULT_SEAT: Seat = FURNITURE.defaultSeat;
 
 /**
  * How far back (m) a Sim stands from the middle of the tile in front while using an object whose
@@ -309,40 +257,8 @@ interface Seat {
  * sleepers lie (`fwd`, m): a sofa bed's mattress unfolds out in front of the sofa. `across`: lain on
  * along its width, head to its left, in its middle (a hammock slung side to side on a wide footprint).
  */
-const BEDS: Record<string, Bed> = {
-  bed: { h: 0.58 },
-  crib: { h: 0.56 },
-  weightBench: { h: 0.5 },
-  'gloomy.soakingTub': { h: 0.25 },
-  'romantic.heartTub': { h: 0.35 },
-  'hotHeaded.coldPlunge': { h: 0.35 },
-  'hotHeaded.coolDownCushion': { h: 0.2 },
-  bedSingle: { h: 0.5 },
-  bedBunk: { h: 0.44 },
-  bedFuton: { h: 0.4 },
-  bedKing: { h: 0.59 },
-  kidsBed: { h: 0.44 },
-  // The race car's mattress ends at its bonnet, 34 cm short of the footprint's end.
-  kidsBedCar: { h: 0.5, foot: 0.37 },
-  sunLounger: { h: 0.35 },
-  // Hammocks: lain in the sagging sling (`Bed.sling`, from their models' builds).
-  hammock: { h: 0.62, sling: { low: 0.6, end: 0.86, half: 0.66, head: 0.5 } },
-  'cheerful.rainbowHammock': { h: 0.5, across: true, sling: { low: 0.49, end: 0.86, half: 0.755, head: 0.52 } },
-  'natureLover.gardenHammock': { h: 0.5, across: true, sling: { low: 0.475, end: 0.86, half: 0.72, head: 0.54 } },
-  wallBed: { h: 0.46 },
-  // The oak double, the upholstered queen and the four-poster (their mattress tops), and the daybed.
-  bedDouble: { h: 0.52 },
-  bedQueenUpholstered: { h: 0.52 },
-  bedCanopy: { h: 0.52 },
-  bedDaybed: { h: 0.51 },
-  // Head on the seat, the rest on the mattress pulled out in front (`bed_out`).
-  sofaBed: { h: 0.44, fwd: 0.6 },
-  // The 2-wide window seat and settee: dozed on along the cushion, head to its left, whichever slot (the nap
-  // takes both, content `whole`).
-  'gloomy.windowSeat': { h: 0.45, across: true },
-  'kind.hearthSettee': { h: 0.44, across: true },
-};
-const DEFAULT_BED: Bed = { h: 0.5 };
+const BEDS: Record<string, Bed> = FURNITURE.beds;
+const DEFAULT_BED: Bed = FURNITURE.defaultBed;
 /** What residents lie on (`BEDS`). */
 interface Bed {
   h: number;
@@ -358,8 +274,8 @@ interface Bed {
    */
   sling?: { low: number; end: number; half: number; head: number };
 }
-/** Bunk beds (content `bunk`): mattress tops of the lower and the upper bunk. */
-const BUNKS: Record<string, readonly [number, number]> = { bedBunk: [0.44, 1.38] };
+/** Bunk beds (content `bunk`): mattress tops of the lower and the upper bunk, `[lower, upper]`. */
+const BUNKS: Record<string, readonly number[]> = FURNITURE.bunks;
 /** Beds whose sleepers get a blanket (pack hammocks, sofas and nap pods don't). */
 const BLANKET_BEDS = new Set(['bed', 'lazy.snoozecloudBed', 'bedSingle', 'bedBunk', 'bedFuton', 'bedKing', 'bedDouble', 'bedQueenUpholstered', 'bedCanopy', 'kidsBed', 'kidsBedCar', 'wallBed']);
 /**
