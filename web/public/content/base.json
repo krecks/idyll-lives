@@ -4228,16 +4228,16 @@
     {
       "id": "iceCreamCone",
       "label": "Ice cream",
-      "model": "item.treatPlate",
+      "model": "item.iceCream",
       "hold": "hand",
-      "radius": 0.1
+      "radius": 0.08
     },
     {
       "id": "hotDog",
       "label": "Hot dog",
-      "model": "item.sandwich",
+      "model": "item.takeout",
       "hold": "hand",
-      "radius": 0.1
+      "radius": 0.13
     },
     {
       "id": "crisps",

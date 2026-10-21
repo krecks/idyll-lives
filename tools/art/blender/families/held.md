@@ -54,6 +54,11 @@ sideways; the pan and the grill food, which stand off their middle, take their m
   `boardDirty`, the pizza to its own round board (`pizzaBoardDirty`), the pie to its dish (`pieDishDirty`), the ice
   cream to its bowl (`bowlDirty`), not to the grill's oval platter or the baking tray. Each is a content `items` entry
   (`dirty`, washed as the others are).
+- **Bought in town** (2026-10-22, review M-held-03): the hot dog stand's hot dog is carried in the takeaway box
+  (`item.takeout`) and the ice cream cart's in the dessert bowl (`item.iceCream`), not on the treat plate or as a
+  sandwich. Still to be made (nothing here fits): a cone or paper cup of ice cream, a hot dog in its bun, a packet of
+  crisps (the snack machine's `crisps`), an apple (the market's `fruit`) and a pastry in a paper bag (the bakery
+  case's `pastry`); those three keep the treat plate meanwhile, the grocery's `shopSandwich` the sandwich.
 - **Finishes.** Dishes glazed `gloss`, pans and trays `metal` (the pan's handle `satin`), food `satin` or `matte`.
   The wooden boards (chopping, tasting, pizza) take `wood` as the old parts did: their second draw call.
 - **The plate** (`plate()`) is shared: a foot, a rim up to 1.7 cm and a paler well at 0.9 cm (`WELL`), where the food
