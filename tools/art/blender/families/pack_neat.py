@@ -8,6 +8,7 @@
 # rolls out of its dock and turns (`vacuum_out`) and the console's key tray drawer slides out (`tray`).
 #
 # Run:  cargo art pack_neat [--only steamMopDock] [--preview]
+import math
 import os
 import random
 import sys
@@ -357,8 +358,8 @@ def robotVacuumDock():
             G.boulder(_name('leaves'), 0.09 - 0.012 * k, at=F.at(0.31 + 0.02 * (k % 2), 0.2 + 0.07 * k, WALL + 0.12),
                       material=M.green, seed=k * 2.1, noise=0.5, subdivisions=2)
     G.join(still, 'body', origin=(0, 0, 0))
-    # The robot: a disc with a teal bumper ring, the lidar turret and a side brush: `vacuum_out` rolls it 60 cm
-    # out of its dock, turning round as it goes; played back, it rolls home.
+    # The robot: a disc with a teal bumper ring, the lidar turret and a side brush: `vacuum_round` (a loop) drives
+    # it out of its dock, round a circle in front of it, turning as it goes, and back in (ROUND).
     x, z = ROBOT
     y = 0.014
     with G.new_parts() as robot:
@@ -371,9 +372,29 @@ def robotVacuumDock():
         F.cyl('side_brush', 0.04, 0.004, (x + 0.12, y + 0.004, z + 0.12), M.steel, verts=8)
     robot = G.hinged(G.join(robot, 'robot'), F.at(x, y, z))
     objs = G.settle(centre=False)
-    G.slide(robot, 'vacuum_out', (0, -0.6, 0), seconds=1.4)
-    G.swing(robot, 'vacuum_out', 180, seconds=1.4)
+    G.path(robot, 'vacuum_round', _round(), linear=True)
     return objs
+
+
+# The robot's round (game metres from where it docks): OUT forward, a circle of RADIUS to its left (seen from
+# the front, game -x: clear of the plant), its middle that far ahead, and back in, at SPEED m/s; it stays a hair
+# inside its tile and off the dock and the plant.
+OUT, RADIUS, SPEED = 0.18, 0.14, 0.25
+
+
+def _round():
+    """[(seconds, Blender offset, Blender degrees)] for `G.path`: the robot faces the way it goes (its front, game
+    +z, turned about Blender Z by the angle round the circle)."""
+    keys, t = [(0.0, (0, 0, 0), (0, 0, 0))], OUT / SPEED
+    keys.append((t, (0, -OUT, 0), (0, 0, 0)))
+    steps = 24
+    for k in range(1, steps + 1):
+        a = 2 * math.pi * k / steps
+        x, z = -RADIUS + RADIUS * math.cos(a), OUT + RADIUS * math.sin(a)   # game (x, depth)
+        keys.append((t + 2 * math.pi * RADIUS * k / steps / SPEED, (-x, -z, 0), (0, 0, math.degrees(a))))
+    t = keys[-1][0]
+    keys.append((t + OUT / SPEED, (0, 0, 0), (0, 0, 360)))
+    return keys
 
 
 # --- the tidy entry console (1x1): a slim birch console, a shoe shelf, a key tray drawer, a leaning mirror -----
@@ -455,7 +476,8 @@ FAMILY = G.Family(
              motions={'uses': {'sort': 'drawer_open', 'ledger': 'drawer_open'}},
              paint=[('body', 'Body'), ('birch', 'Wood'), ('pastel_c', 'Chair')]),
      G.Model('robotVacuumDock', robotVacuumDock, size=(0.86, 0.519, 0.86), key='model.neat.robotVacuumDock',
-             motions={'uses': {'program': 'vacuum_out'}, 'hold': 2},
+             # once programmed the robot drives out of its dock, round its rug and back, again and again
+             motions={'loops': {'program': 'vacuum_round'}},
              paint=[('appliance', 'Body'), ('teal', 'Trim'), ('rug', 'Rug')]),
      G.Model('entryConsole', entryConsole, size=(0.87, 1.769, 0.336), key='model.neat.entryConsole',
              centre=(-0.005, -0.262),

@@ -737,9 +737,11 @@ def chessTable():
 
 # The pool table: a lacquered frame on four legs, a baize bed with cushions, six pockets and sights, the
 # fifteen balls racked at the foot and the cue ball at the head, and a cue lying on the cloth. The triangle
-# round the balls lifts off for pool and trick shots (`rack_off`).
+# round the balls is lifted off, carried over the foot rail and hung on the foot end for pool and trick shots
+# (`rack_off`, G.path).
 BALL = 0.0285
 BED = 0.785        # the cloth's top
+RACK_HUNG = (1.275, 0.6)   # the rack's middle, hung on the foot end (game x, height): its apex at the rail's top
 
 
 def poolTable():
@@ -796,9 +798,13 @@ def poolTable():
             yaw = math.degrees(math.atan2(-(z1 - z0), -(x1 - x0)))
             F.box(f'rack{i}', length, 0.03, t, ((x0 + x1) / 2, BED + 0.015, (z0 + z1) / 2), M.rack, rot=(0, 0, yaw),
                   bevel=0.004)
-    rack = G.join(rp, 'rack')
+    rack = G.hinged(G.join(rp, 'rack'), F.at(centre, BED + 0.015, 0))
     G.settle(centre=False)
-    G.slide(rack, 'rack_off', (0, 0, 0.25), seconds=0.9)
+    # Racked, the triangle is lifted off the balls, carried over the foot rail and hung up by its apex on the
+    # table's foot end (its middle 2.5 cm past the rail, at the apron's height), out of the game's way.
+    hung = (RACK_HUNG[0] - centre, RACK_HUNG[1] - (BED + 0.015))
+    G.path(rack, 'rack_off', [(0.0, (0, 0, 0), (0, 0, 0)), (0.35, (0, 0, 0.14), (0, 0, 0)),
+                              (0.9, (-hung[0], 0, 0.14), (0, 0, 0)), (1.4, (-hung[0], 0, hung[1]), (0, -90, 0))])
     return G.meshes()
 
 

@@ -20,7 +20,9 @@
   two parts: the lower two thirds (`_duvet`, one bevelled box draped down the sides and the foot, still) and
   the top third (`duvet_flap`, flat on the mattress with the sheet turned down over its head edge), hinged
   across the fold on the duvet's top 3 mm up. `turn_down` turns the flap 180° about X in 1 s, laying it over the
-  rest toward the foot, and flattens it as it goes (`_turn_down`). The game's quilt lies 10 cm above the mattress
+  rest toward the foot, and flattens it as it goes (`_turn_down`); half way over it is gathered to a fifth of its
+  length (`ROLL`, a scale along the bed there and back, 2026-10-21), so it rolls over its fold as cloth, a low
+  bulge, not a 0.45 m board standing up across the bed's head. The game's quilt lies 10 cm above the mattress
   off the body times the sleeper's size (8.5 cm for the smallest), rounding down to 6 cm over its outer 8 cm. A
   flap folded at full thickness topped out at 10.1 cm (its sheet at 10.5) and showed through it, along the
   sides of the single, the bunk and the king and between two sleepers in a wide bed. Folded, it is now 40 % of

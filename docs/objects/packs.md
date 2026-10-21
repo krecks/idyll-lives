@@ -90,11 +90,13 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 | `energetic.spinBike` Interactive spin bike | 1x2 · floor | ride:exercise | fitness / — | Frame, Pads, Flywheel | Loop (E1) | `pedals`: the cranks and pedals turn once a second while riding (E1); the rider sits on the still seat. |
 | `energetic.trampoline` Rebound trampoline | 2x2 · floor | bounce:exercise | outdoor / — | Frame, Pads, Mat | Loop (E1) | `bounce`: the mat dips under the bouncer's feet while bounced on (E1), 1.6 times a second (content `stand.height` 0.5). |
 | `energetic.streetballHoop` Streetball hoop | 1x1 · floor | shoot:exercise | outdoor / — | Frame, Pads, Base | Use | `swish`: the net sways after each shot (1.4 s into the use, then every 3.2 s: `delay`, `every`). |
-| `energetic.powerBlender` Power blender station | 1x1 · floor | blend:cook | kitchen / — | Frame, Doors, Blender | Use | `lid`: the jug lid lifts and settles for blend (`hold` 1 s). The blades don't turn (the smoothie hides them). |
+| `energetic.powerBlender` Power blender station | 1x1 · floor | blend:cook | kitchen / — | Frame, Doors, Blender | Use, repeating | `lid`: the jug lid lifts and settles for blend (`hold` 1 s); `blades`: then the smoothie swirls (its fruit streaks and bits turn), once a second, from 1.5 s in till the blend ends (`every` 0.9 s; 2026-10-21, the blades themselves hidden in it). 4 draws. |
 | `energetic.contrastShower` Contrast rain shower | 1x1 · floor | rinse:shower | bathroom / — | Frame, Tiles, Mat | Use | `water_on`: the rain streams grow for rinse. |
 | `energetic.recoveryPod` Recovery pod | 1x2 · floor | recover:relax | fitness / — | Frame, Pads, Boots | Use | `canopy`: the canopy lowers over them for recover and lifts after. |
 
 **In play** (signed off 2026-10-17):
+- Since 2026-10-21 (review A-packs-02) the blender's smoothie swirls once the lid is back on, till the blend ends
+  (`fixes/motions/g1718/views/blender-t0.3.png`).
 - The wall is still (looked at in all facings, climbed); the pedals turn, the mat dips with the bouncer, the net
   sways after each shot, the blender lid lifts and settles, the rain grows, the canopy lowers and lifts. Nothing
   needed fixing.
@@ -283,15 +285,17 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `neat.steamMopDock` Steam mop dock | 1x1 · floor | mop:clean | kitchen / — | Body, Mop | Use | `mop_off`: the mop leaves its dock for mop and is drawn in the resident's hands, pushed over the floor (content `held`). |
-| `neat.laundryCenter` Stacked laundry centre | 2x1 · floor | laundry:clean fold:clean | bathroom / — | Body, Washer & dryer | Use | `door_open`: the washer door swings for laundry and fold. |
+| `neat.laundryCenter` Stacked laundry centre | 2x1 · floor | laundry:clean fold:clean | bathroom / — | Body, Washer & dryer | Use | `door_open`: the washer door swings for laundry and fold and shuts after 2.5 s (2026-10-21: it stood open through the wash and the folding). |
 | `neat.rainShowerTower` Rainfall steam shower | 1x1 · floor | steamShower:shower | bathroom / — | Body, Bench | Use | `water_on`: the rain grows for steamShower. |
 | `neat.organizerDesk` Label-and-sort organizer desk | 2x1 · floor | sort:write ledger:write | office / — | Body, Wood, Chair | Use | `drawer_open`: a bin slides out of the hutch for sort and ledger. Written at on its own chair with the hands on the top (`NEAR_DESKS`, `sitHandsNear`; `SEATS`), not through its front. |
-| `neat.robotVacuumDock` Robot vacuum and dock | 1x1 · floor | program:type | living / — | Body, Trim, Rug | Use | `vacuum_out`: the robot rolls 60 cm out of its dock, turns and rolls back for program (`hold` 2 s). |
+| `neat.robotVacuumDock` Robot vacuum and dock | 1x1 · floor | program:type | living / — | Body, Trim, Rug | Loop | `vacuum_round`: once programmed the robot drives out of its dock, once round a circle in front of it facing the way it goes, and back in, round after round (5 s a round) while program lasts (2026-10-21: it peeked 60 cm out and back). |
 | `neat.entryConsole` Tidy entry console | 1x1 · floor | tidy:clean | decor / — | Body, Wood | Use | `tray`: the key tray drawer slides out for tidy. |
 
 **In play** (signed off 2026-10-17):
 - Every clip plays and shuts: the mop into the resident's hands, the washer door, the rain, the bin, the robot's
   round trip, the key tray.
+- Since 2026-10-21 (reviews A-packs-03, I-packs-15) the washer door shuts for the wash and the folding, and the robot
+  drives round in front of its dock while programmed (`fixes/motions/g1718/views/robot-*.png`, `play-stage.jsonl`).
 - At the organizer desk the hands rest on the top (`sitHandsNear`), no longer through the modesty panel.
 - Seen, not changed: the entry console's leaning mirror and hook board stand on the wall face, so they hang in the
   air when the console stands free. The console's mirror is `chrome`, not mirror glass.

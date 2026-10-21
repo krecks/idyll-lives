@@ -46,17 +46,19 @@ table face the room, as tables do.
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `chessTable` Chess table | 1x1 · floor | chess:play | hobbies / games | Table, Chair | Use | `move`: a pawn slides one square for chess. |
-| `poolTable` Pool table | 3x2 · floor | pool:play trickShots:play | hobbies / games | Frame, Cloth | Use | `rack_off`: the triangle lifts off the balls for pool and trick shots. |
+| `chessTable` Chess table | 1x1 · floor | chess:play | hobbies / games | Table, Chair | Use | `move`: a pawn slides one square for chess, 0.9 s in, once the player has sat down (`delay`). |
+| `poolTable` Pool table | 3x2 · floor | pool:play trickShots:play | hobbies / games | Frame, Cloth | Use | `rack_off`: the triangle is lifted off the balls, carried over the foot rail and hung by its apex on the table's foot end (1.4 s, `G.path`) for pool and trick shots; it hung 25 cm over the balls before 2026-10-21. |
 | `foosball` Foosball table | 2x1 · floor | foosball:play | hobbies / games | Table, Trim | Loop (E1) | `rods`: the two outer rods kick ±55° while played (E1); the inner two are still. |
 | `dartboard` Dartboard | 1x1 · wall | darts:play | hobbies / games | Board, Cabinet | Use | `darts`: three darts grow in the board for darts. |
 | `arcadeCabinet` Arcade cabinet | 1x1 · floor | arcade:play | hobbies / games | Cabinet, Art | Loop (E1) | `joystick`: the stick waggles while played (E1). The screen and marquee glow at night (E8). |
-| `puzzleTable` Jigsaw table | 1x1 · floor | jigsaw:play | hobbies / games | Table, Stool | Use | `pieces`: a patch of finished puzzle grows for jigsaw. |
+| `puzzleTable` Jigsaw table | 1x1 · floor | jigsaw:play | hobbies / games | Table, Stool | Use | `pieces`: a patch of finished puzzle grows for jigsaw, 0.9 s in, once the puzzler has sat down (`delay`). |
 
 **In play** (signed off 2026-10-16):
 - Checked standing free, the dartboard on three inside walls and an outside face, the arcade cabinet against three
   walls and free.
 - Every clip plays for its use and stops or shuts with it.
+- Since 2026-10-21 (review A-hobbies-03) the pool table's rack is lifted off and hung on the foot end for the game,
+  not left hanging 25 cm over the balls (`fixes/motions/g1718/views/pool-end-t99.png`).
 - The chess table's and jigsaw table's second colour is "Chair" and "Stool": it colours the chess chair and the
   jigsaw stool; the chessboard's rim is the table's wood.
 - The darts are thrown from the tile in front of the board, half a metre from the wall.

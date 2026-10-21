@@ -200,6 +200,7 @@ The clips gamekit makes:
 | `G.rock(part, clip, degrees, seconds, axis='X')` | out, back past rest and home, as a pendulum | rocking chairs, swings, the seesaw |
 | `G.scroll(part, clip, (x, y, z), seconds)` | moves by one repeat of a pattern at an even speed; the game jumps it home unseen | a treadmill's belt slats, a conveyor |
 | `G.turns(parts, clip, (x, y, z), seconds)` | the parts take turns moving out and back, ending at rest | a dance floor's tiles lifting in two sets |
+| `G.path(part, clip, [(seconds, (x, y, z), (rx, ry, rz)), …], linear=False)` | moves and turns from rest through keys (offsets in metres, turns in degrees, Blender axes; the first key is rest at 0 s); `linear`: an even speed, for a loop | the pool rack lifted off and hung up, the robot vacuum's round |
 | `G.stages(part, clip, picked, growing, planted, seconds, sink)` | a crop's scale at each growth stage, ripe at rest; `sink`: how far down into the soil at each | vegetables, fruit, a veggie bed |
 | `G.attach(part, parent)` | (no clip) puts a part inside another, to move with it and by its own clips | a lever on a door, a label on a record |
 
@@ -383,7 +384,7 @@ never one that's already running) and drive Playwright headless with full Chrome
 | `shapes.py` | the primitives: `cube`, `sphere`, `cylinder`, `cone`, `torus`, `rod`, `revolve`, `boulder` |
 | `place.py` | `GameFrame`: parts placed in game coordinates (`at`, `box`, `cyl`, `cone`, `sphere`); `depths=` redraws a thing's numbers at another depth (the kitchen counters' one depth) |
 | `parts.py` | `new_parts`, `join`, `join_all`, `set_origin`, `hinged`, `turn`, `settle`, `measure`, `game_size`, `check_size`; `fit` (third-party files only: it stretches) |
-| `motion.py` | the clips: `swing` (turn), `slide` (move), `grow` (appear from nothing), `squash` (scale), `spin` (whole turns home), `rock` (out, past rest and home), `turns` (parts out and back in turn), `scroll` (one repeat on, a belt), `stages` (a crop's growth); `clips` |
+| `motion.py` | the clips: `swing` (turn), `slide` (move), `grow` (appear from nothing), `squash` (scale), `spin` (whole turns home), `rock` (out, past rest and home), `turns` (parts out and back in turn), `scroll` (one repeat on, a belt), `path` (through keys), `stages` (a crop's growth); `clips` |
 | `export.py` | `export_glb` (the fixed export settings), `write_pack`, `stats`, `materials_used` |
 | `preview.py` | `preview` (front three-quarter, Workbench), `preview_clips` |
 | `family.py` | `Model`, `Family` and its `run`: the command line every family script ends with |
