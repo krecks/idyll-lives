@@ -441,11 +441,15 @@
       "category": "kitchen",
       "group": "appliances",
       "description": "A counter with a microwave on top: hot leftovers in a few minutes, no skill needed.",
+      "sounds": {
+        "stir": "none"
+      },
       "interactions": [
         {
           "id": "reheat",
           "label": "Heat up leftovers",
           "anim": "cook",
+          "sound": "none",
           "minutes": 4,
           "eat": {
             "item": "leftovers",
@@ -523,6 +527,7 @@
           "id": "toast",
           "label": "Make toast",
           "anim": "cook",
+          "sound": "none",
           "minutes": 4,
           "eat": {
             "item": "toast",
@@ -539,6 +544,7 @@
           "id": "smoothie",
           "label": "Blend a smoothie",
           "anim": "cook",
+          "sound": "none",
           "minutes": 3,
           "eat": {
             "item": "smoothie",
@@ -569,6 +575,10 @@
       "category": "kitchen",
       "group": "appliances",
       "description": "Built in under the worktop. Loading it is a quick, satisfying chore (the tidy love it).",
+      "sounds": {
+        "clean": "crockery",
+        "wash": "crockery"
+      },
       "interactions": [
         {
           "id": "dishes",
@@ -2285,6 +2295,7 @@
           "id": "use",
           "label": "Use toilet",
           "anim": "toilet",
+          "endSound": "flush",
           "minutes": 5,
           "after": "handwash",
           "pose": "sit",
@@ -2315,6 +2326,7 @@
           "id": "use",
           "label": "Use toilet",
           "anim": "toilet",
+          "endSound": "flush",
           "minutes": 5,
           "after": "handwash",
           "pose": "sit",
@@ -2574,6 +2586,7 @@
           "id": "laundry",
           "label": "Do the laundry",
           "anim": "clean",
+          "sound": "washer",
           "minutes": 30,
           "effects": {
             "hygiene": 0.12,
@@ -2603,6 +2616,7 @@
           "id": "laundry",
           "label": "Fold the laundry",
           "anim": "clean",
+          "sound": "dryer",
           "minutes": 20,
           "effects": {
             "comfort": 0.08,
@@ -4761,6 +4775,7 @@
           "id": "soak",
           "label": "Soak in the hot tub",
           "anim": "bath",
+          "sound": "bathSoak",
           "minutes": 45,
           "pose": "sit",
           "effects": {

@@ -401,6 +401,9 @@
         "oven"
       ],
       "description": "Two ovens one above the other at a comfortable height: roasts and bakes. Baking trains Cooking.",
+      "sounds": {
+        "stir": "none"
+      },
       "interactions": [
         {
           "id": "roast",
@@ -863,6 +866,10 @@
         "dishes"
       ],
       "description": "A dishwasher with a stainless door, under a worktop.",
+      "sounds": {
+        "clean": "crockery",
+        "wash": "crockery"
+      },
       "interactions": [
         {
           "id": "dishes",

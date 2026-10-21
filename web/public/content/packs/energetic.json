@@ -115,6 +115,7 @@
           "id": "blend",
           "label": "Blend a power smoothie",
           "anim": "cook",
+          "sound": "none",
           "minutes": 4,
           "eat": { "item": "smoothie", "minutes": 6 },
           "pose": "stand",

@@ -210,6 +210,7 @@
           "id": "story",
           "label": "Ask the assistant for a story",
           "anim": "listen",
+          "sound": "tv",
           "minutes": 30,
           "effects": { "fun": 0.3, "social": 0.08 },
           "tags": ["entertainment", "screen"],

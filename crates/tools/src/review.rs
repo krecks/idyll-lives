@@ -132,6 +132,10 @@ pub struct Object {
     /// The animation tags cooking plays at it as a station (content `stations`): its recipe steps', and washing
     /// up, scraping plates and putting things away (`cooking.dishesAnim`, `scrapeAnim`, `putAwayAnim`).
     pub station_anims: BTreeSet<String>,
+    /// What's done at it sounds like, by animation tag (content `sounds`: world sound keys, or `none`).
+    pub sounds: BTreeMap<String, String>,
+    /// The world sound it makes by itself (content `ambient`: a fountain).
+    pub ambient: Option<String>,
 }
 
 /// One of an object's interactions.
@@ -151,6 +155,13 @@ pub struct Use {
     /// Content `when` and `leaves` (`open`, `closed`; `ripe`, `picked` for crops).
     pub when: Option<String>,
     pub leaves: Option<String>,
+    /// Content `sound` (a world sound key, or `none`) and `endSound` (played once as it ends: a flush).
+    pub sound: Option<String>,
+    pub end_sound: Option<String>,
+    /// It starts a recipe (content `recipe`): its steps done at this object (as one of its `stations`), each its
+    /// animation tag and its own `sound`, else sounding by the object; the other steps are done elsewhere. None:
+    /// no recipe.
+    pub steps_here: Option<Vec<(String, Option<String>)>>,
 }
 
 /// The buyable objects of the content in `dir` (web/public/content), in the content's order.
@@ -215,6 +226,18 @@ pub fn objects(dir: &Path) -> Result<Vec<Object>, String> {
                     tags: r["tags"].as_array().into_iter().flatten().filter_map(|t| t.as_str().map(String::from)).collect(),
                     when: r["when"].as_str().map(String::from),
                     leaves: r["leaves"].as_str().map(String::from),
+                    sound: r["sound"].as_str().map(String::from),
+                    end_sound: r["endSound"].as_str().map(String::from),
+                    steps_here: it.recipe.map(|i| {
+                        let stations = strs(&raw["stations"]);
+                        let steps = merged["recipes"].as_array().into_iter().flatten().find(|r| r["id"].as_str() == Some(&content.recipes[i].id));
+                        steps
+                            .into_iter()
+                            .flat_map(|r| r["steps"].as_array().into_iter().flatten())
+                            .filter(|s| strs(&s["at"]).iter().any(|a| stations.contains(a)))
+                            .filter_map(|s| Some((s["anim"].as_str()?.to_string(), s["sound"].as_str().map(String::from))))
+                            .collect()
+                    }),
                 }
             })
             .collect();
@@ -233,6 +256,8 @@ pub fn objects(dir: &Path) -> Result<Vec<Object>, String> {
             uses,
             lamp: raw.get("light").is_some_and(|l| !l.is_null()),
             station_anims: strs(&raw["stations"]).iter().flat_map(|s| at_station.get(s).into_iter().flatten().cloned()).collect(),
+            sounds: raw["sounds"].as_object().into_iter().flatten().filter_map(|(k, v)| Some((k.clone(), v.as_str()?.to_string()))).collect(),
+            ambient: raw["ambient"].as_str().map(String::from),
         });
     }
     Ok(out)
@@ -285,15 +310,47 @@ pub fn action_sounds(source: &str) -> Result<BTreeMap<String, String>, String> {
     Ok(entry.captures_iter(ts_block(source, "ACTION_SOUNDS")?).map(|c| (c[1].to_string(), c[2].to_string())).collect())
 }
 
-/// What a use sounds like (audio/world.ts `soundOf`): by its animation, and for washing and cleaning by what
-/// is washed or cleaned (those two cases are written out here, as there).
-pub fn sound_of(sounds: &BTreeMap<String, String>, object: &str, u: &Use) -> Option<String> {
-    match u.anim.as_str() {
-        "wash" if u.id == "washUp" => Some("washUp".into()),
-        "wash" => u.tags.iter().any(|t| t == "handwash").then(|| "tap".into()),
-        "clean" => (u.id == "laundry" && Regex::new(r"(?i)washer|laundryCent").unwrap().is_match(object)).then(|| "washer".into()),
-        anim => sounds.get(anim).cloned(),
+/// What a use sounds like (audio/world.ts `soundOf`): its own `sound`, else the object's for its animation
+/// (`sounds`), else by the animation (`sounds`: `ACTION_SOUNDS`), with washing by what is washed (written out
+/// here, as there). A recipe's use sounds by its steps at this object (the rest are done elsewhere).
+pub fn sound_of(sounds: &BTreeMap<String, String>, o: &Object, u: &Use) -> Option<String> {
+    if let Some(steps) = &u.steps_here {
+        let heard: BTreeSet<String> = steps
+            .iter()
+            .filter_map(|(anim, own)| match own {
+                Some(own) => (own != "none").then(|| own.clone()),
+                None => by_anim(sounds, o, anim, None),
+            })
+            .collect();
+        return (!heard.is_empty()).then(|| heard.into_iter().collect::<Vec<_>>().join(", "));
     }
+    by_anim(sounds, o, &u.anim, Some(u))
+}
+
+/// What `anim` sounds like at `o`, in its use `u` (None: a cooking step at it as a station).
+fn by_anim(sounds: &BTreeMap<String, String>, o: &Object, anim: &str, u: Option<&Use>) -> Option<String> {
+    if let Some(own) = u.and_then(|u| u.sound.as_ref()).or_else(|| o.sounds.get(anim)) {
+        return (own != "none").then(|| own.clone());
+    }
+    match (anim, u) {
+        ("wash", None) => Some("washUp".into()),
+        ("wash", Some(u)) if u.id == "washUp" => Some("washUp".into()),
+        ("wash", Some(u)) => u.tags.iter().any(|t| t == "handwash").then(|| "tap".into()),
+        (anim, _) => sounds.get(anim).cloned(),
+    }
+}
+
+/// The Sound column's cell for a use: what it sounds like, what it plays as it ends, and what the object
+/// sounds like by itself.
+fn sound_cell(sounds: &BTreeMap<String, String>, o: &Object, u: &Use) -> String {
+    let mut cell = sound_of(sounds, o, u).unwrap_or_else(|| "—".into());
+    if let Some(end) = &u.end_sound {
+        let _ = write!(cell, ", then {end}");
+    }
+    if let Some(ambient) = &o.ambient {
+        let _ = write!(cell, " (+ {ambient} by itself)");
+    }
+    cell
 }
 
 /// What looks wrong in an object's uses (`cargo review uses`).
@@ -697,7 +754,7 @@ pub fn uses(objects: &[Object], motions: &BTreeMap<String, Value>, actions: &BTr
                 o.slots,
                 o.approach,
                 motions_cell(motions.get(&o.model)),
-                lines(&|u| sound_of(sounds, &o.id, u).unwrap_or_else(|| "—".into())),
+                lines(&|u| sound_cell(sounds, o, u)),
             );
         }
         files.insert(format!("uses-{page}.md"), md);
