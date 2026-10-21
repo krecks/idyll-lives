@@ -92,6 +92,10 @@ export interface InteractionDef {
   sky?: boolean;
   /** Only with something to work on: dirty dishes, washing to do, a washed load to dry (sim-core `content::WorkOn`). */
   workOn?: 'dishes' | 'laundry' | 'washed';
+  /** A game for two, at an object with two places: played with someone free nearby, fetched to the other place (sim-core `partners.rs`). */
+  partner?: boolean;
+  /** With `partner`: the use (an id of the same object's) the player's order does instead with nobody free to play. */
+  alone?: string;
   /**
    * What it sounds like while it lasts: a world sound by key (`audio/world.ts` `LOOPS`: `chop` for
    * a cheese board), or `none`; absent: by the object's `sounds`, else by `anim`. Not for a

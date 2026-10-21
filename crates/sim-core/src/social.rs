@@ -855,6 +855,11 @@ pub enum EventKind {
     /// `a` was told to close the `n` (object kind: put the hot tub's cover on, fold up a bed) and
     /// didn't, as someone else got in or set off for it first (whoever is last out closes it).
     NotClosed,
+    /// `a` was told to play a game for two at the `object` (`Interaction::partner`) and had
+    /// nobody free to play with, so did its use for one instead (`Interaction::alone`).
+    PlayedAlone,
+    /// `a` was told to play a game for two at the `object` and had nobody free to play with.
+    NoPartner,
 }
 
 impl EventKind {
@@ -867,7 +872,7 @@ impl EventKind {
             | MovedAway | Expecting | Born | Adopted | Graduated => 2,
             BecameFriends | BecameGoodFriends | BecameEnemies | Crush | ProposalRejected
             | Fight | Jealous | QuitJob | RentDebt | Broke | Accident | TurnedAway | WantsToBuy | Bought
-            | DeniedAgain | StayedHome | NoBed | NotClosed => 1,
+            | DeniedAgain | StayedHome | NoBed | NotClosed | PlayedAlone | NoPartner => 1,
             Met | MissedWork | SkillUp | PaidRent | Upgraded | Visited | GoalSuggested | Repaired | NobodyHome | Invited
             | Declined | Babysitter => 0,
         }

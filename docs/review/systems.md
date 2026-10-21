@@ -678,3 +678,14 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Evidence:** from the content and the rule, not shot: the desks' user sits behind the desk facing its front (the computer desk's monitor "its back to the room", `office.py`), so the tile build mode keeps free is the one beyond the screen. A desk pushed against a wall with the sitter facing the wall, the usual way, can't be placed; turned the other way the chair is squeezed against the wall (`bench-results/review/fixes/positions/play/computerDesk-wall-in-200.png`). Since G-51 the desks are sat at from behind or beside (`approach: behind`), so build mode could take a free tile behind or beside the chair as well as the front for them (and the beds' sides for `approach: side`).
 - **Status:** open
 - **Source:** fix: positions
+
+### I-systems-15 — Buying round someone in bed can shut them in where they get up
+
+- **Severity:** S2
+- **Rubric:** I3
+- **Fix class:** code
+- **Where:** `crates/sim-core/src/home.rs` `keeps_reach` ("No Sim at home gets shut in": each resident's own tile, which for someone lying in bed or sitting is the bed's or seat's, never reachable, so never checked)
+- **Evidence:** found by the soak test while fixing G-65 (`--test soak -- --ignored`, busy player, seed 7; the games for two changed the town's run): R18 stood idle for days at (220.5, 13.5) with every need at 0, every use and visit remembered as out of reach, between the bed they had slept in (`bed` at 219,14) and a `lazy.snoozecloudBed` the player had bought at 221,13 while they slept. The check let the bed go in because R18's tile was the bed's; the tile they stood up on was closed off. `bench-results/review/fixes/partners/soak-2.txt` (34 stretches stuck), `soak-3.txt` after (4 of 4 pass).
+- **Status:** fixed (15309c9d) — the check takes the tile they'll stand up on (`seated_from`) for someone in bed or on a seat.
+- **After:** the soak test passes (4 of 4) with G-65; balance unchanged.
+- **Source:** fix: partners

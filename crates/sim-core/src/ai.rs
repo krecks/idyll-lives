@@ -195,6 +195,8 @@ mod tests {
             hours: None,
             sky: false,
             work_on: None,
+            partner: false,
+            alone: None,
         }
     }
 

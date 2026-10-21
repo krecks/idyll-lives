@@ -47,7 +47,7 @@ Family: `tools/art/blender/families/hobbies.py`.
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| `chessTable` Chess table | M-hobbies-02, M-hobbies-09 | A-hobbies-01, A-hobbies-02 | I-hobbies-01, A-hobbies-01 | M-hobbies-02 S3 model; I-hobbies-01 S3 decision; wave: M-hobbies-09 S3 renderer-table (seat 1.5 cm under the pad), A-hobbies-01 S2 code (walks through the table), A-hobbies-02 S3 motion (the pawn moves itself) | `sheets/obj-chessTable.png`, `play/chessTable-chess-*.png`, `clips/clips-chessTable-all-t*.png`, `sheets/seat-chessM.png`, `sheets/seat-chessF.png`, `hobbies/extra/sit00b.png` |
+| `chessTable` Chess table | M-hobbies-02, M-hobbies-09, M-hobbies-11 | A-hobbies-01, A-hobbies-02 | I-hobbies-01, A-hobbies-01 | M-hobbies-02 S3 model; I-hobbies-01 S3 decision; wave: M-hobbies-09 S3 renderer-table (seat 1.5 cm under the pad), A-hobbies-01 S2 code (walks through the table), A-hobbies-02 S3 motion (the pawn moves itself) | `sheets/obj-chessTable.png`, `play/chessTable-chess-*.png`, `clips/clips-chessTable-all-t*.png`, `sheets/seat-chessM.png`, `sheets/seat-chessF.png`, `hobbies/extra/sit00b.png` |
 | `poolTable` Pool table | M-hobbies-06 | A-hobbies-03 | I-hobbies-04, I-hobbies-05, I-hobbies-07, I-hobbies-09 | M-hobbies-06 S3 model; A-hobbies-03 S2 motion; I-hobbies-04 S2 clip; I-hobbies-05 S2 code; I-hobbies-07 S1 code; I-hobbies-09 S3 code | `hobbies/sheets/obj-poolTable.png`, `hobbies/extra/two.png`, `hobbies/clips/clips-poolTable-all-t99.png` |
 | `foosball` Foosball table | M-hobbies-07 | OK | I-hobbies-01, I-hobbies-04, I-hobbies-07, I-hobbies-09 | M-hobbies-07 S3 model; I-hobbies-01 S3 decision (widened: a game for two played alone); I-hobbies-04 S2 clip; I-hobbies-07 S1 code; I-hobbies-09 S3 code | `hobbies/sheets/obj-foosball.png`, `hobbies/extra/two.png`, `hobbies/extra/two-foosball-v1.png` |
 | `dartboard` Dartboard | OK | I-hobbies-04 | I-hobbies-04, I-hobbies-06, I-hobbies-09 | I-hobbies-04 S2 clip (no throw: the darts appear in the board); I-hobbies-06 S3 code; I-hobbies-09 S3 code | `hobbies/sheets/obj-dartboard.png`, `hobbies/extra/side-dartboard-darts-00.png` |
@@ -144,7 +144,8 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Where:** `web/public/content/base.json:3013` (`chessTable`: no `slots`, one use "Practise chess"); compare `web/public/content/community.json` `parkChessTable` (`slots: 2`, a stool either side); `web/public/content/furniture.json:3377` (`foosball`: `slots: 2`, one use "Play foosball", no partner)
 - **Evidence:** `play/chessTable-chess-01.png`: one resident at the board, moving both sides' pawns (`move`). Practising alone is a real thing (problems, openings), and the label says so; but a chess table at home is mostly for playing someone, which the park's table already does. Decide whether the home one gets a second seat and a two-player use (model and content) or stays a training object.
   Wave: the foosball table has two slots but no game between them: each resident plays alone, working both teams' rods from one side (`hobbies/play/c1/foosball-foosball-01.png`; with two, `hobbies/extra/two.png`, they also stand in one spot, I-hobbies-07, and the model has every handle on the front, M-hobbies-07). Solo foosball isn't a real pastime the way a chess problem or trick shots are; the pool table's trick shots and the jigsaw are fine alone. Content has no way to pair two users into one game (no partner field on an interaction, `crates/sim-core/src/content.rs:70`), so a real fix is `code` either way; the decision is whether to keep these as solo uses until then.
-- **Status:** confirmed and widened (wave: hobbies, to `foosball`)
+- **Status:** fixed (42477f91, 4d85ede8; G-65, Q-16)
+- **After:** *Play foosball* and *Shoot pool* are games for two (content `partner`; `social` 0.08 each now they're played with someone): the one told or choosing fetches someone free at home, who plays from the other side (`bench-results/review/fixes/partners/two-foosball.png`, `two-poolTable.png`: Ada and Ben). With nobody free the order does the game's use for one (`alone`, Q-16): *Practise trick shots*, and a new *Practise foosball* (15 min, fun 0.2, the rods turning; only when told), and the story says so (`alone-foosball.png`, `alone-poolTable.png`: "Ada had nobody free to play with at the foosball table, so practised alone"). The home chess table stays *Practise chess* for one (`alone-chessTable.png`): its model has one chair on a 1 × 1 footprint, so a partner across the board needs a model and footprint change, filed as M-hobbies-11.
 - **Source:** pilot; wave: hobbies
 
 ### I-hobbies-02 — The stargazer stands upright beside the telescope, half a metre above the eyepiece
@@ -358,3 +359,13 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Evidence:** `cargo check-glb model.piano`: "seat 0.47 m (content `seat`), the model 0.490 m there (x 0.00, depth 0.23): 2.0 cm higher", past the owner's 1 cm tolerance: the pianist sits 2 cm into the cushion. A piano bench is 0.48–0.51 m, so the content's number is the one to move (0.49). Found by the Blender wave's gate run, not in play.
 - **Status:** open
 - **Source:** fix: blender-hobbies
+
+### M-hobbies-11 — The home chess table has one chair: a game for two needs a second across the board
+
+- **Severity:** S3
+- **Rubric:** M1, I16
+- **Fix class:** model
+- **Where:** `tools/art/blender/families/hobbies.py` `chessTable` (a 0.64 × 0.48 top to the front, one chair behind it, 0.64 × 0.92 m on a 1 × 1 footprint used from behind); `web/public/content/base.json` `chessTable` (`footprint` [1, 1], no `slots` or `places`, one use *Practise chess*)
+- **Evidence:** G-65 gives games for two a partner (content `partner`): the park chess table, the pool and foosball tables now fetch a second player to the other place. The home chess table can't take one: across the board from its chair is the tile in front of it, with nothing to sit on, and a second chair doesn't fit its tile. It stays *Practise chess* for one (Q-16, the practice that's fine alone). Fix: a 1 × 2 table with a chair at each end facing over the board (the park table's layout), content `slots: 2` and `places` facing each other, then a *Play chess* use with `partner` and `"alone": "chess"`. A footprint change moves things placed against it in old saves (early release: fine).
+- **Status:** open
+- **Source:** fix: partners

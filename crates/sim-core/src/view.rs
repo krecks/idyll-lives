@@ -1156,7 +1156,14 @@ fn actions(world: &World, s: &Sim) -> Vec<ActionView> {
             active: true,
         });
     } else {
-        actions.extend(s.current().map(|a| task_view(world, &a.task, Some(&a.phase), s.held)));
+        actions.extend(s.current().map(|a| {
+            let mut view = task_view(world, &a.task, Some(&a.phase), s.held);
+            // A game for two: who with ("Shoot pool · Bo"; `partners.rs`).
+            if let Some((o, i, _)) = s.game {
+                view.target = world.sims.iter().find(|p| p.id != s.id && p.game.is_some_and(|g| (g.0, g.1) == (o, i))).map(|p| p.id);
+            }
+            view
+        }));
     }
     actions.extend(s.queue().map(|t| task_view(world, t, None, None)));
     actions

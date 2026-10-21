@@ -466,6 +466,7 @@
           "anim": "play",
           "minutes": 15,
           "pose": "sit",
+          "partner": true,
           "effects": {
             "fun": 0.4,
             "social": 0.1
@@ -626,6 +627,7 @@
           "label": "Play ping-pong",
           "anim": "play",
           "minutes": 30,
+          "partner": true,
           "effects": {
             "fun": 0.45,
             "social": 0.12,
@@ -672,6 +674,7 @@
           "anim": "play",
           "minutes": 45,
           "pose": "sit",
+          "partner": true,
           "effects": {
             "fun": 0.3,
             "social": 0.08
