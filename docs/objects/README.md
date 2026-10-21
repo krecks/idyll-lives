@@ -97,7 +97,7 @@ Added after, in the same spirit:
   chair's seat, a swing, a hammock, an office chair's swivel).
 - **Mirrors and glow on moving parts:** a mirror cabinet's door reflects as it swings, a laptop's lid glows as it moves.
 - **Tint slots by name:** `tunic#body` (with a finish: `tunic@fabric#body`), as a `parts` entry's `tint`.
-- **Beds** (`characters.ts` `BEDS`): `fwd` (m) lies the sleeper forward (the sofa bed), `foot` ends the quilt (the car
+- **Beds** (`characters/furniture.json` `beds`): `fwd` (m) lies the sleeper forward (the sofa bed), `foot` ends the quilt (the car
   bed), `across` lies a napper along a two-seat seat; content `whole` gives a use every slot of its object (a nap on
   the window seat).
 - **Held things:** content `held` draws the object's part in the resident's hands (the bench's bar, a dumbbell pair,
@@ -112,7 +112,7 @@ Added after, in the same spirit:
 Follow `tools/art/blender/README.md` ("Working as an agent: the loop") and `docs/design/objects.md`. In short:
 
 1. **Read** the content entry and the notes of the family it belongs in. The size, the top height (`surface`), the
-   seat height (`seat`), the mattress height (`BEDS`, `BLANKET_BEDS` in `web/src/render/babylon/characters.ts`) and
+   seat height (`seat`), the mattress height (`beds` in `web/src/render/babylon/characters/furniture.json`, `BLANKET_BEDS` in `characters.ts`) and
    the light position (`light`) are facts the model must keep; the family script asserts them.
 2. **Build** in a family (copy `families/_template.py`, or add to an existing family):
    - one material per part, named for what it is;

@@ -8,7 +8,7 @@ its rider (`rock`, E1); the coffee table's drawer opens for a magazine. The wall
 open (C1: content `leaves: open`, the clip held while the object is open), as the sofa bed and the futon
 (`bedroom.md`) are.
 
-Seats keep their height and depth (`SEATS` in `web/src/render/babylon/characters.ts`, content `seat`); a seat that
+Seats keep their height and depth (`seats` in `web/src/render/babylon/characters/furniture.json`, content `seat`); a seat that
 moves while sat on keeps the sitting pose believable. Shelf and table tops are the content `surface` heights.
 
 ## L1. Sofas and sectionals (12)
@@ -106,7 +106,7 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 | `stereo` Stereo system | 1x1 · floor | listen:listen dance:dance | living / media | Body, Trim | Use | `tray`: the tray of the CD player under the amplifier slides out and back (`hold` 1.2 s) for listen and dance; the woofers `pulse` (E1 loop). 4 draws (the loop's part). |
 | `boombox` Boombox | 1x1 · floor | listen:listen | living / media | Body, Trim | Use | `cassette`: the cassette door tips 32° open from its foot for listen and shuts; `hold` 1.2 s. |
 | `tvStandLow` Low TV bench | 2x1 · floor | watch:watch | living / media | Bench, TV | Use | `tv_up`: the TV rises 60 cm out of a lift hood at the bench's back for watch (0.8 m high at rest, its lid closing the hood), and sinks back at the end; it flickers while up and watched. |
-| `fireplaceElectric` Electric fireplace | 2x1 · floor | relax:relax | living / media | Surround, Firebox | Use | `flames`: five tongues grow from the log bed for relax (gloss, not emissive; the light is the content's); the embers glow at night, the flames while lit. A floor cushion in front, and `characters.ts` `SEATS` sits the resident on it facing the fire. |
+| `fireplaceElectric` Electric fireplace | 2x1 · floor | relax:relax | living / media | Surround, Firebox | Use | `flames`: five tongues grow from the log bed for relax (gloss, not emissive; the light is the content's); the embers glow at night, the flames while lit. A floor cushion in front, and `characters/furniture.json` `seats` sits the resident on it facing the fire. |
 
 **In play** (signed off 2026-10-16):
 - Against the north, west and east walls and free at 180° (the wall TV on window-free walls): watched, listened to,
