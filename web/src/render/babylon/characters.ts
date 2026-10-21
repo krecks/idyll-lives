@@ -546,6 +546,20 @@ const ACTIONS: Record<string, ActionAnim> = {
 
 /** The prop drawn on a station's top while a Sim works there (by action tag; `tool.*` models). */
 const STATION_PROPS: Record<string, string> = { chop: 'tool.board', stir: 'tool.pan', flip: 'tool.grillFood' };
+/**
+ * Where on a station its prop goes, by object def and action tag (else the top's middle, a little towards the
+ * cook): m to its right and forward of its middle (its own frame), and the height it stands at. The pan on the
+ * burner the cooker's clip lights (its flame or hot ring); the grill station's chopping on its free counter, off
+ * the grate.
+ */
+const STATION_SPOTS: Record<string, Partial<Record<string, readonly [x: number, z: number, y: number]>>> = {
+  stoveGas: { stir: [-0.26, 0.02, 0.9] },
+  // (No ring lights on it: the front one on the side of the knob that turns.)
+  stoveElectric: { stir: [-0.16, -0.02, 0.9] },
+  rangeCooker: { stir: [0, 0.03, 0.915] },
+  cooktopCounter: { stir: [0.16, -0.22, 0.955] },
+  grillStation: { chop: [0.6, -0.05, 0.905] },
+};
 /** How far (m, body scale) below the palms' centres a carried thing's base rests. */
 const HOLD_DROP = 0.02;
 /** The palm centre's offset from the wrist (left hand, body scale) for sets without `grip`. */
@@ -2094,12 +2108,19 @@ export class Characters {
 
   /**
    * The tool on the station Sim row `i` cooks at (a chopping board, a pan, food on the grill; by
-   * action tag): on its top, a little towards the cook.
+   * action tag): at its spot (`STATION_SPOTS`), else on its top, a little towards the cook.
    */
   private writeTool(rig: SimRig, i: number, tag: string, station: PlacedObject | null | undefined): void {
     const key = station ? (STATION_PROPS[tag] ?? null) : null;
     const m = this.writeProp(this.toolProp, i, key);
     if (!m || !station) return;
+    const spot = STATION_SPOTS[station.def]?.[tag];
+    if (spot) {
+      const f = (station.rot * Math.PI) / 2;
+      const [x, z, y] = spot;
+      this.placeProp(m, i, station.cx + x * Math.cos(f) + z * Math.sin(f), rig.floorY + y, station.cz - x * Math.sin(f) + z * Math.cos(f), rig.yaw, 1);
+      return;
+    }
     const def = this.content?.object(station.def);
     const top = def?.surface?.height ?? this.content?.cooking.defaultSurfaceHeight ?? 0.9;
     const dx = rig.x - station.cx;
