@@ -18,9 +18,11 @@
  *   than 1 cm per cycle against the ground speed, and a foot flat on the floor in any other loop (or
  *   the short one-shots) stays put (< 1 cm);
  * - every clip's length is within 15% of its target (the runtime sequences on them);
- * - seated (`sit` fitted with the body's `seatDrop`) on a 0.45 m seat, a child's on the kids' chair
- *   (0.31 m), the feet reach the floor, and the other seated clips (and the seated ends of sitDown /
- *   standUp) keep `sit`'s pelvis;
+ * - seated (`sit` fitted with the body's `seatDrop`, the legs as the runtime fits them to the floor:
+ *   characters/seatFit.ts `feetDown`) on a 0.45 m seat, a child's on the kids' chair (0.31 m), the feet
+ *   reach the floor; on each deep seat (furniture.json `seats` with a `front`), with the hips moved forward
+ *   as the runtime does (`perch`), the knees clear its front; and the other seated clips (and the seated
+ *   ends of sitDown / standUp) keep `sit`'s pelvis;
  * - `lie` lies straight and down: knees nearly straight and not above the hips, the ankles 5 cm
  *   below the pelvis (the legs on the mattress, not floating), the hands 5 cm in front of the body;
  * - the baby's lying clips keep the baby on the mattress and inside the crib: no joint more than
@@ -39,8 +41,8 @@
  * uniform scale, though it can change the size picked), the build and head size (skinning only),
  * the elder's stoop (upper back and head, off when lying: no joint checked here), the other
  * procedural layers (look-at, breathing, turning on the spot) and the fits the runtime makes to
- * seats, beds and objects (`tuckIn`, `SEATS`, `BEDS`, `legsOut`, pedals). Children on an adult's
- * 0.45 m seat dangle their feet, as real ones do; that isn't checked.
+ * seats, beds and objects other than the seated legs' (`tuckIn`, `BEDS`, `legsOut`, pedals). Children on
+ * an adult's 0.45 m seat dangle their feet, as real ones do; that isn't checked.
  *
  * Loop flags, NaNs, seams and lengths are the same on every skeleton: they are checked once (body
  * and stage `*`). A failure listed in clip-baseline.json is printed as known and doesn't fail; a
@@ -66,6 +68,9 @@ const { clipDefs } = await import('../../web/src/render/babylon/characters/clips
 const { bake } = await import('../../web/src/render/babylon/characters/clips/dsl.ts');
 const { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } = await import('../../web/src/render/babylon/characters/clips/street.ts');
 const { BOULDER, FOOS, POOL, SMASH } = await import('../../web/src/render/babylon/characters/clips/games.ts');
+const { feetDown, legTurn, perch, SEAT_FIT, seatSize } = await import('../../web/src/render/babylon/characters/seatFit.ts');
+/** Seats whose top ends short of a child's knees (characters.ts `Seat.front`, `perch`). */
+const DEEP: [string, any][] = Object.entries(JSON.parse(readFileSync(new URL('../../web/src/render/babylon/characters/furniture.json', import.meta.url), 'utf8')).seats).filter(([, s]: [string, any]) => s.front !== undefined) as [string, any][];
 
 /** Every clip the runtime plays (characters.ts ACTIONS / choose, reactions.ts) and whether it loops. */
 const RUNTIME: Record<string, boolean> = {
@@ -358,13 +363,29 @@ function checkSeatedAndLying(sk: Skeleton, restAnkle: number): void {
       const d = Math.hypot(p[0] - ref0[0], p[1] - ref0[1], p[2] - ref0[2]);
       if (d > 0.01) fail(sk, name, 'seated', 'pelvis', `${name}: the seated pelvis is ${(d * 100).toFixed(1)} cm from sit's`);
     }
-    // On the seat: the feet reach the floor (within 4 cm).
+    // On the seat, the legs fitted as the runtime does (`seatLegs`): the feet reach the floor (within 2 cm).
     if (sk.seatDrop !== undefined) {
       const seat = SEAT[sk.stage] ?? SEAT_HEIGHT;
       const w = fk(sit, 0, sk);
       const root = seat - (w[bone.pelvis][1] - sk.seatDrop);
-      const gap = w[bone.foot_l][1] + root - restAnkle;
-      if (Math.abs(gap) > 0.04) fail(sk, 'sit', 'sit', 'feet', `sit: on a ${seat} m seat the feet are ${(gap * 100).toFixed(0)} cm off the floor`);
+      const fitted = fk(sit, 0, sk, seatLegs(w, restAnkle - root));
+      for (const side of ['l', 'r']) {
+        const gap = fitted[bone[`foot_${side}`]][1] + root - restAnkle;
+        if (Math.abs(gap) > 0.02) fail(sk, 'sit', 'sit', 'feet', `sit: on a ${seat} m seat the ${side} foot is ${(gap * 100).toFixed(0)} cm off the floor`);
+      }
+      // On a deep seat, the hips moved forward (`perch`): the knee joints clear its front (as far as the runtime
+      // moves them, less a centimetre).
+      const size = seatSize(sk.height);
+      for (const [id, s] of DEEP) {
+        const r = s.h - (w[bone.pelvis][1] - sk.seatDrop);
+        const legs = fk(sit, 0, sk, seatLegs(w, restAnkle - r));
+        const p = perch(legSide(w, 'l'), w[bone.pelvis][2], s.front - s.fwd, size);
+        for (const side of ['l', 'r']) {
+          const knee = s.fwd + p + legs[bone[`calf_${side}`]][2] - w[bone.pelvis][2];
+          const short = s.front + SEAT_FIT.clear * size - 0.01 - knee;
+          if (short > 0) fail(sk, 'sit', 'deep', id, `sit: on ${id} the ${side} knee is ${(short * 100).toFixed(0)} cm short of clearing its front (the shin in the cushion)`);
+        }
+      }
     }
   }
   // Lying: legs nearly straight, hands in front of the body (the lengths on the reference skeleton,
@@ -387,6 +408,27 @@ function checkSeatedAndLying(sk: Skeleton, restAnkle: number): void {
       if (f[2] > w[bone.pelvis][2] - cm5) fail(sk, 'lie', 'lie-heel', `foot_${side}`, `lie: the ${side} ankle is ${((f[2] - w[bone.pelvis][2]) * 100).toFixed(1)} cm from the pelvis, not under it (the heels float)`);
     }
   }
+}
+
+/** A leg of the pose `w` (world joints) as characters.ts `measureLegs` measures it (characters/seatFit.ts `LegSide`). */
+function legSide(w: number[][], side: string) {
+  const [h, k, a] = [w[bone[`thigh_${side}`]], w[bone[`calf_${side}`]], w[bone[`foot_${side}`]]];
+  return { hy: h[1], hz: h[2], l1: Math.hypot(k[1] - h[1], k[2] - h[2]), l2: Math.hypot(a[1] - k[1], a[2] - k[2]), t0: Math.atan2(k[2] - h[2], h[1] - k[1]), c0: Math.atan2(a[2] - k[2], k[1] - a[1]) };
+}
+
+/** The seated legs' turns (characters.ts `seatLegs`) for the pose `w`, the ankles' floor `floor` m up (body space), as `fk`'s additive rotations. */
+function seatLegs(w: number[][], floor: number): Map<number, number[]> {
+  const add = new Map<number, number[]>();
+  const about = (a: number) => [Math.sin(a / 2), 0, 0, Math.cos(a / 2)];
+  for (const side of ['l', 'r']) {
+    const leg = legSide(w, side);
+    const [y, z] = feetDown(leg, floor, 0);
+    const turn = legTurn(leg, y, z, [0, 0]);
+    add.set(bone[`thigh_${side}`], about(turn[0]));
+    // (The calf's turn is relative to the turned thigh, which turns it too: `fk` applies a bone's on top of its parent's.)
+    add.set(bone[`calf_${side}`], about(turn[1]));
+  }
+  return add;
 }
 
 function checkBaby(sk: Skeleton): void {

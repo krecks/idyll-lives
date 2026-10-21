@@ -1320,6 +1320,10 @@ fn content_warnings(facts: Option<&Facts>, lo: &[Num; 3], (slo, shi): &Bounds, s
 /// how far two sources of one may differ before it calls them different.
 const HEIGHT_OFF: f64 = 0.02;
 const SAME: f64 = 0.005;
+/// A seat's front edge (furniture.json `seats` `front`, `Sampler::front`): where its top has dropped this far (m)
+/// below the seat's height (a cushion's rounded front), and how far the model's may be from what the table says.
+const FRONT_DROP: f64 = 0.06;
+const FRONT_OFF: f64 = 0.03;
 
 /// furniture.json: where residents sit and lie on each object (characters.ts `SEATS`, `BEDS`, `BUNKS` and their
 /// defaults). An object in `seats` takes that seat over the content's `seat` (characters.ts `seatOf`).
@@ -1405,6 +1409,21 @@ impl Sampler {
     fn tops_at(&self, x: f64, z: f64) -> Vec<f64> {
         let found = self.line(x, z, true);
         if found.is_empty() { self.line(x, z, false) } else { found }
+    }
+
+    /// Where a seat ends in front (m forward of the footprint's middle): from the hips' point (x, depth) forward a
+    /// centimetre at a time while the model reaches up to within `FRONT_DROP` of the seat's height `h` there (a
+    /// cushion's top, a bean bag's bulge), the last such depth; None: nothing that high under the hips.
+    fn front(&self, x: f64, z: f64, h: f64) -> Option<f64> {
+        let on = |z: f64| self.span(x, z).is_some_and(|(_, hi)| hi >= h - FRONT_DROP);
+        if !on(z) {
+            return None;
+        }
+        let mut at = z;
+        while at < z + 1.5 && on(at + 0.01) {
+            at += 0.01;
+        }
+        Some(at)
     }
 
     /// The lowest and the highest face (m) on the vertical line at (x, depth); None: nothing there.
@@ -1532,6 +1551,22 @@ impl Height {
         let mut out = Vec::new();
         let open = self.open.as_ref().map(|c| format!(", held open ({})", repr_str(c))).unwrap_or_default();
         let at = format!("x {}, depth {}", fixed(self.at[0], 2), fixed(self.at[1], 2));
+        if self.what == "seat front" {
+            if self.off().is_none_or(|off| off > FRONT_OFF) {
+                out.push(match self.mesh {
+                    Some(m) => format!(
+                        "seat front {} m forward ({}), the model's seat ends {} m forward there ({at}): {} cm {}",
+                        fixed(self.expected, 2),
+                        self.source,
+                        fixed(m, 2),
+                        fixed((m - self.expected).abs() * 100.0, 1),
+                        if m < self.expected { "further back" } else { "further forward" }
+                    ),
+                    None => format!("seat front {} m forward ({}): no seat under the hips ({at})", fixed(self.expected, 2), self.source),
+                });
+            }
+            return out;
+        }
         if !self.fits() {
             out.push(match (self.mesh, self.span) {
                 (_, Some((lo, hi))) => format!("{} {} m ({}), outside the lamp there (its model {} to {} m at {at})", self.what, fixed(self.expected, 2), self.source, fixed(lo, 2), fixed(hi, 2)),
@@ -1561,6 +1596,8 @@ struct Seat {
     source: &'static str,
     disagrees: Option<String>,
     points: Vec<[f64; 2]>,
+    /// Where its top ends in front (furniture.json `seats` `front`, m forward of the middle), if the table says.
+    front: Option<f64>,
 }
 
 /// Each slot's x (m right of the footprint's middle) of content object `object` (sim-core `slot_position`).
@@ -1606,7 +1643,8 @@ fn seat_of(object: &J, furniture: &Furniture) -> Option<Seat> {
         Some(a) => vec![[a * seat.1, 0.0]],
         None => slot_xs(object).into_iter().map(|x| [x, seat.1]).collect(),
     };
-    Some(Seat { h: seat.0, source, disagrees, points })
+    let front = table.and_then(|t| t.get("front")).and_then(J::num).map(Num::f);
+    Some(Seat { h: seat.0, source, disagrees, points, front })
 }
 
 /// The functional heights of content object `object` (`Facts::object`) drawn by the model `g` (its `entry`):
@@ -1647,10 +1685,24 @@ fn heights(g: &Glb, entry: &J, object: &J, furniture: &Furniture, every_slot: bo
     };
 
     // Seated.
+    let mut seat_front = None;
     if let Some(seat) = seat
         && let Some(s) = &rest
     {
         height("seat", seat.h, seat.source.into(), &seat.points, s, None, seat.disagrees);
+        // Where its top ends in front (the shins clear of a deep cushion: characters.ts `perch`), the worst point.
+        if let Some(front) = seat.front {
+            let mut worst: Option<([f64; 2], Option<f64>)> = None;
+            for p in &seat.points {
+                let m = s.front(p[0], p[1], seat.h);
+                let off = |m: Option<f64>| m.map_or(f64::INFINITY, |m| (m - front).abs());
+                if worst.is_none_or(|(_, w)| off(m) > off(w)) {
+                    worst = Some((*p, m));
+                }
+            }
+            let (at, mesh) = worst.unwrap_or(([0.0, 0.0], None));
+            seat_front = Some(Height { what: "seat front", expected: front, source: "furniture.json `seats`".into(), at, open: None, mesh, span: None, disagrees: None });
+        }
     }
 
     // On a top.
@@ -1710,6 +1762,7 @@ fn heights(g: &Glb, entry: &J, object: &J, furniture: &Furniture, every_slot: bo
         let span = s.span(at[0], at[1]);
         out.push(Height { what: "light", expected: number(Some(light), "height", 1.55), source: "content `light`".into(), at, open: None, mesh: None, span, disagrees: None });
     }
+    out.extend(seat_front);
     Ok(out)
 }
 
@@ -2495,6 +2548,27 @@ mod tests {
 
     /// A model of flat quads facing up, a node each: `[height, x from, x to, depth from, depth to]` (glTF axes: game
     /// x is the file's -x).
+    #[test]
+    fn a_seat_front_is_where_the_seat_ends_in_front() {
+        // A deep sofa's seat at 0.44 m from 0.4 m back to 0.38 m forward, its back at 0.8 m behind it, and a
+        // cushion's rounded front lip 3 cm lower up to 0.4 m: the seat ends at 0.4 m.
+        let sofa = quads(&[[0.44, -0.4, 0.4, -0.4, 0.38], [0.41, -0.4, 0.4, 0.38, 0.4], [0.8, -0.4, 0.4, -0.5, -0.4], [0.1, -0.4, 0.4, 0.4, 0.45]]);
+        let s = Sampler::new(&sofa, &J::Obj(Vec::new()), None).unwrap().unwrap();
+        assert_eq!(s.front(0.0, -0.09, 0.44).map(|f| (f * 100.0).round()), Some(40.0));
+        assert_eq!(s.front(0.0, 0.6, 0.44), None, "nothing under hips in front of it");
+        let furniture = |front: f64| Furniture {
+            seats: json::loads_text(format!(r#"{{"sofaThree": {{"h": 0.44, "fwd": -0.09, "front": {front}}}}}"#).as_bytes()).unwrap(),
+            default_seat: json::loads_text(br#"{"h": 0.45, "fwd": 0}"#).unwrap(),
+            beds: J::Obj(Vec::new()),
+            default_bed: json::loads_text(br#"{"h": 0.5}"#).unwrap(),
+            bunks: J::Obj(Vec::new()),
+        };
+        let object = json::loads_text(br#"{"id": "sofaThree", "footprint": [1, 1], "interactions": [{"pose": "sit"}]}"#).unwrap();
+        let warn = |front: f64| -> Vec<String> { heights(&sofa, &J::Obj(Vec::new()), &object, &furniture(front), true).unwrap().iter().flat_map(Height::warnings).collect() };
+        assert!(warn(0.41).is_empty(), "{:?}", warn(0.41));
+        assert_eq!(warn(0.3), ["seat front 0.30 m forward (furniture.json `seats`), the model's seat ends 0.40 m forward there (x 0.00, depth -0.09): 10.0 cm further forward"]);
+    }
+
     fn quads(quads: &[[f32; 5]]) -> Glb {
         let mut bin = Vec::new();
         for [y, x0, x1, z0, z1] in quads {

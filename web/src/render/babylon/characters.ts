@@ -79,6 +79,7 @@ import { BOULDER, FOOS, FOOS_LANES, POOL, SMASH, YOGA_AT } from './characters/cl
 // The seat and bed tables (`SEATS`, `BEDS`, `BUNKS` and their defaults) are data, read by `cargo check-glb` and
 // `cargo review` too; what their entries mean and why some are as they are: docs/characters-format.md "Seats and beds".
 import FURNITURE from './characters/furniture.json';
+import { feetDown, legTurn, perch, SEAT_FIT, seatSize, type LegSide } from './characters/seatFit';
 import { furthestAhead, nearestAhead, type TableRoom } from './tableTuck';
 import { addLocal, addRotation, blendInto, makeAdditive, PoseScratch, qmul, resetAdditive, rotate, sampleClip, skin, type Additive, type Placement } from './characters/pose';
 import type { MaterialLibrary } from './materials';
@@ -260,6 +261,11 @@ interface Seat {
   recline?: number;
   /** Pedals the feet turn (an exercise bike): the crank's axle (height, forward of the middle) and its length (m). */
   pedals?: { h: number; fwd: number; crank: number };
+  /**
+   * Where its top ends in front (m forward of the footprint's middle, as `fwd`; `cargo check-glb` measures it): on a
+   * deep seat the hips move forward until the knees clear it (`perch`), not the shins down inside the cushion.
+   */
+  front?: number;
 }
 /**
  * Mattress / bench top height (m) for lying, and how far forward of the footprint's middle the
@@ -713,6 +719,8 @@ interface SimRig {
   /** Lying in a hammock's sling (`inSling`), or null; the upper body's rise in it (rad). */
   sling: Bed['sling'] | null;
   slingLift: number;
+  /** Seated, the legs' turns that put the feet on the floor (`seatLegs`: each thigh, calf and foot, left then right), faded out standing up. */
+  seatTurn: Float32Array;
   tagKnown: boolean;
   cur: Player;
   prev: Player;
@@ -827,21 +835,12 @@ interface SimRig {
   speechSeg: number;
 }
 
-/**
- * A leg in a clip (`measureLegs`; body space, scale 1, in the y-z plane): the hip's height and depth,
- * the thigh's and the calf's lengths and their directions (rad from straight down towards the front).
- */
-interface LegSide {
-  hy: number;
-  hz: number;
-  l1: number;
-  l2: number;
-  t0: number;
-  c0: number;
-}
+/** Where the legs are in a clip (`measureLegs`; body space, scale 1; `LegSide`, characters/seatFit.ts). */
 interface LegFit {
   l: LegSide;
   r: LegSide;
+  /** The ankle joints' height standing (the `idle` clip's), for feet put on the floor (`seatLegs`). */
+  ankle: number;
   /** The spine's base (spine_01) and the head's joint: height and depth. */
   spine: readonly [number, number];
   head: readonly [number, number];
@@ -1390,6 +1389,7 @@ export class Characters {
         useId: -1,
         sling: null,
         slingLift: 0,
+        seatTurn: new Float32Array(6),
         tagKnown: false,
         cur: player(),
         prev: player(),
@@ -2590,7 +2590,7 @@ export class Characters {
       const sp = this.sitPelvis.get(rig.body.name)!;
       rootY = seat.h - sp.y * rig.scale;
       // (Facing the object's back, its forward is the Sim's back.)
-      rootFwd = (seat.back ? -seat.fwd : seat.fwd) - sp.z * rig.scale;
+      rootFwd = (seat.back ? -seat.fwd : seat.fwd) - sp.z * rig.scale + this.perch(rig, seat, sp);
       fade = 0.35;
       rig.useDef = obj?.def ?? '';
       rig.useObj = obj ?? null;
@@ -3236,10 +3236,14 @@ export class Characters {
     const def = rig.useDef;
     const key = rig.cur.key;
     const seed = rig.seed * 6;
+    // (Standing up, the seated legs' fit fades out with the seated pose; it starts afresh on the next seat.)
+    if (pose === Pose.Stand && key === 'standUp') this.seatLegsOff(rig);
+    else if (pose !== Pose.Sit || key === 'sitDown') rig.seatTurn.fill(0);
     if (pose === Pose.Sit && key !== 'sitDown') {
       const seat = rig.useObj?.seat;
       if (seat?.pedals) this.pedal(rig, seat.pedals);
       else if (seat?.legsOut) this.legsOut(rig);
+      else if (rig.tag !== 'meditate') this.seatLegs(rig, rig.tag === 'relax' || rig.tag === 'nap' || rig.tag === 'watch');
       switch (rig.tag) {
         case 'sit':
           // Just sitting: upright, but against a slanted back (`recline`).
@@ -3249,16 +3253,12 @@ export class Characters {
         case 'nap':
         case 'watch':
           // Sinking back into the seat (or against its slanted back, `recline`, split over the spine as `legsOut`
-          // does, the head kept looking ahead), legs stretched out a little (or all the way, `legsOut`), arms on
-          // the armrests.
+          // does, the head kept looking ahead), legs stretched out a little (`seatLegs`, or all the way,
+          // `legsOut`), arms on the armrests.
           if (seat?.recline !== undefined) this.recline(seat.recline);
           else {
             addRotation(add, B.spine_01, 1, 0, 0, -0.14);
             addRotation(add, B.Head, 1, 0, 0, 0.1);
-          }
-          if (!seat?.legsOut) {
-            addRotation(add, B.calf_l, 1, 0, 0, -0.35);
-            addRotation(add, B.calf_r, 1, 0, 0, -0.3);
           }
           addRotation(add, B.upperarm_l, 0, 0, 1, -0.18);
           addRotation(add, B.upperarm_r, 0, 0, 1, 0.18);
@@ -3458,6 +3458,65 @@ export class Characters {
       addRotation(this.add, calf, 1, 0, 0, turn[1] * w);
       // The foot stays about as level as in the clip, its toes dipping as the pedal goes down.
       addRotation(this.add, foot, 1, 0, 0, (-(turn[0] + turn[1]) * 0.75 + 0.15 * Math.sin(a)) * w);
+    }
+  }
+
+  /**
+   * On a deep seat (`Seat.front`), how far forward (m) the hips sit for the knees to clear its front
+   * (characters/seatFit.ts `perch`): a child well forward on a sofa, a grown-up a little on a deep one.
+   */
+  private perch(rig: SimRig, seat: Seat, sp: SeatFit): number {
+    const fit = this.legFits.get(rig.body.name)?.get('sit');
+    if (seat.front === undefined || seat.back || seat.along || seat.legsOut || seat.pedals || !fit) return 0;
+    const s = rig.scale;
+    return perch(fit.l, sp.z, (seat.front - seat.fwd) / s, seatSize(rig.body.height)) * s;
+  }
+
+  /**
+   * Seated: each foot down on the floor under the knee (characters/seatFit.ts `feetDown`), the thigh sloping
+   * off the seat's front to reach it, the feet hanging where it can't (a child on a grown-up's chair); on a low
+   * seat the knees come up. `stretch`: relaxing, the feet further out. Kept in `rig.seatTurn` for standing up.
+   */
+  private seatLegs(rig: SimRig, stretch: boolean): void {
+    const fits = this.legFits.get(rig.body.name);
+    const fit = fits?.get(rig.cur.key) ?? fits?.get('sit');
+    if (!fit) return;
+    const B = this.set!.bone;
+    const s = rig.scale;
+    const w = smooth(rig.w);
+    const floor = fit.ankle - (rig.cur.rootY - (rig.useObj?.lift ?? 0)) / s;
+    const out = stretch ? SEAT_FIT.stretch * seatSize(rig.body.height) : 0;
+    const turns = rig.seatTurn;
+    for (const [k, side, thigh, calf, foot] of [
+      [0, fit.l, B.thigh_l, B.calf_l, B.foot_l],
+      [3, fit.r, B.thigh_r, B.calf_r, B.foot_r],
+    ] as const) {
+      const [y, z] = feetDown(side, floor, out * (k ? 0.85 : 1));
+      const turn = this.legTo(side, y, z);
+      // The foot about as level as in the clip, its toes dropping a little where it hangs.
+      const hang = y > floor + 0.01 ? 0.25 : 0;
+      turns[k] = turn[0];
+      turns[k + 1] = turn[1];
+      turns[k + 2] = -(turn[0] + turn[1]) + hang;
+      addRotation(this.add, thigh, 1, 0, 0, turns[k] * w);
+      addRotation(this.add, calf, 1, 0, 0, turns[k + 1] * w);
+      addRotation(this.add, foot, 1, 0, 0, turns[k + 2] * w);
+    }
+  }
+
+  /** Standing up from a seat: `seatLegs`' turns fading out with the seated pose. */
+  private seatLegsOff(rig: SimRig): void {
+    const w = 1 - smooth(rig.w);
+    if (w <= 0) return;
+    const B = this.set!.bone;
+    const t = rig.seatTurn;
+    for (const [k, thigh, calf, foot] of [
+      [0, B.thigh_l, B.calf_l, B.foot_l],
+      [3, B.thigh_r, B.calf_r, B.foot_r],
+    ] as const) {
+      addRotation(this.add, thigh, 1, 0, 0, t[k] * w);
+      addRotation(this.add, calf, 1, 0, 0, t[k + 1] * w);
+      addRotation(this.add, foot, 1, 0, 0, t[k + 2] * w);
     }
   }
 
@@ -3991,6 +4050,11 @@ export class Characters {
     const head = new Float32Array(3);
     const t = this.scratch.worldT;
     const fits = new Map<string, LegFit>();
+    // The ankles' height standing (the idle's first frame), for feet on the floor.
+    sampleClip(set, set.clips.get('idle')!, 0, this.qA, this.pA);
+    resetAdditive(this.add);
+    skin(set, body, this.qA, this.pA, this.add, { x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1, scale: 1 }, this.scratch, tmp, 0, head);
+    const ankle = t[B.foot_l * 3 + 1];
     for (const key of LEG_CLIPS) {
       const clip = set.clips.get(key);
       if (!clip) continue;
@@ -4006,6 +4070,7 @@ export class Characters {
         r: side(B.thigh_r, B.calf_r, B.foot_r),
         spine: [t[B.spine_01 * 3 + 1], t[B.spine_01 * 3 + 2]],
         head: [t[B.Head * 3 + 1], t[B.Head * 3 + 2]],
+        ankle,
       });
     }
     return fits;
@@ -4018,14 +4083,7 @@ export class Characters {
    * towards -y).
    */
   private legTo(fit: LegSide, y: number, z: number): Float32Array {
-    const { hy, hz, l1, l2 } = fit;
-    const r = clamp(Math.hypot(y - hy, z - hz), Math.abs(l1 - l2) + 0.01, l1 + l2 - 0.002);
-    // Direction angles from straight down (-y) towards the front (+z).
-    const d = Math.atan2(z - hz, hy - y);
-    const thigh = d + Math.acos(clamp((l1 * l1 + r * r - l2 * l2) / (2 * l1 * r), -1, 1));
-    const calf = d - Math.acos(clamp((l2 * l2 + r * r - l1 * l1) / (2 * l2 * r), -1, 1));
-    this.legAdd[0] = fit.t0 - thigh;
-    this.legAdd[1] = fit.c0 - calf - this.legAdd[0];
+    legTurn(fit, y, z, this.legAdd);
     return this.legAdd;
   }
 
