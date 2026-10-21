@@ -14,7 +14,7 @@ Family: `tools/art/blender/families/playground.py`.
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| `slide` Playground slide | OK | I-community-01 | I-community-01, I-community-04 | I-community-01 S1 clip; I-community-04 S1 code | `community/sheets/obj-slide.png`, `community/sheets/age-slide.png` |
+| `slide` Playground slide | M-community-07 | I-community-01, A-community-02 | I-community-01, I-community-04 | I-community-01 S1 clip; I-community-04 S1 code; M-community-07 S2 model; A-community-02 S3 clip | `community/sheets/obj-slide.png`, `community/sheets/age-slide.png` |
 | `climbingFrame` Climbing frame | OK | A-community-01, A-residents-10 | I-community-04 | A-community-01 S3 clip (seeded; confirmed by the code); A-residents-10 S3 clip (residents ledger); I-community-04 S1 code | `community/sheets/obj-climbingFrame.png`, `community/sheets/age-climbingFrame.png` |
 | `seesaw` Seesaw | OK | I-community-13 | I-community-02, I-community-03, I-community-04 | I-community-02 S2 code; I-community-03 S2 code; I-community-04 S1 code; I-community-13 S3 clip | `community/sheets/obj-seesaw.png`, `community/sheets/age-seesaw.png`, `community/extra/poses/rides-child.png` |
 | `springRider` Spring rider | M-community-03 | I-community-13 | I-community-04 | M-community-03 S3 model; I-community-04 S1 code; I-community-13 S3 clip | `community/sheets/obj-springRider.png`, `community/sheets/age-springRider.png`, `community/extra/poses/rides-child.png` |
@@ -194,7 +194,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/playground.py:438-441` (`pingPongTable`: `top = 0.78`, the top 1.9 × 0.94 m); `web/public/content/community.json:576` (footprint 2 × 1)
 - **Evidence:** `tables/sizes-community.md`: 1.90 × 0.95 × 0.99 m against a table tennis table's 2.74 × 0.76 × 1.525 m (ITTF; `reference.json` `pingPongTable` 1.5–1.6 × 2.7–2.8 m): 69 % of the length, 62 % of the width, well outside ±10 %, and the top 2 cm over the fixed 0.76 m. `sheets/obj-pingPongTable.png`: beside the adult it is a dining table with a net. A full table needs a 3 × 2 footprint (with its ends clear for the players, I-community-02).
-- **Status:** open
+- **Status:** fixed (57bf91a8)
+- **After:** the ITTF's table: a 2.74 × 1.525 m top at 0.76 m, the net 15.25 cm high reaching 15.25 cm past each side, on 3 × 2 tiles (content `footprint`), the players at its two ends (`places` ±1.8 m). `fixes/blender-outdoor/gallery/gallery-pingPongTable.png` (beside the residents), `poses/poses-seats-*-pingPongTable_pingPong.png`. `cargo review sizes` still flags its W and D: the reference has the length along the depth, the model across, as the seesaw's (an artefact). The park lot's table at (17, 17) fits (sim tests).
 - **Source:** community wave (sizes table, gallery)
 
 ### M-community-02 — The basketball rim is 11 cm low and the backboard small
@@ -204,7 +205,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/playground.py:381` (`RIM = (2.94, 0.27)`), `:412` (`board` 0.95 × 0.62 m)
 - **Evidence:** A rim is 3.05 m up everywhere (FIBA, and park and driveway hoops); this one is at 2.94 m. The backboard is 0.95 × 0.62 m, about half a regulation board (1.80 × 1.05) and small even for a park or portable one (1.1–1.4 m wide). `sheets/obj-basketballHoop.png`: it reads as a hoop, but a short, small one beside the adult. The overall height (3.50 m) is inside the reference.
-- **Status:** open
+- **Status:** fixed (57bf91a8)
+- **After:** the rim at 3.05 m on a 1.2 × 0.8 m board (the shooter's square 0.59 × 0.45, its foot level with the rim; the post 3.2 m), 3.71 m high: `fixes/blender-outdoor/gallery/gallery-basketballHoop.png`; `cargo review sizes` in range.
 - **Source:** community wave (family script, gallery)
 
 ### M-community-03 — Two playground seats off their range or the content: the spring rider's saddle 8 cm high, the merry-go-round's deck 2 cm under its seat
@@ -214,7 +216,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/playground.py:336` (`saddle` at 0.755 + 0.025 = 0.78 m) and `web/public/content/community.json:465` (`springRider` `seat.height` 0.78); `playground.py:358-362` (`merryGoRound`: the platform's top 0.24 m, its stripes 0.243 m) against `community.json:500` (`seat.height` 0.26)
 - **Evidence:** `tables/sizes-community.md`: the spring rider's seat 0.78 > 0.70 (EN 1176-6 riders, 40–70 cm), on a ride for toddlers to six-year-olds; the content agrees with the model, so both move. `sheets/age-springRider.png`, `extra/poses/rides-child.png`: the child sits high with the feet off the footrests' level. The merry-go-round's deck (0.24 m) is in range by the 1 cm tolerance, but the content seats its riders at 0.26 m, 2 cm above it (the three-way check); in the shots the thighs hide it.
-- **Status:** open
+- **Status:** fixed (57bf91a8)
+- **After:** the spring rider's horse is 16 cm lower on a shorter coil, its saddle at 0.62 m (content `seat` 0.62; `rides.ts`' grips and pegs are measured from the saddle, so the astride clip still fits); the merry-go-round's deck is 2 cm higher, its top at the riders' 0.26 m. `fixes/blender-outdoor/poses/poses-rides-{child,teen}-*.png`, in play (a child) `play/child-springRider-ride-0*.png`, `play/child-merryGoRound-spin-0*.png`; `cargo check-glb` quiet for both.
 - **Source:** community wave (sizes table, poses)
 
 ### M-community-04 — Five overall sizes just past the ±10 % band: the hay bale, the tractor, the park bench, the bus shelter
@@ -229,7 +232,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
   - `parkBench` W 2.86 > 2.75 m (1.8–2.5 m): three seats a metre apart on its three tiles.
   - `busStop` D 0.98 < 1.08 m (1.2–1.8 m): the bench fills the shelter's depth.
   The climbing frame's H (3.45 m, the flag) and the seesaw's W and D (the plank along the width) are tool artefacts, not in this finding.
-- **Status:** open
+- **Status:** fixed (f3e747a1)
+- **After:** the round bale is 1.2 m across and 1.2 m long (chest-high on an adult), on 2 × 2 tiles (`town.ts` `farmstead` places it on the fallow field by its footprint); the little tractor is a compact one, 1.62 m over its rear fenders (the name kept); the long park bench is 2.5 m on its three tiles; the bus shelter is 1.2 m deep, its bench at the back (`seat.forward` -0.3, the timetable reader stepping in to 0.05). `fixes/blender-outdoor/gallery/gallery-{farm.hayBale,farm.tractor,parkBench,busStop}.png`, `poses/poses-seats-*-{parkBench,busStop_wait}.png`; `cargo review sizes`: all four in range.
 - **Source:** community wave (sizes table, gallery)
 
 ### M-community-05 — The town fountain is called round and built square
@@ -262,7 +266,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Where:** `tools/art/blender/families/playground.py:171` (`slide`: the deck's top 1.43 m; `rail_back` across the ladder's top at 1.86 m; the roof's eaves at 1.93 m; `hoop` 0.27 m round the chute's mouth at 1.43 m); the round that copes with it, `web/src/render/babylon/characters/clips/rides.ts` (`slidePose` steps 3-5)
 - **Evidence:** `fixes/rides/slide-top.png`, `fixes/rides/slide/s-side-t0.550.png`–`t0.610.png`: the bar across the deck's back leaves 0.43 m over the deck where the ladder arrives, so a child gets in on hands and knees under it; the roof's eaves are 0.5 m over the deck, so a child sat at the top (about 0.6 m to the top of the head) ducks with the head at the eaves; the hoop over the chute's mouth rises 0.27 m over the chute's floor, so no one can slide through it sitting up, and the round goes down lain back. A real slide's platform has a metre or more over it, an open way in from the ladder between handrails, and a sit-down bar about 0.5 m up.
 - **Fix:** Blender wave: the roof up (the eaves at about 2.5 m), the back bar replaced by handrails either side of the ladder's top, the hoop larger (about 0.5 m) or a bar across. Then the round can stand on the deck and sit up to slide (`slidePose`).
-- **Status:** open
+- **Status:** fixed (57bf91a8), the model; the round's own change is A-community-02
+- **After:** the roof's eaves at 2.46 m (1 m over the deck), beams round the posts' tops, no bar across the deck's back (the ladder's rails go on up as handrails either side of an open way in), and an arch over the chute's mouth rising 0.55 m (`rides.ts` `SLIDE_HOOP.rise`: the round's hands hold it). H 2.81 m (2.6 + 10 %). `fixes/blender-outdoor/gallery/gallery-slide.png`, a child's round in play `play/child-slide-slide-0*.png` (sat at the top holding the arch). The round still goes in on hands and knees and slides lain back: A-community-02.
 - **Source:** fix: rides (G-19)
 
 ### I-community-01 — "Go down the slide" is standing at the foot of the chute
@@ -385,8 +390,20 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/playground.py` (`parkChessTable`: a 1 × 1 tile, the stools at x = ±0.42 m), `web/public/content/community.json` (`parkChessTable` `places`)
 - **Evidence:** `bench-results/review/fixes/slots/play/parkChessTable-side-0*.png`, `parkChessTable-0*.png`: since G-62 the two face each other across the board, but on one tile their hips are 0.84 m apart: the knees meet under the 0.48 m top and the hands at the board's middle, the heads about 0.4 m apart. Real park chess tables seat the players about 1.1 m apart (a 0.7 m top). A 2 × 1 footprint (the stools at ±0.6, moving the park lots' tables), or a narrower seated clip for board games.
-- **Status:** open
+- **Status:** fixed (57bf91a8)
+- **After:** a 0.7 m square top on 2 × 1 tiles, the stools at ±0.6 m (`places` ±0.6): the players' hips 1.2 m apart, their knees clear of each other under the top (`fixes/blender-outdoor/poses/poses-seats-*-parkChessTable_chess.png`, adult, child, elder). The park lot's table at (22, 12, rot 3) fits (sim tests).
 - **Source:** fix: slots
+
+### A-community-02 — The slide's round still crawls onto the deck and slides lain back, now the tower has room to stand and sit up
+
+- **Severity:** S3
+- **Rubric:** A1, I3
+- **Fix class:** clip
+- **Where:** `web/src/render/babylon/characters/clips/rides.ts` (`slidePose` steps 3–5: in on hands and knees "between the handrails", lain back under the arch and down the chute on the back); `tools/art/blender/families/playground.py` (`slide`: `SLIDE_EAVES` 2.46, `SLIDE_ARCH` rising 0.55)
+- **Evidence:** `fixes/blender-outdoor/play/child-slide-slide-0*.png`: the round was fitted to the old tower (a bar at 0.43 m over the deck, the eaves 0.5 m over it, a hoop 0.27 m over the chute). With M-community-07's model the child could step up off the ladder onto the deck between the handrails, stand under the roof, sit at the top and go down sitting up, holding the arch's sides at the start. The round still does what the old tower forced.
+- **Fix:** `slidePose` step 3 a step up and a stand on the deck, step 5 down the chute sat up (the back leant 20–30° back, not lain), the arch's sides let go at the push.
+- **Status:** open
+- **Source:** fix: blender-outdoor
 
 ### Pointers to findings in other ledgers
 
