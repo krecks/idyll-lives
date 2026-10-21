@@ -8,21 +8,33 @@
  *
  *   gallery   the gallery (`/gallery.html`)
  *               --keys model.sofa,model.lamp   which models (required)
+ *               --each   one picture per key (`gallery-<key>.png`) on one page, else all in one
  *               --cols 4  --alpha 0.97 --beta 1.15 --radius 4 --target 1.4   the gallery's camera
  *               --scale adult|child|all   residents beside each model, for scale
  *               --camera game   the game's Live camera: one picture per model, aimed at it
  *   clips     the clips bench (`/clips.html`) held at set times, one picture per time
  *               --keys model.fridge (required)  --clip door_open  --times 0,0.3,0.6,1,99
+ *               --each   each key on its own (`clips-<key>-<clip>-t<t>.png`), one page for all
  *               --colors body:#c46b4a  --target 1.6  --alpha/--beta/--radius
- *   play      buy and use in play: opens `?state=<state>&debug`, free will off, buys the
- *             object, sends the use, waits until the resident is at it and using it (`__sims()`),
- *             then takes a burst of pictures and logs the clips playing (`__renderer.motion`)
- *               --object deskSimple (required)  --at 23,14,0 (corner and rot)  --turn 0
- *               --use sit (interaction id or index, default 0)  --sim 0  --colors body:12
- *               --state bathroom-check  --shots 6 --every 500 (ms)  --wait 60 (s, for the use)
- *               --radius 7 --beta 1.0 --alpha … --y 1.2 (the camera following the resident)
- *               --speed 1  --hour (the renderer's light only; the state sets the clock)
+ *   play      buy and use in play: opens `?state=<state>&debug`, free will off, buys each object,
+ *             sends each use, waits until the resident is at it and using it, takes pictures
+ *             framing the object, then sells it and goes on to the next, all on one page. In the
+ *             page, every animation frame, it logs the clips playing on the object
+ *             (`__renderer.motion`) and the resident's pose and animation (`__sims()`). One JSON
+ *             line per use goes to `<out>/play.jsonl`.
+ *               --objects toilet,fridge@23,14,0   which objects (`def` or `def@x,z,rot`), or
+ *               --objects-file <path>   one a line (`#` comments). Without a place: on
+ *                 `review-stage` a free spot for its layer and footprint (tools/bench/README.md),
+ *                 else `--at`, else wherever the game finds room
+ *               --use all|<id>|<index>   (default all)  --sim 0  --colors body:12  --turn 0
+ *               --state bathroom-check  --shots 3 --every 1000 (ms)  --wait 60 (s, from the use
+ *                 sent to the resident using it)
+ *               --walk 3 (speed walking there, at most 3 = 10×)  --speed 1 (from 3 tiles off)
+ *               --radius --beta --alpha --y (the camera; default from the object's size and facing)
+ *               --hour 12 (the renderer's light only; the state sets the clock)
  *               --free-will (leave it on: with `needy-check`, to watch them go on their own)
+ *             The old single object: --object deskSimple --at 23,14,0 (corner and rot) --use sit
+ *               (default 0) --shots 6 --every 500; the camera follows the resident as before.
  *
  *   Common:  --port <n> (its own Vite, --strictPort: a port in use is an error, never someone
  *            else's server) | --url http://localhost:<n>;  --out <dir> (default
@@ -30,13 +42,17 @@
  *            --size 1280x800;  --extra 'k=v&k=v' (more URL flags);  --headed (a window: only to
  *            measure timing).
  *
+ * The setup fails loudly: the wasm and the asset manifest are fetched through the server first
+ * (each must answer 200), and every HTTP error, failed request, page error and console error is
+ * logged with the job it happened in (`<what>.json`, `play.jsonl`).
+ *
  * Needs `pnpm wasm` first (play), and Playwright: `PLAYWRIGHT=<path to playwright/index.mjs>` if it
  * isn't installed in web/, `CHROME=<executable>` for a browser of your own (Chrome or Chrome for
  * Testing, not `chrome-headless-shell`, which draws in software). See tools/bench/README.md.
  */
 
 import { spawn } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { createConnection } from 'node:net';
 import { join } from 'node:path';
@@ -54,6 +70,7 @@ const flag = (name, fallback) => {
 const has = (name) => args.includes(`--${name}`);
 const list = (name, fallback) => (flag(name, fallback) ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 const need = (name) => flag(name) ?? fail(`--${name} is needed for '${what}'`);
+const num = (name, fallback) => (flag(name) === undefined ? fallback : Number(flag(name)));
 function fail(message) {
   console.error(`check: ${message}`);
   process.exit(1);
@@ -73,7 +90,9 @@ const [width, height] = flag('size', '1280x800').split('x').map(Number);
 const common = new URLSearchParams(flag('extra', ''));
 if (flag('quality')) common.set('quality', flag('quality'));
 if (flag('renderer')) common.set('renderer', flag('renderer'));
-const log = { what, args, shots: [] };
+const log = { what, args, setup: {}, jobs: [], shots: [] };
+const started = Date.now();
+const since = () => Math.round((Date.now() - started) / 100) / 10;
 
 const portTaken = (p) =>
   new Promise((resolve) => {
@@ -92,6 +111,18 @@ if (!url) {
   });
 }
 
+// Fail loudly when the server can't give what the pages need: a wasm package that is missing, or
+// linked from outside the server's allowed folders (403), leaves pictures of an empty scene.
+for (const [name, path, needed] of [
+  ['wasm', '/src/core/wasm-pkg/sim_wasm_bg.wasm', what === 'play'],
+  ['manifest', '/assets/manifest.json', true],
+]) {
+  const answer = await fetch(base + path).then((r) => r.status, (err) => String(err));
+  log.setup[name] = answer;
+  if (answer !== 200 && needed) fail(`${base}${path} answered ${answer}, not 200 (copy the wasm packages into this checkout, run \`pnpm wasm\`; see tools/bench/README.md)`);
+  if (answer !== 200) console.warn(`check: ${base}${path} answered ${answer}`);
+}
+
 async function playwright() {
   if (process.env.PLAYWRIGHT) return import(process.env.PLAYWRIGHT);
   try {
@@ -107,10 +138,99 @@ const browser = await chromium.launch({
   args: ['--enable-unsafe-webgpu', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'],
 });
 
+/** The job running (a picture, an object's use): what goes wrong in the page is logged with it. */
+let job = null;
+function startJob(name, extra = {}) {
+  job = { name, at: since(), errors: [], ...extra };
+  log.jobs.push(job);
+  return job;
+}
+function noteError(text) {
+  console.warn(`${job ? `[${job.name}] ` : ''}${text}`);
+  (job?.errors ?? (log.setup.errors ??= [])).push(text);
+}
+
+/**
+ * In every page, before its own scripts: `__check.loading()`, the loading screen's text (or null);
+ * and `__check.watch(...)`, which from then on, every animation frame, logs the clips playing on an
+ * object and what a resident does (short clips last a few frames: sampling from node missed them),
+ * and slows the game down as the resident comes near (`__check.stop()` returns the log).
+ */
+function pageHelpers() {
+  // The loading screen's labels; "Getting ready" only on the screen itself (a resident may be doing it).
+  const LOADING = ['Moving in', 'Drawing portraits', 'Building the world', 'Warming up'];
+  const loading = () => {
+    const screen = document.querySelector('.loading[role=progressbar]');
+    if (screen) return screen.getAttribute('aria-valuetext') || 'loading';
+    const text = document.body?.innerText ?? '';
+    return LOADING.find((l) => text.includes(l)) ?? null;
+  };
+  /** Most changes logged per clip and for the resident (a loop's rounds would go on). */
+  const MAX_EVENTS = 200;
+  let w = null;
+  function sample() {
+    const t = Math.round(performance.now() - w.t0);
+    w.frames++;
+    const states = window.__renderer?.motion?.states?.get(w.id);
+    for (const [name, c] of states ?? []) {
+      const duration = c.clip.duration;
+      const clip = (w.clips[name] ??= { kind: c.kind, duration: +duration.toFixed(2), first: t, max: 0, state: 'rest', events: [] });
+      clip.max = Math.max(clip.max, +c.time.toFixed(2));
+      const state = c.time <= 1e-3 ? 'rest' : c.time >= duration - 1e-3 ? 'open' : 'moving';
+      if (state !== clip.state && clip.events.length < MAX_EVENTS) clip.events.push([t, state]);
+      clip.state = state;
+    }
+    for (const [name, clip] of Object.entries(w.clips)) {
+      if (states?.has(name) || clip.state === 'rest') continue;
+      clip.state = 'rest';
+      if (clip.events.length < MAX_EVENTS) clip.events.push([t, 'rest']);
+    }
+    const s = window.__sims?.().find((x) => x.id === w.sim);
+    if (!s) return;
+    const using = s.using && s.object === w.id;
+    const now = { pose: s.pose, using, action: s.action, interaction: s.object === w.id ? s.interaction : null, doing: s.doing };
+    const key = JSON.stringify(now);
+    if (key !== w.last && w.resident.length < MAX_EVENTS) w.resident.push({ t, ...now });
+    w.last = key;
+    if (using && w.usingAt === null) w.usingAt = t;
+    if (s.doing || s.queue.length || using) w.busyAt = t;
+    // Fast while walking there, the use's own speed from a few tiles off (fast skips short uses).
+    if (w.slowedAt === null && (using || Math.hypot(s.x - w.near.x, s.z - w.near.z) < w.near.r)) {
+      window.__send({ type: 'setSpeed', speed: w.near.speed });
+      w.slowedAt = t;
+    }
+  }
+  const frame = () => {
+    if (w) {
+      try {
+        sample();
+      } catch (err) {
+        if (w.errors.length < 5) w.errors.push(String(err));
+      }
+    }
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+  window.__check = {
+    loading,
+    watch(o) {
+      w = { ...o, t0: performance.now(), frames: 0, clips: {}, resident: [], last: '', usingAt: null, slowedAt: null, busyAt: 0, errors: [] };
+    },
+    watched: () => w && { t: performance.now() - w.t0, usingAt: w.usingAt, busyAt: w.busyAt, slowedAt: w.slowedAt },
+    stop() {
+      // The frame the caller saw last (a clip just back at rest), too.
+      if (w) sample();
+      const r = w && { ...w, last: undefined, fps: +((w.frames * 1000) / Math.max(1, performance.now() - w.t0)).toFixed(1) };
+      w = null;
+      return r;
+    },
+  };
+}
+
 /**
  * A page at 1 % volume, the camera never taking over on its own (the director's delay 0), and free
  * will off unless `--free-will` (the game's setting applies to the player's household as a game
- * opens, over what a state says).
+ * opens, over what a state says). Reused for every job of a run.
  */
 async function newPage() {
   const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
@@ -125,9 +245,14 @@ async function newPage() {
     }
     localStorage.setItem(key, JSON.stringify({ ...settings, directorDelay: 0, autonomy }));
   }, has('free-will'));
+  await context.addInitScript(pageHelpers);
   const page = await context.newPage();
-  page.on('pageerror', (err) => console.warn(`page error: ${err.message}`));
-  page.on('console', (m) => m.type() === 'error' && console.warn(`console: ${m.text()}`));
+  page.on('pageerror', (err) => noteError(`page error: ${err.message}`));
+  page.on('console', (m) => {
+    if (m.type() === 'error' || (m.type() === 'warning' && /lights only|unavailable|failed/i.test(m.text()))) noteError(`console ${m.type()}: ${m.text()}`);
+  });
+  page.on('response', (r) => r.status() >= 400 && noteError(`HTTP ${r.status()} ${r.url()}`));
+  page.on('requestfailed', (r) => !/ERR_ABORTED/.test(r.failure()?.errorText ?? '') && noteError(`request failed: ${r.url()} (${r.failure()?.errorText})`));
   return page;
 }
 
@@ -147,104 +272,425 @@ async function shot(page, name, extra = {}) {
 
 const settle = (page, ms) => page.waitForTimeout(ms);
 const camera = () => ({ alpha: flag('alpha'), beta: flag('beta'), radius: flag('radius'), target: flag('target') });
+/** A file name part from a model key or content id. */
+const slug = (s) => s.replace(/^model\./, '').replace(/[^A-Za-z0-9_.-]+/g, '_');
+
+/** Opens a page of the benches and waits until it says it's drawn (`__ready`). */
+async function openBench(page, path, params) {
+  await page.goto(pageUrl(path, params), { timeout: 90_000 });
+  await page.waitForFunction(() => window.__ready === true, null, { timeout: 60_000 });
+}
 
 if (what === 'gallery') {
   const keys = need('keys');
-  const name = `gallery-${keys.replace(/model\./g, '').replace(/,/g, '+')}`.slice(0, 120);
-  const params = { keys, cols: flag('cols'), scale: flag('scale'), camera: flag('camera'), ...camera() };
+  const params = { cols: flag('cols'), scale: flag('scale'), camera: flag('camera'), ...camera() };
+  const game = flag('camera') === 'game';
   const page = await newPage();
-  await page.goto(pageUrl('/gallery.html', params));
-  await page.waitForFunction(() => window.__ready === true, null, { timeout: 60_000 });
-  await settle(page, 1500);
-  if (flag('camera') === 'game') {
-    // As far off as players see things: aimed at each model in turn.
-    for (const [n, key] of keys.split(',').entries()) {
-      await page.evaluate((i) => window.__gallery.aim(i), n);
-      await settle(page, 500);
-      await shot(page, `gallery-game-${key.replace(/^model\./, '')}`, { kind: 'model', key, camera: 'game' });
+  // With the game camera every model gets its own picture, aimed at it in turn.
+  for (const key of has('each') ? keys.split(',') : [keys]) {
+    const name = has('each') ? `gallery-${slug(key)}` : `gallery-${keys.replace(/model\./g, '').replace(/,/g, '+')}`.slice(0, 120);
+    startJob(name);
+    try {
+      await openBench(page, '/gallery.html', { keys: key, ...params });
+      await settle(page, 1500);
+      if (game) {
+        // As far off as players see things.
+        for (const [n, k] of key.split(',').entries()) {
+          await page.evaluate((i) => window.__gallery.aim(i), n);
+          await settle(page, 500);
+          await shot(page, `gallery-game-${slug(k)}`, { kind: 'model', key: k, camera: 'game' });
+        }
+      } else {
+        await shot(page, name, { kind: 'model', key });
+      }
+    } catch (err) {
+      noteError(`no picture: ${err.message.split('\n')[0]}`);
     }
-  } else {
-    await shot(page, name, { kind: 'model' });
   }
 }
 
 if (what === 'clips') {
   const keys = need('keys');
-  const name = `clips-${keys.replace(/model\./g, '').replace(/,/g, '+')}`.slice(0, 100);
+  const times = list('times', '0,0.3,0.6,1,99');
   const page = await newPage();
-  for (const t of list('times', '0,0.3,0.6,1,99')) {
-    await page.goto(pageUrl('/clips.html', { keys, clip: flag('clip'), t, colors: flag('colors'), cols: flag('cols'), ...camera() }));
-    await page.waitForFunction(() => window.__ready === true, null, { timeout: 60_000 });
-    await settle(page, 800);
-    await shot(page, `${name}-${flag('clip') ?? 'all'}-t${t}`, { t });
+  for (const key of has('each') ? keys.split(',') : [keys]) {
+    const name = has('each') ? `clips-${slug(key)}` : `clips-${keys.replace(/model\./g, '').replace(/,/g, '+')}`.slice(0, 100);
+    startJob(name);
+    try {
+      // One page a key, held at each time in turn (`__clips.set`), from its first.
+      await openBench(page, '/clips.html', { keys: key, clip: flag('clip'), t: times[0], colors: flag('colors'), cols: flag('cols'), ...camera() });
+      for (const t of times) {
+        await page.evaluate((t) => window.__clips.set(t), Number(t));
+        await settle(page, 800);
+        await shot(page, `${name}-${flag('clip') ?? 'all'}-t${t}`, { key, t });
+      }
+    } catch (err) {
+      noteError(`no picture: ${err.message.split('\n')[0]}`);
+    }
   }
 }
 
 if (what === 'play') {
-  const object = need('object');
   const state = flag('state', 'bathroom-check');
-  const [x, z, rot] = flag('at', '23,14,0').split(',').map(Number);
-  const sim = Number(flag('sim', '0'));
-  const shots = Number(flag('shots', '6'));
-  const every = Number(flag('every', '500'));
+  const batch = Boolean(flag('objects') || flag('objects-file'));
+  /** Each thing to buy: its content id and, if given, where (`[x, z, rot]`). */
+  const parse = (line) => {
+    const [def, at] = line.split('@').map((s) => s.trim());
+    return { def, at: at ? at.split(',').map(Number) : flag('at') ? flag('at').split(',').map(Number) : null };
+  };
+  // `--objects a,b@23,14,0,c`: the numbers after an `@` belong to it.
+  const objects = () =>
+    flag('objects')
+      .split(',')
+      .reduce((all, part) => (/^-?[\d.]+$/.test(part.trim()) && all.length && all.at(-1).includes('@') ? (all[all.length - 1] += `,${part}`) : all.push(part), all), []);
+  const things = batch
+    ? (flag('objects-file') ? readFileSync(flag('objects-file'), 'utf8').split('\n') : objects())
+        .map((l) => l.replace(/#.*/, '').trim())
+        .filter(Boolean)
+        .map(parse)
+    : [{ def: need('object'), at: flag('at', '23,14,0').split(',').map(Number) }];
+  const sim = num('sim', 0);
+  const which = flag('use', batch ? 'all' : '0');
+  const shots = num('shots', batch ? 3 : 6);
+  const every = num('every', batch ? 1000 : 500);
+  const cap = num('wait', 60) * 1000;
+  const speed = num('speed', 1);
+  // Never above 10× (speed 3): at 30× short uses are over between two frames.
+  const walk = Math.min(3, num('walk', batch ? 3 : speed));
+  // The old single object: the camera follows the resident.
+  const follow = !batch || has('follow');
   const colors = flag('colors') ? Object.fromEntries(flag('colors').split(',').map((p) => p.split(':')).map(([k, v]) => [k, Number(v)])) : undefined;
-  const page = await newPage();
-  await page.goto(pageUrl('/', { state, debug: '', hour: flag('hour') }));
-  // In play: the world is there and the household's portraits are drawn (the strip shows its name).
-  await page.waitForFunction(() => typeof window.__sims === 'function' && window.__world?.() && window.__sims().length > 0, null, { timeout: 120_000 });
-  await page.waitForFunction(() => !document.body.innerText.includes('Drawing portraits'), null, { timeout: 60_000 });
-  await settle(page, 1500);
-  const before = await page.evaluate(() => new Set(window.__world().objects.map((o) => o.id)).size);
-  await page.evaluate(
-    ({ object, x, z, rot, colors, turn, freeWill }) => {
+  const turn = num('turn', 0);
+  const hour = flag('hour', batch ? '12' : undefined);
+  const records = join(out, 'play.jsonl');
+  writeFileSync(records, '');
+  const write = (record) => appendFileSync(records, JSON.stringify(record) + '\n');
+
+  let page = await newPage();
+  /** Until nothing is loading (each loading screen's text), at most `timeout` ms. */
+  const loaded = (timeout = 90_000) => page.waitForFunction(() => !window.__check.loading(), null, { timeout, polling: 250 });
+
+  /** Opens the state (again): in play, nothing loading, free will off, money in. */
+  async function openState() {
+    const t0 = Date.now();
+    await page.goto(pageUrl('/', { state, debug: '', hour }), { timeout: 90_000 });
+    // In play: the world is there and the household's portraits are drawn.
+    await page.waitForFunction(() => typeof window.__sims === 'function' && window.__world?.() && window.__sims().length > 0, null, { timeout: 90_000 });
+    await loaded();
+    await settle(page, 1500);
+    await page.evaluate((freeWill) => {
       window.__send({ type: 'setAutonomy', enabled: freeWill, household: 0 });
-      window.__addFunds(100_000);
-      window.__send({ type: 'buy', household: 0, object, at: [x, z, rot], ...(colors ? { colors } : {}), ...(turn ? { turn } : {}) });
-    },
-    { object, x, z, rot, colors, turn: Number(flag('turn', '0')), freeWill: has('free-will') },
-  );
-  const bought = await page
-    .waitForFunction(({ object, x, z }) => window.__world().objects.find((o) => o.def === object && o.x === x && o.z === z)?.id, { object, x, z }, { timeout: 10_000 })
-    .then((h) => h.jsonValue())
-    .catch(() => null);
-  if (bought === null) fail(`not bought: ${object} at ${x},${z},${rot} (${before} objects; is the spot free? see the game's toast)`);
-  const use = flag('use', '0');
-  const interaction = await page.evaluate(
-    ({ id, use }) => {
-      const def = window.__world().objects.find((o) => o.id === id).def;
-      return /^\d+$/.test(use) ? Number(use) : window.__content.object(def)?.interactions.findIndex((i) => i.id === use);
-    },
-    { id: bought, use },
-  );
-  const offered = await page.evaluate((id) => window.__content.object(window.__world().objects.find((o) => o.id === id).def)?.interactions.map((i) => i.id) ?? [], bought);
-  if (!(interaction >= 0 && interaction < offered.length)) fail(`${object} has no interaction '${use}' (it offers: ${offered.join(', ') || 'none'})`);
-  const speed = Number(flag('speed', '1'));
-  await page.evaluate(({ sim, id, interaction, speed, view }) => {
-    window.__send({ type: 'setSpeed', speed });
-    window.__send({ type: 'use', sim, object: id, interaction });
-    window.__controls.follow(sim, view);
-  }, { sim, id: bought, interaction, speed, view: Object.fromEntries(Object.entries({ radius: Number(flag('radius', '7')), beta: flag('beta') && Number(flag('beta')), alpha: flag('alpha') && Number(flag('alpha')), y: flag('y') && Number(flag('y')) }).filter(([, v]) => v)) });
-  const wait = Number(flag('wait', '60')) * 1000;
-  const using = await page
-    .waitForFunction(({ sim, id }) => window.__sims().find((s) => s.id === sim && s.object === id && s.using), { sim, id: bought }, { timeout: wait, polling: 100 })
-    .then(() => true)
-    .catch(() => false);
-  if (!using) {
-    const [resident, screen] = await page.evaluate((s) => [window.__sims().find((x) => x.id === s), document.body.innerText.replace(/\s+/g, ' ').slice(-300)], sim);
-    console.warn(`the resident wasn't using it after ${wait / 1000} s: ${JSON.stringify(resident)}; on screen: ${screen}`);
+      window.__addFunds(1_000_000);
+    }, has('free-will'));
+    const s = await resident();
+    if (!s) throw new Error(`no resident ${sim} in ${state}`);
+    park = [s.x, s.z];
+    return Date.now() - t0;
   }
-  const name = `play-${object}-${x}-${z}-${rot}`;
-  for (let i = 0; i < shots; i++) {
-    const info = await page.evaluate(({ sim, id }) => {
+  /** Where the resident stood as the state opened: they go back there after each object, out of the way of the next. */
+  let park = null;
+  async function goPark() {
+    await page.evaluate(({ sim, walk, park }) => {
+      window.__send({ type: 'setSpeed', speed: walk });
+      window.__send({ type: 'moveTo', sim, x: park[0], z: park[1] });
+    }, { sim, walk, park });
+    await page
+      .waitForFunction(({ sim, park }) => {
+        const s = window.__sims().find((x) => x.id === sim);
+        return s && !s.moving && Math.hypot(s.x - park[0], s.z - park[1]) < 1;
+      }, { sim, park }, { timeout: 15_000, polling: 200 })
+      .catch(() => noteError(`not back at ${park} after 15 s`));
+    await page.evaluate(() => window.__send({ type: 'setSpeed', speed: 1 }));
+  }
+
+  /** Where `def` goes by default on `review-stage` (`check_states.rs`), by its layer and footprint; null: anywhere free. */
+  const stageSpot = (def) =>
+    page.evaluate((id) => {
+      const d = window.__content.object(id);
+      if (!d) return null;
+      const [w, dd] = d.footprint ?? [1, 1];
+      const x = 10 - Math.floor(w / 2);
+      if (d.layer === 'surface') return null;
+      if (d.outdoors) return [x, 22, 0];
+      if (d.layer === 'wall') return d.overWindow ? [4, 14, 1] : [x, 18 - dd, 2];
+      // Against the back wall what fills its height (a wall bed, a wardrobe); the rest in the middle.
+      return d.fillsWall ? [x, 18 - dd, 2] : [x, 12 - Math.floor(dd / 2), 0];
+    }, def);
+
+  /** The object's footprint middle, its facing and layer, for the camera (null: gone). */
+  const placed = (id) =>
+    page.evaluate((id) => {
+      const o = window.__world().objects.find((x) => x.id === id);
+      if (!o) return null;
+      const d = window.__content.object(o.def);
+      const [fw, fd] = d?.footprint ?? [1, 1];
+      const [w, dd] = o.rot % 2 ? [fd, fw] : [fw, fd];
+      return { x: o.x, z: o.z, rot: o.rot, open: Boolean(o.open), mid: [o.x + w / 2, o.z + dd / 2], size: [w, dd], layer: d?.layer ?? 'floor' };
+    }, id);
+
+  /**
+   * Frames the object (not the resident): its footprint's middle, from in front and a little to
+   * the side, as far off as its size needs. Set again before each picture (the intro's tween and
+   * the game's own watching move the camera).
+   */
+  async function aim(id, use) {
+    if (follow) return;
+    const p = await placed(id);
+    if (!p) return;
+    const { mid, size, layer, rot } = p;
+    // The way it faces (rot 0: +z), so the camera stands in front, 0.7 rad round to the side (the
+    // resident at it hides less of it).
+    const facing = [Math.PI / 2, 0, -Math.PI / 2, Math.PI][rot % 4];
+    const y = num('y', layer === 'wall' ? 1.3 : layer === 'ceiling' ? 1.9 : use?.pose === 'lie' ? 0.5 : 0.7);
+    const view = { alpha: num('alpha', facing + 0.7), beta: num('beta', layer === 'ceiling' ? 1.3 : 0.95), radius: num('radius', Math.max(3.2, 1.2 * Math.max(...size) + 2.4)), target: [mid[0], y, mid[1]] };
+    await page.evaluate((view) => {
+      window.__controls.follow(null);
+      window.__camera(view);
+    }, view);
+  }
+
+  /** The resident as `__sims()` has them (null: not there). */
+  const resident = () =>
+    page.evaluate((sim) => {
       const s = window.__sims().find((x) => x.id === sim);
-      const clips = window.__renderer?.motion?.states?.get(id);
-      // Each clip playing on it: how far in (s), of how long, and how it plays.
-      const playing = clips ? Object.fromEntries([...clips].map(([name, c]) => [name, { time: +c.time.toFixed(2), duration: +c.clip.duration.toFixed(2), kind: c.kind }])) : null;
-      return { sim: s && { pose: s.pose, using: s.using, interaction: s.interaction, action: s.action, x: +s.x.toFixed(2), z: +s.z.toFixed(2) }, clips: playing };
-    }, { sim, id: bought });
-    await shot(page, `${name}-${String(i).padStart(2, '0')}`, info);
-    if (i < shots - 1) await settle(page, every);
+      return s && { pose: s.pose, using: s.using, object: s.object, interaction: s.interaction, action: s.action, doing: s.doing, queue: s.queue, x: +s.x.toFixed(2), z: +s.z.toFixed(2), needs: s.needs };
+    }, sim);
+
+  /** Buys `def` (at `at`, or where the game finds room); its id and where it stands, or an error. */
+  async function buy(def, at) {
+    await loaded();
+    const before = await page.evaluate(() => window.__world().objects.map((o) => o.id));
+    await page.evaluate(
+      ({ def, at, colors, turn }) => window.__send({ type: 'buy', household: 0, object: def, ...(at ? { at } : {}), ...(colors ? { colors } : {}), ...(turn ? { turn } : {}) }),
+      { def, at, colors, turn },
+    );
+    const id = await page
+      .waitForFunction(({ def, before }) => window.__world().objects.find((o) => o.def === def && !before.includes(o.id))?.id, { def, before }, { timeout: 10_000 })
+      .then((h) => h.jsonValue())
+      .catch(() => null);
+    if (id === null) return { error: `not bought: ${def}${at ? ` at ${at}` : ''} (is the spot free? on screen: ${await screenText()})` };
+    const where = await placed(id);
+    // A late or misplaced buy puts the wrong thing in a plausible picture: say so.
+    const mismatch = at && (where.x !== at[0] || where.z !== at[1] || where.rot !== at[2]) ? `stands at ${where.x},${where.z},${where.rot}, not ${at}` : null;
+    return { id, where, mismatch };
   }
+
+  const screenText = () => page.evaluate(() => document.body.innerText.replace(/\s+/g, ' ').slice(-300));
+
+  /** Sells `id` (stopping whoever uses it first); whether it went. */
+  async function sell(id) {
+    await page.evaluate((id) => window.__send({ type: 'sell', household: 0, object: id }), id);
+    return page
+      .waitForFunction((id) => !window.__world().objects.some((o) => o.id === id), id, { timeout: 10_000 })
+      .then(() => true)
+      .catch(() => false);
+  }
+
+  /** Stops what the resident does and waits until they're free (and the object's use clips at rest, but for `held` ones). */
+  async function stop(id, held) {
+    for (let i = 0; i < 3; i++) {
+      await page.evaluate((sim) => {
+        window.__send({ type: 'setSpeed', speed: 1 });
+        window.__send({ type: 'cancel', sim, index: 0 });
+      }, sim);
+      const free = await page
+        .waitForFunction((sim) => {
+          const s = window.__sims().find((x) => x.id === sim);
+          return s && !s.doing && !s.queue.length && !s.using;
+        }, sim, { timeout: 8_000, polling: 200 })
+        .then(() => true)
+        .catch(() => false);
+      if (free) break;
+    }
+    // A use's clips close as it ends (a door swinging shut): wait for them, a few seconds at most.
+    await page
+      .waitForFunction(
+        ({ id, held }) => ![...(window.__renderer?.motion?.states?.get(id) ?? [])].some(([name, c]) => ['use', 'loop', 'repeat'].includes(c.kind) && c.time > 1e-3 && !held.includes(name)),
+        { id, held },
+        { timeout: 5_000, polling: 'raf' },
+      )
+      .catch(() => {});
+  }
+
+  /** The clips that always run, or run without a use (ambient, growth, night, clock hands): not "a clip played". */
+  const background = (id) =>
+    page.evaluate((id) => {
+      const m = window.__renderer?.motion?.objects?.get(id)?.motions;
+      return { names: m ? [m.idle, m.growth, m.night, m.clock?.hour, m.clock?.minute].filter(Boolean) : [], open: m?.open ?? null, any: Boolean(m) };
+    }, id);
+
+  /**
+   * One use: watched from the frame it's sent, walking fast and slowing down near the object, up
+   * to `cap` ms until the resident is using it, then `shots` pictures `every` ms apart framing the
+   * object, then stopped. One record in `play.jsonl`.
+   */
+  async function runUse(thing, bought, use, attempt, helper = null) {
+    const name = `${slug(thing.def)}-${slug(use.id)}`;
+    const record = { object: thing.def, id: bought.id, at: [bought.where.x, bought.where.z, bought.where.rot], use: use.id, index: use.index, label: use.label, pose: use.pose ?? null, anim: use.anim ?? null, attempt, ...(helper ? { helper } : {}), outcome: null, shots: [], errors: [] };
+    const j = startJob(`${thing.def}/${use.id}`, { attempt });
+    const t0 = Date.now();
+    await loaded();
+    const bg = await background(bought.id);
+    record.before = await resident();
+    const near = { x: bought.where.mid[0], z: bought.where.mid[1], r: 3 + Math.max(...bought.where.size) / 2, speed };
+    await page.evaluate(
+      ({ id, sim, interaction, walk, near, follow, view }) => {
+        window.__check.watch({ id, sim, near });
+        window.__send({ type: 'setSpeed', speed: walk });
+        window.__send({ type: 'use', sim, object: id, interaction });
+        if (follow) window.__controls.follow(sim, view);
+      },
+      { id: bought.id, sim, interaction: use.index, walk, near, follow, view: Object.fromEntries(Object.entries({ radius: num('radius', 7), beta: num('beta'), alpha: num('alpha'), y: num('y') }).filter(([, v]) => v)) },
+    );
+    // Using it (seen in a frame), not taken (nothing to do for 4 s), or out of time.
+    record.outcome = await page
+      .waitForFunction(
+        (cap) => {
+          const w = window.__check.watched();
+          if (w.usingAt !== null) return 'using';
+          if (w.t > 4000 && w.t - w.busyAt > 4000) return 'not taken';
+          return w.t > cap ? 'timeout' : false;
+        },
+        cap,
+        { timeout: cap + 30_000, polling: 'raf' },
+      )
+      .then((h) => h.jsonValue())
+      .catch((err) => `error: ${err.message.split('\n')[0]}`);
+    record.usingAfter = (await page.evaluate(() => window.__check.watched()?.usingAt)) ?? null;
+    if (record.outcome !== 'using') record.screen = await screenText();
+    if (record.outcome === 'using' && !helper) {
+      for (let i = 0; i < shots; i++) {
+        await loaded();
+        await aim(bought.id, use);
+        await settle(page, 120);
+        const info = await page.evaluate(
+          ({ sim, id }) => {
+            const s = window.__sims().find((x) => x.id === sim);
+            const clips = window.__renderer?.motion?.states?.get(id);
+            const o = window.__world().objects.find((x) => x.id === id);
+            // Each clip playing on it: how far in (s), of how long, and how it plays.
+            const playing = clips ? Object.fromEntries([...clips].map(([name, c]) => [name, { time: +c.time.toFixed(2), duration: +c.clip.duration.toFixed(2), kind: c.kind }])) : null;
+            return {
+              t: Math.round(window.__check.watched()?.t ?? 0),
+              object: o ? { x: o.x, z: o.z, rot: o.rot, open: Boolean(o.open) } : null,
+              sim: s && { pose: s.pose, using: s.using && s.object === id, interaction: s.interaction, action: s.action, x: +s.x.toFixed(2), z: +s.z.toFixed(2) },
+              clips: playing,
+            };
+          },
+          { sim, id: bought.id },
+        );
+        const file = await shot(page, batch ? `${name}-${String(i).padStart(2, '0')}` : `play-${thing.def}-${bought.where.x}-${bought.where.z}-${bought.where.rot}-${String(i).padStart(2, '0')}`, info);
+        record.shots.push({ file, ...info });
+        if (i < shots - 1) await settle(page, every);
+      }
+    }
+    // Held open whatever the use: the night clip; the open one while the object stays open.
+    await stop(bought.id, [...bg.names, ...(bg.open ? [bg.open] : [])]);
+    const watched = await page.evaluate(() => window.__check.stop());
+    record.after = await resident();
+    record.clips = watched?.clips ?? {};
+    // Played: a clip of a use (not the ambient, growth, night or clock ones) that moved.
+    record.played = Object.entries(record.clips)
+      .filter(([n, c]) => !bg.names.includes(n) && !['idle', 'growth', 'clock'].includes(c.kind) && c.max > 0)
+      .map(([n]) => n);
+    record.motions = bg.any;
+    record.resident = watched?.resident ?? [];
+    record.timings = { total: Date.now() - t0, usingAt: watched?.usingAt ?? null, slowedAt: watched?.slowedAt ?? null, fps: watched?.fps ?? null };
+    record.errors = [...j.errors, ...(watched?.errors ?? [])];
+    record.open = Boolean((await placed(bought.id))?.open);
+    write(record);
+    console.log(`${record.object} / ${record.use}${helper ? ` (${helper})` : ''}: ${record.outcome}${record.usingAfter !== null ? ` after ${(record.usingAfter / 1000).toFixed(1)} s` : ''}, ${(record.timings.total / 1000).toFixed(1)} s, played ${record.played.join(', ') || 'nothing'}`);
+    return record;
+  }
+
+  /** The object's uses to run, each with what it needs (`when`) and leaves (`leaves`). */
+  const usesOf = (def) =>
+    page.evaluate((def) => (window.__content.object(def)?.interactions ?? []).map((i, index) => ({ id: i.id, index, label: i.label, pose: i.pose, anim: i.anim, when: i.when, leaves: i.leaves })), def);
+
+  /** Puts an object that is open or closed the way `use` needs it (a wall bed down to sleep in), with one of its own uses. */
+  async function ready(thing, bought, uses, want, attempt) {
+    const open = Boolean((await placed(bought.id))?.open);
+    if (want === undefined || want === open) return;
+    const by = uses.find((u) => u.leaves === (want ? 'open' : 'closed') && u.when !== (want ? 'open' : 'closed'));
+    if (by) await runUse(thing, bought, by, attempt, want ? 'open' : 'close');
+  }
+
+  /** Buys `thing`, runs `uses` (those `pick` keeps), sells it. The uses that failed. */
+  async function runObject(thing, pick, attempt) {
+    startJob(`${thing.def} (buy)`, { attempt });
+    if (!(await page.evaluate((def) => Boolean(window.__content.object(def)), thing.def))) {
+      noteError(`no object '${thing.def}' in the content`);
+      write({ object: thing.def, use: null, attempt, outcome: 'unknown object' });
+      return { failed: [], bought: false, unknown: true };
+    }
+    const at =thing.at ?? (state === 'review-stage' ? await stageSpot(thing.def) : null);
+    const bought = await buy(thing.def, at);
+    if (bought.error) {
+      noteError(bought.error);
+      write({ object: thing.def, use: null, at, attempt, outcome: 'not bought', errors: [bought.error] });
+      return { failed: null, bought: false };
+    }
+    if (bought.mismatch) noteError(bought.mismatch);
+    const uses = await usesOf(thing.def);
+    const chosen = uses.filter(pick);
+    if (!chosen.length) {
+      // Decor (no uses): bought, one picture, sold.
+      const offered = uses.map((u) => u.id);
+      await aim(bought.id);
+      await settle(page, 300);
+      const file = await shot(page, `${slug(thing.def)}-${uses.length ? 'no-such-use' : 'no-uses'}`);
+      write({ object: thing.def, id: bought.id, at: [bought.where.x, bought.where.z, bought.where.rot], use: which, attempt, outcome: uses.length ? 'no such use' : 'no uses', offers: offered, shots: [{ file }] });
+      console.warn(uses.length ? `${thing.def} has no interaction '${which}' (it offers: ${offered.join(', ')})` : `${thing.def} has no uses: one picture`);
+    }
+    const failed = [];
+    for (const use of chosen) {
+      // A crop bought new is just planted: its "when ripe" uses aren't offered.
+      if (use.when === 'ripe') {
+        write({ object: thing.def, use: use.id, index: use.index, attempt, outcome: 'skipped', reason: 'only when ripe (bought new, a crop is just planted)' });
+        continue;
+      }
+      await ready(thing, bought, uses, use.when === 'open' ? true : use.when === 'closed' ? false : undefined, attempt);
+      const record = await runUse(thing, bought, use, attempt);
+      if (record.outcome !== 'using') failed.push({ ...use, outcome: record.outcome });
+    }
+    // Shut what a use left open (a wall bed folded down), then sell it.
+    await ready(thing, bought, uses, false, attempt);
+    if (!(await sell(bought.id))) noteError(`not sold: ${thing.def} (${bought.id})`);
+    await goPark();
+    return { failed, bought: true };
+  }
+
+  const pickUse = (u) => (which === 'all' ? true : /^\d+$/.test(which) ? u.index === Number(which) : u.id === which);
+  const timings = [];
+  log.setup.open = await openState();
+  for (const thing of things) {
+    const t0 = Date.now();
+    let result = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        // A long run wears the resident down (a use ends when its need is full, or runs out), and a
+        // retry after anything but uses not taken (not for them: a baby's, one needing something
+        // near) starts afresh.
+        // (No resident to ask: the page broke, so afresh too.)
+        const now = await resident().catch(() => null);
+        const lowest = now ? Math.min(...Object.values(now.needs ?? { none: 1 })) : 0;
+        const afresh = attempt > 0 && (!result?.bought || result.failed.some((u) => u.outcome !== 'not taken'));
+        if (afresh || lowest < 0.25) log.setup[`reopened-${thing.def}-${attempt}`] = await openState();
+        const pick = attempt === 0 || !result?.failed ? pickUse : (u) => result.failed.some((f) => f.index === u.index);
+        result = await runObject(thing, pick, attempt);
+        if (result.unknown || (result.bought && !result.failed.length)) break;
+        console.warn(`${thing.def}: ${result.bought ? `${result.failed.map((u) => u.id).join(', ')} failed` : 'not bought'}${attempt === 0 ? ', once more' : ''}`);
+      } catch (err) {
+        noteError(`${thing.def}: ${err.message.split('\n')[0]}`);
+        write({ object: thing.def, use: null, attempt, outcome: `error: ${err.message.split('\n')[0]}` });
+        // A page that broke: a new one.
+        if (page.isClosed()) page = await newPage();
+        result = null;
+      }
+    }
+    timings.push({ object: thing.def, seconds: Math.round((Date.now() - t0) / 100) / 10 });
+  }
+  log.timings = timings;
 }
 
 writeFileSync(join(out, `${what}.json`), JSON.stringify(log, null, 2));

@@ -12,3 +12,4 @@ node_modules
 /web/.assets
 __pycache__
 /tools/art/blender/previews
+/web/.vite-cache
