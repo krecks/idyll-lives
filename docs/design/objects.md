@@ -372,7 +372,15 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   footprint at rest, or whose part that goes round (a loop or ambient spin: a fan's blades) sweeps
   over 1 cm past it, a thing on a top that reaches more than 10 % past its content `radius` from its
   origin (its farthest vertex, as it shows), and a floor model or moving part lower than the floor
-  drawn over it; each against every content object that draws the model. No content fact says a thing
+  drawn over it; each against every content object that draws the model. Functional heights (warnings
+  too): the model's top straight down at the seat (furniture.json `seats`, else content `seat`, else
+  `defaultSeat` for one sat on; `fwd` forward, at each slot), the top (content `surface` at its `at`) and
+  the mattress (furniture.json `bunks`, `beds`, else `defaultBed` for one lain on; held open by
+  `motions.open`, a sofa bed's mattress pulled out) more than 2 cm off, nothing under one, a lamp's
+  light (content `light` with an `at`) outside its model there, and content `seat` and furniture.json
+  `seats` that disagree. Of the faces looking up there it takes the one nearest the height, so what lies
+  on a top (a vase, a duvet) or above it (a canopy, the upper bunk) isn't taken for it; the model is at
+  rest (a yoga mat, rolled up, has nothing under its seat). No content fact says a thing
   stands against a wall, so one standing off it isn't caught. It needs no Blender, so CI runs it (in
   `cargo test -p ll-tools`); `--preview` also has Blender re-import each file and render it. A
   content file or manifest it can't read is a FAIL naming the file.

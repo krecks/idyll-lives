@@ -14,7 +14,9 @@
 //! Run the Khronos glTF validator too (the standard says how); this checks the game's own rules.
 //!
 //! What it prints is check_glb.py's to the byte: JSON objects are read in file order, numbers as Python
-//! has them (an int stays an int), and formatted, `repr`'d and `math.hypot`'d as Python does (`py`).
+//! has them (an int stays an int), and formatted, `repr`'d and `math.hypot`'d as Python does (`py`); and
+//! since, the functional heights' warnings (`heights`: seats, tops, mattresses and lamps against the model).
+//! `measures` gives `cargo review` the same numbers.
 
 mod glb;
 mod json;
@@ -59,6 +61,9 @@ pub struct Paths {
     pub assets: String,
     /// web/public/content
     pub content: String,
+    /// web/src/render/babylon/characters/furniture.json: where residents sit and lie on each object (`SEATS`,
+    /// `BEDS`, `BUNKS` in characters.ts), for the height checks.
+    pub furniture: String,
     /// tools/art/blender/centres.json: where each Blender-built model is centred at rest (its Model's
     /// `centre`, (0, 0) for most): {key: [x, depth]}, for this gate only (the game doesn't read it). A build
     /// writes its models' (gamekit/family.py), `cargo art --centres` every family's. A key that isn't in it
@@ -74,6 +79,7 @@ impl Paths {
             here: normpath(&join(&root, "tools/art/blender")),
             assets: normpath(&join(&root, "web/public/assets")),
             content: normpath(&join(&root, "web/public/content")),
+            furniture: normpath(&join(&root, "web/src/render/babylon/characters/furniture.json")),
             centres: normpath(&join(&root, "tools/art/blender/centres.json")),
         }
     }
@@ -198,6 +204,8 @@ struct Facts {
     stairs: bool,
     /// The disc a thing on a top takes (content.ts `radius`: default 0.12, kept within 0.02-0.45).
     radius: f64,
+    /// The content object itself, for its functional heights (`seat`, `surface`, `light`, its uses' poses: `heights`).
+    object: J,
 }
 
 /// {model key: [facts of each content object that draws it]}: where the wall's face is (a footprint's
@@ -225,6 +233,7 @@ fn content_objects(defs: &Content) -> R<HashMap<String, Vec<Facts>>> {
             outside,
             stairs: o.get("stairs").is_some_and(J::truthy),
             radius,
+            object: o.clone(),
         });
     }
     Ok(out)
@@ -306,8 +315,9 @@ struct Placed {
     node: usize,
 }
 
-/// Scales that put nodes elsewhere than at rest (a part grown, `grown`).
-type Pose = HashMap<usize, Vec<Num>>;
+/// Translations, rotations and scales (by node and path) that put nodes elsewhere than at rest (a part grown,
+/// `grown`; a bed pulled out, `open_pose`).
+type Pose = HashMap<(usize, &'static str), Vec<Num>>;
 
 /// The mesh nodes of the default scene (`Placed`), their parts where `pose` puts them; `worlds`, if given,
 /// gets every node's world matrix.
@@ -324,9 +334,17 @@ fn node_matrices(gltf: &J, pose: Option<&Pose>, mut worlds: Option<&mut HashMap<
             return m.get(..16).and_then(|m| m.try_into().ok()).ok_or_else(|| "list index out of range".into());
         }
         let (z, o) = (Num::I(0), Num::I(1));
-        let t = match n.get("translation") { Some(t) => nums(t, 3)?, None => vec![z, z, z] };
-        let q = match n.get("rotation") { Some(q) => nums(q, 4)?, None => vec![z, z, z, o] };
-        let s = match pose.and_then(|p| p.get(&i)) {
+        let t = match (pose.and_then(|p| p.get(&(i, "translation"))), n.get("translation")) {
+            (Some(t), _) if t.len() == 3 => t.clone(),
+            (_, Some(t)) => nums(t, 3)?,
+            _ => vec![z, z, z],
+        };
+        let q = match (pose.and_then(|p| p.get(&(i, "rotation"))), n.get("rotation")) {
+            (Some(q), _) if q.len() == 4 => q.clone(),
+            (_, Some(q)) => nums(q, 4)?,
+            _ => vec![z, z, z, o],
+        };
+        let s = match pose.and_then(|p| p.get(&(i, "scale"))) {
             Some(s) if s.len() != 3 => return Err(format!("too many values to unpack (expected 3, got {})", s.len())),
             Some(s) => s.clone(),
             None => match n.get("scale") { Some(s) => nums(s, 3)?, None => vec![o, o, o] },
@@ -906,8 +924,8 @@ fn grown(g: &Glb, held: &[Option<J>]) -> R<Pose> {
                 }
             }
             let best = best.ok_or("max() iterable argument is empty")?;
-            if best.iter().zip(&rest).any(|(b, r)| b.f().abs() > 1.5 * r.f().abs() + 1e-6) && out.get(&node).is_none_or(|have| abs_sum(best) > abs_sum(have)) {
-                out.insert(node, best.clone());
+            if best.iter().zip(&rest).any(|(b, r)| b.f().abs() > 1.5 * r.f().abs() + 1e-6) && out.get(&(node, "scale")).is_none_or(|have| abs_sum(best) > abs_sum(have)) {
+                out.insert((node, "scale"), best.clone());
             }
         }
     }
@@ -989,35 +1007,82 @@ struct Tri {
     nrm: [f64; 3],
 }
 
-/// The nearest face each way along d from p (Möller-Trumbore): [forward, backward], each (distance, whether it
-/// is a face leaving a solid that way).
-fn cast(p: &[f64; 3], d: &[f64; 3], faces: &[&Tri]) -> [(f64, bool); 2] {
-    let mut near = [(f64::INFINITY, false), (f64::INFINITY, false)];
-    for f in faces {
-        let (a, e1, e2, nrm) = (&f.a, &f.e1, &f.e2, &f.nrm);
+/// Every face the line through p along d crosses (Möller-Trumbore), in the order given: (how far along d,
+/// negative behind p; the face's normal).
+fn hits<'a>(p: &'a [f64; 3], d: &'a [f64; 3], faces: impl IntoIterator<Item = &'a Tri>) -> impl Iterator<Item = (f64, &'a [f64; 3])> {
+    faces.into_iter().filter_map(move |f| {
+        let (a, e1, e2) = (&f.a, &f.e1, &f.e2);
         let h = [d[1] * e2[2] - d[2] * e2[1], d[2] * e2[0] - d[0] * e2[2], d[0] * e2[1] - d[1] * e2[0]];
         let det = e1[0] * h[0] + e1[1] * h[1] + e1[2] * h[2];
         if det.abs() < 1e-12 {
-            continue;
+            return None;
         }
         let s = [p[0] - a[0], p[1] - a[1], p[2] - a[2]];
         let u = (s[0] * h[0] + s[1] * h[1] + s[2] * h[2]) / det;
         #[allow(clippy::manual_range_contains)] // (not the same for a NaN)
         if u < 0.0 || u > 1.0 {
-            continue;
+            return None;
         }
         let q = [s[1] * e1[2] - s[2] * e1[1], s[2] * e1[0] - s[0] * e1[2], s[0] * e1[1] - s[1] * e1[0]];
         let v = (d[0] * q[0] + d[1] * q[1] + d[2] * q[2]) / det;
         if v < 0.0 || u + v > 1.0 {
-            continue;
+            return None;
         }
-        let t = (e2[0] * q[0] + e2[1] * q[1] + e2[2] * q[2]) / det;
+        Some(((e2[0] * q[0] + e2[1] * q[1] + e2[2] * q[2]) / det, &f.nrm))
+    })
+}
+
+/// The nearest face each way along d from p: [forward, backward], each (distance, whether it is a face leaving
+/// a solid that way).
+fn cast(p: &[f64; 3], d: &[f64; 3], faces: &[&Tri]) -> [(f64, bool); 2] {
+    let mut near = [(f64::INFINITY, false), (f64::INFINITY, false)];
+    for (t, nrm) in hits(p, d, faces.iter().copied()) {
         let (slot, way) = if t > 0.0 { (0, 1.0) } else { (1, -1.0) };
         if 1e-4 < t.abs() && t.abs() < near[slot].0 {
             near[slot] = (t.abs(), (nrm[0] * d[0] + nrm[1] * d[1] + nrm[2] * d[2]) * way > 0.0);
         }
     }
     near
+}
+
+/// The triangles of the placed meshes' primitives that `keep` keeps (by their material index), with the node
+/// each belongs to and its normal from the winding; None if some positions can't be read here (compressed).
+fn triangles(g: &Glb, placed: &[Placed], keep: &dyn Fn(Option<&J>) -> R<bool>) -> R<Option<Vec<Tri>>> {
+    let det = |m: &[f64]| m[0] * (m[5] * m[10] - m[9] * m[6]) - m[4] * (m[1] * m[10] - m[9] * m[2]) + m[8] * (m[1] * m[6] - m[5] * m[2]);
+    let mut tris = Vec::new();
+    for p in placed {
+        let mf: Vec<f64> = p.m.iter().map(|v| v.f()).collect();
+        let sign = if det(&mf) >= 0.0 { 1.0 } else { -1.0 };
+        for prim in primitives(&g.gltf, &p.mesh)? {
+            let triangles = prim.get("mode").is_none_or(|m| m.num().is_some_and(|n| n.f() == 4.0));
+            if !triangles || !keep(prim.opt("material"))? {
+                continue;
+            }
+            let pos = accessor(g, key(key(prim, "attributes")?, "POSITION")?)?;
+            let idx = match prim.get("indices") {
+                Some(i) => accessor(g, i)?,
+                None => Some((0..pos.as_ref().map_or(0, |p| p.len())).map(|k| vec![Num::I(k as i64)]).collect()),
+            };
+            let (Some(pos), Some(idx)) = (pos, idx) else { return Ok(None) };
+            let world: Vec<[f64; 3]> = pos.iter().map(|v| applied(&p.m, v)).collect();
+            let corner = |k: usize| -> R<[f64; 3]> {
+                let i = idx[k][0];
+                let i = match i { Num::I(i) => i, Num::F(_) => return Err("list indices must be integers or slices, not float".into()) };
+                let i = if i < 0 { i + world.len() as i64 } else { i };
+                world.get(i as usize).copied().ok_or_else(|| "list index out of range".into())
+            };
+            let mut k = 0;
+            while k + 2 < idx.len() {
+                let (a, b, c) = (corner(k)?, corner(k + 1)?, corner(k + 2)?);
+                let e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+                let e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+                let nrm = [sign * (e1[1] * e2[2] - e1[2] * e2[1]), sign * (e1[2] * e2[0] - e1[0] * e2[2]), sign * (e1[0] * e2[1] - e1[1] * e2[0])];
+                tris.push(Tri { node: p.node, a, e1, e2, nrm });
+                k += 3;
+            }
+        }
+    }
+    Ok(Some(tris))
 }
 
 /// [(part, share of it in view)] for the parts flattened to nothing at rest (a node scaled under 0.01
@@ -1050,41 +1115,8 @@ fn flattened_in_view(g: &Glb, opaque: &dyn Fn(Option<&J>) -> R<bool>) -> R<Vec<(
         return Ok(Vec::new());
     }
     let placed = node_matrices(&g.gltf, None, None)?;
-    let det = |m: &[f64]| m[0] * (m[5] * m[10] - m[9] * m[6]) - m[4] * (m[1] * m[10] - m[9] * m[2]) + m[8] * (m[1] * m[6] - m[5] * m[2]);
     // Every opaque triangle of the model at rest, with the node it belongs to.
-    let mut tris = Vec::new();
-    for p in &placed {
-        let mf: Vec<f64> = p.m.iter().map(|v| v.f()).collect();
-        let sign = if det(&mf) >= 0.0 { 1.0 } else { -1.0 };
-        for prim in primitives(&g.gltf, &p.mesh)? {
-            let triangles = prim.get("mode").is_none_or(|m| m.num().is_some_and(|n| n.f() == 4.0));
-            if !triangles || !opaque(prim.opt("material"))? {
-                continue;
-            }
-            let pos = accessor(g, key(key(prim, "attributes")?, "POSITION")?)?;
-            let idx = match prim.get("indices") {
-                Some(i) => accessor(g, i)?,
-                None => Some((0..pos.as_ref().map_or(0, |p| p.len())).map(|k| vec![Num::I(k as i64)]).collect()),
-            };
-            let (Some(pos), Some(idx)) = (pos, idx) else { return Ok(Vec::new()) };
-            let world: Vec<[f64; 3]> = pos.iter().map(|v| applied(&p.m, v)).collect();
-            let corner = |k: usize| -> R<[f64; 3]> {
-                let i = idx[k][0];
-                let i = match i { Num::I(i) => i, Num::F(_) => return Err("list indices must be integers or slices, not float".into()) };
-                let i = if i < 0 { i + world.len() as i64 } else { i };
-                world.get(i as usize).copied().ok_or_else(|| "list index out of range".into())
-            };
-            let mut k = 0;
-            while k + 2 < idx.len() {
-                let (a, b, c) = (corner(k)?, corner(k + 1)?, corner(k + 2)?);
-                let e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
-                let e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
-                let nrm = [sign * (e1[1] * e2[2] - e1[2] * e2[1]), sign * (e1[2] * e2[0] - e1[0] * e2[2]), sign * (e1[0] * e2[1] - e1[1] * e2[0])];
-                tris.push(Tri { node: p.node, a, e1, e2, nrm });
-                k += 3;
-            }
-        }
-    }
+    let Some(tris) = triangles(g, &placed, opaque)? else { return Ok(Vec::new()) };
 
     let mut out = Vec::new();
     for (&node, &axis) in &flat {
@@ -1284,6 +1316,307 @@ fn content_warnings(facts: Option<&Facts>, lo: &[Num; 3], (slo, shi): &Bounds, s
     Ok(warnings)
 }
 
+/// How far (m) a mesh may be from a functional height (a seat, a top, a mattress) before the gate warns; and
+/// how far two sources of one may differ before it calls them different.
+const HEIGHT_OFF: f64 = 0.02;
+const SAME: f64 = 0.005;
+
+/// furniture.json: where residents sit and lie on each object (characters.ts `SEATS`, `BEDS`, `BUNKS` and their
+/// defaults). An object in `seats` takes that seat over the content's `seat` (characters.ts `seatOf`).
+pub struct Furniture {
+    seats: J,
+    default_seat: J,
+    beds: J,
+    default_bed: J,
+    bunks: J,
+}
+
+impl Furniture {
+    /// Reads `paths.furniture`; a file that can't be read is an error naming it.
+    pub fn read(paths: &Paths) -> Result<Furniture, String> {
+        let f = read_json(&paths.furniture).map_err(|e| format!("{}: {e}", relpath(&paths.furniture, &repo_root())))?;
+        let part = |k: &str| f.get(k).cloned().unwrap_or(J::Obj(Vec::new()));
+        Ok(Furniture { seats: part("seats"), default_seat: part("defaultSeat"), beds: part("beds"), default_bed: part("defaultBed"), bunks: part("bunks") })
+    }
+}
+
+/// A number of the content's (`d[k]`), or `default`.
+fn number(d: Option<&J>, k: &str, default: f64) -> f64 {
+    d.and_then(|d| d.get(k)).and_then(J::num).map_or(default, Num::f)
+}
+
+/// A model as the game draws it, its parts where a pose puts them, to measure heights on: its faces (hidden
+/// materials, and parts flattened to nothing at rest, left out) and the entry's `scale`.
+struct Sampler {
+    tris: Vec<Tri>,
+    scale: f64,
+}
+
+impl Sampler {
+    /// None if its positions can't be read here (compressed).
+    fn new(g: &Glb, entry: &J, pose: Option<&Pose>) -> R<Option<Sampler>> {
+        let materials = g.gltf.get("materials").and_then(J::list).unwrap_or(&[]);
+        let no_overrides = J::Obj(Vec::new());
+        let overrides = entry.get("materials").unwrap_or(&no_overrides);
+        let shown = |i: Option<&J>| -> R<bool> {
+            let name = match i {
+                Some(i) => index(&J::Arr(materials.to_vec()), i)?.get("name").map(J::key).unwrap_or_default(),
+                None => String::new(),
+            };
+            let ov = override_of(overrides, &name);
+            Ok(!(ov.truthy() && ov.get("hide").is_some_and(J::truthy)))
+        };
+        // (A part flattened to nothing: one of its axes under a hundredth of its longest, G.grow from 0.001.)
+        let placed: Vec<Placed> = node_matrices(&g.gltf, pose, None)?
+            .into_iter()
+            .filter(|p| {
+                let axis = |k: usize| hypot(&[p.m[k * 4].f(), p.m[k * 4 + 1].f(), p.m[k * 4 + 2].f()]);
+                let (short, long) = (0..3).map(axis).fold((f64::INFINITY, 0.0f64), |(s, l), a| (s.min(a), l.max(a)));
+                short >= 0.01 * long
+            })
+            .collect();
+        let fit = entry.get("fit").is_some_and(J::truthy);
+        let scale = if fit { 1.0 } else { entry.get("scale").and_then(J::num).map_or(1.0, Num::f) };
+        Ok(triangles(g, &placed, &shown)?.map(|tris| Sampler { tris, scale }))
+    }
+
+    /// The heights (m) of the faces on the vertical line at (x, depth) (game axes, m from the model's origin):
+    /// those looking up, or every face.
+    fn line(&self, x: f64, z: f64, up: bool) -> Vec<f64> {
+        // glTF x -> game -x; the game's model is the file's times `scale`.
+        let (p, d) = ([-x / self.scale, 0.0, z / self.scale], [0.0, -1.0, 0.0]);
+        hits(&p, &d, &self.tris).filter(|(_, n)| !up || n[1] > 0.0).map(|(t, _)| -t * self.scale).collect()
+    }
+
+    /// The top (m) at (x, depth) nearest `near`: of the faces looking up there, the one nearest that height (what
+    /// lies on a top, a vase or a pillow, and what is under it aren't its top). If none looks up (inside out),
+    /// any face. None: nothing there.
+    fn top(&self, x: f64, z: f64, near: f64) -> Option<f64> {
+        let mut found = self.line(x, z, true);
+        if found.is_empty() {
+            found = self.line(x, z, false);
+        }
+        found.into_iter().min_by(|a, b| (a - near).abs().total_cmp(&(b - near).abs()))
+    }
+
+    /// The lowest and the highest face (m) on the vertical line at (x, depth); None: nothing there.
+    fn span(&self, x: f64, z: f64) -> Option<(f64, f64)> {
+        let found = self.line(x, z, false);
+        let lo = found.iter().copied().reduce(f64::min)?;
+        Some((lo, found.into_iter().fold(lo, f64::max)))
+    }
+}
+
+/// Where the clip `clip` leaves the model's parts: each channel's last key (a bed pulled out or folded down,
+/// held open: `motions.open`).
+fn open_pose(g: &Glb, clip: &J) -> R<Pose> {
+    let empty = J::Arr(Vec::new());
+    let nodes = g.gltf.get("nodes").unwrap_or(&empty);
+    let mut pose: Pose = HashMap::new();
+    for a in g.gltf.get("animations").and_then(J::list).unwrap_or(&[]).iter().filter(|a| a.get("name") == Some(clip)) {
+        for c in key(a, "channels")?.list().unwrap_or(&[]) {
+            let target = key(c, "target")?;
+            let (Some(node), Some(path)) = (target.opt("node"), target.get("path").and_then(J::str)) else { continue };
+            let Some(path) = ["translation", "rotation", "scale"].into_iter().find(|p| *p == path) else { continue };
+            if let Some(last) = first_value(g, key(sampler(a, c)?, "output")?, true)? {
+                pose.insert((node_index(nodes, node)?, path), last.into_iter().map(Num::F).collect());
+            }
+        }
+    }
+    Ok(pose)
+}
+
+/// A functional height of a content object (where residents sit or lie on it, where things stand on its top,
+/// where its lamp shines from) and what its model has there (`heights`).
+pub struct Height {
+    /// `seat`, `surface`, `mattress`, `lower bunk`, `upper bunk` or `light`.
+    pub what: &'static str,
+    /// The height the game uses (m), and what says so (content `seat`, furniture.json `seats`, a default).
+    pub expected: f64,
+    pub source: String,
+    /// Where it was measured: m to the right of the footprint's middle and forward of it (game axes).
+    pub at: [f64; 2],
+    /// The clip it was measured held open at (`motions.open`: a bed pulled out), if any.
+    pub open: Option<String>,
+    /// The model's top there (m; None: nothing there); for a light, its lowest and highest faces there.
+    pub mesh: Option<f64>,
+    pub span: Option<(f64, f64)>,
+    /// What a second source of it says, when it says otherwise (content `seat` against furniture.json `seats`).
+    pub disagrees: Option<String>,
+}
+
+impl Height {
+    /// How far (m) the model is from it (for a light, how far outside the lamp it shines from); None: nothing there.
+    pub fn off(&self) -> Option<f64> {
+        if let Some((lo, hi)) = self.span {
+            return Some(if self.expected < lo { lo - self.expected } else { f64::max(0.0, self.expected - hi) });
+        }
+        self.mesh.map(|m| (m - self.expected).abs())
+    }
+
+    /// Whether the model is within `HEIGHT_OFF` of it.
+    pub fn fits(&self) -> bool {
+        self.off().is_some_and(|off| off <= HEIGHT_OFF)
+    }
+
+    /// The gate's warnings about it: the model off it, and a second source that says otherwise.
+    fn warnings(&self) -> Vec<String> {
+        let mut out = Vec::new();
+        let open = self.open.as_ref().map(|c| format!(", held open ({})", repr_str(c))).unwrap_or_default();
+        let at = format!("x {}, depth {}", fixed(self.at[0], 2), fixed(self.at[1], 2));
+        if !self.fits() {
+            out.push(match (self.mesh, self.span) {
+                (_, Some((lo, hi))) => format!("{} {} m ({}), outside the lamp there (its model {} to {} m at {at})", self.what, fixed(self.expected, 2), self.source, fixed(lo, 2), fixed(hi, 2)),
+                (Some(m), _) => format!(
+                    "{} {} m ({}{open}), the model {} m there ({at}): {} cm {}",
+                    self.what,
+                    fixed(self.expected, 2),
+                    self.source,
+                    fixed(m, 3),
+                    fixed((m - self.expected).abs() * 100.0, 1),
+                    if m < self.expected { "lower" } else { "higher" }
+                ),
+                (None, None) => format!("{} {} m ({}{open}): no model under it ({at})", self.what, fixed(self.expected, 2), self.source),
+            });
+        }
+        if let Some(d) = &self.disagrees {
+            out.push(format!("{}: {d}", self.what));
+        }
+        out
+    }
+}
+
+/// The functional heights of content object `object` (`Facts::object`) drawn by the model `g` (its `entry`):
+/// - its seat (furniture.json `seats`, else the content's `seat`, else `defaultSeat` for one sat on), the hips'
+///   point `fwd` forward of the middle, at each slot (the worst reported; along the object for a bath, `along`);
+/// - its top (content `surface`: at its `at`, else the middle);
+/// - its mattress (furniture.json `bunks`, `beds`, else `defaultBed` for one lain on; a hammock's sling at its
+///   low point), `fwd` forward, at each slot (in the middle for one lain on across), held open if it opens;
+/// - its lamp's light (content `light`, only with an `at`: the shade).
+fn heights(g: &Glb, entry: &J, object: &J, furniture: &Furniture) -> R<Vec<Height>> {
+    let mut out = Vec::new();
+    let id = object.get("id").map(J::key).unwrap_or_default();
+    let poses: HashSet<String> = object.get("interactions").and_then(J::list).unwrap_or(&[]).iter().filter_map(|i| i.get("pose").map(J::key)).collect();
+    let slots = object.get("slots").and_then(J::num).map_or(1, |n| n.f().max(1.0) as usize);
+    let width = object.get("footprint").and_then(|f| f.at(0)).and_then(J::num).map_or(1.0, Num::f);
+    // Each slot's x (sim-core `slot_position`).
+    let slot_xs = |n: usize| -> Vec<f64> { (0..n).map(|k| (k as f64 - (n as f64 - 1.0) / 2.0) * width / n as f64).collect() };
+    let sat = object.opt("seat").is_some() || furniture.seats.get(&id).is_some() || poses.contains("sit");
+    let lain = furniture.beds.get(&id).is_some() || furniture.bunks.get(&id).is_some() || poses.contains("lie");
+    let lamp = object.opt("light").is_some_and(|l| l.opt("at").is_some());
+    if !(sat || lain || lamp || object.opt("surface").is_some()) {
+        return Ok(out);
+    }
+    // At rest (not `grown`: a tub's water grown to full would be its seat; so a yoga mat, rolled up at rest, has
+    // nothing under its seat).
+    let rest = Sampler::new(g, entry, None)?;
+    // The worst of the points: the farthest off, nothing there worst of all.
+    let worst = |s: &Sampler, points: &[[f64; 2]], near: f64| -> ([f64; 2], Option<f64>) {
+        let mut best: Option<([f64; 2], Option<f64>)> = None;
+        for p in points {
+            let m = s.top(p[0], p[1], near);
+            let off = |m: Option<f64>| m.map_or(f64::INFINITY, |m| (m - near).abs());
+            if best.is_none_or(|(_, b)| off(m) > off(b)) {
+                best = Some((*p, m));
+            }
+        }
+        best.unwrap_or(([0.0, 0.0], None))
+    };
+    let mut height = |what: &'static str, expected: f64, source: String, points: &[[f64; 2]], s: &Sampler, open: Option<String>, disagrees: Option<String>| {
+        let (at, mesh) = worst(s, points, expected);
+        out.push(Height { what, expected, source, at, open, mesh, span: None, disagrees });
+    };
+
+    // Seated.
+    let own = object.opt("seat");
+    let table = furniture.seats.get(&id);
+    if sat && let Some(s) = &rest {
+        let (seat, source) = match (table, own) {
+            (Some(t), _) => ((number(Some(t), "h", 0.45), number(Some(t), "fwd", 0.0)), "furniture.json `seats`"),
+            (None, Some(o)) => ((number(Some(o), "height", 0.45), number(Some(o), "forward", 0.0)), "content `seat`"),
+            (None, None) => ((number(Some(&furniture.default_seat), "h", 0.45), number(Some(&furniture.default_seat), "fwd", 0.0)), "furniture.json `defaultSeat`"),
+        };
+        let disagrees = match (table, own) {
+            (Some(_), Some(o)) => {
+                let theirs = (number(Some(o), "height", 0.0), number(Some(o), "forward", 0.0));
+                ((theirs.0 - seat.0).abs() > SAME || (theirs.1 - seat.1).abs() > SAME).then(|| {
+                    format!(
+                        "content `seat` says {} m, {} forward; furniture.json `seats` says {} m, {} forward (furniture.json wins: characters.ts `seatOf`)",
+                        fixed(theirs.0, 2),
+                        fixed(theirs.1, 2),
+                        fixed(seat.0, 2),
+                        fixed(seat.1, 3)
+                    )
+                })
+            }
+            _ => None,
+        };
+        let along = table.and_then(|t| t.get("along")).and_then(J::num).map(Num::f);
+        let points: Vec<[f64; 2]> = match along {
+            Some(a) => vec![[a * seat.1, 0.0]],
+            None => slot_xs(slots).into_iter().map(|x| [x, seat.1]).collect(),
+        };
+        height("seat", seat.0, source.into(), &points, s, None, disagrees);
+    }
+
+    // On a top.
+    if let Some(top) = object.opt("surface")
+        && let Some(s) = &rest
+    {
+        let point = match top.get("at").and_then(J::list) {
+            Some([x, z, ..]) => [x.num().map_or(0.0, Num::f), z.num().map_or(0.0, Num::f)],
+            _ => [0.0, 0.0],
+        };
+        height("surface", number(Some(top), "height", 0.0), "content `surface`".into(), &[point], s, None, None);
+    }
+
+    // Lain on: held open if it opens (a sofa bed's mattress pulled out, a wall bed folded down).
+    let bed = furniture.beds.get(&id);
+    let bunk = furniture.bunks.get(&id).and_then(J::list);
+    if lain {
+        let none = J::Obj(Vec::new());
+        let open = entry.get("motions").filter(|m| m.truthy()).unwrap_or(&none).opt("open").cloned();
+        let opened = match &open {
+            Some(clip) => Sampler::new(g, entry, Some(&open_pose(g, clip)?))?,
+            None => None,
+        };
+        let s = match &opened {
+            Some(s) => Some(s),
+            None => rest.as_ref(),
+        };
+        if let Some(s) = s {
+            let fwd = number(bed, "fwd", 0.0);
+            let open = open.map(|c| c.key());
+            if let Some(tops) = bunk {
+                for (what, h) in ["lower bunk", "upper bunk"].into_iter().zip(tops) {
+                    height(what, h.num().map_or(0.0, Num::f), "furniture.json `bunks`".into(), &[[0.0, fwd]], s, open.clone(), None);
+                }
+            } else {
+                let sling = bed.and_then(|b| b.get("sling"));
+                let (h, source) = match (bed, sling) {
+                    (Some(_), Some(sl)) => (number(Some(sl), "low", 0.5), "furniture.json `beds`, its sling's low point"),
+                    (Some(b), None) => (number(Some(b), "h", 0.5), "furniture.json `beds`"),
+                    (None, _) => (number(Some(&furniture.default_bed), "h", 0.5), "furniture.json `defaultBed`"),
+                };
+                let across = bed.and_then(|b| b.get("across")).is_some_and(J::truthy);
+                let points: Vec<[f64; 2]> = if across { vec![[0.0, fwd]] } else { slot_xs(slots).into_iter().map(|x| [x, fwd]).collect() };
+                height("mattress", h, source.into(), &points, s, open, None);
+            }
+        }
+    }
+
+    // A lamp's light, at its shade.
+    if let Some(light) = object.opt("light").filter(|_| lamp)
+        && let Some([x, z, ..]) = light.get("at").and_then(J::list)
+        && let Some(s) = &rest
+    {
+        let at = [x.num().map_or(0.0, Num::f), z.num().map_or(0.0, Num::f)];
+        let span = s.span(at[0], at[1]);
+        out.push(Height { what: "light", expected: number(Some(light), "height", 1.55), source: "content `light`".into(), at, open: None, mesh: None, span, disagrees: None });
+    }
+    Ok(out)
+}
+
 /// The numbers of one file, for the summary and the far version's checks.
 struct Info {
     size: usize,
@@ -1303,8 +1636,8 @@ fn dims_text(dims: &[Num; 3]) -> String {
 /// (errors, warnings, summary) for one model entry and its file (and its far version's, at `far`);
 /// `facts`: those of each content object that draws it (`content_objects`); `centre`: where it's built
 /// centred (centres.json; None: not built here, not checked).
-fn check(fin: &Finishes, entry: &J, path: &str, far: Option<&str>, facts: Option<&Vec<Facts>>, centre: Option<&J>) -> R<(Vec<String>, Vec<String>, String)> {
-    let (mut errors, mut warnings, info) = check_file(fin, entry, path, facts, centre)?;
+fn check(fin: &Finishes, entry: &J, path: &str, far: Option<&str>, facts: Option<&Vec<Facts>>, centre: Option<&J>, furniture: Option<&Furniture>) -> R<(Vec<String>, Vec<String>, String)> {
+    let (mut errors, mut warnings, info) = check_file(fin, entry, path, facts, centre, furniture)?;
     let mut summary = format!("{:>6} KB {:>6} tris {} draws {:>2} materials  {} m", fixed(info.size as f64 / 1024.0, 1), info.tris, info.draws, info.materials, dims_text(&info.dims));
     if info.clips > 0 {
         summary += &format!("  {} moving parts, {} clips", info.moving, info.clips);
@@ -1313,7 +1646,7 @@ fn check(fin: &Finishes, entry: &J, path: &str, far: Option<&str>, facts: Option
         // Its far version (`far`): the same model, still, with far fewer triangles.
         // (Without what the full model is checked for: its clips, colours and centre.)
         let far_entry = J::Obj(entry.entries().unwrap_or(&[]).iter().filter(|(k, _)| k != "motions" && k != "paint").cloned().collect());
-        let (mut far_errors, mut far_warnings, far_info) = match check_file(fin, &far_entry, far, None, None) {
+        let (mut far_errors, mut far_warnings, far_info) = match check_file(fin, &far_entry, far, None, None, None) {
             Ok((e, w, i)) => (e, w, Some(i)),
             Err(err) => (vec![format!("cannot read {far}: {err}")], Vec::new(), None),
         };
@@ -1346,7 +1679,7 @@ fn check(fin: &Finishes, entry: &J, path: &str, far: Option<&str>, facts: Option
 
 /// (errors, warnings, numbers) for one model entry and a file of it; `facts`: those of each content object
 /// that draws it (`content_objects`), each checked; `centre`: where it's built centred (centres.json), or None.
-fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>, centre: Option<&J>) -> R<(Vec<String>, Vec<String>, Info)> {
+fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>, centre: Option<&J>, furniture: Option<&Furniture>) -> R<(Vec<String>, Vec<String>, Info)> {
     let (mut errors, mut warnings) = (Vec::new(), Vec::new());
     let data = std::fs::read(path).map_err(|e| py::os_error(&e, path))?;
     let g = parse_glb(&data)?;
@@ -1589,7 +1922,12 @@ fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>,
         };
         let many = facts.is_some_and(|f| f.len() > 1);
         for fact in each {
-            for w in content_warnings(fact, &lo, &(slo, shi), &sparts, scale, &g, &pose, entry)? {
+            // Its functional heights against the model (`heights`: warnings only).
+            let mut found = content_warnings(fact, &lo, &(slo, shi), &sparts, scale, &g, &pose, entry)?;
+            if let (Some(f), Some(furniture)) = (fact, furniture) {
+                found.extend(heights(&g, entry, &f.object, furniture)?.iter().flat_map(Height::warnings));
+            }
+            for w in found {
                 let w = if many { format!("{w} (object {})", str_of(&fact.unwrap().id)) } else { w };
                 if seen.insert(w.clone()) {
                     warnings.push(w);
@@ -1678,42 +2016,13 @@ pub fn gate(paths: &Paths, keys: &[String]) -> Report {
     let read = || -> Result<_, String> {
         let stack = manifests(paths, &join(&paths.assets, "manifest.json"))?;
         let defs = content(paths)?;
-        Ok((stack, content_objects(&defs)?, content_keys(&defs)?))
+        Ok((stack, content_objects(&defs)?, content_keys(&defs)?, Furniture::read(paths)?))
     };
-    let (stack, facts, named) = match read() {
+    let (stack, facts, named, furniture) = match read() {
         Ok(r) => r,
         Err(err) => return fail(format!("FAIL content and manifests\n       error: cannot read them: {err}\n")),
     };
-    let mut entries: BTreeMap<String, (J, String)> = BTreeMap::new();
-    let mut fin = Finishes { plain: HashMap::new(), see_through: HashSet::new() };
-    for (path, m) in &stack {
-        for (k, entry) in m.get("entries").filter(|e| e.truthy()).and_then(J::entries).unwrap_or(&[]) {
-            let kind = entry.get("type");
-            if kind == Some(&J::Str("model".into())) {
-                // A pack's entry replaces the entry, keeping its `vary` unless it gives its own
-                // (registry.ts `extended`).
-                let mut entry = entry.clone();
-                if let Some((old, _)) = entries.get(k).filter(|(old, _)| old.truthy())
-                    && let (Some(vary), J::Obj(fields)) = (old.get("vary"), &mut entry)
-                {
-                    match fields.iter().position(|(f, _)| f == "vary") {
-                        Some(at) => {
-                            let mine = fields.remove(at);
-                            fields.insert(0, mine);
-                        }
-                        None => fields.insert(0, ("vary".into(), vary.clone())),
-                    }
-                }
-                entries.insert(k.clone(), (entry, path.clone()));
-            } else if kind == Some(&J::Str("material".into())) && k.starts_with("material.finish.") {
-                let alpha = entry.get("alpha").and_then(J::num).map_or(1.0, |a| a.f());
-                fin.plain.insert(k.clone(), !entry.get("texture").is_some_and(J::truthy) && alpha >= 1.0);
-                if alpha < 1.0 {
-                    fin.see_through.insert(k.clone());
-                }
-            }
-        }
-    }
+    let (entries, fin) = model_entries(&stack);
     let centres = match read_centres(&paths.centres) {
         Ok(c) => c,
         Err(err) => return fail(format!("FAIL centres.json\n       error: cannot read it: {err}\n")),
@@ -1760,7 +2069,7 @@ pub fn gate(paths: &Paths, keys: &[String]) -> Report {
         }
         let path = normpath(&join(&dirname(manifest), &url));
         let far = entry.get("far").filter(|f| f.truthy()).map(|f| normpath(&join(&dirname(manifest), &f.key())));
-        let (errors, warnings, summary) = check(&fin, entry, &path, far.as_deref(), facts.get(k), centres.get(k)).unwrap_or_else(|err| (vec![format!("cannot read {path}: {err}")], Vec::new(), String::new()));
+        let (errors, warnings, summary) = check(&fin, entry, &path, far.as_deref(), facts.get(k), centres.get(k), Some(&furniture)).unwrap_or_else(|err| (vec![format!("cannot read {path}: {err}")], Vec::new(), String::new()));
         failed += !errors.is_empty() as usize;
         checked.push(k.clone());
         text += &format!("{} {k:28} {summary}\n", if errors.is_empty() { "ok  " } else { "FAIL" });
@@ -1777,6 +2086,105 @@ pub fn gate(paths: &Paths, keys: &[String]) -> Report {
     }
     text += "\n";
     Report { text, checked, failed }
+}
+
+/// The model entries of the manifests once stacked ({key: (entry, the manifest it's in)}), and their finishes.
+fn model_entries(stack: &[(String, J)]) -> (BTreeMap<String, (J, String)>, Finishes) {
+    let mut entries: BTreeMap<String, (J, String)> = BTreeMap::new();
+    let mut fin = Finishes { plain: HashMap::new(), see_through: HashSet::new() };
+    for (path, m) in stack {
+        for (k, entry) in m.get("entries").filter(|e| e.truthy()).and_then(J::entries).unwrap_or(&[]) {
+            let kind = entry.get("type");
+            if kind == Some(&J::Str("model".into())) {
+                // A pack's entry replaces the entry, keeping its `vary` unless it gives its own
+                // (registry.ts `extended`).
+                let mut entry = entry.clone();
+                if let Some((old, _)) = entries.get(k).filter(|(old, _)| old.truthy())
+                    && let (Some(vary), J::Obj(fields)) = (old.get("vary"), &mut entry)
+                {
+                    match fields.iter().position(|(f, _)| f == "vary") {
+                        Some(at) => {
+                            let mine = fields.remove(at);
+                            fields.insert(0, mine);
+                        }
+                        None => fields.insert(0, ("vary".into(), vary.clone())),
+                    }
+                }
+                entries.insert(k.clone(), (entry, path.clone()));
+            } else if kind == Some(&J::Str("material".into())) && k.starts_with("material.finish.") {
+                let alpha = entry.get("alpha").and_then(J::num).map_or(1.0, |a| a.f());
+                fin.plain.insert(k.clone(), !entry.get("texture").is_some_and(J::truthy) && alpha >= 1.0);
+                if alpha < 1.0 {
+                    fin.see_through.insert(k.clone());
+                }
+            }
+        }
+    }
+    (entries, fin)
+}
+
+/// A model file read: its size at rest (m, game axes: across its front x, up, front to back, as the gate's
+/// summary has it), the file and its entry (for `heights`).
+struct Model {
+    size: [f64; 3],
+    file: Glb,
+    entry: J,
+}
+
+/// A content object's model, its size (`Model`) and its functional heights (`heights`).
+pub struct Measure {
+    pub model: String,
+    pub size: [f64; 3],
+    pub heights: Vec<Height>,
+}
+
+/// Every model the manifests have a file for, measured ({key: its size, or why it can't be read}), and every
+/// content object's measure ({id: …}; an object whose model can't be read has the reason).
+pub struct Measures {
+    pub models: BTreeMap<String, Result<[f64; 3], String>>,
+    pub objects: BTreeMap<String, Result<Measure, String>>,
+}
+
+/// Reads and measures a model file of the manifests (`path`) with its entry: its size at rest, times `scale`.
+fn model(entry: &J, path: &str) -> R<Model> {
+    let file = parse_glb(&std::fs::read(path).map_err(|e| py::os_error(&e, path))?)?;
+    let ((lo, hi), _) = bounds(&file.gltf, &HashMap::new())?;
+    let fit = entry.get("fit").is_some_and(J::truthy);
+    let scale = if fit { 1.0 } else { entry.get("scale").and_then(J::num).map_or(1.0, Num::f) };
+    Ok(Model { size: [0, 1, 2].map(|k| (hi[k].f() - lo[k].f()) * scale), file, entry: entry.clone() })
+}
+
+/// Measures every model and content object (`Measures`), for `cargo review sizes`.
+pub fn measures(paths: &Paths) -> Result<Measures, String> {
+    let stack = manifests(paths, &join(&paths.assets, "manifest.json"))?;
+    let defs = content(paths)?;
+    let facts = content_objects(&defs)?;
+    let furniture = Furniture::read(paths)?;
+    let (entries, _) = model_entries(&stack);
+    let mut read: BTreeMap<String, Result<Model, String>> = BTreeMap::new();
+    for (k, (entry, manifest)) in &entries {
+        let url = entry.get("url").filter(|u| u.truthy()).map(J::key).unwrap_or_default();
+        let found = if url.is_empty() || url.contains("://") {
+            Err(format!("its entry has no file here ({})", if url.is_empty() { "no `url`" } else { &url }))
+        } else {
+            let path = normpath(&join(&dirname(manifest), &url));
+            model(entry, &path).map_err(|e| format!("cannot read {path}: {e}"))
+        };
+        read.insert(k.clone(), found);
+    }
+    let mut objects = BTreeMap::new();
+    for (k, each) in &facts {
+        for f in each {
+            let measured = match read.get(k) {
+                None => Err(format!("no manifest has a model entry {k}")),
+                Some(Err(e)) => Err(e.clone()),
+                Some(Ok(m)) => heights(&m.file, &m.entry, &f.object, &furniture).map(|heights| Measure { model: k.clone(), size: m.size, heights }),
+            };
+            objects.insert(str_of(&f.id), measured);
+        }
+    }
+    let models = read.into_iter().map(|(k, m)| (k, m.map(|m| m.size))).collect();
+    Ok(Measures { models, objects })
 }
 
 /// `cargo check-glb [keys…] [--keys] [--preview]`: the exit code.
@@ -1856,6 +2264,72 @@ mod tests {
         assert_eq!(finish("stone@Matte"), None);
         assert_eq!(finish("stone@matte2"), None);
         assert_eq!(finish("stone"), None);
+    }
+
+    /// A sofa bed of two quads facing up: the seat (glTF x -0.5 to 0.1, so game x -0.1 to 0.5) 0.41 m up, and the
+    /// mattress 0.40 m up under it, which `bed_out` slides 0.6 m forward.
+    fn sofa_bed() -> Glb {
+        let mut bin = Vec::new();
+        for (y, x1) in [(0.41f32, 0.1f32), (0.40, 0.5)] {
+            for v in [[-0.5, y, -0.5], [-0.5, y, 0.5], [x1, y, 0.5], [x1, y, -0.5]] {
+                bin.extend(v.iter().flat_map(|c: &f32| c.to_le_bytes()));
+            }
+        }
+        bin.extend([0u16, 1, 2, 0, 2, 3].iter().flat_map(|i| i.to_le_bytes()));
+        bin.extend([0f32, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.6].iter().flat_map(|c| c.to_le_bytes()));
+        let json = r#"{"asset": {"version": "2.0"}, "scenes": [{"nodes": [0, 1]}],
+            "nodes": [{"name": "seat", "mesh": 0}, {"name": "mattress", "mesh": 1}],
+            "meshes": [{"primitives": [{"attributes": {"POSITION": 0}, "indices": 2}]}, {"primitives": [{"attributes": {"POSITION": 1}, "indices": 2}]}],
+            "bufferViews": [{"byteOffset": 0, "byteLength": 48}, {"byteOffset": 48, "byteLength": 48}, {"byteOffset": 96, "byteLength": 12},
+                {"byteOffset": 108, "byteLength": 8}, {"byteOffset": 116, "byteLength": 24}],
+            "accessors": [{"bufferView": 0, "componentType": 5126, "type": "VEC3", "count": 4, "min": [-0.5, 0.41, -0.5], "max": [0.1, 0.41, 0.5]},
+                {"bufferView": 1, "componentType": 5126, "type": "VEC3", "count": 4, "min": [-0.5, 0.4, -0.5], "max": [0.5, 0.4, 0.5]},
+                {"bufferView": 2, "componentType": 5123, "type": "SCALAR", "count": 6},
+                {"bufferView": 3, "componentType": 5126, "type": "SCALAR", "count": 2}, {"bufferView": 4, "componentType": 5126, "type": "VEC3", "count": 2}],
+            "animations": [{"name": "bed_out", "channels": [{"sampler": 0, "target": {"node": 1, "path": "translation"}}], "samplers": [{"input": 3, "output": 4}]}]}"#;
+        parse_glb(&glb::tests::glb(json, &bin)).unwrap()
+    }
+
+    #[test]
+    fn the_sampler_reads_game_axes_and_the_open_pose() {
+        let g = sofa_bed();
+        let rest = Sampler::new(&g, &J::Obj(Vec::new()), None).unwrap().unwrap();
+        // glTF x -> game -x: the seat reaches game x 0.5, not -0.5.
+        assert!((rest.top(0.3, 0.0, 0.45).unwrap() - 0.41).abs() < 1e-6);
+        assert_eq!(rest.top(-0.3, 0.0, 0.41).map(|h| (h * 100.0).round()), Some(40.0), "only the mattress under it there");
+        assert_eq!(rest.top(0.0, 0.8, 0.4), None, "nothing in front at rest");
+        let open = Sampler::new(&g, &J::Obj(Vec::new()), Some(&open_pose(&g, &J::Str("bed_out".into())).unwrap())).unwrap().unwrap();
+        assert!((open.top(0.0, 0.8, 0.44).unwrap() - 0.40).abs() < 1e-6, "pulled out");
+        // Scaled: the game's model is the file's times `scale`.
+        let big = Sampler::new(&g, &json::loads_text(br#"{"scale": 2}"#).unwrap(), None).unwrap().unwrap();
+        assert!((big.top(0.6, 0.0, 0.85).unwrap() - 0.82).abs() < 1e-6);
+    }
+
+    #[test]
+    fn heights_warn_off_the_model_and_when_their_sources_disagree() {
+        let g = sofa_bed();
+        let furniture = Furniture {
+            seats: json::loads_text(br#"{"sofaBed": {"h": 0.44, "fwd": 0}}"#).unwrap(),
+            default_seat: json::loads_text(br#"{"h": 0.45, "fwd": 0}"#).unwrap(),
+            beds: json::loads_text(br#"{"sofaBed": {"h": 0.4, "fwd": 0.6}}"#).unwrap(),
+            default_bed: json::loads_text(br#"{"h": 0.5}"#).unwrap(),
+            bunks: J::Obj(Vec::new()),
+        };
+        let object = json::loads_text(br#"{"id": "sofaBed", "footprint": [1, 1], "seat": {"height": 0.41, "forward": 0.08}, "interactions": [{"pose": "lie"}]}"#).unwrap();
+        let entry = json::loads_text(br#"{"motions": {"open": "bed_out"}}"#).unwrap();
+        let found = heights(&g, &entry, &object, &furniture).unwrap();
+        let warnings: Vec<String> = found.iter().flat_map(Height::warnings).collect();
+        assert_eq!(warnings, [
+            "seat 0.44 m (furniture.json `seats`), the model 0.410 m there (x 0.00, depth 0.00): 3.0 cm lower",
+            "seat: content `seat` says 0.41 m, 0.08 forward; furniture.json `seats` says 0.44 m, 0.000 forward (furniture.json wins: characters.ts `seatOf`)",
+        ]);
+        let mattress = found.iter().find(|h| h.what == "mattress").unwrap();
+        assert_eq!((mattress.open.as_deref(), mattress.at), (Some("bed_out"), [0.0, 0.6]));
+        assert!(mattress.fits());
+        // Not held open (no `motions.open`): nothing under the sleepers in front.
+        let shut = heights(&g, &J::Obj(Vec::new()), &object, &furniture).unwrap();
+        let shut: Vec<String> = shut.iter().filter(|h| h.what == "mattress").flat_map(Height::warnings).collect();
+        assert_eq!(shut, ["mattress 0.40 m (furniture.json `beds`): no model under it (x 0.00, depth 0.60)"]);
     }
 
     #[test]
