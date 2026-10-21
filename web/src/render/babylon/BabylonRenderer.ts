@@ -97,6 +97,7 @@ import { resizeKey } from '../types';
 import { createLighting, lightingAt } from './environment';
 import { buildFences, swingGate, type GateLeaf } from './fences';
 import { applyShaderFixes } from './shaderFixes';
+import { patchRoomLights, type RoomMask } from './roomLights';
 import { HALF_WALL_HEIGHT, HouseBuilder, houseObjectKey, placeLights, WALL_HALF, WALL_HEIGHT, WALL_STUB, type DoorLeaf, type HouseSurfaces, type RoomLight, type RoomTiles } from './house';
 import { fieldLayers, Street } from './street';
 import { MaterialLibrary, WINDOWLESS_BITS, type DarkTiles } from './materials';
@@ -552,6 +553,8 @@ export class BabylonRenderer implements Renderer {
   private dimmed = new Set<number>();
   /** Their tiles, as `DigState` gets them while the game world is shown (null: none in view). */
   private dimming: DarkTiles | null = null;
+  /** The rooms of the lot in view, for keeping each lamp to its own (`markRoomLights`). */
+  private roomTiles: RoomMask | null = null;
   /** The viewed lot's door leaves that swing, each with how far open it stands (1 open, as drawn; -1 not placed yet). */
   /** `base`: where the leaf's meshes stand (lifted to their storey), before any slide. */
   private doors: { leaf: DoorLeaf; open: number; base: Vector3 }[] = [];
@@ -2379,6 +2382,7 @@ export class BabylonRenderer implements Renderer {
     this.dimmed = new Set();
     this.windowless = { rooms: new Set(), of: [] };
     this.dimming = null;
+    this.roomTiles = null;
     this.applyDimming();
     this.lotTemplates.clear();
     this.lotRooms = null;
@@ -3070,6 +3074,7 @@ export class BabylonRenderer implements Renderer {
 
   private setupLights(): void {
     applyShaderFixes();
+    patchRoomLights();
     // Sky ambient and reflections come from the environment map (image-based lighting); the
     // hemispheric light only adds a time-of-day tint (golden hour, blue hour, moonlight).
     this.sky = new HemisphericLight('sky', new Vector3(0.2, 1, -0.3), this.scene);
@@ -3131,6 +3136,8 @@ export class BabylonRenderer implements Renderer {
       this.lampCluster = new ClusteredLightContainer('lamps', this.roomLights, this.scene);
       this.lampCluster.maxRange = LAMP_MAX_RANGE;
     }
+    // Each clustered lamp lights only its own room (`roomLights.ts`; `?roomlights=0` turns it off to compare).
+    this.lib.rooms.enabled = clustered && new URLSearchParams(location.search).get('roomlights') !== '0';
     if (this.diag.has('nolamps')) for (const light of this.lampCluster ? [this.lampCluster] : this.roomLights) light.setEnabled(false);
     else this.gardenPools = new GardenPools(this.scene);
   }
@@ -3641,6 +3648,7 @@ export class BabylonRenderer implements Renderer {
       return !view || (x >= view.x && row >= view.z && x < view.x + view.w && row < view.z + view.d);
     };
     this.markWindowless(world, view);
+    this.markRoomLights(world, view);
     const lights = this.lotRooms ? placeLights(world, inView, this.lotRooms, (def) => this.deps.content.object(def)?.light).filter((l) => shown(l.z)) : [];
     // With few lights to go round, the storey in view gets them first, then the nearest below it
     // (the sort is stable: within a storey, each room's first light still comes before any second);
@@ -3755,9 +3763,42 @@ export class BabylonRenderer implements Renderer {
   }
   private babies: { of: readonly unknown[]; ids: ReadonlySet<string> } | null = null;
 
-  /** The windowless rooms' darkness on the materials (`dimming`): none while the menus' town is shown. */
+  /**
+   * The rooms of the lot in view on every storey shown, for keeping each lamp's light in its room
+   * (`RoomLightState`): 1 outdoors, 2 and up a room, 0 a tile split by a diagonal wall (lit by all).
+   */
+  private markRoomLights(world: WorldStructure, view: ViewRect | null): void {
+    if (!this.lib.rooms.enabled || !view) {
+      this.roomTiles = null;
+      this.applyDimming();
+      return;
+    }
+    const W = world.width;
+    const [k0, n] = this.storey < 0 ? [this.storey, 1] : [0, this.storey + 1];
+    const tiles = new Uint16Array(view.w * view.d * n);
+    const ids = new Map<number, number>();
+    const diagonals = new Set((world.diagonals ?? []).map((d) => d.z * W + d.x));
+    for (let k = 0; k < n; k++) {
+      const row = this.rowOf(k0 + k);
+      for (let z = 0; z < view.d; z++) {
+        for (let x = 0; x < view.w; x++) {
+          const i = (z + view.z + row) * W + x + view.x;
+          if (z + view.z + row >= world.depth || diagonals.has(i)) continue;
+          const r = world.rooms[i] ?? 0;
+          let id = ids.get(r);
+          if (id === undefined) ids.set(r, (id = r === 0 ? 1 : ids.size + 2));
+          tiles[(k * view.d + z) * view.w + x] = id;
+        }
+      }
+    }
+    this.roomTiles = { x0: view.x, z0: view.z, w: view.w, d: view.d, storey: k0, storeys: n, tiles };
+    this.applyDimming();
+  }
+
+  /** The windowless rooms' darkness on the materials (`dimming`), and the rooms lamps keep to (`roomTiles`): none while the menus' town is shown. */
   private applyDimming(): void {
-    if (this.lib.dig.darken(this.townMode ? null : this.dimming)) this.resetSnapshot();
+    const darker = this.lib.dig.darken(this.townMode ? null : this.dimming);
+    if (this.lib.rooms.show(this.townMode ? null : this.roomTiles) || darker) this.resetSnapshot();
   }
 
   /**

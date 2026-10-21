@@ -49,6 +49,7 @@ import { withBuild } from '../../assets/build';
 import { optimizedUrl, type AssetRegistry } from '../../assets/registry';
 import type { MaterialEntry } from '../../assets/types';
 import { applySoftLook } from './softLook';
+import { RoomLightPlugin, RoomLightState } from './roomLights';
 
 /** Default finish for primitive parts without a `material`. */
 export const DEFAULT_FINISH = 'material.finish.matte';
@@ -681,6 +682,8 @@ export class MaterialLibrary {
   readonly wallCut = new WallCutState();
   /** The ground dug away over a basement in view (see `digInto`). */
   readonly dig: DigState;
+  /** Which room each tile of the lot in view is in, so lamps light only their own (see `roomLights.ts`). */
+  readonly rooms: RoomLightState;
   private readonly dug = new WeakSet<Material>();
 
   /** Makes `material` (the landscape's ground and lawn) follow `dig`. */
@@ -700,6 +703,7 @@ export class MaterialLibrary {
 
   private constructor(private readonly scene: Scene) {
     this.dig = new DigState(scene);
+    this.rooms = new RoomLightState(scene);
     // (The scene clears its own observers, the refreeze one below among them.)
     scene.onDisposeObservable.addOnce(() => this.dispose());
     scene.onAfterRenderObservable.add(() => {
@@ -776,6 +780,7 @@ export class MaterialLibrary {
     if (!(material instanceof PBRMaterial) || this.lit.has(material)) return;
     material.maxSimultaneousLights = MAX_LIGHTS;
     new UndergroundPlugin(material, this.dig);
+    new RoomLightPlugin(material, this.rooms);
     applySoftLook(material);
     // (It may have been compiled without it.)
     material.markDirty(true);
@@ -939,6 +944,7 @@ export class MaterialLibrary {
     if (options.cutaway) new WallCutPlugin(mat, this.wallCut);
     if (options.pattern) new PatternPlugin(mat, options.pattern);
     new UndergroundPlugin(mat, this.dig);
+    new RoomLightPlugin(mat, this.rooms);
     applySoftLook(mat);
     this.lit.add(mat);
     this.freezeWhenReady(mat);
