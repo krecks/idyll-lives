@@ -448,10 +448,15 @@ pub(crate) fn start(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectI
     let task = Task { kind: TaskKind::Phone { action, contact, seat: None, answer: Answer::Pending }, ..task };
     if let Some(seat) = seat_near(sim, ctx, objects) {
         let o = &objects[seat as usize];
-        let (fx, fz) = ctx.index.links.approach_of(seat).unwrap_or_else(|| o.front_tile(content));
+        let def = &content.objects[o.def];
+        let slot = o.pick_slot(sim.id, 0..def.slots as usize, Some((def, sim.pos)));
+        let (fx, fz) = slot
+            .and_then(|k| crate::surface::slot_approach(content, &ctx.nav, o, k))
+            .or_else(|| ctx.index.links.approach_of(seat))
+            .unwrap_or_else(|| o.front_tile(content));
         if let Some(waypoints) = walk_route(ctx, sim, (fx, fz), [fx as f32 + 0.5, fz as f32 + 0.5]) {
             let o = &mut objects[seat as usize];
-            if o.reserve_seat(sim.id, &content.objects[o.def]) {
+            if o.reserve_seat(sim.id, &content.objects[o.def], sim.pos) {
                 let task = Task { kind: TaskKind::Phone { action, contact, seat: Some(seat), answer: Answer::Pending }, ..task };
                 sim.pose = Pose::Stand;
                 sim.current = Some(Activity { task, phase: Phase::Routing { waypoints, next: 0 }, tags: act.tags });
@@ -497,8 +502,9 @@ pub(crate) fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &[ObjectInstance]) {
     if let Some(o) = seat.map(|s| &objects[s as usize]) {
         // They stand back up where they came from (see `end_activity`).
         sim.seated_from = Some(sim.tile());
-        sim.pos = o.slot_position(ctx.content, o.slot_of(sim.id).unwrap_or(0));
-        sim.yaw = o.yaw();
+        let slot = o.slot_of(sim.id).unwrap_or(0);
+        sim.pos = o.slot_position(ctx.content, slot);
+        sim.yaw = o.slot_yaw(ctx.content, slot);
         sim.pose = Pose::Sit;
     }
     if let Some(act) = sim.current.as_mut() {

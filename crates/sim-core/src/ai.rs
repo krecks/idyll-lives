@@ -170,6 +170,7 @@ mod tests {
             needs_table: false,
             whole: false,
             seat_near: 0.0,
+            seat_facing: None,
             broadcast: 0.0,
             broadcast_range: 6.0,
             recipe: None,

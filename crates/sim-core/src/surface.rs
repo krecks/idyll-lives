@@ -206,9 +206,9 @@ impl Top {
     }
 }
 
-/// Which way an object faces, turn included (radians; see `ObjectInstance::yaw`).
+/// Which way an object faces, turn included (radians; see `ObjectInstance::angle`).
 fn angle(o: &ObjectInstance) -> f32 {
-    o.yaw() + (o.turn as f32).to_radians()
+    o.angle()
 }
 
 /// Where an object's middle is, its offset included (tiles).
@@ -350,13 +350,7 @@ pub fn approach_tiles<'a>(
     let r = (obj.rot % 4) as usize;
     let order = [r, (r + 2) % 4, (r + 3) % 4, (r + 1) % 4];
     let storey = nav.stairs.storey(z);
-    let standable = move |(t, inner): ((i32, i32), (i32, i32))| {
-        nav.tile_free(t.0, t.1)
-            && nav.lot.in_bounds(inner.0, inner.1)
-            && nav.stairs.storey(t.1) == storey
-            && nav.stairs.step(t.0, t.1).is_none()
-            && nav.lot.edge_between(inner.0, inner.1, t.0, t.1) == Edge::Open
-    };
+    let standable = move |(t, inner): ((i32, i32), (i32, i32))| stands_by(nav, storey, t, inner);
     // The other middle tile along an even front edge (the front tile is the lower of the two).
     let twin = match r {
         0 | 2 if w % 2 == 0 => Some(((sides[r].0.0 + 1, sides[r].0.1), (sides[r].1.0 + 1, sides[r].1.1))),
@@ -367,6 +361,46 @@ pub fn approach_tiles<'a>(
     let only_front = (!around).then_some(front);
     let beside = around.then_some(order.map(|i| sides[i])).into_iter().flatten().filter_map(move |s| standable(s).then_some(s.0));
     instead.into_iter().chain(only_front).chain(beside)
+}
+
+/// Whether a resident can stand on tile `t` to use a thing on storey `storey` from it: free, on
+/// that storey, not on a stair, and (beside its tile `inner`, on the lot) with no wall or fence
+/// between.
+fn stands_by(nav: &NavGrid, storey: i32, t: (i32, i32), inner: (i32, i32)) -> bool {
+    nav.tile_free(t.0, t.1)
+        && nav.lot.in_bounds(inner.0, inner.1)
+        && nav.stairs.storey(t.1) == storey
+        && nav.stairs.step(t.0, t.1).is_none()
+        // (Diagonally beside it, where the place is off a corner: no one edge between.)
+        && ((t.0 - inner.0).abs() + (t.1 - inner.1).abs() != 1 || nav.lot.edge_between(inner.0, inner.1, t.0, t.1) == Edge::Open)
+}
+
+/// The tile a resident uses `slot` of `obj` from when the slot has its own place (content
+/// `places`): the place's own tile when it's off the footprint (standing at a ping-pong table's
+/// end), else the first tile off the footprint behind it, against the way its user faces (round
+/// to a picnic table's far bench). None without a place, or when that tile can't be stood on
+/// (see `approach_tiles`): then they come from the object's own.
+pub fn slot_approach(content: &Content, nav: &NavGrid, obj: &ObjectInstance, slot: usize) -> Option<(i32, i32)> {
+    content.objects[obj.def].places.get(slot)?;
+    let at = obj.slot_position(content, slot);
+    let yaw = obj.slot_yaw(content, slot);
+    let tile = |p: [f32; 2]| (p[0].floor() as i32, p[1].floor() as i32);
+    let on = |t: (i32, i32)| obj.tiles(content).any(|f| f == t);
+    let off = !on(tile(at));
+    // Along the way they face from a place off it (into the object), against it from one on it
+    // (out of it), until the footprint's edge is crossed: `t` off it, `inner` on it.
+    let step = if off { 0.1 } else { -0.1 };
+    let (mut last, mut found) = (tile(at), None);
+    for k in 1..=40 {
+        let p = tile([at[0] + yaw.sin() * step * k as f32, at[1] + yaw.cos() * step * k as f32]);
+        if on(p) != on(last) {
+            found = Some(if off { (last, p) } else { (p, last) });
+            break;
+        }
+        last = p;
+    }
+    let (t, inner) = found?;
+    stands_by(nav, nav.stairs.storey(obj.z), t, inner).then_some(t)
 }
 
 /// The table `seat` faces: the top covering its front tile, of a kind it tucks under (its
@@ -486,8 +520,10 @@ pub fn free_surface_spot_near(
 fn plate_target(content: &Content, objects: &[ObjectInstance], links: &Links, seat: u32, slot: usize) -> Option<(Top, [f32; 2])> {
     let s = objects.get(seat as usize)?;
     let def = &content.objects[s.def];
-    let at = s.slot_position(content, slot.min(def.slots.max(1) as usize - 1));
-    let a = angle(s);
+    let slot = slot.min(def.slots.max(1) as usize - 1);
+    let at = s.slot_position(content, slot);
+    // (The way they face in it: across the table from a place of their own, `places`.)
+    let a = if def.places.is_empty() { angle(s) } else { s.slot_yaw(content, slot) };
     let forward = [a.sin(), a.cos()];
     let ahead = |t: f32| [at[0] + forward[0] * t, at[1] + forward[1] * t];
     if let Some(top) = Top::of(content, s) {

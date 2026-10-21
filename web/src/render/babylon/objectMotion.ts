@@ -26,7 +26,7 @@ import { Matrix, type Mesh, type Vector3 } from './core';
 import { GAME_RATE, QUIET_SPEED } from './characters';
 import { partPose, type ModelClip, type ModelMotion, type Motions } from './models';
 import type { FrameState } from '../../core/bridge';
-import type { ObjectPlacement } from '../../core/protocol';
+import { objectCentre, type ObjectPlacement } from '../../core/protocol';
 
 /** A placed object with moving parts. */
 export interface MovingObject {
@@ -462,18 +462,38 @@ export class ObjectMotion {
   }
 }
 
+/** What `slotPlace` needs of an object's kind. */
+type SlotDef = { slots?: number; bunk?: boolean; footprint?: [number, number]; places?: { at: [number, number]; facing?: number }[] };
+
 /**
- * Which of `o`'s slots (content `slots`, from 0) a resident at `x`, `z` is in, as sim-core's
- * `slot_position` spreads them along the object's width (a bunk's two a hair apart, the upper one right).
+ * Where the resident in slot `k` of `o` is and which way they face (sim coordinates, yaw as sim-core's), as
+ * sim-core's `slot_position` and `slot_yaw` have it: at its place (content `places`, turned and sized with it),
+ * else spread along the object's width (a bunk's two a hair apart, the upper one right), facing its front.
  */
-export function slotOf(o: ObjectPlacement, def: { slots?: number; bunk?: boolean } | undefined): (x: number, z: number) => number {
+export function slotPlace(o: ObjectPlacement, def: SlotDef | undefined, k: number): { x: number; z: number; yaw: number } {
+  const c = objectCentre(o);
+  const place = def?.places?.[k];
+  if (place) {
+    const a = (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180;
+    const [fw, fd] = def?.footprint ?? [1, 1];
+    const x = place.at[0] * (o.size ? o.size[0] / 100 / fw : 1);
+    const z = place.at[1] * (o.size ? o.size[1] / 100 / fd : 1);
+    return { x: c.x + Math.cos(a) * x + Math.sin(a) * z, z: c.z - Math.sin(a) * x + Math.cos(a) * z, yaw: a + ((place.facing ?? 0) * Math.PI) / 180 };
+  }
   const n = Math.max(1, def?.slots ?? 1);
   const yaw = (o.rot * Math.PI) / 2;
   const width = o.size ? o.size[0] / 100 : o.rot % 2 ? o.d : o.w;
-  const spread = def?.bunk ? 0.04 : width / n;
+  const across = (k - (n - 1) / 2) * (def?.bunk ? 0.04 : width / n);
+  return { x: c.x + Math.cos(yaw) * across, z: c.z - Math.sin(yaw) * across, yaw };
+}
+
+/** Which of `o`'s slots (content `slots`, from 0) a resident at `x`, `z` is in: the nearest of their places (`slotPlace`). */
+export function slotOf(o: ObjectPlacement, def: SlotDef | undefined): (x: number, z: number) => number {
+  const places = Array.from({ length: Math.max(1, def?.slots ?? 1) }, (_, k) => slotPlace(o, def, k));
   return (x, z) => {
-    const across = (x - o.x - o.w / 2) * Math.cos(yaw) - (z - o.z - o.d / 2) * Math.sin(yaw);
-    return Math.min(n - 1, Math.max(0, Math.round(across / spread + (n - 1) / 2)));
+    let best = 0;
+    for (let k = 1; k < places.length; k++) if (Math.hypot(places[k].x - x, places[k].z - z) < Math.hypot(places[best].x - x, places[best].z - z)) best = k;
+    return best;
   };
 }
 

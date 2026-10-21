@@ -28,6 +28,8 @@ export interface InteractionDef {
   pose?: 'stand' | 'sit' | 'lie';
   /** Sit on a free seat within this many metres of the object, if there is one (watching TV from the sofa). */
   seatNear?: number;
+  /** Only a seat that looks at the object: from in front of it (`front`, a screen) or from any side (`around`, a fire). */
+  seatFacing?: 'front' | 'around';
   /** Share (0..1) of the use's need gains that nearby residents get too (hearing the TV while eating). */
   broadcast?: number;
   /** How far (m) that carries outside the same room. */
@@ -184,6 +186,12 @@ export interface ObjectDef {
   description?: string;
   /** Sims that can use it at once. */
   slots?: number;
+  /**
+   * Each slot's place (sim-core `ObjectInstance::slot_position`, `slot_yaw`; `slotPlace`): metres off the
+   * footprint's middle to its right and front (before turning, for its own size), and the way its user faces,
+   * degrees from its front towards its right. Absent: spread across its width, facing its front.
+   */
+  places?: { at: [number, number]; facing?: number }[];
   /** Things it provides while it works (interactions `requires`): a coffee machine provides coffee. */
   provides?: string[];
   /** Can only be placed outdoors (trees, flower beds, ponds). */
