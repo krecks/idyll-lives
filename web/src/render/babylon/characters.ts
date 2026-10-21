@@ -210,9 +210,10 @@ const CROUCH_SHOULDER = 0.55;
  * the action's (none: the action's own, up at the part used), and where: the feet `to` m from the object's
  * middle (along its facing), `up` m above the ground (the clips in `street.ts` are fitted to the drinking
  * fountain and the climbing frame for each size), and at one of `lanes`, m to the object's right of its
- * middle: the first no one else using it has taken (sim-core stands everyone using it on the same tile in
- * front, of a 2-wide thing the one with the lower x or z: the climbing frame's net side or its pole's, by
- * its facing). `wait`: seconds into the use before stepping in (the phone box's door opening first; its
+ * middle: the one nearest where sim-core stood them (each in front of their own slot) no one else using it
+ * has taken; with all of them taken, none: they use it from there. `sides`: used from its front or its back
+ * (sim-core's `places`: the pool and foosball players across the table), `to` and `lanes` measured from the
+ * side they stand on. `wait`: seconds into the use before stepping in (the phone box's door opening first; its
  * clip `delay`s so that they stand `back` m back from the tile's middle first, clear of the door), and
  * `out` seconds after the use before stepping
  * out (the door opening again, `out` in its motions). `perLane`: the clips are one per lane, not a sequence (each
@@ -222,6 +223,7 @@ const CROUCH_SHOULDER = 0.55;
 interface StepIn {
   by: readonly (readonly [height: number, clip: readonly string[], at: { to: number; up?: number }])[];
   lanes?: readonly number[];
+  sides?: boolean;
   wait?: number;
   back?: number;
   out?: number;
@@ -236,11 +238,11 @@ const STEP_IN: Record<string, StepIn> = {
   phoneBooth: { by: [[0, ['phone'], { to: -0.04, up: 0.12 }]], wait: 1, back: 0.25, out: 0.25 },
   // Side by side on the net (0.9 m wide, from -0.75 m), each round over the deck and down the pole.
   climbingFrame: { by: CLIMB.map(({ clip, min, fit }) => [min, CLIMB_LANES.map((_, lane) => climbClip(clip, lane)), fit] as const), lanes: CLIMB_LANES, perLane: true },
-  // Games and sport up against the thing (`clips/games.ts`): bent over the pool table's long rail (two players, a
-  // lane each), at a pair of the foosball rods, at the plate stack and the crate, up on the bouldering wall's crash
+  // Games and sport up against the thing (`clips/games.ts`): bent over the pool table's long rail (two players, one
+  // on each long side), at a pair of the foosball rods (one each side), at the plate stack and the crate, up on the bouldering wall's crash
   // mat, and on the yoga mat's front end, facing along it.
-  poolTable: { by: POOL.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: [-0.55, 0.55] },
-  foosball: { by: FOOS.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: FOOS_LANES },
+  poolTable: { by: POOL.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: [-0.55, 0.55], sides: true },
+  foosball: { by: FOOS.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: FOOS_LANES, sides: true },
   'hotHeaded.smashBin': { by: SMASH.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
   'energetic.boulderingWall': { by: BOULDER.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: [0] },
   yogaMat: { by: [[0, ['yoga'], YOGA_AT]] },
@@ -388,8 +390,10 @@ const SLING = { pillow: 0.07, ankle: 0.07, feet: 0.12, lift: 0.7, back: 0.02, cr
 function slingTop(sling: NonNullable<Bed['sling']>, d: number): number {
   return sling.low + (sling.end - sling.low) * Math.min(1, (d / sling.half) ** 2);
 }
-/** Getting into bed: where the hips sit down, forward of the slot centre (body scale 1). */
+/** Getting into bed over its foot (its sides blocked): where the hips sit down, forward of the slot centre (body scale 1). */
 const LIE_ENTRY = 0.55;
+/** Getting into bed from its side (`sideIn`): how far in from its edge the hips sit down (body scale 1). */
+const SIDE_IN = 0.2;
 /** How far the feet reach past the slot centre for a lying Sim, and their back's height above the feet line: babies (much smaller) lie centred in the crib, on the mattress. */
 function lieCentre(rig: SimRig): number {
   // (A smaller body than its family's base body, a child's, lies with its head where a grown-up's would be, on the pillow.)
@@ -902,6 +906,28 @@ interface SimRig {
   fromBed: boolean;
   lieX: number;
   lieZ: number;
+  /** The way they lay (kept while lying), for turning out of bed to the side sim-core turned them (`outOfBed`). */
+  lieYaw: number;
+  /**
+   * Getting into bed from its side (sim-core brings them to the tile beside it, content `approach: side`):
+   * the way they sit on its edge first, facing out (NaN: from its foot, as `LIE_ENTRY`), and how far
+   * out from the slot the hips sit (m).
+   */
+  sideYaw: number;
+  sideOut: number;
+  /** Where they stood just before sitting or lying down (world), to tell the side they came from. */
+  fromX: number;
+  fromZ: number;
+  /**
+   * Getting up from a seat: sim-core puts the Sim on the tile they came from at once; they rise where
+   * the seat is (`riseX`, `riseZ`: the seated root as last drawn) and step to the tile while rising
+   * (`rising`).
+   */
+  rising: boolean;
+  riseX: number;
+  riseZ: number;
+  sitX: number;
+  sitZ: number;
   /**
    * Using a thing from inside or up against it (`STEP_IN`): which and how (null: not), the seconds since
    * the use began, and where they were last drawn (world); stepping back out to the tile in front after:
@@ -912,8 +938,9 @@ interface SimRig {
   inX: number;
   inY: number;
   inZ: number;
-  /** Its lane (`lanes`), and the step in's sideways part to it (world). */
+  /** Its lane (`lanes`), the way they face it (`stepFacing`), and the step in's sideways part to it (world). */
   inLane: number;
+  inFacing: number;
   inDX: number;
   inDZ: number;
   outT: number;
@@ -1565,12 +1592,23 @@ export class Characters {
         fromBed: false,
         lieX: 0,
         lieZ: 0,
+        lieYaw: 0,
+        sideYaw: NaN,
+        sideOut: 0,
+        fromX: 0,
+        fromZ: 0,
+        rising: false,
+        riseX: 0,
+        riseZ: 0,
+        sitX: 0,
+        sitZ: 0,
         inside: null,
         inT: 0,
         inX: 0,
         inY: 0,
         inZ: 0,
         inLane: 0,
+        inFacing: 0,
         inDX: 0,
         inDZ: 0,
         outT: -1,
@@ -2436,16 +2474,25 @@ export class Characters {
         rig.speed = 0;
         rig.lastPose = pose;
       }
-      const dx = tx - rig.x;
-      const dz = tz - rig.z;
+      // Sitting or lying down: where they stood, and getting into bed, whether from its side (`sideIn`).
+      if ((pose === Pose.Sit || pose === Pose.Lie) && rig.lastPose === Pose.Stand && !appeared) {
+        [rig.fromX, rig.fromZ] = [rig.x, rig.z];
+        rig.sideYaw = pose === Pose.Lie ? this.sideIn(rig, useObj ?? this.objectAt(tx, tz), tx, tz) : NaN;
+      } else if (pose === Pose.Stand || appeared) rig.sideYaw = NaN;
+      // (Into bed from its side: onto its edge first, facing out, then in to the slot lying back.)
+      const edge = pose === Pose.Lie && !Number.isNaN(rig.sideYaw) && gettingIn(rig) ? rig.sideOut : 0;
+      const gx = tx + Math.sin(rig.sideYaw) * edge || tx;
+      const gz = tz + Math.cos(rig.sideYaw) * edge || tz;
+      const dx = gx - rig.x;
+      const dz = gz - rig.z;
       const dist = Math.hypot(dx, dz);
       if (dt > 0) {
         const inst = dist / dt;
         rig.speed += (Math.min(inst, 20) - rig.speed) * (1 - Math.exp(-dt * 10));
       }
       if (moving || dist > SNAP_DISTANCE || !rig.visible) {
-        rig.x = tx;
-        rig.z = tz;
+        rig.x = gx;
+        rig.z = gz;
       } else {
         // Settle into seats / beds / next to objects instead of popping.
         const f = 1 - Math.exp(-dt * 9);
@@ -2453,6 +2500,12 @@ export class Characters {
         rig.z += dz * f;
       }
       let faceYaw = tyaw;
+      // Into bed from its side: facing out on its edge, then turned to lie along it as they lie back; out
+      // of it to the side sim-core turned them, turned from lying to that as they sit up and rise.
+      let turned: number | null = null;
+      if (edge) faceYaw = rig.sideYaw;
+      else if (pose === Pose.Lie && !Number.isNaN(rig.sideYaw) && rig.cur.key === 'lie' && rig.prev.key === 'sitDown' && rig.w < 1) turned = lerpAngle(rig.sideYaw, tyaw, smooth(rig.w));
+      else if (pose === Pose.Stand && rig.fromBed && rig.cur.key === 'standUp' && rig.w < 1) turned = lerpAngle(rig.lieYaw, tyaw, smooth(rig.w));
       // A bed lain on across (`BEDS` `across`): turned a quarter, feet to its right.
       rig.lieAcross = pose === Pose.Lie && !!BEDS[(useObj ?? this.objectAt(rig.x, rig.z))?.def ?? '']?.across;
       if (rig.lieAcross) faceYaw = wrapAngle(tyaw + Math.PI / 2);
@@ -2493,7 +2546,7 @@ export class Characters {
       // Walkers turn as quickly as the game runs (up to 10x): sped up, the corners of their way come sooner.
       const turn = moving ? clamp(gameRate, 1, 10) : 1;
       const maxTurn = (moving ? 9 : 6) * dt * turn;
-      rig.yaw = dir ? wrapAngle(faceYaw) : wrapAngle(rig.yaw + clamp(dyaw * (1 - Math.exp(-dt * 12 * turn)), -maxTurn, maxTurn));
+      rig.yaw = dir ? wrapAngle(faceYaw) : turned !== null ? wrapAngle(turned) : wrapAngle(rig.yaw + clamp(dyaw * (1 - Math.exp(-dt * 12 * turn)), -maxTurn, maxTurn));
       rig.visible = true;
       this.visible[i] = 1;
 
@@ -2578,6 +2631,13 @@ export class Characters {
       pl.y = rootY + rig.floorY;
       pl.z = rig.z + Math.cos(rig.yaw) * rootFwd;
       this.stepPlace(rig, pl, step);
+      if (pose === Pose.Sit) [rig.sitX, rig.sitZ] = [pl.x, pl.z];
+      else if (rig.rising && rig.cur.key === 'standUp') {
+        // Rising off a seat where it is, then stepping off to the tile sim-core put them on (`rising`).
+        const k = smooth(clamp((rig.cur.time / rig.cur.clip!.duration - 0.25) / 0.5, 0, 1));
+        pl.x = lerp(rig.riseX, pl.x, k);
+        pl.z = lerp(rig.riseZ, pl.z, k);
+      }
       pl.scale = rig.scale;
       pl.head = rig.head;
       pl.build = rig.build;
@@ -2606,8 +2666,8 @@ export class Characters {
       shadows[m] = r;
       shadows[m + 5] = 1;
       shadows[m + 10] = r;
-      // (Under them inside a thing they use from inside, and on its floor: `STEP_IN`.)
-      const stepped = !!rig.inside || rig.outT >= 0;
+      // (Under them inside a thing they use from inside, and on its floor: `STEP_IN`; rising off a seat.)
+      const stepped = !!rig.inside || rig.outT >= 0 || (rig.rising && rig.cur.key === 'standUp');
       shadows[m + 12] = stepped ? pl.x : rig.x;
       shadows[m + 13] = 0.02 + (stepped ? pl.y : rig.floorY);
       shadows[m + 14] = stepped ? pl.z : rig.z;
@@ -2708,7 +2768,8 @@ export class Characters {
         const sp = this.sitPelvis.get(rig.body.name)!;
         key = 'sitDown';
         rootY = rig.bedH - sp.y * rig.scale;
-        rootFwd = LIE_ENTRY * rig.scale - sp.z * rig.scale + rig.bedFwd;
+        // (From its side: on its edge, where they are drawn, facing out: `sideIn`.)
+        rootFwd = (Number.isNaN(rig.sideYaw) ? LIE_ENTRY * rig.scale + rig.bedFwd : 0) - sp.z * rig.scale;
         fade = 0.35;
         if (rig.cur.key !== 'sitDown') rig.actTime = 0;
       } else if (rig.body.stage === 'baby') {
@@ -2737,6 +2798,7 @@ export class Characters {
         // (Where it lies, for getting up: by then the Sim has already moved off the bed.)
         rig.lieX = rig.x;
         rig.lieZ = rig.z;
+        rig.lieYaw = rig.yaw;
       }
       hands = tag === 'lift' ? HANDS.grip : HANDS.open;
     } else if (pose === Pose.Sit) {
@@ -2843,8 +2905,10 @@ export class Characters {
       rig.useDef = obj?.def ?? '';
       rig.useObj = obj ?? null;
       // Used from inside or up against it (`STEP_IN`): the clip for their height.
-      const into = known && obj && (!STEP_IN[obj.def]?.tag || STEP_IN[obj.def].tag === tag) ? STEP_IN[obj.def] : undefined;
-      const fitted = into ? this.stepSeq(rig, into) : undefined;
+      // (With every lane taken by others, from where sim-core stood them: three at the bus stop's timetable.)
+      const entry = known && obj && (!STEP_IN[obj.def]?.tag || STEP_IN[obj.def].tag === tag) ? STEP_IN[obj.def] : undefined;
+      const into = entry && obj && (rig.inside === entry || !Number.isNaN(this.freeLane(rig, entry, obj))) ? entry : undefined;
+      const fitted = into && obj ? this.stepSeq(rig, into, obj) : undefined;
       // (Bouncing and vibrating on the equipment, content `stand`: the idle with `activityPose` on top.)
       const seq = fitted?.length
         ? fitted
@@ -2934,10 +2998,13 @@ export class Characters {
       key = 'standUp';
       rig.fromBed = rig.lastPose === Pose.Lie && !!rig.bed;
       if (rig.fromBed) fade = 0.9;
+      // (Off a seat: rising where it is, then stepping off to the tile: `riseX`.)
+      rig.rising = rig.lastPose === Pose.Sit;
+      [rig.riseX, rig.riseZ] = [rig.sitX, rig.sitZ];
     } else if (rig.cur.key === 'standUp' && !moving && pose === Pose.Stand && rig.cur.time < rig.cur.clip!.duration - 0.25) {
       key = 'standUp';
     }
-    if (key !== 'standUp') rig.fromBed = false;
+    if (key !== 'standUp') rig.fromBed = rig.rising = false;
     if (pose !== Pose.Sit) rootFwd += this.tuckOut(rig, key, step);
     // Carrying something while walking or standing about (not while using a station with it).
     if (carry && pose === Pose.Stand && !upper && !dir?.clip && key !== 'standUp' && (moving || !rig.useSeq) && social !== Anim.Hug && social !== Anim.Fight) {
@@ -3005,23 +3072,60 @@ export class Characters {
     }
   }
 
+  /**
+   * Lying down on `bed` at its slot (`sx`, `sz`, sim-core's): from its side (they stood beside it, sim-core's
+   * `approach: side`), the way they face sitting on its edge first, facing out (`sideOut`: how far out from
+   * the slot their hips go, `SIDE_IN` in from the edge); NaN from its foot (`LIE_ENTRY`), for a bed lain on
+   * across, a hammock's sling and a bunk's upper sleeper (up its ladder).
+   */
+  private sideIn(rig: SimRig, bed: PlacedObject | null, sx: number, sz: number): number {
+    const def = bed ? BEDS[bed.def] : undefined;
+    if (!bed || def?.across || def?.sling || rig.body.stage === 'baby') return NaN;
+    const f = (bed.rot * Math.PI) / 2;
+    const across = (x: number, z: number) => (x - bed.cx) * Math.cos(f) - (z - bed.cz) * Math.sin(f);
+    if (BUNKS[bed.def] && across(sx, sz) > 0) return NaN;
+    const [ax, az] = [rig.fromX - sx, rig.fromZ - sz];
+    const side = ax * Math.cos(f) - az * Math.sin(f);
+    const along = ax * Math.sin(f) + az * Math.cos(f);
+    if (Math.abs(side) <= Math.abs(along)) return NaN;
+    const s = Math.sign(side);
+    const half = (Math.abs(Math.cos(f)) * (bed.maxX - bed.minX) + Math.abs(Math.sin(f)) * (bed.maxZ - bed.minZ)) / 2;
+    rig.sideOut = Math.max(0.1, half - s * across(sx, sz) - SIDE_IN * rig.scale);
+    return wrapAngle(f + (s * Math.PI) / 2);
+  }
+
   /** The size of `STEP_IN` entry `into` for this resident's height: [height, clips, where]. */
   private stepFit(rig: SimRig, into: StepIn): StepIn['by'][number] {
     const h = rig.body.height * rig.scale;
     return into.by.find(([min]) => h >= min) ?? into.by[into.by.length - 1];
   }
 
-  /** The first of `into`'s lanes no one else using the same thing has taken (its middle without lanes). */
-  private freeLane(rig: SimRig, into: StepIn): number {
-    const taken = this.sims.filter((r) => r && r !== rig && r.inside === into && r.useId === rig.useId).map((r) => r!.inLane);
-    return into.lanes?.find((x) => !taken.includes(x)) ?? into.lanes?.[0] ?? 0;
+  /** The way `rig` faces using `obj` up against it (`STEP_IN`): its front, or (`sides`) the side of it they stand on, front or back. */
+  private stepFacing(rig: SimRig, obj: PlacedObject, into: StepIn): number {
+    const f = (obj.rot * Math.PI) / 2;
+    return into.sides && (rig.x - obj.cx) * Math.sin(f) + (rig.z - obj.cz) * Math.cos(f) < 0 ? wrapAngle(f + Math.PI) : f;
+  }
+
+  /**
+   * The lane of `into`'s (`lanes`, to the right of the middle of the side they use it from) nearest where
+   * sim-core stood them (each in front of their own slot) that no one else using the same thing from that
+   * side has taken; NaN with every one taken (they use it from where they stand), its middle without lanes.
+   */
+  private freeLane(rig: SimRig, into: StepIn, obj: PlacedObject): number {
+    if (!into.lanes) return 0;
+    const f = this.stepFacing(rig, obj, into);
+    const taken = this.sims.filter((r) => r && r !== rig && r.inside === into && r.useId === rig.useId && Math.abs(wrapAngle(r.inFacing - f)) < 0.1).map((r) => r!.inLane);
+    const across = (rig.x - obj.cx) * Math.cos(f) - (rig.z - obj.cz) * Math.sin(f);
+    let best = NaN;
+    for (const x of into.lanes) if (!taken.includes(x) && !(Math.abs(x - across) >= Math.abs(best - across))) best = x;
+    return best;
   }
 
   /** The clips played using `into` (`STEP_IN`): its sequence for the resident's height, or (`perLane`) the one for their lane. */
-  private stepSeq(rig: SimRig, into: StepIn): readonly string[] {
+  private stepSeq(rig: SimRig, into: StepIn, obj: PlacedObject): readonly string[] {
     const seq = this.stepFit(rig, into)[1];
     if (!into.perLane || !into.lanes) return seq;
-    const lane = Math.max(0, into.lanes.indexOf(rig.inside === into ? rig.inLane : this.freeLane(rig, into)));
+    const lane = Math.max(0, into.lanes.indexOf(rig.inside === into ? rig.inLane : this.freeLane(rig, into, obj)));
     const clip = seq[lane % seq.length];
     let one = LANE_SEQ.get(clip);
     if (!one) LANE_SEQ.set(clip, (one = [clip]));
@@ -3039,15 +3143,16 @@ export class Characters {
       rig.inside = into;
       rig.inT = 0;
       rig.outT = -1;
-      rig.inLane = this.freeLane(rig, into);
+      rig.inFacing = this.stepFacing(rig, obj, into);
+      rig.inLane = this.freeLane(rig, into, obj);
     } else rig.inT += step;
     const at = this.stepFit(rig, into)[2];
-    const f = (obj.rot * Math.PI) / 2;
-    // The tile's distance from the object's middle, along its facing; the way in from stood back.
+    const f = rig.inFacing;
+    // The tile's distance from the object's middle, along the way they face it; the way in from stood back.
     const ahead = (rig.x - obj.cx) * Math.sin(f) + (rig.z - obj.cz) * Math.cos(f);
     const back = into.back ?? 0;
     const dist = ahead - at.to + back;
-    // And sideways to its lane (along the object's right).
+    // And sideways to its lane (along the right of the side they use it from).
     const across = into.lanes ? rig.inLane - ((rig.x - obj.cx) * Math.cos(f) - (rig.z - obj.cz) * Math.sin(f)) : 0;
     const way = Math.hypot(dist, across);
     const span = Math.max(0.3, way / STEP_IN_SPEED);
@@ -4674,6 +4779,11 @@ function setFrame(f: Float32Array, xx: number, xy: number, xz: number, yx: numbe
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
+}
+
+/** Getting into bed: sitting down on its edge (until the crossfade to lying), as `choose` plays it. */
+function gettingIn(rig: SimRig): boolean {
+  return (rig.lastPose === Pose.Stand && rig.cur.key !== 'sitDown') || (rig.cur.key === 'sitDown' && rig.cur.time < rig.cur.clip!.duration - 0.35);
 }
 
 /** 0 before `from`, easing to 1 over `length` after it. */
