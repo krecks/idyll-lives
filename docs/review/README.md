@@ -35,6 +35,8 @@ The pilot (the 28 `base.json` objects and the residents) filled its rows on 2026
 
 The 15 object ledgers follow `docs/objects/<cat>.md` group by group and hold all 541 buyable objects, each in exactly one ledger.
 
+**Consolidated (2026-10-21)** into [docs/authenticity-review.md](../authenticity-review.md): 36 findings with a shared cause moved to [systems.md](systems.md) and [residents.md](residents.md), keeping their ids, with a pointer (`### <id> — moved to <ledger>.md`) left where they were; 15 duplicates closed into the older finding; every open finding put in one fix group (G-01 to G-72) or listed as not checked.
+
 ## Writing a finding
 
 From [§4 of the plan](../../plan/authenticity-review.md#4-findings-format-and-severity):

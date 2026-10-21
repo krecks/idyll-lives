@@ -283,7 +283,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S2
 - **Rubric:** A4
 - **Fix class:** code
-- **Where:** `web/src/render/babylon/characters.ts:2839` (`standUp`), `crates/sim-core/src/world.rs`
+- **Where:** `web/src/render/babylon/characters.ts:2755` (`standUp`), `crates/sim-core/src/world.rs`
 - **Evidence:** The sim puts the resident on the tile in front at once, so `standUp` plays while they glide back to it. Deferred from 0.3.0 unless the stand-up is reworked.
 - **Status:** seeded (from `docs/objects/open.md` L124); not checked in the pilot (the shots are not timed to the stand-up)
 - **Source:** `docs/objects/open.md` Still open › Residents; `plan/release-0.3.0.md` §1.4 and §8 (deferred)
@@ -495,7 +495,7 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Severity:** S2
 - **Rubric:** A1, A4, I2
 - **Fix class:** code
-- **Where:** `web/src/render/babylon/characters.ts:304` (`LIE_ENTRY` 0.55: the hips sit down 0.55 m forward of the slot's middle), `:2533-2541` (getting in: `sitDown` on the edge facing the tile they came from, then the crossfade to lying); the beds' `approach` (default `front`: the tile in front, the foot end) in `web/public/content/furniture.json` and `catalog2/bedroom.json`; getting up `:2758-2807` (`fromBed`)
+- **Where:** `web/src/render/babylon/characters.ts:304` (`LIE_ENTRY` 0.55: the hips sit down 0.55 m forward of the slot's middle), `:2533-2541` (getting in: `sitDown` on the edge facing the tile they came from, then the crossfade to lying); the beds' `approach` (default `front`: the tile in front, the foot end) in `web/public/content/furniture.json` and `catalog2/bedroom.json`; getting up `web/src/render/babylon/characters.ts:2755-2807` (`standUp`, `fromBed`)
 - **Evidence:** `bedroom/play/chunk1/bedSingle-sleep-00.png`: the resident sits down facing out, about 0.4 m in from the foot end of the single, the thighs through its 0.6 m footboard; `bedroom/play/stage-elder/bedSingle-sleep-01.png` (the elder, the same, the shoes on the mattress); `bedroom/play/chunk1/bedKing-sleep-01.png` (half way through the crossfade, half reclined in the middle of the bed); `bedroom/extra/bunk-two-02.png` (the bunk's end board). From there the body crossfades about 1.4 m up the bed to lie with the head on the pillow. People get in at a side, sit on the edge by the pillow and swing the legs in. On beds with a footboard or end arms (`bedSingle`, `bedBunk`, `bedDaybed`) the legs pass through it; on the rest (`bed`, `bedKing`, `bedDouble`, `bedQueenUpholstered`, `bedCanopy`, `bedFuton`) it is the sit at the foot and the slide. Other items: `kidsBed`, `kidsBedCar` (kids), `wallBed`, `sofaBed` (living), the packs' beds: every `lie` use on a bed. Cause in the renderer and the beds' approach: for `residents.md` (row "Lie fit").
 - **Status:** open
 - **Source:** wave: bedroom

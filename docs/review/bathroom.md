@@ -179,7 +179,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S2
 - **Rubric:** A8, A10, M7
 - **Fix class:** model
-- **Where:** `tools/art/blender/families/bathroom.py:554` (`glass_door`, part of the still body) and `:999` (`SHOWER = {'uses': {'shower': 'water_on'}}`); `web/public/content/base.json:2552` (`inside: true`)
+- **Where:** `tools/art/blender/families/bathroom.py:554` (`glass_door`, part of the still body) and `:999` (`SHOWER = {'uses': {'shower': 'water_on'}}`); `web/public/content/base.json:2564` (`inside: true`)
 - **Evidence:** `play/shower-shower-00.png` to `-02.png`, `sheets/obj-shower.png`: the front has a sliding glass door with a handle, but it is built into the still body and no clip moves it; the resident steps in through the shut glass and showers behind it. The README's own example (`{'uses': {'shower': [{'clip': 'door_open', 'hold': 1}, 'water_on']}}`) is the fix: the door its own part, slid open as they step in and shut behind them, and again as they leave (`out`).
   Bathroom wave: the base shower's alone. `docs/objects/bathroom.md` (B2) says the door stays shut because a moving glass part would be a 4th draw call: a budget choice for triage. The walk-in and rain showers have an open way in (`bathroom/sheets/obj-showerWalkIn.png`, `obj-showerRain.png`); the stall's curtain is A-bathroom-02.
 - **Status:** confirmed (bathroom wave: on `shower` only)
