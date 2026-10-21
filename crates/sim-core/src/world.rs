@@ -29,6 +29,9 @@ const AUTONOMY_DELAY_TICKS: u32 = TICKS_PER_SECOND;
 /// which they do nothing else (`Sim::ladder_ticks`).
 pub(crate) const LADDER_DOWN_TICKS: u32 = 13 * TICKS_PER_SECOND / 2;
 const MIN_AUTONOMY_SCORE: f32 = 0.01;
+/// How much less a meal nobody at home would eat tempts free will (the cooking practice it
+/// gives aside): cooked only with nothing much else to do.
+const UNWANTED_MEAL: f32 = 0.1;
 /// A baby with a need below this cries for someone (and lies awake in the crib).
 const BABY_CRIES_BELOW: f32 = 0.3;
 pub const TICKS_PER_DAY: u64 = crate::clock::TICKS_PER_DAY;
@@ -4310,10 +4313,12 @@ fn pick_autonomous(
             // Better objects and more skilled Sims get more out of it, and know it.
             let boost = quality_boost(content, inter, obj.quality) * inter.skill_factor(&content.skill_rules, &sim.skills);
             let gains = ai::score_felt(needs, &felt, &inter.total_gain.map(|g| g * boost), distance);
+            // A meal nobody at home would eat (a household that has eaten): cooked only with
+            // nothing much else to do, not to practise at mid-morning.
+            let mut unwanted = false;
             let mut s = match inter.recipe {
-                // A recipe: only at home with every station it needs, and for someone who'd eat
-                // it (not a meal for a household that has eaten). Long ones tempt less, a
-                // hungry family more, and with food ready hardly at all.
+                // A recipe: only at home with every station it needs. Long ones tempt less, a
+                // hungry family more, and with food ready (or nobody to eat it) hardly at all.
                 Some(r) => {
                     let r = &content.recipes[r];
                     let at_home = ctx.object_plot[obj.id as usize].is_some_and(|p| Some(p) == ctx.households[sim.household as usize].plot);
@@ -4327,9 +4332,7 @@ fn pick_autonomous(
                         continue;
                     }
                     let hungry = crate::cooking::hungry_housemates(sim, ctx, r) as f32;
-                    if hungry == 0.0 && !crate::cooking::hungry_for(sim, content, r) {
-                        continue;
-                    }
+                    unwanted = hungry == 0.0 && !crate::cooking::hungry_for(sim, content, r);
                     let s = gains / (1.0 + r.minutes_with(stations) / 60.0) + content.cooking.feed_family * hungry;
                     if fresh { s * 0.2 } else { s }
                 }
@@ -4341,6 +4344,9 @@ fn pick_autonomous(
             // The plan: a block's activity is the favourite (even with full needs); goals.
             let (plan, floor) = crate::planner::object_factor(content, sim, inter, night);
             let mut s = s.max(floor) * feel(inter.tags) * plan * place;
+            if unwanted {
+                s *= UNWANTED_MEAL;
+            }
             if exhausted && inter.tags & rhythm.sleep_tags != 0 {
                 // (The schedule's daytime damping on sleep doesn't apply.)
                 s /= schedule.preference(inter.tags & rhythm.sleep_tags).clamp(1e-3, 1.0);
