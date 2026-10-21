@@ -2483,6 +2483,7 @@ export class Characters {
     }
     if (this.ghosts.length) this.poseGhosts(count, dt, time);
     this.faceDetail(count + this.ghosts.length);
+    if (this.shadowsBare) this.bareShadows();
     this.writeRing(this.reducedMotion ? 0 : now * 0.001);
     for (let i = count + this.ghosts.length; i < MAX_CHARACTERS; i++) {
       if (!this.visible[i]) continue;
@@ -3891,6 +3892,7 @@ export class Characters {
   private wear(rig: SimRig, i: number, worn: OutfitParams): void {
     rig.worn = worn;
     writeOutfit(worn, this.data, this.row(i) + this.set!.bones.length * 16);
+    if (this.bare[i] !== worn.bare) this.shadowsBare = true;
     this.bare[i] = worn.bare;
     rig.skirt = worn.parts.includes('bottom.skirt') && !(worn.bare & SHELL_BITS.bottom);
   }
@@ -3915,6 +3917,31 @@ export class Characters {
     }
     // (From `SIT_FROM`: a stride's swing of the legs leaves the skirt as it hangs.)
     d[row + set.bones.length * 16 + 18] = clamp((flex / 2 - SIT_FROM) / (SIT_FLEX - SIT_FROM), 0, 1) * rig.size;
+  }
+
+  /** Someone's `bare` changed: the shells' shadow copies are drawn again for the Sims that wear them now (`bareShadows`). */
+  private shadowsBare = false;
+
+  /**
+   * The shells' shadow copies drawn for the Sims whose clothes now draw them (the drawn shells are left out
+   * per frame, `faceDetail`; the shadow copies keep their rows, so only when someone's `bare` changes).
+   */
+  private bareShadows(): void {
+    this.shadowsBare = false;
+    for (const pm of this.shadowMeshes.values()) {
+      if (!pm.shell || !pm.mesh.isEnabled()) continue;
+      const ids = [...pm.all.filter((_, j) => j % 4 === 0)].filter((id) => !(pm.shell & this.bare[id]));
+      if (ids.length === pm.mesh.thinInstanceCount && ids.every((id, j) => pm.settings[j * 4] === id)) continue;
+      // (Nobody: not drawn, its rows kept.)
+      if (ids.length) {
+        const settings = new Float32Array(ids.length * 4);
+        ids.forEach((id, j) => (settings[j * 4] = settings[j * 4 + 1] = id));
+        pm.mesh.thinInstanceSetBuffer('bakedVertexAnimationSettingsInstanced', settings, 4, true);
+        pm.settings = settings;
+      }
+      pm.mesh.thinInstanceCount = ids.length;
+      pm.mesh.isVisible = ids.length > 0;
+    }
   }
 
   /** A base body's heights for the towel and swimwear (`OutfitFit`), from its joints at rest. */
@@ -4279,7 +4306,7 @@ export class Characters {
     mesh.doNotSyncBoundingInfo = true;
     mesh.freezeWorldMatrix();
     const range = shadow ? Range.Always : part.startsWith('lod.') ? Range.Far : part === 'body' || /^(body|top|bottom|shoes)\./.test(part) ? Range.Near : Range.Always;
-    const pm: PartMesh = { mesh, settings: new Float32Array(0), all: new Float32Array(0), detail: shadow ? 0 : (DETAIL_PX[part] ?? 0), range, shell: shadow ? 0 : shellBit(part) };
+    const pm: PartMesh = { mesh, settings: new Float32Array(0), all: new Float32Array(0), detail: shadow ? 0 : (DETAIL_PX[part] ?? 0), range, shell: shellBit(part) };
     meshes.set(key, pm);
     if (!shadow) this.parts.set(mesh, pm);
     return pm;
