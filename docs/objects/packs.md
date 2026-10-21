@@ -137,10 +137,10 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 |---|---|---|---|---|---|---|
 | `foodie.herbGarden` Windowsill herb garden | 1x1 · floor | tendHerbs:tend | decor / — | Body, Pots | Use | `sprig`: a fresh sprig grows in a pot for tendHerbs. |
 | `foodie.deliPantry` Deli pantry | 1x1 · floor | nibble:fetch cheeseBoard:cook | kitchen / — | Body, Worktop, Shelves | Use | `doors_open`: the doors swing for nibble and cheeseBoard (`hold` 2.5 s). |
-| `foodie.espressoBar` Espresso bar | 1x1 · floor | espresso:drink latteArt:drink | kitchen / — | Body, Worktop, Machine | Use | Provides `coffee`; `brew`: the coffee stream grows and the steam wand swings out for espresso and latteArt (`hold` 4 s). |
+| `foodie.espressoBar` Espresso bar | 1x1 · floor | espresso:drink latteArt:drink pour:fetch | kitchen / — | Body, Worktop, Machine | Use | Provides `coffee`; `brew`: the coffee stream grows and the steam wand swings out for espresso and latteArt (`hold` 4 s). A coffee had at a table is poured here first (`pour`, as the coffee machine's, with `brew`). |
 | `foodie.cookbookLectern` Cookbook lectern | 1x1 · floor | studyRecipes:read foodMagazines:read | kitchen / — | Body, Stool & ledge, Cookbook | Use | `page`: a page turns over for studyRecipes and foodMagazines. |
 | `foodie.pizzaOven` Wood-fired pizza oven | 2x1 · floor | bakePizza:cook warmUp:relax | outdoor / — | Body, Worktop, Brick | Use | `door_off`: the oven door lifts aside and the peel slides in for bakePizza (and any `bake` step), with the `flames`; the `flames` alone grow for warmUp. |
-| `foodie.chefsIsland` Chef's island | 2x1 · floor | tastingMenu:cook barBite:eat | kitchen / — | Body, Worktop, Stools | Use | `drawer_open` for tastingMenu (`hold` 2.5 s). Sat at on its stools for barBite. |
+| `foodie.chefsIsland` Chef's island | 2x1 · floor | tastingMenu:cook barBite:eat | kitchen / — | Body, Worktop, Stools | Use | `drawer_open` for a `chop` at it, the tasting menu's prep (`hold` 2.5 s), no longer for its cooking too (A-systems-03); nothing lights on its hob yet. Sat at on its stools for barBite. |
 
 **In play** (signed off 2026-10-17):
 - Every clip plays and shuts; nothing needed fixing.
@@ -285,7 +285,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `natureLover.veggieBed` Raised veggie bed | 2x1 · floor | tendVeggies:tend pickSnack:eat | garden / edibles | Wood, Posts & rails | Use | `harvest`: a lettuce presses down into the soil for pickSnack. `grow` follows the crop's stage (E4); `rustle` sways the plants every 2.4 s while tended. |
+| `natureLover.veggieBed` Raised veggie bed | 2x1 · floor | tendVeggies:tend pickSnack:eat | garden / edibles | Wood, Posts & rails | Use | `harvest`: a lettuce presses down into the soil along pickSnack (`over`), picked as it ends (G-50). `grow` follows the crop's stage (E4); `rustle` sways the plants every 2.4 s while tended. |
 | `natureLover.pottingBench` Potting bench | 2x1 · floor | potSeedlings:tinker tieBouquet:tinker | hobbies / — | Wood, Frame | Use | `seedling`: a seedling grows in a pot for potSeedlings; `bouquet`: a tied bouquet grows on the worktop for tieBouquet. |
 | `natureLover.birdFeeder` Bird feeder post | 1x1 · floor | birdwatch:look | outdoor / — | Wood, Roof | Use | `bird`: a bird appears for birdwatch. |
 | `natureLover.gardenHammock` Garden hammock | 2x1 · floor | swing:relax doze:nap | outdoor / — | Wood, Fabric, Stripes | Loop (E1) | `sway`: the sling rocks 8° each way while swung in or dozed in, and the resident rides it (`ride`), lain across it (`BEDS` `across`). |

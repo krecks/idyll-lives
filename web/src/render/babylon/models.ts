@@ -835,7 +835,7 @@ interface ModelExtras {
 }
 
 /** A use's clip in a manifest's `motions.uses`: its name, or the name and its own `hold` (and `delay`, `every`, `slot`, `out`); or several of these. */
-type UseEntry = string | { clip: string; hold?: number; delay?: number; every?: number; slot?: number; out?: number };
+type UseEntry = string | { clip: string; hold?: number; delay?: number; every?: number; slot?: number; out?: number; over?: 1 | -1 };
 
 /** A model entry's `motions` as the manifest writes it: when its clips play (see `Motions`). */
 interface MotionsEntry {
@@ -893,6 +893,12 @@ export interface UseClip {
   slot?: number;
   /** Opens again for so many seconds when the use ends (a phone box's door letting the caller out). */
   out?: number;
+  /**
+   * Plays along with the use instead (the snapshot's `progress`): 1 from rest to its end over the use's minutes, -1
+   * from its end back to rest; the washing hung out piece by piece and taken in, a crop picked as the hands go (the
+   * sim's state changes when the use ends: content `gradual`, a crop's `picks`).
+   */
+  over?: 1 | -1;
 }
 
 /**

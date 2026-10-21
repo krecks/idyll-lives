@@ -68,6 +68,8 @@ export interface SnapshotLayout {
     aheadZ?: number;
     /** The baby they hold in the arms (sim-core `carry::carrying`: lifting them out of the crib, carrying them): their id + 1, 0 = none (missing in older layouts). */
     carry?: number;
+    /** How far through what they do at `object` they are, 0..1 (a use's minutes, a recipe step's), while at it; else -1 (missing in older layouts). */
+    progress?: number;
   };
   /** Animation tags from content (`animations` in base.json), named by `sim.action`. */
   actions: string[];

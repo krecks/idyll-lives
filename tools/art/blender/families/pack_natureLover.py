@@ -626,7 +626,7 @@ def glasshouse():
 FAMILY = G.Family(
     'pack_natureLover', M,
     [G.Model('veggieBed', veggieBed, size=(1.87, 1.3, 0.91), centre=(0, 0.025), key='model.natureLover.veggieBed',
-             motions={'uses': {'pickSnack': 'harvest', 'tendVeggies': {'clip': 'rustle', 'delay': 0.6, 'every': 2.4}},
+             motions={'uses': {'pickSnack': {'clip': 'harvest', 'over': 1}, 'tendVeggies': {'clip': 'rustle', 'delay': 0.6, 'every': 2.4}},
                       'growth': 'grow'},
              paint=[('cedar', 'Wood'), ('cedar_dark', 'Posts & rails')]),
      G.Model('pottingBench', pottingBench, size=(1.76, 1.785, 0.6), key='model.natureLover.pottingBench',

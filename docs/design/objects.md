@@ -263,6 +263,15 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   ```json
   "motions": { "uses": { "shoot": { "clip": "swish", "delay": 1.4, "every": 3.2 } } }
   ```
+- **Along with the use:** `over` (1 or -1) holds a clip where the use has got to (the snapshot's `progress`), from
+  rest to its end over the use's minutes, or (-1) from its end back to rest: the washing let down onto the line as it's
+  hung out, drawn up as it's taken in, the raised bed's crop squashed away as it's picked. It goes with content
+  `gradual` (and a crop's `"leaves": "picked"`), whose state changes when the use ends; when it does, the clip is the
+  object's `open` (or its growth) again. A crop's clip played to its end stays there a second while the growth clip
+  goes on to picked.
+  ```json
+  "motions": { "uses": { "washing": { "clip": "washing", "over": 1 }, "takeIn": { "clip": "washing", "over": -1 } }, "open": "washing" }
+  ```
 - **Per slot:** `slot` plays a clip only for the resident in that slot (content `slots`, from 0 as
   sim-core's `slot_position` spreads them, or as the content's `places` put them; a bunk's upper bunk
   is 1), so each bunk's duvet turns down for its own sleeper. The renderer tells the slot by where the resident is. (The sofas still sink every seat

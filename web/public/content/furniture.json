@@ -489,8 +489,24 @@
       "price": 260,
       "category": "kitchen",
       "group": "appliances",
-      "description": "A counter with a bean-to-cup machine. A fresh coffee perks residents up and slows their tiredness for a few hours.",
+      "description": "A counter with a bean-to-cup machine. A fresh coffee perks residents up and slows their tiredness for a few hours. A coffee had at a table nearby is poured here first.",
       "interactions": [
+        {
+          "id": "pour",
+          "label": "Pour a coffee to take to a table",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
+          "anim": "fetch",
+          "minutes": 2,
+          "autonomous": false,
+          "tags": [
+            "food"
+          ]
+        },
         {
           "id": "espresso",
           "label": "Make a coffee",
@@ -958,6 +974,7 @@
         {
           "id": "coffee",
           "requires": ["coffee"],
+          "fetch": "pour",
           "label": "Have a coffee",
           "stages": [
             "teen",
@@ -1028,6 +1045,7 @@
         {
           "id": "coffee",
           "requires": ["coffee"],
+          "fetch": "pour",
           "label": "Have a coffee",
           "stages": [
             "teen",
@@ -1098,6 +1116,7 @@
         {
           "id": "coffee",
           "requires": ["coffee"],
+          "fetch": "pour",
           "label": "Have a coffee",
           "stages": [
             "teen",
@@ -1168,6 +1187,7 @@
         {
           "id": "coffee",
           "requires": ["coffee"],
+          "fetch": "pour",
           "label": "Have a coffee",
           "stages": [
             "teen",
@@ -4806,6 +4826,7 @@
         {
           "id": "coffee",
           "requires": ["coffee"],
+          "fetch": "pour",
           "label": "Have a coffee",
           "stages": [
             "teen",
@@ -4888,6 +4909,7 @@
         {
           "id": "coffee",
           "requires": ["coffee"],
+          "fetch": "pour",
           "label": "Have a coffee",
           "stages": [
             "teen",

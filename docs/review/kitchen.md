@@ -459,7 +459,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** decision
 - **Where:** `web/public/content/furniture.json:887` (`bistroSet` breakfast), `:945` (`diningGlass` breakfast), `:1005` (`diningOak` breakfast and "Linger over dinner"), `:784` (`kitchenIsland` breakfast): `anim: eat`, hunger 0.3 (0.45 for dinner), no `eat` item, no recipe
 - **Evidence:** `kitchen/play/c5/bistroSet-breakfast-01.png`, `diningOak-dinner-01.png`, `kitchenIsland-breakfast-01.png`: 20 or 40 minutes of the eat clip with nothing cooked, fetched or put on the table (the plates there are the model's own place settings), against the fridge's snack, the toaster's toast and every recipe, which make an item that is carried and eaten. Fine as a game shortcut if it's meant; else make these uses eat a served item (the meal on the lot) or fetch something first. Decide.
-- **Status:** open
+- **Status:** won't fix (Q-17: the dining sets' breakfasts are kept as a game shortcut; owner, 2026-10-21)
+- **After:** the islands' breakfasts already sit on a stool near (`seatNear`, G-03); the dining sets' are eaten sitting at them.
 - **Source:** wave: kitchen (I1)
 
 ### I-kitchen-11 — Washing up, loading the dishwasher and sorting the recycling need nothing to wash or sort

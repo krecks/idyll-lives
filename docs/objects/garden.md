@@ -17,7 +17,8 @@ the shrubs only the topiary has a pot; the flowering shrubs colour their flowers
 trees have none, but the lemon tree's pot.
 
 The four crops grow (`grow`, `G.stages`, E4: their leaves and their crop as two parts) and have no harvest clip:
-harvesting moves them to the picked stage, so the crop goes as the clip plays on, and grows back over the days. The
+harvesting moves them to the picked stage when the harvest ends (G-50: the crop stays through the 20 minutes the
+hands pick it), so the crop goes as the clip plays on, and grows back over the days. The
 herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
 
 ## G1. Houseplants (10)
@@ -111,11 +112,11 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `garden.vegPatch` Vegetable patch | 1x1 · floor | tend:tend harvest:harvest | garden / edibles | Bed | Growth | `grow` (E4): growth stages from seedling to ripe (lettuces and cabbages full); harvest moves it to picked, the crop shrinking away while the resident picks, and it grows back over the days. |
-| `garden.tomatoes` Tomato plants | 1x1 · floor | tend:tend harvest:harvest | garden / edibles | Bed | Growth | `grow` (E4): growth stages from seedling to ripe (tomatoes red); harvest moves it to picked, the crop shrinking away while the resident picks, and it grows back over the days. |
-| `garden.strawberries` Strawberry bed | 1x1 · floor | tend:tend harvest:harvest | garden / edibles | Bed | Growth | `grow` (E4): growth stages from seedling to ripe (strawberries red); harvest moves it to picked, the crop shrinking away while the resident picks, and it grows back over the days. Each plant a closed rosette (five leaves, two upright in the middle, a dark heart), flat on the straw as a seedling (G-38). |
+| `garden.vegPatch` Vegetable patch | 1x1 · floor | tend:tend harvest:harvest | garden / edibles | Bed | Growth | `grow` (E4): growth stages from seedling to ripe (lettuces and cabbages full); harvest moves it to picked as it ends, the crop shrinking away as the resident finishes picking (G-50), and it grows back over the days. |
+| `garden.tomatoes` Tomato plants | 1x1 · floor | tend:tend harvest:harvest | garden / edibles | Bed | Growth | `grow` (E4): growth stages from seedling to ripe (tomatoes red); harvest moves it to picked as it ends, the crop shrinking away as the resident finishes picking (G-50), and it grows back over the days. |
+| `garden.strawberries` Strawberry bed | 1x1 · floor | tend:tend harvest:harvest | garden / edibles | Bed | Growth | `grow` (E4): growth stages from seedling to ripe (strawberries red); harvest moves it to picked as it ends, the crop shrinking away as the resident finishes picking (G-50), and it grows back over the days. Each plant a closed rosette (five leaves, two upright in the middle, a dark heart), flat on the straw as a seedling (G-38). |
 | `garden.herbs` Herb planter | 1x1 · floor | pickHerbs:harvest water:water | garden / edibles | Bed | Use | `harvest`: a few sprigs (the basil) shrink away for pickHerbs and are back after. The resident steps in to it (`STAND_BACK` -0.5, as to a counter: it is 0.46 m deep) and picks standing, hands at the plants (the `pick` clip); watering steps in too. |
-| `garden.pumpkins` Pumpkin patch | 1x1 · floor | tend:tend harvest:harvest | garden / edibles | Bed | Growth | `grow` (E4): growth stages from seedling to ripe (pumpkins orange); harvest moves it to picked, the crop shrinking away while the resident picks, and it grows back over the days. |
+| `garden.pumpkins` Pumpkin patch | 1x1 · floor | tend:tend harvest:harvest | garden / edibles | Bed | Growth | `grow` (E4): growth stages from seedling to ripe (pumpkins orange); harvest moves it to picked as it ends, the crop shrinking away as the resident finishes picking (G-50), and it grows back over the days. |
 
 **In play** (signed off 2026-10-17):
 - The four crops are bought new at the planted stage and were tended (kneeling at the bed) in all four facings.

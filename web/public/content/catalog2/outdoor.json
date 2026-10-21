@@ -92,6 +92,7 @@
         {
           "id": "coffee",
           "requires": ["coffee"],
+          "fetch": "pour",
           "label": "Have a coffee",
           "stages": [
             "teen",
@@ -553,7 +554,8 @@
             "outdoors"
           ],
           "when": "closed",
-          "leaves": "open"
+          "leaves": "open",
+          "gradual": true
         },
         {
           "id": "takeIn",
@@ -570,7 +572,8 @@
             "outdoors"
           ],
           "when": "open",
-          "leaves": "closed"
+          "leaves": "closed",
+          "gradual": true
         }
       ]
     },

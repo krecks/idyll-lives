@@ -3469,6 +3469,7 @@
         {
           "id": "coffee",
           "requires": ["coffee"],
+          "fetch": "pour",
           "label": "Have a coffee",
           "stages": [
             "teen",
@@ -4223,6 +4224,48 @@
       "model": "item.takeout",
       "hold": "hand",
       "radius": 0.13
+    },
+    {
+      "id": "iceCreamCone",
+      "label": "Ice cream",
+      "model": "item.treatPlate",
+      "hold": "hand",
+      "radius": 0.1
+    },
+    {
+      "id": "hotDog",
+      "label": "Hot dog",
+      "model": "item.sandwich",
+      "hold": "hand",
+      "radius": 0.1
+    },
+    {
+      "id": "crisps",
+      "label": "Snack",
+      "model": "item.treatPlate",
+      "hold": "hand",
+      "radius": 0.1
+    },
+    {
+      "id": "fruit",
+      "label": "Piece of fruit",
+      "model": "item.treatPlate",
+      "hold": "hand",
+      "radius": 0.1
+    },
+    {
+      "id": "pastry",
+      "label": "Pastry",
+      "model": "item.treatPlate",
+      "hold": "hand",
+      "radius": 0.1
+    },
+    {
+      "id": "shopSandwich",
+      "label": "Sandwich",
+      "model": "item.sandwich",
+      "hold": "hand",
+      "radius": 0.1
     },
     {
       "id": "gardenProduce",

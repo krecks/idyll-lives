@@ -5,7 +5,7 @@
 
 mod common;
 
-use sim_core::world::GrowthStage;
+use sim_core::world::{GrowthStage, Phase};
 use sim_core::{Command, TICKS_PER_MINUTE, World};
 
 const CONTENT: &str = r#"{
@@ -48,9 +48,16 @@ fn picked_it_lies_fallow_then_grows_back_ripe() {
 
     let version = w.structure_version();
     w.apply(Command::Use { sim: 0, object: 0, interaction: HARVEST }).unwrap();
-    assert!(until(&mut w, 30, |w| w.objects[0].growth_stage() == GrowthStage::Picked).is_some(), "picked as the harvest starts");
+    // Picked as the hands go: ripe through the harvest, picked once it's done.
+    let mut ripe_while_picking = false;
+    let took = until(&mut w, 40, |w| {
+        ripe_while_picking |= w.sims[0].current().is_some_and(|a| matches!(a.phase, Phase::Using { elapsed } if elapsed > 10.0)) && w.objects[0].ripe();
+        w.objects[0].growth_stage() == GrowthStage::Picked
+    });
+    assert!(ripe_while_picking, "still ripe halfway through the harvest");
+    assert!(took.is_some_and(|m| m >= 20), "picked when the harvest ends, {took:?} minutes in");
     assert_ne!(w.structure_version(), version, "the patch looks different");
-    assert!(until(&mut w, 30, |w| w.sims[0].current().is_none()).is_some(), "the harvest goes on to its end");
+    assert!(until(&mut w, 30, |w| w.sims[0].current().is_none()).is_some(), "the harvest is over");
     let err = w.apply(Command::Use { sim: 0, object: 0, interaction: HARVEST }).unwrap_err();
     assert!(err.to_string().contains("isn't ripe yet"), "{err}");
     w.apply(Command::Use { sim: 0, object: 0, interaction: TEND }).expect("tending it still works");

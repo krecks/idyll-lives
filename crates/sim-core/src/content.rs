@@ -99,6 +99,10 @@ pub struct Interaction {
     /// Things that must be provided by a working object on the same plot (content `requires`;
     /// see `ObjectDef::provides`): a table's coffee needs a coffee machine.
     pub requires: TagMask,
+    /// What it `requires` is fetched first, with this interaction (by id) of the nearest object
+    /// on the plot that provides it (content `fetch`): the coffee poured at the machine and
+    /// brought to the table, the cake taken from the bakery case; then the use goes on here.
+    pub fetch: Option<String>,
     /// Skill levels gained per hour of use (before the per-level slowdown).
     pub skill_gain: [f32; MAX_SKILLS],
     /// Dollars charged from the Sim's household when the Sim starts using the object.
@@ -159,9 +163,15 @@ pub struct Interaction {
     /// Only offered while the object's crop is ripe (content `when`: "ripe"; see
     /// `ObjectInstance::growth`).
     pub ripe: bool,
-    /// Picks the crop as the use starts (content `leaves`: "picked"): it lies fallow, then is
-    /// planted again and grows (see `ObjectDef::grows`).
+    /// Picks the crop (content `leaves`: "picked"): it lies fallow, then is planted again and
+    /// grows (see `ObjectDef::grows`). Picking takes the hands the whole use: the crop goes when
+    /// it ends, not as it starts.
     pub picks: bool,
+    /// What it `leaves` comes about through the use, as the hands get there, and is so once it
+    /// ends (content `gradual`): the washing hung out piece by piece, or taken in. The renderer
+    /// plays the object's clip along with the use (a model's `motions.uses` entry with `over`).
+    /// Without it, what it leaves is so as the use starts (a wall bed folded down to lie in).
+    pub gradual: bool,
     /// Changing clothes (content `changesOutfit`: at a wardrobe, a chest of drawers): halfway
     /// through, the resident is in their next outfit (`Sim::outfit`), and the use lasts its
     /// time even with the needs it fills full.
@@ -2397,6 +2407,12 @@ struct InteractionRaw {
     leaves: Option<OpenState>,
     #[serde(default)]
     close_after: bool,
+    /// What it leaves comes about through the use (see `Interaction::gradual`).
+    #[serde(default)]
+    gradual: bool,
+    /// Fetched first from what provides what it requires (see `Interaction::fetch`).
+    #[serde(default)]
+    fetch: Option<String>,
     /// Changing clothes (see `Interaction::changes_outfit`).
     #[serde(default)]
     changes_outfit: bool,
@@ -3014,6 +3030,8 @@ impl Content {
                     close_after: it.close_after,
                     ripe: it.when == Some(OpenState::Ripe),
                     picks: it.leaves == Some(OpenState::Picked),
+                    gradual: it.gradual,
+                    fetch: it.fetch.clone(),
                     changes_outfit: it.changes_outfit,
                     spare: it.spare,
                     tends: it.tends,
@@ -3024,6 +3042,12 @@ impl Content {
                     sky: it.sky,
                     work_on: it.work_on,
                 });
+                if it.fetch.is_some() && it.requires.is_empty() {
+                    return Err(Error::new(format!("{ctx}: `fetch` fetches what it `requires`: it requires nothing")));
+                }
+                if it.gradual && !matches!(it.leaves, Some(OpenState::Open | OpenState::Closed)) {
+                    return Err(Error::new(format!("{ctx}: `gradual` is for a use that leaves it open or closed")));
+                }
                 if let Some(h) = it.hours
                     && (!h.iter().all(|v| (0.0..=24.0).contains(v)) || h[0] == h[1])
                 {
@@ -3583,6 +3607,17 @@ impl Content {
                 }
                 Ok(out)
             };
+        // What's fetched (`fetch`) is fetched with an interaction of something that provides it.
+        for (o, inter) in objects.iter().flat_map(|o: &ObjectDef| o.interactions.iter().map(move |i| (o, i))) {
+            let Some(fetch) = inter.fetch.as_deref() else { continue };
+            let source = |d: &ObjectDef| d.provides & inter.requires == inter.requires && d.interactions.iter().any(|i| i.id == fetch && i.recipe.is_none() && i.eats.is_none());
+            if !objects.iter().any(source) {
+                return Err(Error::new(format!(
+                    "object '{}' interaction '{}': fetches with '{fetch}', which nothing that provides what it requires has (a plain use: no recipe, no eat)",
+                    o.id, inter.id
+                )));
+            }
+        }
         let sleep_tags = tag_mask(&dr.sleep_tags, "dayRhythm.sleepTags")?;
         if let Some((o, i)) = objects.iter().find_map(|o: &ObjectDef| o.interactions.iter().find(|i| i.spare && i.tags & sleep_tags == 0).map(|i| (o, i))) {
             return Err(Error::new(format!("{}.{}: `spare` is for a night's sleep (a `dayRhythm.sleepTags` tag)", o.id, i.id)));

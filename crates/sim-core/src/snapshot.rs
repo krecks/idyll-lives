@@ -8,8 +8,8 @@ use crate::world::{Activity, MAX_SIMS, Phase, Sim, Task, TaskKind, World};
 use crate::{TICKS_PER_SECOND, clock};
 
 pub const HEADER_LEN: usize = 9;
-/// Floats per Sim (all 29 used).
-pub const SIM_STRIDE: usize = 29;
+/// Floats per Sim (all 30 used).
+pub const SIM_STRIDE: usize = 30;
 pub const CAPACITY: usize = HEADER_LEN + MAX_SIMS * SIM_STRIDE;
 
 pub mod header {
@@ -98,13 +98,19 @@ pub mod sim {
     /// The baby they hold in the arms (`carry::carrying`: lifting them out of the crib, or on
     /// the way with them to the high chair or back): their id + 1, else 0.
     pub const CARRY: usize = 28;
+    /// How far through what they're doing at `OBJECT` they are, 0..1 (a use's minutes, a
+    /// recipe step's), while at it; else -1. The renderer plays a clip along with it (the washing
+    /// hung out piece by piece, a crop picked).
+    pub const PROGRESS: usize = 29;
 }
 
 /// How far ahead along their way `sim::AHEAD_X` looks, in metres.
 pub const AHEAD: f32 = 1.5;
 
 // Every field fits in a Sim's row.
-const _: () = assert!(sim::HEIGHT < SIM_STRIDE && sim::INTERACTION < SIM_STRIDE && sim::RECIPE < SIM_STRIDE && sim::CALL < SIM_STRIDE && sim::AHEAD_Z < SIM_STRIDE && sim::CARRY < SIM_STRIDE);
+const _: () = assert!(
+    sim::HEIGHT < SIM_STRIDE && sim::INTERACTION < SIM_STRIDE && sim::RECIPE < SIM_STRIDE && sim::CALL < SIM_STRIDE && sim::AHEAD_Z < SIM_STRIDE && sim::PROGRESS < SIM_STRIDE && sim::CARRY < SIM_STRIDE
+);
 const _: () = assert!(header::ITEMS_VERSION < HEADER_LEN);
 
 /// What a Sim does for the snapshot; see `sim::OBJECT`, `sim::ACTION`, `sim::OBJECT_DEF` and
@@ -145,8 +151,8 @@ fn doing(world: &World, s: &Sim) -> Doing {
         return Doing::plain(world, None, world.content.visits.door.as_ref().and_then(|d| d.knock_anim));
     }
     // Cooking: at the station, the step's animation for that station while at it (a meal put in
-    // the oven, stirred on a hob; the recipe was started from an interaction of `origin`: that's
-    // the interaction shown while at it).
+    // the oven, stirred on a hob; at the table, the dish put down); at `origin`, the object the
+    // recipe was started from, its interaction is shown for the last step there.
     if let Some(Activity { task: Task { kind: TaskKind::Cook { recipe, step, station, origin, .. }, .. }, phase, .. }) = s.current() {
         let Some(o) = station.and_then(|o| world.objects.get(o as usize)) else {
             return Doing::NOTHING;
@@ -154,10 +160,19 @@ fn doing(world: &World, s: &Sim) -> Doing {
         let r = &world.content.recipes[*recipe];
         let def = &world.content.objects[o.def];
         let using = matches!(phase, Phase::Using { .. });
-        let interaction = (*origin == Some(o.id)).then(|| def.interactions.iter().position(|i| i.recipe == Some(*recipe))).flatten();
+        // (The recipe's own interaction names its last step, the cooking itself: a grill station
+        // lifts its hood to grill, not to chop on its counter first.)
+        let last = *step as usize + 1 >= r.steps.len();
+        let interaction = (*origin == Some(o.id) && last).then(|| def.interactions.iter().position(|i| i.recipe == Some(*recipe))).flatten();
         return Doing {
             object: o.stable as f32,
-            action: r.steps.get(*step as usize).and_then(|s| s.anim_for(def.stations)).filter(|_| using).map_or(-1.0, |a| a as f32),
+            // (Past the last step: putting the dish down on the table.)
+            action: match r.steps.get(*step as usize) {
+                Some(s) => s.anim_for(def.stations),
+                None => world.content.cooking.serve_anim,
+            }
+            .filter(|_| using)
+            .map_or(-1.0, |a| a as f32),
             def: o.def as f32,
             interaction: interaction.map_or(-1.0, |i| i as f32),
         };
@@ -237,6 +252,26 @@ fn doing(world: &World, s: &Sim) -> Doing {
         def: obj.def as f32,
         interaction: *interaction as f32,
     }
+}
+
+/// How far through a use or a recipe's step a Sim at it is (`sim::PROGRESS`), else -1.
+fn progress(world: &World, s: &Sim) -> f32 {
+    if s.away_until.is_some() {
+        return -1.0;
+    }
+    let Some(Activity { task, phase: Phase::Using { elapsed }, .. }) = s.current() else {
+        return -1.0;
+    };
+    let minutes = match task.kind {
+        TaskKind::Use { object, interaction } => world
+            .objects
+            .get(object as usize)
+            .and_then(|o| world.content.objects[o.def].interactions.get(interaction))
+            .map_or(0.0, |i| i.minutes),
+        TaskKind::Cook { minutes, .. } => f32::from(minutes),
+        _ => return -1.0,
+    };
+    if minutes > 0.0 { (elapsed / minutes).clamp(0.0, 1.0) } else { 1.0 }
 }
 
 /// The waypoint a Sim walks to and where their way is `AHEAD` metres on (`sim::WAY_X`,
@@ -319,6 +354,7 @@ pub fn write(world: &World, out: &mut [f32]) {
         [o[sim::WAY_X], o[sim::WAY_Z]] = way;
         [o[sim::AHEAD_X], o[sim::AHEAD_Z]] = ahead;
         o[sim::CARRY] = crate::carry::carrying(s).map_or(0.0, |b| b as f32 + 1.0);
+        o[sim::PROGRESS] = progress(world, s);
     }
     // Conversations: write the shared state into every participant's row.
     for (i, s) in world.sims.iter().enumerate() {
@@ -378,6 +414,7 @@ pub fn layout_json(content: &Content) -> String {
             "held": sim::HELD, "recipe": sim::RECIPE, "call": sim::CALL,
             "wayX": sim::WAY_X, "wayZ": sim::WAY_Z, "aheadX": sim::AHEAD_X, "aheadZ": sim::AHEAD_Z,
             "carry": sim::CARRY,
+            "progress": sim::PROGRESS,
         },
         "actions": content.animations,
         "items": content.items.iter().map(|i| &i.id).collect::<Vec<_>>(),

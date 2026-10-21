@@ -701,13 +701,17 @@
       "group": "food",
       "outdoors": true,
       "decor": 0.4,
-      "description": "A striped parasol over a freezer full of cones. Four dollars a scoop.",
+      "description": "A striped parasol over a self-serve freezer full of cones: lift the lid, take one and leave four dollars in the tin.",
       "interactions": [
         {
           "id": "iceCream",
-          "label": "Buy an ice cream",
-          "anim": "eat",
-          "minutes": 10,
+          "label": "Take an ice cream from the freezer",
+          "anim": "fetch",
+          "minutes": 2,
+          "eat": {
+            "item": "iceCreamCone",
+            "minutes": 8
+          },
           "effects": {
             "hunger": 0.2,
             "fun": 0.25
@@ -734,13 +738,17 @@
       "group": "food",
       "outdoors": true,
       "decor": 0.3,
-      "description": "A steaming cart under an awning: hot dogs with everything for six dollars.",
+      "description": "A steaming self-serve cart under an awning: hot dogs kept warm under the lid, six dollars in the honesty box.",
       "interactions": [
         {
           "id": "hotDog",
-          "label": "Buy a hot dog",
-          "anim": "eat",
-          "minutes": 15,
+          "label": "Help yourself to a hot dog",
+          "anim": "fetch",
+          "minutes": 2,
+          "eat": {
+            "item": "hotDog",
+            "minutes": 13
+          },
           "effects": {
             "hunger": 0.5,
             "fun": 0.08
@@ -770,8 +778,12 @@
         {
           "id": "snack",
           "label": "Buy a snack",
-          "anim": "eat",
-          "minutes": 10,
+          "anim": "fetch",
+          "minutes": 1,
+          "eat": {
+            "item": "crisps",
+            "minutes": 9
+          },
           "effects": {
             "hunger": 0.3,
             "fun": 0.05
@@ -828,7 +840,7 @@
       "slots": 2,
       "outdoors": true,
       "decor": 0.4,
-      "description": "A striped awning over crates of fresh fruit and vegetables.",
+      "description": "A striped awning over crates of fresh fruit and vegetables, and an honesty box: pick what you like and pay as you go.",
       "interactions": [
         {
           "id": "browse",
@@ -845,9 +857,13 @@
         },
         {
           "id": "fruit",
-          "label": "Buy a bag of fruit",
-          "anim": "eat",
-          "minutes": 10,
+          "label": "Pick a piece of fruit",
+          "anim": "fetch",
+          "minutes": 1,
+          "eat": {
+            "item": "fruit",
+            "minutes": 9
+          },
           "effects": {
             "hunger": 0.3,
             "comfort": 0.04
@@ -873,11 +889,11 @@
       "group": "shops",
       "slots": 2,
       "decor": 0.3,
-      "description": "A wooden counter with a till, a jar of sweets and a rack of magazines.",
+      "description": "A wooden counter with a self-service till, a jar of sweets and a rack of magazines.",
       "interactions": [
         {
           "id": "treat",
-          "label": "Buy a little something",
+          "label": "Pick a little something and pay at the till",
           "anim": "idle",
           "minutes": 6,
           "effects": {
@@ -904,13 +920,18 @@
       "group": "shops",
       "slots": 2,
       "decor": 0.4,
-      "description": "A glass case of buns, tarts and loaves, still warm.",
+      "description": "A glass case of buns, tarts, cakes and loaves, still warm: help yourself with the tongs and pay at the till. A slice of cake had at a café table is taken from here.",
+      "provides": ["cake"],
       "interactions": [
         {
           "id": "pastry",
-          "label": "Buy a pastry",
-          "anim": "eat",
-          "minutes": 10,
+          "label": "Take a pastry from the case",
+          "anim": "fetch",
+          "minutes": 2,
+          "eat": {
+            "item": "pastry",
+            "minutes": 8
+          },
           "effects": {
             "hunger": 0.35,
             "fun": 0.1
@@ -919,6 +940,16 @@
             "food"
           ],
           "cost": 5
+        },
+        {
+          "id": "takeCake",
+          "label": "Take a slice of cake to a table",
+          "anim": "fetch",
+          "minutes": 2,
+          "autonomous": false,
+          "tags": [
+            "food"
+          ]
         }
       ]
     },
@@ -952,8 +983,12 @@
         {
           "id": "sandwich",
           "label": "Grab a sandwich",
-          "anim": "eat",
-          "minutes": 15,
+          "anim": "fetch",
+          "minutes": 2,
+          "eat": {
+            "item": "shopSandwich",
+            "minutes": 13
+          },
           "effects": {
             "hunger": 0.5
           },
@@ -1008,7 +1043,7 @@
         "height": 0.47,
         "forward": 0.02
       },
-      "description": "A bentwood chair. Pulled up to a café table, it serves coffee and cake.",
+      "description": "A bentwood chair. Pulled up to a café table, it's for a coffee from the café's machine and a slice of cake from its case.",
       "interactions": [
         {
           "id": "sit",
@@ -1026,6 +1061,7 @@
         {
           "id": "coffee",
           "requires": ["coffee"],
+          "fetch": "pour",
           "label": "Have a coffee",
           "stages": [
             "teen",
@@ -1049,6 +1085,8 @@
         },
         {
           "id": "cake",
+          "requires": ["cake"],
+          "fetch": "takeCake",
           "label": "Have a slice of cake",
           "anim": "eat",
           "minutes": 15,

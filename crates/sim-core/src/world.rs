@@ -786,6 +786,10 @@ pub struct Sim {
     /// What they do next, before choosing anything else (an `after` routine, like washing
     /// hands after the toilet; see `follow_up`). Not saved: losing it on a reload is harmless.
     pub(crate) follow_up: Option<Task>,
+    /// The object they fetched what a use there needs for (`Interaction::fetch`: the coffee
+    /// poured at the machine for the table), so that use, the `follow_up`, goes ahead without
+    /// fetching it again. Any other task started clears it. Not saved.
+    pub(crate) fetched: Option<u32>,
     /// The last few things they chose for themselves but couldn't get to (a plate on a counter
     /// nobody can reach, a bed behind a wall, a house across a river), each with until when they
     /// don't choose it again: uses, eating, cleaning, repairs, washing up, visits, and people
@@ -926,6 +930,7 @@ impl Sim {
         self.current = None;
         self.queue.clear();
         self.follow_up = None;
+        self.fetched = None;
         self.engaged_with = None;
         self.heeding = None;
         self.transition = None;
@@ -2033,6 +2038,7 @@ impl World {
             join_spot: None,
             idle_ticks: 0,
             follow_up: None,
+            fetched: None,
             unreachable: [None; UNREACHABLE],
             social_waited: 0,
             called: false,
@@ -4637,6 +4643,8 @@ pub(crate) fn prefer_factor(prefer: Prefer, rel: &social::Relationship, chemistr
 fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut crate::items::Items) {
     let content = ctx.content;
     let nav = &ctx.nav;
+    // (Fetched for this use, if it's the one: see `Sim::fetched`.)
+    let fetched = sim.fetched.take();
     // Nothing their age isn't for, nor out of its hours, under a roof or with nothing to work
     // on, however it was chosen (`unfit`, `unmet`; an order was refused already).
     if let TaskKind::Use { object, interaction } = task.kind
@@ -4699,6 +4707,19 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             }
             if !obj.allows(inter, sim.id) {
                 return;
+            }
+            // What it needs fetched first (`Interaction::fetch`: a coffee poured at the machine):
+            // off to get it, then back to this (the follow-up); with no way to it, without.
+            if fetched != Some(object)
+                && let Some((from, k)) = fetch_source(sim, ctx, objects, object, inter)
+            {
+                start_task(sim, Task { kind: TaskKind::Use { object: from, interaction: k }, ..task }, ctx, objects, items);
+                sim.fetched = Some(object);
+                if sim.current.is_some() {
+                    sim.follow_up = Some(Task { routine: false, ..task });
+                    return;
+                }
+                return start_task(sim, task, ctx, objects, items);
             }
             // Sitting to use a thing on a top: on a seat pulled up to the top, if one is free
             // (else on one near, `seatNear`, else they stand at it).
@@ -4891,6 +4912,34 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
         phase: Phase::Routing { waypoints, next: 0 },
         tags,
     });
+}
+
+/// Where to fetch what `inter` at `object` needs first (`Interaction::fetch`): the interaction of
+/// that id on the working thing on `object`'s plot that provides it, the nearest to `object`
+/// that they may use now. None: nothing to fetch, or nowhere to fetch it from.
+fn fetch_source(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], object: u32, inter: &crate::content::Interaction) -> Option<(u32, usize)> {
+    let content = ctx.content;
+    let fetch = inter.fetch.as_deref()?;
+    let plot = ctx.object_plot.get(object as usize).copied().flatten()?;
+    let at = objects[object as usize].centre(content);
+    let mut best: Option<(f32, u32, usize)> = None;
+    for &o in ctx.index.on(plot) {
+        let obj = &objects[o as usize];
+        let def = &content.objects[obj.def];
+        if o == object || obj.broken() || def.provides & inter.requires != inter.requires {
+            continue;
+        }
+        let Some(k) = def.interactions.iter().position(|i| i.id == fetch) else { continue };
+        if !obj.can_use_for(sim.id, def, k) || !obj.allows(&def.interactions[k], sim.id) || unfit(content, sim.age, &def.interactions[k]).is_some() {
+            continue;
+        }
+        let c = obj.centre(content);
+        let d = (c[0] - at[0]).hypot(c[1] - at[1]);
+        if best.is_none_or(|b| d < b.0) {
+            best = Some((d, o, k));
+        }
+    }
+    best.map(|(_, o, k)| (o, k))
 }
 
 /// The nearest free seat within `inter`'s `seatNear` metres of `object`, one they may sit on
@@ -5185,6 +5234,11 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
             }
         } else {
             let used = sim.current.as_ref().map(|a| a.task);
+            if let Some(Task { kind: TaskKind::Use { object, interaction }, .. }) = used
+                && !given_up
+            {
+                leaves_at_end(sim, content, &mut objects[object as usize], interaction);
+            }
             end_activity(sim, content, objects);
             if let Some(task) = used
                 && let TaskKind::Use { object, interaction } = task.kind
@@ -5330,8 +5384,10 @@ fn use_object(
             && inter.trains_skills()
             && access(ctx, sim, ctx.object_plot[obj.id as usize]) == Access::Full
             && training_interest(sim, content, inter) > MIN_AUTONOMY_SCORE;
-        // (Clothes are changed all the way, whatever it does for comfort.)
-        elapsed >= inter.minutes || (any_gain && satisfied && !planned && !routine && !practising && !inter.changes_outfit) || drained
+        // A job that changes the thing as the hands go (hanging out the washing, a harvest) goes on to
+        // its end, and clothes are changed all the way, whatever it does for comfort.
+        let job = inter.gradual || inter.picks || inter.changes_outfit;
+        elapsed >= inter.minutes || (any_gain && satisfied && !planned && !routine && !practising && !job) || drained
     };
     // Halfway through changing: in the next outfit, which views draw (a change of looks).
     let half = inter.minutes * 0.5;
@@ -5490,16 +5546,12 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
                 sim.pose = inter.pose;
             }
             act.phase = Phase::Using { elapsed: 0.0 };
-            // Opened or closed as the use starts (a wall bed folds down as they lie down).
-            if let Some(open) = inter.leaves
+            // Opened or closed as the use starts (a wall bed folds down as they lie down); what
+            // the hands do through it, once it's done (`leaves_at_end`).
+            if let Some(open) = inter.leaves.filter(|_| !inter.gradual)
                 && objects[object as usize].open != open
             {
                 objects[object as usize].open = open;
-                sim.reshaped = true;
-            }
-            // A crop picked as the harvest starts: it lies fallow, then grows again.
-            if inter.picks && objects[object as usize].growth >= 0.0 {
-                objects[object as usize].growth = -1.0;
                 sim.reshaped = true;
             }
             // Sitting down by a fire in the dark, they light it (see `lights.rs`).
@@ -5509,6 +5561,25 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
                 sim.lit = true;
             }
         }
+    }
+}
+
+/// A use done that changed the object as the hands went (`Interaction::gradual`, a crop's
+/// `picks`): now it is so. The washing is out on the line (or in); the crop is picked, and lies
+/// fallow, then grows again.
+fn leaves_at_end(sim: &mut Sim, content: &Content, o: &mut ObjectInstance, interaction: usize) {
+    let Some(inter) = content.objects[o.def].interactions.get(interaction) else {
+        return;
+    };
+    if let Some(open) = inter.leaves.filter(|_| inter.gradual)
+        && o.open != open
+    {
+        o.open = open;
+        sim.reshaped = true;
+    }
+    if inter.picks && o.growth >= 0.0 {
+        o.growth = -1.0;
+        sim.reshaped = true;
     }
 }
 

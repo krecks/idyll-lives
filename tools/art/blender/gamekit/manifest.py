@@ -50,7 +50,7 @@ def manifests(path):
 
 
 def uses(motions):
-    """[(use, {clip, hold, delay, every, slot, out})] for each clip an entry's `motions.uses` plays (a clip,
+    """[(use, {clip, hold, delay, every, slot, out, over})] for each clip an entry's `motions.uses` plays (a clip,
     {clip, ...} or a list of them)."""
     return [(use, u if isinstance(u, dict) else {'clip': u})
             for use, value in (motions.get('uses') or {}).items() for u in (value if isinstance(value, list) else [value])]

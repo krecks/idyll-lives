@@ -42,6 +42,11 @@ fn using(w: &World, sim: usize) -> Option<usize> {
     }
 }
 
+/// Whether resident `sim` is at interaction `i`, using it (not on the way).
+fn at_it(w: &World, sim: usize, i: usize) -> bool {
+    using(w, sim) == Some(i) && w.sims[sim].current().is_some_and(|a| matches!(a.phase, sim_core::world::Phase::Using { .. }))
+}
+
 /// Ticks `w` for up to `minutes`, until `done`; true if it got there.
 fn until(w: &mut World, minutes: u64, mut done: impl FnMut(&World) -> bool) -> bool {
     for _ in 0..minutes * TICKS_PER_MINUTE {
@@ -164,13 +169,15 @@ struct Thing {
     only_closed: &'static [&'static str],
     /// Whoever opened it closes it again when done (`closeAfter`).
     closed_after: bool,
+    /// Opened and closed as the hands go, so once the use is done (`gradual`: the washing).
+    gradual: bool,
 }
 
 const THINGS: [Thing; 4] = [
-    Thing { object: FUTON, opens: "unfold", closes: "foldAway", only_closed: &["unfold"], closed_after: false },
-    Thing { object: SOFA_BED, opens: "pullOut", closes: "foldAway", only_closed: &["pullOut", "relax"], closed_after: false },
-    Thing { object: WASHING_LINE, opens: "washing", closes: "takeIn", only_closed: &["washing"], closed_after: false },
-    Thing { object: HOT_TUB, opens: "soak", closes: "coverOn", only_closed: &[], closed_after: true },
+    Thing { object: FUTON, opens: "unfold", closes: "foldAway", only_closed: &["unfold"], closed_after: false, gradual: false },
+    Thing { object: SOFA_BED, opens: "pullOut", closes: "foldAway", only_closed: &["pullOut", "relax"], closed_after: false, gradual: false },
+    Thing { object: WASHING_LINE, opens: "washing", closes: "takeIn", only_closed: &["washing"], closed_after: false, gradual: true },
+    Thing { object: HOT_TUB, opens: "soak", closes: "coverOn", only_closed: &[], closed_after: true, gradual: false },
 ];
 
 #[test]
@@ -186,8 +193,22 @@ fn the_shipped_things_open_and_close_when_told() {
 
         let opens = interaction(&w, t.object, t.opens);
         w.apply(Command::Use { sim: 0, object: t.object, interaction: opens }).unwrap();
-        assert!(until(&mut w, 30, |w| w.objects[o].open), "{name}: {} opens it", t.opens);
-        assert_eq!(using(&w, 0), Some(opens), "{name}: as the use starts");
+        if t.gradual {
+            // Closed while the hands are at it, open once they're done.
+            let mut shut_while_used = false;
+            assert!(
+                until(&mut w, 40, |w| {
+                    shut_while_used |= at_it(w, 0, opens) && !w.objects[o].open;
+                    w.objects[o].open
+                }),
+                "{name}: {} opens it",
+                t.opens
+            );
+            assert!(shut_while_used && using(&w, 0).is_none(), "{name}: once the use is done");
+        } else {
+            assert!(until(&mut w, 30, |w| w.objects[o].open), "{name}: {} opens it", t.opens);
+            assert_eq!(using(&w, 0), Some(opens), "{name}: as the use starts");
+        }
         for id in t.only_closed {
             let i = interaction(&w, t.object, id);
             let refused = w.apply(Command::Use { sim: 1, object: t.object, interaction: i });
@@ -208,11 +229,16 @@ fn the_shipped_things_open_and_close_when_told() {
         let mut w = common::reload(&w, &content);
         assert!(w.objects[o].open, "{name}: still open after loading");
         w.apply(Command::Use { sim: 1, object: t.object, interaction: closes }).unwrap();
+        let mut open_while_used = false;
         assert!(
-            until(&mut w, 30, |w| !w.objects[o].open && w.sims[1].current().is_none()),
+            until(&mut w, 30, |w| {
+                open_while_used |= at_it(w, 1, closes) && w.objects[o].open;
+                !w.objects[o].open && w.sims[1].current().is_none()
+            }),
             "{name}: {} closes it",
             t.closes
         );
+        assert_eq!(open_while_used, t.gradual, "{name}: closed as the hands go, or as it starts");
         for id in t.only_closed {
             let i = interaction(&w, t.object, id);
             assert!(w.objects[o].allows(&w.content.objects[w.objects[o].def].interactions[i], 0), "{name}: {id} again");
@@ -392,7 +418,7 @@ fn the_washing_stays_out_as_it_was_left() {
     let (mut w, _) = shipped();
     let i = interaction(&w, WASHING_LINE, "washing");
     w.apply(Command::Use { sim: 0, object: WASHING_LINE, interaction: i }).unwrap();
-    assert!(until(&mut w, 30, |w| w.objects[2].open), "out as they start");
+    assert!(until(&mut w, 30, |w| w.objects[2].open), "out once it's hung");
     assert!(until(&mut w, 120, |w| w.sims.iter().all(|s| s.current().is_none())), "washing hung out");
     assert!(!until(&mut w, 120, |w| !w.objects[2].open), "the washing stays out");
     let take_in = &w.content.objects[w.objects[2].def].interactions[interaction(&w, WASHING_LINE, "takeIn")];
@@ -470,4 +496,25 @@ fn told_to_cover_the_hot_tub_as_someone_gets_in_first_the_player_hears_of_it() {
         assert!(until(&mut w, 120, |w| !w.objects[HOT_TUB as usize].open), "Bea puts it on as she gets out");
         assert_eq!(told(&w), 1);
     }
+}
+
+#[test]
+fn the_snapshot_says_how_far_the_washing_is_hung() {
+    let (mut w, _) = shipped();
+    let i = interaction(&w, WASHING_LINE, "washing");
+    w.apply(Command::Use { sim: 0, object: WASHING_LINE, interaction: i }).unwrap();
+    let mut buf = vec![0.0; sim_core::snapshot::CAPACITY];
+    let mut seen = Vec::new();
+    until(&mut w, 40, |w| {
+        sim_core::snapshot::write(w, &mut buf);
+        let p = buf[sim_core::snapshot::HEADER_LEN + sim_core::snapshot::sim::PROGRESS];
+        if at_it(w, 0, i) {
+            seen.push(p);
+        } else {
+            assert_eq!(p, -1.0, "not at it");
+        }
+        w.objects[2].open
+    });
+    assert!(seen.first().is_some_and(|&p| p < 0.05) && seen.last().is_some_and(|&p| p > 0.95), "0 to 1 over the use: {:?}", (seen.first(), seen.last()));
+    assert!(seen.windows(2).all(|p| p[1] >= p[0]), "on and on");
 }

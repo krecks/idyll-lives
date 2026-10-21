@@ -196,7 +196,8 @@
       "motions": {
         "uses": {
           "espresso": "brew",
-          "latteArt": "brew"
+          "latteArt": "brew",
+          "pour": "brew"
         },
         "hold": 4.0
       },
@@ -455,7 +456,7 @@
       },
       "motions": {
         "uses": {
-          "tastingMenu": "drawer_open"
+          "chop": "drawer_open"
         },
         "hold": 2.5
       },

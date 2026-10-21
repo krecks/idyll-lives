@@ -242,6 +242,7 @@
         {
           "id": "coffee",
           "requires": ["coffee"],
+          "fetch": "pour",
           "label": "Have a coffee",
           "stages": [
             "teen",
@@ -302,6 +303,7 @@
         {
           "id": "coffee",
           "requires": ["coffee"],
+          "fetch": "pour",
           "label": "Have a coffee",
           "stages": [
             "teen",
@@ -361,6 +363,7 @@
         {
           "id": "coffee",
           "requires": ["coffee"],
+          "fetch": "pour",
           "label": "Have a coffee",
           "stages": [
             "teen",
@@ -421,6 +424,7 @@
         {
           "id": "coffee",
           "requires": ["coffee"],
+          "fetch": "pour",
           "label": "Have a coffee",
           "stages": [
             "teen",
@@ -481,6 +485,7 @@
         {
           "id": "coffee",
           "requires": ["coffee"],
+          "fetch": "pour",
           "label": "Have a coffee",
           "stages": [
             "teen",
@@ -540,6 +545,7 @@
         {
           "id": "coffee",
           "requires": ["coffee"],
+          "fetch": "pour",
           "label": "Have a coffee",
           "stages": [
             "teen",
@@ -600,6 +606,7 @@
         {
           "id": "coffee",
           "requires": ["coffee"],
+          "fetch": "pour",
           "label": "Have a coffee",
           "stages": [
             "teen",
@@ -660,6 +667,7 @@
         {
           "id": "coffee",
           "requires": ["coffee"],
+          "fetch": "pour",
           "label": "Have a coffee",
           "stages": [
             "teen",

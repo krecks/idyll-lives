@@ -167,7 +167,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** decision
 - **Where:** `crates/sim-core/src/cooking.rs`
 - **Evidence:** R2-12's rest: with a bin, clearing away ends at the bin; with neither, plates and spoiled food pile up and are scanned on every decision to eat.
-- **Status:** confirmed (kitchen wave, on the bare stage)
+- **Status:** won't fix (Q-17: every generated home has a sink; owner, 2026-10-21)
 - **Source:** `docs/release-0.2.0-review.md` §4 (R2-12 rest), target v0.3
 
 ### I-systems-04 — Nothing stops a child using a stove
@@ -442,7 +442,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Fix class:** code
 - **Where:** `web/public/content/base.json:4135` (recipes: "Get ingredients" `holds: ingredients`, "Prep" `holds: prepBowl` from `:4166`, the sandwich's "Make it" holds nothing new, so the crate stays), `web/src/render/babylon/characters.ts:2331` (a carried item is drawn in both hands, with the carry clip, through every step), `:2097` (`writeTool`: the board and pan drawn on the station meanwhile)
 - **Evidence:** `kitchen/extra/meal-fridge-stoveGas-01.png` (chopping at the counter with the ingredient crate held at the chest, the board and knife on the top beside it); `-06.png` (stirring the pan on the hob holding the prep bowl in both hands, for the whole 20-minute Cook step); `kitchen/play/c5/counter-sandwich-01.png`, `butcherBlock-sandwich-01.png`, `kitchenIsland-sandwich-01.png` (the sandwich made holding the crate); `stoveElectric-bake-01.png`, `rangeCooker-cook-01.png` (the bowl at the hob). A cook puts the ingredients down to chop and tips the bowl into the pan. Set the carried item down on the station's top while a step is worked (and drop the bowl once the Cook step starts); new behaviour, so `code`. Items: every `prep` station (the counters, islands, butcher block, breakfast counter), every `stove` and `oven` station.
-- **Status:** confirmed and widened (consolidation: I-held-03 and I-systems-07 merged)
+- **Status:** fixed (57b3a576)
+- **After:** what the cook carried in is put down on the station's top while the step is worked, beside its tool, and picked up to move on (`SET_DOWN` in `characters.ts`: `chop`, `mix`, `stir`, `flip`; for a `bake` it is in the oven and not drawn); the sim still holds it between steps (`held`), so a save or a crying baby keeps it. In `family-hungry` (the family-check home, the two parents hungry) the crate stands on the counter by the board while chopping (`fixes/cooking/meal-stoveGas-03.png`), the prepped bowl on the cooker's top by the pan while stirring (`-06.png`), the crate by the mixing bowl for a bake's Mix (`fixes/cooking/bake-stoveElectric-03.png`) and nothing in hand at the oven (`-07.png`); against `kitchen/extra/meal-fridge-stoveGas-01.png`, `-06.png`.
 - **Source:** wave: kitchen (`scratch/scene.mjs` recipe scene, play shots)
 
 ### I-kitchen-05 — Every Cook step is stirring a frying pan, at a microwave, an oven tower or for a bake
@@ -486,7 +487,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Fix class:** code
 - **Where:** `crates/sim-core/src/cooking.rs:9-14` (the dish is served on a free spot near the stove; each eater takes a serving from there)
 - **Evidence:** The six whole dishes (`mealPot`, `tastingBoard`, `grillPlatter`, `pizza`, `bakingTray`, `pieDish`) are never in a hand in play: the cook puts the dish down where it was cooked and everyone fetches a plate from there (`held/index.md` Problems; `held/inhand/bbq-06.png`, `pizza-05.png`, `bakedTreats-05.png`, `pie-07.png`); the pot is carried only dirty, to the sink. The pot's carry pose exists and works (`held/inhand/poses/poses-carry-hold.png`). For a family dinner the dish goes to the table and is served there; carrying it to the dining table, when the home has one, would use the models and poses already built.
-- **Status:** open
+- **Status:** fixed (57b3a576)
+- **After:** the finished dish is carried to the dining table and put down there near its middle (a new serving step past the last: `cooking.tableRange` 12 m on the cook's storey, an indoor table for an indoor dish and an outdoor one for a barbecue, a table before a counter or bar with stools; `serveMinutes` 1 with the `serve` clip, "Serve it" in the action panel); "dinner's ready" comes once it is on the table, and the hungry take their plates from there and sit at it. Without a table near it is served near the station as before. A save on the way keeps the dish in hand and serves it once (`tests/cooking.rs`). On `review-stage` with a four-seat table the pot goes from the hob to the table in both hands (`fixes/cooking/meal-table-08.png`) and Ada eats at the table with the pot beside her plate (`-10.png`); in `family-hungry` it goes to the island with a stool, the nearest top with a seat (its dining set's 0.38 m top strip has no room for a pot), and she eats on the stool (`fixes/cooking/meal-stoveGas-08.png`, `-10.png`); the baked treats likewise (`fixes/cooking/bake-stoveElectric-10.png`). Against `held/inhand/bbq-06.png`, `pizza-05.png`, `bakedTreats-05.png`.
 - **Source:** wave: held (shared with the systems ledger's cooking flow)
 
 ### I-garden-03 — A crop is picked the moment the harvest starts: the bed empties, then the resident picks at nothing for 18 minutes
@@ -498,7 +500,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Fix class:** code
 - **Where:** `crates/sim-core/src/world.rs:4978-4982` (`if inter.picks && … growth >= 0.0 { growth = -1.0 }` as the use starts); the growth clip then goes from ripe to picked at once (`G.stages`, `plants.py:1063` `_crop`)
 - **Evidence:** `extra/harvest/s-garden.vegPatch-harvest.png`, `s-garden.pumpkins-harvest.png`, `s-garden.strawberries-harvest.png`, `s-garden.tomatoes-harvest.png`, `s-raisedBed-harvest.png` (three shots each, the first as the use starts): on every crop the ripe vegetables, pumpkins, berries and tomatoes are there in the first shot and gone 1–2 game minutes into the 20-minute harvest; the resident goes on with the harvest clip over bare soil or leaves to the end. The same on the outdoor ledger's `raisedBed` (and, by the same rule, on the packs ledger's `natureLover.veggieBed` `pickSnack`). Pick the crop when the use ends (or in steps through it), so the produce goes as the hands take it.
-- **Status:** open
+- **Status:** fixed (7d186856)
+- **After:** a crop is picked when the harvest ends: the bed stays ripe through the 20 minutes and empties as the hands finish (`world.rs` `leaves_at_end`), and a harvest goes on to its end even with hunger full; the raised bed's `harvest` clip plays along with the use (`motions.uses` `over`, the snapshot's new `progress`), its tomatoes and carrots going as she picks. `review-garden`: `fixes/cooking/harvest/harvest-raisedBed-harvest-00.png` (ripe as she starts), `-03.png` (half way: the lettuces up, the crop half gone), `-06.png` (bare once done); `harvest-garden.vegPatch-harvest-01.png` (still full mid-harvest), `-04.png` (picked after). Against `extra/harvest/s-garden.vegPatch-harvest.png`, `s-raisedBed-harvest.png`.
 - **Source:** wave: garden (`play --state review-garden --use-existing … --use harvest`)
 
 ### A-outdoor-02 — The washing goes out and comes in, and the crop is picked, in the first two seconds of the use
@@ -512,7 +515,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Fix class:** code
 - **Where:** `crates/sim-core/src/world.rs:4971-4975` (`leaves` applied as the use starts); `tools/art/blender/families/yard.py:853` (`G.grow(washing, 'washing', seconds=1.5)`), `:459` (`G.squash(crop, 'harvest', 0.001, seconds=1.0)`)
 - **Evidence:** Hanging out the washing: all nine pieces appear at once as the 20-minute use starts, then the resident mimes in front of a full line (`sheets/obj-clothesline.png`); taking it in empties the line at the start of its 10 minutes (`play/chunk3/clothesline-takeIn-01.png`). Harvesting the ripe raised bed: the whole crop is gone two seconds in, with the resident's hands on the frame and nothing in them (`extra/harvest/harvest-sheet.png`). The state should change at the end of an emptying use (take in, harvest) and a filling use's clip run over its length, or in steps. The same rule opens a wall bed as the sleeper lies down, which is right; it is the slow jobs it doesn't fit.
-- **Status:** confirmed and widened (consolidation: A-systems-02 merged)
+- **Status:** fixed in part (7d186856); one piece at a time is the Blender wave's
+- **After:** hanging out and taking in are `gradual` (content): the line is out, or in, once the use is done, and the `washing` clip plays along with the use (`over` 1 out, -1 in), so the washing comes down onto the line through the 20 minutes and goes up through the 10 of taking it in (`fixes/cooking/washing/line-clothesline-washing-00.png` empty as she starts, `-03.png` most of the way down; `line-clothesline-takeIn-01.png` half up, `-03.png` in). The crop half is I-garden-03's. The nine pieces are one part, so they come down together rather than piece by piece; a part per line would take the model to 5 draw calls, over the gate's 4 (`cargo check-glb`), so the pieces one at a time wait for a rebuild that keeps the still body to one finish.
 - **Source:** outdoor wave (`play --state review-garden --use-existing raisedBed --use harvest`)
 
 ### I-garden-10 — Fruit and vegetables are eaten on the spot, at any time: endless apples and lemons, a lemon eaten like an apple, a raw pumpkin as a meal
@@ -661,7 +665,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Fix class:** motion
 - **Where:** `crates/sim-core/src/snapshot.rs` (`doing`, Cooking: at the recipe's origin the snapshot gives its interaction for every step done at that object); `web/src/render/babylon/objectMotion.ts` (`findUses`: a clip keyed by the interaction id wins over the step's tag); `tools/art/blender/families/pack_foodie.py` (`chefsIsland`: `{'uses': {'tastingMenu': 'drawer_open'}}`), `outdoor.py` (`grillStation`: `hood_up` for cook and feast)
 - **Evidence:** seen in the code and content while fixing G-16 (no run): the chef's island is a `prep` and a `stove` station, so "Cook a tasting menu" chosen at it preps and cooks there, and both steps play the drawer (`drawer_open`, `hold` 2.5) and nothing on its hob (it has no hob clip, so a tasting menu is cooked on a cold hob, as A-kitchen-02 was); the grill station ([`grill`, `prep`]) lifts its hood for the prep step as for the grilling. The neighbourly oven had the same fault (its oven open while the pastry was made on its worktop) and was fixed by keying its clip by the `bake` step's tag (2dcc4ea0). Key such objects' clips by the step tags (`chop`/`mix`, `stir`, `flip`) and give the island's hob a burner clip.
-- **Status:** open
+- **Status:** fixed in part (57b3a576); the island's hob burner clip is the Blender wave's
+- **After:** the recipe's own interaction now names only its last step at the object it was started from (`snapshot.rs`): the grill station lifts its hood for the grilling, not for the prep on its counter, and the chef's island opens its drawer for a `chop` at it (the prep) and no longer while the menu cooks. Its hob still has no burner clip (a model change). Seen in the code and the snapshot test; no run.
 - **Source:** fix: motions
 
 ### I-systems-14 — A desk can't stand with its screen to a wall

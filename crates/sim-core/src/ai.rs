@@ -182,6 +182,8 @@ mod tests {
             when: None,
             leaves: None,
             close_after: false,
+            gradual: false,
+            fetch: None,
             ripe: false,
             picks: false,
             changes_outfit: false,
