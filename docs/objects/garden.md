@@ -53,13 +53,13 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
 | `garden.tulips` Tulips | 1x1 · floor | water:water smell:smell | garden / flowers | Bed | Static | Static. |
 | `garden.daffodils` Daffodils | 1x1 · floor | water:water smell:smell | garden / flowers | Bed, Petals | Static | Static. |
 | `garden.daisies` Daisies | 1x1 · floor | water:water smell:smell | garden / flowers | Bed, Petals | Static | Static. |
-| `garden.sunflowers` Sunflowers | 1x1 · floor | water:water admire:look | garden / flowers | Bed, Petals | Static | Static. |
-| `garden.poppies` Poppies | 1x1 · floor | water:water smell:smell | garden / flowers | Bed, Petals | Static | Static. |
-| `garden.marigolds` Marigolds | 1x1 · floor | water:water smell:smell | garden / flowers | Bed | Static | Static. |
+| `garden.sunflowers` Sunflowers | 1x1 · floor | water:water admire:admire | garden / flowers | Bed, Petals | Static | Static. Admired looking up at the heads (`anim: admire`), not down at the soil. |
+| `garden.poppies` Poppies | 1x1 · floor | water:water admire:look | garden / flowers | Bed, Petals | Static | Static. Admired (`look`), not smelled: no scent, no Sweet scent feeling. |
+| `garden.marigolds` Marigolds | 1x1 · floor | water:water admire:look | garden / flowers | Bed | Static | Static. Admired (`look`), not smelled: no Sweet scent feeling. |
 | `garden.pansies` Pansies | 1x1 · floor | water:water smell:smell | garden / flowers | Bed | Static | Static; each face on a thin stem over the leaves. |
 | `garden.lilies` Lilies | 1x1 · floor | water:water smell:smell | garden / flowers | Bed | Static | Static. |
 | `garden.lupins` Lupins | 1x1 · floor | water:water smell:smell | garden / flowers | Bed | Static | Static. |
-| `garden.forgetMeNots` Forget-me-nots | 1x1 · floor | water:water smell:smell | garden / flowers | Bed | Static | Static. |
+| `garden.forgetMeNots` Forget-me-nots | 1x1 · floor | water:water admire:look | garden / flowers | Bed | Static | Static. Admired (`look`), not smelled: no Sweet scent feeling. |
 | `garden.cosmos` Cosmos | 1x1 · floor | water:water smell:smell | garden / flowers | Bed | Static | Static. |
 | `garden.meadow` Wildflower meadow | 1x1 · floor | pickFlower:harvest | garden / flowers | — | Use | `pick`: one flower (a white daisy) shrinks away for pickFlower and grows back after. |
 | `garden.geraniums` Potted geraniums | 1x1 · floor | water:water smell:smell | garden / flowers | Pot, Flowers | Static | Static. |
@@ -137,7 +137,7 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
 | `garden.cherry` Cherry blossom tree | 1x1 · floor | shade:relax admire:admire | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). |
 | `garden.apple` Apple tree | 1x1 · floor | pick:eat shade:relax | garden / trees | — | Use | `pick`: an apple at the front shrinks away for pick. |
 | `garden.japaneseMaple` Japanese maple | 1x1 · floor | shade:relax shape:prune | garden / trees | — | Use | `trim`: the top sprigs shrink away for shape. |
-| `garden.magnolia` Magnolia | 1x1 · floor | shade:relax smell:admire | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). |
+| `garden.magnolia` Magnolia | 1x1 · floor | shade:relax smell:admire | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). Its blossom use reads "Admire the magnolia" (looking up). |
 | `garden.willow` Weeping willow | 1x1 · floor | shade:relax | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). |
 | `garden.spruce` Blue spruce | 1x1 · floor | — | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). |
 | `garden.cypress` Italian cypress | 1x1 · floor | — | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). |
