@@ -79,12 +79,11 @@ async function download(url, path, expected) {
 await mkdir(OUT, { recursive: true });
 for (const name of OBSOLETE) await rm(OUT + name, { force: true });
 for (const file of FILES) {
-  const name = file.path.replace('onnx/', '');
-  const saved = file.out ?? name;
-  const out = file.pack ? `${OUT}${name}z` : OUT + saved;
+  const name = file.out ?? file.path.replace('onnx/', '');
+  const out = file.pack ? `${OUT}${name}z` : OUT + name;
   if (await existing(out, file.sha256, file.pack)) continue;
-  console.log(`llm: downloading ${saved}`);
-  await download(`${file.from ?? LFM}/${file.path}`, OUT + saved, file.sha256);
+  console.log(`llm: downloading ${name}`);
+  await download(`${file.from ?? LFM}/${file.path}`, OUT + name, file.sha256);
   if (file.pack) {
     console.log(`llm: packing ${name}z`);
     await pack(OUT + name, out);

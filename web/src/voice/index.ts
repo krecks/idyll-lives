@@ -354,7 +354,6 @@ export class VoiceDirector {
   }
 
   private pauseForSession(why: 'late' | 'frames'): void {
-    if (this.paused) return;
     this.paused = true;
     pauseVoice();
     if (llmStatus.state !== 'off') unloadLlm();

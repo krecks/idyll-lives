@@ -56,7 +56,7 @@
           <span class="lvl tabular">{r.level}</span>
         </span>
         <span class="bar" role="progressbar" aria-label="{r.def.label} progress to level {Math.min(r.level + 1, max)}" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(r.progress * 100)}>
-          <span class="fill" style="transform:scaleX({r.progress})"></span>
+          <span class="fill meter-fill" style="transform:scaleX({r.progress})"></span>
         </span>
       </div>
     </li>
@@ -137,12 +137,6 @@
     overflow: hidden;
   }
   .fill {
-    display: block;
-    width: 100%;
-    height: 100%;
     background: var(--accent);
-    transform-origin: left;
-    /* A transform, not a width: Chrome recalculates style every frame for a running transition. */
-    transition: transform var(--slow) var(--ease);
   }
 </style>

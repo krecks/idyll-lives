@@ -45,6 +45,13 @@ pub fn lod_from_env(w: &mut World) {
     }
 }
 
+/// Buys `def` for household 0 at `x`, `z`, facing the default way: its stable id.
+pub fn buy(w: &mut World, def: &str, x: i32, z: i32) -> u32 {
+    w.apply(sim_core::Command::Buy { household: 0, object: def.into(), at: Some([x, z, 0]), colors: Default::default(), turn: None, offset: None, size: None, tall: None })
+        .unwrap_or_else(|e| panic!("{def}: {e}"));
+    w.objects.last().unwrap().stable
+}
+
 /// Everything that must hold at any moment.
 pub fn check(w: &World) {
     // Things for outside (content `outdoors`) stand outside.

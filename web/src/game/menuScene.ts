@@ -58,6 +58,9 @@ class MenuScene {
   private bounds: Frame | null = null;
   /** Weak so a disposed renderer isn't pinned here after a graphics-preset change. */
   private renderer: WeakRef<Renderer> | null = null;
+  private get live(): Renderer | undefined {
+    return this.renderer?.deref();
+  }
   private readonly labels = new Map<number, Label>();
   private readonly out = { x: 0, y: 0 };
   /** UI on top of the town that tags must keep clear of (buttons, hint bars). */
@@ -92,7 +95,7 @@ class MenuScene {
    * player will live on (the chosen home, the household's), drawn as the game will show it.
    */
   async show(draft: NeighbourhoodDraft, home: number | null = null): Promise<void> {
-    if (draft === this.draft && home === this.home && this.renderer?.deref()?.townShown) return;
+    if (draft === this.draft && home === this.home && this.live?.townShown) return;
     this.draft = draft;
     this.home = home;
     perfPhase('menu: show town');
@@ -123,7 +126,7 @@ class MenuScene {
 
   private applyShot(): void {
     const world = this.world;
-    const renderer = this.renderer?.deref();
+    const renderer = this.live;
     if (!world || !renderer || !this.wanted) return;
     const { shot, duration } = this.wanted;
     this.bounds = shot.kind === 'overview' || shot.kind === 'lot' ? shot.frame : null;
@@ -145,7 +148,7 @@ class MenuScene {
 
   highlight(h: Partial<LotHighlight>): void {
     this.focusPlots = [h.selected ?? null, h.hover ?? null];
-    this.renderer?.deref()?.setLotHighlight({ ...NO_HIGHLIGHT, ...h });
+    this.live?.setLotHighlight({ ...NO_HIGHLIGHT, ...h });
   }
 
   /** Keeps lot tags clear of `el` (a button or bar over the town). Returns a detach function. */
@@ -156,12 +159,12 @@ class MenuScene {
 
   /** Orbit / zoom from the player's drag and wheel on the town. */
   nudge(dAlpha: number, zoom: number): void {
-    this.renderer?.deref()?.nudgeTown(dAlpha, zoom);
+    this.live?.nudgeTown(dAlpha, zoom);
   }
 
   /** Plot under a screen point (CSS pixels), if any. */
   plotAt(x: number, y: number): number | null {
-    const r = this.renderer?.deref();
+    const r = this.live;
     const ground = r?.townShown ? r.pick(x, y).ground : null;
     if (!ground || !this.world) return null;
     const p = this.world.plots.find((p) => ground.x >= p.x && ground.x < p.x + p.w && ground.z >= p.z && ground.z < p.z + p.d);
@@ -251,8 +254,8 @@ class MenuScene {
   }
 
   private attach(renderer: Renderer): void {
-    if (this.renderer?.deref() === renderer) return;
-    this.renderer?.deref()?.onTownFrame(null);
+    if (this.live === renderer) return;
+    this.live?.onTownFrame(null);
     this.renderer = new WeakRef(renderer);
     this.shotKey = '';
     renderer.onTownFrame(this.positionLabels);
@@ -265,7 +268,7 @@ class MenuScene {
    * placed and clear of the UI over the town. Writes transforms only for tags that moved.
    */
   private readonly positionLabels = () => {
-    const r = this.renderer?.deref();
+    const r = this.live;
     if (!r || !this.labels.size) return;
     const b = this.bounds;
     const area = b ? { left: b.left + 8, top: b.top + 8, right: b.right - 8, bottom: b.bottom - 6 } : { left: 8, top: 8, right: window.innerWidth - 8, bottom: window.innerHeight - 8 };

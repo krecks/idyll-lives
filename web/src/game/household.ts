@@ -402,6 +402,11 @@ export function residentsOf(content: Content, h: HouseholdDraft): Residents {
   return r;
 }
 
+/** Residents who need a bed place: all but babies. */
+export function sleepersOf(r: Residents): number {
+  return r.couples * 2 + r.adults + r.children;
+}
+
 /** Bedrooms a household needs (`residentsOf`): one per couple and adult, one for every two children. */
 export function bedroomsNeeded(r: Residents): number {
   return r.couples + r.adults + Math.ceil(r.children / 2);

@@ -10,7 +10,7 @@
  * without downloading.
  */
 
-import { fetchOnce, gunzipText, openCache, prune } from '../ml/assets';
+import { fetchOnce, forget, gunzipText, openCache, prune } from '../ml/assets';
 import { configureOrt, hasWebGpu, importOrt, ORT_WASM, sessionOptions } from '../ml/ort';
 import init, { Voice } from './wasm-pkg/voice_wasm.js';
 import wasmUrl from './wasm-pkg/voice_wasm_bg.wasm?url';
@@ -109,7 +109,7 @@ async function dropOldCaches(): Promise<void> {
   }
 }
 
-/** Downloads (or takes from the cache) the runtime, our WASM, the model and its voices, and starts its sessions on the GPU. */
+/** Downloads (or takes from the cache) the runtime, our WASM, the model and its voices, and starts its sessions on `device`. */
 async function load(base: string, device: VoiceDevice): Promise<void> {
   const start = performance.now();
   if (device === 'gpu' && !(await hasWebGpu())) throw new Error('voices need a graphics card that supports WebGPU');
@@ -146,9 +146,9 @@ async function load(base: string, device: VoiceDevice): Promise<void> {
   const ort = await importOrt();
   configureOrt(ort, ortWasm, device);
   const sessions = {} as Record<keyof typeof MODELS, Session>;
-  // The runtime creates one WebGPU session at a time. The vector estimator's latent stays on the
-  // GPU between its passes and goes straight into the vocoder; the other graphs hand back the few
-  // numbers we need on the CPU.
+  // The runtime creates one session at a time. On the GPU the vector estimator's latent stays there
+  // between its passes and goes straight into the vocoder, and the other graphs hand back the few
+  // numbers we need on the CPU; on the processor everything comes back as CPU tensors.
   for (const [i, k] of names.entries()) {
     sessions[k] = (await ort.InferenceSession.create(
       new Uint8Array(models[i]),
@@ -163,5 +163,7 @@ async function load(base: string, device: VoiceDevice): Promise<void> {
     styles: new Map(STYLE_IDS.map((id, i) => [id, parseStyle(json<StyleFile>(styles[i]))])),
     phonemizer: new Voice(await gunzipText(lexicon)) as unknown as Phonemizer,
   };
+  // The sessions and the engine have their own copies.
+  for (const f of files) forget(f.url);
   scope.postMessage({ type: 'ready', ms: performance.now() - start });
 }

@@ -5,6 +5,7 @@ mod common;
 
 use std::collections::HashSet;
 
+use common::buy;
 use serde_json::{Value, json};
 use sim_core::world::TaskKind;
 use sim_core::{Command, World};
@@ -26,11 +27,6 @@ fn world() -> World {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
     w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
     w
-}
-
-fn buy(w: &mut World, def: &str, x: i32, z: i32) -> u32 {
-    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, 0]), colors: Default::default(), turn: None, offset: None, size: None, tall: None }).unwrap();
-    w.objects.last().unwrap().stable
 }
 
 fn at(w: &World, id: u32) -> &sim_core::world::ObjectInstance {

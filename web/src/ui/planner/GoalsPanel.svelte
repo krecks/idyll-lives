@@ -153,7 +153,7 @@
           <span class="icon"><Icon name={g.icon || 'icon.ui.calendar'} size={15} /></span>
           <div class="body">
             <span class="label">{label(g)}</span>
-            <span class="bar"><span style="transform:scaleX({g.progress})"></span></span>
+            <span class="bar"><span class="meter-fill" style="transform:scaleX({g.progress})"></span></span>
             {#if g.steps.length}
               <span class="steps">
                 {#each g.steps as s, k (k)}<span class="step" class:done={stepDone(s)}>{stepText(s)}</span>{/each}
@@ -312,12 +312,7 @@
     overflow: hidden;
   }
   .bar span {
-    display: block;
-    width: 100%;
-    height: 100%;
     background: var(--good);
-    transform-origin: left;
-    transition: transform var(--slow) var(--ease);
   }
   .steps {
     display: flex;

@@ -3,6 +3,7 @@
 
 mod common;
 
+use common::buy;
 use sim_core::world::{Phase, TaskKind};
 use sim_core::{Command, MINUTES_PER_TICK, World};
 
@@ -16,12 +17,6 @@ fn world() -> World {
     let mut w = World::from_json(&common::content(), TOWN, 1).unwrap();
     w.autonomy = false;
     w
-}
-
-fn buy(w: &mut World, def: &str, x: i32, z: i32) -> u32 {
-    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, 0]), colors: Default::default(), turn: None, offset: None, size: None, tall: None })
-        .unwrap_or_else(|e| panic!("{def}: {e}"));
-    w.objects.last().unwrap().stable
 }
 
 fn need(w: &World, id: &str) -> usize {

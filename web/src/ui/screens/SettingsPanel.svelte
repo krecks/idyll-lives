@@ -100,14 +100,12 @@
   /** Badge for settings that apply the next time a game starts. */
   const NEXT_LOAD = 'Next load';
 
-
-  const voiceRunsOn = $derived(voiceStatus.device === 'cpu' ? "this computer's processor" : "this computer's graphics card");
+  const DEVICE_NAME = { cpu: "this computer's processor", gpu: "this computer's graphics card" };
   const modelStatus = $derived.by(() => {
     if (voiceStatus.state === 'loading') return `Downloading… ${Math.round(voiceStatus.progress * 100)} %`;
     if (voiceStatus.state === 'error') return `Couldn't load the voice: ${voiceStatus.error}`;
-    if (voiceStatus.state === 'ready') return `Supertone's Supertonic 3, on ${voiceRunsOn}.`;
-    if (settings.voiceDevice === 'cpu') return `Supertone's Supertonic 3, on this computer's processor: about ${Math.round(DOWNLOAD_MB)} MB, downloaded once.`;
-    if (gpuAvailable) return `Supertone's Supertonic 3, on this computer's graphics card: about ${Math.round(DOWNLOAD_MB)} MB, downloaded once.`;
+    if (voiceStatus.state === 'ready') return `Supertone's Supertonic 3, on ${DEVICE_NAME[voiceStatus.device === 'cpu' ? 'cpu' : 'gpu']}.`;
+    if (settings.voiceDevice === 'cpu' || gpuAvailable) return `Supertone's Supertonic 3, on ${DEVICE_NAME[settings.voiceDevice === 'cpu' ? 'cpu' : 'gpu']}: about ${Math.round(DOWNLOAD_MB)} MB, downloaded once.`;
     return settings.voiceDevice === 'gpu' ? 'No WebGPU here: choose Auto or Processor for voices.' : "No WebGPU here: Auto uses this computer's processor.";
   });
   const DEVICE_HINT = {

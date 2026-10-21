@@ -1849,6 +1849,12 @@ const MAX_EDIT_OBJECTS = 8;
 /** Dust is shown on at most this many changed wall edges. */
 const MAX_EDIT_EDGES = 40;
 
+/** Objects in `next` that weren't in `prev` (an object keeps its id for life). */
+export function addedObjects(prev: WorldStructure, next: WorldStructure): ObjectPlacement[] {
+  const before = new Set(prev.objects.map((o) => o.id));
+  return next.objects.filter((o) => !before.has(o.id));
+}
+
 /**
  * What changed between two world structures of the same lot, as effects to play and the sound
  * that goes with them: furniture bought, moved, restyled, upgraded or sold; walls, doors and
@@ -1862,7 +1868,7 @@ export function editFeedback(prev: WorldStructure, next: WorldStructure): { effe
   const after = new Set(next.objects.map((o) => o.id));
   // Around where it stands (off the middle of its footprint, for things that stand anywhere on their tile).
   const rect = (o: ObjectPlacement) => ({ x: o.x + (o.offset?.[0] ?? 0) / 100, z: o.z + (o.offset?.[1] ?? 0) / 100, w: o.w, d: o.d });
-  const added = next.objects.filter((o) => !before.has(o.id));
+  const added = addedObjects(prev, next);
   const removed = prev.objects.filter((o) => !after.has(o.id));
   if (added.length + removed.length <= MAX_EDIT_OBJECTS) {
     for (const o of added) {

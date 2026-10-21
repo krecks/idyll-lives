@@ -148,14 +148,15 @@ function onMessage(msg: FromVoiceWorker): void {
     waiters = [];
     unload();
     voiceStatus.state = 'error';
+    if (!settings.voices || held) return;
     // The engine broke making a line: a new worker takes over (the game only speaks while the
     // engine is ready; a preview starts one itself). A few times a session at most.
-    if (msg.restart && settings.voices && !held && restarts < MAX_RESTARTS) {
+    if (msg.restart && restarts < MAX_RESTARTS) {
       restarts++;
       console.warn('[voice] the voice engine failed; starting it again:', msg.message);
       voiceStatus.state = 'off';
       void ensureVoice().catch(() => {});
-    } else if (failedDevice === 'gpu' && settings.voices && !held && settings.voiceDevice === 'auto') {
+    } else if (failedDevice === 'gpu' && settings.voiceDevice === 'auto') {
       // Auto: the graphics card could not start the voices, so use the processor instead.
       void ensureVoice('cpu').catch(() => {});
     }
@@ -408,9 +409,7 @@ async function bench(): Promise<BenchResult> {
 function readBench(): BenchResult | null {
   try {
     const b = JSON.parse(localStorage.getItem(BENCH_KEY) ?? 'null') as BenchResult | null;
-    if (!b || b.model !== MODEL_ID || b.cores !== (navigator.hardwareConcurrency ?? 0)) return null;
-    // Results from before 0.3.0 ran on the graphics card (the only device then).
-    return { ...b, device: b.device === 'cpu' ? 'cpu' : 'gpu' };
+    return b && b.model === MODEL_ID && b.cores === (navigator.hardwareConcurrency ?? 0) ? b : null;
   } catch {
     return null;
   }
@@ -456,12 +455,11 @@ $effect.root(() => {
 });
 
 /**
- * Auto's slow-machine step: stop the graphics-card engine and start the processor one. False if
- * this is not an Auto graphics-card session (a manual choice is never overridden), or if the
+ * Auto's slow-machine step: stop the graphics-card engine and start the processor one. The caller
+ * only asks in an Auto graphics-card session (a manual choice is never overridden). False if the
  * processor cannot start either (the caller then pauses the voices as before).
  */
 export async function stepDownVoice(): Promise<boolean> {
-  if (settings.voiceDevice !== 'auto' || voiceStatus.device !== 'gpu') return false;
   try {
     // (It stops the graphics card's engine first.)
     await ensureVoice('cpu');

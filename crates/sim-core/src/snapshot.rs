@@ -104,15 +104,12 @@ struct Doing {
 impl Doing {
     const NOTHING: Doing = Doing { object: -1.0, action: -1.0, def: -1.0, interaction: -1.0 };
 
-    /// At an object or a spot without an interaction of its own.
-    fn plain(object: f32, anim: Option<usize>) -> Doing {
+    /// At an object (an index into `World::objects`; the renderer gets its stable id) or a spot
+    /// without an interaction of its own.
+    fn plain(world: &World, object: Option<u32>, anim: Option<usize>) -> Doing {
+        let object = object.and_then(|o| world.stable_of(o)).map_or(-1.0, |s| s as f32);
         Doing { object, action: anim.map_or(-1.0, |a| a as f32), ..Doing::NOTHING }
     }
-}
-
-/// A stable object id for the renderer, from an index into `World::objects`.
-fn stable(world: &World, index: u32) -> f32 {
-    world.stable_of(index).map_or(-1.0, |s| s as f32)
 }
 
 fn doing(world: &World, s: &Sim) -> Doing {
@@ -122,15 +119,15 @@ fn doing(world: &World, s: &Sim) -> Doing {
     // Repairing: at the object, the tinker animation while at it.
     if let Some(Activity { task: Task { kind: TaskKind::Repair { object }, .. }, phase, .. }) = s.current() {
         let anim = world.content.object_rules.repair.anim.filter(|_| matches!(phase, Phase::Using { .. }));
-        return Doing::plain(stable(world, *object), anim);
+        return Doing::plain(world, Some(*object), anim);
     }
     // An accident's while on the spot (asleep on the floor, takeout).
     if let Some(Activity { task: Task { kind: TaskKind::Spot { accident }, .. }, .. }) = s.current() {
-        return Doing::plain(-1.0, world.content.accidents[*accident].rest.as_ref().and_then(|r| r.anim));
+        return Doing::plain(world, None, world.content.accidents[*accident].rest.as_ref().and_then(|r| r.anim));
     }
     // A visitor knocking at the door.
     if let Some(Activity { phase: Phase::Knocking { .. }, .. }) = s.current() {
-        return Doing::plain(-1.0, world.content.visits.door.as_ref().and_then(|d| d.knock_anim));
+        return Doing::plain(world, None, world.content.visits.door.as_ref().and_then(|d| d.knock_anim));
     }
     // Cooking: at the station, the step's animation while at it (the recipe was started from
     // an interaction of `origin`: that's the interaction shown while at it).
@@ -153,7 +150,7 @@ fn doing(world: &World, s: &Sim) -> Doing {
     // Eating: at the seat (or standing), the eat animation while at it.
     if let Some(Activity { task: Task { kind: TaskKind::Eat { seat, .. }, .. }, phase, .. }) = s.current() {
         let anim = world.content.cooking.eat_anim.filter(|_| matches!(phase, Phase::Using { .. }));
-        return Doing::plain(seat.map_or(-1.0, |o| stable(world, o)), anim);
+        return Doing::plain(world, *seat, anim);
     }
     // Clearing away: at the bin, the sink or the counter, scraping, washing or putting away.
     if let Some(Activity { task: Task { kind: TaskKind::Dishes { station, stage, .. }, .. }, phase, .. }) = s.current() {
@@ -164,16 +161,16 @@ fn doing(world: &World, s: &Sim) -> Doing {
             _ => rules.dishes_anim,
         };
         let anim = anim.filter(|_| matches!(phase, Phase::Using { .. }));
-        return Doing::plain(station.map_or(-1.0, |o| stable(world, o)), anim);
+        return Doing::plain(world, *station, anim);
     }
     // On the phone: on the seat (or standing), the phone animation while at it.
     if let Some(Activity { task: Task { kind: TaskKind::Phone { seat, .. }, .. }, phase, .. }) = s.current() {
         let anim = world.content.phone.anim.filter(|_| matches!(phase, Phase::Using { .. }));
-        return Doing::plain(seat.map_or(-1.0, |o| stable(world, o)), anim);
+        return Doing::plain(world, *seat, anim);
     }
     // Tidying up: no object, the clean animation while at it.
     if let Some(Activity { task: Task { kind: TaskKind::Clean { .. }, .. }, phase, .. }) = s.current() {
-        return Doing::plain(-1.0, world.content.room_rules.clean.anim.filter(|_| matches!(phase, Phase::Using { .. })));
+        return Doing::plain(world, None, world.content.room_rules.clean.anim.filter(|_| matches!(phase, Phase::Using { .. })));
     }
     let Some(Activity {
         task:

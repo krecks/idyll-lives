@@ -419,5 +419,4 @@ impl Command {
     pub fn from_json(json: &str) -> Result<Self, crate::Error> {
         serde_json::from_str(json).map_err(|e| crate::Error::new(format!("invalid command: {e}")))
     }
-
 }

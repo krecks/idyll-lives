@@ -81,7 +81,7 @@ export class TownOverview {
     camera: ArcRotateCamera,
   ) {
     this.templates = new TemplateCache(scene);
-    this.streets = [new Street(scene, assets, house, LAYER_TOWN), new Street(scene, assets, house, LAYER_TOWN)];
+    this.streets = [new Street(scene, assets, house, { layerMask: LAYER_TOWN }), new Street(scene, assets, house, { layerMask: LAYER_TOWN })];
     const mat = (this.glowMaterial = new StandardMaterial('lotGlow', scene));
     // Unlit: the output is emissive x vertex colour x instance colour.
     mat.disableLighting = true;

@@ -495,7 +495,7 @@ impl World {
             return Err(Error::new("someone is standing there"));
         }
         let before = self.reach_signature(plot);
-        let id = self.place(def, x, z, rot, layout, colors, quality, value)?;
+        let id = self.place(def, x, z, rot, layout, colors, quality, value, None)?;
         let approach = self.approach_tiles(&self.objects[id as usize]);
         let (fx, fz) = approach.first().copied().unwrap_or_else(|| self.objects[id as usize].front_tile(&self.content));
         let seen = self.reachable(plot);
@@ -516,6 +516,14 @@ impl World {
             self.remove_object(id);
             return Err(Error::new("that would block the way"));
         }
+        Ok(id)
+    }
+
+    /// Places `old`, lifted out, back on the home plot at `x`, `z` (see `place_at_home`), keeping
+    /// what it was (`ObjectInstance::carry_state`).
+    pub(crate) fn replace_at_home(&mut self, plot: u32, old: &ObjectInstance, x: i32, z: i32, rot: u8, layout: Layout) -> Result<u32, Error> {
+        let id = self.place_at_home(plot, old.def, x, z, rot, layout, old.colors.clone(), old.quality, old.value)?;
+        self.objects[id as usize].carry_state(old);
         Ok(id)
     }
 
@@ -746,10 +754,8 @@ impl World {
         let result = (|| {
             let layout = Layout { offset: offset.unwrap_or(old.offset), extent: Some(size.unwrap_or(old.extent)), tall: tall.unwrap_or(old.tall) };
             self.keep_doorway_clear(old.def, x, z, rot, layout)?;
-            let id = self.place_at_home(plot, old.def, x, z, rot, layout, old.colors.clone(), old.quality, old.value)?;
-            let placed = &mut self.objects[id as usize];
-            placed.carry_state(&old);
-            placed.turn = turn.unwrap_or(old.turn);
+            let id = self.replace_at_home(plot, &old, x, z, rot, layout)?;
+            self.objects[id as usize].turn = turn.unwrap_or(old.turn);
             let new_top = crate::surface::Top::of(&self.content, &self.objects[id as usize]);
             let turned = |o: &ObjectInstance| (o.rot as i32 * 90 + o.turn as i32).rem_euclid(360);
             let delta = turned(&self.objects[id as usize]) - turned(&old);
@@ -767,11 +773,9 @@ impl World {
                 let facing = (turned(r) + delta).rem_euclid(360);
                 let name = self.content.objects[r.def].name.to_lowercase();
                 let rid = self
-                    .place_at_home(plot, r.def, x, z, (facing / 90) as u8, Layout { offset, ..Layout::of(r) }, r.colors.clone(), r.quality, r.value)
+                    .replace_at_home(plot, r, x, z, (facing / 90) as u8, Layout { offset, ..Layout::of(r) })
                     .map_err(|_| Error::new(format!("the {name} on it wouldn't fit there")))?;
-                let o = &mut self.objects[rid as usize];
-                o.carry_state(r);
-                o.turn = if self.content.objects[r.def].turns { (facing % 90) as u8 } else { 0 };
+                self.objects[rid as usize].turn = if self.content.objects[r.def].turns { (facing % 90) as u8 } else { 0 };
                 placed.push((r.clone(), rid));
             }
             for (was, now) in placed {

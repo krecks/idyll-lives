@@ -100,7 +100,7 @@
     <div class="perf">
       <span class="muted row-between"><span>Performance</span><span class="tabular">{Math.round(job.performance)}%</span></span>
       <span class="track" role="progressbar" aria-label="Performance" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(job.performance)}>
-        <span style="transform:scaleX({Math.min(1, job.performance / 100)})"></span>
+        <span class="meter-fill" style="transform:scaleX({Math.min(1, job.performance / 100)})"></span>
       </span>
     </div>
 
@@ -249,12 +249,7 @@
     overflow: hidden;
   }
   .track span {
-    display: block;
-    width: 100%;
-    height: 100%;
     background: var(--good);
-    transform-origin: left;
-    transition: transform var(--slow) var(--ease);
   }
   .next {
     display: flex;

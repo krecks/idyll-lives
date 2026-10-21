@@ -990,11 +990,10 @@ fn dish(world: &World, held: Option<crate::items::Held>, item: Option<u32>, plat
 fn task_view(world: &World, task: &Task, phase: Option<&Phase>, held: Option<crate::items::Held>) -> ActionView {
     let content = &world.content;
     // The view names objects by stable id.
-    let stable = |object: u32| world.stable_of(object);
     let (label, object, target, minutes) = match task.kind {
         TaskKind::Use { object, interaction } => {
             let inter = &content.objects[world.objects[object as usize].def].interactions[interaction];
-            (inter.label.clone(), stable(object), None, inter.minutes)
+            (inter.label.clone(), world.stable_of(object), None, inter.minutes)
         }
         TaskKind::MoveTo { .. } => ("Go here".to_owned(), None, None, 1.0),
         TaskKind::Social { target, social } => {
@@ -1033,7 +1032,7 @@ fn task_view(world: &World, task: &Task, phase: Option<&Phase>, held: Option<cra
         TaskKind::Repair { object } => {
             let rules = &content.object_rules.repair;
             let name = &content.objects[world.objects[object as usize].def].name;
-            (format!("{} the {}", rules.label, name.to_lowercase()), stable(object), None, rules.minutes)
+            (format!("{} the {}", rules.label, name.to_lowercase()), world.stable_of(object), None, rules.minutes)
         }
         // "Make a meal · Prep (2/3)": the whole recipe's progress.
         TaskKind::Cook { recipe, step, station, origin, minutes, .. } => {
@@ -1049,7 +1048,7 @@ fn task_view(world: &World, task: &Task, phase: Option<&Phase>, held: Option<cra
             let progress = ((done + elapsed) / r.minutes).min(1.0);
             return ActionView {
                 label,
-                object: station.or(origin).and_then(stable),
+                object: station.or(origin).and_then(|o| world.stable_of(o)),
                 target: None,
                 progress: round_to(progress, PERCENT),
                 directed: task.directed,

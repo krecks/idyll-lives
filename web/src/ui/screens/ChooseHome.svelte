@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { menuScene } from '../../game/menuScene';
   import { houseTemplate, loadTemplates, lotDims, vacantSlots, withLotSize, type LotSize, type PlotSlot, type Templates } from '../../game/town';
-  import { residentsOf } from '../../game/household';
+  import { residentsOf, sleepersOf } from '../../game/household';
   import { app } from '../app.svelte';
   import { money } from '../format';
   import Icon from '../Icon.svelte';
@@ -47,14 +47,14 @@
     if (!templates || !selected || lot === 'empty' || !sleep.length) return null;
     const fitted = houseTemplate(templates, selected.template, residents);
     if (!fitted) return null;
-    const count = (objects: { def: string }[] | undefined) =>
-      (objects ?? []).reduce((n, o) => {
+    return [fitted, fitted.upper, fitted.basement]
+      .flatMap((floor) => floor?.objects ?? [])
+      .reduce((n, o) => {
         const def = services.content.object(o.def);
         return n + (def && services.content.offersTags(def, sleep) ? (def.slots ?? 1) : 0);
       }, 0);
-    return count(fitted.objects) + count(fitted.upper?.objects) + count(fitted.basement?.objects);
   });
-  const sleepers = $derived(residents.couples * 2 + residents.adults + residents.children);
+  const sleepers = $derived(sleepersOf(residents));
   const shortage = $derived(bedPlaces !== null && sleepers > bedPlaces ? { beds: bedPlaces, sleepers } : null);
   /** Asking whether to move in anyway (`shortage` can't change while the dialog is open). */
   let confirming = $state(false);

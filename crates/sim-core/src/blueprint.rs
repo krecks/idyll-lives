@@ -621,12 +621,8 @@ impl World {
             let (riders, rest): (Vec<&ObjectInstance>, Vec<&ObjectInstance>) = lifted.iter().rev().partition(on_top);
             for o in rest.into_iter().chain(riders) {
                 let name = self.content.objects[o.def].name.to_lowercase();
-                let id = self
-                    .place_at_home(plot, o.def, o.x + dx, o.z + dz, o.rot, Layout::of(o), o.colors.clone(), o.quality, o.value)
+                self.replace_at_home(plot, o, o.x + dx, o.z + dz, o.rot, Layout::of(o))
                     .map_err(|_| Error::new(format!("there's no room for the {name} there")))?;
-                let placed = &mut self.objects[id as usize];
-                placed.carry_state(o);
-                placed.offset = o.offset;
             }
             // Food and dishes in the room move with it.
             let room: Vec<(i32, i32)> = tiles.iter().copied().collect();

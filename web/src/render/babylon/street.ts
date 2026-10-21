@@ -455,6 +455,17 @@ interface PlotLayout {
   drive: Rect | null;
 }
 
+export interface StreetOptions {
+  /** Camera layer of everything this street draws (see layers.ts); default: the game world. */
+  layerMask?: number;
+  /** Neighbours' windows glow only while someone is up in there (`setUp`; the game's street, not the menus' town). */
+  lived?: boolean;
+  /** Draws the outdoor things of public places outside the viewed lot (the game, not the overview, which draws every lot's). */
+  look?: ObjectLook;
+  /** 1: the street's models' far versions, if they have one (`QualitySettings.streetLod`); 0: full detail. */
+  lod?: 0 | 1;
+}
+
 /** How often (ms) at most the neighbours' window glass is redrawn as they go to bed or get up. */
 const WINDOWS_EVERY_MS = 1000;
 
@@ -487,19 +498,22 @@ export class Street {
   private readonly tmpS = new Vector3();
   private readonly tmpT = new Vector3();
 
+  /** See `StreetOptions`. */
+  private readonly layerMask?: number;
+  private readonly lived: boolean;
+  private readonly look?: ObjectLook;
+  private readonly lod: 0 | 1;
+
   constructor(
     private readonly scene: Scene,
     private readonly assets: AssetRegistry,
     private readonly house: HouseBuilder,
-    /** Camera layer of everything this street draws (see layers.ts); default: the game world. */
-    private readonly layerMask?: number,
-    /** Neighbours' windows glow only while someone is up in there (`setUp`; the game's street, not the menus' town). */
-    private readonly lived = false,
-    /** Draws the outdoor things of public places outside the viewed lot (the game, not the overview, which draws every lot's). */
-    private readonly look?: ObjectLook,
-    /** 1: the street's models' far versions, if they have one (`QualitySettings.streetLod`); 0: full detail. */
-    private readonly lod: 0 | 1 = 0,
+    { layerMask, lived = false, look, lod = 0 }: StreetOptions = {},
   ) {
+    this.layerMask = layerMask;
+    this.lived = lived;
+    this.look = look;
+    this.lod = lod;
     this.lib = MaterialLibrary.for(scene);
     this.templates = new TemplateCache(scene);
     const glow = (this.glowMat = new StandardMaterial('streetLampGlass', scene));

@@ -274,17 +274,19 @@ impl ObjectInstance {
         } else {
             self.reserve_in(sim, range)
         };
-        if reserved && def.interactions[i].when == Some(false) {
-            self.closed_users |= 1 << sim;
-        }
-        reserved
+        self.kept_closed(sim, reserved, def.interactions[i].when == Some(false))
     }
 
     /// Takes a place on it for `sim` to sit while doing something else (eating, the phone, TV
     /// from the sofa). A seat only while closed (a sofa bed) then can't be opened under them.
     pub(crate) fn reserve_seat(&mut self, sim: u32, def: &crate::content::ObjectDef) -> bool {
         let reserved = self.reserve(sim, def.slots);
-        if reserved && def.interactions.iter().any(|i| i.pose == Pose::Sit && i.when == Some(false)) {
+        self.kept_closed(sim, reserved, def.interactions.iter().any(|i| i.pose == Pose::Sit && i.when == Some(false)))
+    }
+
+    /// Passes `reserved` on; a place taken for a use that needs it `closed` keeps it so under `sim`.
+    fn kept_closed(&mut self, sim: u32, reserved: bool, closed: bool) -> bool {
+        if reserved && closed {
             self.closed_users |= 1 << sim;
         }
         reserved
@@ -1364,7 +1366,7 @@ impl World {
             let turn = world.check_turn(def, p.turn).map_err(at)?;
             let layout = world.check_layout(def, p.rot, Layout { offset: p.offset, extent: p.size, tall: p.tall }).map_err(at)?;
             let value = world.content.objects[def].price.unwrap_or(0);
-            let id = world.place(def, p.x, p.z, p.rot, layout, Default::default(), 0, value)?;
+            let id = world.place(def, p.x, p.z, p.rot, layout, Default::default(), 0, value, None)?;
             world.objects[id as usize].turn = turn;
         }
         if lot_file.sims.len() > MAX_SIMS {
@@ -1512,7 +1514,7 @@ impl World {
             .object_index(def_id)
             .ok_or_else(|| Error::new(format!("unknown object '{def_id}'")))?;
         let value = self.content.objects[def].price.unwrap_or(0);
-        self.place(def, x, z, rot, Layout::default(), Default::default(), 0, value)
+        self.place(def, x, z, rot, Layout::default(), Default::default(), 0, value, None)
     }
 
     /// Checks that object `def` fits at `x, z, rot` (laid out as `layout`, unchecked: see
@@ -1699,6 +1701,7 @@ impl World {
         self.hung_on(horizontal, x, z).next().is_some()
     }
 
+    /// Places object `def` if it fits. `stable`: its id from a save; otherwise it gets a fresh one.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn place(
         &mut self,
@@ -1710,10 +1713,14 @@ impl World {
         colors: Colors,
         quality: u8,
         value: i64,
+        stable: Option<u32>,
     ) -> Result<u32, Error> {
         let mut obj = self.check_fit(def, x, z, rot, layout)?;
-        obj.stable = self.next_object_id;
-        self.next_object_id = self.next_object_id.wrapping_add(1);
+        obj.stable = stable.unwrap_or_else(|| {
+            let id = self.next_object_id;
+            self.next_object_id = id.wrapping_add(1);
+            id
+        });
         obj.colors = colors;
         obj.quality = quality.min(self.content.object_rules.max_quality);
         obj.value = value;
@@ -2956,7 +2963,7 @@ impl World {
                 }
             }
             Command::SwitchLamp { object, on } => {
-                let obj = self.objects.get(object as usize).ok_or_else(|| Error::new(format!("unknown object {object}")))?;
+                let obj = &self.objects[object as usize];
                 if !crate::lights::switchable(self, obj.def) {
                     return Err(Error::new(format!("the {} has no switch", self.content.objects[obj.def].name.to_lowercase())));
                 }
@@ -2967,10 +2974,7 @@ impl World {
                 object,
                 interaction,
             } => {
-                let obj = self
-                    .objects
-                    .get(object as usize)
-                    .ok_or_else(|| Error::new(format!("unknown object {object}")))?;
+                let obj = &self.objects[object as usize];
                 let Some(inter) = self.content.objects[obj.def].interactions.get(interaction)
                 else {
                     return Err(Error::new(format!(
@@ -3779,7 +3783,7 @@ fn pick_autonomous(
         let plot = ctx.object_plot[obj.id as usize];
         let allowed = access(ctx, sim, plot);
         // (Off the home plot: a public place or the street.)
-        let outing = || plot != own && !content.objects[obj.def].interactions.iter().any(|i| (0..content.needs.len()).any(|n| stranded & (1 << n) != 0 && i.total_gain[n] > 0.0));
+        let outing = || plot != own && !content.objects[obj.def].interactions.iter().any(|i| i.fills() & stranded != 0);
         if allowed == Access::None || (minding && outing()) {
             continue;
         }
@@ -3863,7 +3867,7 @@ fn pick_autonomous(
                 continue;
             }
             let sleep = inter.tags & rhythm.sleep_tags != 0;
-            let fills = (0..content.needs.len()).filter(|&n| inter.total_gain[n] > 0.0).fold(0u32, |m, n| m | 1 << n);
+            let fills = inter.fills();
             let there = distance / walk_per_minute;
             let minutes = inter.minutes + there;
             // A chosen use that would stop at once for an urgent need (`use_object`), then get
@@ -4463,16 +4467,16 @@ fn seat_near_object(
         .approach_of(object)
         .unwrap_or_else(|| objects[object as usize].front_tile(content));
     let target = [tx as f32 + 0.5, tz as f32 + 0.5];
-    let sits = |o: &ObjectInstance| {
-        o.sits(&content.objects[o.def], rules.seat_tags, rules.seat_avoid)
-    };
     objects
         .iter()
         .filter(|o| o.id != object)
         .filter(|o| {
             plot.is_none_or(|p| ctx.object_plot.get(o.id as usize).copied().flatten() == Some(p))
         })
-        .filter(|o| !o.broken() && o.can_use(sim.id, content.objects[o.def].slots) && sits(o))
+        .filter(|o| {
+            let def = &content.objects[o.def];
+            !o.broken() && o.can_use(sim.id, def.slots) && o.sits(def, rules.seat_tags, rules.seat_avoid)
+        })
         .filter(|o| access(ctx, sim, ctx.object_plot[o.id as usize]) != Access::None)
         .map(|o| {
             let (fx, fz) = ctx
@@ -4990,7 +4994,7 @@ fn ready_to_leave(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<Ta
         None => {}
         Some(Task { kind: TaskKind::Use { object, interaction }, directed: false, routine: false }) => {
             let inter = &content.objects[objects[object as usize].def].interactions[interaction];
-            if (0..content.needs.len()).any(|n| low & (1 << n) != 0 && inter.total_gain[n] > 0.0) {
+            if inter.fills() & low != 0 {
                 return None;
             }
         }
@@ -5028,7 +5032,7 @@ fn home_needs(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], mask: u32, free:
             i.autonomous && !i.cares() && i.recipe.is_none_or(possible)
                 && requirements_met(ctx, objects, o.id, i)
         }) {
-            found |= (0..ctx.content.needs.len()).filter(|&n| i.total_gain[n] > 0.0).fold(0, |m, n| m | 1 << n) & mask;
+            found |= i.fills() & mask;
         }
         if found == mask {
             break;
@@ -5090,7 +5094,7 @@ fn reach(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], usable: &[u32], per_m
             .interactions
             .iter()
             .filter(|i| i.autonomous && !i.baby && !i.cares() && requirements_met(ctx, objects, o.id, i))
-            .fold(0u32, |m, i| (0..content.needs.len()).filter(|&n| i.total_gain[n] > 0.0).fold(m, |m, n| m | 1 << n));
+            .fold(0, |m, i| m | i.fills());
         if fills == 0 {
             continue;
         }

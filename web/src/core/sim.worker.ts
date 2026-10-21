@@ -33,7 +33,6 @@ let memory: WebAssembly.Memory;
 let writer: SharedSnapshotWriter | null = null;
 let lastStructure = -1;
 let lastItems = -1;
-let lastLampStructure = -1;
 let lastLights = -1;
 /** Lot version and region the renderer last got the lot (walls, rooms, meshes) for. */
 let lastLot = -1;
@@ -107,8 +106,8 @@ scope.onmessage = (e) => {
 };
 
 async function start(content: string, source: GameSource): Promise<void> {
-  // Each phase says it's under way (the main thread gives up on a start only when it stalls).
-  starting();
+  // Each phase after the download says it's under way (the main thread gives up on a start only
+  // when it stalls; it started waiting when it sent `init`).
   memory = (await init({ module_or_path: fetchWasm() })).memory;
   starting();
   try {
@@ -131,7 +130,7 @@ async function start(content: string, source: GameSource): Promise<void> {
   runLoop(1000 / layout.ticksPerSecond);
 }
 
-/** The simulation's wasm, saying `loading` as it arrives (it still compiles while it downloads). */
+/** The simulation's wasm, saying `starting` as it arrives (it still compiles while it downloads). */
 async function fetchWasm(): Promise<Response> {
   const response = await fetch(new URL('./wasm-pkg/sim_wasm_bg.wasm', import.meta.url));
   if (!response.ok || !response.body) return response;
@@ -250,8 +249,7 @@ function publish(): void {
   const version = g.structure_version();
   // (Before the world, which the renderer builds with them.)
   const lights = g.lights_version();
-  if (version !== lastLampStructure || lights !== lastLights) {
-    lastLampStructure = version;
+  if (version !== lastStructure || lights !== lastLights) {
     lastLights = lights;
     scope.postMessage({ type: 'lamps', off: JSON.parse(g.lamps_off()) });
   }

@@ -32,7 +32,7 @@ import { VoiceDirector } from '../voice';
 import { WorldSound } from '../audio/world';
 import { addBlueprint, blueprints } from '../persistence/blueprints.svelte';
 import { Director } from './director';
-import { BuildBuyInput, editFeedback, type Picked } from './buildmode';
+import { addedObjects, BuildBuyInput, editFeedback, type Picked } from './buildmode';
 import { ownSize } from './surfaces';
 import { colorValues } from '../ui/buy/catalog';
 import { play } from '../ui/sfx';
@@ -997,8 +997,7 @@ export async function startSession(
     if (feedback?.sound) play(feedback.sound);
     // Things the player just placed: the director looks out for their first use.
     if (game.mode === 'build' && world) {
-      const before = new Set(world.objects.map((o) => o.id));
-      const added = w.objects.filter((o) => !before.has(o.id));
+      const added = addedObjects(world, w);
       if (added.length) director.noteBuilt(added.map((o) => o.id), performance.now());
     }
     world = w;

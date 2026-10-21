@@ -474,13 +474,13 @@ fn seat_near(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<u32> {
         Some(visit) => ctx.index.on(visit.plot),
         None => ctx.index.usable_from(ctx.households[sim.household as usize].plot),
     };
-    let sits = |o: &ObjectInstance| {
-        o.sits(&content.objects[o.def], rules.seat_tags, rules.seat_avoid)
-    };
     usable
         .iter()
         .map(|&o| &objects[o as usize])
-        .filter(|o| !o.broken() && o.can_use(sim.id, content.objects[o.def].slots) && sits(o))
+        .filter(|o| {
+            let def = &content.objects[o.def];
+            !o.broken() && o.can_use(sim.id, def.slots) && o.sits(def, rules.seat_tags, rules.seat_avoid)
+        })
         .filter(|o| access(ctx, sim, ctx.object_plot[o.id as usize]) != Access::None)
         .map(|o| {
             let (fx, fz) = ctx.index.links.approach_of(o.id).unwrap_or_else(|| o.front_tile(content));

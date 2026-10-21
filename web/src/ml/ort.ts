@@ -16,12 +16,18 @@ export function importOrt(): Promise<OrtModule> {
   return import('onnxruntime-web/webgpu');
 }
 
-/** Whether this browser offers WebGPU with an adapter (in a worker or a page). */
+let hadWebGpu = false;
+
+/**
+ * Whether this browser offers WebGPU with an adapter (in a worker or a page). A yes is remembered;
+ * a no is asked again (no adapter can be passing, as just after the graphics were reset).
+ */
 export async function hasWebGpu(): Promise<boolean> {
+  if (hadWebGpu) return true;
   const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } }).gpu;
   if (!gpu) return false;
   try {
-    return !!(await gpu.requestAdapter());
+    return (hadWebGpu = !!(await gpu.requestAdapter()));
   } catch {
     return false;
   }

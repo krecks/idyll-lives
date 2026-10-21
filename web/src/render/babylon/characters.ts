@@ -20,7 +20,7 @@
  *   instance lists change per frame.
  * - Far from the camera a Sim switches to the low-detail body and shells (`lod.*` parts; with a gap
  *   between switching down and up), and every Sim casts its sun shadow from shadow-only copies of
- *   those (`shadowMeshes`, on `LAYER_SHADOW_ONLY`).
+ *   those (`shadowMeshes`, on `LAYER_SHADOW_ONLY`; none where Sims cast no shadows, `castsShadows`).
  * - Life stages load the first time a Sim needs them (`loadStage`).
  * - No allocations per frame.
  *
@@ -1093,8 +1093,9 @@ export class Characters {
   private readonly far = new Uint8Array(MAX_CHARACTERS);
   /** The set has low-detail bodies. */
   private hasLod = false;
-  /** Shadow-only copies of the low-detail meshes (all Sims cast shadows from those). */
+  /** Shadow-only copies of the low-detail meshes (all Sims cast shadows from those; none without `castsShadows`). */
   private readonly shadowMeshes = new Map<string, PartMesh>();
+  private readonly castsShadows: boolean;
   readonly visible = new Uint8Array(MAX_CHARACTERS);
   private lastNow = 0;
   /** Seconds of animation played: stands still while the game is paused (Sims hold their pose). */
@@ -1138,12 +1139,17 @@ export class Characters {
     private readonly lib: MaterialLibrary,
     /** For seats content describes (`seat`) and what can be sat or lain on. */
     private readonly content?: Content,
-    /**
-     * Builds again the props drawn without a model file that came (the game's): the scene then tries
-     * failed files in the background (`onModelFileArrived`). Off for the preview studio and the debug pages.
-     */
-    refreshProps = false,
+    { refreshProps = false, castsShadows = true }: {
+      /**
+       * Builds again the props drawn without a model file that came (the game's): the scene then tries
+       * failed files in the background (`onModelFileArrived`). Off for the preview studio and the debug pages.
+       */
+      refreshProps?: boolean;
+      /** Sims cast sun shadows (the shadow-only copies are built); off where they cast none (`QualitySettings.characterShadows`). */
+      castsShadows?: boolean;
+    } = {},
   ) {
+    this.castsShadows = castsShadows;
     this.props = new TemplateCache(scene);
     // A model file that failed has come: the props drawn without it (small blocks) are built again,
     // and the blocks go once they are (hidden at once: the frame no longer moves them).
@@ -1340,9 +1346,10 @@ export class Characters {
     this.ring?.thinInstanceBufferUpdated('matrix');
   }
 
-  /** Character meshes in use (shadow casters; small details excluded). */
+  /** Character meshes in use (shadow casters; small details excluded); none if Sims cast no shadows. */
   casters(): Mesh[] {
     const out: Mesh[] = [];
+    if (!this.castsShadows) return out;
     // The low-detail body and clothes' shadow copies; sets without them cast from the full meshes.
     for (const p of this.shadowMeshes.values()) if (p.mesh.isEnabled()) out.push(p.mesh);
     if (out.length) return out;
@@ -1537,7 +1544,7 @@ export class Characters {
       this.setInstances(pm, ids);
       pm.mesh.setEnabled(true);
       // Every Sim casts its sun shadow from the low-detail body and clothes (no hair, no face).
-      if (part.startsWith('lod.')) {
+      if (this.castsShadows && part.startsWith('lod.')) {
         const sm = this.partMesh(body, part, true);
         if (sm) {
           this.setInstances(sm, ids);
@@ -1634,7 +1641,7 @@ export class Characters {
     // The ghosts' meshes (and the low-detail ones' shadow copies), even where nobody in the world wears them.
     for (const body of bodies) {
       for (const part of parts) {
-        for (const shadow of part.startsWith('lod.') ? [false, true] : [false]) {
+        for (const shadow of this.castsShadows && part.startsWith('lod.') ? [false, true] : [false]) {
           const pm = this.partMesh(body, part, shadow);
           if (pm && !pm.mesh.isEnabled()) {
             pm.all = new Float32Array(0);

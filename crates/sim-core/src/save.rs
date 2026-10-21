@@ -989,12 +989,17 @@ impl World {
         // Object ids may change from the save's (an object left out, or tops placed last): tasks are remapped.
         // Things standing on tops go in once everything else stands.
         let mut object_ids = HashMap::new();
-        let mut stable_ids: HashMap<u32, Option<u32>> = HashMap::new();
+        // Saved stable ids are kept (once each); old saves and anything else get fresh ones, past
+        // every saved id.
+        world.next_object_id = save.objects.iter().filter_map(|o| o.id).max().map_or(0, |m| m + 1);
+        let mut used = HashSet::new();
         let on_top = |o: &ObjectSave| world.content.object_index(&o.def).is_some_and(|d| world.content.objects[d].layer == crate::content::Layer::Surface);
         let tops: Vec<bool> = save.objects.iter().map(on_top).collect();
         let order: Vec<usize> = (0..tops.len()).filter(|&i| !tops[i]).chain((0..tops.len()).filter(|&i| tops[i])).collect();
         for i in order {
             let o = &save.objects[i];
+            // (A corrupt save's second use of an id gets a fresh one.)
+            let keep = o.id.filter(|s| !used.contains(s));
             let placed = match world.content.object_index(&o.def) {
                 Some(def) => {
                     let value = o
@@ -1005,7 +1010,7 @@ impl World {
                     let own = crate::world::kind_size(world.content.objects[def].footprint);
                     let (size, tall) = world.check_size(def, o.size.unwrap_or(own), o.tall).unwrap_or((own, 0));
                     let layout = crate::world::Layout { offset: o.offset, extent: Some(size), tall };
-                    world.place(def, o.x, o.z, o.rot, layout, colors, o.quality, value)
+                    world.place(def, o.x, o.z, o.rot, layout, colors, o.quality, value, keep)
                 }
                 None => world.place_object(&o.def, o.x, o.z, o.rot),
             };
@@ -1016,30 +1021,18 @@ impl World {
                 let obj = &world.objects[id as usize];
                 let turn = world.check_turn(obj.def, o.turn).unwrap_or(0);
                 let offset = world.check_offset(obj.def, obj.rot, o.offset).unwrap_or([0, 0]);
-                world.objects[id as usize].turn = turn;
-                world.objects[id as usize].offset = offset;
-                world.objects[id as usize].wear = o.wear.clamp(0.0, 1.0);
-                world.objects[id as usize].open = o.open;
-                world.objects[id as usize].off = o.off && world.content.objects[world.objects[id as usize].def].switch;
-                world.objects[id as usize].growth = finite(o.growth.unwrap_or(1.0), 1.0).clamp(-1.0, 1.0);
+                let obj = &mut world.objects[id as usize];
+                obj.turn = turn;
+                obj.offset = offset;
+                obj.wear = o.wear.clamp(0.0, 1.0);
+                obj.open = o.open;
+                obj.off = o.off && world.content.objects[obj.def].switch;
+                obj.growth = finite(o.growth.unwrap_or(1.0), 1.0).clamp(-1.0, 1.0);
+                used.extend(keep);
                 object_ids.insert(i as u32, id);
-                stable_ids.insert(id, o.id);
             }
         }
-        // Keep the saved stable ids where there is one (once); old saves and anything else get
-        // fresh ones, past every saved id.
-        let mut used: HashSet<u32> = HashSet::new();
-        let mut next = stable_ids.values().flatten().copied().max().map_or(0, |m| m + 1);
-        for (i, obj) in world.objects.iter_mut().enumerate() {
-            match stable_ids.get(&(i as u32)).copied().flatten() {
-                Some(id) if used.insert(id) => obj.stable = id,
-                _ => {
-                    obj.stable = next;
-                    next += 1;
-                }
-            }
-        }
-        world.next_object_id = next.max(save.next_object_id.unwrap_or(0));
+        world.next_object_id = world.next_object_id.max(save.next_object_id.unwrap_or(0));
         for s in &save.sims {
             let spawn = SimSpawn {
                 name: s.name.clone(),

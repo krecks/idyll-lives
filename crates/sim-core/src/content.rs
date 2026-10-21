@@ -158,6 +158,11 @@ impl Interaction {
         self.care.iter().any(|&g| g > 0.0)
     }
 
+    /// Bitmask of the needs this fills (a gain above 0).
+    pub fn fills(&self) -> u32 {
+        (0..MAX_NEEDS).filter(|&n| self.total_gain[n] > 0.0).fold(0, |m, n| m | 1 << n)
+    }
+
     pub fn trains_skills(&self) -> bool {
         self.skill_gain.iter().any(|&g| g > 0.0)
     }

@@ -44,6 +44,10 @@ jobs:
           node-version: 22
 
       - name: Generated houses and worlds
+        # Optimised for speed, but without the release build's fat LTO (minutes, for two test binaries).
+        env:
+          CARGO_PROFILE_RELEASE_LTO: 'false'
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '16'
         run: |
           node --experimental-strip-types tools/housegen/sample.ts /tmp/houses.json
           node --experimental-transform-types tools/worlds/sample.ts /tmp/worlds.json

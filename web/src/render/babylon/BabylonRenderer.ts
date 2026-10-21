@@ -429,8 +429,8 @@ export class BabylonRenderer implements Renderer {
   /** Shadow casters without the house walls, and the walls (they cast only with walls up). */
   private baseCasters: Mesh[] = [];
   private wallCasters: Mesh[] = [];
-  /** Object body meshes whose sun shadows are in `objectShadowMerge` (Low), so they cast no shadow of their own. */
-  private objectShadowSources = new Set<Mesh>();
+  /** Some object's moving parts cast sun shadows of their own (on Low only see-through ones do): their motion redraws the map. */
+  private movingPartsCast = false;
   /** The low preset's one static shadow caster for the lot's objects (null on Medium and High). */
   private objectShadowMerge: Mesh | null = null;
   /** `objectShadowMerge`'s material, one for the renderer (the world's meshes go without theirs). */
@@ -439,9 +439,7 @@ export class BabylonRenderer implements Renderer {
   private readonly objectShadowParts = new Map<Float32Array, ShadowPart[]>();
   /** `objectShadowMerge`'s vertex positions (world space). */
   private objectShadowPositions = new Float32Array(0);
-  private readonly shadowMatrix = new Matrix();
   private readonly shadowInstance = new Matrix();
-  private readonly shadowPoint = new Vector3();
   private wallMode: WallMode = 'down';
   /** Camera look bits for the cutaway (+x, -x, +z, -z). */
   private cutLook = -1;
@@ -826,10 +824,14 @@ export class BabylonRenderer implements Renderer {
       roofColors: c.roofColors,
     });
     // Public places seen from another lot show their things in the open (as the overview does).
-    this.street = new Street(scene, this.deps.assets, this.house, undefined, true, (def) => {
-      const d = this.deps.content.object(def);
-      return d && { model: d.model ?? `model.${def}`, footprint: d.footprint ?? [1, 1], standIn: this.standInOf(d) };
-    }, this.quality.streetLod);
+    this.street = new Street(scene, this.deps.assets, this.house, {
+      lived: true,
+      look: (def) => {
+        const d = this.deps.content.object(def);
+        return d && { model: d.model ?? `model.${def}`, footprint: d.footprint ?? [1, 1], standIn: this.standInOf(d) };
+      },
+      lod: this.quality.streetLod,
+    });
     // Wind sway and tint variation for foliage materials (hooks them as the models load).
     installNature(scene);
     await this.setupEnvironment();
@@ -844,7 +846,7 @@ export class BabylonRenderer implements Renderer {
     this.setupHelpers();
     await this.setupMarker();
     // (Their data loads with the first world that has residents, not with the menus.)
-    this.characters = new Characters(scene, this.deps.assets, this.lib, this.deps.content, true);
+    this.characters = new Characters(scene, this.deps.assets, this.lib, this.deps.content, { refreshProps: true, castsShadows: this.quality.characterShadows });
     this.characters.setRide((id) => this.motion.ride(id));
     this.characters.setLoop((id) => this.motion.loopPhase(id));
     this.items = new ItemLayer(scene, this.deps.assets, this.deps.content);
@@ -1023,13 +1025,14 @@ export class BabylonRenderer implements Renderer {
     this.placeRoomLights(world, view);
     await this.pace();
     const streetCasters = await perfTimeAsync('render: street furniture', () => this.street.build(world, this.view, () => this.pace()));
-    await perfTimeAsync('render: objects', async () => {
-      await this.buildObjects(world);
+    const merged = await perfTimeAsync('render: objects', async () => {
+      const merged = await this.buildObjects(world);
       // What replaces the boxes of files that came is placed now: they're hidden (and go at the end).
       this.templates.hideStale();
       this.pullUpChairs(world);
       this.hideHeld();
       await this.pace();
+      return merged;
     });
     await perfTimeAsync('render: sims', () => this.buildSims(world));
     this.retireTemplates(new Set(this.templatesInUse));
@@ -1039,9 +1042,9 @@ export class BabylonRenderer implements Renderer {
     this.baseCasters = [
       ...new Set([
         ...[...this.lotMeshes, ...this.worldMeshes].filter((m) => !notCasting.has(m.name) && !m.name.startsWith('silhouette') && !houseCasters.includes(m)),
-        ...templates.filter((m) => !this.objectShadowSources.has(m)),
-        // Sims' small details (eyes, brows) don't cast sun shadows.
-        ...(this.quality.characterShadows ? this.characters.casters() : []),
+        ...templates.filter((m) => !merged.has(m)),
+        // Sims' small details (eyes, brows) don't cast sun shadows (nothing of them does on Low).
+        ...this.characters.casters(),
         ...(this.quality.streetShadows ? streetCasters : []),
       ]),
     ];
@@ -1114,7 +1117,7 @@ export class BabylonRenderer implements Renderer {
     // Doors that open while residents use what they're on, and ambient clips near the camera (the
     // sun's shadows aren't redrawn for those).
     const motion = this.motion.update(frame, layout.actions ?? [], this.camera.position);
-    if (motion.moved) this.sunShadows.moved(false);
+    if (motion.moved && this.movingPartsCast) this.sunShadows.moved(false);
     if (motion.moved) this.resetSnapshot();
     // (Ambient clips alone don't make the held mirrors draw again: a fan turns in them when something else changes.)
     else if (motion.ambient && this.webgpu?.snapshotRendering) this.webgpu.snapshotRenderingReset();
@@ -1125,7 +1128,7 @@ export class BabylonRenderer implements Renderer {
     this.pullChairs();
 
     // Sims who moved (or breathed: anyone in view while the game runs) cast anew.
-    if (this.characters.posed) this.sunShadows.moved(false);
+    if (this.characters.posed && this.quality.characterShadows) this.sunShadows.moved(false);
     // Held reflections are drawn again when a resident in them moved; they draw only the residents they show.
     this.mirrors.update(this.camera, { heads: this.characters.heads, visible: this.characters.visible, count, moved: this.characters.posed, rowsOf: this.residentRows });
     this.handles.update(this.camera.globalPosition);
@@ -4002,7 +4005,8 @@ export class BabylonRenderer implements Renderer {
     return paintColors(this.deps.assets.get(this.objectModel(o), 'model'), o.colors);
   }
 
-  private async buildObjects(world: WorldStructure): Promise<void> {
+  /** Returns the body meshes whose sun shadows are in `objectShadowMerge` (Low): they cast no shadow of their own. */
+  private async buildObjects(world: WorldStructure): Promise<Set<Mesh>> {
     // Things on the storeys up to the one in view, each lifted to its storey (from its lot rows).
     // From the ground up, stairs down to the basement show in their stairwell too.
     const down = (o: ObjectPlacement) => this.storey >= 0 && this.storeyOf(o.z) === -1 && !!this.deps.content.object(o.def)?.stairs;
@@ -4033,7 +4037,8 @@ export class BabylonRenderer implements Renderer {
     // from every template's thin instances: the lot's furniture costs a draw, not a hundred.
     const merge = this.quality.mergedObjectShadows;
     const shadowSources: ShadowSource[] = [];
-    this.objectShadowSources.clear();
+    const merged = new Set<Mesh>();
+    let partsCast = false;
     const instances = perfStart('render: object instances');
     [...byModel.values()].forEach((list, n) => {
       const template = templates[n];
@@ -4113,9 +4118,9 @@ export class BabylonRenderer implements Renderer {
         // (Something see-through still casts from its own thin instances; a moving part does not cast
         // on Low, where the merged mesh is the lot's one object caster.)
         if (merge && !mesh.material?.needAlphaBlending() && !mesh.material?.needAlphaTesting()) {
-          this.objectShadowSources.add(mesh);
+          merged.add(mesh);
           if (part < 0) shadowSources.push({ mesh, matrices });
-        }
+        } else if (part >= 0) partsCast = true;
       });
       for (const { mesh, part, screen } of template.glows ?? []) {
         // Strengths per instance (`applyGlow`), by the room each stands in; on a moving part, its buffer.
@@ -4133,13 +4138,11 @@ export class BabylonRenderer implements Renderer {
       }
     });
     perfEnd(instances);
+    this.movingPartsCast = partsCast;
     const shadowsSpan = perfStart('render: object shadows');
-    this.objectShadowMerge = null;
     this.objectShadowParts.clear();
-    if (shadowSources.length) {
-      this.objectShadowMerge = this.mergeObjectShadows(shadowSources);
-      if (this.objectShadowMerge) this.worldMeshes.push(this.objectShadowMerge);
-    }
+    this.objectShadowMerge = this.mergeObjectShadows(shadowSources);
+    if (this.objectShadowMerge) this.worldMeshes.push(this.objectShadowMerge);
     for (const g of this.glows) if (!glows.some((n) => n.mesh === g.mesh)) g.mesh.setEnabled(false);
     this.glows = glows;
     this.applyGlow();
@@ -4164,7 +4167,7 @@ export class BabylonRenderer implements Renderer {
       blobs[k + 14] = centre.z - D;
       blobs[k + 15] = 1;
     });
-    if (!shown.length) return;
+    if (!shown.length) return merged;
     const shadows = this.objectShadow.clone('objectShadows', null, true, false) as Mesh;
     shadows.setEnabled(true);
     shadows.thinInstanceSetBuffer('matrix', blobs, 16, true);
@@ -4177,12 +4180,13 @@ export class BabylonRenderer implements Renderer {
     shadows.thinInstanceRefreshBoundingInfo(false);
     this.worldMeshes.push(shadows);
     perfEnd(shadowsSpan);
+    return merged;
   }
 
   /**
    * One mesh of every object body, for the sun's shadow map on Low: a template's thin instances
    * are baked into world-space triangles here, and one again as it hides or moves (`bakeObjectShadow`;
-   * the template is left out of the shadow list, see `objectShadowSources`). Its layer mask keeps it
+   * the template is left out of the shadow list, see `buildObjects`). Its layer mask keeps it
    * out of the camera's pass.
    */
   private mergeObjectShadows(sources: ShadowSource[]): Mesh | null {
@@ -4239,20 +4243,22 @@ export class BabylonRenderer implements Renderer {
   /**
    * Instance `i` of a body mesh in the merged shadow mesh's `positions`, as its matrix stands now: a thin
    * instance draws as `instance × mesh world`. (One hidden, scaled to nothing, is every vertex in one
-   * point: no triangles, no shadow.) Returns the range of `positions` written.
+   * point: no triangles, no shadow.) Returns where in `positions` it starts (`part.pos.length` floats).
    */
-  private bakeShadowInstance(part: ShadowPart, i: number, positions: Float32Array): [number, number] {
+  private bakeShadowInstance(part: ShadowPart, i: number, positions: Float32Array): number {
+    const m = this.mOut;
+    const v = this.vTmp;
     Matrix.FromArrayToRef(part.matrices, i * 16, this.shadowInstance);
-    this.shadowInstance.multiplyToRef(part.world, this.shadowMatrix);
+    this.shadowInstance.multiplyToRef(part.world, m);
     const { pos } = part;
     const start = (part.first + (i * pos.length) / 3) * 3;
     for (let p = 0; p < pos.length; p += 3) {
-      Vector3.TransformCoordinatesFromFloatsToRef(pos[p], pos[p + 1], pos[p + 2], this.shadowMatrix, this.shadowPoint);
-      positions[start + p] = this.shadowPoint.x;
-      positions[start + p + 1] = this.shadowPoint.y;
-      positions[start + p + 2] = this.shadowPoint.z;
+      Vector3.TransformCoordinatesFromFloatsToRef(pos[p], pos[p + 1], pos[p + 2], m, v);
+      positions[start + p] = v.x;
+      positions[start + p + 1] = v.y;
+      positions[start + p + 2] = v.z;
     }
-    return [start, start + pos.length];
+    return start;
   }
 
   /** On Low: an object instance written anew (hidden, shown, moved) casts from where it is now in the merged shadow mesh. */
@@ -4263,8 +4269,8 @@ export class BabylonRenderer implements Renderer {
     const buffer = mesh.getVertexBuffer(VertexBuffer.PositionKind);
     const positions = this.objectShadowPositions;
     for (const part of parts) {
-      const [start, end] = this.bakeShadowInstance(part, target.index, positions);
-      buffer?.updateDirectly(positions.subarray(start, end), start);
+      const start = this.bakeShadowInstance(part, target.index, positions);
+      buffer?.updateDirectly(positions.subarray(start, start + part.pos.length), start);
     }
   }
 

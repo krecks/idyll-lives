@@ -64,9 +64,9 @@ const FILES = [
   out: path === 'LICENSE' ? 'LICENSE.txt' : path.split('/').pop(),
   sha256,
 }));
-/** Files earlier versions wrote that are no longer used (they would be copied into the build). */
 /** Files in the model's folder earlier versions wrote (the graphs as published). */
 const OBSOLETE_IN_MODEL = [...GRAPHS.map((g) => `${g.name}.onnx`), 'LICENSE'];
+/** Files earlier versions wrote that are no longer used (they would be copied into the build). */
 const OBSOLETE = ['misaki-LICENSE', 'pocket-en-2026-04', 'presets-2.pcm', 'presets-2.json', 'presets-2.stamp', 'presets-1.pcm', 'presets-1.json', 'presets-1.stamp', 'paradee-8m.onnx', 'paradee-8m-edit1.onnx', 'paradee-8m.json', 'kitten-nano-0.8-edit1.onnx', 'kitten-nano-0.8-edit2.onnx', 'kitten-nano-0.8-voices.f32'];
 /** Misaki's licence (Apache-2.0: recipients get a copy), next to the dictionary made from it. */
 const LEXICON_LICENSE = { url: `${MISAKI_REPO}/LICENSE`, out: 'misaki-LICENSE.txt', sha256: 'c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4' };

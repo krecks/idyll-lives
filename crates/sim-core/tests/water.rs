@@ -4,6 +4,7 @@
 
 mod common;
 
+use common::buy;
 use sim_core::world::{Phase, TaskKind};
 use sim_core::{Command, MINUTES_PER_TICK, World};
 
@@ -14,12 +15,6 @@ const TOWN: &str = r#"{"width":16,"depth":16,
     "sims":[{"name":"Ada","household":0,"x":3.5,"z":10.5,"traits":["neat"]},{"name":"Bo","household":0,"x":5.5,"z":10.5,"traits":["neat"]},
         {"name":"Cy","household":0,"x":7.5,"z":10.5,"traits":["neat"]},{"name":"Di","household":0,"x":9.5,"z":10.5,"traits":["neat"]},
         {"name":"Ed","household":0,"x":11.5,"z":10.5,"traits":["neat"]}]}"#;
-
-fn buy(w: &mut World, def: &str, x: i32, z: i32) -> u32 {
-    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, 0]), colors: Default::default(), turn: None, offset: None, size: None, tall: None })
-        .unwrap_or_else(|e| panic!("{def}: {e}"));
-    w.objects.last().unwrap().stable
-}
 
 fn interaction(w: &World, object: u32, id: &str) -> usize {
     w.content.objects[w.objects[object as usize].def].interactions.iter().position(|i| i.id == id).unwrap_or_else(|| panic!("{id}"))
