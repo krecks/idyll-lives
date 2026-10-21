@@ -436,6 +436,10 @@
       "category": "community",
       "group": "play",
       "slots": 2,
+      "places": [
+        { "at": [-0.78, 0], "facing": 90 },
+        { "at": [0.78, 0], "facing": -90 }
+      ],
       "outdoors": true,
       "seat": {
         "height": 0.56,
@@ -508,10 +512,16 @@
       "category": "community",
       "group": "play",
       "slots": 4,
+      "places": [
+        { "at": [0, 0.7], "facing": 180 },
+        { "at": [0.7, 0], "facing": -90 },
+        { "at": [0, -0.7] },
+        { "at": [-0.7, 0], "facing": 90 }
+      ],
       "outdoors": true,
       "seat": {
         "height": 0.26,
-        "forward": 0.5
+        "forward": 0
       },
       "description": "A round platform with rails to hold on to: push off, jump on, spin. Room for four.",
       "interactions": [
@@ -584,6 +594,10 @@
       "category": "community",
       "group": "play",
       "slots": 2,
+      "places": [
+        { "at": [-1.3, 0], "facing": 90 },
+        { "at": [1.3, 0], "facing": -90 }
+      ],
       "outdoors": true,
       "description": "A weatherproof concrete table with a steel net. Fast, silly and a little social.",
       "interactions": [
@@ -621,10 +635,14 @@
       "freeRotation": true,
       "group": "play",
       "slots": 2,
+      "places": [
+        { "at": [-0.42, 0], "facing": 90 },
+        { "at": [0.42, 0], "facing": -90 }
+      ],
       "outdoors": true,
       "seat": {
         "height": 0.47,
-        "forward": -0.27
+        "forward": 0
       },
       "description": "A stone table with the board inlaid and a stool either side. Builds Intelligence.",
       "interactions": [

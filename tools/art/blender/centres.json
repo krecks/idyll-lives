@@ -386,7 +386,7 @@
   "model.paperLantern": [0.0, 0.0],
   "model.parasol": [0.0, 0.0],
   "model.parkBench": [0.0, -0.036],
-  "model.parkChessTable": [0.0, 0.02],
+  "model.parkChessTable": [0.0, 0.0],
   "model.patioChair": [0.0, 0.042],
   "model.patioSet": [0.0, 0.05],
   "model.patioTable4": [0.0, -0.04],

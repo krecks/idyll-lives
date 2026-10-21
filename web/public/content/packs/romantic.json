@@ -9,6 +9,10 @@
       "price": 780,
       "category": "kitchen",
       "slots": 2,
+      "places": [
+        { "at": [-0.5, 0] },
+        { "at": [0.5, 0] }
+      ],
       "description": "A linen-draped table for two with tall candles and a single rose. Dinner here is a little more fun and comfortable than at the fridge; good cooks (Cooking 4+) leave with a Candlelit glow that makes flirting land.",
       "interactions": [
         {
