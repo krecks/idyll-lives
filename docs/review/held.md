@@ -122,7 +122,8 @@ Not tied to one row: I-held-01.
 - **Fix class:** model
 - **Where:** `web/public/content/base.json:4050` (`iceCream`: `item.treatPlate`), `:4058` (`toast`: `item.sandwich`), `:4082` (`smoothie`: `item.prepBowl`), `:4089` (`noodles`: `item.prepBowl`), `:4096` (`takeout`: `item.mealPlate`); new models in `tools/art/blender/families/held.py`
 - **Evidence:** Ice cream from the fridge is a plate of cookies and a cupcake (`held/sheets/obj-item.treatPlate.png`). Toast from the breakfast counter is a filled sandwich (`obj-item.sandwich.png`). A smoothie from the breakfast counter or the power blender, and noodles from the delivery locker, are the cook's 32 cm mixing bowl of diced vegetables (`obj-item.prepBowl.png`) held on one palm (`hold: hand`): a smoothie is a 0.3 L glass about 8 cm across, a noodle bowl 15–18 cm. Takeout from a delivery locker or hatch is a china plate of meat and potatoes (`obj-item.mealPlate.png`) rather than a box or a bag. Each is fetched, carried to a seat and eaten in play (`base.json` fridge `frozenTreat`; `furniture.json` `breakfastCounter`; packs `energetic`, `lazy`, `loner`, `couchPotato`). Small models (a cone or a bowl of ice cream, a slice of toast, a glass, a noodle box, a takeaway carton) fix it; `snack` on the treat plate and `leftovers` on the meal plate are fine.
-- **Status:** open
+- **Status:** fixed (119ed5e9)
+- **After:** each has its own model (`base.json` `items`): `item.iceCream` a glazed dessert bowl of three scoops with a spoon, `item.toast` a slice cut corner to corner with butter on a plate, `item.smoothie` a 14 cm tumbler of berry smoothie with a straw, `item.noodles` a card noodle pail with chopsticks, `item.takeout` an open kraft box with a burger and fries; radii 0.08, 0.13, 0.06, 0.07, 0.13 (`fixes/blender-decor/gallery/gallery-item.*.png`; carried and eaten: `play/held-breakfastCounter-toast-03.png`, `held-lazy.deliveryLocker-takeout-03.png`, `held-lazy.deliveryLocker-noodles-03.png`). One draw each, 212–464 triangles. Cutlery in hand stays I-held-01.
 - **Source:** wave: held
 
 ### M-held-02 — An emptied dish turns into a different dish
@@ -132,7 +133,8 @@ Not tied to one row: I-held-01.
 - **Fix class:** content
 - **Where:** `web/public/content/base.json:3957` (`tastingBoard`), `:3975` (`pizza`), `:3993` (`pieDish`), `:4074` (`cheeseBoard`): their `emptyAs`
 - **Evidence:** The pizza on its round wooden board, the tasting board and the cheese board all become `platterDirty`, the grill platter's white oval with sauce and a bone (`held/sheets/obj-item.platterDirty.png`; `held/inhand/pizza-07.png` … `pizza-10.png`, `tastingMenu-11.png` … `tastingMenu-14.png`); the round pie dish becomes the rectangular metal `trayDirty` (`held/inhand/pie-07.png` … `pie-10.png`). The dish that went in should come out: a dirty board for the boards and the pizza, a dirty pie dish for the pie (two small models, or the boards' and dish's own models with a smear part).
-- **Status:** open
+- **Status:** fixed (119ed5e9)
+- **After:** the dish that went in comes out: `tastingBoard` and `cheeseBoard` empty to `boardDirty` (the tab board with a rind, a grape stalk and crumbs), `pizza` to `pizzaBoardDirty` (its round board with crust ends), `pieDish` to `pieDishDirty` (the glazed dish with a smear of filling), and the new ice cream to `bowlDirty`; four `dirty` items, washed as the others (`fixes/blender-decor/gallery/gallery-item.boardDirty.png`, `gallery-item.pizzaBoardDirty.png`, `gallery-item.pieDishDirty.png`, `gallery-item.bowlDirty.png`).
 - **Source:** wave: held
 
 ### I-held-02 — Baking is played as frying: a pan comes out at the oven

@@ -4069,7 +4069,7 @@
       "model": "item.tastingBoard",
       "hold": "both",
       "serving": "mealPlate",
-      "emptyAs": "platterDirty",
+      "emptyAs": "boardDirty",
       "radius": 0.2
     },
     {
@@ -4087,7 +4087,7 @@
       "model": "item.pizza",
       "hold": "both",
       "serving": "pizzaSlice",
-      "emptyAs": "platterDirty",
+      "emptyAs": "pizzaBoardDirty",
       "radius": 0.2
     },
     {
@@ -4105,7 +4105,7 @@
       "model": "item.pieDish",
       "hold": "both",
       "serving": "pieSlice",
-      "emptyAs": "trayDirty",
+      "emptyAs": "pieDishDirty",
       "radius": 0.16
     },
     {
@@ -4159,15 +4159,15 @@
     {
       "id": "iceCream",
       "label": "Ice cream",
-      "model": "item.treatPlate",
+      "model": "item.iceCream",
       "hold": "hand",
-      "emptyAs": "plateDirty",
-      "radius": 0.13
+      "emptyAs": "bowlDirty",
+      "radius": 0.08
     },
     {
       "id": "toast",
       "label": "Toast",
-      "model": "item.sandwich",
+      "model": "item.toast",
       "hold": "hand",
       "emptyAs": "plateDirty",
       "radius": 0.13
@@ -4185,27 +4185,27 @@
       "label": "Cheese board",
       "model": "item.tastingBoard",
       "hold": "both",
-      "emptyAs": "platterDirty",
+      "emptyAs": "boardDirty",
       "radius": 0.2
     },
     {
       "id": "smoothie",
       "label": "Smoothie",
-      "model": "item.prepBowl",
+      "model": "item.smoothie",
       "hold": "hand",
-      "radius": 0.12
+      "radius": 0.06
     },
     {
       "id": "noodles",
       "label": "Noodles",
-      "model": "item.prepBowl",
+      "model": "item.noodles",
       "hold": "hand",
-      "radius": 0.12
+      "radius": 0.07
     },
     {
       "id": "takeout",
       "label": "Takeout",
-      "model": "item.mealPlate",
+      "model": "item.takeout",
       "hold": "hand",
       "radius": 0.13
     },
@@ -4240,6 +4240,38 @@
       "hold": "both",
       "dirty": true,
       "radius": 0.2
+    },
+    {
+      "id": "bowlDirty",
+      "label": "Dirty bowl",
+      "model": "item.bowlDirty",
+      "hold": "hand",
+      "dirty": true,
+      "radius": 0.08
+    },
+    {
+      "id": "boardDirty",
+      "label": "Dirty board",
+      "model": "item.boardDirty",
+      "hold": "both",
+      "dirty": true,
+      "radius": 0.2
+    },
+    {
+      "id": "pizzaBoardDirty",
+      "label": "Dirty pizza board",
+      "model": "item.pizzaBoardDirty",
+      "hold": "both",
+      "dirty": true,
+      "radius": 0.2
+    },
+    {
+      "id": "pieDishDirty",
+      "label": "Dirty pie dish",
+      "model": "item.pieDishDirty",
+      "hold": "both",
+      "dirty": true,
+      "radius": 0.16
     }
   ],
   "recipes": [

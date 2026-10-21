@@ -1,6 +1,6 @@
 # Decor
 
-Mostly still things. All 22 are built by `tools/art/blender/families/decor.py` (notes: `families/decor.md`), each
+Mostly still things. All 23 are built by `tools/art/blender/families/decor.py` (notes: `families/decor.md`), each
 in its place: the wall things (pictures, clocks, shelf, curtains) at their real height with their
 back on the wall face, the hanging plant from the 2.8 m ceiling, the grandfather clock and the fireplace with their
 backs on the wall face, the rest centred on their tile or flat on the floor (the rugs). The pictures are flat colour
@@ -56,7 +56,7 @@ cutaway drops it, from either side.
 | `vasePedestal` Vase on a pedestal | 1x1 · floor | — | decor / ornaments | Vase, Pedestal | Static | Static. |
 | `bustMarble` Marble bust | 1x1 · floor | admire:look | decor / ornaments | Bust, Plinth | Static | Static. |
 | `statueCat` Cat statue | 1x1 · floor | — | decor / ornaments | Body | Static | Static. |
-| `statueHorse` Bronze horse | 1x1 · floor | — | decor / ornaments | Body | Static | Static. |
+| `statueHorse` Bronze horse | 1x1 · floor | — | decor / ornaments | Body | Static | Static. A golden cast bronze, bright on its edges, its mane and tail a dark green patina (M-decor-01, 2026-10-21; it read as dark wood). |
 | `coatRack` Coat stand | 1x1 · floor | — | decor / ornaments | Body | Static | Static. Decor by decision (Q-19: kind `coatStand` marked decor); it carries its coat and hat. |
 | `hangingPlant` Hanging plant | 1x1 · ceiling | water:water | decor / ornaments | Pot, Cord | Use | `sway`: the pot sways 5° and settles for water (`hold` 0.8 s, one sway). |
 | `fireplace` Fireplace | 2x1 · floor | relax:relax | decor / ornaments | Surround, Mantel | Use | `flames`: the flames grow on the logs for relax (gloss; the light is the content's). |
@@ -66,20 +66,22 @@ cutaway drops it, from either side.
 - The grandfather clock is wound (the "tinker" pose at its case) against all four living-room walls, its hands
   keeping the game's time.
 - The hanging plant, watered, sways out and settles after its `hold`.
-- The fireplace has a raised hearth bench (content `seat`: height 0.42, forward 0.02): a resident warming up sits on
-  it, the flames growing behind her. Its `light` (height 0.7, `fire: true`) is a fire's: sitting down by it in the
+- The fireplace has a raised hearth bench (content `seat`: height 0.42, forward 0.36): a resident warming up sits on
+  its front edge, 0.46 m in front of the firebox's opening, her back to the fire and clear of it (I-decor-01, 2026-10-21:
+  the hearth ran only 0.14 m out and she sat in the opening), the flames growing behind her. Its `light` (height 0.7, `fire: true`) is a fire's: sitting down by it in the
   dark lights it (or the player's Light the fire), and then its light, its embers' glow and its flames burn together
   until the last one awake leaves the room, or the morning (`lights.rs`; I-decor-03). Bought unlit.
 - The horse statue is a bronze horse standing on an oak plinth (model and its name and description agree); the pedestal vase is blue.
 
-## D3. Textiles (6)
+## D3. Textiles (7)
 
 - **Family:** `tools/art/blender/families/decor.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `curtains` Curtains | 1x1 · wall | — | decor / textiles | Fabric, Rail | Night (E3) | `close`: drawn closed at night (E3), open by day. |
-| `curtainsLong` Floor-length curtains | 2x1 · wall | — | decor / textiles | Fabric, Rail | Night (E3) | `close` (E3). |
+| `curtains` Curtains | 1x1 · wall | — | decor / textiles | Fabric, Rail | Night (E3) | `close`: drawn closed at night (E3), open by day. Window length (to just under the sill), on a 1.22 m rail: open, they stack beside a one-edge window's glass. |
+| `curtainsWide` Wide curtains | 2x1 · wall | — | decor / textiles | Fabric, Rail | Night (E3) | `close` (E3). Window length on a 2.38 m rail, for a two-edge window (new, M-decor-02). |
+| `curtainsLong` Floor-length curtains | 2x1 · wall | — | decor / textiles | Fabric, Rail | Night (E3) | `close` (E3). On a 2.38 m rail: open, they stack beside a two-edge window's glass. |
 | `rugRound` Round rug | 2x2 · rug | — | decor / textiles | Rug | Static | Static, flat (rug layer). |
 | `rugLarge` Large area rug | 3x2 · rug | — | decor / textiles | Rug | Static | Static, flat. |
 | `rugRunner` Hall runner | 1x3 · rug | — | decor / textiles | Rug | Static | Static, flat. |
@@ -92,3 +94,6 @@ cutaway drops it, from either side.
 - The rugs lie flat in all four facings. Each rug's "Rug" colours its field; borders and motifs keep their colours.
 - A 2-wide curtain over the house's 1-wide windows hangs with the window in one half of its rail (the placement,
   not the model).
+- The rails run 0.1–0.2 m past the window's edges (as real rails do), so the open curtains stack on the wall beside
+  the glass, not over it (M-decor-02, 2026-10-21): `check-glb` warns that they reach 14 and 22 cm past their
+  footprints, over what hangs next to them.

@@ -57,7 +57,7 @@ sits on the top, turns with its facing and lights right at night.
 | `teapotSet` Tea set | 1x1 · surface | — | tabletop / tableware | Body, Tray | Static | Static. |
 | `mugs` Mugs | 1x1 · surface | — | tabletop / tableware | Mug 1, Mug 2, Mug 3 | Static | Static. |
 | `wineGlasses` Wine and glasses | 1x1 · surface | — | tabletop / tableware | Body | Static | Static. |
-| `candlesticks` Candlesticks | 1x1 · surface | — | tabletop / tableware | Body, Candles | Static | Static. |
+| `candlesticks` Candlesticks | 1x1 · surface | — | tabletop / tableware | Body, Candles | Night (E3) | `lit`: by day dark wicks; from dusk the two flames rise out of the candles' tops (held open dusk to dawn) and glow while the room's lights are on (E8; M-tabletop-01, 2026-10-21: they were drawn lit all day and dark at night). |
 
 **In play** (signed off 2026-10-16):
 - The place setting's Body, Rim and Napkin and the cake's Body and Icing land where named.
@@ -92,7 +92,7 @@ sits on the top, turns with its facing and lights right at night.
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `photoFrame` Photo frame | 1x1 · surface | — | tabletop / ornaments | Body | Static | Static. |
-| `tableClock` Alarm clock | 1x1 · surface | — | tabletop / ornaments | Body, Bells & legs | Clock (`motions.clock`) | `hour_hand`, `minute_hand`: the hands tell the game's time, on every preset; no second hand (its red hub stays). |
+| `tableClock` Alarm clock | 1x1 · surface | — | tabletop / ornaments | Body, Bells & legs | Clock (`motions.clock`) | `hour_hand`, `minute_hand`: the hands tell the game's time, on every preset; no second hand (its red hub stays). 0.11 × 0.16 × 0.05 m, a real twin-bell clock's size (M-tabletop-02, 2026-10-21: it was 0.15 × 0.23). |
 | `globe` Globe | 1x1 · surface | — | tabletop / ornaments | Body, Stand | Static | Static. |
 | `snowGlobe` Snow globe | 1x1 · surface | — | tabletop / ornaments | Body | Static | Static. |
 | `trophy` Trophy | 1x1 · surface | — | tabletop / ornaments | Body | Static | Static. |
