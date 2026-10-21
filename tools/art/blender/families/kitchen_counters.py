@@ -88,12 +88,14 @@ def _unit66(F, w=1.0, body=None, top=None):
     F.box('worktop', w, 0.04, 0.66, (0, 0.93, -0.15), top, bevel=0.006)
 
 
-def _unit79(F, w=1.0, x=0.0, body=None, top=None):
-    """A base unit as catalog2's `counter_body`: worktop to 0.95, front face at depth 0.24."""
+def _unit79(F, w=1.0, x=0.0, body=None, top=None, worktop=True):
+    """A base unit as catalog2's `counter_body`: worktop to 0.95, front face at depth 0.24 (`worktop` False: none,
+    for a unit under a worktop laid over more than it)."""
     body, top = body or M.cab, top or M.worktop
     F.box('carcass', w - 0.004, 0.8, 0.7, (x, 0.5, -0.11), body, bevel=0.01)
     F.box('plinth', w - 0.004, 0.10, 0.64, (x, 0.05, -0.14), M.dark, bevel=0.004)
-    F.box('worktop', w, 0.05, 0.79, (x, 0.925, -0.085), top, bevel=0.008)
+    if worktop:
+        F.box('worktop', w, 0.05, 0.79, (x, 0.925, -0.085), top, bevel=0.008)
 
 
 def _doors(F, w, front, y0, y1, body=None, hm=None, hx=0.06, hy=None):
@@ -151,14 +153,15 @@ def counterCorner():
 def counterEnd():
     F = G.GameFrame(shift=0.085, depths=COUNTER66)
     with G.new_parts() as still:
-        _unit79(F, w=0.84, x=-0.08)
+        _unit79(F, w=0.84, x=-0.08, worktop=False)
         F.box('door', 0.808, 0.74, 0.02, (-0.08, 0.49, 0.25), M.cab, bevel=0.008)
         _handle_v(F, 'door_pull', -0.44, 0.74, 0.27)
-        # the open end unit: a back, two sides, a bottom, a top and two shelves
+        # one worktop over the unit and the open end, as a run's
+        F.box('worktop', 1.0, 0.05, 0.79, (0, 0.925, -0.085), M.worktop, bevel=0.008)
+        # the open end unit: a back, two sides, a bottom and two shelves
         F.box('end_back', 0.16, 0.8, 0.03, (0.42, 0.5, -0.43), M.oak, bevel=0.004)
         for s in (-1, 1):
             F.box(f'end_side{s}', 0.012, 0.8, 0.7, (0.42 + s * 0.074, 0.5, -0.11), M.oak, bevel=0.004)
-        F.box('end_top', 0.16, 0.05, 0.79, (0.42, 0.925, -0.085), M.worktop, bevel=0.008)
         F.box('end_bottom', 0.16, 0.05, 0.7, (0.42, 0.125, -0.11), M.oak, bevel=0.004)
         for i, y in enumerate((0.38, 0.66)):
             F.box(f'end_shelf{i}', 0.136, 0.025, 0.66, (0.42, y, -0.11), M.oak, bevel=0.004)

@@ -66,7 +66,7 @@ rest pose where it is.
 |---|---|---|---|---|---|
 | `model.counter` | 1.000 × 0.950 × 0.660 m | 1,404 | 2 | top drawer | `drawer_open` 1.4 s (sandwich, `hold` 1.5 s) |
 | `model.counterCorner` | 1.000 × 1.260 × 0.930 m | 1,520 | 2 | top drawer | `drawer_open` (sandwich, `hold` 1.5 s) |
-| `model.counterEnd` | 1.000 × 0.950 × 0.660 m | 1,428 | 2 | — | static |
+| `model.counterEnd` | 1.000 × 0.950 × 0.660 m | 1,320 | 2 | — | static (one worktop over the unit and the open end, no seam: G-41) |
 | `model.counterCornerOuter` | 0.810 × 1.035 × 0.660 m | 972 | 1 | — | static |
 | `model.counterDrawers` | 1.000 × 0.950 × 0.660 m | 1,620 | 2 | top drawer | `drawer_open` (putting clean dishes away: `fetch` at its prep station, `hold` 1.5 s) |
 | `model.counterOpenShelf` | 1.000 × 0.950 × 0.660 m | 1,452 | 2 | — | static |

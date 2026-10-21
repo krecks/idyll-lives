@@ -383,10 +383,11 @@ def _fridgeFrenchDoor():
     Ff = G.GameFrame(shift=0.0)
     with G.new_parts() as still:
         Ff.box('plinth', 0.86, 0.04, 0.66, (0, 0.02, -0.05), M.trim, bevel=0.006)
-        Ff.box('side_left', 0.03, 1.76, 0.66, (-0.435, 0.92, -0.05), M.steel, bevel=0.008)
-        Ff.box('side_right', 0.03, 1.76, 0.66, (0.435, 0.92, -0.05), M.steel, bevel=0.008)
-        Ff.box('top', 0.90, 0.03, 0.66, (0, 1.805, -0.05), M.steel, bevel=0.008)
-        Ff.box('bottom', 0.90, 0.03, 0.66, (0, 0.035, -0.05), M.steel, bevel=0.008)
+        # the cabinet's sides, top and bottom come forward to the doors' backs, so a shut door sits flush on them
+        Ff.box('side_left', 0.03, 1.76, 0.71, (-0.435, 0.92, -0.025), M.steel, bevel=0.008)
+        Ff.box('side_right', 0.03, 1.76, 0.71, (0.435, 0.92, -0.025), M.steel, bevel=0.008)
+        Ff.box('top', 0.90, 0.03, 0.71, (0, 1.805, -0.025), M.steel, bevel=0.008)
+        Ff.box('bottom', 0.90, 0.03, 0.71, (0, 0.035, -0.025), M.steel, bevel=0.008)
         Ff.box('back', 0.90, 1.76, 0.03, (0, 0.92, -0.365), M.steel, bevel=0.008)
         # the liner, the divider above the freezer and the fridge shelves
         Ff.box('liner_back', 0.84, 1.70, 0.01, (0, 0.92, -0.345), M.liner, bevel=0.002)
@@ -674,7 +675,8 @@ def _fridgeMiniRetro():
 
 
 def _wineFridge():
-    """A dark glass door over a bottle grid, a stack of drawer racks beside it; the top rack slides."""
+    """A smoked-glass door in a dark frame over a bottle grid, a stack of drawers beside it; once the door is open,
+    the top shelf of bottles slides out to the front."""
     Fw = G.GameFrame(shift=0.0, depths=tuple((a + 0.085, b) for a, b in COUNTER66))   # its numbers centred
     with G.new_parts() as still:
         Fw.box('plinth', 0.996, 0.10, 0.64, (0, 0.05, -0.075), M.dark, bevel=0.004)
@@ -684,33 +686,44 @@ def _wineFridge():
         Fw.box('bottom', 0.996, 0.03, 0.70, (0, 0.115, -0.045), M.panel, bevel=0.006)
         Fw.box('back', 0.996, 0.80, 0.03, (0, 0.50, -0.38), M.panel, bevel=0.006)
         Fw.box('liner', 0.90, 0.74, 0.01, (0, 0.50, -0.36), M.liner, bevel=0.002)
-        # the bottle grid on the left: five shelf rows of three bottles
-        for r, y in enumerate((0.22, 0.35, 0.48, 0.61, 0.74)):
-            Fw.box(f'rack_left{r}', 0.46, 0.01, 0.52, (-0.22, y, -0.06), M.shelf, bevel=0.0)
-            for c, x in enumerate((-0.40, -0.25, -0.10)):
-                Fw.cyl(f'bottle{r}_{c}', 0.035, 0.30, (x, y + 0.04, -0.06), M.wine if (r + c) % 2 == 0 else M.wine2,
-                       rot=(90, 0, 0), verts=8, bevel=0.0)
-        # two static drawer racks on the right; the top one is the moving part
-        for r, y in enumerate((0.30, 0.55)):
+        # the bottle grid on the left: five shelf rows of three bottles (the top row slides out: below)
+        for r, y in enumerate(WINE_ROWS[:-1]):
+            _wine_row(Fw, f'rack_left{r}', y, r)
+        # three drawers on the right
+        for r, y in enumerate((0.30, 0.55, 0.74)):
             Fw.box(f'rack_right{r}', 0.37, 0.2347, 0.02, (0.30, y, 0.25), M.panel, bevel=0.008)
             Fw.box(f'rack_handle{r}', 0.16, 0.014, 0.022, (0.30, y + 0.0617, 0.27), M.chrome, bevel=0.005)
     G.join(still, 'body', origin=(0, 0, 0))
-    # the smoked-glass door, hinged on its left edge
+    # the door, hinged on its left edge: a dark frame round a pane of smoked glass the bottles show through
     with G.new_parts() as parts:
-        Fw.box('doorframe', 0.58, 0.76, 0.03, (-0.20, 0.50, 0.325), M.doorframe, bevel=0.010)
-        Fw.box('glass', 0.48, 0.64, 0.012, (-0.20, 0.50, 0.345), M.smoked, bevel=0.004)
+        for s in (-1, 1):
+            Fw.box(f'frame_side{s}', 0.05, 0.76, 0.03, (-0.20 + s * 0.265, 0.50, 0.325), M.doorframe, bevel=0.008)
+            Fw.box(f'frame_rail{s}', 0.48, 0.06, 0.03, (-0.20, 0.50 + s * 0.35, 0.325), M.doorframe, bevel=0.008)
+        Fw.box('glass', 0.49, 0.65, 0.012, (-0.20, 0.50, 0.325), M.smoked, bevel=0.002)
         Fw.box('door_handle', 0.014, 0.40, 0.022, (0.06, 0.50, 0.35), M.chrome, bevel=0.005)
     door = G.hinged(G.join(parts, 'door'), Fw.at(-0.49, 0.50, 0.325))
-    # the top drawer rack, sliding out 15 cm
+    # the top shelf of bottles, sliding out 15 cm once the door is open
     with G.new_parts() as parts:
-        Fw.box('top_rack', 0.37, 0.2347, 0.02, (0.30, 0.74, 0.25), M.panel, bevel=0.008)
-        Fw.box('top_rack_handle', 0.16, 0.014, 0.022, (0.30, 0.8017, 0.27), M.chrome, bevel=0.005)
-        Fw.box('top_rack_tray', 0.35, 0.20, 0.30, (0.30, 0.74, 0.09), M.liner, bevel=0.002)
-    rack = G.join(parts, 'top_rack', origin=Fw.at(0.30, 0.74, 0.25))
+        _wine_row(Fw, 'wine_rack', WINE_ROWS[-1], len(WINE_ROWS) - 1)
+    rack = G.join(parts, 'wine_rack', origin=Fw.at(-0.22, WINE_ROWS[-1], -0.06))
     G.settle()
     G.swing(door, 'door_open', 100, seconds=1.5)
-    G.slide(rack, 'door_open', (0, -0.15, 0), seconds=1.5)
+    G.slide(rack, 'rack_out', (0, -0.15, 0), seconds=0.8)
 
+
+WINE_ROWS = (0.22, 0.35, 0.48, 0.61, 0.74)    # the wine fridge's shelves
+
+
+def _wine_row(Fw, name, y, r):
+    """A shelf of the wine fridge with three bottles lying on it, necks to the front."""
+    Fw.box(name, 0.46, 0.01, 0.52, (-0.22, y, -0.06), M.shelf, bevel=0.0)
+    for c, x in enumerate((-0.40, -0.25, -0.10)):
+        Fw.cyl(f'{name}_bottle{c}', 0.035, 0.30, (x, y + 0.04, -0.06), M.wine if (r + c) % 2 == 0 else M.wine2,
+               rot=(90, 0, 0), verts=8, bevel=0.0)
+
+
+# The fridges with a freezer: food, a meal's ingredients and a drink from the fridge door, ice cream from the freezer.
+FRIDGE_USES = {'frozenTreat': 'freezer_open', 'fetch': 'fridge_open', 'cook': 'fridge_open', 'drink': 'fridge_open'}
 
 # A floor thing against a wall is centred where the game places it (`centre`): its back on the wall,
 # its top under its content `surface`.
@@ -718,8 +731,8 @@ FAMILY = G.Family(
     'kitchen', M,
     [G.Model('fridge', fridge, size=(0.74, 1.8, 0.722), key='model.fridge', centre=(0, -0.069),
              # Taking food or a drink out opens the fridge door (snacks, a meal's ingredients (cook), a cold
-             # drink, putting dishes away); nothing opens the freezer yet: no use takes frozen food.
-             motions={'uses': {'fetch': 'fridge_open', 'cook': 'fridge_open', 'drink': 'fridge_open'}, 'hold': HOLD},
+             # drink, putting dishes away); ice cream (`frozenTreat`) opens the freezer door.
+             motions={'uses': FRIDGE_USES, 'hold': HOLD},
              # The player colours the cabinet and doors, the handles, the plinth and the inside; the
              # food keeps its own colours.
              paint=[('body', 'Body'), ('chrome', 'Handles'), ('trim', 'Plinth & badge'), ('liner', 'Inside')]),
@@ -727,12 +740,12 @@ FAMILY = G.Family(
              motions={'uses': {'fetch': 'fridge_open', 'cook': 'fridge_open'}, 'hold': 3.0},
              paint=[('body', 'Body'), ('chrome', 'Handles'), ('trim', 'Plinth')]),
      G.Model('fridgeBuiltIn', _fridgeBuiltIn, size=(0.84, 2.025, 0.656), key='model.fridgeBuiltIn', centre=(0, -0.099),
-             # the tall door serves every use; the freezer door's clip waits for a use that takes frozen food
-             motions={'uses': {'fetch': 'fridge_open', 'cook': 'fridge_open', 'drink': 'fridge_open'}, 'hold': HOLD},
+             # the tall door serves every use but ice cream, which opens the freezer door
+             motions={'uses': FRIDGE_USES, 'hold': HOLD},
              paint=[('panel', 'Panels'), ('chrome', 'Handles')]),
      G.Model('fridgeFrenchDoor', _fridgeFrenchDoor, size=(0.90, 1.82, 0.76), key='model.fridgeFrenchDoor', centre=(0, -0.052),
              # both doors for a snack or a meal; the right door alone for a cold drink
-             motions={'uses': {'fetch': 'fridge_open', 'cook': 'fridge_open', 'drink': 'door_right'}, 'hold': HOLD},
+             motions={'uses': {**FRIDGE_USES, 'drink': 'door_right'}, 'hold': HOLD},
              paint=[('steel', 'Body'), ('chrome', 'Handles'), ('trim', 'Plinth')]),
      G.Model('fridgeRetro', _fridgeRetro, size=(0.72, 1.64, 0.715), key='model.fridgeRetro', centre=(0, -0.067),
              motions={'uses': {use: RETRO_OPEN for use in ('fetch', 'cook', 'drink')}, 'hold': HOLD},
@@ -742,7 +755,8 @@ FAMILY = G.Family(
              motions={'uses': {use: 'fridge_open' for use in ('fetch', 'cook', 'drink')}, 'hold': 3.0},
              paint=[('pink', 'Body'), ('gold', 'Handle & feet'), ('pink2', 'Trim')]),
      G.Model('wineFridge', _wineFridge, size=(1.00, 0.95, 0.66), key='model.wineFridge', centre=(0, -0.10),
-             motions={'uses': {'drink': 'door_open'}, 'hold': 2.5},
+             # pouring a glass opens the door, then slides the top shelf of bottles out (back in before it shuts)
+             motions={'uses': {'drink': ['door_open', {'clip': 'rack_out', 'delay': 0.9, 'hold': 0.9}]}, 'hold': 2.5},
              paint=[('panel', 'Body'), ('doorframe', 'Door frame')]),
      G.Model('farmhouseSink', farmhouseSink, size=(1.0, 1.253, 0.67), key='model.farmhouseSink', centre=(0, -0.095),
              motions={'uses': {'wash': 'water_on'}},
@@ -756,9 +770,9 @@ FAMILY = G.Family(
             'manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw call '
             'per finish group. Each sink has a `water_on` clip (the stream from the tap) played while a '
             'resident washes up. The fridges (K1) each hinge a door built closed and swing it open while '
-            'a resident takes food or a drink (`motions`); the French-door freezer and the wine fridge\'s '
-            'top rack slide, and the built-in freezer door and French freezer drawer carry clips no use '
-            'plays yet.',
+            'a resident takes food or a drink (`motions`); the French-door freezer slides and the wine '
+            'fridge\'s top shelf of bottles slides out once its glass door is open; every freezer door and '
+            'the French freezer drawer open for \'Get some ice cream\'.',
 )
 
 if __name__ == '__main__':

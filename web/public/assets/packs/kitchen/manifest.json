@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built kitchen models (tools/art/blender/families/kitchen.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Each sink has a `water_on` clip (the stream from the tap) played while a resident washes up. The fridges (K1) each hinge a door built closed and swing it open while a resident takes food or a drink (`motions`); the French-door freezer and the wine fridge's top rack slide, and the built-in freezer door and French freezer drawer carry clips no use plays yet.",
+  "$comment": "Blender-built kitchen models (tools/art/blender/families/kitchen.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Each sink has a `water_on` clip (the stream from the tap) played while a resident washes up. The fridges (K1) each hinge a door built closed and swing it open while a resident takes food or a drink (`motions`); the French-door freezer slides and the wine fridge's top shelf of bottles slides out once its glass door is open; every freezer door and the French freezer drawer open for 'Get some ice cream'.",
   "version": 1,
   "entries": {
     "model.fridge": {
@@ -51,6 +51,7 @@
       },
       "motions": {
         "uses": {
+          "frozenTreat": "freezer_open",
           "fetch": "fridge_open",
           "cook": "fridge_open",
           "drink": "fridge_open"
@@ -299,6 +300,7 @@
       },
       "motions": {
         "uses": {
+          "frozenTreat": "freezer_open",
           "fetch": "fridge_open",
           "cook": "fridge_open",
           "drink": "fridge_open"
@@ -350,6 +352,7 @@
       },
       "motions": {
         "uses": {
+          "frozenTreat": "freezer_open",
           "fetch": "fridge_open",
           "cook": "fridge_open",
           "drink": "door_right"
@@ -484,7 +487,14 @@
       },
       "motions": {
         "uses": {
-          "drink": "door_open"
+          "drink": [
+            "door_open",
+            {
+              "clip": "rack_out",
+              "delay": 0.9,
+              "hold": 0.9
+            }
+          ]
         },
         "hold": 2.5
       },
