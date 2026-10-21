@@ -248,10 +248,12 @@
           "finish": "material.finish.satin"
         },
         "pool": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#9CCBFF"
         },
         "rain": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#BFE4FF"
         },
         "ripple": {
           "finish": "material.finish.gloss"
