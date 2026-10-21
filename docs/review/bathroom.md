@@ -294,3 +294,14 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Status:** fixed (a5968771)
 - **After:** the renderer walks the step sim-core takes in one tick (`characters.ts` `WALK_IN`, shared with A-residents-13), and for the base shower waits for its door (`WALK_WAIT.shower`: 0.7 s standing on the tile while `door_open` slides, then in through the opening, 0.21 m to the shower's right, turned round inside; at the end 0.7 s for the door to open again, out the same way). Done in the walk-in rather than a `STEP_IN` entry: sim-core already stands the bather inside (content `inside`), and `STEP_IN` steps in from the tile sim-core stands them on. `fixes/sweep-render/shower/strip-shower.png` (`shower-in-*`, `shower-out-*` with `shower.json`: on the tile 0–0.7 s with the door opening, walking in 0.7–2.0 s, the door shutting behind from 1.5 s; out: waiting while it opens, out by 2.0 s), `shower-in-3400.png` (in the towel under the water). Against `fixes/blender-rooms/play/showers-shower-shower-00.png` (in the middle before the door moved).
 - **Source:** fix: blender-rooms (A-bathroom-01's re-check)
+
+### A-bathroom-06 — The bather is dressed again the moment the shower ends, still inside it
+
+- **Severity:** S3
+- **Rubric:** A4, I3
+- **Fix class:** code
+- **Where:** `web/src/render/babylon/characters.ts` (`wearFor`: the towel only while the use's tag is `shower`; the walk out, `WALK_WAIT`)
+- **Evidence:** `fixes/sweep-render/shower/shower-out-0.png` … `-900.png`: as the use ends the towel gives way to the day clothes at once, while the bather still stands under the head waiting 0.7 s for the door, then walks out dressed. Someone steps out in the towel and dresses outside (or the shower's walk out keeps the towel until they are clear of it).
+- **Status:** open
+- **Source:** fix: sweep-render (A-bathroom-05's re-check)
+

@@ -435,6 +435,16 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **After:** rising off a chair built into its table or desk (`builtIn`: a top sat at by a use of its own) to a tile behind it, the step goes round a corner 0.55 m to the chair's side away from the set's middle (`cornerOf`, `riseViaX`) instead of through its back. `fixes/sweep-render/walk/strip-dining.png` (`diningTable-up-150` … `-1500`: up at the seat, then out past the chair's side to the tile; was `fixes/positions/play-headed/diningTable-headed-up-700.png`). Headless, but the shots are timed after the cancel as the positions fix's were; not re-timed headed.
 - **Source:** fix: positions
 
+### A-residents-15 — Walking in onto a seat with a frame goes through it
+
+- **Severity:** S3
+- **Rubric:** A1, A4
+- **Fix class:** code
+- **Where:** `web/src/render/babylon/characters.ts` (`WALK_IN`, `walkPlace`: a straight line from where they stood to the seat's front; round a corner only for built-in chairs, `cornerOf`)
+- **Evidence:** `fixes/sweep-render/walk/strip-bike-chair.png` (`exerciseBike-in-200` … `-1000`): from the tile beside the exercise bike the walk-in goes straight through its frame to the saddle, the legs through the crossbar, where someone steps over it. The same for anything sat astride or straddled from the side (the bikes, a rowing machine, the rides) once sim-core seats them from beside it. A step over (the ball pit's `over`, `STEP_IN`) or coming to it from behind would do.
+- **Status:** open
+- **Source:** fix: sweep-render (A-residents-13's re-check)
+
 ### M-residents-01 — Heads are about half a head bigger than the rubric's ratios at every stage
 
 - **Severity:** S3
