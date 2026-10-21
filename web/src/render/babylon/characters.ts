@@ -296,6 +296,8 @@ interface Bed {
   /** How far short of the footprint's foot end the quilt ends (m, default 0.05): a bed whose mattress stops short of it. */
   foot?: number;
   across?: boolean;
+  /** A bench lifted on (the weight bench): the feet down on the floor either side of it, this far (m) out from its middle (`benchLegs`). */
+  feet?: number;
   /**
    * A hammock's sling, along the sleeper from its middle (m): its top's height there (`low`) and at its
    * ends (`end`, `half` each way, at the spreader bars; a parabola between), and how far towards the head
@@ -395,6 +397,10 @@ function shoulderDrop(rig: SimRig, partner: SimRig | null): number {
  * `pedals_turn`), and the ankle's place over the pedal's axle (m up and forward, body scale 1).
  */
 const PEDAL = { turn: 1.2, ankle: [0.08, -0.09] as const };
+/** On the weight bench (`Characters.benchLegs`): the knee this share of the thigh's length on from the hip, towards the feet. */
+const BENCH_KNEE = 0.92;
+/** The hips' joints this far (m, the reference body) out from the middle. */
+const BENCH_HIP = 0.09;
 /** Legs out along a seat (`Characters.legsOut`): the ankles this far below the hips' joints (m, body scale 1). */
 const LEGS_OUT_DROP = 0.04;
 /** How a held part is held (content `held.grip`; see `Characters.writeHeld`). */
@@ -738,7 +744,10 @@ interface SimRig {
   shadeYaw: number;
   /** Sitting (or last sat) on the floor (`floorSit`: `Floor`, `Ground`; '' on a seat): its own clips. */
   floorSat: string;
-  /** Seated, the legs' turns that put the feet on the floor (`seatLegs`: each thigh, calf and foot, left then right), faded out standing up. */
+  /**
+   * Seated, the legs' turns that put the feet on the floor (`seatLegs`, `benchLegs`: each thigh's, calf's and foot's
+   * about x and the thigh's out to the side, left then right), faded out standing up.
+   */
   seatTurn: Float32Array;
   tagKnown: boolean;
   cur: Player;
@@ -1431,7 +1440,7 @@ export class Characters {
         slingLift: 0,
         shadeYaw: NaN,
         floorSat: '',
-        seatTurn: new Float32Array(6),
+        seatTurn: new Float32Array(8),
         tagKnown: false,
         cur: player(),
         prev: player(),
@@ -3242,6 +3251,8 @@ export class Characters {
     if ((rig.reachW > 0 || rig.holdW > 0) && pose === Pose.Stand && !this.force) this.cuddlePose(rig, time);
     // Lying: a bench press, or resting (see the `lie` clip).
     if (pose === Pose.Lie && rig.cur.key === 'lie' && rig.tag === 'lift') {
+      const feet = rig.bed ? BEDS[rig.bed.def]?.feet : undefined;
+      if (feet) this.benchLegs(rig, feet);
       // Bench press: arms push the bar up and lower it to the chest.
       const press = 0.5 - 0.5 * Math.cos(time * 2.2 + rig.seed * 6);
       for (const [ua, la, sgn] of [
@@ -3576,7 +3587,7 @@ export class Characters {
     const turns = rig.seatTurn;
     for (const [k, side, thigh, calf, foot] of [
       [0, fit.l, B.thigh_l, B.calf_l, B.foot_l],
-      [3, fit.r, B.thigh_r, B.calf_r, B.foot_r],
+      [4, fit.r, B.thigh_r, B.calf_r, B.foot_r],
     ] as const) {
       const [y, z] = feetDown(side, floor, out * (k ? 0.85 : 1));
       const turn = this.legTo(side, y, z);
@@ -3599,11 +3610,49 @@ export class Characters {
     const t = rig.seatTurn;
     for (const [k, thigh, calf, foot] of [
       [0, B.thigh_l, B.calf_l, B.foot_l],
-      [3, B.thigh_r, B.calf_r, B.foot_r],
+      [4, B.thigh_r, B.calf_r, B.foot_r],
     ] as const) {
       addRotation(this.add, thigh, 1, 0, 0, t[k] * w);
       addRotation(this.add, calf, 1, 0, 0, t[k + 1] * w);
       addRotation(this.add, foot, 1, 0, 0, t[k + 2] * w);
+      addRotation(this.add, thigh, 0, 0, 1, t[k + 3] * w);
+    }
+  }
+
+  /**
+   * Lying on a bench to lift (`Bed.feet`: the weight bench), the feet down on the floor either side of it, `out` m
+   * from its middle: each thigh out to the side and down off the pad, the shin down to the floor under the knee,
+   * the foot flat on it (as a bench press is done). In the lying body's own space (`lie`, the standing convention
+   * turned flat: its z up, its y towards the head), so planar leg IK (`legTo`) and then the leg turned out about
+   * the hip. Kept in `rig.seatTurn` for getting up.
+   */
+  private benchLegs(rig: SimRig, out: number): void {
+    const fit = this.legFits.get(rig.body.name)?.get('lie');
+    if (!fit) return;
+    const B = this.set!.bone;
+    const s = rig.scale;
+    const w = smooth(rig.w);
+    // The ankle as high as standing, over the floor under the bench.
+    const floor = fit.ankle + ((rig.bed?.lift ?? 0) - rig.cur.rootY) / s;
+    const turns = rig.seatTurn;
+    for (const [k, side, sx, thigh, calf, foot] of [
+      [0, fit.l, -1, B.thigh_l, B.calf_l, B.foot_l],
+      [4, fit.r, 1, B.thigh_r, B.calf_r, B.foot_r],
+    ] as const) {
+      // Out to the side and towards the feet (the knee a little short of the thigh's length on), down to the floor.
+      const vx = sx * (out / s - BENCH_HIP * seatSize(rig.body.height));
+      const vy = -side.l1 * BENCH_KNEE;
+      const across = Math.hypot(vx, vy);
+      const turn = this.legTo(side, side.hy - across, floor);
+      turns[k] = turn[0];
+      turns[k + 1] = turn[1];
+      // The foot level on the floor (the toes towards the bench's foot end).
+      turns[k + 2] = -0.35;
+      turns[k + 3] = Math.atan2(vx, -vy);
+      addRotation(this.add, thigh, 1, 0, 0, turns[k] * w);
+      addRotation(this.add, calf, 1, 0, 0, turns[k + 1] * w);
+      addRotation(this.add, foot, 1, 0, 0, turns[k + 2] * w);
+      addRotation(this.add, thigh, 0, 0, 1, turns[k + 3] * w);
     }
   }
 

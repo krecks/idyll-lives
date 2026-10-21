@@ -77,7 +77,7 @@
   "beds": {
     "bed": { "h": 0.58 },
     "crib": { "h": 0.56 },
-    "weightBench": { "h": 0.5 },
+    "weightBench": { "h": 0.5, "feet": 0.3 },
     "gloomy.soakingTub": { "h": 0.25 },
     "romantic.heartTub": { "h": 0.35 },
     "hotHeaded.coldPlunge": { "h": 0.35 },
