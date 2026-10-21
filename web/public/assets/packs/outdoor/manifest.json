@@ -495,7 +495,8 @@
           "finish": "material.finish.satin"
         },
         "coal_hot": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#FF7A2E"
         },
         "coals": {
           "finish": "material.finish.matte"

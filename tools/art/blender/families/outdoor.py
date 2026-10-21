@@ -61,7 +61,7 @@ M = G.Palette(
     wheel=('#2A2C30', 'satin'),
     coals=('#3A3330', 'matte'),          # a charcoal or ash bed
     ember=('#D9542B', 'gloss', {'glow': '#FF7A2E'}),        # the fire pit's embers: red by day, aglow at night
-    coal_hot=('#D9542B', 'gloss'),       # the kettle's coals: no glow, which would show through its shut lid
+    coal_hot=('#D9542B', 'gloss', {'glow': '#FF7A2E'}),     # the kettle's coals, aglow at night (not through its lid)
     flame=('#FF9A3C', 'gloss', {'glow': '#FFB050'}),        # the fire pit's flames, grown while warmed by
     flame_core=('#FFD27A', 'gloss', {'glow': '#FFE0A0'}),
     burger=('#6B3A26', 'satin'),         # food on the grates
@@ -134,15 +134,18 @@ def _finish(name, centred=False):
 
 
 # --- the park bench: cast-iron ends, four seat slats and three back slats -------------------------------------
+BENCH_SEAT = 0.45   # the slats' top: `seats.bench` (furniture.json)
+
+
 def bench():
     with G.new_parts():
         for s in (-1, 1):
             x = s * 0.78
-            _rod(f'leg_front{s}', (x, 0.0, 0.2), (x, 0.45, 0.2), 0.022, M.iron)
+            _rod(f'leg_front{s}', (x, 0.0, 0.2), (x, 0.415, 0.2), 0.022, M.iron)
             _rod(f'leg_back{s}', (x, 0.0, -0.1), (x, 0.88, -0.224), 0.022, M.iron)
-            _rod(f'rail{s}', (x, 0.435, -0.19), (x, 0.435, 0.24), 0.02, M.iron)
+            _rod(f'rail{s}', (x, 0.4, -0.19), (x, 0.4, 0.24), 0.02, M.iron)
             _rod(f'stretcher{s}', (x, 0.1, -0.11), (x, 0.1, 0.2), 0.014, M.iron, verts=8)
-            _rod(f'arm_post{s}', (x, 0.44, 0.24), (x, 0.65, 0.25), 0.017, M.iron)
+            _rod(f'arm_post{s}', (x, 0.405, 0.24), (x, 0.65, 0.25), 0.017, M.iron)
             _board(f'arm{s}', (x, 0.66, -0.17), (x, 0.66, 0.24), 0.06, 0.03, M.iron, bevel=0.012)
             F.sphere(f'arm_end{s}', 0.03, (x, 0.66, 0.245), M.iron, scale=(1, 1, 0.6), segments=12, rings=8)
             G.torus(f'scroll{s}', 0.045, 0.01, at=F.at(x, 0.56, 0.205), material=M.iron, rot=(0, 90, 0),
@@ -150,7 +153,7 @@ def bench():
             for z in (-0.1, 0.2):
                 F.box(f'foot{s}{z}', 0.06, 0.02, 0.07, (x, 0.01, z), M.iron, bevel=0.006)
         for k, z in enumerate((-0.1, 0.0, 0.1, 0.2)):
-            F.box(f'seat{k}', 1.74, 0.035, 0.085, (0, 0.47, z), M.park_slats, bevel=0.01)
+            F.box(f'seat{k}', 1.74, 0.035, 0.085, (0, BENCH_SEAT - 0.0175, z), M.park_slats, bevel=0.01)
         for k, (y, z) in enumerate(((0.6, -0.2), (0.72, -0.2168), (0.84, -0.2336))):
             F.box(f'back{k}', 1.74, 0.085, 0.03, (0, y, z), M.park_slats, rot=(-8, 0, 0), bevel=0.01)
     return _finish('bench')
@@ -174,56 +177,65 @@ def _bistro_chair(c, facing):
     _rod(f'chair{c}_seat_bar', at(-0.21, 0.415, 0.18), at(0.21, 0.415, 0.18), 0.01, M.iron, verts=8)
 
 
+# The two chairs face each other across the table, their seats' fronts 4 cm under its edges (content `places`).
+BISTRO_CHAIRS = (-0.45, 0.45)
+
+
 def patioSet():
     with G.new_parts():
-        for k, z in enumerate((0.075, 0.225, 0.375, 0.525)):
-            F.box(f'top{k}', 0.6, 0.02, 0.135, (0, 0.71, z), M.bistro, bevel=0.006)
-        for z in (0.03, 0.57):
+        for k, z in enumerate((-0.24, -0.12, 0.0, 0.12, 0.24)):
+            F.box(f'top{k}', 0.6, 0.02, 0.11, (0, 0.71, z), M.bistro, bevel=0.006)
+        for z in (-0.27, 0.27):
             F.box(f'top_rail{z}', 0.58, 0.03, 0.03, (0, 0.69, z), M.iron, bevel=0.006)
-        for z in (0.07, 0.53):
-            for s in (-1, 1):
-                _rod(f'leg{z}{s}', (s * 0.26, 0.0, z), (-s * 0.26, 0.69, z), 0.0125, M.iron, verts=8)
-        _rod('table_stretcher', (0, 0.345, 0.07), (0, 0.345, 0.53), 0.01, M.iron, verts=8)
-        F.cyl('cup', 0.04, 0.09, (0.12, 0.765, 0.36), M.cup, verts=14)
-        G.torus('cup_handle', 0.022, 0.006, at=F.at(0.165, 0.77, 0.36), material=M.cup, rot=(90, 0, 0),
+        # the folding legs cross at the table's sides, clear of the sitters' knees between them
+        for x in (-0.27, 0.27):
+            for e in (-1, 1):
+                _rod(f'leg{x}{e}', (x, 0.0, e * 0.23), (x, 0.69, -e * 0.23), 0.0125, M.iron, verts=8)
+            _rod(f'leg_rail{x}', (x, 0.69, -0.26), (x, 0.69, 0.26), 0.01, M.iron, verts=8)
+        F.cyl('cup', 0.04, 0.09, (0.12, 0.765, 0.06), M.cup, verts=14)
+        G.torus('cup_handle', 0.022, 0.006, at=F.at(0.165, 0.77, 0.06), material=M.cup, rot=(90, 0, 0),
                 major_segments=10, minor_segments=5)
-        F.cone('jug', 0.05, 0.035, 0.12, (-0.14, 0.78, 0.22), M.jug, verts=14)
-        _bistro_chair(-0.62, 1)
-        _bistro_chair(0.72, -1)
+        F.cone('jug', 0.05, 0.035, 0.12, (-0.14, 0.78, -0.08), M.jug, verts=14)
+        _bistro_chair(BISTRO_CHAIRS[0], 1)
+        _bistro_chair(BISTRO_CHAIRS[1], -1)
     return _finish('patioSet')
 
 
 # --- the picnic table: a planked top on A-frames, a bench each side; a gingham cloth and a basket --------------
+PICNIC_TOP, PICNIC_SEAT = 0.73, 0.44   # the top's and the benches' tops: content `surface`, `seats.picnicTable`
+
+
 def picnicTable():
+    top, seat = PICNIC_TOP, PICNIC_SEAT
     with G.new_parts():
         for k, z in enumerate((-0.29, -0.145, 0.0, 0.145, 0.29)):
-            F.box(f'top{k}', 2.5, 0.04, 0.135, (0, 0.61, z), M.pine, bevel=0.008)
+            F.box(f'top{k}', 2.5, 0.04, 0.135, (0, top - 0.02, z), M.pine, bevel=0.008)
         for s in (-1, 1):
             for k, z in enumerate((0.6, 0.745)):
-                F.box(f'seat{s}{k}', 2.5, 0.04, 0.13, (0, 0.38, s * z), M.pine, bevel=0.008)
+                F.box(f'seat{s}{k}', 2.5, 0.04, 0.13, (0, seat - 0.02, s * z), M.pine, bevel=0.008)
         for x in (-0.95, 0.0, 0.95):
-            F.box(f'cleat{x}', 0.07, 0.05, 0.72, (x, 0.565, 0), M.pine_dark, bevel=0.008)
+            F.box(f'cleat{x}', 0.07, 0.05, 0.72, (x, top - 0.065, 0), M.pine_dark, bevel=0.008)
         for s in (-1, 1):
             x = s * 0.95
-            F.box(f'bearer{s}', 0.07, 0.06, 1.62, (x, 0.33, 0), M.pine_dark, bevel=0.008)
+            F.box(f'bearer{s}', 0.07, 0.06, 1.62, (x, seat - 0.07, 0), M.pine_dark, bevel=0.008)
             for e in (-1, 1):
-                _board(f'leg{s}{e}', (x, 0.0, e * 0.64), (x, 0.59, e * 0.12), 0.07, 0.05, M.pine_dark,
+                _board(f'leg{s}{e}', (x, 0.0, e * 0.66), (x, top - 0.04, e * 0.12), 0.07, 0.05, M.pine_dark,
                        face=(0, 0, e), bevel=0.008)
-            _board(f'brace{s}', (s * 0.92, 0.33, 0), (s * 0.04, 0.54, 0), 0.05, 0.05, M.pine_dark, bevel=0.006)
+            _board(f'brace{s}', (s * 0.92, seat - 0.07, 0), (s * 0.04, top - 0.07, 0), 0.05, 0.05, M.pine_dark, bevel=0.006)
         # the cloth: red, with a white check on it
-        F.box('cloth', 0.7, 0.004, 0.6, (-0.3, 0.632, 0), M.cloth, bevel=0.002)
+        F.box('cloth', 0.7, 0.004, 0.6, (-0.3, top + 0.002, 0), M.cloth, bevel=0.002)
         for i in range(4):
             for j in range(4):
                 if (i + j) % 2 == 0:
-                    F.box(f'check{i}{j}', 0.175, 0.003, 0.15, (-0.5625 + 0.175 * i, 0.6345, -0.225 + 0.15 * j),
+                    F.box(f'check{i}{j}', 0.175, 0.003, 0.15, (-0.5625 + 0.175 * i, top + 0.0045, -0.225 + 0.15 * j),
                           M.cloth_check)
         # the basket, its lid and handle
-        F.box('basket', 0.4, 0.2, 0.28, (0.55, 0.73, 0.02), M.wicker, bevel=0.03)
-        F.box('basket_lid', 0.42, 0.03, 0.3, (0.55, 0.845, 0.02), M.wicker_rim, bevel=0.01)
-        G.torus('basket_handle', 0.075, 0.01, at=F.at(0.55, 0.86, 0.02), material=M.handle, rot=(90, 0, 0),
+        F.box('basket', 0.4, 0.2, 0.28, (0.55, top + 0.1, 0.02), M.wicker, bevel=0.03)
+        F.box('basket_lid', 0.42, 0.03, 0.3, (0.55, top + 0.215, 0.02), M.wicker_rim, bevel=0.01)
+        G.torus('basket_handle', 0.075, 0.01, at=F.at(0.55, top + 0.23, 0.02), material=M.handle, rot=(90, 0, 0),
                 major_segments=20, minor_segments=6)
         for k, (x, z, m) in enumerate(((-0.45, 0.12, M.cup), (-0.15, -0.1, M.jug))):
-            F.cyl(f'cup{k}', 0.04, 0.1, (x, 0.68, z), m, verts=12)
+            F.cyl(f'cup{k}', 0.04, 0.1, (x, top + 0.05, z), m, verts=12)
     return _finish('picnicTable')
 
 
@@ -335,14 +347,18 @@ def patioChair():
 
 
 # --- the garden bench: three seat slats and three back slats on three iron frames ------------------------------
+# 1.9 m on its two tiles: the content's three sitters, spread across them, 0.67 m apart.
+GARDEN_BENCH_END = 0.92   # its end frames, either side
+
+
 def benchGarden3():
     with G.new_parts():
         for k, z in enumerate((-0.08, 0.04, 0.16)):
-            F.box(f'seat{k}', 2.7, 0.03, 0.1, (0, 0.45, z), M.bench_slats, bevel=0.008)
+            F.box(f'seat{k}', 1.9, 0.03, 0.1, (0, 0.45, z), M.bench_slats, bevel=0.008)
         for k, y in enumerate((0.6, 0.72, 0.84)):
-            F.box(f'back{k}', 2.7, 0.09, 0.025, (0, y, -0.2 - (y - 0.6) * 0.15), M.bench_slats, rot=(-12, 0, 0),
+            F.box(f'back{k}', 1.9, 0.09, 0.025, (0, y, -0.2 - (y - 0.6) * 0.15), M.bench_slats, rot=(-12, 0, 0),
                   bevel=0.008)
-        for x in (-1.3, 0.0, 1.3):
+        for x in (-GARDEN_BENCH_END, 0.0, GARDEN_BENCH_END):
             _rod(f'leg_front{x}', (x, 0.0, 0.18), (x, 0.435, 0.18), 0.022, M.iron)
             _rod(f'leg_back{x}', (x, 0.0, -0.17), (x, 0.9, -0.3), 0.022, M.iron)
             _rod(f'rail{x}', (x, 0.42, -0.23), (x, 0.42, 0.22), 0.02, M.iron)
@@ -350,7 +366,7 @@ def benchGarden3():
             for z in (-0.17, 0.18):
                 F.box(f'foot{x}{z}', 0.06, 0.02, 0.07, (x, 0.01, z), M.iron, bevel=0.006)
         for s in (-1, 1):
-            x = s * 1.3
+            x = s * GARDEN_BENCH_END
             _board(f'arm{s}', (x, 0.66, -0.23), (x, 0.66, 0.24), 0.07, 0.035, M.iron, bevel=0.012)
             F.sphere(f'arm_end{s}', 0.035, (x, 0.66, 0.245), M.iron, scale=(1, 1, 0.55), segments=12, rings=8)
             _rod(f'arm_post{s}', (x, 0.43, 0.22), (x, 0.65, 0.225), 0.017, M.iron)
@@ -478,24 +494,34 @@ def _sling(name, width, half, low, high, t, materials, bands=8):
     return obj
 
 
+# A stand hammock on its 1 x 3 tiles: a 2.8 m stand, a 1.96 m bed between the spreader bars, long enough to lie in
+# flat (`beds.hammock` `sling`: `low`, `end`, `half`, and the pillow at `head`).
+SLING_LOW, SLING_END, SLING_HALF, SLING_HEAD = 0.52, 0.84, 0.98, 0.78
+HAMMOCK_HOOK = 1.245  # the hooks on the posts' inner faces, either side of the middle
+
+
 def hammock():
     with G.new_parts() as stand:
-        F.box('base', 0.1, 0.06, 1.86, (0, 0.03, 0), M.hammock_frame, bevel=0.01)
+        F.box('base', 0.1, 0.06, 2.8, (0, 0.03, 0), M.hammock_frame, bevel=0.01)
         for s in (-1, 1):
-            F.box(f'foot{s}', 0.7, 0.04, 0.08, (0, 0.02, s * 0.86), M.hammock_frame, bevel=0.01)
-            _board(f'post{s}', (0, 0.0, s * 0.89), (0, 1.15, s * 0.85), 0.08, 0.08, M.hammock_frame, face=(0, 0, s),
+            F.box(f'foot{s}', 1.0, 0.04, 0.08, (0, 0.02, s * 1.36), M.hammock_frame, bevel=0.01)
+            _board(f'post{s}', (0, 0.0, s * 1.36), (0, 1.2, s * 1.3), 0.08, 0.08, M.hammock_frame, face=(0, 0, s),
                    bevel=0.012)
-            _board(f'brace{s}', (0, 0.06, s * 0.6), (0, 0.42, s * 0.87), 0.05, 0.05, M.hammock_frame, face=(1, 0, 0),
+            _board(f'brace{s}', (0, 0.06, s * 1.0), (0, 0.5, s * 1.34), 0.05, 0.05, M.hammock_frame, face=(1, 0, 0),
                    bevel=0.008)
-            F.sphere(f'hook{s}', 0.02, (0, HOOK_Y, s * 0.82), M.hammock_frame, segments=8, rings=6)
+            F.sphere(f'hook{s}', 0.02, (0, HOOK_Y, s * HAMMOCK_HOOK), M.hammock_frame, segments=8, rings=6)
     G.join(stand, 'stand', origin=(0, 0, 0))
     with G.new_parts() as bed:
-        _sling('sling', 0.62, 0.66, 0.6, 0.86, 0.025, [M.sling, M.sling_stripe])
+        _sling('sling', 0.74, SLING_HALF, SLING_LOW, SLING_END, 0.025, [M.sling, M.sling_stripe], bands=10)
+        bar = SLING_HALF + 0.01
         for s in (-1, 1):
-            _rod(f'spreader{s}', (-0.34, 0.865, s * 0.67), (0.34, 0.865, s * 0.67), 0.016, M.hammock_frame)
-            for x in (-0.31, 0.31):
-                _rod(f'rope{s}{x}', (x, 0.87, s * 0.67), (0, HOOK_Y, s * 0.82), 0.007, M.sling_stripe, verts=6)
-        F.box('pillow', 0.4, 0.08, 0.26, (0, 0.73, -0.5), M.pillow, bevel=0.034, rot=(14, 0, 0))
+            _rod(f'spreader{s}', (-0.4, SLING_END + 0.005, s * bar), (0.4, SLING_END + 0.005, s * bar), 0.016,
+                 M.hammock_frame)
+            for x in (-0.36, 0.36):
+                _rod(f'rope{s}{x}', (x, SLING_END + 0.01, s * bar), (0, HOOK_Y, s * HAMMOCK_HOOK), 0.007,
+                     M.sling_stripe, verts=6)
+        head = SLING_LOW + (SLING_END - SLING_LOW) * (SLING_HEAD / SLING_HALF) ** 2
+        F.box('pillow', 0.4, 0.08, 0.26, (0, head + 0.03, -SLING_HEAD), M.pillow, bevel=0.034, rot=(12, 0, 0))
     bed = G.hinged(G.join(bed, 'sling'), F.at(0, HOOK_Y, 0))
     G.settle(centre=False)
     G.rock(bed, 'sway', 8, seconds=2.0, axis='Y')
@@ -503,39 +529,45 @@ def hammock():
 
 
 # --- the porch swing: a slatted swing seat hung on chains from an A-frame; it swings while sat in --------------
-def _a_frame(prefix, beam_y, material, round_legs=False):
-    """Two A-frame ends at x ±0.92 and the beam across them."""
+def _a_frame(prefix, beam_y, material, round_legs=False, spread=0.42):
+    """Two A-frame ends at x ±0.92, their legs `spread` m out at the foot, and the beam across them."""
+    tie = spread * (1 - 0.7 / beam_y)
     for s in (-1, 1):
         for e in (-1, 1):
-            a, b = (s * 0.92, 0.0, e * 0.42), (s * 0.92, beam_y, 0.0)
+            a, b = (s * 0.92, 0.0, e * spread), (s * 0.92, beam_y, 0.0)
             if round_legs:
                 _rod(f'{prefix}leg{s}{e}', a, b, 0.035, material, verts=12)
             else:
                 _board(f'{prefix}leg{s}{e}', a, b, 0.08, 0.08, material, face=(0, 0, e), bevel=0.01)
-        _board(f'{prefix}tie{s}', (s * 0.92, 0.7, -0.27), (s * 0.92, 0.7, 0.27), 0.06, 0.04, material, bevel=0.008)
+        _board(f'{prefix}tie{s}', (s * 0.92, 0.7, -tie), (s * 0.92, 0.7, tie), 0.06, 0.04, material, bevel=0.008)
     if round_legs:
         _rod(f'{prefix}beam', (-0.96, beam_y, 0), (0.96, beam_y, 0), 0.045, material, verts=14)
     else:
         F.box(f'{prefix}beam', 1.92, 0.1, 0.1, (0, beam_y, 0), material, bevel=0.01)
 
 
+# The seat hung 5 cm lower than it was: the cushion's top at 0.515 m (content `seat` 0.50, sunk in it).
+PORCH_DROP = 0.05
+
+
 def porchSwing():
     with G.new_parts() as frame:
         _a_frame('', 2.0, M.porch_frame)
     G.join(frame, 'frame', origin=(0, 0, 0))
+    d = PORCH_DROP
     with G.new_parts() as seat:
         for k in range(4):
-            F.box(f'seat{k}', 1.4, 0.03, 0.105, (0, 0.48, -0.13 + 0.115 * k), M.porch_seat, bevel=0.006)
+            F.box(f'seat{k}', 1.4, 0.03, 0.105, (0, 0.48 - d, -0.13 + 0.115 * k), M.porch_seat, bevel=0.006)
         for k in range(4):
-            F.box(f'back{k}', 1.4, 0.08, 0.025, (0, 0.6 + 0.1 * k, -0.19 - 0.021 * k), M.porch_seat, rot=(-12, 0, 0),
-                  bevel=0.006)
+            F.box(f'back{k}', 1.4, 0.08, 0.025, (0, 0.6 - d + 0.1 * k, -0.19 - 0.021 * k), M.porch_seat,
+                  rot=(-12, 0, 0), bevel=0.006)
         for s in (-1, 1):
-            F.box(f'arm{s}', 0.05, 0.03, 0.46, (s * 0.68, 0.7, 0.02), M.porch_seat, bevel=0.008)
-            F.box(f'arm_post{s}', 0.05, 0.22, 0.05, (s * 0.68, 0.59, 0.22), M.porch_seat, bevel=0.008)
-            F.box(f'side{s}', 0.05, 0.06, 0.48, (s * 0.68, 0.45, 0.03), M.porch_seat, bevel=0.008)
+            F.box(f'arm{s}', 0.05, 0.03, 0.46, (s * 0.68, 0.7 - d, 0.02), M.porch_seat, bevel=0.008)
+            F.box(f'arm_post{s}', 0.05, 0.22, 0.05, (s * 0.68, 0.59 - d, 0.22), M.porch_seat, bevel=0.008)
+            F.box(f'side{s}', 0.05, 0.06, 0.48, (s * 0.68, 0.45 - d, 0.03), M.porch_seat, bevel=0.008)
             for z in (-0.18, 0.24):
-                _rod(f'chain{s}{z}', (s * 0.66, 0.5, z), (s * 0.68, 1.96, 0.0), 0.008, M.chain, verts=6)
-        F.box('cushion', 1.3, 0.07, 0.42, (0, 0.53, 0.05), M.porch_cushion, bevel=0.03, bevel_segments=3)
+                _rod(f'chain{s}{z}', (s * 0.66, 0.5 - d, z), (s * 0.68, 1.96, 0.0), 0.008, M.chain, verts=6)
+        F.box('cushion', 1.3, 0.07, 0.42, (0, 0.53 - d, 0.05), M.porch_cushion, bevel=0.03, bevel_segments=3)
     seat = G.hinged(G.join(seat, 'seat'), F.at(0, 1.98, 0))
     G.settle(centre=False)
     G.rock(seat, 'swing', 10, seconds=2.0, axis='X')
@@ -545,7 +577,7 @@ def porchSwing():
 # --- the swing set: two seats on chains from a round-timber A-frame; they swing while played on ---------------
 def swingSet():
     with G.new_parts() as frame:
-        _a_frame('', 1.92, M.swing_frame, round_legs=True)
+        _a_frame('', 1.92, M.swing_frame, round_legs=True, spread=0.72)   # splayed for seats swinging 20°
     G.join(frame, 'frame', origin=(0, 0, 0))
     with G.new_parts() as seats:
         for x in (-0.48, 0.48):
@@ -561,6 +593,7 @@ def swingSet():
 
 # --- the cedar hot tub: banded staves, a step, water; the cover folds back for a soak and the water bubbles ----
 TUB_R = 0.92
+TUB_SEAT, TUB_BENCH = 0.35, 0.44   # the bench's top (`seats.hotTubCedar`) and its inner edge's radius
 
 
 def hotTubCedar():
@@ -576,6 +609,9 @@ def hotTubCedar():
             a = 22.5 * k
             F.box(f'groove{k}', 0.012, 0.78, 0.006, (TUB_R * G.cosd(a), 0.41, TUB_R * G.sind(a)), M.cedar_band,
                   rot=(0, 0, 90 - a))
+        # the bench round the inside wall, under the water: the soakers' seat (`seats.hotTubCedar`)
+        G.revolve('bench', [(TUB_BENCH, 0.12), (TUB_BENCH, TUB_SEAT), (TUB_R - 0.06, TUB_SEAT)], at=F.at(0, 0, 0),
+                  material=M.cedar, segments=32, smooth=False)
         F.box('step', 0.6, 0.2, 0.3, (0, 0.1, 0.8), M.cedar, bevel=0.01)
         F.box('step_edge', 0.6, 0.02, 0.04, (0, 0.2, 0.94), M.cedar_band, bevel=0.005)
     G.join(tub, 'tub', origin=(0, 0, 0))
@@ -592,9 +628,16 @@ def hotTubCedar():
         F.box('cover_seam', 1.86, 0.01, 0.03, (0, 0.912, 0), M.tub_cover, bevel=0.004)
         for x in (-0.3, 0.3):
             F.box(f'strap{x}', 0.05, 0.012, 0.1, (x, 0.9, TUB_R - 0.02), M.tub_cover, bevel=0.004)
+    # its origin on the back edge, at the bottom: it folds onto its back half about it
     cover = G.hinged(G.join(cover, 'cover'), F.at(0, 0.84, -TUB_R - 0.02))
     G.settle(centre=False)
-    G.swing(cover, 'cover_off', -105, seconds=1.2, axis='X')
+    # Off for a soak: folded back on its seam (its front half over its back: half as deep, twice as thick; one
+    # part, so the tub keeps its three draws), lifted and turned down behind the tub, and lowered to hang there
+    # on its folded edge, as on a cover lifter, its round edge just off the ground (Blender offsets: +y is back).
+    G.squash(cover, 'cover_off', (1, 0.5, 2), seconds=0.5)
+    G.path(cover, 'cover_off', [(0, (0, 0, 0), (0, 0, 0)), (0.5, (0, 0, 0), (0, 0, 0)), (0.8, (0, 0, 0.25), (0, 0, 0)),
+                                (1.1, (0, 0.16, 1.16), (90, 0, 0)), (1.5, (0, 0.16, 0.11), (90, 0, 0))])
+    G.motion._peak(cover, 'cover_off', G.motion.last_frame(1.5))   # previewed hung up, at its end
     G.spin(water, 'bubbles', turns=1, seconds=2.0)
     return G.meshes()
 
@@ -624,55 +667,60 @@ def _embers(prefix, r, y, n, seed, material):
                  scale=(1, 1, 0.6), segments=6, rings=4)
 
 
-KETTLE_R, KETTLE_RIM = 0.3, 0.99     # the charcoal grill's bowl: its radius and its rim's height (old part)
+KETTLE_R, KETTLE_RIM = 0.3, 0.79     # the charcoal grill's bowl: its radius and its rim's height
+UP = KETTLE_RIM - 0.99               # its parts' heights, drawn for a rim at 0.99 m, moved down to it
+
+
+def _h(y):
+    return y + UP
 
 
 # The charcoal grill: a kettle on three legs, wheels on the back two, an ash catcher under the bowl; inside, a bed of
-# red coals and a grate with burgers and sausages. The lid is hinged at the back of the rim
-# and swings up (`lid_open`) for the whole of a cook.
+# red coals (aglow at night) and a grate with burgers and sausages, at a 57 cm kettle's working height. The lid is
+# hinged at the back of the rim and swings up (`lid_open`) for the whole of a cook.
 def grill():
     with G.new_parts() as still:
-        y0, top = 0.64, KETTLE_RIM
-        G.revolve('bowl', [(0, y0), (0.15, y0 + 0.005), (0.24, y0 + 0.04), (0.29, 0.76), (KETTLE_R, 0.86),
-                           (KETTLE_R, top), (KETTLE_R - 0.014, top), (KETTLE_R - 0.014, 0.86), (0.276, 0.77),
+        y0, top = _h(0.64), KETTLE_RIM
+        G.revolve('bowl', [(0, y0), (0.15, y0 + 0.005), (0.24, y0 + 0.04), (0.29, _h(0.76)), (KETTLE_R, _h(0.86)),
+                           (KETTLE_R, top), (KETTLE_R - 0.014, top), (KETTLE_R - 0.014, _h(0.86)), (0.276, _h(0.77)),
                            (0.226, y0 + 0.055), (0.14, y0 + 0.02), (0, y0 + 0.02)],
                   at=F.at(0, 0, 0), material=M.kettle, segments=32)
         G.torus('rim', KETTLE_R - 0.004, 0.007, at=F.at(0, top, 0), material=M.kettle, major_segments=32, minor_segments=6)
         for s in (-1, 1):                                           # the bowl's side handles
-            F.box(f'side_handle{s}', 0.012, 0.025, 0.12, (s * (KETTLE_R + 0.015), 0.93, 0), M.grate, bevel=0.004)
+            F.box(f'side_handle{s}', 0.012, 0.025, 0.12, (s * (KETTLE_R + 0.015), _h(0.93), 0), M.grate, bevel=0.004)
         # the coals, glowing, and the cooking grate over them with food
-        F.cyl('coal_bed', 0.24, 0.03, (0, 0.85, 0), M.coals, verts=20)
-        _embers('coal', 0.21, 0.875, 14, 20, M.coal_hot)
-        G.torus('grate_ring', KETTLE_R - 0.025, 0.006, at=F.at(0, 0.965, 0), material=M.grate, major_segments=28, minor_segments=5)
+        F.cyl('coal_bed', 0.24, 0.03, (0, _h(0.85), 0), M.coals, verts=20)
+        _embers('coal', 0.21, _h(0.875), 14, 20, M.coal_hot)
+        G.torus('grate_ring', KETTLE_R - 0.025, 0.006, at=F.at(0, _h(0.965), 0), material=M.grate, major_segments=28, minor_segments=5)
         for k in range(-5, 6):
             x = k * 0.05
             half = math.sqrt(max((KETTLE_R - 0.025) ** 2 - x * x, 0))
-            _rod(f'grate_bar{k}', (x, 0.965, -half), (x, 0.965, half), 0.004, M.grate, verts=6)
+            _rod(f'grate_bar{k}', (x, _h(0.965), -half), (x, _h(0.965), half), 0.004, M.grate, verts=6)
         for k, (x, z) in enumerate(((-0.12, 0.06), (0.02, -0.12), (0.13, 0.08))):
-            F.cyl(f'burger{k}', 0.048, 0.022, (x, 0.982, z), M.burger, verts=14, bevel=0.006)
+            F.cyl(f'burger{k}', 0.048, 0.022, (x, _h(0.982), z), M.burger, verts=14, bevel=0.006)
         for k, (x, z) in enumerate(((-0.06, -0.09), (0.06, -0.02))):
-            _rod(f'sausage{k}', (x - 0.07, 0.982, z), (x + 0.07, 0.982, z + 0.02), 0.016, M.sausage, verts=8)
+            _rod(f'sausage{k}', (x - 0.07, _h(0.982), z), (x + 0.07, _h(0.982), z + 0.02), 0.016, M.sausage, verts=8)
         # the legs, the ash catcher and the wheels
         for k, a in enumerate((90, 210, 330)):
             c, s_ = G.cosd(a), G.sind(a)
             foot_y = 0.075 if a != 90 else 0.0
-            _rod(f'leg{k}', (c * 0.13, 0.68, s_ * 0.13), (c * 0.31, foot_y, s_ * 0.31), 0.014, M.grate, verts=8)
+            _rod(f'leg{k}', (c * 0.13, _h(0.68), s_ * 0.13), (c * 0.31, foot_y, s_ * 0.31), 0.014, M.grate, verts=8)
         F.cyl('foot_cap', 0.02, 0.02, (0, 0.01, 0.31), M.wheel, verts=10)
-        G.torus('rack', 0.2, 0.008, at=F.at(0, 0.3, 0), material=M.grate, major_segments=24, minor_segments=5)
-        F.cyl('ash_catcher', 0.12, 0.05, (0, 0.45, 0), M.grate, verts=20, bevel=0.01)
+        G.torus('rack', 0.2, 0.008, at=F.at(0, 0.2, 0), material=M.grate, major_segments=24, minor_segments=5)
+        F.cyl('ash_catcher', 0.12, 0.05, (0, 0.31, 0), M.grate, verts=20, bevel=0.01)
         _rod('axle', (-0.29, 0.075, -0.155), (0.29, 0.075, -0.155), 0.008, M.grate, verts=6)
         for s in (-1, 1):
             G.cylinder(f'wheel{s}', 0.075, 0.03, at=F.at(s * 0.29, 0.075, -0.155), material=M.wheel, rot=(0, 90, 0), verts=18)
     G.join(still, 'kettle', origin=(0, 0, 0))
     with G.new_parts() as parts:
-        G.revolve('lid', [(0, 1.215), (0.16, 1.19), (0.25, 1.125), (KETTLE_R - 0.012, 1.04), (KETTLE_R - 0.012, KETTLE_RIM + 0.002),
-                          (KETTLE_R + 0.004, KETTLE_RIM + 0.002), (KETTLE_R + 0.004, 1.045), (0.26, 1.135), (0.165, 1.205),
-                          (0, 1.23)],
+        G.revolve('lid', [(0, _h(1.215)), (0.16, _h(1.19)), (0.25, _h(1.125)), (KETTLE_R - 0.012, _h(1.04)),
+                          (KETTLE_R - 0.012, KETTLE_RIM + 0.002), (KETTLE_R + 0.004, KETTLE_RIM + 0.002),
+                          (KETTLE_R + 0.004, _h(1.045)), (0.26, _h(1.135)), (0.165, _h(1.205)), (0, _h(1.23))],
                   at=F.at(0, 0, 0), material=M.kettle_lid, segments=32)
-        F.cyl('vent', 0.04, 0.012, (0, 1.232, 0), M.grate, verts=16)
+        F.cyl('vent', 0.04, 0.012, (0, _h(1.232), 0), M.grate, verts=16)
         for s in (-1, 1):                                           # the handle, on two brackets at the lid's front
-            _rod(f'handle_post{s}', (s * 0.06, 1.14, 0.235), (s * 0.06, 1.165, 0.275), 0.007, M.grate, verts=6)
-        _rod('handle', (-0.08, 1.165, 0.277), (0.08, 1.165, 0.277), 0.013, M.handle_steel, verts=10)
+            _rod(f'handle_post{s}', (s * 0.06, _h(1.14), 0.235), (s * 0.06, _h(1.165), 0.275), 0.007, M.grate, verts=6)
+        _rod('handle', (-0.08, _h(1.165), 0.277), (0.08, _h(1.165), 0.277), 0.013, M.handle_steel, verts=10)
     lid = G.hinged(G.join(parts, 'lid'), F.at(0, KETTLE_RIM, -KETTLE_R))
     G.settle(centre=False)
     G.swing(lid, 'lid_open', -95, seconds=0.9, axis='X')
@@ -782,9 +830,9 @@ SLATS = [('iron', 'Frame'), ('park_slats', 'Slats')]
 FAMILY = G.Family(
     'outdoor', M,
     [G.Model('bench', bench, size=(1.74, 0.886, 0.528), centre=(0, 0.011), key='model.bench', paint=SLATS),
-     G.Model('patioSet', patioSet, size=(0.6, 0.933, 1.863), centre=(0, 0.05), key='model.patioSet',
+     G.Model('patioSet', patioSet, size=(0.6, 0.933, 1.423), key='model.patioSet',
              paint=[('iron', 'Frame'), ('bistro', 'Slats')]),
-     G.Model('picnicTable', picnicTable, size=(2.5, 0.958, 1.62), key='model.picnicTable',
+     G.Model('picnicTable', picnicTable, size=(2.5, 1.058, 1.62), key='model.picnicTable',
              paint=[('pine_dark', 'Frame'), ('pine', 'Planks'), ('cloth', 'Cloth')]),
      G.Model('gardenChair', gardenChair, size=(0.84, 1.041, 0.757), centre=(0, -0.052), key='model.gardenChair',
              paint=[('garden_white', 'Chair')]),
@@ -796,7 +844,7 @@ FAMILY = G.Family(
              paint=[('patio_green', 'Frame'), ('cushion', 'Cushion')]),
      G.Model('adirondackChair', adirondackChair, size=(0.88, 1.097, 0.785), centre=(0, -0.038), key='model.adirondackChair',
              paint=[('adirondack', 'Chair')]),
-     G.Model('benchGarden3', benchGarden3, size=(2.7, 0.906, 0.602), centre=(0, -0.021), key='model.benchGarden3',
+     G.Model('benchGarden3', benchGarden3, size=(1.91, 0.906, 0.602), centre=(0, -0.021), key='model.benchGarden3',
              paint=[('iron', 'Frame'), ('bench_slats', 'Slats')]),
      G.Model('outdoorBar', outdoorBar, size=(2.0, 1.06, 0.89), centre=(0, 0.015), key='model.outdoorBar',
              paint=[('teak', 'Body'), ('bar_top', 'Counter'), ('steel', 'Foot rail')]),
@@ -805,20 +853,20 @@ FAMILY = G.Family(
      G.Model('sunLounger', sunLounger, size=(0.62, 0.759, 1.866), centre=(0, 0.007), key='model.sunLounger',
              motions={'uses': {'sunbathe': 'recline', 'doze': 'recline'}},
              paint=[('lounger', 'Frame'), ('lounger_pad', 'Cushions'), ('towel', 'Towel')]),
-     G.Model('hammock', hammock, size=(0.7, 1.15, 1.86), key='model.hammock',
+     G.Model('hammock', hammock, size=(1.0, 1.2, 2.8), key='model.hammock',
              motions={'loops': {'swing': 'sway', 'doze': 'sway'}, 'ride': 'sway'},
              paint=[('hammock_frame', 'Frame'), ('sling', 'Fabric'), ('sling_stripe', 'Stripes')]),
      G.Model('porchSwing', porchSwing, size=(1.92, 2.05, 0.92), key='model.porchSwing',
              motions={'loops': {'swing': 'swing'}, 'ride': 'swing'},
              paint=[('porch_seat', 'Seat'), ('porch_frame', 'Frame'), ('chain', 'Chains'), ('porch_cushion', 'Cushion')]),
-     G.Model('swingSet', swingSet, size=(1.92, 1.972, 0.908), key='model.swingSet',
+     G.Model('swingSet', swingSet, size=(1.92, 1.972, 1.51), key='model.swingSet',
              motions={'loops': {'swing': 'swing'}, 'ride': 'swing'},
              paint=[('swing_frame', 'Frame'), ('swing_seat', 'Seats')]),
      G.Model('hotTubCedar', hotTubCedar, size=(1.886, 0.917, 1.903), centre=(0, 0.008), key='model.hotTubCedar',
              motions={'uses': {'soak': 'cover_off'}, 'open': 'cover_off', 'loops': {'soak': 'bubbles'}},
              paint=[('cedar', 'Cedar'), ('tub_cover', 'Cover')]),
      # OU3: the grills and the fire pit
-     G.Model('grill', grill, size=(0.642, 1.242, 0.634), centre=(0, 0.013), key='model.grill', motions={'uses': {'cook': 'lid_open'}},
+     G.Model('grill', grill, size=(0.642, 1.042, 0.634), centre=(0, 0.013), key='model.grill', motions={'uses': {'cook': 'lid_open'}},
              paint=[('kettle', 'Body'), ('kettle_lid', 'Lid')]),
      G.Model('grillStation', grillStation, size=(1.66, 1.199, 0.66), centre=(0, -0.125), key='model.grillStation',
              motions={'uses': {'cook': 'hood_up', 'feast': 'hood_up'}}, paint=[('cart', 'Cart'), ('hood', 'Hood')]),

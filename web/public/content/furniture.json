@@ -4727,8 +4727,8 @@
       "category": "outdoor",
       "slots": 2,
       "places": [
-        { "at": [0, 0.7], "facing": 180 },
-        { "at": [0, -0.6] }
+        { "at": [0, 0.43], "facing": 180 },
+        { "at": [0, -0.43] }
       ],
       "group": "seating",
       "description": "A slatted folding table and chairs for a sunny corner.",
@@ -4738,10 +4738,6 @@
         "size": [
           0.6,
           0.6
-        ],
-        "at": [
-          0,
-          0.3
         ]
       },
       "interactions": [
@@ -4797,7 +4793,7 @@
       ],
       "description": "A big wooden table with benches: picnics for two.",
       "surface": {
-        "height": 0.63,
+        "height": 0.73,
         "kind": "table",
         "size": [
           2.4,
@@ -4925,7 +4921,7 @@
       "outdoors": true,
       "footprint": [
         1,
-        2
+        3
       ],
       "price": 240,
       "category": "outdoor",
@@ -5019,7 +5015,7 @@
       "model": "model.swingSet",
       "footprint": [
         2,
-        1
+        2
       ],
       "price": 380,
       "category": "outdoor",
