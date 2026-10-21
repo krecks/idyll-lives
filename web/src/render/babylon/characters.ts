@@ -132,14 +132,20 @@ const WALK_PER_TICK = 0.075;
 const WALK_FASTEST = 1.5;
 const WALK_SLACK = 1.2;
 /**
- * The walk and jog cycles play matched to the ground speed, up to this many times their own pace
- * (faster, they would only flicker; the feet slide instead). A walker who would need the walk
- * faster jogs along (`jogAlong`), and walks again below `JOG_BACK` of it.
+ * The walk, jog and run cycles play matched to the ground speed, up to this many times their own pace
+ * (faster, they would only flicker; the feet slide instead). A walker who would need the walk faster
+ * jogs along (`jogAlong`), one who would need the jog faster runs (`runAlong`, game speeds 3 and up,
+ * children from 2), each going back to the slower gait below `JOG_BACK` of its switch. The run, the
+ * last, goes on to `RUN_MAX_RATE` (about six strides a second): adults and teens keep their feet on
+ * the ground at speed 3 (15 m/s; children run at up to 13 m/s there), and at speeds 4 and 5 (45 and
+ * 90 m/s) no gait could.
  */
 const GAIT_MAX_RATE = 3;
+const RUN_MAX_RATE = 4;
 const JOG_BACK = 0.8;
-/** Locomotion cycles (they play in real time at the matched rate, and change into each other in step). */
-const GAITS = new Set(['walk', 'jogAlong']);
+/** Locomotion cycles, slowest first (they play in real time at the matched rate, and change into each other in step). */
+const GEARS = ['walk', 'jogAlong', 'runAlong'];
+const GAITS = new Set(GEARS);
 const DEFAULT_FADE = 0.25;
 
 /**
@@ -199,6 +205,8 @@ const STEP_IN: Record<string, StepIn> = {
 };
 /** One clip played alone (`StepIn.perLane`), by name. */
 const LANE_SEQ = new Map<string, readonly string[]>();
+/** How far (s) into someone else's round on the same thing one stepped in may still start theirs (`inTurn`). */
+const LANE_SYNC = 0.4;
 /** Stepping in (m/s, game time) and out again (s). */
 const STEP_IN_SPEED = 1.05;
 const STEP_OUT_S = 1.1;
@@ -2598,13 +2606,14 @@ export class Characters {
       }
     } else if (moving) {
       // Walking, the cycle matched to the ground speed; faster than the walk can step (a sped-up
-      // game, short legs), jogging along.
+      // game, short legs), jogging along, and faster than that running (`GEARS`): the slowest gait
+      // that needn't go faster than its pace, a slower one than now only well within it.
       const legs = rig.body.pelvisScale * rig.scale;
-      const walk = rig.speed / (set.clips.get('walk')!.speed * legs);
-      const jog = set.clips.get('jogAlong');
-      const jogging = !!jog && walk > GAIT_MAX_RATE * (rig.cur.key === 'jogAlong' ? JOG_BACK : 1);
-      key = jogging ? 'jogAlong' : 'walk';
-      rate = clamp(jogging ? rig.speed / (jog!.speed * legs) : walk, 0.35, GAIT_MAX_RATE);
+      const now = GEARS.indexOf(rig.cur.key);
+      let gear = 0;
+      while (gear < GEARS.length - 1 && set.clips.has(GEARS[gear + 1]) && rig.speed / (set.clips.get(GEARS[gear])!.speed * legs) > GAIT_MAX_RATE * (gear < now ? JOG_BACK : 1)) gear++;
+      key = GEARS[gear];
+      rate = clamp(rig.speed / (set.clips.get(key)!.speed * legs), 0.35, gear === GEARS.length - 1 ? RUN_MAX_RATE : GAIT_MAX_RATE);
       fade = GAITS.has(rig.cur.key) ? 0.3 : 0.2;
       hands = HANDS.relaxed;
       rig.useObj = null;
@@ -2880,12 +2889,32 @@ export class Characters {
     rig.inDX = Math.cos(f) * across * k;
     rig.inDZ = -Math.sin(f) * across * k;
     // (Waiting to step in, standing about.)
-    if (k <= 0) return [fwd, y, into.wait ? 'idle' : key, 1];
-    if (k >= 1) return [fwd, y, key, 1];
+    if (k <= 0) return [fwd, y, into.wait || into.perLane ? 'idle' : key, 1];
+    // (Already there, or as good as: no steps.) Waiting for their turn, the use's sequence holds too.
+    if (k >= 1 || way < 0.05) {
+      if (rig.cur.key === key || this.inTurn(rig, into)) return [fwd, y, key, 1];
+      rig.stepTime = 0;
+      return [fwd, y, 'idle', 1];
+    }
     // Walking, the cycle matched to the step's pace (the walk runs on real time).
     const legs = rig.body.pelvisScale * rig.scale;
     const rate = dt > 0 ? ((way / span) * (step / dt)) / (this.clip('walk').speed * legs) : 1;
     return [fwd, y, 'walk', clamp(rate, 0.35, GAIT_MAX_RATE)];
+  }
+
+  /**
+   * Whether `rig`, stepped in to `into`, may start its round (`StepIn.perLane`): the lanes' rounds keep out
+   * of each other's way only in step (the climbing frame's second lane waits on the deck while the first
+   * slides down the pole), so with someone already going round, it waits standing at its lane until their
+   * round comes back to its start (`LANE_SYNC` s into it).
+   */
+  private inTurn(rig: SimRig, into: StepIn): boolean {
+    if (!into.perLane) return true;
+    for (const r of this.sims) {
+      if (!r || r === rig || r.inside !== into || r.useId !== rig.useId || !LANE_SEQ.has(r.cur.key) || !r.cur.clip) continue;
+      if (r.cur.time % r.cur.clip.duration > LANE_SYNC) return false;
+    }
+    return true;
   }
 
   /** The use of a thing used from inside (`STEP_IN`) is over: back out to the tile in front after its `out` seconds (`stepPlace`); none when drawn afresh. */

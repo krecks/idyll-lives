@@ -14,7 +14,7 @@
  * - every clip the runtime plays exists, with the right loop flag (and the phase-2 clips too);
  * - no NaNs; loops wrap seamlessly (the step from the last frame to the first is in line with the
  *   steps either side of it: at most 2 degrees more than the larger);
- * - the planted foot of the locomotion clips (`walk`, `jogAlong`: those with a `speed`) slides less
+ * - the planted foot of the locomotion clips (`walk`, `jogAlong`, `runAlong`: those with a `speed`) slides less
  *   than 1 cm per cycle against the ground speed, and a foot flat on the floor in any other loop (or
  *   the short one-shots) stays put (< 1 cm);
  * - every clip's length is within 15% of its target (the runtime sequences on them);
@@ -68,7 +68,7 @@ const { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } = await import('../../web/src/
 
 /** Every clip the runtime plays (characters.ts ACTIONS / choose, reactions.ts) and whether it loops. */
 const RUNTIME: Record<string, boolean> = {
-  idle: true, talk: true, walk: true, jog: true, jogAlong: true, sit: true, sitTalk: true, sitDown: false, standUp: false, sitHands: true, sitHandsNear: true, sitHandsFar: true,
+  idle: true, talk: true, walk: true, jog: true, jogAlong: true, runAlong: true, sit: true, sitTalk: true, sitDown: false, standUp: false, sitHands: true, sitHandsNear: true, sitHandsFar: true,
   interact: false, pickUp: false, dance: true, punchJab: false, punchCross: false, hit: false, kneel: true, crouch: true,
   eat: false, water: true, harvest: true, pick: true, foldArms: true, no: true, yes: false, phone: true, rail: true, spell: true,
   push: true, plant: false, lantern: true, babyLieAsleep: true, babyLieAwake: true,
@@ -80,7 +80,7 @@ const RUNTIME: Record<string, boolean> = {
 const PHASE2: Record<string, boolean> = { lie: true, chop: true, stir: true, flip: true, drink: false, carry: true, carryOne: true, wave: false };
 /** Lengths (s) from the plan's clip table; within 15%. */
 const LENGTH: Record<string, number> = {
-  idle: 2.5, talk: 2.9, walk: 1.1, jog: 0.7, jogAlong: 0.7, sit: 1.7, sitTalk: 2.9, sitDown: 1.33, standUp: 1.07, sitHands: 1.7, sitHandsNear: 1.7, sitHandsFar: 1.7, interact: 2.0, pickUp: 0.87,
+  idle: 2.5, talk: 2.9, walk: 1.1, jog: 0.7, jogAlong: 0.7, runAlong: 0.6, sit: 1.7, sitTalk: 2.9, sitDown: 1.33, standUp: 1.07, sitHands: 1.7, sitHandsNear: 1.7, sitHandsFar: 1.7, interact: 2.0, pickUp: 0.87,
   dance: 1.0, punchJab: 0.87, punchCross: 1.0, hit: 0.33, kneel: 5.2, crouch: 2.9, eat: 1.33, water: 3.8, harvest: 2.5, pick: 3, plant: 2.8, foldArms: 2.5,
   yes: 2.5, no: 2.5, phone: 2.9, lantern: 2.5, rail: 2.5, spell: 2.1, push: 2.7, babyLieAsleep: 9, babyLieAwake: 6,
   fountainDrink181: 3, fountainDrink163: 3, fountainDrink147: 3, fountainDrink129: 3, fountainDrink112: 3, climb172a: 13, climb147a: 13, climb112a: 13, climb172b: 13, climb147b: 13, climb112b: 13,

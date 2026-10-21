@@ -1,15 +1,6 @@
 {
   "about": "Known failures of tools/characters/check_clips.ts: printed as known, not failing. Body and stage \"*\": the same on every skeleton. Rewrite with --update-baseline.",
   "known": [
-    {"clip":"climb112a","check":"slide","what":"foot_l","body":"female","stage":"child"},
-    {"clip":"climb112a","check":"slide","what":"foot_l","body":"male","stage":"child"},
-    {"clip":"climb112b","check":"slide","what":"foot_l","body":"female","stage":"child"},
-    {"clip":"climb112b","check":"slide","what":"foot_l","body":"male","stage":"child"},
-    {"clip":"climb172a","check":"slide","what":"foot_l","body":"female","stage":"elder"},
-    {"clip":"jogAlong","check":"seam","what":"calf_r","body":"*","stage":"*"},
-    {"clip":"jogAlong","check":"seam","what":"foot_r","body":"*","stage":"*"},
-    {"clip":"jog","check":"slide","what":"foot_r","body":"female","stage":"child"},
-    {"clip":"jog","check":"slide","what":"foot_r","body":"male","stage":"child"},
     {"clip":"sit","check":"sit","what":"feet","body":"female","stage":"child"},
     {"clip":"sit","check":"sit","what":"feet","body":"female","stage":"elder"},
     {"clip":"sit","check":"sit","what":"feet","body":"female","stage":"teen"},
