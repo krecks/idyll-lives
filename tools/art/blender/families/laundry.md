@@ -20,10 +20,14 @@ round the porthole. Two moving parts:
 - **The door** (`door`): a ring with a window (`glass`) and a handle on the right, hinged on its left edge.
   `door_open` swings it 110° in 1 s; `hold` 2.5 s, so it shuts while the resident is still loading.
 - **The drum's face** (`drum`): a dark disc with three paddles and the washing, just behind the window, its
-  origin on the axis. `drum_spin` turns it once in 1.2 s, a loop (`G.spin`) for the whole use.
+  origin on the axis. `drum_spin` turns it once in 1.2 s (`G.spin`); on the washer only.
 
-`motions`: `{'uses': {'laundry': 'door_open'}, 'hold': 2.5, 'loops': {'laundry': 'drum_spin'}}` (the
-interaction id, as the `clean` tag is shared with other chores). The washing on the top (folded towels, the
+`motions` (2026-10-21, review A-bathroom-03): the washer `{'uses': {'laundry': ['door_open', {'clip': 'drum_spin',
+'delay': 3.5, 'every': 1.1}]}, 'hold': 2.5}`: the drum turns once the door has shut (3.5 s in), round after round
+(`every` a hair under the turn, so there's no pause) till the wash ends; it turned behind the open door before. The
+dryer `{'uses': {'laundry': 'door_open'}, 'hold': 2.5}`: "Fold the laundry" opens it to take the washing out, and
+the drum stays still (it tumbled the whole fold). By the interaction id, as the `clean` tag is shared with other
+chores. The washing on the top (folded towels, the
 dryer's basket of dry washing) is plain satin, so it costs no draw call.
 
 **Draw calls: 4** each (the most allowed, as the microwave): the cabinet, the door ring, the door's glass and

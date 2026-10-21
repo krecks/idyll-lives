@@ -140,20 +140,20 @@ fn doing(world: &World, s: &Sim) -> Doing {
     if let Some(Activity { phase: Phase::Knocking { .. }, .. }) = s.current() {
         return Doing::plain(world, None, world.content.visits.door.as_ref().and_then(|d| d.knock_anim));
     }
-    // Cooking: at the station, the step's animation while at it (the recipe was started from
-    // an interaction of `origin`: that's the interaction shown while at it).
+    // Cooking: at the station, the step's animation for that station while at it (a meal put in
+    // the oven, stirred on a hob; the recipe was started from an interaction of `origin`: that's
+    // the interaction shown while at it).
     if let Some(Activity { task: Task { kind: TaskKind::Cook { recipe, step, station, origin, .. }, .. }, phase, .. }) = s.current() {
         let Some(o) = station.and_then(|o| world.objects.get(o as usize)) else {
             return Doing::NOTHING;
         };
         let r = &world.content.recipes[*recipe];
+        let def = &world.content.objects[o.def];
         let using = matches!(phase, Phase::Using { .. });
-        let interaction = (*origin == Some(o.id))
-            .then(|| world.content.objects[o.def].interactions.iter().position(|i| i.recipe == Some(*recipe)))
-            .flatten();
+        let interaction = (*origin == Some(o.id)).then(|| def.interactions.iter().position(|i| i.recipe == Some(*recipe))).flatten();
         return Doing {
             object: o.stable as f32,
-            action: r.steps.get(*step as usize).and_then(|s| s.anim).filter(|_| using).map_or(-1.0, |a| a as f32),
+            action: r.steps.get(*step as usize).and_then(|s| s.anim_for(def.stations)).filter(|_| using).map_or(-1.0, |a| a as f32),
             def: o.def as f32,
             interaction: interaction.map_or(-1.0, |i| i as f32),
         };
@@ -163,7 +163,8 @@ fn doing(world: &World, s: &Sim) -> Doing {
         let anim = world.content.cooking.eat_anim.filter(|_| matches!(phase, Phase::Using { .. }));
         return Doing::plain(world, *seat, anim);
     }
-    // Clearing away: at the bin, the sink or the counter, scraping, washing or putting away.
+    // Clearing away: at the bin, the sink or the counter, scraping, washing or putting away (the
+    // station's kind too: washing at a dishwasher sounds unlike a sink's running tap).
     if let Some(Activity { task: Task { kind: TaskKind::Dishes { station, stage, .. }, .. }, phase, .. }) = s.current() {
         let rules = &world.content.cooking;
         let anim = match stage {
@@ -172,7 +173,8 @@ fn doing(world: &World, s: &Sim) -> Doing {
             _ => rules.dishes_anim,
         };
         let anim = anim.filter(|_| matches!(phase, Phase::Using { .. }));
-        return Doing::plain(world, *station, anim);
+        let def = station.and_then(|o| world.objects.get(o as usize)).map_or(-1.0, |o| o.def as f32);
+        return Doing { def, ..Doing::plain(world, *station, anim) };
     }
     // On the phone: on the seat (or standing), the phone animation while at it.
     if let Some(Activity { task: Task { kind: TaskKind::Phone { seat, .. }, .. }, phase, .. }) = s.current() {

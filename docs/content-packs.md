@@ -313,9 +313,11 @@ voices pick their lines by them.
 | `idle` | standing at an object with nothing better to show (donation jar) |
 | `fetch` | taking ingredients out of the fridge or pantry (a recipe's first step) |
 | `chop` | preparing food on a counter (a chopping board is drawn on its top) |
-| `stir` | cooking on the stove or baking (a pan is drawn on it) |
+| `stir` | cooking on the stove (a pan is drawn on it) |
 | `flip` | grilling (food is drawn on the grill) |
 | `serve` | putting a dish down |
+| `mix` | mixing batter or making pastry on a counter (a mixing bowl is drawn on its top) |
+| `bake` | putting a dish in the oven or the microwave and watching it (nothing drawn: it's inside) |
 
 **Adding an animation:** reuse a tag whenever one is close enough; the characters need a
 clip for every tag. If you must add one, append it to a top-level `"animations"` list in
@@ -695,7 +697,8 @@ the home needs a sink or dishwasher).
   "steps": [
     { "label": "Get ingredients", "at": ["ingredients"], "minutes": 3, "anim": "fetch", "holds": "ingredients" },
     { "label": "Prep", "at": ["prep"], "minutes": 10, "anim": "chop", "optional": true, "holds": "prepBowl" },
-    { "label": "Cook", "at": ["stove", "oven", "microwave"], "minutes": 20, "anim": "stir", "optional": true }
+    { "label": "Cook", "at": ["stove", "oven", "microwave"], "minutes": 20, "anim": "stir",
+      "animAt": { "oven": "bake", "microwave": "bake" }, "optional": true }
   ]
 }]
 ```
@@ -711,7 +714,7 @@ the home needs a sink or dishwasher).
 | `eatNow` | The cook eats it at once (a sandwich): no dish is served. |
 | `outdoor` | A barbecue: outdoor stations first, served on an outdoor table. |
 | `stages` | Who may cook it (life-stage ids), for every interaction that starts it without `stages` of its own (see the interactions' `stages`). Base game: a recipe with a hot step (stove, oven, grill) is for teens and up; the sandwich for anyone. |
-| `steps` | In order: `at` (stations, the first preferred; the one clicked is used when it's one of them), `minutes`, `anim`, `label`, `optional` (done without when the home has none: the dish is a little plainer, and its minutes are spent at the next step that has a station, or, with none after it, at the last one that has: no counter means chopping by the stove, a fridge-only kitchen makes the whole meal at the fridge) and `holds` (an item carried away from it). |
+| `steps` | In order: `at` (stations, the first preferred; the one clicked is used when it's one of them), `minutes`, `anim`, `animAt` (another `anim` at some of its stations, `{"oven": "bake"}`: the station object's first kind in `at` decides, so a cooker, a stove and an oven, stirs on its hob; the station's moving parts play by this tag, as they do by an interaction's id), `label`, `optional` (done without when the home has none: the dish is a little plainer, and its minutes are spent at the next step that has a station, or, with none after it, at the last one that has: no counter means chopping by the stove, a fridge-only kitchen makes the whole meal at the fridge) and `holds` (an item carried away from it). |
 
 Residents choose a recipe only if their home has a station for every step that isn't
 optional; a long recipe tempts them less, a hungry family more, and food already made hardly

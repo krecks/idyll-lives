@@ -185,8 +185,10 @@ export class WorldSound {
     const object = def >= 0 ? this.content.objectList[def] : undefined;
     const use = interaction >= 0 ? object?.interactions[interaction] : undefined;
     if (tag === 'wash') {
-      // Clearing away after a meal washes up at the sink without an interaction of its own.
+      // Clearing away after a meal washes up at the sink without an interaction of its own; at a
+      // dishwasher (no washing interaction) it's loaded without a sound.
       if (use?.id === 'washUp' || !object) return 'washUp';
+      if (!use) return object.interactions.some((i) => i.anim === 'wash') ? 'washUp' : undefined;
       // Getting ready at a dressing table washes without a tap.
       return use?.tags?.includes('handwash') ? 'tap' : undefined;
     }

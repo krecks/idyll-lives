@@ -163,7 +163,8 @@ Measured: the dressing table's top 0.76 (72–78) and its pouf's seat 0.45 (42�
 - **Fix class:** motion
 - **Where:** `tools/art/blender/families/bedroom.py:121-127` (`_turn_down`: the flap, one rigid part, `G.swing` 180° about its fold in `SECONDS` = 1.0, `:75`, with a `G.squash`); `tools/art/blender/families/kids.py:275-285` (the kids' beds, the same)
 - **Evidence:** `bedroom/clips/clips-bed-all-t0.5.png`: half way, the top third of the duvet stands upright across the head of the bed, a flat panel about 0.45 m high in front of the pillows; the same on `bedSingle`, `bedBunk` (both duvets), `bedKing`, `bedDouble`, `bedQueenUpholstered` and `bedCanopy` (`bedroom/clips/clips-*-all-t0.5.png`). A duvet is turned back by a hand and folds as cloth, never upright. It shows for about half of the 1 s clip each time someone gets into or out of bed, at the head end, before the game's quilt covers it. A clip that slides and folds the flap low (or two hinged halves) would read as cloth. Other items: `kidsBed`, `kidsBedCar` (kids ledger).
-- **Status:** open
+- **Status:** fixed (abfc32d9)
+- **After:** as the flap turns over it is gathered along the bed to a fifth of its length half way and springs out again as it lies down (a scale there and back on the same clip, `ROLL`), so half way it is a low roll at the fold, not a 0.45 m board: `fixes/motions/g1718/clips-bed-all-t0.5.png`, `clips-bedBunk-all-t0.5.png`, `views/bunk-t0.5.png` and the other beds' and the kids' beds' (`clips-kidsBed-all-t0.5.png`, `clips-kidsBedCar-all-t0.5.png`). Folded, it is where it was (under the game's quilt).
 - **Source:** wave: bedroom (lead from Phase 0.9 "Seen (not reviewed)")
 
 ### A-bedroom-02 — The upper bunk's sleeper sits down in mid-air: no climb up the ladder

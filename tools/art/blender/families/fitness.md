@@ -14,13 +14,16 @@ The belt runs along the depth, the console at the back, tilted 35° to face the 
 belt facing the console: `characters.ts` moves them forward from the tile in front onto its middle, at the belt's
 top (content `stand.height`, 0.156 m), as it does for the trampoline.
 
-- **The slats** (`slats`): 15 strips across the belt, 10 cm apart. `belt_run` moves them one slat back (towards
-  the rear) in 0.25 s at an even speed (`G.scroll`, 0.4 m/s), a loop for the whole run (`loops: {run: belt_run}`).
-  That is slower than a jog, but faster would blur: at the fastest game speed (2.5×) the slats already move a third
-  of their pitch a frame at 30 frames a second (it was 0.2 m/s, which read as a belt creeping along). The game
-  jumps the loop home at the end of each round; the slats then stand where their neighbours were, and the first
-  and last are under the motor hood and the rear roller cap, so it doesn't show. `check-glb` warns that the
-  loop ends 10 cm from where it starts: right for a belt.
+- **The slats** (`slats`): 6 strips across the belt, 30 cm apart (`SLAT`). `belt_run` moves them one slat back
+  (towards the rear) in 0.13 s at an even speed (`G.scroll`, 2.25 m/s, a run; a clip of 4 frames: 3 failed the
+  gate's even-speed test), a loop for the whole run
+  (`loops: {run: belt_run}`). It was 0.4 m/s with 10 cm slats, a slow walk under a running stride (review
+  A-fitness-02, 2026-10-21): the long pitch is what lets the belt run that fast and still be seen going back, as
+  each frame moves the slats under half a pitch (4 cm a frame at 60 frames a second, 9 cm at the fastest game
+  speed, 2.5×). The game jumps the loop home at the end of each round; the slats then stand where their neighbours
+  were, and the first and last are under the motor hood and the rear roller cap (the last placed a slat short of
+  the cap's far edge), so it doesn't show. `check-glb` warns that the loop ends 30 cm from where it starts: right
+  for a belt.
 
 ## The exercise bike
 

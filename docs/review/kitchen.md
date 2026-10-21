@@ -377,7 +377,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** motion
 - **Where:** `web/public/assets/packs/kitchen_cooking/manifest.json:398`, `:442` (`dishwasher`, `dishwasherCompact` motions: `uses: {dishes: door_open}`, `hold 2.5`); `web/src/render/babylon/objectMotion.ts:413` (clips keyed by interaction id or animation tag); `crates/sim-core/src/snapshot.rs:156` (clearing away is `Doing::plain`: no interaction, tag `wash`); `web/src/audio/world.ts:189` (`wash` with no object def: the washing-up water)
 - **Evidence:** `kitchen/extra/meal-fridge-stoveGas.json` and `-15.png`, `-17.png`: with a dishwasher as the lot's only `dishes` station, the dirty plate (98.4–103.1 s) and the scraped pot (113.1–118.1 s) are each "washed" at it for 5 s with the `wash` clip (hands working at the shut door, holding the plate) and no clip on the dishwasher at all; the sound is a running tap. On its own use "Load the dishwasher" the door drops and the rack slides out, then shuts 2.5 s in (its `hold`; `kitchen/play/c1/play.jsonl`: closing from +2.5 s), while the load lasts 10 game minutes (10 s at speed 1, longer at the slower paces): for most of it the loader works at a shut door. Add `wash` to both dishwashers' `uses` (or key the dishes station), drop the `hold` or make it the use's length, and give clearing away at a dishwasher its own sound (or none).
-- **Status:** open
+- **Status:** fixed (2dcc4ea0)
+- **After:** both dishwashers open for `wash` too and hold their door open for the whole use: clearing a plate and the pot away at one opens it (`fixes/motions/recipes/meal-fridge-stoveGas.json`: `door_open` 100.6–105.4 s and 115.4–120.6 s, `-15.png`, `-17.png`), and "Load the dishwasher" keeps it open its 10 minutes (`fixes/motions/g16/play-g16.jsonl`: open from +1.4 s to +10.1 s). The snapshot gives the dishes station's kind, so clearing away at a dishwasher is silent (`audio/world.ts`), a sink's still the washing-up water.
 - **Source:** wave: kitchen (`scratch/scene.mjs` recipe scene, `check.mjs play`)
 
 ### A-kitchen-02 — moved to systems.md
@@ -389,7 +390,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** motion
 - **Where:** `web/public/assets/packs/kitchen/manifest.json:140` (`counterSinkDouble` motions: `wash → water_on`, one clip that grows both streams)
 - **Evidence:** `kitchen/play/c2/counterSinkDouble-wash-01.png`, `kitchen/clips/clips-counterSinkDouble-all-t99.png`: one resident at the left bowl, water running from both bridge taps. The sink has two slots; the motions support a clip per slot (`slot`, as the bunk bed's duvets), so each tap could run for the person at its bowl.
-- **Status:** open
+- **Status:** fixed (d2c9f0de)
+- **After:** each bowl's stream is its own clip (`water_on_0` at -x, `water_on_1` at +x), played for the resident in that slot: one resident washing runs only their tap (`fixes/motions/g1718/play-stage.jsonl`: `water_on_0` alone for wash and washUp; `stage-counterSinkDouble-wash-*.png`).
 - **Source:** wave: kitchen
 
 ### I-kitchen-03 — moved to residents.md

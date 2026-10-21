@@ -16,7 +16,7 @@ x ±0.5 in the middle, facing the top), with their legroom open right through un
 | `espressoBar` | the coffee from the left group's spout (grown down, 0.4 s) and the steam wand on its ball joint (swung out 40°, 0.6 s): `brew`, `hold` 4 s | `espresso`, `latteArt` |
 | `cookbookLectern` | the right-hand page, origin on the spine and tilted onto the desk (`rotation_mode` YXZ): `page` turns it 172° about the spine (0.9 s), until the read ends | `studyRecipes`, `foodMagazines` |
 | `pizzaOven` | the iron grille door and the peel with a pizza: `door_off` (1.4 s) lifts the door off the mouth and sets it on the ground before the left pillar, then carries the peel from the counter round in front of the oven and in through the mouth | `bakePizza` |
-| `pizzaOven` | flat flames in the mouth behind the grille, built full height and flattened onto the sill: `flames` grows them (0.8 s) | `warmUp`, `bakePizza` |
+| `pizzaOven` | flat flames in the mouth behind the grille, built full height and flattened onto the sill: `flames` grows them (0.8 s) | `warmUp`, `bakePizza` (and any `bake` step) |
 | `chefsIsland` | the middle drawer on the cook's side: `drawer_open` pulls it out 12 cm (0.6 s), `hold` 2.5 s | `tastingMenu` |
 
 The espresso's clip keys two parts; the pizza oven's `door_off` keys two parts with their own timing (`_clip`

@@ -2368,7 +2368,9 @@
     "stir",
     "flip",
     "serve",
-    "cuddle"
+    "cuddle",
+    "bake",
+    "mix"
   ],
   "objects": [
     {
@@ -4283,6 +4285,10 @@
           ],
           "minutes": 20,
           "anim": "stir",
+          "animAt": {
+            "oven": "bake",
+            "microwave": "bake"
+          },
           "optional": true
         }
       ]
@@ -4532,7 +4538,7 @@
             "oven"
           ],
           "minutes": 25,
-          "anim": "stir"
+          "anim": "bake"
         }
       ]
     },
@@ -4572,7 +4578,7 @@
             "prep"
           ],
           "minutes": 15,
-          "anim": "chop",
+          "anim": "mix",
           "optional": true,
           "holds": "prepBowl"
         },
@@ -4582,7 +4588,7 @@
             "oven"
           ],
           "minutes": 35,
-          "anim": "stir"
+          "anim": "bake"
         }
       ]
     },
@@ -4616,12 +4622,12 @@
           "holds": "ingredients"
         },
         {
-          "label": "Roll the pastry",
+          "label": "Make the pastry",
           "at": [
             "prep"
           ],
           "minutes": 15,
-          "anim": "chop",
+          "anim": "mix",
           "optional": true,
           "holds": "prepBowl"
         },
@@ -4631,7 +4637,7 @@
             "oven"
           ],
           "minutes": 30,
-          "anim": "stir"
+          "anim": "bake"
         }
       ]
     },

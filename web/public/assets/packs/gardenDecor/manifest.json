@@ -85,6 +85,9 @@
           "finish": "material.finish.gloss"
         }
       },
+      "motions": {
+        "idle": "flow"
+      },
       "paint": [
         {
           "material": "stone",

@@ -147,6 +147,8 @@ export interface RecipeStep {
   at: string[];
   minutes: number;
   anim?: string;
+  /** Another `anim` at some of its stations (`{oven: 'bake'}`), for a station object whose first kind in `at` it is. */
+  animAt?: Record<string, string>;
   /** Done without when the home has no such station. */
   optional?: boolean;
   /** What the cook carries away from it (an item id). */

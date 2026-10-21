@@ -10,7 +10,7 @@ settee's seat cushions at 0.45 at x = ±0.5, its sleepers on the default 0.5 bed
 
 | Model | Moving part and clip | Played by |
 |---|---|---|
-| `neighbourlyOven` | the range's oven door, hinged on its foot: `oven_open` drops it 85° forward (0.8 s) | `familyPie`, `treatsToShare` |
+| `neighbourlyOven` | the range's oven door, hinged on its foot: `oven_open` drops it 85° forward (0.8 s), shut again after 3 s (`hold`; 2026-10-21) | the `bake` step of `familyPie` and `treatsToShare` (by its tag, so the mixing at its worktop leaves the oven shut) |
 | `givingJar` | a coin standing in the cork lid's slot: `coin` drops it 10 cm through into the jar (0.6 s) | `donate` |
 | `knittingRocker` | the whole chair with its cushion and throw, turning about its rockers' centre (so they roll on the floor): `rock` rocks it ±5° (1.6 s, a loop); `ride` carries the knitter | `knitGift`, `rock` (loop) |
 | `welcomeTeaTable` | the teapot, hinged on its foot under the spout: `pour` tips it 30° (0.8 s), `hold` 1.5 s | `shareTea` |

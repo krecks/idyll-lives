@@ -127,10 +127,22 @@ pub struct RecipeStep {
     pub mask: StationMask,
     pub minutes: f32,
     pub anim: Option<usize>,
+    /// The animation at some of its stations instead (content `animAt`: a meal's Cook step put in the
+    /// oven or the microwave, not stirred), by station index.
+    pub anim_at: Vec<(u8, Option<usize>)>,
     /// Done without when the home has none of its stations (the dish turns out plainer).
     pub optional: bool,
     /// What the cook carries away from it (an item).
     pub holds: Option<usize>,
+}
+
+impl RecipeStep {
+    /// The animation at a station object that is stations `mask`: `animAt`'s for the first of the
+    /// step's stations (`at`, in order) it is (a cooker is a stove before an oven), else the step's own.
+    pub fn anim_for(&self, mask: StationMask) -> Option<usize> {
+        let at = self.at.iter().find(|&&i| mask & (1 << i) != 0);
+        at.and_then(|i| self.anim_at.iter().find(|(s, _)| s == i)).map_or(self.anim, |&(_, a)| a)
+    }
 }
 
 /// Something to cook (content `recipes`); interactions start it with `recipe`.
@@ -268,6 +280,8 @@ pub(crate) struct StepRaw {
     minutes: f32,
     #[serde(default)]
     anim: Option<String>,
+    #[serde(default)]
+    anim_at: HashMap<String, String>,
     #[serde(default)]
     optional: bool,
     #[serde(default)]
@@ -422,12 +436,22 @@ pub(crate) fn parse(
                     .ok_or_else(|| Error::new(format!("{sctx}: unknown station '{name}'")))?;
                 at.push(i as u8);
             }
+            let mut anim_at = Vec::with_capacity(s.anim_at.len());
+            for (name, a) in &s.anim_at {
+                let i = stations
+                    .iter()
+                    .position(|x| x == name)
+                    .filter(|&i| at.contains(&(i as u8)))
+                    .ok_or_else(|| Error::new(format!("{sctx}: animAt names '{name}', not one of its stations")))?;
+                anim_at.push((i as u8, anim(&Some(a.clone()), "cook", &sctx)?));
+            }
             steps.push(RecipeStep {
                 label: s.label.clone().unwrap_or_else(|| capitalised(&s.at[0])),
                 mask: at.iter().fold(0, |m, &i| m | 1 << i),
                 at,
                 minutes: s.minutes,
                 anim: anim(&s.anim, "cook", &sctx)?,
+                anim_at,
                 optional: s.optional,
                 holds: s.holds.as_deref().map(|h| item(h, &sctx)).transpose()?,
             });

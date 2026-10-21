@@ -285,7 +285,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** motion
 - **Where:** `tools/art/blender/families/garden_decor.py:77-92` (`fountain`: a still jet and drop, no clip; `no `motions` in its `G.Model`, `:163-175`); `web/src/audio/world.ts:34` (`ACTION_SOUNDS`: nothing for `listen` or the fountain)
 - **Evidence:** `sheets/obj-garden.fountain.png`: the jet is a static blue rod with a drop on it, the basins flat; "Listen to the water" (20 minutes) plays to silence. The pond has its ripple (`idle`) and the parasol its stir; a fountain's moving water is what makes it one. An ambient clip (water rings in the basins, a pulsing jet) and a water sound. The sound part widens I-bathroom-04 (systems ledger).
-- **Status:** open
+- **Status:** fixed (abfc32d9), the water; the sound is G-53's
+- **After:** `flow` (ambient, `idle`): the jet bubbles up and falls back and a ring swells out on each basin's water and settles, 1.2 s a round, all the time near the camera (`fixes/motions/g1718/views/fountain-t0.6.png`, `clips-garden.fountain-all-t*.png`). It still plays to silence (G-53).
 - **Source:** outdoor wave
 
 ### I-outdoor-01 — Warming up by the fire pit is sitting on its rim, back to the flames

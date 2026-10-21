@@ -102,8 +102,8 @@ their backs on the wall face (game depth -0.43).
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `laundryWasher` Washing machine | 1x1 · floor | laundry:clean | bathroom / laundry | Body, Door, Panel | Use | `door_open`: the round door swings 110° for laundry, `hold` 2.5 s (loading), then shuts. L `drum_spin` (E1). |
-| `laundryDryer` Tumble dryer | 1x1 · floor | laundry:clean | bathroom / laundry | Body, Door, Panel | Use | `door_open`, as the washer. L `drum_spin` (E1). |
+| `laundryWasher` Washing machine | 1x1 · floor | laundry:clean | bathroom / laundry | Body, Door, Panel | Use + repeat | `door_open`: the round door swings 110° for laundry, `hold` 2.5 s (loading), then shuts; `drum_spin`: once it has shut (`delay` 3.5 s) the drum turns, a turn each 1.2 s, till the wash ends. |
+| `laundryDryer` Tumble dryer | 1x1 · floor | laundry:clean | bathroom / laundry | Body, Door, Panel | Use | `door_open`, as the washer, to take the washing out to fold; the drum stays still. |
 | `towelRail` Towel rail | 1x1 · wall | — | bathroom / laundry | Rail, Towels, Hand towel | Static | Static. |
 | `towelLadder` Towel ladder | 1x1 · floor | — | bathroom / laundry | Ladder, Top towel, Middle towel, Bottom towel | Static | Static. |
 | `laundryBasket` Laundry basket | 1x1 · floor | — | bathroom / laundry | Basket, Rim & weave | Static | Static: a wicker basket with clean washing on top; no lid is built (`open.md`). |
@@ -113,6 +113,8 @@ their backs on the wall face (game depth -0.43).
 - The washing machine ("Do the laundry") and tumble dryer ("Fold the laundry") against the walls in all four
   facings: the door swings open, holds 2.5 s and shuts; the drum turns (`drum_spin`) for the whole use and stops
   after it.
+- Since 2026-10-21 (review A-bathroom-03) the washer's drum waits for its door to shut (it turned behind the open
+  door), and the dryer's doesn't tumble while the washing is folded.
 - The towel rail hangs on the walls, the towel ladder leans on them; the basket and bath mat stand free.
 - The towel ladder's colours are Top towel, Middle towel and Bottom towel, listed top to bottom (manifest labels).
 

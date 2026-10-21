@@ -22,7 +22,7 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `bed` King-size bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`: the top third of the duvet folds back toward the foot as they get in (sleep, nap) and back up when they get up, under the game's blanket. Renamed from "Double bed": 1.90 m wide with a 1.72 m mattress, a king (reference kind `bedKing`, Q-08). |
+| `bed` King-size bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`: the top third of the duvet folds back toward the foot as they get in (sleep, nap) and back up when they get up, under the game's blanket; half way it is gathered low, as cloth rolls, not a board standing up (2026-10-21). Renamed from "Double bed": 1.90 m wide with a 1.72 m mattress, a king (reference kind `bedKing`, Q-08). |
 | `bedSingle` Single bed | 1x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`. |
 | `bedBunk` Bunk bed | 1x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down` on the lower bunk, `turn_down_upper` on the upper, each for its own sleeper (`slot`); the ladder is static. The upper bunk is not an elder's (`upperStages`: with the lower bunk taken, an elder is refused, "too old for the top bunk"). |
 | `bedFuton` King futon | 2x2 · floor | sleep:sleep nap:nap unfold:fetch foldAway:fetch relax:relax | bedroom / beds | Frame, Headboard, Bedding | Held open | `unfold`: the back folds flat into a bed while slept in (C1: `leaves: open` on sleep, nap and Unfold, as the wall bed); Fold away closes it. Folded, a sofa: Sit and relax on its front edge (`when: closed`, content `seat` 0.40 m, forward 0.68). Renamed from "Futon bed": a king-size futon, 1.96 m wide (kind `bedLow`, now to 1.95 m, Q-08). |
@@ -34,7 +34,8 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 
 **In play** (signed off 2026-10-16):
 - Each bed napped in, standing free in all four facings (`nap` plays the same clips as the 480-minute sleep). The
-  duvet turns down as the sleeper gets in and back up as they get up. With two sleepers (double, king, oak double,
+  duvet turns down as the sleeper gets in and back up as they get up (since 2026-10-21, review A-bedroom-01, rolling
+  over low half way, `fixes/motions/g1718/clips-bed*-all-t0.5.png`, not standing up as a board). With two sleepers (double, king, oak double,
   upholstered queen, four-poster) both quilts cover the turned-down duvet and nothing pokes through.
 - The bunk turns down the lower duvet for slot 0 and the upper for slot 1, each shutting when its sleeper gets up.
   The futon's back folds flat for a nap or a night and the last one up folds it away (as the wall bed); Unfold leaves

@@ -106,7 +106,7 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 | `tvWall` Flat-screen TV | 2x1 · wall | watch:watch | living / media | Body, Trim | Static | Static: a thin panel on a bracket, a soundbar under it, on the wall face; the screen flickers while watched. 1 draw. Provides `screen`. |
 | `tvRetro` Console TV | 1x1 · floor | watch:watch | living / media | Body, Trim | Use | `antenna`: the rabbit-ear antennae turn 20° and stretch 1.6× up for watch; the tube flickers while watched. Provides `screen`. Renamed from "Portable TV": a wooden console set on legs. |
 | `homeCinema` Home cinema | 2x1 · floor | watch:watch film:watch | living / media | Body, Trim | Use | `screen_down`: the projector screen unrolls from its case on the wall for watch and film, and rolls up at the end; a short-throw projector on the unit; the screen flickers while down and watched. Provides `screen`. |
-| `stereo` Stereo system | 1x1 · floor | listen:listen dance:dance | living / media | Body, Trim | Use | `tray`: the tray of the CD player under the amplifier slides out and back (`hold` 1.2 s) for listen and dance; the woofers `pulse` (E1 loop). 4 draws (the loop's part). Listened to from a seat within 4 m (`seatNear`), else standing; dance stands. |
+| `stereo` Stereo system | 1x1 · floor | listen:listen dance:dance | living / media | Body, Trim | Loop + repeating | `record`: the record turns on the turntable, 33 rpm, for listen and dance (a loop; the label's stripe shows the turn); the woofers `pulse` (`every` 0.45 s). The CD tray no longer moves (2026-10-21: it slid out for the music the description says is a record). 4 draws. Listened to from a seat within 4 m (`seatNear`), else standing; dance stands. |
 | `boombox` Boombox | 1x1 · floor | listen:listen | living / media | Body, Trim | Use | `cassette`: the cassette door tips 32° open from its foot for listen and shuts; `hold` 1.2 s. Listened to from a seat within 4 m (`seatNear`), else standing. |
 | `tvStandLow` Low TV bench | 2x1 · floor | watch:watch | living / media | Bench, TV | Use | `tv_up`: the TV rises 60 cm out of a lift hood at the bench's back for watch (0.8 m high at rest, its lid closing the hood), and sinks back at the end; it flickers while up and watched. Provides `screen`. |
 | `fireplaceElectric` Electric fireplace | 2x1 · floor | relax:relax | living / media | Surround, Firebox | Use | `flames`: five tongues grow from the log bed for relax (gloss, not emissive; the light is the content's); the embers glow at night, the flames while lit. A floor cushion in front, and `characters/furniture.json` `seats` sits the resident on it facing the fire. |
@@ -114,6 +114,8 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 **In play** (signed off 2026-10-16):
 - Against the north, west and east walls and free at 180° (the wall TV on window-free walls): watched, listened to,
   danced to and warmed up at. Every clip plays for its use and shuts after.
+- Since 2026-10-21 (review I-living-08) the stereo's record turns while the music plays, where the CD tray slid
+  out (`fixes/motions/g1718/views/stereo-t0.5.png`).
 - Screens glow while on, brighter at night (the TV and wall TV while watched, the home cinema's screen while down,
   the bench TV while up), and the fire lights the room.
 - *Watch TV* sits the resident on a free sofa or armchair within 4 m when there is one (`seatNear`), facing the way

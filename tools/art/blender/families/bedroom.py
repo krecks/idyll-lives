@@ -125,6 +125,12 @@ def _turn_down(flap, clip, half, tiles):
     narrow = min(1.0, (QUILT_EDGE[tiles] - 0.08) / (half + 0.016))
     G.swing(flap, clip, 180, seconds=SECONDS, axis='X')
     G.squash(flap, clip, (narrow, 1, FOLDED), seconds=SECONDS)
+    G.squash(flap, clip, (1, ROLL, 1), seconds=SECONDS, back=True)
+
+
+# Half way over, the flap is gathered to this much of its length along the bed (it springs out again as it lies
+# down), so a duvet turned back rolls over its fold as cloth does, a low bulge, never a board standing up.
+ROLL = 0.2
 
 
 def _finish(name, flap_args, tiles=2):

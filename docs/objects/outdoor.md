@@ -154,7 +154,7 @@ These six have no group code of their own.
 |---|---|---|---|---|---|---|
 | `garden.gnome` Garden gnome | 1x1 · floor | pat:tend | outdoor / decor | Hat, Tunic, Belt | Static | Static: a gnome with a red hat, white beard and a tunic bell. |
 | `garden.birdbath` Bird bath | 1x1 · floor | birdwatch:look | outdoor / decor | Bowl & column, Plinth | Static | Static: plinth, tapering column and a shallow bowl of water, a small bird on the rim. Birds watched from a seat within 6 m (`seatNear`), else standing. |
-| `garden.fountain` Stone fountain | 1x1 · floor | wish:look listen:relax | outdoor / decor | Fountain, Plinth | Static | Static: a two-tier fountain, its water opaque and still. |
+| `garden.fountain` Stone fountain | 1x1 · floor | wish:look listen:relax | outdoor / decor | Fountain, Plinth | Ambient | `flow`: the water moves all the time near the camera (`idle`, not on Low): the jet bubbles up and falls back and a ring swells out on each basin, 1.2 s a round (2026-10-21; it was still). Its sound is G-53's. |
 | `garden.lantern` Stone lantern | 1x1 · floor | — | outdoor / lights | Lantern, Base | Static | Static: a Japanese stone lantern; its fire box is lit at night (the content's `light`). |
 | `garden.wheelbarrow` Wheelbarrow planter | 1x1 · floor | water:water smell:smell | outdoor / decor | Tray, Handles, Legs & tyre | Static | Static: a green wheelbarrow full of flowers and leaves. |
 | `garden.boulder` Garden boulders | 1x1 · floor | — | outdoor / decor | Large boulder, Middle boulder, Small boulder | Static | Static: three weathered stones, moss on top and tufts round the base. |
@@ -162,6 +162,8 @@ These six have no group code of their own.
 **In play** (signed off 2026-10-17):
 - Checked in the north yard in four facings with their uses: pat the gnome, watch the birds, listen to the water and
   make a wish, water and smell the planter. The lantern and boulders are still; nothing floats or sinks.
+- Since 2026-10-21 (review A-outdoor-03) the fountain's water moves (`flow`, ambient:
+  `fixes/motions/g1718/views/fountain-t0.6.png`); it still makes no sound (G-53).
 - Colours checked by day in two facings with test colours far from the defaults, at night on WebGPU and on Low
   WebGL2, and in the colour studio. Every colour lands on the part its label names.
 - The gnome's Tunic takes in its sleeves; its boots sit wholly inside the tunic bell, so only the belt is named.

@@ -369,8 +369,6 @@ def powerBlender():
         for dx in (-0.04, 0.0, 0.04):
             F.cyl(_name('dial'), 0.008, 0.008, (jx + dx, TOP + 0.025, jz + 0.082), M.chrome, rot=(90, 0, 0), verts=8)
         F.cyl('jug_seat', 0.07, 0.02, (jx, TOP + 0.11, jz), M.dark, verts=20)
-        G.revolve('smoothie', [(0, 0), (0.055, 0), (0.066, 0.16), (0, 0.16)], at=F.at(jx, TOP + 0.13, jz),
-                  material=M.smoothie, segments=18)
         G.revolve('jug', [(0, 0), (0.06, 0), (0.075, 0.03), (0.075, 0.22), (0.068, 0.25), (0.064, 0.25),
                           (0.068, 0.22), (0.068, 0.034), (0.054, 0.006), (0, 0.006)], at=F.at(jx, TOP + 0.12, jz),
                   material=M.jar, segments=20)
@@ -399,8 +397,21 @@ def powerBlender():
         F.cyl('lid', 0.07, 0.025, (jx, TOP + 0.38, jz), M.dark, verts=20, bevel=0.006)
         F.cyl('lid_cap', 0.025, 0.03, (jx, TOP + 0.405, jz), M.dark, verts=12, bevel=0.005)
     lid = G.hinged(G.join(lid, 'lid'), F.at(jx, TOP + 0.37, jz))
+    # The green smoothie in the glass jug, with streaks of fruit through it and bits at the top, so its swirl shows:
+    # `blades` turns it once the lid is back on (the blades themselves would be hidden in it).
+    with G.new_parts() as swirl:
+        G.revolve('smoothie', [(0, 0), (0.055, 0), (0.066, 0.16), (0, 0.16)], at=F.at(jx, TOP + 0.13, jz),
+                  material=M.smoothie, segments=18)
+        for k, (a, m) in enumerate(((20, M.orange), (150, M.apple), (260, M.lime))):
+            r = 0.058
+            F.box(_name('streak'), 0.016, 0.12, 0.006, (jx + r * G.cosd(a), TOP + 0.21, jz + r * G.sind(a)), m,
+                  rot=(0, -a + 90, 0))
+            F.sphere(_name('bit'), 0.014, (jx + 0.035 * G.cosd(a + 60), TOP + 0.29, jz + 0.035 * G.sind(a + 60)), m,
+                     segments=8, rings=6)
+    swirl = G.join(swirl, 'smoothie', origin=F.at(jx, TOP + 0.13, jz))
     objs = G.settle(centre=False)
     G.slide(lid, 'lid', (0, 0, 0.09), seconds=0.5)
+    G.spin(swirl, 'blades', turns=1, seconds=1.0)
     return objs
 
 
@@ -527,7 +538,10 @@ FAMILY = G.Family(
              centre=(0, 0.013), motions={'uses': {'shoot': {'clip': 'swish', 'delay': 1.4, 'every': 3.2}}},
              paint=[('hoop_pole', 'Frame'), ('pad_red', 'Pads'), ('hoop_base', 'Base')]),
      G.Model('powerBlender', powerBlender, size=(0.82, 1.32, 0.63), key='model.energetic.powerBlender',
-             centre=(0, -0.115), motions={'uses': {'blend': 'lid'}, 'hold': 1.0},
+             # the lid comes off for the fruit and goes back on (`hold`), then it blends: the smoothie swirls, a
+             # turn each second (`every` a hair under it) from the lid's back on till the use ends
+             centre=(0, -0.115),
+             motions={'uses': {'blend': ['lid', {'clip': 'blades', 'delay': 1.5, 'every': 0.9}]}, 'hold': 1.0},
              paint=[('blend_cab', 'Frame'), ('blend_door', 'Doors'), ('motor', 'Blender')]),
      G.Model('contrastShower', contrastShower, size=(0.9, 2.15, 0.9), key='model.energetic.contrastShower',
              centre=(0, 0.02), motions={'uses': {'rinse': 'water_on'}},

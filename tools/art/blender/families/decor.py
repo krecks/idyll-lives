@@ -6,7 +6,8 @@
 # Built where the game places them (`F`, game axes): the wall things at their real height with their back
 # on the wall face (`floor=False`), the hanging plant from the ceiling. What moves:
 #   - the clocks' hour and minute hands tell the game's time (`hour_hand`, `minute_hand`, `motions.clock`); the
-#     grandfather clock's trunk door and pendulum are still, so the hands keep it within 4 draw calls;
+#     grandfather clock's pendulum swings all the time (`pendulum`, `idle`): its case is plain satin, not wood, so
+#     it keeps 4 draw calls, and its trunk door stays still (it is wound at the dial);
 #   - the hanging plant sways when watered (`sway`);
 #   - the fireplace's flames grow on the logs while a resident warms up (`flames`);
 #   - the curtains are drawn closed at night (`close`), on cloth tabs over the rail.
@@ -59,8 +60,8 @@ M = G.Palette(
     clock_case=('#C3C7CB', 'metal'),
     face=('#FBFAF6', 'satin'),
     second=('#D9483B', 'satin'),
-    walnut=('#6B4630', 'wood'),
-    walnut_dark=('#4E3222', 'wood'),
+    walnut=('#6B4630', 'satin'),     # the grandfather clock's polished case (plain: its pendulum takes the 4th draw)
+    walnut_dark=('#4E3222', 'satin'),
     dial=('#F4EBD8', 'gloss'),
     brass=('#B8925A', 'metal'),
     hollow=('#2A1C14', 'matte'),     # the clock's trunk behind the pendulum
@@ -372,7 +373,7 @@ DIAL_Y = 1.77
 
 
 def grandfatherClock():
-    """A walnut longcase clock: a plinth, a trunk with a door (open to wind it), a pendulum behind it, and a
+    """A walnut longcase clock: a plinth, a trunk with a glazed door, a pendulum swinging behind it, and a
     hood with a cream dial and brass finials."""
     F = G.GameFrame()
     with G.new_parts() as still:
@@ -400,11 +401,7 @@ def grandfatherClock():
             F.box(f'numeral{k}', 0.01, 0.028, 0.002, (math.sin(a) * 0.13, DIAL_Y + math.cos(a) * 0.13, dz + 0.007),
                   M.ink, rot=(0, -k * 30, 0))
         _disc(F, 'arbor', 0, DIAL_Y, dz + 0.014, 0.012, M.brass, t=0.006, verts=10)
-        # The pendulum (a brass rod and bob, hung from just under the hood, in front of the dark hollow) and
-        # the trunk door (a walnut frame round an open window) are still: the hands take their draws.
-        pz = TRUNK_FRONT + 0.008
-        F.box('pendulum_rod', 0.012, 0.58, 0.006, (0, 1.12, pz), M.brass)
-        _disc(F, 'pendulum_bob', 0, 0.8, pz - 0.004, 0.065, M.brass, t=0.012, verts=24)
+        # The trunk door (a walnut frame round an open window) is still: the pendulum and the hands take the draws.
         door_z = TRUNK_FRONT + 0.026
         for s in (-1, 1):
             F.box(f'door_rail{s}', 0.36, 0.06, 0.02, (0, 1.0 + s * 0.41, door_z), M.walnut, bevel=0.005)
@@ -412,8 +409,16 @@ def grandfatherClock():
         F.box('door_knob', 0.016, 0.03, 0.016, (0.15, 1.0, door_z + 0.016), M.brass, bevel=0.005)
     G.join(still, 'body', origin=(0, 0, 0))
     hands = _clock_hands(F, DIAL_Y, dz, ('hour', 0.07, 0.012, 0.008, 0.0), ('minute', 0.11, 0.008, 0.010, 0.0))
+    # The pendulum: a brass rod and bob hung from just under the hood, in front of the dark hollow, seen through the
+    # door's window; it swings ±4° about its top (`pendulum`, ambient), a beat each 0.8 s, as a pendulum this long does.
+    pz = TRUNK_FRONT + 0.008
+    with G.new_parts() as pendulum:
+        F.box('pendulum_rod', 0.012, 0.58, 0.006, (0, 1.12, pz), M.brass)
+        _disc(F, 'pendulum_bob', 0, 0.8, pz - 0.004, 0.065, M.brass, t=0.012, verts=24)
+    pendulum = G.hinged(G.join(pendulum, 'pendulum'), F.at(0, 1.41, pz))
     G.settle(centre=False)
     _clock_clips(*hands)
+    G.rock(pendulum, 'pendulum', 4, seconds=1.6, axis='Y')
     return G.meshes()
 
 
@@ -871,7 +876,7 @@ FAMILY = G.Family(
              centre=(0, -0.31), floor=False, paint=[('oak', 'Shelves')]),
      # D2. Ornaments
      G.Model('grandfatherClock', grandfatherClock, size=(0.6, 2.116, 0.4), key='model.grandfatherClock',
-             centre=(0, -0.23), motions=CLOCK,
+             centre=(0, -0.23), motions={**CLOCK, 'idle': 'pendulum'},
              paint=[('walnut', 'Case'), ('dial', 'Face')]),
      G.Model('vaseTall', vaseTall, size=(0.329, 1.27, 0.224), key='model.vaseTall', paint=[('ceramic', 'Body')]),
      G.Model('urnPorcelain', urnPorcelain, size=(0.36, 0.62, 0.363), key='model.urnPorcelain',

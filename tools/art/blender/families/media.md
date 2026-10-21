@@ -18,7 +18,7 @@ the old parts did and as housegen expects (`"opposite": "sofa"`).
 | `tvRetro` | the rabbit ears, origin at their foot: `antenna` turns them 20° and stretches them 1.6× up (0.9 s), telescoping | `watch` (until it ends) |
 | `tvStandLow` | the TV with the lift's lid on its top edge, down in the bench at rest: `tv_up` lifts it 60 cm (1.6 s) | `watch` (sinks back at the end) |
 | `homeCinema` | the projector screen, its origin in the case on the wall, flattened into it at rest: `screen_down` unrolls it (1.4 s) | `watch`, `film` |
-| `stereo` | the CD tray with a disc: `tray` slides it 11 cm out (0.6 s), `hold` 1.2 s; the two woofer cones: `pulse` swells them forward and back (0.5 s, `squash(back=True)`) | `listen`, `dance` (`uses` and `loops`) |
+| `stereo` | the record on the turntable (platter, vinyl, label with a stripe): `record` turns it once in 1.8 s, 33 rpm (a loop; 2026-10-21, for the CD tray, which no longer moves); the two woofer cones: `pulse` swells them forward and back (0.5 s, `squash(back=True)`, `every` 0.45 s) | `listen`, `dance` |
 | `boombox` | the cassette door, hinged at its foot: `cassette` tips it 32° open (0.5 s), `hold` 1.2 s | `listen` |
 | `fireplaceElectric` | the flames (five tongues and their cores), origin inside the log bed, flattened into it at rest: `flames` grows them (0.8 s) | `relax` |
 
@@ -32,7 +32,7 @@ night each for a few pixels).
 - The TV, the portable TV, the bench, the home cinema and the fireplace: one textured `wood` group (the unit, the
   cabinet, the oak top, the mantel) plus the plain group, plus the moving part. The portable TV's speaker grille is
   wooden slats over plain cloth (a `fabric` grille would have been a fourth).
-- The stereo: wood and plain, the tray and the pulsing cones: 4. The fourth is the E1 loop the plan asks for;
+- The stereo: wood and plain, the turning record and the pulsing cones: 4. The fourth is the E1 loop the plan asks for;
   `check-glb` warns "4 draw calls, aim for 3 at most".
 
 **The bench's TV lift.** A 0.7 m TV can't hide in a 0.49 m bench, so the lift sits in a hood at the bench's back, as
