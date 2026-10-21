@@ -8,8 +8,23 @@ from it, so the two say the same.
 ## How to use this
 
 - `cargo review sizes` reads `reference.json`, finds each object's kind and compares the built W × H × D (from the
-  `cargo check-glb` summary) and the functional heights with the ranges here. It prints the outliers as a table:
-  the first pass of M1, M2 and M11.
+  `cargo check-glb` summary) and the functional heights with the ranges here. It prints the outliers as a table,
+  each value to the millimetre: the first pass of M1, M2 and M11. What it measures:
+  - **Seat, top, mattress:** the model's face looking up nearest the height the game uses (content `seat` and
+    `surface`, furniture.json `seats` and `beds`). A bed's mattress is measured at slot 0 only (a crib's slot 1 is
+    its changing table).
+  - **A top the content hasn't:** for a kind with a `surface` range, the model's top all the same: on nine vertical
+    lines (the middle of the model seen from above, and a quarter of its width and depth round it), leaving out
+    those within 0.3 m of a seat's hips, the face looking up nearest the range on each; of those, the highest
+    that doesn't stand on what another line found (a vase or a tool on the top stands on it; a basin's floor is
+    lower than the worktop round it). It counts as the top within 20 % of the range's ends; past that the table
+    says "no top to measure" and names the nearest face.
+  - **H (table):** for a kind with a `surface` and no `seat` range (a table or a desk alone) whose object is sat at
+    and whose model carries the seats (the base `diningTable`'s two chairs), H leaves out what rises beside the top
+    higher than it: the faces no more than 2 cm over the top or over the top's own extent (what stands on it, a vase
+    or a screen, stays). A set's kind (with a `seat` range: "with its chairs") keeps the whole model's H.
+  - **H (top step):** for a stair (content `stairs`), the highest tread along its middle, which is the storey it
+    climbs (`h` here), not the handrail over it; the table also gives the number of steps and the rise of each.
 - A kind is one real-world type, shared by every object of that type, so all the dining chairs are checked against
   one range and against each other.
 - **Overall sizes** (`w`, `h`, `d`) are real-world ranges. The tool adds the 10 % `tolerance` itself (owner
