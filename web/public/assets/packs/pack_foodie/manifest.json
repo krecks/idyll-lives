@@ -196,7 +196,8 @@
       "motions": {
         "uses": {
           "espresso": "brew",
-          "latteArt": "brew"
+          "latteArt": "brew",
+          "pour": "brew"
         },
         "hold": 4.0
       },

@@ -662,7 +662,7 @@ FAMILY = G.Family(
              motions={'uses': {'nibble': 'doors_open', 'cheeseBoard': 'doors_open'}, 'hold': 2.5},
              paint=[('cream', 'Body'), ('marble', 'Worktop'), ('honey', 'Shelves')]),
      G.Model('espressoBar', espressoBar, size=(0.76, 1.509, 0.514), key='model.foodie.espressoBar', centre=(0, -0.18),
-             motions={'uses': {'espresso': 'brew', 'latteArt': 'brew'}, 'hold': 4.0},
+             motions={'uses': {'espresso': 'brew', 'latteArt': 'brew', 'pour': 'brew'}, 'hold': 4.0},
              paint=[('teal', 'Body'), ('oak_top', 'Worktop'), ('machine', 'Machine')]),
      G.Model('cookbookLectern', cookbookLectern, size=(0.836, 1.147, 0.588), key='model.foodie.cookbookLectern',
              centre=(0.022, -0.123), motions={'uses': {'studyRecipes': 'page', 'foodMagazines': 'page'}},

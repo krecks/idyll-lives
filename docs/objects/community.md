@@ -92,11 +92,11 @@ rides.
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `iceCreamCart` Ice cream cart | 2x1 · floor | iceCream:eat | community / food | Body, Parasol, Bands | Use | `lid_open`: the freezer lid slides open for iceCream; `hold` 2 s. |
-| `hotDogStand` Hot dog stand | 2x1 · floor | hotDog:eat | community / food | Body, Awning | Use | `lid_open`: the hot-plate lid lifts for hotDog. |
-| `vendingSnack` Snack machine | 1x1 · floor | snack:eat | community / food | Body | Use | `drop`: a snack slides down to the tray for snack. |
+| `iceCreamCart` Ice cream cart | 2x1 · floor | iceCream:fetch | community / food | Body, Parasol, Bands | Use | `lid_open`: the freezer lid slides open for iceCream (*Take an ice cream from the freezer*); `hold` 2 s. Nobody sells: it is self-serve (G-67), fetched and paid for here, then eaten sitting on a bench or at a café table nearby (else standing). |
+| `hotDogStand` Hot dog stand | 2x1 · floor | hotDog:fetch | community / food | Body, Awning | Use | `lid_open`: the hot-plate lid lifts for hotDog (*Help yourself to a hot dog*). Nobody sells: it is self-serve (G-67), fetched and paid for here, then eaten sitting on a bench or at a café table nearby (else standing). |
+| `vendingSnack` Snack machine | 1x1 · floor | snack:fetch | community / food | Body | Use | `drop`: a snack slides down to the tray for snack, then eaten sitting on a bench or at a table nearby (G-67). |
 | `vendingDrink` Drinks machine | 1x1 · floor | drink:drink | community / food | Body | Use | `drop`: a can drops to the tray for drink. |
-| `marketStall` Market stall | 2x1 · floor | browse:look fruit:eat | community / food | Body, Awning | Static | Static. |
+| `marketStall` Market stall | 2x1 · floor | browse:look fruit:fetch | community / food | Body, Awning | Static | Static. *Pick a piece of fruit* (was "a bag of fruit"), paid into an honesty box. Nobody sells: it is self-serve (G-67), fetched and paid for here, then eaten sitting on a bench or at a café table nearby (else standing). |
 
 **In play** (signed off 2026-10-16):
 - Checked with the carts and market stall outdoors, the machines indoors: the ice cream cart's lid for an ice cream
@@ -110,11 +110,11 @@ rides.
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `shopCounter` Shop counter | 2x1 · floor | treat:idle | community / shops | Counter, Trim | Use | `till`: the cash drawer slides out for treat (`hold` 1.5 s). |
-| `bakeryCase` Bakery case | 2x1 · floor | pastry:eat | community / shops | Counter, Trim | Use | `door`: the back glass door slides aside for pastry (`hold` 2 s). |
-| `groceryShelf` Grocery shelves | 2x1 · floor | browse:look sandwich:eat | community / shops | Shelves, Trim | Static | Static. |
+| `shopCounter` Shop counter | 2x1 · floor | treat:idle | community / shops | Counter, Trim | Use | `till`: the cash drawer slides out for treat (`hold` 1.5 s): *Pick a little something and pay at the till*, a self-service till (G-67: nobody serves). |
+| `bakeryCase` Bakery case | 2x1 · floor | pastry:fetch takeCake:fetch | community / shops | Counter, Trim | Use | `door`: the back glass door slides aside for pastry (`hold` 2 s; the door is still the baker's side's). Provides `cake`: the café chair's slice of cake is taken from it first (`takeCake`, not chosen on its own). Nobody sells: it is self-serve (G-67), fetched and paid for here, then eaten sitting on a bench or at a café table nearby (else standing). |
+| `groceryShelf` Grocery shelves | 2x1 · floor | browse:look sandwich:fetch | community / shops | Shelves, Trim | Static | Static. Nobody sells: it is self-serve (G-67), fetched and paid for here, then eaten sitting on a bench or at a café table nearby (else standing). |
 | `cafeTable` Café table | 1x1 · floor | — | community / shops | Top, Frame | Static | Static. |
-| `cafeChair` Café chair | 1x1 · floor | sit:sit coffee:drink cake:eat | community / shops | Frame, Seat | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
+| `cafeChair` Café chair | 1x1 · floor | sit:sit coffee:drink cake:eat | community / shops | Frame, Seat | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. The coffee is poured at the lot's coffee machine first and the cake taken from its bakery case (content `fetch`, G-67); a cake needs a bakery case on the lot. |
 
 **In play** (signed off 2026-10-16):
 - Checked indoors: the till drawer (held 1.5 s) and the bakery case's back door (held 2 s) for their uses, the

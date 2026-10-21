@@ -341,7 +341,8 @@
       },
       "motions": {
         "uses": {
-          "espresso": "brew"
+          "espresso": "brew",
+          "pour": "brew"
         },
         "hold": 2.0
       },

@@ -1830,13 +1830,23 @@ pub(crate) fn settle(w: &mut World) {
 }
 
 /// Every `ROOM_REFRESH_TICKS`: food goes off, dirty things make their tile dirtier, and things
-/// whose place is gone (their table sold, their household moved away) go too.
+/// whose place is gone (their table sold, their household moved away) go too, as do those left
+/// off their household's plot (a plate at a café or in the park) once nobody eats from them.
 fn update(w: &mut World) {
     let content = &w.content;
     let rules = &content.cooking;
     let tick = w.tick;
     let mut changed = false;
     let minutes = crate::world::ROOM_REFRESH_TICKS as f32 * crate::MINUTES_PER_TICK;
+    // (Plates someone is eating from stay, wherever they are: a pastry at a café table.)
+    let eaten: Vec<u32> = w
+        .sims
+        .iter()
+        .filter_map(|s| match s.current.as_ref()?.task.kind {
+            TaskKind::Eat { plate, .. } => plate,
+            _ => None,
+        })
+        .collect();
     let mut keep = Vec::with_capacity(w.items.list.len());
     for mut it in std::mem::take(&mut w.items.list) {
         let household = w.households.get(it.household as usize);
@@ -1848,7 +1858,7 @@ fn update(w: &mut World) {
         };
         let lives_here = w.sims.iter().any(|s| s.here() && s.household == it.household);
         let on_home = home.is_some_and(|p| w.plots[p as usize].contains(x, w.stairs.ground_z(z)));
-        if !placed || !lives_here || !on_home {
+        if !placed || !lives_here || (!on_home && !eaten.contains(&it.id)) {
             changed = true;
             continue;
         }

@@ -213,7 +213,18 @@ fn residents_buy_a_snack_and_sit_on_a_bench_at_the_market() {
     assert_eq!(w.plot_at(at.x, at.z), Some(market));
     let funds = w.households[0].funds;
     w.apply(Command::Use { sim: 0, object: machine, interaction: interaction(&w, machine, "snack") }).unwrap();
-    minutes(&mut w, 40);
+    // Fetched from the machine, then eaten sitting down (a bench), not at the machine.
+    let mut seated = None;
+    for _ in 0..60 {
+        minutes(&mut w, 1);
+        if let Some(a) = w.sims[0].current()
+            && let (TaskKind::Eat { seat: Some(seat), .. }, Phase::Using { .. }) = (a.task.kind, &a.phase)
+        {
+            seated = Some(seat);
+        }
+    }
+    let seat = seated.expect("eaten sitting down");
+    assert_eq!(w.plot_at(w.objects[seat as usize].x, w.objects[seat as usize].z), Some(market), "at the market");
     assert!(w.sims[0].needs[hunger] > 0.4, "a snack from the machine: hunger {}", w.sims[0].needs[hunger]);
     assert_eq!(w.households[0].funds, funds - 4, "and it cost four dollars");
 
@@ -266,14 +277,67 @@ fn a_coffee_at_a_cafe_table() {
         .expect("café chairs")
         .id;
     let funds = w.households[0].funds;
+    let machine = object(&w, "coffeeMachine");
     w.apply(Command::Use { sim: 0, object: chair, interaction: interaction(&w, chair, "coffee") }).unwrap();
-    let mut sat = false;
-    for _ in 0..40 {
+    // Poured at the café's machine first, then had at the table.
+    let (mut poured, mut sat) = (None, None);
+    for m in 0..50 {
         minutes(&mut w, 1);
-        sat |= w.sims[0].current().is_some_and(|a| {
-            matches!((a.task.kind, &a.phase), (TaskKind::Use { object, .. }, Phase::Using { .. }) if object == chair)
-        });
+        if let Some(a) = w.sims[0].current()
+            && matches!(a.phase, Phase::Using { .. })
+            && let TaskKind::Use { object, interaction: i } = a.task.kind
+        {
+            if object == machine && w.content.objects[w.objects[machine as usize].def].interactions[i].id == "pour" {
+                poured.get_or_insert(m);
+            }
+            if object == chair {
+                sat.get_or_insert(m);
+            }
+        }
     }
-    assert!(sat, "Ada sat down at a café table");
+    let (poured, sat) = (poured.expect("the coffee poured at the machine"), sat.expect("Ada sat down at a café table"));
+    assert!(poured < sat, "poured first ({poured}), then sat ({sat})");
     assert_eq!(w.households[0].funds, funds - 4, "and paid for her coffee");
+}
+
+/// Cake and pastries at the café come from its case: the cake is taken to the table first, a
+/// pastry is eaten at a table, its plate there till it's eaten (the café's, off Ada's plot).
+#[test]
+fn cake_and_a_pastry_from_the_case_at_a_cafe_table() {
+    let (mut w, cafe) = town_beside("cafe");
+    w.autonomy = false;
+    let hunger = w.content.needs.iter().position(|n| n.id == "hunger").unwrap();
+    let case = object(&w, "bakeryCase");
+    let chair = w
+        .objects
+        .iter()
+        .find(|o| w.content.objects[o.def].id == "cafeChair" && w.plot_at(o.x, o.z) == Some(cafe))
+        .expect("café chairs")
+        .id;
+    let take = interaction(&w, case, "takeCake");
+    w.apply(Command::Use { sim: 0, object: chair, interaction: interaction(&w, chair, "cake") }).unwrap();
+    let (mut took, mut ate) = (false, false);
+    for _ in 0..50 {
+        minutes(&mut w, 1);
+        let at = w.sims[0].current().filter(|a| matches!(a.phase, Phase::Using { .. })).map(|a| a.task.kind);
+        took |= matches!(at, Some(TaskKind::Use { object, interaction }) if object == case && interaction == take);
+        ate |= took && matches!(at, Some(TaskKind::Use { object, .. }) if object == chair);
+    }
+    assert!(took && ate, "the cake taken from the case ({took}), then eaten at the table ({ate})");
+
+    w.sims[0].needs[hunger] = 0.2;
+    w.apply(Command::Use { sim: 0, object: case, interaction: interaction(&w, case, "pastry") }).unwrap();
+    let mut plate_kept = None;
+    for _ in 0..60 {
+        minutes(&mut w, 1);
+        if let Some(a) = w.sims[0].current()
+            && let (TaskKind::Eat { seat: Some(seat), plate: Some(p), .. }, Phase::Using { elapsed }) = (a.task.kind, &a.phase)
+        {
+            assert!(w.items.get(p).is_some(), "the plate stays on the table while it's eaten ({elapsed} minutes in)");
+            assert_eq!(w.plot_at(w.objects[seat as usize].x, w.objects[seat as usize].z), Some(cafe));
+            plate_kept = Some(*elapsed);
+        }
+    }
+    assert!(plate_kept.is_some_and(|e| e > 7.0), "eaten at a table to the end: {plate_kept:?}");
+    assert!(w.sims[0].needs[hunger] > 0.45, "hunger {}", w.sims[0].needs[hunger]);
 }

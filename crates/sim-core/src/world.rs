@@ -738,6 +738,10 @@ pub struct Sim {
     /// What they do next, before choosing anything else (an `after` routine, like washing
     /// hands after the toilet; see `follow_up`). Not saved: losing it on a reload is harmless.
     pub(crate) follow_up: Option<Task>,
+    /// The object they fetched what a use there needs for (`Interaction::fetch`: the coffee
+    /// poured at the machine for the table), so that use, the `follow_up`, goes ahead without
+    /// fetching it again. Any other task started clears it. Not saved.
+    pub(crate) fetched: Option<u32>,
     /// The last few things they chose for themselves but couldn't get to (a plate on a counter
     /// nobody can reach, a bed behind a wall, a house across a river), each with until when they
     /// don't choose it again: uses, eating, cleaning, repairs, washing up, visits, and people
@@ -868,6 +872,7 @@ impl Sim {
         self.current = None;
         self.queue.clear();
         self.follow_up = None;
+        self.fetched = None;
         self.engaged_with = None;
         self.heeding = None;
         self.transition = None;
@@ -1961,6 +1966,7 @@ impl World {
             join_spot: None,
             idle_ticks: 0,
             follow_up: None,
+            fetched: None,
             unreachable: [None; UNREACHABLE],
             social_waited: 0,
             called: false,
@@ -4441,6 +4447,8 @@ pub(crate) fn prefer_factor(prefer: Prefer, rel: &social::Relationship, chemistr
 fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut crate::items::Items) {
     let content = ctx.content;
     let nav = &ctx.nav;
+    // (Fetched for this use, if it's the one: see `Sim::fetched`.)
+    let fetched = sim.fetched.take();
     // Nothing their age isn't for, however it was chosen (`unfit`; an order was refused already).
     if let TaskKind::Use { object, interaction } = task.kind
         && let Some(o) = objects.get(object as usize)
@@ -4497,6 +4505,19 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             }
             if !obj.allows(inter, sim.id) {
                 return;
+            }
+            // What it needs fetched first (`Interaction::fetch`: a coffee poured at the machine):
+            // off to get it, then back to this (the follow-up); with no way to it, without.
+            if fetched != Some(object)
+                && let Some((from, k)) = fetch_source(sim, ctx, objects, object, inter)
+            {
+                start_task(sim, Task { kind: TaskKind::Use { object: from, interaction: k }, ..task }, ctx, objects, items);
+                sim.fetched = Some(object);
+                if sim.current.is_some() {
+                    sim.follow_up = Some(Task { routine: false, ..task });
+                    return;
+                }
+                return start_task(sim, task, ctx, objects, items);
             }
             if inter.seat_near > 0.0 {
                 reserved_seat = seat_near_object(sim, ctx, objects, object, inter);
@@ -4663,6 +4684,34 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
         phase: Phase::Routing { waypoints, next: 0 },
         tags,
     });
+}
+
+/// Where to fetch what `inter` at `object` needs first (`Interaction::fetch`): the interaction of
+/// that id on the working thing on `object`'s plot that provides it, the nearest to `object`
+/// that they may use now. None: nothing to fetch, or nowhere to fetch it from.
+fn fetch_source(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], object: u32, inter: &crate::content::Interaction) -> Option<(u32, usize)> {
+    let content = ctx.content;
+    let fetch = inter.fetch.as_deref()?;
+    let plot = ctx.object_plot.get(object as usize).copied().flatten()?;
+    let at = objects[object as usize].centre(content);
+    let mut best: Option<(f32, u32, usize)> = None;
+    for &o in ctx.index.on(plot) {
+        let obj = &objects[o as usize];
+        let def = &content.objects[obj.def];
+        if o == object || obj.broken() || def.provides & inter.requires != inter.requires {
+            continue;
+        }
+        let Some(k) = def.interactions.iter().position(|i| i.id == fetch) else { continue };
+        if !obj.can_use_for(sim.id, def, k) || !obj.allows(&def.interactions[k], sim.id) || unfit(content, sim.age, &def.interactions[k]).is_some() {
+            continue;
+        }
+        let c = obj.centre(content);
+        let d = (c[0] - at[0]).hypot(c[1] - at[1]);
+        if best.is_none_or(|b| d < b.0) {
+            best = Some((d, o, k));
+        }
+    }
+    best.map(|(_, o, k)| (o, k))
 }
 
 /// The nearest free seat within `inter`'s `seatNear` metres of `object`, one they may sit on

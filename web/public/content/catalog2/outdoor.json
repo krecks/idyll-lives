@@ -92,6 +92,7 @@
         {
           "id": "coffee",
           "requires": ["coffee"],
+          "fetch": "pour",
           "label": "Have a coffee",
           "anim": "drink",
           "minutes": 20,

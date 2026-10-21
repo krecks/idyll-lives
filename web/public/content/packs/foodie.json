@@ -96,6 +96,15 @@
           "effects": { "fun": 0.1, "energy": 0.04 },
           "tags": ["food", "training"],
           "skills": { "dexterity": 0.12, "cooking": 0.08 }
+        },
+        {
+          "id": "pour",
+          "label": "Pour a coffee to take to a table",
+          "anim": "fetch",
+          "minutes": 2,
+          "pose": "stand",
+          "autonomous": false,
+          "tags": ["food"]
         }
       ]
     },
