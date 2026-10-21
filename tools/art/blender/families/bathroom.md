@@ -32,12 +32,19 @@ only manifest that defines these keys.
 |---|---|---|---|---|
 | `model.sink` | 0.86 × 1.26 × 0.62 m | 3,320 | 2 | base cabinet, shaker doors, rectangular inset basin, gooseneck |
 | `model.sinkPedestal` | 0.56 × 1.06 × 0.47 m | 1,540 | 2 | column, oval bowl, tap deck with soap and a tooth mug |
-| `model.vanityDouble` | 1.90 × 1.12 × 0.56 m | 4,396 | 3 | two-basin cabinet, two taps (no mirrors) |
-| `model.sinkVessel` | 0.84 × 1.16 × 0.54 m | 1,920 | 3 | counter with a raised vessel bowl and a folded towel |
+| `model.vanityDouble` | 1.90 × 1.00 × 0.56 m | 4,396 | 3 | two-basin cabinet, two taps (no mirrors); worktop 0.76, rims 0.88 |
+| `model.sinkVessel` | 0.84 × 1.06 × 0.54 m | 1,920 | 3 | counter with a raised vessel bowl and a folded towel; worktop 0.76, rim 0.88 |
 | `model.sinkConsole` | 0.60 × 1.06 × 0.48 m | 1,108 | 3 | open console on two legs, oval bowl |
 
 `check-glb`: 0 failed; Khronos validator: 0 errors, 0 warnings. Each
 lists the parts the player may colour in `paint`, the `body` first.
+
+## The vessel bowls' rims at a basin's height
+
+The double vanity's and the vessel sink's bowls stand on the worktop, so the worktop is lower than a counter:
+0.76 m, the bowls 12 cm tall, their rims at 0.88 m as the pedestal and console basins' (a basin's rim is
+0.76–0.91 m). Until 2026-10-21 the worktops were at 0.88 and 0.86 m and the rims at 1.00 and 1.02 m
+(M-bathroom-02); the taps came down with them.
 
 ## The double vanity has no mirrors
 
@@ -96,21 +103,31 @@ Validate › Showers until checked in play.
   in 0.5 s and `motions` holds it for the whole use (the `shower` tag). The stall's head is on the wall, so
   its rain is turned about its origin (a fixed node rotation; the clip keys only the scale) to fall from the
   head onto the resident in the middle.
-- **Draw calls: 3** each. The tray, walls and metal (1), the glass (1, see-through `glass`), the rain (1);
-  the stall has a fabric curtain instead of glass. The base shower's sliding door stays shut: a moving glass
-  door would be a 4th.
+- **Draw calls: 3**, the base shower 4. The tray, walls and metal (1), the glass (1, see-through `glass`), the
+  rain (1). The base shower's sliding door is its own part, a fourth (Q-05, owner 2026-10-21): all glass, its
+  grip a bar of smoked glass (`grip`, a `glass` material) on the inside by its leading edge, since a chrome
+  handle on it would be a fifth. The stall's curtain is plain satin (a polyester curtain), so its moving front
+  costs no extra draw: body, curtain, rain.
+- **The base shower's door** (`door_open`) slides 41 cm left behind the fixed panel in 0.7 s, opening the right
+  half of the front (A-bathroom-01): open as the use starts, shut after 1.5 s (`hold`), open again for 1.5 s as
+  the use ends (`out`); the water comes on 2 s in, once it's shut. The resident is moved in by the sim at once
+  (`inside`), so they are already in when it opens and step out while it opens again (A-bathroom-05).
+- **The stall's curtain** hangs along the whole open side (still) and across the front as its own part
+  (`curtain`): built drawn across, 14 pleats from the right corner, and gathered into that corner at rest
+  (scaled to 0.32 along the rail about its origin there); `curtain_draw` grows it across in 0.9 s, 1 s into the
+  use, held till the use ends (A-bathroom-02). The water comes on at 1.8 s.
 - **Tiles** (`_tiled_walls`) are thin satin squares a little proud of a grout backing: the base shower 30 cm,
   the stall 25 cm. The walk-in shower's stone wall has grooved joints; the rain shower's walls are plain stone.
   The rain shower's front glass covers only the left half: the right half is the way in.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.shower` | 0.90 × 2.15 × 0.90 m | 2,968 | 3 | Tray, Frame, Head & tap, Tiles |
-| `model.showerStall` | 0.90 × 2.08 × 0.90 m | 2,056 | 3 | Tray, Rail, Head & tap, Curtain, Tiles |
+| `model.shower` | 0.90 × 2.15 × 0.90 m | 2,968 | 4 | Tray, Frame, Head & tap, Tiles |
+| `model.showerStall` | 0.90 × 2.08 × 0.90 m | 2,212 | 3 | Tray, Rail, Head & tap, Curtain, Tiles |
 | `model.showerWalkIn` | 0.92 × 2.26 × 0.92 m | 2,348 | 3 | Floor, Frame, Head & tap, Wall |
 | `model.showerRain` | 0.94 × 2.19 × 0.93 m | 1,684 | 3 | Tray, Frame, Head & tap, Walls |
 
-`check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
+`check-glb`: 0 failed; the base shower warns of its 4 draws (allowed, Q-05). Khronos validator: 0 errors, 0 warnings each.
 
 ## B3 — the baths
 

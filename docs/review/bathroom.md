@@ -66,7 +66,7 @@ Family: `tools/art/blender/families/bathroom.py`.
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| `shower` Shower | OK | A-bathroom-01 | I-bathroom-02, I-bathroom-03 | A-bathroom-01 S2 model; I-bathroom-02 S3 clip; I-bathroom-03 S3 decision | `sheets/obj-shower.png`, `play/shower-shower-*.png`, `clips/clips-shower-all-t*.png`, `play-child/shower-shower-*.png` |
+| `shower` Shower | OK | A-bathroom-01, A-bathroom-05 | I-bathroom-02, I-bathroom-03 | A-bathroom-01 S2 model; A-bathroom-05 S3 renderer-table; I-bathroom-02 S3 clip; I-bathroom-03 S3 decision | `sheets/obj-shower.png`, `play/shower-shower-*.png`, `clips/clips-shower-all-t*.png`, `play-child/shower-shower-*.png` |
 | `showerStall` Shower stall | OK | A-bathroom-02 | I-bathroom-02, I-bathroom-03 | A-bathroom-02 S3 model; I-bathroom-02 S3 clip; I-bathroom-03 S3 decision | `bathroom/sheets/obj-showerStall.png`, `bathroom/play/chunk1/showerStall-shower-01.png`, `bathroom/clips/redo-tall/clips-showerStall-all-t99.png` |
 | `showerWalkIn` Walk-in rain shower | OK | OK | I-bathroom-02, I-bathroom-03 | I-bathroom-02 S3 clip; I-bathroom-03 S3 decision | `bathroom/sheets/obj-showerWalkIn.png`, `bathroom/play/chunk1/showerWalkIn-shower-01.png`, `bathroom/clips/redo-tall/clips-showerWalkIn-all-t99.png` |
 | `showerRain` Rain shower | OK | OK | I-bathroom-02, I-bathroom-03 | I-bathroom-02 S3 clip; I-bathroom-03 S3 decision | `bathroom/sheets/obj-showerRain.png`, `bathroom/play/chunk2/showerRain-shower-01.png`, `bathroom/clips/redo-tall/clips-showerRain-all-t99.png` |
@@ -183,7 +183,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Where:** `tools/art/blender/families/bathroom.py:554` (`glass_door`, part of the still body) and `:999` (`SHOWER = {'uses': {'shower': 'water_on'}}`); `web/public/content/base.json:2564` (`inside: true`)
 - **Evidence:** `play/shower-shower-00.png` to `-02.png`, `sheets/obj-shower.png`: the front has a sliding glass door with a handle, but it is built into the still body and no clip moves it; the resident steps in through the shut glass and showers behind it. The README's own example (`{'uses': {'shower': [{'clip': 'door_open', 'hold': 1}, 'water_on']}}`) is the fix: the door its own part, slid open as they step in and shut behind them, and again as they leave (`out`).
   Bathroom wave: the base shower's alone. `docs/objects/bathroom.md` (B2) says the door stays shut because a moving glass part would be a 4th draw call: a budget choice for triage. The walk-in and rain showers have an open way in (`bathroom/sheets/obj-showerWalkIn.png`, `obj-showerRain.png`); the stall's curtain is A-bathroom-02.
-- **Status:** confirmed (bathroom wave: on `shower` only)
+- **Status:** fixed (6190c955)
+- **After:** The door is its own part (Q-05: the shower's 4th draw; its grip smoked glass, so the door is one): `door_open` slides it 41 cm left behind the fixed panel in 0.7 s as the use starts, shuts it after 1.5 s and opens it again for 1.5 s as the use ends (`out`); the water comes on 2 s in, behind the shut door (`fixes/blender-rooms/clips/clips-shower-all-t99.png`, `play/showers-shower-shower-00.png` to `-07.png`, `play-showers.jsonl`: `door_open` 3322–5738 ms and again 9204–11410 ms as the resident leaves, `water_on` from 5539). The resident is moved in by the sim at the use's start, so they are inside as the door begins to open and step out as it opens again: A-bathroom-05.
 - **Source:** pilot; wave: bathroom
 
 ### I-bathroom-02 — moved to residents.md
@@ -199,7 +200,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/bathroom.py:231` and `:238` (`vanityDouble`: worktop at 0.88, the bowls from 0.88 up to `rim_y = 1.0`); `:255` and `:260` (`sinkVessel`: worktop at 0.86, the bowl up to 1.02)
 - **Evidence:** `bathroom/sheets/obj-vanityDouble.png`, `bathroom/sheets/obj-sinkVessel.png` (the gallery: the bowls' rims at a standing woman's hip bone). A washbasin's rim is 0.76–0.91 m (`reference.json` `basinPedestal`, `vanityDouble`); a vessel bowl sits on a lower worktop (about 0.75–0.80 m) so that its rim lands there. Here the worktops are at counter height and the bowls stand on top: 1.00 m and 1.02 m, against 0.88 m for the pedestal and console basins beside them in the catalogue. `cargo review sizes` missed it: its "top 0.84 / 0.82" is the underside of the slab (tooling, in the review log).
-- **Status:** open
+- **Status:** fixed (6190c955)
+- **After:** The worktops come down to 0.76 m and the bowls (12 cm) stand on them, their rims at 0.88 m as the pedestal's and the console's; the taps come down with them (`fixes/blender-rooms/gallery/gallery-vanityDouble.png`, `gallery-sinkVessel.png`, `play/rooms-vanityDouble-wash-*.png`, `vessel2-sinkVessel-wash-*.png`). `cargo review sizes`: neither outside (it reads their worktops, 0.76).
 - **Source:** wave: bathroom
 
 ### M-bathroom-03 — moved to systems.md
@@ -211,7 +213,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/bathroom.py:609-610` (`_pleats`: the curtain drawn back along the side and a third of the front, in the still body); `:999` (`SHOWER`: only `water_on`)
 - **Evidence:** `bathroom/sheets/obj-showerStall.png`, `bathroom/play/chunk1/showerStall-shower-01.png`: the resident steps in through the open two thirds of the front and showers there with the curtain bunched at the side, the rain slanted onto them in plain view; nothing stops the water. A stall's curtain is drawn across once you're in and back as you leave. The curtain as its own part with a `door_open`-like clip (`hold` while in, `out` on leaving) fixes it.
-- **Status:** open
+- **Status:** fixed (6190c955)
+- **After:** The curtain's front is its own part, gathered in the right corner at rest and drawn across the front 1 s into the use (`curtain_draw`, 0.9 s), back as the use ends; the side's curtain hangs closed along the whole side; the water comes on at 1.8 s. Plain satin now (a polyester curtain), so the stall keeps 3 draws (`fixes/blender-rooms/clips/clips-showerStall-all-t0.png`, `-t99.png`; `play/showers-showerStall-shower-05.png`: drawn, the bather behind it).
 - **Source:** wave: bathroom
 
 ### A-bathroom-03 — The washer's drum turns with its door open; the dryer tumbles while the laundry is folded
@@ -279,3 +282,13 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Status:** fixed (eaca9ed8, 1222c510)
 - **After:** The round mirror checks the look and practises a speech (`bench-results/review/fixes/content/g12/after-mirrorRound-*.png`); `cargo review uses` no longer flags it.
 - **Source:** wave: bathroom (`cargo review uses` against the mirrors' siblings)
+
+### A-bathroom-05 — The bather is inside the shower before its door opens, and steps out as it opens
+
+- **Severity:** S3
+- **Rubric:** A2, A4
+- **Fix class:** renderer-table
+- **Where:** `web/src/render/babylon/characters.ts:297` (`STEP_IN`: no entry for the showers; `inside` uses are moved in by sim-core at the use's start, `crates/sim-core/src/world.rs:5218`, and drawn there after one snapshot's glide); `tools/art/blender/families/bathroom.py` (`SHOWER_DOOR`: `door_open` from the use's start, `out` 1.5 s at its end)
+- **Evidence:** `fixes/blender-rooms/play/showers-shower-shower-00.png` and `play-showers.jsonl`: the resident is using the shower and standing in its middle at 3304 ms; the door starts to slide at 3322 ms, so it opens round someone already through the glass (in one snapshot's glide). At the end the use stops at 9189 ms and they are back on the tile while the door is only starting to open again (9204–9905 ms). The phone box times its caller's steps to its door with `STEP_IN` (`wait`, `back`, `out`); the base shower wants the same (wait about 0.7 s while the door slides, step in through the right half; wait `out` before stepping out). The stall's curtain is drawn once they're in (`delay` 1 s), so it doesn't need it.
+- **Status:** open
+- **Source:** fix: blender-rooms (A-bathroom-01's re-check)

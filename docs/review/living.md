@@ -261,7 +261,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/living.py:634` (`recliner`), `:1414` (size 0.92 × 0.843 × 0.70)
 - **Evidence:** The lead "the recliner doesn't look reclined in play though its clip plays": the clip does play in play, from 1 s into relax and doze to the end (`play.jsonl`: `recline` and `footrest_up` open at t = 1), and at full size the footrest is up under the sitter's feet and she leans back a little (`living/play/chunk2/recliner-doze-01.png`; the clip alone, `living/clips/side-small/clips-recliner-all-t99.png`). It reads weakly because the chair is 0.84 m high and 0.70 m deep against a real recliner's 0.95–1.10 × 0.85–1.05 (out on both, `tables/sizes-living.md`): the back ends at the sitter's shoulder blades with no headrest, so tipping it 25° moves little that shows, and the dark leather hides the footrest from the game camera. A taller back with a head cushion, and a deeper seat, would make the recline its silhouette.
-- **Status:** open
+- **Status:** fixed (773afc7d)
+- **After:** 0.92 × 0.99 × 0.80 m: the back rises to 1.0 m with a head cushion, the base to the tile's front; reclined, the seat and back tip 25° and glide 8 cm forward (a wall-hugger's, so the back's top stays off the wall), the sitter's head on the cushion and the legs out on the footrest (`fixes/blender-rooms/gallery/gallery-recliner.png`, `clips/clips-recliner-all-t99.png`, `play/rooms-recliner-relax-02.png`, `poses/poses-recliner-relax-teen.png`). `cargo review sizes` living: 13 outside, not the recliner. The child's shins still go into the seat front (A-residents-11, `poses/poses-recliner-sit-child.png`, as before).
 - **Source:** wave: living (Phase 0 "Seen" lead)
 
 ### M-living-05 — Three seats disagree with their models: the lounge chair, the rocking chair and the bean bag
