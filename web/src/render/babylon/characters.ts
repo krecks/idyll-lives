@@ -242,6 +242,8 @@ interface Seat {
   back?: boolean;
   /** Legs stretched out along the seat (a chaise). */
   legsOut?: boolean;
+  /** With `legsOut`: the room (m) ahead of the hips for the legs (a short tub): the heels stop there, the knees drawn up. */
+  room?: number;
   /**
    * Facing along the object, a quarter turn from its front: towards its right (1) or its left (-1), `fwd`
    * then being along that way (a bath, sat in lengthways).
@@ -3223,7 +3225,7 @@ export class Characters {
     if (pose === Pose.Sit && key !== 'sitDown') {
       const seat = rig.useObj?.seat;
       if (seat?.pedals) this.pedal(rig, seat.pedals);
-      else if (seat?.legsOut) this.legsOut(rig);
+      else if (seat?.legsOut) this.legsOut(rig, seat.room);
       switch (rig.tag) {
         case 'sit':
           // Just sitting: upright, but against a slanted back (`recline`).
@@ -3468,13 +3470,15 @@ export class Characters {
 
   /**
    * Legs out along the seat (content `seat.legs`: a chaise): nearly straight, the heels on it, the toes up;
-   * leant back against the back, the head up to look along the legs.
+   * leant back against the back, the head up to look along the legs. In a short tub (`Seat.room`) the heels
+   * stop at its end and the knees come up.
    */
-  private legsOut(rig: SimRig): void {
+  private legsOut(rig: SimRig, room = Infinity): void {
     const fits = this.legFits.get(rig.body.name)?.get(rig.cur.key);
     if (!fits) return;
     const B = this.set!.bone;
     const w = smooth(rig.w);
+    const reach = room / rig.scale;
     addRotation(this.add, B.spine_01, 1, 0, 0, -0.2 * w);
     addRotation(this.add, B.spine_02, 1, 0, 0, -0.08 * w);
     addRotation(this.add, B.Head, 1, 0, 0, 0.18 * w);
@@ -3483,7 +3487,7 @@ export class Characters {
       [fits.r, B.thigh_r, B.calf_r, B.foot_r, 0.93],
     ] as const) {
       // The ankles a heel's height above the seat, the hips' joints being higher (`seatDrop`).
-      const turn = this.legTo(fit, fit.hy - LEGS_OUT_DROP, fit.hz + (fit.l1 + fit.l2) * bend);
+      const turn = this.legTo(fit, fit.hy - LEGS_OUT_DROP, fit.hz + Math.min((fit.l1 + fit.l2) * bend, reach));
       addRotation(this.add, thigh, 1, 0, 0, turn[0] * w);
       addRotation(this.add, calf, 1, 0, 0, turn[1] * w);
       addRotation(this.add, foot, 1, 0, 0, -(turn[0] + turn[1]) * 0.25 * w);
