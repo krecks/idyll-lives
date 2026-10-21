@@ -389,6 +389,16 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Status:** open
 - **Source:** wave: kitchen
 
+### A-kitchen-04 — On a bar or counter stool the feet hang in the air, not on the footrest
+
+- **Severity:** S3
+- **Rubric:** A1, A5
+- **Fix class:** renderer-table
+- **Where:** `web/src/render/babylon/characters.ts` (`seatLegs`: the feet go down to the floor, or hang where it's out of reach), `web/src/render/babylon/characters/furniture.json` (`seats.barStool` 0.72; `stoolCounter`, `stoolBarHigh` content seats 0.68, 0.80)
+- **Evidence:** `bench-results/review/fixes/clips-seated/stools/poses-seats-default-0[0-2]-*-side.png`: since G-20's leg fit, a grown-up on the three stools sits with the shins hanging and the feet in the air a few centimetres over the stretcher ring; before it the clip's feet were in the air too. People on a bar stool rest the feet on its footrest ring (or one on the floor). A footrest height per stool (`seats` `rest`, m: the floor `seatLegs` puts the feet on) would put them there; the rings are at about 0.25–0.3 m.
+- **Status:** open
+- **Source:** fix: clips-seated
+
 ### I-kitchen-03 — moved to residents.md
 
 ### I-kitchen-04 — moved to systems.md
