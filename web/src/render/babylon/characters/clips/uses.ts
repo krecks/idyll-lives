@@ -93,12 +93,12 @@ function eyepiecePose(fit: Fit): (p: number) => PoseSpec {
  * `PICK_DELAY` there, as the hand closes on it): m to the picker's right (facing the tree), up and to the
  * front of the trunk. The apple hangs under the crown's front, the lemon in the potted tree's crown.
  */
-const FRUIT = { apple: [0.05, 1.9, 0.7], lemon: [-0.1, 1.62, 0.6] } as const;
+const FRUIT = { apple: [0.05, 1.84, 0.7], lemon: [-0.1, 1.62, 0.6] } as const;
 
 /** The picker's shares of the reference size (a grown-up, a teen, a child), and the feet's distance from the trunk for each (the shorter nearer, the fruit nearer overhead). */
 type PickFit = Fit & { fruit: readonly [x: number, y: number, z: number] };
 const PICK_SHARES = [1, 0.83, 0.63];
-export const PICK_APPLE: Size<PickFit>[] = sizes('pickApple', PICK_SHARES, (s) => ({ s, to: s > 0.9 ? 1 : s > 0.7 ? 0.92 : 0.88, fruit: FRUIT.apple }));
+export const PICK_APPLE: Size<PickFit>[] = sizes('pickApple', PICK_SHARES, (s) => ({ s, to: s > 0.9 ? 1 : s > 0.7 ? 0.78 : 0.78, fruit: FRUIT.apple }));
 export const PICK_LEMON: Size<PickFit>[] = sizes('pickLemon', PICK_SHARES, (s) => ({ s, to: s > 0.9 ? 0.95 : s > 0.7 ? 0.88 : 0.85, fruit: FRUIT.lemon }));
 /** The picking clip's length (s), and when (shares of it) the hand reaches the fruit, twists it off and is down with it. */
 const PICK_S = 3.3;
@@ -135,7 +135,7 @@ function pickKeys(fit: PickFit): [number, () => PoseSpec, 'smooth'?][] {
     const ref = reference();
     const arm = len(sub(ref.joint('upperarm_r'), ref.joint('lowerarm_r'))) + len(sub(ref.joint('lowerarm_r'), ref.joint('hand_r'))) + 0.06;
     const shoulder = pointOn(reachBody(0, 8, 30, 0), 'upperarm_r', [0, 0, 0]);
-    tip = Math.min(0.08, Math.max(0, len(sub(at, shoulder)) - arm * 0.96));
+    tip = Math.min(0.1, Math.max(0, len(sub(at, shoulder)) - arm * 0.96));
     return tip;
   };
   const rest = () => ({ ...stand(), ...hangArms() });

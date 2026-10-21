@@ -184,7 +184,8 @@ PICK_DELAY = 1.6
 
 def apple():
     """Apple tree: a short trunk, a round crown hung with red and yellow apples; one at the front, on a twig under the
-    crown's front within a grown-up's reach (1.9 m up), which a resident picks (it shrinks away)."""
+    crown's front within reach of a grown-up and of a teen on tiptoe (1.84 m up), which a resident picks (it shrinks
+    away)."""
     P = palette(['#52803A', '#629040', '#74A048', '#86AE52', '#98BC5E'])
     rng = random.Random(15)
     trunk(P, 2.1, 0.4, taper=0.7)
@@ -193,11 +194,11 @@ def apple():
     dots(rng, low(18, 8), (0, 0, 3.6), (2.2, 2.2, 1.65), 0.2, [P.fruit, P.fruit2, P.fruit3, P.fruit4], 'apple',
          band=(-0.65, 0.55), out=0.9, flat=1.0, segments=low(6, 5), rings=low(4, 3))
     still = G.join_all('apple')
-    at = (-0.05, -0.7, 1.9)
+    at = (-0.05, -0.7, 1.84)
 
     def picked():
         lump('picked_apple', 0.11, at, P.fruit, segments=8, rings=5, noise=0.05)
-        # On its stalk, hanging from a twig out of the crown's underside (about 2.05 m up there).
+        # On its stalk, hanging from a twig out of the crown's underside (about 2.05 m up there: a stalk 0.3 m long).
         tube('picked_stalk', [(at[0], at[1], at[2] + 0.09), (at[0] + 0.01, at[1] + 0.02, at[2] + 0.32)], 0.012, 0.009, P.stalk,
              verts=4)
     return _with_part('apple_part', still, picked, (at[0], at[1], at[2] + 0.1), 'pick')
