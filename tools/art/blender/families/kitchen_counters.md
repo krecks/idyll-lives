@@ -145,5 +145,5 @@ the old `shallow`). Islands stand free, centred.
 
 ```
 cargo art kitchen_counters            # the .glbs, the pack, check-glb
-cargo art kitchen_counters --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art kitchen_counters --preview  # previews/kitchen_counters/<id>.png, <id>@<clip>.png
 ```

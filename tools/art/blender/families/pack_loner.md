@@ -63,5 +63,5 @@ seated inside), the radio (`tune`) and the hatch (`order`: it opens as the resid
 
 ```
 cargo art pack_loner            # the six .glb, the pack, check-glb
-cargo art pack_loner --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_loner --preview  # previews/pack_loner/<id>.png, <id>@<clip>.png
 ```

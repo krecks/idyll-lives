@@ -52,5 +52,5 @@ coloured; the same at night (`office-night`, WebGL).
 
 ```
 cargo art pack_slob            # the six .glb, the pack, check-glb
-cargo art pack_slob --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_slob --preview  # previews/pack_slob/<id>.png, <id>@<clip>.png
 ```

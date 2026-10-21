@@ -71,5 +71,5 @@ validator: 0 errors, 0 warnings each.
 
 ```
 cargo art office            # the fourteen .glb, the pack, check-glb
-cargo art office --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art office --preview  # previews/office/<id>.png, <id>@<clip>.png
 ```

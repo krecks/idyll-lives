@@ -107,7 +107,7 @@ class Family:
         The command line, after Blender's `--`:
           (nothing)          build, check and export every model, then write the pack
           --only a,b         just these ids (the pack keeps the others' entries)
-          --preview          render previews/<id>.png (and <id>@<clip>.png) instead of exporting
+          --preview          render previews/<family>/<id>.png (and <id>@<clip>.png) instead of exporting
           --no-pack          export without writing the pack
         """
         args = argv[argv.index('--') + 1:] if '--' in argv else []
@@ -135,8 +135,9 @@ class Family:
         for model in models:
             objs = self.make(model)
             if '--preview' in args:
-                stem = os.path.join(PREVIEWS, model.id)
-                os.makedirs(PREVIEWS, exist_ok=True)
+                # By family: an id may be in two (bench, flowers, hedge ...), and one family's render would overwrite the other's.
+                stem = os.path.join(PREVIEWS, self.name, model.id)
+                os.makedirs(os.path.dirname(stem), exist_ok=True)
                 preview(stem + '.png')
                 preview_clips(stem)
                 print(f'[gamekit] previewed {self.key(model)} -> {stem}.png')

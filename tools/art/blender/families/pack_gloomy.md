@@ -60,5 +60,5 @@ window seat.
 
 ```
 cargo art pack_gloomy            # the six .glb, the pack, check-glb
-cargo art pack_gloomy --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_gloomy --preview  # previews/pack_gloomy/<id>.png, <id>@<clip>.png
 ```

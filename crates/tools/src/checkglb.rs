@@ -9,7 +9,7 @@
 //!   cargo check-glb model.garden.gnome …   only these keys (model., item., tool.)
 //!   cargo check-glb --keys                 the keys a build may write (gamekit/manifest.py `known_keys`)
 //!   cargo check-glb --preview              also re-imports each file in Blender and renders it to
-//!                                          tools/art/blender/previews/rt_<name>.png (gamekit/review.py)
+//!                                          tools/art/blender/previews/<family>/rt_<name>.png (gamekit/review.py)
 //!
 //! Run the Khronos glTF validator too (the standard says how); this checks the game's own rules.
 //!
@@ -1804,7 +1804,7 @@ pub fn main(args: &[String]) -> i32 {
     print!("{}", report.text);
     let mut code = if report.failed > 0 { 1 } else { 0 };
     if args.iter().any(|a| a == "--preview") && !report.checked.is_empty() {
-        // Re-imports each file in Blender and renders it to previews/rt_<name>.png, so export problems show.
+        // Re-imports each file in Blender and renders it to previews/<family>/rt_<name>.png, so export problems show.
         let review = join(&paths.here, "gamekit/review.py");
         let ok = crate::art::blender().map(|exe| crate::art::echo(&crate::art::run(&exe, &review, &report.checked)));
         match ok {

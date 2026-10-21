@@ -86,5 +86,5 @@ washer would need a laundry loop in the sim.)
 
 ```
 cargo art bedroom_storage            # every .glb, the pack, check-glb
-cargo art bedroom_storage --preview  # previews/dresser.png, dresser@drawer_open.png, …
+cargo art bedroom_storage --preview  # previews/bedroom_storage/dresser.png, dresser@drawer_open.png, …
 ```

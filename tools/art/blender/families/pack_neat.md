@@ -57,5 +57,5 @@ yard, the laundry centre, mop dock, robot, shower and console coloured.
 
 ```
 cargo art pack_neat            # the six .glb, the pack, check-glb
-cargo art pack_neat --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_neat --preview  # previews/pack_neat/<id>.png, <id>@<clip>.png
 ```

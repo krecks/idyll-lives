@@ -91,5 +91,5 @@ with the bed ripe: the crop went with the harvest, the bed bare after); the colo
 
 ```
 cargo art yard            # every .glb, the pack, check-glb
-cargo art yard --preview  # previews/sandbox.png, sandbox@castle.png, …
+cargo art yard --preview  # previews/yard/sandbox.png, sandbox@castle.png, …
 ```

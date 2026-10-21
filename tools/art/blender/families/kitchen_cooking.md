@@ -94,7 +94,7 @@ Validate › Appliances until checked in play.
 
 ```
 cargo art kitchen_cooking            # the .glbs, the pack, check-glb
-cargo art kitchen_cooking --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art kitchen_cooking --preview  # previews/kitchen_cooking/<id>.png, <id>@<clip>.png
 ```
 
 ## Where it stands (review, 2026-10-14)

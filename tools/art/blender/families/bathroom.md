@@ -176,5 +176,5 @@ their teeth there, and the tall cabinet's upper door while one takes a fresh tow
 
 ```
 cargo art bathroom            # every .glb, the pack, check-glb
-cargo art bathroom --preview  # previews/sink.png, sink@water_on.png, …
+cargo art bathroom --preview  # previews/bathroom/sink.png, sink@water_on.png, …
 ```

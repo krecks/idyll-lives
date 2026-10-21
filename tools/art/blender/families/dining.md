@@ -111,5 +111,5 @@ the storage against the wall). All 29 sat in Validate › Tables, Chairs and Din
 
 ```
 cargo art dining            # the .glbs, the pack, check-glb
-cargo art dining --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art dining --preview  # previews/dining/<id>.png, <id>@<clip>.png
 ```

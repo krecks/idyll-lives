@@ -45,5 +45,5 @@ the tub in the yard.
 
 ```
 cargo art pack_example            # the two .glb, the pack, check-glb
-cargo art pack_example --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_example --preview  # previews/pack_example/<id>.png, <id>@<clip>.png
 ```

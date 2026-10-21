@@ -96,7 +96,7 @@ Fridges until checked in play.
 
 ```
 cargo art kitchen            # fridge.glb, the pack, check-glb
-cargo art kitchen --preview  # previews/fridge.png, fridge@<clip>.png
+cargo art kitchen --preview  # previews/kitchen/fridge.png, fridge@<clip>.png
 ```
 
 ## Where it stands (review, 2026-10-14)

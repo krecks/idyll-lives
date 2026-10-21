@@ -66,5 +66,5 @@ shows the seated resident.
 
 ```
 cargo art bedroom_dressing            # every .glb, the pack, check-glb
-cargo art bedroom_dressing --preview  # previews/mirror.png, dressingTable@drawer_open.png, …
+cargo art bedroom_dressing --preview  # previews/bedroom_dressing/mirror.png, dressingTable@drawer_open.png, …
 ```

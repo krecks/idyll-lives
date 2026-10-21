@@ -55,5 +55,5 @@ turning.
 
 ```
 cargo art laundry            # the six .glb, the pack, check-glb
-cargo art laundry --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art laundry --preview  # previews/laundry/<id>.png, <id>@<clip>.png
 ```

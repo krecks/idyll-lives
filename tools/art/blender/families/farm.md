@@ -92,5 +92,5 @@ models and their far versions).
 
 ```
 cargo art farm            # the 8 .glb and 8 .far.glb, the pack, check-glb
-cargo art farm --preview  # previews/<id>.png, <id>.far.png, scarecrow@sway.png
+cargo art farm --preview  # previews/farm/<id>.png, <id>.far.png, scarecrow@sway.png
 ```

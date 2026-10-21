@@ -11,7 +11,7 @@ centres.json      where each model built here is centred at rest, for the gate o
 gamekit/          the toolkit every family imports as G
 families/         one script per family: garden_decor, kitchen (the fridge's doors), living (the wall
                   bed that folds down); _template.py (a chest with a lid and a drawer) is the one to copy
-previews/         renders from --preview (ignored by git)
+previews/         renders from --preview, a folder per family (ignored by git)
 ```
 
 The runner and the gate are Rust (`crates/tools`): `cargo art` runs Blender on a family, then the gate;
@@ -27,7 +27,7 @@ here runs inside Blender (`gamekit/manifest.py` is plain Python, no bpy).
    - its model (`web/public/assets/models/<family>/<id>.glb`), whose size and heights it keeps.
 
    For a new object, decide the footprint first; it fixes where the game puts residents (below).
-3. **Build and look.** Run `cargo art <family> --preview`, then open the PNGs in `previews/` (you can read
+3. **Build and look.** Run `cargo art <family> --preview`, then open the PNGs in `previews/<family>/` (you can read
    images). Iterate until it looks right from the front and each clip looks right open.
 4. **Export.** Run `cargo art <family>`, which exports, writes the pack and runs the gate
    (`cargo check-glb`). It must say `0 failed`; read every warning.
@@ -51,14 +51,14 @@ game. Report what you checked, and anything you didn't.
 ```sh
 cargo art kitchen                  # build, export, register, check
 cargo art kitchen --only fridge    # one model
-cargo art garden_decor --preview   # previews/<id>.png (+ <id>@<clip>.png), no export
+cargo art garden_decor --preview   # previews/garden_decor/<id>.png (+ <id>@<clip>.png), no export
 cargo art kitchen --no-pack        # export without writing the pack
 cargo art --all                    # every family (not _template)
 cargo art _template --preview      # the template only previews
 cargo art --centres                # centres.json from every family (runs Blender, builds nothing)
 cargo check-glb [model.fridge …]   # the gate alone (no Blender)
 cargo check-glb --keys             # the keys a build may write
-cargo check-glb --preview          # the gate, then Blender renders each file re-imported (rt_<name>.png)
+cargo check-glb --preview          # the gate, then Blender renders each file re-imported (<family>/rt_<name>.png)
 ```
 
 `centres.json` holds each model's `centre` (key → `[x, depth]`; `[0, 0]`, the middle, for most): where
@@ -149,7 +149,7 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
      lifts the model off the floor. Draw every random number the full build draws, so the far version's
      parts stand where the model's do (`families/plants.py`, `trees.py`). The gate fails a far version
      whose lowest point is more than 0.5 cm off the model's.
-5. **Look**: `cargo art <family> --preview`, then open `previews/<id>.png`. The preview looks at the front
+5. **Look**: `cargo art <family> --preview`, then open `previews/<family>/<id>.png`. The preview looks at the front
    three-quarter, so sides facing away (the inside of side shelves) may not show; the game will.
 6. **Export**: `cargo art <family>`.
 
@@ -272,7 +272,7 @@ How the parts work:
   a whole fraction of a turn round (a four-bladed fan a quarter turn), or moved at an even speed (`G.scroll`), is
   a warning to check. A part a clip grows (darts, a pot thrown) is measured grown, not at rest; one flattened to
   nothing at rest warns if its flat shape shows (traps).
-- **Previews.** `--preview` renders each clip open on its own: `previews/<id>@<clip>.png` (a `spin` half
+- **Previews.** `--preview` renders each clip open on its own: `previews/<family>/<id>@<clip>.png` (a `spin` half
   way round, a `rock` at its furthest).
 - **In the game's renderer.** The clips bench, `/clips.html?keys=model.<id>` (below), plays every clip
   of the model as the game does.
@@ -300,7 +300,9 @@ never one that's already running) and drive Playwright headless with full Chrome
 
 - **Gallery.** `/gallery.html?keys=model.<id>&cols=4` shows the models from the front right, as close as
   frames them, at their middle height (so things on a wall are in view). `&alpha=…&beta=…&radius=…` and
-  `&target=1.4` (the height looked at; `&target=x,y,z` a point) move the camera.
+  `&target=1.4` (the height looked at; `&target=x,y,z` a point) move the camera. `&scale=adult` (or
+  `child`, `all`) stands residents beside each model for scale; `&camera=game` looks from as far as
+  players do (the game's Live camera).
 - **Clips bench.** `/clips.html?keys=model.<id>` plays every clip of the model in turn, as the game plays
   it: a use's clip opens, holds and closes; a loop goes round; an ambient clip plays all the time. A
   button per clip plays only that one (`&clip=<name>`); `&t=0.5` holds every clip at 0.5 s for a
@@ -384,5 +386,5 @@ never one that's already running) and drive Playwright headless with full Chrome
 | `family.py` | `Model`, `Family` and its `run`: the command line every family script ends with |
 | `far.py` | `far_of` (a far version from the model's own build at low detail), `low`, `is_low` |
 | `manifest.py` | plain Python, no bpy: the manifests and content as the gate reads them (`manifests`, `known_keys`, `played`), and centres.json (`read_centres`, `write_centres`) |
-| `review.py` | run by `cargo check-glb --preview`: re-imports each checked file and renders `previews/rt_<name>.png` |
+| `review.py` | run by `cargo check-glb --preview`: re-imports each checked file and renders `previews/<family>/rt_<name>.png` |
 | `centres.py` | run by `cargo art --centres`: imports every family (no build) and writes centres.json |

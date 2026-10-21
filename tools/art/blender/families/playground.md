@@ -73,5 +73,5 @@ validator: 0 errors, 0 warnings on all 16 files.
 
 ```
 cargo art playground            # the 16 .glb, the pack, check-glb
-cargo art playground --preview  # previews/<id>.png, <id>@<clip>.png, <id>.far.png
+cargo art playground --preview  # previews/playground/<id>.png, <id>@<clip>.png, <id>.far.png
 ```

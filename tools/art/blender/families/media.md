@@ -71,5 +71,5 @@ colours on the painted parts.
 
 ```
 cargo art media            # the eight .glb, the pack, check-glb
-cargo art media --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art media --preview  # previews/media/<id>.png, <id>@<clip>.png
 ```

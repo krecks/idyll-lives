@@ -100,5 +100,5 @@ fifth of them.
 
 ```
 cargo art kids            # the twenty .glb, the pack, check-glb
-cargo art kids --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art kids --preview  # previews/kids/<id>.png, <id>@<clip>.png
 ```

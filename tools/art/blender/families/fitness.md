@@ -80,5 +80,5 @@ is never two of it.
 
 ```
 cargo art fitness            # the five .glb, the pack, check-glb
-cargo art fitness --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art fitness --preview  # previews/fitness/<id>.png, <id>@<clip>.png
 ```

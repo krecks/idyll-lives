@@ -68,5 +68,5 @@ models and their far versions).
 
 ```
 cargo art stalls            # the five .glb and .far.glb, the pack, check-glb
-cargo art stalls --preview  # previews/<id>.png, <id>@<clip>.png, <id>.far.png
+cargo art stalls --preview  # previews/stalls/<id>.png, <id>@<clip>.png, <id>.far.png
 ```

@@ -92,5 +92,5 @@ depth, the pottery wheel's height). Khronos validator: 0 errors, 0 warnings each
 
 ```
 cargo art hobbies            # the nineteen .glb, the pack, check-glb
-cargo art hobbies --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art hobbies --preview  # previews/hobbies/<id>.png, <id>@<clip>.png
 ```

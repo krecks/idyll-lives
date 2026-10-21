@@ -56,5 +56,5 @@ the espresso bar used (the resident hides the stream from the camera; seen on th
 
 ```
 cargo art pack_foodie            # the six .glb, the pack, check-glb
-cargo art pack_foodie --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_foodie --preview  # previews/pack_foodie/<id>.png, <id>@<clip>.png
 ```

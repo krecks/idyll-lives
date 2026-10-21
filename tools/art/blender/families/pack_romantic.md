@@ -61,5 +61,5 @@ bureau turned; the table, tub and arbour bought coloured; the same at night (`of
 
 ```
 cargo art pack_romantic            # the six .glb, the pack, check-glb
-cargo art pack_romantic --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_romantic --preview  # previews/pack_romantic/<id>.png, <id>@<clip>.png
 ```

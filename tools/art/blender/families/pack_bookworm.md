@@ -53,5 +53,5 @@ sinking and the fire growing; the bureau turned to three facings; colours on the
 
 ```
 cargo art pack_bookworm            # the six .glb, the pack, check-glb
-cargo art pack_bookworm --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_bookworm --preview  # previews/pack_bookworm/<id>.png, <id>@<clip>.png
 ```

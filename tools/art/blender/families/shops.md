@@ -67,7 +67,7 @@ errors, 0 warnings on all ten files (models and far versions).
 
 ```
 cargo art shops            # the five .glb and their .far.glb, the pack, check-glb
-cargo art shops --preview  # previews/<id>.png, <id>@<clip>.png, <id>.far.png
+cargo art shops --preview  # previews/shops/<id>.png, <id>@<clip>.png, <id>.far.png
 ```
 
 The Workbench previews draw glass opaque: the case's bakes and its back door only show in the game (the clips bench,
