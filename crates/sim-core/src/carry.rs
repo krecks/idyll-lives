@@ -134,7 +134,11 @@ pub(crate) fn start(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectI
             if !f.can_use_in(sim.id, carers.clone()) {
                 return;
             }
-            let goal = ctx.index.links.approach_of(from).unwrap_or_else(|| f.front_tile(content));
+            // (Lifted out of the crib from in front of it, out of the high chair from beside it.)
+            let goal = match baby_place(content, f).filter(|&p| def.interactions[p].baby_bed()) {
+                Some(_) => ctx.index.links.approach_of(from).unwrap_or_else(|| f.front_tile(content)),
+                None => care_spot(ctx, f),
+            };
             let Some(waypoints) = crate::world::walk_route(ctx, sim, goal, [goal.0 as f32 + 0.5, goal.1 as f32 + 0.5]) else { return };
             objects[from as usize].reserve_in(sim.id, carers);
             sim.pose = Pose::Stand;

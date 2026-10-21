@@ -167,10 +167,16 @@ fn doing(world: &World, s: &Sim) -> Doing {
         return Doing::plain(world, *seat, anim);
     }
     // Carrying a baby (at the crib lifting them out, on the way to where they go, putting them
-    // in) or a harvest to the fridge (putting it away there).
+    // in: shown as the cuddle's lift, `sim::CARRY` says who) or a harvest to the fridge (putting
+    // it away there).
     if let Some(Activity { task: Task { kind: TaskKind::Carry { baby, from, to, stage }, .. }, phase, .. }) = s.current() {
         let at = if *stage == 0 { *from } else { *to };
-        let anim = world.content.cooking.put_away_anim.filter(|_| baby.is_none() && matches!(phase, Phase::Using { .. }));
+        let using = matches!(phase, Phase::Using { .. });
+        let anim = match baby {
+            Some(_) => world.content.animations.iter().position(|a| a == "cuddle"),
+            None => world.content.cooking.put_away_anim,
+        }
+        .filter(|_| using);
         let mut d = Doing::plain(world, Some(at), anim);
         d.def = world.objects.get(at as usize).map_or(-1.0, |o| o.def as f32);
         return d;

@@ -159,9 +159,10 @@ const DEFAULT_SEAT: Seat = FURNITURE.defaultSeat;
  * smaller than its tile (the herb planters, 0.4–0.46 m deep, are picked from as from a counter), or to
  * the part used: the toes at a basin or a sink's cabinet, the hands over the water; up to the toaster and
  * the blender on a counter, the chemistry bench pushed back on its tile, the clock's trunk door, the
- * giving jar. Back from the statue, to look up at it.
+ * giving jar. Back from the statue, to look up at it. In beside the high chair, to feed the baby in it.
  */
 const STAND_BACK: Record<string, number> = {
+  highChair: -0.5,
   dishwasher: 0.15,
   dishwasherCompact: 0.15,
   sofaBed: 1,
@@ -371,6 +372,22 @@ const LYING = new Set<string>(['lie', BABY_LIE.asleep, BABY_LIE.awake]);
  * angle forward of it.
  */
 const CUDDLE = { pick: 2.6, put: 2.4, rail: 0.44, reach: 0.22, clear: 0.52, lean: 0.9, height: 1.7, arms: 0.4 };
+/**
+ * Carrying a baby (sim-core `carry.rs`, the layout's `carry`): the grown-up lifts them out of the crib
+ * as for a cuddle (`CUDDLE.pick`, fitted into the sim's `lift` game minutes), carries them cradled in
+ * the arms on the way, and lays them from the arms into the high chair (or back in the crib) as the
+ * cuddle puts them back (`CUDDLE.put`), in the next `lift` minutes.
+ */
+const CARRY = { lift: 1.5 };
+/**
+ * Changing the baby at the crib (action `change`): the carer, standing at the changing table beside
+ * the cot, lifts the baby out of the cot (as `CUDDLE`), lays them on the changing pad across it, the
+ * head to the right, works at them there (the `change` clips) and near the end lifts them back into the
+ * cot; render only, as the cuddle (the sim keeps the baby in the cot's slot). `pad`: the pad's top (m;
+ * the cot's mattress is `BEDS.crib`), `back`: its middle behind the crib's middle (m, along its facing),
+ * `turn`: the baby turned on the pad (rad, about the vertical).
+ */
+const CHANGE = { pad: 0.865, back: -0.19, turn: -Math.PI / 2 };
 /**
  * The held baby: its middle forward of the forearms' (body scale of the one holding them) and its
  * back above them (its own); its head end raised (rad) and turned towards the one holding them.
@@ -586,6 +603,10 @@ const ACTIONS: Record<string, ActionAnim> = {
   },
   // The baby picked up out of the crib and held (`CUDDLE`).
   cuddle: { stand: ['idle'], hands: HANDS.relaxed },
+  // Spoon-feeding the baby in the high chair, from beside it: the hand out to the baby's mouth and back.
+  feed: { stand: ['interact', 'idle', 'interact', 'spell'], hands: HANDS.hold },
+  // At the changing table, the baby on the pad (`CHANGE`): the hands busy over them.
+  change: { stand: ['interact', 'spell'], hands: HANDS.relaxed },
   // (From the waist-high herb planter, standing; low crops crouched down to the soil.)
   // (Fruit picked up in a tree's crown, `pickHigh`.)
   harvest: {
@@ -827,6 +848,21 @@ interface SimRig {
   liftW: number;
   /** Where the feet step in towards the crib (m, along the facing). */
   cuddleStep: number;
+  /**
+   * Carrying a baby (`CARRY`): seconds of lifting them out (-1: not carrying) and of putting them in
+   * (-1: not yet), at `carryRate`.
+   */
+  carryT: number;
+  putT: number;
+  carryRate: number;
+  /** Changing the baby (`CHANGE`): as the cuddle's `cuddleT`, `cuddleOut`, `cuddleMin`, `cuddleRate`. */
+  changeT: number;
+  changeOut: number;
+  changeMin: number;
+  changeRate: number;
+  /** Where they turn to while lifting a baby out of the crib (NaN: as the sim faces them). */
+  faceX: number;
+  faceZ: number;
   /** Day clothes and pyjamas (switched when the Sim lies down in bed). */
   day: OutfitParams | null;
   night: OutfitParams | null;
@@ -1065,6 +1101,8 @@ export class Characters {
   private readonly order = new Int16Array(MAX_CHARACTERS);
   /** Per Sim row holding a baby: the middle of the cradling forearms (x, y, z) as last posed. */
   private readonly cradle = new Float32Array(MAX_CHARACTERS * 3);
+  /** Per Sim row: a baby on the crib's changing pad (`CHANGE`): the crib, else null. */
+  private readonly onPadOf: (PlacedObject | null)[] = new Array(MAX_CHARACTERS).fill(null);
   /** Scratch for placing a held baby: two orientations and a vector. */
   private readonly cradleQ = new Float32Array(12);
   /** How long a cuddle lasts (game minutes), per object def. */
@@ -1494,6 +1532,15 @@ export class Characters {
         holdW: 0,
         liftW: 0,
         cuddleStep: 0,
+        carryT: -1,
+        putT: -1,
+        carryRate: 1,
+        changeT: -1,
+        changeOut: -1,
+        changeMin: 0,
+        changeRate: 1,
+        faceX: NaN,
+        faceZ: NaN,
         day: null,
         night: null,
         asleep: false,
@@ -1997,15 +2044,121 @@ export class Characters {
     const S = layout.simStride;
     const k = layout.sim;
     const act = k.action !== undefined && k.object !== undefined ? this.actionTags.indexOf('cuddle') : -1;
+    const changing = k.action !== undefined && k.object !== undefined ? this.actionTags.indexOf('change') : -1;
     const step = dt * animRate;
     // Seconds of animation per game minute at this speed.
     const perMinute = gameRate > 0 ? animRate / gameRate : Infinity;
     this.heldBy.fill(-1);
+    this.onPadOf.fill(null);
     for (let j = 0; j < count; j++) {
       const rig = this.sims[j];
       if (!rig) continue;
       const o = H + j * S;
       const obj = curr[o + k.object] | 0;
+      const moving = curr[o + k.moving] > 0;
+      rig.faceX = NaN;
+      // Carrying a baby (`CARRY`): lifting them out (standing), then in the arms on the way; put down, laid in.
+      const carried = k.carry !== undefined ? (curr[o + k.carry] | 0) - 1 : -1;
+      if (carried >= 0 && carried < count && carried !== j && this.sims[carried]?.body.stage === 'baby' && !curr[o + k.away] && !this.force) {
+        if (rig.carryT < 0 || rig.cuddleBaby !== carried) {
+          rig.carryT = 0;
+          rig.putT = -1;
+          rig.carryRate = clamp((CUDDLE.pick + 0.4) / (CARRY.lift * perMinute), 1, 6);
+          rig.cuddleT = -1;
+          rig.cuddleOut = -1;
+        }
+        rig.cuddleBaby = carried;
+        rig.carryT += step * rig.carryRate;
+        // (On the way: held, the lift done whatever the speed.)
+        const t = moving ? Math.max(rig.carryT, CUDDLE.pick + 1) : rig.carryT;
+        rig.reachW = ramp(t, 0.15, 0.9) * (1 - ramp(t, 1.5, 0.9));
+        rig.holdW = ramp(t, 1.5, 0.9);
+        rig.liftW = clamp((t - 1.35) / 1.05, 0, 1);
+        const ob = H + carried * S;
+        if (moving) rig.cuddleStep = 0;
+        else {
+          const d = Math.hypot(curr[ob + k.x] - curr[o + k.x], this.groundRow(curr[ob + k.z]) - this.groundRow(curr[o + k.z]));
+          rig.cuddleStep = lerp(Math.max(0, d - CUDDLE.rail - CUDDLE.reach) * ramp(t, 0, 0.7), 0, ramp(t, 1.9, 0.7));
+          if (rig.liftW < 1) [rig.faceX, rig.faceZ] = [curr[ob + k.x], this.groundRow(curr[ob + k.z])];
+        }
+        this.heldBy[carried] = j;
+        continue;
+      }
+      if (rig.carryT >= 0 && rig.cuddleBaby >= 0) {
+        // Put down where they go (the high chair, the crib): laid there from the arms.
+        if (rig.putT < 0) rig.putT = 0;
+        rig.putT += step * rig.carryRate;
+        const u = rig.putT;
+        rig.reachW = ramp(u, 0.1, 0.9) * (1 - ramp(u, 1.4, 0.8));
+        rig.holdW = 1 - ramp(u, 0.1, 0.9);
+        rig.liftW = moving ? 0 : 1 - clamp((u - 0.1) / 1.05, 0, 1);
+        rig.cuddleStep = 0;
+        if (rig.liftW > 0) this.heldBy[rig.cuddleBaby] = j;
+        else {
+          rig.carryT = -1;
+          rig.putT = -1;
+          rig.cuddleBaby = -1;
+        }
+        continue;
+      }
+      // Changing the baby at the changing table (`CHANGE`).
+      let changed = -1;
+      if (changing >= 0 && (curr[o + k.action] | 0) === changing && curr[o + k.pose] === Pose.Stand && !moving && !curr[o + k.away] && !this.force) {
+        for (let b = 0; b < count && changed < 0; b++) {
+          const ob = H + b * S;
+          if (b !== j && this.sims[b]?.body.stage === 'baby' && curr[ob + k.pose] === Pose.Lie && (curr[ob + k.object] | 0) === obj && !curr[ob + k.away]) changed = b;
+        }
+      }
+      const crib = changed >= 0 ? (this.objectById.get(obj) ?? null) : null;
+      if (crib) {
+        const minutes = this.useLength(crib.def, 'change', 10);
+        const T = CUDDLE.pick + CUDDLE.put;
+        if (rig.changeT < 0 || rig.cuddleBaby !== changed) {
+          rig.changeT = 0;
+          rig.changeOut = -1;
+          rig.changeMin = 0;
+          rig.changeRate = clamp((2 * T + 1.5) / (minutes * perMinute), 1, 6);
+          rig.cuddleT = -1;
+        }
+        rig.cuddleBaby = changed;
+        rig.changeT += step * rig.changeRate;
+        rig.changeMin += dt * gameRate;
+        if (rig.changeOut >= 0) rig.changeOut += step * rig.changeRate;
+        else if (rig.changeT >= T && (minutes - rig.changeMin) * perMinute * rig.changeRate <= T) rig.changeOut = 0;
+        // Out of the cot (into the arms), onto the pad, back off it (into the arms), into the cot.
+        const out = rig.changeOut >= 0;
+        const t = out ? rig.changeOut : rig.changeT;
+        const lifting = t < CUDDLE.pick;
+        const u = lifting ? t : t - CUDDLE.pick;
+        if (lifting) {
+          rig.reachW = ramp(u, 0.15, 0.9) * (1 - ramp(u, 1.5, 0.9));
+          rig.holdW = ramp(u, 1.5, 0.9);
+          rig.liftW = clamp((u - 1.35) / 1.05, 0, 1);
+        } else {
+          rig.reachW = ramp(u, 0.1, 0.9) * (1 - ramp(u, 1.4, 0.8));
+          rig.holdW = 1 - ramp(u, 0.1, 0.9);
+          rig.liftW = 1 - clamp((u - 0.1) / 1.05, 0, 1);
+        }
+        rig.cuddleStep = 0;
+        // On the pad from the moment they're in the arms on the way there until they're in the arms on the way back.
+        const onPad = out ? lifting : !lifting;
+        if (onPad) this.onPadOf[changed] = crib;
+        else {
+          const ob = H + changed * S;
+          [rig.faceX, rig.faceZ] = [curr[ob + k.x], this.groundRow(curr[ob + k.z])];
+        }
+        if (rig.liftW > 0) this.heldBy[changed] = j;
+        continue;
+      }
+      if (rig.changeT >= 0) {
+        // Cut short: the baby back in the cot at once.
+        rig.changeT = -1;
+        rig.changeOut = -1;
+        rig.liftW = 0;
+        rig.holdW = 0;
+        rig.reachW = 0;
+        rig.cuddleBaby = -1;
+      }
       let baby = -1;
       if (act >= 0 && (curr[o + k.action] | 0) === act && curr[o + k.pose] === Pose.Stand && !(curr[o + k.moving] > 0) && !curr[o + k.away] && !this.force) {
         for (let b = 0; b < count && baby < 0; b++) {
@@ -2066,6 +2219,48 @@ export class Characters {
     let n = 0;
     for (let i = 0; i < count; i++) if (this.heldBy[i] < 0) this.order[n++] = i;
     for (let i = 0; i < count; i++) if (this.heldBy[i] >= 0) this.order[n++] = i;
+  }
+
+  /** How long the use shown as `anim` at an object of def `def` lasts (game minutes; `fallback` without one). */
+  private useLength(def: string, anim: string, fallback: number): number {
+    const key = `${def}:${anim}`;
+    let m = this.cuddleMinutes.get(key);
+    if (m === undefined) {
+      m = this.content?.object(def)?.interactions.find((it) => it.anim === anim)?.minutes ?? fallback;
+      this.cuddleMinutes.set(key, m);
+    }
+    return m;
+  }
+
+  /**
+   * A baby on the crib's changing pad (`CHANGE`): their placement as in the cot (as posed), moved to the
+   * pad beside it (across the crib's middle from the cot, a little back, on the pad's top) and turned
+   * across it, about the body's middle.
+   */
+  private onPad(rig: SimRig, crib: PlacedObject): void {
+    const pl = this.place;
+    const q = this.cradleQ;
+    const s = rig.scale;
+    const my = rig.body.height * 0.5 * s;
+    const mz = -lieBack(rig);
+    rotate(pl.qx, pl.qy, pl.qz, pl.qw, 0, my, mz, q, 8);
+    const x0 = pl.x + q[8];
+    const y0 = pl.y + q[9];
+    const z0 = pl.z + q[10];
+    // The crib's right (+x) and front (+z), as sim-core lays its slots out.
+    const f = (crib.rot * Math.PI) / 2;
+    const rx = Math.cos(f);
+    const rz = -Math.sin(f);
+    const across = (x0 - crib.cx) * rx + (z0 - crib.cz) * rz;
+    const x = crib.cx - across * rx + CHANGE.back * Math.sin(f);
+    const z = crib.cz - across * rz + CHANGE.back * Math.cos(f);
+    const y = y0 + CHANGE.pad - (BEDS.crib?.h ?? 0.56);
+    qmul(0, Math.sin(CHANGE.turn / 2), 0, Math.cos(CHANGE.turn / 2), pl.qx, pl.qy, pl.qz, pl.qw, q, 0);
+    [pl.qx, pl.qy, pl.qz, pl.qw] = [q[0], q[1], q[2], q[3]];
+    rotate(pl.qx, pl.qy, pl.qz, pl.qw, 0, my, mz, q, 8);
+    pl.x = x - q[8];
+    pl.y = y - q[9];
+    pl.z = z - q[10];
   }
 
   /** How long a cuddle at an object of def `def` lasts (game minutes; its interaction shown as `cuddle`). */
@@ -2404,6 +2599,8 @@ export class Characters {
       // Cuddling: turned to the baby in the crib.
       const cuddled = rig.cuddleT >= 0 && rig.cuddleBaby >= 0 ? this.sims[rig.cuddleBaby] : null;
       if (cuddled) faceYaw = Math.atan2(curr[H + cuddled.id * S + k.x] - rig.x, this.groundRow(curr[H + cuddled.id * S + k.z]) - rig.z);
+      // Lifting a baby out of the cot to carry or to change them: turned to the baby.
+      else if (!moving && !Number.isNaN(rig.faceX)) faceYaw = Math.atan2(rig.faceX - rig.x, rig.faceZ - rig.z);
       let partnerRig = partner >= 0 && partner < count ? this.sims[partner] : null;
       // Listening in (role 3, a group conversation): `partner` started it; they look at whichever
       // of the two is speaking, and stand the way sim-core turned them (to the middle of the group).
@@ -2525,6 +2722,8 @@ export class Characters {
       // Sitting or lying on a seat that moves (a rocking chair, a swing): along with it.
       const ride = (pose === Pose.Sit || pose === Pose.Lie) && usingId >= 0 && this.rideOf ? this.rideOf(usingId) : null;
       if (ride) this.riding(ride);
+      const pad = this.onPadOf[i];
+      if (pad) this.onPad(rig, pad);
       if (inArms > 0) this.cradled(rig, this.heldBy[i], inArms);
       skin(set, rig.body, this.qA, this.pA, this.add, pl, this.scratch, this.data, this.row(i), this.headTmp);
       if (rig.cuddleBaby >= 0 && rig.liftW > 0) this.writeCradle(i);

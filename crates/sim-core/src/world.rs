@@ -319,10 +319,14 @@ impl ObjectInstance {
         }
     }
 
-    /// Where a Sim sits or lies in `slot`: spread across the object's width.
+    /// Where a Sim sits or lies in `slot`: spread across the object's width (but a baby in the
+    /// middle of a seat for one, a high chair, whose other places are the carers' beside it).
     pub fn slot_position(&self, content: &Content, slot: usize) -> [f32; 2] {
         let def = &content.objects[self.def];
         let c = self.centre(content);
+        if slot == 0 && def.interactions.iter().any(|i| i.baby && !i.baby_bed()) {
+            return c;
+        }
         let n = def.slots.max(1) as f32;
         // Bunks lie one above the other: both in the middle (a hair apart, so the renderer can
         // tell the lower bunk from the upper one).

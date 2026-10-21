@@ -1118,6 +1118,10 @@ fn actions(world: &World, s: &Sim) -> Vec<ActionView> {
             active: true,
         });
     }
+    // A baby in someone's arms ("In the arms · Ada", the UI adds who; `carry.rs`).
+    if let Some(c) = s.carried_by {
+        actions.push(ActionView { label: "In the arms".to_owned(), object: None, target: Some(c), progress: 0.0, directed: false, active: true });
+    }
     // Being talked to shows up as the current action.
     if let Some(a) = s.engaged_with
         && let Some((_, social, _, progress)) = world.sims[a as usize].conversation(content)

@@ -25,10 +25,10 @@ pulled up to the kids' table before the dining table (a seat made for their age 
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `crib` Crib | 2x1 · floor | lie:sleep feed:cuddle change:clean play:play cuddle:cuddle | kids / — | Frame, Bedding, Mobile | Use | `side_down`: the front rail slides down 25 cm for feed, change and cuddle, and back up. L `mobile`: the mobile turns slowly while a grown-up plays with the baby (E1, `loops.play`). |
+| `crib` Crib | 2x1 · floor | lie:sleep feed:cuddle change:change play:play cuddle:cuddle | kids / — | Frame, Bedding, Mobile | Use | `side_down`: the front rail slides down 25 cm for feed, change and cuddle, and back up. L `mobile`: the mobile turns slowly while a grown-up plays with the baby (E1, `loops.play`). |
 | `kidsBed` Kids' bed | 1x2 · floor | sleep:sleep nap:nap | kids / — | Frame, Bedding | Use | `turn_down`, as the beds. |
 | `kidsBedCar` Race car bed | 1x2 · floor | sleep:sleep nap:nap | kids / — | Car body, Bedding | Use | `turn_down`; the car body is static. |
-| `highChair` High chair | 1x1 · floor | — | kids / — | Frame, Bedding | Static | Static. (+use) the tray slides out. It has no use or sit yet; its `seatAt` would pull it in to the table it faces while sat on, as far as the knees fit under it. |
+| `highChair` High chair | 1x1 · floor | sit:sit feed:feed | kids / — | Frame, Bedding | Static | Static. (+use) the tray slides out. *Sit in the high chair* is a baby's (`baby`, put in by a carer, `carried`); *Feed the baby* is done from beside it. |
 
 **In play** (signed off 2026-10-16):
 - Against the four walls of the family house's living room: the crib's front rail slides down for feed, change and
@@ -38,8 +38,14 @@ pulled up to the kids' table before the dining table (a seat made for their age 
 - The kids' bed and race car bed turn their duvet down for sleep and nap, a child lying in them under the game's
   quilt, and shut when the use ends. A child lies on the mattress, legs level with its top (`lieBack` scales with
   the body); the car bed's quilt ends at its bonnet (`BEDS` `foot`).
-- The high chair is still in all four facings. Nobody can eat from it: feeding a baby in a chair needs the sim first
-  (a baby is only ever placed lying).
+- The high chair is still in all four facings.
+- Since the authenticity review (G-66, 2026-10-21): by day "Feed the baby" at the crib, with a high chair on the lot,
+  is done at the high chair: the grown-up lifts the baby out of the cot (the cuddle's lift), carries them in the arms
+  (`CARRY`), lays them into the high chair, feeds them standing in beside it (`STAND_BACK` -0.5, `interact`/`spell`)
+  and carries them back to the cot; at night the feed stays at the crib, in the arms. "Change the baby" is done at
+  the changing table (`atSlot`): the carer stands in front of it, lifts the baby out of the cot onto the pad (laid
+  across it, `CHANGE`), works at them there and lays them back in the cot near the end (render only, as the cuddle).
+  `play --state review-baby` (fixes/babies-crops).
 - Known, not changed: the carer at the crib stands or kneels in different spots by facing, once a tile out in front
   of the changing table (slot positions and the shared "tend" pose).
 - Since the authenticity review (G-14, G-05): "Feed the baby" lifts the baby out and holds them, as the cuddle does
