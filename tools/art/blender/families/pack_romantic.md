@@ -5,8 +5,10 @@ entries in `packs/pack_romantic/manifest.json`, an override pack listed in the b
 2026-10-14; they sat in Validate › Romantic until checked in play.
 
 Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
-Seats keep the old part's: the diners and the writer at 0.45 on the footprint's middle line, the bathers at
-0.35 (`characters.ts` `SEATS`/`BEDS` `romantic.heartTub`), the swing's seat top at 0.45 over z = 0.
+Seats: the diners at 0.45 on a slipper chair at each end of the candlelit table, facing each other across its
+0.8 × 0.72 top (content `places` `[±0.62, 0.1]` facing ±90; G-39, 2026-10-21: they sat side by side behind a
+0.3 m top before, their legs through its front skirt), the writer at 0.45 on the footprint's middle line, the
+bathers at 0.35 (`characters.ts` `SEATS`/`BEDS` `romantic.heartTub`), the swing's seat top at 0.45 over z = 0.
 
 | Model | Moving part and clip | Played by |
 |---|---|---|
@@ -38,7 +40,7 @@ the shell at x = ±0.5 where the heart narrows, as they do in the old part: the 
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.romantic.candlelitTable` | 1.70 × 1.12 × 0.74 m | 4,132 | 3 | Body, Fabric, Tablecloth |
+| `model.romantic.candlelitTable` | 1.80 × 1.10 × 0.80 m | 4,216 | 3 | Body, Fabric, Tablecloth |
 | `model.romantic.heartTub` | 1.87 × 0.78 × 1.82 m | 5,264 | 3 | Body, Fabric |
 | `model.romantic.vanity` | 0.80 × 1.64 × 0.82 m | 4,404 | 3 | Body, Fabric, Rose gold |
 | `model.romantic.gramophone` | 0.74 × 1.58 × 0.70 m | 2,720 | 3 | Body, Horn |

@@ -18,15 +18,20 @@ K9 (2026-10-14): catalog2's `sideboard`, `buffet`, `chinaCabinet` and `barCart`.
 ## Facts kept
 
 - **Table tops** at the content's `surface.height`: 0.75 for catalog2's tables (`TT`) and the bistro set, 1.06 for
-  the high café table (`BT`), 0.76 for the glass set, 0.765 for the dining table and the farmhouse set. Tabletop
+  the high café table (`BT`), 0.76 for the three sets for two. Tabletop
   things bought onto `tableDining4` stand on its top (seen in play). The plank joints on the banquet and farmhouse
   tops are flush (0.5 mm proud), so nothing sinks.
 - **Seats** at `characters.ts` SEATS or the content's `seat`: the seat's (hard) top at that height, the pad or
-  cushion a little above, as the old parts: the sets' chairs 0.46 (behind the table, `fwd` −0.19 / −0.22 /
-  −0.24), the bar stool 0.74 (sitters at 0.72), the counter stool 0.685 (0.68), the high stool 0.805 (0.8), the
-  chairs 0.46–0.48, the carver chair's board 0.465 under a cushion to 0.52 (0.5), the bench 0.465 (0.47, two
-  slots). catalog2's seats are centred 5 cm forward (`SZ`), as the old parts.
-- **The sets' chairs** are part of the table (as the old parts drew them): residents sit on them.
+  cushion a little above, as the old parts: the sets' chairs 0.46 (at the content's `places`, `fwd` 0), the bar
+  stool 0.74 (sitters at 0.72), the counter stool 0.685 (0.68), the high stool 0.805 (0.8), the
+  chairs 0.46–0.48, the carver chair's board 0.425 under a cushion to 0.475 (0.47, a dining chair's height: G-30),
+  the bench 0.465 (0.47, two slots). catalog2's seats are centred 5 cm forward (`SZ`), as the old parts.
+- **The sets for two** (`diningTable`, `diningGlass`, `diningOak`; G-39, 2026-10-21) seat their two across the top,
+  facing each other: a chair at each end (`SET_X` ±0.62, `SET_Z` 0.1, the content's `places` `[±0.62, 0.1]` facing
+  ±90), the top 0.84 × 0.75 (the dining table) or 0.9 × 0.8 m (glass, farmhouse) centred at depth 0.1, a place
+  setting before each. A chair is built facing the front and turned a quarter (`_end_chair`). The glass set's sleds
+  run along its sides, leaving the ends open for the knees. The chairs are part of the table (as the old parts drew
+  them): residents sit on them.
 - **Storage** stands where the game places it against the wall (`centre=` the old part's middle, then
   `G.settle()`), so the sideboard's and buffet's tops (0.8, 0.9) are where the content's `surface` is.
 
@@ -61,10 +66,10 @@ it costs no draw call. The bar cart's trays, bottles and wine glasses are `glass
 
 | Model | Size (w × h × d) | Triangles | Draws | Notes |
 |---|---|---|---|---|
-| `model.diningTable` | 1.62 × 1.03 × 0.87 m | 4,816 | 3 | oak top to 0.765, runner, vase, two place settings, two ladder-back chairs |
+| `model.diningTable` | 1.67 × 1.03 × 0.75 m | 4,816 | 3 | oak top 0.84 × 0.75 to 0.76, runner across it, vase, two place settings, a ladder-back chair at each end |
 | `model.bistroSet` | 0.62 × 1.00 × 0.91 m | 3,496 | 3 | round oak top on a black column, cup and vase; a café chair with a looped back |
-| `model.diningGlass` | 1.70 × 1.11 × 0.91 m | 6,068 | 2 | glass top on chrome sled legs; two dark chairs with grey seats |
-| `model.diningOak` | 1.76 × 1.10 × 0.92 m | 5,700 | 3 | thick oak top with breadboard ends on square tapered legs; two chairs |
+| `model.diningGlass` | 1.67 × 1.07 × 0.80 m | 5,596 | 2 | glass top 0.9 × 0.8 on two chrome sleds along its sides; a dark chair with a grey seat at each end |
+| `model.diningOak` | 1.67 × 1.08 × 0.80 m | 5,228 | 3 | thick oak top 0.9 × 0.8 with breadboard ends on square tapered legs; a chair at each end |
 | `model.tableSquare2` | 0.82 × 0.75 × 0.82 m | 1,388 | 1 | round tapered legs with collars, aprons |
 | `model.tableBistroRound` | 0.72 × 0.75 × 0.72 m | 1,196 | 1 | white gloss top, black column and cast foot |
 | `model.tableDining4` | 1.84 × 0.75 × 0.88 m | 588 | 1 | square tapered oak legs, aprons |

@@ -11,7 +11,7 @@
 # shaker lifts 10 cm and tips 30 degrees while a resident mixes a drink (`shake`).
 #
 # Each is built in place where the game places it (`F`, game axes): table tops at the content's `surface`
-# heights (`TT` 0.75, `BT` 1.06; 0.75-0.765 for the catalog sets), seats where the game seats residents
+# heights (`TT` 0.75, `BT` 1.06; 0.75-0.76 for the catalog sets), seats where the game seats residents
 # (`characters.ts` SEATS, content `seat`: the seat's top at that height, its middle 5 cm forward for catalog2's
 # chairs). The sets' chairs are part of the table, as the old parts drew them, since residents sit on them. The
 # storage stands against the wall where the game places it (`centre=`, the old part's middle: its back about
@@ -207,13 +207,14 @@ def _finish(name):
 
 # === K7: dining tables ===============================================================================================
 # --- table settings, vases, a runner ---------------------------------------------------------------------------------
-def _place(prefix, x, z, y, s=1):
-    """A place setting at (x, z) on a top at height `y`: a plate with food, a glass to the side (`s`), cutlery."""
+def _place(prefix, x, z, y, s):
+    """A place setting at (x, z) on a top at height `y`, for the diner at the `s` end (-1: the left one, facing
+    +x): a plate with food, cutlery either side, a glass at their right hand."""
     F.cyl(f'{prefix}plate', 0.12, 0.012, (x, y + 0.006, z), M.porcelain, verts=20, bevel=0.003)
     F.cyl(f'{prefix}food', 0.075, 0.018, (x, y + 0.02, z), M.food, verts=16, bevel=0.006)
-    F.cone(f'{prefix}glass', 0.026, 0.034, 0.1, (x + s * 0.17, y + 0.05, z + 0.1), M.tumbler, verts=12)
-    for dx in (-0.15, 0.15):
-        F.box(f'{prefix}cutlery{dx}', 0.016, 0.004, 0.17, (x + dx, y + 0.002, z), M.cutlery, bevel=0.001)
+    F.cone(f'{prefix}glass', 0.026, 0.034, 0.1, (x - s * 0.1, y + 0.05, z - s * 0.17), M.tumbler, verts=12)
+    for dz in (-0.15, 0.15):
+        F.box(f'{prefix}cutlery{dz}', 0.17, 0.004, 0.016, (x, y + 0.002, z + dz), M.cutlery, bevel=0.001)
 
 
 def _flowers(prefix, x, z, y, h=0.18):
@@ -251,23 +252,34 @@ def _ladder_chair(prefix, x, z, frame, seat, pad, seat_h=0.46, back_h=0.92, faci
     _board(f'{prefix}stretcher', at(-0.18, 0.16, 0.17), at(0.18, 0.16, 0.17), 0.02, 0.02, frame)
 
 
-def _set_chair(prefix, x, z, frame, seat, pad, metal=False):
-    _ladder_chair(prefix, x, z, frame, seat, pad, metal=metal)
+SET_X = 0.62    # the sets for two: each chair's seat this far out from the middle, at its end of the top
+SET_Z = 0.1     # and this far forward, with the top's middle (content `places` [±0.62, 0.1], facing ±90)
 
 
-# --- the dining table (base manifest): an oak top to 0.765 on tapered legs, two chairs behind it --------------------
+def _end_chair(prefix, x, z, frame, seat, pad, metal=False):
+    """A set's chair at the end of its top, seat centred on (x, z), its sitter facing in across the top (+x from
+    the left end, -x from the right): built facing the front, then turned a quarter about its seat's middle."""
+    with G.new_parts() as parts:
+        _ladder_chair(prefix, 0, 0, frame, seat, pad, metal=metal)
+    bpy.context.view_layer.update()                     # the last part's matrix is set only on an update
+    turn = Matrix.Translation(_v((x, 0, z))) @ Matrix.Rotation(math.radians(-90 if x < 0 else 90), 4, 'Z')
+    for o in parts:
+        o.matrix_world = turn @ o.matrix_world
+
+
+# --- the dining table (base manifest): an oak top to 0.76 on tapered legs, a chair at each end facing in -----------
 def diningTable():
-    y = 0.765
-    F.box('top', 1.62, 0.04, 0.38, (0, y - 0.02, 0.26), M.top_oak, bevel=0.01)
-    F.box('apron', 1.5, 0.07, 0.3, (0, y - 0.075, 0.27), M.legs_oakd, bevel=0.006)
-    for x in (-0.76, 0.76):
-        for z in (0.1, 0.42):
-            _taper(f'leg{x}{z}', x, z, y - 0.04, 0.025, 0.017, M.legs_oakd, verts=12)
-    F.box('runner', 0.22, 0.004, 0.38, (0, y + 0.002, 0.26), M.runner)
-    _flowers('', 0, 0.33, y + 0.004, h=0.13)
+    y, z = 0.76, SET_Z
+    F.box('top', 0.84, 0.04, 0.75, (0, y - 0.02, z), M.top_oak, bevel=0.01)
+    F.box('apron', 0.72, 0.07, 0.63, (0, y - 0.075, z), M.legs_oakd, bevel=0.006)
+    for x in (-0.36, 0.36):
+        for dz in (-0.315, 0.315):
+            _taper(f'leg{x}{dz}', x, z + dz, y - 0.04, 0.025, 0.017, M.legs_oakd, verts=12)
+    F.box('runner', 0.2, 0.004, 0.75, (0, y + 0.002, z), M.runner)
+    _flowers('', 0, z - 0.2, y + 0.004, h=0.13)
     for s in (-1, 1):
-        _place(f'p{s}', s * 0.5, 0.24, y, s)
-        _set_chair(f'c{s}', s * 0.5, -0.2, M.legs_oakd, M.top_oak, M.seat_sage)
+        _place(f'p{s}', s * 0.25, z, y, s)
+        _end_chair(f'c{s}', s * SET_X, z, M.legs_oakd, M.top_oak, M.seat_sage)
     return _finish('diningTable')
 
 
@@ -307,49 +319,43 @@ def bistroSet():
     return _finish('bistroSet')
 
 
-# --- the glass dining set: a glass top on chrome sled legs, two dark chairs behind it -------------------------------
+# --- the glass dining set: a glass top on two chrome sleds along its sides, a dark chair at each end ----------------
 def diningGlass():
-    y = 0.76
-    z = 0.16
-    F.box('top', 1.7, 0.02, 0.62, (0, y - 0.01, z), M.glass, bevel=0.008)
-    for x in (-0.7, 0.7):
-        for dz in (-0.22, 0.22):
+    y, z = 0.76, SET_Z
+    F.box('top', 0.9, 0.02, 0.8, (0, y - 0.01, z), M.glass, bevel=0.008)
+    for dz in (-0.3, 0.3):                          # the sleds stand along the sides, the ends open for the knees
+        for x in (-0.38, 0.38):
             _rod(f'post{x}{dz}', (x, 0.02, z + dz), (x, y - 0.03, z + dz), 0.018, M.legs_chrome, verts=12)
             F.sphere(f'corner{x}{dz}', 0.018, (x, y - 0.03, z + dz), M.legs_chrome, segments=10, rings=6)
             F.sphere(f'heel{x}{dz}', 0.018, (x, 0.02, z + dz), M.legs_chrome, segments=10, rings=6)
-        _rod(f'foot{x}', (x, 0.02, z - 0.22), (x, 0.02, z + 0.22), 0.018, M.legs_chrome, verts=12)
-        _rod(f'cross{x}', (x, y - 0.03, z - 0.22), (x, y - 0.03, z + 0.22), 0.018, M.legs_chrome, verts=12)
-        for dz in (-0.18, 0.18):
+        _rod(f'foot{dz}', (-0.38, 0.02, z + dz), (0.38, 0.02, z + dz), 0.018, M.legs_chrome, verts=12)
+        _rod(f'cross{dz}', (-0.38, y - 0.03, z + dz), (0.38, y - 0.03, z + dz), 0.018, M.legs_chrome, verts=12)
+        for x in (-0.3, 0.3):
             F.cyl(f'pad{x}{dz}', 0.02, 0.008, (x, y - 0.016, z + dz), M.legs_chrome, verts=10)
-    _rod('rail', (-0.7, y - 0.05, z), (0.7, y - 0.05, z), 0.012, M.legs_chrome, verts=10)
-    _flowers('', 0, 0.2, y, h=0.22)
+    _rod('rail', (0, y - 0.05, z - 0.3), (0, y - 0.05, z + 0.3), 0.012, M.legs_chrome, verts=10)
+    _flowers('', 0, z - 0.22, y, h=0.18)
     for s in (-1, 1):
-        x = s * 0.5
-        _place(f'p{s}', x, 0.06, y, s)
-        F.cyl(f'far_plate{s}', 0.12, 0.012, (x, y + 0.006, 0.36), M.porcelain, verts=20, bevel=0.003)
-        _set_chair(f'c{s}', x, -0.22, M.chair_dark, M.seat_grey, M.seat_grey, metal=True)
+        _place(f'p{s}', s * 0.25, z, y, s)
+        _end_chair(f'c{s}', s * SET_X, z, M.chair_dark, M.seat_grey, M.seat_grey, metal=True)
     return _finish('diningGlass')
 
 
-# --- the farmhouse dining set: a thick oak top on square legs, a runner, two chairs behind it -----------------------
+# --- the farmhouse dining set: a thick oak top with breadboard ends on square legs, a runner, a chair at each end ---
 def diningOak():
-    y = 0.765
-    z = 0.15
-    F.box('top', 1.76, 0.05, 0.66, (0, y - 0.025, z), M.top_oak, bevel=0.012)
+    y, z = 0.76, SET_Z
+    F.box('top', 0.9, 0.05, 0.8, (0, y - 0.025, z), M.top_oak, bevel=0.012)
     for s in (-1, 1):
-        F.box(f'cleat{s}', 0.06, 0.05, 0.66, (s * 0.85, y - 0.025, z), M.top_oak, bevel=0.01)   # breadboard ends
-        F.box(f'apron{s}', 1.5, 0.08, 0.025, (0, y - 0.09, z + s * 0.26), M.legs_oakd, bevel=0.005)
-        F.box(f'apron_end{s}', 0.025, 0.08, 0.5, (s * 0.76, y - 0.09, z), M.legs_oakd, bevel=0.005)
-    for x in (-0.79, 0.79):
-        for dz in (-0.27, 0.27):
+        F.box(f'cleat{s}', 0.06, 0.05, 0.8, (s * 0.42, y - 0.025, z), M.top_oak, bevel=0.01)   # breadboard ends
+        F.box(f'apron{s}', 0.66, 0.08, 0.025, (0, y - 0.09, z + s * 0.32), M.legs_oakd, bevel=0.005)
+        F.box(f'apron_end{s}', 0.025, 0.08, 0.6, (s * 0.34, y - 0.09, z), M.legs_oakd, bevel=0.005)
+    for x in (-0.37, 0.37):
+        for dz in (-0.33, 0.33):
             _taper(f'leg{x}{dz}', x, z + dz, y - 0.05, 0.04, 0.03, M.legs_oakd, square=True)
-    F.box('runner', 0.3, 0.004, 0.66, (0, y + 0.002, z), M.runner)
-    _flowers('', 0, 0.2, y + 0.004, h=0.2)
+    F.box('runner', 0.24, 0.004, 0.8, (0, y + 0.002, z), M.runner)
+    _flowers('', 0, z - 0.2, y + 0.004, h=0.18)
     for s in (-1, 1):
-        x = s * 0.5
-        _place(f'p{s}', x, 0.04, y, s)
-        F.cyl(f'far_plate{s}', 0.12, 0.012, (x, y + 0.006, 0.34), M.porcelain, verts=20, bevel=0.003)
-        _set_chair(f'c{s}', x, -0.22, M.legs_oakd, M.top_oak, M.seat_sage)
+        _place(f'p{s}', s * 0.27, z, y, s)
+        _end_chair(f'c{s}', s * SET_X, z, M.legs_oakd, M.top_oak, M.seat_sage)
     return _finish('diningOak')
 
 
@@ -673,18 +679,19 @@ def chairFolding():
 
 
 def chairArm():
-    """Carver chair (catalog2): an oak armchair, padded sage seat and back, seat at 0.5."""
-    x, z0, z1 = _legs('', M.frame_oak, 0.54, 0.42, 0.43, 0.92, back_t=0.04, r=0.021)
-    F.box('seat', 0.54, 0.05, 0.44, (0, 0.44, SZ), M.frame_oak, bevel=0.012)
-    F.box('cushion', 0.46, 0.06, 0.4, (0, 0.49, SZ + 0.01), M.seat_sage, bevel=0.022, bevel_segments=3)
-    F.box('back_pad', 0.42, 0.3, 0.05, (0, 0.72, SZ - 0.17), M.seat_sage, rot=(-6, 0, 0), bevel=0.02,
+    """Carver chair (catalog2): an oak armchair, padded sage seat and back, the cushion's top at 0.475 (sat on at
+    0.47, a dining chair's height, so it goes at the head of the same table)."""
+    x, z0, z1 = _legs('', M.frame_oak, 0.54, 0.42, 0.39, 0.92, back_t=0.04, r=0.021)
+    F.box('seat', 0.54, 0.05, 0.44, (0, 0.40, SZ), M.frame_oak, bevel=0.012)
+    F.box('cushion', 0.46, 0.06, 0.4, (0, 0.445, SZ + 0.01), M.seat_sage, bevel=0.022, bevel_segments=3)
+    F.box('back_pad', 0.42, 0.3, 0.05, (0, 0.70, SZ - 0.17), M.seat_sage, rot=(-6, 0, 0), bevel=0.02,
           bevel_segments=3)
     zz = z0 + 0.02 - 0.88 * math.tan(math.radians(4))
     _board('top_rail', (-x - 0.01, 0.88, zz), (x + 0.01, 0.88, zz), 0.07, 0.035, M.frame_oak, face=(0, 0.07, 1),
            bevel=0.012)
     for s in (-1, 1):
         F.box(f'arm{s}', 0.06, 0.03, 0.46, (s * 0.255, 0.66, SZ - 0.02), M.frame_oak, bevel=0.01)
-        F.box(f'arm_post{s}', 0.03, 0.2, 0.03, (s * 0.255, 0.55, SZ + 0.18), M.frame_oak, bevel=0.006)
+        F.box(f'arm_post{s}', 0.03, 0.24, 0.03, (s * 0.255, 0.53, SZ + 0.18), M.frame_oak, bevel=0.006)
         F.box(f'stretcher{s}', 0.025, 0.025, 0.36, (s * x, 0.18, SZ), M.frame_oak, bevel=0.005)
     F.box('stretcher_front', 0.46, 0.025, 0.025, (0, 0.2, SZ + 0.18), M.frame_oak, bevel=0.005)
     return _finish('chairArm')
@@ -951,13 +958,13 @@ STOOL = {'uses': {'sit': 'swivel', 'drink': 'swivel'}, 'hold': 0.6, 'ride': 'swi
 FAMILY = G.Family(
     'dining', M,
     [  # K7: dining tables
-     G.Model('diningTable', diningTable, size=(1.62, 1.032, 0.867), centre=(0, 0.016), key='model.diningTable',
+     G.Model('diningTable', diningTable, size=(1.674, 1.027, 0.75), centre=(0, 0.1), key='model.diningTable',
              paint=DINING_TOP),
      G.Model('bistroSet', bistroSet, size=(0.62, 1.004, 0.912), key='model.bistroSet', centre=(0, 0.024),
              paint=[('top_oak', 'Top'), ('legs_black', 'Frame'), ('seat_sage', 'Seats')]),
-     G.Model('diningGlass', diningGlass, size=(1.7, 1.113, 0.913), centre=(0, 0.024), key='model.diningGlass',
+     G.Model('diningGlass', diningGlass, size=(1.666, 1.073, 0.8), centre=(0, 0.1), key='model.diningGlass',
              paint=[('glass', 'Top'), ('legs_chrome', 'Legs')]),
-     G.Model('diningOak', diningOak, size=(1.76, 1.102, 0.917), centre=(0, 0.021), key='model.diningOak',
+     G.Model('diningOak', diningOak, size=(1.674, 1.077, 0.8), centre=(0, 0.1), key='model.diningOak',
              paint=DINING_TOP),
      G.Model('tableSquare2', tableSquare2, size=(0.82, 0.75, 0.82), key='model.tableSquare2', paint=DINING_TOP),
      G.Model('tableBistroRound', tableBistroRound, size=(0.72, 0.75, 0.72), key='model.tableBistroRound',
