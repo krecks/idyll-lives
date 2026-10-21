@@ -244,8 +244,8 @@
       "category": "living",
       "slots": 2,
       "places": [
-        { "at": [-0.5, 0], "facing": 45 },
-        { "at": [0.5, 0], "facing": -45 }
+        { "at": [-0.72, 0], "facing": 90 },
+        { "at": [0.72, 0], "facing": -90 }
       ],
       "description": "A low table with two cushions and an always-warm teapot where two residents share tea and talk; charming hosts (Charisma 2+) come away warm-hearted.",
       "interactions": [
