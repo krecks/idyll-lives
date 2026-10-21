@@ -289,6 +289,13 @@ const BLANKET_BEDS = new Set(['bed', 'lazy.snoozecloudBed', 'bedSingle', 'bedBun
  * paints as its "Bedding", else this (the futon's own quilt, a throw).
  */
 const QUILT_PART: Record<string, string> = { bedFuton: 'quilt_oat', wallBed: 'throw', 'lazy.snoozecloudBed': 'throw' };
+/**
+ * The thighs' turn forward from the hips (rad) in `sit` (clips/seated.ts), that the shells' seated corrective is
+ * made for (crates/tools/src/characters/clothes.rs `SIT_FLEX`, 76°): `writeSit` weighs it by the thighs' own.
+ */
+const SIT_FLEX = (76 * Math.PI) / 180;
+/** The thighs' turn (rad, their mean) below which the shells keep their standing shape (`writeSit`). */
+const SIT_FROM = (15 * Math.PI) / 180;
 /** A quilt's colour until its bed's file says (sRGB). */
 const QUILT_COLOUR = '#E7E0D4';
 /**
@@ -2447,6 +2454,7 @@ export class Characters {
       if (ride) this.riding(ride);
       if (inArms > 0) this.cradled(rig, this.heldBy[i], inArms);
       skin(set, rig.body, this.qA, this.pA, this.add, pl, this.scratch, this.data, this.row(i), this.headTmp);
+      this.writeSit(rig, i);
       if (rig.cuddleBaby >= 0 && rig.liftW > 0) this.writeCradle(i);
       this.writeBlanket(rig, i, pose, dt, appeared);
       this.writeCarried(rig, i, item);
@@ -3885,6 +3893,28 @@ export class Characters {
     writeOutfit(worn, this.data, this.row(i) + this.set!.bones.length * 16);
     this.bare[i] = worn.bare;
     rig.skirt = worn.parts.includes('bottom.skirt') && !(worn.bare & SHELL_BITS.bottom);
+  }
+
+  /**
+   * How far Sim `i`'s thighs are turned forward from its hips, from its skinning matrices just written (0 at
+   * rest .. 1 as `sit` has them, `SIT_FLEX`; both thighs' mean, at its body's size): appearance texel 4 b, how much
+   * of the shells' seated corrective it wears (a skirt on the lap, not standing out round the seat; material.ts).
+   */
+  private writeSit(rig: SimRig, i: number): void {
+    const set = this.set!;
+    const d = this.data;
+    const row = this.row(i);
+    const p = row + set.bone.pelvis * 16;
+    let flex = 0;
+    for (const thigh of [set.bone.thigh_l, set.bone.thigh_r]) {
+      // The thigh's rest down (0, -1, 0) as posed, in the pelvis' rest frame (columns: the matrices are column-major).
+      const o = row + thigh * 16;
+      const y = -(d[p + 4] * d[o + 4] + d[p + 5] * d[o + 5] + d[p + 6] * d[o + 6]);
+      const z = -(d[p + 8] * d[o + 4] + d[p + 9] * d[o + 5] + d[p + 10] * d[o + 6]);
+      flex += Math.max(0, Math.atan2(z, -y));
+    }
+    // (From `SIT_FROM`: a stride's swing of the legs leaves the skirt as it hangs.)
+    d[row + set.bones.length * 16 + 18] = clamp((flex / 2 - SIT_FROM) / (SIT_FLEX - SIT_FROM), 0, 1) * rig.size;
   }
 
   /** A base body's heights for the towel and swimwear (`OutfitFit`), from its joints at rest. */
