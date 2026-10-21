@@ -165,10 +165,10 @@ def snoozecloudBed():
 
 
 # --- the daydream nap pod (1x1): an egg chair open to the front, seat top 0.45, a hood that swings over -----
-POD = (0.0, 0.78, 0.04)    # the egg's centre (x, height, depth)
-POD_R, POD_H = 0.44, 0.56  # its radius across and its half height (a sitter's head reaches about 1.3)
-HOOD = (0.0, 0.95, 0.04)   # the hood's centre: a sphere about the egg's upper half
-HOOD_R = 0.48
+POD = (0.0, 0.82, 0.09)    # the egg's centre (x, height, depth)
+POD_R, POD_H = 0.44, 0.66  # its radius across and its half height (a grown-up sitter's crown reaches about 1.4)
+HOOD = (0.0, 1.05, 0.09)   # the hood's centre: a sphere about the egg's upper half, clear of a grown-up's head
+HOOD_R = 0.5      # 2026-10-21: 0.48 about 0.95, the hood closing onto the head (A-packs-04)
 
 
 def napPod():
@@ -189,61 +189,73 @@ def napPod():
         F.cone('stem', 0.07, 0.045, 0.24, (0, 0.16, cz), M.chrome, verts=16)
         F.cyl('base_disc', 0.28, 0.04, (0, 0.02, cz), M.chrome, verts=32, bevel=0.01)
         # the cushions: a round seat (top 0.45), a back cushion and a little pillow
-        F.cyl('seat', 0.3, 0.1, (0, 0.4, 0.05), M.seat, verts=28, bevel=0.04, bevel_segments=3)
-        F.sphere('back_cushion', 0.3, (0, 0.78, -0.24), M.seat, scale=(1, 0.3, 1.2), segments=20, rings=12)
-        F.box('pillow', 0.26, 0.2, 0.12, (0.17, 0.56, -0.06), M.blush, rot=(-20, 0, 20), bevel=0.05, bevel_segments=3)
+        F.cyl('seat', 0.3, 0.1, (0, 0.4, 0.1), M.seat, verts=28, bevel=0.04, bevel_segments=3)
+        F.sphere('back_cushion', 0.3, (0, 0.84, -0.21), M.seat, scale=(1, 0.3, 1.3), segments=20, rings=12)
+        F.box('pillow', 0.26, 0.2, 0.12, (0.17, 0.56, -0.01), M.blush, rot=(-20, 0, 20), bevel=0.05, bevel_segments=3)
         # a shaggy rug in front
-        F.cyl('rug', 0.27, 0.016, (0, 0.008, 0.3), M.shag, verts=24, scale=(1, 0.55, 1), bevel=0.006)
+        F.cyl('rug', 0.27, 0.016, (0, 0.008, 0.33), M.shag, verts=24, scale=(1, 0.55, 1), bevel=0.006)
     G.join(still, 'body', origin=(0, 0, 0))
     # The hood: a band of a sphere about the egg's upper half, folded back over the egg's top and turning about
     # that sphere's centre; `hood` swings it 60° forward, half over the opening.
     hood = _sphere_band('hood', F, HOOD, HOOD_R, HOOD_R + 0.02, (-62, 62), (-108, -20), M.hood)
     G.join([hood], 'hood')
     hood = G.hinged(hood, F.at(*HOOD))
-    objs = G.settle()      # on its Model centre: the back on the wall face
+    objs = G.settle(centre=False)   # built in place: the seat under the sitter, the hood over their head
     G.swing(hood, 'hood', 60, seconds=1.0, axis='X')
     return objs
 
 
 # --- the heated quilt table (2x1): a kotatsu in front, two poufs (tops 0.45) at x = ±0.5 behind it ---------
 TOP_Y = 0.6        # the underside of the table top
-FLAP_Z = 0.035     # the quilt's back panel, facing the sitters
+TZ0, TZ1 = -0.03, 0.47   # the top's back and front edges (depth): 0.5 deep, so the sitters' legs and feet go under it
+FLAP_Z = TZ0 - 0.012     # the quilt's back edge, hung over the sitters' laps
+SEAT_Z = -0.2      # the poufs' middles (depth): the hips there (`furniture.json` `lazy.quiltTable`)
 
 
 def quiltTable():
     F = G.GameFrame()
+    tz, td = (TZ0 + TZ1) / 2, TZ1 - TZ0
     with G.new_parts() as still:
-        F.box('top', 1.74, 0.035, 0.42, (0, TOP_Y + 0.0175, 0.23), M.oak, bevel=0.012)
-        F.box('quilt', 1.7, TOP_Y - 0.01, 0.4, (0, (TOP_Y - 0.01) / 2 + 0.005, 0.25), M.quilt, bevel=0.07,
-              bevel_segments=3)
-        F.box('quilt_band', 1.6, 0.03, 0.402, (0, TOP_Y - 0.03, 0.25), M.quilt_band)
-        F.box('heater_glow', 1.44, 0.24, 0.006, (0, 0.44, 0.047), M.heater)
-        F.box('quilt_skirt', 1.62, 0.3, 0.03, (0, 0.17, FLAP_Z), M.quilt, bevel=0.012)
-        # a bowl of mandarins, two mugs, a plate of biscuits
+        F.box('top', 1.74, 0.035, td, (0, TOP_Y + 0.0175, tz), M.oak, bevel=0.012)
+        for x in (-0.82, 0.82):                                       # the legs, inside the quilt
+            for z in (TZ0 + 0.05, TZ1 - 0.05):
+                F.box(_name('leg'), 0.05, TOP_Y, 0.05, (x, TOP_Y / 2, z), M.oak, bevel=0.008)
+        F.box('heater', 0.36, 0.05, 0.3, (0, TOP_Y - 0.025, tz), M.heater, bevel=0.01)   # under the top
+        # the quilt, draped over the top and down its front and ends to the floor: hollow, the legs go in from the
+        # back under its flap (2026-10-21: a solid block 0.4 deep, the feet out of its front: I-packs-01)
+        F.box('quilt', 1.8, 0.03, td + 0.03, (0, TOP_Y + 0.05, tz), M.quilt, bevel=0.012)
+        F.box('quilt_front', 1.8, TOP_Y + 0.04, 0.025, (0, (TOP_Y + 0.04) / 2 + 0.01, TZ1 + 0.0125), M.quilt,
+              bevel=0.01)
+        for s in (-1, 1):
+            F.box(_name('quilt_end'), 0.025, TOP_Y + 0.04, td + 0.02, (s * 0.8875, (TOP_Y + 0.04) / 2 + 0.01, tz + 0.005),
+                  M.quilt, bevel=0.01)
+        F.box('quilt_band', 1.81, 0.03, 0.03, (0, TOP_Y - 0.03, TZ1 + 0.014), M.quilt_band)
+        # a bowl of mandarins, two mugs, a plate of biscuits on the quilt's top
+        ty = TOP_Y + 0.065
         G.revolve('bowl', [(0, 0), (0.06, 0), (0.13, 0.06), (0.125, 0.065), (0.055, 0.008), (0, 0.008)],
-                  at=F.at(0, TOP_Y + 0.035, 0.25), material=M.porcelain, segments=20)
+                  at=F.at(0, ty, 0.25), material=M.porcelain, segments=20)
         for dx, dz, dy in ((-0.05, 0.22, 0), (0.05, 0.27, 0), (0.0, 0.31, 0), (-0.02, 0.2, 0.04), (0.04, 0.2, 0.0)):
-            F.sphere(_name('mandarin'), 0.035, (dx, TOP_Y + 0.07 + dy, dz), M.mandarin, scale=(1, 1, 0.85), segments=12,
+            F.sphere(_name('mandarin'), 0.035, (dx, ty + 0.035 + dy, dz), M.mandarin, scale=(1, 1, 0.85), segments=12,
                      rings=8)
         for s in (-1, 1):
             x = s * 0.5
             G.revolve(_name('mug'), [(0, 0), (0.04, 0), (0.042, 0.09), (0.037, 0.09), (0.035, 0.01), (0, 0.01)],
-                      at=F.at(x + s * 0.12, TOP_Y + 0.035, 0.16), material=M.porcelain, segments=14)
+                      at=F.at(x + s * 0.12, ty, 0.12), material=M.porcelain, segments=14)
             # the pouf, its seat cushion (top 0.45) and a back cushion against the wall
-            F.box(_name('pouf'), 0.5, 0.38, 0.46, (x, 0.2, -0.12), M.pouf, bevel=0.12, bevel_segments=3)
-            F.box(_name('pouf_top'), 0.46, 0.06, 0.44, (x, 0.42, -0.12), M.pouf_top, bevel=0.025, bevel_segments=2)
-            F.box(_name('back_cushion'), 0.44, 0.3, 0.1, (x, 0.6, -0.37), M.sage if s < 0 else M.lilac, rot=(12, 0, 0),
-                  bevel=0.045, bevel_segments=3)
-        F.box('snack_plate', 0.2, 0.012, 0.14, (0.6, TOP_Y + 0.041, 0.32), M.porcelain, bevel=0.004)
+            F.box(_name('pouf'), 0.5, 0.38, 0.44, (x, 0.2, SEAT_Z), M.pouf, bevel=0.12, bevel_segments=3)
+            F.box(_name('pouf_top'), 0.46, 0.06, 0.42, (x, 0.42, SEAT_Z), M.pouf_top, bevel=0.025, bevel_segments=2)
+            F.box(_name('back_cushion'), 0.44, 0.3, 0.07, (x, 0.6, WALL + 0.045), M.sage if s < 0 else M.lilac,
+                  rot=(5, 0, 0), bevel=0.03, bevel_segments=3)
+        F.box('snack_plate', 0.2, 0.012, 0.14, (0.6, ty + 0.006, 0.32), M.porcelain, bevel=0.004)
         for dx, dz in ((-0.02, -0.01), (0.03, 0.02)):
-            F.cyl(_name('biscuit'), 0.025, 0.014, (0.6 + dx, TOP_Y + 0.054, 0.32 + dz), M.biscuit, verts=12)
+            F.cyl(_name('biscuit'), 0.025, 0.014, (0.6 + dx, ty + 0.019, 0.32 + dz), M.biscuit, verts=12)
     G.join(still, 'body', origin=(0, 0, 0))
-    # The quilt's back edge, hung from the table top over the skirt: `quilt` lifts it over the sitters' laps.
+    # The quilt's back edge, hung from the table top: `quilt` lifts it over the sitters' laps.
     with G.new_parts() as flap:
-        F.box('quilt_flap', 1.62, 0.29, 0.03, (0, TOP_Y - 0.145, FLAP_Z + 0.004), M.quilt, bevel=0.012)
-        F.box('flap_band', 1.62, 0.03, 0.032, (0, TOP_Y - 0.03, FLAP_Z), M.quilt_band)
-    flap = G.hinged(G.join(flap, 'quilt_flap'), F.at(0, TOP_Y, FLAP_Z))
-    objs = G.settle()      # on its Model centre: the back on the wall face
+        F.box('quilt_flap', 1.62, 0.29, 0.025, (0, TOP_Y - 0.1, FLAP_Z), M.quilt, bevel=0.01)
+        F.box('flap_band', 1.62, 0.03, 0.028, (0, TOP_Y + 0.03, FLAP_Z), M.quilt_band)
+    flap = G.hinged(G.join(flap, 'quilt_flap'), F.at(0, TOP_Y + 0.05, FLAP_Z))
+    objs = G.settle(centre=False)   # built in place: the poufs under the sitters (`furniture.json`), the back on the wall
     G.swing(flap, 'quilt', 70, seconds=0.8, axis='X')
     return objs
 
@@ -304,6 +316,7 @@ def deliveryLocker():
 
 # --- the effortless vibration plate (1x1): a deck at 0.125 the resident stands on, a column with a console --
 DECK = (0.0, 0.105, 0.12)   # the deck's middle, at its underside
+BAR_Y = 1.1                 # the handlebar's height: a grown-up's waist on the deck
 
 
 def vibePlate():
@@ -312,12 +325,17 @@ def vibePlate():
     with G.new_parts() as still:
         F.box('base', 0.62, dy, 0.6, (0, dy / 2, dz - 0.02), M.plate, bevel=0.04, bevel_segments=3)
         F.box('band', 0.63, 0.02, 0.61, (0, 0.025, dz - 0.02), M.lime, bevel=0.008)
-        G.rod('column', F.at(0, 0.09, -0.22), F.at(0, 1.0, -0.3), 0.04, material=M.plate, verts=16)
-        F.box('handlebar', 0.5, 0.05, 0.08, (0, 1.02, -0.29), M.plate, bevel=0.022)
+        # the column at the plate's far end, which the stander faces (they step on from the tile in front and face
+        # in), its handlebar's arms reaching back to either side of them at waist height, the grips by their hands
+        # (2026-10-21: a short bar at the hip, 30 cm ahead: I-packs-04)
+        G.rod('column', F.at(0, 0.09, -0.24), F.at(0, BAR_Y, -0.32), 0.04, material=M.plate, verts=16)
+        F.box('handlebar', 0.56, 0.05, 0.07, (0, BAR_Y, -0.32), M.plate, bevel=0.02)
         for s in (-1, 1):
-            F.box(_name('grip'), 0.09, 0.065, 0.09, (s * 0.24, 1.02, -0.27), M.lime, bevel=0.028)
-        F.box('console', 0.22, 0.14, 0.04, (0, 1.1, -0.29), M.bezel, rot=(30, 0, 0), bevel=0.015)
-        F.box('console_screen', 0.18, 0.09, 0.004, (0, 1.105, -0.268), M.readout, rot=(30, 0, 0))
+            G.rod(_name('bar_arm'), F.at(s * 0.26, BAR_Y, -0.32), F.at(s * 0.26, BAR_Y - 0.02, -0.08), 0.02,
+                  material=M.plate, verts=10)
+            F.box(_name('grip'), 0.065, 0.065, 0.16, (s * 0.26, BAR_Y - 0.02, -0.12), M.lime, bevel=0.028)
+        F.box('console', 0.22, 0.14, 0.04, (0, BAR_Y + 0.09, -0.32), M.bezel, rot=(30, 0, 0), bevel=0.015)
+        F.box('console_screen', 0.18, 0.09, 0.004, (0, BAR_Y + 0.095, -0.298), M.readout, rot=(30, 0, 0))
         G.revolve('bottle', [(0, 0), (0.035, 0), (0.035, 0.17), (0.02, 0.2), (0, 0.2)], at=F.at(0.32, 0, -0.32),
                   material=M.bottle, segments=14)
         F.cyl('bottle_cap', 0.018, 0.02, (0.32, 0.21, -0.32), M.white, verts=10)
@@ -381,16 +399,16 @@ FAMILY = G.Family(
     [G.Model('snoozecloudBed', snoozecloudBed, size=(1.86, 1.292, 1.86), key='model.lazy.snoozecloudBed',
              motions={'uses': {'sleepIn': 'head_up'}, 'hold': 2},
              paint=[('body', 'Body'), ('upholstery', 'Upholstery'), ('throw', 'Throw')]),
-     G.Model('napPod', napPod, size=(0.883, 1.42, 0.908), key='model.lazy.napPod', centre=(0, 0.024),
+     G.Model('napPod', napPod, size=(0.918, 1.539, 0.908), key='model.lazy.napPod', centre=(0, 0.0243),
              motions={'uses': {'powerNap': 'hood', 'curlUp': 'hood'}},
              paint=[('shell', 'Body'), ('seat', 'Upholstery'), ('hood', 'Hood')]),
-     G.Model('quiltTable', quiltTable, size=(1.74, 0.743, 0.892), key='model.lazy.quiltTable', centre=(0, 0.016),
+     G.Model('quiltTable', quiltTable, size=(1.81, 0.77, 0.929), key='model.lazy.quiltTable', centre=(0, 0.0343),
              motions={'uses': {'tuckIn': 'quilt', 'doze': 'quilt'}},
              paint=[('oak', 'Body'), ('quilt', 'Upholstery'), ('pouf', 'Poufs')]),
      G.Model('deliveryLocker', deliveryLocker, size=(0.86, 1.96, 0.81), key='model.lazy.deliveryLocker', centre=(0, -0.025),
              motions={'uses': {'takeout': 'door_open', 'noodles': 'door_open'}, 'hold': 2},
              paint=[('locker', 'Body'), ('door', 'Doors'), ('accent', 'Trim')]),
-     G.Model('vibePlate', vibePlate, size=(0.67, 1.165, 0.759), key='model.lazy.vibePlate', centre=(0.02, 0.025),
+     G.Model('vibePlate', vibePlate, size=(0.67, 1.255, 0.771), key='model.lazy.vibePlate', centre=(0.02, 0.0193),
              motions={'loops': {'shake': 'shake'}},
              paint=[('plate', 'Body'), ('lime', 'Trim'), ('pad', 'Deck')]),
      G.Model('smartHub', smartHub, size=(0.6, 0.806, 0.842), key='model.lazy.smartHub', centre=(0, -0.009),
