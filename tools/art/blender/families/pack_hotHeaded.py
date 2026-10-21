@@ -303,16 +303,18 @@ def coolDownCushion():
         F.cyl('incense_holder', 0.03, 0.012, (0.3, 0.006, -0.3), M.brass, verts=10)
         G.rod('incense', F.at(0.3, 0.01, -0.3), F.at(0.33, 0.22, -0.33), 0.003, material=M.ember, verts=4)
     G.join(still, 'body', origin=(0, 0, 0))
-    # The zafu, its band and pleats, origin on its underside: `sink_in` presses it to the seat height (0.40).
+    # The zafu, a real one's size (0.38 across, 10 cm on the 8 cm zabuton), its band and pleats, origin on its
+    # underside: `sink_in` presses it to the seat height (0.17), sat on cross-legged (a seat under 0.2 m: the floor
+    # clips). 2026-10-21: it was a 0.45 m pouf (M-packs-12).
     with G.new_parts() as zafu:
-        G.revolve('zafu', [(0, 0), (0.22, 0), (0.248, 0.02), (0.258, 0.08), (0.258, 0.26), (0.248, 0.33),
-                           (0.22, 0.36), (0.12, 0.37), (0, 0.37)], at=F.at(0, 0.08, 0), material=M.zafu, segments=28)
-        G.torus('zafu_band', 0.259, 0.014, at=F.at(0, 0.25, 0), material=M.calm_deep, major_segments=28,
+        G.revolve('zafu', [(0, 0), (0.165, 0), (0.185, 0.012), (0.192, 0.03), (0.192, 0.07), (0.185, 0.09),
+                           (0.165, 0.1), (0.09, 0.102), (0, 0.102)], at=F.at(0, 0.08, 0), material=M.zafu, segments=28)
+        G.torus('zafu_band', 0.193, 0.01, at=F.at(0, 0.13, 0), material=M.calm_deep, major_segments=28,
                 minor_segments=4)
         for a in range(0, 360, 45):
-            F.box(_name('pleat'), 0.012, 0.24, 0.02, (0.255 * G.cosd(a), 0.25, 0.255 * G.sind(a)), M.calm_deep,
+            F.box(_name('pleat'), 0.01, 0.06, 0.016, (0.19 * G.cosd(a), 0.13, 0.19 * G.sind(a)), M.calm_deep,
                   rot=(0, 0, -a))
-        F.cyl('zafu_button', 0.025, 0.012, (0, 0.448, 0), M.calm_deep, verts=10)
+        F.cyl('zafu_button', 0.02, 0.008, (0, 0.184, 0), M.calm_deep, verts=10)
     zafu = G.hinged(G.join(zafu, 'zafu'), F.at(0, 0.08, 0))
     objs = G.settle()      # on its Model centre: the back on the wall face
     G.squash(zafu, 'sink_in', (1.03, 1.03, 0.86), seconds=0.6)
@@ -323,35 +325,35 @@ def coolDownCushion():
 def grudgeJournal():
     F = G.GameFrame()
     with G.new_parts() as still:
-        F.box('top', 0.84, 0.03, 0.3, (0, 0.745, 0.3), M.body, bevel=0.008)
+        F.box('top', 0.84, 0.03, 0.3, (0, 0.73, 0.3), M.body, bevel=0.008)
         for x in (-0.39, 0.39):
             for z in (0.18, 0.42):
-                F.box(_name('leg'), 0.035, 0.73, 0.035, (x, 0.365, z), M.steel_dark, bevel=0.006)
+                F.box(_name('leg'), 0.035, 0.715, 0.035, (x, 0.3575, z), M.steel_dark, bevel=0.006)
             F.box(_name('side_rail'), 0.025, 0.03, 0.22, (x, 0.12, 0.3), M.steel_dark, bevel=0.004)
-        F.box('back_rail', 0.76, 0.05, 0.02, (0, 0.69, 0.43), M.steel_dark, bevel=0.004)
+        F.box('back_rail', 0.76, 0.05, 0.02, (0, 0.675, 0.43), M.steel_dark, bevel=0.004)
         # the drawer's case, hung under the top, open towards the writer
-        F.box('case_top', 0.36, 0.012, 0.28, (0.22, 0.724, 0.3), M.drawer)
-        F.box('case_floor', 0.36, 0.012, 0.28, (0.22, 0.576, 0.3), M.drawer)
+        F.box('case_top', 0.36, 0.012, 0.28, (0.22, 0.709, 0.3), M.drawer)
+        F.box('case_floor', 0.36, 0.012, 0.28, (0.22, 0.561, 0.3), M.drawer)
         for x in (0.045, 0.395):
-            F.box(_name('case_side'), 0.012, 0.16, 0.28, (x, 0.65, 0.3), M.drawer)
-        F.box('case_back', 0.36, 0.16, 0.012, (0.22, 0.65, 0.434), M.drawer)
+            F.box(_name('case_side'), 0.012, 0.16, 0.28, (x, 0.635, 0.3), M.drawer)
+        F.box('case_back', 0.36, 0.16, 0.012, (0.22, 0.635, 0.434), M.drawer)
         # the open journal, the pen, crumpled pages, a cactus and a red desk lamp
-        F.box('journal_cover', 0.36, 0.008, 0.24, (-0.02, 0.764, 0.28), M.journal, bevel=0.003)
+        F.box('journal_cover', 0.36, 0.008, 0.24, (-0.02, 0.749, 0.28), M.journal, bevel=0.003)
         for s in (-1, 1):
-            F.box(_name('page'), 0.165, 0.012, 0.215, (-0.02 + s * 0.087, 0.774, 0.28), M.paper, rot=(0, 0, s * -2))
-        F.cyl('pen', 0.006, 0.15, (0.17, 0.775, 0.24), M.dark, rot=(90, 0, 35), verts=6)
-        for x, y, z, r in ((-0.3, 0.795, 0.22, 0.035), (-0.25, 0.79, 0.36, 0.03), (0.3, 0.035, 0.3, 0.035),
+            F.box(_name('page'), 0.165, 0.012, 0.215, (-0.02 + s * 0.087, 0.759, 0.28), M.paper, rot=(0, 0, s * -2))
+        F.cyl('pen', 0.006, 0.15, (0.17, 0.76, 0.24), M.dark, rot=(90, 0, 35), verts=6)
+        for x, y, z, r in ((-0.3, 0.78, 0.22, 0.035), (-0.25, 0.775, 0.36, 0.03), (0.3, 0.035, 0.3, 0.035),
                            (-0.36, 0.02, 0.08, 0.03)):
             G.boulder(_name('crumple'), r, at=F.at(x, y - r, z), material=M.paper, seed=x * 10, noise=0.35,
                       subdivisions=1)
         G.revolve('bin', [(0, 0), (0.085, 0), (0.1, 0.26), (0.094, 0.26), (0.08, 0.008), (0, 0.008)],
                   at=F.at(-0.3, 0, 0.3), material=M.steel, segments=18)
-        F.cone('cactus_pot', 0.045, 0.05, 0.08, (0.3, 0.8, 0.38), M.ember, verts=12)
-        F.sphere('cactus', 0.035, (0.3, 0.89, 0.38), M.cactus, scale=(1, 1, 1.9), segments=10, rings=8)
-        F.cyl('lamp_foot', 0.055, 0.015, (0.33, 0.768, 0.18), M.dark, verts=14)
-        G.rod('lamp_arm', F.at(0.33, 0.77, 0.18), F.at(0.3, 1.0, 0.24), 0.008, material=M.dark, verts=6)
-        G.rod('lamp_arm2', F.at(0.3, 1.0, 0.24), F.at(0.22, 0.98, 0.2), 0.008, material=M.dark, verts=6)
-        G.revolve('lamp_shade', [(0.06, 0), (0.05, 0.02), (0.025, 0.08), (0, 0.085)], at=F.at(0.2, 0.92, 0.19),
+        F.cone('cactus_pot', 0.045, 0.05, 0.08, (0.3, 0.785, 0.38), M.ember, verts=12)
+        F.sphere('cactus', 0.035, (0.3, 0.875, 0.38), M.cactus, scale=(1, 1, 1.9), segments=10, rings=8)
+        F.cyl('lamp_foot', 0.055, 0.015, (0.33, 0.753, 0.18), M.dark, verts=14)
+        G.rod('lamp_arm', F.at(0.33, 0.755, 0.18), F.at(0.3, 0.985, 0.24), 0.008, material=M.dark, verts=6)
+        G.rod('lamp_arm2', F.at(0.3, 0.985, 0.24), F.at(0.22, 0.965, 0.2), 0.008, material=M.dark, verts=6)
+        G.revolve('lamp_shade', [(0.06, 0), (0.05, 0.02), (0.025, 0.08), (0, 0.085)], at=F.at(0.2, 0.905, 0.19),
                   material=M.fire, segments=16, rot=(25, 0, -20))
         # the chair, the writer's seat at 0.45
         F.box('chair_seat', 0.42, 0.04, 0.4, (0, 0.405, 0.0), M.body, bevel=0.012)
@@ -363,14 +365,14 @@ def grudgeJournal():
     G.join(still, 'body', origin=(0, 0, 0))
     # The drawer: its front, tray and the letters in it; `drawer_open` slides it out towards the writer.
     with G.new_parts() as drawer:
-        F.box('drawer_front', 0.34, 0.13, 0.016, (0.22, 0.65, 0.162), M.drawer, bevel=0.004)
-        F.box('drawer_pull', 0.14, 0.014, 0.014, (0.22, 0.67, 0.148), M.steel, bevel=0.004)
-        F.box('drawer_tray', 0.31, 0.01, 0.25, (0.22, 0.592, 0.29), M.drawer)
+        F.box('drawer_front', 0.34, 0.13, 0.016, (0.22, 0.635, 0.162), M.drawer, bevel=0.004)
+        F.box('drawer_pull', 0.14, 0.014, 0.014, (0.22, 0.655, 0.148), M.steel, bevel=0.004)
+        F.box('drawer_tray', 0.31, 0.01, 0.25, (0.22, 0.577, 0.29), M.drawer)
         for x in (0.07, 0.37):
-            F.box(_name('drawer_side'), 0.008, 0.08, 0.25, (x, 0.63, 0.29), M.drawer)
-        F.box('drawer_back', 0.31, 0.08, 0.008, (0.22, 0.63, 0.41), M.drawer)
+            F.box(_name('drawer_side'), 0.008, 0.08, 0.25, (x, 0.615, 0.29), M.drawer)
+        F.box('drawer_back', 0.31, 0.08, 0.008, (0.22, 0.615, 0.41), M.drawer)
         for k, (dx, dz, r) in enumerate(((-0.05, 0.25, 5), (0.04, 0.3, -8), (0.0, 0.34, 3))):
-            F.box(_name('letter'), 0.16, 0.012, 0.11, (0.22 + dx, 0.603 + 0.012 * k, dz), M.paper, rot=(0, 0, r))
+            F.box(_name('letter'), 0.16, 0.012, 0.11, (0.22 + dx, 0.588 + 0.012 * k, dz), M.paper, rot=(0, 0, r))
     drawer = G.join(drawer, 'drawer')
     objs = G.settle(centre=False)
     G.slide(drawer, 'drawer_open', (0, 0.17, 0), seconds=0.6)   # game -z: out towards the writer
@@ -447,15 +449,16 @@ FAMILY = G.Family(
              motions={'loops': {'pound': 'swing'}},
              paint=[('bag', 'Body')]),
      G.Model('smashBin', smashBin, size=(0.854, 0.643, 0.876), key='model.hotHeaded.smashBin', centre=(0.003, 0.008),
-             motions={'uses': {'smash': 'lid_open'}, 'hold': 1},
+             # the lid stands open while plates are thrown in, and shuts when they're done (2026-10-21: after 1 s)
+             motions={'uses': {'smash': 'lid_open'}},
              paint=[('crate', 'Body')]),
      G.Model('thunderDrums', thunderDrums, size=(1.89, 1.279, 0.9), key='model.hotHeaded.thunderDrums', centre=(0.005, 0.02),
              motions={'loops': {'drum': 'cymbals'}},
              paint=[('shell', 'Body')]),
-     G.Model('coolDownCushion', coolDownCushion, size=(0.9, 0.454, 0.9), centre=(0, 0.02), key='model.hotHeaded.coolDownCushion',
+     G.Model('coolDownCushion', coolDownCushion, size=(0.9, 0.236, 0.9), centre=(0, 0.02), key='model.hotHeaded.coolDownCushion',
              motions={'uses': {'countToTen': 'sink_in', 'breathe': 'sink_in'}},
              paint=[('zafu', 'Body')]),
-     G.Model('grudgeJournal', grudgeJournal, size=(0.84, 1.018, 0.677), key='model.hotHeaded.grudgeJournal', centre=(0, 0.111),
+     G.Model('grudgeJournal', grudgeJournal, size=(0.84, 1.003, 0.677), key='model.hotHeaded.grudgeJournal', centre=(0, 0.111),
              motions={'uses': {'writeItOut': 'drawer_open'}},
              paint=[('body', 'Body')]),
      G.Model('coldPlunge', coldPlunge, size=(0.86, 0.86, 1.39), key='model.hotHeaded.coldPlunge', centre=(0, -0.23),

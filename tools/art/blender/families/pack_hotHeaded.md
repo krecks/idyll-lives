@@ -5,17 +5,17 @@ entries in `packs/pack_hotHeaded/manifest.json`, an override pack listed in the 
 2026-10-14; they sat in Validate › Hot Headed until checked in play.
 
 Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
-Seats stay where the renderer puts residents: the drum throne's top at 0.47 (default seat), the zafu pressed to 0.40
-(`SEATS` `hotHeaded.coolDownCushion`), the plunge's bather at 0.35 in the middle of its tub (`SEATS`), the desk chair
+Seats stay where the renderer puts residents: the drum throne's top at 0.47 (default seat), the zafu pressed to 0.17, sat on cross-legged
+(`furniture.json` `hotHeaded.coolDownCushion`, a seat under 0.2 m: the floor clips), the plunge's bather at 0.35 in the middle of its tub (`SEATS`), the desk chair
 at 0.45 in the middle of its tile.
 
 | Model | Moving part and clip | Played by |
 |---|---|---|
 | `heavyBag` | the bag, straps, logo, chains and swivel, origin on the swivel under the boom: `swing` rocks it 8° back and forth (1.4 s, a loop) | `pound` (loop) |
-| `smashBin` | the crate's board lid, hinged on its back top edge: `lid_open` flips it up 80° (0.6 s), `hold` 1 s | `smash` |
+| `smashBin` | the crate's board lid, hinged on its back top edge: `lid_open` flips it up 80° (0.6 s), held open while plates are thrown in, shut when the use ends (2026-10-21: `hold` 1 s, every plate landing on the shut lid: I-packs-20) | `smash` |
 | `thunderDrums` | the crash and the ride, each on its stand's tip: `cymbals` rocks them (9° and −6°, 0.8 s, a loop) | `drum` (loop) |
-| `coolDownCushion` | the zafu, origin on its underside: `sink_in` presses it from 0.45 to the 0.40 seat (0.6 s) | `countToTen`, `breathe` |
-| `grudgeJournal` | the drawer under the desk top, facing the writer: `drawer_open` slides it 17 cm out towards them (0.6 s) | `writeItOut` |
+| `coolDownCushion` | the zafu, origin on its underside: `sink_in` presses it from 0.18 to the 0.17 seat (0.6 s). A real zafu's size, 0.38 across and 10 cm high on the 8 cm zabuton (2026-10-21: a 0.45 m pouf, M-packs-12) | `countToTen`, `breathe` |
+| `grudgeJournal` | the drawer under the desk top, facing the writer: `drawer_open` slides it 17 cm out towards them (0.6 s). The top is at 0.745 (2026-10-21: 0.76, the journal on it at 0.77; M-packs-08) | `writeItOut` |
 | `coldPlunge` | the slatted cover, origin at its roller housing on the back rim: `cover_off` rolls it back into the housing (0.9 s) | `plunge` |
 
 Where the plan's table says "Loop (E1) … Until then U / static" (the bag, the drums), the loop itself is built.
@@ -41,8 +41,8 @@ moving part one more. So that it stays at 3:
 | `model.hotHeaded.heavyBag` | 0.86 × 2.01 × 0.86 m | 3,112 | 2 | Body (the bag) |
 | `model.hotHeaded.smashBin` | 0.85 × 0.64 × 0.88 m | 3,300 | 3 | Body (the crate) |
 | `model.hotHeaded.thunderDrums` | 1.89 × 1.28 × 0.90 m | 5,672 | 3 | Body (the shells) |
-| `model.hotHeaded.coolDownCushion` | 0.90 × 0.45 × 0.90 m | 2,748 | 3 | Body (the zafu) |
-| `model.hotHeaded.grudgeJournal` | 0.84 × 1.02 × 0.68 m | 2,844 | 3 | Body (the desk's wood) |
+| `model.hotHeaded.coolDownCushion` | 0.90 × 0.24 × 0.90 m | 2,748 | 3 | Body (the zafu) |
+| `model.hotHeaded.grudgeJournal` | 0.84 × 1.00 × 0.68 m | 2,844 | 3 | Body (the desk's wood) |
 | `model.hotHeaded.coldPlunge` | 0.86 × 0.86 × 1.39 m | 7,140 | 3 | Body (the cedar cladding) |
 
 The desk's lamp is a little lower than the old part's (1.02 m against 1.11 m), the only size that differs by more

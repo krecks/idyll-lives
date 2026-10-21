@@ -10,7 +10,7 @@
     "gloomy.soakingTub": { "h": 0.1, "fwd": -0.25, "legsOut": true, "room": 0.7 },
     "romantic.heartTub": { "h": 0.2, "fwd": -0.45, "legsOut": true, "room": 0.35 },
     "hotHeaded.coldPlunge": { "h": 0.1, "fwd": -0.25, "legsOut": true, "room": 0.45 },
-    "hotHeaded.coolDownCushion": { "h": 0.45, "fwd": 0 },
+    "hotHeaded.coolDownCushion": { "h": 0.17, "fwd": 0 },
     "hotHeaded.thunderDrums": { "h": 0.475, "fwd": 0 },
     "gloomy.journalDesk": { "h": 0.46, "fwd": 0 },
     "neat.organizerDesk": { "h": 0.45, "fwd": 0.21, "back": true },
