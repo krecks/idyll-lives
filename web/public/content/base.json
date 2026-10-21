@@ -3618,7 +3618,7 @@
     {"id": "wood.oak", "label": "Oak boards", "finish": "wood", "color": "#FFFFFF", "price": 6},
     {"id": "wood.honey", "label": "Honey pine", "finish": "wood", "color": "#F2D6A8", "price": 6},
     {"id": "wood.walnut", "label": "Walnut boards", "finish": "wood", "color": "#9C7458", "price": 8},
-    {"id": "wood.whitewashed", "label": "Whitewashed wood", "finish": "wood", "color": "#F4EFE6", "price": 8},
+    {"id": "wood.whitewashed", "label": "Whitewashed wood", "finish": "whitewash", "color": "#F4EFE6", "price": 8},
     {"id": "tile.white", "label": "White tiles", "finish": "tile", "color": "#F4F4F2", "price": 5},
     {"id": "tile.sand", "label": "Sand tiles", "finish": "tile", "color": "#E6DCCB", "price": 5},
     {"id": "tile.terracotta", "label": "Terracotta tiles", "finish": "tile", "color": "#D9967A", "price": 7},
