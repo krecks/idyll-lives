@@ -84,3 +84,5 @@ footprint (`SEATS`), facing the wall, the screen towards them. A separate chair 
   the board while the resident plans at it, and is wiped as the clip plays back. The corkboard is still.
 - Colour studio: the cabinet and its handles; each board and its frame (the whiteboard's marker tray goes with the
   frame); "In use" opens the drawer and fills the board.
+- Since the authenticity review (G-15): planning on the whiteboard is done stepped up to it (`STEP_IN`, 0.5 m from its
+  face), the hands at the board's foot; a raised-arm stroke is a clip still to make.

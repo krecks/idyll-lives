@@ -43,6 +43,7 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 - Known, not changed: two residents getting up from the same bed stand on the same spot for a moment (sim). The oak
   double's "Headboard" colours its teak slats; the posts and rails go with the frame. The daybed's back runs along
   a long side, so stood head end to the wall (as built) it doesn't read as a sofa.
+- Since the authenticity review (G-04): the daybed's sleeper gets the quilt (`BLANKET_BEDS`), as the other beds do.
 
 ## BR2. Nightstands and small storage (8)
 
@@ -104,3 +105,5 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
   its `hold`.
 - The wall mirror hides with its wall when the wall is cut down for the camera (each wall thing knows which views
   drop its wall, `BabylonRenderer.ts`).
+- Since the authenticity review (G-04): getting ready at the dressing table, a hand comes up to the hair (the phone
+  clip's upper body, seated), not resting in the lap. A brush stroke or a hand prop is the clip and props waves'.

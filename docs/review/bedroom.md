@@ -188,7 +188,8 @@ Measured: the dressing table's top 0.76 (72–78) and its pouf's seat 0.45 (42�
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters.ts:280` (`BLANKET_BEDS`: no `bedDaybed`); `tools/art/blender/families/bedroom.py:421` (its mattress in a fitted cover, no duvet)
 - **Evidence:** `bedroom/play/chunk2/bedDaybed-sleep-02.png`: 480 minutes asleep on the daybed in pyjamas on a bare fitted cover. A daybed slept on has a blanket over the sleeper; the model has no duvet to double it (the README's reason to leave it out), so the quilt (M-bedroom-04's) would fit as it is. Napping on it with no cover is fine.
-- **Status:** open
+- **Status:** fixed (3cd0bf87)
+- **After:** `bedDaybed` in `BLANKET_BEDS`: the sleeper is under the quilt (`fixes/tables/play-a/a-bedDaybed-sleep-01.png`); it also covers a nap, as on the other beds.
 - **Source:** wave: bedroom (lead from Phase 0.9 "Seen (not reviewed)")
 
 ### I-bedroom-03 — The futon and the daybed are sofas by day, but nobody can sit on them
@@ -238,5 +239,16 @@ Measured: the dressing table's top 0.76 (72–78) and its pouf's seat 0.45 (42�
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters.ts:465` (`ACTIONS.wash`: `stand` clips only, no `sit`, so the seated default `sit` plays); `web/public/content/furniture.json:2219` (`dressingTable` `getReady`: `anim: wash`, `pose: sit`)
 - **Evidence:** `bedroom/extra/pose-dressingTable-getReady.png` (`poses.html?seats=dressingTable:getReady`), `bedroom/play/chunk1/dressingTable-getReady-01.png`, `bedroom/sheets/age-dressingTable.png`: on the pouf facing the mirror for 15 minutes with the hands resting low, the drawer open beside the knee. Getting ready is the hands at the hair and face. A seated clip with the hands up (as `phone`'s hand to the head, or a brush stroke) on `getReady`, chosen by object as `look` and `harvest` are, is a table change; a hand prop is I-held-01's.
-- **Status:** open
+- **Status:** fixed (3cd0bf87)
+- **After:** `ACTIONS.wash.upper` by def: seated at the dressing table the `phone` clip's upper body brings a hand up to the hair (`fixes/tables/play-a/a-dressingTable-getReady-01.png`). A brush stroke clip and a hand prop stay with the clip and props waves.
 - **Source:** wave: bedroom
+
+### A-bedroom-05 — The daybed's quilt hangs down through its front rail
+
+- **Severity:** S3
+- **Rubric:** A1, M2
+- **Fix class:** renderer-table
+- **Where:** `web/src/render/babylon/characters.ts` (`writeBlanket`, `BLANKET_BEDS`: the daybed in it since I-bedroom-02); `tools/art/blender/families/bedroom.py:421` (`bedDaybed`: a back, two arms and a front rail of spindles round the mattress)
+- **Evidence:** `fixes/tables/play-a/a-bedDaybed-sleep-01.png`: the quilt's sides drop past the mattress's edges as on an open bed, so on the front side it hangs down between the rail's spindles to below the mattress, and at the back it runs into the back. A bed with sides wants the quilt tucked in at the mattress's edges (no side drop), as a cot's would be.
+- **Status:** open
+- **Source:** fix: tables (G-04 re-check, 2026-10-21)

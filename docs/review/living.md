@@ -269,7 +269,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** content
 - **Where:** `web/src/render/babylon/characters/furniture.json:26` (`seats.armchairLounge` 0.42), `web/public/content/catalog2/living.json:497` (`rockingChair` seat 0.48), `:549` (`beanBag` seat 0.30)
 - **Evidence:** The heights check (`heights.txt`) and `cargo review sizes`: the lounge chair's seat is 0.42 in `seats` against 0.45 in the mesh (3.0 cm in; its cushion sinks 2 cm, so the elder's thighs show a centimetre in, `living/sheets/age-armchairLounge.png`); the rocking chair's is 0.48 in the content against 0.458 in the mesh (the rider 2.2 cm above the cushion, rocking with it); the bean bag's is 0.30 against 0.458 (squashed 15 % for flop, about 0.39, so the sitter is about 9 cm into the bag: it reads as sinking in, which a bean bag does, but a child sinks to the chest with only the head and arms out, `living/sheets/age-beanBag.png`). The first two are outside the 1 cm tolerance; the bean bag's is a choice (A-living-01's fix) to keep, with a seat per life stage or a shallower one for children.
-- **Status:** open
+- **Status:** fixed (a920f174)
+- **After:** `seats.armchairLounge` 0.44 (its cushion 0.45, sat a centimetre into), `rockingChair` content seat 0.46; the bean bag's 0.30 kept (sinking in, A-living-01's choice). `cargo check-glb`: the lounge chair's and the rocker's warnings gone; `fixes/tables/play-b/b-armchairLounge-sit-01.png`, `b-rockingChair-relax-01.png`.
 - **Source:** wave: living (heights check, `cargo review sizes`)
 
 ### M-living-06 — Names and descriptions that don't match their models

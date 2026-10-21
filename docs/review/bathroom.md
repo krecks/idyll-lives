@@ -230,7 +230,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters/furniture.json:34-36` (`seats`: `bathtub` 0.25, `bathtubClawfoot` 0.28, `bathtubFreestanding` 0.27); `tools/art/blender/families/bathroom.py:796`, `:837`, `:868` (the tubs' floors at 0.15, 0.17 and 0.15 m)
 - **Evidence:** heights warnings (`cargo check-glb`): the model is 10.0, 11.0 and 12.0 cm lower than the seat at the hips. `h` is the seat surface (`characters.ts:146`) and `legsOut` rests the heels at that height (`:3473`), so the bather's seat and heels ride on nothing over the floor. Once the water is in (two thirds of the way up the tub, `fill`, 2.4 s after they sit) it hides the gap, but it shows in those first seconds, and the shins and knees break the surface (`bathroom/play/chunk1/bathtub-bath-01.png`, `bathroom/play/chunk1/bathtubClawfoot-bath-01.png`). Seats at the floors (0.15–0.17 m), or the floors raised to the seats, line them up; then check that the shoulders still clear the rim.
-- **Status:** open
+- **Status:** fixed (96d54386)
+- **After:** The three baths' seats at their floors (0.15, 0.17, 0.15): the bather sits and rests the heels on the tub floor, the shoulders over the rim at every stage (`fixes/tables/after/baths-sheet.png`, `play-b/b-bathtub-bath-02.png`); the clawfoot bather's arm drapes over its higher rim. Heights warnings gone.
 - **Source:** wave: bathroom (T1 heights warnings)
 
 ### I-bathroom-05 — At the basins the washer stands a step back, the hands short of the tap
@@ -240,7 +241,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters.ts:160` (`STAND_BACK`: no entry for the basins; a negative one steps in to a thing smaller than its tile, as `garden.herbs: -0.5`); `:465` (`ACTIONS.wash`: `spell`, `interact` at the chest)
 - **Evidence:** `bathroom/play/chunk1/sinkPedestal-wash-01.png` (a clear air gap between the hands and the basin), `bathroom/play/chunk3-short/sinkConsole-wash-01.png`, `bathroom/play/chunk3-short/sinkVessel-wash-01.png`, `bathroom/play/chunk1/vanityDouble-wash-01.png`. The resident stands at the middle of the tile in front (1.0 m from the object's middle, `play.jsonl` x/z); the basins' fronts are 0.22–0.28 m from it and the streams about at it, so the feet are 0.7–0.8 m from the basin and the working hands at the chest stop about half a metre short of the water. People stand with their toes at the basin and lean over it. The pilot passed the base sink, where the hands at least reach its worktop's front (0.30 m out); the small basins show the gap plainly. Entries of about −0.4 to −0.5 m for `sinkPedestal`, `sinkConsole`, `sinkVessel` and `vanityDouble` (and the base `sink`, −0.3) bring the hands over the basin.
-- **Status:** open
+- **Status:** fixed (0c5e889e)
+- **After:** `STAND_BACK`: `sink` -0.35, `sinkPedestal` -0.5, `sinkConsole`, `sinkVessel`, `vanityDouble` -0.45: the washer stands at the basin, the hands over it (`fixes/tables/play-a/a-sink*-wash-*.png`, `play-b/b-sinkPedestal-wash-*.png`).
 - **Source:** wave: bathroom
 
 ### I-bathroom-06 — Teeth are brushed at the wall cabinet only, with no basin, no water and nothing in hand

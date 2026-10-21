@@ -16,7 +16,7 @@ Kids' seats and beds keep their heights (`seats`, `beds` in `web/src/render/baby
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `crib` Crib | 2x1 · floor | lie:sleep feed:tend change:clean play:play cuddle:cuddle | kids / — | Frame, Bedding, Mobile | Use | `side_down`: the front rail slides down 25 cm for feed, change and cuddle, and back up. L `mobile`: the mobile turns slowly while a grown-up plays with the baby (E1, `loops.play`). |
+| `crib` Crib | 2x1 · floor | lie:sleep feed:cuddle change:clean play:play cuddle:cuddle | kids / — | Frame, Bedding, Mobile | Use | `side_down`: the front rail slides down 25 cm for feed, change and cuddle, and back up. L `mobile`: the mobile turns slowly while a grown-up plays with the baby (E1, `loops.play`). |
 | `kidsBed` Kids' bed | 1x2 · floor | sleep:sleep nap:nap | kids / — | Frame, Bedding | Use | `turn_down`, as the beds. |
 | `kidsBedCar` Race car bed | 1x2 · floor | sleep:sleep nap:nap | kids / — | Car body, Bedding | Use | `turn_down`; the car body is static. |
 | `highChair` High chair | 1x1 · floor | — | kids / — | Frame, Bedding | Static | Static. (+use) the tray slides out. It has no use or sit yet; its `seatAt` would pull it in to the table it faces while sat on, as far as the knees fit under it. |
@@ -33,6 +33,9 @@ Kids' seats and beds keep their heights (`seats`, `beds` in `web/src/render/baby
   (a baby is only ever placed lying).
 - Known, not changed: the carer at the crib stands or kneels in different spots by facing, once a tile out in front
   of the changing table (slot positions and the shared "tend" pose).
+- Since the authenticity review (G-14, G-05): "Feed the baby" lifts the baby out and holds them, as the cuddle does
+  (`anim: cuddle`), not the gardening kneel at the rail (the bottle is the props wave's); the high chair's content
+  seat 0.60, its mesh's.
 
 ## KD2. Toys (10)
 
@@ -60,6 +63,8 @@ Kids' seats and beds keep their heights (`seats`, `beds` in `web/src/render/baby
 - The teddy's hugger crouches in, arms round its neck and cheek on its head, while it squishes (`hugArms`, shared
   with the social hug, with the teddy keeping the default `wrap`).
 - Known, not changed: the toy box's player stands at its front corner.
+- Since the authenticity review (G-14): the toy box and the toy chest are played at kneeling on the floor (`kneel`),
+  the train table crouched at its edge (`crouch`), not standing with the hands out over them.
 
 ## KD3. Kids' study and art (6)
 

@@ -262,7 +262,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters/furniture.json:48` (`SEATS.gardenChair` 0.40); `tools/art/blender/families/outdoor.py:244-245` (`_slatted_chair` seat slats, 0.40–0.42 sloping, their tops about 0.43)
 - **Evidence:** `cargo check-glb` heights warning (`model.gardenChair seat 0.40 m … the model 0.434 m there: 3.4 cm higher`). The mesh is inside the range (30–48), so the table row is what is off; in play the thighs hide it (`sheets/obj-gardenChair.png`). Set `SEATS.gardenChair.h` to 0.43.
-- **Status:** open
+- **Status:** fixed (a920f174)
+- **After:** `seats.gardenChair` 0.43; its heights warning gone (`fixes/tables/play-b/b-gardenChair-sit-01.png`).
 - **Source:** outdoor wave (T1 warning)
 
 ### A-outdoor-01 — The hot tub's open cover stands upright, floating above and behind the tub

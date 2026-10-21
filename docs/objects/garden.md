@@ -73,6 +73,9 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
 - The geraniums' "Flowers" colours all six clusters (all on the painted material).
 - Each pansy face stands on a thin stem over its leaves, at the same size and draw calls.
 - Known, not changed: the marigolds' back poms sit a little above the leaves, but read as one mass of flowers.
+- Since the authenticity review (G-14): flowers that bloom above about 0.7 m (cosmos, the flower box, lavender,
+  lilies, lupins, roses, the wheelbarrow) are smelt standing, a bloom held to the nose (`pick`); the low beds and pots
+  are still crouched to.
 
 ## G3. Shrubs (11)
 
@@ -123,6 +126,8 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
   watering too, rather than standing a tile off.
 - "Bed" colours each bed (the raised bed's and the planter's boards).
 - Not watched: growing back from picked over the days.
+- Since the authenticity review (G-14): strawberries and pumpkins are picked crouched down at the soil (`plant`,
+  `kneel`); the staked tomatoes are tied up and watered standing (`harvest`, `water`).
 
 ## G5. Trees (12)
 

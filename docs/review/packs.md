@@ -443,7 +443,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters/furniture.json:10-12` (`seats` `gloomy.soakingTub` 0.25, `romantic.heartTub` 0.35, `hotHeaded.coldPlunge` 0.35) and `:56-58` (`beds`, the same); `tools/art/blender/families/pack_romantic.py:205` (`heartTub`), `pack_hotHeaded.py:384` (`coldPlunge`), `pack_gloomy.py:417` (`soakingTub`)
 - **Evidence:** `packs/sheets/obj-romantic.heartTub.png` (play: the knees come up over and through the near wall), `packs/sheets/age-romantic.heartTub.png`; the heights check (`heights.txt`): the heart tub's floor is at 0.20 under a 0.35 seat (15 cm), the soaking tub's at 0.095 under 0.25 (15.5 cm). `packs/play/chunk5/hotHeaded.coldPlunge-plunge-01.png`, `packs/sheets/age-hotHeaded.coldPlunge.png`: the plunger's shins and feet pass through the tub's front and show on the floor outside it at every stage but the child (the plunge is 0.86 × 1.39 with the seat in the middle; the heights check measures 0.596 there, the water). Seated bathers in a short tub need the legs drawn up inside or the seat moved back (`fwd`), each checked at every stage.
-- **Status:** confirmed and widened
+- **Status:** fixed (96d54386)
+- **After:** The pack tubs sit on their floors at the back (soaking tub 0.10, heart tub 0.20, cold plunge 0.10) with the legs out and drawn up to a new `Seat.room` (0.7, 0.35, 0.5 m ahead of the hips): no shin or foot through a wall at the adult, teen, child or elder (`fixes/tables/after/heart-sheet.png`, `tubs-sheet.png`, `play-b/`). Their dead `beds` rows (no use lies in them) out; heights warnings gone. A turn towards each other in the heart tub waits for a facing per slot (G-62).
 - **Source:** `docs/objects/open.md` Still open › Models; `plan/release-0.3.0.md` §1.4; wave: packs
 
 ### A-packs-02 — The power blender's blades loop was never built
@@ -553,7 +554,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters/furniture.json:51` (`defaultSeat` 0.45, used by `hotHeaded.thunderDrums`), `:13` (`seats` `hotHeaded.coolDownCushion` 0.40), `:59` (`beds` `hotHeaded.coolDownCushion` 0.2, for a use that never lies), `:77` (`beds` `kind.hearthSettee` 0.44)
 - **Evidence:** The heights check (`heights.txt`): the drum stool's mesh is 0.475 under a 0.45 seat (2.5 cm into it), the pouf 0.45 under 0.40 (5 cm into it), the settee's cushion 0.36 under a 0.44 lie (8 cm over it: `packs/play/chunk5/kind.hearthSettee-quiltNap-01.png`). Each is small in the shots; together they are the three-way M2 check failing.
-- **Status:** open
+- **Status:** fixed (a920f174)
+- **After:** The drum stool its own seat at 0.475 (was `defaultSeat` 0.45), the cool-down cushion's seat 0.45 and its dead `beds` row out (no use lies on it), the hearth settee's bed 0.36 (its cushion). The four heights warnings gone; `fixes/tables/play-b/b-hotHeaded.thunderDrums-drum-01.png`, `b-hotHeaded.coolDownCushion-breathe-01.png`, `b-kind.hearthSettee-quiltNap-02.png`.
 - **Source:** wave: packs (`cargo check-glb` heights)
 
 ### A-packs-03 — The washer, the baking oven and the glasshouse door stay open for the whole use
@@ -583,7 +585,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters/furniture.json:76` (`beds` `gloomy.windowSeat`: `h` 0.45, `across`), `web/public/content/packs/gloomy.json:193` (`doze`: `pose: lie`)
 - **Evidence:** `packs/play/chunk3/gloomy.windowSeat-doze-01.png`: the dozer lies prone, diagonally over the back of the cushion, the face on the window glass, the feet at the left pillow. `across` should lay them along the seat on the back, head to its left, as `kind.hearthSettee` does (`packs/play/chunk5/kind.hearthSettee-quiltNap-01.png`). The cushion between the two pillows is about 1.3 m clear, short for an adult lying flat (a curled-up side lie fits a window seat).
-- **Status:** open
+- **Status:** not reproduced (fix: tables, 2026-10-21)
+- **After:** Played again after the merge (`fixes/tables/play-a/a-gloomy.windowSeat-doze-00.png`, `-01.png`): the dozer lies on the back along the cushion, head on the right-hand pillow, as on the hearth settee; no table row changed. The 1.3 m between the pillows is still short for a grown-up lying flat (the feet on the left pillow): a curled-up side lie is a clip for the resident-clip wave.
 - **Source:** wave: packs
 
 ### A-packs-06 — The recliners tip their backs and raise the footrests; the sitter stays upright, feet on the floor
@@ -699,7 +702,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters.ts:530` (`ACTIONS.phone`: `phone`, the hand at the ear); `web/public/content/packs/outgoing.json:100` (`videoCallNook` `call`), `cheerful.json:173` (`partyBooth` `party`)
 - **Evidence:** `packs/extra/night/night-outgoing.videoCallNook-call-01.png`, `packs/play/chunk3/cheerful.partyBooth-party-01.png`: the caller sits at the laptop (and the ring light) holding a hand to the ear; in the booth the laptop faces the other bench. A video call is talked to the screen, the hands free or on the keys (`sitHands`). The phone prop itself is I-social-01 (social ledger).
-- **Status:** open
+- **Status:** fixed (3cd0bf87)
+- **After:** `ACTIONS.phone` by def (`VIDEO_CALLS`): at the video-call nook and the party booth the caller talks to the screen (`sitTalk`), no phone at the ear (`fixes/tables/play-a/a-outgoing.videoCallNook-call-01.png`, `a-cheerful.partyBooth-party-01.png`); the shortwave radio keeps its handset.
 - **Source:** wave: packs
 
 ### I-packs-11 — The tea guests and the lava-lamp watcher face away from what they're there for

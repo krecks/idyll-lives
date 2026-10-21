@@ -26,6 +26,8 @@ their backs on the wall face (game depth -0.43).
   washed at by day and at night, on WebGPU and WebGL2, on Medium and Low.
 - `water_on` has no `hold`: it plays for the `wash` tag and stops when the use ends.
 - Each basin has painted shoulders from its floor up to the worktop, so the cabinet's colour never shows as the basin.
+- Since the authenticity review (2026-10-21, G-15): the washer steps in to the basin (`STAND_BACK`), the toes at it
+  and the hands over the water, not a step back.
 
 ## B1. Toilets (5)
 
@@ -85,6 +87,8 @@ their backs on the wall face (game depth -0.43).
   and clawfoot's right end, the freestanding bath's left), the hips 0.38–0.42 m from the middle, the legs in the tub
   and under the water towards the taps, the arms on the long rims; nothing through the panel or the rim.
 - The freestanding bath's seat is in `SEATS`, not its content.
+- Since the authenticity review (G-06): bathers sit on the tub's floor (seats 0.15, 0.17, 0.15), the heels on it and
+  the shoulders over the rim at every stage; the clawfoot bather's arm drapes over its higher rim.
 
 ## B4. Laundry (6)
 

@@ -46,6 +46,8 @@ their uses. The climbing frame has no clip of its own: the resident's clips clim
   `characters/clips/street.ts`). The second lane's climber waits on the deck for the first to slide, so two who
   start together don't meet at the pole. Checked for a man, a woman and a child, two children at once, by day and
   on Low WebGL2 at night.
+- Since the authenticity review (G-04): "Shoot some hoops" picks the ball up and reaches with it (the streetball
+  hoop's `pickUp`, `interact`), not jogging on the spot; a shot from out on the court is a clip still to make.
 
 ## CM2. Street furniture (10)
 
@@ -73,6 +75,9 @@ their uses. The climbing frame has no clip of its own: the resident's clips clim
   (`fountainDrink<cm>` in `characters/clips/street.ts`, one per height).
 - Phone box: the door opens outwards, the caller steps inside onto the plinth, it shuts behind them, and it opens
   again to let them out (motions `out`: a use's clip opens again for N s at its end).
+- Since the authenticity review (G-15): the notice board is read looking at it (`idle`), not at a book in the hands;
+  the timetable reader steps into the shelter to its end (`STEP_IN`); the statue is admired from a step further back,
+  looking up at it.
 
 ## CM3. Food stalls and vending (5)
 

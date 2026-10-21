@@ -46,6 +46,7 @@ none.
   unchanged.
 - Every colour part lands on the part its label names: the round table's Frame is its rim and pedestal, Top and
   Tiles the mosaic; the parasol's Edge is the valance.
+- Since the authenticity review (G-05): the garden chair's sitter is on its slats' tops (0.43, was 0.40).
 
 ## OU2. Loungers, swings and the hot tub (5)
 
@@ -84,6 +85,8 @@ none.
   food; the gas station's hood is up for cook and for the feast; the fire pit's flames grow for "Warm up by the
   fire", the resident on its front capstones, and the embers and flames glow at night.
 - Each shuts when the use ends. Nothing needed fixing.
+- Since the authenticity review (G-08): chopping at the grill station is on its free counter (`STATION_SPOTS`), not on
+  the grate.
 
 ## OU4. Play and yard (9)
 
@@ -111,6 +114,8 @@ none.
 - The washing comes down onto the line for "Hang out the washing", stays out after, and "Take the washing in"
   (`takeIn`) takes it in.
 - Colour parts land where named; the log store's Shelter is the whole iron rack and roof (one material).
+- Since the authenticity review (G-14): the compost bin and the greenhouse's staging are tended standing, leaning in
+  (`pick`), not kneeling; the raised bed's soil is bent over (`harvest`).
 
 ## OU5. Pond, small garden things and lights (9)
 

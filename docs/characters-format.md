@@ -300,10 +300,14 @@ Why some entries are as they are:
   `neat.organizerDesk`, `romantic.letterBureau`, `hotHeaded.grudgeJournal`) are their own chairs (`NEAR_DESKS`): the
   hands on the top or the flap, in front of the hutch.
 - `fireplaceElectric` sits on the floor cushion in front of the fire, facing it (`back`).
-- Baths (`bathtub`, `bathtubClawfoot`, `bathtubFreestanding`): along the tub, the back at the end without the taps,
-  the legs out along it towards them (`along`, `legsOut`).
-- `gardenChair`: against its slanted back, `recline` 0.314 rad (18°; the Adirondack chair's content `seat.recline`
-  is in degrees).
+- Baths (`bathtub`, `bathtubClawfoot`, `bathtubFreestanding`): on the tub's floor, along the tub, the back at the
+  end without the taps, the legs out along it towards them (`along`, `legsOut`).
+- The pack tubs (`gloomy.soakingTub`, `romantic.heartTub`, `hotHeaded.coldPlunge`): on the floor at the back, the
+  legs out with only `room` m for them ahead of the hips, so the heels stop inside the front wall and the knees
+  come up.
+- `gardenChair`: on its slats' tops (0.43), against its slanted back, `recline` 0.314 rad (18°; the Adirondack
+  chair's content `seat.recline` is in degrees).
+- `chessTable`, `sewingTable`, `hotHeaded.thunderDrums`: their chairs' and the drum stool's pads (0.475).
 - `kidsBedCar`: the race car's mattress ends at its bonnet, 34 cm short of the footprint's end (`foot`).
 - Hammocks (`hammock`, `cheerful.rainbowHammock`, `natureLover.gardenHammock`): lain in the sagging sling (`sling`,
   from their models' builds).

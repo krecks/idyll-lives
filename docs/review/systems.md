@@ -143,7 +143,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters.ts:546` (`STATION_PROPS`) and `:2097` (`writeTool`)
 - **Evidence:** The chopping board and the food are drawn at the station's middle, a little towards the cook. On `grillStation` that is the grate, so the chopping happens on the grill. Cross-cutting wave: `outdoor/play/chunk5-kitchen/grillStation-cook-01.png` and `grillStation-feast-01.png` (the outdoor wave's runs): the orange board lies over the burning grate while the station's own wooden prep board, at its right end, stays bare. The kettle grill (`bbq`) and kitchen counters are right (`systems/sheets/cook-bbq-1.png`, `cook-meal-1.png`).
-- **Status:** confirmed and widened (cross-cutting wave; the kitchen wave at the hobs)
+- **Status:** fixed (65278fa4)
+- **After:** `STATION_SPOTS` (`writeTool`): the pan on the burner each cooker's clip lights (the gas range's flame, the range cooker's middle ring, the hob counter's hot ring, measured from those parts; the electric cooker's front ring on the turning knob's side) and the grill station's chopping board on its free counter, off the grate (`fixes/tables/play-b/b-stoveGas-cook-*.png`, `b-rangeCooker-cook-*.png`, `b-cooktopCounter-cook-*.png`, `b-grillStation-cook-*.png`). Its own prep board keeps its tray of patties.
 - **Source:** `docs/objects/open.md` Still open › Rendering; `plan/authenticity-review.md` §3.3 (I13); wave: cross-cutting
 
 ### I-systems-02 — Uses end once every need they raise is full

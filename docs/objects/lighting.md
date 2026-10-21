@@ -105,3 +105,4 @@ inside. The ceiling fan's blades turn (`blades_turn`, once in 2.5 s) and the pap
 - A top under a lit lamp is washed almost white at night: the light is 30–45 cm above it and the shade casts no
   shadow (renderer; seen, not changed).
 - The lantern's "Glass" tints faintly, as glass does.
+- Since the authenticity review (G-05): the table lamp's light is at 0.75 m, inside its shade (it was 0.95, over it).
