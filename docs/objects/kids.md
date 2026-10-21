@@ -55,7 +55,7 @@ pulled up to the kids' table before the dining table (a seat made for their age 
 | `toyBox` Toy box | 1x1 · floor | play:play | kids / — | Body, Lid | Use | `lid_open`: the lid swings up 100° for play; `hold` 2 s. |
 | `toyChest` Toy chest | 1x1 · floor | play:play | kids / — | Body, Trim | Use | `lid_open`. Its text no longer says the lid is open (it opens only for play). |
 | `dollHouse` Doll house | 1x1 · floor | dolls:tend | kids / — | Walls, Roof | Use | `front_open`: the front wall swings 120° on its side hinge for the whole of dolls. |
-| `rockingHorse` Rocking horse | 1x1 · floor | ride:play | kids / — | Body, Trim | Loop (E1) | `rock`: rocks ±12° while ridden (E1), the rider riding it. |
+| `rockingHorse` Rocking horse | 1x1 · floor | ride:play | kids / — | Body, Trim | Loop (E1) | `rock`: rocks ±12° while ridden (E1), the rider riding it. Ridden astride, the hands on the handle (`rideHorse112`). |
 | `playTent` Play tent | 1x1 · floor | play:play | kids / — | Canvas, Poles | Use | `flap_open`: the door flap rolls up for play; the child crawls in and out through it (`STEP_IN`, `tentPlay112`). |
 | `ballPit` Ball pit | 1x1 · floor | jump:play | kids / — | Pit, Rim | Loop (E1) | `bounce`: a few balls bob while played in (E1); the child steps in over the rim (`STEP_IN` `over`, `ballPit112`). |
 | `trainTable` Train table | 2x1 · floor | trains:play | kids / — | Table, Train | Loop (E1) | `train`: the train runs round its ring of track (E1, a `spin` about the ring's middle). |

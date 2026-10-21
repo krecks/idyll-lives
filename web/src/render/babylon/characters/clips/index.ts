@@ -4,8 +4,8 @@
  * docs/characters-format.md for the list and the conventions. Phase-2 clips are here too, ready for
  * the runtime: `lie`, `chop`, `stir`, `flip`, `drink`, `carry`, `carryOne` and `wave`. A baby in
  * the crib has its own lying clips (`baby.ts`); children's play inside the ball pit and the play tent theirs (`play.ts`); the drinking fountain and the climbing frame theirs, in
- * three sizes (`street.ts`); games and sport at things theirs (`games.ts`), some in sizes too; the socials' gestures and reactions and
- * the phone held in front theirs (`social.ts`). Arm and leg placement uses the IK helpers in
+ * three sizes (`street.ts`); games and sport at things theirs (`games.ts`), some in sizes too; the slide's round, the bunk's ladder and
+ * the rides theirs (`rides.ts`), in sizes; the socials' gestures and reactions and the phone held in front theirs (`social.ts`). Arm and leg placement uses the IK helpers in
  * `ik.ts` (on the reference skeleton, while the clips bake).
  *
  * In dev, editing a clip file re-bakes the clips of every loaded set in place (Vite HMR), so the
@@ -20,6 +20,7 @@ import { gameClips } from './games';
 import { gardenClips } from './garden';
 import { idleClips } from './idle';
 import { lieClips } from './lie';
+import { rideClips } from './rides';
 import { locomotionClips } from './locomotion';
 import { seatedClips } from './seated';
 import { socialClips } from './social';
@@ -30,7 +31,7 @@ import { workClips } from './work';
 
 /** Every clip definition. */
 export function clipDefs(): ClipDef[] {
-  return [...idleClips(), ...locomotionClips(), ...seatedClips(), ...workClips(), ...gardenClips(), ...actionClips(), ...lieClips(), ...babyClips(), ...streetClips(), ...gameClips(), ...useClips(), ...socialClips(), ...playClips()];
+  return [...idleClips(), ...locomotionClips(), ...seatedClips(), ...workClips(), ...gardenClips(), ...actionClips(), ...lieClips(), ...babyClips(), ...streetClips(), ...gameClips(), ...useClips(), ...socialClips(), ...playClips(), ...rideClips()];
 }
 
 const live = new Set<CharacterSet>();

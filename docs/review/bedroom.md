@@ -174,7 +174,8 @@ Measured: the dressing table's top 0.76 (72–78) and its pouf's seat 0.45 (42�
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters.ts:2526-2541` (a bunk's second sleeper gets `bedH` = the upper mattress, 1.38 m; getting in is `sitDown` with `rootY = rig.bedH − …` at `LIE_ENTRY`, `:304`, from the tile in front, as on any bed); `tools/art/blender/families/bedroom.py:225-229` (the ladder, static, at the foot end on the right); `web/src/render/babylon/characters/furniture.json:81` (`bunks.bedBunk` [0.44, 1.38])
 - **Evidence:** `bedroom/extra/bunk-two-02.png`: with someone asleep below, a second resident (the elder) sent to sleep walks to the foot end and sits down 1.4 m above the floor on nothing, facing out, the legs through the upper bunk's end board; then lies on the upper duvet (`bunk-two-05.png`) and the quilt comes (`bunk-two-09.png`). Getting up, they drop the same way. Nobody uses the ladder. A climb (up the ladder, then in over the side) is new behaviour. Related: anyone may take the upper bunk, an elder or a small child too (no age rule, I-systems-04, systems ledger).
-- **Status:** open
+- **Status:** fixed (6a1438d5, 1768f8b0)
+- **After:** the upper bunk's sleeper walks from the tile round the foot end to the ladder, climbs its four rungs, crawls in through the gap in the guard rail, sits with the legs swung round and lies back into `lie` (`bunkUp172`/`147`/`112`); woken, the same way down and a walk round to the tile (`bunkDown…`), sim-core keeping them at the bed meanwhile (`Sim::ladder_ticks`, sim test `up_from_the_upper_bunk_they_climb_down_its_ladder_before_anything_else`). Shots, the lower bunk's sleeper in already: `fixes/rides/bunk-up-child.png`, `bunk-up-child-close.png`, `bunk-down-child.png`, `bunk-up-adult-down-teen.png` (the adult up, the teen down). The lower bunk as before. The duvet's turn-down comes early: A-bedroom-06.
 - **Source:** wave: bedroom (`bedroom/extra/scenes.mjs` phase `bunk`, `review-stage`, residents 0 and 4)
 
 ### A-bedroom-03 — moved to residents.md
@@ -257,6 +258,16 @@ Measured: the dressing table's top 0.76 (72–78) and its pouf's seat 0.45 (42�
 - **Evidence:** `fixes/tables/play-a/a-bedDaybed-sleep-01.png`: the quilt's sides drop past the mattress's edges as on an open bed, so on the front side it hangs down between the rail's spindles to below the mattress, and at the back it runs into the back. A bed with sides wants the quilt tucked in at the mattress's edges (no side drop), as a cot's would be.
 - **Status:** open
 - **Source:** fix: tables (G-04 re-check, 2026-10-21)
+
+### A-bedroom-06 — The upper bunk's duvet turns down while its sleeper is still at the foot of the ladder
+
+- **Severity:** S3
+- **Rubric:** A2, A4
+- **Fix class:** motion
+- **Where:** `web/public/assets/packs/bedroom/manifest.json` (`model.bedBunk` `motions.uses.sleep`: `turn_down_upper` for slot 1, played as the use starts); `tools/art/blender/families/bedroom.py:219` (`bedBunk`: `_turn_down(upper, 'turn_down_upper', …)`)
+- **Evidence:** `fixes/rides/bunk-up-child.png` (t 0.1 to 0.86): the upper duvet's flap folds back the moment the use starts, about 6 s before its sleeper, now climbing the ladder (G-44, `bunkUp`), gets onto the mattress, and stands folded up beside them while they crawl in and sit. Someone turns their own duvet back once in bed. The upper slot's turn-down wants a delay of the climb's length (`bunkUp`, 7 s at speed 1), as the moving parts in time with the use (G-17) do.
+- **Status:** open
+- **Source:** fix: rides (G-44)
 
 ### I-bedroom-08 — At a mirror the resident looks down, not at the glass
 
