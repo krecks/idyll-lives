@@ -10,11 +10,11 @@ sling) are meshes made from points in the family (`_slab`, `_ring`, `_pleats`, `
 
 | Model | Moving part and clip | Played by |
 |---|---|---|
-| `jukebox` | the top record of the stack in the window, hinged on its front edge: `record` swings it up 90° to stand in the window (0.8 s); its label (with a coral stripe) is a part inside it (`G.attach`): `spin` turns it at 33⅓ a minute, a loop | `dance` |
-| `karaokeMachine` | the stand's upper tube, boom and microphone: `mic_up` raises them 25 cm out of the lower tube (0.8 s) | `sing` |
+| `jukebox` | the top record of the stack in the window, hinged on its front edge: `record` swings it up 90° to stand in the window (0.8 s); its label (with a coral stripe) is a part inside it (`G.attach`): `spin` turns it at 33⅓ a minute, a loop. The arch bands and the bubble tubes glow at night (`amber`, `sunny`: M-packs-07) | `dance` |
+| `karaokeMachine` | the stand's upper tube, boom and microphone: `mic_up` raises them 25 cm out of the lower tube (0.8 s). The lyrics screen glows while it is sung to (`lyrics`, `screen`: M-packs-07) | `sing` |
 | `mocktailCart` | the cocktail shaker, hinged on its foot's edge: `shake` tips it 35° over the pink drink (0.6 s) | `mix` |
-| `rainbowHammock` | the sling with its spreader bars, ropes, hooks and pillow, pivoting on the hooks: `sway` rocks it 5° each way (2.4 s), a loop; `ride: sway` | `swing`, `doze` (loops) |
-| `sunriseLamp` | the sun, set behind the hills: `sunrise` slides it 22 cm up into the sky (1.5 s) | `stretch` |
+| `rainbowHammock` | the sling with its spreader bars, ropes, hooks and pillow, pivoting on the hooks: `sway` rocks it 5° each way (2.4 s), a loop; `ride: sway`. A 3 × 1 stand, the sling 2 m between the spreader bars at ±1.015 (`furniture.json` `sling`: low 0.5, end 0.9, half 1.015, head 0.75), so a grown-up lies in it near flat (2026-10-21: 2 × 1, a 1.5 m sling, the knees up: M-packs-06, Q-07) | `swing`, `doze` (loops) |
+| `sunriseLamp` | the sun, set behind the hills: `sunrise` slides it 22 cm up into the sky (1.5 s). The lamp has a content `light` (2.5 m, at 1.25 m), switched as a lamp, its sky glowing with it (M-packs-07) | `stretch` |
 | `partyBooth` | the right side curtain, hanging closed along its rail: `curtain` gathers it to the back (scaled to a quarter along its rail, 0.8 s), `hold` 1.5 s | `party` |
 
 **Draw calls: 3 each** (the lamp 2). The still body takes its plain finishes and at most one textured finish, the
@@ -43,7 +43,7 @@ Deviations from the plan:
 | `model.cheerful.jukebox` | 0.75 × 1.43 × 0.50 m | 4,324 | 4 | Body, Trim |
 | `model.cheerful.karaokeMachine` | 0.76 × 1.76 × 0.85 m | 3,684 | 3 | Body, Trim, Rug |
 | `model.cheerful.mocktailCart` | 0.84 × 1.64 × 0.57 m | 6,852 | 3 | Body, Trim, Frame |
-| `model.cheerful.rainbowHammock` | 1.88 × 1.09 × 0.70 m | 2,736 | 3 | Body, Trim, Pillow |
+| `model.cheerful.rainbowHammock` | 2.84 × 1.17 × 0.70 m | 3,048 | 3 | Body, Trim, Pillow |
 | `model.cheerful.sunriseLamp` | 0.78 × 1.64 × 0.87 m | 2,868 | 2 | Body, Trim, Mat |
 | `model.cheerful.partyBooth` | 1.90 × 1.64 × 1.83 m | 7,972 | 3 | Body, Trim, Curtain |
 
