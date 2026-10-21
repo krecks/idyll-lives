@@ -8,8 +8,8 @@ use crate::world::{Activity, MAX_SIMS, Phase, Sim, Task, TaskKind, World};
 use crate::{TICKS_PER_SECOND, clock};
 
 pub const HEADER_LEN: usize = 9;
-/// Floats per Sim (all 23 used).
-pub const SIM_STRIDE: usize = 24;
+/// Floats per Sim (all 28 used).
+pub const SIM_STRIDE: usize = 28;
 pub const CAPACITY: usize = HEADER_LEN + MAX_SIMS * SIM_STRIDE;
 
 pub mod header {
@@ -86,10 +86,21 @@ pub mod sim {
     pub const RECIPE: usize = 22;
     /// Calling out someone's name (to talk; see `conversation.rs`): their id + 1, else 0.
     pub const CALL: usize = 23;
+    /// While walking, the waypoint they're walking to (`YAW` faces it); else where they stand.
+    pub const WAY_X: usize = 24;
+    pub const WAY_Z: usize = 25;
+    /// While walking, where their way is `AHEAD` metres on from where they are (or its end;
+    /// not past a step onto another storey); else where they stand. With `WAY_X`, the renderer
+    /// opens a door or a gate only for someone about to go through it.
+    pub const AHEAD_X: usize = 26;
+    pub const AHEAD_Z: usize = 27;
 }
 
+/// How far ahead along their way `sim::AHEAD_X` looks, in metres.
+pub const AHEAD: f32 = 1.5;
+
 // Every field fits in a Sim's row.
-const _: () = assert!(sim::HEIGHT < SIM_STRIDE && sim::INTERACTION < SIM_STRIDE && sim::RECIPE < SIM_STRIDE && sim::CALL < SIM_STRIDE);
+const _: () = assert!(sim::HEIGHT < SIM_STRIDE && sim::INTERACTION < SIM_STRIDE && sim::RECIPE < SIM_STRIDE && sim::CALL < SIM_STRIDE && sim::AHEAD_Z < SIM_STRIDE);
 const _: () = assert!(header::ITEMS_VERSION < HEADER_LEN);
 
 /// What a Sim does for the snapshot; see `sim::OBJECT`, `sim::ACTION`, `sim::OBJECT_DEF` and
@@ -206,6 +217,32 @@ fn doing(world: &World, s: &Sim) -> Doing {
     }
 }
 
+/// The waypoint a Sim walks to and where their way is `AHEAD` metres on (`sim::WAY_X`,
+/// `sim::AHEAD_X`), both where they stand when they aren't walking.
+fn way_ahead(world: &World, s: &Sim) -> ([f32; 2], [f32; 2]) {
+    let Some(Activity { phase: Phase::Routing { waypoints, next }, .. }) = s.current() else {
+        return (s.pos, s.pos);
+    };
+    let storey = world.storey_of(s.pos[1].floor() as i32);
+    let Some(&way) = waypoints.get(*next).filter(|wp| world.storey_of(wp[1].floor() as i32) == storey) else {
+        return (s.pos, s.pos);
+    };
+    let (mut at, mut left) = (s.pos, AHEAD);
+    for &wp in &waypoints[*next..] {
+        if world.storey_of(wp[1].floor() as i32) != storey {
+            break;
+        }
+        let d = (wp[0] - at[0]).hypot(wp[1] - at[1]);
+        if d >= left {
+            let k = left / d;
+            return (way, [at[0] + (wp[0] - at[0]) * k, at[1] + (wp[1] - at[1]) * k]);
+        }
+        left -= d;
+        at = wp;
+    }
+    (way, at)
+}
+
 /// Writes the snapshot into `out`, which must hold at least `CAPACITY` floats.
 pub fn write(world: &World, out: &mut [f32]) {
     out[header::TICK] = (world.tick % (1 << 24)) as f32;
@@ -256,6 +293,9 @@ pub fn write(world: &World, out: &mut [f32]) {
             Some(Activity { task: Task { kind: TaskKind::Social { target, .. }, .. }, phase: Phase::Calling { .. }, .. }) => *target as f32 + 1.0,
             _ => 0.0,
         };
+        let (way, ahead) = way_ahead(world, s);
+        [o[sim::WAY_X], o[sim::WAY_Z]] = way;
+        [o[sim::AHEAD_X], o[sim::AHEAD_Z]] = ahead;
     }
     // Conversations: write the shared state into every participant's row.
     for (i, s) in world.sims.iter().enumerate() {
@@ -309,6 +349,7 @@ pub fn layout_json(content: &Content) -> String {
             "mood": sim::MOOD, "thought": sim::THOUGHT, "thoughtSubject": sim::THOUGHT_SUBJECT, "height": sim::HEIGHT,
             "objectDef": sim::OBJECT_DEF, "interaction": sim::INTERACTION,
             "held": sim::HELD, "recipe": sim::RECIPE, "call": sim::CALL,
+            "wayX": sim::WAY_X, "wayZ": sim::WAY_Z, "aheadX": sim::AHEAD_X, "aheadZ": sim::AHEAD_Z,
         },
         "actions": content.animations,
         "items": content.items.iter().map(|i| &i.id).collect::<Vec<_>>(),

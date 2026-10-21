@@ -285,8 +285,9 @@ export interface HouseBuild {
  */
 export interface DoorLeaf {
   meshes: Mesh[];
-  /** The middle of its doorway. */
+  /** The middle of its doorway, in a wall along x (`axis` h) or z. */
   centre: [number, number];
+  axis: 'h' | 'v';
   /** Turn about y that shuts it, and how much of it back it swings open (1: all the way, against the wall). */
   close: number;
   opens: number;
@@ -1903,7 +1904,7 @@ export class HouseBuilder {
     // The leaf's glass belongs to the room it stands in (opening outdoors, the one it shuts).
     const roomOn = (side: number) => (axis === 'h' ? roomP(x + 0.5, z + side * 0.25) : roomP(x + side * 0.25, z + 0.5));
     const inside = roomOn(into) || roomOn(-into);
-    const own = moves ? geos.swing?.({ hinge: pivot, centre: axis === 'h' ? [x + 0.5, z] : [x, z + 0.5], close, opens, front, rooms, slide }) : undefined;
+    const own = moves ? geos.swing?.({ hinge: pivot, centre: axis === 'h' ? [x + 0.5, z] : [x, z + 0.5], axis, close, opens, front, rooms, slide }) : undefined;
     const glass = own ? own.glass : geos.glass(inside);
     // One that moves is drawn open and turned (and slid) by `swingDoors`. One that doesn't (or
     // any in a preview) is drawn at rest, as `swingDoors` would leave it: turned about the pivot
