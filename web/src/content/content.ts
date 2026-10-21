@@ -82,6 +82,12 @@ export interface InteractionDef {
    * (default every stage but a baby's): the kids' things are a child's, wine a grown-up's.
    */
   stages?: string[];
+  /** Only started between these hours of the day (`[from, to]`, past midnight when `from` > `to`): stargazing after dark. */
+  hours?: [number, number];
+  /** Only under open sky: the object stands outside. */
+  sky?: boolean;
+  /** Only with something to work on: dirty dishes, washing to do, a washed load to dry (sim-core `content::WorkOn`). */
+  workOn?: 'dishes' | 'laundry' | 'washed';
 }
 
 /** How cooking, eating and washing up go (content `cooking`; sim-core `cooking::CookingRules`). */

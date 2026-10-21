@@ -92,8 +92,8 @@ their backs on the wall face (game depth -0.43).
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `laundryWasher` Washing machine | 1x1 · floor | laundry:clean | bathroom / laundry | Body, Door, Panel | Use | `door_open`: the round door swings 110° for laundry, `hold` 2.5 s (loading), then shuts. L `drum_spin` (E1). |
-| `laundryDryer` Tumble dryer | 1x1 · floor | laundry:clean | bathroom / laundry | Body, Door, Panel | Use | `door_open`, as the washer. L `drum_spin` (E1). |
+| `laundryWasher` Washing machine | 1x1 · floor | laundry:clean | bathroom / laundry | Body, Door, Panel | Use | `door_open`: the round door swings 110° for laundry, `hold` 2.5 s (loading), then shuts. L `drum_spin` (E1). Only with a load of dirty washing (`workOn`: about 0.4 a resident a day), which it washes for the dryer. |
+| `laundryDryer` Tumble dryer | 1x1 · floor | laundry:clean | bathroom / laundry | Body, Door, Panel | Use | `door_open`, as the washer. L `drum_spin` (E1). Only with a washed load to dry and fold (`workOn`). |
 | `towelRail` Towel rail | 1x1 · wall | — | bathroom / laundry | Rail, Towels, Hand towel | Static | Static. |
 | `towelLadder` Towel ladder | 1x1 · floor | — | bathroom / laundry | Ladder, Top towel, Middle towel, Bottom towel | Static | Static. |
 | `laundryBasket` Laundry basket | 1x1 · floor | — | bathroom / laundry | Basket, Rim & weave | Static | Static: a wicker basket with clean washing on top; no lid is built (`open.md`). |

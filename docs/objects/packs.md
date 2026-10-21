@@ -276,7 +276,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `neat.steamMopDock` Steam mop dock | 1x1 · floor | mop:clean | kitchen / — | Body, Mop | Use | `mop_off`: the mop leaves its dock for mop and is drawn in the resident's hands, pushed over the floor (content `held`). |
-| `neat.laundryCenter` Stacked laundry centre | 2x1 · floor | laundry:clean fold:clean | bathroom / — | Body, Washer & dryer | Use | `door_open`: the washer door swings for laundry and fold. |
+| `neat.laundryCenter` Stacked laundry centre | 2x1 · floor | laundry:clean fold:clean | bathroom / — | Body, Washer & dryer | Use | `door_open`: the washer door swings for laundry and fold. laundry only with dirty washing (`workOn`). |
 | `neat.rainShowerTower` Rainfall steam shower | 1x1 · floor | steamShower:shower | bathroom / — | Body, Bench | Use | `water_on`: the rain grows for steamShower. |
 | `neat.organizerDesk` Label-and-sort organizer desk | 2x1 · floor | sort:write ledger:write | office / — | Body, Wood, Chair | Use | `drawer_open`: a bin slides out of the hutch for sort and ledger. Written at on its own chair with the hands on the top (`NEAR_DESKS`, `sitHandsNear`; `SEATS`), not through its front. |
 | `neat.robotVacuumDock` Robot vacuum and dock | 1x1 · floor | program:type | living / — | Body, Trim, Rug | Use | `vacuum_out`: the robot rolls 60 cm out of its dock, turns and rolls back for program (`hold` 2 s). |

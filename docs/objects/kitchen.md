@@ -27,8 +27,8 @@ espresso machine on a top, the foodie espresso bar) and every *Have a coffee* at
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `farmhouseSink` Farmhouse sink | 1x1 · floor | wash:wash washUp:wash | kitchen / counters | Cabinet, Worktop, Basin, Tap & handles, Plinth | Use | `water_on`: the stream grows from the gooseneck tap into the apron-front basin in 0.4 s, runs for the whole use and retracts as it ends. |
-| `counterSinkDouble` Double sink | 2x1 · floor | wash:wash washUp:wash | kitchen / counters | Cabinets, Worktop, Basins, Tap & handles, Plinth | Use | `water_on`, as the farmhouse sink: both bridge taps run together (two slots). |
+| `farmhouseSink` Farmhouse sink | 1x1 · floor | wash:wash washUp:wash | kitchen / counters | Cabinet, Worktop, Basin, Tap & handles, Plinth | Use | `water_on`: the stream grows from the gooseneck tap into the apron-front basin in 0.4 s, runs for the whole use and retracts as it ends. washUp only with dirty dishes to wash (`workOn`). |
+| `counterSinkDouble` Double sink | 2x1 · floor | wash:wash washUp:wash | kitchen / counters | Cabinets, Worktop, Basins, Tap & handles, Plinth | Use | `water_on`, as the farmhouse sink: both bridge taps run together (two slots). washUp only with dirty dishes to wash (`workOn`). |
 
 **In play** (signed off 2026-10-16):
 - Checked with the bathroom sinks, the first group: bought in all four facings, every part coloured (through `buy` and
@@ -90,8 +90,8 @@ espresso machine on a top, the foodie espresso bar) and every *Have a coffee* at
 |---|---|---|---|---|---|---|
 | `coffeeMachine` Coffee machine | 1x1 · floor | espresso:drink | kitchen / appliances | Cabinet, Worktop, Machine | Use | Provides `coffee`; `brew`: a cup slides under the spout and a thin coffee stream grows for espresso. |
 | `breakfastCounter` Breakfast counter | 1x1 · floor | toast:cook smoothie:cook | kitchen / appliances | Counter, Toaster, Blender | Use | `toast_down`: the toaster's carriage (lever and toast, one part) slides 5 cm down for toast and pops up at the end. `blend` for smoothie: the blender lid lifts. L `blades`: the smoothie under the lid swirls while it blends (E1). |
-| `dishwasher` Dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | `door_open`: the door drops 85° and the lower rack slides out 30 cm for dishes; `hold` 2.5 s (loading), then it closes. |
-| `dishwasherCompact` Stainless dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | `door_open`, as the dishwasher. |
+| `dishwasher` Dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | `door_open`: the door drops 85° and the lower rack slides out 30 cm for dishes; `hold` 2.5 s (loading), then it closes. Only with dirty dishes (`workOn`). |
+| `dishwasherCompact` Stainless dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | `door_open`, as the dishwasher. Only with dirty dishes (`workOn`). |
 
 **In play** (signed off 2026-10-16):
 - The dishwashers' doors drop 0.44 m into the tile in front: the loader stands 15 cm further back while using either
@@ -139,7 +139,7 @@ espresso machine on a top, the foodie espresso bar) and every *Have a coffee* at
 | `potRail` Pot rail | 1x1 · wall | — | kitchen / counters | Rail, Pots | Static | Static. |
 | `kitchenShelfWall` Kitchen wall shelves | 1x1 · wall | — | kitchen / counters | Shelves, Brackets | Static | Static. |
 | `trashCan` Pedal bin | 1x1 · floor | — | kitchen / counters | Bin, Lid | Use | `lid_open`: the pedal lid lifts 75° while a plate is scraped in (`clean` at its `bin` station, `hold` 1 s). |
-| `recyclingBins` Recycling bins | 1x1 · floor | sortRecycling:clean | kitchen / counters | Left bin, Middle bin, Right bin (each with its lid), Handles | Use | `lid0_open`, `lid1_open`, `lid2_open`: the three lids lift one after another (0.6 s apart, each 80° in 0.5 s, `hold` 0.9 s) for "Sort the recycling". |
+| `recyclingBins` Recycling bins | 1x1 · floor | sortRecycling:clean | kitchen / counters | Left bin, Middle bin, Right bin (each with its lid), Handles | Use | `lid0_open`, `lid1_open`, `lid2_open`: the three lids lift one after another (0.6 s apart, each 80° in 0.5 s, `hold` 0.9 s) for "Sort the recycling". Only after a meal, with something to clear (`workOn`). |
 
 **In play** (signed off 2026-10-16):
 - The pantry's and tall larder's doors open for a snack; the three wall cabinets' doors when clean dishes are put

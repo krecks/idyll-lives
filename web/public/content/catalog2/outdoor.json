@@ -532,6 +532,7 @@
         {
           "id": "washing",
           "label": "Hang out the washing",
+          "workOn": "washed",
           "anim": "clean",
           "minutes": 20,
           "effects": {

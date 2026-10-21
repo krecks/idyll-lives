@@ -24,6 +24,9 @@ fn interaction(w: &World, object: u32, id: &str) -> usize {
 fn showering_bathing_washing_up_and_laundry_at_once() {
     let mut w = World::from_json(&common::content(), TOWN, 1).unwrap();
     w.autonomy = false;
+    // A dirty plate to wash up (washing up needs dishes to wash, content `workOn`).
+    let plate = w.content.item_index("plateDirty").unwrap();
+    w.items.add(sim_core::items::ItemInstance { id: 0, def: plate, at: sim_core::items::ItemAt::Floor { x: 1, z: 1, offset: [0, 0] }, servings: 0, quality: 1.0, made_at: 0, household: 0, spoiled: false, recipe: None });
     let uses = [("showerStall", 2, 3, "shower", "shower"), ("bathtub", 5, 3, "bath", "bath"), ("sink", 9, 3, "wash", "wash"), ("farmhouseSink", 11, 3, "washUp", "wash"), ("laundryWasher", 13, 3, "laundry", "clean")];
     let mut wanted = Vec::new();
     for (i, (def, x, z, id, anim)) in uses.into_iter().enumerate() {

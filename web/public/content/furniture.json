@@ -579,6 +579,7 @@
         {
           "id": "dishes",
           "label": "Load the dishwasher",
+          "workOn": "dishes",
           "anim": "clean",
           "minutes": 10,
           "effects": {
@@ -703,6 +704,7 @@
         {
           "id": "washUp",
           "label": "Wash the dishes",
+          "workOn": "dishes",
           "anim": "wash",
           "minutes": 15,
           "effects": {
@@ -2609,6 +2611,7 @@
         {
           "id": "laundry",
           "label": "Do the laundry",
+          "workOn": "laundry",
           "anim": "clean",
           "minutes": 30,
           "effects": {
@@ -2638,6 +2641,7 @@
         {
           "id": "laundry",
           "label": "Fold the laundry",
+          "workOn": "washed",
           "anim": "clean",
           "minutes": 20,
           "effects": {

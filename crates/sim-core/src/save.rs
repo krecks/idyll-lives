@@ -44,7 +44,8 @@
 //! (`objects[].growth`: -1..0 fallow, 0..1 growing, 1 ripe; absent: ripe); 28 = lamps can be
 //! switched off (`objects[].off`; absent: on); 29 = objects have a stable id (`objects[].id`)
 //! that doesn't change when other objects are sold or moved (absent: assigned on load), and
-//! `next_object_id` keeps ids from being reused after the highest one is sold. Older
+//! `next_object_id` keeps ids from being reused after the highest one is sold; 30 = washing
+//! piles up (`households[].laundry`: loads dirty and washed; absent: one of each). Older
 //! files load. Saves
 //! written before feelings were renamed from "moodlets" store them under `moodlets`; a serde
 //! alias still reads it.
@@ -63,7 +64,7 @@ use crate::planner::{BlockResult, Goal, HomeWish, Outcome, Planner, Reason, Rout
 use crate::world::{GameMode, Household, Plot, Task, TaskKind, World};
 use crate::{Error, MINUTES_PER_TICK, clock::MAX_SPEED};
 
-pub const SAVE_VERSION: u32 = 29;
+pub const SAVE_VERSION: u32 = 30;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -599,6 +600,10 @@ pub struct HouseholdSave {
     /// The day a babysitter was booked for (absent: none).
     #[serde(default, rename = "sitterDay", skip_serializing_if = "Option::is_none")]
     pub sitter_day: Option<u32>,
+    /// Loads of washing waiting: dirty, and washed to dry (see `Household::laundry`; absent
+    /// before v30: one of each).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub laundry: Option<[f32; 2]>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -803,6 +808,7 @@ impl World {
                     routines: h.routines.iter().map(|r| routine_save(content, r)).collect(),
                     expecting: h.expecting,
                     sitter_day: h.sitter_day,
+                    laundry: Some(h.laundry),
                 })
                 .collect(),
             plots: self
@@ -958,6 +964,7 @@ impl World {
                 routines: Vec::new(),
                 expecting: None,
                 sitter_day: None,
+                laundry: [crate::world::LAUNDRY_AT_START; 2],
             }]
         } else {
             save.households
@@ -979,6 +986,7 @@ impl World {
                         .collect(),
                     expecting: h.expecting,
                     sitter_day: h.sitter_day,
+                    laundry: h.laundry.map_or([crate::world::LAUNDRY_AT_START; 2], |l| l.map(|v| finite(v, 0.0).max(0.0))),
                 })
                 .collect()
         };

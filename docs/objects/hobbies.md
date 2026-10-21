@@ -67,7 +67,7 @@ table face the room, as tables do.
 |---|---|---|---|---|---|---|
 | `easel` Easel | 1x1 · floor | paint:paint | hobbies / crafts | Wood, Metal | Use | `painting`: a painting grows on the canvas for paint. |
 | `workbench` Workbench | 2x1 · floor | tinker:tinker | hobbies / crafts | Wood, Metal | Use | `vice`: the vice jaw slides shut on a plank for tinker. |
-| `telescope` Telescope | 1x1 · floor | stargaze:look | hobbies / crafts | Tube, Tripod | Use | `aim`: the tube tilts up 35° for stargaze and comes back down. |
+| `telescope` Telescope | 1x1 · floor | stargaze:look | hobbies / crafts | Tube, Tripod | Use | `aim`: the tube tilts up 35° for stargaze and comes back down. Only from 20:00 to 5:00, standing outside (`hours`, `sky`). |
 | `sewingTable` Sewing table | 1x1 · floor | sew:tinker mend:tinker | hobbies / crafts | Table, Legs, Machine | Use + Loop (E1) | `presser`: the presser foot lowers for sew and mend, and the handwheel turns in a loop (`handwheel`, E1). |
 | `chemistrySet` Chemistry bench | 1x1 · floor | experiment:tinker | hobbies / crafts | Bench, Glassware | Use | `bubble`: the liquid rises in the flask for experiment. |
 | `potteryWheel` Pottery wheel | 1x1 · floor | throw:tinker | hobbies / crafts | Wheel, Stool | Use + Loop (E1) | `clay`: the pot grows from a lump for throw, and the wheel head spins in a loop (`wheel`, E1). |

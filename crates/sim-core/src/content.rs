@@ -159,6 +159,62 @@ pub struct Interaction {
     /// Picks the crop as the use starts (content `leaves`: "picked"): it lies fallow, then is
     /// planted again and grows (see `ObjectDef::grows`).
     pub picks: bool,
+    /// Only started between these hours of the day (content `hours`: `[from, to]`, 0..24; past
+    /// midnight when `from` is later than `to`): stargazing after dark. Free will and the
+    /// player's orders keep it alike (`world::unmet`), as all the conditions below.
+    pub hours: Option<[f32; 2]>,
+    /// Only under open sky (content `sky`): the object stands outdoors, every tile of it.
+    pub sky: bool,
+    /// Only with something to work on (content `workOn`): washing up with dirty dishes,
+    /// the laundry with washing to do.
+    pub work_on: Option<WorkOn>,
+}
+
+/// Something a use works on (content `workOn`), which must be there for it to start.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum WorkOn {
+    /// Dirty dishes or food gone off, the household's, to clear away (`ItemInstance::to_clear`).
+    Dishes,
+    /// A load of the household's dirty washing (`Household::laundry`, content `laundry`): the
+    /// use washes it, and it waits to be dried (`Washed`).
+    Laundry,
+    /// A load the household washed (`Household::washed`): the use dries and folds it.
+    Washed,
+}
+
+impl WorkOn {
+    pub const ALL: [WorkOn; 3] = [WorkOn::Dishes, WorkOn::Laundry, WorkOn::Washed];
+
+    /// Its bit in a mask of what there is to work on (`world::work_waiting`).
+    pub fn bit(self) -> u8 {
+        1 << self as u8
+    }
+
+    /// What there is none of, as the player is told.
+    pub fn none(self) -> &'static str {
+        match self {
+            WorkOn::Dishes => "there are no dishes to wash",
+            WorkOn::Laundry => "there's no washing to do",
+            WorkOn::Washed => "there's no washed laundry to dry",
+        }
+    }
+}
+
+/// Whether `hour` (0..24) is in the window `[from, to]` (past midnight when `from` > `to`).
+pub fn in_hours(window: [f32; 2], hour: f32) -> bool {
+    let [from, to] = window;
+    if from <= to { (from..to).contains(&hour) } else { hour >= from || hour < to }
+}
+
+/// Dirty washing piling up (content `laundry`): what the laundry's uses work on
+/// (`WorkOn::Laundry`, `WorkOn::Washed`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LaundryRules {
+    /// Loads of washing each resident at home makes a day.
+    pub per_day: f32,
+    /// Most loads that pile up (dirty, and washed waiting to dry, each).
+    pub most: f32,
 }
 
 impl Interaction {
@@ -1379,6 +1435,9 @@ pub struct Content {
     /// Everyone's smartphone: who has one and what they do with it (content `phone`; see
     /// `phone.rs`).
     pub phone: crate::phone::PhoneRules,
+    /// How dirty washing piles up (content `laundry`; None: it never does, and nothing works
+    /// on it).
+    pub laundry: Option<LaundryRules>,
     object_index: HashMap<String, usize>,
 }
 
@@ -1476,6 +1535,8 @@ struct ContentFile {
     recipes: Vec<crate::cooking::RecipeRaw>,
     #[serde(default)]
     phone: crate::phone::PhoneRaw,
+    #[serde(default)]
+    laundry: Option<LaundryRaw>,
 }
 
 #[derive(Deserialize)]
@@ -2226,6 +2287,23 @@ struct InteractionRaw {
     leaves: Option<OpenState>,
     #[serde(default)]
     close_after: bool,
+    /// Hours of the day it may start in (see `Interaction::hours`).
+    #[serde(default)]
+    hours: Option<[f32; 2]>,
+    /// Only under open sky (see `Interaction::sky`).
+    #[serde(default)]
+    sky: bool,
+    /// Something it works on (see `Interaction::work_on`).
+    #[serde(default)]
+    work_on: Option<WorkOn>,
+}
+
+/// Content `laundry` (see `LaundryRules`).
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LaundryRaw {
+    per_day: f32,
+    most: f32,
 }
 
 /// An object's state for `when` and `leaves` (see `ObjectInstance::open`), or its crop's
@@ -2760,7 +2838,18 @@ impl Content {
                     close_after: it.close_after,
                     ripe: it.when == Some(OpenState::Ripe),
                     picks: it.leaves == Some(OpenState::Picked),
+                    hours: it.hours,
+                    sky: it.sky,
+                    work_on: it.work_on,
                 });
+                if let Some(h) = it.hours
+                    && (!h.iter().all(|v| (0.0..=24.0).contains(v)) || h[0] == h[1])
+                {
+                    return Err(Error::new(format!("{ctx}: `hours` is [from, to], two different hours of the day (0 to 24)")));
+                }
+                if matches!(it.work_on, Some(WorkOn::Laundry | WorkOn::Washed)) && raw.laundry.is_none() {
+                    return Err(Error::new(format!("{ctx}: `workOn` laundry needs content `laundry` (how the washing piles up)")));
+                }
                 if it.close_after
                     && (it.leaves != Some(OpenState::Open)
                         || !obj.interactions.iter().any(|i| i.leaves == Some(OpenState::Closed)))
@@ -3640,6 +3729,11 @@ impl Content {
         let (activities, planner, goals) =
             crate::planner::parse(&raw.activities, &raw.planner, &raw.goals, &tag_index, &feelings)?;
         let phone = crate::phone::parse(&raw.phone, &ix, &animations, &life.stages)?;
+        let laundry = match &raw.laundry {
+            Some(l) if l.per_day > 0.0 && l.per_day.is_finite() && l.most >= 1.0 && l.most.is_finite() => Some(LaundryRules { per_day: l.per_day, most: l.most }),
+            Some(_) => return Err(Error::new("laundry: `perDay` above 0 and `most` at least 1 (loads)")),
+            None => None,
+        };
         Ok(Self {
             needs,
             objects,
@@ -3682,6 +3776,7 @@ impl Content {
             items,
             recipes,
             phone,
+            laundry,
             object_index,
         })
     }
@@ -4090,6 +4185,18 @@ mod tests {
         refused(&|c| c["accidents"] = json!([{"id": "doze", "need": "fun", "cooldownHours": 1e39}]), "accident 'doze': times must be numbers");
         refused(&|c| c["dayRhythm"] = json!({"babyWakes": {"cooldownMinutes": 1e39}}), "dayRhythm.babyWakes.cooldownMinutes");
         refused(&|c| c["cooking"] = json!({"inviteMinutes": 1e39}), "cooking.inviteMinutes must be a number");
+        refused(&|c| c["objects"][0]["interactions"][0]["hours"] = json!([20, 20]), "fridge.snack: `hours` is [from, to]");
+        refused(&|c| c["objects"][0]["interactions"][0]["hours"] = json!([20, 25]), "fridge.snack: `hours`");
+        refused(&|c| c["objects"][0]["interactions"][0]["workOn"] = json!("laundry"), "fridge.snack: `workOn` laundry needs content `laundry`");
+        refused(&|c| c["laundry"] = json!({"perDay": 0, "most": 4}), "laundry: `perDay` above 0");
+        refused(
+            &|c| {
+                c["objects"][1]["layer"] = json!("surface");
+                c["objects"][1]["footprint"] = json!([1, 1]);
+                c["objects"][1]["interactions"][0]["pose"] = json!("lie");
+            },
+            "a thing on a surface is used standing or sitting at its top",
+        );
         // (Each of these on its own is fine.)
         let mut c: serde_json::Value = serde_json::from_str(CONTENT).unwrap();
         c["objectRules"] = json!({"resale": 1.0, "upgradeCost": 0.0});
