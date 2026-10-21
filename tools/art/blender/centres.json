@@ -575,5 +575,6 @@
   "model.yogaMat": [0.025, -0.295],
   "tool.board": [0.0, 0.0],
   "tool.grillFood": [-0.015, -0.005],
+  "tool.mixingBowl": [0.0, 0.0029],
   "tool.pan": [0.0, 0.0575]
 }

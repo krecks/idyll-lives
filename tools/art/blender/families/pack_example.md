@@ -12,12 +12,14 @@ middle, facing the front), with the water up to 0.65.
 
 | Model | Moving part and clip | Played by |
 |---|---|---|
-| `chefStove` | the left oven door, on its bottom hinge: `oven_open` drops it 85° (1.2 s), shut again after 3 s | `cook`, `practise` |
-| `chefStove` | a knob and the front middle burner's flame ring (built full size, scaled to nothing): `burner_on` turns the knob 90° and grows the flame (0.5 s), for the whole use | `cook`, `practise` |
+| `chefStove` | the left oven door, on its bottom hinge: `oven_open` drops it 85° (1.2 s), shut again after 3 s | `practise`, the `bake` tag |
+| `chefStove` | a knob and the front middle burner's flame ring (built full size, scaled to nothing): `burner_on` turns the knob 90° and grows the flame (0.5 s), for the whole use | `cook`, the `stir` tag |
 | `whirlpoolTub` | the water, origin under the footwell floor, flat at rest: `fill` raises it (0.8 s), for the whole soak | `soak` |
 | `whirlpoolTub` | the bubbles over the jets, origin under the floor, flat at rest: `bubbles` (a loop, `G.squash` there and back, 1.6 s) swells them up through the water to the surface and back | `soak` (loop) |
 
-`motions`: the stove `{'uses': {'cook': [{'clip': 'oven_open', 'hold': 3}, 'burner_on'], 'practise': …}}`; the tub
+`motions`: the stove `{'uses': {'cook': 'burner_on', 'stir': 'burner_on', 'practise': {'clip': 'oven_open', 'hold': 3},
+'bake': …}}` (by the cooking step's tag too, for a meal started elsewhere; 2026-10-21: a bake no longer lights the
+hob, nor a meal on the hob opens the oven); the tub
 `{'uses': {'soak': 'fill'}, 'loops': {'soak': 'bubbles'}}`. The bubbles' rise takes as long as `fill` from the same
 origin, so on the first round they ride up on the rising water instead of floating over an empty tub.
 

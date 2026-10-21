@@ -57,19 +57,24 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `stoveElectric` Electric cooker | 1x1 · floor | cook:cook bake:cook | kitchen / appliances | Body, Knobs, Hob | Use | `oven_open`: the oven door drops 85° on its bottom hinge for bake; `knob_on`: the front-left knob turns 90° for cook. |
-| `stoveGas` Gas range | 1x1 · floor | cook:cook gourmet:cook bake:cook | kitchen / appliances | Body, Knobs, Hob | Use | `oven_open` for bake (door drops); `burner_on` for cook and gourmet: a knob turns and a ring of blue flame (gloss, not emissive) grows on the front burner, the `water_on` way. |
-| `wallOven` Oven tower | 1x1 · floor | roast:cook bake:cook | kitchen / appliances | Tower, Handles | Use | `oven_open`: the upper oven door drops and its tray slides out 10 cm for roast and bake. |
-| `rangeCooker` Range cooker | 2x1 · floor | cook:cook gourmet:cook bake:cook | kitchen / appliances | Body, Knobs & rail, Hob | Use | `oven_open`: the left oven door drops for bake; `burner_on` (knob and flame ring) for cook and gourmet. |
-| `cooktopCounter` Hob counter | 1x1 · floor | cook:cook | kitchen / appliances | Cabinet, Worktop, Hob | Use | `burner_on`: a knob turns and the front-right ceramic ring glows red (grown from nothing, as a flame) for cook. |
-| `microwave` Microwave counter | 1x1 · floor | reheat:cook | kitchen / appliances | Cabinet, Worktop, Microwave | Use | `door_open`: the microwave door swings open and shuts again (`hold` 1.2 s) for reheat. L `turntable`: the glass plate turns while it heats (E1). |
+| `stoveElectric` Electric cooker | 1x1 · floor | cook:cook bake:cook | kitchen / appliances | Body, Knobs, Hob | Use | `oven_open`: the oven door drops 85° on its bottom hinge for bake (and any `bake` step), shut after 3 s; `burner_on`: the front-left knob turns 90° and the front ring on its side glows red for cook (and any `stir` step: a meal started at the fridge). 4 draws. |
+| `stoveGas` Gas range | 1x1 · floor | cook:cook gourmet:cook bake:cook | kitchen / appliances | Body, Knobs, Hob | Use | `oven_open` for bake and any `bake` step (door drops); `burner_on` for cook, gourmet and any `stir` step: a knob turns and a ring of blue flame (gloss, not emissive) grows on the front burner, the `water_on` way. |
+| `wallOven` Oven tower | 1x1 · floor | roast:cook bake:cook | kitchen / appliances | Tower, Handles | Use | `oven_open`: the upper oven door drops and its tray slides out 10 cm for roast, bake and any `bake` step (a meal cooked in it is put in, `animAt`), shut after 3 s. |
+| `rangeCooker` Range cooker | 2x1 · floor | cook:cook gourmet:cook bake:cook | kitchen / appliances | Body, Knobs & rail, Hob | Use | `oven_open`: the left oven door drops for bake and any `bake` step; `burner_on` (knob and flame ring) for cook, gourmet and any `stir` step. |
+| `cooktopCounter` Hob counter | 1x1 · floor | cook:cook | kitchen / appliances | Cabinet, Worktop, Hob | Use | `burner_on`: a knob turns and the front-right ceramic ring glows red (grown from nothing, as a flame) for cook and any `stir` step. |
+| `microwave` Microwave counter | 1x1 · floor | reheat:cook | kitchen / appliances | Cabinet, Worktop, Microwave | Use | `door_open`: the microwave door swings open and shuts again (`hold` 1.2 s) for reheat and a meal's `bake` step (a meal cooked in it, `animAt`). `turntable`: once the door has shut (`delay` 2.2 s) the glass plate turns, every 2 s while it heats. |
 
 **In play** (signed off 2026-10-16):
 - Each use run as a recipe (fridge, then a counter, then the cooker): the flame rings and the electric cooker's knob
   for cook and gourmet, the oven doors for bake and roast, the hob counter's hot ring, the microwave's door and
   turntable for reheat.
-- The hob clips (`knob_on`, `burner_on`) last the whole use; `oven_open` shuts after its `hold` (3 s). Each shuts
+- The hob clip (`burner_on`) lasts the whole use; `oven_open` shuts after its `hold` (3 s). Each shuts
   when the resident moves on.
+- Since 2026-10-21 (G-16) the clips play by the cooking step's tag too, so a meal started at the fridge lights the hob
+  (`stir`), and a bake or a meal put in an oven or a microwave (`bake`, the meal's `animAt`) opens its door; the
+  resident bends to a cooker's oven or stands at the tower's and the microwave, with no pan drawn. The Mix step and the
+  pie's pastry (`mix`) are stirred in a mixing bowl (`tool.mixingBowl`) on the counter. Recipe runs:
+  `bench-results/review/fixes/motions/recipes/`.
 - Each oven has a dark cavity inside its door and the microwave is hollow, so an open door shows an oven, not a block.
 - Not right yet: at the microwave the resident's hands reach for the cabinet below, not the door (the shared `cook`
   pose).
@@ -82,7 +87,7 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 |---|---|---|---|---|---|---|
 | `coffeeMachine` Coffee machine | 1x1 · floor | espresso:drink | kitchen / appliances | Cabinet, Worktop, Machine | Use | Provides `coffee`; `brew`: a cup slides under the spout and a thin coffee stream grows for espresso. |
 | `breakfastCounter` Breakfast counter | 1x1 · floor | toast:cook smoothie:cook | kitchen / appliances | Counter, Toaster, Blender | Use | `toast_down`: the toaster's carriage (lever and toast, one part) slides 5 cm down for toast and pops up at the end. `blend` for smoothie: the blender lid lifts. L `blades`: the smoothie under the lid swirls while it blends (E1). |
-| `dishwasher` Dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | `door_open`: the door drops 85° and the lower rack slides out 30 cm for dishes; `hold` 2.5 s (loading), then it closes. |
+| `dishwasher` Dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | `door_open`: the door drops 85° and the lower rack slides out 30 cm for dishes and for clearing away at it (the `wash` tag), open for the whole loading. |
 | `dishwasherCompact` Stainless dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | `door_open`, as the dishwasher. |
 
 **In play** (signed off 2026-10-16):
@@ -91,6 +96,8 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 - The breakfast counter keeps 4 draw calls: the toaster's lever and toast are one part, and the smoothie swirls
   (`blades`, a loop) under the lifted lid.
 - The coffee machine's cup and stream, the toaster and both dishwashers' doors and racks play and shut as they should.
+- Since 2026-10-21 (G-16) a plate or a pot cleared away at a dishwasher opens its door (the `wash` tag) and makes no
+  sound (it was the washing-up water); the door stays open for the whole load.
 - Coffee at the dining tables and chairs needs a working coffee machine on the same lot (`requires` / `provides`).
 
 ## K4. Base counters (8)

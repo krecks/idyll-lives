@@ -404,6 +404,8 @@ const CROUCH_ONLY: readonly string[] = ['crouch'];
  * through its front.
  */
 const NEAR_DESKS = new Set(['gloomy.journalDesk', 'neat.organizerDesk', 'romantic.letterBureau', 'hotHeaded.grudgeJournal']);
+/** Ovens under a hob, near the floor: baking (`bake`) bends down to them. */
+const LOW_OVENS = new Set(['stoveElectric', 'stoveGas', 'rangeCooker', 'chefStove', 'kind.neighbourlyOven']);
 /** Seated objects whose activity uses the hands on a desk / keys. */
 const SIT_HANDS = new Set(['computerDesk', 'piano']);
 /** Standing object use: clip sequence (looped). */
@@ -540,10 +542,15 @@ const ACTIONS: Record<string, ActionAnim> = {
   stir: { stand: ['stir', 'interact', 'stir'], hands: HANDS.hold },
   flip: { stand: ['flip', 'interact', 'flip'], hands: HANDS.grip },
   serve: { stand: ['pickUp', 'idle'], hands: HANDS.hold },
+  // Batter stirred in a mixing bowl, pastry made (the bowl is drawn on the counter).
+  mix: { stand: ['stir', 'interact', 'stir'], hands: HANDS.hold },
+  // A dish put in the oven or the microwave, then watched, bending to look in now and then: down to
+  // a cooker's oven, at chest height to an oven tower's, a pizza oven's mouth or a microwave.
+  bake: { stand: (def) => (LOW_OVENS.has(def) ? ['pickUp', 'idle', 'foldArms', 'idle'] : ['interact', 'idle', 'foldArms', 'idle']), hands: HANDS.relaxed },
 };
 
-/** The prop drawn on a station's top while a Sim works there (by action tag; `tool.*` models). */
-const STATION_PROPS: Record<string, string> = { chop: 'tool.board', stir: 'tool.pan', flip: 'tool.grillFood' };
+/** The prop drawn on a station's top while a Sim works there (by action tag; `tool.*` models). Nothing for a bake: the dish is in the oven. */
+const STATION_PROPS: Record<string, string> = { chop: 'tool.board', stir: 'tool.pan', flip: 'tool.grillFood', mix: 'tool.mixingBowl' };
 /** How far (m, body scale) below the palms' centres a carried thing's base rests. */
 const HOLD_DROP = 0.02;
 /** The palm centre's offset from the wrist (left hand, body scale) for sets without `grip`. */

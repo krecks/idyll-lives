@@ -32,7 +32,7 @@ hob and the oven windows are opaque glossy black (`hob`, a plain finish) rather 
 | `chrome` | chrome | handles and knobs |
 | `grate` | satin | burner heads, grates and hob rings |
 | `flame` | gloss | a gas flame ring (gloss, not emissive) |
-| `heat` | gloss | the hob counter's ring glowing red (gloss, so it reads by day) |
+| `heat` | gloss | the hob counter's and the electric cooker's ring glowing red (gloss, so it reads by day) |
 | `charcoal` | satin | the microwave's body |
 | `display` | gloss | the microwave's display |
 | `tray` | metal | the oven tower's tray; a dishwasher's rack |
@@ -54,7 +54,7 @@ then the clips keyed (`settle()` must come before `swing()`/`slide()`).
 
 | Model | Size (w × h × d) | Triangles | Draws | Moving parts | Clips (uses) |
 |---|---|---|---|---|---|
-| `model.stoveElectric` | 0.600 × 0.980 × 0.659 m | 2,192 | 3 | oven door, knob | `oven_open` 1.4 s (bake); `knob_on` 0.5 s (cook) |
+| `model.stoveElectric` | 0.600 × 0.980 × 0.659 m | 2,280 | 4 | oven door, knob, hot ring | `oven_open` 1.4 s (bake); `burner_on` 0.5 s: the knob turns and the front ring on its side glows red (cook) |
 | `model.stoveGas` | 0.920 × 1.113 × 0.704 m | 2,904 | 4 | oven door, knob, flame | `oven_open` (bake); `burner_on` (cook, gourmet) |
 | `model.wallOven` | 0.700 × 2.110 × 0.706 m | 1,668 | 3 | upper door, tray | `oven_open` 1.4 s: door drops and tray slides 10 cm (roast, bake) |
 | `model.rangeCooker` | 1.580 × 1.140 × 0.754 m | 3,632 | 4 | left oven door, knob, flame | `oven_open` (bake); `burner_on` (cook, gourmet) |
@@ -64,8 +64,14 @@ then the clips keyed (`settle()` must come before `swing()`/`slide()`).
 Seen from the front, the microwave's controls are on the right and its door hinges on its left edge (game +x is
 the viewer's left) and swings 100°; its glass turntable turns a full turn every 2 s
 while it heats. The gas range and the range cooker carry a pot and a pan on the hob; the flame lights on a
-free burner beside them. `stoveGas`, `rangeCooker` and `microwave` take 4 draw calls (the most allowed);
-the rest take 3.
+free burner beside them. `stoveGas`, `rangeCooker`, `stoveElectric` (since its ring glows, 2026-10-21) and
+`microwave` take 4 draw calls (the most allowed); the rest take 3.
+
+**By the step's tag** (2026-10-21, review G-16): a cooker is a station of recipes started elsewhere (a meal from
+the fridge), where the snapshot gives no interaction, only the step's animation tag. So the hobs play `burner_on`
+for `stir` too, and the ovens `oven_open` for `bake` (the Bake steps, and a meal's Cook step in an oven or a
+microwave: content `animAt`). The microwave opens its door for reheat or `bake`, shuts it (`hold` 1.2 s) and only
+then turns its plate (`turntable`, `delay` 2.2 s, `every` 2 s: a loop that waits for the door).
 
 ## K3 — small appliances and dishwashers
 
@@ -81,12 +87,12 @@ Its blender lid lifts for `blend` (the jug blades need E1).
 |---|---|---|---|---|---|
 | `model.coffeeMachine` | 1.000 × 1.400 × 0.665 m | 1,748 | 3 | cup, coffee stream | `brew` 0.6 s: cup slides under the spout, stream grows (espresso) |
 | `model.breakfastCounter` | 1.000 × 1.380 × 0.665 m | 2,224 | 4 | lever, toast, lid | `toast_down` (toast); `blend` 0.4 s: lid lifts (smoothie) |
-| `model.dishwasher` | 1.000 × 0.950 × 0.685 m | 1,160 | 3 | door, rack | `door_open` 0.9 s: door drops 85°, rack slides 30 cm (dishes) |
-| `model.dishwasherCompact` | 1.000 × 0.950 × 0.790 m | 1,160 | 3 | door, rack | `door_open` 0.9 s (dishes) |
+| `model.dishwasher` | 1.000 × 0.950 × 0.685 m | 1,160 | 3 | door, rack | `door_open` 0.9 s: door drops 85°, rack slides 30 cm, open for the whole use (dishes; clearing away at it, the `wash` tag) |
+| `model.dishwasherCompact` | 1.000 × 0.950 × 0.790 m | 1,160 | 3 | door, rack | `door_open` 0.9 s (dishes, `wash`), as the dishwasher |
 
 The coffee machine and both dishwashers take 3 draw calls; the breakfast counter takes 4 (its three
-moving parts each cost one). `check-glb`: 31 models, 0 failed; its four warnings are those same draw counts
-(the stove, the range cooker, the microwave, the breakfast counter). Khronos glTF validator: 0 errors, 0 warnings
+moving parts each cost one). `check-glb`: 31 models, 0 failed; its five warnings are those same draw counts
+(the gas range, the range cooker, the electric cooker, the microwave, the breakfast counter). Khronos glTF validator: 0 errors, 0 warnings
 each). The ten sat in Validate › Cookers and
 Validate › Appliances until checked in play.
 
@@ -107,7 +113,7 @@ There is one counter depth, the catalogue's 0.66 m (worktop -0.43..0.23): the ca
 the old 0.79-deep numbers and are drawn through `COUNTER66` (gamekit `GameFrame(depths=)`,
 the old `shallow`). Islands stand free, centred.
 
-Also from the review: the hob clips (`knob_on`, `burner_on`) last the whole use, and only `oven_open`
+Also from the review: the hob clip (`burner_on`) lasts the whole use, and only `oven_open`
 shuts after `HOLD` (a `{clip, hold}`); each oven has a dark `oven_cavity` face just inside its closed door,
 and each dishwasher's dark tub face sits just inside its door, so a dropped door shows an oven or a tub
 and the tray and rack slide out of it; the microwave is hollow (floor, top, back, side and the control

@@ -107,13 +107,15 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `chefStove` Chef's stove | 2x1 · floor | cook:cook practise:cook | kitchen / — | Body, Handles & knobs, Tiles | Use | `oven_open` (the door drops, shut again after 3 s) and `burner_on` (knob and flame ring, the whole use) for cook and practise. |
+| `chefStove` Chef's stove | 2x1 · floor | cook:cook practise:cook | kitchen / — | Body, Handles & knobs, Tiles | Use | `oven_open` (the door drops, shut again after 3 s) for practise and any `bake` step; `burner_on` (knob and flame ring, the whole use) for cook and any `stir` step. |
 | `whirlpoolTub` Whirlpool tub | 2x2 · floor | soak:bath | wellness / — | Tub, Surround, Headrests | Use | `fill`: the water rises for soak. `bubbles` swell up through the water while soaking (a loop, E1). |
 
 **In play** (signed off 2026-10-17):
 - The stove opens its oven and lights its burner for cook and practise, each run as a recipe from the house's
   fridge (`meal`, `bakedTreats`); the tub fills and bubbles for soak, its two bathers on the bench. Nothing needed
   fixing.
+- Since 2026-10-21 (G-16) practise (baking) opens only the oven and cook only lights the hob; the resident bends to
+  the oven with no pan drawn (`bench-results/review/fixes/motions/recipes/practise-chefStove-*`).
 - Both take 4 draws on purpose (the stove's door, knob and flame; the tub's water and bubbles).
 - Wellness is the pack's own category.
 
@@ -127,7 +129,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 | `foodie.deliPantry` Deli pantry | 1x1 · floor | nibble:fetch cheeseBoard:cook | kitchen / — | Body, Worktop, Shelves | Use | `doors_open`: the doors swing for nibble and cheeseBoard (`hold` 2.5 s). |
 | `foodie.espressoBar` Espresso bar | 1x1 · floor | espresso:drink latteArt:drink | kitchen / — | Body, Worktop, Machine | Use | Provides `coffee`; `brew`: the coffee stream grows and the steam wand swings out for espresso and latteArt (`hold` 4 s). |
 | `foodie.cookbookLectern` Cookbook lectern | 1x1 · floor | studyRecipes:read foodMagazines:read | kitchen / — | Body, Stool & ledge, Cookbook | Use | `page`: a page turns over for studyRecipes and foodMagazines. |
-| `foodie.pizzaOven` Wood-fired pizza oven | 2x1 · floor | bakePizza:cook warmUp:relax | outdoor / — | Body, Worktop, Brick | Use | `door_off`: the oven door lifts aside and the peel slides in for bakePizza, with the `flames`; the `flames` alone grow for warmUp. |
+| `foodie.pizzaOven` Wood-fired pizza oven | 2x1 · floor | bakePizza:cook warmUp:relax | outdoor / — | Body, Worktop, Brick | Use | `door_off`: the oven door lifts aside and the peel slides in for bakePizza (and any `bake` step), with the `flames`; the `flames` alone grow for warmUp. |
 | `foodie.chefsIsland` Chef's island | 2x1 · floor | tastingMenu:cook barBite:eat | kitchen / — | Body, Worktop, Stools | Use | `drawer_open` for tastingMenu (`hold` 2.5 s). Sat at on its stools for barBite. |
 
 **In play** (signed off 2026-10-17):
@@ -189,7 +191,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `kind.neighbourlyOven` Neighbourly baking counter | 2x1 · floor | familyPie:cook treatsToShare:cook | kitchen / — | Body, Fabric, Cupboards | Use | `oven_open` for familyPie and treatsToShare. |
+| `kind.neighbourlyOven` Neighbourly baking counter | 2x1 · floor | familyPie:cook treatsToShare:cook | kitchen / — | Body, Fabric, Cupboards | Use | `oven_open` for the `bake` step of familyPie and treatsToShare: the door drops as the dish goes in and shuts after 3 s; the pastry and batter are made on its worktop with the oven shut. |
 | `kind.givingJar` Community giving jar | 1x1 · floor | donate:idle | decor / — | Body, Fabric | Use | `coin`: a coin slides into the slot for donate. |
 | `kind.knittingRocker` Gift-knitting rocker | 1x1 · floor | knitGift:tinker rock:relax | hobbies / — | Body, Fabric | Loop (E1) | `rock`: the chair rocks ±5° on its rockers with the knitter riding it (`ride`) for knitGift and rock (E1). |
 | `kind.welcomeTeaTable` Welcome tea table | 2x1 · floor | shareTea:drink | living / — | Body, Fabric, Second pouf, Rug | Use | `pour`: the teapot tips for shareTea (`hold` 1.5 s). |
@@ -199,6 +201,9 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 **In play** (signed off 2026-10-17):
 - Every clip plays and shuts: the oven for pie and treats (recipes `pie` and `bakedTreats` from the house's fridge),
   the coin, the rocker with its sitter, the teapot, the feeder's roof and birds, the settee's cushions.
+- Since 2026-10-21 (G-16, G-17) the oven door drops only for the bake, keyed by the `bake` step's tag, and shuts after
+  3 s (it stood open through the 30 and more minutes); the pastry is made in a mixing bowl on its worktop
+  (`bench-results/review/fixes/motions/recipes/pie-neighbourlyOven-*`).
 - A nap on the hearth settee takes the whole settee, as on the gloomy window seat (content `whole`): refused with
   "someone is using the hearthside quilted settee" while someone sits there; two can still sit for curlUp.
 - The coin stays in the jar while the resident is at it and comes back up into the slot when the use ends.

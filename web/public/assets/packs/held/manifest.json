@@ -463,6 +463,21 @@
           "finish": "material.finish.satin"
         }
       }
+    },
+    "tool.mixingBowl": {
+      "type": "model",
+      "url": "../../models/held/mixingBowl.glb",
+      "materials": {
+        "batter": {
+          "finish": "material.finish.satin"
+        },
+        "mixing": {
+          "finish": "material.finish.gloss"
+        },
+        "spoon": {
+          "finish": "material.finish.satin"
+        }
+      }
     }
   }
 }

@@ -187,7 +187,11 @@ pub fn objects(dir: &Path) -> Result<Vec<Object>, String> {
     plays(vec!["bin".into()], &cooking["scrapeAnim"]);
     plays(strs(&cooking["putAwayAt"]), &cooking["putAwayAnim"]);
     for step in merged["recipes"].as_array().into_iter().flatten().flat_map(|r| r["steps"].as_array().into_iter().flatten()) {
-        plays(strs(&step["at"]), &step["anim"]);
+        // (`animAt`: another animation at some of its stations, a meal's Cook step baked in the oven.)
+        for station in strs(&step["at"]) {
+            let anim = step["animAt"].get(&station).unwrap_or(&step["anim"]);
+            plays(vec![station], anim);
+        }
     }
     let mut out = Vec::new();
     for def in content.objects.iter().filter(|d| d.price.is_some()) {
