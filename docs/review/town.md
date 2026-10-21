@@ -81,7 +81,7 @@ Phase 0's "car parked against the house wall" (`views/04`): closed. The car stan
 | `slats` Modern slats | OK | n/a | OK | 1.4 m horizontal slats with gaps | `town/extra/fences-all.png` |
 | `iron` Wrought iron | OK | n/a | OK | 1.2 m bars every 0.1 m with finials | `town/extra/fences-all.png` |
 | `stone` Low stone wall | OK | n/a | OK | 0.7 m dry-stone wall with a cap, 0.32 m thick | `town/extra/fences-all.png` |
-| Gates | OK | A-town-02 | A-town-02 | A-town-02 S2 code: gates never open; residents walk through the shut leaf. The leaf (0.82 m, braced from the hinge foot to the latch head) is right | `town/extra/sheet-fences.png`, `town/extra/gate-walk-1.png` |
+| Gates | OK | A-town-02 | A-town-02 | A-town-02 S2 code: gates never open; residents walk through the shut leaf. Fixed (e04bc6c0): the leaf swings open for the one going through (`fixes/town/doors/gate-in-1.png`). The leaf (0.82 m, braced from the hinge foot to the latch head) is right | `town/extra/sheet-fences.png`, `town/extra/gate-walk-1.png` |
 | Lot-edge pickets, rails and hedges along the street | OK | n/a | n/a | Pickets 0.92–0.98 m, farm rails 1.08 m, hedges from `model.hedge` 0.87–1.07 m (`street.ts:374-409`, `:1162-1170`); from the house front line back only | `town/views/08-back-gardens-fences-h13.png`, `town/extra/views-05-08.png` |
 
 ### Real uses against the content's (I1)
@@ -167,7 +167,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/nature.ts:580-582` (the lawn's `model.grassTuft` and `model.flowers` are instanced at `lod` 0 whatever the distance)
 - **Evidence:** `nature.ts` never asks for the `.far` versions of the grass tufts and wildflowers. Wave town: the rock's far version is drawn: rocks always go to the far bucket (`nature.ts:505`, `close` leaves rocks out) and that bucket is built at `lod` 1 (`nature.ts:517`, `models.ts:248`).
-- **Status:** confirmed (for the grass tufts and wildflowers; closed for the rock)
+- **Status:** fixed (13ab25bf)
+- **After:** on Low (`streetLod` 1) the lawn's grass tufts and wildflowers are drawn from their far versions, as the street's models are (`nature.ts` `lawnLod`); Medium and High keep the full ones. The bench village on Low, same draws (orbit 280-283 against 278, the difference the shadow and mirror redraws that come and go; wide 323.4 against 323.5), triangles 0.94-0.99 M against 1.13 M in the orbit and 1.18 M against 1.51 M wide (`fixes/town/counts-before.jsonl`, `counts-after.jsonl`; headless, counts only).
 - **Source:** `docs/objects/open.md` Still open › Rendering; wave: town
 
 ### M-town-02 — `model.street.hedge` is built but unused
@@ -177,7 +178,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** decision
 - **Where:** `web/src/render/babylon/street.ts:71` (`FOLIAGE.hedge` is `model.hedge`)
 - **Evidence:** The street draws its hedges from `model.hedge`; the street pack's own hedge is never drawn. Use it or drop it. Wave town: no file under `web/src` names `model.street.hedge`; the two look alike (1.28 × 1.02 × 0.63 against 1.55 × 1.02 × 0.85, `town/extra/town-gallery-a.png`), so dropping it loses nothing.
-- **Status:** confirmed
+- **Status:** fixed (13ab25bf): dropped (Q-09)
+- **After:** the street pack's own hedge is gone from `families/street.py`, `packs/street/manifest.json`, `models/street/` (`hedge.glb`, `hedge.far.glb`), `centres.json` and `reference.json`; the street's hedges are `model.hedge` (plants pack) as before, so nothing drawn changes.
 - **Source:** `docs/objects/open.md` Still open › Rendering; wave: town
 
 ### M-town-03 — A far road's lane markings change brightness between loads
@@ -217,7 +219,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** decision
 - **Where:** `web/src/game/town.ts:182` (`STREET = 6`, the whole street tile row), `web/src/render/babylon/street.ts:47` (`SIDEWALK = 1.35` each side), `street.ts:754-757` (the dashed centre line)
 - **Evidence:** 6 m less two sidewalks of 1.35 m leaves a carriageway of 3.3 m, which the centre line splits into two lanes of 1.65 m: narrower than any of the street's cars (1.74–1.88 m, `street.ts:205-214`). A real two-way residential street is 5.5–7.3 m between kerbs, a lane 2.75–3.5 m; 3.3 m is one lane. In the views the road reads as a lane next to the houses and cars (`town/views/02-street-cars-h13.png`, `town/views/09-willow-street-h13.png`, `town/extra/views-overview.png`). Options: widen the street row to about 8.5–9 m (moves every lot of every town, so the owner's call), or keep 6 m and drop the centre line so it reads as a one-lane mews.
-- **Status:** open
+- **Status:** fixed (76d38b46): the centre line dropped (Q-13); the street keeps its 6 m
+- **After:** without the dashed line the 3.3 m between the kerbs reads as one lane, a mews (`street.ts`; `fixes/town/views/02-street-cars-h13.png`, `09-willow-street-h13.png`, against `town/views/02-street-cars-h13.png`). Widening the street to 8.5-9 m would move every lot of every town: left for a new town layout, as Q-13 says. The country roads past the town (`roads.ts`, 5-6 m) keep their centre lines.
 - **Source:** wave: town
 
 ### M-town-06 — The cars ride high: 0.30 m (SUV 0.40 m) under the body
@@ -227,7 +230,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/street.ts:207-213` (`CARS[].low`: each side profile's lowest points are at y 0.3, the SUV's at 0.4)
 - **Evidence:** The body's underside, between the wheels, is 0.30 m off the ground on the saloon, hatchback and estate and 0.40 m on the SUV; real ground clearance is 0.13–0.16 m for a saloon and 0.18–0.22 m for a compact SUV, sills a little higher. With wheels 0.62–0.74 m across the cars look jacked up from low angles (`town/views/03-neighbour-2-sycamore-h13.png`, the beige car; `town/views/09-willow-street-h13.png`, the white estate). Lowering the profiles' bottom edge to about 0.18 m (SUV 0.24 m) keeps the wheel arches.
-- **Status:** open
+- **Status:** fixed (76d38b46)
+- **After:** the sills are at 0.17 m (the SUV's 0.23 m), the bumpers and lights staying by the wheels' height (`street.ts` `CARS`, `car`): `fixes/town/views/13-garage-willow-h13.png` (the white estate), against `town/views/09-willow-street-h13.png`.
 - **Source:** wave: town
 
 ### M-town-07 — The kerb stands 3.3 cm over the road
@@ -237,8 +241,19 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** decision
 - **Where:** `web/src/render/babylon/street.ts:49-51` (`WALK_Y` 0.03, `KERB_Y` 0.045, `ROAD_Y` 0.012)
 - **Evidence:** A real kerb's upstand is 10–15 cm (UK 125 mm, US 150 mm); here it is 3.3 cm, with the walk 1.5 cm below the kerb's top, so the kerb reads as a white painted strip rather than a step (`town/views/05-kerb-mailbox-hydrant-bin-h13.png`). Residents walk the street at ground level, so a taller kerb would sink their feet into the sidewalk unless the walkers are lifted onto it: a decision between a real step and keeping it flat.
-- **Status:** open
+- **Status:** won't fix (Q-13: the kerb stays flat)
+- **After:** the owner kept the flat kerb: a real 10-15 cm step would sink the residents' feet into the sidewalk unless walkers were lifted onto it, and the sim walks them at ground level.
 - **Source:** wave: town
 
 ### A-town-02 — moved to systems.md
+
+### M-town-08 — Surfaces alike but for planar UVs may share one shader
+
+- **Severity:** S3
+- **Rubric:** M9
+- **Fix class:** code
+- **Where:** `web/src/render/babylon/materials.ts:70-104` (`VertexTweaksPlugin`: `planarUV` and `srgbColors` change its code but it declares no defines)
+- **Evidence:** Babylon caches an effect by shader name and defines. A plugin whose code differs between materials without a define of its own gets one material's shader reused for another with the same defines: G-57's `PatternPlugin` showed it (its stripes never appeared until it had `PATTERN_*` defines). `VertexTweaksPlugin` is built that way, so a surface with planar UVs (roads, the ground: `projection` `xz`) and one without, with otherwise the same defines, could draw with each other's UVs. Not seen in a view; found reading the code.
+- **Status:** not checked (needs two such materials in one scene, and a look at which shader each draws with)
+- **Source:** fix: town
 

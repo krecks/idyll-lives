@@ -33,7 +33,7 @@ import { objectCentre, storeyOfRow, storeyRow, type StoreyLayout, type DiagonalW
 import type { ViewRect } from '../types';
 import { Cut, facing, Geo, LOOK, type V3 } from './geometry';
 import { LAYER_SHADOW_ONLY } from './layers';
-import { MaterialLibrary } from './materials';
+import { MaterialLibrary, type SurfacePattern } from './materials';
 import { addHipPolygon, area, convexHull, diagonalEnds, halfAt, halfCentroid, halfTriangle, postOutline, WallFrame, type P2 } from './slanted';
 import { WALL_HALF, WALL_HEIGHT } from './walls';
 
@@ -69,7 +69,6 @@ export const HOUSE_MATERIALS = {
   floorWood: 'material.floor.wood',
   floorTile: 'material.floor.tile',
   floorCarpet: 'material.floor.carpet',
-  door: 'material.door',
   plaster: 'material.wall',
   panelling: 'material.finish.wood',
 } as const;
@@ -88,10 +87,14 @@ const FINISH_MATERIALS: Record<WallCoveringDef['finish'], string> = {
 /** The surface of each floor-covering finish. */
 const FLOOR_MATERIALS: Record<FloorCoveringDef['finish'], string> = {
   wood: HOUSE_MATERIALS.floorWood,
+  whitewash: HOUSE_MATERIALS.floorWood,
   tile: HOUSE_MATERIALS.floorTile,
   carpet: HOUSE_MATERIALS.floorCarpet,
   stone: HOUSE_MATERIALS.stone,
 };
+
+/** The finishes drawn with a pattern over their surface (wall and floor finishes alike). */
+const FINISH_PATTERNS: Partial<Record<WallCoveringDef['finish'] | FloorCoveringDef['finish'], SurfacePattern>> = { wallpaper: 'stripes', whitewash: 'whitewash' };
 
 /** How far a covering preview lies off the surface it covers, so it draws over it (metres). */
 const PROUD = 0.004;
@@ -119,6 +122,8 @@ const FLAT_PITCH = 0.03;
 type WindowSpec = Pick<WindowStyleDef, 'panes' | 'sill' | 'head' | 'inset' | 'shutters'>;
 const CLASSIC_WINDOW: WindowSpec = { panes: 'cross', sill: SILL, head: HEAD, inset: WIN_INSET, shutters: 'house' };
 const PANEL_DOOR: Pick<DoorStyleDef, 'leaf' | 'color'> = { leaf: 'panel' };
+/** Natural oak, light and golden, on the oak grain (the oak panelling's), for an oak leaf without a colour of its own. */
+const OAK = '#D4B48A';
 /** Door leaf size (m): width and thickness; it stands from 0.01 m to just under the head. */
 const LEAF_W = 0.8;
 const LEAF_T = 0.045;
@@ -285,8 +290,9 @@ export interface HouseBuild {
  */
 export interface DoorLeaf {
   meshes: Mesh[];
-  /** The middle of its doorway. */
+  /** The middle of its doorway, in a wall along x (`axis` h) or z. */
   centre: [number, number];
+  axis: 'h' | 'v';
   /** Turn about y that shuts it, and how much of it back it swings open (1: all the way, against the wall). */
   close: number;
   opens: number;
@@ -468,8 +474,8 @@ export class HouseBuilder {
   }
 
   /** Materials (cached by the library) so the renderer can update window glow etc. */
-  material(key: string, cut = true): Material {
-    return this.lib.surface(key, { vertexColors: true, cutaway: cut });
+  material(key: string, cut = true, pattern?: SurfacePattern): Material {
+    return this.lib.surface(key, { vertexColors: true, cutaway: cut, pattern });
   }
 
   /**
@@ -478,21 +484,21 @@ export class HouseBuilder {
    */
   coverPreview(parts: readonly Geo[], cover: number): Mesh | null {
     const def = this.looks.coverings[cover - 1];
-    return def ? this.laid('preview-cover', parts, def.color, FINISH_MATERIALS[def.finish], true) : null;
+    return def ? this.laid('preview-cover', parts, def.color, FINISH_MATERIALS[def.finish], true, FINISH_PATTERNS[def.finish]) : null;
   }
 
   /** Build mode's Floor tool: floor tiles (from `HouseBuild.surfaces`) laid with floor covering `floor` (1-based). */
   floorPreview(parts: readonly Geo[], floor: number): Mesh | null {
     const def = this.looks.floors[floor - 1];
-    return def ? this.laid('preview-floor-laid', parts, def.color, FLOOR_MATERIALS[def.finish], false) : null;
+    return def ? this.laid('preview-floor-laid', parts, def.color, FLOOR_MATERIALS[def.finish], false, FINISH_PATTERNS[def.finish]) : null;
   }
 
-  private laid(name: string, parts: readonly Geo[], color: string, key: string, cut: boolean): Mesh | null {
+  private laid(name: string, parts: readonly Geo[], color: string, key: string, cut: boolean, pattern?: SurfacePattern): Mesh | null {
     const geo = new Geo().color(color);
     for (const part of parts) geo.append(part);
     const mesh = geo.toMesh(name, this.scene, { colors: true, cut });
     if (!mesh) return null;
-    mesh.material = this.material(key, cut);
+    mesh.material = this.material(key, cut, pattern);
     mesh.receiveShadows = true;
     mesh.isPickable = false;
     return mesh;
@@ -750,9 +756,10 @@ export class HouseBuilder {
       return g;
     };
     const ao = new Geo().color('#000000');
-    // Covered faces: one bucket per finish (tinted per covering), and natural-wood door leaves.
+    // Covered faces: one bucket per finish (tinted per covering); natural-wood door leaves go with the
+    // wood panelling.
     const covered = new Map<WallCoveringDef['finish'], Geo>((Object.keys(FINISH_MATERIALS) as WallCoveringDef['finish'][]).map((f) => [f, new Geo()]));
-    const doorWood = new Geo();
+    const doorWood = covered.get('wood')!;
     // Front doors and bathroom doors move (each leaf its own meshes; a preview draws them at
     // rest); the others stand open.
     const swinging: { spec: SwingSpec & { bath: number }; trim: Geo; wood: Geo; glass: Geo }[] = [];
@@ -764,7 +771,7 @@ export class HouseBuilder {
       return leaf;
     };
     /** Every bucket a wall segment writes to (they share its cutaway data). */
-    const wallGeos = [ext, int, wainscot, stone, trim, ao, doorWood, ...covered.values()];
+    const wallGeos = [ext, int, wainscot, stone, trim, ao, ...covered.values()];
     /** The bucket for a covering (0: none, the automatic look), tinted. */
     const coverGeo = (cover: number | undefined): Geo | null => {
       const c = cover ? this.looks.coverings[cover - 1] : undefined;
@@ -1293,10 +1300,11 @@ export class HouseBuilder {
     const tile = new Geo();
     const carpet = new Geo();
     const stoneFloor = new Geo();
+    const whitewash = new Geo();
     const carpetTint = pick(CARPET, sx, sz, 21);
     const laid = new Map<number, number>();
     for (const [x, z, c] of world.floors ?? []) laid.set(z * W + x, c);
-    const FINISH = { wood, tile, carpet, stone: stoneFloor };
+    const FINISH = { wood, whitewash, tile, carpet, stone: stoneFloor };
     for (let z = bounds.z; z < bounds.z + bounds.d; z++) {
       for (let x = bounds.x; x < bounds.x + bounds.w; x++) {
         const r = room(x, z);
@@ -1345,7 +1353,13 @@ export class HouseBuilder {
           along === 'x' ? trim.box(u0, y0, c - half, u1, y1, c + half) : trim.box(c - half, y0, u0, c + half, y1, u1);
         bar(a0, a1, RAIL - 0.05, RAIL, 0.03);
         bar(a0, a1, 0.06, 0.1, 0.02);
-        for (let u = a0 + 0.12; u < a1 - 0.06; u += 0.14) bar(u - 0.012, u + 0.012, 0.1, RAIL - 0.05, 0.012);
+        // Balusters spaced evenly between the posts, under 100 mm apart (a guard lets no 100 mm sphere through).
+        const span = a1 - a0 - 0.07;
+        const count = Math.ceil((span - 0.1) / 0.12);
+        for (let k = 1; k <= count; k++) {
+          const u = a0 + 0.035 + (k * span) / (count + 1);
+          bar(u - 0.012, u + 0.012, 0.1, RAIL - 0.05, 0.012);
+        }
         bar(a0 - 0.035, a0 + 0.035, 0, RAIL + 0.04, 0.035);
         bar(a1 - 0.035, a1 + 0.035, 0, RAIL + 0.04, 0.035);
       };
@@ -1517,11 +1531,11 @@ export class HouseBuilder {
     const meshes: Mesh[] = [];
     const casters: Mesh[] = [];
     const roofs: Mesh[] = [];
-    const add = (geo: Geo, name: string, key: string | Material, opts: { cut?: boolean; cast?: boolean; roof?: boolean; shadowOnly?: boolean } = {}) => {
+    const add = (geo: Geo, name: string, key: string | Material, opts: { cut?: boolean; cast?: boolean; roof?: boolean; shadowOnly?: boolean; pattern?: SurfacePattern } = {}) => {
       const cut = !storey.preview && (opts.cut ?? true);
       const mesh = geo.toMesh(name, this.scene, { colors: true, cut });
       if (!mesh) return;
-      mesh.material = typeof key === 'string' ? this.material(key, cut) : key;
+      mesh.material = typeof key === 'string' ? this.material(key, cut, opts.pattern) : key;
       mesh.receiveShadows = !opts.shadowOnly;
       if (opts.shadowOnly) mesh.layerMask = LAYER_SHADOW_ONLY;
       mesh.isPickable = false;
@@ -1535,8 +1549,7 @@ export class HouseBuilder {
     add(wainscot, 'wallsTiled', M.floorTile);
     add(stone, 'plinth', M.stone);
     add(trim, 'trim', M.trim, { cast: true });
-    for (const [finish, geo] of covered) add(geo, `walls-${finish}`, FINISH_MATERIALS[finish], { cast: true });
-    add(doorWood, 'doorLeaves', M.door, { cast: true });
+    for (const [finish, geo] of covered) add(geo, `walls-${finish}`, FINISH_MATERIALS[finish], { cast: true, pattern: FINISH_PATTERNS[finish] });
     for (const [room, geo] of glassByRoom) add(geo, 'windows', this.glassMaterial(room, !storey.preview));
     // Glass is see-through: draw it after the other blended surfaces (contact shadows) so
     // what lies behind it is complete when it is blended over.
@@ -1544,6 +1557,7 @@ export class HouseBuilder {
     // (A preview's walls stand on the shadows of the walls they stand in for.)
     if (!storey.preview) add(ao, 'contactShadows', this.lib.contactShadow(), { cut: true });
     add(wood, 'floors', M.floorWood, { cut: false });
+    add(whitewash, 'floorsWhitewashed', M.floorWood, { cut: false, pattern: 'whitewash' });
     add(tile, 'floorsTiled', M.floorTile, { cut: false });
     add(carpet, 'floorsCarpet', M.floorCarpet, { cut: false });
     add(stoneFloor, 'floorsStone', M.stone, { cut: false });
@@ -1557,7 +1571,7 @@ export class HouseBuilder {
       const { hinge, rooms, ...leaf } = spec;
       const at = meshes.length;
       add(t, 'doorLeaf', M.trim, { cast: true });
-      add(w, 'doorLeaf', M.door, { cast: true });
+      add(w, 'doorLeaf', M.panelling, { cast: true });
       add(g, 'doorLeafGlass', this.glassMaterial(rooms[0] || rooms[1], true));
       const own = meshes.slice(at);
       for (const mesh of own) {
@@ -1677,7 +1691,7 @@ export class HouseBuilder {
       }
       roof.color(s.roof);
       addRoofShaped({ x0: b.x0, z0: b.z0, x1: b.x1, z1: b.z1 }, s, roof, trim, walls, tall);
-      if (hash(b.x0, b.z0, 8) < 0.6 && s.shape !== 'flat' && !b.roof && !b.home) this.chimney(b, s, brick, stone);
+      if (hash(b.x0, b.z0, 8) < 0.6 && s.shape !== 'flat' && !b.roof && !b.home) this.chimney(b, s, brick, stone, tall);
       const g = b.home ? null : b.garage;
       if (g) {
         walls.color(s.wall);
@@ -1687,7 +1701,9 @@ export class HouseBuilder {
         // Sectional door on the street side, with a coach lamp beside it.
         const plane = b.front > 0 ? g.z1 + T : g.z0 - T;
         const n: V3 = [0, 0, b.front];
-        const [d0, d1] = [g.x0 + 0.35, g.x1 - 0.35];
+        // A single garage's door, 2.4–2.5 m (wider garages keep their walls either side).
+        const half = Math.min(g.x1 - g.x0 - 0.7, 2.5) / 2;
+        const [d0, d1] = [(g.x0 + g.x1) / 2 - half, (g.x0 + g.x1) / 2 + half];
         trim.color(TRIM).box(...span('h', plane, n, d0 - 0.1, d1 + 0.1, 0, 2.25, 0.03));
         const door = hash(b.x0, b.z0, 9) < 0.5 ? '#F2F0EA' : s.accent;
         trim.color(door).box(...span('h', plane, n, d0, d1, 0, 2.12, 0.045));
@@ -1767,20 +1783,20 @@ export class HouseBuilder {
     trim.color(TRIM);
   }
 
-  /** A brick chimney through one roof slope near a gable end, with a stone cap. */
-  private chimney(b: SilhouetteSpec, s: HouseScheme, brick: Geo, stone: Geo): void {
+  /** A brick chimney through one roof slope near a gable end, with a stone cap, on a roof whose eaves are `base` high. */
+  private chimney(b: SilhouetteSpec, s: HouseScheme & RoofShape, brick: Geo, stone: Geo, base: number): void {
     const alongX = b.x1 - b.x0 >= b.z1 - b.z0;
     const [a0, a1] = alongX ? [b.x0, b.x1] : [b.z0, b.z1];
     const [c0, c1] = alongX ? [b.z0, b.z1] : [b.x0, b.x1];
     const half = (c1 - c0) / 2 + T + OVERHANG;
-    const yr = WALL_HEIGHT - OVERHANG * PITCH + half * PITCH + ROOF_THICKNESS;
+    const yr = base - OVERHANG * s.pitch + half * s.pitch + ROOF_THICKNESS;
     const end = hash(b.x0, b.z0, 10) < 0.5;
     const ridge = s.hip ? Math.max(0, a1 - a0 - (c1 - c0)) / 2 : (a1 - a0) / 2;
     const a = (a0 + a1) / 2 + (end ? 1 : -1) * Math.max(0, ridge - 0.9);
     const c = (c0 + c1) / 2 + (hash(b.x0, b.z0, 11) < 0.5 ? 0.75 : -0.75);
     const P = (u0: number, y0: number, v0: number, u1: number, y1: number, v1: number) =>
       alongX ? ([u0, y0, v0, u1, y1, v1] as const) : ([v0, y0, u0, v1, y1, u1] as const);
-    brick.color(s.brick ? s.wall : '#E2C8B8').box(...P(a - 0.3, WALL_HEIGHT, c - 0.38, a + 0.3, yr + 0.75, c + 0.38), 'ny');
+    brick.color(s.brick ? s.wall : '#E2C8B8').box(...P(a - 0.3, base, c - 0.38, a + 0.3, yr + 0.75, c + 0.38), 'ny');
     stone.box(...P(a - 0.36, yr + 0.75, c - 0.44, a + 0.36, yr + 0.85, c + 0.44));
   }
 
@@ -1903,7 +1919,7 @@ export class HouseBuilder {
     // The leaf's glass belongs to the room it stands in (opening outdoors, the one it shuts).
     const roomOn = (side: number) => (axis === 'h' ? roomP(x + 0.5, z + side * 0.25) : roomP(x + side * 0.25, z + 0.5));
     const inside = roomOn(into) || roomOn(-into);
-    const own = moves ? geos.swing?.({ hinge: pivot, centre: axis === 'h' ? [x + 0.5, z] : [x, z + 0.5], close, opens, front, rooms, slide }) : undefined;
+    const own = moves ? geos.swing?.({ hinge: pivot, centre: axis === 'h' ? [x + 0.5, z] : [x, z + 0.5], axis, close, opens, front, rooms, slide }) : undefined;
     const glass = own ? own.glass : geos.glass(inside);
     // One that moves is drawn open and turned (and slid) by `swingDoors`. One that doesn't (or
     // any in a preview) is drawn at rest, as `swingDoors` would leave it: turned about the pivot
@@ -1956,9 +1972,19 @@ export class HouseBuilder {
     const paint = def.color ?? (front ? scheme.accent : '#EDEAE2');
     const top = head - 0.03;
     const box = (g: Geo, y0: number, y1: number, l0: number, l1: number) => put.box(g, 0, LEAF_T, y0, y1, l0, l1);
-    if (def.leaf === 'oak') box(wood.color('#FFFFFF'), 0.01, top, 0, width);
-    else if (def.leaf === 'panel') box(trim.color(paint), 0.01, top, 0, width);
-    else {
+    if (def.leaf === 'oak' || def.leaf === 'panel') {
+      // Four raised panels on both faces, as the neighbours' doors have, a shade lighter.
+      const [g, colour] = def.leaf === 'oak' ? [wood, def.color ?? OAK] : [trim, paint];
+      box(g.color(colour), 0.01, top, 0, width);
+      g.color(shade(colour, 1.08));
+      const mid = width / 2;
+      for (const [y0, y1] of [[0.15, 0.95], [1.15, 1.95]]) {
+        for (const [l0, l1] of [[0.1, mid - 0.04], [mid + 0.04, width - 0.1]]) {
+          put.box(g, -0.012, 0, y0, y1, l0, l1);
+          put.box(g, LEAF_T, LEAF_T + 0.012, y0, y1, l0, l1);
+        }
+      }
+    } else {
       // A frame of stiles and rails around glass (half-glazed: a solid panel below).
       const glassFrom = def.leaf === 'halfGlass' ? 1.05 : 0.22;
       const stile = def.leaf === 'halfGlass' ? 0.1 : 0.08;

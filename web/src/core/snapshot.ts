@@ -61,6 +61,11 @@ export interface SnapshotLayout {
     recipe?: number;
     /** Calling out someone's name (to talk): their id + 1, 0 = nobody (missing in older layouts). */
     call?: number;
+    /** While walking, the waypoint they walk to, and where their way is 1.5 m on (`snapshot::AHEAD`); else where they stand (missing in older layouts). */
+    wayX?: number;
+    wayZ?: number;
+    aheadX?: number;
+    aheadZ?: number;
   };
   /** Animation tags from content (`animations` in base.json), named by `sim.action`. */
   actions: string[];

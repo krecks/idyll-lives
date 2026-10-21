@@ -137,7 +137,6 @@ a single object does is on its category page ([README.md](README.md)); this page
 - **Mirrors on High** log an occasional `GL_INVALID_VALUE: glGetProgramiv`; not reproduced in 5 runs, probably
   Babylon's parallel shader compile.
 - **`partBox`** draws spheres and tori up to 5 % / 2.5 % bigger than Babylon's meshes (never smaller).
-- The ground's far versions are built but `nature.ts` never asks for them; `model.street.hedge` is built but unused.
 
 ### Content and sim
 - **Parts with no use, left decorative for 0.3.0:** the executive desk's drawer (its clip would need a seated use

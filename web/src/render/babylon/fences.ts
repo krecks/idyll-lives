@@ -2,10 +2,12 @@
  * Fences and gates the player builds (Build mode's Fence and Gate tools): one baked mesh of
  * every fence edge in its style (picket, ranch rails, slats, wrought iron, low stone wall).
  * Fences are drawn per 1 m grid edge with posts on the grid corners they share, so runs and
- * corners join up; a gate is a framed leaf in the fence's style between two stout posts.
+ * corners join up; a gate is a framed leaf in the fence's style between two stout posts, which
+ * swings open for someone going through it (`Fences.gates`, `swingGate`) by moving its vertices
+ * in the one mesh: no draw of its own.
  */
 
-import type { Mesh, Scene } from './core';
+import { VertexBuffer, type Mesh, type Scene } from './core';
 import type { FenceStyleDef } from '../../content/content';
 import type { FenceEdge } from '../../core/protocol';
 import { Geo } from './geometry';
@@ -18,8 +20,30 @@ const FALLBACK: FenceStyleDef = { id: 'picket', label: 'Picket', kind: 'picket',
 /** Colour of iron gate leaves in stone walls. */
 const IRON = '#2B2D30';
 
+/** How far out from its post a gate leaf's hinge stands, along the fence (the leaf starts at 0.09). */
+const GATE_HINGE = 0.08;
+
+/** A gate's leaf in the fences' mesh: its vertices, and where it turns. */
+export interface GateLeaf {
+  axis: 'h' | 'v';
+  /** The middle of its gateway, and the hinge it turns about (x, z). */
+  centre: [number, number];
+  hinge: [number, number];
+  /** Along the fence from the hinge to the latch (unit x, z). */
+  along: [number, number];
+  /** Its vertices in the mesh (from `first`, as many as `rest` holds), shut: positions and normals. */
+  first: number;
+  rest: Float32Array;
+  restNormals: Float32Array;
+}
+
+export interface Fences {
+  mesh: Mesh;
+  gates: GateLeaf[];
+}
+
 /** Builds the mesh of all fences and gates (null when there are none). */
-export function buildFences(scene: Scene, fences: readonly FenceEdge[], styles: readonly FenceStyleDef[], layerMask?: number): Mesh | null {
+export function buildFences(scene: Scene, fences: readonly FenceEdge[], styles: readonly FenceStyleDef[], layerMask?: number): Fences | null {
   if (!fences.length) return null;
   const p = new Painter(new Geo());
   const styleOf = (f: FenceEdge) => styles[f.style ?? 0] ?? styles[0] ?? FALLBACK;
@@ -35,26 +59,82 @@ export function buildFences(scene: Scene, fences: readonly FenceEdge[], styles: 
       else if (f.kind === 'gate') had.gate = true;
     }
   }
+  const gates: GateLeaf[] = [];
   for (const f of fences) {
     const style = styleOf(f);
     // Local frame: +x along the edge (0..1), +z across it.
     p.at(f.x, f.z, f.axis === 'h' ? 0 : -Math.PI / 2);
-    if (f.kind === 'gate') gate(p, style);
-    else panel(p, style);
+    if (f.kind !== 'gate') {
+      panel(p, style);
+      continue;
+    }
+    const first = p.geo.pos.length / 3;
+    gate(p, style);
+    const [hx, , hz] = p.p(GATE_HINGE, 0, 0);
+    gates.push({
+      axis: f.axis,
+      centre: f.axis === 'h' ? [f.x + 0.5, f.z] : [f.x, f.z + 0.5],
+      hinge: [hx, hz],
+      along: f.axis === 'h' ? [1, 0] : [0, 1],
+      first,
+      rest: new Float32Array(p.geo.pos.slice(first * 3)),
+      restNormals: new Float32Array(p.geo.nor.slice(first * 3)),
+    });
   }
   for (const post of posts.values()) {
     if (post.style.kind === 'stone' && !post.gate) continue;
     p.at(post.x, post.z, 0);
     postAt(p, post.style, post.gate);
   }
-  const mesh = p.geo.toMesh('fences', scene, { colors: true, cut: false });
+  const mesh = p.geo.toMesh('fences', scene, { colors: true, cut: false, updatable: gates.length > 0 });
   if (!mesh) return null;
+  if (gates.length) {
+    // Room in its bounds for the leaves standing open.
+    const bounds = mesh.getBoundingInfo();
+    const [min, max] = [bounds.minimum.clone(), bounds.maximum.clone()];
+    for (const { hinge: [x, z] } of gates) {
+      min.set(Math.min(min.x, x - 1), min.y, Math.min(min.z, z - 1));
+      max.set(Math.max(max.x, x + 1), max.y, Math.max(max.z, z + 1));
+    }
+    bounds.reConstruct(min, max);
+  }
   mesh.hasVertexAlpha = false;
   mesh.material = MaterialLibrary.for(scene).plainFinish();
   mesh.receiveShadows = true;
   mesh.isPickable = false;
   if (layerMask !== undefined) mesh.layerMask = layerMask;
-  return mesh;
+  return { mesh, gates };
+}
+
+const scratch = { pos: new Float32Array(0), nor: new Float32Array(0) };
+
+/**
+ * Turns a gate's leaf `open` of the way (0 shut, 1 a quarter turn) about its hinge, its latch end
+ * towards the side `towards` (+1: +z of a fence along x, +x of one along z; -1 the other).
+ */
+export function swingGate(mesh: Mesh, gate: GateLeaf, open: number, towards: number): void {
+  const { rest, restNormals, hinge, along } = gate;
+  // A turn of +90 degrees takes `along` to (z, -x).
+  const across = gate.axis === 'h' ? [0, towards] : [towards, 0];
+  const turn = (along[1] * across[0] - along[0] * across[1] >= 0 ? 1 : -1) * (Math.PI / 2) * open;
+  const [c, s] = [Math.cos(turn), Math.sin(turn)];
+  if (scratch.pos.length < rest.length) scratch.pos = new Float32Array(rest.length);
+  if (scratch.nor.length < rest.length) scratch.nor = new Float32Array(rest.length);
+  const pos = scratch.pos.subarray(0, rest.length);
+  const nor = scratch.nor.subarray(0, rest.length);
+  for (let i = 0; i < rest.length; i += 3) {
+    const dx = rest[i] - hinge[0];
+    const dz = rest[i + 2] - hinge[1];
+    pos[i] = hinge[0] + dx * c + dz * s;
+    pos[i + 1] = rest[i + 1];
+    pos[i + 2] = hinge[1] - dx * s + dz * c;
+    const [nx, nz] = [restNormals[i], restNormals[i + 2]];
+    nor[i] = nx * c + nz * s;
+    nor[i + 1] = restNormals[i + 1];
+    nor[i + 2] = -nx * s + nz * c;
+  }
+  mesh.getVertexBuffer(VertexBuffer.PositionKind)?.updateDirectly(pos, gate.first * 3);
+  mesh.getVertexBuffer(VertexBuffer.NormalKind)?.updateDirectly(nor, gate.first * 3);
 }
 
 const height = (s: FenceStyleDef) => s.height ?? 1;

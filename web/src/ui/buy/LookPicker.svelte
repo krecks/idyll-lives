@@ -48,6 +48,7 @@
   /** Rough colour of each floor finish's texture. */
   const FLOOR_BASE: Record<FloorCoveringDef['finish'], string> = {
     wood: '#C9A27C',
+    whitewash: '#E9E3DA',
     tile: '#F2F2F0',
     carpet: '#E4DDD2',
     stone: '#A39C90',
@@ -346,7 +347,8 @@
       linear-gradient(90deg, transparent 11px, rgba(255, 255, 255, 0.5) 11px 12px, transparent 12px) 0 0 / 13px 6px,
       repeating-linear-gradient(180deg, var(--c) 0 5px, rgba(255, 255, 255, 0.55) 5px 6px);
   }
-  .swatch.wood {
+  .swatch.wood,
+  .swatch.whitewash {
     background: repeating-linear-gradient(90deg, var(--c) 0 5px, rgba(0, 0, 0, 0.14) 5px 6px);
   }
   .swatch.stone {

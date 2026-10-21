@@ -375,7 +375,7 @@ export interface FenceStyleDef {
 export interface FloorCoveringDef {
   id: string;
   label: string;
-  finish: 'wood' | 'tile' | 'carpet' | 'stone';
+  finish: 'wood' | 'whitewash' | 'tile' | 'carpet' | 'stone';
   color: string;
   price?: number;
 }

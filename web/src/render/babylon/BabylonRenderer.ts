@@ -95,7 +95,7 @@ import type {
 } from '../types';
 import { resizeKey } from '../types';
 import { createLighting, lightingAt } from './environment';
-import { buildFences } from './fences';
+import { buildFences, swingGate, type GateLeaf } from './fences';
 import { applyShaderFixes } from './shaderFixes';
 import { HALF_WALL_HEIGHT, HouseBuilder, houseObjectKey, placeLights, WALL_HALF, WALL_HEIGHT, WALL_STUB, type DoorLeaf, type HouseSurfaces, type RoomLight, type RoomTiles } from './house';
 import { fieldLayers, Street } from './street';
@@ -105,7 +105,7 @@ import { Geo, LOOK as CUT } from './geometry';
 import { buildModel, motionsOf, onModelFileArrived, paintColors, painted, placementVariation, prefetchModels, standInOf, withGlows, type ModelTemplate, type StandIn } from './models';
 import { TemplateCache } from './templateCache';
 import { compressedTextureFeatures, noteWebGpuFailed, webGpuFailed } from './loaders';
-import { Characters, MAX_CHARACTERS } from './characters';
+import { Characters, GAME_RATE, MAX_CHARACTERS } from './characters';
 import { ItemLayer } from './items';
 import { Mirrors, type MirrorInstance } from './mirrors';
 import { ResizeHandles } from './handles';
@@ -184,9 +184,19 @@ const FILL_POWER = 0.35;
 const BASEMENT_SKY = 0.12;
 const BASEMENT_ENV = 0.12;
 const NIGHT_EXPOSURE = Math.max(...LOOK.keys.map((k) => k.exposure));
-/** Seconds a door takes to swing open or shut, and how near (metres) someone walking opens it. */
+/**
+ * Seconds a door or a gate takes to swing open or shut at speed 1 (quicker as the game runs
+ * faster, up to 10x, as walkers' turns are). It opens for someone whose way crosses its doorway
+ * within `DOOR_AHEAD` metres (sim-core `snapshot::AHEAD`: about a second's walk), or who stands
+ * less than `DOORWAY` metres either side of it; open, it waits to shut until nobody walking is
+ * within `DOOR_CLEAR` of it (a leaf is 0.83 m long).
+ */
 const DOOR_SWING = 0.45;
-const DOOR_REACH = 1.3;
+const DOOR_AHEAD = 1.5;
+const DOORWAY = 0.35;
+const DOOR_CLEAR = 1.1;
+/** Floats per resident in `movers`: where they are, the waypoint they walk to, where their way is `DOOR_AHEAD` on. */
+const MOVER = 6;
 /** Seconds over which a room's lights go out (or come back on) as its residents fall asleep (or wake). */
 const LIGHTS_OUT_FADE = 1.2;
 /** Seconds a lamp takes to go off or on at its switch. */
@@ -511,8 +521,8 @@ export class BabylonRenderer implements Renderer {
   private readonly windowGlowOn = new Map<number, number>();
   /**
    * Rooms where everyone is asleep (lights out), rooms with someone awake (babies don't count, as
-   * in sim-core `lights`), and rooms with anyone in them; where residents on the move are (x, z
-   * pairs, in lot rows); all as of this frame (`findDarkRooms`).
+   * in sim-core `lights`), and rooms with anyone in them; where residents on the move are and
+   * where their way goes (`MOVER` floats each, in lot rows); all as of this frame (`findDarkRooms`).
    */
   private readonly darkRooms = new Set<number>();
   private readonly awakeRooms = new Set<number>();
@@ -530,6 +540,8 @@ export class BabylonRenderer implements Renderer {
   /** The viewed lot's door leaves that swing, each with how far open it stands (1 open, as drawn; -1 not placed yet). */
   /** `base`: where the leaf's meshes stand (lifted to their storey), before any slide. */
   private doors: { leaf: DoorLeaf; open: number; base: Vector3 }[] = [];
+  /** Gates in the fences' meshes, each with how far open it stands (0 shut, as drawn) and the side it opens to. */
+  private gates: { mesh: Mesh; leaf: GateLeaf; open: number; towards: number }[] = [];
   /** Per neighbour's house (`Street.houses`): someone is up in there (scratch). */
   private readonly neighboursUp: boolean[] = [];
   /** The lamps switched off (object ids; sim-core `lights.rs`), and since when nothing fades (`fadeLamps`). */
@@ -1006,11 +1018,14 @@ export class BabylonRenderer implements Renderer {
       // The viewed lot's fences stand on the ground (hidden with it while the basement is in view); other lots' stay.
       const v = view;
       const onLot = (f: FenceEdge) => !!v && f.x >= v.x && f.z >= v.z && f.x + (f.axis === 'h' ? 1 : 0) <= v.x + v.w && f.z + (f.axis === 'v' ? 1 : 0) <= v.z + v.d;
+      this.gates = [];
       for (const [list, storey] of [[(world.fences ?? []).filter(onLot), 0], [(world.fences ?? []).filter((f) => !onLot(f)), undefined]] as const) {
         const fences = buildFences(this.scene, list, this.deps.content.fenceStyles);
         if (!fences) continue;
-        if (storey !== undefined) fences.metadata = { storey };
-        this.worldMeshes.push(fences);
+        const { mesh } = fences;
+        if (storey !== undefined) mesh.metadata = { storey };
+        this.worldMeshes.push(mesh);
+        for (const leaf of fences.gates) this.gates.push({ mesh, leaf, open: 0, towards: 1 });
       }
       // What was just built belongs to the lot layer; objects follow in `worldMeshes`.
       this.lotMeshes = this.worldMeshes;
@@ -1085,7 +1100,7 @@ export class BabylonRenderer implements Renderer {
     const switched = this.fadeLamps(this.frameDt / 1000);
     // Lights go out in rooms where everyone is asleep (and neighbours' windows where they all are).
     this.findDarkRooms(frame);
-    this.swingDoors();
+    this.swingDoors(GAME_RATE[curr[h.speed] | 0] ?? 1);
     if (this.fadeRoomLights(this.frameDt / 1000) && (this.lampsLevel > 0 || this.storey < 0 || this.dimmed.size > 0)) {
       this.applyRoomLights();
       this.resetSnapshot();
@@ -1652,7 +1667,7 @@ export class BabylonRenderer implements Renderer {
     const next: Mesh[] = [];
     let hole: number[] | null = null;
     const fences = edges.flatMap((e) => ((e.kind === 'fence' || e.kind === 'gate') && (e.axis === 'h' || e.axis === 'v') ? [{ axis: e.axis, x: e.x, z: e.z, kind: e.kind, style: e.style }] : []));
-    const fenceMesh = buildFences(this.scene, fences, this.deps.content.fenceStyles);
+    const fenceMesh = buildFences(this.scene, fences, this.deps.content.fenceStyles)?.mesh;
     if (fenceMesh) next.push(fenceMesh);
     // A lot with just these walls (in the rooms as they are), the walls they go into keeping their looks.
     const W = world.width;
@@ -2343,6 +2358,7 @@ export class BabylonRenderer implements Renderer {
     this.lotKey = '';
     this.lotCasters = [];
     this.doors = [];
+    this.gates = [];
     this.dimmed = new Set();
     this.windowless = { rooms: new Set(), of: [] };
     this.dimming = null;
@@ -2735,7 +2751,7 @@ export class BabylonRenderer implements Renderer {
     const ticket = ++this.natureTicket[layer];
     let set = this.natures.get(key);
     if (!set) {
-      const landscape = new Landscape(world, this.quality.lawnDensity);
+      const landscape = new Landscape(world, this.quality.lawnDensity, this.quality.streetLod);
       const created: NatureSet = { key, landscape, meshes: [], casters: [], only: new Map(), users: new Set(), pending: 0, ready: Promise.resolve(), refreshing: Promise.resolve(), coming: [] };
       created.ready = landscape.build(this.scene, this.deps.assets, world, () => this.pace()).then((nature) => {
         perfTime('nature: meshes', () => {
@@ -3749,7 +3765,12 @@ export class BabylonRenderer implements Renderer {
       if (curr[o + k.away] !== 0) continue;
       const px = curr[o + k.x];
       const pz = curr[o + k.z];
-      if (curr[o + k.moving] !== 0) movers.push(px, pz);
+      if (curr[o + k.moving] !== 0) {
+        // (An older layout without the way ahead: where they are, so only a doorway they're in opens.)
+        const [wx, wz, ax, az] = [k.wayX, k.wayZ, k.aheadX, k.aheadZ];
+        if (wx === undefined || wz === undefined || ax === undefined || az === undefined) movers.push(px, pz, px, pz, px, pz);
+        else movers.push(px, pz, curr[o + wx], curr[o + wz], curr[o + ax], curr[o + az]);
+      }
       const asleep = curr[o + k.pose] === Pose.Lie && sleeping.has(curr[o + k.action] | 0);
       const baby = babies.has(world.sims[i]?.stage ?? '');
       // `z` is in lot rows: upper storeys have rooms of their own there.
@@ -3772,27 +3793,35 @@ export class BabylonRenderer implements Renderer {
   }
 
   /**
-   * Front doors stand shut, and a bathroom's door while someone is in there; any of them opens
-   * as someone walks up to it (or through it), and swings back once they've passed.
+   * Front doors and gates stand shut, and a bathroom's door while someone is in there; each opens
+   * only for someone going through it (`goingThrough`: not for someone walking past), and swings
+   * back once they're through. `rate`: how fast the game runs (`GAME_RATE`).
    */
-  private swingDoors(): void {
-    if (!this.doors.length) return;
+  private swingDoors(rate: number): void {
+    if (!this.doors.length && !this.gates.length) return;
     const movers = this.movers;
-    const step = Math.min(1, this.frameDt / 1000 / DOOR_SWING);
+    const step = Math.min(1, (this.frameDt / 1000 / DOOR_SWING) * Math.min(Math.max(rate, 1), 10));
+    const swung = (target: number, at: number) => (target > at ? Math.min(target, at + step) : Math.max(target, at - step));
+    for (const gate of this.gates) {
+      if (gate.mesh.isDisposed()) continue;
+      const way = goingThrough(movers, gate.leaf.axis, gate.leaf.centre, gate.open === 1);
+      // It opens away from the one coming through, and shuts the way it opened.
+      if (way && gate.open === 0) gate.towards = way;
+      const open = swung(way ? 1 : 0, gate.open);
+      if (open === gate.open) continue;
+      gate.open = open;
+      swingGate(gate.mesh, gate.leaf, ease(open), gate.towards);
+      this.resetSnapshot();
+    }
     let moved = false;
     for (const door of this.doors) {
       const { leaf } = door;
       if (leaf.meshes[0]?.isDisposed()) continue;
-      // Someone on the move by it (both in lot rows: the storey is in the row).
-      let passing = false;
-      for (let i = 0; i < movers.length && !passing; i += 2) {
-        const dx = movers[i] - leaf.centre[0];
-        const dz = movers[i + 1] - leaf.centre[1];
-        passing = dx * dx + dz * dz < DOOR_REACH * DOOR_REACH;
-      }
+      // (Both in lot rows: the storey is in the row.)
+      const going = goingThrough(movers, leaf.axis, leaf.centre, door.open === 1) !== 0;
       const engaged = leaf.bath !== 0 && this.occupiedRooms.has(leaf.bath);
-      const target = passing || !(leaf.front || engaged) ? 1 : 0;
-      const open = door.open < 0 ? target : target > door.open ? Math.min(target, door.open + step) : Math.max(target, door.open - step);
+      const target = going || !(leaf.front || engaged) ? 1 : 0;
+      const open = door.open < 0 ? target : swung(target, door.open);
       if (open === door.open) continue;
       door.open = open;
       // Eased: quick off the frame, slowing as it meets the jamb or the wall. One that slides stays
@@ -4950,6 +4979,44 @@ export class BabylonRenderer implements Renderer {
 /** Smoothstep: eases 0..1 in and out. */
 function ease(t: number): number {
   return t * t * (3 - 2 * t);
+}
+
+/**
+ * Whether someone in `movers` (`MOVER` floats each) goes through the 1 m doorway whose middle is
+ * `centre`, in a wall or fence along x (`axis` 'h') or z: their way crosses it before `DOOR_AHEAD`
+ * metres on, or they're in it. Walking past, or up to it and away, isn't. One that stands `open`
+ * also stays so while anyone on the move is still within `DOOR_CLEAR` of it (the leaf would
+ * sweep through them shutting). Returns the way they go across (+1 towards +z of an 'h' edge or
+ * +x of a 'v' one, -1 the other), 0 for nobody.
+ */
+function goingThrough(movers: readonly number[], axis: 'h' | 'v', centre: readonly [number, number], open: boolean): number {
+  // In the doorway's own terms: `a` along the edge from its middle, `n` across it.
+  const h = axis === 'h';
+  const [ca, cn] = h ? centre : [centre[1], centre[0]];
+  const [ia, iN] = h ? [0, 1] : [1, 0];
+  for (let i = 0; i < movers.length; i += MOVER) {
+    const pa = movers[i + ia] - ca;
+    const pn = movers[i + iN] - cn;
+    let wa = movers[i + 2 + ia] - ca;
+    let wn = movers[i + 2 + iN] - cn;
+    const qa = movers[i + 4 + ia] - ca;
+    const qn = movers[i + 4 + iN] - cn;
+    if ((Math.abs(pa) <= 0.5 && Math.abs(pn) < DOORWAY) || (open && pa * pa + pn * pn < DOOR_CLEAR * DOOR_CLEAR)) return qn >= pn ? 1 : -1;
+    // A waypoint further than the look ahead: where it looks to is on the way there.
+    if (Math.hypot(wa - pa, wn - pn) >= DOOR_AHEAD) {
+      wa = qa;
+      wn = qn;
+    }
+    const way = crosses(pa, pn, wa, wn) || crosses(wa, wn, qa, qn);
+    if (way) return way;
+  }
+  return 0;
+}
+
+/** Whether a step from `s` to `e` (along, across) crosses a 1 m doorway at the origin: its way across (±1), or 0. */
+function crosses(sa: number, sn: number, ea: number, en: number): number {
+  if (sn * en > 0 || sn === en) return 0;
+  return Math.abs(sa + ((ea - sa) * sn) / (sn - en)) <= 0.5 ? Math.sign(en - sn) : 0;
 }
 
 function setExposure(config: ImageProcessingConfiguration, value: number): void {
