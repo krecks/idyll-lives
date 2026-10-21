@@ -1,9 +1,9 @@
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, searchForWorkspaceRoot, type Plugin } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { cp, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { basename, join, resolve } from 'node:path';
-import { readFileSync } from 'node:fs';
+import { lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
 // SharedArrayBuffer (zero-copy sim -> render snapshots, threads for the language model on the
@@ -13,6 +13,21 @@ const crossOriginIsolation = {
   'Cross-Origin-Opener-Policy': 'same-origin',
   'Cross-Origin-Embedder-Policy': 'require-corp',
 };
+
+/**
+ * In a worktree whose `node_modules` is a link to the main checkout's: the server may read the linked
+ * packages (else Vite refuses them with 403), and keeps its pre-bundled packages in this worktree
+ * (`web/.vite-cache`) rather than in the shared `node_modules/.vite`, which every other worktree's
+ * server would re-optimise and wipe under it. Null in a checkout with its own `node_modules`.
+ */
+const linkedModules = (() => {
+  const dir = fileURLToPath(new URL('./node_modules', import.meta.url));
+  try {
+    return lstatSync(dir).isSymbolicLink() ? realpathSync(dir) : null;
+  } catch {
+    return null;
+  }
+})();
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
 
@@ -357,7 +372,8 @@ export default defineConfig({
   plugins: [svelte(), debugReports(), earlyEnvironment(), optimizedAssets(), minifiedManifests(), dataBundle(), isolationWorker(), releaseWasm(), collectPackages(), thirdPartyLicenses()],
   // The game's version (one number for web and Rust; `node ../tools/release/version.mjs <x.y.z>` bumps it).
   define: { __APP_VERSION__: JSON.stringify(pkg.version), __APP_COMMIT__: JSON.stringify(COMMIT), __BUILD_ID__: JSON.stringify(BUILD_ID) },
-  server: { headers: crossOriginIsolation },
+  server: { headers: crossOriginIsolation, ...(linkedModules ? { fs: { allow: [searchForWorkspaceRoot(process.cwd()), linkedModules] } } : {}) },
+  ...(linkedModules ? { cacheDir: fileURLToPath(new URL('./.vite-cache', import.meta.url)) } : {}),
   preview: { headers: crossOriginIsolation },
   worker: { format: 'es', plugins: () => [collectPackages()] },
   // The voice and language model workers' imports: Vite's start-up scan doesn't reach worker
