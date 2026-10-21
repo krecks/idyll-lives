@@ -63,7 +63,7 @@ sits on the top, turns with its facing and lights right at night.
 | `teapotSet` Tea set | 1x1 · surface | tea:drink | tabletop / tableware | Body, Tray | Static | Static. |
 | `mugs` Mugs | 1x1 · surface | drink:drink | tabletop / tableware | Mug 1, Mug 2, Mug 3 | Static | Static. |
 | `wineGlasses` Wine and glasses | 1x1 · surface | wine:drink | tabletop / tableware | Body | Static | Static. |
-| `candlesticks` Candlesticks | 1x1 · surface | — | tabletop / tableware | Body, Candles | Night (E3) | `lit`: by day dark wicks; from dusk the two flames rise out of the candles' tops (held open dusk to dawn) and glow while the room's lights are on (E8; M-tabletop-01, 2026-10-21: they were drawn lit all day and dark at night). |
+| `candlesticks` Candlesticks | 1x1 · surface | — | tabletop / tableware | Body, Candles | Night (E3) | `lit`: by day dark wicks; from dusk the two flames rise out of the candles' tops and glow while the room's lights are on (someone awake there; E8; M-tabletop-01, 2026-10-21: they were drawn lit all day and dark at night); in a room gone dark they sink back to the wicks (`ObjectMotion.setUnlit`, M-tabletop-03). |
 
 **In play** (signed off 2026-10-16):
 - The place setting's Body, Rim and Napkin and the cake's Body and Icing land where named.

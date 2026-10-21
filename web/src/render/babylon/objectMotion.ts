@@ -8,7 +8,7 @@
  * rocking chair) goes round from rest to rest while the use lasts, then finishes its round. An
  * object that is open (the sim's `open`: a wall bed folded down) holds its `motions.open` clip
  * open as long as it stays so, and its `motions.night` clip (curtains drawn) from dusk to dawn,
- * whoever is asleep. A crop's `motions.growth` clip is held where its growth stage is, moving on
+ * whoever is asleep (a thing it lights, the candles' flames, only while its room's lights are on: `setUnlit`). A crop's `motions.growth` clip is held where its growth stage is, moving on
  * to the next stage at the clip's own pace. An ambient clip (`idle`: a ceiling fan, a fountain's water) goes
  * round all the time (a lamp's only while it's switched on: the fan's blades with its light), but
  * only within `ambientRange` of the camera (none on Low), without the shadows being redrawn for it.
@@ -140,6 +140,8 @@ export class ObjectMotion {
   private snapNight = false;
   /** Lamps and fires switched off (`setLampsOff`). */
   private lampsOff: ReadonlySet<number> = new Set();
+  /** Whether an object's glow is out with its room's lights (`setUnlit`): a night clip that lights it (candles) stays shut. */
+  private unlit: (id: number) => boolean = () => false;
 
   /**
    * The lamps' level (the lighting's `lamps`, 0 by day to 1 at night): night clips close from about
@@ -160,6 +162,14 @@ export class ObjectMotion {
   /** The lamps (and fires) switched off, by object id (the sim's `lampsOff`): a fan's blades stop, a fire's flames die down. */
   setLampsOff(off: ReadonlySet<number>): void {
     this.lampsOff = off;
+  }
+
+  /**
+   * Which objects glow with their room's lights and have them out now (the renderer's window glow): their
+   * `night` clip (the candles' flames rising) is held open only while the room is lit, as the glow is.
+   */
+  setUnlit(unlit: (id: number) => boolean): void {
+    this.unlit = unlit;
   }
 
   /** The objects of a newly built world; those still mid-clip are posed again. */
@@ -228,7 +238,7 @@ export class ObjectMotion {
   private held(o: MovingObject): string[] {
     const held: string[] = [];
     if (o.open && o.motions.open) held.push(o.motions.open);
-    if (this.night && o.motions.night) held.push(o.motions.night);
+    if (this.night && o.motions.night && !this.unlit(o.id)) held.push(o.motions.night);
     if (this.night && o.burns && !this.lampsOff.has(o.id)) held.push(...o.burns);
     return held;
   }

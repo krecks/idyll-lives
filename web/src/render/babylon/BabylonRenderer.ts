@@ -4210,6 +4210,13 @@ export class BabylonRenderer implements Renderer {
     if (this.objectShadowMerge) this.worldMeshes.push(this.objectShadowMerge);
     for (const g of this.glows) if (!glows.some((n) => n.mesh === g.mesh)) g.mesh.setEnabled(false);
     this.glows = glows;
+    // A night clip that lights a thing glowing with its room (the candles' flames) stands only while the room's lights are on.
+    const glowRoom = new Map<number, number>();
+    for (const g of glows) if (!g.screen) g.ids.forEach((id, k) => g.lamps[k] < 0 && g.rooms[k] && glowRoom.set(id, g.rooms[k]));
+    this.motion.setUnlit((id) => {
+      const room = glowRoom.get(id);
+      return room !== undefined && (this.windowGlowOn.get(room) ?? 1) < 0.5;
+    });
     this.applyGlow();
     this.mirrors.set(mirrors);
     this.motion.set(moving);
