@@ -36,6 +36,18 @@
  *             The old single object: --object deskSimple --at 23,14,0 (corner and rot) --use sit
  *               (default 0) --shots 6 --every 500; the camera follows the resident as before.
  *
+ *   sheet     contact sheets for reading an evidence folder (`bench-results/review/<cat>`) at a glance:
+ *             per object `sheets/obj-<id>.png`, up to six of its pictures in a grid (gallery, game
+ *             camera, in use in play, clip held open, then a close-up, at night, other framings of
+ *             the clip and the other uses),
+ *             and `sheets/age-<id>.png` (`-2`, … past six) for its pose and play shots by life stage,
+ *             each picture labelled with its file. Files are found by the names the other commands
+ *             give them, anywhere in the folder (the newest of a name taken twice). PNGs 1600 wide
+ *             (about 1000 high for 2 × 2), drawn in the headless browser: no server, no --port.
+ *               --dir <folder> (required)  --ids fridge,sink | --ids-file <path> (default: the
+ *                 folder's `../lists/<folder>.txt` or `.models.txt`, else the ids in backticks that
+ *                 open the rows of its `index.md`)  --out (default <folder>/sheets)
+ *
  *   Common:  --port <n> (its own Vite, --strictPort: a port in use is an error, never someone
  *            else's server) | --url http://localhost:<n>;  --out <dir> (default
  *            <repo>/bench-results/check-<time>);  --quality low|medium|high;  --renderer webgl;
@@ -52,10 +64,10 @@
  */
 
 import { spawn } from 'node:child_process';
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { createConnection } from 'node:net';
-import { join } from 'node:path';
+import { basename, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { quiet } from './quiet.mjs';
 
@@ -76,14 +88,16 @@ function fail(message) {
   process.exit(1);
 }
 
-if (!['gallery', 'clips', 'play'].includes(what)) fail('say what to check: gallery, clips or play (options at the top of tools/bench/check.mjs)');
+if (!['gallery', 'clips', 'play', 'sheet'].includes(what)) fail('say what to check: gallery, clips, play or sheet (options at the top of tools/bench/check.mjs)');
+/** Every command but `sheet` opens the game's pages from a server. */
+const served = what !== 'sheet';
 const url = flag('url', null);
 const port = Number(flag('port', null));
-if (!url && !port) fail('give your own port (--port <n>, a free one) or --url of a server you started from this checkout');
+if (served && !url && !port) fail('give your own port (--port <n>, a free one) or --url of a server you started from this checkout');
 if (port === 5199) fail('5199 is the main checkout\'s server: pick a port of your own');
 const base = url ?? `http://localhost:${port}`;
 const stamp = new Date().toISOString().replace(/\.\d+Z$/, '').replace(/[:T]/g, '-');
-const out = flag('out', join(ROOT, 'bench-results', `check-${stamp}`));
+const out = flag('out', what === 'sheet' ? join(resolve(need('dir')), 'sheets') : join(ROOT, 'bench-results', `check-${stamp}`));
 mkdirSync(out, { recursive: true });
 const [width, height] = flag('size', '1280x800').split('x').map(Number);
 /** URL flags every page gets. */
@@ -101,7 +115,7 @@ const portTaken = (p) =>
   });
 
 let vite = null;
-if (!url) {
+if (served && !url) {
   if (await portTaken(port)) fail(`port ${port} is in use (someone else's server?): pick a free one`);
   vite = spawn(`${WEB}node_modules/.bin/vite`, ['--port', String(port), '--strictPort'], { cwd: WEB, stdio: ['ignore', 'pipe', 'inherit'] });
   process.on('exit', () => vite.kill());
@@ -113,10 +127,12 @@ if (!url) {
 
 // Fail loudly when the server can't give what the pages need: a wasm package that is missing, or
 // linked from outside the server's allowed folders (403), leaves pictures of an empty scene.
-for (const [name, path, needed] of [
-  ['wasm', '/src/core/wasm-pkg/sim_wasm_bg.wasm', what === 'play'],
-  ['manifest', '/assets/manifest.json', true],
-]) {
+for (const [name, path, needed] of served
+  ? [
+      ['wasm', '/src/core/wasm-pkg/sim_wasm_bg.wasm', what === 'play'],
+      ['manifest', '/assets/manifest.json', true],
+    ]
+  : []) {
   const answer = await fetch(base + path).then((r) => r.status, (err) => String(err));
   log.setup[name] = answer;
   if (answer !== 200 && needed) fail(`${base}${path} answered ${answer}, not 200 (copy the wasm packages into this checkout, run \`pnpm wasm\`; see tools/bench/README.md)`);
@@ -691,6 +707,171 @@ if (what === 'play') {
     timings.push({ object: thing.def, seconds: Math.round((Date.now() - t0) / 100) / 10 });
   }
   log.timings = timings;
+}
+
+if (what === 'sheet') {
+  const dir = resolve(need('dir'));
+  const folder = basename(dir);
+  /** Life stages as pictures name them, in the order a sheet shows them (`default`: the page's own, grown-ups). */
+  const STAGES = ['baby', 'child', 'teen', 'youngAdult', 'adult', 'default', 'elder'];
+  /** Most pictures a sheet: 2 × 2, or 3 × 2. */
+  const TILES = 6;
+  const lines = (file) => readFileSync(file, 'utf8').split('\n').map((l) => l.replace(/#.*/, '').trim()).filter(Boolean);
+  // The objects: given, else the review's list for this folder (`lists/<cat>.txt`, or the models for
+  // folders of models), else the ids in backticks that open the rows of the folder's index.
+  const lists = join(dir, '..', 'lists');
+  const listed = [`${folder}.txt`, `${folder}.models.txt`].map((f) => join(lists, f)).find((f) => existsSync(f));
+  const ids = flag('ids')
+    ? list('ids')
+    : flag('ids-file')
+      ? lines(flag('ids-file'))
+      : listed
+        ? lines(listed)
+        : [...new Set(readFileSync(join(dir, 'index.md'), 'utf8').split('\n').flatMap((l) => l.match(/^\|(?:[^|`]*\|)?\s*`([^`]+)`/)?.[1] ?? []))];
+  if (!ids.length) fail(`no objects for ${dir}: give --ids or --ids-file`);
+  // Each object's model, from the game's content: gallery and clip pictures are named by it.
+  const contentDir = join(WEB, 'public/content');
+  const baseContent = JSON.parse(readFileSync(join(contentDir, 'base.json'), 'utf8'));
+  const models = new Map();
+  for (const file of [baseContent, ...(baseContent.include ?? []).map((f) => JSON.parse(readFileSync(join(contentDir, f), 'utf8')))]) {
+    for (const o of file.objects ?? []) models.set(o.id, o.model);
+  }
+  // Every picture in the folder but the sheets, with the folders it is in and when it was taken.
+  const pngs = readdirSync(dir, { recursive: true })
+    .filter((rel) => rel.endsWith('.png') && !rel.split(sep).includes('sheets') && !resolve(dir, rel).startsWith(out + sep))
+    .map((rel) => ({ rel, name: basename(rel), dirs: rel.split(sep).slice(0, -1), time: statSync(join(dir, rel)).mtimeMs }));
+  // `poses.html`'s own stations, whose shots are named by label ("feed baby": the crib's): label → object.
+  const bare = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const stationDefs = new Map([...readFileSync(join(WEB, 'src/debug/poses.ts'), 'utf8').matchAll(/\{ label: '([^']+)', def: '([^']+)'/g)].map(([, label, def]) => [bare(label), def]));
+  /** Whether a pose shot is of object `id`: the station its name ends with ("…-2-sleep-two"), else an id in its name ("poses-seats-teen-sofa"). */
+  function posedOn(stem, id, names) {
+    const words = stem.split(/[-_]/);
+    for (let k = 1; k < words.length; k++) {
+      const def = stationDefs.get(bare(words.slice(k).join('')));
+      if (def) return def === id;
+    }
+    return stem.split('-').some((t) => names.includes(t));
+  }
+  const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const stageIn = (tokens) => STAGES.find((s) => tokens.includes(s));
+  /** The newest picture of each file name (a use taken again in a later chunk), in name order. */
+  const newest = (files) => [...files.reduce((m, f) => ((m.get(f.name)?.time ?? -1) >= f.time ? m : m.set(f.name, f)), new Map()).values()].sort((a, b) => a.name.localeCompare(b.name));
+  /** The one nearest the folder's top (the main run, not a redo in a subfolder), newest first. */
+  const first = (files) => [...files].sort((a, b) => a.dirs.length - b.dirs.length || b.time - a.time)[0];
+
+  /** An object's pictures, by what they show, found by the names `gallery`, `clips`, `play` and `poses.html` shots get. */
+  function pictures(id) {
+    const names = [...new Set([slug(id), models.has(id) ? slug(models.get(id)) : null].filter(Boolean))];
+    const any = names.map(escape).join('|');
+    const gallery = new RegExp(`^gallery-(${any})\\.png$`);
+    const game = new RegExp(`^gallery-game-(${any})\\.png$`);
+    const clip = new RegExp(`^clips-(${any})-(.+)-t([\\d.]+)\\.png$`);
+    const use = new RegExp(`^(${any})-(.+?)(?:-(\\d+))?\\.png$`);
+    const found = { gallery: [], close: [], game: [], clips: [], uses: [], night: [], staged: [], ages: [] };
+    for (const f of pngs) {
+      const stem = f.name.slice(0, -4);
+      if (gallery.test(f.name)) (f.dirs.includes('close') ? found.close : found.gallery).push(f);
+      else if (game.test(f.name)) found.game.push(f);
+      else if (clip.test(f.name)) found.clips.push({ ...f, clip: f.name.match(clip)[2], t: Number(f.name.match(clip)[3]) });
+      else if (stem.startsWith('poses-') && posedOn(stem, id, names)) found.ages.push({ ...f, stage: stageIn(stem.split('-')) ?? 'default' });
+      else if (use.test(f.name)) {
+        // In play: at another life stage (a folder named for it), at night, or as the state has them.
+        const stage = stageIn(f.dirs.flatMap((d) => d.split('-')));
+        const [, , what, shot] = f.name.match(use);
+        (stage ? found.staged : f.dirs.some((d) => d.startsWith('night')) ? found.night : found.uses).push({ ...f, use: what, shot, stage });
+      }
+    }
+    // Each use once: its middle picture (`-01` of three), the uses with none (`no-uses`) last.
+    const middles = (files, key) => {
+      const byUse = new Map();
+      for (const f of files) byUse.set(key(f), [...(byUse.get(key(f)) ?? []), f]);
+      return [...byUse.values()].map((shots) => shots.find((f) => f.shot === '01') ?? shots[Math.floor(shots.length / 2)]);
+    };
+    const uses = middles(newest(found.uses), (f) => f.use).sort((a, b) => (a.use === 'no-uses') - (b.use === 'no-uses'));
+    found.ages.push(...middles(found.staged, (f) => `${f.dirs.join('/')}:${f.use}`));
+    // Each clip held open (its latest time), the main run's first, then other framings (`clips/side/`, `clips-tall/`).
+    const open = new Map();
+    for (const f of found.clips) {
+      const key = `${f.dirs.join('/')}:${f.clip}`;
+      if (!open.has(key) || open.get(key).t < f.t) open.set(key, f);
+    }
+    const clips = [...open.values()].sort((a, b) => a.dirs.length - b.dirs.length || a.rel.localeCompare(b.rel));
+    const tiles = [];
+    const add = (f) => f && tiles.length < TILES && !tiles.some((t) => t.rel === f.rel) && tiles.push(f);
+    const night = newest(found.night);
+    for (const f of [first(found.gallery), first(found.game), uses[0], clips[0], first(found.close), night[0], ...clips.slice(1), ...uses.slice(1), ...night.slice(1)]) add(f);
+    // By life stage: the same picture (its name without the stage) at each stage side by side, a
+    // sheet holding as many such sets as fit whole.
+    const sets = new Map();
+    for (const f of newest(found.ages)) {
+      const key = f.rel.split(sep).map((part) => part.replace(/\.png$/, '').split('-').filter((t) => t !== f.stage).join('-')).join('/');
+      sets.set(key, [...(sets.get(key) ?? []), f]);
+    }
+    const ages = [];
+    for (const set of [...sets.values()].map((s) => s.sort((a, b) => STAGES.indexOf(a.stage) - STAGES.indexOf(b.stage)))) {
+      for (let k = 0; k < set.length; k += TILES) {
+        const part = set.slice(k, k + TILES);
+        if (ages.length && ages.at(-1).length + part.length <= TILES) ages.at(-1).push(...part);
+        else ages.push(part);
+      }
+    }
+    return { tiles, ages };
+  }
+
+  const page = await (await browser.newContext({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 1 })).newPage();
+  const html = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  /**
+   * One sheet: `tiles` in a grid under `title`, each picture whole and labelled with its file; 1600
+   * wide and as tall as the pictures need (about 1000 for 2 × 2, 700 for 3 × 2).
+   */
+  async function compose(name, title, tiles) {
+    const cols = tiles.length <= 4 ? 2 : 3;
+    const rows = tiles.length <= 2 ? 1 : 2;
+    const data = tiles.map((f) => readFileSync(join(dir, f.rel)));
+    // The tallest picture's shape (a PNG's width and height are at bytes 16 and 20).
+    const aspect = Math.max(...data.map((b) => b.readUInt32BE(20) / b.readUInt32BE(16)));
+    const height = Math.round(32 + 4 + rows * (((1600 - 8 - 4 * (cols - 1)) / cols) * aspect) + 4 * (rows - 1));
+    await page.setViewportSize({ width: 1600, height });
+    const figures = tiles.map((f, i) => `<figure><img src="data:image/png;base64,${data[i].toString('base64')}"><figcaption>${html(f.rel)}</figcaption></figure>`);
+    await page.setContent(
+      `<!doctype html><style>
+        body { margin: 0; width: 1600px; height: ${height}px; display: flex; flex-direction: column; background: #1d1f21; color: #eee; font: 15px system-ui, sans-serif; }
+        h1 { margin: 0; padding: 0 12px; height: 32px; line-height: 32px; font-size: 17px; font-weight: 600; }
+        main { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(${cols}, 1fr); grid-template-rows: repeat(${rows}, 1fr); gap: 4px; padding: 0 4px 4px; }
+        figure { margin: 0; position: relative; min-height: 0; background: #000; }
+        img { width: 100%; height: 100%; object-fit: contain; display: block; }
+        figcaption { position: absolute; left: 0; top: 0; max-width: calc(100% - 16px); padding: 3px 8px; background: #000c; color: #fff; overflow-wrap: anywhere; }
+      </style><h1>${html(title)}</h1><main>${figures.join('')}</main>`,
+      { waitUntil: 'load' },
+    );
+    await shot(page, name, { kind: 'sheet', tiles: tiles.map((f) => f.rel) });
+  }
+
+  log.sheets = [];
+  log.without = [];
+  for (const id of ids) {
+    startJob(slug(id));
+    try {
+      const { tiles, ages } = pictures(id);
+      const sheets = [];
+      if (tiles.length) {
+        await compose(`obj-${slug(id)}`, `${id} · ${folder}`, tiles);
+        sheets.push(`obj-${slug(id)}.png`);
+      }
+      for (const [k, part] of ages.entries()) {
+        const name = `age-${slug(id)}${k ? `-${k + 1}` : ''}`;
+        await compose(name, `${id} · ${folder} · by life stage: ${[...new Set(part.map((f) => f.stage))].join(', ')}`, part);
+        sheets.push(`${name}.png`);
+      }
+      log.sheets.push({ id, sheets, tiles: tiles.length, ages: ages.flat().length });
+      if (!sheets.length) log.without.push(id);
+    } catch (err) {
+      noteError(`no sheet: ${err.message.split('\n')[0]}`);
+      log.without.push(id);
+    }
+  }
+  const count = (prefix) => log.sheets.reduce((n, s) => n + s.sheets.filter((f) => f.startsWith(prefix)).length, 0);
+  console.log(`${folder}: ${ids.length} objects, ${count('obj-')} object sheets, ${count('age-')} age sheets in ${out}${log.without.length ? `; no pictures for ${log.without.join(', ')}` : ''}`);
 }
 
 writeFileSync(join(out, `${what}.json`), JSON.stringify(log, null, 2));

@@ -316,7 +316,9 @@ for (const name of ['', ...new Set(benches.flatMap((b) => b.clips.map((c) => c.n
 setSolo(solo);
 
 // From the front (models face +z), a little above, everything in view: at most 0.75 m up for things
-// on the floor, at the middle of things that all hang higher (on a wall), or at `target`.
+// on the floor, at the middle of things that all hang higher (on a wall), or at `target`. Models that
+// don't fit so (a tall wardrobe, a shower, a tree), at rest or with every clip open, are framed whole:
+// looked at from their middle height, from as far as it takes.
 const tallest = Math.max(1, ...benches.map((b) => b.template.height));
 const top = Math.max(...benches.map((b) => b.template.height));
 const lowest = Math.min(...benches.map((b) => b.template.bottom ?? 0));
@@ -329,6 +331,41 @@ const camera = new ArcRotateCamera('cam', Number(params.get('alpha') ?? Math.PI 
 camera.attachControl(canvas, true);
 camera.minZ = 0.02;
 camera.wheelPrecision = 20;
+
+/** The corners of every model's parts as placed, at rest and with all its clips open (`t=99`). */
+function corners(): Vector3[] {
+  const out: Vector3[] = [];
+  for (const b of benches) {
+    const open = b.clips.map((c) => ({ clip: c.clip, time: c.clip.duration, kind: c.kind }));
+    const place = Matrix.Translation(b.x, 0, b.z);
+    b.template.meshes.forEach((mesh, i) => {
+      const { minimum: lo, maximum: hi } = mesh.getBoundingInfo().boundingBox;
+      const part = b.template.motion ? b.template.motion.parts[i] : -1;
+      const own = mesh.computeWorldMatrix(true);
+      for (const at of part >= 0 && partPose(open, part, posed) ? [place, Matrix.FromArray(posed).multiply(place)] : [place]) {
+        const m = at.multiply(own);
+        for (let k = 0; k < 8; k++) out.push(Vector3.TransformCoordinates(new Vector3(k & 1 ? hi.x : lo.x, k & 2 ? hi.y : lo.y, k & 4 ? hi.z : lo.z), m));
+      }
+    });
+  }
+  return out;
+}
+/** Whether all of `points` are on screen, clear of the buttons along the top. */
+function inView(points: Vector3[]): boolean {
+  const m = camera.getViewMatrix(true).multiply(camera.getProjectionMatrix(true));
+  return points.every((p) => {
+    const q = Vector3.TransformCoordinates(p, m);
+    return Math.abs(q.x) <= 0.95 && q.y >= -0.95 && q.y <= 0.86;
+  });
+}
+if (!params.get('radius')) {
+  const points = corners();
+  if (points.length && !inView(points)) {
+    if (!target) aim.y = (Math.min(...points.map((p) => p.y)) + Math.max(...points.map((p) => p.y))) / 2;
+    camera.setTarget(aim, false, false, true);
+    for (let n = 0; n < 80 && !inView(points); n++) camera.radius *= 1.04;
+  }
+}
 
 const projected = new Vector3();
 engine.runRenderLoop(() => {
