@@ -1,7 +1,7 @@
 /**
  * Rides and climbs at things: a child's round on the slide (`STEP_IN` in characters.ts: round to its ladder,
- * up it, in onto the deck on hands and knees, sat at the top holding the arch, down the chute on the back, off at
- * the run-out and back round to the front), the upper bunk's ladder (characters.ts `BUNK_LADDER`: up it and
+ * up it, a step up onto the deck and stood under its roof, sat at the top holding the arch, down the chute sat up,
+ * off at the run-out and back round to the front), the upper bunk's ladder (characters.ts `BUNK_LADDER`: up it and
  * onto the mattress getting into bed, down it getting up), and the rides sat astride with the hands on the
  * grips (characters.ts `RIDES`): the rocking horse and the spring rider, the seesaw, the merry-go-round and the
  * swing (the legs pumping in time with it).
@@ -313,10 +313,11 @@ const SLIDE_S = 14;
 /**
  * A round on the slide, from standing at the run-out's foot facing it: round its right side to the ladder
  * (the walk on the left of the way, clear of the chute), hands onto the rails and up the five rungs, hand and
- * foot in turn; the chest down between the handrails, hands onto the deck, a knee up and in on hands and knees
- * (as when a bar crossed the deck's back: the tower has standing room now, M-community-07); sat at the top, the legs
- * into the chute, holding the arch, a look down; a push, lain back under the arch, down the chute on the back (the body on its floor, the legs ahead along it), sat up on the run-out, the
- * feet down, up off it, and a turn round back to where the round began.
+ * foot in turn; the hands up the handrails, a step up off the top rung onto the deck and the other foot after it,
+ * stood up under the roof (M-community-07's headroom; A-community-02); the hands onto the arch's sides, sat down at
+ * the top, the legs into the chute, a look down; a pull on the arch and a push, the hands let go onto the chute's
+ * sides, down it sat up, the back leant back a little (25 deg down the steep middle), the legs out ahead along it;
+ * upright on the run-out, the feet down, up off it, and a turn round back to where the round began.
  */
 function slidePose(fit: SlideFit): (p: number) => PoseSpec {
   const { s, to } = fit;
@@ -370,68 +371,68 @@ function slidePose(fit: SlideFit): (p: number) => PoseSpec {
       r.grab(other, t, palm(other, Math.min(1.7, reachY(rung(i)[0]) + 0.05 * s)), { from: t - dm * 0.3 });
       r.grab(side, t + dm * 0.4, palm(side, Math.min(1.68, reachY(rung(i)[0]) + 0.15 * s)), { from: t + dm * 0.05 });
     }
-    // 3. Over the top: the chest down between the handrails, hands onto the deck, a knee up onto it and the other, in on
-    // hands and knees to sit at the front.
+    // 3. Over the top: the hands up the handrails, a step up off the top rung onto the deck and the other foot after
+    // it, stood up on the deck under the roof (its eaves 1.03 m over the deck: the head bowed a little), the hands
+    // let go of the handrails.
     const o0 = c1;
     const o1 = 0.55;
     const ok = (k: number) => o0 + (o1 - o0) * k;
-    const knee = (side: Side, z: number): Vec => C((side === 'l' ? -1 : 1) * 0.1 * s, SLIDE_DECK + 0.06 * s, z - 0.34 * s);
-    const deckPalm = (side: Side, z: number): Vec => C((side === 'l' ? -1 : 1) * 0.13 * s, SLIDE_DECK + 0.02, z);
-    const crawlHips = (z: number): Vec => C(0, SLIDE_DECK + 0.5 * s, z);
-    r.grab('l', ok(0.2), deckPalm('l', -0.56), { from: ok(0.04), elbow: 1 });
-    r.grab('r', ok(0.3), deckPalm('r', -0.53), { from: ok(0.14), elbow: 1 });
-    r.body(ok(0.3), { at: climbHips(rung(5)[0] - 0.05), hip: 55, bend: 10, nod: -35 });
-    r.step('l', ok(0.55), knee('l', -0.62), { from: ok(0.32), pitch: 140, knee: -1 });
-    r.body(ok(0.58), { at: crawlHips(-0.75), hip: 82, bend: 5, nod: -45 });
-    r.step('r', ok(0.72), knee('r', -0.6), { from: ok(0.55), pitch: 140, knee: -1 });
-    r.grab('l', ok(0.82), deckPalm('l', -0.4), { from: ok(0.7) });
-    r.body(ok(0.85), { at: crawlHips(-0.66), hip: 82, bend: 5, nod: -45 });
-    r.grab('r', ok(0.92), deckPalm('r', -0.38), { from: ok(0.8) });
-    r.step('l', ok(0.95), knee('l', -0.52), { from: ok(0.84) });
-    r.step('r', ok(1), knee('r', -0.5), { from: ok(0.9) });
-    r.body(o1, { at: crawlHips(-0.58), hip: 80, bend: 5, nod: -45 });
-    // 4. Sat at the top: down onto the bottom, the legs out into the chute (under the hoop), the hands onto the
-    // hoop's sides; leant forward under the roof, a look down the slide.
+    const deckFoot = (side: Side, z: number): Vec => C((side === 'l' ? -1 : 1) * 0.096 * s, SLIDE_DECK + aY * s, z);
+    const zStand = -0.6;
+    r.grab('r', ok(0.15), palm('r', SLIDE_DECK + 0.5 * s), { from: ok(0.02) });
+    r.grab('l', ok(0.25), palm('l', SLIDE_DECK + 0.45 * s), { from: ok(0.1) });
+    r.step('r', ok(0.42), deckFoot('r', -0.66), { from: ok(0.2), pitch: 0, knee: 0 });
+    r.body(ok(0.5), { at: C(0, SLIDE_DECK + 0.84 * hipY * s, -0.7), hip: 14, bend: 6, nod: -10 });
+    r.step('l', ok(0.68), deckFoot('l', zStand), { from: ok(0.48), pitch: 0, knee: 0 });
+    r.step('r', ok(0.82), deckFoot('r', zStand), { from: ok(0.66), pitch: 0, knee: 0 });
+    r.body(ok(0.85), { at: C(0, SLIDE_DECK + 0.95 * hipY * s, zStand), hip: 4, bend: 4, nod: 12 });
+    r.grabBoth(ok(1), null, null, { from: ok(0.82), elbow: 0 });
+    // 4. Sat at the top: the hands onto the arch's sides, down onto the bottom at the deck's front, the legs out into
+    // the chute (under the arch), a look down the slide.
     const t0 = o1;
     const t1 = 0.61;
     const tk = (k: number) => t0 + (t1 - t0) * k;
     const zSit = -0.5;
     const sitAt = C(0, SLIDE_DECK + sd * s, zSit);
     const legOut = (side: Side, z: number): Vec => C((side === 'l' ? -1 : 1) * 0.09 * s, chuteY(z) + 0.07 * s, z);
-    r.body(tk(0.45), { at: [sitAt[0], sitAt[1] + 0.12, sitAt[2] + 0.1], hip: 40, bend: 10, nod: -15 });
-    r.step('l', tk(0.6), legOut('l', zSit + 0.72 * s), { from: tk(0.25), pitch: -20, knee: 1 });
-    r.step('r', tk(0.7), legOut('r', zSit + 0.72 * s), { from: tk(0.35), pitch: -20, knee: 1 });
-    r.body(tk(0.75), { at: sitAt, hip: 28, bend: 12, nod: 8 });
     const hoop = (side: Side, a: number): Vec => C((side === 'l' ? -1 : 1) * SLIDE_HOOP.r * Math.cos((a * Math.PI) / 180), SLIDE_HOOP.y + SLIDE_HOOP.rise * Math.sin((a * Math.PI) / 180), SLIDE_HOOP.z - 0.03);
-    r.grab('l', tk(0.8), hoop('l', 35), { from: tk(0.45), elbow: 0 });
-    r.grab('r', tk(0.85), hoop('r', 35), { from: tk(0.5), elbow: 0 });
-    r.body(t1, { nod: 20 });
-    // 5. A pull on the hoop and lain back under it, the hands let go; down the chute on the back, the body on its
-    // floor and the legs ahead along it; sat up on the run-out.
+    r.grab('l', tk(0.25), hoop('l', 55), { from: tk(0.02), elbow: 0 });
+    r.grab('r', tk(0.3), hoop('r', 55), { from: tk(0.07), elbow: 0 });
+    r.body(tk(0.45), { at: C(0, SLIDE_DECK + 0.5 * hipY * s, zSit - 0.04), hip: 35, bend: 10, nod: 5 });
+    r.step('l', tk(0.6), legOut('l', zSit + 0.72 * s), { from: tk(0.3), pitch: -20, knee: 1 });
+    r.step('r', tk(0.7), legOut('r', zSit + 0.72 * s), { from: tk(0.4), pitch: -20, knee: 1 });
+    r.body(tk(0.75), { at: sitAt, hip: 10, bend: 6, nod: 10 });
+    r.grab('l', tk(0.85), hoop('l', 35), { from: tk(0.6) });
+    r.grab('r', tk(0.9), hoop('r', 35), { from: tk(0.65) });
+    r.body(t1, { nod: 18 });
+    // 5. A pull on the arch, the hands let go at the push and down onto the chute's sides; down it sat up, the back
+    // leant back a little (more down the steep middle), the legs out ahead along it, the heels on it; upright on
+    // the run-out.
     const s0 = t1 + 0.02;
     const s1 = 0.71;
-    r.body(s0, { at: C(0, SLIDE_DECK + sd * s, -0.42), hip: 20, bend: 8, nod: 10 });
+    r.body(s0, { at: C(0, SLIDE_DECK + sd * s, -0.42), hip: -5, bend: 4, nod: 12 });
     const n = 12;
     const zEnd = CHUTE.end[1] - 0.12;
     const zFrom = -0.38;
+    const side = (sx: number, z: number): Vec => C(sx * 0.235, chuteY(z) + 0.14, z + 0.02);
     for (let k = 1; k <= n; k++) {
       const u = k / n;
       // Quick down the steep middle, slowing on the level run-out.
       const e = 1 - (1 - u) * (1 - u);
       const t = s0 + (s1 - s0) * u;
       const z = zFrom + (zEnd - zFrom) * e;
-      const slope = chuteSlope(z);
-      // Lain back (the back 15 deg off the chute) under the hoop and down the steep part, sitting up on the level.
-      const up = smooth((u - 0.6) / 0.4);
-      const lean = 15 + 75 * up;
-      const y = chuteY(z) + (0.11 + 0.06 * up) * s;
-      r.body(t, { at: C(0, y, z), hip: slope - (90 - lean), bend: -4 + 10 * up, nod: 25 - 20 * up }, 'lin');
+      // Leant back 25 deg from upright down the steep part, 8 at the last on the level.
+      const steep = Math.min(1, chuteSlope(z) / 30);
+      const y = chuteY(z) + (sd + 0.01) * s;
+      r.body(t, { at: C(0, y, z), hip: -8 - 17 * steep, bend: 2, nod: 10 + 6 * steep }, 'lin');
       // The legs out ahead along the chute (the heels on it, the knees a little bent), off its end at the last.
       let zf = z;
       while (zf < CHUTE.end[1] + 0.05 && Math.hypot(zf - z, chuteY(zf) - y) < 0.72 * s) zf += 0.01;
-      for (const side of ['l', 'r'] as const) r.step(side, t, legOut(side, zf), { pitch: -15, knee: 0.6, how: 'lin' });
-      if (k === 2) r.grabBoth(t, null, null, { elbow: 0, how: 'set' });
+      for (const sd2 of ['l', 'r'] as const) r.step(sd2, t, legOut(sd2, zf), { pitch: -15, knee: 0.6, how: 'lin' });
+      if (k === 1) r.grabBoth(t, side(-1, z), side(1, z), { elbow: 0.3 });
+      else r.grabBoth(t, side(-1, z), side(1, z), { how: 'lin' });
     }
+    r.grabBoth(s1 + 0.01, null, null, { elbow: 0 });
     // 6. The feet down off the end onto the ground, up off the run-out over them, a turn round and back.
     const g0 = s1;
     const g1 = 0.82;
