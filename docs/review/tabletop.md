@@ -77,7 +77,7 @@ Family: `tools/art/blender/families/tabletop.py`.
 | `perfumeTray` Perfume tray | — | — | — | | |
 | `deskOrganiser` Desk organiser | — | — | — | | |
 | `laptopClosed` Laptop | — | — | — | I-tabletop-03 S3 code (seeded) | |
-| `monitor` Monitor and keyboard | — | — | — | | |
+| `monitor` Monitor and keyboard | — | — | I-tabletop-05 | I-tabletop-05 S2 content: fits on no counter and almost no desk | |
 | `stuffedToy` Teddy | — | — | — | | |
 | `toyBlocks` Toy blocks | — | — | — | | |
 
@@ -126,3 +126,13 @@ Not tied to one row: I-tabletop-04.
 - **Evidence:** Every one of the 180 sample houses has small things on tops. With the rule against uses on things on a top (I-tabletop-01), they are decor in every home.
 - **Status:** seeded (from `docs/objects/open.md` L147)
 - **Source:** `docs/objects/open.md` Still open › Content and sim
+
+### I-tabletop-05 — The monitor fits on no counter and on almost no desk
+
+- **Severity:** S2
+- **Rubric:** I2, M4
+- **Fix class:** content
+- **Where:** `monitor` in `web/public/content/catalog2/tabletop.json` (`radius`); the disc test for things on tops in `crates/sim-core/src/surface.rs`
+- **Evidence:** Things on tops are discs. The monitor's radius is 0.30 plus a 0.04 margin, but the stage's counter top is 0.62 deep (0.31 each way), so it fits at no offset ("would hang over the edge"). It also fits on no standard 0.66 counter and on none of the computer, writing, laptop, standing or kids' desks, though its description says it stands on a counter or desk; only `deskSimple` takes it. `laptopClosed` (radius 0.19) fits. Shots: `tabletop/play/c3-monitor/monitor-on-deskSimple.png`.
+- **Status:** open (found in the Phase 0 tooling round)
+- **Source:** play runner agent, tooling round
