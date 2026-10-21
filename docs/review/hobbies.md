@@ -152,7 +152,8 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Fix class:** clip
 - **Where:** `web/src/render/babylon/characters.ts:523-526` (`ACTIONS.look`: `rail` for `telescope`); the eyepiece at 0.975 m (`tools/art/blender/families/hobbies.py:1202`)
 - **Evidence:** `play/telescope-stargaze-01.png`, `sheets/obj-telescope.png`: the resident stands straight beside the tube with the hands at the chest (`rail`, a hold on a railing); the eye is about 1.55 m up, the eyecup at 0.975 m, and nobody bends to it. For a child (`play-child/telescope-stargaze-01.png`) the eyecup is about at eye height, by chance. A stoop to the eyepiece with a hand on the tube is what reads as looking through a telescope.
-- **Status:** open
+- **Status:** fixed (5bd8a29c, 1abb80cf)
+- **After:** the stargazer steps up to the telescope and bends down to its eyepiece, the right eye at the eyecup of the tube as aimed (0.765 m, 0.3 m out: lower than the 0.975 m at rest), the right hand on the tube, the left on the knee, once a loop looking up at the sky; in five sizes for the user's height (`eyepiece181`…`eyepiece112`, `clips/uses.ts`, `STEP_IN` for `look` only): a grown-up deep in the knees and bent over, a child bent a little. `bench-results/review/fixes/clips-standing/``sheet-tele.png` (man, child, elder from the side), `play/tele-*`, `strips/sheets/eyepiece*`.
 - **Source:** pilot
 
 ### I-hobbies-03 — Stargazing at noon, indoors
@@ -232,7 +233,8 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters/furniture.json:7` (`chessTable` h 0.46), `:45` (`sewingTable` h 0.46); the pad's top 0.475 m (`tools/art/blender/families/hobbies.py:261`, `_chair`)
 - **Evidence:** `sizes-hobbies.md` measures both seats at 0.48 (0.475 in the family script); the renderer sits the resident at 0.46, 1.5 cm into the pad, outside the 1 cm tolerance the owner approved after the pilot (the pilot's M-hobbies-02 found the chess seat "fine" before that). One number each; neither content has a `seat` the heights check could compare.
-- **Status:** open
+- **Status:** fixed (a920f174)
+- **After:** `seats.chessTable` and `sewingTable` 0.475, the pads' tops (`fixes/tables/play-b/b-chessTable-chess-01.png`, `b-sewingTable-sew-01.png`).
 - **Source:** wave: hobbies
 
 ### A-hobbies-01 — moved to systems.md
@@ -244,7 +246,8 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Fix class:** motion
 - **Where:** `tools/art/blender/families/hobbies.py:1452-1494` (`FAMILY` motions: `fallboard`, `move`, `pieces`, `presser`/`handwheel`, `clay`/`wheel`, `book_open`, `cymbals`, none with a `delay`); compare `tools/art/blender/families/fitness.py:276` (`bar_off` with `delay: BAR_DELAY`, 0.8 s, for the same reason)
 - **Evidence:** `hobbies/play/c1/play.jsonl` `clips`: each clip's `first` is 0–17 ms after `using`, which for a seated use is when `sitDown` starts (about 1 s; `characters.ts:2585`). So the chess pawn slides (0.8 s) and the jigsaw patch spreads (1.2 s) before a hand is near the board, and the presser foot drops, the pot rises, the scrapbook opens and the cymbals rock while the resident is still lowering onto the seat (and, A-hobbies-01, still passing through the table). A `delay` of about 0.9 s on each, as the weight bench has, puts them at the hands. Close watching only.
-- **Status:** open
+- **Status:** fixed (d2c9f0de)
+- **After:** each starts 0.9 s in (`SIT`, `delay`), the loops (cymbals, handwheel, wheel) now repeating uses from then (`every` 0.9 s): `fixes/motions/g1718/play-stage.jsonl`, the piano's `fallboard` first moving at +0.93 s, the cymbals at +0.93 s, the pawn at +0.93 s, the jigsaw patch at +0.92 s, and the sewing table's, the pottery wheel's and the scrapbook's the same.
 - **Source:** wave: hobbies
 
 ### A-hobbies-03 — The pool rack floats 25 cm over the balls for the whole game
@@ -254,7 +257,8 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Fix class:** motion
 - **Where:** `tools/art/blender/families/hobbies.py:801` (`G.slide(rack, 'rack_off', (0, 0, 0.25))`: Blender z, straight up); `:1467-1468` (`rack_off` for `pool` and `trickShots`, held until the use ends)
 - **Evidence:** `hobbies/sheets/obj-poolTable.png` (play), `hobbies/extra/two.png`: the triangle hangs in mid-air above the racked balls for the 30 or 60 minutes. Racking lifts the triangle off and puts it away (on the rail, a hook or under the table). Slide it up and over onto the head rail, or squash it away (`G.squash`); the balls would want to break too (I-hobbies-05).
-- **Status:** open
+- **Status:** fixed (abfc32d9)
+- **After:** `rack_off` (new `G.path`, 1.4 s) lifts the triangle 14 cm off the balls, carries it over the foot rail and hangs it upright by its apex on the table's foot end, out of the play, for the whole game (`fixes/motions/g1718/views/pool-end-t99.png`, `-t0.6.png`, `clips-poolTable-all-t*.png`). The balls still don't break (I-hobbies-05).
 - **Source:** wave: hobbies
 
 ### I-hobbies-04 — Darts, pool and foosball are played with the same hand-weaving clip
@@ -297,7 +301,8 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Fix class:** clip
 - **Where:** `web/src/render/babylon/characters.ts:387` (`GUITAR`: the body `out` 0.17 m in front of the spine's base), `:392-395` (`GUITAR_ARMS`: the left upper arm raised forward), `:1756-1776` (`writeHeld`: the neck aimed from the body at the left palm)
 - **Evidence:** `hobbies/extra/gsidetop.png` (from above): the guitar's body is about 0.25 m in front of the player's chest, not against the belly, and its neck runs forward and left at about 30–35° off the line of the shoulders, the guitar's head level with the face. From the front (`hobbies/extra/inst.png`) that passes for a guitar across the body; from the game's camera, behind and above the player as they face the stand, the forward neck reads as pointing straight up past the head (`hobbies/extra/gdef.png`, `hobbies/play/c1/guitarAcoustic-strum-00.png`, the child in `hobbies/extra/child/child-guitarAcoustic-strum-01.png`): the lead in `index.md`. A guitar rests on the right thigh or against the belly, the neck to the left in the plane of the body, tilted up 10–45°. The same for `guitarElectric` and `ukulele` (the only three with `grip: guitar`). The hands are where they should be on it (left on the neck, right over the sound hole).
-- **Status:** open
+- **Status:** fixed (5bd8a29c, 1abb80cf)
+- **After:** the guitar, the electric guitar and the ukulele are held across the body by their own clips (`strum`, `strumShort` for the ukulele, held higher; `clips/uses.ts`): the body against the belly a little to the right, the neck out to the left in the plane of the body, 30° up and angled 13° forward, the left hand on the neck 0.55 m along (0.27 on the ukulele), the right strumming over the sound hole, the head bent to the strings; the procedural arm turns (`GUITAR_ARMS`) are gone, and the guitar's rest point scales with the body (a child's belly is nearer the spine). From the game camera the neck no longer points up past the head. `bench-results/review/fixes/clips-standing/``sheet-guitars.png` (front and above, man and child), `play/guitar-*`, `strips/sheets/strum*`. The full-size guitar in a child's hands is M-hobbies-03's.
 - **Source:** wave: hobbies (play from the front, the side and above; `index.md` "Seen" for the lead)
 
 ### I-hobbies-09 — Games, crafts and the exercise bike are silent, and the drums play the plucked tune
@@ -329,5 +334,6 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters.ts:160` (`STAND_BACK`, where a negative value steps the user in: `garden.herbs` −0.5; nothing for `chemistrySet`); the bench pushed back on its tile, `tools/art/blender/families/hobbies.py:1488` (`centre` −0.18, the top 0.5 m deep)
 - **Evidence:** `hobbies/extra/side1.png` (side): the resident stands about 0.6 m off the bench's front edge; reaching (`interact`) only the fingertips get to the edge (`hobbies/extra/stand3.png`, beside the pilot's workbench and easel, where the hands are on the work), never the flasks or the microscope at the back. A child stands as far off, the top at her head (`hobbies/extra/child2.png`). About −0.35 in `STAND_BACK` brings them to the bench.
-- **Status:** open
+- **Status:** fixed (0c5e889e)
+- **After:** `STAND_BACK.chemistrySet` -0.35: at the bench, the hands on its top among the flasks (`fixes/tables/play-a/a-chemistrySet-experiment-01.png`).
 - **Source:** wave: hobbies

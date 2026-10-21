@@ -315,6 +315,7 @@
     },
     {
       "id": "wallBed",
+      "againstWall": true,
       "name": "Fold-down wall bed",
       "model": "model.wallBed",
       "footprint": [
@@ -445,7 +446,8 @@
       "group": "seating",
       "seat": {
         "height": 0.44,
-        "forward": 0.12
+        "forward": 0.12,
+        "legs": "out"
       },
       "description": "A deep leather armchair with a footrest that pops up. Very hard to get out of.",
       "interactions": [
@@ -494,7 +496,7 @@
       "group": "seating",
       "decor": 0.3,
       "seat": {
-        "height": 0.48,
+        "height": 0.46,
         "forward": 0.05
       },
       "description": "A spindle-back rocker with a cushion. Rock and read.",
@@ -805,11 +807,14 @@
           -0.15
         ]
       },
-      "description": "A slim oak table for a hall or behind a sofa, baskets underneath.",
+      "description": "A long oak table on black steel legs for a hall or behind a sofa, baskets underneath.",
       "interactions": []
     },
     {
       "id": "tvStandLow",
+      "provides": [
+        "screen"
+      ],
       "name": "Low TV bench",
       "model": "model.tvStandLow",
       "footprint": [
@@ -827,6 +832,7 @@
           "anim": "watch",
           "minutes": 60,
           "seatNear": 4,
+          "seatFacing": "front",
           "broadcast": 0.35,
           "broadcastRange": 6,
           "effects": {
@@ -858,6 +864,7 @@
           "id": "read",
           "label": "Read a book",
           "anim": "read",
+          "seatNear": 4,
           "minutes": 45,
           "effects": {
             "fun": 0.4
@@ -875,6 +882,7 @@
           "id": "study",
           "label": "Study",
           "anim": "read",
+          "seatNear": 4,
           "minutes": 60,
           "effects": {
             "fun": 0.1
@@ -910,6 +918,7 @@
           "id": "read",
           "label": "Read a book",
           "anim": "read",
+          "seatNear": 4,
           "minutes": 45,
           "effects": {
             "fun": 0.4
@@ -954,6 +963,7 @@
     },
     {
       "id": "ladderShelf",
+      "againstWall": true,
       "name": "Ladder shelf",
       "model": "model.ladderShelf",
       "footprint": [
@@ -1000,7 +1010,7 @@
         "intensity": 0.6,
         "height": 0.45,
         "tiles": 4,
-        "switch": false
+        "fire": true
       },
       "description": "A slim white surround with a flickering electric fire: no chimney needed. It lights the room at night.",
       "interactions": [

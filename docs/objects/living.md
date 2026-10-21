@@ -17,9 +17,9 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `sofa` Sofa | 2x1 · floor | relax:relax | living / seating | Upholstery, Cushions, Frame, Legs, Pillow, Second pillow | Use | `sink_in`: the seat cushions settle 2 cm while sat on (relax, doze; T0 `squash`). |
+| `sofa` Sofa | 2x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions, Frame, Legs, Pillow, Second pillow | Use | `sink_in`: the seat cushions settle 2 cm while sat on (relax, doze; T0 `squash`). Doze off, as the other sofas. |
 | `loveseat` Loveseat | 2x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions, Legs, Pillow | Use | `sink_in`. |
-| `sofaThree` Three-seat sofa | 3x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions, Legs, Pillows, Throw | Use | `sink_in`. |
+| `sofaThree` Three-seat sofa | 3x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions, Legs, Pillows, Throw | Use | `sink_in`. Three residents at once (`slots: 3`, was 2). |
 | `sofaDesign` Designer sofa | 2x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions, Frame, Legs | Use | `sink_in`. |
 | `sofaThreeSeat` Three-seater sofa | 3x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions, Legs, Pillow, Second pillow | Use | `sink_in`. |
 | `sofaBed` Sofa bed | 2x1 · floor | relax:relax doze:nap pullOut:fetch foldAway:fetch | living / seating | Upholstery, Cushions, Legs, Bedding, Pillow, Second pillow | Held open | `bed_out`: the mattress pulls out forward from under the seat for doze and "Pull out the bed" and stays out until "Fold the bed away" (relax only while folded); `beds` height 0.44 and `fwd` 0.6 (head on the seat; `cargo check-glb` measures the mattress pulled out at 0.44); pulling it out and folding it away the resident stands 1 m further back, clear of the mattress (`STAND_BACK`). |
@@ -50,12 +50,12 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `armchair` Armchair | 1x1 · floor | sit:sit | living / seating | Upholstery, Cushion, Frame, Legs, Pillow | Use | `sink_in`. |
+| `armchair` Armchair | 1x1 · floor | sit:sit read:read | living / seating | Upholstery, Cushion, Frame, Legs, Pillow | Use | `sink_in`. Read a book sitting, as the leather and wingback chairs. |
 | `armchairLounge` Lounge chair | 1x1 · floor | sit:sit | living / seating | Upholstery, Cushions, Legs | Use | `sink_in`. |
 | `armchairLeather` Leather armchair | 1x1 · floor | sit:sit read:read | living / seating | Frame, Upholstery | Use | `sink_in`. |
-| `armchairDesign` Designer lounge chair | 1x1 · floor | relax:relax doze:nap | living / seating | Frame, Upholstery, Base | Static | Static (moulded shell). |
+| `armchairDesign` Executive lounge chair | 1x1 · floor | relax:relax doze:nap | living / seating | Frame, Upholstery, Base | Static | Static (moulded shell). Renamed from "Designer lounge chair", its text now the model's (chrome five-star base, no bent wood). |
 | `armchairWingback` Wingback armchair | 1x1 · floor | sit:sit read:read | living / seating | Upholstery, Cushion, Legs | Use | `sink_in`. |
-| `recliner` Recliner | 1x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions & footrest | Use | `recline`: the seat and back tip 25° and the footrest swings up 80° for relax and doze; the resident reclines with it (`ride`). |
+| `recliner` Recliner | 1x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions & footrest | Use | `recline`: the seat and back tip 25° and the footrest swings up 80° for relax and doze; the resident reclines with it (`ride`), the legs out on the footrest (content `seat.legs: "out"`). |
 | `rockingChair` Rocking chair | 1x1 · floor | relax:relax read:read | living / seating | Wood, Cushion | Loop (E1) | `rock`: rocks ±6° while sat in (E1), the rider with it. |
 | `pouf` Leather pouf | 1x1 · floor | sit:sit | living / seating | Leather, Buttons, Legs | Use | `sink_in`. |
 | `ottoman` Tufted ottoman | 1x1 · floor | sit:sit | living / seating | Upholstery, Buttons, Feet | Use | `sink_in`. |
@@ -66,15 +66,18 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 - Each standing free, sat on in all four facings, by day and at night, on WebGPU and WebGL2, Medium and Low, every
   colour part its own colour. `sink_in` plays and holds while sat on (sit, and read on the leather and wingback
   chairs) and shuts when the resident gets up.
-- The recliner's back and seat tip back with the sitter riding them and the footrest swings up for relax and doze;
+- The recliner's back and seat tip back with the sitter riding them and the footrest swings up for relax and doze,
+  the sitter's legs out along it (2026-10-21);
   the rocking chair rocks with its rider for relax and read and stops after; the bean bag flattens for flop (a
   sitting flop at seat 0.3 m, not a lie); the designer lounge chair is still.
 - The leather armchair's "Read a book" is a sitting read (`"pose": "sit"`, as the wingback's), so the reader sits in
   the chair while its cushion sinks.
-- G-20 and G-22 (2026-10-21): on the deep armchairs, the recliner, the ottoman and the bean bag (`front` in
+- G-20 and G-22 (2026-10-21): on the deep armchairs, the ottoman and the bean bag (`front` in
   `furniture.json` `seats`) a child sits forward, not kneeling, the feet down; the floor cushion is sat on
   cross-legged (`sitFloor`, any seat under 0.2 m: characters.ts `floorSit`), the knees out over it, not through the
   floor.
+- Since the authenticity review (G-05): the lounge chair's seat is 0.44 (its cushion 0.45, sat a centimetre into), the
+  rocking chair's 0.46 (its cushion); the bean bag's 0.30 stays, sunk into on purpose.
 
 ## L3. Coffee and side tables (9)
 
@@ -82,15 +85,15 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `coffeeTable` Coffee table | 2x1 · floor | magazine:read | living / tables | Wood, Knob | Use | `drawer_open`: the drawer slides out 30 cm with a magazine for magazine; `hold` 2.5 s. |
-| `coffeeTableGlass` Glass coffee table | 2x1 · floor | magazine:read | living / tables | Frame, Glass | Static | Static; glass top. |
-| `coffeeTableMarble` Marble side table | 1x1 · floor | magazine:read | living / tables | Top, Base | Static | Static. |
+| `coffeeTable` Coffee table | 2x1 · floor | magazine:read | living / tables | Wood, Knob | Use | `drawer_open`: the drawer slides out 30 cm with a magazine for magazine; `hold` 2.5 s. The magazine is read on a seat within 2 m (`seatNear`), else standing. |
+| `coffeeTableGlass` Glass coffee table | 2x1 · floor | magazine:read | living / tables | Frame, Glass | Static | Static; glass top. The magazine is read on a seat within 2 m (`seatNear`), else standing. |
+| `coffeeTableMarble` Round marble coffee table | 1x1 · floor | magazine:read | living / tables | Top, Base | Static | Static. The magazine is read on a seat within 2 m (`seatNear`), else standing. Renamed from "Marble side table" (a coffee-table top on a brass pedestal). |
 | `sideTable` Side table | 1x1 · floor | — | living / tables | Wood, Knob | Static | Static. |
 | `coffeeTableRound` Round coffee table | 1x1 · floor | — | living / tables | Top, Base | Static | Static. |
 | `coffeeTableLong` Long coffee table | 2x1 · floor | — | living / tables | Top, Legs | Static | Static. |
 | `nestingTables` Nesting tables | 1x1 · floor | — | living / tables | Top, Small table, Legs | Static | Static. (+use) the small table slides out: it is a part of its own (`small_table`). |
 | `sideTableRound` Round side table | 1x1 · floor | — | living / tables | Top, Base | Static | Static. |
-| `consoleTable` Console table | 2x1 · floor | — | living / tables | Top, Legs, Baskets | Static | Static. |
+| `consoleTable` Console table | 2x1 · floor | — | living / tables | Top, Legs, Baskets | Static | Static. Its text no longer says slim (0.56 m deep). |
 
 **In play** (signed off 2026-10-16):
 - Each standing free in all four facings (the console table against a wall, and free at 180°). The coffee table's
@@ -107,13 +110,13 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `tv` Television | 1x1 · floor | watch:watch | living / media | Body, Trim | Static | Static: a slim set on its stand on an oak unit, a soundbar; the screen flickers while watched (E8). 2 draws. |
-| `tvWall` Flat-screen TV | 2x1 · wall | watch:watch | living / media | Body, Trim | Static | Static: a thin panel on a bracket, a soundbar under it, on the wall face; the screen flickers while watched. 1 draw. |
-| `tvRetro` Portable TV | 1x1 · floor | watch:watch | living / media | Body, Trim | Use | `antenna`: the rabbit-ear antennae turn 20° and stretch 1.6× up for watch; the tube flickers while watched. |
-| `homeCinema` Home cinema | 2x1 · floor | watch:watch film:watch | living / media | Body, Trim | Use | `screen_down`: the projector screen unrolls from its case on the wall for watch and film, and rolls up at the end; a short-throw projector on the unit; the screen flickers while down and watched. |
-| `stereo` Stereo system | 1x1 · floor | listen:listen dance:dance | living / media | Body, Trim | Use | `tray`: the tray of the CD player under the amplifier slides out and back (`hold` 1.2 s) for listen and dance; the woofers `pulse` (E1 loop). 4 draws (the loop's part). |
-| `boombox` Boombox | 1x1 · floor | listen:listen | living / media | Body, Trim | Use | `cassette`: the cassette door tips 32° open from its foot for listen and shuts; `hold` 1.2 s. |
-| `tvStandLow` Low TV bench | 2x1 · floor | watch:watch | living / media | Bench, TV | Use | `tv_up`: the TV rises 60 cm out of a lift hood at the bench's back for watch (0.8 m high at rest, its lid closing the hood), and sinks back at the end; it flickers while up and watched. |
+| `tv` Television | 1x1 · floor | watch:watch | living / media | Body, Trim | Static | Static: a slim set on its stand on an oak unit, a soundbar; the screen flickers while watched (E8). 2 draws. Provides `screen` (the gaming recliner's marathon needs one). |
+| `tvWall` Flat-screen TV | 2x1 · wall | watch:watch | living / media | Body, Trim | Static | Static: a thin panel on a bracket, a soundbar under it, on the wall face; the screen flickers while watched. 1 draw. Provides `screen`. |
+| `tvRetro` Console TV | 1x1 · floor | watch:watch | living / media | Body, Trim | Use | `antenna`: the rabbit-ear antennae turn 20° and stretch 1.6× up for watch; the tube flickers while watched. Provides `screen`. Renamed from "Portable TV": a wooden console set on legs. |
+| `homeCinema` Home cinema | 2x1 · floor | watch:watch film:watch | living / media | Body, Trim | Use | `screen_down`: the projector screen unrolls from its case on the wall for watch and film, and rolls up at the end; a short-throw projector on the unit; the screen flickers while down and watched. Provides `screen`. |
+| `stereo` Stereo system | 1x1 · floor | listen:listen dance:dance | living / media | Body, Trim | Loop + repeating | `record`: the record turns on the turntable, 33 rpm, for listen and dance (a loop; the label's stripe shows the turn); the woofers `pulse` (`every` 0.45 s). The CD tray no longer moves (2026-10-21: it slid out for the music the description says is a record). 4 draws. Listened to from a seat within 4 m (`seatNear`), else standing; dance stands. |
+| `boombox` Boombox | 1x1 · floor | listen:listen | living / media | Body, Trim | Use | `cassette`: the cassette door tips 32° open from its foot for listen and shuts; `hold` 1.2 s. Listened to from a seat within 4 m (`seatNear`), else standing. |
+| `tvStandLow` Low TV bench | 2x1 · floor | watch:watch | living / media | Bench, TV | Use | `tv_up`: the TV rises 60 cm out of a lift hood at the bench's back for watch (0.8 m high at rest, its lid closing the hood), and sinks back at the end; it flickers while up and watched. Provides `screen`. |
 | `fireplaceElectric` Electric fireplace | 2x1 · floor | relax:relax | living / media | Surround, Firebox | Use | `flames`: five tongues grow from the log bed for relax (gloss, not emissive; the light is the content's); the embers glow at night, the flames while lit. A floor cushion in front, and `characters/furniture.json` `seats` sits the resident on it cross-legged facing the fire. |
 
 **In play** (signed off 2026-10-16):
@@ -121,10 +124,14 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
   danced to and warmed up at. Every clip plays for its use and shuts after.
 - Warm up by the fire (G-22, 2026-10-21): cross-legged on the hearth cushion (`sitFloor`), the hips at its back
   (`seats.fireplaceElectric` `fwd` 0.36), the knees short of the surround.
+- Since 2026-10-21 (review I-living-08) the stereo's record turns while the music plays, where the CD tray slid
+  out (`fixes/motions/g1718/views/stereo-t0.5.png`).
 - Screens glow while on, brighter at night (the TV and wall TV while watched, the home cinema's screen while down,
   the bench TV while up), and the fire lights the room.
 - *Watch TV* sits the resident on a free sofa or armchair within 4 m when there is one (`seatNear`), facing the way
-  the seat does; the seat is reserved while they watch. With no seat free they stand in front of it as before.
+  the seat does; the seat is reserved while they watch. Only a seat that looks at the screen from in front of it
+  counts (`seatFacing: front`, 2026-10-21): not a sofa with its back to the TV, nor one behind it. With no seat
+  like that free they stand in front of it as before.
 - Residents in the same room (or within 6 m, `broadcast`) hear the TV too: they get 35% of its fun while they eat,
   drink coffee or do something else. The screen flickers whenever someone is watching, day or night (`prefers-reduced-motion`
   holds it steady); the TV's own sound loop plays as before.
@@ -137,12 +144,12 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `bookshelf` Bookshelf | 1x1 · floor | read:read study:read homework:read | living / shelves | Frame, Back | Use | `book_out`: a red book on the third shelf tips out 25° for read, study and homework, and back at the end. Its back is on the wall face. |
-| `bookcaseLow` Low bookcase | 1x1 · floor | read:read | living / shelves | Frame, Back | Use | `book_out`. Top 0.9 (content `surface`); a back panel. |
-| `bookcaseWide` Library bookcase | 2x1 · floor | read:read study:read homework:read | living / shelves | Frame, Back | Use | `book_out`. Brass knobs on the cupboard doors. |
+| `bookshelf` Bookshelf | 1x1 · floor | read:read study:read homework:read | living / shelves | Frame, Back | Use | `book_out`: a red book on the third shelf tips out 25° for read, study and homework, and back at the end. Its back is on the wall face. Read, study and homework are done on a seat within 4 m (`seatNear`), else standing (Q-14). |
+| `bookcaseLow` Low bookcase | 1x1 · floor | read:read | living / shelves | Frame, Back | Use | `book_out`. Top 0.9 (content `surface`); a back panel. Read on a seat within 4 m (`seatNear`), else standing. |
+| `bookcaseWide` Library bookcase | 2x1 · floor | read:read study:read homework:read | living / shelves | Frame, Back | Use | `book_out`. Brass knobs on the cupboard doors. Read, study and homework on a seat within 4 m (`seatNear`), else standing. |
 | `shelvingIndustrial` Industrial shelving | 2x1 · floor | — | living / shelves | Frame, Shelves | Static | Static. Top 1.83 (content `surface`); boards 53 cm deep, back on the wall face. |
-| `bookcaseTall` Tall bookcase | 1x1 · floor | read:read study:read | living / shelves | Frame, Back | Use | `book_out`. A dark walnut back. |
-| `bookcaseCorner` Corner bookcase | 1x1 · floor | read:read | living / shelves | Frame, Back | Use | `book_out`. Quarter-round open end shelves to the wall. |
+| `bookcaseTall` Tall bookcase | 1x1 · floor | read:read study:read | living / shelves | Frame, Back | Use | `book_out`. A dark walnut back. Read and study on a seat within 4 m (`seatNear`), else standing. |
+| `bookcaseCorner` Corner bookcase | 1x1 · floor | read:read | living / shelves | Frame, Back | Use | `book_out`. Quarter-round open end shelves to the wall. Read on a seat within 4 m (`seatNear`), else standing. |
 | `cubeShelf` Cube shelf | 1x1 · floor | — | living / shelves | Frame, Back | Static | Static. Top 0.8 (content `surface`); 36 cm deep, back on the wall face. |
 | `ladderShelf` Ladder shelf | 1x1 · floor | — | living / shelves | Frame, Shelves | Static | Static; no back, its top on the wall face. |
 | `displayCabinet` Display cabinet | 1x1 · floor | — | living / shelves | Frame, Back | Static | Static; the brass-framed glass door is a part of its own (`door`, origin on its left hinge), still. (+use) the door swings. |

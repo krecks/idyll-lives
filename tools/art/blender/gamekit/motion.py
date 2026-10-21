@@ -155,6 +155,27 @@ def stages(obj, clip, picked, growing, planted, seconds=1.5, sink=None):
     return obj
 
 
+def path(obj, clip, keys, linear=False):
+    """A clip `clip` taking `obj` along a path of `keys`, [(seconds, (x, y, z), (rx, ry, rz))]: at each time, its
+    offset from rest (Blender metres) and its turn from rest about its own X, Y and Z (Blender degrees); the
+    first key, at 0 s, is rest. For what moves along more than a line: the pool rack lifted off the balls,
+    carried over the rail and hung on the table's end; the robot vacuum's round (a loop: it ends at rest, its
+    heading a whole turn on, either way; `linear` keeps an even speed between the keys, else each eases)."""
+    assert keys[0][0] == 0 and not any(keys[0][1]) and not any(keys[0][2]), f'path {clip!r}: the first key is rest, at 0 s'
+    frames = [1 + round(s * fps()) for s, _, _ in keys]
+    assert all(b > a for a, b in zip(frames, frames[1:])), f'path {clip!r}: keys a frame or more apart, in order'
+    obj.rotation_mode = 'XYZ'
+    moved = False
+    for i in range(3):
+        for prop, k, scale in (('location', 1, 1.0), ('rotation_euler', 2, math.radians(1))):
+            if any(key[k][i] for key in keys):
+                rest = getattr(obj, prop)[i]
+                _clip(obj, clip, prop, i, [(f, rest + key[k][i] * scale) for f, key in zip(frames, keys)], linear=linear)
+                moved = True
+    assert moved, f'path {clip!r}: every key at rest'
+    return _peak(obj, clip, frames[len(frames) // 2])
+
+
 def grow(obj, clip, seconds=0.4, axis='Z'):
     """A clip `clip` scaling `obj` about its own origin along `axis` ('X', 'Y' or 'Z', Blender) from
     where it is (built small and hidden) to full size (scale 1): a part that appears while a resident

@@ -157,6 +157,15 @@ clump bands (0..1), w reserved. The eyelids take the tone of the skin they lie o
 stage uses the base stage's tone; the shader deepens the cavities with the resident's age
 (appearance texel 4 g).
 
+The jacket, suit and skirt shells use their tone's xyz for their seated shape instead (m, in the
+rest space, before skinning; w 0): what moves each vertex from where a seated pose (`seated_pose`
+with the thighs turned 76° forward, as `sit` has them) skins it to where its seated shape is skinned
+(the skirt without its flare, its hollows between the legs bridged, the jacket without its hem's
+flare), out of the seated skin and no lower than the seat (`seated_tone`, clothes.rs). The runtime
+adds it as far as the thighs are turned forward (`writeSit`: from 15° to 76°, the mean of both, at
+the body's size; appearance texel 4 b), so a seated skirt lies on the lap and the jacket's hem on it
+instead of standing out round the seat as they hang standing.
+
 ## Clothes
 
 Clothes are painted on the body by its shader. Each garment's cut (metres on the base body's
@@ -173,6 +182,16 @@ paints the thighs (the shell hangs over them). Babies don't wear skirts (the she
 their drawn-up, spread legs): a baby whose outfit has one wears `bottom.shorts` in the top's colour,
 a romper (outfit.ts).
 
+What a resident wears changes with what it does (`Wear`, outfit.ts; characters.ts `wearFor`): its day
+clothes; pyjamas for a night's sleep in bed (a `sleep` use lying down: the `top.long` and
+`bottom.trousers` cuts in a sleep colour, barefoot); the day clothes barefoot for a nap on something
+slept in; a towel under a shower and sat in a bath (the bottom's cut alone, from under the arms, or
+round a man's hips, to the thigh); swimwear in a hot tub (a swimsuit, the `top.tank` cut down to the
+top of the legs, or trunks). Only the day clothes draw their shells: the others leave them out by the
+resident's row (`bare`), so a change of clothes draws nothing more. The towel's and swimwear's heights
+come from the base body's joints at rest (`OutfitFit`: under the arms half way between `spine_03` and
+`upperarm_l`, the hips and the knees).
+
 Garment ids per family (outfit.ts):
 
 - male: `top.tee top.vneck top.polo top.long top.shirt top.jacket top.suit`, `bottom.trousers bottom.shorts bottom.suit`;
@@ -187,7 +206,7 @@ Garment ids per family (outfit.ts):
 | 1 | top colour | top: hem |
 | 2 | bottom colour | top: crew cut |
 | 3 | hair colour (plain) | top: scoop cut |
-| 4 | r = 1 if the top is `over` the bottom; g = age (0 young, 0.4 adult, 1 elder) | bottom: waist |
+| 4 | r = 1 if the top is `over` the bottom; g = age (0 young, 0.4 adult, 1 elder); b = how far the shells take their seated shape (0..1, at the body's size; below) | bottom: waist |
 | 5 | skin reference (1) | bottom: leg cut |
 | 6 | shoe colour | shoes: top height |
 | 7 | eye colour | 1 if the resident wears hair (the scalp takes the hair colour) |
@@ -246,7 +265,8 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | talk | yes | 2.93 | talking, singing (with `phone` on top), the mirror |
 | walk | yes | 1.1 (1.1 m/s) | moving (played at the ground speed) |
 | jog | yes | 0.7 | running on the spot, treadmills, exercise |
-| jogAlong | yes | 0.7 (2.5 m/s) | moving fast: the jog's pose given a stride, played at the ground speed when the walk would need more than 3× its own pace (`GAIT_MAX_RATE`); back to walking below 0.8 of that (`JOG_BACK`) |
+| jogAlong | yes | 0.7 (2.5 m/s) | moving fast: the jog's pose given a stride, the hips 6 cm lower (the knees bent through the stance), played at the ground speed when the walk would need more than 3× its own pace (`GAIT_MAX_RATE`); back to walking below 0.8 of that (`JOG_BACK`) |
+| runAlong | yes | 0.6 (5.8 m/s) | moving faster still (game speed 3 and up, children from 2): a run with a 3.5 m stride, each foot down a sixth of the time, played at the ground speed when the jog would need more than 3×, up to 4× (`RUN_MAX_RATE`); back to the jog below 0.8 of the switch |
 | sit | yes | 1.67 | seated |
 | sitTalk | yes | 2.93 | seated in a conversation |
 | sitDown | no | 1.33 | sitting down, and onto the edge of a bed before lying down |
@@ -267,7 +287,11 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | foldArms | yes | 2.5 | watching, relaxing, idle variations |
 | yes / no | no / yes | 2.5 | listening, arguing |
 | phone, lantern | yes | 2.93, 2.5 | the phone; reading (a book at the chest) |
-| rail | yes | 2.5 | the telescope |
+| rail | yes | 2.5 | leaning on a rail (the older layouts' telescope, `USE`) |
+| eyepiece181, 163, 147, 129, 112 | yes | 6 | bent down to the telescope's eyepiece (the tube aimed up: the eye at 0.765 m, 0.3 m out), the right hand on the tube, the left on the knee, a look up at the sky each loop; a size per height (cm, `STEP_IN`, for `look`) |
+| pickApple177, 147, 112; pickLemon177, 147, 112 | no | 3.3 | reaching up to the fruit tree's picked fruit (the apple 1.84 m up, the lemon 1.62 m), on tiptoe if high, the left hand on the bough, a twist off and down to the chest; then `eat` (`STEP_IN`, for `eat`); a size per height |
+| shower, showerChild | yes | 14 | showering: the hair lathered and rinsed, a 50° turn in two steps to soap the arms and the chest, back, the face rinsed; a child (under 1.29 m, `SHOWER_CHILD`) turns only the chest |
+| strum, strumShort | yes | 2 | a guitar (or a ukulele, `strumShort`, held higher) across the body: the neck out to the left 30° up in the body's plane, the left hand on it, the right strumming; `writeHeld` draws the instrument from its rest point (`GUITAR`) to the left palm |
 | push | yes | 2.67 | mopping, vacuuming |
 | water, harvest, plant, kneel, crouch | yes, yes, no, yes, yes | 3.8, 2.5, 2.77, 5.2, 2.93 | gardening, smelling flowers |
 | pick | yes | 3.0 | picking herbs from a waist-high planter |
@@ -275,7 +299,7 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | punchJab, punchCross, hit | no | 0.87, 1.0, 0.33 | heavy bags and fights |
 | wave | no | 2.2 | the household creator's greetings |
 | fountainDrink181, 163, 147, 129, 112 | yes | 3 | bent over a drinking fountain's spout, sipping from its water (a size per height, in cm; the smaller two on tiptoe at the water's falling end); `STEP_IN` steps them up to it |
-| climb172a, 147a, 112a; climb172b, 147b, 112b | yes | 13 | a round on the climbing frame: up its rope net three ropes, hands and feet in turn, over the edge onto the deck, ducking under the roof across it to the fireman's pole, round the pole and down it (hands and legs round it), and back round to the net; a size per height (cm), and one per lane of the net (`a`, `b`: the second waits on the deck for the first to slide) |
+| climb172a, 147a, 112a; climb172b, 147b, 112b | yes | 13 | a round on the climbing frame: up its rope net three ropes, hands and feet in turn, over the edge onto the deck, ducking under the roof across it to the fireman's pole, round the pole and down it (hands and legs round it), and back round to the net; a size per height (cm), and one per lane of the net (`a`, `b`: the second waits on the deck for the first to slide; one stepping in while someone goes round waits at their lane until that round is back at its start, so the two stay in step: `inTurn`) |
 | dartThrow | yes | 7.2 | darts (`ACTIONS.play` at the `dartboard`): side-on at the line, three throws (aim, the forearm back, through, the hand following to the board), a step back to read the score and in again; the first dart goes as the board's darts grow in |
 | pingPong | yes | 1.8 | table tennis (`ACTIONS.play` at the `pingPongTable`): the ready stance, a forehand and a backhand, the bat mimed in a closed hand |
 | poolShot172, 147, 112 | yes | 8 | the pool table (`STEP_IN`, a lane each for two): bent over the long rail as far as the height needs, the left hand bridging on the cloth, two practice strokes and the shot, then up to chalk the cue (mimed); a size per height (cm) |
@@ -297,7 +321,9 @@ against the floor, `lie` and the baby's clips (the list is in its header). The d
 Each body and stage plays the clips on its own skeleton (`restT`, the pelvis motion and ground
 speed scaled by `pelvisScale`, `walk`'s hip roll), the sized clips at the size its height picks,
 babies only their own; the height slider, build, head size, stoop and the runtime's fits to seats
-and beds other than the seated legs' are not covered. The known failures are in `tools/characters/clip-baseline.json`: they
+and beds other than the seated legs' are not covered. Planted feet are checked on each skeleton as it is, so a clip that turns the
+hips over a planted foot slides on hips wider for their legs than the reference's (a child's, a little a
+woman's): place the feet for them (`footIK`'s `wide`, a size per height) or keep the hips still. The known failures are in `tools/characters/clip-baseline.json`: they
 print as `known` and don't fail, one that no longer fails prints as `fixed` (take it out), and only
 a new one exits 1. `--update-baseline` rewrites the file for the bodies and stages checked. CI runs
 `pnpm check:clips` (in `web/`: `--body all --stage all`).
@@ -320,18 +346,23 @@ Why some entries are as they are:
   hands on the top or the flap, in front of the hutch.
 - `fireplaceElectric` sits cross-legged on the floor cushion in front of the fire, facing it (`back`), the hips on its
   back half (0.36 m out) so the knees stop short of the surround.
-- Deep seats (the sofas, sectionals, sofa bed, armchairs, recliner, ottoman, bean bags and six pack seats) give
-  `front`: where the seat ends in front, m forward of the footprint's middle as `fwd` (`cargo check-glb` measures it:
-  from the hips forward while the model reaches within 6 cm of the seat's height, and warns past 3 cm). The hips sit
+- Deep seats (the sofas, sectionals, sofa bed, armchairs, ottoman, bean bags and four pack seats) give `front`:
+  where the seat ends in front, m forward of the footprint's middle as `fwd` (`cargo check-glb` measures it: from
+  the hips forward while the model reaches within 6 cm of the seat's height, and warns past 3 cm). The hips sit
   forward until the knees clear it (`perch`). The content-seated ones (`sofaThreeSeat`, `sofaBed`, the sectionals,
-  `armchairWingback`, `recliner`, `ottoman`, the bean bags) copy their content `seat` into the row.
+  `armchairWingback`, `ottoman`, the bean bags) copy their content `seat` into the row; the recliners, whose
+  content seats put the legs out, keep theirs (no `perch` with the legs out).
 - Trees (`tree`, the seven `garden.*` trees with "Relax in the shade"): on the ground (`h` 0, not measured: nothing
   of the model's is sat on) against the trunk, `fwd` the hips' distance from it, `shade`: facing out on the trunk's
   front or a side, whichever the sun's light falls towards as they sit down (`shadeSide`; the renderer's sun).
-- Baths (`bathtub`, `bathtubClawfoot`, `bathtubFreestanding`): along the tub, the back at the end without the taps,
-  the legs out along it towards them (`along`, `legsOut`).
-- `gardenChair`: against its slanted back, `recline` 0.314 rad (18°; the Adirondack chair's content `seat.recline`
-  is in degrees).
+- Baths (`bathtub`, `bathtubClawfoot`, `bathtubFreestanding`): on the tub's floor, along the tub, the back at the
+  end without the taps, the legs out along it towards them (`along`, `legsOut`).
+- The pack tubs (`gloomy.soakingTub`, `romantic.heartTub`, `hotHeaded.coldPlunge`): on the floor at the back, the
+  legs out with only `room` m for them ahead of the hips, so the heels stop inside the front wall and the knees
+  come up.
+- `gardenChair`: on its slats' tops (0.43), against its slanted back, `recline` 0.314 rad (18°; the Adirondack
+  chair's content `seat.recline` is in degrees).
+- `chessTable`, `sewingTable`, `hotHeaded.thunderDrums`: their chairs' and the drum stool's pads (0.475).
 - `weightBench`: lifting, the feet down on the floor either side of the bench, `feet` m out from its middle
   (`benchLegs`).
 - `kidsBedCar`: the race car's mattress ends at its bonnet, 34 cm short of the footprint's end (`foot`).

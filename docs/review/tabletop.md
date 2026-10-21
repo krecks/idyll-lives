@@ -210,7 +210,8 @@ Not tied to one row: I-tabletop-04.
 - **Where:** `monitor` in `web/public/content/catalog2/tabletop.json` (`radius`); the disc test for things on tops in `crates/sim-core/src/surface.rs` (refused at `crates/sim-core/src/world.rs:1652`)
 - **Evidence:** Things on tops are discs. The monitor's radius is 0.30 plus a 0.04 margin, but the stage's counter top is 0.62 deep (0.31 each way), so it fits at no offset ("would hang over the edge"). It also fits on no standard 0.66 counter and on none of the computer, writing, laptop, standing or kids' desks, though its description says it stands on a counter or desk; only `deskSimple` takes it. `laptopClosed` (radius 0.19) fits. Shots: `tabletop/play/c3-monitor/monitor-on-deskSimple.png`.
   Activities wave: the play run's two buys on the counter were refused (`tabletop/index.md` Problems), the desk shot places it. The model itself is right (0.54 × 0.46 × 0.335, a 24-inch screen with keyboard and mouse); the disc is the screen's width, not its 0.33 m depth.
-- **Status:** confirmed (activities wave)
+- **Status:** fixed (543c6121)
+- **After:** Radius 0.23 (half its 0.46 m depth with the keyboard): bought on the stage counter (`bench-results/review/fixes/content/g07/after-monitor-no-uses.png`), on the standing, simple and executive desks at their tops' middles; refused on the 0.38–0.42 m deep computer and writing desks. Its text says so.
 - **Source:** play runner agent, tooling round
 
 ### M-tabletop-01 — The candles are drawn lit all day, and at night they don't glow

@@ -81,7 +81,7 @@ gate below, so the review does.
   their height, until the garden decor was rebuilt at real size (2026-10-14). It, and the manifest's
   `fit`, are for third-party files only.
 - **Heights the content names** come from the model: `seat.height`, `surface.height` and its
-  rectangle (`size`, `at`), `light.height`, and `slots` spread across the width. Mark them in
+  rectangle (`size`, `at`), `light.height`, and `slots` spread across the width (or each slot's `places`). Mark them in
   Blender with empties named `top`, `seat`, `seat.1` …, `light` (not exported), and have the
   family script assert them against the content JSON (`families/lighting.py` reads each lamp's
   `light.height` from the content and `_near_light` checks its bulb against it). The content stays the
@@ -264,8 +264,8 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   "motions": { "uses": { "shoot": { "clip": "swish", "delay": 1.4, "every": 3.2 } } }
   ```
 - **Per slot:** `slot` plays a clip only for the resident in that slot (content `slots`, from 0 as
-  sim-core's `slot_position` spreads them; a bunk's upper bunk is 1), so each bunk's duvet turns down for
-  its own sleeper. The renderer tells the slot by where the resident is. (The sofas still sink every seat
+  sim-core's `slot_position` spreads them, or as the content's `places` put them; a bunk's upper bunk
+  is 1), so each bunk's duvet turns down for its own sleeper. The renderer tells the slot by where the resident is. (The sofas still sink every seat
   cushion: their cushions are one part.)
   ```json
   "motions": { "uses": { "sleep": [{ "clip": "turn_down", "slot": 0 }, { "clip": "turn_down_upper", "slot": 1 }] } }

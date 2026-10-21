@@ -737,9 +737,11 @@ def chessTable():
 
 # The pool table: a lacquered frame on four legs, a baize bed with cushions, six pockets and sights, the
 # fifteen balls racked at the foot and the cue ball at the head, and a cue lying on the cloth. The triangle
-# round the balls lifts off for pool and trick shots (`rack_off`).
+# round the balls is lifted off, carried over the foot rail and hung on the foot end for pool and trick shots
+# (`rack_off`, G.path).
 BALL = 0.0285
 BED = 0.785        # the cloth's top
+RACK_HUNG = (1.275, 0.6)   # the rack's middle, hung on the foot end (game x, height): its apex at the rail's top
 
 
 def poolTable():
@@ -796,9 +798,13 @@ def poolTable():
             yaw = math.degrees(math.atan2(-(z1 - z0), -(x1 - x0)))
             F.box(f'rack{i}', length, 0.03, t, ((x0 + x1) / 2, BED + 0.015, (z0 + z1) / 2), M.rack, rot=(0, 0, yaw),
                   bevel=0.004)
-    rack = G.join(rp, 'rack')
+    rack = G.hinged(G.join(rp, 'rack'), F.at(centre, BED + 0.015, 0))
     G.settle(centre=False)
-    G.slide(rack, 'rack_off', (0, 0, 0.25), seconds=0.9)
+    # Racked, the triangle is lifted off the balls, carried over the foot rail and hung up by its apex on the
+    # table's foot end (its middle 2.5 cm past the rail, at the apron's height), out of the game's way.
+    hung = (RACK_HUNG[0] - centre, RACK_HUNG[1] - (BED + 0.015))
+    G.path(rack, 'rack_off', [(0.0, (0, 0, 0), (0, 0, 0)), (0.35, (0, 0, 0.14), (0, 0, 0)),
+                              (0.9, (-hung[0], 0, 0.14), (0, 0, 0)), (1.4, (-hung[0], 0, hung[1]), (0, -90, 0))])
     return G.meshes()
 
 
@@ -1447,10 +1453,21 @@ def craftTable():
     return G.meshes()
 
 
+# The seated hobbies' parts wait while the resident sits down (characters.ts: the `sitDown` clip, about 1 s), so
+# the board, the keys, the presser and the wheel move once the hands are there, as the weight bench's bar does
+# (fitness.py `BAR_DELAY`). A part that goes round while used does so from then too: `every` a hair under its
+# round (its clip, 1.0 s), so the rounds run on without a pause.
+SIT = 0.9
+
+
+def _after_sitting(clip, every=None):
+    return {'clip': clip, 'delay': SIT, **({'every': every} if every else {})}
+
+
 FAMILY = G.Family(
     'hobbies', M,
     [G.Model('piano', piano, size=(1.54, 1.48, 0.827), key='model.piano', centre=(0, -0.0435 + PIANO_FORWARD),
-             motions={'uses': {'play': 'fallboard'}}, paint=[('piano', 'Body'), ('piano_trim', 'Trim')]),
+             motions={'uses': {'play': _after_sitting('fallboard')}}, paint=[('piano', 'Body'), ('piano_trim', 'Trim')]),
      G.Model('ukulele', ukulele, size=(0.348, 0.841, 0.258), key='model.ukulele', centre=(0, 0.065),
              motions={'uses': {'music': 'off_stand'}}, paint=[('uke', 'Body & neck'), ('uke_top', 'Top'), ('stand', 'Stand')]),
      G.Model('guitarElectric', guitarElectric, size=(0.46, 1.374, 0.584), key='model.guitarElectric',
@@ -1458,12 +1475,12 @@ FAMILY = G.Family(
      G.Model('keyboardDigital', keyboardDigital, size=(0.9, 1.092, 0.75), key='model.keyboardDigital',
              centre=(0, 0.015), paint=[('kb_body', 'Body'), ('kb_trim', 'Trim')]),
      G.Model('drumKit', drumKit, size=(0.978, 1.088, 0.885), key='model.drumKit', centre=(0.0076, 0.0125),
-             motions={'loops': {'drum': 'cymbals', 'practise': 'cymbals'}},
+             motions={'uses': {'drum': _after_sitting('cymbals', 0.9), 'practise': _after_sitting('cymbals', 0.9)}},
              paint=[('shell', 'Shells'), ('chrome', 'Hardware')]),
      G.Model('guitarAcoustic', guitarAcoustic, size=(0.36, 1.482, 0.405), key='model.guitarAcoustic',
              centre=(0, -0.0217), motions={'uses': {'music': 'off_stand'}}, paint=[('acoustic', 'Body'), ('spruce', 'Top'), ('stand', 'Stand')]),
      G.Model('chessTable', chessTable, size=(0.46, 0.92, 0.85), key='model.chessTable', centre=(0, 0.025),
-             motions={'uses': {'chess': 'move'}}, paint=[('table_wood', 'Table'), ('chair_wood', 'Chair')]),
+             motions={'uses': {'chess': _after_sitting('move')}}, paint=[('table_wood', 'Table'), ('chair_wood', 'Chair')]),
      G.Model('poolTable', poolTable, size=(2.5, 0.842, 1.4), key='model.poolTable',
              motions={'uses': {'pool': 'rack_off', 'trickShots': 'rack_off'}},
              paint=[('pool_frame', 'Frame'), ('cloth', 'Cloth')]),
@@ -1475,7 +1492,7 @@ FAMILY = G.Family(
              centre=(0, 0.006), motions={'loops': {'arcade': 'joystick'}},
              paint=[('arcade', 'Cabinet'), ('art', 'Art')]),
      G.Model('puzzleTable', puzzleTable, size=(0.865, 0.794, 0.891), key='model.puzzleTable', centre=(0.0025, 0.0155),
-             motions={'uses': {'jigsaw': 'pieces'}}, paint=[('table_wood', 'Table'), ('chair_wood', 'Stool')]),
+             motions={'uses': {'jigsaw': _after_sitting('pieces')}}, paint=[('table_wood', 'Table'), ('chair_wood', 'Stool')]),
      G.Model('easel', easel, size=(0.704, 1.747, 0.762), key='model.easel', centre=(0.0318, -0.0347),
              motions={'uses': {'paint': 'painting'}}, paint=[('easel_wood', 'Wood'), ('easel_metal', 'Metal')]),
      G.Model('workbench', workbench, size=(1.62, 0.995, 0.665), key='model.workbench', centre=(0, -0.0975),
@@ -1483,15 +1500,15 @@ FAMILY = G.Family(
      G.Model('telescope', telescope, size=(0.664, 1.522, 0.912), key='model.telescope', centre=(0, 0.026),
              motions={'uses': {'stargaze': 'aim'}}, paint=[('tube', 'Tube'), ('tripod', 'Tripod')]),
      G.Model('sewingTable', sewingTable, size=(0.9, 1.08, 0.89), key='model.sewingTable', centre=(0, 0.025),
-             motions={'uses': {'sew': 'presser', 'mend': 'presser'}, 'loops': {'sew': 'handwheel', 'mend': 'handwheel'}},
+             motions={'uses': {use: [_after_sitting('presser'), _after_sitting('handwheel', 0.9)] for use in ('sew', 'mend')}},
              paint=[('sew_table', 'Table'), ('sew_legs', 'Legs'), ('machine', 'Machine')]),
      G.Model('chemistrySet', chemistrySet, size=(0.92, 1.4, 0.5), key='model.chemistrySet', centre=(0, -0.18),
              motions={'uses': {'experiment': 'bubble'}}, paint=[('chem_bench', 'Bench'), ('glass', 'Glassware')]),
      G.Model('potteryWheel', potteryWheel, size=(0.7, 0.544, 0.92), key='model.potteryWheel', centre=(0, 0.03),
-             motions={'uses': {'throw': 'clay'}, 'loops': {'throw': 'wheel'}},
+             motions={'uses': {'throw': [_after_sitting('clay'), _after_sitting('wheel', 0.9)]}},
              paint=[('wheel_body', 'Wheel'), ('stool', 'Stool')]),
      G.Model('craftTable', craftTable, size=(1.7, 0.904, 0.89), key='model.craftTable', centre=(0, 0.005),
-             motions={'uses': {'scrapbook': 'book_open'}}, paint=[('craft_top', 'Wood'), ('craft_metal', 'Metal')])],
+             motions={'uses': {'scrapbook': _after_sitting('book_open')}}, paint=[('craft_top', 'Wood'), ('craft_metal', 'Metal')])],
     comment='Blender-built hobby models (tools/art/blender/families/hobbies.py): music, games, crafts and '
             'science. Listed in the base manifest\'s packs. The materials map onto the game\'s finishes so '
             'a model costs one draw call per finish group. The piano lifts its fallboard, the drums\' '

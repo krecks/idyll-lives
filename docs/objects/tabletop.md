@@ -114,7 +114,7 @@ sits on the top, turns with its facing and lights right at night.
 | `perfumeTray` Perfume tray | 1x1 · surface | — | tabletop / bath | Body | Static | Static. |
 | `deskOrganiser` Desk organiser | 1x1 · surface | — | tabletop / desk | Body | Static | Static. |
 | `laptopClosed` Laptop | 1x1 · surface | — | tabletop / desk | Body | Static | Static. (+use) the lid opens. |
-| `monitor` Monitor and keyboard | 1x1 · surface | — | tabletop / desk | Body | Static | Static. |
+| `monitor` Monitor and keyboard | 1x1 · surface | — | tabletop / desk | Body | Static | Static. Takes a 0.23 m disc (half its 0.46 m depth with the keyboard): it fits on counters, islands and the simple, executive, corner and standing desks, not on the 0.38–0.44 m deep computer, writing, laptop and kids' desks. |
 | `stuffedToy` Teddy | 1x1 · surface | — | tabletop / toys | Body | Static | Static. |
 | `toyBlocks` Toy blocks | 1x1 · surface | — | tabletop / toys | Block 1, Block 2, Block 3 | Static | Static. |
 

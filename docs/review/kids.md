@@ -100,7 +100,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/tableTuck.ts`, `web/src/render/babylon/characters.ts:216` (`TUCK`)
 - **Evidence:** A kids' chair pulled up to a coffee table (living.md L3) leaves the hands hovering over the top. Deferred from 0.3.0. Wave: `kids/extra/coffee-kidsChair-draw-01.png` (the 8-year-old, `draw`, kids' chair at the coffee table's long side): the chair isn't pulled in, the child sits a hand's breadth back from the 0.42 m top with the hands at the knees, short of it. At the kids' table the same chair is pulled in and the hands are on the top (`kids/play/child-pair-kidsChair/child-kidsChair-homework-01.png`).
-- **Status:** confirmed
+- **Status:** open: needs a clip (re-checked, fix: tables, 2026-10-21)
+- **After:** Played again (`fixes/tables/play-child/child-kidsChair-draw-02.png`): the chair is pulled in (`TUCK`) until the child's knees meet the 0.42 m top's edge, as far as it goes (a child's thighs on the 0.31 m seat are higher than the 0.38 m underside); the top is then about 0.4 m ahead of the hips and only 0.11 m over the seat, while the desk-hands clips (`sitHands`, `sitHandsFar`) hold the hands about 0.3 m over the seat (scaled) and at most 0.43 m out: they hover just over and short of its edge. No table row reaches it: a seated clip for a low top (leaning in, the hands about 0.12 m over the seat and 0.45 m out) is for the resident-clip wave.
 - **Source:** `docs/objects/open.md` Still open › Residents; `plan/release-0.3.0.md` §1.4; wave: office/kids (`check.mjs play --objects kidsChair@9,13,2 --with coffeeTable@9,12,0 --use draw --sim 3`)
 
 ### I-kids-01 — The high chair's tray has no use: the sim never seats a baby in it
@@ -136,7 +137,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** renderer-table
 - **Where:** `web/public/content/base.json:3397` (`feed`: `anim: tend`); `web/src/render/babylon/characters.ts:508` (`ACTIONS.tend`: `kneel`, the flower bed's clip)
 - **Evidence:** `sheets/crib-care.png` (top left, `scenes/crib-adult-feed-02.png`): the carer kneels on the floor at the cot's rail for 15 minutes while the baby lies on the mattress inside, and a child sent to do it stands at the rail (`sheets/crib-care.png` bottom right, `scenes/care-child-feed-01.png`). A baby is fed held in the arms (or sitting up), with a bottle. `cuddle` already lifts the baby out and holds them (`CUDDLE`), so a feed that plays the cuddle hold (the bottle is I-held-01) is a table change: `feed` on its own `ACTIONS` entry, or `tend` chosen by object as `harvest` and `look` are.
-- **Status:** open
+- **Status:** fixed (425486ee)
+- **After:** "Feed the baby" is `anim: cuddle` (`base.json`): the carer lifts the baby out and holds them in the arms (`CUDDLE`) for the feed, not the gardening kneel (`fixes/tables/play-a/a-crib-feed-01.png`). The bottle is the props wave's (I-held-01); who may feed is the age rules' (G-45).
 - **Source:** pilot
 
 ### I-kids-05 — Changing the baby happens over the cot rail; the changing table is never used
@@ -166,7 +168,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters.ts:477` (`ACTIONS.play`: standing `spell`, `HANDS.keys`, for every object whose use is `anim: play`); content `anim: play` at `web/public/content/furniture.json:2663` (`toyBox`), `web/public/content/catalog2/kids.json:135` (`toyChest`), `kids.json:232` (`trainTable`)
 - **Evidence:** `kids/play/c1/toyChest-play-01.png`, `kids/play/c1/toyBox-play-01.png`, `kids/play/child-c1/toyBox-play-01.png`: adult and child stand at the open box for 30 minutes with the hands held out over it; no toy comes out. `kids/play/c1/trainTable-trains-01.png`, `kids/play/child-c1/trainTable-trains-01.png`: at the 0.44 m train table they stand upright, the hands at the waist 0.3 m (child) to 0.5 m (adult) above the track. A child plays with toys kneeling or sitting on the floor, and at a train table kneels or bends over it. The play mat and the doll house already play the kneel (`anim: tend`, `ACTIONS.tend` `kneel`, `kids/sheets/obj-playMat.png`); choosing the `play` clip by object (as `look` and `harvest` do, `characters.ts:512` and `:523`) would give these the kneel, with toys out of the box as a `motion` or a prop.
-- **Status:** open
+- **Status:** fixed (425486ee)
+- **After:** `ACTIONS.play` by def: the toy box and chest played at kneeling on the floor (`kneel`), the train table crouched at its edge (`crouch`) (`fixes/tables/play-a/a-toyBox-play-01.png`, `a-toyChest-play-01.png`, `a-trainTable-trains-01.png`, `play-child/`). Toys out of the box are a motion or a prop; a kneel at a low table with the hands on its top is a clip for the resident-clip wave.
 - **Source:** wave: office/kids
 
 ### I-kids-07 — The ball pit and the play tent are used from outside
@@ -197,7 +200,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/catalog2/kids.json:23` (`kidsTable`: "legs in four colours", against `tools/art/blender/families/kids.py:130` and `:919`, one `ktable` blue for all four legs); `kids.json:145` (`toyChest`: "with its lid open", against `kids.py:511-534`, the lid shut at rest and opened only while played with)
 - **Evidence:** `kids/sheets/obj-kidsTable.png` (four blue legs), `kids/sheets/obj-toyChest.png` (the gallery and game shots show the lid shut). Either the text or the model changes.
-- **Status:** open
+- **Status:** fixed (b3f6b82d)
+- **After:** The texts: blue legs; the toy chest's lid comes up for play.
 - **Source:** wave: office/kids
 
 ### M-kids-04 — The high chair's seat is 2 cm over the range, and its base is narrow
@@ -207,7 +211,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/catalog2/dining.json:759` (`highChair` `seat.height` 0.62); `tools/art/blender/families/kids.py:443-450` (legs splayed to ±0.205 × −0.16…0.28)
 - **Evidence:** `tables/sizes-kids.md`: the model's seat is 0.609 m (inside the 0.50–0.60 range with the 1 cm tolerance), but the content's `seat` is 0.62, 2 cm over; W 0.444 and D 0.474 are a little under the 0.45 and 0.495 low ends (0.50–0.65 × 0.55–0.80 less 10 %): real high chairs splay their legs wide so they can't tip. `kids/sheets/obj-highChair.png`. Nothing sits in it today (I-kids-01), so only the content number matters once something does: 0.60 or under.
-- **Status:** open
+- **Status:** fixed (a920f174)
+- **After:** `highChair` content seat 0.60 (the mesh's 0.609, inside the 1 cm tolerance). Nothing sits in it yet (I-kids-01). The narrow base is a model change, left to the Blender band.
 - **Source:** wave: office/kids
 
 ### I-kids-08 — The kids' table is never a place to eat

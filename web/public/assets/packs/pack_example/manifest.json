@@ -51,20 +51,16 @@
       },
       "motions": {
         "uses": {
-          "cook": [
-            {
-              "clip": "oven_open",
-              "hold": 3.0
-            },
-            "burner_on"
-          ],
-          "practise": [
-            {
-              "clip": "oven_open",
-              "hold": 3.0
-            },
-            "burner_on"
-          ]
+          "cook": "burner_on",
+          "stir": "burner_on",
+          "practise": {
+            "clip": "oven_open",
+            "hold": 3.0
+          },
+          "bake": {
+            "clip": "oven_open",
+            "hold": 3.0
+          }
         }
       },
       "paint": [

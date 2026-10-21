@@ -73,7 +73,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** motion
 - **Where:** `tools/art/blender/families/fitness.py:100` (`G.scroll(slats, 'belt_run', (0, -SLAT, 0), seconds=0.25)`, `SLAT = 0.1` at `:55`)
 - **Evidence:** One 0.1 m slat each 0.25 s is a belt speed of 0.4 m/s, a slow walk; the runner jogs (`jog`, 0.7 s a cycle) on it (`play/treadmill-run-01.png`, `clips/clips-treadmill-all-t*.png`). A run is 2.2–3.3 m/s; the belt would need about 0.04 s a slat (the README keeps a loop's steps above the 1/30 s sampling, so a longer slat pitch or a blurred texture). Close to the eye only; at the game camera the belt reads as moving.
-- **Status:** open
+- **Status:** fixed (abfc32d9)
+- **After:** the slats are 30 cm apart and `belt_run` moves them one on in 0.13 s: 2.25 m/s, a run, and under half a pitch a frame at 60 frames a second up to the fastest game speed, so they're seen going back (`fixes/motions/g1718/clips-treadmill-all-t*.png`; `cargo check-glb`: the loop moves them 30 cm, the belt's warning).
 - **Source:** pilot
 
 ### M-fitness-02 — The yoga mat unrolls to 0.9 m, half a real mat's length

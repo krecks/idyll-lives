@@ -1,6 +1,6 @@
 /**
- * Bed blankets (Sims sleep under the covers): one draped quilt mesh per body type,
- * drawn with one thin instance per Sim that is scaled to zero unless that Sim sleeps in a bed.
+ * Bed blankets (Sims sleep under the covers): one draped quilt mesh per body type, drawn with one
+ * thin instance per Sim asleep in a bed (none drawn at all while nobody is), in that bed's colours.
  *
  * The quilt is a height field draped over the actual lying pose (the body skinned once on the CPU at
  * load): heights are tented and blurred so the cloth bridges between the feet, knees, hips and the
@@ -193,22 +193,39 @@ function clampI(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
 }
 
-/** Quilt material: a soft quilted cover with a turned-down white sheet band at the top. */
+/** Depth (m, from the top edge) of the turned-down sheet band, which keeps its own colour. */
+const SHEET = 0.17;
+/** The cover's grey in the texture (sRGB byte): a quilt's tint is its bed's colour over it (`quiltTint`). */
+const COVER = 0xe6;
+
+/** A quilt's `blanketTint` (linear rgb) for a bed's bedding colour (sRGB hex): that colour where the cover is plain. */
+export function quiltTint(hex: string, out: Float32Array, o: number): void {
+  const c = Color3.FromHexString(hex).toLinearSpace();
+  const k = 1 / Color3.FromInts(COVER, COVER, COVER).toLinearSpace().r;
+  out[o] = c.r * k;
+  out[o + 1] = c.g * k;
+  out[o + 2] = c.b * k;
+}
+
+/**
+ * Quilt material: a soft quilted cover with a turned-down white sheet band at the top. The cover is
+ * drawn grey and each quilt takes its bed's bedding colour over it (`blanketTint`, per instance), so
+ * every bed keeps the colour the player chose, under one material.
+ */
 export function blanketMaterial(scene: Scene, toeZ: number, footZ: number): PBRMaterial {
   const size = 512;
   const tex = new DynamicTexture('simBlanket', { width: size, height: size }, scene, true);
   const ctx = tex.getContext() as CanvasRenderingContext2D;
-  // v (texture y) spans 2 m; the top 0.16 m is the sheet.
+  // v (texture y) spans 2 m; the top `SHEET` is the sheet.
   const perM = size / 2;
-  ctx.fillStyle = '#6F97A6';
+  const cover = COVER.toString(16);
+  ctx.fillStyle = `#${cover}${cover}${cover}`;
   ctx.fillRect(0, 0, size, size);
   // Quilting: diamond stitch lines with soft puffed shading between them.
   const step = 0.16 * perM;
   for (let k = -size; k < size * 2; k += step) {
     for (const dir of [1, -1]) {
-      const g = ctx.createLinearGradient(0, 0, step * 0.7, 0);
-      g.addColorStop(0, 'rgba(255,255,255,0.0)');
-      ctx.strokeStyle = 'rgba(40,60,70,0.35)';
+      ctx.strokeStyle = 'rgba(40,40,40,0.35)';
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(k, 0);
@@ -225,9 +242,9 @@ export function blanketMaterial(scene: Scene, toeZ: number, footZ: number): PBRM
   // Turned-down sheet with a piped edge.
   // (Canvas rows run bottom-up in texture v.)
   ctx.fillStyle = '#EEEBE4';
-  ctx.fillRect(0, size - 0.17 * perM, size, 0.17 * perM);
+  ctx.fillRect(0, size - SHEET * perM, size, SHEET * perM);
   ctx.fillStyle = '#C9C3B8';
-  ctx.fillRect(0, size - 0.17 * perM - 3, size, 3);
+  ctx.fillRect(0, size - SHEET * perM - 3, size, 3);
   ctx.fillStyle = '#D9D4CB';
   ctx.fillRect(0, size - 0.03 * perM - 2, size, 2);
   tex.update();
@@ -255,6 +272,7 @@ let pendingRange: [number, number] = [0, 1];
  * while the part over the body keeps its shape. The second is how far up it is pulled (local z): the quilt
  * from there to its foot end keeps its shape and the rest folds down under that line, flat on the mattress
  * (pulled up as the Sim lies down, pushed down as they get up; far past the top edge when it's all up).
+ * Per-instance `blanketTint` (linear rgb, `quiltTint`): its bed's bedding colour, over the cover.
  */
 class BlanketPlugin extends MaterialPluginBase {
   private readonly range: [number, number];
@@ -278,21 +296,36 @@ class BlanketPlugin extends MaterialPluginBase {
   }
 
   override getAttributes(attributes: string[]): void {
-    attributes.push('blanketExt');
+    attributes.push('blanketExt', 'blanketTint');
   }
 
   override getCustomCode(shaderType: string, shaderLanguage?: ShaderLanguage): Nullable<{ [pointName: string]: string }> {
-    if (shaderType !== 'vertex') return null;
     const [a, b] = (this.range ?? pendingRange).map((v) => v.toFixed(4));
+    // The tint over the cover, not the sheet band (v: metres from the top edge).
+    const sheet = SHEET.toFixed(3);
     if (shaderLanguage === ShaderLanguage.WGSL) {
+      if (shaderType !== 'vertex') {
+        return {
+          CUSTOM_FRAGMENT_DEFINITIONS: `#ifdef SIMBLANKET\nvarying vBlanketTint: vec4<f32>;\n#endif\n`,
+          CUSTOM_FRAGMENT_UPDATE_ALBEDO: `#ifdef SIMBLANKET\nsurfaceAlbedo = select(surfaceAlbedo, surfaceAlbedo * fragmentInputs.vBlanketTint.rgb, fragmentInputs.vBlanketTint.w >= ${sheet});\n#endif\n`,
+        };
+      }
       return {
-        CUSTOM_VERTEX_DEFINITIONS: `#ifdef SIMBLANKET\nattribute blanketExt: vec2<f32>;\n#endif\n`,
+        CUSTOM_VERTEX_DEFINITIONS: `#ifdef SIMBLANKET\nattribute blanketExt: vec2<f32>;\nattribute blanketTint: vec3<f32>;\nvarying vBlanketTint: vec4<f32>;\n#endif\n`,
         CUSTOM_VERTEX_UPDATE_POSITION: `#ifdef SIMBLANKET\nif (positionUpdated.z < vertexInputs.blanketExt.y) { positionUpdated = vec3<f32>(positionUpdated.x, 0.0, vertexInputs.blanketExt.y); }\npositionUpdated.z += vertexInputs.blanketExt.x * smoothstep(${a}, ${b}, positionUpdated.z);\n#endif\n`,
+        CUSTOM_VERTEX_MAIN_END: `#ifdef SIMBLANKET\nvertexOutputs.vBlanketTint = vec4<f32>(vertexInputs.blanketTint, vertexInputs.uv.y);\n#endif\n`,
+      };
+    }
+    if (shaderType !== 'vertex') {
+      return {
+        CUSTOM_FRAGMENT_DEFINITIONS: `#ifdef SIMBLANKET\nvarying vec4 vBlanketTint;\n#endif\n`,
+        CUSTOM_FRAGMENT_UPDATE_ALBEDO: `#ifdef SIMBLANKET\nif (vBlanketTint.w >= ${sheet}) surfaceAlbedo *= vBlanketTint.rgb;\n#endif\n`,
       };
     }
     return {
-      CUSTOM_VERTEX_DEFINITIONS: `#ifdef SIMBLANKET\nattribute vec2 blanketExt;\n#endif\n`,
+      CUSTOM_VERTEX_DEFINITIONS: `#ifdef SIMBLANKET\nattribute vec2 blanketExt;\nattribute vec3 blanketTint;\nvarying vec4 vBlanketTint;\n#endif\n`,
       CUSTOM_VERTEX_UPDATE_POSITION: `#ifdef SIMBLANKET\nif (positionUpdated.z < blanketExt.y) positionUpdated = vec3(positionUpdated.x, 0.0, blanketExt.y);\npositionUpdated.z += blanketExt.x * smoothstep(${a}, ${b}, positionUpdated.z);\n#endif\n`,
+      CUSTOM_VERTEX_MAIN_END: `#ifdef SIMBLANKET\nvBlanketTint = vec4(blanketTint, uv.y);\n#endif\n`,
     };
   }
 }

@@ -22,7 +22,7 @@ export interface Size<F extends Fit = Fit> {
   min: number;
   fit: F;
 }
-const REF_HEIGHT = 1.77;
+export const REF_HEIGHT = 1.77;
 /** The sizes of `name` for these shares of the reference body's size (the tallest first), each fitted by `fit`. */
 export function sizes<F extends Fit>(name: string, shares: readonly number[], fit: (s: number) => F): Size<F>[] {
   return shares.map((s, i) => ({
@@ -123,8 +123,14 @@ function fountainPose(fit: FountainFit): (p: number) => PoseSpec {
  * side); above it the deck (its top 1.13 m up) to 0.9 m out, under a roof whose front beam is 2.2 m up at
  * 0.85 m out; the fireman's pole 0.55 m to the right of the middle, 0.95 m out, up to 2.05 m.
  */
-type ClimbFit = Fit & { reach: number };
-export const CLIMB: Size<ClimbFit>[] = sizes('climb', [0.97, 0.83, 0.63], (s) => ({ s, to: 0.9 + 0.24 * s, reach: s < 0.7 ? 3 : 4 }));
+type ClimbFit = Fit & { reach: number; wide: number };
+/**
+ * (`wide`: a child's hips are wider for its legs than the reference's, about 0.12 m from the middle on the
+ * reference's scale against its 0.096 (rig.rs proportions), and a woman's a little (0.10): the feet are
+ * placed for those of the size's users (the tallest is for the men and the women), so that they stay put on
+ * their skeletons as the hips turn over them, `footIK`'s `wide`.)
+ */
+export const CLIMB: Size<ClimbFit>[] = sizes('climb', [0.97, 0.83, 0.63], (s) => ({ s, to: 0.9 + 0.24 * s, reach: s < 0.7 ? 3 : 4, wide: s < 0.7 ? 0.024 : s > 0.9 ? 0.004 : 0 }));
 /** Where the climbers go up the net: m to the frame's right of its middle (their feet's middle). */
 export const CLIMB_LANES = [-0.53, -0.1] as const;
 /** The clip of size `clip` for lane `lane` (an index of `CLIMB_LANES`). */
@@ -508,6 +514,7 @@ function climbPose(fit: ClimbFit, lane: number): (p: number) => PoseSpec {
       return footIK(side, [a[0] - rest[0], a[1] + lift - rest[1], a[2] - rest[2]], body, {
         pole: wrap ? turned([0.9 * sx, 0, 0.45], yaw) : pole,
         foot: [wrap ? 30 : 0, (net ? 0 : h.yaw) + 10 * sx * (0.3 + 0.7 * onIt), 0],
+        wide: fit.wide,
       });
     };
     const arm = (side: 'l' | 'r', holds: Hold[], netAt: Vec): PoseSpec => {

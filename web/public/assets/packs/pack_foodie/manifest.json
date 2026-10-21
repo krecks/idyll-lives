@@ -360,6 +360,10 @@
             "door_off",
             "flames"
           ],
+          "bake": [
+            "door_off",
+            "flames"
+          ],
           "warmUp": "flames"
         }
       },

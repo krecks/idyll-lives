@@ -33,7 +33,8 @@ Each is built where the game places it (`F`, game axes; `G.settle(centre=False)`
 
 - **Chess table**: a black pawn is its own part and slides one square (`move`) for `chess`. Its chair is coloured on
   its own ("Chair"); the board's rim is the table's wood.
-- **Pool table**: the triangle lifts 25 cm off the fifteen racked balls (`rack_off`) for `pool` and
+- **Pool table**: the triangle is lifted off the fifteen racked balls, carried over the foot rail and hung up by its
+  apex on the foot end (`rack_off`, `G.path`, 1.4 s; 2026-10-21: it hung 25 cm over the balls) for `pool` and
   `trickShots`. The cue lies on the cloth, as it now does (it stuck out to 1.69 m).
 - **Foosball**: four rods; the two outer ones (one each side, by where the players stand) kick ±55° in a loop,
   `rods`. Four turning rods would be six draw calls.
@@ -62,6 +63,12 @@ Each is built where the game places it (`F`, game axes; `G.settle(centre=False)`
   a loop (`wheel`) for `throw`. At rest it is lower than the old part's full pot.
 - **Craft table**: the scrapbook's cover swings 176° open over its spine (`book_open`), onto the photos of its
   first page.
+
+**Seated uses wait for the hands** (2026-10-21, review G-17): the piano's fallboard, the cymbals, the pawn, the jigsaw
+patch, the presser and handwheel, the pot and wheel and the scrapbook start 0.9 s into the use (`SIT`, `delay`),
+once the resident has sat down (`sitDown`, about 1 s), as the weight bench's bar does. What went round while used
+(the cymbals, the handwheel, the wheel) is now a use's clip played `every` 0.9 s from then (a hair under its 1 s
+round), since a loop can't wait.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|

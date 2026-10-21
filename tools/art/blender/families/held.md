@@ -6,7 +6,7 @@ The 20 things residents carry and cook with. One pack, `packs/held/manifest.json
 - **Items** (`item.*`, content `items[].model`): drawn on the palms while carried (characters.ts `writeCarried`:
   one hand or both, content `hold`, level and facing the way the resident faces, base 2 cm under the palms), and set
   down on tops, tables and the floor (items.ts, one thin-instanced template per model, turned by the item's `yaw`).
-- **Tools** (`tool.*`, characters.ts `STATION_PROPS`): the chopping board (`chop`), the pan (`stir`) and the food on
+- **Tools** (`tool.*`, characters.ts `STATION_PROPS`): the chopping board (`chop`), the pan (`stir`), the mixing bowl (`mix`, 2026-10-21) and the food on
   the grill (`flip`), on the station's top while a resident works there, 15 cm towards the cook, turned to face the
   way they face.
 
@@ -36,6 +36,7 @@ sideways; the pan and the grill food, which stand off their middle, take their m
 | `tool.board` | the chopping board: a carrot half cut into rounds, chopped greens, the knife | 2 | 290 |
 | `tool.pan` | the frying pan, its handle to the back, a heap of stir-fry | 1 | 356 |
 | `tool.grillFood` | two sausages with grill marks and a marked burger | 1 | 400 |
+| `tool.mixingBowl` | a deep glazed bowl of batter, a wooden spoon leaning on its far rim (plain satin, one draw) | 1 | 312 |
 
 - **Finishes.** Dishes glazed `gloss`, pans and trays `metal` (the pan's handle `satin`), food `satin` or `matte`.
   The wooden boards (chopping, tasting, pizza) take `wood` as the old parts did: their second draw call.

@@ -18,7 +18,7 @@ at 0.45 m.
 | `gardenHammock` | the sling with its spreader bars, ropes and pillow, pivoting on the line between the hooks: `sway` rocks it 8° each way and home (2.4 s), a loop; `ride` carries the resident | `swing`, `doze` (loops) |
 | `cedarShower` | streaks of rain from the copper head, built full length, origin at the head: `water_on` grows them down (0.6 s) | `rinse` |
 | `mossTerrarium` | the glass cloche: `lid_open` lifts it 22 cm (0.7 s) | `mist` |
-| `glasshouse` | the glass door, hinged on its post, and a roof vent hinged at the ridge: `door_open` swings the door 70° out and lifts the vent 25° (0.9 s), one clip on both | `unwind`, `orchids` |
+| `glasshouse` | the glass door, hinged on its post: `door_open` swings it 70° out (0.9 s), `hold` 1.5 s, `out` 1.5 s: open to let the resident in, shut behind them, open again to let them out (2026-10-21: it stood open the whole use); the roof vent, hinged at the ridge: `vent_open` lifts it 25° (0.9 s) while they're in | `unwind`, `orchids` |
 
 `tieBouquet` grows a tied bouquet (three stems, three flower heads and a twine wrap, plain) on the potting bench's
 worktop front (`bouquet`, 0.8 s), held while it is tied and gone when it ends, as the kids' painting. Its origin is

@@ -6,7 +6,7 @@
 # `Model`): a lettuce is picked from the veggie bed (`harvest`) whose crop follows its growth stage (`grow`), a
 # seedling comes up in a pot (`seedling`), a bird lands on the feeder (`bird`), the hammock sways (`sway`, a
 # loop the resident rides), the shower runs (`water_on`), the terrarium's glass lid lifts (`lid_open`) and the
-# glasshouse's door and roof vent open (`door_open`).
+# glasshouse's door opens to let the resident in and out (`door_open`) and its roof vent airs it (`vent_open`).
 #
 # Run:  cargo art pack_natureLover [--only veggieBed] [--preview]
 import math
@@ -608,7 +608,8 @@ def glasshouse():
                       F.at(x + 0.13 * G.cosd(a), 1.42, -0.3 + 0.13 * G.sind(a)), 0.012, material=M.green_dark, verts=5)
     G.join(still, 'body', origin=(0, 0, 0))
     # The door: a glass leaf hinged on the left post, swinging out; the roof vent: a glass panel hinged at
-    # the ridge, lifting. `door_open` opens both.
+    # the ridge, lifting. `door_open` lets the resident in and shuts behind them (and lets them out), `vent_open`
+    # airs it while they're in.
     with G.new_parts() as door:
         F.box('door_glass', DOOR - 0.01, 1.86, 0.014, (0, 0.06 + 0.93, hz), M.glass)
     door = G.hinged(G.join(door, 'door'), F.at(-DOOR / 2, 1.0, hz))
@@ -618,7 +619,7 @@ def glasshouse():
     vent = G.hinged(G.join(vent, 'vent'), F.at(0.0, HR + 0.01, 0))
     objs = G.settle(centre=False)
     G.swing(door, 'door_open', 70, seconds=0.9)
-    G.swing(vent, 'door_open', 25, seconds=0.9, axis='Y')
+    G.swing(vent, 'vent_open', 25, seconds=0.9, axis='Y')
     return objs
 
 
@@ -645,7 +646,9 @@ FAMILY = G.Family(
              centre=(0.03, 0.049), motions={'uses': {'mist': 'lid_open'}},
              paint=[('walnut', 'Wood')]),
      G.Model('glasshouse', glasshouse, size=(1.887, 2.481, 1.86), key='model.natureLover.glasshouse',
-             motions={'uses': {'unwind': 'door_open', 'orchids': 'door_open'}},
+             # the door lets the resident in and shuts behind them (`hold`), and opens again to let them out
+             # (`out`); the vent stays open while they're in
+             motions={'uses': {use: [{'clip': 'door_open', 'hold': 1.5, 'out': 1.5}, 'vent_open'] for use in ('unwind', 'orchids')}},
              paint=[('cedar', 'Wood'), ('frame', 'Frame'), ('cushion', 'Cushions')])],
     comment='Blender-built nature lover pack models (tools/art/blender/families/pack_natureLover.py). '
             'Listed in the base manifest\'s packs. The materials map onto the game\'s finishes so a model '

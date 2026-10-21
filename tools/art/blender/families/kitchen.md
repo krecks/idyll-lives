@@ -61,7 +61,9 @@ The two kitchen sinks share the fridge's `GameFrame` style and the family's pale
 `water` moving part: the stream is built full length from the spout into the basin, hidden at rest (scaled
 to 0.001 along its axis), and a `water_on` clip grows it to 1 over 0.4 s. `motions` plays `water_on` for the
 `wash` animation tag, with no `hold`, so the water runs for the whole use and retracts afterwards (the `wash`
-tag covers both the `wash` and `washUp` interactions).
+tag covers both the `wash` and `washUp` interactions). The double sink has a stream for each bowl, each its own clip
+(`water_on_0`, `water_on_1`) played for the resident in that slot (`slot`; 2026-10-21, review A-kitchen-03: one
+washer ran both taps).
 
 | Model | Size (w × h × d) | Triangles | Draws | Note |
 |---|---|---|---|---|

@@ -8,7 +8,8 @@
  *   top, bottom or shoe colour (anti-aliased edges; a top cut `over` the bottom wins over it, else
  *   the bottom wins), rougher than skin; under hair, the scalp (head skin whose crew field is
  *   -1 - scalp weight) takes the hair colour;
- * - cloth: shells (jackets, skirts, shoes) in the flat top / bottom / shoe colour, soles darker;
+ * - cloth: shells (jackets, skirts, shoes) in the flat top / bottom / shoe colour, soles darker; seated,
+ *   moved by their tone (xyz: the seated corrective) as far as texel 4 b says;
  * - hair: the hair colour, with the tone's clump bands;
  * - brow: brows in the hair colour (darker); lash: lashes, near black;
  * - mouth: teeth, and the mouth plate darkened by its tone;
@@ -24,7 +25,8 @@
  *   1: top colour rgb, top: hem height
  *   2: bottom colour rgb, top: crew neckline cut
  *   3: hair colour rgb, top: scoop neckline cut
- *   4: r = 1 if the top is painted over the bottom, g = age (deeper cavities: elders 1), bottom: waist height
+ *   4: r = 1 if the top is painted over the bottom, g = age (deeper cavities: elders 1), b = how far
+ *      the shells take their seated shape (characters.ts `writeSit`), bottom: waist height
  *   5: skin reference colour rgb (the skin is tinted relative to it; 1), bottom: leg cut
  *   6: shoe colour rgb, shoes: top height
  *   7: eye colour rgb, 1 if the Sim wears hair (the scalp takes the hair colour)
@@ -213,6 +215,10 @@ if (vertexInputs.simMorph.x >= 0.0 && textureLoad(bakedVertexAnimationTexture, v
   }
 }
 #endif
+#ifdef SIMCLOTH
+// Seated: the shell's corrective (its tone) as far as the thighs are turned forward (texel 4 b).
+positionUpdated += vertexInputs.simTone.xyz * textureLoad(bakedVertexAnimationTexture, vec2<i32>(${off + 4}, i32(vertexInputs.bakedVertexAnimationSettingsInstanced.x + 0.5)), 0).z;
+#endif
 #endif
 `,
       CUSTOM_VERTEX_MAIN_END: `${GUARD}\nvertexOutputs.vSimSlot = vertexInputs.bakedVertexAnimationSettingsInstanced.x;\nvertexOutputs.vSimField = vertexInputs.simField;\nvertexOutputs.vSimTone = vertexInputs.simTone;\n#endif\n`,
@@ -377,6 +383,10 @@ if (simMorph.x >= 0.0 && texelFetch(bakedVertexAnimationTexture, ivec2(${pairs},
     }
   }
 }
+#endif
+#ifdef SIMCLOTH
+// Seated: the shell's corrective (its tone) as far as the thighs are turned forward (texel 4 b).
+positionUpdated += simTone.xyz * texelFetch(bakedVertexAnimationTexture, ivec2(${off + 4}, int(bakedVertexAnimationSettingsInstanced.x + 0.5)), 0).z;
 #endif
 #endif
 `,

@@ -1,6 +1,8 @@
 /**
  * Water for the sounds of the world (`world.ts`), synthesised (no sound files): a shower, a tap
- * running into a basin, washing up, a bath filling and someone soaking in it, a washing machine.
+ * running into a basin, washing up, a bath filling and someone soaking in it, a washing machine,
+ * a fountain and a toilet's flush; and, made from the same parts, a tumble dryer and a dishwasher
+ * being loaded.
  *
  * Each is a stereo loop several seconds long, made once and played on repeat, so it costs nothing
  * while playing. Running water is mostly two things, and both are built here:
@@ -10,8 +12,9 @@
  *   "blip" of each air bubble the stream pushes under the surface (the gurgle of a tap), modelled
  *   as a decaying sine whose pitch rises a little as it rings (van den Doel's bubble model).
  * Then the room: a short, damped reverb for a tiled stall, a basin, a bathroom.
- * The end of each loop is cross-faded into its start, so the seam can't be heard. They take a
- * moment to make, so they're made off the main thread (`water.worker.ts`).
+ * The end of each loop is cross-faded into its start, so the seam can't be heard (the flush is
+ * played once: `ONCE`). They take a moment to make, so they're made off the main thread
+ * (`water.worker.ts`).
  */
 
 /** Two channels of samples. */
@@ -28,9 +31,16 @@ export const WATER = {
   bathFill: bathFillSound,
   bathSoak: bathSoakSound,
   washer: washerSound,
+  dryer: dryerSound,
+  crockery: crockerySound,
+  fountain: fountainSound,
+  flush: flushSound,
 } satisfies Record<string, (rate: number) => Stereo>;
 
 export type WaterKind = keyof typeof WATER;
+
+/** The sounds played once as something happens (a flush), not looped while it lasts. */
+export const ONCE = ['flush'] as const satisfies readonly WaterKind[];
 
 /** A shower: spray on the tiles and on someone standing in it, in a small tiled stall. */
 export function showerSound(rate: number): Stereo {
@@ -196,6 +206,127 @@ export function washerSound(rate: number): Stereo {
   return finish(out, 0.16);
 }
 
+/** A tumble dryer: the drum turning steadily one way, the motor's hum and the fan's rush, the dry washing lifted and dropped (softer than a wash), now and then a button or a zip ticking on the drum. */
+export function dryerSound(rate: number): Stereo {
+  const r = random(18);
+  const out = track(rate, 12);
+  const n = out.left.length;
+  const hum = new Biquad(rate).set('lowpass', 450, 0.7);
+  const fan = new Biquad(rate).set('bandpass', 650, 0.5);
+  const fanHp = new Biquad(rate).set('highpass', 180, 0.6);
+  const wobble = wander(r, n, rate, 0.4);
+  let phase = 0;
+  const p = new Pink(r);
+  for (let i = 0; i < n; i++) {
+    phase += (2 * Math.PI * 100 * (1 + 0.008 * wobble[i])) / rate;
+    const saw = Math.sin(phase) + 0.5 * Math.sin(2 * phase) + 0.3 * Math.sin(3 * phase) + 0.15 * Math.sin(5 * phase);
+    const v = hum.run(saw) * 0.03 + fanHp.run(fan.run(p.next())) * 0.55 * (1 + 0.1 * wobble[i]);
+    out.left[i] = v;
+    out.right[i] = v;
+  }
+  // The washing tumbling over, about twice a turn: soft thuds.
+  for (let t = 0.3 + r() * 0.2; t < out.seconds - 0.3; t += 0.5 + r() * 0.45) thud(out, rate, t, 0.05 + 0.05 * r());
+  // A button or a zip knocking on the drum.
+  for (let t = 0.8 + r(); t < out.seconds - 0.3; t += 1.2 + r() * 2.5) clink(out, rate, t, 2400 + 1600 * r(), 0.05 + 0.06 * r(), (r() - 0.5) * 0.3, [1, 2.32, 4.25, 6.63], 0.05, false);
+  // Inside a metal box, as the washing machine.
+  for (const [c, ch] of [out.left, out.right].entries()) {
+    const lp = new Biquad(rate).set('lowpass', 3000, 0.7);
+    const hp = new Biquad(rate).set('highpass', 110, 0.7);
+    for (let i = 0; i < ch.length; i++) ch[i] = hp.run(lp.run(ch[i]));
+    room(ch, rate, c ? [3.7, 6.1, 8.3, 10.9] : [4.1, 5.9, 8.9, 10.3], 0.55, 0.3, 0.2);
+  }
+  return finish(out, 0.14);
+}
+
+/** Loading a dishwasher: plates and mugs set into the rack, a handful of cutlery dropped in the basket, a rack rolled out or in; no water. */
+export function crockerySound(rate: number): Stereo {
+  const r = random(20);
+  const out = track(rate, 12);
+  for (let t = 0.3 + r() * 0.4; t < out.seconds; ) {
+    const pan = (r() - 0.5) * 0.5;
+    const what = r();
+    if (what < 0.15) {
+      // Cutlery into the basket: a quick rattle.
+      const f = 3200 + 1800 * r();
+      for (let k = 0, at = t; k < 3 + Math.floor(r() * 4); k++, at += 0.02 + r() * 0.05) clink(out, rate, at, f * (0.9 + r() * 0.2), 0.12 + 0.12 * r(), pan, [1, 1.53, 2.37, 3.11], 0.15, false);
+      t += 0.8 + r() * 1.2;
+    } else if (what < 0.25) {
+      roll(out, rate, r, t, 0.45 + r() * 0.3, pan);
+      t += 1 + r();
+    } else {
+      // A plate or a mug knocking the rack as it goes in, sometimes again as it settles.
+      const f = 1300 + 1500 * r();
+      clink(out, rate, t, f, 0.2 + 0.35 * r() ** 2, pan, [1, 2.76, 5.4, 8.93], 0.07, false);
+      if (r() < 0.4) clink(out, rate, t + 0.06 + r() * 0.1, f * (0.9 + r() * 0.2), 0.1 + 0.2 * r(), pan, [1, 2.76, 5.4, 8.93], 0.07, false);
+      t += 0.7 + r() * 1.3;
+    }
+  }
+  for (const [c, ch] of [out.left, out.right].entries()) room(ch, rate, c ? [3.1, 5.3, 7.1, 9.7] : [2.9, 4.7, 7.9, 9.1], 0.55, 0.4, 0.2);
+  return finish(out, 0, 0.7);
+}
+
+/** A fountain heard from beside it: the jet falling back into the basin as a broad, splashing rush, drops pattering all over the water; out of doors, so no echo. */
+export function fountainSound(rate: number): Stereo {
+  const r = random(17);
+  const out = track(rate, 10);
+  stream(out, r, { centre: 1100, q: 0.45, bubbles: 600, gurgle: 0.1, low: 500, high: 3500, rumble: 0.3 });
+  // Drops landing all over the basin, each somewhere of its own left to right.
+  for (let t = r() * 0.01; t < out.seconds; t += -Math.log(1 - r()) / 500) {
+    const [l, rr] = gains((r() - 0.5) * 1.4);
+    const amp = 0.06 * (0.2 + r() ** 3);
+    const f = 1000 * 4 ** r();
+    tick(out.left, rate, t, amp * 0.5 * l);
+    tick(out.right, rate, t, amp * 0.5 * rr);
+    bubble(out.left, rate, t + 0.001, f, amp * l, 0.2 + r() * 0.4);
+    bubble(out.right, rate, t + 0.001, f, amp * rr, 0.2 + r() * 0.4);
+  }
+  return finish(out, 0.18);
+}
+
+/**
+ * A toilet flushing, played once: the lever's clunk, the cistern emptying into the bowl in a rush
+ * that swirls away, the gulp as the trap empties, then the cistern filling again with a thin hiss
+ * and a trickle into the bowl until the valve shuts.
+ */
+export function flushSound(rate: number): Stereo {
+  const r = random(19);
+  const out = track(rate, 9, 0);
+  const n = out.left.length;
+  const swirl = wander(r, n, rate, 0.25);
+  const burble = wander(r, n, rate, 0.04);
+  const shared = new Pink(r);
+  // How the rush goes: on at once, falling away as the cistern empties; and the refill after it.
+  const rush = (t: number) => (t < 0.15 ? 0 : Math.min(1, (t - 0.15) / 0.12) * Math.exp(-Math.max(0, t - 0.9) / 1.1));
+  const refill = (t: number) => ramp(2.2, 3.2, t) * (1 - ramp(7.4, 8.6, t));
+  for (const [c, ch] of [out.left, out.right].entries()) {
+    const own = new Pink(r);
+    const jet = new Biquad(rate);
+    const low = new Biquad(rate).set('lowpass', 300, 0.8);
+    const hiss = new Biquad(rate).set('bandpass', 3400, 3);
+    const hp = new Biquad(rate).set('highpass', 110, 0.7);
+    const deep = new Pink(r);
+    for (let i = 0; i < n; i++) {
+      const t = i / rate;
+      if ((i & 31) === 0) jet.set('bandpass', 900 * 2 ** (0.5 * swirl[i] + 0.25 * burble[i]), 0.7);
+      const w = 0.6 * shared.next() + 0.75 * own.next();
+      const a = rush(t);
+      ch[i] = hp.run(jet.run(w) * 1.6 * a * (1 + 0.3 * burble[i]) + low.run(deep.next()) * 0.9 * a + hiss.run(w) * 0.5 * refill(t));
+    }
+    // Bubbles in the swirl...
+    for (let t = 0.3 + r() * 0.01; t < 3.2; t += -Math.log(1 - r()) / 260) bubble(ch, rate, t, 300 * (2600 / 300) ** r() ** 0.8, 0.18 * rush(t) * (0.2 + r() ** 2), 0.1 + r() * 0.3);
+    // ...the gulp as the trap empties: a run of big, low bubbles...
+    for (let k = 0, t = 2.3 + r() * 0.1; k < 7; k++, t += 0.07 + r() * 0.08) bubble(ch, rate, t, 160 + 260 * r(), 0.5 * (1 - k / 9), 0.4 + r() * 0.4);
+    // ...and the trickle back into the bowl as the cistern fills.
+    for (let t = 3; t < 8.4; t += -Math.log(1 - r()) / 30) bubble(ch, rate, t, 900 + 1500 * r(), 0.05 * refill(t), 0.3);
+    room(ch, rate, c ? [11.3, 17.9, 23.1, 29.3] : [12.7, 16.1, 24.7, 27.9], 0.62, 0.45, 0.25);
+  }
+  // The lever: a plastic clunk.
+  thud(out, rate, 0.02, 0.3);
+  tick(out.left, rate, 0.02, 0.25);
+  tick(out.right, rate, 0.021, 0.25);
+  return finish(out, 0, 0.8);
+}
+
 // Building blocks.
 
 interface Track extends Stereo {
@@ -205,9 +336,8 @@ interface Track extends Stereo {
   overlap: number;
 }
 
-/** Room for a loop of `seconds`, plus a little more to cross-fade into its start. */
-function track(rate: number, seconds: number): Track {
-  const overlap = 0.6;
+/** Room for a loop of `seconds`, plus a little more to cross-fade into its start (none for a sound played once). */
+function track(rate: number, seconds: number, overlap = 0.6): Track {
   const n = Math.round((seconds + overlap) * rate);
   return { left: new Float32Array(n), right: new Float32Array(n), rate, seconds: seconds + overlap, overlap };
 }
@@ -341,6 +471,31 @@ function thud(out: Track, rate: number, at: number, amp: number): void {
     out.left[start + j] += v;
     out.right[start + j] += v;
   }
+}
+
+/** A dishwasher's rack rolled on its rails: a low rumble with the wheels ticking over the joins, then the knock as it stops. */
+function roll(out: Track, rate: number, r: () => number, at: number, seconds: number, pan: number): void {
+  const start = Math.round(at * rate);
+  const len = Math.min(out.left.length - start, Math.round(seconds * rate));
+  if (len <= 0) return;
+  const [l, rr] = gains(pan);
+  const band = new Biquad(rate).set('bandpass', 420, 1.2);
+  for (let j = 0; j < len; j++) {
+    const v = band.run(r() * 2 - 1) * 0.5 * Math.sin((Math.PI * j) / len) ** 0.5;
+    out.left[start + j] += v * l;
+    out.right[start + j] += v * rr;
+  }
+  for (let t = at + 0.02; t < at + seconds; t += 0.03 + r() * 0.03) {
+    tick(out.left, rate, t, 0.08 * l);
+    tick(out.right, rate, t, 0.08 * rr);
+  }
+  clink(out, rate, at + seconds, 900 + 300 * r(), 0.25, pan, [1, 2.76, 5.4], 0.05, false);
+}
+
+/** 0 before `a`, 1 after `b`, a smooth step between. */
+function ramp(a: number, b: number, x: number): number {
+  const u = Math.max(0, Math.min(1, (x - a) / (b - a)));
+  return u * u * (3 - 2 * u);
 }
 
 /** Left and right levels for `pan` from -1 (left) to 1 (right), keeping the loudness. */

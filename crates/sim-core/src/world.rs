@@ -126,7 +126,8 @@ pub struct ObjectInstance {
     /// A crop's growth (its kind `grows`; see `GrowthStage`): -1..0 lying fallow after it was
     /// picked, 0..1 planted and growing, 1 ripe. Bought ripe. Meaningless for other things.
     pub growth: f32,
-    /// A lamp switched off (see `lights.rs`); bought on. Meaningless for other things.
+    /// A lamp (or a fire) switched off (see `lights.rs`); bought off, on with a lot or a house's
+    /// file. Meaningless for other things.
     pub off: bool,
     /// Residents whose current use needs it closed (bits by sim id), so opening it under them is
     /// refused (`allows`). Derived from their tasks: set when the use reserves a slot, cleared
@@ -248,22 +249,47 @@ impl ObjectInstance {
 
     /// Takes one of the slots in `range` for `sim` (keeps the one it already has).
     pub(crate) fn reserve_in(&mut self, sim: u32, range: std::ops::Range<usize>) -> bool {
+        self.reserve_near(sim, range, None)
+    }
+
+    /// Takes the slot `pick_slot` gives `sim` in `range` (`near`: see there).
+    fn reserve_near(&mut self, sim: u32, range: std::ops::Range<usize>, near: Option<(&crate::content::ObjectDef, [f32; 2])>) -> bool {
         if self.slot_of(sim).is_some() {
             return true;
         }
-        let start = range.start;
-        match self.users[range].iter().position(Option::is_none) {
-            Some(i) => {
-                self.users[start + i] = Some(sim);
+        match self.pick_slot(sim, range, near) {
+            Some(k) => {
+                self.users[k] = Some(sim);
                 true
             }
             None => false,
         }
     }
 
-    /// Takes a place for `sim` for interaction `i` of `def` (see `can_use_for`): one of its
-    /// slots, or every one for a use that takes the whole object (`slot_of` is then the first).
-    pub(crate) fn reserve_for(&mut self, sim: u32, def: &crate::content::ObjectDef, i: usize) -> bool {
+    /// The slot in `range` `sim` gets: theirs already, else a free one; of a kind whose slots
+    /// have their places (`near`: its def, and where `sim` is now), the one nearest them, else
+    /// the first.
+    pub(crate) fn pick_slot(&self, sim: u32, range: std::ops::Range<usize>, near: Option<(&crate::content::ObjectDef, [f32; 2])>) -> Option<usize> {
+        if let Some(k) = self.slot_of(sim) {
+            return Some(k);
+        }
+        let mut free = range.filter(|&k| self.users[k].is_none());
+        match near.filter(|(def, _)| !def.places.is_empty()) {
+            Some((def, from)) => free.min_by(|&a, &b| {
+                let d = |k| {
+                    let p = self.place_at(def, k);
+                    (p[0] - from[0]).hypot(p[1] - from[1])
+                };
+                d(a).total_cmp(&d(b))
+            }),
+            None => free.next(),
+        }
+    }
+
+    /// Takes a place for `sim` (now at `from`) for interaction `i` of `def` (see `can_use_for`):
+    /// one of its slots (`pick_slot`), or every one for a use that takes the whole object
+    /// (`slot_of` is then the first).
+    pub(crate) fn reserve_for(&mut self, sim: u32, def: &crate::content::ObjectDef, i: usize, from: [f32; 2]) -> bool {
         let range = def.slots_for(i);
         let reserved = if def.interactions[i].whole {
             if !self.can_use_for(sim, def, i) {
@@ -272,15 +298,25 @@ impl ObjectInstance {
             self.users[range].fill(Some(sim));
             true
         } else {
-            self.reserve_in(sim, range)
+            self.reserve_near(sim, range, Some((def, from)))
         };
         self.kept_closed(sim, reserved, def.interactions[i].when == Some(false))
     }
 
-    /// Takes a place on it for `sim` to sit while doing something else (eating, the phone, TV
-    /// from the sofa). A seat only while closed (a sofa bed) then can't be opened under them.
-    pub(crate) fn reserve_seat(&mut self, sim: u32, def: &crate::content::ObjectDef) -> bool {
-        let reserved = self.reserve(sim, def.slots);
+    /// The slot `reserve_for` would give `sim` (at `from`) for interaction `i` of `def`.
+    pub(crate) fn slot_for(&self, sim: u32, def: &crate::content::ObjectDef, i: usize, from: [f32; 2]) -> Option<usize> {
+        let range = def.slots_for(i);
+        if def.interactions[i].whole {
+            return Some(range.start);
+        }
+        self.pick_slot(sim, range, Some((def, from)))
+    }
+
+    /// Takes a place on it for `sim` (now at `from`) to sit while doing something else (eating,
+    /// the phone, TV from the sofa). A seat only while closed (a sofa bed) then can't be opened
+    /// under them.
+    pub(crate) fn reserve_seat(&mut self, sim: u32, def: &crate::content::ObjectDef, from: [f32; 2]) -> bool {
+        let reserved = self.reserve_near(sim, 0..def.slots as usize, Some((def, from)));
         self.kept_closed(sim, reserved, def.interactions.iter().any(|i| i.pose == Pose::Sit && i.when == Some(false)))
     }
 
@@ -319,10 +355,27 @@ impl ObjectInstance {
         }
     }
 
-    /// Where a Sim sits or lies in `slot`: spread across the object's width.
+    /// Where a Sim sits, lies or stands in `slot`: at its place (content `places`), else spread
+    /// across the object's width, in the middle of its depth.
     pub fn slot_position(&self, content: &Content, slot: usize) -> [f32; 2] {
-        let def = &content.objects[self.def];
-        let c = self.centre(content);
+        self.place_at(&content.objects[self.def], slot)
+    }
+
+    /// `slot_position`, for its kind `def`.
+    fn place_at(&self, def: &crate::content::ObjectDef, slot: usize) -> [f32; 2] {
+        // (Where it stands on its tiles, as it's drawn.)
+        let (w, d) = self.turned_footprint();
+        let c = [
+            self.x as f32 + w as f32 / 2.0 + self.offset[0] as f32 / 100.0,
+            self.z as f32 + d as f32 / 2.0 + self.offset[1] as f32 / 100.0,
+        ];
+        if let Some(p) = def.places.get(slot) {
+            // Its place, turned with it (a freely turned one too: the place is on its model) and
+            // moved out with its size.
+            let a = self.angle();
+            let [x, z] = [0, 1].map(|k| p.at[k] * self.extent[k] as f32 / 100.0 / def.footprint[k].max(1) as f32);
+            return [c[0] + a.cos() * x + a.sin() * z, c[1] - a.sin() * x + a.cos() * z];
+        }
         let n = def.slots.max(1) as f32;
         // Bunks lie one above the other: both in the middle (a hair apart, so the renderer can
         // tell the lower bunk from the upper one).
@@ -332,8 +385,26 @@ impl ObjectInstance {
         // Local +x (the object's right) after rotation.
         [c[0] + yaw.cos() * offset, c[1] - yaw.sin() * offset]
     }
+
+    /// Which way a Sim in `slot` faces (`Sim::yaw`): its place's facing (content `places`), else
+    /// the way the object faces.
+    pub fn slot_yaw(&self, content: &Content, slot: usize) -> f32 {
+        match content.objects[self.def].places.get(slot) {
+            Some(p) => self.angle() + p.facing,
+            None => self.yaw(),
+        }
+    }
+
+    /// Which way it faces, its free turn included (radians; see `yaw`).
+    pub fn angle(&self) -> f32 {
+        self.yaw() + (self.turn as f32).to_radians()
+    }
     /// Rotated footprint `(x extent, z extent)`.
     pub fn size(&self, _content: &Content) -> (i32, i32) {
+        self.turned_footprint()
+    }
+
+    fn turned_footprint(&self) -> (i32, i32) {
         let [w, d] = self.footprint;
         if self.rot.is_multiple_of(2) {
             (w as i32, d as i32)
@@ -653,6 +724,16 @@ pub struct Sim {
     pub(crate) attraction: u32,
     pub(crate) queue: VecDeque<Task>,
     pub(crate) current: Option<Activity>,
+    /// Sitting, what they sat down to do, held while they talk from the seat (a chat with the
+    /// one beside them on the sofa, listening in at the table; `conversation::from_seat`): they
+    /// carry on with it when the talk is over, still sitting (`end_activity`). Not saved: after
+    /// a reload they stand up where they sat down from.
+    pub(crate) paused: Option<Activity>,
+    /// Joining in: the place in the group they're walking to (`conversation::take_place`). Not
+    /// saved, as listening in isn't.
+    pub(crate) join_spot: Option<[f32; 2]>,
+    /// Ticks without anything to do (to choose something); sitting at something that leaves
+    /// room for a word, ticks since they last thought of one (`from_seat`).
     pub(crate) idle_ticks: u32,
     /// What they do next, before choosing anything else (an `after` routine, like washing
     /// hands after the toilet; see `follow_up`). Not saved: losing it on a reload is harmless.
@@ -702,6 +783,9 @@ pub struct Sim {
     /// Opened or closed an object this tick (`Interaction::leaves`): how the house looks
     /// changed (applied after the step).
     pub(crate) reshaped: bool,
+    /// Lit a fire this tick (sat down by one in the dark: see `lights.rs`): the lamps' state
+    /// changed (applied after the step).
+    pub(crate) lit: bool,
     /// When they last woke someone crying (a baby), or were woken by a crying baby (a
     /// grown-up), as a tick (0: never; see `World::wake_for_crying_babies`).
     pub(crate) night_woken: u64,
@@ -755,6 +839,11 @@ impl Sim {
 
     pub fn current(&self) -> Option<&Activity> {
         self.current.as_ref()
+    }
+
+    /// Sitting, what they sat down to do while they talk from the seat (`paused`).
+    pub fn paused(&self) -> Option<&Activity> {
+        self.paused.as_ref()
     }
 
     /// In bed for the night (or a nap): using something tagged as sleep.
@@ -1112,6 +1201,8 @@ pub(crate) struct SimBrief {
     pub conversing: Option<(u32, usize)>,
     /// The tile they're tidying up (or on their way to), if any.
     pub cleaning: Option<(i32, i32)>,
+    /// Sitting down (on a sofa, at a table): someone sitting near can talk to them from their seat.
+    pub seated: bool,
 }
 
 pub struct World {
@@ -1563,13 +1654,16 @@ impl World {
         let called = |o: &ObjectInstance| self.content.objects[o.def].name.to_lowercase();
         for (tx, tz) in obj.tiles(&self.content) {
             // Furniture needs free floor; things on a wall, the ceiling or rugs only a free spot
-            // on their own layer (and a hanging plant that hangs low the floor as well).
+            // on their own layer (and a hanging plant that hangs low the floor as well). A lamp at
+            // head height takes the floor from walking only: furniture goes under it.
             let floor = self.lot.in_bounds(tx, tz) && self.blocked[self.lot.tile_index(tx, tz)];
+            let furniture = || self.objects.iter().any(|o| !self.content.objects[o.def].layer.mounted() && on(o, (tx, tz)));
             let taken = if layer.mounted() {
                 self.objects.iter().any(|o| self.content.objects[o.def].layer == layer && on(o, (tx, tz)))
-                    || (d.hangs_low && floor && !self.objects.iter().any(|o| !self.content.objects[o.def].layer.mounted() && on(o, (tx, tz))))
+                    || (d.hangs_low && floor && !furniture())
             } else {
-                floor && !self.objects.iter().any(|o| self.content.objects[o.def].hangs_low && on(o, (tx, tz)))
+                let hung = || self.objects.iter().any(|o| (self.content.objects[o.def].hangs_low || self.content.objects[o.def].head_height) && on(o, (tx, tz)));
+                floor && (furniture() || !hung())
             };
             if !self.lot.in_bounds(tx, tz) || taken {
                 return Err(Error::new(format!(
@@ -1632,6 +1726,14 @@ impl World {
                 _ => {}
             }
         }
+        // Built to stand back to a wall (a wall-hung toilet's cistern box): plain wall behind it.
+        if d.against_wall {
+            match self.wall_behind(&obj) {
+                None => return Err(Error::new(format!("'{name}' at {x},{z} needs a wall behind it"))),
+                Some(true) => return Err(Error::new(format!("'{name}' at {x},{z} can't stand against a window"))),
+                _ => {}
+            }
+        }
         self.check_storey_fit(&obj)?;
         Ok(obj)
     }
@@ -1673,7 +1775,7 @@ impl World {
 
     /// What runs along the whole back edge of `obj`: None if not a wall (plain or with a window)
     /// all along, else whether a window is part of it.
-    fn wall_behind(&self, obj: &ObjectInstance) -> Option<bool> {
+    pub(crate) fn wall_behind(&self, obj: &ObjectInstance) -> Option<bool> {
         use crate::lot::Edge;
         let lot = &self.lot;
         obj.back_edges(&self.content).into_iter().try_fold(false, |window, (horizontal, x, z)| {
@@ -1855,6 +1957,8 @@ impl World {
             attraction,
             queue: VecDeque::new(),
             current: None,
+            paused: None,
+            join_spot: None,
             idle_ticks: 0,
             follow_up: None,
             unreachable: [None; UNREACHABLE],
@@ -1874,6 +1978,7 @@ impl World {
             planner: Default::default(),
             mess: None,
             reshaped: false,
+            lit: false,
             care_out: None,
             night_woken: 0,
             conceived: None,
@@ -2215,6 +2320,9 @@ impl World {
                 self.structure_version = self.structure_version.wrapping_add(1);
                 self.rooms_need_clean_rescore();
             }
+            if std::mem::take(&mut self.sims[i].lit) {
+                self.lights_version = self.lights_version.wrapping_add(1);
+            }
             if let Some(news) = self.sims[i].news.take() {
                 // Broken or mended: what the house offers and how it looks change.
                 self.structure_version = self.structure_version.wrapping_add(1);
@@ -2535,6 +2643,7 @@ impl World {
                 age: s.age,
                 conversing: None,
                 cleaning: s.current().and_then(|a| if let TaskKind::Clean { x, z } = a.task.kind { Some((x, z)) } else { None }),
+                seated: s.pose == Pose::Sit && !s.is_moving(),
             });
         }
         // Who's in a conversation, and whose (for joining in).
@@ -3610,6 +3719,25 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
         sim.follow_up = Some(task);
     }
 
+    // Sitting with others near (on the sofa, round a table): now and then a word from the seat,
+    // without getting up (`conversation::from_seat`).
+    let free_will = ctx.autonomy && ctx.households[sim.household as usize].free_will;
+    if free_will
+        && sim.pose == Pose::Sit
+        && sim.current.as_ref().is_some_and(|a| matches!((a.task.kind, &a.phase), (TaskKind::Use { .. }, Phase::Using { .. })))
+        && sim.available_for_social(content)
+    {
+        sim.idle_ticks = sim.idle_ticks.saturating_add(sim.steps);
+        if sim.idle_ticks >= conversation::SEAT_TALK_TICKS {
+            sim.idle_ticks = 0;
+            if rng.next_f32() < conversation::SEAT_TALK_CHANCE
+                && let Some(task) = pick_autonomous(sim, ctx, objects, items, rng, Some(conversation::SEAT_RANGE))
+            {
+                conversation::from_seat(sim, task, content, ctx.briefs);
+            }
+        }
+    }
+
     // Ticks what they're doing moves on by (fewer than `steps` if it starts partway through).
     let mut ticks = sim.steps;
     if sim.current.is_none() {
@@ -3629,11 +3757,10 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                 }
                 return;
             }
-            let free_will = ctx.autonomy && ctx.households[sim.household as usize].free_will;
             if free_will && sim.idle_ticks >= AUTONOMY_DELAY_TICKS {
                 let since = sim.idle_ticks - AUTONOMY_DELAY_TICKS;
                 sim.idle_ticks = 0;
-                if let Some(task) = pick_autonomous(sim, ctx, objects, items, rng) {
+                if let Some(task) = pick_autonomous(sim, ctx, objects, items, rng, None) {
                     start_task(sim, task, ctx, objects, items);
                     if sim.current.is_none() && sim.follow_up.is_none() {
                         // People move: don't hold a grudge against where they were for long.
@@ -3774,12 +3901,15 @@ fn requirements_met(ctx: &Ctx, objects: &[ObjectInstance], object: u32, inter: &
     missing_requirement(ctx.content, ctx.object_plot, Some(ctx.index), objects, object, inter).is_none()
 }
 
+/// What a Sim chooses to do on their own. `from_seat`: sitting, only a word with someone sitting
+/// within that many metres, or listening in on a talk there (`conversation::from_seat`).
 fn pick_autonomous(
     sim: &Sim,
     ctx: &Ctx,
     objects: &[ObjectInstance],
     items: &crate::items::Items,
     rng: &mut Rng,
+    from_seat: Option<f32>,
 ) -> Option<Task> {
     let content = ctx.content;
     let needs = &sim.needs[..content.needs.len()];
@@ -4246,6 +4376,17 @@ fn pick_autonomous(
         });
     }
 
+    // From the seat: only a word with someone sitting near (nothing that takes them closer than
+    // talking does: a hug, a kiss, a fight), or listening in on a talk going on beside them.
+    if let Some(range) = from_seat {
+        let near = |p: [f32; 2]| (p[0] - sim.pos[0]).hypot(p[1] - sim.pos[1]) <= range;
+        candidates.retain(|&(_, choice)| match choice {
+            Choice::Social(t, s) => ctx.briefs[t as usize].seated && near(ctx.briefs[t as usize].pos) && content.socials[s].distance >= conversation::SEATED_DISTANCE,
+            Choice::Join(l) => ctx.briefs.iter().any(|b| b.conversing.is_some_and(|c| c.0 == l) && near(b.pos)),
+            _ => false,
+        });
+    }
+
     // Needs about to run out come first: whatever doesn't fill one is put off.
     if urgent != 0 {
         for (s, choice) in &mut candidates {
@@ -4358,18 +4499,22 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
                 return;
             }
             if inter.seat_near > 0.0 {
-                reserved_seat = seat_near_object(sim, ctx, objects, object, inter.seat_near);
+                reserved_seat = seat_near_object(sim, ctx, objects, object, inter);
             }
+            // From the tile by the slot they'll get, when it has a place of its own (`places`).
             let t = match reserved_seat {
-                Some(seat) => ctx
-                    .index
-                    .links
-                    .approach_of(seat)
-                    .unwrap_or_else(|| objects[seat as usize].front_tile(content)),
-                None => ctx
-                    .index
-                    .links
-                    .approach_of(object)
+                Some(seat) => {
+                    let s = &objects[seat as usize];
+                    let def = &content.objects[s.def];
+                    s.pick_slot(sim.id, 0..def.slots as usize, Some((def, sim.pos)))
+                        .and_then(|k| crate::surface::slot_approach(content, nav, s, k))
+                        .or_else(|| ctx.index.links.approach_of(seat))
+                        .unwrap_or_else(|| s.front_tile(content))
+                }
+                None => obj
+                    .slot_for(sim.id, &content.objects[obj.def], interaction, sim.pos)
+                    .and_then(|k| crate::surface::slot_approach(content, nav, obj, k))
+                    .or_else(|| ctx.index.links.approach_of(object))
                     .unwrap_or_else(|| obj.front_tile(content)),
             };
             let tags = inter.tags;
@@ -4467,7 +4612,7 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
     // A place on the seat for the use (two housemates don't both sit on the same sofa).
     if let Some(seat) = reserved_seat.take() {
         let def = &content.objects[objects[seat as usize].def];
-        if objects[seat as usize].reserve_seat(sim.id, def) {
+        if objects[seat as usize].reserve_seat(sim.id, def, sim.pos) {
             sim.use_seat = Some(seat);
         }
     }
@@ -4492,7 +4637,7 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
     }
     if let TaskKind::Use { object, interaction } = task.kind {
         let obj = &mut objects[object as usize];
-        if !obj.reserve_for(sim.id, &content.objects[obj.def], interaction) {
+        if !obj.reserve_for(sim.id, &content.objects[obj.def], interaction, sim.pos) {
             if let Some(seat) = sim.use_seat.take() {
                 objects[seat as usize].release(sim.id);
             }
@@ -4520,24 +4665,42 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
     });
 }
 
-/// The nearest free seat within `range` metres of `object` (content `seatNear`), one they may
-/// sit on here. Seats are the sitting interactions residents eat in (`cooking.seatTags`).
+/// The nearest free seat within `inter`'s `seatNear` metres of `object`, one they may sit on
+/// here. Seats are the sitting interactions residents eat in (`cooking.seatTags`). For a use
+/// with `seatFacing` the slot they'd get on it looks at the object (within `SEAT_LOOKS`), and
+/// for a screen (`SeatFacing::Front`) sits in front of it (within `SEAT_IN_FRONT` of the way it
+/// faces): no sofa with its back to the TV.
 fn seat_near_object(
     sim: &Sim,
     ctx: &Ctx,
     objects: &[ObjectInstance],
     object: u32,
-    range: f32,
+    inter: &crate::content::Interaction,
 ) -> Option<u32> {
     let content = ctx.content;
     let plot = ctx.object_plot.get(object as usize).copied().flatten();
     let rules = &content.cooking;
+    let it = &objects[object as usize];
     let (tx, tz) = ctx
         .index
         .links
         .approach_of(object)
-        .unwrap_or_else(|| objects[object as usize].front_tile(content));
+        .unwrap_or_else(|| it.front_tile(content));
     let target = [tx as f32 + 0.5, tz as f32 + 0.5];
+    let middle = crate::surface::middle(content, it);
+    let faces = |o: &ObjectInstance| {
+        let Some(facing) = inter.seat_facing else { return true };
+        let def = &content.objects[o.def];
+        let Some(slot) = o.pick_slot(sim.id, 0..def.slots as usize, Some((def, sim.pos))) else { return false };
+        let at = o.slot_position(content, slot);
+        let yaw = o.slot_yaw(content, slot);
+        let to = [middle[0] - at[0], middle[1] - at[1]];
+        let d = to[0].hypot(to[1]).max(1e-3);
+        let looks = (yaw.sin() * to[0] + yaw.cos() * to[1]) / d >= SEAT_LOOKS.cos();
+        let a = it.angle();
+        let in_front = facing == crate::content::SeatFacing::Around || -(a.sin() * to[0] + a.cos() * to[1]) / d >= SEAT_IN_FRONT.cos();
+        looks && in_front
+    };
     objects
         .iter()
         .filter(|o| o.id != object)
@@ -4549,6 +4712,7 @@ fn seat_near_object(
             !o.broken() && o.can_use(sim.id, def.slots) && o.sits(def, content.life.stage(sim.age), rules.seat_tags, rules.seat_avoid)
         })
         .filter(|o| access(ctx, sim, ctx.object_plot[o.id as usize]) != Access::None)
+        .filter(|o| faces(o))
         .map(|o| {
             let (fx, fz) = ctx
                 .index
@@ -4562,10 +4726,15 @@ fn seat_near_object(
                     .distance([fx as f32 + 0.5, fz as f32 + 0.5], target),
             )
         })
-        .filter(|&(_, d)| d <= range)
+        .filter(|&(_, d)| d <= inter.seat_near)
         .min_by(|a, b| a.1.total_cmp(&b.1))
         .map(|(o, _)| o)
 }
+
+/// A seat taken for a `seatFacing` use looks at the thing within this of straight ahead...
+const SEAT_LOOKS: f32 = std::f32::consts::FRAC_PI_3;
+/// ...and, for a screen, is within this of the way it faces.
+const SEAT_IN_FRONT: f32 = std::f32::consts::FRAC_PI_3;
 
 /// Where `sim` may walk on the way to tile `goal` (see `path::Grounds`): home, the place
 /// they're a guest at, public places, the plot they're on now (nobody is stuck in a garden)
@@ -5014,19 +5183,32 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
                 // Watching from the sofa: sit on the seat, facing the way it faces, and step
                 // back off where they came from (see `end_activity`).
                 let s = &objects[seat as usize];
+                let slot = s.slot_of(sim.id).unwrap_or(0);
                 sim.seated_from = Some((sim.pos[0].floor() as i32, sim.pos[1].floor() as i32));
-                sim.pos = s.slot_position(content, s.slot_of(sim.id).unwrap_or(0));
-                sim.yaw = s.yaw();
+                sim.pos = s.slot_position(content, slot);
+                sim.yaw = s.slot_yaw(content, slot);
                 sim.pose = Pose::Sit;
             } else if inter.pose == Pose::Stand && !inter.inside {
-                sim.yaw = (c[0] - sim.pos[0]).atan2(c[1] - sim.pos[1]);
+                // At their slot's own place, come to its tile (the end of a ping-pong table),
+                // facing the way it says; else facing the thing.
+                let slot = obj.slot_of(sim.id).unwrap_or(0);
+                let here = (sim.pos[0].floor() as i32, sim.pos[1].floor() as i32);
+                let place = Some(obj.slot_position(content, slot))
+                    .filter(|p| !content.objects[obj.def].places.is_empty() && (p[0].floor() as i32, p[1].floor() as i32) == here);
+                if let Some(p) = place {
+                    sim.pos = p;
+                    sim.yaw = obj.slot_yaw(content, slot);
+                } else {
+                    sim.yaw = (c[0] - sim.pos[0]).atan2(c[1] - sim.pos[1]);
+                }
                 sim.pose = inter.pose;
             } else {
-                // Onto the seat or bed, or into the shower, facing the way it faces; they step
-                // back off where they came from (see `end_activity`).
+                // Onto the seat or bed, or into the shower, facing the way it faces (or its
+                // slot's place does); they step back off where they came from (see `end_activity`).
+                let slot = obj.slot_of(sim.id).unwrap_or(0);
                 sim.seated_from = Some((sim.pos[0].floor() as i32, sim.pos[1].floor() as i32));
-                sim.pos = obj.slot_position(content, obj.slot_of(sim.id).unwrap_or(0));
-                sim.yaw = obj.yaw();
+                sim.pos = obj.slot_position(content, slot);
+                sim.yaw = obj.slot_yaw(content, slot);
                 sim.pose = inter.pose;
             }
             act.phase = Phase::Using { elapsed: 0.0 };
@@ -5041,6 +5223,12 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
             if inter.picks && objects[object as usize].growth >= 0.0 {
                 objects[object as usize].growth = -1.0;
                 sim.reshaped = true;
+            }
+            // Sitting down by a fire in the dark, they light it (see `lights.rs`).
+            let o = &objects[object as usize];
+            if o.off && content.objects[o.def].fire && (crate::lights::dark_at(ctx.minute) || ctx.nav.stairs.storey(o.z) < 0) {
+                objects[object as usize].off = false;
+                sim.lit = true;
             }
         }
     }
@@ -5343,12 +5531,23 @@ fn accident(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], a: usize) 
 /// is free again, and they stand up in front of it (or step out of the shower). What they carry is put down after the step
 /// (`cooking::after_step`).
 pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [ObjectInstance]) {
-    let held = sim.current.take().and_then(|act| match act.task.kind {
-        TaskKind::Use { object, .. } | TaskKind::Repair { object } => Some(object),
-        TaskKind::Cook { station, .. } | TaskKind::Dishes { station, .. } => station,
-        TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => seat,
-        _ => None,
-    });
+    sim.join_spot = None;
+    // A talk from the seat over: back to what they sat down to do, still sitting.
+    if let Some(paused) = sim.paused.take() {
+        if matches!(sim.current.as_ref().map(|a| a.task.kind), Some(TaskKind::Social { .. } | TaskKind::Join { .. })) {
+            sim.current = Some(paused);
+            sim.idle_ticks = 0;
+            return;
+        }
+        // (Ended some other way: what they sat down to do ends too.)
+        if let Some(o) = held_object(paused.task.kind).filter(|&o| (o as usize) < objects.len()) {
+            objects[o as usize].release(sim.id);
+        }
+        if let Some((fx, fz)) = sim.seated_from {
+            sim.pos = [fx as f32 + 0.5, fz as f32 + 0.5];
+        }
+    }
+    let held = sim.current.take().and_then(|act| held_object(act.task.kind));
     if let Some(o) = held.map(|o| o as usize).filter(|&o| o < objects.len()) {
         objects[o].release(sim.id);
         if sim.pose != Pose::Stand || sim.seated_from.is_some() {
@@ -5364,6 +5563,17 @@ pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [Obje
     sim.seated_from = None;
     sim.pose = Pose::Stand;
     sim.idle_ticks = 0;
+}
+
+/// The object a task holds a place at (using it, repairing it, cooking at it, the seat they eat
+/// or phone from), released when it ends.
+fn held_object(kind: TaskKind) -> Option<u32> {
+    match kind {
+        TaskKind::Use { object, .. } | TaskKind::Repair { object } => Some(object),
+        TaskKind::Cook { station, .. } | TaskKind::Dishes { station, .. } => station,
+        TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => seat,
+        _ => None,
+    }
 }
 
 /// A free crib at home for a baby (one with no other baby in it): they're put straight in.

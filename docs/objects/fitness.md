@@ -17,7 +17,7 @@ the object's colours, so there are never two.
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `treadmill` Treadmill | 1x2 · floor | run:run | fitness / — | Frame, Pads | Loop (E1) | `belt_run`: the belt's slats run back at 0.4 m/s under the jogging runner for the whole run (E1). |
+| `treadmill` Treadmill | 1x2 · floor | run:run | fitness / — | Frame, Pads | Loop (E1) | `belt_run`: the belt's slats (30 cm apart) run back at 2.25 m/s, a running pace, under the runner for the whole run (E1; 0.4 m/s, a walk, before 2026-10-21). |
 | `weightBench` Weight bench | 1x2 · floor | lift:lift | fitness / — | Frame, Pads | Use | `bar_off`: the bar on the rack shrinks away 0.8 s into the lift (`BAR_DELAY`), as the lifter lies back and the game draws it in the hands (content `held`). |
 | `exerciseBike` Exercise bike | 1x1 · floor | cycle:exercise | fitness / — | Frame, Pads | Loop (E1) | `pedals_turn`: the cranks and pedals turn once every 1.2 s while cycled, the rider's feet on them (E1). |
 | `yogaMat` Yoga mat | 1x1 · floor | yoga:exercise | fitness / — | Mat | Use | `unroll`: the rolled mat unrolls flat for yoga and rolls up again at the end. |
@@ -28,6 +28,8 @@ the object's colours, so there are never two.
   runner, the rider's feet stay on the turning pedals, the mat unrolls and rolls up again, the bar and the pair leave
   the bench and the rack; by day and at night, WebGPU and Low WebGL2, every colour part and the colour studio
   ("In use").
+- Since 2026-10-21 (review A-fitness-02) the treadmill's belt runs at a run's pace, its slats a long pitch apart so
+  each frame moves them under half of it and they're seen going back (`fixes/motions/g1718/clips-treadmill-*`).
 - A held part is drawn in the object's player colours (its prop key carries them, `<model>#<part>@<colours>`): a
   coloured rack's dumbbells are its "Weights" colour in the hands; uncoloured, they are the model's dark grey.
 - The bench's bar stays on its hooks while the lifter sits down, shrinks away 0.8–1.0 s into the lift and is in the

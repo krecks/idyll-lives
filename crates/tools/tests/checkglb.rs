@@ -76,7 +76,8 @@ fn the_review_measures_the_pilots_cases() {
     let (_, workbench) = of("workbench").top.unwrap();
     assert!((workbench - 0.78).abs() < 0.01, "{workbench}");
     let (_, sink) = of("sink").top.unwrap();
-    assert!((0.76..=0.91).contains(&sink), "{sink}");
+    // The base sink is a kitchen sink unit since G-11 (reference kind `kitchenSink`): its worktop, not a basin rim.
+    assert!((0.85..=1.0).contains(&sink), "{sink}");
     let table = of("diningTable");
     assert!(table.table.unwrap() <= table.size[1] + 1e-9 && table.top.is_none(), "{:?}", table.table);
     let (top, steps) = of("stairs").steps.unwrap();

@@ -668,7 +668,8 @@ FAMILY = G.Family(
              centre=(0.022, -0.123), motions={'uses': {'studyRecipes': 'page', 'foodMagazines': 'page'}},
              paint=[('walnut', 'Body'), ('honey_wood', 'Stool & ledge'), ('cover', 'Cookbook')]),
      G.Model('pizzaOven', pizzaOven, size=(1.89, 1.9, 0.916), key='model.foodie.pizzaOven', centre=(0.005, 0.018),
-             motions={'uses': {'bakePizza': ['door_off', 'flames'], 'warmUp': 'flames'}},
+             # a bake (the pizza, or any `bake` step of a recipe at it) takes the door off and lights the fire
+             motions={'uses': {'bakePizza': ['door_off', 'flames'], 'bake': ['door_off', 'flames'], 'warmUp': 'flames'}},
              paint=[('plaster', 'Body'), ('worktop', 'Worktop'), ('brick', 'Brick')]),
      G.Model('chefsIsland', chefsIsland, size=(1.86, 1.128, 0.774), key='model.foodie.chefsIsland', centre=(0, 0.073),
              motions={'uses': {'tastingMenu': 'drawer_open'}, 'hold': 2.5},

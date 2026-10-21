@@ -23,11 +23,12 @@ import { locomotionClips } from './locomotion';
 import { seatedClips } from './seated';
 import { playClips } from './play';
 import { streetClips } from './street';
+import { useClips } from './uses';
 import { workClips } from './work';
 
 /** Every clip definition. */
 export function clipDefs(): ClipDef[] {
-  return [...idleClips(), ...locomotionClips(), ...seatedClips(), ...workClips(), ...gardenClips(), ...actionClips(), ...lieClips(), ...babyClips(), ...streetClips(), ...gameClips(), ...playClips()];
+  return [...idleClips(), ...locomotionClips(), ...seatedClips(), ...workClips(), ...gardenClips(), ...actionClips(), ...lieClips(), ...babyClips(), ...streetClips(), ...gameClips(), ...useClips(), ...playClips()];
 }
 
 const live = new Set<CharacterSet>();
