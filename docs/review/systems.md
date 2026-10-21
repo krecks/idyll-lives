@@ -387,7 +387,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Fix class:** code
 - **Where:** `web/public/content/catalog2/bath.json:38` (`toiletWallHung`), `:223` (`towelLadder`); `web/public/content/furniture.json:2301` (`toiletSmart`): floor layer, nothing ties them to a wall; `crates/sim-core/src/content.rs:263` (`fillsWall` keeps the wall above clear, it doesn't require one)
 - **Evidence:** `bathroom/play/chunk2/towelLadder-no-uses.png` (the ladder leans 10.7° on nothing, mid-room), `bathroom/play/chunk4-redo/toiletWallHung-use-00.png` and `bathroom/play/chunk1/toiletSmart-use-01.png` (the boxed-in cistern panel, 1.1–1.2 m tall, stands free with the bowl hung off it). Each is built with its back on the wall face (game depth −0.43) and reads right only there; the blender README's traps say no content fact says a thing stands against a wall. A placement rule (a content `againstWall`, refused away from one, like a wall thing) is new behaviour. It would serve every floor model built to the wall face in the other ledgers too (fridges, counters, wardrobes), though those read as merely pulled out; these three look broken.
-- **Status:** confirmed and widened (consolidation: M-living-07 merged)
+- **Status:** fixed (05970ca3)
+- **After:** content `againstWall` on `toiletWallHung`, `toiletSmart`, `towelLadder`, `wallBed`, `ladderShelf` and `homeCinema` (`content.rs`, `world.rs` `check_fit`): refused mid-room ("that stands against a wall: put its back to one") or against a window, and its wall can't come down or become a door or window under it (sim test `layers.rs` `what_stands_against_a_wall_needs_one`; build mode, the house generator and `check.mjs`'s stage spots follow; generated houses and worlds pass). The packs' wall-hung parts (Q-06) stay with G-36.
 - **Source:** wave: bathroom (from the evidence's "Seen (not reviewed)")
 
 ### M-lighting-01 — Removing a wall can leave a ceiling lamp outdoors
@@ -400,7 +401,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Where:** `crates/sim-core/src/home.rs:475` (the "needs a ceiling" refusal)
 - **Evidence:** Building lets a wall's removal leave a ceiling lamp outdoors (or something upstairs outside a room). It hangs there until the game is loaded again, which leaves it out and loses its value.
   Activities wave: on `review-stage`, a `ceilingPendant` at `(12, 8, 0)` inside the room, then `build` with the front wall's segments at `x = 11, 12` (`z = 6`) set `open`: no refusal and no toast, the room stops being one (its tiled floor is drawn as grass, the kitchen and the crib now stand outdoors) and the pendant hangs from nothing in the open (`lighting/extra/ceiling-before.png`, `lighting/extra/ceiling-after-wall-open.png`; `decor/extra/extra.json`). Not checked: the reload that drops it.
-- **Status:** confirmed (activities wave)
+- **Status:** fixed (05970ca3)
+- **After:** a build that would leave a ceiling lamp outdoors (or something upstairs or in the basement outside a room) is refused, "the pendant would be left outdoors: move it first", and so is moving a room that would (`home.rs` `walls_still_hold`; sim test `layers.rs` `a_wall_taken_down_leaves_no_ceiling_lamp_outdoors`). A save from before with one outdoors still loads without it (`a_lamp_left_without_a_ceiling_doesnt_spoil_the_save`).
 - **Source:** `docs/release-0.2.0-review.md` §4 (new, Z1), target 0.2.1, not in the 0.3.0 notes
 
 ### I-kitchen-04 — Cooks chop with the crate in both hands and stir holding the bowl
@@ -566,7 +568,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
   - `lampBanker` and the lamps on tops: a disc up the wall behind them (`lighting/extra/lampBanker-night-bought.png`), where a banker's lamp lights the desk under its shade.
   - `wallLightOutdoor` on the outside of the back wall, walls cut away: the fitting isn't drawn, its light lands on the inside floor by the wall (`lighting/night/extra/wallLightOutdoor-outside-on.png`; walls up, the wall is lit outside, `…-outside-on-wallsup.png`).
   Shared beyond this ledger: every content `light` is drawn so, also `nightstandLamp` (bedroom), `fireplace` (decor), `fireplaceElectric` (living), `lampPost`, `stringLights`, `firePit`, `garden.lantern` (outdoor, garden) and `streetLamp` (community). Directional lamps (a spot or a cone per kind) and lights kept to their room would be new renderer behaviour.
-- **Status:** open
+- **Status:** fixed in part (0eaa3ba7); light kept to its room filed as M-lighting-08
+- **After:** the room lights are spot lights and content `light.aim` sends a shade's light one way: `down` (pendant, industrial pendant, track lights, swing-arm, arc and banker's lamps: no disc up the wall, `fixes/lighting/webgpu-medium/banker-cut.png`, `pendant-cut.png`), `up` (the sconce: a wash up the wall above it, `sconce-cut.png`), `out` (the bulkhead: nothing behind its wall, the inside floor dark, `bulkhead-inside.png`; a pool on the lawn in front, `bulkhead-cut.png`, `bulkhead-up.png`) and `ceiling` (the uplighter: from 30 cm under the ceiling, the room lit from above rather than a pool round its foot, `uplighter-cut.png`, `uplighter-up.png`). The same in `webgl-medium`, `webgpu-low`, `webgl-low`. Same draws and lights; GPU within noise on Low and Medium (`fixes/lighting/perf`). Lights still pass through walls into the next room (M-lighting-08).
 - **Source:** wave: lighting (leads "the uplighter lights the floor, not the ceiling" and "the outside bulkhead's light reaches the inside floor with walls cut away", both confirmed)
 
 ### I-lighting-01 — A lamp bought is on, at night in an empty room too
@@ -578,7 +581,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Fix class:** decision
 - **Where:** `crates/sim-core/src/world.rs:129` ("A lamp switched off …; bought on"), `:1553` (`off: false`); `crates/sim-core/src/lights.rs:3-10` (residents switch only on coming and going)
 - **Evidence:** `lighting/extra/lamp-night-bought.png`: on `review-stage-night` (22:00 by the sim's clock), a floor lamp bought in the room while everyone is in the front yard (and the baby asleep) comes on and stays on; nobody came or left, so no rule switches it. The same by day: a lamp bought at noon in a room nobody uses is lit when dusk comes. A new real lamp is off until someone switches it on. Decide: off when bought (and residents switch it on as they come in), or on (the player sees the lamp work). Covers every lamp in this ledger and the other ledgers' (`nightstandLamp` and the rest named in M-lighting-02).
-- **Status:** open
+- **Status:** fixed (0eaa3ba7)
+- **After:** Q-11: a lamp (or a fire) bought comes switched off (`home.rs` `buy_at`); it goes on with the room's as someone comes in after dark, or by a click (sim test `lamps.rs` `a_lamp_bought_is_off_until_someone_comes_in`; in the browser the bought lamp is in `lampsOff`, `{E}/*/*.json`). A lot's and a house's own lamps still start on.
 - **Source:** wave: lighting (lead "a newly bought lamp is already on", confirmed)
 
 ### M-outdoor-01 — Night glow draws through other parts: the grill's coals through its shut lid
@@ -592,5 +596,6 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/models.ts:73` (`glows`), `tools/art/blender/families/outdoor.py:64`
 - **Evidence:** A glowing material draws through the parts in front of it. `outdoor.py:64` now builds the grill's hot coals with no glow "which would show through its shut lid", so the grill may be worked round while the renderer still has the fault for other models. `extra/night/sheet-fire.png`: the grill cooking at 22:00 with the lid up shows dull red coals and no light on the cook; the fire pit beside it glows.
-- **Status:** confirmed (outdoor wave)
+- **Status:** fixed (0f7cf80f); the grill's coals glowing again is the Blender wave's
+- **After:** the glow copy no longer takes a slope-scaled depth offset (`models.ts` `glowMesh`: `zOffsetUnits` -4 instead of `zOffset` -2). With the grill's coals made to glow for the check (a local manifest edit, not kept), the shut lid showed red specks of the coals from 9 m before (`fixes/lighting/webgpu-medium/grill-far-glowing-coals-before.png`) and none after (`grill-far-glowing-coals.png`, `grill-shut.png` in each folder); shades glow as before, no z-fighting. Not shot: the lid open (cooking needs the kitchen's ingredients on the stage). Giving `coal_hot` its glow back (`outdoor.py:64` and the manifest) is a model change for the Blender wave (G-35).
 - **Source:** `docs/objects/open.md` Still open › Rendering; `plan/authenticity-review.md` §3.1 (M10); outdoor wave (night run)

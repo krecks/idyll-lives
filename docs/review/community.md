@@ -248,7 +248,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/public/content/community.json:27` (`streetLamp` `light`: range 8, intensity 1.3, height 3.5); `web/src/render/babylon/house.ts:198-235` (`placeLights`: the garden's lamps are placed last); `web/src/render/babylon/BabylonRenderer.ts:4704-4724` (`applyRoomLights`)
 - **Evidence:** `extra/night/night-streetLamp-no-uses.png` (`review-stage-night`, 22:02, Medium, headless): the lantern's panes glow warm, the grass round the post is as dark as the rest of the garden, no pool of light under a 3.5 m lamp whose whole job is lighting the pavement. The cause isn't traced: Medium has clustered lamps (32), so the stage's rooms shouldn't crowd it out; a lamp's light from 3.5 m with the clustered inverse-square falloff may just be too weak to show. Not checked on a town lot at night (no night state of the park).
-- **Status:** open (seen on `review-stage-night` only)
+- **Status:** fixed (0eaa3ba7)
+- **After:** the cause: the lamps never light the landscape, the lawn included (`excludeLandscape`), so a garden lamp lit only what stands round it. Letting the cluster light the ground cost 1.1–1.5 ms of GPU a frame at night on Medium (`fixes/lighting/perf/perf-ab`), so the garden's lamps now cast pools of light on the lawn as the street's lamps do (`gardenPools.ts`: one draw at night, on Low too), and the street lamp is brighter (`intensity` 1.3 → 3.0; the bulkhead 0.9 → 1.6): `fixes/lighting/webgpu-medium/street.png`, `firepit-lit.png`, and the same in the other three folders. Not checked on a town lot (no night state of the park).
 - **Source:** community wave (night run)
 
 ### I-community-01 — "Go down the slide" is standing at the foot of the chute

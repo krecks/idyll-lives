@@ -82,7 +82,9 @@ none.
 **In play** (signed off 2026-10-17):
 - Each checked in four facings: the charcoal grill's lid is up for the whole of "Grill dinner", over the coals and
   food; the gas station's hood is up for cook and for the feast; the fire pit's flames grow for "Warm up by the
-  fire", the resident on its front capstones, and the embers and flames glow at night.
+  fire", the resident on its front capstones, and the embers and flames glow at night. It is a fire (content
+  `light.fire`): lit by sitting down by it in the dark or by the player, it burns (light, glow and flames) until the
+  morning, and its light lies in a pool on the lawn round it (`gardenPools.ts`).
 - Each shuts when the use ends. Nothing needed fixing.
 
 ## OU4. Play and yard (9)

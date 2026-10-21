@@ -147,7 +147,8 @@ Not tied to one row: M-lighting-01, M-lighting-02 (every lamp).
 - **Fix class:** decision
 - **Where:** `tools/art/blender/families/lighting.py:173` (`ceilingPendant`, dome bottom about 1.86 m), `:235` (`pendantIndustrial`, 1.93), `:297` (`paperLantern`, globe bottom 1.80), `:205` (`chandelier`, ring 2.04); `crates/sim-core/src/home.rs:491` ("Residents walk under pictures and lamps"); the adult man is 1.77 m (`crates/tools/src/characters/rig.rs:81`)
 - **Evidence:** `cargo review sizes` (H from the 2.8 m ceiling: 0.95, 0.87, 1.00, 0.76), `lighting/gallery/gallery-ceilingPendant.png`, `lighting/gallery/gallery-paperLantern.png`. The reference (`pendant`) gives at least 2.1 m clear where people walk, or 0.75–0.9 m over a dining table (bottom 1.5–1.65 m); these hang between, 3–16 cm over a man's crown, and nothing keeps residents from walking under (they are not `hangsLow`). Decide per lamp: a shorter drop (walk-under) or `hangsLow` (over a table only, as the hanging plant).
-- **Status:** open
+- **Status:** fixed in part (05970ca3); the shorter drops are the Blender wave's
+- **After:** Q-12: the ring chandelier and the industrial pendant are `headHeight` (content): nobody walks under them, furniture still goes under (a dining table, a sofa), not furniture as tall as the wall (sim test `layers.rs` `a_lamp_at_head_height_hangs_over_a_table_not_over_heads`; generated houses take their floor from walking and use another kind where one would block the way). Not done: the shorter drop for `ceilingPendant` and `paperLantern` (`lighting.py:173`, `:297`), a model change for the Blender wave (G-35/G-40).
 - **Source:** wave: lighting
 
 ### M-lighting-06 — The arc lamp's arc doesn't reach past its own tile
@@ -179,5 +180,16 @@ Not tied to one row: M-lighting-01, M-lighting-02 (every lamp).
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/objectMotion.ts:239` (an `idle` clip plays whenever the camera is near, whatever the object's state); `tools/art/blender/families/lighting.py:248` (`ceilingFan`, `blades_turn` idle), `:297` (`paperLantern`, `sway` idle)
 - **Evidence:** `lighting/extra/ceilingFan-night-bought.png`; after `switchLamp` off, the fan's `blades_turn` clip still runs (its time 0.2 then 0.9 s, 0.7 s apart: `decor/extra/extra.json`), and it turns by day in an empty house. A real fan has its own switch (pull cord or wall) and stops; the content has one switch, for the light. The paper lantern's sway goes on day and night indoors, where a paper globe hangs still without a draught. The fan's clip following its switch (on: turning) and the lantern's sway kept for open windows or dropped would do.
-- **Status:** open
+- **Status:** fixed in part (0eaa3ba7); dropping the lantern's sway is the Blender wave's
+- **After:** a lamp's `idle` clip goes round only while it is switched on (`objectMotion.ts`): the fan's blades stop with its light off (in the browser, `blades_turn` absent bought off, turning 1.5 → 2.2 s once switched on, gone when off again). The paper lantern sways only while lit now; dropping its `sway` (`lighting.py:297`, `IDLE_SWAY`, and the manifest) is a model change for the Blender wave.
 - **Source:** wave: lighting
+
+### M-lighting-08 — A lamp's light passes through walls into the next room
+
+- **Severity:** S3
+- **Rubric:** M10
+- **Fix class:** code
+- **Where:** `web/src/render/babylon/BabylonRenderer.ts` (`setupLights`: the room lights have no shadows and no room of their own), `web/src/render/babylon/house.ts` (`placeLights`)
+- **Evidence:** the part of M-lighting-02 its fix left: a lamp near a wall lights the floor and furniture of the room behind it within its reach (4–7 m); aimed lamps (`light.aim`, G-60) leak less, all-round ones (a floor lamp, a fire) as before. Keeping a light to its room needs a per-room mask in the cluster's shader or shadows per lamp, both new renderer work with a frame cost to measure first.
+- **Status:** open
+- **Source:** fix: lighting
