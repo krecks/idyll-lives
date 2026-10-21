@@ -1,6 +1,6 @@
 /**
  * Sitting: the seated loop, talking and desk work seated, sitting down and standing up, eating
- * (also the seated upper-body layer) and a sip from a cup.
+ * (also the seated upper-body layer), a sip from a cup, and sitting cross-legged on the floor (down to it and up).
  *
  * The seated pelvis sits where a 0.45 m seat puts it on the reference body (`seatDrop` above the
  * seat; the runtime fits every clip's seat to each body and seat with `measureSit` on `sit`),
@@ -8,9 +8,9 @@
  * Every seated clip shares that pelvis, the thighs about level and the feet flat on the floor.
  */
 
-import { clip, cycle, type ClipDef, type PoseSpec, type Vec } from './dsl';
+import { clip, cycle, reference, type ClipDef, type PoseSpec, type Vec } from './dsl';
 import { breathe, bump, hangArms, stand, TAU } from './idle';
-import { armIK, footIK, wrist } from './ik';
+import { armIK, axisAngle, footIK, lerpV, mul, sub, toEuler, world, wrist } from './ik';
 
 /** Pelvis offset when seated (reference skeleton), and the left foot's offset from its rest place. */
 export const SEAT_MOVE: Vec = [0, -0.348, -0.19];
@@ -137,6 +137,148 @@ function seated(): PoseSpec {
   return sitPose(0);
 }
 
+// --- on the floor -----------------------------------------------------------------------------------------
+
+/**
+ * Sitting on the floor (characters.ts `FLOOR_SIT`), in two ways, each with its sitting down and getting up:
+ * - `Floor`: cross-legged on a floor cushion (the floor cushion, the electric fireplace's hearth cushion), the
+ *   ankles crossed in front, each under the other knee, the hands on the knees;
+ * - `Ground`: on the ground against a tree's trunk ("Relax in the shade"), leant back against it, the legs out
+ *   long and crossed at the ankles, the hands in the lap.
+ * `seat`: the seat height each is made for (m; the pelvis `seatDrop` above it, as `SEAT_MOVE` on a chair's,
+ * a little back from the standing place). `legs`: where the ankles go (m from the pelvis joint across and
+ * ahead, and up from the floor, reference skeleton), where the knees point and how the feet turn (`sx`: -1
+ * for the left). `tilt`, `lean`: the pelvis's tilt and the back's lean (deg, as `seatedBody`'s).
+ */
+export interface FloorSit {
+  name: 'Floor' | 'Ground';
+  seat: number;
+  legs: { l: Vec; r: Vec; pole: (sx: number) => Vec; foot: (sx: number, k: number) => Vec };
+  tilt: number;
+  lean: number;
+  /** The left hand: across from the pelvis joint, up from the floor, ahead (m; the right mirrors it). */
+  hands: Vec;
+}
+export const FLOOR_SITS: readonly FloorSit[] = [
+  {
+    name: 'Floor',
+    seat: 0.14,
+    legs: {
+      l: [0.12, 0.09, 0.23],
+      r: [-0.12, 0.065, 0.13],
+      // The knees out to the sides, the feet turned in across and rolled onto their outer edges.
+      pole: (sx) => [sx, -0.1, 0.6],
+      foot: (sx, k) => toEuler(mul(axisAngle([0, 1, 0], -50 * sx * k), axisAngle([0, 0, 1], -95 * sx * k))),
+    },
+    tilt: -10,
+    lean: 9,
+    hands: [-0.24, 0.25, 0.25],
+  },
+  {
+    name: 'Ground',
+    seat: 0,
+    legs: {
+      l: [0.03, 0.095, 0.74],
+      r: [-0.03, 0.07, 0.7],
+      // The knees up (nearly straight), the toes up and falling out.
+      pole: (sx) => [0.1 * sx, 1, 0.3],
+      foot: (sx, k) => toEuler(mul(axisAngle([0, 1, 0], 14 * sx * k), axisAngle([1, 0, 0], -72 * k))),
+    },
+    tilt: -14,
+    lean: -12,
+    hands: [-0.1, 0.24, 0.3],
+  },
+];
+/** The floor cushion's height (`FLOOR_SITS`' `Floor`). */
+export const FLOOR_SEAT = 0.14;
+
+/** Its pelvis offset (as `SEAT_MOVE`). */
+function floorMove(f: FloorSit): Vec {
+  return [0, SEAT_MOVE[1] - (0.45 - f.seat), -0.1];
+}
+
+/** A point `at` from the pelvis joint across and ahead, `y` m above the floor, as an ankle offset of `footIK`. */
+function ankleAt(body: PoseSpec, side: 'l' | 'r', at: Vec): Vec {
+  const p = world(body, 'pelvis').p;
+  return sub([p[0] + at[0], at[1], p[2] + at[2]], reference().joint(`foot_${side}`));
+}
+
+/**
+ * The legs on the floor: as `f` has them (`k` 1), or (0) the feet flat in front, the knees up, `ahead` m in
+ * front of the pelvis, or between.
+ */
+function floorLegs(f: FloorSit, body: PoseSpec, k: number, ahead = 0.32): PoseSpec {
+  const legs: PoseSpec = {};
+  for (const side of ['l', 'r'] as const) {
+    const sx = side === 'l' ? -1 : 1;
+    const up: Vec = [0.11 * sx, 0.08, ahead];
+    const pole = lerpV([0.15 * sx, 0.2, 1], f.legs.pole(sx), k);
+    Object.assign(legs, footIK(side, ankleAt(body, side, lerpV(up, f.legs[side], k)), body, { pole, foot: f.legs.foot(sx, k) }));
+  }
+  return legs;
+}
+
+/** The hands where `f` rests them (`wide` 1), or in nearer and lower. */
+function floorHands(f: FloorSit, body: PoseSpec, wide = 1): PoseSpec {
+  const p = world(body, 'pelvis').p;
+  const [x, y, z] = f.hands;
+  const at = (sx: number): Vec => [p[0] + sx * (0.12 + (-x - 0.12) * wide), y - 0.05 * (1 - wide), p[2] + z];
+  return {
+    ...armIK('l', at(-1), body, { palm: true, pole: [-0.6, -0.4, -0.7], pronate: 80, hand: wrist('l', 15, 0) }),
+    ...armIK('r', at(1), body, { palm: true, pole: [0.6, -0.4, -0.7], pronate: 80, hand: wrist('r', 15, 0) }),
+  };
+}
+
+/** Sitting on the floor as `f` does, breathing, the head moving a little. */
+function floorPose(f: FloorSit, p: number): PoseSpec {
+  const body = seatedBody({ breath: p, depth: 1, move: floorMove(f), tilt: f.tilt, lean: f.lean, head: [6 + 2 * Math.sin(p * TAU + 1), 4 * Math.sin(p * TAU), 0] });
+  return { ...body, ...floorLegs(f, body, 1), ...floorHands(f, body) };
+}
+
+/** Down on the floor or up from it: the pelvis at `move`, leaning `lean`, the legs as `f`'s by `k` (or flat, `ahead`), a hand down on the floor. */
+function floorBetween(f: FloorSit, move: Vec, lean: number, k: number, ahead: number, hand: number): PoseSpec {
+  const body = seatedBody({ move, lean, tilt: lean * 0.3 - 6, head: [-lean * 0.3, 0, 0] });
+  const p = world(body, 'pelvis').p;
+  const reach: Vec = [p[0] + 0.24, 0.04 + (1 - hand) * 0.3, p[2] - 0.05 + (1 - hand) * 0.3];
+  return {
+    ...body,
+    ...floorLegs(f, body, k, ahead),
+    ...floorHands(f, body, 0.6),
+    ...armIK('r', reach, body, { palm: true, pole: [0.8, -0.2, -0.5], pronate: 80, hand: wrist('r', -40 * hand, 0) }),
+  };
+}
+
+/** Squatting over the feet (getting down to the floor or up from it), leaning `lean`, the arms forward. */
+function squat(move: Vec, lean: number): PoseSpec {
+  return crouchOver(move, lean, [0, 0, 0.04], 0.3);
+}
+
+/**
+ * `sit<name>` (the loop), `sitDown<name>` (a squat, a hand down to the floor, sitting back, the legs into
+ * place) and `standUp<name>` (the legs drawn in, forward over the feet into a squat and up) for `f`.
+ */
+function floorClips(f: FloorSit): ClipDef[] {
+  const m = floorMove(f);
+  const sat = () => floorPose(f, 0);
+  return [
+    cycle(`sit${f.name}`, { seconds: 50 / 30, loop: true }, (p) => floorPose(f, p)),
+    clip(`sitDown${f.name}`, { seconds: 48 / 30, loop: false }, [
+      [0, standing],
+      [0.28, () => squat([0, -0.42, -0.06], 28), 'smooth'],
+      [0.55, () => floorBetween(f, [m[0], m[1] + 0.02, m[2] - 0.03], 6, 0, 0.32, 1), 'smooth'],
+      [0.8, () => floorBetween(f, m, (6 + f.lean) / 2, 0.6, 0.3, 0.3), 'smooth'],
+      [1, sat, 'smooth'],
+    ]),
+    clip(`standUp${f.name}`, { seconds: 44 / 30, loop: false }, [
+      [0, sat],
+      [0.24, () => floorBetween(f, m, 10, 0, 0.26, 0.6), 'smooth'],
+      [0.52, () => squat([0, -0.46, -0.04], 34), 'smooth'],
+      [0.78, () => squat([0, -0.18, -0.02], 16), 'out'],
+      [1, standing, 'smooth'],
+    ]),
+  ];
+}
+
 /** Hand to mouth (eating; the seated upper-body layer too): the left hand holds the food low in front. */
 function eatPose(t: number, at: Vec, head: Vec, lean: number): PoseSpec {
   const body = stand({ shift: 0.25, breath: t * 0.5, lean, head });
@@ -172,6 +314,8 @@ export function seatedClips(): ClipDef[] {
       [0.88, () => ({ ...stand({ lean: -2, head: [-2, 0, 0] }), ...hangArms(6, 8, 18) }), 'smooth'],
       [1, standing, 'smooth'],
     ]),
+    // On the floor (`FLOOR_SITS`): cross-legged on a cushion, on the ground against a trunk.
+    ...FLOOR_SITS.flatMap(floorClips),
     cycle('sitHands', { seconds: 50 / 30, loop: true }, (p) => deskPose(p)),
     cycle('sitHandsNear', { seconds: 50 / 30, loop: true }, nearDeskPose),
     cycle('sitHandsFar', { seconds: 50 / 30, loop: true }, farDeskPose),

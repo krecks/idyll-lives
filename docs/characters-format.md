@@ -255,7 +255,13 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
   elder's stoop), so a clip looks in game as it was authored.
 - Seated clips share `sit`'s pelvis. The runtime fits it to each body and seat: the pelvis joint
   goes `seatDrop` above the seat's surface and at the seat's forward offset (`SEATS`, from
-  characters/furniture.json, or the content's `seat`). Lying plays `lie` turned flat on the mattress (`LIE_*`);
+  characters/furniture.json, or the content's `seat`). It fits the legs too (`characters/seatFit.ts`, shared with
+  `check_clips.ts`): each ankle down to the floor under the knee, the thigh sloping off the seat's front by up to
+  0.3 rad, past that the feet hanging (a child on a grown-up's chair), the knees coming up on a low seat; on a deep
+  seat (`front`) the hips move forward until the knees clear its front (`perch`). Relaxing, the feet go 12 cm
+  further out. A seat under 0.2 m is the floor's (`floorSit`): sat on by the floor clips, cross-legged on a cushion
+  (`sitFloor`) or on the ground against a tree's trunk (`sitGround`), each with its own sitting down and getting up
+  and its own pelvis. Lying plays `lie` turned flat on the mattress (`LIE_*`);
   the blanket is fitted to `lie` too. A baby lying (in the crib) plays its own clips the same way,
   `babyLieAsleep` or `babyLieAwake`, centred on the mattress.
 - Carried things sit on the palms (`grip`): the right one, or between both.
@@ -274,6 +280,8 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | sitTalk | yes | 2.93 | seated in a conversation |
 | sitDown | no | 1.33 | sitting down, and onto the edge of a bed before lying down |
 | standUp | no | 1.07 | getting up from a seat or out of bed |
+| sitFloor, sitDownFloor, standUpFloor | yes, no, no | 1.67, 1.6, 1.47 | on a floor cushion (a seat under 0.2 m: the floor cushion, the electric fireplace's hearth cushion): cross-legged, the hands on the knees; down to it through a squat and a hand on the floor, and up again (clips/seated.ts `FLOOR_SITS`) |
+| sitGround, sitDownGround, standUpGround | yes, no, no | 1.67, 1.6, 1.47 | on the ground (a seat under 0.07 m: a tree's shade) against the trunk, leant back, the legs out long, crossed at the ankles, the hands in the lap |
 | sitHands | yes | 1.67 | seated at a desk or keys (type, write, play, music) |
 | sitHandsNear | yes | 1.67 | the same at a shallow desk with its chair built in close (`NEAR_DESKS`) |
 | sitHandsFar | yes | 1.67 | the same reaching further out, leaning in more: at a desk or table a chair can't be pulled in to far enough (drawer pedestals where the knees go: `TUCK`) |
@@ -285,9 +293,12 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | carry, carryOne | yes | 1.1 | the upper body while carrying something in both hands / on the right palm (`held`, content `hold`) |
 | lie | yes | 2.4 | lying (turned flat by the runtime, played at a third of the speed) |
 | babyLieAsleep, babyLieAwake | yes | 9, 6 | a baby lying in the crib, asleep (still, quick breaths, a twitch) or awake (kicking, waving, turning the head); legs drawn up, hands by the head; turned flat like `lie`, played at full speed |
-| foldArms | yes | 2.5 | watching, relaxing, idle variations |
+| foldArms | yes | 2.5 | watching, relaxing, idle variations; unamused at a joke that fell flat, unmoved by an apology or a compliment |
 | yes / no | no / yes | 2.5 | listening, arguing |
-| phone, lantern | yes | 2.93, 2.5 | the phone; reading (a book at the chest) |
+| phone, lantern | yes | 2.93, 2.5 | a call, the phone at the ear; reading (a book at the chest) |
+| phoneText | yes | 3.0 | texting and scrolling (`ACTIONS.phoneScreen`, content `phone.actions[].anim`): the phone held in both hands before the chest, the head bowed over it, the thumbs tapping and swiping; the upper body of it seated |
+| compliment, deepTalk, flirt, sweetTalk, argue, insult, apologize, joke, introduce, askPartner, breakUp, prank | yes | 3, 4, 3.2, 3.4, 2.2, 2.4, 3.4, 2.8, 3, 3.2, 3, 2.6 | the socials' own gestures on a speaker's turn (`GESTURES`, `clips/social.ts`): an open hand offered and two claps; the fingertips together, then the chin on the hand; a hand in the hair, the other on the hip; the hands clasped at the heart, a reach to the other's arm; palms up, then a chopping hand; a dismissive flick; a hand on the heart, then open palms; the story told with the hands, then the arms thrown wide; a hand to the chest, then held out to shake; hands clasped low, then held out; a hand to the brow, then both sweeping apart; a creep, "boo!" with clawed hands, a laugh |
+| laugh, shrug, rebuffed, refuse | yes | 2, 2.4, 2.6, 2.4 | how a social is taken (`GESTURES`, `REFUSED`): laughing at a joke that landed (the head back, a hand on the belly, bent over once); a teller's shrug at a joke that fell flat; turned down (the shoulders dropped, the head bowed aside, a hand to the neck); turning down a hug or a kiss (leaning away, the head turned aside, a hand up, palm out, a step back) |
 | rail | yes | 2.5 | leaning on a rail (the older layouts' telescope, `USE`) |
 | eyepiece181, 163, 147, 129, 112 | yes | 6 | bent down to the telescope's eyepiece (the tube aimed up: the eye at 0.765 m, 0.3 m out), the right hand on the tube, the left on the knee, a look up at the sky each loop; a size per height (cm, `STEP_IN`, for `look`) |
 | pickApple177, 147, 112; pickLemon177, 147, 112 | no | 3.3 | reaching up to the fruit tree's picked fruit (the apple 1.84 m up, the lemon 1.62 m), on tiptoe if high, the left hand on the bough, a twist off and down to the chest; then `eat` (`STEP_IN`, for `eat`); a size per height |
@@ -297,7 +308,7 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | water, harvest, plant, kneel, crouch | yes, yes, no, yes, yes | 3.8, 2.5, 2.77, 5.2, 2.93 | gardening, smelling flowers |
 | pick | yes | 3.0 | picking herbs from a waist-high planter |
 | dance | yes | 1.0 | dancing, fitness games |
-| punchJab, punchCross, hit | no | 0.87, 1.0, 0.33 | heavy bags and fights |
+| punchJab, punchCross, hit | no | 0.87, 1.0, 0.33 | heavy bags and fights (the attacker's punches aimed at the other's head at any two heights by the runtime, `AIM`) |
 | wave | no | 2.2 | the household creator's greetings |
 | fountainDrink181, 163, 147, 129, 112 | yes | 3 | bent over a drinking fountain's spout, sipping from its water (a size per height, in cm; the smaller two on tiptoe at the water's falling end); `STEP_IN` steps them up to it |
 | climb172a, 147a, 112a; climb172b, 147b, 112b | yes | 13 | a round on the climbing frame: up its rope net three ropes, hands and feet in turn, over the edge onto the deck, ducking under the roof across it to the fireman's pole, round the pole and down it (hands and legs round it), and back round to the net; a size per height (cm), and one per lane of the net (`a`, `b`: the second waits on the deck for the first to slide; one stepping in while someone goes round waits at their lane until that round is back at its start, so the two stay in step: `inTurn`) |
@@ -307,18 +318,37 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | foosball172, 147, 112 | yes | 3.2 | the foosball table (`STEP_IN`, a pair of rods each for two): hands on two handles, the wrists turning the rods (the right in time with the table's moving rods) and sliding them; a size per height |
 | smashPlate172, 147, 112 | yes | 3.4 | the plate-smash bin (`STEP_IN`): a plate taken from the stack (mimed), up over the right shoulder and thrown overarm down into the crate; a size per height |
 | boulder172, 147, 112 | yes | 16 | the bouldering wall (`STEP_IN`, up on its crash mat): hands to the start holds, the feet onto the low ones, up the wall's holds hand and foot in turn to the top, a drop to the mat onto bent knees; the route scaled to the size and put on the model's nearest holds |
+| ballPit112 | yes | 12 | the ball pit (`STEP_IN`, over its rim, `over`): wading and a jump in the balls, down to sit in them tossing balls up, up again; a child's size (clips/play.ts) |
+| tentPlay112 | yes | 24 | the play tent (`STEP_IN`): down on hands and knees at its door, crawling in, sitting back on the heels to play on its mat, crawling back out; a child's size |
 | yoga | yes | 48 | a yoga flow on the mat (`STEP_IN` onto its front end, open hands): mountain, hands to the heart, upward salute, forward fold, half lift, a short downward dog (heels pedalling), a lunge up to warrior I, back to the dog, a child's pose, sitting on the heels, up through a squat |
+| slide125, 112, 99 | yes | 14 | a round on the slide (`STEP_IN` at the run-out's foot; `clips/rides.ts`): round its right side to the ladder, up the five rungs hand and foot in turn, ducking under the bar onto the deck on hands and knees, sat at the top holding the hoop, lain back under it and down the chute on the back (the body on the chute's floor, the legs ahead along it), sat up on the run-out, up off it and a turn back to the start; a child's sizes (cm), fitted by the legs (a child's `pelvisScale`, 0.51 of the height); a planted foot pivots on its ball as the body turns over it |
+| bunkUp172, 147, 112; bunkDown172, 147, 112 | no | 7, 6.5 | the upper bunk's ladder (`BUNK_LADDER`, getting into the bed's second slot and up from it): from the tile in front round the foot end to the ladder, up its four rungs, onto the mattress on hands and knees through the gap in the guard rail, sat with the legs swung round and lain back, ending in the `lie` pose (the pelvis turned flat in the clip, so the fade to `lie` is short); down the same way backwards and a walk round to the tile, sim-core waiting for them (`LADDER_DOWN_TICKS`); placed in the bed's frame (`Player.frame`); a size per height (grown-up, teen, child) |
+| rideHorse112, rideSpring112 | yes | 2.4, 2 | astride the rocking horse and the spring rider (`RIDES`, a child's): the thighs either side of the barrel, the hands on the handles, the feet down by the rockers or on the pegs; the ride's `ride` part rocks them |
+| rideSeesaw147, 112 | yes | 2.8 | astride the seesaw's end, facing along it to the middle (its slot's place, content `places`), the hands on the handle bar, the feet tucked clear of the ground |
+| rideRound147, 112 | yes | 2.4 | sat on the merry-go-round's platform at a slot's place, facing in between two rails: leant in, a hand on each rail, the legs out towards the column, the knees up |
+| rideSwing172, 147, 112 | yes | 1.6 | the swing: both hands on the chains, pumping in time with the swing (`RIDES` `sync`: the clip held to its loop): leant back with the legs out on the way forward, tucked under the seat on the way back |
+| putAway177, 147, 112; putAwayGlass…, putAwayCorner…, putAwayHutch… | yes | 3.2 | clean things put away (`fetch`, `STEP_IN` up to the worktop under the wall cabinet, the glazed and the corner one, and to the china cabinet): up on tiptoe to the pulls of the doors that open, drawn open along their swing, the stack lifted from the worktop onto the shelf, a door pushed shut as the model's closes; the smallest size (a child, who can't reach) puts it on the worktop's back, looking up. Reaching up (clips/reach.ts `upFor`): on tiptoe, the shoulder lifted and leant in as far as the hands need |
+| windClock177, 147, 112 | yes | 4.5 | the grandfather clock wound (`tinker`, `STEP_IN`): the key into each winding hole under the 1.77 m dial for four turns of the wrist, the other hand on the hood; the smallest pulls the weights' chains hand over hand in the trunk |
+| fillFeeder177, 147, 112 | yes | 4 | the songbird feeder refilled (`garden`, `STEP_IN` at its post): the scoop (mimed) tipped twice over the house's open top, the other hand steadying it; the smallest tips it onto the seed tray |
+| writeBoard177, 147, 112 | yes | 6 | planning on the whiteboard (`STEP_IN` up to it): three lines written at shoulder to head height, the marker off the board between words, the weight and the head with the hand |
+| hoopShot177, 147, 112 | yes | 3.2 | "Shoot some hoops" (`STEP_IN` back out on the court, 2.5 m from the hoop's middle, walked to backwards): dribbles, the gather, the dip, a jump shot let go at the top towards the 2.94 m rim, the follow-through held; the smallest heaves it two-handed from the chest; the ball mimed. The round is the net's `swish` period |
+| sitHandsLow177, 147, 112 | yes | 5 | seated at a top less than `LOW_TOP` (0.2 m for the reference height) over the seat (the kids' chair at the coffee table, `tuckLow`): bent well over it, the left hand flat on it, the right drawing; `sit`'s pelvis |
+| kneelTable177, 147, 112 | yes | 6 | at the train table (`play`, `STEP_IN`, a lane each): kneeling up at its edge, leant in, the right hand pushing the engine along the track and the left on the top, now and then sitting back for a look |
+| brushHair | yes | 5 | getting ready at the dressing table (the seated upper body, `ACTIONS.wash`): four brush strokes from the crown down the right side, the head tilting into each, then the left hand smoothing the other side |
+| lieCurl | yes | 2.4 | dozing on a bed too short to lie on flat (`CURLED_BEDS`: the window seat): curled up on the left side facing the room, the knees drawn up, the head on the pillow on the left forearm; turned flat like `lie` |
 
 ### Checking clips
 
 `tools/characters/check_clips.ts [rig.json] [--body male|female|all] [--stage <stage>[,…]|all]
 [--update-baseline]` bakes the clips as the runtime does and checks loop flags, NaNs, loop seams,
-lengths, sliding feet, the seated pelvis and feet, `lie` and the baby's clips (the list is in its
-header). The default is the reference: `male` at `youngAdult`, plus `baby` for the baby's clips.
+lengths, sliding feet, the seated pelvis and feet (with the runtime's leg fit, `seatFit.ts`: on a 0.45 m seat, a
+child's on the kids' chair, and the knees clear of every deep seat's `front`), the floor sits' knees and ankles
+against the floor, `lie` and the baby's clips (the list is in its header). The default is the reference: `male` at
+`youngAdult`, plus `baby` for the baby's clips.
 Each body and stage plays the clips on its own skeleton (`restT`, the pelvis motion and ground
 speed scaled by `pelvisScale`, `walk`'s hip roll), the sized clips at the size its height picks,
 babies only their own; the height slider, build, head size, stoop and the runtime's fits to seats
-and beds are not covered. Planted feet are checked on each skeleton as it is, so a clip that turns the
+and beds other than the seated legs' are not covered. Planted feet are checked on each skeleton as it is, so a clip that turns the
 hips over a planted foot slides on hips wider for their legs than the reference's (a child's, a little a
 woman's): place the feet for them (`footIK`'s `wide`, a size per height) or keep the hips still. The known failures are in `tools/characters/clip-baseline.json`: they
 print as `known` and don't fail, one that no longer fails prints as `fixed` (take it out), and only
@@ -341,7 +371,17 @@ Why some entries are as they are:
   back half of the footprint, facing the work surface. The pack writing desks (`gloomy.journalDesk`,
   `neat.organizerDesk`, `romantic.letterBureau`, `hotHeaded.grudgeJournal`) are their own chairs (`NEAR_DESKS`): the
   hands on the top or the flap, in front of the hutch.
-- `fireplaceElectric` sits on the floor cushion in front of the fire, facing it (`back`).
+- `fireplaceElectric` sits cross-legged on the floor cushion in front of the fire, facing it (`back`), the hips on its
+  back half (0.36 m out) so the knees stop short of the surround.
+- Deep seats (the sofas, sectionals, sofa bed, armchairs, ottoman, bean bags and four pack seats) give `front`:
+  where the seat ends in front, m forward of the footprint's middle as `fwd` (`cargo check-glb` measures it: from
+  the hips forward while the model reaches within 6 cm of the seat's height, and warns past 3 cm). The hips sit
+  forward until the knees clear it (`perch`). The content-seated ones (`sofaThreeSeat`, `sofaBed`, the sectionals,
+  `armchairWingback`, `ottoman`, the bean bags) copy their content `seat` into the row; the recliners, whose
+  content seats put the legs out, keep theirs (no `perch` with the legs out).
+- Trees (`tree`, the seven `garden.*` trees with "Relax in the shade"): on the ground (`h` 0, not measured: nothing
+  of the model's is sat on) against the trunk, `fwd` the hips' distance from it, `shade`: facing out on the trunk's
+  front or a side, whichever the sun's light falls towards as they sit down (`shadeSide`; the renderer's sun).
 - Baths (`bathtub`, `bathtubClawfoot`, `bathtubFreestanding`): on the tub's floor, along the tub, the back at the
   end without the taps, the legs out along it towards them (`along`, `legsOut`).
 - The pack tubs (`gloomy.soakingTub`, `romantic.heartTub`, `hotHeaded.coldPlunge`): on the floor at the back, the
@@ -350,6 +390,8 @@ Why some entries are as they are:
 - `gardenChair`: on its slats' tops (0.43), against its slanted back, `recline` 0.314 rad (18°; the Adirondack
   chair's content `seat.recline` is in degrees).
 - `chessTable`, `sewingTable`, `hotHeaded.thunderDrums`: their chairs' and the drum stool's pads (0.475).
+- `weightBench`: lifting, the feet down on the floor either side of the bench, `feet` m out from its middle
+  (`benchLegs`).
 - `kidsBedCar`: the race car's mattress ends at its bonnet, 34 cm short of the footprint's end (`foot`).
 - Hammocks (`hammock`, `cheerful.rainbowHammock`, `natureLover.gardenHammock`): lain in the sagging sling (`sling`,
   from their models' builds).

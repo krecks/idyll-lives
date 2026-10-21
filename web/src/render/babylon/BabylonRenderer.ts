@@ -876,6 +876,7 @@ export class BabylonRenderer implements Renderer {
     this.characters = new Characters(scene, this.deps.assets, this.lib, this.deps.content, { refreshProps: true, castsShadows: this.quality.characterShadows });
     this.characters.setRide((id) => this.motion.ride(id));
     this.characters.setLoop((id) => this.motion.loopPhase(id));
+    this.characters.setSun(() => this.sun.direction);
     this.items = new ItemLayer(scene, this.deps.assets, this.deps.content);
     this.items.onChange = () => this.resetSnapshot();
     // A model file that failed has come: what was drawn without it (a box, or nothing) is built again.

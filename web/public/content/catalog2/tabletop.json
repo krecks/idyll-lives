@@ -16,7 +16,22 @@
       "decor": 0.2,
       "radius": 0.13,
       "description": "A cream kettle on its base. It stands on a table, counter, desk or shelf.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "tea",
+          "label": "Make a cup of tea",
+          "anim": "drink",
+          "minutes": 8,
+          "effects": {
+            "comfort": 0.12,
+            "energy": 0.04
+          },
+          "tags": [
+            "food",
+            "lounge"
+          ]
+        }
+      ]
     },
     {
       "id": "toaster",
@@ -33,7 +48,24 @@
       "decor": 0.2,
       "radius": 0.16,
       "description": "A two-slice toaster with the toast just up. It stands on a table, counter, desk or shelf.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "toast",
+          "label": "Make toast",
+          "anim": "cook",
+          "minutes": 4,
+          "eat": {
+            "item": "toast",
+            "minutes": 8
+          },
+          "effects": {
+            "hunger": 0.3
+          },
+          "tags": [
+            "food"
+          ]
+        }
+      ]
     },
     {
       "id": "blender",
@@ -50,7 +82,25 @@
       "decor": 0.2,
       "radius": 0.11,
       "description": "A blender with a smoothie in the jug. It stands on a table, counter, desk or shelf.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "smoothie",
+          "label": "Blend a smoothie",
+          "anim": "cook",
+          "minutes": 3,
+          "eat": {
+            "item": "smoothie",
+            "minutes": 5
+          },
+          "effects": {
+            "hunger": 0.2,
+            "energy": 0.06
+          },
+          "tags": [
+            "food"
+          ]
+        }
+      ]
     },
     {
       "id": "standMixer",
@@ -67,7 +117,25 @@
       "decor": 0.3,
       "radius": 0.17,
       "description": "A red stand mixer for serious bakers. It stands on a table, counter, desk or shelf.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "bake",
+          "label": "Practise baking",
+          "anim": "cook",
+          "minutes": 30,
+          "effects": {
+            "fun": 0.1
+          },
+          "tags": [
+            "training",
+            "creative"
+          ],
+          "skills": {
+            "cooking": 0.2,
+            "creativity": 0.04
+          }
+        }
+      ]
     },
     {
       "id": "espressoMachineSmall",
@@ -84,7 +152,29 @@
       "decor": 0.3,
       "radius": 0.22,
       "description": "A little steel espresso machine with a cup under the spout. It stands on a table, counter, desk or shelf.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "espresso",
+          "label": "Make a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
+          "anim": "drink",
+          "minutes": 10,
+          "effects": {
+            "energy": 0.1,
+            "comfort": 0.1
+          },
+          "tags": [
+            "food",
+            "lounge"
+          ],
+          "feeling": "home.perkedUp"
+        }
+      ]
     },
     {
       "id": "knifeBlock",
@@ -152,7 +242,25 @@
       "decor": 0.2,
       "radius": 0.19,
       "description": "A cream roll-top bread bin. It stands on a table, counter, desk or shelf.",
-      "interactions": []
+      "wearPerUse": 0,
+      "interactions": [
+        {
+          "id": "sandwich",
+          "label": "Make a sandwich",
+          "anim": "chop",
+          "minutes": 5,
+          "eat": {
+            "item": "sandwich",
+            "minutes": 10
+          },
+          "effects": {
+            "hunger": 0.35
+          },
+          "tags": [
+            "food"
+          ]
+        }
+      ]
     },
     {
       "id": "spiceJars",
@@ -186,7 +294,22 @@
       "decor": 0.3,
       "radius": 0.11,
       "description": "A glass jar of biscuits with a red lid. It stands on a table, counter, desk or shelf.",
-      "interactions": []
+      "wearPerUse": 0,
+      "interactions": [
+        {
+          "id": "biscuit",
+          "label": "Sneak a biscuit",
+          "anim": "fetch",
+          "minutes": 2,
+          "effects": {
+            "hunger": 0.1,
+            "fun": 0.1
+          },
+          "tags": [
+            "food"
+          ]
+        }
+      ]
     },
     {
       "id": "fruitBowl",
@@ -203,7 +326,21 @@
       "decor": 0.4,
       "radius": 0.19,
       "description": "A bowl of apples, oranges and a banana. It stands on a table, counter, desk or shelf.",
-      "interactions": []
+      "wearPerUse": 0,
+      "interactions": [
+        {
+          "id": "fruit",
+          "label": "Have a piece of fruit",
+          "anim": "fetch",
+          "minutes": 2,
+          "effects": {
+            "hunger": 0.15
+          },
+          "tags": [
+            "food"
+          ]
+        }
+      ]
     },
     {
       "id": "plateSet",
@@ -254,7 +391,25 @@
       "decor": 0.4,
       "radius": 0.23,
       "description": "A teapot and two cups on a wooden tray. It stands on a table, counter, desk or shelf.",
-      "interactions": []
+      "wearPerUse": 0,
+      "interactions": [
+        {
+          "id": "tea",
+          "label": "Pour a cup of tea",
+          "anim": "drink",
+          "minutes": 20,
+          "pose": "sit",
+          "seatNear": 2,
+          "effects": {
+            "comfort": 0.25,
+            "energy": 0.04
+          },
+          "tags": [
+            "food",
+            "lounge"
+          ]
+        }
+      ]
     },
     {
       "id": "mugs",
@@ -271,7 +426,25 @@
       "decor": 0.2,
       "radius": 0.15,
       "description": "Three mugs of coffee. It stands on a table, counter, desk or shelf.",
-      "interactions": []
+      "wearPerUse": 0,
+      "interactions": [
+        {
+          "id": "drink",
+          "label": "Have a hot drink",
+          "anim": "drink",
+          "minutes": 15,
+          "pose": "sit",
+          "seatNear": 2,
+          "effects": {
+            "comfort": 0.2,
+            "energy": 0.04
+          },
+          "tags": [
+            "food",
+            "lounge"
+          ]
+        }
+      ]
     },
     {
       "id": "wineGlasses",
@@ -288,7 +461,30 @@
       "decor": 0.3,
       "radius": 0.14,
       "description": "A bottle of red and two glasses. It stands on a table, counter, desk or shelf.",
-      "interactions": []
+      "wearPerUse": 0,
+      "interactions": [
+        {
+          "id": "wine",
+          "label": "Pour a glass of wine",
+          "stages": [
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
+          "anim": "drink",
+          "minutes": 10,
+          "pose": "sit",
+          "seatNear": 2,
+          "effects": {
+            "comfort": 0.1,
+            "fun": 0.08
+          },
+          "tags": [
+            "food",
+            "lounge"
+          ]
+        }
+      ]
     },
     {
       "id": "candlesticks",
@@ -322,7 +518,28 @@
       "decor": 0.3,
       "radius": 0.16,
       "description": "A pile of books someone is halfway through. It stands on a table, counter, desk or shelf.",
-      "interactions": []
+      "wearPerUse": 0,
+      "interactions": [
+        {
+          "id": "read",
+          "label": "Read a book",
+          "anim": "read",
+          "minutes": 45,
+          "pose": "sit",
+          "seatNear": 2,
+          "effects": {
+            "fun": 0.4
+          },
+          "tags": [
+            "entertainment",
+            "reading"
+          ],
+          "skills": {
+            "intelligence": 0.1,
+            "writing": 0.04
+          }
+        }
+      ]
     },
     {
       "id": "booksUpright",
@@ -339,7 +556,28 @@
       "decor": 0.4,
       "radius": 0.17,
       "description": "A row of books between brass bookends. It stands on a table, counter, desk or shelf.",
-      "interactions": []
+      "wearPerUse": 0,
+      "interactions": [
+        {
+          "id": "read",
+          "label": "Read a book",
+          "anim": "read",
+          "minutes": 45,
+          "pose": "sit",
+          "seatNear": 2,
+          "effects": {
+            "fun": 0.4
+          },
+          "tags": [
+            "entertainment",
+            "reading"
+          ],
+          "skills": {
+            "intelligence": 0.1,
+            "writing": 0.04
+          }
+        }
+      ]
     },
     {
       "id": "vaseFlowers",
@@ -390,7 +628,27 @@
       "decor": 0.3,
       "radius": 0.11,
       "description": "A small rosette succulent in a pale pot. It stands on a table, counter, desk or shelf.",
-      "interactions": []
+      "wearPerUse": 0,
+      "interactions": [
+        {
+          "id": "water",
+          "label": "Water the succulent",
+          "anim": "water",
+          "minutes": 3,
+          "autonomous": false,
+          "effects": {
+            "fun": 0.04
+          },
+          "tags": [
+            "chores",
+            "nature",
+            "garden"
+          ],
+          "skills": {
+            "gardening": 0.1
+          }
+        }
+      ]
     },
     {
       "id": "potCactus",
@@ -407,7 +665,27 @@
       "decor": 0.3,
       "radius": 0.1,
       "description": "A little cactus in a terracotta pot, in flower. It stands on a table, counter, desk or shelf.",
-      "interactions": []
+      "wearPerUse": 0,
+      "interactions": [
+        {
+          "id": "water",
+          "label": "Water the cactus",
+          "anim": "water",
+          "minutes": 3,
+          "autonomous": false,
+          "effects": {
+            "fun": 0.04
+          },
+          "tags": [
+            "chores",
+            "nature",
+            "garden"
+          ],
+          "skills": {
+            "gardening": 0.1
+          }
+        }
+      ]
     },
     {
       "id": "potSmall",
@@ -424,7 +702,27 @@
       "decor": 0.3,
       "radius": 0.16,
       "description": "A leafy plant in a white pot. It stands on a table, counter, desk or shelf.",
-      "interactions": []
+      "wearPerUse": 0,
+      "interactions": [
+        {
+          "id": "water",
+          "label": "Water the plant",
+          "anim": "water",
+          "minutes": 3,
+          "autonomous": false,
+          "effects": {
+            "fun": 0.04
+          },
+          "tags": [
+            "chores",
+            "nature",
+            "garden"
+          ],
+          "skills": {
+            "gardening": 0.1
+          }
+        }
+      ]
     },
     {
       "id": "photoFrame",
@@ -611,7 +909,83 @@
       "decor": 0.2,
       "radius": 0.19,
       "description": "A closed silver laptop. It stands on a table, counter, desk or shelf.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "browse",
+          "label": "Browse the web",
+          "anim": "type",
+          "minutes": 45,
+          "pose": "sit",
+          "seatNear": 2,
+          "effects": {
+            "fun": 0.4,
+            "comfort": 0.1
+          },
+          "tags": [
+            "entertainment",
+            "screen"
+          ]
+        },
+        {
+          "id": "code",
+          "label": "Practise coding",
+          "anim": "type",
+          "minutes": 60,
+          "pose": "sit",
+          "seatNear": 2,
+          "effects": {
+            "fun": 0.1,
+            "comfort": 0.1
+          },
+          "tags": [
+            "training",
+            "screen"
+          ],
+          "skills": {
+            "technology": 0.18,
+            "intelligence": 0.04
+          }
+        },
+        {
+          "id": "write",
+          "label": "Write",
+          "anim": "type",
+          "minutes": 60,
+          "pose": "sit",
+          "seatNear": 2,
+          "effects": {
+            "fun": 0.15,
+            "comfort": 0.1
+          },
+          "tags": [
+            "training",
+            "creative"
+          ],
+          "skills": {
+            "writing": 0.18,
+            "creativity": 0.04
+          }
+        },
+        {
+          "id": "homework",
+          "label": "Do homework",
+          "anim": "type",
+          "minutes": 45,
+          "pose": "sit",
+          "seatNear": 2,
+          "homework": 7,
+          "effects": {
+            "fun": -0.05
+          },
+          "tags": [
+            "screen"
+          ],
+          "skills": {
+            "intelligence": 0.1,
+            "writing": 0.05
+          }
+        }
+      ]
     },
     {
       "id": "monitor",
@@ -628,7 +1002,63 @@
       "decor": 0.2,
       "radius": 0.23,
       "description": "A flat monitor with a keyboard and mouse. It stands on a table, a counter or a desk deep enough for the keyboard.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "browse",
+          "label": "Browse the web",
+          "anim": "type",
+          "minutes": 45,
+          "pose": "sit",
+          "seatNear": 2,
+          "effects": {
+            "fun": 0.4,
+            "comfort": 0.1
+          },
+          "tags": [
+            "entertainment",
+            "screen"
+          ]
+        },
+        {
+          "id": "code",
+          "label": "Practise coding",
+          "anim": "type",
+          "minutes": 60,
+          "pose": "sit",
+          "seatNear": 2,
+          "effects": {
+            "fun": 0.1,
+            "comfort": 0.1
+          },
+          "tags": [
+            "training",
+            "screen"
+          ],
+          "skills": {
+            "technology": 0.18,
+            "intelligence": 0.04
+          }
+        },
+        {
+          "id": "homework",
+          "label": "Do homework",
+          "anim": "type",
+          "minutes": 45,
+          "pose": "sit",
+          "seatNear": 2,
+          "homework": 7,
+          "effects": {
+            "fun": -0.05
+          },
+          "tags": [
+            "screen"
+          ],
+          "skills": {
+            "intelligence": 0.1,
+            "writing": 0.05
+          }
+        }
+      ]
     },
     {
       "id": "stuffedToy",
@@ -645,7 +1075,26 @@
       "decor": 0.3,
       "radius": 0.16,
       "description": "A small, well-loved teddy bear. It stands on a table, counter, desk or shelf.",
-      "interactions": []
+      "wearPerUse": 0,
+      "interactions": [
+        {
+          "id": "play",
+          "label": "Play with the teddy",
+          "stages": [
+            "child"
+          ],
+          "anim": "play",
+          "minutes": 15,
+          "effects": {
+            "fun": 0.3,
+            "comfort": 0.05
+          },
+          "tags": [
+            "entertainment",
+            "toys"
+          ]
+        }
+      ]
     },
     {
       "id": "toyBlocks",
@@ -662,7 +1111,30 @@
       "decor": 0.2,
       "radius": 0.16,
       "description": "A little tower of wooden blocks. It stands on a table, counter, desk or shelf.",
-      "interactions": []
+      "wearPerUse": 0,
+      "interactions": [
+        {
+          "id": "blocks",
+          "label": "Build with blocks",
+          "stages": [
+            "child"
+          ],
+          "anim": "tend",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "fun": 0.4
+          },
+          "tags": [
+            "entertainment",
+            "toys"
+          ],
+          "skills": {
+            "creativity": 0.05,
+            "dexterity": 0.04
+          }
+        }
+      ]
     }
   ]
 }

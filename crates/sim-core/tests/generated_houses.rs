@@ -136,7 +136,7 @@ fn generated_houses_are_livable() {
             if def.interactions.is_empty() {
                 continue;
             }
-            let reached = surface::approach_tiles(&w.content, &nav, o).any(|t| nav.find_path(start, t).is_some());
+            let reached = surface::use_tiles(&w.content, &w.objects, &nav, o).into_iter().any(|t| nav.find_path(start, t).is_some());
             if !reached {
                 failures.push(format!("{label}: can't reach the {} at {},{}", def.id, o.x, o.z));
             }

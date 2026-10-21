@@ -44,8 +44,9 @@
 //! (`objects[].growth`: -1..0 fallow, 0..1 growing, 1 ripe; absent: ripe); 28 = lamps can be
 //! switched off (`objects[].off`; absent: on); 29 = objects have a stable id (`objects[].id`)
 //! that doesn't change when other objects are sold or moved (absent: assigned on load), and
-//! `next_object_id` keeps ids from being reused after the highest one is sold; 30 = the outfit
-//! a resident changed into (`sims[].outfit`; absent: 0, the creator's). Older
+//! `next_object_id` keeps ids from being reused after the highest one is sold; 30 = washing
+//! piles up (`households[].laundry`: loads dirty and washed; absent: one of each); 31 = the
+//! outfit a resident changed into (`sims[].outfit`; older files: 0, the creator's). Older
 //! files load. Saves
 //! written before feelings were renamed from "moodlets" store them under `moodlets`; a serde
 //! alias still reads it.
@@ -64,7 +65,7 @@ use crate::planner::{BlockResult, Goal, HomeWish, Outcome, Planner, Reason, Rout
 use crate::world::{GameMode, Household, Plot, Task, TaskKind, World};
 use crate::{Error, MINUTES_PER_TICK, clock::MAX_SPEED};
 
-pub const SAVE_VERSION: u32 = 30;
+pub const SAVE_VERSION: u32 = 31;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -328,7 +329,7 @@ pub struct SimSave {
     /// How a pupil does at school (0..100).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grade: Option<f32>,
-    /// The outfit they're in (`Sim::outfit`; absent before v30, or the creator's: 0).
+    /// The outfit they're in (`Sim::outfit`; absent before v31, or the creator's: 0).
     #[serde(default, skip_serializing_if = "is_zero_u8")]
     pub outfit: u8,
     pub pos: [f32; 2],
@@ -607,6 +608,10 @@ pub struct HouseholdSave {
     /// The day a babysitter was booked for (absent: none).
     #[serde(default, rename = "sitterDay", skip_serializing_if = "Option::is_none")]
     pub sitter_day: Option<u32>,
+    /// Loads of washing waiting: dirty, and washed to dry (see `Household::laundry`; absent
+    /// before v30: one of each).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub laundry: Option<[f32; 2]>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -816,6 +821,7 @@ impl World {
                     routines: h.routines.iter().map(|r| routine_save(content, r)).collect(),
                     expecting: h.expecting,
                     sitter_day: h.sitter_day,
+                    laundry: Some(h.laundry),
                 })
                 .collect(),
             plots: self
@@ -971,6 +977,7 @@ impl World {
                 routines: Vec::new(),
                 expecting: None,
                 sitter_day: None,
+                laundry: [crate::world::LAUNDRY_AT_START; 2],
             }]
         } else {
             save.households
@@ -992,6 +999,7 @@ impl World {
                         .collect(),
                     expecting: h.expecting,
                     sitter_day: h.sitter_day,
+                    laundry: h.laundry.map_or([crate::world::LAUNDRY_AT_START; 2], |l| l.map(|v| finite(v, 0.0).max(0.0))),
                 })
                 .collect()
         };
@@ -1080,7 +1088,8 @@ impl World {
             if let Some(g) = s.grade {
                 sim.grade = g.clamp(0.0, 100.0);
             }
-            sim.outfit = s.outfit % crate::world::OUTFITS;
+            // (v31: residents change outfits; before it everyone wore the creator's.)
+            sim.outfit = if save.version >= 31 { s.outfit % crate::world::OUTFITS } else { 0 };
             for (i, need) in content.needs.iter().enumerate() {
                 sim.needs[i] = s
                     .needs

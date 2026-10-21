@@ -34,5 +34,9 @@ the object's colours, so there are never two.
   coloured rack's dumbbells are its "Weights" colour in the hands; uncoloured, they are the model's dark grey.
 - The bench's bar stays on its hooks while the lifter sits down, shrinks away 0.8–1.0 s into the lift and is in the
   hands from about 1.0 s on (the `sitDown` clip less its last 0.35 s), never missing.
+- The bench press (G-24, 2026-10-21): the feet are down on the floor either side of the bench, 0.3 m out from its
+  middle (`furniture.json` `beds.weightBench` `feet`, characters.ts `benchLegs`), the knees bent off the pad, not
+  stretched along it onto the leg rollers. Teens, grown-ups and elders reach the floor from the 0.5 m pad.
+  Known, not changed: the pad is 50 cm high, over a flat bench's 40–48 (M-fitness-01, left to the Blender wave).
 - The treadmill's belt runs slower than a jog: faster blurs at the fastest game speed. The loop jumps home each round
   under the motor hood and rear roller cap, where it doesn't show.

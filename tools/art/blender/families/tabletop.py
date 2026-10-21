@@ -13,8 +13,9 @@
 # have no uses, so no clips, and every finish is a plain one (wood, fabric and leaves drawn satin or matte),
 # so each costs one draw call. The exceptions: the cookie jar, the wine glasses and the snow globe are
 # see-through `glass` (two); the kettle's lid, the bread bin's roll-top and the laptop's lid are parts of
-# their own, hinged where they would open, for a use to come (two); the alarm clock's hour and minute hands
-# tell the game's time (`motions.clock`; three).
+# their own, hinged where they would open, for a use to come (two); the candlesticks' flames rise out of the candles
+# at night and glow (`motions.night`; two); the alarm clock's hour and minute hands tell the game's time
+# (`motions.clock`; three).
 #
 # Run:  cargo art tabletop [--only kettle] [--preview]
 import math
@@ -95,7 +96,7 @@ M = G.Palette(
     mug_c=('#E4B8AE', 'gloss'),
     bottle=('#2F4A33', 'gloss'),
     candle=('#F4EBD8', 'satin'),
-    flame=('#FFD27A', 'gloss'),        # gloss, never emissive
+    flame=('#FFD27A', 'gloss', {'glow': '#FFC46A'}),   # gloss, never emissive; it glows at night (lit)
     # TT3 books and small plants
     book_a=('#3E5470', 'matte'),
     book_b=('#D6A64A', 'matte'),
@@ -500,14 +501,29 @@ def wineGlasses():
 
 
 def candlesticks():
-    for i, (x, h) in enumerate(((0.05, 0.18), (-0.05, 0.14))):
-        lathe(f'stick{i}', [(0, 0), (0.034, 0), (0.034, 0.006), (0.024, 0.016), (0.009, 0.03), (0.008, h * 0.45),
-                            (0.016, h * 0.5), (0.008, h * 0.56), (0.008, h - 0.022), (0.022, h - 0.012),
-                            (0.022, h), (0, h)], M.brass, at=(x, 0, 0), segments=14)
-        cyl(f'candle{i}', 0.011, 0.14, (x, 0, h + 0.07), M.candle, verts=10)
-        G.rod(f'wick{i}', (x, 0, h + 0.14), (x, 0, h + 0.148), 0.0015, material=M.dark, verts=4)
-        ball(f'flame{i}', 0.0075, (x, 0, h + 0.158), M.flame, scale=(1, 1, 2.0), seg=8, rings=5)
-    return done('candlesticks')
+    """Two brass candlesticks with tall candles. By day the wicks are dark; from dusk the flames rise out of the
+    candles' tops (`lit`, a `night` clip) and glow (`glow`), the brightest thing on the table."""
+    with G.new_parts() as still:
+        for i, (x, h) in enumerate(CANDLES):
+            lathe(f'stick{i}', [(0, 0), (0.034, 0), (0.034, 0.006), (0.024, 0.016), (0.009, 0.03), (0.008, h * 0.45),
+                                (0.016, h * 0.5), (0.008, h * 0.56), (0.008, h - 0.022), (0.022, h - 0.012),
+                                (0.022, h), (0, h)], M.brass, at=(x, 0, 0), segments=14)
+            cyl(f'candle{i}', 0.011, 0.14, (x, 0, h + 0.07), M.candle, verts=10)
+            G.rod(f'wick{i}', (x, 0, h + 0.14), (x, 0, h + 0.148), 0.0015, material=M.dark, verts=4)
+    G.join(still, 'candlesticks', origin=(0, 0, 0))
+    # the flames, built lit and sunk into the candles at rest (hidden inside the wax, 1.1 cm across to their
+    # 1.5): the same rise lifts both, the candles being the same length
+    with G.new_parts() as lit:
+        for i, (x, h) in enumerate(CANDLES):
+            ball(f'flame{i}', 0.0075, (x, 0, h + 0.158 - FLAME_RISE), M.flame, scale=(1, 1, 2.0), seg=8, rings=5)
+    flames = G.join(lit, 'flames', origin=(0, 0, 0))
+    G.settle()
+    G.slide(flames, 'lit', (0, 0, FLAME_RISE), seconds=0.6)
+    return G.meshes()
+
+
+CANDLES = ((0.05, 0.18), (-0.05, 0.14))   # (x, the stick's height)
+FLAME_RISE = 0.034                         # a flame's 3 cm, from inside the candle's top to over its wick
 
 
 # --- TT3 books and small plants -------------------------------------------------------------------------------
@@ -656,26 +672,31 @@ def photoFrame():
 
 
 def tableClock():
-    Z, R = 0.112, 0.074
+    """A twin-bell alarm clock: a red case 10.7 cm across on two brass legs, two bells and a hammer on top,
+    16.5 cm tall in all (a real one 12-18 cm). Built at 0.72 of its first size (`S`), which was half again too tall."""
+    S = 0.72
+    Z, R = 0.112 * S, 0.074 * S
     with G.new_parts() as body:
-        cyl('case', R, 0.05, (0, 0, Z), M.clock, verts=24, rot=(90, 0, 0), bevel=0.008)
-        cyl('face', R - 0.01, 0.004, (0, -0.025, Z), M.clock_face, verts=24, rot=(90, 0, 0))
+        cyl('case', R, 0.05 * S, (0, 0, Z), M.clock, verts=24, rot=(90, 0, 0), bevel=0.008 * S)
+        cyl('face', R - 0.01 * S, 0.004, (0, -0.025 * S, Z), M.clock_face, verts=24, rot=(90, 0, 0))
         for i in range(12):
             a = i * 30
-            box(f'tick{i}', (0.003, 0.002, 0.01 if i % 3 else 0.014),
-                (0.054 * G.sind(a), -0.0275, Z + 0.054 * G.cosd(a)), M.dark, rot=(0, a, 0))
-        cyl('hub', 0.004, 0.003, (0, -0.031, Z), M.red, verts=10, rot=(90, 0, 0))
+            box(f'tick{i}', (0.003, 0.002, (0.01 if i % 3 else 0.014) * S),
+                (0.054 * S * G.sind(a), -0.025 * S - 0.0025, Z + 0.054 * S * G.cosd(a)), M.dark, rot=(0, a, 0))
+        cyl('hub', 0.004, 0.003, (0, -0.025 * S - 0.006, Z), M.red, verts=10, rot=(90, 0, 0))
         for s in (-1, 1):
-            ball(f'bell{s}', 0.032, (s * 0.048, 0.0, Z + 0.083), M.brass, scale=(1, 1, 0.75), rot=(0, s * 30, 0))
-            G.rod(f'leg{s}', (s * 0.045, 0.0, Z - 0.06), (s * 0.06, -0.008, 0.0), 0.005, material=M.brass, verts=6)
-            ball(f'foot{s}', 0.008, (s * 0.06, -0.008, 0.004), M.brass, seg=8, rings=5)
-        G.rod('bell_post', (0, 0.0, Z + R - 0.004), (0, 0.0, Z + 0.104), 0.0035, material=M.brass, verts=6)
-        ball('hammer', 0.007, (0, 0.0, Z + 0.105), M.brass, seg=8, rings=5)
+            ball(f'bell{s}', 0.032 * S, (s * 0.048 * S, 0.0, Z + 0.083 * S), M.brass, scale=(1, 1, 0.75), rot=(0, s * 30, 0))
+            G.rod(f'leg{s}', (s * 0.045 * S, 0.0, Z - 0.06 * S), (s * 0.06 * S, -0.008 * S, 0.0), 0.005 * S,
+                  material=M.brass, verts=6)
+            ball(f'foot{s}', 0.008 * S, (s * 0.06 * S, -0.008 * S, 0.004 * S), M.brass, seg=8, rings=5)
+        G.rod('bell_post', (0, 0.0, Z + R - 0.004 * S), (0, 0.0, Z + 0.104 * S), 0.0035 * S, material=M.brass, verts=6)
+        ball('hammer', 0.007 * S, (0, 0.0, Z + 0.105 * S), M.brass, seg=8, rings=5)
     G.join(body, 'clock', origin=(0, 0, 0))
     # the hour and minute hands: parts of their own round the face's middle, telling the game's time
     # (`motions.clock`), at rest ten past ten
     hands = []
-    for name, (w, depth, length), y, angle in (('hour', (0.005, 0.002, 0.032), -0.029, 305), ('minute', (0.004, 0.002, 0.05), -0.03, 60)):
+    for name, (w, depth, length), y, angle in (('hour', (0.005, 0.002, 0.032 * S), -0.025 * S - 0.004, 305),
+                                               ('minute', (0.004, 0.002, 0.05 * S), -0.025 * S - 0.005, 60)):
         with G.new_parts() as hand:
             box(f'{name}_hand', (w, depth, length), (G.sind(angle) * length / 2, y, Z + G.cosd(angle) * length / 2), M.dark,
                 rot=(0, angle, 0))
@@ -885,7 +906,8 @@ FAMILY = G.Family(
         T('teapotSet', teapotSet, (0.4, 0.167, 0.26), [('teapot', BODY), ('tray', 'Tray')]),
         T('mugs', mugs, (0.216, 0.09, 0.212), [('mug_a', 'Mug 1'), ('mug_b', 'Mug 2'), ('mug_c', 'Mug 3')]),
         T('wineGlasses', wineGlasses, (0.214, 0.301, 0.197), [('bottle', BODY)]),
-        T('candlesticks', candlesticks, (0.168, 0.353, 0.066), [('brass', BODY), ('candle', 'Candles')]),
+        T('candlesticks', candlesticks, (0.168, 0.328, 0.066), [('brass', BODY), ('candle', 'Candles')],
+          motions={'night': 'lit'}),
         # TT3 books and small plants
         T('bookStack', bookStack, (0.25, 0.133, 0.196),
           [('book_a', 'Book 1'), ('book_b', 'Book 2'), ('book_c', 'Book 3'), ('book_d', 'Book 4')]),
@@ -900,7 +922,7 @@ FAMILY = G.Family(
         T('potSmall', potSmall, (0.16, 0.261, 0.154), [('pot_white', BODY)]),
         # TT4 small ornaments
         T('photoFrame', photoFrame, (0.18, 0.231, 0.114), [('frame', BODY)]),
-        T('tableClock', tableClock, (0.153, 0.228, 0.063), [('clock', BODY), ('brass', 'Bells & legs')],
+        T('tableClock', tableClock, (0.11, 0.164, 0.048), [('clock', BODY), ('brass', 'Bells & legs')],
           motions={'clock': {'hour': 'hour_hand', 'minute': 'minute_hand', 'at': 10 * 60 + 10}}),
         T('globe', globe, (0.212, 0.31, 0.24), [('globe', BODY), ('wood_dark', 'Stand')]),
         T('snowGlobe', snowGlobe, (0.128, 0.176, 0.128), [('wood_dark', BODY)]),

@@ -39,6 +39,10 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 - The wall bed folds down and up, and is slept in under the game's blanket; the last one up folds it away. Its
   lying pose was checked with the other beds (heels and buttocks about 4 cm into the mattress, legs on it).
 - Where the old parts had no frame (the `sofa_run` sofas, the sofa bed), there is no Frame colour part.
+- Seated at every life stage (G-20, 2026-10-21): the feet are on the floor (the runtime's leg fit), and on these deep
+  seats the hips sit forward until the knees clear the cushion's front (`furniture.json` `seats` `front`, measured by
+  `cargo check-glb`): a child at the front edge with the shins and feet showing, a grown-up a few centimetres
+  forward on the loveseat and the three-seat sofa; no one's shins end inside the seat.
 
 ## L2. Armchairs and small seats (11)
 
@@ -73,6 +77,10 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
   sitting flop at seat 0.3 m, not a lie); the designer lounge chair is still.
 - The leather armchair's "Read a book" is a sitting read (`"pose": "sit"`, as the wingback's), so the reader sits in
   the chair while its cushion sinks.
+- G-20 and G-22 (2026-10-21): on the deep armchairs, the ottoman and the bean bag (`front` in
+  `furniture.json` `seats`) a child sits forward, not kneeling, the feet down; the floor cushion is sat on
+  cross-legged (`sitFloor`, any seat under 0.2 m: characters.ts `floorSit`), the knees out over it, not through the
+  floor.
 - Since the authenticity review (G-05): the lounge chair's seat is 0.44 (its cushion 0.45, sat a centimetre into), the
   rocking chair's 0.46 (its cushion); the bean bag's 0.30 stays, sunk into on purpose.
 
@@ -114,11 +122,13 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 | `stereo` Stereo system | 1x1 · floor | listen:listen dance:dance | living / media | Body, Trim | Loop + repeating | `record`: the record turns on the turntable, 33 rpm, for listen and dance (a loop; the label's stripe shows the turn); the woofers `pulse` (`every` 0.45 s). The CD tray no longer moves (2026-10-21: it slid out for the music the description says is a record). 4 draws. Listened to from a seat within 4 m (`seatNear`), else standing; dance stands. |
 | `boombox` Boombox | 1x1 · floor | listen:listen | living / media | Body, Trim | Use | `cassette`: the cassette door tips 32° open from its foot for listen and shuts; `hold` 1.2 s. Listened to from a seat within 4 m (`seatNear`), else standing. |
 | `tvStandLow` Low TV bench | 2x1 · floor | watch:watch | living / media | Bench, TV | Use | `tv_up`: the TV rises 60 cm out of a lift hood at the bench's back for watch (0.8 m high at rest, its lid closing the hood), and sinks back at the end; it flickers while up and watched. Provides `screen`. |
-| `fireplaceElectric` Electric fireplace | 2x1 · floor | relax:relax | living / media | Surround, Firebox | Use | `flames`: five tongues grow from the log bed for relax (gloss, not emissive; the light is the content's); the embers glow at night, the flames while lit. A floor cushion in front, and `characters/furniture.json` `seats` sits the resident on it facing the fire. |
+| `fireplaceElectric` Electric fireplace | 2x1 · floor | relax:relax | living / media | Surround, Firebox | Use | `flames`: five tongues grow from the log bed for relax (gloss, not emissive; the light is the content's); the embers glow at night, the flames while lit. A floor cushion in front, and `characters/furniture.json` `seats` sits the resident on it cross-legged facing the fire. |
 
 **In play** (signed off 2026-10-16):
 - Against the north, west and east walls and free at 180° (the wall TV on window-free walls): watched, listened to,
   danced to and warmed up at. Every clip plays for its use and shuts after.
+- Warm up by the fire (G-22, 2026-10-21): cross-legged on the hearth cushion (`sitFloor`), the hips at its back
+  (`seats.fireplaceElectric` `fwd` 0.36), the knees short of the surround.
 - Since 2026-10-21 (review I-living-08) the stereo's record turns while the music plays, where the CD tray slid
   out (`fixes/motions/g1718/views/stereo-t0.5.png`).
 - Screens glow while on, brighter at night (the TV and wall TV while watched, the home cinema's screen while down,

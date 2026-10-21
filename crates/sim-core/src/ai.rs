@@ -185,6 +185,9 @@ mod tests {
             ripe: false,
             picks: false,
             changes_outfit: false,
+            hours: None,
+            sky: false,
+            work_on: None,
         }
     }
 

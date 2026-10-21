@@ -57,7 +57,7 @@ none.
 | `sunLounger` Sun lounger | 1x2 · floor | sunbathe:relax doze:nap | outdoor / seating | Frame, Cushions, Towel | Use | `recline`: the back lowers 30° for sunbathe and doze. |
 | `hammock` Hammock | 1x2 · floor | swing:relax doze:nap | outdoor / seating | Frame, Fabric, Stripes | Loop (E1) | `sway`: swings ±8° while lain in (E1). |
 | `porchSwing` Porch swing | 2x1 · floor | swing:relax | outdoor / seating | Seat, Frame, Chains, Cushion | Loop (E1) | `swing`: the seat swings ±10° while sat in (E1). |
-| `swingSet` Swing set | 2x1 · floor | swing:play | outdoor / play | Frame, Seats | Loop (E1) | `swing`: the seat swings while played (E1). |
+| `swingSet` Swing set | 2x1 · floor | swing:play | outdoor / play | Frame, Seats | Loop (E1) | `swing`: the seat swings while played (E1). Both hands on the chains, the legs pumping in time with it (`rideSwing172`/`147`/`112`). |
 | `hotTubCedar` Cedar hot tub | 2x2 · floor | soak:bath coverOn:fetch | outdoor / seating | Cedar, Cover | Use + Loop | `cover_off`: the cover slides off and folds back for soak and stays off (C1) until "Put the cover on" (`coverOn`); `bubbles`: the water bubbles while soaking (E1). |
 
 **In play** (signed off 2026-10-17):
@@ -107,7 +107,7 @@ none.
 | `greenhouse` Greenhouse | 2x3 · floor | tend:tend harvest:harvest | outdoor / yard | Frame, Wall | Use | `door_open`: the glass door swings 70° and the roof vent lifts 25° for tend and harvest, worked from the path down its middle (`inside`). 4 draws (plain, glass, door, vent), as the nature lover's glasshouse. Far version. |
 | `compostBin` Compost bin | 1x1 · floor | compost:tend | outdoor / yard | Bin | Use | `lid_open`: the slatted lid lifts 75° for compost; `hold` 2 s. Far version. |
 | `rainBarrel` Rain barrel | 1x1 · floor | — | outdoor / yard | Barrel | Static | Static: ribbed barrel, brass tap, the downpipe into its lid. Far version. |
-| `clothesline` Washing line | 3x1 · floor | washing:clean takeIn:clean | outdoor / yard | Posts, Washing | Use + Open | `washing`: the washing comes down from the line (1.5 s) and is the `open` clip (C1): it stays out until taken in. Far version (washing in). |
+| `clothesline` Washing line | 3x1 · floor | washing:clean takeIn:clean | outdoor / yard | Posts, Washing | Use + Open | `washing`: the washing comes down from the line (1.5 s) and is the `open` clip (C1): it stays out until taken in. Far version (washing in). Hanging out takes a washed load (`workOn`). |
 | `firewoodStack` Log store | 1x1 · floor | — | outdoor / yard | Shelter | Static | Static: the iron rack under a pent iron roof, logs ends out. Far version. |
 
 **In play** (signed off 2026-10-17):
