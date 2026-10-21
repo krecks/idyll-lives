@@ -4,6 +4,7 @@ What it covers: the 5 objects of [docs/objects/fitness.md](../objects/fitness.md
 
 - **Evidence:** `bench-results/review/fitness/` (gallery, clip, pose and play shots; shots stay out of git).
 - **Pilot rows** (the 28 `base.json` objects and the residents, 2026-10-21): Shots are relative to `bench-results/review/pilot/` in the review worktree; how they were taken is in its `log.md`, what was learnt in [pilot-notes.md](pilot-notes.md).
+- **Wave rows** (activities wave, fitness and hobbies, 2026-10-21): Shots are paths under `bench-results/review/` in the review worktree (`fitness/…`, `hobbies/…`); the shots this wave took are in `fitness/extra/` and `hobbies/extra/`, how in `hobbies/review-log.md`.
 - **Rubric:** [plan/authenticity-review.md §3](../../plan/authenticity-review.md#3-rubrics); real-world ranges in [reference.md](reference.md). Finding format and severities: [README.md](README.md#writing-a-finding).
 - **Columns:** M, A and I take `OK`, a finding id or `n/a`; `—` is pending. Findings lists the ids filed against the row, with severity and fix class; Shots names the evidence files.
 - **Seeded findings** (`Status: seeded`) are known issues copied in from earlier docs. Confirm or close them; don't file them again.
@@ -15,19 +16,28 @@ Family: `tools/art/blender/families/fitness.py`.
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
 | `treadmill` Treadmill | OK | A-fitness-02 | I-bathroom-04 | A-fitness-02 S3 motion; I-bathroom-04 S3 code (bathroom ledger: no sound) | `sheets/obj-treadmill.png`, `play/treadmill-run-*.png`, `clips/clips-treadmill-all-t*.png`, `play-child/treadmill-run-*.png`, `play-elder/treadmill-run-*.png` |
-| `weightBench` Weight bench | M-fitness-01 | A-fitness-01 | OK | A-fitness-01 S2 clip (seeded; confirmed); M-fitness-01 S3 model | `sheets/obj-weightBench.png`, `play/weightBench-lift-*.png`, `clips/clips-weightBench-all-t*.png` |
-| `exerciseBike` Exercise bike | — | — | — | | |
-| `yogaMat` Yoga mat | — | — | — | | |
-| `dumbbells` Dumbbell rack | — | — | — | | |
+| `weightBench` Weight bench | M-fitness-01 | A-fitness-01 | I-systems-04 | A-fitness-01 S2 clip (seeded; confirmed); M-fitness-01 S3 model; I-systems-04 S2 code (systems ledger: an 8-year-old bench-presses the loaded bar, wave shot `fitness/extra/child-weightBench-lift-01.png`) | `sheets/obj-weightBench.png`, `play/weightBench-lift-*.png`, `clips/clips-weightBench-all-t*.png` |
+| `exerciseBike` Exercise bike | OK | A-hobbies-01 | A-hobbies-01, I-hobbies-09 | A-hobbies-01 S2 code (hobbies ledger: gets on through the handlebars); I-hobbies-09 S3 code (hobbies ledger: no flywheel whirr) | `fitness/sheets/obj-exerciseBike.png`, `fitness/extra/side-exerciseBike-cycle-00.png`, `fitness/sheets/age-exerciseBike.png` |
+| `yogaMat` Yoga mat | M-fitness-02 | OK | I-fitness-01 | M-fitness-02 S3 model; I-fitness-01 S3 clip | `fitness/sheets/obj-yogaMat.png`, `fitness/clips/clips-yogaMat-all-t99.png`, `fitness/play/c1/yogaMat-yoga-01.png` |
+| `dumbbells` Dumbbell rack | OK | OK | I-fitness-02, I-systems-04 | I-fitness-02 S3 model; I-systems-04 S2 code (systems ledger: a child curls the adult pair) | `fitness/sheets/obj-dumbbells.png`, `fitness/extra/side-dumbbells-lift-00.png`, `fitness/extra/child-dumbbells-lift-01.png` |
+
+Wave notes on the rows:
+- `exerciseBike`: 0.53 × 1.11 × 0.90 m and the saddle at 0.75 m (content 0.76, `reference.json` 0.75–1.05) are in range; flywheel to the front, console, cranks and stabilisers are all there. The pedals turn under the feet at every stage, the hands on the grips (`sitHands`, `ACTIONS.exercise`, `characters.ts:481`); a child's feet still reach the pedals (`fitness/sheets/age-exerciseBike.png`, `fitness/extra/child-exerciseBike-cycle-01.png`). The rider gets on through the handlebars and flywheel, from the front tile to a saddle 0.12 m behind the middle (A-hobbies-01).
+- `yogaMat`: the `sizes` table measures the mat rolled up at rest (W 0.92 is the block and the bottle, H 0.23 the bottle), so its three "out" are the rest pose, not a finding; the flat mat is M-fitness-02. The seat (0.03 m) is on the unrolled mat (1.6 cm thick); the mat unrolls as the resident sits and rolls up after.
+- `dumbbells`: D 0.71 m includes the rubber floor mat in front; the rack itself is 0.41 m deep (0.30–0.60). Curls alternate, a dumbbell in each fist, in the rack's colours (`writeHeld`, `characters.ts:1721`).
+- `treadmill`, `weightBench`: pilot rows. The wave adds only the child at the bench (`--sim 3`).
 
 ## Real uses against the content's (I1)
 
-Filled by the pilot for its rows; durations are judged by §9 decision 2.
+Filled by the pilot for its rows and by the activities wave for the rest; durations are judged by §9 decision 2 (none of these is more than 3× from its tag's median: by design).
 
 | Item | Real uses | Content uses (minutes) | Verdict |
 |---|---|---|---|
 | `treadmill` | walk or run, warm up | go for a run (60) | OK |
 | `weightBench` | bench press, lift weights | lift weights (45, lying) | OK |
+| `exerciseBike` | cycle, ride a programme on the console | cycle (45, seated) | OK |
+| `yogaMat` | a yoga flow of standing and lying poses, stretch, meditate | do yoga (30, seated cross-legged) | the poses missing: it is a meditation (I-fitness-01) |
+| `dumbbells` | curls, presses, rows | lift dumbbells (30, standing curls) | OK |
 
 ## Findings
 
@@ -63,3 +73,33 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Evidence:** One 0.1 m slat each 0.25 s is a belt speed of 0.4 m/s, a slow walk; the runner jogs (`jog`, 0.7 s a cycle) on it (`play/treadmill-run-01.png`, `clips/clips-treadmill-all-t*.png`). A run is 2.2–3.3 m/s; the belt would need about 0.04 s a slat (the README keeps a loop's steps above the 1/30 s sampling, so a longer slat pitch or a blurred texture). Close to the eye only; at the game camera the belt reads as moving.
 - **Status:** open
 - **Source:** pilot
+
+### M-fitness-02 — The yoga mat unrolls to 0.9 m, half a real mat's length
+
+- **Severity:** S3
+- **Rubric:** M1, M6
+- **Fix class:** model
+- **Where:** `tools/art/blender/families/fitness.py:193` (`MAT_W, MAT_L = 0.62, 0.9`); the footprint `[1, 1]` at `web/public/content/furniture.json:3567`
+- **Evidence:** `fitness/clips/clips-yogaMat-all-t99.png`, `fitness/play/c1/yogaMat-yoga-01.png`: unrolled, the mat is 0.62 × 0.90 m; a yoga mat is 0.61 × 1.73–1.83 (`reference.json` `yogaMat` 0.6–0.7 × 1.7–1.9). For the seated use it shows as a square cushion under a cross-legged resident; any standing or lying pose (I-fitness-01) needs the full length, so a 1 × 2 footprint. Width, thickness (1.6 cm, over the floor's 1 cm), the roll, block and bottle are fine. The `sizes` table can't see this: it measures the mat rolled up (row note).
+- **Status:** open
+- **Source:** wave: fitness
+
+### I-fitness-01 — "Do yoga" is half an hour sitting cross-legged
+
+- **Severity:** S3
+- **Rubric:** I1, I3
+- **Fix class:** clip
+- **Where:** `web/public/content/furniture.json:3585` (`yoga`: `anim: meditate`, `pose: sit`); `web/src/render/babylon/characters.ts:532` (`ACTIONS.meditate`: the idle) and `:3269-3285` (the cross-legged layer)
+- **Evidence:** `fitness/play/c1/yogaMat-yoga-01.png`: the resident sits cross-legged on the mat with the hands on the knees, breathing, eyes shut, for the whole 30 minutes; the content's description says "Yoga stretches the body". A sitting meditation is one part of a yoga session, so it reads as yoga at a glance; a careful player sees no pose ever change. A short sequence of held poses (downward dog, warrior, a forward fold, then the seated end) is new resident clips, and wants the full-length mat (M-fitness-02). The same `meditate` anim is used by `hotHeaded.json:93`, `:104`, where a meditation is what is meant.
+- **Status:** open
+- **Source:** wave: fitness
+
+### I-fitness-02 — The lifter curls beside the rack's rubber mat, not on it
+
+- **Severity:** S3
+- **Rubric:** I2, M4
+- **Fix class:** model
+- **Where:** `tools/art/blender/families/fitness.py:250` (`floor_mat` 0.6 × 0.36 at depth 0.2, inside the footprint)
+- **Evidence:** `fitness/extra/side-dumbbells-lift-00.png`, `fitness/sheets/obj-dumbbells.png` (play): the resident stands on the tile in front, as every standing use does, and the mat lies empty between them and the rack. A mat in front of a rack is where you stand to lift. Either drop the mat (the rack alone fits 0.41 m deep) or move the rack back so the mat reaches the tile in front; the game can't stand them on the footprint.
+- **Status:** open
+- **Source:** wave: fitness
