@@ -21,7 +21,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gamekit as G  # noqa: E402
-from plants import LOW, _with_part, dots, far_of, low, lump, pot, sprigs, tube  # noqa: E402
+from plants import LOW, _mesh, _with_part, cupped, dots, far_of, low, lump, pot, sprigs, tube  # noqa: E402
 
 BASE = dict(
     bark=('#E4D8C8', 'bark'),           # the bark texture is dark: its colours are pale
@@ -63,7 +63,8 @@ def shades(P, n=5):
 def crown(name, rng, c, r, n, cols, size=0.75, spread=0.72, squash=0.85, noise=0.3, bottom=-0.45, core=0.0):
     """Leaf clumps over an ellipsoid crown (centre `c`, radii `r`): `n` lumps about `size` x the mean radius,
     `spread` x the radius out from the centre, lighter towards the top; `core` adds a dark filling lump. A far
-    version has every third clump round a smooth core spanning all the full crown's clumps, so it keeps its size."""
+    version has every third clump round a smooth core spanning all the full crown's clumps, so it keeps its size.
+    Returns each clump as (middle, half sizes, height on the ellipsoid, drawn), for what sits on them (blooms)."""
     m = sum(r) / 3
     cx, cy, cz = c
     full_core = core
@@ -76,6 +77,7 @@ def crown(name, rng, c, r, n, cols, size=0.75, spread=0.72, squash=0.85, noise=0
              noise=noise * 0.8, seed=rng.random() * 9, segments=10, rings=6)
     ga = math.pi * (3 - math.sqrt(5))
     off = rng.random() * math.tau
+    out = []
     for i in range(n):
         t = 1 - (i + 0.5) / n * (1 - bottom)                          # height on the ellipsoid, top first
         ring = math.sqrt(max(0.0, 1 - t * t))
@@ -87,6 +89,7 @@ def crown(name, rng, c, r, n, cols, size=0.75, spread=0.72, squash=0.85, noise=0
         col = cols[max(0, min(len(cols) - 1, round(light * (len(cols) - 1) + rng.uniform(-0.6, 0.6))))]
         sx, sy, clump_seed = rng.uniform(0.9, 1.15), rng.uniform(0.9, 1.15), i * 1.7 + rng.random()
         at = (cx + r[0] * ring * math.cos(a) * k, cy + r[1] * ring * math.sin(a) * k, z)
+        out.append(((at[0], at[1], z), (s * sx, s * sy, s * squash), t, not far or i % 3 == 0))
         if far:                                                        # the clumps' reach, for the core
             half = (s * sx, s * sy, s * squash)
             lo = [min(lo[j], at[j] - half[j]) for j in range(3)]
@@ -99,6 +102,7 @@ def crown(name, rng, c, r, n, cols, size=0.75, spread=0.72, squash=0.85, noise=0
         rx, ry, rz = ((hi[j] - lo[j]) / 2 for j in range(3))
         lump(f'{name}_core', rx, ((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]), cols[0], scale=(1, ry / rx, rz / rx),
              noise=0.0, seed=seed, segments=14, rings=7)               # smooth, 8 x 4 (its equator kept)
+    return out
 
 
 def trunk(P, h, d, material=None, taper=0.62, flare=True, verts=9):
@@ -137,12 +141,15 @@ def oak():
 
 
 def maple():
-    """Maple: a straight trunk and a tall, rounded crown of many clumps."""
-    P = palette(['#5A8A36', '#6A9A3E', '#7EAA48', '#92BA52', '#A6C85E'])
+    """Maple (a Norway maple): a straight trunk with a leader and steep limbs under one dense, even dome, wide and
+    round, of many small clumps in a cool, deep green; not the oak's few big billows and low side crowns."""
+    P = palette(['#3E6E34', '#4A7C3A', '#588A42', '#68984A', '#7AA654'])
     rng = random.Random(12)
-    trunk(P, 3.2, 0.5)
-    limbs(P, rng, (0, 0, 2.8), [xy(t) for t in ([1.1, 4.3, 0.4], [-1.0, 4.4, -0.3], [0.1, 4.6, -1.1])], 0.24)
-    crown('crown', rng, (0, 0, 5.1), (2.5, 2.5, 2.4), 14, shades(P), size=0.6, spread=0.78, core=0.85)
+    trunk(P, 3.0, 0.48, taper=0.66)
+    limbs(P, rng, (0, 0, 2.6), [xy(t) for t in ([1.2, 4.2, 0.4], [-1.1, 4.3, -0.4], [0.2, 4.4, -1.2], [-0.3, 4.3, 1.1],
+                                               [0.0, 4.9, 0.0])], 0.22)
+    crown('crown', rng, (0, 0, 5.0), (2.35, 2.35, 2.1), 26, shades(P), size=0.5, spread=0.82, squash=0.9, noise=0.24, core=0.9,
+          bottom=-0.6)
     return G.settle([G.join_all('maple')])
 
 
@@ -238,35 +245,85 @@ def apple():
 
 
 def japanese_maple():
-    """Japanese maple: low, spreading limbs and layered red crowns; a few stray sprigs on top, which shaping
-    takes off."""
+    """Japanese maple: a short trunk branching low into slender, upswept limbs, a vase of layered red crowns: a narrow
+    first layer inside its tile at chest height, the broad tiers over head height (from 2.1 m), so residents walk past
+    and work at it from the next tile; a few stray sprigs on top, which shaping takes off."""
     P = palette(['#6E1C1C', '#8A2424', '#A2302A', '#B83F2F', '#CC5636'], bark='#B09A8A', leaf_light='#B83F2F')
     rng = random.Random(16)
-    limbs(P, rng, (0, 0, 0), [xy(t) for t in ([0.7, 1.7, 0.3], [-0.6, 1.6, -0.4], [0.1, 1.9, -0.7], [-0.2, 1.5, 0.7])], 0.17)
+    tube('trunk', [(0, 0, 0), (0, 0, 0.55)], 0.1, 0.085, P.bark, verts=7)
+    limbs(P, rng, (0, 0, 0.45), [xy(t) for t in ([0.75, 2.45, 0.3], [-0.65, 2.35, -0.4], [0.1, 2.6, -0.75], [-0.2, 2.3, 0.75],
+                                                  [0.45, 2.55, 0.55], [-0.55, 2.6, 0.3])], 0.15)
     G.cone('foot', 0.21, 0.105, 0.3, at=(0, 0, 0.15), material=P.bark, verts=low(7, 5))
-    crown('crown', rng, (0, 0, 2.0), (1.95, 1.95, 0.6), 9, shades(P), size=0.66, squash=0.68, noise=0.32, spread=0.8, core=0.75)
-    crown('crown2', rng, (0.2, -0.1, 2.7), (1.45, 1.45, 0.55), 7, shades(P)[1:], size=0.7, squash=0.68, noise=0.32, spread=0.8,
+    crown('crown0', rng, (0, 0, 1.55), (0.5, 0.5, 0.38), 5, shades(P)[1:], size=0.75, squash=0.68, noise=0.3, spread=0.7, core=0.7)
+    crown('crown', rng, (0, 0, 2.7), (1.95, 1.95, 0.6), 9, shades(P), size=0.66, squash=0.68, noise=0.32, spread=0.8, core=0.75)
+    crown('crown2', rng, (0.2, -0.1, 3.25), (1.45, 1.45, 0.55), 7, shades(P)[1:], size=0.7, squash=0.68, noise=0.32, spread=0.8,
           core=0.7)
-    crown('crown3', rng, (-0.1, 0.1, 3.2), (0.85, 0.85, 0.4), 3, shades(P)[2:], size=0.9, squash=0.7, noise=0.3)
+    crown('crown3', rng, (-0.1, 0.1, 3.65), (0.85, 0.85, 0.4), 3, shades(P)[2:], size=0.9, squash=0.7, noise=0.3)
     still = G.join_all('japaneseMaple')
-    at = (0.0, 0.0, 3.42)
+    at = (0.0, 0.0, 3.87)
     return _with_part('sprigs', still, lambda: sprigs('sprig', P, at, 0.35, n=6, length=0.22), at, 'trim')
 
 
+# A magnolia's bloom: a tall cup of petals, open at the top (its inside turned back down to the middle).
+GOBLET = [(0, 0), (0.045, 0.01), (0.1, 0.08), (0.12, 0.18), (0.1, 0.26), (0.078, 0.235), (0, 0.13)]
+
+
 def magnolia():
-    """Magnolia: a grey trunk, upswept limbs and a crown dotted with big white and pink blooms."""
+    """Magnolia: a grey trunk, upswept limbs and a pale pink crown with big upright white and pink goblets on it."""
     P = palette(['#EAAACA', '#F2BED6', '#F8D2E2', '#FCE2EE', '#FFF2F8'], bark='#D2CBC0', fruit='#FFFFFF', fruit2='#F2A2C4',
                 fruit3='#E888B0', green='#6E9A48', green2='#628E40')
     rng = random.Random(17)
     trunk(P, 1.6, 0.36, taper=0.7)
     limbs(P, rng, (0, 0, 1.4), [xy(t) for t in ([1.2, 3.0, 0.3], [-1.1, 3.1, -0.4], [0.2, 3.5, -1.0], [-0.3, 3.3, 1.0],
                                                  [0.1, 3.9, 0.1])], 0.16)
-    crown('crown', rng, (0, 0, 3.4), (1.9, 1.8, 1.5), 11, shades(P), size=0.58, spread=0.8, noise=0.3, core=0.7)
+    clumps = crown('crown', rng, (0, 0, 3.4), (1.9, 1.8, 1.5), 11, shades(P), size=0.58, spread=0.8, noise=0.3, core=0.7)
     lump('leaves', 0.3, (1.5, 0.8, 2.72), P.green, scale=(1, 1, 0.75), seed=1.0)
     lump('leaves2', 0.28, (-1.3, -0.9, 3.44), P.green2, scale=(1, 1, 0.73), seed=2.0)
-    dots(rng, low(16, 7), (0, 0, 3.45), (1.95, 1.85, 1.55), 0.24, [P.fruit, P.fruit2, P.fruit3, P.fruit], 'bloom', band=(-0.3, 0.95),
-         out=0.98, flat=1.0, segments=low(7, 5), rings=low(4, 3))
+    # Blooms: upright goblets set into the crown's top and outer shoulders over each clump of its upper part (the
+    # branch tips), two to a clump, white, pink and deep pink as a saucer magnolia's. Each stands where a line out
+    # from its clump's middle leaves the crown, sunk a little into it, so none stands off it (a far version: over
+    # the clumps it draws, on its smooth core).
+    cols = [P.fruit, P.fruit2, P.fruit, P.fruit3]
+    for o in bpy.context.scene.objects:
+        o.data.update()
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    depsgraph.update()
+    blooms = []
+    for (mx, my, mz), _, t, drawn in clumps:
+        if t < -0.25 or not drawn:
+            continue
+        heading = math.atan2(my, mx)
+        for turn, up in ((0.3, 0.92), (0.9, 0.55), (-1.0, 0.6)):
+            a = heading + turn
+            lean = 1 - up                                              # how far down the clump's side: 0 on top
+            d = Vector((math.cos(a) * lean, math.sin(a) * lean, up)).normalized()
+            hit, at = bpy.context.scene.ray_cast(depsgraph, Vector((mx, my, mz)) + d * 4, -d, distance=6)[:2]
+            if hit:
+                blooms.append((at - d * 0.05, a, lean))
+    for i, (at, a, lean) in enumerate(blooms):
+        cupped(f'bloom{i}', GOBLET, at, cols[i % 4], 90 - math.degrees(a), 8 + 40 * lean, segments=low(6, 3))
     return G.settle([G.join_all('magnolia')])
+
+
+def streamer(name, top, heading, reach, drop, width, material):
+    """A willow's hanging strand: a thin leafy ribbon from `top` (Blender metres), out `reach` towards `heading`
+    (radians) and down `drop`, falling straight by its foot, its flat face outwards, narrowing to a third of
+    `width`: a thin lens across (four points a row, smooth), so it shades as a soft strip from either side."""
+    rows = low(7, 3)
+    out = Vector((math.cos(heading), math.sin(heading), 0))
+    side = Vector((-out.y, out.x, 0))
+    verts, faces = [], []
+    for i in range(rows + 1):
+        t = i / rows
+        c = Vector(top) + out * reach * (1 - (1 - t) ** 3) - Vector((0, 0, drop * t ** 1.15))
+        w = width * (1 - 0.66 * t) / 2
+        thick = min(0.015, w * 0.3)
+        verts += [c - side * w, c + out * thick, c + side * w, c - out * thick]
+    for i in range(rows):
+        a, b = 4 * i, 4 * (i + 1)
+        faces += [(a + j, a + (j + 1) % 4, b + (j + 1) % 4, b + j) for j in range(4)]
+    faces += [(0, 3, 2, 1), (4 * rows, 4 * rows + 1, 4 * rows + 2, 4 * rows + 3)]
+    return _mesh(name, verts, faces, material)
 
 
 def willow():
@@ -278,19 +335,17 @@ def willow():
     trunk(P, 2.7, 0.62, taper=0.65)
     limbs(P, rng, (0, 0, 2.4), [(2.0 * math.cos(a), 2.0 * math.sin(a), 4.3) for a in (0.3, 1.6, 2.9, 4.2, 5.4)], 0.24)
     crown('crown', rng, (0, 0, 4.7), (2.3, 2.3, 1.4), 9, cols, size=0.68, squash=0.7, core=0.85, bottom=-0.3)
-    # Hanging curtains: long strands narrowing downwards all round, down to about a metre off the ground.
-    for i in range(low(26, 10)):
-        a = i / low(26, 10) * math.tau + rng.uniform(-0.1, 0.1)
-        rr = rng.uniform(1.75, 2.2)
-        length = rng.uniform(2.4, 3.5)
-        top = rng.uniform(4.6, 5.0)
-        G.cone(f'strand{i}', 0.03, rng.uniform(0.25, 0.35), length, at=(rr * math.cos(a), rr * math.sin(a), top - length / 2),
-               material=cols[rng.randint(1, 4)], scale=(0.6, 1, 1), rot=(rng.uniform(-6, 6), 0, math.degrees(a)),
-               verts=low(6, 4))
-    for i in range(low(8, 4)):
-        a = i / low(8, 4) * math.tau + 0.3
-        G.cone(f'inner{i}', 0.03, 0.4, 2.6, at=(1.35 * math.cos(a), 1.35 * math.sin(a), 3.7), material=cols[0],
-               scale=(0.75, 1, 1), rot=(0, 0, math.degrees(a)), verts=low(6, 4))
+    # Hanging curtains: long, thin leafy streamers all round, out of the crown's edge and straight down to about half
+    # a metre off the lawn, in two staggered rows with gaps between them, so whoever sits by the trunk shows through.
+    n = low(68, 20)
+    for i in range(n):
+        a = i / n * math.tau + rng.uniform(-0.04, 0.04)
+        outer = i % 2 == 0
+        rr = rng.uniform(2.0, 2.25) if outer else rng.uniform(1.6, 1.85)
+        top = rng.uniform(4.5, 5.1) if outer else rng.uniform(4.1, 4.6)
+        foot = rng.uniform(0.45, 0.8) if outer else rng.uniform(0.9, 1.5)
+        streamer(f'strand{i}', (rr * math.cos(a), rr * math.sin(a), top), a + rng.uniform(-0.15, 0.15), rng.uniform(0.25, 0.45),
+                 top - foot, rng.uniform(0.15, 0.2), cols[rng.randint(1, 4)])
     return G.settle([G.join_all('willow')])
 
 
@@ -309,41 +364,44 @@ def conifer(rng, tiers, base_d, z0, step, h, cols, top_d=0.5, tilt=4.0, offset=0
 
 
 def pine():
-    """Pine: a tall bare trunk and six broad tiers narrowing to a point."""
+    """Pine: a tall bare trunk and six broad tiers narrowing to a point, the lowest from 2.35 m: residents walk under
+    its boughs."""
     P = palette(['#335C38', '#3D683E', '#477444', '#51804A'], bark='#B59A82')
     rng = random.Random(19)
-    trunk(P, 3.4, 0.38, taper=0.55, verts=8)
-    conifer(rng, 6, 6.0, 1.4, 1.12, 2.1, shades(P, 4), top_d=0.9, tilt=6, offset=0.2)
-    G.cone('tip', 0.25, 0.02, 1.3, at=(0, 0, 8.2), material=P.leaf3, verts=low(8, 5))
+    trunk(P, 3.8, 0.38, taper=0.55, verts=8)
+    conifer(rng, 6, 6.0, 2.35, 1.0, 2.1, shades(P, 4), top_d=0.9, tilt=3, offset=0.2)
+    G.cone('tip', 0.25, 0.02, 1.3, at=(0, 0, 8.55), material=P.leaf3, verts=low(8, 5))
     return G.settle([G.join_all('pine')])
 
 
 def spruce():
-    """Blue spruce: a dense blue-green cone of nine tiers right down to the ground."""
+    """Blue spruce: a dense blue-green cone of nine tiers, limbed up to a bare trunk to 2.2 m, as a garden spruce by a
+    path is: residents walk under its skirt."""
     P = palette(['#3A5E52', '#446A5C', '#4E7666', '#5A8270'], bark='#8E7A6A')
     rng = random.Random(20)
-    trunk(P, 1.2, 0.36, flare=False, verts=7)
-    conifer(rng, 9, 5.4, 0.35, 0.98, 1.85, shades(P, 4), top_d=0.7, tilt=3, offset=0.08)
-    G.cone('tip', 0.21, 0.02, 1.2, at=(0, 0, 9.6), material=P.leaf4, verts=low(8, 5))
+    trunk(P, 3.0, 0.36, taper=0.6, verts=7)
+    conifer(rng, 9, 5.0, 2.2, 0.82, 1.85, shades(P, 4), top_d=0.7, tilt=2, offset=0.08)
+    G.cone('tip', 0.21, 0.02, 1.2, at=(0, 0, 9.9), material=P.leaf4, verts=low(8, 5))
     return G.settle([G.join_all('spruce')])
 
 
 def cypress():
-    """Italian cypress: a narrow dark column of leaves, a little ragged, tapering to a point."""
+    """Italian cypress: a pencil of dark leaves about a metre across and eight tall, a little ragged, tapering to a
+    point."""
     P = palette(['#2E5034', '#385C3A', '#426842', '#4C744A'], bark='#8E7A6A')
     rng = random.Random(21)
     cols = shades(P, 4)
-    tube('trunk', [(0, 0, 0), (0, 0, 0.8)], 0.14, 0.11, P.bark, verts=7)
-    for i, (d, h, z) in enumerate([(2.0, 2.4, 1.6), (1.9, 2.4, 2.9), (1.7, 2.3, 4.1), (1.4, 2.1, 5.3), (1.05, 1.8, 6.3)]):
-        lump(f'column{i}', d / 2, (rng.uniform(-0.06, 0.06), rng.uniform(-0.06, 0.06), z - h / 2), cols[i % 4],
-             scale=(rng.uniform(0.95, 1.05), rng.uniform(0.95, 1.05), h / d), noise=0.18, seed=i * 1.3, segments=14, rings=7)
+    tube('trunk', [(0, 0, 0), (0, 0, 0.8)], 0.1, 0.08, P.bark, verts=7)
+    for i, (d, h, z) in enumerate([(0.98, 2.4, 1.6), (0.96, 2.4, 2.9), (0.86, 2.3, 4.1), (0.7, 2.1, 5.3), (0.52, 1.8, 6.3)]):
+        lump(f'column{i}', d / 2, (rng.uniform(-0.03, 0.03), rng.uniform(-0.03, 0.03), z - h / 2), cols[i % 4],
+             scale=(rng.uniform(0.95, 1.05), rng.uniform(0.95, 1.05), h / d), noise=0.14, seed=i * 1.3, segments=14, rings=8)
     for i in range(low(6, 3)):
         a = i / low(6, 3) * math.tau
         z = 1.6 + i * low(0.85, 1.7)
-        rr = 0.75 - i * low(0.07, 0.14)
-        lump(f'tuft{i}', 0.35, (rr * math.cos(a), rr * math.sin(a), z - 0.6), cols[(i + 2) % 4], scale=(1, 1, 1.7), noise=0.25,
+        rr = 0.3 - i * low(0.03, 0.06)
+        lump(f'tuft{i}', 0.17, (rr * math.cos(a), rr * math.sin(a), z - 0.6), cols[(i + 2) % 4], scale=(1, 1, 2.6), noise=0.25,
              seed=i * 2.1)
-    G.cone('tip', 0.3, 0.02, 1.3, at=(0, 0, 7.3), material=cols[3], verts=low(8, 5))
+    G.cone('tip', 0.16, 0.02, 1.3, at=(0, 0, 7.3), material=cols[3], verts=low(8, 5))
     return G.settle([G.join_all('cypress')])
 
 
@@ -373,19 +431,19 @@ TOLERANCE = 0.1
 FAMILY = G.Family(
     'trees', M,
     [G.Model('oak', oak, size=(5.488, 7.473, 5.23), key='model.tree', tolerance=TOLERANCE, far=far_of(oak)),
-     G.Model('maple', maple, size=(4.848, 7.625, 4.971), key='model.tree.maple', tolerance=TOLERANCE, far=far_of(maple)),
+     G.Model('maple', maple, size=(4.983, 7.312, 5.335), key='model.tree.maple', tolerance=TOLERANCE, far=far_of(maple)),
      G.Model('birch', birch, size=(3.446, 8.184, 3.293), key='model.tree.birch', tolerance=TOLERANCE, far=far_of(birch)),
      G.Model('cherry', cherry, size=(5.251, 5.454, 5.14), key='model.tree.blossom', tolerance=TOLERANCE, far=far_of(cherry)),
      G.Model('apple', apple, size=(4.467, 5.569, 4.378), key='model.tree.fruit', tolerance=TOLERANCE, far=far_of(apple),
              motions={'uses': {'pick': {'clip': 'pick', 'delay': PICK_DELAY}, 'harvest': {'clip': 'pick', 'delay': PICK_DELAY}},
                       'growth': 'ripen'}),
-     G.Model('japaneseMaple', japanese_maple, size=(3.894, 3.722, 4.025), key='model.tree.japaneseMaple', tolerance=TOLERANCE,
+     G.Model('japaneseMaple', japanese_maple, size=(3.723, 4.153, 3.828), key='model.tree.japaneseMaple', tolerance=TOLERANCE,
              far=far_of(japanese_maple), motions={'uses': {'shape': 'trim'}}),
-     G.Model('magnolia', magnolia, size=(4.1, 4.948, 3.805), key='model.tree.magnolia', tolerance=TOLERANCE, far=far_of(magnolia)),
-     G.Model('willow', willow, size=(4.482, 6.1, 4.664), key='model.tree.willow', tolerance=TOLERANCE, far=far_of(willow)),
-     G.Model('pine', pine, size=(6.026, 8.85, 6.034), key='model.pine', tolerance=TOLERANCE, far=far_of(pine)),
-     G.Model('spruce', spruce, size=(5.601, 10.2, 5.567), key='model.spruce', tolerance=TOLERANCE, far=far_of(spruce)),
-     G.Model('cypress', cypress, size=(2.12, 7.95, 2.05), key='model.cypress', tolerance=TOLERANCE, far=far_of(cypress)),
+     G.Model('magnolia', magnolia, size=(4.1, 5.076, 3.756), key='model.tree.magnolia', tolerance=TOLERANCE, far=far_of(magnolia)),
+     G.Model('willow', willow, size=(4.947, 6.1, 5.052), key='model.tree.willow', tolerance=TOLERANCE, far=far_of(willow)),
+     G.Model('pine', pine, size=(6.031, 9.2, 6.054), key='model.pine', tolerance=TOLERANCE, far=far_of(pine)),
+     G.Model('spruce', spruce, size=(5.188, 10.5, 5.154), key='model.spruce', tolerance=TOLERANCE, far=far_of(spruce)),
+     G.Model('cypress', cypress, size=(1.012, 7.95, 1.025), key='model.cypress', tolerance=TOLERANCE, far=far_of(cypress)),
      G.Model('lemonTree', lemon_tree, size=(1.288, 2.374, 1.344), key='model.garden.lemonTree', tolerance=TOLERANCE, far=far_of(lemon_tree),
              paint=[('body', 'Pot')], motions={'growth': 'ripen'})],
     comment='Blender-built trees (tools/art/blender/families/trees.py): the G5 garden trees, the woods\' '

@@ -242,7 +242,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/garden_decor.py:147-158` (`boulder`: three `G.boulder`s with the default low noise, scaled to smooth spheroids, pale `stone`, flat moss pads on top)
 - **Evidence:** `sheets/obj-garden.boulder.png`: smooth, pale, rounded, egg-shaped stones with moss lying on them as flat green discs; from the game camera they read as eggs or a toy turtle, not weathered stones. Real garden boulders are faceted and flat-bottomed, wider than tall, darker and mottled, with moss in their cracks. More noise and flattening, a darker mottled finish, and the stones sunk a little into the grass.
-- **Status:** open
+- **Status:** fixed (d81aded7)
+- **After:** three stones broader than tall (1.01 × 0.47 × 0.92 m, inside `boulders`), roughened and split into flat faces, their feet cut flat where they go into the lawn (the woods' rock's cuts, `ground.py`), in darker greys (their own `rock` materials; the other decor keeps its dressed `stone`), moss in patches on the tops and in the crack between the two big ones, pale lichen on the faces, the two small stones on one side so the group reads as a heap, not a shell with a head and a tail (`bench-results/review/fixes/blender-trees/gallery/gallery-garden.boulder.png`, `gallery-game/gallery-game-garden.boulder.png`). Its colour parts are now `rock`, `rock_dark`, `rock_warm` (labels unchanged).
 - **Source:** outdoor wave (lead; Phase 0 "Seen")
 
 ### M-outdoor-08 — Overall sizes outside the range: a long bench, a narrow swing frame, a deep bar, a high swing seat, a bistro set pulled apart
