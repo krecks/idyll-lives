@@ -103,7 +103,7 @@ pulled up to the kids' table before the dining table (a seat made for their age 
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `kidsDesk` Kids' desk | 1x1 · floor | homework:write drawing:write | kids / — | Frame, Top, Chair | Use | `drawer_open`: the pencil drawer slides out for homework and drawing; `hold` 2 s. Its chair is part of the desk. |
+| `kidsDesk` Kids' desk | 1x1 · floor | homework:write drawing:write | kids / — | Frame, Top, Chair | Use | `drawer_open`: the pencil drawer slides out for homework and drawing; `hold` 2 s. Its chair is part of the desk. A chair bought facing it isn't pulled up to it: its chairs are its own (`seats_itself`, I-office-01). |
 | `kidsTable` Kids' table | 1x1 · floor | — | kids / — | Frame, Top | Static | Static. Its text says blue legs, as built. |
 | `kidsChair` Kids' chair | 1x1 · floor | sit:sit draw:write homework:write | kids / — | Frame, Seat | Static | Static. Pulled in to the low table it faces while sat on (`seatAt` `low`), as far as the knees fit under it: written at with the hands on the top. |
 | `kidsBookshelf` Picture-book shelf | 1x1 · floor | read:read | kids / — | Frame, Top | Use | `book_out`: a picture book tips out 20° for read. |

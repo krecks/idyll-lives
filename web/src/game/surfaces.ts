@@ -13,7 +13,7 @@
 import type { ObjectDef } from '../content/content';
 
 /** What these rules read of an object type. */
-export type Shape = Pick<ObjectDef, 'footprint' | 'layer' | 'surface' | 'radius' | 'approach' | 'seatAt'>;
+export type Shape = Pick<ObjectDef, 'footprint' | 'layer' | 'surface' | 'radius' | 'approach' | 'seatAt'> & Partial<Pick<ObjectDef, 'interactions'>>;
 
 /** Object types by id, and the disc a thing on a top takes (the game's `Content`, or a house generator's view of it). */
 export interface Shapes {
@@ -274,6 +274,11 @@ export function approachTile(
  * it, of a kind it tucks under, on the same storey (`storeyDepth`: rows per storey, 0 for one)
  * with no wall between (`wallBetween`).
  */
+/** A top that is sat at by a use of its own (a dining set with its chairs, a desk with its chair built in): no other seat is pulled up to it (sim-core `seats_itself`). */
+export function seatsItself(def: Shape | undefined): boolean {
+  return !!def?.interactions?.some((i) => i.pose === 'sit');
+}
+
 export function facedTable(content: Shapes, objects: readonly Placed[], seat: Placed, wallBetween: (ax: number, az: number, bx: number, bz: number) => boolean, storeyDepth = 0): Placed | null {
   const def = content.object(seat.def);
   const kinds = def?.seatAt ?? [];
@@ -282,10 +287,12 @@ export function facedTable(content: Shapes, objects: readonly Placed[], seat: Pl
   const storey = (z: number) => (storeyDepth > 0 ? Math.floor(z / storeyDepth) : 0);
   if (storey(tile[1]) !== storey(inner[1]) || wallBetween(inner[0], inner[1], tile[0], tile[1])) return null;
   for (const o of objects) {
-    const s = content.object(o.def)?.surface;
+    const host = content.object(o.def);
+    const s = host?.surface;
     if (!s || !kinds.includes(s.kind)) continue;
     const [ow, od] = placedSize(content, o);
-    if (tile[0] >= o.x && tile[1] >= o.z && tile[0] < o.x + ow && tile[1] < o.z + od) return o;
+    // (A table or desk with seats of its own, a dining set or a desk with its chair built in: none.)
+    if (tile[0] >= o.x && tile[1] >= o.z && tile[0] < o.x + ow && tile[1] < o.z + od) return seatsItself(host) ? null : o;
   }
   return null;
 }

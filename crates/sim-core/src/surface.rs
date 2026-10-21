@@ -639,10 +639,18 @@ fn faced(
     (s.kind.bit() & kinds != 0).then_some(host)
 }
 
-/// The table `seat` faces, if it is a seat that tucks under one (see `Links::table`).
+/// The table `seat` faces, if it is a seat that tucks under one (see `Links::table`); none at a
+/// top with seats of its own (`seats_itself`).
 pub fn faced_table(content: &Content, objects: &[ObjectInstance], nav: &NavGrid, seat: u32) -> Option<u32> {
     let o = objects.get(seat as usize)?;
-    faced(content, objects, nav, o, |x, z| host_at(content, objects, x, z))
+    faced(content, objects, nav, o, |x, z| host_at(content, objects, x, z)).filter(|&h| !seats_itself(content, &objects[h as usize]))
+}
+
+/// A top sat at by a use of its own (a dining set with its chairs built in, a desk with its
+/// chair): a seat bought facing it stands behind or beside those chairs, a metre from the top,
+/// so it isn't pulled up to it (its `needsTable` uses aren't offered there).
+pub fn seats_itself(content: &Content, obj: &ObjectInstance) -> bool {
+    content.objects[obj.def].interactions.iter().any(|i| i.pose == Pose::Sit)
 }
 
 /// The nearest place to `near` on `top` where a disc of `radius` fits among `discs`, no

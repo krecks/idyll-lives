@@ -200,10 +200,10 @@ espresso machine on a top, the foodie espresso bar) and every *Have a coffee* at
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `diningTable` Dining table | 2x1 · floor | coffee:drink | kitchen / dining | Top, Legs | Static | Static. A chair at each end of a 0.84 × 0.75 top: its two (content `places` `[±0.62, 0.1]`, facing ±90) face each other across it (G-39). |
-| `bistroSet` Bistro table | 1x1 · floor | breakfast:eat coffee:drink | kitchen / dining | Top, Frame, Seats | Static | Static. |
-| `diningGlass` Glass dining table | 2x1 · floor | breakfast:eat coffee:drink | kitchen / dining | Top, Legs | Static | Static; a 0.9 × 0.8 glass top on two sleds along its sides, a chair at each end: its two face each other across it (G-39). |
-| `diningOak` Farmhouse dining table | 2x1 · floor | breakfast:eat coffee:drink dinner:eat | kitchen / dining | Top, Legs | Static | Static; a 0.9 × 0.8 oak top with breadboard ends, a chair at each end: its two face each other across it (G-39). |
+| `diningTable` Dining table | 2x1 · floor | coffee:drink | kitchen / dining | Top, Legs | Static | Static. A chair at each end of a 0.84 × 0.75 top: its two (content `places` `[±0.62, 0.1]`, facing ±90) face each other across it (G-39). A chair bought facing it isn't pulled up to it: its chairs are its own (`seats_itself`, I-office-01). |
+| `bistroSet` Bistro table | 1x1 · floor | breakfast:eat coffee:drink | kitchen / dining | Top, Frame, Seats | Static | Static. A chair bought facing it isn't pulled up to it: its chairs are its own (`seats_itself`, I-office-01). |
+| `diningGlass` Glass dining table | 2x1 · floor | breakfast:eat coffee:drink | kitchen / dining | Top, Legs | Static | Static; a 0.9 × 0.8 glass top on two sleds along its sides, a chair at each end: its two face each other across it (G-39). A chair bought facing it isn't pulled up to it: its chairs are its own (`seats_itself`, I-office-01). |
+| `diningOak` Farmhouse dining table | 2x1 · floor | breakfast:eat coffee:drink dinner:eat | kitchen / dining | Top, Legs | Static | Static; a 0.9 × 0.8 oak top with breadboard ends, a chair at each end: its two face each other across it (G-39). A chair bought facing it isn't pulled up to it: its chairs are its own (`seats_itself`, I-office-01). |
 | `tableSquare2` Square table for two | 1x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
 | `tableBistroRound` Round bistro table | 1x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
 | `tableDining4` Dining table for six | 2x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. Renamed from "Dining table for four": 1.84 m seats six (kind `diningTable6`, Q-08). |

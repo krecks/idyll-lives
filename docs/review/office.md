@@ -103,8 +103,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/tableTuck.ts`
 - **Evidence:** A chair that faces a desk with its own chair built in (the laptop desk, and the kids' desk: I-kids-02) is tucked in from behind and doesn't reach the top. Deferred from 0.3.0. Wave check: buying a desk chair on the laptop desk's (and the kids' desk's) front tile, facing it, is refused by the game, "that would block the way", on both tries (`office/extra/play-gaps.jsonl`). Beside the desk, facing its end, the chair isn't pulled in and the resident writes at the end of the top with a hand on its edge (`office/extra/laptop-chairTask-write-01.png`): believable enough, not filed.
-- **Status:** open (renderer code: `tableTuck.ts`, or the sets' own chairs)
-- **After:** Not fixed in the content band: a chair facing a dining set with its own chairs built in still passes `needsTable`; telling those sets apart needs code.
+- **Status:** fixed (COMMIT)
+- **After:** a top sat at by a use of its own (a dining set with its chairs, a desk with its chair built in) is no table for another seat: sim-core `surface::faced_table` skips it (`seats_itself`), and so do the game's `facedTable` (build mode, the menu) and the renderer's tuck (`tableTuck.ts`). A chair bought facing the base dining table or the farmhouse set is no seat at it: "Have a coffee needs a table: pull the moulded chair up to one" (`fixes/sweep-render/sets/play-sets.jsonl`: `chairModern` and `chairWindsor` behind `diningTable` and `diningOak`, refused; the same chair at `tableSquare2` drinks there, `sets-chairModern-9-11-0-coffee-01.png`); the set's own coffee is from its own chair with the loose chair there (`own-diningTable-coffee-01.png`, was `kitchen/play/c5/chairModern-coffee-01.png`). Test: `dining.rs` `a_chair_is_no_seat_at_a_dining_set_with_its_own_chairs`.
 - **Source:** `docs/objects/open.md` Still open › Residents; `plan/release-0.3.0.md` §1.4; wave: office/kids (`check.mjs play --objects-file gaps.txt`)
 
 ### I-office-02 — The executive desk's drawer has no use
