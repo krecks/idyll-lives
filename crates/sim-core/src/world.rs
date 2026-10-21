@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, VecDeque};
 use std::f32::consts::FRAC_PI_2;
 
 use crate::clock::{AUTO_FAST_SPEED, MAX_SPEED, TICKS_PER_STEP};
-use crate::content::{Content, HabitTime, Layer, MAX_NEEDS, MAX_SKILLS, MAX_SLOTS, Modifiers, Pose, TagMask};
+use crate::content::{Content, HabitTime, Layer, MAX_NEEDS, MAX_SKILLS, MAX_SLOTS, Modifiers, Pose, TagMask, stage_in};
 use crate::index::ObjectIndex;
 use crate::lot::{BondRaw, Lot, LotFile, SimSpawn};
 use crate::path::{Grounds, NavGrid};
@@ -292,15 +292,16 @@ impl ObjectInstance {
         reserved
     }
 
-    /// The tags of each way someone past the crib can sit on it as it is now (a sofa bed pulled
-    /// out is no seat).
-    pub fn seats_now<'a>(&'a self, def: &'a crate::content::ObjectDef) -> impl Iterator<Item = TagMask> + 'a {
-        def.interactions.iter().filter(|i| i.pose == Pose::Sit && !i.baby && self.fits(i)).map(|i| i.tags)
+    /// The tags of each way someone past the crib, in life stage `stage`, can sit on it as it is
+    /// now (a sofa bed pulled out is no seat; a kids' chair is none for a grown-up).
+    pub fn seats_now<'a>(&'a self, def: &'a crate::content::ObjectDef, stage: usize) -> impl Iterator<Item = TagMask> + 'a {
+        def.interactions.iter().filter(move |i| i.pose == Pose::Sit && !i.baby && self.fits(i) && i.for_stage(stage)).map(|i| i.tags)
     }
 
-    /// Whether it is a seat now with a way to sit that has one of `want`'s tags and none of `avoid`'s.
-    pub fn sits(&self, def: &crate::content::ObjectDef, want: TagMask, avoid: TagMask) -> bool {
-        self.seats_now(def).any(|t| t & want != 0 && t & avoid == 0)
+    /// Whether it is a seat now for someone in `stage` with a way to sit that has one of `want`'s
+    /// tags and none of `avoid`'s.
+    pub fn sits(&self, def: &crate::content::ObjectDef, stage: usize, want: TagMask, avoid: TagMask) -> bool {
+        self.seats_now(def, stage).any(|t| t & want != 0 && t & avoid == 0)
     }
 
     /// Takes on the state `old`, this object before it was lifted out and placed again, had: its
@@ -3042,6 +3043,24 @@ impl World {
                 if allowed == Access::Guest && !guest_may(&self.content, inter) {
                     return Err(Error::new(format!("{} is a guest there, and guests don't {}", s.name, inter.label.to_lowercase())));
                 }
+                // Who may use what, as free will keeps it: wine and the stove not for a child,
+                // the kids' things not for grown-ups, homework for pupils, the baby's care for
+                // grown-ups (and only with the baby there).
+                if let Some(why) = unfit(&self.content, s.age, inter) {
+                    return Err(Error::new(match why {
+                        Unfit::TooYoung => format!("{} is too young to {}", s.name, inter.label.to_lowercase()),
+                        Unfit::TooBig => format!("{} is too big for the {thing}", s.name),
+                        Unfit::NoHomework => format!("{} has no homework to do", s.name),
+                        Unfit::TooYoungToCare => format!("{} is too young to look after a baby", s.name),
+                    }));
+                }
+                if inter.cares() && !obj.users().any(|u| self.sims.get(u as usize).is_some_and(|b| self.content.life.baby(b.age))) {
+                    return Err(Error::new(format!("there's no baby in the {thing}")));
+                }
+                if upper_barred(&self.content, obj, sim, s.age) {
+                    let young = crate::content::all_older(self.content.objects[obj.def].upper_stages, self.content.life.stage(s.age));
+                    return Err(Error::new(format!("{} is too {} for the top bunk", s.name, if young { "young" } else { "old" })));
+                }
                 let household = s.household as usize;
                 if !affordable(inter.cost, self.households[household].funds) {
                     return Err(Error::new(format!(
@@ -3656,6 +3675,41 @@ pub(crate) fn guest_may(content: &Content, inter: &crate::content::Interaction) 
     inter.tags & rules.busy_tags & !rules.guest_tags == 0 && inter.recipe.is_none() && !inter.cares()
 }
 
+/// Why someone may not take an interaction at their age, wherever it is (see `unfit`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Unfit {
+    /// Every stage it is for (`Interaction::stages`) is older than theirs: wine for a child.
+    TooYoung,
+    /// It is for younger ones only: a toddler's spring rider for a grown-up.
+    TooBig,
+    /// Homework is a pupil's.
+    NoHomework,
+    /// Looking after a baby is a grown-up's.
+    TooYoungToCare,
+}
+
+/// Why someone of `age` may not take `inter` (None: they may): its life stages, homework only
+/// at a school stage, and caring for a baby only grown up. Free will and the player's orders
+/// keep it alike.
+pub(crate) fn unfit(content: &Content, age: f32, inter: &crate::content::Interaction) -> Option<Unfit> {
+    let life = &content.life;
+    let stage = life.stage(age);
+    if !inter.for_stage(stage) {
+        return Some(if crate::content::all_older(inter.stages, stage) { Unfit::TooYoung } else { Unfit::TooBig });
+    }
+    if inter.homework > 0.0 && !life.stage_at(age).is_some_and(|s| s.school) {
+        return Some(Unfit::NoHomework);
+    }
+    (inter.cares() && !life.adult(age)).then_some(Unfit::TooYoungToCare)
+}
+
+/// Whether `sim` (of `age`) could only take the upper bunk of `obj` (the lower one someone
+/// else's) and may not (`ObjectDef::upper_stages`): an elder, say.
+pub(crate) fn upper_barred(content: &Content, obj: &ObjectInstance, sim: u32, age: f32) -> bool {
+    let def = &content.objects[obj.def];
+    def.bunk && !stage_in(def.upper_stages, content.life.stage(age)) && obj.users[0].is_some_and(|u| u != sim)
+}
+
 /// What the player may have `sim` use on `plot`: as `access`, but their own home and public
 /// places stay theirs to use while they're a guest somewhere.
 pub(crate) fn order_access(households: &[Household], plots: &[Plot], sim: &Sim, plot: Option<u32>) -> Access {
@@ -3831,11 +3885,13 @@ fn pick_autonomous(
                 * (1.0 - environment);
         for (i, inter) in content.objects[obj.def].interactions.iter().enumerate() {
             // A baby's place is only ever a baby's; caring for one is for grown-ups at home with
-            // a baby in it, the more the baby needs it.
+            // a baby in it, the more the baby needs it. Nothing their age isn't for (`unfit`).
             let mut care = 0.0;
             // Dining at a table only with a table to dine at.
             // (Nor one that takes the whole thing while someone else is on it.)
             if inter.baby
+                || unfit(content, sim.age, inter).is_some()
+                || upper_barred(content, obj, sim.id, sim.age)
                 || (inter.needs_table && !at_table)
                 || !requirements_met(ctx, objects, obj.id, inter)
                 || !obj.allows(inter, sim.id)
@@ -3851,14 +3907,11 @@ fn pick_autonomous(
                 continue;
             }
             if inter.homework > 0.0 {
-                if !content.life.stage_at(sim.age).is_some_and(|s| s.school) {
-                    continue;
-                }
                 care += inter.homework / 10.0 * (100.0 - sim.grade) / 100.0 * 1.5 / (1.0 + distance * 0.08);
             }
             if inter.cares() {
                 let baby = obj.users().find(|&u| ctx.briefs.get(u as usize).is_some_and(|b| b.baby));
-                let Some(baby) = baby.filter(|_| content.life.adult(sim.age) && allowed == Access::Full) else { continue };
+                let Some(baby) = baby.filter(|_| allowed == Access::Full) else { continue };
                 let b = &ctx.briefs[baby as usize];
                 let family = if ctx.rels.kin(me, baby as usize) != crate::social::Kin::None { 1.5 } else { 1.0 };
                 care = ai::score_gains(&b.needs[..content.needs.len()], &inter.care, distance) * family;
@@ -3975,8 +4028,10 @@ fn pick_autonomous(
         } else {
             0.0
         };
+        let (my_stage, their_stage) = (content.life.stage(sim.age), content.life.stage(other.age));
         for (k, s) in content.socials.iter().enumerate() {
-            if !s.autonomous || !s.requires.allows(rel) {
+            // (Nor with someone their age isn't for: no fights with a child.)
+            if !s.autonomous || !s.requires.allows(rel) || !stage_in(s.stages, my_stage) || !stage_in(s.target_stages, their_stage) {
                 continue;
             }
             // Romance only between grown-ups who aren't family.
@@ -4245,6 +4300,13 @@ pub(crate) fn prefer_factor(prefer: Prefer, rel: &social::Relationship, chemistr
 fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut crate::items::Items) {
     let content = ctx.content;
     let nav = &ctx.nav;
+    // Nothing their age isn't for, however it was chosen (`unfit`; an order was refused already).
+    if let TaskKind::Use { object, interaction } = task.kind
+        && let Some(o) = objects.get(object as usize)
+        && content.objects[o.def].interactions.get(interaction).is_some_and(|i| unfit(content, sim.age, i).is_some())
+    {
+        return;
+    }
     // A recipe isn't made where it was picked: the cook goes round its stations, starting with
     // the first (see `cooking.rs`).
     if let TaskKind::Use { object, interaction } = task.kind
@@ -4279,7 +4341,7 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
                 sim.news.get_or_insert(News::NotClosed(object));
                 return;
             }
-            if !obj.can_use_for(sim.id, &content.objects[obj.def], interaction) || obj.broken() {
+            if !obj.can_use_for(sim.id, &content.objects[obj.def], interaction) || obj.broken() || upper_barred(content, obj, sim.id, sim.age) {
                 return;
             }
             // Never other people's things; what the player asks a guest to do, only what guests
@@ -4484,7 +4546,7 @@ fn seat_near_object(
         })
         .filter(|o| {
             let def = &content.objects[o.def];
-            !o.broken() && o.can_use(sim.id, def.slots) && o.sits(def, rules.seat_tags, rules.seat_avoid)
+            !o.broken() && o.can_use(sim.id, def.slots) && o.sits(def, content.life.stage(sim.age), rules.seat_tags, rules.seat_avoid)
         })
         .filter(|o| access(ctx, sim, ctx.object_plot[o.id as usize]) != Access::None)
         .map(|o| {
@@ -5039,6 +5101,7 @@ fn home_needs(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], mask: u32, free:
         let startable = |&(n, _): &(usize, &crate::content::Interaction)| !free || o.can_use_for(sim.id, def, n);
         for (_, i) in def.interactions.iter().enumerate().filter(startable).filter(|(_, i)| {
             i.autonomous && !i.cares() && i.recipe.is_none_or(possible)
+                && unfit(ctx.content, sim.age, i).is_none()
                 && requirements_met(ctx, objects, o.id, i)
         }) {
             found |= i.fills() & mask;
@@ -5102,7 +5165,7 @@ fn reach(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], usable: &[u32], per_m
         let fills = content.objects[o.def]
             .interactions
             .iter()
-            .filter(|i| i.autonomous && !i.baby && !i.cares() && requirements_met(ctx, objects, o.id, i))
+            .filter(|i| i.autonomous && !i.baby && !i.cares() && requirements_met(ctx, objects, o.id, i) && unfit(content, sim.age, i).is_none())
             .fold(0, |m, i| m | i.fills());
         if fills == 0 {
             continue;
@@ -5222,6 +5285,8 @@ fn nearest(
             let def = &content.objects[o.def];
             let i = (0..def.interactions.len()).find(|&i| {
                 fits(&def.interactions[i])
+                    && unfit(content, sim.age, &def.interactions[i]).is_none()
+                    && !upper_barred(content, o, sim.id, sim.age)
                     && requirements_met(ctx, objects, o.id, &def.interactions[i])
                     && o.allows(&def.interactions[i], sim.id)
                     && o.can_use_for(sim.id, def, i)

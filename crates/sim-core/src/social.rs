@@ -9,7 +9,7 @@ use std::collections::{HashMap, VecDeque};
 
 use serde::{Deserialize, Serialize};
 
-use crate::content::{MAX_NEEDS, Modifiers, ModifiersRaw, TagMask};
+use crate::content::{MAX_NEEDS, Modifiers, ModifiersRaw, StageMask, TagMask};
 use crate::{Error, MINUTES_PER_TICK};
 
 /// Animation names the renderer understands, in snapshot code order (code = index + 1).
@@ -186,6 +186,10 @@ pub struct SocialDef {
     pub joinable: bool,
     pub tags: TagMask,
     pub requires: Requirements,
+    /// The life stages that may start it, and that it may be started with (content `stages`,
+    /// `targetStages`; default everyone): nobody starts a fight with a child.
+    pub stages: StageMask,
+    pub target_stages: StageMask,
     pub acceptance: Acceptance,
     pub prefer: Prefer,
     /// Need gains over the whole interaction.
@@ -289,6 +293,12 @@ pub(crate) struct SocialRaw {
     success: OutcomeRaw,
     #[serde(default)]
     failure: OutcomeRaw,
+    /// Life-stage ids that may start it, and that it may be started with (see
+    /// `SocialDef::stages`).
+    #[serde(default)]
+    stages: Option<Vec<String>>,
+    #[serde(default)]
+    target_stages: Option<Vec<String>>,
 }
 
 #[derive(Deserialize, Default)]
@@ -440,7 +450,7 @@ pub(crate) fn parse_outcome(raw: &OutcomeRaw, ix: &Indices, ctx: &str) -> Result
     })
 }
 
-pub(crate) fn parse_social(raw: &SocialRaw, ix: &Indices) -> Result<SocialDef, Error> {
+pub(crate) fn parse_social(raw: &SocialRaw, ix: &Indices, stage_ids: &[&str]) -> Result<SocialDef, Error> {
     let ctx = raw.id.as_str();
     if !(raw.minutes > 0.0 && raw.minutes.is_finite()) {
         return Err(Error::new(format!("{ctx}: minutes must be > 0")));
@@ -465,6 +475,8 @@ pub(crate) fn parse_social(raw: &SocialRaw, ix: &Indices) -> Result<SocialDef, E
         joinable: raw.joinable,
         tags: tag_mask(&raw.tags, ix, ctx)?,
         requires: raw.requires,
+        stages: crate::content::stage_mask(stage_ids, &raw.stages, ctx)?.unwrap_or(StageMask::MAX),
+        target_stages: crate::content::stage_mask(stage_ids, &raw.target_stages, ctx)?.unwrap_or(StageMask::MAX),
         acceptance: raw.acceptance,
         prefer: raw.prefer,
         actor_gain: need_array(&raw.needs, ix, ctx)?,

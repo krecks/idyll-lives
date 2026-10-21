@@ -73,6 +73,15 @@ export interface InteractionDef {
   leaves?: 'open' | 'closed' | 'picked';
   /** A tag: what follows when it finishes (toilets: `handwash`, washing hands at a sink). */
   after?: string;
+  /** The baby's place in a crib: only a baby takes it. */
+  baby?: boolean;
+  /** Grade points for a full use: only pupils do homework. */
+  homework?: number;
+  /**
+   * The life stages (`life.stages` ids) that may take it, else its recipe's, else its object's
+   * (default every stage but a baby's): the kids' things are a child's, wine a grown-up's.
+   */
+  stages?: string[];
 }
 
 /** How cooking, eating and washing up go (content `cooking`; sim-core `cooking::CookingRules`). */
@@ -159,6 +168,8 @@ export interface RecipeDef {
   /** Cooked and served outdoors (a barbecue). */
   outdoor?: boolean;
   steps: RecipeStep[];
+  /** The life stages that may cook it, for interactions without `stages` of their own (at a hot stove: teens and up). */
+  stages?: string[];
 }
 
 /** What kind of top a surface is (sim-core `content::SurfaceKind`): which seats tuck under it. */
@@ -214,6 +225,10 @@ export interface ObjectDef {
   hangsLow?: boolean;
   /** Bunk beds: the second slot lies on the upper bunk. */
   bunk?: boolean;
+  /** Bunk beds: the life stages that may take the upper bunk (default everyone who may use the bed). */
+  upperStages?: string[];
+  /** The life stages that may use it, for interactions without `stages` of their own. */
+  stages?: string[];
   /**
    * A top small things stand on: its height (m), kind, and the margin kept clear along its edges
    * (m, default 0.04); its width and depth (m, default the footprint's) and where its middle is off
@@ -729,6 +744,21 @@ export class Content {
     if (!s) return [25, 50];
     const next = this.lifeStages[i + 1];
     return [s.from, next ? next.from - 1 : s.from + 15];
+  }
+
+  /**
+   * Whether someone in life stage `stage` (an id) may take interaction `it` of `def`, as the
+   * simulation keeps it (sim-core `world::unfit`): its `stages`, homework only for pupils, a
+   * baby's care only for grown-ups.
+   */
+  mayUse(def: ObjectDef, it: InteractionDef, stage: string | null | undefined): boolean {
+    const s = this.lifeStages.find((x) => x.id === stage);
+    if (!s) return true;
+    const stages = it.stages ?? (it.recipe ? this.recipes.find((r) => r.id === it.recipe)?.stages : undefined) ?? def.stages;
+    const babies = this.lifeStages.some((x) => x.baby);
+    if (stages ? !stages.includes(s.id) : it.baby ? babies && !s.baby : !!s.baby) return false;
+    if (it.homework && !s.school) return false;
+    return !Object.values(it.care ?? {}).some((g) => g > 0) || (s.adult ?? (!s.baby && !s.school));
   }
 
   /** Whether an object belongs in the garden rather than a room (outdoor-only, or its category or group says so). */

@@ -1141,6 +1141,8 @@ export async function startSession(
     const placement = world?.objects.find((o) => o.id === objectId);
     const def = placement && content.object(placement.def);
     if (!placement || !def) return;
+    // Uses the resident's age isn't for are greyed out (the kids' things for a grown-up, wine for a child).
+    const stage = game.sims.find((s) => s.id === game.selected)?.stage;
     // Paid interactions show their price; the pie menu greys them out when funds run short.
     // Dining at a table only at a chair pulled up to one; folding down only what's folded up.
     const atTable = def.interactions.some((it) => it.needsTable) && buildBuy.atTable(objectId);
@@ -1158,7 +1160,9 @@ export async function startSession(
     }
     const supplied = (requires: string[] | undefined) => !requires?.length || requires.every((r) => provided.has(r));
     const items: { label: string; index: number; disabled?: boolean; cost?: number }[] = def.interactions.flatMap((it, index) =>
-      (it.needsTable && !atTable) || !supplied(it.requires) || !offered(it.when) ? [] : [it.cost ? { label: it.label, index, cost: it.cost } : { label: it.label, index }],
+      (it.needsTable && !atTable) || !supplied(it.requires) || !offered(it.when)
+        ? []
+        : [{ label: it.label, index, ...(it.cost ? { cost: it.cost } : {}), ...(content.mayUse(def, it, stage) ? {} : { disabled: true }) }],
     );
     // A lamp: its switch (not a fire's).
     if (def.light && def.light.switch !== false) items.unshift({ label: bridge.lampOff(objectId) ? 'Turn on' : 'Turn off', index: -1 });

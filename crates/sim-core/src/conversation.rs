@@ -14,7 +14,7 @@
 //! little closer. They stay for the leader's next social with someone there, and go otherwise.
 
 use crate::{MINUTES_PER_TICK, TICKS_PER_SECOND};
-use crate::content::{Content, MAX_NEEDS, Pose};
+use crate::content::{Content, MAX_NEEDS, Pose, stage_in};
 use crate::path::{Grounds, NavGrid, STOREY_WALK};
 use crate::rng::Rng;
 use crate::social::{self, Effect, EventKind, EventLog, Relationships, SocialDef};
@@ -59,7 +59,8 @@ pub fn duration(s: &SocialDef, success: bool) -> f32 {
     }
 }
 
-/// Whether `actor` can start `s` with `target` (relationship requirements and attraction).
+/// Whether `actor` can start `s` with `target` (relationship requirements, both their life
+/// stages and attraction).
 pub fn social_allowed(
     content: &Content,
     rels: &Relationships,
@@ -70,8 +71,11 @@ pub fn social_allowed(
     let rel = rels.get(actor.id as usize, target.id as usize);
     let romantic = s.tags & content.social_rules.romantic_tags != 0;
     let grown_ups = actor.adult(content) && target.adult(content);
+    let stage = |sim: &Sim| content.life.stage(sim.age);
     actor.id != target.id
         && s.requires.allows(rel)
+        && stage_in(s.stages, stage(actor))
+        && stage_in(s.target_stages, stage(target))
         && (!romantic || (grown_ups && actor.attracted_to(target) && rel.kin.is_none()))
 }
 

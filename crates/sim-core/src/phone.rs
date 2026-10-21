@@ -479,7 +479,7 @@ fn seat_near(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<u32> {
         .map(|&o| &objects[o as usize])
         .filter(|o| {
             let def = &content.objects[o.def];
-            !o.broken() && o.can_use(sim.id, def.slots) && o.sits(def, rules.seat_tags, rules.seat_avoid)
+            !o.broken() && o.can_use(sim.id, def.slots) && o.sits(def, content.life.stage(sim.age), rules.seat_tags, rules.seat_avoid)
         })
         .filter(|o| access(ctx, sim, ctx.object_plot[o.id as usize]) != Access::None)
         .map(|o| {

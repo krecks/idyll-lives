@@ -14,7 +14,7 @@
 //! use it. `Links` caches what depends only on where objects and walls stand; it is rebuilt with
 //! the object index when the structure changes.
 
-use crate::content::{Approach, Content, DEFAULT_RADIUS, Layer, Pose, Surface};
+use crate::content::{Approach, Content, DEFAULT_RADIUS, Layer, Pose, StageMask, Surface};
 use crate::lot::Edge;
 use crate::path::NavGrid;
 use crate::world::{MAX_OFFSET, ObjectInstance};
@@ -528,40 +528,45 @@ pub fn spot_for_seat(
     nearest_on(&top, target, PLATE_SEARCH, radius, &discs, extra).map(|f| f.1)
 }
 
-/// The best free seat to eat at among `candidates`, nearest within a rank, from `from`: a
-/// chair pulled up to a table, else a table with its seats built in, else anywhere comfortable
-/// to sit (not a toilet or a desk chair).
+/// The best free seat to eat at among `candidates` for someone in life stage `stage`, nearest
+/// within a rank, from `from`: a chair pulled up to a table, else a table with its seats built
+/// in, else anywhere comfortable to sit (not a toilet or a desk chair). Within a rank, a seat
+/// made for their age comes first: a child has a snack at the kids' table.
 pub fn dining_seat(
     content: &Content,
     objects: &[ObjectInstance],
     links: &Links,
     candidates: &[u32],
     from: [f32; 2],
+    stage: usize,
 ) -> Option<DiningSeat> {
     let tag = |name: &str| content.tags.iter().position(|t| t == name).map_or(0, |i| 1u64 << i);
     let food = tag("food");
     let comfy = food | tag("lounge");
-    let mut best: Option<(DiningRank, f32, u32, Option<u32>)> = None;
+    // (Every stage but a baby's: a seat for fewer is made for them.)
+    let anyone: StageMask = content.life.stages.iter().enumerate().filter(|(_, s)| !s.baby).fold(0, |m, (i, _)| m | 1 << i);
+    let mut best: Option<(DiningRank, bool, f32, u32, Option<u32>)> = None;
     for &id in candidates {
         let Some(o) = objects.get(id as usize) else { continue };
         let def = &content.objects[o.def];
         if o.broken() || !o.has_free_slot(def.slots) {
             continue;
         }
-        let sits = |mask: u64| o.seats_now(def).any(|t| mask == 0 || t & mask != 0);
+        let sits = |mask: u64| o.seats_now(def, stage).any(|t| mask == 0 || t & mask != 0);
         let (rank, table) = match links.table_of(id) {
             Some(t) if def.seat_at != 0 && sits(0) => (DiningRank::ChairAtTable, Some(t)),
             _ if def.surface.is_some() && food != 0 && sits(food) => (DiningRank::TableSeat, Some(id)),
             _ if sits(comfy) => (DiningRank::AnySeat, None),
             _ => continue,
         };
+        let anyones = !def.interactions.iter().any(|i| i.pose == Pose::Sit && i.for_stage(stage) && i.stages & anyone != anyone);
         let c = o.centre(content);
         let d = (c[0] - from[0]).hypot(c[1] - from[1]);
-        if best.is_none_or(|b| (rank, d) < (b.0, b.1)) {
-            best = Some((rank, d, id, table));
+        if best.is_none_or(|b| (rank, anyones, d) < (b.0, b.1, b.2)) {
+            best = Some((rank, anyones, d, id, table));
         }
     }
-    let (rank, _, object, table) = best?;
+    let (rank, _, _, object, table) = best?;
     let o = &objects[object as usize];
     let slot = o.users[..content.objects[o.def].slots as usize].iter().position(Option::is_none).unwrap_or(0);
     Some(DiningSeat { object, rank, table, spot: spot_for_seat(content, objects, links, object, slot, DEFAULT_RADIUS, &[]) })

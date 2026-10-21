@@ -23,6 +23,10 @@ pub const MAX_GENDERS: usize = 32;
 pub const MAX_WALK_SPEED: f32 = 10.0;
 /// Bitmask of indices into `Content::tags`.
 pub type TagMask = u64;
+/// Bitmask of indices into `LifeRules::stages` (content `stages` rules: who may use what).
+pub type StageMask = u32;
+/// Most life stages content may have (a `StageMask` bit each).
+pub const MAX_STAGES: usize = 32;
 /// Upper bound on the number of skills, so per-Sim skills fit in a fixed array.
 pub const MAX_SKILLS: usize = 16;
 /// Most Sims that can use one object at once (two in a double bed, three on a long sofa, four
@@ -118,6 +122,11 @@ pub struct Interaction {
     pub whole: bool,
     /// Homework: grade points for a full use (only pupils do it).
     pub homework: f32,
+    /// The life stages that may take it (content `stages` on the interaction, else on its
+    /// recipe, else on its object; default every stage but a baby's, and for a `baby` use only
+    /// a baby's): the kids' furniture is for children, wine for grown-ups. Free will and the
+    /// player's orders keep it alike (`world::unfit`).
+    pub stages: StageMask,
     /// Starts this recipe (index into `Content::recipes`): the resident goes round the
     /// recipe's stations (see `cooking.rs`) instead of using this object on its own. Its
     /// `total_gain` is then what a serving gives plus its own effects (what cooking gives the
@@ -156,6 +165,11 @@ impl Interaction {
     /// Whether this looks after a baby lying in the object.
     pub fn cares(&self) -> bool {
         self.care.iter().any(|&g| g > 0.0)
+    }
+
+    /// Whether someone in life stage `stage` (`LifeRules::stage`) may take it (`stages`).
+    pub fn for_stage(&self, stage: usize) -> bool {
+        stage_in(self.stages, stage)
     }
 
     /// Bitmask of the needs this fills (a gain above 0).
@@ -231,6 +245,9 @@ pub struct ObjectDef {
     /// Its two slots are bunks, one above the other (content `bunk`): both users lie in the
     /// middle of its width, and the renderer lifts the second to the upper bunk.
     pub bunk: bool,
+    /// Who may take the upper bunk (content `upperStages`; default everyone who may use the
+    /// bed): with the lower bunk someone else's, nobody else gets in.
+    pub upper_stages: StageMask,
     /// A top that small things stand on (content `surface`): tables, counters, desks,
     /// nightstands, shelves. Things on the `Surface` layer stand on it; plated food too.
     pub surface: Option<Surface>,
@@ -284,6 +301,31 @@ impl ObjectDef {
             0..slots
         }
     }
+}
+
+/// Whether `stage` is one of `mask`'s.
+pub fn stage_in(mask: StageMask, stage: usize) -> bool {
+    1u32.checked_shl(stage as u32).is_some_and(|bit| mask & bit != 0)
+}
+
+/// Whether every stage of `mask` is older than `stage` (someone of `stage` is too young for it;
+/// else too old, or too big).
+pub fn all_older(mask: StageMask, stage: usize) -> bool {
+    mask != 0 && mask & 1u32.checked_shl(stage as u32 + 1).map_or(u32::MAX, |b| b - 1) == 0
+}
+
+/// Life-stage ids (`stages` rules) as a mask of `stage_ids`, content `life.stages` in order.
+pub(crate) fn stage_mask(stage_ids: &[&str], ids: &Option<Vec<String>>, ctx: &str) -> Result<Option<StageMask>, Error> {
+    let Some(ids) = ids else { return Ok(None) };
+    if ids.is_empty() {
+        return Err(Error::new(format!("{ctx}: `stages` names at least one life stage")));
+    }
+    ids.iter()
+        .try_fold(0, |m: StageMask, id| match stage_ids.iter().position(|s| s == id) {
+            Some(i) => Ok(m | 1 << i),
+            None => Err(Error::new(format!("{ctx}: unknown life stage '{id}' (see life.stages)"))),
+        })
+        .map(Some)
 }
 
 /// Radius of a thing on the `Surface` layer when content gives none (m).
@@ -2059,6 +2101,12 @@ struct ObjectRaw {
     fills_wall: bool,
     #[serde(default, rename = "hangsLow")]
     hangs_low: bool,
+    /// Life-stage ids that may use it (see `Interaction::stages`).
+    #[serde(default)]
+    stages: Option<Vec<String>>,
+    /// Life-stage ids that may take the upper bunk (see `ObjectDef::upper_stages`).
+    #[serde(default, rename = "upperStages")]
+    upper_stages: Option<Vec<String>>,
 }
 
 /// An object's `grows`: `{"days": 2, "fallow": 0.5}` (game days to ripen, and fallow after picking).
@@ -2114,6 +2162,9 @@ struct InteractionRaw {
     whole: bool,
     #[serde(default)]
     homework: f32,
+    /// Life-stage ids that may take it (see `Interaction::stages`).
+    #[serde(default)]
+    stages: Option<Vec<String>>,
     #[serde(default)]
     care: HashMap<String, f32>,
     #[serde(default)]
@@ -2520,6 +2571,17 @@ impl Content {
         )?;
 
         let lamp_tiles = raw.room_rules.lamp_tiles.unwrap_or(10.0).max(0.1);
+        // Who may use what (`stages` rules): life stages by id, a bit each. Without stages in
+        // content, everyone may use everything.
+        let life_stages = &raw.life.stages;
+        if life_stages.len() > MAX_STAGES {
+            return Err(Error::new(format!("life: at most {MAX_STAGES} stages")));
+        }
+        let every_stage: StageMask = if life_stages.is_empty() { StageMask::MAX } else { StageMask::MAX >> (MAX_STAGES - life_stages.len()) };
+        let babies: StageMask = life_stages.iter().enumerate().filter(|(_, s)| s.baby).fold(0, |m, (i, _)| m | 1 << i);
+        let stage_ids: Vec<&str> = life_stages.iter().map(|s| s.id.as_str()).collect();
+        let stages_of = |ids: &Option<Vec<String>>, ctx: &str| stage_mask(&stage_ids, ids, ctx);
+        let recipe_stages = raw.recipes.iter().map(|r| stages_of(&r.stages, &format!("recipe '{}'", r.id))).collect::<Result<Vec<_>, _>>()?;
         let mut objects = Vec::with_capacity(raw.objects.len());
         let mut object_index = HashMap::new();
         for obj in &raw.objects {
@@ -2536,6 +2598,7 @@ impl Content {
             if let Some((i, it)) = obj.interactions.iter().enumerate().find(|(i, it)| obj.interactions[..*i].iter().any(|o| o.id == it.id)) {
                 return Err(Error::new(format!("object '{}': interaction {i} repeats the id '{}'", obj.id, it.id)));
             }
+            let object_stages = stages_of(&obj.stages, &format!("object '{}'", obj.id))?;
             let mut interactions = Vec::with_capacity(obj.interactions.len());
             for it in &obj.interactions {
                 let ctx = format!("{}.{}", obj.id, it.id);
@@ -2544,6 +2607,18 @@ impl Content {
                     .as_deref()
                     .map(|r| recipes.iter().position(|d| d.id == r).ok_or_else(|| Error::new(format!("{ctx}: unknown recipe '{r}'"))))
                     .transpose()?;
+                // Its own stages, else its recipe's, else its object's; a baby's place is a baby's.
+                let stages = stages_of(&it.stages, &ctx)?.or(recipe.and_then(|r| recipe_stages.get(r).copied().flatten())).or(object_stages);
+                if it.baby && stages.is_some_and(|s| s & !babies != 0) {
+                    return Err(Error::new(format!("{ctx}: a `baby` use is a baby's only: no other `stages`")));
+                }
+                let stages = stages.unwrap_or(if !it.baby {
+                    every_stage & !babies
+                } else if babies != 0 {
+                    babies
+                } else {
+                    every_stage
+                });
                 // A recipe takes as long as its steps.
                 let minutes = recipe.map_or(it.minutes, |r| recipes[r].minutes);
                 if !(minutes > 0.0 && minutes.is_finite()) {
@@ -2661,6 +2736,7 @@ impl Content {
                     needs_table: it.needs_table,
                     whole: it.whole,
                     homework: it.homework.max(0.0),
+                    stages,
                     care,
                     recipe,
                     after,
@@ -2803,6 +2879,10 @@ impl Content {
                     obj.id
                 )));
             }
+            let upper_stages = stages_of(&obj.upper_stages, &format!("object '{}' upperStages", obj.id))?;
+            if upper_stages.is_some() && !obj.bunk {
+                return Err(Error::new(format!("object '{}': `upperStages` is a bunk bed's", obj.id)));
+            }
             if obj.stairs && layer.mounted() {
                 return Err(Error::new(format!("object '{}': stairs stand on the floor", obj.id)));
             }
@@ -2850,6 +2930,7 @@ impl Content {
                 provides,
                 layer,
                 bunk: obj.bunk,
+                upper_stages: upper_stages.unwrap_or(every_stage),
                 surface,
                 radius: obj.radius.unwrap_or(DEFAULT_RADIUS).clamp(0.02, 0.45),
                 approach,
@@ -2889,7 +2970,7 @@ impl Content {
         let socials = raw
             .socials
             .iter()
-            .map(|s| social::parse_social(s, &ix))
+            .map(|s| social::parse_social(s, &ix, &stage_ids))
             .collect::<Result<Vec<_>, _>>()?;
         if socials
             .iter()

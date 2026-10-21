@@ -169,6 +169,7 @@ mod tests {
             baby: false,
             needs_table: false,
             whole: false,
+            stages: crate::content::StageMask::MAX,
             seat_near: 0.0,
             broadcast: 0.0,
             broadcast_range: 6.0,
