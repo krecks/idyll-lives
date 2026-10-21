@@ -258,7 +258,7 @@
         "height": 0.44,
         "forward": 0.08
       },
-      "description": "A boxy two-seat sofa that folds out for guests.",
+      "description": "A boxy two-seat sofa that folds out into a bed for a guest's night.",
       "interactions": [
         {
           "id": "relax",
@@ -290,6 +290,23 @@
             "nap"
           ],
           "leaves": "open"
+        },
+        {
+          "id": "sleep",
+          "label": "Sleep the night",
+          "anim": "sleep",
+          "minutes": 480,
+          "pose": "lie",
+          "effects": {
+            "energy": 0.85,
+            "comfort": 0.25
+          },
+          "tags": [
+            "rest",
+            "sleep"
+          ],
+          "leaves": "open",
+          "spare": true
         },
         {
           "id": "pullOut",

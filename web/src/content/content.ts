@@ -73,6 +73,8 @@ export interface InteractionDef {
   leaves?: 'open' | 'closed' | 'picked';
   /** A tag: what follows when it finishes (toilets: `handwash`, washing hands at a sink). */
   after?: string;
+  /** A spare bed's night (a sofa bed's): it doesn't make the room a bedroom, and is slept in with no other bed free. */
+  spare?: boolean;
   /** The baby's place in a crib: only a baby takes it. */
   baby?: boolean;
   /** Grade points for a full use: only pupils do homework. */

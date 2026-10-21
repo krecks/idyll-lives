@@ -159,6 +159,11 @@ pub struct Interaction {
     /// Picks the crop as the use starts (content `leaves`: "picked"): it lies fallow, then is
     /// planted again and grows (see `ObjectDef::grows`).
     pub picks: bool,
+    /// A spare bed's night (content `spare`, on a `dayRhythm.sleepTags` use: a sofa bed pulled
+    /// out for a guest): it doesn't make the room a bedroom (its tags aren't the object's
+    /// `tags`, what the room is for), and residents sleep in it only with no other bed free for
+    /// them.
+    pub spare: bool,
 }
 
 impl Interaction {
@@ -2220,6 +2225,9 @@ struct InteractionRaw {
     leaves: Option<OpenState>,
     #[serde(default)]
     close_after: bool,
+    /// A spare bed's night (see `Interaction::spare`).
+    #[serde(default)]
+    spare: bool,
 }
 
 /// An object's state for `when` and `leaves` (see `ObjectInstance::open`), or its crop's
@@ -2754,6 +2762,7 @@ impl Content {
                     close_after: it.close_after,
                     ripe: it.when == Some(OpenState::Ripe),
                     picks: it.leaves == Some(OpenState::Picked),
+                    spare: it.spare,
                 });
                 if it.close_after
                     && (it.leaves != Some(OpenState::Open)
@@ -2782,7 +2791,8 @@ impl Content {
             if obj.price.is_some_and(|p| p < 0) {
                 return Err(Error::new(format!("object '{}': negative price", obj.id)));
             }
-            let offered = interactions.iter().fold(0, |m: TagMask, it| m | it.tags);
+            // (A spare bed's night doesn't make its room a bedroom.)
+            let offered = interactions.iter().filter(|it| !it.spare).fold(0, |m: TagMask, it| m | it.tags);
             let mut provides = 0;
             for t in &obj.provides {
                 provides |= 1 << tag_index[t.as_str()];
@@ -3276,6 +3286,9 @@ impl Content {
                 Ok(out)
             };
         let sleep_tags = tag_mask(&dr.sleep_tags, "dayRhythm.sleepTags")?;
+        if let Some((o, i)) = objects.iter().find_map(|o: &ObjectDef| o.interactions.iter().find(|i| i.spare && i.tags & sleep_tags == 0).map(|i| (o, i))) {
+            return Err(Error::new(format!("{}.{}: `spare` is for a night's sleep (a `dayRhythm.sleepTags` tag)", o.id, i.id)));
+        }
         let mut slept = [0.0f32; MAX_NEEDS];
         for inter in objects.iter().flat_map(|o: &ObjectDef| &o.interactions).filter(|i| i.tags & sleep_tags != 0) {
             for (n, g) in inter.total_gain.iter().enumerate() {

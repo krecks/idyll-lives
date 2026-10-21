@@ -3710,6 +3710,26 @@ pub(crate) fn upper_barred(content: &Content, obj: &ObjectInstance, sim: u32, ag
     def.bunk && !stage_in(def.upper_stages, content.life.stage(age)) && obj.users[0].is_some_and(|u| u != sim)
 }
 
+/// Whether one of `usable` is a bed free for `sim` tonight that isn't a spare one
+/// (`Interaction::spare`): working, a place on it free for them (or theirs), for their age, and
+/// not one they couldn't get to a moment ago.
+fn has_bed(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], usable: &[u32]) -> bool {
+    let content = ctx.content;
+    usable.iter().map(|&o| &objects[o as usize]).any(|o| {
+        let def = &content.objects[o.def];
+        !o.broken()
+            && !sim.couldnt_reach(o.id, ctx.tick)
+            && def.interactions.iter().enumerate().any(|(i, inter)| {
+                inter.tags & content.day_rhythm.sleep_tags != 0
+                    && !inter.spare
+                    && !inter.baby
+                    && o.can_use_for(sim.id, def, i)
+                    && unfit(content, sim.age, inter).is_none()
+                    && !upper_barred(content, o, sim.id, sim.age)
+            })
+    })
+}
+
 /// What the player may have `sim` use on `plot`: as `access`, but their own home and public
 /// places stay theirs to use while they're a guest somewhere.
 pub(crate) fn order_access(households: &[Household], plots: &[Plot], sim: &Sim, plot: Option<u32>) -> Access {
@@ -3838,6 +3858,8 @@ fn pick_autonomous(
     let minding = crate::life::minding_baby(sim, ctx);
     let own = ctx.households[sim.household as usize].plot;
     let stranded = short & !fillable & content.autonomy.urgent;
+    // A spare bed's night (a sofa bed's) only for someone with no other bed free.
+    let bedded = has_bed(sim, ctx, objects, usable);
     for obj in usable
         .iter()
         .map(|&o| &objects[o as usize])
@@ -3890,6 +3912,7 @@ fn pick_autonomous(
             // Dining at a table only with a table to dine at.
             // (Nor one that takes the whole thing while someone else is on it.)
             if inter.baby
+                || (inter.spare && bedded)
                 || unfit(content, sim.age, inter).is_some()
                 || upper_barred(content, obj, sim.id, sim.age)
                 || (inter.needs_table && !at_table)

@@ -581,7 +581,7 @@ pub(crate) fn bed_for_child(w: &mut World, i: usize) {
         return;
     }
     let bed = (0..w.content.objects.len())
-        .filter(|&d| w.content.objects[d].interactions.iter().any(|it| it.tags & sleep != 0 && !it.baby))
+        .filter(|&d| w.content.objects[d].interactions.iter().any(|it| it.tags & sleep != 0 && !it.baby && !it.spare))
         .filter_map(|d| w.content.objects[d].price.map(|p| (p, d)))
         .min();
     let reserve = crate::life::weekly_costs(w, h).map_or(0, |(rent, bills)| rent + bills);

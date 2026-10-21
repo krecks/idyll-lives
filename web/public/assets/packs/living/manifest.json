@@ -105,6 +105,7 @@
       "motions": {
         "uses": {
           "doze": "bed_out",
+          "sleep": "bed_out",
           "pullOut": "bed_out"
         },
         "open": "bed_out"

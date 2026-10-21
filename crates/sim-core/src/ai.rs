@@ -183,6 +183,7 @@ mod tests {
             close_after: false,
             ripe: false,
             picks: false,
+            spare: false,
         }
     }
 
