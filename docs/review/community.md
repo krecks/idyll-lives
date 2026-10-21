@@ -183,7 +183,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** clip
 - **Where:** `web/src/render/babylon/characters/clips/street.ts:127` (`CLIMB`, lanes), `:156-157` (`ROUND`: when each lane's round reaches the deck, waits, crosses and swings, as shares of the climber's own 13 s loop), `web/src/render/babylon/characters.ts:2838-2851` (`freeLane`, `stepSeq`: a lane is chosen on stepping in, the loop runs on the climber's own clock)
 - **Evidence:** Two climbers on the frame have a lane each, but if they start at other offsets they can still meet at the fireman's pole. The second lane's `wait` (0.34 → 0.50 of the round) holds it back only if both rounds started together: nothing ties the second climber's clock to the first's, so one who steps in half a round later reaches the pole while the first is still on it. `check:clips` doesn't test two climbers, and `check.mjs play` uses one resident.
-- **Status:** confirmed (community wave, by the code)
+- **Status:** fixed (3872d23a)
+- **After:** a climber stepping in while someone is going round the same frame waits at their lane, standing, until the other's round comes back to its start (`inTurn`, `LANE_SYNC` 0.4 s), so the two lanes always go round in step and the second waits on the deck while the first slides. Two climbers (a child and a teen, the second sent 6 s later) waited 7 s and then ran 0.016 s apart for the rest of the use. `bench-results/review/fixes/clips-standing/``climb/` (`climb2-gap6.json`, the pictures at the pole).
 - **Source:** `docs/objects/open.md` Still open › Residents; community wave (code reading)
 
 ### M-community-01 — The ping-pong table is about two thirds of a real one

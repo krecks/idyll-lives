@@ -177,9 +177,15 @@ def cherry():
     return G.settle([G.join_all('cherry')])
 
 
+# A resident picking fruit (`pickApple*`, `pickLemon*` in web/src/render/babylon/characters/clips/uses.ts, fitted to
+# where the picked fruit hangs): it shrinks away as the hand closes on it, this long into the use.
+PICK_DELAY = 1.6
+
+
 def apple():
-    """Apple tree: a short trunk, a round crown hung with red and yellow apples; one at the front, which a resident
-    picks (it shrinks away)."""
+    """Apple tree: a short trunk, a round crown hung with red and yellow apples; one at the front, on a twig under the
+    crown's front within reach of a grown-up and of a teen on tiptoe (1.84 m up), which a resident picks (it shrinks
+    away)."""
     P = palette(['#52803A', '#629040', '#74A048', '#86AE52', '#98BC5E'])
     rng = random.Random(15)
     trunk(P, 2.1, 0.4, taper=0.7)
@@ -188,11 +194,13 @@ def apple():
     dots(rng, low(18, 8), (0, 0, 3.6), (2.2, 2.2, 1.65), 0.2, [P.fruit, P.fruit2, P.fruit3, P.fruit4], 'apple',
          band=(-0.65, 0.55), out=0.9, flat=1.0, segments=low(6, 5), rings=low(4, 3))
     still = G.join_all('apple')
-    at = (0.2, -1.95, 2.95)
+    at = (-0.05, -0.7, 1.84)
 
     def picked():
         lump('picked_apple', 0.11, at, P.fruit, segments=8, rings=5, noise=0.05)
-        tube('picked_stalk', [(at[0], at[1], at[2] + 0.2), (at[0], at[1], at[2] + 0.28)], 0.012, 0.01, P.stalk, verts=4)
+        # On its stalk, hanging from a twig out of the crown's underside (about 2.05 m up there: a stalk 0.3 m long).
+        tube('picked_stalk', [(at[0], at[1], at[2] + 0.09), (at[0] + 0.01, at[1] + 0.02, at[2] + 0.32)], 0.012, 0.009, P.stalk,
+             verts=4)
     return _with_part('apple_part', still, picked, (at[0], at[1], at[2] + 0.1), 'pick')
 
 
@@ -334,7 +342,7 @@ FAMILY = G.Family(
      G.Model('birch', birch, size=(3.446, 8.184, 3.293), key='model.tree.birch', tolerance=TOLERANCE, far=far_of(birch)),
      G.Model('cherry', cherry, size=(5.251, 5.454, 5.14), key='model.tree.blossom', tolerance=TOLERANCE, far=far_of(cherry)),
      G.Model('apple', apple, size=(4.467, 5.569, 4.378), key='model.tree.fruit', tolerance=TOLERANCE, far=far_of(apple),
-             motions={'uses': {'pick': 'pick'}}),
+             motions={'uses': {'pick': {'clip': 'pick', 'delay': PICK_DELAY}}}),
      G.Model('japaneseMaple', japanese_maple, size=(3.894, 3.722, 4.025), key='model.tree.japaneseMaple', tolerance=TOLERANCE,
              far=far_of(japanese_maple), motions={'uses': {'shape': 'trim'}}),
      G.Model('magnolia', magnolia, size=(4.1, 4.948, 3.805), key='model.tree.magnolia', tolerance=TOLERANCE, far=far_of(magnolia)),
@@ -343,7 +351,7 @@ FAMILY = G.Family(
      G.Model('spruce', spruce, size=(5.601, 10.2, 5.567), key='model.spruce', tolerance=TOLERANCE, far=far_of(spruce)),
      G.Model('cypress', cypress, size=(2.12, 7.95, 2.05), key='model.cypress', tolerance=TOLERANCE, far=far_of(cypress)),
      G.Model('lemonTree', lemon_tree, size=(1.288, 2.374, 1.344), key='model.garden.lemonTree', tolerance=TOLERANCE, far=far_of(lemon_tree),
-             paint=[('body', 'Pot')], motions={'uses': {'pick': 'pick'}})],
+             paint=[('body', 'Pot')], motions={'uses': {'pick': {'clip': 'pick', 'delay': PICK_DELAY}}})],
     comment='Blender-built trees (tools/art/blender/families/trees.py): the G5 garden trees, the woods\' '
             'oaks, maples, birches, pines and spruces, and the potted lemon tree. Listed in the base '
             'manifest\'s packs. Leaves are on `foliage` and trunks on `bark`, which the nature shader '

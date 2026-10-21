@@ -64,7 +64,9 @@ their backs on the wall face (game depth -0.43).
 
 **In play** (signed off 2026-10-17):
 - Each showered in, in all four facings, by day and at night, on WebGPU and WebGL2, on Medium and Low, every part
-  coloured. The resident steps in onto the middle of the tile (`inside`).
+  coloured. The resident steps in onto the middle of the tile (`inside`) and washes: lathers and rinses the hair,
+  turns 50° to soap the arms and the chest, turns back and rinses the face (`shower`; a child turns only the chest,
+  `showerChild`; G-21). The pack showers play the same.
 - `water_on` (0.5 s) grows the rain as the use starts, holds it for the whole use and shuts it as it ends.
 - The colour studio frames a moving part by its posed vertices, so the stall (whose rain grows from nothing and is
   turned for the slant) draws at rest and in use.

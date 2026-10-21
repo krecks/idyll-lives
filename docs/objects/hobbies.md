@@ -10,7 +10,9 @@ foosball rods, the arcade joystick, the sewing machine's handwheel and the potte
 Instruments a resident holds (the guitars and the ukulele) are a part of their own: while played, the object hides
 it on its stand (T0 `squash` to 0, `off_stand`) and the game draws the same part in the player's hands, in the
 object's colours (content `"held": {"part": "guitar", "grip": "guitar"}`, `characters.ts` `writeHeld`): the neck in
-the left hand, the body against the belly. That part costs one draw call more (3). The piano is an upright with its
+the left hand, the body against the belly. The player's own clips hold it across the body (`strum`, `strumShort` for
+the ukulele, higher; G-21): the neck out to the left in the plane of the body, 30° up, the right hand strumming over
+the sound hole. That part costs one draw call more (3). The piano is an upright with its
 back on the wall and its pianist facing the case (content `seat.facing: "back"`); the digital piano and the sewing
 table face the room, as tables do.
 
@@ -73,7 +75,7 @@ table face the room, as tables do.
 |---|---|---|---|---|---|---|
 | `easel` Easel | 1x1 · floor | paint:paint | hobbies / crafts | Wood, Metal | Use | `painting`: a painting grows on the canvas for paint. |
 | `workbench` Workbench | 2x1 · floor | tinker:tinker | hobbies / crafts | Wood, Metal | Use | `vice`: the vice jaw slides shut on a plank for tinker. |
-| `telescope` Telescope | 1x1 · floor | stargaze:look | hobbies / crafts | Tube, Tripod | Use | `aim`: the tube tilts up 35° for stargaze and comes back down. |
+| `telescope` Telescope | 1x1 · floor | stargaze:look | hobbies / crafts | Tube, Tripod | Use | `aim`: the tube tilts up 35° for stargaze and comes back down. In play the stargazer steps up and bends down to the eyepiece as aimed (0.765 m), the right hand on the tube (`eyepiece181`…`112` by height, G-21). |
 | `sewingTable` Sewing table | 1x1 · floor | sew:tinker mend:tinker | hobbies / crafts | Table, Legs, Machine | Use + Loop (E1) | `presser`: the presser foot lowers for sew and mend, and the handwheel turns in a loop (`handwheel`, E1). |
 | `chemistrySet` Chemistry bench | 1x1 · floor | experiment:tinker | hobbies / crafts | Bench, Glassware | Use | `bubble`: the liquid rises in the flask for experiment. |
 | `potteryWheel` Pottery wheel | 1x1 · floor | throw:tinker | hobbies / crafts | Wheel, Stool | Use + Loop (E1) | `clay`: the pot grows from a lump for throw, and the wheel head spins in a loop (`wheel`, E1). |

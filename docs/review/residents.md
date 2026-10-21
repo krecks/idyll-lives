@@ -297,7 +297,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** clip
 - **Where:** `web/src/render/babylon/characters/clips/locomotion.ts:208`, `tools/characters/check_clips.ts`
 - **Evidence:** Fails since before fbf8883. The plan takes it as the baseline failure for T5.
-- **Status:** confirmed (pilot: `pnpm check:clips` prints the seam on `calf_r` 29.1° and `foot_r` 21.7° as known, every body and stage)
+- **Status:** fixed (3872d23a)
+- **After:** the seam was the stance knee locking straight (the IK's reach clamp, 0° steps between 29–36° ones) and the run's `kick` landing and leaving at speed; the kick is squared (it starts and ends at rest) and `jogAlong` sinks 6 cm (the knees bent through the stance). `check:clips` no longer prints the seam; both baseline entries removed. `bench-results/review/fixes/clips-standing/``check-clips-after.txt`, `strips/sheets/jogAlong*`.
 - **Source:** `docs/objects/open.md` Still open › Residents; `plan/authenticity-review.md` §5.1 (T5)
 
 ### A-residents-03 — Feet still slide at game speed 3 and above
@@ -307,7 +308,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** clip
 - **Where:** `web/src/render/babylon/characters.ts:136` (`GAIT_MAX_RATE`), `web/src/render/babylon/characters/clips/locomotion.ts:208`
 - **Evidence:** After R1-05's jog switch (76ac264), foot slide at height 1.0 with no traits: adults at speed 3 50–53 %, speeds 4–5 83–95 %. Children walk at the adults' 1.5 m/s on short legs.
-- **Status:** seeded (from `docs/release-0.2.0-review.md` §3.1 R1-05); not checked in the pilot (its play runs at speed 1 near the object)
+- **Status:** fixed (3872d23a) at speeds 2 and 3; speeds 4 and 5 reduced, the rest won't fix (no gait steps at 45–90 m/s without strobing)
+- **After:** a third gear, `runAlong` (5.8 m/s, a 3.5 m stride in 0.6 s, up to 4×, `RUN_MAX_RATE`), takes over when the jog would need more than 3×. Steady-state foot slide (`gait-table.txt`, the runtime's choice, height 1, no traits / the fastest ×1.38): speed 3 adults, teens and elders 50–59 % → 0 % (3–9 % for the fastest), children 71–72 % → 11–14 %; speed 2 children 4–8 % → 0; speeds 4–5 83–92 % → 56–78 %. In play (`gait-after.json`, round trips on the review stage) speed 1 has no slide; the stage is too small for a steady walk at speed 3 and up. `bench-results/review/fixes/clips-standing/``strips/sheets/runAlong*`.
 - **Source:** `docs/release-0.2.0-review.md` §2.1 and §3.1 (R1-05)
 
 ### A-residents-04 — The start and end of a walk jump at speeds 4–5
@@ -381,7 +383,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** clip
 - **Where:** `web/src/render/babylon/characters/clips/` (jog, climb)
 - **Evidence:** `pnpm check:clips`: a child's right foot slides 1.5 cm in `jog` (both bodies); the left foot slides 1.3–1.9 cm in `climb112a`/`climb112b`, and an elder woman's 1.1 cm in `climb172a`.
-- **Status:** confirmed (pilot: `check:clips` prints all five as known)
+- **Status:** fixed (3872d23a)
+- **After:** the child's `jog` slide was the kick's landing (fixed with A-residents-02); on the climbing frame a child's hips are wider for its legs than the reference's (0.12 m against 0.096 on its scale), so a planted foot moved as the hips turned: the feet are placed for such hips (`footIK` `wide`, 0.024 for the child's size, 0.004 for the tallest, the women's). All five baseline entries removed. `bench-results/review/fixes/clips-standing/``check-clips-after.txt`.
 - **Source:** `tools/characters/check_clips.ts --body all --stage all`
 
 ### A-residents-11 — An elder woman, a teen or a child on the sofa loses the shins
@@ -525,7 +528,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Where:** `web/src/render/babylon/characters.ts:466` (`ACTIONS.shower`: `spell`, `interact`, `idle`)
 - **Evidence:** `play/shower-shower-01.png`, `play-child/shower-shower-01.png`: under the water the resident works the hands at chest height (`spell`) and stands; no hands to the hair, no turning under the head. Reads as waiting in the shower.
   Bathroom wave: the same at the stall, the walk-in and the rain shower (`bathroom/play/chunk1/showerStall-shower-01.png`, `showerWalkIn-shower-01.png`, `bathroom/play/chunk2/showerRain-shower-01.png`). The entry is shared with the packs' `energetic.contrastShower`, `natureLover.cedarShower` and `neat.rainShowerTower` (packs ledger).
-- **Status:** confirmed and widened (bathroom wave: all four showers; the three pack showers named)
+- **Status:** fixed (5bd8a29c, 1abb80cf)
+- **After:** the shower clip washes: lathering the hair with both hands, the head bowed; rinsing it, face up, smoothing it back; a 50° turn in two steps, soaping the left arm, the right and the chest; back round, the face rinsed, the palms wiping the water down it (`shower`, 14 s, `clips/uses.ts`); a child turns only the chest (`showerChild`: turned over planted feet their wider hips would slide them). All seven showers (the four base ones and the three pack ones) play it. `bench-results/review/fixes/clips-standing/``sheet-showers.png` (a woman and a child at each), `play/shower-*`, `strips/sheets/shower*`.
 - **Source:** pilot; wave: bathroom
 
 ### I-kitchen-03 — Hands at the cabinet doors, not on the tap, the appliance or the shelf

@@ -76,6 +76,7 @@ import { outfitFor, writeOutfit, type OutfitParams } from './characters/outfit';
 import { BLANKET_WIDTH, blanketMaterial, buildBlanket, type BlanketShape } from './characters/blanket';
 import { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } from './characters/clips/street';
 import { BOULDER, FOOS, FOOS_LANES, POOL, SMASH, YOGA_AT } from './characters/clips/games';
+import { EYEPIECE, PICK_APPLE, PICK_LEMON, SHOWER_CHILD } from './characters/clips/uses';
 // The seat and bed tables (`SEATS`, `BEDS`, `BUNKS` and their defaults) are data, read by `cargo check-glb` and
 // `cargo review` too; what their entries mean and why some are as they are: docs/characters-format.md "Seats and beds".
 import FURNITURE from './characters/furniture.json';
@@ -133,14 +134,20 @@ const WALK_PER_TICK = 0.075;
 const WALK_FASTEST = 1.5;
 const WALK_SLACK = 1.2;
 /**
- * The walk and jog cycles play matched to the ground speed, up to this many times their own pace
- * (faster, they would only flicker; the feet slide instead). A walker who would need the walk
- * faster jogs along (`jogAlong`), and walks again below `JOG_BACK` of it.
+ * The walk, jog and run cycles play matched to the ground speed, up to this many times their own pace
+ * (faster, they would only flicker; the feet slide instead). A walker who would need the walk faster
+ * jogs along (`jogAlong`), one who would need the jog faster runs (`runAlong`, game speeds 3 and up,
+ * children from 2), each going back to the slower gait below `JOG_BACK` of its switch. The run, the
+ * last, goes on to `RUN_MAX_RATE` (about six strides a second): adults and teens keep their feet on
+ * the ground at speed 3 (15 m/s; children run at up to 13 m/s there), and at speeds 4 and 5 (45 and
+ * 90 m/s) no gait could.
  */
 const GAIT_MAX_RATE = 3;
+const RUN_MAX_RATE = 4;
 const JOG_BACK = 0.8;
-/** Locomotion cycles (they play in real time at the matched rate, and change into each other in step). */
-const GAITS = new Set(['walk', 'jogAlong']);
+/** Locomotion cycles, slowest first (they play in real time at the matched rate, and change into each other in step). */
+const GEARS = ['walk', 'jogAlong', 'runAlong'];
+const GAITS = new Set(GEARS);
 const DEFAULT_FADE = 0.25;
 
 /**
@@ -203,7 +210,8 @@ const CROUCH_SHOULDER = 0.55;
  * clip `delay`s so that they stand `back` m back from the tile's middle first, clear of the door), and
  * `out` seconds after the use before stepping
  * out (the door opening again, `out` in its motions). `perLane`: the clips are one per lane, not a sequence (each
- * lane's round goes its own way: the climbing frame's, round to its pole and back).
+ * lane's round goes its own way: the climbing frame's, round to its pole and back). `tag`: only for that use
+ * (its action tag), the object's other uses as usual.
  */
 interface StepIn {
   by: readonly (readonly [height: number, clip: readonly string[], at: { to: number; up?: number }])[];
@@ -212,7 +220,10 @@ interface StepIn {
   back?: number;
   out?: number;
   perLane?: boolean;
+  tag?: string;
 }
+/** Eating a picked fruit (after the pick), bite by bite. */
+const EAT_FRUIT = ['eat', 'idle', 'eat', 'idle', 'eat', 'idle'];
 const STEP_IN: Record<string, StepIn> = {
   drinkingFountain: { by: FOUNTAIN.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
   // Onto its floor (the plinth, 12 cm), facing the phone at the back.
@@ -239,9 +250,16 @@ const STEP_IN: Record<string, StepIn> = {
   'cheerful.karaokeMachine': { by: [[0, [], { to: 0.45 }]], lanes: [0.18] },
   // Up on the stage, each at a mic stand.
   'outgoing.karaokeStage': { by: [[0, [], { to: 0.36, up: 0.146 }]], lanes: [-0.36, 0.36] },
+  // Bent down to the eyepiece of the tube aimed up (clips/uses.ts), from nearer than the tile.
+  telescope: { by: EYEPIECE.map(({ clip, min, fit }) => [min, [clip], fit] as const), tag: 'look' },
+  // Picking the fruit hanging at the front (clips/uses.ts, fitted to where it hangs), then eating it.
+  'garden.apple': { by: PICK_APPLE.map(({ clip, min, fit }) => [min, [clip, ...EAT_FRUIT], fit] as const), tag: 'eat' },
+  'garden.lemonTree': { by: PICK_LEMON.map(({ clip, min, fit }) => [min, [clip, ...EAT_FRUIT], fit] as const), tag: 'eat' },
 };
 /** One clip played alone (`StepIn.perLane`), by name. */
 const LANE_SEQ = new Map<string, readonly string[]>();
+/** How far (s) into someone else's round on the same thing one stepped in may still start theirs (`inTurn`). */
+const LANE_SYNC = 0.4;
 /** Stepping in (m/s, game time) and out again (s). */
 const STEP_IN_SPEED = 1.05;
 const STEP_OUT_S = 1.1;
@@ -427,20 +445,22 @@ interface Prop {
  * front, to the right, up; `upShort` more for a short one, held higher), and how far up the instrument
  * that is (its share of the instrument's height). Instruments `short` m long and shorter (for the
  * player's size: a ukulele) are held as short, `long` and longer (a guitar) as long, between them in
- * between (`guitarReach`).
+ * between (`guitarReach`). The strumming clips are fitted to it (clips/uses.ts `GUITAR_BODY`): its neck goes
+ * from there to the left hand, out to the left across the body.
  */
 const GUITAR = { out: 0.17, right: 0.08, up: -0.03, upShort: 0.12, body: 0.27, short: 0.7, long: 1.15 };
 /**
- * The player's arms (rad, `activityPose`), for a long instrument and a short one: the left upper arm out
- * and up, its elbow bent and the forearm turned in to the neck; the right the same over the body.
+ * Playing a guitar or a ukulele (clips/uses.ts: held across the body, the neck to the left; `strumShort`
+ * for a short one, `guitarReach` under a half).
  */
-const GUITAR_ARMS = {
-  long: { leftOut: -0.55, leftUp: -0.55, leftBend: -1.1, leftIn: 0.5, rightOut: 0.2, rightUp: -0.2, rightBend: -0.75, rightIn: -0.9 },
-  short: { leftOut: -0.45, leftUp: -0.3, leftBend: -1.25, leftIn: 0.9, rightOut: 0.2, rightUp: -0.25, rightBend: -0.95, rightIn: -0.9 },
-};
-/** A use sequence of the idle alone (curling dumbbells and playing a guitar on top, `activityPose`), and of pushing (a mop). */
+const STRUM: readonly string[] = ['strum'];
+const STRUM_SHORT: readonly string[] = ['strumShort'];
+/** A use sequence of the idle alone (curling dumbbells on top, `activityPose`), and of pushing (a mop). */
 const IDLE_ONLY: readonly string[] = ['idle'];
 const PUSH_ONLY: readonly string[] = ['push'];
+/** Showering (`ACTIONS.shower`), a grown-up's and a child's. */
+const SHOWER_ONLY: readonly string[] = ['shower'];
+const SHOWER_SMALL: readonly string[] = ['showerChild'];
 /** Crouched down (to hug the teddy, `HUGGED`). */
 const CROUCH_ONLY: readonly string[] = ['crouch'];
 /**
@@ -486,7 +506,7 @@ const HANDS = {
 /**
  * Animation per action tag (`layout.actions`, from the content's `animations`):
  * - `stand`: clip sequence while standing at the object (looped; looping clips play ~4 s per step);
- *   a function picks one by object def;
+ *   a function picks one by object def (and the resident's height);
  * - `sit`: seated clip (default `sit`), or a function of the object def;
  * - `upper`: upper-body layer while seated (`eat` and `drink` play now and then), or a function of the
  *   object def ('' for none);
@@ -494,7 +514,7 @@ const HANDS = {
  * Procedural layers on top (reclining, instruments, gazes, ...) are in `activityPose`.
  */
 interface ActionAnim {
-  stand?: readonly string[] | ((def: string) => readonly string[]);
+  stand?: readonly string[] | ((def: string, height: number) => readonly string[]);
   sit?: string | ((def: string) => string);
   upper?: string | ((def: string) => string);
   hands?: number | ((def: string) => number);
@@ -523,7 +543,8 @@ const ACTIONS: Record<string, ActionAnim> = {
   },
   // (Seated at the dressing table, getting ready: a hand up at the hair, the phone clip's.)
   wash: { stand: ['spell', 'interact'], upper: (def) => (def === 'dressingTable' ? 'phone' : ''), hands: HANDS.relaxed },
-  shower: { stand: ['spell', 'interact', 'idle'], hands: HANDS.open },
+  // Washing the hair, turning round, soaping, rinsing (clips/uses.ts; a child turns only the chest).
+  shower: { stand: (_, height) => (height < SHOWER_CHILD ? SHOWER_SMALL : SHOWER_ONLY), hands: HANDS.open },
   bath: { hands: HANDS.open },
   toilet: { hands: HANDS.relaxed },
   sleep: { hands: HANDS.open },
@@ -600,7 +621,8 @@ const ACTIONS: Record<string, ActionAnim> = {
     hands: HANDS.grip,
   },
   look: {
-    stand: (def) => (def === 'telescope' ? ['rail'] : ['idle', 'foldArms']),
+    // (At the telescope bent down to its eyepiece: `STEP_IN`.)
+    stand: ['idle', 'foldArms'],
     hands: HANDS.relaxed,
   },
   // Down to low flowers, leaning in to tall ones / up into a tree's crown (`activityPose` turns the head).
@@ -1850,11 +1872,13 @@ export class Characters {
     if (grip === 'guitar') {
       // Upright along its neck from where its body rests against the belly (in front of the spine's
       // base, a little to the right) to the left hand; its face to the front.
+      // (Out from the spine as far as the body's size: a child's belly is nearer it; clips/uses.ts `GUITAR_BODY`.)
       const t = this.scratch.worldT;
       const g = GUITAR;
-      const bx = t[B.spine_01 * 3] + (fx * g.out + fz * g.right) * s;
-      const by = t[B.spine_01 * 3 + 1] + (g.up + g.upShort * (1 - this.guitarReach(rig))) * s;
-      const bz = t[B.spine_01 * 3 + 2] + (fz * g.out - fx * g.right) * s;
+      const k = s * rig.size;
+      const bx = t[B.spine_01 * 3] + (fx * g.out + fz * g.right) * k;
+      const by = t[B.spine_01 * 3 + 1] + (g.up + g.upShort * (1 - this.guitarReach(rig))) * k;
+      const bz = t[B.spine_01 * 3 + 2] + (fz * g.out - fx * g.right) * k;
       unit(lx - bx, ly - by, lz - bz);
       const yx = UNIT[0];
       const yy = UNIT[1];
@@ -2699,13 +2723,14 @@ export class Characters {
       }
     } else if (moving) {
       // Walking, the cycle matched to the ground speed; faster than the walk can step (a sped-up
-      // game, short legs), jogging along.
+      // game, short legs), jogging along, and faster than that running (`GEARS`): the slowest gait
+      // that needn't go faster than its pace, a slower one than now only well within it.
       const legs = rig.body.pelvisScale * rig.scale;
-      const walk = rig.speed / (set.clips.get('walk')!.speed * legs);
-      const jog = set.clips.get('jogAlong');
-      const jogging = !!jog && walk > GAIT_MAX_RATE * (rig.cur.key === 'jogAlong' ? JOG_BACK : 1);
-      key = jogging ? 'jogAlong' : 'walk';
-      rate = clamp(jogging ? rig.speed / (jog!.speed * legs) : walk, 0.35, GAIT_MAX_RATE);
+      const now = GEARS.indexOf(rig.cur.key);
+      let gear = 0;
+      while (gear < GEARS.length - 1 && set.clips.has(GEARS[gear + 1]) && rig.speed / (set.clips.get(GEARS[gear])!.speed * legs) > GAIT_MAX_RATE * (gear < now ? JOG_BACK : 1)) gear++;
+      key = GEARS[gear];
+      rate = clamp(rig.speed / (set.clips.get(key)!.speed * legs), 0.35, gear === GEARS.length - 1 ? RUN_MAX_RATE : GAIT_MAX_RATE);
       fade = GAITS.has(rig.cur.key) ? 0.3 : 0.2;
       hands = HANDS.relaxed;
       rig.useObj = null;
@@ -2772,7 +2797,7 @@ export class Characters {
       rig.useDef = obj?.def ?? '';
       rig.useObj = obj ?? null;
       // Used from inside or up against it (`STEP_IN`): the clip for their height.
-      const into = known && obj ? STEP_IN[obj.def] : undefined;
+      const into = known && obj && (!STEP_IN[obj.def]?.tag || STEP_IN[obj.def].tag === tag) ? STEP_IN[obj.def] : undefined;
       const fitted = into ? this.stepSeq(rig, into) : undefined;
       // (Bouncing and vibrating on the equipment, content `stand`: the idle with `activityPose` on top.)
       const seq = fitted?.length
@@ -2780,13 +2805,17 @@ export class Characters {
         : known
         ? obj && HUGGED[obj.def]
           ? CROUCH_ONLY
-          : obj?.stand?.motion || obj?.held?.grip === 'pair' || obj?.held?.grip === 'guitar'
+          : obj?.held?.grip === 'guitar'
+          ? this.guitarReach(rig) < 0.5
+            ? STRUM_SHORT
+            : STRUM
+          : obj?.stand?.motion || obj?.held?.grip === 'pair'
           ? IDLE_ONLY
           : obj?.held?.grip === 'pole'
             ? PUSH_ONLY
           : act?.stand
             ? typeof act.stand === 'function'
-              ? act.stand(useObj?.def ?? '')
+              ? act.stand(useObj?.def ?? '', rig.body.height * rig.scale)
               : act.stand
             : undefined
         : obj
@@ -2982,12 +3011,32 @@ export class Characters {
     rig.inDX = Math.cos(f) * across * k;
     rig.inDZ = -Math.sin(f) * across * k;
     // (Waiting to step in, standing about.)
-    if (k <= 0) return [fwd, y, into.wait ? 'idle' : key, 1];
-    if (k >= 1) return [fwd, y, key, 1];
+    if (k <= 0) return [fwd, y, into.wait || into.perLane ? 'idle' : key, 1];
+    // (Already there, or as good as: no steps.) Waiting for their turn, the use's sequence holds too.
+    if (k >= 1 || way < 0.05) {
+      if (rig.cur.key === key || this.inTurn(rig, into)) return [fwd, y, key, 1];
+      rig.stepTime = 0;
+      return [fwd, y, 'idle', 1];
+    }
     // Walking, the cycle matched to the step's pace (the walk runs on real time).
     const legs = rig.body.pelvisScale * rig.scale;
     const rate = dt > 0 ? ((way / span) * (step / dt)) / (this.clip('walk').speed * legs) : 1;
     return [fwd, y, 'walk', clamp(rate, 0.35, GAIT_MAX_RATE)];
+  }
+
+  /**
+   * Whether `rig`, stepped in to `into`, may start its round (`StepIn.perLane`): the lanes' rounds keep out
+   * of each other's way only in step (the climbing frame's second lane waits on the deck while the first
+   * slides down the pole), so with someone already going round, it waits standing at its lane until their
+   * round comes back to its start (`LANE_SYNC` s into it).
+   */
+  private inTurn(rig: SimRig, into: StepIn): boolean {
+    if (!into.perLane) return true;
+    for (const r of this.sims) {
+      if (!r || r === rig || r.inside !== into || r.useId !== rig.useId || !LANE_SEQ.has(r.cur.key) || !r.cur.clip) continue;
+      if (r.cur.time % r.cur.clip.duration > LANE_SYNC) return false;
+    }
+    return true;
   }
 
   /** The use of a thing used from inside (`STEP_IN`) is over: back out to the tile in front after its `out` seconds (`stepPlace`); none when drawn afresh. */
@@ -3437,25 +3486,6 @@ export class Characters {
           addRotation(add, B.Head, 1, 0, 0, 0.12);
         }
         break;
-      case 'music':
-        if (grip === 'guitar') {
-          // A guitar across the body (`writeHeld`): the left arm out to its neck, the right forearm over
-          // its body, strumming; the head bent to the strings, nodding with the music.
-          const { long: a, short: b } = GUITAR_ARMS;
-          const k = this.guitarReach(rig);
-          const strum = Math.sin(time * 7 + seed);
-          addRotation(add, B.upperarm_l, 0, 0, 1, lerp(b.leftOut, a.leftOut, k));
-          addRotation(add, B.upperarm_l, 1, 0, 0, lerp(b.leftUp, a.leftUp, k));
-          addRotation(add, B.lowerarm_l, 1, 0, 0, lerp(b.leftBend, a.leftBend, k));
-          addRotation(add, B.lowerarm_l, 0, 1, 0, lerp(b.leftIn, a.leftIn, k));
-          addRotation(add, B.upperarm_r, 0, 0, 1, lerp(b.rightOut, a.rightOut, k));
-          addRotation(add, B.upperarm_r, 1, 0, 0, lerp(b.rightUp, a.rightUp, k) + 0.06 * strum);
-          addRotation(add, B.lowerarm_r, 1, 0, 0, lerp(b.rightBend, a.rightBend, k));
-          addRotation(add, B.lowerarm_r, 0, 1, 0, lerp(b.rightIn, a.rightIn, k) + 0.12 * strum);
-          addRotation(add, B.Head, 1, 0, 0, 0.25 + Math.sin(time * 3.5 + seed) * 0.04);
-          addRotation(add, B.Head, 0, 1, 0, 0.15);
-        }
-        break;
       case 'relax': {
         const hugged = HUGGED[def];
         if (!hugged) break;
@@ -3480,7 +3510,7 @@ export class Characters {
       case 'look':
       case 'listen':
         // Talking to a plant, looking at a bird bath: eyes down to the object.
-        if (def && def !== 'telescope' && key !== 'rail') addRotation(add, B.Head, 1, 0, 0, 0.2);
+        if (def && def !== 'telescope') addRotation(add, B.Head, 1, 0, 0, 0.2);
         break;
       case 'exercise':
         if (rig.useObj?.stand?.motion === 'bounce') {

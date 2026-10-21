@@ -117,7 +117,8 @@ function footAt(q: number, g: Gait): FootState {
   // Lift: the knee pulls the foot up early in the swing, then it reaches forward and down.
   const arc = Math.sin(Math.PI * Math.pow(s, 0.75));
   const y = yBase + Math.max(0, g.lift - yBase) * (g.run ? Math.pow(arc, 1.6) : arc);
-  const kick = -(g.kick ?? 0) * Math.sin(Math.PI * s) * (1 - 2 * s);
+  // (Squared, so that it starts and ends at rest: the foot leaves and lands at the stance's own pace.)
+  const kick = -(g.kick ?? 0) * 1.5 * Math.sin(Math.PI * s) ** 2 * (1 - 2 * s);
   // Toes down at toe-off, level by mid-swing, up for the heel strike.
   const pitch = s < 0.45 ? g.toeOff * (1 - smooth(s / 0.45)) : -g.heel * smooth((s - 0.45) / 0.55);
   return { ankle: [0, y, z + kick], pitch, toes: -g.toeOff * (1 - smooth(s / 0.3)) };
@@ -184,19 +185,50 @@ export const JOG: Gait = {
   kick: 0.22,
 };
 
-/** Jogging along (`jogAlong`): the jog travelling at 2.5 m/s, a stride per cycle, leaning into it a little more. */
+/**
+ * Jogging along (`jogAlong`): the jog travelling at 2.5 m/s, a stride per cycle, leaning into it a little
+ * more, the hips lower (the knees bent through the stance, as a runner's: the stance leg straight would
+ * snap the knee at the strike).
+ */
 const JOG_SECONDS = 0.7;
 const JOG_SPEED = 2.5;
-const JOG_ALONG: Gait = { ...JOG, stride: JOG_SPEED * JOG_SECONDS, back: 0.02, lean: 7 };
+const JOG_ALONG: Gait = { ...JOG, stride: JOG_SPEED * JOG_SECONDS, back: 0.02, lean: 7, sink: 0.06 };
 
-function jogPose(p: number, g: Gait = JOG): PoseSpec {
+/**
+ * Running along (`runAlong`), for the faster game speeds: 5.8 m/s, a 3.5 m stride in 0.6 s, each foot down
+ * a sixth of the time (0.56 m of ground under the hips, as far as the legs reach with the knees bent from
+ * them sunk 12 cm), long flights, the knee driven high and the heel kicked up behind, leaning in, the arms
+ * pumping hard.
+ */
+const RUN_SECONDS = 0.6;
+const RUN_SPEED = 5.8;
+const RUN: Gait = {
+  ...JOG,
+  stride: RUN_SPEED * RUN_SECONDS,
+  back: 0.05,
+  duty: 0.16,
+  heelOff: 0.06,
+  toeOff: 34,
+  lift: 0.34,
+  toeOut: 2,
+  bob: 0.04,
+  sink: 0.12,
+  sway: 0.008,
+  turn: 9,
+  tilt: 6,
+  lean: 12,
+  kick: 0.36,
+};
+
+/** The jog's bent arms (`swing`: degrees forward and back, `bend` the elbow's, more going forward) on a gait. */
+function jogPose(p: number, g: Gait = JOG, swing = 24, bend = 12): PoseSpec {
   const swingL = -Math.cos(TAU * (p - 0.04));
   return {
     ...gaitPose(p, g),
-    upperarm_l: hang('l', -2 + 24 * swingL, 9),
-    upperarm_r: hang('r', -2 - 24 * swingL, 9),
-    lowerarm_l: elbow('l', 84 + 12 * swingL, 15),
-    lowerarm_r: elbow('r', 84 - 12 * swingL, 15),
+    upperarm_l: hang('l', -2 + swing * swingL, 9),
+    upperarm_r: hang('r', -2 - swing * swingL, 9),
+    lowerarm_l: elbow('l', 84 + bend * swingL, 15),
+    lowerarm_r: elbow('r', 84 - bend * swingL, 15),
   };
 }
 
@@ -206,5 +238,7 @@ export function locomotionClips(): ClipDef[] {
     cycle('jog', { seconds: JOG_SECONDS, loop: true }, (p) => jogPose(p)),
     // Residents on their way faster than the walk can step (the game sped up; children's short legs).
     cycle('jogAlong', { seconds: JOG_SECONDS, loop: true, speed: JOG_SPEED }, (p) => jogPose(p, JOG_ALONG)),
+    // Faster than the jog can step (game speeds 3 and up).
+    cycle('runAlong', { seconds: RUN_SECONDS, loop: true, speed: RUN_SPEED }, (p) => jogPose(p, RUN, 40, 18)),
   ];
 }

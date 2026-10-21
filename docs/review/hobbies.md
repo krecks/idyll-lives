@@ -152,7 +152,8 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Fix class:** clip
 - **Where:** `web/src/render/babylon/characters.ts:523-526` (`ACTIONS.look`: `rail` for `telescope`); the eyepiece at 0.975 m (`tools/art/blender/families/hobbies.py:1202`)
 - **Evidence:** `play/telescope-stargaze-01.png`, `sheets/obj-telescope.png`: the resident stands straight beside the tube with the hands at the chest (`rail`, a hold on a railing); the eye is about 1.55 m up, the eyecup at 0.975 m, and nobody bends to it. For a child (`play-child/telescope-stargaze-01.png`) the eyecup is about at eye height, by chance. A stoop to the eyepiece with a hand on the tube is what reads as looking through a telescope.
-- **Status:** open
+- **Status:** fixed (5bd8a29c, 1abb80cf)
+- **After:** the stargazer steps up to the telescope and bends down to its eyepiece, the right eye at the eyecup of the tube as aimed (0.765 m, 0.3 m out: lower than the 0.975 m at rest), the right hand on the tube, the left on the knee, once a loop looking up at the sky; in five sizes for the user's height (`eyepiece181`…`eyepiece112`, `clips/uses.ts`, `STEP_IN` for `look` only): a grown-up deep in the knees and bent over, a child bent a little. `bench-results/review/fixes/clips-standing/``sheet-tele.png` (man, child, elder from the side), `play/tele-*`, `strips/sheets/eyepiece*`.
 - **Source:** pilot
 
 ### I-hobbies-03 — Stargazing at noon, indoors
@@ -298,7 +299,8 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Fix class:** clip
 - **Where:** `web/src/render/babylon/characters.ts:387` (`GUITAR`: the body `out` 0.17 m in front of the spine's base), `:392-395` (`GUITAR_ARMS`: the left upper arm raised forward), `:1756-1776` (`writeHeld`: the neck aimed from the body at the left palm)
 - **Evidence:** `hobbies/extra/gsidetop.png` (from above): the guitar's body is about 0.25 m in front of the player's chest, not against the belly, and its neck runs forward and left at about 30–35° off the line of the shoulders, the guitar's head level with the face. From the front (`hobbies/extra/inst.png`) that passes for a guitar across the body; from the game's camera, behind and above the player as they face the stand, the forward neck reads as pointing straight up past the head (`hobbies/extra/gdef.png`, `hobbies/play/c1/guitarAcoustic-strum-00.png`, the child in `hobbies/extra/child/child-guitarAcoustic-strum-01.png`): the lead in `index.md`. A guitar rests on the right thigh or against the belly, the neck to the left in the plane of the body, tilted up 10–45°. The same for `guitarElectric` and `ukulele` (the only three with `grip: guitar`). The hands are where they should be on it (left on the neck, right over the sound hole).
-- **Status:** open
+- **Status:** fixed (5bd8a29c, 1abb80cf)
+- **After:** the guitar, the electric guitar and the ukulele are held across the body by their own clips (`strum`, `strumShort` for the ukulele, held higher; `clips/uses.ts`): the body against the belly a little to the right, the neck out to the left in the plane of the body, 30° up and angled 13° forward, the left hand on the neck 0.55 m along (0.27 on the ukulele), the right strumming over the sound hole, the head bent to the strings; the procedural arm turns (`GUITAR_ARMS`) are gone, and the guitar's rest point scales with the body (a child's belly is nearer the spine). From the game camera the neck no longer points up past the head. `bench-results/review/fixes/clips-standing/``sheet-guitars.png` (front and above, man and child), `play/guitar-*`, `strips/sheets/strum*`. The full-size guitar in a child's hands is M-hobbies-03's.
 - **Source:** wave: hobbies (play from the front, the side and above; `index.md` "Seen" for the lead)
 
 ### I-hobbies-09 — Games, crafts and the exercise bike are silent, and the drums play the plucked tune
