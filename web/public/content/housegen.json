@@ -190,9 +190,10 @@
       "maxSide": [4, 4],
       "furniture": [
         { "one": ["bookcaseTall", "bookshelf", "bookcaseLow", "cubeShelf"] },
-        { "one": ["armchair", "armchairWingback", "filingCabinet", "plant", "floorLampSimple", "bookcaseLow"], "chance": 0.6 }
+        { "one": ["armchair", "armchairWingback", "filingCabinet", "plant", "floorLampSimple", "bookcaseLow"], "chance": 0.6 },
+        { "one": ["deskCorner"], "chance": 0.35 }
       ],
-      "dining": [{ "tables": ["deskSimple", "deskSimple", "deskCorner"], "chairs": ["chairTask", "officeChair"], "seats": [1, 1], "wall": true }],
+      "dining": [{ "tables": ["deskSimple"], "chairs": ["chairTask", "officeChair"], "seats": [1, 1], "wall": true, "chance": 0.7 }],
       "surfaces": [
         { "on": ["desk"], "one": ["laptopClosed", "monitor", "deskOrganiser", "lampBanker", "bookStack"], "count": [1, 3] },
         { "on": ["shelf", "low"], "one": ["booksUpright", "globe", "trophy", "tableClock", "potSucculent"], "count": [1, 2] }

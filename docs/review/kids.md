@@ -158,7 +158,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/kids.py:345-373` (`crib`: posts ±0.42 m both ways, `mattress` 0.80 × 0.80 at `CRIB_TOP` 0.56, `:291`)
 - **Evidence:** `sheets/obj-crib.png`, `clips/clips-crib-all-t99.png`: the cot is 0.88 m square in plan on the 1 × 1 half of its footprint; a cot is oblong (mattress 60 × 120 or 70 × 140 cm, `reference.json` `crib`). Its depth 0.93 m is over the 0.60–0.80 (±10 %) range for the same reason. The mattress height (0.56 m) and the rail top (0.92 m) are right. The check-glb warning "mattress 0.56 m, the model 0.780 m there (x 0.50)" is the changing pad under the second slot, not the cot (`BEDS.crib` applies to slot 0): a tool artefact.
-- **Status:** open
+- **Status:** fixed (e70de674)
+- **After:** an oblong cot, a 1.18 × 0.58 m mattress at 0.56 m running across the left of its tiles, its back on the wall's face, a 0.62 m changing chest at the right; the baby lies along it at slot 0 (`characters/furniture.json` `beds.crib` `across`; `check-glb` now measures a baby at its slot on a bed lain on across), the blanket folded at its feet, the carers reaching in over the front rail 0.25 m from the baby (`characters.ts` `CUDDLE.rail`, was 0.44). `fixes/blender-hobbies/play/crib-top-crib-play-00.png`, `crib-top-crib-cuddle-01.png`, `gallery/gallery-crib.png`.
 - **Source:** pilot
 
 ### I-kids-06 — Toys are played with standing over them, the hands out in the air
@@ -190,7 +191,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/kids.py:759-764` (`trainTable`: `frame` 1.8 × 0.84), `:1122` (`size=(1.8, 0.68, 0.84)`)
 - **Evidence:** `kids/sheets/obj-trainTable.png`: the table fills its 2 × 1 footprint, 1.80 m long against 0.90–1.30 m for a train table (1.43 with the 10 %; `tables/sizes-kids.md`). The top (0.44 m) is right; the H 0.68 is the trees on it. From the game camera it reads as a coffee table with a track on it.
-- **Status:** open
+- **Status:** fixed (e70de674)
+- **After:** 1.24 m long, centred on its 2 × 1 tiles (`kids.py` `TRAIN_W`), the town at its left beside the ring; the top 0.44 as it was. `fixes/blender-hobbies/gallery/gallery-trainTable.png`, `play/adult-trainTable-trains-01.png`, `child-trainTable-trains-01.png`.
 - **Source:** wave: office/kids
 
 ### M-kids-03 — Two descriptions say what the models don't show
@@ -212,7 +214,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Where:** `web/public/content/catalog2/dining.json:759` (`highChair` `seat.height` 0.62); `tools/art/blender/families/kids.py:443-450` (legs splayed to ±0.205 × −0.16…0.28)
 - **Evidence:** `tables/sizes-kids.md`: the model's seat is 0.609 m (inside the 0.50–0.60 range with the 1 cm tolerance), but the content's `seat` is 0.62, 2 cm over; W 0.444 and D 0.474 are a little under the 0.45 and 0.495 low ends (0.50–0.65 × 0.55–0.80 less 10 %): real high chairs splay their legs wide so they can't tip. `kids/sheets/obj-highChair.png`. Nothing sits in it today (I-kids-01), so only the content number matters once something does: 0.60 or under.
 - **Status:** fixed (a920f174)
-- **After:** `highChair` content seat 0.60 (the mesh's 0.609, inside the 1 cm tolerance). Nothing sits in it yet (I-kids-01). The narrow base is a model change, left to the Blender band.
+- **After:** `highChair` content seat 0.60 (the mesh's 0.609, inside the 1 cm tolerance). Nothing sits in it yet (I-kids-01). The narrow base is a model change, left to the Blender band. Blender band (e70de674): the legs splay to 0.54 × 0.55 m at the floor, the seat still 0.61 (`fixes/blender-hobbies/gallery/gallery-highChair.png`).
 - **Source:** wave: office/kids
 
 ### I-kids-08 — The kids' table is never a place to eat

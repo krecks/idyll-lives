@@ -38,6 +38,15 @@
       "type": "model",
       "url": "../../models/office/deskCorner.glb",
       "materials": {
+        "castor": {
+          "finish": "material.finish.satin"
+        },
+        "chair": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
         "drawers": {
           "finish": "material.finish.satin"
         },
@@ -49,6 +58,9 @@
         },
         "oak_panel": {
           "finish": "material.finish.wood"
+        },
+        "plastic": {
+          "finish": "material.finish.satin"
         }
       },
       "paint": [
@@ -63,6 +75,10 @@
         {
           "material": "drawers",
           "label": "Drawers"
+        },
+        {
+          "material": "chair",
+          "label": "Chair"
         }
       ]
     },

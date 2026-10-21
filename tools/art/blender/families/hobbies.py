@@ -139,7 +139,9 @@ M = G.Palette(
     palette=('#D2B48A', 'satin'),
     jar=('#7E9AA8', 'satin'),
     bench_top=('#C9A579', 'wood'),     # the workbench's butcher-block top
-    bench_steel=('#8A9298', 'metal'),  # its pedestals and frame
+    bench_steel=('#8A9298', 'metal'),  # its tool board and the vice's pads
+    bench_frame=('#A87B50', 'wood'),   # its posts, rails and shelves
+    pegboard=('#C9B08A', 'matte'),     # its tool board (hardboard)
     label=('#EFEDE6', 'matte'),
     foot=('#2F3236', 'satin'),         # feet, grips, dark plastic
     toolbox=('#4E7A5A', 'satin'),
@@ -447,28 +449,30 @@ def _electric(F):
         _slab(F, 'horn_bass', 0.045, 0.075, 0.045, (-0.09, 0.39, 0), M.electric, verts=16)
         _slab(F, 'horn_treble', 0.04, 0.055, 0.045, (0.095, 0.37, 0), M.electric, verts=16)
         _slab(F, 'guard', 0.1, 0.13, 0.003, (0.025, 0.2, 0.0235), M.pickguard, verts=24, smooth=False)
-        F.box('guard_neck', 0.07, 0.12, 0.003, (-0.005, 0.33, 0.0235), M.pickguard)
+        F.box('guard_neck', 0.07, 0.05, 0.003, (-0.005, 0.325, 0.0235), M.pickguard)
         for k, y in enumerate((0.13, 0.2, 0.27)):
             F.box(f'pickup{k}', 0.07, 0.018, 0.006, (0, y, 0.027), M.black, bevel=0.003)
         F.box('bridge', 0.075, 0.025, 0.008, (0, 0.085, 0.027), M.chrome, bevel=0.002)
         for k, (x, y) in enumerate(((0.09, 0.12), (0.1, 0.075), (0.085, 0.035))):
             F.cyl(f'knob{k}', 0.011, 0.014, (x, y, 0.028), M.black, rot=(90, 0, 0), verts=10)
         F.box('switch', 0.006, 0.03, 0.006, (0.11, 0.19, 0.027), M.pickguard)
-        F.box('neck', 0.05, 0.62, 0.025, (0, 0.73, 0.0), M.maple)
-        F.box('fretboard', 0.048, 0.6, 0.005, (0, 0.73, 0.015), M.fretboard)
-        _frets(F, 21, 0.65, 1.035, 0.048, 0.0185)
-        F.box('nut', 0.048, 0.004, 0.004, (0, 1.036, 0.0185), M.bone)
-        F.box('head', 0.075, 0.16, 0.016, (0.008, 1.11, -0.002), M.black, bevel=0.012)
+        # a 0.648 m scale from the saddle to the nut (review M-hobbies-03: the neck was half as long again)
+        nut = 0.09 + 0.648
+        F.box('neck', 0.05, nut - 0.36, 0.025, (0, (nut + 0.36) / 2, 0.0), M.maple)
+        F.box('fretboard', 0.048, nut - 0.355, 0.005, (0, (nut + 0.355) / 2, 0.015), M.fretboard)
+        _frets(F, 15, 0.648, nut, 0.048, 0.0185)
+        F.box('nut', 0.048, 0.004, 0.004, (0, nut + 0.001, 0.0185), M.bone)
+        F.box('head', 0.075, 0.16, 0.016, (0.008, nut + 0.083, -0.002), M.black, bevel=0.012)
         for k in range(6):
-            F.cyl(f'tuner{k}', 0.006, 0.018, (-0.026, 1.05 + 0.022 * k, 0.012), M.chrome, verts=8, rot=(90, 0, 0))
-        _strings(F, 6, 0.009, 0.0075, 0.087, 1.036, 0.033, 0.0215)
+            F.cyl(f'tuner{k}', 0.006, 0.018, (-0.026, nut + 0.023 + 0.022 * k, 0.012), M.chrome, verts=8, rot=(90, 0, 0))
+        _strings(F, 6, 0.009, 0.0075, 0.087, nut + 0.001, 0.033, 0.0215)
     return _upright(p, 'guitar')
 
 
 def guitarElectric():
     F = G.GameFrame()
     with G.new_parts() as still:
-        _guitar_stand(F, 0.12, 0.2, 0.82, -0.05, front=0.03)
+        _guitar_stand(F, 0.0, 0.11, 0.71, 0.005, reach=0.1, back=0.12, front=0.15)
         # the practice amp behind
         F.box('amp', 0.46, 0.4, 0.28, (0, 0.2, -0.28), M.amp, bevel=0.02)
         F.box('amp_grille', 0.4, 0.26, 0.004, (0, 0.17, -0.139), M.grille, bevel=0.006)
@@ -482,7 +486,7 @@ def guitarElectric():
             for y in (0.01, 0.39):
                 F.box(f'amp_corner{sx}{y}', 0.03, 0.03, 0.03, (sx * 0.215, y + 0.005, -0.145), M.chrome, bevel=0.006)
     G.join(still, 'stand', origin=(0, 0, 0))
-    guitar = _lean(F, _electric(G.GameFrame()), 12, (0, 0.21, 0.106))
+    guitar = _lean(F, _electric(G.GameFrame()), 12, (0, 0.12, 0.106))
     G.settle(centre=False)
     _off_stand(guitar)
     return G.meshes()
@@ -490,89 +494,116 @@ def guitarElectric():
 
 def _acoustic(F):
     with G.new_parts() as p:
-        _slab(F, 'lower_bout', 0.18, 0.21, 0.1, (0, 0.21, 0), M.acoustic, verts=32)
-        _slab(F, 'upper_bout', 0.14, 0.16, 0.1, (0, 0.51, 0), M.acoustic, verts=28)
-        _slab(F, 'top_lower', 0.173, 0.203, 0.004, (0, 0.21, 0.05), M.spruce, verts=32, smooth=False)
-        _slab(F, 'top_upper', 0.133, 0.153, 0.004, (0, 0.51, 0.05), M.spruce, verts=28, smooth=False)
-        F.cyl('hole', 0.045, 0.004, (0, 0.41, 0.0515), M.hole, rot=(90, 0, 0), verts=24, smooth=False)
-        G.torus('rosette', 0.052, 0.003, at=F.at(0, 0.41, 0.052), material=M.tortoise, rot=(90, 0, 0),
+        # a dreadnought: a 0.51 m body, 0.40 m across the lower bout, the neck meeting it at the 14th fret, a
+        # 0.645 m scale from the saddle to the nut, 1.05 m long (review M-hobbies-03: it was 1.29 m, the scale 0.97)
+        saddle, scale = 0.222, 0.645
+        nut = saddle + scale
+        _slab(F, 'lower_bout', 0.2, 0.17, 0.1, (0, 0.17, 0), M.acoustic, verts=32)
+        _slab(F, 'upper_bout', 0.145, 0.13, 0.1, (0, 0.38, 0), M.acoustic, verts=28)
+        _slab(F, 'top_lower', 0.193, 0.163, 0.004, (0, 0.17, 0.05), M.spruce, verts=32, smooth=False)
+        _slab(F, 'top_upper', 0.138, 0.123, 0.004, (0, 0.38, 0.05), M.spruce, verts=28, smooth=False)
+        F.cyl('hole', 0.05, 0.004, (0, 0.4, 0.0515), M.hole, rot=(90, 0, 0), verts=24, smooth=False)
+        G.torus('rosette', 0.057, 0.003, at=F.at(0, 0.4, 0.052), material=M.tortoise, rot=(90, 0, 0),
                 major_segments=28, minor_segments=4)
-        _slab(F, 'pickguard', 0.045, 0.06, 0.002, (0.06, 0.34, 0.0525), M.tortoise, verts=16, smooth=False)
-        F.box('bridge', 0.11, 0.025, 0.008, (0, 0.13, 0.055), M.fretboard, bevel=0.003)
-        F.box('saddle', 0.07, 0.003, 0.004, (0, 0.135, 0.06), M.bone)
-        F.box('neck', 0.05, 0.5, 0.025, (0, 0.87, 0.0), M.neck)
-        F.box('heel', 0.05, 0.05, 0.05, (0, 0.645, -0.01), M.neck, bevel=0.01)
-        F.box('fretboard', 0.048, 0.48, 0.005, (0, 0.865, 0.015), M.fretboard)
-        _frets(F, 19, 0.64, 1.105, 0.048, 0.0185)
-        F.box('nut', 0.048, 0.004, 0.004, (0, 1.106, 0.0185), M.bone)
-        F.box('head', 0.08, 0.18, 0.016, (0, 1.2, -0.003), M.neck, bevel=0.008)
+        _slab(F, 'pickguard', 0.05, 0.065, 0.002, (0.07, 0.325, 0.0525), M.tortoise, verts=16, smooth=False)
+        F.box('bridge', 0.15, 0.03, 0.008, (0, saddle - 0.004, 0.055), M.fretboard, bevel=0.003)
+        F.box('saddle', 0.075, 0.003, 0.004, (0, saddle, 0.06), M.bone)
+        F.box('neck', 0.05, nut - 0.505, 0.025, (0, (nut + 0.505) / 2, 0.0), M.neck)
+        F.box('heel', 0.05, 0.05, 0.05, (0, 0.525, -0.01), M.neck, bevel=0.01)
+        F.box('fretboard', 0.048, nut - 0.455, 0.005, (0, (nut + 0.455) / 2, 0.015), M.fretboard)
+        _frets(F, 17, scale, nut, 0.048, 0.0185)
+        F.box('nut', 0.048, 0.004, 0.004, (0, nut + 0.001, 0.0185), M.bone)
+        F.box('head', 0.08, 0.18, 0.016, (0, nut + 0.095, -0.003), M.neck, bevel=0.008)
         for s in (-1, 1):
             for k in range(3):
-                y = 1.15 + 0.045 * k
+                y = nut + 0.045 + 0.045 * k
                 F.cyl(f'peg{s}{k}', 0.004, 0.024, (s * 0.05, y, -0.003), M.fret, rot=(0, 90, 0), verts=8)
                 F.box(f'peg_button{s}{k}', 0.005, 0.018, 0.012, (s * 0.064, y, -0.003), M.fret, bevel=0.002)
-        _strings(F, 6, 0.0095, 0.0075, 0.137, 1.106, 0.0625, 0.0215)
+        _strings(F, 6, 0.0095, 0.0075, saddle + 0.007, nut + 0.001, 0.0625, 0.0215)
     return _upright(p, 'guitar')
 
 
 def guitarAcoustic():
     F = G.GameFrame(shift=0.07)   # a little forward, where the game places it
     with G.new_parts() as still:
-        _guitar_stand(F, -0.01, 0.19, 1.0, -0.075, reach=0.1, back=0.27)
+        _guitar_stand(F, -0.01, 0.105, 0.79, -0.057, reach=0.1, back=0.27)
     G.join(still, 'stand', origin=(0, 0, 0))
-    guitar = _lean(F, _acoustic(G.GameFrame()), 8, (0, 0.205, 0.06))
+    guitar = _lean(F, _acoustic(G.GameFrame()), 8, (0, 0.12, 0.06))
     G.settle(centre=False)
     _off_stand(guitar)
     return G.meshes()
 
 
-# The digital piano: a slim keyboard on a black X-stand with a padded X-legged bench behind it. Still.
-KB_BLACK = [-0.38 + 0.273 * o + d for o in range(4) for d in (0, 0.039, 0.117, 0.156, 0.195)]
+# The digital piano: a home console of 88 full-size keys (52 white at 2.35 cm) on two side panels with a
+# pedal board of three pedals, a control strip and a music rest behind the keys, and a padded X-legged bench
+# behind it, built facing the front and turned round to stand against the wall like the upright, the player
+# facing it (content `seat.facing`). The keys' tops are at 0.745 m, as the upright's (0.72–0.76; review M-hobbies-04: they were at
+# 0.845 on a three-octave keyboard on an X-stand). Still.
+KB_KEY = 0.0235          # a white key's width
+KB_TOP = 0.745           # the white keys' top
+KB_KEYS_Z = 0.17         # the keys' middle (depth), as built (before it is turned round)
+KB_FORWARD = -0.02       # turned round, how far forward it stands: its back on the wall's face
+KB_W = 52 * KB_KEY       # the keyboard's width, 1.222 m
+
+
+def _kb_black_keys():
+    """Game x of each black key of an 88-key keyboard (A0 to C8): after A0, then C, D, F, G and A of each
+    octave from C1."""
+    x0 = -KB_W / 2
+    edges = [1] + [2 + 7 * o + n for o in range(7) for n in (1, 2, 4, 5, 6)]
+    return [x0 + KB_KEY * e for e in edges]   # A0 at the player's left: game -x as built, facing the front (+z)
 
 
 def keyboardDigital():
     F = G.GameFrame()
+    half = KB_W / 2 + 0.06          # the side panels' middles
     with G.new_parts() as parts:
-        F.box('case', 0.9, 0.1, 0.3, (0, 0.78, 0.22), M.kb_body, bevel=0.015)
-        F.box('keys', 0.8, 0.02, 0.15, (0, 0.835, 0.17), M.ivory)
-        for k in range(1, 21):
-            F.box(f'gap{k}', 0.0015, 0.003, 0.148, (-0.4 + 0.039 * k, 0.8455, 0.17), M.key_gap)
-        for k, x in enumerate(x for x in KB_BLACK if x <= 0.37):
-            F.box(f'black{k}', 0.02, 0.016, 0.09, (x + 0.0195, 0.852, 0.2), M.ebony)
-        F.box('strip', 0.9, 0.03, 0.08, (0, 0.845, 0.32), M.kb_trim, bevel=0.008)
-        F.box('lcd', 0.12, 0.004, 0.035, (0, 0.861, 0.31), M.lcd)
-        for k in range(6):
-            F.box(f'button{k}', 0.022, 0.006, 0.014, (0.1 + 0.03 * k, 0.861, 0.31), M.kb_body)
+        # the keys, the key slip in front and the keybed under them
+        F.box('keys', KB_W, 0.022, 0.15, (0, KB_TOP - 0.011, KB_KEYS_Z), M.ivory)
+        for k in range(1, 52):
+            F.box(f'gap{k}', 0.0015, 0.003, 0.148, (-KB_W / 2 + KB_KEY * k, KB_TOP + 0.0005, KB_KEYS_Z), M.key_gap)
+        for k, x in enumerate(_kb_black_keys()):
+            F.box(f'black{k}', 0.012, 0.012, 0.09, (x, KB_TOP + 0.006, KB_KEYS_Z + 0.03), M.ebony)
+        F.box('keybed', KB_W + 0.02, 0.05, 0.31, (0, KB_TOP - 0.047, 0.245), M.kb_body, bevel=0.006)
+        F.box('key_slip', KB_W + 0.02, 0.03, 0.012, (0, KB_TOP - 0.02, KB_KEYS_Z - 0.081), M.kb_body, bevel=0.004)
+        # the case behind the keys: the top and its control strip, the fallboard folded back
+        F.box('case_top', KB_W + 0.02, 0.06, 0.13, (0, KB_TOP + 0.03, 0.335), M.kb_body, bevel=0.01)
+        F.box('strip', KB_W - 0.1, 0.004, 0.05, (0, KB_TOP + 0.062, 0.3), M.kb_trim)
+        F.box('lcd', 0.12, 0.004, 0.03, (0.2, KB_TOP + 0.065, 0.3), M.lcd)
+        for k in range(8):
+            F.box(f'button{k}', 0.018, 0.006, 0.012, (-0.45 + 0.03 * k, KB_TOP + 0.066, 0.3), M.kb_body)
         for s in (-1, 1):
-            F.cyl(f'speaker{s}', 0.035, 0.004, (s * 0.33, 0.861, 0.31), M.kb_body, verts=16, smooth=False)
-            F.cyl(f'knob{s}', 0.012, 0.012, (s * 0.2, 0.864, 0.31), M.kb_body, verts=12)
+            F.cyl(f'knob{s}', 0.01, 0.012, (s * 0.52, KB_TOP + 0.068, 0.3), M.kb_trim, verts=12)
         # the music rest, leant back, and a sheet on it
-        F.box('rest', 0.42, 0.22, 0.012, (0, 0.98, 0.335), M.kb_body, rot=(12, 0, 0), bevel=0.004)
-        F.box('rest_ledge', 0.42, 0.012, 0.03, (0, 0.872, 0.318), M.kb_body)
-        _sheet_music(F, 'music', 0.32, 0.18, (0, 0.99, 0.327), rot=(12, 0, 0))
-        # the X-stand: a pair of crossed tubes at each end, a bar across
-        for x in (-0.34, 0.34):
-            for k, yaw in enumerate((0.0, 180.0)):
-                _rod(F, f'x{x}{k}', (x, 0.37, 0.22), 0.754, (21.8, yaw, 0), 0.015, M.stand)
-            for z in (0.08, 0.36):
-                F.box(f'cap{x}{z}', 0.04, 0.02, 0.06, (x, 0.01, z), M.rubber, bevel=0.006)
-        G.rod('x_bar', F.at(-0.34, 0.37, 0.22), F.at(0.34, 0.37, 0.22), 0.012, material=M.stand, verts=8)
+        F.box('rest', 0.7, 0.24, 0.012, (0, KB_TOP + 0.18, 0.37), M.kb_body, rot=(12, 0, 0), bevel=0.004)
+        F.box('rest_ledge', 0.7, 0.012, 0.03, (0, KB_TOP + 0.066, 0.355), M.kb_body)
+        _sheet_music(F, 'music', 0.4, 0.2, (0, KB_TOP + 0.19, 0.362), rot=(12, 0, 0))
+        # the side panels with their arms, the back panel, and the pedal board with three pedals
+        for s in (-1, 1):
+            F.box(f'side{s}', 0.04, KB_TOP + 0.06, 0.36, (s * half, (KB_TOP + 0.06) / 2, 0.22), M.kb_body, bevel=0.008)
+            F.box(f'arm{s}', 0.04, 0.03, 0.2, (s * half, KB_TOP + 0.075, 0.27), M.kb_body, bevel=0.01)
+            F.box(f'toe{s}', 0.05, 0.03, 0.4, (s * half, 0.015, 0.21), M.kb_trim, bevel=0.006)
+        F.box('back', KB_W + 0.08, 0.5, 0.015, (0, 0.38, 0.39), M.kb_body)
+        F.box('pedal_board', 0.36, 0.09, 0.12, (0, 0.065, 0.33), M.kb_body, bevel=0.01)
+        G.rod('pedal_rod', F.at(0, 0.11, 0.38), F.at(0, KB_TOP - 0.07, 0.38), 0.008, material=M.kb_trim, verts=8)
+        for x in (-0.07, 0.0, 0.07):
+            F.box(f'pedal{x}', 0.03, 0.012, 0.09, (x, 0.05, 0.25), M.brass, bevel=0.004)
         # the bench
-        F.box('seat', 0.62, 0.06, 0.32, (0, 0.42, -0.2), M.kb_seat, bevel=0.03)
-        F.box('seat_frame', 0.58, 0.02, 0.26, (0, 0.385, -0.2), M.stand)
-        for x in (-0.26, 0.26):
+        # the bench, its top at 0.48 m (content `seat`; a piano bench is 0.46–0.56)
+        F.box('seat', 0.66, 0.06, 0.32, (0, 0.45, -0.2), M.kb_seat, bevel=0.03)
+        F.box('seat_frame', 0.62, 0.02, 0.26, (0, 0.415, -0.2), M.stand)
+        for x in (-0.28, 0.28):
             for z, yaw in ((-0.26, 0.0), (-0.14, 180.0)):
-                _rod(F, f'bench_leg{x}{z}', (x, 0.195, z), 0.408, (17.1, yaw, 0), 0.014, M.stand)
+                _rod(F, f'bench_leg{x}{z}', (x, 0.21, z), 0.44, (17.1, yaw, 0), 0.014, M.stand)
             for z in (-0.32, -0.08):
                 F.box(f'bench_cap{x}{z}', 0.035, 0.016, 0.05, (x, 0.008, z), M.rubber, bevel=0.005)
     G.join_all('keyboardDigital')
+    _turn_round(G.meshes(), KB_FORWARD)   # built facing the front; it stands with its back on the wall's face
     G.settle(centre=False)
     return G.meshes()
 
 
-# The drum kit: a kick drum to the front with two rack toms on it, a snare, a floor tom and a hi-hat, the
-# crash and ride cymbals on stands and a throne behind. The two cymbals are parts of their own, their
-# origins on their stands' tops, and wobble while a resident drums (`cymbals`, a loop).
+# The drum kit's parts.
 def _cymbal(F, name, r, at, rot):
     profile = [(0, 0.016), (0.02, 0.015), (0.028, 0.008), (r, 0.0), (r, -0.002), (0.028, 0.005), (0.02, 0.012),
                (0, 0.013)]
@@ -603,61 +634,80 @@ def _drum_stand(F, name, x, z, top, spread=0.18):
               material=M.chrome, verts=6)
 
 
+# The drum kit, spread over two tiles as a real five-piece is (review M-hobbies-05: it was packed onto one, the
+# toms on the kick and the floor tom under the ride): a 22" kick to the front with two rack toms on a mount on it,
+# a snare and a hi-hat to the drummer's left (game -x: they face the front, +z), a 16" floor tom to the right, the crash and ride cymbals on boom stands
+# over them, and the throne behind (content `seat`: 0.52 m, `DRUM_THRONE` behind the middle). Built in place
+# about the throne. The two cymbals are parts of their own, their origins on their stands' tops, and wobble
+# while a resident drums (`cymbals`).
+DRUM_THRONE = -0.4     # the throne's depth (content `seat.forward`)
+CRASH = (-0.42, 1.18, DRUM_THRONE + 0.62)   # the cymbals' middles, on their booms
+RIDE = (0.52, 1.1, DRUM_THRONE + 0.52)
+
+
 def drumKit():
     F = G.GameFrame()
+    T = DRUM_THRONE
+    kz, ky, kr = T + 0.66, 0.29, 0.28      # the kick: its middle and radius
     with G.new_parts() as still:
         # the kick drum lies on its side, its front head to the front
-        F.cyl('kick', 0.25, 0.34, (0, 0.27, 0.2), M.shell, rot=(90, 0, 0), verts=32)
-        for k, z in enumerate((0.028, 0.372)):
-            F.cyl(f'kick_head{k}', 0.24, 0.006, (0, 0.27, z), M.head, rot=(90, 0, 0), verts=32, smooth=False)
-            G.torus(f'kick_hoop{k}', 0.245, 0.013, at=F.at(0, 0.27, z), material=M.shell, rot=(90, 0, 0),
+        F.cyl('kick', kr, 0.4, (0, ky, kz), M.shell, rot=(90, 0, 0), verts=32)
+        for k, z in enumerate((kz - 0.2, kz + 0.2)):
+            F.cyl(f'kick_head{k}', kr - 0.01, 0.006, (0, ky, z), M.head, rot=(90, 0, 0), verts=32, smooth=False)
+            G.torus(f'kick_hoop{k}', kr - 0.005, 0.013, at=F.at(0, ky, z), material=M.shell, rot=(90, 0, 0),
                     major_segments=28, minor_segments=4)
-        F.cyl('kick_logo', 0.09, 0.002, (0, 0.27, 0.3765), M.shell, rot=(90, 0, 0), verts=24, smooth=False)
+        F.cyl('kick_logo', 0.1, 0.002, (0, ky, kz + 0.2045), M.shell, rot=(90, 0, 0), verts=24, smooth=False)
         for k in range(8):
             a = 22.5 + 45 * k
-            F.box(f'kick_lug{k}', 0.018, 0.018, 0.08, (0.252 * G.cosd(a), 0.27 + 0.252 * G.sind(a), 0.2), M.chrome)
+            F.box(f'kick_lug{k}', 0.018, 0.018, 0.1, ((kr + 0.002) * G.cosd(a), ky + (kr + 0.002) * G.sind(a), kz),
+                  M.chrome)
         for s in (-1, 1):
-            G.rod(f'spur{s}', F.at(s * 0.2, 0.16, 0.3), F.at(s * 0.3, 0.006, 0.34), 0.008, material=M.chrome, verts=6)
-        # the pedal and its beater
-        F.box('pedal', 0.08, 0.015, 0.2, (0, 0.03, -0.09), M.chrome, rot=(-6, 0, 0), bevel=0.004)
-        G.rod('beater', F.at(0, 0.06, -0.02), F.at(0, 0.24, 0.005), 0.005, material=M.chrome, verts=6)
-        F.sphere('beater_head', 0.022, (0, 0.24, 0.01), M.head, segments=10, rings=6)
-        # two rack toms on a mount, tilted to the drummer
-        G.rod('tom_mount', F.at(0, 0.5, 0.2), F.at(0, 0.6, 0.17), 0.012, material=M.chrome, verts=8)
-        for k, (x, r, h) in enumerate(((-0.14, 0.13, 0.2), (0.16, 0.12, 0.18))):
-            _drum(F, f'tom{k}', r, h, (x, 0.64, 0.15), rot=(-20, 0, 0), heads=(1,))
-            G.rod(f'tom_arm{k}', F.at(0, 0.6, 0.17), F.at(x * 0.6, 0.6, 0.15), 0.009, material=M.chrome, verts=6)
-        # the snare on its stand
-        _drum(F, 'snare', 0.17, 0.12, (-0.28, 0.6, -0.08), heads=(1, -1), lugs=8)
-        _drum_stand(F, 'snare_stand', -0.28, -0.08, 0.53)
-        # the floor tom on three legs
-        _drum(F, 'floor_tom', 0.18, 0.26, (0.3, 0.32, -0.05), heads=(1,), lugs=6)
+            G.rod(f'spur{s}', F.at(s * 0.22, 0.17, kz + 0.1), F.at(s * 0.34, 0.006, kz + 0.16), 0.008,
+                  material=M.chrome, verts=6)
+        # the pedal and its beater, on the batter head
+        F.box('pedal', 0.08, 0.015, 0.22, (0, 0.03, kz - 0.33), M.chrome, rot=(-6, 0, 0), bevel=0.004)
+        G.rod('beater', F.at(0, 0.06, kz - 0.24), F.at(0, 0.26, kz - 0.215), 0.005, material=M.chrome, verts=6)
+        F.sphere('beater_head', 0.024, (0, 0.26, kz - 0.21), M.head, segments=10, rings=6)
+        # two rack toms (10" and 12") on a mount on the kick, tilted to the drummer
+        G.rod('tom_mount', F.at(0, ky + kr - 0.01, kz - 0.02), F.at(0, 0.72, kz - 0.08), 0.013, material=M.chrome, verts=8)
+        for k, (x, r, h) in enumerate(((-0.15, 0.13, 0.2), (0.15, 0.155, 0.22))):
+            _drum(F, f'tom{k}', r, h, (x, 0.78, kz - 0.12), rot=(-20, 0, 0), heads=(1,))
+            G.rod(f'tom_arm{k}', F.at(0, 0.72, kz - 0.08), F.at(x * 0.6, 0.72, kz - 0.12), 0.009, material=M.chrome, verts=6)
+        # the snare on its stand, between the drummer's knees and the hi-hat
+        _drum(F, 'snare', 0.18, 0.13, (-0.26, 0.63, T + 0.3), heads=(1, -1), lugs=8)
+        _drum_stand(F, 'snare_stand', -0.26, T + 0.3, 0.56, spread=0.2)
+        # the floor tom on three legs, to the right
+        fx, fz = 0.46, T + 0.3
+        _drum(F, 'floor_tom', 0.2, 0.36, (fx, 0.42, fz), heads=(1,), lugs=8)
         for k in range(3):
             a = 30 + 120 * k
-            G.rod(f'floor_leg{k}', F.at(0.3 + 0.19 * G.cosd(a), 0.38, -0.05 + 0.19 * G.sind(a)),
-                  F.at(0.3 + 0.22 * G.cosd(a), 0.006, -0.05 + 0.22 * G.sind(a)), 0.007, material=M.chrome, verts=6)
-        # the hi-hat: two cymbals shut on their pole, and its pedal
-        _drum_stand(F, 'hihat', -0.32, -0.16, 0.9)
-        _cymbal(F, 'hihat_bottom', 0.14, (-0.32, 0.85, -0.16), (0, 0, 0))
-        _cymbal(F, 'hihat_top', 0.14, (-0.32, 0.868, -0.16), (0, 0, 0))
-        F.box('hihat_pedal', 0.07, 0.012, 0.18, (-0.32, 0.03, -0.24), M.chrome, rot=(-6, 0, 0), bevel=0.004)
-        # the crash's and the ride's stands
-        _drum_stand(F, 'crash_stand', -0.3, 0.18, 1.0)
-        _drum_stand(F, 'ride_stand', 0.3, 0.12, 1.05)
+            G.rod(f'floor_leg{k}', F.at(fx + 0.21 * G.cosd(a), 0.48, fz + 0.21 * G.sind(a)),
+                  F.at(fx + 0.25 * G.cosd(a), 0.006, fz + 0.25 * G.sind(a)), 0.007, material=M.chrome, verts=6)
+        # the hi-hat: two 14" cymbals shut on their pole, and its pedal, by the left foot
+        hx, hz = -0.52, T + 0.22
+        _drum_stand(F, 'hihat', hx, hz, 0.94, spread=0.2)
+        _cymbal(F, 'hihat_bottom', 0.18, (hx, 0.89, hz), (0, 0, 0))
+        _cymbal(F, 'hihat_top', 0.18, (hx, 0.908, hz), (0, 0, 0))
+        F.box('hihat_pedal', 0.07, 0.012, 0.2, (hx, 0.03, hz - 0.12), M.chrome, rot=(-6, 0, 0), bevel=0.004)
+        # the crash's and the ride's boom stands
+        for name, x, z, top, bx, bz in (('crash', -0.62, T + 0.74, 1.1, CRASH[0], CRASH[2]),
+                                         ('ride', 0.72, T + 0.62, 1.02, RIDE[0], RIDE[2])):
+            _drum_stand(F, f'{name}_stand', x, z, top, spread=0.22)
+            G.rod(f'{name}_boom', F.at(x, top, z), F.at(bx, top + 0.08, bz), 0.008, material=M.chrome, verts=6)
         # the throne
-        F.cyl('throne', 0.2, 0.07, (0, 0.495, -0.3), M.seat, verts=20, bevel=0.02)
-        F.cyl('throne_base', 0.05, 0.03, (0, 0.445, -0.3), M.chrome, verts=12)
-        _drum_stand(F, 'throne_stand', 0, -0.3, 0.45, spread=0.2)
+        F.cyl('throne', 0.2, 0.07, (0, 0.485, T), M.seat, verts=20, bevel=0.02)
+        F.cyl('throne_base', 0.05, 0.03, (0, 0.435, T), M.chrome, verts=12)
+        _drum_stand(F, 'throne_stand', 0, T, 0.44, spread=0.22)
     G.join(still, 'body', origin=(0, 0, 0))
     with G.new_parts() as c:
-        _cymbal(F, 'crash', 0.17, (-0.3, 1.0, 0.18), (-10, 8, 0))
-        F.cyl('crash_felt', 0.012, 0.02, (-0.3, 1.02, 0.18), M.seat, verts=8)
-    crash = G.hinged(G.join(c, 'crash'), F.at(-0.3, 1.0, 0.18))
+        _cymbal(F, 'crash', 0.2, CRASH, (-14, 10, 0))
+        F.cyl('crash_felt', 0.012, 0.02, (CRASH[0], CRASH[1] + 0.02, CRASH[2]), M.seat, verts=8)
+    crash = G.hinged(G.join(c, 'crash'), F.at(*CRASH))
     with G.new_parts() as r:
-        _cymbal(F, 'ride', 0.18, (0.3, 1.05, 0.12), (-10, -8, 0))
-        F.cyl('ride_felt', 0.012, 0.02, (0.3, 1.07, 0.12), M.seat, verts=8)
-    ride = G.hinged(G.join(r, 'ride'), F.at(0.3, 1.05, 0.12))
-    G.settle()  # on its Model's `centre`: its back moved onto the wall face
+        _cymbal(F, 'ride', 0.25, RIDE, (-10, -8, 0))
+        F.cyl('ride_felt', 0.012, 0.02, (RIDE[0], RIDE[1] + 0.02, RIDE[2]), M.seat, verts=8)
+    ride = G.hinged(G.join(r, 'ride'), F.at(*RIDE))
+    G.settle(centre=False)
     G.rock(crash, 'cymbals', 7, seconds=1.0, axis='X')
     G.rock(ride, 'cymbals', 4, seconds=1.0, axis='Y')
     return G.meshes()
@@ -675,9 +725,11 @@ def _square_at(col, row):
     return (-0.1505 + SQUARE * col, 0.0995 + SQUARE * row)
 
 
-def _piece(F, name, kind, col, row, material):
-    """A turned chess piece on a square: pawn, rook, knight, bishop, queen or king."""
-    x, z = _square_at(col, row)
+def _piece(F, name, kind, col, row, material, at=None):
+    """A turned chess piece on a square: pawn, rook, knight, bishop, queen or king; or standing at `at` (game
+    x, height, depth), off the board."""
+    x, z = _square_at(col, row) if at is None else (at[0], at[2])
+    y = BOARD_Y if at is None else at[1]
     base = [(0, 0), (0.013, 0), (0.013, 0.004), (0.009, 0.008)]
     profiles = {
         'pawn': base + [(0.005, 0.022), (0.008, 0.024), (0.004, 0.026), (0.007, 0.03), (0.008, 0.034),
@@ -691,20 +743,22 @@ def _piece(F, name, kind, col, row, material):
                         (0, 0.067)],
         'knight': base + [(0.008, 0.014), (0, 0.014)],
     }
-    G.revolve(name, profiles[kind], at=F.at(x, BOARD_Y, z), material=material, segments=8)
+    G.revolve(name, profiles[kind], at=F.at(x, y, z), material=material, segments=8)
     if kind == 'king':
-        F.box(f'{name}_cross', 0.005, 0.02, 0.005, (x, BOARD_Y + 0.075, z), material)
-        F.box(f'{name}_arm', 0.014, 0.005, 0.005, (x, BOARD_Y + 0.077, z), material)
+        F.box(f'{name}_cross', 0.005, 0.02, 0.005, (x, y + 0.075, z), material)
+        F.box(f'{name}_arm', 0.014, 0.005, 0.005, (x, y + 0.077, z), material)
     if kind == 'knight':
         facing = -1 if material == M.piece_dark else 1
-        F.box(f'{name}_neck', 0.014, 0.032, 0.016, (x, BOARD_Y + 0.03, z), material, rot=(facing * 12, 0, 0))
-        F.box(f'{name}_head', 0.012, 0.012, 0.024, (x, BOARD_Y + 0.045, z + facing * 0.008), material)
+        F.box(f'{name}_neck', 0.014, 0.032, 0.016, (x, y + 0.03, z), material, rot=(facing * 12, 0, 0))
+        F.box(f'{name}_head', 0.012, 0.012, 0.024, (x, y + 0.045, z + facing * 0.008), material)
 
 
 def chessTable():
     F = G.GameFrame()
     with G.new_parts() as still:
-        F.box('top', 0.46, 0.03, 0.4, (0, 0.725, 0.25), M.table_wood, bevel=0.006, bevel_segments=1)
+        # the top 0.64 × 0.48 m, room either side of the board for the taken pieces and the players' elbows (review
+        # M-hobbies-02: it was 0.46 × 0.40, the board filling it)
+        F.box('top', 0.64, 0.03, 0.48, (0, 0.725, 0.25), M.table_wood, bevel=0.006, bevel_segments=1)
         F.box('board', 0.37, 0.004, 0.37, (0, 0.742, 0.2505), M.table_wood, bevel=0.002)
         F.box('board_dark', 0.344, 0.0005, 0.344, (0, 0.74425, 0.2505), M.square_dark)
         for col in range(8):
@@ -713,9 +767,9 @@ def chessTable():
                     x, z = _square_at(col, row)
                     F.box(f'square{col}{row}', SQUARE, 0.0006, SQUARE, (x, 0.7444, z), M.square_light)
         F.cone('pedestal', 0.035, 0.026, 0.62, (0, 0.4, 0.25), M.table_wood, verts=12)
-        F.cone('foot', 0.16, 0.1, 0.05, (0, 0.025, 0.25), M.table_wood, verts=16)
         F.cone('collar', 0.05, 0.07, 0.06, (0, 0.68, 0.25), M.table_wood, verts=12)
-        F.box('apron', 0.4, 0.04, 0.34, (0, 0.69, 0.25), M.table_wood)
+        F.box('apron', 0.56, 0.04, 0.4, (0, 0.69, 0.25), M.table_wood)
+        F.cone('foot', 0.2, 0.12, 0.05, (0, 0.025, 0.25), M.table_wood, verts=16)
         _chair(F, -0.21, M.chair_wood, M.seat_pad)
         # the game: the white side to the front
         for kind, col, row in (('rook', 0, 7), ('knight', 6, 7), ('bishop', 3, 6), ('king', 4, 7)):
@@ -726,6 +780,11 @@ def chessTable():
             _piece(F, f'b_{kind}', kind, col, row, M.piece_dark)
         for k, (col, row) in enumerate(((2, 1), (3, 3), (6, 2))):
             _piece(F, f'b_pawn{k}', 'pawn', col, row, M.piece_dark)
+        # the taken pieces beside the board
+        for k, (kind, x, z) in enumerate((('pawn', -0.25, 0.14), ('pawn', -0.27, 0.19))):
+            _piece(F, f'taken_w{k}', kind, 0, 0, M.piece_light, at=(x, 0.74, z))
+        for k, (kind, x, z) in enumerate((('pawn', 0.25, 0.34), ('pawn', 0.27, 0.39))):
+            _piece(F, f'taken_b{k}', kind, 0, 0, M.piece_dark, at=(x, 0.74, z))
     G.join(still, 'body', origin=(0, 0, 0))
     with G.new_parts() as p:
         _piece(F, 'pawn', 'pawn', 5, 1, M.piece_dark)
@@ -740,8 +799,10 @@ def chessTable():
 # round the balls is lifted off, carried over the foot rail and hung on the foot end for pool and trick shots
 # (`rack_off`, G.path).
 BALL = 0.0285
-BED = 0.785        # the cloth's top
-RACK_HUNG = (1.275, 0.6)   # the rack's middle, hung on the foot end (game x, height): its apex at the rail's top
+BED = 0.75         # the cloth's top: the rails' top 3.5 cm over it, at 0.785 m (a table is 0.74–0.79 to the rail; review
+                   # M-hobbies-06: the cloth was at 0.785, the rails at 0.82)
+RAIL_TOP = BED + 0.035
+RACK_HUNG = (1.275, BED - 0.185)   # the rack's middle, hung on the foot end (game x, height): its apex at the rail's top
 
 
 def poolTable():
@@ -752,25 +813,25 @@ def poolTable():
     apex, row = 0.5, math.sqrt(3) * BALL
     with G.new_parts() as still:
         F.box('bed', 2.3, 0.02, 1.2, (0, BED - 0.01, 0), M.cloth)
-        F.box('slate', 2.3, 0.08, 1.2, (0, 0.725, 0), M.pool_frame)
-        F.box('apron', 2.4, 0.18, 1.3, (0, 0.6, 0), M.pool_frame, bevel=0.02)
+        F.box('slate', 2.3, 0.08, 1.2, (0, BED - 0.06, 0), M.pool_frame)
+        F.box('apron', 2.4, 0.18, 1.3, (0, BED - 0.185, 0), M.pool_frame, bevel=0.02)
         for s in (-1, 1):
-            F.box(f'rail_long{s}', 2.5, 0.15, 0.1, (0, 0.745, s * 0.65), M.pool_frame, bevel=0.012)
-            F.box(f'rail_short{s}', 0.1, 0.15, 1.2, (s * 1.2, 0.745, 0), M.pool_frame, bevel=0.012)
+            F.box(f'rail_long{s}', 2.5, 0.15, 0.1, (0, RAIL_TOP - 0.075, s * 0.65), M.pool_frame, bevel=0.012)
+            F.box(f'rail_short{s}', 0.1, 0.15, 1.2, (s * 1.2, RAIL_TOP - 0.075, 0), M.pool_frame, bevel=0.012)
             F.box(f'cushion_short{s}', 0.03, 0.03, 1.06, (s * 1.135, BED + 0.015, 0), M.cloth)
             for half in (-1, 1):
                 F.box(f'cushion_long{s}{half}', 1.02, 0.03, 0.03, (half * 0.575, BED + 0.015, s * 0.585), M.cloth)
             for x in (-1.15, 0, 1.15):
-                F.cyl(f'pocket{s}{x}', 0.058, 0.004, (x, 0.822, s * (0.6 if x else 0.625)), M.pocket, verts=16)
+                F.cyl(f'pocket{s}{x}', 0.058, 0.004, (x, RAIL_TOP + 0.002, s * (0.6 if x else 0.625)), M.pocket, verts=16)
             for k in range(1, 4):
                 for half in (-1, 1):
-                    F.box(f'sight{s}{half}{k}', 0.012, 0.002, 0.02, (half * 0.2875 * k, 0.821, s * 0.65), M.pearl)
+                    F.box(f'sight{s}{half}{k}', 0.012, 0.002, 0.02, (half * 0.2875 * k, RAIL_TOP + 0.001, s * 0.65), M.pearl)
             for z in (-0.3, 0, 0.3):
-                F.box(f'sight_end{s}{z}', 0.02, 0.002, 0.012, (s * 1.2, 0.821, z), M.pearl)
+                F.box(f'sight_end{s}{z}', 0.02, 0.002, 0.012, (s * 1.2, RAIL_TOP + 0.001, z), M.pearl)
             for sz in (-1, 1):
-                F.box(f'leg{s}{sz}', 0.15, 0.52, 0.15, (s * 1.08, 0.27, sz * 0.5), M.pool_frame, bevel=0.02)
+                F.box(f'leg{s}{sz}', 0.15, BED - 0.265, 0.15, (s * 1.08, (BED - 0.265) / 2 + 0.01, sz * 0.5), M.pool_frame, bevel=0.02)
                 F.box(f'foot{s}{sz}', 0.19, 0.02, 0.19, (s * 1.08, 0.01, sz * 0.5), M.pool_frame, bevel=0.006)
-        F.box('chalk', 0.022, 0.022, 0.022, (0.9, 0.831, 0.65), M.ball_blue)
+        F.box('chalk', 0.022, 0.022, 0.022, (0.9, RAIL_TOP + 0.011, 0.65), M.ball_blue)
         # the racked balls, the apex to the head, and the cue ball
         k = 0
         for i in range(5):
@@ -808,21 +869,36 @@ def poolTable():
     return G.meshes()
 
 
-# The foosball table: a birch cabinet on legs, a pitch with its lines and goals, and four rods of players,
-# red and blue, their handles to the front where the players stand. The two outer rods, one each, are parts
-# of their own and kick back and forth while played (`rods`, a loop); the inner two stay still.
+# The foosball table: a birch cabinet on legs, a pitch with its lines and goals, and the eight rods of a real
+# table, 15 cm apart (review M-hobbies-07: it had four, every handle on the front): from the left goal, blue's
+# goalie and defence, red's attack, blue's five midfielders, red's, blue's attack, red's defence and goalie,
+# each team's handles on its own side: blue's to the front, where the players stand (characters.ts `STEP_IN`
+# lanes: one at the goalie and defence, `FOOS_LANES` in clips/games.ts; one at the midfield and attack), red's
+# to the back, short there so the table can stand against a wall. One rod in each blue player's hands is a part
+# of its own and kicks back and forth while played (`rods`, a loop); the others stay still.
 ROD_Y = 0.84
+FOOS_RODS = [-0.525 + 0.15 * k for k in range(8)]
+# per rod: blue (front handles) or red, and its men (depth across the pitch)
+FOOS_TEAMS = [(True, (0.0,)), (True, (-0.12, 0.12)), (False, (-0.18, 0.0, 0.18)),
+              (True, (-0.24, -0.12, 0.0, 0.12, 0.24)), (False, (-0.24, -0.12, 0.0, 0.12, 0.24)),
+              (True, (-0.18, 0.0, 0.18)), (False, (-0.12, 0.12)), (False, (0.0,))]
+FOOS_KICKING = (1, 5)    # the rods that kick: blue's defence and attack
 
 
-def _rod_men(F, name, x, team):
-    G.rod(f'{name}_bar', F.at(x, ROD_Y, -0.43), F.at(x, ROD_Y, 0.44), 0.009, material=M.chrome, verts=10)   # its end on the wall face
-    F.cyl(f'{name}_handle', 0.02, 0.09, (x, ROD_Y, 0.46), M.grip, rot=(90, 0, 0), verts=12, bevel=0.006)
+def _rod_men(F, name, x, front, men):
+    team = M.ball_blue if front else M.ball_red
+    if front:   # the handle to the front, the bar's back end on the back wall's outside
+        G.rod(f'{name}_bar', F.at(x, ROD_Y, -0.375), F.at(x, ROD_Y, 0.44), 0.009, material=M.chrome, verts=8)
+        F.cyl(f'{name}_handle', 0.02, 0.09, (x, ROD_Y, 0.46), M.grip, rot=(90, 0, 0), verts=10, bevel=0.006)
+    else:       # the handle to the back, short, inside the wall's face
+        G.rod(f'{name}_bar', F.at(x, ROD_Y, -0.39), F.at(x, ROD_Y, 0.375), 0.009, material=M.chrome, verts=8)
+        F.cyl(f'{name}_handle', 0.02, 0.05, (x, ROD_Y, -0.403), M.grip, rot=(90, 0, 0), verts=10, bevel=0.005)
     for z in (-0.37, 0.37):
-        F.cyl(f'{name}_bumper{z}', 0.016, 0.016, (x, ROD_Y, z), M.grip, rot=(90, 0, 0), verts=10)
-    for z in (-0.18, 0.0, 0.18):
-        F.sphere(f'{name}_head{z}', 0.018, (x, 0.888, z), team, segments=10, rings=6)
-        F.box(f'{name}_body{z}', 0.034, 0.07, 0.046, (x, 0.835, z), team, bevel=0.008)
-        F.box(f'{name}_legs{z}', 0.026, 0.05, 0.03, (x, 0.775, z), team, bevel=0.005)
+        F.cyl(f'{name}_bumper{z}', 0.016, 0.016, (x, ROD_Y, z), M.grip, rot=(90, 0, 0), verts=8)
+    for z in men:
+        F.sphere(f'{name}_head{z}', 0.018, (x, 0.888, z), team, segments=8, rings=5)
+        F.box(f'{name}_body{z}', 0.034, 0.07, 0.046, (x, 0.835, z), team, bevel=0.006, bevel_segments=1)
+        F.box(f'{name}_legs{z}', 0.026, 0.05, 0.03, (x, 0.775, z), team)
 
 
 def foosball():
@@ -846,18 +922,20 @@ def foosball():
             G.rod(f'score{s}', F.at(s * 0.62, 0.935, -0.12), F.at(s * 0.62, 0.935, 0.12), 0.004, material=M.chrome, verts=6)
             for k in range(5):
                 F.sphere(f'bead{s}{k}', 0.012, (s * 0.62, 0.935, -0.1 + 0.025 * k + (0.06 if k > 1 else 0)),
-                         M.ball_white, segments=8, rings=6)
+                         M.ball_white, segments=8, rings=5)
         F.box('half_line', 0.004, 0.0015, 0.62, (0, 0.7205, 0), M.line)
         G.torus('centre_circle', 0.08, 0.003, at=F.at(0, 0.7205, 0), material=M.line, major_segments=28, minor_segments=4)
         F.sphere('ball', 0.018, (0.05, 0.738, 0.05), M.ball_white, segments=10, rings=6)
-        _rod_men(F, 'rod_b', -0.15, M.ball_blue)
-        _rod_men(F, 'rod_c', 0.15, M.ball_red)
+        for k, (x, (front, men)) in enumerate(zip(FOOS_RODS, FOOS_TEAMS)):
+            if k not in FOOS_KICKING:
+                _rod_men(F, f'rod{k}', x, front, men)
     G.join(still, 'body', origin=(0, 0, 0))
     rods = []
-    for name, x, team in (('rod_red', -0.45, M.ball_red), ('rod_blue', 0.45, M.ball_blue)):
+    for k in FOOS_KICKING:
+        x, (front, men) = FOOS_RODS[k], FOOS_TEAMS[k]
         with G.new_parts() as p:
-            _rod_men(F, name, x, team)
-        rods.append(G.hinged(G.join(p, name), F.at(x, ROD_Y, 0)))
+            _rod_men(F, f'rod{k}', x, front, men)
+        rods.append(G.hinged(G.join(p, f'rod{k}'), F.at(x, ROD_Y, 0)))
     G.settle(centre=False)
     for rod in rods:
         G.rock(rod, 'rods', 55, seconds=0.8, axis='Y')
@@ -1091,54 +1169,103 @@ def easel():
     return G.meshes()
 
 
-# The workbench: a butcher-block top on two steel drawer pedestals, a toolbox, a drill and a tin, and a
-# bench vice holding a plank on edge. The vice's front jaw, its screw and handle are a part of their own and
-# slide shut on the plank while a resident tinkers (`vice`).
+# The workbench: a thick butcher-block top on an open frame of square posts, rails and a slatted shelf below,
+# the back posts carrying a steel tool board on the wall with its tools hung up; a toolbox, a drill and a tin on
+# the top, and a bench vice holding a plank on edge. The top is at 0.90 m, a standing height (workbenches are
+# 0.85–0.95; review M-hobbies-01: it was a steel desk at 0.78). The vice's front jaw, its screw and handle are a
+# part of their own and slide shut on the plank while a resident tinkers (`vice`).
 BENCH_Z = -0.0975     # the top's middle: its back on the wall face
+BENCH_D = 0.665
+BENCH_TOP = 0.90      # the top's surface
+BENCH_UP = BENCH_TOP - 0.7795   # how far the things on the top stand over where they stood on the old desk
 VICE_X = 0.1
-VICE_Y = 0.7795       # the top's surface
+VICE_Y = BENCH_TOP
 VICE_GAP = 0.04
 VICE_Z = 0.02        # the back jaw's middle
+BOARD_Z = -0.4225    # the tool board's middle: its back on the wall face
+
+
+def _tool_board(F):
+    """The steel pegboard on the back posts, a shelf along its top, and the tools hung on it: a saw, a
+    square, two screwdrivers, a spanner, pliers, a mallet and a tape measure."""
+    z = BOARD_Z + 0.0075 + 0.001     # the board's face
+    F.box('board', 1.46, 0.6, 0.015, (0, 1.27, BOARD_Z), M.pegboard, bevel=0.003)
+    for row in range(8):
+        for col in range(18):
+            F.box(f'peg{row}_{col}', 0.008, 0.008, 0.002, (-0.68 + 0.08 * col, 1.02 + 0.07 * row, z), M.hole)
+    F.box('board_shelf', 1.46, 0.02, 0.12, (0, 1.58, BOARD_Z + 0.065), M.bench_frame, bevel=0.003)
+    for k, (x, r, h, colour) in enumerate(((-0.55, 0.035, 0.09, M.can), (-0.46, 0.03, 0.07, M.toolbox),
+                                           (0.5, 0.04, 0.1, M.jar))):
+        F.cyl(f'shelf_jar{k}', r, h, (x, 1.59 + h / 2, BOARD_Z + 0.06), colour, verts=12)
+    # a hand saw, its handle up
+    F.box('saw_blade', 0.11, 0.42, 0.002, (-0.48, 1.16, z + 0.006), M.chrome)
+    F.box('saw_handle', 0.12, 0.11, 0.022, (-0.47, 1.41, z + 0.014), M.drill, bevel=0.01)
+    # a carpenter's square
+    F.box('square_long', 0.03, 0.3, 0.004, (-0.3, 1.25, z + 0.004), M.chrome)
+    F.box('square_short', 0.18, 0.03, 0.004, (-0.225, 1.115, z + 0.004), M.chrome)
+    # two screwdrivers and a spanner
+    for k, (x, colour) in enumerate(((-0.12, M.ball_red), (-0.06, M.vice))):
+        F.cyl(f'driver_handle{k}', 0.013, 0.1, (x, 1.37, z + 0.016), colour, verts=8)
+        F.cyl(f'driver_shaft{k}', 0.003, 0.12, (x, 1.26, z + 0.016), M.chrome, verts=6)
+    F.box('spanner', 0.022, 0.24, 0.005, (0.04, 1.25, z + 0.005), M.chrome, bevel=0.002)
+    for y in (1.13, 1.37):
+        F.cyl(f'spanner_end{y}', 0.02, 0.005, (0.04, y, z + 0.005), M.chrome, rot=(90, 0, 0), verts=10)
+    # pliers, a mallet and a tape measure
+    for s in (-1, 1):
+        F.box(f'plier{s}', 0.016, 0.2, 0.008, (0.16 + s * 0.012, 1.24, z + 0.008), M.ball_red, rot=(0, s * 4, 0))
+    F.box('mallet_handle', 0.025, 0.26, 0.022, (0.3, 1.2, z + 0.013), M.plank, bevel=0.006)
+    F.box('mallet_head', 0.13, 0.06, 0.06, (0.3, 1.36, z + 0.032), M.plank, bevel=0.01)
+    F.box('tape', 0.08, 0.08, 0.04, (0.46, 1.3, z + 0.022), M.drill, bevel=0.015)
 
 
 def workbench():
     F = G.GameFrame()
+    back, front = BENCH_Z - BENCH_D / 2, BENCH_Z + BENCH_D / 2
     with G.new_parts() as still:
-        F.box('top', 1.62, 0.035, 0.665, (0, 0.762, BENCH_Z), M.bench_top, bevel=0.006)
-        F.box('frame', 1.6, 0.025, 0.645, (0, 0.732, BENCH_Z), M.bench_steel, bevel=0.004)
-        F.box('modesty', 0.8, 0.4, 0.02, (0, 0.52, -0.41), M.bench_steel, bevel=0.004)
-        F.box('drawer', 0.78, 0.09, 0.02, (0, 0.67, 0.21), M.bench_steel, bevel=0.006)
-        F.box('drawer_pull', 0.16, 0.014, 0.014, (0, 0.67, 0.227), M.chrome, bevel=0.005)
+        F.box('top', 1.62, 0.05, BENCH_D, (0, BENCH_TOP - 0.025, BENCH_Z), M.bench_top, bevel=0.006)
+        # the frame: four posts (the back two up to the tool board's top), rails under the top, stretchers and
+        # a slatted shelf low down
+        post, rail_y = 0.07, BENCH_TOP - 0.09
         for sx in (-1, 1):
-            x = sx * 0.6
-            F.box(f'pedestal{sx}', 0.4, 0.67, 0.63, (x, 0.39, -0.115), M.bench_steel, bevel=0.01)
-            for k, (y, h) in enumerate(((0.185, 0.218), (0.405, 0.178), (0.613, 0.193))):
-                F.box(f'front{sx}{k}', 0.37, h, 0.018, (x, y, 0.209), M.bench_steel, bevel=0.006)
-                F.box(f'pull{sx}{k}', 0.12, 0.016, 0.016, (x, y + h / 2 - 0.035, 0.226), M.chrome, bevel=0.006)
-                F.box(f'label{sx}{k}', 0.05, 0.025, 0.003, (x, y + h / 2 - 0.07, 0.219), M.label, bevel=0.002)
-            for dx in (-0.15, 0.15):
-                for z in (-0.39, 0.16):
-                    F.cyl(f'foot{sx}{dx}{z}', 0.0175, 0.055, (x + dx, 0.0275, z), M.foot, verts=8)
+            x = sx * 0.73
+            F.box(f'post_front{sx}', post, BENCH_TOP - 0.05, post, (x, (BENCH_TOP - 0.05) / 2, front - 0.06),
+                  M.bench_frame, bevel=0.004)
+            F.box(f'post_back{sx}', post, 1.6, post, (x, 0.8, back + post / 2 + 0.015), M.bench_frame, bevel=0.004)
+            F.box(f'rail_side{sx}', 0.05, 0.08, BENCH_D - 0.12, (x, rail_y, BENCH_Z - 0.01), M.bench_frame)
+            F.box(f'stretcher{sx}', 0.05, 0.06, BENCH_D - 0.12, (x, 0.14, BENCH_Z - 0.01), M.bench_frame)
+        for z, name in ((front - 0.06, 'front'), (back + 0.05, 'back')):
+            F.box(f'rail_{name}', 1.39, 0.08, 0.04, (0, rail_y, z), M.bench_frame)
+            F.box(f'stretcher_{name}', 1.39, 0.06, 0.04, (0, 0.14, z), M.bench_frame)
+        for k in range(5):
+            F.box(f'shelf_slat{k}', 1.39, 0.02, 0.09, (0, 0.18, back + 0.1 + 0.11 * k), M.bench_top)
+        # on the shelf: a crate of offcuts and a can
+        F.box('crate', 0.4, 0.2, 0.34, (-0.4, 0.29, BENCH_Z), M.toolbox, bevel=0.01)
+        for k, dx in enumerate((-0.12, 0.0, 0.1)):
+            F.box(f'offcut{k}', 0.06, 0.32 - 0.05 * k, 0.02, (-0.4 + dx, 0.35 + 0.02 * k, BENCH_Z + 0.04 * k),
+                  M.plank, rot=(8 - 6 * k, 0, 0))
+        F.cyl('paint_can', 0.09, 0.18, (0.45, 0.28, BENCH_Z - 0.05), M.can, verts=16)
+        _tool_board(F)
         # the toolbox
-        F.box('toolbox', 0.42, 0.16, 0.2, (-0.5, 0.86, -0.3), M.toolbox, bevel=0.02)
-        F.box('toolbox_lid', 0.43, 0.035, 0.21, (-0.5, 0.93, -0.3), M.toolbox_lid, bevel=0.012)
+        u = BENCH_UP
+        F.box('toolbox', 0.42, 0.16, 0.2, (-0.5, 0.86 + u, -0.3), M.toolbox, bevel=0.02)
+        F.box('toolbox_lid', 0.43, 0.035, 0.21, (-0.5, 0.93 + u, -0.3), M.toolbox_lid, bevel=0.012)
         for x in (-0.62, -0.38):
-            F.box(f'latch{x}', 0.06, 0.03, 0.03, (x, 0.88, -0.195), M.chrome, bevel=0.006)
-        G.rod('toolbox_handle', F.at(-0.6, 0.985, -0.3), F.at(-0.4, 0.985, -0.3), 0.01, material=M.foot, verts=8)
+            F.box(f'latch{x}', 0.06, 0.03, 0.03, (x, 0.88 + u, -0.195), M.chrome, bevel=0.006)
+        G.rod('toolbox_handle', F.at(-0.6, 0.985 + u, -0.3), F.at(-0.4, 0.985 + u, -0.3), 0.01, material=M.foot, verts=8)
         for x in (-0.6, -0.4):
-            G.rod(f'toolbox_post{x}', F.at(x, 0.948, -0.3), F.at(x, 0.985, -0.3), 0.01, material=M.foot, verts=8)
+            G.rod(f'toolbox_post{x}', F.at(x, 0.948 + u, -0.3), F.at(x, 0.985 + u, -0.3), 0.01, material=M.foot, verts=8)
         # the drill lying on its side
-        F.cyl('drill_body', 0.03, 0.16, (0.45, 0.91, -0.16), M.drill, rot=(0, 90, 0), verts=14)
-        F.sphere('drill_back', 0.03, (0.53, 0.91, -0.16), M.drill, segments=14, rings=8)
-        F.box('drill_grip', 0.05, 0.13, 0.05, (0.5, 0.85, -0.16), M.foot, rot=(0, -12, 0), bevel=0.015)
-        F.box('drill_battery', 0.09, 0.03, 0.07, (0.51, 0.795, -0.16), M.drill, bevel=0.012)
-        F.cyl('drill_chuck', 0.02, 0.05, (0.345, 0.91, -0.16), M.foot, rot=(0, 90, 0), verts=10)
-        F.cyl('drill_bit', 0.004, 0.06, (0.29, 0.91, -0.16), M.chrome, rot=(0, 90, 0), verts=6)
-        F.cyl('tin', 0.045, 0.06, (0.15, 0.81, -0.32), M.can, verts=14)
+        F.cyl('drill_body', 0.03, 0.16, (0.45, 0.91 + u, -0.16), M.drill, rot=(0, 90, 0), verts=14)
+        F.sphere('drill_back', 0.03, (0.53, 0.91 + u, -0.16), M.drill, segments=14, rings=8)
+        F.box('drill_grip', 0.05, 0.13, 0.05, (0.5, 0.85 + u, -0.16), M.foot, rot=(0, -12, 0), bevel=0.015)
+        F.box('drill_battery', 0.09, 0.03, 0.07, (0.51, 0.795 + u, -0.16), M.drill, bevel=0.012)
+        F.cyl('drill_chuck', 0.02, 0.05, (0.345, 0.91 + u, -0.16), M.foot, rot=(0, 90, 0), verts=10)
+        F.cyl('drill_bit', 0.004, 0.06, (0.29, 0.91 + u, -0.16), M.chrome, rot=(0, 90, 0), verts=6)
+        F.cyl('tin', 0.045, 0.06, (0.15, 0.81 + u, -0.32), M.can, verts=14)
         # a hammer and a pencil
-        F.box('hammer_handle', 0.2, 0.022, 0.03, (-0.28, 0.791, 0.0), M.plank, rot=(0, 0, 20), bevel=0.008)
-        F.box('hammer_head', 0.03, 0.03, 0.11, (-0.19, 0.795, 0.032), M.foot, rot=(0, 0, 20), bevel=0.006)
-        F.box('pencil', 0.15, 0.01, 0.01, (-0.12, 0.785, 0.15), M.drill, rot=(0, 0, -20), bevel=0.003)
+        F.box('hammer_handle', 0.2, 0.022, 0.03, (-0.28, 0.791 + u, 0.0), M.plank, rot=(0, 0, 20), bevel=0.008)
+        F.box('hammer_head', 0.03, 0.03, 0.11, (-0.19, 0.795 + u, 0.032), M.foot, rot=(0, 0, 20), bevel=0.006)
+        F.box('pencil', 0.15, 0.01, 0.01, (-0.12, 0.785 + u, 0.15), M.drill, rot=(0, 0, -20), bevel=0.003)
         # the vice: a base, its back jaw, the plank clamped on edge
         F.box('vice_base', 0.16, 0.02, 0.15, (VICE_X, VICE_Y + 0.01, VICE_Z + 0.02), M.vice, bevel=0.005)
         F.box('vice_jaw', 0.15, 0.07, 0.04, (VICE_X, VICE_Y + 0.055, VICE_Z), M.vice, bevel=0.006)
@@ -1219,6 +1346,9 @@ def telescope():
 # chair behind. The presser foot and needle lower while a resident sews or mends (`presser`), and the
 # handwheel turns for as long as they do (`handwheel`, a loop).
 MACHINE_Z = 0.28
+# The sewer sits behind, facing the front (+z), so their left is game -x: the needle and the head are on their left
+# and the pillar and the handwheel on their right, the cloth fed towards them, as on every domestic machine (review
+# M-hobbies-08 read it as mirrored: it isn't, checked in play 2026-10-21).
 NEEDLE_X = -0.12
 WHEEL = (0.212, 0.94, MACHINE_Z)
 
@@ -1355,11 +1485,14 @@ def chemistrySet():
     return G.meshes()
 
 
-# The pottery wheel: a round body with a splash pan, the wheel head and a pot on it, a pedal and a stool
-# behind. The pot is its own part and rises from a squat lump while a resident throws (`clay`); the wheel
-# head turns for as long as they do (`wheel`, a loop).
+# The pottery wheel: a low, narrow motor body on four feet under a 0.48 m splash pan, the wheel head and a pot
+# on it, a foot pedal by the right foot (game +x: the potter faces the front, +z) and a stool behind. The potter sits with the knees either side of the pan
+# (characters.ts `activityPose`, `tinker`), the shins either side of the body, as at a real wheel (review
+# I-hobbies-10: the knees went into a 0.66 m drum). The pot is its own part and rises from a squat lump while a
+# resident throws (`clay`); the wheel head turns for as long as they do (`wheel`, a loop).
 WHEEL_Z = 0.12
 HEAD_TOP = 0.475
+PAN_R = 0.24        # the splash pan's rim
 POT = [(0, 0), (0.064, 0), (0.092, 0.04), (0.1, 0.09), (0.08, 0.15), (0.048, 0.184), (0.052, 0.2), (0.04, 0.2),
        (0.036, 0.18), (0, 0.176)]
 LUMP = 0.3          # the pot's height at rest, as a share of its height thrown
@@ -1368,16 +1501,23 @@ LUMP = 0.3          # the pot's height at rest, as a share of its height thrown
 def potteryWheel():
     F = G.GameFrame(shift=0.02)        # 2 cm forward: the stool's back on the wall face
     with G.new_parts() as still:
-        F.cyl('base', 0.33, 0.36, (0, 0.18, WHEEL_Z), M.wheel_body, verts=32, bevel=0.02)
+        # the body: a narrow box under the pan, set forward, on four rubber feet
+        F.box('base', 0.26, 0.3, 0.42, (0, 0.19, WHEEL_Z + 0.08), M.wheel_body, bevel=0.03)
+        F.box('base_plinth', 0.3, 0.025, 0.46, (0, 0.04, WHEEL_Z + 0.08), M.wheel_body, bevel=0.006)
+        for sx in (-1, 1):
+            for z in (-0.1, 0.26):
+                F.cyl(f'foot{sx}{z}', 0.022, 0.028, (sx * 0.12, 0.014, WHEEL_Z + z), M.foot, verts=10)
+        F.box('vent', 0.16, 0.08, 0.004, (0, 0.2, WHEEL_Z + 0.292), M.foot)
+        F.cyl('column', 0.06, 0.06, (0, 0.37, WHEEL_Z), M.wheel_body, verts=16)
         pan = [(0, -0.5), (0.3, -0.5), (0.42, -0.2), (0.5, 0.5), (0.45, 0.5), (0.36, -0.15), (0.25, -0.35), (0, -0.35)]
-        G.revolve('splash_pan', [(r * 0.7, z * 0.12) for r, z in pan], at=F.at(0, 0.42, WHEEL_Z), material=M.pan,
+        G.revolve('splash_pan', [(r * PAN_R * 2, z * 0.12) for r, z in pan], at=F.at(0, 0.42, WHEEL_Z), material=M.pan,
                   segments=32)
         F.cyl('spindle', 0.04, 0.03, (0, 0.43, WHEEL_Z), M.chrome, verts=12)
-        F.box('pedal', 0.12, 0.04, 0.2, (0.22, 0.02, -0.12), M.foot, rot=(-6, 0, 0), bevel=0.01)
-        G.rod('pedal_cable', F.at(0.22, 0.01, 0.0), F.at(0.18, 0.05, WHEEL_Z - 0.3), 0.005, material=M.foot, verts=6)
-        F.box('switch', 0.06, 0.04, 0.02, (0.2, 0.3, WHEEL_Z - 0.32), M.foot, bevel=0.005)
-        F.box('sponge', 0.06, 0.025, 0.04, (-0.24, 0.395, WHEEL_Z + 0.14), M.drill, bevel=0.008)
-        G.rod('wire_tool', F.at(0.2, 0.39, WHEEL_Z + 0.18), F.at(0.27, 0.39, WHEEL_Z + 0.12), 0.003, material=M.chrome,
+        F.box('pedal', 0.12, 0.04, 0.2, (0.3, 0.02, 0.0), M.foot, rot=(-6, 0, 0), bevel=0.01)
+        G.rod('pedal_cable', F.at(0.3, 0.01, 0.1), F.at(0.13, 0.05, WHEEL_Z + 0.08), 0.005, material=M.foot, verts=6)
+        F.box('switch', 0.004, 0.04, 0.06, (0.132, 0.25, WHEEL_Z + 0.2), M.foot, bevel=0.002)
+        F.box('sponge', 0.06, 0.025, 0.04, (-0.17, 0.395, WHEEL_Z + 0.06), M.drill, bevel=0.008)
+        G.rod('wire_tool', F.at(0.12, 0.39, WHEEL_Z + 0.16), F.at(0.18, 0.39, WHEEL_Z + 0.1), 0.003, material=M.chrome,
               verts=4)
         _stool(F, -0.3, 0.44, 0.15, M.stool, M.stool)
     G.join(still, 'body', origin=(0, 0, 0))
@@ -1470,18 +1610,18 @@ FAMILY = G.Family(
              motions={'uses': {'play': _after_sitting('fallboard')}}, paint=[('piano', 'Body'), ('piano_trim', 'Trim')]),
      G.Model('ukulele', ukulele, size=(0.348, 0.841, 0.258), key='model.ukulele', centre=(0, 0.065),
              motions={'uses': {'music': 'off_stand'}}, paint=[('uke', 'Body & neck'), ('uke_top', 'Top'), ('stand', 'Stand')]),
-     G.Model('guitarElectric', guitarElectric, size=(0.46, 1.374, 0.584), key='model.guitarElectric',
+     G.Model('guitarElectric', guitarElectric, size=(0.46, 1.001, 0.584), key='model.guitarElectric',
              centre=(0, -0.128), motions={'uses': {'music': 'off_stand'}}, paint=[('electric', 'Guitar'), ('amp', 'Amp')]),
-     G.Model('keyboardDigital', keyboardDigital, size=(0.9, 1.092, 0.75), key='model.keyboardDigital',
-             centre=(0, 0.015), paint=[('kb_body', 'Body'), ('kb_trim', 'Trim')]),
-     G.Model('drumKit', drumKit, size=(0.978, 1.088, 0.885), key='model.drumKit', centre=(0.0076, 0.0125),
+     G.Model('keyboardDigital', keyboardDigital, size=(1.392, 1.047, 0.77), key='model.keyboardDigital',
+             centre=(0, -0.025 + KB_FORWARD), paint=[('kb_body', 'Body'), ('kb_trim', 'Trim')]),
+     G.Model('drumKit', drumKit, size=(1.732, 1.238, 1.165), key='model.drumKit', centre=(0.05, -0.0175),
              motions={'uses': {'drum': _after_sitting('cymbals', 0.9), 'practise': _after_sitting('cymbals', 0.9)}},
              paint=[('shell', 'Shells'), ('chrome', 'Hardware')]),
-     G.Model('guitarAcoustic', guitarAcoustic, size=(0.36, 1.482, 0.405), key='model.guitarAcoustic',
+     G.Model('guitarAcoustic', guitarAcoustic, size=(0.4, 1.161, 0.405), key='model.guitarAcoustic',
              centre=(0, -0.0217), motions={'uses': {'music': 'off_stand'}}, paint=[('acoustic', 'Body'), ('spruce', 'Top'), ('stand', 'Stand')]),
-     G.Model('chessTable', chessTable, size=(0.46, 0.92, 0.85), key='model.chessTable', centre=(0, 0.025),
+     G.Model('chessTable', chessTable, size=(0.64, 0.92, 0.89), key='model.chessTable', centre=(0, 0.045),
              motions={'uses': {'chess': _after_sitting('move')}}, paint=[('table_wood', 'Table'), ('chair_wood', 'Chair')]),
-     G.Model('poolTable', poolTable, size=(2.5, 0.842, 1.4), key='model.poolTable',
+     G.Model('poolTable', poolTable, size=(2.5, 0.807, 1.4), key='model.poolTable',
              motions={'uses': {'pool': 'rack_off', 'trickShots': 'rack_off'}},
              paint=[('pool_frame', 'Frame'), ('cloth', 'Cloth')]),
      G.Model('foosball', foosball, size=(1.42, 0.947, 0.935), key='model.foosball', centre=(0, 0.0375),
@@ -1495,8 +1635,9 @@ FAMILY = G.Family(
              motions={'uses': {'jigsaw': _after_sitting('pieces')}}, paint=[('table_wood', 'Table'), ('chair_wood', 'Stool')]),
      G.Model('easel', easel, size=(0.704, 1.747, 0.762), key='model.easel', centre=(0.0318, -0.0347),
              motions={'uses': {'paint': 'painting'}}, paint=[('easel_wood', 'Wood'), ('easel_metal', 'Metal')]),
-     G.Model('workbench', workbench, size=(1.62, 0.995, 0.665), key='model.workbench', centre=(0, -0.0975),
-             motions={'uses': {'tinker': 'vice'}}, paint=[('bench_top', 'Wood'), ('bench_steel', 'Metal')]),
+     G.Model('workbench', workbench, size=(1.62, 1.69, 0.665), key='model.workbench', centre=(0, -0.0975),
+             motions={'uses': {'tinker': 'vice'}},
+             paint=[('bench_top', 'Top'), ('bench_frame', 'Frame'), ('pegboard', 'Tool board')]),
      G.Model('telescope', telescope, size=(0.664, 1.522, 0.912), key='model.telescope', centre=(0, 0.026),
              motions={'uses': {'stargaze': 'aim'}}, paint=[('tube', 'Tube'), ('tripod', 'Tripod')]),
      G.Model('sewingTable', sewingTable, size=(0.9, 1.08, 0.89), key='model.sewingTable', centre=(0, 0.025),
@@ -1504,7 +1645,7 @@ FAMILY = G.Family(
              paint=[('sew_table', 'Table'), ('sew_legs', 'Legs'), ('machine', 'Machine')]),
      G.Model('chemistrySet', chemistrySet, size=(0.92, 1.4, 0.5), key='model.chemistrySet', centre=(0, -0.18),
              motions={'uses': {'experiment': 'bubble'}}, paint=[('chem_bench', 'Bench'), ('glass', 'Glassware')]),
-     G.Model('potteryWheel', potteryWheel, size=(0.7, 0.544, 0.92), key='model.potteryWheel', centre=(0, 0.03),
+     G.Model('potteryWheel', potteryWheel, size=(0.6, 0.544, 0.88), key='model.potteryWheel', centre=(0.06, 0.01),
              motions={'uses': {'throw': [_after_sitting('clay'), _after_sitting('wheel', 0.9)]}},
              paint=[('wheel_body', 'Wheel'), ('stool', 'Stool')]),
      G.Model('craftTable', craftTable, size=(1.7, 0.904, 0.89), key='model.craftTable', centre=(0, 0.005),

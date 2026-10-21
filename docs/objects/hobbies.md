@@ -24,10 +24,10 @@ table face the room, as tables do.
 |---|---|---|---|---|---|---|
 | `piano` Piano | 2x1 · floor | play:music | hobbies / music | Body, Trim | Use | `fallboard`: the key cover lifts and the music desk unfolds for play, 0.9 s in, once the pianist has sat down (`delay`). |
 | `ukulele` Ukulele | 1x1 · floor | strum:music practise:music | hobbies / music | Body & neck, Top, Stand | Use | `off_stand`: the ukulele leaves its stand while strummed and is drawn in the player's hands (content `held`). |
-| `guitarElectric` Electric guitar | 1x1 · floor | jam:music practise:music | hobbies / music | Guitar, Amp | Use | `off_stand`, as the ukulele; the amp is static. |
-| `keyboardDigital` Digital piano | 1x1 · floor | play:music | hobbies / music | Body, Trim | Static | Static. |
-| `drumKit` Drum kit | 1x1 · floor | drum:music practise:music | hobbies / music | Shells, Hardware | Use, repeating (E1) | `cymbals`: the crash and ride cymbals rock while drummed, from 0.9 s in, once the drummer has sat down (`delay`, `every` 0.9 s; it was a loop from the first frame); the hi-hat is still. |
-| `guitarAcoustic` Acoustic guitar | 1x1 · floor | strum:music practise:music | hobbies / music | Body, Top, Stand | Use | `off_stand`, as the ukulele. |
+| `guitarElectric` Electric guitar | 1x1 · floor | jam:music practise:music | hobbies / music | Guitar, Amp | Use | `off_stand`, as the ukulele; the amp is static. A 0.9 m solid body (a 0.648 m scale) on a 1.0 m stand since 2026-10-21 (G-40: a quarter too long). |
+| `keyboardDigital` Digital piano | 2x1 · floor | play:music | hobbies / music | Body, Trim | Static | Static. A console of 88 keys at 0.745 m against the wall, the player facing it (content `seat` 0.48, `facing: back`), since 2026-10-21 (G-29: a three-octave keyboard on an X-stand, the keys at 0.845). |
+| `drumKit` Drum kit | 2x2 · floor | drum:music practise:music | hobbies / music | Shells, Hardware | Use, repeating (E1) | `cymbals`: the crash and ride cymbals rock while drummed, from 0.9 s in, once the drummer has sat down (`delay`, `every` 0.9 s; it was a loop from the first frame); the hi-hat is still. Spread over 2 × 2 since 2026-10-21 (G-40), the hi-hat and snare at the drummer's left, the throne 0.4 m behind the middle. |
+| `guitarAcoustic` Acoustic guitar | 1x1 · floor | strum:music practise:music | hobbies / music | Body, Top, Stand | Use | `off_stand`, as the ukulele. A 1.05 m dreadnought (a 0.645 m scale) on a 1.16 m stand since 2026-10-21 (G-40). |
 
 **In play** (signed off 2026-10-16):
 - Checked in all four facings (the piano against three walls and standing free), every part coloured, played by
@@ -48,9 +48,9 @@ table face the room, as tables do.
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `chessTable` Chess table | 1x1 · floor | chess:play | hobbies / games | Table, Chair | Use | `move`: a pawn slides one square for chess, 0.9 s in, once the player has sat down (`delay`). |
-| `poolTable` Pool table | 3x2 · floor | pool:play trickShots:play | hobbies / games | Frame, Cloth | Use | `rack_off`: the triangle is lifted off the balls, carried over the foot rail and hung by its apex on the table's foot end (1.4 s, `G.path`) for pool and trick shots; it hung 25 cm over the balls before 2026-10-21. |
-| `foosball` Foosball table | 2x1 · floor | foosball:play | hobbies / games | Table, Trim | Loop (E1) | `rods`: the two outer rods kick ±55° while played (E1); the inner two are still. |
+| `chessTable` Chess table | 1x1 · floor | chess:play | hobbies / games | Table, Chair | Use | `move`: a pawn slides one square for chess, 0.9 s in, once the player has sat down (`delay`). A 0.64 × 0.48 m top, the taken pieces beside the board, since 2026-10-21 (G-40). |
+| `poolTable` Pool table | 3x2 · floor | pool:play trickShots:play | hobbies / games | Frame, Cloth | Use | `rack_off`: the triangle is lifted off the balls, carried over the foot rail and hung by its apex on the table's foot end (1.4 s, `G.path`) for pool and trick shots; it hung 25 cm over the balls before 2026-10-21. The rails' top at 0.785 m, the cloth at 0.75 (G-29: 0.82). |
+| `foosball` Foosball table | 2x1 · floor | foosball:play | hobbies / games | Table, Trim | Loop (E1) | `rods`: blue's defence and attack rods kick ±55° while played (E1). Eight rods since 2026-10-21 (G-41: four, every handle on the front), each team's handles on its own side, blue's to the front where the players stand. |
 | `dartboard` Dartboard | 1x1 · wall | darts:play | hobbies / games | Board, Cabinet | Use | `darts`: three darts grow in the board for darts. |
 | `arcadeCabinet` Arcade cabinet | 1x1 · floor | arcade:play | hobbies / games | Cabinet, Art | Loop (E1) | `joystick`: the stick waggles while played (E1). The screen and marquee glow at night (E8). |
 | `puzzleTable` Jigsaw table | 1x1 · floor | jigsaw:play | hobbies / games | Table, Stool | Use | `pieces`: a patch of finished puzzle grows for jigsaw, 0.9 s in, once the puzzler has sat down (`delay`). |
@@ -79,11 +79,11 @@ table face the room, as tables do.
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `easel` Easel | 1x1 · floor | paint:paint | hobbies / crafts | Wood, Metal | Use | `painting`: a painting grows on the canvas for paint. |
-| `workbench` Workbench | 2x1 · floor | tinker:tinker | hobbies / crafts | Wood, Metal | Use | `vice`: the vice jaw slides shut on a plank for tinker. |
+| `workbench` Workbench | 2x1 · floor | tinker:tinker | hobbies / crafts | Top, Frame, Tool board | Use | `vice`: the vice jaw slides shut on a plank for tinker. A 0.90 m top on an open frame with a shelf and a tool board on the wall since 2026-10-21 (G-29: a 0.78 m steel desk). |
 | `telescope` Telescope | 1x1 · floor | stargaze:look | hobbies / crafts | Tube, Tripod | Use | `aim`: the tube tilts up 35° for stargaze and comes back down. In play the stargazer steps up and bends down to the eyepiece as aimed (0.765 m), the right hand on the tube (`eyepiece181`…`112` by height, G-21). Only from 20:00 to 5:00, standing outside (`hours`, `sky`). |
-| `sewingTable` Sewing table | 1x1 · floor | sew:tinker mend:tinker | hobbies / crafts | Table, Legs, Machine | Use, repeating (E1) | `presser`: the presser foot lowers for sew and mend, and the handwheel turns round after round (`handwheel`, `every` 0.9 s, E1), both from 0.9 s in, once the sewer has sat down (`delay`). |
+| `sewingTable` Sewing table | 1x1 · floor | sew:tinker mend:tinker | hobbies / crafts | Table, Legs, Machine | Use, repeating (E1) | `presser`: the presser foot lowers for sew and mend, and the handwheel turns round after round (`handwheel`, `every` 0.9 s, E1), both from 0.9 s in, once the sewer has sat down (`delay`). The needle on the sewer's left, the handwheel on their right, as on a real machine (checked in play 2026-10-21: M-hobbies-08 closed, not mirrored). |
 | `chemistrySet` Chemistry bench | 1x1 · floor | experiment:tinker | hobbies / crafts | Bench, Glassware | Use | `bubble`: the liquid rises in the flask for experiment. |
-| `potteryWheel` Pottery wheel | 1x1 · floor | throw:tinker | hobbies / crafts | Wheel, Stool | Use, repeating (E1) | `clay`: the pot grows from a lump for throw, and the wheel head spins round after round (`wheel`, `every` 0.9 s, E1), both from 0.9 s in, once the potter has sat down (`delay`). |
+| `potteryWheel` Pottery wheel | 1x1 · floor | throw:tinker | hobbies / crafts | Wheel, Stool | Use, repeating (E1) | `clay`: the pot grows from a lump for throw, and the wheel head spins round after round (`wheel`, `every` 0.9 s, E1), both from 0.9 s in, once the potter has sat down (`delay`). A narrow body under a 0.48 m pan, the potter's knees either side, since 2026-10-21 (G-31: the knees went into the drum). |
 | `craftTable` Craft table | 2x1 · floor | scrapbook:tinker | hobbies / crafts | Wood, Metal | Use | `book_open`: the scrapbook cover swings open for scrapbook, 0.9 s in, once the crafter has sat down (`delay`). |
 
 **In play** (signed off 2026-10-16):
