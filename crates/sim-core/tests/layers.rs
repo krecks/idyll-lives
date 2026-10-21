@@ -216,6 +216,13 @@ fn a_lamp_at_head_height_hangs_over_a_table_not_over_heads() {
     assert!(buy(&mut w, "chandelier", 7, 5, 0).unwrap_err().to_string().contains("standing there"), "not on Ada's head");
     let loaded = World::from_save_json(TALL, &w.save_json()).unwrap();
     assert!(!free(&loaded, 3, 3) && !free(&loaded, 5, 4), "loaded, it still takes its tiles");
+    // Sold, it leaves the sofa under it in the way still (and the tile beside, now free).
+    let lamp = w.objects.iter().find(|o| w.content.objects[o.def].id == "chandelier" && o.x == 3).unwrap().id;
+    w.apply(Command::Sell { household: 0, object: lamp }).unwrap();
+    assert!(!free(&w, 3, 3), "the sofa under the sold lamp is still in the way");
+    let lamp = w.objects.iter().find(|o| w.content.objects[o.def].id == "chandelier" && o.x == 5).unwrap().id;
+    w.apply(Command::Sell { household: 0, object: lamp }).unwrap();
+    assert!(!free(&w, 5, 4) && free(&w, 6, 4), "the sofa's other tile too");
 }
 
 #[test]

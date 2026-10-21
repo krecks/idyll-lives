@@ -1331,9 +1331,20 @@ impl World {
         for (i, o) in self.objects.iter_mut().enumerate() {
             o.id = i as u32;
         }
-        for (x, z) in self.blocking_tiles(&obj) {
+        // Its tiles are free again, but for what else takes them: the table under a lamp at head
+        // height, the lamp over a sofa.
+        let freed = self.blocking_tiles(&obj);
+        for &(x, z) in &freed {
             let i = self.lot.tile_index(x, z);
             self.blocked[i] = false;
+        }
+        for o in 0..self.objects.len() {
+            for (x, z) in self.blocking_tiles(&self.objects[o]) {
+                if freed.contains(&(x, z)) {
+                    let i = self.lot.tile_index(x, z);
+                    self.blocked[i] = true;
+                }
+            }
         }
         if self.content.objects[obj.def].stairs {
             self.refresh_stairs();
