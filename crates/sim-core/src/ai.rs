@@ -184,6 +184,15 @@ mod tests {
             close_after: false,
             ripe: false,
             picks: false,
+            changes_outfit: false,
+            spare: false,
+            tends: 0.0,
+            yields: None,
+            carried: false,
+            at_slot: false,
+            hours: None,
+            sky: false,
+            work_on: None,
         }
     }
 

@@ -45,11 +45,13 @@ WebGL, day and night, all four facings across the set): residents sit on each, a
 
 Built as the sofas are, from the old primitive parts (`armchair_bergere` and the rest). Most have a still part and a `seat` that sinks 2 cm (`sink_in`) for `sit` (and `read`).
 
-- **Recliner** (`recline`, `footrest_up`, for relax and doze): a skirted base and arms (still); the seat cushion and
-  the back as one part (`seat`) turning back 25° about the sitter's hips (content seat 0.44 m, forward 0), with
-  `ride` on it, so the resident reclines with it; the padded footrest, folded flat against the front of the base at
-  rest, swings up 80°. It stands 13 cm off the wall's face, so the tipped back stops 4 cm short of the wall; the
-  hips (content `seat.forward` 0.12) and the old part (drawn at rest) moved forward with it.
+- **Recliner** (`recline`, `footrest_up`, for relax and doze): a skirted base and arms (still); the seat cushion,
+  the back and its head cushion as one part (`seat`) turning back 25° about the sitter's hips (content seat 0.44 m,
+  forward 0.12) and gliding 8 cm forward as it does (`G.path`, a wall-hugger's), with `ride` on it, so the resident
+  reclines with it and rests the head on the head cushion; the padded footrest, folded flat against the front of the
+  base at rest, swings up 80°. Since 2026-10-21 (M-living-04) the back stands 1.0 m high with a head cushion, over a
+  0.80 m deep base (it was 0.84 × 0.70, the back stopping at the sitter's shoulder blades). It stands 11 cm off the
+  wall's face; with the glide the tipped back's top stops 2 cm short of the wall.
 - **Rocking chair** (`rock`, a loop for relax and read, `ride`): the whole chair rocks ±6° in 1.4 s about the
   rockers' centre of curvature (1 m above the floor), so the rockers roll on the floor; the rockers are flat bent
   strips.
@@ -64,7 +66,7 @@ Built as the sofas are, from the old primitive parts (`armchair_bergere` and the
 | `model.armchairLeather` | 0.73 × 0.95 × 0.85 m | 1,348 | 3 | Frame, Upholstery |
 | `model.armchairDesign` | 0.76 × 0.96 × 0.85 m | 1,756 | 2 | Frame, Upholstery, Base |
 | `model.armchairWingback` | 0.84 × 1.10 × 0.80 m | 1,788 | 3 | Upholstery, Cushion, Legs |
-| `model.recliner` | 0.92 × 0.84 × 0.70 m | 1,248 | 3 | Upholstery, Cushions & footrest |
+| `model.recliner` | 0.92 × 0.99 × 0.80 m | 1,436 | 3 | Upholstery, Cushions & footrest |
 | `model.rockingChair` | 0.53 × 1.03 × 0.90 m | 1,148 | 2 | Wood, Cushion |
 | `model.pouf` | 0.72 × 0.47 × 0.50 m | 1,032 | 3 | Leather, Buttons, Legs |
 | `model.ottoman` | 0.62 × 0.45 × 0.62 m | 1,672 | 3 | Upholstery, Buttons, Feet |

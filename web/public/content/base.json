@@ -2373,7 +2373,9 @@
     "cuddle",
     "bake",
     "mix",
-    "phoneScreen"
+    "phoneScreen",
+    "feed",
+    "change"
   ],
   "objects": [
     {
@@ -3373,19 +3375,21 @@
       "price": 900,
       "category": "hobbies",
       "group": "crafts",
-      "description": "Builds Perception.",
+      "description": "Builds Perception. The stars come out after dark, out under the open sky.",
       "interactions": [
         {
           "id": "stargaze",
           "label": "Stargaze",
           "anim": "look",
           "minutes": 45,
+          "hours": [20, 5],
+          "sky": true,
           "effects": {
             "fun": 0.3
           },
           "tags": [
             "training",
-            "outdoors"
+            "stargazing"
           ],
           "skills": {
             "perception": 0.22,
@@ -3466,6 +3470,12 @@
           "id": "coffee",
           "requires": ["coffee"],
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",
@@ -3499,7 +3509,7 @@
       "id": "crib",
       "name": "Crib",
       "model": "model.crib",
-      "description": "A crib with a changing table beside it: a baby sleeps here, and grown-ups come to feed, change, cuddle and play with them.",
+      "description": "A crib with a changing table beside it: a baby sleeps here, and grown-ups come to feed, cuddle and play with them, and change them on the changing table's pad.",
       "footprint": [2, 1],
       "price": 350,
       "category": "kids",
@@ -3509,7 +3519,7 @@
         {"id": "lie", "label": "Lie in the crib", "anim": "sleep", "minutes": 720, "pose": "lie", "baby": true, "autonomous": false,
          "effects": {"energy": 1.0, "comfort": 0.75}, "tags": ["rest"]},
         {"id": "feed", "label": "Feed the baby", "anim": "cuddle", "minutes": 15, "care": {"hunger": 0.8, "social": 0.1}, "tags": ["care"]},
-        {"id": "change", "label": "Change the baby", "anim": "clean", "minutes": 10, "care": {"bladder": 1.0, "hygiene": 0.7}, "tags": ["care", "chores"]},
+        {"id": "change", "label": "Change the baby", "anim": "change", "minutes": 10, "care": {"bladder": 1.0, "hygiene": 0.7}, "tags": ["care", "chores"], "atSlot": true},
         {"id": "play", "label": "Play with the baby", "anim": "play", "minutes": 20, "effects": {"fun": 0.2, "social": 0.15}, "care": {"fun": 0.6, "social": 0.5}, "tags": ["care", "social"]},
         {"id": "cuddle", "label": "Cuddle the baby", "anim": "cuddle", "minutes": 15, "effects": {"social": 0.1}, "care": {"comfort": 0.5, "social": 0.15}, "tags": ["care", "social"]}
       ]
@@ -3667,6 +3677,7 @@
     "babyWakes": {"needs": ["hunger", "bladder", "hygiene"], "below": 0.3, "tendBelow": 0.6, "cooldownMinutes": 90, "feeling": "brokenSleep"}
   },
   "autonomy": {"urgent": ["hunger", "energy", "bladder", "hygiene"], "urgentBelow": 0.1, "comfortBoost": 2, "lookAhead": 0.25, "quickMinutes": 30, "retryMinutes": 30},
+  "laundry": {"perDay": 0.4, "most": 4},
   "objectRules": {
     "freeRotation": ["decor", "garden", "outdoor", "lighting", "kids", "community"],
     "wear": {"perUse": 0.004, "byCategory": {"bathroom": 0.006, "garden": 0, "outdoor": 0, "decor": 0}, "perQuality": 0.2},
@@ -4211,6 +4222,22 @@
       "label": "Takeout",
       "model": "item.takeout",
       "hold": "hand",
+      "radius": 0.13
+    },
+    {
+      "id": "gardenProduce",
+      "label": "Garden produce",
+      "model": "item.ingredients",
+      "hold": "both",
+      "serving": "freshPlate",
+      "radius": 0.15
+    },
+    {
+      "id": "freshPlate",
+      "label": "Something fresh from the garden",
+      "model": "item.treatPlate",
+      "hold": "hand",
+      "emptyAs": "plateDirty",
       "radius": 0.13
     },
     {

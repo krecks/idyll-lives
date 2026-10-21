@@ -624,11 +624,14 @@ def armchair_wingback():
     _settled(_run(M.forest, M.forest_cushion, M.walnut_warm, 0.84, arms=(-1, 1), depth=0.8, z=-0.06, extra=wings))
 
 
-# The recliner: its seat and back tip back 25° about the sitter's hips (`recline`), carrying them (`ride`),
-# and its footrest swings up 80° from the front of the base (`footrest_up`), for relax and doze.
-# It stands 13 cm off the wall's face, so the back's top stays out of the wall when tipped.
-RC_Z0, RC_Z1 = -0.30, 0.40   # the base, back to front
+# The recliner: its seat and back tip back 25° about the sitter's hips and glide 8 cm forward as they do
+# (`recline`, a wall-hugger's), carrying them (`ride`), and its footrest swings up 80° from the front of the
+# base (`footrest_up`), for relax and doze. A high back with a head cushion (1.0 m) over a 0.80 m deep
+# base and footrest: reclined, the head rests on it (it stopped at the shoulder blades: M-living-04). It
+# stands 11 cm off the wall's face; the glide keeps the back's top out of the wall when tipped.
+RC_Z0, RC_Z1 = -0.32, 0.48   # the base, back to front
 RC_HIPS = (0.44, 0.12)      # (height, depth): content seat 0.44, forward 0.12
+RC_GLIDE = 0.08             # how far the seat and back come forward reclined
 
 
 def recliner():
@@ -643,8 +646,9 @@ def recliner():
     sw = w - 2 * aw
     with G.new_parts() as body:   # the seat cushion and the back, which tip together
         _cushion('seat', sw - 0.02, 0.13, RC_Z1 - RC_Z0 - 0.22, (0, 0.385, (RC_Z0 + 0.2 + RC_Z1) / 2), M.tan_cushion)
-        F.box('back', w - 2 * aw + 0.02, 0.5, 0.18, (0, 0.57, RC_Z0 + 0.1), M.tan, bevel=0.06, bevel_segments=3)
-        _cushion('back_cushion', sw - 0.03, 0.42, 0.16, (0, 0.63, RC_Z0 + 0.25), M.tan_cushion, rot=(-9, 0, 0))
+        F.box('back', w - 2 * aw + 0.02, 0.66, 0.18, (0, 0.65, RC_Z0 + 0.11), M.tan, bevel=0.06, bevel_segments=3)
+        _cushion('back_cushion', sw - 0.03, 0.42, 0.16, (0, 0.63, RC_Z0 + 0.27), M.tan_cushion, rot=(-9, 0, 0))
+        _cushion('head_cushion', sw - 0.05, 0.16, 0.14, (0, 0.905, RC_Z0 + 0.24), M.tan_cushion, rot=(-9, 0, 0))
     seat = G.join(body, 'seat', origin=F.at(0, *RC_HIPS))
     # the footrest, built up (open), hinged at the front of the base
     hinge = (0.3, RC_Z1 - 0.09)   # folded down, its padded face stands 2 cm proud of the base's front
@@ -653,7 +657,7 @@ def recliner():
     footrest = G.hinged(G.join(foot, 'footrest'), F.at(0, *hinge))
     G.turn(footrest, 90, 'X')   # folded down flat against the front of the base at rest
     G.settle(centre=False)
-    G.swing(seat, 'recline', -25, seconds=1.0, axis='X')
+    G.path(seat, 'recline', [(0, (0, 0, 0), (0, 0, 0)), (1.0, (0, -RC_GLIDE, 0), (-25, 0, 0))])
     G.swing(footrest, 'footrest_up', -80, seconds=1.0, axis='X')
 
 
@@ -1360,7 +1364,7 @@ FAMILY = G.Family(
                     ('throw', 'Throw'), ('inside', 'Inside & shelves'), ('metal', 'Handle')]),
      G.Model('sofaBed', sofa_bed, key='model.sofaBed', size=(1.86, 0.83, 0.83), centre=(0, -0.015),
              # Out while the sofa bed is open, from the moment a use that opens it starts.
-             motions={'uses': {'doze': 'bed_out', 'pullOut': 'bed_out'}, 'open': 'bed_out'},
+             motions={'uses': {'doze': 'bed_out', 'sleep': 'bed_out', 'pullOut': 'bed_out'}, 'open': 'bed_out'},
              paint=[('upholstery', 'Upholstery'), ('cushion', 'Cushions'), ('legs', 'Legs'), ('bedding', 'Bedding'),
                     ('pillow_rose', 'Pillow'), ('pillow_cream', 'Second pillow')]),
      # L6: the staircase (placed by build mode's Stairs tool and the house generator)
@@ -1411,7 +1415,7 @@ FAMILY = G.Family(
      G.Model('armchairWingback', armchair_wingback, key='model.armchairWingback', size=(0.84, 1.1, 0.8), centre=(0, -0.03),
              motions={'uses': {'sit': 'sink_in', 'read': 'sink_in'}},
              paint=[('forest', 'Upholstery'), ('forest_cushion', 'Cushion'), ('walnut_warm', 'Legs')]),
-     G.Model('recliner', recliner, key='model.recliner', size=(0.92, 0.843, 0.7), centre=(0, 0.05),
+     G.Model('recliner', recliner, key='model.recliner', size=(0.92, 0.99, 0.80), centre=(0, 0.08),
              motions={'uses': {'relax': ['recline', 'footrest_up'], 'doze': ['recline', 'footrest_up']}, 'ride': 'recline'},
              paint=[('tan', 'Upholstery'), ('tan_cushion', 'Cushions & footrest')]),
      G.Model('rockingChair', rocking_chair, key='model.rockingChair', size=(0.525, 1.033, 0.9), centre=(0, 0.05),

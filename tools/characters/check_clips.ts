@@ -71,13 +71,15 @@ registerHooks({
 const { clipDefs } = await import('../../web/src/render/babylon/characters/clips/index.ts');
 const { bake } = await import('../../web/src/render/babylon/characters/clips/dsl.ts');
 const { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } = await import('../../web/src/render/babylon/characters/clips/street.ts');
-const { BOULDER, FOOS, POOL, SMASH } = await import('../../web/src/render/babylon/characters/clips/games.ts');
+const { BOULDER, FOOS, FOOS_LANES, foosClip, POOL, SMASH } = await import('../../web/src/render/babylon/characters/clips/games.ts');
 const { feetDown, legTurn, perch, SEAT_FIT, seatSize } = await import('../../web/src/render/babylon/characters/seatFit.ts');
 const { FLOOR_SITS } = await import('../../web/src/render/babylon/characters/clips/seated.ts');
 const { BALL_PIT, PLAY_TENT } = await import('../../web/src/render/babylon/characters/clips/play.ts');
 /** Seats whose top ends short of a child's knees (characters.ts `Seat.front`, `perch`). */
 const DEEP: [string, any][] = Object.entries(JSON.parse(readFileSync(new URL('../../web/src/render/babylon/characters/furniture.json', import.meta.url), 'utf8')).seats).filter(([, s]: [string, any]) => s.front !== undefined) as [string, any][];
 const { BUNK_DOWN, BUNK_UP, RIDE_HORSE, RIDE_ROUND, RIDE_SEESAW, RIDE_SPRING, RIDE_SWING, SLIDE, SWING_S } = await import('../../web/src/render/babylon/characters/clips/rides.ts');
+/** The foosball's clips, one per lane in each size (characters.ts STEP_IN). */
+const FOOS_LANED = FOOS.flatMap(({ clip, min }: any) => FOOS_LANES.map((_: number, lane: number) => ({ clip: foosClip(clip, lane), min })));
 const { EYEPIECE, PICK_APPLE, PICK_LEMON, SHOWER_CHILD } = await import('../../web/src/render/babylon/characters/clips/uses.ts');
 const { BOARD, CLOCK, FEEDER, PUT_AWAY } = await import('../../web/src/render/babylon/characters/clips/reach.ts');
 const { SHOT } = await import('../../web/src/render/babylon/characters/clips/shot.ts');
@@ -96,7 +98,7 @@ const RUNTIME: Record<string, boolean> = {
   // On the floor (clips/seated.ts FLOOR_SITS): cross-legged on a cushion, on the ground against a trunk.
   ...Object.fromEntries(FLOOR_SITS.flatMap(({ name }: any) => [[`sit${name}`, true], [`sitDown${name}`, false], [`standUp${name}`, false]])),
   interact: false, pickUp: false, dance: true, punchJab: false, punchCross: false, hit: false, kneel: true, crouch: true,
-  eat: false, water: true, harvest: true, pick: true, foldArms: true, no: true, yes: false, phone: true, rail: true, spell: true,
+  eat: false, water: true, harvest: true, pick: true, pickHigh: true, foldArms: true, no: true, yes: false, phone: true, rail: true, spell: true,
   push: true, plant: false, lantern: true, babyLieAsleep: true, babyLieAwake: true,
   // The drinking fountain and the climbing frame, in sizes (and the frame's in lanes: characters.ts STEP_IN, clips/street.ts).
   fountainDrink181: true, fountainDrink163: true, fountainDrink147: true, fountainDrink129: true, fountainDrink112: true,
@@ -105,7 +107,7 @@ const RUNTIME: Record<string, boolean> = {
   dartThrow: true, pingPong: true, yoga: true,
   // The socials' gestures and reactions, and the phone held in front (characters.ts GESTURES, ACTIONS; clips/social.ts).
   ...Object.fromEntries(Object.keys(SOCIAL).map((clip) => [clip, true])),
-  ...Object.fromEntries([POOL, FOOS, SMASH, BOULDER].flatMap((sizes: any[]) => sizes.map(({ clip }: any) => [clip, true]))),
+  ...Object.fromEntries([POOL, FOOS_LANED, SMASH, BOULDER].flatMap((sizes: any[]) => sizes.map(({ clip }: any) => [clip, true]))),
   // The slide's round, the bunk's ladder and the rides (characters.ts STEP_IN, BUNK_LADDER, RIDES; clips/rides.ts), in sizes.
   ...Object.fromEntries([SLIDE].flatMap((sizes: any[]) => sizes.map(({ clip }: any) => [clip, true]))),
   ...Object.fromEntries([BUNK_UP, BUNK_DOWN].flatMap((sizes: any[]) => sizes.map(({ clip }: any) => [clip, false]))),
@@ -126,12 +128,12 @@ const PHASE2: Record<string, boolean> = { lie: true, chop: true, stir: true, fli
 const LENGTH: Record<string, number> = {
   idle: 2.5, talk: 2.9, walk: 1.1, jog: 0.7, jogAlong: 0.7, runAlong: 0.6, sit: 1.7, sitTalk: 2.9, sitDown: 1.33, standUp: 1.07, sitHands: 1.7, sitHandsNear: 1.7, sitHandsFar: 1.7, interact: 2.0, pickUp: 0.87,
   ...Object.fromEntries(FLOOR_SITS.flatMap(({ name }: any) => [[`sit${name}`, 1.7], [`sitDown${name}`, 1.6], [`standUp${name}`, 1.47]])),
-  dance: 1.0, punchJab: 0.87, punchCross: 1.0, hit: 0.33, kneel: 5.2, crouch: 2.9, eat: 1.33, water: 3.8, harvest: 2.5, pick: 3, plant: 2.8, foldArms: 2.5,
+  dance: 1.0, punchJab: 0.87, punchCross: 1.0, hit: 0.33, kneel: 5.2, crouch: 2.9, eat: 1.33, water: 3.8, harvest: 2.5, pick: 3, pickHigh: 3.2, plant: 2.8, foldArms: 2.5,
   yes: 2.5, no: 2.5, phone: 2.9, lantern: 2.5, rail: 2.5, spell: 2.1, push: 2.7, babyLieAsleep: 9, babyLieAwake: 6,
   fountainDrink181: 3, fountainDrink163: 3, fountainDrink147: 3, fountainDrink129: 3, fountainDrink112: 3, climb172a: 13, climb147a: 13, climb112a: 13, climb172b: 13, climb147b: 13, climb112b: 13,
   dartThrow: 7.2, pingPong: 1.8, yoga: 48,
   ...SOCIAL,
-  ...Object.fromEntries(([[POOL, 8], [FOOS, 3.2], [SMASH, 3.4], [BOULDER, 16], [BALL_PIT, 12], [PLAY_TENT, 24], [SLIDE, 14], [BUNK_UP, 7], [BUNK_DOWN, 6.5], [RIDE_HORSE, 2.4], [RIDE_SPRING, 2], [RIDE_SEESAW, 2.8], [RIDE_ROUND, 2.4], [RIDE_SWING, SWING_S]] as [any[], number][]).flatMap(([sizes, s]) => sizes.map(({ clip }: any) => [clip, s]))),
+  ...Object.fromEntries(([[POOL, 8], [FOOS_LANED, 3.2], [SMASH, 3.4], [BOULDER, 16], [BALL_PIT, 12], [PLAY_TENT, 24], [SLIDE, 14], [BUNK_UP, 7], [BUNK_DOWN, 6.5], [RIDE_HORSE, 2.4], [RIDE_SPRING, 2], [RIDE_SEESAW, 2.8], [RIDE_ROUND, 2.4], [RIDE_SWING, SWING_S]] as [any[], number][]).flatMap(([sizes, s]) => sizes.map(({ clip }: any) => [clip, s]))),
   eyepiece181: 6, eyepiece163: 6, eyepiece147: 6, eyepiece129: 6, eyepiece112: 6, pickApple177: 3.3, pickApple147: 3.3, pickApple112: 3.3, pickLemon177: 3.3, pickLemon147: 3.3, pickLemon112: 3.3,
   shower: 14, showerChild: 14,
   ...Object.fromEntries(MORE_SIZED.flatMap(([sizes, s]) => sizes.map(({ clip }: any) => [clip, s]))),
@@ -151,7 +153,8 @@ const STAGES = ['baby', 'child', 'teen', 'youngAdult', 'adult', 'elder'];
 const SIZED: { min: number; clips: string[] }[][] = [
   FOUNTAIN.map(({ clip, min }: any) => ({ min, clips: [clip] })),
   CLIMB.map(({ clip, min }: any) => ({ min, clips: CLIMB_LANES.map((_: number, lane: number) => climbClip(clip, lane)) })),
-  ...[POOL, FOOS, SMASH, BOULDER, BALL_PIT, PLAY_TENT, SLIDE, BUNK_UP, BUNK_DOWN, RIDE_HORSE, RIDE_SPRING, RIDE_SEESAW, RIDE_ROUND, RIDE_SWING].map((sizes: any[]) => sizes.map(({ clip, min }: any) => ({ min, clips: [clip] }))),
+  FOOS.map(({ clip, min }: any) => ({ min, clips: FOOS_LANES.map((_: number, lane: number) => foosClip(clip, lane)) })),
+  ...[POOL, SMASH, BOULDER, BALL_PIT, PLAY_TENT, SLIDE, BUNK_UP, BUNK_DOWN, RIDE_HORSE, RIDE_SPRING, RIDE_SEESAW, RIDE_ROUND, RIDE_SWING].map((sizes: any[]) => sizes.map(({ clip, min }: any) => ({ min, clips: [clip] }))),
   ...[EYEPIECE, PICK_APPLE, PICK_LEMON].map((sizes) => sizes.map(({ clip, min }: any) => ({ min, clips: [clip] }))),
   [{ min: SHOWER_CHILD, clips: ['shower'] }, { min: 0, clips: ['showerChild'] }],
   ...MORE_SIZED.map(([sizes]) => sizes.map(({ clip, min }: any) => ({ min, clips: [clip] }))),

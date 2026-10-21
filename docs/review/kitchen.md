@@ -462,7 +462,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/public/content/furniture.json:669` (`farmhouseSink` `washUp`), `web/public/content/catalog2/kitchen.json:197` (`counterSinkDouble` `washUp`), `web/public/content/furniture.json:558` (`dishwasher` `dishes`), `web/public/content/catalog2/kitchen.json:840` (`dishwasherCompact`), `:901` (`recyclingBins` `sortRecycling`)
 - **Evidence:** `kitchen/play/c1/farmhouseSink-washUp-01.png`, `dishwasher-dishes-01.png`, `kitchen/play/c3/recyclingBins-sortRecycling-01.png`: each runs on the bare stage with nothing to wash or sort, the water running into an empty bowl and the dishwasher loaded from empty hands. They aren't autonomous, so only the player starts them, but a player asked to wash up with nothing to wash sees a mime. Clearing away after a meal already washes the real plates at these stations. A condition (a dirty item on the lot, or recycling) is new behaviour: `code`.
-- **Status:** open
+- **Status:** fixed (69d0bc33)
+- **After:** `"workOn": "dishes"` (G-64) on *Wash the dishes* (farmhouse and double sink), both dishwashers and *Sort the recycling*: only with dirty dishes or food gone off of the household's to clear. On the bare `review-stage` the order is refused, "Wash the dishes: there are no dishes to wash" (`fixes/tops-conditions/play-washup-none.jsonl`); with a dirty plate down (`review-stage-dishes`, the state file beside the shots) the resident washes up, the tap running (`play-washup-dishes.jsonl`). Free will never picks one with nothing to work on (`tests/tops_and_conditions.rs`). The use still doesn't take the plates from the table (clearing away does that, as before); recycling counts the meal's leftovers, the sim having no packaging. Paths under `bench-results/review/fixes/tops-conditions/`.
 - **Source:** wave: kitchen (I16)
 
 ### I-kitchen-12 — The kitchen's machines sound like a frying pan or not at all

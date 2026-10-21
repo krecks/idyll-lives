@@ -56,7 +56,6 @@
     "deskLaptop": { "h": 0.44, "fwd": -0.17 },
     "computerGaming": { "h": 0.44, "fwd": -0.17 },
     "officeChair": { "h": 0.47, "fwd": -0.04 },
-    "keyboardDigital": { "h": 0.45, "fwd": -0.2 },
     "sewingTable": { "h": 0.475, "fwd": -0.22 },
     "patioSet": { "h": 0.44, "fwd": 0 },
     "picnicTable": { "h": 0.4, "fwd": 0 },
@@ -74,8 +73,8 @@
   "defaultSeat": { "h": 0.45, "fwd": 0 },
   "beds": {
     "bed": { "h": 0.58 },
-    "crib": { "h": 0.56 },
-    "weightBench": { "h": 0.5, "feet": 0.3 },
+    "crib": { "h": 0.56, "across": true },
+    "weightBench": { "h": 0.44, "feet": 0.3 },
     "bedSingle": { "h": 0.5 },
     "bedBunk": { "h": 0.44 },
     "bedFuton": { "h": 0.4 },
@@ -98,5 +97,9 @@
   "defaultBed": { "h": 0.5 },
   "bunks": {
     "bedBunk": [0.44, 1.38]
+  },
+  "footstools": {
+    "pouf": [0.72, 0.5],
+    "ottoman": [0.62, 0.62]
   }
 }

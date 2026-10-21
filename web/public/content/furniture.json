@@ -494,6 +494,12 @@
         {
           "id": "espresso",
           "label": "Make a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 10,
           "effects": {
@@ -596,6 +602,7 @@
         {
           "id": "dishes",
           "label": "Load the dishwasher",
+          "workOn": "dishes",
           "anim": "clean",
           "minutes": 10,
           "effects": {
@@ -720,6 +727,7 @@
         {
           "id": "washUp",
           "label": "Wash the dishes",
+          "workOn": "dishes",
           "anim": "wash",
           "minutes": 15,
           "effects": {
@@ -951,6 +959,12 @@
           "id": "coffee",
           "requires": ["coffee"],
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",
@@ -1015,6 +1029,12 @@
           "id": "coffee",
           "requires": ["coffee"],
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",
@@ -1079,6 +1099,12 @@
           "id": "coffee",
           "requires": ["coffee"],
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",
@@ -1143,6 +1169,12 @@
           "id": "coffee",
           "requires": ["coffee"],
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",
@@ -2244,6 +2276,7 @@
         {
           "id": "outfit",
           "label": "Pick an outfit",
+          "changesOutfit": true,
           "anim": "clean",
           "minutes": 10,
           "effects": {
@@ -2273,6 +2306,7 @@
         {
           "id": "outfit",
           "label": "Pick an outfit",
+          "changesOutfit": true,
           "anim": "clean",
           "minutes": 10,
           "effects": {
@@ -2700,6 +2734,7 @@
         {
           "id": "laundry",
           "label": "Do the laundry",
+          "workOn": "laundry",
           "anim": "clean",
           "sound": "washer",
           "minutes": 30,
@@ -2730,6 +2765,7 @@
         {
           "id": "laundry",
           "label": "Fold the laundry",
+          "workOn": "washed",
           "anim": "clean",
           "sound": "dryer",
           "minutes": 20,
@@ -3487,14 +3523,19 @@
       "name": "Digital piano",
       "model": "model.keyboardDigital",
       "footprint": [
-        1,
+        2,
         1
       ],
       "approach": "behind",
       "price": 650,
       "category": "hobbies",
       "group": "music",
-      "description": "A slim keyboard on a stand with a bench: piano practice for a smaller room and budget.",
+      "seat": {
+        "height": 0.48,
+        "forward": 0.18,
+        "facing": "back"
+      },
+      "description": "A console digital piano, 88 weighted keys and three pedals, with a bench: piano practice without the upright's price.",
       "interactions": [
         {
           "id": "play",
@@ -3775,7 +3816,7 @@
       "model": "model.yogaMat",
       "footprint": [
         1,
-        1
+        2
       ],
       "price": 45,
       "category": "fitness",
@@ -4770,6 +4811,12 @@
           "id": "coffee",
           "requires": ["coffee"],
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",
@@ -4846,6 +4893,12 @@
           "id": "coffee",
           "requires": ["coffee"],
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",

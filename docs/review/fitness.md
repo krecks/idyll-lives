@@ -51,8 +51,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Where:** `web/src/render/babylon/characters/furniture.json:55` (`beds.weightBench`, read as `BEDS` at `characters.ts:260`), `web/src/render/babylon/characters/clips/lie.ts`
 - **Evidence:** The lifter lies along the bench and the legs stretch out past its end in mid-air; in a real bench press the feet are on the floor either side. Needs a bespoke feet-down lie pose, not a data tweak. Deferred from 0.3.0.
   Pilot: `play/weightBench-lift-02.png`: the legs lie straight along the pad and the heels rest on the leg-roller pads, not on the floor; the bar is in the hands over the chest and gone from the rack (`bar_off` after 0.8 s). Same for the child and elder (`play-child/`, `play-elder/`). The `BEDS` row is now in `furniture.json` (the old `characters.ts:315` line no longer holds it).
-- **Status:** fixed (60890be0)
-- **After:** lifting on the weight bench the feet are down on the floor either side of it, 0.3 m out from its middle (`furniture.json` `beds.weightBench` `feet`, characters.ts `benchLegs`: each thigh out and down off the pad, the shin to the floor, the foot flat), no longer on the leg rollers; faded out as they get up. Teens, grown-ups and elders reach the floor from the 0.5 m pad; a child (who may not use it: the age rules) would hang short. `bench-results/review/fixes/clips-seated/bench/sheet-bench.png`, `bench-results/review/fixes/clips-seated/poses/poses-beds-*-weightBench_lift*.png`; in game `bench-results/review/fixes/clips-seated/play-adult/adult-weightBench-lift-0*.png`, `bench-results/review/fixes/clips-seated/play-elder/elder-weightBench-lift-0*.png`.
+- **Status:** fixed (60890be0, 8b6b2364)
+- **After:** lifting on the weight bench the feet are down on the floor either side of it, 0.3 m out from its middle (`furniture.json` `beds.weightBench` `feet`, characters.ts `benchLegs`: each thigh out and down off the pad, the shin to the floor, the foot flat), no longer on the leg rollers; faded out as they get up. Teens, grown-ups and elders reach the floor from the 0.5 m pad; a child (who may not use it: the age rules) would hang short. `bench-results/review/fixes/clips-seated/bench/sheet-bench.png`, `bench-results/review/fixes/clips-seated/poses/poses-beds-*-weightBench_lift*.png`; in game `bench-results/review/fixes/clips-seated/play-adult/adult-weightBench-lift-0*.png`, `bench-results/review/fixes/clips-seated/play-elder/elder-weightBench-lift-0*.png`. Model half (8b6b2364): the pad is at 0.44 m and the leg rollers at its foot are gone.
 - **Source:** `docs/objects/open.md` Still open › Residents; `plan/release-0.3.0.md` §1.4 and §8 (deferred); pilot
 
 ### M-fitness-01 — The weight bench's pad is 50 cm high, over a flat bench's 40–48
@@ -62,8 +62,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/fitness.py:111` (`weightBench`); `web/src/render/babylon/characters/furniture.json:55` (`beds.weightBench` 0.5)
 - **Evidence:** `sizes-fitness.md` measures the lie height 0.50 m; `reference.json` `weightBench` gives a seat of 0.40–0.48 (a bench press bench is about 43–45 cm so the lifter's feet reach the floor). The sizes table can't measure it as a seat ("no seat to measure"): the content gives it a lie, not a seat. Lowering the pad goes with A-fitness-01's feet-down pose.
-- **Status:** open: left to the Blender wave (G-29, a working height); the clip half is fixed (60890be0)
-- **After:** the feet-down bench press reaches the floor from the 0.5 m pad (A-fitness-01), so the clip doesn't need the pad lowered; the pad is still 2–10 cm over a flat bench's 40–48 cm. For the rebuild: `fitness.py` `weightBench` pad top to about 0.44 m (pad 0.455 → 0.395, board, beam and posts down 6 cm, the rack's hooks unchanged), then `beds.weightBench` `h` 0.44; `benchLegs` needs no change.
+- **Status:** fixed (8b6b2364)
+- **After:** a flat bench, the pad's top at 0.44 m (`fitness.py` `PAD_TOP`; `characters/furniture.json` `beds.weightBench` 0.44, was 0.5), the leg-roller arm gone; `cargo review sizes`: mattress 0.44, inside 0.40–0.48. `fixes/blender-hobbies/gallery/gallery-weightBench.png`, `play/adult-weightBench-lift-01.png`. The feet-down pose is A-fitness-01's clip.
 - **Source:** pilot
 
 ### A-fitness-02 — The treadmill's belt crawls under a running stride
@@ -84,7 +84,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/fitness.py:193` (`MAT_W, MAT_L = 0.62, 0.9`); the footprint `[1, 1]` at `web/public/content/furniture.json:3567`
 - **Evidence:** `fitness/clips/clips-yogaMat-all-t99.png`, `fitness/play/c1/yogaMat-yoga-01.png`: unrolled, the mat is 0.62 × 0.90 m; a yoga mat is 0.61 × 1.73–1.83 (`reference.json` `yogaMat` 0.6–0.7 × 1.7–1.9). For the seated use it shows as a square cushion under a cross-legged resident; any standing or lying pose (I-fitness-01) needs the full length, so a 1 × 2 footprint. Width, thickness (1.6 cm, over the floor's 1 cm), the roll, block and bottle are fine. The `sizes` table can't see this: it measures the mat rolled up (row note).
-- **Status:** open
+- **Status:** fixed (8b6b2364)
+- **After:** a 1.8 × 0.62 m mat on a 1 × 2 footprint (content), rolled at rest on the wall's face; the yogi stands 0.4 m in front of its middle (`clips/games.ts` `YOGA_AT`, was 0.3 on the 0.9 m mat), so the fold, the dog and the squat are on it. `fixes/blender-hobbies/play/flow-yogaMat-yoga-0*.png`, `clips/clips-yogaMat-all-t99.png`. The flattened mat's origin is under the roll now (`check-glb` still warns of 42 % of its strip showing, from 100 %).
 - **Source:** wave: fitness
 
 ### I-fitness-01 — "Do yoga" is half an hour sitting cross-legged
@@ -105,5 +106,6 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/fitness.py:250` (`floor_mat` 0.6 × 0.36 at depth 0.2, inside the footprint)
 - **Evidence:** `fitness/extra/side-dumbbells-lift-00.png`, `fitness/sheets/obj-dumbbells.png` (play): the resident stands on the tile in front, as every standing use does, and the mat lies empty between them and the rack. A mat in front of a rack is where you stand to lift. Either drop the mat (the rack alone fits 0.41 m deep) or move the rack back so the mat reaches the tile in front; the game can't stand them on the footprint.
-- **Status:** open
+- **Status:** fixed (8b6b2364)
+- **After:** the rack stands back on the wall's face (`fitness.py` `RACK_SHIFT`) and a 0.7 × 0.48 m mat fills the front of its tile; the lifter steps in onto it (`characters.ts` `STAND_BACK.dumbbells` -0.6) and curls there. `fixes/blender-hobbies/play/adult-dumbbells-lift-01.png`. (`cargo review sizes` now measures 0.93 m deep, the mat counted with the rack: the tool's known overcount, §7.)
 - **Source:** wave: fitness

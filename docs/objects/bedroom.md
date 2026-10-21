@@ -24,7 +24,7 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 |---|---|---|---|---|---|---|
 | `bed` King-size bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`: the top third of the duvet folds back toward the foot as they get in (sleep, nap) and back up when they get up, under the game's blanket; half way it is gathered low, as cloth rolls, not a board standing up (2026-10-21). Renamed from "Double bed": 1.90 m wide with a 1.72 m mattress, a king (reference kind `bedKing`, Q-08). |
 | `bedSingle` Single bed | 1x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`. |
-| `bedBunk` Bunk bed | 1x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down` on the lower bunk, `turn_down_upper` on the upper, each for its own sleeper (`slot`); the ladder is static. The upper bunk is not an elder's (`upperStages`: with the lower bunk taken, an elder is refused, "too old for the top bunk"). Its sleeper climbs the ladder from the tile in front and in through the gap in the guard rail (`bunkUp172`/`147`/`112`), and back down it getting up (`bunkDown…`, sim-core waiting for them); the lower bunk is got into from its foot as any bed. |
+| `bedBunk` Bunk bed | 1x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down` on the lower bunk, `turn_down_upper` on the upper, each for its own sleeper (`slot`), the upper one 5 s in, once its sleeper has climbed in (`delay`, A-bedroom-06); the ladder is static. The upper bunk is not an elder's (`upperStages`: with the lower bunk taken, an elder is refused, "too old for the top bunk"). Its sleeper climbs the ladder from the tile in front and in through the gap in the guard rail (`bunkUp172`/`147`/`112`), and back down it getting up (`bunkDown…`, sim-core waiting for them); the lower bunk is got into from its foot as any bed. |
 | `bedFuton` King futon | 2x2 · floor | sleep:sleep nap:nap unfold:fetch foldAway:fetch relax:relax | bedroom / beds | Frame, Headboard, Bedding | Held open | `unfold`: the back folds flat into a bed while slept in (C1: `leaves: open` on sleep, nap and Unfold, as the wall bed); Fold away closes it. Folded, a sofa: Sit and relax on its front edge (`when: closed`, content `seat` 0.40 m, forward 0.68). Renamed from "Futon bed": a king-size futon, 1.96 m wide (kind `bedLow`, now to 1.95 m, Q-08). |
 | `bedKing` Upholstered king bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`. |
 | `bedDouble` Double bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`. |
@@ -64,9 +64,9 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `nightstand` Nightstand | 1x1 · floor | — | bedroom / storage | Body, Handles | Static | Static. |
-| `nightstandModern` Modern nightstand | 1x1 · floor | — | bedroom / nightstands | Body, Handles | Static | Static. |
+| `nightstandModern` Modern nightstand | 1x1 · floor | — | bedroom / nightstands | Body, Handles | Static | Static. 0.47 m deep (it was 0.63, M-bedroom-02). |
 | `nightstandRound` Drum nightstand | 1x1 · floor | — | bedroom / nightstands | Body, Handles | Static | Static. |
-| `nightstandDrawers` Three-drawer nightstand | 1x1 · floor | snack:fetch | bedroom / nightstands | Body, Handles | Use | `drawer_open`: the top drawer slides out for outfit; `hold` 2.5 s. A snack from the drawer (fetched, then eaten sitting), not an outfit. The drawer clip is still keyed to the old `outfit` use in `bedroom_storage.py` (`DRAWER_USE`): it opens again once that key is `snack` and the family is rebuilt. |
+| `nightstandDrawers` Three-drawer nightstand | 1x1 · floor | snack:fetch | bedroom / nightstands | Body, Handles | Use | `drawer_open`: the top drawer, a biscuit tin, chocolate and a paperback in it, slides out for the snack (`SNACK_DRAWER`); `hold` 2.5 s. A snack from the drawer (fetched, then eaten sitting), not an outfit. 0.47 m deep (it was 0.63, M-bedroom-02). |
 | `nightstandLamp` Nightstand with lamp | 1x1 · floor | — | bedroom / storage | Body, Shade | Static | Static; the shade glows at night (N, E3/E8), the light at the shade. |
 | `cedarChest` Blanket chest | 1x1 · floor | takeBlanket:fetch | bedroom / storage | Body, Handles | Use | `lid_open`: the lid swings up 100° for takeBlanket; `hold` 2 s. |
 | `laundryHamper` Laundry hamper | 1x1 · floor | sortWashing:clean | bedroom / storage | Hamper | Use | `lid_open`: the lid lifts for sortWashing. |
@@ -74,7 +74,7 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 
 **In play** (signed off 2026-10-16):
 - All eight in all four facings, standing free and against the wall. The three-drawer nightstand's top drawer slides
-  out for "Pick an outfit", the blanket chest's lid lifts for "Take out a blanket" and the hamper's for "Sort the
+  out for "Grab a snack from the drawer" (2026-10-21; "Pick an outfit" before), the blanket chest's lid lifts for "Take out a blanket" and the hamper's for "Sort the
   washing", each shutting after its use. The bed-end bench is sat on; the rest are still.
 - The nightstand lamp lights at night: the shade glows, the top lit warm; coloured by day, the shade shows its glow's
   colour at night. Its light (content `light.at`) sits at the shade in every facing, against a wall and free.
@@ -86,17 +86,21 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `dresser` Chest of drawers | 2x1 · floor | outfit:clean | bedroom / storage | Body, Handles | Use | `drawer_open`: the middle drawer slides out 30 cm for outfit; `hold` 2.5 s. |
-| `wardrobe` Wardrobe | 2x1 · floor | outfit:clean | bedroom / storage | Body, Doors, Handles | Use | `doors_open`: both doors swing out 100° for outfit; `hold` 3 s. |
-| `chestOfDrawers` Tall chest of drawers | 1x1 · floor | outfit:clean | bedroom / storage | Body, Handles | Use | `drawer_open`. |
+| `dresser` Chest of drawers | 2x1 · floor | outfit:clean | bedroom / storage | Body, Handles | Use | `drawer_open`: the middle drawer slides out 30 cm for outfit; `hold` 2.5 s. `drawer_open`: the middle drawer slides out 30 cm for outfit, open while they change. |
+| `wardrobe` Wardrobe | 2x1 · floor | outfit:clean | bedroom / storage | Body, Doors, Handles | Use | `doors_open`: both doors swing out 100° for outfit; `hold` 3 s. `doors_open`: both doors swing out 100° for outfit, open while they change. |
+| `chestOfDrawers` Tall chest of drawers | 1x1 · floor | outfit:clean | bedroom / storage | Body, Handles | Use | `drawer_open`. 0.51 m deep (it was 0.66, M-bedroom-02). |
 | `dresserLow` Low dresser | 2x1 · floor | outfit:clean | bedroom / storage | Body, Handles | Use | `drawer_open`. |
-| `wardrobeSingle` Single wardrobe | 1x1 · floor | outfit:clean | bedroom / storage | Body, Handles | Use | `door_open`. |
+| `wardrobeSingle` Single wardrobe | 1x1 · floor | outfit:clean | bedroom / storage | Body, Handles | Use | `door_open`. 0.60 m wide, its one door 0.58 (it was 0.90 and 0.88, M-bedroom-03). |
 | `armoire` Armoire | 2x1 · floor | outfit:clean | bedroom / storage | Body, Handles | Use | `doors_open`. |
 
 **In play** (signed off 2026-10-16):
 - Each standing free in all four facings, used for "Pick an outfit": the dresser's, tall chest's and low dresser's
   drawer slides out 30 cm; the wardrobe's and armoire's doors (`doors_open`) and the single wardrobe's door
   (`door_open`) swing out onto the rail of clothes. Each shuts after its `hold`.
+- 2026-10-21 (G-69): "Pick an outfit" changes the clothes (content `changesOutfit`): halfway through, with the
+  drawer or the doors open (held for the whole use now, no `hold`), the resident is in their next outfit (three
+  in turn: the creator's, then two made from the id, `docs/characters-format.md`), walks off in it and keeps it,
+  saved, until they change again. The use lasts its 10 minutes even with comfort full.
 - The wardrobe's Body colours the white carcass and its birch doors are a part of their own, Doors.
 
 ## BR4. Dressing and mirrors (4)

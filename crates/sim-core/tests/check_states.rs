@@ -29,6 +29,10 @@
 //! - `review-garden`: the same stage with every crop kind (content `grows`) in a row at the back
 //!   of the garden, ripe (a crop comes ripe with a lot), for their "when ripe" uses
 //!   (`check.mjs play --use-existing <def>`).
+//! - `review-baby`: the same stage with a dining table (`tableDining4`) and the high chair pulled up to it (at
+//!   `BABY_TABLE`), for the baby's care (G-66): Ada (0) feeding Eve (5) from the crib carries her
+//!   to the high chair and feeds her there, and changes her at the crib's changing table
+//!   (`check.mjs play --use-existing crib --use feed`, `--use change`). Eve's hunger and bladder low.
 
 mod common;
 
@@ -219,6 +223,8 @@ fn town_things_lot() {
 /// `review-garden` to z = 27, its crops at `GARDEN_ROW`). The kitchen stands at `(15, 7..=9, 3)`,
 /// out of them all.
 const STAGE_ROOM: (i32, i32, i32, i32) = (4, 6, 16, 18);
+/// `review-baby`'s dining table (2 x 1, facing the front), the high chair at its front facing it.
+const BABY_TABLE: (i32, i32) = (8, 12);
 /// `review-garden`'s row of crops, facing the house, one every `GARDEN_STEP` tiles from x = 2.
 const GARDEN_ROW: i32 = 29;
 const GARDEN_STEP: i32 = 3;
@@ -329,6 +335,28 @@ fn review_stage_night() {
     let hour = clock::hour(world.tick);
     assert!(sim_core::lights::dark_at(hour * 60.0) && hour >= 22.0, "after dark: {hour}");
     common::dump_state(&world, "review-stage-night");
+}
+
+#[test]
+fn review_baby() {
+    let (tx, tz) = BABY_TABLE;
+    let more = [json!({"def": "tableDining4", "x": tx, "z": tz, "rot": 0}), json!({"def": "highChair", "x": tx, "z": tz + 1, "rot": 2})];
+    let mut world = stage(&more, 10.0);
+    let hunger = world.content.needs.iter().position(|n| n.id == "hunger").unwrap();
+    let bladder = world.content.needs.iter().position(|n| n.id == "bladder").unwrap();
+    world.sims[5].needs[hunger] = 0.25;
+    world.sims[5].needs[bladder] = 0.25;
+    common::dump_state(&world, "review-baby");
+    // Ada's feed from the crib goes to the high chair, by day.
+    let crib = world.objects.iter().find(|o| world.content.objects[o.def].id == "crib").unwrap().stable;
+    let feed = world.content.objects[world.objects[0].def].interactions.iter().position(|i| i.id == "feed").unwrap();
+    world.apply(Command::Use { sim: 0, object: crib, interaction: feed }).unwrap();
+    let mut seated = false;
+    for _ in 0..(30.0 / MINUTES_PER_TICK) as u32 {
+        world.tick_once();
+        seated |= world.objects.iter().any(|o| world.content.objects[o.def].id == "highChair" && o.users[0] == Some(5));
+    }
+    assert!(seated, "Eve was carried to the high chair");
 }
 
 #[test]

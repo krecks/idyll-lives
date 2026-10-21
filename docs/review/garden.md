@@ -175,7 +175,7 @@ Family: `tools/art/blender/families/trees.py`.
 | `garden.maple` Maple tree | M-garden-05 | I-garden-02 | I-garden-02 | M-garden-05 S3 model; I-garden-02 S2 clip | `sheets/obj-garden.maple.png` |
 | `garden.birch` Silver birch | OK | I-garden-02 | I-garden-02 | I-garden-02 S2 clip | `sheets/obj-garden.birch.png` |
 | `garden.cherry` Cherry blossom tree | OK | I-garden-02 | I-garden-02 | I-garden-02 S2 clip | `sheets/obj-garden.cherry.png` |
-| `garden.apple` Apple tree | OK | I-garden-02, I-garden-05 | I-garden-02, I-garden-05, I-garden-10, I-garden-11 | I-garden-05 S2 clip; I-garden-11 S3 decision (fix: clips-standing); I-garden-02 S2 clip; I-garden-10 S3 decision | `sheets/obj-garden.apple.png`, `extra/close/s-garden.apple-pick.png`, `extra/s-garden.apple-pick.png` |
+| `garden.apple` Apple tree | OK | I-garden-02, I-garden-05 | I-garden-02, I-garden-05, I-garden-10, I-garden-11, I-garden-12 | I-garden-05 S2 clip; I-garden-11 S3 decision (fix: clips-standing); I-garden-02 S2 clip; I-garden-10 S3 decision (fixed, G-68); I-garden-12 S3 model (fix: babies-crops) | `sheets/obj-garden.apple.png`, `extra/close/s-garden.apple-pick.png`, `extra/s-garden.apple-pick.png` |
 | `garden.japaneseMaple` Japanese maple | M-garden-01 | I-garden-02 | M-garden-01, I-garden-02 | M-garden-01 S2 model (widened); I-garden-02 S2 clip; I-held-01 S2 code (held ledger) | `sheets/obj-garden.japaneseMaple.png`, `extra/close/s-jm-willow.png` |
 | `garden.magnolia` Magnolia | M-garden-05 | I-garden-02 | I-garden-02, I-garden-08 | M-garden-05 S3 model; I-garden-02 S2 clip; I-garden-08 S3 content | `sheets/obj-garden.magnolia.png` |
 | `garden.willow` Weeping willow | M-garden-02 | I-garden-02 | I-garden-02 | M-garden-02 S2 model; I-garden-02 S2 clip | `sheets/obj-garden.willow.png`, `extra/close/s-jm-willow.png` |
@@ -383,4 +383,14 @@ Causes shared beyond this ledger, moved at the consolidation (2026-10-21): I-gar
 - **Evidence:** `bench-results/review/fixes/clips-standing/sheet-pick.png` (right column): with G-21's pick a child of 1.1 m reaches up on tiptoe to about 1.45 m, the apple 0.4 m and the lemon 0.2 m above the hand, while the fruit shrinks away. Grown-ups and teens reach it. Real children pick the low fruit or are lifted up. A lower fruit of its own for a child (a second part the child's size picks), or picking only from 1.3 m up (an age or height rule, G-45's), are the choices.
 - **Status:** open
 - **Source:** fix: clips-standing
+
+### I-garden-12 — The apples picked from a crown out of reach
+
+- **Severity:** S3
+- **Rubric:** I3, M2
+- **Fix class:** model
+- **Where:** `tools/art/blender/families/trees.py:180-200` (`apple`: the crown's middle at 3.6 m, 1.65 m deep; only the front apple brought down within reach, 1.84 m, by G-21); `web/src/render/babylon/characters/clips/garden.ts` (`pickHigh`: the hand up to about 1.8 m)
+- **Evidence:** `fixes/babies-crops/garden/apple-02-picking.png` (taken before G-21 brought the front apple down): picking the apples (`harvest`, G-68) the resident reaches up under the crown, whose lowest leaves and fruit hang at about 2.5–3 m; the hand stops at 1.8 m, in the air. One apple within reach (I-garden-05's) doesn't make the crown's dozen pickable. A garden apple tree (a dwarf or semi-dwarf on a garden lot) carries fruit from about 1 m up, picked standing or from a step; the 5.6 m model is an orchard standard's size. Bring the crown down (fruit from about 1.2 m) or give the use a ladder.
+- **Status:** open
+- **Source:** fix: babies-crops
 

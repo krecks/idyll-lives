@@ -302,6 +302,8 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 - pickSnack needs a ripe crop (`when: ripe`, `leaves: picked`; the bed takes two game days to ripen, content
   `grows`). Its `harvest` was seen playing and shutting when the ripe crop was picked, but not caught in a picture.
 - Picked, the bed loses its fruit and keeps its plants.
+- Since the authenticity review (G-68): tending brings the crop on (`tends` 0.15); "Pick something fresh" stays a
+  nibble eaten at the bed (the shortcut Q-18 keeps), unlike the other beds' harvests, which go to the fridge.
 - The veggie bed, the potting bench and the glasshouse take 4 draws.
 
 ## P13. Neat (6)
@@ -311,7 +313,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `neat.steamMopDock` Steam mop dock | 1x1 · floor | mop:clean | kitchen / — | Body, Mop | Use | `mop_off`: the mop leaves its dock for mop and is drawn in the resident's hands, pushed over the floor (content `held`). |
-| `neat.laundryCenter` Stacked laundry centre | 2x1 · floor | laundry:clean fold:clean | bathroom / — | Body, Washer & dryer | Use | `door_open`: the washer door swings for laundry and fold and shuts after 2.5 s (2026-10-21: it stood open through the wash and the folding). Folding is 20 minutes (was 60). |
+| `neat.laundryCenter` Stacked laundry centre | 2x1 · floor | laundry:clean fold:clean | bathroom / — | Body, Washer & dryer | Use | `door_open`: the washer door swings for laundry and fold and shuts after 2.5 s (2026-10-21: it stood open through the wash and the folding). Folding is 20 minutes (was 60). laundry only with dirty washing (`workOn`). |
 | `neat.rainShowerTower` Rainfall steam shower | 1x1 · floor | steamShower:shower | bathroom / — | Body, Bench | Use | `water_on`: the rain grows for steamShower. |
 | `neat.organizerDesk` Label-and-sort organizer desk | 2x1 · floor | sort:write ledger:write | office / — | Body, Wood, Chair | Use | `drawer_open`: a bin slides out of the hutch for sort and ledger. Written at on its own chair with the hands on the top (`NEAR_DESKS`, `sitHandsNear`; `SEATS`), not through its front. |
 | `neat.robotVacuumDock` Robot vacuum and dock | 1x1 · floor | program:type | living / — | Body, Trim, Rug | Loop | `vacuum_round`: once programmed the robot drives out of its dock, once round a circle in front of it facing the way it goes, and back in, round after round (5 s a round) while program lasts (2026-10-21: it peeked 60 cm out and back). Program from a seat within 4 m (`seatNear`), else standing. |

@@ -192,6 +192,15 @@ resident's row (`bare`), so a change of clothes draws nothing more. The towel's 
 come from the base body's joints at rest (`OutfitFit`: under the arms half way between `spine_03` and
 `upperarm_l`, the hips and the knees).
 
+The day clothes are one of the resident's outfits (sim-core `Sim::outfit`, in the snapshot's `sims[].outfit`):
+0 is the one made in the creator, as `appearance` has it; the others (`OUTFITS`, three in all) are picked from
+the id (outfit.ts `spareLook`: garments as `pickOutfit` picks a new resident's, a top or a bottom other than
+the creator's, and a top in another colour from `palette.outfit`), skin and hair as they are. A use with
+`changesOutfit` (the wardrobes and chests of drawers' "Pick an outfit") puts on the next one halfway through,
+with the doors or the drawer open, and the resident walks off in it; it is kept, and saved, until they change
+again. Pyjamas, the towel and swimwear are made from whichever outfit is worn. Its shells change with it (the
+world is drawn again for it, as for a cupboard opened).
+
 Garment ids per family (outfit.ts):
 
 - male: `top.tee top.vneck top.polo top.long top.shirt top.jacket top.suit`, `bottom.trousers bottom.shorts bottom.suit`;
@@ -351,7 +360,7 @@ In dev, editing a clip file re-bakes the clips in place (Vite HMR).
 ## Seats and beds
 
 `web/src/render/babylon/characters/furniture.json` holds where residents sit and lie, by object id: `seats`
-(`SEATS`), `defaultSeat`, `beds` (`BEDS`), `defaultBed` and `bunks` (`BUNKS`). `characters.ts` reads it with its
+(`SEATS`), `defaultSeat`, `beds` (`BEDS`), `defaultBed`, `bunks` (`BUNKS`) and `footstools` (`FOOTSTOOLS`). `characters.ts` reads it with its
 `Seat` and `Bed` types (the fields are documented there); `cargo check-glb` measures the meshes against it and
 `cargo review sizes` against real-world sizes. An object in `seats` takes that seat over the content's `seat`
 (`seatOf`); one in neither sits at `defaultSeat`. Heights are m above the floor, `fwd` m forward of the footprint's
@@ -391,6 +400,14 @@ Why some entries are as they are:
 - `gloomy.windowSeat`, `kind.hearthSettee` (2 wide): dozed on along the cushion, head to its left, whichever slot
   (the nap takes both, content `whole`).
 - `bunks.bedBunk`: the lower and the upper mattress tops, `[lower, upper]` (content `bunk`).
+- `footstools`: things a seated resident puts their feet up on (`FOOTSTOOLS`, `footstoolFor`, `feetUp`): their
+  tops' width and depth as made (m, before turning; resized, they scale), the top at their seat's height. A
+  resident sitting (`sit`, `sitTalk`) on anything else, facing a footstool in front of them that nobody sits on,
+  its near half within the legs' reach (`FEET_UP`: the heels 0.14 m in from its edge, up to 0.3 m to one side,
+  the legs turned to it), has the legs out with the heels on it. Not on a seat with its own legs out or
+  pedals (the recliner's footrest, a chaise, a tub, a bike), facing a seat's back, pulled up to a table, at the
+  desk clips, or for an instrument, the toilet, a bath or the dressing table (`NO_FEET_UP`). The sim doesn't
+  know: an armchair with one in front is sat in from beside it (sim-core `approach_tiles`).
 
 ## Where things are
 

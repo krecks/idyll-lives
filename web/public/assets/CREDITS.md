@@ -92,7 +92,7 @@ The sofas and sectionals (`models/living/sofa.glb`, `loveseat.glb`, `sofaThree.g
 The armchairs and small seats (`models/living/armchair.glb`, `armchairLounge.glb`, `armchairLeather.glb`,
 `armchairDesign.glb`, `armchairWingback.glb`, `recliner.glb`, `rockingChair.glb`, `pouf.glb`, `ottoman.glb`,
 `floorCushion.glb`, `beanBag.glb`, same pack) are built the same way (glTF, original, CC0). Their seats sink in, the
-recliner tips back with its footrest up, the rocking chair rocks with whoever sits in it, and the bean bag squashes;
+recliner tips back onto its head cushion with its footrest up, the rocking chair rocks with whoever sits in it, and the bean bag squashes;
 the designer lounge chair is still.
 
 The coffee and side tables (`models/living/coffeeTable.glb`, `coffeeTableGlass.glb`, `coffeeTableMarble.glb`,
@@ -121,7 +121,8 @@ its lid (`lid_up`) while a resident uses it.
 
 The bathroom showers (`models/bathroom/shower.glb`, `showerStall.glb`, `showerWalkIn.glb`, `showerRain.glb`, override
 pack `packs/bathroom/manifest.json`) are built in Blender by `tools/art/blender/families/bathroom.py` on `gamekit` and
-exported as `.glb` (glTF, original, CC0). Each rains from its head (`water_on`) while a resident showers.
+exported as `.glb` (glTF, original, CC0). Each rains from its head (`water_on`) while a resident showers; the
+shower's glass door slides open to let them in and out, and the stall's curtain is drawn across while they shower.
 
 The bathroom baths (`models/bathroom/bathtub.glb`, `bathtubClawfoot.glb`, `bathtubFreestanding.glb`, override pack
 `packs/bathroom/manifest.json`) are built in Blender by `tools/art/blender/families/bathroom.py` on `gamekit` and
@@ -367,8 +368,9 @@ gets ready.
 The bedroom nightstands and small storage (`models/bedroom_storage/nightstand.glb`, `nightstandModern.glb`,
 `nightstandRound.glb`, `nightstandDrawers.glb`, `nightstandLamp.glb`, `cedarChest.glb`, `laundryHamper.glb`,
 `benchBedEnd.glb`, override pack `packs/bedroom_storage/manifest.json`) are built in Blender by
-`tools/art/blender/families/bedroom_storage.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). They are
-static; the nightstand lamp's shade glows at night.
+`tools/art/blender/families/bedroom_storage.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The
+three-drawer nightstand's top drawer slides out with a midnight snack in it, the chest's and the hamper's lids lift;
+the rest are static, and the nightstand lamp's shade glows at night.
 
 The bedroom wardrobes and drawers (`models/bedroom_storage/dresser.glb`, `wardrobe.glb`, `chestOfDrawers.glb`,
 `dresserLow.glb`, `wardrobeSingle.glb`, `armoire.glb`, same pack) are built in Blender by

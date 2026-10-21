@@ -6,8 +6,8 @@
       "name": "Drum kit",
       "model": "model.drumKit",
       "footprint": [
-        1,
-        1
+        2,
+        2
       ],
       "approach": "behind",
       "price": 900,
@@ -15,7 +15,7 @@
       "group": "music",
       "seat": {
         "height": 0.52,
-        "forward": -0.23
+        "forward": -0.4
       },
       "description": "A red five-piece kit with cymbals and a stool. Loud, and good for Dexterity.",
       "interactions": [

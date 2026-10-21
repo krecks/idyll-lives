@@ -261,7 +261,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/living.py:634` (`recliner`), `:1414` (size 0.92 × 0.843 × 0.70)
 - **Evidence:** The lead "the recliner doesn't look reclined in play though its clip plays": the clip does play in play, from 1 s into relax and doze to the end (`play.jsonl`: `recline` and `footrest_up` open at t = 1), and at full size the footrest is up under the sitter's feet and she leans back a little (`living/play/chunk2/recliner-doze-01.png`; the clip alone, `living/clips/side-small/clips-recliner-all-t99.png`). It reads weakly because the chair is 0.84 m high and 0.70 m deep against a real recliner's 0.95–1.10 × 0.85–1.05 (out on both, `tables/sizes-living.md`): the back ends at the sitter's shoulder blades with no headrest, so tipping it 25° moves little that shows, and the dark leather hides the footrest from the game camera. A taller back with a head cushion, and a deeper seat, would make the recline its silhouette.
-- **Status:** open
+- **Status:** fixed (773afc7d)
+- **After:** 0.92 × 0.99 × 0.80 m: the back rises to 1.0 m with a head cushion, the base to the tile's front; reclined, the seat and back tip 25° and glide 8 cm forward (a wall-hugger's, so the back's top stays off the wall), the sitter's head on the cushion and the legs out on the footrest (`fixes/blender-rooms/gallery/gallery-recliner.png`, `clips/clips-recliner-all-t99.png`, `play/rooms-recliner-relax-02.png`, `poses/poses-recliner-relax-teen.png`). `cargo review sizes` living: 13 outside, not the recliner. The child's shins still go into the seat front (A-residents-11, `poses/poses-recliner-sit-child.png`, as before).
 - **Source:** wave: living (Phase 0 "Seen" lead)
 
 ### M-living-05 — Three seats disagree with their models: the lounge chair, the rocking chair and the bean bag
@@ -309,7 +310,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** decision
 - **Where:** `web/public/content/catalog2/living.json:246` (`sofaBed`: relax, doze, pull out, fold away); `web/public/content/base.json:3679` (`roomKinds`: a `sleep` tag makes the room a bedroom)
 - **Evidence:** A sofa bed is bought to sleep a guest or a resident for the night (`reference.json`: "pull it out for a guest to sleep", sleep 420–540 min). Its only lying use is "Doze off", 30 minutes with the `nap` tag; you can pull the bed out (`living/sheets/obj-sofaBed.png`) but nobody can sleep the night in it, so a household with a sofa bed and no bed has nowhere to sleep. The content can't just add a `sleep` use: the tag turns the living room into a bedroom (`tools/art/blender/README.md`, "Room kind"), which is why only `nap` is there. Either a sleep that doesn't type the room (a tag or rule for guest beds), or accept the sofa bed as a napping sofa and say so in its description.
-- **Status:** open
+- **Status:** fixed (aba5f915): a sleep that doesn't type the room (Q-15)
+- **After:** The sofa bed offers "Sleep the night" (480 min, energy 0.85, comfort 0.25, the mattress pulled out for it and folded away by the last one up), with `spare`: its tags don't count towards the room's kind, so a living room with a sofa bed stays a living room, and residents sleep in it only with no other bed free for them; it counts as a bed place for a household moving in. On `review-stage-night` (no bed) Ada sleeps the night on it in pyjamas (`fixes/babies-crops/sofa-bed/sofa-bed-sofaBed-sleep-01.png`, against `living/sheets/obj-sofaBed.png`). Sim tests `tests/spare_beds.rs`: one in the bed and the other on the sofa bed for the night, the room still `living`; with two beds, nobody on the sofa bed. The futon and the wall bed keep their own `sleep` (bedroom furniture: they do make the room a bedroom).
 - **Source:** wave: living (I1 against `reference.json` uses)
 
 ### I-living-05 — moved to systems.md
@@ -323,7 +325,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/public/content/furniture.json:1389` (`pouf`), `web/public/content/catalog2/living.json:572` (`ottoman`): one use each, "Sit down"
 - **Evidence:** A pouf or an ottoman is first a place to put your feet up from the armchair or sofa beside it (`reference.json` pouf: "put your feet up; perch for a moment"); in the game both are only sat on, as a stool (`living/sheets/obj-pouf.png`, `living/sheets/obj-ottoman.png`). Feet up needs a pairing: a seat's use that finds a footstool in front of it and a legs-up pose, like the recliner's footrest. New behaviour, filed only (owner decision 3).
-- **Status:** open
+- **Status:** fixed (5f4411b9)
+- **After:** a resident sitting with a pouf or an ottoman in front of them (within reach, nobody on it) puts their feet up on it, the heels on its top, slid forward and slouched in the seat as reaching it takes (characters.ts `footstoolFor`, `feetUp`; `footstools` in characters/furniture.json): the armchair with the pouf, the sofa with the ottoman, for the teen, the adult and the elder; a child's legs don't reach a stool a tile off (`fixes/pairings/seats/`: `after-armchair-sit-02.png`, `sofa-sofa-relax-02.png`, `teen-armchair-sit-01.png`, `elder-sofa-relax-01.png`, `child-armchair-sit-01.png`). The recliner doesn't pair: its own footrest comes up (`after-recliner-relax-02.png`). An armchair with a footstool in front, refused before ("would block the way"), is sat in from beside it (sim-core `approach_tiles`, `tests/footstools.rs`). A lone sitter on a sofa takes its first free seat, not the one before the footstool (I-living-10). Before: `fixes/pairings/before/obj-pouf.png`, `obj-ottoman.png`.
 - **Source:** wave: living (I1)
 
 ### I-living-08 — The stereo's record player never turns; a CD tray opens instead
@@ -347,6 +350,16 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Status:** fixed (eaca9ed8)
 - **After:** `slots: 3`: three on the three-seat sofa.
 - **Source:** wave: living (`cargo review uses`)
+
+### I-living-10 — A lone sitter takes the sofa's first seat, not the one before the footstool
+
+- **Severity:** S3
+- **Rubric:** I1
+- **Fix class:** code
+- **Where:** `crates/sim-core/src/world.rs:272` (`pick_slot`: without `places`, the first free slot)
+- **Evidence:** `fixes/pairings/seats/after2-sofa-relax-02.png` (`play-after2.json`): a two-seat sofa with the ottoman in front of its second seat; Ada, alone, sits in the first and keeps her feet down. Someone on their own would take the seat with the footstool. The sim doesn't know footstools (the pairing is the renderer's, G-69): a content `footstool` flag and a `pick_slot` that prefers a slot with one in front would do.
+- **Status:** open
+- **Source:** fix: pairings
 
 ## Seen here for findings in other ledgers
 

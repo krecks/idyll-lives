@@ -16,9 +16,12 @@ are `_slab`s: an outline on a face's frame (`_plane`, `_board`), a few millimetr
 
 ## KD1: the crib, the beds and the high chair
 
-- **Crib** (2 × 1): the crib on the left half, where the baby lies, and a changing table on the right. Two moving
+- **Crib** (2 × 1): an oblong cot, a 1.18 × 0.58 m mattress (a 60 × 120 cot's) running across the left of its tiles,
+  its back on the wall's face, and a 0.62 m changing chest on the right (2026-10-21, review M-kids-01: the cot was
+  0.80 m square). The baby lies along it (`beds.crib` `across`) at slot 0, its head to the left, the blanket folded
+  at its feet; the carers reach in over the front rail, 0.25 m from the baby (`characters.ts` `CUDDLE.rail`). Two moving
   parts: the front rail (`side_down`, slides down 25 cm for feed, change and cuddle, `uses`) and the mobile over
-  the head end (`mobile`, a turn every 6 s while a grown-up plays with the baby, `loops.play`: a toy for an awake
+  the baby (`mobile`, a turn every 6 s while a grown-up plays with the baby, `loops.play`: a toy for an awake
   baby, not turning all night; the crib's uses can't tell a sleeping baby from an awake one, and playing is the
   one that means awake). The mobile hangs at the back,
   clear of the arms of a grown-up lifting the baby out over the front rail.
@@ -27,7 +30,8 @@ are `_slab`s: an outline on a face's frame (`_plane`, `_board`), a few millimetr
   it rolls as cloth (2026-10-21). Both are in `BLANKET_BEDS`, so the game lays its
   quilt over the sleeper. The car's body, wheels and spoiler are
   still.
-- **High chair**: static, and left decorative in 0.3.0. Its tray is a part of its own (no clip yet), so a "tray
+- **High chair**: its legs splay to 0.54 m each way at the floor, so it can't tip (2026-10-21, review M-kids-04:
+  0.44 × 0.47 m); the seat stays at 0.61 m. Static, and left decorative in 0.3.0. Its tray is a part of its own (no clip yet), so a "tray
   slides out" clip can come with a use. Content can't give it one yet: a baby is only ever placed lying (`baby`,
   `care` are for a baby lying in an object), so feeding a baby in the chair needs the sim first.
 
@@ -45,7 +49,8 @@ are `_slab`s: an outline on a face's frame (`_plane`, `_board`), a few millimetr
 | Giant teddy bear | `squish`: the bear squashes 10 % and bulges 6 % | `uses.hug` |
 | Kids' bean bag | `squash`: the bag flattens 15 % | `uses.flop` |
 
-The train table's track is a circle (the old part's is an oval), so the train can `spin` round its middle.
+The train table is 1.24 m long, centred on its 2 × 1 tiles (2026-10-21, review M-kids-02: it filled them, 1.8 m), the
+town at its left. Its track is a circle (the old part's is an oval), so the train can `spin` round its middle.
 
 ## KD3: the kids' study and art
 
@@ -65,17 +70,17 @@ The train table's track is a circle (the old part's is an oval), so the train ca
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.crib` | 1.86 × 1.01 × 0.93 m | 7,996 | 3 | Frame, Bedding, Mobile |
+| `model.crib` | 1.94 × 1.01 × 0.69 m | 6,596 | 3 | Frame, Bedding, Mobile |
 | `model.kidsBed` | 0.97 × 0.76 × 1.88 m | 2,692 | 3 | Frame, Bedding |
 | `model.kidsBedCar` | 0.99 × 0.77 × 1.92 m | 3,744 | 3 | Car body, Bedding |
-| `model.highChair` | 0.44 × 0.94 × 0.47 m | 1,384 | 2 | Frame, Bedding |
+| `model.highChair` | 0.53 × 0.94 × 0.55 m | 1,384 | 2 | Frame, Bedding |
 | `model.toyBox` | 0.82 × 0.51 × 0.80 m | 2,560 | 2 | Body, Lid |
 | `model.toyChest` | 0.85 × 0.53 × 0.51 m | 3,780 | 2 | Body, Trim |
 | `model.dollHouse` | 0.84 × 0.91 × 0.46 m | 3,236 | 2 | Walls, Roof |
 | `model.rockingHorse` | 0.29 × 0.82 × 0.88 m | 3,528 | 3 | Body, Trim |
 | `model.playTent` | 0.95 × 1.57 × 0.83 m | 386 | 3 | Canvas, Poles |
 | `model.ballPit` | 0.93 × 0.47 × 0.93 m | 3,816 | 2 | Pit, Rim |
-| `model.trainTable` | 1.80 × 0.68 × 0.84 m | 3,448 | 3 | Table, Train |
+| `model.trainTable` | 1.24 × 0.68 × 0.84 m | 3,448 | 3 | Table, Train |
 | `model.playMat` | 0.92 × 0.20 × 0.92 m | 1,680 | 3 | Mat |
 | `model.teddyBear` | 0.64 × 0.91 × 0.57 m | 3,340 | 2 | Fur, Bow |
 | `model.beanBagKids` | 0.62 × 0.53 × 0.64 m | 1,292 | 1 | Bag |
@@ -89,9 +94,9 @@ The train table's track is a circle (the old part's is an oval), so the train ca
 `check-glb`: 20 models, 0 failed, no warnings. The toy box and the chest had the lid drawn open; they're shut
 now (2026-10-14), as the models at rest. The doll house stood 5 cm off the wall and the picture-book shelf 3 cm
 into it; all stand on the wall face now. The crib, the two beds, the ball pit and the play mat reached 3–7 cm into
-the wall; their backs are on the face now (2026-10-15). The crib, the pit
-and the mat stand 3–3.5 cm forward of the middle (`_place(forward=)`; the crib's post caps and the pit's rim 1 cm
-smaller, so their fronts stay on the tile). The beds' mattresses stay where the game lays children: the kids'
+the wall; their backs are on the face now (2026-10-15). The pit
+and the mat stand 3–3.5 cm forward of the middle (`_place(forward=)`; the pit's rim 1 cm smaller, so its front
+stays on the tile); the crib is built in place, its back on the wall's face. The beds' mattresses stay where the game lays children: the kids'
 bed's headboard is 4 cm thick (was 6), the car's tail and spoiler are shorter from the back. The play tent stands free, centred. Khronos validator: 0 errors, 0 warnings each.
 
 The ball pit's colour parts are Pit and Rim, not "Balls": the balls are five colours, and one slot would recolour a

@@ -14,11 +14,16 @@ shapes and helpers (`lump`, `tube`, `dots`, `sprigs`, `far_of`) come from `plant
   birch's white bark and fruit plain.
 - **Trunk on the origin:** crowns are built round the trunk, so `settle` moves a lopsided crown's bounds only by a
   few centimetres.
-- **Clips:** `pick` shrinks one apple (or lemon) at the front for `pick`, 1.6 s into it (`PICK_DELAY`: the picker's
+- **Clips:** `pick` shrinks one apple at the front for `pick` and `harvest`, 1.6 s into it (`PICK_DELAY`: the picker's
   hand closes on it then, `pickApple*`/`pickLemon*` in `characters/clips/uses.ts`, fitted to where it hangs; move
   the fruit and those clips' `FRUIT` together). The apple hangs within reach, 1.84 m up and 0.7 m out under the
   crown on a stalk into it (2026-10-21; it was 2.95 m up, 1.95 m out). `trim` the Japanese maple's stray sprigs
   for `shape`. Each is one more draw call (the apple and lemon trees come to four; `check-glb` warns).
+- **Ripeness (G-68, 2026-10-21):** the fruit trees `grows` in content: their fruit over the crown is a moving part
+  (`_fruiting`) with the growth clip `ripen` (`motions.growth`, `G.stages`): in fruit at rest, gone (shrunk into the
+  crown's middle) when picked and while it fruits again; the apple's front apple follows it too. The lemon tree's
+  lemons are all picked at once, so its front lemon is one with the rest (no `pick` clip): still four draws. Far
+  versions: all one still part, in fruit.
 
 ## Far versions and the woods
 

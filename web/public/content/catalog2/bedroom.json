@@ -210,11 +210,11 @@
         "kind": "low",
         "size": [
           0.58,
-          0.6
+          0.46
         ],
         "at": [
           0.0,
-          -0.13
+          -0.2
         ]
       },
       "description": "A white bedside table on oak legs with a drawer and a shelf.",
@@ -264,11 +264,11 @@
         "kind": "low",
         "size": [
           0.58,
-          0.6
+          0.46
         ],
         "at": [
           0.0,
-          -0.13
+          -0.2
         ]
       },
       "description": "A walnut bedside chest with three drawers.",
@@ -308,11 +308,11 @@
         "kind": "shelf",
         "size": [
           0.88,
-          0.63
+          0.48
         ],
         "at": [
           0.0,
-          -0.115
+          -0.19
         ]
       },
       "description": "Five drawers with brass pulls; things stand on top.",
@@ -320,6 +320,7 @@
         {
           "id": "outfit",
           "label": "Pick an outfit",
+          "changesOutfit": true,
           "anim": "clean",
           "minutes": 10,
           "effects": {
@@ -361,6 +362,7 @@
         {
           "id": "outfit",
           "label": "Pick an outfit",
+          "changesOutfit": true,
           "anim": "clean",
           "minutes": 10,
           "effects": {
@@ -390,6 +392,7 @@
         {
           "id": "outfit",
           "label": "Pick an outfit",
+          "changesOutfit": true,
           "anim": "clean",
           "minutes": 10,
           "effects": {
@@ -420,6 +423,7 @@
         {
           "id": "outfit",
           "label": "Pick an outfit",
+          "changesOutfit": true,
           "anim": "clean",
           "minutes": 10,
           "effects": {

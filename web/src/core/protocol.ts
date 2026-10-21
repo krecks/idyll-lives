@@ -356,6 +356,8 @@ export interface SimInfo {
   generation?: number;
   /** Life stage id (how they look: elders' hair greys). */
   stage?: string;
+  /** The outfit they changed into at a wardrobe (absent: 0, the creator's; characters/outfit.ts `spareLook`). */
+  outfit?: number;
 }
 
 /** Someone whose slot a newcomer took; story events name them with `FORMER | index`. */
