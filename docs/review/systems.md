@@ -72,9 +72,9 @@ The crib (`base.json`), `babyWakes` and the cuddle lift (`characters.ts`).
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| Front door: who opens it and when | n/a | A-houses-01 | OK | Shut; swings in as she walks up to it, open while she passes, shut behind her (`bathroom-check`); a visitor knocking stands still, so it stays shut until the host walks out. A-houses-01 S3 code (systems ledger, confirmed: by nearness, no hand) | `systems/sheets/doors.png` |
+| Front door: who opens it and when | n/a | A-houses-01 | OK | Shut; swings in as she walks up to it, open while she passes, shut behind her (`bathroom-check`); a visitor knocking stands still, so it stays shut until the host walks out. A-houses-01 S3 code (systems ledger, confirmed: by nearness, no hand). Fixed (e04bc6c0): only for someone going through it | `systems/sheets/doors.png`, `fixes/town/doors/swing1-past-0.png` |
 | Bathroom door: shut while in use | n/a | A-houses-01 | I-systems-05 | Opens as she walks in, shuts behind her and stays shut on the toilet and at the basin (from above, `systems/sheets/doors-top.png`). I-systems-05 S3 code (confirmed and widened: the drawing only; every other inside door stands open always) | `systems/sheets/doors-top.png` |
-| Garden door to the patio | n/a | A-houses-01 | OK | A door with outdoors on one side is a "front" door (`house.ts:293`, `:760`): shut, opening as someone passes, like the front door (code read; not shot apart) | `systems/sheets/doors.png` |
+| Garden door to the patio | n/a | A-houses-01 | OK | A door with outdoors on one side is a "front" door (`house.ts:293`, `:760`): shut, opening as someone passes, like the front door (code read; not shot apart). Fixed (e04bc6c0): opens only for someone going through, as the front door | `systems/sheets/doors.png` |
 
 ## Objects that open (6)
 
@@ -525,7 +525,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
   - Walking along the front wall outside, 0.7 m off it, past the door and not through it, Ada opens the front door fully (`swing1-past-0.png`; "swing1 past": open 0 → 1 as she passes x 4.5 → 5.4).
   - A bathroom built in the back corner: with Ada in there (on the toilet, then standing by it) the door stays shut; Ben walking along the hall past it, 0.7 m off, swings it wide open on her (`sheet-bath.png`, `bath-passer-open-0.png`; "bathPass": 0 → 1 at 1 m from the door). That breaks the one privacy the renderer gives (`I-systems-05`, systems ledger) and is what raises this to S2.
   - The cheap part, short of hands on handles: open a door only for a mover heading through it (their next path step crosses the doorway), and keep an engaged bathroom's door shut for everyone but someone leaving it.
-- **Status:** confirmed and widened
+- **Status:** fixed (e04bc6c0): the cheap part (Q-03); doors opened by hand stay new behaviour (decision 3)
+- **After:** the snapshot tells each walker's way ahead (`snapshot.rs` `WAY_X`, `AHEAD_X`: the waypoint they walk to and the point 1.5 m on), and `swingDoors` opens a door only when that way crosses its doorway, or someone stands in it (`goingThrough`); open, it waits to shut until nobody walking is within 1.1 m (the leaf would sweep through them). On `review-stage` (`fixes/town/doors/doors.jsonl`): Ada walking along the front wall outside 0.7 m off, past the door, leaves it shut (open 0 throughout, `fixes/town/doors/swing1-past-0.png`, against `houses/extra/swing1-past-0.png`); walking in at speed 1 it opens from 1.5 m out and stands fully open before she reaches it. A bathroom in use: Ben walking the hall 0.7 m off it leaves it shut (open 0, `fixes/town/doors/bath-passer-0.png`, against `houses/extra/bath-passer-open-0.png`); Ada going in and coming out opens it for her (`bath-in-1.png`, `bath-leave-0.png`), and it shuts behind her while she is in there (`bath-occupied-shut.png`). One way the cheap part goes past the decision's words: someone walking into an engaged bathroom (the sim lets them: no privacy, I-systems-05, G-72) still has it open for them rather than walking through the shut leaf; passers-by never do.
 - **Source:** `plan/authenticity-review.md` §3.2 (A12) and §9 (decision 3); wave: houses (shared with the systems ledger's "Front door: who opens it and when" and "Bathroom door: shut while in use" rows)
 
 ### A-houses-02 — At the faster speeds residents walk through a door that has hardly opened
@@ -537,7 +538,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/BabylonRenderer.ts:188` (`DOOR_SWING` 0.45 s), `:3781` (the step is real frame time, not game time)
 - **Evidence:** At speed 1 the front door is fully open 0.6 m before Ada reaches it (`houses/extra/swing1-in-1.png`; "swing1 in"). At speed 3 she crosses the 2.6 m the door watches in about 0.3 s of real time, while the door takes 0.45 s: she is through it at 19 % open and the leaf shuts behind her at once (`houses/extra/swing-in-0.png`, her body through the near-shut leaf; "swing in": open 0.19 at z 5.7, 0.11 when she is inside). Scaling the swing by the game's speed (as walkers' turning is, `characters.ts:2324`), or the reach by the walker's speed, keeps the door ahead of her.
-- **Status:** open
+- **Status:** fixed (e04bc6c0)
+- **After:** the swing keeps pace with the game (`DOOR_SWING` over the game's rate, up to 10x, as walkers' turns), and opening for the way 1.5 m ahead gives it about a second's walk of lead at any speed. At speed 3 the front door is fully open when Ada is 0.3 m short of the doorway (open 1 at z 5.7, where it was 0.19; `fixes/town/doors/swing-in-0.png` against `houses/extra/swing-in-0.png`).
 - **Source:** wave: houses
 
 ### A-town-02 — Gates never open: residents walk through the shut leaf
@@ -549,7 +551,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/fences.ts:42` and `:110` (`gate()`: one still mesh with the fences, the leaf drawn shut); `crates/sim-core/src/command.rs:389` (a gate is walked through); `web/src/render/babylon/BabylonRenderer.ts:3778` (`swingDoors` turns only house doors)
 - **Evidence:** On `review-stage` a picket gate in a run of fences: Ada walks through it, her body passing through the shut leaf (`town/extra/gate-walk-0.png` … `gate-walk-2.png`, `town/extra/sheet-fences.png`; `houses/extra/houses.jsonl` "gate"). The house's front door swings for her on the same lot. Swinging the leaf as `swingDoors` swings a front door (hinge on a post, a quarter turn away from the walker) is new behaviour (§9, decision 3).
-- **Status:** open
+- **Status:** fixed (e04bc6c0)
+- **After:** a gate's leaf swings a quarter turn about its hinge post, away from the one coming through, by `goingThrough` as doors do, and shuts the way it opened once they're clear (`fences.ts` `swingGate`): it moves its vertices in the fences' one mesh, so it costs no draw. On `review-stage`, a picket gate in a run of fence: open from 0.7 m out as Ada walks in, fully open as she passes (`fixes/town/doors/gate-in-1.png` against `town/extra/gate-walk-1.png`), shut behind her; the same on the way back (`gate-out-*.png`); walking along the fence past it, it stays shut (`gate-past-0.png`).
 - **Source:** wave: town
 
 ### M-lighting-02 — Every lamp is a bare point light: the uplighter lights the floor, wall lights throw a disc, and light goes through walls
