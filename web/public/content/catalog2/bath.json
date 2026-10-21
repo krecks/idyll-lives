@@ -294,7 +294,7 @@
         {
           "id": "primp",
           "label": "Check the mirror",
-          "anim": "look",
+          "anim": "idle",
           "minutes": 5,
           "effects": {
             "comfort": 0.03

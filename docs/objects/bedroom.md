@@ -92,10 +92,10 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `mirror` Cheval mirror | 1x1 · floor | speech:talk primp:look | bedroom / dressing | Frame | Static | Static; mirror part (E6). Renamed from "Standing mirror" (the floor mirror's name too); checks the look as well as the speech. |
+| `mirror` Cheval mirror | 1x1 · floor | speech:talk primp:idle | bedroom / dressing | Frame | Static | Static; mirror part (E6). Renamed from "Standing mirror" (the floor mirror's name too); checks the look as well as the speech. |
 | `dressingTable` Dressing table | 1x1 · floor | getReady:wash | bedroom / dressing | Table, Frame | Use | `drawer_open`: the drawer slides out for getReady; mirror part (E6). |
-| `mirrorWall` Wall mirror | 1x1 · wall | speech:talk primp:look | bedroom / dressing | Frame | Static | Static; mirror part (E6). Checks the look as well as the speech. |
-| `mirrorFloor` Standing mirror | 1x1 · floor | primp:look speech:talk | bedroom / dressing | Frame | Static | Static; mirror part (E6). Practise a speech as well. |
+| `mirrorWall` Wall mirror | 1x1 · wall | speech:talk primp:idle | bedroom / dressing | Frame | Static | Static; mirror part (E6). Checks the look as well as the speech. |
+| `mirrorFloor` Standing mirror | 1x1 · floor | primp:idle speech:talk | bedroom / dressing | Frame | Static | Static; mirror part (E6). Practise a speech as well. |
 
 **In play** (signed off 2026-10-16):
 - The cheval mirror ("Practise a speech") and the standing mirror ("Check the mirror") standing free in all four

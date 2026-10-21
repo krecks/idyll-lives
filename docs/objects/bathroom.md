@@ -113,7 +113,7 @@ their backs on the wall face (game depth -0.43).
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `mirrorCabinet` Mirror cabinet | 1x1 · wall | brushTeeth:wash | bathroom / sinks | Cabinet, Frame | Use | `door_open`: the mirrored door swings open 100° in 0.8 s, the reflection with it, for "Brush your teeth"; `hold` 1.5 s. The mirror glass is in the file (E6); shelves, a cup and bottles behind the door. |
-| `mirrorRound` Round mirror | 1x1 · wall | primp:look speech:talk | bathroom / sinks | Frame, Strap | Static | Static; the mirror glass is in the file (E6), hung on its strap. Check the mirror and practise a speech, as the other mirrors. |
+| `mirrorRound` Round mirror | 1x1 · wall | primp:idle speech:talk | bathroom / sinks | Frame, Strap | Static | Static; the mirror glass is in the file (E6), hung on its strap. Check the mirror and practise a speech, as the other mirrors. |
 | `bathCabinetTall` Tall bathroom cabinet | 1x1 · floor | takeTowel:fetch | bathroom / sinks | Cabinet, Doors, Towels | Use | `door_open`: the upper door swings open onto its towels for "Take a fresh towel"; `hold` 1.5 s. |
 
 **In play** (signed off 2026-10-16):
