@@ -294,7 +294,7 @@
         "height": 0.5,
         "forward": 1.3
       },
-      "description": "A round stone basin with a fountain in the middle. Sit on the rim, or toss in a coin and make a wish.",
+      "description": "A square stone basin with a round fountain in the middle. Sit on the rim, or toss in a coin and make a wish.",
       "interactions": [
         {
           "id": "wish",
@@ -1117,8 +1117,29 @@
       "group": "farm",
       "outdoors": true,
       "decor": 0.25,
+      "slots": 2,
+      "seat": {
+        "height": 0.45,
+        "forward": 0.25
+      },
       "description": "Three square bales stacked up: a step, a seat, a fort.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit on the hay bales",
+          "anim": "sit",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.25,
+            "fun": 0.05
+          },
+          "tags": [
+            "lounge",
+            "outdoors"
+          ]
+        }
+      ]
     },
     {
       "id": "farm.scarecrow",

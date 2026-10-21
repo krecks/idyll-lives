@@ -44,9 +44,9 @@ and heat up leftovers. Coffee is left to anyone (not an age rule yet).
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `fridge` Fridge | 1x1 · floor | snack:fetch frozenTreat:fetch meal:cook gourmet:cook | kitchen / appliances | Body, Handles, Plinth & badge, Inside | Use | `fridge_open`: the tall fridge door below swings 102° for snack, meal and gourmet; `hold` 3.5 s. The freezer door above swings 118° (`freezer_open`) for frozenTreat. |
-| `fridgeMini` Mini fridge | 1x1 · floor | snack:fetch meal:cook | kitchen / appliances | Body, Handles, Plinth | Use | `fridge_open`: the door swings 100° on its hinge for snack and meal; `hold` 3 s. |
-| `fridgeBuiltIn` Built-in fridge | 1x1 · floor | snack:fetch frozenTreat:fetch meal:cook gourmet:cook coldDrink:drink | kitchen / appliances | Panels, Handles | Use | `fridge_open`: the tall fridge door swings for snack, meal, gourmet and coldDrink; the freezer door below opens (`freezer_open`) for frozenTreat. |
+| `fridge` Fridge | 1x1 · floor | snack:fetch frozenTreat:fetch meal:cook gourmet:cook coldDrink:drink | kitchen / appliances | Body, Handles, Plinth & badge, Inside | Use | `fridge_open`: the tall fridge door below swings 102° for snack, meal and gourmet; `hold` 3.5 s. The freezer door above swings 118° (`freezer_open`) for frozenTreat. Has the other fridges' cold drink (2026-10-21). |
+| `fridgeMini` Mini fridge | 1x1 · floor | snack:fetch meal:cook coldDrink:drink | kitchen / appliances | Body, Handles, Plinth | Use | `fridge_open`: the door swings 100° on its hinge for snack and meal; `hold` 3 s. Has a cold drink, as the retro mini fridge. |
+| `fridgeBuiltIn` Counter-depth fridge | 1x1 · floor | snack:fetch frozenTreat:fetch meal:cook gourmet:cook coldDrink:drink | kitchen / appliances | Panels, Handles | Use | `fridge_open`: the tall fridge door swings for snack, meal, gourmet and coldDrink; the freezer door below opens (`freezer_open`) for frozenTreat. Renamed from "Built-in fridge": a free-standing counter-depth fridge with a dispenser (kind `fridgeAmerican`, Q-08). |
 | `fridgeFrenchDoor` French-door fridge | 1x1 · floor | snack:fetch frozenTreat:fetch meal:cook gourmet:cook coldDrink:drink | kitchen / appliances | Body, Handles, Plinth | Use | `fridge_open`: both upper doors swing out (-100° / +100°) for snack, meal, gourmet; `door_right` (the right door only) for coldDrink. The freezer drawer slides out 35 cm (`freezer_open`) for frozenTreat. |
 | `fridgeRetro` Retro fridge | 1x1 · floor | snack:fetch meal:cook coldDrink:drink | kitchen / appliances | Body, Handle, Trim | Use | `lever`: the chrome lever (a part inside the door) turns 30° out, then `fridge_open` (`delay` 0.3 s): the rounded door swings 100°; snack, meal, coldDrink. |
 | `fridgeMiniRetro` Retro mini fridge | 1x1 · floor | snack:fetch meal:cook coldDrink:drink | kitchen / appliances | Body, Handle & feet, Trim | Use | `fridge_open`: the pastel door with its unicorn sticker swings 100° on its hinge; snack, meal, coldDrink. `hold` 3 s. |
@@ -92,7 +92,7 @@ and heat up leftovers. Coffee is left to anyone (not an age rule yet).
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `coffeeMachine` Coffee machine | 1x1 · floor | espresso:drink | kitchen / appliances | Cabinet, Worktop, Machine | Use | Provides `coffee`; `brew`: a cup slides under the spout and a thin coffee stream grows for espresso. |
-| `breakfastCounter` Breakfast counter | 1x1 · floor | toast:cook smoothie:cook | kitchen / appliances | Counter, Toaster, Blender | Use | `toast_down`: the toaster's carriage (lever and toast, one part) slides 5 cm down for toast and pops up at the end. `blend` for smoothie: the blender lid lifts. L `blades`: the smoothie under the lid swirls while it blends (E1). |
+| `breakfastCounter` Breakfast counter | 1x1 · floor | toast:cook smoothie:cook | kitchen / appliances | Counter, Toaster, Blender | Use | `toast_down`: the toaster's carriage (lever and toast, one part) slides 5 cm down for toast and pops up at the end. `blend` for smoothie: the blender lid lifts. L `blades`: the smoothie under the lid swirls while it blends (E1). Its 0.95 m top is a `counter` (counter stools tuck under it). |
 | `dishwasher` Dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | `door_open`: the door drops 85° and the lower rack slides out 30 cm for dishes; `hold` 2.5 s (loading), then it closes. |
 | `dishwasherCompact` Stainless dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | `door_open`, as the dishwasher. |
 
@@ -114,10 +114,10 @@ and heat up leftovers. Coffee is left to anyone (not an age rule yet).
 |---|---|---|---|---|---|---|
 | `counter` Kitchen counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Worktop, Handles | Use | `drawer_open`: the top drawer slides out 25 cm for sandwich; `hold` 1.5 s. |
 | `counterCorner` Corner counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Worktop, Handles | Use | `drawer_open`, as the counter. |
-| `counterEnd` Counter end with shelves | 1x1 · floor | — | kitchen / counters | Cabinet, Worktop, Handles | Static | Static (open end shelves). |
-| `counterCornerOuter` Outer corner counter | 1x1 · floor | — | kitchen / counters | Cabinet, Worktop, Handles | Static | Static. |
-| `counterDrawers` Drawer counter | 1x1 · floor | — | kitchen / counters | Cabinet, Worktop, Handles | Use | `drawer_open`: the top drawer slides out 25 cm while clean things are put away in it (`fetch` at its `prep` station, `hold` 1.5 s). |
-| `counterOpenShelf` Open-shelf counter | 1x1 · floor | — | kitchen / counters | Cabinet, Worktop | Static | Static. |
+| `counterEnd` Counter end with shelves | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Worktop, Handles | Static | Static (open end shelves). A sandwich, as the other counters. |
+| `counterCornerOuter` Outer corner counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Worktop, Handles | Static | Static. A sandwich, as the other counters. |
+| `counterDrawers` Drawer counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Worktop, Handles | Use | `drawer_open`: the top drawer slides out 25 cm while clean things are put away in it (`fetch` at its `prep` station, `hold` 1.5 s). A sandwich, as the other counters. |
+| `counterOpenShelf` Open-shelf counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Worktop | Static | Static. A sandwich, as the other counters. |
 | `butcherBlock` Butcher block | 1x1 · floor | sandwich:cook | kitchen / counters | Base, Block, Top | Use | `drawer_open`: the knife drawer slides out for sandwich. |
 | `counterMarble` Marble counter | 1x1 · floor | sandwich:cook | kitchen / counters | Cabinet, Marble top, Handles | Use | `drawer_open` for sandwich. |
 
@@ -140,9 +140,9 @@ and heat up leftovers. Coffee is left to anyone (not an age rule yet).
 | `wallCabinetGlass` Glazed wall cabinet | 1x1 · wall | — | kitchen / counters | Cabinet, Handles | Use | Glass doors (`glass` finish). `door_open`: the right door opens as the wall cabinet's (each glazed door costs two draws). |
 | `wallCabinetCorner` Wall cabinet with end shelves | 1x1 · wall | — | kitchen / counters | Cabinet, Handles | Use | `door_open`: the door opens as the wall cabinet's. |
 | `rangeHood` Cooker hood | 1x1 · wall | — | kitchen / counters | Hood, Trim | Static | Static. |
-| `spiceRack` Spice rack | 1x1 · wall | — | kitchen / counters | Rack | Static | Static. |
-| `potRail` Pot rail | 1x1 · wall | — | kitchen / counters | Rail, Pots | Static | Static. |
-| `kitchenShelfWall` Kitchen wall shelves | 1x1 · wall | — | kitchen / counters | Shelves, Brackets | Static | Static. |
+| `spiceRack` Spice rack | 1x1 · wall | — | kitchen / counters | Rack | Static | Static. Decor by decision (Q-19: kind marked decor). |
+| `potRail` Pot rail | 1x1 · wall | — | kitchen / counters | Rail, Pots | Static | Static. Decor by decision (Q-19: kind marked decor). |
+| `kitchenShelfWall` Kitchen wall shelves | 1x1 · wall | — | kitchen / counters | Shelves, Brackets | Static | Static. Decor by decision (Q-19: kind marked decor). |
 | `trashCan` Pedal bin | 1x1 · floor | — | kitchen / counters | Bin, Lid | Use | `lid_open`: the pedal lid lifts 75° while a plate is scraped in (`clean` at its `bin` station, `hold` 1 s). |
 | `recyclingBins` Recycling bins | 1x1 · floor | sortRecycling:clean | kitchen / counters | Left bin, Middle bin, Right bin (each with its lid), Handles | Use | `lid0_open`, `lid1_open`, `lid2_open`: the three lids lift one after another (0.6 s apart, each 80° in 0.5 s, `hold` 0.9 s) for "Sort the recycling". |
 
@@ -162,10 +162,10 @@ and heat up leftovers. Coffee is left to anyone (not an age rule yet).
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `kitchenIsland` Kitchen island | 2x1 · floor | sandwich:cook breakfast:eat | kitchen / counters | Cabinet, Worktop | Use | `drawer_open`: a drawer slides out for sandwich (not for breakfast: residents sit at it). |
-| `islandSmall` Small island | 1x1 · floor | — | kitchen / islands | Cabinet, Worktop | Static | Static. |
-| `islandLong` Long island | 3x1 · floor | — | kitchen / islands | Cabinet, Worktop | Static | Static. |
-| `barSegment` Bar counter | 1x1 · floor | — | kitchen / islands | Cabinet, Worktop | Static | Static. |
+| `kitchenIsland` Kitchen island | 2x1 · floor | sandwich:cook breakfast:eat | kitchen / counters | Cabinet, Worktop | Use | `drawer_open`: a drawer slides out for sandwich (not for breakfast). Breakfast is eaten on a stool at its back, or any seat within 3 m (`seatNear`), else standing. |
+| `islandSmall` Small island | 1x1 · floor | sandwich:cook breakfast:eat | kitchen / islands | Cabinet, Worktop | Static | Static. A sandwich, and breakfast on a stool or seat within 3 m (`seatNear`), as the kitchen island. |
+| `islandLong` Long island | 3x1 · floor | sandwich:cook breakfast:eat | kitchen / islands | Cabinet, Worktop | Static | Static. A sandwich, and breakfast on a stool or seat within 3 m (`seatNear`), as the kitchen island. |
+| `barSegment` Bar counter | 1x1 · floor | — | kitchen / islands | Cabinet, Worktop | Static | Static. High bar stools seat at it (the counter stools at counters, G-07). |
 | `barEnd` Bar end | 1x1 · floor | — | kitchen / islands | Cabinet, Worktop | Static | Static. |
 
 **In play** (signed off 2026-10-16):
@@ -188,12 +188,12 @@ and heat up leftovers. Coffee is left to anyone (not an age rule yet).
 | `diningOak` Farmhouse dining table | 2x1 · floor | breakfast:eat coffee:drink dinner:eat | kitchen / dining | Top, Legs | Static | Static. |
 | `tableSquare2` Square table for two | 1x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
 | `tableBistroRound` Round bistro table | 1x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
-| `tableDining4` Dining table for four | 2x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
-| `tableDining6` Dining table for six | 3x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
-| `tableBanquet8` Banquet table | 4x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
-| `tableRound4` Round pedestal table | 2x2 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
+| `tableDining4` Dining table for six | 2x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. Renamed from "Dining table for four": 1.84 m seats six (kind `diningTable6`, Q-08). |
+| `tableDining6` Dining table for eight | 3x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. Renamed from "Dining table for six": 2.84 m seats eight (kind `diningTable8`). |
+| `tableBanquet8` Banquet table | 4x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. Seats twelve (kind `diningTable12`). |
+| `tableRound4` Round pedestal table | 2x2 · floor | — | kitchen / dining | Top, Legs | Static | Static. 1.52 m across: seats six (kind `roundTable6`). |
 | `tableSquare8` Square table for eight | 2x2 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
-| `tableFarmhouse6` Farmhouse table | 3x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
+| `tableFarmhouse6` Farmhouse table | 3x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. 2.86 m: seats eight (kind `diningTable8`). |
 | `tableBarHigh` High café table | 1x1 · floor | — | kitchen / dining | Top, Legs | Static | Static. |
 
 **In play** (signed off 2026-10-16):
@@ -215,9 +215,9 @@ and heat up leftovers. Coffee is left to anyone (not an age rule yet).
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `barStool` Bar stool | 1x1 · floor | sit:sit drink:drink | kitchen / dining | Frame, Seat | Use | `swivel`: the seat turns 20° toward the resident and back, for sit and drink. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
-| `stoolCounter` Counter stool | 1x1 · floor | sit:sit drink:drink | kitchen / dining | Frame, Seat | Use | `swivel`, as the bar stool. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
-| `stoolBarHigh` High bar stool | 1x1 · floor | sit:sit drink:drink | kitchen / dining | Frame, Seat | Use | `swivel`, as the bar stool. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
+| `barStool` Bar stool | 1x1 · floor | sit:sit drink:drink | kitchen / dining | Frame, Seat | Use | `swivel`: the seat turns 20° toward the resident and back, for sit and drink. Pulled in to the table it faces while sat on, as far as the knees fit under it. Seats at counters and islands only (`seatAt: counter`, seat 0.72 m under a 0.95 m top), not at 1.06 m bars. |
+| `stoolCounter` Counter stool | 1x1 · floor | sit:sit drink:drink | kitchen / dining | Frame, Seat | Use | `swivel`, as the bar stool. Pulled in to the table it faces while sat on, as far as the knees fit under it. Seats at counters and islands only (`seatAt: counter`, seat 0.68 m). |
+| `stoolBarHigh` High bar stool | 1x1 · floor | sit:sit drink:drink | kitchen / dining | Frame, Seat | Use | `swivel`, as the bar stool. Pulled in to the table it faces while sat on, as far as the knees fit under it. Seats at bars and the high café table only (`seatAt: bar`, seat 0.80 m under a 1.06 m top); generated islands no longer get it. |
 | `diningChair` Dining chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static: the sitting pose is fitted to the seat, so the chair stays put. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
 | `chairWood` Wooden chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Seat | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
 | `chairUpholstered` Upholstered chair | 1x1 · floor | sit:sit coffee:drink | kitchen / dining | Frame, Upholstery | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. |

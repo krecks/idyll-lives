@@ -30,7 +30,7 @@ none.
 | `patioChair` Patio chair | 1x1 · floor | sit:sit coffee:drink | outdoor / seating | Frame, Cushion | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. |
 | `adirondackChair` Adirondack chair | 1x1 · floor | relax:relax | outdoor / seating | Chair | Static | Static. |
 | `benchGarden3` Garden bench | 3x1 · floor | sit:sit | outdoor / seating | Frame, Slats | Static | Static. |
-| `outdoorBar` Outdoor bar | 2x1 · floor | — | outdoor / seating | Body, Counter, Foot rail | Static | Static. |
+| `outdoorBar` Outdoor bar | 2x1 · floor | — | outdoor / seating | Body, Counter, Foot rail | Static | Static. A high bar stool pulled up to it offers Have a drink at the bar (`stoolBarHigh`, `seatAt: bar`). |
 | `parasol` Parasol | 1x1 · floor | — | outdoor / seating | Canopy, Pole, Edge | Ambient (E2) | Open; `stir`: the canopy stirs in the wind, ambient (not on Low). (+use) it folds. |
 
 **In play** (signed off 2026-10-17):
@@ -99,7 +99,7 @@ none.
 | `bikeRack` Bike rack | 2x1 · floor | tuneUp:tinker | outdoor / play | Rack, Bike | Use + Loop | `wheel_up`: the bike tips up 8.5° on its front tyre, its back axle onto the stand's cradle; `wheel_turn`: the back wheel turns while tuned up (E1 loop). Far version. |
 | `raisedBed` Raised vegetable bed | 2x1 · floor | tend:tend harvest:harvest | outdoor / yard | Bed | Growth + Use | `grow` (E4): lettuces, carrots and tomato bushes ripe at rest, the bed bare when picked, seedlings when planted; `harvest`: the crop is picked away (the stage then goes to picked); `rustle`: tending sways the plants every 2.4 s, on top of the stage. Far version. |
 | `shedSmall` Garden shed | 2x2 · floor | potter:tinker | outdoor / yard | Wood, Roof, Door | Use | `door_open`: the ledged door swings 100° out for the whole of potter, the dark inside with a bench and tools behind. The door is a colour part of its own (one plain draw). Far version. |
-| `greenhouse` Greenhouse | 2x3 · floor | tend:tend harvest:harvest | outdoor / yard | Frame, Wall | Use | `door_open`: the glass door swings 70° and the roof vent lifts 25° for tend and harvest. 4 draws (plain, glass, door, vent), as the nature lover's glasshouse. Far version. |
+| `greenhouse` Greenhouse | 2x3 · floor | tend:tend harvest:harvest | outdoor / yard | Frame, Wall | Use | `door_open`: the glass door swings 70° and the roof vent lifts 25° for tend and harvest, worked from the path down its middle (`inside`). 4 draws (plain, glass, door, vent), as the nature lover's glasshouse. Far version. |
 | `compostBin` Compost bin | 1x1 · floor | compost:tend | outdoor / yard | Bin | Use | `lid_open`: the slatted lid lifts 75° for compost; `hold` 2 s. Far version. |
 | `rainBarrel` Rain barrel | 1x1 · floor | — | outdoor / yard | Barrel | Static | Static: ribbed barrel, brass tap, the downpipe into its lid. Far version. |
 | `clothesline` Washing line | 3x1 · floor | washing:clean takeIn:clean | outdoor / yard | Posts, Washing | Use + Open | `washing`: the washing comes down from the line (1.5 s) and is the `open` clip (C1): it stays out until taken in. Far version (washing in). |
@@ -108,7 +108,7 @@ none.
 **In play** (signed off 2026-10-17):
 - Each checked in four facings: the sand castle rises for a sandcastle; the bike tips onto its stand and its back
   wheel turns for a tune-up; the shed's door opens for pottering, the dark inside showing; the greenhouse's door and
-  roof vent open for tend and harvest; the compost lid is up for 2 s.
+  roof vent open for tend and harvest, the gardener stepping in onto the path between the benches (`inside`, 2026-10-21); the compost lid is up for 2 s.
 - The raised bed's plants rustle every 2.4 s while tended. A new bed is planted, so harvest isn't offered until it
   is ripe; a ripe bed is harvested, the crop picked away and the bed left at picked.
 - The washing comes down onto the line for "Hang out the washing", stays out after, and "Take the washing in"
@@ -127,7 +127,7 @@ none.
 | `garden.pond` Garden pond | 2x2 · floor | fish:look feedFish:garden | outdoor / decor | Stones | Use + Ambient | `fish`: a koi rises 4 cm to the surface, turning, held for feedFish; `surface` (up and down, 2.4 s) every 7 s while watching (fish); `ripple` ambient (E2). Opaque gloss water, reeds still (satin): 3 draws, 4408 tris. |
 | `planterBox` Planter box | 1x1 · floor | water:water | outdoor / decor | Box | Static | Static: plank trough, leaves on `foliage` (wind, tint), flowers; far version (`far_of`). 3 draws, 3752 tris. |
 | `birdhouse` Birdhouse | 1x1 · floor | — | outdoor / decor | House, Roof | Static | Static. 2 draws, 1028 tris. |
-| `birdFeederPole` Bird feeders | 1x1 · floor | birdwatch:look | outdoor / decor | Pole, Feeders | Use | `bird`: a blue tit appears on the second perch for birdwatch, held while watching; the robin is always there. 3 draws, 2932 tris. |
+| `birdFeederPole` Bird feeders | 1x1 · floor | birdwatch:look | outdoor / decor | Pole, Feeders | Use | `bird`: a blue tit appears on the second perch for birdwatch, held while watching; the robin is always there. 3 draws, 2932 tris. Birds watched from a seat within 6 m (`seatNear`), else standing. |
 | `dogHouse` Dog house | 1x1 · floor | — | outdoor / decor | House, Roof | Static | Static: name plate REX, bowl. 2 draws, 2224 tris. |
 | `sundial` Sundial | 1x1 · floor | — | outdoor / decor | Plinth, Dial | Static | Static. 1 draw, 1316 tris. |
 | `steppingStones` Stepping stones | 1x3 · rug | — | outdoor / decor | Stones | Static | Static, flat: 4 cm slabs that show on the lawn. 1 draw, 320 tris. |
@@ -151,7 +151,7 @@ These six have no group code of their own.
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `garden.gnome` Garden gnome | 1x1 · floor | pat:tend | outdoor / decor | Hat, Tunic, Belt | Static | Static: a gnome with a red hat, white beard and a tunic bell. |
-| `garden.birdbath` Bird bath | 1x1 · floor | birdwatch:look | outdoor / decor | Bowl & column, Plinth | Static | Static: plinth, tapering column and a shallow bowl of water, a small bird on the rim. |
+| `garden.birdbath` Bird bath | 1x1 · floor | birdwatch:look | outdoor / decor | Bowl & column, Plinth | Static | Static: plinth, tapering column and a shallow bowl of water, a small bird on the rim. Birds watched from a seat within 6 m (`seatNear`), else standing. |
 | `garden.fountain` Stone fountain | 1x1 · floor | wish:look listen:relax | outdoor / decor | Fountain, Plinth | Static | Static: a two-tier fountain, its water opaque and still. |
 | `garden.lantern` Stone lantern | 1x1 · floor | — | outdoor / lights | Lantern, Base | Static | Static: a Japanese stone lantern; its fire box is lit at night (the content's `light`). |
 | `garden.wheelbarrow` Wheelbarrow planter | 1x1 · floor | water:water smell:smell | outdoor / decor | Tray, Handles, Legs & tyre | Static | Static: a green wheelbarrow full of flowers and leaves. |

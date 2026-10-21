@@ -445,7 +445,8 @@
       "group": "seating",
       "seat": {
         "height": 0.44,
-        "forward": 0.12
+        "forward": 0.12,
+        "legs": "out"
       },
       "description": "A deep leather armchair with a footrest that pops up. Very hard to get out of.",
       "interactions": [
@@ -805,11 +806,14 @@
           -0.15
         ]
       },
-      "description": "A slim oak table for a hall or behind a sofa, baskets underneath.",
+      "description": "A long oak table on black steel legs for a hall or behind a sofa, baskets underneath.",
       "interactions": []
     },
     {
       "id": "tvStandLow",
+      "provides": [
+        "screen"
+      ],
       "name": "Low TV bench",
       "model": "model.tvStandLow",
       "footprint": [
@@ -858,6 +862,7 @@
           "id": "read",
           "label": "Read a book",
           "anim": "read",
+          "seatNear": 4,
           "minutes": 45,
           "effects": {
             "fun": 0.4
@@ -875,6 +880,7 @@
           "id": "study",
           "label": "Study",
           "anim": "read",
+          "seatNear": 4,
           "minutes": 60,
           "effects": {
             "fun": 0.1
@@ -910,6 +916,7 @@
           "id": "read",
           "label": "Read a book",
           "anim": "read",
+          "seatNear": 4,
           "minutes": 45,
           "effects": {
             "fun": 0.4

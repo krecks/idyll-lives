@@ -70,7 +70,7 @@ rides.
 | `postBox` Post box | 1x1 · floor | post:write | community / street | Box | Use | `flap`: the slot flap swings in for post (`hold` 1 s). |
 | `noticeBoard` Notice board | 1x1 · floor | read:read | community / street | Frame | Static | Static. |
 | `phoneBooth` Phone box | 1x1 · floor | call:phone | community / street | Kiosk | Use | `door_open`: the door opens out (`delay` 0.3 s), the caller steps inside and it shuts behind them (`hold` 2.4 s); it opens again to let them out (`out` 1.6 s). |
-| `fountainTown` Town fountain | 3x3 · floor | wish:look sitBy:relax | community / street | Stone | Ambient (E2) | `water_run`: the water runs all the time, ambient (not on Low). |
+| `fountainTown` Town fountain | 3x3 · floor | wish:look sitBy:relax | community / street | Stone | Ambient (E2) | `water_run`: the water runs all the time, ambient (not on Low). Its text says square, as built. |
 | `townStatue` Founder's statue | 2x2 · floor | admire:admire | community / street | Statue | Static | Static. |
 
 **In play** (signed off 2026-10-16):
@@ -137,10 +137,10 @@ rides.
 | `farm.silo` Grain silo | 3x3 · floor | — | community / farm | Paint, Roof | Static | Static. |
 | `farm.tractor` Little tractor | 2x4 · floor | — | community / farm | Paint, Wheels | Static | Static. |
 | `farm.hayBale` Round hay bale | 1x1 · floor | — | community / farm | Twine | Static | Static. |
-| `farm.hayStack` Stack of hay bales | 2x1 · floor | — | community / farm | Twine | Static | Static. |
+| `farm.hayStack` Stack of hay bales | 2x1 · floor | sit:sit | community / farm | Twine | Static | Static. Sit on the hay bales, two at once on the lower bales' front edges (content `seat` 0.45 m, forward 0.25; 2026-10-21, Q-19). |
 | `farm.scarecrow` Scarecrow | 1x1 · floor | — | community / farm | Shirt, Trousers, Hat | Ambient (E2) | `sway`: a slow sway, ambient (not on Low). |
 | `farm.trough` Water trough | 2x1 · floor | — | community / farm | Paint | Static | Static. |
-| `farm.coop` Chicken coop | 2x2 · floor | — | community / farm | Paint, Roof, Trim | Night (E3) | `close`: the hatch slides shut at night (held from dusk) and is open by day. |
+| `farm.coop` Chicken coop | 2x2 · floor | — | community / farm | Paint, Roof, Trim | Night (E3) | `close`: the hatch slides shut at night (held from dusk) and is open by day. Decor by decision (Q-19: kind `chickenCoop` marked decor); hens and eggs would be new behaviour. |
 
 **In play** (signed off 2026-10-16):
 - All looked at in four facings by day, at night and on Low WebGL, and together on the `town-things` lot, near and

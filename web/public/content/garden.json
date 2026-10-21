@@ -335,7 +335,7 @@
         },
         {
           "id": "smell",
-          "label": "Smell the magnolia",
+          "label": "Admire the magnolia",
           "anim": "admire",
           "minutes": 5,
           "effects": {
@@ -1006,7 +1006,7 @@
         {
           "id": "admire",
           "label": "Admire the sunflowers",
-          "anim": "look",
+          "anim": "admire",
           "minutes": 5,
           "effects": {
             "fun": 0.06,
@@ -1049,9 +1049,9 @@
           }
         },
         {
-          "id": "smell",
-          "label": "Smell the flowers",
-          "anim": "smell",
+          "id": "admire",
+          "label": "Admire the poppies",
+          "anim": "look",
           "minutes": 5,
           "effects": {
             "fun": 0.06,
@@ -1060,8 +1060,7 @@
           "tags": [
             "nature",
             "outdoors"
-          ],
-          "feeling": "garden.sweetScent"
+          ]
         }
       ]
     },
@@ -1095,9 +1094,9 @@
           }
         },
         {
-          "id": "smell",
-          "label": "Smell the flowers",
-          "anim": "smell",
+          "id": "admire",
+          "label": "Admire the marigolds",
+          "anim": "look",
           "minutes": 5,
           "effects": {
             "fun": 0.06,
@@ -1106,8 +1105,7 @@
           "tags": [
             "nature",
             "outdoors"
-          ],
-          "feeling": "garden.sweetScent"
+          ]
         }
       ]
     },
@@ -1279,9 +1277,9 @@
           }
         },
         {
-          "id": "smell",
-          "label": "Smell the flowers",
-          "anim": "smell",
+          "id": "admire",
+          "label": "Admire the forget-me-nots",
+          "anim": "look",
           "minutes": 5,
           "effects": {
             "fun": 0.06,
@@ -1290,8 +1288,7 @@
           "tags": [
             "nature",
             "outdoors"
-          ],
-          "feeling": "garden.sweetScent"
+          ]
         }
       ]
     },
@@ -2155,6 +2152,7 @@
           "id": "birdwatch",
           "label": "Watch the birds",
           "anim": "look",
+          "seatNear": 6,
           "minutes": 20,
           "effects": {
             "fun": 0.12,

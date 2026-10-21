@@ -137,7 +137,8 @@ Not tied to one row: M-lighting-01, M-lighting-02 (every lamp).
 - **Fix class:** decision
 - **Where:** `tools/art/blender/families/lighting.py:185` (`ceilingLight`: a 0.36 m frosted cube on a 0.28 m stem), `web/public/content/furniture.json:4142`
 - **Evidence:** `lighting/sheets/obj-ceilingLight.png`; `cargo review sizes`: H 0.60 against the reference's flush ceiling light 0.05–0.30. What is drawn is a square lantern pendant (its docstring says so); what a buyer of a "Ceiling light" expects is a flush or semi-flush fitting. Either rename it (and its kind to `pendantLamp`, inside whose range it is) or build a flush one.
-- **Status:** open
+- **Status:** fixed (b3f6b82d)
+- **After:** "Lantern pendant", kind `pendantLamp`: lighting 1 → 0 outside.
 - **Source:** wave: lighting
 
 ### M-lighting-05 — Pendants hang at head height where residents walk under them

@@ -191,12 +191,25 @@
           "skills": {
             "cooking": 0.1
           }
+        },
+        {
+          "id": "coldDrink",
+          "label": "Get a cold drink",
+          "anim": "drink",
+          "minutes": 5,
+          "effects": {
+            "comfort": 0.05,
+            "fun": 0.04
+          },
+          "tags": [
+            "food"
+          ]
         }
       ]
     },
     {
       "id": "fridgeBuiltIn",
-      "name": "Built-in fridge",
+      "name": "Counter-depth fridge",
       "model": "model.fridgeBuiltIn",
       "stations": [
         "ingredients"
@@ -210,7 +223,7 @@
       "category": "kitchen",
       "fillsWall": true,
       "group": "appliances",
-      "description": "A tall fridge-freezer behind cabinet doors that match the kitchen. Plenty of fresh food: bigger snacks, fuller meals and a cold drink.",
+      "description": "A tall counter-depth fridge-freezer, the freezer below and a water dispenser in the door. Plenty of fresh food: bigger snacks, fuller meals and a cold drink.",
       "interactions": [
         {
           "id": "snack",
@@ -508,7 +521,7 @@
       "description": "A counter with a toaster and a blender: toast for a quick bite, a smoothie for a little energy.",
       "surface": {
         "height": 0.95,
-        "kind": "bar",
+        "kind": "counter",
         "size": [
           1.0,
           0.62
@@ -822,6 +835,7 @@
           "id": "breakfast",
           "label": "Have breakfast at the island",
           "anim": "eat",
+          "seatNear": 3,
           "minutes": 20,
           "effects": {
             "hunger": 0.3,
@@ -848,7 +862,6 @@
       "description": "A tall stool for the counter or the island.",
       "approach": "around",
       "seatAt": [
-        "bar",
         "counter"
       ],
       "interactions": [
@@ -1182,7 +1195,7 @@
       "price": 900,
       "category": "living",
       "group": "seating",
-      "slots": 2,
+      "slots": 3,
       "description": "A long, deep sofa with soft cushions: very comfortable, and good for a doze.",
       "interactions": [
         {
@@ -1340,7 +1353,7 @@
     },
     {
       "id": "armchairDesign",
-      "name": "Designer lounge chair",
+      "name": "Executive lounge chair",
       "model": "model.armchairDesign",
       "footprint": [
         1,
@@ -1350,7 +1363,7 @@
       "category": "living",
       "group": "seating",
       "decor": 0.8,
-      "description": "A mid-century swivel chair in leather and bent wood. Sinking into it leaves residents feeling at home.",
+      "description": "A high-backed swivel chair in padded leather on a chrome five-star base. Sinking into it leaves residents feeling at home.",
       "interactions": [
         {
           "id": "relax",
@@ -1438,6 +1451,7 @@
           "id": "magazine",
           "label": "Flip through a magazine",
           "anim": "read",
+          "seatNear": 2,
           "minutes": 15,
           "effects": {
             "fun": 0.15
@@ -1475,6 +1489,7 @@
           "id": "magazine",
           "label": "Flip through a magazine",
           "anim": "read",
+          "seatNear": 2,
           "minutes": 15,
           "effects": {
             "fun": 0.15
@@ -1488,7 +1503,7 @@
     },
     {
       "id": "coffeeTableMarble",
-      "name": "Marble side table",
+      "name": "Round marble coffee table",
       "model": "model.coffeeTableMarble",
       "footprint": [
         1,
@@ -1498,7 +1513,7 @@
       "category": "living",
       "group": "tables",
       "decor": 0.5,
-      "description": "A round marble top on bent steel legs.",
+      "description": "A round marble top on a brass pedestal, at coffee-table height.",
       "surface": {
         "height": 0.42,
         "kind": "low",
@@ -1512,6 +1527,7 @@
           "id": "magazine",
           "label": "Flip through a magazine",
           "anim": "read",
+          "seatNear": 2,
           "minutes": 15,
           "effects": {
             "fun": 0.15
@@ -1548,6 +1564,9 @@
     },
     {
       "id": "tvWall",
+      "provides": [
+        "screen"
+      ],
       "name": "Flat-screen TV",
       "model": "model.tvWall",
       "footprint": [
@@ -1580,7 +1599,10 @@
     },
     {
       "id": "tvRetro",
-      "name": "Portable TV",
+      "provides": [
+        "screen"
+      ],
+      "name": "Console TV",
       "model": "model.tvRetro",
       "footprint": [
         1,
@@ -1589,7 +1611,7 @@
       "price": 150,
       "category": "living",
       "group": "media",
-      "description": "A little old TV on a low cabinet. It still works (mostly).",
+      "description": "An old television in a wooden console on legs, rabbit ears on top. It still works (mostly).",
       "interactions": [
         {
           "id": "watch",
@@ -1611,6 +1633,9 @@
     },
     {
       "id": "homeCinema",
+      "provides": [
+        "screen"
+      ],
       "name": "Home cinema",
       "model": "model.homeCinema",
       "footprint": [
@@ -1676,6 +1701,7 @@
           "id": "listen",
           "label": "Listen to music",
           "anim": "listen",
+          "seatNear": 4,
           "minutes": 30,
           "effects": {
             "fun": 0.35,
@@ -1719,6 +1745,7 @@
           "id": "listen",
           "label": "Listen to music",
           "anim": "listen",
+          "seatNear": 4,
           "minutes": 30,
           "effects": {
             "fun": 0.3,
@@ -1761,6 +1788,7 @@
           "id": "read",
           "label": "Read a book",
           "anim": "read",
+          "seatNear": 4,
           "minutes": 45,
           "effects": {
             "fun": 0.4
@@ -1795,6 +1823,7 @@
           "id": "read",
           "label": "Read a book",
           "anim": "read",
+          "seatNear": 4,
           "minutes": 45,
           "effects": {
             "fun": 0.5
@@ -1812,6 +1841,7 @@
           "id": "study",
           "label": "Study",
           "anim": "read",
+          "seatNear": 4,
           "minutes": 60,
           "effects": {
             "fun": 0.1
@@ -1830,6 +1860,7 @@
           "id": "homework",
           "label": "Do homework",
           "anim": "read",
+          "seatNear": 4,
           "minutes": 45,
           "homework": 6,
           "effects": {
@@ -1972,7 +2003,7 @@
     },
     {
       "id": "bedFuton",
-      "name": "Futon bed",
+      "name": "King futon",
       "model": "model.bedFuton",
       "footprint": [
         2,
@@ -1982,7 +2013,11 @@
       "category": "bedroom",
       "group": "beds",
       "slots": 2,
-      "description": "A low platform with a firm futon: the cheapest double, if not the comfiest.",
+      "seat": {
+        "height": 0.4,
+        "forward": 0.68
+      },
+      "description": "A low platform with a firm king-size futon: the cheapest big bed, if not the comfiest. Folded, it is a deep sofa.",
       "interactions": [
         {
           "id": "sleep",
@@ -2035,6 +2070,21 @@
           "autonomous": false,
           "when": "open",
           "leaves": "closed"
+        },
+        {
+          "id": "relax",
+          "label": "Sit and relax",
+          "anim": "relax",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.5
+          },
+          "tags": [
+            "rest",
+            "lounge"
+          ],
+          "when": "closed"
         }
       ]
     },
@@ -2270,6 +2320,21 @@
           "skills": {
             "charisma": 0.18
           }
+        },
+        {
+          "id": "primp",
+          "label": "Check the mirror",
+          "anim": "idle",
+          "minutes": 5,
+          "effects": {
+            "comfort": 0.03
+          },
+          "tags": [
+            "lounge"
+          ],
+          "skills": {
+            "charisma": 0.04
+          }
         }
       ]
     },
@@ -2484,6 +2549,19 @@
             "hygiene",
             "handwash"
           ]
+        },
+        {
+          "id": "brushTeeth",
+          "label": "Brush your teeth",
+          "anim": "wash",
+          "minutes": 3,
+          "effects": {
+            "hygiene": 0.03
+          },
+          "tags": [
+            "hygiene",
+            "handwash"
+          ]
         }
       ]
     },
@@ -2509,6 +2587,19 @@
           "minutes": 2,
           "effects": {
             "hygiene": 0.05
+          },
+          "tags": [
+            "hygiene",
+            "handwash"
+          ]
+        },
+        {
+          "id": "brushTeeth",
+          "label": "Brush your teeth",
+          "anim": "wash",
+          "minutes": 3,
+          "effects": {
+            "hygiene": 0.03
           },
           "tags": [
             "hygiene",
@@ -3095,6 +3186,18 @@
       ],
       "price": 1900,
       "category": "office",
+      "surface": {
+        "height": 0.75,
+        "kind": "desk",
+        "size": [
+          1.7,
+          0.44
+        ],
+        "at": [
+          0,
+          0.24
+        ]
+      },
       "description": "Two screens, a glowing keyboard and a fast tower. Games are more fun the better the player (Dexterity); from Dexterity 3 a win leaves them sharp.",
       "interactions": [
         {
@@ -3184,6 +3287,45 @@
           "tags": [
             "lounge"
           ]
+        },
+        {
+          "id": "write",
+          "label": "Write at the desk",
+          "anim": "write",
+          "minutes": 60,
+          "pose": "sit",
+          "needsTable": true,
+          "effects": {
+            "fun": 0.15,
+            "comfort": 0.1
+          },
+          "tags": [
+            "training",
+            "creative"
+          ],
+          "skills": {
+            "writing": 0.2,
+            "creativity": 0.04
+          }
+        },
+        {
+          "id": "homework",
+          "label": "Do homework at the desk",
+          "anim": "write",
+          "minutes": 45,
+          "pose": "sit",
+          "needsTable": true,
+          "homework": 7,
+          "effects": {
+            "fun": -0.05
+          },
+          "tags": [
+            "study"
+          ],
+          "skills": {
+            "intelligence": 0.1,
+            "writing": 0.05
+          }
         }
       ]
     },
@@ -4156,7 +4298,7 @@
     },
     {
       "id": "ceilingLight",
-      "name": "Ceiling light",
+      "name": "Lantern pendant",
       "model": "model.ceilingLight",
       "footprint": [
         1,
@@ -4174,7 +4316,7 @@
         "height": 2.3,
         "tiles": 20
       },
-      "description": "A simple square ceiling light.",
+      "description": "A frosted square lantern on a short stem from the ceiling.",
       "interactions": []
     },
     {

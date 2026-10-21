@@ -18,10 +18,10 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `bed` Double bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`: the top third of the duvet folds back toward the foot as they get in (sleep, nap) and back up when they get up, under the game's blanket. |
+| `bed` King-size bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`: the top third of the duvet folds back toward the foot as they get in (sleep, nap) and back up when they get up, under the game's blanket. Renamed from "Double bed": 1.90 m wide with a 1.72 m mattress, a king (reference kind `bedKing`, Q-08). |
 | `bedSingle` Single bed | 1x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`. |
 | `bedBunk` Bunk bed | 1x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down` on the lower bunk, `turn_down_upper` on the upper, each for its own sleeper (`slot`); the ladder is static. The upper bunk is not an elder's (`upperStages`: with the lower bunk taken, an elder is refused, "too old for the top bunk"). |
-| `bedFuton` Futon bed | 2x2 · floor | sleep:sleep nap:nap unfold:fetch foldAway:fetch | bedroom / beds | Frame, Headboard, Bedding | Held open | `unfold`: the back folds flat into a bed while slept in (C1: `leaves: open` on sleep, nap and Unfold, as the wall bed); Fold away closes it. |
+| `bedFuton` King futon | 2x2 · floor | sleep:sleep nap:nap unfold:fetch foldAway:fetch relax:relax | bedroom / beds | Frame, Headboard, Bedding | Held open | `unfold`: the back folds flat into a bed while slept in (C1: `leaves: open` on sleep, nap and Unfold, as the wall bed); Fold away closes it. Folded, a sofa: Sit and relax on its front edge (`when: closed`, content `seat` 0.40 m, forward 0.68). Renamed from "Futon bed": a king-size futon, 1.96 m wide (kind `bedLow`, now to 1.95 m, Q-08). |
 | `bedKing` Upholstered king bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`. |
 | `bedDouble` Double bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`. |
 | `bedQueenUpholstered` Upholstered queen bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`. |
@@ -54,7 +54,7 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 | `nightstand` Nightstand | 1x1 · floor | — | bedroom / storage | Body, Handles | Static | Static. |
 | `nightstandModern` Modern nightstand | 1x1 · floor | — | bedroom / nightstands | Body, Handles | Static | Static. |
 | `nightstandRound` Drum nightstand | 1x1 · floor | — | bedroom / nightstands | Body, Handles | Static | Static. |
-| `nightstandDrawers` Three-drawer nightstand | 1x1 · floor | outfit:clean | bedroom / nightstands | Body, Handles | Use | `drawer_open`: the top drawer slides out for outfit; `hold` 2.5 s. |
+| `nightstandDrawers` Three-drawer nightstand | 1x1 · floor | snack:fetch | bedroom / nightstands | Body, Handles | Use | `drawer_open`: the top drawer slides out for outfit; `hold` 2.5 s. A snack from the drawer (fetched, then eaten sitting), not an outfit. The drawer clip is still keyed to the old `outfit` use in `bedroom_storage.py` (`DRAWER_USE`): it opens again once that key is `snack` and the family is rebuilt. |
 | `nightstandLamp` Nightstand with lamp | 1x1 · floor | — | bedroom / storage | Body, Shade | Static | Static; the shade glows at night (N, E3/E8), the light at the shade. |
 | `cedarChest` Blanket chest | 1x1 · floor | takeBlanket:fetch | bedroom / storage | Body, Handles | Use | `lid_open`: the lid swings up 100° for takeBlanket; `hold` 2 s. |
 | `laundryHamper` Laundry hamper | 1x1 · floor | sortWashing:clean | bedroom / storage | Hamper | Use | `lid_open`: the lid lifts for sortWashing. |
@@ -93,10 +93,10 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `mirror` Standing mirror | 1x1 · floor | speech:talk | bedroom / dressing | Frame | Static | Static; mirror part (E6). |
+| `mirror` Cheval mirror | 1x1 · floor | speech:talk primp:idle | bedroom / dressing | Frame | Static | Static; mirror part (E6). Renamed from "Standing mirror" (the floor mirror's name too); checks the look as well as the speech. |
 | `dressingTable` Dressing table | 1x1 · floor | getReady:wash | bedroom / dressing | Table, Frame | Use | `drawer_open`: the drawer slides out for getReady; mirror part (E6). |
-| `mirrorWall` Wall mirror | 1x1 · wall | speech:talk | bedroom / dressing | Frame | Static | Static; mirror part (E6). |
-| `mirrorFloor` Standing mirror | 1x1 · floor | primp:look | bedroom / dressing | Frame | Static | Static; mirror part (E6). |
+| `mirrorWall` Wall mirror | 1x1 · wall | speech:talk primp:idle | bedroom / dressing | Frame | Static | Static; mirror part (E6). Checks the look as well as the speech. |
+| `mirrorFloor` Standing mirror | 1x1 · floor | primp:idle speech:talk | bedroom / dressing | Frame | Static | Static; mirror part (E6). Practise a speech as well. |
 
 **In play** (signed off 2026-10-16):
 - The cheval mirror ("Practise a speech") and the standing mirror ("Check the mirror") standing free in all four

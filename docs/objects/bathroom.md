@@ -15,11 +15,11 @@ their backs on the wall face (game depth -0.43).
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `sink` Sink | 1x1 · floor | wash:wash | bathroom / sinks | Cabinet, Worktop, Basin, Tap & handles, Plinth | Use | `water_on`: the stream grows from the gooseneck into the inset basin in 0.4 s, runs for the whole use and retracts as it ends. |
-| `sinkPedestal` Pedestal sink | 1x1 · floor | wash:wash | bathroom / sinks | Pedestal, Basin & cup, Tap | Use | `water_on`, as the sink. |
-| `vanityDouble` Double vanity | 2x1 · floor | wash:wash | bathroom / sinks | Cabinet, Worktop, Basins, Taps & handles, Plinth | Use | `water_on`: both taps run together (two slots). No mirrors of its own: the player hangs one above it. |
-| `sinkVessel` Vessel sink | 1x1 · floor | wash:wash | bathroom / sinks | Vanity, Worktop, Bowl, Tap, Shelf & legs, Towels | Use | `water_on` into the raised bowl. |
-| `sinkConsole` Console sink | 1x1 · floor | wash:wash | bathroom / sinks | Basin, Legs & tap, Towel | Use | `water_on`, as the sink. |
+| `sink` Sink | 1x1 · floor | wash:wash brushTeeth:wash | bathroom / sinks | Cabinet, Worktop, Basin, Tap & handles, Plinth | Use | `water_on`: the stream grows from the gooseneck into the inset basin in 0.4 s, runs for the whole use and retracts as it ends. Brush your teeth (3 min, the tap running and its sound: `handwash` tag after Wash hands, so a toilet's follow-up still washes hands). |
+| `sinkPedestal` Pedestal sink | 1x1 · floor | wash:wash brushTeeth:wash | bathroom / sinks | Pedestal, Basin & cup, Tap | Use | `water_on`, as the sink. Brush your teeth, the tap running. |
+| `vanityDouble` Double vanity | 2x1 · floor | wash:wash brushTeeth:wash | bathroom / sinks | Cabinet, Worktop, Basins, Taps & handles, Plinth | Use | `water_on`: both taps run together (two slots). No mirrors of its own: the player hangs one above it. Brush your teeth at either basin, the taps running. |
+| `sinkVessel` Vessel sink | 1x1 · floor | wash:wash brushTeeth:wash | bathroom / sinks | Vanity, Worktop, Bowl, Tap, Shelf & legs, Towels | Use | `water_on` into the raised bowl. Brush your teeth, the tap running. |
+| `sinkConsole` Console sink | 1x1 · floor | wash:wash brushTeeth:wash | bathroom / sinks | Basin, Legs & tap, Towel | Use | `water_on`, as the sink. Brush your teeth, the tap running. |
 
 **In play** (signed off 2026-10-16):
 - The first group checked: bought in all four facings, every part coloured (through `buy` and in the colour studio),
@@ -117,7 +117,7 @@ their backs on the wall face (game depth -0.43).
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `mirrorCabinet` Mirror cabinet | 1x1 · wall | brushTeeth:wash | bathroom / sinks | Cabinet, Frame | Use | `door_open`: the mirrored door swings open 100° in 0.8 s, the reflection with it, for "Brush your teeth"; `hold` 1.5 s. The mirror glass is in the file (E6); shelves, a cup and bottles behind the door. |
-| `mirrorRound` Round mirror | 1x1 · wall | — | bathroom / sinks | Frame, Strap | Static | Static; the mirror glass is in the file (E6), hung on its strap. |
+| `mirrorRound` Round mirror | 1x1 · wall | primp:idle speech:talk | bathroom / sinks | Frame, Strap | Static | Static; the mirror glass is in the file (E6), hung on its strap. Check the mirror and practise a speech, as the other mirrors. |
 | `bathCabinetTall` Tall bathroom cabinet | 1x1 · floor | takeTowel:fetch | bathroom / sinks | Cabinet, Doors, Towels | Use | `door_open`: the upper door swings open onto its towels for "Take a fresh towel"; `hold` 1.5 s. |
 
 **In play** (signed off 2026-10-16):

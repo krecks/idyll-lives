@@ -5,6 +5,7 @@
       "id": "outgoing.partyBar",
       "name": "Home party bar",
       "model": "model.outgoing.partyBar",
+      "seat": { "height": 0.74, "forward": 0.5, "facing": "back" },
       "footprint": [2, 1],
       "price": 1150,
       "category": "kitchen",
@@ -35,6 +36,16 @@
           "autonomous": true,
           "effects": { "hunger": 0.1, "fun": 0.05, "bladder": -0.04 },
           "tags": ["food", "party"]
+        },
+        {
+          "id": "barDrink",
+          "label": "Have a drink at the bar",
+          "anim": "drink",
+          "minutes": 15,
+          "pose": "sit",
+          "autonomous": true,
+          "effects": { "comfort": 0.15, "fun": 0.08, "social": 0.03, "bladder": -0.04 },
+          "tags": ["party", "entertainment"]
         }
       ]
     },
@@ -64,6 +75,7 @@
       "id": "outgoing.karaokeStage",
       "name": "Karaoke stage",
       "model": "model.outgoing.karaokeStage",
+      "stand": { "height": 0.146 },
       "footprint": [2, 1],
       "price": 680,
       "category": "hobbies",

@@ -47,7 +47,7 @@
     },
     {
       "id": "tableDining4",
-      "name": "Dining table for four",
+      "name": "Dining table for six",
       "model": "model.tableDining4",
       "footprint": [
         2,
@@ -65,12 +65,12 @@
           0.88
         ]
       },
-      "description": "An oak table for four: two chairs along each side. Chairs are sold separately: put them round it.",
+      "description": "An oak table for six: two chairs along each side and one at each end. Chairs are sold separately: put them round it.",
       "interactions": []
     },
     {
       "id": "tableDining6",
-      "name": "Dining table for six",
+      "name": "Dining table for eight",
       "model": "model.tableDining6",
       "footprint": [
         3,
@@ -88,7 +88,7 @@
           0.88
         ]
       },
-      "description": "A long walnut table on tapered legs for family dinners. Chairs are sold separately: put them round it.",
+      "description": "A long walnut table for eight on tapered legs, for family dinners. Chairs are sold separately: put them round it.",
       "interactions": []
     },
     {
@@ -111,7 +111,7 @@
           0.88
         ]
       },
-      "description": "Four metres of table on six legs: room for the whole family, and then some. Chairs are sold separately: put them round it.",
+      "description": "Four metres of table on six legs: room for twelve, the whole family and then some. Chairs are sold separately: put them round it.",
       "interactions": []
     },
     {
@@ -134,7 +134,7 @@
           1.075
         ]
       },
-      "description": "A big round birch table on one pedestal: everyone can see everyone. Chairs are sold separately: put them round it.",
+      "description": "A big round birch table for six on one pedestal: everyone can see everyone. Chairs are sold separately: put them round it.",
       "interactions": []
     },
     {
@@ -180,7 +180,7 @@
           0.88
         ]
       },
-      "description": "Thick planks on trestle legs: a table that has seen a lot of Sunday lunches. Chairs are sold separately: put them round it.",
+      "description": "Thick planks on trestle legs: a table for eight that has seen a lot of Sunday lunches. Chairs are sold separately: put them round it.",
       "interactions": []
     },
     {
@@ -202,7 +202,7 @@
           0.495
         ]
       },
-      "description": "A round table at bar height for standing or for bar stools.",
+      "description": "A round table at bar height for standing or for high bar stools.",
       "interactions": []
     },
     {
@@ -647,14 +647,13 @@
       "group": "dining",
       "approach": "around",
       "seatAt": [
-        "counter",
-        "bar"
+        "counter"
       ],
       "seat": {
         "height": 0.68,
         "forward": 0.05
       },
-      "description": "A stool at counter height for the island or the bar.",
+      "description": "A stool at counter height for the counter or the island.",
       "interactions": [
         {
           "id": "sit",
@@ -700,8 +699,7 @@
       "group": "dining",
       "approach": "around",
       "seatAt": [
-        "bar",
-        "counter"
+        "bar"
       ],
       "seat": {
         "height": 0.8,
