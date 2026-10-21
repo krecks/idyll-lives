@@ -4336,10 +4336,10 @@
         "aim": "down",
         "range": 5.0,
         "intensity": 1.0,
-        "height": 1.9,
+        "height": 2.16,
         "tiles": 16
       },
-      "description": "A frosted globe on a long cord.",
+      "description": "A frosted dome on a short cord, hung high enough to walk under.",
       "interactions": []
     },
     {

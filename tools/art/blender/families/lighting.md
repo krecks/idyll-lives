@@ -6,7 +6,10 @@ Ceiling Lights, Wall Lights, Floor Lamps and Table Lamps until signed off.
 
 - **LT1, ceiling:** `ceilingPendant`, `ceilingLight`, `chandelier`, `pendantIndustrial`, `ceilingFan`,
   `trackLights`, `paperLantern`. They hang from 2.8 m at their real height (`G.settle(floor=False)`,
-  `floor=False` on the `Model`), centred.
+  `floor=False` on the `Model`), centred. The pendant lamp and the paper lantern, which residents walk under, hang
+  clear of heads: their lowest point 2.11 and 2.12 m up (a 0.69 m drop; 2026-10-21, review M-lighting-05 and Q-12,
+  was 1.85 and 1.80); the chandelier and the industrial pendant hang lower, over furniture only (content
+  `headHeight`).
 - **LT2, wall:** `wallSconce`, `wallLampArm`, `wallLightOutdoor`. Their back is on the wall face (−0.43), at
   their real height (`G.settle(centre=False, floor=False)`, `centre=` on the `Model`).
 - **LT3, floor:** `lamp`, `floorLampSimple`, `lampFloorArc`, `lampFloorTripod`, `lampTorchiere`. The arc lamp's
@@ -33,16 +36,18 @@ bulkhead lit only a small hot ring round themselves and lost the warm pool on th
 ## Night glow
 
 The shades, diffusers, globes, the paper and the candle's flame have `glow` (E8): they light up from dusk with
-the room's lamps, nothing by day. Metal shades (the industrial pendant, the swing-arm lamp, the arc lamp, the
-banker's lamp) glow only on their white `liner`, a thin shell just inside the shade.
+the room's lamps, nothing by day. Metal shades (the industrial pendant, the swing-arm lamp, the arc lamp) glow only
+on their white `liner`, a thin shell just inside the shade. Coloured glass glows in its own colour, not the cream
+`GLOW` (2026-10-21, review M-lighting-03): the banker's green shade `#4FB27A` over its white liner, the mushroom
+lamp's coral cap `#FFAA78`.
 
-## Clips (both ambient, `idle`)
+## Clips (ambient, `idle`)
 
 - **Ceiling fan** (`blades`): the five blades and their irons, origin on the axis; `blades_turn` turns them
   once in 2.5 s (`G.spin`). The axis is on the tile's middle, so the blades sweep a circle 0.974 m across
   inside the tile (the fan's box, reaching farther one way, is centred 3.3 cm off: its `centre`).
-- **Paper lantern** (`lantern`): the cord, the paper globe and its ribs, origin on the canopy; `sway` rocks
-  them 2.5° in 2 s (`G.rock`), about a pendulum's period for its length.
+- **Paper lantern**: still since 2026-10-21 (review A-lighting-01: a paper globe indoors hangs still without a
+  draught; it swayed 2.5° in 2 s, `G.rock`). One node, joined.
 
 Not on Low (E2); at rest they look as the old part.
 
@@ -70,13 +75,13 @@ Not on Low (E2); at rest they look as the old part.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| ceilingPendant | 0.43 × 0.95 × 0.43 | 1,080 | 1 | Body, Shade |
+| ceilingPendant | 0.43 × 0.69 × 0.43 | 1,080 | 1 | Body, Shade |
 | ceilingLight | 0.36 × 0.60 × 0.36 | 1,040 | 1 | Body, Shade |
 | chandelier | 0.94 × 0.76 × 0.90 | 3,788 | 1 | Body, Globes |
 | pendantIndustrial | 0.38 × 0.87 × 0.38 | 1,592 | 1 | Body, Shade |
 | ceilingFan | 0.91 × 0.39 × 0.95 | 2,328 | 3 | Body, Blades |
 | trackLights | 0.94 × 0.30 × 0.19 | 936 | 1 | Body, Shade |
-| paperLantern | 0.54 × 1.00 × 0.54 | 2,204 | 3 | Paper, Ribs |
+| paperLantern | 0.54 × 0.68 × 0.54 | 2,204 | 2 | Paper, Ribs |
 | wallSconce | 0.20 × 0.25 × 0.27 | 764 | 2 | Body, Shade |
 | wallLampArm | 0.20 × 0.30 × 0.42 | 1,044 | 1 | Body, Shade |
 | wallLightOutdoor | 0.22 × 0.33 × 0.11 | 1,220 | 2 | Body, Shade |

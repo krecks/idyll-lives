@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built lamps (tools/art/blender/families/lighting.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Shades, diffusers and bulbs glow at night (`glow`); the ceiling fan's blades turn and the paper lantern sways all the time near the camera (`idle`).",
+  "$comment": "Blender-built lamps (tools/art/blender/families/lighting.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Shades, diffusers and bulbs glow at night (`glow`); the ceiling fan's blades turn while it is on, near the camera (`idle`).",
   "version": 1,
   "entries": {
     "model.ceilingPendant": {
@@ -181,9 +181,6 @@
         "white": {
           "finish": "material.finish.satin"
         }
-      },
-      "motions": {
-        "idle": "sway"
       },
       "paint": [
         {
@@ -550,7 +547,8 @@
       "url": "../../models/lighting/lampBanker.glb",
       "materials": {
         "banker": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#4FB27A"
         },
         "brass": {
           "finish": "material.finish.metal"
@@ -585,7 +583,7 @@
         },
         "cap": {
           "finish": "material.finish.gloss",
-          "glow": "#FFD9A0"
+          "glow": "#FFAA78"
         },
         "porcelain": {
           "finish": "material.finish.gloss"
