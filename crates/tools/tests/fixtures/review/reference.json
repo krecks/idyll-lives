@@ -1,0 +1,18 @@
+{
+  "tolerance": 0.1,
+  "sources": {
+    "ergo": { "title": "An ergonomics table", "url": "https://example.org/ergonomics" }
+  },
+  "kinds": {
+    "dining-chair": { "label": "Dining chair", "w": [0.4, 0.55], "h": [0.78, 1.0], "d": [0.45, 0.6], "seat": [0.42, 0.48], "uses": ["sit at a table"], "sources": ["ergo"] },
+    "dining-table": { "label": "Dining table", "h": [0.72, 0.78], "surface": [0.72, 0.76] },
+    "armchair": { "label": "Armchair", "seat": [0.4, 0.48] },
+    "bar-stool": { "label": "Bar stool", "seat": [0.65, 0.8] },
+    "sofa-bed": { "label": "Sofa bed", "seat": [0.4, 0.48], "mattress": [0.4, 0.5], "minutes": { "nap": [20, 60] }, "mechanisms": { "mattress": [0, 0.6] } },
+    "lamp": { "label": "Lamp", "h": [0.3, 0.7] },
+    "vase": { "label": "Vase" }
+  },
+  "groups": { "kitchen/dining": "dining-table", "seating": "armchair", "ornaments": "vase" },
+  "ids": { "stool": "bar-stool", "model.sharedChair": "dining-chair", "model.lampOnly": "lamp", "ghost": "no-such-kind" },
+  "decor": ["vase"]
+}

@@ -6,4 +6,5 @@ pub mod characters;
 pub mod checkglb;
 pub mod content;
 pub mod pcg64;
+pub mod review;
 pub mod tex;
