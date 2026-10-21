@@ -175,33 +175,36 @@
       "type": "model",
       "url": "../../models/garden/boulder.glb",
       "materials": {
+        "fleck": {
+          "finish": "material.finish.matte"
+        },
         "leaf": {
           "finish": "material.finish.foliage"
         },
         "moss": {
           "finish": "material.finish.foliage"
         },
-        "stone": {
+        "rock": {
           "finish": "material.finish.matte"
         },
-        "stone_dark": {
+        "rock_dark": {
           "finish": "material.finish.matte"
         },
-        "stone_warm": {
+        "rock_warm": {
           "finish": "material.finish.matte"
         }
       },
       "paint": [
         {
-          "material": "stone",
+          "material": "rock",
           "label": "Large boulder"
         },
         {
-          "material": "stone_dark",
+          "material": "rock_dark",
           "label": "Middle boulder"
         },
         {
-          "material": "stone_warm",
+          "material": "rock_warm",
           "label": "Small boulder"
         }
       ]

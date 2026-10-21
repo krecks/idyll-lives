@@ -5,8 +5,12 @@
 # time near the camera (`flow`, ambient: the jet bubbling up, rings on the basins); the rest are still.
 #
 # Run:  cargo art garden_decor [--only gnome] [--preview]
+import math
 import os
 import sys
+
+from mathutils import Vector
+from mathutils import noise as vnoise
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -16,6 +20,10 @@ M = G.Palette(
     stone=('#B9B2A6', 'matte'),
     stone_dark=('#8F887C', 'matte'),
     stone_warm=('#C6BCA9', 'matte'),
+    rock=('#8A847A', 'matte'),          # the boulders: weathered grey-brown stone, darker than the dressed stone
+    rock_dark=('#6F6A62', 'matte'),
+    rock_warm=('#968A78', 'matte'),
+    fleck=('#5C5852', 'matte'),         # their mottle: darker facets (plain, so no more draws)
     water=('#6FA8C0', 'gloss'),         # opaque, like the old parts' water
     moss=('#5E8A3C', 'foliage'),
     leaf=('#4E7A34', 'foliage'),
@@ -157,16 +165,52 @@ def wheelbarrow():
     return G.settle([G.join_all('wheelbarrow')])
 
 
+def _rock(name, radius, at, material, scale, seed, cut=0.22):
+    """A weathered garden stone: a coarse icosphere broken up by two octaves of noise and flat-shaded into facets,
+    its bottom cut flat (`cut` of its height: sunk into the grass), then squashed by `scale`; a mottle of `M.fleck`
+    on the faces the noise picks."""
+    obj = G.boulder(name, radius, at=at, material=material, seed=seed, noise=0.0, subdivisions=2, smooth=False)
+    mesh = obj.data
+    centre = Vector((0, 0, radius))
+    for v in mesh.vertices:
+        q = v.co - centre
+        a = vnoise.noise(Vector((q.x * 1.4 + seed, q.y * 1.4 - seed, q.z * 1.4 + seed * 0.5)))
+        b = vnoise.noise(Vector((q.x * 3.6 - seed, q.y * 3.6 + seed, q.z * 3.6)))
+        q = q * (1.0 + 0.45 * a + 0.12 * b)
+        # split faces: the stone cut back flat where a plane crosses it, as rock breaks
+        for k in range(3):
+            t = math.radians(seed * 97 + k * 131)
+            n = Vector((math.cos(t) * 0.8, math.sin(t) * 0.8, 0.45 - 0.3 * k)).normalized()
+            over = q.dot(n) - radius * (0.62 + 0.08 * k)
+            if over > 0:
+                q = q - n * over
+        v.co = centre + q
+    zs = [v.co.z for v in mesh.vertices]
+    floor = min(zs) + cut * (max(zs) - min(zs))
+    for v in mesh.vertices:
+        v.co.z = max(v.co.z, floor) - floor
+    mesh.materials.append(M.fleck)
+    for p in mesh.polygons:
+        c = p.center
+        if vnoise.noise(Vector((c.x * 9 + seed, c.y * 9, c.z * 9 - seed))) > 0.05:
+            p.material_index = 1
+    mesh.update()
+    obj.scale = scale
+    return obj
+
+
 def boulder():
-    G.boulder('boulder_main', 0.40, at=(0, 0, 0), material=M.stone, scale=(1.05, 0.9, 0.62), seed=0.4)
-    G.boulder('boulder_side', 0.17, at=(0.30, -0.20, 0), material=M.stone_dark, scale=(1.0, 0.8, 0.85), seed=2.1)
-    G.boulder('boulder_small', 0.10, at=(-0.36, 0.20, 0), material=M.stone_warm, scale=(1.0, 0.8, 1.0), seed=4.2)
-    # moss on top and a few tufts around the base
-    G.boulder('moss', 0.22, at=(-0.06, -0.04, 0.41), material=M.moss, scale=(1.5, 0.75, 0.20), seed=7.3, noise=0.35)
-    G.boulder('moss2', 0.13, at=(0.24, 0.14, 0.16), material=M.moss, scale=(1.3, 0.75, 0.25), seed=9.1, noise=0.4)
-    for i, (x, y) in enumerate([(0.38, 0.04), (-0.40, 0.08), (0.10, 0.33), (-0.16, -0.33)]):
+    # three stones, wider than tall and flat-bottomed, darker than the fountain's dressed stone and mottled
+    _rock('boulder_main', 0.4, (0, 0, 0), M.rock, (1.08, 0.92, 0.72), seed=0.4)
+    _rock('boulder_side', 0.18, (0.33, -0.2, 0), M.rock_dark, (1.0, 0.85, 0.8), seed=2.1)
+    _rock('boulder_small', 0.11, (-0.38, 0.2, 0), M.rock_warm, (1.0, 0.8, 0.9), seed=4.2)
+    # moss in the cracks and where the stones meet the grass, not lying on top; a few tufts round the base
+    for i, (x, y, z, r, s) in enumerate([(0.2, -0.12, 0.0, 0.1, (1.6, 0.8, 0.35)), (-0.3, 0.1, 0.0, 0.09, (1.4, 0.9, 0.4)),
+                                         (0.05, -0.36, 0.0, 0.08, (1.8, 0.7, 0.3))]):
+        G.boulder(f'moss{i}', r, at=(x, y, z), material=M.moss, scale=s, seed=7.3 + i, noise=0.4, subdivisions=2)
+    for i, (x, y) in enumerate([(0.38, 0.06), (-0.40, 0.1), (0.10, 0.34), (-0.16, -0.34)]):
         G.boulder(f'tuft{i}', 0.09, at=(x, y, 0), material=M.leaf, scale=(1.6 if i > 1 else 0.7, 0.7 if i > 1 else 1.6, 0.6),
-               seed=i * 2.3, noise=0.45)
+                  seed=i * 2.3, noise=0.45)
     return G.settle([G.join_all('boulder')])
 
 
@@ -185,8 +229,8 @@ FAMILY = G.Family(
              paint=[('stone', 'Lantern'), ('stone_dark', 'Base')]),
      G.Model('wheelbarrow', wheelbarrow, size=(0.587, 0.754, 1.036), tolerance=TOLERANCE,
              paint=[('paint', 'Tray'), ('wood', 'Handles'), ('metal_dark', 'Legs & tyre')]),
-     G.Model('boulder', boulder, size=(0.903, 0.515, 0.848), tolerance=TOLERANCE,
-             paint=[('stone', 'Large boulder'), ('stone_dark', 'Middle boulder'), ('stone_warm', 'Small boulder')])],
+     G.Model('boulder', boulder, size=(0.973, 0.426, 0.84), tolerance=TOLERANCE,
+             paint=[('rock', 'Large boulder'), ('rock_dark', 'Middle boulder'), ('rock_warm', 'Small boulder')])],
     pack='gardenDecor',
     comment='Blender-built garden decor (tools/art/blender/families/garden_decor.py): a gnome, a bird '
             'bath, a two-tier fountain, a stone lantern, a wheelbarrow planter and boulders. Listed in '
