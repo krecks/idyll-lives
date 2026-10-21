@@ -4477,6 +4477,13 @@
       ],
       "price": 380,
       "category": "outdoor",
+      "slots": 4,
+      "places": [
+        { "at": [0, 0.85], "facing": 180 },
+        { "at": [0.85, 0], "facing": -90 },
+        { "at": [0, -0.85] },
+        { "at": [-0.85, 0], "facing": 90 }
+      ],
       "freeRotation": true,
       "group": "cooking",
       "outdoors": true,
@@ -4487,10 +4494,6 @@
         "tiles": 8,
         "switch": false
       },
-      "seat": {
-        "height": 0.38,
-        "forward": 0.38
-      },
       "description": "A ring of stones and a crackling fire. It lights the garden at night, and warming up by it leaves residents cosy.",
       "interactions": [
         {
@@ -4498,7 +4501,8 @@
           "label": "Warm up by the fire",
           "anim": "relax",
           "minutes": 30,
-          "pose": "sit",
+          "seatNear": 3,
+          "seatFacing": "around",
           "effects": {
             "comfort": 0.4,
             "fun": 0.15
