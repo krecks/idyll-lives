@@ -43,6 +43,8 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
   seats the hips sit forward until the knees clear the cushion's front (`furniture.json` `seats` `front`, measured by
   `cargo check-glb`): a child at the front edge with the shins and feet showing, a grown-up a few centimetres
   forward on the loveseat and the three-seat sofa; no one's shins end inside the seat.
+- Since the authenticity review (G-51): the chaise is got onto from its side (`approach: side`), not over its leg
+  rest; the wall bed, folded down, is got into from beside each sleeper's half, not over its foot.
 
 ## L2. Armchairs and small seats (11)
 

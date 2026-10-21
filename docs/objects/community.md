@@ -58,6 +58,10 @@ rides.
   dribbles, a gather, a jump shot let go at the top with the wrist flicked through, the follow-through held; a child
   heaves it two-handed from the chest. The ball is mimed (props in hand, I-held-01); the streetball hoop still picks
   its ball up (`pickUp`, `interact`).
+- Since the authenticity review (G-43): the hoop's two players come to their own half of the tile in front of it
+  (`stand_spot`), so each steps back to the lane on their side, not both to the first one from one spot inside
+  each other; the streetball hoop's two shoot from their own spots a pace apart, turned in a little (`places`,
+  packs).
 
 ## CM2. Street furniture (10)
 
@@ -88,6 +92,10 @@ rides.
 - Since the authenticity review (G-15): the notice board is read looking at it (`idle`), not at a book in the hands;
   the timetable reader steps into the shelter to its end (`STEP_IN`); the statue is admired from a step further back,
   looking up at it.
+- Since the authenticity review (G-43, G-51): three waiting each come to the tile in front of their own seat on the
+  bench and sit down from it (not all from the middle tile, sliding along), and three at the timetable stand one in
+  front of each tile: the first steps in to it (`STEP_IN`), the others read from where they stand. A wish at the
+  fountain: up to four along its front, a pace apart.
 
 ## CM3. Food stalls and vending (5)
 
@@ -106,6 +114,8 @@ rides.
   (held 2 s), the hot dog stand's lid, a snack and a can dropping in the machines, the market stall browsed and
   fruit bought.
 - Each clip plays its full length and shuts in every run. Nothing needed fixing.
+- Since the authenticity review (G-43): two at a stall stand one in front of each half, facing it, not one inside the
+  other (`stand_spot`); one alone at a 2-wide stall or cart at its middle, not its left end (I-community-08).
 
 ## CM4. Shops and café (5)
 
@@ -129,6 +139,8 @@ rides.
   top's near edge is a fixed reach ahead of the hips (up to 0.45 m, read from the table's triangles in
   `tableTuck.ts`), and pushes it back while rising; the sim's positions are unchanged.
 - The shop counter's "Counter" colours its front panels, "Trim" the walnut top and frame.
+- Since the authenticity review (G-43): two at the shop counter, the bakery case or the grocery shelves stand one in
+  front of each half, facing it; one alone at its middle (I-community-08).
 
 ## CM5. Farm (8)
 

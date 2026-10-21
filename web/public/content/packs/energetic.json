@@ -30,6 +30,7 @@
       "name": "Interactive recumbent bike",
       "model": "model.energetic.spinBike",
       "footprint": [1, 2],
+      "approach": "side",
       "price": 1250,
       "category": "fitness",
       "slots": 1,
@@ -86,6 +87,10 @@
       "category": "outdoor",
       "freeRotation": true,
       "slots": 2,
+      "places": [
+        { "at": [-0.45, 1], "facing": 156 },
+        { "at": [0.45, 1], "facing": -156 }
+      ],
       "description": "A weighted hoop for the driveway. Shooting around is fun and, with a friend, a little social too.",
       "interactions": [
         {

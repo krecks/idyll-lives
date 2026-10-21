@@ -113,7 +113,8 @@ fn on_a_turned_lot_they_get_into_bed_from_the_free_side() {
     }
     let s = &w.sims[0];
     assert_eq!(s.pose, Pose::Lie, "never got into bed");
-    assert_eq!(stood, Some((W - 1 - 1, D - 1 - 3)), "got into bed from the wrong side");
+    // (From beside it, by the foot row: its other side is against the wall; G-51.)
+    assert_eq!(stood, Some((W - 1 - 3, D - 1 - 2)), "got into bed from the wrong side");
     // Lying where they would in a bed whichever way it's turned.
     let bed = &w.objects[BED as usize];
     let lying = (0..2).map(|slot| bed.slot_position(&w.content, slot));

@@ -70,6 +70,8 @@ none.
 - A doze on the lounger or in the hammock is taken in the day clothes, shoes on (pyjamas are for a night in bed).
 - Known: a swing or a sunbathe ends within seconds when the need it fills is full (fun 0.8 to 1 in about 8 s), and
   the next one is refused until it drops. That is the needs, not the model.
+- Since the authenticity review (G-51): the sun lounger and the hammock are got onto from their side (`approach:
+  side`), sitting on the edge first (the hammock's sling as before, from the side), not over their foot.
 
 ## OU3. Grills and fire (3)
 

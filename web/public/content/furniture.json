@@ -922,6 +922,7 @@
         1,
         1
       ],
+      "approach": "behind",
       "price": 160,
       "category": "kitchen",
       "group": "dining",
@@ -1966,6 +1967,7 @@
         1,
         2
       ],
+      "approach": "side",
       "price": 320,
       "category": "bedroom",
       "group": "beds",
@@ -2011,6 +2013,7 @@
         1,
         2
       ],
+      "approach": "side",
       "price": 650,
       "category": "bedroom",
       "upperStages": [
@@ -2151,6 +2154,7 @@
         2,
         2
       ],
+      "approach": "side",
       "price": 1800,
       "category": "bedroom",
       "group": "beds",
@@ -2784,6 +2788,7 @@
         1,
         2
       ],
+      "approach": "side",
       "price": 260,
       "category": "kids",
       "description": "A small bed with a guard rail and stars on the headboard.",
@@ -2992,6 +2997,7 @@
         1,
         1
       ],
+      "approach": "behind",
       "price": 180,
       "category": "kids",
       "stages": [
@@ -3088,6 +3094,7 @@
         2,
         1
       ],
+      "approach": "behind",
       "price": 260,
       "category": "office",
       "description": "A plain desk with a lamp, paper and pens: writing trains Writing, and pupils do their homework here.",
@@ -3151,6 +3158,7 @@
         1,
         1
       ],
+      "approach": "behind",
       "price": 650,
       "category": "office",
       "description": "A small desk with a laptop: browse, write or code without the price of a full computer desk.",
@@ -3248,6 +3256,7 @@
         2,
         1
       ],
+      "approach": "behind",
       "price": 1900,
       "category": "office",
       "surface": {
@@ -3517,6 +3526,7 @@
         2,
         1
       ],
+      "approach": "behind",
       "price": 650,
       "category": "hobbies",
       "group": "music",
@@ -3561,6 +3571,10 @@
       "category": "hobbies",
       "group": "games",
       "slots": 2,
+      "places": [
+        { "at": [-0.55, 1.5], "facing": 180 },
+        { "at": [0.55, -1.5] }
+      ],
       "description": "A full-size table with balls and a cue. A game for two that trains Perception and Dexterity.",
       "interactions": [
         {
@@ -3611,6 +3625,10 @@
       "category": "hobbies",
       "group": "games",
       "slots": 2,
+      "places": [
+        { "at": [-0.3, 1], "facing": 180 },
+        { "at": [0.3, -1] }
+      ],
       "description": "Spin the rods and score: quick fun for two.",
       "interactions": [
         {
@@ -3640,6 +3658,7 @@
         1,
         1
       ],
+      "places": [{ "at": [0, 2.24], "facing": 180 }],
       "price": 70,
       "category": "hobbies",
       "group": "games",
@@ -3673,6 +3692,7 @@
         1,
         1
       ],
+      "approach": "behind",
       "price": 380,
       "category": "hobbies",
       "group": "crafts",
@@ -3762,6 +3782,7 @@
         1,
         1
       ],
+      "approach": "side",
       "price": 420,
       "category": "fitness",
       "description": "A basic upright bike: cycling builds Endurance.",
@@ -4928,6 +4949,7 @@
         1,
         2
       ],
+      "approach": "side",
       "price": 220,
       "category": "outdoor",
       "group": "seating",
@@ -4976,6 +4998,7 @@
         1,
         3
       ],
+      "approach": "side",
       "price": 240,
       "category": "outdoor",
       "group": "seating",

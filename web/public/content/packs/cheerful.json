@@ -44,6 +44,10 @@
       "price": 850,
       "category": "living",
       "slots": 2,
+      "places": [
+        { "at": [-0.45, 1], "facing": 156 },
+        { "at": [0.45, 1], "facing": -156 }
+      ],
       "description": "Glowing retro jukebox full of feel-good hits: dancing to it is as fun as TV, keeps residents a little fitter and leaves them Upbeat.",
       "interactions": [
         {

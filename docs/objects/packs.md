@@ -56,6 +56,8 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 - The booth's curtain is gathered along its rail, not hinged: swung, it would sweep through the backrest.
 - Since the authenticity review (G-04): the karaoke singer steps up to the machine's mic stand (`STEP_IN`), the hands
   free; the party booth's video party is talked to the laptop (`sitTalk`), not a phone at the ear.
+- Since the authenticity review (G-43): two dancing to the jukebox dance a pace apart in front of it, turned in a
+  little (`places`), not one inside the other.
 
 ## P3. Couch potato (6)
 
@@ -106,6 +108,8 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
   needed fixing.
 - The recovery pod stands open 40° at rest (clear of the wall behind) and closes for recover.
 - The contrast shower fills its tile with its own tiled walls, as the bathroom showers do.
+- Since the authenticity review (G-43, G-51): the streetball hoop's two shoot from their own spots a pace apart
+  (`places`); the recumbent bike is got onto from its side (`approach: side`), not over its front.
 
 ## P5. Example pack (2)
 
@@ -147,6 +151,8 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 - The herb garden has no worktop; its second colour part is the pots.
 - Since the authenticity review (G-14): the herb trough is tended standing at it, leaning in (`pick`, `STAND_BACK`
   -0.5), not kneeling.
+- Since the authenticity review (G-43): two at the pizza oven or the chef's island stand one in front of each half,
+  facing it.
 
 ## P7. Gloomy (6)
 
@@ -250,6 +256,8 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
   and on Low WebGL2.
 - Known, accepted: at the quilt table the shoes poke out at the foot of the quilt's front, for tuckIn and doze.
 - The bed's head section is held up only 2 s: up for the whole nap, it would cover the sleepers' heads.
+- Since the authenticity review (G-51): the Snoozecloud bed is got into from its sides, each sleeper by their own
+  half (`approach: side`), as the base beds.
 
 ## P11. Loner (6)
 
@@ -341,6 +349,8 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 - Nothing glows at night (the dance floor's tiles and the photo wall's string lights could take a `glow`).
 - Since the authenticity review (G-04): the video call is talked to the screen (`sitTalk`), the hands free; on the
   karaoke stage each singer steps up onto it to a mic stand (`STEP_IN`, the lyrics screen ahead).
+- Since the authenticity review (G-43): two at the party bar, the karaoke stage or the dance floor stand one in front
+  of each half (the stage's two then step up to a mic stand each), not one inside the other.
 
 ## P15. Romantic (6)
 

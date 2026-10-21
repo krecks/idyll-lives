@@ -40,3 +40,6 @@ the object's colours, so there are never two.
   Known, not changed: the pad is 50 cm high, over a flat bench's 40–48 (M-fitness-01, left to the Blender wave).
 - The treadmill's belt runs slower than a jog: faster blurs at the fastest game speed. The loop jumps home each round
   under the motor hood and rear roller cap, where it doesn't show.
+- Since the authenticity review (G-51): the exercise bike is got onto from its side (`approach: side`, the side
+  nearer them first), not through its handlebars and flywheel; the weight bench from its side too. A rider still
+  glides the half metre onto the saddle while sitting down (no straddle clip).

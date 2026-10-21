@@ -284,8 +284,12 @@ export interface ObjectDef {
   surface?: { height: number; kind: SurfaceKind; inset?: number; size?: [number, number]; at?: [number, number] };
   /** Things on the `surface` layer: the radius (m) of the disc they take on their host's top (default 0.12). */
   radius?: number;
-  /** Where it is used from: the tile in front (default), or any free tile `around` it (chairs pushed under a table). */
-  approach?: 'front' | 'around';
+  /**
+   * Where it is used from: the tile in front (default), any free tile `around` it (chairs pushed under a table);
+   * sat or lain on from beside the slot (`side`: beds, bikes) or from behind it (`behind`: a desk's chair), in
+   * front of it in build mode's rule and used standing (sim-core's `seat_approach`).
+   */
+  approach?: 'front' | 'around' | 'side' | 'behind';
   /** Seats: the kinds of surface they tuck under; facing one, they are a seat at that table. */
   seatAt?: SurfaceKind[];
   /**

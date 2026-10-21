@@ -674,6 +674,42 @@ fn doors(w: &mut World) {
     }
 }
 
+/// How far (m) out from its front door a visitor stands to knock: an arm's length.
+const KNOCK_REACH: f32 = 0.45;
+
+/// Where a visitor knocks at `plot`: at the front door (the door from outdoors into the house
+/// nearest the plot's `entry`, within a few tiles of it), `KNOCK_REACH` out from it, facing it;
+/// and the tile they stand on. None without a door like that, or with something in front of it.
+pub(crate) fn knock_spot(nav: &crate::path::NavGrid, plot: &crate::world::Plot) -> Option<Knock> {
+    let lot = nav.lot;
+    let entry = plot.arrival_point();
+    let (ex, ez) = (entry[0].floor() as i32, entry[1].floor() as i32);
+    let mut best: Option<(f32, Knock)> = None;
+    for z in ez - 3..=ez + 3 {
+        for x in ex - 3..=ex + 3 {
+            if !plot.contains(x, z) || !lot.in_bounds(x, z) || lot.room_at(x, z) != crate::lot::OUTDOORS || !nav.tile_free(x, z) {
+                continue;
+            }
+            for (dx, dz) in [(0, 1), (1, 0), (0, -1), (-1, 0)] {
+                let (ix, iz) = (x + dx, z + dz);
+                if !lot.in_bounds(ix, iz) || lot.room_at(ix, iz) == crate::lot::OUTDOORS || lot.edge_between(x, z, ix, iz) != crate::lot::Edge::Door {
+                    continue;
+                }
+                let door = [x as f32 + 0.5 + dx as f32 * 0.5, z as f32 + 0.5 + dz as f32 * 0.5];
+                let at = [door[0] - dx as f32 * KNOCK_REACH, door[1] - dz as f32 * KNOCK_REACH];
+                let d = (door[0] - entry[0]).hypot(door[1] - entry[1]);
+                if best.is_none_or(|b| d < b.0) {
+                    best = Some((d, ((x, z), at, (dx as f32).atan2(dz as f32))));
+                }
+            }
+        }
+    }
+    best.map(|(_, k)| k)
+}
+
+/// Where a visitor knocks (`knock_spot`): the tile, the point and the way they face.
+pub(crate) type Knock = ((i32, i32), [f32; 2], f32);
+
 /// Who answers the door of `plot`: the grown-up of the household living there who is nearest to
 /// the door, at home, awake, and not busy with something the player asked for or a conversation.
 fn door_host(w: &World, plot: u32, guest: usize) -> Option<usize> {

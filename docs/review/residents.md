@@ -285,7 +285,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters.ts:2755` (`standUp`), `crates/sim-core/src/world.rs`
 - **Evidence:** The sim puts the resident on the tile in front at once, so `standUp` plays while they glide back to it. Deferred from 0.3.0 unless the stand-up is reworked.
-- **Status:** seeded (from `docs/objects/open.md` L124); not checked in the pilot (the shots are not timed to the stand-up)
+- **Status:** fixed (d7b7096d)
+- **After:** getting up from a seat, the body rises where the seat is (the seated root as last drawn) and steps to the tile sim-core put them on in the second half of the stand-up (0.25–0.75 of it), its shadow with it, instead of gliding there seated from the clip's start. Timed in a window: `bench-results/review/fixes/positions/play-headed/diningTable-headed-up-100.png` … `-up-1100.png` (up at the seat to 300 ms, stepped off by 700); headless `computerDesk-up-*.png`, `bed-up-*.png`. Still: the step is a slide, through a built-in chair's back when the tile is behind it (A-residents-14); walking off at once skips the stand-up, as before.
 - **Source:** `docs/objects/open.md` Still open › Residents; `plan/release-0.3.0.md` §1.4 and §8 (deferred)
 
 ### A-residents-02 — `check_clips.ts` fails `jogAlong`: a loop seam and sliding feet
@@ -411,6 +412,26 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Status:** open
 - **Source:** fix: rides
 
+### A-residents-13 — Sitting down still slides from the tile onto the seat
+
+- **Severity:** S3
+- **Rubric:** A4
+- **Fix class:** code
+- **Where:** `web/src/render/babylon/characters.ts` (the settle into a seat: `rig.x` eased to sim-core's slot at 9/s while `sitDown` plays)
+- **Evidence:** `bench-results/review/fixes/positions/play/computerDesk-wall-in-200.png` (the desk's back to the wall: come from beside it, G-51, the sitter slides 1.5 m along behind the desk onto the chair in the first 0.3 s of sitting down), `bench-results/review/fixes/positions/play/exerciseBike-in-200.png` (half a metre sideways onto the saddle). Now that seats are come to from their side or behind (G-51) the slide no longer goes through the work, but it is still a slide: the other half of A-residents-01. A short walk-in to the seat's front before `sitDown` (the walk clip at the walk's pace, then the turn) would close it.
+- **Status:** open
+- **Source:** fix: positions
+
+### A-residents-14 — Rising off a chair that can't move steps back through it
+
+- **Severity:** S3
+- **Rubric:** A1, A4
+- **Fix class:** code
+- **Where:** `web/src/render/babylon/characters.ts` (`rising`: the step from the seat to the tile sim-core put them on, in the second half of `standUp`); chairs built into tables and desks (`diningTable`, the desks, `places` come to from behind)
+- **Evidence:** `bench-results/review/fixes/positions/play-headed/diningTable-headed-up-700.png` (headed, timed): risen at the seat, the sitter steps back to the tile behind the table's chair through the chair's back. A chair pulled up to a table is pushed back as they rise (`tuckOut`); one built into the model isn't, so the step passes through it. A step sideways round it (to the tile beside), or the chair part moved back as the loose chairs are, would close it.
+- **Status:** open
+- **Source:** fix: positions
+
 ### M-residents-01 — Heads are about half a head bigger than the rubric's ratios at every stage
 
 - **Severity:** S3
@@ -518,7 +539,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters.ts:304` (`LIE_ENTRY` 0.55: the hips sit down 0.55 m forward of the slot's middle), `:2533-2541` (getting in: `sitDown` on the edge facing the tile they came from, then the crossfade to lying); the beds' `approach` (default `front`: the tile in front, the foot end) in `web/public/content/furniture.json` and `catalog2/bedroom.json`; getting up `web/src/render/babylon/characters.ts:2755-2807` (`standUp`, `fromBed`)
 - **Evidence:** `bedroom/play/chunk1/bedSingle-sleep-00.png`: the resident sits down facing out, about 0.4 m in from the foot end of the single, the thighs through its 0.6 m footboard; `bedroom/play/stage-elder/bedSingle-sleep-01.png` (the elder, the same, the shoes on the mattress); `bedroom/play/chunk1/bedKing-sleep-01.png` (half way through the crossfade, half reclined in the middle of the bed); `bedroom/extra/bunk-two-02.png` (the bunk's end board). From there the body crossfades about 1.4 m up the bed to lie with the head on the pillow. People get in at a side, sit on the edge by the pillow and swing the legs in. On beds with a footboard or end arms (`bedSingle`, `bedBunk`, `bedDaybed`) the legs pass through it; on the rest (`bed`, `bedKing`, `bedDouble`, `bedQueenUpholstered`, `bedCanopy`, `bedFuton`) it is the sit at the foot and the slide. Other items: `kidsBed`, `kidsBedCar` (kids), `wallBed`, `sofaBed` (living), the packs' beds: every `lie` use on a bed. Cause in the renderer and the beds' approach: for `residents.md` (row "Lie fit").
-- **Status:** open
+- **Status:** fixed (36198175, 0d20c5c9, d7b7096d, ad1c277d)
+- **After:** beds are got into from the side (`approach: side` on every bed but the futon and the sofa bed): the sleeper comes to the tile beside their own half (a double's two on its two sides, a single from the side nearer, the bunk's lower sleeper from its ladder side, the upper one from the front up G-44's ladder), sits on the edge facing out 0.2 m in from it (`sideIn`, `SIDE_IN`), and turns to lie along it as they lie back; up, sim-core turns them out to that side and they sit up and step off there. Over the foot (`LIE_ENTRY`) only with both sides blocked. `bench-results/review/fixes/positions/play/bed-in-300.png`, `bed-in-900.png`, `bed-in-1500.png`, `bed-up-*.png`, `bedCanopy-in-300.png`, `bedBunk-in-*.png` against `bedroom/play/chunk1/bedSingle-sleep-00.png`, `bedKing-sleep-01.png`, `bedroom/extra/bunk-two-02.png`. Sim tests `tests/positions.rs` `beds_are_got_into_from_the_side_and_left_that_way`, `turned_lots.rs`.
 - **Source:** wave: bedroom
 
 ### I-bathroom-03 — Residents shower in their clothes, behind clear glass

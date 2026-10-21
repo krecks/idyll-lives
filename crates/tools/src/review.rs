@@ -256,6 +256,8 @@ pub fn objects(dir: &Path) -> Result<Vec<Object>, String> {
             approach: match def.approach {
                 sim_core::content::Approach::Front => "front",
                 sim_core::content::Approach::Around => "around",
+                sim_core::content::Approach::Side => "side",
+                sim_core::content::Approach::Behind => "behind",
             },
             uses,
             lamp: raw.get("light").is_some_and(|l| !l.is_null()),

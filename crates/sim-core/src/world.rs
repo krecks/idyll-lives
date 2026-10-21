@@ -393,12 +393,32 @@ impl ObjectInstance {
         [c[0] + yaw.cos() * offset, c[1] - yaw.sin() * offset]
     }
 
+    /// Where `slot`'s user is in the object's own frame, before its free turn: metres to its
+    /// right and to its front of the middle of its tiles (`slot_position` without the offset).
+    pub(crate) fn slot_local(&self, def: &crate::content::ObjectDef, slot: usize) -> [f32; 2] {
+        if let Some(p) = def.places.get(slot) {
+            return [0, 1].map(|k| p.at[k] * self.extent[k] as f32 / 100.0 / def.footprint[k].max(1) as f32);
+        }
+        let n = def.slots.max(1) as f32;
+        let spread = if def.bunk { 0.04 } else { self.extent[0] as f32 / 100.0 / n };
+        [(slot as f32 - (n - 1.0) / 2.0) * spread, 0.0]
+    }
+
+    /// The point `[right, front]` metres off the middle of its tiles in its own frame (by its
+    /// `rot`, not its free turn or offset: where its tiles are).
+    pub(crate) fn local_point(&self, at: [f32; 2]) -> [f32; 2] {
+        let (w, d) = self.turned_footprint();
+        let yaw = self.yaw();
+        let c = [self.x as f32 + w as f32 / 2.0, self.z as f32 + d as f32 / 2.0];
+        [c[0] + yaw.cos() * at[0] + yaw.sin() * at[1], c[1] - yaw.sin() * at[0] + yaw.cos() * at[1]]
+    }
+
     /// Which way a Sim in `slot` faces (`Sim::yaw`): its place's facing (content `places`), else
     /// the way the object faces.
     pub fn slot_yaw(&self, content: &Content, slot: usize) -> f32 {
         match content.objects[self.def].places.get(slot) {
             // Kept within a half turn either way, as every yaw is (a place's facing on a turned object can add up past one).
-            Some(p) => (self.angle() + p.facing + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI,
+            Some(p) => wrap_angle(self.angle() + p.facing),
             None => self.yaw(),
         }
     }
@@ -4691,30 +4711,40 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             if inter.seat_near > 0.0 && reserved_seat.is_none() {
                 reserved_seat = seat_near_object(sim, ctx, objects, object, inter);
             }
-            // From the tile by the slot they'll get, when it has a place of its own (`places`).
+            // From the tile by the slot they'll get (round to its place, `places`; onto a bed
+            // from the side, `seat_approach`), or to their own spot along the front of a thing
+            // used standing (`stand_spot`).
+            let slot = obj.slot_for(sim.id, &content.objects[obj.def], interaction, sim.pos);
+            let spot = slot
+                .filter(|_| reserved_seat.is_none() && inter.pose == Pose::Stand && !inter.inside && !inter.carried && !inter.at_slot).and_then(|k| crate::surface::stand_spot(content, nav, obj, k, inter.whole || inter.leaves.is_some()));
             let t = match reserved_seat {
                 Some(seat) => {
                     let s = &objects[seat as usize];
                     let def = &content.objects[s.def];
                     s.pick_slot(sim.id, 0..def.slots as usize, Some((def, sim.pos)))
-                        .and_then(|k| crate::surface::slot_approach(content, nav, s, k))
+                        .and_then(|k| crate::surface::seat_approach(content, nav, s, k, sim.pos))
                         .or_else(|| ctx.index.links.approach_of(seat))
                         .unwrap_or_else(|| s.front_tile(content))
                 }
                 // (A baby's care at the high chair from beside it; the change at the crib's
-                // changing table, in front of it.)
+                // changing table, in front of it; then their own spot, or round to their seat or
+                // bed, or a thing on a top from the top's front.)
                 None if inter.carried => crate::carry::care_spot(ctx, obj),
-                None => {
-                    let slot = obj.slot_for(sim.id, &content.objects[obj.def], interaction, sim.pos);
-                    slot.filter(|_| inter.at_slot)
-                        .and_then(|k| crate::carry::slot_front(ctx, obj, k))
-                        .or_else(|| slot.and_then(|k| crate::surface::slot_approach(content, nav, obj, k)))
-                        .or_else(|| ctx.index.links.approach_of(object))
-                        .unwrap_or_else(|| obj.front_tile(content))
-                }
+                None => slot
+                    .filter(|_| inter.at_slot)
+                    .and_then(|k| crate::carry::slot_front(ctx, obj, k))
+                    .or_else(|| spot.map(|(t, ..)| t))
+                    .or_else(|| {
+                        slot.and_then(|k| match inter.pose {
+                            Pose::Stand if !inter.inside => crate::surface::slot_approach(content, nav, obj, k),
+                            _ => crate::surface::seat_approach(content, nav, obj, k, sim.pos),
+                        })
+                    })
+                    .or_else(|| ctx.index.links.approach_of(object))
+                    .unwrap_or_else(|| obj.front_tile(content)),
             };
             let tags = inter.tags;
-            ([t.0 as f32 + 0.5, t.1 as f32 + 0.5], t, tags)
+            (spot.map_or([t.0 as f32 + 0.5, t.1 as f32 + 0.5], |(_, p, _)| p), t, tags)
         }
         TaskKind::MoveTo { x, z } => ([x, z], (x.floor() as i32, z.floor() as i32), 0),
         TaskKind::Clean { x, z } => ([x as f32 + 0.5, z as f32 + 0.5], (x, z), content.room_rules.clean.tags),
@@ -4741,12 +4771,14 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
         }
         // (Their visit starts once there's a way there: see below.)
         TaskKind::Visit { plot } => {
-            let door = ctx.plots[plot as usize].arrival_point();
-            (
-                door,
-                (door[0].floor() as i32, door[1].floor() as i32),
-                content.visits.tags,
-            )
+            // At a house with door rules, up to its front door to knock (`life::knock_spot`).
+            let p = &ctx.plots[plot as usize];
+            let knock = (content.visits.door.is_some() && !p.public).then(|| crate::life::knock_spot(nav, p)).flatten();
+            let door = p.arrival_point();
+            match knock {
+                Some((t, at, _)) => (at, t, content.visits.tags),
+                None => (door, (door[0].floor() as i32, door[1].floor() as i32), content.visits.tags),
+            }
         }
         TaskKind::GoHome => {
             let home = ctx.households[sim.household as usize].plot;
@@ -5381,9 +5413,13 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
         TaskKind::Visit { plot } => {
             // At a house (not a park) with door rules: knock and wait (`life::doors`).
             if content.visits.door.is_some() && !ctx.plots[plot as usize].public {
+                // Facing the door, at it (else towards the middle of the lot).
                 let p = &ctx.plots[plot as usize];
                 let centre = [p.x as f32 + p.w as f32 / 2.0, p.z as f32 + p.d as f32 / 2.0];
-                sim.yaw = (centre[0] - sim.pos[0]).atan2(centre[1] - sim.pos[1]);
+                sim.yaw = match crate::life::knock_spot(&ctx.nav, p) {
+                    Some((_, at, yaw)) if (at[0] - sim.pos[0]).hypot(at[1] - sim.pos[1]) < 0.3 => yaw,
+                    _ => (centre[0] - sim.pos[0]).atan2(centre[1] - sim.pos[1]),
+                };
                 sim.pose = Pose::Stand;
                 act.phase = Phase::Knocking { ticks: 0, host: None };
             } else {
@@ -5432,15 +5468,13 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
                 sim.yaw = s.slot_yaw(content, slot);
                 sim.pose = Pose::Sit;
             } else if (inter.pose == Pose::Stand || on_top) && !inter.inside {
-                // At their slot's own place, come to its tile (the end of a ping-pong table),
-                // facing the way it says; else facing the thing.
+                // At their own spot, come to it (the end of a ping-pong table, their basin at a
+                // double sink: `stand_spot`), facing the way it says; else facing the thing.
                 let slot = obj.slot_of(sim.id).unwrap_or(0);
-                let here = (sim.pos[0].floor() as i32, sim.pos[1].floor() as i32);
-                let place = Some(obj.slot_position(content, slot))
-                    .filter(|p| !content.objects[obj.def].places.is_empty() && (p[0].floor() as i32, p[1].floor() as i32) == here);
-                if let Some(p) = place {
+                let spot = (!inter.carried && !inter.at_slot).then(|| crate::surface::stand_spot(content, &ctx.nav, obj, slot, inter.whole || inter.leaves.is_some())).flatten().filter(|&(_, p, _)| (p[0] - sim.pos[0]).hypot(p[1] - sim.pos[1]) < 0.75);
+                if let Some((_, p, yaw)) = spot {
                     sim.pos = p;
-                    sim.yaw = obj.slot_yaw(content, slot);
+                    sim.yaw = yaw;
                 } else {
                     sim.yaw = (c[0] - sim.pos[0]).atan2(c[1] - sim.pos[1]);
                 }
@@ -5801,7 +5835,15 @@ pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [Obje
         objects[o].release(sim.id);
         if sim.pose != Pose::Stand || sim.seated_from.is_some() {
             let (fx, fz) = sim.seated_from.unwrap_or_else(|| objects[o].front_tile(content));
-            sim.pos = [fx as f32 + 0.5, fz as f32 + 0.5];
+            let to = [fx as f32 + 0.5, fz as f32 + 0.5];
+            // Out of bed facing the way they get out, square to it: off its side, sitting up
+            // on the edge with their back to the pillows, or over its foot.
+            if sim.pose == Pose::Lie {
+                let a = objects[o].angle();
+                let d = (to[0] - sim.pos[0]).atan2(to[1] - sim.pos[1]) - a;
+                sim.yaw = wrap_angle(a + (d / FRAC_PI_2).round() * FRAC_PI_2);
+            }
+            sim.pos = to;
         }
     }
     if let Some(seat) = sim.use_seat.take()
@@ -5812,6 +5854,11 @@ pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [Obje
     sim.seated_from = None;
     sim.pose = Pose::Stand;
     sim.idle_ticks = 0;
+}
+
+/// `a` (radians) as a facing from -PI to PI.
+pub(crate) fn wrap_angle(a: f32) -> f32 {
+    (a + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI
 }
 
 /// The object a task holds a place at (using it, repairing it, cooking at it, the seat they eat

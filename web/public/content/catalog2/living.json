@@ -201,6 +201,7 @@
         1,
         2
       ],
+      "approach": "side",
       "price": 420,
       "category": "living",
       "group": "sectionals",
@@ -339,6 +340,7 @@
         2,
         3
       ],
+      "approach": "side",
       "price": 1150,
       "category": "living",
       "group": "seating",

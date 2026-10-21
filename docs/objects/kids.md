@@ -46,11 +46,15 @@ pulled up to the kids' table before the dining table (a seat made for their age 
   the changing table (`atSlot`): the carer stands in front of it, lifts the baby out of the cot onto the pad (laid
   across it, `CHANGE`), works at them there and lays them back in the cot near the end (render only, as the cuddle).
   `play --state review-baby` (fixes/babies-crops).
-- Known, not changed: the carer at the crib stands or kneels in different spots by facing, once a tile out in front
+- Known, not changed (until G-43 and G-66, below): the carer at the crib stands or kneels in different spots by facing, once a tile out in front
   of the changing table (slot positions and the shared "tend" pose).
 - Since the authenticity review (G-14, G-05): "Feed the baby" lifts the baby out and holds them, as the cuddle does
   (`anim: cuddle`), not the gardening kneel at the rail (the bottle is the props wave's); the high chair's content
   seat 0.60, its mesh's.
+- Since the authenticity review (G-43, G-51): the carer at the crib stands in front of the baby (the crib half, slot
+  0) in every facing, facing it, not by facing in front of the changing table or the crib (the change at the
+  changing table, G-66's `atSlot`, in front of it); the kids' bed and the race
+  car bed are got into from their side (`approach: side`), sitting on the edge first.
 
 ## KD2. Toys (10)
 
@@ -90,6 +94,8 @@ pulled up to the kids' table before the dining table (a seat made for their age 
 - Since the authenticity review (G-04): a child on the kids' chair at the coffee table bends over it with both hands on
   its top, drawing (`sitHandsLow177`/`147`/`112`, clips/low.ts: a top less than `LOW_TOP`, 0.2 m for a body of the
   reference height, over the seat).
+- Since the authenticity review (G-43): two at the train table come to the tile in front of their own half
+  (`stand_spot`) and kneel at the lane on their side, not both from one spot.
 
 ## KD3. Kids' study and art (6)
 
@@ -118,3 +124,5 @@ pulled up to the kids' table before the dining table (a seat made for their age 
   own). The kids' chair at a coffee table (top 0.11 m over the seat) gets the desk hands, hovering over it, and a
   desk chair facing the kids' desk from behind can't come in (the desk's own chair is there) and reaches over it;
   nothing sets either up.
+- Since the authenticity review (G-51): the kids' desk is sat at from behind its chair (`approach: behind`), else
+  beside it, not through the desk.

@@ -2528,6 +2528,7 @@
         2,
         2
       ],
+      "approach": "side",
       "interactions": [
         {
           "id": "sleep",
@@ -3070,6 +3071,7 @@
         1,
         2
       ],
+      "approach": "side",
       "price": 480,
       "category": "fitness",
       "stages": [
@@ -3110,6 +3112,7 @@
         1,
         1
       ],
+      "approach": "behind",
       "price": 350,
       "category": "hobbies",
       "group": "games",
@@ -3143,6 +3146,7 @@
         2,
         1
       ],
+      "approach": "behind",
       "price": 1100,
       "category": "office",
       "description": "Builds Technology, Writing and Business.",

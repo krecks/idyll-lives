@@ -685,11 +685,18 @@ pub(crate) fn start(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectI
 fn go_to(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], obj: u32, tags: TagMask) -> bool {
     let content = ctx.content;
     let o = &objects[obj as usize];
-    // (A seat of its own: round to it, `places`.)
+    // (A seat of its own: round to it, `seat_approach`; at a station, their own spot along it,
+    // `stand_spot`: two cooks at an island side by side.)
     let def = &content.objects[o.def];
     let slot = o.pick_slot(sim.id, 0..def.slots as usize, Some((def, sim.pos)));
-    let (fx, fz) = slot.and_then(|k| surface::slot_approach(content, &ctx.nav, o, k)).unwrap_or_else(|| approach(ctx, o));
-    let Some(waypoints) = walk_route(ctx, sim, (fx, fz), [fx as f32 + 0.5, fz as f32 + 0.5]) else {
+    let seat = matches!(task.kind, TaskKind::Eat { .. });
+    let spot = slot.filter(|_| !seat).and_then(|k| surface::stand_spot(content, &ctx.nav, o, k, false));
+    let (fx, fz) = match spot {
+        Some((t, ..)) => t,
+        None => slot.filter(|_| seat).and_then(|k| surface::seat_approach(content, &ctx.nav, o, k, sim.pos)).unwrap_or_else(|| approach(ctx, o)),
+    };
+    let target = spot.map_or([fx as f32 + 0.5, fz as f32 + 0.5], |(_, p, _)| p);
+    let Some(waypoints) = walk_route(ctx, sim, (fx, fz), target) else {
         return false;
     };
     let o = &mut objects[obj as usize];
@@ -743,6 +750,36 @@ fn item_access(ctx: &Ctx, objects: &[ObjectInstance], at: &ItemAt) -> Vec<(i32, 
     tiles
 }
 
+/// Waits for a busy station for `task` (`waited` ticks so far: `Phase::Queued`), first stepping
+/// aside off the spot they used (`aside`) so the next one to use it doesn't stand inside them.
+fn queue(sim: &mut Sim, task: Task, ctx: &Ctx, tags: TagMask, waited: Option<u32>) {
+    if waited.is_none() && aside(sim, ctx).is_some_and(|t| walk_to(sim, task, ctx, t, tags)) {
+        return;
+    }
+    sim.current = Some(Activity { task, phase: Phase::Queued { ticks: waited.unwrap_or(0) }, tags });
+}
+
+/// The tile beside `sim` to wait on: free, on their storey, nothing used from it (no object's
+/// approach tile) and nobody else standing there; the ones straight beside first. None when
+/// they aren't on a tile something is used from, or there is no such tile.
+fn aside(sim: &Sim, ctx: &Ctx) -> Option<(i32, i32)> {
+    let nav = &ctx.nav;
+    let used = |t: (i32, i32)| ctx.index.links.approach.contains(&t);
+    let (x, z) = sim.tile();
+    if !used((x, z)) {
+        return None;
+    }
+    let taken = |t: (i32, i32)| ctx.briefs.iter().enumerate().any(|(i, b)| i as u32 != sim.id && !b.away && (b.pos[0].floor() as i32, b.pos[1].floor() as i32) == t);
+    let storey = nav.stairs.storey(z);
+    [(0, 1), (1, 0), (0, -1), (-1, 0), (1, 1), (-1, 1), (1, -1), (-1, -1)]
+        .into_iter()
+        .map(|(dx, dz)| (x + dx, z + dz))
+        .find(|&t| {
+            nav.tile_free(t.0, t.1) && nav.stairs.storey(t.1) == storey && nav.stairs.step(t.0, t.1).is_none() && !used(t) && !taken(t)
+                && ((t.0 - x).abs() + (t.1 - z).abs() == 2 || nav.lot.edge_between(x, z, t.0, t.1) == crate::lot::Edge::Open)
+        })
+}
+
 /// Walks for `task` to the first of `goals` (a few at most) there's a way to.
 fn walk_to_any(sim: &mut Sim, task: Task, ctx: &Ctx, goals: &[(i32, i32)], tags: TagMask) -> bool {
     goals.iter().take(4).any(|&goal| walk_to(sim, task, ctx, goal, tags))
@@ -790,7 +827,7 @@ fn cook_next(
                 }
             }
             Found::Busy if !give_up => {
-                sim.current = Some(Activity { task, phase: Phase::Queued { ticks: waited.unwrap_or(0) }, tags });
+                queue(sim, task, ctx, tags, waited);
                 return;
             }
             _ => {}
@@ -1269,7 +1306,7 @@ fn dishes_next(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstan
                     go_to(sim, at(o, 2), ctx, objects, o, tags);
                 }
                 Found::Busy if !give_up => {
-                    sim.current = Some(Activity { task, phase: Phase::Queued { ticks: waited.unwrap_or(0) }, tags });
+                    queue(sim, task, ctx, tags, waited);
                 }
                 // Nowhere to wash up: what they carry is put down again (after the step).
                 _ => {}
@@ -1324,10 +1361,15 @@ fn extra_minutes(r: &RecipeDef, step: usize, mask: StationMask, carried: u16) ->
     f32::from(carried) + trailing
 }
 
-/// Turns to face `o`, standing.
-fn face(sim: &mut Sim, content: &Content, o: &ObjectInstance) {
+/// Turns to face `o`, standing: straight at it from their own spot along it (`stand_spot`).
+fn face(sim: &mut Sim, ctx: &Ctx, o: &ObjectInstance) {
+    let content = ctx.content;
     let c = o.centre(content);
-    sim.yaw = (c[0] - sim.pos[0]).atan2(c[1] - sim.pos[1]);
+    let spot = o.slot_of(sim.id).and_then(|k| surface::stand_spot(content, &ctx.nav, o, k, false));
+    sim.yaw = match spot {
+        Some((_, p, yaw)) if (p[0] - sim.pos[0]).hypot(p[1] - sim.pos[1]) < 0.75 => yaw,
+        _ => (c[0] - sim.pos[0]).atan2(c[1] - sim.pos[1]),
+    };
     sim.pose = Pose::Stand;
 }
 
@@ -1368,7 +1410,7 @@ pub(crate) fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], i
             let at_origin = origin.and_then(|o| objects.get(o as usize)).map_or(0, |o| content.objects[o.def].stations);
             let mask = station_mask(sim, ctx, objects) | at_origin;
             let minutes = r.steps[step as usize].minutes + extra_minutes(r, step as usize, mask, carried);
-            face(sim, content, &objects[o as usize]);
+            face(sim, ctx, &objects[o as usize]);
             let act = sim.current.as_mut().expect("checked above");
             act.task.kind = TaskKind::Cook {
                 recipe,
@@ -1455,9 +1497,15 @@ pub(crate) fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], i
             dishes_next(sim, next, ctx, objects, items, None);
         }
         TaskKind::Dishes { station: Some(o), .. } => {
-            face(sim, content, &objects[o as usize]);
+            face(sim, ctx, &objects[o as usize]);
             if let Some(act) = sim.current.as_mut() {
                 act.phase = Phase::Using { elapsed: 0.0 };
+            }
+        }
+        // Stepped aside to wait for a busy station (`queue`).
+        TaskKind::Cook { station: None, .. } | TaskKind::Dishes { station: None, stage: 2, .. } => {
+            if let Some(act) = sim.current.as_mut() {
+                act.phase = Phase::Queued { ticks: 0 };
             }
         }
         _ => sim.current = None,

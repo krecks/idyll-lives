@@ -9,6 +9,7 @@
         2,
         2
       ],
+      "approach": "behind",
       "price": 900,
       "category": "hobbies",
       "group": "music",
@@ -99,6 +100,7 @@
         1,
         1
       ],
+      "approach": "behind",
       "price": 600,
       "category": "hobbies",
       "group": "crafts",
@@ -136,6 +138,7 @@
         2,
         1
       ],
+      "approach": "behind",
       "price": 340,
       "category": "hobbies",
       "group": "crafts",
@@ -172,6 +175,7 @@
         1,
         1
       ],
+      "approach": "behind",
       "price": 220,
       "category": "hobbies",
       "group": "games",

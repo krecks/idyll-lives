@@ -98,7 +98,7 @@ fn places_must_fit_the_slots() {
     assert_ne!(bad, CONTENT);
     let Err(err) = World::from_json(&bad, &lot("", ""), 1) else { panic!("refused") };
     assert!(err.to_string().contains("one place a slot"), "{err}");
-    let far = CONTENT.replace(r#"{"at":[1.3,0],"facing":-90}"#, r#"{"at":[2.6,0],"facing":-90}"#);
+    let far = CONTENT.replace(r#"{"at":[1.3,0],"facing":-90}"#, r#"{"at":[3.1,0],"facing":-90}"#);
     let Err(err) = World::from_json(&far, &lot("", ""), 1) else { panic!("refused") };
     assert!(err.to_string().contains("off its footprint"), "{err}");
     let lone = CONTENT.replace(r#""seatNear":5,"seatFacing":"front""#, r#""seatFacing":"front""#);

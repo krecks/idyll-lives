@@ -41,6 +41,7 @@
       "name": "Snoozecloud adjustable bed",
       "model": "model.lazy.snoozecloudBed",
       "footprint": [2, 2],
+      "approach": "side",
       "slots": 2,
       "price": 2600,
       "category": "bedroom",
