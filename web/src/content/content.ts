@@ -212,6 +212,10 @@ export interface ObjectDef {
   fillsWall?: boolean;
   /** From the ceiling: hangs low enough to walk into (a hanging plant): it takes the floor under it. */
   hangsLow?: boolean;
+  /** From the ceiling: hangs at head height (a chandelier, a low pendant), to hang over a table: nobody walks under it, but furniture goes under it. */
+  headHeight?: boolean;
+  /** On the floor: built to stand back to a wall (a wall-hung toilet, a wall bed, a leaning ladder): it needs plain wall all along its back. */
+  againstWall?: boolean;
   /** Bunk beds: the second slot lies on the upper bunk. */
   bunk?: boolean;
   /**

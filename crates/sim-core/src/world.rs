@@ -1562,13 +1562,16 @@ impl World {
         let called = |o: &ObjectInstance| self.content.objects[o.def].name.to_lowercase();
         for (tx, tz) in obj.tiles(&self.content) {
             // Furniture needs free floor; things on a wall, the ceiling or rugs only a free spot
-            // on their own layer (and a hanging plant that hangs low the floor as well).
+            // on their own layer (and a hanging plant that hangs low the floor as well). A lamp at
+            // head height takes the floor from walking only: furniture goes under it.
             let floor = self.lot.in_bounds(tx, tz) && self.blocked[self.lot.tile_index(tx, tz)];
+            let furniture = || self.objects.iter().any(|o| !self.content.objects[o.def].layer.mounted() && on(o, (tx, tz)));
             let taken = if layer.mounted() {
                 self.objects.iter().any(|o| self.content.objects[o.def].layer == layer && on(o, (tx, tz)))
-                    || (d.hangs_low && floor && !self.objects.iter().any(|o| !self.content.objects[o.def].layer.mounted() && on(o, (tx, tz))))
+                    || (d.hangs_low && floor && !furniture())
             } else {
-                floor && !self.objects.iter().any(|o| self.content.objects[o.def].hangs_low && on(o, (tx, tz)))
+                let hung = || self.objects.iter().any(|o| (self.content.objects[o.def].hangs_low || self.content.objects[o.def].head_height) && on(o, (tx, tz)));
+                floor && (furniture() || !hung())
             };
             if !self.lot.in_bounds(tx, tz) || taken {
                 return Err(Error::new(format!(
@@ -1631,6 +1634,14 @@ impl World {
                 _ => {}
             }
         }
+        // Built to stand back to a wall (a wall-hung toilet's cistern box): plain wall behind it.
+        if d.against_wall {
+            match self.wall_behind(&obj) {
+                None => return Err(Error::new(format!("'{name}' at {x},{z} needs a wall behind it"))),
+                Some(true) => return Err(Error::new(format!("'{name}' at {x},{z} can't stand against a window"))),
+                _ => {}
+            }
+        }
         self.check_storey_fit(&obj)?;
         Ok(obj)
     }
@@ -1672,7 +1683,7 @@ impl World {
 
     /// What runs along the whole back edge of `obj`: None if not a wall (plain or with a window)
     /// all along, else whether a window is part of it.
-    fn wall_behind(&self, obj: &ObjectInstance) -> Option<bool> {
+    pub(crate) fn wall_behind(&self, obj: &ObjectInstance) -> Option<bool> {
         use crate::lot::Edge;
         let lot = &self.lot;
         obj.back_edges(&self.content).into_iter().try_fold(false, |window, (horizontal, x, z)| {

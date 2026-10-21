@@ -463,7 +463,7 @@ impl World {
                 return Error::new(e);
             }
             // Why it doesn't fit beside something else, as it says it.
-            for why in ["would hang into ", "would hang too low over ", "is too tall for ", "is under ", "can't hang over a window"] {
+            for why in ["would hang into ", "would hang too low over ", "is too tall for ", "is under ", "can't hang over a window", "can't stand against a window"] {
                 if let Some(i) = e.find(why) {
                     return Error::new(format!("that {}", &e[i..]));
                 }
@@ -472,6 +472,8 @@ impl World {
                 "furniture can't stand on a tile with a diagonal wall"
             } else if e.contains("no wall to hang on") {
                 "that hangs on a wall: put its back to one"
+            } else if e.contains("needs a wall behind it") {
+                "that stands against a wall: put its back to one"
             } else if e.contains("needs a ceiling") {
                 "that hangs from a ceiling: put it in a room"
             } else if e.contains("nothing to stand on") {
@@ -488,9 +490,10 @@ impl World {
         if self.content.objects[def].outdoors && !self.all_outdoors(&obj) {
             return Err(Error::new("that has to go outside"));
         }
-        // Residents walk under pictures and lamps and over rugs (not into a plant hanging low).
+        // Residents walk under pictures and lamps and over rugs (not into a plant hanging low, nor
+        // under a lamp at head height).
         let d = &self.content.objects[def];
-        let mounted = d.layer.mounted() && !d.hangs_low;
+        let mounted = d.walked_under();
         if !mounted && self.sim_in_the_way(&obj) {
             return Err(Error::new("someone is standing there"));
         }
@@ -551,7 +554,7 @@ impl World {
     /// nobody needs to reach could otherwise stand anywhere that leaves the rest reachable.
     fn keep_doorway_clear(&self, def: usize, x: i32, z: i32, rot: u8, layout: Layout) -> Result<(), Error> {
         let d = &self.content.objects[def];
-        if (d.layer.mounted() && !d.hangs_low) || d.stairs {
+        if d.walked_under() || d.stairs {
             return Ok(());
         }
         // Where it doesn't fit at all, `place_at_home` says why.
@@ -953,6 +956,14 @@ impl World {
             {
                 return Err(Error::new("something hangs on that wall: move it first"));
             }
+            // Nor does the wall come down (or become a door or a window) behind what stands against it.
+            if target != Edge::Wall
+                && diagonal.is_none()
+                && let Some(o) = self.objects.iter().find(|o| self.content.objects[o.def].against_wall && o.back_edges(&self.content).contains(&(e.axis == EdgeAxis::H, e.x, e.z)))
+            {
+                let name = self.content.objects[o.def].name.to_lowercase();
+                return Err(Error::new(format!("the {name} stands against that wall: move it first")));
+            }
             // Only curtains and the like hang over a window.
             if target == Edge::Window
                 && diagonal.is_none()
@@ -1073,7 +1084,7 @@ impl World {
                 "that would shut a resident or an object in — add a door or a gate",
             ));
         }
-        if let Err(e) = self.storeys_stand(plot) {
+        if let Err(e) = self.storeys_stand(plot).and_then(|()| self.walls_still_hold(plot)) {
             self.lot = saved;
             return Err(e);
         }
@@ -1235,6 +1246,25 @@ impl World {
                         return Err(Error::new("walls upstairs have to stand on a room below"));
                     }
                 }
+            }
+        }
+        Ok(())
+    }
+
+    /// After walls change on the plot, what they held still stands as `check_fit` and
+    /// `check_storey_fit` have it: what hangs from a ceiling, and what stands upstairs or in the
+    /// basement, inside a room (a wall taken down doesn't leave a ceiling lamp hanging from
+    /// nothing outdoors), and what stands against a wall with plain wall behind it.
+    pub(crate) fn walls_still_hold(&self, plot: u32) -> Result<(), Error> {
+        for (o, _) in self.objects.iter().zip(&self.object_plot).filter(|(_, on)| **on == Some(plot)) {
+            let def = &self.content.objects[o.def];
+            let name = || def.name.to_lowercase();
+            let needs_room = def.layer == Layer::Ceiling || self.storey_of(o.z) != 0;
+            if needs_room && o.tiles(&self.content).any(|(x, z)| self.lot.room_at(x, z) == OUTDOORS) {
+                return Err(Error::new(format!("the {} would be left outdoors: move it first", name())));
+            }
+            if def.against_wall && self.wall_behind(o) != Some(false) {
+                return Err(Error::new(format!("the {} stands against that wall: move it first", name())));
             }
         }
         Ok(())

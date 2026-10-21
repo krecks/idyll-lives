@@ -267,9 +267,23 @@ pub struct ObjectDef {
     /// Things from the ceiling that hang low enough to walk into (content `hangsLow`: a hanging
     /// plant): it takes the floor under it as furniture does.
     pub hangs_low: bool,
+    /// Things from the ceiling that hang at head height (content `headHeight`: a chandelier, a
+    /// low pendant), to hang over a table: nobody walks under it, but furniture may stand under
+    /// it (not furniture as tall as the wall).
+    pub head_height: bool,
+    /// Furniture built to stand with its back on a wall (content `againstWall`: a wall-hung
+    /// toilet's cistern box, a wall bed, a ladder leaning on the wall): it needs plain wall all
+    /// along its back, and that wall can't come down (nor become a window or a door) under it.
+    pub against_wall: bool,
 }
 
 impl ObjectDef {
+    /// Off the floor and out of the way: residents walk under (or over) it (a picture, a ceiling
+    /// lamp, a rug), unless it hangs low or at head height.
+    pub fn walked_under(&self) -> bool {
+        self.layer.mounted() && !self.hangs_low && !self.head_height
+    }
+
     /// The slots interaction `i` takes one of. A crib's first slot is the baby's (the crib on
     /// its left, where `ObjectInstance::slot_position` lays them; the changing table beside it
     /// is where carers stand), whoever gets there first: after loading a save, a carer may set
@@ -2059,6 +2073,10 @@ struct ObjectRaw {
     fills_wall: bool,
     #[serde(default, rename = "hangsLow")]
     hangs_low: bool,
+    #[serde(default, rename = "headHeight")]
+    head_height: bool,
+    #[serde(default, rename = "againstWall")]
+    against_wall: bool,
 }
 
 /// An object's `grows`: `{"days": 2, "fallow": 0.5}` (game days to ripen, and fallow after picking).
@@ -2725,7 +2743,16 @@ impl Content {
                     )));
                 }
             };
-            for (set, flag, on) in [(obj.over_window, "overWindow", Layer::Wall), (obj.fills_wall, "fillsWall", Layer::Floor), (obj.hangs_low, "hangsLow", Layer::Ceiling)] {
+            if obj.hangs_low && obj.head_height {
+                return Err(Error::new(format!("object '{}': `hangsLow` or `headHeight`, not both", obj.id)));
+            }
+            for (set, flag, on) in [
+                (obj.over_window, "overWindow", Layer::Wall),
+                (obj.fills_wall, "fillsWall", Layer::Floor),
+                (obj.hangs_low, "hangsLow", Layer::Ceiling),
+                (obj.head_height, "headHeight", Layer::Ceiling),
+                (obj.against_wall, "againstWall", Layer::Floor),
+            ] {
                 if set && layer != on {
                     let on = match on {
                         Layer::Wall => "a wall",
@@ -2867,6 +2894,8 @@ impl Content {
                 over_window: obj.over_window,
                 fills_wall: obj.fills_wall,
                 hangs_low: obj.hangs_low,
+                head_height: obj.head_height,
+                against_wall: obj.against_wall,
             });
         }
 

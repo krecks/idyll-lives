@@ -315,6 +315,7 @@
     },
     {
       "id": "wallBed",
+      "againstWall": true,
       "name": "Fold-down wall bed",
       "model": "model.wallBed",
       "footprint": [
@@ -954,6 +955,7 @@
     },
     {
       "id": "ladderShelf",
+      "againstWall": true,
       "name": "Ladder shelf",
       "model": "model.ladderShelf",
       "footprint": [

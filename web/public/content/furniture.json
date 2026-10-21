@@ -1611,6 +1611,7 @@
     },
     {
       "id": "homeCinema",
+      "againstWall": true,
       "name": "Home cinema",
       "model": "model.homeCinema",
       "footprint": [
@@ -2299,6 +2300,7 @@
     },
     {
       "id": "toiletSmart",
+      "againstWall": true,
       "name": "Smart toilet",
       "model": "model.toiletSmart",
       "footprint": [
@@ -4163,6 +4165,7 @@
     },
     {
       "id": "chandelier",
+      "headHeight": true,
       "name": "Ring chandelier",
       "model": "model.chandelier",
       "footprint": [
@@ -4186,6 +4189,7 @@
     },
     {
       "id": "pendantIndustrial",
+      "headHeight": true,
       "name": "Industrial pendant",
       "model": "model.pendantIndustrial",
       "footprint": [
