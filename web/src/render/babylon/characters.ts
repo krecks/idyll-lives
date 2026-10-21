@@ -1967,7 +1967,8 @@ export class Characters {
       // Its middle where it stands (things that stand anywhere on their tile); the bounds stay on tiles.
       const centre = objectCentre(o);
       const def = this.content?.object(o.def);
-      const restful = !!(SEATS[o.def] || BEDS[o.def]) || !!def?.interactions.some((i) => i.pose === 'sit' || i.pose === 'lie');
+      // (A thing on a top used sitting is used from the seat pulled up to the top, not sat on: `seatUnder` finds that.)
+      const restful = !!(SEATS[o.def] || BEDS[o.def]) || (def?.layer !== 'surface' && !!def?.interactions.some((i) => i.pose === 'sit' || i.pose === 'lie'));
       const lift = (o.tall ?? 0) / 100;
       const seat = seatOf(def, o.def);
       const stand = def?.stand ? { h: def.stand.height + lift, motion: def.stand.motion } : null;
