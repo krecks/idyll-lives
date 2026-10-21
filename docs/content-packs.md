@@ -307,6 +307,7 @@ voices pick their lines by them.
 | `clean` | mopping, laundry, tidying |
 | `talk` | conversations (automatic); talking to a mirror |
 | `phone` | calls and video calls, radio chats; everyone's smartphone (`phone.anim`) |
+| `phoneScreen` | looking at a phone held in front: texting and scrolling (`phone.actions[].anim`) |
 | `meditate` | breathing, counting to ten |
 | `idle` | standing at an object with nothing better to show (donation jar) |
 | `fetch` | taking ingredients out of the fridge or pantry (a recipe's first step) |
@@ -794,6 +795,7 @@ their own like they choose anything else: talking scored by `needs` × `autonomy
 | `contact` | With someone (default false: on their own, like scrolling). |
 | `message` | A message, not a call: reaches anyone awake. |
 | `meet` | After a yes, `here` (they come over) or `there` (the caller goes over). |
+| `anim` | Animation tag while at it (default the phone's `anim`): the base game's text and scrolling use `phoneScreen`, the phone held in front; the calls the phone at the ear. |
 | `tags`, `autonomous`, `autonomyWeight`, `prefer`, `requires`, `acceptance` | As for socials. `requires` defaults to having met. |
 | `needs`, `contactNeeds` | Need gains over the whole action for the caller (while connected) and, on hanging up, for the contact. |
 | `success`, `failure` | Outcomes as for socials (`friendship`, `targetFriendship`, `romance`, `targetRomance`, `feeling`, `targetFeeling`, `needs`, `targetNeeds`), without an `effect`. |

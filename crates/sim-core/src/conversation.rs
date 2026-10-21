@@ -1042,7 +1042,9 @@ mod tests {
           {"id":"askPartner","label":"Ask to be partners","minutes":5,"tags":["social","romantic"],"autonomous":false,
            "requires":{"minRomance":30,"partners":false},"acceptance":{"base":1.0},"success":{"effect":"becomePartners"}},
           {"id":"fight","label":"Fight","minutes":5,"tags":["social","mean"],"animation":"fight","autonomous":false,
-           "acceptance":{"base":1.0},"success":{"friendship":-20,"targetFriendship":-20,"effect":"fight","loserFeeling":"lost"}}],
+           "acceptance":{"base":1.0},"success":{"friendship":-20,"targetFriendship":-20,"effect":"fight","loserFeeling":"lost"}},
+          {"id":"hug","label":"Hug","minutes":4,"tags":["social","friendly"],"animation":"hug","autonomous":false,
+           "acceptance":{"base":0.0}}],
         "bondPresets":{"roommates":{"friendship":20},"partners":{"friendship":50,"romance":70,"partners":true}},
         "socialRules":{"defaultBond":"roommates","romanticTags":["romantic"],"jealousyFeeling":"jealous","heartbreakFeeling":"heartbroken"}}"#;
 
@@ -1462,5 +1464,36 @@ mod tests {
         assert_eq!(listeners(&w, 0), 1);
         let loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();
         assert!(loaded.sims[2].current.is_none() && loaded.sims[2].queue.is_empty());
+    }
+
+    /// The snapshot's `OUTCOME` for Sim `i`, ticking on until the two are in the social.
+    fn outcome_shown(w: &World, i: usize) -> f32 {
+        let mut out = vec![0.0; crate::snapshot::CAPACITY];
+        crate::snapshot::write(w, &mut out);
+        out[crate::snapshot::HEADER_LEN + i * crate::snapshot::SIM_STRIDE + crate::snapshot::sim::OUTCOME]
+    }
+
+    #[test]
+    fn a_refused_hug_shows_at_once_a_chat_halfway_through() {
+        // A hug is answered by the body, from the start (the renderer's step back, `characters.ts`).
+        let mut w = town(r#"{"name":"A","x":5.5,"z":5.5},{"name":"B","x":7.5,"z":5.5}"#, "");
+        w.autonomy = false;
+        let hug = w.content.social_index("hug").unwrap();
+        w.apply(Command::Social { sim: 0, target: 1, social: hug }).unwrap();
+        let mut seen = None;
+        for _ in 0..TICKS_PER_SECOND * 5 {
+            w.tick_once();
+            if let Some((_, _, success, progress)) = w.sims[0].conversation(&w.content) {
+                seen = Some((success, progress, outcome_shown(&w, 0), outcome_shown(&w, 1)));
+                break;
+            }
+        }
+        let (success, progress, a, b) = seen.expect("A never started the hug");
+        assert!(!success && progress < 0.1, "refused, just begun: {progress}");
+        assert_eq!((a, b), (2.0, 2.0), "the refusal shows from the start");
+        // A chat's outcome shows only halfway through (the answer after the opener).
+        let w = chatting("");
+        assert!(w.sims[0].conversation(&w.content).is_some_and(|c| c.3 < 0.5));
+        assert_eq!(outcome_shown(&w, 1), 0.0);
     }
 }
