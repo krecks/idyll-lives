@@ -338,7 +338,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 | `outgoing.conversationSectional` Conversation sectional | 2x2 · floor | hangOut:relax | living / — | Body, Upholstery | Use | `sink_in`: the seat cushions press down for hangOut. |
 | `outgoing.karaokeStage` Karaoke stage | 2x1 · floor | practise:sing perform:sing | hobbies / — | Body, Speakers | Use | `mic_up`: the mic stands rise for practise and perform. Sung up on the stage, between the mics (content `stand`, 0.146 m). The screen and lyrics glow while used. |
 | `outgoing.videoCallNook` Video-call corner | 1x1 · floor | call:phone | office / — | Body, Upholstery, Wood | Use | `ring_light`: the ring light swings up for call. The ring light and laptop screen glow during the call. |
-| `outgoing.danceFloor` Light-up dance floor | 2x2 · floor | dance:dance | hobbies / — | Body, Speakers | Loop (E1) | `tiles`: the tiles pulse up and down in two checkerboard sets, taking turns, while dancing (E1). The tiles light up while danced on. |
+| `outgoing.danceFloor` Light-up dance floor | 2x2 · floor | dance:dance | hobbies / — | Body, Speakers | Loop (E1) | `tiles`: the tiles pulse up and down in two checkerboard sets, taking turns, while dancing (E1). The tiles light up while danced on. Danced on, not beside: content `stand` 0.074 (the tiles' top), each dancer forward onto their own half (I-packs-21, 2026-10-22). |
 | `outgoing.photoWall` Party photo wall | 1x1 · floor | reminisce:look | decor / — | Body, Board | Use | `photo`: a new photo grows on the wall for reminisce. The bulbs glow at night. |
 
 **In play** (signed off 2026-10-17):

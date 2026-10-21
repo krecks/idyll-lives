@@ -138,6 +138,7 @@
       "id": "outgoing.danceFloor",
       "name": "Light-up dance floor",
       "model": "model.outgoing.danceFloor",
+      "stand": { "height": 0.074 },
       "footprint": [2, 2],
       "price": 3400,
       "category": "hobbies",
