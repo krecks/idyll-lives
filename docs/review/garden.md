@@ -238,7 +238,8 @@ Causes shared beyond this ledger, moved at the consolidation (2026-10-21): I-gar
   - Japanese maple (garden wave): both its uses are taken from the front tile, inside the crown: "Relax in the shade" and "Shape the maple" show the resident from the knees down, the rest inside the red foliage (`extra/close/s-jm-willow.png`, first two frames; `play/trees-wide/garden.japaneseMaple-shape-01.png`). A real Japanese maple is often that low, but you stand outside it to prune it.
   - Blue spruce (garden wave): its skirt is 5.6 m across from 0.35 m up on one tile (`sheets/obj-garden.spruce.png`), so anyone walking within 2.7 m of the trunk walks into it, as at the pine.
   - Fix: lift the first tier or crown (to about 2.2 m), or narrow it, or give each a footprint as wide as its skirt (and, for the Japanese maple, a slot outside the crown).
-- **Status:** confirmed and widened (garden wave: the Japanese maple, the blue spruce)
+- **Status:** fixed (4507945e)
+- **After:** the pine's lowest tier stands at 2.35 m (was 1.4), the blue spruce is limbed up to a skirt at 2.2 m (was 0.35; 5.0 m across, was 5.4) and the Japanese maple is a vase on slender limbs, a narrow first layer inside its tile and its broad tiers from 2.7 m (were from 2.0). Measured on the files, the lowest point farther than 0.85 m from the trunk: pine 2.19 m, spruce 2.15, Japanese maple 2.24 (its first layer reaches 0.8 m out at 1.4 m, where the one shaping it works). On `review-stage` a resident walks to the tile beside each, clear under the boughs (`bench-results/review/fixes/blender-trees/``treewalk/tree-walk-*-low.png`, `-eye.png`; `gallery-eye/gallery-spruce.png`, `gallery-pine.png`); shaping and relaxing at the Japanese maple from its front tile (`play/garden.japaneseMaple-*`). From the game's camera, looking down, a resident under any wide crown is hidden by it, as under the oak.
 - **Source:** pilot (`scripts/scenes.mjs` pine); wave: garden
 
 ### I-garden-02 — moved to residents.md
@@ -250,7 +251,8 @@ Causes shared beyond this ledger, moved at the consolidation (2026-10-21): I-gar
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/trees.py:240-252` (`willow`: 26 strands, each a cone 0.5–0.7 m across at the crown narrowing to 6 cm, 2.4–3.5 m long from 4.6–5.0 m up, so their tips end 1.1–2.6 m off the ground; 8 inner cones 0.8 m across)
 - **Evidence:** `sheets/obj-garden.willow.png` (gallery and game camera), `extra/close/s-jm-willow.png` (third frame): the curtains read as green stalactites or icicles, not as the long thin trailing strands that make a weeping willow; the content says they "sweep down to the lawn" (`garden.json:362`). From the game's camera a resident relaxing under it is hidden behind the solid wedges. Many thin strips (or a few curtain sheets with a strand texture) reaching to about 0.5 m off the ground would read right.
-- **Status:** open
+- **Status:** fixed (4507945e)
+- **After:** 68 thin leafy streamers in two staggered rows, out of the crown's edge and straight down to 0.45-0.8 m (outer) and 0.9-1.5 m (inner) off the lawn, with gaps: a resident standing or sitting inside shows through them (`bench-results/review/fixes/blender-trees/``gallery/gallery-tree.willow.png`, `treewalk/tree-walk-garden.willow-low.png`, `play/garden.willow-shade-*.png`). 4,944 triangles, far version 732.
 - **Source:** wave: garden
 
 ### M-garden-03 — The Italian cypress is twice as broad as a real one
@@ -260,7 +262,8 @@ Causes shared beyond this ledger, moved at the consolidation (2026-10-21): I-gar
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/trees.py:290-306` (`cypress`: column lumps 2.0, 1.9, 1.7, 1.4 and 1.05 m across); `trees.py:344` (`size=(2.12, 7.95, 2.05)`)
 - **Evidence:** `cargo review sizes`: W 2.12 and D 2.05 m against the `columnarConifer` range 0.5–1.5 m (out past +10 %). At 7.95 m tall it is 3.7 times as tall as it is wide; an Italian cypress is a pencil, 6 to 10 times (`sheets/obj-garden.cypress.png`: it reads as a fat column next to the spruce and the topiary). Narrow the column to about 1–1.2 m.
-- **Status:** open
+- **Status:** fixed (4507945e)
+- **After:** 1.01 × 7.95 × 1.02 m, a pencil (`cargo review sizes`: inside `columnarConifer`); `bench-results/review/fixes/blender-trees/``gallery/gallery-cypress.png`.
 - **Source:** wave: garden
 
 ### M-garden-04 — The potted lemon tree is 2.37 m tall
@@ -280,7 +283,8 @@ Causes shared beyond this ledger, moved at the consolidation (2026-10-21): I-gar
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/trees.py:139-146` (`maple`: the same `crown` of round lumps as `oak`, `trees.py:127-136`, only greener); `trees.py:226-227` (`magnolia`: 16 blooms as `dots` of radius 0.24 set out to 0.98 of the crown's radius)
 - **Evidence:** `sheets/obj-garden.maple.png` next to `sheets/obj-tree.png`: the two can't be told apart without the label (no lobed-leaf texture, no broader, denser dome). `sheets/obj-garden.magnolia.png` (gallery): the magnolia's flowers are pink and white spheres on the crown's edge, several standing clear of it in the air; a magnolia's are big upright goblets on the branch tips, often before the leaves. Both trees are recognisable as "a tree" and "a pink tree", which is why S3.
-- **Status:** open
+- **Status:** fixed (4507945e)
+- **After:** the maple is a dense, even dome of 26 small clumps in a cooler, deeper green on a straight trunk with a leader, beside the oak's few big billows and side crowns (`bench-results/review/fixes/blender-trees/``gallery/gallery-tree.maple.png` against `gallery-tree.png`). The magnolia's blooms are upright white, pink and deep pink goblets, three over each clump of the upper crown, each set where a line out from its clump leaves the crown, so none floats (`gallery/gallery-tree.magnolia.png`). No lobed-leaf texture: the foliage finish is shared.
 - **Source:** wave: garden
 
 ### M-garden-06 — The rose bush reads as a berry bush (the azalea looks more like roses), and the meadow has no long grass
@@ -290,7 +294,8 @@ Causes shared beyond this ledger, moved at the consolidation (2026-10-21): I-gar
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/plants.py:944-953` (`rosebush`: a dark round shrub with 15 red `dots` of radius 0.1, round lumps); `plants.py:956-964` (`azalea`: 20 larger, flatter crimson-pink `dots`); `plants.py:720-746` (`meadow`)
 - **Evidence:** `sheets/obj-garden.roses.png`: a dark ball dotted with small red spheres, like a holly or a currant bush, where a rose bush is open, upright canes with cupped blooms. `sheets/obj-garden.azalea.png`: the azalea's blooms are the rose-like ones (big, layered, crimson). `sheets/obj-garden.meadow.png`: "a patch of long grass and wildflowers" is three round leafy mounds with flowers on stalks; no grass shows.
-- **Status:** open
+- **Status:** fixed (814839da)
+- **After:** the rose bush is nine upright, arching canes from a low leafy base with leaf clusters along them and a cupped red rose on each (`gallery/gallery-garden.rosebush.png`); the azalea is smothered in 36 small, flat pink trusses down its sides, no rose-like heads (`gallery/gallery-garden.azalea.png`); the meadow is long grass, 64 thin blades to 0.5 m and stalks gone to seed among its flowers, over low tussocks (`gallery/gallery-garden.meadow.png`, `play/garden.meadow-pickFlower-*.png`). Shots in `bench-results/review/fixes/blender-trees/`.
 - **Source:** wave: garden
 
 ### M-garden-07 — Planted, the strawberry plants are rings of three leaves with a hole in the middle
@@ -300,7 +305,8 @@ Causes shared beyond this ledger, moved at the consolidation (2026-10-21): I-gar
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/plants.py:1167-1171` (`strawberries`: each crown is three leaves tilted 45° out from one point, 120° apart, nothing in the middle)
 - **Evidence:** `extra/stages-strawberries.png` (planted, growing, ripe, picked), `play/c3/garden.strawberries-tend-01.png`: at the planted stage the three leaves shrink to a triangle round a straw-coloured hole, seven of them on the bed; even ripe the crowns are open in the middle. A strawberry plant is a dense rosette of trifoliate leaves on stalks round a crown. A few upright leaves in the middle would close it.
-- **Status:** open
+- **Status:** fixed (814839da)
+- **After:** each plant a closed rosette, five leaves spreading round two upright ones over a dark heart; planted, the rosettes sit flat on the straw (the bed sinks its plants 12 % of their height there, was 32 %) (`bench-results/review/fixes/blender-trees/``clips/clips-garden.strawberries-all-t0.png`, ripe; `-t99.png`, planted).
 - **Source:** wave: garden
 
 ### M-garden-08 — The cactus trio and the succulent bowl only stand on the floor
@@ -369,7 +375,8 @@ Causes shared beyond this ledger, moved at the consolidation (2026-10-21): I-gar
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/plants.py:410-418` (`bonsai`: the table top at 0.36–0.38 m on 0.34 m legs); `web/public/content/garden.json:2103-2105` (`prune`: `anim: tinker`, 45 min, no `pose`)
 - **Evidence:** `sheets/obj-garden.bonsai.png` (prune, water): the resident bends over a tray at 0.4 m with the `tinker` clip (`interact`, `spell`, `pickUp`, `characters.ts:518-522`), hands reaching down. Bonsai are pruned at a bench or table at 0.75–0.95 m, often seated (`reference.json` `bonsaiBench`: top 75–95 cm, the packs' `loner.bonsaiBench`). Raise the table to about 0.75 m (the tree then stands at 1.3 m), or keep it low and give the use a seat nearby.
-- **Status:** open
+- **Status:** fixed (814839da)
+- **After:** the bonsai stands on a bonsai stand with a shelf, its top at 0.76 m (reference `bonsaiBench` 75-95 cm; was 0.38): pruned standing with the hands at the tray (`bench-results/review/fixes/blender-trees/``play/garden.bonsai-prune-*.png`). The sizes table still reads its 1.35 m against `houseplantSmall`: the tree on the stand, as before.
 - **Source:** wave: garden
 
 ### I-garden-10 — moved to systems.md

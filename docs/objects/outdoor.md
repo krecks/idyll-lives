@@ -160,7 +160,7 @@ These six have no group code of their own.
 | `garden.fountain` Stone fountain | 1x1 · floor | wish:look listen:relax | outdoor / decor | Fountain, Plinth | Ambient | `flow`: the water moves all the time near the camera (`idle`, not on Low): the jet bubbles up and falls back and a ring swells out on each basin, 1.2 s a round (2026-10-21; it was still). Its sound is G-53's. |
 | `garden.lantern` Stone lantern | 1x1 · floor | — | outdoor / lights | Lantern, Base | Static | Static: a Japanese stone lantern; its fire box is lit at night (the content's `light`). |
 | `garden.wheelbarrow` Wheelbarrow planter | 1x1 · floor | water:water smell:smell | outdoor / decor | Tray, Handles, Legs & tyre | Static | Static: a green wheelbarrow full of flowers and leaves. |
-| `garden.boulder` Garden boulders | 1x1 · floor | — | outdoor / decor | Large boulder, Middle boulder, Small boulder | Static | Static: three weathered stones, moss on top and tufts round the base. |
+| `garden.boulder` Garden boulders | 1x1 · floor | — | outdoor / decor | Large boulder, Middle boulder, Small boulder | Static | Static: three weathered stones, broader than tall, rough and split into flat faces, darker grey, their feet cut flat where they sink into the lawn; moss in patches on their tops and in the crack between the two big ones, pale lichen, tufts round the base (G-38, as the woods' rock, `ground.py`). |
 
 **In play** (signed off 2026-10-17):
 - Checked in the north yard in four facings with their uses: pat the gnome, watch the birds, listen to the water and

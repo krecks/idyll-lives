@@ -72,7 +72,10 @@ The trees (`models/trees/oak.glb`, `maple.glb`, `birch.glb`, `cherry.glb`, `appl
 `magnolia.glb`, `willow.glb`, `pine.glb`, `spruce.glb`, `cypress.glb`, `lemonTree.glb`, each with its far version,
 override pack `packs/trees/manifest.json`) are built in Blender by `tools/art/blender/families/trees.py` on `gamekit`
 and exported as `.glb` (glTF, original, CC0). They stand on the lots and in the woods, whose far trees draw the far
-versions. An apple or a lemon shrinks away while it is picked, the Japanese maple's stray sprigs while it is shaped.
+versions. An apple or a lemon shrinks away while it is picked, the Japanese maple's stray sprigs while it is shaped. The pine, spruce, Japanese maple, willow, cypress, maple and magnolia were rebuilt for the authenticity review
+(G-38, 2026-10-21): crowns over head height, the willow's streamers, a slim cypress, a maple of its own and the
+magnolia's goblets; with them the bonsai's stand, the rose bush, azalea, meadow and strawberries (`plants.py`) and
+the garden boulders (`garden_decor.py`), all original and CC0.
 
 The kitchen fridge (`models/kitchen/fridge.glb`, override pack `packs/kitchen/manifest.json`) is built in
 Blender by `tools/art/blender/families/kitchen.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).

@@ -35,7 +35,7 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
 | `garden.bostonFern` Fern on a stand | 1x1 · floor | water:water talk:talk | garden / houseplants | Pot | Static | Static; the foliage sways in the shader. |
 | `garden.palm` Parlour palm | 1x1 · floor | water:water talk:talk | garden / houseplants | Pot | Static | Static; the foliage sways in the shader. |
 | `garden.orchid` Orchid | 1x1 · floor | water:water talk:talk admire:look | garden / houseplants | Pot | Static | Static; the foliage sways in the shader. |
-| `garden.bonsai` Bonsai | 1x1 · floor | prune:tinker water:water | garden / houseplants | Pot | Use | `trim`: a stray twig shrinks away for prune. |
+| `garden.bonsai` Bonsai | 1x1 · floor | prune:tinker water:water | garden / houseplants | Pot | Use | `trim`: a stray twig shrinks away for prune. On a bonsai stand at bench height (its top 0.76 m, a shelf below; 1.35 m with the tree, G-29), pruned standing at it. |
 
 **In play** (signed off 2026-10-17):
 - Checked in the living room: watered in all four facings (the resident stands in front and pours), talked to
@@ -61,7 +61,7 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
 | `garden.lupins` Lupins | 1x1 · floor | water:water smell:smell | garden / flowers | Bed | Static | Static. |
 | `garden.forgetMeNots` Forget-me-nots | 1x1 · floor | water:water admire:look | garden / flowers | Bed | Static | Static. Admired (`look`), not smelled: no Sweet scent feeling. |
 | `garden.cosmos` Cosmos | 1x1 · floor | water:water smell:smell | garden / flowers | Bed | Static | Static. |
-| `garden.meadow` Wildflower meadow | 1x1 · floor | pickFlower:harvest | garden / flowers | — | Use | `pick`: one flower (a white daisy) shrinks away for pickFlower and grows back after. |
+| `garden.meadow` Wildflower meadow | 1x1 · floor | pickFlower:harvest | garden / flowers | — | Use | `pick`: one flower (a white daisy) shrinks away for pickFlower and grows back after. Long grass, 64 blades up to 0.5 m and stalks gone to seed, over low tussocks (G-38). |
 | `garden.geraniums` Potted geraniums | 1x1 · floor | water:water smell:smell | garden / flowers | Pot, Flowers | Static | Static. |
 | `garden.flowerBox` Flower box | 1x1 · floor | water:water smell:smell | garden / flowers | Box | Static | Static. |
 
@@ -88,8 +88,8 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
 | `garden.topiary` Topiary cone | 1x1 · floor | trim:prune | garden / shrubs | Pot | Use | `trim`: sprigs reaching out of the cone's sides near the tip shrink away for trim. |
 | `garden.hedge` Clipped hedge | 1x1 · floor | trim:prune | garden / shrubs | — | Use | `trim`. |
 | `garden.hydrangea` Hydrangea | 1x1 · floor | water:water admire:look | garden / shrubs | Flowers | Static | Static. |
-| `garden.roses` Rose bush | 1x1 · floor | smell:smell prune:prune | garden / shrubs | Roses | Use | `cut`: one bloom shrinks away for prune. |
-| `garden.azalea` Azalea | 1x1 · floor | water:water trim:prune | garden / shrubs | Flowers | Use | `trim`. |
+| `garden.roses` Rose bush | 1x1 · floor | smell:smell prune:prune | garden / shrubs | Roses | Use | `cut`: one bloom shrinks away for prune. Upright, arching canes from a low leafy base, dark leaf clusters along them, a cupped red rose on each (G-38). |
+| `garden.azalea` Azalea | 1x1 · floor | water:water trim:prune | garden / shrubs | Flowers | Use | `trim`. Smothered in 36 small, flat pink trusses down its sides (G-38). |
 | `garden.lavender` Lavender | 1x1 · floor | smell:smell cut:prune | garden / shrubs | Flowers | Use | `cut`: a few stems shrink away. |
 | `garden.fern` Garden fern | 1x1 · floor | water:water | garden / shrubs | — | Static | Static. |
 | `garden.grass` Ornamental grass | 1x1 · floor | — | garden / shrubs | — | Static | Static. |
@@ -113,7 +113,7 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
 |---|---|---|---|---|---|---|
 | `garden.vegPatch` Vegetable patch | 1x1 · floor | tend:tend harvest:harvest | garden / edibles | Bed | Growth | `grow` (E4): growth stages from seedling to ripe (lettuces and cabbages full); harvest moves it to picked, the crop shrinking away while the resident picks, and it grows back over the days. |
 | `garden.tomatoes` Tomato plants | 1x1 · floor | tend:tend harvest:harvest | garden / edibles | Bed | Growth | `grow` (E4): growth stages from seedling to ripe (tomatoes red); harvest moves it to picked, the crop shrinking away while the resident picks, and it grows back over the days. |
-| `garden.strawberries` Strawberry bed | 1x1 · floor | tend:tend harvest:harvest | garden / edibles | Bed | Growth | `grow` (E4): growth stages from seedling to ripe (strawberries red); harvest moves it to picked, the crop shrinking away while the resident picks, and it grows back over the days. |
+| `garden.strawberries` Strawberry bed | 1x1 · floor | tend:tend harvest:harvest | garden / edibles | Bed | Growth | `grow` (E4): growth stages from seedling to ripe (strawberries red); harvest moves it to picked, the crop shrinking away while the resident picks, and it grows back over the days. Each plant a closed rosette (five leaves, two upright in the middle, a dark heart), flat on the straw as a seedling (G-38). |
 | `garden.herbs` Herb planter | 1x1 · floor | pickHerbs:harvest water:water | garden / edibles | Bed | Use | `harvest`: a few sprigs (the basil) shrink away for pickHerbs and are back after. The resident steps in to it (`STAND_BACK` -0.5, as to a counter: it is 0.46 m deep) and picks standing, hands at the plants (the `pick` clip); watering steps in too. |
 | `garden.pumpkins` Pumpkin patch | 1x1 · floor | tend:tend harvest:harvest | garden / edibles | Bed | Growth | `grow` (E4): growth stages from seedling to ripe (pumpkins orange); harvest moves it to picked, the crop shrinking away while the resident picks, and it grows back over the days. |
 
@@ -136,16 +136,16 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `tree` Oak tree | 1x1 · floor | shade:relax | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). |
-| `pine` Pine tree | 1x1 · floor | — | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). |
-| `garden.maple` Maple tree | 1x1 · floor | shade:relax | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). |
+| `pine` Pine tree | 1x1 · floor | — | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). A bare trunk to its lowest tier at 2.2 m (G-38, 2026-10-21): residents walk under its boughs. |
+| `garden.maple` Maple tree | 1x1 · floor | shade:relax | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). A Norway maple's dense, even dome of many small clumps in a deep green, on a straight trunk with a leader, not the oak's billows (G-38). |
 | `garden.birch` Silver birch | 1x1 · floor | shade:relax | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). |
 | `garden.cherry` Cherry blossom tree | 1x1 · floor | shade:relax admire:admire | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). |
 | `garden.apple` Apple tree | 1x1 · floor | pick:eat shade:relax | garden / trees | — | Use | `pick`: an apple at the front, 1.84 m up and 0.7 m out under the crown, shrinks away 1.6 s into pick, as the picker's hand closes on it (`pickApple*` by height, then eating it; G-21). A child reaches up short of it (I-garden-11). |
-| `garden.japaneseMaple` Japanese maple | 1x1 · floor | shade:relax shape:prune | garden / trees | — | Use | `trim`: the top sprigs shrink away for shape. |
-| `garden.magnolia` Magnolia | 1x1 · floor | shade:relax smell:admire | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). Its blossom use reads "Admire the magnolia" (looking up). |
-| `garden.willow` Weeping willow | 1x1 · floor | shade:relax | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). |
-| `garden.spruce` Blue spruce | 1x1 · floor | — | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). |
-| `garden.cypress` Italian cypress | 1x1 · floor | — | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). |
+| `garden.japaneseMaple` Japanese maple | 1x1 · floor | shade:relax shape:prune | garden / trees | — | Use | `trim`: the top sprigs shrink away for shape. A vase on slender limbs from a short trunk: a narrow first layer inside its tile (to 0.8 m from the trunk), the broad red tiers from 2.2 m, 4.15 m tall (G-38): shaped from the next tile, walked past under it. |
+| `garden.magnolia` Magnolia | 1x1 · floor | shade:relax smell:admire | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). Its blossom use reads "Admire the magnolia" (looking up). Its blooms are upright white and pink goblets set into the crown's top and shoulders (G-38). |
+| `garden.willow` Weeping willow | 1x1 · floor | shade:relax | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). Curtains of 68 thin leafy streamers in two rows, out of the crown's edge and down to 0.45-1.5 m off the lawn, with gaps a sitter shows through (G-38). |
+| `garden.spruce` Blue spruce | 1x1 · floor | — | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). Limbed up: a bare trunk to its skirt at 2.15 m, 5.2 m across and 10.5 m tall (G-38). |
+| `garden.cypress` Italian cypress | 1x1 · floor | — | garden / trees | — | Static | Static; the canopy sways in the shader. Far version (E7). A pencil 1.0 m across and 7.95 m tall (G-38). |
 | `garden.lemonTree` Potted lemon tree | 1x1 · floor | pick:eat water:water | garden / trees | Pot | Use | `pick`: a lemon at the front (1.62 m up) shrinks away 1.6 s into pick, in the picker's hand (`pickLemon*` by height, then eating it; G-21). |
 
 **In play** (signed off 2026-10-17):
@@ -159,6 +159,6 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
   call, a snack). Known, not changed: it is still offered at night (I16, G-64).
 - The apple and the lemon tree each lose their front fruit for "Pick" (`pick`), the Japanese maple its top sprigs
   for "Shape the maple" (`trim`), in all four facings, shutting after the use.
-- Known, not changed: two tiles from the house the pine's and spruce's crowns (6 m and 5.6 m across on a one-tile
-  footprint) reach through the house's wall. The game lets a tree stand that close, and no model can be
+- Known, not changed: two tiles from the house the pine's and spruce's crowns (6 m and 5.2 m across on a one-tile
+  footprint, from 2.2 m up since G-38) reach through the house's wall. The game lets a tree stand that close, and no model can be
   narrower without losing its shape.
