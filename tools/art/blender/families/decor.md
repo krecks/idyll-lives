@@ -70,5 +70,5 @@ tabs are their own fabric, so the moving panels cost one draw call each.
 
 ```
 cargo art decor            # the 22 .glb, the pack, check-glb
-cargo art decor --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art decor --preview  # previews/decor/<id>.png, <id>@<clip>.png
 ```

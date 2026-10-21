@@ -62,5 +62,5 @@ one or two; colours on the clips bench; at night (`office-night`, WebGL) in the 
 
 ```
 cargo art pack_lazy            # the six .glb, the pack, check-glb
-cargo art pack_lazy --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_lazy --preview  # previews/pack_lazy/<id>.png, <id>@<clip>.png
 ```

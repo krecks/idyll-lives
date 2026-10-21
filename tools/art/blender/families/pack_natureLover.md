@@ -82,5 +82,5 @@ lying direction is the engine's, not the model's.
 
 ```
 cargo art pack_natureLover            # the seven .glb, the pack, check-glb
-cargo art pack_natureLover --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_natureLover --preview  # previews/pack_natureLover/<id>.png, <id>@<clip>.png
 ```

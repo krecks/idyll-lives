@@ -67,5 +67,5 @@ canopy closed over the head and lifted after), the wall climbed, the shower (rai
 
 ```
 cargo art pack_energetic            # the seven .glb, the pack, check-glb
-cargo art pack_energetic --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_energetic --preview  # previews/pack_energetic/<id>.png, <id>@<clip>.png
 ```

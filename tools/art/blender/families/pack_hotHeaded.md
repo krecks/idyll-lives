@@ -59,5 +59,5 @@ all six turned to rot 2 in the yard, the plunge and drums to rot 0, 1 and 3; col
 
 ```
 cargo art pack_hotHeaded            # the six .glb, the pack, check-glb
-cargo art pack_hotHeaded --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_hotHeaded --preview  # previews/pack_hotHeaded/<id>.png, <id>@<clip>.png
 ```

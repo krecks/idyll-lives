@@ -49,5 +49,5 @@ spruce's read 7.8 m for cones 5.4 m across); the oak's and maple's crowns were d
 
 ```
 cargo art trees            # the .glb files, the pack, check-glb
-cargo art trees --preview  # previews/<id>.png, <id>.far.png, <id>@<clip>.png
+cargo art trees --preview  # previews/trees/<id>.png, <id>.far.png, <id>@<clip>.png
 ```

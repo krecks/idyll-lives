@@ -171,5 +171,5 @@ play from a state with all four crops at each (picked, planted, growing, ripe).
 
 ```
 cargo art plants            # the .glb files, the pack, check-glb
-cargo art plants --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art plants --preview  # previews/plants/<id>.png, <id>@<clip>.png
 ```

@@ -63,5 +63,5 @@ turned in the yard (the settee to all four facings, the range to 1, 2 and 3); co
 
 ```
 cargo art pack_kind            # the six .glb, the pack, check-glb
-cargo art pack_kind --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_kind --preview  # previews/pack_kind/<id>.png, <id>@<clip>.png
 ```

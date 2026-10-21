@@ -176,5 +176,5 @@ colour studio.
 
 ```
 cargo art living            # the .glb files, the pack, check-glb
-cargo art living --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art living --preview  # previews/living/<id>.png, <id>@<clip>.png
 ```

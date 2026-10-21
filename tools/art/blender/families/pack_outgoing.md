@@ -57,5 +57,5 @@ bought coloured; the same at night (`office-night`, WebGL).
 
 ```
 cargo art pack_outgoing            # the six .glb, the pack, check-glb
-cargo art pack_outgoing --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_outgoing --preview  # previews/pack_outgoing/<id>.png, <id>@<clip>.png
 ```

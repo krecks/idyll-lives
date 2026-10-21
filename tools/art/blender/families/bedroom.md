@@ -79,5 +79,5 @@ residents asleep in it stay in view from above.
 
 ```
 cargo art bedroom            # every .glb, the pack, check-glb
-cargo art bedroom --preview  # previews/bed.png, bed@turn_down.png, …
+cargo art bedroom --preview  # previews/bedroom/bed.png, bed@turn_down.png, …
 ```

@@ -66,5 +66,5 @@ across): kept from the old part, as the footprint is fixed.
 
 ```
 cargo art pack_cheerful            # the six .glb, the pack, check-glb
-cargo art pack_cheerful --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_cheerful --preview  # previews/pack_cheerful/<id>.png, <id>@<clip>.png
 ```

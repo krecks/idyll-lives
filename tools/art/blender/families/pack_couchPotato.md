@@ -71,5 +71,5 @@ on WebGL (the lava lamp used at night, its glass and wax drawn).
 
 ```
 cargo art pack_couchPotato            # the six .glb, the pack, check-glb
-cargo art pack_couchPotato --preview  # previews/<id>.png, <id>@<clip>.png
+cargo art pack_couchPotato --preview  # previews/pack_couchPotato/<id>.png, <id>@<clip>.png
 ```

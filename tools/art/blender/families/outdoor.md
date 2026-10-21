@@ -123,5 +123,5 @@ fire pit (flames up, sitting on its rim), by day and at night; the colour studio
 
 ```
 cargo art outdoor            # every .glb, the pack, check-glb
-cargo art outdoor --preview  # previews/bench.png, parasol@stir.png, …
+cargo art outdoor --preview  # previews/outdoor/bench.png, parasol@stir.png, …
 ```

@@ -117,5 +117,5 @@ Khronos validator: 0 errors, 0 warnings on all twenty files (each model and its 
 
 ```
 cargo art street_furniture            # the ten .glb and .far.glb, the pack, check-glb
-cargo art street_furniture --preview  # previews/<id>.png, <id>@<clip>.png, <id>.far.png
+cargo art street_furniture --preview  # previews/street_furniture/<id>.png, <id>@<clip>.png, <id>.far.png
 ```

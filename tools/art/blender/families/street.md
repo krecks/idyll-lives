@@ -55,5 +55,5 @@ more (308 against 120).
 
 ```
 cargo art street            # the nine .glb and .far.glb, the pack, check-glb
-cargo art street --preview  # previews/<id>.png, <id>.far.png
+cargo art street --preview  # previews/street/<id>.png, <id>.far.png
 ```
