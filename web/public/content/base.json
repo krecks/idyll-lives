@@ -2573,6 +2573,7 @@
           "id": "use",
           "label": "Use toilet",
           "anim": "toilet",
+          "endSound": "flush",
           "minutes": 5,
           "after": "handwash",
           "pose": "sit",
@@ -4538,7 +4539,8 @@
             "oven"
           ],
           "minutes": 25,
-          "anim": "bake"
+          "anim": "bake",
+          "sound": "none"
         }
       ]
     },
@@ -4588,7 +4590,8 @@
             "oven"
           ],
           "minutes": 35,
-          "anim": "bake"
+          "anim": "bake",
+          "sound": "none"
         }
       ]
     },
@@ -4637,7 +4640,8 @@
             "oven"
           ],
           "minutes": 30,
-          "anim": "bake"
+          "anim": "bake",
+          "sound": "none"
         }
       ]
     },

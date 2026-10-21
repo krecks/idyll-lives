@@ -84,6 +84,14 @@ export interface InteractionDef {
    * (default every stage but a baby's): the kids' things are a child's, wine a grown-up's.
    */
   stages?: string[];
+  /**
+   * What it sounds like while it lasts: a world sound by key (`audio/world.ts` `LOOPS`: `chop` for
+   * a cheese board), or `none`; absent: by the object's `sounds`, else by `anim`. Not for a
+   * `recipe`, whose steps sound by the station they're done at.
+   */
+  sound?: string;
+  /** A sound played once as it ends (`audio/water.ts` `ONCE`: a toilet's `flush`). */
+  endSound?: string;
 }
 
 /** How cooking, eating and washing up go (content `cooking`; sim-core `cooking::CookingRules`). */
@@ -153,6 +161,8 @@ export interface RecipeStep {
   optional?: boolean;
   /** What the cook carries away from it (an item id). */
   holds?: string;
+  /** What it sounds like, over the station's (`ObjectDef.sounds`; a world sound key or `none`): a bake in the oven of a cooker is no frying pan. */
+  sound?: string;
 }
 
 /** Something to cook (content `recipes`; sim-core `cooking::RecipeDef`). */
@@ -218,6 +228,14 @@ export interface ObjectDef {
    * default `roomRules.lampTiles`).
    */
   light?: { range?: number; intensity?: number; height?: number; at?: [number, number]; tiles?: number; switch?: boolean };
+  /**
+   * What's done at it sounds like this, by animation tag (world sound keys or `none`, as an
+   * interaction's `sound`), for its uses without a `sound` and the cooking steps at it as a
+   * station: an oven's `stir` is silent, not a frying pan.
+   */
+  sounds?: Record<string, string>;
+  /** A world sound it makes by itself, used or not, while its lot is looked at (a fountain's water). */
+  ambient?: string;
   /** Turns freely (at any angle, for looks); default: 1×1 objects of `objectRules.freeRotation` categories. */
   freeRotation?: boolean;
   /**

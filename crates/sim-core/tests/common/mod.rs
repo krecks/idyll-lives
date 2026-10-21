@@ -184,17 +184,19 @@ pub fn check(w: &World) {
             assert!(a < n && b < n && a != b, "{} expects a baby from {:?}", hh.name, e.parents);
         }
     }
-    // Every object slot holder is someone who is using or heading to that object.
+    // Every object slot holder is someone who is using or heading to that object (or talking
+    // from its seat, what they sat down to do held: `paused`).
     for o in &w.objects {
         for u in o.users() {
             let s = &w.sims[u as usize];
-            let ok = s.current().is_some_and(|a| match a.task.kind {
+            let doing = s.paused().or(s.current());
+            let ok = doing.is_some_and(|a| match a.task.kind {
                 TaskKind::Use { object, .. } | TaskKind::Repair { object } => object == o.id,
                 TaskKind::Cook { station, .. } | TaskKind::Dishes { station, .. } => station == Some(o.id),
                 TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => seat == Some(o.id),
                 _ => false,
             }) || (s.use_seat == Some(o.id)
-                && s.current()
+                && doing
                     .is_some_and(|a| matches!(a.task.kind, TaskKind::Use { .. })));
             assert!(
                 ok,
@@ -1082,4 +1084,83 @@ pub fn dump_state(w: &World, name: &str) {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../debug-states");
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join(format!("{name}.json")), w.save_json()).unwrap();
+}
+
+/// The player's household of three in `town(content, 7, 3)` at 9:00 on day one, free will off,
+/// everyone rested and fed; they get on well and know nobody else. (World, its residents, content.)
+pub fn household_of_three() -> (World, Vec<usize>, String) {
+    let content = content();
+    let mut w = World::from_json(&content, &town(&content, 7, 3), 7).unwrap();
+    let h = w.households.iter().position(|h| h.player).unwrap() as u32;
+    let home: Vec<usize> = (0..w.sims.len()).filter(|&i| w.sims[i].household == h).collect();
+    assert_eq!(home.len(), 3);
+    w.autonomy = false;
+    while w.tick < clock::tick_at(1, 9.0 * 60.0).unwrap() {
+        w.tick_once();
+    }
+    for &i in &home {
+        let n = w.content.needs.len();
+        w.sims[i].needs[..n].fill(1.0);
+        for x in (0..w.sims.len()).filter(|x| !home.contains(x)) {
+            *w.relationships.get_mut(i, x) = Default::default();
+            *w.relationships.get_mut(x, i) = Default::default();
+        }
+        for &x in home.iter().filter(|&&x| x != i) {
+            w.relationships.get_mut(i, x).friendship = 70.0;
+        }
+    }
+    (w, home, content)
+}
+
+/// Sits `who` on the home's sofa as if they'd chosen to (the player's order to sit would be theirs
+/// to keep: nobody talks to them then), with the sofa's comfort still to come. Free will off.
+pub fn sit_on_the_sofa(w: World, content: &str, who: &[usize]) -> World {
+    use sim_core::content::Pose;
+    let plot = w.households.iter().find(|h| h.player).and_then(|h| h.plot).unwrap() as usize;
+    let p = &w.plots[plot];
+    let sofa_def = w.content.object_index("sofa").unwrap();
+    let sofa = w.objects.iter().find(|o| o.def == sofa_def && o.x >= p.x && o.x < p.x + p.w && o.z >= p.z && o.z < p.z + p.d).unwrap().id;
+    let relax = w.content.objects[sofa_def].interactions.iter().position(|i| i.pose == Pose::Sit).unwrap();
+    let mut w = w;
+    let comfort = w.content.needs.iter().position(|n| n.id == "comfort").unwrap();
+    for &i in who {
+        w.sims[i].needs[comfort] = 0.2;
+        w.apply(sim_core::Command::Use { sim: i as u32, object: sofa, interaction: relax }).unwrap();
+    }
+    let seated = |w: &World| who.iter().all(|&i| w.sims[i].pose == Pose::Sit && w.sims[i].current().is_some_and(|a| matches!(a.phase, Phase::Using { .. })));
+    for _ in 0..(20.0 / MINUTES_PER_TICK) as u64 {
+        if seated(&w) {
+            break;
+        }
+        w.tick_once();
+    }
+    assert!(seated(&w), "they didn't sit down");
+    // Saved and loaded with the orders made their own: they sit down again.
+    let mut save: Value = serde_json::from_str(&w.save_json()).unwrap();
+    for s in save["sims"].as_array_mut().unwrap() {
+        for t in s["tasks"].as_array_mut().into_iter().flatten() {
+            if t.get("directed").is_some() {
+                t["directed"] = false.into();
+            }
+        }
+    }
+    let mut w = World::from_save_json(content, &save.to_string()).unwrap();
+    w.autonomy = false;
+    for _ in 0..(5.0 / MINUTES_PER_TICK) as u64 {
+        if seated(&w) {
+            break;
+        }
+        w.tick_once();
+    }
+    assert!(seated(&w), "they didn't sit down again");
+    for &i in who {
+        assert!(w.sims[i].current().is_some_and(|a| !a.task.directed));
+        w.sims[i].needs[comfort] = 0.2;
+    }
+    w
+}
+
+/// Metres between two points.
+pub fn apart(p: [f32; 2], q: [f32; 2]) -> f32 {
+    (p[0] - q[0]).hypot(p[1] - q[1])
 }

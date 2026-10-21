@@ -2178,6 +2178,7 @@
       "group": "decor",
       "outdoors": true,
       "description": "A two-tier stone fountain. Toss a coin and make a wish, or just listen to the water.",
+      "ambient": "fountain",
       "interactions": [
         {
           "id": "wish",

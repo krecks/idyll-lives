@@ -723,6 +723,16 @@ pub struct Sim {
     pub(crate) attraction: u32,
     pub(crate) queue: VecDeque<Task>,
     pub(crate) current: Option<Activity>,
+    /// Sitting, what they sat down to do, held while they talk from the seat (a chat with the
+    /// one beside them on the sofa, listening in at the table; `conversation::from_seat`): they
+    /// carry on with it when the talk is over, still sitting (`end_activity`). Not saved: after
+    /// a reload they stand up where they sat down from.
+    pub(crate) paused: Option<Activity>,
+    /// Joining in: the place in the group they're walking to (`conversation::take_place`). Not
+    /// saved, as listening in isn't.
+    pub(crate) join_spot: Option<[f32; 2]>,
+    /// Ticks without anything to do (to choose something); sitting at something that leaves
+    /// room for a word, ticks since they last thought of one (`from_seat`).
     pub(crate) idle_ticks: u32,
     /// What they do next, before choosing anything else (an `after` routine, like washing
     /// hands after the toilet; see `follow_up`). Not saved: losing it on a reload is harmless.
@@ -825,6 +835,11 @@ impl Sim {
 
     pub fn current(&self) -> Option<&Activity> {
         self.current.as_ref()
+    }
+
+    /// Sitting, what they sat down to do while they talk from the seat (`paused`).
+    pub fn paused(&self) -> Option<&Activity> {
+        self.paused.as_ref()
     }
 
     /// In bed for the night (or a nap): using something tagged as sleep.
@@ -1182,6 +1197,8 @@ pub(crate) struct SimBrief {
     pub conversing: Option<(u32, usize)>,
     /// The tile they're tidying up (or on their way to), if any.
     pub cleaning: Option<(i32, i32)>,
+    /// Sitting down (on a sofa, at a table): someone sitting near can talk to them from their seat.
+    pub seated: bool,
 }
 
 pub struct World {
@@ -1925,6 +1942,8 @@ impl World {
             attraction,
             queue: VecDeque::new(),
             current: None,
+            paused: None,
+            join_spot: None,
             idle_ticks: 0,
             follow_up: None,
             unreachable: [None; UNREACHABLE],
@@ -2605,6 +2624,7 @@ impl World {
                 age: s.age,
                 conversing: None,
                 cleaning: s.current().and_then(|a| if let TaskKind::Clean { x, z } = a.task.kind { Some((x, z)) } else { None }),
+                seated: s.pose == Pose::Sit && !s.is_moving(),
             });
         }
         // Who's in a conversation, and whose (for joining in).
@@ -3680,6 +3700,25 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
         sim.follow_up = Some(task);
     }
 
+    // Sitting with others near (on the sofa, round a table): now and then a word from the seat,
+    // without getting up (`conversation::from_seat`).
+    let free_will = ctx.autonomy && ctx.households[sim.household as usize].free_will;
+    if free_will
+        && sim.pose == Pose::Sit
+        && sim.current.as_ref().is_some_and(|a| matches!((a.task.kind, &a.phase), (TaskKind::Use { .. }, Phase::Using { .. })))
+        && sim.available_for_social(content)
+    {
+        sim.idle_ticks = sim.idle_ticks.saturating_add(sim.steps);
+        if sim.idle_ticks >= conversation::SEAT_TALK_TICKS {
+            sim.idle_ticks = 0;
+            if rng.next_f32() < conversation::SEAT_TALK_CHANCE
+                && let Some(task) = pick_autonomous(sim, ctx, objects, items, rng, Some(conversation::SEAT_RANGE))
+            {
+                conversation::from_seat(sim, task, content, ctx.briefs);
+            }
+        }
+    }
+
     // Ticks what they're doing moves on by (fewer than `steps` if it starts partway through).
     let mut ticks = sim.steps;
     if sim.current.is_none() {
@@ -3699,11 +3738,10 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                 }
                 return;
             }
-            let free_will = ctx.autonomy && ctx.households[sim.household as usize].free_will;
             if free_will && sim.idle_ticks >= AUTONOMY_DELAY_TICKS {
                 let since = sim.idle_ticks - AUTONOMY_DELAY_TICKS;
                 sim.idle_ticks = 0;
-                if let Some(task) = pick_autonomous(sim, ctx, objects, items, rng) {
+                if let Some(task) = pick_autonomous(sim, ctx, objects, items, rng, None) {
                     start_task(sim, task, ctx, objects, items);
                     if sim.current.is_none() && sim.follow_up.is_none() {
                         // People move: don't hold a grudge against where they were for long.
@@ -3844,12 +3882,15 @@ fn requirements_met(ctx: &Ctx, objects: &[ObjectInstance], object: u32, inter: &
     missing_requirement(ctx.content, ctx.object_plot, Some(ctx.index), objects, object, inter).is_none()
 }
 
+/// What a Sim chooses to do on their own. `from_seat`: sitting, only a word with someone sitting
+/// within that many metres, or listening in on a talk there (`conversation::from_seat`).
 fn pick_autonomous(
     sim: &Sim,
     ctx: &Ctx,
     objects: &[ObjectInstance],
     items: &crate::items::Items,
     rng: &mut Rng,
+    from_seat: Option<f32>,
 ) -> Option<Task> {
     let content = ctx.content;
     let needs = &sim.needs[..content.needs.len()];
@@ -4313,6 +4354,17 @@ fn pick_autonomous(
             (Choice::Social(t, s), TaskKind::Social { target, social }) => (t, s) != (target, social),
             (Choice::Join(l), TaskKind::Join { leader }) => l != leader,
             _ => true,
+        });
+    }
+
+    // From the seat: only a word with someone sitting near (nothing that takes them closer than
+    // talking does: a hug, a kiss, a fight), or listening in on a talk going on beside them.
+    if let Some(range) = from_seat {
+        let near = |p: [f32; 2]| (p[0] - sim.pos[0]).hypot(p[1] - sim.pos[1]) <= range;
+        candidates.retain(|&(_, choice)| match choice {
+            Choice::Social(t, s) => ctx.briefs[t as usize].seated && near(ctx.briefs[t as usize].pos) && content.socials[s].distance >= conversation::SEATED_DISTANCE,
+            Choice::Join(l) => ctx.briefs.iter().any(|b| b.conversing.is_some_and(|c| c.0 == l) && near(b.pos)),
+            _ => false,
         });
     }
 
@@ -5454,12 +5506,23 @@ fn accident(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], a: usize) 
 /// is free again, and they stand up in front of it (or step out of the shower). What they carry is put down after the step
 /// (`cooking::after_step`).
 pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [ObjectInstance]) {
-    let held = sim.current.take().and_then(|act| match act.task.kind {
-        TaskKind::Use { object, .. } | TaskKind::Repair { object } => Some(object),
-        TaskKind::Cook { station, .. } | TaskKind::Dishes { station, .. } => station,
-        TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => seat,
-        _ => None,
-    });
+    sim.join_spot = None;
+    // A talk from the seat over: back to what they sat down to do, still sitting.
+    if let Some(paused) = sim.paused.take() {
+        if matches!(sim.current.as_ref().map(|a| a.task.kind), Some(TaskKind::Social { .. } | TaskKind::Join { .. })) {
+            sim.current = Some(paused);
+            sim.idle_ticks = 0;
+            return;
+        }
+        // (Ended some other way: what they sat down to do ends too.)
+        if let Some(o) = held_object(paused.task.kind).filter(|&o| (o as usize) < objects.len()) {
+            objects[o as usize].release(sim.id);
+        }
+        if let Some((fx, fz)) = sim.seated_from {
+            sim.pos = [fx as f32 + 0.5, fz as f32 + 0.5];
+        }
+    }
+    let held = sim.current.take().and_then(|act| held_object(act.task.kind));
     if let Some(o) = held.map(|o| o as usize).filter(|&o| o < objects.len()) {
         objects[o].release(sim.id);
         if sim.pose != Pose::Stand || sim.seated_from.is_some() {
@@ -5475,6 +5538,17 @@ pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [Obje
     sim.seated_from = None;
     sim.pose = Pose::Stand;
     sim.idle_ticks = 0;
+}
+
+/// The object a task holds a place at (using it, repairing it, cooking at it, the seat they eat
+/// or phone from), released when it ends.
+fn held_object(kind: TaskKind) -> Option<u32> {
+    match kind {
+        TaskKind::Use { object, .. } | TaskKind::Repair { object } => Some(object),
+        TaskKind::Cook { station, .. } | TaskKind::Dishes { station, .. } => station,
+        TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => seat,
+        _ => None,
+    }
 }
 
 /// A free crib at home for a baby (one with no other baby in it): they're put straight in.

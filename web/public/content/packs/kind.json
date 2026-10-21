@@ -93,6 +93,9 @@
       "category": "kitchen",
       "slots": 1,
       "description": "A roomy counter and oven for baking pies and treats to share; better bakers feed the family better, and Cooking 4+ bakes leave residents glowing and extra charming.",
+      "sounds": {
+        "stir": "none"
+      },
       "interactions": [
         {
           "id": "familyPie",
