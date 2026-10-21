@@ -498,7 +498,8 @@ function lainOnBunk(fit: BunkFit): PoseSpec {
   const root: Vec = [0, (BUNK.top + (0.1 * fit.h) / 1.77) / fit.s, (fit.h - 0.91) / fit.s];
   const { pelvis } = rest();
   const p = lie.pelvis ?? [0, 0, 0];
-  return { ...lie, pelvis: [p[0] - 90, p[1], p[2]], move: [0, root[1] - pelvis[1], root[2] - pelvis[1]] };
+  // (Turned a whole way round, as the round ends sat facing the foot end: blended into, it doesn't turn back.)
+  return { ...lie, pelvis: [p[0] - 90, p[1] + 360, p[2]], move: [0, root[1] - pelvis[1], root[2] - pelvis[1]] };
 }
 
 /**
