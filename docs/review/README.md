@@ -42,19 +42,27 @@ From [§4 of the plan](../../plan/authenticity-review.md#4-findings-format-and-s
 **Ids:** `M-<cat>-NN`, `A-<cat>-NN`, `I-<cat>-NN` (for example `M-kitchen-07`), where the category is the `docs/objects/` page or `residents`, `houses`, `town`, `social`, `systems`.
 
 **Severity**
-- **S1 — breaks belief:** wrong at a glance in normal play (a resident floats above the bed, a door opens into the wall, a child-sized adult chair, a use from the back of the object).
+- **S1 — breaks belief:** wrong at a glance in normal play (a resident floats above the bed, a door opens into the wall, a child-sized adult chair, a use from the back of the object, an adult using a child's or a baby's thing, or a child an adult's, as if it fitted).
 - **S2 — noticeably wrong:** a careful player sees it (hands hover, a counter 10 cm too low, a 2-minute shower, a missing obvious use).
 - **S3 — polish:** only on close inspection or a side-by-side.
 
-**Fix class:** `model` (Blender rebuild), `content` (numbers or fields), `renderer-table` (`SEATS`, `BEDS`, `ACTIONS`, `STATION_PROPS`), `clip` (resident clip), `motion` (object clip or manifest `motions`), `code` (new behaviour), `decision` (needs the owner).
+A `decision` finding takes the severity of its worse outcome.
+
+**Fix class:** `model` (Blender rebuild), `content` (numbers or fields), `renderer-table` (`characters/furniture.json`, `ACTIONS`, `STATION_PROPS`), `clip` (resident clip), `motion` (object clip or manifest `motions`), `code` (new behaviour), `decision` (needs the owner).
 
 **Ledger row** (`docs/review/<cat>.md`, one table per group, in the order of `docs/objects/<cat>.md`):
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| `fridge` | OK | A-kitchen-03 | OK | A-kitchen-03 S2 motion: freezer door opens at use start, not at the hand | `review/kitchen/fridge-*.png` |
+| `fridge` | OK | A-kitchen-03 | OK | A-kitchen-03 S2 motion: freezer door opens at use start, not at the hand | `kitchen/sheets/obj-fridge.png` |
 
-Shots go in the scratchpad or a gitignored `review-shots/` folder, not in git. The ledger names them, and the key ones are attached when a finding is filed.
+Shots stay in the review worktree's gitignored `bench-results/review/<cat>/`, not in git. The Shots cell names the object's contact sheet (`<cat>/sheets/obj-<id>.png`, from `check.mjs sheet`) and at most two more shots, as paths under `bench-results/review/`.
+
+Under each group, a table **Real uses against the content's** (I1) lists each item's real-world uses next to the content's uses.
+
+A **resident's pose at an object** (reach, eye line, contact with its parts) is filed under I3 with A1 in its Rubric field; the A column names the same id.
+
+A **cause shared by many objects** (a sim rule such as `Command::Use`, an `ACTIONS` entry, a clip) goes in the ledger of the first object it was seen on, naming every other affected item; other rows point to it with "(<ledger> ledger)". The coordinator moves it to `systems.md` or `residents.md` at the merge. Each object wave judges the `ACTIONS` entries its objects use, at those objects.
 
 In a ledger's Findings section a finding is written as:
 
@@ -66,7 +74,7 @@ In a ledger's Findings section a finding is written as:
 - **Fix class:** motion
 - **Where:** `web/public/assets/packs/kitchen/manifest.json` (`freezer_open`)
 - **Evidence:** `review/kitchen/fridge-*.png`; what was seen, measured or compared
-- **Status:** open (or confirmed, closed; `seeded (from <source>)` for known issues)
+- **Status:** one of `open`, `seeded (from <source>)`, `confirmed`, `confirmed and widened`, `confirmed fixed on <item>`, `not checked (<why>)`, `closed (<why>)`; in Phase 4 also `fixed (<commit>)`, `later`, `won't fix (<why>)`
 - **Source:** who found it, in which pass
 ```
 
@@ -84,6 +92,8 @@ From [§9 of the plan](../../plan/authenticity-review.md#9-owner-decisions-2026-
 4. **Decor without uses** (default): decor stays decor. A clear missing use is an I1 finding, decided at triage.
 5. **Residents' proportions** (default): changes to `rig.rs` are filed only and decided at triage.
 6. **Pace** (default): the review runs as its own workstream now, on branch `review/authenticity`, through Phase 4.
+
+After the pilot (2026-10-21) the owner approved: M14's head ratios based on the style (half a head bigger); a new rubric line **I16 conditions** (a use that needs a time, place or state has it); a **1 cm measuring tolerance** on functional heights (5 mm on table tops); the bookkeeping rules above; the S1 example for adults and children using each other's things; and decisions rated by their worse outcome.
 
 ## Tooling
 
