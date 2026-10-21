@@ -3,6 +3,7 @@
 What it covers: the 21 objects of [docs/objects/lighting.md](../objects/lighting.md), in its groups and order.
 
 - **Evidence:** `bench-results/review/lighting/` (gallery, clip, pose and play shots; shots stay out of git).
+- **Pilot rows** (the 28 `base.json` objects and the residents, 2026-10-21): Shots are relative to `bench-results/review/pilot/` in the review worktree; how they were taken is in its `log.md`, what was learnt in [pilot-notes.md](pilot-notes.md).
 - **Rubric:** [plan/authenticity-review.md §3](../../plan/authenticity-review.md#3-rubrics); real-world ranges in [reference.md](reference.md). Finding format and severities: [README.md](README.md#writing-a-finding).
 - **Columns:** M, A and I take `OK`, a finding id or `n/a`; `—` is pending. Findings lists the ids filed against the row, with severity and fix class; Shots names the evidence files.
 - **Seeded findings** (`Status: seeded`) are known issues copied in from earlier docs. Confirm or close them; don't file them again.
@@ -37,7 +38,7 @@ Family: `tools/art/blender/families/lighting.py`.
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| `lamp` Floor lamp | — | — | — | | |
+| `lamp` Floor lamp | OK | OK | OK | | `sheets/obj-lamp.png`, `play-night/lamp-no-uses.png`, `gallery-all/gallery-lamp.png` |
 | `floorLampSimple` Simple floor lamp | — | — | — | | |
 | `lampFloorArc` Arc floor lamp | — | — | — | | |
 | `lampFloorTripod` Tripod floor lamp | — | — | — | | |
@@ -55,6 +56,14 @@ Family: `tools/art/blender/families/lighting.py`.
 | `lampBanker` Banker's lamp | — | — | — | | |
 | `lampMushroom` Mushroom lamp | — | — | — | | |
 | `lampLantern` Candle lantern | — | — | — | | |
+
+## Real uses against the content's (I1)
+
+Filled by the pilot for its rows.
+
+| Item | Real uses | Content uses (minutes) | Verdict |
+|---|---|---|---|
+| `lamp` | switch it on and off, read by it | its switch in the pie menu (`session.ts:1163`); residents switch a room's lamps together at dusk and on leaving (`lights.rs`) | OK (the switch is its use) |
 
 ## Findings
 

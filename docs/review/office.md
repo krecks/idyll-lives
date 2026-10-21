@@ -3,6 +3,7 @@
 What it covers: the 14 objects of [docs/objects/office.md](../objects/office.md), in its groups and order.
 
 - **Evidence:** `bench-results/review/office/` (gallery, clip, pose and play shots; shots stay out of git).
+- **Pilot rows** (the 28 `base.json` objects and the residents, 2026-10-21): Shots are relative to `bench-results/review/pilot/` in the review worktree; how they were taken is in its `log.md`, what was learnt in [pilot-notes.md](pilot-notes.md).
 - **Rubric:** [plan/authenticity-review.md §3](../../plan/authenticity-review.md#3-rubrics); real-world ranges in [reference.md](reference.md). Finding format and severities: [README.md](README.md#writing-a-finding).
 - **Columns:** M, A and I take `OK`, a finding id or `n/a`; `—` is pending. Findings lists the ids filed against the row, with severity and fix class; Shots names the evidence files.
 - **Seeded findings** (`Status: seeded`) are known issues copied in from earlier docs. Confirm or close them; don't file them again.
@@ -17,7 +18,7 @@ Family: `tools/art/blender/families/office.py`.
 | `deskCorner` Corner desk | — | — | — | | |
 | `deskStanding` Standing desk | — | — | — | A-office-01 S2 renderer-table (seeded) | |
 | `deskExecutive` Executive desk | — | — | — | I-office-02 S3 decision (seeded) | |
-| `computerDesk` Computer desk | — | — | — | | |
+| `computerDesk` Computer desk | OK | OK | I-kids-03 | I-kids-03 S1 code (kids ledger: an adult does homework) | `sheets/obj-computerDesk.png`, `play/computerDesk-*.png`, `clips/clips-computerDesk-all-t*.png`, `sheets/seat-deskM.png`, `sheets/seat-deskF.png`, `play-child/computerDesk-*.png`, `play-teen/computerDesk-*.png` |
 | `deskWriting` Writing desk | — | — | — | | |
 | `deskLaptop` Laptop desk | — | — | — | I-office-01 S3 renderer-table (seeded) | |
 | `computerGaming` Gaming PC | — | — | — | | |
@@ -41,6 +42,14 @@ Family: `tools/art/blender/families/office.py`.
 | `filingCabinet` Filing cabinet | — | — | — | | |
 | `whiteboard` Whiteboard | — | — | — | | |
 | `corkboard` Corkboard | — | — | — | | |
+
+## Real uses against the content's (I1)
+
+Filled by the pilot for its rows; durations are judged by §9 decision 2.
+
+| Item | Real uses | Content uses (minutes) | Verdict |
+|---|---|---|---|
+| `computerDesk` | work at a computer, write, browse, game, do homework | practise coding (60), write (60), study the markets (60), browse the web (45), do homework (45) | OK; homework offered to adults too (I-kids-03) |
 
 ## Findings
 

@@ -31,6 +31,8 @@ Rubric: [§3 of the plan](../../plan/authenticity-review.md#3-rubrics). Real-wor
 | [Systems](systems.md) | 46 | 6: A-systems-01, I-systems-01, I-systems-02, I-systems-03, I-systems-04, I-systems-05 |
 | **Total** | **948** | **52** |
 
+The pilot (the 28 `base.json` objects and the residents) filled its rows on 2026-10-21; what it found about the rubric, the format and the tools, and the changes it proposes, are in [pilot-notes.md](pilot-notes.md).
+
 The 15 object ledgers follow `docs/objects/<cat>.md` group by group and hold all 541 buyable objects, each in exactly one ledger.
 
 ## Writing a finding
