@@ -259,7 +259,8 @@ Measured: the dressing table's top 0.76 (72–78) and its pouf's seat 0.45 (42�
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters.ts` (`writeBlanket`, `BLANKET_BEDS`: the daybed in it since I-bedroom-02); `tools/art/blender/families/bedroom.py:421` (`bedDaybed`: a back, two arms and a front rail of spindles round the mattress)
 - **Evidence:** `fixes/tables/play-a/a-bedDaybed-sleep-01.png`: the quilt's sides drop past the mattress's edges as on an open bed, so on the front side it hangs down between the rail's spindles to below the mattress, and at the back it runs into the back. A bed with sides wants the quilt tucked in at the mattress's edges (no side drop), as a cot's would be.
-- **Status:** open
+- **Status:** fixed (COMMIT)
+- **After:** the daybed's quilt is tucked in (`furniture.json` `beds.bedDaybed` `tuck: [0.7, 0]`, `foot` 0.12; `writeBlanket`): 0.7 m wide, so its side drops fall inside the mattress, and ending just past the toes (a tucked quilt may end up to 0.3 short of its stretch), inside the foot end's arm. `fixes/sweep-render/daybed/b-bedDaybed-sleep-01.png` against `fixes/tables/play-a/a-bedDaybed-sleep-01.png` (the same camera: no drape through the rail or the foot end's spindles), `foot-bedDaybed-sleep-01.png` (the foot end and the open side close up), `front-bedDaybed-sleep-01.png` (from the head end), `child-bedDaybed-sleep-01.png` (Dee, 8).
 - **Source:** fix: tables (G-04 re-check, 2026-10-21)
 
 ### A-bedroom-06 — The upper bunk's duvet turns down while its sleeper is still at the foot of the ladder

@@ -441,6 +441,12 @@ interface Bed {
   fwd?: number;
   /** How far short of the footprint's foot end the quilt ends (m, default 0.05): a bed whose mattress stops short of it. */
   foot?: number;
+  /**
+   * A bed with sides round the mattress (a back, arms, a rail: the daybed): the quilt is tucked in at the mattress's
+   * edges, `[width, right]`: its width over the sleeper (m, the side drops then inside the mattress) and how far (m)
+   * to the bed's right of the footprint's middle the mattress's open middle is (clear of the back's cushions).
+   */
+  tuck?: readonly number[];
   across?: boolean;
   /** A bench lifted on (the weight bench): the feet down on the floor either side of it, this far (m) out from its middle (`benchLegs`). */
   feet?: number;
@@ -5018,7 +5024,9 @@ export class Characters {
     // Two to a wide bed: each quilt half the bed and a little more, moved a little towards its middle, so the
     // two meet over it (the one lifted a hair over the other) with no strip of the bed's own cover between.
     const wide = across >= 1.8;
-    const slot = wide ? across / 2 + BLANKET_MEET * 2 : Math.min(across - 0.08, 1.0);
+    // (Tucked in between a bed's sides: `Bed.tuck`.)
+    const tuck = BEDS[bed.def]?.tuck;
+    const slot = tuck ? tuck[0] : wide ? across / 2 + BLANKET_MEET * 2 : Math.min(across - 0.08, 1.0);
     const side = wide ? Math.sign((x - bed.cx) * fz - (z - bed.cz) * fx) * BLANKET_MEET : 0;
     const tx = fx > 1e-3 ? (bed.maxX - x) / fx : fx < -1e-3 ? (bed.minX - x) / fx : Infinity;
     const tz = fz > 1e-3 ? (bed.maxZ - z) / fz : fz < -1e-3 ? (bed.minZ - z) / fz : Infinity;
@@ -5027,8 +5035,9 @@ export class Characters {
     // shrunk to it along the body and in height, from its feet, so its head is out (the width stays the bed's).
     const zs = own ? s : s * rig.size;
     const z0 = lieCentre(rig) - LIE_CENTRE * zs;
-    // The quilt past the toes reaches the bed's foot end (local units, at the Sim's scale).
-    blanket.ext[d * 2] = clamp((foot - z0) / zs - blanket.footZ, -0.22, 1.2);
+    // The quilt past the toes reaches the bed's foot end (local units, at the Sim's scale); tucked in, as close
+    // as just past the toes.
+    blanket.ext[d * 2] = clamp((foot - z0) / zs - blanket.footZ, tuck ? -0.3 : -0.22, 1.2);
     const c = smooth(rig.cover);
     // Pulled up: the quilt from its foot end to this line (local z) at full height, the rest folded away
     // under it (`BlanketPlugin`), so nothing shows through it on the way up or down.
@@ -5051,9 +5060,11 @@ export class Characters {
     m[o + 9] = 0;
     m[o + 10] = fz * zs;
     m[o + 11] = 0;
-    m[o + 12] = x - fz * side + fx * z0;
+    const r = (bed.rot * Math.PI) / 2;
+    const right = tuck ? tuck[1] : 0;
+    m[o + 12] = x - fz * side + fx * z0 + Math.cos(r) * right;
     m[o + 13] = rig.bedH + lift;
-    m[o + 14] = z + fx * side + fz * z0;
+    m[o + 14] = z + fx * side + fz * z0 - Math.sin(r) * right;
     m[o + 15] = 1;
   }
 

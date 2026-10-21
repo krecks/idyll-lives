@@ -91,7 +91,7 @@
     "bedDouble": { "h": 0.52 },
     "bedQueenUpholstered": { "h": 0.52 },
     "bedCanopy": { "h": 0.52 },
-    "bedDaybed": { "h": 0.51 },
+    "bedDaybed": { "h": 0.51, "foot": 0.12, "tuck": [0.7, 0] },
     "sofaBed": { "h": 0.44, "fwd": 0.6 },
     "gloomy.windowSeat": { "h": 0.45, "across": true },
     "kind.hearthSettee": { "h": 0.36, "across": true }
