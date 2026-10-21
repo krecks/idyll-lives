@@ -22,7 +22,7 @@ import sys
 
 import bmesh
 import bpy
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -168,31 +168,44 @@ def _chute(name, steps=22):
     return obj
 
 
+# Headroom on the deck (M-community-07): the roof's eaves 1.03 m over it (a child stands under them), an open way in
+# from the ladder between its handrails (no bar across the deck's back), and an arch over the chute's mouth rising
+# 0.55 m over its floor (a child sits up under it).
+SLIDE_EAVES = 2.46
+SLIDE_ARCH = (0.27, 0.55)   # the arch over the chute's mouth: half its width, its rise over the floor
+
+
 def slide():
     with G.new_parts():
-        # the tower: four posts, a deck, side rails and a roof
+        # the tower: four posts, a deck, side rails, beams round the top and a roof
         for x in (-0.28, 0.28):
             for z in (-0.31, -0.69):
-                F.cyl(f'post{x}{z}', 0.035, 1.95, (x, 0.975, z), M.body, verts=12)
+                F.cyl(f'post{x}{z}', 0.035, SLIDE_EAVES, (x, SLIDE_EAVES / 2, z), M.body, verts=12)
             for k, y in enumerate((1.62, 1.86)):
                 G.rod(f'side{x}{k}', F.at(x, y, -0.31), F.at(x, y, -0.69), 0.02, material=M.body, verts=8)
+            G.rod(f'beam_side{x}', F.at(x, SLIDE_EAVES - 0.03, -0.31), F.at(x, SLIDE_EAVES - 0.03, -0.69), 0.025,
+                  material=M.body, verts=8)
+        for z in (-0.31, -0.69):
+            G.rod(f'beam{z}', F.at(-0.28, SLIDE_EAVES - 0.03, z), F.at(0.28, SLIDE_EAVES - 0.03, z), 0.025,
+                  material=M.body, verts=8)
         F.box('deck', 0.62, 0.05, 0.44, (0, 1.405, -0.5), M.tread, bevel=0.008)
         F.box('deck_frame', 0.6, 0.06, 0.06, (0, 1.35, -0.31), M.body)
         F.box('deck_frame_back', 0.6, 0.06, 0.06, (0, 1.35, -0.69), M.body)
-        F.box('rail_back', 0.56, 0.04, 0.04, (0, 1.86, -0.69), M.body)
-        G.cone('roof', 0.53, 0.02, 0.38, at=F.at(0, 2.12, -0.5), material=M.roof, verts=4, rot=(0, 0, 45))
-        G.sphere('roof_knob', 0.035, at=F.at(0, 2.32, -0.5), material=M.roof, segments=10, rings=6)
-        # the ladder behind, leaning on the deck
+        G.cone('roof', 0.53, 0.02, 0.3, at=F.at(0, SLIDE_EAVES + 0.15, -0.5), material=M.roof, verts=4, rot=(0, 0, 45))
+        G.sphere('roof_knob', 0.035, at=F.at(0, SLIDE_EAVES + 0.31, -0.5), material=M.roof, segments=10, rings=6)
+        # the ladder behind, leaning on the deck; its rails go on up as handrails either side of the way in
         for x in (-0.25, 0.25):
             G.rod(f'ladder{x}', F.at(x, 0.0, -0.94), F.at(x, 1.42, -0.7), 0.025, material=M.body, verts=8)
-            G.rod(f'ladder_hand{x}', F.at(x, 1.42, -0.7), F.at(x, 1.72, -0.69), 0.025, material=M.body, verts=8)
+            G.rod(f'ladder_hand{x}', F.at(x, 1.42, -0.7), F.at(x, 1.95, -0.69), 0.025, material=M.body, verts=8)
+            G.rod(f'ladder_rail{x}', F.at(x, 1.95, -0.69), F.at(x * 1.12, 1.95, -0.69), 0.025, material=M.body, verts=8)
         for i in range(1, 6):
             t = i / 6
             F.box(f'rung{i}', 0.48, 0.03, 0.08, (0, 1.42 * t, -0.94 + 0.24 * t), M.tread, bevel=0.006)
-        # the chute, a hoop over its mouth and the legs under its run-out
+        # the chute, an arch over its mouth and the legs under its run-out
         _chute('chute')
-        G.torus('hoop', 0.27, 0.018, at=F.at(0, 1.43, -0.27), material=M.body, rot=(90, 0, 0),
-                major_segments=20, minor_segments=6)
+        rx, ry = SLIDE_ARCH
+        arch = [F.at(rx * math.cos(math.pi * i / 14), SLIDE_TOP[0] + ry * math.sin(math.pi * i / 14), -0.27) for i in range(15)]
+        _tube('arch', arch, 0.018, M.body, verts=6)
         for x in (-0.18, 0.18):
             G.rod(f'leg{x}', F.at(x, 0.0, 0.84), F.at(x, 0.29, 0.84), 0.025, material=M.body, verts=8)
             F.cyl(f'foot{x}', 0.045, 0.02, (x, 0.01, 0.84), M.steel, verts=10)
@@ -296,16 +309,18 @@ def seesaw():
 
 
 # --- the spring rider --------------------------------------------------------------------------------------------
-# A horse on a big coil spring. The saddle's top is the content's seat (0.78 m, 4 cm back). The horse (all
-# above the spring) rocks about the spring's top.
-SPRING_TOP = 0.42
+# A horse on a big coil spring. The saddle's top is the content's seat (0.62 m, 4 cm back: a rider's seat for a
+# toddler to a six-year-old, EN 1176-6). The horse (all above the spring) rocks about the spring's top. Its parts are
+# drawn for a spring top at HORSE_DRAWN and moved down onto SPRING_TOP (it was 16 cm higher, the saddle at 0.78).
+SPRING_TOP = 0.26
+HORSE_DRAWN = 0.42
 
 
 def springRider():
     with G.new_parts() as still:
         F.cyl('base', 0.2, 0.03, (0, 0.015, 0), M.steel, verts=24, bevel=0.008)
         F.cyl('base_plate', 0.13, 0.02, (0, 0.04, 0), M.steel, verts=20)
-        turns, r = 5.5, 0.1
+        turns, r = 3.5, 0.1
         coil = []
         for i in range(int(turns * 14) + 1):
             a = math.tau * i / 14
@@ -314,8 +329,8 @@ def springRider():
         _tube('coil', coil, 0.018, M.spring, verts=6)
     G.join(still, 'spring', origin=(0, 0, 0))
     with G.new_parts() as parts:
-        F.cyl('top_plate', 0.12, 0.02, (0, SPRING_TOP, 0), M.steel, verts=20)
-        F.cyl('mount', 0.05, 0.1, (0, SPRING_TOP + 0.06, 0), M.steel, verts=12)
+        F.cyl('top_plate', 0.12, 0.02, (0, HORSE_DRAWN, 0), M.steel, verts=20)
+        F.cyl('mount', 0.05, 0.1, (0, HORSE_DRAWN + 0.06, 0), M.steel, verts=12)
         G.sphere('barrel', 0.15, at=F.at(0, 0.6, -0.02), material=M.horse, scale=(0.85, 2.15, 1.0), segments=20, rings=12)
         G.rod('neck', F.at(0, 0.66, 0.18), F.at(0, 0.9, 0.29), 0.075, material=M.horse, verts=14)
         G.sphere('head', 0.1, at=F.at(0, 0.96, 0.33), material=M.horse, scale=(0.85, 1.55, 1.0), rot=(-25, 0, 0),
@@ -340,14 +355,16 @@ def springRider():
         G.rod('pegs', F.at(-0.19, 0.5, 0.06), F.at(0.19, 0.5, 0.06), 0.016, material=M.grip, verts=10)
         for s in (-1, 1):
             F.cyl(f'peg_end{s}', 0.03, 0.02, (s * 0.19, 0.5, 0.06), M.grip, rot=(0, 90, 0), verts=10)
-    horse = G.hinged(G.join(parts, 'horse'), F.at(0, SPRING_TOP, 0))
+    horse = G.join(parts, 'horse')
+    horse.data.transform(Matrix.Translation((0, 0, SPRING_TOP - HORSE_DRAWN)))
+    horse = G.hinged(horse, F.at(0, SPRING_TOP, 0))
     G.settle(centre=False)
     G.rock(horse, 'rock', 10, seconds=1.0, axis='X')
     return G.meshes()
 
 
 # --- the merry-go-round ----------------------------------------------------------------------------------------
-# A 1.9 m platform 0.25 m up (the content's seat 0.26 m: the riders sit on it), four bent rails to hold on to.
+# A 1.9 m platform, its top 0.26 m up (the content's seat: the riders sit on it), four bent rails to hold on to.
 # The platform turns once in 3.5 s about the hub; the riders ride round with it.
 def merryGoRound():
     with G.new_parts() as still:
@@ -355,12 +372,12 @@ def merryGoRound():
         F.cyl('hub', 0.16, 0.12, (0, 0.09, 0), M.steel, verts=20)
     G.join(still, 'hub', origin=(0, 0, 0))
     with G.new_parts() as parts:
-        F.cyl('platform', 0.95, 0.08, (0, 0.2, 0), M.platform, verts=48, bevel=0.012)
-        G.torus('edge', 0.95, 0.03, at=F.at(0, 0.2, 0), material=M.rail, major_segments=48, minor_segments=6)
-        F.cyl('skirt', 0.6, 0.05, (0, 0.135, 0), M.steel, verts=24)
+        F.cyl('platform', 0.95, 0.08, (0, 0.22, 0), M.platform, verts=48, bevel=0.012)
+        G.torus('edge', 0.95, 0.03, at=F.at(0, 0.22, 0), material=M.rail, major_segments=48, minor_segments=6)
+        F.cyl('skirt', 0.6, 0.05, (0, 0.155, 0), M.steel, verts=24)
         for a in (45, -45):
-            F.box(f'stripe{a}', 0.22, 0.008, 1.72, (0, 0.243, 0), M.deck, rot=(0, 0, a))
-        F.cyl('centre_disc', 0.2, 0.012, (0, 0.246, 0), M.deck, verts=24)
+            F.box(f'stripe{a}', 0.22, 0.008, 1.72, (0, 0.263, 0), M.deck, rot=(0, 0, a))
+        F.cyl('centre_disc', 0.2, 0.012, (0, 0.266, 0), M.deck, verts=24)
         F.cyl('column', 0.05, 0.7, (0, 0.59, 0), M.rail, verts=14)
         F.sphere('knob', 0.08, (0, 0.96, 0), M.deck, segments=14, rings=8)
         for k in range(4):
@@ -368,7 +385,7 @@ def merryGoRound():
             c, s = math.sin(t), math.cos(t)
             pts = _bezier((0.05 * c, 0.9, 0.05 * s), (0.78 * c, 0.9, 0.78 * s), (0.78 * c, 0.25, 0.78 * s), 12)
             _tube(f'rail{k}', [F.at(*p) for p in pts], 0.022, M.rail, verts=8)
-            F.cyl(f'rail_foot{k}', 0.04, 0.012, (0.78 * c, 0.246, 0.78 * s), M.steel, verts=10)
+            F.cyl(f'rail_foot{k}', 0.04, 0.012, (0.78 * c, 0.266, 0.78 * s), M.steel, verts=10)
     platform = G.hinged(G.join(parts, 'platform'), (0, 0, 0))
     G.settle(centre=False)
     G.spin(platform, 'spin', turns=1, seconds=3.5, axis='Z')
@@ -376,9 +393,11 @@ def merryGoRound():
 
 
 # --- the basketball hoop ----------------------------------------------------------------------------------------
-# A hoop on a post with a ballast base at the back of its tile; the rim at 2.94 m reaches forward. The net
+# A hoop on a post with a ballast base at the back of its tile; the rim at 3.05 m (regulation, park and driveway
+# hoops alike) reaches forward from a 1.2 x 0.8 m board (a park one's; they were 2.94 m and 0.95 x 0.62). The net
 # is its own part, hung from the rim: `swish` sways and stretches it once a ball goes through.
-RIM = (2.94, 0.27)   # (height, depth) of the rim's middle
+RIM = (3.05, 0.27)   # (height, depth) of the rim's middle
+BOARD_W, BOARD_H, BOARD_Y = 1.2, 0.8, 3.3   # the backboard: its width, height and middle's height
 
 
 def _net(name):
@@ -405,19 +424,23 @@ def basketballHoop():
     with G.new_parts() as still:
         F.box('ballast', 0.62, 0.22, 0.6, (0, 0.11, -0.17), M.post, bevel=0.03)
         F.box('ballast_lid', 0.5, 0.02, 0.48, (0, 0.225, -0.17), M.steel, bevel=0.008)
-        F.cyl('pole', 0.05, 2.9, (0, 1.6, -0.3), M.post, verts=14)
-        F.cyl('pole_cap', 0.055, 0.03, (0, 3.06, -0.3), M.steel, verts=14)
-        for y in (3.0, 2.78):
-            G.rod(f'arm{y}', F.at(0, y, -0.3), F.at(0, 3.05 if y == 3.0 else 2.95, 0.02), 0.025, material=M.post, verts=8)
-        F.box('board', 0.95, 0.62, 0.03, (0, 3.18, 0.04), M.board, bevel=0.008)
-        for w, h, y in ((0.95, 0.03, 3.475), (0.95, 0.03, 2.885)):
-            F.box(f'border{y}', w, h, 0.034, (0, y, 0.04), M.board_mark)
-        for x in (-0.46, 0.46):
-            F.box(f'border{x}', 0.03, 0.62, 0.034, (x, 3.18, 0.04), M.board_mark)
-        for w, h, x, y in ((0.36, 0.025, 0, 3.17), (0.36, 0.025, 0, 2.94), (0.025, 0.25, -0.168, 3.055),
-                           (0.025, 0.25, 0.168, 3.055)):
+        F.cyl('pole', 0.05, 3.2, (0, 1.75, -0.3), M.post, verts=14)
+        F.cyl('pole_cap', 0.055, 0.03, (0, 3.36, -0.3), M.steel, verts=14)
+        for y, to in ((3.3, 3.45), (3.0, 3.08)):
+            G.rod(f'arm{y}', F.at(0, y, -0.3), F.at(0, to, 0.02), 0.025, material=M.post, verts=8)
+        bw, bh, by = BOARD_W, BOARD_H, BOARD_Y
+        F.box('board', bw, bh, 0.03, (0, by, 0.04), M.board, bevel=0.008)
+        for y in (by + bh / 2 - 0.015, by - bh / 2 + 0.015):
+            F.box(f'border{y}', bw, 0.03, 0.034, (0, y, 0.04), M.board_mark)
+        for x in (-bw / 2 + 0.015, bw / 2 - 0.015):
+            F.box(f'border{x}', 0.03, bh, 0.034, (x, by, 0.04), M.board_mark)
+        # the shooter's square, 0.59 x 0.45 m as on a regulation board, its foot level with the rim
+        tw, th = 0.59, 0.45
+        ty = RIM[0] + th / 2
+        for w, h, x, y in ((tw, 0.025, 0, ty + th / 2), (tw, 0.025, 0, ty - th / 2), (0.025, th, -tw / 2, ty),
+                           (0.025, th, tw / 2, ty)):
             F.box(f'target{x}{y}', w, h, 0.034, (x, y, 0.045), M.board_mark)
-        F.box('rim_bracket', 0.16, 0.12, 0.05, (0, 2.9, 0.075), M.rim, bevel=0.006)
+        F.box('rim_bracket', 0.16, 0.12, 0.05, (0, RIM[0] - 0.04, 0.075), M.rim, bevel=0.006)
         G.torus('rim', 0.22, 0.012, at=F.at(*(0, RIM[0], RIM[1])), material=M.rim, major_segments=28, minor_segments=6)
         # the ball, at rest on the ground in front
         F.sphere('ball', 0.12, (0.3, 0.12, 0.32), M.ball, segments=16, rings=10)
@@ -434,42 +457,51 @@ def basketballHoop():
 
 
 # --- the ping-pong table ---------------------------------------------------------------------------------------
-# A weatherproof table: a green top on two concrete legs, a steel net, two bats and a ball. Still.
+# A weatherproof table at the ITTF's size (2.74 x 1.525 m, its top 0.76 m up) on 3 x 2 tiles, the players at its two
+# ends (content `places`): a green top on two concrete legs, a steel net 15.25 cm high reaching 15.25 cm past each
+# side, two bats and a ball. Still. (It was 1.9 x 0.94 m, its top at 0.78.)
+PONG = (2.74, 0.76, 1.525)   # the top's length, height and width
+
+
 def pingPongTable():
-    top = 0.78
+    length, top, width = PONG
+    hl, hw = length / 2, width / 2
     with G.new_parts():
-        F.box('top', 1.9, 0.05, 0.94, (0, top - 0.025, 0), M.table_top, bevel=0.01)
-        for x in (-0.6, 0.6):
-            F.box(f'leg{x}', 0.12, top - 0.05, 0.66, (x, (top - 0.05) / 2, 0), M.concrete, bevel=0.015)
-            F.box(f'foot{x}', 0.2, 0.04, 0.74, (x, 0.02, 0), M.concrete, bevel=0.01)
+        F.box('top', length, 0.03, width, (0, top - 0.015, 0), M.table_top, bevel=0.01)
+        for x in (-0.85, 0.85):
+            F.box(f'leg{x}', 0.12, top - 0.03, 1.0, (x, (top - 0.03) / 2, 0), M.concrete, bevel=0.015)
+            F.box(f'foot{x}', 0.22, 0.04, 1.12, (x, 0.02, 0), M.concrete, bevel=0.01)
         y = top + 0.001
-        for w, d, x, z in ((1.9, 0.025, 0, 0.4575), (1.9, 0.025, 0, -0.4575), (0.025, 0.94, 0.9375, 0),
-                           (0.025, 0.94, -0.9375, 0), (1.9, 0.012, 0, 0)):
+        for w, d, x, z in ((length, 0.02, 0, hw - 0.01), (length, 0.02, 0, -hw + 0.01), (0.02, width, hl - 0.01, 0),
+                           (0.02, width, -hl + 0.01, 0), (length, 0.003, 0, 0)):
             F.box(f'line{x}{z}', w, 0.003, d, (x, y, z), M.lines)
         # the steel net: a plate between two posts, a white band along its top
-        F.box('net', 0.02, 0.14, 0.98, (0, top + 0.075, 0), M.steel)
-        F.box('net_band', 0.026, 0.02, 0.98, (0, top + 0.145, 0), M.lines)
-        for z in (-0.48, 0.48):
+        net = width + 2 * 0.1525
+        F.box('net', 0.02, 0.135, net, (0, top + 0.0675, 0), M.steel)
+        F.box('net_band', 0.026, 0.02, net, (0, top + 0.1425, 0), M.lines)
+        for z in (-net / 2, net / 2):
             F.box(f'net_post{z}', 0.04, 0.17, 0.03, (0, top + 0.08, z), M.steel, bevel=0.005)
         # two bats and the ball
-        for colour, x, z, a in ((M.bat, -0.55, 0.2, 20), (M.bat_blue, 0.6, -0.22, 200)):
+        for colour, x, z, a in ((M.bat, -0.8, 0.3, 20), (M.bat_blue, 0.85, -0.32, 200)):
             F.cyl(f'bat{x}', 0.075, 0.012, (x, top + 0.006, z), colour, verts=20)
             dx, dz = 0.11 * math.sin(math.radians(a)), 0.11 * math.cos(math.radians(a))
             G.rod(f'bat_handle{x}', F.at(x + 0.06 * dx / 0.11, top + 0.008, z + 0.06 * dz / 0.11),
                   F.at(x + dx, top + 0.008, z + dz), 0.014, material=M.bat_handle, verts=8)
-        F.sphere('ball', 0.02, (0.35, top + 0.02, -0.1), M.ping, segments=10, rings=6)
+        F.sphere('ball', 0.02, (0.5, top + 0.02, -0.15), M.ping, segments=10, rings=6)
     G.join_all('pingPongTable')
     G.settle(centre=False)
     return G.meshes()
 
 
 # --- the park chess table -----------------------------------------------------------------------------------------
-# A stone table with the board inlaid, and a stone stool either side of it, left and right, where the
-# content's two places seat the players facing each other across the board (x = ±0.42 m, 0.47 m up). White
-# plays from the left. A white pawn slides one square on (`move`) as they play.
+# A stone table with the board inlaid, its top 0.7 m square, and a stone stool either side of it, left and right,
+# where the content's two places seat the players facing each other across the board (x = ±0.6 m, 0.47 m up, on
+# 2 x 1 tiles: their knees clear of each other under the top; they were ±0.42 on one tile). White plays from the
+# left. A white pawn slides one square on (`move`) as they play.
 BOARD = (0.762, 0.0)   # (height, depth) of the board's middle
 SQUARE = 0.05
-STOOL = 0.42           # the stools' middles, either side (the content's `places`)
+STOOL = 0.6            # the stools' middles, either side (the content's `places`)
+CHESS_TOP = 0.7        # the top, square
 
 
 def _square(i, j):
@@ -511,7 +543,7 @@ def parkChessTable():
     with G.new_parts() as still:
         G.revolve('pedestal', [(0, 0), (0.17, 0), (0.17, 0.04), (0.1, 0.08), (0.08, 0.6), (0.12, 0.68), (0.12, 0.7),
                                (0, 0.7)], at=F.at(0, 0, BOARD[1]), material=M.stool, segments=16)
-        F.box('top', 0.48, 0.06, 0.56, (0, 0.73, BOARD[1]), M.stone, bevel=0.015)
+        F.box('top', CHESS_TOP, 0.06, CHESS_TOP, (0, 0.73, BOARD[1]), M.stone, bevel=0.015)
         F.box('board', 8 * SQUARE + 0.02, 0.003, 8 * SQUARE + 0.02, (0, BOARD[0] - 0.0005, BOARD[1]), M.square_dark)
         F.box('board_light', 8 * SQUARE, 0.003, 8 * SQUARE, (0, BOARD[0] + 0.0005, BOARD[1]), M.square_light)
         for i in range(8):
@@ -543,7 +575,7 @@ def parkChessTableFar():
     with G.new_parts():
         G.revolve('pedestal', [(0, 0), (0.17, 0), (0.17, 0.04), (0.1, 0.08), (0.08, 0.6), (0.12, 0.68), (0.12, 0.7),
                                (0, 0.7)], at=F.at(0, 0, BOARD[1]), material=M.stool, segments=12)
-        F.box('top', 0.48, 0.06, 0.56, (0, 0.73, BOARD[1]), M.stone)
+        F.box('top', CHESS_TOP, 0.06, CHESS_TOP, (0, 0.73, BOARD[1]), M.stone)
         F.box('board_light', 8 * SQUARE, 0.003, 8 * SQUARE, (0, BOARD[0] + 0.0005, BOARD[1]), M.square_light)
         for i in range(8):
             for j in range(8):
@@ -567,21 +599,21 @@ CHESS = {'uses': {'chess': 'move'}}
 
 FAMILY = G.Family(
     'playground', M,
-    [G.Model('slide', slide, size=(0.75, 2.359, 1.934), key='model.slide', centre=(0, 0.0024), far=0.25,
+    [G.Model('slide', slide, size=(0.75, 2.805, 1.934), key='model.slide', centre=(0, 0.0024), far=0.25,
              paint=[('body', 'Frame'), ('chute', 'Slide'), ('roof', 'Roof')]),
      G.Model('climbingFrame', climbingFrame, size=(1.814, 3.45, 1.99), key='model.climbingFrame', centre=(0, 0.015),
              far=0.25, paint=[('timber', 'Frame'), ('shingle', 'Roof'), ('rope', 'Net')]),
      G.Model('seesaw', seesaw, size=(2.5, 0.846, 0.42), key='model.seesaw', motions=SEESAW, far=0.25,
              paint=[('body', 'Frame'), ('seat', 'Seats'), ('plank', 'Plank')]),
-     G.Model('springRider', springRider, size=(0.4, 1.109, 0.957), key='model.springRider', centre=(0, 0.0387),
+     G.Model('springRider', springRider, size=(0.4, 0.949, 0.957), key='model.springRider', centre=(0, 0.0387),
              motions=SPRING, far=0.25, paint=[('horse', 'Horse'), ('saddle', 'Saddle'), ('spring', 'Spring')]),
      G.Model('merryGoRound', merryGoRound, size=(1.96, 1.04, 1.96), key='model.merryGoRound', motions=MERRY,
              far=0.25, paint=[('platform', 'Platform'), ('rail', 'Rails'), ('deck', 'Stripes')]),
-     G.Model('basketballHoop', basketballHoop, size=(0.95, 3.495, 0.972), key='model.basketballHoop', centre=(0, 0.016),
+     G.Model('basketballHoop', basketballHoop, size=(1.2, 3.7, 0.972), key='model.basketballHoop', centre=(0, 0.016),
              motions=HOOP, far=0.25, paint=[('post', 'Frame'), ('board', 'Backboard'), ('rim', 'Hoop')]),
-     G.Model('pingPongTable', pingPongTable, size=(1.9, 0.945, 0.99), key='model.pingPongTable', far=0.25,
+     G.Model('pingPongTable', pingPongTable, size=(2.74, 0.925, 1.86), key='model.pingPongTable', far=0.25,
              paint=[('table_top', 'Table'), ('concrete', 'Legs')]),
-     G.Model('parkChessTable', parkChessTable, size=(1.08, 0.855, 0.56), key='model.parkChessTable',
+     G.Model('parkChessTable', parkChessTable, size=(1.44, 0.855, 0.7), key='model.parkChessTable',
              motions=CHESS, far=parkChessTableFar, paint=[('stone', 'Table'), ('stool', 'Stools')])],
     comment='Blender-built playground (tools/art/blender/families/playground.py): a slide, a climbing '
             'frame, a seesaw, a spring rider, a merry-go-round, a basketball hoop, a ping-pong table and '
