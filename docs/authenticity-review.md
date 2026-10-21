@@ -2,13 +2,13 @@
 
 The review of every model, animation and interaction in the game against the real thing, planned in [plan/authenticity-review.md](../plan/authenticity-review.md). It started on 2026-10-21 from `main` at e725166 (v0.3.0), on the branch `review/authenticity`. Its record is one ledger per category in [docs/review/](review/README.md); this document consolidates them for the owner's triage.
 
-**Status (2026-10-21):** Phases 0–3 are done: every ledger row has its verdicts and every finding its fields. The findings are grouped by the fix that would close them (§4) and wait for triage (Phase 4, plan §7).
-- §1 sums up what was covered and found, §2 says how.
-- §3 lists every S1 and S2 finding by category, with its fix group; S3 findings are counted, with a pointer to the ledger.
-- §4 lists the 72 fix groups and a proposed order.
-- §5 lists the decisions the owner is asked for, each with a recommendation; §6 the decisions already made.
+**Status (2026-10-22):** Phases 0–4 are done on `review/authenticity`: the review, the owner's triage (2026-10-21) and the Phase 4 fixes, by 30 fix agents and a coordinator. Every finding's Status in its ledger says what came of it. The branch waits for the owner's sign-off (§11.3).
+- §1 sums up what was covered, found and fixed; §2 says how.
+- §3 lists every S1 and S2 finding by category, with its fix group, as filed; S3 findings are counted, with a pointer to the ledger.
+- §4 lists the 72 fix groups and the order proposed for them.
+- §5 lists the decisions the owner was asked for, each with a recommendation; §6 the decisions made before triage.
 - §7 lists the tooling problems the waves met.
-- §8–§10 are for Phase 4: fixed, found but not fixed, and the manual test checklist.
+- §8 lists what Phase 4 fixed, §9 what it didn't and why, §10 what a person should play through before release, and §11 the triage, the re-check and the decisions left for sign-off.
 
 Severity (plan §4):
 - **S1, breaks belief:** wrong at a glance in normal play (a resident floats above the bed, a use from the back of the object, an adult using a child's or a baby's thing, or a child an adult's, as if it fitted).
@@ -18,6 +18,44 @@ Severity (plan §4):
 A `decision` finding takes the severity of its worse outcome. Line numbers refer to the branch at the time of writing (e725166 plus the review's tooling commits); the S1 and S2 findings' lines were checked against it.
 
 ## 1. Summary
+
+### 1.1 After Phase 4 (2026-10-22)
+
+**Findings: 341.** The 300 of the review and 41 more the fix agents found while fixing and re-checking (6 S2, 35 S3; Source `fix: <agent>` in the ledgers). By status (from each ledger finding's Status line):
+
+| Status | S1 | S2 | S3 | Total |
+|---|---|---|---|---|
+| fixed | 8 | 102 | 164 | 274 |
+| fixed in part | | 1 | 8 | 9 |
+| fixed in 0.3.0 (confirmed by the review) | | 1 | 1 | 2 |
+| later | | 4 | 6 | 10 |
+| won't fix | | | 7 | 7 |
+| closed (duplicates, decor by decision 4, not a defect) | | 9 | 16 | 25 |
+| not checked | | | 11 | 11 |
+| open | | | 3 | 3 |
+| **Total** | **8** | **117** | **216** | **341** |
+
+Every S1 is fixed. Of the S2s, everything is fixed but the four that wait for props in hand and body language (G-70, G-71, owner decision 3) and the vendors' half of I-community-09. What is left, and why, is in §9.
+
+**What Phase 4 changed**
+- **Age rules (G-45):** content `stages` on objects, recipes and uses, and on socials (`stages`, `targetStages`); one rule for free will and the player's orders alike, and the pie menu greys out what the selected resident may not use. Children don't pour wine, cook at a hob, lift weights or start a fight; grown-ups don't ride the toddlers' things or lie in the cot; the upper bunk has `upperStages`; coffee is for teens and up; a child eats at the kids' table and isn't sent to a wall cupboard out of reach (`reach`).
+- **A place and a facing per slot (G-62, G-47, G-39):** content `places` and `seatFacing`. Two at a dining set, a tea table, the picnic table, the seesaw, park chess or ping-pong face each other across it; watchers take a seat that faces the screen; the fire pit is warmed at from the seats round it.
+- **Games for two (G-65):** content `partner` and `alone`. Pool, foosball, the seesaw, ping-pong and park chess fetch a second player to the other place and wait for them; with nobody free, pool and foosball are practised alone and the rest are refused.
+- **Things on tops and conditions (G-63, G-64):** 20 things that stand on a counter or table (the kettle, the toaster, the laptop, the fruit bowl…) are used where they stand. Uses may need an hour (`hours`), open sky (`sky`) or something to work on (`workOn`): stargazing only after dark and outside, washing up only with dishes, and laundry that piles up and is washed, then dried.
+- **Where residents stand and how they get on and off (G-43, G-51, G-55):** each user of a shared thing stands at their own slot; a cook waiting for a busy station steps aside; darts are thrown from the oche; visitors knock at the front door. Beds are got into from the side and desks from behind (`approach: side|behind`), the stand-up happens at the seat, and a step the sim takes in one tick is walked.
+- **Cooking and food (G-08, G-16, G-49, G-67):** an oven bakes and a bowl mixes (`animAt`); the pan sits on the burner that's lit; the cook's hands are free at each station and the dish is carried to the table. Town food is self-serve, fetched and then eaten sitting down; the café's coffee is poured at its machine first (`fetch`). Quick foods have models of their own, and the dish that went in comes out dirty. Residents talk over a meal.
+- **Babies and crops (G-66, G-68, G-50, G-61):** babies are carried to the high chair by day and changed at the changing table (`carried`, `atSlot`); a guest sleeps on the sofa bed without the living room becoming a bedroom (`spare`). Tending brings crops on (`tends`), harvests go to the fridge (`yields`), fruit trees ripen, and a crop or the washing changes as the hands go (`gradual`).
+- **Clothes and blankets (G-46, G-42, G-69):** quilts in each bed's colours and none at the world's origin; pyjamas only for a night's sleep, naps barefoot in day clothes; towels in the shower and bath, swimwear in the hot tubs; seated skirts and jackets lie on the lap; picking an outfit changes the clothes (`changesOutfit`); feet go up on a footstool.
+- **Lamps and glow (G-60, G-52, G-35, G-54):** a lamp bought is off; shades send their light down, up, out or off the ceiling (`light.aim`); a fire is lit by someone sitting by it (`light.fire`); garden and street lamps cast pools on the ground; on Medium and High a lamp lights only its own room (M-lighting-08). Glow no longer draws through the parts in front of it; coloured shades, candles, screens and the packs' mood lamps glow. Where things may stand: `againstWall`, `headHeight`, and `overhang` for a shade over the next tile.
+- **Doors (G-48):** front doors, bathroom doors and garden gates open only for the one going through, in time at every game speed.
+- **Sounds and talk (G-53, G-56, G-27):** a use sounds like the thing (`sound`, `endSound`, `sounds`, `ambient`), with five new synthesised sounds (a flush, a fountain, a dryer, crockery, drums); things that only sounded wrong are silent. Residents talk from their seats and join a group on foot; kisses and fights meet at any height, refusals and flat jokes show, and the phone is held in front to text or scroll.
+- **Clips:** the clip check covers 168 clips, up from 54, and its list of known failures is empty (it held 14). New: the slide's round, the bunk's ladder, rides astride, darts, pool, foosball, table tennis, bouldering, yoga and the smash bin, reaching up to wall cupboards, the clock and the whiteboard, a hoop shot, the shower, the telescope, picking fruit, the guitar's strum, floor and ground sits, the ball pit and the tent, the bench press, warming the hands, a run gear, 17 social gestures, and the seated legs fitted at every life stage.
+- **Models:** 134 model files rebuilt or new in 42 families (the street's unused hedge dropped): bathroom, bedroom, bedroom_storage, decor, dining, farm, fitness, garden (boulders), held (ten new items), hobbies, kids, kitchen, kitchen_cooking, kitchen_counters, laundry, lighting, living, media, office, outdoor, plants, playground, street_furniture, tabletop, trees, yard, and the packs bookworm, cheerful, couchPotato, energetic, foodie, gloomy, hotHeaded, kind, lazy, loner, natureLover, neat, outgoing, romantic and slob. The functional heights the review flagged are inside the real ranges now, and every model passes `cargo check-glb` inside its budget (`cargo review sizes`' remaining outliers are its own measuring, §7).
+- **Houses and town (G-57, G-58, G-59):** panelled doors, a light oak, patterned wallpapers and limed floors, chimneys from the eaves, balusters; a one-lane street without a centre line, cars at their real clearance, garages a car fits; generated houses hang curtains as wide as the window.
+
+**Checks now in CI** (`.github/workflows/ci.yml`, every push and pull request): clippy; the simulation's tests, with ten new test files (`age_rules`, `positions`, `slots`, `partners`, `tops_and_conditions`, `harvests`, `high_chair`, `spare_beds`, `outfits`, `footstools`); the generated houses and worlds; `pnpm check:clips` (every clip on both bodies at every life stage, against an empty baseline); and `cargo test -p ll-tools --release`, which runs the `cargo check-glb` gate over every shipped model (its heights checks, T1 and T2, warn) and the tests of `cargo review sizes` and `uses`. The review tools' own reports, the balance and soak tests (`--ignored`) and the browser checks are run by hand.
+
+### 1.2 At the consolidation (2026-10-21)
 
 **Scope.** 948 ledger rows, every one with an M, A and I verdict (or `n/a`):
 - 541 buyable objects in 15 object ledgers (kitchen 72, bathroom 26, bedroom 27, living 50, office 14, kids 20, hobbies 19, fitness 5, tabletop 39, decor 22, lighting 21, outdoor 43, garden 53, community and farm 36, personality packs 94);
@@ -700,46 +738,281 @@ From the coordinator's notes and each wave's `review-log.md`, deduplicated; the 
 
 ## 8. Fixed
 
-Phase 4. Each row will name the group, the commit, and the before and after shots.
+Phase 4, by band and group. Commits are from each finding's Status line in its ledger, where its **After:** line names the after shots (under `bench-results/review/fixes/<agent>/`, §11.2). "(in part)" marks a finding fixed in part, whose rest is in §9; a finding closed or won't fix inside a group is named in brackets.
 
-| Group | Findings | Commit | Merge | Before → after |
-|---|---|---|---|---|
-| G-63 | I-tabletop-01, I-tabletop-04 | ed77dc36, 5209bd53 | | no thing on a top usable → 20 used at their top (`fixes/tops-conditions/tops-adult-*.png`, `generated-82-*.png`) |
-| G-64 | I-hobbies-03, I-kitchen-11, I-bathroom-07 (in part) | 69d0bc33 | | stargazing at noon indoors, washing up with nothing to wash → refused with the reason; used after dark outside, with dishes (`fixes/tops-conditions/play-stars-*.jsonl`, `play-washup-*.jsonl`, `play-laundry.jsonl`) |
-| (with G-45) | I-systems-11 | 9463d1a7 | | a child's coffee → teens and up (`tests/tops_and_conditions.rs`) |
-| G-27 | A-social-01, A-social-03, I-social-02, I-social-03, I-social-04 | 43ca1cc1, 2d887ff9 | | `social/sheets/romance.png`, `fights.png`, `fails.png`, `talks.png`, `phone.png` → `fixes/clips-social/sheets/` (the same names, `flat-joke.png`, `phone-sofa.png`) |
+### 8.1 Content and renderer tables
+
+| Group | Findings | Commits | What changed |
+|---|---|---|---|
+| G-01 | I-outdoor-01 (S1) | aac64b84, 278de962 | The fire pit is warmed at from the seats round it, facing the fire (`seatFacing: around`), or standing; nobody sits on its rim. |
+| G-02 | I-outdoor-05, I-packs-09, I-packs-02, I-packs-08, A-packs-06 (I-packs-12 open) | 0cc15781 | The greenhouses are worked from inside; residents stand on the fitness board, the sunrise mat and the karaoke stage, sit at the vanity, put their legs up in the recliners. |
+| G-03 | I-living-03, I-kitchen-07, I-outdoor-06, I-packs-07, I-packs-14 | 9a5cc144 | Reading, listening, the magazine, breakfast at the island and bird watching take a seat near; the gaming marathon needs a TV. |
+| G-04 | I-community-05, I-packs-10, I-residents-02, I-bedroom-07, I-bedroom-02, A-packs-05, A-kids-01 | 3cd0bf87, 0c5e889e, 0f613d59 | Existing clips and rows for single objects: video calls talk to the screen, the singer at the mic, a hoop shot, the hair brushed, a curled doze on the window seat, hands on low tops. |
+| G-05 | M-living-05, M-hobbies-09, M-outdoor-09, M-packs-13, M-kids-04, M-lighting-07 | a920f174 | Seat, bed and light heights where the mesh is (`cargo check-glb` heights warnings 36 → 19). |
+| G-06 | A-bathroom-04, A-packs-01 | 96d54386 | Bathers sit on the tub's floor, the legs inside it. |
+| G-07 | I-kitchen-14, A-office-01, I-office-01, I-tabletop-05 | 543c6121, f8e58511 | Stools go with tops of their height; the standing desk takes no chair; no chair is pulled up to a set with chairs of its own; the monitor fits counters and deep desks. |
+| G-08 | I-systems-01 | 65278fa4 | The pan on the burner each cooker lights; the grill station's chopping on its free counter, off the grate. |
+| G-09 | I-kitchen-02, I-kitchen-08, I-bathroom-06, I-bathroom-08, I-bedroom-03 (in part), I-bedroom-05, I-bedroom-06, I-living-09, I-office-03, I-office-05, I-outdoor-08, I-packs-16, I-packs-18 | eaca9ed8, 1222c510 | The uses the siblings have: cold drinks, dozing on the sofa, reading in the armchair, brushing teeth at every basin, sandwiches at counters, the mirrors, the folded futon, the office chair, the jukebox, the party bar's stools; folding in 20 minutes. |
+| G-10 | I-garden-07, I-garden-08 | a45e65a2 | Residents look up at the sunflowers and admire the scentless flowers rather than smell them. |
+| G-11 | M-living-06, M-kids-03, M-community-05, M-bedroom-01, M-kitchen-04, M-lighting-04, M-packs-09, M-kitchen-03, M-bathroom-01 (M-living-03, M-garden-08 won't fix) | b3f6b82d | Names and texts that match the models (king-size beds, a counter-depth fridge, a lantern pendant, a recumbent bike, tables named by their seats); whole-tile ranges widened in `reference.json`. |
+| G-12 | I-kitchen-09, I-decor-04, I-community-12 (I-office-02 won't fix) | 198e90d9 | A sit on the hay stack; the spice rack, pot rail, kitchen shelves, coat stand and coop are decor (decision 4). |
+| G-13 | (I-systems-02 won't fix) | f5eb7f59 | Uses end when the needs are full, by design (Q-22). |
+| G-14 | I-garden-04, I-garden-06, I-kids-04, I-kids-06 | 425486ee, 0f613d59 | Garden, care and play clips chosen by the thing's height: waist-high beds bent over, low ones knelt at, the train table knelt at. |
+| G-15 | I-kitchen-03, I-bathroom-05, I-hobbies-11, I-decor-02, I-residents-03, I-community-07, I-office-04 | 0c5e889e, df11b893 | Residents step in to the part used and reach up to the wall cupboards, the clock's dial, the feeder and the whiteboard. |
+
+### 8.2 Object clips and motions
+
+| Group | Findings | Commits | What changed |
+|---|---|---|---|
+| G-16 | I-kitchen-05, A-kitchen-02, A-kitchen-01 | 2dcc4ea0 | Ovens and microwaves bake (a recipe step's `animAt`), mixing has a bowl, the dishwasher stays open while it is loaded. |
+| G-17 | A-packs-03, A-bathroom-03, A-hobbies-02, A-kitchen-03 | d2c9f0de, 2dcc4ea0 | Moving parts in time with the hand: the washer's door held, then the drum; a tap per basin of the double sink; the hobbies' parts after the sit. |
+| G-18 | A-hobbies-03, A-packs-02, A-fitness-02, A-decor-01 (in part), A-outdoor-03, I-living-08, I-packs-15, A-bedroom-01 | abfc32d9 | The pool rack lifted off, the robot vacuum's round, the power blender's blades, the treadmill's belt at its speed, the clock's pendulum, the fountain's water, the stereo's record, quilts turned down along the bed. |
+
+### 8.3 Resident clips
+
+| Group | Findings | Commits | What changed |
+|---|---|---|---|
+| G-19 | I-community-01 (S1) | a5af337b, 2fdfb304 | The slide: round to its ladder, up it, sat at the arch and down the chute sat up. |
+| G-20 | A-residents-09, A-residents-11 | d9c02ead | Seated feet on the floor at every life stage, the knees clear of deep seats (`characters/seatFit.ts`). |
+| G-21 | I-hobbies-02, I-garden-05, I-bathroom-02, I-hobbies-08 | 5bd8a29c, 1abb80cf | The telescope's eyepiece, the apple and lemon picked from the tree, a 14 s shower, the guitar strummed. |
+| G-22 | I-living-06, I-garden-02, I-kids-07 | 98b4def3, ff1e1db5 | Cross-legged on floor cushions and the hearth; against a tree's trunk in its shade; into the ball pit and the play tent. |
+| G-23 | I-outdoor-03, I-community-13 | b69bf74b | Rides sat astride, the hands on the grips; the swing pumped in time with it. |
+| G-24 | A-fitness-01, M-fitness-01 | 60890be0, 8b6b2364 | The bench press with the feet on the floor either side, on a 0.44 m pad. |
+| G-25 | A-residents-02, A-residents-03 (in part), A-residents-10, A-community-01 | 3872d23a | The jog's seams and slides gone, a run gear for speed 3, two climbers at the pole take turns. |
+| G-26 | I-hobbies-04, I-community-06, I-packs-13, I-packs-03, I-fitness-01 | 4366ec55, 83d53185 | Darts, pool, foosball, table tennis, smashing plates, bouldering and yoga, each with a clip of its own at the object. |
+| G-27 | A-social-01, A-social-03, I-social-02, I-social-03, I-social-04 | 43ca1cc1, 2d887ff9 | Kisses and punches fitted to both heights, a hug or kiss answered at once, refusals and flat jokes shown, gestures per social, the phone in front to text or scroll. |
+
+### 8.4 Blender rebuilds
+
+| Group | Findings | Commits | What changed |
+|---|---|---|---|
+| G-28 | I-decor-01 (S1) | edf25038 | A deeper hearth: residents sit on its edge in front of the fire, not in it. |
+| G-29 | M-hobbies-01, M-hobbies-04, M-bathroom-02, M-outdoor-04, M-packs-04, M-hobbies-06, M-packs-08, I-garden-09 | 8b6b2364, 6190c955, b4306968, db55d69b, dd1a7325, 757fe0e3, 814839da | Working heights in range: the workbench at 0.90 m, an 88-key piano, vessel rims at 0.88 m, the kettle grill, the chef's island stools, the pack desks, the pool table's rail, the bonsai stand. |
+| G-30 | M-outdoor-03, M-outdoor-02, M-kitchen-05, M-community-03 | b4306968, 346158ba, 57bf91a8 | The picnic table and park bench, the carver chair, the spring rider and the merry-go-round at seat and table heights. |
+| G-31 | I-hobbies-10, I-packs-01, A-packs-04, I-packs-17, I-packs-04, I-fitness-02 | 8b6b2364, 346158ba, 2c0c1de5, 055a72e6 | Room for the body: the pottery wheel's knees, the candlelit and quilt tables' legs, the nap pod's head, the vibration plate's grips, the sauna's feet, the dumbbell rack's mat. |
+| G-32 | M-kitchen-02, M-community-01, M-office-01 | 42528540, 57bf91a8, e8fa632e | Dishwashers 60 and 45 cm wide, a full-size ping-pong table on 3 × 2, an L-shaped corner desk with its chair. |
+| G-33 | A-bathroom-01, A-bathroom-02, A-outdoor-01 | 6190c955, 0ff6cf97, b4306968 | The shower's sliding door (a fourth draw, Q-05), the stall's curtain drawn, the hot tub's cover folding back on its seam. |
+| G-34 | M-held-01, M-held-02 | 119ed5e9 | Ice cream, toast, a smoothie, noodles and a takeaway box of their own; the board or dish that went in comes out dirty. |
+| G-35 | M-packs-07, M-lighting-03, M-tabletop-01 | 4029f842, 1c55d5ef, 9b47587c, 9e8bfe3b, dfac8172, e4769357, 1ec6792c, dd1a7325, 209a7ef0 | Coloured shades glow their colour, the candles are lit at night, the packs' screens, mood lamps and flames glow and light. |
+| G-36 | M-packs-01, M-packs-02, M-outdoor-06 | 0ff6cf97, 0b118edb, dfac8172, d09f7f52 | Back panels for the entry console, the jar shelf and the spritz mirror; a lidded rain barrel without the downpipe (Q-06). |
+| G-37 | M-outdoor-05, M-packs-06 | b4306968, 9e8bfe3b, 14de632d | Hammocks on 3 × 1, long enough to lie in. |
+| G-38 | M-garden-01, M-garden-02, M-garden-03, M-garden-04, M-garden-05, M-garden-06, M-garden-07, M-outdoor-07 | 4507945e, 814839da, d81aded7, f95e9579, 32338a12 | Conifers residents walk under, a willow of streamers, a slim cypress, a maple and magnolia of their own, a two-metre lemon tree, roses on canes, an azalea's trusses, a meadow of long grass, closed strawberry rosettes, boulders that read as rock. |
+| G-39 | M-kitchen-01, M-packs-11, I-packs-11 | 346158ba, 1ec6792c, 0b118edb, 9b47587c | Dining and tea for two face across the table; the lava lamp's watcher faces it. |
+| G-40 | M-bedroom-02, M-bedroom-03, M-hobbies-02, M-hobbies-03, M-hobbies-05, M-kids-01, M-kids-02, M-fitness-02, M-tabletop-02, M-packs-12, M-outdoor-08, M-community-02, M-community-04, M-living-04, M-lighting-06 (in part) | 8b6b2364, e70de674, dca59e66, 773afc7d, 1c55d5ef, b4306968, 57bf91a8, f3e747a1, 757fe0e3, c430e812, 2b7cf0d8 | Real sizes: the chess top, the guitars, the drum kit on 2 × 2, the yoga mat on 1 × 2, an oblong cot, the train table, nightstands and a single wardrobe, the recliner, the alarm clock, the garden bench, the basketball rim at 3.05 m, the hay bale, tractor, park bench and bus shelter, the zafu, the bedside stack. |
+| G-41 | M-packs-05, M-hobbies-07, M-packs-03, M-packs-10, M-kitchen-06, M-decor-01, M-decor-02 (M-hobbies-08 closed) | 0ff6cf97, 1ec6792c, 8b6b2364, e4769357, c430e812, 39659c10, edf25038 | The organizer desk and bureau turned, eight foosball rods, the party bar's shelves, the fireside hood over the fire, the wine fridge's glass door, a bronze horse, curtains off the glass. |
+| G-42 | M-residents-02 | 654ce1da | Seated skirts and jackets lie on the lap. |
+
+### 8.5 Code
+
+| Group | Findings | Commits | What changed |
+|---|---|---|---|
+| G-43 | I-hobbies-07 (S1), I-community-08, I-systems-10 | 36198175, 0d20c5c9, d7b7096d, ad1c277d | Each standing user of a shared thing at their own slot, facing it; a cook waiting for a busy station steps aside. |
+| G-44 | A-bedroom-02 (S1) | 6a1438d5, 1768f8b0 | Up the bunk's ladder into the upper bunk, and down it. |
+| G-45 | I-kids-03, I-kitchen-06, I-community-04 (S1s), I-systems-04, I-kids-08 | 697544c2, 742572df, d2027317 | Age rules (`stages`, `upperStages`) on free will and orders alike; the kids' table seats children for a meal. |
+| G-46 | M-bedroom-04, A-bedroom-04, I-bedroom-01, I-bathroom-03 | f4925b24, d7190242 | Quilts in each bed's colours and none at the origin; pyjamas only for a night's sleep; towels and swimwear (Q-10). |
+| G-47 | I-living-05 | aac64b84, 1224f373 | Watching takes a seat that faces the screen. |
+| G-48 | A-houses-01, A-houses-02, A-town-02 | e04bc6c0 | Doors and gates open only for the one going through, in time at every speed (the cheap part, Q-03). |
+| G-49 | I-kitchen-04, I-held-04 | 57b3a576 | Hands free at each station; the dish carried to the table and eaten there. |
+| G-50 | I-garden-03, A-outdoor-02 (in part) | 7d186856 | A crop is picked and the washing hung out as the hands go (`gradual`, motions `over`). |
+| G-51 | A-bedroom-03, A-hobbies-01, A-residents-01 | 36198175, 0d20c5c9, d7b7096d, ad1c277d | Into bed from its side, to a desk from behind (`approach`), up at the seat before the step back. |
+| G-52 | M-outdoor-01 | 0f7cf80f, b4306968 | Glow no longer draws through the parts in front of it; the grill's coals glow again. |
+| G-53 | I-bathroom-04 (in part) | 54139115 | Sounds by the thing (`sound`, `endSound`, `sounds`, `ambient`); a flush, a fountain, a dryer, crockery and drums. |
+| G-54 | M-bathroom-03, M-lighting-01, M-lighting-05 | 05970ca3, 4029f842 | `againstWall` and `headHeight`; a wall that would leave a ceiling lamp outdoors is refused; pendants hung high enough to walk under (Q-12). |
+| G-55 | I-hobbies-06, I-systems-09 | 36198175, 0d20c5c9 | Darts thrown from the oche; a visitor knocks at the front door, facing it. |
+| G-56 | I-social-06, A-social-04 | d7735fc0 | Talking from the seats; someone joining a group walks to their spot. |
+| G-57 | M-houses-02, M-houses-03, M-houses-04, M-houses-05, M-houses-07 | 8e0f83c2 | Panelled doors, a light oak, patterned wallpapers and limed floors, chimneys from the eaves, balusters. |
+| G-58 | M-town-05, M-town-06, M-houses-06 (M-town-07 won't fix) | 76d38b46 | A one-lane street without a centre line (Q-13), cars at their real clearance, garages a car fits. |
+| G-59 | M-town-01, M-town-02 | 13ab25bf | The lawn's far versions on Low; the street's unused hedge dropped (Q-09). |
+| G-60 | M-lighting-02, M-community-06, I-lighting-01, A-lighting-01, I-decor-03 | 0eaa3ba7, 4029f842, ae10185e | Lamps bought off (Q-11), light sent where the shade sends it (`light.aim`), fires lit by sitting by them (`light.fire`), pools of light on the ground, the fan only while on; light kept to its room on Medium and High. |
+| G-61 | I-living-04 | aba5f915 | A night on the sofa bed leaves the living room a living room (`spare`, Q-15). |
+
+### 8.6 New behaviour brought into Phase 4
+
+| Group | Findings | Commits | What changed |
+|---|---|---|---|
+| G-62 | I-outdoor-07 | aac64b84, b4dfcfc2 | A place and a facing per slot (`places`, `seatFacing`); the park chess table rebuilt. |
+| G-63 | I-tabletop-01, I-tabletop-04 | ed77dc36, 5209bd53 | Things on tops are used where they stand, from beside the top or from a chair pulled up to it. |
+| G-64 | I-hobbies-03, I-kitchen-11, I-bathroom-07 (in part) | 69d0bc33 | Conditions: `hours`, `sky`, `workOn`; laundry piles up (save 30). |
+| G-65 | I-community-03, I-hobbies-01 | 42477f91, 4d85ede8, 15309c9d, 1c726904 | Games for two fetch a partner (`partner`, `alone`); practice alone as the fallback (Q-16). |
+| G-66 | I-kids-01, I-kids-05 | ba8bbd91 | Babies carried to the high chair by day (`carried`) and changed at the changing table (`atSlot`). |
+| G-67 | I-community-09 (in part), I-community-10 (I-kitchen-10, I-systems-03 won't fix) | 77029b75, 11f55859 | Town food self-serve, fetched and eaten sitting down; coffee poured first (`fetch`, Q-17). |
+| G-68 | I-systems-08, I-garden-10 | 9bb1c2ff, fe8cf92d | Tending helps (`tends`), harvests to the fridge (`yields`), fruit trees ripen (Q-18). |
+| G-69 | I-living-07, I-bedroom-04 | 5f4411b9 | Feet up on a footstool; picking an outfit changes the clothes (`changesOutfit`, save 31). |
+
+### 8.7 Found and fixed during Phase 4
+
+The fix agents' own findings (Source `fix: <agent>`): 36 of the 41 fixed and one in part; the other four are in §9 (I-garden-11, I-garden-12, M-hobbies-11, M-town-08).
+
+| Area | Finding | Commit | What changed |
+|---|---|---|---|
+| Residents | A-residents-12 | e3e95ae3 | Clips sized to a thing are fitted by the legs, so a child's hands and feet meet it. |
+| Residents | A-residents-13, A-residents-14, A-social-05, A-bathroom-05 | a5968771 | A step the sim takes in one tick is walked: onto a seat, round a built-in chair, up to a talk, into the shower once its door is open. |
+| Residents | A-residents-15, A-bathroom-06 | da7e41ef | Seats in a frame (bikes, straddled rides) settled onto, not walked through; the towel kept until out of the shower. |
+| Residents | A-kitchen-04 | d2da9bec | On bar and counter stools the feet rest on the foot ring. |
+| Residents | A-community-02 | 2fdfb304 | The slide's round steps up onto the deck and slides down sat up. |
+| Residents | I-outdoor-09 | 38165d6e | Warming up at the fire pit on foot: the hands held out and rubbed. |
+| Residents | I-packs-22 | fa21264f | Both hands on the vibration plate's grips. |
+| Residents | I-bedroom-08 | fcb1cb7a | A speech at a mirror is given into the glass, the head level. |
+| Residents | A-bedroom-05 | e38de4b7 | The daybed's quilt tucked in at the mattress's edges. |
+| Residents | A-bedroom-06 | ac62888a | The upper bunk's duvet turns down once its sleeper has climbed in. |
+| Objects | M-community-07, I-community-14 | 57bf91a8 | The slide's tower has headroom; the park chess players' knees clear each other. |
+| Objects | I-packs-20 | 757fe0e3 | The smash bin's lid stays up while plates are thrown. |
+| Objects | A-kitchen-05 | 39659c10 | The freezers open for ice cream again. |
+| Objects | M-hobbies-10 | e6fa6773 | The piano is sat on at its bench's top. |
+| Objects | M-decor-03 | d3bdebcc | Generated houses hang curtains as wide as the window. |
+| Objects | M-houses-08 | 089516aa | The unused door texture and `material.door` dropped. |
+| Objects | M-tabletop-03 | 2a35c671 | The candles' night flames stand only while their room's lights are on. |
+| Objects | I-packs-21 | 925c09fe | The light-up dance floor is danced on. |
+| Objects | I-packs-23 | 3cb6c1af | The sunrise lamp's stretches only from 5:00 to 11:00 (`hours`). |
+| Sim | I-systems-11 | 9463d1a7 | Coffee for teens and up. |
+| Sim | I-systems-12 | 342dd820, c5a96988 | A meal nobody needs is cooked only with nothing else to do; a cook on the way hears a call. |
+| Sim | I-systems-13 | aac64b84 | A seat moved off its tile's middle is sat on where it is. |
+| Sim | I-systems-14 | 3dbfaa48 | A desk may stand with its screen to a wall. |
+| Sim | I-systems-15 | 15309c9d, f15bbd47 | Nobody in bed or on a seat is shut in where they get up. |
+| Sim | I-systems-16 | 2cb0ca69 | Selling a lamp at head height leaves the table under it in the way. |
+| Sim | I-kitchen-15 | e5a20254 | A child isn't sent to a wall cupboard out of reach (`reach`). |
+| Sim | I-living-10 | 25e64359 | Someone alone on a sofa takes the seat with the footstool. |
+| Sim | I-tabletop-06 | b21ef195 | A chair used for a thing on the top is pulled in. |
+| Sim | I-social-07 | 0f068866 | A word over a meal. |
+| Sim | A-systems-03 | 57b3a576, db55d69b | At a thing that is two stations, each step plays its own clip. |
+| Lights | M-lighting-08 | ae10185e | A lamp lights only its own room, on Medium and High. |
+| Held | M-held-03 (in part) | eab099da | The hot dog in the takeaway box, the cart's ice cream in its bowl. |
+
+Fixed in 0.3.0 and confirmed by the review: M-living-01 (the sofa bed's mattress height), A-living-01 (the bean bag's snoozer).
 
 ## 9. Found but not fixed
 
-Phase 4: the groups triaged to a later release or "won't fix", with the reason and a target.
+Every finding still `later`, `won't fix`, `not checked` or `open`, and the rest of those fixed in part, with the reason and what it would take. Sizes as in §4: S under an hour, M a clip, a rebuild or a contained change, L new behaviour.
 
-| Group | Findings | Severity | Why not now | Recommendation | Target |
-|---|---|---|---|---|---|
+### 9.1 New behaviour the owner put off (decision 3)
+
+Planned separately, after this review (§11.1).
+
+| Group | Findings | Sev. | What it would take |
+|---|---|---|---|
+| G-70: props in hand | I-held-01, I-social-01, I-hobbies-05, I-kitchen-13, I-community-11 | S2 | Prop models in `held.py` (a book, a cup, cutlery, a phone, the cue and bats, the shaker, a coin, bird seed), a prop per use in `ACTIONS` with grips (`writeProp`, the `held` grips), the pool table's cue and balls as moving parts; every prop use played, and `pnpm check:clips`. L. The coin toss at the fountain alone is a clip and table change that could go first. |
+| G-71: body language, turning on the spot | A-residents-07, A-residents-08 | S2 | A body layer per mood beside the face's 18 (posture, pace, arms), and a step-round clip for turns on the spot in `locomotion.ts`; a headed, timed check. L. |
+| G-72: privacy | I-systems-05, I-social-05 | S3 | A private flag on rooms and things, a shut bathroom door the sim knows of (others wait outside it, visitors are refused private things), then "Try for a baby" at a double bed behind a shut door (Q-21). With it the bathroom door can stay shut to someone walking in (§11.3 a). L. |
+| Doors by hand | A-houses-01 (the rest) | S2 | A hand on the handle and the swing timed by it, on top of G-48's door that opens only for the one going through. M. |
+
+### 9.2 Model work still to do
+
+| Finding | Sev. | What is left | What it would take |
+|---|---|---|---|
+| M-hobbies-11 (open) | S3 | The home chess table has one chair, so chess at home stays *Practise chess* (Q-16). | A 1 × 2 table with a chair at each end, as the park's; `slots: 2`, `places` facing each other, a *Play chess* use with `partner` and `alone: chess`. M. |
+| I-garden-12 (later) | S3 | Only the apple tree's front apple hangs within reach; *Pick the apples* reaches into the air under the crown. | The crown's middle down to about 2.6 m, or six to eight apples on low twigs at 1.4–1.9 m; recorded in `tools/art/blender/families/trees.md`. With it, low fruit for a child (I-garden-11). M. |
+| M-held-03 (in part) | S3 | Crisps, the stall's fruit and the pastry come on the treat plate. | A cone or paper cup, a hot dog in its bun, a crisp packet, an apple and a pastry in a paper bag; recorded in `held.md`. M. |
+| M-lighting-06 (in part) | S3 | The sim lets a shade reach over the next tile (`overhang`); the arc lamp's model still stops at its own. | Rebuild `lampFloorArc` reaching over the next tile, then `overhang: [[0, 1]]`, its `light.at`, and build mode's and `housegen.ts`'s placing; recorded in `lighting.md`. M. |
+| A-outdoor-01 (fixed) | S2 | The hot tub's cover folds back as one part, squashed about its back edge, not in two halves. | Two halves are a fourth draw call, as the shower's door was (Q-05). S once the draw is allowed. |
+| A-outdoor-02 (in part) | S3 | The washing comes down onto the line all together, not piece by piece. | A part per line takes the model to five draws: a rebuild that keeps the still body to one finish. M. |
+| A-decor-01 (in part) | S3 | The grandfather clock's trunk door never opens. | A fifth draw call; the clock is wound at its dial, so it can stay shut. |
+| I-kids-01 (fixed) | — | The high chair's tray doesn't slide out for the baby. | A tray clip in `kids.py`. S. |
+| I-community-09 (in part) | — | The bakery case's sliding door is on the baker's side. | With vendors (§9.3). |
+| I-tabletop-01 (fixed) | — | The kettle's lid, the bread bin's roll-top and the laptop's lid have uses since G-63 but no clip. | A clip each in `tabletop.py`. S. |
+
+### 9.3 Small leftovers
+
+| Finding | Sev. | What is left | What it would take |
+|---|---|---|---|
+| I-packs-12 (open) | S3 | The bonsai, the roses on the arbour, the lectern and the streetball hoop are worked from the object's edge. | Possible now with G-62: `places` on each; a reading hand pose at the lectern (a clip). S–M. |
+| I-garden-11 (open) | S3 | A child can't reach the fruit it picks. | The owner's decision (§11.3 c). |
+| I-bedroom-03 (in part) | S3 | The daybed can't be sat on by day. | A `seats` row with `along` in `characters/furniture.json` and a sit use. S. |
+| I-bathroom-07 (in part) | S3 | The resident stands at the washer for its 30 minutes and folds at the dryer with empty hands. | A timed machine (load it, it runs on its own, unload it) and a fold at the basket: new behaviour. M. |
+| I-community-09 (in part) | S2 | Nobody serves in town: the food is self-serve. | Vendors and shopkeepers (Q-17, later). L. |
+| I-bathroom-04 (in part) | S3 | About thirty uses still have no sound: the treadmill and bikes, the workbench, the ball games and darts, the arcade, the sewing machine, the pottery wheel, the coffee machines, the blender's motor, the microwave, the toaster, an oven's fan, the pizza oven, the fridge door, the bin lid, the vending machines, the phone box, the basketball, singing, a bowed cello, the punch bag and the smash bin. | New synthesised sounds (art), keyed by `sound`; the headed listening check G-53 left. M. |
+| A-residents-03 (in part) | S3 | Feet slide 56–78 % of the way at speeds 4 and 5. | Won't fix: no gait steps at 45–90 m/s without strobing. |
+| M-lighting-08 (fixed) | S3 | On Low the four forward lamps aren't kept to their room, nor are tiles split by a diagonal wall. | The same room mask in the forward lights' shader (§11.3 e). M. |
+| I-kitchen-09 (fixed) | S3 | The range hood's light and hum while the hob below is in use. | Later, as polish (Q-19). S. |
+| I-garden-08 (fixed) | S3 | No flower can be cut for a vase. | Later, with a vase to put them in (Q-18). M. |
+
+The tooling left to improve is in §7.
+
+### 9.4 Won't fix
+
+| Finding | Sev. | Why |
+|---|---|---|
+| I-systems-02 | S3 | Uses end when the needs they raise are full: by design (Q-22). |
+| I-kitchen-10 | S3 | Breakfast at a dining set from nowhere: kept as a game shortcut (Q-17). |
+| I-systems-03 | S3 | Plates pile up with neither sink nor bin: every generated home has a sink (Q-17). |
+| I-office-02 | S3 | The executive desk's drawer stays a still part (Q-19). |
+| M-living-03 | S3 | The large sofas, the chaise and the long coffee table fill their tiles (Q-08); the console table's text was fixed. |
+| M-garden-08 | S3 | The cactus trio and the succulent bowl are floor pots by design (Q-08). |
+| M-town-07 | S3 | The kerb stays flat (Q-13). |
+
+### 9.5 Not checked
+
+None could be checked headless or in the review's states. §10 says how a person can.
+
+| Finding | Sev. | What it would take |
+|---|---|---|
+| A-residents-04 | S3 | A headed, timed run at speeds 4–5 (0.3.0 says walks no longer jump at the start and end). |
+| A-residents-05, A-residents-06 | S3 | A hidden tab, headed: switch away mid-walk and mid-sit, and back. |
+| A-social-02 | S3 | Not reproduced; watch children near a hug in a long play. |
+| A-systems-01 | S3 | Furniture resizing is off since 0.3.0; check when it comes back. |
+| A-town-01 | S3 | The household creator's preview with reduce motion on. |
+| I-garden-01 | S3 | A crowded garden in play (`tests/crowded_garden.rs` couldn't reproduce it). |
+| M-houses-01 | S3 | Build mode with a wall thing held over lowered walls. |
+| M-living-02 | S3 | The stairs from a basement view. |
+| M-town-03 | S3 | A far road's lane markings over several page loads, compared pixel by pixel. |
+| M-town-08 | S3 | Two materials alike but for planar UVs in one scene, and a look at the shader each draws with. |
 
 ## 10. Manual test checklist
 
-For each fixed object, from [docs/objects/README.md](objects/README.md) "Checking an object in play":
-- [ ] Buy it and place it in all four facings.
-- [ ] Colour every part in the colour studio (every slot a distinct colour, far from each part's default), "At rest" and "In use", turning the turntable.
-- [ ] Let a resident use it, so every clip plays and shuts when it should (sit and lie uses again about 4 s in).
-- [ ] By day and at night, on WebGPU and `&renderer=webgl`, on the Medium and Low presets.
-- [ ] Check the neighbours that share code you touched (a pose, a `BEDS` entry, a family helper).
+What a person should play through before release, from what the review changed. On WebGPU and `&renderer=webgl`, on Medium and Low, by day and at night, with an adult and a child each time unless it says otherwise.
 
-What the review learned to check as well:
-- [ ] Every life stage that may use it: `poses.html?stage=all` and `check.mjs play --sim <n>` (feet on the floor, shins out of the cushion, the child's reach).
-- [ ] Two residents at once on anything with two slots (by hand until `play --sims` exists).
-- [ ] A side or top-down shot for contact: hands on the part used, legs not through the front, sitters not inside the object.
-- [ ] A night pass for anything that should glow or give light (`review-stage-night`).
-- [ ] `cargo check-glb` heights, `cargo review sizes` and `cargo review uses` before and after; `pnpm check:clips` for a changed clip; the balance and soak tests for changed `minutes` or `effects`.
-- [ ] Listen: the use's sound starts and stops with it.
+**Who may use what**
+- [ ] As a child, try the wine fridge, the bar cart, a hob, the weight bench, coffee: each refused with a reason; the pie menu greys them out (never shot by an agent).
+- [ ] As a grown-up, try the cot, the kids' bed, the spring rider and the slide: refused. A child eats at the kids' table.
+- [ ] Two children at a bunk bed: the second climbs the ladder to the upper bunk and down it in the morning.
 
-Only a person can check these, on hardware no agent had or at timings shots can't show:
-- [ ] Timed, headed: a door at speed 3 (A-houses-02), the stand-up from a chair (A-residents-01), walks starting and stopping at speeds 4–5 (A-residents-04), moving parts at the hand (A10).
+**Places, partners and getting on and off**
+- [ ] Two at a dining set for two, the tea table, the picnic table, park chess, ping-pong, the seesaw and the merry-go-round: they face each other.
+- [ ] Pool, foosball, ping-pong, park chess and the seesaw with two: the second is fetched, the first waits still. Alone: pool and foosball are practised, the rest refused with "nobody is free".
+- [ ] Two at the double sink, the pool table, the shop counter: apart, each at their own place. The cook waiting for a busy counter steps aside.
+- [ ] Get into a double bed from each side, a single against a wall, a desk from behind, an exercise bike; get up from a dining chair (headed, timed: up at the seat, then the step back).
+- [ ] Darts from the oche; a visitor knocks at the front door.
+
+**Things on tops, conditions and food**
+- [ ] In a generated kitchen, use the kettle, the toaster and the fruit bowl where they stand.
+- [ ] The telescope at noon (refused), at night indoors (refused), at night outside (used).
+- [ ] Washing up with no dishes (refused); the laundry washed, then dried, then refused when none waits.
+- [ ] A meal from the fridge to the table: a bowl for mixing, the oven bakes, the pan on the lit burner, nothing in hand while chopping, the dish carried to the table, a chat over it.
+- [ ] In town: coffee poured at the café's machine and drunk at a table; a hot dog, an ice cream and a pastry eaten sitting down.
+
+**Babies and the garden**
+- [ ] A baby fed in the high chair by day (lifted, carried, put in, fed, carried back) and changed at the changing table; a night feed stays at the crib.
+- [ ] Tend and harvest a vegetable bed: picked as the hands go, carried to the fridge. The apple and lemon trees ripen, are picked bare and fruit again.
+- [ ] The washing line hung out and taken in over the use.
+
+**Clothes, beds and seats**
+- [ ] A night's sleep in pyjamas, a nap barefoot in day clothes, a doze on the lounger dressed; quilts in each bed's colours, nothing at the world's origin.
+- [ ] A shower (the door slides open, shut behind, the towel kept until out) and a bath in a towel; the hot tub in swimwear.
+- [ ] A woman in a skirt seated at a dining chair; feet up on the pouf and the ottoman; an outfit changed at the wardrobe.
+- [ ] Seated feet on the floor at every life stage on the sofas, armchairs and kids' chair; floor cushions, the hearth, a tree's shade, the ball pit and the tent.
+
+**Lamps, glow and doors**
+- [ ] A lamp bought is off; switched on, the pendant lights down, the sconce up the wall, the bulkhead outwards, the uplighter off the ceiling; on Medium and High no light in the next room (on Low it still crosses walls).
+- [ ] The fire pit and the fireplace light when someone sits by them; garden and street lamps cast pools on the lawn; the grill's coals don't glow through the shut lid; candles at night only with the room lit.
+- [ ] The front door, a bathroom door and a garden gate open only for the one going through, at speeds 1 and 3 (headed); a bathroom in use stays shut to passers-by.
+- [ ] Medium at night in the village: the frame time against 0.3.0.
+
+**Sounds and talk**
+- [ ] Listen, headed: the toilet flushes once as the use ends, the dryer tumbles, the dishwasher clinks, the drums play, the fountains run with nobody at them; toast, the microwave and baking are silent.
+- [ ] Two on a sofa talk from their seats and a third walks over to listen; a kiss and a fight between a tall and a short resident; a refused hug; texting with the phone in front.
+
+**Clips and models**
+- [ ] The slide, the rides, the darts, pool, foosball, ping-pong, bouldering, yoga, the smash bin, the hoop shot, the telescope, the guitar, reaching up to the wall cupboards and the clock.
+- [ ] The 42 rebuilt families in the gallery and at the game camera, by day and at night.
+- [ ] A 0.3.0 save (version 29) loads and plays on: one dirty and one washed load of laundry, everyone in the creator's outfit.
+
+**Only a person can check these** (no agent had the hardware or the timing; §9.5)
+- [ ] Timed, headed: walks starting and stopping at speeds 4–5 (A-residents-04), moving parts at the hand (A10), a joiner walking into a group (G-56).
 - [ ] A hidden tab (A-residents-05, A-residents-06): switch away mid-walk and mid-sit and back.
-- [ ] Build mode with a wall thing held over lowered walls (M-houses-01); the stairs from a basement view (M-living-02); a wall removed under a ceiling lamp (M-lighting-01).
-- [ ] The household creator's preview with reduce motion on (A-town-01).
-- [ ] A far road's lane markings over several page loads (M-town-03).
+- [ ] Build mode with a wall thing held over lowered walls (M-houses-01); the stairs from a basement view (M-living-02).
+- [ ] The household creator's preview with reduce motion on (A-town-01); a far road's lane markings over several page loads (M-town-03).
 - [ ] A crowded garden (I-garden-01) and children near a hug (A-social-02).
+
+For any object touched later, the routine in [docs/objects/README.md](objects/README.md) "Checking an object in play" still holds: the four facings, the colour studio, every clip, both renderers and presets, the neighbours sharing its code; and `cargo check-glb`, `cargo review sizes` and `uses` before and after, `pnpm check:clips` for a changed clip, the balance and soak tests for changed `minutes` or `effects`.
 
 ## 11. Phase 4
 
@@ -831,8 +1104,79 @@ Triage with the owner on 2026-10-21:
 
 ### 11.2 Re-check
 
-The Phase 0 evidence made again for the changed items, and each finding closed in its ledger with a before and after shot (plan §7.5).
+Each fix agent made the Phase 0 evidence again for what it changed and closed each finding in its ledger with an **After:** line naming the after shot beside the finding's before shot. The evidence and each agent's log (`log.md`: what it changed, the checks, the balance and soak numbers, the save version, its decisions) are in the review worktree's gitignored `bench-results/review/fixes/<agent>/`:
+
+| Agent | Groups and findings | Evidence |
+|---|---|---|
+| `tables` | G-04, G-05, G-06, G-08, G-14, G-15 | `play-a/`, `play-b/`, `play-child/`, `play-garden/`, tub sheets, `heights-before.txt` / `-after.txt` |
+| `content` | G-02, G-03, G-07, G-09, G-10, G-11, G-12 | `shots/g02/` … `g12/`, `cargo review uses` and `sizes` before and after, balance and soak |
+| `motions` | G-16, G-17, G-18 | `recipes/` (eight recipe scenes), `g16/`, `g1718/` |
+| `clips-standing` | G-21, G-25 | the picks, the shower, the guitars, `gait-table.txt`, `climb/` |
+| `clips-seated` | G-20, G-22, G-24 | `poses/` at four stages, `play-adult/`, `play-child/`, `play-elder/` |
+| `rides` | G-19, G-23, G-44 | the slide, bunk and ride runs, `merge/` |
+| `clips-games` | G-26 | `after-*` and `child-*` play shots |
+| `clips-social` | G-27 | `pairs/`, `sheets/`, `bench/` |
+| `clips-reach` | G-04, G-14, G-15 follow-ups | `play-*/`, `putaway/`, `compare/<finding>.png` side by side |
+| `slots` | G-01, G-47, G-62 | `poses/`, `play/` (two or more at one thing) |
+| `positions` | G-43, G-51, G-55 | `play/` (pool, foosball, sinks, crib, beds, desks, the knock), `play-headed/` |
+| `age-rules` | G-13, G-45 | play runs per life stage, refusals and their toasts |
+| `tops-conditions` | G-63, G-64, I-systems-11 | `tops-adult-*`, `play-stars-*`, `play-washup-*`, `play-laundry.jsonl`, balance and soak |
+| `partners` | G-65 | `two-*`, `wait-*`, `alone-*`, balance and soak |
+| `babies-crops` | G-61, G-66, G-68 | `baby/`, `garden/`, `sofa-bed/` |
+| `cooking` | G-49, G-50, G-67 | `cooking/`, `harvest/`, `washing/`, `town/`, `smoke/` |
+| `pairings` | G-69 | feet up and outfit runs, `merged/` |
+| `clothes` | G-42, G-46 | `game/`, `seated-before/` → `seated-after/` |
+| `lighting` | G-52, G-54, G-60 | `<backend>-<preset>/` night shots, `perf-before/` → `perf-after/` |
+| `sound-social` | G-53, G-56 | `sounds/` (`sounds.log`, the WAVs), `group/` |
+| `town` | G-48, G-57, G-58, G-59 | `doors/`, `houses/`, `covers/`, `views/`, draw counts |
+| `blender-decor` | G-28, G-34, G-35, G-40, G-41 (decor, lighting, tabletop, held) | `gallery/`, `clips/`, `play/`, the fireplace poses, `check-glb.txt`, `sizes-changed.txt` |
+| `blender-hobbies` | G-24, G-29, G-31, G-32, G-40, G-41 (hobbies, fitness, office, kids) | gallery, clips, play, `sizes-after.md` |
+| `blender-kitchen` | G-30, G-32, G-39, G-41 (dining, kitchen families) | `gallery/`, `clips/`, `poses/`, `play/two-*`, `recipes/` |
+| `blender-rooms` | G-29, G-33, G-40 (bathroom, bedroom, living) | `gallery/`, `clips/`, `play/showers-*`, `bunk/`, `poses/` |
+| `blender-outdoor` | G-29, G-30, G-32, G-33, G-36, G-37, G-40 (outdoor, playground, yard, farm, street furniture) | `gallery/`, `clips/`, `play/`, `poses/` |
+| `blender-packs` | G-29, G-31, G-33, G-35, G-36, G-37, G-39, G-40, G-41 (the packs) | `gallery/`, `clips/`, `play/`, `night/`, `poses/` |
+| `blender-trees` | G-29, G-38 (trees, plants, boulders) | `before/` → `after/` (gallery, game camera, eye level, tree walk, play) |
+| `sweep-render` | the renderer's Phase 4 findings (§8.7) | one folder per finding |
+| `sweep-sim` | the sim's Phase 4 findings, M-lighting-06, M-lighting-08 | one folder per finding, `M-lighting-08/` before, after and diffs |
+
+Balance after the last fix (`sweep-sim`, 180 days): median weekly savings $407, richest household $11,887 after 60 days, 1.2 grades on average and 3 at most, inside PLAN.md's targets; the soak test passed 4 of 4, and the generated houses and worlds passed. Every agent's log has the numbers after its own change.
 
 ### 11.3 Sign-off
 
-To come.
+**Decisions for the owner at sign-off**, each with a recommendation:
+
+**(a) The bathroom door opens for someone walking into an occupied bathroom.** G-48 opens a bathroom door only for the one going through it; passers-by never open it. But the sim lets anyone into a bathroom in use (there is no privacy, I-systems-05), so a door kept shut to them would be walked through. Until privacy (G-72) it opens for them too (A-houses-01's After). *Recommendation:* accept until G-72, which keeps the door shut and has them wait outside.
+
+**(b) Tests the fix agents changed to keep them passing:**
+- `calling_out.rs` (d0bbe6ff): the called housemate was given some fun to fill (0.6), because after G-09's armchair read free will had them cook a meal nobody needed, which a call couldn't interrupt. I-systems-12's fix (342dd820, c5a96988: no meal nobody needs, a cook on the way hears a call) made it unnecessary, and 342dd820 took it out again; checked: against e725166 the file only gains G-56's new seated test. *Recommendation:* nothing to do.
+- `behaviour.rs` `an_order_holds_against_needs` (11f55859): the window grew from 90 to 150 game minutes. With free will on, the resident is now out in town at noon (town food is eaten there, G-67), and the walk home took the 90 minutes. The order still has to hold; only the time allowed grew. *Recommendation:* accept.
+- `shipped_content` `every_personality_lives_well_with_all_packs` (0f068866): the seed moved from 5 to 6. With a word over meals (I-social-07), seed 5 sent two of three to bed by nine one evening and up again before three, in two of five sets; seeds 1 to 8 otherwise all pass. The test is chaotic (the `blender-packs` agent saw it flip with unrelated content). *Recommendation:* accept, and make the test less seed-sensitive later (several seeds, a share of them to pass).
+- `soak.rs`, the busy town's baby chance (0f068866): `room_for_a_baby` counts an hour as a chance only for partners close enough for a social that can make a baby (`tryForBaby`'s `requires`, romance 50 and up), as the sim does. Before, it counted any partners, and a town whose only couple sat at romance 44–48 failed "nobody born in 120 hours". *Recommendation:* accept: the test counts what the game counts. Watch that romance doesn't stall over long games.
+- `turned_lots.rs` (36198175): the bed on a turned lot is got into from beside it by the foot row, its other side being against the wall (G-51). *Recommendation:* accept: the test follows the new rule.
+- `slots.rs` `places_must_fit_the_slots` (36198175): its example of a place too far off the footprint moved from 2.6 to 3.1 m, because places may now stand up to 2 m out (`PLACE_REACH`, for the dartboard's toe line at 2.37 m from its face). *Recommendation:* accept.
+- `crates/tools/tests/checkglb.rs` (5841caec): the base sink is measured as a kitchen sink, the kind G-11 gave it (Q-08). *Recommendation:* accept.
+- Others follow a behaviour change and test it the new way: `water.rs` puts a dirty plate down to wash up (G-64), `needs.rs`'s home cinema has a wall behind it (`againstWall`), the cooking and snapshot tests serve at the table (G-49), growth is picked at the end (G-50), the harvest test checks the serving did her good rather than a fixed level (G-68), the workbench's top is 0.90 m, the sofa bed's seat is read from `furniture.json` (da6a7fba), and `review.rs` counts 542 objects (the wide curtains). *Recommendation:* accept.
+
+**(c) I-garden-11: a child can't reach the fruit it picks.** The picked apple hangs at 1.84 m and the lemon at 1.62 m; a child reaches to about 1.45 m on tiptoe. The choices: low fruit for a child (a second part the child's size picks), or picking only from about 1.3 m tall (a stage or height rule, G-45's). *Recommendation:* low fruit, built with I-garden-12's crown rebuild (fruit from about 1.2 m up); until then accept the short reach. A rule that children may not pick fruit would take away something real children do.
+
+**(d) Save version 31.** 0.3.0 wrote 29. Version 30 adds the laundry (`households[].laundry`; absent: one dirty and one washed load), 31 the outfits (`sims[].outfit`; absent: the creator's). A 0.3.0 save loads and plays on (`older_saves_load_in_the_creators_outfit` loads 29, 30 and 31). Nothing else Phase 4 changed is saved: a carry, a partner's wait, a dish on its way to the table (saved as the cook's task one past its last step) and a seated talk all load as before. Early release: bad state in old saves isn't repaired. Things placed against an object whose footprint grew (the hammocks, the ping-pong and park chess tables, the drum kit, the yoga mat, the digital piano, the swing set, the hay bale, the garden bench) may overlap it in an old save. *Recommendation:* accept, and say so in the release notes.
+
+**(e) The lamp mask costs a little on Medium, and Low isn't masked.** Keeping a lamp's light to its room (M-lighting-08) costs Medium on WebGPU 3.35 → 3.47 ms of GPU a frame (196 → 194 fps, the village at night, M3 Pro); WebGL2 and Low are unchanged. Low's four forward lamps aren't masked, so on Low light still passes through walls, as do tiles split by a diagonal wall, everywhere. *Recommendation:* accept both; mask Low's forward lamps only if a Low player notices.
+
+**(f) Other judgement calls in the fix logs:**
+- **Brushing teeth gives less hygiene** (`content`): at 0.05 the busy soak's town had no birth in 120 hours; 0.03 (under washing hands' rate) passes. *Recommendation:* accept; the soak's threshold is the real question, with (b)'s baby chance.
+- **Feet slide at speeds 4 and 5** (A-residents-03): won't fix, as no gait steps at 45–90 m/s without strobing. *Recommendation:* accept.
+- **The draw budget over moving parts:** the hot tub's cover folds as one squashed part, the washing comes down in one piece, the grandfather clock's trunk door stays shut, all to stay within four draws (§9.2). *Recommendation:* accept now; allow a fourth draw for the hot tub's cover with its next rebuild, as for the shower (Q-05).
+- **Town food is self-serve:** nobody serves, so the labels and descriptions say tin, honesty box, tongs or self-service till (G-67, Q-17). *Recommendation:* accept until vendors.
+- **Games for two without a partner:** the seesaw, ping-pong and park chess are refused with nobody free; pool and foosball are practised alone; the home chess table stays a game for one (M-hobbies-11). *Recommendation:* accept.
+- **Harvests go to the fridge** (G-68 read with Q-18): crops still replant themselves; "Pick an apple" and the nature lover's veggie bed stay nibbles eaten on the spot, as does a harvest with no fridge. *Recommendation:* accept.
+- **The high chair by day only:** night feeds stay at the crib, in the arms. *Recommendation:* accept.
+- **Trees count as seats:** since residents sit against a trunk in the shade (G-22), they may phone or snack there too. *Recommendation:* accept; it is what people do.
+- **The digital piano faces the wall** (rebuilt as an upright console): before, the objects' decisions had it face the room. *Recommendation:* accept: an upright stands against a wall.
+- **Some narrow-drive houses lose their garage** (G-58: a garage now needs 3 m inside). *Recommendation:* accept.
+- **A meal nobody needs** scores a tenth (`UNWANTED_MEAL`, I-systems-12): it is cooked only with nothing else to do. *Recommendation:* accept.
+- **The lamps don't light the ground:** the clustered lamps lighting the terrain cost 1.5 ms on Medium, so garden and street lamps cast pools instead (G-60). *Recommendation:* accept.
+- **Silence over a wrong sound:** toast, the blender, the microwave and baking are silent until their sounds are made (G-53). *Recommendation:* accept.
+- **A hang-out cancelled half way loses its load** and leaves the line empty (the washing is claimed as the use starts, so no two uses take one load). *Recommendation:* accept; small.
+
+**Sign-off:** to come.
