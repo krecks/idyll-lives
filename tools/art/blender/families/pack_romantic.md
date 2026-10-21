@@ -5,16 +5,16 @@ entries in `packs/pack_romantic/manifest.json`, an override pack listed in the b
 2026-10-14; they sat in Validate › Romantic until checked in play.
 
 Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
-Seats keep the old part's: the diners and the writer at 0.45 on the footprint's middle line, the bathers at
-0.35 (`characters.ts` `SEATS`/`BEDS` `romantic.heartTub`), the swing's seat top at 0.45 over z = 0.
+Seats at 0.45: the diners on a chair at each end of the table at x = ±0.62, facing each other (content `places`, facing ±90°), the writer in front of the bureau at depth 0.2, facing it (`furniture.json` `back`, the hips at 0.25); the bathers at
+0.20 (`furniture.json` `romantic.heartTub`), the swing's seat top at 0.45 over z = 0. (2026-10-21: the diners sat side by side behind a long, narrow top and the writer at the bureau's back, both facing the room: M-packs-11, M-packs-05.)
 
 | Model | Moving part and clip | Played by |
 |---|---|---|
-| `candlelitTable` | the two candle flames, origin just under the shorter wick and flattened inside the wax: `candles` grows them (0.6 s) | `candlelitDinner`, `shareDessert` |
+| `candlelitTable` | the two candle flames, origin just under the shorter wick and flattened inside the wax: `candles` grows them (0.6 s); they glow at night (`flame`, `flame_core` `glow`; M-packs-07). A 0.72 m square top in the middle, the cloth short (8 cm) at the diners' ends so the knees go under it, long on the free sides (I-packs-01) | `candlelitDinner`, `shareDessert` |
 | `heartTub` | the water with its petals and bubbles, origin just under the tub's floor, flattened: `fill` raises it to 7 cm under the rim (1.2 s) | `petalBath` |
 | `vanity` | the middle drawer with a lipstick and a compact in it: `drawer_open` pulls it 20 cm out (0.7 s), `hold` 2 s | `primp` |
 | `gramophone` | the tone arm, resting beside the record: `needle` swings it 30° onto the record (0.8 s); the platter and record: `platter` turns them once in 1.8 s (a loop) | `listen`, `waltz` (`uses` and `loops`) |
-| `letterBureau` | the writing flap over the lower pigeonholes, a letter on its inside, hinged on its foot: `fall_front` drops it 90° onto the desk towards the writer (0.8 s) | `writeLetter`, `writePoem` |
+| `letterBureau` | the writing flap over the lower middle pigeonholes, a letter on its inside, hinged on its foot: `fall_front` drops it 90° onto the desk towards the writer (0.8 s). Its back on the wall, the hutch on the desk's back, the chair in front | `writeLetter`, `writePoem` |
 | `roseArbourSwing` | the swing (seat, back, arms, cushions, chains), pivoting on the beam: `swing` rocks it 7° each way in 2 s (a loop) and the riders ride it (`ride`); a bloom on the front left post: `cut` shrinks it away (0.6 s) | `swing` (`loops`); `tendRoses` |
 
 The gramophone's "L the platter spins (E1)" is built: the platter is a second moving part, and the model still
@@ -38,11 +38,11 @@ the shell at x = ±0.5 where the heart narrows, as they do in the old part: the 
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.romantic.candlelitTable` | 1.70 × 1.12 × 0.74 m | 4,132 | 3 | Body, Fabric, Tablecloth |
+| `model.romantic.candlelitTable` | 1.80 × 1.12 × 0.78 m | 4,216 | 3 | Body, Fabric, Tablecloth |
 | `model.romantic.heartTub` | 1.87 × 0.78 × 1.82 m | 5,264 | 3 | Body, Fabric |
 | `model.romantic.vanity` | 0.80 × 1.64 × 0.82 m | 4,404 | 3 | Body, Fabric, Rose gold |
 | `model.romantic.gramophone` | 0.74 × 1.58 × 0.70 m | 2,720 | 3 | Body, Horn |
-| `model.romantic.letterBureau` | 0.84 × 1.18 × 0.74 m | 3,004 | 3 | Body, Fabric |
+| `model.romantic.letterBureau` | 0.84 × 1.18 × 0.91 m | 2,788 | 3 | Body, Fabric |
 | `model.romantic.roseArbourSwing` | 1.84 × 2.63 × 0.82 m | 7,036 | 3 | Body, Fabric |
 
 Body is the table's gold legs, the tub's shell, the vanity's and bureau's ivory, the gramophone's cabinet and the
