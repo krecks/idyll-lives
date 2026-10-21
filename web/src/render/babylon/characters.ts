@@ -155,9 +155,29 @@ const DEFAULT_SEAT: Seat = FURNITURE.defaultSeat;
  * How far back (m) a Sim stands from the middle of the tile in front while using an object whose
  * clip opens something across that tile: a dishwasher's door drops 0.44 m into it; a sofa bed's
  * mattress, pulled out or folded away, reaches half a metre past it. Negative: steps in to a thing
- * smaller than its tile (the herb planter, 0.46 m deep, is picked from as from a counter).
+ * smaller than its tile (the herb planter, 0.46 m deep, is picked from as from a counter), or to
+ * the part used: the toes at a basin or a sink's cabinet, the hands over the water; up to the toaster and
+ * the blender on a counter, the chemistry bench pushed back on its tile, the clock's trunk door, the
+ * giving jar. Back from the statue, to look up at it.
  */
-const STAND_BACK: Record<string, number> = { dishwasher: 0.15, dishwasherCompact: 0.15, sofaBed: 1, 'garden.herbs': -0.5 };
+const STAND_BACK: Record<string, number> = {
+  dishwasher: 0.15,
+  dishwasherCompact: 0.15,
+  sofaBed: 1,
+  'garden.herbs': -0.5,
+  sink: -0.35,
+  sinkPedestal: -0.5,
+  sinkConsole: -0.45,
+  sinkVessel: -0.45,
+  vanityDouble: -0.45,
+  farmhouseSink: -0.45,
+  counterSinkDouble: -0.45,
+  breakfastCounter: -0.3,
+  chemistrySet: -0.35,
+  grandfatherClock: -0.6,
+  'kind.givingJar': -0.4,
+  townStatue: 0.8,
+};
 /**
  * Things hugged (the giant teddy, sitting on the floor): the hugger crouches down to it this far (m) from
  * the middle of the tile in front and wraps the arms round it
@@ -172,13 +192,14 @@ const CROUCH_SHOULDER = 0.55;
  * Things used from inside or right up against them, while sim-core stands their users on the tile in front
  * (`stepIn`): they step up to the object (walking) and use it there, and step back out to the tile when
  * done (`stepOut`). `by`: by the user's height (m, the tallest first), the clip played there instead of
- * the action's, and where: the feet `to` m from the object's middle (along its facing), `up` m above the
- * ground (the clips in `street.ts` are fitted to the drinking fountain and the climbing frame for each
- * size), and at one of `lanes`, m to the object's right of its middle: the first no one else using it has
- * taken (sim-core stands everyone using it on the same tile in front, of a 2-wide thing the one with the
- * lower x or z: the climbing frame's net side or its pole's, by its facing). `wait`: seconds into the use
- * before stepping in (the phone box's door opening first; its clip `delay`s so that they stand `back` m
- * back from the tile's middle first, clear of the door), and `out` seconds after the use before stepping
+ * the action's (none: the action's own, up at the part used), and where: the feet `to` m from the object's
+ * middle (along its facing), `up` m above the ground (the clips in `street.ts` are fitted to the drinking
+ * fountain and the climbing frame for each size), and at one of `lanes`, m to the object's right of its
+ * middle: the first no one else using it has taken (sim-core stands everyone using it on the same tile in
+ * front, of a 2-wide thing the one with the lower x or z: the climbing frame's net side or its pole's, by
+ * its facing). `wait`: seconds into the use before stepping in (the phone box's door opening first; its
+ * clip `delay`s so that they stand `back` m back from the tile's middle first, clear of the door), and
+ * `out` seconds after the use before stepping
  * out (the door opening again, `out` in its motions). `perLane`: the clips are one per lane, not a sequence (each
  * lane's round goes its own way: the climbing frame's, round to its pole and back).
  */
@@ -196,6 +217,18 @@ const STEP_IN: Record<string, StepIn> = {
   phoneBooth: { by: [[0, ['phone'], { to: -0.04, up: 0.12 }]], wait: 1, back: 0.25, out: 0.25 },
   // Side by side on the net (0.9 m wide, from -0.75 m), each round over the deck and down the pole.
   climbingFrame: { by: CLIMB.map(({ clip, min, fit }) => [min, CLIMB_LANES.map((_, lane) => climbClip(clip, lane)), fit] as const), lanes: CLIMB_LANES, perLane: true },
+  // Up to the board on the wall (its face 0.42 m behind the middle), the hands at it.
+  whiteboard: { by: [[0, [], { to: 0.1 }]] },
+  // Into the shelter at the timetable's end, on the back glass past the bench.
+  busStop: { by: [[0, [], { to: 0.2 }]], lanes: [-0.95] },
+  // At the feeder's post, at its back left, clear of the bird bath.
+  'kind.songbirdFeeder': { by: [[0, [], { to: 0.25 }]], lanes: [-0.2] },
+  // At the microwave on the counter's right, the hands at its door.
+  microwave: { by: [[0, [], { to: 0.55 }]], lanes: [-0.2] },
+  // At the mic stand, singing into it.
+  'cheerful.karaokeMachine': { by: [[0, [], { to: 0.45 }]], lanes: [0.18] },
+  // Up on the stage, each at a mic stand.
+  'outgoing.karaokeStage': { by: [[0, [], { to: 0.36, up: 0.146 }]], lanes: [-0.36, 0.36] },
 };
 /** One clip played alone (`StepIn.perLane`), by name. */
 const LANE_SEQ = new Map<string, readonly string[]>();
@@ -455,12 +488,15 @@ interface ActionAnim {
   upper?: string;
   hands?: number;
 }
+/** Wall cupboards: things put away up in them (no squat to the floor). */
+const WALL_CUPBOARDS = new Set(['wallCabinet', 'wallCabinetGlass', 'wallCabinetCorner', 'chinaCabinet']);
 const ACTIONS: Record<string, ActionAnim> = {
   eat: { stand: ['eat', 'idle'], upper: 'eat', hands: HANDS.hold },
   // Sips from a cup, spaced out.
   drink: { stand: ['drink', 'idle', 'idle'], upper: 'drink', hands: HANDS.hold },
   cook: {
-    stand: ['spell', 'interact', 'spell', 'pickUp'],
+    // (At an appliance on a counter, the microwave, the toaster: at it, not down at the floor.)
+    stand: (def) => (def === 'microwave' || def === 'breakfastCounter' ? ['spell', 'interact'] : ['spell', 'interact', 'spell', 'pickUp']),
     sit: 'sitHands',
     hands: HANDS.hold,
   },
@@ -474,7 +510,8 @@ const ACTIONS: Record<string, ActionAnim> = {
   relax: { stand: ['idle', 'foldArms'], hands: HANDS.open },
   type: { stand: ['spell'], sit: 'sitHands', hands: HANDS.keys },
   write: { stand: ['interact', 'spell'], sit: (def) => (NEAR_DESKS.has(def) ? 'sitHandsNear' : 'sitHands'), hands: HANDS.hold },
-  read: { stand: ['lantern'], upper: 'lantern', hands: HANDS.hold },
+  // (A notice board or a timetable is read looking at it, not at a book in the hands.)
+  read: { stand: (def) => (def === 'noticeBoard' || def === 'busStop' ? ['idle'] : ['lantern']), upper: 'lantern', hands: HANDS.hold },
   watch: { stand: ['foldArms', 'idle'], hands: HANDS.open },
   play: { stand: ['spell'], sit: 'sitHands', hands: HANDS.keys },
   // Keys and drums on the desk-hands clip; a cello is held upright between the knees.
@@ -514,11 +551,14 @@ const ACTIONS: Record<string, ActionAnim> = {
   harvest: { stand: (def) => (def === 'garden.herbs' ? ['pick'] : ['harvest', 'plant']), hands: HANDS.hold },
   prune: { stand: ['interact', 'spell', 'interact'], hands: HANDS.grip },
   garden: {
-    stand: (def) => (def === 'plant' || def.includes('Terrarium') || def.includes('bonsai') ? ['water'] : ['harvest', 'plant']),
+    // (The bird feeder's box on its post: reached for standing at it.)
+    stand: (def) =>
+      def === 'plant' || def.includes('Terrarium') || def.includes('bonsai') ? ['water'] : def === 'kind.songbirdFeeder' ? ['interact', 'spell'] : ['harvest', 'plant'],
     hands: HANDS.hold,
   },
   tinker: {
-    stand: ['interact', 'spell', 'pickUp'],
+    // (The longcase clock wound at its trunk door, its weights' chains: no stoop to the floor.)
+    stand: (def) => (def === 'grandfatherClock' ? ['interact', 'spell'] : ['interact', 'spell', 'pickUp']),
     sit: 'sitHands',
     hands: HANDS.grip,
   },
@@ -532,12 +572,13 @@ const ACTIONS: Record<string, ActionAnim> = {
   phone: { stand: ['phone'], upper: 'phone', hands: HANDS.hold },
   listen: { stand: ['idle', 'foldArms'], hands: HANDS.open },
   meditate: { stand: ['idle'], hands: HANDS.open },
-  idle: { stand: ['idle'], hands: HANDS.relaxed },
+  // (A coin into the giving jar.)
+  idle: { stand: (def) => (def === 'kind.givingJar' ? ['interact', 'idle'] : ['idle']), hands: HANDS.relaxed },
   // A visitor at the front door: a knock, then waiting.
   knock: { stand: ['interact', 'idle'], hands: HANDS.relaxed },
   // Cooking, step by step (content `recipes`): ingredients from the fridge, chopping on the board,
   // stirring the pan, turning things on the grill, putting a dish down.
-  fetch: { stand: ['interact', 'pickUp', 'idle'], hands: HANDS.hold },
+  fetch: { stand: (def) => (WALL_CUPBOARDS.has(def) ? ['interact', 'idle'] : ['interact', 'pickUp', 'idle']), hands: HANDS.hold },
   chop: { stand: ['chop', 'interact', 'chop'], hands: HANDS.grip },
   stir: { stand: ['stir', 'interact', 'stir'], hands: HANDS.hold },
   flip: { stand: ['flip', 'interact', 'flip'], hands: HANDS.grip },
@@ -2695,9 +2736,10 @@ export class Characters {
       rig.useObj = obj ?? null;
       // Used from inside or up against it (`STEP_IN`): the clip for their height.
       const into = known && obj ? STEP_IN[obj.def] : undefined;
+      const fitted = into ? this.stepSeq(rig, into) : undefined;
       // (Bouncing and vibrating on the equipment, content `stand`: the idle with `activityPose` on top.)
-      const seq = into
-        ? this.stepSeq(rig, into)
+      const seq = fitted?.length
+        ? fitted
         : known
         ? obj && HUGGED[obj.def]
           ? CROUCH_ONLY
