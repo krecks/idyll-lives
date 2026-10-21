@@ -841,3 +841,73 @@ fn a_household_that_has_eaten_cooks_no_meal_nobody_needs() {
         }
     }
 }
+
+#[test]
+fn two_at_the_table_talk_over_the_meal_and_eat_up_after() {
+    // Ada and Ben sit down to dinner at the table; Ada feels lonely: a word across the table
+    // from their seats (nothing they'd get up for), the meal left a moment, then they eat up.
+    let content = CONTENT
+        .replace(r#""eatMinutes":20"#, r#""eatMinutes":60"#)
+        .replace(r#"{"id":"comfort","label":"Comfort","decayPerHour":0.02}],"#, r#"{"id":"comfort","label":"Comfort","decayPerHour":0.02},{"id":"social","label":"Social","decayPerHour":0.02}],
+        "socials":[{"id":"chat","label":"Chat","minutes":10,"tags":["social"],"acceptance":{"base":1.0},"needs":{"social":0.3}},
+                   {"id":"hug","label":"Hug","minutes":2,"distance":0.4,"tags":["social"],"acceptance":{"base":1.0},"needs":{"social":0.6}}],"#);
+    assert_ne!(content, CONTENT);
+    // (No fridge: dinner is on the table already, nobody cooks another.)
+    let kitchen = KITCHEN.replace(r#"{"def":"fridge","x":1,"z":1,"rot":0},"#, "");
+    let mut w = World::from_json(&content, &town(&kitchen, 2), 3).unwrap();
+    for s in &mut w.sims {
+        s.needs = [1.0; 8];
+        s.needs[0] = 0.3;
+    }
+    let social = w.content.needs.iter().position(|n| n.id == "social").unwrap();
+    w.relationships.get_mut(0, 1).friendship = 60.0;
+    w.relationships.get_mut(1, 0).friendship = 60.0;
+    w.relationships.get_mut(0, 1).met = true;
+    w.relationships.get_mut(1, 0).met = true;
+    let table = w.objects.iter().find(|o| w.content.objects[o.def].id == "table").unwrap().id;
+    let def = item_def(&w, "mealPot");
+    let radius = w.content.items[def].radius;
+    let occupied = w.items.occupancy(&w.content);
+    let centre = w.objects[table as usize].centre(&w.content);
+    let spot = sim_core::surface::free_surface_spot_near(&w.content, &w.objects, &[table], centre, 3.0, 0, radius, &occupied).unwrap();
+    let recipe = w.content.recipes.iter().position(|r| r.id == "meal");
+    w.items.add(sim_core::items::ItemInstance { id: 0, def, at: ItemAt::on(&spot), servings: 2, quality: 1.0, made_at: 0, household: 0, spoiled: false, recipe });
+    // (Sitting down to it of their own accord: the player's orders aren't interrupted.)
+    w.autonomy = true;
+    let eating = |w: &World, x: usize| w.sims[x].pose == sim_core::content::Pose::Sit && matches!(w.sims[x].current().map(|a| a.task.kind), Some(TaskKind::Eat { .. }));
+    let mut seated = false;
+    for _ in 0..(30.0 / sim_core::MINUTES_PER_TICK) as u32 {
+        w.tick_once();
+        if eating(&w, 0) && eating(&w, 1) {
+            seated = true;
+            break;
+        }
+    }
+    assert!(seated, "both sat down to eat: {:?} / {:?}", w.sims[0].current().map(|a| a.task.kind), w.sims[1].current().map(|a| a.task.kind));
+    w.sims[0].needs[social] = 0.25;
+    let seats = [w.sims[0].pos, w.sims[1].pos];
+    let mut talked = None;
+    for _ in 0..(45.0 / sim_core::MINUTES_PER_TICK) as u32 {
+        w.tick_once();
+        common::check(&w);
+        talked = (0..2).find_map(|x| w.sims[x].conversation(&w.content).filter(|t| t.0 as usize == 1 - x).map(|t| t.1));
+        if talked.is_some() {
+            break;
+        }
+    }
+    let social = talked.unwrap_or_else(|| panic!("nobody talked over the meal: {:?} / {:?} ({:?})", w.sims[0].current().map(|a| (a.task.kind, a.task.directed, &a.phase)), w.sims[1].current().map(|a| a.task.kind), w.sims[0].needs));
+    assert_eq!(w.content.socials[social].id, "chat", "nothing to get up from the meal for");
+    for _ in 0..(5.0 / sim_core::MINUTES_PER_TICK) as u32 {
+        w.tick_once();
+        for x in 0..2 {
+            assert_eq!(w.sims[x].pose, sim_core::content::Pose::Sit, "{} got up from the meal", w.sims[x].name);
+            let p = w.sims[x].pos;
+            assert!((p[0] - seats[x][0]).hypot(p[1] - seats[x][1]) < 0.05, "{} left the seat", w.sims[x].name);
+        }
+    }
+    // The talk over, they eat up.
+    ticks(&mut w, 60.0);
+    for s in &w.sims {
+        assert!(s.needs[0] > 0.8, "{} didn't finish the meal: {}", s.name, s.needs[0]);
+    }
+}

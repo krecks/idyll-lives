@@ -23,6 +23,12 @@ is cooked by teens and up, wherever it is started (a fridge, a stove, an oven, a
 and heat up leftovers. Coffee is for teens and up (I-systems-11): making one at the coffee machine (and the small
 espresso machine on a top, the foodie espresso bar) and every *Have a coffee* at a table or chair.
 
+**Over a meal** (I-social-07, 2026-10-22): residents eating sitting down (at the table, on the sofa) talk to each
+other from their seats now and then, and can be talked to there, as on the sofa: the meal waits on the table while
+they talk and goes on after. Nothing they'd get up for (a hug) is chosen with someone eating. A household that has
+eaten no longer cooks a meal of its own accord (I-systems-12): a meal nobody at home would eat tempts a tenth as much,
+for when there's nothing else to do, and a cook on the way to the fridge still hears their name.
+
 ## Kitchen sinks (2)
 
 - **Family:** `tools/art/blender/families/kitchen.py`

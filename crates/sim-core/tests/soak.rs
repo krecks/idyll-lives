@@ -554,18 +554,23 @@ const CHANCE_HOURS: u32 = 5 * 24;
 
 /// Whether partners somewhere could have a baby now (as `could_conceive` in world.rs): two
 /// grown-ups no older than content `pregnancy.maxAge`, in one household with none on the way
-/// and room for one more, in a town that isn't full (`MAX_SIMS`).
+/// and room for one more, in a town that isn't full (`MAX_SIMS`), close enough for a social that
+/// can make one (`tryForBaby`'s `requires`: romance 50 and up).
 fn room_for_a_baby(w: &World) -> bool {
     let Some(rules) = w.content.life.pregnancy else { return false };
     if w.sims.iter().filter(|s| s.here()).count() >= sim_core::world::MAX_SIMS {
         return false;
     }
     let fits = |s: &sim_core::world::Sim| s.here() && s.adult(&w.content) && s.age <= rules.max_age;
+    let close = |a: usize, b: usize| {
+        let rel = w.relationships.get(a, b);
+        rel.partners && w.content.socials.iter().any(|s| s.success.effect == sim_core::social::Effect::Conceive && s.requires.allows(rel))
+    };
     w.sims.iter().enumerate().filter(|(_, s)| fits(s)).any(|(a, s)| {
         let members = w.sims.iter().filter(|o| o.here() && o.household == s.household).count();
         w.households[s.household as usize].expecting.is_none()
             && members < w.content.rules.max_household
-            && w.sims.iter().enumerate().any(|(b, o)| b != a && fits(o) && o.household == s.household && w.relationships.get(a, b).partners)
+            && w.sims.iter().enumerate().any(|(b, o)| b != a && fits(o) && o.household == s.household && close(a, b))
     })
 }
 

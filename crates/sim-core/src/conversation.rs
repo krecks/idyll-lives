@@ -541,10 +541,10 @@ pub(crate) fn update(w: &mut World) {
 }
 
 /// Whether `sim`, talked to with `s`, stays in their seat: sitting at something they carry on
-/// with afterwards (the sofa, a coffee at the table; or talking from it themselves), for a
-/// social they needn't get up for.
+/// with afterwards (the sofa, a coffee at the table, a meal; or talking from it themselves), for
+/// a social they needn't get up for.
 fn keeps_seat(sim: &Sim, s: &SocialDef) -> bool {
-    let sitting = sim.paused.is_some() || sim.current.as_ref().is_some_and(|a| matches!((a.task.kind, &a.phase), (TaskKind::Use { .. }, Phase::Using { .. })));
+    let sitting = sim.paused.is_some() || sim.current.as_ref().is_some_and(|a| matches!((a.task.kind, &a.phase), (TaskKind::Use { .. } | TaskKind::Eat { .. }, Phase::Using { .. })));
     sim.pose == Pose::Sit && sitting && s.distance >= SEATED_DISTANCE
 }
 

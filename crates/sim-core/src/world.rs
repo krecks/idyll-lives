@@ -912,6 +912,11 @@ impl Sim {
         self.current.as_ref()
     }
 
+    /// Eating sitting down (at the table, on the sofa), not talking.
+    pub(crate) fn eating_seated(&self) -> bool {
+        self.pose == Pose::Sit && self.current.as_ref().is_some_and(|a| matches!((a.task.kind, &a.phase), (TaskKind::Eat { .. }, Phase::Using { .. })))
+    }
+
     /// Sitting, what they sat down to do while they talk from the seat (`paused`).
     pub fn paused(&self) -> Option<&Activity> {
         self.paused.as_ref()
@@ -1046,6 +1051,8 @@ impl Sim {
             // to the first station (nothing bought yet, nothing in hand) does.
             (TaskKind::Work | TaskKind::Visit { .. } | TaskKind::GoHome | TaskKind::Answer { .. }, _) => false,
             (TaskKind::Cook { step: 0, servings: 0, .. }, Phase::Routing { .. }) if self.held.is_none() => true,
+            // Eating sitting down: a word over the meal, from their seat (`conversation::keeps_seat`).
+            (TaskKind::Eat { .. }, Phase::Using { .. }) if self.pose == Pose::Sit => true,
             (TaskKind::Cook { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. }, _) => false,
             (TaskKind::Social { .. } | TaskKind::Join { .. }, Phase::Conversing { .. }) => false,
             // A guest on their way to say goodbye (`visits.farewell`) is leaving.
@@ -1284,6 +1291,9 @@ pub(crate) struct SimBrief {
     pub cleaning: Option<(i32, i32)>,
     /// Sitting down (on a sofa, at a table): someone sitting near can talk to them from their seat.
     pub seated: bool,
+    /// Eating sitting down: talked to only from close by in their seat (not a hug), the meal
+    /// left a moment (`conversation::keeps_seat`).
+    pub eating: bool,
 }
 
 pub struct World {
@@ -2737,6 +2747,7 @@ impl World {
                 conversing: None,
                 cleaning: s.current().and_then(|a| if let TaskKind::Clean { x, z } = a.task.kind { Some((x, z)) } else { None }),
                 seated: s.pose == Pose::Sit && !s.is_moving(),
+                eating: s.eating_seated(),
             });
         }
         // Who's in a conversation, and whose (for joining in).
@@ -3872,7 +3883,7 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
     let free_will = ctx.autonomy && ctx.households[sim.household as usize].free_will;
     if free_will
         && sim.pose == Pose::Sit
-        && sim.current.as_ref().is_some_and(|a| matches!((a.task.kind, &a.phase), (TaskKind::Use { .. }, Phase::Using { .. })))
+        && sim.current.as_ref().is_some_and(|a| matches!((a.task.kind, &a.phase), (TaskKind::Use { .. } | TaskKind::Eat { .. }, Phase::Using { .. })))
         && sim.available_for_social(content)
     {
         sim.idle_ticks = sim.idle_ticks.saturating_add(sim.steps);
@@ -4412,8 +4423,9 @@ fn pick_autonomous(
         };
         let (my_stage, their_stage) = (content.life.stage(sim.age), content.life.stage(other.age));
         for (k, s) in content.socials.iter().enumerate() {
-            // (Nor with someone their age isn't for: no fights with a child.)
-            if !s.autonomous || !s.requires.allows(rel) || !stage_in(s.stages, my_stage) || !stage_in(s.target_stages, their_stage) {
+            // (Nor with someone their age isn't for: no fights with a child; nor anything they'd
+            // have to get up from their meal for.)
+            if !s.autonomous || !s.requires.allows(rel) || !stage_in(s.stages, my_stage) || !stage_in(s.target_stages, their_stage) || (other.eating && s.distance < conversation::SEATED_DISTANCE) {
                 continue;
             }
             // Romance only between grown-ups who aren't family.
