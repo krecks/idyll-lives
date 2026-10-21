@@ -19,10 +19,12 @@
           "finish": "material.finish.fabric"
         },
         "flame": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#FFB050"
         },
         "flame_core": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#FFD27A"
         },
         "glassy": {
           "finish": "material.finish.gloss"
@@ -93,7 +95,8 @@
           "finish": "material.finish.fabric"
         },
         "flame_core": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#FFD27A"
         },
         "ivory": {
           "finish": "material.finish.satin"
@@ -272,7 +275,8 @@
           "finish": "material.finish.fabric"
         },
         "flame_core": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#FFD27A"
         },
         "gold": {
           "finish": "material.finish.metal"

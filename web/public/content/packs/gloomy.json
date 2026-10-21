@@ -157,6 +157,7 @@
       "category": "decor",
       "freeRotation": true,
       "slots": 1,
+      "light": { "range": 2.5, "intensity": 0.4, "height": 1.3, "at": [0, -0.05], "tiles": 3 },
       "description": "A glass column of endless indoor rain; watching it is oddly soothing and a little fun.",
       "interactions": [
         {

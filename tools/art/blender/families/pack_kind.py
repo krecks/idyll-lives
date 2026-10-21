@@ -181,7 +181,13 @@ def neighbourlyOven():
                   at=F.at(cxm - 0.42, top, -0.3), material=M.porcelain, segments=18)
         G.revolve('cake', [(0, 0), (0.09, 0), (0.09, 0.08), (0.075, 0.095), (0, 0.095)],
                   at=F.at(cxm - 0.42, top + 0.085, -0.3), material=M.icing, segments=18)
-        # the wall shelf with three jars
+        # a beadboard back rising from the worktop's back (a dresser's), carrying the shelf with three jars: it stands
+        # free or on the wall (2026-10-21: the shelf hung on the air over a free-standing counter)
+        F.box('backboard', cw, 1.62 - top, 0.018, (cxm, (top + 1.62) / 2, WALL + 0.009), M.cabinet, bevel=0.004)
+        for i in range(1, 8):
+            F.box(_name('bead'), 0.006, 1.62 - top - 0.04, 0.004, (cx0 + i * cw / 8, (top + 1.62) / 2, WALL + 0.02),
+                  M.cabinet_panel)
+        F.box('backboard_cap', cw + 0.02, 0.025, 0.04, (cxm, 1.6325, WALL + 0.02), M.butcher, bevel=0.006)
         F.box('shelf', cw, 0.03, 0.2, (cxm, 1.5, WALL + 0.1), M.butcher, bevel=0.006)
         for x in (cx0 + 0.06, cx1 - 0.06):
             F.box(_name('bracket'), 0.03, 0.12, 0.16, (x, 1.44, WALL + 0.08), M.brass, bevel=0.005)
@@ -512,10 +518,10 @@ def hearthSettee():
 
 FAMILY = G.Family(
     'pack_kind', M,
-    [G.Model('neighbourlyOven', neighbourlyOven, size=(1.827, 1.718, 0.634), key='model.kind.neighbourlyOven',
+    [G.Model('neighbourlyOven', neighbourlyOven, size=(1.832, 1.718, 0.634), key='model.kind.neighbourlyOven',
              # the door drops while the dish goes in, then shuts for the bake (`hold`). Keyed by the bake step's
              # tag, not the uses: the recipes' mixing is done at its worktop too, where the oven stays shut.
-             centre=(-0.002, -0.113), motions={'uses': {'bake': 'oven_open'}, 'hold': 3.0},
+             centre=(-0.004, -0.113), motions={'uses': {'bake': 'oven_open'}, 'hold': 3.0},
              paint=[('enamel', 'Body'), ('towel', 'Fabric'), ('cabinet', 'Cupboards')]),
      G.Model('givingJar', givingJar, size=(0.641, 1.32, 0.655), key='model.kind.givingJar', centre=(0.101, 0.057),
              motions={'uses': {'donate': 'coin'}},

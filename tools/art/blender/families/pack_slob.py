@@ -32,9 +32,9 @@ M = G.Palette(
     laundry_red=('#E8473B', 'fabric'),
     cabinet=('#4660C2', 'satin'),    # the arcade cabinet's body
     side=('#6A4BB5', 'gloss'),
-    marquee=('#F2D14E', 'gloss'),
+    marquee=('#F2D14E', 'gloss', {'glow': '#FFE08A'}),   # the lit marquee: it glows at night
     screen=('#1B2240', 'gloss'),
-    screen_lit=('#3BA3E0', 'gloss'),
+    screen_lit=('#3BA3E0', 'gloss', {'glow': '#5CB8F0', 'screen': True}),   # lit while it's played
     seat=('#5A6680', 'satin'),       # the recliner's leatherette
     stripe=('#E8473B', 'satin'),
     cyan=('#3FD0E0', 'gloss'),       # LED trim
@@ -227,6 +227,7 @@ def snackNightstand():
 
 # --- the spritz & go station (1x1): a narrow shelf unit with a round mirror and an arsenal of sprays ----------
 SPRAY = (0.13, 0.935, -0.28)   # the spray bottle's foot (x, height, depth)
+BOARD_TOP = 1.62                # the back board's top, over the mirror
 
 
 def spritzStation():
@@ -236,9 +237,11 @@ def spritzStation():
         F.box('lower_shelf', 0.56, 0.03, 0.24, (0, 0.42, WALL + 0.13), M.gloss_white, bevel=0.008)
         for x in (-0.28, 0.28):
             F.box(_name('side'), 0.04, 0.92, 0.24, (x, 0.46, WALL + 0.13), M.shelf, bevel=0.01)
-        F.cyl('mirror_frame', 0.23, 0.03, (0, 1.35, WALL + 0.015), M.shelf, rot=(90, 0, 0), verts=32)
-        F.cyl('mirror', 0.2, 0.01, (0, 1.35, WALL + 0.032), M.mirror, rot=(90, 0, 0), verts=32)
-        F.box('mirror_post', 0.04, 0.28, 0.03, (0, 1.06, WALL + 0.015), M.shelf, bevel=0.008)
+        # a back board rising from the top carries the round mirror, standing free or on the wall (2026-10-21: the
+        # mirror hung on the air over a free-standing station)
+        F.box('backboard', 0.6, BOARD_TOP - 0.935, 0.018, (0, (0.935 + BOARD_TOP) / 2, WALL + 0.009), M.shelf, bevel=0.008)
+        F.cyl('mirror_frame', 0.23, 0.02, (0, 1.35, WALL + 0.028), M.shelf, rot=(90, 0, 0), verts=32)
+        F.cyl('mirror', 0.2, 0.01, (0, 1.35, WALL + 0.04), M.mirror, rot=(90, 0, 0), verts=32)
         for i, (m, hh) in enumerate((('pop_blue', 0.22), ('pop_red', 0.18), ('pop_yellow', 0.24), ('pop_green', 0.2))):
             x = -0.24 + i * 0.09
             F.cyl(_name('can'), 0.03, hh, (x, 0.935 + hh / 2, -0.3), _m(m), verts=12)
@@ -246,7 +249,11 @@ def spritzStation():
         for i, m in enumerate(('pop_purple', 'pop_blue', 'pop_red')):
             F.cyl(_name('bottle'), 0.035, 0.16, (-0.18 + i * 0.12, 0.515, -0.3), _m(m), verts=12)
         F.box('towels', 0.24, 0.04, 0.2, (0.16, 0.455, -0.3), M.towel, bevel=0.015)
-        F.box('towel_hung', 0.36, 0.5, 0.03, (0.24, 0.74, -0.15), M.towel_green, rot=(0, -8, 0), bevel=0.012)
+        # the towel over a bar under the top's front edge (it hung on nothing at the side)
+        G.rod('towel_bar', F.at(-0.02, 0.87, -0.155), F.at(0.26, 0.87, -0.155), 0.008, material=M.chrome, verts=8)
+        for x in (-0.02, 0.26):
+            F.box(_name('bar_post'), 0.015, 0.04, 0.02, (x, 0.885, -0.162), M.chrome)
+        F.box('towel_hung', 0.26, 0.42, 0.024, (0.12, 0.66, -0.148), M.towel_green, bevel=0.01)
         G.boulder('laundry', 0.2, at=F.at(-0.14, 0, 0.14), material=M.laundry, scale=(1.05, 0.85, 0.5), seed=1.0,
                   noise=0.3, subdivisions=2)
         G.boulder('laundry_red', 0.13, at=F.at(0.08, 0, 0.24), material=M.laundry_red, scale=(1.0, 0.85, 0.55), seed=2.0,
@@ -380,8 +387,8 @@ FAMILY = G.Family(
      G.Model('snackNightstand', snackNightstand, size=(0.897, 0.45, 0.728), key='model.slob.snackNightstand',
              centre=(0.021, 0.031), motions={'uses': {'midnightSnack': 'drawer_open'}},
              paint=[('stand', 'Body'), ('pad', 'Top')]),
-     G.Model('spritzStation', spritzStation, size=(0.765, 1.58, 0.798), key='model.slob.spritzStation',
-             centre=(0.069, -0.031), motions={'uses': {'spritz': 'spritz'}},
+     G.Model('spritzStation', spritzStation, size=(0.692, 1.62, 0.798), key='model.slob.spritzStation',
+             centre=(0.0325, -0.031), motions={'uses': {'spritz': 'spritz'}},
              paint=[('shelf', 'Body')]),
      G.Model('arcadeCabinet', arcadeCabinet, size=(0.765, 1.88, 0.784), key='model.slob.arcadeCabinet',
              centre=(0.031, -0.039), motions={'loops': {'chaseHighScore': 'joystick', 'quickRound': 'joystick'}},

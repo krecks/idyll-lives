@@ -86,8 +86,8 @@ M = G.Palette(
     # the lava lamp
     pouf=('#5A4A7A', 'satin'),            # the pouf; its main part (plain: the lamp's glass takes the extra draw)
     lamp_metal=('#4E7A7F', 'metal'),
-    vessel=('#E96A9A', 'glass'),
-    wax=('#F2914A', 'gloss'),
+    vessel=('#E96A9A', 'glass', {'glow': '#FF6FA8'}),   # the lit glass: it and the wax glow at night (the lamp's `light`)
+    wax=('#F2914A', 'gloss', {'glow': '#FFA060'}),
     table_white=('#E8E8E6', 'satin'),
     rug=('#E9B54A', 'satin'),
 )
@@ -411,7 +411,11 @@ def fitnessGame():
 
 
 # --- the lava glow lamp (1x1): a floor pouf to zone out on, a side table with a big lava lamp --------------------
-LAMP = (0.3, -0.32)      # the side table's middle (x, depth)
+# The pouf is turned to face the lamp at its front right: the sitter faces it (content `places`, facing TURN°),
+# coming from the tile to its left. 2026-10-21: the lamp stood behind the sitter's shoulder (I-packs-11).
+LAMP = (0.32, 0.25)      # the side table's middle (x, depth)
+POUF = (-0.04, -0.03)    # the pouf's middle (x, depth): the sitter's place
+TURN = 50                # the way the pouf and its sitter face, degrees from the front towards the right
 VESSEL = (0.65, 0.42)    # the glass's foot height and height
 
 
@@ -427,10 +431,12 @@ def lavaLamp():
     tx, tz = LAMP
     y0, h = VESSEL
     with G.new_parts() as still:
-        _cushion(F, 'pouf', 0.62, 0.36, 0.6, (0, 0.18, -0.02), M.pouf, r=0.15)
-        _cushion(F, 'pouf_top', 0.54, 0.1, 0.52, (0, 0.4, -0.02), M.pouf, r=0.05)
-        _cushion(F, 'lean', 0.5, 0.36, 0.14, (0, 0.6, -0.3), M.pouf, rot=(-12, 0, 0), r=0.06)
-        F.cyl('rug', 0.2, 0.012, (-0.22, 0.006, 0.24), M.rug, verts=28)
+        px, pz = POUF
+        fx, fz = G.sind(TURN), G.cosd(TURN)                     # the way it faces (game x, depth)
+        _cushion(F, 'pouf', 0.62, 0.36, 0.6, (px, 0.18, pz), M.pouf, rot=(0, 0, -TURN), r=0.15)
+        _cushion(F, 'pouf_top', 0.54, 0.1, 0.52, (px, 0.4, pz), M.pouf, rot=(0, 0, -TURN), r=0.05)
+        _cushion(F, 'lean', 0.5, 0.36, 0.14, (px - 0.26 * fx, 0.6, pz - 0.26 * fz), M.pouf, rot=(-12, 0, -TURN), r=0.06)
+        F.cyl('rug', 0.2, 0.012, (-0.22, 0.006, 0.27), M.rug, verts=28)
         # the side table and the lamp: a metal foot, the glass, a cap; a pool of wax at the bottom
         F.cyl('table_top', 0.13, 0.03, (tx, 0.5, tz), M.oak, verts=24, bevel=0.006)
         F.cyl('table_stem', 0.02, 0.48, (tx, 0.25, tz), M.table_white, verts=10)
@@ -454,7 +460,7 @@ def lavaLamp():
             F.sphere(_name('drift'), r, (tx + 0.022 * G.cosd(a), y, tz + 0.022 * G.sind(a)), M.wax, scale=(1, 1, 1.3),
                      segments=10, rings=6)
     drift = G.hinged(G.join(drift, 'drift'), F.at(tx, y0, tz))
-    objs = G.settle()      # on its Model centre: the back on the wall face
+    objs = G.settle(centre=False)   # built in place: the sitter's place is content `places`
     G.slide(rise, 'blobs', (0, 0, 0.14), seconds=2.5)
     G.spin(drift, 'drift', 1, seconds=8.0)
     return objs
@@ -477,8 +483,8 @@ FAMILY = G.Family(
      G.Model('fitnessGame', fitnessGame, size=(0.865, 1.155, 0.88), key='model.couchPotato.fitnessGame',
              centre=(0.032, 0.01), motions={'uses': {'workout': 'board'}},
              paint=[('fit_stand', 'Body'), ('fit_mat', 'Mat'), ('board', 'Board')]),
-     G.Model('lavaLamp', lavaLamp, size=(0.85, 1.15, 0.89), key='model.couchPotato.lavaLamp',
-             centre=(0.005, 0.015), motions={'uses': {'zoneOut': 'blobs'}, 'idle': 'drift'},
+     G.Model('lavaLamp', lavaLamp, size=(0.896, 1.15, 0.894), key='model.couchPotato.lavaLamp',
+             centre=(0.0019, 0.0232), motions={'uses': {'zoneOut': 'blobs'}, 'idle': 'drift'},
              paint=[('lamp_metal', 'Body'), ('pouf', 'Upholstery'), ('vessel', 'Glass')])],
     comment='Blender-built couch potato pack models (tools/art/blender/families/pack_couchPotato.py). '
             'Listed in the base manifest\'s packs. The materials map onto the game\'s finishes so a model '

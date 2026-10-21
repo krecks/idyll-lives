@@ -90,11 +90,12 @@ M = G.Palette(
     door_oak=('#CDB08A', 'satin'),
     # the chef's island
     cabinet=('#5F9095', 'satin'),    # the island's cabinets; its main part
-    oak=('#CDB08A', 'wood'),         # the stools
-    oak_dark=('#B08E66', 'wood'),
+    oak=('#CDB08A', 'satin'),        # the stools, plain (the hob's hot ring takes the third draw)
+    oak_dark=('#B08E66', 'satin'),
     seat=('#C9A46E', 'satin'),
     hob=('#22262B', 'gloss'),
     ring=('#C9483B', 'gloss'),
+    heat=('#D2402A', 'gloss'),       # the hob's ring glowing hot under the pan while it cooks
     carrot=('#E2832E', 'satin'),
     plate=('#F6F3EA', 'gloss'),
 )
@@ -574,20 +575,25 @@ def pizzaOven():
 TOP = 0.9   # the content's top (`surface.height`)
 
 
+STOOL = 0.65         # the counter stools' seat top: 25 cm under the top (counter stools are 0.58-0.71 for it)
+STOOL_Z = -0.235     # their middles' depth, the knees under the top's back overhang (`furniture.json`)
+
+
 def _stool(F, x, z):
-    """A stool with its seat at 0.45 and a low back, centred on (x, z), facing the front."""
-    F.cyl(_name('stool_seat'), 0.18, 0.03, (x, 0.405, z), M.oak, verts=20, bevel=0.008)
-    F.cyl(_name('stool_cushion'), 0.165, 0.03, (x, 0.435, z), M.seat, verts=20, bevel=0.012)
+    """A counter stool with its seat at STOOL, a foot ring and a low back, centred on (x, z), facing the front."""
+    y = STOOL - 0.045                                             # the wooden seat's middle
+    F.cyl(_name('stool_seat'), 0.18, 0.03, (x, y, z), M.oak, verts=20, bevel=0.008)
+    F.cyl(_name('stool_cushion'), 0.165, 0.03, (x, STOOL - 0.015, z), M.seat, verts=20, bevel=0.012)
     for k in range(4):
         a = 45 + 90 * k
-        G.rod(_name('stool_leg'), F.at(x + 0.17 * G.cosd(a), 0.0, z + 0.17 * G.sind(a)),
-              F.at(x + 0.12 * G.cosd(a), 0.39, z + 0.12 * G.sind(a)), 0.016, material=M.oak_dark, verts=8)
-    G.torus(_name('stool_ring'), 0.155, 0.008, at=F.at(x, 0.16, z), material=M.oak_dark, major_segments=20,
+        G.rod(_name('stool_leg'), F.at(x + 0.19 * G.cosd(a), 0.0, z + 0.19 * G.sind(a)),
+              F.at(x + 0.12 * G.cosd(a), y - 0.015, z + 0.12 * G.sind(a)), 0.016, material=M.oak_dark, verts=8)
+    G.torus(_name('stool_ring'), 0.165, 0.009, at=F.at(x, 0.3, z), material=M.oak_dark, major_segments=20,
             minor_segments=4)
     for dx in (-0.12, 0.12):
-        G.rod(_name('stool_back_post'), F.at(x + dx, 0.42, z - 0.13), F.at(x + dx, 0.6, z - 0.17), 0.012,
-              material=M.oak_dark, verts=6)
-    F.box(_name('stool_back'), 0.32, 0.1, 0.025, (x, 0.64, z - 0.175), M.oak, rot=(-10, 0, 0), bevel=0.01)
+        G.rod(_name('stool_back_post'), F.at(x + dx, STOOL - 0.03, z - 0.13), F.at(x + dx, STOOL + 0.17, z - 0.17),
+              0.012, material=M.oak_dark, verts=6)
+    F.box(_name('stool_back'), 0.32, 0.1, 0.025, (x, STOOL + 0.21, z - 0.175), M.oak, rot=(-10, 0, 0), bevel=0.01)
 
 
 def chefsIsland():
@@ -610,7 +616,7 @@ def chefsIsland():
             F.box(_name('side_drawer'), 0.42, 0.13, 0.014, (x, 0.8, zf + 0.007), M.cabinet, bevel=0.005)
             F.box(_name('side_pull'), 0.12, 0.012, 0.016, (x, 0.8, zf + 0.022), M.brass, bevel=0.005)
         # the sitters' side: their knee space under the top, a brass foot rail
-        G.rod('foot_rail', F.at(-0.67, 0.18, 0.08), F.at(0.67, 0.18, 0.08), 0.012, material=M.brass, verts=10)
+        G.rod('foot_rail', F.at(-0.67, 0.25, 0.06), F.at(0.67, 0.25, 0.06), 0.012, material=M.brass, verts=10)
         # on the top: the hob with a copper pan and a stock pot, a board of vegetables, two tasting plates
         F.box('hob', 0.5, 0.008, 0.28, (0, TOP + 0.004, 0.27), M.hob, bevel=0.003)
         for dx in (-0.12, 0.12):
@@ -635,8 +641,8 @@ def chefsIsland():
             F.sphere(_name('bite'), 0.025, (x + 0.03, TOP + 0.02, 0.1), M.cheese_light, scale=(1, 1, 0.6), segments=8,
                      rings=5)
         F.box('menu', 0.14, 0.18, 0.006, (0.0, TOP + 0.08, 0.06), M.chalk, rot=(-12, 0, 0), bevel=0.002)
-        _stool(F, -0.5, -0.12)
-        _stool(F, 0.5, -0.12)
+        _stool(F, -0.5, STOOL_Z)
+        _stool(F, 0.5, STOOL_Z)
     G.join(still, 'body', origin=(0, 0, 0))
     # The middle drawer on the cook's side: `drawer_open` pulls it out 12 cm.
     with G.new_parts() as drawer:
@@ -648,8 +654,15 @@ def chefsIsland():
         for k, x in enumerate((-0.12, -0.05, 0.03, 0.1)):
             F.box(_name('utensil'), 0.02, 0.008, 0.11, (x, 0.755, zf - 0.06), (M.chrome, M.oak_top)[k % 2])
     drawer = G.join(drawer, 'drawer')
+    # The ring under the copper pan glowing hot, scaled to nothing at rest: `burner_on` grows it while it cooks.
+    with G.new_parts() as heat:
+        F.cyl('hot_ring', 0.13, 0.003, (-0.12, TOP + 0.0085, 0.27), M.heat, verts=24)
+    heat = G.join(heat, 'hot_ring', origin=F.at(-0.12, TOP + 0.0085, 0.27))
+    heat.scale = (0.001, 0.001, 0.001)
     objs = G.settle(centre=False)
     G.slide(drawer, 'drawer_open', (0, -0.12, 0), seconds=0.6)
+    for axis in 'XYZ':
+        G.grow(heat, 'burner_on', seconds=0.5, axis=axis)
     return objs
 
 
@@ -671,9 +684,10 @@ FAMILY = G.Family(
              # a bake (the pizza, or any `bake` step of a recipe at it) takes the door off and lights the fire
              motions={'uses': {'bakePizza': ['door_off', 'flames'], 'bake': ['door_off', 'flames'], 'warmUp': 'flames'}},
              paint=[('plaster', 'Body'), ('worktop', 'Worktop'), ('brick', 'Brick')]),
-     G.Model('chefsIsland', chefsIsland, size=(1.86, 1.128, 0.774), key='model.foodie.chefsIsland', centre=(0, 0.073),
-             # the drawer for the knives as the menu is prepped on its worktop (`chop`); nothing lights on its hob yet
-             motions={'uses': {'chop': 'drawer_open'}, 'hold': 2.5},
+     G.Model('chefsIsland', chefsIsland, size=(1.86, 1.128, 0.889), key='model.foodie.chefsIsland', centre=(0, 0.0154),
+             # the drawer opens for the prep step's utensils (chop), the ring under the pan glows while it cooks (stir):
+             # keyed by the recipe's step tags, so each step at it plays its own (A-systems-03)
+             motions={'uses': {'chop': {'clip': 'drawer_open', 'hold': 2.5}, 'stir': 'burner_on'}},
              paint=[('cabinet', 'Body'), ('marble', 'Worktop'), ('oak', 'Stools')])],
     comment='Blender-built foodie pack models (tools/art/blender/families/pack_foodie.py). Listed in the '
             'base manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw '

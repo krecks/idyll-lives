@@ -338,7 +338,7 @@ def bonsaiBench():
 
 
 # --- the cedar sauna for one (1x2): seated in the middle on the bench, a glass door at the front ----------------
-FRONT = 0.42    # the door's depth
+FRONT = 0.7     # the door's depth: the seated bather's feet inside it (2026-10-21: 0.42, the shoes at and past the glass: I-packs-17)
 
 
 def soloSauna():
@@ -348,7 +348,7 @@ def soloSauna():
     with G.new_parts() as still:
         F.box('floor', 0.9, 0.06, d, (0, 0.03, zc), M.cedar, bevel=0.01)
         F.box('back_wall', 0.86, 1.96, 0.05, (0, 1.04, zb + 0.025), M.cedar, bevel=0.01)
-        F.box('roof', 0.94, 0.07, d + 0.06, (0, 2.05, zc + 0.02), M.cedar, bevel=0.015)
+        F.box('roof', 0.94, 0.07, d + 0.05, (0, 2.05, zc + 0.025), M.cedar, bevel=0.015)   # its back on the wall face
         F.box('roof_fascia', 0.94, 0.05, 0.02, (0, 2.0, zf + 0.04), M.cedar_dark)
         for s in (-1, 1):
             x = s * 0.425
@@ -470,9 +470,10 @@ FAMILY = G.Family(
              centre=(0, -0.055),
              motions={'uses': {'shape': 'trim'}, 'loops': {'tend': 'mist'}},
              paint=[('body', 'Body'), ('teak', 'Wood'), ('glaze', 'Pot')]),
-     G.Model('soloSauna', soloSauna, size=(0.94, 2.085, 1.435), key='model.loner.soloSauna',
-             centre=(0, -0.222),
-             motions={'uses': {'sweat': {'clip': 'door_open', 'hold': 1.5}}},
+     G.Model('soloSauna', soloSauna, size=(0.94, 2.085, 1.705), key='model.loner.soloSauna',
+             centre=(0, -0.0775),
+             # the door lets the bather in, shuts behind them and opens again to let them out
+             motions={'uses': {'sweat': {'clip': 'door_open', 'hold': 1.5, 'out': 1.5}}},
              paint=[('cedar', 'Wood'), ('cedar_dark', 'Trim')]),
      G.Model('deliveryHatch', deliveryHatch, size=(0.84, 1.95, 0.84), key='model.loner.deliveryHatch',
              centre=(0, -0.01),

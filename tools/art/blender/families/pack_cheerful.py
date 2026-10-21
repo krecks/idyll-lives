@@ -23,8 +23,8 @@ import gamekit as G  # noqa: E402
 M = G.Palette(
     # the jukebox
     cherry=('#D7263D', 'gloss'),       # the cabinet; its main part
-    amber=('#F6A609', 'gloss'),        # the arch band and the bubble tubes
-    sunny=('#FFE29A', 'gloss'),        # the inner arch band
+    amber=('#F6A609', 'gloss', {'glow': '#FFB733'}),   # the arch band and the bubble tubes: lit at night
+    sunny=('#FFE29A', 'gloss', {'glow': '#FFE7A8'}),   # the inner arch band, lit
     window=('#5B3A8C', 'gloss'),       # the record window's back
     grille=('#E9D8B0', 'fabric'),      # the speaker cloth
     cards=('#FFF2C8', 'gloss'),        # the song cards
@@ -41,7 +41,7 @@ M = G.Palette(
     cone=('#3B2F4E', 'satin'),
     steel=('#C9CCD0', 'metal'),
     dark=('#2B2433', 'satin'),         # the screen's case, the mic, the tablet
-    lyrics=('#3B2A6B', 'gloss'),
+    lyrics=('#3B2A6B', 'gloss', {'glow': '#8E7BFF', 'screen': True}),   # the lyrics screen: lit while it's sung to
     white=('#F4F4F2', 'gloss'),
     stand=('#3A3D41', 'satin'),        # stands and poles
     lens=('#FFF4B0', 'gloss'),
@@ -420,9 +420,13 @@ def mocktailCart():
     return objs
 
 
-# --- the rainbow hammock (2x1): a striped sling between spreader bars, on a wooden stand -----------------------
-SLING_END, SLING_LOW, SLING_W = 0.86, 0.49, 0.62     # the sling's ends' and middle's heights, its width
-HOOK = 1.0                                           # the hooks' height: the sway's pivot
+# --- the rainbow hammock (3x1): a striped sling 2 m long between spreader bars, on a wooden stand (2026-10-21: 2x1,
+# its sling 1.5 m, grown-ups lying in it with the knees up: M-packs-06, Q-07) ---------------------------------------
+SLING_END, SLING_LOW, SLING_W = 0.9, 0.5, 0.62       # the sling's ends' and middle's heights, its width
+SLING_X = 1.0                                        # its ends' x, at the spreader bars
+HOOK = 1.08                                          # the hooks' height: the sway's pivot
+POST_X = 1.38                                        # the posts' tops' x, the hooks on them
+PILLOW = 0.75                                        # the pillow's x (towards the left end): `furniture.json` `head`
 
 
 def _sling_y(u, v):
@@ -434,17 +438,19 @@ def _sling_y(u, v):
 def rainbowHammock():
     F = G.GameFrame()
     with G.new_parts() as still:
-        F.box('beam', 1.72, 0.07, 0.09, (0, 0.05, 0), M.wood, bevel=0.02)
+        F.box('beam', 2 * POST_X - 0.04, 0.07, 0.09, (0, 0.05, 0), M.wood, bevel=0.02)
         for s in (-1, 1):
-            G.rod(_name('post'), F.at(s * 0.8, 0.04, 0), F.at(s * 0.9, 1.05, 0), 0.036, material=M.wood, verts=10)
-            F.box(_name('foot'), 0.09, 0.045, 0.62, (s * 0.84, 0.0225, 0), M.wood, bevel=0.015)
-            F.sphere(_name('post_top'), 0.042, (s * 0.9, 1.05, 0), M.wood, segments=12, rings=8)
+            G.rod(_name('post'), F.at(s * (POST_X - 0.1), 0.04, 0), F.at(s * POST_X, HOOK + 0.05, 0), 0.036, material=M.wood,
+                  verts=10)
+            F.box(_name('foot'), 0.09, 0.045, 0.62, (s * (POST_X - 0.06), 0.0225, 0), M.wood, bevel=0.015)
+            F.sphere(_name('post_top'), 0.042, (s * POST_X, HOOK + 0.05, 0), M.wood, segments=12, rings=8)
             for z in (-0.18, 0.18):                                   # braces from the foot to the post
-                G.rod(_name('brace'), F.at(s * 0.84, 0.04, z * 1.5), F.at(s * 0.835, 0.32, 0), 0.016, material=M.wood, verts=8)
+                G.rod(_name('brace'), F.at(s * (POST_X - 0.06), 0.04, z * 1.5), F.at(s * (POST_X - 0.065), 0.32, 0), 0.016,
+                      material=M.wood, verts=8)
     G.join(still, 'body', origin=(0, 0, 0))
     # The sling, its spreader bars and ropes, the hooks, the pillow and the throw: `sway` rocks them about the hooks.
     with G.new_parts() as sling:
-        nu, nv, x0, x1, t = 20, 12, -0.74, 0.74, 0.018
+        nu, nv, x0, x1, t = 26, 12, -SLING_X, SLING_X, 0.018
         verts, faces, mats = [], [], []
         for layer in (0, 1):
             for i in range(nu + 1):
@@ -468,17 +474,18 @@ def rainbowHammock():
                 mats.append(stripe(j))
         _obj('sling', verts, faces, [getattr(M, s) for s in STRIPES], face_mats=mats, sharp=50)
         for s in (-1, 1):
-            F.box(_name('spreader'), 0.045, 0.045, SLING_W + 0.08, (s * 0.755, SLING_END - 0.01, 0), M.spreader, bevel=0.012)
-            hook = (s * 0.88, HOOK, 0)
+            bx = s * (SLING_X + 0.015)
+            F.box(_name('spreader'), 0.045, 0.045, SLING_W + 0.08, (bx, SLING_END - 0.01, 0), M.spreader, bevel=0.012)
+            hook = (s * (POST_X - 0.02), HOOK, 0)
             G.torus(_name('hook'), 0.03, 0.007, at=F.at(*hook), material=M.lamp_metal, rot=(90, 0, 0),
                     major_segments=12, minor_segments=5)
             for z in (-0.33, -0.11, 0.11, 0.33):
-                G.rod(_name('rope'), F.at(s * 0.87, HOOK - 0.03, 0), F.at(s * 0.755, SLING_END + 0.01, z), 0.006,
+                G.rod(_name('rope'), F.at(s * (POST_X - 0.03), HOOK - 0.03, 0), F.at(bx, SLING_END + 0.01, z), 0.006,
                       material=M.rope, verts=6)
         # the pillow at the left end, lying on the slope
-        u = (-0.52 - x0) / (x1 - x0)
+        u = (-PILLOW - x0) / (x1 - x0)
         slope = math.degrees(math.atan((SLING_END - SLING_LOW) * 4 * (2 * u - 1) / (x1 - x0)))
-        F.box('pillow', 0.36, 0.11, 0.3, (-0.52, _sling_y(u, 0.5) + 0.05, 0), M.pillow, rot=(0, slope, 0),
+        F.box('pillow', 0.36, 0.11, 0.3, (-PILLOW, _sling_y(u, 0.5) + 0.05, 0), M.pillow, rot=(0, slope, 0),
               bevel=0.045, bevel_segments=3)
     sling = G.hinged(G.join(sling, 'sling'), F.at(0, HOOK, 0))
     objs = G.settle(centre=False)
@@ -606,7 +613,7 @@ FAMILY = G.Family(
      G.Model('mocktailCart', mocktailCart, size=(0.84, 1.635, 0.57), key='model.cheerful.mocktailCart',
              centre=(0, -0.045), motions={'uses': {'mix': 'shake'}},
              paint=[('mint', 'Body'), ('canopy', 'Trim'), ('brass', 'Frame')]),
-     G.Model('rainbowHammock', rainbowHammock, size=(1.88, 1.09, 0.7), key='model.cheerful.rainbowHammock',
+     G.Model('rainbowHammock', rainbowHammock, size=(2.844, 1.172, 0.7), key='model.cheerful.rainbowHammock',
              centre=(0, 0), motions={'loops': {'swing': 'sway', 'doze': 'sway'}, 'ride': 'sway'},
              paint=[('wood', 'Body'), ('spreader', 'Trim'), ('pillow', 'Pillow')]),
      G.Model('sunriseLamp', sunriseLamp, size=(0.784, 1.642, 0.87), key='model.cheerful.sunriseLamp',

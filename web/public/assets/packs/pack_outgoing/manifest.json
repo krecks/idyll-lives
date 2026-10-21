@@ -181,13 +181,22 @@
           "finish": "material.finish.satin"
         },
         "lyric": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#FFFFFF",
+          "screen": true
+        },
+        "lyric_hi": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFD45A",
+          "screen": true
         },
         "magenta": {
           "finish": "material.finish.gloss"
         },
         "screen": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#5A78D8",
+          "screen": true
         },
         "speaker": {
           "finish": "material.finish.satin"
@@ -251,10 +260,14 @@
           "finish": "material.finish.satin"
         },
         "ring": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#FFF3D8",
+          "screen": true
         },
         "screen": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#5A78D8",
+          "screen": true
         },
         "sunny": {
           "finish": "material.finish.satin"
@@ -312,22 +325,34 @@
           "finish": "material.finish.metal"
         },
         "tile_a": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#FF5AA8",
+          "screen": true
         },
         "tile_b": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#4FE0D8",
+          "screen": true
         },
         "tile_c": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#FFD860",
+          "screen": true
         },
         "tile_d": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#B08CFF",
+          "screen": true
         },
         "tile_e": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#70DCFF",
+          "screen": true
         },
         "tile_f": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#FF8A6A",
+          "screen": true
         },
         "turq": {
           "finish": "material.finish.gloss"
@@ -357,7 +382,8 @@
           "finish": "material.finish.gloss"
         },
         "bulb": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#FFDC8A"
         },
         "coral": {
           "finish": "material.finish.gloss"

@@ -362,10 +362,12 @@
           "finish": "material.finish.satin"
         },
         "vessel": {
-          "finish": "material.finish.glass"
+          "finish": "material.finish.glass",
+          "glow": "#FF6FA8"
         },
         "wax": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#FFA060"
         }
       },
       "motions": {

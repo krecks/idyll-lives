@@ -420,6 +420,9 @@
         "dark": {
           "finish": "material.finish.satin"
         },
+        "heat": {
+          "finish": "material.finish.gloss"
+        },
         "hob": {
           "finish": "material.finish.gloss"
         },
@@ -427,10 +430,10 @@
           "finish": "material.finish.gloss"
         },
         "oak": {
-          "finish": "material.finish.wood"
+          "finish": "material.finish.satin"
         },
         "oak_dark": {
-          "finish": "material.finish.wood"
+          "finish": "material.finish.satin"
         },
         "oak_top": {
           "finish": "material.finish.satin"
@@ -456,9 +459,12 @@
       },
       "motions": {
         "uses": {
-          "chop": "drawer_open"
-        },
-        "hold": 2.5
+          "chop": {
+            "clip": "drawer_open",
+            "hold": 2.5
+          },
+          "stir": "burner_on"
+        }
       },
       "paint": [
         {

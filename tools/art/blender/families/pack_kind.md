@@ -14,7 +14,7 @@ The ferns stand at the back between the poufs and the table.
 
 | Model | Moving part and clip | Played by |
 |---|---|---|
-| `neighbourlyOven` | the range's oven door, hinged on its foot: `oven_open` drops it 85° forward (0.8 s), shut again after 3 s (`hold`; 2026-10-21) | the `bake` step of `familyPie` and `treatsToShare` (by its tag, so the mixing at its worktop leaves the oven shut) |
+| `neighbourlyOven` | the range's oven door, hinged on its foot: `oven_open` drops it 85° forward (0.8 s), shut again after 3 s (`hold`; 2026-10-21). A beadboard back rises from the worktop's back to carry the jar shelf, standing free or on the wall (2026-10-21, M-packs-01; Q-06). | the `bake` step of `familyPie` and `treatsToShare` (by its tag, so the mixing at its worktop leaves the oven shut) |
 | `givingJar` | a coin standing in the cork lid's slot: `coin` drops it 10 cm through into the jar (0.6 s) | `donate` |
 | `knittingRocker` | the whole chair with its cushion and throw, turning about its rockers' centre (so they roll on the floor): `rock` rocks it ±5° (1.6 s, a loop); `ride` carries the knitter | `knitGift`, `rock` (loop) |
 | `welcomeTeaTable` | the teapot, hinged on its foot under the spout: `pour` tips it 30° (0.8 s), `hold` 1.5 s | `shareTea` |
@@ -46,7 +46,7 @@ parts the rest. So that it stays at 3:
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.kind.neighbourlyOven` | 1.83 × 1.72 × 0.63 m | 5,292 | 3 | Body (the range's enamel), Fabric (the towel), Cupboards |
+| `model.kind.neighbourlyOven` | 1.83 × 1.72 × 0.63 m | 5,592 | 3 | Body (the range's enamel), Fabric (the towel), Cupboards |
 | `model.kind.givingJar` | 0.64 × 1.32 × 0.66 m | 3,068 | 3 | Body (the pedestal), Fabric (the ribbon) |
 | `model.kind.knittingRocker` | 0.72 × 1.05 × 0.87 m | 2,840 | 3 | Body (the chair), Fabric (the cushion) |
 | `model.kind.welcomeTeaTable` | 1.94 × 0.50 × 0.86 m | 4,616 | 3 | Body (the table), Fabric, Second pouf, Rug |

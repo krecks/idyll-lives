@@ -13,8 +13,8 @@ chair, the window seat's cushion top); the tub keeps `SEATS`/`BEDS` 0.25 (its in
 | `recordCabinet` | the lid over the turntable's well, hinged along its back: `lid_open` lifts it 80° (0.9 s) | `listen`, `newAlbum` |
 | `recordCabinet` | the platter and record, origin on the spindle: `platter_spin`, one turn clockwise in 1.8 s (33 rpm), a loop | `listen`, `newAlbum` (loop) |
 | `cello` | the cello, built upright on its stand, origin on the end pin's foot: `off_stand` (0.9 s) moves it across to between the player's knees and leans it back 14° | `practise`, `lament` |
-| `journalDesk` | the tall candle's flame, built full size on its wick and scaled to nothing: `candle` lights it (0.6 s); its material glows at night | `journal`, `poetry` |
-| `rainLamp` | the rain, 18 lines with drops from the canopy to the pool, squashed to nothing under the canopy: `rain` runs them down (0.6 s) | `watchRain` |
+| `journalDesk` | the tall candle's flame, built full size on its wick and scaled to nothing: `candle` lights it (0.6 s); its material glows at night. Its top is at 0.75 (2026-10-21: 0.78, over a desk's 0.72–0.76: M-packs-08), everything on it 3 cm lower with it | `journal`, `poetry` |
+| `rainLamp` | the rain, 18 lines with drops from the canopy to the pool, squashed to nothing under the canopy: `rain` runs them down (0.6 s). Under the canopy its light (`lamp_light`), the pool and the rain (`pool`, `rain`) glow at night with the content's `light` (range 2.5 m, at 1.3 m), switched as a lamp (2026-10-21, M-packs-07) | `watchRain` |
 | `rainLamp` | the ripples on the pool: `ripple` swells them 12 % and back (2 s), ambient (`idle`) | always (not on Low) |
 | `windowSeat` | the seat cushion with its throw and a book, origin on the underside: `sink_in` presses them 2 cm (0.6 s) | `brood`, `doze` |
 | `soakingTub` | the water up to 0.52 with a little foam, origin under the tub's floor, flat there at rest: `fill` raises it (1.5 s) | `soak` |

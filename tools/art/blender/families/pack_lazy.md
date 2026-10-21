@@ -12,10 +12,10 @@ deck at 0.125 (content `stand.height` 0.12, where the resident stands).
 | Model | Moving part and clip | Played by |
 |---|---|---|
 | `snoozecloudBed` | the head section of the mattress and its pillows, hinged on its front edge: `head_up` raises it 30° (1.2 s), `hold` 2 s | `sleepIn` |
-| `napPod` | the hood, a band of a sphere about the egg's upper half, folded back over its top: `hood` swings it 60° forward, half over the opening (1 s) | `powerNap`, `curlUp` |
-| `quiltTable` | the quilt's back edge, hung from the table top: `quilt` lifts it 70° over the sitters' laps (0.8 s) | `tuckIn`, `doze` |
+| `napPod` | the hood, a band of a sphere about the egg's upper half, folded back over its top: `hood` swings it 60° forward, half over the opening (1 s). The egg is 1.54 m tall and the hood turns about a point 1.05 m up with a 0.5 m radius, clear of a grown-up's crown (about 1.4 m) when it is over (2026-10-21: an egg of 1.42 m, the hood about 0.95 m with a 0.48 m radius, closing onto the head: A-packs-04); the seat's middle at depth 0.1 (`furniture.json` fwd 0.05, front 0.42) | `powerNap`, `curlUp` |
+| `quiltTable` | the quilt's back edge, hung from the table top: `quilt` lifts it 70° over the sitters' laps (0.8 s). A 0.5 m deep top (from −0.03 to 0.47) with the quilt draped hollow over its front and ends to the floor, so the legs go in under it from the back and the feet stay inside; the poufs at depth −0.2, the hips there (`furniture.json` `lazy.quiltTable` fwd −0.2). 2026-10-21: a solid quilt block 0.4 deep and the hips at the footprint's middle, the shins and feet out of its front (I-packs-01) | `tuckIn`, `doze` |
 | `deliveryLocker` | the left locker of the middle row, hinged on its outer edge: `door_open` swings it 105° open on a takeout bag (0.7 s), `hold` 2 s | `takeout`, `noodles` |
-| `vibePlate` | the deck the resident stands on: `shake` rocks it ±3° side to side, four times a second (0.25 s, a loop) | `shake` (loop) |
+| `vibePlate` | the deck the resident stands on: `shake` rocks it ±3° side to side, four times a second (0.25 s, a loop). The column stands at the plate's far end, which the stander faces, its handlebar at 1.1 m with arms reaching back to grips either side of them (2026-10-21: a short bar at the hip 30 cm ahead: I-packs-04) | `shake` (loop) |
 | `smartHub` | the tablet, hinged in its dock: `screen_up` tilts it from lying back (72°) up to 15° (0.8 s) | `program`, `story` |
 
 Where the plan's table says "Loop (E1) … Until then static" (the plate), the loop itself is built.
@@ -45,10 +45,10 @@ Where the plan's table says "Loop (E1) … Until then static" (the plate), the l
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
 | `model.lazy.snoozecloudBed` | 1.86 × 1.29 × 1.86 m | 4,772 | 3 | Body, Upholstery (the mattress), Throw |
-| `model.lazy.napPod` | 0.88 × 1.42 × 0.91 m | 4,308 | 3 | Body (the egg), Upholstery (the cushions), Hood |
-| `model.lazy.quiltTable` | 1.74 × 0.74 × 0.89 m | 3,032 | 3 | Body (the table top), Upholstery (the quilt), Poufs |
+| `model.lazy.napPod` | 0.92 × 1.54 × 0.91 m | 4,308 | 3 | Body (the egg), Upholstery (the cushions), Hood |
+| `model.lazy.quiltTable` | 1.81 × 0.77 × 0.93 m | 3,696 | 3 | Body (the table top), Upholstery (the quilt), Poufs |
 | `model.lazy.deliveryLocker` | 0.86 × 1.96 × 0.81 m | 3,104 | 2 | Body, Doors, Trim |
-| `model.lazy.vibePlate` | 0.67 × 1.16 × 0.76 m | 1,380 | 2 | Body, Trim, Deck |
+| `model.lazy.vibePlate` | 0.67 × 1.25 × 0.77 m | 1,452 | 2 | Body, Trim, Deck |
 | `model.lazy.smartHub` | 0.60 × 0.81 × 0.84 m | 2,236 | 3 | Body (the table), Speaker |
 
 `check-glb`: 6 models, 0 failed; one warning (the pod's depth, above). Khronos validator: 0 errors, 0 warnings
