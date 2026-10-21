@@ -65,7 +65,8 @@ none.
 - Lying, seen 1, 4 and 8 s into the use (also on Low WebGL2 at night): the resident sits on first, then lies along
   the lounger and in the hammock's sling.
 - The hot tub's cover lifts and the water bubbles for a soak; after it, "Put the cover on" follows (`closeAfter`)
-  and the cover shuts.
+  and the cover shuts. The soakers wear swimwear in it (a swimsuit, or trunks; `BATH_WEAR`).
+- A doze on the lounger or in the hammock is taken in the day clothes, shoes on (pyjamas are for a night in bed).
 - Known: a swing or a sunbathe ends within seconds when the need it fills is full (fun 0.8 to 1 in about 8 s), and
   the next one is refused until it drops. That is the needs, not the model.
 

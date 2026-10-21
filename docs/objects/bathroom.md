@@ -67,6 +67,8 @@ their backs on the wall face (game depth -0.43).
 - The colour studio frames a moving part by its posed vertices, so the stall (whose rain grows from nothing and is
   turned for the slant) draws at rest and in use.
 - Three draw calls each: the tray, walls and metal; the glass (the stall's curtain); the rain.
+- Under the water the resident wears a towel, barefoot (`wearFor`, `outfit.ts` `towel`: wrapped under the arms, a
+  man's round the hips), not the day clothes; they dress again as they step out. The packs' showers do the same.
 
 ## B3. Baths (3)
 
@@ -85,6 +87,8 @@ their backs on the wall face (game depth -0.43).
   and clawfoot's right end, the freestanding bath's left), the hips 0.38–0.42 m from the middle, the legs in the tub
   and under the water towards the taps, the arms on the long rims; nothing through the panel or the rim.
 - The freestanding bath's seat is in `SEATS`, not its content.
+- Sat in the water the bather wears a towel (the shower's); in the hot tub, the whirlpool and the cold plunge
+  (outdoor and packs ledgers) swimwear: a swimsuit, or trunks (`BATH_WEAR`).
 
 ## B4. Laundry (6)
 

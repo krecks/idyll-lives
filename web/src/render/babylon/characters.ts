@@ -72,8 +72,8 @@ import { loadCharacterSet, loadStage, type BodyData, type CharacterSet, type Cli
 import { APPEARANCE_TEXELS, CharacterPlugin, MORPH_TEXELS, type CharacterSurface, type MorphBinding } from './characters/material';
 import { FACE_KEYS, FaceMixer, NEUTRAL, type Face } from './characters/face';
 import { ENERGY_RATE, type VisemeTrack } from '../../voice/visemes';
-import { outfitFor, writeOutfit, type OutfitParams } from './characters/outfit';
-import { BLANKET_WIDTH, blanketMaterial, buildBlanket, type BlanketShape } from './characters/blanket';
+import { outfitFor, SHELL_BITS, WEARS, writeOutfit, type OutfitFit, type OutfitParams, type Wear } from './characters/outfit';
+import { BLANKET_WIDTH, blanketMaterial, buildBlanket, quiltTint, type BlanketShape } from './characters/blanket';
 import { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } from './characters/clips/street';
 // The seat and bed tables (`SEATS`, `BEDS`, `BUNKS` and their defaults) are data, read by `cargo check-glb` and
 // `cargo review` too; what their entries mean and why some are as they are: docs/characters-format.md "Seats and beds".
@@ -83,7 +83,8 @@ import { addLocal, addRotation, blendInto, makeAdditive, PoseScratch, qmul, rese
 import type { MaterialLibrary } from './materials';
 import { WALL_HEIGHT } from './house';
 import { LAYER_SHADOW_ONLY } from './layers';
-import { buildModel, ITEM_STAND_IN, onModelFileArrived, paintColors, painted, type ModelTemplate } from './models';
+import { buildModel, fileColour, ITEM_STAND_IN, onModelFileArrived, paintColors, painted, type ModelTemplate } from './models';
+import { paintSlots } from '../../assets/paint';
 import { TemplateCache } from './templateCache';
 
 /** Rows in the pose texture (= Sim capacity). */
@@ -97,6 +98,11 @@ const YOUNG_STAGES = new Set(['baby', 'child', 'teen']);
 const FACE_PARTS: readonly string[] = ['eyes', 'brows', 'lashes', 'teeth', 'tongue'];
 
 /** The body's skin chunks a Sim wearing `parts` shows (those no worn garment hides completely). */
+/** A part's shell category as a `SHELL_BITS` bit (`top.jacket`, `lod.bottom.skirt`, `shoes.boots` ...); 0 for anything else. */
+function shellBit(part: string): number {
+  const kind = /^(?:lod\.)?(top|bottom|shoes)\./.exec(part)?.[1] as keyof typeof SHELL_BITS | undefined;
+  return kind ? SHELL_BITS[kind] : 0;
+}
 function skinChunks(body: BodyData, parts: readonly string[]): string[] {
   return Object.entries(body.bodyChunks)
     .filter(([, hiders]) => !hiders.some((h) => parts.includes(h)))
@@ -278,6 +284,18 @@ interface Bed {
 const BUNKS: Record<string, readonly number[]> = FURNITURE.bunks;
 /** Beds whose sleepers get a blanket (pack hammocks, sofas and nap pods don't). */
 const BLANKET_BEDS = new Set(['bed', 'lazy.snoozecloudBed', 'bedSingle', 'bedBunk', 'bedFuton', 'bedKing', 'bedDouble', 'bedQueenUpholstered', 'bedCanopy', 'kidsBed', 'kidsBedCar', 'wallBed']);
+/**
+ * The part of a bed whose colour its sleepers' quilts take (`PlacedObject.quilt`): the one the player
+ * paints as its "Bedding", else this (the futon's own quilt, a throw).
+ */
+const QUILT_PART: Record<string, string> = { bedFuton: 'quilt_oat', wallBed: 'throw', 'lazy.snoozecloudBed': 'throw' };
+/** A quilt's colour until its bed's file says (sRGB). */
+const QUILT_COLOUR = '#E7E0D4';
+/**
+ * What is worn in the water (`wearFor`) where it isn't a towel (every shower, bath and tub is): swimwear in
+ * the hot tubs and the cold plunge; and a towel where the use isn't a bath or a shower (the sauna).
+ */
+const BATH_WEAR: Record<string, Wear> = { hotTubCedar: 'swim', whirlpoolTub: 'swim', 'hotHeaded.coldPlunge': 'swim', 'loner.soloSauna': 'towel' };
 /**
  * Two sleepers' quilts in a wide bed (`writeBlanket`): each this much (m) wider on each side than half the bed
  * and moved this much towards its middle, so they overlap by four times it over the middle.
@@ -727,10 +745,9 @@ interface SimRig {
   liftW: number;
   /** Where the feet step in towards the crib (m, along the facing). */
   cuddleStep: number;
-  /** Day clothes and pyjamas (switched when the Sim lies down in bed). */
-  day: OutfitParams | null;
-  night: OutfitParams | null;
-  asleep: boolean;
+  /** Its clothes for each `Wear` (`wearFor`; null: a ghost), and the ones written to its row (null: none yet). */
+  outfits: Record<Wear, OutfitParams> | null;
+  worn: OutfitParams | null;
   /** Finger openness (see HANDS), smoothed. */
   hands: number;
   /** Seconds in the current step of a use sequence. */
@@ -856,6 +873,11 @@ interface PlacedObject {
   lift: number;
   /** Something to sit or lie on (a seat or a bed, by its interactions or the tables above). */
   restful: boolean;
+  /**
+   * A bed's bedding (`QUILT_PART`), whose colour its sleepers' quilts take: the colour the player gave
+   * it, else `key` (`<model>#<part>`) for the file's own (`beddingColours`); null for anything else.
+   */
+  quilt: { key: string; colour?: string } | null;
   cx: number;
   cz: number;
   minX: number;
@@ -874,6 +896,8 @@ interface PartMesh {
   detail: number;
   /** Drawn on Sims near the camera, far from it (the low-detail body and clothes), or always. */
   range: Range;
+  /** A shell's category (`SHELL_BITS`; 0: not a shell), left out for the Sims whose clothes now don't draw it (`bare`). */
+  shell: number;
 }
 
 const enum Range {
@@ -992,9 +1016,13 @@ export class Characters {
    * the covered Sims wearing that body packed afresh each frame into its drawn `matrices` (a matrix each) and
    * `ext` (two numbers each), `drawn` of them (`writeBlanket`).
    */
-  private readonly blankets = new Map<string, BlanketShape & { matrices: Float32Array; ext: Float32Array; drawn: number; base: boolean }>();
+  private readonly blankets = new Map<string, BlanketShape & { matrices: Float32Array; ext: Float32Array; tint: Float32Array; drawn: number; base: boolean }>();
   /** The quilts' shared material, for the life stages' quilts made later. */
   private quilt: PBRMaterial | null = null;
+  /** The beds' bedding colours as their files have them, by `PlacedObject.quilt` key (null: still loading, or none). */
+  private readonly beddingColours = new Map<string, string | null>();
+  /** Per Sim row: the shells its clothes now leave out (`OutfitParams.bare`, `faceDetail`). */
+  private readonly bare = new Uint8Array(MAX_CHARACTERS);
   /** Per Sim row: head top (x, y, z) for speech bubbles and the selection marker. */
   readonly heads = new Float32Array(MAX_CHARACTERS * 3);
   /** Per Sim row: where they stand (x, z), drawn or not (NaN while away). */
@@ -1311,6 +1339,7 @@ export class Characters {
     this.ghosts = [];
     this.data.fill(0);
     this.visible.fill(0);
+    this.bare.fill(0);
     const groups = new Map<string, SimInfo[]>();
     const push = (key: string, s: SimInfo) => {
       const list = groups.get(key) ?? [];
@@ -1347,7 +1376,7 @@ export class Characters {
       const who = `${s.name}|${s.generation ?? 0}|${s.gender}|${stage ?? ''}|${body.name}|${outfitId}`;
       const old = kept[s.id];
       // The same rig carries on (pyjamas: `asleep` is worked out again, and the outfit for it written, when next posed).
-      const rig: SimRig = old && (keep === 'rows' || old.who === who) ? Object.assign(old, { who, body, scale, size, head, stoop, build, asleep: false }) : {
+      const rig: SimRig = old && (keep === 'rows' || old.who === who) ? Object.assign(old, { who, body, scale, size, head, stoop, build, worn: null }) : {
         id: s.id,
         who,
         floorY: 0,
@@ -1394,9 +1423,8 @@ export class Characters {
         holdW: 0,
         liftW: 0,
         cuddleStep: 0,
-        day: null,
-        night: null,
-        asleep: false,
+        outfits: null,
+        worn: null,
         hands: HANDS.relaxed,
         stepTime: 0,
         emotion: 0,
@@ -1443,10 +1471,10 @@ export class Characters {
         speechSeg: 0,
       };
       this.sims[s.id] = rig;
-      rig.day = outfitFor(outfitId, s.gender, s.appearance, body);
-      rig.night = outfitFor(outfitId, s.gender, s.appearance, body, true);
-      rig.skirt = rig.day.parts.includes('bottom.skirt');
-      writeOutfit(rig.day, this.data, this.row(s.id) + set.bones.length * 16);
+      // (Day clothes until posed: `wearFor` then picks again.)
+      const fit = this.outfitFit(base);
+      rig.outfits = Object.fromEntries(WEARS.map((wear) => [wear, outfitFor(outfitId, s.gender, s.appearance, body, wear, fit)])) as Record<Wear, OutfitParams>;
+      this.wear(rig, s.id, rig.outfits.day);
     }
     for (const p of this.meshes.values()) p.mesh.setEnabled(false);
     for (const p of this.shadowMeshes.values()) p.mesh.setEnabled(false);
@@ -1481,7 +1509,7 @@ export class Characters {
       const stand = def?.stand ? { h: def.stand.height + lift, motion: def.stand.motion } : null;
       const paint = def?.held ? colorsKey(paintColors(this.assets.get(def.model, 'model'), o.colors)) : '';
       const held = def?.held ? { keys: [def.held.part].flat().map((part) => `${def.model}#${part}${paint ? `@${paint}` : ''}`), grip: def.held.grip } : null;
-      return { def: o.def, rot: o.rot, seat: { ...seat, h: seat.h + lift }, stand, held, lift, restful, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
+      return { def: o.def, rot: o.rot, seat: { ...seat, h: seat.h + lift }, stand, held, lift, restful, quilt: BLANKET_BEDS.has(o.def) ? this.beddingOf(o.def, def?.model, o.colors) : null, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
     });
     world.objects.forEach((o, j) => this.objectById.set(o.id, this.objects[j]));
     this.seatIds.clear();
@@ -1491,7 +1519,9 @@ export class Characters {
     const rows = this.sims.length;
     for (const [name, b] of this.blankets) {
       // `update` compacts the covered rows (a town of six must not draw 64 quilts' worth of triangles).
+      // With none, hidden: Babylon draws a mesh with no thin instances once as it is (at the origin).
       b.mesh.thinInstanceCount = 0;
+      b.mesh.isVisible = false;
       // (A life stage's quilt only where someone has that body: no draw call for nobody.)
       b.mesh.setEnabled(rows > 0 && beds && (b.base || bodies.has(name)));
     }
@@ -2370,12 +2400,9 @@ export class Characters {
         this.qA.set(set.sourceRestQ);
         this.pA.set(set.sourcePelvis);
       }
-      // Pyjamas in bed.
-      const asleep = pose === Pose.Lie && LYING.has(rig.cur.key) && w > 0.5 && (!rig.tagKnown || rig.tag === 'sleep' || rig.tag === 'nap');
-      if (asleep !== rig.asleep && rig.day && rig.night) {
-        rig.asleep = asleep;
-        writeOutfit(asleep ? rig.night : rig.day, this.data, this.row(i) + NB * 16);
-      }
+      // Clothes for what they're doing: pyjamas in bed for the night, a towel in the bath ...
+      const worn = rig.outfits?.[this.wearFor(rig, pose, moving, w, useObj, tag)];
+      if (worn && worn !== rig.worn) this.wear(rig, i, worn);
       // Hand pose: the clips clench fists; open them according to the activity.
       blendInto(this.qA, this.pA, set.sourceRestQ, this.pA, rig.hands, this.fingerMask);
 
@@ -2459,8 +2486,11 @@ export class Characters {
       // (Nobody under it now or last frame: nothing to upload.)
       if (!b.drawn && !b.mesh.thinInstanceCount) continue;
       b.mesh.thinInstanceCount = b.drawn;
+      // (None: not drawn at all, rather than once as it is, at the origin.)
+      b.mesh.isVisible = b.drawn > 0;
       b.mesh.thinInstanceBufferUpdated('matrix');
       b.mesh.thinInstanceBufferUpdated('blanketExt');
+      b.mesh.thinInstanceBufferUpdated('blanketTint');
     }
     this.props.forEachBuilt(this.showProp);
     this.pullChairs();
@@ -3823,6 +3853,48 @@ export class Characters {
   }
 
   /**
+   * What a Sim wears now (`Wear`): pyjamas for a night's sleep (lying in a bed, `sleep`), the shoes off
+   * for a nap on a bed (a thing slept in; on a sofa or a lounger, or outdoors, the day clothes stay as they
+   * are), a towel in the shower and sat in a bath (swimwear in a hot tub, `BATH_WEAR`), else the day clothes.
+   * They change as they lie back (the crossfade half done), sit down in the water or stop under the shower.
+   */
+  private wearFor(rig: SimRig, pose: number, moving: boolean, w: number, useObj: PlacedObject | null | undefined, tag: string): Wear {
+    if (moving) return 'day';
+    if (pose === Pose.Lie) {
+      if (!LYING.has(rig.cur.key) || w <= 0.5) return 'day';
+      // (A lying Sim whose use isn't known is taken to sleep, as its face and its quilt are.)
+      if (!rig.tagKnown || tag === 'sleep') return 'night';
+      return tag === 'nap' && rig.bed && this.sleptIn(rig.bed.def) ? 'rest' : 'day';
+    }
+    const def = useObj?.def ?? '';
+    const water = BATH_WEAR[def] ?? (tag === 'bath' || tag === 'shower' ? 'towel' : null);
+    return water && (pose === Pose.Sit || tag === 'shower') ? water : 'day';
+  }
+
+  /** Things slept in (a use tagged `sleep`: beds, the crib), by def (`wearFor`). */
+  private readonly beds = new Map<string, boolean>();
+  private sleptIn(def: string): boolean {
+    let bed = this.beds.get(def);
+    if (bed === undefined) this.beds.set(def, (bed = !!this.content?.object(def)?.interactions.some((x) => x.tags?.includes('sleep'))));
+    return bed;
+  }
+
+  /** Puts `worn` (one of its `outfits`) on Sim `i`: its appearance texels, and the shells it doesn't draw (`bare`). */
+  private wear(rig: SimRig, i: number, worn: OutfitParams): void {
+    rig.worn = worn;
+    writeOutfit(worn, this.data, this.row(i) + this.set!.bones.length * 16);
+    this.bare[i] = worn.bare;
+    rig.skirt = worn.parts.includes('bottom.skirt') && !(worn.bare & SHELL_BITS.bottom);
+  }
+
+  /** A base body's heights for the towel and swimwear (`OutfitFit`), from its joints at rest. */
+  private outfitFit(base: BodyData): OutfitFit {
+    const set = this.set!;
+    const y = (bone: string) => Matrix.FromArray(base.inverseBind, set.bone[bone] * 16).invert().m[13];
+    return { chest: (y('spine_03') + y('upperarm_l')) / 2, hip: y('thigh_l'), knee: y('calf_l') };
+  }
+
+  /**
    * Blanket over a Sim asleep in a bed: fitted to the slot (half of a double bed, or a single bed)
    * and to the bed's foot end, pulled up from the foot end over ~0.5 s once the Sim lies flat (and
    * pushed back down as they get up); not drawn otherwise. A quilt is drawn only for the Sims covered
@@ -3871,6 +3943,8 @@ export class Characters {
     // under it (`BlanketPlugin`), so nothing shows through it on the way up or down.
     blanket.ext[d * 2 + 1] = c >= 1 ? -9 : blanket.footZ - (blanket.footZ - blanket.topZ + 0.02) * c;
     const sx = (slot / BLANKET_WIDTH) * (0.9 + 0.1 * c);
+    // In the bed's own bedding colour.
+    quiltTint(bed.quilt?.colour ?? (bed.quilt && this.beddingColours.get(bed.quilt.key)) ?? QUILT_COLOUR, blanket.tint, d * 3);
     // Two Sims in one bed: offset the quilts a hair so their tops don't z-fight where they meet.
     const lift = (i % 2) * 0.004;
     // Rows: x axis, y axis, z axis, translation (Babylon row-vector layout).
@@ -3897,11 +3971,34 @@ export class Characters {
     const shape = buildBlanket(this.scene, `simBlanket:${body.name}`, lying.positions, lying.chestZ, lying.feetZ, this.quilt!);
     const matrices = new Float32Array(MAX_CHARACTERS * 16);
     const ext = new Float32Array(MAX_CHARACTERS * 2);
+    const tint = new Float32Array(MAX_CHARACTERS * 3);
     shape.mesh.thinInstanceSetBuffer('matrix', matrices, 16, false);
     shape.mesh.thinInstanceSetBuffer('blanketExt', ext, 2, false);
+    shape.mesh.thinInstanceSetBuffer('blanketTint', tint, 3, false);
     shape.mesh.thinInstanceCount = 0;
+    shape.mesh.isVisible = false;
     shape.mesh.setEnabled(false);
-    this.blankets.set(body.name, { ...shape, matrices, ext, drawn: 0, base: body.name === body.family });
+    this.blankets.set(body.name, { ...shape, matrices, ext, tint, drawn: 0, base: body.name === body.family });
+  }
+
+  /**
+   * A bed's bedding (`PlacedObject.quilt`): the part `QUILT_PART` names or its "Bedding", in the colour the
+   * player gave it, else the file's own (looked up once per model, `beddingColours`); null without one.
+   */
+  private beddingOf(id: string, model: string | undefined, colors: PartColors | undefined): PlacedObject['quilt'] {
+    const entry = model ? this.assets.get(model, 'model') : undefined;
+    const part = QUILT_PART[id] ?? paintSlots(entry).find((s) => s.label === 'Bedding')?.material;
+    if (!part) return null;
+    const key = `${model}#${part}`;
+    const colour = colors?.[part];
+    if (!colour && !this.beddingColours.has(key)) {
+      this.beddingColours.set(key, null);
+      fileColour(this.scene, entry, part).then(
+        (c) => this.beddingColours.set(key, c ?? null),
+        () => this.beddingColours.delete(key),
+      );
+    }
+    return { key, colour };
   }
 
   /**
@@ -4152,7 +4249,7 @@ export class Characters {
     mesh.doNotSyncBoundingInfo = true;
     mesh.freezeWorldMatrix();
     const range = shadow ? Range.Always : part.startsWith('lod.') ? Range.Far : part === 'body' || /^(body|top|bottom|shoes)\./.test(part) ? Range.Near : Range.Always;
-    const pm: PartMesh = { mesh, settings: new Float32Array(0), all: new Float32Array(0), detail: shadow ? 0 : (DETAIL_PX[part] ?? 0), range };
+    const pm: PartMesh = { mesh, settings: new Float32Array(0), all: new Float32Array(0), detail: shadow ? 0 : (DETAIL_PX[part] ?? 0), range, shell: shadow ? 0 : shellBit(part) };
     meshes.set(key, pm);
     if (!shadow) this.parts.set(mesh, pm);
     return pm;
@@ -4229,6 +4326,7 @@ export class Characters {
         const id = all[j];
         if (px[id] < pm.detail) continue;
         if (ranged && (far[id] === 1) === near) continue;
+        if (pm.shell & this.bare[id]) continue;
         if (out[n * 4] !== id) {
           out[n * 4] = out[n * 4 + 1] = id;
           changed = true;

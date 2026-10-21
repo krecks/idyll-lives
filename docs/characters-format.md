@@ -173,6 +173,16 @@ paints the thighs (the shell hangs over them). Babies don't wear skirts (the she
 their drawn-up, spread legs): a baby whose outfit has one wears `bottom.shorts` in the top's colour,
 a romper (outfit.ts).
 
+What a resident wears changes with what it does (`Wear`, outfit.ts; characters.ts `wearFor`): its day
+clothes; pyjamas for a night's sleep in bed (a `sleep` use lying down: the `top.long` and
+`bottom.trousers` cuts in a sleep colour, barefoot); the day clothes barefoot for a nap on something
+slept in; a towel under a shower and sat in a bath (the bottom's cut alone, from under the arms, or
+round a man's hips, to the thigh); swimwear in a hot tub (a swimsuit, the `top.tank` cut down to the
+top of the legs, or trunks). Only the day clothes draw their shells: the others leave them out by the
+resident's row (`bare`), so a change of clothes draws nothing more. The towel's and swimwear's heights
+come from the base body's joints at rest (`OutfitFit`: under the arms half way between `spine_03` and
+`upperarm_l`, the hips and the knees).
+
 Garment ids per family (outfit.ts):
 
 - male: `top.tee top.vneck top.polo top.long top.shirt top.jacket top.suit`, `bottom.trousers bottom.shorts bottom.suit`;

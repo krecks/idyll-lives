@@ -78,7 +78,8 @@ a single object does is on its category page ([README.md](README.md)); this page
 - **Beds keep their place; the head end is tucked:** headboards 3.5–4 cm thick, so mattresses, pillows and sleepers
   stay put and no foot passes its tile. The six-seat, farmhouse and banquet tables are 0.88 m deep, as the four-seat.
 - **A quilt per body**, shaped over its own lying pose, coming up from the foot once the sleeper lies flat; the
-  turned-down duvet flattens and narrows under it.
+  turned-down duvet flattens and narrows under it. It takes its bed's bedding colour (per instance, one material),
+  and with nobody under it no quilt is drawn at all.
 - **Finishes reach the shader** (gloss, chrome and metal); metals reflect the sky just above the horizon where they
   would reflect the ground (`SKY_FOR_GROUND = 0.3`). **Hardware is metal** (handles, knobs, pulls); the dresser, low
   dresser, dressing table and writing bureau went to 4 draws for it.
