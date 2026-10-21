@@ -123,7 +123,7 @@ New and confirmed, pilot rows only (24 new, 10 confirmed; 5 seeded ones not chec
 (c) = a seeded finding confirmed by the pilot.
 
 **S1**
-- **I-kids-03:** a direct use skips the user rules free will keeps: an adult lies in the cot, a child or teen feeds and changes the baby, an adult does homework (`world.rs:2972`).
+- **I-kids-03:** a direct use skips the user rules free will keeps: an adult lies in the cot, a child or teen feeds and changes the baby, an adult does homework (`world.rs:2981`).
 
 **S2**
 - **M-kitchen-01:** the base dining table is a 38 cm deep plank with both diners side by side.
