@@ -74,11 +74,15 @@ import { FACE_KEYS, FaceMixer, NEUTRAL, type Face } from './characters/face';
 import { ENERGY_RATE, type VisemeTrack } from '../../voice/visemes';
 import { outfitFor, SHELL_BITS, WEARS, writeOutfit, type OutfitFit, type OutfitParams, type Wear } from './characters/outfit';
 import { BLANKET_WIDTH, blanketMaterial, buildBlanket, quiltTint, type BlanketShape } from './characters/blanket';
+import { BUNK_DOWN, BUNK_UP, RIDE_HORSE, RIDE_ROUND, RIDE_SEESAW, RIDE_SPRING, RIDE_SWING, SLIDE } from './characters/clips/rides';
 import { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } from './characters/clips/street';
 import { FLOOR_SITS } from './characters/clips/seated';
 import { BALL_PIT, PLAY_TENT } from './characters/clips/play';
 import { BOULDER, FOOS, FOOS_LANES, POOL, SMASH, YOGA_AT } from './characters/clips/games';
 import { EYEPIECE, PICK_APPLE, PICK_LEMON, SHOWER_CHILD } from './characters/clips/uses';
+import { KNEEL_LANES, KNEEL_TABLE, LOW_TOP, SIT_LOW } from './characters/clips/low';
+import { BOARD, CLOCK, CUPBOARD_OF, FEEDER, PUT_AWAY } from './characters/clips/reach';
+import { SHOT } from './characters/clips/shot';
 // The seat and bed tables (`SEATS`, `BEDS`, `BUNKS` and their defaults) are data, read by `cargo check-glb` and
 // `cargo review` too; what their entries mean and why some are as they are: docs/characters-format.md "Seats and beds".
 import FURNITURE from './characters/furniture.json';
@@ -232,8 +236,8 @@ const DEFAULT_SEAT: Seat = FURNITURE.defaultSeat;
  * mattress, pulled out or folded away, reaches half a metre past it. Negative: steps in to a thing
  * smaller than its tile (the herb planters, 0.4–0.46 m deep, are picked from as from a counter), or to
  * the part used: the toes at a basin or a sink's cabinet, the hands over the water; up to the toaster and
- * the blender on a counter, the chemistry bench pushed back on its tile, the clock's trunk door, the
- * giving jar. Back from the statue, to look up at it. In beside the high chair, to feed the baby in it.
+ * the blender on a counter, the chemistry bench pushed back on its tile, the giving jar. Back from the
+ * statue, to look up at it. In beside the high chair, to feed the baby in it.
  */
 const STAND_BACK: Record<string, number> = {
   highChair: -0.5,
@@ -251,7 +255,6 @@ const STAND_BACK: Record<string, number> = {
   counterSinkDouble: -0.45,
   breakfastCounter: -0.3,
   chemistrySet: -0.35,
-  grandfatherClock: -0.6,
   'kind.givingJar': -0.4,
   townStatue: 0.8,
 };
@@ -300,6 +303,8 @@ const STEP_IN: Record<string, StepIn> = {
   phoneBooth: { by: [[0, ['phone'], { to: -0.04, up: 0.12 }]], wait: 1, back: 0.25, out: 0.25 },
   // Side by side on the net (0.9 m wide, from -0.75 m), each round over the deck and down the pole.
   climbingFrame: { by: CLIMB.map(({ clip, min, fit }) => [min, CLIMB_LANES.map((_, lane) => climbClip(clip, lane)), fit] as const), lanes: CLIMB_LANES, perLane: true },
+  // A round from the run-out's foot: round to the ladder, up it, down the chute and back (`clips/rides.ts`).
+  slide: { by: SLIDE.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
   // Games and sport up against the thing (`clips/games.ts`): bent over the pool table's long rail (two players, a
   // lane each), at a pair of the foosball rods, at the plate stack and the crate, up on the bouldering wall's crash
   // mat, and on the yoga mat's front end, facing along it.
@@ -308,12 +313,20 @@ const STEP_IN: Record<string, StepIn> = {
   'hotHeaded.smashBin': { by: SMASH.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
   'energetic.boulderingWall': { by: BOULDER.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: [0] },
   yogaMat: { by: [[0, ['yoga'], YOGA_AT]] },
-  // Up to the board on the wall (its face 0.42 m behind the middle), the hands at it.
-  whiteboard: { by: [[0, [], { to: 0.1 }]] },
+  // Up to the board on the wall (its face 0.42 m behind the middle), writing on it at shoulder to head height
+  // (clips/reach.ts); up to the wall cupboards over the worktop and the china cabinet, the doors opened and the
+  // clean things put away up in them; to the clock's hood, winding it at the dial (a child at the trunk's chains).
+  whiteboard: { by: BOARD.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
+  ...Object.fromEntries(Object.entries(CUPBOARD_OF).map(([def, name]): [string, StepIn] => [def, { by: PUT_AWAY[name].map(({ clip, min, fit }) => [min, [clip], fit] as const), tag: 'fetch' }])),
+  grandfatherClock: { by: CLOCK.map(({ clip, min, fit }) => [min, [clip], fit] as const), tag: 'tinker' },
+  // Out on the court (2.5 m from the hoop's middle, a lane each for two), shooting (clips/shot.ts).
+  basketballHoop: { by: SHOT.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: [-0.45, 0.45], tag: 'exercise' },
+  // Kneeling at the low train table's edge, the hands on its track and its little town, a lane each (clips/low.ts).
+  trainTable: { by: KNEEL_TABLE.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: KNEEL_LANES, tag: 'play' },
   // Into the shelter at the timetable's end, on the back glass past the bench.
   busStop: { by: [[0, [], { to: 0.2 }]], lanes: [-0.95] },
-  // At the feeder's post, at its back left, clear of the bird bath.
-  'kind.songbirdFeeder': { by: [[0, [], { to: 0.25 }]], lanes: [-0.2] },
+  // At the feeder's post, at its back left, clear of the bird bath: its house filled from a scoop (clips/reach.ts).
+  'kind.songbirdFeeder': { by: FEEDER.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: [-0.2], tag: 'garden' },
   // At the microwave on the counter's right, the hands at its door.
   microwave: { by: [[0, [], { to: 0.55 }]], lanes: [-0.2] },
   // At the mic stand, singing into it.
@@ -473,6 +486,32 @@ function slingTop(sling: NonNullable<Bed['sling']>, d: number): number {
 }
 /** Getting into bed: where the hips sit down, forward of the slot centre (body scale 1). */
 const LIE_ENTRY = 0.55;
+/**
+ * Rides, sat astride with the hands on the grips whatever the use (`clips/rides.ts`): the clip for the rider's
+ * height (`sizes`), in time with the ride's loop (`sync`: the swing's pumping legs). Where each rider sits and
+ * faces is its slot's place (content `places`: the seesaw's two at its ends facing each other, the
+ * merry-go-round's four round it facing in); each ride carries its rider with it (`ObjectMotion.ride`).
+ */
+interface Ride {
+  sizes: readonly { clip: string; min: number }[];
+  sync?: boolean;
+}
+const RIDES: Record<string, Ride> = {
+  rockingHorse: { sizes: RIDE_HORSE },
+  springRider: { sizes: RIDE_SPRING },
+  seesaw: { sizes: RIDE_SEESAW },
+  merryGoRound: { sizes: RIDE_ROUND },
+  swingSet: { sizes: RIDE_SWING, sync: true },
+};
+/**
+ * The upper bunk's ladder (`BUNKS`): getting into the upper bunk the sleeper climbs up it from the tile in front
+ * of the foot end and lies down (`up`), and getting up climbs back down it to the tile (`down`: sim-core keeps
+ * them there meanwhile, `LADDER_DOWN_TICKS`), the clip for their height (`clips/rides.ts`). Both are made in the
+ * bed's frame, its upper slot facing its foot end (`Player.frame`), as sim-core puts the Sim in the bed, and
+ * back on the tile, at once. Faded in from standing over `fade` s; to and from lying (the clips end and begin
+ * in the lying pose) over `lie` s.
+ */
+const BUNK_LADDER = { up: BUNK_UP, down: BUNK_DOWN, fade: 0.3, lie: 0.12 };
 /** How far the feet reach past the slot centre for a lying Sim, and their back's height above the feet line: babies (much smaller) lie centred in the crib, on the mattress. */
 function lieCentre(rig: SimRig): number {
   // (A smaller body than its family's base body, a child's, lies with its head where a grown-up's would be, on the pillow.)
@@ -485,7 +524,9 @@ function lieBack(rig: SimRig): number {
 const BABY_LIE = { asleep: 'babyLieAsleep', awake: 'babyLieAwake' } as const;
 const BABY_LIE_FADE = 1.6;
 /** Every lying clip (`lie`, and the baby's). */
-const LYING = new Set<string>(['lie', BABY_LIE.asleep, BABY_LIE.awake]);
+const LYING = new Set<string>(['lie', 'lieCurl', BABY_LIE.asleep, BABY_LIE.awake]);
+/** Beds too short to lie on flat (a window seat's 1.3 m between its pillows): dozed on curled up on the side (`lieCurl`, clips/self.ts). */
+const CURLED_BEDS = new Set(['gloomy.windowSeat']);
 /**
  * A cuddle at the crib (action `cuddle`): the grown-up steps up to the rail, leans over it and lifts
  * the baby out, holds them cradled in the arms (head in the crook of the left arm) rocking gently,
@@ -673,8 +714,8 @@ const ACTIONS: Record<string, ActionAnim> = {
     sit: 'sitHands',
     hands: HANDS.hold,
   },
-  // (Seated at the dressing table, getting ready: a hand up at the hair, the phone clip's.)
-  wash: { stand: ['spell', 'interact'], upper: (def) => (def === 'dressingTable' ? 'phone' : ''), hands: HANDS.relaxed },
+  // (Seated at the dressing table, getting ready: brushing the hair in the mirror, clips/self.ts.)
+  wash: { stand: ['spell', 'interact'], upper: (def) => (def === 'dressingTable' ? 'brushHair' : ''), hands: (def) => (def === 'dressingTable' ? HANDS.grip : HANDS.relaxed) },
   // Washing the hair, turning round, soaping, rinsing (clips/uses.ts; a child turns only the chest).
   shower: { stand: (_, height) => (height < SHOWER_CHILD ? SHOWER_SMALL : SHOWER_ONLY), hands: HANDS.open },
   bath: { hands: HANDS.open },
@@ -902,6 +943,14 @@ interface Player {
   rootY: number;
   rootFwd: number;
   rootPitch: number;
+  /** Placed in this frame (world: a point on the floor and a facing) instead of at the Sim: the bunk's ladder (`BUNK_LADDER`). */
+  frame: Frame | null;
+}
+/** A place on the floor and a facing (world, the Sim's convention: `yaw` 0 faces +z). */
+interface Frame {
+  x: number;
+  z: number;
+  yaw: number;
 }
 
 function player(): Player {
@@ -914,6 +963,7 @@ function player(): Player {
     rootY: 0,
     rootFwd: 0,
     rootPitch: 0,
+    frame: null,
   };
 }
 
@@ -926,6 +976,7 @@ function copyPlayer(from: Player, to: Player): void {
   to.rootY = from.rootY;
   to.rootFwd = from.rootFwd;
   to.rootPitch = from.rootPitch;
+  to.frame = from.frame;
 }
 
 interface SimRig {
@@ -1037,6 +1088,11 @@ interface SimRig {
   bedH: number;
   /** How far forward of the slot it lies (`BEDS` `fwd`). */
   bedFwd: number;
+  /** Lying (or last lain) in the upper bunk (`BUNKS`): up and down its ladder (`BUNK_LADDER`). */
+  upperBunk: boolean;
+  /** Where the newest snapshot has them (the drawn place, `x` and `z`, eases there): which bunk they are given. */
+  tx: number;
+  tz: number;
   /**
    * Lying along a bed lain on across (`BEDS` `across`), in its middle, from whichever slot (on a
    * 2-wide seat the nap takes both: content `whole`).
@@ -1074,6 +1130,8 @@ interface SimRig {
   tuckSeat: number;
   /** The top still further off than the desk-hands clip reaches, pulled in as far as it goes (`sitHandsFar`). */
   tuckFar: boolean;
+  /** The top lower over the seat than the desk-hands clip's hands (`LOW_TOP`, `sitHandsLow`): a kids' chair at a coffee table. */
+  tuckLow: boolean;
   cover: number;
   /** Current (smoothed) facial expression. */
   face: Face;
@@ -1736,6 +1794,9 @@ export class Characters {
         bed: null,
         bedH: 0,
         bedFwd: 0,
+        upperBunk: false,
+        tx: 0,
+        tz: 0,
         lieAcross: false,
         fromBed: false,
         lieX: 0,
@@ -1754,6 +1815,7 @@ export class Characters {
         tuck: 0,
         tuckSeat: -1,
         tuckFar: false,
+        tuckLow: false,
         cover: 0,
         face: { ...NEUTRAL },
         blinkAt: -1,
@@ -2825,6 +2887,8 @@ export class Characters {
       rig.yaw = dir ? wrapAngle(faceYaw) : wrapAngle(rig.yaw + clamp(dyaw * (1 - Math.exp(-dt * 12 * turn)), -maxTurn, maxTurn));
       rig.visible = true;
       this.visible[i] = 1;
+      rig.tx = cx;
+      rig.tz = cz;
 
       // What it carries (`items` index + 1), and the arms that carry it.
       const held = k.held !== undefined ? curr[o + k.held] | 0 : 0;
@@ -2893,8 +2957,10 @@ export class Characters {
       const rootY = lerp(rig.prev.rootY, rig.cur.rootY, w);
       const rootFwd = lerp(rig.prev.rootFwd, rig.cur.rootFwd, w) + rig.approach;
       const pitch = lerp(rig.prev.rootPitch, rig.cur.rootPitch, w);
-      const sy = Math.sin(rig.yaw / 2);
-      const cyw = Math.cos(rig.yaw / 2);
+      // (At the Sim, or a clip placed in a frame of its own: the bunk's ladder.)
+      const at: Frame = rig.cur.frame || rig.prev.frame ? this.framed(rig, w) : rig;
+      const sy = Math.sin(at.yaw / 2);
+      const cyw = Math.cos(at.yaw / 2);
       const sp = Math.sin(pitch / 2);
       const cp = Math.cos(pitch / 2);
       // q = yaw(Y) * pitch(X)
@@ -2903,9 +2969,9 @@ export class Characters {
       pl.qy = sy * cp;
       pl.qz = -sy * sp;
       pl.qw = cyw * cp;
-      pl.x = rig.x + Math.sin(rig.yaw) * rootFwd;
+      pl.x = at.x + Math.sin(at.yaw) * rootFwd;
       pl.y = rootY + rig.floorY;
-      pl.z = rig.z + Math.cos(rig.yaw) * rootFwd;
+      pl.z = at.z + Math.cos(at.yaw) * rootFwd;
       this.stepPlace(rig, pl, step);
       pl.scale = rig.scale;
       pl.head = rig.head;
@@ -2931,7 +2997,8 @@ export class Characters {
       this.heads[i * 3 + 2] = this.headTmp[2];
 
       // Contact shadow under standing / sitting Sims.
-      const r = pose === Pose.Lie ? 0 : 0.62 * hs;
+      // (None on the bunk's ladder: the root is in the bed.)
+      const r = pose === Pose.Lie || at !== rig ? 0 : 0.62 * hs;
       const m = i * 16;
       shadows.fill(0, m, m + 16);
       shadows[m] = r;
@@ -3018,6 +3085,8 @@ export class Characters {
     let reachRate = 4;
     // Using a thing from inside or up against it this frame (`stepIn`).
     let inside = false;
+    // Placed in a frame of its own this frame (`Player.frame`: the bunk's ladder).
+    let frame: Frame | null = null;
 
     if (this.force) {
       key = this.force;
@@ -3025,15 +3094,26 @@ export class Characters {
       const obj = (known ? useObj : null) ?? this.objectAt(rig.x, rig.z);
       const bed = (obj && BEDS[obj.def]) || DEFAULT_BED;
       rig.bed = obj;
-      // A bunk's second sleeper (a hair to the right of its centre, see sim-core `slot_position`) is on top.
+      // A bunk's second sleeper (a hair to the right of its centre, see sim-core `slot_position`) is on top
+      // (by where the snapshot puts them: the drawn place may still be on its way there).
       const bunk = obj && BUNKS[obj.def];
-      const across = obj ? (rig.x - obj.cx) * Math.cos((obj.rot * Math.PI) / 2) - (rig.z - obj.cz) * Math.sin((obj.rot * Math.PI) / 2) : 0;
-      rig.bedH = (bunk ? bunk[across > 0 ? 1 : 0] : bed.h) + (obj?.lift ?? 0);
+      const right = (x: number, z: number) => (obj ? (x - obj.cx) * Math.cos((obj.rot * Math.PI) / 2) - (z - obj.cz) * Math.sin((obj.rot * Math.PI) / 2) : 0);
+      const across = right(rig.x, rig.z);
+      rig.upperBunk = !!bunk && right(rig.tx, rig.tz) > 0;
+      rig.bedH = (bunk ? bunk[rig.upperBunk ? 1 : 0] : bed.h) + (obj?.lift ?? 0);
+      const climb = rig.upperBunk && obj ? this.sizedClip(rig, BUNK_LADDER.up) : '';
       // (Lain on across, they face along it: moved back to its middle from a slot to one side.)
       rig.bedFwd = (bed.fwd ?? 0) - (rig.lieAcross ? across : 0);
       rig.useDef = obj?.def ?? '';
       rig.useObj = obj ?? null;
-      if ((rig.lastPose === Pose.Stand && rig.cur.key !== 'sitDown') || (rig.cur.key === 'sitDown' && rig.cur.time < rig.cur.clip!.duration - 0.35)) {
+      if (climb && ((rig.lastPose === Pose.Stand && rig.cur.key !== climb) || (rig.cur.key === climb && rig.cur.time < rig.cur.clip!.duration - 0.1))) {
+        // Into the upper bunk: up its ladder from the tile in front, lain down at the end (`BUNK_LADDER`).
+        key = climb;
+        rootY = obj!.lift ?? 0;
+        fade = BUNK_LADDER.fade;
+        frame = this.bedFrame(obj!);
+        if (rig.cur.key !== climb) rig.actTime = 0;
+      } else if ((rig.lastPose === Pose.Stand && rig.cur.key !== 'sitDown') || (rig.cur.key === 'sitDown' && rig.cur.time < rig.cur.clip!.duration - 0.35)) {
         // Getting in: sit down on the edge first; the crossfade to lying then leans the Sim back
         // (the root pitch blends with the clips).
         const sp = this.sitPelvis.get(rig.body.name)!;
@@ -3055,7 +3135,7 @@ export class Characters {
       } else {
         // On the back, head towards the head of the bed (local -z), centred on the slot: the
         // `lie` clip (made standing) turned flat and slowed down.
-        key = 'lie';
+        key = obj && CURLED_BEDS.has(obj.def) ? 'lieCurl' : 'lie';
         rootY = rig.bedH + lieBack(rig);
         rootFwd = lieCentre(rig) + rig.bedFwd;
         pitch = -Math.PI / 2;
@@ -3064,7 +3144,7 @@ export class Characters {
         const at = bed.sling ? this.inSling(rig, bed.sling, obj?.lift ?? 0, rootFwd) : null;
         rig.sling = at ? bed.sling! : null;
         if (at) [rootY, rootFwd] = at;
-        fade = rig.cur.key === 'sitDown' ? 0.9 : 0.45;
+        fade = rig.cur.key === 'sitDown' ? 0.9 : rig.cur.key.startsWith('bunkUp') ? BUNK_LADDER.lie : 0.45;
         // (Where it lies, for getting up: by then the Sim has already moved off the bed.)
         rig.lieX = rig.x;
         rig.lieZ = rig.z;
@@ -3083,8 +3163,13 @@ export class Characters {
       fade = 0.35;
       rig.useDef = obj?.def ?? '';
       rig.useObj = obj ?? null;
+      const ride = known && obj ? RIDES[obj.def] : undefined;
       if (social) key = speaking(pair, role, time) ? 'sitTalk' : 'sit';
-      else if (act?.sit) key = typeof act.sit === 'function' ? act.sit(rig.useDef) : act.sit;
+      else if (ride) {
+        // Astride a ride, the hands on its grips (`RIDES`).
+        key = this.sizedClip(rig, ride.sizes);
+        hands = HANDS.grip;
+      } else if (act?.sit) key = typeof act.sit === 'function' ? act.sit(rig.useDef) : act.sit;
       else if (!known && obj && SIT_HANDS.has(obj.def)) key = 'sitHands';
       else key = 'sit';
       if (floor) key = `sit${floor}`;
@@ -3096,7 +3181,9 @@ export class Characters {
         key = down;
       }
       rootFwd += this.tuckIn(rig, obj, seat, key !== down, step, fresh);
-      if (key === 'sitHands' && rig.tuckFar) key = 'sitHandsFar';
+      // (At a low top, a kids' chair at a coffee table: bent over it, the size for their height.)
+      if (key === 'sitHands' && rig.tuckLow) key = (SIT_LOW.find(({ min }) => rig.body.height * rig.scale >= min) ?? SIT_LOW[SIT_LOW.length - 1]).clip;
+      else if (key === 'sitHands' && rig.tuckFar) key = 'sitHandsFar';
       if (!social) {
         const up = known ? (typeof act?.upper === 'function' ? act.upper(rig.useDef) : act?.upper) : obj?.def === 'diningTable' ? 'eat' : undefined;
         // Eating / drinking now and then; holding a book or phone throughout.
@@ -3265,7 +3352,22 @@ export class Characters {
     if (dir?.hands !== undefined) hands = dir.hands;
     // (From the floor, its own clip: `sitFloor`.)
     const up = rig.lastPose === Pose.Sit ? `standUp${rig.floorSat}` : RISING.has(rig.cur.key) && rig.cur.key.startsWith('standUp') ? rig.cur.key : 'standUp';
-    if (!moving && pose === Pose.Stand && (rig.lastPose === Pose.Sit || rig.lastPose === Pose.Lie) && rig.cur.key !== up && !this.force) {
+    // Up from the upper bunk: down its ladder to the tile in front (`BUNK_LADDER`), sim-core waiting for them.
+    const down = rig.upperBunk && rig.bed && pose === Pose.Stand && !this.force ? this.sizedClip(rig, BUNK_LADDER.down) : '';
+    const climbDown = !!down && !moving && (rig.lastPose === Pose.Lie || (rig.cur.key === down && rig.cur.time < rig.cur.clip!.duration - 0.25));
+    if (climbDown) {
+      if (rig.cur.key !== down) rig.actTime = 0;
+      key = down;
+      rootY = rig.bed!.lift ?? 0;
+      rootFwd = 0;
+      fade = BUNK_LADDER.lie;
+      repeat = false;
+      upper = '';
+      frame = this.bedFrame(rig.bed!);
+    } else if (down) rig.upperBunk = false;
+    if (climbDown) {
+      // (Not standing up as from another bed.)
+    } else if (!moving && pose === Pose.Stand && (rig.lastPose === Pose.Sit || rig.lastPose === Pose.Lie) && rig.cur.key !== up && !this.force) {
       // Rising from a seat (or sitting up out of bed: the crossfade from lying leans the Sim up).
       key = up;
       rig.fromBed = rig.lastPose === Pose.Lie && !!rig.bed;
@@ -3316,6 +3418,14 @@ export class Characters {
       cur.rootFwd = rootFwd;
       cur.rootPitch = pitch;
     }
+    rig.cur.frame = frame;
+    // A ride in time with its loop (`RIDES` `sync`: the swing's pumping legs).
+    if (pose === Pose.Sit && key === rig.cur.key && rig.useId >= 0 && RIDES[rig.useDef]?.sync) {
+      const phase = this.loopOf?.(rig.useId);
+      if (phase != null) rig.cur.time = phase * rig.cur.clip!.duration;
+    }
+    // (Down the bunk's ladder from lying: the lying body fading out lies where it lay, in the bed's frame.)
+    if (frame && LYING.has(rig.prev.key) && rig.lastPose === Pose.Lie) rig.prev.frame = frame;
 
     if (rig.fromBed && LYING.has(rig.prev.key)) rig.prev.rootFwd = (rig.lieX - rig.x) * fx + (rig.lieZ - rig.z) * fz + lieCentre(rig) + rig.bedFwd;
 
@@ -3339,6 +3449,25 @@ export class Characters {
       rig.approach = reach;
       rig.hands = hands;
     }
+  }
+
+  /** The clip of `sizes` (the bunk's ladder, `BUNK_LADDER`; a ride's, `RIDES`) for this resident's height. */
+  private sizedClip(rig: SimRig, sizes: readonly { clip: string; min: number }[]): string {
+    const h = rig.body.height * rig.scale;
+    return (sizes.find(({ min }) => h >= min) ?? sizes[sizes.length - 1]).clip;
+  }
+
+  /** The upper bunk's frame (`BUNK_LADDER`): its slot (sim-core `slot_position`, a hair to the right of the middle), facing the foot end. */
+  private bedFrame(bed: PlacedObject): Frame {
+    const f = (bed.rot * Math.PI) / 2;
+    return { x: bed.cx + Math.cos(f) * 0.02, z: bed.cz - Math.sin(f) * 0.02, yaw: f };
+  }
+
+  /** Where the blend of the two players is placed: at the Sim, or between it and a frame of their own (`Player.frame`). */
+  private framed(rig: SimRig, w: number): Frame {
+    const a = rig.prev.frame ?? rig;
+    const b = rig.cur.frame ?? rig;
+    return { x: lerp(a.x, b.x, w), z: lerp(a.z, b.z, w), yaw: a.yaw + wrapAngle(b.yaw - a.yaw) * w };
   }
 
   /** The size of `STEP_IN` entry `into` for this resident's height: [height, clips, where]. */
@@ -3406,10 +3535,11 @@ export class Characters {
       rig.stepTime = 0;
       return [fwd, y, 'idle', 1];
     }
-    // Walking, the cycle matched to the step's pace (the walk runs on real time).
+    // Walking, the cycle matched to the step's pace (the walk runs on real time); backwards, facing it, when
+    // the place is further out than the tile (out on the court from the hoop).
     const legs = rig.body.pelvisScale * rig.scale;
     const rate = dt > 0 ? ((way / span) * (step / dt)) / (this.clip('walk').speed * legs) : 1;
-    return [fwd, y, 'walk', clamp(rate, 0.35, GAIT_MAX_RATE)];
+    return [fwd, y, 'walk', clamp(rate, 0.35, GAIT_MAX_RATE) * (dist < -Math.abs(across) ? -1 : 1)];
   }
 
   /**
@@ -3496,8 +3626,10 @@ export class Characters {
     rig.tuckSeat = id ?? -1;
     let goal = 0;
     rig.tuckFar = false;
+    rig.tuckLow = false;
     if (obj && room && settled && !seat.back && room.top > seat.h && room.top - seat.h <= TUCK.rise) {
       const s = (rig.body.height * rig.scale) / CLIP_HEIGHT;
+      rig.tuckLow = room.top - seat.h < LOW_TOP * s;
       const yaw = (obj.rot * Math.PI) / 2;
       const [dx, dz] = [rig.x - obj.cx, rig.z - obj.cz];
       const right = dx * Math.cos(yaw) - dz * Math.sin(yaw);

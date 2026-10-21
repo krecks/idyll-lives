@@ -61,7 +61,7 @@ fn generated_worlds_are_livable() {
                 if def.interactions.is_empty() || w.lot.room_at(o.x, o.z) != OUTDOORS {
                     continue;
                 }
-                if !surface::approach_tiles(&w.content, &nav, o).any(|t| nav.find_path(start, t).is_some()) {
+                if !surface::use_tiles(&w.content, &w.objects, &nav, o).into_iter().any(|t| nav.find_path(start, t).is_some()) {
                     failures.push(format!("{label}: can't reach the {} at {},{}", def.id, o.x, o.z));
                 }
             }
@@ -86,7 +86,7 @@ fn generated_worlds_are_livable() {
             }
             for o in w.objects.iter().filter(|o| !w.content.objects[o.def].interactions.is_empty() && w.lot.room_at(o.x, o.z) != OUTDOORS) {
                 let Some(from) = door(o.x, o.z) else { continue };
-                if !surface::approach_tiles(&w.content, &nav, o).any(|t| nav.find_path(from, t).is_some()) {
+                if !surface::use_tiles(&w.content, &w.objects, &nav, o).into_iter().any(|t| nav.find_path(from, t).is_some()) {
                     let at = match w.storey_of(o.z) {
                         -1 => "in the basement",
                         0 => "downstairs",

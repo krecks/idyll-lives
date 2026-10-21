@@ -18,7 +18,8 @@ drink* and the party bar's *Mix drinks for everyone* are for young adults and up
 is too young to pour a glass of wine", never picks them, and sees them greyed out; the party bar's soda is anyone's).
 Every recipe with a hot step (meal, gourmet, tasting menu, both barbecues, pizza, baked treats, pie; recipe `stages`)
 is cooked by teens and up, wherever it is started (a fridge, a stove, an oven, a grill); a child may make a sandwich
-and heat up leftovers. Coffee is left to anyone (not an age rule yet).
+and heat up leftovers. Coffee is for teens and up (I-systems-11): making one at the coffee machine (and the small
+espresso machine on a top, the foodie espresso bar) and every *Have a coffee* at a table or chair.
 
 ## Kitchen sinks (2)
 
@@ -26,8 +27,8 @@ and heat up leftovers. Coffee is left to anyone (not an age rule yet).
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `farmhouseSink` Farmhouse sink | 1x1 · floor | wash:wash washUp:wash | kitchen / counters | Cabinet, Worktop, Basin, Tap & handles, Plinth | Use | `water_on`: the stream grows from the gooseneck tap into the apron-front basin in 0.4 s, runs for the whole use and retracts as it ends. |
-| `counterSinkDouble` Double sink | 2x1 · floor | wash:wash washUp:wash | kitchen / counters | Cabinets, Worktop, Basins, Tap & handles, Plinth | Use | `water_on_0`, `water_on_1`: each bridge tap runs for the one washing at its bowl (`slot`; 2026-10-21: one washer ran both). |
+| `farmhouseSink` Farmhouse sink | 1x1 · floor | wash:wash washUp:wash | kitchen / counters | Cabinet, Worktop, Basin, Tap & handles, Plinth | Use | `water_on`: the stream grows from the gooseneck tap into the apron-front basin in 0.4 s, runs for the whole use and retracts as it ends. washUp only with dirty dishes to wash (`workOn`). |
+| `counterSinkDouble` Double sink | 2x1 · floor | wash:wash washUp:wash | kitchen / counters | Cabinets, Worktop, Basins, Tap & handles, Plinth | Use | `water_on_0`, `water_on_1`: each bridge tap runs for the one washing at its bowl (`slot`; 2026-10-21: one washer ran both). washUp only with dirty dishes to wash (`workOn`). |
 
 **In play** (signed off 2026-10-16):
 - Checked with the bathroom sinks, the first group: bought in all four facings, every part coloured (through `buy` and
@@ -100,8 +101,8 @@ and heat up leftovers. Coffee is left to anyone (not an age rule yet).
 |---|---|---|---|---|---|---|
 | `coffeeMachine` Coffee machine | 1x1 · floor | espresso:drink | kitchen / appliances | Cabinet, Worktop, Machine | Use | Provides `coffee`; `brew`: a cup slides under the spout and a thin coffee stream grows for espresso. |
 | `breakfastCounter` Breakfast counter | 1x1 · floor | toast:cook smoothie:cook | kitchen / appliances | Counter, Toaster, Blender | Use | `toast_down`: the toaster's carriage (lever and toast, one part) slides 5 cm down for toast and pops up at the end. `blend` for smoothie: the blender lid lifts. L `blades`: the smoothie under the lid swirls while it blends (E1). Its 0.95 m top is a `counter` (counter stools tuck under it). |
-| `dishwasher` Dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | `door_open`: the door drops 85° and the lower rack slides out 30 cm for dishes and for clearing away at it (the `wash` tag), open for the whole loading. |
-| `dishwasherCompact` Stainless dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | `door_open`, as the dishwasher. |
+| `dishwasher` Dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | `door_open`: the door drops 85° and the lower rack slides out 30 cm for dishes and for clearing away at it (the `wash` tag), open for the whole loading. Only with dirty dishes (`workOn`). |
+| `dishwasherCompact` Stainless dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | `door_open`, as the dishwasher. Only with dirty dishes (`workOn`). |
 
 **In play** (signed off 2026-10-16):
 - The dishwashers' doors drop 0.44 m into the tile in front: the loader stands 15 cm further back while using either
@@ -153,7 +154,7 @@ and heat up leftovers. Coffee is left to anyone (not an age rule yet).
 | `potRail` Pot rail | 1x1 · wall | — | kitchen / counters | Rail, Pots | Static | Static. Decor by decision (Q-19: kind marked decor). |
 | `kitchenShelfWall` Kitchen wall shelves | 1x1 · wall | — | kitchen / counters | Shelves, Brackets | Static | Static. Decor by decision (Q-19: kind marked decor). |
 | `trashCan` Pedal bin | 1x1 · floor | — | kitchen / counters | Bin, Lid | Use | `lid_open`: the pedal lid lifts 75° while a plate is scraped in (`clean` at its `bin` station, `hold` 1 s). |
-| `recyclingBins` Recycling bins | 1x1 · floor | sortRecycling:clean | kitchen / counters | Left bin, Middle bin, Right bin (each with its lid), Handles | Use | `lid0_open`, `lid1_open`, `lid2_open`: the three lids lift one after another (0.6 s apart, each 80° in 0.5 s, `hold` 0.9 s) for "Sort the recycling". |
+| `recyclingBins` Recycling bins | 1x1 · floor | sortRecycling:clean | kitchen / counters | Left bin, Middle bin, Right bin (each with its lid), Handles | Use | `lid0_open`, `lid1_open`, `lid2_open`: the three lids lift one after another (0.6 s apart, each 80° in 0.5 s, `hold` 0.9 s) for "Sort the recycling". Only after a meal, with something to clear (`workOn`). |
 
 **In play** (signed off 2026-10-16):
 - The pantry's and tall larder's doors open for a snack; the three wall cabinets' doors when clean dishes are put
@@ -162,8 +163,11 @@ and heat up leftovers. Coffee is left to anyone (not an age rule yet).
   (not autonomous, so generated houses play as before).
 - "Left bin" and "Right bin" are left and right as seen from the front.
 - The hood, spice rack, pot rail and wall shelves are still; looked at on all four walls.
-- Since the authenticity review (G-15): putting dishes away in a wall cabinet is a reach at the counter (`interact`),
-  with no squat to the floor; a reach up to its doors is a clip still to make.
+- Since the authenticity review (G-15): putting dishes away in a wall cabinet is done stepped up to the worktop under it
+  (`STEP_IN`, `putAway`, `putAwayGlass`, `putAwayCorner` in three sizes, clips/reach.ts): up on tiptoe to the pulls of the
+  doors that open, drawing them open along their swing, the stack lifted from the worktop onto the bottom shelf, and a
+  door pushed shut as it closes. A child, who can't reach a wall cupboard, puts the stack on the worktop's back under
+  it, looking up (I-kitchen-15).
 
 ## K6. Islands and bars (5)
 
@@ -271,5 +275,6 @@ and heat up leftovers. Coffee is left to anyone (not an age rule yet).
 - The bar cart's shaker lifts and tips towards the resident for "Mix a drink" and shuts after its `hold` (1.5 s).
 - The china cabinet's hutch back is the body's colour outside (blue only inside), so it reads standing free or with
   the wall cut away.
-- Not right yet: at the china cabinet the resident reaches at the waist while the glazed door above opens (a reach-up
-  clip still to make; since the authenticity review, G-15, at least no squat to the floor).
+- Since the authenticity review (G-15): at the china cabinet the resident steps up to it, opens the glazed door at its
+  knob and puts the stack from the base's top onto the hutch's middle shelf (`putAwayHutch`, clips/reach.ts); a child
+  puts it on the base's top.

@@ -3371,19 +3371,21 @@
       "price": 900,
       "category": "hobbies",
       "group": "crafts",
-      "description": "Builds Perception.",
+      "description": "Builds Perception. The stars come out after dark, out under the open sky.",
       "interactions": [
         {
           "id": "stargaze",
           "label": "Stargaze",
           "anim": "look",
           "minutes": 45,
+          "hours": [20, 5],
+          "sky": true,
           "effects": {
             "fun": 0.3
           },
           "tags": [
             "training",
-            "outdoors"
+            "stargazing"
           ],
           "skills": {
             "perception": 0.22,
@@ -3464,6 +3466,12 @@
           "id": "coffee",
           "requires": ["coffee"],
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",
@@ -3665,6 +3673,7 @@
     "babyWakes": {"needs": ["hunger", "bladder", "hygiene"], "below": 0.3, "tendBelow": 0.6, "cooldownMinutes": 90, "feeling": "brokenSleep"}
   },
   "autonomy": {"urgent": ["hunger", "energy", "bladder", "hygiene"], "urgentBelow": 0.1, "comfortBoost": 2, "lookAhead": 0.25, "quickMinutes": 30, "retryMinutes": 30},
+  "laundry": {"perDay": 0.4, "most": 4},
   "objectRules": {
     "freeRotation": ["decor", "garden", "outdoor", "lighting", "kids", "community"],
     "wear": {"perUse": 0.004, "byCategory": {"bathroom": 0.006, "garden": 0, "outdoor": 0, "decor": 0}, "perQuality": 0.2},

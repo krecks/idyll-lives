@@ -175,6 +175,16 @@ pub(crate) fn update(w: &mut World) {
         // Interactions started this tick are paid from the Sim's own household (guests too).
         let spend = std::mem::take(&mut w.sims[i].pending_spend);
         w.households[w.sims[i].household as usize].funds -= spend;
+        // A load of washing washed (it waits to be dried), or dried and folded.
+        let worked = std::mem::take(&mut w.sims[i].worked);
+        let laundry = &mut w.households[w.sims[i].household as usize].laundry;
+        if worked & crate::content::WorkOn::Laundry.bit() != 0 && laundry[0] >= 1.0 {
+            laundry[0] -= 1.0;
+            laundry[1] = (laundry[1] + 1.0).min(w.content.laundry.map_or(1.0, |l| l.most));
+        }
+        if worked & crate::content::WorkOn::Washed.bit() != 0 {
+            laundry[1] = (laundry[1] - 1.0).max(0.0);
+        }
         if let Some(transition) = w.sims[i].transition.take() {
             apply_transition(w, i, transition);
         }

@@ -158,7 +158,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 | `gloomy.cello` Nocturne cello | 1x1 · floor | practise:music lament:music | hobbies / — | Body, Trim, Cello | Use | `off_stand`: the cello comes off its stand to between the player's knees for practise and lament. |
 | `gloomy.journalDesk` Candlelit writing desk | 2x1 · floor | journal:write poetry:write | office / — | Body, Trim | Use | `candle`: the candle flame grows for journal and poetry; it glows at night. Written at on its own chair with the hands on the top (`NEAR_DESKS`, `sitHandsNear`; `SEATS`), not through its front. |
 | `gloomy.rainLamp` Rainfall lamp | 1x1 · floor | watchRain:look | decor / — | Body, Trim | Use | `rain`: the rain strands grow for watchRain. `ripple` swells the pool's ripples all the time, near the camera (E2). |
-| `gloomy.windowSeat` Brooding window seat | 2x1 · floor | brood:look doze:nap | living / — | Body, Cushion, Trim | Use | `sink_in` for brood and doze. The dozer lies along the cushion, head on the left pillow (`BEDS` 0.45, `across`); the doze takes both places (`whole`): it starts only on an empty seat, and nobody sits beside the dozer. |
+| `gloomy.windowSeat` Brooding window seat | 2x1 · floor | brood:look doze:nap | living / — | Body, Cushion, Trim | Use | `sink_in` for brood and doze. The dozer lies curled up on the side along the cushion, facing the room, the head on a pillow (`BEDS` 0.45, `across`; `lieCurl`, `CURLED_BEDS`: 1.3 m between the pillows is short to lie flat, since the authenticity review, G-04); the doze takes both places (`whole`): it starts only on an empty seat, and nobody sits beside the dozer. |
 | `gloomy.soakingTub` Moonstone soaking tub | 2x2 · floor | soak:bath | bathroom / — | Body, Trim | Use | `fill`: the water rises for soak. |
 
 **In play** (signed off 2026-10-17):
@@ -224,8 +224,10 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 - The coin stays in the jar while the resident is at it and comes back up into the slot when the use ends.
 - The tea table's two poufs colour apart (Fabric, Second pouf); the settee's cushions take its Body colour.
 - Since the authenticity review (G-05, G-15): the hearth settee's napper lies on its cushion (0.36); the feeder is
-  filled stepped in to its post (`STEP_IN`, clear of the bird bath), the hands at the post (a reach up to the box is a
-  clip still to make); a coin goes into the giving jar from beside it (`interact`).
+  filled stepped in to its post (`STEP_IN`, clear of the bird bath, for the refill only): the left hand steadies the
+  house and the scoop (mimed) is tipped twice over its open top (`fillFeeder177`/`147`, clips/reach.ts); a child
+  (`fillFeeder112`) tips it onto the seed tray, as high as they reach. A coin goes into the giving jar from beside it
+  (`interact`).
 
 ## P10. Lazy (6)
 
@@ -303,7 +305,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `neat.steamMopDock` Steam mop dock | 1x1 · floor | mop:clean | kitchen / — | Body, Mop | Use | `mop_off`: the mop leaves its dock for mop and is drawn in the resident's hands, pushed over the floor (content `held`). |
-| `neat.laundryCenter` Stacked laundry centre | 2x1 · floor | laundry:clean fold:clean | bathroom / — | Body, Washer & dryer | Use | `door_open`: the washer door swings for laundry and fold and shuts after 2.5 s (2026-10-21: it stood open through the wash and the folding). Folding is 20 minutes (was 60). |
+| `neat.laundryCenter` Stacked laundry centre | 2x1 · floor | laundry:clean fold:clean | bathroom / — | Body, Washer & dryer | Use | `door_open`: the washer door swings for laundry and fold and shuts after 2.5 s (2026-10-21: it stood open through the wash and the folding). Folding is 20 minutes (was 60). laundry only with dirty washing (`workOn`). |
 | `neat.rainShowerTower` Rainfall steam shower | 1x1 · floor | steamShower:shower | bathroom / — | Body, Bench | Use | `water_on`: the rain grows for steamShower. |
 | `neat.organizerDesk` Label-and-sort organizer desk | 2x1 · floor | sort:write ledger:write | office / — | Body, Wood, Chair | Use | `drawer_open`: a bin slides out of the hutch for sort and ledger. Written at on its own chair with the hands on the top (`NEAR_DESKS`, `sitHandsNear`; `SEATS`), not through its front. |
 | `neat.robotVacuumDock` Robot vacuum and dock | 1x1 · floor | program:type | living / — | Body, Trim, Rug | Loop | `vacuum_round`: once programmed the robot drives out of its dock, once round a circle in front of it facing the way it goes, and back in, round after round (5 s a round) while program lasts (2026-10-21: it peeked 60 cm out and back). Program from a seat within 4 m (`seatNear`), else standing. |

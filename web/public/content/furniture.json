@@ -494,6 +494,12 @@
         {
           "id": "espresso",
           "label": "Make a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 10,
           "effects": {
@@ -596,6 +602,7 @@
         {
           "id": "dishes",
           "label": "Load the dishwasher",
+          "workOn": "dishes",
           "anim": "clean",
           "minutes": 10,
           "effects": {
@@ -720,6 +727,7 @@
         {
           "id": "washUp",
           "label": "Wash the dishes",
+          "workOn": "dishes",
           "anim": "wash",
           "minutes": 15,
           "effects": {
@@ -950,6 +958,12 @@
           "id": "coffee",
           "requires": ["coffee"],
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",
@@ -1014,6 +1028,12 @@
           "id": "coffee",
           "requires": ["coffee"],
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",
@@ -1078,6 +1098,12 @@
           "id": "coffee",
           "requires": ["coffee"],
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",
@@ -1142,6 +1168,12 @@
           "id": "coffee",
           "requires": ["coffee"],
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",
@@ -2696,6 +2728,7 @@
         {
           "id": "laundry",
           "label": "Do the laundry",
+          "workOn": "laundry",
           "anim": "clean",
           "sound": "washer",
           "minutes": 30,
@@ -2726,6 +2759,7 @@
         {
           "id": "laundry",
           "label": "Fold the laundry",
+          "workOn": "washed",
           "anim": "clean",
           "sound": "dryer",
           "minutes": 20,
@@ -4749,6 +4783,12 @@
           "id": "coffee",
           "requires": ["coffee"],
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",
@@ -4825,6 +4865,12 @@
           "id": "coffee",
           "requires": ["coffee"],
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",

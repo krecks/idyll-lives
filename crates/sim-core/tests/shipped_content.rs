@@ -554,7 +554,7 @@ fn every_category_and_group_exists() {
     }
 }
 
-/// Things on tops are small and nobody uses them; tops lie on their footprint; table-only
+/// Things on tops are small and used at their top; tops lie on their footprint; table-only
 /// interactions belong to seats that tuck under a table and are sat down for.
 #[test]
 fn surfaces_seats_and_tabletop_things_are_consistent() {
@@ -568,10 +568,10 @@ fn surfaces_seats_and_tabletop_things_are_consistent() {
         if obj["layer"] == "surface" {
             let r = obj["radius"].as_f64().unwrap_or(0.12);
             assert!(r > 0.0 && r <= 0.45, "{id}: radius {r}");
-            assert!(
-                obj["interactions"].as_array().is_none_or(|i| i.is_empty()),
-                "{id}: things on a top have no interactions"
-            );
+            // Used at their top, standing or sitting (`surface::rider_tiles`).
+            for it in obj["interactions"].as_array().into_iter().flatten() {
+                assert!(it["pose"] != "lie" && it["inside"] != true, "{id}.{}: used standing or sitting at its top", it["id"]);
+            }
         }
         if obj["surface"].is_object() {
             let s = &obj["surface"];

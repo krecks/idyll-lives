@@ -26,11 +26,11 @@ rides.
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `slide` Playground slide | 1x2 · floor | slide:play | community / play | Frame, Slide, Roof | Static | Static. |
+| `slide` Playground slide | 1x2 · floor | slide:play | community / play | Frame, Slide, Roof | Static | Static. Gone down in rounds (`slide125`/`112`/`99` by height, `STEP_IN` at the run-out's foot): round to the ladder and up it, in under the bar onto the deck, sat at the top holding the hoop, down the chute lain back, off at the run-out and back round. |
 | `climbingFrame` Climbing frame | 2x2 · floor | climb:exercise | community / play | Frame, Roof, Net | Static | Static. Climbed round: up its rope net, across the deck (ducking under the roof) and down the fireman's pole, then back round to the net (`climb172a`/`147a`/`112a` by height, `b` for the second lane: two side by side, the second waiting on the deck for the first to slide; one who steps in while someone goes round waits at their lane until that round is back at its start, so the two stay in step, G-25). |
-| `seesaw` Seesaw | 3x1 · floor | seesaw:play | community / play | Frame, Seats, Plank | Loop (E1) | `seesaw`: the plank tips ±12° while two play (E1). The two ride at the two ends, facing each other over the handles (content `places`). |
-| `springRider` Spring rider | 1x1 · floor | ride:play | community / play | Horse, Saddle, Spring | Loop (E1) | `rock` on its spring while ridden (E1). |
-| `merryGoRound` Merry-go-round | 2x2 · floor | spin:play | community / play | Platform, Rails, Stripes | Loop (E1) | `spin` while ridden (E1). Four sit round the platform between the rails, facing the column (content `places`). |
+| `seesaw` Seesaw | 3x1 · floor | seesaw:play | community / play | Frame, Seats, Plank | Loop (E1) | `seesaw`: the plank tips ±12° while two play (E1). The two ride at the two ends, facing each other over the handles (content `places`). Ridden astride, the hands on the handle bar (`rideSeesaw147`/`112`). |
+| `springRider` Spring rider | 1x1 · floor | ride:play | community / play | Horse, Saddle, Spring | Loop (E1) | `rock` on its spring while ridden (E1). Ridden astride, the feet on the pegs, the hands on the handles (`rideSpring112`). |
+| `merryGoRound` Merry-go-round | 2x2 · floor | spin:play | community / play | Platform, Rails, Stripes | Loop (E1) | `spin` while ridden (E1). Four sit round the platform between the rails, facing the column (content `places`). Leant in, a hand on the rail either side, the legs out towards the column (`rideRound147`/`112`). |
 | `basketballHoop` Basketball hoop | 1x1 · floor | shoot:exercise | community / play | Frame, Backboard, Hoop | Use | `swish`: the net sways after each shot (1.4 s into the use, then every 3.2 s: `delay`, `every`). |
 | `pingPongTable` Ping-pong table | 2x1 · floor | pingPong:play | community / play | Table, Legs | Static | Static. The two players stand at the two ends, facing each other across the net (content `places`, off its tiles; a blocked end is played from the front). |
 | `parkChessTable` Park chess table | 1x1 · floor | chess:play | community / play | Table, Stools | Use | `move`: a pawn slides one square for chess. A stool either side, the players facing each other across the board (content `places`; rebuilt 2026-10-21, the stools were both behind it). |
@@ -53,8 +53,11 @@ rides.
   `characters/clips/street.ts`). The second lane's climber waits on the deck for the first to slide, so two who
   start together don't meet at the pole. Checked for a man, a woman and a child, two children at once, by day and
   on Low WebGL2 at night.
-- Since the authenticity review (G-04): "Shoot some hoops" picks the ball up and reaches with it (the streetball
-  hoop's `pickUp`, `interact`), not jogging on the spot; a shot from out on the court is a clip still to make.
+- Since the authenticity review (G-04): "Shoot some hoops" is shot from out on the court: the shooter steps back 1.5 m
+  (2.5 m from the hoop's middle, a lane each for two, `STEP_IN`) and plays `hoopShot177`/`147`/`112` (clips/shot.ts):
+  dribbles, a gather, a jump shot let go at the top with the wrist flicked through, the follow-through held; a child
+  heaves it two-handed from the chest. The ball is mimed (props in hand, I-held-01); the streetball hoop still picks
+  its ball up (`pickUp`, `interact`).
 
 ## CM2. Street furniture (10)
 

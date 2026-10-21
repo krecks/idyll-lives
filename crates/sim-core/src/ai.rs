@@ -189,6 +189,9 @@ mod tests {
             yields: None,
             carried: false,
             at_slot: false,
+            hours: None,
+            sky: false,
+            work_on: None,
         }
     }
 

@@ -406,10 +406,10 @@ impl World {
             .iter()
             .map(|o| {
                 let def = &self.content.objects[o.def];
-                // Nobody needs to reach a picture, a rug or a table nobody uses; chairs pulled up
-                // to a table, from any side.
+                // Nobody needs to reach a picture, a rug, a table nobody uses or what stands on a
+                // top; chairs pulled up to a table, from any side.
                 self.object_plot[o.id as usize] != Some(plot)
-                    || def.interactions.is_empty()
+                    || !def.reached()
                     || self.approach_tiles(o).iter().any(|&(fx, fz)| self.lot.in_bounds(fx, fz) && seen[self.lot.tile_index(fx, fz)])
             })
             .collect();
@@ -515,9 +515,9 @@ impl World {
             room != OUTDOORS
                 && !(p.z + k..p.z + p.d + k).any(|z| (p.x..p.x + p.w).any(|x| self.lot.room_at(x, z) == room && seen[self.lot.tile_index(x, z)]))
         };
-        // A picture, a rug or a table nobody uses can go anywhere (over a bed, behind a sofa,
-        // with chairs all round); a chair pulled up to a table needs one free side.
-        let unused = self.content.objects[def].interactions.is_empty();
+        // A picture, a rug, a table nobody uses or a thing on a top can go anywhere (over a bed,
+        // behind a sofa, with chairs all round); a chair pulled up to a table needs one free side.
+        let unused = !self.content.objects[def].reached();
         let reached = approach.iter().any(|&(ax, az)| self.lot.in_bounds(ax, az) && seen[self.lot.tile_index(ax, az)]);
         let front_ok = unused || reached || (!approach.is_empty() && self.storey_of(fz) != 0 && cut_off());
         if !front_ok || !self.keeps_reach(plot, &before, Some(id)) {
