@@ -216,5 +216,6 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** decision
 - **Where:** `web/public/content/catalog2/kids.json:17` (`kidsTable` `surface.kind: "low"`), `kids.json:38` (`kidsChair` `seatAt: ["low"]`); meals are eaten at a `table` kind (`crates/sim-core/src/surface.rs`)
 - **Evidence:** The kids' table has no uses of its own and the kids' chair at it only draws and does homework (`kids/play/child-pair-kidsChair/child-kidsChair-homework-01.png`, which looks right). Children have a snack or a meal at a little table; here a child carrying a plate goes to the dining table. Making the kids' table a `table` would let adults dine at it too (I-kids-03), so it needs a decision.
-- **Status:** open
+- **Status:** fixed (697544c2, 742572df)
+- **After:** Decided with the age rules (G-45, Q-01) instead of a new table kind: the kids' chair is a child's (`stages`), so it is no seat for a grown-up to eat at, and a diner takes a seat made for their age first within a rank (`surface::dining_seat`): a child with a plate sits at a kids' chair pulled up to the kids' table (or any low table) before the dining table, even from beside the dining table; a grown-up never does (`tests/age_rules.rs` `a_child_has_a_snack_at_the_kids_table_and_a_grown_up_never_does`). The kids' table keeps its `low` kind. Not shot in play (a sim test only; the plate on the low top is the same `spot_for_seat` as at a coffee table).
 - **Source:** wave: office/kids
