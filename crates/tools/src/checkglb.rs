@@ -1563,15 +1563,27 @@ struct Seat {
     points: Vec<[f64; 2]>,
 }
 
-/// Each slot's x (m right of the footprint's middle) of content object `object` (sim-core `slot_position`).
-fn slot_xs(object: &J) -> Vec<f64> {
+/// Each slot's place of content object `object` (sim-core `slot_position`, `slot_yaw`), `fwd` m ahead of it the
+/// way its user faces (m right of the footprint's middle and forward of it): its `places`, else spread across
+/// its width, facing its front.
+fn slot_points(object: &J, fwd: f64) -> Vec<[f64; 2]> {
+    if let Some(places) = object.get("places").and_then(J::list) {
+        return places
+            .iter()
+            .map(|p| {
+                let at = |k| p.get("at").and_then(|a| a.at(k)).and_then(J::num).map_or(0.0, Num::f);
+                let facing = number(Some(p), "facing", 0.0).to_radians();
+                [at(0) + facing.sin() * fwd, at(1) + facing.cos() * fwd]
+            })
+            .collect();
+    }
     let n = object.get("slots").and_then(J::num).map_or(1, |n| n.f().max(1.0) as usize);
     let width = object.get("footprint").and_then(|f| f.at(0)).and_then(J::num).map_or(1.0, Num::f);
-    (0..n).map(|k| (k as f64 - (n as f64 - 1.0) / 2.0) * width / n as f64).collect()
+    (0..n).map(|k| [(k as f64 - (n as f64 - 1.0) / 2.0) * width / n as f64, fwd]).collect()
 }
 
 /// The seat of content object `object` (furniture.json `seats`, else the content's `seat`, else `defaultSeat` for
-/// one sat on), the hips' point `fwd` forward of the middle at each slot (along the object for a bath, `along`).
+/// one sat on), the hips' point `fwd` ahead of each slot's place (`slot_points`; along the object for a bath, `along`).
 /// None: no one sits on it.
 fn seat_of(object: &J, furniture: &Furniture) -> Option<Seat> {
     let id = object.get("id").map(J::key).unwrap_or_default();
@@ -1604,7 +1616,7 @@ fn seat_of(object: &J, furniture: &Furniture) -> Option<Seat> {
     let along = table.and_then(|t| t.get("along")).and_then(J::num).map(Num::f);
     let points = match along {
         Some(a) => vec![[a * seat.1, 0.0]],
-        None => slot_xs(object).into_iter().map(|x| [x, seat.1]).collect(),
+        None => slot_points(object, seat.1),
     };
     Some(Seat { h: seat.0, source, disagrees, points })
 }
@@ -1693,9 +1705,9 @@ fn heights(g: &Glb, entry: &J, object: &J, furniture: &Furniture, every_slot: bo
                     (None, _) => (number(Some(&furniture.default_bed), "h", 0.5), "furniture.json `defaultBed`"),
                 };
                 let across = bed.and_then(|b| b.get("across")).is_some_and(J::truthy);
-                let xs = slot_xs(object);
-                let n = if every_slot { xs.len() } else { 1 };
-                let points: Vec<[f64; 2]> = if across { vec![[0.0, fwd]] } else { xs.into_iter().take(n).map(|x| [x, fwd]).collect() };
+                let slots = slot_points(object, fwd);
+                let n = if every_slot { slots.len() } else { 1 };
+                let points: Vec<[f64; 2]> = if across { vec![[0.0, fwd]] } else { slots.into_iter().take(n).collect() };
                 height("mattress", h, source.into(), &points, s, open, None);
             }
         }

@@ -661,12 +661,15 @@ pub(crate) fn start(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectI
 fn go_to(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], obj: u32, tags: TagMask) -> bool {
     let content = ctx.content;
     let o = &objects[obj as usize];
-    let (fx, fz) = approach(ctx, o);
+    // (A seat of its own: round to it, `places`.)
+    let def = &content.objects[o.def];
+    let slot = o.pick_slot(sim.id, 0..def.slots as usize, Some((def, sim.pos)));
+    let (fx, fz) = slot.and_then(|k| surface::slot_approach(content, &ctx.nav, o, k)).unwrap_or_else(|| approach(ctx, o));
     let Some(waypoints) = walk_route(ctx, sim, (fx, fz), [fx as f32 + 0.5, fz as f32 + 0.5]) else {
         return false;
     };
     let o = &mut objects[obj as usize];
-    if !o.reserve_seat(sim.id, &content.objects[o.def]) {
+    if !o.reserve_seat(sim.id, &content.objects[o.def], sim.pos) {
         return false;
     }
     sim.pose = Pose::Stand;
@@ -1374,8 +1377,9 @@ pub(crate) fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], i
             let o = &objects[seat as usize];
             // They stand back up where they came from (see `end_activity`).
             sim.seated_from = Some(sim.tile());
-            sim.pos = o.slot_position(content, o.slot_of(sim.id).unwrap_or(0));
-            sim.yaw = o.yaw();
+            let slot = o.slot_of(sim.id).unwrap_or(0);
+            sim.pos = o.slot_position(content, slot);
+            sim.yaw = o.slot_yaw(content, slot);
             sim.pose = Pose::Sit;
             // The plate goes on the table in front of them.
             let mut plate = None;

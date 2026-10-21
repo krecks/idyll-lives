@@ -831,6 +831,7 @@
           "anim": "watch",
           "minutes": 60,
           "seatNear": 4,
+          "seatFacing": "front",
           "broadcast": 0.35,
           "broadcastRange": 6,
           "effects": {

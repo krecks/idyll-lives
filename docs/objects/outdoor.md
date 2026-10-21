@@ -22,8 +22,8 @@ none.
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `bench` Park bench | 2x1 · floor | sit:sit | outdoor / seating | Frame, Slats | Static | Static. |
-| `patioSet` Folding bistro set | 1x2 · floor | coffee:drink sit:sit | outdoor / seating | Frame, Slats | Static | Static. |
-| `picnicTable` Picnic table | 3x2 · floor | picnic:eat coffee:drink | outdoor / seating | Frame, Planks, Cloth | Static | Static. |
+| `patioSet` Folding bistro set | 1x2 · floor | coffee:drink sit:sit | outdoor / seating | Frame, Slats | Static | Static. For two: one on each chair, facing each other across the table (content `places`; the far chair reached from behind it). |
+| `picnicTable` Picnic table | 3x2 · floor | picnic:eat coffee:drink | outdoor / seating | Frame, Planks, Cloth | Static | Static. The two sit across the cloth, one on each bench, facing each other (content `places`; the far bench reached from behind it). |
 | `gardenChair` Garden chair | 1x1 · floor | sit:sit | outdoor / seating | Chair | Static | Static. |
 | `patioTableRound` Round patio table | 1x1 · floor | — | outdoor / seating | Frame, Top, Tiles | Static | Static. |
 | `patioTable4` Teak patio table | 2x1 · floor | — | outdoor / seating | Frame, Top | Static | Static. |
@@ -78,12 +78,13 @@ none.
 |---|---|---|---|---|---|---|
 | `grill` Charcoal grill | 1x1 · floor | cook:cook | outdoor / cooking | Body, Lid | Use | `lid_open`, the lid swings up 95° on its back hinge for the whole of cook, over red coals and food on the grate (no night glow on the coals: it showed through the shut lid). |
 | `grillStation` Gas grill station | 2x1 · floor | cook:cook feast:cook | outdoor / cooking | Cart, Hood | Use | `hood_up`, the barrel hood swings up 75° for cook and feast; the counter at the content's 0.9 m. |
-| `firePit` Fire pit | 1x1 · floor | relax:relax | outdoor / cooking | Bowl, Stones | Use | `flames`, tongues grow on the logs for relax, aglow at night with the embers (the light is the content's); content `seat` puts the resident on the front capstones, not in the fire. |
+| `firePit` Fire pit | 1x1 · floor | relax:relax | outdoor / cooking | Bowl, Stones | Use | `flames`, tongues grow on the logs for relax, aglow at night with the embers (the light is the content's); warmed up at from a seat within 3 m that faces it (`seatNear`, `seatFacing: around`: a garden chair round it), else standing at one of four places round it, facing the fire (content `places`); never on its rim. |
 
 **In play** (signed off 2026-10-17):
 - Each checked in four facings: the charcoal grill's lid is up for the whole of "Grill dinner", over the coals and
   food; the gas station's hood is up for cook and for the feast; the fire pit's flames grow for "Warm up by the
-  fire", the resident on its front capstones, and the embers and flames glow at night.
+  fire", and the embers and flames glow at night. (Since 2026-10-21 they warm up from a chair round it that faces
+  it, or standing round it facing in, not on its capstones: I-outdoor-01.)
 - Each shuts when the use ends. Nothing needed fixing.
 - Since the authenticity review (G-08): chopping at the grill station is on its free counter (`STATION_SPOTS`), not on
   the grate.

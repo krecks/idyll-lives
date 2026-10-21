@@ -91,7 +91,9 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
 - **Against a wall.** Its back is on the wall's face, 7 cm into the tile: at depth −0.43 in a 1-deep
   footprint, −1.43 in a 3-deep one. Built on the tile's edge, it sits inside the wall.
 - **Residents** stand on the tile in front of the footprint to use it.
-  - Sitting and lying, they are moved to the footprint's middle (slots spread across the width).
+  - Sitting and lying, they are moved to the footprint's middle (slots spread across the width), or to
+    each slot's own place and facing (content `places`: a picnic table's two benches, the ends of a
+    ping-pong table). Build the seats where the places are.
   - Lying, the head is about 0.84 m behind that middle and the feet 0.86 m in front, whatever the
     footprint.
   - A bed's mattress is wherever its footprint's middle is. Its height is the renderer's

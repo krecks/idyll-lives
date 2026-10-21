@@ -464,16 +464,25 @@ def pingPongTable():
 
 
 # --- the park chess table -----------------------------------------------------------------------------------------
-# A stone table in the front half with the board inlaid, and two stone stools behind it where the content
-# seats its two players side by side (x = ±0.25 m, 27 cm back, 0.47 m up), facing the board. A white pawn
-# slides one square on (`move`) as they play.
-BOARD = (0.762, 0.18)   # (height, depth) of the board's middle
+# A stone table with the board inlaid, and a stone stool either side of it, left and right, where the
+# content's two places seat the players facing each other across the board (x = ±0.42 m, 0.47 m up). White
+# plays from the left. A white pawn slides one square on (`move`) as they play.
+BOARD = (0.762, 0.0)   # (height, depth) of the board's middle
 SQUARE = 0.05
+STOOL = 0.42           # the stools' middles, either side (the content's `places`)
 
 
 def _square(i, j):
-    """The game (x, depth) of square (file i, rank j), rank 0 nearest the players."""
-    return -3.5 * SQUARE + i * SQUARE, BOARD[1] - 3.5 * SQUARE + j * SQUARE
+    """The game (x, depth) of square (file i, rank j), rank 0 nearest white on the left, file 0 on white's
+    left (to the front)."""
+    return -3.5 * SQUARE + j * SQUARE, BOARD[1] + 3.5 * SQUARE - i * SQUARE
+
+
+def _stools(segments):
+    for s in (-1, 1):
+        G.revolve(f'stool{s}', [(0, 0), (0.11, 0), (0.11, 0.03), (0.07, 0.06), (0.06, 0.4), (0.12, 0.43),
+                                (0.12, 0.47), (0, 0.47)], at=F.at(s * STOOL, 0, 0), material=M.stool,
+                  segments=segments)
 
 
 def _piece(name, kind, i, j, material):
@@ -502,7 +511,7 @@ def parkChessTable():
     with G.new_parts() as still:
         G.revolve('pedestal', [(0, 0), (0.17, 0), (0.17, 0.04), (0.1, 0.08), (0.08, 0.6), (0.12, 0.68), (0.12, 0.7),
                                (0, 0.7)], at=F.at(0, 0, BOARD[1]), material=M.stool, segments=16)
-        F.box('top', 0.6, 0.06, 0.56, (0, 0.73, BOARD[1]), M.stone, bevel=0.015)
+        F.box('top', 0.48, 0.06, 0.56, (0, 0.73, BOARD[1]), M.stone, bevel=0.015)
         F.box('board', 8 * SQUARE + 0.02, 0.003, 8 * SQUARE + 0.02, (0, BOARD[0] - 0.0005, BOARD[1]), M.square_dark)
         F.box('board_light', 8 * SQUARE, 0.003, 8 * SQUARE, (0, BOARD[0] + 0.0005, BOARD[1]), M.square_light)
         for i in range(8):
@@ -510,10 +519,8 @@ def parkChessTable():
                 if (i + j) % 2 == 0:
                     x, z = _square(i, j)
                     F.box(f'sq{i}{j}', SQUARE, 0.003, SQUARE, (x, BOARD[0] + 0.001, z), M.square_dark)
-        for x in (-0.25, 0.25):
-            G.revolve(f'stool{x}', [(0, 0), (0.13, 0), (0.13, 0.03), (0.08, 0.06), (0.07, 0.4), (0.15, 0.43),
-                                    (0.15, 0.47), (0, 0.47)], at=F.at(x, 0, -0.27), material=M.stool, segments=16)
-        # a game under way: white near the players, black across
+        _stools(16)
+        # a game under way: white on the left, black across
         for k, (kind, i, j) in enumerate((('king', 4, 0), ('rook', 0, 0), ('pawn', 1, 1), ('pawn', 5, 1),
                                           ('pawn', 6, 2), ('queen', 2, 3))):
             _piece(f'white{k}', kind, i, j, M.piece_white)
@@ -526,7 +533,7 @@ def parkChessTable():
     x, z = _square(4, 1)
     pawn = G.hinged(G.join(parts, 'pawn'), F.at(x, BOARD[0], z))
     G.settle(centre=False)
-    G.slide(pawn, 'move', (0, -SQUARE, 0), seconds=0.6)   # one square on, away from the players
+    G.slide(pawn, 'move', (-SQUARE, 0, 0), seconds=0.6)   # one square on, towards black (game +x)
     return G.meshes()
 
 
@@ -536,16 +543,14 @@ def parkChessTableFar():
     with G.new_parts():
         G.revolve('pedestal', [(0, 0), (0.17, 0), (0.17, 0.04), (0.1, 0.08), (0.08, 0.6), (0.12, 0.68), (0.12, 0.7),
                                (0, 0.7)], at=F.at(0, 0, BOARD[1]), material=M.stool, segments=12)
-        F.box('top', 0.6, 0.06, 0.56, (0, 0.73, BOARD[1]), M.stone)
+        F.box('top', 0.48, 0.06, 0.56, (0, 0.73, BOARD[1]), M.stone)
         F.box('board_light', 8 * SQUARE, 0.003, 8 * SQUARE, (0, BOARD[0] + 0.0005, BOARD[1]), M.square_light)
         for i in range(8):
             for j in range(8):
                 if (i + j) % 2 == 0:
                     x, z = _square(i, j)
                     F.box(f'sq{i}{j}', SQUARE, 0.003, SQUARE, (x, BOARD[0] + 0.001, z), M.square_dark)
-        for x in (-0.25, 0.25):
-            G.revolve(f'stool{x}', [(0, 0), (0.13, 0), (0.13, 0.03), (0.08, 0.06), (0.07, 0.4), (0.15, 0.43),
-                                    (0.15, 0.47), (0, 0.47)], at=F.at(x, 0, -0.27), material=M.stool, segments=12)
+        _stools(12)
         _piece('white_king', 'king', 4, 0, M.piece_white)
         _piece('black_king', 'king', 4, 7, M.piece_black)
     G.join_all('parkChessTable_far')
@@ -576,7 +581,7 @@ FAMILY = G.Family(
              motions=HOOP, far=0.25, paint=[('post', 'Frame'), ('board', 'Backboard'), ('rim', 'Hoop')]),
      G.Model('pingPongTable', pingPongTable, size=(1.9, 0.945, 0.99), key='model.pingPongTable', far=0.25,
              paint=[('table_top', 'Table'), ('concrete', 'Legs')]),
-     G.Model('parkChessTable', parkChessTable, size=(0.8, 0.855, 0.88), key='model.parkChessTable', centre=(0, 0.02),
+     G.Model('parkChessTable', parkChessTable, size=(1.08, 0.855, 0.56), key='model.parkChessTable',
              motions=CHESS, far=parkChessTableFar, paint=[('stone', 'Table'), ('stool', 'Stools')])],
     comment='Blender-built playground (tools/art/blender/families/playground.py): a slide, a climbing '
             'frame, a seesaw, a spring rider, a merry-go-round, a basketball hoop, a ping-pong table and '

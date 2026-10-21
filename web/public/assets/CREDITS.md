@@ -407,7 +407,8 @@ town overview, override pack `packs/playground/manifest.json`) is built in Blend
 `tools/art/blender/families/playground.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The seesaw's
 plank, the spring rider's horse and the merry-go-round's platform go round while they are played on, carrying their
 riders; the hoop's net swishes after a shot and a pawn moves on the chess table; the slide, the climbing frame and the
-ping-pong table are static.
+ping-pong table are static. The chess table was rebuilt with a stool either side, its players facing each other
+(2026-10-21).
 
 The farm (`models/farm/barn.glb`, `silo.glb`, `tractor.glb`, `hayBale.glb`, `hayStack.glb`, `scarecrow.glb`,
 `trough.glb`, `coop.glb`, each with a `.far.glb` for the town overview, override pack `packs/farm/manifest.json`) is

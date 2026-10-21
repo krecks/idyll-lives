@@ -889,7 +889,7 @@ export interface UseClip {
   delay?: number;
   /** Plays again every so many seconds while the use lasts, from rest to rest each time (a net swishing after each shot). */
   every?: number;
-  /** Only for the resident in this slot (content `slots`, from 0 along the object's x, as sim-core's `slot_position`; a bunk's 1 is the upper one). */
+  /** Only for the resident in this slot (content `slots`, from 0: the one nearest its place, `slotOf`, as sim-core's `slot_position` has them; a bunk's 1 is the upper one). */
   slot?: number;
   /** Opens again for so many seconds when the use ends (a phone box's door letting the caller out). */
   out?: number;

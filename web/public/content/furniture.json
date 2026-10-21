@@ -966,6 +966,10 @@
       "category": "kitchen",
       "group": "dining",
       "slots": 2,
+      "places": [
+        { "at": [-0.5, -0.22] },
+        { "at": [0.5, -0.22] }
+      ],
       "decor": 0.3,
       "description": "A glass-topped table for two with chairs: breakfast and coffee in style.",
       "surface": {
@@ -1026,6 +1030,10 @@
       "category": "kitchen",
       "group": "dining",
       "slots": 2,
+      "places": [
+        { "at": [-0.5, -0.22] },
+        { "at": [0.5, -0.22] }
+      ],
       "decor": 0.5,
       "description": "A solid oak table set for four. Lingering over a long meal here is the best part of the day.",
       "surface": {
@@ -1585,6 +1593,7 @@
           "anim": "watch",
           "minutes": 60,
           "seatNear": 4,
+          "seatFacing": "front",
           "broadcast": 0.35,
           "broadcastRange": 6,
           "effects": {
@@ -1619,6 +1628,7 @@
           "anim": "watch",
           "minutes": 60,
           "seatNear": 4,
+          "seatFacing": "front",
           "broadcast": 0.35,
           "broadcastRange": 6,
           "effects": {
@@ -1654,6 +1664,7 @@
           "anim": "watch",
           "minutes": 60,
           "seatNear": 4,
+          "seatFacing": "front",
           "broadcast": 0.35,
           "broadcastRange": 6,
           "effects": {
@@ -1670,6 +1681,7 @@
           "anim": "watch",
           "minutes": 120,
           "seatNear": 4,
+          "seatFacing": "front",
           "broadcast": 0.35,
           "broadcastRange": 6,
           "effects": {
@@ -4623,6 +4635,13 @@
       ],
       "price": 380,
       "category": "outdoor",
+      "slots": 4,
+      "places": [
+        { "at": [0, 0.85], "facing": 180 },
+        { "at": [0.85, 0], "facing": -90 },
+        { "at": [0, -0.85] },
+        { "at": [-0.85, 0], "facing": 90 }
+      ],
       "freeRotation": true,
       "group": "cooking",
       "outdoors": true,
@@ -4633,10 +4652,6 @@
         "tiles": 8,
         "switch": false
       },
-      "seat": {
-        "height": 0.38,
-        "forward": 0.38
-      },
       "description": "A ring of stones and a crackling fire. It lights the garden at night, and warming up by it leaves residents cosy.",
       "interactions": [
         {
@@ -4644,7 +4659,8 @@
           "label": "Warm up by the fire",
           "anim": "relax",
           "minutes": 30,
-          "pose": "sit",
+          "seatNear": 3,
+          "seatFacing": "around",
           "effects": {
             "comfort": 0.4,
             "fun": 0.15
@@ -4669,6 +4685,11 @@
       ],
       "price": 220,
       "category": "outdoor",
+      "slots": 2,
+      "places": [
+        { "at": [0, 0.7], "facing": 180 },
+        { "at": [0, -0.6] }
+      ],
       "group": "seating",
       "description": "A slatted folding table and chairs for a sunny corner.",
       "surface": {
@@ -4730,6 +4751,10 @@
       "category": "outdoor",
       "group": "seating",
       "slots": 2,
+      "places": [
+        { "at": [-0.3, 0.7], "facing": 180 },
+        { "at": [-0.3, -0.7] }
+      ],
       "description": "A big wooden table with benches: picnics for two.",
       "surface": {
         "height": 0.63,
