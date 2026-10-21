@@ -257,7 +257,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/furniture.json` (`coffeeMachine.espresso` "Make a coffee"), `packs/foodie.json` (`foodie.espressoBar` espresso, latte art), every *Have a coffee* at a chair or table (`requires: ["coffee"]`, about 15 objects in `base.json`, `furniture.json`, `community.json`, `catalog2/dining.json`, `catalog2/outdoor.json`)
 - **Evidence:** I-kitchen-06's lesser case, left out of G-45 on purpose: with the age rules in place (`stages`), nothing yet keeps a child of 8 from a 10-minute espresso ("perked up") or a coffee at the table, on free will too. A teen with a coffee is ordinary, a young child is not. Fix: `"stages": ["teen", "youngAdult", "adult", "elder"]` on these interactions (the machine's and every *Have a coffee*), many lines across files other groups edit; or decide coffee stays anyone's (a game simplification).
-- **Status:** open
+- **Status:** fixed (9463d1a7)
+- **After:** Every coffee use is for teens and up (`"stages": ["teen", "youngAdult", "adult", "elder"]`): the coffee machine's *Make a coffee*, the foodie espresso bar's *Pull an espresso* and *Practise latte art*, all 17 *Have a coffee* at tables and chairs (base, furniture, dining, outdoor, community), and the new *Make a coffee* at the small espresso machine on a top (G-63). A child's order is refused ("Dee is too young to make a coffee") and free will never picks one for them (`world::unfit`); `tests/tops_and_conditions.rs` `coffee_is_for_teens_and_up` checks every shipped interaction labelled coffee, espresso or latte. Tea (the kettle, the tea set) and hot drinks stay anyone's. Not shot in play (a content rule on the G-45 path, shot there).
 - **Source:** fix: age-rules
 
 ### A-systems-02 — The washing appears on the line in 1.5 s at the start of a 20-minute hang-out

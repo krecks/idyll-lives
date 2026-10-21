@@ -703,6 +703,9 @@ Phase 4. Each row will name the group, the commit, and the before and after shot
 
 | Group | Findings | Commit | Merge | Before → after |
 |---|---|---|---|---|
+| G-63 | I-tabletop-01, I-tabletop-04 | ed77dc36, 5209bd53 | | no thing on a top usable → 20 used at their top (`fixes/tops-conditions/tops-adult-*.png`, `generated-82-*.png`) |
+| G-64 | I-hobbies-03, I-kitchen-11, I-bathroom-07 (in part) | 69d0bc33 | | stargazing at noon indoors, washing up with nothing to wash → refused with the reason; used after dark outside, with dishes (`fixes/tops-conditions/play-stars-*.jsonl`, `play-washup-*.jsonl`, `play-laundry.jsonl`) |
+| (with G-45) | I-systems-11 | 9463d1a7 | | a child's coffee → teens and up (`tests/tops_and_conditions.rs`) |
 
 ## 9. Found but not fixed
 
