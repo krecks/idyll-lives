@@ -478,6 +478,207 @@
           "finish": "material.finish.satin"
         }
       }
+    },
+    "item.iceCream": {
+      "type": "model",
+      "url": "../../models/held/iceCream.glb",
+      "materials": {
+        "bowl": {
+          "finish": "material.finish.gloss"
+        },
+        "china_well": {
+          "finish": "material.finish.gloss"
+        },
+        "choc_ice": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "strawberry": {
+          "finish": "material.finish.satin"
+        },
+        "vanilla": {
+          "finish": "material.finish.satin"
+        }
+      }
+    },
+    "item.bowlDirty": {
+      "type": "model",
+      "url": "../../models/held/bowlDirty.glb",
+      "materials": {
+        "bowl": {
+          "finish": "material.finish.gloss"
+        },
+        "china_well": {
+          "finish": "material.finish.gloss"
+        },
+        "choc_ice": {
+          "finish": "material.finish.satin"
+        },
+        "melt": {
+          "finish": "material.finish.matte"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      }
+    },
+    "item.toast": {
+      "type": "model",
+      "url": "../../models/held/toast.glb",
+      "materials": {
+        "bread": {
+          "finish": "material.finish.matte"
+        },
+        "butter": {
+          "finish": "material.finish.satin"
+        },
+        "china": {
+          "finish": "material.finish.gloss"
+        },
+        "china_well": {
+          "finish": "material.finish.gloss"
+        },
+        "toast": {
+          "finish": "material.finish.matte"
+        },
+        "toast_crust": {
+          "finish": "material.finish.matte"
+        }
+      }
+    },
+    "item.smoothie": {
+      "type": "model",
+      "url": "../../models/held/smoothie.glb",
+      "materials": {
+        "glass": {
+          "finish": "material.finish.gloss"
+        },
+        "smoothie": {
+          "finish": "material.finish.satin"
+        },
+        "smoothie_top": {
+          "finish": "material.finish.satin"
+        },
+        "straw": {
+          "finish": "material.finish.satin"
+        }
+      }
+    },
+    "item.noodles": {
+      "type": "model",
+      "url": "../../models/held/noodles.glb",
+      "materials": {
+        "chopstick": {
+          "finish": "material.finish.satin"
+        },
+        "lettuce": {
+          "finish": "material.finish.satin"
+        },
+        "noodle": {
+          "finish": "material.finish.satin"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "paper_red": {
+          "finish": "material.finish.matte"
+        }
+      }
+    },
+    "item.takeout": {
+      "type": "model",
+      "url": "../../models/held/takeout.glb",
+      "materials": {
+        "bun": {
+          "finish": "material.finish.satin"
+        },
+        "bun_base": {
+          "finish": "material.finish.matte"
+        },
+        "cheese": {
+          "finish": "material.finish.satin"
+        },
+        "fries": {
+          "finish": "material.finish.satin"
+        },
+        "kraft": {
+          "finish": "material.finish.matte"
+        },
+        "kraft_fold": {
+          "finish": "material.finish.matte"
+        },
+        "kraft_inside": {
+          "finish": "material.finish.matte"
+        },
+        "lettuce": {
+          "finish": "material.finish.satin"
+        },
+        "patty": {
+          "finish": "material.finish.satin"
+        }
+      }
+    },
+    "item.boardDirty": {
+      "type": "model",
+      "url": "../../models/held/boardDirty.glb",
+      "materials": {
+        "board_dark": {
+          "finish": "material.finish.wood"
+        },
+        "cheese": {
+          "finish": "material.finish.satin"
+        },
+        "cracker": {
+          "finish": "material.finish.matte"
+        },
+        "grease": {
+          "finish": "material.finish.matte"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
+        }
+      }
+    },
+    "item.pizzaBoardDirty": {
+      "type": "model",
+      "url": "../../models/held/pizzaBoardDirty.glb",
+      "materials": {
+        "crumb": {
+          "finish": "material.finish.matte"
+        },
+        "dough_baked": {
+          "finish": "material.finish.matte"
+        },
+        "grease": {
+          "finish": "material.finish.matte"
+        },
+        "peel": {
+          "finish": "material.finish.wood"
+        },
+        "smear_sauce": {
+          "finish": "material.finish.matte"
+        }
+      }
+    },
+    "item.pieDishDirty": {
+      "type": "model",
+      "url": "../../models/held/pieDishDirty.glb",
+      "materials": {
+        "dish": {
+          "finish": "material.finish.gloss"
+        },
+        "pastry_baked": {
+          "finish": "material.finish.matte"
+        },
+        "residue": {
+          "finish": "material.finish.matte"
+        },
+        "smear_filling": {
+          "finish": "material.finish.matte"
+        }
+      }
     }
   }
 }

@@ -163,7 +163,8 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Fix class:** code
 - **Where:** `web/public/content/base.json:3256` (`telescope`, `stargaze`: `tags ["training", "outdoors"]`, no hour or sky rule); `crates/sim-core/src/content.rs:70` (`Interaction` has no time-of-day field)
 - **Evidence:** `play/telescope-stargaze-01.png`: "Stargaze" at 12:02, in a closed room, the tube aimed at the ceiling. Its `outdoors` tag works against it: the night schedule (`base.json:1797-1809`, 22:00–06:00) weights `outdoors` uses at 0.1, so free will is least likely to stargaze at night. Stars are a night thing seen through open sky or a window; a use that only runs after dark (and outdoors or by a window) is new behaviour, so filed as `code`.
-- **Status:** open
+- **Status:** fixed (69d0bc33)
+- **After:** Interactions take conditions (G-64; `docs/content-packs.md`: `hours`, `sky`, `workOn`), kept by free will and the player's orders alike (`world::unmet`). *Stargaze* is `"hours": [20, 5], "sky": true`: at 10:00 the order is refused, "Ada can only stargaze from 20:00 to 5:00" (`fixes/tops-conditions/play-stars-noon.jsonl`); at 22:00 the telescope in the garden is used, the tube aimed up (`play-stars-night.jsonl`, `stars-night-telescope-10-22-0-stargaze-01.png`), and one in the room is refused, "Ada can only stargaze under open sky: the telescope has to stand outside". Its tags are `training, stargazing` (was `outdoors`), so the night schedule's `outdoors` 0.1 no longer weighs it down: free will stargazes at 22:00 and never at noon (`tests/tops_and_conditions.rs` `free_will_stargazes_only_at_night`). By a window indoors is not offered (open sky only). Paths under `bench-results/review/fixes/tops-conditions/`.
 - **Source:** pilot
 
 ### M-hobbies-03 — The guitars are a quarter too long, on stands as tall as a child

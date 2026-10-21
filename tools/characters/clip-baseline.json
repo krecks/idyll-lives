@@ -1,10 +1,6 @@
 {
   "about": "Known failures of tools/characters/check_clips.ts: printed as known, not failing. Body and stage \"*\": the same on every skeleton. Rewrite with --update-baseline.",
   "known": [
-    {"clip":"sit","check":"sit","what":"feet","body":"female","stage":"child"},
-    {"clip":"sit","check":"sit","what":"feet","body":"female","stage":"elder"},
-    {"clip":"sit","check":"sit","what":"feet","body":"female","stage":"teen"},
-    {"clip":"sit","check":"sit","what":"feet","body":"male","stage":"child"},
-    {"clip":"sit","check":"sit","what":"feet","body":"male","stage":"teen"}
+
   ]
 }

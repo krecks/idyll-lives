@@ -150,8 +150,14 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
 | `garden.lemonTree` Potted lemon tree | 1x1 · floor | pick:eat water:water | garden / trees | Pot | Use | `pick`: a lemon at the front (1.62 m up) shrinks away 1.6 s into pick, in the picker's hand (`pickLemon*` by height, then eating it; G-21). |
 
 **In play** (signed off 2026-10-17):
-- Checked outdoors (the lemon tree also close up): relaxed under in the shade (standing by the trunk), admired
-  (cherry), smelled (magnolia), watered (lemon tree).
+- Checked outdoors (the lemon tree also close up): relaxed under in the shade, admired (cherry), smelled
+  (magnolia), watered (lemon tree).
+- "Relax in the shade" (G-22, 2026-10-21) is a sit (`"pose": "sit"`): on the ground against the trunk, leant back,
+  the legs out long (`sitGround`), at each tree's own distance from its trunk (`furniture.json` `seats`, `shade`:
+  the oak and willow 0.58 m, the maple 0.5, the cherry 0.46, the apple 0.42, the magnolia and Japanese maple 0.4, the
+  birch 0.36), on the trunk's front or a side, whichever the sun's light falls towards as they sit down (the crown's
+  shadow; never behind, which would mean walking through the trunk). Trees so count as seats outdoors (a phone
+  call, a snack). Known, not changed: it is still offered at night (I16, G-64).
 - The apple and the lemon tree each lose their front fruit for "Pick" (`pick`), the Japanese maple its top sprigs
   for "Shape the maple" (`trim`), in all four facings, shutting after the use.
 - Known, not changed: two tiles from the house the pine's and spruce's crowns (6 m and 5.6 m across on a one-tile

@@ -37,3 +37,18 @@ middle once round, `G.spin(hand, '<name>_hand', 1, seconds=12, axis='Y')`, and t
 it (`motions.clock`, `at` 610: ten past ten at rest, the catalogue picture), on every preset. A positive turn about
 Blender +Y is clockwise seen from the front. The red second hand is gone (a game minute is a real second at normal
 speed); its red hub stays on the face. Three draws: the body and the two hands.
+
+## The candles (2026-10-21)
+
+`candlesticks` was drawn with its flames lit all day and dark at night (review M-tabletop-01). Its two flames are now
+one part of their own (`flames`, one more draw: two), built lit and sunk 3.4 cm into the candles' tops at rest, hidden
+in the wax (1.1 cm across to their 1.5). `lit` slides them up over the wicks (`G.slide`, 0.6 s) and is the model's
+`night` clip, held open dusk to dawn: by day the wicks are dark, at night the flames stand on them. The flame's
+material glows (`#FFC46A`, as the lantern's): bright while the room's lights are on, out with them (a dark room's
+candles show their flames unlit). Its height is the candles' at rest: 0.33 m.
+
+## The alarm clock's size (2026-10-21)
+
+`tableClock` was 0.15 × 0.23 × 0.06 m, half again a real twin-bell clock's height (review M-tabletop-02). It is built
+at 0.72 (`S`): the case 10.7 cm across, 0.11 × 0.16 × 0.05 m in all, its ticks and hands as thick as
+before.

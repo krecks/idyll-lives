@@ -18,9 +18,13 @@
  *   than 1 cm per cycle against the ground speed, and a foot flat on the floor in any other loop (or
  *   the short one-shots) stays put (< 1 cm);
  * - every clip's length is within 15% of its target (the runtime sequences on them);
- * - seated (`sit` fitted with the body's `seatDrop`) on a 0.45 m seat, a child's on the kids' chair
- *   (0.31 m), the feet reach the floor, and the other seated clips (and the seated ends of sitDown /
- *   standUp) keep `sit`'s pelvis;
+ * - seated (`sit` fitted with the body's `seatDrop`, the legs as the runtime fits them to the floor:
+ *   characters/seatFit.ts `feetDown`) on a 0.45 m seat, a child's on the kids' chair (0.31 m), the feet
+ *   reach the floor; on each deep seat (furniture.json `seats` with a `front`), with the hips moved forward
+ *   as the runtime does (`perch`), the knees clear its front; and the other seated clips (and the seated
+ *   ends of sitDown / standUp) keep `sit`'s pelvis;
+ * - on the floor (`sitFloor` on a 0.14 m floor cushion, `sitGround` on the ground, fitted with `seatDrop`), no knee or ankle goes under
+ *   the floor and the ankles lie on it or on the other foot (within 15 cm), and their sitting down and getting up end and start there;
  * - `lie` lies straight and down: knees nearly straight and not above the hips, the ankles 5 cm
  *   below the pelvis (the legs on the mattress, not floating), the hands 5 cm in front of the body;
  * - the baby's lying clips keep the baby on the mattress and inside the crib: no joint more than
@@ -33,14 +37,16 @@
  * stage's own bone offsets (`restT`, rig.json `bodies.<body>.stages`), the clip's pelvis motion
  * scaled by its `pelvisScale`, and the locomotion's ground speed scaled by it too (characters.ts
  * `legs`). `walk` gets the runtime's hip roll per body (characters.ts `GAIT_SWAY`). Of the clips
- * made in sizes (the fountain's, the climbing frame's, the telescope's, the fruit trees' and the shower's) each stage gets the size its height picks
+ * made in sizes (the fountain's, the climbing frame's, the games', the telescope's, the fruit trees', the
+ * shower's, the slide's, the bunk's ladder and the rides, the reaches up to the wall cupboards, the clock, the feeder and
+ * the whiteboard, the hoop shot's and the low tops') each stage gets the size its height picks
  * (characters.ts `stepFit`), and babies only their own clips (only those are checked at `baby`, and
  * only the others at every other stage). What it doesn't cover: the resident's height slider (a
  * uniform scale, though it can change the size picked), the build and head size (skinning only),
  * the elder's stoop (upper back and head, off when lying: no joint checked here), the other
  * procedural layers (look-at, breathing, turning on the spot) and the fits the runtime makes to
- * seats, beds and objects (`tuckIn`, `SEATS`, `BEDS`, `legsOut`, pedals). Children on an adult's
- * 0.45 m seat dangle their feet, as real ones do; that isn't checked.
+ * seats, beds and objects other than the seated legs' (`tuckIn`, `BEDS`, `legsOut`, pedals). Children on
+ * an adult's 0.45 m seat dangle their feet, as real ones do; that isn't checked.
  *
  * Loop flags, NaNs, seams and lengths are the same on every skeleton: they are checked once (body
  * and stage `*`). A failure listed in clip-baseline.json is printed as known and doesn't fail; a
@@ -66,11 +72,29 @@ const { clipDefs } = await import('../../web/src/render/babylon/characters/clips
 const { bake } = await import('../../web/src/render/babylon/characters/clips/dsl.ts');
 const { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } = await import('../../web/src/render/babylon/characters/clips/street.ts');
 const { BOULDER, FOOS, POOL, SMASH } = await import('../../web/src/render/babylon/characters/clips/games.ts');
+const { feetDown, legTurn, perch, SEAT_FIT, seatSize } = await import('../../web/src/render/babylon/characters/seatFit.ts');
+const { FLOOR_SITS } = await import('../../web/src/render/babylon/characters/clips/seated.ts');
+const { BALL_PIT, PLAY_TENT } = await import('../../web/src/render/babylon/characters/clips/play.ts');
+/** Seats whose top ends short of a child's knees (characters.ts `Seat.front`, `perch`). */
+const DEEP: [string, any][] = Object.entries(JSON.parse(readFileSync(new URL('../../web/src/render/babylon/characters/furniture.json', import.meta.url), 'utf8')).seats).filter(([, s]: [string, any]) => s.front !== undefined) as [string, any][];
+const { BUNK_DOWN, BUNK_UP, RIDE_HORSE, RIDE_ROUND, RIDE_SEESAW, RIDE_SPRING, RIDE_SWING, SLIDE, SWING_S } = await import('../../web/src/render/babylon/characters/clips/rides.ts');
 const { EYEPIECE, PICK_APPLE, PICK_LEMON, SHOWER_CHILD } = await import('../../web/src/render/babylon/characters/clips/uses.ts');
+const { BOARD, CLOCK, FEEDER, PUT_AWAY } = await import('../../web/src/render/babylon/characters/clips/reach.ts');
+const { SHOT } = await import('../../web/src/render/babylon/characters/clips/shot.ts');
+const { KNEEL_TABLE, SIT_LOW } = await import('../../web/src/render/babylon/characters/clips/low.ts');
+/** The clips made in sizes for reaching up (the wall cupboards, the clock, the feeder, the whiteboard), the hoop shot and the low tops (clips/reach.ts, shot.ts, low.ts), each with its length (s); all loop. */
+const MORE_SIZED: [any[], number][] = [...Object.values(PUT_AWAY).map((sizes: any): [any[], number] => [sizes, 3.2]), [CLOCK, 4.5], [FEEDER, 4], [BOARD, 6], [SHOT, 3.2], [KNEEL_TABLE, 6], [SIT_LOW, 5]];
 
+/** The socials' clips (clips/social.ts) and their lengths (s). */
+const SOCIAL: Record<string, number> = {
+  compliment: 3, deepTalk: 4, flirt: 3.2, sweetTalk: 3.4, argue: 2.2, insult: 2.4, apologize: 3.4, joke: 2.8, introduce: 3, askPartner: 3.2, breakUp: 3, prank: 2.6,
+  laugh: 2, shrug: 2.4, rebuffed: 2.6, refuse: 2.4, phoneText: 3,
+};
 /** Every clip the runtime plays (characters.ts ACTIONS / choose, reactions.ts) and whether it loops. */
 const RUNTIME: Record<string, boolean> = {
   idle: true, talk: true, walk: true, jog: true, jogAlong: true, runAlong: true, sit: true, sitTalk: true, sitDown: false, standUp: false, sitHands: true, sitHandsNear: true, sitHandsFar: true,
+  // On the floor (clips/seated.ts FLOOR_SITS): cross-legged on a cushion, on the ground against a trunk.
+  ...Object.fromEntries(FLOOR_SITS.flatMap(({ name }: any) => [[`sit${name}`, true], [`sitDown${name}`, false], [`standUp${name}`, false]])),
   interact: false, pickUp: false, dance: true, punchJab: false, punchCross: false, hit: false, kneel: true, crouch: true,
   eat: false, water: true, harvest: true, pick: true, foldArms: true, no: true, yes: false, phone: true, rail: true, spell: true,
   push: true, plant: false, lantern: true, babyLieAsleep: true, babyLieAwake: true,
@@ -79,24 +103,39 @@ const RUNTIME: Record<string, boolean> = {
   climb172a: true, climb147a: true, climb112a: true, climb172b: true, climb147b: true, climb112b: true,
   // Games and sport at things (characters.ts ACTIONS, STEP_IN; clips/games.ts), the sized ones in each size.
   dartThrow: true, pingPong: true, yoga: true,
+  // The socials' gestures and reactions, and the phone held in front (characters.ts GESTURES, ACTIONS; clips/social.ts).
+  ...Object.fromEntries(Object.keys(SOCIAL).map((clip) => [clip, true])),
   ...Object.fromEntries([POOL, FOOS, SMASH, BOULDER].flatMap((sizes: any[]) => sizes.map(({ clip }: any) => [clip, true]))),
+  // The slide's round, the bunk's ladder and the rides (characters.ts STEP_IN, BUNK_LADDER, RIDES; clips/rides.ts), in sizes.
+  ...Object.fromEntries([SLIDE].flatMap((sizes: any[]) => sizes.map(({ clip }: any) => [clip, true]))),
+  ...Object.fromEntries([BUNK_UP, BUNK_DOWN].flatMap((sizes: any[]) => sizes.map(({ clip }: any) => [clip, false]))),
+  ...Object.fromEntries([RIDE_HORSE, RIDE_SPRING, RIDE_SEESAW, RIDE_ROUND, RIDE_SWING].flatMap((sizes: any[]) => sizes.map(({ clip }: any) => [clip, true]))),
   // The telescope's eyepiece and the fruit trees, in sizes (characters.ts STEP_IN, clips/uses.ts); the shower, a child's without the turn.
   eyepiece181: true, eyepiece163: true, eyepiece147: true, eyepiece129: true, eyepiece112: true,
   pickApple177: false, pickApple147: false, pickApple112: false, pickLemon177: false, pickLemon147: false, pickLemon112: false,
   shower: true, showerChild: true,
+  // Children's play inside things (characters.ts STEP_IN; clips/play.ts).
+  ...Object.fromEntries([BALL_PIT, PLAY_TENT].flatMap((sizes: any[]) => sizes.map(({ clip }: any) => [clip, true]))),
+  // Reaching up, the hoop shot and the low tops, in sizes (characters.ts STEP_IN, `tuckIn`); brushing the hair seated and lying curled up on the side.
+  ...Object.fromEntries(MORE_SIZED.flatMap(([sizes]) => sizes.map(({ clip }: any) => [clip, true]))),
+  brushHair: true, lieCurl: true,
 };
 /** Phase-2 clips (the runtime picks them up later) and whether they loop. */
 const PHASE2: Record<string, boolean> = { lie: true, chop: true, stir: true, flip: true, drink: false, carry: true, carryOne: true, wave: false };
 /** Lengths (s) from the plan's clip table; within 15%. */
 const LENGTH: Record<string, number> = {
   idle: 2.5, talk: 2.9, walk: 1.1, jog: 0.7, jogAlong: 0.7, runAlong: 0.6, sit: 1.7, sitTalk: 2.9, sitDown: 1.33, standUp: 1.07, sitHands: 1.7, sitHandsNear: 1.7, sitHandsFar: 1.7, interact: 2.0, pickUp: 0.87,
+  ...Object.fromEntries(FLOOR_SITS.flatMap(({ name }: any) => [[`sit${name}`, 1.7], [`sitDown${name}`, 1.6], [`standUp${name}`, 1.47]])),
   dance: 1.0, punchJab: 0.87, punchCross: 1.0, hit: 0.33, kneel: 5.2, crouch: 2.9, eat: 1.33, water: 3.8, harvest: 2.5, pick: 3, plant: 2.8, foldArms: 2.5,
   yes: 2.5, no: 2.5, phone: 2.9, lantern: 2.5, rail: 2.5, spell: 2.1, push: 2.7, babyLieAsleep: 9, babyLieAwake: 6,
   fountainDrink181: 3, fountainDrink163: 3, fountainDrink147: 3, fountainDrink129: 3, fountainDrink112: 3, climb172a: 13, climb147a: 13, climb112a: 13, climb172b: 13, climb147b: 13, climb112b: 13,
   dartThrow: 7.2, pingPong: 1.8, yoga: 48,
-  ...Object.fromEntries(([[POOL, 8], [FOOS, 3.2], [SMASH, 3.4], [BOULDER, 16]] as [any[], number][]).flatMap(([sizes, s]) => sizes.map(({ clip }: any) => [clip, s]))),
+  ...SOCIAL,
+  ...Object.fromEntries(([[POOL, 8], [FOOS, 3.2], [SMASH, 3.4], [BOULDER, 16], [BALL_PIT, 12], [PLAY_TENT, 24], [SLIDE, 14], [BUNK_UP, 7], [BUNK_DOWN, 6.5], [RIDE_HORSE, 2.4], [RIDE_SPRING, 2], [RIDE_SEESAW, 2.8], [RIDE_ROUND, 2.4], [RIDE_SWING, SWING_S]] as [any[], number][]).flatMap(([sizes, s]) => sizes.map(({ clip }: any) => [clip, s]))),
   eyepiece181: 6, eyepiece163: 6, eyepiece147: 6, eyepiece129: 6, eyepiece112: 6, pickApple177: 3.3, pickApple147: 3.3, pickApple112: 3.3, pickLemon177: 3.3, pickLemon147: 3.3, pickLemon112: 3.3,
   shower: 14, showerChild: 14,
+  ...Object.fromEntries(MORE_SIZED.flatMap(([sizes, s]) => sizes.map(({ clip }: any) => [clip, s]))),
+  brushHair: 5, lieCurl: 2.4,
 };
 /** The baby lying in the crib: how far out to the side a joint may reach (m, reference skeleton: about 0.23 m on a baby, whose crib's bars are about 0.4 m from its middle). */
 const BABY_REACH = 0.6;
@@ -112,9 +151,10 @@ const STAGES = ['baby', 'child', 'teen', 'youngAdult', 'adult', 'elder'];
 const SIZED: { min: number; clips: string[] }[][] = [
   FOUNTAIN.map(({ clip, min }: any) => ({ min, clips: [clip] })),
   CLIMB.map(({ clip, min }: any) => ({ min, clips: CLIMB_LANES.map((_: number, lane: number) => climbClip(clip, lane)) })),
-  ...[POOL, FOOS, SMASH, BOULDER].map((sizes: any[]) => sizes.map(({ clip, min }: any) => ({ min, clips: [clip] }))),
+  ...[POOL, FOOS, SMASH, BOULDER, BALL_PIT, PLAY_TENT, SLIDE, BUNK_UP, BUNK_DOWN, RIDE_HORSE, RIDE_SPRING, RIDE_SEESAW, RIDE_ROUND, RIDE_SWING].map((sizes: any[]) => sizes.map(({ clip, min }: any) => ({ min, clips: [clip] }))),
   ...[EYEPIECE, PICK_APPLE, PICK_LEMON].map((sizes) => sizes.map(({ clip, min }: any) => ({ min, clips: [clip] }))),
   [{ min: SHOWER_CHILD, clips: ['shower'] }, { min: 0, clips: ['showerChild'] }],
+  ...MORE_SIZED.map(([sizes]) => sizes.map(({ clip, min }: any) => ({ min, clips: [clip] }))),
 ];
 /** The runtime's hip roll while walking, per body (rad), read from characters.ts so the two can't drift apart. */
 const GAIT_SWAY: Record<string, number> = (() => {
@@ -357,6 +397,7 @@ function checkSeatedAndLying(sk: Skeleton, restAnkle: number): void {
     const seatedAt: [string, number][] = [
       ['sitTalk', 0],
       ['sitHands', 0],
+      ...SIT_LOW.map(({ clip }: any): [string, number] => [clip, 0]),
       ['sitDown', -1],
       ['standUp', 0],
     ];
@@ -367,13 +408,51 @@ function checkSeatedAndLying(sk: Skeleton, restAnkle: number): void {
       const d = Math.hypot(p[0] - ref0[0], p[1] - ref0[1], p[2] - ref0[2]);
       if (d > 0.01) fail(sk, name, 'seated', 'pelvis', `${name}: the seated pelvis is ${(d * 100).toFixed(1)} cm from sit's`);
     }
-    // On the seat: the feet reach the floor (within 4 cm).
+    // On the seat, the legs fitted as the runtime does (`seatLegs`): the feet reach the floor (within 2 cm).
     if (sk.seatDrop !== undefined) {
       const seat = SEAT[sk.stage] ?? SEAT_HEIGHT;
       const w = fk(sit, 0, sk);
       const root = seat - (w[bone.pelvis][1] - sk.seatDrop);
-      const gap = w[bone.foot_l][1] + root - restAnkle;
-      if (Math.abs(gap) > 0.04) fail(sk, 'sit', 'sit', 'feet', `sit: on a ${seat} m seat the feet are ${(gap * 100).toFixed(0)} cm off the floor`);
+      const fitted = fk(sit, 0, sk, seatLegs(w, restAnkle - root));
+      for (const side of ['l', 'r']) {
+        const gap = fitted[bone[`foot_${side}`]][1] + root - restAnkle;
+        if (Math.abs(gap) > 0.02) fail(sk, 'sit', 'sit', 'feet', `sit: on a ${seat} m seat the ${side} foot is ${(gap * 100).toFixed(0)} cm off the floor`);
+      }
+      // On a deep seat, the hips moved forward (`perch`): the knee joints clear its front (as far as the runtime
+      // moves them, less a centimetre).
+      const size = seatSize(sk.height);
+      for (const [id, s] of DEEP) {
+        const r = s.h - (w[bone.pelvis][1] - sk.seatDrop);
+        const legs = fk(sit, 0, sk, seatLegs(w, restAnkle - r));
+        const p = perch(legSide(w, 'l'), w[bone.pelvis][2], s.front - s.fwd, size);
+        for (const side of ['l', 'r']) {
+          const knee = s.fwd + p + legs[bone[`calf_${side}`]][2] - w[bone.pelvis][2];
+          const short = s.front + SEAT_FIT.clear * size - 0.01 - knee;
+          if (short > 0) fail(sk, 'sit', 'deep', id, `sit: on ${id} the ${side} knee is ${(short * 100).toFixed(0)} cm short of clearing its front (the shin in the cushion)`);
+        }
+      }
+    }
+  }
+  // On the floor (a floor cushion, the ground): the knees and ankles over the floor, the ankles on it; sitting down
+  // there and getting up end and start there.
+  for (const { name, seat } of FLOOR_SITS as any[]) {
+    const floor = clips.get(`sit${name}`);
+    if (!floor || sk.seatDrop === undefined) continue;
+    const w = fk(floor, 0, sk);
+    const root = seat - (w[bone.pelvis][1] - sk.seatDrop);
+    for (const side of ['l', 'r']) {
+      for (const [j, what] of [['calf', 'knee'], ['foot', 'ankle']]) {
+        const y = w[bone[`${j}_${side}`]][1] + root;
+        if (y < 0.02) fail(sk, `sit${name}`, 'floor', `${j}_${side}`, `sit${name}: the ${side} ${what} is ${((0.02 - y) * 100).toFixed(0)} cm into the floor`);
+        if (j === 'foot' && y > 0.15) fail(sk, `sit${name}`, 'floor', `${j}_${side}`, `sit${name}: the ${side} ankle is ${(y * 100).toFixed(0)} cm up, on neither the floor nor the other foot`);
+      }
+    }
+    for (const [c, f] of [[`sitDown${name}`, -1], [`standUp${name}`, 0]] as [string, number][]) {
+      const clip = clips.get(c);
+      if (!clip) continue;
+      const p = fk(clip, f < 0 ? clip.frames - 1 : f, sk)[bone.pelvis];
+      const d = Math.hypot(p[0] - w[bone.pelvis][0], p[1] - w[bone.pelvis][1], p[2] - w[bone.pelvis][2]);
+      if (d > 0.01) fail(sk, c, 'seated', 'pelvis', `${c}: the seated pelvis is ${(d * 100).toFixed(1)} cm from sit${name}'s`);
     }
   }
   // Lying: legs nearly straight, hands in front of the body (the lengths on the reference skeleton,
@@ -396,6 +475,27 @@ function checkSeatedAndLying(sk: Skeleton, restAnkle: number): void {
       if (f[2] > w[bone.pelvis][2] - cm5) fail(sk, 'lie', 'lie-heel', `foot_${side}`, `lie: the ${side} ankle is ${((f[2] - w[bone.pelvis][2]) * 100).toFixed(1)} cm from the pelvis, not under it (the heels float)`);
     }
   }
+}
+
+/** A leg of the pose `w` (world joints) as characters.ts `measureLegs` measures it (characters/seatFit.ts `LegSide`). */
+function legSide(w: number[][], side: string) {
+  const [h, k, a] = [w[bone[`thigh_${side}`]], w[bone[`calf_${side}`]], w[bone[`foot_${side}`]]];
+  return { hy: h[1], hz: h[2], l1: Math.hypot(k[1] - h[1], k[2] - h[2]), l2: Math.hypot(a[1] - k[1], a[2] - k[2]), t0: Math.atan2(k[2] - h[2], h[1] - k[1]), c0: Math.atan2(a[2] - k[2], k[1] - a[1]) };
+}
+
+/** The seated legs' turns (characters.ts `seatLegs`) for the pose `w`, the ankles' floor `floor` m up (body space), as `fk`'s additive rotations. */
+function seatLegs(w: number[][], floor: number): Map<number, number[]> {
+  const add = new Map<number, number[]>();
+  const about = (a: number) => [Math.sin(a / 2), 0, 0, Math.cos(a / 2)];
+  for (const side of ['l', 'r']) {
+    const leg = legSide(w, side);
+    const [y, z] = feetDown(leg, floor, 0);
+    const turn = legTurn(leg, y, z, [0, 0]);
+    add.set(bone[`thigh_${side}`], about(turn[0]));
+    // (The calf's turn is relative to the turned thigh, which turns it too: `fk` applies a bone's on top of its parent's.)
+    add.set(bone[`calf_${side}`], about(turn[1]));
+  }
+  return add;
 }
 
 function checkBaby(sk: Skeleton): void {

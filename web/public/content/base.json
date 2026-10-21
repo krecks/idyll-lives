@@ -1931,6 +1931,7 @@
         "label": "Text",
         "icon": "icon.phone.text",
         "minutes": 10,
+        "anim": "phoneScreen",
         "contact": true,
         "message": true,
         "tags": ["social", "friendly", "phone"],
@@ -1993,6 +1994,7 @@
         "label": "Scroll the phone",
         "icon": "icon.phone.browse",
         "minutes": 20,
+        "anim": "phoneScreen",
         "tags": ["fun", "phone"],
         "autonomyWeight": 0.8,
         "needs": {"fun": 0.15}
@@ -2370,7 +2372,8 @@
     "serve",
     "cuddle",
     "bake",
-    "mix"
+    "mix",
+    "phoneScreen"
   ],
   "objects": [
     {
@@ -2941,6 +2944,7 @@
           "id": "shade",
           "label": "Relax in the shade",
           "anim": "relax",
+          "pose": "sit",
           "minutes": 30,
           "effects": {
             "comfort": 0.18,
@@ -3365,19 +3369,21 @@
       "price": 900,
       "category": "hobbies",
       "group": "crafts",
-      "description": "Builds Perception.",
+      "description": "Builds Perception. The stars come out after dark, out under the open sky.",
       "interactions": [
         {
           "id": "stargaze",
           "label": "Stargaze",
           "anim": "look",
           "minutes": 45,
+          "hours": [20, 5],
+          "sky": true,
           "effects": {
             "fun": 0.3
           },
           "tags": [
             "training",
-            "outdoors"
+            "stargazing"
           ],
           "skills": {
             "perception": 0.22,
@@ -3459,6 +3465,12 @@
           "requires": ["coffee"],
           "fetch": "pour",
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",
@@ -3660,6 +3672,7 @@
     "babyWakes": {"needs": ["hunger", "bladder", "hygiene"], "below": 0.3, "tendBelow": 0.6, "cooldownMinutes": 90, "feeling": "brokenSleep"}
   },
   "autonomy": {"urgent": ["hunger", "energy", "bladder", "hygiene"], "urgentBelow": 0.1, "comfortBoost": 2, "lookAhead": 0.25, "quickMinutes": 30, "retryMinutes": 30},
+  "laundry": {"perDay": 0.4, "most": 4},
   "objectRules": {
     "freeRotation": ["decor", "garden", "outdoor", "lighting", "kids", "community"],
     "wear": {"perUse": 0.004, "byCategory": {"bathroom": 0.006, "garden": 0, "outdoor": 0, "decor": 0}, "perQuality": 0.2},
@@ -4066,7 +4079,7 @@
       "model": "item.tastingBoard",
       "hold": "both",
       "serving": "mealPlate",
-      "emptyAs": "platterDirty",
+      "emptyAs": "boardDirty",
       "radius": 0.2
     },
     {
@@ -4084,7 +4097,7 @@
       "model": "item.pizza",
       "hold": "both",
       "serving": "pizzaSlice",
-      "emptyAs": "platterDirty",
+      "emptyAs": "pizzaBoardDirty",
       "radius": 0.2
     },
     {
@@ -4102,7 +4115,7 @@
       "model": "item.pieDish",
       "hold": "both",
       "serving": "pieSlice",
-      "emptyAs": "trayDirty",
+      "emptyAs": "pieDishDirty",
       "radius": 0.16
     },
     {
@@ -4156,15 +4169,15 @@
     {
       "id": "iceCream",
       "label": "Ice cream",
-      "model": "item.treatPlate",
+      "model": "item.iceCream",
       "hold": "hand",
-      "emptyAs": "plateDirty",
-      "radius": 0.13
+      "emptyAs": "bowlDirty",
+      "radius": 0.08
     },
     {
       "id": "toast",
       "label": "Toast",
-      "model": "item.sandwich",
+      "model": "item.toast",
       "hold": "hand",
       "emptyAs": "plateDirty",
       "radius": 0.13
@@ -4182,27 +4195,27 @@
       "label": "Cheese board",
       "model": "item.tastingBoard",
       "hold": "both",
-      "emptyAs": "platterDirty",
+      "emptyAs": "boardDirty",
       "radius": 0.2
     },
     {
       "id": "smoothie",
       "label": "Smoothie",
-      "model": "item.prepBowl",
+      "model": "item.smoothie",
       "hold": "hand",
-      "radius": 0.12
+      "radius": 0.06
     },
     {
       "id": "noodles",
       "label": "Noodles",
-      "model": "item.prepBowl",
+      "model": "item.noodles",
       "hold": "hand",
-      "radius": 0.12
+      "radius": 0.07
     },
     {
       "id": "takeout",
       "label": "Takeout",
-      "model": "item.mealPlate",
+      "model": "item.takeout",
       "hold": "hand",
       "radius": 0.13
     },
@@ -4279,6 +4292,38 @@
       "hold": "both",
       "dirty": true,
       "radius": 0.2
+    },
+    {
+      "id": "bowlDirty",
+      "label": "Dirty bowl",
+      "model": "item.bowlDirty",
+      "hold": "hand",
+      "dirty": true,
+      "radius": 0.08
+    },
+    {
+      "id": "boardDirty",
+      "label": "Dirty board",
+      "model": "item.boardDirty",
+      "hold": "both",
+      "dirty": true,
+      "radius": 0.2
+    },
+    {
+      "id": "pizzaBoardDirty",
+      "label": "Dirty pizza board",
+      "model": "item.pizzaBoardDirty",
+      "hold": "both",
+      "dirty": true,
+      "radius": 0.2
+    },
+    {
+      "id": "pieDishDirty",
+      "label": "Dirty pie dish",
+      "model": "item.pieDishDirty",
+      "hold": "both",
+      "dirty": true,
+      "radius": 0.16
     }
   ],
   "recipes": [

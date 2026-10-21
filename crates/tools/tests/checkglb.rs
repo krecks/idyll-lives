@@ -39,7 +39,8 @@ fn the_known_keys_hold_every_checked_model() {
 }
 
 /// The sofa bed (the plan's known case, "0.44 against 0.42 m"): its mattress is measured pulled out (`bed_out`),
-/// and today the model has it where furniture.json does, 0.44 m, and the seat at the content's 0.44: no height
+/// and today the model has it where furniture.json does, 0.44 m, and the seat at 0.44 (furniture.json `seats`, the
+/// content's copied there with its `front`): no height
 /// warning.
 #[test]
 fn the_sofa_bed_is_measured_held_open_where_furniture_json_has_it() {
@@ -51,7 +52,7 @@ fn the_sofa_bed_is_measured_held_open_where_furniture_json_has_it() {
     assert_eq!((mattress.expected, mattress.source.as_str(), mattress.open.as_deref()), (0.44, "furniture.json `beds`", Some("bed_out")));
     assert_eq!(mattress.at, [-0.5, 0.6], "the first sleeper's slot, 0.6 m forward");
     assert!((mattress.mesh.unwrap() - 0.44).abs() < 0.002, "mattress {:?}", mattress.mesh);
-    assert_eq!((seat.expected, seat.source.as_str(), seat.open.as_deref()), (0.44, "content `seat`", None));
+    assert_eq!((seat.expected, seat.source.as_str(), seat.open.as_deref()), (0.44, "furniture.json `seats`", None));
     assert!((seat.mesh.unwrap() - 0.44).abs() < 0.002, "seat {:?}", seat.mesh);
     assert!(mattress.fits() && seat.fits() && seat.disagrees.is_none());
     let report = gate(&paths, &["model.sofaBed".to_string()]);

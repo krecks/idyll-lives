@@ -1063,6 +1063,12 @@
           "requires": ["coffee"],
           "fetch": "pour",
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",

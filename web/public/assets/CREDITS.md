@@ -280,14 +280,14 @@ dumbbell rack are still.
 
 The lamps (`models/lighting/*.glb`: the seven ceiling lights, three wall lights, five floor lamps and six table
 lamps, override pack `packs/lighting/manifest.json`) are built in Blender by `tools/art/blender/families/lighting.py`
-on `gamekit` and exported as `.glb` (glTF, original, CC0). Their shades glow at night; the ceiling fan's blades turn
-and the paper lantern sways.
+on `gamekit` and exported as `.glb` (glTF, original, CC0). Their shades glow at night (coloured glass in its own colour); the ceiling fan's blades
+turn while it is on.
 
 The decor models (`models/decor/*.glb`: the D1 wall art and clocks, D2 ornaments and D3 curtains and rugs, override
 pack `packs/decor/manifest.json`) are built in Blender by `tools/art/blender/families/decor.py` on `gamekit` and
 exported as `.glb` (glTF, original, CC0). The wall clock's second hand and the grandfather clock's pendulum go
-round near the camera, the clock's door opens to wind it, the hanging plant sways when watered, the fire burns while
-a resident warms up by it, and the curtains are drawn at night.
+round near the camera, the hanging plant sways when watered, the fire burns while a resident warms up by it, and the
+curtains (a window-length pair, a wide pair and a floor-length pair) are drawn at night.
 
 The bathroom mirror cabinet, round mirror and tall cabinet (`models/bathroom/mirrorCabinet.glb`, `mirrorRound.glb`,
 `bathCabinetTall.glb`, override pack `packs/bathroom/manifest.json`) are built in Blender by
@@ -398,8 +398,8 @@ tableware `fruitBowl`, `plateSet`, `cakeStand`, `teapotSet`, `mugs`, `wineGlasse
 `photoFrame`, `tableClock`, `globe`, `snowGlobe`, `trophy`, `sculptureSmall`; and `soapSet`, `towelStack`,
 `perfumeTray`, `deskOrganiser`, `laptopClosed`, `monitor`, `stuffedToy`, `toyBlocks`; override pack
 `packs/tabletop/manifest.json`) are built in Blender by `tools/art/blender/families/tabletop.py` on `gamekit` and
-exported as `.glb` (glTF, original, CC0). The alarm clock's second hand goes round once a minute (`hands`, ambient);
-the rest are static.
+exported as `.glb` (glTF, original, CC0). The alarm clock's hands tell the game's time and the
+candles' flames rise at night; the rest are static.
 
 The playground (`models/playground/slide.glb`, `climbingFrame.glb`, `seesaw.glb`, `springRider.glb`,
 `merryGoRound.glb`, `basketballHoop.glb`, `pingPongTable.glb`, `parkChessTable.glb`, each with a `.far.glb` for the
@@ -467,7 +467,9 @@ cassette door tips open, and the electric fire's flames grow while a resident wa
 
 The things residents carry and cook with (`models/held/*.glb`: the bag of shopping, the prep bowl, the stew pot and
 the dirty pot, the tasting board, the grill platter and the dirty platter, the pizza, the baking tray and the dirty
-tray, the pie, the plates of stew, pizza, treats, pie and a sandwich, the dirty plate, and the chopping board, the
+tray, the pie and the dirty pie dish, the plates of stew, pizza, treats, pie, a sandwich and toast, the dirty plate, the
+dirty tasting board and pizza board, the bowl of ice cream and the dirty bowl, the smoothie, the noodle pail and the
+takeaway box, and the chopping board, the
 pan, the mixing bowl and the food on the grill that stand on a station while a resident cooks; override pack
 `packs/held/manifest.json`, over the `item.*` and `tool.*` keys) are built in Blender by
 `tools/art/blender/families/held.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). They are still.

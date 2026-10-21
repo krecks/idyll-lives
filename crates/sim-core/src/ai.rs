@@ -186,6 +186,9 @@ mod tests {
             fetch: None,
             ripe: false,
             picks: false,
+            hours: None,
+            sky: false,
+            work_on: None,
         }
     }
 

@@ -74,12 +74,19 @@ import { FACE_KEYS, FaceMixer, NEUTRAL, type Face } from './characters/face';
 import { ENERGY_RATE, type VisemeTrack } from '../../voice/visemes';
 import { outfitFor, SHELL_BITS, WEARS, writeOutfit, type OutfitFit, type OutfitParams, type Wear } from './characters/outfit';
 import { BLANKET_WIDTH, blanketMaterial, buildBlanket, quiltTint, type BlanketShape } from './characters/blanket';
+import { BUNK_DOWN, BUNK_UP, RIDE_HORSE, RIDE_ROUND, RIDE_SEESAW, RIDE_SPRING, RIDE_SWING, SLIDE } from './characters/clips/rides';
 import { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } from './characters/clips/street';
+import { FLOOR_SITS } from './characters/clips/seated';
+import { BALL_PIT, PLAY_TENT } from './characters/clips/play';
 import { BOULDER, FOOS, FOOS_LANES, POOL, SMASH, YOGA_AT } from './characters/clips/games';
 import { EYEPIECE, PICK_APPLE, PICK_LEMON, SHOWER_CHILD } from './characters/clips/uses';
+import { KNEEL_LANES, KNEEL_TABLE, LOW_TOP, SIT_LOW } from './characters/clips/low';
+import { BOARD, CLOCK, CUPBOARD_OF, FEEDER, PUT_AWAY } from './characters/clips/reach';
+import { SHOT } from './characters/clips/shot';
 // The seat and bed tables (`SEATS`, `BEDS`, `BUNKS` and their defaults) are data, read by `cargo check-glb` and
 // `cargo review` too; what their entries mean and why some are as they are: docs/characters-format.md "Seats and beds".
 import FURNITURE from './characters/furniture.json';
+import { feetDown, legTurn, perch, SEAT_FIT, seatSize, type LegSide } from './characters/seatFit';
 import { furthestAhead, nearestAhead, type TableRoom } from './tableTuck';
 import { addLocal, addRotation, blendInto, makeAdditive, PoseScratch, qmul, resetAdditive, rotate, sampleClip, skin, type Additive, type Placement } from './characters/pose';
 import type { MaterialLibrary } from './materials';
@@ -124,6 +131,64 @@ const Anim = {
   Kiss: 7,
   Wave: 8,
 } as const;
+/**
+ * A social's body language (`choose`; the clips in characters/clips/social.ts). `speak`: the one who
+ * started it, on their turn (default `talk`); `answer`: the other on theirs (default `talk`); `listen`:
+ * either while the other speaks (default the idle, with a nod or a head shake now and then once it's
+ * going well or badly). Once the outcome shows (snapshot `outcome`): `good` / `bad`, the other's (and
+ * those listening in) for the rest of it when it went well / badly, and `flop`, the starter's when it
+ * went badly (a joke nobody laughs at, a flirt turned down). A `good` laugh is shared: the teller
+ * laughs along between their turns.
+ */
+interface Gesture {
+  speak?: string;
+  answer?: string;
+  listen?: string;
+  good?: string;
+  bad?: string;
+  flop?: string;
+}
+/** Per animation code, for socials without their own (`GESTURES`; packs'). */
+const ANIM_GESTURES: Record<number, Gesture> = {
+  [Anim.Laugh]: { good: 'laugh', bad: 'foldArms', flop: 'shrug' },
+  [Anim.Flirt]: { speak: 'flirt', bad: 'foldArms', flop: 'rebuffed' },
+  [Anim.Argue]: { speak: 'argue', answer: 'argue', listen: 'no' },
+};
+/** Per social (content `socials` id), over its animation code's. */
+const GESTURES: Record<string, Gesture> = {
+  introduce: { speak: 'introduce', answer: 'introduce' },
+  joke: { speak: 'joke' },
+  compliment: { speak: 'compliment', bad: 'foldArms', flop: 'shrug' },
+  deepTalk: { speak: 'deepTalk', answer: 'deepTalk' },
+  flirt: { answer: 'flirt' },
+  sweetTalk: { speak: 'sweetTalk', answer: 'sweetTalk' },
+  askPartner: { speak: 'askPartner', bad: 'refuse', flop: 'rebuffed' },
+  breakUp: { speak: 'breakUp', answer: 'argue', listen: 'no' },
+  insult: { speak: 'insult', listen: 'no' },
+  prank: { speak: 'prank' },
+  apologize: { speak: 'apologize', bad: 'foldArms', flop: 'rebuffed' },
+};
+/**
+ * A refused hug or kiss (`Anim.Hug`, `Anim.Kiss`, snapshot `outcome` 2, shown from the start): the one asked
+ * leans away with a hand up (`refuse`) and steps back `back` m; the one who asked stays where they stood,
+ * the shoulders dropped (`rebuffed`).
+ */
+const REFUSED = { back: 0.14 };
+/**
+ * A kiss between two of any heights (`Anim.Kiss`), per metre the one is taller than the other (rad):
+ * `bend`, the taller's back bent over; `nod`, their head bowed; `lift`, the shorter's face lifted (the neck,
+ * the head and the upper back); each at most `most`. `lean`: how far both lean in. The arms: the taller's
+ * raised `waist` round the other's waist (elbows `waistWrap`), the shorter's raised `neck` up round the
+ * other's shoulders (elbows `neckWrap`, `hugArms`).
+ */
+const KISS_FIT = { bend: 0.7, nod: 1.3, lift: 1.8, most: 0.45, lean: 0.06, waist: 0.75, waistWrap: 1.35, neck: 1.4, neckWrap: 1.25 };
+/**
+ * Punches aimed at the other's head at any two heights (`Anim.Fight`, the attacker): the fist goes `head` of
+ * the difference in height lower (the clips aim at one's own face, at about that share of the height), at
+ * `reach` m (body scale 1); of that angle (at most `most` rad), `bend` is bent down at the back over a
+ * shorter one and `straighten` straightened up to a taller one, the arms doing the rest.
+ */
+const AIM = { head: 0.85, reach: 0.55, most: 0.7, bend: 0.45, straighten: 0.3 };
 /** Sim ticks per frame step at each game speed (`clock::TICKS_PER_STEP`). */
 export const GAME_RATE = [0, 1, 3, 10, 30, 60];
 /** Speed while time skips through quiet hours (`clock::AUTO_FAST_SPEED`). */
@@ -171,8 +236,8 @@ const DEFAULT_SEAT: Seat = FURNITURE.defaultSeat;
  * mattress, pulled out or folded away, reaches half a metre past it. Negative: steps in to a thing
  * smaller than its tile (the herb planters, 0.4–0.46 m deep, are picked from as from a counter), or to
  * the part used: the toes at a basin or a sink's cabinet, the hands over the water; up to the toaster and
- * the blender on a counter, the chemistry bench pushed back on its tile, the clock's trunk door, the
- * giving jar. Back from the statue, to look up at it.
+ * the blender on a counter, the chemistry bench pushed back on its tile, the giving jar. Back from the
+ * statue, to look up at it.
  */
 const STAND_BACK: Record<string, number> = {
   dishwasher: 0.15,
@@ -189,7 +254,6 @@ const STAND_BACK: Record<string, number> = {
   counterSinkDouble: -0.45,
   breakfastCounter: -0.3,
   chemistrySet: -0.35,
-  grandfatherClock: -0.6,
   'kind.givingJar': -0.4,
   townStatue: 0.8,
 };
@@ -217,7 +281,8 @@ const CROUCH_SHOULDER = 0.55;
  * `out` seconds after the use before stepping
  * out (the door opening again, `out` in its motions). `perLane`: the clips are one per lane, not a sequence (each
  * lane's round goes its own way: the climbing frame's, round to its pole and back). `tag`: only for that use
- * (its action tag), the object's other uses as usual.
+ * (its action tag), the object's other uses as usual. `over`: a rim stepped over on the way in and out (`at` m
+ * from the middle, `h` m high: the ball pit's).
  */
 interface StepIn {
   by: readonly (readonly [height: number, clip: readonly string[], at: { to: number; up?: number }])[];
@@ -227,6 +292,7 @@ interface StepIn {
   out?: number;
   perLane?: boolean;
   tag?: string;
+  over?: { at: number; h: number };
 }
 /** Eating a picked fruit (after the pick), bite by bite. */
 const EAT_FRUIT = ['eat', 'idle', 'eat', 'idle', 'eat', 'idle'];
@@ -236,6 +302,8 @@ const STEP_IN: Record<string, StepIn> = {
   phoneBooth: { by: [[0, ['phone'], { to: -0.04, up: 0.12 }]], wait: 1, back: 0.25, out: 0.25 },
   // Side by side on the net (0.9 m wide, from -0.75 m), each round over the deck and down the pole.
   climbingFrame: { by: CLIMB.map(({ clip, min, fit }) => [min, CLIMB_LANES.map((_, lane) => climbClip(clip, lane)), fit] as const), lanes: CLIMB_LANES, perLane: true },
+  // A round from the run-out's foot: round to the ladder, up it, down the chute and back (`clips/rides.ts`).
+  slide: { by: SLIDE.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
   // Games and sport up against the thing (`clips/games.ts`): bent over the pool table's long rail (two players, a
   // lane each), at a pair of the foosball rods, at the plate stack and the crate, up on the bouldering wall's crash
   // mat, and on the yoga mat's front end, facing along it.
@@ -244,12 +312,20 @@ const STEP_IN: Record<string, StepIn> = {
   'hotHeaded.smashBin': { by: SMASH.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
   'energetic.boulderingWall': { by: BOULDER.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: [0] },
   yogaMat: { by: [[0, ['yoga'], YOGA_AT]] },
-  // Up to the board on the wall (its face 0.42 m behind the middle), the hands at it.
-  whiteboard: { by: [[0, [], { to: 0.1 }]] },
+  // Up to the board on the wall (its face 0.42 m behind the middle), writing on it at shoulder to head height
+  // (clips/reach.ts); up to the wall cupboards over the worktop and the china cabinet, the doors opened and the
+  // clean things put away up in them; to the clock's hood, winding it at the dial (a child at the trunk's chains).
+  whiteboard: { by: BOARD.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
+  ...Object.fromEntries(Object.entries(CUPBOARD_OF).map(([def, name]): [string, StepIn] => [def, { by: PUT_AWAY[name].map(({ clip, min, fit }) => [min, [clip], fit] as const), tag: 'fetch' }])),
+  grandfatherClock: { by: CLOCK.map(({ clip, min, fit }) => [min, [clip], fit] as const), tag: 'tinker' },
+  // Out on the court (2.5 m from the hoop's middle, a lane each for two), shooting (clips/shot.ts).
+  basketballHoop: { by: SHOT.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: [-0.45, 0.45], tag: 'exercise' },
+  // Kneeling at the low train table's edge, the hands on its track and its little town, a lane each (clips/low.ts).
+  trainTable: { by: KNEEL_TABLE.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: KNEEL_LANES, tag: 'play' },
   // Into the shelter at the timetable's end, on the back glass past the bench.
   busStop: { by: [[0, [], { to: 0.2 }]], lanes: [-0.95] },
-  // At the feeder's post, at its back left, clear of the bird bath.
-  'kind.songbirdFeeder': { by: [[0, [], { to: 0.25 }]], lanes: [-0.2] },
+  // At the feeder's post, at its back left, clear of the bird bath: its house filled from a scoop (clips/reach.ts).
+  'kind.songbirdFeeder': { by: FEEDER.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: [-0.2], tag: 'garden' },
   // At the microwave on the counter's right, the hands at its door.
   microwave: { by: [[0, [], { to: 0.55 }]], lanes: [-0.2] },
   // At the mic stand, singing into it.
@@ -261,6 +337,10 @@ const STEP_IN: Record<string, StepIn> = {
   // Picking the fruit hanging at the front (clips/uses.ts, fitted to where it hangs), then eating it.
   'garden.apple': { by: PICK_APPLE.map(({ clip, min, fit }) => [min, [clip, ...EAT_FRUIT], fit] as const), tag: 'eat' },
   'garden.lemonTree': { by: PICK_LEMON.map(({ clip, min, fit }) => [min, [clip, ...EAT_FRUIT], fit] as const), tag: 'eat' },
+  // Children's play (`clips/play.ts`): over the ball pit's rim into its middle, wading, jumping and sitting in the
+  // balls; down at the play tent's door, crawling in to play on its mat and back out.
+  ballPit: { by: BALL_PIT.map(({ clip, min, fit }) => [min, [clip], fit] as const), over: BALL_PIT[0].fit.over },
+  playTent: { by: PLAY_TENT.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
 };
 /** One clip played alone (`StepIn.perLane`), by name. */
 const LANE_SEQ = new Map<string, readonly string[]>();
@@ -269,6 +349,8 @@ const LANE_SYNC = 0.4;
 /** Stepping in (m/s, game time) and out again (s). */
 const STEP_IN_SPEED = 1.05;
 const STEP_OUT_S = 1.1;
+/** Over a rim (`StepIn.over`): up on it from this far (m) either side. */
+const STEP_OVER = 0.3;
 
 /**
  * A chair pulled up to a table (`tableTuck.ts`): once seated, the sitter shuffles it in (and pushes it back
@@ -320,6 +402,16 @@ interface Seat {
   recline?: number;
   /** Pedals the feet turn (an exercise bike): the crank's axle (height, forward of the middle) and its length (m). */
   pedals?: { h: number; fwd: number; crank: number };
+  /**
+   * Where its top ends in front (m forward of the footprint's middle, as `fwd`; `cargo check-glb` measures it): on a
+   * deep seat the hips move forward until the knees clear it (`perch`), not the shins down inside the cushion.
+   */
+  front?: number;
+  /**
+   * Sat against a tree's trunk on the ground, in its shade: facing out from it on whichever of its front and its
+   * sides is in the crown's shadow then (`shadeSide`), `fwd` from the trunk's middle.
+   */
+  shade?: boolean;
 }
 /**
  * Mattress / bench top height (m) for lying, and how far forward of the footprint's middle the
@@ -335,6 +427,8 @@ interface Bed {
   /** How far short of the footprint's foot end the quilt ends (m, default 0.05): a bed whose mattress stops short of it. */
   foot?: number;
   across?: boolean;
+  /** A bench lifted on (the weight bench): the feet down on the floor either side of it, this far (m) out from its middle (`benchLegs`). */
+  feet?: number;
   /**
    * A hammock's sling, along the sleeper from its middle (m): its top's height there (`low`) and at its
    * ends (`end`, `half` each way, at the spreader bars; a parabola between), and how far towards the head
@@ -390,6 +484,32 @@ function slingTop(sling: NonNullable<Bed['sling']>, d: number): number {
 }
 /** Getting into bed: where the hips sit down, forward of the slot centre (body scale 1). */
 const LIE_ENTRY = 0.55;
+/**
+ * Rides, sat astride with the hands on the grips whatever the use (`clips/rides.ts`): the clip for the rider's
+ * height (`sizes`), in time with the ride's loop (`sync`: the swing's pumping legs). Where each rider sits and
+ * faces is its slot's place (content `places`: the seesaw's two at its ends facing each other, the
+ * merry-go-round's four round it facing in); each ride carries its rider with it (`ObjectMotion.ride`).
+ */
+interface Ride {
+  sizes: readonly { clip: string; min: number }[];
+  sync?: boolean;
+}
+const RIDES: Record<string, Ride> = {
+  rockingHorse: { sizes: RIDE_HORSE },
+  springRider: { sizes: RIDE_SPRING },
+  seesaw: { sizes: RIDE_SEESAW },
+  merryGoRound: { sizes: RIDE_ROUND },
+  swingSet: { sizes: RIDE_SWING, sync: true },
+};
+/**
+ * The upper bunk's ladder (`BUNKS`): getting into the upper bunk the sleeper climbs up it from the tile in front
+ * of the foot end and lies down (`up`), and getting up climbs back down it to the tile (`down`: sim-core keeps
+ * them there meanwhile, `LADDER_DOWN_TICKS`), the clip for their height (`clips/rides.ts`). Both are made in the
+ * bed's frame, its upper slot facing its foot end (`Player.frame`), as sim-core puts the Sim in the bed, and
+ * back on the tile, at once. Faded in from standing over `fade` s; to and from lying (the clips end and begin
+ * in the lying pose) over `lie` s.
+ */
+const BUNK_LADDER = { up: BUNK_UP, down: BUNK_DOWN, fade: 0.3, lie: 0.12 };
 /** How far the feet reach past the slot centre for a lying Sim, and their back's height above the feet line: babies (much smaller) lie centred in the crib, on the mattress. */
 function lieCentre(rig: SimRig): number {
   // (A smaller body than its family's base body, a child's, lies with its head where a grown-up's would be, on the pillow.)
@@ -402,7 +522,9 @@ function lieBack(rig: SimRig): number {
 const BABY_LIE = { asleep: 'babyLieAsleep', awake: 'babyLieAwake' } as const;
 const BABY_LIE_FADE = 1.6;
 /** Every lying clip (`lie`, and the baby's). */
-const LYING = new Set<string>(['lie', BABY_LIE.asleep, BABY_LIE.awake]);
+const LYING = new Set<string>(['lie', 'lieCurl', BABY_LIE.asleep, BABY_LIE.awake]);
+/** Beds too short to lie on flat (a window seat's 1.3 m between its pillows): dozed on curled up on the side (`lieCurl`, clips/self.ts). */
+const CURLED_BEDS = new Set(['gloomy.windowSeat']);
 /**
  * A cuddle at the crib (action `cuddle`): the grown-up steps up to the rail, leans over it and lifts
  * the baby out, holds them cradled in the arms (head in the crook of the left arm) rocking gently,
@@ -453,6 +575,10 @@ function shoulderDrop(rig: SimRig, partner: SimRig | null): number {
  * `pedals_turn`), and the ankle's place over the pedal's axle (m up and forward, body scale 1).
  */
 const PEDAL = { turn: 1.2, ankle: [0.08, -0.09] as const };
+/** On the weight bench (`Characters.benchLegs`): the knee this share of the thigh's length on from the hip, towards the feet. */
+const BENCH_KNEE = 0.92;
+/** The hips' joints this far (m, the reference body) out from the middle. */
+const BENCH_HIP = 0.09;
 /** Legs out along a seat (`Characters.legsOut`): the ankles this far below the hips' joints (m, body scale 1). */
 const LEGS_OUT_DROP = 0.04;
 /** How a held part is held (content `held.grip`; see `Characters.writeHeld`). */
@@ -568,8 +694,8 @@ const ACTIONS: Record<string, ActionAnim> = {
     sit: 'sitHands',
     hands: HANDS.hold,
   },
-  // (Seated at the dressing table, getting ready: a hand up at the hair, the phone clip's.)
-  wash: { stand: ['spell', 'interact'], upper: (def) => (def === 'dressingTable' ? 'phone' : ''), hands: HANDS.relaxed },
+  // (Seated at the dressing table, getting ready: brushing the hair in the mirror, clips/self.ts.)
+  wash: { stand: ['spell', 'interact'], upper: (def) => (def === 'dressingTable' ? 'brushHair' : ''), hands: (def) => (def === 'dressingTable' ? HANDS.grip : HANDS.relaxed) },
   // Washing the hair, turning round, soaping, rinsing (clips/uses.ts; a child turns only the chest).
   shower: { stand: (_, height) => (height < SHOWER_CHILD ? SHOWER_SMALL : SHOWER_ONLY), hands: HANDS.open },
   bath: { hands: HANDS.open },
@@ -656,6 +782,8 @@ const ACTIONS: Record<string, ActionAnim> = {
   smell: { stand: (def) => (TALL_FLOWERS.has(def) ? ['pick'] : ['crouch']), hands: HANDS.relaxed },
   admire: { stand: ['idle', 'foldArms'], hands: HANDS.relaxed },
   phone: { stand: ['phone'], sit: (def) => (VIDEO_CALLS.has(def) ? 'sitTalk' : 'sit'), upper: (def) => (VIDEO_CALLS.has(def) ? '' : 'phone'), hands: HANDS.hold },
+  // Texting and scrolling (content `phone.actions[].anim`): the phone held in front, the head bowed over it, the thumbs moving.
+  phoneScreen: { stand: ['phoneText'], sit: 'sit', upper: 'phoneText', hands: HANDS.hold },
   listen: { stand: ['idle', 'foldArms'], hands: HANDS.open },
   meditate: { stand: ['idle'], hands: HANDS.open },
   // (A coin into the giving jar.)
@@ -756,6 +884,13 @@ const LAUGH: Partial<Face> = { mood: 'laugh', smile: 0, frown: 0, browDown: 0, p
 const KISS: Partial<Face> = { mood: 'kiss', smile: 0, frown: 0, browDown: 0, press: 0 };
 const HUG: Partial<Face> = { mood: 'hug', smile: 0, frown: 0, browDown: 0, press: 0 };
 const NONE: Partial<Face> = {};
+/** Faces for how a social was taken, by the clip it's shown with (`GESTURES`, `REFUSED`); a laugh is `LAUGH`. */
+const SOCIAL_FACES: Record<string, Partial<Face>> = {
+  refuse: { mood: 'uncomfortable', smile: 0 },
+  rebuffed: { mood: 'sad', smile: 0, gazeDown: 0.5 },
+  shrug: { mood: 'embarrassed', smile: 0 },
+  foldArms: { mood: 'bored', smile: 0 },
+};
 
 /**
  * Stage directions for one Sim row (character creator and portraits; never set in game): a clip to
@@ -788,6 +923,14 @@ interface Player {
   rootY: number;
   rootFwd: number;
   rootPitch: number;
+  /** Placed in this frame (world: a point on the floor and a facing) instead of at the Sim: the bunk's ladder (`BUNK_LADDER`). */
+  frame: Frame | null;
+}
+/** A place on the floor and a facing (world, the Sim's convention: `yaw` 0 faces +z). */
+interface Frame {
+  x: number;
+  z: number;
+  yaw: number;
 }
 
 function player(): Player {
@@ -800,6 +943,7 @@ function player(): Player {
     rootY: 0,
     rootFwd: 0,
     rootPitch: 0,
+    frame: null,
   };
 }
 
@@ -812,6 +956,7 @@ function copyPlayer(from: Player, to: Player): void {
   to.rootY = from.rootY;
   to.rootFwd = from.rootFwd;
   to.rootPitch = from.rootPitch;
+  to.frame = from.frame;
 }
 
 interface SimRig {
@@ -853,6 +998,15 @@ interface SimRig {
   /** Lying in a hammock's sling (`inSling`), or null; the upper body's rise in it (rad). */
   sling: Bed['sling'] | null;
   slingLift: number;
+  /** Sat against a tree in its shade (`Seat.shade`): the way they face, chosen as they sit down (NaN: not yet). */
+  shadeYaw: number;
+  /** Sitting (or last sat) on the floor (`floorSit`: `Floor`, `Ground`; '' on a seat): its own clips. */
+  floorSat: string;
+  /**
+   * Seated, the legs' turns that put the feet on the floor (`seatLegs`, `benchLegs`: each thigh's, calf's and foot's
+   * about x and the thigh's out to the side, left then right), faded out standing up.
+   */
+  seatTurn: Float32Array;
   tagKnown: boolean;
   cur: Player;
   prev: Player;
@@ -892,11 +1046,18 @@ interface SimRig {
   stepTime: number;
   /** Emotion code (index + 1 into the content's emotions; 0 = none). */
   emotion: number;
+  /** The social they're in (content `socials` id; '' when none or unknown), for its gestures (`GESTURES`). */
+  socialId: string;
   /** Bed while lying (for the blanket) and how far the blanket is pulled up (0..1). */
   bed: PlacedObject | null;
   bedH: number;
   /** How far forward of the slot it lies (`BEDS` `fwd`). */
   bedFwd: number;
+  /** Lying (or last lain) in the upper bunk (`BUNKS`): up and down its ladder (`BUNK_LADDER`). */
+  upperBunk: boolean;
+  /** Where the newest snapshot has them (the drawn place, `x` and `z`, eases there): which bunk they are given. */
+  tx: number;
+  tz: number;
   /**
    * Lying along a bed lain on across (`BEDS` `across`), in its middle, from whichever slot (on a
    * 2-wide seat the nap takes both: content `whole`).
@@ -927,11 +1088,15 @@ interface SimRig {
   outT: number;
   /** Seconds after the use before stepping out (the entry's `out`). */
   outWait: number;
+  /** Over a rim on the way (`StepIn.over`): where it is (a share of the way out), how high, and the way's length (m); [0, 0, 1]: none. */
+  inOver: Float32Array;
   /** Pulled up to a table (`TUCK`): how far the chair is in now (m), and which seat (-1: none). */
   tuck: number;
   tuckSeat: number;
   /** The top still further off than the desk-hands clip reaches, pulled in as far as it goes (`sitHandsFar`). */
   tuckFar: boolean;
+  /** The top lower over the seat than the desk-hands clip's hands (`LOW_TOP`, `sitHandsLow`): a kids' chair at a coffee table. */
+  tuckLow: boolean;
   cover: number;
   /** Current (smoothed) facial expression. */
   face: Face;
@@ -966,24 +1131,27 @@ interface SimRig {
   speechSeg: number;
 }
 
-/**
- * A leg in a clip (`measureLegs`; body space, scale 1, in the y-z plane): the hip's height and depth,
- * the thigh's and the calf's lengths and their directions (rad from straight down towards the front).
- */
-interface LegSide {
-  hy: number;
-  hz: number;
-  l1: number;
-  l2: number;
-  t0: number;
-  c0: number;
-}
+/** Where the legs are in a clip (`measureLegs`; body space, scale 1; `LegSide`, characters/seatFit.ts). */
 interface LegFit {
   l: LegSide;
   r: LegSide;
+  /** The ankle joints' height standing (the `idle` clip's), for feet put on the floor (`seatLegs`). */
+  ankle: number;
   /** The spine's base (spine_01) and the head's joint: height and depth. */
   spine: readonly [number, number];
   head: readonly [number, number];
+}
+/** Sitting down and getting up (from a chair or the floor): no held prop drawn meanwhile. */
+const RISING = new Set(['sitDown', 'standUp', ...FLOOR_SITS.flatMap((f) => [`sitDown${f.name}`, `standUp${f.name}`])]);
+/** Sitting on the floor (`floorSit`), and sitting down there. */
+const ON_FLOOR = new Set(FLOOR_SITS.flatMap((f) => [`sit${f.name}`, `sitDown${f.name}`]));
+/**
+ * How a seat `h` m over the floor under it is sat on: on a chair's clips (''), or on the floor by the floor clips
+ * (clips/seated.ts `FLOOR_SITS`, each with its own sitting down and getting up): under 0.2 m cross-legged on a
+ * floor cushion or a hearth's (`Floor`), under 0.07 m on the ground against a tree's trunk (`Ground`).
+ */
+function floorSit(h: number): string {
+  return h < 0.07 ? 'Ground' : h < 0.2 ? 'Floor' : '';
 }
 /** Clips whose legs are placed by `legTo`: sitting (pedalling, legs out along a chaise) and lying (in a hammock). */
 const LEG_CLIPS = ['sit', 'sitHands', 'lie'] as const;
@@ -1184,8 +1352,13 @@ export class Characters {
   private clock = 0;
   /** Sit / lie pelvis offsets per body (computed once from the clips). */
   private readonly sitPelvis = new Map<string, SeatFit>();
+  /** The same for the floor clips (`sitFloor`). */
+  private readonly floorPelvis = new Map<string, SeatFit>();
+  /** (By body and floor sit: `<body>|<FloorSit name>`.) */
   /** Per body, then clip (`LEG_CLIPS`): where its legs are in the clip, for placing the feet (`legTo`). */
   private readonly legFits = new Map<string, Map<string, LegFit>>();
+  /** Which way the sun's light goes (the renderer's sun), for the shade under a tree (`shadeSide`). */
+  private sunOf: (() => { x: number; z: number }) | null = null;
   /** Where a moving object's loop has got to (0..1 of a round; a bike's pedals), null while none plays. */
   private loopOf: ((objectId: number) => number | null) | null = null;
   /** Scratch: a leg's thigh and calf rotations from `legTo`, and the root's height and forward offset from `inSling`. */
@@ -1331,6 +1504,7 @@ export class Characters {
     });
     for (const body of set.bodies.values()) {
       this.sitPelvis.set(body.name, this.measureSit(body));
+      for (const f of FLOOR_SITS) this.floorPelvis.set(`${body.name}|${f.name}`, this.measureSit(body, `sit${f.name}`));
       this.legFits.set(body.name, this.measureLegs(body));
     }
     const lying = [...set.bodies.values()].map((body) => ({
@@ -1462,6 +1636,7 @@ export class Characters {
           const b = await loadStage(set, base, stage).catch((err) => (console.warn('[render] life stage unavailable', base.name, stage, err), null));
           if (b && !this.sitPelvis.has(b.name)) {
             this.sitPelvis.set(b.name, this.measureSit(b));
+            for (const f of FLOOR_SITS) this.floorPelvis.set(`${b.name}|${f.name}`, this.measureSit(b, `sit${f.name}`));
             this.legFits.set(b.name, this.measureLegs(b));
           }
           // Its own quilt, draped over its own lying pose: a child's feet stand up higher for its size than a
@@ -1541,6 +1716,9 @@ export class Characters {
         useId: -1,
         sling: null,
         slingLift: 0,
+        shadeYaw: NaN,
+        floorSat: '',
+        seatTurn: new Float32Array(8),
         tagKnown: false,
         cur: player(),
         prev: player(),
@@ -1566,9 +1744,13 @@ export class Characters {
         hands: HANDS.relaxed,
         stepTime: 0,
         emotion: 0,
+        socialId: '',
         bed: null,
         bedH: 0,
         bedFwd: 0,
+        upperBunk: false,
+        tx: 0,
+        tz: 0,
         lieAcross: false,
         fromBed: false,
         lieX: 0,
@@ -1583,9 +1765,11 @@ export class Characters {
         inDZ: 0,
         outT: -1,
         outWait: 0,
+        inOver: Float32Array.of(0, 0, 1),
         tuck: 0,
         tuckSeat: -1,
         tuckFar: false,
+        tuckLow: false,
         cover: 0,
         face: { ...NEUTRAL },
         blinkAt: -1,
@@ -1874,7 +2058,7 @@ export class Characters {
    * with its foot on the floor ahead.
    */
   private writeHeld(rig: SimRig, i: number, pose: number, moving: boolean): void {
-    const held = !moving && rig.tagKnown && pose !== Pose.Sit && rig.cur.key !== 'sitDown' && rig.cur.key !== 'standUp' ? rig.useObj?.held : undefined;
+    const held = !moving && rig.tagKnown && pose !== Pose.Sit && !RISING.has(rig.cur.key) ? rig.useObj?.held : undefined;
     const grip = held && (held.grip === 'bar') === (pose === Pose.Lie) ? held.grip : null;
     const left = this.writeProp(this.leftProp, i, grip === 'pair' ? held!.keys[0] : null);
     const right = this.writeProp(this.rightProp, i, grip ? (held!.keys[grip === 'pair' ? 1 : 0] ?? null) : null);
@@ -2437,6 +2621,7 @@ export class Characters {
       const partner = call > 0 ? call - 1 : curr[o + k.partner] | 0;
       const outcome = curr[o + k.outcome] | 0;
       rig.emotion = curr[o + k.emotion] | 0;
+      rig.socialId = social ? (this.content?.social((curr[o + k.social] | 0) - 1)?.id ?? '') : '';
       const mood = k.mood !== undefined ? curr[o + k.mood] : 1;
       rig.warmth = clamp((mood - MOOD_COLD) / (MOOD_WARM - MOOD_COLD), 0, 1);
       // What the Sim is doing (sim-core's `object` / `action` fields; older layouts: guessed from position).
@@ -2486,7 +2671,9 @@ export class Characters {
         // dressing table's mirror, an upright piano); or along it (`Seat.along`: a bath), turned a quarter.
         if (seat?.back) faceYaw = wrapAngle(tyaw + Math.PI);
         else if (seat?.along) faceYaw = wrapAngle(tyaw + (seat.along * Math.PI) / 2);
+        else if (seat?.shade) faceYaw = this.shadeSide(rig, tyaw);
       }
+      if (pose !== Pose.Sit) rig.shadeYaw = NaN;
       // Cuddling: turned to the baby in the crib.
       const cuddled = rig.cuddleT >= 0 && rig.cuddleBaby >= 0 ? this.sims[rig.cuddleBaby] : null;
       if (cuddled) faceYaw = Math.atan2(curr[H + cuddled.id * S + k.x] - rig.x, this.groundRow(curr[H + cuddled.id * S + k.z]) - rig.z);
@@ -2520,6 +2707,8 @@ export class Characters {
       rig.yaw = dir ? wrapAngle(faceYaw) : wrapAngle(rig.yaw + clamp(dyaw * (1 - Math.exp(-dt * 12 * turn)), -maxTurn, maxTurn));
       rig.visible = true;
       this.visible[i] = 1;
+      rig.tx = cx;
+      rig.tz = cz;
 
       // What it carries (`items` index + 1), and the arms that carry it.
       const held = k.held !== undefined ? curr[o + k.held] | 0 : 0;
@@ -2590,8 +2779,10 @@ export class Characters {
       const rootY = lerp(rig.prev.rootY, rig.cur.rootY, w);
       const rootFwd = lerp(rig.prev.rootFwd, rig.cur.rootFwd, w) + rig.approach;
       const pitch = lerp(rig.prev.rootPitch, rig.cur.rootPitch, w);
-      const sy = Math.sin(rig.yaw / 2);
-      const cyw = Math.cos(rig.yaw / 2);
+      // (At the Sim, or a clip placed in a frame of its own: the bunk's ladder.)
+      const at: Frame = rig.cur.frame || rig.prev.frame ? this.framed(rig, w) : rig;
+      const sy = Math.sin(at.yaw / 2);
+      const cyw = Math.cos(at.yaw / 2);
       const sp = Math.sin(pitch / 2);
       const cp = Math.cos(pitch / 2);
       // q = yaw(Y) * pitch(X)
@@ -2600,9 +2791,9 @@ export class Characters {
       pl.qy = sy * cp;
       pl.qz = -sy * sp;
       pl.qw = cyw * cp;
-      pl.x = rig.x + Math.sin(rig.yaw) * rootFwd;
+      pl.x = at.x + Math.sin(at.yaw) * rootFwd;
       pl.y = rootY + rig.floorY;
-      pl.z = rig.z + Math.cos(rig.yaw) * rootFwd;
+      pl.z = at.z + Math.cos(at.yaw) * rootFwd;
       this.stepPlace(rig, pl, step);
       pl.scale = rig.scale;
       pl.head = rig.head;
@@ -2627,7 +2818,8 @@ export class Characters {
       this.heads[i * 3 + 2] = this.headTmp[2];
 
       // Contact shadow under standing / sitting Sims.
-      const r = pose === Pose.Lie ? 0 : 0.62 * hs;
+      // (None on the bunk's ladder: the root is in the bed.)
+      const r = pose === Pose.Lie || at !== rig ? 0 : 0.62 * hs;
       const m = i * 16;
       shadows.fill(0, m, m + 16);
       shadows[m] = r;
@@ -2714,6 +2906,8 @@ export class Characters {
     let reachRate = 4;
     // Using a thing from inside or up against it this frame (`stepIn`).
     let inside = false;
+    // Placed in a frame of its own this frame (`Player.frame`: the bunk's ladder).
+    let frame: Frame | null = null;
 
     if (this.force) {
       key = this.force;
@@ -2721,15 +2915,26 @@ export class Characters {
       const obj = (known ? useObj : null) ?? this.objectAt(rig.x, rig.z);
       const bed = (obj && BEDS[obj.def]) || DEFAULT_BED;
       rig.bed = obj;
-      // A bunk's second sleeper (a hair to the right of its centre, see sim-core `slot_position`) is on top.
+      // A bunk's second sleeper (a hair to the right of its centre, see sim-core `slot_position`) is on top
+      // (by where the snapshot puts them: the drawn place may still be on its way there).
       const bunk = obj && BUNKS[obj.def];
-      const across = obj ? (rig.x - obj.cx) * Math.cos((obj.rot * Math.PI) / 2) - (rig.z - obj.cz) * Math.sin((obj.rot * Math.PI) / 2) : 0;
-      rig.bedH = (bunk ? bunk[across > 0 ? 1 : 0] : bed.h) + (obj?.lift ?? 0);
+      const right = (x: number, z: number) => (obj ? (x - obj.cx) * Math.cos((obj.rot * Math.PI) / 2) - (z - obj.cz) * Math.sin((obj.rot * Math.PI) / 2) : 0);
+      const across = right(rig.x, rig.z);
+      rig.upperBunk = !!bunk && right(rig.tx, rig.tz) > 0;
+      rig.bedH = (bunk ? bunk[rig.upperBunk ? 1 : 0] : bed.h) + (obj?.lift ?? 0);
+      const climb = rig.upperBunk && obj ? this.sizedClip(rig, BUNK_LADDER.up) : '';
       // (Lain on across, they face along it: moved back to its middle from a slot to one side.)
       rig.bedFwd = (bed.fwd ?? 0) - (rig.lieAcross ? across : 0);
       rig.useDef = obj?.def ?? '';
       rig.useObj = obj ?? null;
-      if ((rig.lastPose === Pose.Stand && rig.cur.key !== 'sitDown') || (rig.cur.key === 'sitDown' && rig.cur.time < rig.cur.clip!.duration - 0.35)) {
+      if (climb && ((rig.lastPose === Pose.Stand && rig.cur.key !== climb) || (rig.cur.key === climb && rig.cur.time < rig.cur.clip!.duration - 0.1))) {
+        // Into the upper bunk: up its ladder from the tile in front, lain down at the end (`BUNK_LADDER`).
+        key = climb;
+        rootY = obj!.lift ?? 0;
+        fade = BUNK_LADDER.fade;
+        frame = this.bedFrame(obj!);
+        if (rig.cur.key !== climb) rig.actTime = 0;
+      } else if ((rig.lastPose === Pose.Stand && rig.cur.key !== 'sitDown') || (rig.cur.key === 'sitDown' && rig.cur.time < rig.cur.clip!.duration - 0.35)) {
         // Getting in: sit down on the edge first; the crossfade to lying then leans the Sim back
         // (the root pitch blends with the clips).
         const sp = this.sitPelvis.get(rig.body.name)!;
@@ -2751,7 +2956,7 @@ export class Characters {
       } else {
         // On the back, head towards the head of the bed (local -z), centred on the slot: the
         // `lie` clip (made standing) turned flat and slowed down.
-        key = 'lie';
+        key = obj && CURLED_BEDS.has(obj.def) ? 'lieCurl' : 'lie';
         rootY = rig.bedH + lieBack(rig);
         rootFwd = lieCentre(rig) + rig.bedFwd;
         pitch = -Math.PI / 2;
@@ -2760,7 +2965,7 @@ export class Characters {
         const at = bed.sling ? this.inSling(rig, bed.sling, obj?.lift ?? 0, rootFwd) : null;
         rig.sling = at ? bed.sling! : null;
         if (at) [rootY, rootFwd] = at;
-        fade = rig.cur.key === 'sitDown' ? 0.9 : 0.45;
+        fade = rig.cur.key === 'sitDown' ? 0.9 : rig.cur.key.startsWith('bunkUp') ? BUNK_LADDER.lie : 0.45;
         // (Where it lies, for getting up: by then the Sim has already moved off the bed.)
         rig.lieX = rig.x;
         rig.lieZ = rig.z;
@@ -2769,25 +2974,37 @@ export class Characters {
     } else if (pose === Pose.Sit) {
       const obj = known ? this.seatUnder(rig, useObj) : this.objectAt(rig.x, rig.z);
       const seat = obj?.seat ?? DEFAULT_SEAT;
-      const sp = this.sitPelvis.get(rig.body.name)!;
+      // A seat on the floor (a floor cushion) is sat on cross-legged, by its own clips.
+      const floor = floorSit(seat.h - (obj?.lift ?? 0));
+      rig.floorSat = floor;
+      const sp = (floor ? this.floorPelvis.get(`${rig.body.name}|${floor}`) : this.sitPelvis.get(rig.body.name))!;
       rootY = seat.h - sp.y * rig.scale;
       // (Facing the object's back, its forward is the Sim's back.)
-      rootFwd = (seat.back ? -seat.fwd : seat.fwd) - sp.z * rig.scale;
+      rootFwd = (seat.back ? -seat.fwd : seat.fwd) - sp.z * rig.scale + (floor ? 0 : this.perch(rig, seat, sp));
       fade = 0.35;
       rig.useDef = obj?.def ?? '';
       rig.useObj = obj ?? null;
+      const ride = known && obj ? RIDES[obj.def] : undefined;
       if (social) key = speaking(pair, role, time) ? 'sitTalk' : 'sit';
-      else if (act?.sit) key = typeof act.sit === 'function' ? act.sit(rig.useDef) : act.sit;
+      else if (ride) {
+        // Astride a ride, the hands on its grips (`RIDES`).
+        key = this.sizedClip(rig, ride.sizes);
+        hands = HANDS.grip;
+      } else if (act?.sit) key = typeof act.sit === 'function' ? act.sit(rig.useDef) : act.sit;
       else if (!known && obj && SIT_HANDS.has(obj.def)) key = 'sitHands';
       else key = 'sit';
-      if (rig.lastPose === Pose.Stand && rig.cur.key !== 'sitDown') {
-        key = 'sitDown';
+      if (floor) key = `sit${floor}`;
+      const down = `sitDown${floor}`;
+      if (rig.lastPose === Pose.Stand && rig.cur.key !== down) {
+        key = down;
         rig.actTime = 0;
-      } else if (rig.cur.key === 'sitDown' && rig.cur.time < rig.cur.clip!.duration - 0.3) {
-        key = 'sitDown';
+      } else if (rig.cur.key === down && rig.cur.time < rig.cur.clip!.duration - 0.3) {
+        key = down;
       }
-      rootFwd += this.tuckIn(rig, obj, seat, key !== 'sitDown', step, fresh);
-      if (key === 'sitHands' && rig.tuckFar) key = 'sitHandsFar';
+      rootFwd += this.tuckIn(rig, obj, seat, key !== down, step, fresh);
+      // (At a low top, a kids' chair at a coffee table: bent over it, the size for their height.)
+      if (key === 'sitHands' && rig.tuckLow) key = (SIT_LOW.find(({ min }) => rig.body.height * rig.scale >= min) ?? SIT_LOW[SIT_LOW.length - 1]).clip;
+      else if (key === 'sitHands' && rig.tuckFar) key = 'sitHandsFar';
       if (!social) {
         const up = known ? (typeof act?.upper === 'function' ? act.upper(rig.useDef) : act?.upper) : obj?.def === 'diningTable' ? 'eat' : undefined;
         // Eating / drinking now and then; holding a book or phone throughout.
@@ -2814,24 +3031,19 @@ export class Characters {
       rig.useObj = null;
       switch (social) {
         case Anim.Talk:
-          key = me
-            ? 'talk'
-            : outcome === 1 && hash(Math.floor(time / 3) + i) < 0.4
-              ? 'yes'
-              : outcome === 2 && hash(Math.floor(time / 3) + i) < 0.4
-                ? 'no'
-                : 'idle';
-          break;
         case Anim.Laugh:
-          key = 'talk';
-          break;
         case Anim.Flirt:
-          key = me ? 'talk' : 'idle';
+        case Anim.Argue: {
+          // The social's own gestures and how it's taken (`GESTURES`).
+          const g = { ...ANIM_GESTURES[social], ...GESTURES[rig.socialId] };
+          const nod = hash(Math.floor(time / 3) + i) < 0.4;
+          const listen = g.listen ?? (outcome === 1 && nod ? 'yes' : outcome === 2 && nod ? 'no' : 'idle');
+          if (role === 1) key = outcome === 2 && g.flop ? g.flop : me ? (g.speak ?? 'talk') : outcome === 1 && g.good === 'laugh' ? 'laugh' : listen;
+          else key = outcome === 2 && g.bad ? g.bad : outcome === 1 && g.good && (!me || g.good === 'laugh') ? g.good : me ? (g.answer ?? 'talk') : listen;
+          // (The chat's talk and head shakes, quicker in an argument.)
+          if (social === Anim.Argue && (key === 'talk' || key === 'no')) rate = 1.25;
           break;
-        case Anim.Argue:
-          key = me ? 'talk' : 'no';
-          rate = 1.25;
-          break;
+        }
         case Anim.Fight: {
           // The attacker steps in with each punch, the defender gives ground as it lands
           // (eased like the hug's approach).
@@ -2845,14 +3057,17 @@ export class Characters {
           break;
         }
         case Anim.Hug:
-          // Arms around each other (`procedural`), stepped in until the chests meet.
-          key = 'idle';
-          reach = embraceStep(rig, partner, 0);
-          reachRate = 6;
-          break;
         case Anim.Kiss:
+          if (outcome === 2) {
+            // Refused (`REFUSED`): leaning away, a hand up, a step back; the one who asked crestfallen.
+            key = role === 1 ? 'rebuffed' : 'refuse';
+            reach = role === 1 ? 0 : -REFUSED.back;
+            reachRate = 3;
+            break;
+          }
+          // Arms around each other (`procedural`), stepped in until the chests meet (a kiss: the faces).
           key = 'idle';
-          reach = embraceStep(rig, partner, EMBRACE.kiss);
+          reach = embraceStep(rig, partner, social === Anim.Hug ? 0 : EMBRACE.kiss);
           reachRate = 6;
           break;
         case Anim.Wave:
@@ -2956,18 +3171,35 @@ export class Characters {
       upper = '';
     }
     if (dir?.hands !== undefined) hands = dir.hands;
-    if (!moving && pose === Pose.Stand && (rig.lastPose === Pose.Sit || rig.lastPose === Pose.Lie) && rig.cur.key !== 'standUp' && !this.force) {
+    // (From the floor, its own clip: `sitFloor`.)
+    const up = rig.lastPose === Pose.Sit ? `standUp${rig.floorSat}` : RISING.has(rig.cur.key) && rig.cur.key.startsWith('standUp') ? rig.cur.key : 'standUp';
+    // Up from the upper bunk: down its ladder to the tile in front (`BUNK_LADDER`), sim-core waiting for them.
+    const down = rig.upperBunk && rig.bed && pose === Pose.Stand && !this.force ? this.sizedClip(rig, BUNK_LADDER.down) : '';
+    const climbDown = !!down && !moving && (rig.lastPose === Pose.Lie || (rig.cur.key === down && rig.cur.time < rig.cur.clip!.duration - 0.25));
+    if (climbDown) {
+      if (rig.cur.key !== down) rig.actTime = 0;
+      key = down;
+      rootY = rig.bed!.lift ?? 0;
+      rootFwd = 0;
+      fade = BUNK_LADDER.lie;
+      repeat = false;
+      upper = '';
+      frame = this.bedFrame(rig.bed!);
+    } else if (down) rig.upperBunk = false;
+    if (climbDown) {
+      // (Not standing up as from another bed.)
+    } else if (!moving && pose === Pose.Stand && (rig.lastPose === Pose.Sit || rig.lastPose === Pose.Lie) && rig.cur.key !== up && !this.force) {
       // Rising from a seat (or sitting up out of bed: the crossfade from lying leans the Sim up).
-      key = 'standUp';
+      key = up;
       rig.fromBed = rig.lastPose === Pose.Lie && !!rig.bed;
       if (rig.fromBed) fade = 0.9;
-    } else if (rig.cur.key === 'standUp' && !moving && pose === Pose.Stand && rig.cur.time < rig.cur.clip!.duration - 0.25) {
-      key = 'standUp';
+    } else if (rig.cur.key === up && !moving && pose === Pose.Stand && rig.cur.time < rig.cur.clip!.duration - 0.25) {
+      key = up;
     }
     if (key !== 'standUp') rig.fromBed = false;
     if (pose !== Pose.Sit) rootFwd += this.tuckOut(rig, key, step);
     // Carrying something while walking or standing about (not while using a station with it).
-    if (carry && pose === Pose.Stand && !upper && !dir?.clip && key !== 'standUp' && (moving || !rig.useSeq) && social !== Anim.Hug && social !== Anim.Fight) {
+    if (carry && pose === Pose.Stand && !upper && !dir?.clip && key !== up && (moving || !rig.useSeq) && social !== Anim.Hug && social !== Anim.Fight) {
       upper = carry;
       hands = HANDS.hold;
       if (key === 'foldArms') key = 'idle';
@@ -3007,6 +3239,14 @@ export class Characters {
       cur.rootFwd = rootFwd;
       cur.rootPitch = pitch;
     }
+    rig.cur.frame = frame;
+    // A ride in time with its loop (`RIDES` `sync`: the swing's pumping legs).
+    if (pose === Pose.Sit && key === rig.cur.key && rig.useId >= 0 && RIDES[rig.useDef]?.sync) {
+      const phase = this.loopOf?.(rig.useId);
+      if (phase != null) rig.cur.time = phase * rig.cur.clip!.duration;
+    }
+    // (Down the bunk's ladder from lying: the lying body fading out lies where it lay, in the bed's frame.)
+    if (frame && LYING.has(rig.prev.key) && rig.lastPose === Pose.Lie) rig.prev.frame = frame;
 
     if (rig.fromBed && LYING.has(rig.prev.key)) rig.prev.rootFwd = (rig.lieX - rig.x) * fx + (rig.lieZ - rig.z) * fz + lieCentre(rig) + rig.bedFwd;
 
@@ -3030,6 +3270,25 @@ export class Characters {
       rig.approach = reach;
       rig.hands = hands;
     }
+  }
+
+  /** The clip of `sizes` (the bunk's ladder, `BUNK_LADDER`; a ride's, `RIDES`) for this resident's height. */
+  private sizedClip(rig: SimRig, sizes: readonly { clip: string; min: number }[]): string {
+    const h = rig.body.height * rig.scale;
+    return (sizes.find(({ min }) => h >= min) ?? sizes[sizes.length - 1]).clip;
+  }
+
+  /** The upper bunk's frame (`BUNK_LADDER`): its slot (sim-core `slot_position`, a hair to the right of the middle), facing the foot end. */
+  private bedFrame(bed: PlacedObject): Frame {
+    const f = (bed.rot * Math.PI) / 2;
+    return { x: bed.cx + Math.cos(f) * 0.02, z: bed.cz - Math.sin(f) * 0.02, yaw: f };
+  }
+
+  /** Where the blend of the two players is placed: at the Sim, or between it and a frame of their own (`Player.frame`). */
+  private framed(rig: SimRig, w: number): Frame {
+    const a = rig.prev.frame ?? rig;
+    const b = rig.cur.frame ?? rig;
+    return { x: lerp(a.x, b.x, w), z: lerp(a.z, b.z, w), yaw: a.yaw + wrapAngle(b.yaw - a.yaw) * w };
   }
 
   /** The size of `STEP_IN` entry `into` for this resident's height: [height, clips, where]. */
@@ -3080,7 +3339,13 @@ export class Characters {
     const span = Math.max(0.3, way / STEP_IN_SPEED);
     const k = smooth(clamp((rig.inT - (into.wait ?? 0)) / span, 0, 1));
     const fwd = -back * smooth(clamp(rig.inT / 0.4, 0, 1)) + dist * k;
-    const y = (at.up ?? 0) * smooth(clamp((k - 0.35) / 0.3, 0, 1));
+    let y = (at.up ?? 0) * smooth(clamp((k - 0.35) / 0.3, 0, 1));
+    // Up over a rim on the way (and, stepping out, back over it: `stepPlace`).
+    const over = into.over;
+    if (over) {
+      y += over.h * smooth(clamp(1 - Math.abs(ahead - fwd - over.at) / STEP_OVER, 0, 1));
+      rig.inOver.set([(over.at - at.to) / Math.max(0.01, ahead - at.to), over.h, Math.max(0.01, ahead - at.to)]);
+    } else rig.inOver.set([0, 0, 1]);
     rig.inDX = Math.cos(f) * across * k;
     rig.inDZ = -Math.sin(f) * across * k;
     // (Waiting to step in, standing about.)
@@ -3091,10 +3356,11 @@ export class Characters {
       rig.stepTime = 0;
       return [fwd, y, 'idle', 1];
     }
-    // Walking, the cycle matched to the step's pace (the walk runs on real time).
+    // Walking, the cycle matched to the step's pace (the walk runs on real time); backwards, facing it, when
+    // the place is further out than the tile (out on the court from the hoop).
     const legs = rig.body.pelvisScale * rig.scale;
     const rate = dt > 0 ? ((way / span) * (step / dt)) / (this.clip('walk').speed * legs) : 1;
-    return [fwd, y, 'walk', clamp(rate, 0.35, GAIT_MAX_RATE)];
+    return [fwd, y, 'walk', clamp(rate, 0.35, GAIT_MAX_RATE) * (dist < -Math.abs(across) ? -1 : 1)];
   }
 
   /**
@@ -3129,8 +3395,9 @@ export class Characters {
     }
     if (rig.outT < 0) return;
     const k = smooth(clamp((rig.outT - rig.outWait) / STEP_OUT_S, 0, 1));
+    const [rim, high, way] = rig.inOver;
     pl.x = lerp(rig.inX, pl.x, k);
-    pl.y = lerp(rig.inY, pl.y, k);
+    pl.y = lerp(rig.inY, pl.y, k) + high * smooth(clamp(1 - (Math.abs(k - rim) * way) / STEP_OVER, 0, 1));
     pl.z = lerp(rig.inZ, pl.z, k);
     rig.outT = k < 1 ? rig.outT + step : -1;
   }
@@ -3180,8 +3447,10 @@ export class Characters {
     rig.tuckSeat = id ?? -1;
     let goal = 0;
     rig.tuckFar = false;
+    rig.tuckLow = false;
     if (obj && room && settled && !seat.back && room.top > seat.h && room.top - seat.h <= TUCK.rise) {
       const s = (rig.body.height * rig.scale) / CLIP_HEIGHT;
+      rig.tuckLow = room.top - seat.h < LOW_TOP * s;
       const yaw = (obj.rot * Math.PI) / 2;
       const [dx, dz] = [rig.x - obj.cx, rig.z - obj.cz];
       const right = dx * Math.cos(yaw) - dz * Math.sin(yaw);
@@ -3222,6 +3491,11 @@ export class Characters {
     this.rideOf = rideOf;
   }
 
+  /** Which way the sun's light goes (the renderer's `sun.direction`): the shade under a tree is on that side of it (`shadeSide`). */
+  setSun(sunOf: (() => { x: number; z: number }) | null): void {
+    this.sunOf = sunOf;
+  }
+
   /** How far round an object's loop is (`ObjectMotion.loopPhase`: the bike's pedals the feet follow). */
   setLoop(loopOf: ((objectId: number) => number | null) | null): void {
     this.loopOf = loopOf;
@@ -3253,7 +3527,7 @@ export class Characters {
     rig.fadeRate = 1 / Math.max(0.05, fade);
   }
 
-  /** Look-at, laughing, flirting and kissing on top of the clips. */
+  /** Look-at, flirting, kissing and hugging at the partner's height, punches aimed at theirs, on top of the clips. */
   private procedural(
     rig: SimRig,
     i: number,
@@ -3330,28 +3604,35 @@ export class Characters {
         addRotation(add, B.Head, 0, 1, 0, 0.018 * Math.sin(time * 0.37 + rig.seed * 17));
       }
     }
+    // (A refused hug or kiss plays its own clips, `REFUSED`: nobody leans in or holds anyone.)
+    const refused = rig.cur.key === 'refuse' || rig.cur.key === 'rebuffed';
     switch (social) {
-      case Anim.Laugh: {
-        // Natural laughter: body bounces, head tilts, shoulders shake.
-        const bounce = Math.sin(time * 8 + rig.seed * 5) * 0.04;
-        addRotation(add, B.spine_02, 1, 0, 0, -0.15 + bounce);
-        addRotation(add, B.spine_01, 1, 0, 0, -0.08 + bounce * 0.5);
-        addRotation(add, B.Head, 1, 0, 0, -0.2 + bounce * 0.7);
-        // Shoulder shake.
-        addRotation(add, B.upperarm_l, 1, 0, 0, Math.sin(time * 10 + rig.seed * 3) * 0.05);
-        addRotation(add, B.upperarm_r, 1, 0, 0, -Math.sin(time * 10 + rig.seed * 3) * 0.05);
-        break;
-      }
       case Anim.Flirt:
+        // A head tilt and a sway of the hips for the one listening (the flirt's own clip has its own).
+        if (rig.cur.key === 'flirt') break;
         addRotation(add, B.Head, 0, 0, 1, 0.16 + Math.sin(time * 1.7) * 0.04);
         addRotation(add, B.pelvis, 0, 0, 1, Math.sin(time * 1.3) * 0.04);
         break;
-      case Anim.Kiss:
-        addRotation(add, B.spine_02, 1, 0, 0, 0.12);
+      case Anim.Kiss: {
+        if (refused) break;
+        // To the other's lips at any two heights (`KISS`): the taller bends and bows the head, the shorter
+        // lifts the face (the look at the other's head does the rest); the taller's arms round the waist,
+        // the shorter's up round the shoulders (of two alike, the one who asked holds the waist).
+        const dh = partner ? rig.body.height * rig.scale - partner.body.height * partner.scale : 0;
+        const taller = dh > 0.01 || (Math.abs(dh) <= 0.01 && role === 1);
+        const up = Math.max(0, dh);
+        const down = Math.max(0, -dh);
+        addRotation(add, B.spine_02, 1, 0, 0, KISS_FIT.lean + Math.min(KISS_FIT.most, up * KISS_FIT.bend));
+        addRotation(add, B.spine_03, 1, 0, 0, Math.min(KISS_FIT.most, up * KISS_FIT.bend) * 0.5 - Math.min(KISS_FIT.most, down * KISS_FIT.lift) * 0.3);
+        addRotation(add, B.neck_01, 1, 0, 0, Math.min(KISS_FIT.most, up * KISS_FIT.nod) - Math.min(KISS_FIT.most, down * KISS_FIT.lift));
         addRotation(add, B.Head, 0, 0, 1, role === 1 ? 0.22 : -0.22);
-        addRotation(add, B.Head, 1, 0, 0, 0.1);
+        addRotation(add, B.Head, 1, 0, 0, 0.1 - Math.min(KISS_FIT.most, down * KISS_FIT.lift) * 0.5);
+        if (taller) this.hugArms(KISS_FIT.waist, time + role / 1.5, KISS_FIT.waistWrap);
+        else this.hugArms(KISS_FIT.neck, time + role / 1.5, KISS_FIT.neckWrap);
         break;
+      }
       case Anim.Hug: {
+        if (refused) break;
         // Bent down over a smaller one (a child), the arms lowered to go round them (`EMBRACE`).
         const drop = shoulderDrop(rig, partner);
         addRotation(add, B.spine_02, 1, 0, 0, 0.1 + drop * EMBRACE.bend);
@@ -3368,9 +3649,17 @@ export class Characters {
       case Anim.Fight: {
         const isAttacker = role === 1;
         if (isAttacker) {
-          // Attacker: body leans forward into punches.
+          // Attacker: body leans forward into punches, which are aimed at the other's head (`AIM`): bent
+          // down over a shorter one, the arms lowered the rest of the way; up at a taller one.
           addRotation(add, B.spine_02, 1, 0, 0, 0.15);
           addRotation(add, B.spine_01, 1, 0, 0, 0.1);
+          const drop = partner ? (rig.body.height * rig.scale - partner.body.height * partner.scale) * AIM.head : 0;
+          const angle = clamp(Math.atan2(drop, AIM.reach * rig.scale), -AIM.most, AIM.most);
+          const bend = angle > 0 ? angle * AIM.bend : angle * AIM.straighten;
+          addRotation(add, B.spine_01, 1, 0, 0, bend * 0.5);
+          addRotation(add, B.spine_02, 1, 0, 0, bend * 0.5);
+          addRotation(add, B.upperarm_l, 1, 0, 0, angle - bend);
+          addRotation(add, B.upperarm_r, 1, 0, 0, angle - bend);
         } else {
           // Defender: flinch back, forearms up to guard the face.
           addRotation(add, B.spine_02, 1, 0, 0, -0.12);
@@ -3386,6 +3675,8 @@ export class Characters {
     if ((rig.reachW > 0 || rig.holdW > 0) && pose === Pose.Stand && !this.force) this.cuddlePose(rig, time);
     // Lying: a bench press, or resting (see the `lie` clip).
     if (pose === Pose.Lie && rig.cur.key === 'lie' && rig.tag === 'lift') {
+      const feet = rig.bed ? BEDS[rig.bed.def]?.feet : undefined;
+      if (feet) this.benchLegs(rig, feet);
       // Bench press: arms push the bar up and lower it to the chest.
       const press = 0.5 - 0.5 * Math.cos(time * 2.2 + rig.seed * 6);
       for (const [ua, la, sgn] of [
@@ -3444,10 +3735,17 @@ export class Characters {
     const def = rig.useDef;
     const key = rig.cur.key;
     const seed = rig.seed * 6;
-    if (pose === Pose.Sit && key !== 'sitDown') {
+    // (Standing up, the seated legs' fit fades out with the seated pose; it starts afresh on the next seat.)
+    const onFloor = ON_FLOOR.has(key);
+    if (pose === Pose.Stand && key === 'standUp') this.seatLegsOff(rig);
+    else rig.seatTurn.fill(0);
+    if (pose === Pose.Sit && !RISING.has(key)) {
       const seat = rig.useObj?.seat;
-      if (seat?.pedals) this.pedal(rig, seat.pedals);
+      if (onFloor) {
+        // (Cross-legged on the floor: the clip's legs.)
+      } else if (seat?.pedals) this.pedal(rig, seat.pedals);
       else if (seat?.legsOut) this.legsOut(rig, seat.room);
+      else if (rig.tag !== 'meditate') this.seatLegs(rig, rig.tag === 'relax' || rig.tag === 'nap' || rig.tag === 'watch');
       switch (rig.tag) {
         case 'sit':
           // Just sitting: upright, but against a slanted back (`recline`).
@@ -3457,16 +3755,13 @@ export class Characters {
         case 'nap':
         case 'watch':
           // Sinking back into the seat (or against its slanted back, `recline`, split over the spine as `legsOut`
-          // does, the head kept looking ahead), legs stretched out a little (or all the way, `legsOut`), arms on
-          // the armrests.
+          // does, the head kept looking ahead), legs stretched out a little (`seatLegs`, or all the way,
+          // `legsOut`), arms on the armrests. (On the floor, nothing to sink back into: the clip.)
+          if (onFloor) break;
           if (seat?.recline !== undefined) this.recline(seat.recline);
           else {
             addRotation(add, B.spine_01, 1, 0, 0, -0.14);
             addRotation(add, B.Head, 1, 0, 0, 0.1);
-          }
-          if (!seat?.legsOut) {
-            addRotation(add, B.calf_l, 1, 0, 0, -0.35);
-            addRotation(add, B.calf_r, 1, 0, 0, -0.3);
           }
           addRotation(add, B.upperarm_l, 0, 0, 1, -0.18);
           addRotation(add, B.upperarm_r, 0, 0, 1, 0.18);
@@ -3491,11 +3786,12 @@ export class Characters {
           addRotation(add, B.lowerarm_r, 1, 0, 0, 0.1);
           break;
         case 'meditate': {
-          // Cross-legged and upright, hands resting on the knees, slow deep breaths.
+          // Cross-legged and upright, hands resting on the knees, slow deep breaths (on the floor, the clip's legs).
           const breath = Math.sin(time * 0.8 + seed) * 0.025;
           addRotation(add, B.spine_01, 1, 0, 0, 0.18 + breath);
           addRotation(add, B.spine_02, 1, 0, 0, -breath);
           addRotation(add, B.Head, 1, 0, 0, 0.06);
+          if (onFloor) break;
           addRotation(add, B.thigh_l, 0, 1, 0, -0.75);
           addRotation(add, B.thigh_r, 0, 1, 0, 0.75);
           addRotation(add, B.calf_l, 0, 0, 1, 1.25);
@@ -3650,6 +3946,121 @@ export class Characters {
     }
   }
 
+  /**
+   * Sitting against a tree (`Seat.shade`, the tree facing `tyaw`): the way to face, out from the trunk on its
+   * front or a side, whichever the sun's light falls towards (the crown's shadow), the front unless a side is
+   * clearly more so; chosen as they sit down and kept. (Not behind it: they'd walk through the trunk to get there.)
+   */
+  private shadeSide(rig: SimRig, tyaw: number): number {
+    if (!Number.isNaN(rig.shadeYaw)) return rig.shadeYaw;
+    const sun = this.sunOf?.();
+    const len = sun ? Math.hypot(sun.x, sun.z) : 0;
+    let best = 0;
+    if (sun && len > 0.05) {
+      const towards = (turn: number) => (Math.sin(tyaw + turn) * sun.x + Math.cos(tyaw + turn) * sun.z) / len;
+      for (const turn of [Math.PI / 2, -Math.PI / 2]) if (towards(turn) > towards(best) + 0.3) best = turn;
+    }
+    rig.shadeYaw = wrapAngle(tyaw + best);
+    return rig.shadeYaw;
+  }
+
+  /**
+   * On a deep seat (`Seat.front`), how far forward (m) the hips sit for the knees to clear its front
+   * (characters/seatFit.ts `perch`): a child well forward on a sofa, a grown-up a little on a deep one.
+   */
+  private perch(rig: SimRig, seat: Seat, sp: SeatFit): number {
+    const fit = this.legFits.get(rig.body.name)?.get('sit');
+    if (seat.front === undefined || seat.back || seat.along || seat.legsOut || seat.pedals || !fit) return 0;
+    const s = rig.scale;
+    return perch(fit.l, sp.z, (seat.front - seat.fwd) / s, seatSize(rig.body.height)) * s;
+  }
+
+  /**
+   * Seated: each foot down on the floor under the knee (characters/seatFit.ts `feetDown`), the thigh sloping
+   * off the seat's front to reach it, the feet hanging where it can't (a child on a grown-up's chair); on a low
+   * seat the knees come up. `stretch`: relaxing, the feet further out. Kept in `rig.seatTurn` for standing up.
+   */
+  private seatLegs(rig: SimRig, stretch: boolean): void {
+    const fits = this.legFits.get(rig.body.name);
+    const fit = fits?.get(rig.cur.key) ?? fits?.get('sit');
+    if (!fit) return;
+    const B = this.set!.bone;
+    const s = rig.scale;
+    const w = smooth(rig.w);
+    const floor = fit.ankle - (rig.cur.rootY - (rig.useObj?.lift ?? 0)) / s;
+    const out = stretch ? SEAT_FIT.stretch * seatSize(rig.body.height) : 0;
+    const turns = rig.seatTurn;
+    for (const [k, side, thigh, calf, foot] of [
+      [0, fit.l, B.thigh_l, B.calf_l, B.foot_l],
+      [4, fit.r, B.thigh_r, B.calf_r, B.foot_r],
+    ] as const) {
+      const [y, z] = feetDown(side, floor, out * (k ? 0.85 : 1));
+      const turn = this.legTo(side, y, z);
+      // The foot about as level as in the clip, its toes dropping a little where it hangs.
+      const hang = y > floor + 0.01 ? 0.25 : 0;
+      turns[k] = turn[0];
+      turns[k + 1] = turn[1];
+      turns[k + 2] = -(turn[0] + turn[1]) + hang;
+      addRotation(this.add, thigh, 1, 0, 0, turns[k] * w);
+      addRotation(this.add, calf, 1, 0, 0, turns[k + 1] * w);
+      addRotation(this.add, foot, 1, 0, 0, turns[k + 2] * w);
+    }
+  }
+
+  /** Standing up from a seat: `seatLegs`' turns fading out with the seated pose. */
+  private seatLegsOff(rig: SimRig): void {
+    const w = 1 - smooth(rig.w);
+    if (w <= 0) return;
+    const B = this.set!.bone;
+    const t = rig.seatTurn;
+    for (const [k, thigh, calf, foot] of [
+      [0, B.thigh_l, B.calf_l, B.foot_l],
+      [4, B.thigh_r, B.calf_r, B.foot_r],
+    ] as const) {
+      addRotation(this.add, thigh, 1, 0, 0, t[k] * w);
+      addRotation(this.add, calf, 1, 0, 0, t[k + 1] * w);
+      addRotation(this.add, foot, 1, 0, 0, t[k + 2] * w);
+      addRotation(this.add, thigh, 0, 0, 1, t[k + 3] * w);
+    }
+  }
+
+  /**
+   * Lying on a bench to lift (`Bed.feet`: the weight bench), the feet down on the floor either side of it, `out` m
+   * from its middle: each thigh out to the side and down off the pad, the shin down to the floor under the knee,
+   * the foot flat on it (as a bench press is done). In the lying body's own space (`lie`, the standing convention
+   * turned flat: its z up, its y towards the head), so planar leg IK (`legTo`) and then the leg turned out about
+   * the hip. Kept in `rig.seatTurn` for getting up.
+   */
+  private benchLegs(rig: SimRig, out: number): void {
+    const fit = this.legFits.get(rig.body.name)?.get('lie');
+    if (!fit) return;
+    const B = this.set!.bone;
+    const s = rig.scale;
+    const w = smooth(rig.w);
+    // The ankle as high as standing, over the floor under the bench.
+    const floor = fit.ankle + ((rig.bed?.lift ?? 0) - rig.cur.rootY) / s;
+    const turns = rig.seatTurn;
+    for (const [k, side, sx, thigh, calf, foot] of [
+      [0, fit.l, -1, B.thigh_l, B.calf_l, B.foot_l],
+      [4, fit.r, 1, B.thigh_r, B.calf_r, B.foot_r],
+    ] as const) {
+      // Out to the side and towards the feet (the knee a little short of the thigh's length on), down to the floor.
+      const vx = sx * (out / s - BENCH_HIP * seatSize(rig.body.height));
+      const vy = -side.l1 * BENCH_KNEE;
+      const across = Math.hypot(vx, vy);
+      const turn = this.legTo(side, side.hy - across, floor);
+      turns[k] = turn[0];
+      turns[k + 1] = turn[1];
+      // The foot level on the floor (the toes towards the bench's foot end).
+      turns[k + 2] = -0.35;
+      turns[k + 3] = Math.atan2(vx, -vy);
+      addRotation(this.add, thigh, 1, 0, 0, turns[k] * w);
+      addRotation(this.add, calf, 1, 0, 0, turns[k + 1] * w);
+      addRotation(this.add, foot, 1, 0, 0, turns[k + 2] * w);
+      addRotation(this.add, thigh, 0, 0, 1, turns[k + 3] * w);
+    }
+  }
+
   /** Leaning back by `angle` (rad) against a seat's slanted back (`Seat.recline`), split over the spine as `legsOut` does, the head tipped forward to keep looking ahead. */
   private recline(angle: number): void {
     const B = this.set!.bone;
@@ -3736,12 +4147,22 @@ export class Characters {
     Object.assign(tgt, EXPRESSIONS[emotion] ?? NONE);
     let eyesClosed = 0;
     let talking = false;
-    if (social) {
+    const reaction = social ? SOCIAL_FACES[rig.cur.key] : undefined;
+    if (reaction) {
+      // How it was taken (`GESTURES`, `REFUSED`): put off, crestfallen, embarrassed, unamused.
+      Object.assign(tgt, reaction);
+    } else if (social) {
       const me = speaking(pair, role, time);
       switch (social) {
         case Anim.Laugh:
-          Object.assign(tgt, LAUGH);
-          tgt.jaw = 0.1 + 0.2 * Math.abs(Math.sin(time * 11 + i));
+          // The teller grins through the joke; whoever laughs, laughs.
+          if (rig.cur.key === 'laugh') {
+            Object.assign(tgt, LAUGH);
+            tgt.jaw = 0.1 + 0.2 * Math.abs(Math.sin(time * 11 + i));
+          } else {
+            tgt.smile = Math.max(tgt.smile, 0.5);
+            talking = me;
+          }
           break;
         case Anim.Flirt:
           Object.assign(tgt, EXPRESSIONS.flirty);
@@ -4297,6 +4718,11 @@ export class Characters {
     const head = new Float32Array(3);
     const t = this.scratch.worldT;
     const fits = new Map<string, LegFit>();
+    // The ankles' height standing (the idle's first frame), for feet on the floor.
+    sampleClip(set, set.clips.get('idle')!, 0, this.qA, this.pA);
+    resetAdditive(this.add);
+    skin(set, body, this.qA, this.pA, this.add, { x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1, scale: 1 }, this.scratch, tmp, 0, head);
+    const ankle = t[B.foot_l * 3 + 1];
     for (const key of LEG_CLIPS) {
       const clip = set.clips.get(key);
       if (!clip) continue;
@@ -4312,6 +4738,7 @@ export class Characters {
         r: side(B.thigh_r, B.calf_r, B.foot_r),
         spine: [t[B.spine_01 * 3 + 1], t[B.spine_01 * 3 + 2]],
         head: [t[B.Head * 3 + 1], t[B.Head * 3 + 2]],
+        ankle,
       });
     }
     return fits;
@@ -4324,14 +4751,7 @@ export class Characters {
    * towards -y).
    */
   private legTo(fit: LegSide, y: number, z: number): Float32Array {
-    const { hy, hz, l1, l2 } = fit;
-    const r = clamp(Math.hypot(y - hy, z - hz), Math.abs(l1 - l2) + 0.01, l1 + l2 - 0.002);
-    // Direction angles from straight down (-y) towards the front (+z).
-    const d = Math.atan2(z - hz, hy - y);
-    const thigh = d + Math.acos(clamp((l1 * l1 + r * r - l2 * l2) / (2 * l1 * r), -1, 1));
-    const calf = d - Math.acos(clamp((l2 * l2 + r * r - l1 * l1) / (2 * l2 * r), -1, 1));
-    this.legAdd[0] = fit.t0 - thigh;
-    this.legAdd[1] = fit.c0 - calf - this.legAdd[0];
+    legTurn(fit, y, z, this.legAdd);
     return this.legAdd;
   }
 
@@ -4396,8 +4816,8 @@ export class Characters {
     }
   }
 
-  /** Pelvis height / forward offset of the seated and lying poses (body space, scale 1). */
-  private measureSit(body: BodyData): SeatFit {
+  /** Pelvis height / forward offset of the seated and lying poses (body space, scale 1): `sit`'s, or `key`'s (`sitFloor`). */
+  private measureSit(body: BodyData, key = 'sit'): SeatFit {
     const set = this.set!;
     const tmp = new Float32Array(set.bones.length * 16);
     const head = new Float32Array(3);
@@ -4409,7 +4829,7 @@ export class Characters {
       const p = set.bone.pelvis * 3;
       return { y: this.scratch.worldT[p + 1], z: this.scratch.worldT[p + 2] };
     };
-    const sit = pose('sit', 0);
+    const sit = pose(key, 0);
     // The pelvis joint rests `seatDrop` above the seat surface (sets without it: ~11 cm).
     return { y: sit.y - (body.seatDrop ?? 0.11), z: sit.z };
   }

@@ -94,6 +94,12 @@
           "requires": ["coffee"],
           "fetch": "pour",
           "label": "Have a coffee",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "drink",
           "minutes": 20,
           "pose": "sit",
@@ -529,6 +535,7 @@
         {
           "id": "washing",
           "label": "Hang out the washing",
+          "workOn": "washed",
           "anim": "clean",
           "minutes": 20,
           "effects": {
