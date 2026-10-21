@@ -234,6 +234,10 @@
         "figure": {
           "finish": "material.finish.satin"
         },
+        "lamp_light": {
+          "finish": "material.finish.satin",
+          "glow": "#CFE0FF"
+        },
         "page": {
           "finish": "material.finish.matte"
         },
@@ -244,19 +248,18 @@
           "finish": "material.finish.satin"
         },
         "pool": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#9CCBFF"
         },
         "rain": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#BFE4FF"
         },
         "ripple": {
           "finish": "material.finish.gloss"
         },
         "slate": {
           "finish": "material.finish.metal"
-        },
-        "smoke": {
-          "finish": "material.finish.satin"
         },
         "umbrella": {
           "finish": "material.finish.satin"

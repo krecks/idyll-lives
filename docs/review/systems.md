@@ -665,8 +665,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Fix class:** motion
 - **Where:** `crates/sim-core/src/snapshot.rs` (`doing`, Cooking: at the recipe's origin the snapshot gives its interaction for every step done at that object); `web/src/render/babylon/objectMotion.ts` (`findUses`: a clip keyed by the interaction id wins over the step's tag); `tools/art/blender/families/pack_foodie.py` (`chefsIsland`: `{'uses': {'tastingMenu': 'drawer_open'}}`), `outdoor.py` (`grillStation`: `hood_up` for cook and feast)
 - **Evidence:** seen in the code and content while fixing G-16 (no run): the chef's island is a `prep` and a `stove` station, so "Cook a tasting menu" chosen at it preps and cooks there, and both steps play the drawer (`drawer_open`, `hold` 2.5) and nothing on its hob (it has no hob clip, so a tasting menu is cooked on a cold hob, as A-kitchen-02 was); the grill station ([`grill`, `prep`]) lifts its hood for the prep step as for the grilling. The neighbourly oven had the same fault (its oven open while the pastry was made on its worktop) and was fixed by keying its clip by the `bake` step's tag (2dcc4ea0). Key such objects' clips by the step tags (`chop`/`mix`, `stir`, `flip`) and give the island's hob a burner clip.
-- **Status:** fixed in part (57b3a576); the island's hob burner clip is the Blender wave's
-- **After:** the recipe's own interaction now names only its last step at the object it was started from (`snapshot.rs`): the grill station lifts its hood for the grilling, not for the prep on its counter, and the chef's island opens its drawer for a `chop` at it (the prep) and no longer while the menu cooks. Its hob still has no burner clip (a model change). Seen in the code and the snapshot test; no run.
+- **Status:** fixed (57b3a576, db55d69b)
+- **After:** the recipe's own interaction now names only its last step at the object it was started from (`snapshot.rs`): the grill station lifts its hood for the grilling, not for the prep on its counter, and the chef's island opens its drawer for a `chop` at it (the prep) and no longer while the menu cooks. Its hob still has no burner clip (a model change). Seen in the code and the snapshot test; no run. The chef's island's clips are keyed by the step tags, not the use: `chop` (the prep step) opens the drawer (`hold` 2.5), `stir` (the cooking) grows a red hot ring under the copper pan (`burner_on`, its own part: the stools went plain to keep 3 draws), so the tasting menu is cooked on a hot hob (`bench-results/review/fixes/blender-packs/clips/clips-foodie.chefsIsland-*.png`, `play/day-foodie.chefsIsland-tastingMenu-01.png`).
 - **Source:** fix: motions
 
 ### I-systems-14 — A desk can't stand with its screen to a wall
@@ -678,3 +678,14 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Evidence:** from the content and the rule, not shot: the desks' user sits behind the desk facing its front (the computer desk's monitor "its back to the room", `office.py`), so the tile build mode keeps free is the one beyond the screen. A desk pushed against a wall with the sitter facing the wall, the usual way, can't be placed; turned the other way the chair is squeezed against the wall (`bench-results/review/fixes/positions/play/computerDesk-wall-in-200.png`). Since G-51 the desks are sat at from behind or beside (`approach: behind`), so build mode could take a free tile behind or beside the chair as well as the front for them (and the beds' sides for `approach: side`).
 - **Status:** open
 - **Source:** fix: positions
+
+### I-systems-15 — Buying round someone in bed can shut them in where they get up
+
+- **Severity:** S2
+- **Rubric:** I3
+- **Fix class:** code
+- **Where:** `crates/sim-core/src/home.rs` `keeps_reach` ("No Sim at home gets shut in": each resident's own tile, which for someone lying in bed or sitting is the bed's or seat's, never reachable, so never checked)
+- **Evidence:** found by the soak test while fixing G-65 (`--test soak -- --ignored`, busy player, seed 7; the games for two changed the town's run): R18 stood idle for days at (220.5, 13.5) with every need at 0, every use and visit remembered as out of reach, between the bed they had slept in (`bed` at 219,14) and a `lazy.snoozecloudBed` the player had bought at 221,13 while they slept. The check let the bed go in because R18's tile was the bed's; the tile they stood up on was closed off. `bench-results/review/fixes/partners/soak-2.txt` (34 stretches stuck), `soak-3.txt` after (4 of 4 pass).
+- **Status:** fixed (15309c9d) — the check takes the tile they'll stand up on (`seated_from`) for someone in bed or on a seat.
+- **After:** the soak test passes (4 of 4) with G-65; balance unchanged.
+- **Source:** fix: partners

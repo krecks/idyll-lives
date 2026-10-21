@@ -51,6 +51,8 @@ const ICONS: Record<string, string> = {
   stayedHome: 'icon.ui.home',
   noBed: 'icon.need.energy',
   notClosed: 'icon.ui.home',
+  playedAlone: 'icon.need.fun',
+  noPartner: 'icon.need.social',
 };
 
 const LOVE = new Set(['crush', 'firstKiss', 'startedDating', 'movedInWith', 'expecting', 'born', 'adopted']);

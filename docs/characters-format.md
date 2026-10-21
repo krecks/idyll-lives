@@ -264,6 +264,10 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
   and its own pelvis. Lying plays `lie` turned flat on the mattress (`LIE_*`);
   the blanket is fitted to `lie` too. A baby lying (in the crib) plays its own clips the same way,
   `babyLieAsleep` or `babyLieAwake`, centred on the mattress.
+- Clips in sizes (`street.ts` `sizes`: things at fixed heights, the size picked by the resident's height) are fitted
+  by the legs: a size's metres are the object's over its height's share of the reference times `legShare` (a child's
+  legs are 0.9 of a grown-up's for the height, from 1.25 m up to 1.4 m in between), as the runtime moves the clip's
+  pelvis by the body's `pelvisScale` (A-residents-12; the rides in `rides.ts` were already).
 - Carried things sit on the palms (`grip`): the right one, or between both.
 - Every name the runtime plays, with its loop flag and length (seconds; the runtime sequences
   object use, sitting down and standing up on these lengths):
@@ -321,7 +325,7 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | ballPit112 | yes | 12 | the ball pit (`STEP_IN`, over its rim, `over`): wading and a jump in the balls, down to sit in them tossing balls up, up again; a child's size (clips/play.ts) |
 | tentPlay112 | yes | 24 | the play tent (`STEP_IN`): down on hands and knees at its door, crawling in, sitting back on the heels to play on its mat, crawling back out; a child's size |
 | yoga | yes | 48 | a yoga flow on the mat (`STEP_IN` onto its front end, open hands): mountain, hands to the heart, upward salute, forward fold, half lift, a short downward dog (heels pedalling), a lunge up to warrior I, back to the dog, a child's pose, sitting on the heels, up through a squat |
-| slide125, 112, 99 | yes | 14 | a round on the slide (`STEP_IN` at the run-out's foot; `clips/rides.ts`): round its right side to the ladder, up the five rungs hand and foot in turn, ducking under the bar onto the deck on hands and knees, sat at the top holding the hoop, lain back under it and down the chute on the back (the body on the chute's floor, the legs ahead along it), sat up on the run-out, up off it and a turn back to the start; a child's sizes (cm), fitted by the legs (a child's `pelvisScale`, 0.51 of the height); a planted foot pivots on its ball as the body turns over it |
+| slide125, 112, 99 | yes | 14 | a round on the slide (`STEP_IN` at the run-out's foot; `clips/rides.ts`): round its right side to the ladder, up the five rungs hand and foot in turn, a step up onto the deck and stood under the roof, sat at the top holding the arch, down the chute sat up (the back leant back up to 25°, the hands on the chute's sides, the legs ahead along it), upright on the run-out, up off it and a turn back to the start; a child's sizes (cm), fitted by the legs (a child's `pelvisScale`, 0.51 of the height); a planted foot pivots on its ball as the body turns over it |
 | bunkUp172, 147, 112; bunkDown172, 147, 112 | no | 7, 6.5 | the upper bunk's ladder (`BUNK_LADDER`, getting into the bed's second slot and up from it): from the tile in front round the foot end to the ladder, up its four rungs, onto the mattress on hands and knees through the gap in the guard rail, sat with the legs swung round and lain back, ending in the `lie` pose (the pelvis turned flat in the clip, so the fade to `lie` is short); down the same way backwards and a walk round to the tile, sim-core waiting for them (`LADDER_DOWN_TICKS`); placed in the bed's frame (`Player.frame`); a size per height (grown-up, teen, child) |
 | rideHorse112, rideSpring112 | yes | 2.4, 2 | astride the rocking horse and the spring rider (`RIDES`, a child's): the thighs either side of the barrel, the hands on the handles, the feet down by the rockers or on the pegs; the ride's `ride` part rocks them |
 | rideSeesaw147, 112 | yes | 2.8 | astride the seesaw's end, facing along it to the middle (its slot's place, content `places`), the hands on the handle bar, the feet tucked clear of the ground |
@@ -335,6 +339,8 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | sitHandsLow177, 147, 112 | yes | 5 | seated at a top less than `LOW_TOP` (0.2 m for the reference height) over the seat (the kids' chair at the coffee table, `tuckLow`): bent well over it, the left hand flat on it, the right drawing; `sit`'s pelvis |
 | kneelTable177, 147, 112 | yes | 6 | at the train table (`play`, `STEP_IN`, a lane each): kneeling up at its edge, leant in, the right hand pushing the engine along the track and the left on the top, now and then sitting back for a look |
 | brushHair | yes | 5 | getting ready at the dressing table (the seated upper body, `ACTIONS.wash`): four brush strokes from the crown down the right side, the head tilting into each, then the left hand smoothing the other side |
+| warmHands | yes | 7 | warming up standing at a fire (`ACTIONS.relax` at `WARM_AT`: the fire pit): leant a little to it, the hands held out over it, palms to the flames, turned now and then, then brought together and rubbed (clips/uses.ts) |
+| plateHold177, 147, 112 | yes | 3 | stood on the vibration plate (`GRIPPED`): both hands on its grips (fore-and-aft bars 0.26 m either side, 0.96 m over the deck, 0.12 m ahead), the weight shifting a little; the plate's buzz on top (`activityPose`); a size per height |
 | lieCurl | yes | 2.4 | dozing on a bed too short to lie on flat (`CURLED_BEDS`: the window seat): curled up on the left side facing the room, the knees drawn up, the head on the pillow on the left forearm; turned flat like `lie` |
 
 ### Checking clips
@@ -390,12 +396,17 @@ Why some entries are as they are:
 - `gardenChair`: on its slats' tops (0.43), against its slanted back, `recline` 0.314 rad (18°; the Adirondack
   chair's content `seat.recline` is in degrees).
 - `chessTable`, `sewingTable`, `hotHeaded.thunderDrums`: their chairs' and the drum stool's pads (0.475).
+- `barStool`, `stoolCounter`, `stoolBarHigh`: a foot ring (`rest`: its top's height and how far forward its front is);
+  where the feet hang over the floor, they go on it instead, the balls of the feet on its front (`REST_BACK`), if the
+  legs reach it (a child's still hang).
 - `weightBench`: lifting, the feet down on the floor either side of the bench, `feet` m out from its middle
   (`benchLegs`).
 - `kidsBedCar`: the race car's mattress ends at its bonnet, 34 cm short of the footprint's end (`foot`).
 - Hammocks (`hammock`, `cheerful.rainbowHammock`, `natureLover.gardenHammock`): lain in the sagging sling (`sling`,
   from their models' builds).
-- `bedDouble`, `bedQueenUpholstered`, `bedCanopy`: their mattress tops; `bedDaybed` its daybed top.
+- `bedDouble`, `bedQueenUpholstered`, `bedCanopy`: their mattress tops; `bedDaybed` its daybed top, its quilt tucked in
+  between the back, the arms and the rail (`tuck`: the quilt's width, no side drop showing; `foot` 0.12, the quilt ending
+  just past the toes inside the foot end's arm).
 - `sofaBed`: the head on the seat, the rest on the mattress pulled out in front (`bed_out`, `fwd`).
 - `gloomy.windowSeat`, `kind.hearthSettee` (2 wide): dozed on along the cushion, head to its left, whichever slot
   (the nap takes both, content `whole`).
@@ -408,6 +419,22 @@ Why some entries are as they are:
   pedals (the recliner's footrest, a chaise, a tub, a bike), facing a seat's back, pulled up to a table, at the
   desk clips, or for an instrument, the toilet, a bath or the dressing table (`NO_FEET_UP`). The sim doesn't
   know: an armchair with one in front is sat in from beside it (sim-core `approach_tiles`).
+
+### Walking in
+
+sim-core moves a standing resident onto a seat, into a shower, up to someone they start talking to or onto the spot
+it stands them at in one tick. Drawn, a step of more than 0.25 m is walked (characters.ts `WALK_IN`, `walksIn`): the
+`walk` clip at 0.8 of its pace for the body, from where they were drawn to where they will stand, then a turn to the
+way sim-core faces them, and only then the seat's `sitDown` or the use's clips. The Sim is already there (the seat
+is found, a chair pulled in, from the place sim-core gave them); only its drawing is on the way. To or from a tile
+behind a chair built into its table or desk (a top sat at by a use of its own, `builtIn`), the step goes round a
+corner 0.55 m to the chair's side (`cornerOf`), and so does rising off it (`riseViaX`). A shower with a door
+(`WALK_WAIT`: the base `shower`) is waited at until the door has slid open (0.7 s), walked into through its opening
+and out the same way as the use ends, when it opens again; the towel goes on once they are in and stays on until they
+are out (`toweled`: while stepping out and `TOWEL_OUT`, 0.8 s, after). Not walked: a baby, one held, a resident on
+directions, using a thing from inside (`STEP_IN`), rising, on a bunk's ladder, out of bed, into a bath or a seat with
+the legs out, and onto a seat in a frame sat astride (pedals: the bikes; `STRADDLED`: the rocking horse, the spring
+rider, the seesaw), which they settle onto as before rather than walk through.
 
 ## Where things are
 

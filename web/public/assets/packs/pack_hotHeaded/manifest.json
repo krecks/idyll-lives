@@ -87,8 +87,7 @@
       "motions": {
         "uses": {
           "smash": "lid_open"
-        },
-        "hold": 1
+        }
       },
       "paint": [
         {

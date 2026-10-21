@@ -21,8 +21,8 @@ other way (+90°); the old part was turned the same way.
 | `libraryWall` | the rolling ladder: `ladder` rolls it 40 cm along the brass rail, towards the middle (1.2 s) | `research`, `browse` |
 | `writingBureau` | the writing flap over the pigeonholes, hinged on its foot: `fall_front` drops it 90° onto the desk (0.8 s) | `draft`, `letter` |
 | `teaTrolley` | the teapot, hinged on its foot under the spout: `pour` tips it 30° (0.8 s), `hold` 1.5 s | `brew` |
-| `firesideLounge` | the flames on the grate's logs, built flat: `flames` grows them (0.8 s) | `readByFire`, `readAloud` |
-| `bedsideStack` | the top book's cover, hinged on the spine: `book_up` opens it 170° to the right (0.8 s) | `chapter` |
+| `firesideLounge` | the flames on the grate's logs, built flat: `flames` grows them (0.8 s). The hood hangs right over the grate on its flue, its rim at 0.6 (2026-10-21: at 1.0, over the air between the chairs: M-packs-10) | `readByFire`, `readAloud` |
+| `bedsideStack` | the top book's cover, hinged on the spine: `book_up` opens it 170° to the right (0.8 s). The chest is nightstand-sized, 0.6 wide with four drawers (2026-10-21: a 0.8 m chest of six, M-packs-12); the floor pile in front of it | `chapter` |
 
 **Draw calls: 3 each.** The still body takes its plain finishes and one textured finish, the moving part one
 more. So that it stays at 3:
@@ -40,8 +40,8 @@ Book spines are plain satin, unbevelled boxes: a wall of books costs no draw cal
 | `model.bookworm.libraryWall` | 1.88 × 2.34 × 0.82 m | 6,492 | 3 | Wood, Ladder |
 | `model.bookworm.writingBureau` | 0.85 × 1.35 × 0.76 m | 5,144 | 3 | Wood, Fabric, Chair |
 | `model.bookworm.teaTrolley` | 0.75 × 0.94 × 0.49 m | 3,892 | 3 | Wood, Fabric, Frame |
-| `model.bookworm.firesideLounge` | 1.70 × 1.96 × 1.85 m | 5,834 | 3 | Wood, Fabric, Rug |
-| `model.bookworm.bedsideStack` | 0.85 × 0.93 × 0.74 m | 3,624 | 3 | Wood, Fabric, Drawers |
+| `model.bookworm.firesideLounge` | 1.70 × 2.80 × 1.85 m | 6,070 | 3 | Wood, Fabric, Rug |
+| `model.bookworm.bedsideStack` | 0.63 × 0.93 × 0.73 m | 2,976 | 3 | Wood, Fabric, Drawers |
 
 The library wall has no fabric to colour; its second part is the ladder.
 

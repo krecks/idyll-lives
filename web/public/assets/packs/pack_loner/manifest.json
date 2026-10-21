@@ -281,7 +281,8 @@
         "uses": {
           "sweat": {
             "clip": "door_open",
-            "hold": 1.5
+            "hold": 1.5,
+            "out": 1.5
           }
         }
       },

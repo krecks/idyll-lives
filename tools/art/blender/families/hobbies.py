@@ -1625,7 +1625,7 @@ FAMILY = G.Family(
              motions={'uses': {'pool': 'rack_off', 'trickShots': 'rack_off'}},
              paint=[('pool_frame', 'Frame'), ('cloth', 'Cloth')]),
      G.Model('foosball', foosball, size=(1.42, 0.947, 0.935), key='model.foosball', centre=(0, 0.0375),
-             motions={'loops': {'foosball': 'rods'}}, paint=[('foos', 'Table'), ('foos_trim', 'Trim')]),
+             motions={'loops': {'foosball': 'rods', 'practise': 'rods'}}, paint=[('foos', 'Table'), ('foos_trim', 'Trim')]),
      G.Model('dartboard', dartboard, size=(0.62, 0.62, 0.07), key='model.dartboard', centre=(0, -0.393), floor=False,
              motions={'uses': {'darts': 'darts'}}, paint=[('board', 'Board'), ('cabinet', 'Cabinet')]),
      G.Model('arcadeCabinet', arcadeCabinet, size=(0.672, 1.82, 0.872), key='model.arcadeCabinet',

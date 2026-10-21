@@ -186,6 +186,13 @@ The nature lover pack models (`models/pack_natureLover/veggieBed.glb`, `pottingB
 veggie bed (whose crop follows its growth stage), a seedling comes up, a bird lands, the hammock sways, the shower
 runs, the cloche lifts and the glasshouse's door and roof vent open.
 
+Rebuilt in the same families (2026-10-21, original, CC0): the entry console, the baking counter and the spritz
+station with back panels for their mirrors, hooks and shelves; the organizer desk and the love-letter bureau turned
+round, their backs on the wall; the two pack showers with glass doors that open; the chef's island with counter
+stools and a hob that heats; the two hammocks on 3 × 1 stands; the nap pod, the quilt table, the vibration plate and
+the sauna with room for the body; a real zafu; the writing desks at desk height; the fireside hood over its fire; a
+nightstand-sized bedside stack; the lava lamp turned to its watcher; and glowing screens, lamps, tiles and candles.
+
 The neat pack models (`models/pack_neat/steamMopDock.glb`, `laundryCenter.glb`, `rainShowerTower.glb`,
 `organizerDesk.glb`, `robotVacuumDock.glb`, `entryConsole.glb`, override pack `packs/pack_neat/manifest.json`) are
 built in Blender by `tools/art/blender/families/pack_neat.py` on `gamekit` and exported as `.glb` (glTF, original,

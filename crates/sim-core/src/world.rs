@@ -814,6 +814,22 @@ pub struct Sim {
     /// resident nobody watches takes a turn only every so often, and a change between two of
     /// them still catches up with them. Not saved (after a load, a walker routes again once).
     pub(crate) nav_seen: u32,
+    /// The game for two (`Interaction::partner`) they're at, or on their way to, next: its
+    /// object and interaction, and whether they're at their place. Set as each tick starts
+    /// (`partners::refresh`), not saved (the task it comes from is).
+    pub(crate) game: Option<(u32, usize, bool)>,
+    /// They set off for a game for two this tick: someone to play with is to be found
+    /// (`partners::update`). Not saved.
+    pub(crate) wants_partner: bool,
+    /// Fetched to play with this resident (`partners::update`): the game they're sent to is
+    /// that one's, joined, never one of their own. Not saved.
+    pub(crate) joins: Option<u32>,
+    /// Ticks they've waited at their place for the one they play with to get to theirs (see
+    /// `partners::hold`; 0: not waiting). Not saved.
+    pub(crate) partner_wait: u32,
+    /// Found nobody to play a game for two with they chose: none chosen again until this tick
+    /// (`partners::alone`). Not saved.
+    pub(crate) alone_until: u64,
     pub household: u32,
     pub job: Option<crate::life::Job>,
     /// At work until this tick (not on the map).
@@ -1028,7 +1044,8 @@ impl Sim {
 
     /// Whether another Sim can pull this one into a conversation right now.
     pub fn available_for_social(&self, content: &Content) -> bool {
-        if self.engaged_with.is_some() || self.heeding.is_some() || self.pose == Pose::Lie || self.away_until.is_some() || self.pressed(content) {
+        // (Nor someone at a game for two, or on their way to one: `partners.rs`.)
+        if self.engaged_with.is_some() || self.heeding.is_some() || self.pose == Pose::Lie || self.away_until.is_some() || self.pressed(content) || self.game.is_some() {
             return false;
         }
         // Busy with a planned block (unless it's for socialising).
@@ -1294,6 +1311,10 @@ pub(crate) struct SimBrief {
     /// Eating sitting down: talked to only from close by in their seat (not a hug), the meal
     /// left a moment (`conversation::keeps_seat`).
     pub eating: bool,
+    /// The game for two they're at or on their way to (`Sim::game`).
+    pub game: Option<(u32, usize, bool)>,
+    /// Free to be fetched for one (`partners::free_now`).
+    pub free: bool,
 }
 
 pub struct World {
@@ -2064,6 +2085,11 @@ impl World {
             social_waited: 0,
             called: false,
             nav_seen: 0,
+            game: None,
+            wants_partner: false,
+            joins: None,
+            partner_wait: 0,
+            alone_until: 0,
             household: spawn.household,
             job,
             away_until: None,
@@ -2725,6 +2751,7 @@ impl World {
         self.tick += 1;
         let tick = self.tick;
 
+        crate::partners::refresh(self);
         let mut briefs = std::mem::take(&mut self.briefs);
         briefs.clear();
         for s in &self.sims {
@@ -2748,6 +2775,8 @@ impl World {
                 cleaning: s.current().and_then(|a| if let TaskKind::Clean { x, z } = a.task.kind { Some((x, z)) } else { None }),
                 seated: s.pose == Pose::Sit && !s.is_moving(),
                 eating: s.eating_seated(),
+                game: s.game,
+                free: crate::partners::free_now(&self.content, s, tick),
             });
         }
         // Who's in a conversation, and whose (for joining in).
@@ -2818,6 +2847,7 @@ impl World {
                 step_sim(sim, &ctx, objects, items, rng);
             }
         }
+        crate::partners::update(self);
         self.broadcast();
         self.apply_messes();
         crate::carry::after_step(self);
@@ -3316,6 +3346,21 @@ impl World {
                         Unmet::Nothing(w) => format!("{}: {}", inter.label, w.none()),
                     }));
                 }
+                // A game for two: its places free (or one taken by someone there for the same
+                // game, to play along with), and someone free to play, or a use for one to do
+                // instead (`partners.rs`).
+                if inter.partner {
+                    let def = &self.content.objects[obj.def];
+                    let mut others = obj.users[def.slots_for(interaction)].iter().flatten().filter(|&&u| u != sim);
+                    let (first, more) = (others.next().copied(), others.next().is_some());
+                    let along = |u: u32| crate::partners::game(self, u).is_some_and(|(o, i, _)| (o, i) == (object, interaction));
+                    if more || first.is_some_and(|u| !along(u)) {
+                        return Err(Error::new(format!("someone is using the {thing}")));
+                    }
+                    if first.is_none() && inter.alone.is_none() && crate::partners::partner_for(self, sim as usize, object, interaction).is_none() {
+                        return Err(Error::new(format!("nobody is free to {} with {}", inter.label.to_lowercase(), s.name)));
+                    }
+                }
                 if inter.cares() && !obj.users().any(|u| self.sims.get(u as usize).is_some_and(|b| self.content.life.baby(b.age))) {
                     return Err(Error::new(format!("there's no baby in the {thing}")));
                 }
@@ -3588,7 +3633,7 @@ impl World {
 /// Keeps a queue within `MAX_QUEUE` by dropping what was chosen for them from the back, but
 /// never the first `keep` tasks (just put there), the player's orders, nor a recipe whose
 /// ingredients are paid for: for those, it goes over the cap.
-fn trim_queue(queue: &mut VecDeque<Task>, keep: usize) {
+pub(crate) fn trim_queue(queue: &mut VecDeque<Task>, keep: usize) {
     while queue.len() > MAX_QUEUE {
         let paid = |t: &Task| matches!(t.kind, TaskKind::Cook { servings, .. } if servings > 0);
         let Some(k) = queue.iter().rposition(|t| !t.directed && !paid(t)).filter(|&k| k >= keep) else { break };
@@ -4282,6 +4327,7 @@ fn pick_autonomous(
                 || !requirements_met(ctx, sim, objects, obj.id, inter)
                 || !obj.allows(inter, sim.id)
                 || !obj.can_use_for(sim.id, &content.objects[obj.def], i)
+                || (inter.partner && !(crate::partners::may_take(obj, &content.objects[obj.def], i, sim.id, None, |_| false) && crate::partners::free_near(ctx, sim, obj, inter)))
             {
                 continue;
             }
@@ -4705,8 +4751,10 @@ pub(crate) fn prefer_factor(prefer: Prefer, rel: &social::Relationship, chemistr
 fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut crate::items::Items) {
     let content = ctx.content;
     let nav = &ctx.nav;
-    // (Fetched for this use, if it's the one: see `Sim::fetched`.)
+    // (Fetched for this use, if it's the one: see `Sim::fetched`; sent to play with someone,
+    // `Sim::joins`.)
     let fetched = sim.fetched.take();
+    let joins = sim.joins.take();
     // Nothing their age isn't for, nor out of its hours, under a roof or with nothing to work
     // on, however it was chosen (`unfit`, `unmet`; an order was refused already).
     if let TaskKind::Use { object, interaction } = task.kind
@@ -4755,6 +4803,11 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
                 return;
             }
             if !obj.can_use_for(sim.id, &content.objects[obj.def], interaction) || obj.broken() || upper_barred(content, obj, sim.id, sim.age) {
+                return;
+            }
+            // A game for two: both its places free, or joining whoever they play it with.
+            let along = |u: u32| ctx.briefs.get(u as usize).and_then(|b| b.game).is_some_and(|(o, i, _)| (o, i) == (object, interaction));
+            if inter.partner && !crate::partners::may_take(obj, &content.objects[obj.def], interaction, sim.id, joins, along) {
                 return;
             }
             // Never other people's things; what the player asks a guest to do, only what guests
@@ -4971,6 +5024,14 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             }
             return start_task(sim, first, ctx, objects, items);
         }
+    }
+    // Off to a game for two: someone to play with is found after the step (`partners::update`),
+    // unless they're the one fetched.
+    if let TaskKind::Use { object, interaction } = task.kind
+        && content.objects[objects[object as usize].def].interactions[interaction].partner
+    {
+        sim.wants_partner = joins.is_none();
+        sim.partner_wait = 0;
     }
     sim.pose = Pose::Stand;
     sim.current = Some(Activity {
@@ -5199,8 +5260,31 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
             false
         }
         Phase::Using { elapsed } => {
+            // A game for two: not begun until the one they play with is at their place too, and
+            // over once they've stopped (`partners::hold`).
+            let mut over = false;
+            if let TaskKind::Use { object, interaction } = act.task.kind
+                && let Some(inter) = content.objects[objects[object as usize].def].interactions.get(interaction).filter(|i| i.partner)
+            {
+                match crate::partners::hold(ctx, sim.id, (object, interaction), *elapsed > 0.0, sim.wants_partner, &mut sim.partner_wait, ticks) {
+                    crate::partners::Hold::Play => {}
+                    crate::partners::Hold::Wait => return,
+                    crate::partners::Hold::Over => over = true,
+                    // Nobody's coming: the game's use for one, if they were told to play, else given up.
+                    crate::partners::Hold::Alone => match inter.alone.filter(|_| act.task.directed) {
+                        Some(k) => {
+                            act.tags = content.objects[objects[object as usize].def].interactions[k].tags;
+                            act.task.kind = TaskKind::Use { object, interaction: k };
+                            return;
+                        }
+                        None => return end_activity(sim, content, objects),
+                    },
+                }
+            }
             let first = *elapsed == 0.0;
-            *elapsed += minutes;
+            if !over {
+                *elapsed += minutes;
+            }
             let elapsed = *elapsed;
             match act.task.kind {
                 TaskKind::Use {
@@ -5208,7 +5292,7 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                     interaction,
                 } => {
                     let urgent = urgent_needs(sim, ctx, objects);
-                    let done = use_object(sim, ctx, &objects[object as usize], interaction, elapsed, minutes, urgent);
+                    let done = over || use_object(sim, ctx, &objects[object as usize], interaction, elapsed, minutes, urgent);
                     given_up = done && first && content.objects[objects[object as usize].def].interactions.get(interaction).is_some_and(|i| elapsed < i.minutes);
                     // Every finished use wears it a little, by how much of a full use it was (a
                     // nap cut short when they're rested is a fraction); better quality wears slower.
@@ -5452,7 +5536,8 @@ fn use_object(
             && training_interest(sim, content, inter) > MIN_AUTONOMY_SCORE;
         // A job that changes the thing as the hands go (hanging out the washing, a harvest) goes on to
         // its end, and clothes are changed all the way, whatever it does for comfort.
-        let job = inter.gradual || inter.picks || inter.changes_outfit;
+        // So does a game for two: one stopping would end it for the other.
+        let job = inter.gradual || inter.picks || inter.changes_outfit || inter.partner;
         elapsed >= inter.minutes || (any_gain && satisfied && !planned && !routine && !practising && !job) || drained
     };
     // Halfway through changing: in the next outfit, which views draw (a change of looks).
@@ -5788,7 +5873,7 @@ fn leave_today(sim: &Sim, ctx: &Ctx) -> Option<u64> {
 }
 
 /// When they leave for work or school later today (`leave_today`).
-fn leave_at(sim: &Sim, content: &Content, tick: u64) -> Option<u64> {
+pub(crate) fn leave_at(sim: &Sim, content: &Content, tick: u64) -> Option<u64> {
     sim.job
         .as_ref()
         .and_then(|job| crate::life::shift_today(content, job, &sim.skills, tick))

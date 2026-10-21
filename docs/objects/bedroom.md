@@ -30,7 +30,7 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 | `bedDouble` Double bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`. |
 | `bedQueenUpholstered` Upholstered queen bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`. |
 | `bedCanopy` Four-poster bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`; the canopy drapes are static. |
-| `bedDaybed` Daybed | 1x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Static | Static (a sofa by day). |
+| `bedDaybed` Daybed | 1x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Static | Static (a sofa by day). The sleeper's quilt is tucked in at the mattress's edges, inside its back, arms and rail (`BEDS` `tuck`, A-bedroom-05). |
 
 **In play** (signed off 2026-10-16):
 - Each bed napped in, standing free in all four facings (`nap` plays the same clips as the 480-minute sleep). The
@@ -117,6 +117,8 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 **In play** (signed off 2026-10-16):
 - The cheval mirror ("Practise a speech") and the standing mirror ("Check the mirror") standing free in all four
   facings, the wall mirror on all four walls: the resident stands in front of the glass, which reflects the room.
+  Practising a speech, they look into the glass with the head level (`LEVEL_GAZE`), not down at the thing as at a
+  plant (I-bedroom-08).
 - The dressing table's drawer slides out for "Get ready", the resident on the pouf facing the mirror, and shuts after
   its `hold`.
 - The wall mirror hides with its wall when the wall is cut down for the camera (each wall thing knows which views

@@ -259,7 +259,8 @@ Measured: the dressing table's top 0.76 (72â€“78) and its pouf's seat 0.45 (42â€
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters.ts` (`writeBlanket`, `BLANKET_BEDS`: the daybed in it since I-bedroom-02); `tools/art/blender/families/bedroom.py:421` (`bedDaybed`: a back, two arms and a front rail of spindles round the mattress)
 - **Evidence:** `fixes/tables/play-a/a-bedDaybed-sleep-01.png`: the quilt's sides drop past the mattress's edges as on an open bed, so on the front side it hangs down between the rail's spindles to below the mattress, and at the back it runs into the back. A bed with sides wants the quilt tucked in at the mattress's edges (no side drop), as a cot's would be.
-- **Status:** open
+- **Status:** fixed (e38de4b7)
+- **After:** the daybed's quilt is tucked in (`furniture.json` `beds.bedDaybed` `tuck: [0.7, 0]`, `foot` 0.12; `writeBlanket`): 0.7 m wide, so its side drops fall inside the mattress, and ending just past the toes (a tucked quilt may end up to 0.3 short of its stretch), inside the foot end's arm. `fixes/sweep-render/daybed/b-bedDaybed-sleep-01.png` against `fixes/tables/play-a/a-bedDaybed-sleep-01.png` (the same camera: no drape through the rail or the foot end's spindles), `foot-bedDaybed-sleep-01.png` (the foot end and the open side close up), `front-bedDaybed-sleep-01.png` (from the head end), `child-bedDaybed-sleep-01.png` (Dee, 8).
 - **Source:** fix: tables (G-04 re-check, 2026-10-21)
 
 ### A-bedroom-06 â€” The upper bunk's duvet turns down while its sleeper is still at the foot of the ladder
@@ -280,5 +281,6 @@ Measured: the dressing table's top 0.76 (72â€“78) and its pouf's seat 0.45 (42â€
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters.ts:3378` (`talk`, `look`, `listen` tip the head 0.2 rad down at any object but the telescope)
 - **Evidence:** "Practise a speech" (`anim: talk`) at every mirror tips the head down to the object, as at a plant or a bird bath; a mirror is looked into at eye height. "Check the mirror" was `look` (the same tip) and is `idle` now (1222c510); the speech wants the head level at a mirror (by def, or a `mirror` anim).
-- **Status:** open
+- **Status:** fixed (fcb1cb7a)
+- **After:** at the mirrors (`mirror`, `mirrorWall`, `mirrorRound`, `mirrorFloor`) the speech's head stays level, looking into the glass (`characters.ts` `LEVEL_GAZE`, with the telescope); at a plant or a bird bath it still tips down. `fixes/sweep-render/mirror/side-mirrorWall-speech-00.png` (side on: the head level at the wall mirror), `mirror-mirror-speech-01.png`.
 - **Source:** fix: content

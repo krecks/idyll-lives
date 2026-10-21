@@ -11,7 +11,8 @@ Twenty of them have uses (G-63): the appliances and screens, food and drink, boo
 on a top is used from the floor beside its top (`surface::rider_tiles`: in front of the counter, desk or table it
 stands on, else at the top's side), standing and facing it; a use with `"pose": "sit"` (the laptop, monitor, books,
 tea set, mugs, wine, blocks) takes a chair pulled up to that top if one is free, else a seat within `seatNear`, else
-it is done standing; at a top with chairs all round, any use is done from one of its chairs. The other nineteen are decor (the chopping board, the alarm clock, the globe and the
+it is done standing (sat on a chair pulled up to the top, the chair is shuffled in as for a meal: the thing on the top
+isn't taken for the seat, I-tabletop-06); at a top with chairs all round, any use is done from one of its chairs. The other nineteen are decor (the chopping board, the alarm clock, the globe and the
 ornaments, towels, soap and the like). Food, drink, books, plants and toys don't wear (`wearPerUse: 0`); the
 appliances and screens do. No use has a clip yet: one draw call where it can (wood `satin`, towels and the teddy
 `matte`), a second only for glass that is seen through (the cookie jar, the wine glasses, the snow globe), and the
@@ -63,7 +64,7 @@ sits on the top, turns with its facing and lights right at night.
 | `teapotSet` Tea set | 1x1 · surface | tea:drink | tabletop / tableware | Body, Tray | Static | Static. |
 | `mugs` Mugs | 1x1 · surface | drink:drink | tabletop / tableware | Mug 1, Mug 2, Mug 3 | Static | Static. |
 | `wineGlasses` Wine and glasses | 1x1 · surface | wine:drink | tabletop / tableware | Body | Static | Static. |
-| `candlesticks` Candlesticks | 1x1 · surface | — | tabletop / tableware | Body, Candles | Night (E3) | `lit`: by day dark wicks; from dusk the two flames rise out of the candles' tops (held open dusk to dawn) and glow while the room's lights are on (E8; M-tabletop-01, 2026-10-21: they were drawn lit all day and dark at night). |
+| `candlesticks` Candlesticks | 1x1 · surface | — | tabletop / tableware | Body, Candles | Night (E3) | `lit`: by day dark wicks; from dusk the two flames rise out of the candles' tops and glow while the room's lights are on (someone awake there; E8; M-tabletop-01, 2026-10-21: they were drawn lit all day and dark at night); in a room gone dark they sink back to the wicks (`ObjectMotion.setUnlit`, M-tabletop-03). |
 
 **In play** (signed off 2026-10-16):
 - The place setting's Body, Rim and Napkin and the cake's Body and Icing land where named.

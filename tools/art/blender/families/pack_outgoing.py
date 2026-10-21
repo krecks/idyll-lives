@@ -31,8 +31,9 @@ M = G.Palette(
     steel=('#C9CCD0', 'metal'),      # the dance floor's gantry, mic bases
     dark=('#3A3D41', 'satin'),       # speaker cones, the ring light's stand
     speaker=('#E4E1DA', 'satin'),    # speaker cabinets
-    screen=('#26305A', 'gloss'),
-    lyric=('#F2F2F0', 'gloss'),
+    screen=('#26305A', 'gloss', {'glow': '#5A78D8', 'screen': True}),   # the karaoke and laptop screens: lit while used
+    lyric=('#F2F2F0', 'gloss', {'glow': '#FFFFFF', 'screen': True}),
+    lyric_hi=('#F2C14E', 'gloss', {'glow': '#FFD45A', 'screen': True}),   # the line being sung
     sunny=('#F2C14E', 'satin'),
     coral=('#E8735A', 'gloss'),
     magenta=('#D64B8A', 'gloss'),
@@ -48,19 +49,19 @@ M = G.Palette(
     beer=('#E8B04A', 'gloss'),
     laptop=('#D9DADB', 'metal'),
     face=('#E8B892', 'gloss'),
-    ring=('#FFF6E2', 'gloss'),
+    ring=('#FFF6E2', 'gloss', {'glow': '#FFF3D8', 'screen': True}),   # the ring light: on while the call lasts
     cork=('#C9A27A', 'matte'),
     paper=('#FAFAF7', 'satin'),
-    bulb=('#FFE9A8', 'gloss'),
+    bulb=('#FFE9A8', 'gloss', {'glow': '#FFDC8A'}),   # the photo wall's string of bulbs: lit at night
     string=('#3A3D41', 'satin'),
     base=('#E4E1DA', 'satin'),       # the dance floor's base
     mirror=('#E8EEF2', 'chrome'),
-    tile_a=('#D64B8A', 'gloss'),
-    tile_b=('#3FA9A5', 'gloss'),
-    tile_c=('#F2C14E', 'gloss'),
-    tile_d=('#8E6BD6', 'gloss'),
-    tile_e=('#58C7E8', 'gloss'),
-    tile_f=('#E8735A', 'gloss'),
+    tile_a=('#D64B8A', 'gloss', {'glow': '#FF5AA8', 'screen': True}),   # the floor's tiles light up while it's danced on
+    tile_b=('#3FA9A5', 'gloss', {'glow': '#4FE0D8', 'screen': True}),
+    tile_c=('#F2C14E', 'gloss', {'glow': '#FFD860', 'screen': True}),
+    tile_d=('#8E6BD6', 'gloss', {'glow': '#B08CFF', 'screen': True}),
+    tile_e=('#58C7E8', 'gloss', {'glow': '#70DCFF', 'screen': True}),
+    tile_f=('#E8735A', 'gloss', {'glow': '#FF8A6A', 'screen': True}),
     bottle_a=('#2E7D5B', 'gloss'),
     bottle_b=('#B5372E', 'gloss'),
     bottle_c=('#E8B04A', 'gloss'),
@@ -142,9 +143,9 @@ def partyBar():
         for x in (-0.68, -0.23, 0.23, 0.68):
             F.box(_name('cabinet_door'), 0.42, 0.7, 0.012, (x, 0.43, WALL + 0.255), M.oak, bevel=0.005)
             F.box(_name('door_pull'), 0.012, 0.12, 0.016, (x + (0.17 if x < 0 else -0.17), 0.55, WALL + 0.266), M.brass)
-        F.box('back_top', 1.84, 0.03, 0.27, (0, 0.875, WALL + 0.135), M.oak, bevel=0.006)
+        F.box('back_top', 1.84, 0.03, 0.27, (0, 0.875, WALL + 0.135), M.wood, bevel=0.006)
         for y in (1.28, 1.62):
-            F.box(_name('shelf'), 1.8, 0.03, 0.18, (0, y, WALL + 0.09), M.oak, bevel=0.005)
+            F.box(_name('shelf'), 1.8, 0.03, 0.18, (0, y, WALL + 0.09), M.wood, bevel=0.005)   # the back bar's own wood
             F.box(_name('led'), 1.78, 0.014, 0.01, (0, y - 0.022, WALL + 0.17), M.sunny)
         for x in (-0.89, 0.89):
             F.box(_name('upright'), 0.03, 0.78, 0.16, (x, 1.43, WALL + 0.08), M.brass, bevel=0.006)
@@ -272,7 +273,7 @@ def karaokeStage():
         F.box('screen_case', 0.96, 0.56, 0.05, (0, 1.35, -0.34), M.speaker, bevel=0.015)
         F.box('screen', 0.9, 0.5, 0.004, (0, 1.35, -0.314), M.screen)
         for i, (w, y) in enumerate(((0.6, 1.47), (0.7, 1.38), (0.5, 1.29), (0.62, 1.2))):
-            F.box(_name('lyric'), w, 0.032, 0.003, (0, y, -0.311), M.sunny if i == 1 else M.lyric)
+            F.box(_name('lyric'), w, 0.032, 0.003, (0, y, -0.311), M.lyric_hi if i == 1 else M.lyric)
         F.box('screen_post', 0.05, 1.0, 0.05, (0, 0.6, -0.39), M.steel, bevel=0.008)
         F.box('screen_foot', 0.5, 0.03, 0.16, (0, 0.16, -0.36), M.steel, bevel=0.008)
         for s in (-1, 1):

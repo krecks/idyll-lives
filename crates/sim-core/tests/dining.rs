@@ -156,6 +156,22 @@ fn dining_needs_a_table() {
     }
 }
 
+/// A dining set has its chairs built in: a chair bought facing it stands behind them, a metre
+/// from the top, so it isn't pulled up to the set (I-office-01).
+#[test]
+fn a_chair_is_no_seat_at_a_dining_set_with_its_own_chairs() {
+    let mut w = world();
+    buy(&mut w, "diningSet", 4, 4, 0).unwrap();
+    let table = buy(&mut w, "table", 9, 4, 0).unwrap();
+    let at_set = buy(&mut w, "chair", 4, 3, 0).unwrap();
+    let at_table = buy(&mut w, "chair", 9, 3, 0).unwrap();
+    assert_eq!(table_of(&w, at_set), None);
+    assert_eq!(table_of(&w, at_table), Some(table));
+    let dine = interaction(&w, at_set, "dine");
+    let err = w.apply(Command::Use { sim: 0, object: at_set, interaction: dine }).unwrap_err().to_string();
+    assert!(err.contains("table"), "{err}");
+}
+
 #[test]
 fn a_bar_stool_is_no_seat_at_a_dining_table() {
     let mut w = world();

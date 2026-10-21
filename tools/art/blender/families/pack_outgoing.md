@@ -9,12 +9,12 @@ backs on the wall's face (depth −0.43; the old parts' backs were 2 cm into the
 
 | Model | Moving part and clip | Played by |
 |---|---|---|
-| `partyBar` | the beer tap's lever, hinged on the faucet: `tap` pulls it 40° towards the front (0.5 s), `hold` 2 s | `mixDrinks`, `soda` |
+| `partyBar` | the beer tap's lever, hinged on the faucet: `tap` pulls it 40° towards the front (0.5 s), `hold` 2 s. "Back bar" (`wood`) colours the back cabinet, its top and the bottle shelves together (2026-10-21: the shelves were `oak`, the counter top's: M-packs-03) | `mixDrinks`, `soda` |
 | `conversationSectional` | the three seat cushions (tops at 0.45), origin on their underside: `sink_in` presses them 20 % (0.6 s) | `hangOut` |
-| `karaokeStage` | both mic stands' upper tubes, booms and mics, lowered at rest: `mic_up` raises them 20 cm (0.8 s) | `practise`, `perform` |
-| `videoCallNook` | the ring light and its phone clip, pivoting in the yoke: tipped back 60° at rest (face to the ceiling), `ring_light` swings it up to face the caller (0.7 s) | `call` |
-| `danceFloor` | the sixteen tiles in two checkerboard parts: `tiles` (a loop, 1.2 s) lifts one set 2.5 cm and back, then the other | `dance` (`loops`) |
-| `photoWall` | a new snapshot in the board's bottom row, built full size and shrunk to nothing: `photo` grows it onto the board (0.8 s) | `reminisce` |
+| `karaokeStage` | both mic stands' upper tubes, booms and mics, lowered at rest: `mic_up` raises them 20 cm (0.8 s). The screen and its lyrics glow while it is sung on (`screen`, `lyric`, `lyric_hi` `screen` glows: M-packs-07) | `practise`, `perform` |
+| `videoCallNook` | the ring light and its phone clip, pivoting in the yoke: tipped back 60° at rest (face to the ceiling), `ring_light` swings it up to face the caller (0.7 s). The ring light and the laptop's screen glow while the call lasts (`ring`, `screen`: M-packs-07) | `call` |
+| `danceFloor` | the sixteen tiles in two checkerboard parts: `tiles` (a loop, 1.2 s) lifts one set 2.5 cm and back, then the other. The tiles light up in their colours while it is danced on (`tile_*` `screen` glows: M-packs-07) | `dance` (`loops`) |
+| `photoWall` | a new snapshot in the board's bottom row, built full size and shrunk to nothing: `photo` grows it onto the board (0.8 s). The string of bulbs glows at night (`bulb`) | `reminisce` |
 
 The dance floor's table entry asks for the loop itself (`tiles`, E1), built as two parts on one clip with
 `G.turns` (the two sets take turns lifting), and it starts and ends at rest.

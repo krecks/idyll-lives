@@ -4,7 +4,8 @@
 #
 # Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
 # `Model`), one moving part each: the mop leaves its dock for the hands (`mop_off`), the washer's door swings open
-# (`door_open`), the rain falls (`water_on`), a bin slides out of the desk's hutch (`drawer_open`), the robot
+# (`door_open`), the rain falls (`water_on`) and the shower's glass door swings open (`door_open`), a bin slides out of the
+# desk's hutch (`drawer_open`), the robot
 # rolls out of its dock and turns (`vacuum_out`) and the console's key tray drawer slides out (`tray`).
 #
 # Run:  cargo art pack_neat [--only steamMopDock] [--preview]
@@ -215,6 +216,7 @@ def laundryCenter():
 # --- the rainfall steam shower (1x1): a glass cabin, tiled back and side, a ceiling rain head, a teak bench ---
 S, T, HC = 0.45, 0.07, 2.18      # half the cabin's width, the tray's top, the cabin's height
 HEAD_Y = 2.075                   # the rain head's face
+DOOR_HALF = 0.28                 # half the door's width, across the middle of the front
 
 
 def rainShowerTower():
@@ -233,17 +235,18 @@ def rainShowerTower():
         for k in (1, 2):
             F.box(_name('joint'), 0.008, HC - T, 0.004, (-S + k * w / 3, T + (HC - T) / 2, -S + 0.031), M.joint)
             F.box(_name('joint'), 0.004, HC - T, 0.008, (-S + 0.031, T + (HC - T) / 2, -S + k * w / 3 + 0.03), M.joint)
-        # the glass: the right side and the front, a fixed pane and the door
+        # the glass: the right side and the front, a narrow fixed pane either side of the door (its own part)
         F.box('glass_side', 0.012, HC - T - 0.06, w - 0.06, (S - 0.012, T + (HC - T - 0.06) / 2, 0.0), M.glass)
-        F.box('glass_front', w * 0.55, HC - T - 0.08, 0.012, (-S + w * 0.3, T + (HC - T - 0.08) / 2 + 0.01, S - 0.012),
-              M.glass)
-        F.box('glass_door', w * 0.5, HC - T - 0.1, 0.012, (S - w * 0.27, T + (HC - T - 0.1) / 2 + 0.02, S - 0.03), M.glass)
+        pw = S - 0.03 - DOOR_HALF - 0.004
+        for x in (-S + 0.03 + pw / 2, S - 0.03 - pw / 2):
+            F.box(_name('glass_front'), pw, HC - T - 0.08, 0.012, (x, T + (HC - T - 0.08) / 2 + 0.01, S - 0.012), M.glass)
         for px, pz in ((S - 0.015, S - 0.015), (S - 0.015, -S + 0.035)):
             F.box(_name('frame_post'), 0.03, HC - T, 0.03, (px, T + (HC - T) / 2, pz), M.chrome)
         F.box('frame_top', w - 0.03, 0.03, 0.03, (0.015, HC - 0.015, S - 0.015), M.chrome)
         F.box('frame_top_side', 0.03, 0.03, w - 0.03, (S - 0.015, HC - 0.015, 0.0), M.chrome)
         F.box('frame_sill', w - 0.03, 0.02, 0.03, (0.015, T + 0.01, S - 0.015), M.chrome)
-        F.box('door_pull', 0.022, 0.4, 0.022, (S - w * 0.5 + 0.03, 1.05, S - 0.04), M.chrome, bevel=0.009)
+        for y in (T + 0.2, HC - 0.25):                                  # the door's hinges on the right pane
+            F.box(_name('hinge'), 0.05, 0.05, 0.03, (DOOR_HALF + 0.01, y, S - 0.012), M.chrome, bevel=0.006)
         # the rain head on its arm from the back wall
         F.box('rain_head', 0.44, 0.02, 0.44, (0, HEAD_Y + 0.015, 0.0), M.chrome, bevel=0.008)
         F.box('rain_face', 0.4, 0.004, 0.4, (0, HEAD_Y + 0.003, 0.0), M.steel)
@@ -273,33 +276,45 @@ def rainShowerTower():
                       material=M.water, verts=4)
     rain = G.join(rain, 'water', origin=F.at(0, HEAD_Y, 0))
     rain.scale[2] = 0.001
+    # The glass door across the middle of the front, hinged on its right: `door_open` swings it out to let the
+    # bather in and out (a fourth draw: Q-05). All glass, no pull, to keep it one draw.
+    with G.new_parts() as door:
+        F.box('glass_door', 2 * DOOR_HALF, HC - T - 0.1, 0.012, (0, T + (HC - T - 0.1) / 2 + 0.02, S - 0.012), M.glass)
+    door = G.hinged(G.join(door, 'door'), F.at(DOOR_HALF, T, S - 0.012))
     objs = G.settle()      # on its Model centre: the back on the wall face
     G.grow(rain, 'water_on', seconds=0.6)
+    G.swing(door, 'door_open', -95, seconds=0.8)
     return objs
 
 
-# --- the label-and-sort organizer desk (2x1): seated in the middle, a hutch of labelled bins before them ------
-HZ, HD = 0.37, 0.16       # the hutch's depth and its own depth
-BIN = (0.0, 0.87)         # the bin `drawer_open` pulls out (x, middle height): the lower row's middle
+# --- the label-and-sort organizer desk (2x1): its back on the wall, the hutch of labelled bins on the desk's back,
+# open towards the sitter and the room; the chair in front, the sitter facing the wall (2026-10-21: it stood the
+# other way round, its backs to the room) ------------------------------------------------------------------------
+HD = 0.16                    # the hutch's own depth
+HZ = WALL + 0.012 + HD / 2   # the hutch's middle depth, its back panel on the wall face
+DZ, DD = WALL + 0.24, 0.48   # the desk top's middle depth and its depth: from the wall face to 0.05
+CZ = 0.25                    # the chair seat's middle depth (the hips 4 cm nearer the desk: `furniture.json`)
+BIN = (0.0, 0.87)            # the bin `drawer_open` pulls out (x, middle height): the lower row's middle
 
 
 def _bin(F, x, y, material):
-    F.box(_name('bin'), 0.27, 0.19, HD - 0.02, (x, y, HZ + 0.005), material, bevel=0.02, bevel_segments=2)
-    F.box(_name('bin_label'), 0.1, 0.04, 0.004, (x, y + 0.035, HZ - HD / 2 + 0.003), M.paper, bevel=0.002)
-    F.box(_name('bin_grip'), 0.08, 0.02, 0.004, (x, y - 0.04, HZ - HD / 2 + 0.003), M.dark)
+    F.box(_name('bin'), 0.27, 0.19, HD - 0.02, (x, y, HZ - 0.005), material, bevel=0.02, bevel_segments=2)
+    face = HZ - 0.005 + (HD - 0.02) / 2
+    F.box(_name('bin_label'), 0.1, 0.04, 0.004, (x, y + 0.035, face + 0.001), M.paper, bevel=0.002)
+    F.box(_name('bin_grip'), 0.08, 0.02, 0.004, (x, y - 0.04, face + 0.001), M.dark)
 
 
 def organizerDesk():
     F = G.GameFrame()
     with G.new_parts() as still:
-        F.box('desk_top', 1.6, 0.035, 0.34, (0, 0.745, 0.28), M.birch, bevel=0.008)
+        F.box('desk_top', 1.6, 0.035, DD, (0, 0.745, DZ), M.birch, bevel=0.008)
         for x in (-0.78, 0.78):
-            F.box(_name('desk_side'), 0.04, 0.73, 0.32, (x, 0.365, 0.28), M.body, bevel=0.008)
-        F.box('modesty', 1.52, 0.6, 0.015, (0, 0.42, 0.44), M.birch, bevel=0.004)
+            F.box(_name('desk_side'), 0.04, 0.73, DD - 0.02, (x, 0.365, DZ - 0.01), M.body, bevel=0.008)
+        F.box('modesty', 1.52, 0.6, 0.015, (0, 0.42, WALL + 0.02), M.birch, bevel=0.004)
         # the hutch: two rows of five cubbies, open towards the sitter
         F.box('hutch_shelf', 1.6, 0.02, HD, (0, 0.99, HZ), M.body, bevel=0.005)
         F.box('hutch_top', 1.6, 0.02, HD, (0, 1.22, HZ), M.body, bevel=0.005)
-        F.box('hutch_back', 1.6, 0.5, 0.012, (0, 1.0, HZ + HD / 2 - 0.004), M.birch)
+        F.box('hutch_back', 1.6, 0.5, 0.012, (0, 1.0, HZ - HD / 2 + 0.004), M.birch)
         for i in range(6):
             F.box(_name('divider'), 0.02, 0.48, HD, (-0.79 + i * 0.316, 1.0, HZ), M.body)
         for r, y in enumerate((0.87, 1.105)):
@@ -307,33 +322,34 @@ def organizerDesk():
                 x = -0.632 + i * 0.316
                 if (x, y) != BIN:
                     _bin(F, x, y, _m(PASTELS[(i + r * 2) % len(PASTELS)]))
-        # on the desk: the ledger, the label maker, a calculator, a pen cup
-        F.box('ledger', 0.36, 0.02, 0.24, (0.32, 0.773, 0.2), M.ledger, bevel=0.006)
-        F.box('ledger_pages', 0.33, 0.012, 0.21, (0.32, 0.789, 0.2), M.paper)
-        F.box('ledger_spine', 0.008, 0.003, 0.2, (0.32, 0.796, 0.2), M.ledger)
-        F.box('label_maker', 0.1, 0.05, 0.16, (-0.4, 0.79, 0.2), M.coral, bevel=0.02)
-        F.box('label_screen', 0.06, 0.004, 0.06, (-0.4, 0.816, 0.17), M.screen)
-        F.box('calculator', 0.12, 0.015, 0.16, (-0.62, 0.77, 0.2), M.trim, bevel=0.006)
-        F.cyl('pen_cup', 0.04, 0.11, (0.62, 0.818, 0.2), M.pastel_f, verts=14)
+        # on the desk in front of the hutch: the ledger, the label maker, a calculator, a pen cup
+        z = -0.1
+        F.box('ledger', 0.36, 0.02, 0.24, (0.32, 0.773, z), M.ledger, bevel=0.006)
+        F.box('ledger_pages', 0.33, 0.012, 0.21, (0.32, 0.789, z), M.paper)
+        F.box('ledger_spine', 0.008, 0.003, 0.2, (0.32, 0.796, z), M.ledger)
+        F.box('label_maker', 0.1, 0.05, 0.16, (-0.4, 0.79, z), M.coral, bevel=0.02)
+        F.box('label_screen', 0.06, 0.004, 0.06, (-0.4, 0.816, z + 0.03), M.screen)
+        F.box('calculator', 0.12, 0.015, 0.16, (-0.62, 0.77, z), M.trim, bevel=0.006)
+        F.cyl('pen_cup', 0.04, 0.11, (0.62, 0.818, z - 0.06), M.pastel_f, verts=14)
         for k, m in enumerate(('pastel_d', 'ledger', 'coral')):
-            F.cyl(_name('pen'), 0.006, 0.16, (0.605 + 0.016 * k, 0.86, 0.19 + 0.01 * k), _m(m), verts=6)
-        # the chair (seat top 0.45 at depth -0.12)
-        F.box('chair_seat', 0.46, 0.06, 0.44, (0, 0.42, -0.12), M.pastel_c, bevel=0.025, bevel_segments=2)
-        F.box('chair_back', 0.44, 0.34, 0.06, (0, 0.72, -0.33), M.pastel_c, rot=(6, 0, 0), bevel=0.025,
+            F.cyl(_name('pen'), 0.006, 0.16, (0.605 + 0.016 * k, 0.86, z - 0.07 + 0.01 * k), _m(m), verts=6)
+        # the chair in front, its back to the room (seat top 0.45 at depth CZ)
+        F.box('chair_seat', 0.46, 0.06, 0.44, (0, 0.42, CZ), M.pastel_c, bevel=0.025, bevel_segments=2)
+        F.box('chair_back', 0.44, 0.34, 0.06, (0, 0.72, CZ + 0.18), M.pastel_c, rot=(-6, 0, 0), bevel=0.025,
               bevel_segments=2)
         for dx in (-0.2, 0.2):
-            for dz in (-0.3, 0.06):
-                F.cone(_name('chair_leg'), 0.015, 0.012, 0.39, (dx, 0.195, dz), M.birch, verts=8)
-            F.box(_name('chair_post'), 0.03, 0.3, 0.03, (dx, 0.55, -0.32), M.birch, bevel=0.008)
+            for dz in (-0.18, 0.18):
+                F.cone(_name('chair_leg'), 0.015, 0.012, 0.39, (dx, 0.195, CZ + dz), M.birch, verts=8)
+            F.box(_name('chair_post'), 0.03, 0.3, 0.03, (dx, 0.55, CZ + 0.17), M.birch, bevel=0.008)
     G.join(still, 'body', origin=(0, 0, 0))
     # The bin in the lower row's middle: `drawer_open` slides it out towards the sitter.
     with G.new_parts() as drawer:
         _bin(F, BIN[0], BIN[1], M.pastel_b)
         for k in range(3):                                         # labelled cards inside
-            F.box(_name('card'), 0.2, 0.1, 0.004, (BIN[0], BIN[1] + 0.06, HZ - 0.03 + 0.03 * k), M.paper)
+            F.box(_name('card'), 0.2, 0.1, 0.004, (BIN[0], BIN[1] + 0.06, HZ + 0.025 - 0.03 * k), M.paper)
     drawer = G.join(drawer, 'bin')
     objs = G.settle(centre=False)
-    G.slide(drawer, 'drawer_open', (0, 0.13, 0), seconds=0.6)
+    G.slide(drawer, 'drawer_open', (0, -0.13, 0), seconds=0.6)
     return objs
 
 
@@ -400,6 +416,7 @@ def _round():
 # --- the tidy entry console (1x1): a slim birch console, a shoe shelf, a key tray drawer, a leaning mirror -----
 DRAWER = (-0.2, 0.74)    # the key tray drawer's middle (x, height)
 FZ = WALL + 0.3          # the console's front
+PANEL_TOP = 1.78         # the back panel's top, under its cap
 
 
 def entryConsole():
@@ -433,14 +450,21 @@ def entryConsole():
             G.rod(_name('tulip_stem'), F.at(0.28, 0.98, -0.3), F.at(x, 1.2, z), 0.005, material=M.stem, verts=5)
             F.sphere(_name('tulip'), 0.5, (x, 1.23, z), _m(('coral', 'pastel_b', 'pad', 'coral', 'pastel_e')[k]),
                      scale=(0.045, 0.045, 0.06), segments=8, rings=6)
-        # the mirror leaning on the wall above, coat hooks with a tote and a scarf
-        F.box('mirror_frame', 0.5, 0.9, 0.03, (0.0, 1.32, -0.41), M.body, rot=(3, 0, 0), bevel=0.02)
-        F.box('mirror', 0.44, 0.84, 0.006, (0.0, 1.32, -0.393), M.mirror, rot=(3, 0, 0), bevel=0.003)
-        F.box('hook_board', 0.03, 0.4, 0.03, (-0.36, 1.42, WALL + 0.015), M.oak, bevel=0.008)
+        # the back panel rising from the top (a hall stand's), standing free or on the wall: the mirror on it, the
+        # coat hooks with a tote and a scarf (2026-10-21: they hung on the air over a free-standing console)
+        pb, pt = 0.8175, PANEL_TOP
+        F.box('back_panel', 0.82, pt - pb, 0.018, (0, (pb + pt) / 2, WALL + 0.009), M.birch, bevel=0.004)
+        for x in (-0.41, 0.41):
+            F.box(_name('panel_post'), 0.03, pt - 0.79, 0.03, (x, (0.79 + pt) / 2, WALL + 0.02), M.body, bevel=0.008)
+        F.box('panel_cap', 0.87, 0.025, 0.045, (0, pt + 0.0125, WALL + 0.0225), M.body, bevel=0.008)
+        pz = WALL + 0.018
+        F.box('mirror_frame', 0.5, 0.86, 0.025, (0.05, 1.33, pz + 0.0125), M.body, bevel=0.02)
+        F.box('mirror', 0.44, 0.8, 0.006, (0.05, 1.33, pz + 0.028), M.mirror, bevel=0.003)
+        F.box('hook_board', 0.05, 0.4, 0.02, (-0.33, 1.42, pz + 0.01), M.oak, bevel=0.006)
         for y in (1.5, 1.32):
-            F.cyl(_name('hook'), 0.01, 0.06, (-0.36, y, WALL + 0.06), M.brass, rot=(90, 0, 0), verts=8)
-        F.box('tote', 0.2, 0.24, 0.06, (-0.34, 1.2, WALL + 0.07), M.wicker, bevel=0.02)
-        F.box('scarf', 0.06, 0.4, 0.02, (-0.33, 1.25, WALL + 0.08), M.coral, bevel=0.008)
+            F.cyl(_name('hook'), 0.01, 0.06, (-0.33, y, pz + 0.05), M.brass, rot=(90, 0, 0), verts=8)
+        F.box('tote', 0.2, 0.24, 0.06, (-0.31, 1.2, pz + 0.06), M.wicker, bevel=0.02)
+        F.box('scarf', 0.06, 0.4, 0.02, (-0.3, 1.25, pz + 0.07), M.coral, bevel=0.008)
     G.join(still, 'body', origin=(0, 0, 0))
     # The key tray drawer: front, knob, the tray and keys inside: `tray` slides it out.
     with G.new_parts() as drawer:
@@ -469,17 +493,19 @@ FAMILY = G.Family(
              motions={'uses': {'laundry': 'door_open', 'fold': 'door_open'}, 'hold': 2.5},
              paint=[('body', 'Body'), ('appliance', 'Washer & dryer')]),
      G.Model('rainShowerTower', rainShowerTower, size=(0.9, 2.18, 0.9), key='model.neat.rainShowerTower',
-             centre=(0, 0.02), motions={'uses': {'steamShower': 'water_on'}},
+             centre=(0, 0.02),
+             # the door lets the bather in, shuts behind them and opens again to let them out (as the glasshouse's)
+             motions={'uses': {'steamShower': [{'clip': 'door_open', 'hold': 1.5, 'out': 1.5}, 'water_on']}},
              paint=[('tile', 'Body'), ('teak', 'Bench')]),
-     G.Model('organizerDesk', organizerDesk, size=(1.6, 1.25, 0.827), key='model.neat.organizerDesk',
-             centre=(0, 0.039),
+     G.Model('organizerDesk', organizerDesk, size=(1.6, 1.25, 0.905), key='model.neat.organizerDesk',
+             centre=(0, 0.0225),
              motions={'uses': {'sort': 'drawer_open', 'ledger': 'drawer_open'}},
              paint=[('body', 'Body'), ('birch', 'Wood'), ('pastel_c', 'Chair')]),
      G.Model('robotVacuumDock', robotVacuumDock, size=(0.86, 0.519, 0.86), key='model.neat.robotVacuumDock',
              # once programmed the robot drives out of its dock, round its rug and back, again and again
              motions={'loops': {'program': 'vacuum_round'}},
              paint=[('appliance', 'Body'), ('teal', 'Trim'), ('rug', 'Rug')]),
-     G.Model('entryConsole', entryConsole, size=(0.87, 1.769, 0.336), key='model.neat.entryConsole',
+     G.Model('entryConsole', entryConsole, size=(0.87, 1.805, 0.318), key='model.neat.entryConsole',
              centre=(-0.005, -0.262),
              motions={'uses': {'tidy': 'tray'}},
              paint=[('body', 'Body'), ('birch', 'Wood')])],

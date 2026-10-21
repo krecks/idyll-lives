@@ -38,8 +38,8 @@ M = G.Palette(
     gold=('#C9A54A', 'metal'),
     oak=('#CDB08A', 'satin'),
     wax=('#FBF6EC', 'satin'),
-    flame=('#F28C28', 'gloss'),
-    flame_core=('#FFC24A', 'gloss'),
+    flame=('#F28C28', 'gloss', {'glow': '#FFB050'}),        # candle flames: they glow at night
+    flame_core=('#FFC24A', 'gloss', {'glow': '#FFD27A'}),
     porcelain=('#FBFAF7', 'gloss'),
     glassy=('#E4EEEE', 'gloss'),
     dessert=('#C77D4F', 'matte'),
@@ -104,14 +104,24 @@ def _wine_glass(F, x, y, z, wine=True):
         F.sphere(_name('wine'), 0.028, (x, y + 0.115, z), M.rosed, scale=(1, 1, 0.6), segments=10, rings=6)
 
 
-def _velvet_chair(F, x, z=0.0, frame=None, seat=None):
-    """A slipper chair centred on (x, z), facing the front: seat top 0.45."""
+def _velvet_chair(F, x, z=0.0, frame=None, seat=None, facing='front'):
+    """A slipper chair centred on (x, z): seat top 0.45, facing the object's `facing` ('front', 'back', 'right' or
+    'left': its back on the far side)."""
     frame, seat = frame or M.body, seat or M.fabric
-    F.box(_name('chair_seat'), 0.44, 0.1, 0.42, (x, 0.4, z), seat, bevel=0.04, bevel_segments=3)
-    F.box(_name('chair_back'), 0.42, 0.46, 0.09, (x, 0.7, z - 0.21), seat, rot=(-8, 0, 0), bevel=0.04, bevel_segments=3)
-    for dx in (-0.18, 0.18):
-        for dz in (0.16, -0.17):
-            F.cone(_name('chair_leg'), 0.012, 0.018, 0.36, (x + dx, 0.18, z + dz), frame, verts=8)
+    if facing in ('front', 'back'):
+        s = 1 if facing == 'front' else -1
+        F.box(_name('chair_seat'), 0.44, 0.1, 0.42, (x, 0.4, z), seat, bevel=0.04, bevel_segments=3)
+        F.box(_name('chair_back'), 0.42, 0.46, 0.09, (x, 0.7, z - s * 0.21), seat, rot=(-8 * s, 0, 0), bevel=0.04,
+              bevel_segments=3)
+        legs = [(dx, s * dz) for dx in (-0.18, 0.18) for dz in (0.16, -0.17)]
+    else:
+        s = 1 if facing == 'right' else -1
+        F.box(_name('chair_seat'), 0.42, 0.1, 0.44, (x, 0.4, z), seat, bevel=0.04, bevel_segments=3)
+        F.box(_name('chair_back'), 0.09, 0.46, 0.42, (x - s * 0.21, 0.7, z), seat, rot=(0, -8 * s, 0), bevel=0.04,
+              bevel_segments=3)
+        legs = [(s * dx, dz) for dz in (-0.18, 0.18) for dx in (0.16, -0.17)]
+    for dx, dz in legs:
+        F.cone(_name('chair_leg'), 0.012, 0.018, 0.36, (x + dx, 0.18, z + dz), frame, verts=8)
 
 
 # --- the candlelit bistro table (2x1): a diner at each end (x = +-0.62, z = 0.1) facing in across the top -------
@@ -166,7 +176,7 @@ def candlelitTable():
             F.sphere(_name('petal'), 0.025, (x, 0.778, z), M.rose, scale=(1.2, 0.9, 0.25), segments=8, rings=4)
     G.join(still, 'body', origin=(0, 0, 0))
     # The two flames, joined with their origin on the shorter wick and built full size, then flattened:
-    # `candles` grows them while the two dine.
+    # `candles` grows them while the two dine; they glow at night (`flame`'s `glow`).
     with G.new_parts() as flames:
         for x, z, h in CANDLES:
             _flame(F, x, top + 0.06 + h, z, 1.1)
@@ -364,55 +374,62 @@ def gramophone():
     return objs
 
 
-# --- the love-letter bureau (1x1): the writer sits in the middle, the desk and its pigeonholes before them ---
+# --- the love-letter bureau (1x1): its back on the wall, the desk and its pigeonholes there, the writer's chair in front ---
+DESK_D = 0.45     # the desk's depth from the wall face
+CHAIR_Z = 0.2     # the chair's middle depth (the hips at 0.25: `furniture.json`)
+
+
 def letterBureau():
     F = G.GameFrame()
+    # Its back on the wall, the pigeonhole hutch on the desk's back facing the writer and the room, the chair in front,
+    # the writer facing the wall (`furniture.json` `back`; 2026-10-21: it stood the other way round, the hutch's
+    # panelled back and the writer's back to the room).
+    hz = WALL + 0.012 + 0.05          # the hutch's middle depth (0.1 deep)
+    hf = hz + 0.05                    # its front
     with G.new_parts() as still:
-        F.box('desk_top', 0.84, 0.03, 0.3, (0, 0.745, 0.3), M.ivory, bevel=0.01)
-        F.box('apron', 0.8, 0.1, 0.27, (0, 0.68, 0.31), M.ivory, bevel=0.008)
-        F.box('drawer', 0.3, 0.06, 0.01, (0, 0.68, 0.172), M.blush, bevel=0.004)
-        F.sphere('drawer_knob', 0.014, (0, 0.68, 0.165), M.gold, segments=8, rings=6)
+        F.box('desk_top', 0.84, 0.03, DESK_D, (0, 0.745, WALL + DESK_D / 2), M.ivory, bevel=0.01)
+        F.box('apron', 0.8, 0.1, DESK_D - 0.03, (0, 0.68, WALL + (DESK_D - 0.03) / 2), M.ivory, bevel=0.008)
+        F.box('drawer', 0.3, 0.06, 0.01, (0, 0.68, WALL + DESK_D - 0.022), M.blush, bevel=0.004)
+        F.sphere('drawer_knob', 0.014, (0, 0.68, WALL + DESK_D - 0.015), M.gold, segments=8, rings=6)
         for x in (-0.39, 0.39):
-            for z in (0.18, 0.42):
+            for z in (WALL + 0.03, WALL + DESK_D - 0.04):
                 F.cone(_name('leg'), 0.012, 0.02, 0.63, (x, 0.315, z), M.ivory, verts=10)
-        # the pigeonhole hutch facing the writer, a gold crest
-        F.box('hutch_back', 0.8, 0.38, 0.02, (0, 0.95, 0.44), M.ivory, bevel=0.004)
+        # the pigeonhole hutch facing the writer, its back on the wall, a gold crest
+        F.box('hutch_back', 0.8, 0.38, 0.02, (0, 0.95, WALL + 0.01), M.ivory, bevel=0.004)
         for x in (-0.4, 0.4):
-            F.box(_name('hutch_side'), 0.02, 0.38, 0.1, (x, 0.95, 0.4), M.ivory, bevel=0.004)
-        F.box('hutch_top', 0.84, 0.025, 0.11, (0, 1.15, 0.4), M.ivory, bevel=0.006)
-        for x in (-0.2, 0.2):                              # panels on its back, which faces the room
-            F.box(_name('hutch_panel'), 0.34, 0.28, 0.008, (x, 0.95, 0.452), M.blush, bevel=0.003)
-            F.box(_name('panel_bead'), 0.3, 0.24, 0.004, (x, 0.95, 0.457), M.ivory, bevel=0.002)
-        F.box('crest', 0.84, 0.02, 0.11, (0, 1.17, 0.4), M.gold, bevel=0.004)
+            F.box(_name('hutch_side'), 0.02, 0.38, 0.1, (x, 0.95, hz), M.ivory, bevel=0.004)
+            F.box(_name('hutch_panel'), 0.004, 0.28, 0.07, (x * 1.026, 0.95, hz), M.blush, bevel=0.002)
+        F.box('hutch_top', 0.84, 0.025, 0.11, (0, 1.15, hz), M.ivory, bevel=0.006)
+        F.box('crest', 0.84, 0.02, 0.11, (0, 1.17, hz), M.gold, bevel=0.004)
         for x in (-0.2, 0.0, 0.2):
-            F.box(_name('divider'), 0.012, 0.36, 0.09, (x, 0.95, 0.395), M.ivory)
-        F.box('shelf', 0.78, 0.012, 0.09, (0, 0.97, 0.395), M.ivory)
+            F.box(_name('divider'), 0.012, 0.36, 0.09, (x, 0.95, hz + 0.005), M.ivory)
+        F.box('shelf', 0.78, 0.012, 0.09, (0, 0.97, hz + 0.005), M.ivory)
         for x, y, m in ((-0.3, 1.0, M.paper), (-0.1, 1.0, M.blush), (0.3, 1.0, M.envelope), (-0.3, 0.8, M.paper),
                         (0.1, 0.8, M.envelope)):
-            F.box(_name('letters'), 0.14, 0.08, 0.06, (x, y + 0.015, 0.4), m)
-        # on the desk: an inkpot and a quill, a wax seal, a candle
+            F.box(_name('letters'), 0.14, 0.08, 0.06, (x, y + 0.015, hz), m)
+        # on the desk either side of the flap: an inkpot and a quill, a wax seal, a candle
         G.revolve('inkpot', [(0, 0), (0.03, 0), (0.03, 0.035), (0.012, 0.045), (0.012, 0.06), (0, 0.06)],
-                  at=F.at(0.3, 0.76, 0.34), material=M.ink, segments=12)
-        G.rod('quill', F.at(0.3, 0.8, 0.34), F.at(0.2, 0.98, 0.3), 0.004, material=M.paper, verts=6)
-        F.sphere('quill_vane', 0.02, (0.23, 0.93, 0.31), M.paper, scale=(0.5, 0.25, 3.5), rot=(0, 30, 0), segments=8,
+                  at=F.at(0.33, 0.76, -0.2), material=M.ink, segments=12)
+        G.rod('quill', F.at(0.33, 0.8, -0.2), F.at(0.25, 0.98, -0.25), 0.004, material=M.paper, verts=6)
+        F.sphere('quill_vane', 0.02, (0.27, 0.93, -0.24), M.paper, scale=(0.5, 0.25, 3.5), rot=(0, 30, 0), segments=8,
                  rings=6)
-        F.cyl('wax_seal', 0.025, 0.012, (0.18, 0.766, 0.2), M.rosed, verts=12)
-        F.box('wax_stick', 0.012, 0.012, 0.1, (0.3, 0.766, 0.22), M.rose, rot=(0, 0, 30))
-        wx, wy, wz = _candle(F, -0.33, 0.22, 0.76, 0.14)
+        F.cyl('wax_seal', 0.025, 0.012, (0.32, 0.766, -0.07), M.rosed, verts=12)
+        F.box('wax_stick', 0.012, 0.012, 0.1, (0.3, 0.766, -0.11), M.rose, rot=(0, 0, 30))
+        wx, wy, wz = _candle(F, -0.33, -0.15, 0.76, 0.14)
         F.sphere('candle_flame', 0.011, (wx, wy + 0.02, wz), M.flame_core, scale=(1, 1, 2), segments=8, rings=6)
-        _velvet_chair(F, 0.0, 0.0, frame=M.ivory)
+        _velvet_chair(F, 0.0, CHAIR_Z, frame=M.ivory, facing='back')
     G.join(still, 'body', origin=(0, 0, 0))
-    # The writing flap, closed up over the lower pigeonholes, hinged on its foot: `fall_front` drops it towards
-    # the writer onto the desk, a letter on it.
+    # The writing flap, closed up over the lower middle pigeonholes, hinged on its foot: `fall_front` drops it
+    # towards the writer onto the desk, a letter on its inside.
     with G.new_parts() as flap:
-        F.box('flap', 0.76, 0.2, 0.018, (0, 0.87, 0.34), M.ivory, bevel=0.005)
-        F.box('flap_panel', 0.66, 0.14, 0.006, (0, 0.87, 0.33), M.blush, bevel=0.003)
-        F.sphere('flap_knob', 0.012, (0, 0.95, 0.325), M.gold, segments=8, rings=6)
-        F.box('flap_letter', 0.22, 0.14, 0.003, (-0.05, 0.87, 0.35), M.paper, rot=(0, 0, 6))
-        F.box('flap_envelope', 0.16, 0.1, 0.003, (0.2, 0.86, 0.35), M.envelope, rot=(0, 0, -8))
-    flap = G.hinged(G.join(flap, 'flap'), F.at(0, 0.77, 0.34))
+        F.box('flap', 0.5, 0.2, 0.018, (0, 0.87, hf + 0.009), M.ivory, bevel=0.005)
+        F.box('flap_panel', 0.42, 0.14, 0.006, (0, 0.87, hf + 0.021), M.blush, bevel=0.003)
+        F.sphere('flap_knob', 0.012, (0, 0.95, hf + 0.026), M.gold, segments=8, rings=6)
+        F.box('flap_letter', 0.2, 0.14, 0.003, (-0.08, 0.87, hf - 0.002), M.paper, rot=(0, 0, 6))
+        F.box('flap_envelope', 0.14, 0.1, 0.003, (0.13, 0.86, hf - 0.002), M.envelope, rot=(0, 0, -8))
+    flap = G.hinged(G.join(flap, 'flap'), F.at(0, 0.77, hf + 0.009))
     objs = G.settle(centre=False)
-    G.swing(flap, 'fall_front', -90, seconds=0.8, axis='X')
+    G.swing(flap, 'fall_front', 90, seconds=0.8, axis='X')
     return objs
 
 
@@ -501,8 +518,8 @@ FAMILY = G.Family(
              centre=(0.041, -0.079), motions={'uses': {'listen': 'needle', 'waltz': 'needle'},
                                           'loops': {'listen': 'platter', 'waltz': 'platter'}},
              paint=[('cabinet', 'Body'), ('horn', 'Horn')]),
-     G.Model('letterBureau', letterBureau, size=(0.84, 1.18, 0.736), key='model.romantic.letterBureau',
-             centre=(0, 0.087), motions={'uses': {'writeLetter': 'fall_front', 'writePoem': 'fall_front'}},
+     G.Model('letterBureau', letterBureau, size=(0.84, 1.18, 0.911), key='model.romantic.letterBureau',
+             centre=(0, 0.0255), motions={'uses': {'writeLetter': 'fall_front', 'writePoem': 'fall_front'}},
              paint=[('ivory', 'Body'), ('fabric', 'Fabric')]),
      G.Model('roseArbourSwing', roseArbourSwing, size=(1.844, 2.63, 0.821), key='model.romantic.roseArbourSwing',
              centre=(0, 0.0), motions={'uses': {'tendRoses': 'cut'}, 'loops': {'swing': 'swing'}, 'ride': 'swing'},

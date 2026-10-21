@@ -196,6 +196,9 @@
       "type": "model",
       "url": "../../models/pack_slob/spritzStation.glb",
       "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
         "gloss_white": {
           "finish": "material.finish.gloss"
         },
@@ -268,7 +271,8 @@
           "finish": "material.finish.satin"
         },
         "marquee": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#FFE08A"
         },
         "pop_blue": {
           "finish": "material.finish.gloss"
@@ -292,7 +296,9 @@
           "finish": "material.finish.gloss"
         },
         "screen_lit": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#5CB8F0",
+          "screen": true
         },
         "side": {
           "finish": "material.finish.gloss"

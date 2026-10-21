@@ -7,7 +7,8 @@
       "url": "../../models/pack_cheerful/jukebox.glb",
       "materials": {
         "amber": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#FFB733"
         },
         "brass": {
           "finish": "material.finish.metal"
@@ -37,7 +38,8 @@
           "finish": "material.finish.gloss"
         },
         "sunny": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#FFE7A8"
         },
         "vinyl": {
           "finish": "material.finish.gloss"
@@ -85,7 +87,9 @@
           "finish": "material.finish.gloss"
         },
         "lyrics": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#8E7BFF",
+          "screen": true
         },
         "speaker": {
           "finish": "material.finish.gloss"

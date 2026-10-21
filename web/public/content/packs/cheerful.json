@@ -133,7 +133,7 @@
       "name": "Rainbow hammock",
       "model": "model.cheerful.rainbowHammock",
       "outdoors": true,
-      "footprint": [2, 1],
+      "footprint": [3, 1],
       "price": 360,
       "category": "outdoor",
       "slots": 1,
@@ -170,11 +170,13 @@
       "price": 240,
       "category": "bedroom",
       "slots": 1,
+      "light": { "range": 2.5, "intensity": 0.5, "height": 1.25, "at": [0, -0.3], "tiles": 3 },
       "description": "A warm dawn-coloured light for gentle morning stretches: a little energy and a Bright morning that keeps residents going for hours.",
       "interactions": [
         {
           "id": "stretch",
           "label": "Sunrise stretches",
+          "hours": [5, 11],
           "anim": "exercise",
           "minutes": 20,
           "pose": "stand",

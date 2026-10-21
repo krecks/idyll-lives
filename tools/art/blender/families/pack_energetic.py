@@ -435,6 +435,7 @@ def _tiled_walls(F, x0, x1, z0, z1, y0, y1, t=0.03, size=0.3, gap=0.005):
 
 
 HEAD = (0.0, 2.0, -0.02)   # the rain head's underside
+DOOR_HALF = 0.28           # half the glass door's width, across the middle of the front
 
 
 def contrastShower():
@@ -448,14 +449,16 @@ def contrastShower():
             F.box(_name('mat_rib'), 0.56, 0.004, 0.02, (0, 0.071, -0.22 + k * 0.11), M.tray)
         _tiled_walls(F, -s, s, -s, s, 0.058, top)
         F.box('glass_side', 0.01, 2.0, 0.83, (0.435, 1.09, -0.005), M.glass)
-        F.box('glass_fixed', 0.46, 2.0, 0.01, (-0.195, 1.09, 0.437), M.glass)
-        F.box('glass_door', 0.44, 1.98, 0.01, (0.205, 1.08, 0.423), M.glass)
+        # a narrow fixed pane either side of the door across the middle (the door its own part, below)
+        for x0, x1 in ((-0.414, -DOOR_HALF - 0.004), (DOOR_HALF + 0.004, 0.4225)):
+            F.box(_name('glass_fixed'), x1 - x0, 2.0, 0.01, ((x0 + x1) / 2, 1.09, 0.437), M.glass)
         for x, z in ((0.435, 0.435), (0.435, -0.42)):
             F.box(_name('post'), 0.025, top - 0.058, 0.025, (x, (top + 0.058) / 2, z), M.shower_frame, bevel=0.004)
         F.box('rail_front', 0.87, 0.03, 0.03, (0.015, top - 0.015, 0.435), M.shower_frame, bevel=0.004)
         F.box('rail_side', 0.03, 0.03, 0.84, (0.435, top - 0.015, 0.0), M.shower_frame, bevel=0.004)
         F.box('rail_bottom', 0.87, 0.02, 0.03, (0.015, 0.068, 0.435), M.shower_frame, bevel=0.004)
-        F.box('door_handle', 0.02, 0.4, 0.02, (0.03, 1.05, 0.405), M.shower_frame, bevel=0.006)
+        for y in (0.3, 1.85):                                           # the door's hinges on the right pane
+            F.box(_name('hinge'), 0.05, 0.05, 0.026, (DOOR_HALF + 0.01, y, 0.437), M.shower_frame, bevel=0.006)
         # the square rain head on its arm, the hot and cold dials, a towel on a hook
         hx, hy, hz = HEAD
         G.rod('arm', F.at(0, 2.04, -0.415), F.at(0, 2.04, hz), 0.014, material=M.fittings, verts=10)
@@ -477,8 +480,14 @@ def contrastShower():
                       verts=6, smooth=False)
     rain = G.join(rain, 'water', origin=F.at(hx, hy, hz))
     rain.scale[2] = 0.001
+    # The glass door across the middle of the front, hinged on its right: `door_open` swings it out to let the
+    # bather in and out (a fourth draw: Q-05). All glass, no handle, to keep it one draw.
+    with G.new_parts() as door:
+        F.box('glass_door', 2 * DOOR_HALF, 1.98, 0.01, (0, 1.08, 0.437), M.glass)
+    door = G.hinged(G.join(door, 'door'), F.at(DOOR_HALF, 0.09, 0.437))
     objs = G.settle()      # on its Model centre: the back on the wall face
     G.grow(rain, 'water_on', seconds=0.5)
+    G.swing(door, 'door_open', -95, seconds=0.8)
     return objs
 
 
@@ -544,7 +553,8 @@ FAMILY = G.Family(
              motions={'uses': {'blend': ['lid', {'clip': 'blades', 'delay': 1.5, 'every': 0.9}]}, 'hold': 1.0},
              paint=[('blend_cab', 'Frame'), ('blend_door', 'Doors'), ('motor', 'Blender')]),
      G.Model('contrastShower', contrastShower, size=(0.9, 2.15, 0.9), key='model.energetic.contrastShower',
-             centre=(0, 0.02), motions={'uses': {'rinse': 'water_on'}},
+             # the door lets the bather in, shuts behind them and opens again to let them out (as the glasshouse's)
+             centre=(0, 0.02), motions={'uses': {'rinse': [{'clip': 'door_open', 'hold': 1.5, 'out': 1.5}, 'water_on']}},
              paint=[('shower_frame', 'Frame'), ('tile', 'Tiles'), ('shower_mat', 'Mat')]),
      G.Model('recoveryPod', recoveryPod, size=(0.859, 1.175, 1.86), key='model.energetic.recoveryPod',
              centre=(0, 0), motions={'uses': {'recover': 'canopy'}},

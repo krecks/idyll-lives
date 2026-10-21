@@ -23,7 +23,7 @@ the console's sit 8 cm further back than before, against the loveseat's back, so
 | `recliner` | the back (with its pillows), hinged at the seat's back: `recline` tips it 11° back; the footrest, folded under the seat's front, rises 80° in the same clip (1.2 s); the sitter rides the back (`ride: recline`) | `recline`, `doze` |
 | `snackFridge` | the door with its takeout screen and handle, hinged on its right edge: `fridge_open` swings it 100° (0.9 s); cans, a takeout box and a pizza inside | `snack`, `takeout` |
 | `fitnessGame` | the balance board on its rocker, on the mat: `board` tilts it 10° to one side (0.8 s) | `workout` |
-| `lavaLamp` | the wax in the glass: `blobs` lifts three blobs 14 cm (2.5 s, slow); `drift` turns two more round the glass once in 8 s, all the time near the camera (`idle`) | `zoneOut`; ambient |
+| `lavaLamp` | the wax in the glass: `blobs` lifts three blobs 14 cm (2.5 s, slow); `drift` turns two more round the glass once in 8 s, all the time near the camera (`idle`). The glass and the wax glow at night with the content's `light` (2 m, at 0.85 m over the side table), switched as a lamp (M-packs-07). The side table stands at the pouf's front right and the pouf is turned 50° to face it, its sitter too (content `places`), coming from its left (2026-10-21: the lamp stood behind the sitter's shoulder, I-packs-11) | `zoneOut`; ambient |
 
 **Draw calls: 3 each, the lava lamp 4.**
 - The cinema has two moving parts (the curtains, `fabric`), so its still body is all plain: the recliners are satin
@@ -53,7 +53,7 @@ on the wax or glass would be one more draw at night.
 | `model.couchPotato.recliner` | 0.94 × 0.95 × 0.76 m | 2,324 | 3 | Body, Upholstery, Throw |
 | `model.couchPotato.snackFridge` | 0.58 × 0.54 × 0.54 m | 2,800 | 3 | Body, Upholstery |
 | `model.couchPotato.fitnessGame` | 0.87 × 1.15 × 0.88 m | 2,732 | 3 | Body, Mat, Board |
-| `model.couchPotato.lavaLamp` | 0.85 × 1.15 × 0.89 m | 2,896 | 4 | Body, Upholstery, Glass |
+| `model.couchPotato.lavaLamp` | 0.90 × 1.15 × 0.89 m | 2,896 | 4 | Body, Upholstery, Glass |
 
 The painted materials: the cinema `cinema_frame` (the console between the seats), `leather`, `curtain`; the console
 `console`, `gamer`, `mustard`; the recliner `plinth`, `plush`, `throw`; the fridge `mint`, `lid`; the workout game

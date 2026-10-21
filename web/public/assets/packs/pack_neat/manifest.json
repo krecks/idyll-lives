@@ -203,7 +203,14 @@
       },
       "motions": {
         "uses": {
-          "steamShower": "water_on"
+          "steamShower": [
+            {
+              "clip": "door_open",
+              "hold": 1.5,
+              "out": 1.5
+            },
+            "water_on"
+          ]
         }
       },
       "paint": [

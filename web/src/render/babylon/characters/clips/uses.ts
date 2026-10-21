@@ -316,6 +316,51 @@ function strumPose(reach: number, up = 0): (p: number) => PoseSpec {
   };
 }
 
+/**
+ * The vibration plate (`lazy.vibePlate`, pack_lazy.py): stood on its deck (content `stand`, 0.12 m up) at the
+ * middle, facing its column; its grips, bars running fore and aft, 0.26 m to either side, 0.96 m over the deck and
+ * 0.12 m ahead (`PLATE_GRIP`, m: across, up from the deck, ahead). A size per height (characters.ts `GRIPPED`).
+ */
+const PLATE_GRIP: Vec = [0.26, 0.96, 0.12];
+export const PLATE_HOLD: Size[] = sizes('plateHold', [1, 0.83, 0.63], (s) => ({ s, to: 0 }));
+
+/** Standing on the plate holding both grips, the knees soft, the weight shifting a little while it shakes. */
+function platePose(fit: Fit): (p: number) => PoseSpec {
+  const { s } = fit;
+  return (p) => {
+    const body = stand({ shift: 0.25 * Math.sin(p * TAU), breath: p, lean: 3, head: [6, 3 * Math.sin(p * TAU), 0] });
+    const grip = (sx: number): Vec => [(sx * PLATE_GRIP[0]) / s, PLATE_GRIP[1] / s, PLATE_GRIP[2] / s];
+    return {
+      ...body,
+      ...armIK('l', grip(-1), body, { palm: true, pole: [-0.5, -1, -0.4], pronate: 10, hand: wrist('l', 0, 0) }),
+      ...armIK('r', grip(1), body, { palm: true, pole: [0.5, -1, -0.4], pronate: 10, hand: wrist('r', 0, 0) }),
+    };
+  };
+}
+
+/** Warming up at a fire (`warmHands`): seconds round, and the hands held out to it (model space, m: across, up, out). */
+const WARM_S = 7;
+const WARM_OUT: Vec = [0.17, 1.0, 0.45];
+
+/**
+ * Warming up standing at a fire (a fire pit, `ACTIONS.relax`): leant a little towards it, the hands held out over
+ * it, palms to the flames, turned now and then; then brought together and rubbed, and held out again.
+ */
+function warmPose(p: number): PoseSpec {
+  const rub = bump(p, 0.5, 0.86, 0.1);
+  const turn = Math.sin(p * TAU * 2) * (1 - rub);
+  const scrub = Math.sin(p * TAU * 14) * rub;
+  const body = stand({ shift: 0.4 * Math.sin(p * TAU), breath: p * 2, lean: 7 - 3 * rub, head: [14 - 6 * rub, 4 * Math.sin(p * TAU), 0] });
+  const out = (sx: number): Vec => [sx * (WARM_OUT[0] + 0.02 * turn * sx), WARM_OUT[1] + 0.01 * turn, WARM_OUT[2]];
+  const together = (sx: number): Vec => [sx * 0.035, 1.07 + 0.03 * scrub * sx, 0.3 + 0.01 * scrub];
+  const at = (sx: number) => lerpV(out(sx), together(sx), rub);
+  return {
+    ...body,
+    ...armIK('l', at(-1), body, { pole: [-0.4, -1, -0.3], pronate: 75 - 75 * rub + 12 * turn, hand: wrist('l', -35 + 35 * rub, 0) }),
+    ...armIK('r', at(1), body, { pole: [0.4, -1, -0.3], pronate: 75 - 75 * rub - 12 * turn, hand: wrist('r', -35 + 35 * rub, 0) }),
+  };
+}
+
 export function useClips(): ClipDef[] {
   return [
     ...EYEPIECE.map(({ clip, fit }) => cycle(clip, { seconds: 6, loop: true }, eyepiecePose(fit))),
@@ -324,5 +369,7 @@ export function useClips(): ClipDef[] {
     cycle('showerChild', { seconds: SHOWER_S, loop: true, hands: 'open' }, showerPose(0, SHOWER_TWIST)),
     cycle('strum', { seconds: 2, loop: true }, strumPose(GUITAR_REACH.long)),
     cycle('strumShort', { seconds: 2, loop: true }, strumPose(GUITAR_REACH.short, GUITAR_UP_SHORT)),
+    cycle('warmHands', { seconds: WARM_S, loop: true, hands: 'open' }, warmPose),
+    ...PLATE_HOLD.map(({ clip, fit }) => cycle(clip, { seconds: 3, loop: true }, platePose(fit))),
   ];
 }

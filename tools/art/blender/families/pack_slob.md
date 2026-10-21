@@ -13,8 +13,8 @@ nightstand's padded top at about 0.45, the recliner's seat top at 0.45 in the mi
 | `microwaveCart` | the microwave's door, window and handle, hinged on its outer edge: `door_open` swings it 100° open (0.6 s), `hold` 1.5 s (open and shut) | `nuke`, `invent` |
 | `beanbag` | the whole bag (body, back, dimple, seam), origin on the floor: `squash` settles it to 86 % high, 4 % wider (0.5 s) | `flop`, `snooze` |
 | `snackNightstand` | the top side drawer full of chip bags and a cookie: `drawer_open` slides it 16 cm out to the right (0.6 s) | `midnightSnack` |
-| `spritzStation` | the trigger spray bottle, hinged on its foot: `spritz` tips it 35° to the front (0.4 s) | `spritz` |
-| `arcadeCabinet` | the joystick, its origin in the deck: `joystick` waggles it 18° each way, side to side, in 0.6 s (a loop) | `chaseHighScore`, `quickRound` (`loops`) |
+| `spritzStation` | the trigger spray bottle, hinged on its foot: `spritz` tips it 35° to the front (0.4 s). The round mirror hangs on a purple back board rising from the top and the green towel on a chrome bar under the top's front, so neither hangs on the air free of a wall (2026-10-21, M-packs-02; Q-06). | `spritz` |
+| `arcadeCabinet` | the joystick, its origin in the deck: `joystick` waggles it 18° each way, side to side, in 0.6 s (a loop). The marquee glows at night (`glow`) and the screen while it is played (`screen`; 2026-10-21, M-packs-07). | `chaseHighScore`, `quickRound` (`loops`) |
 | `gamingRecliner` | the tall back with its stripe and headrest, hinged at the seat's back: `recline` lays it back 20° (1 s); the cup holder with a soda on the right armrest: `cup_out` swings it 110° out (0.6 s) | `marathon`; `armrestSoda` |
 
 The arcade's joystick is the loop the table asks for (E1). The recliner's back reclines and the sitter rides
@@ -33,7 +33,7 @@ it (`ride: recline`), tipping back with it.
 | `model.slob.microwaveCart` | 0.72 × 1.10 × 0.78 m | 2,944 | 2 | Body |
 | `model.slob.beanbag` | 0.89 × 0.66 × 0.87 m | 2,116 | 2 | Body |
 | `model.slob.snackNightstand` | 0.90 × 0.45 × 0.73 m | 1,652 | 3 | Body, Top |
-| `model.slob.spritzStation` | 0.77 × 1.58 × 0.80 m | 1,948 | 3 | Body |
+| `model.slob.spritzStation` | 0.69 × 1.62 × 0.80 m | 2,000 | 3 | Body |
 | `model.slob.arcadeCabinet` | 0.77 × 1.88 × 0.78 m | 1,676 | 2 | Body, Sides |
 | `model.slob.gamingRecliner` | 1.77 × 1.10 × 0.87 m | 2,764 | 3 | Body, Stripes |
 

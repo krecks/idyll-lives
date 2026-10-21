@@ -409,7 +409,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** clip
 - **Where:** `web/src/render/babylon/characters/clips/street.ts:27` (`sizes`: a size's share `s` is of the height), used by the fountain's, the climbing frame's and the games' clips (`games.ts` `POOL`, `FOOS`, `SMASH`, `BOULDER`); `web/src/render/babylon/characters/pose.ts:268` (the clip's pelvis moved by the body's `pelvisScale`)
 - **Evidence:** from the code and rig.json, not measured in a shot: the runtime moves a clip's pelvis by the body's `pelvisScale`, and a child's legs (and arms) are shorter for its height than a grown-up's: the male child's `pelvisScale` is 0.575 against a height share of 0.638 (the female's 0.554 against 0.653), teens and grown-ups within a few per cent. The `112` sizes are fitted to a body of share 0.63, so on a child every height and reach in them comes out about 9 % short: the climbing frame's deck (1.13 m) is stood on about 10 cm under its top, the bouldering wall's holds and the pool table's rail are reached for lower than they are. `fixes/rides/climbingFrame-child-deck.png` (the child crouched on the frame's deck, the feet hidden at the deck's top) doesn't settle it either way. The climbing frame's `climb112` slides of the child's left foot in `clip-baseline.json` may be the same cause: a child's hips are wider for its legs than the reference's, so the feet slide as the body turns over them. The slide's round, the bunk's ladder and the rides (`clips/rides.ts`, G-19, G-44, G-23) are fitted by the legs and pivot planted feet on the ball; the same fit for `sizes` (a size's share of the legs, not the height) would put the children's clips where the things are.
-- **Status:** open
+- **Status:** fixed (e3e95ae3)
+- **After:** `sizes()` (`clips/street.ts`) fits each size by the legs: its `s` (the share the clip's metres are the object's over) is the height's share times `legShare(height)`, 0.9 for a child's heights (rig.json: `pelvisScale` / height is 0.90 of the reference's at both children, 1.0 for teens and grown-ups), blending to 1 from 1.25 to 1.4 m; the size picked by height, its `to` and its branches stay as they were. So every sized clip (the fountain, the climbing frame, the games, the eyepiece, the fruit trees, the cupboards, the clock, the feeder, the board, the hoop, the low tops, the ball pit, the tent) puts a child's feet and hands where the thing is. `fixes/sweep-render/legs/strip-deck.png` (Dee on the climbing frame's deck: the shoes on its boards, was sunk to the ankles in `before-climbingFrame-climb-02.png`), `strip-climb-fountain.png`, `strip-pit-boulder.png` (before above, after below). `check_clips.ts --body all --stage all`: 0 new, 0 known.
 - **Source:** fix: rides
 
 ### A-residents-13 — Sitting down still slides from the tile onto the seat
@@ -419,7 +420,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters.ts` (the settle into a seat: `rig.x` eased to sim-core's slot at 9/s while `sitDown` plays)
 - **Evidence:** `bench-results/review/fixes/positions/play/computerDesk-wall-in-200.png` (the desk's back to the wall: come from beside it, G-51, the sitter slides 1.5 m along behind the desk onto the chair in the first 0.3 s of sitting down), `bench-results/review/fixes/positions/play/exerciseBike-in-200.png` (half a metre sideways onto the saddle). Now that seats are come to from their side or behind (G-51) the slide no longer goes through the work, but it is still a slide: the other half of A-residents-01. A short walk-in to the seat's front before `sitDown` (the walk clip at the walk's pace, then the turn) would close it.
-- **Status:** open
+- **Status:** fixed (a5968771)
+- **After:** sitting down is walked: the renderer draws the resident walking (the `walk` clip, 0.8 of its pace) from where they were to the seat's front, turned round there, and only then plays `sitDown` (`characters.ts` `WALK_IN`, `walksIn`, `walkPlace`); from a tile behind a built-in chair round its side (`cornerOf`). `fixes/sweep-render/walk/strip-desk-wall-in.png` (the computer desk against the wall, from beside it: walking along behind the desk 200–1000 ms, sat by 2200; was `fixes/positions/play/computerDesk-wall-in-200.png`'s slide), `strip-dining.png` (the dining table's built-in chair from behind it, round its side), `strip-bike-chair.png` (a loose chair from beside the table; the exercise bike there was walked through its frame, so seats in a frame settle as before: A-residents-15). Also the shower (A-bathroom-05) and the talk (A-social-05).
 - **Source:** fix: positions
 
 ### A-residents-14 — Rising off a chair that can't move steps back through it
@@ -429,8 +431,20 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters.ts` (`rising`: the step from the seat to the tile sim-core put them on, in the second half of `standUp`); chairs built into tables and desks (`diningTable`, the desks, `places` come to from behind)
 - **Evidence:** `bench-results/review/fixes/positions/play-headed/diningTable-headed-up-700.png` (headed, timed): risen at the seat, the sitter steps back to the tile behind the table's chair through the chair's back. A chair pulled up to a table is pushed back as they rise (`tuckOut`); one built into the model isn't, so the step passes through it. A step sideways round it (to the tile beside), or the chair part moved back as the loose chairs are, would close it.
-- **Status:** open
+- **Status:** fixed (a5968771)
+- **After:** rising off a chair built into its table or desk (`builtIn`: a top sat at by a use of its own) to a tile behind it, the step goes round a corner 0.55 m to the chair's side away from the set's middle (`cornerOf`, `riseViaX`) instead of through its back. `fixes/sweep-render/walk/strip-dining.png` (`diningTable-up-150` … `-1500`: up at the seat, then out past the chair's side to the tile; was `fixes/positions/play-headed/diningTable-headed-up-700.png`). Headless, but the shots are timed after the cancel as the positions fix's were; not re-timed headed.
 - **Source:** fix: positions
+
+### A-residents-15 — Walking in onto a seat with a frame goes through it
+
+- **Severity:** S3
+- **Rubric:** A1, A4
+- **Fix class:** code
+- **Where:** `web/src/render/babylon/characters.ts` (`WALK_IN`, `walkPlace`: a straight line from where they stood to the seat's front; round a corner only for built-in chairs, `cornerOf`)
+- **Evidence:** `fixes/sweep-render/walk/strip-bike-chair.png` (`exerciseBike-in-200` … `-1000`): from the tile beside the exercise bike the walk-in goes straight through its frame to the saddle, the legs through the crossbar, where someone steps over it. The same for anything sat astride or straddled from the side (the bikes, a rowing machine, the rides) once sim-core seats them from beside it. A step over (the ball pit's `over`, `STEP_IN`) or coming to it from behind would do.
+- **Status:** fixed (da7e41ef)
+- **After:** onto a seat in a frame sat astride the walk-in is not used (`walksIn`: seats with `pedals`, and `STRADDLED`: the rocking horse, the spring rider, the seesaw); they settle onto it as before, quickly, instead of walking through the frame for a second. `fixes/sweep-render/walk2/strip.png` (`exerciseBike-in-200` … `-3000`: on the saddle at once, was `fixes/sweep-render/walk/strip-bike-chair.png`'s walk through the crossbar; `rides-rockingHorse-ride-0*`: onto the horse at once; `rides-swingSet-swing-*`: the swing, not in a frame, still walked to). A step over the frame (as the ball pit's rim, `STEP_IN` `over`) would be better still; not done.
+- **Source:** fix: sweep-render (A-residents-13's re-check)
 
 ### M-residents-01 — Heads are about half a head bigger than the rubric's ratios at every stage
 

@@ -366,6 +366,7 @@ def teaTrolley():
 
 # --- the fireside reading lounge (2x2): two wing chairs before an open fire grate under a hood ----------------
 STOVE = (0.0, 0.62)   # the grate's middle (x, depth)
+HOOD_Y = 0.6          # the hood's rim, right over the flames (they reach 0.47); 2026-10-21: 1.0, over the air (M-packs-10)
 
 
 def _wing_chair(F, x, z=0.0):
@@ -392,7 +393,7 @@ def firesideLounge():
     with G.new_parts() as still:
         F.cyl('rug', 0.85, 0.012, (0, 0.006, 0.2), M.rug, verts=40, scale=(1, 0.76, 1))
         F.cyl('rug_field', 0.75, 0.014, (0, 0.007, 0.2), M.rug_inner, verts=40, scale=(1, 0.75, 1))
-        # the hearth stone, the iron grate on its legs with logs, the hood on its flue
+        # the hearth stone, the iron grate on its legs with logs, the hood on its flue right over them
         F.cyl('hearth', 0.3, 0.05, (sx, 0.025, sz), M.stone, verts=28, bevel=0.01)
         G.revolve('grate', [(0.0, 0.0), (0.16, 0.0), (0.2, 0.14), (0.185, 0.14), (0.15, 0.015), (0.0, 0.015)],
                   at=F.at(sx, 0.12, sz), material=M.iron, segments=20)
@@ -403,9 +404,9 @@ def firesideLounge():
             F.cyl(_name('log'), 0.035, 0.28, (sx + dx, 0.17 + 0.03 * (k == 2), sz), M.log, rot=(90, 0, a), verts=10)
         F.cyl('embers', 0.13, 0.02, (sx, 0.16, sz), M.ember, verts=18)
         G.revolve('hood', [(0.25, 0.0), (0.235, 0.02), (0.07, 0.26), (0.06, 0.28), (0.06, 0.29), (0.24, 0.03)],
-                  at=F.at(sx, 1.0, sz), material=M.iron, segments=28)
+                  at=F.at(sx, HOOD_Y, sz), material=M.iron, segments=28)
         # the flue up to the ceiling (2.8 m) and its collar there: the hood hangs from it
-        F.cyl('flue', 0.06, 1.5, (sx, 2.03, sz), M.iron, verts=20)
+        F.cyl('flue', 0.06, 2.8 - HOOD_Y - 0.28, (sx, (2.8 + HOOD_Y + 0.28) / 2, sz), M.iron, verts=20)
         F.cyl('flue_collar', 0.09, 0.03, (sx, 2.785, sz), M.iron, verts=20, bevel=0.005)
         # the chairs, a side table with books and tea between them, a low bookcase behind
         _wing_chair(F, -0.5)
@@ -439,38 +440,38 @@ def firesideLounge():
     return objs
 
 
-# --- the bedside book stack (1x1): a little chest of drawers piled with books, a lamp and tea ----------------
+# --- the bedside book stack (1x1): a nightstand-sized chest of drawers (0.6 wide) piled with books, a lamp and tea --
 def bedsideStack():
     F = G.GameFrame()
     rnd = random.Random(9)
     h, d = 0.5, 0.43
     zf = WALL + d
     with G.new_parts() as still:
-        F.box('chest_top', 0.8, 0.03, d, (0, h - 0.015, WALL + d / 2), M.body, bevel=0.008)
-        F.box('chest', 0.78, h - 0.09, d - 0.02, (0, 0.06 + (h - 0.09) / 2, WALL + (d - 0.02) / 2), M.body, bevel=0.006)
-        for lx in (-0.36, 0.36):
+        F.box('chest_top', 0.6, 0.03, d, (0, h - 0.015, WALL + d / 2), M.body, bevel=0.008)
+        F.box('chest', 0.58, h - 0.09, d - 0.02, (0, 0.06 + (h - 0.09) / 2, WALL + (d - 0.02) / 2), M.body, bevel=0.006)
+        for lx in (-0.26, 0.26):
             for lz in (WALL + 0.04, zf - 0.04):
                 G.revolve(_name('leg'), [(0, 0), (0.015, 0), (0.025, 0.035), (0.022, 0.06), (0, 0.06)], at=F.at(lx, 0, lz),
                           material=M.body, segments=12)
-        fw, fh = 0.74 / 3, (h - 0.14) / 2
-        for i in range(3):
+        fw, fh = 0.54 / 2, (h - 0.14) / 2
+        for i in range(2):
             for j in range(2):
-                cx, cy = -0.37 + fw * (i + 0.5), 0.095 + fh * (j + 0.5)
+                cx, cy = -0.27 + fw * (i + 0.5), 0.095 + fh * (j + 0.5)
                 F.box(_name('drawer'), fw - 0.014, fh - 0.014, 0.016, (cx, cy, zf - 0.002), M.panel, bevel=0.005)
                 F.box(_name('pull'), 0.07, 0.02, 0.018, (cx, cy - 0.01, zf + 0.012), M.brass, bevel=0.006)
                 F.box(_name('label'), 0.05, 0.028, 0.004, (cx, cy + 0.04, zf + 0.007), M.page, bevel=0.001)
-        _pile(F, rnd, -0.16, -0.25, h, 5, 0.22, 0.16)
+        _pile(F, rnd, -0.12, -0.25, h, 5, 0.22, 0.16)
         top = _pile(F, rnd, 0.1, -0.15, h, 2, 0.2, 0.15)
         F.box('book_block', 0.19, 0.03, 0.145, (0.1, top + 0.015, -0.15), M.page)
         F.box('book_back', 0.2, 0.006, 0.15, (0.1, top + 0.003, -0.15), M.book_a)
         F.box('book_spine', 0.006, 0.042, 0.15, (0.2, top + 0.021, -0.15), M.book_a)
-        _lamp(F, 0.28, h, -0.33, h=0.44)
-        _mug(F, -0.3, h, -0.06, M.mug_a)
+        _lamp(F, 0.17, h, -0.3, h=0.44)
+        _mug(F, -0.22, h, -0.06, M.mug_a)
         for s in (-1, 1):                               # reading glasses folded on the top
             G.torus(_name('lens'), 0.02, 0.003, at=F.at(-0.07 + s * 0.024, h + 0.004, -0.05), material=M.dark,
                     major_segments=14, minor_segments=4)
         F.box('glasses_arm', 0.09, 0.004, 0.004, (-0.07, h + 0.004, -0.07), M.dark)
-        _pile(F, rnd, 0.32, 0.18, 0.0, 6, 0.24, 0.18)    # a pile on the floor beside the chest
+        _pile(F, rnd, 0.2, 0.2, 0.0, 6, 0.24, 0.18)      # a pile on the floor in front of the chest
     G.join(still, 'body', origin=(0, 0, 0))
     # The top book's cover, hinged on the spine at its right: `book_up` opens it over to the right.
     with G.new_parts() as cover:
@@ -499,7 +500,7 @@ FAMILY = G.Family(
      G.Model('firesideLounge', firesideLounge, size=(1.7, 2.8, 1.85), key='model.bookworm.firesideLounge',
              centre=(0, -0.005), motions={'uses': {'readByFire': 'flames', 'readAloud': 'flames'}},
              paint=[('walnut', 'Wood'), ('velvet', 'Fabric'), ('rug', 'Rug')]),
-     G.Model('bedsideStack', bedsideStack, size=(0.846, 0.931, 0.74), key='model.bookworm.bedsideStack',
+     G.Model('bedsideStack', bedsideStack, size=(0.626, 0.931, 0.73), key='model.bookworm.bedsideStack',
              centre=(0.023, -0.06), motions={'uses': {'chapter': 'book_up'}},
              paint=[('body', 'Wood'), ('shade', 'Fabric'), ('panel', 'Drawers')])],
     comment='Blender-built bookworm pack models (tools/art/blender/families/pack_bookworm.py). Listed in '

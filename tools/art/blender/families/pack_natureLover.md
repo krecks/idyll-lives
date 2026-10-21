@@ -15,7 +15,7 @@ at 0.45 m.
 | `veggieBed` | the plants (foliage), the fruit (tomatoes, carrots, courgettes) and one lettuce, origins on the soil: `grow` holds each where the crop's stage is (ripe at rest; picked: the fruit gone; growing: the plants at 0.6 height; planted: 0.25); `harvest` presses the lettuce down into the soil (0.8 s); `rustle` sways the plants and the fruit 3° back and forth about the soil line (0.8 s, every 2.4 s), on top of the stage | `growth`; `pickSnack`; `tendVeggies` |
 | `pottingBench` | a seedling in a pot on the worktop, built flat on its soil: `seedling` grows it up (1 s) | `potSeedlings` |
 | `birdFeeder` | a bluebird on the tray, built at full size and scaled to nothing: `bird` brings it in (0.5 s) | `birdwatch` |
-| `gardenHammock` | the sling with its spreader bars, ropes and pillow, pivoting on the line between the hooks: `sway` rocks it 8° each way and home (2.4 s), a loop; `ride` carries the resident | `swing`, `doze` (loops) |
+| `gardenHammock` | the sling with its spreader bars, ropes and pillow, pivoting on the line between the hooks: `sway` rocks it 8° each way and home (2.4 s), a loop; `ride` carries the resident. A 3 × 1 stand, the sling 2 m between the spreader bars at ±1.0 (`furniture.json` `sling`: low 0.49, end 0.9, half 1.0, head 0.76), so a grown-up lies in it near flat (2026-10-21: 2 × 1, a 1.44 m sling, the knees up: M-packs-06, Q-07) | `swing`, `doze` (loops) |
 | `cedarShower` | streaks of rain from the copper head, built full length, origin at the head: `water_on` grows them down (0.6 s) | `rinse` |
 | `mossTerrarium` | the glass cloche: `lid_open` lifts it 22 cm (0.7 s) | `mist` |
 | `glasshouse` | the glass door, hinged on its post: `door_open` swings it 70° out (0.9 s), `hold` 1.5 s, `out` 1.5 s: open to let the resident in, shut behind them, open again to let them out (2026-10-21: it stood open the whole use); the roof vent, hinged at the ridge: `vent_open` lifts it 25° (0.9 s) while they're in | `unwind`, `orchids` |
@@ -60,7 +60,7 @@ the lettuce sits 2 cm into the soil, so flattened it is hidden.
 | `model.natureLover.veggieBed` | 1.87 × 1.30 × 0.91 m | 4,780 | 4 | Wood, Posts & rails |
 | `model.natureLover.pottingBench` | 1.76 × 1.79 × 0.60 m | 7,704 | 4 | Wood, Frame |
 | `model.natureLover.birdFeeder` | 0.71 × 1.78 × 0.68 m | 3,372 | 3 | Wood, Roof |
-| `model.natureLover.gardenHammock` | 1.88 × 1.11 × 0.68 m | 2,416 | 3 | Wood, Fabric, Stripes |
+| `model.natureLover.gardenHammock` | 2.88 × 1.19 × 0.68 m | 2,704 | 3 | Wood, Fabric, Stripes |
 | `model.natureLover.cedarShower` | 0.90 × 2.08 × 0.88 m | 5,736 | 3 | Wood, Copper |
 | `model.natureLover.mossTerrarium` | 0.48 × 1.17 × 0.70 m | 2,140 | 3 | Wood |
 | `model.natureLover.glasshouse` | 1.89 × 2.48 × 1.86 m | 7,496 | 4 | Wood, Frame, Cushions |

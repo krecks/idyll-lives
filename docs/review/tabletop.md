@@ -223,7 +223,8 @@ Not tied to one row: I-tabletop-04, I-tabletop-06.
 - **Fix class:** code
 - **Where:** the renderer's chair tuck (`web/src/render/babylon/characters.ts` `tuckIn`, `TUCK`, and the seat it finds, `seatUnder`); the sim seats them through `Sim::use_seat` (`surface::seat_at_top`, G-63)
 - **Evidence:** `fixes/tops-conditions/tops-adult-teapotSet-tea-01.png`: pouring tea from the tea set, Ada sits on the wooden chair a hand's width back from the square table, hands in her lap; `tops-adult-laptopClosed-browse-01.png`: at the laptop on the desk, the office chair stays about 0.4 m out, her hands reaching. Shot 2–4 s into the use, well after the tuck's ease-in. A chair pulled up to a table is shuffled in for a meal; a use of a thing on the top, done from that chair, isn't. Cause not traced (whether `tuckIn` sees the chair as the seat when the use is the thing on the top's).
-- **Status:** open
+- **Status:** fixed (b21ef195)
+- **After:** the cause: a thing on a top with a sitting use (the tea set, the laptop) counted as `restful`, so `seatUnder` took it, not the chair under the resident, for the seat, and `tuckIn` found no table in front of it. Things on the `surface` layer are no longer restful (`characters.ts` `setWorld`); the chair is then the seat and is shuffled in. `fixes/sweep-render/tuck/tea-side.png` against `tea-before-side.png` (the same setup before the change: `tableSquare2` with `chairWood`, Ada pouring tea, hands in her lap a hand's width back; after: pulled in 0.33 m, the hands at the top; `tea.json` has the tuck), `laptop-side.png` (`deskSimple` and `chairTask`, browsing: pulled in 0.45 m, `sitHands`).
 - **Source:** fix: tops-conditions
 
 ### M-tabletop-01 — The candles are drawn lit all day, and at night they don't glow
@@ -255,5 +256,6 @@ Not tied to one row: I-tabletop-04, I-tabletop-06.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/objectMotion.ts:225` (a `night` clip is held open by the lamps' level, dusk to dawn, whatever the room); `tools/art/blender/families/tabletop.py` (`candlesticks`, `motions.night: lit`)
 - **Evidence:** after M-tabletop-01's fix the flames rise out of the candles from dusk and glow while the room's lights are on (`fixes/blender-decor/candlesticks-night-room-lit.png`); in a room whose lights are out (nobody awake there, `review-stage-night`) the flames still stand on the wicks, unlit and dull (`fixes/blender-decor/candlesticks-night.png`). Real candles are lit by someone and blown out when they leave or go to bed. A night clip that follows the room's lights (as the shade glow does), or the candles lit as a fire is (content `light.fire`, a use), would do.
-- **Status:** open
+- **Status:** fixed (2a35c671)
+- **After:** a `night` clip on a thing that glows with its room (its glow not a lamp's or a screen's: the candlesticks) is held open only while that room's lights are on (`ObjectMotion.setUnlit`, from the renderer's window glow), so the flames rise and glow together. `fixes/sweep-render/candles/`: `candlesticks-night-room-dark.png` (22:07, only the baby asleep in the room: dark wicks, no flame, was the dull flames of `fixes/blender-decor/candlesticks-night.png`), `candlesticks-night-room-lit.png` (Ada walked in: the two flames up and glowing), `candlesticks-night-room-dark-again.png` (she left: down again); `log.json` has `unlit` at each. Curtains and the coop (no glow) still close by the clock.
 - **Source:** fix: blender-decor
