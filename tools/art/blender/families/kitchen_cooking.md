@@ -71,7 +71,7 @@ free burner beside them. `stoveGas`, `rangeCooker`, `stoveElectric` (since its r
 the fridge), where the snapshot gives no interaction, only the step's animation tag. So the hobs play `burner_on`
 for `stir` too, and the ovens `oven_open` for `bake` (the Bake steps, and a meal's Cook step in an oven or a
 microwave: content `animAt`). The microwave opens its door for reheat or `bake`, shuts it (`hold` 1.2 s) and only
-then turns its plate (`turntable`, `delay` 2.2 s, `every` 2 s: a loop that waits for the door).
+then turns its plate (`turntable`, `delay` 2.2 s, `every` 1.9 s, a hair under its 2 s turn: a loop that waits for the door).
 
 ## K3 — small appliances and dishwashers
 

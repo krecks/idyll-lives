@@ -39,7 +39,10 @@
       },
       "motions": {
         "uses": {
-          "play": "fallboard"
+          "play": {
+            "clip": "fallboard",
+            "delay": 0.9
+          }
         }
       },
       "paint": [
@@ -238,9 +241,17 @@
         }
       },
       "motions": {
-        "loops": {
-          "drum": "cymbals",
-          "practise": "cymbals"
+        "uses": {
+          "drum": {
+            "clip": "cymbals",
+            "delay": 0.9,
+            "every": 0.9
+          },
+          "practise": {
+            "clip": "cymbals",
+            "delay": 0.9,
+            "every": 0.9
+          }
         }
       },
       "paint": [
@@ -340,7 +351,10 @@
       },
       "motions": {
         "uses": {
-          "chess": "move"
+          "chess": {
+            "clip": "move",
+            "delay": 0.9
+          }
         }
       },
       "paint": [
@@ -610,7 +624,10 @@
       },
       "motions": {
         "uses": {
-          "jigsaw": "pieces"
+          "jigsaw": {
+            "clip": "pieces",
+            "delay": 0.9
+          }
         }
       },
       "paint": [
@@ -823,12 +840,28 @@
       },
       "motions": {
         "uses": {
-          "sew": "presser",
-          "mend": "presser"
-        },
-        "loops": {
-          "sew": "handwheel",
-          "mend": "handwheel"
+          "sew": [
+            {
+              "clip": "presser",
+              "delay": 0.9
+            },
+            {
+              "clip": "handwheel",
+              "delay": 0.9,
+              "every": 0.9
+            }
+          ],
+          "mend": [
+            {
+              "clip": "presser",
+              "delay": 0.9
+            },
+            {
+              "clip": "handwheel",
+              "delay": 0.9,
+              "every": 0.9
+            }
+          ]
         }
       },
       "paint": [
@@ -934,10 +967,17 @@
       },
       "motions": {
         "uses": {
-          "throw": "clay"
-        },
-        "loops": {
-          "throw": "wheel"
+          "throw": [
+            {
+              "clip": "clay",
+              "delay": 0.9
+            },
+            {
+              "clip": "wheel",
+              "delay": 0.9,
+              "every": 0.9
+            }
+          ]
         }
       },
       "paint": [
@@ -997,7 +1037,10 @@
       },
       "motions": {
         "uses": {
-          "scrapbook": "book_open"
+          "scrapbook": {
+            "clip": "book_open",
+            "delay": 0.9
+          }
         }
       },
       "paint": [

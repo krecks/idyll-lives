@@ -444,7 +444,8 @@ FAMILY = G.Family(
              paint=[('body', 'Body'), ('teal', 'Mop')]),
      G.Model('laundryCenter', laundryCenter, size=(1.82, 1.738, 0.625), key='model.neat.laundryCenter',
              centre=(0.01, -0.127),
-             motions={'uses': {'laundry': 'door_open', 'fold': 'door_open'}},
+             # the porthole opens for the washing to go in (or come out to fold) and shuts for the wash
+             motions={'uses': {'laundry': 'door_open', 'fold': 'door_open'}, 'hold': 2.5},
              paint=[('body', 'Body'), ('appliance', 'Washer & dryer')]),
      G.Model('rainShowerTower', rainShowerTower, size=(0.9, 2.18, 0.9), key='model.neat.rainShowerTower',
              centre=(0, 0.02), motions={'uses': {'steamShower': 'water_on'}},

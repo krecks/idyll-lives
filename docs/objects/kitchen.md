@@ -20,12 +20,14 @@ nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wal
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `farmhouseSink` Farmhouse sink | 1x1 · floor | wash:wash washUp:wash | kitchen / counters | Cabinet, Worktop, Basin, Tap & handles, Plinth | Use | `water_on`: the stream grows from the gooseneck tap into the apron-front basin in 0.4 s, runs for the whole use and retracts as it ends. |
-| `counterSinkDouble` Double sink | 2x1 · floor | wash:wash washUp:wash | kitchen / counters | Cabinets, Worktop, Basins, Tap & handles, Plinth | Use | `water_on`, as the farmhouse sink: both bridge taps run together (two slots). |
+| `counterSinkDouble` Double sink | 2x1 · floor | wash:wash washUp:wash | kitchen / counters | Cabinets, Worktop, Basins, Tap & handles, Plinth | Use | `water_on_0`, `water_on_1`: each bridge tap runs for the one washing at its bowl (`slot`; 2026-10-21: one washer ran both). |
 
 **In play** (signed off 2026-10-16):
 - Checked with the bathroom sinks, the first group: bought in all four facings, every part coloured (through `buy` and
   in the colour studio), washed at and washed up at, by day and at night, on WebGPU and WebGL2, on Medium and Low.
 - `water_on` has no `hold`: it plays for the `wash` tag (both `wash` and `washUp`) and stops when the use ends.
+- Since 2026-10-21 (review A-kitchen-03) the double sink runs only the tap of the bowl in use (`slot` 0 at -x, 1 at
+  +x: `fixes/motions/g1718/play-stage.jsonl`).
 - Both are `dishes` stations: a cleared plate is rinsed here between the bin and the cupboard. Housegen keeps small
   things off sinks.
 

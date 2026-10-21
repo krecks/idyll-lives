@@ -63,6 +63,12 @@ Each is built where the game places it (`F`, game axes; `G.settle(centre=False)`
 - **Craft table**: the scrapbook's cover swings 176° open over its spine (`book_open`), onto the photos of its
   first page.
 
+**Seated uses wait for the hands** (2026-10-21, review G-17): the piano's fallboard, the cymbals, the pawn, the jigsaw
+patch, the presser and handwheel, the pot and wheel and the scrapbook start 0.9 s into the use (`SIT`, `delay`),
+once the resident has sat down (`sitDown`, about 1 s), as the weight bench's bar does. What went round while used
+(the cymbals, the handwheel, the wheel) is now a use's clip played `every` 0.9 s from then (a hair under its 1 s
+round), since a loop can't wait.
+
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
 | `model.piano` | 1.54 × 1.48 × 0.83 m | 5,072 | 3 | Body, Trim |

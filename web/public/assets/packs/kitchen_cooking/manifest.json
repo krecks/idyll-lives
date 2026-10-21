@@ -278,7 +278,7 @@
             {
               "clip": "turntable",
               "delay": 2.2,
-              "every": 2.0
+              "every": 1.9
             }
           ],
           "bake": [
@@ -286,7 +286,7 @@
             {
               "clip": "turntable",
               "delay": 2.2,
-              "every": 2.0
+              "every": 1.9
             }
           ]
         },

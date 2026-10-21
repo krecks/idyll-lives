@@ -263,11 +263,13 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 | `natureLover.gardenHammock` Garden hammock | 2x1 · floor | swing:relax doze:nap | outdoor / — | Wood, Fabric, Stripes | Loop (E1) | `sway`: the sling rocks 8° each way while swung in or dozed in, and the resident rides it (`ride`), lain across it (`BEDS` `across`). |
 | `natureLover.cedarShower` Cedar outdoor shower | 1x1 · floor | rinse:shower | outdoor / — | Wood, Copper | Use | `water_on`: the stream grows for rinse. |
 | `natureLover.mossTerrarium` Moss terrarium | 1x1 · floor | mist:water | decor / — | Wood | Use | `lid_open`: the glass lid lifts for mist. |
-| `natureLover.glasshouse` Fern glasshouse | 2x2 · floor | unwind:relax orchids:water | outdoor / — | Wood, Frame, Cushions | Use | `door_open`: the door and a roof vent open for unwind and orchids. |
+| `natureLover.glasshouse` Fern glasshouse | 2x2 · floor | unwind:relax orchids:water | outdoor / — | Wood, Frame, Cushions | Use | `door_open`: the door opens to let the resident in, shuts behind them (`hold` 1.5 s) and opens again to let them out (`out` 1.5 s); `vent_open`: the roof vent lifts while they're in, for unwind and orchids (2026-10-21: the door stood open the whole use). |
 
 **In play** (signed off 2026-10-17):
 - Every clip plays and shuts: the bed's plants sway while tended (over the growth pose), the seedling and the
   bouquet, the bird, the hammock with its sleeper, the stream, the terrarium lid, the glasshouse door and vent.
+- Since 2026-10-21 (review A-packs-03) the glasshouse door shuts behind the resident and opens to let them out; the
+  vent stays open while they're in (`fixes/motions/g1718/play-garden.jsonl`).
   Nothing needed fixing.
 - pickSnack needs a ripe crop (`when: ripe`, `leaves: picked`; the bed takes two game days to ripen, content
   `grows`). Its `harvest` was seen playing and shutting when the ripe crop was picked, but not caught in a picture.

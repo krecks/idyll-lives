@@ -46,7 +46,7 @@ SECONDS = 1.4   # a door drops, a drawer slides or a knob turns in this long
 COUNTER66 = ((-0.48, -0.43), (-0.46, -0.41), (0.24, 0.19), (0.31, 0.23))
 HOLD = 3.0      # seconds a door stays open once a use starts
 # the microwave's plate turns once its door has shut (`door_open` opens in 1.0 s and plays back from its hold, 1.2 s)
-TURNTABLE = {'clip': 'turntable', 'delay': 2.2, 'every': 2.0}
+TURNTABLE = {'clip': 'turntable', 'delay': 2.2, 'every': 1.9}   # (a hair under its 2 s turn: no pause between turns)
 
 
 def _knob(F, name, x, y, z, r=0.022, d=0.03, material=None, mark=True):
@@ -468,7 +468,7 @@ FAMILY = G.Family(
      G.Model('microwave', microwave, size=(1.0, 1.25, 0.66), key='model.microwave', centre=(0, -0.095),
              # reheat (and a meal's `bake` step) opens the door to put the dish in, shuts it, then turns the
              # plate while it heats: from the door shut (TURNTABLE), round
-             # and round (`every` its 2 s turn)
+             # and round (`every`, a turn each 2 s)
              motions={'uses': {use: ['door_open', TURNTABLE] for use in ('reheat', 'bake')}, 'hold': 1.2},
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop'), ('charcoal', 'Microwave')]),
      G.Model('coffeeMachine', coffeeMachine, size=(1.0, 1.40, 0.66), key='model.coffeeMachine', centre=(0, -0.097),

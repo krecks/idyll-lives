@@ -230,7 +230,10 @@ How the parts work:
   - `{'clip': 'fridge_open', 'delay': 0.3}`: the clip starts 0.3 s into the use (its `hold` counts from
     then): the retro fridge's lever turns first, then the door swings.
   - `{'clip': 'swish', 'delay': 1.4, 'every': 3.2}`: the clip plays from rest to rest every 3.2 s while
-    the use lasts, the first 1.4 s in (the hoops' nets after each shot). It must end where it starts.
+    the use lasts, the first 1.4 s in (the hoops' nets after each shot). It must end where it starts. It is also
+    the loop that waits: a washer's drum turning once its door has shut (`delay` 3.5, `every` 1.1 for its 1.2 s
+    turn), the seated hobbies' wheels once the resident has sat down. Make `every` a hair under the clip's length
+    so the rounds run on without a pause.
   - `{'clip': 'turn_down_upper', 'slot': 1}`: only for the resident in that slot (`bedBunk`: one duvet
     per bunk).
   - `{'clip': 'door_open', 'delay': 0.3, 'hold': 2.4, 'out': 1.6}`: the clip opens again for 1.6 s when

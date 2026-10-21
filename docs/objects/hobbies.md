@@ -20,17 +20,20 @@ table face the room, as tables do.
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `piano` Piano | 2x1 · floor | play:music | hobbies / music | Body, Trim | Use | `fallboard`: the key cover lifts and the music desk unfolds for play. |
+| `piano` Piano | 2x1 · floor | play:music | hobbies / music | Body, Trim | Use | `fallboard`: the key cover lifts and the music desk unfolds for play, 0.9 s in, once the pianist has sat down (`delay`). |
 | `ukulele` Ukulele | 1x1 · floor | strum:music practise:music | hobbies / music | Body & neck, Top, Stand | Use | `off_stand`: the ukulele leaves its stand while strummed and is drawn in the player's hands (content `held`). |
 | `guitarElectric` Electric guitar | 1x1 · floor | jam:music practise:music | hobbies / music | Guitar, Amp | Use | `off_stand`, as the ukulele; the amp is static. |
 | `keyboardDigital` Digital piano | 1x1 · floor | play:music | hobbies / music | Body, Trim | Static | Static. |
-| `drumKit` Drum kit | 1x1 · floor | drum:music practise:music | hobbies / music | Shells, Hardware | Loop (E1) | `cymbals`: the crash and ride cymbals rock while drummed (E1); the hi-hat is still. |
+| `drumKit` Drum kit | 1x1 · floor | drum:music practise:music | hobbies / music | Shells, Hardware | Use, repeating (E1) | `cymbals`: the crash and ride cymbals rock while drummed, from 0.9 s in, once the drummer has sat down (`delay`, `every` 0.9 s; it was a loop from the first frame); the hi-hat is still. |
 | `guitarAcoustic` Acoustic guitar | 1x1 · floor | strum:music practise:music | hobbies / music | Body, Top, Stand | Use | `off_stand`, as the ukulele. |
 
 **In play** (signed off 2026-10-16):
 - Checked in all four facings (the piano against three walls and standing free), every part coloured, played by
   day and at night, on WebGPU and WebGL2, on Medium and Low.
 - The piano's fallboard lifts and its music desk tilts for play, and shut when the use ends.
+- Since 2026-10-21 (review A-hobbies-02) the seated hobbies' parts wait 0.9 s, while the resident sits down
+  (`sitDown`), as the weight bench's bar does: the fallboard and the cymbals here, the pawn and the jigsaw patch, the
+  presser and handwheel, the pot and wheel and the scrapbook below (`fixes/motions/g1718/play-stage.jsonl`).
 - The ukulele and both guitars leave their stands for strum, jam and practise and are back on the stand when the use
   ends; the drum kit's cymbals stop with the use. The digital piano is still.
 - The acoustic guitar's and ukulele's soundboard has its own colour, "Top"; "Body" (back and sides) and "Body & neck"
@@ -68,10 +71,10 @@ table face the room, as tables do.
 | `easel` Easel | 1x1 · floor | paint:paint | hobbies / crafts | Wood, Metal | Use | `painting`: a painting grows on the canvas for paint. |
 | `workbench` Workbench | 2x1 · floor | tinker:tinker | hobbies / crafts | Wood, Metal | Use | `vice`: the vice jaw slides shut on a plank for tinker. |
 | `telescope` Telescope | 1x1 · floor | stargaze:look | hobbies / crafts | Tube, Tripod | Use | `aim`: the tube tilts up 35° for stargaze and comes back down. |
-| `sewingTable` Sewing table | 1x1 · floor | sew:tinker mend:tinker | hobbies / crafts | Table, Legs, Machine | Use + Loop (E1) | `presser`: the presser foot lowers for sew and mend, and the handwheel turns in a loop (`handwheel`, E1). |
+| `sewingTable` Sewing table | 1x1 · floor | sew:tinker mend:tinker | hobbies / crafts | Table, Legs, Machine | Use, repeating (E1) | `presser`: the presser foot lowers for sew and mend, and the handwheel turns round after round (`handwheel`, `every` 0.9 s, E1), both from 0.9 s in, once the sewer has sat down (`delay`). |
 | `chemistrySet` Chemistry bench | 1x1 · floor | experiment:tinker | hobbies / crafts | Bench, Glassware | Use | `bubble`: the liquid rises in the flask for experiment. |
-| `potteryWheel` Pottery wheel | 1x1 · floor | throw:tinker | hobbies / crafts | Wheel, Stool | Use + Loop (E1) | `clay`: the pot grows from a lump for throw, and the wheel head spins in a loop (`wheel`, E1). |
-| `craftTable` Craft table | 2x1 · floor | scrapbook:tinker | hobbies / crafts | Wood, Metal | Use | `book_open`: the scrapbook cover swings open for scrapbook. |
+| `potteryWheel` Pottery wheel | 1x1 · floor | throw:tinker | hobbies / crafts | Wheel, Stool | Use, repeating (E1) | `clay`: the pot grows from a lump for throw, and the wheel head spins round after round (`wheel`, `every` 0.9 s, E1), both from 0.9 s in, once the potter has sat down (`delay`). |
+| `craftTable` Craft table | 2x1 · floor | scrapbook:tinker | hobbies / crafts | Wood, Metal | Use | `book_open`: the scrapbook cover swings open for scrapbook, 0.9 s in, once the crafter has sat down (`delay`). |
 
 **In play** (signed off 2026-10-16):
 - Checked standing free (the workbench also against three walls); every clip plays for its use and shuts when the

@@ -137,7 +137,8 @@
         "uses": {
           "laundry": "door_open",
           "fold": "door_open"
-        }
+        },
+        "hold": 2.5
       },
       "paint": [
         {
