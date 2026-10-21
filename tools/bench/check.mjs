@@ -740,6 +740,18 @@ if (what === 'sheet') {
   const pngs = readdirSync(dir, { recursive: true })
     .filter((rel) => rel.endsWith('.png') && !rel.split(sep).includes('sheets') && !resolve(dir, rel).startsWith(out + sep))
     .map((rel) => ({ rel, name: basename(rel), dirs: rel.split(sep).slice(0, -1), time: statSync(join(dir, rel)).mtimeMs }));
+  // `poses.html`'s own stations, whose shots are named by label ("feed baby": the crib's): label → object.
+  const bare = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const stationDefs = new Map([...readFileSync(join(WEB, 'src/debug/poses.ts'), 'utf8').matchAll(/\{ label: '([^']+)', def: '([^']+)'/g)].map(([, label, def]) => [bare(label), def]));
+  /** Whether a pose shot is of object `id`: the station its name ends with ("…-2-sleep-two"), else an id in its name ("poses-seats-teen-sofa"). */
+  function posedOn(stem, id, names) {
+    const words = stem.split(/[-_]/);
+    for (let k = 1; k < words.length; k++) {
+      const def = stationDefs.get(bare(words.slice(k).join('')));
+      if (def) return def === id;
+    }
+    return stem.split('-').some((t) => names.includes(t));
+  }
   const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const stageIn = (tokens) => STAGES.find((s) => tokens.includes(s));
   /** The newest picture of each file name (a use taken again in a later chunk), in name order. */
@@ -755,25 +767,28 @@ if (what === 'sheet') {
     const game = new RegExp(`^gallery-game-(${any})\\.png$`);
     const clip = new RegExp(`^clips-(${any})-(.+)-t([\\d.]+)\\.png$`);
     const use = new RegExp(`^(${any})-(.+?)(?:-(\\d+))?\\.png$`);
-    const found = { gallery: [], close: [], game: [], clips: [], uses: [], night: [], ages: [] };
+    const found = { gallery: [], close: [], game: [], clips: [], uses: [], night: [], staged: [], ages: [] };
     for (const f of pngs) {
       const stem = f.name.slice(0, -4);
       if (gallery.test(f.name)) (f.dirs.includes('close') ? found.close : found.gallery).push(f);
       else if (game.test(f.name)) found.game.push(f);
       else if (clip.test(f.name)) found.clips.push({ ...f, clip: f.name.match(clip)[2], t: Number(f.name.match(clip)[3]) });
-      else if (stem.startsWith('poses-') && stem.split('-').some((t) => names.includes(t))) found.ages.push({ ...f, stage: stageIn(stem.split('-')) ?? 'default' });
+      else if (stem.startsWith('poses-') && posedOn(stem, id, names)) found.ages.push({ ...f, stage: stageIn(stem.split('-')) ?? 'default' });
       else if (use.test(f.name)) {
         // In play: at another life stage (a folder named for it), at night, or as the state has them.
         const stage = stageIn(f.dirs.flatMap((d) => d.split('-')));
         const [, , what, shot] = f.name.match(use);
-        if (stage) found.ages.push({ ...f, stage });
-        else (f.dirs.some((d) => d.startsWith('night')) ? found.night : found.uses).push({ ...f, use: what, shot });
+        (stage ? found.staged : f.dirs.some((d) => d.startsWith('night')) ? found.night : found.uses).push({ ...f, use: what, shot, stage });
       }
     }
     // Each use once: its middle picture (`-01` of three), the uses with none (`no-uses`) last.
-    const byUse = new Map();
-    for (const f of newest(found.uses)) byUse.set(f.use, [...(byUse.get(f.use) ?? []), f]);
-    const uses = [...byUse.values()].map((shots) => shots.find((f) => f.shot === '01') ?? shots[Math.floor(shots.length / 2)]).sort((a, b) => (a.use === 'no-uses') - (b.use === 'no-uses'));
+    const middles = (files, key) => {
+      const byUse = new Map();
+      for (const f of files) byUse.set(key(f), [...(byUse.get(key(f)) ?? []), f]);
+      return [...byUse.values()].map((shots) => shots.find((f) => f.shot === '01') ?? shots[Math.floor(shots.length / 2)]);
+    };
+    const uses = middles(newest(found.uses), (f) => f.use).sort((a, b) => (a.use === 'no-uses') - (b.use === 'no-uses'));
+    found.ages.push(...middles(found.staged, (f) => `${f.dirs.join('/')}:${f.use}`));
     // Each clip held open (its latest time), the main run's first, then other framings (`clips/side/`, `clips-tall/`).
     const open = new Map();
     for (const f of found.clips) {
