@@ -252,6 +252,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `crates/tools/src/tex.rs:462` (`door_wood`, Wood066, `Op::Rot90`) and `:625` (`material.door`), `web/public/assets/manifest.json:1164`, `web/public/assets/textures/door_wood/`, `web/public/assets/CREDITS.md:29`
 - **Evidence:** Since G-57 the oak door leaf is drawn on the oak panelling's grain (`material.finish.wood`); nothing in `web/src` names `material.door` any more, so the 1024 px door wood set is built and shipped for nothing (never loaded). Dropping it goes through the texture tool: its `HOUSE_SETS` entry and `material.door` (and the fixture `tests/fixtures/tex/materials.json`), then `Op::Rot90`, which only it uses.
-- **Status:** open
+- **Status:** fixed (089516aa)
+- **After:** the `door_wood` set (Wood066) is gone from `cargo tex`'s `HOUSE_SETS` and `material.door` from its materials and the fixture, with `Op::Rot90` and `Img::rotate90` that only it used; the manifest entry, the CREDITS row and `textures/door_wood/` too. `cargo test -p ll-tools --release` passes (`materials_bytes` matches the fixture).
 - **Source:** fix: town
 

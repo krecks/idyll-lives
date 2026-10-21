@@ -847,7 +847,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/packs/outgoing.json:138` (`danceFloor`: no `stand`, 2 slots); the mechanism as I-packs-02's (`stand` on the karaoke stage)
 - **Evidence:** `fixes/blender-packs/night/night-outgoing.danceFloor-dance-01.png`: the dancer stands on the floor in front of the platform's edge while its tiles light up behind her; the floor (tiles at about 5 cm) is the thing danced on. Two dancers also need a place each on it (G-62 `places` for standing users stand off the footprint, so `stand` with two slots may need code).
-- **Status:** open
+- **Status:** fixed (925c09fe)
+- **After:** content `stand` 0.074 m (the tiles' top), as G-02 did for the karaoke stage: the dancer steps up onto the floor, each of two forward onto their own half (`fixes/sweep-sim/I-packs-21/after-outgoing.danceFloor-dance-01.png`, review-stage-night).
 - **Source:** fix: blender-packs
 
 ### I-packs-22 — The vibration plate's user jogs beside the grips instead of holding them

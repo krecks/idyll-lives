@@ -144,7 +144,8 @@ Not tied to one row: I-held-01.
 - **Fix class:** model
 - **Where:** `web/public/content/base.json` items `iceCreamCone`, `crisps`, `fruit`, `pastry` (`item.treatPlate`), `hotDog`, `shopSandwich` (`item.sandwich`); new models in `tools/art/blender/families/held.py`
 - **Evidence:** seen while fixing G-67 (no run of its own): the food fetched at the ice cream cart, the snack machine, the market stall, the bakery case, the hot dog stand and the grocery shelf is now carried to a bench or a café table and eaten there, so it is drawn: an ice cream, a packet of crisps, a piece of fruit and a pastry as the plate of cookies and a cupcake, a hot dog as a filled sandwich. A cone, a packet, an apple, a pastry in a paper bag and a hot dog in its bun would fix it, with M-held-01's small models.
-- **Status:** open
+- **Status:** fixed (eab099da) for the hot dog and the cart's ice cream; models recorded for the rest
+- **After:** content only: `hotDog` is carried in the kraft takeaway box (`item.takeout`, radius 0.13) and `iceCreamCone` as the dessert bowl of scoops (`item.iceCream`, 0.08). Still to be made, recorded in `tools/art/blender/families/held.md`: a cone or paper cup, a hot dog in its bun, a packet of crisps, an apple and a pastry in a paper bag (`crisps`, `fruit`, `pastry` keep the treat plate meanwhile; `shopSandwich` the sandwich, which fits).
 - **Source:** fix: cooking
 
 ### I-held-02 — Baking is played as frying: a pan comes out at the oven

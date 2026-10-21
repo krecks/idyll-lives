@@ -644,7 +644,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Fix class:** code
 - **Where:** `crates/sim-core/src/world.rs:885` (cooking, eating and washing up are never interrupted); `crates/sim-core/tests/calling_out.rs`
 - **Evidence:** With every need at 1.0 at 9:00, free will sent the called housemate to cook a full meal at the fridge (`TaskKind::Cook`, recipe `meal`) once the base armchair had its sitting read (G-09); a cook can't heed a call, so `calling_out` failed ("B never heard A"). Before, the same housemate picked the bookshelf's read. Two things: a meal is cooked for a fed household at mid-morning, and someone at the hob can't so much as turn to their name. The test now gives B a little fun to fill (d0bbe6ff), which keeps its point (a call heard and answered) off the content's order.
-- **Status:** open
+- **Status:** fixed (342dd820, c5a96988)
+- **After:** both halves: a meal nobody at home would eat (neither the cook nor a hungry housemate) tempts free will a tenth as much (`UNWANTED_MEAL`), so a fed household no longer cooks at mid-morning (`cooking::a_household_that_has_eaten_cooks_no_meal_nobody_needs`, fails without it; skipping it outright left a resident in a bare house idle for hours in the soak); and a cook on the way to the first station (nothing bought, nothing in hand) is available to be called (`world::tests::a_cook_on_the_way_to_the_first_station_can_be_called_but_not_once_started`). `calling_out` passes without d0bbe6ff's lowered fun (removed). Balance after: median weekly $443, richest $11,829, grades 1.4 / 3; soak 4 of 4 (`fixes/sweep-sim/balance-after.txt`, `soak-after.txt`).
 - **Source:** fix: content
 
 ### I-systems-13 — Sitting on a thing moved off its tile's middle sits beside it
@@ -676,7 +677,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Fix class:** code
 - **Where:** `crates/sim-core/src/home.rs:502-517` (placing: the approach tile, in front, must be free or reachable), `web/src/game/surfaces.ts` (`approachCandidates`: the front for everything not `around`)
 - **Evidence:** from the content and the rule, not shot: the desks' user sits behind the desk facing its front (the computer desk's monitor "its back to the room", `office.py`), so the tile build mode keeps free is the one beyond the screen. A desk pushed against a wall with the sitter facing the wall, the usual way, can't be placed; turned the other way the chair is squeezed against the wall (`bench-results/review/fixes/positions/play/computerDesk-wall-in-200.png`). Since G-51 the desks are sat at from behind or beside (`approach: behind`), so build mode could take a free tile behind or beside the chair as well as the front for them (and the beds' sides for `approach: side`).
-- **Status:** open
+- **Status:** fixed (3dbfaa48)
+- **After:** for a seat behind the work (`approach: behind`) `approach_tiles` gives the tiles behind, left and right that can be stood on, then the front only if it can be; `wall_edges` no longer needs the front open; build mode mirrors it (`approachCandidates`, no "Faces a wall" for them). A desk with its screen to a wall between two fridges is bought and sat at from behind; with the tiles behind taken too it is refused (`footstools::a_desk_stands_with_its_screen_to_the_wall_between_other_things`). Generated houses and worlds checks pass.
 - **Source:** fix: positions
 
 ### I-systems-15 — Buying round someone in bed can shut them in where they get up
@@ -687,5 +689,16 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Where:** `crates/sim-core/src/home.rs` `keeps_reach` ("No Sim at home gets shut in": each resident's own tile, which for someone lying in bed or sitting is the bed's or seat's, never reachable, so never checked)
 - **Evidence:** found by the soak test while fixing G-65 (`--test soak -- --ignored`, busy player, seed 7; the games for two changed the town's run): R18 stood idle for days at (220.5, 13.5) with every need at 0, every use and visit remembered as out of reach, between the bed they had slept in (`bed` at 219,14) and a `lazy.snoozecloudBed` the player had bought at 221,13 while they slept. The check let the bed go in because R18's tile was the bed's; the tile they stood up on was closed off. `bench-results/review/fixes/partners/soak-2.txt` (34 stretches stuck), `soak-3.txt` after (4 of 4 pass).
 - **Status:** fixed (15309c9d) — the check takes the tile they'll stand up on (`seated_from`) for someone in bed or on a seat.
-- **After:** the soak test passes (4 of 4) with G-65; balance unchanged.
+- **After:** the soak test passes (4 of 4) with G-65; balance unchanged. Found again by fix: sweep-sim's soak (seed 7, R41 boxed in by a karaoke stage bought beside the bed while asleep) and fixed the same way (f15bbd47); G-65's version is kept at the merge, with sweep-sim's test `daily_life::a_resident_in_bed_cant_be_shut_in_where_they_get_up` (walls round the tile they lay down from, the bed still reached at its other slot: refused; fails without the fix).
 - **Source:** fix: partners
+
+### I-systems-16 — Selling a lamp at head height leaves the table under it walked through
+
+- **Severity:** S2
+- **Rubric:** I3
+- **Fix class:** code
+- **Where:** `crates/sim-core/src/home.rs` `remove_object` (every tile the sold thing took from walking set free, also those something else still takes)
+- **Evidence:** found by fix: sweep-sim while giving the arc lamp's shade a tile (M-lighting-06): a chandelier (`headHeight`) over a sofa takes the sofa's tile from walking too; sold, the tile was free though the sofa stood there, and residents walked through it (the same for the sofa sold from under a chandelier: then walked under the lamp). `layers::a_lamp_at_head_height_hangs_over_a_table_not_over_heads` (extended) fails without the fix.
+- **Status:** fixed (2cb0ca69)
+- **After:** a sold thing's tiles are taken again by whatever else takes them; the test passes, and so does the arc lamp's (`layers::an_arc_lamp_reaches_over_the_sofa_in_front_of_it`).
+- **Source:** fix: sweep-sim

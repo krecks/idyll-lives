@@ -194,5 +194,6 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `crates/sim-core/src/world.rs` (`available_for_social`: `TaskKind::Eat` is never available; `from_seat` starts only from a sitting `Use`)
 - **Evidence:** Left from I-social-06 (fixed for sofas, chairs and the coffee at a table): the family eating at the dinner table still eat in silence, as the eaters can't be talked to and don't talk from their seats. A talk over a meal would pause the eating (or run beside it) and keep the plate in front of them.
-- **Status:** open
+- **Status:** fixed (0f068866)
+- **After:** residents eating sitting down are available to talk from close by and talk from their own seats (`step_sim`'s word from the seat, `conversation::keeps_seat`), the meal waiting on the table while they do; nothing they'd get up for (a hug) is chosen with someone eating (`SimBrief.eating`). `cooking::two_at_the_table_talk_over_the_meal_and_eat_up_after`: a chat across the table, both seated throughout, then both eat up. `shipped_content`'s personality run moves to seed 6 (seed 5 put two of three to bed by nine one evening, up again before three; seeds 1–8 otherwise 8 of 12 asleep), and the busy soak counts a chance for a baby only where the couple's romance allows `tryForBaby`. Soak 4 of 4, balance in range.
 - **Source:** fix: sound-social

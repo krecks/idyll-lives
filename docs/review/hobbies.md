@@ -357,7 +357,8 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Fix class:** content
 - **Where:** `web/public/content/base.json:3393` (`piano` `seat.height` 0.47); the bench's top 0.49 m (`tools/art/blender/families/hobbies.py` `piano`: `bench_top` 0.05 at 0.465)
 - **Evidence:** `cargo check-glb model.piano`: "seat 0.47 m (content `seat`), the model 0.490 m there (x 0.00, depth 0.23): 2.0 cm higher", past the owner's 1 cm tolerance: the pianist sits 2 cm into the cushion. A piano bench is 0.48–0.51 m, so the content's number is the one to move (0.49). Found by the Blender wave's gate run, not in play.
-- **Status:** open
+- **Status:** fixed (e6fa6773)
+- **After:** `piano` `seat.height` 0.49, the bench's top (`docs/objects/hobbies.md`); `cargo check-glb` no longer warns for it.
 - **Source:** fix: blender-hobbies
 
 ### M-hobbies-11 — The home chess table has one chair: a game for two needs a second across the board

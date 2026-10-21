@@ -358,7 +358,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `crates/sim-core/src/world.rs:272` (`pick_slot`: without `places`, the first free slot)
 - **Evidence:** `fixes/pairings/seats/after2-sofa-relax-02.png` (`play-after2.json`): a two-seat sofa with the ottoman in front of its second seat; Ada, alone, sits in the first and keeps her feet down. Someone on their own would take the seat with the footstool. The sim doesn't know footstools (the pairing is the renderer's, G-69): a content `footstool` flag and a `pick_slot` that prefers a slot with one in front would do.
-- **Status:** open
+- **Status:** fixed (25e64359)
+- **After:** the pouf and the ottoman are content `footstool`s; `world::footstool_slots` marks a seat's slots with one 0.3–1.2 m in front and `pick_slot` takes a free one of them first (a use, a seat for TV or the phone), the next sitter another (`positions::someone_alone_on_a_sofa_takes_the_seat_with_the_footstool_in_front`, both facings). In play the lone sitter takes the loveseat's seat before the ottoman (`fixes/sweep-sim/I-living-10/after-loveseat-relax-02.png`); her feet stay down there (the renderer's pairing, G-69: not this fix).
 - **Source:** fix: pairings
 
 ## Seen here for findings in other ledgers

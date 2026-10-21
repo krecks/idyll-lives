@@ -399,6 +399,7 @@ Causes shared beyond this ledger, moved at the consolidation (2026-10-21): I-gar
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/trees.py:180-200` (`apple`: the crown's middle at 3.6 m, 1.65 m deep; only the front apple brought down within reach, 1.84 m, by G-21); `web/src/render/babylon/characters/clips/garden.ts` (`pickHigh`: the hand up to about 1.8 m)
 - **Evidence:** `fixes/babies-crops/garden/apple-02-picking.png` (taken before G-21 brought the front apple down): picking the apples (`harvest`, G-68) the resident reaches up under the crown, whose lowest leaves and fruit hang at about 2.5–3 m; the hand stops at 1.8 m, in the air. One apple within reach (I-garden-05's) doesn't make the crown's dozen pickable. A garden apple tree (a dwarf or semi-dwarf on a garden lot) carries fruit from about 1 m up, picked standing or from a step; the 5.6 m model is an orchard standard's size. Bring the crown down (fruit from about 1.2 m) or give the use a ladder.
-- **Status:** open
+- **Status:** later (model: the crown or low fruit within reach; recorded in `tools/art/blender/families/trees.md`, 4a09dc6e)
+- **After:** not a content or clip fix: `pickHigh` reaches about 1.8 m and only the one front apple hangs there; the rest from about 2.5 m. The model change is recorded: the crown's middle down to about 2.6 m, or six to eight apples on low twigs round its front half at 1.4–1.9 m; the clip and the content can stay.
 - **Source:** fix: babies-crops
 
