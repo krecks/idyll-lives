@@ -75,11 +75,14 @@ import { ENERGY_RATE, type VisemeTrack } from '../../voice/visemes';
 import { outfitFor, SHELL_BITS, WEARS, writeOutfit, type OutfitFit, type OutfitParams, type Wear } from './characters/outfit';
 import { BLANKET_WIDTH, blanketMaterial, buildBlanket, quiltTint, type BlanketShape } from './characters/blanket';
 import { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } from './characters/clips/street';
+import { FLOOR_SITS } from './characters/clips/seated';
+import { BALL_PIT, PLAY_TENT } from './characters/clips/play';
 import { BOULDER, FOOS, FOOS_LANES, POOL, SMASH, YOGA_AT } from './characters/clips/games';
 import { EYEPIECE, PICK_APPLE, PICK_LEMON, SHOWER_CHILD } from './characters/clips/uses';
 // The seat and bed tables (`SEATS`, `BEDS`, `BUNKS` and their defaults) are data, read by `cargo check-glb` and
 // `cargo review` too; what their entries mean and why some are as they are: docs/characters-format.md "Seats and beds".
 import FURNITURE from './characters/furniture.json';
+import { feetDown, legTurn, perch, SEAT_FIT, seatSize, type LegSide } from './characters/seatFit';
 import { furthestAhead, nearestAhead, type TableRoom } from './tableTuck';
 import { addLocal, addRotation, blendInto, makeAdditive, PoseScratch, qmul, resetAdditive, rotate, sampleClip, skin, type Additive, type Placement } from './characters/pose';
 import type { MaterialLibrary } from './materials';
@@ -275,7 +278,8 @@ const CROUCH_SHOULDER = 0.55;
  * `out` seconds after the use before stepping
  * out (the door opening again, `out` in its motions). `perLane`: the clips are one per lane, not a sequence (each
  * lane's round goes its own way: the climbing frame's, round to its pole and back). `tag`: only for that use
- * (its action tag), the object's other uses as usual.
+ * (its action tag), the object's other uses as usual. `over`: a rim stepped over on the way in and out (`at` m
+ * from the middle, `h` m high: the ball pit's).
  */
 interface StepIn {
   by: readonly (readonly [height: number, clip: readonly string[], at: { to: number; up?: number }])[];
@@ -285,6 +289,7 @@ interface StepIn {
   out?: number;
   perLane?: boolean;
   tag?: string;
+  over?: { at: number; h: number };
 }
 /** Eating a picked fruit (after the pick), bite by bite. */
 const EAT_FRUIT = ['eat', 'idle', 'eat', 'idle', 'eat', 'idle'];
@@ -319,6 +324,10 @@ const STEP_IN: Record<string, StepIn> = {
   // Picking the fruit hanging at the front (clips/uses.ts, fitted to where it hangs), then eating it.
   'garden.apple': { by: PICK_APPLE.map(({ clip, min, fit }) => [min, [clip, ...EAT_FRUIT], fit] as const), tag: 'eat' },
   'garden.lemonTree': { by: PICK_LEMON.map(({ clip, min, fit }) => [min, [clip, ...EAT_FRUIT], fit] as const), tag: 'eat' },
+  // Children's play (`clips/play.ts`): over the ball pit's rim into its middle, wading, jumping and sitting in the
+  // balls; down at the play tent's door, crawling in to play on its mat and back out.
+  ballPit: { by: BALL_PIT.map(({ clip, min, fit }) => [min, [clip], fit] as const), over: BALL_PIT[0].fit.over },
+  playTent: { by: PLAY_TENT.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
 };
 /** One clip played alone (`StepIn.perLane`), by name. */
 const LANE_SEQ = new Map<string, readonly string[]>();
@@ -327,6 +336,8 @@ const LANE_SYNC = 0.4;
 /** Stepping in (m/s, game time) and out again (s). */
 const STEP_IN_SPEED = 1.05;
 const STEP_OUT_S = 1.1;
+/** Over a rim (`StepIn.over`): up on it from this far (m) either side. */
+const STEP_OVER = 0.3;
 
 /**
  * A chair pulled up to a table (`tableTuck.ts`): once seated, the sitter shuffles it in (and pushes it back
@@ -378,6 +389,16 @@ interface Seat {
   recline?: number;
   /** Pedals the feet turn (an exercise bike): the crank's axle (height, forward of the middle) and its length (m). */
   pedals?: { h: number; fwd: number; crank: number };
+  /**
+   * Where its top ends in front (m forward of the footprint's middle, as `fwd`; `cargo check-glb` measures it): on a
+   * deep seat the hips move forward until the knees clear it (`perch`), not the shins down inside the cushion.
+   */
+  front?: number;
+  /**
+   * Sat against a tree's trunk on the ground, in its shade: facing out from it on whichever of its front and its
+   * sides is in the crown's shadow then (`shadeSide`), `fwd` from the trunk's middle.
+   */
+  shade?: boolean;
 }
 /**
  * Mattress / bench top height (m) for lying, and how far forward of the footprint's middle the
@@ -393,6 +414,8 @@ interface Bed {
   /** How far short of the footprint's foot end the quilt ends (m, default 0.05): a bed whose mattress stops short of it. */
   foot?: number;
   across?: boolean;
+  /** A bench lifted on (the weight bench): the feet down on the floor either side of it, this far (m) out from its middle (`benchLegs`). */
+  feet?: number;
   /**
    * A hammock's sling, along the sleeper from its middle (m): its top's height there (`low`) and at its
    * ends (`end`, `half` each way, at the spreader bars; a parabola between), and how far towards the head
@@ -511,6 +534,10 @@ function shoulderDrop(rig: SimRig, partner: SimRig | null): number {
  * `pedals_turn`), and the ankle's place over the pedal's axle (m up and forward, body scale 1).
  */
 const PEDAL = { turn: 1.2, ankle: [0.08, -0.09] as const };
+/** On the weight bench (`Characters.benchLegs`): the knee this share of the thigh's length on from the hip, towards the feet. */
+const BENCH_KNEE = 0.92;
+/** The hips' joints this far (m, the reference body) out from the middle. */
+const BENCH_HIP = 0.09;
 /** Legs out along a seat (`Characters.legsOut`): the ankles this far below the hips' joints (m, body scale 1). */
 const LEGS_OUT_DROP = 0.04;
 /** How a held part is held (content `held.grip`; see `Characters.writeHeld`). */
@@ -912,6 +939,15 @@ interface SimRig {
   /** Lying in a hammock's sling (`inSling`), or null; the upper body's rise in it (rad). */
   sling: Bed['sling'] | null;
   slingLift: number;
+  /** Sat against a tree in its shade (`Seat.shade`): the way they face, chosen as they sit down (NaN: not yet). */
+  shadeYaw: number;
+  /** Sitting (or last sat) on the floor (`floorSit`: `Floor`, `Ground`; '' on a seat): its own clips. */
+  floorSat: string;
+  /**
+   * Seated, the legs' turns that put the feet on the floor (`seatLegs`, `benchLegs`: each thigh's, calf's and foot's
+   * about x and the thigh's out to the side, left then right), faded out standing up.
+   */
+  seatTurn: Float32Array;
   tagKnown: boolean;
   cur: Player;
   prev: Player;
@@ -988,6 +1024,8 @@ interface SimRig {
   outT: number;
   /** Seconds after the use before stepping out (the entry's `out`). */
   outWait: number;
+  /** Over a rim on the way (`StepIn.over`): where it is (a share of the way out), how high, and the way's length (m); [0, 0, 1]: none. */
+  inOver: Float32Array;
   /** Pulled up to a table (`TUCK`): how far the chair is in now (m), and which seat (-1: none). */
   tuck: number;
   tuckSeat: number;
@@ -1027,24 +1065,27 @@ interface SimRig {
   speechSeg: number;
 }
 
-/**
- * A leg in a clip (`measureLegs`; body space, scale 1, in the y-z plane): the hip's height and depth,
- * the thigh's and the calf's lengths and their directions (rad from straight down towards the front).
- */
-interface LegSide {
-  hy: number;
-  hz: number;
-  l1: number;
-  l2: number;
-  t0: number;
-  c0: number;
-}
+/** Where the legs are in a clip (`measureLegs`; body space, scale 1; `LegSide`, characters/seatFit.ts). */
 interface LegFit {
   l: LegSide;
   r: LegSide;
+  /** The ankle joints' height standing (the `idle` clip's), for feet put on the floor (`seatLegs`). */
+  ankle: number;
   /** The spine's base (spine_01) and the head's joint: height and depth. */
   spine: readonly [number, number];
   head: readonly [number, number];
+}
+/** Sitting down and getting up (from a chair or the floor): no held prop drawn meanwhile. */
+const RISING = new Set(['sitDown', 'standUp', ...FLOOR_SITS.flatMap((f) => [`sitDown${f.name}`, `standUp${f.name}`])]);
+/** Sitting on the floor (`floorSit`), and sitting down there. */
+const ON_FLOOR = new Set(FLOOR_SITS.flatMap((f) => [`sit${f.name}`, `sitDown${f.name}`]));
+/**
+ * How a seat `h` m over the floor under it is sat on: on a chair's clips (''), or on the floor by the floor clips
+ * (clips/seated.ts `FLOOR_SITS`, each with its own sitting down and getting up): under 0.2 m cross-legged on a
+ * floor cushion or a hearth's (`Floor`), under 0.07 m on the ground against a tree's trunk (`Ground`).
+ */
+function floorSit(h: number): string {
+  return h < 0.07 ? 'Ground' : h < 0.2 ? 'Floor' : '';
 }
 /** Clips whose legs are placed by `legTo`: sitting (pedalling, legs out along a chaise) and lying (in a hammock). */
 const LEG_CLIPS = ['sit', 'sitHands', 'lie'] as const;
@@ -1245,8 +1286,13 @@ export class Characters {
   private clock = 0;
   /** Sit / lie pelvis offsets per body (computed once from the clips). */
   private readonly sitPelvis = new Map<string, SeatFit>();
+  /** The same for the floor clips (`sitFloor`). */
+  private readonly floorPelvis = new Map<string, SeatFit>();
+  /** (By body and floor sit: `<body>|<FloorSit name>`.) */
   /** Per body, then clip (`LEG_CLIPS`): where its legs are in the clip, for placing the feet (`legTo`). */
   private readonly legFits = new Map<string, Map<string, LegFit>>();
+  /** Which way the sun's light goes (the renderer's sun), for the shade under a tree (`shadeSide`). */
+  private sunOf: (() => { x: number; z: number }) | null = null;
   /** Where a moving object's loop has got to (0..1 of a round; a bike's pedals), null while none plays. */
   private loopOf: ((objectId: number) => number | null) | null = null;
   /** Scratch: a leg's thigh and calf rotations from `legTo`, and the root's height and forward offset from `inSling`. */
@@ -1392,6 +1438,7 @@ export class Characters {
     });
     for (const body of set.bodies.values()) {
       this.sitPelvis.set(body.name, this.measureSit(body));
+      for (const f of FLOOR_SITS) this.floorPelvis.set(`${body.name}|${f.name}`, this.measureSit(body, `sit${f.name}`));
       this.legFits.set(body.name, this.measureLegs(body));
     }
     const lying = [...set.bodies.values()].map((body) => ({
@@ -1523,6 +1570,7 @@ export class Characters {
           const b = await loadStage(set, base, stage).catch((err) => (console.warn('[render] life stage unavailable', base.name, stage, err), null));
           if (b && !this.sitPelvis.has(b.name)) {
             this.sitPelvis.set(b.name, this.measureSit(b));
+            for (const f of FLOOR_SITS) this.floorPelvis.set(`${b.name}|${f.name}`, this.measureSit(b, `sit${f.name}`));
             this.legFits.set(b.name, this.measureLegs(b));
           }
           // Its own quilt, draped over its own lying pose: a child's feet stand up higher for its size than a
@@ -1602,6 +1650,9 @@ export class Characters {
         useId: -1,
         sling: null,
         slingLift: 0,
+        shadeYaw: NaN,
+        floorSat: '',
+        seatTurn: new Float32Array(8),
         tagKnown: false,
         cur: player(),
         prev: player(),
@@ -1645,6 +1696,7 @@ export class Characters {
         inDZ: 0,
         outT: -1,
         outWait: 0,
+        inOver: Float32Array.of(0, 0, 1),
         tuck: 0,
         tuckSeat: -1,
         tuckFar: false,
@@ -1936,7 +1988,7 @@ export class Characters {
    * with its foot on the floor ahead.
    */
   private writeHeld(rig: SimRig, i: number, pose: number, moving: boolean): void {
-    const held = !moving && rig.tagKnown && pose !== Pose.Sit && rig.cur.key !== 'sitDown' && rig.cur.key !== 'standUp' ? rig.useObj?.held : undefined;
+    const held = !moving && rig.tagKnown && pose !== Pose.Sit && !RISING.has(rig.cur.key) ? rig.useObj?.held : undefined;
     const grip = held && (held.grip === 'bar') === (pose === Pose.Lie) ? held.grip : null;
     const left = this.writeProp(this.leftProp, i, grip === 'pair' ? held!.keys[0] : null);
     const right = this.writeProp(this.rightProp, i, grip ? (held!.keys[grip === 'pair' ? 1 : 0] ?? null) : null);
@@ -2533,7 +2585,9 @@ export class Characters {
         // dressing table's mirror, an upright piano); or along it (`Seat.along`: a bath), turned a quarter.
         if (seat?.back) faceYaw = wrapAngle(tyaw + Math.PI);
         else if (seat?.along) faceYaw = wrapAngle(tyaw + (seat.along * Math.PI) / 2);
+        else if (seat?.shade) faceYaw = this.shadeSide(rig, tyaw);
       }
+      if (pose !== Pose.Sit) rig.shadeYaw = NaN;
       // Cuddling: turned to the baby in the crib.
       const cuddled = rig.cuddleT >= 0 && rig.cuddleBaby >= 0 ? this.sims[rig.cuddleBaby] : null;
       if (cuddled) faceYaw = Math.atan2(curr[H + cuddled.id * S + k.x] - rig.x, this.groundRow(curr[H + cuddled.id * S + k.z]) - rig.z);
@@ -2813,10 +2867,13 @@ export class Characters {
     } else if (pose === Pose.Sit) {
       const obj = known ? this.seatUnder(rig, useObj) : this.objectAt(rig.x, rig.z);
       const seat = obj?.seat ?? DEFAULT_SEAT;
-      const sp = this.sitPelvis.get(rig.body.name)!;
+      // A seat on the floor (a floor cushion) is sat on cross-legged, by its own clips.
+      const floor = floorSit(seat.h - (obj?.lift ?? 0));
+      rig.floorSat = floor;
+      const sp = (floor ? this.floorPelvis.get(`${rig.body.name}|${floor}`) : this.sitPelvis.get(rig.body.name))!;
       rootY = seat.h - sp.y * rig.scale;
       // (Facing the object's back, its forward is the Sim's back.)
-      rootFwd = (seat.back ? -seat.fwd : seat.fwd) - sp.z * rig.scale;
+      rootFwd = (seat.back ? -seat.fwd : seat.fwd) - sp.z * rig.scale + (floor ? 0 : this.perch(rig, seat, sp));
       fade = 0.35;
       rig.useDef = obj?.def ?? '';
       rig.useObj = obj ?? null;
@@ -2824,13 +2881,15 @@ export class Characters {
       else if (act?.sit) key = typeof act.sit === 'function' ? act.sit(rig.useDef) : act.sit;
       else if (!known && obj && SIT_HANDS.has(obj.def)) key = 'sitHands';
       else key = 'sit';
-      if (rig.lastPose === Pose.Stand && rig.cur.key !== 'sitDown') {
-        key = 'sitDown';
+      if (floor) key = `sit${floor}`;
+      const down = `sitDown${floor}`;
+      if (rig.lastPose === Pose.Stand && rig.cur.key !== down) {
+        key = down;
         rig.actTime = 0;
-      } else if (rig.cur.key === 'sitDown' && rig.cur.time < rig.cur.clip!.duration - 0.3) {
-        key = 'sitDown';
+      } else if (rig.cur.key === down && rig.cur.time < rig.cur.clip!.duration - 0.3) {
+        key = down;
       }
-      rootFwd += this.tuckIn(rig, obj, seat, key !== 'sitDown', step, fresh);
+      rootFwd += this.tuckIn(rig, obj, seat, key !== down, step, fresh);
       if (key === 'sitHands' && rig.tuckFar) key = 'sitHandsFar';
       if (!social) {
         const up = known ? (typeof act?.upper === 'function' ? act.upper(rig.useDef) : act?.upper) : obj?.def === 'diningTable' ? 'eat' : undefined;
@@ -2998,18 +3057,20 @@ export class Characters {
       upper = '';
     }
     if (dir?.hands !== undefined) hands = dir.hands;
-    if (!moving && pose === Pose.Stand && (rig.lastPose === Pose.Sit || rig.lastPose === Pose.Lie) && rig.cur.key !== 'standUp' && !this.force) {
+    // (From the floor, its own clip: `sitFloor`.)
+    const up = rig.lastPose === Pose.Sit ? `standUp${rig.floorSat}` : RISING.has(rig.cur.key) && rig.cur.key.startsWith('standUp') ? rig.cur.key : 'standUp';
+    if (!moving && pose === Pose.Stand && (rig.lastPose === Pose.Sit || rig.lastPose === Pose.Lie) && rig.cur.key !== up && !this.force) {
       // Rising from a seat (or sitting up out of bed: the crossfade from lying leans the Sim up).
-      key = 'standUp';
+      key = up;
       rig.fromBed = rig.lastPose === Pose.Lie && !!rig.bed;
       if (rig.fromBed) fade = 0.9;
-    } else if (rig.cur.key === 'standUp' && !moving && pose === Pose.Stand && rig.cur.time < rig.cur.clip!.duration - 0.25) {
-      key = 'standUp';
+    } else if (rig.cur.key === up && !moving && pose === Pose.Stand && rig.cur.time < rig.cur.clip!.duration - 0.25) {
+      key = up;
     }
     if (key !== 'standUp') rig.fromBed = false;
     if (pose !== Pose.Sit) rootFwd += this.tuckOut(rig, key, step);
     // Carrying something while walking or standing about (not while using a station with it).
-    if (carry && pose === Pose.Stand && !upper && !dir?.clip && key !== 'standUp' && (moving || !rig.useSeq) && social !== Anim.Hug && social !== Anim.Fight) {
+    if (carry && pose === Pose.Stand && !upper && !dir?.clip && key !== up && (moving || !rig.useSeq) && social !== Anim.Hug && social !== Anim.Fight) {
       upper = carry;
       hands = HANDS.hold;
       if (key === 'foldArms') key = 'idle';
@@ -3122,7 +3183,13 @@ export class Characters {
     const span = Math.max(0.3, way / STEP_IN_SPEED);
     const k = smooth(clamp((rig.inT - (into.wait ?? 0)) / span, 0, 1));
     const fwd = -back * smooth(clamp(rig.inT / 0.4, 0, 1)) + dist * k;
-    const y = (at.up ?? 0) * smooth(clamp((k - 0.35) / 0.3, 0, 1));
+    let y = (at.up ?? 0) * smooth(clamp((k - 0.35) / 0.3, 0, 1));
+    // Up over a rim on the way (and, stepping out, back over it: `stepPlace`).
+    const over = into.over;
+    if (over) {
+      y += over.h * smooth(clamp(1 - Math.abs(ahead - fwd - over.at) / STEP_OVER, 0, 1));
+      rig.inOver.set([(over.at - at.to) / Math.max(0.01, ahead - at.to), over.h, Math.max(0.01, ahead - at.to)]);
+    } else rig.inOver.set([0, 0, 1]);
     rig.inDX = Math.cos(f) * across * k;
     rig.inDZ = -Math.sin(f) * across * k;
     // (Waiting to step in, standing about.)
@@ -3171,8 +3238,9 @@ export class Characters {
     }
     if (rig.outT < 0) return;
     const k = smooth(clamp((rig.outT - rig.outWait) / STEP_OUT_S, 0, 1));
+    const [rim, high, way] = rig.inOver;
     pl.x = lerp(rig.inX, pl.x, k);
-    pl.y = lerp(rig.inY, pl.y, k);
+    pl.y = lerp(rig.inY, pl.y, k) + high * smooth(clamp(1 - (Math.abs(k - rim) * way) / STEP_OVER, 0, 1));
     pl.z = lerp(rig.inZ, pl.z, k);
     rig.outT = k < 1 ? rig.outT + step : -1;
   }
@@ -3262,6 +3330,11 @@ export class Characters {
   /** Where residents sitting or lying on an object are carried by its moving seat (`ObjectMotion.ride`). */
   setRide(rideOf: ((objectId: number) => Matrix | null) | null): void {
     this.rideOf = rideOf;
+  }
+
+  /** Which way the sun's light goes (the renderer's `sun.direction`): the shade under a tree is on that side of it (`shadeSide`). */
+  setSun(sunOf: (() => { x: number; z: number }) | null): void {
+    this.sunOf = sunOf;
   }
 
   /** How far round an object's loop is (`ObjectMotion.loopPhase`: the bike's pedals the feet follow). */
@@ -3443,6 +3516,8 @@ export class Characters {
     if ((rig.reachW > 0 || rig.holdW > 0) && pose === Pose.Stand && !this.force) this.cuddlePose(rig, time);
     // Lying: a bench press, or resting (see the `lie` clip).
     if (pose === Pose.Lie && rig.cur.key === 'lie' && rig.tag === 'lift') {
+      const feet = rig.bed ? BEDS[rig.bed.def]?.feet : undefined;
+      if (feet) this.benchLegs(rig, feet);
       // Bench press: arms push the bar up and lower it to the chest.
       const press = 0.5 - 0.5 * Math.cos(time * 2.2 + rig.seed * 6);
       for (const [ua, la, sgn] of [
@@ -3501,10 +3576,17 @@ export class Characters {
     const def = rig.useDef;
     const key = rig.cur.key;
     const seed = rig.seed * 6;
-    if (pose === Pose.Sit && key !== 'sitDown') {
+    // (Standing up, the seated legs' fit fades out with the seated pose; it starts afresh on the next seat.)
+    const onFloor = ON_FLOOR.has(key);
+    if (pose === Pose.Stand && key === 'standUp') this.seatLegsOff(rig);
+    else rig.seatTurn.fill(0);
+    if (pose === Pose.Sit && !RISING.has(key)) {
       const seat = rig.useObj?.seat;
-      if (seat?.pedals) this.pedal(rig, seat.pedals);
+      if (onFloor) {
+        // (Cross-legged on the floor: the clip's legs.)
+      } else if (seat?.pedals) this.pedal(rig, seat.pedals);
       else if (seat?.legsOut) this.legsOut(rig, seat.room);
+      else if (rig.tag !== 'meditate') this.seatLegs(rig, rig.tag === 'relax' || rig.tag === 'nap' || rig.tag === 'watch');
       switch (rig.tag) {
         case 'sit':
           // Just sitting: upright, but against a slanted back (`recline`).
@@ -3514,16 +3596,13 @@ export class Characters {
         case 'nap':
         case 'watch':
           // Sinking back into the seat (or against its slanted back, `recline`, split over the spine as `legsOut`
-          // does, the head kept looking ahead), legs stretched out a little (or all the way, `legsOut`), arms on
-          // the armrests.
+          // does, the head kept looking ahead), legs stretched out a little (`seatLegs`, or all the way,
+          // `legsOut`), arms on the armrests. (On the floor, nothing to sink back into: the clip.)
+          if (onFloor) break;
           if (seat?.recline !== undefined) this.recline(seat.recline);
           else {
             addRotation(add, B.spine_01, 1, 0, 0, -0.14);
             addRotation(add, B.Head, 1, 0, 0, 0.1);
-          }
-          if (!seat?.legsOut) {
-            addRotation(add, B.calf_l, 1, 0, 0, -0.35);
-            addRotation(add, B.calf_r, 1, 0, 0, -0.3);
           }
           addRotation(add, B.upperarm_l, 0, 0, 1, -0.18);
           addRotation(add, B.upperarm_r, 0, 0, 1, 0.18);
@@ -3548,11 +3627,12 @@ export class Characters {
           addRotation(add, B.lowerarm_r, 1, 0, 0, 0.1);
           break;
         case 'meditate': {
-          // Cross-legged and upright, hands resting on the knees, slow deep breaths.
+          // Cross-legged and upright, hands resting on the knees, slow deep breaths (on the floor, the clip's legs).
           const breath = Math.sin(time * 0.8 + seed) * 0.025;
           addRotation(add, B.spine_01, 1, 0, 0, 0.18 + breath);
           addRotation(add, B.spine_02, 1, 0, 0, -breath);
           addRotation(add, B.Head, 1, 0, 0, 0.06);
+          if (onFloor) break;
           addRotation(add, B.thigh_l, 0, 1, 0, -0.75);
           addRotation(add, B.thigh_r, 0, 1, 0, 0.75);
           addRotation(add, B.calf_l, 0, 0, 1, 1.25);
@@ -3704,6 +3784,121 @@ export class Characters {
       addRotation(this.add, calf, 1, 0, 0, turn[1] * w);
       // The foot stays about as level as in the clip, its toes dipping as the pedal goes down.
       addRotation(this.add, foot, 1, 0, 0, (-(turn[0] + turn[1]) * 0.75 + 0.15 * Math.sin(a)) * w);
+    }
+  }
+
+  /**
+   * Sitting against a tree (`Seat.shade`, the tree facing `tyaw`): the way to face, out from the trunk on its
+   * front or a side, whichever the sun's light falls towards (the crown's shadow), the front unless a side is
+   * clearly more so; chosen as they sit down and kept. (Not behind it: they'd walk through the trunk to get there.)
+   */
+  private shadeSide(rig: SimRig, tyaw: number): number {
+    if (!Number.isNaN(rig.shadeYaw)) return rig.shadeYaw;
+    const sun = this.sunOf?.();
+    const len = sun ? Math.hypot(sun.x, sun.z) : 0;
+    let best = 0;
+    if (sun && len > 0.05) {
+      const towards = (turn: number) => (Math.sin(tyaw + turn) * sun.x + Math.cos(tyaw + turn) * sun.z) / len;
+      for (const turn of [Math.PI / 2, -Math.PI / 2]) if (towards(turn) > towards(best) + 0.3) best = turn;
+    }
+    rig.shadeYaw = wrapAngle(tyaw + best);
+    return rig.shadeYaw;
+  }
+
+  /**
+   * On a deep seat (`Seat.front`), how far forward (m) the hips sit for the knees to clear its front
+   * (characters/seatFit.ts `perch`): a child well forward on a sofa, a grown-up a little on a deep one.
+   */
+  private perch(rig: SimRig, seat: Seat, sp: SeatFit): number {
+    const fit = this.legFits.get(rig.body.name)?.get('sit');
+    if (seat.front === undefined || seat.back || seat.along || seat.legsOut || seat.pedals || !fit) return 0;
+    const s = rig.scale;
+    return perch(fit.l, sp.z, (seat.front - seat.fwd) / s, seatSize(rig.body.height)) * s;
+  }
+
+  /**
+   * Seated: each foot down on the floor under the knee (characters/seatFit.ts `feetDown`), the thigh sloping
+   * off the seat's front to reach it, the feet hanging where it can't (a child on a grown-up's chair); on a low
+   * seat the knees come up. `stretch`: relaxing, the feet further out. Kept in `rig.seatTurn` for standing up.
+   */
+  private seatLegs(rig: SimRig, stretch: boolean): void {
+    const fits = this.legFits.get(rig.body.name);
+    const fit = fits?.get(rig.cur.key) ?? fits?.get('sit');
+    if (!fit) return;
+    const B = this.set!.bone;
+    const s = rig.scale;
+    const w = smooth(rig.w);
+    const floor = fit.ankle - (rig.cur.rootY - (rig.useObj?.lift ?? 0)) / s;
+    const out = stretch ? SEAT_FIT.stretch * seatSize(rig.body.height) : 0;
+    const turns = rig.seatTurn;
+    for (const [k, side, thigh, calf, foot] of [
+      [0, fit.l, B.thigh_l, B.calf_l, B.foot_l],
+      [4, fit.r, B.thigh_r, B.calf_r, B.foot_r],
+    ] as const) {
+      const [y, z] = feetDown(side, floor, out * (k ? 0.85 : 1));
+      const turn = this.legTo(side, y, z);
+      // The foot about as level as in the clip, its toes dropping a little where it hangs.
+      const hang = y > floor + 0.01 ? 0.25 : 0;
+      turns[k] = turn[0];
+      turns[k + 1] = turn[1];
+      turns[k + 2] = -(turn[0] + turn[1]) + hang;
+      addRotation(this.add, thigh, 1, 0, 0, turns[k] * w);
+      addRotation(this.add, calf, 1, 0, 0, turns[k + 1] * w);
+      addRotation(this.add, foot, 1, 0, 0, turns[k + 2] * w);
+    }
+  }
+
+  /** Standing up from a seat: `seatLegs`' turns fading out with the seated pose. */
+  private seatLegsOff(rig: SimRig): void {
+    const w = 1 - smooth(rig.w);
+    if (w <= 0) return;
+    const B = this.set!.bone;
+    const t = rig.seatTurn;
+    for (const [k, thigh, calf, foot] of [
+      [0, B.thigh_l, B.calf_l, B.foot_l],
+      [4, B.thigh_r, B.calf_r, B.foot_r],
+    ] as const) {
+      addRotation(this.add, thigh, 1, 0, 0, t[k] * w);
+      addRotation(this.add, calf, 1, 0, 0, t[k + 1] * w);
+      addRotation(this.add, foot, 1, 0, 0, t[k + 2] * w);
+      addRotation(this.add, thigh, 0, 0, 1, t[k + 3] * w);
+    }
+  }
+
+  /**
+   * Lying on a bench to lift (`Bed.feet`: the weight bench), the feet down on the floor either side of it, `out` m
+   * from its middle: each thigh out to the side and down off the pad, the shin down to the floor under the knee,
+   * the foot flat on it (as a bench press is done). In the lying body's own space (`lie`, the standing convention
+   * turned flat: its z up, its y towards the head), so planar leg IK (`legTo`) and then the leg turned out about
+   * the hip. Kept in `rig.seatTurn` for getting up.
+   */
+  private benchLegs(rig: SimRig, out: number): void {
+    const fit = this.legFits.get(rig.body.name)?.get('lie');
+    if (!fit) return;
+    const B = this.set!.bone;
+    const s = rig.scale;
+    const w = smooth(rig.w);
+    // The ankle as high as standing, over the floor under the bench.
+    const floor = fit.ankle + ((rig.bed?.lift ?? 0) - rig.cur.rootY) / s;
+    const turns = rig.seatTurn;
+    for (const [k, side, sx, thigh, calf, foot] of [
+      [0, fit.l, -1, B.thigh_l, B.calf_l, B.foot_l],
+      [4, fit.r, 1, B.thigh_r, B.calf_r, B.foot_r],
+    ] as const) {
+      // Out to the side and towards the feet (the knee a little short of the thigh's length on), down to the floor.
+      const vx = sx * (out / s - BENCH_HIP * seatSize(rig.body.height));
+      const vy = -side.l1 * BENCH_KNEE;
+      const across = Math.hypot(vx, vy);
+      const turn = this.legTo(side, side.hy - across, floor);
+      turns[k] = turn[0];
+      turns[k + 1] = turn[1];
+      // The foot level on the floor (the toes towards the bench's foot end).
+      turns[k + 2] = -0.35;
+      turns[k + 3] = Math.atan2(vx, -vy);
+      addRotation(this.add, thigh, 1, 0, 0, turns[k] * w);
+      addRotation(this.add, calf, 1, 0, 0, turns[k + 1] * w);
+      addRotation(this.add, foot, 1, 0, 0, turns[k + 2] * w);
+      addRotation(this.add, thigh, 0, 0, 1, turns[k + 3] * w);
     }
   }
 
@@ -4364,6 +4559,11 @@ export class Characters {
     const head = new Float32Array(3);
     const t = this.scratch.worldT;
     const fits = new Map<string, LegFit>();
+    // The ankles' height standing (the idle's first frame), for feet on the floor.
+    sampleClip(set, set.clips.get('idle')!, 0, this.qA, this.pA);
+    resetAdditive(this.add);
+    skin(set, body, this.qA, this.pA, this.add, { x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1, scale: 1 }, this.scratch, tmp, 0, head);
+    const ankle = t[B.foot_l * 3 + 1];
     for (const key of LEG_CLIPS) {
       const clip = set.clips.get(key);
       if (!clip) continue;
@@ -4379,6 +4579,7 @@ export class Characters {
         r: side(B.thigh_r, B.calf_r, B.foot_r),
         spine: [t[B.spine_01 * 3 + 1], t[B.spine_01 * 3 + 2]],
         head: [t[B.Head * 3 + 1], t[B.Head * 3 + 2]],
+        ankle,
       });
     }
     return fits;
@@ -4391,14 +4592,7 @@ export class Characters {
    * towards -y).
    */
   private legTo(fit: LegSide, y: number, z: number): Float32Array {
-    const { hy, hz, l1, l2 } = fit;
-    const r = clamp(Math.hypot(y - hy, z - hz), Math.abs(l1 - l2) + 0.01, l1 + l2 - 0.002);
-    // Direction angles from straight down (-y) towards the front (+z).
-    const d = Math.atan2(z - hz, hy - y);
-    const thigh = d + Math.acos(clamp((l1 * l1 + r * r - l2 * l2) / (2 * l1 * r), -1, 1));
-    const calf = d - Math.acos(clamp((l2 * l2 + r * r - l1 * l1) / (2 * l2 * r), -1, 1));
-    this.legAdd[0] = fit.t0 - thigh;
-    this.legAdd[1] = fit.c0 - calf - this.legAdd[0];
+    legTurn(fit, y, z, this.legAdd);
     return this.legAdd;
   }
 
@@ -4463,8 +4657,8 @@ export class Characters {
     }
   }
 
-  /** Pelvis height / forward offset of the seated and lying poses (body space, scale 1). */
-  private measureSit(body: BodyData): SeatFit {
+  /** Pelvis height / forward offset of the seated and lying poses (body space, scale 1): `sit`'s, or `key`'s (`sitFloor`). */
+  private measureSit(body: BodyData, key = 'sit'): SeatFit {
     const set = this.set!;
     const tmp = new Float32Array(set.bones.length * 16);
     const head = new Float32Array(3);
@@ -4476,7 +4670,7 @@ export class Characters {
       const p = set.bone.pelvis * 3;
       return { y: this.scratch.worldT[p + 1], z: this.scratch.worldT[p + 2] };
     };
-    const sit = pose('sit', 0);
+    const sit = pose(key, 0);
     // The pelvis joint rests `seatDrop` above the seat surface (sets without it: ~11 cm).
     return { y: sit.y - (body.seatDrop ?? 0.11), z: sit.z };
   }

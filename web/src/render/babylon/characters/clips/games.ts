@@ -19,14 +19,14 @@ import { sizes, type Fit, type Size } from './street';
 
 type Ease = 'smooth' | 'out' | 'in' | 'linear';
 /** A key: at time `t` the value `v`, eased into from the key before. */
-type Key<T> = readonly [t: number, v: T, ease?: Ease];
+export type Key<T> = readonly [t: number, v: T, ease?: Ease];
 
 function eased(e: Ease | undefined, u: number): number {
   return e === 'linear' ? u : e === 'out' ? 1 - (1 - u) * (1 - u) : e === 'in' ? u * u : smooth(u);
 }
 
 /** The value of `keys` (in time order) at `t`: eased from key to key, held before the first and after the last. */
-function track<T extends number | Vec>(keys: readonly Key<T>[], t: number): T {
+export function track<T extends number | Vec>(keys: readonly Key<T>[], t: number): T {
   if (t <= keys[0][0]) return keys[0][1];
   for (let i = 1; i < keys.length; i++) {
     const [t1, b, e] = keys[i];
@@ -39,7 +39,7 @@ function track<T extends number | Vec>(keys: readonly Key<T>[], t: number): T {
 }
 
 /** A foot (or a hand) going from place to place (`keys`): as `track`, lifted clear by `lift` (m, at the middle of each move) between two places. */
-function moved(keys: readonly Key<Vec>[], t: number, lift: Vec): Vec {
+export function moved(keys: readonly Key<Vec>[], t: number, lift: Vec): Vec {
   const at = track(keys, t);
   for (let i = 1; i < keys.length; i++) {
     const [t0, a] = keys[i - 1];
@@ -53,7 +53,7 @@ function moved(keys: readonly Key<Vec>[], t: number, lift: Vec): Vec {
 
 // --- the body -----------------------------------------------------------------------------------
 
-interface Body {
+export interface Body {
   /** The pelvis moved from rest (m), pitched forward `hip` and turned `yaw` (deg, + to the right). */
   at?: Vec;
   hip?: number;
@@ -75,7 +75,7 @@ interface Body {
 }
 
 /** A body pose: pelvis, spine and head, the feet put where `o` says (leg IK). It breathes in the chest only: the pelvis keeps still over planted feet. */
-function body(o: Body): PoseSpec {
+export function body(o: Body): PoseSpec {
   const b = breathe(o.breath ?? 0, 0.7);
   const bend = o.bend ?? 0;
   const tw = o.twist ?? 0;
@@ -100,10 +100,10 @@ function body(o: Body): PoseSpec {
   };
 }
 
-type Hand = ArmOptions & { at: Vec };
+export type Hand = ArmOptions & { at: Vec };
 
 /** The arms placed by IK on `b` (a side null: hanging). */
-function arms(b: PoseSpec, l: Hand | null, r: Hand | null): PoseSpec {
+export function arms(b: PoseSpec, l: Hand | null, r: Hand | null): PoseSpec {
   return { ...b, ...hangArms(), ...(l ? armIK('l', l.at, b, l) : {}), ...(r ? armIK('r', r.at, b, r) : {}) };
 }
 

@@ -3,7 +3,7 @@
  * Every name the runtime plays (characters.ts `ACTIONS`, `choose`, reactions) must be here; see
  * docs/characters-format.md for the list and the conventions. Phase-2 clips are here too, ready for
  * the runtime: `lie`, `chop`, `stir`, `flip`, `drink`, `carry`, `carryOne` and `wave`. A baby in
- * the crib has its own lying clips (`baby.ts`); the drinking fountain and the climbing frame theirs, in
+ * the crib has its own lying clips (`baby.ts`); children's play inside the ball pit and the play tent theirs (`play.ts`); the drinking fountain and the climbing frame theirs, in
  * three sizes (`street.ts`); games and sport at things theirs (`games.ts`), some in sizes too; the socials' gestures and reactions and
  * the phone held in front theirs (`social.ts`). Arm and leg placement uses the IK helpers in
  * `ik.ts` (on the reference skeleton, while the clips bake).
@@ -23,13 +23,14 @@ import { lieClips } from './lie';
 import { locomotionClips } from './locomotion';
 import { seatedClips } from './seated';
 import { socialClips } from './social';
+import { playClips } from './play';
 import { streetClips } from './street';
 import { useClips } from './uses';
 import { workClips } from './work';
 
 /** Every clip definition. */
 export function clipDefs(): ClipDef[] {
-  return [...idleClips(), ...locomotionClips(), ...seatedClips(), ...workClips(), ...gardenClips(), ...actionClips(), ...lieClips(), ...babyClips(), ...streetClips(), ...gameClips(), ...useClips(), ...socialClips()];
+  return [...idleClips(), ...locomotionClips(), ...seatedClips(), ...workClips(), ...gardenClips(), ...actionClips(), ...lieClips(), ...babyClips(), ...streetClips(), ...gameClips(), ...useClips(), ...socialClips(), ...playClips()];
 }
 
 const live = new Set<CharacterSet>();
