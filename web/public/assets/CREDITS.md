@@ -438,10 +438,10 @@ shuts behind the caller, and the town fountain's water runs near the camera (`wa
 litter bin, the bus shelter, the notice board and the founder's statue are static.
 
 The street's dressing props (`models/street/bench.glb`, `planter.glb`, `flowerTub.glb`, `sign.glb`, `busSign.glb`,
-`pot.glb`, `pathLight.glb`, `hedge.glb`, `flowers.glb`, each with a `.far.glb` for the town overview, override pack
+`pot.glb`, `pathLight.glb`, `flowers.glb`, each with a `.far.glb` for the town overview, override pack
 `packs/street/manifest.json`) are built in Blender by `tools/art/blender/families/street.py` on `gamekit` and exported
 as `.glb` (glTF, original, CC0): the kerbside bench, the planter with its little tree, the flower tub, the street-name
-and bus-stop signs, the door pot, the garden path light (its lens glows at night), the street hedge and the flower
+and bus-stop signs, the door pot, the garden path light (its lens glows at night) and the flower
 clump. All are static; their leaves and flowers sway in the wind.
 
 The garden things and lights (`models/garden_things/pond.glb`, `planterBox.glb`, `birdhouse.glb`,
@@ -491,7 +491,7 @@ expressions of TalkingHead by Mika Suominen (MIT, https://github.com/met4citizen
 
 ## Street and gardens (`street/`)
 
-The neighbourhood dressing (`render/babylon/street.ts`: sidewalks, kerbs, streetlights, mailboxes, hydrants, bins, cars, picket fences, flower beds; neighbour porches, chimneys and garages in `house.ts`) is built from primitives in code (original, CC0). The hedge and flower-clump models are Blender-built (`packs/street`, above). Only the sidewalk surface is third-party:
+The neighbourhood dressing (`render/babylon/street.ts`: sidewalks, kerbs, streetlights, mailboxes, hydrants, bins, cars, picket fences, flower beds; neighbour porches, chimneys and garages in `house.ts`) is built from primitives in code (original, CC0). The flower-clump models are Blender-built (`packs/street`, above); the hedges are the plants pack's (`models/plants/hedge.glb`). Only the sidewalk surface is third-party:
 
 | File | Used for | Source asset | Authors | URL | Licence |
 |---|---|---|---|---|---|

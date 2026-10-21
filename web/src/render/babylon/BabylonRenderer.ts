@@ -2751,7 +2751,7 @@ export class BabylonRenderer implements Renderer {
     const ticket = ++this.natureTicket[layer];
     let set = this.natures.get(key);
     if (!set) {
-      const landscape = new Landscape(world, this.quality.lawnDensity);
+      const landscape = new Landscape(world, this.quality.lawnDensity, this.quality.streetLod);
       const created: NatureSet = { key, landscape, meshes: [], casters: [], only: new Map(), users: new Set(), pending: 0, ready: Promise.resolve(), refreshing: Promise.resolve(), coming: [] };
       created.ready = landscape.build(this.scene, this.deps.assets, world, () => this.pace()).then((nature) => {
         perfTime('nature: meshes', () => {

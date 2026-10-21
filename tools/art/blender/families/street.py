@@ -1,6 +1,6 @@
 # The street's dressing props (`model.street.*`): the kerbside bench, the planter with its little tree, the flower
 # tub, the street-name sign, the bus-stop sign, the pot by a front door, the garden path light, and the foliage of
-# the street (`hedge`, `flowers`). Notes: street.md.
+# the street (`flowers`). Notes: street.md.
 #
 # render/babylon/street.ts draws them as thin instances along the kerbs and in the neighbours' front gardens, dozens
 # to hundreds of copies, and the town overview draws them again from afar: each is small (a few hundred to a
@@ -30,9 +30,6 @@ M = G.Palette(
     leaf=('#5E8F4E', 'foliage'),
     leaf_light=('#6E9C58', 'foliage'),
     leaf_dark=('#527F45', 'foliage'),
-    hedge=('#557F36', 'foliage'),
-    hedge_light=('#618C3C', 'foliage'),
-    hedge_dark=('#4D7531', 'foliage'),
     bed=('#4E7432', 'foliage'),        # the flowers' leafy clumps
     bed_light=('#5C8438', 'foliage'),
     red=('#D9483B', 'foliage'),        # flowers: on foliage, as the old parts', so they sway with the leaves
@@ -245,18 +242,6 @@ def pathLight():
 
 
 # --- the street foliage --------------------------------------------------------------------------------------
-def hedge():
-    """A clipped hedge block with a softer, lumpy top (the old part's three blobs)."""
-    F = G.GameFrame()
-    F.box('block', 1.25, 0.84, 0.62, (0, 0.42, 0), M.hedge, bevel=low(0.14, 0.0), bevel_segments=2)
-    for i, (x, w, mat) in enumerate(((-0.34, 0.3, M.hedge_dark), (0.0, 0.3, M.hedge), (0.32, 0.32, M.hedge_light))):
-        lump(f'top{i}', w, F.at(x, 0.62, (i - 1) * 0.03), mat, scale=(1, 0.28 / w, 0.42 / w * 0.48), noise=0.16, seed=i * 3.1,
-             segments=12, rings=7)
-    G.join_all('hedge')
-    G.settle()
-    return G.meshes()
-
-
 def flowers():
     """A clump of leaves and little flowers in many colours, for the beds along the house fronts."""
     F = G.GameFrame()
@@ -288,11 +273,10 @@ FAMILY = G.Family(
      G.Model('busSign', busSign, size=(0.46, 2.627, 0.108), centre=(0, 0.0163), far=far_of(busSign)),
      G.Model('pot', pot, size=(0.432, 0.88, 0.421), far=far_of(pot)),
      G.Model('pathLight', pathLight, size=(0.18, 0.56, 0.18), far=far_of(pathLight)),
-     G.Model('hedge', hedge, size=(1.275, 1.035, 0.62), far=far_of(hedge)),
      G.Model('flowers', flowers, size=(0.6, 0.343, 0.52), far=far_of(flowers))],
     comment='Blender-built street dressing (tools/art/blender/families/street.py): the kerbside bench, '
             'the planter with its little tree, the flower tub, the street-name sign, the bus-stop sign, '
-            'the door pot, the garden path light, the street hedge and the flower clump that '
+            'the door pot, the garden path light and the flower clump that '
             'render/babylon/street.ts draws as thin instances along the kerbs and front gardens. Listed '
             'in the base manifest\'s packs. Each has a far version for the town overview. Leaves and '
             'flowers are on the foliage finish, so they sway in the wind; the path light\'s lens glows at '
