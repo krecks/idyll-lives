@@ -138,7 +138,7 @@
   "model.couchPotato.cinemaWall": [0.0, 0.025],
   "model.couchPotato.fitnessGame": [0.032, 0.01],
   "model.couchPotato.gameConsole": [0.0, 0.02],
-  "model.couchPotato.lavaLamp": [0.005, 0.015],
+  "model.couchPotato.lavaLamp": [0.0019, 0.0232],
   "model.couchPotato.recliner": [-0.01, -0.02],
   "model.couchPotato.snackFridge": [0.0, 0.0],
   "model.counter": [0.0, -0.1],
