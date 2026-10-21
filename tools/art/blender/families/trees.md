@@ -22,7 +22,13 @@ shapes and helpers (`lump`, `tube`, `dots`, `sprigs`, `far_of`) come from `plant
 - **Ripeness (G-68, 2026-10-21):** the fruit trees `grows` in content: their fruit over the crown is a moving part
   (`_fruiting`) with the growth clip `ripen` (`motions.growth`, `G.stages`): in fruit at rest, gone (shrunk into the
   crown's middle) when picked and while it fruits again; the apple's front apple follows it too. The lemon tree's
-  lemons are all picked at once, so its front lemon is one with the rest (no `pick` clip): still four draws. Far
+  lemons are all picked at once, so its front lemon is one with the rest (no `pick` clip): still four draws.
+  Still to do (I-garden-12, a model change, 2026-10-22): "Pick the apples" (`harvest`, `pickHigh`: the hand up to
+  about 1.8 m, twice a loop for its 20 minutes) reaches under a crown whose fruit hangs from about 2.5 m (the
+  `dots` band from 3.6 m less 0.65 of the crown's 1.65 m depth): only the one front apple is within reach. A garden
+  apple (dwarf or semi-dwarf) carries fruit from about 1 m: bring the crown's middle down to about 2.6 m (the lowest
+  leaves at about 1.3 m, the tree about 4.3 m), or hang a ring of six to eight apples on low twigs round its front
+  half between 1.4 and 1.9 m, so `pickHigh` closes on fruit; the clip and the content can stay. Far
   versions: all one still part, in fruit.
 
 ## Far versions and the woods
