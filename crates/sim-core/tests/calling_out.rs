@@ -45,6 +45,10 @@ fn a_lonely_housemate_calls_another_over() {
     }
     let social = w.content.needs.iter().position(|n| n.id == "social").unwrap();
     w.sims[a].needs[social] = 0.05;
+    // B could do with some fun, so free will finds them something to pass the time with (a book,
+    // the TV) that a call can interrupt, not a meal to cook for a household that has eaten.
+    let fun = w.content.needs.iter().position(|n| n.id == "fun").unwrap();
+    w.sims[b].needs[fun] = 0.6;
     for x in (0..w.sims.len()).filter(|&x| x != a && x != b) {
         *w.relationships.get_mut(a, x) = Default::default();
         *w.relationships.get_mut(x, a) = Default::default();
