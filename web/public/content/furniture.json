@@ -3602,8 +3602,11 @@
           "label": "Shoot pool",
           "anim": "play",
           "minutes": 30,
+          "partner": true,
+          "alone": "trickShots",
           "effects": {
-            "fun": 0.5
+            "fun": 0.5,
+            "social": 0.08
           },
           "tags": [
             "entertainment",
@@ -3649,15 +3652,18 @@
         { "at": [-0.3, 1], "facing": 180 },
         { "at": [0.3, -1] }
       ],
-      "description": "Spin the rods and score: quick fun for two.",
+      "description": "Spin the rods and score: quick fun for two, or a few shots practised alone.",
       "interactions": [
         {
           "id": "foosball",
           "label": "Play foosball",
           "anim": "play",
           "minutes": 20,
+          "partner": true,
+          "alone": "practise",
           "effects": {
-            "fun": 0.4
+            "fun": 0.4,
+            "social": 0.08
           },
           "tags": [
             "entertainment",
@@ -3666,6 +3672,23 @@
           "skills": {
             "dexterity": 0.04,
             "perception": 0.02
+          }
+        },
+        {
+          "id": "practise",
+          "label": "Practise foosball",
+          "anim": "play",
+          "minutes": 15,
+          "autonomous": false,
+          "effects": {
+            "fun": 0.2
+          },
+          "tags": [
+            "entertainment",
+            "gaming"
+          ],
+          "skills": {
+            "dexterity": 0.04
           }
         }
       ]

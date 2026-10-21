@@ -475,7 +475,8 @@
       },
       "motions": {
         "loops": {
-          "foosball": "rods"
+          "foosball": "rods",
+          "practise": "rods"
         }
       },
       "paint": [
