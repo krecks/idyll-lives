@@ -47,6 +47,7 @@ answer 200 (a missing or linked wasm package otherwise gives pictures of an empt
 | `gallery` | `/gallery.html?keys=…` from the front right. `--alpha --beta --radius --target --cols`; `--each`: one picture per key, `gallery-<key>.png`, on one page; `--scale adult\|child\|all` stands residents beside each model; `--camera game` takes one picture per model with the game's Live camera aimed at it |
 | `clips` | `/clips.html?keys=…` held at each of `--times` (default `0,0.3,0.6,1,99`; 99 is open), one picture each. `--each`: each key on its own, `clips-<key>-<clip>-t<t>.png`, one page for all. `--clip --colors --target` |
 | `play` | Opens `?state=<--state, default bathroom-check>&debug`, adds money, then for each of `--objects a,b@x,z,rot,…` (or `--objects-file <path>`, one `def` or `def@x,z,rot` a line, `#` comments) on the same page: buys it, runs each `--use` (`all`, the default, an interaction id or an index) for `--sim`, takes `--shots` (3) pictures `--every` (1000) ms once the resident is using it, framing the object, then sells it and the resident walks back to where they started. One JSON line per use in `<out>/play.jsonl`. |
+| `sheet` | Contact sheets of an evidence folder, for reading it a sheet at a time rather than shot by shot: `--dir bench-results/review/<cat>` writes `<dir>/sheets/obj-<id>.png` per object (up to 6 of its pictures, 2 × 2 or 3 × 2: gallery, game camera, a play shot in use, the clip held open, then a close-up, a night shot, other clip framings and the other uses) and `age-<id>.png` (`-2`, `-3`, …) with its `poses.html` shots, and play shots from folders named for a life stage, side by side by stage. Each picture is labelled with its path. Pictures are found by the names `gallery`, `clips`, `play` and the pose shots give them (`gallery-<model>`, `gallery-game-<model>`, `clips-<model>-<clip>-t<t>`, `<id>-<use>-NN`, `poses-…-<stage>-…-<id>`), anywhere in the folder, the newest of a name taken twice; the objects from `--ids` or `--ids-file`, else `../lists/<cat>.txt` (or `.models.txt`), else the ids in backticks that open `index.md`'s rows. Composed as a page of `<img>` tiles in the headless browser and screenshotted (no ffmpeg, no server: no `--port`); 1600 wide, about 1000 high for 2 × 2 and 700 for 3 × 2. About 0.2 s a sheet. |
 
 `play` in more detail:
 - **Where.** `def@x,z,rot`, else `--at`, else on `review-stage` a free spot by the object's layer and
@@ -103,9 +104,9 @@ flags are at the top of its file in `web/src/debug/`. The ones the review uses:
 | Page | Flags |
 |---|---|
 | `/gallery.html` | `keys=model.a,model.b` (or `filter=`), `cols`, `gap`, `labels=0`, `alpha`, `beta`, `radius`, `target`. `scale=adult` stands a man and a woman on each model's own left (the right of the picture, away from the camera), facing the camera (the game's `Characters`, at the idle), `scale=child` a child, `scale=all` a woman, a teen, a child and an elder (at most 64 residents: the first models get them). `camera=game` is the game's Live camera as a game starts (radius 24, beta 0.86, its 0.7 lens) aimed at the floor under the first model, or under `at=<key or index>`; `__gallery.aim(n)` aims it at model n. |
-| `/poses.html` | `only=`, `seats=`, `focus=`, `clip=`, `strip=N` (the clip held at N times on a man, a woman, a child, a teen and an elder), `bottom=`, `manual`. `stage=baby\|child\|teen\|youngAdult\|adult\|elder` puts everyone placed at that stage where sim-core lets the stage take the place (a baby only lies in a crib; children and teens don't care for a baby, flirt or kiss), with the game's look for it (an elder's stoop and grey hair); with `strip`, the rows are a man and a woman at that stage. |
+| `/poses.html` | The objects as the game loads them (`base.json` and all its includes, footprints and slots). `only=bed,water` (the stations whose label, object id or tag is one of these, exactly), `focus=<index, label or object id>` (close up; one that isn't there says so on the page and in `__poses.error`, and the page still sets `__ready`), `seats=sofa,chessTable` (one resident a slot, a man, a woman, …, sitting; a futon or wall bed, used only open, open), `seats=<def>:<use or anim>` (doing that use: its pose and clip, the object's clips for it held open, and open if the use opens it: `seats=sofaBed:doze`), `beds=wallBed,sofaBed:doze` (the same, the first use lying down unless one is named), `labels=0` (labels are on the floor in front of each station), `clip=`, `strip=N` (the clip held at N times on a man, a woman, a child, a teen and an elder), `bottom=`, `manual`. `stage=baby\|child\|teen\|youngAdult\|adult\|elder` puts everyone placed at that stage where sim-core lets the stage take the place (a baby only lies in a crib; children and teens don't care for a baby, flirt or kiss), with the game's look for it (an elder's stoop and grey hair); with `strip`, the rows are a man and a woman at that stage. |
 | `/characters.html` | `stage=child` or `stage=all`, `hair=all`, `tops=all`, `face=moods`, `clip=walk&t=0.4`, `view=side` (more in `characters.ts`). |
-| `/clips.html` | `keys=`, `clip=`, `t=` (99: open), `colors=`, `target=` (see `check.mjs clips`). |
+| `/clips.html` | `keys=`, `clip=`, `t=` (99: open), `colors=`, `target=`, `radius=` (see `check.mjs clips`). Models that don't fit the default view at rest or open (a wardrobe, a shower, a tree) are framed whole: aimed at their middle height, from as far as it takes. |
 
 ```
 /gallery.html?keys=model.fridge,model.diningChair,model.bed&scale=all
@@ -113,6 +114,9 @@ flags are at the top of its file in `web/src/debug/`. The ones the review uses:
 /poses.html?stage=child
 /poses.html?strip=8&clip=sitDown
 /poses.html?seats=sofa,diningChair&stage=elder
+/poses.html?only=bed&stage=child&focus=sleep
+/poses.html?beds=wallBed:sleep,sofaBed,bedBunk&stage=elder
+/clips.html?keys=model.wardrobe&t=99
 ```
 
 ## States for checks
