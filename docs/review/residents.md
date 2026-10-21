@@ -442,7 +442,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters.ts` (`WALK_IN`, `walkPlace`: a straight line from where they stood to the seat's front; round a corner only for built-in chairs, `cornerOf`)
 - **Evidence:** `fixes/sweep-render/walk/strip-bike-chair.png` (`exerciseBike-in-200` … `-1000`): from the tile beside the exercise bike the walk-in goes straight through its frame to the saddle, the legs through the crossbar, where someone steps over it. The same for anything sat astride or straddled from the side (the bikes, a rowing machine, the rides) once sim-core seats them from beside it. A step over (the ball pit's `over`, `STEP_IN`) or coming to it from behind would do.
-- **Status:** fixed (COMMIT)
+- **Status:** fixed (da7e41ef)
 - **After:** onto a seat in a frame sat astride the walk-in is not used (`walksIn`: seats with `pedals`, and `STRADDLED`: the rocking horse, the spring rider, the seesaw); they settle onto it as before, quickly, instead of walking through the frame for a second. `fixes/sweep-render/walk2/strip.png` (`exerciseBike-in-200` … `-3000`: on the saddle at once, was `fixes/sweep-render/walk/strip-bike-chair.png`'s walk through the crossbar; `rides-rockingHorse-ride-0*`: onto the horse at once; `rides-swingSet-swing-*`: the swing, not in a frame, still walked to). A step over the frame (as the ball pit's rim, `STEP_IN` `over`) would be better still; not done.
 - **Source:** fix: sweep-render (A-residents-13's re-check)
 
