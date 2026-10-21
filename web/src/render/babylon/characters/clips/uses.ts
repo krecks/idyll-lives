@@ -316,6 +316,28 @@ function strumPose(reach: number, up = 0): (p: number) => PoseSpec {
   };
 }
 
+/**
+ * The vibration plate (`lazy.vibePlate`, pack_lazy.py): stood on its deck (content `stand`, 0.12 m up) at the
+ * middle, facing its column; its grips, bars running fore and aft, 0.26 m to either side, 0.96 m over the deck and
+ * 0.12 m ahead (`PLATE_GRIP`, m: across, up from the deck, ahead). A size per height (characters.ts `GRIPPED`).
+ */
+const PLATE_GRIP: Vec = [0.26, 0.96, 0.12];
+export const PLATE_HOLD: Size[] = sizes('plateHold', [1, 0.83, 0.63], (s) => ({ s, to: 0 }));
+
+/** Standing on the plate holding both grips, the knees soft, the weight shifting a little while it shakes. */
+function platePose(fit: Fit): (p: number) => PoseSpec {
+  const { s } = fit;
+  return (p) => {
+    const body = stand({ shift: 0.25 * Math.sin(p * TAU), breath: p, lean: 3, head: [6, 3 * Math.sin(p * TAU), 0] });
+    const grip = (sx: number): Vec => [(sx * PLATE_GRIP[0]) / s, PLATE_GRIP[1] / s, PLATE_GRIP[2] / s];
+    return {
+      ...body,
+      ...armIK('l', grip(-1), body, { palm: true, pole: [-0.5, -1, -0.4], pronate: 10, hand: wrist('l', 0, 0) }),
+      ...armIK('r', grip(1), body, { palm: true, pole: [0.5, -1, -0.4], pronate: 10, hand: wrist('r', 0, 0) }),
+    };
+  };
+}
+
 /** Warming up at a fire (`warmHands`): seconds round, and the hands held out to it (model space, m: across, up, out). */
 const WARM_S = 7;
 const WARM_OUT: Vec = [0.17, 1.0, 0.45];
@@ -348,5 +370,6 @@ export function useClips(): ClipDef[] {
     cycle('strum', { seconds: 2, loop: true }, strumPose(GUITAR_REACH.long)),
     cycle('strumShort', { seconds: 2, loop: true }, strumPose(GUITAR_REACH.short, GUITAR_UP_SHORT)),
     cycle('warmHands', { seconds: WARM_S, loop: true, hands: 'open' }, warmPose),
+    ...PLATE_HOLD.map(({ clip, fit }) => cycle(clip, { seconds: 3, loop: true }, platePose(fit))),
   ];
 }

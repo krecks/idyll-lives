@@ -340,6 +340,7 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | kneelTable177, 147, 112 | yes | 6 | at the train table (`play`, `STEP_IN`, a lane each): kneeling up at its edge, leant in, the right hand pushing the engine along the track and the left on the top, now and then sitting back for a look |
 | brushHair | yes | 5 | getting ready at the dressing table (the seated upper body, `ACTIONS.wash`): four brush strokes from the crown down the right side, the head tilting into each, then the left hand smoothing the other side |
 | warmHands | yes | 7 | warming up standing at a fire (`ACTIONS.relax` at `WARM_AT`: the fire pit): leant a little to it, the hands held out over it, palms to the flames, turned now and then, then brought together and rubbed (clips/uses.ts) |
+| plateHold177, 147, 112 | yes | 3 | stood on the vibration plate (`GRIPPED`): both hands on its grips (fore-and-aft bars 0.26 m either side, 0.96 m over the deck, 0.12 m ahead), the weight shifting a little; the plate's buzz on top (`activityPose`); a size per height |
 | lieCurl | yes | 2.4 | dozing on a bed too short to lie on flat (`CURLED_BEDS`: the window seat): curled up on the left side facing the room, the knees drawn up, the head on the pillow on the left forearm; turned flat like `lie` |
 
 ### Checking clips

@@ -79,7 +79,7 @@ import { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } from './characters/clips/stre
 import { FLOOR_SITS } from './characters/clips/seated';
 import { BALL_PIT, PLAY_TENT } from './characters/clips/play';
 import { BOULDER, FOOS, FOOS_LANES, foosClip, POOL, SMASH, YOGA_AT } from './characters/clips/games';
-import { EYEPIECE, PICK_APPLE, PICK_LEMON, SHOWER_CHILD } from './characters/clips/uses';
+import { EYEPIECE, PICK_APPLE, PICK_LEMON, PLATE_HOLD, SHOWER_CHILD } from './characters/clips/uses';
 import { KNEEL_LANES, KNEEL_TABLE, LOW_TOP, SIT_LOW } from './characters/clips/low';
 import { BOARD, CLOCK, CUPBOARD_OF, FEEDER, PUT_AWAY } from './characters/clips/reach';
 import { SHOT } from './characters/clips/shot';
@@ -683,6 +683,8 @@ const STRUM_SHORT: readonly string[] = ['strumShort'];
 /** A use sequence of the idle alone (curling dumbbells on top, `activityPose`), and of pushing (a mop). */
 const IDLE_ONLY: readonly string[] = ['idle'];
 const PUSH_ONLY: readonly string[] = ['push'];
+/** Things stood on holding their grips (content `stand`): the vibration plate, its clip in a size per height (`PLATE_HOLD`). */
+const GRIPPED: Record<string, readonly { clip: string; min: number }[]> = { 'lazy.vibePlate': PLATE_HOLD };
 /** Relaxing on foot (`ACTIONS.relax`): standing about, the arms folded now and then; at a fire (`WARM_AT`), the hands held out to it and rubbed. */
 const RELAX_STAND: readonly string[] = ['idle', 'foldArms'];
 const WARM_HANDS: readonly string[] = ['warmHands'];
@@ -3512,6 +3514,8 @@ export class Characters {
           ? this.guitarReach(rig) < 0.5
             ? STRUM_SHORT
             : STRUM
+          : obj && GRIPPED[obj.def]
+          ? this.gripped(rig, GRIPPED[obj.def])
           : obj?.stand?.motion || obj?.held?.grip === 'pair'
           ? IDLE_ONLY
           : obj?.held?.grip === 'pole'
@@ -3547,6 +3551,8 @@ export class Characters {
           reach = HUGGED[obj.def].reach;
         }
         const on = obj?.stand;
+        // (Holding its grips: `GRIPPED`.)
+        if (obj && GRIPPED[obj.def]) hands = HANDS.grip;
         if (on && obj && tag !== 'cuddle') {
           // Up on the equipment (content `stand`; Sims use it from the tile in front): forward to its
           // middle, on what they stand on (a treadmill's belt, facing the console).
@@ -3728,6 +3734,14 @@ export class Characters {
   }
 
   /** The clip of `sizes` (the bunk's ladder, `BUNK_LADDER`; a ride's, `RIDES`) for this resident's height. */
+  /** Holding the grips of a thing stood on (`GRIPPED`): its clip for the resident's height, as a sequence of one. */
+  private gripped(rig: SimRig, sizes: readonly { clip: string; min: number }[]): readonly string[] {
+    const clip = this.sizedClip(rig, sizes);
+    let one = LANE_SEQ.get(clip);
+    if (!one) LANE_SEQ.set(clip, (one = [clip]));
+    return one;
+  }
+
   private sizedClip(rig: SimRig, sizes: readonly { clip: string; min: number }[]): string {
     const h = rig.body.height * rig.scale;
     return (sizes.find(({ min }) => h >= min) ?? sizes[sizes.length - 1]).clip;

@@ -857,7 +857,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** clip
 - **Where:** `web/src/render/babylon/characters.ts` (`ACTIONS.exercise`: `jog` for `vibePlate`)
 - **Evidence:** `fixes/blender-packs/play/day-lazy.vibePlate-shake-01.png`: the grips now reach back to the stander's hands (I-packs-04), but the `jog` clip swings the arms past them; standing on a plate, the hands hold the bar and the body stays still while the deck shakes (a hold-the-grips idle with `buzz`).
-- **Status:** open
+- **Status:** fixed (COMMIT)
+- **After:** a clip of its own, `plateHold` (`clips/uses.ts`, in three sizes, fitted by the legs): standing on the deck with both hands round the grips (fists, `HANDS.grip`), the weight shifting a little, the plate's buzz and soft knees on top as before; picked by object (`characters.ts` `GRIPPED`) instead of the idle the plate had (its content `stand.motion` sent it to `IDLE_ONLY`, not `jog`). `fixes/sweep-render/plate/strip.png`: `day-lazy.vibePlate-shake-01.png` (from behind: the hands on the grips, was `fixes/blender-packs/play/day-lazy.vibePlate-shake-01.png`'s hands by the sides past them), `side-…-01.png`, `teen-…-01.png` (Cal, 15).
 - **Source:** fix: blender-packs
 
 ### I-packs-23 — The sunrise lamp's stretches are done at 3 in the morning
