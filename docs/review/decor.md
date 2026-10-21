@@ -104,7 +104,8 @@ Notes: the lead "curtains off-centre on the stage window" is closed. The stage's
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/decor.py:697` (`hearth`: 0.57 deep from the wall face `WALL = -0.43`, `decor.py:120`, so only 0.14 m proud of the surround, whose front is the tile's middle) and `:889`; the seat `web/public/content/furniture.json:4094` (`seat`: height 0.42, `forward` 0.02 from the footprint's middle); no `fireplace` row in `web/src/render/babylon/characters/furniture.json` (the default seat)
 - **Evidence:** `decor/extra/fireplace-relax-front.png` (straight on: the flames either side of her torso), `decor/play/c2/fireplace-relax-01.png`, `decor/poses/poses-seats-fireplace.png` (both sitters' hips in the opening). The sim puts the pelvis at `(10, 17.5)` facing out (`extra.json`): the firebox opening's plane is at the tile's middle, so the seat 2 cm in front of it has the body's back inside the opening, against burning logs. A real raised hearth runs 0.4–0.5 m in front of the opening and people sit on its edge or its end, side-on to the fire. Fix with the model (a deeper hearth bench, or a seat at the hearth's end) and the content `seat.forward`.
-- **Status:** open
+- **Status:** fixed (edf25038)
+- **After:** the raised hearth runs out to 0.46 m in front of the firebox's opening (`HEARTH_FRONT`, the model 0.88 m deep; it ran 0.14 m out) and the sitter's hips are 0.36 m forward (`seat.forward`, was 0.02): she sits on the bench's front edge, her back about 0.1 m clear of the opening and 0.3 m from the logs, her feet on the floor in front (`fixes/blender-decor/poses-seats-fireplace-side.png`, a child too: `poses-seats-fireplace-child.png`; in play, straight on: `fireplace-relax-front.png`, from the side: `fireplace-relax-side.png`; before: `decor/extra/fireplace-relax-front.png`). `cargo review sizes`: D 0.88 over the reference's fireplace 0.25–0.65, which leaves out a raised hearth (0.4–0.5 m in front of the opening).
 - **Source:** wave: decor (lead from the evidence index's "Seen" notes, confirmed)
 
 ### I-decor-02 — The grandfather clock is wound at arm's length, hands at the chest, the dial 0.6 m higher
@@ -158,7 +159,8 @@ Notes: the lead "curtains off-centre on the stage window" is closed. The stage's
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/decor.py:90` (`bronze=('#6E4F35', 'metal')`), `:568`
 - **Evidence:** `decor/play/c2/statueHorse-no-uses.png`, `decor/gallery/gallery-statueHorse.png`: on its oak plinth the horse is a flat dark brown, the same family as the wood, with no metallic highlight at the game camera. Bronze statuary reads with a greener or golden patina and bright edges.
-- **Status:** open
+- **Status:** fixed (edf25038)
+- **After:** `bronze` is a golden cast bronze (`#A47B45`, metal), bright on its edges, the mane and tail a dark green patina (`bronze_dark` `#55583E`): metallic against the pale oak plinth (`fixes/blender-decor/gallery/gallery-statueHorse.png`).
 - **Source:** wave: decor (lead from the evidence index's "Seen" notes, confirmed)
 
 ### M-decor-02 — The curtains hang inside the window: open, they cover its sides; the short pair covers one edge of a wide window
@@ -168,5 +170,16 @@ Notes: the lead "curtains off-centre on the stage window" is closed. The stage's
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/decor.py:753` (`_curtains`), `:781` (`curtains`: `w` 0.86, rail 0.92), `:785` (`curtainsLong`: `w` 1.8, rail 1.86); footprints `web/public/content/furniture.json:3777`, `:3794`
 - **Evidence:** `decor/extra/curtainsLong-straight.png`: on the stage's two-edge window the long pair's rail is barely wider than the frame, so the open panels (0.34 m gathered each) hang over a fifth of the glass on each side; `decor/extra/curtains-pair-straight.png`: the window-height `curtains` are one edge wide, so a two-edge window needs two pairs, and two of the four panels hang in the middle of the glass. A real rail runs 15–25 cm past the frame each side so the open curtains stack off the glass; window-height curtains come in the window's width. Wider rails (about the footprint plus 0.3 m) and a two-edge window-height pair would do.
-- **Status:** open
+- **Status:** fixed (edf25038)
+- **After:** each rail is the window's opening (0.76 m over one edge, 1.76 over two) plus its two gathered panels: `curtains` 1.22 m, `curtainsLong` 2.38 m, so open they stack on the wall beside the glass (`fixes/blender-decor/curtainsLong-straight.png`, `curtains-one-straight.png`; before: `decor/extra/curtainsLong-straight.png`). New `curtainsWide` ("Wide curtains", 2 × 1, window length): one pair for a two-edge window (`curtainsWide-straight.png`, drawn at night: `curtainsWide-night-closed.png`). The window-length pairs hang to 0.85 m, under the 0.9 m sill (they stopped 10 cm above it). The rails reach 14 and 22 cm past their footprints (`check-glb` warns: over what hangs next to them), as real rails run past the frame; two `curtains` side by side on a two-edge window now overlap at the middle (`curtains-pair-straight.png`): that window takes the wide pair.
 - **Source:** wave: decor (the "off-centre" lead, closed as the camera angle; this is what the straight-on shots show)
+
+### M-decor-03 — Generated houses never hang the wide pair; two single pairs on a wide window overlap
+
+- **Severity:** S3
+- **Rubric:** M3, M4
+- **Fix class:** content
+- **Where:** `web/public/content/housegen.json:84`, `:162`, `:182` (`"one": ["curtains", "curtainsLong"]`: no `curtainsWide`); `tools/art/blender/families/decor.py` (`curtains`: a 1.22 m rail on a 1 m footprint)
+- **Evidence:** M-decor-02's fix runs each rail past its window, as real rails do, and adds `curtainsWide` for a two-edge window. The house generator still picks only `curtains` and `curtainsLong`, so a generated house's wide window gets floor-length curtains or one-edge pairs; two `curtains` side by side on one wide window now overlap 0.29 m at the middle, rail over rail (`fixes/blender-decor/curtains-pair-straight.png`). Adding `curtainsWide` to the lists (and a window-length pair only where the window has the edges for it) would do; it moves generated houses, so the sim's generated-house tests want a look.
+- **Status:** open
+- **Source:** fix: blender-decor
