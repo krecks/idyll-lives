@@ -95,7 +95,10 @@ cutaway drops it, from either side.
   fabric stretches to close, kept so).
 - The rugs lie flat in all four facings. Each rug's "Rug" colours its field; borders and motifs keep their colours.
 - A 2-wide curtain over the house's 1-wide windows hangs with the window in one half of its rail (the placement,
-  not the model).
+  not the model). Generated houses no longer do (M-decor-03, 2026-10-21): their curtains are as wide as the window,
+  a pair a tile wide over a one-edge window, the wide or the floor-length pair over a two-edge window (`housegen.ts`
+  `mount`; the slot's other curtains when the one picked fits none), so the floor-length pair is rarer (13 of 262
+  in the house sample, was 119 of 272); a floor-length pair a tile wide would bring it back to one-edge windows.
 - The rails run 0.1–0.2 m past the window's edges (as real rails do), so the open curtains stack on the wall beside
   the glass, not over it (M-decor-02, 2026-10-21): `check-glb` warns that they reach 14 and 22 cm past their
   footprints, over what hangs next to them.

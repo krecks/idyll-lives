@@ -1235,8 +1235,12 @@ function furnishRoom(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, 
       for (let n = 0; n < count; n++) {
         if (rng() >= (slot.chance ?? 1)) continue;
         const def = pick(rng, slot.one);
-        const fp = info(def)?.footprint;
-        if (fp) mount(cfg, info, f, r, def, fp, layer, rng, slot.over);
+        // (Curtains that don't fit the room's windows: the slot's others, as wide as one is.)
+        const others = info(def)?.overWindow ? slot.one.filter((d) => d !== def && info(d)?.overWindow) : [];
+        for (const d of [def, ...others]) {
+          const fp = info(d)?.footprint;
+          if (fp && mount(cfg, info, f, r, d, fp, layer, rng, slot.over)) break;
+        }
       }
     }
   }
@@ -1613,8 +1617,15 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
     // Only what belongs over a window (content `overWindow`: curtains) hangs on one.
     const window = !!info(def)?.overWindow;
     const backed = (e: string) => f.edges.get(e) === 'wall' || (window && f.edges.get(e) === 'window');
-    // ...and that only over one (with no free window in the room, none).
-    const hangs = (backs: string[]) => backs.every(backed) && (!window || backs.some((e) => f.edges.get(e) === 'window'));
+    // ...and that only over one (with no free window in the room, none), just as wide as the
+    // window: a pair a tile wide over a one-edge window, the wide ones over a two-edge window
+    // (two pairs on one window would hang rail over rail).
+    const glass = (e: string) => f.edges.get(e) === 'window';
+    const beyond = (backs: string[]) => {
+      const [first, last] = [backs[0], backs[backs.length - 1]].map((e) => e.split(':'));
+      return first[0] === 'h' ? [`h:${Number(first[1]) - 1}:${first[2]}`, `h:${Number(last[1]) + 1}:${last[2]}`] : [`v:${first[1]}:${Number(first[2]) - 1}`, `v:${last[1]}:${Number(last[2]) + 1}`];
+    };
+    const hangs = (backs: string[]) => backs.every(backed) && (!window || (backs.every(glass) && !beyond(backs).some(glass)));
     // Over a piece in the room: turned as it is, centred on it, its back on the same wall.
     for (const o of over ? f.objects.filter((o) => over.includes(o.def) && inside(r, o.x, o.z)) : []) {
       const [ow, od] = info(o.def)?.footprint ?? [1, 1];
