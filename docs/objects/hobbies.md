@@ -22,7 +22,7 @@ table face the room, as tables do.
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `piano` Piano | 2x1 · floor | play:music | hobbies / music | Body, Trim | Use | `fallboard`: the key cover lifts and the music desk unfolds for play, 0.9 s in, once the pianist has sat down (`delay`). |
+| `piano` Piano | 2x1 · floor | play:music | hobbies / music | Body, Trim | Use | `fallboard`: the key cover lifts and the music desk unfolds for play, 0.9 s in, once the pianist has sat down (`delay`). Sat on at the bench's top (content `seat` 0.49, M-hobbies-10). |
 | `ukulele` Ukulele | 1x1 · floor | strum:music practise:music | hobbies / music | Body & neck, Top, Stand | Use | `off_stand`: the ukulele leaves its stand while strummed and is drawn in the player's hands (content `held`). |
 | `guitarElectric` Electric guitar | 1x1 · floor | jam:music practise:music | hobbies / music | Guitar, Amp | Use | `off_stand`, as the ukulele; the amp is static. A 0.9 m solid body (a 0.648 m scale) on a 1.0 m stand since 2026-10-21 (G-40: a quarter too long). |
 | `keyboardDigital` Digital piano | 2x1 · floor | play:music | hobbies / music | Body, Trim | Static | Static. A console of 88 keys at 0.745 m against the wall, the player facing it (content `seat` 0.48, `facing: back`), since 2026-10-21 (G-29: a three-octave keyboard on an X-stand, the keys at 0.845). |

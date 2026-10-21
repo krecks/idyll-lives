@@ -3403,7 +3403,7 @@
       "name": "Piano",
       "model": "model.piano",
       "seat": {
-        "height": 0.47,
+        "height": 0.49,
         "forward": 0.227,
         "facing": "back"
       },
