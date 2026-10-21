@@ -37,6 +37,7 @@
     },
     {
       "id": "toiletWallHung",
+      "againstWall": true,
       "name": "Wall-hung toilet",
       "model": "model.toiletWallHung",
       "footprint": [
@@ -249,6 +250,7 @@
     },
     {
       "id": "towelLadder",
+      "againstWall": true,
       "name": "Towel ladder",
       "model": "model.towelLadder",
       "footprint": [

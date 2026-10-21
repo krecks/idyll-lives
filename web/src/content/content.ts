@@ -186,6 +186,9 @@ export interface RecipeDef {
   stages?: string[];
 }
 
+/** Where a lamp's shade sends its light (content `light.aim`; see `ObjectDef.light`). */
+export type LightAim = 'down' | 'up' | 'out' | 'ceiling';
+
 /** What kind of top a surface is (sim-core `content::SurfaceKind`): which seats tuck under it. */
 export type SurfaceKind = 'table' | 'bar' | 'counter' | 'desk' | 'low' | 'shelf';
 
@@ -225,9 +228,13 @@ export interface ObjectDef {
    * Gives light at night (lamps, lanterns): reach in metres, relative brightness, height of the bulb,
    * where the bulb is off the middle (`at`: metres, x and z in the object's own frame, before
    * turning; default the middle), and the floor it lights fully as its room is scored (tiles;
-   * default `roomRules.lampTiles`).
+   * default `roomRules.lampTiles`). `aim`: where its shade sends the light (default all round):
+   * `down` (a pendant's dome, a desk lamp), `up` (a sconce's open cup: a wash up the wall), `out`
+   * (a wall light: away from its wall and down, none behind it) or `ceiling` (an uplighter: up
+   * at the ceiling, which lights the room). `switch: false`: no switch, lit every night; `fire`:
+   * a fire, lit to sit by (sim-core `lights.rs`), its flames burning while it's lit.
    */
-  light?: { range?: number; intensity?: number; height?: number; at?: [number, number]; tiles?: number; switch?: boolean };
+  light?: { range?: number; intensity?: number; height?: number; at?: [number, number]; tiles?: number; switch?: boolean; fire?: boolean; aim?: LightAim };
   /**
    * What's done at it sounds like this, by animation tag (world sound keys or `none`, as an
    * interaction's `sound`), for its uses without a `sound` and the cooking steps at it as a
@@ -251,6 +258,10 @@ export interface ObjectDef {
   fillsWall?: boolean;
   /** From the ceiling: hangs low enough to walk into (a hanging plant): it takes the floor under it. */
   hangsLow?: boolean;
+  /** From the ceiling: hangs at head height (a chandelier, a low pendant), to hang over a table: nobody walks under it, but furniture goes under it. */
+  headHeight?: boolean;
+  /** On the floor: built to stand back to a wall (a wall-hung toilet, a wall bed, a leaning ladder): it needs plain wall all along its back. */
+  againstWall?: boolean;
   /** Bunk beds: the second slot lies on the upper bunk. */
   bunk?: boolean;
   /** Bunk beds: the life stages that may take the upper bunk (default everyone who may use the bed). */

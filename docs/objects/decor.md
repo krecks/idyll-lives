@@ -67,8 +67,9 @@ cutaway drops it, from either side.
   keeping the game's time.
 - The hanging plant, watered, sways out and settles after its `hold`.
 - The fireplace has a raised hearth bench (content `seat`: height 0.42, forward 0.02): a resident warming up sits on
-  it with the flames growing behind her and dying down when she gets up. Its `light` (height 0.7, `switch: false`:
-  residents don't switch it) lights the room at night.
+  it, the flames growing behind her. Its `light` (height 0.7, `fire: true`) is a fire's: sitting down by it in the
+  dark lights it (or the player's Light the fire), and then its light, its embers' glow and its flames burn together
+  until the last one awake leaves the room, or the morning (`lights.rs`; I-decor-03). Bought unlit.
 - The horse statue is a bronze horse standing on an oak plinth (model and its name and description agree); the pedestal vase is blue.
 
 ## D3. Textiles (6)

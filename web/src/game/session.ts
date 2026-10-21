@@ -1166,8 +1166,9 @@ export async function startSession(
         ? []
         : [{ label: it.label, index, ...(it.cost ? { cost: it.cost } : {}), ...(content.mayUse(def, it, stage) ? {} : { disabled: true }) }],
     );
-    // A lamp: its switch (not a fire's).
-    if (def.light && def.light.switch !== false) items.unshift({ label: bridge.lampOff(objectId) ? 'Turn on' : 'Turn off', index: -1 });
+    // A lamp: its switch; a fire is lit and put out.
+    const off = bridge.lampOff(objectId);
+    if (def.light && def.light.switch !== false) items.unshift({ label: def.light.fire ? (off ? 'Light the fire' : 'Put out the fire') : off ? 'Turn on' : 'Turn off', index: -1 });
     // Upgrades are bought in the catalog, not from here.
     if (items.length === 0) return;
     game.menu = { objectId, title: placement.quality ? `${def.name} ${'★'.repeat(placement.quality)}` : def.name, x, y, items };

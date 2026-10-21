@@ -84,8 +84,11 @@ none.
 **In play** (signed off 2026-10-17):
 - Each checked in four facings: the charcoal grill's lid is up for the whole of "Grill dinner", over the coals and
   food; the gas station's hood is up for cook and for the feast; the fire pit's flames grow for "Warm up by the
-  fire", and the embers and flames glow at night. (Since 2026-10-21 they warm up from a chair round it that faces
-  it, or standing round it facing in, not on its capstones: I-outdoor-01.)
+  fire", and the embers and flames glow at night. It is a fire (content
+  `light.fire`): lit by sitting down by it in the dark or by the player, it burns (light, glow and flames) until the
+  morning, and its light lies in a pool on the lawn round it (`gardenPools.ts`).
+  (Since 2026-10-21 they warm up from a chair round it that faces it, or standing round it facing in, not on its
+  capstones: I-outdoor-01.)
 - Each shuts when the use ends. Nothing needed fixing.
 - Since the authenticity review (G-08): chopping at the grill station is on its free counter (`STATION_SPOTS`), not on
   the grate.

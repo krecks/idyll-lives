@@ -1545,6 +1545,8 @@ function fileMirror(data: VertexData, { lo, hi }: { lo: number[]; hi: number[] }
 
 /** The material glows are drawn with: unlit, added to what's behind, coloured per vertex and per instance. */
 const glowMaterials = new WeakMap<Scene, StandardMaterial>();
+/** How far (depth-buffer steps) a glow is drawn in front of the faces it lights. */
+const GLOW_DEPTH_STEPS = -4;
 
 /**
  * One mesh of the glowing faces (`MaterialOverride.glow`), each piece in its glow colour, a hair in
@@ -1562,7 +1564,11 @@ function glowMesh(scene: Scene, name: string, pieces: { data: VertexData; color:
     material.alphaMode = Constants.ALPHA_ADD;
     material.alpha = 0.999;
     material.disableDepthWrite = true;
-    material.zOffset = -2;
+    // Its faces are the lit ones again, so it only has to win their own depth: a few steps of the
+    // depth buffer, not a slope-scaled offset, which at a glancing angle (or from far off) pulled a
+    // glow through the parts in front of it (the grill's coals through its shut lid).
+    material.zOffset = 0;
+    material.zOffsetUnits = GLOW_DEPTH_STEPS;
     // Both sides (a shade glows inside too; the faces' winding varies with the file's handedness).
     material.backFaceCulling = false;
     material.fogEnabled = false;

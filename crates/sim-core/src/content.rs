@@ -235,9 +235,13 @@ pub struct ObjectDef {
     /// `roomRules.lampTiles`): a chandelier lights more of a room than a table lamp. 0: it gives
     /// no light (no `light`).
     pub lamp: f32,
-    /// A lamp that can be switched on and off (a `light` without `"switch": false`, which fires
-    /// have; see `lights.rs`).
+    /// A lamp that can be switched on and off (a `light` without `"switch": false`; see
+    /// `lights.rs`).
     pub switch: bool,
+    /// A fire (content `light.fire`): switched as a lamp is, but lit by someone who sits by it (a
+    /// use of it lights it when it's dark) or the player, never by coming into the room; it burns
+    /// down by morning (see `lights.rs`).
+    pub fire: bool,
     /// Wear per finished use (it breaks at 1; see `ObjectRules::wear_per_quality`).
     pub wear_per_use: f32,
     /// Every tag its interactions have (what the room it stands in can be used for).
@@ -290,9 +294,23 @@ pub struct ObjectDef {
     /// Things from the ceiling that hang low enough to walk into (content `hangsLow`: a hanging
     /// plant): it takes the floor under it as furniture does.
     pub hangs_low: bool,
+    /// Things from the ceiling that hang at head height (content `headHeight`: a chandelier, a
+    /// low pendant), to hang over a table: nobody walks under it, but furniture may stand under
+    /// it (not furniture as tall as the wall).
+    pub head_height: bool,
+    /// Furniture built to stand with its back on a wall (content `againstWall`: a wall-hung
+    /// toilet's cistern box, a wall bed, a ladder leaning on the wall): it needs plain wall all
+    /// along its back, and that wall can't come down (nor become a window or a door) under it.
+    pub against_wall: bool,
 }
 
 impl ObjectDef {
+    /// Off the floor and out of the way: residents walk under (or over) it (a picture, a ceiling
+    /// lamp, a rug), unless it hangs low or at head height.
+    pub fn walked_under(&self) -> bool {
+        self.layer.mounted() && !self.hangs_low && !self.head_height
+    }
+
     /// The slots interaction `i` takes one of. A crib's first slot is the baby's (the crib on
     /// its left, where `ObjectInstance::slot_position` lays them; the changing table beside it
     /// is where carers stand), whoever gets there first: after loading a save, a carer may set
@@ -2099,7 +2117,8 @@ struct ObjectRaw {
     #[serde(default, rename = "wearPerUse")]
     wear_per_use: Option<f32>,
     /// Lamps: the renderer reads the light's look; the simulation only its `tiles`, the floor it
-    /// lights (default `roomRules.lampTiles`), and `switch` (false: always lit at night, a fire).
+    /// lights (default `roomRules.lampTiles`), `switch` (false: no switch, always lit at night)
+    /// and `fire` (a fire, lit to sit by: see `ObjectDef::fire`).
     #[serde(default)]
     light: Option<serde_json::Value>,
     /// `wall`, `ceiling` or `rug` (default `floor`: furniture).
@@ -2137,6 +2156,10 @@ struct ObjectRaw {
     /// Life-stage ids that may take the upper bunk (see `ObjectDef::upper_stages`).
     #[serde(default, rename = "upperStages")]
     upper_stages: Option<Vec<String>>,
+    #[serde(default, rename = "headHeight")]
+    head_height: bool,
+    #[serde(default, rename = "againstWall")]
+    against_wall: bool,
 }
 
 /// A slot's place: `{"at": [-0.3, 0.7], "facing": 180}` (m off the middle, to its right and front;
@@ -2853,7 +2876,16 @@ impl Content {
                     )));
                 }
             };
-            for (set, flag, on) in [(obj.over_window, "overWindow", Layer::Wall), (obj.fills_wall, "fillsWall", Layer::Floor), (obj.hangs_low, "hangsLow", Layer::Ceiling)] {
+            if obj.hangs_low && obj.head_height {
+                return Err(Error::new(format!("object '{}': `hangsLow` or `headHeight`, not both", obj.id)));
+            }
+            for (set, flag, on) in [
+                (obj.over_window, "overWindow", Layer::Wall),
+                (obj.fills_wall, "fillsWall", Layer::Floor),
+                (obj.hangs_low, "hangsLow", Layer::Ceiling),
+                (obj.head_height, "headHeight", Layer::Ceiling),
+                (obj.against_wall, "againstWall", Layer::Floor),
+            ] {
                 if set && layer != on {
                     let on = match on {
                         Layer::Wall => "a wall",
@@ -2978,6 +3010,7 @@ impl Content {
                     l.get("tiles").and_then(serde_json::Value::as_f64).map_or(lamp_tiles, |t| t as f32).max(0.1)
                 }),
                 switch: obj.light.as_ref().is_some_and(|l| l.get("switch").and_then(serde_json::Value::as_bool) != Some(false)),
+                fire: obj.light.as_ref().is_some_and(|l| l.get("fire").and_then(serde_json::Value::as_bool) == Some(true) && l.get("switch").and_then(serde_json::Value::as_bool) != Some(false)),
                 // Things nobody uses up (scenery, plants, decor) never wear out.
                 wear_per_use: if !used {
                     0.0
@@ -3010,6 +3043,8 @@ impl Content {
                 over_window: obj.over_window,
                 fills_wall: obj.fills_wall,
                 hangs_low: obj.hangs_low,
+                head_height: obj.head_height,
+                against_wall: obj.against_wall,
             });
         }
 

@@ -315,6 +315,7 @@
     },
     {
       "id": "wallBed",
+      "againstWall": true,
       "name": "Fold-down wall bed",
       "model": "model.wallBed",
       "footprint": [
@@ -962,6 +963,7 @@
     },
     {
       "id": "ladderShelf",
+      "againstWall": true,
       "name": "Ladder shelf",
       "model": "model.ladderShelf",
       "footprint": [
@@ -1008,7 +1010,7 @@
         "intensity": 0.6,
         "height": 0.45,
         "tiles": 4,
-        "switch": false
+        "fire": true
       },
       "description": "A slim white surround with a flickering electric fire: no chimney needed. It lights the room at night.",
       "interactions": [

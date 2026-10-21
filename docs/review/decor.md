@@ -125,7 +125,8 @@ Notes: the lead "curtains off-centre on the stage window" is closed. The stage's
 - **Fix class:** code
 - **Where:** `web/public/content/furniture.json:4087` (`light`, `switch: false`); `web/src/render/babylon/house.ts:222` (a light with `switch: false` has no lamp id, so it follows the room's fill rule, `BabylonRenderer.ts:3622`); `tools/art/blender/families/decor.py:889` (`motions.uses.relax → flames`)
 - **Evidence:** By code: the firelight (range 4, power 0.8) comes up at dusk in any room with someone awake and goes out when they sleep, while the flames are drawn only during "Warm up by the fire"; between, the grate shows embers (`decor/extra/fireplace-night-unused.png`, a room whose only resident, the baby, sleeps: no firelight). A real fire is lit by someone, burns for hours, and its light and flames go together. A "light the fire" use (or the flames following the light) is missing. Not shot: an awake room at night with nobody at the fire.
-- **Status:** open
+- **Status:** fixed (0eaa3ba7)
+- **After:** fires (content `light.fire`: `fireplace`, `firePit`, `fireplaceElectric`) switch as lamps do (Light the fire / Put out the fire); nobody lights one for coming in, sitting down by it in the dark lights it, it goes out with the room's lamps as the last one awake leaves and burns down by morning (`lights.rs`, `world.rs` `arrive`; sim tests `lamps.rs` `a_fire_is_lit_to_sit_by_and_burns_down_by_morning`, `a_fire_sat_by_in_daylight_isnt_lit`). Its flames (its uses' clips) burn while it's lit at night, with the firelight and the embers' glow (`objectMotion.ts` `burns`): `fixes/lighting/webgpu-medium/fireplace-cut.png`, `fireplace-up.png`, `firepit-lit.png`.
 - **Source:** wave: decor
 
 ### I-decor-04 — The coat stand has nothing to hang

@@ -126,7 +126,8 @@ pub struct ObjectInstance {
     /// A crop's growth (its kind `grows`; see `GrowthStage`): -1..0 lying fallow after it was
     /// picked, 0..1 planted and growing, 1 ripe. Bought ripe. Meaningless for other things.
     pub growth: f32,
-    /// A lamp switched off (see `lights.rs`); bought on. Meaningless for other things.
+    /// A lamp (or a fire) switched off (see `lights.rs`); bought off, on with a lot or a house's
+    /// file. Meaningless for other things.
     pub off: bool,
     /// Residents whose current use needs it closed (bits by sim id), so opening it under them is
     /// refused (`allows`). Derived from their tasks: set when the use reserves a slot, cleared
@@ -782,6 +783,9 @@ pub struct Sim {
     /// Opened or closed an object this tick (`Interaction::leaves`): how the house looks
     /// changed (applied after the step).
     pub(crate) reshaped: bool,
+    /// Lit a fire this tick (sat down by one in the dark: see `lights.rs`): the lamps' state
+    /// changed (applied after the step).
+    pub(crate) lit: bool,
     /// When they last woke someone crying (a baby), or were woken by a crying baby (a
     /// grown-up), as a tick (0: never; see `World::wake_for_crying_babies`).
     pub(crate) night_woken: u64,
@@ -1650,13 +1654,16 @@ impl World {
         let called = |o: &ObjectInstance| self.content.objects[o.def].name.to_lowercase();
         for (tx, tz) in obj.tiles(&self.content) {
             // Furniture needs free floor; things on a wall, the ceiling or rugs only a free spot
-            // on their own layer (and a hanging plant that hangs low the floor as well).
+            // on their own layer (and a hanging plant that hangs low the floor as well). A lamp at
+            // head height takes the floor from walking only: furniture goes under it.
             let floor = self.lot.in_bounds(tx, tz) && self.blocked[self.lot.tile_index(tx, tz)];
+            let furniture = || self.objects.iter().any(|o| !self.content.objects[o.def].layer.mounted() && on(o, (tx, tz)));
             let taken = if layer.mounted() {
                 self.objects.iter().any(|o| self.content.objects[o.def].layer == layer && on(o, (tx, tz)))
-                    || (d.hangs_low && floor && !self.objects.iter().any(|o| !self.content.objects[o.def].layer.mounted() && on(o, (tx, tz))))
+                    || (d.hangs_low && floor && !furniture())
             } else {
-                floor && !self.objects.iter().any(|o| self.content.objects[o.def].hangs_low && on(o, (tx, tz)))
+                let hung = || self.objects.iter().any(|o| (self.content.objects[o.def].hangs_low || self.content.objects[o.def].head_height) && on(o, (tx, tz)));
+                floor && (furniture() || !hung())
             };
             if !self.lot.in_bounds(tx, tz) || taken {
                 return Err(Error::new(format!(
@@ -1719,6 +1726,14 @@ impl World {
                 _ => {}
             }
         }
+        // Built to stand back to a wall (a wall-hung toilet's cistern box): plain wall behind it.
+        if d.against_wall {
+            match self.wall_behind(&obj) {
+                None => return Err(Error::new(format!("'{name}' at {x},{z} needs a wall behind it"))),
+                Some(true) => return Err(Error::new(format!("'{name}' at {x},{z} can't stand against a window"))),
+                _ => {}
+            }
+        }
         self.check_storey_fit(&obj)?;
         Ok(obj)
     }
@@ -1760,7 +1775,7 @@ impl World {
 
     /// What runs along the whole back edge of `obj`: None if not a wall (plain or with a window)
     /// all along, else whether a window is part of it.
-    fn wall_behind(&self, obj: &ObjectInstance) -> Option<bool> {
+    pub(crate) fn wall_behind(&self, obj: &ObjectInstance) -> Option<bool> {
         use crate::lot::Edge;
         let lot = &self.lot;
         obj.back_edges(&self.content).into_iter().try_fold(false, |window, (horizontal, x, z)| {
@@ -1963,6 +1978,7 @@ impl World {
             planner: Default::default(),
             mess: None,
             reshaped: false,
+            lit: false,
             care_out: None,
             night_woken: 0,
             conceived: None,
@@ -2303,6 +2319,9 @@ impl World {
                 // An object opened or closed: how it looks changes.
                 self.structure_version = self.structure_version.wrapping_add(1);
                 self.rooms_need_clean_rescore();
+            }
+            if std::mem::take(&mut self.sims[i].lit) {
+                self.lights_version = self.lights_version.wrapping_add(1);
             }
             if let Some(news) = self.sims[i].news.take() {
                 // Broken or mended: what the house offers and how it looks change.
@@ -5204,6 +5223,12 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
             if inter.picks && objects[object as usize].growth >= 0.0 {
                 objects[object as usize].growth = -1.0;
                 sim.reshaped = true;
+            }
+            // Sitting down by a fire in the dark, they light it (see `lights.rs`).
+            let o = &objects[object as usize];
+            if o.off && content.objects[o.def].fire && (crate::lights::dark_at(ctx.minute) || ctx.nav.stairs.storey(o.z) < 0) {
+                objects[object as usize].off = false;
+                sim.lit = true;
             }
         }
     }
