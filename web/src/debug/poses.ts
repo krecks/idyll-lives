@@ -6,10 +6,17 @@
  * Each station is one object and one Sim (two for social interactions) doing an activity tag;
  * a station with a `script` cycles through poses (sitting down, getting into bed, ...).
  *
- * URL: `?only=garden,water` (stations whose label contains any), `?cols=6`, `?gap=3.4`,
- * `?focus=<n>` (frame station n close up), `?alpha=…&beta=…&radius=…`, `?labels=0`,
+ * Objects are as the game has them: every content file `base.json` includes, with their footprints,
+ * slots and models.
+ *
+ * URL: `?only=bed,water` (stations whose label, object id or tag is one of these, exactly), `?cols=6`,
+ * `?gap=3.4`, `?focus=<n | label | object id>` (frame that station close up; one that isn't there
+ * says so on the page and in `__poses.error`), `?alpha=…&beta=…&radius=…`, `?labels=0`,
  * `?manual` (time only advances via `__poses.advance(seconds)`, for screenshots), `?seats=sofa,toilet`
- * (a man and a woman seated on each),
+ * (one resident a slot on each, men and women in turn, sitting; an object that only opens to be used, a
+ * wall bed or a futon, open), `?seats=sofaBed:doze,chessTable:play` (doing that use, by interaction id
+ * or animation tag: its pose, its clip, the object's clips for it held open, and open if the use opens
+ * it), `?beds=wallBed,sofaBed:doze` (the same, the first use lying down unless one is named),
  * `?clip=walk` (every Sim plays that clip: `__characters.force`), `?clip=walk&strip=8` (a filmstrip:
  * the clip held at 8 times through it, on a man, a woman, a child, a teen and an elder; no stations),
  * `?bottom=bottom.skirt` (everyone who can wears that bottom),
@@ -42,7 +49,7 @@ import { Pose, type SnapshotLayout } from '../core/snapshot';
 import { lookAtStage, palette } from '../game/household';
 import { Characters, MAX_CHARACTERS } from '../render/babylon/characters';
 import { MaterialLibrary } from '../render/babylon/materials';
-import { buildModel } from '../render/babylon/models';
+import { buildModel, motionsOf, partPose } from '../render/babylon/models';
 import { installNature } from '../render/babylon/nature';
 
 const P = Pose;
@@ -77,6 +84,11 @@ interface Station {
   alone?: boolean;
   /** A second Sim (a woman) does the same in the object's second slot (two in a double bed). */
   pair?: boolean;
+  /** One Sim a slot of the object (`?seats`, `?beds`), a man, then a woman, and so on. */
+  seated?: boolean;
+  /** The object drawn open (a wall bed folded down), and its clips for this use (interaction id or tag) held open. */
+  open?: boolean;
+  clips?: string[];
   /** The station's Sim's height and build (appearance; 1 = average). */
   height?: number;
   build?: number;
@@ -225,7 +237,7 @@ const STATIONS: Station[] = [
 ];
 
 const params = new URLSearchParams(location.search);
-const only = params.get('only')?.split(',');
+const only = params.get('only')?.split(',').filter(Boolean);
 const forced = params.get('clip');
 const strip = Number(params.get('strip')) || 0;
 const stage = params.get('stage');
@@ -247,16 +259,49 @@ const allows = (s: Station, a: Actor, st: string): boolean => {
   const grownUp = st !== 'child' && st !== 'teen';
   return grownUp || (!s.baby && s.social !== 'flirt' && s.social !== 'kiss');
 };
-// `?seats=sofa,toilet`: a man and a woman sitting on each of those objects instead of the stations.
-const seats = params.get('seats')?.split(',');
+// The content as the game loads it (`base.json` and every file it includes): object defs (model,
+// footprint, slots, uses), the seats it describes, the items Sims carry and the life stages.
+const base = import.meta.env.BASE_URL;
+const content = await Content.load(`${base}content/base.json`);
+/** What the page couldn't do as asked (an object or station that isn't there), shown on it and in `__poses.error`. */
+const problems: string[] = [];
+
+/**
+ * `?seats=<def>[:<use>]` (`lie` false) or `?beds=…` (true): one Sim a slot of the object, doing the
+ * use named (an interaction id, else an animation tag), or else sitting (`seats`) or its first use
+ * lying down (`beds`). Drawn open if that use opens it, or, sitting, if only a use that opens it
+ * puts anyone on it (a futon).
+ */
+function seatStation(spec: string, lie: boolean): Station {
+  const [id, use] = spec.split(':');
+  const def = content.object(id);
+  if (!def) problems.push(`no object '${id}'`);
+  const uses = def?.interactions ?? [];
+  const it = use ? uses.find((u) => u.id === use) : lie ? uses.find((u) => u.pose === 'lie') : undefined;
+  if (lie && !use && !it) problems.push(`${id}: no use lying down`);
+  if (use && !it && !content.animations.includes(use)) problems.push(`${spec}: neither a use of ${id} nor an animation tag`);
+  const pose = it ? (it.pose === 'lie' ? P.Lie : it.pose === 'sit' ? P.Sit : P.Stand) : lie ? P.Lie : P.Sit;
+  const tag = it ? (it.anim ?? (pose === P.Lie ? 'sleep' : pose === P.Sit ? 'sit' : '')) : (use ?? (lie ? 'sleep' : 'sit'));
+  // Whether it is open while this goes on: the use's own `leaves` / `when`, or for the plain sit, that of the way it is sat on (or else lain on).
+  const way = it ?? uses.find((u) => u.pose === 'sit') ?? uses.find((u) => u.pose === 'lie');
+  const open = way?.leaves === 'open' || way?.when === 'open';
+  return { label: spec, def: id, tag, pose, seated: true, open, clips: it || use ? [it?.id ?? use, tag] : undefined };
+}
+const seats = params.get('seats')?.split(',').filter(Boolean);
+const beds = params.get('beds')?.split(',').filter(Boolean);
 const bottom = params.get('bottom');
+/** `?only=`: stations whose label, object id or activity tag is one of these. */
+const named = (o: string, s: Station) => o === s.label || o === s.def || o === s.tag;
 const stations: Station[] = strip
   ? STRIP_ROWS.flatMap((r) => Array.from({ length: strip }, (_, k) => ({ label: `${r.label} ${k}/${strip}`, female: r.female, stage: r.stage, strip: k / strip })))
-  : seats
-    ? seats.flatMap((def) => [false, true].map((female) => ({ label: def, def, tag: 'sit', pose: P.Sit, female })))
+  : seats || beds
+    ? [...(seats ?? []).map((s) => seatStation(s, false)), ...(beds ?? []).map((s) => seatStation(s, true))]
     : only
-    ? STATIONS.filter((s) => only.some((o) => s.label.includes(o) || s.def?.includes(o) || s.tag === o))
-    : STATIONS;
+      ? STATIONS.filter((s) => only.some((o) => named(o, s)))
+      : STATIONS;
+for (const o of only && !strip && !seats && !beds ? only : []) {
+  if (!STATIONS.some((s) => named(o, s))) problems.push(`only=${o}: no station with that label, object id or tag`);
+}
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
@@ -276,36 +321,20 @@ const shadowGen = new ShadowGenerator(2048, sun);
 shadowGen.usePercentageCloserFiltering = true;
 shadowGen.bias = 0.002;
 
-const base = import.meta.env.BASE_URL;
 const assets = await AssetRegistry.load(`${base}assets/manifest.json`, params.getAll('pack'));
 const lib = MaterialLibrary.for(scene).setAssets(assets);
 const env = assets.get('environment.sky', 'image');
 if (env?.url) await lib.loadEnvironment(env.url);
 
-// Content: object defs (model and footprint) and the animation tags.
-interface DefRaw {
-  id: string;
-  model?: string;
-  footprint?: [number, number];
-  slots?: number;
-  interactions?: { inside?: boolean }[];
-}
-const PACKS = ['bookworm', 'cheerful', 'couchPotato', 'energetic', 'foodie', 'gloomy', 'hotHeaded', 'kind', 'lazy', 'loner', 'natureLover', 'neat', 'outgoing', 'romantic', 'slob'];
-const files = await Promise.all(
-  ['base', 'furniture', 'garden', 'catalog2/living', 'catalog2/hobbies', 'catalog2/kids', 'catalog2/bedroom', ...PACKS.map((p) => `packs/${p}`)].map((f) =>
-    fetch(`${base}content/${f}.json`)
-      .then((r) => r.json() as Promise<{ objects?: DefRaw[]; animations?: string[] }>)
-      .catch(() => ({ objects: [] as DefRaw[], animations: undefined as string[] | undefined })),
-  ),
-);
-const defs = new Map<string, DefRaw>();
-for (const f of files) for (const o of f.objects ?? []) defs.set(o.id, o);
-const actions = [...(files[0].animations ?? [])];
+// The animation tags, and those the stations use that the content doesn't list.
+const actions = [...content.animations];
 for (const s of stations) for (const t of [s.tag, ...(s.script ?? []).map((x) => x.tag)]) if (t && !actions.includes(t)) actions.push(t);
 
 // Layout: stations in a grid, each object at its cell's centre facing +z.
 const cols = Number(params.get('cols')) || (strip ? strip : Math.ceil(Math.sqrt(stations.length * 1.4)));
-const gap = Number(params.get('gap')) || (strip ? 1.1 : 3.4);
+// (Seats and beds: room past the largest, a wall bed folded down clear of the next.)
+const largest = Math.max(0, ...stations.filter((s) => s.seated).map((s) => Math.max(...(content.object(s.def!)?.footprint ?? [1, 1]))));
+const gap = Number(params.get('gap')) || (strip ? 1.1 : Math.max(3.4, largest + 1.6));
 const rows = Math.ceil(stations.length / cols);
 const ground = MeshBuilder.CreateGround('ground', { width: cols * gap + 6, height: rows * gap + 6 }, scene);
 const gm = new PBRMaterial('ground', scene);
@@ -330,14 +359,15 @@ interface Actor {
   inside?: boolean;
   /** The baby lying in the station's crib. */
   baby?: boolean;
-  /** The station's second Sim (`Station.pair`). */
-  second?: boolean;
+  /** A woman: the station's second Sim (`Station.pair`), or every other one of `Station.seated`. */
+  female?: boolean;
 }
 const objects: ObjectPlacement[] = [];
 const actors: Actor[] = [];
 const labels = document.getElementById('labels')!;
 const spots: { at: Vector3; el: HTMLSpanElement }[] = [];
 const centres: Vector3[] = [];
+const posed = new Float32Array(16);
 const look = (id: number, female: boolean, stage?: string, height = 1, build = 1): SimInfo => ({
   id,
   name: '',
@@ -363,33 +393,54 @@ await Promise.all(
     const cx = ((n % cols) - (cols - 1) / 2) * gap;
     const cz = -(Math.floor(n / cols) - (rows - 1) / 2) * gap;
     centres.push(new Vector3(cx, 0, cz));
+    // Its label on the floor just in front of it: of its object, else of where its Sims stand.
+    let labelAt = new Vector3(cx, 0, cz + 1);
     if (s.strip !== undefined) {
       actors.push({ station: n, x: cx, z: cz, yaw: 0, object: -1, partner: -1, role: 0 });
     } else if (s.social) {
       actors.push({ station: n, x: cx, z: cz - 0.5, yaw: 0, object: -1, partner: 0, role: 1 });
       actors.push({ station: n, x: cx, z: cz + 0.5, yaw: Math.PI, object: -1, partner: 0, role: 2 });
     } else if (s.def) {
-      const def = defs.get(s.def);
+      const def = content.object(s.def);
       const [w, d] = def?.footprint ?? [1, 1];
       const ox = Math.round(cx - w / 2);
       const oz = Math.round(cz - d / 2);
       const id = objects.length;
-      objects.push({ id, def: s.def, x: ox, z: oz, rot: 0, w, d, quality: 0, sellValue: null });
+      objects.push({ id, def: s.def, x: ox, z: oz, rot: 0, w, d, quality: 0, sellValue: null, ...(s.open ? { open: true } : {}) });
       const key = def?.model ?? `model.${s.def}`;
-      const template = await buildModel(scene, key, assets.get(key, 'model'), [w, d]);
-      for (const mesh of template.meshes) {
-        mesh.thinInstanceSetBuffer('matrix', Matrix.Translation(ox + w / 2, 0, oz + d / 2).asArray() as unknown as Float32Array, 16, true);
+      const entry = assets.get(key, 'model');
+      const template = await buildModel(scene, key, entry, [w, d]);
+      // Open (a wall bed folded down) and the use's own clips held open, as the game holds them.
+      const motions = motionsOf(entry);
+      // (Each clip once: a sofa bed's `open` is its pull-out use's clip too.)
+      const held = new Set([...(s.open && motions?.open ? [motions.open] : []), ...(s.clips ?? []).flatMap((c) => (motions?.uses[c] ?? []).map((u) => u.clip))]);
+      const playing = [...held].flatMap((name) => {
+        const clip = template.motion?.clips.get(name);
+        return clip ? [{ clip, time: clip.duration, kind: 'use' }] : [];
+      });
+      const place = Matrix.Translation(ox + w / 2, 0, oz + d / 2);
+      for (const [i, mesh] of template.meshes.entries()) {
+        const part = template.motion ? template.motion.parts[i] : -1;
+        const m = part >= 0 && playing.length && partPose(playing, part, posed) ? Matrix.FromArray(posed).multiply(place) : place;
+        mesh.thinInstanceSetBuffer('matrix', m.asArray() as unknown as Float32Array, 16, true);
         mesh.receiveShadows = true;
         shadowGen.addShadowCaster(mesh);
       }
       // Standing use: centred on the front tile, facing the object; sitting / lying (or
-      // standing inside, a shower): on the (first) slot, facing out (as sim-core places them).
+      // standing inside, a shower): on the slot, facing out (as sim-core places them: spread
+      // across its width, a bunk's one above the other).
       const slots = def?.slots ?? 1;
-      const slotX = ox + w / 2 + (0 - (slots - 1) / 2) * (w / slots);
+      const slotX = (k: number) => ox + w / 2 + (k - (slots - 1) / 2) * (def?.bunk ? 0.04 : w / slots);
       const inside = def?.interactions?.some((it) => it.inside) ?? false;
-      if (!s.alone) actors.push({ station: n, x: slotX, z: oz + d / 2, yaw: 0, object: id, partner: -1, role: 0, frontX: ox + Math.floor((w - 1) / 2) + 0.5, frontZ: oz + d + 0.5, inside });
-      if (s.baby) actors.push({ station: n, x: slotX, z: oz + d / 2, yaw: 0, object: id, partner: -1, role: 0, baby: true });
-      if (s.pair) actors.push({ station: n, x: slotX + w / slots, z: oz + d / 2, yaw: 0, object: id, partner: -1, role: 0, second: true });
+      const front = { frontX: ox + Math.floor((w - 1) / 2) + 0.5, frontZ: oz + d + 0.5 };
+      if (s.seated) {
+        for (let k = 0; k < slots; k++) actors.push({ station: n, x: slotX(k), z: oz + d / 2, yaw: 0, object: id, partner: -1, role: 0, ...front, inside, female: k % 2 === 1 });
+      } else if (!s.alone) {
+        actors.push({ station: n, x: slotX(0), z: oz + d / 2, yaw: 0, object: id, partner: -1, role: 0, ...front, inside });
+      }
+      if (s.baby) actors.push({ station: n, x: slotX(0), z: oz + d / 2, yaw: 0, object: id, partner: -1, role: 0, baby: true });
+      if (s.pair) actors.push({ station: n, x: slotX(1), z: oz + d / 2, yaw: 0, object: id, partner: -1, role: 0, female: true });
+      labelAt = new Vector3(ox + w / 2, 0, oz + d + 0.1);
     } else {
       actors.push({ station: n, x: cx, z: cz, yaw: 0, object: -1, partner: -1, role: 0 });
     }
@@ -397,18 +448,16 @@ await Promise.all(
       const el = document.createElement('span');
       el.textContent = `${n}: ${s.label}`;
       labels.append(el);
-      spots.push({ at: new Vector3(cx, 0, cz + gap * 0.42), el });
+      spots.push({ at: labelAt, el });
     }
   }),
 );
 actors.sort((a, b) => a.station - b.station);
-// The base content (with its includes): seats it describes, the items Sims carry and the life stages.
-const content = await Content.load(`${base}content/base.json`);
 const hairPalette = palette(assets, 'palette.hair');
 // Stations load in any order: row i is actor i after sorting (a station's own actors keep their order).
 const actorSims = actors.map((a, i) => {
   const s = stations[a.station];
-  const sim = a.baby ? look(i, i % 2 === 0, 'baby') : look(i, s.social ? a.role === 2 : !!s.female || !!a.second, s.stage, s.height, s.build);
+  const sim = a.baby ? look(i, i % 2 === 0, 'baby') : look(i, s.social ? a.role === 2 : !!s.female || !!a.female, s.stage, s.height, s.build);
   // `?stage` and the strip's rows take the game's look for the stage (the stations' own stages keep theirs).
   const st = stage && allows(s, a, stage) ? stage : s.strip !== undefined ? s.stage : undefined;
   if (st) sim.appearance = lookAtStage(sim.appearance, content.lifeStages.find((x) => x.id === st), hairPalette);
@@ -505,13 +554,20 @@ function writeSnapshot(): void {
   });
 }
 
-const focus = params.get('focus');
-const target = focus !== null ? centres[Number(focus)].add(new Vector3(0.3, 0.7, 0.75)) : Vector3.Zero();
+/** A station by its index, label or object id (the first with it); -1 if there's none. */
+function stationOf(at: number | string): number {
+  const n = typeof at === 'number' || /^\d+$/.test(at) ? Number(at) : stations.findIndex((s) => s.label === at || s.def === at);
+  return n >= 0 && n < stations.length ? n : -1;
+}
+const focusParam = params.get('focus');
+const focus = focusParam === null ? -1 : stationOf(focusParam);
+if (focusParam !== null && focus < 0) problems.push(`focus=${focusParam}: no such station (an index 0–${stations.length - 1}, a label or an object id)`);
+const target = focus >= 0 ? centres[focus].add(new Vector3(0.3, 0.7, 0.75)) : Vector3.Zero();
 const camera = new ArcRotateCamera(
   'cam',
   Number(params.get('alpha') ?? Math.PI / 2 + 0.5),
   Number(params.get('beta') ?? 1.15),
-  Number(params.get('radius')) || (focus !== null ? 4 : Math.max(cols, rows) * gap * 1.05),
+  Number(params.get('radius')) || (focus >= 0 ? 4 : Math.max(cols, rows) * gap * 1.05),
   target,
   scene,
 );
@@ -528,6 +584,14 @@ scene.onAfterRenderObservable.add(() => {
     s.el.style.top = `${(p.y / engine.getRenderHeight()) * canvas.clientHeight}px`;
   }
 });
+
+if (problems.length) {
+  const el = document.createElement('span');
+  el.textContent = problems.join('; ');
+  Object.assign(el.style, { left: '50%', top: '8px', background: '#a00d', fontSize: '14px' });
+  labels.append(el);
+  console.warn(`poses: ${el.textContent}`);
+}
 
 const manual = params.has('manual');
 function step(dt: number): void {
@@ -554,12 +618,17 @@ Object.assign(window, {
     advance(seconds: number) {
       for (let t = 0; t < seconds - 1e-6; t += 1 / 30) step(1 / 30);
     },
-    focus(n: number, radius = 4, alpha?: number, beta?: number) {
+    /** Frames a station (index, label or object id) close up; throws if there's no such station. */
+    focus(at: number | string, radius = 4, alpha?: number, beta?: number) {
+      const n = stationOf(at);
+      if (n < 0) throw new Error(`no station ${at} (an index 0–${stations.length - 1}, a label or an object id)`);
       camera.target = centres[n].add(new Vector3(0.3, 0.7, 0.75));
       camera.radius = radius;
       if (alpha !== undefined) camera.alpha = alpha;
       if (beta !== undefined) camera.beta = beta;
     },
+    /** What the page couldn't do as asked (also shown on it), or null. */
+    error: problems.length ? problems.join('; ') : null,
     characters,
     camera,
   },
