@@ -1256,8 +1256,17 @@ impl World {
             sim.queue.retain(|t| !uses_object(&t.kind, id));
             // (A routine's next step, washing hands at this sink, goes with it.)
             sim.follow_up = sim.follow_up.take().filter(|t| !uses_object(&t.kind, id));
+            // Talking from the seat that goes: on their feet, and nothing to sit back down to.
+            if sim.paused.as_ref().is_some_and(|a| uses_object(&a.task.kind, id)) {
+                sim.paused = None;
+                if sim.use_seat.is_none() {
+                    sim.seated_from = None;
+                    sim.pose = crate::content::Pose::Stand;
+                }
+            }
             let current = sim.current.as_mut().map(|a| &mut a.task);
-            for t in current.into_iter().chain(sim.queue.iter_mut()).chain(sim.follow_up.iter_mut()) {
+            let paused = sim.paused.as_mut().map(|a| &mut a.task);
+            for t in current.into_iter().chain(paused).chain(sim.queue.iter_mut()).chain(sim.follow_up.iter_mut()) {
                 shift_objects(&mut t.kind, id);
             }
             sim.remap_unreachable(|o| if o == id { None } else { Some(if o > id { o - 1 } else { o }) });
