@@ -1701,7 +1701,9 @@ export class HouseBuilder {
         // Sectional door on the street side, with a coach lamp beside it.
         const plane = b.front > 0 ? g.z1 + T : g.z0 - T;
         const n: V3 = [0, 0, b.front];
-        const [d0, d1] = [g.x0 + 0.35, g.x1 - 0.35];
+        // A single garage's door, 2.4–2.5 m (wider garages keep their walls either side).
+        const half = Math.min(g.x1 - g.x0 - 0.7, 2.5) / 2;
+        const [d0, d1] = [(g.x0 + g.x1) / 2 - half, (g.x0 + g.x1) / 2 + half];
         trim.color(TRIM).box(...span('h', plane, n, d0 - 0.1, d1 + 0.1, 0, 2.25, 0.03));
         const door = hash(b.x0, b.z0, 9) < 0.5 ? '#F2F0EA' : s.accent;
         trim.color(door).box(...span('h', plane, n, d0, d1, 0, 2.12, 0.045));

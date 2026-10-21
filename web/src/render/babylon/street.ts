@@ -52,6 +52,8 @@ const ROAD_Y = 0.012;
 /** Paths at least this wide are driveways (garden paths are 1 m; see `game/town.ts`). */
 const DRIVEWAY_MIN_WIDTH = 1.8;
 const GARAGE_DEPTH = 5.4;
+/** A garage's least width between its wall lines: 3 m inside, a single garage's (its door 2.4 m). */
+const GARAGE_WIDTH = 3.14;
 /** Half wall thickness (as in house.ts). */
 const T = 0.07;
 
@@ -196,7 +198,11 @@ interface CarBody {
   wid: number;
   wheelR: number;
   wheelBase: number;
-  /** Side profile of the lower body (z forward, y up), convex, counter-clockwise. */
+  /**
+   * Side profile of the lower body (z forward, y up), convex, counter-clockwise; its first two
+   * points the sills, at the ground clearance (a saloon's 0.13–0.16 m, a compact SUV's 0.2 m, and
+   * a little for the sills).
+   */
   low: [number, number][];
   /** Greenhouse: base rear z, base front z, roof rear z, roof front z, belt y, roof y. */
   cabin: [number, number, number, number, number, number];
@@ -204,13 +210,13 @@ interface CarBody {
 
 const CARS: CarBody[] = [
   // Saloon.
-  { len: 4.4, wid: 1.78, wheelR: 0.32, wheelBase: 2.65, low: [[-2.2, 0.3], [2.2, 0.3], [2.24, 0.52], [2.14, 0.74], [0.95, 0.88], [-1.35, 0.93], [-2.12, 0.88], [-2.24, 0.58]], cabin: [-1.4, 0.95, -0.8, 0.16, 0.9, 1.42] },
+  { len: 4.4, wid: 1.78, wheelR: 0.32, wheelBase: 2.65, low: [[-2.2, 0.17], [2.2, 0.17], [2.24, 0.52], [2.14, 0.74], [0.95, 0.88], [-1.35, 0.93], [-2.12, 0.88], [-2.24, 0.58]], cabin: [-1.4, 0.95, -0.8, 0.16, 0.9, 1.42] },
   // Hatchback.
-  { len: 4.0, wid: 1.74, wheelR: 0.31, wheelBase: 2.5, low: [[-1.98, 0.3], [2.0, 0.3], [2.04, 0.52], [1.96, 0.72], [0.85, 0.87], [-1.9, 0.93], [-2.02, 0.6]], cabin: [-1.9, 0.88, -1.72, 0.08, 0.9, 1.46] },
+  { len: 4.0, wid: 1.74, wheelR: 0.31, wheelBase: 2.5, low: [[-1.98, 0.17], [2.0, 0.17], [2.04, 0.52], [1.96, 0.72], [0.85, 0.87], [-1.9, 0.93], [-2.02, 0.6]], cabin: [-1.9, 0.88, -1.72, 0.08, 0.9, 1.46] },
   // SUV.
-  { len: 4.6, wid: 1.88, wheelR: 0.37, wheelBase: 2.75, low: [[-2.3, 0.4], [2.3, 0.4], [2.34, 0.66], [2.24, 0.92], [1.25, 1.02], [-2.25, 1.06], [-2.34, 0.7]], cabin: [-2.24, 1.28, -2.14, 0.48, 1.02, 1.76] },
+  { len: 4.6, wid: 1.88, wheelR: 0.37, wheelBase: 2.75, low: [[-2.3, 0.23], [2.3, 0.23], [2.34, 0.66], [2.24, 0.92], [1.25, 1.02], [-2.25, 1.06], [-2.34, 0.7]], cabin: [-2.24, 1.28, -2.14, 0.48, 1.02, 1.76] },
   // Estate.
-  { len: 4.6, wid: 1.8, wheelR: 0.32, wheelBase: 2.7, low: [[-2.3, 0.3], [2.3, 0.3], [2.34, 0.52], [2.24, 0.74], [1.05, 0.88], [-2.25, 0.93], [-2.33, 0.6]], cabin: [-2.24, 1.05, -2.1, 0.25, 0.9, 1.45] },
+  { len: 4.6, wid: 1.8, wheelR: 0.32, wheelBase: 2.7, low: [[-2.3, 0.17], [2.3, 0.17], [2.34, 0.52], [2.24, 0.74], [1.05, 0.88], [-2.25, 0.93], [-2.33, 0.6]], cabin: [-2.24, 1.05, -2.1, 0.25, 0.9, 1.45] },
 ];
 
 /** A parked car in `p`'s frame (front towards +z), sitting on the ground at `y`. */
@@ -292,7 +298,8 @@ function car(p: Painter, body: CarBody, paint: string): void {
   // Bumpers, lights, grille, plates, mirrors.
   const zf = Math.max(...low.map((q) => q[0]));
   const zb = Math.min(...low.map((q) => q[0]));
-  const yl = low[0][1];
+  // Bumpers and lights by the wheels' height, not the sills'.
+  const yl = body.wheelR - 0.02;
   p.paint('#2A2C2E', 0.6, 0);
   p.box(-hw + 0.04, yl - 0.02, zf - 0.12, hw - 0.04, yl + 0.16, zf + 0.04);
   p.box(-hw + 0.04, yl - 0.02, zb - 0.04, hw - 0.04, yl + 0.16, zb + 0.12);
@@ -751,10 +758,7 @@ export class Street {
           }
         }
       }
-      // Dashed centre line.
-      props.at(0, 0).paint('#E8E2CC', 0.6, 0);
-      const zc = st.z + st.d / 2;
-      for (let x = st.x + 1; x + 2.4 < st.x + st.w - 1; x += 5) props.poly([[x, ROAD_Y + 0.005, zc - 0.06], [x + 2.4, ROAD_Y + 0.005, zc - 0.06], [x + 2.4, ROAD_Y + 0.005, zc + 0.06], [x, ROAD_Y + 0.005, zc + 0.06]], [0, 1, 0]);
+      // No centre line: 3.3 m between the kerbs is one lane, a mews (two would need 5.5 m or more).
     }
 
     perfEnd(sidewalks);
@@ -1127,17 +1131,14 @@ export class Street {
     const h = L.house;
     if (!d || !h || hash(L.plot.x, L.plot.z, 50) > 0.7) return null;
     const { plot, front } = L;
+    // As wide as the drive and a little more, at least a single garage's `GARAGE_WIDTH`, moved
+    // (off the drive's middle if it must) to stand clear of the house and the plot's edge.
     const toRight = d.x >= h.x1;
-    let x0 = d.x - 0.15;
-    let x1 = d.x + d.w + 0.15;
-    if (toRight) {
-      x0 = Math.max(x0, h.x1 + 0.35);
-      x1 = Math.min(x1, plot.x + plot.w - 0.45);
-    } else {
-      x0 = Math.max(x0, plot.x + 0.45);
-      x1 = Math.min(x1, h.x0 - 0.35);
-    }
-    if (x1 - x0 < 2.7) return null;
+    const [lo, hi] = toRight ? [h.x1 + 0.35, plot.x + plot.w - 0.45] : [plot.x + 0.45, h.x0 - 0.35];
+    const w = Math.max(d.w + 0.3, GARAGE_WIDTH);
+    if (hi - lo < w) return null;
+    const x0 = Math.min(Math.max(d.x + d.w / 2 - w / 2, lo), hi - w);
+    const x1 = x0 + w;
     const inner = front > 0 ? d.z : d.z + d.d;
     const [z0, z1] = front > 0 ? [inner - GARAGE_DEPTH, inner] : [inner, inner + GARAGE_DEPTH];
     if (z0 < plot.z + 0.8 || z1 > plot.z + plot.d - 0.8) return null;
