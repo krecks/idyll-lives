@@ -8,7 +8,7 @@ chicken coop (`model.farm.coop`). Built 2026-10-14; they sat in Validate › Far
 
 They stand on the farm lots of farm worlds, placed by id in `web/src/game/town.ts` `farmstead` (the farmyard behind
 the house, hay on the fallow field, a scarecrow in a crop row), not by category or group. Each is built in the game's
-axes (`F`) and centred on its footprint by `G.settle`; the sizes are the old parts', within 3 %.
+axes (`F`) and centred on its footprint by `G.settle`; the sizes are the old parts', within 3 % (but the bale's and the tractor's, below).
 
 ## Far versions (E7)
 
@@ -36,8 +36,11 @@ Every model has a `<id>.far.glb` for the town overview (the menus' town, the new
   a cage would reach past the 3 × 3 footprint.
 - **Tractor**: big rear wheels with tread lugs under green fenders, small front wheels, a hood with a grille,
   headlights and side vents, an exhaust stack and air pre-cleaner. It has a seat and steering wheel under a canopy
-  on four posts, front weights and a drawbar. Tail lamps sit on the rear posts.
-- **Round bale**: a roll lying on its side, its ends rolled in rings (`hay_dark`), three bands of twine.
+  on four posts, front weights and a drawbar. Tail lamps sit on the rear posts. A compact tractor, as its name says:
+  1.62 m over the rear fenders (2026-10-21; it was 1.98, a utility tractor's track).
+- **Round bale**: a roll lying on its side, its ends rolled in rings (`hay_dark`), three bands of twine. 1.2 m across
+  and 1.2 m long, up to an adult's chest, on 2 × 2 tiles (2026-10-21; it was 0.99 m on one, waist-high); `town.ts`
+  `farmstead` places it on the fallow field by its footprint.
 - **Hay stack**: three square bales, two side by side and one on top turned 3°, each tied twice, the cut ends darker.
 - **Scarecrow**: a post and cross-bar in a plaid shirt (dark check lines, collar, cuffs) and patched trousers.
   Straw pokes out at the hands, ankles, waist and neck. A sack head tied at the neck has a stitched face and a
@@ -78,8 +81,8 @@ The table says Paint, Roof. The barn, silo and coop take those with their real m
 |---|---|---|---|---|
 | `model.farm.barn` | 6.04 × 6.00 × 5.94 m | 2,842 | 596 | 1 |
 | `model.farm.silo` | 2.77 × 6.90 × 2.72 m | 4,348 | 556 | 1 |
-| `model.farm.tractor` | 1.98 × 2.50 × 3.28 m | 5,680 | 1,472 | 1 |
-| `model.farm.hayBale` | 0.88 × 1.00 × 1.00 m | 2,144 | 396 | 2 (hay fabric + plain) |
+| `model.farm.tractor` | 1.62 × 2.50 × 3.28 m | 5,680 | 1,472 | 1 |
+| `model.farm.hayBale` | 1.22 × 1.21 × 1.21 m | 2,144 | 396 | 2 (hay fabric + plain) |
 | `model.farm.hayStack` | 1.89 × 0.92 × 0.90 m | 468 | 92 | 2 |
 | `model.farm.scarecrow` | 0.99 × 2.13 × 0.54 m | 2,290 | 570 | 3 (post wood, clothes fabric, plain) |
 | `model.farm.trough` | 1.84 × 0.66 × 0.74 m | 1,012 | 208 | 1 |

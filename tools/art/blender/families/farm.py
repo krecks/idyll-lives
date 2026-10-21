@@ -396,8 +396,9 @@ def silo_far():
 
 
 # --- the tractor -----------------------------------------------------------------------------------------
-REAR_R, REAR_W, REAR_X, REAR_Z = 0.725, 0.42, 0.76, -0.75
-FRONT_R, FRONT_W, FRONT_X, FRONT_Z = 0.39, 0.28, 0.58, 1.3
+# A compact tractor's track: 1.58 m over the rear tyres (it was 1.98, a utility tractor's).
+REAR_R, REAR_W, REAR_X, REAR_Z = 0.725, 0.38, 0.6, -0.75
+FRONT_R, FRONT_W, FRONT_X, FRONT_Z = 0.39, 0.26, 0.5, 1.3
 
 
 def _wheel(name, x, z, r, w, lugs, segments=28):
@@ -429,7 +430,7 @@ def tractor(detail=True):
         _wheel(f'front{s}', s * FRONT_X, FRONT_Z, FRONT_R, FRONT_W, 18 if detail else 0, 28 if detail else 14)
         # the fender over each rear wheel, and a step
         arc = [(REAR_Z + 0.82 * math.cos(math.radians(a)), REAR_R + 0.82 * math.sin(math.radians(a))) for a in range(160, 5, -15)]
-        _shell(f'fender{s}', arc, 0.04, s * 0.53, s * 0.99, green, axis='x')
+        _shell(f'fender{s}', arc, 0.04, s * 0.4, s * 0.79, green, axis='x')
         F.box(f'step{s}', 0.3, 0.04, 0.3, (s * 0.38, 0.62, 0.08), M.iron)
     # chassis, axles, transmission housing under the cab, platform
     F.box('chassis', 0.56, 0.32, 2.6, (0, 0.55, 0.2), M.iron, bevel=0.02)
@@ -482,7 +483,10 @@ def tractor(detail=True):
 
 
 # --- hay -------------------------------------------------------------------------------------------------
-BALE_R, BALE_L = 0.495, 0.86
+# A round bale as they come off the baler: 1.2 m across and 1.2 m long, up to an adult's chest (it was 0.99 x 0.86 m,
+# waist-high), on 2 x 2 tiles. Its rings and twine are spaced for its size.
+BALE_R, BALE_L = 0.6, 1.2
+TWINE = (-0.35, 0.0, 0.35)
 
 
 def hayBale():
@@ -493,11 +497,11 @@ def hayBale():
                        (BALE_R + 0.005, 0), (BALE_R, hl - 0.08), (BALE_R - 0.03, hl - 0.02), (BALE_R - 0.09, hl), (0, hl)],
               at=F.at(0, y, 0), material=M.hay, segments=28, rot=(0, 90, 0))
     for s in (-1, 1):
-        for k, r in enumerate((0.1, 0.2, 0.3, 0.39)):
+        for k, r in enumerate((0.12, 0.24, 0.36, 0.47)):
             G.torus(f'spiral{s}{k}', r, 0.013, at=F.at(s * (hl - 0.004), y, 0), material=M.hay_dark, rot=(0, 90, 0),
                     major_segments=8 + 4 * k, minor_segments=4)
-        G.sphere(f'core{s}', 0.05, at=F.at(s * (hl - 0.005), y, 0), material=M.hay_dark, scale=(0.3, 1, 1), segments=8, rings=5)
-    for k, x in enumerate((-0.25, 0.0, 0.25)):
+        G.sphere(f'core{s}', 0.06, at=F.at(s * (hl - 0.005), y, 0), material=M.hay_dark, scale=(0.3, 1, 1), segments=8, rings=5)
+    for k, x in enumerate(TWINE):
         G.torus(f'twine{k}', BALE_R - 0.003, 0.008, at=F.at(x, y, 0), material=M.twine, rot=(0, 90, 0),
                 major_segments=28, minor_segments=4)
     return G.settle([G.join_all('hayBale')])
@@ -509,8 +513,8 @@ def hayBale_far():
     G.revolve('bale', [(0, -hl), (BALE_R - 0.06, -hl), (BALE_R, -hl + 0.07), (BALE_R + 0.005, 0), (BALE_R, hl - 0.07),
                        (BALE_R - 0.06, hl), (0, hl)], at=F.at(0, y, 0), material=M.hay, segments=14, rot=(0, 90, 0))
     for s in (-1, 1):
-        G.cylinder(f'end{s}', 0.3, 0.01, at=F.at(s * (hl - 0.002), y, 0), material=M.hay_dark, rot=(0, 90, 0), verts=10)
-    for k, x in enumerate((-0.25, 0.0, 0.25)):
+        G.cylinder(f'end{s}', 0.36, 0.01, at=F.at(s * (hl - 0.002), y, 0), material=M.hay_dark, rot=(0, 90, 0), verts=10)
+    for k, x in enumerate(TWINE):
         G.cylinder(f'twine{k}', BALE_R + 0.02, 0.016, at=F.at(x, y, 0), material=M.twine, rot=(0, 90, 0), verts=14)
     return G.settle([G.join_all('hayBale_far')])
 
@@ -729,9 +733,9 @@ FAMILY = G.Family(
              paint=[('barn', 'Paint'), ('barn_roof', 'Roof'), ('barn_trim', 'Trim')]),
      G.Model('silo', silo, size=(2.77, 6.9, 2.72), tolerance=TOLERANCE, far=silo_far,
              paint=[('silo', 'Paint'), ('silo_cap', 'Roof')]),
-     G.Model('tractor', tractor, size=(1.98, 2.5, 3.28), tolerance=TOLERANCE, far=lambda: tractor(detail=False),
+     G.Model('tractor', tractor, size=(1.62, 2.5, 3.28), tolerance=TOLERANCE, far=lambda: tractor(detail=False),
              paint=[('tractor', 'Paint'), ('rims', 'Wheels')]),
-     G.Model('hayBale', hayBale, size=(0.88, 1.0, 1.0), tolerance=TOLERANCE, far=hayBale_far,
+     G.Model('hayBale', hayBale, size=(1.224, 1.21, 1.21), tolerance=TOLERANCE, far=hayBale_far,
              paint=[('twine', 'Twine')]),
      G.Model('hayStack', hayStack, size=(1.9, 0.915, 0.9), tolerance=TOLERANCE, far=0.25,
              paint=[('twine', 'Twine')]),

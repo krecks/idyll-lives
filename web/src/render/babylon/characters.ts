@@ -313,7 +313,7 @@ const STEP_IN: Record<string, StepIn> = {
   // Up to the board on the wall (its face 0.42 m behind the middle), the hands at it.
   whiteboard: { by: [[0, [], { to: 0.1 }]] },
   // Into the shelter at the timetable's end, on the back glass past the bench.
-  busStop: { by: [[0, [], { to: 0.2 }]], lanes: [-0.95] },
+  busStop: { by: [[0, [], { to: 0.05 }]], lanes: [-0.95] },
   // At the feeder's post, at its back left, clear of the bird bath.
   'kind.songbirdFeeder': { by: [[0, [], { to: 0.25 }]], lanes: [-0.2] },
   // At the microwave on the counter's right, the hands at its door.

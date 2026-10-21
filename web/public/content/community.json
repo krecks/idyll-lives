@@ -148,7 +148,7 @@
       "outdoors": true,
       "seat": {
         "height": 0.46,
-        "forward": -0.16
+        "forward": -0.3
       },
       "description": "A glass shelter with a bench for three and the timetable on the wall.",
       "interactions": [
@@ -1112,8 +1112,8 @@
       "name": "Round hay bale",
       "model": "model.farm.hayBale",
       "footprint": [
-        1,
-        1
+        2,
+        2
       ],
       "price": 60,
       "category": "community",

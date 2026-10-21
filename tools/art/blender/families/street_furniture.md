@@ -65,13 +65,16 @@ Decimate modifier). Their far versions sit on the floor at the full model's size
 - **Street lamp**: a fluted cast-iron base, a pole with collars, a lamplighter's ladder bar with ball ends, and a
   square lantern (frosted panes widening upwards in an iron frame) under a pyramid roof with a vent and finial. One
   draw call.
-- **Park bench**: four wooden seat slats and three back slats on three cast-iron supports (front and back legs, the
-  back upright, a seat rail, feet), with armrests and scrolls on the end supports.
+- **Park bench**: five wooden seat slats and three back slats, 2.5 m long, on three cast-iron supports (front and
+  back legs, the back upright, a seat rail, feet), with armrests and scrolls on the end supports; its three sitters
+  a metre apart on its three tiles (2026-10-21; it was 2.86 m, past a long bench's 1.8–2.5).
 - **Drinking fountain**: a stone slab, a turned stone pillar and bowl with a drain, a chrome bubbler at the back of
   the bowl turned to the front, and a chrome foot pedal.
 - **Litter bin**: a green ribbed bin on an iron post with two straps, an iron rim round a dark opening, a label.
-- **Bus shelter**: four posts, a roof with a fascia, glass at the back and the right-hand end in rails, a two-slat
-  bench on brackets, the timetable on the back glass and the stop's blue flag on the roof.
+- **Bus shelter**: four posts, a roof with a fascia, 1.2 m deep (2026-10-21; it was 0.98, the bench filling it), glass
+  at the back and the right-hand end in rails, a two-slat bench on brackets at the back (content `seat.forward`
+  -0.3), the timetable on the back glass and the stop's blue flag on the roof. The roof reaches 0.1 m past its tile
+  front and back.
 - **Post box**: a red pillar box on a black plinth, a band, a cornice and a dome, the slot's hooded housing with its
   flap, the collection times and a crest.
 - **Notice board**: a cork board between two walnut posts, framed, under a little gabled roof; six pinned notices.
@@ -87,10 +90,10 @@ Decimate modifier). Their far versions sit on the floor at the full model's size
 | Model | Size (w × h × d) | Triangles | Far | Draws | Colour parts |
 |---|---|---|---|---|---|
 | `model.streetLamp` | 0.66 × 4.24 × 0.47 m | 780 | 186 | 1 | Lamp post |
-| `model.parkBench` | 2.86 × 0.91 × 0.57 m | 2,052 | 512 | 2 | Frame |
+| `model.parkBench` | 2.50 × 0.91 × 0.57 m | 2,160 | 540 | 2 | Frame |
 | `model.drinkingFountain` | 0.56 × 1.09 × 0.56 m | 1,524 | 380 | 2 | Pillar |
 | `model.litterBin` | 0.47 × 0.97 × 0.58 m | 1,704 | 412 | 1 | Bin |
-| `model.busStop` | 2.98 × 2.89 × 0.98 m | 2,616 | 642 | 3 | Frame |
+| `model.busStop` | 2.98 × 2.89 × 1.20 m | 2,616 | 646 | 3 | Frame |
 | `model.postBox` | 0.50 × 1.53 × 0.52 m | 2,132 | 528 | 2 | Box |
 | `model.noticeBoard` | 1.02 × 2.07 × 0.35 m | 1,320 | 324 | 2 | Frame |
 | `model.phoneBooth` | 0.95 × 2.70 × 0.95 m | 3,100 | 714 | 4 | Kiosk |
