@@ -251,6 +251,17 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Status:** open (seen on `review-stage-night` only)
 - **Source:** community wave (night run)
 
+### M-community-07 — The slide's tower has no headroom: a crawl under the bar, a duck under the roof, the hoop too low to sit through
+
+- **Severity:** S2
+- **Rubric:** M1, M3, I2
+- **Fix class:** model
+- **Where:** `tools/art/blender/families/playground.py:171` (`slide`: the deck's top 1.43 m; `rail_back` across the ladder's top at 1.86 m; the roof's eaves at 1.93 m; `hoop` 0.27 m round the chute's mouth at 1.43 m); the round that copes with it, `web/src/render/babylon/characters/clips/rides.ts` (`slidePose` steps 3-5)
+- **Evidence:** `fixes/rides/slide-top.png`, `fixes/rides/slide/s-side-t0.550.png`–`t0.610.png`: the bar across the deck's back leaves 0.43 m over the deck where the ladder arrives, so a child gets in on hands and knees under it; the roof's eaves are 0.5 m over the deck, so a child sat at the top (about 0.6 m to the top of the head) ducks with the head at the eaves; the hoop over the chute's mouth rises 0.27 m over the chute's floor, so no one can slide through it sitting up, and the round goes down lain back. A real slide's platform has a metre or more over it, an open way in from the ladder between handrails, and a sit-down bar about 0.5 m up.
+- **Fix:** Blender wave: the roof up (the eaves at about 2.5 m), the back bar replaced by handrails either side of the ladder's top, the hoop larger (about 0.5 m) or a bar across. Then the round can stand on the deck and sit up to slide (`slidePose`).
+- **Status:** open
+- **Source:** fix: rides (G-19)
+
 ### I-community-01 — "Go down the slide" is standing at the foot of the chute
 
 - **Severity:** S1
@@ -258,7 +269,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** clip
 - **Where:** `web/src/render/babylon/characters.ts:477` (`ACTIONS.play`: `stand: ['spell']`, the hands-at-waist mime); `:193-199` (`STEP_IN`: the drinking fountain, the phone box and the climbing frame have a fitted round, the slide has none); `web/public/content/community.json:361` (`slide`: `anim: play`); the ladder at the back (`playground.py:185-191`)
 - **Evidence:** `sheets/obj-slide.png` (`play/slide-slide-01.png`), `sheets/age-slide.png` (`play/child/slide-slide-01.png`): the adult and the child stand on the tile in front of the run-out for 15 minutes, hands moving at the waist by the chute's end. Nobody climbs the ladder behind the tower or comes down the chute: the use named on the label never happens, and it is done at the wrong end of the object. The lead (the adult and the child stand at the foot) is confirmed. The climbing frame shows what the fix is: a `STEP_IN` round fitted per height (round the tower to the ladder, up, sit on the deck, down the chute on the seat, off at the run-out).
-- **Status:** open
+- **Status:** fixed (a5af337b)
+- **After:** a child's round on the slide (`STEP_IN` at the run-out's foot, `slide125`/`112`/`99` by height): round its right side to the ladder, up the five rungs hand and foot in turn, in under the bar onto the deck on hands and knees, sat at the top holding the hoop, lain back under it and down the chute on the back, sat up on the run-out, up off it and back round, about once a use at speed 1 (`fixes/rides/slide-round-side.png`, `fixes/rides/slide-top.png`, `fixes/rides/play/child/child-slide-slide-0*.png`). The adult is refused (G-45, `fixes/rides/play/adult/play-adult.jsonl`). The tower's headroom and the hoop make the climb in a crawl and the slide lain back: M-community-07.
 - **Source:** community wave (Phase 0 play shots, "Seen (not reviewed)")
 
 ### I-community-02 — Seats and places only go side by side, facing the front: riders, players and diners can't face each other

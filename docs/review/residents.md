@@ -396,6 +396,16 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Status:** confirmed and widened (pilot: `poses/seat-sofaF-elder.png`: the shins end in the cushion and the boots stand on the floor in front of the sofa, apart from the legs. The same for the child and the teen on the sofa, `sheets/seat-sofaM.png` top right and bottom left: their knees stop short of the 0.8 m deep seat's front, so the shins go down inside it. The adults are fine. A shorter seat depth per stage (sit further forward) or a legs-out pose for short thighs)
 - **Source:** Phase 0.7b check of `poses.html?stage=`; wave: cross-cutting (widened: `living/sheets/age-beanBag.png`, the child sits in the bean bag with only the shoes showing past its front, the shins inside it; teen, adult and elder sit upright on it, the shins in it to mid-calf)
 
+### A-residents-12 — Clips fitted to a thing by the height put a child's feet and hands about a tenth low
+
+- **Severity:** S3
+- **Rubric:** A1, A3
+- **Fix class:** clip
+- **Where:** `web/src/render/babylon/characters/clips/street.ts:27` (`sizes`: a size's share `s` is of the height), used by the fountain's, the climbing frame's and the games' clips (`games.ts` `POOL`, `FOOS`, `SMASH`, `BOULDER`); `web/src/render/babylon/characters/pose.ts:268` (the clip's pelvis moved by the body's `pelvisScale`)
+- **Evidence:** from the code and rig.json, not measured in a shot: the runtime moves a clip's pelvis by the body's `pelvisScale`, and a child's legs (and arms) are shorter for its height than a grown-up's: the male child's `pelvisScale` is 0.575 against a height share of 0.638 (the female's 0.554 against 0.653), teens and grown-ups within a few per cent. The `112` sizes are fitted to a body of share 0.63, so on a child every height and reach in them comes out about 9 % short: the climbing frame's deck (1.13 m) is stood on about 10 cm under its top, the bouldering wall's holds and the pool table's rail are reached for lower than they are. `fixes/rides/climbingFrame-child-deck.png` (the child crouched on the frame's deck, the feet hidden at the deck's top) doesn't settle it either way. The climbing frame's `climb112` slides of the child's left foot in `clip-baseline.json` may be the same cause: a child's hips are wider for its legs than the reference's, so the feet slide as the body turns over them. The slide's round, the bunk's ladder and the rides (`clips/rides.ts`, G-19, G-44, G-23) are fitted by the legs and pivot planted feet on the ball; the same fit for `sizes` (a size's share of the legs, not the height) would put the children's clips where the things are.
+- **Status:** open
+- **Source:** fix: rides
+
 ### M-residents-01 — Heads are about half a head bigger than the rubric's ratios at every stage
 
 - **Severity:** S3
@@ -600,7 +610,8 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters.ts:477` (`ACTIONS.play`: `sit: 'sitHands'`, `HANDS.keys`)
 - **Evidence:** `extra/swing-hands.png` (from `play/chunk2/swingSet-swing-01.png` and `play/chunk8-child/swingSet-swing-01.png`): the adult and the child sit on the swing with their forearms out over their knees and typing fingers, the chains passing beside their shoulders. On a swing both hands hold the chains at about shoulder height. `play` sitting is the desk-hands clip, right for the chess table, puzzles and consoles but not for rides; the same entry drives `rockingHorse` (kids: hands on the handles), `seesaw`, `springRider` and `merryGoRound` (community). A rides entry (or `sit` chosen by def, as `music` does), holding up in a grip.
-- **Status:** open
+- **Status:** fixed (b69bf74b)
+- **After:** the rides have their own clips (`RIDES` in characters.ts): on the swing both hands hold the chains at the chest, the legs pumping in time with the swing (`rideSwing172`/`147`/`112`, the clip held to its loop: out on the way forward, tucked on the way back), for the child, the teen and the adult (`fixes/rides/swing-pump-child.png`, `fixes/rides/rides-teen-adult.png`, `fixes/rides/play/*/…-swingSet-swing-0*.png`); the rocking horse, spring rider, seesaw and merry-go-round astride or holding their grips (I-community-13).
 - **Source:** outdoor wave (`play` adult and child)
 
 ### I-community-13 — Rides are sat like chairs: no astride pose on the spring horse or the seesaw
@@ -612,5 +623,6 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Fix class:** clip
 - **Where:** `web/src/render/babylon/characters.ts:471` (`ACTIONS.sit`), the seated clip (`characters/clips/seated.ts`); `tools/art/blender/families/playground.py:319` (the horse's barrel, 0.26 m across at the saddle), `:285-290` (the seesaw's seats and handles)
 - **Evidence:** `extra/poses/rides-child.png`, `sheets/age-springRider.png`: on the spring horse the knees come forward together over the neck as on a chair, the thighs through the barrel's sides, the hands loose rather than on the handles; on the seesaw both riders sit sideways off the plank (also I-community-02, the facing). A rider sits astride, the legs either side, the feet on the pegs, the hands on the grips. Needs an astride seated pose (a `legs: astride` seat, as `legs: out` exists).
-- **Status:** open
+- **Status:** fixed (b69bf74b)
+- **After:** astride the rocking horse (`rideHorse112`) and the spring rider (`rideSpring112`, the feet on the pegs), the thighs either side of the barrel and the hands on the handles; astride the seesaw's end facing along it to the middle, the two riders facing each other over the handles (`rideSeesaw147`/`112`, `RIDES` `face`); on the merry-go-round holding the rail beside them, the legs out on the platform or over its edge by where they sit (`rideRound…`). Child and teen in play: `fixes/rides/rides-child.png`, `merryGoRound-edge-child.png`, `rides-teen-adult.png`, `fixes/rides/play/child/`, `play/teen/`. The seesaw's facing is by the slot's side until seats per slot (G-62); the merry-go-round's hands assume its rail 0.25 m to a rider's side, as its slots are now.
 - **Source:** community wave (poses)

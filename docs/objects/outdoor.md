@@ -57,7 +57,7 @@ none.
 | `sunLounger` Sun lounger | 1x2 · floor | sunbathe:relax doze:nap | outdoor / seating | Frame, Cushions, Towel | Use | `recline`: the back lowers 30° for sunbathe and doze. |
 | `hammock` Hammock | 1x2 · floor | swing:relax doze:nap | outdoor / seating | Frame, Fabric, Stripes | Loop (E1) | `sway`: swings ±8° while lain in (E1). |
 | `porchSwing` Porch swing | 2x1 · floor | swing:relax | outdoor / seating | Seat, Frame, Chains, Cushion | Loop (E1) | `swing`: the seat swings ±10° while sat in (E1). |
-| `swingSet` Swing set | 2x1 · floor | swing:play | outdoor / play | Frame, Seats | Loop (E1) | `swing`: the seat swings while played (E1). |
+| `swingSet` Swing set | 2x1 · floor | swing:play | outdoor / play | Frame, Seats | Loop (E1) | `swing`: the seat swings while played (E1). Both hands on the chains, the legs pumping in time with it (`rideSwing172`/`147`/`112`). |
 | `hotTubCedar` Cedar hot tub | 2x2 · floor | soak:bath coverOn:fetch | outdoor / seating | Cedar, Cover | Use + Loop | `cover_off`: the cover slides off and folds back for soak and stays off (C1) until "Put the cover on" (`coverOn`); `bubbles`: the water bubbles while soaking (E1). |
 
 **In play** (signed off 2026-10-17):
