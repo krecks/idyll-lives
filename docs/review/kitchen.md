@@ -377,15 +377,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Status:** open
 - **Source:** wave: kitchen (`scratch/scene.mjs` recipe scene, `check.mjs play`)
 
-### A-kitchen-02 — The hob, the oven and the microwave don't work when the meal was started somewhere else
-
-- **Severity:** S2
-- **Rubric:** A10, I7, I13
-- **Fix class:** motion
-- **Where:** `web/public/assets/packs/kitchen_cooking/manifest.json:5`, `:49`, `:103`, `:141`, `:192`, `:238` (the cookers' and the microwave's `motions.uses` keyed by their own use ids: `cook`, `gourmet`, `bake`, `roast`, `reheat`); `crates/sim-core/src/snapshot.rs:140` (at a station that isn't the recipe's origin the interaction is -1, so only the step's tag, `stir`, reaches the renderer); `web/src/render/babylon/objectMotion.ts:413`
-- **Evidence:** `kitchen/extra/meal-fridge-stoveGas.json`: "Make a meal" started at the fridge, cooked on the gas range from 42.2 to 62.3 s with the `stir` clip and the pan drawn on its hob; no clip on the range moves (no `burner_on` flame, no knob), against `kitchen/play/c5/stoveGas-cook-01.png` where "Cook dinner" chosen at the range itself lights the ring. The same with only a microwave (`meal-fridge-microwave.json`: no `door_open`, no turntable) and only an oven tower (`meal-fridge-wallOven.json`: no `oven_open`). Free will chooses among every recipe use on every station object (the fridge's meal and gourmet, the counters' sandwich, the cookers' cook and bake: `world.rs:3894-3906`), so many meals are cooked on a cold hob. Also seen: the electric cooker's `knob_on` only turns a knob: its ring never glows, where the hob counter's does (`kitchen/clips/clips-stoveElectric-all-t99.png` against `clips-cooktopCounter-all-t99.png`). Key the hob clips by the `stir` tag as well (and the oven's by a bake step's own tag, I-kitchen-05), and give the electric cooker a glowing ring.
-- **Status:** open
-- **Source:** wave: kitchen (`scratch/scene.mjs` recipe scenes)
+### A-kitchen-02 — moved to systems.md
 
 ### A-kitchen-03 — One person washing at the double sink runs both taps
 
@@ -397,53 +389,13 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Status:** open
 - **Source:** wave: kitchen
 
-### I-kitchen-03 — Hands at the cabinet doors, not on the tap, the appliance or the shelf
+### I-kitchen-03 — moved to residents.md
 
-- **Severity:** S2
-- **Rubric:** I3, A1
-- **Fix class:** renderer-table
-- **Where:** `web/src/render/babylon/characters.ts:460` (`ACTIONS.cook`: `spell, interact, spell, pickUp`), `:465` (`ACTIONS.wash`: `spell, interact`), `:538` (`ACTIONS.fetch`: `interact, pickUp, idle`); no per-object variant for these (as `look` has for the telescope)
-- **Evidence:**
-  - Sinks: washing hands or washing up at the farmhouse and double sinks, the hands work at hip height in front of the cabinet doors, 15 cm under the 0.95 m rim and 30 cm short of the basin, the water running into an empty bowl (`kitchen/play/c1/farmhouseSink-washUp-01.png`, `kitchen/play/c2/counterSinkDouble-wash-01.png`, `kitchen/extra/putaway-wallCabinet-04.png`). The base sink is the same (pilot `play/sink-wash-01.png`); the pilot passed `ACTIONS.wash` there, this wave doesn't.
-  - Microwave, toaster, blender: "Heat up leftovers", "Make toast" and "Blend a smoothie" (`anim: cook`) are worked at the cabinet below while the microwave door (1.0–1.25 m) or the toaster's lever opens by itself on the top (`kitchen/play/c1/microwave-reheat-01.png`, `breakfastCounter-toast-01.png`); `docs/objects/kitchen.md` K2 already notes it for the microwave.
-  - Putting clean dishes away (`fetch`) in a wall cabinet: its doors open at 1.44–2.2 m while the hands stay at the waist over the sink below (`kitchen/extra/putaway-wallCabinet-05.png`); the same for the three wall cabinets and the china cabinet's glazed top (K9 "Not right yet"); `pickUp` bends to the floor in it.
-  Items: `farmhouseSink`, `counterSinkDouble`, `sink` (bathroom ledger), `microwave`, `breakfastCounter`, `wallCabinet`, `wallCabinetGlass`, `wallCabinetCorner`, `chinaCabinet`. A reach to the worktop (the `chop` clip's arms, without the board) for the sinks and appliances, and a reach up for the wall cupboards, by object def as `look` does, would fix all of them.
-- **Status:** open
-- **Source:** wave: kitchen (play shots, `scratch/scene.mjs` put-away scene)
+### I-kitchen-04 — moved to systems.md
 
-### I-kitchen-04 — Cooks chop with the crate in both hands and stir holding the bowl
+### I-kitchen-05 — moved to systems.md
 
-- **Severity:** S2
-- **Rubric:** I13, A1, A2
-- **Fix class:** code
-- **Where:** `web/public/content/base.json:4135` (recipes: "Get ingredients" `holds: ingredients`, "Prep" `holds: prepBowl` from `:4166`, the sandwich's "Make it" holds nothing new, so the crate stays), `web/src/render/babylon/characters.ts:2331` (a carried item is drawn in both hands, with the carry clip, through every step), `:2097` (`writeTool`: the board and pan drawn on the station meanwhile)
-- **Evidence:** `kitchen/extra/meal-fridge-stoveGas-01.png` (chopping at the counter with the ingredient crate held at the chest, the board and knife on the top beside it); `-06.png` (stirring the pan on the hob holding the prep bowl in both hands, for the whole 20-minute Cook step); `kitchen/play/c5/counter-sandwich-01.png`, `butcherBlock-sandwich-01.png`, `kitchenIsland-sandwich-01.png` (the sandwich made holding the crate); `stoveElectric-bake-01.png`, `rangeCooker-cook-01.png` (the bowl at the hob). A cook puts the ingredients down to chop and tips the bowl into the pan. Set the carried item down on the station's top while a step is worked (and drop the bowl once the Cook step starts); new behaviour, so `code`. Items: every `prep` station (the counters, islands, butcher block, breakfast counter), every `stove` and `oven` station.
-- **Status:** open
-- **Source:** wave: kitchen (`scratch/scene.mjs` recipe scene, play shots)
-
-### I-kitchen-05 — Every Cook step is stirring a frying pan, at a microwave, an oven tower or for a bake
-
-- **Severity:** S2
-- **Rubric:** I13, I3, I7
-- **Fix class:** renderer-table
-- **Where:** `web/public/content/base.json:4135` (`meal` Cook `at: [stove, oven, microwave]`, `anim: stir`; `bakedTreats` from `:4401`, `pie` and `pizza` Bake `at: [oven]`, `anim: stir`); `web/src/render/babylon/characters.ts:546` (`STATION_PROPS`: `stir → tool.pan`), `:2102` (the pan at the station's `surface.height`, else `defaultSurfaceHeight` 0.9)
-- **Evidence:**
-  - Microwave: a meal whose only cooker is the microwave is "cooked" by stirring a frying pan of vegetables drawn on the worktop beside the shut microwave (`kitchen/extra/meal-fridge-microwave-06.png`).
-  - Oven tower: the pan is drawn at 0.9 m through the shut lower oven door, the cook stirring at the tower's face (`kitchen/extra/meal-fridge-wallOven-06.png`).
-  - Baking and roasting: "Bake treats" at the electric and gas cookers and the range, and "Roast dinner" and "Bake treats" at the oven tower, open the oven door for 3 s at the start and then stir a pan of vegetables on the hob or at the tower while the oven stands empty (`kitchen/play/c5/stoveElectric-bake-01.png`, `wallOven-roast-01.png`, `rangeCooker-bake-01.png`). The Mix step of baking chops on a board (`chop`).
-  The steps need their own tags at an oven and a microwave (a tray slid in, a dish put in and the door shut), with props of their own (`item.bakingTray` and the pie dish exist as items) and their own clips on the station. Shared beyond this ledger: the packs' ovens use the same recipes (`web/public/content/packs/foodie.json:150`, the pizza oven's `pizza`; `packs/kind.json:100`, `:119`, the neighbourly oven's `pie` and `bakedTreats`), for the packs and cross-cutting waves.
-- **Status:** open
-- **Source:** wave: kitchen (`scratch/scene.mjs` recipe scenes, play shots)
-
-### I-kitchen-06 — Children pour wine and mix cocktails
-
-- **Severity:** S1
-- **Rubric:** I6
-- **Fix class:** code
-- **Where:** `web/public/content/catalog2/kitchen.json:799` (`wineFridge` "Pour a glass of wine": tags `food, lounge`, autonomous), `web/public/content/catalog2/dining.json:845` (`barCart` "Mix a drink": `food, lounge, party`); `crates/sim-core/src/world.rs:3832-3856` (free will's tests on a use: baby, table, requirements, homework for pupils, care for adults; nothing on the user's stage otherwise), `:2972` (`Command::Use`, I-kids-03)
-- **Evidence:** `kitchen/extra/play-child/child-wineFridge-wine-01.png`: Dee (8) "Pour a glass of wine", sipping at the open wine fridge; `child-barCart-mix-01.png`: the same child mixing a drink at the bar cart, the shaker tipping (`kitchen/extra/play-child/play-child.jsonl`: both `using`). These were direct uses, but free will has no stage rule for either, so a child picks them for comfort and fun on their own; a teen too. A lesser case of the same, by the same missing rule (not run): nothing keeps a child of 8 from a 10-minute espresso at the coffee machine (`furniture.json:464`, feeling "perked up"). Age rules are new behaviour (§9 decision 3): filed as `code`. Related: I-systems-04 (systems ledger: a child at a stove) and I-kids-03 (kids ledger: a direct use skips the rules free will keeps).
-- **Status:** open
-- **Source:** wave: kitchen (`check.mjs play --sim 3`)
+### I-kitchen-06 — moved to systems.md
 
 ### I-kitchen-07 — Breakfast at the kitchen island is eaten standing at its cupboards
 
@@ -497,12 +449,14 @@ Seeded from earlier docs first; add new findings after them in the same form.
 
 ### I-kitchen-12 — The kitchen's machines sound like a frying pan or not at all
 
+> Consolidation (2026-10-21): closed as a duplicate of I-bathroom-04 (systems ledger), which takes its items and evidence.
+
 - **Severity:** S3
 - **Rubric:** I9, A13
 - **Fix class:** code
 - **Where:** `web/src/audio/world.ts:34` (`ACTION_SOUNDS`: `cook`, `stir`, `flip` → `sizzle`, by tag only), `:185` (`soundOf`: only `wash` and `clean` look at the object)
 - **Evidence:** `bench-results/review/tables/uses-kitchen.md` (Sound column): "Make toast", "Blend a smoothie" and "Heat up leftovers" (`anim: cook`) play the frying sizzle; the Cook step at a microwave or an oven tower sizzles too (I-kitchen-05). Silent: the dishwasher running, the coffee machine grinding and hissing, the blender's motor, the microwave's hum and ping, the toaster's pop, the fridge door and the bin lid. A sound per object (or per object kind) for the `cook` tag, and the missing ones, are new sounds: `code`.
-- **Status:** open
+- **Status:** closed (duplicate of I-bathroom-04)
 - **Source:** wave: kitchen (I9)
 
 ### I-kitchen-13 — The bar cart's shaker lifts and tips by itself
@@ -527,7 +481,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 
 ## Evidence for findings in other ledgers
 
-Kitchen-wave evidence for causes filed elsewhere; not filed again here.
+Kitchen-wave evidence for causes filed elsewhere; not filed again here. Carried into those findings at the consolidation (2026-10-21).
 
 - **I-systems-01** (systems ledger; seeded): confirmed and widened at the hobs. The pan is drawn at the station's middle, a little towards the cook, not on the burner the clip lights: on the gas range the flame ring is at the front right and the pan at the front left (`kitchen/play/c5/stoveGas-cook-01.png`, `kitchen/extra/meal-fridge-stoveGas-06.png`); on the hob counter the glowing ring is at the back and the pan at the front (`kitchen/play/c5/cooktopCounter-cook-01.png`); on the range cooker the ring is in the middle and the pan to its left (`kitchen/play/c5/rangeCooker-cook-01.png`). Items: `stoveElectric`, `stoveGas`, `rangeCooker`, `cooktopCounter`. A per-model hob spot (the burner the clip lights) would fix both.
 - **I-systems-04** (systems ledger; seeded): applies to every kitchen cooker (`stoveElectric`, `stoveGas`, `wallOven`, `rangeCooker`, `cooktopCounter`); the alcohol uses are filed here as I-kitchen-06.
@@ -535,4 +489,4 @@ Kitchen-wave evidence for causes filed elsewhere; not filed again here.
 - **I-office-01** (office ledger; seeded): widened to the dining sets. A chair bought facing the base dining table, the glass or the farmhouse set (each with its own chairs built in at the back) passes `needsTable` and sits behind or beside the set's own chair, about a metre from the top, for its coffee (`kitchen/play/c5/chairModern-coffee-01.png`, `benchDining-coffee-01.png`, `chairWindsor-coffee-01.png`); the same chairs at plain tables sit right (`kitchen/extra/seats/`). Items: `diningTable`, `diningGlass`, `diningOak`, `bistroSet`.
 - **I-held-01** (held ledger): no cup, glass or plate for the coffee (tables, chairs, coffee machine), the drinks (stools, fridges' cold drink, wine), breakfast and dinner (`kitchen/play/c5/diningGlass-coffee-01.png`, `kitchen/play/c7/stoolBarHigh-drink-01.png`). Cooked meals do show a plate (`kitchen/extra/meal-fridge-stoveGas-11.png`).
 - **A-residents-09** (residents ledger): the chairs' and sets' rows; `pnpm check:clips` still lists the teen and elder women's feet off a 0.45 m seat.
-- **I-kids-03** (kids ledger): the child's wine and cocktail above were direct uses; free will has no rule either way (I-kitchen-06).
+- **I-kids-03** (systems ledger): the child's wine and cocktail above were direct uses; free will has no rule either way (I-kitchen-06).

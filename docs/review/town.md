@@ -240,12 +240,5 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Status:** open
 - **Source:** wave: town
 
-### A-town-02 — Gates never open: residents walk through the shut leaf
+### A-town-02 — moved to systems.md
 
-- **Severity:** S2
-- **Rubric:** A12, M7
-- **Fix class:** code
-- **Where:** `web/src/render/babylon/fences.ts:42` and `:110` (`gate()`: one still mesh with the fences, the leaf drawn shut); `crates/sim-core/src/command.rs:389` (a gate is walked through); `web/src/render/babylon/BabylonRenderer.ts:3778` (`swingDoors` turns only house doors)
-- **Evidence:** On `review-stage` a picket gate in a run of fences: Ada walks through it, her body passing through the shut leaf (`town/extra/gate-walk-0.png` … `gate-walk-2.png`, `town/extra/sheet-fences.png`; `houses/extra/houses.jsonl` "gate"). The house's front door swings for her on the same lot. Swinging the leaf as `swingDoors` swings a front door (hinge on a post, a quarter turn away from the walker) is new behaviour (§9, decision 3).
-- **Status:** open
-- **Source:** wave: town

@@ -47,7 +47,7 @@ The crib (`base.json`), `babyWakes` and the cuddle lift (`characters.ts`).
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| `lie` Lie in the crib (sleep, 720 min) | n/a | OK | I-kids-03 | The baby lies on the mattress, asleep or awake (pilot); I-kids-03 S1 code (kids ledger: an adult told to lies in it) | `kids/sheets/obj-crib.png`, `systems/sheets/baby.png` |
+| `lie` Lie in the crib (sleep, 720 min) | n/a | OK | I-kids-03 | The baby lies on the mattress, asleep or awake (pilot); I-kids-03 S1 code (systems ledger: an adult told to lies in it) | `kids/sheets/obj-crib.png`, `systems/sheets/baby.png` |
 | `feed` Feed the baby (tend, 15 min) | n/a | I-kids-04 | I-kids-04 | I-kids-04 S2 renderer-table (confirmed again: Ada, on her own, kneels at the rail for the feed); I-held-01 S2 code (no bottle) | `systems/sheets/baby.png` |
 | `change` Change the baby (clean, 10 min) | n/a | I-kids-05 | I-kids-05 | I-kids-05 S2 code (confirmed again: changed over the rail, the changing chest beside it unused) | `systems/sheets/baby.png` |
 | `play` Play with the baby (play, 20 min) | n/a | OK | OK | Standing at the rail, the hands working over the baby (pilot `play/crib-play-01.png`) | `kids/sheets/obj-crib.png` |
@@ -72,7 +72,7 @@ The crib (`base.json`), `babyWakes` and the cuddle lift (`characters.ts`).
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| Front door: who opens it and when | n/a | A-houses-01 | OK | Shut; swings in as she walks up to it, open while she passes, shut behind her (`bathroom-check`); a visitor knocking stands still, so it stays shut until the host walks out. A-houses-01 S3 code (houses ledger, confirmed: by nearness, no hand) | `systems/sheets/doors.png` |
+| Front door: who opens it and when | n/a | A-houses-01 | OK | Shut; swings in as she walks up to it, open while she passes, shut behind her (`bathroom-check`); a visitor knocking stands still, so it stays shut until the host walks out. A-houses-01 S3 code (systems ledger, confirmed: by nearness, no hand) | `systems/sheets/doors.png` |
 | Bathroom door: shut while in use | n/a | A-houses-01 | I-systems-05 | Opens as she walks in, shuts behind her and stays shut on the toilet and at the basin (from above, `systems/sheets/doors-top.png`). I-systems-05 S3 code (confirmed and widened: the drawing only; every other inside door stands open always) | `systems/sheets/doors-top.png` |
 | Garden door to the patio | n/a | A-houses-01 | OK | A door with outdoors on one side is a "front" door (`house.ts:293`, `:760`): shut, opening as someone passes, like the front door (code read; not shot apart) | `systems/sheets/doors.png` |
 
@@ -83,7 +83,7 @@ Content `when` / `leaves` (crops below); the objects themselves are in their own
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
 | Open state: Futon bed (`bedFuton`): sleep, nap, unfold, foldAway | n/a | A-bedroom-03 | I-bedroom-03 | Going to bed unfolds it, the last one up folds it away (tests `open_objects.rs`); nobody folds it over a sleeper. A-bedroom-03 S2 code, I-bedroom-03 S3 content (bedroom ledger: in at the foot; no sitting on it folded) | `bedroom/sheets/obj-bedFuton.png` |
-| Open state: Cedar hot tub (`hotTubCedar`): soak, coverOn | n/a | OK | I-bathroom-03 | The cover off as they get in (stood up behind the tub), the last one out puts it back (`closeAfter`); I-bathroom-03 S2 code (bathroom ledger, widened there: soaking in clothes) | `outdoor/sheets/obj-hotTubCedar.png` |
+| Open state: Cedar hot tub (`hotTubCedar`): soak, coverOn | n/a | OK | I-bathroom-03 | The cover off as they get in (stood up behind the tub), the last one out puts it back (`closeAfter`); I-bathroom-03 S2 code (residents ledger, widened there: soaking in clothes) | `outdoor/sheets/obj-hotTubCedar.png` |
 | Open state: Sofa bed (`sofaBed`): relax, doze, pullOut, foldAway | n/a | OK | OK | Relax only folded; pulled out for a doze and put away after; nobody opens it under someone sitting (tests). The sofa bed's own shots: living ledger | `living/play/chunk2/sofaBed-pullOut-01.png`, `living/play/chunk2/sofaBed-doze-01.png` |
 | Open state: Fold-down wall bed (`wallBed`): sleep, nap, foldDown, foldUp | n/a | OK | OK | Folded down from its foot, up by the last one up (tests); nobody folds it up over a sleeper | `living/sheets/obj-wallBed.png` |
 | Open state: Washing line (`clothesline`): washing, takeIn | n/a | A-systems-02 | OK | Hung out, it stays out until someone takes it in (autonomous); A-systems-02 S3 motion (all the washing on the line in 1.5 s at the start of a 20-minute use) | `outdoor/sheets/obj-clothesline.png` |
@@ -96,9 +96,9 @@ Content `grows`; `harvest` from ripe to picked.
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
 | Planting | n/a | n/a | I-systems-08 | I-systems-08 S3 decision (nobody plants: a picked bed plants itself half a day later) | `garden/sheets/obj-garden.vegPatch.png` |
-| Watering | n/a | OK | I-systems-08 | "Weed and water" / "Tie up and water" (`tend`) changes nothing in the crop: I-systems-08; the clip and pose at each crop: I-garden-04 S2 renderer-table (garden ledger); no can: I-held-01 | `garden/play/c3/garden.tomatoes-tend-01.png` |
+| Watering | n/a | OK | I-systems-08 | "Weed and water" / "Tie up and water" (`tend`) changes nothing in the crop: I-systems-08; the clip and pose at each crop: I-garden-04 S2 renderer-table (residents ledger); no can: I-held-01 | `garden/play/c3/garden.tomatoes-tend-01.png` |
 | Growing from planted to ripe | n/a | OK | OK | Planted, growing and ripe stages over 2–4 days (`grows.days`), shown by the model's growth clip; the strawberries' planted stage is M-garden-07 (garden ledger) | `garden/sheets/obj-garden.strawberries.png` |
-| Harvesting and picking | n/a | I-garden-03 | I-garden-10 | I-garden-03 S2 code (garden ledger: the crop is gone as the harvest starts); I-garden-04 S2 renderer-table; I-garden-10 S3 decision (eaten on the spot) | `garden/extra/harvest/s-garden.vegPatch-harvest.png` |
+| Harvesting and picking | n/a | I-garden-03 | I-garden-10 | I-garden-03 S2 code (systems ledger: the crop is gone as the harvest starts); I-garden-04 S2 renderer-table; I-garden-10 S3 decision (eaten on the spot) | `garden/extra/harvest/s-garden.vegPatch-harvest.png` |
 
 ## Visitors (5)
 
@@ -136,12 +136,14 @@ Seeded from earlier docs first; add new findings after them in the same form.
 
 ### I-systems-01 — Cooking props are drawn at a station's middle: on the gas grill station, on the grate
 
+> Consolidation: the kitchen wave widened it to the hobs: the pan is drawn at the station's middle, not on the burner the clip lights (the gas range's flame at the front right and the pan at the front left, the hob counter's ring at the back and the pan at the front, the range cooker's ring in the middle and the pan to its left: `kitchen/play/c5/stoveGas-cook-01.png`, `cooktopCounter-cook-01.png`, `rangeCooker-cook-01.png`). Items: `stoveElectric`, `stoveGas`, `rangeCooker`, `cooktopCounter`, `grillStation`. A per-model hob spot fixes both.
+
 - **Severity:** S2
 - **Rubric:** I13
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters.ts:546` (`STATION_PROPS`) and `:2097` (`writeTool`)
 - **Evidence:** The chopping board and the food are drawn at the station's middle, a little towards the cook. On `grillStation` that is the grate, so the chopping happens on the grill. Cross-cutting wave: `outdoor/play/chunk5-kitchen/grillStation-cook-01.png` and `grillStation-feast-01.png` (the outdoor wave's runs): the orange board lies over the burning grate while the station's own wooden prep board, at its right end, stays bare. The kettle grill (`bbq`) and kitchen counters are right (`systems/sheets/cook-bbq-1.png`, `cook-meal-1.png`).
-- **Status:** confirmed
+- **Status:** confirmed and widened (cross-cutting wave; the kitchen wave at the hobs)
 - **Source:** `docs/objects/open.md` Still open › Rendering; `plan/authenticity-review.md` §3.3 (I13); wave: cross-cutting
 
 ### I-systems-02 — Uses end once every need they raise is full
@@ -156,17 +158,21 @@ Seeded from earlier docs first; add new findings after them in the same form.
 
 ### I-systems-03 — With neither a sink nor a bin, dirty plates pile up on the floor
 
+> Consolidation: the kitchen wave saw it on the bare stage: a snack's plate left on the floor with no top, sink or bin about (`kitchen/play/c1/rangeHood-no-uses.png`, bottom middle); with a counter the plate goes on the counter (`kitchen/extra/putaway-wallCabinet.json`).
+
 - **Severity:** S3
 - **Rubric:** I13
 - **Fix class:** decision
 - **Where:** `crates/sim-core/src/cooking.rs`
 - **Evidence:** R2-12's rest: with a bin, clearing away ends at the bin; with neither, plates and spoiled food pile up and are scanned on every decision to eat.
-- **Status:** not checked (every review state has a sink and a bin)
+- **Status:** confirmed (kitchen wave, on the bare stage)
 - **Source:** `docs/release-0.2.0-review.md` §4 (R2-12 rest), target v0.3
 
 ### I-systems-04 — Nothing stops a child using a stove
 
 > Cross-cutting wave: confirmed and widened to the socials: any resident may start a fist fight with a child.
+>
+> Consolidation: widened by the object waves: every kitchen cooker (`stoveElectric`, `stoveGas`, `wallOven`, `rangeCooker`, `cooktopCounter`; kitchen ledger), the alcohol (I-kitchen-06), the upper bunk taken by an elder or a small child (A-bedroom-02), the playground (I-community-04).
 
 - **Severity:** S2
 - **Rubric:** I6
@@ -190,22 +196,26 @@ Seeded from earlier docs first; add new findings after them in the same form.
 
 ### I-systems-06 — Every oven step is stirring a pan: pizzas, pies and cakes are "baked" on the hob
 
+> Consolidation (2026-10-21): closed as a duplicate of I-kitchen-05 (systems ledger), which takes its items and evidence.
+
 - **Severity:** S2
 - **Rubric:** I13, I3
 - **Fix class:** renderer-table
 - **Where:** `web/public/content/base.json:4396`, `:4440`, `:4483` (`pizza`, `bakedTreats`, `pie`: the oven step's `anim: stir`) and `:4176` (`meal`'s cook step at `stove`, `oven` or `microwave`, `stir`); `web/src/render/babylon/characters.ts:540` (`ACTIONS.stir`: `stir`, `interact`), `:546` (`STATION_PROPS.stir`: the pan)
 - **Evidence:** `systems/sheets/cook-ovens.png` (the kitchen wave's `kitchen/play/c5/stoveGas-bake-01.png`, `stoveElectric-bake-01.png`, `wallOven-bake-01.png`): baking at a stove the oven door drops open and stays open while the cook stirs a pan on the lit hob for 35 minutes, the prep bowl of batter in the other hand; at the oven tower, with no hob, she stirs at the open oven door. `systems/sheets/cook-pizza-1.png` (`held/inhand/pizza-04.png`): the pizza "baked" stirring a pan at the wood-fired oven's side; `cook-pie-1.png` the same at the neighbourly oven. Baking is putting the tray in, shutting the door and waiting (a check through the glass), then taking it out: an oven step of its own (`anim: bake` with a tray prop, the door open at the start and end).
-- **Status:** open
+- **Status:** closed (duplicate of I-kitchen-05)
 - **Source:** wave: cross-cutting (held, kitchen and packs waves' runs)
 
 ### I-systems-07 — The prep bowl stays in the hand through the cooking step
+
+> Consolidation (2026-10-21): closed as a duplicate of I-kitchen-04 (systems ledger), which takes its items and evidence.
 
 - **Severity:** S3
 - **Rubric:** I13, I7
 - **Fix class:** code
 - **Where:** `crates/sim-core/src/cooking.rs:1501` (`step_done`: `held` is set to what the step `holds` and kept until the next step ends), the renderer drawing `held` in the hand whatever the step (`web/src/render/babylon/characters.ts`, `writeHeld`)
 - **Evidence:** `systems/sheets/cook-meal-1.png`, `cook-bbq-1.png`, `cook-bakedTreats-1.png` (`held/inhand/meal-03.png`, `meal-04.png`, `bbq-05.png`, `bakedTreats-04.png`, `pie-04.png`, `tastingMenu-04.png`; the held wave's "Seen"): the cook stirs the pan or turns the food on the grill one-handed for 20–50 minutes with the bowl of chopped food held in the other. The bowl is tipped into the pan and put down as the step starts.
-- **Status:** open
+- **Status:** closed (duplicate of I-kitchen-04)
 - **Source:** wave: cross-cutting (held wave's runs)
 
 ### I-systems-08 — Nobody sows: a picked bed plants itself, and tending changes nothing
@@ -240,10 +250,347 @@ Seeded from earlier docs first; add new findings after them in the same form.
 
 ### A-systems-02 — The washing appears on the line in 1.5 s at the start of a 20-minute hang-out
 
+> Consolidation (2026-10-21): closed as a duplicate of A-outdoor-02 (systems ledger), which takes its items and evidence.
+
 - **Severity:** S3
 - **Rubric:** A10, A9
 - **Fix class:** motion
 - **Where:** `web/public/assets/packs/yard/manifest.json:361` (`clothesline` `motions.washing`, 1.5 s, played as the use starts; `takeIn` plays it back)
 - **Evidence:** `outdoor/play/chunk3/play.jsonl` (the outdoor wave's run): the `washing` clip runs from 0.18 to its full 1.5 s by the first shot, so every piece is pegged up before the resident has lifted one, and the basket stays full beside them (`outdoor/sheets/obj-clothesline.png`); taking it in, the line is bare in the first second. Hanging washing out goes piece by piece over the use (a `hold` spread over it, or the pieces in turn).
-- **Status:** open
+- **Status:** closed (duplicate of A-outdoor-02)
 - **Source:** wave: cross-cutting (the outdoor wave's run)
+
+Moved here at the consolidation (2026-10-21) from the ledgers they were first seen in, ids unchanged: the sim rules (who may use what, where users stand and sit), cooking, crops, sounds, doors, lamps and placement. Pilot evidence in them stays relative to `bench-results/review/pilot/`, the waves' to `bench-results/review/`, as in the ledgers they came from.
+
+### I-kids-03 — A direct use skips the rules free will keeps: an adult lies in the crib, a child cares for the baby, an adult does homework
+
+> Pilot: confirmed and widened to its cause. Severity raised from S2 to S1 (an adult in pyjamas lying in a cot, legs through the rails, from the pie menu); fix class from `content` to `code`.
+>
+> Office/kids wave: confirmed and widened to the kids' furniture and the reverse (the owner's S1 rule: an adult using a child's or a baby's thing, or a child an adult's, as if it fitted). For these there is no rule at all, for free will either: free will checks only `baby`, care and `homework` (`world.rs:3838-3865`), so an adult on free will may ride the rocking horse too (the half I-systems-04 names for the stove).
+>
+> Consolidation: widened by the object waves: an adult does homework at `bookcaseWide` (`living/play/chunk2/bookcaseWide-homework-01.png`); the child's wine and cocktail (I-kitchen-06) were direct uses; the playground rides (I-community-04).
+>
+> Moved from kids.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S1
+- **Rubric:** I1, I6
+- **Fix class:** code
+- **Where:** `crates/sim-core/src/world.rs:2981` (`Command::Use`: checks broken, `requires`, `when`/open, `whole`, `needsTable`; nothing about the user); against `world.rs:3838-3865` (free will: a `baby` use only for a baby, care only by an adult with `Access::Full` and a baby in the crib, homework only at a school stage); `web/src/game/session.ts:1160` (the pie menu offers every interaction to whoever is selected); `crates/sim-core/src/content.rs` (objects and interactions have no life-stage rule: the kids' furniture can't say it is for children)
+- **Evidence:** `play/crib-lie-01.png`: the adult resident 0 lies in the crib in pyjamas, the legs out over the end rail (`sheets/crib-care.png` shows the cot at its real size beside the carers); the elder and the teen take it too (`play-elder/crib-lie-*.png`, `play-teen/crib-lie-*.png`). A newly bought, empty crib's feed, change, play and cuddle all run (`play/crib-feed-*.png` …), as Phase 0 saw. On `review-stage`'s own crib, with its baby, the child (8) and the teen (15) each feed, cuddle, change and play with the baby on a direct use (`scenes/care-child-*.png`, `scenes/care-teen-*.png`, `scenes/scenes.log`), which free will never lets them; an adult (`play/bookshelf-homework-*.png`, `play/computerDesk-homework-*.png`) does homework, which free will offers only to pupils. One cause: the command doesn't apply the user tests free will applies. Related: I-systems-04 (no age rule exists at all for a stove); this one is rules that exist but only for free will. (Pilot shots: relative to `bench-results/review/pilot/`.)
+- **Evidence (office/kids wave;** paths under `bench-results/review/`**):**
+  - The baby's crib: the 8-year-old lies in it, the mobile through her head and her feet through the rail (`kids/play/child-c1/crib-lie-01.png`); the child also feeds and changes at an empty crib (`kids/play/child-c1/crib-change-01.png`).
+  - The race car bed (mattress 0.84 × 1.44 m, a junior bed's, `kids.py:417`): an adult lies with her feet on the bonnet (`kids/play/c1/kidsBedCar-sleep-01.png`), and an elder's blanket drapes over the whole bonnet (`kids/poses/poses-only-elder-0-car_bed.png`). The kids' bed (0.88 × 1.82 m, a single bed's size) fits an adult and isn't counted.
+  - The rocking horse (seat 0.56 m, 0.29 m wide): adults, the teen and the elder ride it astride with their feet flat on the floor, the horse lost under them (`kids/play/c1/rockingHorse-ride-01.png`, `kids/poses/poses-seats-default-0-rockingHorse.png`).
+  - The kids' chair (seat 0.31 m): an adult or an elder sits with the knees up and the feet sunk through the floor (`kids/poses/poses-seats-default-3-kidsChair.png`, `-elder-3-`); at the kids' table an adult draws and does homework, the knees under a 0.50 m top (`kids/play/pair-kidsChair/kidsChair-homework-01.png`).
+  - The kids' desk (top 0.57, seat 0.36): an adult does homework and draws on its child-size chair (`kids/play/c1/kidsDesk-homework-01.png`); an adult desk chair also works at it, the top 9 cm over the seat (`kids/extra/side-chairTask-11-12-3-write-01.png`; `chairTask` `seatAt: ["desk"]` takes the kids' desk's `desk` kind, `furniture.json:2834`).
+  - The kids' bean bag (0.62 m), the ball pit (0.93 m across, 0.47 high) and the play tent (door 0.56 m high): adults flop into the bag and "jump in the ball pit" and "play in the tent" (`kids/play/c1/beanBagKids-flop-01.png`, `kids/play/c1/ballPit-jump-01.png`, `kids/play/c1/playTent-play-01.png`; the last two are also used from outside, I-kids-07).
+  - The reverse: the 8-year-old types at the standing desk's 1.05 m top, the keyboard shelf at her chin (`office/extra/child-deskStanding-browse-01.png`).
+  - Homework by adults on every homework use in these two ledgers: `computerDesk`, `deskWriting`, `deskLaptop`, `chairTask`, `chairExecutive`, `kidsDesk`, `kidsChair` (`office/play/c1/deskWriting-homework-01.png`, `office/play/pair-chairTask/chairTask-homework-01.png`).
+  - Toys (toy box, toy chest, doll house, train table, play mat, teddy, easels, picture books) are not counted: grown-ups play with them in life too.
+- **Status:** confirmed and widened (pilot; office/kids wave)
+- **Source:** `check.mjs play --state review-stage --objects crib --use all` (Phase 0 and pilot, adult, teen, elder); pilot `scripts/scenes.mjs` childcare; wave: office/kids (Phase 0.9 `play/c1`, `play/child-c1`, poses; `check.mjs play --objects deskStanding --sim 3`)
+
+### I-kitchen-06 — Children pour wine and mix cocktails
+
+> Moved from kitchen.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S1
+- **Rubric:** I6
+- **Fix class:** code
+- **Where:** `web/public/content/catalog2/kitchen.json:799` (`wineFridge` "Pour a glass of wine": tags `food, lounge`, autonomous), `web/public/content/catalog2/dining.json:845` (`barCart` "Mix a drink": `food, lounge, party`); `crates/sim-core/src/world.rs:3832-3856` (free will's tests on a use: baby, table, requirements, homework for pupils, care for adults; nothing on the user's stage otherwise), `:2972` (`Command::Use`, I-kids-03)
+- **Evidence:** `kitchen/extra/play-child/child-wineFridge-wine-01.png`: Dee (8) "Pour a glass of wine", sipping at the open wine fridge; `child-barCart-mix-01.png`: the same child mixing a drink at the bar cart, the shaker tipping (`kitchen/extra/play-child/play-child.jsonl`: both `using`). These were direct uses, but free will has no stage rule for either, so a child picks them for comfort and fun on their own; a teen too. A lesser case of the same, by the same missing rule (not run): nothing keeps a child of 8 from a 10-minute espresso at the coffee machine (`furniture.json:464`, feeling "perked up"). Age rules are new behaviour (§9 decision 3): filed as `code`. Related: I-systems-04 (systems ledger: a child at a stove) and I-kids-03 (systems ledger: a direct use skips the rules free will keeps).
+- **Status:** open
+- **Source:** wave: kitchen (`check.mjs play --sim 3`)
+
+### I-community-04 — Adults and elders ride the spring horse, the seesaw and the merry-go-round and climb the fort
+
+> Moved from community.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S1
+- **Rubric:** I6
+- **Fix class:** code
+- **Where:** no age rule on a use (`crates/sim-core/src/content.rs`, see I-systems-04); free will only weights `toys` down for teens to elders (`web/public/content/base.json:3662-3668`, `tagPreference` toys 0.4 / 0.15, multiplied in `content.rs:727`); the climbing frame isn't tagged `toys` (`web/public/content/community.json:415-419`: entertainment, fitness, outdoors)
+- **Evidence:** `sheets/obj-springRider.png` (`play/springRider-ride-01.png`): the adult sits on a 1.1 m horse meant for toddlers, knees up round its head; `sheets/obj-seesaw.png`, `sheets/obj-merryGoRound.png`, `sheets/obj-slide.png`, `sheets/obj-climbingFrame.png` (`play/climbingFrame-climb-01.png`): the adult on each, ducking under the fort's roof; `sheets/age-springRider.png`, `sheets/age-seesaw.png`: an elder on them too. Free will offers the spring rider, the seesaw, the slide and the merry-go-round to adults at 15 % weight, and the climbing frame at full weight, since it carries no `toys` tag; a direct use offers them all (I-kids-03, kids ledger). An adult on a toddler's spring horse is the rubric's S1 ("an adult using a child's thing as if it fitted"). Two parts: the `toys` tag on the climbing frame (content, now), and an age rule for the toddler rides (new behaviour, `code`, §9 decision 3). Widens I-systems-04 (systems ledger) from the stove to the playground.
+- **Status:** open
+- **Source:** community wave (play, Phase 0)
+
+### I-hobbies-07 — Two residents at a two-player table stand in one spot, inside each other
+
+> Moved from hobbies.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S1
+- **Rubric:** I2, A7
+- **Fix class:** code
+- **Where:** `crates/sim-core/src/world.rs:4958-4960` (a standing use keeps the resident on the tile they came to and only turns them); `world.rs:322-333` (`slot_position` spreads the slots, but only sitting and lying uses move there); `web/public/content/furniture.json:3327`, `:3377` (`poolTable`, `foosball`: `slots: 2`)
+- **Evidence:** `hobbies/extra/two.mjs` sent the adult (0) and the young adult (1) to the same table: both were `using` at (9.5, 13.5), yaw 2.68, at the foosball, and at (10.5, 13.5), yaw 3.14, at the pool table (`hobbies/extra/two.jsonl`): one body inside the other, the second's sleeves showing through the first (`hobbies/extra/two.png`, front and top). At a real pool table the two move round it; at foosball they face each other across it. Wrong at a glance whenever two people play. The renderer's `STEP_IN` lanes (`characters.ts:193`) split users for the climbing frame only. The same cause reaches every other object with two or more slots and a standing use (a content scan, not checked in play): `crib`, `counterSinkDouble`, `vanityDouble`, `kitchenIsland`, `homeCinema`, `trainTable`, `pingPongTable`, `basketballHoop`, `marketStall`, `shopCounter`, `bakeryCase`, `groceryShelf`, `fountainTown`, `busStop`, `energetic.streetballHoop`, `cheerful.jukebox`, `outgoing.partyBar`, `outgoing.karaokeStage`, `outgoing.danceFloor`, `foodie.pizzaOven`, `foodie.chefsIsland`, `natureLover.glasshouse`, `romantic.roseArbourSwing`, `hotTubCedar` (its cover), and the fold uses of `sofaBed`, `wallBed`, `bedFuton`.
+- **Status:** open
+- **Source:** wave: hobbies (`two.mjs`, adult and young adult on `review-stage`)
+
+### I-community-08 — Standing at a 2-wide thing, residents stand in front of its left half
+
+> Moved from community.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S3
+- **Rubric:** I2
+- **Fix class:** code
+- **Where:** `crates/sim-core/src/world.rs:357-365` (`front_tile`: `x + (w - 1) / 2`, so the left of the two tiles in front of an even width)
+- **Evidence:** `play/play.jsonl`: for each 2-wide thing at x 9–11 (middle 10.0) the user stands at x 9.5: the ice cream cart, the hot dog stand, the market stall, the shop counter, the bakery case, the grocery shelves, the ping-pong table, and the 2 × 2 statue. `sheets/obj-hotDogStand.png` (`play/stalls-town/hotDogStand-hotDog-01.png`): the customer stands at the cart's left end, by the sauce bottles, not at its front; `sheets/obj-townStatue.png`: the admirer at the plinth's left corner. Across the content 22 one-slot things of even width are used standing (a scan of the content: also `wardrobe`, `dresser`, `dresserLow`, `armoire`, `bookcaseWide`, `workbench`, `grillStation`, `rangeCooker`, `raisedBed`, `sandbox`, `garden.pond`, `bikeRack`, `canvasAbstract`, `tvWall`, `tvStandLow`, `shedSmall`, `greenhouse`), where it matters less beside a wardrobe's left door. Standing users of an even-width thing want its middle (the renderer could centre them, as it spreads seated slots).
+- **Status:** open
+- **Source:** community wave (play records)
+
+### I-outdoor-07 — Sets for two seat their pair side by side: the bistro set takes one, the picnic table two on one bench
+
+> Consolidation: raised from S3 to S2, as I-community-02 (community ledger, S2) is merged into it. The same cause reaches the seesaw's riders (side-on, not facing each other), the merry-go-round's four (in a row along one chord), the park chess players (shoulder to shoulder behind the board), the ping-pong player (at the long side by the net), and by the content `diningOak`, `diningGlass` and `romantic.candlelitTable` (built side by side: M-kitchen-01, M-packs-11). The renderer half: `web/src/render/babylon/characters.ts:240-249` (`Seat`: one facing per object, not per slot).
+>
+> Moved from outdoor.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S2 (raised from S3 at the consolidation: I-community-02 merged)
+- **Rubric:** I2
+- **Fix class:** code
+- **Where:** `crates/sim-core/src/world.rs:321-333` (`slot_position`: slots spread across the width, all facing the object's front); `web/public/content/furniture.json:4504` (`patioSet`: no `slots`), `:4574` (`picnicTable` `slots: 2`)
+- **Evidence:** The bistro set has two chairs facing each other and one slot: a second resident can't join a coffee (`sheets/obj-patioSet.png`, the near chair stays empty). The picnic table's two ("picnics for two", its description) sit on the back bench 1.5 m apart, both facing the far bench (`extra/picnic-top/top-picnicTable-picnic-01.png` for slot 0's place). A couple at a table sit across from each other. Slots with their own place and facing (or the second slot turned round) are new behaviour. The base dining table has the same side-by-side seating (M-kitchen-01, kitchen ledger).
+- **Status:** confirmed and widened (consolidation: I-community-02 merged; raised to S2)
+- **Source:** outdoor wave
+
+### A-hobbies-01 — Residents walk through the table, the wheel or the drum kit to a seat behind it
+
+> Moved from hobbies.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S2
+- **Rubric:** A4, I2
+- **Fix class:** code
+- **Where:** `crates/sim-core/src/world.rs:4961-4967` (a sitting use: the resident moves from the tile in front, where they stop, to `slot_position` in the footprint); seats behind the middle with `approach` front: `web/src/render/babylon/characters/furniture.json:7`, `:44`, `:45` (`chessTable`, the digital piano, `sewingTable`: fwd −0.2, −0.2, −0.22), `web/public/content/catalog2/hobbies.json:5`, `:93`, `:130`, `:166` (`drumKit` −0.23, `potteryWheel` −0.28, `craftTable` −0.25, `puzzleTable` −0.25), `web/public/content/furniture.json:3523` (`exerciseBike` −0.12)
+- **Evidence:** the first play shot of each catches the resident mid-way through the object: `hobbies/play/c1/potteryWheel-throw-00.png` (standing on the wheel head), `drumKit-drum-00.png` (in the toms), `sewingTable-sew-00.png`, `craftTable-scrapbook-00.png`, `chessTable-chess-00.png`, `puzzleTable-jigsaw-00.png` and the digital piano's `play-00` (composites `hobbies/extra/sit00.png`, `sit00b.png`); a second in, from the side, the potter still stands in the wheel's body (`hobbies/extra/side1.png`), and the rider climbs on through the bike's handlebars and flywheel (`fitness/extra/side-exerciseBike-cycle-00.png`). They come to the front tile, then glide about a metre back through the work to the seat while sitting down, and out the same way (A-residents-01, residents ledger, is the stand-up glide on its own). Real people go round to the chair, or straddle the saddle from the side. Two ways out: walk them round to the seat's side (code, for every object like this), or build these hobby objects with the seat at the front, facing back, as the piano is (`seat.facing: back`, model and content). The same layout, seat behind the middle with approach front, is in other ledgers' objects (a scan of the content, not checked in play): `computerDesk`, `diningTable` (base), `deskLaptop`, `deskWriting`, `computerGaming`, `kidsDesk`, `bistroSet`, `diningGlass`, `diningOak`, `patioSet`, `picnicTable`, `parkChessTable`, `busStop`, `chaise`.
+- **Status:** open
+- **Source:** wave: hobbies
+
+### I-living-05 — Watching TV takes the nearest seat even when it faces away from the screen
+
+> Moved from living.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S2
+- **Rubric:** I2
+- **Fix class:** code
+- **Where:** `crates/sim-core/src/world.rs:4463` (`seat_near_object`: the nearest free seat within `seatNear` metres, by path distance from the TV's front tile; no facing or sight check), called at `:4299`
+- **Evidence:** `check.mjs play --objects homeCinema,tvWall@9,17,2 --with sofa@9,15,2` (`living/extra/tv-seat/`): the sofa faces the home cinema (rot 2, towards −z) and its back is to the wall TV on the back wall. For the home cinema the watcher sits on it facing the screen, right; for the wall TV she takes the same sofa and watches the hour with her back to the screen (`living/extra/tv-seat/seat-tvWall-watch-01.png`, pose `sit` at 10.5, 15.5). Any sofa or chair within 4 m counts, whichever way it faces (a dining chair at the table behind, an armchair turned away). Only the five living screens use `seatNear` (`tv`, `tvWall`, `tvRetro`, `homeCinema`, `tvStandLow`); a fix (a seat whose front looks towards the screen, else the standing fallback of I-living-03) would carry over to reading if I-living-03 gives the books `seatNear`.
+- **Status:** open
+- **Source:** wave: living (extra play run)
+
+### M-bathroom-03 — Wall-backed floor things can stand in the middle of a room
+
+> Consolidation: M-living-07 (living ledger) merged into it: the wall bed (`web/public/content/catalog2/living.json:317`, which has no `fillsWall` either, so play put it mid-room), the ladder shelf (`:956`, leaning on nothing) and the home cinema, whose screen case hangs over the media unit with no wall (`web/public/content/furniture.json:1613`). The packs' wall-hung parts on floor objects (M-packs-01, M-packs-02) would be served by the same rule.
+>
+> Moved from bathroom.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S3
+- **Rubric:** M4, M7
+- **Fix class:** code
+- **Where:** `web/public/content/catalog2/bath.json:38` (`toiletWallHung`), `:223` (`towelLadder`); `web/public/content/furniture.json:2301` (`toiletSmart`): floor layer, nothing ties them to a wall; `crates/sim-core/src/content.rs:263` (`fillsWall` keeps the wall above clear, it doesn't require one)
+- **Evidence:** `bathroom/play/chunk2/towelLadder-no-uses.png` (the ladder leans 10.7° on nothing, mid-room), `bathroom/play/chunk4-redo/toiletWallHung-use-00.png` and `bathroom/play/chunk1/toiletSmart-use-01.png` (the boxed-in cistern panel, 1.1–1.2 m tall, stands free with the bowl hung off it). Each is built with its back on the wall face (game depth −0.43) and reads right only there; the blender README's traps say no content fact says a thing stands against a wall. A placement rule (a content `againstWall`, refused away from one, like a wall thing) is new behaviour. It would serve every floor model built to the wall face in the other ledgers too (fridges, counters, wardrobes), though those read as merely pulled out; these three look broken.
+- **Status:** confirmed and widened (consolidation: M-living-07 merged)
+- **Source:** wave: bathroom (from the evidence's "Seen (not reviewed)")
+
+### M-lighting-01 — Removing a wall can leave a ceiling lamp outdoors
+
+> Moved from lighting.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S3
+- **Rubric:** M4
+- **Fix class:** code
+- **Where:** `crates/sim-core/src/home.rs:475` (the "needs a ceiling" refusal)
+- **Evidence:** Building lets a wall's removal leave a ceiling lamp outdoors (or something upstairs outside a room). It hangs there until the game is loaded again, which leaves it out and loses its value.
+  Activities wave: on `review-stage`, a `ceilingPendant` at `(12, 8, 0)` inside the room, then `build` with the front wall's segments at `x = 11, 12` (`z = 6`) set `open`: no refusal and no toast, the room stops being one (its tiled floor is drawn as grass, the kitchen and the crib now stand outdoors) and the pendant hangs from nothing in the open (`lighting/extra/ceiling-before.png`, `lighting/extra/ceiling-after-wall-open.png`; `decor/extra/extra.json`). Not checked: the reload that drops it.
+- **Status:** confirmed (activities wave)
+- **Source:** `docs/release-0.2.0-review.md` §4 (new, Z1), target 0.2.1, not in the 0.3.0 notes
+
+### I-kitchen-04 — Cooks chop with the crate in both hands and stir holding the bowl
+
+> Consolidation: I-held-03 (held ledger) and I-systems-07 (systems ledger) merged into it: the same in every recipe run (`held/inhand/timeline.jsonl`: `held: ingredients, action: chop`, `held: prepBowl, action: stir` and `flip`), at the grill too (`held/inhand/bbq-05.png`). The sim side is `crates/sim-core/src/cooking.rs:1501` (`held` kept through the next step), the drawing `web/src/render/babylon/characters.ts:2425` (`writeCarried`).
+>
+> Moved from kitchen.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S2
+- **Rubric:** I13, A1, A2
+- **Fix class:** code
+- **Where:** `web/public/content/base.json:4135` (recipes: "Get ingredients" `holds: ingredients`, "Prep" `holds: prepBowl` from `:4166`, the sandwich's "Make it" holds nothing new, so the crate stays), `web/src/render/babylon/characters.ts:2331` (a carried item is drawn in both hands, with the carry clip, through every step), `:2097` (`writeTool`: the board and pan drawn on the station meanwhile)
+- **Evidence:** `kitchen/extra/meal-fridge-stoveGas-01.png` (chopping at the counter with the ingredient crate held at the chest, the board and knife on the top beside it); `-06.png` (stirring the pan on the hob holding the prep bowl in both hands, for the whole 20-minute Cook step); `kitchen/play/c5/counter-sandwich-01.png`, `butcherBlock-sandwich-01.png`, `kitchenIsland-sandwich-01.png` (the sandwich made holding the crate); `stoveElectric-bake-01.png`, `rangeCooker-cook-01.png` (the bowl at the hob). A cook puts the ingredients down to chop and tips the bowl into the pan. Set the carried item down on the station's top while a step is worked (and drop the bowl once the Cook step starts); new behaviour, so `code`. Items: every `prep` station (the counters, islands, butcher block, breakfast counter), every `stove` and `oven` station.
+- **Status:** confirmed and widened (consolidation: I-held-03 and I-systems-07 merged)
+- **Source:** wave: kitchen (`scratch/scene.mjs` recipe scene, play shots)
+
+### I-kitchen-05 — Every Cook step is stirring a frying pan, at a microwave, an oven tower or for a bake
+
+> Consolidation: I-held-02 (held ledger) and I-systems-06 (systems ledger) merged into it: the pizza "baked" stirring a pan at the wood-fired oven, the pie at the neighbourly oven, the bake's 35 minutes stirring on the hob with the oven door open and the bowl of batter in the other hand, the Mix and Roll steps chopped with a knife, and the microwave counter's pan drawn at 0.9 m (no `surface`).
+>
+> Moved from kitchen.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S2
+- **Rubric:** I13, I3, I7
+- **Fix class:** renderer-table
+- **Where:** `web/public/content/base.json:4135` (`meal` Cook `at: [stove, oven, microwave]`, `anim: stir`; `bakedTreats` from `:4401`, `pie` and `pizza` Bake `at: [oven]`, `anim: stir`); `web/src/render/babylon/characters.ts:546` (`STATION_PROPS`: `stir → tool.pan`), `:2102` (the pan at the station's `surface.height`, else `defaultSurfaceHeight` 0.9)
+- **Evidence:**
+  - Microwave: a meal whose only cooker is the microwave is "cooked" by stirring a frying pan of vegetables drawn on the worktop beside the shut microwave (`kitchen/extra/meal-fridge-microwave-06.png`).
+  - Oven tower: the pan is drawn at 0.9 m through the shut lower oven door, the cook stirring at the tower's face (`kitchen/extra/meal-fridge-wallOven-06.png`).
+  - Baking and roasting: "Bake treats" at the electric and gas cookers and the range, and "Roast dinner" and "Bake treats" at the oven tower, open the oven door for 3 s at the start and then stir a pan of vegetables on the hob or at the tower while the oven stands empty (`kitchen/play/c5/stoveElectric-bake-01.png`, `wallOven-roast-01.png`, `rangeCooker-bake-01.png`). The Mix step of baking chops on a board (`chop`).
+  The steps need their own tags at an oven and a microwave (a tray slid in, a dish put in and the door shut), with props of their own (`item.bakingTray` and the pie dish exist as items) and their own clips on the station. Shared beyond this ledger: the packs' ovens use the same recipes (`web/public/content/packs/foodie.json:150`, the pizza oven's `pizza`; `packs/kind.json:100`, `:119`, the neighbourly oven's `pie` and `bakedTreats`), for the packs and cross-cutting waves.
+- **Status:** confirmed and widened (consolidation: I-held-02 and I-systems-06 merged)
+- **Source:** wave: kitchen (`scratch/scene.mjs` recipe scenes, play shots)
+
+### A-kitchen-02 — The hob, the oven and the microwave don't work when the meal was started somewhere else
+
+> Moved from kitchen.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S2
+- **Rubric:** A10, I7, I13
+- **Fix class:** motion
+- **Where:** `web/public/assets/packs/kitchen_cooking/manifest.json:5`, `:49`, `:103`, `:141`, `:192`, `:238` (the cookers' and the microwave's `motions.uses` keyed by their own use ids: `cook`, `gourmet`, `bake`, `roast`, `reheat`); `crates/sim-core/src/snapshot.rs:140` (at a station that isn't the recipe's origin the interaction is -1, so only the step's tag, `stir`, reaches the renderer); `web/src/render/babylon/objectMotion.ts:413`
+- **Evidence:** `kitchen/extra/meal-fridge-stoveGas.json`: "Make a meal" started at the fridge, cooked on the gas range from 42.2 to 62.3 s with the `stir` clip and the pan drawn on its hob; no clip on the range moves (no `burner_on` flame, no knob), against `kitchen/play/c5/stoveGas-cook-01.png` where "Cook dinner" chosen at the range itself lights the ring. The same with only a microwave (`meal-fridge-microwave.json`: no `door_open`, no turntable) and only an oven tower (`meal-fridge-wallOven.json`: no `oven_open`). Free will chooses among every recipe use on every station object (the fridge's meal and gourmet, the counters' sandwich, the cookers' cook and bake: `world.rs:3894-3906`), so many meals are cooked on a cold hob. Also seen: the electric cooker's `knob_on` only turns a knob: its ring never glows, where the hob counter's does (`kitchen/clips/clips-stoveElectric-all-t99.png` against `clips-cooktopCounter-all-t99.png`). Key the hob clips by the `stir` tag as well (and the oven's by a bake step's own tag, I-kitchen-05), and give the electric cooker a glowing ring.
+- **Status:** open
+- **Source:** wave: kitchen (`scratch/scene.mjs` recipe scenes)
+
+### I-held-04 — Whole dishes never leave the station
+
+> Moved from held.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S3
+- **Rubric:** I13, I1
+- **Fix class:** code
+- **Where:** `crates/sim-core/src/cooking.rs:9-14` (the dish is served on a free spot near the stove; each eater takes a serving from there)
+- **Evidence:** The six whole dishes (`mealPot`, `tastingBoard`, `grillPlatter`, `pizza`, `bakingTray`, `pieDish`) are never in a hand in play: the cook puts the dish down where it was cooked and everyone fetches a plate from there (`held/index.md` Problems; `held/inhand/bbq-06.png`, `pizza-05.png`, `bakedTreats-05.png`, `pie-07.png`); the pot is carried only dirty, to the sink. The pot's carry pose exists and works (`held/inhand/poses/poses-carry-hold.png`). For a family dinner the dish goes to the table and is served there; carrying it to the dining table, when the home has one, would use the models and poses already built.
+- **Status:** open
+- **Source:** wave: held (shared with the systems ledger's cooking flow)
+
+### I-garden-03 — A crop is picked the moment the harvest starts: the bed empties, then the resident picks at nothing for 18 minutes
+
+> Moved from garden.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S2
+- **Rubric:** I8, A10
+- **Fix class:** code
+- **Where:** `crates/sim-core/src/world.rs:4978-4982` (`if inter.picks && … growth >= 0.0 { growth = -1.0 }` as the use starts); the growth clip then goes from ripe to picked at once (`G.stages`, `plants.py:1063` `_crop`)
+- **Evidence:** `extra/harvest/s-garden.vegPatch-harvest.png`, `s-garden.pumpkins-harvest.png`, `s-garden.strawberries-harvest.png`, `s-garden.tomatoes-harvest.png`, `s-raisedBed-harvest.png` (three shots each, the first as the use starts): on every crop the ripe vegetables, pumpkins, berries and tomatoes are there in the first shot and gone 1–2 game minutes into the 20-minute harvest; the resident goes on with the harvest clip over bare soil or leaves to the end. The same on the outdoor ledger's `raisedBed` (and, by the same rule, on the packs ledger's `natureLover.veggieBed` `pickSnack`). Pick the crop when the use ends (or in steps through it), so the produce goes as the hands take it.
+- **Status:** open
+- **Source:** wave: garden (`play --state review-garden --use-existing … --use harvest`)
+
+### A-outdoor-02 — The washing goes out and comes in, and the crop is picked, in the first two seconds of the use
+
+> Consolidation: A-systems-02 (systems ledger) merged into it: the `washing` clip runs its 1.5 s as the 20-minute use starts (`web/public/assets/packs/yard/manifest.json:361`), the basket full beside the resident. The crop half is I-garden-03's (the same rule, `crates/sim-core/src/world.rs:4978-4982`); one fix closes both.
+>
+> Moved from outdoor.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S3
+- **Rubric:** A10, I8
+- **Fix class:** code
+- **Where:** `crates/sim-core/src/world.rs:4971-4975` (`leaves` applied as the use starts); `tools/art/blender/families/yard.py:853` (`G.grow(washing, 'washing', seconds=1.5)`), `:459` (`G.squash(crop, 'harvest', 0.001, seconds=1.0)`)
+- **Evidence:** Hanging out the washing: all nine pieces appear at once as the 20-minute use starts, then the resident mimes in front of a full line (`sheets/obj-clothesline.png`); taking it in empties the line at the start of its 10 minutes (`play/chunk3/clothesline-takeIn-01.png`). Harvesting the ripe raised bed: the whole crop is gone two seconds in, with the resident's hands on the frame and nothing in them (`extra/harvest/harvest-sheet.png`). The state should change at the end of an emptying use (take in, harvest) and a filling use's clip run over its length, or in steps. The same rule opens a wall bed as the sleeper lies down, which is right; it is the slow jobs it doesn't fit.
+- **Status:** confirmed and widened (consolidation: A-systems-02 merged)
+- **Source:** outdoor wave (`play --state review-garden --use-existing raisedBed --use harvest`)
+
+### I-garden-10 — Fruit and vegetables are eaten on the spot, at any time: endless apples and lemons, a lemon eaten like an apple, a raw pumpkin as a meal
+
+> Moved from garden.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S3
+- **Rubric:** I5, I16
+- **Fix class:** decision
+- **Where:** `web/public/content/garden.json:210-241` (apple: `pick`, no `grows`, hunger 0.25), `:406-437` (lemon tree: `pick`, `anim: eat`, hunger 0.1, energy 0.05), `:1494`, `:1612`, `:1718` (veg patch, strawberries, pumpkins `harvest`: hunger 0.45, 0.25, 0.5 at the bed); `catalog2/outdoor.json:342` (`raisedBed` `harvest`)
+- **Evidence:** `tables/uses-garden.md`. The fruit trees have no ripeness (`grows`), so an apple can be picked and eaten every 15 minutes all year, where the crops beside them ripen in 2–4 days. The lemon is eaten for hunger like the apple ("a fresh boost"); a lemon is picked for a drink or for cooking. A harvest fills hunger at once, as if eaten raw in the bed: half a meal from a pumpkin, 0.45 from cabbages and carrots. In life the harvest goes to the kitchen (the herbs already work that way: a cooking boost, `garden.freshHerbs`). The same on the outdoor ledger's `raisedBed` and the packs ledger's `natureLover.veggieBed` (`pickSnack`, `anim: eat`). For triage: give the fruit trees `grows` (the apple model would need its growth stages), make the lemon a drink or cooking boost, and decide whether a harvest feeds directly (a game shortcut) or stocks the fridge (new behaviour, `code`).
+- **Status:** open
+- **Source:** wave: garden
+
+### I-bathroom-04 — Noisy uses with no sound: the toilet, the treadmill, the workbench
+
+> Consolidation: I-hobbies-09 (hobbies ledger), I-kitchen-12 (kitchen ledger) and I-packs-19 (packs ledger) merged into it: one cause, `ACTION_SOUNDS` by the clip's tag only (`web/src/audio/world.ts:34`). Silent as well: the pool table, foosball, darts, the arcade, the sewing machine, the chemistry bench, the pottery wheel, the exercise bike, the dishwasher, the coffee machine, the blender's motor, the microwave's hum and ping, the toaster, the fridge door and bin lid, both fountains, the court and table balls, the vending machines and the phone box (community ledger), and the stone fountain (A-outdoor-03). Wrong: the drum kit plays the plucked `music` tune; the toaster, blender, microwave, cheese board and oven bakes sizzle like a pan (any `cook` use away from a hob: 31 in the content); the smart speaker's story plays music.
+>
+> Moved from bathroom.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S3
+- **Rubric:** I9
+- **Fix class:** code
+- **Where:** `web/src/audio/world.ts:34` (`ACTION_SOUNDS`: no `toilet`, `run` or `tinker`); `:193` (`clean` sounds only for a washer)
+- **Evidence:** `cargo review uses` Sound column (`—` for `toilet`, `treadmill`, `workbench`) and `world.ts`: no flush after the toilet, no belt hum or footfalls on the treadmill, no tools at the workbench. The shower, tap, TV and piano have theirs. Listed as missing, as I9 asks; the sounds are synthesised in code (no sound files).
+  Bathroom wave: the same for all five toilets (`toiletCompact`, `toiletSmart`, `toiletClassic`, `toiletWallHung`: Sound `—`, `tables/uses-bathroom.md`), and for the tumble dryer, whose drum turns silently while the washer's runs with the `washer` loop (`world.ts:193` matches `washer|laundryCent` only).
+- **Status:** confirmed and widened (bathroom wave: all five toilets and the dryer; consolidation: I-hobbies-09, I-kitchen-12 and I-packs-19 merged)
+- **Source:** pilot; wave: bathroom
+
+### A-houses-01 — House doors open by nearness, not by hand
+
+> Moved from houses.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S2 (raised from S3: the bathroom door below)
+- **Rubric:** A12, A10, I6
+- **Fix class:** code
+- **Where:** `web/src/render/babylon/BabylonRenderer.ts:3778` (`swingDoors`); the rule at `:3794` (`target = passing || !(leaf.front || engaged)`: anyone moving within `DOOR_REACH` 1.3 m, `:189`, opens any door, an occupied bathroom's too)
+- **Evidence:** Front and bathroom doors swing when someone walks near them; nobody reaches for the handle. Doors opened by hand are new behaviour: filed as `code`, planned separately (§9, decision 3).
+  Wave houses, on `review-stage` (`houses/extra/houses.jsonl`):
+  - Walking along the front wall outside, 0.7 m off it, past the door and not through it, Ada opens the front door fully (`swing1-past-0.png`; "swing1 past": open 0 → 1 as she passes x 4.5 → 5.4).
+  - A bathroom built in the back corner: with Ada in there (on the toilet, then standing by it) the door stays shut; Ben walking along the hall past it, 0.7 m off, swings it wide open on her (`sheet-bath.png`, `bath-passer-open-0.png`; "bathPass": 0 → 1 at 1 m from the door). That breaks the one privacy the renderer gives (`I-systems-05`, systems ledger) and is what raises this to S2.
+  - The cheap part, short of hands on handles: open a door only for a mover heading through it (their next path step crosses the doorway), and keep an engaged bathroom's door shut for everyone but someone leaving it.
+- **Status:** confirmed and widened
+- **Source:** `plan/authenticity-review.md` §3.2 (A12) and §9 (decision 3); wave: houses (shared with the systems ledger's "Front door: who opens it and when" and "Bathroom door: shut while in use" rows)
+
+### A-houses-02 — At the faster speeds residents walk through a door that has hardly opened
+
+> Moved from houses.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S3
+- **Rubric:** A9, A10
+- **Fix class:** code
+- **Where:** `web/src/render/babylon/BabylonRenderer.ts:188` (`DOOR_SWING` 0.45 s), `:3781` (the step is real frame time, not game time)
+- **Evidence:** At speed 1 the front door is fully open 0.6 m before Ada reaches it (`houses/extra/swing1-in-1.png`; "swing1 in"). At speed 3 she crosses the 2.6 m the door watches in about 0.3 s of real time, while the door takes 0.45 s: she is through it at 19 % open and the leaf shuts behind her at once (`houses/extra/swing-in-0.png`, her body through the near-shut leaf; "swing in": open 0.19 at z 5.7, 0.11 when she is inside). Scaling the swing by the game's speed (as walkers' turning is, `characters.ts:2324`), or the reach by the walker's speed, keeps the door ahead of her.
+- **Status:** open
+- **Source:** wave: houses
+
+### A-town-02 — Gates never open: residents walk through the shut leaf
+
+> Moved from town.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S2
+- **Rubric:** A12, M7
+- **Fix class:** code
+- **Where:** `web/src/render/babylon/fences.ts:42` and `:110` (`gate()`: one still mesh with the fences, the leaf drawn shut); `crates/sim-core/src/command.rs:389` (a gate is walked through); `web/src/render/babylon/BabylonRenderer.ts:3778` (`swingDoors` turns only house doors)
+- **Evidence:** On `review-stage` a picket gate in a run of fences: Ada walks through it, her body passing through the shut leaf (`town/extra/gate-walk-0.png` … `gate-walk-2.png`, `town/extra/sheet-fences.png`; `houses/extra/houses.jsonl` "gate"). The house's front door swings for her on the same lot. Swinging the leaf as `swingDoors` swings a front door (hinge on a post, a quarter turn away from the walker) is new behaviour (§9, decision 3).
+- **Status:** open
+- **Source:** wave: town
+
+### M-lighting-02 — Every lamp is a bare point light: the uplighter lights the floor, wall lights throw a disc, and light goes through walls
+
+> Moved from lighting.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S3
+- **Rubric:** M7, M10
+- **Fix class:** code
+- **Where:** `web/src/render/babylon/BabylonRenderer.ts:3075` (the interior lights: `PointLight`s, no shadows), `:4714` ("a warm pool around it"); `web/src/render/babylon/house.ts:222` (one light per lamp at `light.height`, no direction, no room limit)
+- **Evidence:** A shade decides where a real lamp's light goes; here none does, and no wall stops it.
+  - `lampTorchiere`: the uplighter's bowl glows and its light is a pool on the floor round its foot, the same as a shaded floor lamp's, walls up or cut away (`lighting/extra/lampTorchiere-night-wallsup.png`, `lighting/night/c2/lampTorchiere-no-uses.png`); a real one washes the ceiling, and the ceiling isn't drawn in Live mode either.
+  - `wallSconce`, `wallLampArm`, `wallLightOutdoor`: a bright round disc on the wall centred on the fitting (`lighting/night/c1/wallSconce-no-uses.png`, `…/wallLampArm-no-uses.png`), not the up-and-down wash of a sconce or the arm lamp's pool on the chair below.
+  - `lampBanker` and the lamps on tops: a disc up the wall behind them (`lighting/extra/lampBanker-night-bought.png`), where a banker's lamp lights the desk under its shade.
+  - `wallLightOutdoor` on the outside of the back wall, walls cut away: the fitting isn't drawn, its light lands on the inside floor by the wall (`lighting/night/extra/wallLightOutdoor-outside-on.png`; walls up, the wall is lit outside, `…-outside-on-wallsup.png`).
+  Shared beyond this ledger: every content `light` is drawn so, also `nightstandLamp` (bedroom), `fireplace` (decor), `fireplaceElectric` (living), `lampPost`, `stringLights`, `firePit`, `garden.lantern` (outdoor, garden) and `streetLamp` (community). Directional lamps (a spot or a cone per kind) and lights kept to their room would be new renderer behaviour.
+- **Status:** open
+- **Source:** wave: lighting (leads "the uplighter lights the floor, not the ceiling" and "the outside bulkhead's light reaches the inside floor with walls cut away", both confirmed)
+
+### I-lighting-01 — A lamp bought is on, at night in an empty room too
+
+> Moved from lighting.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S3
+- **Rubric:** I15, I8
+- **Fix class:** decision
+- **Where:** `crates/sim-core/src/world.rs:129` ("A lamp switched off …; bought on"), `:1553` (`off: false`); `crates/sim-core/src/lights.rs:3-10` (residents switch only on coming and going)
+- **Evidence:** `lighting/extra/lamp-night-bought.png`: on `review-stage-night` (22:00 by the sim's clock), a floor lamp bought in the room while everyone is in the front yard (and the baby asleep) comes on and stays on; nobody came or left, so no rule switches it. The same by day: a lamp bought at noon in a room nobody uses is lit when dusk comes. A new real lamp is off until someone switches it on. Decide: off when bought (and residents switch it on as they come in), or on (the player sees the lamp work). Covers every lamp in this ledger and the other ledgers' (`nightstandLamp` and the rest named in M-lighting-02).
+- **Status:** open
+- **Source:** wave: lighting (lead "a newly bought lamp is already on", confirmed)
+
+### M-outdoor-01 — Night glow draws through other parts: the grill's coals through its shut lid
+
+> Outdoor wave: confirmed. On the outdoor objects only the grill meets the fault, and it pays for the work-round: its coals are plain red with no glow and give no light, even at night with the lid open, where the fire pit's embers and flames glow.
+>
+> Moved from outdoor.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S2
+- **Rubric:** M10
+- **Fix class:** code
+- **Where:** `web/src/render/babylon/models.ts:73` (`glows`), `tools/art/blender/families/outdoor.py:64`
+- **Evidence:** A glowing material draws through the parts in front of it. `outdoor.py:64` now builds the grill's hot coals with no glow "which would show through its shut lid", so the grill may be worked round while the renderer still has the fault for other models. `extra/night/sheet-fire.png`: the grill cooking at 22:00 with the lid up shows dull red coals and no light on the cook; the fire pit beside it glows.
+- **Status:** confirmed (outdoor wave)
+- **Source:** `docs/objects/open.md` Still open › Rendering; `plan/authenticity-review.md` §3.1 (M10); outdoor wave (night run)

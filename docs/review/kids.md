@@ -127,29 +127,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Status:** closed (a chair can no longer stand on the desk's front tile: "that would block the way")
 - **Source:** `docs/objects/open.md` Still open › Residents; `plan/release-0.3.0.md` §1.4; wave: office/kids (`check.mjs play --objects-file gaps2.txt`)
 
-### I-kids-03 — A direct use skips the rules free will keeps: an adult lies in the crib, a child cares for the baby, an adult does homework
-
-> Pilot: confirmed and widened to its cause. Severity raised from S2 to S1 (an adult in pyjamas lying in a cot, legs through the rails, from the pie menu); fix class from `content` to `code`.
->
-> Office/kids wave: confirmed and widened to the kids' furniture and the reverse (the owner's S1 rule: an adult using a child's or a baby's thing, or a child an adult's, as if it fitted). For these there is no rule at all, for free will either: free will checks only `baby`, care and `homework` (`world.rs:3838-3865`), so an adult on free will may ride the rocking horse too (the half I-systems-04 names for the stove).
-
-- **Severity:** S1
-- **Rubric:** I1, I6
-- **Fix class:** code
-- **Where:** `crates/sim-core/src/world.rs:2981` (`Command::Use`: checks broken, `requires`, `when`/open, `whole`, `needsTable`; nothing about the user); against `world.rs:3838-3865` (free will: a `baby` use only for a baby, care only by an adult with `Access::Full` and a baby in the crib, homework only at a school stage); `web/src/game/session.ts:1160` (the pie menu offers every interaction to whoever is selected); `crates/sim-core/src/content.rs` (objects and interactions have no life-stage rule: the kids' furniture can't say it is for children)
-- **Evidence:** `play/crib-lie-01.png`: the adult resident 0 lies in the crib in pyjamas, the legs out over the end rail (`sheets/crib-care.png` shows the cot at its real size beside the carers); the elder and the teen take it too (`play-elder/crib-lie-*.png`, `play-teen/crib-lie-*.png`). A newly bought, empty crib's feed, change, play and cuddle all run (`play/crib-feed-*.png` …), as Phase 0 saw. On `review-stage`'s own crib, with its baby, the child (8) and the teen (15) each feed, cuddle, change and play with the baby on a direct use (`scenes/care-child-*.png`, `scenes/care-teen-*.png`, `scenes/scenes.log`), which free will never lets them; an adult (`play/bookshelf-homework-*.png`, `play/computerDesk-homework-*.png`) does homework, which free will offers only to pupils. One cause: the command doesn't apply the user tests free will applies. Related: I-systems-04 (no age rule exists at all for a stove); this one is rules that exist but only for free will. (Pilot shots: relative to `bench-results/review/pilot/`.)
-- **Evidence (office/kids wave;** paths under `bench-results/review/`**):**
-  - The baby's crib: the 8-year-old lies in it, the mobile through her head and her feet through the rail (`kids/play/child-c1/crib-lie-01.png`); the child also feeds and changes at an empty crib (`kids/play/child-c1/crib-change-01.png`).
-  - The race car bed (mattress 0.84 × 1.44 m, a junior bed's, `kids.py:417`): an adult lies with her feet on the bonnet (`kids/play/c1/kidsBedCar-sleep-01.png`), and an elder's blanket drapes over the whole bonnet (`kids/poses/poses-only-elder-0-car_bed.png`). The kids' bed (0.88 × 1.82 m, a single bed's size) fits an adult and isn't counted.
-  - The rocking horse (seat 0.56 m, 0.29 m wide): adults, the teen and the elder ride it astride with their feet flat on the floor, the horse lost under them (`kids/play/c1/rockingHorse-ride-01.png`, `kids/poses/poses-seats-default-0-rockingHorse.png`).
-  - The kids' chair (seat 0.31 m): an adult or an elder sits with the knees up and the feet sunk through the floor (`kids/poses/poses-seats-default-3-kidsChair.png`, `-elder-3-`); at the kids' table an adult draws and does homework, the knees under a 0.50 m top (`kids/play/pair-kidsChair/kidsChair-homework-01.png`).
-  - The kids' desk (top 0.57, seat 0.36): an adult does homework and draws on its child-size chair (`kids/play/c1/kidsDesk-homework-01.png`); an adult desk chair also works at it, the top 9 cm over the seat (`kids/extra/side-chairTask-11-12-3-write-01.png`; `chairTask` `seatAt: ["desk"]` takes the kids' desk's `desk` kind, `furniture.json:2834`).
-  - The kids' bean bag (0.62 m), the ball pit (0.93 m across, 0.47 high) and the play tent (door 0.56 m high): adults flop into the bag and "jump in the ball pit" and "play in the tent" (`kids/play/c1/beanBagKids-flop-01.png`, `kids/play/c1/ballPit-jump-01.png`, `kids/play/c1/playTent-play-01.png`; the last two are also used from outside, I-kids-07).
-  - The reverse: the 8-year-old types at the standing desk's 1.05 m top, the keyboard shelf at her chin (`office/extra/child-deskStanding-browse-01.png`).
-  - Homework by adults on every homework use in these two ledgers: `computerDesk`, `deskWriting`, `deskLaptop`, `chairTask`, `chairExecutive`, `kidsDesk`, `kidsChair` (`office/play/c1/deskWriting-homework-01.png`, `office/play/pair-chairTask/chairTask-homework-01.png`).
-  - Toys (toy box, toy chest, doll house, train table, play mat, teddy, easels, picture books) are not counted: grown-ups play with them in life too.
-- **Status:** confirmed and widened (pilot; office/kids wave)
-- **Source:** `check.mjs play --state review-stage --objects crib --use all` (Phase 0 and pilot, adult, teen, elder); pilot `scripts/scenes.mjs` childcare; wave: office/kids (Phase 0.9 `play/c1`, `play/child-c1`, poses; `check.mjs play --objects deskStanding --sim 3`)
+### I-kids-03 — moved to systems.md
 
 ### I-kids-04 — Feeding the baby is the gardening kneel at the cot rail
 

@@ -185,38 +185,11 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Status:** confirmed (bathroom wave: on `shower` only)
 - **Source:** pilot; wave: bathroom
 
-### I-bathroom-02 — The shower clip has no washing in it
+### I-bathroom-02 — moved to residents.md
 
-- **Severity:** S3
-- **Rubric:** I3, A1
-- **Fix class:** clip
-- **Where:** `web/src/render/babylon/characters.ts:466` (`ACTIONS.shower`: `spell`, `interact`, `idle`)
-- **Evidence:** `play/shower-shower-01.png`, `play-child/shower-shower-01.png`: under the water the resident works the hands at chest height (`spell`) and stands; no hands to the hair, no turning under the head. Reads as waiting in the shower.
-  Bathroom wave: the same at the stall, the walk-in and the rain shower (`bathroom/play/chunk1/showerStall-shower-01.png`, `showerWalkIn-shower-01.png`, `bathroom/play/chunk2/showerRain-shower-01.png`). The entry is shared with the packs' `energetic.contrastShower`, `natureLover.cedarShower` and `neat.rainShowerTower` (packs ledger).
-- **Status:** confirmed and widened (bathroom wave: all four showers; the three pack showers named)
-- **Source:** pilot; wave: bathroom
+### I-bathroom-03 — moved to residents.md
 
-### I-bathroom-03 — Residents shower in their clothes, behind clear glass
-
-- **Severity:** S3
-- **Rubric:** I3
-- **Fix class:** decision
-- **Where:** `web/src/render/babylon/characters/outfit.ts:120` (day outfit or pyjamas only); `tools/art/blender/families/bathroom.py:552-554` (clear `glass` panels)
-- **Evidence:** `play/shower-shower-01.png`: the day outfit stays on under the water and shows through the enclosure. Bed has its pyjamas; the bath and shower have nothing. A towel or swimwear-like outfit, frosted glass, or leaving it as the style's convention is the owner's call.
-  Bathroom wave: every shower and every bath. Dressed under the rain in the stall, the walk-in and the rain shower (glass at `bathroom.py:637`, `:668-669`), and lying dressed in the bath water in all three tubs at every life stage (`bathroom/play/chunk1/showerStall-shower-01.png`, `bathroom/play/chunk1/bathtub-bath-01.png`, `bathroom/play/stage-elder/bathtub-bath-01.png`). The same outfit rule covers the tubs and showers of the other ledgers that use `bath` or `shower` (`gloomy.soakingTub`, `romantic.heartTub`, `hotHeaded.coldPlunge`, `hotTubCedar`, `whirlpoolTub` and the three pack showers), where a swimsuit is the real thing for the hot tubs.
-- **Status:** confirmed and widened (bathroom wave: all four showers and three baths; the other tubs named)
-- **Source:** pilot; wave: bathroom
-
-### I-bathroom-04 — Noisy uses with no sound: the toilet, the treadmill, the workbench
-
-- **Severity:** S3
-- **Rubric:** I9
-- **Fix class:** code
-- **Where:** `web/src/audio/world.ts:34` (`ACTION_SOUNDS`: no `toilet`, `run` or `tinker`); `:193` (`clean` sounds only for a washer)
-- **Evidence:** `cargo review uses` Sound column (`—` for `toilet`, `treadmill`, `workbench`) and `world.ts`: no flush after the toilet, no belt hum or footfalls on the treadmill, no tools at the workbench. The shower, tap, TV and piano have theirs. Listed as missing, as I9 asks; the sounds are synthesised in code (no sound files).
-  Bathroom wave: the same for all five toilets (`toiletCompact`, `toiletSmart`, `toiletClassic`, `toiletWallHung`: Sound `—`, `tables/uses-bathroom.md`), and for the tumble dryer, whose drum turns silently while the washer's runs with the `washer` loop (`world.ts:193` matches `washer|laundryCent` only).
-- **Status:** confirmed and widened (bathroom wave: all five toilets and the dryer)
-- **Source:** pilot; wave: bathroom
+### I-bathroom-04 — moved to systems.md
 
 ### M-bathroom-02 — The vessel basins' rims stand at 1.00–1.02 m, 9–11 cm over a basin's height
 
@@ -228,15 +201,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Status:** open
 - **Source:** wave: bathroom
 
-### M-bathroom-03 — Wall-backed floor things can stand in the middle of a room
-
-- **Severity:** S3
-- **Rubric:** M4, M7
-- **Fix class:** code
-- **Where:** `web/public/content/catalog2/bath.json:38` (`toiletWallHung`), `:223` (`towelLadder`); `web/public/content/furniture.json:2301` (`toiletSmart`): floor layer, nothing ties them to a wall; `crates/sim-core/src/content.rs:263` (`fillsWall` keeps the wall above clear, it doesn't require one)
-- **Evidence:** `bathroom/play/chunk2/towelLadder-no-uses.png` (the ladder leans 10.7° on nothing, mid-room), `bathroom/play/chunk4-redo/toiletWallHung-use-00.png` and `bathroom/play/chunk1/toiletSmart-use-01.png` (the boxed-in cistern panel, 1.1–1.2 m tall, stands free with the bowl hung off it). Each is built with its back on the wall face (game depth −0.43) and reads right only there; the blender README's traps say no content fact says a thing stands against a wall. A placement rule (a content `againstWall`, refused away from one, like a wall thing) is new behaviour. It would serve every floor model built to the wall face in the other ledgers too (fridges, counters, wardrobes), though those read as merely pulled out; these three look broken.
-- **Status:** open
-- **Source:** wave: bathroom (from the evidence's "Seen (not reviewed)")
+### M-bathroom-03 — moved to systems.md
 
 ### A-bathroom-02 — The shower stall's curtain never closes
 

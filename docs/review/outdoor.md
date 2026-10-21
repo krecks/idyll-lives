@@ -55,7 +55,7 @@ Family: `tools/art/blender/families/outdoor.py`.
 | `hammock` Hammock | M-outdoor-05 | M-outdoor-05 | I-outdoor-02 | M-outdoor-05 S2 model; I-outdoor-02 S2 code | `sheets/obj-hammock.png`, `sheets/age-hammock.png` |
 | `porchSwing` Porch swing | M-outdoor-08 | OK | OK | M-outdoor-08 S3 model | `sheets/obj-porchSwing.png`, `sheets/age-porchSwing.png` |
 | `swingSet` Swing set | M-outdoor-08 | I-outdoor-03 | I-outdoor-03 | I-outdoor-03 S2 renderer-table; M-outdoor-08 S3 model | `sheets/obj-swingSet.png`, `sheets/age-swingSet.png`, `extra/swing-hands.png` |
-| `hotTubCedar` Cedar hot tub | A-outdoor-01 | A-outdoor-01 | I-bathroom-03 | A-outdoor-01 S2 model; I-bathroom-03 S3 decision (bathroom ledger: soaking in day clothes) | `sheets/obj-hotTubCedar.png`, `clips/clips-hotTubCedar-all-t99.png` |
+| `hotTubCedar` Cedar hot tub | A-outdoor-01 | A-outdoor-01 | I-bathroom-03 | A-outdoor-01 S2 model; I-bathroom-03 S3 decision (residents ledger: soaking in day clothes) | `sheets/obj-hotTubCedar.png`, `clips/clips-hotTubCedar-all-t99.png` |
 
 Notes: the lounger's cushion top is 0.35 m, as `BEDS.sunLounger` (the check's 0.28 is the gap between the seat cushion and the leg cushion); its back folds nearly flat for both uses, which is how a lounger is lain on. Children's feet dangle on the garden seats, as they do.
 
@@ -161,7 +161,7 @@ Family: `tools/art/blender/families/garden_decor.py`.
 |---|---|---|---|---|---|
 | `garden.gnome` Garden gnome | OK | OK | OK | | `sheets/obj-garden.gnome.png` |
 | `garden.birdbath` Bird bath | OK | n/a | I-outdoor-06 | I-outdoor-06 S3 content | `sheets/obj-garden.birdbath.png` |
-| `garden.fountain` Stone fountain | OK | A-outdoor-03 | A-outdoor-03 | A-outdoor-03 S3 motion; I-bathroom-04 S3 code (bathroom ledger: no sound) | `sheets/obj-garden.fountain.png` |
+| `garden.fountain` Stone fountain | OK | A-outdoor-03 | A-outdoor-03 | A-outdoor-03 S3 motion; I-bathroom-04 S3 code (systems ledger: no sound) | `sheets/obj-garden.fountain.png` |
 | `garden.lantern` Stone lantern | OK | n/a | OK | | `sheets/obj-garden.lantern.png`, `extra/night/sheet-lights.png` |
 | `garden.wheelbarrow` Wheelbarrow planter | OK | OK | I-held-01 | I-held-01 S2 code (held ledger: no can) | `sheets/obj-garden.wheelbarrow.png` |
 | `garden.boulder` Garden boulders | M-outdoor-07 | n/a | OK | M-outdoor-07 S2 model | `sheets/obj-garden.boulder.png` |
@@ -183,17 +183,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 
 **Heights warnings closed as artefacts** (outdoor wave): `cargo check-glb`'s "no model under it" for `patioSet` (seat, depth −0.62), `picnicTable` (seat, depth −0.68) and `adirondackChair` (seat), and its lower readings for the `patioSet` top (0.363 at depth 0.30), `sunLounger` (0.28 at depth 0) and `firePit` (0.30 at depth 0.38), all probe one point that falls in a gap between slats, planks, cushions or capstones (`outdoor.py:179-191`, `:200-203`, `:421-425`, `:750-753`). The parts there are at the content's heights. `cargo review sizes`'s grill "top 0.71" is not the grate (0.965, M-outdoor-04). Reported as a tool problem in the wave's log.
 
-### M-outdoor-01 — Night glow draws through other parts: the grill's coals through its shut lid
-
-> Outdoor wave: confirmed. On the outdoor objects only the grill meets the fault, and it pays for the work-round: its coals are plain red with no glow and give no light, even at night with the lid open, where the fire pit's embers and flames glow.
-
-- **Severity:** S2
-- **Rubric:** M10
-- **Fix class:** code
-- **Where:** `web/src/render/babylon/models.ts:73` (`glows`), `tools/art/blender/families/outdoor.py:64`
-- **Evidence:** A glowing material draws through the parts in front of it. `outdoor.py:64` now builds the grill's hot coals with no glow "which would show through its shut lid", so the grill may be worked round while the renderer still has the fault for other models. `extra/night/sheet-fire.png`: the grill cooking at 22:00 with the lid up shows dull red coals and no light on the cook; the fire pit beside it glows.
-- **Status:** confirmed (outdoor wave)
-- **Source:** `docs/objects/open.md` Still open › Rendering; `plan/authenticity-review.md` §3.1 (M10); outdoor wave (night run)
+### M-outdoor-01 — moved to systems.md
 
 ### M-outdoor-02 — The park bench's slats are 4 cm above where the sitter is put
 
@@ -285,15 +275,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Status:** open
 - **Source:** outdoor wave (lead; Phase 0 "Seen")
 
-### A-outdoor-02 — The washing goes out and comes in, and the crop is picked, in the first two seconds of the use
-
-- **Severity:** S3
-- **Rubric:** A10, I8
-- **Fix class:** code
-- **Where:** `crates/sim-core/src/world.rs:4971-4975` (`leaves` applied as the use starts); `tools/art/blender/families/yard.py:853` (`G.grow(washing, 'washing', seconds=1.5)`), `:459` (`G.squash(crop, 'harvest', 0.001, seconds=1.0)`)
-- **Evidence:** Hanging out the washing: all nine pieces appear at once as the 20-minute use starts, then the resident mimes in front of a full line (`sheets/obj-clothesline.png`); taking it in empties the line at the start of its 10 minutes (`play/chunk3/clothesline-takeIn-01.png`). Harvesting the ripe raised bed: the whole crop is gone two seconds in, with the resident's hands on the frame and nothing in them (`extra/harvest/harvest-sheet.png`). The state should change at the end of an emptying use (take in, harvest) and a filling use's clip run over its length, or in steps. The same rule opens a wall bed as the sleeper lies down, which is right; it is the slow jobs it doesn't fit.
-- **Status:** open
-- **Source:** outdoor wave (`play --state review-garden --use-existing raisedBed --use harvest`)
+### A-outdoor-02 — moved to systems.md
 
 ### A-outdoor-03 — The stone fountain's water stands still and makes no sound
 
@@ -301,7 +283,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Rubric:** A11, I9
 - **Fix class:** motion
 - **Where:** `tools/art/blender/families/garden_decor.py:77-92` (`fountain`: a still jet and drop, no clip; `no `motions` in its `G.Model`, `:163-175`); `web/src/audio/world.ts:34` (`ACTION_SOUNDS`: nothing for `listen` or the fountain)
-- **Evidence:** `sheets/obj-garden.fountain.png`: the jet is a static blue rod with a drop on it, the basins flat; "Listen to the water" (20 minutes) plays to silence. The pond has its ripple (`idle`) and the parasol its stir; a fountain's moving water is what makes it one. An ambient clip (water rings in the basins, a pulsing jet) and a water sound. The sound part widens I-bathroom-04 (bathroom ledger).
+- **Evidence:** `sheets/obj-garden.fountain.png`: the jet is a static blue rod with a drop on it, the basins flat; "Listen to the water" (20 minutes) plays to silence. The pond has its ripple (`idle`) and the parasol its stir; a fountain's moving water is what makes it one. An ambient clip (water rings in the basins, a pulsing jet) and a water sound. The sound part widens I-bathroom-04 (systems ledger).
 - **Status:** open
 - **Source:** outdoor wave
 
@@ -317,32 +299,28 @@ Seeded from earlier docs first; add new findings after them in the same form.
 
 ### I-outdoor-02 — Dozing outdoors, and on a sofa bed or window seat, puts the resident in pyjamas
 
+> Consolidation (2026-10-21): closed as a duplicate of I-bedroom-01 (residents ledger), which takes its items and evidence.
+
 - **Severity:** S2
 - **Rubric:** I3
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters.ts:2373-2377` (pyjamas whenever the pose is `lie` and the tag is `sleep` or `nap`)
 - **Evidence:** `sheets/obj-sunLounger.png` (`play/chunk1/sunLounger-doze-01.png`: pink pyjamas on the lounger; sunbathing beside it keeps the day clothes), `sheets/age-sunLounger.png` (the elder too), `sheets/obj-hammock.png` (`play/chunk2/hammock-doze-01.png`). A doze outside or on a sofa is taken in day clothes. Lying naps are: `sunLounger`, `hammock` (this ledger), `sofaBed` (living), `cheerful.rainbowHammock`, `natureLover.gardenHammock`, `gloomy.windowSeat`, `kind.hearthSettee` (packs), and the beds' daytime naps. Pyjamas for `sleep` only, or for `nap` only in a bed.
-- **Status:** open
+- **Status:** closed (duplicate of I-bedroom-01)
 - **Source:** outdoor wave (lead; Phase 0 "Seen")
 
-### I-outdoor-03 — On the swing set the hands reach forward as at a desk, not up on the chains
-
-- **Severity:** S2
-- **Rubric:** I3 (A1)
-- **Fix class:** renderer-table
-- **Where:** `web/src/render/babylon/characters.ts:477` (`ACTIONS.play`: `sit: 'sitHands'`, `HANDS.keys`)
-- **Evidence:** `extra/swing-hands.png` (from `play/chunk2/swingSet-swing-01.png` and `play/chunk8-child/swingSet-swing-01.png`): the adult and the child sit on the swing with their forearms out over their knees and typing fingers, the chains passing beside their shoulders. On a swing both hands hold the chains at about shoulder height. `play` sitting is the desk-hands clip, right for the chess table, puzzles and consoles but not for rides; the same entry drives `rockingHorse` (kids: hands on the handles), `seesaw`, `springRider` and `merryGoRound` (community). A rides entry (or `sit` chosen by def, as `music` does), holding up in a grip.
-- **Status:** open
-- **Source:** outdoor wave (`play` adult and child)
+### I-outdoor-03 — moved to residents.md
 
 ### I-outdoor-04 — Waist-high garden jobs are done kneeling: the greenhouse benches, the compost bin
+
+> Consolidation (2026-10-21): closed as a duplicate of I-garden-04 (residents ledger), which takes its items and evidence.
 
 - **Severity:** S2
 - **Rubric:** I3 (A1)
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters.ts:508` (`ACTIONS.tend`: `kneel` for every object); `web/public/content/catalog2/outdoor.json:418-420` (`greenhouse` `tend`), `:475-477` (`compostBin` `compost`, `anim: tend`)
 - **Evidence:** `play/chunk7-greenhouse-wide/greenhouse-tend-01.png`: the seedlings are on staging about 0.8 m high inside, and the resident kneels on the grass for 45 minutes. `play/chunk3/compostBin-compost-01.png`: kneeling at a bin whose rim is 0.72 m, the hands at its slats, below the heap they're turning. The kneel is right at the raised bed, the sandpit and low flowers. `tend` chosen by object (standing, `harvest` or `plant`, at the greenhouse and the compost bin), as `harvest` and `look` already are.
-- **Status:** open
+- **Status:** closed (duplicate of I-garden-04)
 - **Source:** outdoor wave
 
 ### I-outdoor-05 — The greenhouse is tended and picked from outside its door
@@ -365,15 +343,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Status:** open
 - **Source:** outdoor wave
 
-### I-outdoor-07 — Sets for two seat their pair side by side: the bistro set takes one, the picnic table two on one bench
-
-- **Severity:** S3
-- **Rubric:** I2
-- **Fix class:** code
-- **Where:** `crates/sim-core/src/world.rs:321-333` (`slot_position`: slots spread across the width, all facing the object's front); `web/public/content/furniture.json:4504` (`patioSet`: no `slots`), `:4574` (`picnicTable` `slots: 2`)
-- **Evidence:** The bistro set has two chairs facing each other and one slot: a second resident can't join a coffee (`sheets/obj-patioSet.png`, the near chair stays empty). The picnic table's two ("picnics for two", its description) sit on the back bench 1.5 m apart, both facing the far bench (`extra/picnic-top/top-picnicTable-picnic-01.png` for slot 0's place). A couple at a table sit across from each other. Slots with their own place and facing (or the second slot turned round) are new behaviour. The base dining table has the same side-by-side seating (M-kitchen-01, kitchen ledger).
-- **Status:** open
-- **Source:** outdoor wave
+### I-outdoor-07 — moved to systems.md
 
 ### I-outdoor-08 — The outdoor bar has no drink to have at it
 

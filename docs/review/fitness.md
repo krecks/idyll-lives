@@ -15,9 +15,9 @@ Family: `tools/art/blender/families/fitness.py`.
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| `treadmill` Treadmill | OK | A-fitness-02 | I-bathroom-04 | A-fitness-02 S3 motion; I-bathroom-04 S3 code (bathroom ledger: no sound) | `sheets/obj-treadmill.png`, `play/treadmill-run-*.png`, `clips/clips-treadmill-all-t*.png`, `play-child/treadmill-run-*.png`, `play-elder/treadmill-run-*.png` |
+| `treadmill` Treadmill | OK | A-fitness-02 | I-bathroom-04 | A-fitness-02 S3 motion; I-bathroom-04 S3 code (systems ledger: no sound) | `sheets/obj-treadmill.png`, `play/treadmill-run-*.png`, `clips/clips-treadmill-all-t*.png`, `play-child/treadmill-run-*.png`, `play-elder/treadmill-run-*.png` |
 | `weightBench` Weight bench | M-fitness-01 | A-fitness-01 | I-systems-04 | A-fitness-01 S2 clip (seeded; confirmed); M-fitness-01 S3 model; I-systems-04 S2 code (systems ledger: an 8-year-old bench-presses the loaded bar, wave shot `fitness/extra/child-weightBench-lift-01.png`) | `sheets/obj-weightBench.png`, `play/weightBench-lift-*.png`, `clips/clips-weightBench-all-t*.png` |
-| `exerciseBike` Exercise bike | OK | A-hobbies-01 | A-hobbies-01, I-hobbies-09 | A-hobbies-01 S2 code (hobbies ledger: gets on through the handlebars); I-hobbies-09 S3 code (hobbies ledger: no flywheel whirr) | `fitness/sheets/obj-exerciseBike.png`, `fitness/extra/side-exerciseBike-cycle-00.png`, `fitness/sheets/age-exerciseBike.png` |
+| `exerciseBike` Exercise bike | OK | A-hobbies-01 | A-hobbies-01, I-hobbies-09 | A-hobbies-01 S2 code (systems ledger: gets on through the handlebars); I-hobbies-09 S3 code (hobbies ledger: no flywheel whirr) | `fitness/sheets/obj-exerciseBike.png`, `fitness/extra/side-exerciseBike-cycle-00.png`, `fitness/sheets/age-exerciseBike.png` |
 | `yogaMat` Yoga mat | M-fitness-02 | OK | I-fitness-01 | M-fitness-02 S3 model; I-fitness-01 S3 clip | `fitness/sheets/obj-yogaMat.png`, `fitness/clips/clips-yogaMat-all-t99.png`, `fitness/play/c1/yogaMat-yoga-01.png` |
 | `dumbbells` Dumbbell rack | OK | OK | I-fitness-02, I-systems-04 | I-fitness-02 S3 model; I-systems-04 S2 code (systems ledger: a child curls the adult pair) | `fitness/sheets/obj-dumbbells.png`, `fitness/extra/side-dumbbells-lift-00.png`, `fitness/extra/child-dumbbells-lift-01.png` |
 

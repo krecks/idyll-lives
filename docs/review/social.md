@@ -89,6 +89,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 
 ### I-social-01 — Phone actions are mimed: there is no phone in the hand
 
+> Consolidation: the community wave saw the phone box's receiver stay on its hook while the caller holds a phone that isn't there to the ear.
+
 - **Severity:** S2
 - **Rubric:** I12, I7
 - **Fix class:** code

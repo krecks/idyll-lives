@@ -153,15 +153,7 @@ Measured: the dressing table's top 0.76 (72–78) and its pouf's seat 0.45 (42�
 - **Status:** open
 - **Source:** wave: bedroom
 
-### M-bedroom-04 — Every sleeper gets the same blue checked quilt, whatever the bed's own bedding
-
-- **Severity:** S2
-- **Rubric:** M9, M13, A12
-- **Fix class:** code
-- **Where:** `web/src/render/babylon/characters/blanket.ts:197-246` (`blanketMaterial`: one texture, `#6F97A6` with a white sheet band); `web/src/render/babylon/characters.ts:1176` (one `quilt` material for every quilt), `:280` (`BLANKET_BEDS`)
-- **Evidence:** `bedroom/play/chunk1/bedSingle-sleep-02.png` (a blue checked quilt over the sage single), `bedroom/play/chunk2/bedCanopy-sleep-02.png` (over the rust four-poster), `bedroom/play/chunk1/bedDouble-sleep-02.png`, `bedroom/extra/bunk-two-09.png` (teal bunks). Asleep, the bed's own duvet, the part the buyer colours (`Bedding`), is hidden under the game's quilt, which is the same blue check on every bed and every colour; it appears as the sleeper lies down and goes when they get up, so the bed changes colour twice a night. Tinting the quilt from the bed's `Bedding` colour (or its pattern by bed) would keep the bed the player chose. Other items (other ledgers): `kidsBed`, `kidsBedCar` (kids), `wallBed` (living), `lazy.snoozecloudBed` (packs): every bed in `BLANKET_BEDS`. Cause in the renderer: for `residents.md` (row "Blankets and pyjamas in bed").
-- **Status:** open
-- **Source:** wave: bedroom (lead from Phase 0.9 "Seen (not reviewed)")
+### M-bedroom-04 — moved to residents.md
 
 ### A-bedroom-01 — Turning down the bed, the duvet stands up as a stiff board
 
@@ -183,35 +175,11 @@ Measured: the dressing table's top 0.76 (72–78) and its pouf's seat 0.45 (42�
 - **Status:** open
 - **Source:** wave: bedroom (`bedroom/extra/scenes.mjs` phase `bunk`, `review-stage`, residents 0 and 4)
 
-### A-bedroom-03 — Residents get into bed at its foot end, through the footboard, and slide up to the pillow
+### A-bedroom-03 — moved to residents.md
 
-- **Severity:** S2
-- **Rubric:** A1, A4, I2
-- **Fix class:** code
-- **Where:** `web/src/render/babylon/characters.ts:304` (`LIE_ENTRY` 0.55: the hips sit down 0.55 m forward of the slot's middle), `:2533-2541` (getting in: `sitDown` on the edge facing the tile they came from, then the crossfade to lying); the beds' `approach` (default `front`: the tile in front, the foot end) in `web/public/content/furniture.json` and `catalog2/bedroom.json`; getting up `:2758-2807` (`fromBed`)
-- **Evidence:** `bedroom/play/chunk1/bedSingle-sleep-00.png`: the resident sits down facing out, about 0.4 m in from the foot end of the single, the thighs through its 0.6 m footboard; `bedroom/play/stage-elder/bedSingle-sleep-01.png` (the elder, the same, the shoes on the mattress); `bedroom/play/chunk1/bedKing-sleep-01.png` (half way through the crossfade, half reclined in the middle of the bed); `bedroom/extra/bunk-two-02.png` (the bunk's end board). From there the body crossfades about 1.4 m up the bed to lie with the head on the pillow. People get in at a side, sit on the edge by the pillow and swing the legs in. On beds with a footboard or end arms (`bedSingle`, `bedBunk`, `bedDaybed`) the legs pass through it; on the rest (`bed`, `bedKing`, `bedDouble`, `bedQueenUpholstered`, `bedCanopy`, `bedFuton`) it is the sit at the foot and the slide. Other items: `kidsBed`, `kidsBedCar` (kids), `wallBed`, `sofaBed` (living), the packs' beds: every `lie` use on a bed. Cause in the renderer and the beds' approach: for `residents.md` (row "Lie fit").
-- **Status:** open
-- **Source:** wave: bedroom
+### A-bedroom-04 — moved to residents.md
 
-### A-bedroom-04 — A stray quilt lies at the world origin whenever a bed with a blanket is on the lot
-
-- **Severity:** S2
-- **Rubric:** A12, M7
-- **Fix class:** code
-- **Where:** `web/src/render/babylon/characters.ts:1489-1497` (every base body's quilt mesh `setEnabled(true)` once any object is in `BLANKET_BEDS`, with `thinInstanceCount = 0`), `:2458-2464` (`thinInstanceCount = drawn`, 0 when nobody is under that quilt); `web/src/render/babylon/characters/blanket.ts:181-188` (the mesh at the origin, `alwaysSelectAsActiveMesh`); Babylon draws a mesh with no thin instances as a plain mesh at its own transform (`Mesh.hasThinInstances` is `instancesCount > 0`, `@babylonjs/core` 9.30 `Meshes/mesh.pure.js:225`)
-- **Evidence:** `bedroom/extra/quilt-origin-bed-awake.png`, `quilt-origin-bed-awake-far.png` (`review-stage`, a `bedSingle` bought, nobody in bed): a quilt lies on the lawn at the lot's corner, `(0, 0, 0)`, in view of the Live camera from the front garden. With no bed it isn't there (`quilt-origin-nobed.png`; the meshes disabled). With someone asleep it stays (`quilt-origin-asleep.png`): the sleeper's body's quilt is drawn on the bed, the other bodies' quilts (count 0) at the origin. `bedroom/extra/scenes.log` lists the seven `simBlanket:*` meshes, enabled, count 0, at the origin. The tooling agent's quilt on `poses.html` (`bedroom/sheets/age-bed.png`, right edge) is the same. Hiding a quilt mesh while its count is 0 (or `forcedInstanceCount`) fixes it. Other items: every bed in `BLANKET_BEDS` (`kidsBed`, `kidsBedCar`, `wallBed`, `lazy.snoozecloudBed` in other ledgers); where the origin falls on other lots (a street, a neighbour's lot) wasn't checked.
-- **Status:** open
-- **Source:** wave: bedroom (lead from the tooling round; `bedroom/extra/scenes.mjs` phase `quilt`)
-
-### I-bedroom-01 — Pyjamas for every nap, a doze in the garden too, and the shoes stay on
-
-- **Severity:** S2
-- **Rubric:** I3, I16
-- **Fix class:** code
-- **Where:** `web/src/render/babylon/characters.ts:2373-2378` (`asleep`: lying in a `LYING` clip with tag `sleep` or `nap` → the night outfit); `web/src/render/babylon/characters/outfit.ts:149-154` (pyjamas recolour the top and bottom only; the shoe part stays)
-- **Evidence:** `bedroom/play/chunk1/bed-nap-01.png` and every bed's nap: the resident changes into pyjamas for a 30-minute nap at noon; `bedroom/extra/lounger-doze.png`: "Doze in the sun" on a sun lounger in the garden at 10:22 is in pink pyjamas, white shoes on. `bedroom/play/stage-elder/bedSingle-sleep-01.png`: the shoes go into bed (on the mattress at the foot while getting in). People nap in their clothes, take their shoes off for bed and dress for the night only at night. Pyjamas for `sleep` only, and no shoes with them, would do. Other items: every lying `nap` use: `kidsBed`, `kidsBedCar` (kids), `sofaBed`, `wallBed` (living), `sunLounger`, `hammock` (outdoor), `lazy.snoozecloudBed`, `cheerful.rainbowHammock`, `gloomy.windowSeat`, `natureLover.gardenHammock`, `kind.hearthSettee` (packs) (`tables/uses-*.md`). Cause in the renderer: for `residents.md` (row "Blankets and pyjamas in bed").
-- **Status:** open
-- **Source:** wave: bedroom (lead from Phase 0.9 "Seen (not reviewed)"; `bedroom/extra/scenes.mjs` phase `lounger`)
+### I-bedroom-01 — moved to residents.md
 
 ### I-bedroom-02 — A night on the daybed with no cover
 

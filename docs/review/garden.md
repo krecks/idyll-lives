@@ -212,7 +212,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 
 Not tied to one row: I-garden-01.
 
-Causes shared beyond this ledger (for the coordinator to move at the merge): I-garden-03 (the sim picks a crop at use start: the outdoor ledger's `raisedBed`, the packs ledger's `natureLover.veggieBed`), I-garden-04 (`ACTIONS.harvest` and `tend`: `raisedBed`, `natureLover.veggieBed`), I-garden-10 (harvests feed on the spot: `raisedBed`, `natureLover.veggieBed`'s `pickSnack`), I-garden-02 (`ACTIONS.relax.stand` and the `relax` anim at trees, base and garden). I-held-01 is the held ledger's.
+Causes shared beyond this ledger, moved at the consolidation (2026-10-21): I-garden-03 and I-garden-10 to [systems.md](systems.md) (the sim picks a crop at use start; harvests feed on the spot), I-garden-02 and I-garden-04 to [residents.md](residents.md) (`ACTIONS.relax.stand` at trees; `ACTIONS.harvest` and `tend`). I-held-01 is the held ledger's.
 
 ### I-garden-01 — Residents once didn't reach things in a crowded garden
 
@@ -241,19 +241,7 @@ Causes shared beyond this ledger (for the coordinator to move at the merge): I-g
 - **Status:** confirmed and widened (garden wave: the Japanese maple, the blue spruce)
 - **Source:** pilot (`scripts/scenes.mjs` pine); wave: garden
 
-### I-garden-02 — "Relax in the shade" is half an hour standing by the trunk
-
-- **Severity:** S2
-- **Rubric:** I3, A2, I2, I16
-- **Fix class:** clip
-- **Where:** `web/public/content/base.json:2861` (`shade`: `anim: relax`, no `pose`); `web/public/content/garden.json:122, 150, 178, 243, 271, 322, 365` (the same use on the maple, birch, cherry, apple, Japanese maple, magnolia and willow); `web/src/render/babylon/characters.ts:472` (`ACTIONS.relax.stand`: `idle`, `foldArms`)
-- **Evidence:**
-  - Pilot: `play/tree-shade-01.png`, `sheets/obj-tree.png`: the resident stands at the trunk, arms at the sides or folded, for 30 minutes. Relaxing in a tree's shade is sitting against the trunk or lying in the grass. No clip sits on the ground today (`sit` needs a seat height); a sit-on-the-ground pose, or `pose: sit` at a seat height of 0, is the fix.
-  - Garden wave: the same on all seven garden trees that have the use (`play/trees-wide/garden.<tree>-shade-01.png`, `extra/close/close-garden.apple-shade-01.png`, `close-garden.willow-shade-01.png`). Two more things wrong with the place and the time:
-    - The slot is the front tile wherever the shadow falls: at the maple, birch and cherry the resident stands on the lit side of the trunk with the crown's shadow beside them (`sheets/obj-garden.maple.png`, `sheets/obj-garden.birch.png`, play shots).
-    - The use has no time rule: it is offered at night, when there is no shade to relax in (I16; the same gap as stargazing at noon, I-hobbies-03).
-- **Status:** confirmed and widened (garden wave: maple, birch, cherry, apple, Japanese maple, magnolia, willow; the slot and the night)
-- **Source:** pilot; wave: garden
+### I-garden-02 — moved to residents.md
 
 ### M-garden-02 — The weeping willow's curtains are thick solid spikes that stop 1–2.6 m above the lawn
 
@@ -325,28 +313,9 @@ Causes shared beyond this ledger (for the coordinator to move at the merge): I-g
 - **Status:** open
 - **Source:** wave: garden
 
-### I-garden-03 — A crop is picked the moment the harvest starts: the bed empties, then the resident picks at nothing for 18 minutes
+### I-garden-03 — moved to systems.md
 
-- **Severity:** S2
-- **Rubric:** I8, A10
-- **Fix class:** code
-- **Where:** `crates/sim-core/src/world.rs:4978-4982` (`if inter.picks && … growth >= 0.0 { growth = -1.0 }` as the use starts); the growth clip then goes from ripe to picked at once (`G.stages`, `plants.py:1063` `_crop`)
-- **Evidence:** `extra/harvest/s-garden.vegPatch-harvest.png`, `s-garden.pumpkins-harvest.png`, `s-garden.strawberries-harvest.png`, `s-garden.tomatoes-harvest.png`, `s-raisedBed-harvest.png` (three shots each, the first as the use starts): on every crop the ripe vegetables, pumpkins, berries and tomatoes are there in the first shot and gone 1–2 game minutes into the 20-minute harvest; the resident goes on with the harvest clip over bare soil or leaves to the end. The same on the outdoor ledger's `raisedBed` (and, by the same rule, on the packs ledger's `natureLover.veggieBed` `pickSnack`). Pick the crop when the use ends (or in steps through it), so the produce goes as the hands take it.
-- **Status:** open
-- **Source:** wave: garden (`play --state review-garden --use-existing … --use harvest`)
-
-### I-garden-04 — Harvesting and tending don't follow the plant's height: the hand stops half a metre above low crops, and the tomatoes are tied up kneeling at the soil
-
-- **Severity:** S2
-- **Rubric:** I3, A1
-- **Fix class:** renderer-table
-- **Where:** `web/src/render/babylon/characters.ts:508` (`ACTIONS.tend`: `kneel` for every crop) and `:512` (`ACTIONS.harvest`: `harvest`, `plant` for every def but the herb planter); `web/src/render/babylon/characters/clips/garden.ts:37-44` (`harvestPose`: standing, bent 22–32°, the picking hand at 0.68–0.80 m)
-- **Evidence:**
-  - Harvest: `extra/harvest/s-garden.strawberries-harvest.png` and `s-garden.pumpkins-harvest.png`: the resident stands bent a little with the hand at the knees, 0.4–0.5 m above berries at 0.07 m and pumpkins at 0.2 m; nothing is touched. At the veg patch (0.4 m, `s-garden.vegPatch-harvest.png`) the hand is at the box's rim; at the tomatoes (1.2 m) it is in the plant, which is right. The meadow's "Pick a wildflower" plays the same clip over a 0.5 m patch (`play/c3/garden.meadow-pickFlower-01.png`). Low crops want the crouch the `plant` clip already has (`garden.ts:110-135`), or a deeper harvest pose.
-  - Tend: "Tie up and water" at the tomatoes is the weeding kneel (`play/c3/garden.tomatoes-tend-01.png`): right while planted, wrong at a ripe, staked 1.2 m plant, which is tied up standing.
-  - The same entries play at the outdoor ledger's `raisedBed` (hand at its rim, fine) and the packs ledger's `natureLover.veggieBed` (`tendVeggies`).
-- **Status:** open
-- **Source:** wave: garden
+### I-garden-04 — moved to residents.md
 
 ### I-garden-05 — Picking an apple or a lemon is eating at the trunk; the fruit shrinks away 1.2 m over the picker's head
 
@@ -398,12 +367,5 @@ Causes shared beyond this ledger (for the coordinator to move at the merge): I-g
 - **Status:** open
 - **Source:** wave: garden
 
-### I-garden-10 — Fruit and vegetables are eaten on the spot, at any time: endless apples and lemons, a lemon eaten like an apple, a raw pumpkin as a meal
+### I-garden-10 — moved to systems.md
 
-- **Severity:** S3
-- **Rubric:** I5, I16
-- **Fix class:** decision
-- **Where:** `web/public/content/garden.json:210-241` (apple: `pick`, no `grows`, hunger 0.25), `:406-437` (lemon tree: `pick`, `anim: eat`, hunger 0.1, energy 0.05), `:1494`, `:1612`, `:1718` (veg patch, strawberries, pumpkins `harvest`: hunger 0.45, 0.25, 0.5 at the bed); `catalog2/outdoor.json:342` (`raisedBed` `harvest`)
-- **Evidence:** `tables/uses-garden.md`. The fruit trees have no ripeness (`grows`), so an apple can be picked and eaten every 15 minutes all year, where the crops beside them ripen in 2–4 days. The lemon is eaten for hunger like the apple ("a fresh boost"); a lemon is picked for a drink or for cooking. A harvest fills hunger at once, as if eaten raw in the bed: half a meal from a pumpkin, 0.45 from cabbages and carrots. In life the harvest goes to the kitchen (the herbs already work that way: a cooking boost, `garden.freshHerbs`). The same on the outdoor ledger's `raisedBed` and the packs ledger's `natureLover.veggieBed` (`pickSnack`, `anim: eat`). For triage: give the fruit trees `grows` (the apple model would need its growth stages), make the lemon a drink or cooking boost, and decide whether a harvest feeds directly (a game shortcut) or stocks the fridge (new behaviour, `code`).
-- **Status:** open
-- **Source:** wave: garden

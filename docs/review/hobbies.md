@@ -81,7 +81,7 @@ Family: `tools/art/blender/families/hobbies.py`.
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
 | `easel` Easel | OK | OK | I-held-01 | I-held-01 S2 code (seeded; held ledger: no brush) | `sheets/obj-easel.png`, `play/easel-paint-*.png`, `clips/clips-easel-all-t*.png`, `play-child/easel-paint-*.png` |
-| `workbench` Workbench | M-hobbies-01 | OK | I-bathroom-04 | M-hobbies-01 S2 model; I-bathroom-04 S3 code (bathroom ledger: no sound) | `sheets/obj-workbench.png`, `play/workbench-tinker-*.png`, `clips/clips-workbench-all-t*.png`, `play-child/workbench-tinker-*.png` |
+| `workbench` Workbench | M-hobbies-01 | OK | I-bathroom-04 | M-hobbies-01 S2 model; I-bathroom-04 S3 code (systems ledger: no sound) | `sheets/obj-workbench.png`, `play/workbench-tinker-*.png`, `clips/clips-workbench-all-t*.png`, `play-child/workbench-tinker-*.png` |
 | `telescope` Telescope | OK | I-hobbies-02 | I-hobbies-02, I-hobbies-03 | I-hobbies-02 S2 clip; I-hobbies-03 S2 code | `sheets/obj-telescope.png`, `play/telescope-stargaze-*.png`, `clips/clips-telescope-all-t*.png`, `play-child/telescope-stargaze-*.png` |
 | `sewingTable` Sewing table | M-hobbies-08, M-hobbies-09 | A-hobbies-01, A-hobbies-02 | A-hobbies-01, I-hobbies-09 | M-hobbies-08 S3 model; M-hobbies-09 S3 renderer-table; A-hobbies-01 S2 code; A-hobbies-02 S3 motion; I-hobbies-09 S3 code (a silent machine) | `hobbies/sheets/obj-sewingTable.png`, `hobbies/extra/side2-sewingTable-sew-01.png`, `hobbies/extra/sit00.png` |
 | `chemistrySet` Chemistry bench | OK | I-hobbies-11 | I-hobbies-11 | I-hobbies-11 S3 renderer-table | `hobbies/sheets/obj-chemistrySet.png`, `hobbies/extra/side1.png`, `hobbies/extra/stand3.png` |
@@ -133,6 +133,8 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 ### I-hobbies-01 — The chess table seats one: chess is a game for two
 
 > Wave (hobbies): confirmed and widened to the foosball table, a game for two or four played alone (Rubric I16 added: someone to play with).
+>
+> Consolidation: the park chess table's "stool either side" stands side by side (I-community-02, merged into I-outdoor-07, systems ledger).
 
 - **Severity:** S3
 - **Rubric:** I1, I2, I16
@@ -233,15 +235,7 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Status:** open
 - **Source:** wave: hobbies
 
-### A-hobbies-01 — Residents walk through the table, the wheel or the drum kit to a seat behind it
-
-- **Severity:** S2
-- **Rubric:** A4, I2
-- **Fix class:** code
-- **Where:** `crates/sim-core/src/world.rs:4961-4967` (a sitting use: the resident moves from the tile in front, where they stop, to `slot_position` in the footprint); seats behind the middle with `approach` front: `web/src/render/babylon/characters/furniture.json:7`, `:44`, `:45` (`chessTable`, the digital piano, `sewingTable`: fwd −0.2, −0.2, −0.22), `web/public/content/catalog2/hobbies.json:5`, `:93`, `:130`, `:166` (`drumKit` −0.23, `potteryWheel` −0.28, `craftTable` −0.25, `puzzleTable` −0.25), `web/public/content/furniture.json:3523` (`exerciseBike` −0.12)
-- **Evidence:** the first play shot of each catches the resident mid-way through the object: `hobbies/play/c1/potteryWheel-throw-00.png` (standing on the wheel head), `drumKit-drum-00.png` (in the toms), `sewingTable-sew-00.png`, `craftTable-scrapbook-00.png`, `chessTable-chess-00.png`, `puzzleTable-jigsaw-00.png` and the digital piano's `play-00` (composites `hobbies/extra/sit00.png`, `sit00b.png`); a second in, from the side, the potter still stands in the wheel's body (`hobbies/extra/side1.png`), and the rider climbs on through the bike's handlebars and flywheel (`fitness/extra/side-exerciseBike-cycle-00.png`). They come to the front tile, then glide about a metre back through the work to the seat while sitting down, and out the same way (A-residents-01, residents ledger, is the stand-up glide on its own). Real people go round to the chair, or straddle the saddle from the side. Two ways out: walk them round to the seat's side (code, for every object like this), or build these hobby objects with the seat at the front, facing back, as the piano is (`seat.facing: back`, model and content). The same layout, seat behind the middle with approach front, is in other ledgers' objects (a scan of the content, not checked in play): `computerDesk`, `diningTable` (base), `deskLaptop`, `deskWriting`, `computerGaming`, `kidsDesk`, `bistroSet`, `diningGlass`, `diningOak`, `patioSet`, `picnicTable`, `parkChessTable`, `busStop`, `chaise`.
-- **Status:** open
-- **Source:** wave: hobbies
+### A-hobbies-01 — moved to systems.md
 
 ### A-hobbies-02 — At seated hobbies the moving part starts while the resident is still sitting down
 
@@ -293,15 +287,7 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Status:** open
 - **Source:** wave: hobbies
 
-### I-hobbies-07 — Two residents at a two-player table stand in one spot, inside each other
-
-- **Severity:** S1
-- **Rubric:** I2, A7
-- **Fix class:** code
-- **Where:** `crates/sim-core/src/world.rs:4958-4960` (a standing use keeps the resident on the tile they came to and only turns them); `world.rs:322-333` (`slot_position` spreads the slots, but only sitting and lying uses move there); `web/public/content/furniture.json:3327`, `:3377` (`poolTable`, `foosball`: `slots: 2`)
-- **Evidence:** `hobbies/extra/two.mjs` sent the adult (0) and the young adult (1) to the same table: both were `using` at (9.5, 13.5), yaw 2.68, at the foosball, and at (10.5, 13.5), yaw 3.14, at the pool table (`hobbies/extra/two.jsonl`): one body inside the other, the second's sleeves showing through the first (`hobbies/extra/two.png`, front and top). At a real pool table the two move round it; at foosball they face each other across it. Wrong at a glance whenever two people play. The renderer's `STEP_IN` lanes (`characters.ts:193`) split users for the climbing frame only. The same cause reaches every other object with two or more slots and a standing use (a content scan, not checked in play): `crib`, `counterSinkDouble`, `vanityDouble`, `kitchenIsland`, `homeCinema`, `trainTable`, `pingPongTable`, `basketballHoop`, `marketStall`, `shopCounter`, `bakeryCase`, `groceryShelf`, `fountainTown`, `busStop`, `energetic.streetballHoop`, `cheerful.jukebox`, `outgoing.partyBar`, `outgoing.karaokeStage`, `outgoing.danceFloor`, `foodie.pizzaOven`, `foodie.chefsIsland`, `natureLover.glasshouse`, `romantic.roseArbourSwing`, `hotTubCedar` (its cover), and the fold uses of `sofaBed`, `wallBed`, `bedFuton`.
-- **Status:** open
-- **Source:** wave: hobbies (`two.mjs`, adult and young adult on `review-stage`)
+### I-hobbies-07 — moved to systems.md
 
 ### I-hobbies-08 — The guitar is held out in front of the chest, its neck pointing forward and up
 
@@ -315,12 +301,14 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 
 ### I-hobbies-09 — Games, crafts and the exercise bike are silent, and the drums play the plucked tune
 
+> Consolidation (2026-10-21): closed as a duplicate of I-bathroom-04 (systems ledger), which takes its items and evidence.
+
 - **Severity:** S3
 - **Rubric:** I9
 - **Fix class:** code
 - **Where:** `web/src/audio/world.ts:34-47` (`ACTION_SOUNDS`: nothing for `play`, `tinker`, `exercise`; `music` is one sound for every instrument), `:659-678` (`musicBuffer`, a plucked melody)
-- **Evidence:** `cargo review uses` Sound column (`tables/uses-hobbies.md`, `tables/uses-fitness.md`): `—` for the pool table, foosball, darts, the arcade, the sewing machine, the chemistry bench, the pottery wheel, the jigsaw and craft tables, and the exercise bike; `music` for the drum kit, so drumming sounds like the piano and the guitars (a plucked tune on a pentatonic scale) with no beat. In life: balls clacking, the rods and the ball, darts' thuds, arcade bleeps, a sewing machine's whirr, a wheel's motor, a bike's flywheel. The jigsaw and the scrapbook are near silent (fine). The same cause and fix site as I-bathroom-04 (bathroom ledger: the toilet, the treadmill, the workbench), which this widens; one finding at the merge.
-- **Status:** open
+- **Evidence:** `cargo review uses` Sound column (`tables/uses-hobbies.md`, `tables/uses-fitness.md`): `—` for the pool table, foosball, darts, the arcade, the sewing machine, the chemistry bench, the pottery wheel, the jigsaw and craft tables, and the exercise bike; `music` for the drum kit, so drumming sounds like the piano and the guitars (a plucked tune on a pentatonic scale) with no beat. In life: balls clacking, the rods and the ball, darts' thuds, arcade bleeps, a sewing machine's whirr, a wheel's motor, a bike's flywheel. The jigsaw and the scrapbook are near silent (fine). The same cause and fix site as I-bathroom-04 (systems ledger: the toilet, the treadmill, the workbench), which this widens; one finding at the merge.
+- **Status:** closed (duplicate of I-bathroom-04)
 - **Source:** wave: hobbies
 
 ### I-hobbies-10 — The potter's knees go into the wheel's body

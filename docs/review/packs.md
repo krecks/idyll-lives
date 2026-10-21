@@ -49,7 +49,7 @@ Family: `tools/art/blender/families/pack_cheerful.py`.
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
 | `cheerful.jukebox` Sunburst jukebox | M-packs-07 | OK | I-packs-16 | M-packs-07 S2 model; I-packs-16 S3 content | `packs/sheets/obj-cheerful.jukebox.png`, `packs/extra/night/night-cheerful.jukebox-dance-01.png` |
-| `cheerful.karaokeMachine` Spotlight karaoke machine | M-packs-07 | OK | I-bathroom-04 | M-packs-07 S2 model (lyrics screen, from its material; not shot at night); I-bathroom-04 S3 code (bathroom ledger: singing has no sound) | `packs/sheets/obj-cheerful.karaokeMachine.png` |
+| `cheerful.karaokeMachine` Spotlight karaoke machine | M-packs-07 | OK | I-bathroom-04 | M-packs-07 S2 model (lyrics screen, from its material; not shot at night); I-bathroom-04 S3 code (systems ledger: singing has no sound) | `packs/sheets/obj-cheerful.karaokeMachine.png` |
 | `cheerful.mocktailCart` Fizz & sunshine mocktail cart | OK | OK | I-held-01 | I-held-01 S2 code (held ledger: no glass or shaker) | `packs/sheets/obj-cheerful.mocktailCart.png` |
 | `cheerful.rainbowHammock` Rainbow hammock | M-packs-06 | M-packs-06 | OK | M-packs-06 S2 decision | `packs/sheets/obj-cheerful.rainbowHammock.png`, `packs/sheets/age-cheerful.rainbowHammock.png` |
 | `cheerful.sunriseLamp` Sunrise stretch lamp | M-packs-07 | OK | I-packs-02 | M-packs-07 S2 model (no `light`); I-packs-02 S2 content | `packs/sheets/obj-cheerful.sunriseLamp.png`, `packs/extra/night/night-cheerful.sunriseLamp-stretch-01.png` |
@@ -101,7 +101,7 @@ Family: `tools/art/blender/families/pack_energetic.py`.
 | `energetic.trampoline` Rebound trampoline | OK | OK | OK | | `packs/sheets/obj-energetic.trampoline.png` |
 | `energetic.streetballHoop` Streetball hoop | OK | OK | I-packs-12 | I-packs-12 S3 content | `packs/sheets/obj-energetic.streetballHoop.png` |
 | `energetic.powerBlender` Power blender station | OK | A-packs-02 | I-packs-19 | A-packs-02 S3 motion (seeded; confirmed); I-packs-19 S3 code | `packs/sheets/obj-energetic.powerBlender.png` |
-| `energetic.contrastShower` Contrast rain shower | OK | A-bathroom-01 | I-bathroom-02 | A-bathroom-01 S2 model (bathroom ledger: the glass door never opens); I-bathroom-02 S3 clip (bathroom ledger) | `packs/sheets/obj-energetic.contrastShower.png` |
+| `energetic.contrastShower` Contrast rain shower | OK | A-bathroom-01 | I-bathroom-02 | A-bathroom-01 S2 model (bathroom ledger: the glass door never opens); I-bathroom-02 S3 clip (residents ledger) | `packs/sheets/obj-energetic.contrastShower.png` |
 | `energetic.recoveryPod` Recovery pod | OK | OK | OK | | `packs/sheets/obj-energetic.recoveryPod.png`, `packs/play/chunk2/energetic.recoveryPod-recover-01.png` |
 
 ### Real uses against the content's (I1)
@@ -186,7 +186,7 @@ Family: `tools/art/blender/families/pack_hotHeaded.py`.
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| `hotHeaded.heavyBag` Heavy punching bag | OK | OK | I-bathroom-04 | I-bathroom-04 S3 code (bathroom ledger: no thud) | `packs/sheets/obj-hotHeaded.heavyBag.png` |
+| `hotHeaded.heavyBag` Heavy punching bag | OK | OK | I-bathroom-04 | I-bathroom-04 S3 code (systems ledger: no thud) | `packs/sheets/obj-hotHeaded.heavyBag.png` |
 | `hotHeaded.smashBin` Plate-smash bin | OK | I-packs-13 | I-packs-13 | I-packs-13 S3 clip | `packs/sheets/obj-hotHeaded.smashBin.png` |
 | `hotHeaded.thunderDrums` Thunder drum kit | M-packs-13 | OK | OK | M-packs-13 S3 renderer-table | `packs/sheets/obj-hotHeaded.thunderDrums.png`, `packs/sheets/age-hotHeaded.thunderDrums.png` |
 | `hotHeaded.coolDownCushion` Cool-down meditation cushion | M-packs-12, M-packs-13 | OK | OK | M-packs-12 S3 model; M-packs-13 S3 renderer-table | `packs/sheets/obj-hotHeaded.coolDownCushion.png`, `packs/sheets/age-hotHeaded.coolDownCushion.png` |
@@ -286,7 +286,7 @@ Family: `tools/art/blender/families/pack_natureLover.py`.
 | `natureLover.pottingBench` Potting bench | OK | OK | OK | | `packs/sheets/obj-natureLover.pottingBench.png` |
 | `natureLover.birdFeeder` Bird feeder post | OK | OK | OK | | `packs/sheets/obj-natureLover.birdFeeder.png` |
 | `natureLover.gardenHammock` Garden hammock | M-packs-06 | M-packs-06 | OK | M-packs-06 S2 decision | `packs/sheets/obj-natureLover.gardenHammock.png`, `packs/sheets/age-natureLover.gardenHammock.png` |
-| `natureLover.cedarShower` Cedar outdoor shower | OK | OK | I-bathroom-02 | I-bathroom-02 S3 clip (bathroom ledger) | `packs/sheets/obj-natureLover.cedarShower.png` |
+| `natureLover.cedarShower` Cedar outdoor shower | OK | OK | I-bathroom-02 | I-bathroom-02 S3 clip (residents ledger) | `packs/sheets/obj-natureLover.cedarShower.png` |
 | `natureLover.mossTerrarium` Moss terrarium | OK | OK | I-held-01 | I-held-01 S2 code (held ledger: the mister stays on the floor) | `packs/sheets/obj-natureLover.mossTerrarium.png` |
 | `natureLover.glasshouse` Fern glasshouse | OK | A-packs-03 | I-packs-09 | A-packs-03 S2 motion; I-packs-09 S2 content | `packs/sheets/obj-natureLover.glasshouse.png`, `packs/play/chunk4/natureLover.glasshouse-orchids-01.png` |
 
@@ -310,7 +310,7 @@ Family: `tools/art/blender/families/pack_neat.py`.
 |---|---|---|---|---|---|
 | `neat.steamMopDock` Steam mop dock | OK | OK | OK | | `packs/sheets/obj-neat.steamMopDock.png` |
 | `neat.laundryCenter` Stacked laundry centre | OK | A-packs-03 | I-packs-18 | A-packs-03 S2 motion; I-packs-18 S3 content | `packs/sheets/obj-neat.laundryCenter.png`, `packs/play/chunk2/neat.laundryCenter-laundry-01.png` |
-| `neat.rainShowerTower` Rainfall steam shower | OK | A-bathroom-01 | I-bathroom-02 | A-bathroom-01 S2 model (bathroom ledger: the glass door never opens); I-bathroom-02 S3 clip (bathroom ledger) | `packs/sheets/obj-neat.rainShowerTower.png` |
+| `neat.rainShowerTower` Rainfall steam shower | OK | A-bathroom-01 | I-bathroom-02 | A-bathroom-01 S2 model (bathroom ledger: the glass door never opens); I-bathroom-02 S3 clip (residents ledger) | `packs/sheets/obj-neat.rainShowerTower.png` |
 | `neat.organizerDesk` Label-and-sort organizer desk | M-packs-05 | OK | OK | M-packs-05 S2 model | `packs/sheets/obj-neat.organizerDesk.png`, `packs/sheets/age-neat.organizerDesk.png` |
 | `neat.robotVacuumDock` Robot vacuum and dock | OK | I-packs-15 | I-packs-15, I-packs-05 | I-packs-15 S3 motion; I-packs-05 S2 content | `packs/sheets/obj-neat.robotVacuumDock.png` |
 | `neat.entryConsole` Tidy entry console | M-packs-01 | OK | OK | M-packs-01 S2 model (seeded; confirmed and widened) | `packs/sheets/obj-neat.entryConsole.png` |
@@ -334,7 +334,7 @@ Family: `tools/art/blender/families/pack_outgoing.py`.
 |---|---|---|---|---|---|
 | `outgoing.partyBar` Home party bar | M-packs-03 | OK | I-packs-16, I-held-01 | M-packs-03 S3 model (seeded; confirmed); I-packs-16 S3 content; I-held-01 S2 code (held ledger: no glass) | `packs/sheets/obj-outgoing.partyBar.png` |
 | `outgoing.conversationSectional` Conversation sectional | OK | OK | OK | | `packs/sheets/obj-outgoing.conversationSectional.png`, `packs/sheets/age-outgoing.conversationSectional.png` |
-| `outgoing.karaokeStage` Karaoke stage | M-packs-07 | OK | I-packs-02, I-bathroom-04 | M-packs-07 S2 model; I-packs-02 S2 content; I-bathroom-04 S3 code (bathroom ledger: no sound) | `packs/sheets/obj-outgoing.karaokeStage.png`, `packs/extra/night/night-outgoing.karaokeStage-practise-01.png` |
+| `outgoing.karaokeStage` Karaoke stage | M-packs-07 | OK | I-packs-02, I-bathroom-04 | M-packs-07 S2 model; I-packs-02 S2 content; I-bathroom-04 S3 code (systems ledger: no sound) | `packs/sheets/obj-outgoing.karaokeStage.png`, `packs/extra/night/night-outgoing.karaokeStage-practise-01.png` |
 | `outgoing.videoCallNook` Video-call corner | M-packs-07 | OK | I-packs-10 | M-packs-07 S2 model; I-packs-10 S3 renderer-table | `packs/sheets/obj-outgoing.videoCallNook.png`, `packs/extra/night/night-outgoing.videoCallNook-call-01.png` |
 | `outgoing.danceFloor` Light-up dance floor | M-packs-07 | OK | OK | M-packs-07 S2 model | `packs/sheets/obj-outgoing.danceFloor.png`, `packs/extra/night/night-outgoing.danceFloor-dance-01.png` |
 | `outgoing.photoWall` Party photo wall | OK | OK | OK | | `packs/sheets/obj-outgoing.photoWall.png` |
@@ -384,7 +384,7 @@ Family: `tools/art/blender/families/pack_slob.py`.
 | `slob.beanbag` Crumb-proof beanbag | OK | OK | OK | | `packs/sheets/obj-slob.beanbag.png`, `packs/sheets/age-slob.beanbag.png` |
 | `slob.snackNightstand` Snack-stash nightstand | OK | I-packs-07 | I-packs-07 | I-packs-07 S2 content | `packs/sheets/obj-slob.snackNightstand.png`, `packs/play/chunk2/slob.snackNightstand-midnightSnack-01.png` |
 | `slob.spritzStation` Spritz & go station | M-packs-02 | OK | OK | M-packs-02 S2 model (seeded; confirmed) | `packs/sheets/obj-slob.spritzStation.png` |
-| `slob.arcadeCabinet` Pixel-blaster arcade cabinet | M-packs-07 | OK | I-bathroom-04 | M-packs-07 S2 model; I-bathroom-04 S3 code (bathroom ledger: no sound) | `packs/sheets/obj-slob.arcadeCabinet.png`, `packs/extra/night/night-slob.arcadeCabinet-chaseHighScore-01.png` |
+| `slob.arcadeCabinet` Pixel-blaster arcade cabinet | M-packs-07 | OK | I-bathroom-04 | M-packs-07 S2 model; I-bathroom-04 S3 code (systems ledger: no sound) | `packs/sheets/obj-slob.arcadeCabinet.png`, `packs/extra/night/night-slob.arcadeCabinet-chaseHighScore-01.png` |
 | `slob.gamingRecliner` Command-couch gaming recliner | OK | A-packs-06 | A-packs-06, I-packs-14 | A-packs-06 S2 content; I-packs-14 S3 content | `packs/sheets/obj-slob.gamingRecliner.png`, `packs/sheets/age-slob.gamingRecliner.png` |
 
 ### Real uses against the content's (I1)
@@ -618,12 +618,14 @@ Seeded from earlier docs first; then the review's, in the same form.
 
 ### I-packs-03 — Bouldering on the floor beside the crash mat
 
+> Consolidation: I-residents-01 (residents ledger) merged into it for the bouldering wall; its fitness-game half (danced beside the balance board) is I-packs-02's.
+
 - **Severity:** S2
 - **Rubric:** I3, A1
 - **Fix class:** clip
 - **Where:** `web/src/render/babylon/characters.ts:490` (`ACTIONS.exercise`: `idle` for `boulder`) and `:3384` (`activityPose`: climbing in place); `web/public/content/packs/energetic.json:5`
 - **Evidence:** `packs/play/chunk2/energetic.boulderingWall-climb-01.png`, `packs/sheets/obj-energetic.boulderingWall.png`: for an hour the climber stands on the floor off the end of the mat, reaching for holds overhead in turn; the feet never leave the floor and the hands don't touch the wall. Climbing needs the body on the wall (a rise up the panel and back, the hands and feet on holds).
-- **Status:** open
+- **Status:** confirmed and widened (consolidation: I-residents-01 merged)
 - **Source:** wave: packs
 
 ### I-packs-04 — On the vibration plate the resident turns their back to the handlebar
@@ -638,22 +640,26 @@ Seeded from earlier docs first; then the review's, in the same form.
 
 ### I-packs-05 — Long sit-down uses done standing at the object (the packs' share of I-living-03)
 
+> Consolidation (2026-10-21): closed as a duplicate of I-living-03 (living ledger), which takes its items and evidence.
+
 - **Severity:** S2
 - **Rubric:** I2, I3
 - **Fix class:** content
 - **Where:** `web/public/content/packs/bookworm.json:27` (`libraryWall`: research 60, browse 45), `:98` (`teaTrolley`: brew 20), `:154` (`bedsideStack`: chapter 20); `gloomy.json:39` (`recordCabinet`: listen 60, newAlbum 45); `romantic.json:126` (`gramophone`: listen 45); `lazy.json:188` (`smartHub`: program 60); `neat.json:127` (`robotVacuumDock`: program 45); `crates/sim-core/src/content.rs:79` (`seatNear`)
 - **Evidence:** Same cause as I-living-03 (living ledger: the bookshelf's uses and the TV lack `seatNear`). `packs/play/chunk1/bookworm.libraryWall-research-01.png`, `packs/sheets/obj-gloomy.recordCabinet.png`, `packs/sheets/obj-romantic.gramophone.png`, `packs/sheets/obj-lazy.smartHub.png`: the resident stands beside the thing, arms folded or the hands at the chest, for 20–60 minutes: a record is listened to and a library book read in a chair, the bedside chapter in bed, the tea drunk sitting. Giving these `seatNear` (a seat within a few metres) fixes the common case; what happens with no seat near is I-living-03's triage. The coordinator may merge this into I-living-03.
-- **Status:** open
+- **Status:** closed (duplicate of I-living-03)
 - **Source:** wave: packs
 
 ### I-packs-06 — Tending the waist-high herb garden is the flower bed's kneel
+
+> Consolidation (2026-10-21): closed as a duplicate of I-garden-04 (residents ledger), which takes its items and evidence.
 
 - **Severity:** S2
 - **Rubric:** I3, A1
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters.ts:508` (`ACTIONS.tend`: `kneel`); compare `:512` (`ACTIONS.harvest`: `pick` for `garden.herbs`, the standing waist-high case); `web/public/content/packs/foodie.json:5` (`tendHerbs`: `anim: tend`)
 - **Evidence:** `packs/play/chunk1/foodie.herbGarden-tendHerbs-01.png`: the resident kneels on the floor beside the stand's legs, the herbs 0.9 m up out of reach. A planter at worktop height is tended standing. (The cot's `feed` also plays this kneel: I-kids-04, kids ledger.)
-- **Status:** open
+- **Status:** closed (duplicate of I-garden-04)
 - **Source:** wave: packs
 
 ### I-packs-07 — The midnight snack is eaten sitting on the nightstand
@@ -778,10 +784,12 @@ Seeded from earlier docs first; then the review's, in the same form.
 
 ### I-packs-19 — A blender, a cheese board, a microwave and a pie sizzle; a story plays music
 
+> Consolidation (2026-10-21): closed as a duplicate of I-bathroom-04 (systems ledger), which takes its items and evidence.
+
 - **Severity:** S3
 - **Rubric:** I9
 - **Fix class:** code
 - **Where:** `web/src/audio/world.ts:35` (`ACTION_SOUNDS.cook`: `sizzle`) and `:45` (`listen`: `music`); `web/public/content/packs/energetic.json:105` (`blend`), `foodie.json:53` (`deliPantry` `cheeseBoard`), `slob.json:6` (`microwaveCart`), `kind.json:81` (`neighbourlyOven`), `lazy.json:188` (`smartHub` `story`)
-- **Evidence:** `tables/uses-packs.md` Sound column: every `cook`-tagged use sounds like frying, so the smoothie, the cold cheese board, the microwave and the oven bake all sizzle; the smart speaker's story plays the music loop. The sound follows the clip's tag, not the thing. Missing sounds (singing, the punch bag, the arcade) are I-bathroom-04's (bathroom ledger). Shared beyond this ledger: any `cook` use away from a hob (31 in the other content files).
-- **Status:** open
+- **Evidence:** `tables/uses-packs.md` Sound column: every `cook`-tagged use sounds like frying, so the smoothie, the cold cheese board, the microwave and the oven bake all sizzle; the smart speaker's story plays the music loop. The sound follows the clip's tag, not the thing. Missing sounds (singing, the punch bag, the arcade) are I-bathroom-04's (systems ledger). Shared beyond this ledger: any `cook` use away from a hob (31 in the other content files).
+- **Status:** closed (duplicate of I-bathroom-04)
 - **Source:** wave: packs

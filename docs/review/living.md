@@ -134,9 +134,9 @@ Family: `tools/art/blender/families/living.py`.
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| `bookshelf` Bookshelf | OK | OK | I-living-03, I-kids-03, I-held-01 | I-living-03 S2 content; I-kids-03 S1 code (kids ledger: an adult does homework); I-held-01 S2 code (seeded; held ledger: no book) | `sheets/obj-bookshelf.png`, `play/bookshelf-*.png`, `clips/clips-bookshelf-all-t*.png`, `play-child/bookshelf-*.png` |
+| `bookshelf` Bookshelf | OK | OK | I-living-03, I-kids-03, I-held-01 | I-living-03 S2 content; I-kids-03 S1 code (systems ledger: an adult does homework); I-held-01 S2 code (seeded; held ledger: no book) | `sheets/obj-bookshelf.png`, `play/bookshelf-*.png`, `clips/clips-bookshelf-all-t*.png`, `play-child/bookshelf-*.png` |
 | `bookcaseLow` Low bookcase | OK | OK | I-living-03 | I-living-03 S2 content; I-held-01 S2 code (held ledger) | `living/sheets/obj-bookcaseLow.png` |
-| `bookcaseWide` Library bookcase | OK | OK | I-living-03, I-kids-03 | I-living-03 S2 content; I-kids-03 S1 code (kids ledger: an adult does homework, `living/play/chunk2/bookcaseWide-homework-01.png`); I-held-01 S2 code (held ledger) | `living/sheets/obj-bookcaseWide.png`, `living/play/chunk2/bookcaseWide-homework-01.png` |
+| `bookcaseWide` Library bookcase | OK | OK | I-living-03, I-kids-03 | I-living-03 S2 content; I-kids-03 S1 code (systems ledger: an adult does homework, `living/play/chunk2/bookcaseWide-homework-01.png`); I-held-01 S2 code (held ledger) | `living/sheets/obj-bookcaseWide.png`, `living/play/chunk2/bookcaseWide-homework-01.png` |
 | `shelvingIndustrial` Industrial shelving | OK | n/a | OK | | `living/sheets/obj-shelvingIndustrial.png` |
 | `bookcaseTall` Tall bookcase | OK | OK | I-living-03 | I-living-03 S2 content; I-held-01 S2 code (held ledger) | `living/sheets/obj-bookcaseTall.png` |
 | `bookcaseCorner` Corner bookcase | OK | OK | I-living-03 | I-living-03 S2 content; I-held-01 S2 code (held ledger) | `living/sheets/obj-bookcaseCorner.png` |
@@ -231,13 +231,15 @@ Seeded from earlier docs first; add new findings after them in the same form.
 
 ### I-living-03 — Reading at the bookshelf, and TV without a seat, are an hour on foot
 
+> Consolidation: I-packs-05 (packs ledger) merged into it: the same standing hour at `bookworm.libraryWall`, `bookworm.teaTrolley`, `bookworm.bedsideStack`, `gloomy.recordCabinet`, `romantic.gramophone`, `lazy.smartHub` and `neat.robotVacuumDock`.
+
 - **Severity:** S2
 - **Rubric:** I2, I3
 - **Fix class:** content
 - **Where:** `web/public/content/base.json:2649`, `:2666`, `:2683` (`bookshelf` read, study, homework: no `seatNear`); `:2622` (`tv` watch: `seatNear: 4`); `web/src/render/babylon/characters.ts:475` (`ACTIONS.read`: `lantern` standing). Living wave, the same: `web/public/content/furniture.json:1417`, `:1453`, `:1490` (the coffee tables' magazine), `:1663`, `:1706` (`stereo`, `boombox` listen), `:1735`, `:1780` (`bookcaseLow`, `bookcaseWide`); `web/public/content/catalog2/living.json` `bookcaseTall`, `bookcaseCorner` (read, study: no `seatNear`)
 - **Evidence:** `play/bookshelf-homework-01.png`, `sheets/obj-bookshelf.png`: the resident stands at the shelf for 45–60 minutes holding a book that isn't there (I-held-01) at the chest. People take the book to a chair. The content already has the mechanism: the TV's watch takes a free seat within 4 m (`seatNear`, `world.rs:4289`); the three reading uses don't ask for one. The TV shows the fallback: with no seat near, the watcher stands half a metre from the screen, arms folded, for the hour (`play/tv-watch-01.png`). Giving the bookshelf uses `seatNear` fixes the common case; what a reader does with no seat near is for triage.
   Living wave: the same at every living thing used for a long time on foot: read and study at `bookcaseLow`, `bookcaseWide`, `bookcaseTall`, `bookcaseCorner` (45–60 min, `living/play/chunk3/bookcaseTall-read-01.png`); "Flip through a magazine" standing over `coffeeTable`, `coffeeTableGlass` and `coffeeTableMarble` (15 min, `living/play/chunk1/coffeeTable-magazine-01.png`); listening to music standing at `stereo` and `boombox` (30 min). The TVs (`tvWall`, `tvRetro`, `tvStandLow`) and the home cinema's watch (60) and film (120 min) were watched standing 0.5 m from the screen in Phase 0 play only because play buys each thing alone on the stage (`living/play/chunk2/homeCinema-film-01.png`). With a sofa 3 m in front, the home cinema's watch and film are watched sitting on it (`living/extra/tv-seat/seat-homeCinema-film-01.png`): the standing hour and the standing two-hour film are the no-seat fallback above. Which seat is taken is I-living-05.
-- **Status:** confirmed and widened (wave: living: the bookcases, the coffee tables, the stereo and the boombox; the TVs' fallback seen on all five)
+- **Status:** confirmed and widened (wave: living: the bookcases, the coffee tables, the stereo and the boombox; the TVs' fallback seen on all five; consolidation: I-packs-05 merged)
 - **Source:** pilot; widened in wave: living
 
 ### M-living-03 — The three-seat sofas, the chaise, the long coffee table and the console table are over the real size
@@ -286,12 +288,14 @@ Seeded from earlier docs first; add new findings after them in the same form.
 
 ### M-living-07 — Things made for a wall can stand in mid-room with nothing holding them
 
+> Consolidation (2026-10-21): closed as a duplicate of M-bathroom-03 (systems ledger), which takes its items and evidence.
+
 - **Severity:** S3
 - **Rubric:** M4, M7
 - **Fix class:** code
 - **Where:** `web/public/content/catalog2/living.json:317` (`wallBed`), `:956` (`ladderShelf`); `web/public/content/furniture.json:1613` (`homeCinema`); `tools/art/blender/families/media.py:274` (the screen's case "on the wall above"); no content field says a floor thing must have a wall behind it (`fillsWall` only keeps the wall over it clear, `crates/sim-core/src/world.rs:1584`)
 - **Evidence:** The lead "the wall bed placed freestanding in mid-room": Phase 0 play put the wall bed at the middle of the stage floor (`[9, 11, 0]`) and the game bought it there; folded down it is an open cabinet standing in the room with the bed on the floor in front (`living/play/chunk2/wallBed-foldDown-01.png`). A real one is bolted to the wall or it tips over. The same for the ladder shelf, which leans on nothing (`living/play/chunk3/ladderShelf-no-uses.png`; `docs/objects/living.md` L5 notes it), and the home cinema, whose screen case hangs in the air over the media unit with no wall to hold it (`living/extra/tv-seat/seat-homeCinema-film-01.png`). Players will mostly put them on a wall; the game could ask for one (a "needs a wall behind" flag the build tool checks) or the models could carry their own support. Related, content: the wall bed has no `fillsWall` (the tall bookcases and the display cabinet have it), so a picture or a shelf can be hung on the wall where its 2.22 m cabinet stands, and play's free-spot rule (`tools/bench/check.mjs:561`, by `fillsWall`) put it mid-room although `tools/bench/README.md` lists wall beds among the things it puts on the back wall.
-- **Status:** open
+- **Status:** closed (duplicate of M-bathroom-03)
 - **Source:** wave: living (Phase 0 "Seen" lead)
 
 ### I-living-04 — The sofa bed can't be slept in for a night
@@ -304,25 +308,9 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Status:** open
 - **Source:** wave: living (I1 against `reference.json` uses)
 
-### I-living-05 — Watching TV takes the nearest seat even when it faces away from the screen
+### I-living-05 — moved to systems.md
 
-- **Severity:** S2
-- **Rubric:** I2
-- **Fix class:** code
-- **Where:** `crates/sim-core/src/world.rs:4463` (`seat_near_object`: the nearest free seat within `seatNear` metres, by path distance from the TV's front tile; no facing or sight check), called at `:4299`
-- **Evidence:** `check.mjs play --objects homeCinema,tvWall@9,17,2 --with sofa@9,15,2` (`living/extra/tv-seat/`): the sofa faces the home cinema (rot 2, towards −z) and its back is to the wall TV on the back wall. For the home cinema the watcher sits on it facing the screen, right; for the wall TV she takes the same sofa and watches the hour with her back to the screen (`living/extra/tv-seat/seat-tvWall-watch-01.png`, pose `sit` at 10.5, 15.5). Any sofa or chair within 4 m counts, whichever way it faces (a dining chair at the table behind, an armchair turned away). Only the five living screens use `seatNear` (`tv`, `tvWall`, `tvRetro`, `homeCinema`, `tvStandLow`); a fix (a seat whose front looks towards the screen, else the standing fallback of I-living-03) would carry over to reading if I-living-03 gives the books `seatNear`.
-- **Status:** open
-- **Source:** wave: living (extra play run)
-
-### I-living-06 — Sitting on the floor is the chair sit: shins under the floor on the floor cushion, legs into the fire at the electric fireplace
-
-- **Severity:** S2
-- **Rubric:** I3, A1
-- **Fix class:** clip
-- **Where:** `web/src/render/babylon/characters/clips/seated.ts` (the `sit` clip, made for a chair seat); `web/public/content/catalog2/living.json:617` (`floorCushion` seat 0.14), `web/src/render/babylon/characters/furniture.json:30` (`seats.fireplaceElectric`: 0.14, `fwd` 0.3, facing the fire)
-- **Evidence:** The lead "legs below the floor on the floor cushion": on the 0.14 m cushion the resident sits with the knees bent as on a chair, so the shins go down through the floor, worst for the teen and the elder (`living/sheets/age-floorCushion.png`; the adult in play has the feet at the floor's edge, `living/play/chunk3/floorCushion-sit-01.png`). At the electric fireplace the same sit on its built-in cushion, 0.3 m in front, facing the fire, puts the knees and shins into the surround and the firebox among the flames (`living/play/chunk3/fireplaceElectric-relax-01.png`, `living/sheets/age-fireplaceElectric.png`). Real people sit on a floor cushion cross-legged or kneeling. A floor-sitting clip (cross-legged, for seats under about 0.25 m), or at least legs out (`legsOut`, as the chaise), with the fireplace's cushion moved back so the feet stop short of the surround. Other low seats may share it, not checked here: `yogaMat` (seat 0.03), `beanBagKids` (0.24, kids ledger).
-- **Status:** open
-- **Source:** wave: living (Phase 0 "Seen" lead)
+### I-living-06 — moved to residents.md
 
 ### I-living-07 — The pouf and the ottoman are never footstools
 
@@ -356,9 +344,9 @@ Seeded from earlier docs first; add new findings after them in the same form.
 
 ## Seen here for findings in other ledgers
 
-For the coordinator; nothing new is filed for these here.
+For the coordinator; nothing new is filed for these here. Carried into those findings at the consolidation (2026-10-21).
 
 - **A-residents-11** (residents ledger), widened: the child "kneels" on most living seats (the lead "children kneel on armchairs"): thighs on the seat, the shins down inside the cushion, the shoes showing through or under the seat front, on `loveseat`, `sofaThree`, `sofaDesign`, `sofaThreeSeat`, `sofaBed`, the four sectional modules, `armchairLounge`, `armchairLeather`, `armchairWingback`, `recliner` and `ottoman` (`living/sheets/age-armchairWingback.png`, `age-sectionalMiddle.png`, `age-ottoman.png`); not on `pouf` (0.50 deep) or `rockingChair`. Teens and elders lose the shins on `sofaThree`, `sofaDesign`, `loveseat` and `armchairLounge`, and so do the adult man on the loveseat and the adult woman on `sofaThree` (`living/sheets/age-loveseat.png`, `age-sofaThree.png`), where the pilot saw adults fine on the base sofa.
 - **A-residents-09** (residents ledger): the child's feet hang on `rockingChair` and `pouf`.
 - **I-held-01** (held ledger): no book on the reading chairs (`armchairLeather`, `armchairWingback`, `rockingChair`) or at the four bookcases, no magazine at the three coffee tables (the coffee table's drawer opens with one and it stays there).
-- **I-kids-03** (kids ledger): an adult does homework at `bookcaseWide` (`living/play/chunk2/bookcaseWide-homework-01.png`).
+- **I-kids-03** (systems ledger): an adult does homework at `bookcaseWide` (`living/play/chunk2/bookcaseWide-homework-01.png`).

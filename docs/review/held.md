@@ -103,6 +103,8 @@ Not tied to one row: I-held-01.
 
 ### I-held-01 — No book, cup or cutlery prop: residents mime them
 
+> Consolidation: widened by the object waves. Kitchen: no cup, glass or plate for the coffee at tables and chairs, the coffee machine, the stools' and fridges' drinks, the wine, breakfast and dinner (`kitchen/play/c5/diningGlass-coffee-01.png`, `kitchen/play/c7/stoolBarHigh-drink-01.png`; cooked meals do show a plate). Living: no book on the reading chairs or at the four bookcases, no magazine at the three coffee tables. Community: the card at the post box, the cone at the ice cream cart, the snack and the can at the machines, the café's cup, cake and plate, the coin at the fountain, the basketball.
+
 - **Severity:** S2
 - **Rubric:** I7
 - **Fix class:** code
@@ -135,30 +137,27 @@ Not tied to one row: I-held-01.
 
 ### I-held-02 — Baking is played as frying: a pan comes out at the oven
 
+> Consolidation (2026-10-21): closed as a duplicate of I-kitchen-05 (systems ledger), which takes its items and evidence.
+
 - **Severity:** S2
 - **Rubric:** I13, I7, I3
 - **Fix class:** content
 - **Where:** `web/public/content/base.json:4391`, `:4435`, `:4478` (the `pizza`, `bakedTreats` and `pie` "Bake" steps: `anim: stir`), `:4425` and `:4468` ("Mix" and "Roll the pastry": `anim: chop`), `:4169-4176` (`meal`'s "Cook" also at the `microwave` station, `stir`); `web/src/render/babylon/characters.ts:546` (`STATION_PROPS`, by clip tag, not by station), `:2102` (a station without a `surface` gets the tool at 0.9 m)
 - **Evidence:** Baking a pie at the stove, a pizza at the pizza oven, treats at the oven: the cook stands at the oven stirring, a frying pan drawn on its top (`held/inhand/pie-04.png`, `held/inhand/pizza-04.png`; `held/extra/inhand-b.png`). Mixing the batter and rolling the pastry are chopping with a knife on a board. A meal "cooked" at the microwave counter puts the frying pan on it (code: `meal` lists `microwave`; the microwave counter has no `surface`, so the pan goes at 0.9 m over its middle). Real baking is: put the tray or dish in the oven, wait, take it out; mixing is stirring in a bowl. A `bake` anim (the oven's door motion, a pick-up and put-in pose, the dish as its prop: `item.bakingTray`, `item.pieDish`, `item.pizza` exist) and a `mix` one (the prep bowl on the counter) fix it, each with an `ACTIONS` and `STATION_PROPS` entry.
-- **Status:** open
+- **Status:** closed (duplicate of I-kitchen-05)
 - **Source:** wave: held (shared with the systems ledger's `pizza`, `bakedTreats`, `pie` and `meal` recipe rows)
 
 ### I-held-03 — The cook keeps the last step's things in hand through the next
+
+> Consolidation (2026-10-21): closed as a duplicate of I-kitchen-04 (systems ledger), which takes its items and evidence.
 
 - **Severity:** S2
 - **Rubric:** I13, I7, A1
 - **Fix class:** code
 - **Where:** `crates/sim-core/src/cooking.rs:1501` (`held` is set to the step's `holds` when it ends and kept through the whole next step), `web/src/render/babylon/characters.ts:2425` (`writeCarried` draws it at the palms whatever the clip; only the carry arms are dropped at a station, `:2766`)
 - **Evidence:** In every recipe run Ada chops at the counter with the bag of ingredients still in her hands (`inhand/timeline.jsonl`: `held: ingredients, action: chop`; `held/inhand/meal-01.png`), and stands over the hob and the grill holding the prepped bowl for the whole cook step (`held: prepBowl, action: stir` and `flip`; `held/extra/inhand-crops.png`, `held/inhand/bbq-05.png`), the pan or the grill food beside it. In a kitchen the bag is unpacked onto the worktop and the bowl tipped into the pan as the step starts. Putting the held thing down on the station (or dropping `held` once the step has begun, with the tool showing) fixes it.
-- **Status:** open
+- **Status:** closed (duplicate of I-kitchen-04)
 - **Source:** wave: held (shared with the systems ledger's cooking flow rows "carried items appear at each step")
 
-### I-held-04 — Whole dishes never leave the station
+### I-held-04 — moved to systems.md
 
-- **Severity:** S3
-- **Rubric:** I13, I1
-- **Fix class:** code
-- **Where:** `crates/sim-core/src/cooking.rs:9-14` (the dish is served on a free spot near the stove; each eater takes a serving from there)
-- **Evidence:** The six whole dishes (`mealPot`, `tastingBoard`, `grillPlatter`, `pizza`, `bakingTray`, `pieDish`) are never in a hand in play: the cook puts the dish down where it was cooked and everyone fetches a plate from there (`held/index.md` Problems; `held/inhand/bbq-06.png`, `pizza-05.png`, `bakedTreats-05.png`, `pie-07.png`); the pot is carried only dirty, to the sink. The pot's carry pose exists and works (`held/inhand/poses/poses-carry-hold.png`). For a family dinner the dish goes to the table and is served there; carrying it to the dining table, when the home has one, would use the models and poses already built.
-- **Status:** open
-- **Source:** wave: held (shared with the systems ledger's cooking flow)

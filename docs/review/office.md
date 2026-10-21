@@ -17,11 +17,11 @@ Family: `tools/art/blender/families/office.py`.
 |---|---|---|---|---|---|
 | `deskSimple` Simple desk | OK | n/a | OK | — (used through a desk chair; I-office-03 for the office chair at it) | `office/sheets/obj-deskSimple.png`, `office/play/pair-chairTask/chairTask-write-01.png`, `office/extra/gaps-officeChair-9-13-2-sit-01.png` |
 | `deskCorner` Corner desk | M-office-01 | n/a | OK | M-office-01 S2 model | `office/sheets/obj-deskCorner.png`, `office/extra/gaps-chairTask-9-13-2-write-01.png` |
-| `deskStanding` Standing desk | OK | A-office-01 | A-office-01, I-kids-03 | A-office-01 S2 content (seeded; confirmed and widened); I-kids-03 S1 code (kids ledger: a child at the standing desk) | `office/sheets/obj-deskStanding.png`, `office/extra/standing-chairTask-write-01.png`, `office/extra/child-deskStanding-browse-01.png` |
+| `deskStanding` Standing desk | OK | A-office-01 | A-office-01, I-kids-03 | A-office-01 S2 content (seeded; confirmed and widened); I-kids-03 S1 code (systems ledger: a child at the standing desk) | `office/sheets/obj-deskStanding.png`, `office/extra/standing-chairTask-write-01.png`, `office/extra/child-deskStanding-browse-01.png` |
 | `deskExecutive` Executive desk | OK | n/a | I-office-02 | I-office-02 S3 decision (seeded; confirmed) | `office/sheets/obj-deskExecutive.png`, `office/play/pair-chairExecutive/chairExecutive-write-01.png` |
-| `computerDesk` Computer desk | OK | OK | I-kids-03 | I-kids-03 S1 code (kids ledger: an adult does homework) | `sheets/obj-computerDesk.png`, `play/computerDesk-*.png`, `clips/clips-computerDesk-all-t*.png`, `sheets/seat-deskM.png`, `sheets/seat-deskF.png`, `play-child/computerDesk-*.png`, `play-teen/computerDesk-*.png` |
-| `deskWriting` Writing desk | OK | OK | I-kids-03 | I-kids-03 S1 code (kids ledger: an adult does homework) | `office/sheets/obj-deskWriting.png`, `office/sheets/age-deskWriting.png`, `office/play/c1/deskWriting-homework-01.png` |
-| `deskLaptop` Laptop desk | OK | OK | I-kids-03 | I-kids-03 S1 code (kids ledger: an adult does homework); I-office-01 S3 renderer-table (seeded; closed) | `office/sheets/obj-deskLaptop.png`, `office/extra/laptop-chairTask-write-01.png` |
+| `computerDesk` Computer desk | OK | OK | I-kids-03 | I-kids-03 S1 code (systems ledger: an adult does homework) | `sheets/obj-computerDesk.png`, `play/computerDesk-*.png`, `clips/clips-computerDesk-all-t*.png`, `sheets/seat-deskM.png`, `sheets/seat-deskF.png`, `play-child/computerDesk-*.png`, `play-teen/computerDesk-*.png` |
+| `deskWriting` Writing desk | OK | OK | I-kids-03 | I-kids-03 S1 code (systems ledger: an adult does homework) | `office/sheets/obj-deskWriting.png`, `office/sheets/age-deskWriting.png`, `office/play/c1/deskWriting-homework-01.png` |
+| `deskLaptop` Laptop desk | OK | OK | I-kids-03 | I-kids-03 S1 code (systems ledger: an adult does homework); I-office-01 S3 renderer-table (seeded; closed) | `office/sheets/obj-deskLaptop.png`, `office/extra/laptop-chairTask-write-01.png` |
 | `computerGaming` Gaming PC | OK | OK | I-office-05 | I-office-05 S3 content | `office/sheets/obj-computerGaming.png`, `office/sheets/age-computerGaming.png` |
 
 ### Real uses against the content's (I1)
@@ -45,8 +45,8 @@ Family: `tools/art/blender/families/office.py`.
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| `chairExecutive` Executive chair | OK | A-residents-09 | I-kids-03 | A-residents-09 S2 clip (residents ledger: a child's feet off the floor); I-kids-03 S1 code (kids ledger: an adult does homework) | `office/sheets/obj-chairExecutive.png`, `office/sheets/age-chairExecutive.png`, `office/play/pair-chairExecutive/chairExecutive-homework-01.png` |
-| `chairTask` Desk chair | OK | A-residents-09 | I-kids-03 | A-residents-09 S2 clip (residents ledger); I-kids-03 S1 code (kids ledger: an adult does homework; a desk chair works at the kids' desk) | `office/sheets/obj-chairTask.png`, `office/sheets/age-chairTask.png`, `office/play/pair-chairTask/chairTask-homework-01.png` |
+| `chairExecutive` Executive chair | OK | A-residents-09 | I-kids-03 | A-residents-09 S2 clip (residents ledger: a child's feet off the floor); I-kids-03 S1 code (systems ledger: an adult does homework) | `office/sheets/obj-chairExecutive.png`, `office/sheets/age-chairExecutive.png`, `office/play/pair-chairExecutive/chairExecutive-homework-01.png` |
+| `chairTask` Desk chair | OK | A-residents-09 | I-kids-03 | A-residents-09 S2 clip (residents ledger); I-kids-03 S1 code (systems ledger: an adult does homework; a desk chair works at the kids' desk) | `office/sheets/obj-chairTask.png`, `office/sheets/age-chairTask.png`, `office/play/pair-chairTask/chairTask-homework-01.png` |
 | `officeChair` Office chair | OK | A-residents-09 | I-office-03 | I-office-03 S2 content; A-residents-09 S2 clip (residents ledger); A-office-01 S2 content (seeded; it sits beside the standing desk) | `office/sheets/obj-officeChair.png`, `office/extra/gaps-officeChair-9-13-2-sit-01.png`, `office/extra/side-officeChair-sit-01.png` |
 
 ### Real uses against the content's (I1)
@@ -94,13 +94,15 @@ Seeded from earlier docs first; add new findings after them in the same form.
 ### I-office-01 — A chair facing the laptop desk is used from behind its built-in chair
 
 > Office/kids wave: closed. The case can't be set up today.
+>
+> Consolidation: reopened. The kitchen wave set the case up on the dining sets, which have their own chairs built in: a chair bought facing the base dining table, the glass or the farmhouse set passes `needsTable` and sits behind or beside the set's own chair, about a metre from the top, for its coffee (`kitchen/play/c5/chairModern-coffee-01.png`, `benchDining-coffee-01.png`, `chairWindsor-coffee-01.png`). Items: `diningTable`, `diningGlass`, `diningOak`, `bistroSet`. Still closed for the desks.
 
 - **Severity:** S3
 - **Rubric:** I2, A1
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/tableTuck.ts`
 - **Evidence:** A chair that faces a desk with its own chair built in (the laptop desk, and the kids' desk: I-kids-02) is tucked in from behind and doesn't reach the top. Deferred from 0.3.0. Wave check: buying a desk chair on the laptop desk's (and the kids' desk's) front tile, facing it, is refused by the game, "that would block the way", on both tries (`office/extra/play-gaps.jsonl`). Beside the desk, facing its end, the chair isn't pulled in and the resident writes at the end of the top with a hand on its edge (`office/extra/laptop-chairTask-write-01.png`): believable enough, not filed.
-- **Status:** closed (a chair can no longer stand on the desk's front tile: "that would block the way")
+- **Status:** confirmed and widened (kitchen wave: on the dining sets; closed for the desks, where a chair can no longer stand on the front tile)
 - **Source:** `docs/objects/open.md` Still open › Residents; `plan/release-0.3.0.md` §1.4; wave: office/kids (`check.mjs play --objects-file gaps.txt`)
 
 ### I-office-02 — The executive desk's drawer has no use

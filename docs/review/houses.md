@@ -175,29 +175,9 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Status:** not checked (needs Build mode with a wall object held; the wave's harness drives Live mode only)
 - **Source:** `docs/objects/open.md` Still open › Rendering
 
-### A-houses-01 — House doors open by nearness, not by hand
+### A-houses-01 — moved to systems.md
 
-- **Severity:** S2 (raised from S3: the bathroom door below)
-- **Rubric:** A12, A10, I6
-- **Fix class:** code
-- **Where:** `web/src/render/babylon/BabylonRenderer.ts:3778` (`swingDoors`); the rule at `:3794` (`target = passing || !(leaf.front || engaged)`: anyone moving within `DOOR_REACH` 1.3 m, `:189`, opens any door, an occupied bathroom's too)
-- **Evidence:** Front and bathroom doors swing when someone walks near them; nobody reaches for the handle. Doors opened by hand are new behaviour: filed as `code`, planned separately (§9, decision 3).
-  Wave houses, on `review-stage` (`houses/extra/houses.jsonl`):
-  - Walking along the front wall outside, 0.7 m off it, past the door and not through it, Ada opens the front door fully (`swing1-past-0.png`; "swing1 past": open 0 → 1 as she passes x 4.5 → 5.4).
-  - A bathroom built in the back corner: with Ada in there (on the toilet, then standing by it) the door stays shut; Ben walking along the hall past it, 0.7 m off, swings it wide open on her (`sheet-bath.png`, `bath-passer-open-0.png`; "bathPass": 0 → 1 at 1 m from the door). That breaks the one privacy the renderer gives (`I-systems-05`, systems ledger) and is what raises this to S2.
-  - The cheap part, short of hands on handles: open a door only for a mover heading through it (their next path step crosses the doorway), and keep an engaged bathroom's door shut for everyone but someone leaving it.
-- **Status:** confirmed and widened
-- **Source:** `plan/authenticity-review.md` §3.2 (A12) and §9 (decision 3); wave: houses (shared with the systems ledger's "Front door: who opens it and when" and "Bathroom door: shut while in use" rows)
-
-### A-houses-02 — At the faster speeds residents walk through a door that has hardly opened
-
-- **Severity:** S3
-- **Rubric:** A9, A10
-- **Fix class:** code
-- **Where:** `web/src/render/babylon/BabylonRenderer.ts:188` (`DOOR_SWING` 0.45 s), `:3781` (the step is real frame time, not game time)
-- **Evidence:** At speed 1 the front door is fully open 0.6 m before Ada reaches it (`houses/extra/swing1-in-1.png`; "swing1 in"). At speed 3 she crosses the 2.6 m the door watches in about 0.3 s of real time, while the door takes 0.45 s: she is through it at 19 % open and the leaf shuts behind her at once (`houses/extra/swing-in-0.png`, her body through the near-shut leaf; "swing in": open 0.19 at z 5.7, 0.11 when she is inside). Scaling the swing by the game's speed (as walkers' turning is, `characters.ts:2324`), or the reach by the walker's speed, keeps the door ahead of her.
-- **Status:** open
-- **Source:** wave: houses
+### A-houses-02 — moved to systems.md
 
 ### M-houses-02 — The "Painted panel" doors are flat slabs
 

@@ -15,14 +15,14 @@ Proportions and heights: `crates/tools/src/characters/rig.rs` (`STAGES`, `propor
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
 | `male` baby | M-residents-01 | OK | n/a | M-residents-01 S3 decision | `residents/chars-stages.png`, `residents/chars-stages-side.png`, `play/crib-lie-*.png` |
-| `male` child | M-residents-01 | A-residents-09, A-residents-11 | I-kids-03 | M-residents-01 S3 decision; A-residents-09 S2 clip; A-residents-11 S2 clip; I-kids-03 S1 code (kids ledger) | `residents/chars-stages.png`, `residents/chars-stages-side.png`, `sheets/seat-sofaM.png`, `play-child/*.png` |
-| `male` teen | M-residents-01 | A-residents-09, A-residents-11 | I-kids-03 | M-residents-01 S3 decision; A-residents-09 S2 clip; A-residents-11 S2 clip; I-kids-03 S1 code (kids ledger) | `residents/chars-stages.png`, `residents/chars-stages-side.png`, `play-teen/*.png` |
+| `male` child | M-residents-01 | A-residents-09, A-residents-11 | I-kids-03 | M-residents-01 S3 decision; A-residents-09 S2 clip; A-residents-11 S2 clip; I-kids-03 S1 code (systems ledger) | `residents/chars-stages.png`, `residents/chars-stages-side.png`, `sheets/seat-sofaM.png`, `play-child/*.png` |
+| `male` teen | M-residents-01 | A-residents-09, A-residents-11 | I-kids-03 | M-residents-01 S3 decision; A-residents-09 S2 clip; A-residents-11 S2 clip; I-kids-03 S1 code (systems ledger) | `residents/chars-stages.png`, `residents/chars-stages-side.png`, `play-teen/*.png` |
 | `male` youngAdult | M-residents-01 | OK | OK | M-residents-01 S3 decision | `residents/chars-stages.png`, `residents/chars-stages-side.png` |
 | `male` adult | M-residents-01 | OK | OK | M-residents-01 S3 decision | `residents/chars-stages.png`, `residents/chars-stages-side.png`, `play/*.png` |
 | `male` elder | M-residents-01 | OK | OK | M-residents-01 S3 decision | `residents/chars-stages.png`, `residents/chars-stages-side.png`, `residents/chars-elder-side.png`, `poses/seat-sofaF-elder.png`, `play-elder/*.png` |
 | `female` baby | M-residents-01 | OK | n/a | M-residents-01 S3 decision | `residents/chars-stages.png`, `residents/chars-stages-side.png`, `play/crib-lie-*.png` |
-| `female` child | M-residents-01 | A-residents-09, A-residents-11 | I-kids-03 | M-residents-01 S3 decision; A-residents-09 S2 clip; A-residents-11 S2 clip; I-kids-03 S1 code (kids ledger) | `residents/chars-stages.png`, `residents/chars-stages-side.png`, `sheets/seat-sofaM.png`, `play-child/*.png` |
-| `female` teen | M-residents-01 | A-residents-09, A-residents-11 | I-kids-03 | M-residents-01 S3 decision; A-residents-09 S2 clip; A-residents-11 S2 clip; I-kids-03 S1 code (kids ledger) | `residents/chars-stages.png`, `residents/chars-stages-side.png`, `play-teen/*.png` |
+| `female` child | M-residents-01 | A-residents-09, A-residents-11 | I-kids-03 | M-residents-01 S3 decision; A-residents-09 S2 clip; A-residents-11 S2 clip; I-kids-03 S1 code (systems ledger) | `residents/chars-stages.png`, `residents/chars-stages-side.png`, `sheets/seat-sofaM.png`, `play-child/*.png` |
+| `female` teen | M-residents-01 | A-residents-09, A-residents-11 | I-kids-03 | M-residents-01 S3 decision; A-residents-09 S2 clip; A-residents-11 S2 clip; I-kids-03 S1 code (systems ledger) | `residents/chars-stages.png`, `residents/chars-stages-side.png`, `play-teen/*.png` |
 | `female` youngAdult | M-residents-01 | OK | OK | M-residents-01 S3 decision | `residents/chars-stages.png`, `residents/chars-stages-side.png` |
 | `female` adult | M-residents-01 | OK | OK | M-residents-01 S3 decision | `residents/chars-stages.png`, `residents/chars-stages-side.png`, `play/*.png` |
 | `female` elder | M-residents-01 | A-residents-09, A-residents-11 | OK | M-residents-01 S3 decision; A-residents-09 S2 clip; A-residents-11 S2 clip (confirmed) | `residents/chars-stages.png`, `residents/chars-stages-side.png`, `residents/chars-elder-side.png`, `poses/seat-sofaF-elder.png`, `play-elder/*.png` |
@@ -136,7 +136,7 @@ Painted garments and their shells: `crates/tools/src/characters/garments.rs`, `c
 |---|---|---|---|---|---|
 | Clip `interact` | n/a | OK | OK |  | `residents/strip-interact.png`, `play/fridge-snack-01.png` |
 | Clip `pickUp` | n/a | OK | OK |  | `residents/strip-pickUp.png` |
-| Clip `spell` | n/a | OK | I-bathroom-02 | I-bathroom-02 S3 clip (bathroom ledger: the shower) | `residents/strip-spell.png`, `play/shower-shower-01.png` |
+| Clip `spell` | n/a | OK | I-bathroom-02 | I-bathroom-02 S3 clip (residents ledger: the shower) | `residents/strip-spell.png`, `play/shower-shower-01.png` |
 | Clip `chop` | n/a | OK | n/a |  | `residents/strip-chop.png` |
 | Clip `stir` | n/a | OK | n/a |  | `residents/strip-stir.png` |
 | Clip `flip` | n/a | OK | n/a |  | `residents/strip-flip.png` |
@@ -215,14 +215,14 @@ Content `anim` → clip, hands and layers: `ACTIONS` in `web/src/render/babylon/
 | `ACTIONS.cook` | n/a | OK | OK |  | `play/fridge-meal-01.png` |
 | `ACTIONS.wash` | n/a | OK | OK |  | `play/sink-wash-01.png` |
 | `ACTIONS.shower` | n/a | OK | I-bathroom-02 | I-bathroom-02 S3 clip | `play/shower-shower-01.png` |
-| `ACTIONS.bath` | n/a | OK | A-bathroom-04 | A-bathroom-04 S3 renderer-table (bathroom ledger: bathers 10–12 cm above the tub floor); I-bathroom-03 S2 code (bathroom ledger: in clothes, also in the hot tubs). The hot tub, whirlpool, cold plunge and heart tub sit low in the water, hands on the rim | `bathroom/play/chunk1/bathtub-bath-01.png`, `systems/sheets/act-write-garden-bath.png` |
+| `ACTIONS.bath` | n/a | OK | A-bathroom-04 | A-bathroom-04 S3 renderer-table (bathroom ledger: bathers 10–12 cm above the tub floor); I-bathroom-03 S2 code (residents ledger: in clothes, also in the hot tubs). The hot tub, whirlpool, cold plunge and heart tub sit low in the water, hands on the rim | `bathroom/play/chunk1/bathtub-bath-01.png`, `systems/sheets/act-write-garden-bath.png` |
 | `ACTIONS.toilet` | n/a | OK | OK |  | `play/toilet-use-01.png` |
 | `ACTIONS.sleep` | n/a | OK | OK |  | `play/bed-sleep-02.png` |
 | `ACTIONS.nap` | n/a | OK | OK |  | `play/bed-nap-01.png` |
 | `ACTIONS.sit` | n/a | A-residents-09 | OK | A-residents-09 S2 clip | `play/armchair-sit-01.png`, `play/bench-sit-01.png` |
-| `ACTIONS.relax` | n/a | OK | I-garden-02 | I-garden-02 S2 clip (garden ledger: standing in the shade) | `play/sofa-relax-01.png`, `play/tree-shade-01.png` |
+| `ACTIONS.relax` | n/a | OK | I-garden-02 | I-garden-02 S2 clip (residents ledger: standing in the shade) | `play/sofa-relax-01.png`, `play/tree-shade-01.png` |
 | `ACTIONS.type` | n/a | OK | OK |  | `play/computerDesk-code-01.png` |
-| `ACTIONS.write` | n/a | OK | I-kids-03 | Seated at the desk, the hands on the paper (`sitHands`, `sitHandsNear` at the built-in-chair desks); posting a letter standing at the post box. An adult at the kids' desk: I-kids-03 S1 code (kids ledger) | `systems/sheets/act-write-garden-bath.png` |
+| `ACTIONS.write` | n/a | OK | I-kids-03 | Seated at the desk, the hands on the paper (`sitHands`, `sitHandsNear` at the built-in-chair desks); posting a letter standing at the post box. An adult at the kids' desk: I-kids-03 S1 code (systems ledger) | `systems/sheets/act-write-garden-bath.png` |
 | `ACTIONS.read` | n/a | OK | I-living-03 | I-living-03 S2 content; I-held-01 S2 code (no book) | `play/bookshelf-read-01.png` |
 | `ACTIONS.watch` | n/a | OK | I-living-03 | I-living-03 S2 content (standing when no seat is near) | `play/tv-watch-01.png` |
 | `ACTIONS.play` | n/a | OK | OK |  | `play/chessTable-chess-01.png`, `play/crib-play-01.png` |
@@ -238,13 +238,13 @@ Content `anim` → clip, hands and layers: `ACTIONS` in `web/src/render/babylon/
 | `ACTIONS.water` | n/a | OK | I-held-01 | I-held-01 S2 code (no can) | `play/plant-water-01.png` |
 | `ACTIONS.tend` | n/a | OK | I-kids-04 | I-kids-04 S2 renderer-table (kids ledger: the feed kneels) | `play/flowerbed-tend-01.png`, `scenes/crib-adult-feed-02.png` |
 | `ACTIONS.cuddle` | n/a | OK | OK |  | `scenes/crib-adult-cuddle-03.png` |
-| `ACTIONS.harvest` | n/a | OK | I-garden-03 | I-garden-03 S2 code and I-garden-04 S2 renderer-table (garden ledger: the crop goes at the start; the hand half a metre over low crops); the herb planter's `pick` fits. The greenhouse is harvested from outside its door (outdoor ledger's object) | `garden/extra/harvest/s-garden.strawberries-harvest.png`, `systems/sheets/act-write-garden-bath.png` |
+| `ACTIONS.harvest` | n/a | OK | I-garden-03 | I-garden-03 S2 code and I-garden-04 S2 renderer-table (residents ledger: the crop goes at the start; the hand half a metre over low crops); the herb planter's `pick` fits. The greenhouse is harvested from outside its door (outdoor ledger's object) | `garden/extra/harvest/s-garden.strawberries-harvest.png`, `systems/sheets/act-write-garden-bath.png` |
 | `ACTIONS.prune` | n/a | OK | I-held-01 | I-held-01 S2 code (no shears) | `play/bush-trim-01.png` |
 | `ACTIONS.garden` | n/a | OK | I-residents-03 | Feeding the fish fits (`water` at the pond's rim); I-residents-03 S3 renderer-table (the songbird feeder refilled at knee height, 1 m under it) | `systems/sheets/act-write-garden-bath.png` |
 | `ACTIONS.tinker` | n/a | OK | OK |  | `play/workbench-tinker-01.png` |
 | `ACTIONS.look` | n/a | OK | I-hobbies-02 | I-hobbies-02 S2 clip (hobbies ledger: the telescope) | `play/telescope-stargaze-01.png` |
 | `ACTIONS.smell` | n/a | OK | OK |  | `play/flowerbed-smell-01.png` |
-| `ACTIONS.admire` | n/a | OK | I-residents-03 | I-residents-03 S3 renderer-table (the statue admired with the nose to its plinth); I-garden-02 S2 clip (garden ledger: the trees) | `systems/sheets/act-phone-meditate-idle.png`, `garden/play/c1/garden.cherry-admire-01.png` |
+| `ACTIONS.admire` | n/a | OK | I-residents-03 | I-residents-03 S3 renderer-table (the statue admired with the nose to its plinth); I-garden-02 S2 clip (residents ledger: the trees) | `systems/sheets/act-phone-meditate-idle.png`, `garden/play/c1/garden.cherry-admire-01.png` |
 | `ACTIONS.phone` | n/a | OK | I-social-04 | I-social-04 S2 clip (social ledger: the hand at the ear for every phone use, a video call at a laptop too); I-social-01 S2 code (social ledger: no phone). The phone booth fits (inside, at its receiver) | `systems/sheets/act-phone-meditate-idle.png`, `social/sheets/phone.png` |
 | `ACTIONS.listen` | n/a | OK | I-living-03 | Standing with the arms folded for 30–60 minutes at the stereo, the boombox, the record cabinet and the gramophone: I-living-03 S2 content (living ledger: no `seatNear`, widen there) | `systems/sheets/act-dance-sing-listen.png` |
 | `ACTIONS.meditate` | n/a | OK | OK | Cross-legged on the yoga mat and the cool-down cushion | `systems/sheets/act-phone-meditate-idle.png` |
@@ -268,9 +268,9 @@ Code in `web/src/render/babylon/characters.ts`.
 | Elder's stoop | OK | OK | n/a |  | `residents/chars-elder-side.png`, `residents/chars-stages-side.png` |
 | Arms a little out over a skirt | OK | OK | n/a |  | `residents/tops-female-front.png` |
 | Hands: open or gripping per activity | n/a | OK | OK |  | `play/computerDesk-code-01.png`, `play/weightBench-lift-02.png` |
-| Seat fit: pelvis `seatDrop` over the seat (`SEATS`, content `seat`) | n/a | A-residents-09, A-residents-11 | I-kids-03 | A-residents-09 S2 clip; A-residents-11 S2 clip (widened: the child in the bean bag); M-residents-02 S3 model (widened: every seated woman's skirt a hoop round the seat); M-outdoor-02 S3 model (outdoor ledger: the bench 4 cm into its slats); I-kids-03 S1 code (kids ledger: teens, adults and elders sit on the 0.31 m kids' chair as on any). Cross-cutting wave, over the other waves' age sheets (`<cat>/sheets/age-*.png`: 253, of which the dining chairs, bar stools, sofas, armchairs, bean bags, office chairs, kids' chair, fountain rim read): the pelvis sits on the seat at every stage and every height of seat; a child's feet dangle on adult chairs and bar stools (as a child's do), a teen's and an elder woman's hang a few cm off a 0.45 m seat (A-residents-09); deep low seats swallow short shins | `kitchen/sheets/age-diningChair.png`, `kitchen/sheets/age-barStool.png`, `living/sheets/age-beanBag.png`, `kids/sheets/age-kidsChair.png` |
-| Lie fit: `lie` turned flat on the mattress (`BEDS`, `LIE_*`) | n/a | A-fitness-01, A-bedroom-03 | OK | A-fitness-01 S2 clip (fitness ledger); I-kids-03 S1 code (kids ledger: an adult in the cot); A-bedroom-03 S2 code (bedroom ledger: into bed at the foot end, at every stage, the bunk's elder too); A-bedroom-02 S2 code (bedroom ledger: the upper bunk). Cross-cutting wave, over the bedroom, kids, living and packs age sheets: the sleeper lies on the mattress at every stage on every bed; `poses.html` puts only a child in the kids' bed (sim-core's stage rules for free will; a direct use skips them, I-kids-03) | `bedroom/sheets/age-bedBunk.png`, `kids/sheets/age-kidsBed.png`, `play/bed-sleep-02.png` |
-| Blankets and pyjamas in bed | OK | OK | n/a |  | `play/bed-sleep-02.png`, `sheets/bedpose-0.png` |
+| Seat fit: pelvis `seatDrop` over the seat (`SEATS`, content `seat`) | n/a | A-residents-09, A-residents-11 | I-kids-03 | A-residents-09 S2 clip; A-residents-11 S2 clip (widened: the child in the bean bag); M-residents-02 S3 model (widened: every seated woman's skirt a hoop round the seat); M-outdoor-02 S3 model (outdoor ledger: the bench 4 cm into its slats); I-kids-03 S1 code (systems ledger: teens, adults and elders sit on the 0.31 m kids' chair as on any). Cross-cutting wave, over the other waves' age sheets (`<cat>/sheets/age-*.png`: 253, of which the dining chairs, bar stools, sofas, armchairs, bean bags, office chairs, kids' chair, fountain rim read): the pelvis sits on the seat at every stage and every height of seat; a child's feet dangle on adult chairs and bar stools (as a child's do), a teen's and an elder woman's hang a few cm off a 0.45 m seat (A-residents-09); deep low seats swallow short shins | `kitchen/sheets/age-diningChair.png`, `kitchen/sheets/age-barStool.png`, `living/sheets/age-beanBag.png`, `kids/sheets/age-kidsChair.png` |
+| Lie fit: `lie` turned flat on the mattress (`BEDS`, `LIE_*`) | n/a | A-fitness-01, A-bedroom-03 | OK | A-fitness-01 S2 clip (fitness ledger); I-kids-03 S1 code (systems ledger: an adult in the cot); A-bedroom-03 S2 code (residents ledger: into bed at the foot end, at every stage, the bunk's elder too); A-bedroom-02 S1 code (bedroom ledger: the upper bunk). Cross-cutting wave, over the bedroom, kids, living and packs age sheets: the sleeper lies on the mattress at every stage on every bed; `poses.html` puts only a child in the kids' bed (sim-core's stage rules for free will; a direct use skips them, I-kids-03) | `bedroom/sheets/age-bedBunk.png`, `kids/sheets/age-kidsBed.png`, `play/bed-sleep-02.png` |
+| Blankets and pyjamas in bed | M-bedroom-04 | A-bedroom-04 | I-bedroom-01 | M-bedroom-04 S2 code (one blue checked quilt on every bed); A-bedroom-04 S2 code (a stray quilt at the world origin); I-bedroom-01 S2 code (pyjamas for every nap, the shoes on); all three filed by the bedroom wave, moved here at the consolidation | `play/bed-sleep-02.png`, `sheets/bedpose-0.png` |
 | Turning: towards travel, and on the spot | n/a | A-residents-08 | n/a | A-residents-08 S3 code (seeded; seen: residents turn in place at each use) | `play/*-00.png` |
 | Approach: stepping to a use and back | n/a | OK | OK | A-bathroom-01 S2 model (bathroom ledger: through the shower door) | `play/*-00.png`, `play/shower-shower-00.png` |
 
@@ -362,6 +362,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 
 ### A-residents-09 — Seated feet don't reach the floor for children, teens and elder women
 
+> Consolidation: widened by the object waves: `pnpm check:clips` still lists the teen and elder women's feet off a 0.45 m seat (kitchen chairs and sets); the child's feet hang on `rockingChair` and `pouf` (living) and on the park bench, the bus shelter and the café chair (community).
+
 - **Severity:** S2
 - **Rubric:** A1, A5
 - **Fix class:** clip
@@ -372,6 +374,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 
 ### A-residents-10 — A child's feet slide in `jog` and on the climbing frame
 
+> Consolidation: the community wave's `check:clips` run still prints the child's 1.3–1.9 cm and the elder woman's 1.1 cm foot slide in the climbing frame's rounds (`climb112a`, `climb112b`, `climb172a`).
+
 - **Severity:** S3
 - **Rubric:** A1, A5
 - **Fix class:** clip
@@ -381,6 +385,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Source:** `tools/characters/check_clips.ts --body all --stage all`
 
 ### A-residents-11 — An elder woman, a teen or a child on the sofa loses the shins
+
+> Consolidation: widened by the living wave: the child "kneels" on most living seats, the shins down inside the cushion and the shoes through or under the seat front (`loveseat`, `sofaThree`, `sofaDesign`, `sofaThreeSeat`, `sofaBed`, the four sectional modules, `armchairLounge`, `armchairLeather`, `armchairWingback`, `recliner`, `ottoman`; `living/sheets/age-armchairWingback.png`, `age-sectionalMiddle.png`, `age-ottoman.png`), not on `pouf` or `rockingChair`. Teens and elders lose the shins on `sofaThree`, `sofaDesign`, `loveseat` and `armchairLounge`, and so do the adult man on the loveseat and the adult woman on `sofaThree` (`living/sheets/age-loveseat.png`, `age-sofaThree.png`).
 
 - **Severity:** S2
 - **Rubric:** A1, A5
@@ -397,7 +403,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** decision
 - **Where:** `crates/tools/src/characters/rig.rs:129` (`proportions`: `hh` 1/3.4 baby, 1/4.6 child, 1/6.0 teen, 1/6.5 young adult and adult, 1/6.4 elder); `web/public/content/base.json:3657` (`life.stages`: `scale`, `head`)
 - **Evidence:** `residents/chars-stages.png`, `residents/chars-stages-side.png`. The rubric asks baby about 1:4, child 1:5–6, teen 1:6.5–7, adult 1:7–7.5; the rig has 1:3.4, 1:4.6, 1:6.0, 1:6.5. The order and the steps between stages are right, and heights are real (0.67, 1.13/1.09, 1.51/1.44, 1.77/1.67, 1.76/1.66, 1.74/1.64 m against `target_height`, `rig.rs:80`); the bigger heads, like the 1.15× hands and feet (`rig.rs:174`), are the stylised look (`docs/design/look.md`). Every stage reads as its age at the game camera. Filed only (§9 decision 5): either the owner accepts the style and M14's ranges move half a head (proposed in `pilot-notes.md`), or `rig.rs` changes, which moves every seat and bed fit.
-- **Status:** open
+- **Status:** closed (the owner approved M14's ratios based on the style, half a head bigger, after the pilot; any `rig.rs` change stays filed only, §9 decision 5)
 - **Source:** pilot
 
 ### M-residents-02 — Seated, the skirt and the women's jacket keep their standing flare
@@ -412,12 +418,14 @@ Seeded from earlier docs first; add new findings after them in the same form.
 
 ### I-residents-01 — The bouldering wall is "climbed" standing on its mat, and the fitness game is played off its board
 
+> Consolidation (2026-10-21): closed as a duplicate of I-packs-03 (packs ledger), which takes its items and evidence.
+
 - **Severity:** S2
 - **Rubric:** I3, A1
 - **Fix class:** clip
 - **Where:** `web/src/render/babylon/characters.ts:481-495` (`ACTIONS.exercise`: `boulder` and `sunrise` get `idle` with `activityPose` on top; `fitnessGame` `dance`, `punchJab`, `punchCross` from the tile in front), `:198` (`STEP_IN.climbingFrame`, the climbing clips the frame already has)
 - **Evidence:** `systems/sheets/act-exercise.png` (the packs wave's `packs/play/chunk2/energetic.boulderingWall-climb-01.png`): for the 60 minutes of "Climb" the resident stands on the crash mat at the wall's foot with both arms raised, the feet on the floor, never on a hold; the climbing frame beside it climbs its net (`community/play/climbingFrame-climb-01.png`, `climb*` clips at five heights). The fitness game (`packs/play/chunk1/couchPotato.fitnessGame-workout-01.png`) is danced and punched standing beside its balance board, not on it. The exercise bike, spin bike, hoops, trampoline, heavy bag, vibe plate and the sunrise lamp's stretch fit their objects.
-- **Status:** open
+- **Status:** closed (duplicate of I-packs-03)
 - **Source:** wave: cross-cutting (ACTIONS entries no base object uses, judged at the packs wave's objects)
 
 ### I-residents-02 — Singing mimes a hand microphone beside the karaoke machine's own microphone stand
@@ -439,3 +447,166 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Evidence:** `systems/sheets/act-write-garden-bath.png`, `systems/sheets/act-phone-meditate-idle.png` (the packs and community waves' play shots): "Refill the feeder" is the watering clip at knee height beside the bird bath, a metre under the 1.5 m feeder box; "Donate" at the giving jar stands by it with the hands at the sides; "Admire the statue" stands with the face to its plinth, the statue 2 m over the head, never looked up at. The pond's "Feed the fish" and the shop counter's treat (served across it) fit. A reach to the part's height (`STEP_IN`-style sizes, or the `look` entry's head tilt) would fix each.
 - **Status:** open
 - **Source:** wave: cross-cutting
+
+Moved here at the consolidation (2026-10-21) from the ledgers they were first seen in, ids unchanged: the blankets and pyjamas, getting into bed, the bath outfit, and the `ACTIONS` entries and clips used by objects in several ledgers. Pilot evidence in them stays relative to `bench-results/review/pilot/`, the waves' to `bench-results/review/`, as in the ledgers they came from.
+
+### I-bedroom-01 — Pyjamas for every nap, a doze in the garden too, and the shoes stay on
+
+> Consolidation: I-outdoor-02 (outdoor ledger) merged into it: the sun lounger's and the hammock's doze in pink pyjamas, the elder's too (`outdoor/sheets/obj-sunLounger.png`, `outdoor/sheets/age-sunLounger.png`, `outdoor/sheets/obj-hammock.png`).
+>
+> Moved from bedroom.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S2
+- **Rubric:** I3, I16
+- **Fix class:** code
+- **Where:** `web/src/render/babylon/characters.ts:2373-2378` (`asleep`: lying in a `LYING` clip with tag `sleep` or `nap` → the night outfit); `web/src/render/babylon/characters/outfit.ts:149-154` (pyjamas recolour the top and bottom only; the shoe part stays)
+- **Evidence:** `bedroom/play/chunk1/bed-nap-01.png` and every bed's nap: the resident changes into pyjamas for a 30-minute nap at noon; `bedroom/extra/lounger-doze.png`: "Doze in the sun" on a sun lounger in the garden at 10:22 is in pink pyjamas, white shoes on. `bedroom/play/stage-elder/bedSingle-sleep-01.png`: the shoes go into bed (on the mattress at the foot while getting in). People nap in their clothes, take their shoes off for bed and dress for the night only at night. Pyjamas for `sleep` only, and no shoes with them, would do. Other items: every lying `nap` use: `kidsBed`, `kidsBedCar` (kids), `sofaBed`, `wallBed` (living), `sunLounger`, `hammock` (outdoor), `lazy.snoozecloudBed`, `cheerful.rainbowHammock`, `gloomy.windowSeat`, `natureLover.gardenHammock`, `kind.hearthSettee` (packs) (`tables/uses-*.md`). Cause in the renderer: for `residents.md` (row "Blankets and pyjamas in bed").
+- **Status:** confirmed and widened (consolidation: I-outdoor-02 merged)
+- **Source:** wave: bedroom (lead from Phase 0.9 "Seen (not reviewed)"; `bedroom/extra/scenes.mjs` phase `lounger`)
+
+### M-bedroom-04 — Every sleeper gets the same blue checked quilt, whatever the bed's own bedding
+
+> Moved from bedroom.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S2
+- **Rubric:** M9, M13, A12
+- **Fix class:** code
+- **Where:** `web/src/render/babylon/characters/blanket.ts:197-246` (`blanketMaterial`: one texture, `#6F97A6` with a white sheet band); `web/src/render/babylon/characters.ts:1176` (one `quilt` material for every quilt), `:280` (`BLANKET_BEDS`)
+- **Evidence:** `bedroom/play/chunk1/bedSingle-sleep-02.png` (a blue checked quilt over the sage single), `bedroom/play/chunk2/bedCanopy-sleep-02.png` (over the rust four-poster), `bedroom/play/chunk1/bedDouble-sleep-02.png`, `bedroom/extra/bunk-two-09.png` (teal bunks). Asleep, the bed's own duvet, the part the buyer colours (`Bedding`), is hidden under the game's quilt, which is the same blue check on every bed and every colour; it appears as the sleeper lies down and goes when they get up, so the bed changes colour twice a night. Tinting the quilt from the bed's `Bedding` colour (or its pattern by bed) would keep the bed the player chose. Other items (other ledgers): `kidsBed`, `kidsBedCar` (kids), `wallBed` (living), `lazy.snoozecloudBed` (packs): every bed in `BLANKET_BEDS`. Cause in the renderer: for `residents.md` (row "Blankets and pyjamas in bed").
+- **Status:** open
+- **Source:** wave: bedroom (lead from Phase 0.9 "Seen (not reviewed)")
+
+### A-bedroom-04 — A stray quilt lies at the world origin whenever a bed with a blanket is on the lot
+
+> Moved from bedroom.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S2
+- **Rubric:** A12, M7
+- **Fix class:** code
+- **Where:** `web/src/render/babylon/characters.ts:1489-1497` (every base body's quilt mesh `setEnabled(true)` once any object is in `BLANKET_BEDS`, with `thinInstanceCount = 0`), `:2458-2464` (`thinInstanceCount = drawn`, 0 when nobody is under that quilt); `web/src/render/babylon/characters/blanket.ts:181-188` (the mesh at the origin, `alwaysSelectAsActiveMesh`); Babylon draws a mesh with no thin instances as a plain mesh at its own transform (`Mesh.hasThinInstances` is `instancesCount > 0`, `@babylonjs/core` 9.30 `Meshes/mesh.pure.js:225`)
+- **Evidence:** `bedroom/extra/quilt-origin-bed-awake.png`, `quilt-origin-bed-awake-far.png` (`review-stage`, a `bedSingle` bought, nobody in bed): a quilt lies on the lawn at the lot's corner, `(0, 0, 0)`, in view of the Live camera from the front garden. With no bed it isn't there (`quilt-origin-nobed.png`; the meshes disabled). With someone asleep it stays (`quilt-origin-asleep.png`): the sleeper's body's quilt is drawn on the bed, the other bodies' quilts (count 0) at the origin. `bedroom/extra/scenes.log` lists the seven `simBlanket:*` meshes, enabled, count 0, at the origin. The tooling agent's quilt on `poses.html` (`bedroom/sheets/age-bed.png`, right edge) is the same. Hiding a quilt mesh while its count is 0 (or `forcedInstanceCount`) fixes it. Other items: every bed in `BLANKET_BEDS` (`kidsBed`, `kidsBedCar`, `wallBed`, `lazy.snoozecloudBed` in other ledgers); where the origin falls on other lots (a street, a neighbour's lot) wasn't checked.
+- **Status:** open
+- **Source:** wave: bedroom (lead from the tooling round; `bedroom/extra/scenes.mjs` phase `quilt`)
+
+### A-bedroom-03 — Residents get into bed at its foot end, through the footboard, and slide up to the pillow
+
+> Moved from bedroom.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S2
+- **Rubric:** A1, A4, I2
+- **Fix class:** code
+- **Where:** `web/src/render/babylon/characters.ts:304` (`LIE_ENTRY` 0.55: the hips sit down 0.55 m forward of the slot's middle), `:2533-2541` (getting in: `sitDown` on the edge facing the tile they came from, then the crossfade to lying); the beds' `approach` (default `front`: the tile in front, the foot end) in `web/public/content/furniture.json` and `catalog2/bedroom.json`; getting up `:2758-2807` (`fromBed`)
+- **Evidence:** `bedroom/play/chunk1/bedSingle-sleep-00.png`: the resident sits down facing out, about 0.4 m in from the foot end of the single, the thighs through its 0.6 m footboard; `bedroom/play/stage-elder/bedSingle-sleep-01.png` (the elder, the same, the shoes on the mattress); `bedroom/play/chunk1/bedKing-sleep-01.png` (half way through the crossfade, half reclined in the middle of the bed); `bedroom/extra/bunk-two-02.png` (the bunk's end board). From there the body crossfades about 1.4 m up the bed to lie with the head on the pillow. People get in at a side, sit on the edge by the pillow and swing the legs in. On beds with a footboard or end arms (`bedSingle`, `bedBunk`, `bedDaybed`) the legs pass through it; on the rest (`bed`, `bedKing`, `bedDouble`, `bedQueenUpholstered`, `bedCanopy`, `bedFuton`) it is the sit at the foot and the slide. Other items: `kidsBed`, `kidsBedCar` (kids), `wallBed`, `sofaBed` (living), the packs' beds: every `lie` use on a bed. Cause in the renderer and the beds' approach: for `residents.md` (row "Lie fit").
+- **Status:** open
+- **Source:** wave: bedroom
+
+### I-bathroom-03 — Residents shower in their clothes, behind clear glass
+
+> Moved from bathroom.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S3
+- **Rubric:** I3
+- **Fix class:** decision
+- **Where:** `web/src/render/babylon/characters/outfit.ts:120` (day outfit or pyjamas only); `tools/art/blender/families/bathroom.py:552-554` (clear `glass` panels)
+- **Evidence:** `play/shower-shower-01.png`: the day outfit stays on under the water and shows through the enclosure. Bed has its pyjamas; the bath and shower have nothing. A towel or swimwear-like outfit, frosted glass, or leaving it as the style's convention is the owner's call.
+  Bathroom wave: every shower and every bath. Dressed under the rain in the stall, the walk-in and the rain shower (glass at `bathroom.py:637`, `:668-669`), and lying dressed in the bath water in all three tubs at every life stage (`bathroom/play/chunk1/showerStall-shower-01.png`, `bathroom/play/chunk1/bathtub-bath-01.png`, `bathroom/play/stage-elder/bathtub-bath-01.png`). The same outfit rule covers the tubs and showers of the other ledgers that use `bath` or `shower` (`gloomy.soakingTub`, `romantic.heartTub`, `hotHeaded.coldPlunge`, `hotTubCedar`, `whirlpoolTub` and the three pack showers), where a swimsuit is the real thing for the hot tubs.
+- **Status:** confirmed and widened (bathroom wave: all four showers and three baths; the other tubs named)
+- **Source:** pilot; wave: bathroom
+
+### I-bathroom-02 — The shower clip has no washing in it
+
+> Moved from bathroom.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S3
+- **Rubric:** I3, A1
+- **Fix class:** clip
+- **Where:** `web/src/render/babylon/characters.ts:466` (`ACTIONS.shower`: `spell`, `interact`, `idle`)
+- **Evidence:** `play/shower-shower-01.png`, `play-child/shower-shower-01.png`: under the water the resident works the hands at chest height (`spell`) and stands; no hands to the hair, no turning under the head. Reads as waiting in the shower.
+  Bathroom wave: the same at the stall, the walk-in and the rain shower (`bathroom/play/chunk1/showerStall-shower-01.png`, `showerWalkIn-shower-01.png`, `bathroom/play/chunk2/showerRain-shower-01.png`). The entry is shared with the packs' `energetic.contrastShower`, `natureLover.cedarShower` and `neat.rainShowerTower` (packs ledger).
+- **Status:** confirmed and widened (bathroom wave: all four showers; the three pack showers named)
+- **Source:** pilot; wave: bathroom
+
+### I-kitchen-03 — Hands at the cabinet doors, not on the tap, the appliance or the shelf
+
+> Moved from kitchen.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S2
+- **Rubric:** I3, A1
+- **Fix class:** renderer-table
+- **Where:** `web/src/render/babylon/characters.ts:460` (`ACTIONS.cook`: `spell, interact, spell, pickUp`), `:465` (`ACTIONS.wash`: `spell, interact`), `:538` (`ACTIONS.fetch`: `interact, pickUp, idle`); no per-object variant for these (as `look` has for the telescope)
+- **Evidence:**
+  - Sinks: washing hands or washing up at the farmhouse and double sinks, the hands work at hip height in front of the cabinet doors, 15 cm under the 0.95 m rim and 30 cm short of the basin, the water running into an empty bowl (`kitchen/play/c1/farmhouseSink-washUp-01.png`, `kitchen/play/c2/counterSinkDouble-wash-01.png`, `kitchen/extra/putaway-wallCabinet-04.png`). The base sink is the same (pilot `play/sink-wash-01.png`); the pilot passed `ACTIONS.wash` there, this wave doesn't.
+  - Microwave, toaster, blender: "Heat up leftovers", "Make toast" and "Blend a smoothie" (`anim: cook`) are worked at the cabinet below while the microwave door (1.0–1.25 m) or the toaster's lever opens by itself on the top (`kitchen/play/c1/microwave-reheat-01.png`, `breakfastCounter-toast-01.png`); `docs/objects/kitchen.md` K2 already notes it for the microwave.
+  - Putting clean dishes away (`fetch`) in a wall cabinet: its doors open at 1.44–2.2 m while the hands stay at the waist over the sink below (`kitchen/extra/putaway-wallCabinet-05.png`); the same for the three wall cabinets and the china cabinet's glazed top (K9 "Not right yet"); `pickUp` bends to the floor in it.
+  Items: `farmhouseSink`, `counterSinkDouble`, `sink` (bathroom ledger), `microwave`, `breakfastCounter`, `wallCabinet`, `wallCabinetGlass`, `wallCabinetCorner`, `chinaCabinet`. A reach to the worktop (the `chop` clip's arms, without the board) for the sinks and appliances, and a reach up for the wall cupboards, by object def as `look` does, would fix all of them.
+- **Status:** open
+- **Source:** wave: kitchen (play shots, `scratch/scene.mjs` put-away scene)
+
+### I-garden-04 — Harvesting and tending don't follow the plant's height: the hand stops half a metre above low crops, and the tomatoes are tied up kneeling at the soil
+
+> Consolidation: I-outdoor-04 (outdoor ledger: the greenhouse's staging and the compost bin, 0.7–0.8 m, tended kneeling) and I-packs-06 (packs ledger: the waist-high herb garden tended kneeling) merged into it. One cause: `ACTIONS.tend` kneels and `ACTIONS.harvest` picks at one height for every object; the cot's feed (I-kids-04) also plays the kneel.
+>
+> Moved from garden.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S2
+- **Rubric:** I3, A1
+- **Fix class:** renderer-table
+- **Where:** `web/src/render/babylon/characters.ts:508` (`ACTIONS.tend`: `kneel` for every crop) and `:512` (`ACTIONS.harvest`: `harvest`, `plant` for every def but the herb planter); `web/src/render/babylon/characters/clips/garden.ts:37-44` (`harvestPose`: standing, bent 22–32°, the picking hand at 0.68–0.80 m)
+- **Evidence:**
+  - Harvest: `extra/harvest/s-garden.strawberries-harvest.png` and `s-garden.pumpkins-harvest.png`: the resident stands bent a little with the hand at the knees, 0.4–0.5 m above berries at 0.07 m and pumpkins at 0.2 m; nothing is touched. At the veg patch (0.4 m, `s-garden.vegPatch-harvest.png`) the hand is at the box's rim; at the tomatoes (1.2 m) it is in the plant, which is right. The meadow's "Pick a wildflower" plays the same clip over a 0.5 m patch (`play/c3/garden.meadow-pickFlower-01.png`). Low crops want the crouch the `plant` clip already has (`garden.ts:110-135`), or a deeper harvest pose.
+  - Tend: "Tie up and water" at the tomatoes is the weeding kneel (`play/c3/garden.tomatoes-tend-01.png`): right while planted, wrong at a ripe, staked 1.2 m plant, which is tied up standing.
+  - The same entries play at the outdoor ledger's `raisedBed` (hand at its rim, fine) and the packs ledger's `natureLover.veggieBed` (`tendVeggies`).
+- **Status:** confirmed and widened (consolidation: I-outdoor-04 and I-packs-06 merged)
+- **Source:** wave: garden
+
+### I-garden-02 — "Relax in the shade" is half an hour standing by the trunk
+
+> Moved from garden.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S2
+- **Rubric:** I3, A2, I2, I16
+- **Fix class:** clip
+- **Where:** `web/public/content/base.json:2861` (`shade`: `anim: relax`, no `pose`); `web/public/content/garden.json:122, 150, 178, 243, 271, 322, 365` (the same use on the maple, birch, cherry, apple, Japanese maple, magnolia and willow); `web/src/render/babylon/characters.ts:472` (`ACTIONS.relax.stand`: `idle`, `foldArms`)
+- **Evidence:**
+  - Pilot: `play/tree-shade-01.png`, `sheets/obj-tree.png`: the resident stands at the trunk, arms at the sides or folded, for 30 minutes. Relaxing in a tree's shade is sitting against the trunk or lying in the grass. No clip sits on the ground today (`sit` needs a seat height); a sit-on-the-ground pose, or `pose: sit` at a seat height of 0, is the fix.
+  - Garden wave: the same on all seven garden trees that have the use (`play/trees-wide/garden.<tree>-shade-01.png`, `extra/close/close-garden.apple-shade-01.png`, `close-garden.willow-shade-01.png`). Two more things wrong with the place and the time:
+    - The slot is the front tile wherever the shadow falls: at the maple, birch and cherry the resident stands on the lit side of the trunk with the crown's shadow beside them (`sheets/obj-garden.maple.png`, `sheets/obj-garden.birch.png`, play shots).
+    - The use has no time rule: it is offered at night, when there is no shade to relax in (I16; the same gap as stargazing at noon, I-hobbies-03).
+- **Status:** confirmed and widened (garden wave: maple, birch, cherry, apple, Japanese maple, magnolia, willow; the slot and the night)
+- **Source:** pilot; wave: garden
+
+### I-living-06 — Sitting on the floor is the chair sit: shins under the floor on the floor cushion, legs into the fire at the electric fireplace
+
+> Moved from living.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S2
+- **Rubric:** I3, A1
+- **Fix class:** clip
+- **Where:** `web/src/render/babylon/characters/clips/seated.ts` (the `sit` clip, made for a chair seat); `web/public/content/catalog2/living.json:617` (`floorCushion` seat 0.14), `web/src/render/babylon/characters/furniture.json:30` (`seats.fireplaceElectric`: 0.14, `fwd` 0.3, facing the fire)
+- **Evidence:** The lead "legs below the floor on the floor cushion": on the 0.14 m cushion the resident sits with the knees bent as on a chair, so the shins go down through the floor, worst for the teen and the elder (`living/sheets/age-floorCushion.png`; the adult in play has the feet at the floor's edge, `living/play/chunk3/floorCushion-sit-01.png`). At the electric fireplace the same sit on its built-in cushion, 0.3 m in front, facing the fire, puts the knees and shins into the surround and the firebox among the flames (`living/play/chunk3/fireplaceElectric-relax-01.png`, `living/sheets/age-fireplaceElectric.png`). Real people sit on a floor cushion cross-legged or kneeling. A floor-sitting clip (cross-legged, for seats under about 0.25 m), or at least legs out (`legsOut`, as the chaise), with the fireplace's cushion moved back so the feet stop short of the surround. Other low seats may share it, not checked here: `yogaMat` (seat 0.03), `beanBagKids` (0.24, kids ledger).
+- **Status:** open
+- **Source:** wave: living (Phase 0 "Seen" lead)
+
+### I-outdoor-03 — On the swing set the hands reach forward as at a desk, not up on the chains
+
+> Moved from outdoor.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S2
+- **Rubric:** I3 (A1)
+- **Fix class:** renderer-table
+- **Where:** `web/src/render/babylon/characters.ts:477` (`ACTIONS.play`: `sit: 'sitHands'`, `HANDS.keys`)
+- **Evidence:** `extra/swing-hands.png` (from `play/chunk2/swingSet-swing-01.png` and `play/chunk8-child/swingSet-swing-01.png`): the adult and the child sit on the swing with their forearms out over their knees and typing fingers, the chains passing beside their shoulders. On a swing both hands hold the chains at about shoulder height. `play` sitting is the desk-hands clip, right for the chess table, puzzles and consoles but not for rides; the same entry drives `rockingHorse` (kids: hands on the handles), `seesaw`, `springRider` and `merryGoRound` (community). A rides entry (or `sit` chosen by def, as `music` does), holding up in a grip.
+- **Status:** open
+- **Source:** outdoor wave (`play` adult and child)
+
+### I-community-13 — Rides are sat like chairs: no astride pose on the spring horse or the seesaw
+
+> Moved from community.md at the consolidation (2026-10-21): the cause is shared, not one object's.
+
+- **Severity:** S3
+- **Rubric:** I3, A1
+- **Fix class:** clip
+- **Where:** `web/src/render/babylon/characters.ts:471` (`ACTIONS.sit`), the seated clip (`characters/clips/seated.ts`); `tools/art/blender/families/playground.py:319` (the horse's barrel, 0.26 m across at the saddle), `:285-290` (the seesaw's seats and handles)
+- **Evidence:** `extra/poses/rides-child.png`, `sheets/age-springRider.png`: on the spring horse the knees come forward together over the neck as on a chair, the thighs through the barrel's sides, the hands loose rather than on the handles; on the seesaw both riders sit sideways off the plank (also I-community-02, the facing). A rider sits astride, the legs either side, the feet on the pegs, the hands on the grips. Needs an astride seated pose (a `legs: astride` seat, as `legs: out` exists).
+- **Status:** open
+- **Source:** community wave (poses)

@@ -116,31 +116,9 @@ Seeded from earlier docs first; add new findings after them in the same form.
 
 Not tied to one row: M-lighting-01, M-lighting-02 (every lamp).
 
-### M-lighting-01 — Removing a wall can leave a ceiling lamp outdoors
+### M-lighting-01 — moved to systems.md
 
-- **Severity:** S3
-- **Rubric:** M4
-- **Fix class:** code
-- **Where:** `crates/sim-core/src/home.rs:475` (the "needs a ceiling" refusal)
-- **Evidence:** Building lets a wall's removal leave a ceiling lamp outdoors (or something upstairs outside a room). It hangs there until the game is loaded again, which leaves it out and loses its value.
-  Activities wave: on `review-stage`, a `ceilingPendant` at `(12, 8, 0)` inside the room, then `build` with the front wall's segments at `x = 11, 12` (`z = 6`) set `open`: no refusal and no toast, the room stops being one (its tiled floor is drawn as grass, the kitchen and the crib now stand outdoors) and the pendant hangs from nothing in the open (`lighting/extra/ceiling-before.png`, `lighting/extra/ceiling-after-wall-open.png`; `decor/extra/extra.json`). Not checked: the reload that drops it.
-- **Status:** confirmed (activities wave)
-- **Source:** `docs/release-0.2.0-review.md` §4 (new, Z1), target 0.2.1, not in the 0.3.0 notes
-
-### M-lighting-02 — Every lamp is a bare point light: the uplighter lights the floor, wall lights throw a disc, and light goes through walls
-
-- **Severity:** S3
-- **Rubric:** M7, M10
-- **Fix class:** code
-- **Where:** `web/src/render/babylon/BabylonRenderer.ts:3075` (the interior lights: `PointLight`s, no shadows), `:4714` ("a warm pool around it"); `web/src/render/babylon/house.ts:222` (one light per lamp at `light.height`, no direction, no room limit)
-- **Evidence:** A shade decides where a real lamp's light goes; here none does, and no wall stops it.
-  - `lampTorchiere`: the uplighter's bowl glows and its light is a pool on the floor round its foot, the same as a shaded floor lamp's, walls up or cut away (`lighting/extra/lampTorchiere-night-wallsup.png`, `lighting/night/c2/lampTorchiere-no-uses.png`); a real one washes the ceiling, and the ceiling isn't drawn in Live mode either.
-  - `wallSconce`, `wallLampArm`, `wallLightOutdoor`: a bright round disc on the wall centred on the fitting (`lighting/night/c1/wallSconce-no-uses.png`, `…/wallLampArm-no-uses.png`), not the up-and-down wash of a sconce or the arm lamp's pool on the chair below.
-  - `lampBanker` and the lamps on tops: a disc up the wall behind them (`lighting/extra/lampBanker-night-bought.png`), where a banker's lamp lights the desk under its shade.
-  - `wallLightOutdoor` on the outside of the back wall, walls cut away: the fitting isn't drawn, its light lands on the inside floor by the wall (`lighting/night/extra/wallLightOutdoor-outside-on.png`; walls up, the wall is lit outside, `…-outside-on-wallsup.png`).
-  Shared beyond this ledger: every content `light` is drawn so, also `nightstandLamp` (bedroom), `fireplace` (decor), `fireplaceElectric` (living), `lampPost`, `stringLights`, `firePit`, `garden.lantern` (outdoor, garden) and `streetLamp` (community). Directional lamps (a spot or a cone per kind) and lights kept to their room would be new renderer behaviour.
-- **Status:** open
-- **Source:** wave: lighting (leads "the uplighter lights the floor, not the ceiling" and "the outside bulkhead's light reaches the inside floor with walls cut away", both confirmed)
+### M-lighting-02 — moved to systems.md
 
 ### M-lighting-03 — Coloured shades glow the same cream at night
 
@@ -192,15 +170,7 @@ Not tied to one row: M-lighting-01, M-lighting-02 (every lamp).
 - **Status:** open
 - **Source:** wave: lighting
 
-### I-lighting-01 — A lamp bought is on, at night in an empty room too
-
-- **Severity:** S3
-- **Rubric:** I15, I8
-- **Fix class:** decision
-- **Where:** `crates/sim-core/src/world.rs:129` ("A lamp switched off …; bought on"), `:1553` (`off: false`); `crates/sim-core/src/lights.rs:3-10` (residents switch only on coming and going)
-- **Evidence:** `lighting/extra/lamp-night-bought.png`: on `review-stage-night` (22:00 by the sim's clock), a floor lamp bought in the room while everyone is in the front yard (and the baby asleep) comes on and stays on; nobody came or left, so no rule switches it. The same by day: a lamp bought at noon in a room nobody uses is lit when dusk comes. A new real lamp is off until someone switches it on. Decide: off when bought (and residents switch it on as they come in), or on (the player sees the lamp work). Covers every lamp in this ledger and the other ledgers' (`nightstandLamp` and the rest named in M-lighting-02).
-- **Status:** open
-- **Source:** wave: lighting (lead "a newly bought lamp is already on", confirmed)
+### I-lighting-01 — moved to systems.md
 
 ### A-lighting-01 — The ceiling fan turns with its light off; the paper lantern sways in still air
 

@@ -19,7 +19,7 @@ Family: `tools/art/blender/families/playground.py`.
 | `seesaw` Seesaw | OK | I-community-13 | I-community-02, I-community-03, I-community-04 | I-community-02 S2 code; I-community-03 S2 code; I-community-04 S1 code; I-community-13 S3 clip | `community/sheets/obj-seesaw.png`, `community/sheets/age-seesaw.png`, `community/extra/poses/rides-child.png` |
 | `springRider` Spring rider | M-community-03 | I-community-13 | I-community-04 | M-community-03 S3 model; I-community-04 S1 code; I-community-13 S3 clip | `community/sheets/obj-springRider.png`, `community/sheets/age-springRider.png`, `community/extra/poses/rides-child.png` |
 | `merryGoRound` Merry-go-round | M-community-03 | OK | I-community-02, I-community-04 | I-community-02 S2 code; I-community-04 S1 code; M-community-03 S3 model | `community/sheets/obj-merryGoRound.png`, `community/sheets/age-merryGoRound.png`, `community/extra/poses/rides-child.png` |
-| `basketballHoop` Basketball hoop | M-community-02 | I-community-05 | I-community-05, I-bathroom-04 | I-community-05 S2 renderer-table; M-community-02 S3 model; I-bathroom-04 S3 code (bathroom ledger: no sound) | `community/sheets/obj-basketballHoop.png`, `community/sheets/age-basketballHoop.png` |
+| `basketballHoop` Basketball hoop | M-community-02 | I-community-05 | I-community-05, I-bathroom-04 | I-community-05 S2 renderer-table; M-community-02 S3 model; I-bathroom-04 S3 code (systems ledger: no sound) | `community/sheets/obj-basketballHoop.png`, `community/sheets/age-basketballHoop.png` |
 | `pingPongTable` Ping-pong table | M-community-01 | I-community-06 | I-community-02, I-community-03, I-community-06, I-community-08 | M-community-01 S2 model; I-community-02 S2 code; I-community-03 S2 code; I-community-06 S2 clip; I-community-08 S3 code | `community/sheets/obj-pingPongTable.png`, `community/sheets/age-pingPongTable.png` |
 | `parkChessTable` Park chess table | I-community-02 | OK | I-community-02, I-community-03 | I-community-02 S2 code; I-community-03 S2 code | `community/sheets/obj-parkChessTable.png`, `community/sheets/age-parkChessTable.png`, `community/extra/poses/chess-adult.png` |
 
@@ -50,13 +50,13 @@ Family: `tools/art/blender/families/street_furniture.py`.
 |---|---|---|---|---|---|
 | `streetLamp` Street lamp | M-community-06 | n/a | OK | M-community-06 S3 code | `community/sheets/obj-streetLamp.png`, `community/extra/night/night-streetLamp-no-uses.png` |
 | `parkBench` Long park bench | M-community-04 | OK | I-community-11 | M-community-04 S3 model; I-community-11 S3 code | `community/sheets/obj-parkBench.png`, `community/sheets/age-parkBench.png` |
-| `drinkingFountain` Drinking fountain | OK | OK | I-bathroom-04 | I-bathroom-04 S3 code (bathroom ledger: no sound) | `community/sheets/obj-drinkingFountain.png` |
+| `drinkingFountain` Drinking fountain | OK | OK | I-bathroom-04 | I-bathroom-04 S3 code (systems ledger: no sound) | `community/sheets/obj-drinkingFountain.png` |
 | `litterBin` Litter bin | OK | n/a | OK | | `community/sheets/obj-litterBin.png` |
 | `busStop` Bus shelter | M-community-04 | I-community-07 | I-community-07 | I-community-07 S3 renderer-table; M-community-04 S3 model | `community/sheets/obj-busStop.png`, `community/sheets/age-busStop.png` |
 | `postBox` Post box | OK | OK | I-held-01 | I-held-01 S2 code (held ledger: no card) | `community/sheets/obj-postBox.png` |
 | `noticeBoard` Notice board | OK | I-community-07 | I-community-07 | I-community-07 S3 renderer-table | `community/sheets/obj-noticeBoard.png` |
 | `phoneBooth` Phone box | OK | OK | I-social-01 | I-social-01 S2 code (social ledger: the receiver mimed) | `community/sheets/obj-phoneBooth.png`, `community/play/phoneBooth-call-02.png` |
-| `fountainTown` Town fountain | M-community-05 | I-community-11 | I-community-11, I-bathroom-04 | I-community-11 S3 code; M-community-05 S3 content; I-bathroom-04 S3 code (bathroom ledger: no water sound) | `community/sheets/obj-fountainTown.png`, `community/sheets/age-fountainTown.png` |
+| `fountainTown` Town fountain | M-community-05 | I-community-11 | I-community-11, I-bathroom-04 | I-community-11 S3 code; M-community-05 S3 content; I-bathroom-04 S3 code (systems ledger: no water sound) | `community/sheets/obj-fountainTown.png`, `community/sheets/age-fountainTown.png` |
 | `townStatue` Founder's statue | OK | OK | I-community-08 | I-community-08 S3 code | `community/sheets/obj-townStatue.png` |
 
 Notes:
@@ -263,12 +263,14 @@ Seeded from earlier docs first; add new findings after them in the same form.
 
 ### I-community-02 — Seats and places only go side by side, facing the front: riders, players and diners can't face each other
 
+> Consolidation (2026-10-21): closed as a duplicate of I-outdoor-07 (systems ledger), which takes its items and evidence.
+
 - **Severity:** S2
 - **Rubric:** I2, M8
 - **Fix class:** code
 - **Where:** `crates/sim-core/src/world.rs:322-333` (`slot_position`: slots spread across the width at one depth); `web/src/render/babylon/characters.ts:240-249` (`Seat`: one facing per object, `back` or `along`, not per slot); `tools/art/blender/families/playground.py:513` (the chess stools both at z = -0.27, side by side)
 - **Evidence:** `extra/poses/rides-child.png` (`poses.html` with the real footprints and slots, at the riding clips): the seesaw's two riders sit on the end seats side-on, both facing the same way off the plank's side, not astride facing each other over the handles; the merry-go-round's four sit in a row along one chord, all facing the same way, not round the rim. `extra/poses/chess-adult.png`: the two chess players sit shoulder to shoulder behind the board, the man's arm across it; the content says "a stool either side" (`community.json:629`). `sheets/obj-pingPongTable.png`: the player stands at the long side by the net (and a second would stand beside them), where players stand at the two ends. One cause in the sim and the renderer: a slot is a place across the front, facing it. Other items it reaches: the base dining table, both diners on one side (M-kitchen-01, kitchen ledger, filed there as a model finding); by the content (2 slots, one `SEATS` entry each, not checked in shots) `diningOak`, `diningGlass`, `picnicTable` (`SEATS.picnicTable` fwd -0.68: both on one bench) and `romantic.candlelitTable`. A per-slot place and facing (or slots round a circle) is new behaviour; the chess stools then move to opposite sides.
-- **Status:** open
+- **Status:** closed (duplicate of I-outdoor-07)
 - **Source:** community wave (poses with real footprints, play)
 
 ### I-community-03 — Two-player things played alone: the seesaw tips with one rider, ping-pong and park chess have no partner
@@ -281,15 +283,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Status:** open
 - **Source:** community wave (play)
 
-### I-community-04 — Adults and elders ride the spring horse, the seesaw and the merry-go-round and climb the fort
-
-- **Severity:** S1
-- **Rubric:** I6
-- **Fix class:** code
-- **Where:** no age rule on a use (`crates/sim-core/src/content.rs`, see I-systems-04); free will only weights `toys` down for teens to elders (`web/public/content/base.json:3662-3668`, `tagPreference` toys 0.4 / 0.15, multiplied in `content.rs:727`); the climbing frame isn't tagged `toys` (`web/public/content/community.json:415-419`: entertainment, fitness, outdoors)
-- **Evidence:** `sheets/obj-springRider.png` (`play/springRider-ride-01.png`): the adult sits on a 1.1 m horse meant for toddlers, knees up round its head; `sheets/obj-seesaw.png`, `sheets/obj-merryGoRound.png`, `sheets/obj-slide.png`, `sheets/obj-climbingFrame.png` (`play/climbingFrame-climb-01.png`): the adult on each, ducking under the fort's roof; `sheets/age-springRider.png`, `sheets/age-seesaw.png`: an elder on them too. Free will offers the spring rider, the seesaw, the slide and the merry-go-round to adults at 15 % weight, and the climbing frame at full weight, since it carries no `toys` tag; a direct use offers them all (I-kids-03, kids ledger). An adult on a toddler's spring horse is the rubric's S1 ("an adult using a child's thing as if it fitted"). Two parts: the `toys` tag on the climbing frame (content, now), and an age rule for the toddler rides (new behaviour, `code`, §9 decision 3). Widens I-systems-04 (systems ledger) from the stove to the playground.
-- **Status:** open
-- **Source:** community wave (play, Phase 0)
+### I-community-04 — moved to systems.md
 
 ### I-community-05 — "Shoot some hoops" is jogging on the spot under the rim
 
@@ -321,15 +315,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Status:** open
 - **Source:** community wave (play)
 
-### I-community-08 — Standing at a 2-wide thing, residents stand in front of its left half
-
-- **Severity:** S3
-- **Rubric:** I2
-- **Fix class:** code
-- **Where:** `crates/sim-core/src/world.rs:357-365` (`front_tile`: `x + (w - 1) / 2`, so the left of the two tiles in front of an even width)
-- **Evidence:** `play/play.jsonl`: for each 2-wide thing at x 9–11 (middle 10.0) the user stands at x 9.5: the ice cream cart, the hot dog stand, the market stall, the shop counter, the bakery case, the grocery shelves, the ping-pong table, and the 2 × 2 statue. `sheets/obj-hotDogStand.png` (`play/stalls-town/hotDogStand-hotDog-01.png`): the customer stands at the cart's left end, by the sauce bottles, not at its front; `sheets/obj-townStatue.png`: the admirer at the plinth's left corner. Across the content 22 one-slot things of even width are used standing (a scan of the content: also `wardrobe`, `dresser`, `dresserLow`, `armoire`, `bookcaseWide`, `workbench`, `grillStation`, `rangeCooker`, `raisedBed`, `sandbox`, `garden.pond`, `bikeRack`, `canvasAbstract`, `tvWall`, `tvStandLow`, `shedSmall`, `greenhouse`), where it matters less beside a wardrobe's left door. Standing users of an even-width thing want its middle (the renderer could centre them, as it spreads seated slots).
-- **Status:** open
-- **Source:** community wave (play records)
+### I-community-08 — moved to systems.md
 
 ### I-community-09 — Nobody serves: carts, the stall, the counters and the café sell themselves
 
@@ -371,24 +357,16 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Status:** open
 - **Source:** community wave (I1)
 
-### I-community-13 — Rides are sat like chairs: no astride pose on the spring horse or the seesaw
-
-- **Severity:** S3
-- **Rubric:** I3, A1
-- **Fix class:** clip
-- **Where:** `web/src/render/babylon/characters.ts:471` (`ACTIONS.sit`), the seated clip (`characters/clips/seated.ts`); `tools/art/blender/families/playground.py:319` (the horse's barrel, 0.26 m across at the saddle), `:285-290` (the seesaw's seats and handles)
-- **Evidence:** `extra/poses/rides-child.png`, `sheets/age-springRider.png`: on the spring horse the knees come forward together over the neck as on a chair, the thighs through the barrel's sides, the hands loose rather than on the handles; on the seesaw both riders sit sideways off the plank (also I-community-02, the facing). A rider sits astride, the legs either side, the feet on the pegs, the hands on the grips. Needs an astride seated pose (a `legs: astride` seat, as `legs: out` exists).
-- **Status:** open
-- **Source:** community wave (poses)
+### I-community-13 — moved to residents.md
 
 ### Pointers to findings in other ledgers
 
-What this wave saw of causes filed elsewhere (the coordinator may widen them):
+What this wave saw of causes filed elsewhere, carried into those findings at the consolidation (2026-10-21):
 
 - **I-held-01** (held ledger, no props): the card at the post box, the cone at the ice cream cart, the snack and the can at the machines, the coffee cup, the cake and its plate at the café table (`extra/cafe/cafe-cafeChair-cake-01.png`: hands in the lap, nothing on the table), the coin at the fountain, the basketball held.
 - **I-social-01** (social ledger, the phone mimed): the phone box's receiver stays on its hook while the caller holds a phone that isn't there to the ear.
-- **I-kids-03** (kids ledger, a direct use skips free will's rules) and **I-systems-04** (systems ledger, no age rule): the playground (I-community-04).
-- **I-bathroom-04** (bathroom ledger, noisy uses with no sound): no running water at either fountain, no ball on the court or the table, no clunk from the machines, no ring or dial tone in the phone box (`web/src/audio/world.ts:34`, `ACTION_SOUNDS`: none of these uses).
+- **I-kids-03** (systems ledger, a direct use skips free will's rules) and **I-systems-04** (systems ledger, no age rule): the playground (I-community-04).
+- **I-bathroom-04** (systems ledger, noisy uses with no sound): no running water at either fountain, no ball on the court or the table, no clunk from the machines, no ring or dial tone in the phone box (`web/src/audio/world.ts:34`, `ACTION_SOUNDS`: none of these uses).
 - **A-residents-10** (residents ledger): `check:clips` still prints the child's 1.3–1.9 cm and the elder woman's 1.1 cm foot slide in the climbing frame's rounds (`climb112a/b`, `climb172a`).
 - **A-residents-09** (residents ledger): a child's feet off the floor on the park bench, the shelter and the café chair.
 - **I-hobbies-01** (hobbies ledger) names the park chess table as the one with "a stool either side": its stools are side by side (I-community-02).
