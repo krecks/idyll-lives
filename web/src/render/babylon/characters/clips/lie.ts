@@ -11,7 +11,8 @@ import { cycle, type ClipDef, type PoseSpec } from './dsl';
 import { TAU } from './idle';
 import { armIK, footIK, wrist } from './ik';
 
-function liePose(p: number): PoseSpec {
+/** The lying pose at phase `p` (made standing: the runtime turns it flat; the bunk's ladder ends in it, `rides.ts`). */
+export function liePose(p: number): PoseSpec {
   const b = Math.sin(p * TAU * 2);
   const body: PoseSpec = {
     move: [0, 0, 0],

@@ -13,8 +13,9 @@
  * is `m / s` of the clip's metres from it.
  */
 
-import { cycle, reference, type ClipDef, type PoseSpec, type Vec } from './dsl';
+import { cycle, mix, reference, type ClipDef, type PoseSpec, type Vec } from './dsl';
 import { breathe, hangArms } from './idle';
+import { liePose } from './lie';
 import { addV, armIK, footIK, lerpV, smooth, sub, wrist } from './ik';
 import type { Fit, Size } from './street';
 
@@ -125,6 +126,22 @@ class Round {
       if (keys[keys.length - 1][0] < 1) keys.push([1, keys[keys.length - 1][1]]);
     }
     return this;
+  }
+  /**
+   * This round's part from `a` to `b` played backwards from `c0` to `c1` (climbing back down what it climbed up,
+   * backing out the way it crawled in), as a new round to go on from. Each move keeps its own way of moving.
+   */
+  reversed(a: number, b: number, c0: number, c1: number): Round {
+    const out = new Round();
+    const into = out.tracks();
+    const at = (t: number) => c0 + ((b - t) * (c1 - c0)) / (b - a);
+    this.tracks().forEach((keys, n) => {
+      const inner = keys.filter(([t]) => t > a && t < b);
+      const all: K<number | Vec>[] = [[a, value(keys, a, [0, 0, 0])], ...inner, [b, value(keys, b, [0, 0, 0])]];
+      // (A move's way, kept on the key it ends at: backwards it ends at the key it started from.)
+      for (let k = all.length - 1; k >= 0; k--) into[n].push([at(all[k][0]), all[k][1], all[k + 1]?.[2]]);
+    });
+    return out;
   }
 }
 
@@ -433,8 +450,186 @@ function slidePose(fit: SlideFit): (p: number) => PoseSpec {
   };
 }
 
+// --- the bunk bed's ladder ----------------------------------------------------------------------
+
+/**
+ * The bunk bed (bedroom, `model.bedBunk`; the clip's root at its middle, facing its foot end, the bed's metres
+ * the clip's in its size): the ladder flat against its right side at the foot end, 0.465 m to the right of the
+ * middle, its rails 0.42 m and 0.86 m towards the foot, rungs 0.32, 0.62, 0.92 and 1.22 m up; the upper mattress
+ * 1.38 m up (characters.ts `BUNKS`), 0.84 m wide and 1.8 m long; its guard rail along the right side as far as
+ * 0.38 m towards the foot, so the way in is between it and the foot end. The tile in front of the foot end is
+ * 1.5 m from the middle.
+ */
+const BUNK = { x: 0.465, rails: [0.42, 0.86] as const, rungs: [0.32, 0.62, 0.92, 1.22], top: 1.38, tile: 1.5 };
+/** The ladder's middle (m towards the foot end), where the climber goes up it. */
+const BUNK_Z = 0.64;
+/**
+ * The sizes of the climb (heights, m, and the legs' share of the reference's): a grown-up's, a teen's and a
+ * child's (an elder doesn't take the upper bunk: content `upperStages`). Each lies down as the runtime lies a
+ * body of its height (characters.ts `lieCentre`, `lieBack`): the feet `h - 0.91` m towards the foot from the
+ * middle, the back `0.1 h / 1.77` m over the mattress.
+ */
+const BUNK_SIZES: readonly (readonly [h: number, s: number])[] = [
+  [1.72, 0.97],
+  [1.47, 0.83],
+  [1.12, 0.57],
+];
+type BunkFit = Fit & { h: number };
+const bunkSizes = (name: string): Size<BunkFit>[] =>
+  BUNK_SIZES.map(([h, s], i) => ({ clip: `${name}${Math.round(h * 100)}`, min: i < BUNK_SIZES.length - 1 ? (h + BUNK_SIZES[i + 1][0]) / 2 : 0, fit: { s, to: 0, h } }));
+/** Up the ladder into the upper bunk and lain down (characters.ts `BUNK_LADDER`, getting into bed), and back down it getting up. */
+export const BUNK_UP = bunkSizes('bunkUp');
+export const BUNK_DOWN = bunkSizes('bunkDown');
+/** Their lengths (s). */
+const BUNK_UP_S = 7;
+const BUNK_DOWN_S = 6.5;
+/** Up: the walk round to the ladder ends (`walk`), the climb from the rails to sitting on the mattress (`sat`), then lain back. */
+const BUNK_AT = { walk: 0.2, sat: 0.86 };
+/** Down: lain to sitting up (`sat`), the climb back down to the ground (`down`), then the walk round to the tile. */
+const BUNK_DOWN_AT = { sat: 0.12, down: 0.8 };
+
+/**
+ * Lain on the upper bunk as the runtime has the `lie` clip (turned flat by its root's -90 degree pitch about
+ * the feet, `h - 0.91` m towards the foot): the same pose with the pelvis turned flat instead.
+ */
+function lainOnBunk(fit: BunkFit): PoseSpec {
+  const lie = liePose(0);
+  const root: Vec = [0, (BUNK.top + (0.1 * fit.h) / 1.77) / fit.s, (fit.h - 0.91) / fit.s];
+  const { pelvis } = rest();
+  const p = lie.pelvis ?? [0, 0, 0];
+  return { ...lie, pelvis: [p[0] - 90, p[1], p[2]], move: [0, root[1] - pelvis[1], root[2] - pelvis[1]] };
+}
+
+/**
+ * Up the ladder into the upper bunk: from the tile in front of the foot end round the bed's right side to the
+ * ladder, turned to face it; hands onto its rails and up the four rungs, hand and foot in turn; hands onto the
+ * mattress, a knee up onto it and the other, in on hands and knees through the gap in the guard rail; sat down,
+ * the legs swung round to lie along the bed, sitting up; lain back (into `lie`).
+ */
+function bunkUpRound(fit: BunkFit): Round {
+  const { s } = fit;
+  const C = (x: number, y: number, z: number): Vec => [x / s, y / s, z / s];
+  const r = new Round();
+  const { pelvis, ankle } = rest();
+  const aY = ankle.l[1];
+  // Standing on the tile, facing the bed.
+  const start = C(0, 0, BUNK.tile);
+  r.body(0, { at: [start[0], pelvis[1], start[2]], yaw: 180, hip: 0, bend: 0, nod: 0 });
+  for (const side of ['l', 'r'] as const) {
+    const a = turned([ankle[side][0], 0, ankle[side][2]], 180);
+    r.step(side, 0, [start[0] + a[0], aY, start[2] + a[2]], { pitch: 0, knee: 0, yaw: 180, how: 'set' });
+    r.grab(side, 0, null, { elbow: 0, how: 'set' });
+  }
+  // 1. Round the foot end's corner to the ladder, and a turn to face it (the body's right towards the foot).
+  const xFoot = BUNK.x + 0.05 + 0.12 * s;
+  walk(r, [start, C(0.72, 0, 1.25), C(xFoot + 0.1 * s, 0, BUNK_Z)], 0.01, BUNK_AT.walk, { first: 'r', face: 270 });
+  const yaw = 270;
+  // The ladder (the bed's metres): a foot on rung `i` (0 the ground), a palm on a rail at a height.
+  const foot = (side: Side, i: number): Vec => C(BUNK.x + 0.12 * s, (i ? BUNK.rungs[i - 1] + 0.016 : 0) + aY * s, BUNK_Z + (side === 'l' ? -1 : 1) * 0.1 * s);
+  const palm = (side: Side, y: number): Vec => C(BUNK.x + 0.035, Math.min(1.6, y), side === 'l' ? BUNK.rails[0] + 0.03 : BUNK.rails[1] - 0.03);
+  const hips = (y: number): Vec => C(BUNK.x + 0.3 * s, y + 0.74 * s, BUNK_Z);
+  // 2. Hands onto the rails at the chest, then up the rungs, hand and foot in turn.
+  const c0 = BUNK_AT.walk + 0.02;
+  const c1 = 0.52;
+  r.grab('r', c0 + 0.02, palm('r', 1.0 * s), { from: c0 - 0.02 });
+  r.grab('l', c0 + 0.03, palm('l', 1.08 * s), { from: c0 - 0.01 });
+  r.body(c0 + 0.03, { at: hips(0), yaw, hip: 6, nod: -12 });
+  const n = BUNK.rungs.length;
+  const dm = (c1 - c0 - 0.03) / n;
+  for (let i = 1; i <= n; i++) {
+    const t = c0 + 0.03 + dm * i;
+    const side: Side = i % 2 ? 'r' : 'l';
+    const other: Side = side === 'r' ? 'l' : 'r';
+    r.step(side, t - dm * 0.35, foot(side, i), { from: t - dm, pitch: -8 });
+    r.body(t - dm * 0.1, { at: hips(BUNK.rungs[i - 1]), yaw, hip: 10, nod: -15 });
+    r.grab(other, t, palm(other, BUNK.rungs[i - 1] + 1.05 * s), { from: t - dm * 0.3 });
+    // (The trailing foot up beside it at the top.)
+    if (i === n) r.step(other, t + dm * 0.4, foot(other, i), { from: t + dm * 0.05, pitch: -8 });
+    else r.grab(side, t + dm * 0.4, palm(side, BUNK.rungs[i - 1] + 1.12 * s), { from: t + dm * 0.05 });
+  }
+  // 3. Hands onto the mattress, leant in over it, a knee up onto it and the other, in on hands and knees
+  // towards the head end.
+  const o0 = c1;
+  const o1 = 0.7;
+  const ok = (k: number) => o0 + (o1 - o0) * k;
+  const top = BUNK.top;
+  /** On hands and knees on the mattress, the hips over the knees at (x, z) of the bed, facing `y` (deg). */
+  const kneel = (x: number, z: number, y: number) => {
+    const at = C(x, top + 0.5 * s, z);
+    const fwd = turned([0, 0, 1], y);
+    const right = turned([1, 0, 0], y);
+    const on = (side: Side, ahead: number, out: number, up: number): Vec => {
+      const k = side === 'l' ? -1 : 1;
+      return [at[0] + fwd[0] * ahead + right[0] * k * out, (top + up * s) / s, at[2] + fwd[2] * ahead + right[2] * k * out];
+    };
+    return { at, l: on('l', -0.34, 0.1, 0.06), r: on('r', -0.34, 0.1, 0.06), lh: on('l', 0.45, 0.13, 0.02 / s), rh: on('r', 0.45, 0.13, 0.02 / s) };
+  };
+  const edge = kneel(0.42, BUNK_Z, yaw);
+  r.grab('l', ok(0.2), edge.lh, { from: ok(0.02), elbow: 1 });
+  r.grab('r', ok(0.28), edge.rh, { from: ok(0.1), elbow: 1 });
+  r.body(ok(0.3), { at: hips(BUNK.rungs[n - 1] + 0.05), hip: 50, bend: 10, nod: -30 });
+  r.step('r', ok(0.55), edge.r, { from: ok(0.3), pitch: 140, knee: -1 });
+  r.body(ok(0.6), { at: kneel(0.5, BUNK_Z, yaw).at, hip: 82, bend: 5, nod: -40 });
+  r.step('l', ok(0.72), edge.l, { from: ok(0.55), pitch: 140, knee: -1 });
+  r.body(ok(0.75), { at: edge.at });
+  const inside = kneel(0.2, 0.48, 250);
+  r.grab('l', ok(0.82), inside.lh, { from: ok(0.7) });
+  r.grab('r', ok(0.9), inside.rh, { from: ok(0.78) });
+  r.step('r', ok(0.95), inside.r, { from: ok(0.82), yaw: 250 });
+  r.step('l', ok(1), inside.l, { from: ok(0.88), yaw: 250 });
+  r.body(o1, { at: inside.at, yaw: 250, hip: 80, bend: 5, nod: -40 });
+  // 4. Sat down onto the hip, a turn to face the foot end with the legs swung round along the bed, sitting up
+  // where the hips will lie (near enough: lying back takes them the rest of the way).
+  const t0 = o1;
+  const t1 = BUNK_AT.sat;
+  const tk = (k: number) => t0 + (t1 - t0) * k;
+  const lieZ = fit.h - 0.91 - 0.947 * s + 0.15;
+  const sat = C(0, top + 0.174 * s, lieZ);
+  r.grabBoth(tk(0.35), null, null, { from: tk(0.05) });
+  r.body(tk(0.45), { at: [(sat[0] + inside.at[0]) / 2, sat[1] + 0.1, (sat[2] + inside.at[2]) / 2], yaw: 315, hip: 30, bend: 5, nod: 0 });
+  const out = (side: Side): Vec => C((side === 'l' ? -1 : 1) * 0.1 * s, top + 0.07 * s, lieZ + 0.78 * s);
+  r.step('l', tk(0.75), out('l'), { from: tk(0.3), pitch: -30, knee: 1, yaw: 360 });
+  r.step('r', tk(0.85), out('r'), { from: tk(0.4), pitch: -30, knee: 1, yaw: 360 });
+  r.body(t1, { at: sat, yaw: 360, hip: -12, bend: 0, nod: 5 });
+  return r.done();
+}
+
+/** Getting into the upper bunk: the round up to sitting on the mattress, then lain back into the `lie` pose. */
+function bunkUpPose(fit: BunkFit): (p: number) => PoseSpec {
+  let made: { r: Round; lain: PoseSpec } | null = null;
+  return (p) => {
+    made ??= { r: bunkUpRound(fit), lain: lainOnBunk(fit) };
+    const at = BUNK_AT.sat;
+    return p <= at ? posed(made.r, p, p * 2) : mix(posed(made.r, at, at * 2), made.lain, smooth((p - at) / (1 - at)));
+  };
+}
+
+/**
+ * Getting up from the upper bunk: sitting up from lying, then the way up backwards (the legs swung round, onto
+ * hands and knees facing the bed's far side, backing out to the ladder and down it facing it), and a walk round
+ * the foot end's corner to the tile in front, facing away from the bed.
+ */
+function bunkDownPose(fit: BunkFit): (p: number) => PoseSpec {
+  let made: { r: Round; lain: PoseSpec } | null = null;
+  const make = () => {
+    const up = bunkUpRound(fit);
+    const r = up.reversed(BUNK_AT.walk, BUNK_AT.sat, BUNK_DOWN_AT.sat, BUNK_DOWN_AT.down);
+    const { s } = fit;
+    const C = (x: number, y: number, z: number): Vec => [x / s, y / s, z / s];
+    walk(r, [Round.last(r.pel), C(0.72, 0, 1.2), C(0, 0, BUNK.tile)], BUNK_DOWN_AT.down, 0.99, { first: 'l', face: 360 });
+    return { r: r.done(), lain: lainOnBunk(fit) };
+  };
+  return (p) => {
+    made ??= make();
+    const at = BUNK_DOWN_AT.sat;
+    return p >= at ? posed(made.r, p, p * 2) : mix(made.lain, posed(made.r, at, at * 2), smooth(p / at));
+  };
+}
+
 export function rideClips(): ClipDef[] {
   return [
     ...SLIDE.map(({ clip, fit }) => cycle(clip, { seconds: SLIDE_S, loop: true }, slidePose(fit))),
+    ...BUNK_UP.map(({ clip, fit }) => cycle(clip, { seconds: BUNK_UP_S, loop: false }, bunkUpPose(fit))),
+    ...BUNK_DOWN.map(({ clip, fit }) => cycle(clip, { seconds: BUNK_DOWN_S, loop: false }, bunkDownPose(fit))),
   ];
 }
