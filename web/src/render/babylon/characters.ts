@@ -75,6 +75,7 @@ import { ENERGY_RATE, type VisemeTrack } from '../../voice/visemes';
 import { outfitFor, writeOutfit, type OutfitParams } from './characters/outfit';
 import { BLANKET_WIDTH, blanketMaterial, buildBlanket, type BlanketShape } from './characters/blanket';
 import { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } from './characters/clips/street';
+import { BOULDER, FOOS, FOOS_LANES, POOL, SMASH, YOGA_AT } from './characters/clips/games';
 // The seat and bed tables (`SEATS`, `BEDS`, `BUNKS` and their defaults) are data, read by `cargo check-glb` and
 // `cargo review` too; what their entries mean and why some are as they are: docs/characters-format.md "Seats and beds".
 import FURNITURE from './characters/furniture.json';
@@ -196,6 +197,14 @@ const STEP_IN: Record<string, StepIn> = {
   phoneBooth: { by: [[0, ['phone'], { to: -0.04, up: 0.12 }]], wait: 1, back: 0.25, out: 0.25 },
   // Side by side on the net (0.9 m wide, from -0.75 m), each round over the deck and down the pole.
   climbingFrame: { by: CLIMB.map(({ clip, min, fit }) => [min, CLIMB_LANES.map((_, lane) => climbClip(clip, lane)), fit] as const), lanes: CLIMB_LANES, perLane: true },
+  // Games and sport up against the thing (`clips/games.ts`): bent over the pool table's long rail (two players, a
+  // lane each), at a pair of the foosball rods, at the plate stack and the crate, up on the bouldering wall's crash
+  // mat, and on the yoga mat's front end, facing along it.
+  poolTable: { by: POOL.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: [-0.55, 0.55] },
+  foosball: { by: FOOS.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: FOOS_LANES },
+  'hotHeaded.smashBin': { by: SMASH.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
+  'energetic.boulderingWall': { by: BOULDER.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: [0] },
+  yogaMat: { by: [[0, ['yoga'], YOGA_AT]] },
 };
 /** One clip played alone (`StepIn.perLane`), by name. */
 const LANE_SEQ = new Map<string, readonly string[]>();
@@ -444,14 +453,14 @@ const HANDS = {
  *   a function picks one by object def;
  * - `sit`: seated clip (default `sit`), or a function of the object def;
  * - `upper`: upper-body layer while seated (`eat` and `drink` play now and then);
- * - `hands`: finger pose.
+ * - `hands`: finger pose, or a function of the object def.
  * Procedural layers on top (reclining, instruments, gazes, ...) are in `activityPose`.
  */
 interface ActionAnim {
   stand?: readonly string[] | ((def: string) => readonly string[]);
   sit?: string | ((def: string) => string);
   upper?: string;
-  hands?: number;
+  hands?: number | ((def: string) => number);
 }
 const ACTIONS: Record<string, ActionAnim> = {
   eat: { stand: ['eat', 'idle'], upper: 'eat', hands: HANDS.hold },
@@ -474,24 +483,31 @@ const ACTIONS: Record<string, ActionAnim> = {
   write: { stand: ['interact', 'spell'], sit: (def) => (NEAR_DESKS.has(def) ? 'sitHandsNear' : 'sitHands'), hands: HANDS.hold },
   read: { stand: ['lantern'], upper: 'lantern', hands: HANDS.hold },
   watch: { stand: ['foldArms', 'idle'], hands: HANDS.open },
-  play: { stand: ['spell'], sit: 'sitHands', hands: HANDS.keys },
+  // Darts thrown and the table-tennis bat swung (mimed, closed hands: `clips/games.ts`); the pool table and the foosball
+  // rods have their clips in `STEP_IN`; other games (the arcade's panel, toys) the hands busy at it.
+  play: {
+    stand: (def) => (def === 'dartboard' ? ['dartThrow'] : def === 'pingPongTable' ? ['pingPong'] : ['spell']),
+    sit: 'sitHands',
+    hands: (def) => (def === 'dartboard' || def === 'pingPongTable' || def === 'poolTable' || def === 'foosball' ? HANDS.grip : HANDS.keys),
+  },
   // Keys and drums on the desk-hands clip; a cello is held upright between the knees.
   music: { stand: ['spell'], sit: (def) => (def.includes('cello') ? 'sit' : 'sitHands'), hands: HANDS.keys },
   paint: { stand: ['spell', 'interact', 'spell'], hands: HANDS.hold },
+  // (The plate-smash bin, the bouldering wall and the yoga mat have their clips in `STEP_IN`.)
   exercise: {
     stand: (def) =>
-      def.includes('Bag') || def.includes('smash')
+      def.includes('Bag')
         ? ['punchJab', 'punchCross']
         : def.includes('fitnessGame')
           ? ['dance', 'punchJab', 'punchCross']
           : def.includes('streetball')
             ? ['pickUp', 'interact']
-            : // Climbing and stretching (and, `choose`, bouncing and vibrating): the idle with `activityPose` on top.
-              def.includes('boulder') || def.includes('sunrise')
+            : // Stretching (and, `choose`, bouncing and vibrating): the idle with `activityPose` on top.
+              def.includes('sunrise')
               ? ['idle']
               : ['jog'],
     sit: 'sitHands',
-    hands: HANDS.grip,
+    hands: (def) => (def === 'yogaMat' ? HANDS.open : HANDS.grip),
   },
   run: { stand: ['jog'], hands: HANDS.grip },
   lift: { stand: ['pickUp'], hands: HANDS.grip },
@@ -2510,7 +2526,7 @@ export class Characters {
     let fade = DEFAULT_FADE;
     let upper = '';
     let rate = 1;
-    let hands: number = act?.hands ?? HANDS.relaxed;
+    let hands: number = (typeof act?.hands === 'function' ? act.hands(useObj?.def ?? '') : act?.hands) ?? HANDS.relaxed;
     // Step towards a partner (hugs, kisses, fights): eased towards `reach` at `reachRate`.
     let reach = 0;
     let reachRate = 4;
@@ -3381,20 +3397,7 @@ export class Characters {
         if (def && def !== 'telescope' && key !== 'rail') addRotation(add, B.Head, 1, 0, 0, 0.2);
         break;
       case 'exercise':
-        if (def.includes('boulder')) {
-          // Climbing in place: the hands reach for holds overhead in turn, a knee comes up.
-          const c = time * 1.4 + seed;
-          const l = 0.5 + 0.5 * Math.sin(c);
-          const r = 1 - l;
-          addRotation(add, B.upperarm_l, 1, 0, 0, -2.2 - 0.5 * l);
-          addRotation(add, B.upperarm_r, 1, 0, 0, -2.2 - 0.5 * r);
-          addRotation(add, B.lowerarm_l, 1, 0, 0, -0.9 * r);
-          addRotation(add, B.lowerarm_r, 1, 0, 0, -0.9 * l);
-          addRotation(add, B.thigh_l, 1, 0, 0, -0.7 * r);
-          addRotation(add, B.calf_l, 1, 0, 0, 1.0 * r);
-          addRotation(add, B.thigh_r, 1, 0, 0, -0.7 * l);
-          addRotation(add, B.calf_r, 1, 0, 0, 1.0 * l);
-        } else if (rig.useObj?.stand?.motion === 'bounce') {
+        if (rig.useObj?.stand?.motion === 'bounce') {
           // Arms swing up in the air, knees give on landing.
           const b = Math.sin(((rig.actTime * 1.6) % 1) * Math.PI);
           addRotation(add, B.upperarm_l, 0, 0, 1, -1.3 * b);
