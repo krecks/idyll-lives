@@ -25,6 +25,7 @@ M = G.Palette(
     mauve=('#9C7FA0', 'satin'),
     slate=('#5E6F8C', 'metal'),      # the rain lamp's base and canopy; its main part
     smoke=('#A7A9B4', 'satin'),
+    lamp_light=('#DDE6F2', 'satin', {'glow': '#CFE0FF'}),   # the rain lamp's light under its canopy: it glows at night
     chrome=('#D0D3D6', 'chrome'),
     brass=('#B8925A', 'metal'),
     platter=('#C9CCD0', 'metal'),
@@ -239,42 +240,42 @@ def cello():
 
 
 # --- the candlelit writing desk (2x1): the writer's chair in the middle, the desk before them ---------------
-WICK = (-0.25, 0.78 + 0.14, 0.38)   # the lit candle's wick top
+WICK = (-0.25, 0.75 + 0.14, 0.38)   # the lit candle's wick top
 
 
 def journalDesk():
     F = G.GameFrame()
     with G.new_parts() as still:
-        F.box('top', 1.5, 0.04, 0.26, (0, 0.76, 0.32), M.rosewood, bevel=0.01)
+        F.box('top', 1.5, 0.04, 0.26, (0, 0.73, 0.32), M.rosewood, bevel=0.01)
         # an apron only along the far edge and the ends, so the writer's hands have room under the top
-        F.box('apron', 1.42, 0.13, 0.02, (0, 0.675, 0.43), M.walnut, bevel=0.004)
+        F.box('apron', 1.42, 0.13, 0.02, (0, 0.645, 0.43), M.walnut, bevel=0.004)
         for x in (-0.7, 0.7):
-            F.box(_name('apron_end'), 0.02, 0.1, 0.2, (x, 0.69, 0.32), M.walnut)
-        F.box('gallery', 1.5, 0.14, 0.04, (0, 0.85, 0.43), M.rosewood, bevel=0.01)
-        F.box('shelf', 1.44, 0.02, 0.12, (0, 0.93, 0.4), M.walnut, bevel=0.004)
+            F.box(_name('apron_end'), 0.02, 0.1, 0.2, (x, 0.66, 0.32), M.walnut)
+        F.box('gallery', 1.5, 0.14, 0.04, (0, 0.82, 0.43), M.rosewood, bevel=0.01)
+        F.box('shelf', 1.44, 0.02, 0.12, (0, 0.90, 0.4), M.walnut, bevel=0.004)
         for x in (-0.7, 0.7):
             for z in (0.22, 0.42):
-                F.cone(_name('leg'), 0.025, 0.016, 0.72, (x, 0.36, z), M.walnut, verts=10)
+                F.cone(_name('leg'), 0.025, 0.016, 0.69, (x, 0.345, z), M.walnut, verts=10)
         # on the desk: the open journal, an inkwell and quill, books, a wilted rose, candles on a dish
-        F.box('journal_left', 0.2, 0.012, 0.24, (-0.1, 0.786, 0.31), M.page, rot=(0, 0, 3), bevel=0.003)
-        F.box('journal_right', 0.2, 0.012, 0.24, (0.1, 0.786, 0.31), M.page, rot=(0, 0, -3), bevel=0.003)
-        F.box('journal_cover', 0.42, 0.006, 0.25, (0, 0.781, 0.31), M.plum)
+        F.box('journal_left', 0.2, 0.012, 0.24, (-0.1, 0.756, 0.31), M.page, rot=(0, 0, 3), bevel=0.003)
+        F.box('journal_right', 0.2, 0.012, 0.24, (0.1, 0.756, 0.31), M.page, rot=(0, 0, -3), bevel=0.003)
+        F.box('journal_cover', 0.42, 0.006, 0.25, (0, 0.751, 0.31), M.plum)
         for k in range(4):
-            F.box(_name('line'), 0.15, 0.002, 0.004, (-0.1, 0.793, 0.25 + 0.03 * k), M.ink)
-        F.cyl('inkwell', 0.03, 0.05, (0.3, 0.805, 0.32), M.inkwell, verts=12)
-        G.rod('quill', F.at(0.3, 0.82, 0.32), F.at(0.36, 1.02, 0.36), 0.004, material=M.page, verts=6)
-        F.sphere('quill_vane', 0.02, (0.345, 0.96, 0.35), M.page, scale=(1, 0.3, 4), rot=(10, -16, 0), segments=8, rings=6)
-        y = 0.78
+            F.box(_name('line'), 0.15, 0.002, 0.004, (-0.1, 0.763, 0.25 + 0.03 * k), M.ink)
+        F.cyl('inkwell', 0.03, 0.05, (0.3, 0.775, 0.32), M.inkwell, verts=12)
+        G.rod('quill', F.at(0.3, 0.79, 0.32), F.at(0.36, 0.99, 0.36), 0.004, material=M.page, verts=6)
+        F.sphere('quill_vane', 0.02, (0.345, 0.93, 0.35), M.page, scale=(1, 0.3, 4), rot=(10, -16, 0), segments=8, rings=6)
+        y = 0.75
         for w, h, m, r in ((0.22, 0.05, M.sleeve_a, 0), (0.2, 0.04, M.sleeve_b, 10), (0.21, 0.045, M.sleeve_d, -6)):
             F.box(_name('book'), w, h, 0.15, (-0.5, y + h / 2, 0.36), m, rot=(0, 0, r), bevel=0.005)
             y += h
-        top = _vase(F, 0.6, 0.78, 0.38, 0.7)
+        top = _vase(F, 0.6, 0.75, 0.38, 0.7)
         G.rod('rose_stem', F.at(0.6, top - 0.04, 0.38), F.at(0.66, top + 0.1, 0.35), 0.004, material=M.stem, verts=5)
         F.sphere('rose', 0.03, (0.67, top + 0.08, 0.35), M.rose, scale=(1, 1, 0.8), segments=10, rings=6)
-        F.cyl('dish', 0.07, 0.01, (-0.215, 0.785, 0.39), M.brass, verts=16)
-        _candle(F, WICK[0], 0.79, WICK[2], h=WICK[1] - 0.79, r=0.022, lit=False)
-        _candle(F, -0.18, 0.79, 0.4, h=0.09, r=0.02, lit=False)
-        _candle(F, 0.5, 0.94, 0.4, h=0.12, r=0.022, lit=False)
+        F.cyl('dish', 0.07, 0.01, (-0.215, 0.755, 0.39), M.brass, verts=16)
+        _candle(F, WICK[0], 0.76, WICK[2], h=WICK[1] - 0.76, r=0.022, lit=False)
+        _candle(F, -0.18, 0.76, 0.4, h=0.09, r=0.02, lit=False)
+        _candle(F, 0.5, 0.91, 0.4, h=0.12, r=0.022, lit=False)
         # the chair: a high plum-upholstered back, its seat at 0.45 under the writer
         F.box('seat', 0.48, 0.05, 0.44, (0, 0.4, -0.06), M.walnut, bevel=0.012)
         F.box('seat_pad', 0.44, 0.025, 0.4, (0, 0.4375, -0.05), M.plum, bevel=0.01)
@@ -315,7 +316,7 @@ def rainLamp():
         G.revolve('canopy', [(0, 0), (0.22, 0), (0.22, 0.02), (0.18, 0.06), (0.06, 0.09), (0.02, 0.1), (0, 0.1)],
                   at=F.at(0, CANOPY, LZ), material=M.slate, segments=36)
         F.sphere('finial', 0.025, (0, CANOPY + 0.11, LZ), M.brass, segments=10, rings=6)
-        F.cyl('canopy_under', 0.2, 0.004, (0, CANOPY - 0.002, LZ), M.smoke, verts=32)
+        F.cyl('canopy_under', 0.2, 0.004, (0, CANOPY - 0.002, LZ), M.lamp_light, verts=32)   # the light (content `light`)
         # the rock in the pool and the little figure under an umbrella
         F.sphere('rock', 0.06, (0, POOL + 0.01, LZ), M.pebble_dark, scale=(1.3, 1.1, 0.6), segments=12, rings=7)
         F.cone('figure', 0.03, 0.014, 0.12, (0.0, POOL + 0.09, LZ), M.figure, verts=10)

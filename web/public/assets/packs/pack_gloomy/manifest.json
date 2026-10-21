@@ -234,6 +234,10 @@
         "figure": {
           "finish": "material.finish.satin"
         },
+        "lamp_light": {
+          "finish": "material.finish.satin",
+          "glow": "#CFE0FF"
+        },
         "page": {
           "finish": "material.finish.matte"
         },
@@ -254,9 +258,6 @@
         },
         "slate": {
           "finish": "material.finish.metal"
-        },
-        "smoke": {
-          "finish": "material.finish.satin"
         },
         "umbrella": {
           "finish": "material.finish.satin"
