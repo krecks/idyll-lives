@@ -74,7 +74,7 @@ import { FACE_KEYS, FaceMixer, NEUTRAL, type Face } from './characters/face';
 import { ENERGY_RATE, type VisemeTrack } from '../../voice/visemes';
 import { outfitFor, writeOutfit, type OutfitParams } from './characters/outfit';
 import { BLANKET_WIDTH, blanketMaterial, buildBlanket, type BlanketShape } from './characters/blanket';
-import { BUNK_DOWN, BUNK_UP, SLIDE } from './characters/clips/rides';
+import { BUNK_DOWN, BUNK_UP, RIDE_HORSE, RIDE_ROUND, RIDE_SEESAW, RIDE_SPRING, RIDE_SWING, roundClip, SLIDE } from './characters/clips/rides';
 import { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } from './characters/clips/street';
 import { BOULDER, FOOS, FOOS_LANES, POOL, SMASH, YOGA_AT } from './characters/clips/games';
 // The seat and bed tables (`SEATS`, `BEDS`, `BUNKS` and their defaults) are data, read by `cargo check-glb` and
@@ -350,6 +350,28 @@ function slingTop(sling: NonNullable<Bed['sling']>, d: number): number {
 }
 /** Getting into bed: where the hips sit down, forward of the slot centre (body scale 1). */
 const LIE_ENTRY = 0.55;
+/**
+ * Rides, sat astride with the hands on the grips whatever the use (`clips/rides.ts`): the clip for the rider's
+ * height (`sizes`; on the merry-go-round, `round`, by where they sit on it too: at its edge or not, its rail on
+ * their left or right), facing along it to its middle (`face`: the seesaw's riders face each other over its
+ * handles), and in time with its loop (`sync`: the swing's pumping legs). Each ride carries its rider with it
+ * (`ObjectMotion.ride`).
+ */
+interface Ride {
+  sizes: readonly { clip: string; min: number }[];
+  round?: boolean;
+  face?: 'middle';
+  sync?: boolean;
+}
+const RIDES: Record<string, Ride> = {
+  rockingHorse: { sizes: RIDE_HORSE },
+  springRider: { sizes: RIDE_SPRING },
+  seesaw: { sizes: RIDE_SEESAW, face: 'middle' },
+  merryGoRound: { sizes: RIDE_ROUND, round: true },
+  swingSet: { sizes: RIDE_SWING, sync: true },
+};
+/** The merry-go-round's rails (`RIDES` `round`): where they come down beside its riders, m to its right and ahead of its middle (either way), and how far out its edge riders sit. */
+const ROUND_RAILS = { at: 0.5, edge: 0.75 };
 /**
  * The upper bunk's ladder (`BUNKS`): getting into the upper bunk the sleeper climbs up it from the tile in front
  * of the foot end and lies down (`up`), and getting up climbs back down it to the tile (`down`: sim-core keeps
@@ -2424,6 +2446,12 @@ export class Characters {
         // dressing table's mirror, an upright piano); or along it (`Seat.along`: a bath), turned a quarter.
         if (seat?.back) faceYaw = wrapAngle(tyaw + Math.PI);
         else if (seat?.along) faceYaw = wrapAngle(tyaw + (seat.along * Math.PI) / 2);
+        // A ride sat facing along it to its middle (`RIDES` `face`: the seesaw's riders face each other).
+        const ride = useObj && RIDES[useObj.def];
+        if (useObj && ride?.face) {
+          const f = (useObj.rot * Math.PI) / 2;
+          faceYaw = wrapAngle(f + ((tx - useObj.cx) * Math.cos(f) - (tz - useObj.cz) * Math.sin(f) > 0 ? -1 : 1) * (Math.PI / 2));
+        }
       }
       // Cuddling: turned to the baby in the crib.
       const cuddled = rig.cuddleT >= 0 && rig.cuddleBaby >= 0 ? this.sims[rig.cuddleBaby] : null;
@@ -2727,8 +2755,13 @@ export class Characters {
       fade = 0.35;
       rig.useDef = obj?.def ?? '';
       rig.useObj = obj ?? null;
+      const ride = known && obj ? RIDES[obj.def] : undefined;
       if (social) key = speaking(pair, role, time) ? 'sitTalk' : 'sit';
-      else if (act?.sit) key = typeof act.sit === 'function' ? act.sit(rig.useDef) : act.sit;
+      else if (ride) {
+        // Astride a ride, the hands on its grips (`RIDES`).
+        key = this.rideClip(rig, obj!, ride);
+        hands = HANDS.grip;
+      } else if (act?.sit) key = typeof act.sit === 'function' ? act.sit(rig.useDef) : act.sit;
       else if (!known && obj && SIT_HANDS.has(obj.def)) key = 'sitHands';
       else key = 'sit';
       if (rig.lastPose === Pose.Stand && rig.cur.key !== 'sitDown') {
@@ -2969,6 +3002,11 @@ export class Characters {
       cur.rootPitch = pitch;
     }
     rig.cur.frame = frame;
+    // A ride in time with its loop (`RIDES` `sync`: the swing's pumping legs).
+    if (pose === Pose.Sit && key === rig.cur.key && rig.useId >= 0 && RIDES[rig.useDef]?.sync) {
+      const phase = this.loopOf?.(rig.useId);
+      if (phase != null) rig.cur.time = phase * rig.cur.clip!.duration;
+    }
     // (Down the bunk's ladder from lying: the lying body fading out lies where it lay, in the bed's frame.)
     if (frame && LYING.has(rig.prev.key) && rig.lastPose === Pose.Lie) rig.prev.frame = frame;
 
@@ -2996,7 +3034,21 @@ export class Characters {
     }
   }
 
-  /** The clip of `sizes` (the bunk's ladder, `BUNK_LADDER`) for this resident's height. */
+  /** The clip of `ride` (`RIDES`) for this rider: by their height, and on the merry-go-round by where they sit. */
+  private rideClip(rig: SimRig, obj: PlacedObject, ride: Ride): string {
+    const clip = this.sizedClip(rig, ride.sizes);
+    if (!ride.round) return clip;
+    const f = (obj.rot * Math.PI) / 2;
+    const [dx, dz] = [rig.tx - obj.cx, rig.tz - obj.cz];
+    // (Where the hips are: the slot, and the seat's forward offset from it.)
+    const right = dx * Math.cos(f) - dz * Math.sin(f);
+    const ahead = dx * Math.sin(f) + dz * Math.cos(f) + obj.seat.fwd;
+    // (The nearest rail: on the rider's right if it's further right than they sit.)
+    const rail = Math.sign(right || 1) * ROUND_RAILS.at;
+    return roundClip(clip, Math.hypot(right, ahead) > ROUND_RAILS.edge, rail > right ? 'r' : 'l');
+  }
+
+  /** The clip of `sizes` (the bunk's ladder, `BUNK_LADDER`; a ride's, `RIDES`) for this resident's height. */
   private sizedClip(rig: SimRig, sizes: readonly { clip: string; min: number }[]): string {
     const h = rig.body.height * rig.scale;
     return (sizes.find(({ min }) => h >= min) ?? sizes[sizes.length - 1]).clip;

@@ -14,8 +14,9 @@
  */
 
 import { cycle, mix, reference, type ClipDef, type PoseSpec, type Vec } from './dsl';
-import { breathe, hangArms } from './idle';
+import { breathe, hangArms, TAU } from './idle';
 import { liePose } from './lie';
+import { SEAT_MOVE, seatedBody } from './seated';
 import { addV, armIK, footIK, lerpV, smooth, sub, wrist } from './ik';
 import type { Fit, Size } from './street';
 
@@ -626,10 +627,187 @@ function bunkDownPose(fit: BunkFit): (p: number) => PoseSpec {
   };
 }
 
+// --- the rides, sat astride ---------------------------------------------------------------------
+
+/**
+ * Sat on a ride (characters.ts `RIDES`): the pelvis where `sit` has it (the runtime fits the seat to it), the
+ * hands on the ride's grips and the legs astride it, placed from the ride's measures: metres from the seat's
+ * point under the hips, in the rider's frame (to their right, up, ahead). A size is for a body whose legs are
+ * `s` of the reference's, its pelvis joint `drop` m over the seat (rig.json `seatDrop`).
+ */
+interface RideFit {
+  s: number;
+  drop: number;
+}
+/** A grown-up's, a teen's and a child's (`h` m tall: the size's name, and the shortest it is for). */
+const RIDE_SIZES: readonly (RideFit & { h: number })[] = [
+  { h: 1.72, s: 0.97, drop: 0.146 },
+  { h: 1.47, s: 0.83, drop: 0.123 },
+  { h: 1.12, s: 0.57, drop: 0.099 },
+];
+type RideSize = { clip: string; min: number; fit: RideFit };
+/** A ride's clips in the sizes of `RIDE_SIZES` from `from` down to `to` (indices), named `name` and the height (cm). */
+function rideSizes(name: string, from: number, to: number): RideSize[] {
+  const own = RIDE_SIZES.slice(from, to + 1);
+  return own.map((f, i) => ({ clip: `${name}${Math.round(f.h * 100)}`, min: i < own.length - 1 ? (f.h + own[i + 1].h) / 2 : 0, fit: f }));
+}
+/** The seated pelvis (the clip's metres): `sit`'s. */
+const SAT: Vec = [0, 0.947 + SEAT_MOVE[1], SEAT_MOVE[2]];
+/** A place on the ride (m from the seat's point, the rider's frame) in the clip's metres. */
+const onRide = (f: RideFit, p: Vec): Vec => [p[0] / f.s, SAT[1] + (p[1] - f.drop) / f.s, SAT[2] + p[2] / f.s];
+
+/**
+ * A rider's pose: sat, leant forward `lean` deg, the head's nod; the ankles at `feet` (the left; the right
+ * mirrored; the clip's metres, absolute), the knees pointing forward (`knees` 0) to out to the side (1), raised
+ * by `up`; the palms at `hands` (the left and the right, absolute) on the grips, rolled by `pronate`.
+ */
+function astride(o: { lean: number; nod?: number; breath: number; feet: Vec; knees: number; up?: number; toes?: number; hands: [Vec, Vec]; pronate?: number }): PoseSpec {
+  const body = seatedBody({ breath: o.breath, depth: 0.7, lean: o.lean, head: [o.nod ?? 0, 0, 0], tilt: -6 + o.lean * 0.3 });
+  const { ankle } = rest();
+  const out: PoseSpec = { ...body };
+  for (const side of ['l', 'r'] as const) {
+    const sx = side === 'l' ? -1 : 1;
+    const at: Vec = side === 'l' ? o.feet : [-o.feet[0], o.feet[1], o.feet[2]];
+    const pole: Vec = [sx * (0.15 + 0.85 * o.knees), o.up ?? 0.2, 1 - 0.5 * o.knees];
+    Object.assign(out, footIK(side, sub(at, ankle[side]), body, { foot: [o.toes ?? 10, sx * (6 + 20 * o.knees), 0], pole }));
+  }
+  const [l, r] = o.hands;
+  return {
+    ...out,
+    ...armIK('l', l, body, { palm: true, pole: [-0.8, -0.6, -0.2], pronate: o.pronate ?? 70, hand: wrist('l', -10, 0) }),
+    ...armIK('r', r, body, { palm: true, pole: [0.8, -0.6, -0.2], pronate: o.pronate ?? 70, hand: wrist('r', -10, 0) }),
+  };
+}
+
+/**
+ * The rocking horse (kids, `model.rockingHorse`, a child's): its saddle 0.56 m up over the middle, the handle's
+ * grips 0.115 m either side, 0.12 m over it and 0.28 m ahead, at the head; the barrel 0.2 m across under the
+ * saddle. Astride, the thighs either side of the barrel, the feet down by the rockers, leant to the handle;
+ * the horse rocks the rider with it (its `ride` part).
+ */
+export const RIDE_HORSE = rideSizes('rideHorse', 2, 2);
+function horsePose(f: RideFit): (p: number) => PoseSpec {
+  return (p) =>
+    astride({
+      lean: 16 + 4 * Math.sin(p * TAU),
+      nod: -10,
+      breath: p,
+      feet: onRide(f, [-0.17, -0.36, 0.06]),
+      knees: 0.8,
+      hands: [onRide(f, [-0.115, 0.12, 0.28]), onRide(f, [0.115, 0.12, 0.28])],
+    });
+}
+
+/**
+ * The spring rider (playground, `model.springRider`, a child's): its saddle 0.78 m up, the handles' ends 0.16 m
+ * either side, 0.15 m over it and 0.28 m ahead, the foot pegs 0.19 m either side, 0.28 m under it and 0.1 m
+ * ahead. Astride, the feet on the pegs, the hands on the handles.
+ */
+export const RIDE_SPRING = rideSizes('rideSpring', 2, 2);
+function springPose(f: RideFit): (p: number) => PoseSpec {
+  return (p) =>
+    astride({
+      lean: 12 + 3 * Math.sin(p * TAU),
+      nod: -6,
+      breath: p,
+      feet: onRide(f, [-0.19, -0.23, 0.05]),
+      knees: 0.7,
+      toes: 0,
+      hands: [onRide(f, [-0.15, 0.15, 0.28]), onRide(f, [0.15, 0.15, 0.28])],
+    });
+}
+
+/**
+ * The seesaw (playground, `model.seesaw`, a child's or a teen's): a seat at each end of the plank, 0.56 m up, the
+ * rider facing along it to the middle (characters.ts `RIDES` `face`), its handle bar 0.28 m ahead, 0.26 m over the
+ * seat, the grips 0.1 m either side; the plank 0.24 m wide. Astride the plank, the feet down either side of it,
+ * tucked up clear of the ground at the low end (the plank tips 12 deg).
+ */
+export const RIDE_SEESAW = rideSizes('rideSeesaw', 1, 2);
+function seesawPose(f: RideFit): (p: number) => PoseSpec {
+  // (A teen's longer legs tucked further back.)
+  const feet: Vec = f.s > 0.7 ? [-0.2, -0.38, 0.05] : [-0.17, -0.34, 0.12];
+  return (p) =>
+    astride({
+      lean: 10 + 3 * Math.sin(p * TAU),
+      nod: -4,
+      breath: p,
+      feet: onRide(f, feet),
+      knees: 0.6,
+      hands: [onRide(f, [-0.1, 0.26, 0.28]), onRide(f, [0.1, 0.26, 0.28])],
+      pronate: 80,
+    });
+}
+
+/**
+ * The merry-go-round (playground, `model.merryGoRound`, a child's or a teen's): sat on its platform (0.26 m up),
+ * holding one of its four bent rails, which comes down beside a rider 0.25 m to one side (`side`: the near hand
+ * on it at the shoulder, the far hand across the body under it). Near the middle the legs lie out ahead on the
+ * platform, the knees up; at its edge (`edge`) they hang over it, the feet down by the ground.
+ */
+export const RIDE_ROUND = rideSizes('rideRound', 1, 2);
+/** The clip of a merry-go-round size for a rider at its edge or not, with the rail on their left or right. */
+export const roundClip = (clip: string, edge: boolean, side: Side): string => `${clip}${edge ? 'Edge' : 'In'}${side.toUpperCase()}`;
+function roundPose(f: RideFit, edge: boolean, side: Side): (p: number) => PoseSpec {
+  const k = side === 'l' ? -1 : 1;
+  const teen = f.s > 0.7;
+  const feet: Vec = edge ? (teen ? [-0.11, -0.19, 0.3] : [-0.1, -0.2, 0.14]) : teen ? [-0.1, 0.05, 0.4] : [-0.1, 0.05, 0.38];
+  const near = onRide(f, [k * 0.25, 0.36, 0.02]);
+  const far = onRide(f, [k * 0.21, 0.25, 0.06]);
+  return (p) =>
+    astride({
+      lean: 6 + 2 * Math.sin(p * TAU),
+      nod: -2,
+      breath: p,
+      feet: onRide(f, feet),
+      knees: 0.1,
+      up: edge ? 0.2 : 1,
+      toes: edge ? 15 : -10,
+      hands: side === 'l' ? [near, far] : [far, near],
+      pronate: 30,
+    });
+}
+
+/**
+ * The swing (outdoor, `model.swingSet`, anyone's): its seat 0.5 m up, the chains 0.17 m either side of the
+ * rider's middle, straight up from the seat. Both hands on the chains at the chest; pumping in time with the
+ * swing (characters.ts syncs the clip to its loop, 1.6 s): leant back with the legs out straight on the way
+ * forward, sat up with them tucked under the seat on the way back. The seat swings the rider with it.
+ */
+export const RIDE_SWING = rideSizes('rideSwing', 0, 2);
+export const SWING_S = 1.6;
+function swingPose(f: RideFit): (p: number) => PoseSpec {
+  const grip = (x: number): Vec => onRide(f, [x, 0.6 * f.s, 0]);
+  return (p) => {
+    // The swing is back at the loop's quarter, forward at three quarters: the legs out on the way forward.
+    const e = 0.5 - 0.5 * Math.cos(TAU * (p - 0.2));
+    const tucked: Vec = [-0.1, 0.2, -0.2];
+    const out: Vec = [-0.1, 0.44, 0.52];
+    return astride({
+      lean: 8 - 30 * e,
+      nod: 6 - 4 * e,
+      breath: 0,
+      feet: lerpV(tucked, out, smooth(e)),
+      knees: 0,
+      up: 0.6,
+      toes: 10 + 20 * e,
+      hands: [grip(-0.17), grip(0.17)],
+      pronate: 0,
+    });
+  };
+}
+
 export function rideClips(): ClipDef[] {
   return [
     ...SLIDE.map(({ clip, fit }) => cycle(clip, { seconds: SLIDE_S, loop: true }, slidePose(fit))),
     ...BUNK_UP.map(({ clip, fit }) => cycle(clip, { seconds: BUNK_UP_S, loop: false }, bunkUpPose(fit))),
     ...BUNK_DOWN.map(({ clip, fit }) => cycle(clip, { seconds: BUNK_DOWN_S, loop: false }, bunkDownPose(fit))),
+    ...RIDE_HORSE.map(({ clip, fit }) => cycle(clip, { seconds: 2.4, loop: true }, horsePose(fit))),
+    ...RIDE_SPRING.map(({ clip, fit }) => cycle(clip, { seconds: 2, loop: true }, springPose(fit))),
+    ...RIDE_SEESAW.map(({ clip, fit }) => cycle(clip, { seconds: 2.8, loop: true }, seesawPose(fit))),
+    ...RIDE_ROUND.flatMap(({ clip, fit }) =>
+      [false, true].flatMap((edge) => (['l', 'r'] as const).map((side) => cycle(roundClip(clip, edge, side), { seconds: 2.4, loop: true }, roundPose(fit, edge, side)))),
+    ),
+    ...RIDE_SWING.map(({ clip, fit }) => cycle(clip, { seconds: SWING_S, loop: true }, swingPose(fit))),
   ];
 }
