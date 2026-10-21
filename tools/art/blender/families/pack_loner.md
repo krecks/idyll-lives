@@ -17,7 +17,7 @@ agree within a centimetre.
 | `shortwaveRadio` | the tuning knob on the receiver's face: `dial` turns it 150° (1 s); the antenna's inner section: `antenna` runs it 45 cm up out of its tube (1 s) | `tune` (dial); `airwaves` (antenna and dial) |
 | `puzzleTable` | a patch of seven pieces, built flat across with its origin on its left edge: `pieces` grows it across the gap in the puzzle (0.9 s) | `piece`, `newPuzzle` |
 | `bonsaiBench` | a leggy twig with two tufts, origin where it leaves the pad: `trim` shrinks it away (0.7 s); `mist` nods it 10° each way (1.2 s, a loop) | `shape`; `tend` (loop) |
-| `soloSauna` | the glass door with its cedar pull, hinged on its post: `door_open` swings it 60° out (0.8 s), `hold` 1.5 s | `sweat` |
+| `soloSauna` | the glass door with its cedar pull, hinged on its post: `door_open` swings it 60° out (0.8 s), `hold` 1.5 s and `out` 1.5 s: it lets the bather in, shuts behind them and opens to let them out. The cabin is 1.64 m deep, the door at depth 0.7, so the seated bather's feet stay inside it (2026-10-21: the door at 0.42, the shoes at and past the glass: I-packs-17) | `sweat` |
 | `deliveryHatch` | the steel hatch door, hinged on its edge: `hatch` swings it 105° open (0.8 s) over a recess with a parcel, `hold` 2 s | `order`, `treat` |
 
 `tend` (Mist and feed) nods the twig under the mister for as long as it lasts (`loops`), on the part `trim`
@@ -46,7 +46,7 @@ already moves, so it costs no draw. A mist puff of its own would be a fourth dra
 | `model.loner.shortwaveRadio` | 0.84 × 1.33 × 0.68 m | 3,564 | 3 | Body, Wood, Seat |
 | `model.loner.puzzleTable` | 0.87 × 1.01 × 0.72 m | 2,516 | 3 | Body, Wood |
 | `model.loner.bonsaiBench` | 0.86 × 1.31 × 0.75 m | 5,056 | 3 | Body, Wood, Pot |
-| `model.loner.soloSauna` | 0.94 × 2.09 × 1.43 m | 3,728 | 4 | Wood, Trim |
+| `model.loner.soloSauna` | 0.94 × 2.09 × 1.71 m | 3,728 | 4 | Wood, Trim |
 | `model.loner.deliveryHatch` | 0.84 × 1.95 × 0.84 m | 2,232 | 3 | Body, Wood |
 
 The plan's colour parts are "Body, Wood" for all six; the sauna is all wood, so its parts are the cedar (Wood)
