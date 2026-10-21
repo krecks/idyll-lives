@@ -6,14 +6,18 @@ Validate › Kind until checked in play.
 
 Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
 Seats stay where the renderer puts residents: the rocker's cushion and the poufs at 0.45–0.49 (default seat), the
-settee's seat cushions at 0.45 at x = ±0.5, its sleepers on the default 0.5 bed height.
+settee's seat cushions at 0.45 at x = ±0.5, its sleepers on the default 0.5 bed height. The tea table's poufs
+(40 cm across) stand at x = ±0.75 either side of its low table (top 0.36, 0.4 × 0.56 m), and its two face each
+other straight across it (content `places` `[±0.75, 0]` facing ±90; G-39, 2026-10-21: the poufs were at ±0.5
+beside a 0.42 m table, the sitters turned 45°): the knees stop short of the table's ends, the feet before them.
+The ferns stand at the back between the poufs and the table.
 
 | Model | Moving part and clip | Played by |
 |---|---|---|
 | `neighbourlyOven` | the range's oven door, hinged on its foot: `oven_open` drops it 85° forward (0.8 s), shut again after 3 s (`hold`; 2026-10-21). A beadboard back rises from the worktop's back to carry the jar shelf, standing free or on the wall (2026-10-21, M-packs-01; Q-06). | the `bake` step of `familyPie` and `treatsToShare` (by its tag, so the mixing at its worktop leaves the oven shut) |
 | `givingJar` | a coin standing in the cork lid's slot: `coin` drops it 10 cm through into the jar (0.6 s) | `donate` |
 | `knittingRocker` | the whole chair with its cushion and throw, turning about its rockers' centre (so they roll on the floor): `rock` rocks it ±5° (1.6 s, a loop); `ride` carries the knitter | `knitGift`, `rock` (loop) |
-| `welcomeTeaTable` | the teapot, hinged on its foot under the spout: `pour` tips it 30° (0.8 s), `hold` 1.5 s. A pouf at each end of the table at x = ±0.72, host and guest facing each other across it (content `places`, facing ±90°; 2026-10-21, I-packs-11: at ±0.5 m they sat side by side, facing the room); far enough out that the knees stop at the table's ends. | `shareTea` |
+| `welcomeTeaTable` | the teapot, hinged on its foot under the spout: `pour` tips it 30° (0.8 s), `hold` 1.5 s | `shareTea` |
 | `songbirdFeeder` | the feeder's roof, hinged on its back eave: `lid_open` lifts it 70° (0.7 s); three songbirds, built where they perch (tray and bath) and shrunk into the feeder house: `bird` grows them out (1 s) | `refill`; `watchBirds` |
 | `hearthSettee` | the two seat cushions and the quilt over the right one, origin on their underside: `sink_in` presses them 2 cm (0.6 s) | `curlUp`, `quiltNap` |
 
@@ -45,7 +49,7 @@ parts the rest. So that it stays at 3:
 | `model.kind.neighbourlyOven` | 1.83 × 1.72 × 0.63 m | 5,592 | 3 | Body (the range's enamel), Fabric (the towel), Cupboards |
 | `model.kind.givingJar` | 0.64 × 1.32 × 0.66 m | 3,068 | 3 | Body (the pedestal), Fabric (the ribbon) |
 | `model.kind.knittingRocker` | 0.72 × 1.05 × 0.87 m | 2,840 | 3 | Body (the chair), Fabric (the cushion) |
-| `model.kind.welcomeTeaTable` | 1.95 × 0.56 × 0.86 m | 4,616 | 3 | Body (the table), Fabric, Second pouf, Rug |
+| `model.kind.welcomeTeaTable` | 1.94 × 0.50 × 0.86 m | 4,616 | 3 | Body (the table), Fabric, Second pouf, Rug |
 | `model.kind.songbirdFeeder` | 0.90 × 1.70 × 0.88 m | 5,004 | 3 | Body (the feeder house), Fabric (the seed sack), Roof |
 | `model.kind.hearthSettee` | 1.90 × 0.95 × 0.83 m | 3,188 | 3 | Body (the velvet), Fabric (the quilt) |
 

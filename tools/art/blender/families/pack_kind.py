@@ -343,54 +343,53 @@ def knittingRocker():
     return objs
 
 
-# --- the welcome tea table (2x1): two poufs (tops 0.45 at x = ±POUF_X), a low table with the tea set between --
-POUF_X = 0.72    # the poufs' middles (content `places`)
+# --- the welcome tea table (2x1): two poufs (tops 0.45 at x = ±0.75) facing across a low table with the tea set --
+POUF_X = 0.75                                   # content `places` [±0.75, 0], facing ±90
 
 
 def welcomeTeaTable():
     F = G.GameFrame()
     with G.new_parts() as still:
-        F.cyl('rug', 0.93, 0.012, (0, 0.006, 0), M.rug, verts=48, scale=(1, 0.46, 1))
-        edge = G.torus('rug_edge', 0.9, 0.012, at=F.at(0, 0.013, 0), material=M.rug_edge, major_segments=48,
+        F.cyl('rug', 0.97, 0.012, (0, 0.006, 0), M.rug, verts=48, scale=(1, 0.44, 1))
+        edge = G.torus('rug_edge', 0.94, 0.012, at=F.at(0, 0.013, 0), material=M.rug_edge, major_segments=48,
                        minor_segments=4)
-        edge.scale = (1, 0.46, 1)
-        # a pouf at each end of the table, host and guest facing each other across it (content `places`), far
-        # enough out that the knees stop at the table's ends (2026-10-21: at 0.5 m they sat side by side)
+        edge.scale = (1, 0.44, 1)
         for x, m in ((-POUF_X, M.pouf), (POUF_X, M.pouf_rose)):
-            G.revolve(_name('pouf'), [(0, 0), (0.2, 0), (0.22, 0.03), (0.22, 0.33), (0.2, 0.37), (0, 0.37)],
+            G.revolve(_name('pouf'), [(0, 0), (0.18, 0), (0.2, 0.03), (0.2, 0.33), (0.18, 0.37), (0, 0.37)],
                       at=F.at(x, 0.0, 0.0), material=m, segments=24)
-            G.revolve(_name('pouf_top'), [(0, 0.37), (0.21, 0.37), (0.225, 0.39), (0.215, 0.43), (0.17, 0.45), (0, 0.45)],
+            G.revolve(_name('pouf_top'), [(0, 0.37), (0.19, 0.37), (0.205, 0.39), (0.195, 0.43), (0.15, 0.45), (0, 0.45)],
                       at=F.at(x, 0.0, 0.0), material=M.cushion, segments=24)
-            G.torus(_name('piping'), 0.222, 0.01, at=F.at(x, 0.37, 0.0), material=M.rug, major_segments=24,
+            G.torus(_name('piping'), 0.202, 0.01, at=F.at(x, 0.37, 0.0), material=M.rug, major_segments=24,
                     minor_segments=4)
-        # the low table (top 0.42), a shelf of books, a tea light
-        F.box('table_top', 0.48, 0.04, 0.56, (0, 0.4, -0.02), M.table, bevel=0.012)
-        for x in (-0.2, 0.2):
+        # the low table between them (top 0.36, 0.4 across: their knees stop short of its ends, their feet before
+        # them), a shelf of books, a tea light
+        F.box('table_top', 0.4, 0.04, 0.56, (0, 0.34, -0.02), M.table, bevel=0.012)
+        for x in (-0.16, 0.16):
             for z in (-0.25, 0.21):
-                F.box(_name('table_leg'), 0.04, 0.38, 0.04, (x, 0.19, z), M.table, bevel=0.006)
-        F.box('table_shelf', 0.4, 0.02, 0.48, (0, 0.12, -0.02), M.table, bevel=0.005)
-        F.box('book_a', 0.16, 0.035, 0.12, (-0.08, 0.148, -0.1), M.mustard, bevel=0.004)
-        F.box('book_b', 0.15, 0.03, 0.11, (-0.08, 0.18, -0.1), M.sky, bevel=0.004, rot=(0, 0, 8))
-        F.cyl('tea_light', 0.035, 0.04, (0.15, 0.44, -0.2), M.candle, verts=12)
-        F.sphere('tea_light_flame', 0.01, (0.15, 0.475, -0.2), M.flame, scale=(1, 1, 2), segments=8, rings=5)
-        _cup(F, 0.02, 0.42, 0.08)
-        _cup(F, 0.14, 0.42, -0.05)
+                F.box(_name('table_leg'), 0.04, 0.32, 0.04, (x, 0.16, z), M.table, bevel=0.006)
+        F.box('table_shelf', 0.32, 0.02, 0.48, (0, 0.1, -0.02), M.table, bevel=0.005)
+        F.box('book_a', 0.16, 0.035, 0.12, (-0.04, 0.128, -0.1), M.mustard, bevel=0.004)
+        F.box('book_b', 0.15, 0.03, 0.11, (-0.04, 0.16, -0.1), M.sky, bevel=0.004, rot=(0, 0, 8))
+        F.cyl('tea_light', 0.035, 0.04, (0.1, 0.38, -0.22), M.candle, verts=12)
+        F.sphere('tea_light_flame', 0.01, (0.1, 0.415, -0.22), M.flame, scale=(1, 1, 2), segments=8, rings=5)
+        _cup(F, -0.1, 0.36, 0.14)      # a cup before each of them
+        _cup(F, 0.1, 0.36, 0.1)
         G.revolve('milk_jug', [(0, 0), (0.025, 0), (0.03, 0.045), (0.022, 0.065), (0.026, 0.07), (0, 0.062)],
-                  at=F.at(0.0, 0.42, -0.12), material=M.porcelain, segments=14)
-        # potted ferns in the back corners, behind the poufs
-        for x in (-0.88, 0.88):
-            G.revolve(_name('fern_pot'), [(0, 0), (0.07, 0), (0.09, 0.2), (0, 0.2)], at=F.at(x, 0, -0.32),
+                  at=F.at(0.11, 0.36, -0.1), material=M.porcelain, segments=14)
+        # potted ferns at the back, between the poufs and the table
+        for x in (-0.44, 0.44):
+            G.revolve(_name('fern_pot'), [(0, 0), (0.07, 0), (0.09, 0.2), (0, 0.2)], at=F.at(x, 0, -0.33),
                       material=M.pot, segments=16)
             for k in range(7):
                 a = k * 360 / 7
-                G.rod(_name('frond'), F.at(x, 0.19, -0.32),
-                      F.at(x + 0.08 * G.cosd(a), 0.34 + 0.04 * (k % 2), -0.32 + 0.09 * G.sind(a)), 0.022,
+                G.rod(_name('frond'), F.at(x, 0.19, -0.33),
+                      F.at(x + 0.08 * G.cosd(a), 0.34 + 0.04 * (k % 2), -0.33 + 0.09 * G.sind(a)), 0.022,
                       material=M.leaf if k % 2 else M.leaf_light, verts=4)
     G.join(still, 'body', origin=(0, 0, 0))
     with G.new_parts() as pot:
-        _teapot(F, -0.12, 0.42, -0.04)
+        _teapot(F, -0.07, 0.36, -0.06)
     # `pour` tips it towards its spout about the foot's edge under the spout, over the cups.
-    pot = G.hinged(G.join(pot, 'teapot'), F.at(-0.07, 0.42, -0.04))
+    pot = G.hinged(G.join(pot, 'teapot'), F.at(-0.02, 0.36, -0.06))
     objs = G.settle(centre=False)
     G.swing(pot, 'pour', -30, seconds=0.8, axis='Y')
     return objs
@@ -530,8 +529,8 @@ FAMILY = G.Family(
      G.Model('knittingRocker', knittingRocker, size=(0.723, 1.046, 0.867), key='model.kind.knittingRocker',
              centre=(0.09, 0.007), motions={'loops': {'knitGift': 'rock', 'rock': 'rock'}, 'ride': 'rock'},
              paint=[('rocker', 'Body'), ('cushion', 'Fabric')]),
-     G.Model('welcomeTeaTable', welcomeTeaTable, size=(1.949, 0.559, 0.856), key='model.kind.welcomeTeaTable',
-             centre=(0.005, 0),
+     G.Model('welcomeTeaTable', welcomeTeaTable, size=(1.94, 0.499, 0.864), key='model.kind.welcomeTeaTable',
+             centre=(0, -0.005),
              motions={'uses': {'shareTea': 'pour'}, 'hold': 1.5},
              paint=[('table', 'Body'), ('pouf', 'Fabric'), ('pouf_rose', 'Second pouf'), ('rug', 'Rug')]),
      G.Model('songbirdFeeder', songbirdFeeder, size=(0.901, 1.698, 0.884), key='model.kind.songbirdFeeder',

@@ -397,44 +397,63 @@ def breakfastCounter():
     G.spin(swirl, 'blades', turns=1, seconds=1.0)
 
 
-# --- dishwashers: a door dropping open over a sliding lower rack ---------------------------------------
-def _dishwasher(F, w, h, top_d, top_z, front, door_h, body, panel, top):
-    """A dishwasher: a tub whose door drops on its bottom hinge and whose lower rack slides out."""
+# --- dishwashers: a door dropping open over a sliding lower rack, a cabinet beside it under the worktop --
+def _dishwasher(F, w, h, top_d, top_z, front, door_h, body, panel, top, dw, drawers):
+    """A dishwasher `dw` wide at the left of a `w`-wide unit under one worktop: a tub whose door drops on its bottom
+    hinge and whose lower rack slides out. Beside it, the rest of the unit: a drawer over a door, or (`drawers`) a
+    stack of three drawers."""
+    mx = -w / 2 + dw / 2                                               # the machine's middle
+    cw = w - dw
+    cx = w / 2 - cw / 2                                                # the cabinet's
     with G.new_parts() as still:
         F.box('plinth', w - 0.04, 0.10, top_d - 0.10, (0, 0.05, top_z - 0.03), M.dark, bevel=0.005)
         F.box('carcass', w - 0.02, h - 0.14, top_d - 0.06, (0, h / 2 - 0.02, top_z - 0.01), body, bevel=0.012)
         face = top_z - 0.01 + (top_d - 0.06) / 2 + 0.005               # 5 mm proud of the carcass, inside the door
-        F.box('tub', w - 0.14, door_h - 0.04, top_d - 0.12, (0, 0.12 + door_h / 2, face - (top_d - 0.12) / 2), M.dark, bevel=0.006)
+        F.box('tub', dw - 0.08, door_h - 0.04, top_d - 0.12, (mx, 0.12 + door_h / 2, face - (top_d - 0.12) / 2), M.dark,
+              bevel=0.006)
         F.box('worktop', w, 0.04, top_d, (0, h - 0.02, top_z), top, bevel=0.006)
-        F.box('strip', w - 0.10, 0.09, 0.02, (0, h - 0.12, front - 0.01), M.dark, bevel=0.004)
-        F.sphere('button', 0.012, (w / 2 - 0.14, h - 0.12, front + 0.002), M.display, segments=8, rings=6)
+        F.box('strip', dw - 0.03, 0.09, 0.02, (mx, h - 0.12, front - 0.01), M.dark, bevel=0.004)
+        F.sphere('button', 0.012, (mx + dw / 2 - 0.08, h - 0.12, front + 0.002), M.display, segments=8, rings=6)
+        # the cabinet beside it, its fronts flush with the door
+        if drawers:
+            for k, (y0, y1) in enumerate(((0.12, 0.41), (0.42, 0.71), (0.72, h - 0.07))):
+                F.box(f'drawer{k}', cw - 0.03, y1 - y0, 0.02, (cx, (y0 + y1) / 2, front), body, bevel=0.006)
+                F.box(f'drawer_pull{k}', cw - 0.25, 0.02, 0.02, (cx, y1 - 0.05, front + 0.02), M.chrome, bevel=0.004)
+        else:
+            F.box('drawer', cw - 0.03, 0.12, 0.02, (cx, h - 0.13, front), body, bevel=0.006)
+            F.box('drawer_pull', cw - 0.22, 0.02, 0.02, (cx, h - 0.13, front + 0.02), M.chrome, bevel=0.004)
+            F.box('cab_door', cw - 0.03, h - 0.33, 0.02, (cx, 0.12 + (h - 0.33) / 2, front), body, bevel=0.006)
+            F.box('cab_door_pull', 0.02, 0.12, 0.02, (cx - cw / 2 + 0.06, h - 0.31, front + 0.02), M.chrome, bevel=0.004)
     G.join(still, 'body', origin=(0, 0, 0))
     # the door, hinged on its bottom edge (its bottom at y 0.12)
     with G.new_parts() as parts:
-        F.box('door', w - 0.10, door_h, 0.02, (0, 0.12 + door_h / 2, front), panel, bevel=0.01)
-        F.box('handle', w - 0.50, 0.02, 0.03, (0, 0.12 + door_h - 0.04, front + 0.015), M.chrome, bevel=0.006)
-    door = G.hinged(G.join(parts, 'door'), F.at(0, 0.12, front))
+        F.box('door', dw - 0.02, door_h, 0.02, (mx, 0.12 + door_h / 2, front), panel, bevel=0.01)
+        F.box('handle', dw - 0.2, 0.02, 0.03, (mx, 0.12 + door_h - 0.04, front + 0.015), M.chrome, bevel=0.006)
+    door = G.hinged(G.join(parts, 'door'), F.at(mx, 0.12, front))
     # the lower rack, sliding out to the front
     with G.new_parts() as parts:
-        F.box('rack', w - 0.16, 0.06, top_d - 0.26, (0, 0.30, top_z - 0.01), M.tray, bevel=0.004)
+        F.box('rack', dw - 0.12, 0.06, top_d - 0.26, (mx, 0.30, top_z - 0.01), M.tray, bevel=0.004)
         for s in (-1, 1):
-            F.box(f'rack_side{s}', 0.02, 0.10, top_d - 0.26, (s * (w / 2 - 0.09), 0.34, top_z - 0.01), M.tray, bevel=0.003)
-    rack = G.join(parts, 'rack', origin=F.at(0, 0.30, top_z - 0.01))
+            F.box(f'rack_side{s}', 0.02, 0.10, top_d - 0.26, (mx + s * (dw / 2 - 0.07), 0.34, top_z - 0.01), M.tray,
+                  bevel=0.003)
+    rack = G.join(parts, 'rack', origin=F.at(mx, 0.30, top_z - 0.01))
     G.settle()
     G.swing(door, 'door_open', 85, seconds=SECONDS, axis='X')
     G.slide(rack, 'door_open', (0, -0.30, 0), seconds=SECONDS)
 
 
 def dishwasher():
+    """A 60 cm dishwasher beside a 40 cm cupboard (a drawer over a door)."""
     F = G.GameFrame(shift=0.1375)
     _dishwasher(F, w=1.0, h=0.95, top_d=0.66, top_z=-0.15, front=0.175, door_h=0.72,
-                body=M.cab, panel=M.steel, top=M.cab)
+                body=M.cab, panel=M.steel, top=M.cab, dw=0.6, drawers=False)
 
 
 def dishwasherCompact():
+    """A slimline 45 cm dishwasher beside a 55 cm stack of three drawers."""
     F = G.GameFrame(shift=0.085, depths=COUNTER66)
     _dishwasher(F, w=1.0, h=0.95, top_d=0.79, top_z=-0.085, front=0.25, door_h=0.66,
-                body=M.cab, panel=M.steel, top=M.cab)
+                body=M.cab, panel=M.steel, top=M.cab, dw=0.45, drawers=True)
 
 
 # A floor thing against a wall is centred where the game places it (`centre`): its back on the wall,

@@ -144,7 +144,8 @@ The romantic pack models (`models/pack_romantic/candlelitTable.glb`, `heartTub.g
 `letterBureau.glb`, `roseArbourSwing.glb`, override pack `packs/pack_romantic/manifest.json`) are built in Blender by
 `tools/art/blender/families/pack_romantic.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each moves
 while it is used: the candles light, the tub fills with petals, the vanity's drawer opens, the gramophone's arm drops
-onto the turning record, the bureau's flap drops and the arbour swing sways while a bloom is cut.
+onto the turning record, the bureau's flap drops and the arbour swing sways while a bloom is cut. The candlelit table
+was rebuilt with a chair at each end, its two diners facing each other (2026-10-21).
 
 The slob pack models (`models/pack_slob/microwaveCart.glb`, `beanbag.glb`, `snackNightstand.glb`, `spritzStation.glb`,
 `arcadeCabinet.glb`, `gamingRecliner.glb`, override pack `packs/pack_slob/manifest.json`) are built in Blender by
@@ -217,7 +218,8 @@ The kind pack models (`models/pack_kind/neighbourlyOven.glb`, `givingJar.glb`, `
 `welcomeTeaTable.glb`, `songbirdFeeder.glb`, `hearthSettee.glb`, override pack `packs/pack_kind/manifest.json`) are
 built in Blender by `tools/art/blender/families/pack_kind.py` on `gamekit` and exported as `.glb` (glTF, original,
 CC0). Each moves while it is used: the oven door drops, a coin drops into the jar, the rocker rocks, the teapot pours,
-the feeder's roof lifts and songbirds fly out, and the settee's cushions sink.
+the feeder's roof lifts and songbirds fly out, and the settee's cushions sink. The tea table was rebuilt lower and
+narrower, its poufs either side of it facing each other (2026-10-21).
 
 The lazy pack models (`models/pack_lazy/snoozecloudBed.glb`, `napPod.glb`, `quiltTable.glb`, `deliveryLocker.glb`,
 `vibePlate.glb`, `smartHub.glb`, override pack `packs/pack_lazy/manifest.json`) are built in Blender by
@@ -302,8 +304,9 @@ The other kitchen fridges (`models/kitchen/fridgeMini.glb`, `fridgeBuiltIn.glb`,
 `fridgeRetro.glb`, `fridgeMiniRetro.glb`, `wineFridge.glb`, same pack) are built in Blender by
 `tools/art/blender/families/kitchen.py`
 on `gamekit` and exported as `.glb` (glTF, original, CC0). Each hinges a door built closed and swings it open
-while a resident takes food or a drink, held for a few seconds; the French-door freezer and the wine fridge's
-top rack slide, and the built-in freezer door and French freezer drawer carry clips no use plays yet.
+while a resident takes food or a drink, held for a few seconds; the French-door freezer drawer slides, and every
+freezer opens for ice cream. The wine fridge's glass door shows its bottles, and its top shelf of them slides out
+once the door is open; the French-door fridge's doors sit flush on its cabinet (2026-10-21).
 
 The kitchen cookers (`models/kitchen_cooking/stoveElectric.glb`, `stoveGas.glb`, `wallOven.glb`,
 `rangeCooker.glb`, `cooktopCounter.glb`, `microwave.glb`, override pack `packs/kitchen_cooking/manifest.json`)
@@ -317,7 +320,7 @@ The kitchen small appliances and dishwashers (`models/kitchen_cooking/coffeeMach
 `tools/art/blender/families/kitchen_cooking.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
 The coffee machine slides its cup under the spout and runs a coffee stream; the breakfast counter's toaster
 lever slides and its toast pops, and its blender lid lifts over a swirling smoothie; the dishwashers drop their door and slide a rack
-out.
+out. The dishwashers were rebuilt 60 and 45 cm wide beside a cupboard or a drawer stack (2026-10-21).
 
 The kitchen base counters (`models/kitchen_counters/counter.glb`, `counterCorner.glb`, `counterEnd.glb`,
 `counterCornerOuter.glb`, `counterDrawers.glb`, `counterOpenShelf.glb`, `butcherBlock.glb`,
@@ -344,7 +347,9 @@ The dining tables (`models/dining/diningTable.glb`, `bistroSet.glb`, `diningGlas
 `tableSquare2.glb`, `tableBistroRound.glb`, `tableDining4.glb`, `tableDining6.glb`, `tableBanquet8.glb`,
 `tableRound4.glb`, `tableSquare8.glb`, `tableFarmhouse6.glb`, `tableBarHigh.glb`, override pack
 `packs/dining/manifest.json`) are built in Blender by `tools/art/blender/families/dining.py` on `gamekit` and
-exported as `.glb` (glTF, original, CC0). They are static; the four sets keep the chairs residents sit on.
+exported as `.glb` (glTF, original, CC0). They are static; the four sets keep the chairs residents sit on. The
+dining table and the glass and farmhouse sets were rebuilt for two facing each other, a chair at each end of the
+top, and the carver chair's seat lowered to a dining chair's (2026-10-21).
 
 The dining chairs and stools (`models/dining/barStool.glb`, `stoolCounter.glb`, `stoolBarHigh.glb`,
 `diningChair.glb`, `chairWood.glb`, `chairUpholstered.glb`, `chairModern.glb`, `chairWindsor.glb`,

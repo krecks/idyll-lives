@@ -86,10 +86,16 @@ rack slide instead. The clip each use plays is in the pack's `motions`:
 | `model.fridgeFrenchDoor` | 0.900 × 1.820 × 0.760 m | 2,756 | 4 | left door, right door, drawer | `fridge_open` 1.75 s (fetch, cook); `door_right` 1.75 s (cold drink); `freezer_open` 1.75 s (frozen treat) |
 | `model.fridgeRetro` | 0.720 × 1.640 × 0.725 m | 1,920 | 3 | door; the chrome lever inside it (`G.attach`) | `lever` turns 30° out (0.3 s, `hold` 0.4), then `fridge_open` 1.75 s (`delay` 0.3; fetch, cook, cold drink) |
 | `model.fridgeMiniRetro` | 0.574 × 0.860 × 0.580 m | 3,975 | 2 | door (its handle, "MARIE" letters and unicorn sticker on it) | `fridge_open` 1.6 s (fetch, cook, cold drink); `hold` 3 s |
-| `model.wineFridge` | 1.000 × 0.950 × 0.660 m | 2,316 | 4 | glass door, top rack | `door_open` 1.5 s (wine `drink`); `hold` 2.5 s |
+| `model.wineFridge` | 1.000 × 0.950 × 0.660 m | 2,532 | 4 | glass door, top shelf of bottles | `door_open` 1.5 s (wine `drink`), `hold` 2.5 s; `rack_out` 0.8 s, the shelf out 15 cm (`delay` 0.9, `hold` 0.9: out once the door is open, in before it shuts) |
 
 The built-in's freezer door and the French-door freezer drawer play `freezer_open` for "Get some ice
-cream"; `model.fridge`'s freezer door does the same.
+cream"; `model.fridge`'s freezer door does the same (`FRIDGE_USES`, by the interaction `frozenTreat`; the G-17
+rebuild of 2026-10-21 had lost it, as the family script never named it: back the same day).
+
+Fixed 2026-10-21 (G-41, M-kitchen-06): the wine fridge's door is a dark frame round a pane of smoked `glass` (it was
+a solid slab with the glass in front of it, so it drew black), and what slides out is its top shelf of bottles
+behind the door, not the drawer stack's top front beside it; the French-door fridge's sides, top and bottom come
+forward 5 cm to the doors' backs, so a shut door sits flush on the cabinet instead of standing off it.
 `fridgeFrenchDoor` and `wineFridge` take 4 draw calls (the most allowed, one per moving part plus the
 still body); the rest take 2 or 3. The five were built and exported on 2026-10-14 and sat in Validate ›
 Fridges until checked in play.

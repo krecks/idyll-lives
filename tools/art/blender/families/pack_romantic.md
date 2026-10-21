@@ -5,12 +5,14 @@ entries in `packs/pack_romantic/manifest.json`, an override pack listed in the b
 2026-10-14; they sat in Validate › Romantic until checked in play.
 
 Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
-Seats at 0.45: the diners on a chair at each end of the table at x = ±0.62, facing each other (content `places`, facing ±90°), the writer in front of the bureau at depth 0.2, facing it (`furniture.json` `back`, the hips at 0.25); the bathers at
-0.20 (`furniture.json` `romantic.heartTub`), the swing's seat top at 0.45 over z = 0. (2026-10-21: the diners sat side by side behind a long, narrow top and the writer at the bureau's back, both facing the room: M-packs-11, M-packs-05.)
+Seats: the diners at 0.45 on a slipper chair at each end of the candlelit table, facing each other across its
+0.8 × 0.72 top (content `places` `[±0.62, 0.1]` facing ±90; G-39, 2026-10-21: they sat side by side behind a
+0.3 m top before, their legs through its front skirt), the writer at 0.45 in front of the bureau at depth 0.2, facing it (`furniture.json` `back`, the hips at 0.25; M-packs-05), the
+bathers at 0.20 (`furniture.json` `romantic.heartTub`), the swing's seat top at 0.45 over z = 0.
 
 | Model | Moving part and clip | Played by |
 |---|---|---|
-| `candlelitTable` | the two candle flames, origin just under the shorter wick and flattened inside the wax: `candles` grows them (0.6 s); they glow at night (`flame`, `flame_core` `glow`; M-packs-07). A 0.72 m square top in the middle, the cloth short (8 cm) at the diners' ends so the knees go under it, long on the free sides (I-packs-01) | `candlelitDinner`, `shareDessert` |
+| `candlelitTable` | the two candle flames, origin just under the shorter wick and flattened inside the wax: `candles` grows them (0.6 s); they glow at night (`flame`, `flame_core` `glow`; M-packs-07) | `candlelitDinner`, `shareDessert` |
 | `heartTub` | the water with its petals and bubbles, origin just under the tub's floor, flattened: `fill` raises it to 7 cm under the rim (1.2 s) | `petalBath` |
 | `vanity` | the middle drawer with a lipstick and a compact in it: `drawer_open` pulls it 20 cm out (0.7 s), `hold` 2 s | `primp` |
 | `gramophone` | the tone arm, resting beside the record: `needle` swings it 30° onto the record (0.8 s); the platter and record: `platter` turns them once in 1.8 s (a loop) | `listen`, `waltz` (`uses` and `loops`) |
@@ -38,7 +40,7 @@ the shell at x = ±0.5 where the heart narrows, as they do in the old part: the 
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.romantic.candlelitTable` | 1.80 × 1.12 × 0.78 m | 4,216 | 3 | Body, Fabric, Tablecloth |
+| `model.romantic.candlelitTable` | 1.80 × 1.10 × 0.80 m | 4,216 | 3 | Body, Fabric, Tablecloth |
 | `model.romantic.heartTub` | 1.87 × 0.78 × 1.82 m | 5,264 | 3 | Body, Fabric |
 | `model.romantic.vanity` | 0.80 × 1.64 × 0.82 m | 4,404 | 3 | Body, Fabric, Rose gold |
 | `model.romantic.gramophone` | 0.74 × 1.58 × 0.70 m | 2,720 | 3 | Body, Horn |

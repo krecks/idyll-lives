@@ -76,8 +76,10 @@ then turns its plate (`turntable`, `delay` 2.2 s, `every` 1.9 s, a hair under it
 ## K3 — small appliances and dishwashers
 
 A dishwasher is a tub under a worktop with a door hinged along its bottom edge (built closed, drops 85°)
-and a lower rack that slides out 30 cm as the door opens; the `dishwasher` wears the kitchen's cabinet
-fronts and the `dishwasherCompact` a stainless door. The coffee machine slides its cup back under the
+and a lower rack that slides out 30 cm as the door opens, at the left of its 1 m unit (G-32, 2026-10-21: the whole
+front was the door before): the `dishwasher` is a 60 cm machine beside a 40 cm cupboard (a drawer over a door),
+the `dishwasherCompact` a slimline 45 cm one beside a 55 cm stack of three drawers, both with stainless doors under
+one worktop. The cupboard and drawers are in the still body. The coffee machine slides its cup back under the
 spout and runs a thin coffee stream (the sinks' `_water` way: built full size, origin at the spout tip,
 scaled to nothing along its length, `grow` runs it out). The breakfast counter's toast stands up in the
 toaster at rest; `toast_down` presses it down with the lever, and playing back after the `hold` pops it up.
@@ -87,8 +89,8 @@ Its blender lid lifts for `blend` (the jug blades need E1).
 |---|---|---|---|---|---|
 | `model.coffeeMachine` | 1.000 × 1.400 × 0.665 m | 1,748 | 3 | cup, coffee stream | `brew` 0.6 s: cup slides under the spout, stream grows (espresso) |
 | `model.breakfastCounter` | 1.000 × 1.380 × 0.665 m | 2,224 | 4 | lever, toast, lid | `toast_down` (toast); `blend` 0.4 s: lid lifts (smoothie) |
-| `model.dishwasher` | 1.000 × 0.950 × 0.685 m | 1,160 | 3 | door, rack | `door_open` 0.9 s: door drops 85°, rack slides 30 cm, open for the whole use (dishes; clearing away at it, the `wash` tag) |
-| `model.dishwasherCompact` | 1.000 × 0.950 × 0.790 m | 1,160 | 3 | door, rack | `door_open` 0.9 s (dishes, `wash`), as the dishwasher |
+| `model.dishwasher` | 1.000 × 0.950 × 0.685 m | 1,592 | 3 | door (0.58 m), rack | `door_open` 0.9 s: door drops 85°, rack slides 30 cm, open for the whole use (dishes; clearing away at it, the `wash` tag) |
+| `model.dishwasherCompact` | 1.000 × 0.950 × 0.660 m | 1,808 | 3 | door (0.43 m), rack | `door_open` 0.9 s (dishes, `wash`), as the dishwasher |
 
 The coffee machine and both dishwashers take 3 draw calls; the breakfast counter takes 4 (its three
 moving parts each cost one). `check-glb`: 31 models, 0 failed; its five warnings are those same draw counts
