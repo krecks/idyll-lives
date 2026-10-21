@@ -77,6 +77,7 @@ import { BLANKET_WIDTH, blanketMaterial, buildBlanket, quiltTint, type BlanketSh
 import { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } from './characters/clips/street';
 import { BOULDER, FOOS, FOOS_LANES, POOL, SMASH, YOGA_AT } from './characters/clips/games';
 import { EYEPIECE, PICK_APPLE, PICK_LEMON, SHOWER_CHILD } from './characters/clips/uses';
+import { BOARD, CLOCK, CUPBOARD_OF, FEEDER, PUT_AWAY } from './characters/clips/reach';
 // The seat and bed tables (`SEATS`, `BEDS`, `BUNKS` and their defaults) are data, read by `cargo check-glb` and
 // `cargo review` too; what their entries mean and why some are as they are: docs/characters-format.md "Seats and beds".
 import FURNITURE from './characters/furniture.json';
@@ -171,8 +172,8 @@ const DEFAULT_SEAT: Seat = FURNITURE.defaultSeat;
  * mattress, pulled out or folded away, reaches half a metre past it. Negative: steps in to a thing
  * smaller than its tile (the herb planters, 0.4–0.46 m deep, are picked from as from a counter), or to
  * the part used: the toes at a basin or a sink's cabinet, the hands over the water; up to the toaster and
- * the blender on a counter, the chemistry bench pushed back on its tile, the clock's trunk door, the
- * giving jar. Back from the statue, to look up at it.
+ * the blender on a counter, the chemistry bench pushed back on its tile, the giving jar. Back from the
+ * statue, to look up at it.
  */
 const STAND_BACK: Record<string, number> = {
   dishwasher: 0.15,
@@ -189,7 +190,6 @@ const STAND_BACK: Record<string, number> = {
   counterSinkDouble: -0.45,
   breakfastCounter: -0.3,
   chemistrySet: -0.35,
-  grandfatherClock: -0.6,
   'kind.givingJar': -0.4,
   townStatue: 0.8,
 };
@@ -244,12 +244,16 @@ const STEP_IN: Record<string, StepIn> = {
   'hotHeaded.smashBin': { by: SMASH.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
   'energetic.boulderingWall': { by: BOULDER.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: [0] },
   yogaMat: { by: [[0, ['yoga'], YOGA_AT]] },
-  // Up to the board on the wall (its face 0.42 m behind the middle), the hands at it.
-  whiteboard: { by: [[0, [], { to: 0.1 }]] },
+  // Up to the board on the wall (its face 0.42 m behind the middle), writing on it at shoulder to head height
+  // (clips/reach.ts); up to the wall cupboards over the worktop and the china cabinet, the doors opened and the
+  // clean things put away up in them; to the clock's hood, winding it at the dial (a child at the trunk's chains).
+  whiteboard: { by: BOARD.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
+  ...Object.fromEntries(Object.entries(CUPBOARD_OF).map(([def, name]): [string, StepIn] => [def, { by: PUT_AWAY[name].map(({ clip, min, fit }) => [min, [clip], fit] as const), tag: 'fetch' }])),
+  grandfatherClock: { by: CLOCK.map(({ clip, min, fit }) => [min, [clip], fit] as const), tag: 'tinker' },
   // Into the shelter at the timetable's end, on the back glass past the bench.
   busStop: { by: [[0, [], { to: 0.2 }]], lanes: [-0.95] },
-  // At the feeder's post, at its back left, clear of the bird bath.
-  'kind.songbirdFeeder': { by: [[0, [], { to: 0.25 }]], lanes: [-0.2] },
+  // At the feeder's post, at its back left, clear of the bird bath: its house filled from a scoop (clips/reach.ts).
+  'kind.songbirdFeeder': { by: FEEDER.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: [-0.2], tag: 'garden' },
   // At the microwave on the counter's right, the hands at its door.
   microwave: { by: [[0, [], { to: 0.55 }]], lanes: [-0.2] },
   // At the mic stand, singing into it.

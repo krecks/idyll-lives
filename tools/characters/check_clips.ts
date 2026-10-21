@@ -33,7 +33,8 @@
  * stage's own bone offsets (`restT`, rig.json `bodies.<body>.stages`), the clip's pelvis motion
  * scaled by its `pelvisScale`, and the locomotion's ground speed scaled by it too (characters.ts
  * `legs`). `walk` gets the runtime's hip roll per body (characters.ts `GAIT_SWAY`). Of the clips
- * made in sizes (the fountain's, the climbing frame's, the telescope's, the fruit trees' and the shower's) each stage gets the size its height picks
+ * made in sizes (the fountain's, the climbing frame's, the games', the telescope's, the fruit trees', the shower's and the reaches
+ * up to the wall cupboards, the clock, the feeder and the whiteboard) each stage gets the size its height picks
  * (characters.ts `stepFit`), and babies only their own clips (only those are checked at `baby`, and
  * only the others at every other stage). What it doesn't cover: the resident's height slider (a
  * uniform scale, though it can change the size picked), the build and head size (skinning only),
@@ -67,6 +68,9 @@ const { bake } = await import('../../web/src/render/babylon/characters/clips/dsl
 const { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } = await import('../../web/src/render/babylon/characters/clips/street.ts');
 const { BOULDER, FOOS, POOL, SMASH } = await import('../../web/src/render/babylon/characters/clips/games.ts');
 const { EYEPIECE, PICK_APPLE, PICK_LEMON, SHOWER_CHILD } = await import('../../web/src/render/babylon/characters/clips/uses.ts');
+const { BOARD, CLOCK, FEEDER, PUT_AWAY } = await import('../../web/src/render/babylon/characters/clips/reach.ts');
+/** The clips made in sizes for reaching up (the wall cupboards, the clock, the feeder, the whiteboard: clips/reach.ts), each with its length (s); all loop. */
+const MORE_SIZED: [any[], number][] = [...Object.values(PUT_AWAY).map((sizes: any): [any[], number] => [sizes, 3.2]), [CLOCK, 4.5], [FEEDER, 4], [BOARD, 6]];
 
 /** Every clip the runtime plays (characters.ts ACTIONS / choose, reactions.ts) and whether it loops. */
 const RUNTIME: Record<string, boolean> = {
@@ -84,6 +88,8 @@ const RUNTIME: Record<string, boolean> = {
   eyepiece181: true, eyepiece163: true, eyepiece147: true, eyepiece129: true, eyepiece112: true,
   pickApple177: false, pickApple147: false, pickApple112: false, pickLemon177: false, pickLemon147: false, pickLemon112: false,
   shower: true, showerChild: true,
+  // Reaching up, in sizes (characters.ts STEP_IN).
+  ...Object.fromEntries(MORE_SIZED.flatMap(([sizes]) => sizes.map(({ clip }: any) => [clip, true]))),
 };
 /** Phase-2 clips (the runtime picks them up later) and whether they loop. */
 const PHASE2: Record<string, boolean> = { lie: true, chop: true, stir: true, flip: true, drink: false, carry: true, carryOne: true, wave: false };
@@ -97,6 +103,7 @@ const LENGTH: Record<string, number> = {
   ...Object.fromEntries(([[POOL, 8], [FOOS, 3.2], [SMASH, 3.4], [BOULDER, 16]] as [any[], number][]).flatMap(([sizes, s]) => sizes.map(({ clip }: any) => [clip, s]))),
   eyepiece181: 6, eyepiece163: 6, eyepiece147: 6, eyepiece129: 6, eyepiece112: 6, pickApple177: 3.3, pickApple147: 3.3, pickApple112: 3.3, pickLemon177: 3.3, pickLemon147: 3.3, pickLemon112: 3.3,
   shower: 14, showerChild: 14,
+  ...Object.fromEntries(MORE_SIZED.flatMap(([sizes, s]) => sizes.map(({ clip }: any) => [clip, s]))),
 };
 /** The baby lying in the crib: how far out to the side a joint may reach (m, reference skeleton: about 0.23 m on a baby, whose crib's bars are about 0.4 m from its middle). */
 const BABY_REACH = 0.6;
@@ -115,6 +122,7 @@ const SIZED: { min: number; clips: string[] }[][] = [
   ...[POOL, FOOS, SMASH, BOULDER].map((sizes: any[]) => sizes.map(({ clip, min }: any) => ({ min, clips: [clip] }))),
   ...[EYEPIECE, PICK_APPLE, PICK_LEMON].map((sizes) => sizes.map(({ clip, min }: any) => ({ min, clips: [clip] }))),
   [{ min: SHOWER_CHILD, clips: ['shower'] }, { min: 0, clips: ['showerChild'] }],
+  ...MORE_SIZED.map(([sizes]) => sizes.map(({ clip, min }: any) => ({ min, clips: [clip] }))),
 ];
 /** The runtime's hip roll while walking, per body (rad), read from characters.ts so the two can't drift apart. */
 const GAIT_SWAY: Record<string, number> = (() => {
