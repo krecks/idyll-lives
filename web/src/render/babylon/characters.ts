@@ -683,6 +683,10 @@ const STRUM_SHORT: readonly string[] = ['strumShort'];
 /** A use sequence of the idle alone (curling dumbbells on top, `activityPose`), and of pushing (a mop). */
 const IDLE_ONLY: readonly string[] = ['idle'];
 const PUSH_ONLY: readonly string[] = ['push'];
+/** Relaxing on foot (`ACTIONS.relax`): standing about, the arms folded now and then; at a fire (`WARM_AT`), the hands held out to it and rubbed. */
+const RELAX_STAND: readonly string[] = ['idle', 'foldArms'];
+const WARM_HANDS: readonly string[] = ['warmHands'];
+const WARM_AT = new Set(['firePit']);
 /** Showering (`ACTIONS.shower`), a grown-up's and a child's. */
 const SHOWER_ONLY: readonly string[] = ['shower'];
 const SHOWER_SMALL: readonly string[] = ['showerChild'];
@@ -779,7 +783,8 @@ const ACTIONS: Record<string, ActionAnim> = {
   sleep: { hands: HANDS.open },
   nap: { hands: HANDS.open },
   sit: { hands: HANDS.open },
-  relax: { stand: ['idle', 'foldArms'], hands: HANDS.open },
+  // (At a fire on foot, warming the hands at it: `WARM_AT`.)
+  relax: { stand: (def) => (WARM_AT.has(def) ? WARM_HANDS : RELAX_STAND), hands: HANDS.open },
   type: { stand: ['spell'], sit: 'sitHands', hands: HANDS.keys },
   write: { stand: ['interact', 'spell'], sit: (def) => (NEAR_DESKS.has(def) ? 'sitHandsNear' : 'sitHands'), hands: HANDS.hold },
   // (A notice board or a timetable is read looking at it, not at a book in the hands.)
