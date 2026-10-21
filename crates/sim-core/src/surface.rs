@@ -424,8 +424,9 @@ const SIDE_ROW: f32 = 0.15;
 
 /// The tile someone sitting or lying in `slot` of `obj` comes to it from (and gets up to), when
 /// it isn't the object's own (`approach_tiles`): round to its place (`slot_approach`); beside
-/// the slot for a thing got onto from the side (`Approach::Side`: a bed by the pillow end of its
-/// side, the slot's own side first, a bunk's ladder side first; a bike, a chaise), behind it for
+/// the slot for a thing got onto from the side (`Approach::Side`: a bed beside its sleeper's
+/// middle, the slot's own side first, a bunk's lower sleeper from its ladder side first and the
+/// upper one from the front, up the ladder; a bike, a chaise), behind it for
 /// a seat behind the work (`Approach::Behind`: a desk's chair, the drum kit's throne), else
 /// beside it; in front of its own slot on a seat for several (the end of a sofa). Each side
 /// nearer `from` (where they are now) first where the slot is in the middle. None when none of
@@ -461,6 +462,8 @@ pub fn seat_approach(content: &Content, nav: &NavGrid, obj: &ObjectInstance, slo
     };
     let beside = || side(first).or_else(|| side(-first));
     match def.approach {
+        // (The upper bunk is climbed into from the tile in front, round its foot to the ladder.)
+        Approach::Side if def.bunk && slot > 0 => None,
         Approach::Side => beside(),
         Approach::Behind => stand([r, -hd - 0.5], [r, -hd + 0.5]).or_else(beside),
         Approach::Front if def.slots > 1 && !def.bunk => stand([r, hd + 0.5], [r, hd - 0.5]),

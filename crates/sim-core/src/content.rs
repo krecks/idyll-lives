@@ -431,8 +431,8 @@ pub enum Approach {
     Front,
     /// Any free tile beside it, the front first (chairs pushed under a table).
     Around,
-    /// Its seats and beds got onto from the side (`surface::seat_approach`): beside the slot, by
-    /// the pillow end of a bed's side, else the front. Used standing, from the front.
+    /// Its seats and beds got onto from the side (`surface::seat_approach`): beside the slot (a
+    /// bed beside its sleeper's middle; an upper bunk from the front), else the front. Used standing, from the front.
     Side,
     /// Its seat behind the work (a desk's chair, a drum kit's throne): from behind the slot, else
     /// beside it, else the front.

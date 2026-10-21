@@ -52,10 +52,10 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 - Since the authenticity review (G-51): every bed here but the futon (a sofa by day, sat on from the front) is got
   into from its side (`approach: side`): the sleeper
   comes to the tile beside their own half, by the foot row of the middle (a double's two on its two sides, a single's
-  from the side nearer them, the bunk's from its ladder side), sits on the edge facing out 0.2 m in from it
+  from the side nearer them, the bunk's lower one from its ladder side), sits on the edge facing out 0.2 m in from it
   (`SIDE_IN`), and turns to lie along it as they lie back; getting up, sim-core turns them out to that side and they
   sit up there and step off (the two of a double on their own sides, not on one spot). With both sides blocked they
-  get in over the foot (`LIE_ENTRY`), as before. The bunk's upper sleeper still gets in as before (the ladder: G-44).
+  get in over the foot (`LIE_ENTRY`), as before. The bunk's upper sleeper comes from the front, round its foot and up the ladder (G-44).
 
 ## BR2. Nightstands and small storage (8)
 
