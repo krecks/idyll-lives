@@ -80,6 +80,9 @@ import { FLOOR_SITS } from './characters/clips/seated';
 import { BALL_PIT, PLAY_TENT } from './characters/clips/play';
 import { BOULDER, FOOS, FOOS_LANES, POOL, SMASH, YOGA_AT } from './characters/clips/games';
 import { EYEPIECE, PICK_APPLE, PICK_LEMON, SHOWER_CHILD } from './characters/clips/uses';
+import { KNEEL_LANES, KNEEL_TABLE, LOW_TOP, SIT_LOW } from './characters/clips/low';
+import { BOARD, CLOCK, CUPBOARD_OF, FEEDER, PUT_AWAY } from './characters/clips/reach';
+import { SHOT } from './characters/clips/shot';
 // The seat and bed tables (`SEATS`, `BEDS`, `BUNKS` and their defaults) are data, read by `cargo check-glb` and
 // `cargo review` too; what their entries mean and why some are as they are: docs/characters-format.md "Seats and beds".
 import FURNITURE from './characters/furniture.json';
@@ -233,8 +236,8 @@ const DEFAULT_SEAT: Seat = FURNITURE.defaultSeat;
  * mattress, pulled out or folded away, reaches half a metre past it. Negative: steps in to a thing
  * smaller than its tile (the herb planters, 0.4–0.46 m deep, are picked from as from a counter), or to
  * the part used: the toes at a basin or a sink's cabinet, the hands over the water; up to the toaster and
- * the blender on a counter, the chemistry bench pushed back on its tile, the clock's trunk door, the
- * giving jar. Back from the statue, to look up at it.
+ * the blender on a counter, the chemistry bench pushed back on its tile, the giving jar. Back from the
+ * statue, to look up at it.
  */
 const STAND_BACK: Record<string, number> = {
   dishwasher: 0.15,
@@ -251,7 +254,6 @@ const STAND_BACK: Record<string, number> = {
   counterSinkDouble: -0.45,
   breakfastCounter: -0.3,
   chemistrySet: -0.35,
-  grandfatherClock: -0.6,
   'kind.givingJar': -0.4,
   townStatue: 0.8,
 };
@@ -310,12 +312,20 @@ const STEP_IN: Record<string, StepIn> = {
   'hotHeaded.smashBin': { by: SMASH.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
   'energetic.boulderingWall': { by: BOULDER.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: [0] },
   yogaMat: { by: [[0, ['yoga'], YOGA_AT]] },
-  // Up to the board on the wall (its face 0.42 m behind the middle), the hands at it.
-  whiteboard: { by: [[0, [], { to: 0.1 }]] },
+  // Up to the board on the wall (its face 0.42 m behind the middle), writing on it at shoulder to head height
+  // (clips/reach.ts); up to the wall cupboards over the worktop and the china cabinet, the doors opened and the
+  // clean things put away up in them; to the clock's hood, winding it at the dial (a child at the trunk's chains).
+  whiteboard: { by: BOARD.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
+  ...Object.fromEntries(Object.entries(CUPBOARD_OF).map(([def, name]): [string, StepIn] => [def, { by: PUT_AWAY[name].map(({ clip, min, fit }) => [min, [clip], fit] as const), tag: 'fetch' }])),
+  grandfatherClock: { by: CLOCK.map(({ clip, min, fit }) => [min, [clip], fit] as const), tag: 'tinker' },
+  // Out on the court (2.5 m from the hoop's middle, a lane each for two), shooting (clips/shot.ts).
+  basketballHoop: { by: SHOT.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: [-0.45, 0.45], tag: 'exercise' },
+  // Kneeling at the low train table's edge, the hands on its track and its little town, a lane each (clips/low.ts).
+  trainTable: { by: KNEEL_TABLE.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: KNEEL_LANES, tag: 'play' },
   // Into the shelter at the timetable's end, on the back glass past the bench.
   busStop: { by: [[0, [], { to: 0.2 }]], lanes: [-0.95] },
-  // At the feeder's post, at its back left, clear of the bird bath.
-  'kind.songbirdFeeder': { by: [[0, [], { to: 0.25 }]], lanes: [-0.2] },
+  // At the feeder's post, at its back left, clear of the bird bath: its house filled from a scoop (clips/reach.ts).
+  'kind.songbirdFeeder': { by: FEEDER.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: [-0.2], tag: 'garden' },
   // At the microwave on the counter's right, the hands at its door.
   microwave: { by: [[0, [], { to: 0.55 }]], lanes: [-0.2] },
   // At the mic stand, singing into it.
@@ -512,7 +522,9 @@ function lieBack(rig: SimRig): number {
 const BABY_LIE = { asleep: 'babyLieAsleep', awake: 'babyLieAwake' } as const;
 const BABY_LIE_FADE = 1.6;
 /** Every lying clip (`lie`, and the baby's). */
-const LYING = new Set<string>(['lie', BABY_LIE.asleep, BABY_LIE.awake]);
+const LYING = new Set<string>(['lie', 'lieCurl', BABY_LIE.asleep, BABY_LIE.awake]);
+/** Beds too short to lie on flat (a window seat's 1.3 m between its pillows): dozed on curled up on the side (`lieCurl`, clips/self.ts). */
+const CURLED_BEDS = new Set(['gloomy.windowSeat']);
 /**
  * A cuddle at the crib (action `cuddle`): the grown-up steps up to the rail, leans over it and lifts
  * the baby out, holds them cradled in the arms (head in the crook of the left arm) rocking gently,
@@ -682,8 +694,8 @@ const ACTIONS: Record<string, ActionAnim> = {
     sit: 'sitHands',
     hands: HANDS.hold,
   },
-  // (Seated at the dressing table, getting ready: a hand up at the hair, the phone clip's.)
-  wash: { stand: ['spell', 'interact'], upper: (def) => (def === 'dressingTable' ? 'phone' : ''), hands: HANDS.relaxed },
+  // (Seated at the dressing table, getting ready: brushing the hair in the mirror, clips/self.ts.)
+  wash: { stand: ['spell', 'interact'], upper: (def) => (def === 'dressingTable' ? 'brushHair' : ''), hands: (def) => (def === 'dressingTable' ? HANDS.grip : HANDS.relaxed) },
   // Washing the hair, turning round, soaping, rinsing (clips/uses.ts; a child turns only the chest).
   shower: { stand: (_, height) => (height < SHOWER_CHILD ? SHOWER_SMALL : SHOWER_ONLY), hands: HANDS.open },
   bath: { hands: HANDS.open },
@@ -1075,6 +1087,8 @@ interface SimRig {
   tuckSeat: number;
   /** The top still further off than the desk-hands clip reaches, pulled in as far as it goes (`sitHandsFar`). */
   tuckFar: boolean;
+  /** The top lower over the seat than the desk-hands clip's hands (`LOW_TOP`, `sitHandsLow`): a kids' chair at a coffee table. */
+  tuckLow: boolean;
   cover: number;
   /** Current (smoothed) facial expression. */
   face: Face;
@@ -1747,6 +1761,7 @@ export class Characters {
         tuck: 0,
         tuckSeat: -1,
         tuckFar: false,
+        tuckLow: false,
         cover: 0,
         face: { ...NEUTRAL },
         blinkAt: -1,
@@ -2914,7 +2929,7 @@ export class Characters {
       } else {
         // On the back, head towards the head of the bed (local -z), centred on the slot: the
         // `lie` clip (made standing) turned flat and slowed down.
-        key = 'lie';
+        key = obj && CURLED_BEDS.has(obj.def) ? 'lieCurl' : 'lie';
         rootY = rig.bedH + lieBack(rig);
         rootFwd = lieCentre(rig) + rig.bedFwd;
         pitch = -Math.PI / 2;
@@ -2960,7 +2975,9 @@ export class Characters {
         key = down;
       }
       rootFwd += this.tuckIn(rig, obj, seat, key !== down, step, fresh);
-      if (key === 'sitHands' && rig.tuckFar) key = 'sitHandsFar';
+      // (At a low top, a kids' chair at a coffee table: bent over it, the size for their height.)
+      if (key === 'sitHands' && rig.tuckLow) key = (SIT_LOW.find(({ min }) => rig.body.height * rig.scale >= min) ?? SIT_LOW[SIT_LOW.length - 1]).clip;
+      else if (key === 'sitHands' && rig.tuckFar) key = 'sitHandsFar';
       if (!social) {
         const up = known ? (typeof act?.upper === 'function' ? act.upper(rig.useDef) : act?.upper) : obj?.def === 'diningTable' ? 'eat' : undefined;
         // Eating / drinking now and then; holding a book or phone throughout.
@@ -3312,10 +3329,11 @@ export class Characters {
       rig.stepTime = 0;
       return [fwd, y, 'idle', 1];
     }
-    // Walking, the cycle matched to the step's pace (the walk runs on real time).
+    // Walking, the cycle matched to the step's pace (the walk runs on real time); backwards, facing it, when
+    // the place is further out than the tile (out on the court from the hoop).
     const legs = rig.body.pelvisScale * rig.scale;
     const rate = dt > 0 ? ((way / span) * (step / dt)) / (this.clip('walk').speed * legs) : 1;
-    return [fwd, y, 'walk', clamp(rate, 0.35, GAIT_MAX_RATE)];
+    return [fwd, y, 'walk', clamp(rate, 0.35, GAIT_MAX_RATE) * (dist < -Math.abs(across) ? -1 : 1)];
   }
 
   /**
@@ -3402,8 +3420,10 @@ export class Characters {
     rig.tuckSeat = id ?? -1;
     let goal = 0;
     rig.tuckFar = false;
+    rig.tuckLow = false;
     if (obj && room && settled && !seat.back && room.top > seat.h && room.top - seat.h <= TUCK.rise) {
       const s = (rig.body.height * rig.scale) / CLIP_HEIGHT;
+      rig.tuckLow = room.top - seat.h < LOW_TOP * s;
       const yaw = (obj.rot * Math.PI) / 2;
       const [dx, dz] = [rig.x - obj.cx, rig.z - obj.cz];
       const right = dx * Math.cos(yaw) - dz * Math.sin(yaw);

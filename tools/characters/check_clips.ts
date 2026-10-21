@@ -38,7 +38,8 @@
  * scaled by its `pelvisScale`, and the locomotion's ground speed scaled by it too (characters.ts
  * `legs`). `walk` gets the runtime's hip roll per body (characters.ts `GAIT_SWAY`). Of the clips
  * made in sizes (the fountain's, the climbing frame's, the games', the telescope's, the fruit trees', the
- * shower's, the slide's, the bunk's ladder and the rides) each stage gets the size its height picks
+ * shower's, the slide's, the bunk's ladder and the rides, the reaches up to the wall cupboards, the clock, the feeder and
+ * the whiteboard, the hoop shot's and the low tops') each stage gets the size its height picks
  * (characters.ts `stepFit`), and babies only their own clips (only those are checked at `baby`, and
  * only the others at every other stage). What it doesn't cover: the resident's height slider (a
  * uniform scale, though it can change the size picked), the build and head size (skinning only),
@@ -78,6 +79,11 @@ const { BALL_PIT, PLAY_TENT } = await import('../../web/src/render/babylon/chara
 const DEEP: [string, any][] = Object.entries(JSON.parse(readFileSync(new URL('../../web/src/render/babylon/characters/furniture.json', import.meta.url), 'utf8')).seats).filter(([, s]: [string, any]) => s.front !== undefined) as [string, any][];
 const { BUNK_DOWN, BUNK_UP, RIDE_HORSE, RIDE_ROUND, RIDE_SEESAW, RIDE_SPRING, RIDE_SWING, SLIDE, SWING_S } = await import('../../web/src/render/babylon/characters/clips/rides.ts');
 const { EYEPIECE, PICK_APPLE, PICK_LEMON, SHOWER_CHILD } = await import('../../web/src/render/babylon/characters/clips/uses.ts');
+const { BOARD, CLOCK, FEEDER, PUT_AWAY } = await import('../../web/src/render/babylon/characters/clips/reach.ts');
+const { SHOT } = await import('../../web/src/render/babylon/characters/clips/shot.ts');
+const { KNEEL_TABLE, SIT_LOW } = await import('../../web/src/render/babylon/characters/clips/low.ts');
+/** The clips made in sizes for reaching up (the wall cupboards, the clock, the feeder, the whiteboard), the hoop shot and the low tops (clips/reach.ts, shot.ts, low.ts), each with its length (s); all loop. */
+const MORE_SIZED: [any[], number][] = [...Object.values(PUT_AWAY).map((sizes: any): [any[], number] => [sizes, 3.2]), [CLOCK, 4.5], [FEEDER, 4], [BOARD, 6], [SHOT, 3.2], [KNEEL_TABLE, 6], [SIT_LOW, 5]];
 
 /** The socials' clips (clips/social.ts) and their lengths (s). */
 const SOCIAL: Record<string, number> = {
@@ -110,6 +116,9 @@ const RUNTIME: Record<string, boolean> = {
   shower: true, showerChild: true,
   // Children's play inside things (characters.ts STEP_IN; clips/play.ts).
   ...Object.fromEntries([BALL_PIT, PLAY_TENT].flatMap((sizes: any[]) => sizes.map(({ clip }: any) => [clip, true]))),
+  // Reaching up, the hoop shot and the low tops, in sizes (characters.ts STEP_IN, `tuckIn`); brushing the hair seated and lying curled up on the side.
+  ...Object.fromEntries(MORE_SIZED.flatMap(([sizes]) => sizes.map(({ clip }: any) => [clip, true]))),
+  brushHair: true, lieCurl: true,
 };
 /** Phase-2 clips (the runtime picks them up later) and whether they loop. */
 const PHASE2: Record<string, boolean> = { lie: true, chop: true, stir: true, flip: true, drink: false, carry: true, carryOne: true, wave: false };
@@ -125,6 +134,8 @@ const LENGTH: Record<string, number> = {
   ...Object.fromEntries(([[POOL, 8], [FOOS, 3.2], [SMASH, 3.4], [BOULDER, 16], [BALL_PIT, 12], [PLAY_TENT, 24], [SLIDE, 14], [BUNK_UP, 7], [BUNK_DOWN, 6.5], [RIDE_HORSE, 2.4], [RIDE_SPRING, 2], [RIDE_SEESAW, 2.8], [RIDE_ROUND, 2.4], [RIDE_SWING, SWING_S]] as [any[], number][]).flatMap(([sizes, s]) => sizes.map(({ clip }: any) => [clip, s]))),
   eyepiece181: 6, eyepiece163: 6, eyepiece147: 6, eyepiece129: 6, eyepiece112: 6, pickApple177: 3.3, pickApple147: 3.3, pickApple112: 3.3, pickLemon177: 3.3, pickLemon147: 3.3, pickLemon112: 3.3,
   shower: 14, showerChild: 14,
+  ...Object.fromEntries(MORE_SIZED.flatMap(([sizes, s]) => sizes.map(({ clip }: any) => [clip, s]))),
+  brushHair: 5, lieCurl: 2.4,
 };
 /** The baby lying in the crib: how far out to the side a joint may reach (m, reference skeleton: about 0.23 m on a baby, whose crib's bars are about 0.4 m from its middle). */
 const BABY_REACH = 0.6;
@@ -143,6 +154,7 @@ const SIZED: { min: number; clips: string[] }[][] = [
   ...[POOL, FOOS, SMASH, BOULDER, BALL_PIT, PLAY_TENT, SLIDE, BUNK_UP, BUNK_DOWN, RIDE_HORSE, RIDE_SPRING, RIDE_SEESAW, RIDE_ROUND, RIDE_SWING].map((sizes: any[]) => sizes.map(({ clip, min }: any) => ({ min, clips: [clip] }))),
   ...[EYEPIECE, PICK_APPLE, PICK_LEMON].map((sizes) => sizes.map(({ clip, min }: any) => ({ min, clips: [clip] }))),
   [{ min: SHOWER_CHILD, clips: ['shower'] }, { min: 0, clips: ['showerChild'] }],
+  ...MORE_SIZED.map(([sizes]) => sizes.map(({ clip, min }: any) => ({ min, clips: [clip] }))),
 ];
 /** The runtime's hip roll while walking, per body (rad), read from characters.ts so the two can't drift apart. */
 const GAIT_SWAY: Record<string, number> = (() => {
@@ -385,6 +397,7 @@ function checkSeatedAndLying(sk: Skeleton, restAnkle: number): void {
     const seatedAt: [string, number][] = [
       ['sitTalk', 0],
       ['sitHands', 0],
+      ...SIT_LOW.map(({ clip }: any): [string, number] => [clip, 0]),
       ['sitDown', -1],
       ['standUp', 0],
     ];

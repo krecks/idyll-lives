@@ -108,13 +108,13 @@ export function arms(b: PoseSpec, l: Hand | null, r: Hand | null): PoseSpec {
 }
 
 /** A hand held open (the clip's own fingers: the rest pose, not `GRIP`). */
-function open(side: 'l' | 'r'): PoseSpec {
+export function open(side: 'l' | 'r'): PoseSpec {
   const z: Rot = [0, 0, 0];
   return { [`fingers_01_${side}`]: z, [`fingers_02_${side}`]: z, [`thumb_01_${side}`]: [0, 0, 6], [`thumb_02_${side}`]: z } as PoseSpec;
 }
 
 /** The ankle raised on tiptoe by `tip` m (the heel up about the ball of the foot, 0.17 m ahead), and the foot's pitch for it (deg). */
-function tiptoe(tip: number): [Vec, number] {
+export function tiptoe(tip: number): [Vec, number] {
   const a = Math.asin(Math.min(0.9, tip / 0.17));
   return [[0, tip, -0.17 * (1 - Math.cos(a))], (a * 180) / Math.PI];
 }
