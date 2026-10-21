@@ -1037,8 +1037,10 @@ impl Sim {
         }
         match (act.task.kind, &act.phase) {
             // People on their way somewhere don't stop to chat (it would strand them), nor do
-            // cooks halfway through a recipe or people eating or washing up.
+            // cooks halfway through a recipe or people eating or washing up. A cook on their way
+            // to the first station (nothing bought yet, nothing in hand) does.
             (TaskKind::Work | TaskKind::Visit { .. } | TaskKind::GoHome | TaskKind::Answer { .. }, _) => false,
+            (TaskKind::Cook { step: 0, servings: 0, .. }, Phase::Routing { .. }) if self.held.is_none() => true,
             (TaskKind::Cook { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. }, _) => false,
             (TaskKind::Social { .. } | TaskKind::Join { .. }, Phase::Conversing { .. }) => false,
             // A guest on their way to say goodbye (`visits.farewell`) is leaving.
@@ -4309,7 +4311,8 @@ fn pick_autonomous(
             let boost = quality_boost(content, inter, obj.quality) * inter.skill_factor(&content.skill_rules, &sim.skills);
             let gains = ai::score_felt(needs, &felt, &inter.total_gain.map(|g| g * boost), distance);
             let mut s = match inter.recipe {
-                // A recipe: only at home with every station it needs. Long ones tempt less, a
+                // A recipe: only at home with every station it needs, and for someone who'd eat
+                // it (not a meal for a household that has eaten). Long ones tempt less, a
                 // hungry family more, and with food ready hardly at all.
                 Some(r) => {
                     let r = &content.recipes[r];
@@ -4324,6 +4327,9 @@ fn pick_autonomous(
                         continue;
                     }
                     let hungry = crate::cooking::hungry_housemates(sim, ctx, r) as f32;
+                    if hungry == 0.0 && !crate::cooking::hungry_for(sim, content, r) {
+                        continue;
+                    }
                     let s = gains / (1.0 + r.minutes_with(stations) / 60.0) + content.cooking.feed_family * hungry;
                     if fresh { s * 0.2 } else { s }
                 }
@@ -6093,6 +6099,24 @@ mod tests {
         for _ in 0..n {
             w.tick_once();
         }
+    }
+
+    #[test]
+    fn a_cook_on_the_way_to_the_first_station_can_be_called_but_not_once_started() {
+        let content = Content::from_json(CONTENT).unwrap();
+        let mut w = world();
+        let cook = |step, servings, directed| Activity {
+            task: Task { kind: TaskKind::Cook { recipe: 0, step, station: None, origin: None, servings, skipped: 0, minutes: 0 }, directed, routine: false },
+            phase: Phase::Routing { waypoints: Vec::new(), next: 0 },
+            tags: 0,
+        };
+        let s = &mut w.sims[0];
+        s.current = Some(cook(0, 0, false));
+        assert!(s.available_for_social(&content), "on the way to the fridge");
+        s.current = Some(cook(1, 2, false));
+        assert!(!s.available_for_social(&content), "ingredients bought");
+        s.current = Some(cook(0, 0, true));
+        assert!(!s.available_for_social(&content), "the player's order");
     }
 
     #[test]

@@ -827,3 +827,17 @@ fn a_dish_on_its_way_to_the_table_survives_a_save_and_is_served_once() {
     assert_eq!(sim_core::items::holder(&loaded.content, &loaded.objects, &pots[0].at), Some(TABLE));
     assert!(loaded.sims[0].held.is_none());
 }
+
+#[test]
+fn a_household_that_has_eaten_cooks_no_meal_nobody_needs() {
+    // The shipped content, everyone fed at 9:00: nobody spends the morning cooking a meal
+    // (practising their cooking on food nobody would eat).
+    let (mut w, home, _) = common::household_of_three();
+    w.autonomy = true;
+    for _ in 0..(90.0 / sim_core::MINUTES_PER_TICK) as u32 {
+        w.tick_once();
+        for &i in &home {
+            assert!(!cooking(&w, i), "{} cooks for a household that has eaten at {}", w.sims[i].name, sim_core::clock::hour(w.tick));
+        }
+    }
+}
