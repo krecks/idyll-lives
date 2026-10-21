@@ -82,6 +82,9 @@ pub struct Interaction {
     /// Sit on a free seat within this many metres of the object, if there is one (content
     /// `seatNear`: watching TV from the sofa). 0: use it standing, as `pose` says.
     pub seat_near: f32,
+    /// The seat taken for `seat_near` faces the object (content `seatFacing`): a screen's from
+    /// in front of it, a fire's from any side. Without one like that they use it as `pose` says.
+    pub seat_facing: Option<SeatFacing>,
     /// Share (0..1) of this use's need gains that nearby residents get too (content
     /// `broadcast`: hearing the TV while eating). 0: nobody else.
     pub broadcast: f32,
@@ -249,6 +252,9 @@ pub struct ObjectDef {
     pub price: Option<i64>,
     /// How many Sims can use it at once (1..=MAX_SLOTS).
     pub slots: u8,
+    /// Where each slot's user is and which way they face (content `places`, one a slot), or empty:
+    /// spread across its width, facing its front (`ObjectInstance::slot_position`).
+    pub places: Vec<SlotPlace>,
     /// Can only be placed outdoors (trees, flower beds, ponds).
     pub outdoors: bool,
     /// A flight of stairs up to the storey above (one tile wide, climbed from the front; see
@@ -263,9 +269,13 @@ pub struct ObjectDef {
     /// `roomRules.lampTiles`): a chandelier lights more of a room than a table lamp. 0: it gives
     /// no light (no `light`).
     pub lamp: f32,
-    /// A lamp that can be switched on and off (a `light` without `"switch": false`, which fires
-    /// have; see `lights.rs`).
+    /// A lamp that can be switched on and off (a `light` without `"switch": false`; see
+    /// `lights.rs`).
     pub switch: bool,
+    /// A fire (content `light.fire`): switched as a lamp is, but lit by someone who sits by it (a
+    /// use of it lights it when it's dark) or the player, never by coming into the room; it burns
+    /// down by morning (see `lights.rs`).
+    pub fire: bool,
     /// Wear per finished use (it breaks at 1; see `ObjectRules::wear_per_quality`).
     pub wear_per_use: f32,
     /// Every tag its interactions have (what the room it stands in can be used for).
@@ -318,9 +328,23 @@ pub struct ObjectDef {
     /// Things from the ceiling that hang low enough to walk into (content `hangsLow`: a hanging
     /// plant): it takes the floor under it as furniture does.
     pub hangs_low: bool,
+    /// Things from the ceiling that hang at head height (content `headHeight`: a chandelier, a
+    /// low pendant), to hang over a table: nobody walks under it, but furniture may stand under
+    /// it (not furniture as tall as the wall).
+    pub head_height: bool,
+    /// Furniture built to stand with its back on a wall (content `againstWall`: a wall-hung
+    /// toilet's cistern box, a wall bed, a ladder leaning on the wall): it needs plain wall all
+    /// along its back, and that wall can't come down (nor become a window or a door) under it.
+    pub against_wall: bool,
 }
 
 impl ObjectDef {
+    /// Off the floor and out of the way: residents walk under (or over) it (a picture, a ceiling
+    /// lamp, a rug), unless it hangs low or at head height.
+    pub fn walked_under(&self) -> bool {
+        self.layer.mounted() && !self.hangs_low && !self.head_height
+    }
+
     /// The slots interaction `i` takes one of. A crib's first slot is the baby's (the crib on
     /// its left, where `ObjectInstance::slot_position` lays them; the changing table beside it
     /// is where carers stand), whoever gets there first: after loading a save, a carer may set
@@ -361,6 +385,27 @@ pub(crate) fn stage_mask(stage_ids: &[&str], ids: &Option<Vec<String>>, ctx: &st
         })
         .map(Some)
 }
+
+/// Where a slot's user sits, lies or stands (content `places`): metres off the footprint's middle
+/// in the object's own frame (`[right, front]`, before turning and for its own size), and the way
+/// they face, turned from its front towards its right (radians: `FRAC_PI_2` faces its right, `PI`
+/// its back).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SlotPlace {
+    pub at: [f32; 2],
+    pub facing: f32,
+}
+
+/// Which seats a `seatNear` use takes (content `seatFacing`): one that looks at the thing from
+/// in front of it (`front`: a screen) or from any side (`around`: a fire).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SeatFacing {
+    Front,
+    Around,
+}
+
+/// How far (m) past its footprint's edge a slot's place may be (standing at a ping-pong table's end).
+pub const PLACE_REACH: f32 = 1.5;
 
 /// Radius of a thing on the `Surface` layer when content gives none (m).
 pub const DEFAULT_RADIUS: f32 = 0.12;
@@ -2084,6 +2129,9 @@ struct ObjectRaw {
     price: Option<i64>,
     #[serde(default = "one_slot")]
     slots: u8,
+    /// Each slot's place and facing (see `ObjectDef::places`).
+    #[serde(default)]
+    places: Vec<PlaceRaw>,
     #[serde(default)]
     outdoors: bool,
     #[serde(default)]
@@ -2103,7 +2151,8 @@ struct ObjectRaw {
     #[serde(default, rename = "wearPerUse")]
     wear_per_use: Option<f32>,
     /// Lamps: the renderer reads the light's look; the simulation only its `tiles`, the floor it
-    /// lights (default `roomRules.lampTiles`), and `switch` (false: always lit at night, a fire).
+    /// lights (default `roomRules.lampTiles`), `switch` (false: no switch, always lit at night)
+    /// and `fire` (a fire, lit to sit by: see `ObjectDef::fire`).
     #[serde(default)]
     light: Option<serde_json::Value>,
     /// `wall`, `ceiling` or `rug` (default `floor`: furniture).
@@ -2141,6 +2190,19 @@ struct ObjectRaw {
     /// Life-stage ids that may take the upper bunk (see `ObjectDef::upper_stages`).
     #[serde(default, rename = "upperStages")]
     upper_stages: Option<Vec<String>>,
+    #[serde(default, rename = "headHeight")]
+    head_height: bool,
+    #[serde(default, rename = "againstWall")]
+    against_wall: bool,
+}
+
+/// A slot's place: `{"at": [-0.3, 0.7], "facing": 180}` (m off the middle, to its right and front;
+/// degrees from its front towards its right, default 0).
+#[derive(Deserialize)]
+struct PlaceRaw {
+    at: [f32; 2],
+    #[serde(default)]
+    facing: f32,
 }
 
 /// An object's `grows`: `{"days": 2, "fallow": 0.5}` (game days to ripen, and fallow after picking).
@@ -2208,6 +2270,9 @@ struct InteractionRaw {
     /// Sit on a free seat within this many metres of the object (see `Interaction::seat_near`).
     #[serde(default)]
     seat_near: f32,
+    /// That seat faces the object: `front` or `around` (see `Interaction::seat_facing`).
+    #[serde(default)]
+    seat_facing: Option<String>,
     /// Share of the gains nearby residents get too (see `Interaction::broadcast`).
     #[serde(default)]
     broadcast: f32,
@@ -2762,6 +2827,15 @@ impl Content {
                 if it.seat_near < 0.0 {
                     return Err(Error::new(format!("{ctx}: negative seatNear")));
                 }
+                let seat_facing = match it.seat_facing.as_deref() {
+                    None => None,
+                    Some("front") => Some(SeatFacing::Front),
+                    Some("around") => Some(SeatFacing::Around),
+                    Some(other) => return Err(Error::new(format!("{ctx}: unknown seatFacing '{other}' (front or around)"))),
+                };
+                if seat_facing.is_some() && it.seat_near <= 0.0 {
+                    return Err(Error::new(format!("{ctx}: seatFacing needs a seatNear")));
+                }
                 if !(0.0..=1.0).contains(&it.broadcast) {
                     return Err(Error::new(format!("{ctx}: broadcast must be 0..=1")));
                 }
@@ -2804,6 +2878,7 @@ impl Content {
                     gain_per_minute: own_gain.map(|g| g / minutes),
                     pose: it.pose,
                     seat_near: it.seat_near,
+                    seat_facing,
                     broadcast: it.broadcast,
                     broadcast_range: it.broadcast_range.unwrap_or(6.0),
                     inside: it.inside,
@@ -2894,7 +2969,16 @@ impl Content {
                     )));
                 }
             };
-            for (set, flag, on) in [(obj.over_window, "overWindow", Layer::Wall), (obj.fills_wall, "fillsWall", Layer::Floor), (obj.hangs_low, "hangsLow", Layer::Ceiling)] {
+            if obj.hangs_low && obj.head_height {
+                return Err(Error::new(format!("object '{}': `hangsLow` or `headHeight`, not both", obj.id)));
+            }
+            for (set, flag, on) in [
+                (obj.over_window, "overWindow", Layer::Wall),
+                (obj.fills_wall, "fillsWall", Layer::Floor),
+                (obj.hangs_low, "hangsLow", Layer::Ceiling),
+                (obj.head_height, "headHeight", Layer::Ceiling),
+                (obj.against_wall, "againstWall", Layer::Floor),
+            ] {
                 if set && layer != on {
                     let on = match on {
                         Layer::Wall => "a wall",
@@ -2979,6 +3063,15 @@ impl Content {
             if obj.stairs && layer.mounted() {
                 return Err(Error::new(format!("object '{}': stairs stand on the floor", obj.id)));
             }
+            if !obj.places.is_empty() {
+                let half = obj.footprint.map(|f| f as f32 / 2.0 + PLACE_REACH);
+                if obj.places.len() != obj.slots as usize || obj.bunk || layer != Layer::Floor {
+                    return Err(Error::new(format!("object '{}': `places` gives one place a slot, on the floor (not for a bunk bed)", obj.id)));
+                }
+                if obj.places.iter().any(|p| !p.facing.is_finite() || (0..2).any(|k| !p.at[k].is_finite() || p.at[k].abs() > half[k])) {
+                    return Err(Error::new(format!("object '{}': a place is more than {PLACE_REACH} m off its footprint", obj.id)));
+                }
+            }
             objects.push(ObjectDef {
                 id: obj.id.clone(),
                 name: obj.name.clone(),
@@ -2986,6 +3079,7 @@ impl Content {
                 interactions,
                 price: obj.price,
                 slots: obj.slots,
+                places: obj.places.iter().map(|p| SlotPlace { at: p.at, facing: p.facing.to_radians() }).collect(),
                 outdoors: obj.outdoors,
                 stairs: obj.stairs,
                 // Things on a wall hang square to it; things on a surface always turn.
@@ -3009,6 +3103,7 @@ impl Content {
                     l.get("tiles").and_then(serde_json::Value::as_f64).map_or(lamp_tiles, |t| t as f32).max(0.1)
                 }),
                 switch: obj.light.as_ref().is_some_and(|l| l.get("switch").and_then(serde_json::Value::as_bool) != Some(false)),
+                fire: obj.light.as_ref().is_some_and(|l| l.get("fire").and_then(serde_json::Value::as_bool) == Some(true) && l.get("switch").and_then(serde_json::Value::as_bool) != Some(false)),
                 // Things nobody uses up (scenery, plants, decor) never wear out.
                 wear_per_use: if !used {
                     0.0
@@ -3041,6 +3136,8 @@ impl Content {
                 over_window: obj.over_window,
                 fills_wall: obj.fills_wall,
                 hangs_low: obj.hangs_low,
+                head_height: obj.head_height,
+                against_wall: obj.against_wall,
             });
         }
 

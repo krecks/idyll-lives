@@ -454,11 +454,15 @@
       "category": "kitchen",
       "group": "appliances",
       "description": "A counter with a microwave on top: hot leftovers in a few minutes, no skill needed.",
+      "sounds": {
+        "stir": "none"
+      },
       "interactions": [
         {
           "id": "reheat",
           "label": "Heat up leftovers",
           "anim": "cook",
+          "sound": "none",
           "minutes": 4,
           "eat": {
             "item": "leftovers",
@@ -536,6 +540,7 @@
           "id": "toast",
           "label": "Make toast",
           "anim": "cook",
+          "sound": "none",
           "minutes": 4,
           "eat": {
             "item": "toast",
@@ -552,6 +557,7 @@
           "id": "smoothie",
           "label": "Blend a smoothie",
           "anim": "cook",
+          "sound": "none",
           "minutes": 3,
           "eat": {
             "item": "smoothie",
@@ -582,6 +588,10 @@
       "category": "kitchen",
       "group": "appliances",
       "description": "Built in under the worktop. Loading it is a quick, satisfying chore (the tidy love it).",
+      "sounds": {
+        "clean": "crockery",
+        "wash": "crockery"
+      },
       "interactions": [
         {
           "id": "dishes",
@@ -966,6 +976,10 @@
       "category": "kitchen",
       "group": "dining",
       "slots": 2,
+      "places": [
+        { "at": [-0.5, -0.22] },
+        { "at": [0.5, -0.22] }
+      ],
       "decor": 0.3,
       "description": "A glass-topped table for two with chairs: breakfast and coffee in style.",
       "surface": {
@@ -1026,6 +1040,10 @@
       "category": "kitchen",
       "group": "dining",
       "slots": 2,
+      "places": [
+        { "at": [-0.5, -0.22] },
+        { "at": [0.5, -0.22] }
+      ],
       "decor": 0.5,
       "description": "A solid oak table set for four. Lingering over a long meal here is the best part of the day.",
       "surface": {
@@ -1585,6 +1603,7 @@
           "anim": "watch",
           "minutes": 60,
           "seatNear": 4,
+          "seatFacing": "front",
           "broadcast": 0.35,
           "broadcastRange": 6,
           "effects": {
@@ -1619,6 +1638,7 @@
           "anim": "watch",
           "minutes": 60,
           "seatNear": 4,
+          "seatFacing": "front",
           "broadcast": 0.35,
           "broadcastRange": 6,
           "effects": {
@@ -1636,6 +1656,7 @@
       "provides": [
         "screen"
       ],
+      "againstWall": true,
       "name": "Home cinema",
       "model": "model.homeCinema",
       "footprint": [
@@ -1654,6 +1675,7 @@
           "anim": "watch",
           "minutes": 60,
           "seatNear": 4,
+          "seatFacing": "front",
           "broadcast": 0.35,
           "broadcastRange": 6,
           "effects": {
@@ -1670,6 +1692,7 @@
           "anim": "watch",
           "minutes": 120,
           "seatNear": 4,
+          "seatFacing": "front",
           "broadcast": 0.35,
           "broadcastRange": 6,
           "effects": {
@@ -2356,6 +2379,7 @@
           "id": "use",
           "label": "Use toilet",
           "anim": "toilet",
+          "endSound": "flush",
           "minutes": 5,
           "after": "handwash",
           "pose": "sit",
@@ -2370,6 +2394,7 @@
     },
     {
       "id": "toiletSmart",
+      "againstWall": true,
       "name": "Smart toilet",
       "model": "model.toiletSmart",
       "footprint": [
@@ -2386,6 +2411,7 @@
           "id": "use",
           "label": "Use toilet",
           "anim": "toilet",
+          "endSound": "flush",
           "minutes": 5,
           "after": "handwash",
           "pose": "sit",
@@ -2671,6 +2697,7 @@
           "id": "laundry",
           "label": "Do the laundry",
           "anim": "clean",
+          "sound": "washer",
           "minutes": 30,
           "effects": {
             "hygiene": 0.12,
@@ -2700,6 +2727,7 @@
           "id": "laundry",
           "label": "Fold the laundry",
           "anim": "clean",
+          "sound": "dryer",
           "minutes": 20,
           "effects": {
             "comfort": 0.08,
@@ -3949,6 +3977,23 @@
       "interactions": []
     },
     {
+      "id": "curtainsWide",
+      "name": "Wide curtains",
+      "model": "model.curtainsWide",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 110,
+      "category": "decor",
+      "overWindow": true,
+      "group": "textiles",
+      "layer": "wall",
+      "decor": 0.6,
+      "description": "A window-length pair on a long rod, for a wide window.",
+      "interactions": []
+    },
+    {
       "id": "curtainsLong",
       "name": "Floor-length curtains",
       "model": "model.curtainsLong",
@@ -4247,11 +4292,11 @@
         "intensity": 0.8,
         "height": 0.7,
         "tiles": 6,
-        "switch": false
+        "fire": true
       },
       "seat": {
         "height": 0.42,
-        "forward": 0.02
+        "forward": 0.36
       },
       "description": "A real fire under a mantel. It lights the room at night, and warming up by it leaves residents cosy.",
       "interactions": [
@@ -4288,12 +4333,13 @@
       "layer": "ceiling",
       "decor": 0.3,
       "light": {
+        "aim": "down",
         "range": 5.0,
         "intensity": 1.0,
-        "height": 1.9,
+        "height": 2.16,
         "tiles": 16
       },
-      "description": "A frosted globe on a long cord.",
+      "description": "A frosted dome on a short cord, hung high enough to walk under.",
       "interactions": []
     },
     {
@@ -4321,6 +4367,7 @@
     },
     {
       "id": "chandelier",
+      "headHeight": true,
       "name": "Ring chandelier",
       "model": "model.chandelier",
       "footprint": [
@@ -4344,6 +4391,7 @@
     },
     {
       "id": "pendantIndustrial",
+      "headHeight": true,
       "name": "Industrial pendant",
       "model": "model.pendantIndustrial",
       "footprint": [
@@ -4357,6 +4405,7 @@
       "layer": "ceiling",
       "decor": 0.4,
       "light": {
+        "aim": "down",
         "range": 5.0,
         "intensity": 1.0,
         "height": 1.9,
@@ -4402,6 +4451,7 @@
       "layer": "wall",
       "decor": 0.3,
       "light": {
+        "aim": "up",
         "range": 3.5,
         "intensity": 0.7,
         "height": 1.8,
@@ -4424,6 +4474,7 @@
       "layer": "wall",
       "decor": 0.3,
       "light": {
+        "aim": "down",
         "range": 3.5,
         "intensity": 0.8,
         "height": 1.7,
@@ -4446,8 +4497,9 @@
       "layer": "wall",
       "decor": 0.2,
       "light": {
+        "aim": "out",
         "range": 5.0,
-        "intensity": 0.9,
+        "intensity": 1.6,
         "height": 2.0,
         "tiles": 8
       },
@@ -4623,6 +4675,13 @@
       ],
       "price": 380,
       "category": "outdoor",
+      "slots": 4,
+      "places": [
+        { "at": [0, 0.85], "facing": 180 },
+        { "at": [0.85, 0], "facing": -90 },
+        { "at": [0, -0.85] },
+        { "at": [-0.85, 0], "facing": 90 }
+      ],
       "freeRotation": true,
       "group": "cooking",
       "outdoors": true,
@@ -4631,11 +4690,7 @@
         "intensity": 0.8,
         "height": 0.5,
         "tiles": 8,
-        "switch": false
-      },
-      "seat": {
-        "height": 0.38,
-        "forward": 0.38
+        "fire": true
       },
       "description": "A ring of stones and a crackling fire. It lights the garden at night, and warming up by it leaves residents cosy.",
       "interactions": [
@@ -4644,7 +4699,8 @@
           "label": "Warm up by the fire",
           "anim": "relax",
           "minutes": 30,
-          "pose": "sit",
+          "seatNear": 3,
+          "seatFacing": "around",
           "effects": {
             "comfort": 0.4,
             "fun": 0.15
@@ -4669,6 +4725,11 @@
       ],
       "price": 220,
       "category": "outdoor",
+      "slots": 2,
+      "places": [
+        { "at": [0, 0.7], "facing": 180 },
+        { "at": [0, -0.6] }
+      ],
       "group": "seating",
       "description": "A slatted folding table and chairs for a sunny corner.",
       "surface": {
@@ -4730,6 +4791,10 @@
       "category": "outdoor",
       "group": "seating",
       "slots": 2,
+      "places": [
+        { "at": [-0.3, 0.7], "facing": 180 },
+        { "at": [-0.3, -0.7] }
+      ],
       "description": "A big wooden table with benches: picnics for two.",
       "surface": {
         "height": 0.63,
@@ -4919,6 +4984,7 @@
           "id": "soak",
           "label": "Soak in the hot tub",
           "anim": "bath",
+          "sound": "bathSoak",
           "minutes": 45,
           "pose": "sit",
           "effects": {

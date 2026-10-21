@@ -51,7 +51,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Where:** `web/src/render/babylon/characters/furniture.json:55` (`beds.weightBench`, read as `BEDS` at `characters.ts:260`), `web/src/render/babylon/characters/clips/lie.ts`
 - **Evidence:** The lifter lies along the bench and the legs stretch out past its end in mid-air; in a real bench press the feet are on the floor either side. Needs a bespoke feet-down lie pose, not a data tweak. Deferred from 0.3.0.
   Pilot: `play/weightBench-lift-02.png`: the legs lie straight along the pad and the heels rest on the leg-roller pads, not on the floor; the bar is in the hands over the chest and gone from the rack (`bar_off` after 0.8 s). Same for the child and elder (`play-child/`, `play-elder/`). The `BEDS` row is now in `furniture.json` (the old `characters.ts:315` line no longer holds it).
-- **Status:** confirmed (pilot)
+- **Status:** fixed (60890be0)
+- **After:** lifting on the weight bench the feet are down on the floor either side of it, 0.3 m out from its middle (`furniture.json` `beds.weightBench` `feet`, characters.ts `benchLegs`: each thigh out and down off the pad, the shin to the floor, the foot flat), no longer on the leg rollers; faded out as they get up. Teens, grown-ups and elders reach the floor from the 0.5 m pad; a child (who may not use it: the age rules) would hang short. `bench-results/review/fixes/clips-seated/bench/sheet-bench.png`, `bench-results/review/fixes/clips-seated/poses/poses-beds-*-weightBench_lift*.png`; in game `bench-results/review/fixes/clips-seated/play-adult/adult-weightBench-lift-0*.png`, `bench-results/review/fixes/clips-seated/play-elder/elder-weightBench-lift-0*.png`.
 - **Source:** `docs/objects/open.md` Still open › Residents; `plan/release-0.3.0.md` §1.4 and §8 (deferred); pilot
 
 ### M-fitness-01 — The weight bench's pad is 50 cm high, over a flat bench's 40–48
@@ -61,7 +62,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/fitness.py:111` (`weightBench`); `web/src/render/babylon/characters/furniture.json:55` (`beds.weightBench` 0.5)
 - **Evidence:** `sizes-fitness.md` measures the lie height 0.50 m; `reference.json` `weightBench` gives a seat of 0.40–0.48 (a bench press bench is about 43–45 cm so the lifter's feet reach the floor). The sizes table can't measure it as a seat ("no seat to measure"): the content gives it a lie, not a seat. Lowering the pad goes with A-fitness-01's feet-down pose.
-- **Status:** open
+- **Status:** open: left to the Blender wave (G-29, a working height); the clip half is fixed (60890be0)
+- **After:** the feet-down bench press reaches the floor from the 0.5 m pad (A-fitness-01), so the clip doesn't need the pad lowered; the pad is still 2–10 cm over a flat bench's 40–48 cm. For the rebuild: `fitness.py` `weightBench` pad top to about 0.44 m (pad 0.455 → 0.395, board, beam and posts down 6 cm, the rack's hooks unchanged), then `beds.weightBench` `h` 0.44; `benchLegs` needs no change.
 - **Source:** pilot
 
 ### A-fitness-02 — The treadmill's belt crawls under a running stride
@@ -71,7 +73,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** motion
 - **Where:** `tools/art/blender/families/fitness.py:100` (`G.scroll(slats, 'belt_run', (0, -SLAT, 0), seconds=0.25)`, `SLAT = 0.1` at `:55`)
 - **Evidence:** One 0.1 m slat each 0.25 s is a belt speed of 0.4 m/s, a slow walk; the runner jogs (`jog`, 0.7 s a cycle) on it (`play/treadmill-run-01.png`, `clips/clips-treadmill-all-t*.png`). A run is 2.2–3.3 m/s; the belt would need about 0.04 s a slat (the README keeps a loop's steps above the 1/30 s sampling, so a longer slat pitch or a blurred texture). Close to the eye only; at the game camera the belt reads as moving.
-- **Status:** open
+- **Status:** fixed (abfc32d9)
+- **After:** the slats are 30 cm apart and `belt_run` moves them one on in 0.13 s: 2.25 m/s, a run, and under half a pitch a frame at 60 frames a second up to the fastest game speed, so they're seen going back (`fixes/motions/g1718/clips-treadmill-all-t*.png`; `cargo check-glb`: the loop moves them 30 cm, the belt's warning).
 - **Source:** pilot
 
 ### M-fitness-02 — The yoga mat unrolls to 0.9 m, half a real mat's length

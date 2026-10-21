@@ -154,8 +154,14 @@
       },
       "motions": {
         "uses": {
-          "pick": "pick",
-          "harvest": "pick"
+          "pick": {
+            "clip": "pick",
+            "delay": 1.6
+          },
+          "harvest": {
+            "clip": "pick",
+            "delay": 1.6
+          }
         },
         "growth": "ripen"
       },

@@ -28,7 +28,7 @@
  */
 
 import { Color3, Vector3, type Material, type Mesh, type PBRMaterial, type Scene } from './core';
-import type { DoorStyleDef, FloorCoveringDef, RoofColorDef, RoofStyleDef, WallCoveringDef, WindowStyleDef } from '../../content/content';
+import type { DoorStyleDef, FloorCoveringDef, LightAim, RoofColorDef, RoofStyleDef, WallCoveringDef, WindowStyleDef } from '../../content/content';
 import { objectCentre, storeyOfRow, storeyRow, type StoreyLayout, type DiagonalWall, type Opening, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
 import { Cut, facing, Geo, LOOK, type V3 } from './geometry';
@@ -194,9 +194,18 @@ export interface RoomLight {
   /** Lamps: reach in metres and relative brightness (content `light`). */
   range?: number;
   power?: number;
-  /** A lamp with a switch (not a fire's): its object id, to follow it on and off. */
+  /** A lamp with a switch (or a fire): its object id, to follow it on and off. */
   lamp?: number;
+  /** Where its shade sends the light (content `light.aim`): a unit direction for a lamp that lights one side only (none: all round). */
+  dir?: [number, number, number];
 }
+
+/** Below the ceiling (m) where an uplighter's light comes off it (`aim: 'ceiling'`), and how much further it reaches from there. */
+const BOUNCE_DROP = 0.3;
+const BOUNCE_REACH = 1.5;
+/** A wall light aimed `out`: away from its wall and down (a unit vector's forward and down parts). */
+const OUT_FORWARD = 0.85;
+const OUT_DOWN = -0.53;
 
 /** Per room: indoor area in tiles and the sums of tile centres (x, z) weighted by area. */
 export type RoomTiles = ReadonlyMap<number, { n: number; sx: number; sz: number }>;
@@ -210,7 +219,7 @@ export type RoomTiles = ReadonlyMap<number, { n: number; sx: number; sz: number 
 export function placeLights(world: WorldStructure, inView: (x: number, z: number) => boolean, rooms: RoomTiles, lightOf: (def: string) => LampLight | undefined): RoomLight[] {
   const W = world.width;
   const roomAt = (x: number, z: number) => (x >= 0 && z >= 0 && x < W && z < world.depth ? world.rooms[z * W + x] : 0);
-  const lamps: { x: number; z: number; lift: number; room: number; light: LampLight; id: number }[] = [];
+  const lamps: { x: number; z: number; lift: number; room: number; light: LampLight; id: number; facing: [number, number] }[] = [];
   for (const o of world.objects) {
     const light = inView(o.x, o.z) ? lightOf(o.def) : undefined;
     if (!light) continue;
@@ -220,11 +229,27 @@ export function placeLights(world: WorldStructure, inView: (x: number, z: number
     const yaw = (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180;
     const [c, s] = [Math.cos(yaw), Math.sin(yaw)];
     // (Model x and z turned as the object is drawn: x -> (c, -s), z -> (s, c).)
-    lamps.push({ x: x + ax * c + az * s, z: z - ax * s + az * c, lift: o.lift ?? 0, room: roomAt(o.x, o.z), light, id: o.id });
+    lamps.push({ x: x + ax * c + az * s, z: z - ax * s + az * c, lift: o.lift ?? 0, room: roomAt(o.x, o.z), light, id: o.id, facing: [s, c] });
   }
   const areaOf = (r: number) => rooms.get(r)?.n ?? 0;
+  /** Where a lamp's shade sends its light: down, up, out from its wall and down, or all round (an uplighter's from under the ceiling it lights). */
+  const aimed = (l: (typeof lamps)[number]): Pick<RoomLight, 'y' | 'dir' | 'range'> => {
+    const y = l.lift + (l.light.height ?? 1.55);
+    switch (l.light.aim) {
+      case 'down':
+        return { y, dir: [0, -1, 0], range: l.light.range };
+      case 'up':
+        return { y, dir: [0, 1, 0], range: l.light.range };
+      case 'out':
+        return { y, dir: [l.facing[0] * OUT_FORWARD, OUT_DOWN, l.facing[1] * OUT_FORWARD], range: l.light.range };
+      case 'ceiling':
+        return { y: Math.max(y, WALL_HEIGHT - BOUNCE_DROP), range: (l.light.range ?? 4.5) + BOUNCE_REACH };
+      default:
+        return { y, range: l.light.range };
+    }
+  };
   const lights = [
-    ...lamps.map((l): RoomLight => ({ x: l.x, y: l.lift + (l.light.height ?? 1.55), z: l.z, room: l.room, area: areaOf(l.room), kind: 'lamp', range: l.light.range, power: l.light.intensity, ...(l.light.switch === false ? {} : { lamp: l.id }) })),
+    ...lamps.map((l): RoomLight => ({ x: l.x, z: l.z, ...aimed(l), room: l.room, area: areaOf(l.room), kind: 'lamp', power: l.light.intensity, ...(l.light.switch === false ? {} : { lamp: l.id }) })),
     ...[...rooms.entries()].filter(([r]) => !lamps.some((l) => l.room === r)).map(([r, t]): RoomLight => ({ x: t.sx / t.n, y: 2.45, z: t.sz / t.n, room: r, area: t.n, kind: 'fill' })),
   ];
   // How many lights of its room come before each.
@@ -245,8 +270,12 @@ export interface LampLight {
   height?: number;
   /** Where the light is off the object's middle (m, x and z in its own frame, turned with it): an arc lamp's shade. */
   at?: [number, number];
-  /** False: no switch, lit every night (a fire). */
+  /** False: no switch, lit every night. */
   switch?: boolean;
+  /** A fire: lit and put out as a lamp is switched (sim-core `lights.rs`), its flames burning while it's lit. */
+  fire?: boolean;
+  /** Where its shade sends the light (`ObjectDef.light.aim`). */
+  aim?: LightAim;
 }
 
 /** How a storey is built (`HouseBuilder.build`); the ground storey needs none of it. */

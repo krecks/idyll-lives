@@ -376,6 +376,43 @@ fn bored_with_nothing_to_do_they_scroll() {
     assert!(w.sims[0].needs[1] > 0.25, "and had some fun: {}", w.sims[0].needs[1]);
 }
 
+/// The animation tag in Sim 0's snapshot row (the `ACTION` field).
+fn shown(w: &World) -> Option<&str> {
+    let mut out = vec![0.0; sim_core::snapshot::CAPACITY];
+    sim_core::snapshot::write(w, &mut out);
+    let a = out[sim_core::snapshot::HEADER_LEN + sim_core::snapshot::sim::ACTION];
+    (a >= 0.0).then(|| w.content.animations[a as usize].as_str())
+}
+
+#[test]
+fn texting_and_scrolling_look_at_the_screen_a_call_is_at_the_ear() {
+    // An action's own `anim`, else the phone's.
+    let content = CONTENT
+        .replace(r#""animations":["knock","talk","phone"]"#, r#""animations":["knock","talk","phone","phoneScreen"]"#)
+        .replace(r#""id":"browse","label":"Scroll","minutes":20,"#, r#""id":"browse","label":"Scroll","minutes":20,"anim":"phoneScreen","#);
+    let mut w = world(&content, "friends");
+    w.apply(Command::Phone { sim: 0, action: action(&w, "browse"), contact: None }).unwrap();
+    minutes(&mut w, 2.0);
+    assert_eq!(shown(&w), Some("phoneScreen"));
+    minutes(&mut w, 25.0);
+    w.apply(Command::Phone { sim: 0, action: action(&w, "call"), contact: Some(1) }).unwrap();
+    minutes(&mut w, 2.0);
+    assert_eq!(on_the_phone(&w, 0).map(|p| p.0), Some(action(&w, "call")));
+    assert_eq!(shown(&w), Some("phone"));
+    // An unknown tag is an error.
+    let bad = content.replace(r#""anim":"phoneScreen""#, r#""anim":"scroll""#);
+    let err = World::from_json(&bad, &town("friends"), 7).err().expect("an unknown anim");
+    assert!(err.to_string().contains("phone.browse.anim"), "{err}");
+    // The shipped content: texting and scrolling at the screen, the calls at the ear.
+    let shipped = common::content();
+    let w = World::from_json(&shipped, &common::town(&shipped, 7, 3), 7).unwrap();
+    let phone = &w.content.phone;
+    for (id, tag) in [("text", "phoneScreen"), ("browse", "phoneScreen"), ("call", "phone"), ("invite", "phone"), ("askOver", "phone")] {
+        let a = &phone.actions[phone.action_index(id).unwrap()];
+        assert_eq!(a.anim.map(|i| w.content.animations[i].as_str()), Some(tag), "{id}");
+    }
+}
+
 #[test]
 fn the_phone_box_is_gone_from_the_market_square() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web/public/content");

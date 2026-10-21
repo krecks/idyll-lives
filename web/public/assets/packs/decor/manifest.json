@@ -237,10 +237,10 @@
           "finish": "material.finish.satin"
         },
         "walnut": {
-          "finish": "material.finish.wood"
+          "finish": "material.finish.satin"
         },
         "walnut_dark": {
-          "finish": "material.finish.wood"
+          "finish": "material.finish.satin"
         }
       },
       "motions": {
@@ -248,7 +248,8 @@
           "hour": "hour_hand",
           "minute": "minute_hand",
           "at": 610
-        }
+        },
+        "idle": "pendulum"
       },
       "paint": [
         {
@@ -641,6 +642,31 @@
         {
           "material": "rug_ground",
           "label": "Rug"
+        }
+      ]
+    },
+    "model.curtainsWide": {
+      "type": "model",
+      "url": "../../models/decor/curtainsWide.glb",
+      "materials": {
+        "linen": {
+          "finish": "material.finish.fabric"
+        },
+        "rail": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "night": "close"
+      },
+      "paint": [
+        {
+          "material": "linen",
+          "label": "Fabric"
+        },
+        {
+          "material": "rail",
+          "label": "Rail"
         }
       ]
     }

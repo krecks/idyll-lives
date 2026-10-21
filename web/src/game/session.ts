@@ -29,7 +29,7 @@ import { aboutUs } from '../ui/story';
 import { BubbleLayer } from './bubbles';
 import { RoomOverlay } from './roomOverlay';
 import { VoiceDirector } from '../voice';
-import { WorldSound } from '../audio/world';
+import { endSoundOf, soundOf, WorldSound } from '../audio/world';
 import { addBlueprint, blueprints } from '../persistence/blueprints.svelte';
 import { Director } from './director';
 import { addedObjects, BuildBuyInput, editFeedback, type Picked } from './buildmode';
@@ -1049,7 +1049,9 @@ export async function startSession(
     }
     const plot = viewPlot === null ? null : w.plots[viewPlot];
     const buildSpan = perfStart('session: renderer setWorld');
-    const build = renderer.setWorld(w, plot ? { x: plot.x, z: plot.z, w: plot.w, d: plot.d } : null).then((value) => {
+    const view = plot ? { x: plot.x, z: plot.z, w: plot.w, d: plot.d } : null;
+    worldSound.setWorld(w, view);
+    const build = renderer.setWorld(w, view).then((value) => {
       perfEnd(buildSpan);
       return value;
     });
@@ -1164,8 +1166,9 @@ export async function startSession(
         ? []
         : [{ label: it.label, index, ...(it.cost ? { cost: it.cost } : {}), ...(content.mayUse(def, it, stage) ? {} : { disabled: true }) }],
     );
-    // A lamp: its switch (not a fire's).
-    if (def.light && def.light.switch !== false) items.unshift({ label: bridge.lampOff(objectId) ? 'Turn on' : 'Turn off', index: -1 });
+    // A lamp: its switch; a fire is lit and put out.
+    const off = bridge.lampOff(objectId);
+    if (def.light && def.light.switch !== false) items.unshift({ label: def.light.fire ? (off ? 'Light the fire' : 'Put out the fire') : off ? 'Turn on' : 'Turn off', index: -1 });
     // Upgrades are bought in the catalog, not from here.
     if (items.length === 0) return;
     game.menu = { objectId, title: placement.quality ? `${def.name} ${'★'.repeat(placement.quality)}` : def.name, x, y, items };
@@ -1602,6 +1605,16 @@ export async function startSession(
       townFile: () => ('lot' in source ? source.lot : null),
       /** Sends a simulation command (benchmarks and checks). */
       send: (command: Parameters<typeof bridge.send>[0]) => bridge.send(command),
+      /** The world sounds heard on the last update (loops by residents and things, sounds played once). */
+      sound: () => worldSound.playing(),
+      /** What a use sounds like (`soundOf`), and what it plays as it ends: by object and use id; `anim` and `recipe` (an id) for a cooking step at it. */
+      soundOf(object: string, use: string | null, anim?: string, recipe?: string) {
+        const def = content.objectList.findIndex((o) => o.id === object);
+        const it = def >= 0 && use !== null ? content.objectList[def].interactions.findIndex((i) => i.id === use) : -1;
+        const tag = anim ?? (it >= 0 ? (content.objectList[def].interactions[it].anim ?? '') : '');
+        const cooking = recipe === undefined ? 0 : content.recipes.findIndex((r) => r.id === recipe) + 1;
+        return { loop: soundOf(content, tag, def, it, cooking) ?? null, end: endSoundOf(content, def, it) ?? null, ambient: (def >= 0 && content.objectList[def].ambient) || null };
+      },
       save: (id: string) => session.save(id, id),
       autosave: () => autosave(),
       plan: (id: number) => game.sims.find((x) => x.id === id)?.plan ?? null,

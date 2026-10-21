@@ -22,8 +22,8 @@ none.
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `bench` Park bench | 2x1 · floor | sit:sit | outdoor / seating | Frame, Slats | Static | Static. |
-| `patioSet` Folding bistro set | 1x2 · floor | coffee:drink sit:sit | outdoor / seating | Frame, Slats | Static | Static. |
-| `picnicTable` Picnic table | 3x2 · floor | picnic:eat coffee:drink | outdoor / seating | Frame, Planks, Cloth | Static | Static. |
+| `patioSet` Folding bistro set | 1x2 · floor | coffee:drink sit:sit | outdoor / seating | Frame, Slats | Static | Static. For two: one on each chair, facing each other across the table (content `places`; the far chair reached from behind it). |
+| `picnicTable` Picnic table | 3x2 · floor | picnic:eat coffee:drink | outdoor / seating | Frame, Planks, Cloth | Static | Static. The two sit across the cloth, one on each bench, facing each other (content `places`; the far bench reached from behind it). |
 | `gardenChair` Garden chair | 1x1 · floor | sit:sit | outdoor / seating | Chair | Static | Static. |
 | `patioTableRound` Round patio table | 1x1 · floor | — | outdoor / seating | Frame, Top, Tiles | Static | Static. |
 | `patioTable4` Teak patio table | 2x1 · floor | — | outdoor / seating | Frame, Top | Static | Static. |
@@ -66,7 +66,8 @@ none.
 - Lying, seen 1, 4 and 8 s into the use (also on Low WebGL2 at night): the resident sits on first, then lies along
   the lounger and in the hammock's sling.
 - The hot tub's cover lifts and the water bubbles for a soak; after it, "Put the cover on" follows (`closeAfter`)
-  and the cover shuts.
+  and the cover shuts. The soakers wear swimwear in it (a swimsuit, or trunks; `BATH_WEAR`).
+- A doze on the lounger or in the hammock is taken in the day clothes, shoes on (pyjamas are for a night in bed).
 - Known: a swing or a sunbathe ends within seconds when the need it fills is full (fun 0.8 to 1 in about 8 s), and
   the next one is refused until it drops. That is the needs, not the model.
 
@@ -78,12 +79,16 @@ none.
 |---|---|---|---|---|---|---|
 | `grill` Charcoal grill | 1x1 · floor | cook:cook | outdoor / cooking | Body, Lid | Use | `lid_open`, the lid swings up 95° on its back hinge for the whole of cook, over red coals and food on the grate (no night glow on the coals: it showed through the shut lid). |
 | `grillStation` Gas grill station | 2x1 · floor | cook:cook feast:cook | outdoor / cooking | Cart, Hood | Use | `hood_up`, the barrel hood swings up 75° for cook and feast; the counter at the content's 0.9 m. |
-| `firePit` Fire pit | 1x1 · floor | relax:relax | outdoor / cooking | Bowl, Stones | Use | `flames`, tongues grow on the logs for relax, aglow at night with the embers (the light is the content's); content `seat` puts the resident on the front capstones, not in the fire. |
+| `firePit` Fire pit | 1x1 · floor | relax:relax | outdoor / cooking | Bowl, Stones | Use | `flames`, tongues grow on the logs for relax, aglow at night with the embers (the light is the content's); warmed up at from a seat within 3 m that faces it (`seatNear`, `seatFacing: around`: a garden chair round it), else standing at one of four places round it, facing the fire (content `places`); never on its rim. |
 
 **In play** (signed off 2026-10-17):
 - Each checked in four facings: the charcoal grill's lid is up for the whole of "Grill dinner", over the coals and
   food; the gas station's hood is up for cook and for the feast; the fire pit's flames grow for "Warm up by the
-  fire", the resident on its front capstones, and the embers and flames glow at night.
+  fire", and the embers and flames glow at night. It is a fire (content
+  `light.fire`): lit by sitting down by it in the dark or by the player, it burns (light, glow and flames) until the
+  morning, and its light lies in a pool on the lawn round it (`gardenPools.ts`).
+  (Since 2026-10-21 they warm up from a chair round it that faces it, or standing round it facing in, not on its
+  capstones: I-outdoor-01.)
 - Each shuts when the use ends. Nothing needed fixing.
 - Since the authenticity review (G-08): chopping at the grill station is on its free counter (`STATION_SPOTS`), not on
   the grate.
@@ -152,7 +157,7 @@ These six have no group code of their own.
 |---|---|---|---|---|---|---|
 | `garden.gnome` Garden gnome | 1x1 · floor | pat:tend | outdoor / decor | Hat, Tunic, Belt | Static | Static: a gnome with a red hat, white beard and a tunic bell. |
 | `garden.birdbath` Bird bath | 1x1 · floor | birdwatch:look | outdoor / decor | Bowl & column, Plinth | Static | Static: plinth, tapering column and a shallow bowl of water, a small bird on the rim. Birds watched from a seat within 6 m (`seatNear`), else standing. |
-| `garden.fountain` Stone fountain | 1x1 · floor | wish:look listen:relax | outdoor / decor | Fountain, Plinth | Static | Static: a two-tier fountain, its water opaque and still. |
+| `garden.fountain` Stone fountain | 1x1 · floor | wish:look listen:relax | outdoor / decor | Fountain, Plinth | Ambient | `flow`: the water moves all the time near the camera (`idle`, not on Low): the jet bubbles up and falls back and a ring swells out on each basin, 1.2 s a round (2026-10-21; it was still). Its sound is G-53's. |
 | `garden.lantern` Stone lantern | 1x1 · floor | — | outdoor / lights | Lantern, Base | Static | Static: a Japanese stone lantern; its fire box is lit at night (the content's `light`). |
 | `garden.wheelbarrow` Wheelbarrow planter | 1x1 · floor | water:water smell:smell | outdoor / decor | Tray, Handles, Legs & tyre | Static | Static: a green wheelbarrow full of flowers and leaves. |
 | `garden.boulder` Garden boulders | 1x1 · floor | — | outdoor / decor | Large boulder, Middle boulder, Small boulder | Static | Static: three weathered stones, moss on top and tufts round the base. |
@@ -160,6 +165,8 @@ These six have no group code of their own.
 **In play** (signed off 2026-10-17):
 - Checked in the north yard in four facings with their uses: pat the gnome, watch the birds, listen to the water and
   make a wish, water and smell the planter. The lantern and boulders are still; nothing floats or sinks.
+- Since 2026-10-21 (review A-outdoor-03) the fountain's water moves (`flow`, ambient:
+  `fixes/motions/g1718/views/fountain-t0.6.png`); it still makes no sound (G-53).
 - Colours checked by day in two facings with test colours far from the defaults, at night on WebGPU and on Low
   WebGL2, and in the colour studio. Every colour lands on the part its label names.
 - The gnome's Tunic takes in its sleeves; its boots sit wholly inside the tunic bell, so only the belt is named.

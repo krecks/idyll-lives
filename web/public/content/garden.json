@@ -134,6 +134,7 @@
           "id": "shade",
           "label": "Relax in the shade",
           "anim": "relax",
+          "pose": "sit",
           "minutes": 30,
           "effects": {
             "comfort": 0.18,
@@ -162,6 +163,7 @@
           "id": "shade",
           "label": "Relax in the shade",
           "anim": "relax",
+          "pose": "sit",
           "minutes": 30,
           "effects": {
             "comfort": 0.18,
@@ -190,6 +192,7 @@
           "id": "shade",
           "label": "Relax in the shade",
           "anim": "relax",
+          "pose": "sit",
           "minutes": 30,
           "effects": {
             "comfort": 0.18,
@@ -289,6 +292,7 @@
           "id": "shade",
           "label": "Relax in the shade",
           "anim": "relax",
+          "pose": "sit",
           "minutes": 30,
           "effects": {
             "comfort": 0.18,
@@ -317,6 +321,7 @@
           "id": "shade",
           "label": "Relax in the shade",
           "anim": "relax",
+          "pose": "sit",
           "minutes": 30,
           "effects": {
             "comfort": 0.18,
@@ -368,6 +373,7 @@
           "id": "shade",
           "label": "Relax in the shade",
           "anim": "relax",
+          "pose": "sit",
           "minutes": 30,
           "effects": {
             "comfort": 0.18,
@@ -411,6 +417,7 @@
           "id": "shade",
           "label": "Relax in the shade",
           "anim": "relax",
+          "pose": "sit",
           "minutes": 30,
           "effects": {
             "comfort": 0.18,
@@ -2250,6 +2257,7 @@
       "group": "decor",
       "outdoors": true,
       "description": "A two-tier stone fountain. Toss a coin and make a wish, or just listen to the water.",
+      "ambient": "fountain",
       "interactions": [
         {
           "id": "wish",

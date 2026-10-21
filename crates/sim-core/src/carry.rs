@@ -326,13 +326,14 @@ pub(crate) fn after_step(w: &mut World) {
                 baby.carried_by = None;
                 let o = &mut objects[object as usize];
                 let def = &content.objects[o.def];
-                if !o.reserve_for(b, def, interaction) {
+                if !o.reserve_for(b, def, interaction, baby.pos) {
                     continue;
                 }
                 let inter = &def.interactions[interaction];
+                let slot = o.slot_of(b).unwrap_or(0);
                 baby.seated_from = Some((baby.pos[0].floor() as i32, baby.pos[1].floor() as i32));
-                baby.pos = o.slot_position(content, o.slot_of(b).unwrap_or(0));
-                baby.yaw = o.yaw();
+                baby.pos = o.slot_position(content, slot);
+                baby.yaw = o.slot_yaw(content, slot);
                 baby.pose = inter.pose;
                 baby.current = Some(Activity {
                     task: Task { kind: TaskKind::Use { object, interaction }, directed: false, routine: false },

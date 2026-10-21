@@ -13,10 +13,10 @@ stood, so the model and the wall agree within a centimetre.
 | Model | Moving part and clip | Played by |
 |---|---|---|
 | `steamMopDock` | the mop (pole, tank, head, pad), its origin at its head's foot: `mop_off` hides it (0.2 s) while the game draws it in the resident's hands (content `held`, pushed over the floor) | `mop` |
-| `laundryCenter` | the washer's porthole door, hinged on its left: `door_open` swings it 100° (0.8 s) | `laundry`, `fold` |
+| `laundryCenter` | the washer's porthole door, hinged on its left: `door_open` swings it 100° (0.8 s), `hold` 2.5 s: open for the washing to go in or come out, shut for the wash and the folding (2026-10-21) | `laundry`, `fold` |
 | `rainShowerTower` | streaks of rain from the square head, built full length, origin at the head: `water_on` grows them down (0.6 s) | `steamShower` |
 | `organizerDesk` | the middle bin of the hutch's lower row, with cards in it: `drawer_open` slides it 13 cm out towards the sitter (0.6 s) | `sort`, `ledger` |
-| `robotVacuumDock` | the robot, origin at its middle: `vacuum_out` rolls it 60 cm out of the dock while turning it round (1.4 s), `hold` 2 s, then rolls it home | `program` |
+| `robotVacuumDock` | the robot, origin at its middle: `vacuum_round` (a loop, `G.path`, 5 s a round at 0.25 m/s) drives it 18 cm out of the dock, once round a 14 cm circle in front of it (to the left, clear of the plant), facing the way it goes, and back in, round after round while it is programmed (2026-10-21: it peeked 60 cm out and back) | `program` (loop) |
 | `entryConsole` | the key tray drawer under the top (front, knob, tray, keys): `tray` slides it 20 cm out (0.6 s) | `tidy` |
 
 The mop is not hidden while in use: the `clean` animation holds no prop, so it stays out of its dock, leaning, and

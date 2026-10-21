@@ -102,7 +102,17 @@ fn a_hungry_harvester_has_some_then_and_there() {
     w.sims[0].needs[hunger] = 0.3;
     let harvest = interaction(&w, PATCH, "harvest");
     w.apply(Command::Use { sim: 0, object: PATCH, interaction: harvest }).unwrap();
-    assert!(until(&mut w, 120, |w| w.sims[0].needs[hunger] > 0.55), "ate a serving");
+    // Off to the fridge with it, and some of it at once, sitting down.
+    let mut before = None;
+    let eating = |w: &World| w.sims[0].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Eat { stage: 1, .. }));
+    let ate = until(&mut w, 120, |w| {
+        if eating(w) {
+            before.get_or_insert(w.sims[0].needs[hunger]);
+        }
+        before.is_some() && !eating(w)
+    });
+    assert!(ate, "ate a serving");
+    assert!(w.sims[0].needs[hunger] > before.unwrap() + 0.1, "and it did her good: {} from {before:?}", w.sims[0].needs[hunger]);
     let left: u8 = w.items.list.iter().filter(|it| it.def == produce(&w)).map(|it| it.servings).sum();
     assert_eq!(left, 1, "the rest in the fridge");
 }

@@ -84,9 +84,9 @@
       },
       "motions": {
         "uses": {
-          "familyPie": "oven_open",
-          "treatsToShare": "oven_open"
-        }
+          "bake": "oven_open"
+        },
+        "hold": 3.0
       },
       "paint": [
         {

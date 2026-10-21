@@ -1,8 +1,8 @@
 # The example pack (P5): the chef's stove and the whirlpool tub of `content/packs/example.json`. Notes: pack_example.md.
 #
 # Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
-# `Model`). The stove's left oven door drops (`oven_open`) and a knob turns as a ring of gas flame grows on the
-# front burner (`burner_on`); the tub's water rises (`fill`) and bubbles well up through it while it lasts
+# `Model`). The stove's left oven door drops (`oven_open`) while a resident bakes, and a knob turns as a ring of
+# gas flame grows on the front burner (`burner_on`) while they cook on the hob; the tub's water rises (`fill`) and bubbles well up through it while it lasts
 # (`bubbles`, a loop).
 #
 # Run:  cargo art pack_example [--only chefStove] [--preview]
@@ -317,8 +317,10 @@ def whirlpoolTub():
 FAMILY = G.Family(
     'pack_example', M,
     [G.Model('chefStove', chefStove, size=(1.62, 2.55, 0.662), key='model.chefStove', centre=(0, -0.099),
-             motions={'uses': {'cook': [{'clip': 'oven_open', 'hold': 3.0}, 'burner_on'],
-                               'practise': [{'clip': 'oven_open', 'hold': 3.0}, 'burner_on']}},
+             # a meal on the hob lights the burner; a bake (practise, or any `bake` step) drops the oven door
+             # for 3 s; by the cooking step's tag too (`stir`, `bake`), for a meal started at the fridge
+             motions={'uses': {'cook': 'burner_on', 'stir': 'burner_on',
+                               'practise': {'clip': 'oven_open', 'hold': 3.0}, 'bake': {'clip': 'oven_open', 'hold': 3.0}}},
              paint=[('body', 'Body'), ('chrome', 'Handles & knobs'), ('tile', 'Tiles')]),
      G.Model('whirlpoolTub', whirlpoolTub, size=(1.86, 0.929, 1.86), key='model.whirlpoolTub',
              motions={'uses': {'soak': 'fill'}, 'loops': {'soak': 'bubbles'}},

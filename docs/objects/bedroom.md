@@ -7,7 +7,11 @@ nightstands, wardrobes and drawers are built by `families/bedroom_storage.py` (n
 `families/bedroom_dressing.py` (notes: `families/bedroom_dressing.md`: `drawer_open`; the glass is a mirror part, E6).
 
 Mattress tops match `BEDS` (`BUNKS` for the bunk's two), and beds that get the game's blanket are in `BLANKET_BEDS`
-(`web/src/render/babylon/characters.ts`): a bed's own duvet sits under that blanket, turned down. Every bed of BR1
+(`web/src/render/babylon/characters.ts`): a bed's own duvet sits under that blanket, turned down, and the blanket
+takes the duvet's colour (the "Bedding" part, as the player painted it or as made; `QUILT_PART` names the futon's own
+quilt and the wall bed's throw), so a bed keeps its colours with someone in it. Residents sleep the night in pyjamas
+(a long top and trousers, barefoot) and nap in their day clothes with the shoes off; on a lounger or a sofa they doze
+as they are (`wearFor`, `outfit.ts`). Every bed of BR1
 but the daybed is in `BLANKET_BEDS`, and all nine have their mattress tops in `BEDS`. Sleepers lie with the heels
 and buttocks about 4 cm into the mattress and the legs on it; a child lies on it too (`lieBack` scales with the
 body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitchen.md`).
@@ -18,7 +22,7 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `bed` King-size bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`: the top third of the duvet folds back toward the foot as they get in (sleep, nap) and back up when they get up, under the game's blanket. Renamed from "Double bed": 1.90 m wide with a 1.72 m mattress, a king (reference kind `bedKing`, Q-08). |
+| `bed` King-size bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`: the top third of the duvet folds back toward the foot as they get in (sleep, nap) and back up when they get up, under the game's blanket; half way it is gathered low, as cloth rolls, not a board standing up (2026-10-21). Renamed from "Double bed": 1.90 m wide with a 1.72 m mattress, a king (reference kind `bedKing`, Q-08). |
 | `bedSingle` Single bed | 1x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`. |
 | `bedBunk` Bunk bed | 1x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down` on the lower bunk, `turn_down_upper` on the upper, each for its own sleeper (`slot`); the ladder is static. The upper bunk is not an elder's (`upperStages`: with the lower bunk taken, an elder is refused, "too old for the top bunk"). |
 | `bedFuton` King futon | 2x2 · floor | sleep:sleep nap:nap unfold:fetch foldAway:fetch relax:relax | bedroom / beds | Frame, Headboard, Bedding | Held open | `unfold`: the back folds flat into a bed while slept in (C1: `leaves: open` on sleep, nap and Unfold, as the wall bed); Fold away closes it. Folded, a sofa: Sit and relax on its front edge (`when: closed`, content `seat` 0.40 m, forward 0.68). Renamed from "Futon bed": a king-size futon, 1.96 m wide (kind `bedLow`, now to 1.95 m, Q-08). |
@@ -30,7 +34,8 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 
 **In play** (signed off 2026-10-16):
 - Each bed napped in, standing free in all four facings (`nap` plays the same clips as the 480-minute sleep). The
-  duvet turns down as the sleeper gets in and back up as they get up. With two sleepers (double, king, oak double,
+  duvet turns down as the sleeper gets in and back up as they get up (since 2026-10-21, review A-bedroom-01, rolling
+  over low half way, `fixes/motions/g1718/clips-bed*-all-t0.5.png`, not standing up as a board). With two sleepers (double, king, oak double,
   upholstered queen, four-poster) both quilts cover the turned-down duvet and nothing pokes through.
 - The bunk turns down the lower duvet for slot 0 and the upper for slot 1, each shutting when its sleeper gets up.
   The futon's back folds flat for a nap or a night and the last one up folds it away (as the wall bed); Unfold leaves

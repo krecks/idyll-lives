@@ -53,6 +53,7 @@
           "id": "cheeseBoard",
           "label": "Put together a cheese board",
           "anim": "cook",
+          "sound": "chop",
           "minutes": 5,
           "eat": { "item": "cheeseBoard", "minutes": 20 },
           "pose": "stand",
@@ -143,6 +144,7 @@
       "category": "outdoor",
       "slots": 2,
       "description": "A brick dome for blistered crusts. Pizza gets better with Cooking skill, and good cooks (Cooking 4+) pull out a perfect pie that keeps them full and sociable; two residents can bake together.",
+      "sounds": {"stir": "none"},
       "interactions": [
         {
           "id": "bakePizza",

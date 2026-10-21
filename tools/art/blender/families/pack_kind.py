@@ -509,7 +509,9 @@ def hearthSettee():
 FAMILY = G.Family(
     'pack_kind', M,
     [G.Model('neighbourlyOven', neighbourlyOven, size=(1.827, 1.718, 0.634), key='model.kind.neighbourlyOven',
-             centre=(-0.002, -0.113), motions={'uses': {'familyPie': 'oven_open', 'treatsToShare': 'oven_open'}},
+             # the door drops while the dish goes in, then shuts for the bake (`hold`). Keyed by the bake step's
+             # tag, not the uses: the recipes' mixing is done at its worktop too, where the oven stays shut.
+             centre=(-0.002, -0.113), motions={'uses': {'bake': 'oven_open'}, 'hold': 3.0},
              paint=[('enamel', 'Body'), ('towel', 'Fabric'), ('cabinet', 'Cupboards')]),
      G.Model('givingJar', givingJar, size=(0.641, 1.32, 0.655), key='model.kind.givingJar', centre=(0.101, 0.057),
              motions={'uses': {'donate': 'coin'}},

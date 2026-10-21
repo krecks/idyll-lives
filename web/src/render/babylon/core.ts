@@ -33,7 +33,7 @@ export { ClusteredLightContainer } from '@babylonjs/core/Lights/Clustered/cluste
 export { DirectionalLight } from '@babylonjs/core/Lights/directionalLight';
 export { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight';
 export { Light } from '@babylonjs/core/Lights/light';
-export { PointLight } from '@babylonjs/core/Lights/pointLight';
+export { SpotLight } from '@babylonjs/core/Lights/spotLight';
 export { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator';
 export { ImportMeshAsync } from '@babylonjs/core/Loading/sceneLoader';
 export { ColorCurves } from '@babylonjs/core/Materials/colorCurves';

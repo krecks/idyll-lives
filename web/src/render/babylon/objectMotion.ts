@@ -10,8 +10,9 @@
  * open as long as it stays so, and its `motions.night` clip (curtains drawn) from dusk to dawn,
  * whoever is asleep. A crop's `motions.growth` clip is held where its growth stage is, moving on
  * to the next stage at the clip's own pace. An ambient clip (`idle`: a ceiling fan, a fountain's water) goes
- * round all the time, but only within `ambientRange` of the camera (none on Low), without the
- * shadows being redrawn for it. A clock's hands (`clock`) show the game's time, set each game
+ * round all the time (a lamp's only while it's switched on: the fan's blades with its light), but
+ * only within `ambientRange` of the camera (none on Low), without the shadows being redrawn for it.
+ * A fire (content `light.fire`) holds its uses' clips (its flames) open while it burns at night. A clock's hands (`clock`) show the game's time, set each game
  * minute (each five on Low) within `CLOCK_RANGE` of the camera or the ambient range. A part moved by
  * several clips at once takes all their poses (`partPose`: a record spinning as it swings up; a use's clip
  * on top of a crop's growth stage, the veggie bed's plants rustling as tall as they have grown). Each
@@ -26,7 +27,7 @@ import { Matrix, type Mesh, type Vector3 } from './core';
 import { GAME_RATE, QUIET_SPEED } from './characters';
 import { partPose, type ModelClip, type ModelMotion, type Motions } from './models';
 import type { FrameState } from '../../core/bridge';
-import type { ObjectPlacement } from '../../core/protocol';
+import { objectCentre, type ObjectPlacement } from '../../core/protocol';
 
 /** A placed object with moving parts. */
 export interface MovingObject {
@@ -42,6 +43,10 @@ export interface MovingObject {
   stage?: number;
   /** The slot (content `slots`, from 0) of a resident standing, sitting or lying at `x`, `z` (the snapshot's), for clips with a `slot`. */
   slotOf?: (x: number, z: number) => number;
+  /** A lamp with a switch (content `light`): its `idle` clip (a ceiling fan's blades) goes round only while it's switched on. */
+  lamp?: boolean;
+  /** A fire (content `light.fire`): these clips (its flames, its uses') are held open while it burns at night. */
+  burns?: readonly string[];
 }
 
 /** Metres from the camera within which clocks show the time, at least (Low has no ambient range). */
@@ -127,6 +132,8 @@ export class ObjectMotion {
   private night: boolean | null = null;
   /** The night clips go straight to where the lighting has them (the first lighting of a world), without playing. */
   private snapNight = false;
+  /** Lamps and fires switched off (`setLampsOff`). */
+  private lampsOff: ReadonlySet<number> = new Set();
 
   /**
    * The lamps' level (the lighting's `lamps`, 0 by day to 1 at night): night clips close from about
@@ -142,6 +149,11 @@ export class ObjectMotion {
   /** Ambient clips play within `range` metres of the camera (0: nowhere, all at rest). */
   setAmbientRange(range: number): void {
     this.ambientRange = range;
+  }
+
+  /** The lamps (and fires) switched off, by object id (the sim's `lampsOff`): a fan's blades stop, a fire's flames die down. */
+  setLampsOff(off: ReadonlySet<number>): void {
+    this.lampsOff = off;
   }
 
   /** The objects of a newly built world; those still mid-clip are posed again. */
@@ -206,11 +218,12 @@ export class ObjectMotion {
     return clip ? { name: name!, clip, at: (GROWTH_TIMES[o.stage!] ?? 0) * clip.duration } : undefined;
   }
 
-  /** The clips `o` holds open now: its `open` one while open, its `night` one at night. */
+  /** The clips `o` holds open now: its `open` one while open, its `night` one at night, a fire's flames while it burns at night. */
   private held(o: MovingObject): string[] {
     const held: string[] = [];
     if (o.open && o.motions.open) held.push(o.motions.open);
     if (this.night && o.motions.night) held.push(o.motions.night);
+    if (this.night && o.burns && !this.lampsOff.has(o.id)) held.push(...o.burns);
     return held;
   }
 
@@ -236,7 +249,8 @@ export class ObjectMotion {
     for (const [id, o] of this.objects) {
       const wanted = this.wanted.get(id);
       const held = this.held(o);
-      const idle = o.motions.idle !== undefined && reach > 0 && this.distance2(o, eye) < reach ? o.motions.idle : undefined;
+      // (A lamp's, a fan's blades, only while it's switched on.)
+      const idle = o.motions.idle !== undefined && reach > 0 && !(o.lamp && this.lampsOff.has(id)) && this.distance2(o, eye) < reach ? o.motions.idle : undefined;
       let clips = this.states.get(id);
       const growth = this.growth(o);
       if ((wanted || held.length || idle || growth) && !clips) this.states.set(id, (clips = new Map()));
@@ -462,18 +476,38 @@ export class ObjectMotion {
   }
 }
 
+/** What `slotPlace` needs of an object's kind. */
+type SlotDef = { slots?: number; bunk?: boolean; footprint?: [number, number]; places?: { at: [number, number]; facing?: number }[] };
+
 /**
- * Which of `o`'s slots (content `slots`, from 0) a resident at `x`, `z` is in, as sim-core's
- * `slot_position` spreads them along the object's width (a bunk's two a hair apart, the upper one right).
+ * Where the resident in slot `k` of `o` is and which way they face (sim coordinates, yaw as sim-core's), as
+ * sim-core's `slot_position` and `slot_yaw` have it: at its place (content `places`, turned and sized with it),
+ * else spread along the object's width (a bunk's two a hair apart, the upper one right), facing its front.
  */
-export function slotOf(o: ObjectPlacement, def: { slots?: number; bunk?: boolean } | undefined): (x: number, z: number) => number {
+export function slotPlace(o: ObjectPlacement, def: SlotDef | undefined, k: number): { x: number; z: number; yaw: number } {
+  const c = objectCentre(o);
+  const place = def?.places?.[k];
+  if (place) {
+    const a = (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180;
+    const [fw, fd] = def?.footprint ?? [1, 1];
+    const x = place.at[0] * (o.size ? o.size[0] / 100 / fw : 1);
+    const z = place.at[1] * (o.size ? o.size[1] / 100 / fd : 1);
+    return { x: c.x + Math.cos(a) * x + Math.sin(a) * z, z: c.z - Math.sin(a) * x + Math.cos(a) * z, yaw: a + ((place.facing ?? 0) * Math.PI) / 180 };
+  }
   const n = Math.max(1, def?.slots ?? 1);
   const yaw = (o.rot * Math.PI) / 2;
   const width = o.size ? o.size[0] / 100 : o.rot % 2 ? o.d : o.w;
-  const spread = def?.bunk ? 0.04 : width / n;
+  const across = (k - (n - 1) / 2) * (def?.bunk ? 0.04 : width / n);
+  return { x: c.x + Math.cos(yaw) * across, z: c.z - Math.sin(yaw) * across, yaw };
+}
+
+/** Which of `o`'s slots (content `slots`, from 0) a resident at `x`, `z` is in: the nearest of their places (`slotPlace`). */
+export function slotOf(o: ObjectPlacement, def: SlotDef | undefined): (x: number, z: number) => number {
+  const places = Array.from({ length: Math.max(1, def?.slots ?? 1) }, (_, k) => slotPlace(o, def, k));
   return (x, z) => {
-    const across = (x - o.x - o.w / 2) * Math.cos(yaw) - (z - o.z - o.d / 2) * Math.sin(yaw);
-    return Math.min(n - 1, Math.max(0, Math.round(across / spread + (n - 1) / 2)));
+    let best = 0;
+    for (let k = 1; k < places.length; k++) if (Math.hypot(places[k].x - x, places[k].z - z) < Math.hypot(places[best].x - x, places[best].z - z)) best = k;
+    return best;
   };
 }
 

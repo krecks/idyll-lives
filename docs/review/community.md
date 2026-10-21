@@ -183,7 +183,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** clip
 - **Where:** `web/src/render/babylon/characters/clips/street.ts:127` (`CLIMB`, lanes), `:156-157` (`ROUND`: when each lane's round reaches the deck, waits, crosses and swings, as shares of the climber's own 13 s loop), `web/src/render/babylon/characters.ts:2838-2851` (`freeLane`, `stepSeq`: a lane is chosen on stepping in, the loop runs on the climber's own clock)
 - **Evidence:** Two climbers on the frame have a lane each, but if they start at other offsets they can still meet at the fireman's pole. The second lane's `wait` (0.34 → 0.50 of the round) holds it back only if both rounds started together: nothing ties the second climber's clock to the first's, so one who steps in half a round later reaches the pole while the first is still on it. `check:clips` doesn't test two climbers, and `check.mjs play` uses one resident.
-- **Status:** confirmed (community wave, by the code)
+- **Status:** fixed (3872d23a)
+- **After:** a climber stepping in while someone is going round the same frame waits at their lane, standing, until the other's round comes back to its start (`inTurn`, `LANE_SYNC` 0.4 s), so the two lanes always go round in step and the second waits on the deck while the first slides. Two climbers (a child and a teen, the second sent 6 s later) waited 7 s and then ran 0.016 s apart for the rest of the use. `bench-results/review/fixes/clips-standing/``climb/` (`climb2-gap6.json`, the pictures at the pole).
 - **Source:** `docs/objects/open.md` Still open › Residents; community wave (code reading)
 
 ### M-community-01 — The ping-pong table is about two thirds of a real one
@@ -249,7 +250,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/public/content/community.json:27` (`streetLamp` `light`: range 8, intensity 1.3, height 3.5); `web/src/render/babylon/house.ts:198-235` (`placeLights`: the garden's lamps are placed last); `web/src/render/babylon/BabylonRenderer.ts:4704-4724` (`applyRoomLights`)
 - **Evidence:** `extra/night/night-streetLamp-no-uses.png` (`review-stage-night`, 22:02, Medium, headless): the lantern's panes glow warm, the grass round the post is as dark as the rest of the garden, no pool of light under a 3.5 m lamp whose whole job is lighting the pavement. The cause isn't traced: Medium has clustered lamps (32), so the stage's rooms shouldn't crowd it out; a lamp's light from 3.5 m with the clustered inverse-square falloff may just be too weak to show. Not checked on a town lot at night (no night state of the park).
-- **Status:** open (seen on `review-stage-night` only)
+- **Status:** fixed (0eaa3ba7)
+- **After:** the cause: the lamps never light the landscape, the lawn included (`excludeLandscape`), so a garden lamp lit only what stands round it. Letting the cluster light the ground cost 1.1–1.5 ms of GPU a frame at night on Medium (`fixes/lighting/perf/perf-ab`), so the garden's lamps now cast pools of light on the lawn as the street's lamps do (`gardenPools.ts`: one draw at night, on Low too), and the street lamp is brighter (`intensity` 1.3 → 3.0; the bulkhead 0.9 → 1.6): `fixes/lighting/webgpu-medium/street.png`, `firepit-lit.png`, and the same in the other three folders. Not checked on a town lot (no night state of the park).
 - **Source:** community wave (night run)
 
 ### I-community-01 — "Go down the slide" is standing at the foot of the chute
@@ -363,6 +365,16 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Source:** community wave (I1)
 
 ### I-community-13 — moved to residents.md
+
+### I-community-14 — The park chess players' knees meet under the table
+
+- **Severity:** S3
+- **Rubric:** I2, M6
+- **Fix class:** model
+- **Where:** `tools/art/blender/families/playground.py` (`parkChessTable`: a 1 × 1 tile, the stools at x = ±0.42 m), `web/public/content/community.json` (`parkChessTable` `places`)
+- **Evidence:** `bench-results/review/fixes/slots/play/parkChessTable-side-0*.png`, `parkChessTable-0*.png`: since G-62 the two face each other across the board, but on one tile their hips are 0.84 m apart: the knees meet under the 0.48 m top and the hands at the board's middle, the heads about 0.4 m apart. Real park chess tables seat the players about 1.1 m apart (a 0.7 m top). A 2 × 1 footprint (the stools at ±0.6, moving the park lots' tables), or a narrower seated clip for board games.
+- **Status:** open
+- **Source:** fix: slots
 
 ### Pointers to findings in other ledgers
 

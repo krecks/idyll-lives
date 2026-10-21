@@ -39,7 +39,8 @@ pub mod sim {
     pub const MOVING: usize = 5;
     /// Social interaction index + 1 while in a conversation (as actor, target or listener), else 0.
     pub const SOCIAL: usize = 6;
-    /// 0 = undecided/hidden, 1 = went well, 2 = went badly (revealed halfway through).
+    /// 0 = undecided/hidden, 1 = went well, 2 = went badly (revealed halfway through; at once for
+    /// a hug or a kiss, which the body answers).
     pub const OUTCOME: usize = 7;
     /// Conversation partner's id (for a listener, the one who started it), or -1.
     pub const PARTNER: usize = 8;
@@ -143,20 +144,20 @@ fn doing(world: &World, s: &Sim) -> Doing {
     if let Some(Activity { phase: Phase::Knocking { .. }, .. }) = s.current() {
         return Doing::plain(world, None, world.content.visits.door.as_ref().and_then(|d| d.knock_anim));
     }
-    // Cooking: at the station, the step's animation while at it (the recipe was started from
-    // an interaction of `origin`: that's the interaction shown while at it).
+    // Cooking: at the station, the step's animation for that station while at it (a meal put in
+    // the oven, stirred on a hob; the recipe was started from an interaction of `origin`: that's
+    // the interaction shown while at it).
     if let Some(Activity { task: Task { kind: TaskKind::Cook { recipe, step, station, origin, .. }, .. }, phase, .. }) = s.current() {
         let Some(o) = station.and_then(|o| world.objects.get(o as usize)) else {
             return Doing::NOTHING;
         };
         let r = &world.content.recipes[*recipe];
+        let def = &world.content.objects[o.def];
         let using = matches!(phase, Phase::Using { .. });
-        let interaction = (*origin == Some(o.id))
-            .then(|| world.content.objects[o.def].interactions.iter().position(|i| i.recipe == Some(*recipe)))
-            .flatten();
+        let interaction = (*origin == Some(o.id)).then(|| def.interactions.iter().position(|i| i.recipe == Some(*recipe))).flatten();
         return Doing {
             object: o.stable as f32,
-            action: r.steps.get(*step as usize).and_then(|s| s.anim).filter(|_| using).map_or(-1.0, |a| a as f32),
+            action: r.steps.get(*step as usize).and_then(|s| s.anim_for(def.stations)).filter(|_| using).map_or(-1.0, |a| a as f32),
             def: o.def as f32,
             interaction: interaction.map_or(-1.0, |i| i as f32),
         };
@@ -181,7 +182,8 @@ fn doing(world: &World, s: &Sim) -> Doing {
         d.def = world.objects.get(at as usize).map_or(-1.0, |o| o.def as f32);
         return d;
     }
-    // Clearing away: at the bin, the sink or the counter, scraping, washing or putting away.
+    // Clearing away: at the bin, the sink or the counter, scraping, washing or putting away (the
+    // station's kind too: washing at a dishwasher sounds unlike a sink's running tap).
     if let Some(Activity { task: Task { kind: TaskKind::Dishes { station, stage, .. }, .. }, phase, .. }) = s.current() {
         let rules = &world.content.cooking;
         let anim = match stage {
@@ -190,11 +192,13 @@ fn doing(world: &World, s: &Sim) -> Doing {
             _ => rules.dishes_anim,
         };
         let anim = anim.filter(|_| matches!(phase, Phase::Using { .. }));
-        return Doing::plain(world, *station, anim);
+        let def = station.and_then(|o| world.objects.get(o as usize)).map_or(-1.0, |o| o.def as f32);
+        return Doing { def, ..Doing::plain(world, *station, anim) };
     }
-    // On the phone: on the seat (or standing), the phone animation while at it.
-    if let Some(Activity { task: Task { kind: TaskKind::Phone { seat, .. }, .. }, phase, .. }) = s.current() {
-        let anim = world.content.phone.anim.filter(|_| matches!(phase, Phase::Using { .. }));
+    // On the phone: on the seat (or standing), the action's animation while at it.
+    if let Some(Activity { task: Task { kind: TaskKind::Phone { seat, action, .. }, .. }, phase, .. }) = s.current() {
+        let phone = &world.content.phone;
+        let anim = phone.actions.get(*action).map_or(phone.anim, |a| a.anim).filter(|_| matches!(phase, Phase::Using { .. }));
         return Doing::plain(world, *seat, anim);
     }
     // Tidying up: no object, the clean animation while at it.
@@ -321,14 +325,18 @@ pub fn write(world: &World, out: &mut [f32]) {
         let Some((t, social, success, progress)) = s.conversation(&world.content) else {
             continue;
         };
-        let outcome = if progress < 0.5 {
+        // A hug or a kiss is answered at once, by the body (a refused one is leant away from); talk
+        // halfway through.
+        let def = &world.content.socials[social];
+        let reveal = if matches!(crate::social::ANIMATIONS.get(def.anim as usize - 1), Some(&("hug" | "kiss"))) { 0.0 } else { 0.5 };
+        let outcome = if progress < reveal {
             0.0
         } else if success {
             1.0
         } else {
             2.0
         };
-        let anim = world.content.socials[social].anim as f32;
+        let anim = def.anim as f32;
         let talk = world.content.talk_anim.map_or(-1.0, |a| a as f32);
         // Those listening in (a group conversation) have the one who started it as partner.
         let listeners = world.sims.iter().filter(|l| l.listening_to() == Some(i as u32)).map(|l| (l.id as usize, i, 3.0));

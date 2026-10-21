@@ -29,10 +29,12 @@ things, seen from far: every model has a far version (`far=0.25`; the chess tabl
   (`net`, a diamond mesh of thin strands, `fabric`) is its own part hung from the rim: `swish` sways it 9° and
   stretches it 18 % down and back in 0.6 s, from rest to rest, after each shot: 1.4 s into `shoot`, then every
   3.2 s while it lasts. `motions`: `{'uses': {'shoot': {'clip': 'swish', 'delay': 1.4, 'every': 3.2}}}`.
-- **Park chess table**: a stone table in the front half with the board inlaid (5 cm squares), and two stone stools
-  behind it where the content seats its players side by side (x = ±0.25 m, 27 cm back, 0.47 m up), facing the board.
-  A game is under way; one white pawn (`pawn`) slides one square on, away from the players (`move`, 0.6 s), for the
-  whole game (no `hold`: it goes back when they get up). `motions`: `{'uses': {'chess': 'move'}}`.
+- **Park chess table**: a stone table (0.48 m across, 0.56 deep) with the board inlaid (5 cm squares), and a stone
+  stool either side, left and right, where the content's `places` seat the two players facing each other across the
+  board (x = ±0.42 m, 0.47 m up; until 2026-10-21 both stools stood behind it, the players side by side). White plays
+  from the left. A game is under way; one white pawn (`pawn`) slides one square on, towards black (`move`, 0.6 s), for
+  the whole game (no `hold`: it goes back when they get up). `motions`: `{'uses': {'chess': 'move'}}`. The stools
+  reach 4 cm past the tile either side (it stands outdoors, where the gate doesn't hold it to its tile).
 
 How riding works: `objectMotion.ts` `ride(id)` gives the seat's move from rest (the first part the `ride` clip moves),
 and `characters.ts` moves a sitting or lying resident by it. All three rides use `"pose": "sit"`, so their riders go
@@ -63,7 +65,7 @@ build of its own (`parkChessTableFar`): the table, the squares and the stools at
 | `model.merryGoRound` | 1.96 × 1.04 × 1.96 m | 2,924 (721) | 2 | Platform, Rails, Stripes |
 | `model.basketballHoop` | 0.95 × 3.50 × 0.97 m | 2,912 (720) | 2 | Frame, Backboard, Hoop |
 | `model.pingPongTable` | 1.90 × 0.95 × 0.99 m | 1,148 (276) | 1 | Table, Legs |
-| `model.parkChessTable` | 0.80 × 0.85 × 0.88 m | 3,468 (1,216) | 2 | Table, Stools |
+| `model.parkChessTable` | 1.08 × 0.85 × 0.56 m | 3,468 (1,216) | 2 | Table, Stools |
 
 `check-glb`: 8 models, 0 failed, no warnings (the seesaw, built for 2 × 1 tiles, was widened to the content's
 3 × 1 with its seats at ±0.75 m, so picking and the shadow match the model). Khronos

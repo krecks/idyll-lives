@@ -50,6 +50,7 @@ import { lookAtStage, palette } from '../game/household';
 import { Characters, MAX_CHARACTERS } from '../render/babylon/characters';
 import { MaterialLibrary } from '../render/babylon/materials';
 import { buildModel, motionsOf, partPose } from '../render/babylon/models';
+import { slotPlace } from '../render/babylon/objectMotion';
 import { installNature } from '../render/babylon/nature';
 
 const P = Pose;
@@ -165,6 +166,8 @@ const STATIONS: Station[] = [
   // Seats
   { label: 'sofa', def: 'sofa', tag: 'sit', pose: P.Sit },
   { label: 'tv sofa', def: 'sofaThree', tag: 'watch', pose: P.Sit, female: true },
+  { label: 'texting on the sofa', def: 'sofa', tag: 'phoneScreen', pose: P.Sit, female: true },
+  { label: 'a call on the sofa', def: 'sofa', tag: 'phone', pose: P.Sit },
   { label: 'dining chair', def: 'diningChair', tag: 'sit', pose: P.Sit, female: true },
   { label: 'bar stool', def: 'barStool', tag: 'sit', pose: P.Sit },
   { label: 'office chair', def: 'officeChair', tag: 'sit', pose: P.Sit, female: true },
@@ -365,9 +368,10 @@ interface Actor {
   object: number;
   partner: number;
   role: number;
-  /** Standing use: the front tile's centre. */
+  /** Standing use: the front tile's centre, facing the object; or its slot's own place (content `places`), facing as it says. */
   frontX?: number;
   frontZ?: number;
+  frontYaw?: number;
   /** Used standing inside (a shower): on the slot, facing out, like sitting. */
   inside?: boolean;
   /** The baby lying in the station's crib. */
@@ -439,20 +443,24 @@ await Promise.all(
         mesh.receiveShadows = true;
         shadowGen.addShadowCaster(mesh);
       }
-      // Standing use: centred on the front tile, facing the object; sitting / lying (or
-      // standing inside, a shower): on the slot, facing out (as sim-core places them: spread
-      // across its width, a bunk's one above the other).
+      // Standing use: centred on the front tile, facing the object (or at its slot's own place); sitting /
+      // lying (or standing inside, a shower): on the slot, facing out or as its place says (as sim-core
+      // places them: `slotPlace`).
       const slots = def?.slots ?? 1;
-      const slotX = (k: number) => ox + w / 2 + (k - (slots - 1) / 2) * (def?.bunk ? 0.04 : w / slots);
+      const slot = (k: number) => slotPlace(objects[id], def, k);
       const inside = def?.interactions?.some((it) => it.inside) ?? false;
-      const front = { frontX: ox + Math.floor((w - 1) / 2) + 0.5, frontZ: oz + d + 0.5 };
+      const front = (k: number) => {
+        if (!def?.places) return { frontX: ox + Math.floor((w - 1) / 2) + 0.5, frontZ: oz + d + 0.5 };
+        const p = slotPlace(objects[id], def, k);
+        return { frontX: p.x, frontZ: p.z, frontYaw: p.yaw };
+      };
       if (s.seated) {
-        for (let k = 0; k < slots; k++) actors.push({ station: n, x: slotX(k), z: oz + d / 2, yaw: 0, object: id, partner: -1, role: 0, ...front, inside, female: k % 2 === 1 });
+        for (let k = 0; k < slots; k++) actors.push({ station: n, ...slot(k), object: id, partner: -1, role: 0, ...front(k), inside, female: k % 2 === 1 });
       } else if (!s.alone) {
-        actors.push({ station: n, x: slotX(0), z: oz + d / 2, yaw: 0, object: id, partner: -1, role: 0, ...front, inside });
+        actors.push({ station: n, ...slot(0), object: id, partner: -1, role: 0, ...front(0), inside });
       }
-      if (s.baby) actors.push({ station: n, x: slotX(0), z: oz + d / 2, yaw: 0, object: id, partner: -1, role: 0, baby: true });
-      if (s.pair) actors.push({ station: n, x: slotX(1), z: oz + d / 2, yaw: 0, object: id, partner: -1, role: 0, female: true });
+      if (s.baby) actors.push({ station: n, ...slot(0), object: id, partner: -1, role: 0, baby: true });
+      if (s.pair) actors.push({ station: n, ...slot(1), object: id, partner: -1, role: 0, female: true });
       labelAt = new Vector3(ox + w / 2, 0, oz + d + 0.1);
     } else {
       actors.push({ station: n, x: cx, z: cz, yaw: 0, object: -1, partner: -1, role: 0 });
@@ -540,7 +548,7 @@ function writeSnapshot(): void {
     snap[o + k.x] = standing ? a.frontX! : a.x;
     snap[o + k.z] = standing ? a.frontZ! : a.z;
     // Scripted stations stand up facing away, as sim-core leaves them (it keeps the yaw), unless the step uses the object.
-    snap[o + k.yaw] = standing && (!s.script || tag) ? Math.PI : a.yaw;
+    snap[o + k.yaw] = standing && (!s.script || tag) ? (a.frontYaw ?? Math.PI) : a.yaw;
     snap[o + k.pose] = pose;
     snap[o + k.moving] = 0;
     if (s.walk) {

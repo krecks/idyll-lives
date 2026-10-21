@@ -92,13 +92,15 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 | `energetic.spinBike` Interactive recumbent bike | 1x2 · floor | ride:exercise | fitness / — | Frame, Pads, Flywheel | Loop (E1) | `pedals`: the cranks and pedals turn once a second while riding (E1); the rider sits on the still seat. Renamed from "Interactive spin bike": a recumbent (kind `recumbentBike`, Q-08). |
 | `energetic.trampoline` Rebound trampoline | 2x2 · floor | bounce:exercise | outdoor / — | Frame, Pads, Mat | Loop (E1) | `bounce`: the mat dips under the bouncer's feet while bounced on (E1), 1.6 times a second (content `stand.height` 0.5). |
 | `energetic.streetballHoop` Streetball hoop | 1x1 · floor | shoot:exercise | outdoor / — | Frame, Pads, Base | Use | `swish`: the net sways after each shot (1.4 s into the use, then every 3.2 s: `delay`, `every`). |
-| `energetic.powerBlender` Power blender station | 1x1 · floor | blend:cook | kitchen / — | Frame, Doors, Blender | Use | `lid`: the jug lid lifts and settles for blend (`hold` 1 s). The blades don't turn (the smoothie hides them). |
+| `energetic.powerBlender` Power blender station | 1x1 · floor | blend:cook | kitchen / — | Frame, Doors, Blender | Use, repeating | `lid`: the jug lid lifts and settles for blend (`hold` 1 s); `blades`: then the smoothie swirls (its fruit streaks and bits turn), once a second, from 1.5 s in till the blend ends (`every` 0.9 s; 2026-10-21, the blades themselves hidden in it). 4 draws. |
 | `energetic.contrastShower` Contrast rain shower | 1x1 · floor | rinse:shower | bathroom / — | Frame, Tiles, Mat | Use | `water_on`: the rain streams grow for rinse. |
 | `energetic.recoveryPod` Recovery pod | 1x2 · floor | recover:relax | fitness / — | Frame, Pads, Boots | Use | `canopy`: the canopy lowers over them for recover and lifts after. |
 
 **In play** (signed off 2026-10-17):
 - The wall is climbed on (G-26: `boulder*`, a size per height, `STEP_IN` up onto the crash mat): hands to the start
   holds, the feet onto the low ones, up the model's holds hand and foot in turn to the top, a drop onto the mat.
+- Since 2026-10-21 (review A-packs-02) the blender's smoothie swirls once the lid is back on, till the blend ends
+  (`fixes/motions/g1718/views/blender-t0.3.png`).
 - The wall is still (looked at in all facings, climbed); the pedals turn, the mat dips with the bouncer, the net
   sways after each shot, the blender lid lifts and settles, the rain grows, the canopy lowers and lifts. Nothing
   needed fixing.
@@ -111,13 +113,15 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `chefStove` Chef's stove | 2x1 · floor | cook:cook practise:cook | kitchen / — | Body, Handles & knobs, Tiles | Use | `oven_open` (the door drops, shut again after 3 s) and `burner_on` (knob and flame ring, the whole use) for cook and practise. |
+| `chefStove` Chef's stove | 2x1 · floor | cook:cook practise:cook | kitchen / — | Body, Handles & knobs, Tiles | Use | `oven_open` (the door drops, shut again after 3 s) for practise and any `bake` step; `burner_on` (knob and flame ring, the whole use) for cook and any `stir` step. |
 | `whirlpoolTub` Whirlpool tub | 2x2 · floor | soak:bath | wellness / — | Tub, Surround, Headrests | Use | `fill`: the water rises for soak. `bubbles` swell up through the water while soaking (a loop, E1). |
 
 **In play** (signed off 2026-10-17):
 - The stove opens its oven and lights its burner for cook and practise, each run as a recipe from the house's
   fridge (`meal`, `bakedTreats`); the tub fills and bubbles for soak, its two bathers on the bench. Nothing needed
   fixing.
+- Since 2026-10-21 (G-16) practise (baking) opens only the oven and cook only lights the hob; the resident bends to
+  the oven with no pan drawn (`bench-results/review/fixes/motions/recipes/practise-chefStove-*`).
 - Both take 4 draws on purpose (the stove's door, knob and flame; the tub's water and bubbles).
 - Wellness is the pack's own category.
 
@@ -131,7 +135,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 | `foodie.deliPantry` Deli pantry | 1x1 · floor | nibble:fetch cheeseBoard:cook | kitchen / — | Body, Worktop, Shelves | Use | `doors_open`: the doors swing for nibble and cheeseBoard (`hold` 2.5 s). |
 | `foodie.espressoBar` Espresso bar | 1x1 · floor | espresso:drink latteArt:drink | kitchen / — | Body, Worktop, Machine | Use | Provides `coffee`; `brew`: the coffee stream grows and the steam wand swings out for espresso and latteArt (`hold` 4 s). |
 | `foodie.cookbookLectern` Cookbook lectern | 1x1 · floor | studyRecipes:read foodMagazines:read | kitchen / — | Body, Stool & ledge, Cookbook | Use | `page`: a page turns over for studyRecipes and foodMagazines. |
-| `foodie.pizzaOven` Wood-fired pizza oven | 2x1 · floor | bakePizza:cook warmUp:relax | outdoor / — | Body, Worktop, Brick | Use | `door_off`: the oven door lifts aside and the peel slides in for bakePizza, with the `flames`; the `flames` alone grow for warmUp. |
+| `foodie.pizzaOven` Wood-fired pizza oven | 2x1 · floor | bakePizza:cook warmUp:relax | outdoor / — | Body, Worktop, Brick | Use | `door_off`: the oven door lifts aside and the peel slides in for bakePizza (and any `bake` step), with the `flames`; the `flames` alone grow for warmUp. |
 | `foodie.chefsIsland` Chef's island | 2x1 · floor | tastingMenu:cook barBite:eat | kitchen / — | Body, Worktop, Stools | Use | `drawer_open` for tastingMenu (`hold` 2.5 s). Sat at on its stools for barBite. |
 
 **In play** (signed off 2026-10-17):
@@ -202,16 +206,19 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `kind.neighbourlyOven` Neighbourly baking counter | 2x1 · floor | familyPie:cook treatsToShare:cook | kitchen / — | Body, Fabric, Cupboards | Use | `oven_open` for familyPie and treatsToShare. |
+| `kind.neighbourlyOven` Neighbourly baking counter | 2x1 · floor | familyPie:cook treatsToShare:cook | kitchen / — | Body, Fabric, Cupboards | Use | `oven_open` for the `bake` step of familyPie and treatsToShare: the door drops as the dish goes in and shuts after 3 s; the pastry and batter are made on its worktop with the oven shut. |
 | `kind.givingJar` Community giving jar | 1x1 · floor | donate:idle | decor / — | Body, Fabric | Use | `coin`: a coin slides into the slot for donate. |
 | `kind.knittingRocker` Gift-knitting rocker | 1x1 · floor | knitGift:tinker rock:relax | hobbies / — | Body, Fabric | Loop (E1) | `rock`: the chair rocks ±5° on its rockers with the knitter riding it (`ride`) for knitGift and rock (E1). |
-| `kind.welcomeTeaTable` Welcome tea table | 2x1 · floor | shareTea:drink | living / — | Body, Fabric, Second pouf, Rug | Use | `pour`: the teapot tips for shareTea (`hold` 1.5 s). |
+| `kind.welcomeTeaTable` Welcome tea table | 2x1 · floor | shareTea:drink | living / — | Body, Fabric, Second pouf, Rug | Use | `pour`: the teapot tips for shareTea (`hold` 1.5 s). The two on the poufs turn 45° to each other (content `places`; facing across waits for G-39). |
 | `kind.songbirdFeeder` Songbird feeding station | 1x1 · floor | refill:garden watchBirds:look | outdoor / — | Body, Fabric, Roof | Use | `lid_open` for refill; `bird`: birds appear for watchBirds. |
 | `kind.hearthSettee` Hearthside quilted settee | 2x1 · floor | curlUp:relax quiltNap:nap | living / — | Body, Fabric | Use | `sink_in` for curlUp and quiltNap. The napper lies along the seat between the arms, head at the lantern's end (`BEDS` 0.44, `across`); the nap takes both places (`whole`): it starts only on an empty settee, and nobody sits beside the napper. |
 
 **In play** (signed off 2026-10-17):
 - Every clip plays and shuts: the oven for pie and treats (recipes `pie` and `bakedTreats` from the house's fridge),
   the coin, the rocker with its sitter, the teapot, the feeder's roof and birds, the settee's cushions.
+- Since 2026-10-21 (G-16, G-17) the oven door drops only for the bake, keyed by the `bake` step's tag, and shuts after
+  3 s (it stood open through the 30 and more minutes); the pastry is made in a mixing bowl on its worktop
+  (`bench-results/review/fixes/motions/recipes/pie-neighbourlyOven-*`).
 - A nap on the hearth settee takes the whole settee, as on the gloomy window seat (content `whole`): refused with
   "someone is using the hearthside quilted settee" while someone sits there; two can still sit for curlUp.
 - The coin stays in the jar while the resident is at it and comes back up into the slot when the use ends.
@@ -274,11 +281,13 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 | `natureLover.gardenHammock` Garden hammock | 2x1 · floor | swing:relax doze:nap | outdoor / — | Wood, Fabric, Stripes | Loop (E1) | `sway`: the sling rocks 8° each way while swung in or dozed in, and the resident rides it (`ride`), lain across it (`BEDS` `across`). |
 | `natureLover.cedarShower` Cedar outdoor shower | 1x1 · floor | rinse:shower | outdoor / — | Wood, Copper | Use | `water_on`: the stream grows for rinse. |
 | `natureLover.mossTerrarium` Moss terrarium | 1x1 · floor | mist:water | decor / — | Wood | Use | `lid_open`: the glass lid lifts for mist. |
-| `natureLover.glasshouse` Fern glasshouse | 2x2 · floor | unwind:relax orchids:water | outdoor / — | Wood, Frame, Cushions | Use | `door_open`: the door and a roof vent open for unwind and orchids; the orchids are tended from inside (`inside`). |
+| `natureLover.glasshouse` Fern glasshouse | 2x2 · floor | unwind:relax orchids:water | outdoor / — | Wood, Frame, Cushions | Use | `door_open`: the door opens to let the resident in, shuts behind them (`hold` 1.5 s) and opens again to let them out (`out` 1.5 s); `vent_open`: the roof vent lifts while they're in, for unwind and orchids (2026-10-21: the door stood open the whole use). `door_open`: the door and a roof vent open for unwind and orchids; the orchids are tended from inside (`inside`). |
 
 **In play** (signed off 2026-10-17):
 - Every clip plays and shuts: the bed's plants sway while tended (over the growth pose), the seedling and the
   bouquet, the bird, the hammock with its sleeper, the stream, the terrarium lid, the glasshouse door and vent.
+- Since 2026-10-21 (review A-packs-03) the glasshouse door shuts behind the resident and opens to let them out; the
+  vent stays open while they're in (`fixes/motions/g1718/play-garden.jsonl`).
   Nothing needed fixing.
 - pickSnack needs a ripe crop (`when: ripe`, `leaves: picked`; the bed takes two game days to ripen, content
   `grows`). Its `harvest` was seen playing and shutting when the ripe crop was picked, but not caught in a picture.
@@ -294,15 +303,17 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `neat.steamMopDock` Steam mop dock | 1x1 · floor | mop:clean | kitchen / — | Body, Mop | Use | `mop_off`: the mop leaves its dock for mop and is drawn in the resident's hands, pushed over the floor (content `held`). |
-| `neat.laundryCenter` Stacked laundry centre | 2x1 · floor | laundry:clean fold:clean | bathroom / — | Body, Washer & dryer | Use | `door_open`: the washer door swings for laundry and fold. Folding is 20 minutes (was 60). |
+| `neat.laundryCenter` Stacked laundry centre | 2x1 · floor | laundry:clean fold:clean | bathroom / — | Body, Washer & dryer | Use | `door_open`: the washer door swings for laundry and fold and shuts after 2.5 s (2026-10-21: it stood open through the wash and the folding). Folding is 20 minutes (was 60). |
 | `neat.rainShowerTower` Rainfall steam shower | 1x1 · floor | steamShower:shower | bathroom / — | Body, Bench | Use | `water_on`: the rain grows for steamShower. |
 | `neat.organizerDesk` Label-and-sort organizer desk | 2x1 · floor | sort:write ledger:write | office / — | Body, Wood, Chair | Use | `drawer_open`: a bin slides out of the hutch for sort and ledger. Written at on its own chair with the hands on the top (`NEAR_DESKS`, `sitHandsNear`; `SEATS`), not through its front. |
-| `neat.robotVacuumDock` Robot vacuum and dock | 1x1 · floor | program:type | living / — | Body, Trim, Rug | Use | `vacuum_out`: the robot rolls 60 cm out of its dock, turns and rolls back for program (`hold` 2 s). Program from a seat within 4 m (`seatNear`), else standing. |
+| `neat.robotVacuumDock` Robot vacuum and dock | 1x1 · floor | program:type | living / — | Body, Trim, Rug | Loop | `vacuum_round`: once programmed the robot drives out of its dock, once round a circle in front of it facing the way it goes, and back in, round after round (5 s a round) while program lasts (2026-10-21: it peeked 60 cm out and back). Program from a seat within 4 m (`seatNear`), else standing. |
 | `neat.entryConsole` Tidy entry console | 1x1 · floor | tidy:clean | decor / — | Body, Wood | Use | `tray`: the key tray drawer slides out for tidy. |
 
 **In play** (signed off 2026-10-17):
 - Every clip plays and shuts: the mop into the resident's hands, the washer door, the rain, the bin, the robot's
   round trip, the key tray.
+- Since 2026-10-21 (reviews A-packs-03, I-packs-15) the washer door shuts for the wash and the folding, and the robot
+  drives round in front of its dock while programmed (`fixes/motions/g1718/views/robot-*.png`, `play-stage.jsonl`).
 - At the organizer desk the hands rest on the top (`sitHandsNear`), no longer through the modesty panel.
 - Seen, not changed: the entry console's leaning mirror and hook board stand on the wall face, so they hang in the
   air when the console stands free. The console's mirror is `chrome`, not mirror glass.
@@ -335,7 +346,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `romantic.candlelitTable` Candlelit bistro table | 2x1 · floor | candlelitDinner:eat shareDessert:eat | kitchen / — | Body, Fabric, Tablecloth | Use | `candles`: the candle flames grow for candlelitDinner and shareDessert. |
+| `romantic.candlelitTable` Candlelit bistro table | 2x1 · floor | candlelitDinner:eat shareDessert:eat | kitchen / — | Body, Fabric, Tablecloth | Use | `candles`: the candle flames grow for candlelitDinner and shareDessert. Its places are its two chairs as built, side by side (G-39 rebuilds it to face across). |
 | `romantic.heartTub` Heart-shaped petal tub | 2x2 · floor | petalBath:bath | bathroom / — | Body, Fabric | Use | `fill`: the water rises with petals for petalBath. |
 | `romantic.vanity` Rose-gold vanity | 1x1 · floor | primp:wash (sit) | bedroom / — | Body, Fabric, Rose gold | Use | `drawer_open` for primp (`hold` 2 s), sat on the pouf facing the mirror (content `seat.facing: "back"`); the mirror is mirror glass (E6). |
 | `romantic.gramophone` Moonlight gramophone | 1x1 · floor | listen:listen waltz:dance | living / — | Body, Horn | Use | `needle`: the tone arm swings onto the record for listen and waltz. `platter` spins the record while it plays (E1). Listen is from a seat within 4 m (`seatNear`), else standing; waltz stands. |

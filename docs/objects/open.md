@@ -78,7 +78,8 @@ a single object does is on its category page ([README.md](README.md)); this page
 - **Beds keep their place; the head end is tucked:** headboards 3.5–4 cm thick, so mattresses, pillows and sleepers
   stay put and no foot passes its tile. The six-seat, farmhouse and banquet tables are 0.88 m deep, as the four-seat.
 - **A quilt per body**, shaped over its own lying pose, coming up from the foot once the sleeper lies flat; the
-  turned-down duvet flattens and narrows under it.
+  turned-down duvet flattens and narrows under it. It takes its bed's bedding colour (per instance, one material),
+  and with nobody under it no quilt is drawn at all.
 - **Finishes reach the shader** (gloss, chrome and metal); metals reflect the sky just above the horizon where they
   would reflect the ground (`SKY_FOR_GROUND = 0.3`). **Hardware is metal** (handles, knobs, pulls); the dresser, low
   dresser, dressing table and writing bureau went to 4 draws for it.
@@ -123,10 +124,10 @@ a single object does is on its category page ([README.md](README.md)); this page
   desk) from behind. Deferred from 0.3.0: each needs its own reach/clip adjustment.
 - **Getting up from a chair:** the sim puts the resident on the tile in front at once, so `standUp` plays while they
   glide back. Deferred from 0.3.0 unless the stand-up animation is reworked.
-- **Climbers** who start at other offsets could still meet at the pole.
-- **`jogAlong` has a seam** where its loop wraps (`calf_r`, `foot_r`; since before fbf8883). Its feet don't slide:
-  `check_clips.ts` had tested them as standing still. This and the clips' failures on other bodies and life stages
-  are the known ones in `tools/characters/clip-baseline.json`.
+- **Feet slide at game speeds 4 and 5** (56–78 % of the way: 45 and 90 m/s, faster than any gait steps without
+  strobing); at speed 3 the run (`runAlong`) keeps grown-ups' and teens' feet on the ground, children slide 11–14 %
+  (G-25). The clips' known failures on other bodies and life stages (the seated feet) are in
+  `tools/characters/clip-baseline.json`.
 
 ### Rendering
 - **The town map's backdrop** blocks the world like the old pie menu's did (left as a panel).

@@ -64,11 +64,15 @@ their backs on the wall face (game depth -0.43).
 
 **In play** (signed off 2026-10-17):
 - Each showered in, in all four facings, by day and at night, on WebGPU and WebGL2, on Medium and Low, every part
-  coloured. The resident steps in onto the middle of the tile (`inside`).
+  coloured. The resident steps in onto the middle of the tile (`inside`) and washes: lathers and rinses the hair,
+  turns 50° to soap the arms and the chest, turns back and rinses the face (`shower`; a child turns only the chest,
+  `showerChild`; G-21). The pack showers play the same.
 - `water_on` (0.5 s) grows the rain as the use starts, holds it for the whole use and shuts it as it ends.
 - The colour studio frames a moving part by its posed vertices, so the stall (whose rain grows from nothing and is
   turned for the slant) draws at rest and in use.
 - Three draw calls each: the tray, walls and metal; the glass (the stall's curtain); the rain.
+- Under the water the resident wears a towel, barefoot (`wearFor`, `outfit.ts` `towel`: wrapped under the arms, a
+  man's round the hips), not the day clothes; they dress again as they step out. The packs' showers do the same.
 
 ## B3. Baths (3)
 
@@ -89,6 +93,8 @@ their backs on the wall face (game depth -0.43).
 - The freestanding bath's seat is in `SEATS`, not its content.
 - Since the authenticity review (G-06): bathers sit on the tub's floor (seats 0.15, 0.17, 0.15), the heels on it and
   the shoulders over the rim at every stage; the clawfoot bather's arm drapes over its higher rim.
+- Sat in the water the bather wears a towel (the shower's); in the hot tub, the whirlpool and the cold plunge
+  (outdoor and packs ledgers) swimwear: a swimsuit, or trunks (`BATH_WEAR`).
 
 ## B4. Laundry (6)
 
@@ -96,8 +102,8 @@ their backs on the wall face (game depth -0.43).
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `laundryWasher` Washing machine | 1x1 · floor | laundry:clean | bathroom / laundry | Body, Door, Panel | Use | `door_open`: the round door swings 110° for laundry, `hold` 2.5 s (loading), then shuts. L `drum_spin` (E1). |
-| `laundryDryer` Tumble dryer | 1x1 · floor | laundry:clean | bathroom / laundry | Body, Door, Panel | Use | `door_open`, as the washer. L `drum_spin` (E1). |
+| `laundryWasher` Washing machine | 1x1 · floor | laundry:clean | bathroom / laundry | Body, Door, Panel | Use + repeat | `door_open`: the round door swings 110° for laundry, `hold` 2.5 s (loading), then shuts; `drum_spin`: once it has shut (`delay` 3.5 s) the drum turns, a turn each 1.2 s, till the wash ends. |
+| `laundryDryer` Tumble dryer | 1x1 · floor | laundry:clean | bathroom / laundry | Body, Door, Panel | Use | `door_open`, as the washer, to take the washing out to fold; the drum stays still. |
 | `towelRail` Towel rail | 1x1 · wall | — | bathroom / laundry | Rail, Towels, Hand towel | Static | Static. |
 | `towelLadder` Towel ladder | 1x1 · floor | — | bathroom / laundry | Ladder, Top towel, Middle towel, Bottom towel | Static | Static. |
 | `laundryBasket` Laundry basket | 1x1 · floor | — | bathroom / laundry | Basket, Rim & weave | Static | Static: a wicker basket with clean washing on top; no lid is built (`open.md`). |
@@ -107,6 +113,8 @@ their backs on the wall face (game depth -0.43).
 - The washing machine ("Do the laundry") and tumble dryer ("Fold the laundry") against the walls in all four
   facings: the door swings open, holds 2.5 s and shuts; the drum turns (`drum_spin`) for the whole use and stops
   after it.
+- Since 2026-10-21 (review A-bathroom-03) the washer's drum waits for its door to shut (it turned behind the open
+  door), and the dryer's doesn't tumble while the washing is folded.
 - The towel rail hangs on the walls, the towel ladder leans on them; the basket and bath mat stand free.
 - The towel ladder's colours are Top towel, Middle towel and Bottom towel, listed top to bottom (manifest labels).
 

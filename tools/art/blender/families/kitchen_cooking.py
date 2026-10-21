@@ -45,6 +45,8 @@ SECONDS = 1.4   # a door drops, a drawer slides or a knob turns in this long
 # catalog2's 0.79-deep counter numbers drawn 0.66 deep against the wall (kitchen_counters.py COUNTER66)
 COUNTER66 = ((-0.48, -0.43), (-0.46, -0.41), (0.24, 0.19), (0.31, 0.23))
 HOLD = 3.0      # seconds a door stays open once a use starts
+# the microwave's plate turns once its door has shut (`door_open` opens in 1.0 s and plays back from its hold, 1.2 s)
+TURNTABLE = {'clip': 'turntable', 'delay': 2.2, 'every': 1.9}   # (a hair under its 2 s turn: no pause between turns)
 
 
 def _knob(F, name, x, y, z, r=0.022, d=0.03, material=None, mark=True):
@@ -130,9 +132,12 @@ def stoveElectric():
     G.join(still, 'body', origin=(0, 0, 0))
     door = _oven_door(F, 'oven_door', 0, 0.56, 0.43, 0.152, hinge_y=0.17)
     knob = _knob_obj(F, 'knob0', -0.21, 0.845, 0.155)
+    # the front ring on the knob's side glows red while it's on, as the hob counter's does
+    ring = _hot_ring(F, 'hot_ring', -0.16, 0.892, -0.05, 0.066)
     G.settle()
     G.swing(door, 'oven_open', 85, seconds=SECONDS, axis='X')
-    G.swing(knob, 'knob_on', 90, seconds=0.5, axis='Y')
+    G.swing(knob, 'burner_on', 90, seconds=0.5, axis='Y')
+    _light(ring)
 
 
 # --- gas range: 1x1, four burners with flames, a taller back guard and an oven -------------------------
@@ -437,28 +442,34 @@ def dishwasherCompact():
 FAMILY = G.Family(
     'kitchen_cooking', M,
     [G.Model('stoveElectric', stoveElectric, size=(0.60, 0.98, 0.661), key='model.stoveElectric', centre=(0, -0.0995),
-             # cook turns the front-left knob for the whole use; bake drops the oven door for HOLD s
-             motions={'uses': {'cook': 'knob_on', 'bake': {'clip': 'oven_open', 'hold': HOLD}}},
+             # cook turns the front-left knob and its ring glows for the whole use; bake drops the oven door
+             # for HOLD s. By the cooking step's tag too (`stir` on the hob, `bake` in the oven), for a meal
+             # started at the fridge (snapshot.rs: no interaction at a station that isn't the recipe's origin).
+             motions={'uses': {'cook': 'burner_on', 'stir': 'burner_on', 'bake': {'clip': 'oven_open', 'hold': HOLD}}},
              paint=[('enamel', 'Body'), ('chrome', 'Knobs'), ('hob', 'Hob')]),
      G.Model('stoveGas', stoveGas, size=(0.92, 1.113, 0.716), key='model.stoveGas', centre=(0, -0.078),
-             # cook and gourmet light the front burner; bake drops the oven door
-             motions={'uses': {'cook': 'burner_on', 'gourmet': 'burner_on', 'bake': {'clip': 'oven_open', 'hold': HOLD}}},
+             # cook and gourmet (and any `stir` step) light the front burner; bake drops the oven door
+             motions={'uses': {'cook': 'burner_on', 'gourmet': 'burner_on', 'stir': 'burner_on',
+                               'bake': {'clip': 'oven_open', 'hold': HOLD}}},
              paint=[('enamel', 'Body'), ('chrome', 'Knobs'), ('grate', 'Hob')]),
      G.Model('wallOven', wallOven, size=(0.70, 2.11, 0.696), key='model.wallOven', centre=(0, -0.077),
-             # roast and bake drop the upper oven door and pull its tray out
+             # roast and bake (the interactions, and any `bake` step) drop the upper oven door and pull its tray out
              motions={'uses': {'roast': 'oven_open', 'bake': 'oven_open'}, 'hold': HOLD},
              paint=[('cab', 'Tower'), ('chrome', 'Handles')]),
      G.Model('rangeCooker', rangeCooker, size=(1.58, 1.13, 0.755), key='model.rangeCooker', centre=(0, -0.0525),
-             # cook and gourmet light a burner; bake drops the left oven door
-             motions={'uses': {'cook': 'burner_on', 'gourmet': 'burner_on', 'bake': {'clip': 'oven_open', 'hold': HOLD}}},
+             # cook and gourmet (and any `stir` step) light a burner; bake drops the left oven door
+             motions={'uses': {'cook': 'burner_on', 'gourmet': 'burner_on', 'stir': 'burner_on',
+                               'bake': {'clip': 'oven_open', 'hold': HOLD}}},
              paint=[('enamel2', 'Body'), ('chrome', 'Knobs & rail'), ('grate', 'Hob')]),
      G.Model('cooktopCounter', cooktopCounter, size=(1.0, 0.955, 0.66), key='model.cooktopCounter', centre=(0, -0.10),
-             # cook turns a knob and the front-right ring glows red
-             motions={'uses': {'cook': 'burner_on'}},
+             # cook (and any `stir` step) turns a knob and the front-right ring glows red
+             motions={'uses': {'cook': 'burner_on', 'stir': 'burner_on'}},
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop'), ('hob', 'Hob')]),
      G.Model('microwave', microwave, size=(1.0, 1.25, 0.66), key='model.microwave', centre=(0, -0.095),
-             # reheat opens the door and turns the plate while it heats
-             motions={'uses': {'reheat': 'door_open'}, 'loops': {'reheat': 'turntable'}, 'hold': 1.2},
+             # reheat (and a meal's `bake` step) opens the door to put the dish in, shuts it, then turns the
+             # plate while it heats: from the door shut (TURNTABLE), round
+             # and round (`every`, a turn each 2 s)
+             motions={'uses': {use: ['door_open', TURNTABLE] for use in ('reheat', 'bake')}, 'hold': 1.2},
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop'), ('charcoal', 'Microwave')]),
      G.Model('coffeeMachine', coffeeMachine, size=(1.0, 1.40, 0.66), key='model.coffeeMachine', centre=(0, -0.097),
              # espresso slides a cup under the spout and grows a stream of coffee
@@ -470,12 +481,13 @@ FAMILY = G.Family(
              motions={'uses': {'toast': 'toast_down', 'smoothie': 'blend'}, 'loops': {'smoothie': 'blades'}, 'hold': 2.0},
              paint=[('cab', 'Counter'), ('toaster', 'Toaster'), ('charcoal', 'Blender')]),
      G.Model('dishwasher', dishwasher, size=(1.0, 0.95, 0.685), key='model.dishwasher', centre=(0, -0.088),
-             # dishes drops the door and slides the lower rack out, held while it is loaded
-             motions={'uses': {'dishes': 'door_open'}, 'hold': 2.5},
+             # dishes (loading it) and clearing away at it (the `wash` tag) drop the door and slide the lower
+             # rack out, held open while it is loaded
+             motions={'uses': {'dishes': 'door_open', 'wash': 'door_open'}},
              paint=[('cab', 'Body'), ('chrome', 'Handle'), ('steel', 'Panel')]),
      G.Model('dishwasherCompact', dishwasherCompact, size=(1.0, 0.95, 0.66), key='model.dishwasherCompact', centre=(0, -0.10),
-             # dishes, as the dishwasher
-             motions={'uses': {'dishes': 'door_open'}, 'hold': 2.5},
+             # dishes and clearing away, as the dishwasher
+             motions={'uses': {'dishes': 'door_open', 'wash': 'door_open'}},
              paint=[('cab', 'Body'), ('chrome', 'Handle'), ('steel', 'Panel')])],
     comment='Blender-built kitchen cookers (tools/art/blender/families/kitchen_cooking.py). Listed in the '
             'base manifest\'s packs. Each cooker is a box on the floor with a hob on top and an oven '

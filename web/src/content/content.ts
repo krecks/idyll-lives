@@ -28,6 +28,8 @@ export interface InteractionDef {
   pose?: 'stand' | 'sit' | 'lie';
   /** Sit on a free seat within this many metres of the object, if there is one (watching TV from the sofa). */
   seatNear?: number;
+  /** Only a seat that looks at the object: from in front of it (`front`, a screen) or from any side (`around`, a fire). */
+  seatFacing?: 'front' | 'around';
   /** Share (0..1) of the use's need gains that nearby residents get too (hearing the TV while eating). */
   broadcast?: number;
   /** How far (m) that carries outside the same room. */
@@ -84,6 +86,14 @@ export interface InteractionDef {
    * (default every stage but a baby's): the kids' things are a child's, wine a grown-up's.
    */
   stages?: string[];
+  /**
+   * What it sounds like while it lasts: a world sound by key (`audio/world.ts` `LOOPS`: `chop` for
+   * a cheese board), or `none`; absent: by the object's `sounds`, else by `anim`. Not for a
+   * `recipe`, whose steps sound by the station they're done at.
+   */
+  sound?: string;
+  /** A sound played once as it ends (`audio/water.ts` `ONCE`: a toilet's `flush`). */
+  endSound?: string;
 }
 
 /** How cooking, eating and washing up go (content `cooking`; sim-core `cooking::CookingRules`). */
@@ -147,10 +157,14 @@ export interface RecipeStep {
   at: string[];
   minutes: number;
   anim?: string;
+  /** Another `anim` at some of its stations (`{oven: 'bake'}`), for a station object whose first kind in `at` it is. */
+  animAt?: Record<string, string>;
   /** Done without when the home has no such station. */
   optional?: boolean;
   /** What the cook carries away from it (an item id). */
   holds?: string;
+  /** What it sounds like, over the station's (`ObjectDef.sounds`; a world sound key or `none`): a bake in the oven of a cooker is no frying pan. */
+  sound?: string;
 }
 
 /** Something to cook (content `recipes`; sim-core `cooking::RecipeDef`). */
@@ -173,6 +187,9 @@ export interface RecipeDef {
   /** The life stages that may cook it, for interactions without `stages` of their own (at a hot stove: teens and up). */
   stages?: string[];
 }
+
+/** Where a lamp's shade sends its light (content `light.aim`; see `ObjectDef.light`). */
+export type LightAim = 'down' | 'up' | 'out' | 'ceiling';
 
 /** What kind of top a surface is (sim-core `content::SurfaceKind`): which seats tuck under it. */
 export type SurfaceKind = 'table' | 'bar' | 'counter' | 'desk' | 'low' | 'shelf';
@@ -197,6 +214,12 @@ export interface ObjectDef {
   description?: string;
   /** Sims that can use it at once. */
   slots?: number;
+  /**
+   * Each slot's place (sim-core `ObjectInstance::slot_position`, `slot_yaw`; `slotPlace`): metres off the
+   * footprint's middle to its right and front (before turning, for its own size), and the way its user faces,
+   * degrees from its front towards its right. Absent: spread across its width, facing its front.
+   */
+  places?: { at: [number, number]; facing?: number }[];
   /** Things it provides while it works (interactions `requires`): a coffee machine provides coffee. */
   provides?: string[];
   /** Can only be placed outdoors (trees, flower beds, ponds). */
@@ -207,9 +230,21 @@ export interface ObjectDef {
    * Gives light at night (lamps, lanterns): reach in metres, relative brightness, height of the bulb,
    * where the bulb is off the middle (`at`: metres, x and z in the object's own frame, before
    * turning; default the middle), and the floor it lights fully as its room is scored (tiles;
-   * default `roomRules.lampTiles`).
+   * default `roomRules.lampTiles`). `aim`: where its shade sends the light (default all round):
+   * `down` (a pendant's dome, a desk lamp), `up` (a sconce's open cup: a wash up the wall), `out`
+   * (a wall light: away from its wall and down, none behind it) or `ceiling` (an uplighter: up
+   * at the ceiling, which lights the room). `switch: false`: no switch, lit every night; `fire`:
+   * a fire, lit to sit by (sim-core `lights.rs`), its flames burning while it's lit.
    */
-  light?: { range?: number; intensity?: number; height?: number; at?: [number, number]; tiles?: number; switch?: boolean };
+  light?: { range?: number; intensity?: number; height?: number; at?: [number, number]; tiles?: number; switch?: boolean; fire?: boolean; aim?: LightAim };
+  /**
+   * What's done at it sounds like this, by animation tag (world sound keys or `none`, as an
+   * interaction's `sound`), for its uses without a `sound` and the cooking steps at it as a
+   * station: an oven's `stir` is silent, not a frying pan.
+   */
+  sounds?: Record<string, string>;
+  /** A world sound it makes by itself, used or not, while its lot is looked at (a fountain's water). */
+  ambient?: string;
   /** Turns freely (at any angle, for looks); default: 1×1 objects of `objectRules.freeRotation` categories. */
   freeRotation?: boolean;
   /**
@@ -225,6 +260,10 @@ export interface ObjectDef {
   fillsWall?: boolean;
   /** From the ceiling: hangs low enough to walk into (a hanging plant): it takes the floor under it. */
   hangsLow?: boolean;
+  /** From the ceiling: hangs at head height (a chandelier, a low pendant), to hang over a table: nobody walks under it, but furniture goes under it. */
+  headHeight?: boolean;
+  /** On the floor: built to stand back to a wall (a wall-hung toilet, a wall bed, a leaning ladder): it needs plain wall all along its back. */
+  againstWall?: boolean;
   /** Bunk beds: the second slot lies on the upper bunk. */
   bunk?: boolean;
   /** Bunk beds: the life stages that may take the upper bunk (default everyone who may use the bed). */

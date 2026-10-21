@@ -665,6 +665,10 @@ impl World {
                 {
                     let (fx, fz) = s.seated_from.unwrap_or_else(|| self.approach_tile(&self.objects[object as usize]));
                     pos = [fx as f32 + 0.5, fz as f32 + 0.5];
+                } else if let Some((fx, fz)) = s.seated_from {
+                    // (Talking from their seat: up where they sat down from, as what they sat
+                    // down to do isn't saved.)
+                    pos = [fx as f32 + 0.5, fz as f32 + 0.5];
                 }
                 // (Lost somewhere: back at home's front door, or the middle of town.)
                 if !pos.iter().all(|p| p.is_finite()) {
