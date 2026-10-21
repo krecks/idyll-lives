@@ -316,6 +316,7 @@
         {
           "id": "outfit",
           "label": "Pick an outfit",
+          "changesOutfit": true,
           "anim": "clean",
           "minutes": 10,
           "effects": {
@@ -357,6 +358,7 @@
         {
           "id": "outfit",
           "label": "Pick an outfit",
+          "changesOutfit": true,
           "anim": "clean",
           "minutes": 10,
           "effects": {
@@ -386,6 +388,7 @@
         {
           "id": "outfit",
           "label": "Pick an outfit",
+          "changesOutfit": true,
           "anim": "clean",
           "minutes": 10,
           "effects": {
@@ -416,6 +419,7 @@
         {
           "id": "outfit",
           "label": "Pick an outfit",
+          "changesOutfit": true,
           "anim": "clean",
           "minutes": 10,
           "effects": {

@@ -79,8 +79,8 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `dresser` Chest of drawers | 2x1 · floor | outfit:clean | bedroom / storage | Body, Handles | Use | `drawer_open`: the middle drawer slides out 30 cm for outfit; `hold` 2.5 s. |
-| `wardrobe` Wardrobe | 2x1 · floor | outfit:clean | bedroom / storage | Body, Doors, Handles | Use | `doors_open`: both doors swing out 100° for outfit; `hold` 3 s. |
+| `dresser` Chest of drawers | 2x1 · floor | outfit:clean | bedroom / storage | Body, Handles | Use | `drawer_open`: the middle drawer slides out 30 cm for outfit, open while they change. |
+| `wardrobe` Wardrobe | 2x1 · floor | outfit:clean | bedroom / storage | Body, Doors, Handles | Use | `doors_open`: both doors swing out 100° for outfit, open while they change. |
 | `chestOfDrawers` Tall chest of drawers | 1x1 · floor | outfit:clean | bedroom / storage | Body, Handles | Use | `drawer_open`. |
 | `dresserLow` Low dresser | 2x1 · floor | outfit:clean | bedroom / storage | Body, Handles | Use | `drawer_open`. |
 | `wardrobeSingle` Single wardrobe | 1x1 · floor | outfit:clean | bedroom / storage | Body, Handles | Use | `door_open`. |
@@ -90,6 +90,10 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 - Each standing free in all four facings, used for "Pick an outfit": the dresser's, tall chest's and low dresser's
   drawer slides out 30 cm; the wardrobe's and armoire's doors (`doors_open`) and the single wardrobe's door
   (`door_open`) swing out onto the rail of clothes. Each shuts after its `hold`.
+- 2026-10-21 (G-69): "Pick an outfit" changes the clothes (content `changesOutfit`): halfway through, with the
+  drawer or the doors open (held for the whole use now, no `hold`), the resident is in their next outfit (three
+  in turn: the creator's, then two made from the id, `docs/characters-format.md`), walks off in it and keeps it,
+  saved, until they change again. The use lasts its 10 minutes even with comfort full.
 - The wardrobe's Body colours the white carcass and its birch doors are a part of their own, Doors.
 
 ## BR4. Dressing and mirrors (4)

@@ -337,8 +337,9 @@ pub fn fit_on_top(
 }
 
 /// The tile a resident stands on to use `obj`: its front tile (or, should that be taken, the
-/// other of the two middle tiles in front of a thing an even number of tiles wide); for seats
-/// used from around, the first free one of the tiles in front of, behind, left and right of it.
+/// other of the two middle tiles in front of a thing an even number of tiles wide; a seat with
+/// neither free, from beside it); for seats used from around, the first free one of the tiles in
+/// front of, behind, left and right of it.
 pub fn approach_tile(content: &Content, nav: &NavGrid, obj: &ObjectInstance) -> (i32, i32) {
     approach_tiles(content, nav, obj).next().unwrap_or_else(|| obj.front_tile(content))
 }
@@ -346,9 +347,10 @@ pub fn approach_tile(content: &Content, nav: &NavGrid, obj: &ObjectInstance) -> 
 /// The tiles a resident may use `obj` from, best first: its front tile (whether or not it is
 /// free; along an even front edge, the other middle tile comes first if the front can't be stood
 /// on and it can: a thing two tiles wide is used from either, as which counts as the front swaps
-/// when the house it's in is turned round); for seats used from around, each tile in front of,
-/// behind, left and right of its middle that can be stood on, on the same storey with no wall or
-/// fence between.
+/// when the house it's in is turned round; a seat whose front can't be stood on, from the tiles
+/// left and right of it that can first: an armchair with a footstool in front of it is sat in
+/// from beside it); for seats used from around, each tile in front of, behind, left and right of its
+/// middle that can be stood on, on the same storey with no wall or fence between.
 pub fn approach_tiles<'a>(
     content: &Content,
     nav: &'a NavGrid,
@@ -377,9 +379,14 @@ pub fn approach_tiles<'a>(
         _ => None,
     };
     let instead = twin.filter(|&t| !around && !standable(sides[r]) && standable(t)).map(|(t, _)| t);
+    // (A seat with its front taken, a footstool there: from its left or right first, else still the front.)
+    let seat = content.objects[obj.def].interactions.iter().any(|i| i.pose == Pose::Sit);
+    let from_side = !around && instead.is_none() && seat && !standable(sides[r]);
     let only_front = (!around).then_some(front);
-    let beside = around.then_some(order.map(|i| sides[i])).into_iter().flatten().filter_map(move |s| standable(s).then_some(s.0));
-    instead.into_iter().chain(only_front).chain(beside)
+    let skip = if around { 0 } else if from_side { 2 } else { 4 };
+    let beside = order.into_iter().skip(skip).map(move |i| sides[i]).filter_map(move |s| standable(s).then_some(s.0));
+    let (front_first, front_last) = if from_side { (None, only_front) } else { (only_front, None) };
+    instead.into_iter().chain(front_first).chain(beside).chain(front_last)
 }
 
 /// The tiles a resident may use `obj`, a thing standing on `host`'s top, from, best first: at

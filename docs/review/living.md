@@ -323,7 +323,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/public/content/furniture.json:1389` (`pouf`), `web/public/content/catalog2/living.json:572` (`ottoman`): one use each, "Sit down"
 - **Evidence:** A pouf or an ottoman is first a place to put your feet up from the armchair or sofa beside it (`reference.json` pouf: "put your feet up; perch for a moment"); in the game both are only sat on, as a stool (`living/sheets/obj-pouf.png`, `living/sheets/obj-ottoman.png`). Feet up needs a pairing: a seat's use that finds a footstool in front of it and a legs-up pose, like the recliner's footrest. New behaviour, filed only (owner decision 3).
-- **Status:** open
+- **Status:** fixed (5f4411b9)
+- **After:** a resident sitting with a pouf or an ottoman in front of them (within reach, nobody on it) puts their feet up on it, the heels on its top, slid forward and slouched in the seat as reaching it takes (characters.ts `footstoolFor`, `feetUp`; `footstools` in characters/furniture.json): the armchair with the pouf, the sofa with the ottoman, for the teen, the adult and the elder; a child's legs don't reach a stool a tile off (`fixes/pairings/seats/`: `after-armchair-sit-02.png`, `sofa-sofa-relax-02.png`, `teen-armchair-sit-01.png`, `elder-sofa-relax-01.png`, `child-armchair-sit-01.png`). The recliner doesn't pair: its own footrest comes up (`after-recliner-relax-02.png`). An armchair with a footstool in front, refused before ("would block the way"), is sat in from beside it (sim-core `approach_tiles`, `tests/footstools.rs`). A lone sitter on a sofa takes its first free seat, not the one before the footstool (I-living-10). Before: `fixes/pairings/before/obj-pouf.png`, `obj-ottoman.png`.
 - **Source:** wave: living (I1)
 
 ### I-living-08 — The stereo's record player never turns; a CD tray opens instead
@@ -347,6 +348,16 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Status:** fixed (eaca9ed8)
 - **After:** `slots: 3`: three on the three-seat sofa.
 - **Source:** wave: living (`cargo review uses`)
+
+### I-living-10 — A lone sitter takes the sofa's first seat, not the one before the footstool
+
+- **Severity:** S3
+- **Rubric:** I1
+- **Fix class:** code
+- **Where:** `crates/sim-core/src/world.rs:272` (`pick_slot`: without `places`, the first free slot)
+- **Evidence:** `fixes/pairings/seats/after2-sofa-relax-02.png` (`play-after2.json`): a two-seat sofa with the ottoman in front of its second seat; Ada, alone, sits in the first and keeps her feet down. Someone on their own would take the seat with the footstool. The sim doesn't know footstools (the pairing is the renderer's, G-69): a content `footstool` flag and a `pick_slot` that prefers a slot with one in front would do.
+- **Status:** open
+- **Source:** fix: pairings
 
 ## Seen here for findings in other ledgers
 

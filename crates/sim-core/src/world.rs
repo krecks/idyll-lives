@@ -688,6 +688,9 @@ pub struct Activity {
     pub tags: TagMask,
 }
 
+/// How many outfits each resident has to change between (`Sim::outfit`).
+pub const OUTFITS: u8 = 3;
+
 #[derive(Debug, Clone)]
 pub struct Sim {
     /// Equal to the Sim's index in `World::sims`.
@@ -695,6 +698,10 @@ pub struct Sim {
     pub name: String,
     /// Opaque appearance data for the renderer/UI.
     pub appearance: serde_json::Value,
+    /// Which of their `OUTFITS` they're dressed in (0: the one in `appearance`, as made in the
+    /// creator; the renderer makes the others from the id): the next one once they change at
+    /// a wardrobe (`Interaction::changes_outfit`), kept until they change again.
+    pub outfit: u8,
     pub gender: String,
     /// Genders this Sim is romantically attracted to.
     pub attracted_to: Vec<String>,
@@ -790,8 +797,9 @@ pub struct Sim {
     pub(crate) conceived: Option<u32>,
     /// Care given this tick: the baby it's for and what it fills (applied after the step).
     pub(crate) care_out: Option<(u32, [f32; MAX_NEEDS])>,
-    /// Opened or closed an object this tick (`Interaction::leaves`): how the house looks
-    /// changed (applied after the step).
+    /// Opened or closed an object this tick (`Interaction::leaves`), or changed clothes
+    /// (`Interaction::changes_outfit`): how the house or they look changed (applied after the
+    /// step).
     pub(crate) reshaped: bool,
     /// Lit a fire this tick (sat down by one in the dark: see `lights.rs`): the lamps' state
     /// changed (applied after the step).
@@ -1958,6 +1966,7 @@ impl World {
             id: id as u32,
             name: name.clone(),
             appearance: spawn.appearance.clone(),
+            outfit: 0,
             gender,
             attracted_to,
             traits: spawn.traits.clone(),
@@ -2340,7 +2349,7 @@ impl World {
                 }
             }
             if std::mem::take(&mut self.sims[i].reshaped) {
-                // An object opened or closed: how it looks changes.
+                // An object opened or closed, or someone changed clothes: how it looks changes.
                 self.structure_version = self.structure_version.wrapping_add(1);
                 self.rooms_need_clean_rescore();
             }
@@ -5201,8 +5210,15 @@ fn use_object(
             && inter.trains_skills()
             && access(ctx, sim, ctx.object_plot[obj.id as usize]) == Access::Full
             && training_interest(sim, content, inter) > MIN_AUTONOMY_SCORE;
-        elapsed >= inter.minutes || (any_gain && satisfied && !planned && !routine && !practising) || drained
+        // (Clothes are changed all the way, whatever it does for comfort.)
+        elapsed >= inter.minutes || (any_gain && satisfied && !planned && !routine && !practising && !inter.changes_outfit) || drained
     };
+    // Halfway through changing: in the next outfit, which views draw (a change of looks).
+    let half = inter.minutes * 0.5;
+    if inter.changes_outfit && elapsed >= half && elapsed - minutes < half {
+        sim.outfit = (sim.outfit + 1) % OUTFITS;
+        sim.reshaped = true;
+    }
     // Homework done: better at school (by how much of it they did).
     if done && inter.homework > 0.0 && content.life.stage_at(sim.age).is_some_and(|s| s.school) {
         let share = (elapsed / inter.minutes.max(1.0)).min(1.0);

@@ -213,7 +213,8 @@ Measured: the dressing table's top 0.76 (72–78) and its pouf's seat 0.45 (42�
 - **Fix class:** code
 - **Where:** `web/public/content/furniture.json:2162`, `:2191` (`dresser`, `wardrobe` `outfit`), `web/public/content/catalog2/bedroom.json:273`, `:314`, `:355`, `:384`, `:414` (`nightstandDrawers`, `chestOfDrawers`, `dresserLow`, `wardrobeSingle`, `armoire`); `web/src/render/babylon/characters/outfit.ts:120` (`outfitFor`: the day outfit is fixed by the resident's id and appearance)
 - **Evidence:** `bedroom/play/chunk1/dresser-outfit-01.png`, `wardrobe-outfit-01.png`, `bedroom/play/chunk2/armoire-outfit-01.png`: the drawer or doors open, the resident works at the clothes for 10 minutes, the doors shut and they walk off dressed as before (comfort +0.05). Picking an outfit is changing into it. Changing the day outfit (from the wardrobe's clothes, or a pick from the creator's choices) is new behaviour.
-- **Status:** open
+- **Status:** fixed (5f4411b9)
+- **After:** "Pick an outfit" (content `changesOutfit`, on all six) puts the resident in their next outfit halfway through, the doors or the drawer open for the whole use now (no `hold`, `bedroom_storage.py`), and they walk off in it: the creator's, then two made from the id (`outfit.ts` `spareLook`: other garments, another top colour), in turn, kept and saved until they change again (`Sim::outfit`, save v31; `tests/outfits.rs`). `fixes/pairings/outfit/`: at the wardrobe in the creator's green top and navy capris (`after-wardrobe-outfit-01.png`), the white top and brown trousers from halfway (`-05`), leaving in them (`-07`); then at the dresser from those (`after-dresser-outfit-02.png`, the drawer out) into the yellow top and black shorts (`-06`). The use lasts its 10 minutes with comfort full. Not done: choosing which outfit. Before: `fixes/pairings/before/wardrobe-outfit-01.png`.
 - **Source:** wave: bedroom
 
 ### I-bedroom-05 — An outfit from the bedside drawer
