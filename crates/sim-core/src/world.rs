@@ -1658,12 +1658,13 @@ impl World {
     /// The tile a resident stands on to use `obj`, as things stand now (see
     /// `surface::approach_tile`; residents deciding what to do use `Links`).
     pub(crate) fn approach_tile(&self, obj: &ObjectInstance) -> (i32, i32) {
-        crate::surface::approach_tile(&self.content, &self.nav(), obj)
+        self.approach_tiles(obj).first().copied().unwrap_or_else(|| obj.front_tile(&self.content))
     }
 
-    /// Every tile a resident may use `obj` from, as things stand now (see `surface::approach_tiles`).
+    /// Every tile a resident may use `obj` from, as things stand now (see `surface::use_tiles`:
+    /// a thing on a top from beside its top).
     pub(crate) fn approach_tiles(&self, obj: &ObjectInstance) -> Vec<(i32, i32)> {
-        crate::surface::approach_tiles(&self.content, &self.nav(), obj).collect()
+        crate::surface::use_tiles(&self.content, &self.objects, &self.nav(), obj)
     }
 
     /// What is walkable now.
@@ -4357,7 +4358,12 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             if !obj.allows(inter, sim.id) {
                 return;
             }
-            if inter.seat_near > 0.0 {
+            // Sitting to use a thing on a top: on a seat pulled up to the top, if one is free
+            // (else on one near, `seatNear`, else they stand at it).
+            if inter.pose == Pose::Sit && content.objects[obj.def].layer == Layer::Surface {
+                reserved_seat = crate::surface::seat_at_top(content, objects, &ctx.index.links, object, sim.id, content.life.stage(sim.age));
+            }
+            if inter.seat_near > 0.0 && reserved_seat.is_none() {
                 reserved_seat = seat_near_object(sim, ctx, objects, object, inter.seat_near);
             }
             let t = match reserved_seat {
@@ -5009,7 +5015,10 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
         } => {
             let obj = &objects[object as usize];
             let inter = &content.objects[obj.def].interactions[interaction];
-            let c = obj.centre(content);
+            // A thing on a top is used at its top: standing, facing it, unless they sat down at
+            // a seat pulled up to the top.
+            let on_top = content.objects[obj.def].layer == Layer::Surface;
+            let c = if on_top { crate::surface::middle(content, obj) } else { obj.centre(content) };
             if let Some(seat) = sim.use_seat {
                 // Watching from the sofa: sit on the seat, facing the way it faces, and step
                 // back off where they came from (see `end_activity`).
@@ -5018,9 +5027,9 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
                 sim.pos = s.slot_position(content, s.slot_of(sim.id).unwrap_or(0));
                 sim.yaw = s.yaw();
                 sim.pose = Pose::Sit;
-            } else if inter.pose == Pose::Stand && !inter.inside {
+            } else if (inter.pose == Pose::Stand || on_top) && !inter.inside {
                 sim.yaw = (c[0] - sim.pos[0]).atan2(c[1] - sim.pos[1]);
-                sim.pose = inter.pose;
+                sim.pose = Pose::Stand;
             } else {
                 // Onto the seat or bed, or into the shower, facing the way it faces; they step
                 // back off where they came from (see `end_activity`).

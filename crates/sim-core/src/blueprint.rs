@@ -566,8 +566,7 @@ impl World {
                 .iter()
                 .filter(|o| w.object_plot[o.id as usize] == Some(plot))
                 .filter(|o| {
-                    let used = !w.content.objects[o.def].interactions.is_empty();
-                    used && !w.approach_tiles(o).iter().any(|&(fx, fz)| w.lot.in_bounds(fx, fz) && seen[w.lot.tile_index(fx, fz)])
+                    w.content.objects[o.def].reached() && !w.approach_tiles(o).iter().any(|&(fx, fz)| w.lot.in_bounds(fx, fz) && seen[w.lot.tile_index(fx, fz)])
                 })
                 .count();
             let sims = w

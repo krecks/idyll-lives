@@ -89,8 +89,10 @@ pub struct DiningSeat {
 pub struct Links {
     /// The table each seat faces (seats with a `seatAt`).
     pub table: Vec<Option<u32>>,
-    /// The tile each object is used from (see `approach_tile`).
+    /// The tile each object is used from (see `approach_tile`; a thing on a top, `rider_tiles`).
     pub approach: Vec<(i32, i32)>,
+    /// The top each thing on the `Surface` layer stands on (see `host_of`).
+    pub host: Vec<Option<u32>>,
 }
 
 impl Links {
@@ -116,8 +118,20 @@ impl Links {
                 faced(content, objects, nav, o, at)
             })
             .collect();
-        let approach = objects.iter().map(|o| approach_tile(content, nav, o)).collect();
-        Self { table, approach }
+        let host: Vec<Option<u32>> = objects.iter().map(|o| host_of(content, objects, o)).collect();
+        let approach = objects
+            .iter()
+            .map(|o| match host[o.id as usize] {
+                Some(h) => rider_tiles(content, objects, nav, o, h).first().copied().unwrap_or_else(|| approach_tile(content, nav, &objects[h as usize])),
+                None => approach_tile(content, nav, o),
+            })
+            .collect();
+        Self { table, approach, host }
+    }
+
+    /// The top a thing on the `Surface` layer stands on (as of the last rebuild).
+    pub fn host_of(&self, id: u32) -> Option<u32> {
+        self.host.get(id as usize).copied().flatten()
     }
 
     /// The table `seat` is pulled up to.
@@ -367,6 +381,82 @@ pub fn approach_tiles<'a>(
     let only_front = (!around).then_some(front);
     let beside = around.then_some(order.map(|i| sides[i])).into_iter().flatten().filter_map(move |s| standable(s).then_some(s.0));
     instead.into_iter().chain(only_front).chain(beside)
+}
+
+/// The tiles a resident may use `obj`, a thing standing on `host`'s top, from, best first: at
+/// the top's edge by it, from the floor beside the tile it stands over (the top's front first,
+/// then its left, right and back), else anywhere along the top's edge, nearest it first. Each
+/// can be stood on, on the same storey, with no wall or fence between it and the top. A kettle
+/// is used from in front of its counter, a book on a table from beside it. Empty when the top
+/// stands with no free side (then it is used from the top's own approach tile, `Links::new`).
+pub fn rider_tiles(content: &Content, objects: &[ObjectInstance], nav: &NavGrid, obj: &ObjectInstance, host: u32) -> Vec<(i32, i32)> {
+    let Some(h) = objects.get(host as usize) else { return Vec::new() };
+    let (w, d) = h.size(content);
+    let on = |x: i32, z: i32| x >= h.x && x < h.x + w && z >= h.z && z < h.z + d;
+    let p = middle(content, obj);
+    let under = (p[0].floor() as i32, p[1].floor() as i32);
+    let under = if on(under.0, under.1) { under } else { (under.0.clamp(h.x, h.x + w - 1), under.1.clamp(h.z, h.z + d - 1)) };
+    let storey = nav.stairs.storey(h.z);
+    let standable = |inner: (i32, i32), t: (i32, i32)| {
+        !on(t.0, t.1)
+            && nav.tile_free(t.0, t.1)
+            && nav.stairs.storey(t.1) == storey
+            && nav.stairs.step(t.0, t.1).is_none()
+            && nav.lot.edge_between(inner.0, inner.1, t.0, t.1) == Edge::Open
+    };
+    // The way the top faces (+z, +x, -z, -x), then its left, right and back.
+    const STEPS: [(i32, i32); 4] = [(0, 1), (1, 0), (0, -1), (-1, 0)];
+    let r = (h.rot % 4) as usize;
+    let mut tiles: Vec<(i32, i32)> = [r, (r + 3) % 4, (r + 1) % 4, (r + 2) % 4]
+        .into_iter()
+        .map(|i| (under.0 + STEPS[i].0, under.1 + STEPS[i].1))
+        .filter(|&t| standable(under, t))
+        .collect();
+    if tiles.is_empty() {
+        let mut edge: Vec<(f32, (i32, i32))> = h
+            .tiles(content)
+            .flat_map(|inner| STEPS.map(|s| (inner, (inner.0 + s.0, inner.1 + s.1))))
+            .filter(|&(inner, t)| standable(inner, t))
+            .map(|(_, t)| ((t.0 as f32 + 0.5 - p[0]).hypot(t.1 as f32 + 0.5 - p[1]), t))
+            .collect();
+        edge.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+        edge.dedup_by_key(|e| e.1);
+        tiles = edge.into_iter().map(|e| e.1).collect();
+    }
+    tiles
+}
+
+/// Every tile a resident may use `obj` from, best first (`approach_tiles`; for a thing on a
+/// top, `rider_tiles`, else its top's).
+pub fn use_tiles(content: &Content, objects: &[ObjectInstance], nav: &NavGrid, obj: &ObjectInstance) -> Vec<(i32, i32)> {
+    match host_of(content, objects, obj) {
+        Some(h) => {
+            let tiles = rider_tiles(content, objects, nav, obj, h);
+            if tiles.is_empty() { approach_tiles(content, nav, &objects[h as usize]).collect() } else { tiles }
+        }
+        None => approach_tiles(content, nav, obj).collect(),
+    }
+}
+
+/// A free seat pulled up to the top thing `object` stands on (`Links::table_of`), for someone
+/// in life stage `stage`, the nearest to it first: they sit there to use a laptop on a desk.
+pub fn seat_at_top(content: &Content, objects: &[ObjectInstance], links: &Links, object: u32, sim: u32, stage: usize) -> Option<u32> {
+    let host = links.host_of(object)?;
+    let p = middle(content, objects.get(object as usize)?);
+    let rules = &content.cooking;
+    objects
+        .iter()
+        .filter(|o| links.table_of(o.id) == Some(host))
+        .filter(|o| {
+            let def = &content.objects[o.def];
+            !o.broken() && o.can_use(sim, def.slots) && o.sits(def, stage, rules.seat_tags, rules.seat_avoid)
+        })
+        .map(|o| {
+            let c = middle(content, o);
+            ((c[0] - p[0]).hypot(c[1] - p[1]), o.id)
+        })
+        .min_by(|a, b| a.0.total_cmp(&b.0))
+        .map(|(_, o)| o)
 }
 
 /// The table `seat` faces: the top covering its front tile, of a kind it tucks under (its

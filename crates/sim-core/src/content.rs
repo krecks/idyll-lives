@@ -287,6 +287,12 @@ pub struct ObjectDef {
 }
 
 impl ObjectDef {
+    /// Whether building must leave a way to it: it has uses, and doesn't stand on a top (a
+    /// kettle is reached as its counter is; nothing is refused for the way to it).
+    pub fn reached(&self) -> bool {
+        !self.interactions.is_empty() && self.layer != Layer::Surface
+    }
+
     /// The slots interaction `i` takes one of. A crib's first slot is the baby's (the crib on
     /// its left, where `ObjectInstance::slot_position` lays them; the changing table beside it
     /// is where carers stand), whoever gets there first: after loading a save, a carer may set
@@ -2811,12 +2817,18 @@ impl Content {
                     return Err(Error::new(format!("object '{}': `{flag}` is for things on {on}", obj.id)));
                 }
             }
+            if layer == Layer::Surface && (obj.footprint != [1, 1] || obj.slots != 1 || obj.stairs) {
+                return Err(Error::new(format!("object '{}': things on a surface are 1×1, with one slot", obj.id)));
+            }
+            // A thing on a top is used from beside its top (`surface::rider_tiles`), standing, at
+            // a seat pulled up to the top or on one near (`seatNear`): not lain on, stood in,
+            // cooked at as a station or dined at.
             if layer == Layer::Surface
-                && (obj.footprint != [1, 1] || obj.slots != 1 || used || obj.stairs)
+                && let Some(it) = interactions.iter().find(|i| i.pose == Pose::Lie || i.inside || i.whole || i.baby || i.cares() || i.needs_table || i.recipe.is_some())
             {
                 return Err(Error::new(format!(
-                    "object '{}': things on a surface are 1×1, with one slot and no interactions",
-                    obj.id
+                    "{}.{}: a thing on a surface is used standing or sitting at its top (no lie, inside, whole, baby, care, needsTable or recipe)",
+                    obj.id, it.id
                 )));
             }
             let surface = match &obj.surface {
