@@ -42,11 +42,11 @@ Played with the `phone` clip, sitting on a `lounge` seat within 5 m when one is 
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| `text` Text (10 min) | n/a | OK | I-social-04 | I-social-04 S2 clip (texting is a call at the ear); I-social-01 S2 code (confirmed) | `social/scenes/phone-text-01.png` |
+| `text` Text (10 min) | n/a | OK | I-social-04 | I-social-04 S2 clip (texting is a call at the ear; fixed: the phone in front, `phoneScreen`); I-social-01 S2 code (confirmed) | `social/scenes/phone-text-01.png` |
 | `call` Call (25 min) | n/a | OK | I-social-01 | I-social-01 S2 code (confirmed: the hand at the ear holds nothing) | `social/scenes/phone-call-01.png` |
-| `invite` Invite over (5 min) | n/a | OK | I-social-04 | I-social-04 S2 clip; I-social-01 S2 code | `social/scenes/visit-*.png` |
-| `askOver` Ask to come over (5 min) | n/a | OK | I-social-04 | I-social-04 S2 clip; I-social-01 S2 code (not run: `meet: there`, the same clip as `invite`) | `social/scenes/phone-call-01.png` |
-| `browse` Scroll the phone (20 min) | n/a | OK | I-social-04 | I-social-04 S2 clip (scrolling is a call at the ear); I-social-01 S2 code. The child is refused ("too young for a phone"), teen, adult and elder scroll | `social/sheets/phone.png` |
+| `invite` Invite over (5 min) | n/a | OK | OK | I-social-01 S2 code (a call: at the ear is right; I-social-04 was filed here too) | `social/scenes/visit-*.png` |
+| `askOver` Ask to come over (5 min) | n/a | OK | OK | I-social-01 S2 code (a call, at the ear; not run: `meet: there`, the same clip as `invite`) | `social/scenes/phone-call-01.png` |
+| `browse` Scroll the phone (20 min) | n/a | OK | I-social-04 | I-social-04 S2 clip (scrolling is a call at the ear; fixed: the phone in front, `phoneScreen`); I-social-01 S2 code. The child is refused ("too young for a phone"), teen, adult and elder scroll | `social/sheets/phone.png` |
 
 ## Group conversations (6)
 
@@ -74,7 +74,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters.ts:346` (`EMBRACE`), `:2654-2658` (`Anim.Kiss`: `idle` and a step in), `:3125-3129` (the kiss layer: a lean and a head tilt, nothing for the height or the arms)
 - **Evidence:** The taller one's mouth meets the shorter one's forehead. The taller one needs to bend and the shorter one to tilt the head up: two-body procedural work. Deferred from 0.3.0. Cross-cutting wave: `social/pairs/kiss-adultF-yaM-back.png` (Ben 1.77 m, Ada 1.67 m): his mouth is at her brow, 10 cm apart in height is enough; `social/pairs/kiss-elder-adult-01.png` (Gus, stooped, and Ada) meet nearer the mouth. In every kiss, and the 30 minutes of `tryForBaby`, both stand with the arms hanging at their sides, touching only at the face (`social/sheets/romance.png`); the hug beside it already holds the other (`hugArms`). A kiss holds the other at the waist or the shoulders.
-- **Status:** confirmed and widened
+- **Status:** fixed (43ca1cc1, 2d887ff9)
+- **After:** the kiss meets at the lips at any two heights (`KISS_FIT`: the taller bends and bows the head, the shorter lifts the face, with the look at the other's head), the taller's arms round the waist, the shorter's up round the shoulders: Ada 1.67 and Ben 1.77 both ways, Gus (elder) and Ada (`bench-results/review/fixes/clips-social/sheets/romance.png`, `pairs/kiss-adultF-yaM-00.png`, `pairs/kiss-yaM-adultF-01.png`, `pairs/kiss-elder-adult-01.png`; before `social/pairs/kiss-adultF-yaM-back.png`). `tryForBaby` plays the same kiss.
 - **Source:** `docs/objects/open.md` Still open › Residents; `plan/release-0.3.0.md` §1.4 and §8 (deferred); wave: cross-cutting
 
 ### A-social-02 — Other children gather round a hug, right next to the pair
@@ -106,7 +107,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters.ts:2611-2665` (`choose`: the outcome is read only for `Anim.Talk`, as the listener's `yes` / `no`; hug, kiss, flirt and laugh play the same whatever it is), `:3110-3120` (the laugh layer on both of them); the outcome is in the snapshot already (`k.outcome`, `:2245`)
 - **Evidence:** `social/sheets/fails.png` (`review-social-fail`, every roll failed): a refused hug, adult–child and teen–child, is the two standing 0.6 m apart with the arms down for the shortened 1.6 minutes, no step in and no step back; a refused kiss the same; a failed flirt is the accepted one. `social/pairs/fail-joke-ya-adult-01.png`: Ada, who can't stand Ben, tips her head back and laughs at his joke with him, under a "bad" bubble. Only the face (`EXPRESSIONS`) and the bubble (`bubbles.ts:167` `iconFor`) say it went badly. A refused hug is a step back with the hands up, a refused kiss a turn of the head, a flat joke a blank face.
-- **Status:** open
+- **Status:** fixed (43ca1cc1, 2d887ff9)
+- **After:** the snapshot shows a hug's or a kiss's outcome from the start (the body answers it; talk still halfway, conversation.rs test `a_refused_hug_shows_at_once_a_chat_halfway_through`). A refused hug or kiss: the one asked leans away, the head turned aside, a hand up palm out, and steps back 0.14 m (`refuse`), the one who asked drops the shoulders and bows the head, a hand to the neck (`rebuffed`), with put-off and sad faces (`bench-results/review/fixes/clips-social/sheets/fails.png`: adult–child, teen–child, young adult–adult; before `social/sheets/fails.png`). A joke that falls flat: the listener folds the arms with a bored face, the teller shrugs (`bench-results/review/fixes/clips-social/sheets/flat-joke.png`, before `social/pairs/fail-joke-ya-adult-01.png`); one that lands is laughed at (`laugh`: the head back, a hand on the belly), the teller laughing along between turns. A flirt or sweet talk turned down: `rebuffed` and folded arms (`GESTURES`). Note: in `review-social-fail` the joke still lands on most tries (`joke` acceptance base 0.6); the flat one came from retrying, the teller walked elsewhere first, until the `bad` bubble showed.
 - **Source:** wave: cross-cutting
 
 ### I-social-03 — Most socials are the chat's talk with nothing of their own
@@ -116,7 +118,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** clip
 - **Where:** `web/src/render/babylon/characters.ts:2617-2635` (`Anim.Talk`, `Anim.Laugh`, `Anim.Flirt`, `Anim.Argue` all `talk` / `idle` / `no`), `:3121-3124` (the flirt's head tilt); `web/public/content/base.json:1085` (`socials`: introduce, compliment, askPartner and apologize are `talk`, prank is `laugh`)
 - **Evidence:** `social/sheets/talks.png`, `social/sheets/romance.png`, `social/sheets/fights.png`: introducing oneself, a compliment, asking to be partners and apologising are the same talk as a chat, with no handshake, no hand on the heart, no bow of the head; a prank is the joke's laugh with nothing played on the other; flirting and sweet talk are the talk with the head tilted; insults, an argument and a break-up a faster talk with head shakes. The face changes with each (`EXPRESSIONS`). Related: A-residents-07 (no body language for feelings, residents ledger). Small gestures per social (a handshake for `introduce`, a shrug and open hands for `apologize`, a point for `insult`) would tell them apart at the game camera.
-- **Status:** open
+- **Status:** fixed (43ca1cc1, 2d887ff9)
+- **After:** each main social has its own looping body clip on the speaker's turn (`GESTURES`, `clips/social.ts`): compliment (an open hand offered, two light claps), deep talk (fingertips together, then the chin on the hand), flirt (a hand in the hair, the other on the hip), sweet talk (the hands at the heart, a reach to the other's arm), argue (palms up, a chopping hand), insult (a dismissive flick), apologize (a hand on the heart, then open palms), joke (the story in the hands, the arms thrown wide), introduce (a hand to the chest, then out to shake), ask to be partners (hands clasped, then held out), break up (a hand to the brow, both sweeping apart), prank (a creep and "boo!") (`bench-results/review/fixes/clips-social/sheets/talks.png`, `sheets/romance.png`; the bench sheets in the log; before `social/sheets/talks.png`). Chat keeps `talk`.
 - **Source:** wave: cross-cutting
 
 ### A-social-03 — Fist fights are aimed at the attacker's own height: a teen punches over a child's head
@@ -126,7 +129,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** clip
 - **Where:** `web/src/render/babylon/characters.ts:2636-2647` (`Anim.Fight`: `punchJab` / `punchCross` / `hit` at the clip's heights, a step in and back; nothing for the partner's height, as the hug has `shoulderDrop`), `:3144-3160` (the lean and the guard)
 - **Evidence:** `social/sheets/fights.png`: Cal (teen, 1.51 m) against Dee (child, 1.09 m) throws his punches at his own chest height, a head above hers, from 1.2 m off; she guards a face nobody aims at. Young adult against teen and elder against young adult land near the face. Who may fight whom is I-systems-04's (systems ledger, widened: nothing stops a teen or an adult starting a fight with a child, `conversation.rs:63` `social_allowed` checks only the relationship and, for romance, age).
-- **Status:** open
+- **Status:** fixed (43ca1cc1, 2d887ff9)
+- **After:** the attacker's punches are aimed at the other's head (`AIM`: the arms lowered or raised to it, the back bent over a shorter one): young adult on teen, adult on teen, elder on young adult (`bench-results/review/fixes/clips-social/pairs/fight-ya-teen-01.png`, `fight-adult-teen-01.png`, `fight-elder-ya-01.png`; before `social/sheets/fights.png`). Teen on child is no longer allowed (G-45).
 - **Source:** wave: cross-cutting
 
 ### I-social-04 — Every phone action is a call: texting and scrolling hold the phone to the ear
@@ -136,7 +140,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** clip
 - **Where:** `web/public/content/base.json:1912` (`phone.anim: "phone"`, one animation for all five actions); `web/src/render/babylon/characters.ts:530` (`ACTIONS.phone`: `phone`, upper `phone`); `web/src/render/babylon/characters/clips/idle.ts:132` (`phonePose`: the right hand at the ear, the left arm across the waist)
 - **Evidence:** `social/sheets/phone.png`: "Scroll the phone" and "Text" are the call pose, hand to the ear, the head nodding as if listening, for 10 and 20 minutes; only `call` (and `invite`, `askOver`, short calls) fit it. The objects that use `phone` get the same: a video call at the nook's laptop is held to the ear in front of the screen, and so is the shortwave radio (`systems/sheets/act-phone-meditate-idle.png`). Texting and scrolling look down at a phone held in front at chest height, thumbs moving (the reading clip `lantern`'s arms are close). A per-action `anim` (content) and a "phone in hand" clip.
-- **Status:** open
+- **Status:** fixed (43ca1cc1, 2d887ff9)
+- **After:** a phone action's own `anim` (content `phone.actions[].anim`; tests/phone.rs `texting_and_scrolling_look_at_the_screen_a_call_is_at_the_ear`): texting and scrolling play `phoneScreen`, the phone held in both hands before the chest, the head bowed, the thumbs tapping and swiping (`phoneText`; seated as the upper body); calls, invitations and asking over stay at the ear (`bench-results/review/fixes/clips-social/sheets/phone.png`, `sheets/phone-sofa.png`; before `social/sheets/phone.png`). The phone itself is still mimed (I-social-01, G-70).
 - **Source:** wave: cross-cutting
 
 ### I-social-05 — "Try for a baby" is a 30-minute standing kiss, wherever the two happen to be

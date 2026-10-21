@@ -703,6 +703,7 @@ Phase 4. Each row will name the group, the commit, and the before and after shot
 
 | Group | Findings | Commit | Merge | Before → after |
 |---|---|---|---|---|
+| G-27 | A-social-01, A-social-03, I-social-02, I-social-03, I-social-04 | 43ca1cc1, 2d887ff9 | | `social/sheets/romance.png`, `fights.png`, `fails.png`, `talks.png`, `phone.png` → `fixes/clips-social/sheets/` (the same names, `flat-joke.png`, `phone-sofa.png`) |
 
 ## 9. Found but not fixed
 
