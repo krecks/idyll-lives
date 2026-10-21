@@ -153,7 +153,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** decision
 - **Where:** `crates/sim-core/src/world.rs`
 - **Evidence:** By design. It makes uses (and their clips) short and easy to miss in checks: a reviewer should lower the needs first. Cross-cutting wave: every `review-*` state sets the needs to 0.5 for this reason; on `review-baby` (the grown-ups' needs full) the feed and change ended as soon as the baby's needs were up.
-- **Status:** confirmed
+- **Status:** won't fix (by design, Q-22)
+- **After:** Phase 4 (2026-10-21): kept as designed (owner decision Q-22, G-13); review states keep setting the needs to 0.5 so a use lasts. No code change.
 - **Source:** `docs/objects/open.md` Still open › Content and sim
 
 ### I-systems-03 — With neither a sink nor a bin, dirty plates pile up on the floor
