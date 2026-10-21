@@ -4,6 +4,7 @@ What it covers: the 20 objects of [docs/objects/kids.md](../objects/kids.md), in
 
 - **Evidence:** `bench-results/review/kids/` (gallery, clip, pose and play shots; shots stay out of git).
 - **Pilot rows** (the 28 `base.json` objects and the residents, 2026-10-21): Shots are relative to `bench-results/review/pilot/` in the review worktree; how they were taken is in its `log.md`, what was learnt in [pilot-notes.md](pilot-notes.md).
+- **Wave rows** (office/kids wave, 2026-10-21): Shots are relative to `bench-results/review/` in the review worktree; the shots taken for this wave are in `kids/extra/` and `office/extra/` (how: `office/review-log.md`). Kids' furniture is judged against children's sizes (reference `resident.child`, the kinds' child ranges).
 - **Rubric:** [plan/authenticity-review.md §3](../../plan/authenticity-review.md#3-rubrics); real-world ranges in [reference.md](reference.md). Finding format and severities: [README.md](README.md#writing-a-finding).
 - **Columns:** M, A and I take `OK`, a finding id or `n/a`; `—` is pending. Findings lists the ids filed against the row, with severity and fix class; Shots names the evidence files.
 - **Seeded findings** (`Status: seeded`) are known issues copied in from earlier docs. Confirm or close them; don't file them again.
@@ -15,9 +16,20 @@ Family: `tools/art/blender/families/kids.py`.
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
 | `crib` Crib | M-kids-01 | I-kids-04 | I-kids-03, I-kids-05 | I-kids-03 S1 code (confirmed, widened); I-kids-04 S2 renderer-table; I-kids-05 S2 code; M-kids-01 S3 model | `sheets/obj-crib.png`, `sheets/crib-care.png`, `play/crib-*.png`, `scenes/crib-*.png`, `scenes/care-*.png`, `clips/clips-crib-all-t*.png`, `sheets/bedpose-6.png`, `sheets/bedpose-9.png` |
-| `kidsBed` Kids' bed | — | — | — | | |
-| `kidsBedCar` Race car bed | — | — | — | | |
-| `highChair` High chair | — | — | — | I-kids-01 S3 code (seeded) | |
+| `kidsBed` Kids' bed | OK | OK | OK | — (its 0.88 × 1.82 m mattress is a single bed's, so an adult in it isn't the I-kids-03 case) | `kids/sheets/obj-kidsBed.png`, `kids/sheets/age-kidsBed.png`, `kids/play/child-c1/kidsBed-sleep-02.png` |
+| `kidsBedCar` Race car bed | OK | OK | I-kids-03 | I-kids-03 S1 code (an adult's feet on the bonnet) | `kids/sheets/obj-kidsBedCar.png`, `kids/sheets/age-kidsBedCar.png`, `kids/poses/poses-only-elder-0-car_bed.png` |
+| `highChair` High chair | M-kids-04 | n/a | I-kids-01 | I-kids-01 S2 code (seeded; confirmed, raised); M-kids-04 S3 content | `kids/sheets/obj-highChair.png`, `kids/play/c1/highChair-no-uses.png` |
+
+### Real uses against the content's (I1)
+
+Durations are judged by §9 decision 2 (short by design; only outliers against similar uses are filed).
+
+| Item | Real uses | Content uses (minutes) | Verdict |
+|---|---|---|---|
+| `crib` | a baby sleeps; feed (bottle, in arms), change a nappy on the changing table, play, cuddle, settle them | lie in the crib (720, the baby), feed (15), change (10), play (20), cuddle (15) | the right set; feeding and changing don't look like it (I-kids-04, I-kids-05), and anyone may take any of them, the 8-year-old and adults lying in it too (I-kids-03) |
+| `kidsBed` | a child sleeps, naps, hears a bedtime story | sleep (480), nap (30) | OK (480 for a child, who needs 540–720, is the game's short night, by design); no bedtime story (a two-person use, not filed) |
+| `kidsBedCar` | a child sleeps, naps, plays at driving it | sleep (480), nap (30) | OK; an adult lies in it with the feet on the bonnet (I-kids-03) |
+| `highChair` | a baby or toddler sits in it to be fed at the table | none | the one use missing (I-kids-01) |
 
 ## KD2. Toys (10)
 
@@ -25,16 +37,31 @@ Family: `tools/art/blender/families/kids.py`.
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| `toyBox` Toy box | — | — | — | | |
-| `toyChest` Toy chest | — | — | — | | |
-| `dollHouse` Doll house | — | — | — | | |
-| `rockingHorse` Rocking horse | — | — | — | | |
-| `playTent` Play tent | — | — | — | | |
-| `ballPit` Ball pit | — | — | — | | |
-| `trainTable` Train table | — | — | — | | |
-| `playMat` Play mat | — | — | — | | |
-| `teddyBear` Giant teddy bear | — | — | — | | |
-| `beanBagKids` Kids' bean bag | — | — | — | | |
+| `toyBox` Toy box | OK | I-kids-06 | I-kids-06 | I-kids-06 S2 renderer-table | `kids/sheets/obj-toyBox.png`, `kids/sheets/age-toyBox.png` |
+| `toyChest` Toy chest | M-kids-03 | I-kids-06 | I-kids-06 | I-kids-06 S2 renderer-table; M-kids-03 S3 content | `kids/sheets/obj-toyChest.png`, `kids/play/c1/toyChest-play-01.png` |
+| `dollHouse` Doll house | OK | OK | OK | | `kids/sheets/obj-dollHouse.png`, `kids/sheets/age-dollHouse.png` |
+| `rockingHorse` Rocking horse | OK | OK | I-kids-03 | I-kids-03 S1 code (adults, teens and elders ride it) | `kids/sheets/obj-rockingHorse.png`, `kids/sheets/age-rockingHorse.png` |
+| `playTent` Play tent | OK | I-kids-07 | I-kids-07, I-kids-03 | I-kids-07 S2 renderer-table; I-kids-03 S1 code | `kids/sheets/obj-playTent.png`, `kids/play/child-c1/playTent-play-01.png` |
+| `ballPit` Ball pit | OK | I-kids-07 | I-kids-07, I-kids-03 | I-kids-07 S2 renderer-table; I-kids-03 S1 code | `kids/sheets/obj-ballPit.png`, `kids/play/child-c1/ballPit-jump-01.png` |
+| `trainTable` Train table | M-kids-02 | I-kids-06 | I-kids-06 | I-kids-06 S2 renderer-table; M-kids-02 S3 model | `kids/sheets/obj-trainTable.png`, `kids/sheets/age-trainTable.png` |
+| `playMat` Play mat | OK | OK | OK | | `kids/sheets/obj-playMat.png`, `kids/sheets/age-playMat.png` |
+| `teddyBear` Giant teddy bear | OK | OK | OK | | `kids/sheets/obj-teddyBear.png`, `kids/sheets/age-teddyBear.png` |
+| `beanBagKids` Kids' bean bag | OK | OK | I-kids-03 | I-kids-03 S1 code (adults flop into it) | `kids/sheets/obj-beanBagKids.png`, `kids/sheets/age-beanBagKids.png` |
+
+### Real uses against the content's (I1)
+
+| Item | Real uses | Content uses (minutes) | Verdict |
+|---|---|---|---|
+| `toyBox` | take toys out and play on the floor; tidy them away | play with toys (30) | the use is right; it is played standing over the box (I-kids-06); tidying away missing (minor, not filed) |
+| `toyChest` | as the toy box | play with toys (30) | as the toy box (I-kids-06) |
+| `dollHouse` | play with dolls, kneeling or sitting at its open front | play with the doll house (30), kneeling | OK |
+| `rockingHorse` | a small child rocks on it | ride (15) | OK for a child; adults ride it too (I-kids-03) |
+| `playTent` | crawl in, hide, play inside | play in the tent (30) | played outside the flap (I-kids-07) |
+| `ballPit` | climb in, jump, throw the balls about | jump in the ball pit (20) | played beside the pit (I-kids-07) |
+| `trainTable` | push the trains round, one or two children kneeling or standing at the low table | play with the trains (30, two slots) | the use is right; hands far over the track (I-kids-06) |
+| `playMat` | build with blocks; a baby's tummy time | build with blocks (30), kneeling | OK; no baby use (a baby only lies in the crib today; not filed) |
+| `teddyBear` | hug it, sit against it | hug (5) | OK (5 minutes is real, 1–5; the T4 flag against the `relax` median isn't an outlier against hugs) |
+| `beanBagKids` | flop down, read a picture book in it | flop (20) | OK; adults flop into it too (I-kids-03) |
 
 ## KD3. Kids' study and art (6)
 
@@ -42,20 +69,23 @@ Family: `tools/art/blender/families/kids.py`.
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| `kidsDesk` Kids' desk | — | — | — | I-kids-02 S3 renderer-table (seeded) | |
-| `kidsTable` Kids' table | — | — | — | | |
-| `kidsChair` Kids' chair | — | — | — | A-kids-01 S3 renderer-table (seeded) | |
-| `kidsBookshelf` Picture-book shelf | — | — | — | | |
-| `kidsChalkboard` Chalkboard easel | — | — | — | | |
-| `kidsEasel` Kids' easel | — | — | — | | |
+| `kidsDesk` Kids' desk | OK | OK | I-kids-03 | I-kids-03 S1 code (an adult does homework at it; an adult desk chair works at it); I-kids-02 S3 renderer-table (seeded; closed) | `kids/sheets/obj-kidsDesk.png`, `kids/sheets/age-kidsDesk.png`, `kids/extra/side-chairTask-11-12-3-write-01.png` |
+| `kidsTable` Kids' table | M-kids-03 | n/a | I-kids-08 | M-kids-03 S3 content; I-kids-08 S3 decision | `kids/sheets/obj-kidsTable.png`, `kids/play/child-pair-kidsChair/child-kidsChair-homework-01.png` |
+| `kidsChair` Kids' chair | OK | A-kids-01, A-residents-09 | I-kids-03 | A-kids-01 S2 renderer-table (seeded; confirmed, raised); A-residents-09 S2 clip (residents ledger); I-kids-03 S1 code (adults' feet through the floor) | `kids/sheets/obj-kidsChair.png`, `kids/sheets/age-kidsChair-2.png`, `kids/extra/coffee-kidsChair-draw-01.png` |
+| `kidsBookshelf` Picture-book shelf | OK | OK | I-living-03, I-held-01 | I-living-03 S2 content (living ledger: read standing at the shelf); I-held-01 S2 code (held ledger: no book) | `kids/sheets/obj-kidsBookshelf.png`, `kids/play/c1/kidsBookshelf-read-01.png` |
+| `kidsChalkboard` Chalkboard easel | OK | OK | I-held-01 | I-held-01 S2 code (held ledger: no chalk) | `kids/sheets/obj-kidsChalkboard.png`, `kids/sheets/age-kidsChalkboard.png` |
+| `kidsEasel` Kids' easel | OK | OK | I-held-01 | I-held-01 S2 code (held ledger: no brush) | `kids/sheets/obj-kidsEasel.png`, `kids/sheets/age-kidsEasel.png` |
 
-## Real uses against the content's (I1)
-
-Filled by the pilot for its rows; durations are judged by §9 decision 2.
+### Real uses against the content's (I1)
 
 | Item | Real uses | Content uses (minutes) | Verdict |
 |---|---|---|---|
-| `crib` | a baby sleeps; feed (bottle, in arms), change a nappy on the changing table, play, cuddle, settle them | lie in the crib (720, the baby), feed (15), change (10), play (20), cuddle (15) | the right set; feeding and changing don't look like it (I-kids-04, I-kids-05), and anyone may take any of them (I-kids-03) |
+| `kidsDesk` | a child does homework, draws | homework (45), draw (30) | OK for a child; adults do both (I-kids-03) |
+| `kidsTable` | children draw, have a snack, play a game, on little chairs | none of its own; a kids' chair at it: draw (30), homework (45) | OK for drawing; never a place to eat (I-kids-08) |
+| `kidsChair` | sit at the kids' table | sit (20); at a low table: draw (30), homework (45) | OK; at a coffee table the hands fall short (A-kids-01) |
+| `kidsBookshelf` | pick a picture book and read it sitting down | read a picture book (30), standing | read standing at the shelf, no book (I-living-03, I-held-01) |
+| `kidsChalkboard` | draw in chalk, wipe it | draw (30) | OK (no chalk in hand: I-held-01) |
+| `kidsEasel` | paint (one child each side of a double easel) | paint (30), one slot | OK (no brush: I-held-01) |
 
 ## Findings
 
@@ -63,45 +93,63 @@ Seeded from earlier docs first; add new findings after them in the same form.
 
 ### A-kids-01 — A kids' chair at a coffee table: the hands hover
 
-- **Severity:** S3
+> Office/kids wave: confirmed with the child it is for; raised from S3 to S2 (hands hovering is the README's S2 example, and a child drawing at the coffee table is a normal sight).
+
+- **Severity:** S2
 - **Rubric:** A1
 - **Fix class:** renderer-table
-- **Where:** `web/src/render/babylon/tableTuck.ts`, `web/src/render/babylon/characters.ts:268` (`TUCK`)
-- **Evidence:** A kids' chair pulled up to a coffee table (living.md L3) leaves the hands hovering over the top. Deferred from 0.3.0.
-- **Status:** seeded (from `docs/objects/open.md` L121)
-- **Source:** `docs/objects/open.md` Still open › Residents; `plan/release-0.3.0.md` §1.4
+- **Where:** `web/src/render/babylon/tableTuck.ts`, `web/src/render/babylon/characters.ts:216` (`TUCK`)
+- **Evidence:** A kids' chair pulled up to a coffee table (living.md L3) leaves the hands hovering over the top. Deferred from 0.3.0. Wave: `kids/extra/coffee-kidsChair-draw-01.png` (the 8-year-old, `draw`, kids' chair at the coffee table's long side): the chair isn't pulled in, the child sits a hand's breadth back from the 0.42 m top with the hands at the knees, short of it. At the kids' table the same chair is pulled in and the hands are on the top (`kids/play/child-pair-kidsChair/child-kidsChair-homework-01.png`).
+- **Status:** confirmed
+- **Source:** `docs/objects/open.md` Still open › Residents; `plan/release-0.3.0.md` §1.4; wave: office/kids (`check.mjs play --objects kidsChair@9,13,2 --with coffeeTable@9,12,0 --use draw --sim 3`)
 
 ### I-kids-01 — The high chair's tray has no use: the sim never seats a baby in it
 
-- **Severity:** S3
+> Office/kids wave: confirmed; raised from S3 to S2: the high chair has no use at all, and its one real use is obvious (the README's S2 example "a missing obvious use").
+
+- **Severity:** S2
 - **Rubric:** I1, I14
 - **Fix class:** code
-- **Where:** `tools/art/blender/families/kids.py:443`, `web/public/content/catalog2/dining.json:744`
-- **Evidence:** A modelled part with no clip, left decorative for 0.3.0. A baby is never seated in the high chair, so nothing could use the tray.
-- **Status:** seeded (from `docs/objects/open.md` L141)
-- **Source:** `docs/objects/open.md` Still open › Content and sim; `plan/release-0.3.0.md` §2.5
+- **Where:** `tools/art/blender/families/kids.py:443-464`, `web/public/content/catalog2/dining.json:744` (`highChair`, no `interactions`)
+- **Evidence:** A modelled part with no clip, left decorative for 0.3.0. A baby is never seated in the high chair, so nothing could use the tray. Wave: `kids/play/c1/highChair-no-uses.png` and `kids/play/child-c1/highChair-no-uses.png`: no uses for anyone. A baby is fed in the crib instead (I-kids-04). Seating a baby in it at a table, fed by an adult, is new behaviour.
+- **Status:** confirmed
+- **Source:** `docs/objects/open.md` Still open › Content and sim; `plan/release-0.3.0.md` §2.5; wave: office/kids
 
 ### I-kids-02 — A chair facing the kids' desk is used from behind its built-in chair
+
+> Office/kids wave: closed, as I-office-01.
 
 - **Severity:** S3
 - **Rubric:** I2, A1
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/tableTuck.ts`
-- **Evidence:** As I-office-01: a chair facing a desk with its own chair built in is tucked in from behind. Deferred from 0.3.0.
-- **Status:** seeded (from `docs/objects/open.md` L121)
-- **Source:** `docs/objects/open.md` Still open › Residents; `plan/release-0.3.0.md` §1.4
+- **Evidence:** As I-office-01: a chair facing a desk with its own chair built in is tucked in from behind. Deferred from 0.3.0. Wave check: a desk chair can't be bought on the kids' desk's front tile ("that would block the way", both tries, `office/extra/play-gaps.jsonl`), and the kids' chair can't face it at all (`seatAt: ["low"]`, the kids' desk is a `desk`). Beside it, an adult in a desk chair writes at the end of the 0.57 m top, 9 cm over her seat (`kids/extra/side-chairTask-11-12-3-write-01.png`): that is an adult at a child's desk, filed under I-kids-03.
+- **Status:** closed (a chair can no longer stand on the desk's front tile: "that would block the way")
+- **Source:** `docs/objects/open.md` Still open › Residents; `plan/release-0.3.0.md` §1.4; wave: office/kids (`check.mjs play --objects-file gaps2.txt`)
 
 ### I-kids-03 — A direct use skips the rules free will keeps: an adult lies in the crib, a child cares for the baby, an adult does homework
 
 > Pilot: confirmed and widened to its cause. Severity raised from S2 to S1 (an adult in pyjamas lying in a cot, legs through the rails, from the pie menu); fix class from `content` to `code`.
+>
+> Office/kids wave: confirmed and widened to the kids' furniture and the reverse (the owner's S1 rule: an adult using a child's or a baby's thing, or a child an adult's, as if it fitted). For these there is no rule at all, for free will either: free will checks only `baby`, care and `homework` (`world.rs:3838-3865`), so an adult on free will may ride the rocking horse too (the half I-systems-04 names for the stove).
 
 - **Severity:** S1
 - **Rubric:** I1, I6
 - **Fix class:** code
-- **Where:** `crates/sim-core/src/world.rs:2972` (`Command::Use`: checks broken, `requires`, `when`/open, `whole`, `needsTable`; nothing about the user); against `world.rs:3829-3856` (free will: a `baby` use only for a baby, care only by an adult with `Access::Full` and a baby in the crib, homework only at a school stage); `web/src/game/session.ts:1160` (the pie menu offers every interaction to whoever is selected)
-- **Evidence:** `play/crib-lie-01.png`: the adult resident 0 lies in the crib in pyjamas, the legs out over the end rail (`sheets/crib-care.png` shows the cot at its real size beside the carers); the elder and the teen take it too (`play-elder/crib-lie-*.png`, `play-teen/crib-lie-*.png`). A newly bought, empty crib's feed, change, play and cuddle all run (`play/crib-feed-*.png` …), as Phase 0 saw. On `review-stage`'s own crib, with its baby, the child (8) and the teen (15) each feed, cuddle, change and play with the baby on a direct use (`scenes/care-child-*.png`, `scenes/care-teen-*.png`, `scenes/scenes.log`), which free will never lets them; an adult (`play/bookshelf-homework-*.png`, `play/computerDesk-homework-*.png`) does homework, which free will offers only to pupils. One cause: the command doesn't apply the user tests free will applies. Related: I-systems-04 (no age rule exists at all for a stove); this one is rules that exist but only for free will.
-- **Status:** confirmed (pilot)
-- **Source:** `check.mjs play --state review-stage --objects crib --use all` (Phase 0 and pilot, adult, teen, elder); pilot `scripts/scenes.mjs` childcare
+- **Where:** `crates/sim-core/src/world.rs:2981` (`Command::Use`: checks broken, `requires`, `when`/open, `whole`, `needsTable`; nothing about the user); against `world.rs:3838-3865` (free will: a `baby` use only for a baby, care only by an adult with `Access::Full` and a baby in the crib, homework only at a school stage); `web/src/game/session.ts:1160` (the pie menu offers every interaction to whoever is selected); `crates/sim-core/src/content.rs` (objects and interactions have no life-stage rule: the kids' furniture can't say it is for children)
+- **Evidence:** `play/crib-lie-01.png`: the adult resident 0 lies in the crib in pyjamas, the legs out over the end rail (`sheets/crib-care.png` shows the cot at its real size beside the carers); the elder and the teen take it too (`play-elder/crib-lie-*.png`, `play-teen/crib-lie-*.png`). A newly bought, empty crib's feed, change, play and cuddle all run (`play/crib-feed-*.png` …), as Phase 0 saw. On `review-stage`'s own crib, with its baby, the child (8) and the teen (15) each feed, cuddle, change and play with the baby on a direct use (`scenes/care-child-*.png`, `scenes/care-teen-*.png`, `scenes/scenes.log`), which free will never lets them; an adult (`play/bookshelf-homework-*.png`, `play/computerDesk-homework-*.png`) does homework, which free will offers only to pupils. One cause: the command doesn't apply the user tests free will applies. Related: I-systems-04 (no age rule exists at all for a stove); this one is rules that exist but only for free will. (Pilot shots: relative to `bench-results/review/pilot/`.)
+- **Evidence (office/kids wave;** paths under `bench-results/review/`**):**
+  - The baby's crib: the 8-year-old lies in it, the mobile through her head and her feet through the rail (`kids/play/child-c1/crib-lie-01.png`); the child also feeds and changes at an empty crib (`kids/play/child-c1/crib-change-01.png`).
+  - The race car bed (mattress 0.84 × 1.44 m, a junior bed's, `kids.py:417`): an adult lies with her feet on the bonnet (`kids/play/c1/kidsBedCar-sleep-01.png`), and an elder's blanket drapes over the whole bonnet (`kids/poses/poses-only-elder-0-car_bed.png`). The kids' bed (0.88 × 1.82 m, a single bed's size) fits an adult and isn't counted.
+  - The rocking horse (seat 0.56 m, 0.29 m wide): adults, the teen and the elder ride it astride with their feet flat on the floor, the horse lost under them (`kids/play/c1/rockingHorse-ride-01.png`, `kids/poses/poses-seats-default-0-rockingHorse.png`).
+  - The kids' chair (seat 0.31 m): an adult or an elder sits with the knees up and the feet sunk through the floor (`kids/poses/poses-seats-default-3-kidsChair.png`, `-elder-3-`); at the kids' table an adult draws and does homework, the knees under a 0.50 m top (`kids/play/pair-kidsChair/kidsChair-homework-01.png`).
+  - The kids' desk (top 0.57, seat 0.36): an adult does homework and draws on its child-size chair (`kids/play/c1/kidsDesk-homework-01.png`); an adult desk chair also works at it, the top 9 cm over the seat (`kids/extra/side-chairTask-11-12-3-write-01.png`; `chairTask` `seatAt: ["desk"]` takes the kids' desk's `desk` kind, `furniture.json:2834`).
+  - The kids' bean bag (0.62 m), the ball pit (0.93 m across, 0.47 high) and the play tent (door 0.56 m high): adults flop into the bag and "jump in the ball pit" and "play in the tent" (`kids/play/c1/beanBagKids-flop-01.png`, `kids/play/c1/ballPit-jump-01.png`, `kids/play/c1/playTent-play-01.png`; the last two are also used from outside, I-kids-07).
+  - The reverse: the 8-year-old types at the standing desk's 1.05 m top, the keyboard shelf at her chin (`office/extra/child-deskStanding-browse-01.png`).
+  - Homework by adults on every homework use in these two ledgers: `computerDesk`, `deskWriting`, `deskLaptop`, `chairTask`, `chairExecutive`, `kidsDesk`, `kidsChair` (`office/play/c1/deskWriting-homework-01.png`, `office/play/pair-chairTask/chairTask-homework-01.png`).
+  - Toys (toy box, toy chest, doll house, train table, play mat, teddy, easels, picture books) are not counted: grown-ups play with them in life too.
+- **Status:** confirmed and widened (pilot; office/kids wave)
+- **Source:** `check.mjs play --state review-stage --objects crib --use all` (Phase 0 and pilot, adult, teen, elder); pilot `scripts/scenes.mjs` childcare; wave: office/kids (Phase 0.9 `play/c1`, `play/child-c1`, poses; `check.mjs play --objects deskStanding --sim 3`)
 
 ### I-kids-04 — Feeding the baby is the gardening kneel at the cot rail
 
@@ -132,3 +180,63 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Evidence:** `sheets/obj-crib.png`, `clips/clips-crib-all-t99.png`: the cot is 0.88 m square in plan on the 1 × 1 half of its footprint; a cot is oblong (mattress 60 × 120 or 70 × 140 cm, `reference.json` `crib`). Its depth 0.93 m is over the 0.60–0.80 (±10 %) range for the same reason. The mattress height (0.56 m) and the rail top (0.92 m) are right. The check-glb warning "mattress 0.56 m, the model 0.780 m there (x 0.50)" is the changing pad under the second slot, not the cot (`BEDS.crib` applies to slot 0): a tool artefact.
 - **Status:** open
 - **Source:** pilot
+
+### I-kids-06 — Toys are played with standing over them, the hands out in the air
+
+- **Severity:** S2
+- **Rubric:** I3, A1
+- **Fix class:** renderer-table
+- **Where:** `web/src/render/babylon/characters.ts:477` (`ACTIONS.play`: standing `spell`, `HANDS.keys`, for every object whose use is `anim: play`); content `anim: play` at `web/public/content/furniture.json:2663` (`toyBox`), `web/public/content/catalog2/kids.json:135` (`toyChest`), `kids.json:232` (`trainTable`)
+- **Evidence:** `kids/play/c1/toyChest-play-01.png`, `kids/play/c1/toyBox-play-01.png`, `kids/play/child-c1/toyBox-play-01.png`: adult and child stand at the open box for 30 minutes with the hands held out over it; no toy comes out. `kids/play/c1/trainTable-trains-01.png`, `kids/play/child-c1/trainTable-trains-01.png`: at the 0.44 m train table they stand upright, the hands at the waist 0.3 m (child) to 0.5 m (adult) above the track. A child plays with toys kneeling or sitting on the floor, and at a train table kneels or bends over it. The play mat and the doll house already play the kneel (`anim: tend`, `ACTIONS.tend` `kneel`, `kids/sheets/obj-playMat.png`); choosing the `play` clip by object (as `look` and `harvest` do, `characters.ts:512` and `:523`) would give these the kneel, with toys out of the box as a `motion` or a prop.
+- **Status:** open
+- **Source:** wave: office/kids
+
+### I-kids-07 — The ball pit and the play tent are used from outside
+
+- **Severity:** S2
+- **Rubric:** I2, I3
+- **Fix class:** renderer-table
+- **Where:** `web/src/render/babylon/characters.ts:193` (`STEP_IN`: the drinking fountain, the phone box and the climbing frame step in; no entry for `ballPit` or `playTent`); `web/public/content/catalog2/kids.json:264` (`ballPit` "Jump in the ball pit"), `kids.json:166` (`playTent` "Play in the tent"); `tools/art/blender/families/kids.py:1118-1121` (`flap_open`, `bounce`)
+- **Evidence:** `kids/play/c1/ballPit-jump-01.png`, `kids/play/child-c1/ballPit-jump-01.png`: "Jump in the ball pit" is 20 minutes standing on the floor beside the pit, reaching in, while its balls bounce on their own. `kids/play/c1/playTent-play-01.png`, `kids/play/child-c1/playTent-play-01.png`: "Play in the tent" is standing outside the open flap. In life a child climbs into the pit and crawls into the tent. A `STEP_IN` entry each (into the pit, on its floor 0.03 m up, with a bounce or sit clip; through the flap, crouched or sitting) would place them; the clips are the `clip` half of the fix.
+- **Status:** open
+- **Source:** wave: office/kids
+
+### M-kids-02 — The train table is 1.8 m long
+
+- **Severity:** S3
+- **Rubric:** M1
+- **Fix class:** model
+- **Where:** `tools/art/blender/families/kids.py:759-764` (`trainTable`: `frame` 1.8 × 0.84), `:1122` (`size=(1.8, 0.68, 0.84)`)
+- **Evidence:** `kids/sheets/obj-trainTable.png`: the table fills its 2 × 1 footprint, 1.80 m long against 0.90–1.30 m for a train table (1.43 with the 10 %; `tables/sizes-kids.md`). The top (0.44 m) is right; the H 0.68 is the trees on it. From the game camera it reads as a coffee table with a track on it.
+- **Status:** open
+- **Source:** wave: office/kids
+
+### M-kids-03 — Two descriptions say what the models don't show
+
+- **Severity:** S3
+- **Rubric:** M6
+- **Fix class:** content
+- **Where:** `web/public/content/catalog2/kids.json:23` (`kidsTable`: "legs in four colours", against `tools/art/blender/families/kids.py:130` and `:919`, one `ktable` blue for all four legs); `kids.json:145` (`toyChest`: "with its lid open", against `kids.py:511-534`, the lid shut at rest and opened only while played with)
+- **Evidence:** `kids/sheets/obj-kidsTable.png` (four blue legs), `kids/sheets/obj-toyChest.png` (the gallery and game shots show the lid shut). Either the text or the model changes.
+- **Status:** open
+- **Source:** wave: office/kids
+
+### M-kids-04 — The high chair's seat is 2 cm over the range, and its base is narrow
+
+- **Severity:** S3
+- **Rubric:** M1, M2
+- **Fix class:** content
+- **Where:** `web/public/content/catalog2/dining.json:759` (`highChair` `seat.height` 0.62); `tools/art/blender/families/kids.py:443-450` (legs splayed to ±0.205 × −0.16…0.28)
+- **Evidence:** `tables/sizes-kids.md`: the model's seat is 0.609 m (inside the 0.50–0.60 range with the 1 cm tolerance), but the content's `seat` is 0.62, 2 cm over; W 0.444 and D 0.474 are a little under the 0.45 and 0.495 low ends (0.50–0.65 × 0.55–0.80 less 10 %): real high chairs splay their legs wide so they can't tip. `kids/sheets/obj-highChair.png`. Nothing sits in it today (I-kids-01), so only the content number matters once something does: 0.60 or under.
+- **Status:** open
+- **Source:** wave: office/kids
+
+### I-kids-08 — The kids' table is never a place to eat
+
+- **Severity:** S3
+- **Rubric:** I1
+- **Fix class:** decision
+- **Where:** `web/public/content/catalog2/kids.json:17` (`kidsTable` `surface.kind: "low"`), `kids.json:38` (`kidsChair` `seatAt: ["low"]`); meals are eaten at a `table` kind (`crates/sim-core/src/surface.rs`)
+- **Evidence:** The kids' table has no uses of its own and the kids' chair at it only draws and does homework (`kids/play/child-pair-kidsChair/child-kidsChair-homework-01.png`, which looks right). Children have a snack or a meal at a little table; here a child carrying a plate goes to the dining table. Making the kids' table a `table` would let adults dine at it too (I-kids-03), so it needs a decision.
+- **Status:** open
+- **Source:** wave: office/kids
