@@ -76,5 +76,9 @@
   "defaultBed": { "h": 0.5 },
   "bunks": {
     "bedBunk": [0.44, 1.38]
+  },
+  "footstools": {
+    "pouf": [0.72, 0.5],
+    "ottoman": [0.62, 0.62]
   }
 }

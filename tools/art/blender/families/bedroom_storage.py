@@ -65,9 +65,9 @@ F = G.GameFrame()        # game numbers as they are: the models stand where the 
 WALL = -0.43             # the wall's face, the back of anything against it
 
 DRAWER_SECONDS = 0.9     # a drawer slides out 30 cm in this long
-DRAWER_HOLD = 2.5        # seconds it stays out once a resident starts choosing an outfit
+DRAWER_HOLD = 2.5        # seconds the nightstand's drawer stays out (the dressers' and wardrobes' stay open while
+                         # the resident changes, the whole use)
 DOOR_SECONDS = 1.2       # doors swing out 100 degrees in this long
-DOOR_HOLD = 3.0          # seconds they stay open
 PULL = 0.30              # how far a drawer slides out
 CLOTHES = ('cloth1', 'cloth2', 'cloth3', 'cloth4')   # palette names (materials are made per model)
 
@@ -521,6 +521,9 @@ def _key(id):
 
 
 DRAWER_USE = {'uses': {'outfit': 'drawer_open'}, 'hold': DRAWER_HOLD}
+# Open while the resident changes into another outfit (content `changesOutfit`), shut as they leave.
+CHANGE_DRAWER = {'uses': {'outfit': 'drawer_open'}}
+CHANGE_DOORS = {'uses': {'outfit': 'doors_open'}}
 
 FAMILY = G.Family(
     'bedroom_storage', M,
@@ -544,20 +547,20 @@ FAMILY = G.Family(
              paint=[('brass', 'Frame'), ('olive', 'Cushion')]),
      # BR3: each opens while a resident picks an outfit
      G.Model('dresser', dresser, size=(1.44, 1.349, 0.54), key=_key('dresser'), centre=(0, -0.16),
-             motions=DRAWER_USE, paint=[('oak', 'Body'), ('brass', 'Handles')]),
+             motions=CHANGE_DRAWER, paint=[('oak', 'Body'), ('brass', 'Handles')]),
      G.Model('wardrobe', wardrobe, size=(1.84, 2.41, 0.626), key=_key('wardrobe'), centre=(0, -0.117),
-             motions={'uses': {'outfit': 'doors_open'}, 'hold': DOOR_HOLD},
+             motions=CHANGE_DOORS,
              # (the white carcass is its body; the birch doors are their own part)
              paint=[('white', 'Body'), ('birch', 'Doors'), ('brass', 'Handles')]),
      G.Model('chestOfDrawers', chestOfDrawers, size=(0.88, 1.16, 0.655), key=_key('chestOfDrawers'),
-             centre=(0, -0.1025), motions=DRAWER_USE, paint=[('linen', 'Body'), ('brass', 'Handles')]),
+             centre=(0, -0.1025), motions=CHANGE_DRAWER, paint=[('linen', 'Body'), ('brass', 'Handles')]),
      G.Model('dresserLow', dresserLow, size=(1.82, 0.8, 0.635), key=_key('dresserLow'), centre=(0, -0.1125),
-             motions=DRAWER_USE, paint=[('oak', 'Body'), ('iron', 'Handles')]),
+             motions=CHANGE_DRAWER, paint=[('oak', 'Body'), ('iron', 'Handles')]),
      G.Model('wardrobeSingle', wardrobeSingle, size=(0.9, 2.28, 0.617), key=_key('wardrobeSingle'),
-             centre=(0, -0.1215), motions={'uses': {'outfit': 'door_open'}, 'hold': DOOR_HOLD},
+             centre=(0, -0.1215), motions={'uses': {'outfit': 'door_open'}},
              paint=[('white', 'Body'), ('brass', 'Handles')]),
      G.Model('armoire', armoire, size=(1.86, 2.109, 0.628), key=_key('armoire'), centre=(0, -0.1162),
-             motions={'uses': {'outfit': 'doors_open'}, 'hold': DOOR_HOLD},
+             motions=CHANGE_DOORS,
              paint=[('mahogany', 'Body'), ('brass', 'Handles')])],
     comment='Blender-built bedroom storage (tools/art/blender/families/bedroom_storage.py): the '
             'nightstands, the blanket chest, the laundry hamper and the bed-end bench (BR2), and the '

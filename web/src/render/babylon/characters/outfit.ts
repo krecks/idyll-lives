@@ -144,9 +144,43 @@ export interface OutfitFit {
 const TOWELS = ['#F2EFE8', '#CFE0E6', '#E9D8C4', '#D8E3CF'];
 const SWIMWEAR = ['#1F3A5F', '#B23A48', '#2E6E65', '#D98E04', '#3B3B58', '#C45A7A'];
 
-/** The outfit for `wear` (`fit`: the base body's, for the towel and swimwear). */
-export function outfitFor(id: number, gender: string, appearance: Appearance | null | undefined, body: BodyData, wear: Wear = 'day', fit?: OutfitFit): OutfitParams {
-  const day = dayOutfit(id, gender, appearance, body, wear === 'night');
+/** Tops' colours for the outfits a Sim changes into (`spareLook`): the creator's `palette.outfit`. */
+const SPARE_TOPS = ['#E98A6B', '#5F86C9', '#8FA89A', '#E2B65B', '#9C7BD1', '#4FBF85', '#34405A', '#F4F1EC', '#D45D79'];
+
+/**
+ * The look of a Sim's `outfit`-th outfit (sim-core `Sim::outfit`, changed into at a wardrobe): 0 the
+ * creator's, as `appearance` has it; the others garments and colours picked from the id, each with a
+ * top or a bottom other than the creator's, its top in another colour and the bottom standing out from it.
+ * Everything else (skin, hair) stays.
+ */
+function spareLook(id: number, gender: string, appearance: Appearance | null | undefined, body: BodyData, outfit: number): Appearance | null | undefined {
+  if (outfit <= 0 || !appearance) return appearance;
+  const own = dayOutfit(id, gender, appearance, body, false).parts;
+  let look = appearance;
+  for (let tries = 0; tries < 6; tries++) {
+    let k = 0;
+    const rand = () => hash(id * 31 + 100 + outfit * 17 + tries * 5 + k++);
+    const top = SPARE_TOPS.filter((c) => c.toLowerCase() !== appearance.body?.toLowerCase());
+    look = { ...appearance, ...pickOutfit(gender, rand), body: pick(top, rand()), shoesColor: undefined };
+    const parts = dayOutfit(id, gender, look, body, false).parts;
+    // (Not all one colour: a bottom that stands out from the top, as `dayOutfit`'s own.)
+    const contrast = Math.abs(luminance(hexToLinear(look.body, '#8FA89A')) - luminance(hexToLinear(look.bottomColor, '#33415C')));
+    if ((parts[0] !== own[0] || parts[1] !== own[1]) && contrast >= 0.2) break;
+  }
+  return look;
+}
+
+/** The outfit for `wear` (`fit`: the base body's, for the towel and swimwear) in the Sim's `outfit`-th clothes (`spareLook`). */
+export function outfitFor(
+  id: number,
+  gender: string,
+  appearance: Appearance | null | undefined,
+  body: BodyData,
+  wear: Wear = 'day',
+  fit?: OutfitFit,
+  outfit = 0,
+): OutfitParams {
+  const day = dayOutfit(id, gender, spareLook(id, gender, appearance, body, outfit), body, wear === 'night');
   if (wear === 'day') return day;
   const c = [...day.cuts] as OutfitParams['cuts'];
   // Barefoot.

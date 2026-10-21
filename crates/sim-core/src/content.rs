@@ -162,6 +162,10 @@ pub struct Interaction {
     /// Picks the crop as the use starts (content `leaves`: "picked"): it lies fallow, then is
     /// planted again and grows (see `ObjectDef::grows`).
     pub picks: bool,
+    /// Changing clothes (content `changesOutfit`: at a wardrobe, a chest of drawers): halfway
+    /// through, the resident is in their next outfit (`Sim::outfit`), and the use lasts its
+    /// time even with the needs it fills full.
+    pub changes_outfit: bool,
 }
 
 impl Interaction {
@@ -2285,6 +2289,9 @@ struct InteractionRaw {
     leaves: Option<OpenState>,
     #[serde(default)]
     close_after: bool,
+    /// Changing clothes (see `Interaction::changes_outfit`).
+    #[serde(default)]
+    changes_outfit: bool,
 }
 
 /// An object's state for `when` and `leaves` (see `ObjectInstance::open`), or its crop's
@@ -2829,6 +2836,7 @@ impl Content {
                     close_after: it.close_after,
                     ripe: it.when == Some(OpenState::Ripe),
                     picks: it.leaves == Some(OpenState::Picked),
+                    changes_outfit: it.changes_outfit,
                 });
                 if it.close_after
                     && (it.leaves != Some(OpenState::Open)

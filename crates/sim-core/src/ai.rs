@@ -184,6 +184,7 @@ mod tests {
             close_after: false,
             ripe: false,
             picks: false,
+            changes_outfit: false,
         }
     }
 

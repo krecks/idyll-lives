@@ -323,8 +323,7 @@
       "motions": {
         "uses": {
           "outfit": "drawer_open"
-        },
-        "hold": 2.5
+        }
       },
       "paint": [
         {
@@ -378,8 +377,7 @@
       "motions": {
         "uses": {
           "outfit": "doors_open"
-        },
-        "hold": 3.0
+        }
       },
       "paint": [
         {
@@ -425,8 +423,7 @@
       "motions": {
         "uses": {
           "outfit": "drawer_open"
-        },
-        "hold": 2.5
+        }
       },
       "paint": [
         {
@@ -471,8 +468,7 @@
       "motions": {
         "uses": {
           "outfit": "drawer_open"
-        },
-        "hold": 2.5
+        }
       },
       "paint": [
         {
@@ -520,8 +516,7 @@
       "motions": {
         "uses": {
           "outfit": "door_open"
-        },
-        "hold": 3.0
+        }
       },
       "paint": [
         {
@@ -569,8 +564,7 @@
       "motions": {
         "uses": {
           "outfit": "doors_open"
-        },
-        "hold": 3.0
+        }
       },
       "paint": [
         {

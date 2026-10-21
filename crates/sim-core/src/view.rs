@@ -1473,6 +1473,13 @@ struct SimInfo<'a> {
     /// Life stage (content `life.stages` id), for how they look.
     #[serde(skip_serializing_if = "Option::is_none")]
     stage: Option<&'a str>,
+    /// The outfit they're in (`Sim::outfit`; 0, the creator's, left out).
+    #[serde(skip_serializing_if = "is_zero_u8")]
+    outfit: u8,
+}
+
+fn is_zero_u8(n: &u8) -> bool {
+    *n == 0
 }
 
 fn is_zero_u32(n: &u32) -> bool {
@@ -1686,6 +1693,7 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
             gone: s.gone,
             generation: world.generations.get(s.id as usize).copied().unwrap_or(0),
             stage: content.life.stages.get(content.life.stage(s.age)).map(|st| st.id.as_str()),
+            outfit: s.outfit,
         })
         .collect();
     let households = world

@@ -33,16 +33,18 @@ by the existing `model.<id>` keys. Built
 
 ## The clips (BR3)
 
-All are played for the `outfit` use (`motions.uses.outfit`):
+All are played for the `outfit` use (`motions.uses.outfit`), and held open for the whole of it: the resident
+changes into another outfit there (content `changesOutfit`, halfway through) and the drawer or the doors shut as
+they leave (until 2026-10-21 they shut after 2.5 or 3 s, before the change):
 
-| Model | Clip | Moves | Hold |
-|---|---|---|---|
-| `dresser` | `drawer_open` | the middle (wide) drawer slides out 30 cm in 0.9 s | 2.5 s |
-| `chestOfDrawers` | `drawer_open` | the middle (third) drawer, 30 cm | 2.5 s |
-| `dresserLow` | `drawer_open` | the middle drawer of the middle column, 30 cm | 2.5 s |
-| `wardrobe` | `doors_open` | both doors swing out 100° in 1.2 s | 3 s |
-| `armoire` | `doors_open` | both doors, 100° | 3 s |
-| `wardrobeSingle` | `door_open` | its door, hinged on the left (the old part's handle is on the right), 100° | 3 s |
+| Model | Clip | Moves |
+|---|---|---|
+| `dresser` | `drawer_open` | the middle (wide) drawer slides out 30 cm in 0.9 s |
+| `chestOfDrawers` | `drawer_open` | the middle (third) drawer, 30 cm |
+| `dresserLow` | `drawer_open` | the middle drawer of the middle column, 30 cm |
+| `wardrobe` | `doors_open` | both doors swing out 100° in 1.2 s |
+| `armoire` | `doors_open` | both doors, 100° |
+| `wardrobeSingle` | `door_open` | its door, hinged on the left (the old part's handle is on the right), 100° |
 
 The dresser's old part has two columns of three drawers; the model has two small drawers over two wide ones,
 so "the middle drawer" is one drawer.

@@ -345,6 +345,20 @@ interface Bed {
 }
 /** Bunk beds (content `bunk`): mattress tops of the lower and the upper bunk, `[lower, upper]`. */
 const BUNKS: Record<string, readonly number[]> = FURNITURE.bunks;
+/**
+ * Footstools: the feet go up on them from a seat in front (`Characters.footstoolFor`). Each its top's width
+ * and depth (m, its own frame, as made); the top is its seat (`Seat.h`).
+ */
+const FOOTSTOOLS: Record<string, readonly number[]> = FURNITURE.footstools;
+/**
+ * Feet up on a footstool (`Characters.feetUp`): the heels `heel` m in from its near edge (at most to its middle),
+ * else as far in as the legs reach, at least `edge` m; the ankles `ankle` over its top (body scale 1), at most
+ * `side` m to one side of the hips. The legs reach `reach` of their length, no nearer than `near` of it (the
+ * knees not drawn right up), slid forward in the seat up to `slide` m for it, slouching back `slouch` rad a metre
+ * slid. Not for what is done with the hands or the legs on a seat (`NO_FEET_UP`).
+ */
+const FEET_UP = { heel: 0.14, edge: 0.03, ankle: 0.075, side: 0.3, reach: 0.995, near: 0.6, slide: 0.18, slouch: 1.4 };
+const NO_FEET_UP = new Set(['music', 'meditate', 'toilet', 'bath', 'wash']);
 /** Beds whose sleepers get a blanket (pack hammocks, sofas and nap pods don't). */
 const BLANKET_BEDS = new Set(['bed', 'lazy.snoozecloudBed', 'bedSingle', 'bedBunk', 'bedFuton', 'bedKing', 'bedDouble', 'bedQueenUpholstered', 'bedCanopy', 'kidsBed', 'kidsBedCar', 'wallBed', 'bedDaybed']);
 /**
@@ -857,8 +871,14 @@ interface SimRig {
   upperTarget: number;
   lookYaw: number;
   lookPitch: number;
-  /** Extra forward step towards a partner (hugs, kisses). */
+  /** Extra forward step towards a partner (hugs, kisses); slid forward in a seat to put the feet up (`feet`). */
   approach: number;
+  /**
+   * Feet up on a footstool this frame (`footstoolFor`, `feetUp`): whether, and where the ankles go (m: height,
+   * forward of and to the right of the Sim's place) and how far forward the Sim slides in the seat for it.
+   */
+  feetUp: boolean;
+  feet: Float32Array;
   /**
    * A cuddle (`CUDDLE`): seconds since it began (-1: not cuddling) and since laying the baby back
    * down began (-1: not yet), game minutes so far, the pace of picking up / putting back, and the
@@ -1008,6 +1028,8 @@ interface PlacedObject {
    * it, else `key` (`<model>#<part>`) for the file's own (`beddingColours`); null for anything else.
    */
   quilt: { key: string; colour?: string } | null;
+  /** A footstool (`FOOTSTOOLS`): its top's half width and depth (m, resized with it) and its facing (rad); null for anything else. */
+  footstool: { hw: number; hd: number; yaw: number } | null;
   cx: number;
   cz: number;
   minX: number;
@@ -1085,6 +1107,8 @@ export class Characters {
   /** Pulled up to a table (`TUCK`): the tables the seats face, by seat id (`setTables`), and the seats' ids. */
   private tables = new Map<number, TableRoom>();
   private readonly seatIds = new Map<PlacedObject, number>();
+  /** The placed footstools (`PlacedObject.footstool`). */
+  private footstools: PlacedObject[] = [];
   /** Where an object's moving seat has its riders now (`ObjectMotion.ride`): world space, from rest. */
   private rideOf: ((objectId: number) => Matrix | null) | null = null;
   private readonly rideM = new Matrix();
@@ -1485,7 +1509,7 @@ export class Characters {
       const shaped = !!stage && body.stage === stage;
       const hairKey = this.hairPart(s.appearance?.hairStyle);
       const outfitId = (s as SimInfo & { outfitId?: number }).outfitId ?? s.id;
-      const day = outfitFor(outfitId, s.gender, s.appearance, body);
+      const day = outfitFor(outfitId, s.gender, s.appearance, body, 'day', undefined, s.outfit);
       // (Pyjamas are the same garments, so the same chunks show at night.)
       for (const part of skinChunks(body, day.parts)) if (body.parts.has(part)) push(`${body.name}:${part}`, s);
       for (const part of FACE_PARTS) if (body.parts.has(part)) push(`${body.name}:${part}`, s);
@@ -1544,6 +1568,8 @@ export class Characters {
         lookYaw: 0,
         lookPitch: 0,
         approach: 0,
+        feetUp: false,
+        feet: new Float32Array(4),
         cuddleT: -1,
         cuddleOut: -1,
         cuddleMin: 0,
@@ -1603,7 +1629,7 @@ export class Characters {
       this.sims[s.id] = rig;
       // (Day clothes until posed: `wearFor` then picks again.)
       const fit = this.outfitFit(base);
-      rig.outfits = Object.fromEntries(WEARS.map((wear) => [wear, outfitFor(outfitId, s.gender, s.appearance, body, wear, fit)])) as Record<Wear, OutfitParams>;
+      rig.outfits = Object.fromEntries(WEARS.map((wear) => [wear, outfitFor(outfitId, s.gender, s.appearance, body, wear, fit, s.outfit)])) as Record<Wear, OutfitParams>;
       this.wear(rig, s.id, rig.outfits.day);
     }
     for (const p of this.meshes.values()) p.mesh.setEnabled(false);
@@ -1639,8 +1665,12 @@ export class Characters {
       const stand = def?.stand ? { h: def.stand.height + lift, motion: def.stand.motion } : null;
       const paint = def?.held ? colorsKey(paintColors(this.assets.get(def.model, 'model'), o.colors)) : '';
       const held = def?.held ? { keys: [def.held.part].flat().map((part) => `${def.model}#${part}${paint ? `@${paint}` : ''}`), grip: def.held.grip } : null;
-      return { def: o.def, rot: o.rot, seat: { ...seat, h: seat.h + lift }, stand, held, lift, restful, quilt: BLANKET_BEDS.has(o.def) ? this.beddingOf(o.def, def?.model, o.colors) : null, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
+      const stool = FOOTSTOOLS[o.def];
+      const made = def?.footprint ?? [1, 1];
+      const footstool = stool ? { hw: (stool[0] / 2) * (o.size ? o.size[0] / (made[0] * 100) : 1), hd: (stool[1] / 2) * (o.size ? o.size[1] / (made[1] * 100) : 1), yaw: ((o.rot * 90 + (o.turn ?? 0)) * Math.PI) / 180 } : null;
+      return { def: o.def, rot: o.rot, seat: { ...seat, h: seat.h + lift }, stand, held, lift, restful, quilt: BLANKET_BEDS.has(o.def) ? this.beddingOf(o.def, def?.model, o.colors) : null, footstool, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
     });
+    this.footstools = this.objects.filter((o) => o.footstool);
     world.objects.forEach((o, j) => this.objectById.set(o.id, this.objects[j]));
     this.seatIds.clear();
     world.objects.forEach((o, j) => this.tables.has(o.id) && this.seatIds.set(this.objects[j], o.id));
@@ -2671,6 +2701,7 @@ export class Characters {
     const act = ACTIONS[tag];
     rig.tag = tag;
     rig.tagKnown = known;
+    rig.feetUp = false;
     rig.actTime += step;
     rig.stepTime += step;
     let key = 'idle';
@@ -2760,6 +2791,11 @@ export class Characters {
         key = 'sitDown';
       }
       rootFwd += this.tuckIn(rig, obj, seat, key !== 'sitDown', step, fresh);
+      // Feet up on a footstool in front, slid forward in the seat as far as that takes.
+      if (!social && key !== 'sitDown' && !seat.legsOut && !seat.pedals && this.footstoolFor(rig, key, rootY, rootFwd)) {
+        reach = rig.feet[3];
+        reachRate = 1.5;
+      }
       if (key === 'sitHands' && rig.tuckFar) key = 'sitHandsFar';
       if (!social) {
         const up = known ? (typeof act?.upper === 'function' ? act.upper(rig.useDef) : act?.upper) : obj?.def === 'diningTable' ? 'eat' : undefined;
@@ -3419,8 +3455,10 @@ export class Characters {
     const seed = rig.seed * 6;
     if (pose === Pose.Sit && key !== 'sitDown') {
       const seat = rig.useObj?.seat;
+      const stool = rig.feetUp;
       if (seat?.pedals) this.pedal(rig, seat.pedals);
       else if (seat?.legsOut) this.legsOut(rig, seat.room);
+      else if (stool) this.feetUp(rig);
       switch (rig.tag) {
         case 'sit':
           // Just sitting: upright, but against a slanted back (`recline`).
@@ -3437,7 +3475,7 @@ export class Characters {
             addRotation(add, B.spine_01, 1, 0, 0, -0.14);
             addRotation(add, B.Head, 1, 0, 0, 0.1);
           }
-          if (!seat?.legsOut) {
+          if (!seat?.legsOut && !stool) {
             addRotation(add, B.calf_l, 1, 0, 0, -0.35);
             addRotation(add, B.calf_r, 1, 0, 0, -0.3);
           }
@@ -3654,6 +3692,87 @@ export class Characters {
       addRotation(this.add, thigh, 1, 0, 0, turn[0] * w);
       addRotation(this.add, calf, 1, 0, 0, turn[1] * w);
       addRotation(this.add, foot, 1, 0, 0, -(turn[0] + turn[1]) * 0.25 * w);
+    }
+  }
+
+  /**
+   * Whether a Sim sitting on `rig.useObj` (playing `key`, its root at `rootY` and `rootFwd`) puts their feet up on
+   * a footstool (`FOOTSTOOLS`), and where (`rig.feetUp`, `rig.feet`): one in front of them, nobody sitting on it,
+   * its near half within the legs' reach once slid forward in the seat (`FEET_UP`); the nearest. Not when sitting
+   * on one, facing a seat's back (a dressing table), pulled up to a table, at the desk clips, nor for an
+   * instrument, a bath or the toilet (`NO_FEET_UP`).
+   */
+  private footstoolFor(rig: SimRig, key: string, rootY: number, rootFwd: number): boolean {
+    const own = rig.useObj;
+    const fit = this.legFits.get(rig.body.name)?.get(key)?.l;
+    if (key !== 'sit' || !fit || !this.footstools.length || own?.footstool || own?.seat.back || rig.tuck > 0.01 || NO_FEET_UP.has(rig.tag)) return false;
+    const s = rig.scale;
+    const fx = Math.sin(rig.yaw);
+    const fz = Math.cos(rig.yaw);
+    // The hips' joints (forward of the Sim's place, height), and how far the ankles go from them.
+    const hipFwd = rootFwd + fit.hz * s;
+    const hipY = rootY + fit.hy * s;
+    const legs = (fit.l1 + fit.l2) * s;
+    let best = Infinity;
+    for (const o of this.footstools) {
+      const f = o.footstool!;
+      const dx = o.cx - rig.x;
+      const dz = o.cz - rig.z;
+      const ahead = dx * fx + dz * fz;
+      const right = dx * fz - dz * fx;
+      // Its half depth along the Sim's facing and half width across it (a box turned any way).
+      const turn = rig.yaw - f.yaw;
+      const along = Math.abs(Math.cos(turn)) * f.hd + Math.abs(Math.sin(turn)) * f.hw;
+      const across = Math.abs(Math.sin(turn)) * f.hd + Math.abs(Math.cos(turn)) * f.hw;
+      const near = ahead - along;
+      if (near <= hipFwd || Math.abs(right) > across + FEET_UP.side * 0.5) continue;
+      // The feet on its top towards the hips' line, the ankles over it.
+      const side = clamp(right, -Math.max(0, across - 0.12), Math.max(0, across - 0.12));
+      const up = o.seat.h + FEET_UP.ankle * s - hipY;
+      const most = legs * FEET_UP.reach;
+      if (Math.abs(side) > FEET_UP.side || Math.abs(up) >= most) continue;
+      // As far in as the legs reach, slid forward if need be.
+      const out = Math.sqrt(Math.max(0, most * most - up * up - side * side));
+      const heel = Math.min(near + Math.min(FEET_UP.heel, along), hipFwd + out + FEET_UP.slide);
+      if (heel < near + FEET_UP.edge || heel - hipFwd < legs * FEET_UP.near) continue;
+      const slide = Math.max(0, heel - hipFwd - out);
+      if (slide >= best) continue;
+      // Nobody sitting on it.
+      if (this.sims.some((r) => r && r !== rig && r.useObj === o && r.lastPose === Pose.Sit)) continue;
+      best = slide;
+      rig.feet.set([o.seat.h + FEET_UP.ankle * s, heel, side, slide]);
+    }
+    rig.feetUp = best < Infinity;
+    return rig.feetUp;
+  }
+
+  /**
+   * Feet up on a footstool (`footstoolFor`): the legs out to it, the heels on its top, the toes up, turned
+   * towards it if it's to one side; leant back a little, and slouched back as far as they slid forward.
+   */
+  private feetUp(rig: SimRig): void {
+    const fits = this.legFits.get(rig.body.name)?.get(rig.cur.key);
+    if (!fits) return;
+    const B = this.set!.bone;
+    const w = smooth(rig.w);
+    const s = rig.scale;
+    const [ankle, heel, side] = rig.feet;
+    // (Where the root is now, slid forward as far as it has got.)
+    const y = (ankle - rig.cur.rootY) / s;
+    const z = (heel - rig.cur.rootFwd - rig.approach) / s;
+    const slouch = 0.08 + rig.approach * FEET_UP.slouch;
+    addRotation(this.add, B.spine_01, 1, 0, 0, -slouch * w);
+    addRotation(this.add, B.Head, 1, 0, 0, slouch * 0.6 * w);
+    for (const [fit, thigh, calf, foot] of [
+      [fits.l, B.thigh_l, B.calf_l, B.foot_l],
+      [fits.r, B.thigh_r, B.calf_r, B.foot_r],
+    ] as const) {
+      const flat = Math.hypot(z - fit.hz, side / s);
+      const legTurn = this.legTo(fit, y, fit.hz + flat);
+      addRotation(this.add, thigh, 1, 0, 0, legTurn[0] * w);
+      addRotation(this.add, calf, 1, 0, 0, legTurn[1] * w);
+      addRotation(this.add, foot, 1, 0, 0, -(legTurn[0] + legTurn[1]) * 0.3 * w);
+      addRotation(this.add, thigh, 0, 1, 0, Math.atan2(side / s, z - fit.hz) * w);
     }
   }
 

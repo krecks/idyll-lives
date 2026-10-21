@@ -44,7 +44,8 @@
 //! (`objects[].growth`: -1..0 fallow, 0..1 growing, 1 ripe; absent: ripe); 28 = lamps can be
 //! switched off (`objects[].off`; absent: on); 29 = objects have a stable id (`objects[].id`)
 //! that doesn't change when other objects are sold or moved (absent: assigned on load), and
-//! `next_object_id` keeps ids from being reused after the highest one is sold. Older
+//! `next_object_id` keeps ids from being reused after the highest one is sold; 30 = the outfit
+//! a resident changed into (`sims[].outfit`; absent: 0, the creator's). Older
 //! files load. Saves
 //! written before feelings were renamed from "moodlets" store them under `moodlets`; a serde
 //! alias still reads it.
@@ -63,7 +64,7 @@ use crate::planner::{BlockResult, Goal, HomeWish, Outcome, Planner, Reason, Rout
 use crate::world::{GameMode, Household, Plot, Task, TaskKind, World};
 use crate::{Error, MINUTES_PER_TICK, clock::MAX_SPEED};
 
-pub const SAVE_VERSION: u32 = 29;
+pub const SAVE_VERSION: u32 = 30;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -237,6 +238,10 @@ fn is_zero_i64(n: &i64) -> bool {
     *n == 0
 }
 
+fn is_zero_u8(n: &u8) -> bool {
+    *n == 0
+}
+
 fn is_zero_u32(n: &u32) -> bool {
     *n == 0
 }
@@ -323,6 +328,9 @@ pub struct SimSave {
     /// How a pupil does at school (0..100).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grade: Option<f32>,
+    /// The outfit they're in (`Sim::outfit`; absent before v30, or the creator's: 0).
+    #[serde(default, skip_serializing_if = "is_zero_u8")]
+    pub outfit: u8,
     pub pos: [f32; 2],
     pub yaw: f32,
     /// Sorted so identical worlds produce identical save files.
@@ -703,6 +711,7 @@ impl World {
                     retired: s.retired,
                     pension: s.pension,
                     grade: content.life.stage_at(s.age).is_some_and(|st| st.school).then_some(s.grade).and_then(some_finite),
+                    outfit: s.outfit,
                     pos,
                     yaw: finite(s.yaw, 0.0),
                     needs: content
@@ -1071,6 +1080,7 @@ impl World {
             if let Some(g) = s.grade {
                 sim.grade = g.clamp(0.0, 100.0);
             }
+            sim.outfit = s.outfit % crate::world::OUTFITS;
             for (i, need) in content.needs.iter().enumerate() {
                 sim.needs[i] = s
                     .needs
