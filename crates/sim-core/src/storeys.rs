@@ -106,7 +106,8 @@ impl World {
             let d = self.stairs.rise(self.storey_of(obj.z));
             return obj.tiles(&self.content).map(|(x, z)| (x, z + d)).filter(|&(x, z)| self.lot.in_bounds(x, z)).collect();
         }
-        obj.tiles(&self.content).collect()
+        // (And where it reaches over at head height: an arc lamp's shade.)
+        obj.tiles(&self.content).chain(obj.overhang_tiles(&self.content).filter(|&(x, z)| self.lot.in_bounds(x, z))).collect()
     }
 
     /// Storey rules for an object about to be placed: nothing on stairs; off the ground only on

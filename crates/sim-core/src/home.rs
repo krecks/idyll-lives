@@ -443,7 +443,10 @@ impl World {
     fn sim_in_the_way(&self, obj: &ObjectInstance) -> bool {
         self.sims.iter().any(|s| {
             let seated = s.seated_from;
-            s.away_until.is_none() && obj.tiles(&self.content).any(|t| t == s.tile() || Some(t) == seated)
+            // (Under an arc lamp's shade, only someone on their feet: one sitting on the sofa
+            // under it is out of its way.)
+            let standing = s.pose == crate::content::Pose::Stand;
+            s.away_until.is_none() && (obj.tiles(&self.content).any(|t| t == s.tile() || Some(t) == seated) || (standing && obj.overhang_tiles(&self.content).any(|t| t == s.tile())))
         })
     }
 
@@ -955,6 +958,7 @@ impl World {
                 && self.objects.iter().any(|o| {
                     o.wall_edges(&self.content)
                         .chain(o.body_edges(&self.content))
+                        .chain(o.overhang_edges(&self.content))
                         .any(|(p, q)| (p, q) == (a, b) || (q, p) == (a, b))
                 })
             {

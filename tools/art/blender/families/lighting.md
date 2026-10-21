@@ -14,6 +14,10 @@ Ceiling Lights, Wall Lights, Floor Lamps and Table Lamps until signed off.
   their real height (`G.settle(centre=False, floor=False)`, `centre=` on the `Model`).
 - **LT3, floor:** `lamp`, `floorLampSimple`, `lampFloorArc`, `lampFloorTripod`, `lampTorchiere`. The arc lamp's
   base stands in the back corner, its back on the wall face (`centre=`), as its old part now does.
+  Still to do (M-lighting-06, the model half): the arc reaches over the next tile, the shade about 1.2 m in front of
+  the base and 1.9–2.0 m up over the middle of the tile in front (a sofa's seat), the base where it is; then content
+  `overhang: [[0, 1]]` on `lampFloorArc` (the sim allows it since 2026-10-22: furniture under the shade, nobody walking
+  there), `light.at` moved to the shade, and build mode's and `housegen.ts`'s placing taught the overhang.
 - **LT4, table:** `tableLamp` (a lamp on its own oak side table, a floor object), and the surface lamps
   `lampTableRound`, `lampTableSquare`, `lampBanker`, `lampMushroom`, `lampLantern`. Their content `radius` (the room
   they take on a top) follows the drawn model: the round, square, mushroom and lantern lamps' were taken from their

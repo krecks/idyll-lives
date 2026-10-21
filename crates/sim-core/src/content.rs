@@ -422,6 +422,11 @@ pub struct ObjectDef {
     /// A footstool (content `footstool`: a pouf, an ottoman): someone sitting down alone on a
     /// sofa takes the seat with one in front (`world::footstool_slots`).
     pub footstool: bool,
+    /// Tiles beside its own it reaches over at head height (content `overhang`, `[right, front]`
+    /// tiles from it; a 1×1 thing on the floor only): an arc lamp's shade over the sofa. As under
+    /// a lamp at head height (`head_height`), furniture may stand there and nobody walks there
+    /// (`ObjectInstance::overhang_tiles`).
+    pub overhang: Vec<(i32, i32)>,
 }
 
 impl ObjectDef {
@@ -2321,6 +2326,8 @@ struct ObjectRaw {
     reach: f32,
     #[serde(default)]
     footstool: bool,
+    #[serde(default)]
+    overhang: Vec<[i32; 2]>,
 }
 
 /// A slot's place: `{"at": [-0.3, 0.7], "facing": 180}` (m off the middle, to its right and front;
@@ -3202,6 +3209,9 @@ impl Content {
                     return Err(Error::new(format!("object '{}': `{flag}` is for things on {on}", obj.id)));
                 }
             }
+            if !obj.overhang.is_empty() && (layer != Layer::Floor || obj.footprint != [1, 1] || obj.overhang.iter().any(|&[r, f]| (r, f) == (0, 0) || r.abs() > 2 || f.abs() > 2)) {
+                return Err(Error::new(format!("object '{}': `overhang` is for a 1×1 thing on the floor, over tiles up to 2 from its own", obj.id)));
+            }
             if layer == Layer::Surface && (obj.footprint != [1, 1] || obj.slots != 1 || obj.stairs) {
                 return Err(Error::new(format!("object '{}': things on a surface are 1×1, with one slot", obj.id)));
             }
@@ -3362,6 +3372,7 @@ impl Content {
                 against_wall: obj.against_wall,
                 reach: obj.reach.max(0.0),
                 footstool: obj.footstool,
+                overhang: obj.overhang.iter().map(|&[r, f]| (r, f)).collect(),
             });
         }
 

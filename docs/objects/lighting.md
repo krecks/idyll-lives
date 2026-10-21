@@ -84,7 +84,7 @@ ceiling lamp outdoors (M-lighting-01).
 |---|---|---|---|---|---|---|
 | `lamp` Floor lamp | 1x1 · floor | — | lighting / floor | Stand, Shade, Fittings | Static | Static. The drum shade glows at night. |
 | `floorLampSimple` Simple floor lamp | 1x1 · floor | — | lighting / floor | Stand, Shade | Static | Static. The square shade glows at night. |
-| `lampFloorArc` Arc floor lamp | 1x1 · floor | — | lighting / floor | Stand, Shade, Base | Static | Static. The metal dome glows inside at night; the light is at the shade (`light.at`). |
+| `lampFloorArc` Arc floor lamp | 1x1 · floor | — | lighting / floor | Stand, Shade, Base | Static | Static. The metal dome glows inside at night; the light is at the shade (`light.at`). Its shade still hangs over its own tile: the sim allows one over the next (content `overhang`, 2026-10-22), for when the model reaches there (M-lighting-06, `lighting.md`). |
 | `lampFloorTripod` Tripod floor lamp | 1x1 · floor | — | lighting / floor | Stand, Shade | Static | Static. The linen shade glows at night. |
 | `lampTorchiere` Uplighter | 1x1 · floor | — | lighting / floor | Stand, Shade, Base | Static | Static. The bowl glows at night. |
 

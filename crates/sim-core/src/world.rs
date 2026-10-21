@@ -460,6 +460,35 @@ impl ObjectInstance {
         (self.rot % 4) as f32 * FRAC_PI_2
     }
 
+    /// The tiles it reaches over at head height beside its own (content `overhang`, turned with
+    /// it): an arc lamp's shade over the sofa.
+    pub fn overhang_tiles<'a>(&self, content: &'a Content) -> impl Iterator<Item = (i32, i32)> + 'a {
+        // Its right and its front, as it's turned.
+        let ((rx, rz), (fx, fz)) = match self.rot % 4 {
+            0 => ((1, 0), (0, 1)),
+            1 => ((0, -1), (1, 0)),
+            2 => ((-1, 0), (0, -1)),
+            _ => ((0, 1), (-1, 0)),
+        };
+        let (x, z) = (self.x, self.z);
+        content.objects[self.def].overhang.iter().map(move |&(r, f)| (x + r * rx + f * fx, z + r * rz + f * fz))
+    }
+
+    /// Pairs of neighbouring tiles the arm to each `overhang_tiles` crosses (along the row, then
+    /// the column): no wall may stand between them.
+    pub(crate) fn overhang_edges(&self, content: &Content) -> Vec<((i32, i32), (i32, i32))> {
+        let mut edges = Vec::new();
+        for to in self.overhang_tiles(content) {
+            let mut at = (self.x, self.z);
+            while at != to {
+                let next = if at.0 != to.0 { (at.0 + (to.0 - at.0).signum(), at.1) } else { (at.0, at.1 + (to.1 - at.1).signum()) };
+                edges.push((at, next));
+                at = next;
+            }
+        }
+        edges
+    }
+
     /// Tile a Sim stands on to use the object: centred in front of the footprint.
     pub fn front_tile(&self, content: &Content) -> (i32, i32) {
         let (w, d) = self.size(content);
@@ -1767,6 +1796,8 @@ impl World {
             return self.check_surface_fit(obj);
         }
         let on = |o: &ObjectInstance, t: (i32, i32)| o.tiles(&self.content).any(|q| q == t);
+        // (Reaching over it at head height: an arc lamp's shade.)
+        let over = |o: &ObjectInstance, t: (i32, i32)| o.overhang_tiles(&self.content).any(|q| q == t);
         let called = |o: &ObjectInstance| self.content.objects[o.def].name.to_lowercase();
         for (tx, tz) in obj.tiles(&self.content) {
             // Furniture needs free floor; things on a wall, the ceiling or rugs only a free spot
@@ -1778,7 +1809,7 @@ impl World {
                 self.objects.iter().any(|o| self.content.objects[o.def].layer == layer && on(o, (tx, tz)))
                     || (d.hangs_low && floor && !furniture())
             } else {
-                let hung = || self.objects.iter().any(|o| (self.content.objects[o.def].hangs_low || self.content.objects[o.def].head_height) && on(o, (tx, tz)));
+                let hung = || self.objects.iter().any(|o| ((self.content.objects[o.def].hangs_low || self.content.objects[o.def].head_height) && on(o, (tx, tz))) || over(o, (tx, tz)));
                 floor && (furniture() || !hung())
             };
             if !self.lot.in_bounds(tx, tz) || taken {
@@ -1799,6 +1830,8 @@ impl World {
                         _ => false,
                     }
             });
+            // Nor under (or into) a lamp's shade reaching over from beside.
+            let clash = clash.or_else(|| self.objects.iter().find(|o| over(o, (tx, tz)) && (d.fills_wall || d.hangs_low || d.head_height)));
             if let Some(o) = clash {
                 let other = &self.content.objects[o.def];
                 let why = match layer {
@@ -1819,6 +1852,21 @@ impl World {
                 )));
             }
         }
+        // Where it reaches over (an arc lamp's shade): on the lot, off the stairs, no wall in the
+        // way from its own tile, and nothing tall or hanging there to run into. Furniture may be
+        // under it.
+        for (tx, tz) in obj.overhang_tiles(&self.content) {
+            if !self.lot.in_bounds(tx, tz) || self.lot.diag(tx, tz).is_some() || self.stairs.step(tx, tz).is_some() {
+                return Err(Error::new(format!("'{name}' at {x},{z} would hang over the edge")));
+            }
+            let other = |o: &ObjectInstance| {
+                let def = &self.content.objects[o.def];
+                (on(o, (tx, tz)) && (def.fills_wall || def.hangs_low || def.head_height)) || over(o, (tx, tz))
+            };
+            if let Some(o) = self.objects.iter().find(|o| other(o)) {
+                return Err(Error::new(format!("'{name}' at {x},{z} would hang into the {}", called(o))));
+            }
+        }
         let (fx, fz) = obj.front_tile(&self.content);
         if !self.lot.in_bounds(fx, fz) {
             return Err(Error::new(format!("'{name}' at {x},{z} faces off the lot")));
@@ -1829,7 +1877,7 @@ impl World {
         let body = obj.body_edges(&self.content).into_iter().filter(in_lot);
         // Nor a diagonal wall across a tile it reaches into.
         let diagonal = |(tx, tz): (i32, i32)| self.lot.diag(tx, tz).is_some_and(|g| obj.body_crosses(&self.content, tx, tz, g.dir));
-        if obj.wall_edges(&self.content).chain(body).any(|(a, b)| {
+        if obj.wall_edges(&self.content).chain(body).chain(obj.overhang_edges(&self.content)).any(|(a, b)| {
             self.lot.edge_between(a.0, a.1, b.0, b.1) != crate::lot::Edge::Open
         }) || obj.body_tiles(&self.content).any(diagonal)
         {

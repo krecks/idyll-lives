@@ -123,6 +123,7 @@ const TALL: &str = r#"{
       {"id":"plant","name":"Hanging plant","price":50,"layer":"ceiling","hangsLow":true,"interactions":[]},
       {"id":"chandelier","name":"Chandelier","price":50,"layer":"ceiling","headHeight":true,"interactions":[]},
       {"id":"ladder","name":"Towel ladder","price":40,"againstWall":true,"interactions":[]},
+      {"id":"arc","name":"Arc lamp","price":50,"overhang":[[0,1]],"interactions":[]},
       {"id":"rug","name":"Rug","price":50,"layer":"rug","interactions":[]}],
     "economy":{"startingFunds":5000}}"#;
 
@@ -217,12 +218,46 @@ fn a_lamp_at_head_height_hangs_over_a_table_not_over_heads() {
     let loaded = World::from_save_json(TALL, &w.save_json()).unwrap();
     assert!(!free(&loaded, 3, 3) && !free(&loaded, 5, 4), "loaded, it still takes its tiles");
     // Sold, it leaves the sofa under it in the way still (and the tile beside, now free).
-    let lamp = w.objects.iter().find(|o| w.content.objects[o.def].id == "chandelier" && o.x == 3).unwrap().id;
+    let lamp = w.objects.iter().find(|o| w.content.objects[o.def].id == "chandelier" && o.x == 3).unwrap().stable;
     w.apply(Command::Sell { household: 0, object: lamp }).unwrap();
     assert!(!free(&w, 3, 3), "the sofa under the sold lamp is still in the way");
-    let lamp = w.objects.iter().find(|o| w.content.objects[o.def].id == "chandelier" && o.x == 5).unwrap().id;
+    let lamp = w.objects.iter().find(|o| w.content.objects[o.def].id == "chandelier" && o.x == 5).unwrap().stable;
     w.apply(Command::Sell { household: 0, object: lamp }).unwrap();
     assert!(!free(&w, 5, 4) && free(&w, 6, 4), "the sofa's other tile too");
+}
+
+#[test]
+fn an_arc_lamp_reaches_over_the_sofa_in_front_of_it() {
+    // Its shade over the tile in front (content `overhang`), at head height: furniture under it,
+    // nobody walking there, nothing tall or hanging low there, no wall in the way.
+    let mut w = World::from_json(TALL, WINDOWS, 1).unwrap();
+    let free = |w: &World, x: i32, z: i32| !w.blocked()[w.lot.tile_index(x, z)];
+    buy(&mut w, "arc", 2, 2, 0).unwrap();
+    assert!(!free(&w, 2, 3), "nobody walks under the shade");
+    buy(&mut w, "sofa", 2, 3, 0).expect("a sofa under it");
+    buy(&mut w, "sofa", 4, 4, 0).unwrap();
+    buy(&mut w, "arc", 5, 3, 0).expect("bought behind a sofa, over it");
+    buy(&mut w, "arc", 7, 2, 3).unwrap();
+    assert!(!free(&w, 6, 2) && free(&w, 8, 2), "turned, over the tile in front of it");
+    buy(&mut w, "arc", 3, 5, 0).unwrap();
+    let refused = |w: &mut World, def: &str, x: i32, z: i32, rot: i32| buy(w, def, x, z, rot).unwrap_err().to_string();
+    assert!(refused(&mut w, "wardrobe", 3, 6, 0).contains("too tall"), "nothing tall under it");
+    assert!(refused(&mut w, "chandelier", 3, 6, 0).contains("hang into"), "nor a lamp at head height");
+    assert!(refused(&mut w, "arc", 4, 6, 3).contains("hang into"), "nor another shade");
+    assert!(buy(&mut w, "arc", 8, 6, 0).is_err(), "not over the wall");
+    buy(&mut w, "arc", 8, 6, 2).expect("turned the other way, over the room");
+    let loaded = World::from_save_json(TALL, &w.save_json()).unwrap();
+    assert!(!free(&loaded, 2, 3) && !free(&loaded, 6, 2), "loaded, it still takes its tiles");
+    // Sold, the sofa under it is still in the way, and what was only under the shade free.
+    let lamp = |w: &World, x: i32| w.objects.iter().find(|o| w.content.objects[o.def].id == "arc" && o.x == x).unwrap().stable;
+    let arc = lamp(&w, 2);
+    w.apply(Command::Sell { household: 0, object: arc }).unwrap();
+    assert!(!free(&w, 2, 3), "the sofa is still there");
+    let arc = lamp(&w, 7);
+    w.apply(Command::Sell { household: 0, object: arc }).unwrap();
+    for o in &w.objects { eprintln!("DBGO {} {} {} rot {}", w.content.objects[o.def].id, o.x, o.z, o.rot); }
+    eprintln!("DBGS {:?}", w.sims.iter().map(|s| s.pos).collect::<Vec<_>>());
+    assert!(free(&w, 6, 2), "the floor under the shade is free again");
 }
 
 #[test]
