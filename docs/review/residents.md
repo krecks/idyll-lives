@@ -192,17 +192,17 @@ Painted garments and their shells: `crates/tools/src/characters/garments.rs`, `c
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| Clip `fountainDrink181` | n/a | — | — | not in the pilot (town and playground waves) |  |
-| Clip `fountainDrink163` | n/a | — | — | strip shot only; judged with the fountain (town wave) | `residents/strip-fountainDrink163.png` |
-| Clip `fountainDrink147` | n/a | — | — | not in the pilot (town and playground waves) |  |
-| Clip `fountainDrink129` | n/a | — | — | not in the pilot (town and playground waves) |  |
-| Clip `fountainDrink112` | n/a | — | — | not in the pilot (town and playground waves) |  |
-| Clip `climb172a` | n/a | A-residents-10 | — | A-residents-10 S3 clip (confirmed by check:clips, elder woman) |  |
-| Clip `climb147a` | n/a | A-residents-10 | — | A-residents-10 S3 clip (confirmed by check:clips for climb112a/b, climb172a); judged with the climbing frame (community wave) | `residents/strip-climb147a.png` |
-| Clip `climb112a` | n/a | A-residents-10 | — | A-residents-10 S3 clip (confirmed by check:clips) |  |
-| Clip `climb172b` | n/a | — | — | not in the pilot (town and playground waves) |  |
-| Clip `climb147b` | n/a | — | — | not in the pilot (town and playground waves) |  |
-| Clip `climb112b` | n/a | A-residents-10 | — | A-residents-10 S3 clip (confirmed by check:clips) |  |
+| Clip `fountainDrink181` | n/a | OK | OK | One of five heights for the drinking fountain (`STEP_IN.drinkingFountain`); `check:clips` clean at every stage; not shot (an adult plays `fountainDrink163`) | |
+| Clip `fountainDrink163` | n/a | OK | OK | The adult bends to the spout, hands on the bowl | `residents/strip-fountainDrink163.png`, `community/play/drinkingFountain-drink-01.png` |
+| Clip `fountainDrink147` | n/a | OK | OK | As `fountainDrink181` | |
+| Clip `fountainDrink129` | n/a | OK | OK | As `fountainDrink181` | |
+| Clip `fountainDrink112` | n/a | OK | OK | As `fountainDrink181` | |
+| Clip `climb172a` | n/a | A-residents-10 | OK | A-residents-10 S3 clip (confirmed by check:clips, elder woman) | `community/play/climbingFrame-climb-01.png` |
+| Clip `climb147a` | n/a | A-residents-10 | OK | A-residents-10 S3 clip (confirmed by check:clips for climb112a/b, climb172a); up the frame's net, hands and feet on it | `residents/strip-climb147a.png`, `community/play/climbingFrame-climb-01.png` |
+| Clip `climb112a` | n/a | A-residents-10 | OK | A-residents-10 S3 clip (confirmed by check:clips) | `community/sheets/age-climbingFrame.png` |
+| Clip `climb172b` | n/a | OK | OK | The second lane of `climb172a`; `check:clips` clean | `community/sheets/age-climbingFrame.png` |
+| Clip `climb147b` | n/a | OK | OK | The second lane of `climb147a`; `check:clips` clean | `community/sheets/age-climbingFrame.png` |
+| Clip `climb112b` | n/a | A-residents-10 | OK | A-residents-10 S3 clip (confirmed by check:clips) | `community/sheets/age-climbingFrame.png` |
 
 ## Actions (45)
 
@@ -215,46 +215,46 @@ Content `anim` → clip, hands and layers: `ACTIONS` in `web/src/render/babylon/
 | `ACTIONS.cook` | n/a | OK | OK |  | `play/fridge-meal-01.png` |
 | `ACTIONS.wash` | n/a | OK | OK |  | `play/sink-wash-01.png` |
 | `ACTIONS.shower` | n/a | OK | I-bathroom-02 | I-bathroom-02 S3 clip | `play/shower-shower-01.png` |
-| `ACTIONS.bath` | n/a | — | — | not used by the 28 base objects: for the wave that owns its objects | |
+| `ACTIONS.bath` | n/a | OK | A-bathroom-04 | A-bathroom-04 S3 renderer-table (bathroom ledger: bathers 10–12 cm above the tub floor); I-bathroom-03 S2 code (bathroom ledger: in clothes, also in the hot tubs). The hot tub, whirlpool, cold plunge and heart tub sit low in the water, hands on the rim | `bathroom/play/chunk1/bathtub-bath-01.png`, `systems/sheets/act-write-garden-bath.png` |
 | `ACTIONS.toilet` | n/a | OK | OK |  | `play/toilet-use-01.png` |
 | `ACTIONS.sleep` | n/a | OK | OK |  | `play/bed-sleep-02.png` |
 | `ACTIONS.nap` | n/a | OK | OK |  | `play/bed-nap-01.png` |
 | `ACTIONS.sit` | n/a | A-residents-09 | OK | A-residents-09 S2 clip | `play/armchair-sit-01.png`, `play/bench-sit-01.png` |
 | `ACTIONS.relax` | n/a | OK | I-garden-02 | I-garden-02 S2 clip (garden ledger: standing in the shade) | `play/sofa-relax-01.png`, `play/tree-shade-01.png` |
 | `ACTIONS.type` | n/a | OK | OK |  | `play/computerDesk-code-01.png` |
-| `ACTIONS.write` | n/a | — | — | not used by the 28 base objects: for the wave that owns its objects | |
+| `ACTIONS.write` | n/a | OK | I-kids-03 | Seated at the desk, the hands on the paper (`sitHands`, `sitHandsNear` at the built-in-chair desks); posting a letter standing at the post box. An adult at the kids' desk: I-kids-03 S1 code (kids ledger) | `systems/sheets/act-write-garden-bath.png` |
 | `ACTIONS.read` | n/a | OK | I-living-03 | I-living-03 S2 content; I-held-01 S2 code (no book) | `play/bookshelf-read-01.png` |
 | `ACTIONS.watch` | n/a | OK | I-living-03 | I-living-03 S2 content (standing when no seat is near) | `play/tv-watch-01.png` |
 | `ACTIONS.play` | n/a | OK | OK |  | `play/chessTable-chess-01.png`, `play/crib-play-01.png` |
 | `ACTIONS.music` | n/a | OK | OK |  | `play/piano-play-01.png` |
 | `ACTIONS.paint` | n/a | OK | I-held-01 | I-held-01 S2 code (no brush) | `play/easel-paint-01.png` |
-| `ACTIONS.exercise` | n/a | — | — | not used by the 28 base objects: for the wave that owns its objects | |
+| `ACTIONS.exercise` | n/a | I-residents-01 | I-residents-01 | I-residents-01 S2 clip (the bouldering wall is "climbed" standing on its mat; the fitness game played off its board). The exercise bike, spin bike, climbing frame (A-residents-10), hoops, trampoline, heavy bag, vibe plate and stretch fit | `systems/sheets/act-exercise.png` |
 | `ACTIONS.run` | n/a | OK | OK | A-fitness-02 S3 motion (fitness ledger: the belt) | `play/treadmill-run-01.png` |
 | `ACTIONS.lift` | n/a | A-fitness-01 | OK | A-fitness-01 S2 clip (fitness ledger) | `play/weightBench-lift-02.png` |
-| `ACTIONS.dance` | n/a | — | — | not used by the 28 base objects: for the wave that owns its objects | |
+| `ACTIONS.dance` | n/a | OK | OK | The `dance` clip at the stereo, jukebox, dance floor and gramophone (the gramophone's "waltz" is danced alone: the packs ledger's use) | `systems/sheets/act-dance-sing-listen.png` |
 | `ACTIONS.talk` | n/a | OK | OK |  | `play/mirror-speech-01.png` |
-| `ACTIONS.sing` | n/a | — | — | not used by the 28 base objects: for the wave that owns its objects | |
+| `ACTIONS.sing` | n/a | OK | I-residents-02 | I-residents-02 S3 renderer-table (a mimed hand microphone beside the karaoke's own mic stand) | `systems/sheets/act-dance-sing-listen.png` |
 | `ACTIONS.clean` | n/a | OK | I-kids-05 | I-kids-05 S2 code (kids ledger: changing over the cot rail) | `scenes/crib-elder-change-02.png` |
 | `ACTIONS.water` | n/a | OK | I-held-01 | I-held-01 S2 code (no can) | `play/plant-water-01.png` |
 | `ACTIONS.tend` | n/a | OK | I-kids-04 | I-kids-04 S2 renderer-table (kids ledger: the feed kneels) | `play/flowerbed-tend-01.png`, `scenes/crib-adult-feed-02.png` |
 | `ACTIONS.cuddle` | n/a | OK | OK |  | `scenes/crib-adult-cuddle-03.png` |
-| `ACTIONS.harvest` | n/a | — | — | not used by the 28 base objects: for the wave that owns its objects | |
+| `ACTIONS.harvest` | n/a | OK | I-garden-03 | I-garden-03 S2 code and I-garden-04 S2 renderer-table (garden ledger: the crop goes at the start; the hand half a metre over low crops); the herb planter's `pick` fits. The greenhouse is harvested from outside its door (outdoor ledger's object) | `garden/extra/harvest/s-garden.strawberries-harvest.png`, `systems/sheets/act-write-garden-bath.png` |
 | `ACTIONS.prune` | n/a | OK | I-held-01 | I-held-01 S2 code (no shears) | `play/bush-trim-01.png` |
-| `ACTIONS.garden` | n/a | — | — | not used by the 28 base objects: for the wave that owns its objects | |
+| `ACTIONS.garden` | n/a | OK | I-residents-03 | Feeding the fish fits (`water` at the pond's rim); I-residents-03 S3 renderer-table (the songbird feeder refilled at knee height, 1 m under it) | `systems/sheets/act-write-garden-bath.png` |
 | `ACTIONS.tinker` | n/a | OK | OK |  | `play/workbench-tinker-01.png` |
 | `ACTIONS.look` | n/a | OK | I-hobbies-02 | I-hobbies-02 S2 clip (hobbies ledger: the telescope) | `play/telescope-stargaze-01.png` |
 | `ACTIONS.smell` | n/a | OK | OK |  | `play/flowerbed-smell-01.png` |
-| `ACTIONS.admire` | n/a | — | — | not used by the 28 base objects: for the wave that owns its objects | |
-| `ACTIONS.phone` | n/a | — | — | not used by the 28 base objects: for the wave that owns its objects | |
-| `ACTIONS.listen` | n/a | — | — | not used by the 28 base objects: for the wave that owns its objects | |
-| `ACTIONS.meditate` | n/a | — | — | not used by the 28 base objects: for the wave that owns its objects | |
-| `ACTIONS.idle` | n/a | — | — | not used by the 28 base objects: for the wave that owns its objects | |
-| `ACTIONS.knock` | n/a | — | — | not used by the 28 base objects: for the wave that owns its objects | |
+| `ACTIONS.admire` | n/a | OK | I-residents-03 | I-residents-03 S3 renderer-table (the statue admired with the nose to its plinth); I-garden-02 S2 clip (garden ledger: the trees) | `systems/sheets/act-phone-meditate-idle.png`, `garden/play/c1/garden.cherry-admire-01.png` |
+| `ACTIONS.phone` | n/a | OK | I-social-04 | I-social-04 S2 clip (social ledger: the hand at the ear for every phone use, a video call at a laptop too); I-social-01 S2 code (social ledger: no phone). The phone booth fits (inside, at its receiver) | `systems/sheets/act-phone-meditate-idle.png`, `social/sheets/phone.png` |
+| `ACTIONS.listen` | n/a | OK | I-living-03 | Standing with the arms folded for 30–60 minutes at the stereo, the boombox, the record cabinet and the gramophone: I-living-03 S2 content (living ledger: no `seatNear`, widen there) | `systems/sheets/act-dance-sing-listen.png` |
+| `ACTIONS.meditate` | n/a | OK | OK | Cross-legged on the yoga mat and the cool-down cushion | `systems/sheets/act-phone-meditate-idle.png` |
+| `ACTIONS.idle` | n/a | OK | I-residents-03 | Fits at the shop counter (served across it); I-residents-03 S3 renderer-table (the giving jar's donation made with the hands at the sides) | `systems/sheets/act-phone-meditate-idle.png` |
+| `ACTIONS.knock` | n/a | OK | I-systems-09 | Visitors at the front door (`visits.door.knockAnim`): I-systems-09 S3 code (systems ledger) | `systems/sheets/knock.png` |
 | `ACTIONS.fetch` | n/a | OK | OK |  | `play/fridge-snack-01.png` |
-| `ACTIONS.chop` | n/a | — | — | not used by the 28 base objects: for the wave that owns its objects | |
-| `ACTIONS.stir` | n/a | — | — | not used by the 28 base objects: for the wave that owns its objects | |
-| `ACTIONS.flip` | n/a | — | — | not used by the 28 base objects: for the wave that owns its objects | |
-| `ACTIONS.serve` | n/a | — | — | not used by the 28 base objects: for the wave that owns its objects | |
+| `ACTIONS.chop` | n/a | OK | I-systems-01 | The board drawn on the counter and chopped on (`systems/sheets/cook-meal-1.png`); I-systems-01 S2 renderer-table (systems ledger: on the gas grill station, the grate) | `systems/sheets/cook-meal-1.png`, `outdoor/play/chunk5-kitchen/grillStation-cook-01.png` |
+| `ACTIONS.stir` | n/a | OK | I-systems-06 | Fits on a hob; I-systems-06 S2 renderer-table (systems ledger: every oven step is stirring a pan); I-systems-07 S3 code (the prep bowl in the other hand) | `systems/sheets/cook-meal-1.png`, `systems/sheets/cook-ovens.png` |
+| `ACTIONS.flip` | n/a | OK | I-systems-07 | Turning the food on the grill fits; I-systems-07 S3 code (systems ledger: the prep bowl in the other hand) | `systems/sheets/cook-bbq-1.png` |
+| `ACTIONS.serve` | n/a | n/a | n/a | Nothing plays it: no interaction, recipe step or cooking rule names `serve` (a dish is put down at the end of the last step, under its clip) | |
 
 ## Procedural layers (11)
 
@@ -268,8 +268,8 @@ Code in `web/src/render/babylon/characters.ts`.
 | Elder's stoop | OK | OK | n/a |  | `residents/chars-elder-side.png`, `residents/chars-stages-side.png` |
 | Arms a little out over a skirt | OK | OK | n/a |  | `residents/tops-female-front.png` |
 | Hands: open or gripping per activity | n/a | OK | OK |  | `play/computerDesk-code-01.png`, `play/weightBench-lift-02.png` |
-| Seat fit: pelvis `seatDrop` over the seat (`SEATS`, content `seat`) | n/a | A-residents-09, A-residents-11 | OK | A-residents-09 S2 clip; A-residents-11 S2 clip; M-outdoor-02 S3 model (outdoor ledger: the bench 4 cm into its slats) | `sheets/seat-*.png`, `poses/seat-sofaF-elder.png` |
-| Lie fit: `lie` turned flat on the mattress (`BEDS`, `LIE_*`) | n/a | A-fitness-01 | OK | A-fitness-01 S2 clip (fitness ledger); I-kids-03 S1 code (kids ledger: an adult in the cot) | `play/bed-sleep-02.png`, `sheets/bedpose-0.png`, `play/crib-lie-01.png` |
+| Seat fit: pelvis `seatDrop` over the seat (`SEATS`, content `seat`) | n/a | A-residents-09, A-residents-11 | I-kids-03 | A-residents-09 S2 clip; A-residents-11 S2 clip (widened: the child in the bean bag); M-residents-02 S3 model (widened: every seated woman's skirt a hoop round the seat); M-outdoor-02 S3 model (outdoor ledger: the bench 4 cm into its slats); I-kids-03 S1 code (kids ledger: teens, adults and elders sit on the 0.31 m kids' chair as on any). Cross-cutting wave, over the other waves' age sheets (`<cat>/sheets/age-*.png`: 253, of which the dining chairs, bar stools, sofas, armchairs, bean bags, office chairs, kids' chair, fountain rim read): the pelvis sits on the seat at every stage and every height of seat; a child's feet dangle on adult chairs and bar stools (as a child's do), a teen's and an elder woman's hang a few cm off a 0.45 m seat (A-residents-09); deep low seats swallow short shins | `kitchen/sheets/age-diningChair.png`, `kitchen/sheets/age-barStool.png`, `living/sheets/age-beanBag.png`, `kids/sheets/age-kidsChair.png` |
+| Lie fit: `lie` turned flat on the mattress (`BEDS`, `LIE_*`) | n/a | A-fitness-01, A-bedroom-03 | OK | A-fitness-01 S2 clip (fitness ledger); I-kids-03 S1 code (kids ledger: an adult in the cot); A-bedroom-03 S2 code (bedroom ledger: into bed at the foot end, at every stage, the bunk's elder too); A-bedroom-02 S2 code (bedroom ledger: the upper bunk). Cross-cutting wave, over the bedroom, kids, living and packs age sheets: the sleeper lies on the mattress at every stage on every bed; `poses.html` puts only a child in the kids' bed (sim-core's stage rules for free will; a direct use skips them, I-kids-03) | `bedroom/sheets/age-bedBunk.png`, `kids/sheets/age-kidsBed.png`, `play/bed-sleep-02.png` |
 | Blankets and pyjamas in bed | OK | OK | n/a |  | `play/bed-sleep-02.png`, `sheets/bedpose-0.png` |
 | Turning: towards travel, and on the spot | n/a | A-residents-08 | n/a | A-residents-08 S3 code (seeded; seen: residents turn in place at each use) | `play/*-00.png` |
 | Approach: stepping to a use and back | n/a | OK | OK | A-bathroom-01 S2 model (bathroom ledger: through the shower door) | `play/*-00.png`, `play/shower-shower-00.png` |
@@ -388,7 +388,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Where:** `web/src/render/babylon/characters.ts` (seat fit per stage), sofa seat in `web/src/render/babylon/characters/furniture.json`
 - **Evidence:** `poses.html?stage=elder`: the woman on the TV sofa has no shins and her boots stand apart on the floor; the adult version is fine. Shots: `poses-tvsofa-elder.png` against `poses-tvsofa-default.png` (Phase 0 gallery agent's scratch folder).
 - **Status:** confirmed and widened (pilot: `poses/seat-sofaF-elder.png`: the shins end in the cushion and the boots stand on the floor in front of the sofa, apart from the legs. The same for the child and the teen on the sofa, `sheets/seat-sofaM.png` top right and bottom left: their knees stop short of the 0.8 m deep seat's front, so the shins go down inside it. The adults are fine. A shorter seat depth per stage (sit further forward) or a legs-out pose for short thighs)
-- **Source:** Phase 0.7b check of `poses.html?stage=`
+- **Source:** Phase 0.7b check of `poses.html?stage=`; wave: cross-cutting (widened: `living/sheets/age-beanBag.png`, the child sits in the bean bag with only the shoes showing past its front, the shins inside it; teen, adult and elder sit upright on it, the shins in it to mid-calf)
 
 ### M-residents-01 — Heads are about half a head bigger than the rubric's ratios at every stage
 
@@ -407,5 +407,35 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `crates/tools/src/characters/clothes.rs:10` (`bottom.skirt`: an A-line loft from the waistband to above the knees, swinging with the thighs); `crates/tools/src/characters/garments.rs` (the jacket's hem)
 - **Evidence:** `residents/tops-female-sit-side.png`: seated, the skirt stands off the thighs as a stiff bell, its hem in the air past the knees, and the jacket's hem flares out over the lap the same way; nothing clips. A skirt seated lies on the thighs and drapes off the knees. Visible at the close camera only.
+- **Status:** confirmed and widened (cross-cutting wave: every seated woman at teen, adult and elder in a skirt, on every seat of the age sheets, shows the skirt as a dark hoop standing out round the seat at the game camera's height, e.g. `kitchen/sheets/age-diningChair.png`, `kitchen/sheets/age-barStool.png`; the hem doesn't clip)
+- **Source:** pilot; wave: cross-cutting
+
+### I-residents-01 — The bouldering wall is "climbed" standing on its mat, and the fitness game is played off its board
+
+- **Severity:** S2
+- **Rubric:** I3, A1
+- **Fix class:** clip
+- **Where:** `web/src/render/babylon/characters.ts:481-495` (`ACTIONS.exercise`: `boulder` and `sunrise` get `idle` with `activityPose` on top; `fitnessGame` `dance`, `punchJab`, `punchCross` from the tile in front), `:198` (`STEP_IN.climbingFrame`, the climbing clips the frame already has)
+- **Evidence:** `systems/sheets/act-exercise.png` (the packs wave's `packs/play/chunk2/energetic.boulderingWall-climb-01.png`): for the 60 minutes of "Climb" the resident stands on the crash mat at the wall's foot with both arms raised, the feet on the floor, never on a hold; the climbing frame beside it climbs its net (`community/play/climbingFrame-climb-01.png`, `climb*` clips at five heights). The fitness game (`packs/play/chunk1/couchPotato.fitnessGame-workout-01.png`) is danced and punched standing beside its balance board, not on it. The exercise bike, spin bike, hoops, trampoline, heavy bag, vibe plate and the sunrise lamp's stretch fit their objects.
 - **Status:** open
-- **Source:** pilot
+- **Source:** wave: cross-cutting (ACTIONS entries no base object uses, judged at the packs wave's objects)
+
+### I-residents-02 — Singing mimes a hand microphone beside the karaoke machine's own microphone stand
+
+- **Severity:** S3
+- **Rubric:** I3
+- **Fix class:** renderer-table
+- **Where:** `web/src/render/babylon/characters.ts:501` (`ACTIONS.sing`: `talk` with the `phone` clip's hand at the mouth as a microphone)
+- **Evidence:** `systems/sheets/act-dance-sing-listen.png` (`packs/play/chunk3/cheerful.karaokeMachine-sing-01.png`, `packs/play/chunk4/outgoing.karaokeStage-perform-01.png`): at the karaoke machine the singer stands to one side of its mic stand, an empty hand held to the mouth; on the karaoke stage they stand at the front edge, the two mic stands behind them. A singer at a stand sings into it, hands on the stand or free; a karaoke singer holds the machine's microphone (a prop: I-held-01's family).
+- **Status:** open
+- **Source:** wave: cross-cutting
+
+### I-residents-03 — Standing uses with no reach to the part used: the bird feeder, the giving jar, the statue
+
+- **Severity:** S3
+- **Rubric:** I3, A1
+- **Fix class:** renderer-table
+- **Where:** `web/src/render/babylon/characters.ts:514-517` (`ACTIONS.garden`: `water` for the feeder), `:529` (`admire`: `idle`, `foldArms`), `:533` (`idle`)
+- **Evidence:** `systems/sheets/act-write-garden-bath.png`, `systems/sheets/act-phone-meditate-idle.png` (the packs and community waves' play shots): "Refill the feeder" is the watering clip at knee height beside the bird bath, a metre under the 1.5 m feeder box; "Donate" at the giving jar stands by it with the hands at the sides; "Admire the statue" stands with the face to its plinth, the statue 2 m over the head, never looked up at. The pond's "Feed the fish" and the shop counter's treat (served across it) fit. A reach to the part's height (`STEP_IN`-style sizes, or the `look` entry's head tilt) would fix each.
+- **Status:** open
+- **Source:** wave: cross-cutting
