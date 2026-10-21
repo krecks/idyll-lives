@@ -44,7 +44,7 @@ answer 200 (a missing or linked wasm package otherwise gives pictures of an empt
 
 | Check | Does |
 |---|---|
-| `gallery` | `/gallery.html?keys=…` from the front right. `--alpha --beta --radius --target --cols`; `--scale adult\|child\|all` stands residents beside each model; `--camera game` takes one picture per model with the game's Live camera aimed at it |
+| `gallery` | `/gallery.html?keys=…` from the front right. `--alpha --beta --radius --target --cols`; `--each`: one picture per key, `gallery-<key>.png`, on one page; `--scale adult\|child\|all` stands residents beside each model; `--camera game` takes one picture per model with the game's Live camera aimed at it |
 | `clips` | `/clips.html?keys=…` held at each of `--times` (default `0,0.3,0.6,1,99`; 99 is open), one picture each. `--each`: each key on its own, `clips-<key>-<clip>-t<t>.png`, one page for all. `--clip --colors --target` |
 | `play` | Opens `?state=<--state, default bathroom-check>&debug`, adds money, then for each of `--objects a,b@x,z,rot,…` (or `--objects-file <path>`, one `def` or `def@x,z,rot` a line, `#` comments) on the same page: buys it, runs each `--use` (`all`, the default, an interaction id or an index) for `--sim`, takes `--shots` (3) pictures `--every` (1000) ms once the resident is using it, framing the object, then sells it and the resident walks back to where they started. One JSON line per use in `<out>/play.jsonl`. |
 
