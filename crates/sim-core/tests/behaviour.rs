@@ -347,7 +347,8 @@ fn an_order_holds_against_needs() {
         w.sims[sim].needs[fun] = 0.0;
         w.apply(Command::Use { sim: sim as u32, object: tv, interaction: 0 }).unwrap();
         let (mut watched, mut other) = (0u64, None);
-        for _ in 0..90 * sim_core::TICKS_PER_MINUTE {
+        // (Time for the walk home first: at noon with free will on they may be out in town.)
+        for _ in 0..150 * sim_core::TICKS_PER_MINUTE {
             w.tick_once();
             match w.sims[sim].current().map(|a| (a.task.kind, &a.phase)) {
                 Some((TaskKind::Use { object, .. }, Phase::Using { .. })) if object == tv_at => watched += 1,

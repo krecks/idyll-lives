@@ -494,6 +494,12 @@
         {
           "id": "pour",
           "label": "Pour a coffee to take to a table",
+          "stages": [
+            "teen",
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
           "anim": "fetch",
           "minutes": 2,
           "autonomous": false,
