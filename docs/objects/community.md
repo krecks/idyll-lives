@@ -22,7 +22,7 @@ their uses. The climbing frame has no clip of its own: the resident's clips clim
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `slide` Playground slide | 1x2 · floor | slide:play | community / play | Frame, Slide, Roof | Static | Static. |
-| `climbingFrame` Climbing frame | 2x2 · floor | climb:exercise | community / play | Frame, Roof, Net | Static | Static. Climbed round: up its rope net, across the deck (ducking under the roof) and down the fireman's pole, then back round to the net (`climb172a`/`147a`/`112a` by height, `b` for the second lane: two side by side, the second waiting on the deck for the first to slide). |
+| `climbingFrame` Climbing frame | 2x2 · floor | climb:exercise | community / play | Frame, Roof, Net | Static | Static. Climbed round: up its rope net, across the deck (ducking under the roof) and down the fireman's pole, then back round to the net (`climb172a`/`147a`/`112a` by height, `b` for the second lane: two side by side, the second waiting on the deck for the first to slide; one who steps in while someone goes round waits at their lane until that round is back at its start, so the two stay in step, G-25). |
 | `seesaw` Seesaw | 3x1 · floor | seesaw:play | community / play | Frame, Seats, Plank | Loop (E1) | `seesaw`: the plank tips ±12° while two play (E1). |
 | `springRider` Spring rider | 1x1 · floor | ride:play | community / play | Horse, Saddle, Spring | Loop (E1) | `rock` on its spring while ridden (E1). |
 | `merryGoRound` Merry-go-round | 2x2 · floor | spin:play | community / play | Platform, Rails, Stripes | Loop (E1) | `spin` while ridden (E1). |

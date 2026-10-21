@@ -240,7 +240,8 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | talk | yes | 2.93 | talking, singing (with `phone` on top), the mirror |
 | walk | yes | 1.1 (1.1 m/s) | moving (played at the ground speed) |
 | jog | yes | 0.7 | running on the spot, treadmills, exercise |
-| jogAlong | yes | 0.7 (2.5 m/s) | moving fast: the jog's pose given a stride, played at the ground speed when the walk would need more than 3× its own pace (`GAIT_MAX_RATE`); back to walking below 0.8 of that (`JOG_BACK`) |
+| jogAlong | yes | 0.7 (2.5 m/s) | moving fast: the jog's pose given a stride, the hips 6 cm lower (the knees bent through the stance), played at the ground speed when the walk would need more than 3× its own pace (`GAIT_MAX_RATE`); back to walking below 0.8 of that (`JOG_BACK`) |
+| runAlong | yes | 0.6 (5.8 m/s) | moving faster still (game speed 3 and up, children from 2): a run with a 3.5 m stride, each foot down a sixth of the time, played at the ground speed when the jog would need more than 3×, up to 4× (`RUN_MAX_RATE`); back to the jog below 0.8 of the switch |
 | sit | yes | 1.67 | seated |
 | sitTalk | yes | 2.93 | seated in a conversation |
 | sitDown | no | 1.33 | sitting down, and onto the edge of a bed before lying down |
@@ -259,7 +260,11 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | foldArms | yes | 2.5 | watching, relaxing, idle variations |
 | yes / no | no / yes | 2.5 | listening, arguing |
 | phone, lantern | yes | 2.93, 2.5 | the phone; reading (a book at the chest) |
-| rail | yes | 2.5 | the telescope |
+| rail | yes | 2.5 | leaning on a rail (the older layouts' telescope, `USE`) |
+| eyepiece181, 163, 147, 129, 112 | yes | 6 | bent down to the telescope's eyepiece (the tube aimed up: the eye at 0.765 m, 0.3 m out), the right hand on the tube, the left on the knee, a look up at the sky each loop; a size per height (cm, `STEP_IN`, for `look`) |
+| pickApple177, 147, 112; pickLemon177, 147, 112 | no | 3.3 | reaching up to the fruit tree's picked fruit (the apple 1.84 m up, the lemon 1.62 m), on tiptoe if high, the left hand on the bough, a twist off and down to the chest; then `eat` (`STEP_IN`, for `eat`); a size per height |
+| shower, showerChild | yes | 14 | showering: the hair lathered and rinsed, a 50° turn in two steps to soap the arms and the chest, back, the face rinsed; a child (under 1.29 m, `SHOWER_CHILD`) turns only the chest |
+| strum, strumShort | yes | 2 | a guitar (or a ukulele, `strumShort`, held higher) across the body: the neck out to the left 30° up in the body's plane, the left hand on it, the right strumming; `writeHeld` draws the instrument from its rest point (`GUITAR`) to the left palm |
 | push | yes | 2.67 | mopping, vacuuming |
 | water, harvest, plant, kneel, crouch | yes, yes, no, yes, yes | 3.8, 2.5, 2.77, 5.2, 2.93 | gardening, smelling flowers |
 | pick | yes | 3.0 | picking herbs from a waist-high planter |
@@ -267,7 +272,7 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | punchJab, punchCross, hit | no | 0.87, 1.0, 0.33 | heavy bags and fights |
 | wave | no | 2.2 | the household creator's greetings |
 | fountainDrink181, 163, 147, 129, 112 | yes | 3 | bent over a drinking fountain's spout, sipping from its water (a size per height, in cm; the smaller two on tiptoe at the water's falling end); `STEP_IN` steps them up to it |
-| climb172a, 147a, 112a; climb172b, 147b, 112b | yes | 13 | a round on the climbing frame: up its rope net three ropes, hands and feet in turn, over the edge onto the deck, ducking under the roof across it to the fireman's pole, round the pole and down it (hands and legs round it), and back round to the net; a size per height (cm), and one per lane of the net (`a`, `b`: the second waits on the deck for the first to slide) |
+| climb172a, 147a, 112a; climb172b, 147b, 112b | yes | 13 | a round on the climbing frame: up its rope net three ropes, hands and feet in turn, over the edge onto the deck, ducking under the roof across it to the fireman's pole, round the pole and down it (hands and legs round it), and back round to the net; a size per height (cm), and one per lane of the net (`a`, `b`: the second waits on the deck for the first to slide; one stepping in while someone goes round waits at their lane until that round is back at its start, so the two stay in step: `inTurn`) |
 
 ### Checking clips
 
@@ -278,7 +283,9 @@ header). The default is the reference: `male` at `youngAdult`, plus `baby` for t
 Each body and stage plays the clips on its own skeleton (`restT`, the pelvis motion and ground
 speed scaled by `pelvisScale`, `walk`'s hip roll), the sized clips at the size its height picks,
 babies only their own; the height slider, build, head size, stoop and the runtime's fits to seats
-and beds are not covered. The known failures are in `tools/characters/clip-baseline.json`: they
+and beds are not covered. Planted feet are checked on each skeleton as it is, so a clip that turns the
+hips over a planted foot slides on hips wider for their legs than the reference's (a child's, a little a
+woman's): place the feet for them (`footIK`'s `wide`, a size per height) or keep the hips still. The known failures are in `tools/characters/clip-baseline.json`: they
 print as `known` and don't fail, one that no longer fails prints as `fixed` (take it out), and only
 a new one exits 1. `--update-baseline` rewrites the file for the bodies and stages checked. CI runs
 `pnpm check:clips` (in `web/`: `--body all --stage all`).
