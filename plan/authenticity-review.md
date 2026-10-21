@@ -1,7 +1,7 @@
 # Idyll Lives — Authenticity Review Plan (models, animations, interactions)
 
 - **Base:** `main` at `e725166` (v0.3.0)
-- **Status:** In progress (Phase 0)
+- **Status:** In progress (pilot done; owner checkpoint passed 2026-10-21; tooling round before waves 2–6)
 - **Output:** `docs/authenticity-review.md` (findings, fixes, leftovers, laid out like `docs/release-0.2.0-review.md`) plus one ledger per category in `docs/review/`
 
 ## 1. Intent
@@ -59,7 +59,7 @@ Each reviewer works from these lists and records a verdict per line: **OK**, **f
 
 **Size and proportion**
 - M1. Overall W × H × D is inside a real-world range for the thing (§3.4 reference table). Built size comes from the `cargo check-glb` summary line, not from the family notes.
-- M2. Functional heights match people: seat, table top, counter, desk, bed mattress, sink rim, toilet seat, shelf reach, light switch, handle heights. They also agree three ways: content (`seat.height`, `surface.height`, `light.height`), the renderer tables (`SEATS`, `BEDS` in `characters.ts`) and the mesh.
+- M2. Functional heights match people: seat, table top, counter, desk, bed mattress, sink rim, toilet seat, shelf reach, light switch, handle heights. They also agree three ways: content (`seat.height`, `surface.height`, `light.height`), the renderer tables (`web/src/render/babylon/characters/furniture.json`) and the mesh. A height up to 1 cm out (5 mm on table tops) counts as inside: the modelling grid and bevels move it that much.
 - M3. Parts are in proportion to each other: a fridge handle against the door, a drawer against the carcass, a tap against the basin.
 - M4. The model fits its footprint and layer: floor, surface, wall back on the wall face, ceiling hanging from 2.8 m. A model may be smaller than its tile only where a real one would be.
 
@@ -79,7 +79,7 @@ Each reviewer works from these lists and records a verdict per line: **OK**, **f
 - M13. Quality is about the same as its neighbours in the same room. Note outliers in detail level, both too plain and too busy.
 
 **Residents (in addition)**
-- M14. Height and head-to-body ratio per life stage are in a believable range (baby about 1:4, child 1:5–6, teen 1:6.5–7, adult 1:7–7.5, elder a little shorter with a stoop). Check `rig.rs` `proportions` and `target_height`.
+- M14. Height and head-to-body ratio per life stage are in a believable range for the style, which draws heads about half a head bigger than life (baby about 1:3.5, child 1:4.5–5, teen 1:6–6.5, adult 1:6.5–7, elder a little shorter with a stoop). Check `rig.rs` `proportions` and `target_height`.
 - M15. Hair sits on the head without clipping at the usual head turns. Garments are plausible as clothes (collar, hem, sole), and skirts and jackets don't clip at sitting or walking.
 - M16. The `build` slider extremes (0.85, 1.2) still read as people.
 
@@ -90,7 +90,7 @@ Each reviewer works from these lists and records a verdict per line: **OK**, **f
 ### 3.2 Animation authenticity (A)
 
 **Residents**
-- A1. Contact: feet don't slide, the seat carries the pelvis, a lying resident touches the mattress, hands touch what they use (handle, tap, keyboard, pan) and don't hover or pass through it.
+- A1. Contact: feet don't slide, the seat carries the pelvis, a lying resident touches the mattress, hands touch what they use (handle, tap, keyboard, pan) and don't hover or pass through it. A resident's pose at an object (reach, eye line, contact with its parts) is filed under I3 with A1 in its Rubric field; the A column names the same id.
 - A2. Weight and balance: the centre of mass sits over the support, sitting down lowers into the seat, standing up pushes off, and carrying changes the posture.
 - A3. Timing: walk and jog cadence fit the ground speed at each game speed, gestures last a believable time, and loops have no visible seam.
 - A4. Transitions: no pops between clips. Approach, turn, sit and lie happen in a believable order: no gliding back to the tile, no spinning on the spot without stepping.
@@ -119,6 +119,8 @@ Each reviewer works from these lists and records a verdict per line: **OK**, **f
 - I8. Open, closed and ripe states make sense (`when`, `leaves`, `closeAfter`): who opens and closes, and what happens to an occupant.
 - I9. Sound: uses that make noise in life have it, or are listed as missing.
 
+- I16. Conditions: a use whose real thing needs a time, a place or a state (night for stargazing, outdoors, someone to play with, a baby in the crib) has it, or is filed.
+
 **Social**
 - I10. Each social has a fitting clip, distance and facial expression, and its success and failure look different.
 - I11. Group conversations: joining, roles, glances and spacing.
@@ -140,9 +142,11 @@ Before Phase 1 starts, a reviewer writes `docs/review/reference.md`: real-world 
 **Ids:** `M-<cat>-NN`, `A-<cat>-NN`, `I-<cat>-NN` (for example `M-kitchen-07`), where the category is the `docs/objects/` page or `residents`, `houses`, `town`, `social`, `systems`.
 
 **Severity**
-- **S1 — breaks belief:** wrong at a glance in normal play (a resident floats above the bed, a door opens into the wall, a child-sized adult chair, a use from the back of the object).
+- **S1 — breaks belief:** wrong at a glance in normal play (a resident floats above the bed, a door opens into the wall, a child-sized adult chair, a use from the back of the object, an adult using a child's or a baby's thing, or a child an adult's, as if it fitted).
 - **S2 — noticeably wrong:** a careful player sees it (hands hover, a counter 10 cm too low, a 2-minute shower, a missing obvious use).
 - **S3 — polish:** only on close inspection or a side-by-side.
+
+A `decision` finding takes the severity of its worse outcome.
 
 **Fix class:** `model` (Blender rebuild), `content` (numbers or fields), `renderer-table` (`SEATS`, `BEDS`, `ACTIONS`, `STATION_PROPS`), `clip` (resident clip), `motion` (object clip or manifest `motions`), `code` (new behaviour), `decision` (needs the owner).
 
@@ -152,7 +156,13 @@ Before Phase 1 starts, a reviewer writes `docs/review/reference.md`: real-world 
 |---|---|---|---|---|---|
 | `fridge` | OK | A-kitchen-03 | OK | A-kitchen-03 S2 motion: freezer door opens at use start, not at the hand | `review/kitchen/fridge-*.png` |
 
-Shots go in the scratchpad or a gitignored `review-shots/` folder, not in git. The ledger names them, and the key ones are attached when a finding is filed.
+Shots stay in the gitignored `bench-results/review/<cat>/`, not in git. The Shots cell names the object's contact sheet (`sheets/obj-<id>.png`, from `check.mjs sheet`) and at most two more shots.
+
+**Status values:** `open`, `seeded (from <source>)`, `confirmed`, `confirmed and widened`, `confirmed fixed on <item>`, `not checked (<why>)`, `closed (<why>)`, and in Phase 4 `fixed (<commit>)`, `later`, `won't fix (<why>)`.
+
+**Causes shared by many objects:** a finding whose cause is in the sim or the renderer and not in one object (a `Command::Use` rule, an `ACTIONS` entry, a clip) goes in the ledger of the first object it was seen on, naming every other affected item; the other ledgers' rows point to it. The coordinator moves it to `systems.md` or `residents.md` when the wave is merged. Each object wave judges the `ACTIONS` entries its objects use, at those objects; the cross-cutting wave takes the rest.
+
+**Real uses (I1):** under each group, a table "Real uses against the content's" lists the real-world uses of each item next to the content's.
 
 ---
 
