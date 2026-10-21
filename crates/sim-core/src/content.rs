@@ -370,8 +370,9 @@ pub enum SeatFacing {
     Around,
 }
 
-/// How far (m) past its footprint's edge a slot's place may be (standing at a ping-pong table's end).
-pub const PLACE_REACH: f32 = 1.5;
+/// How far (m) past its footprint's edge a slot's place may be (standing at a ping-pong table's end, at the
+/// oche two metres out from the dartboard).
+pub const PLACE_REACH: f32 = 2.0;
 
 /// Radius of a thing on the `Surface` layer when content gives none (m).
 pub const DEFAULT_RADIUS: f32 = 0.12;
@@ -430,6 +431,12 @@ pub enum Approach {
     Front,
     /// Any free tile beside it, the front first (chairs pushed under a table).
     Around,
+    /// Its seats and beds got onto from the side (`surface::seat_approach`): beside the slot, by
+    /// the pillow end of a bed's side, else the front. Used standing, from the front.
+    Side,
+    /// Its seat behind the work (a desk's chair, a drum kit's throne): from behind the slot, else
+    /// beside it, else the front.
+    Behind,
 }
 
 /// Where an object goes (content `layer`). Things on a wall, the ceiling or the floor's surface
@@ -2930,9 +2937,11 @@ impl Content {
             let approach = match obj.approach.as_deref() {
                 None | Some("front") => Approach::Front,
                 Some("around") => Approach::Around,
+                Some("side") => Approach::Side,
+                Some("behind") => Approach::Behind,
                 Some(other) => {
                     return Err(Error::new(format!(
-                        "object '{}': unknown approach '{other}' (front or around)",
+                        "object '{}': unknown approach '{other}' (front, around, side or behind)",
                         obj.id
                     )));
                 }
@@ -2972,8 +2981,8 @@ impl Content {
             }
             if !obj.places.is_empty() {
                 let half = obj.footprint.map(|f| f as f32 / 2.0 + PLACE_REACH);
-                if obj.places.len() != obj.slots as usize || obj.bunk || layer != Layer::Floor {
-                    return Err(Error::new(format!("object '{}': `places` gives one place a slot, on the floor (not for a bunk bed)", obj.id)));
+                if obj.places.len() != obj.slots as usize || obj.bunk || !matches!(layer, Layer::Floor | Layer::Wall) {
+                    return Err(Error::new(format!("object '{}': `places` gives one place a slot, on the floor or a wall (not for a bunk bed)", obj.id)));
                 }
                 if obj.places.iter().any(|p| !p.facing.is_finite() || (0..2).any(|k| !p.at[k].is_finite() || p.at[k].abs() > half[k])) {
                     return Err(Error::new(format!("object '{}': a place is more than {PLACE_REACH} m off its footprint", obj.id)));

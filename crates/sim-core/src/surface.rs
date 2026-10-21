@@ -18,6 +18,7 @@ use crate::content::{Approach, Content, DEFAULT_RADIUS, Layer, Pose, StageMask, 
 use crate::lot::Edge;
 use crate::path::NavGrid;
 use crate::world::{MAX_OFFSET, ObjectInstance};
+use std::f32::consts::{FRAC_PI_2, PI};
 
 /// Slack (m) when checking that a disc stays on a top: offsets are whole centimetres.
 const SLACK: f32 = 0.006;
@@ -384,23 +385,121 @@ pub fn slot_approach(content: &Content, nav: &NavGrid, obj: &ObjectInstance, slo
     content.objects[obj.def].places.get(slot)?;
     let at = obj.slot_position(content, slot);
     let yaw = obj.slot_yaw(content, slot);
-    let tile = |p: [f32; 2]| (p[0].floor() as i32, p[1].floor() as i32);
     let on = |t: (i32, i32)| obj.tiles(content).any(|f| f == t);
-    let off = !on(tile(at));
-    // Along the way they face from a place off it (into the object), against it from one on it
-    // (out of it), until the footprint's edge is crossed: `t` off it, `inner` on it.
-    let step = if off { 0.1 } else { -0.1 };
-    let (mut last, mut found) = (tile(at), None);
-    for k in 1..=40 {
-        let p = tile([at[0] + yaw.sin() * step * k as f32, at[1] + yaw.cos() * step * k as f32]);
-        if on(p) != on(last) {
-            found = Some(if off { (last, p) } else { (p, last) });
-            break;
-        }
-        last = p;
+    let storey = nav.stairs.storey(obj.z);
+    if !on(tile_of(at)) {
+        // Off it: on the place's own tile (two tiles out at the oche), with nothing in the way
+        // to the next tile towards the thing.
+        let t = tile_of(at);
+        let inner = (1..=20).map(|k| tile_of([at[0] + yaw.sin() * 0.1 * k as f32, at[1] + yaw.cos() * 0.1 * k as f32])).find(|&p| p != t)?;
+        return stands_by(nav, storey, t, inner).then_some(t);
     }
-    let (t, inner) = found?;
-    stands_by(nav, nav.stairs.storey(obj.z), t, inner).then_some(t)
+    // Against the way they face from a place on it (out of it), until the footprint's edge is
+    // crossed: `t` off it, `inner` on it; else from beside the place (round the end of a bench).
+    let out = |a: f32| {
+        let mut last = tile_of(at);
+        (1..=40).find_map(|k| {
+            let p = tile_of([at[0] - a.sin() * 0.1 * k as f32, at[1] - a.cos() * 0.1 * k as f32]);
+            let crossed = !on(p) && on(last);
+            let found = crossed.then_some((p, last));
+            last = p;
+            found
+        })
+    };
+    [yaw, yaw + FRAC_PI_2, yaw - FRAC_PI_2]
+        .into_iter()
+        .filter_map(out)
+        .find(|&(t, inner)| stands_by(nav, storey, t, inner))
+        .map(|(t, _)| t)
+}
+
+/// The tile `p` is on.
+fn tile_of(p: [f32; 2]) -> (i32, i32) {
+    (p[0].floor() as i32, p[1].floor() as i32)
+}
+
+/// How far (m) towards its front of its slot's middle someone sits on a bed's or a seat's side
+/// to get on (and so which row of a bed two tiles long they come to it from).
+const SIDE_ROW: f32 = 0.15;
+
+/// The tile someone sitting or lying in `slot` of `obj` comes to it from (and gets up to), when
+/// it isn't the object's own (`approach_tiles`): round to its place (`slot_approach`); beside
+/// the slot for a thing got onto from the side (`Approach::Side`: a bed by the pillow end of its
+/// side, the slot's own side first, a bunk's ladder side first; a bike, a chaise), behind it for
+/// a seat behind the work (`Approach::Behind`: a desk's chair, the drum kit's throne), else
+/// beside it; in front of its own slot on a seat for several (the end of a sofa). Each side
+/// nearer `from` (where they are now) first where the slot is in the middle. None when none of
+/// those can be stood on.
+pub fn seat_approach(content: &Content, nav: &NavGrid, obj: &ObjectInstance, slot: usize, from: [f32; 2]) -> Option<(i32, i32)> {
+    let def = &content.objects[obj.def];
+    if !def.places.is_empty() {
+        return slot_approach(content, nav, obj, slot);
+    }
+    let [r, f] = obj.slot_local(def, slot);
+    let [hw, hd] = obj.footprint.map(|v| v as f32 / 2.0);
+    let storey = nav.stairs.storey(obj.z);
+    // (A hair off a tile line: the middle of a thing two tiles wide.)
+    let r = if (r + hw).fract().abs() < 1e-3 { r - 0.01 } else { r };
+    let stand = |out: [f32; 2], inner: [f32; 2]| {
+        let (t, i) = (tile_of(obj.local_point(out)), tile_of(obj.local_point(inner)));
+        stands_by(nav, storey, t, i).then_some(t)
+    };
+    let row = (f + SIDE_ROW).clamp(-hd + 0.5, hd - 0.5);
+    let side = |s: f32| stand([s * (hw + 0.5), row], [s * (hw - 0.5), row]);
+    let to = |s: f32| {
+        let p = obj.local_point([s * (hw + 0.5), row]);
+        (p[0] - from[0]).hypot(p[1] - from[1])
+    };
+    let first = if def.bunk {
+        1.0
+    } else if r.abs() > 0.05 {
+        r.signum()
+    } else if to(1.0) < to(-1.0) {
+        1.0
+    } else {
+        -1.0
+    };
+    let beside = || side(first).or_else(|| side(-first));
+    match def.approach {
+        Approach::Side => beside(),
+        Approach::Behind => stand([r, -hd - 0.5], [r, -hd + 0.5]).or_else(beside),
+        Approach::Front if def.slots > 1 && !def.bunk => stand([r, hd + 0.5], [r, hd - 0.5]),
+        _ => None,
+    }
+}
+
+/// Where someone using `slot` of `obj` standing stands, when not on the object's own tile in
+/// front (`approach_tiles`): the tile, the point and the way they face. At the slot's place off
+/// the footprint (`places`: the end of a ping-pong table, the oche); for a thing several use at
+/// once standing, or two tiles wide, along its front, each in front of their own slot (two at a
+/// double sink, one at each basin) or in front of its middle, facing straight in; a carer at a
+/// thing with a baby's slot (the crib), in front of the baby; for a use of the `whole` of it (or
+/// one that opens or shuts it), in front of its middle. None when that can't be stood on.
+pub fn stand_spot(content: &Content, nav: &NavGrid, obj: &ObjectInstance, slot: usize, whole: bool) -> Option<((i32, i32), [f32; 2], f32)> {
+    let def = &content.objects[obj.def];
+    if !def.places.is_empty() {
+        let at = obj.slot_position(content, slot);
+        let on = obj.tiles(content).any(|t| t == tile_of(at));
+        return (!on).then(|| slot_approach(content, nav, obj, slot)).flatten().map(|t| (t, at, obj.slot_yaw(content, slot)));
+    }
+    let [w, d] = obj.footprint;
+    if def.approach != Approach::Front || def.stairs || def.bunk || !matches!(def.layer, Layer::Floor | Layer::Wall) || (def.slots < 2 && w % 2 == 1) {
+        return None;
+    }
+    let baby = def.interactions.iter().any(|i| i.baby);
+    let r = if whole || def.slots < 2 { 0.0 } else { obj.slot_local(def, if baby { 0 } else { slot })[0] };
+    let [hw, hd] = [w as f32 / 2.0, d as f32 / 2.0];
+    let nudged = if (r + hw).fract().abs() < 1e-3 { r - 0.01 } else { r };
+    let t = tile_of(obj.local_point([nudged, hd + 0.5]));
+    let inner = tile_of(obj.local_point([nudged, hd - 0.5]));
+    if !stands_by(nav, nav.stairs.storey(obj.z), t, inner) {
+        return None;
+    }
+    // As it's drawn (its offset), on that tile.
+    let p = obj.local_point([r, hd + 0.5]);
+    let o = [obj.offset[0] as f32 / 100.0, obj.offset[1] as f32 / 100.0];
+    let p = [0, 1].map(|k| (p[k] + o[k]).clamp([t.0, t.1][k] as f32, [t.0, t.1][k] as f32 + 1.0));
+    Some((t, p, crate::world::wrap_angle(obj.angle() + PI)))
 }
 
 /// The table `seat` faces: the top covering its front tile, of a kind it tucks under (its

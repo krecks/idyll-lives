@@ -451,7 +451,7 @@ pub(crate) fn start(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectI
         let def = &content.objects[o.def];
         let slot = o.pick_slot(sim.id, 0..def.slots as usize, Some((def, sim.pos)));
         let (fx, fz) = slot
-            .and_then(|k| crate::surface::slot_approach(content, &ctx.nav, o, k))
+            .and_then(|k| crate::surface::seat_approach(content, &ctx.nav, o, k, sim.pos))
             .or_else(|| ctx.index.links.approach_of(seat))
             .unwrap_or_else(|| o.front_tile(content));
         if let Some(waypoints) = walk_route(ctx, sim, (fx, fz), [fx as f32 + 0.5, fz as f32 + 0.5]) {

@@ -396,6 +396,35 @@ fn a_busy_stove_means_waiting_or_the_other_stove() {
 }
 
 #[test]
+fn a_cook_waiting_for_a_busy_counter_steps_aside_off_the_fridge() {
+    // Ben preps a gourmet meal at the only counter; Ada gets her ingredients and waits for it,
+    // not on the fridge's spot (where the next cook to the fridge would stand inside her) nor
+    // in front of any other station.
+    let mut w = world_with(KITCHEN, 2, false);
+    order(&mut w, 1, FRIDGE, "gourmet");
+    for _ in 0..(10.0 / sim_core::MINUTES_PER_TICK) as u32 {
+        w.tick_once();
+        if matches!(w.sims[1].current().map(|a| a.task.kind), Some(TaskKind::Cook { step: 1, station: Some(COUNTER), .. })) {
+            break;
+        }
+    }
+    order(&mut w, 0, FRIDGE, "meal");
+    let fronts: Vec<(i32, i32)> = w.objects.iter().map(|o| o.front_tile(&w.content)).collect();
+    let mut waited = 0;
+    for _ in 0..(15.0 / sim_core::MINUTES_PER_TICK) as u32 {
+        w.tick_once();
+        common::check(&w);
+        if w.sims[0].current().is_some_and(|a| matches!(a.phase, Phase::Queued { .. })) {
+            waited += 1;
+            let t = w.sims[0].tile();
+            assert!(!fronts.contains(&t), "Ada waits at {t:?}, where a station is used from");
+            assert_ne!(t, w.sims[1].tile(), "and not where Ben stands");
+        }
+    }
+    assert!(waited > 0, "Ada waited for the counter");
+}
+
+#[test]
 fn a_recipe_given_up_after_paying_gives_the_money_back() {
     // The only stove breaks while Ada preps a gourmet meal, which can't do without one.
     let mut w = world_with(KITCHEN, 1, false);
