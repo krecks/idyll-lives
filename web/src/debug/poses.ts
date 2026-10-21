@@ -11,8 +11,12 @@
  * `?manual` (time only advances via `__poses.advance(seconds)`, for screenshots), `?seats=sofa,toilet`
  * (a man and a woman seated on each),
  * `?clip=walk` (every Sim plays that clip: `__characters.force`), `?clip=walk&strip=8` (a filmstrip:
- * the clip held at 8 times through it, on a man, a woman and a child; no stations),
- * `?bottom=bottom.skirt` (everyone who can wears that bottom).
+ * the clip held at 8 times through it, on a man, a woman, a child, a teen and an elder; no stations),
+ * `?bottom=bottom.skirt` (everyone who can wears that bottom),
+ * `?stage=teen` (a life stage: baby, child, teen, youngAdult, adult or elder) everyone placed is at,
+ * where sim-core lets that stage take the place (a baby only lies in a crib; children and teens
+ * don't care for a baby, flirt or kiss), with the game's look for it (stoop, grey hair); with
+ * `strip`, the rows are a man and a woman at that stage.
  */
 
 import {
@@ -35,6 +39,7 @@ import { Content } from '../content/content';
 import type { FrameState } from '../core/bridge';
 import type { ObjectPlacement, SimInfo } from '../core/protocol';
 import { Pose, type SnapshotLayout } from '../core/snapshot';
+import { lookAtStage, palette } from '../game/household';
 import { Characters, MAX_CHARACTERS } from '../render/babylon/characters';
 import { MaterialLibrary } from '../render/babylon/materials';
 import { buildModel } from '../render/babylon/models';
@@ -223,11 +228,25 @@ const params = new URLSearchParams(location.search);
 const only = params.get('only')?.split(',');
 const forced = params.get('clip');
 const strip = Number(params.get('strip')) || 0;
-const STRIP_ROWS = [
-  { label: 'man', female: false },
-  { label: 'woman', female: true },
-  { label: 'child', female: false, stage: 'child' },
-];
+const stage = params.get('stage');
+const STRIP_ROWS: { label: string; female: boolean; stage?: string }[] = stage
+  ? [
+      { label: `${stage} man`, female: false, stage },
+      { label: `${stage} woman`, female: true, stage },
+    ]
+  : [
+      { label: 'man', female: false },
+      { label: 'woman', female: true },
+      { label: 'child', female: false, stage: 'child' },
+      { label: 'teen', female: true, stage: 'teen' },
+      { label: 'elder', female: false, stage: 'elder' },
+    ];
+/** Whether sim-core lets a resident at life stage `st` take actor `a`'s place at station `s`. */
+const allows = (s: Station, a: Actor, st: string): boolean => {
+  if (a.baby || st === 'baby') return !!a.baby && st === 'baby';
+  const grownUp = st !== 'child' && st !== 'teen';
+  return grownUp || (!s.baby && s.social !== 'flirt' && s.social !== 'kiss');
+};
 // `?seats=sofa,toilet`: a man and a woman sitting on each of those objects instead of the stations.
 const seats = params.get('seats')?.split(',');
 const bottom = params.get('bottom');
@@ -383,18 +402,23 @@ await Promise.all(
   }),
 );
 actors.sort((a, b) => a.station - b.station);
+// The base content (with its includes): seats it describes, the items Sims carry and the life stages.
+const content = await Content.load(`${base}content/base.json`);
+const hairPalette = palette(assets, 'palette.hair');
 // Stations load in any order: row i is actor i after sorting (a station's own actors keep their order).
 const actorSims = actors.map((a, i) => {
   const s = stations[a.station];
-  return a.baby ? look(i, i % 2 === 0, 'baby') : look(i, s.social ? a.role === 2 : !!s.female || !!a.second, s.stage, s.height, s.build);
+  const sim = a.baby ? look(i, i % 2 === 0, 'baby') : look(i, s.social ? a.role === 2 : !!s.female || !!a.second, s.stage, s.height, s.build);
+  // `?stage` and the strip's rows take the game's look for the stage (the stations' own stages keep theirs).
+  const st = stage && allows(s, a, stage) ? stage : s.strip !== undefined ? s.stage : undefined;
+  if (st) sim.appearance = lookAtStage(sim.appearance, content.lifeStages.find((x) => x.id === st), hairPalette);
+  return sim;
 });
 for (let i = 0; i < actors.length; i++) {
   const a = actors[i];
   if (a.partner >= 0) a.partner = actors[i].role === 1 ? i + 1 : i - 1;
 }
 
-// The base content (with its includes): seats it describes and the items Sims carry.
-const content = await Content.load(`${base}content/base.json`);
 const characters = new Characters(scene, assets, lib, content);
 if (!(await characters.init())) throw new Error('characters unavailable');
 await characters.build({ sims: actorSims, objects });
