@@ -110,5 +110,7 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
   its `hold`.
 - The wall mirror hides with its wall when the wall is cut down for the camera (each wall thing knows which views
   drop its wall, `BabylonRenderer.ts`).
-- Since the authenticity review (G-04): getting ready at the dressing table, a hand comes up to the hair (the phone
-  clip's upper body, seated), not resting in the lap. A brush stroke or a hand prop is the clip and props waves'.
+- Since the authenticity review (G-04): getting ready at the dressing table is brushing the hair in the mirror
+  (`brushHair`, clips/self.ts, the seated upper body): four strokes from the crown down the right side, the head
+  tilting into each, then the left hand smoothing the other side; the brush is mimed in the closed hand (a hand prop is
+  I-held-01's).

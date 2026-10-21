@@ -53,8 +53,11 @@ rides.
   `characters/clips/street.ts`). The second lane's climber waits on the deck for the first to slide, so two who
   start together don't meet at the pole. Checked for a man, a woman and a child, two children at once, by day and
   on Low WebGL2 at night.
-- Since the authenticity review (G-04): "Shoot some hoops" picks the ball up and reaches with it (the streetball
-  hoop's `pickUp`, `interact`), not jogging on the spot; a shot from out on the court is a clip still to make.
+- Since the authenticity review (G-04): "Shoot some hoops" is shot from out on the court: the shooter steps back 1.5 m
+  (2.5 m from the hoop's middle, a lane each for two, `STEP_IN`) and plays `hoopShot177`/`147`/`112` (clips/shot.ts):
+  dribbles, a gather, a jump shot let go at the top with the wrist flicked through, the follow-through held; a child
+  heaves it two-handed from the chest. The ball is mimed (props in hand, I-held-01); the streetball hoop still picks
+  its ball up (`pickUp`, `interact`).
 
 ## CM2. Street furniture (10)
 

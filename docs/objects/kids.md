@@ -73,7 +73,12 @@ pulled up to the kids' table before the dining table (a seat made for their age 
   with the social hug, with the teddy keeping the default `wrap`).
 - Known, not changed: the toy box's player stands at its front corner.
 - Since the authenticity review (G-14): the toy box and the toy chest are played at kneeling on the floor (`kneel`),
-  the train table crouched at its edge (`crouch`), not standing with the hands out over them.
+  not standing with the hands out over them; at the train table the players kneel up at its edge, a lane each (the
+  ring of track, the little town: `STEP_IN`, `kneelTable177`/`147`/`112`, clips/low.ts), the right hand pushing the
+  engine along the track and the left on the top, now and then moving a tree.
+- Since the authenticity review (G-04): a child on the kids' chair at the coffee table bends over it with both hands on
+  its top, drawing (`sitHandsLow177`/`147`/`112`, clips/low.ts: a top less than `LOW_TOP`, 0.2 m for a body of the
+  reference height, over the seat).
 
 ## KD3. Kids' study and art (6)
 

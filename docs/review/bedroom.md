@@ -244,8 +244,8 @@ Measured: the dressing table's top 0.76 (72–78) and its pouf's seat 0.45 (42�
 - **Fix class:** renderer-table
 - **Where:** `web/src/render/babylon/characters.ts:465` (`ACTIONS.wash`: `stand` clips only, no `sit`, so the seated default `sit` plays); `web/public/content/furniture.json:2219` (`dressingTable` `getReady`: `anim: wash`, `pose: sit`)
 - **Evidence:** `bedroom/extra/pose-dressingTable-getReady.png` (`poses.html?seats=dressingTable:getReady`), `bedroom/play/chunk1/dressingTable-getReady-01.png`, `bedroom/sheets/age-dressingTable.png`: on the pouf facing the mirror for 15 minutes with the hands resting low, the drawer open beside the knee. Getting ready is the hands at the hair and face. A seated clip with the hands up (as `phone`'s hand to the head, or a brush stroke) on `getReady`, chosen by object as `look` and `harvest` are, is a table change; a hand prop is I-held-01's.
-- **Status:** fixed (3cd0bf87)
-- **After:** `ACTIONS.wash.upper` by def: seated at the dressing table the `phone` clip's upper body brings a hand up to the hair (`fixes/tables/play-a/a-dressingTable-getReady-01.png`). A brush stroke clip and a hand prop stay with the clip and props waves.
+- **Status:** fixed (3cd0bf87, 0f613d59)
+- **After:** `ACTIONS.wash.upper` by def: seated at the dressing table the `phone` clip's upper body brings a hand up to the hair (`fixes/tables/play-a/a-dressingTable-getReady-01.png`). A brush stroke clip and a hand prop stay with the clip and props waves. Then (fix: clips-reach) the brush stroke: `brushHair` (clips/self.ts) as the seated upper body, the hand closed (`HANDS.grip`): four strokes from the crown down the right side, the head tilting into each, then the left hand smoothing the other side (`fixes/clips-reach/poses/poses-dressingTable-getReady-strokes.png`, `play-a/a-dressingTable-getReady-01.png`, `play-teen/`, `play-child/`, `play-elder/`; `compare/I-bedroom-07.png`). The brush itself is I-held-01's.
 - **Source:** wave: bedroom
 
 ### A-bedroom-05 — The daybed's quilt hangs down through its front rail
