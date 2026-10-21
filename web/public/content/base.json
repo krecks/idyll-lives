@@ -1931,6 +1931,7 @@
         "label": "Text",
         "icon": "icon.phone.text",
         "minutes": 10,
+        "anim": "phoneScreen",
         "contact": true,
         "message": true,
         "tags": ["social", "friendly", "phone"],
@@ -1993,6 +1994,7 @@
         "label": "Scroll the phone",
         "icon": "icon.phone.browse",
         "minutes": 20,
+        "anim": "phoneScreen",
         "tags": ["fun", "phone"],
         "autonomyWeight": 0.8,
         "needs": {"fun": 0.15}
@@ -2370,7 +2372,8 @@
     "serve",
     "cuddle",
     "bake",
-    "mix"
+    "mix",
+    "phoneScreen"
   ],
   "objects": [
     {

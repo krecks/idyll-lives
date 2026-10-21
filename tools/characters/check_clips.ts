@@ -68,6 +68,11 @@ const { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } = await import('../../web/src/
 const { BOULDER, FOOS, POOL, SMASH } = await import('../../web/src/render/babylon/characters/clips/games.ts');
 const { EYEPIECE, PICK_APPLE, PICK_LEMON, SHOWER_CHILD } = await import('../../web/src/render/babylon/characters/clips/uses.ts');
 
+/** The socials' clips (clips/social.ts) and their lengths (s). */
+const SOCIAL: Record<string, number> = {
+  compliment: 3, deepTalk: 4, flirt: 3.2, sweetTalk: 3.4, argue: 2.2, insult: 2.4, apologize: 3.4, joke: 2.8, introduce: 3, askPartner: 3.2, breakUp: 3, prank: 2.6,
+  laugh: 2, shrug: 2.4, rebuffed: 2.6, refuse: 2.4, phoneText: 3,
+};
 /** Every clip the runtime plays (characters.ts ACTIONS / choose, reactions.ts) and whether it loops. */
 const RUNTIME: Record<string, boolean> = {
   idle: true, talk: true, walk: true, jog: true, jogAlong: true, runAlong: true, sit: true, sitTalk: true, sitDown: false, standUp: false, sitHands: true, sitHandsNear: true, sitHandsFar: true,
@@ -79,6 +84,8 @@ const RUNTIME: Record<string, boolean> = {
   climb172a: true, climb147a: true, climb112a: true, climb172b: true, climb147b: true, climb112b: true,
   // Games and sport at things (characters.ts ACTIONS, STEP_IN; clips/games.ts), the sized ones in each size.
   dartThrow: true, pingPong: true, yoga: true,
+  // The socials' gestures and reactions, and the phone held in front (characters.ts GESTURES, ACTIONS; clips/social.ts).
+  ...Object.fromEntries(Object.keys(SOCIAL).map((clip) => [clip, true])),
   ...Object.fromEntries([POOL, FOOS, SMASH, BOULDER].flatMap((sizes: any[]) => sizes.map(({ clip }: any) => [clip, true]))),
   // The telescope's eyepiece and the fruit trees, in sizes (characters.ts STEP_IN, clips/uses.ts); the shower, a child's without the turn.
   eyepiece181: true, eyepiece163: true, eyepiece147: true, eyepiece129: true, eyepiece112: true,
@@ -94,6 +101,7 @@ const LENGTH: Record<string, number> = {
   yes: 2.5, no: 2.5, phone: 2.9, lantern: 2.5, rail: 2.5, spell: 2.1, push: 2.7, babyLieAsleep: 9, babyLieAwake: 6,
   fountainDrink181: 3, fountainDrink163: 3, fountainDrink147: 3, fountainDrink129: 3, fountainDrink112: 3, climb172a: 13, climb147a: 13, climb112a: 13, climb172b: 13, climb147b: 13, climb112b: 13,
   dartThrow: 7.2, pingPong: 1.8, yoga: 48,
+  ...SOCIAL,
   ...Object.fromEntries(([[POOL, 8], [FOOS, 3.2], [SMASH, 3.4], [BOULDER, 16]] as [any[], number][]).flatMap(([sizes, s]) => sizes.map(({ clip }: any) => [clip, s]))),
   eyepiece181: 6, eyepiece163: 6, eyepiece147: 6, eyepiece129: 6, eyepiece112: 6, pickApple177: 3.3, pickApple147: 3.3, pickApple112: 3.3, pickLemon177: 3.3, pickLemon147: 3.3, pickLemon112: 3.3,
   shower: 14, showerChild: 14,

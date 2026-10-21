@@ -124,6 +124,64 @@ const Anim = {
   Kiss: 7,
   Wave: 8,
 } as const;
+/**
+ * A social's body language (`choose`; the clips in characters/clips/social.ts). `speak`: the one who
+ * started it, on their turn (default `talk`); `answer`: the other on theirs (default `talk`); `listen`:
+ * either while the other speaks (default the idle, with a nod or a head shake now and then once it's
+ * going well or badly). Once the outcome shows (snapshot `outcome`): `good` / `bad`, the other's (and
+ * those listening in) for the rest of it when it went well / badly, and `flop`, the starter's when it
+ * went badly (a joke nobody laughs at, a flirt turned down). A `good` laugh is shared: the teller
+ * laughs along between their turns.
+ */
+interface Gesture {
+  speak?: string;
+  answer?: string;
+  listen?: string;
+  good?: string;
+  bad?: string;
+  flop?: string;
+}
+/** Per animation code, for socials without their own (`GESTURES`; packs'). */
+const ANIM_GESTURES: Record<number, Gesture> = {
+  [Anim.Laugh]: { good: 'laugh', bad: 'foldArms', flop: 'shrug' },
+  [Anim.Flirt]: { speak: 'flirt', bad: 'foldArms', flop: 'rebuffed' },
+  [Anim.Argue]: { speak: 'argue', answer: 'argue', listen: 'no' },
+};
+/** Per social (content `socials` id), over its animation code's. */
+const GESTURES: Record<string, Gesture> = {
+  introduce: { speak: 'introduce', answer: 'introduce' },
+  joke: { speak: 'joke' },
+  compliment: { speak: 'compliment', bad: 'foldArms', flop: 'shrug' },
+  deepTalk: { speak: 'deepTalk', answer: 'deepTalk' },
+  flirt: { answer: 'flirt' },
+  sweetTalk: { speak: 'sweetTalk', answer: 'sweetTalk' },
+  askPartner: { speak: 'askPartner', bad: 'refuse', flop: 'rebuffed' },
+  breakUp: { speak: 'breakUp', answer: 'argue', listen: 'no' },
+  insult: { speak: 'insult', listen: 'no' },
+  prank: { speak: 'prank' },
+  apologize: { speak: 'apologize', bad: 'foldArms', flop: 'rebuffed' },
+};
+/**
+ * A refused hug or kiss (`Anim.Hug`, `Anim.Kiss`, snapshot `outcome` 2, shown from the start): the one asked
+ * leans away with a hand up (`refuse`) and steps back `back` m; the one who asked stays where they stood,
+ * the shoulders dropped (`rebuffed`).
+ */
+const REFUSED = { back: 0.14 };
+/**
+ * A kiss between two of any heights (`Anim.Kiss`), per metre the one is taller than the other (rad):
+ * `bend`, the taller's back bent over; `nod`, their head bowed; `lift`, the shorter's face lifted (the neck,
+ * the head and the upper back); each at most `most`. `lean`: how far both lean in. The arms: the taller's
+ * raised `waist` round the other's waist (elbows `waistWrap`), the shorter's raised `neck` up round the
+ * other's shoulders (elbows `neckWrap`, `hugArms`).
+ */
+const KISS_FIT = { bend: 0.7, nod: 1.3, lift: 1.8, most: 0.45, lean: 0.06, waist: 0.75, waistWrap: 1.35, neck: 1.4, neckWrap: 1.25 };
+/**
+ * Punches aimed at the other's head at any two heights (`Anim.Fight`, the attacker): the fist goes `head` of
+ * the difference in height lower (the clips aim at one's own face, at about that share of the height), at
+ * `reach` m (body scale 1); of that angle (at most `most` rad), `bend` is bent down at the back over a
+ * shorter one and `straighten` straightened up to a taller one, the arms doing the rest.
+ */
+const AIM = { head: 0.85, reach: 0.55, most: 0.7, bend: 0.45, straighten: 0.3 };
 /** Sim ticks per frame step at each game speed (`clock::TICKS_PER_STEP`). */
 export const GAME_RATE = [0, 1, 3, 10, 30, 60];
 /** Speed while time skips through quiet hours (`clock::AUTO_FAST_SPEED`). */
@@ -656,6 +714,8 @@ const ACTIONS: Record<string, ActionAnim> = {
   smell: { stand: (def) => (TALL_FLOWERS.has(def) ? ['pick'] : ['crouch']), hands: HANDS.relaxed },
   admire: { stand: ['idle', 'foldArms'], hands: HANDS.relaxed },
   phone: { stand: ['phone'], sit: (def) => (VIDEO_CALLS.has(def) ? 'sitTalk' : 'sit'), upper: (def) => (VIDEO_CALLS.has(def) ? '' : 'phone'), hands: HANDS.hold },
+  // Texting and scrolling (content `phone.actions[].anim`): the phone held in front, the head bowed over it, the thumbs moving.
+  phoneScreen: { stand: ['phoneText'], sit: 'sit', upper: 'phoneText', hands: HANDS.hold },
   listen: { stand: ['idle', 'foldArms'], hands: HANDS.open },
   meditate: { stand: ['idle'], hands: HANDS.open },
   // (A coin into the giving jar.)
@@ -748,6 +808,13 @@ const LAUGH: Partial<Face> = { mood: 'laugh', smile: 0, frown: 0, browDown: 0, p
 const KISS: Partial<Face> = { mood: 'kiss', smile: 0, frown: 0, browDown: 0, press: 0 };
 const HUG: Partial<Face> = { mood: 'hug', smile: 0, frown: 0, browDown: 0, press: 0 };
 const NONE: Partial<Face> = {};
+/** Faces for how a social was taken, by the clip it's shown with (`GESTURES`, `REFUSED`); a laugh is `LAUGH`. */
+const SOCIAL_FACES: Record<string, Partial<Face>> = {
+  refuse: { mood: 'uncomfortable', smile: 0 },
+  rebuffed: { mood: 'sad', smile: 0, gazeDown: 0.5 },
+  shrug: { mood: 'embarrassed', smile: 0 },
+  foldArms: { mood: 'bored', smile: 0 },
+};
 
 /**
  * Stage directions for one Sim row (character creator and portraits; never set in game): a clip to
@@ -884,6 +951,8 @@ interface SimRig {
   stepTime: number;
   /** Emotion code (index + 1 into the content's emotions; 0 = none). */
   emotion: number;
+  /** The social they're in (content `socials` id; '' when none or unknown), for its gestures (`GESTURES`). */
+  socialId: string;
   /** Bed while lying (for the blanket) and how far the blanket is pulled up (0..1). */
   bed: PlacedObject | null;
   bedH: number;
@@ -1558,6 +1627,7 @@ export class Characters {
         hands: HANDS.relaxed,
         stepTime: 0,
         emotion: 0,
+        socialId: '',
         bed: null,
         bedH: 0,
         bedFwd: 0,
@@ -2413,6 +2483,7 @@ export class Characters {
       const partner = call > 0 ? call - 1 : curr[o + k.partner] | 0;
       const outcome = curr[o + k.outcome] | 0;
       rig.emotion = curr[o + k.emotion] | 0;
+      rig.socialId = social ? (this.content?.social((curr[o + k.social] | 0) - 1)?.id ?? '') : '';
       const mood = k.mood !== undefined ? curr[o + k.mood] : 1;
       rig.warmth = clamp((mood - MOOD_COLD) / (MOOD_WARM - MOOD_COLD), 0, 1);
       // What the Sim is doing (sim-core's `object` / `action` fields; older layouts: guessed from position).
@@ -2787,24 +2858,19 @@ export class Characters {
       rig.useObj = null;
       switch (social) {
         case Anim.Talk:
-          key = me
-            ? 'talk'
-            : outcome === 1 && hash(Math.floor(time / 3) + i) < 0.4
-              ? 'yes'
-              : outcome === 2 && hash(Math.floor(time / 3) + i) < 0.4
-                ? 'no'
-                : 'idle';
-          break;
         case Anim.Laugh:
-          key = 'talk';
-          break;
         case Anim.Flirt:
-          key = me ? 'talk' : 'idle';
+        case Anim.Argue: {
+          // The social's own gestures and how it's taken (`GESTURES`).
+          const g = { ...ANIM_GESTURES[social], ...GESTURES[rig.socialId] };
+          const nod = hash(Math.floor(time / 3) + i) < 0.4;
+          const listen = g.listen ?? (outcome === 1 && nod ? 'yes' : outcome === 2 && nod ? 'no' : 'idle');
+          if (role === 1) key = outcome === 2 && g.flop ? g.flop : me ? (g.speak ?? 'talk') : outcome === 1 && g.good === 'laugh' ? 'laugh' : listen;
+          else key = outcome === 2 && g.bad ? g.bad : outcome === 1 && g.good && (!me || g.good === 'laugh') ? g.good : me ? (g.answer ?? 'talk') : listen;
+          // (The chat's talk and head shakes, quicker in an argument.)
+          if (social === Anim.Argue && (key === 'talk' || key === 'no')) rate = 1.25;
           break;
-        case Anim.Argue:
-          key = me ? 'talk' : 'no';
-          rate = 1.25;
-          break;
+        }
         case Anim.Fight: {
           // The attacker steps in with each punch, the defender gives ground as it lands
           // (eased like the hug's approach).
@@ -2818,14 +2884,17 @@ export class Characters {
           break;
         }
         case Anim.Hug:
-          // Arms around each other (`procedural`), stepped in until the chests meet.
-          key = 'idle';
-          reach = embraceStep(rig, partner, 0);
-          reachRate = 6;
-          break;
         case Anim.Kiss:
+          if (outcome === 2) {
+            // Refused (`REFUSED`): leaning away, a hand up, a step back; the one who asked crestfallen.
+            key = role === 1 ? 'rebuffed' : 'refuse';
+            reach = role === 1 ? 0 : -REFUSED.back;
+            reachRate = 3;
+            break;
+          }
+          // Arms around each other (`procedural`), stepped in until the chests meet (a kiss: the faces).
           key = 'idle';
-          reach = embraceStep(rig, partner, EMBRACE.kiss);
+          reach = embraceStep(rig, partner, social === Anim.Hug ? 0 : EMBRACE.kiss);
           reachRate = 6;
           break;
         case Anim.Wave:
@@ -3226,7 +3295,7 @@ export class Characters {
     rig.fadeRate = 1 / Math.max(0.05, fade);
   }
 
-  /** Look-at, laughing, flirting and kissing on top of the clips. */
+  /** Look-at, flirting, kissing and hugging at the partner's height, punches aimed at theirs, on top of the clips. */
   private procedural(
     rig: SimRig,
     i: number,
@@ -3303,28 +3372,35 @@ export class Characters {
         addRotation(add, B.Head, 0, 1, 0, 0.018 * Math.sin(time * 0.37 + rig.seed * 17));
       }
     }
+    // (A refused hug or kiss plays its own clips, `REFUSED`: nobody leans in or holds anyone.)
+    const refused = rig.cur.key === 'refuse' || rig.cur.key === 'rebuffed';
     switch (social) {
-      case Anim.Laugh: {
-        // Natural laughter: body bounces, head tilts, shoulders shake.
-        const bounce = Math.sin(time * 8 + rig.seed * 5) * 0.04;
-        addRotation(add, B.spine_02, 1, 0, 0, -0.15 + bounce);
-        addRotation(add, B.spine_01, 1, 0, 0, -0.08 + bounce * 0.5);
-        addRotation(add, B.Head, 1, 0, 0, -0.2 + bounce * 0.7);
-        // Shoulder shake.
-        addRotation(add, B.upperarm_l, 1, 0, 0, Math.sin(time * 10 + rig.seed * 3) * 0.05);
-        addRotation(add, B.upperarm_r, 1, 0, 0, -Math.sin(time * 10 + rig.seed * 3) * 0.05);
-        break;
-      }
       case Anim.Flirt:
+        // A head tilt and a sway of the hips for the one listening (the flirt's own clip has its own).
+        if (rig.cur.key === 'flirt') break;
         addRotation(add, B.Head, 0, 0, 1, 0.16 + Math.sin(time * 1.7) * 0.04);
         addRotation(add, B.pelvis, 0, 0, 1, Math.sin(time * 1.3) * 0.04);
         break;
-      case Anim.Kiss:
-        addRotation(add, B.spine_02, 1, 0, 0, 0.12);
+      case Anim.Kiss: {
+        if (refused) break;
+        // To the other's lips at any two heights (`KISS`): the taller bends and bows the head, the shorter
+        // lifts the face (the look at the other's head does the rest); the taller's arms round the waist,
+        // the shorter's up round the shoulders (of two alike, the one who asked holds the waist).
+        const dh = partner ? rig.body.height * rig.scale - partner.body.height * partner.scale : 0;
+        const taller = dh > 0.01 || (Math.abs(dh) <= 0.01 && role === 1);
+        const up = Math.max(0, dh);
+        const down = Math.max(0, -dh);
+        addRotation(add, B.spine_02, 1, 0, 0, KISS_FIT.lean + Math.min(KISS_FIT.most, up * KISS_FIT.bend));
+        addRotation(add, B.spine_03, 1, 0, 0, Math.min(KISS_FIT.most, up * KISS_FIT.bend) * 0.5 - Math.min(KISS_FIT.most, down * KISS_FIT.lift) * 0.3);
+        addRotation(add, B.neck_01, 1, 0, 0, Math.min(KISS_FIT.most, up * KISS_FIT.nod) - Math.min(KISS_FIT.most, down * KISS_FIT.lift));
         addRotation(add, B.Head, 0, 0, 1, role === 1 ? 0.22 : -0.22);
-        addRotation(add, B.Head, 1, 0, 0, 0.1);
+        addRotation(add, B.Head, 1, 0, 0, 0.1 - Math.min(KISS_FIT.most, down * KISS_FIT.lift) * 0.5);
+        if (taller) this.hugArms(KISS_FIT.waist, time + role / 1.5, KISS_FIT.waistWrap);
+        else this.hugArms(KISS_FIT.neck, time + role / 1.5, KISS_FIT.neckWrap);
         break;
+      }
       case Anim.Hug: {
+        if (refused) break;
         // Bent down over a smaller one (a child), the arms lowered to go round them (`EMBRACE`).
         const drop = shoulderDrop(rig, partner);
         addRotation(add, B.spine_02, 1, 0, 0, 0.1 + drop * EMBRACE.bend);
@@ -3341,9 +3417,17 @@ export class Characters {
       case Anim.Fight: {
         const isAttacker = role === 1;
         if (isAttacker) {
-          // Attacker: body leans forward into punches.
+          // Attacker: body leans forward into punches, which are aimed at the other's head (`AIM`): bent
+          // down over a shorter one, the arms lowered the rest of the way; up at a taller one.
           addRotation(add, B.spine_02, 1, 0, 0, 0.15);
           addRotation(add, B.spine_01, 1, 0, 0, 0.1);
+          const drop = partner ? (rig.body.height * rig.scale - partner.body.height * partner.scale) * AIM.head : 0;
+          const angle = clamp(Math.atan2(drop, AIM.reach * rig.scale), -AIM.most, AIM.most);
+          const bend = angle > 0 ? angle * AIM.bend : angle * AIM.straighten;
+          addRotation(add, B.spine_01, 1, 0, 0, bend * 0.5);
+          addRotation(add, B.spine_02, 1, 0, 0, bend * 0.5);
+          addRotation(add, B.upperarm_l, 1, 0, 0, angle - bend);
+          addRotation(add, B.upperarm_r, 1, 0, 0, angle - bend);
         } else {
           // Defender: flinch back, forearms up to guard the face.
           addRotation(add, B.spine_02, 1, 0, 0, -0.12);
@@ -3709,12 +3793,22 @@ export class Characters {
     Object.assign(tgt, EXPRESSIONS[emotion] ?? NONE);
     let eyesClosed = 0;
     let talking = false;
-    if (social) {
+    const reaction = social ? SOCIAL_FACES[rig.cur.key] : undefined;
+    if (reaction) {
+      // How it was taken (`GESTURES`, `REFUSED`): put off, crestfallen, embarrassed, unamused.
+      Object.assign(tgt, reaction);
+    } else if (social) {
       const me = speaking(pair, role, time);
       switch (social) {
         case Anim.Laugh:
-          Object.assign(tgt, LAUGH);
-          tgt.jaw = 0.1 + 0.2 * Math.abs(Math.sin(time * 11 + i));
+          // The teller grins through the joke; whoever laughs, laughs.
+          if (rig.cur.key === 'laugh') {
+            Object.assign(tgt, LAUGH);
+            tgt.jaw = 0.1 + 0.2 * Math.abs(Math.sin(time * 11 + i));
+          } else {
+            tgt.smile = Math.max(tgt.smile, 0.5);
+            talking = me;
+          }
           break;
         case Anim.Flirt:
           Object.assign(tgt, EXPRESSIONS.flirty);

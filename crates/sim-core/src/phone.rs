@@ -58,6 +58,9 @@ pub struct PhoneAction {
     pub message: bool,
     /// After a yes, a visit (none: just the talk).
     pub meet: Option<Meet>,
+    /// Animation tag while at it (content `anim`; default the phone's `anim`): texting and
+    /// scrolling look at the screen, a call holds it to the ear.
+    pub anim: Option<usize>,
     pub autonomous: bool,
     pub autonomy_weight: f32,
     pub prefer: Prefer,
@@ -136,6 +139,8 @@ pub(crate) struct PhoneActionRaw {
     message: bool,
     #[serde(default)]
     meet: Option<Meet>,
+    #[serde(default)]
+    anim: Option<String>,
     #[serde(default = "yes")]
     autonomous: bool,
     #[serde(default = "one")]
@@ -176,13 +181,14 @@ pub(crate) fn parse(raw: &PhoneRaw, ix: &Indices, animations: &[String], stages:
         // Everyone but babies.
         None => stages.iter().find(|s| !s.baby).map_or(0.0, |s| s.from),
     };
+    let tag = |a: &str, ctx: &str| {
+        animations
+            .iter()
+            .position(|x| x == a)
+            .ok_or_else(|| Error::new(format!("{ctx}.anim: unknown anim '{a}' (declare it in \"animations\")")))
+    };
     let anim = match &raw.anim {
-        Some(a) => Some(
-            animations
-                .iter()
-                .position(|x| x == a)
-                .ok_or_else(|| Error::new(format!("phone.anim: unknown anim '{a}' (declare it in \"animations\")")))?,
-        ),
+        Some(a) => Some(tag(a, "phone")?),
         None => animations.iter().position(|x| x == "phone"),
     };
     // (Seat tags content doesn't have are left out.)
@@ -211,6 +217,10 @@ pub(crate) fn parse(raw: &PhoneRaw, ix: &Indices, animations: &[String], stages:
             contact: a.contact,
             message: a.message,
             meet: a.meet,
+            anim: match &a.anim {
+                Some(t) => Some(tag(t, &ctx)?),
+                None => anim,
+            },
             autonomous: a.autonomous,
             autonomy_weight: a.autonomy_weight.max(0.0),
             prefer: a.prefer,

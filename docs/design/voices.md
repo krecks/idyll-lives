@@ -420,7 +420,8 @@ content data** (`content/voice/<lang>.json`), so content packs can add and trans
 English file has about 1,000 lines, and the trait packs about 500 more for their own items.
 
 - **Conversations** (`social`, per social interaction id): `start` for the one who starts it,
-  `good` and `bad` for the answer once the outcome shows. Read from the snapshot fields `social`,
+  `good` and `bad` for the answer once the outcome shows (halfway through; at once for a hug or a
+  kiss, which the body answers). Read from the snapshot fields `social`,
   `role`, `outcome` and `partner` that the bubbles already use.
 - **Using something:** a line when the selected resident starts using an object. The snapshot
   says which (`objectDef` and `interaction`, content indices, next to the animation tag in
