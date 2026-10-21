@@ -455,7 +455,7 @@
       },
       "motions": {
         "uses": {
-          "tastingMenu": "drawer_open"
+          "chop": "drawer_open"
         },
         "hold": 2.5
       },

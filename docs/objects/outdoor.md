@@ -78,7 +78,7 @@ none.
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `grill` Charcoal grill | 1x1 · floor | cook:cook | outdoor / cooking | Body, Lid | Use | `lid_open`, the lid swings up 95° on its back hinge for the whole of cook, over red coals and food on the grate (no night glow on the coals: it showed through the shut lid). |
-| `grillStation` Gas grill station | 2x1 · floor | cook:cook feast:cook | outdoor / cooking | Cart, Hood | Use | `hood_up`, the barrel hood swings up 75° for cook and feast; the counter at the content's 0.9 m. |
+| `grillStation` Gas grill station | 2x1 · floor | cook:cook feast:cook | outdoor / cooking | Cart, Hood | Use | `hood_up`, the barrel hood swings up 75° for cook and feast, for the grilling only (the recipe's interaction names its last step: the prep on its counter leaves the hood shut, A-systems-03); the counter at the content's 0.9 m. |
 | `firePit` Fire pit | 1x1 · floor | relax:relax | outdoor / cooking | Bowl, Stones | Use | `flames`, tongues grow on the logs for relax, aglow at night with the embers (the light is the content's); warmed up at from a seat within 3 m that faces it (`seatNear`, `seatFacing: around`: a garden chair round it), else standing at one of four places round it, facing the fire (content `places`); never on its rim. |
 
 **In play** (signed off 2026-10-17):

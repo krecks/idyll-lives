@@ -1225,7 +1225,8 @@ impl World {
                         let Some(recipe) = content.recipe_index(recipe) else {
                             continue;
                         };
-                        if *step as usize >= content.recipes[recipe].steps.len() {
+                        // (At most one past the last step: the dish on its way to the table.)
+                        if *step as usize > content.recipes[recipe].steps.len() {
                             continue;
                         }
                         Task {

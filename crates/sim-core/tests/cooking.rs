@@ -13,7 +13,7 @@ const CONTENT: &str = r#"{
     "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.1},
              {"id":"fun","label":"Fun","decayPerHour":0.02},
              {"id":"comfort","label":"Comfort","decayPerHour":0.02}],
-    "animations":["idle","cook","eat","wash","clean","fetch","chop","stir","flip","sit"],
+    "animations":["idle","cook","eat","wash","clean","fetch","chop","stir","flip","sit","serve"],
     "accidents":[{"id":"takeout","need":"hunger","story":"ordered takeout","cost":25,"graceMinutes":20,
       "crowdedGraceMinutes":20,"rest":{"label":"Eat takeout","minutes":20,"anim":"eat","gains":{"hunger":0.7},"tags":["food"]}}],
     "cooking":{"spoilHours":8,"storedSpoilHours":72,"eatMinutes":20,"dishesMinutes":5,"carryDishes":3},
@@ -90,6 +90,7 @@ const FRIDGE: u32 = 0;
 const COUNTER: u32 = 1;
 const STOVE: u32 = 2;
 const SINK: u32 = 3;
+const TABLE: u32 = 4;
 const GRILL: u32 = 6;
 const PICNIC: u32 = 7;
 
@@ -157,13 +158,14 @@ fn a_meal_goes_from_the_fridge_to_the_counter_to_the_stove_and_is_served() {
             }
         }
     }
-    assert_eq!(stations, [FRIDGE, COUNTER, STOVE], "fridge, counter, then the stove that was clicked");
+    assert_eq!(stations, [FRIDGE, COUNTER, STOVE, TABLE], "fridge, counter, the stove that was clicked, then the table");
     assert!(held_between.contains(&Some("ingredients".into())), "carried the ingredients: {held_between:?}");
     assert!(held_between.contains(&Some("prepBowl".into())), "carried the prepped bowl: {held_between:?}");
+    assert!(held_between.contains(&Some("mealPot".into())), "carried the dish to the table: {held_between:?}");
     // Paid once, for a serving each (two at home).
     assert_eq!(funds - w.households[0].funds, 6, "3 a serving, two servings");
     let pot = w.items.list.iter().find(|it| it.def == item_def(&w, "mealPot")).expect("a pot of food");
-    assert!(matches!(pot.at, ItemAt::Surface { .. }), "served on a surface: {:?}", pot.at);
+    assert_eq!(sim_core::items::holder(&w.content, &w.objects, &pot.at), Some(TABLE), "served on the dining table: {:?}", pot.at);
     assert_eq!(pot.servings, 2);
     assert!(!cooking(&w, 0));
 }
@@ -249,7 +251,7 @@ fn a_dishwasher_does_the_washing_up_too() {
 fn a_step_has_its_own_animation_at_some_stations() {
     // A meal cooked in the microwave is put in, not stirred (`animAt`); on a cooker's hob it's stirred.
     let content = CONTENT
-        .replace(r#""stir","flip","sit"]"#, r#""stir","flip","sit","bake"]"#)
+        .replace(r#""stir","flip","sit","serve"]"#, r#""stir","flip","sit","serve","bake"]"#)
         .replace(
             r#"{"label":"Cook","at":["stove","microwave"],"minutes":20,"anim":"stir","optional":true}"#,
             r#"{"label":"Cook","at":["stove","microwave"],"minutes":20,"anim":"stir","animAt":{"microwave":"bake"},"optional":true}"#,
@@ -603,7 +605,7 @@ fn the_snapshot_says_what_is_carried_cooked_and_when_food_changes() {
     assert_eq!(layout["header"]["itemsVersion"], snapshot::header::ITEMS_VERSION);
     let items: serde_json::Value = serde_json::from_str(&sim_core::view::items_json(&w)).unwrap();
     assert_eq!(items[0]["def"], "mealPot");
-    assert_eq!(items[0]["y"], 0.9, "on the counter");
+    assert_eq!(items[0]["y"], 0.75, "on the dining table");
 }
 
 #[test]
@@ -739,4 +741,60 @@ fn cooks_put_the_food_down_in_the_kitchen_not_through_the_wall() {
     ticks(&mut w, 60.0);
     let pot = w.items.list.iter().find(|it| it.servings > 0).expect("dinner");
     assert!(matches!(pot.at, ItemAt::Stored { x: 2, z: 2 }), "in the kitchen fridge: {:?}", pot.at);
+}
+
+#[test]
+fn the_dish_is_carried_to_the_table_put_down_there_and_eaten_at_it() {
+    let mut w = world_with(KITCHEN, 2, false);
+    order(&mut w, 0, STOVE, "cook");
+    let serve = w.content.animations.iter().position(|a| a == "serve");
+    let (mut carried, mut put_down) = (false, false);
+    while cooking(&w, 0) || w.items.list.iter().all(|it| it.def != item_def(&w, "mealPot")) {
+        w.tick_once();
+        common::check(&w);
+        let held = w.sims[0].held.map(|h| w.content.items[h.def].id.clone());
+        if w.sims[0].is_moving() && held.as_deref() == Some("mealPot") {
+            carried = true;
+            assert!(w.items.list.iter().all(|it| it.def != item_def(&w, "mealPot")), "in hand, not on a top too");
+        }
+        let r = row(&w, 0);
+        put_down |= r[snapshot::sim::OBJECT] == w.objects[TABLE as usize].stable as f32
+            && serve.is_some_and(|a| r[snapshot::sim::ACTION] == a as f32);
+        assert!(w.tick < 200 * 60 * 4, "never served");
+    }
+    assert!(carried, "the pot is carried from the stove");
+    assert!(put_down, "and put down at the table");
+    let pot = w.items.list.iter().find(|it| it.def == item_def(&w, "mealPot")).unwrap();
+    assert_eq!(sim_core::items::holder(&w.content, &w.objects, &pot.at), Some(TABLE), "{:?}", pot.at);
+    // Hungry, the two sit down to it at that table.
+    for s in &mut w.sims {
+        s.needs[0] = 0.2;
+    }
+    w.autonomy = true;
+    let mut at_table = [false; 2];
+    for _ in 0..(40.0 / sim_core::MINUTES_PER_TICK) as u32 {
+        w.tick_once();
+        for (i, seated) in at_table.iter_mut().enumerate() {
+            *seated |= w.sims[i].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Eat { seat: Some(TABLE), .. }) && matches!(a.phase, Phase::Using { .. }));
+        }
+    }
+    assert_eq!(at_table, [true, true], "both eat at the table");
+}
+
+#[test]
+fn a_dish_on_its_way_to_the_table_survives_a_save_and_is_served_once() {
+    let mut w = world_with(KITCHEN, 2, false);
+    order(&mut w, 0, STOVE, "cook");
+    while !(w.sims[0].is_moving() && w.sims[0].held.is_some_and(|h| h.def == item_def(&w, "mealPot"))) {
+        w.tick_once();
+        assert!(w.tick < 200 * 60 * 4, "never carried");
+    }
+    let json = w.save_json();
+    let mut loaded = World::from_save_json(CONTENT, &json).unwrap();
+    common::check(&loaded);
+    ticks(&mut loaded, 10.0);
+    let pots: Vec<_> = loaded.items.list.iter().filter(|it| it.def == item_def(&loaded, "mealPot")).collect();
+    assert_eq!(pots.len(), 1, "one pot: {:?}", loaded.items.list);
+    assert_eq!(sim_core::items::holder(&loaded.content, &loaded.objects, &pots[0].at), Some(TABLE));
+    assert!(loaded.sims[0].held.is_none());
 }

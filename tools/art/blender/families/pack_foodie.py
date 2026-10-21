@@ -672,7 +672,8 @@ FAMILY = G.Family(
              motions={'uses': {'bakePizza': ['door_off', 'flames'], 'bake': ['door_off', 'flames'], 'warmUp': 'flames'}},
              paint=[('plaster', 'Body'), ('worktop', 'Worktop'), ('brick', 'Brick')]),
      G.Model('chefsIsland', chefsIsland, size=(1.86, 1.128, 0.774), key='model.foodie.chefsIsland', centre=(0, 0.073),
-             motions={'uses': {'tastingMenu': 'drawer_open'}, 'hold': 2.5},
+             # the drawer for the knives as the menu is prepped on its worktop (`chop`); nothing lights on its hob yet
+             motions={'uses': {'chop': 'drawer_open'}, 'hold': 2.5},
              paint=[('cabinet', 'Body'), ('marble', 'Worktop'), ('oak', 'Stools')])],
     comment='Blender-built foodie pack models (tools/art/blender/families/pack_foodie.py). Listed in the '
             'base manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw '

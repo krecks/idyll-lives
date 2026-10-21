@@ -747,7 +747,10 @@ them away) and are saved with the game.
 `invitedBoost` 2.5 and `inviteMinutes` 60 (dinner's ready), `stationWaitMinutes` 10,
 `dirtyDirtPerHour` 0.02, `skipPenalty` 0.05, `seatTags` (`lounge`, `food`) and `seatAvoid`
 (`spa`, `hygiene`, `bathroom`), `defaultSurfaceHeight` 0.9 (where tools are drawn on a station
-without a `surface`), `serveRange` 6 (m), `eatLabel`, `eatTags` (`food`), `eatAnim` (`eat`),
+without a `surface`), `serveRange` 6 (m), `tableRange` 12 (m: the cook carries the dish to the nearest
+dining table this near on their storey, one with a chair pulled up to it or seats of its own, an outdoor
+one first for an outdoor recipe, and serves it there; with none, it's served within `serveRange`),
+`serveMinutes` 1, `serveAnim` (`serve`) and `serveLabel` ("Serve it": putting it down on the table), `eatLabel`, `eatTags` (`food`), `eatAnim` (`eat`),
 `dishesLabel`, `dishesTags` (`chores`, `cleaning`), `dishesAnim` (`wash`), `dishesInterest` 0.6,
 `scrapeMinutes` 1 (per thing with food on it) and `scrapeAnim` (`clean`), `putAwayMinutes` 2 (per
 armful), `putAwayAnim` (`fetch`) and `putAwayAt` (stations: the nearest, on a tie the first listed; `prep`; the

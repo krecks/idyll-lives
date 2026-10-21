@@ -692,6 +692,14 @@ const STATION_SPOTS: Record<string, Partial<Record<string, readonly [x: number, 
   cooktopCounter: { stir: [0.16, -0.22, 0.955] },
   grillStation: { chop: [0.6, -0.05, 0.905] },
 };
+/**
+ * Station steps worked with the hands free (by action tag): what the cook carried in (the ingredients, the prepped
+ * bowl) is put down on the station's top beside its tool while chopping, mixing, stirring or grilling, and picked up
+ * again to move on; for a bake it's in the oven, not drawn.
+ */
+const SET_DOWN: Record<string, 'top' | 'in'> = { chop: 'top', mix: 'top', stir: 'top', flip: 'top', bake: 'in' };
+/** How far (m) to the side of the station's tool a thing put down beside it stands. */
+const SET_DOWN_SIDE = 0.3;
 /** How far (m, body scale) below the palms' centres a carried thing's base rests. */
 const HOLD_DROP = 0.02;
 /** The palm centre's offset from the wrist (left hand, body scale) for sets without `grip`. */
@@ -2024,6 +2032,22 @@ export class Characters {
     this.placeProp(m, i, x, y - HOLD_DROP * rig.scale, z, rig.yaw, Math.min(1, rig.scale));
   }
 
+  /**
+   * What Sim row `i` carried in, put down on the station it works at (`SET_DOWN`; none: in the oven): on its top, to
+   * the side of the step's tool (`writeTool`) away from the station's middle, else of the middle.
+   */
+  private writeSetDown(rig: SimRig, i: number, item: ItemDef | undefined, tag: string, station: PlacedObject | null | undefined): void {
+    const m = this.writeProp(this.heldProp, i, item && station ? (item.model ?? `item.${item.id}`) : null);
+    if (!m || !station) return;
+    const f = (station.rot * Math.PI) / 2;
+    const spot = STATION_SPOTS[station.def]?.[tag];
+    const top = this.content?.object(station.def)?.surface?.height ?? spot?.[2] ?? this.content?.cooking.defaultSurfaceHeight ?? 0.9;
+    // (In the station's own frame: right of its middle, or of the tool's spot, by the side it isn't on.)
+    const x = spot ? spot[0] - Math.sign(spot[0] || 1) * SET_DOWN_SIDE : SET_DOWN_SIDE;
+    const z = spot ? spot[1] : 0;
+    this.placeProp(m, i, station.cx + x * Math.cos(f) + z * Math.sin(f), rig.floorY + top, station.cz - x * Math.sin(f) + z * Math.cos(f), (station.rot * Math.PI) / 2, 1);
+  }
+
   /** The palm centre of hand bone `b` (`side` 1 right, -1 left) as last posed, into `out`. */
   private palmAt(rig: SimRig, b: number, side: number, out: Float32Array): void {
     const t = this.scratch.worldT;
@@ -2500,7 +2524,9 @@ export class Characters {
       // What it carries (`items` index + 1), and the arms that carry it.
       const held = k.held !== undefined ? curr[o + k.held] | 0 : 0;
       const item = held > 0 && layout.items ? this.content?.item(layout.items[held - 1] ?? '') : undefined;
-      const carry = item ? (item.hold === 'both' ? 'carry' : 'carryOne') : '';
+      // (Working at a station, what they carry is put down: `SET_DOWN`.)
+      const setDown = item && !moving && useObj && k.recipe !== undefined && curr[o + k.recipe] > 0 ? SET_DOWN[tag] : undefined;
+      const carry = item && !setDown ? (item.hold === 'both' ? 'carry' : 'carryOne') : '';
 
       // Activity → clip.
       rig.useId = usingId;
@@ -2589,7 +2615,8 @@ export class Characters {
       this.writeSit(rig, i);
       if (rig.cuddleBaby >= 0 && rig.liftW > 0) this.writeCradle(i);
       this.writeBlanket(rig, i, pose, dt, appeared);
-      this.writeCarried(rig, i, item);
+      if (setDown) this.writeSetDown(rig, i, setDown === 'top' ? item : undefined, tag, useObj);
+      else this.writeCarried(rig, i, item);
       this.writeHeld(rig, i, pose, moving);
       this.writeTool(rig, i, moving ? '' : tag, useObj);
 

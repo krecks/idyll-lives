@@ -1039,13 +1039,18 @@ fn task_view(world: &World, task: &Task, phase: Option<&Phase>, held: Option<cra
             let r = &content.recipes[recipe];
             let label = crate::cooking::origin_interaction(content, &world.objects, origin, recipe).map_or(&r.label, |i| &i.label);
             let i = (step as usize).min(r.steps.len() - 1);
-            let label = format!("{label} · {} ({}/{})", r.steps[i].label, i + 1, r.steps.len());
+            // (Past the last step: the dish carried to the table, all but done.)
+            let serving = step as usize >= r.steps.len();
+            let label = match serving {
+                true => format!("{label} · {}", content.cooking.serve_label),
+                false => format!("{label} · {} ({}/{})", r.steps[i].label, i + 1, r.steps.len()),
+            };
             let done: f32 = r.steps[..i].iter().map(|s| s.minutes).sum();
             let elapsed = match phase {
                 Some(Phase::Using { elapsed }) => elapsed.min(f32::from(minutes)) / f32::from(minutes.max(1)) * r.steps[i].minutes,
                 _ => 0.0,
             };
-            let progress = ((done + elapsed) / r.minutes).min(1.0);
+            let progress = if serving { 1.0 } else { ((done + elapsed) / r.minutes).min(1.0) };
             return ActionView {
                 label,
                 object: station.or(origin).and_then(|o| world.stable_of(o)),

@@ -141,8 +141,8 @@ fn doing(world: &World, s: &Sim) -> Doing {
         return Doing::plain(world, None, world.content.visits.door.as_ref().and_then(|d| d.knock_anim));
     }
     // Cooking: at the station, the step's animation for that station while at it (a meal put in
-    // the oven, stirred on a hob; the recipe was started from an interaction of `origin`: that's
-    // the interaction shown while at it).
+    // the oven, stirred on a hob; at the table, the dish put down); at `origin`, the object the
+    // recipe was started from, its interaction is shown for the last step there.
     if let Some(Activity { task: Task { kind: TaskKind::Cook { recipe, step, station, origin, .. }, .. }, phase, .. }) = s.current() {
         let Some(o) = station.and_then(|o| world.objects.get(o as usize)) else {
             return Doing::NOTHING;
@@ -150,10 +150,19 @@ fn doing(world: &World, s: &Sim) -> Doing {
         let r = &world.content.recipes[*recipe];
         let def = &world.content.objects[o.def];
         let using = matches!(phase, Phase::Using { .. });
-        let interaction = (*origin == Some(o.id)).then(|| def.interactions.iter().position(|i| i.recipe == Some(*recipe))).flatten();
+        // (The recipe's own interaction names its last step, the cooking itself: a grill station
+        // lifts its hood to grill, not to chop on its counter first.)
+        let last = *step as usize + 1 >= r.steps.len();
+        let interaction = (*origin == Some(o.id) && last).then(|| def.interactions.iter().position(|i| i.recipe == Some(*recipe))).flatten();
         return Doing {
             object: o.stable as f32,
-            action: r.steps.get(*step as usize).and_then(|s| s.anim_for(def.stations)).filter(|_| using).map_or(-1.0, |a| a as f32),
+            // (Past the last step: putting the dish down on the table.)
+            action: match r.steps.get(*step as usize) {
+                Some(s) => s.anim_for(def.stations),
+                None => world.content.cooking.serve_anim,
+            }
+            .filter(|_| using)
+            .map_or(-1.0, |a| a as f32),
             def: o.def as f32,
             interaction: interaction.map_or(-1.0, |i| i as f32),
         };
