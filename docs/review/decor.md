@@ -134,7 +134,8 @@ Notes: the lead "curtains off-centre on the stage window" is closed. The stage's
 - **Fix class:** decision
 - **Where:** `web/public/content/furniture.json:4022` (`coatRack`, `interactions: []`)
 - **Evidence:** A coat stand's one use is hanging a coat and a hat coming in; the reference doesn't mark the kind as decor (`coatStand`: "hang up a coat and hat"), and `cargo review uses` flags it. Residents have no outerwear to take off, so a use would be a mime (I-held-01). Decide: decor (it carries a coat and a hat already, `decor.py:611`) or a "hang up your coat" use on coming home.
-- **Status:** open
+- **Status:** fixed (198e90d9): decor (Q-19)
+- **After:** `coatStand` is a decor kind; the stand carries its coat and hat.
 - **Source:** wave: decor
 
 ### A-decor-01 — The grandfather clock's pendulum hangs still, and its trunk door never opens

@@ -310,7 +310,8 @@ Causes shared beyond this ledger, moved at the consolidation (2026-10-21): I-gar
 - **Fix class:** decision
 - **Where:** `web/public/content/garden.json:1870` (`garden.cacti`) and `:1912` (`garden.succulents`): no `layer`, so floor; `tools/art/blender/families/plants.py:288-334`
 - **Evidence:** `sheets/obj-garden.cacti.png`, `sheets/obj-garden.succulents.png`: three pots 0.3–0.5 m high and a 0.62 m bowl 0.17 m high stand on the floor tile, ankle high, where real ones sit on a sill, a shelf or a table. The tabletop catalog has small pots that do (`potSucculent`, `potCactus`, `catalog2/tabletop.json:379`, `layer: surface`). Either make these two surface things (the bowl then needs to shrink to about 0.3 m) or keep them as floor pots by design.
-- **Status:** open
+- **Status:** won't fix (Q-08: floor pots by design)
+- **After:** The tabletop catalogue has the small pots that stand on tops.
 - **Source:** wave: garden
 
 ### I-garden-03 — moved to systems.md
@@ -344,7 +345,8 @@ Causes shared beyond this ledger, moved at the consolidation (2026-10-21): I-gar
 - **Fix class:** content
 - **Where:** `web/public/content/garden.json:1007-1009` (sunflowers `admire`: `anim: look`); `web/src/render/babylon/characters.ts:3377-3381` (`look` lowers the head 0.2 rad at any object but the telescope)
 - **Evidence:** `sheets/obj-garden.sunflowers.png` (admire): the resident stands at the bed with the head tipped down while the flower heads are at 1.6–2.1 m. The cherry's and the magnolia's uses take `anim: admire`, which looks up into the crown (`characters.ts:3371-3376`); the sunflowers want the same.
-- **Status:** open
+- **Status:** fixed (a45e65a2)
+- **After:** `anim: admire`: the head tips up to the flower heads (`bench-results/review/fixes/content/g10/after-garden.sunflowers-admire-00.png`).
 - **Source:** wave: garden
 
 ### I-garden-08 — Every flower bed is "water" and "smell": scentless flowers are smelled, and none can be cut for a vase
@@ -354,7 +356,8 @@ Causes shared beyond this ledger, moved at the consolidation (2026-10-21): I-gar
 - **Fix class:** content
 - **Where:** `web/public/content/garden.json:1052` (poppies `smell`, `feeling: garden.sweetScent`), `:1098` (marigolds), `:1282` (forget-me-nots), `:337-339` (magnolia "Smell the magnolia": `anim: admire`); the cut-flower uses would go beside the tulips', daffodils', lilies', cosmos' and daisies' (`:869`, `:915`, `:1190`, `:1328`, `:961`)
 - **Evidence:** `cargo review uses` (`tables/uses-garden.md`): the 11 beds have the same two uses. Poppies and forget-me-nots have no scent to speak of and marigolds' is sharp, yet each gives "Sweet scent". The magnolia's smell is looking up at flowers about 3 m above the nose (`sheets/obj-garden.magnolia.png`). The reference's real uses for a bed (`reference.json` `flowerBed`: water, smell, pick a few) include cutting, which the game has nowhere: the meadow's "Pick a wildflower" is the only picking. Make the scentless beds' second use "Admire" (anim `look`), relabel the magnolia's "Admire the magnolia", and decide at triage whether cut flowers (for a vase) are wanted.
-- **Status:** open
+- **Status:** fixed (a45e65a2); cut flowers later (Q-18)
+- **After:** Poppies, marigolds and forget-me-nots: "Admire the …" (`look`), no Sweet scent feeling; the magnolia's reads "Admire the magnolia". Played on `review-garden`.
 - **Source:** wave: garden
 
 ### I-garden-09 — The bonsai is pruned for 45 minutes standing, stooped over a knee-high table

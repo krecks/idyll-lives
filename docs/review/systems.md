@@ -594,3 +594,13 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Evidence:** A glowing material draws through the parts in front of it. `outdoor.py:64` now builds the grill's hot coals with no glow "which would show through its shut lid", so the grill may be worked round while the renderer still has the fault for other models. `extra/night/sheet-fire.png`: the grill cooking at 22:00 with the lid up shows dull red coals and no light on the cook; the fire pit beside it glows.
 - **Status:** confirmed (outdoor wave)
 - **Source:** `docs/objects/open.md` Still open › Rendering; `plan/authenticity-review.md` §3.1 (M10); outdoor wave (night run)
+
+### I-systems-12 — A housemate cooking a meal nobody needs can't hear a call
+
+- **Severity:** S3
+- **Rubric:** I16, I2
+- **Fix class:** code
+- **Where:** `crates/sim-core/src/world.rs:885` (cooking, eating and washing up are never interrupted); `crates/sim-core/tests/calling_out.rs`
+- **Evidence:** With every need at 1.0 at 9:00, free will sent the called housemate to cook a full meal at the fridge (`TaskKind::Cook`, recipe `meal`) once the base armchair had its sitting read (G-09); a cook can't heed a call, so `calling_out` failed ("B never heard A"). Before, the same housemate picked the bookshelf's read. Two things: a meal is cooked for a fed household at mid-morning, and someone at the hob can't so much as turn to their name. The test now gives B a little fun to fill (d0bbe6ff), which keeps its point (a call heard and answered) off the content's order.
+- **Status:** open
+- **Source:** fix: content

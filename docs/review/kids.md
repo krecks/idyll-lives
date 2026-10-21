@@ -196,7 +196,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/catalog2/kids.json:23` (`kidsTable`: "legs in four colours", against `tools/art/blender/families/kids.py:130` and `:919`, one `ktable` blue for all four legs); `kids.json:145` (`toyChest`: "with its lid open", against `kids.py:511-534`, the lid shut at rest and opened only while played with)
 - **Evidence:** `kids/sheets/obj-kidsTable.png` (four blue legs), `kids/sheets/obj-toyChest.png` (the gallery and game shots show the lid shut). Either the text or the model changes.
-- **Status:** open
+- **Status:** fixed (b3f6b82d)
+- **After:** The texts: blue legs; the toy chest's lid comes up for play.
 - **Source:** wave: office/kids
 
 ### M-kids-04 — The high chair's seat is 2 cm over the range, and its base is narrow

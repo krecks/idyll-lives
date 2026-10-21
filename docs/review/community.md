@@ -238,7 +238,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/community.json:297` (`fountainTown` description: "A round stone basin"); `tools/art/blender/families/street_furniture.py:380` ("a square stone basin")
 - **Evidence:** `sheets/obj-fountainTown.png`: a square basin with a round two-tier fountain in it. The buy catalogue's text says round. Either word is fine; they should agree (the square rim is what seats four along its front).
-- **Status:** open
+- **Status:** fixed (b3f6b82d)
+- **After:** "A square stone basin with a round fountain in the middle".
 - **Source:** community wave (content against the model)
 
 ### M-community-06 — At night the street lamp's lantern glows but no light reaches the ground
@@ -354,7 +355,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** decision
 - **Where:** `web/public/content/community.json:1090` (`farm.hayStack`: no interactions; its description, `:1102`, "a step, a seat, a fort"), `:1139` (`farm.coop`: no interactions)
 - **Evidence:** `sheets/obj-farm.hayStack.png`: three bales at 0.46 and 0.92 m, as good a seat as the fountain's rim; the buy text offers a seat and a fort that the object doesn't have. `sheets/obj-farm.coop.png`: a coop with a ramp and a pop door that shuts at night, no hens and no eggs (`reference.json` `chickenCoop`: collect eggs, feed the hens). The rest of the farm (the barn, the silo, the tractor, the round bale, the scarecrow, the trough) is decor, as §9 decision 4 has it. Decide whether the hay stack gets a sit (content) and whether hens and eggs come with the coop (new behaviour).
-- **Status:** open
+- **Status:** fixed (198e90d9): a sit on the hay stack; the coop decor (Q-19)
+- **After:** "Sit on the hay bales", two at once on the front edges (seat 0.45 m, forward 0.25: `bench-results/review/fixes/content/g12/fwd25-farm.hayStack-sit-00.png`); `chickenCoop` is decor (hens and eggs would be new behaviour).
 - **Source:** community wave (I1)
 
 ### I-community-13 — moved to residents.md

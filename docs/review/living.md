@@ -239,7 +239,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Where:** `web/public/content/base.json:2649`, `:2666`, `:2683` (`bookshelf` read, study, homework: no `seatNear`); `:2622` (`tv` watch: `seatNear: 4`); `web/src/render/babylon/characters.ts:475` (`ACTIONS.read`: `lantern` standing). Living wave, the same: `web/public/content/furniture.json:1417`, `:1453`, `:1490` (the coffee tables' magazine), `:1663`, `:1706` (`stereo`, `boombox` listen), `:1735`, `:1780` (`bookcaseLow`, `bookcaseWide`); `web/public/content/catalog2/living.json` `bookcaseTall`, `bookcaseCorner` (read, study: no `seatNear`)
 - **Evidence:** `play/bookshelf-homework-01.png`, `sheets/obj-bookshelf.png`: the resident stands at the shelf for 45–60 minutes holding a book that isn't there (I-held-01) at the chest. People take the book to a chair. The content already has the mechanism: the TV's watch takes a free seat within 4 m (`seatNear`, `world.rs:4298`); the three reading uses don't ask for one. The TV shows the fallback: with no seat near, the watcher stands half a metre from the screen, arms folded, for the hour (`play/tv-watch-01.png`). Giving the bookshelf uses `seatNear` fixes the common case; what a reader does with no seat near is for triage.
   Living wave: the same at every living thing used for a long time on foot: read and study at `bookcaseLow`, `bookcaseWide`, `bookcaseTall`, `bookcaseCorner` (45–60 min, `living/play/chunk3/bookcaseTall-read-01.png`); "Flip through a magazine" standing over `coffeeTable`, `coffeeTableGlass` and `coffeeTableMarble` (15 min, `living/play/chunk1/coffeeTable-magazine-01.png`); listening to music standing at `stereo` and `boombox` (30 min). The TVs (`tvWall`, `tvRetro`, `tvStandLow`) and the home cinema's watch (60) and film (120 min) were watched standing 0.5 m from the screen in Phase 0 play only because play buys each thing alone on the stage (`living/play/chunk2/homeCinema-film-01.png`). With a sofa 3 m in front, the home cinema's watch and film are watched sitting on it (`living/extra/tv-seat/seat-homeCinema-film-01.png`): the standing hour and the standing two-hour film are the no-seat fallback above. Which seat is taken is I-living-05.
-- **Status:** confirmed and widened (wave: living: the bookcases, the coffee tables, the stereo and the boombox; the TVs' fallback seen on all five; consolidation: I-packs-05 merged)
+- **Status:** fixed (9a5cc144)
+- **After:** `seatNear` (4 m) on the bookshelf, the four bookcases, the stereo, the boombox and the packs' library wall, record cabinet, gramophone, smart hub and robot vacuum dock; 3 m on the tea trolley and the bedside stack; 2 m on the three coffee tables' magazine. Each sat with a seat placed near (`bench-results/review/fixes/content/g03/`, records `pose: sit`); with none near they stand, as the TV's watcher (Q-14).
 - **Source:** pilot; widened in wave: living
 
 ### M-living-03 — The three-seat sofas, the chaise, the long coffee table and the console table are over the real size
@@ -249,7 +250,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** decision
 - **Where:** `tools/art/blender/families/living.py:449`, `:1376` (`sofaThree`, 2.82 m wide), `:500`, `:1383` (`sofaThreeSeat`, 2.86), `:509`, `:1396` (`chaise`, 1.90 deep), `:914`, `:1438` (`coffeeTableLong`, 1.66 wide), `:952`, `:1444` (`consoleTable`, 1.80 × 0.56)
 - **Evidence:** `cargo review sizes` (`tables/sizes-living.md`) against `reference.json` with the ±10 % of owner decision 1: the three-seat sofas are 2.82 and 2.86 m against 1.90–2.40 (out above 2.64), the chaise 1.90 m deep against 1.40–1.70 (above 1.87), the long coffee table 1.66 m against 0.60–1.40 (above 1.54), the console table 1.80 × 0.56 m against 0.80–1.60 × 0.25–0.45 (0.56 deep is a sideboard's depth, not a console's; its description says "slim"). The sofas fill their 3-tile footprint and read as large sofas, not wrong (`living/sheets/obj-sofaThree.png`); the console table reads as a long open table (`living/sheets/obj-consoleTable.png`). Whether to build them inside the range (a 2.4 m sofa centred on 3 tiles) or accept the large ones is the owner's. The other flags in the table are the measuring, not the model, and are closed here: `coffeeTableGlass` and `coffeeTableMarble` H is the plant bowl and the vase on top (tops 0.42, inside); `boombox` H is the crate it stands on (the kind's range is the boombox's); `shelvingIndustrial` 0.53 m is boltless utility shelving's usual depth; `wallBed` W includes its two side bookshelves (its description); `fireplaceElectric` D includes its floor cushion; `tvRetro` W is a console set's (M-living-06); `recliner` is M-living-04.
-- **Status:** open
+- **Status:** won't fix (accepted, Q-08) for the sofas, chaise and long coffee table; the console table's text fixed (b3f6b82d)
+- **After:** They fill their tiles and read as large, not wrong (owner, Q-08); the console table no longer says slim.
 - **Source:** wave: living (`cargo review sizes`)
 
 ### M-living-04 — The recliner's back stops below the sitter's shoulders, so reclined it doesn't read
@@ -283,7 +285,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
   - `coffeeTableMarble` "Marble side table", "a round marble top on bent steel legs": its top is at coffee-table height (0.42, the reference's choice of kind) and it stands on a brass pedestal (`living/sheets/obj-coffeeTableMarble.png`).
   - `tvRetro` "Portable TV": a 0.94 m wooden console set on legs with rabbit ears (`living/sheets/obj-tvRetro.png`); right for a console television, not for a portable one.
   - `consoleTable` "A slim oak table": 0.56 m deep (M-living-03) on black steel legs (`living/sheets/obj-consoleTable.png`).
-- **Status:** open
+- **Status:** fixed (b3f6b82d)
+- **After:** "Executive lounge chair" (chrome five-star base, padded leather), "Round marble coffee table" (brass pedestal), "Console TV", the console table not slim.
 - **Source:** wave: living
 
 ### M-living-07 — Things made for a wall can stand in mid-room with nothing holding them
@@ -339,7 +342,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/furniture.json:1185` (`sofaThree` `slots: 2`)
 - **Evidence:** "Three-seat sofa", 2.82 m with three seat cushions (`living/sheets/obj-sofaThree.png`), takes two residents; the other three-seater, `sofaThreeSeat`, takes three (`catalog2/living.json:396`). A third member of the family can't join the two on it to watch TV.
-- **Status:** open
+- **Status:** fixed (eaca9ed8)
+- **After:** `slots: 3`: three on the three-seat sofa.
 - **Source:** wave: living (`cargo review uses`)
 
 ## Seen here for findings in other ledgers
