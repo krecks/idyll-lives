@@ -442,8 +442,11 @@ def _paint(frame, headboard, bedding):
 
 
 TURN_DOWN = {'uses': {'sleep': 'turn_down', 'nap': 'turn_down'}}
-# The bunk turns down the duvet of the bunk slept in: the lower one's for slot 0, the upper one's for slot 1.
-BUNKS = [{'clip': 'turn_down', 'slot': 0}, {'clip': 'turn_down_upper', 'slot': 1}]
+# The bunk turns down the duvet of the bunk slept in: the lower one's for slot 0, the upper one's for slot 1,
+# once its sleeper has climbed the ladder and crawled in (characters' `bunkUp`, 7 s: in on hands and knees by
+# 4.9 s, sat up by 6), so it folds back as they turn to sit, not while they're at the ladder's foot.
+BUNK_CLIMB_IN = 5.0
+BUNKS = [{'clip': 'turn_down', 'slot': 0}, {'clip': 'turn_down_upper', 'slot': 1, 'delay': BUNK_CLIMB_IN}]
 BUNK_TURN_DOWN = {'uses': {'sleep': BUNKS, 'nap': BUNKS}}
 
 FAMILY = G.Family(

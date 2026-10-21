@@ -2373,7 +2373,9 @@
     "cuddle",
     "bake",
     "mix",
-    "phoneScreen"
+    "phoneScreen",
+    "feed",
+    "change"
   ],
   "objects": [
     {
@@ -3444,19 +3446,19 @@
       "group": "dining",
       "slots": 2,
       "places": [
-        { "at": [-0.5, -0.19] },
-        { "at": [0.5, -0.19] }
+        { "at": [-0.62, 0.1], "facing": 90 },
+        { "at": [0.62, 0.1], "facing": -90 }
       ],
       "surface": {
-        "height": 0.765,
+        "height": 0.76,
         "kind": "table",
         "size": [
-          1.62,
-          0.38
+          0.84,
+          0.75
         ],
         "at": [
           0,
-          0.26
+          0.1
         ]
       },
       "interactions": [
@@ -3504,7 +3506,7 @@
       "id": "crib",
       "name": "Crib",
       "model": "model.crib",
-      "description": "A crib with a changing table beside it: a baby sleeps here, and grown-ups come to feed, change, cuddle and play with them.",
+      "description": "A crib with a changing table beside it: a baby sleeps here, and grown-ups come to feed, cuddle and play with them, and change them on the changing table's pad.",
       "footprint": [2, 1],
       "price": 350,
       "category": "kids",
@@ -3514,7 +3516,7 @@
         {"id": "lie", "label": "Lie in the crib", "anim": "sleep", "minutes": 720, "pose": "lie", "baby": true, "autonomous": false,
          "effects": {"energy": 1.0, "comfort": 0.75}, "tags": ["rest"]},
         {"id": "feed", "label": "Feed the baby", "anim": "cuddle", "minutes": 15, "care": {"hunger": 0.8, "social": 0.1}, "tags": ["care"]},
-        {"id": "change", "label": "Change the baby", "anim": "clean", "minutes": 10, "care": {"bladder": 1.0, "hygiene": 0.7}, "tags": ["care", "chores"]},
+        {"id": "change", "label": "Change the baby", "anim": "change", "minutes": 10, "care": {"bladder": 1.0, "hygiene": 0.7}, "tags": ["care", "chores"], "atSlot": true},
         {"id": "play", "label": "Play with the baby", "anim": "play", "minutes": 20, "effects": {"fun": 0.2, "social": 0.15}, "care": {"fun": 0.6, "social": 0.5}, "tags": ["care", "social"]},
         {"id": "cuddle", "label": "Cuddle the baby", "anim": "cuddle", "minutes": 15, "effects": {"social": 0.1}, "care": {"comfort": 0.5, "social": 0.15}, "tags": ["care", "social"]}
       ]
@@ -4260,6 +4262,22 @@
       "model": "item.sandwich",
       "hold": "hand",
       "radius": 0.1
+    },
+    {
+      "id": "gardenProduce",
+      "label": "Garden produce",
+      "model": "item.ingredients",
+      "hold": "both",
+      "serving": "freshPlate",
+      "radius": 0.15
+    },
+    {
+      "id": "freshPlate",
+      "label": "Something fresh from the garden",
+      "model": "item.treatPlate",
+      "hold": "hand",
+      "emptyAs": "plateDirty",
+      "radius": 0.13
     },
     {
       "id": "plateDirty",

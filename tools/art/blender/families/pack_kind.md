@@ -6,7 +6,11 @@ Validate › Kind until checked in play.
 
 Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
 Seats stay where the renderer puts residents: the rocker's cushion and the poufs at 0.45–0.49 (default seat), the
-settee's seat cushions at 0.45 at x = ±0.5, its sleepers on the default 0.5 bed height.
+settee's seat cushions at 0.45 at x = ±0.5, its sleepers on the default 0.5 bed height. The tea table's poufs
+(40 cm across) stand at x = ±0.75 either side of its low table (top 0.36, 0.4 × 0.56 m), and its two face each
+other straight across it (content `places` `[±0.75, 0]` facing ±90; G-39, 2026-10-21: the poufs were at ±0.5
+beside a 0.42 m table, the sitters turned 45°): the knees stop short of the table's ends, the feet before them.
+The ferns stand at the back between the poufs and the table.
 
 | Model | Moving part and clip | Played by |
 |---|---|---|
@@ -45,7 +49,7 @@ parts the rest. So that it stays at 3:
 | `model.kind.neighbourlyOven` | 1.83 × 1.72 × 0.63 m | 5,292 | 3 | Body (the range's enamel), Fabric (the towel), Cupboards |
 | `model.kind.givingJar` | 0.64 × 1.32 × 0.66 m | 3,068 | 3 | Body (the pedestal), Fabric (the ribbon) |
 | `model.kind.knittingRocker` | 0.72 × 1.05 × 0.87 m | 2,840 | 3 | Body (the chair), Fabric (the cushion) |
-| `model.kind.welcomeTeaTable` | 1.86 × 0.56 × 0.86 m | 4,616 | 3 | Body (the table), Fabric, Second pouf, Rug |
+| `model.kind.welcomeTeaTable` | 1.94 × 0.50 × 0.86 m | 4,616 | 3 | Body (the table), Fabric, Second pouf, Rug |
 | `model.kind.songbirdFeeder` | 0.90 × 1.70 × 0.88 m | 5,004 | 3 | Body (the feeder house), Fabric (the seed sack), Roof |
 | `model.kind.hearthSettee` | 1.90 × 0.95 × 0.83 m | 3,188 | 3 | Body (the velvet), Fabric (the quilt) |
 

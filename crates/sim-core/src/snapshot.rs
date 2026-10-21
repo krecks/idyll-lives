@@ -8,8 +8,8 @@ use crate::world::{Activity, MAX_SIMS, Phase, Sim, Task, TaskKind, World};
 use crate::{TICKS_PER_SECOND, clock};
 
 pub const HEADER_LEN: usize = 9;
-/// Floats per Sim (all 29 used).
-pub const SIM_STRIDE: usize = 29;
+/// Floats per Sim (all 30 used).
+pub const SIM_STRIDE: usize = 30;
 pub const CAPACITY: usize = HEADER_LEN + MAX_SIMS * SIM_STRIDE;
 
 pub mod header {
@@ -95,10 +95,13 @@ pub mod sim {
     /// opens a door or a gate only for someone about to go through it.
     pub const AHEAD_X: usize = 26;
     pub const AHEAD_Z: usize = 27;
+    /// The baby they hold in the arms (`carry::carrying`: lifting them out of the crib, or on
+    /// the way with them to the high chair or back): their id + 1, else 0.
+    pub const CARRY: usize = 28;
     /// How far through what they're doing at `OBJECT` they are, 0..1 (a use's minutes, a
     /// recipe step's), while at it; else -1. The renderer plays a clip along with it (the washing
     /// hung out piece by piece, a crop picked).
-    pub const PROGRESS: usize = 28;
+    pub const PROGRESS: usize = 29;
 }
 
 /// How far ahead along their way `sim::AHEAD_X` looks, in metres.
@@ -106,7 +109,7 @@ pub const AHEAD: f32 = 1.5;
 
 // Every field fits in a Sim's row.
 const _: () = assert!(
-    sim::HEIGHT < SIM_STRIDE && sim::INTERACTION < SIM_STRIDE && sim::RECIPE < SIM_STRIDE && sim::CALL < SIM_STRIDE && sim::AHEAD_Z < SIM_STRIDE && sim::PROGRESS < SIM_STRIDE
+    sim::HEIGHT < SIM_STRIDE && sim::INTERACTION < SIM_STRIDE && sim::RECIPE < SIM_STRIDE && sim::CALL < SIM_STRIDE && sim::AHEAD_Z < SIM_STRIDE && sim::PROGRESS < SIM_STRIDE && sim::CARRY < SIM_STRIDE
 );
 const _: () = assert!(header::ITEMS_VERSION < HEADER_LEN);
 
@@ -179,6 +182,21 @@ fn doing(world: &World, s: &Sim) -> Doing {
         let anim = world.content.cooking.eat_anim.filter(|_| matches!(phase, Phase::Using { .. }));
         return Doing::plain(world, *seat, anim);
     }
+    // Carrying a baby (at the crib lifting them out, on the way to where they go, putting them
+    // in: shown as the cuddle's lift, `sim::CARRY` says who) or a harvest to the fridge (putting
+    // it away there).
+    if let Some(Activity { task: Task { kind: TaskKind::Carry { baby, from, to, stage }, .. }, phase, .. }) = s.current() {
+        let at = if *stage == 0 { *from } else { *to };
+        let using = matches!(phase, Phase::Using { .. });
+        let anim = match baby {
+            Some(_) => world.content.animations.iter().position(|a| a == "cuddle"),
+            None => world.content.cooking.put_away_anim,
+        }
+        .filter(|_| using);
+        let mut d = Doing::plain(world, Some(at), anim);
+        d.def = world.objects.get(at as usize).map_or(-1.0, |o| o.def as f32);
+        return d;
+    }
     // Clearing away: at the bin, the sink or the counter, scraping, washing or putting away (the
     // station's kind too: washing at a dishwasher sounds unlike a sink's running tap).
     if let Some(Activity { task: Task { kind: TaskKind::Dishes { station, stage, .. }, .. }, phase, .. }) = s.current() {
@@ -224,7 +242,7 @@ fn doing(world: &World, s: &Sim) -> Doing {
     let inter = &world.content.objects[obj.def].interactions[*interaction];
     // A baby lying awake in the crib isn't shown asleep.
     let action = match phase {
-        Phase::Using { .. } if inter.baby && s.awake_in_crib(&world.content, clock::hour(world.tick)) => None,
+        Phase::Using { .. } if inter.baby_bed() && s.awake_in_crib(&world.content, clock::hour(world.tick)) => None,
         Phase::Using { .. } => inter.anim,
         _ => None,
     };
@@ -335,6 +353,7 @@ pub fn write(world: &World, out: &mut [f32]) {
         let (way, ahead) = way_ahead(world, s);
         [o[sim::WAY_X], o[sim::WAY_Z]] = way;
         [o[sim::AHEAD_X], o[sim::AHEAD_Z]] = ahead;
+        o[sim::CARRY] = crate::carry::carrying(s).map_or(0.0, |b| b as f32 + 1.0);
         o[sim::PROGRESS] = progress(world, s);
     }
     // Conversations: write the shared state into every participant's row.
@@ -394,6 +413,7 @@ pub fn layout_json(content: &Content) -> String {
             "objectDef": sim::OBJECT_DEF, "interaction": sim::INTERACTION,
             "held": sim::HELD, "recipe": sim::RECIPE, "call": sim::CALL,
             "wayX": sim::WAY_X, "wayZ": sim::WAY_Z, "aheadX": sim::AHEAD_X, "aheadZ": sim::AHEAD_Z,
+            "carry": sim::CARRY,
             "progress": sim::PROGRESS,
         },
         "actions": content.animations,

@@ -38,6 +38,7 @@ fn task_object(kind: &TaskKind) -> Option<u32> {
         TaskKind::Use { object, .. } | TaskKind::Repair { object } => Some(object),
         TaskKind::Cook { station, .. } | TaskKind::Dishes { station, .. } => station,
         TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => seat,
+        TaskKind::Carry { to, .. } => Some(to),
         _ => None,
     }
 }

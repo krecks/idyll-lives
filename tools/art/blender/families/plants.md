@@ -42,7 +42,7 @@ whole prune (the game brings it back after). It is the model's fourth draw call 
 | `model.garden.bostonFern` | 0.73 × 0.98 × 0.79 m | 2,796 | 3 |
 | `model.garden.palm` | 0.77 × 0.89 × 0.69 m | 1,644 | 2 |
 | `model.garden.orchid` | 0.43 × 1.20 × 0.38 m | 1,632 | 3 |
-| `model.garden.bonsai` | 0.62 × 0.97 × 0.41 m | 1,260 | 4 |
+| `model.garden.bonsai` | 0.62 × 1.35 × 0.41 m | 1,368 | 4 |
 
 `check-glb`: 10 models, 0 failed; warnings: the bonsai's four draw calls. Khronos validator: 0 errors, 0 warnings
 each.
@@ -87,7 +87,7 @@ the old part's pot narrowed to the model's 40 cm on 2026-10-15).
 | `model.garden.lupins` | 0.84 × 0.99 × 0.84 m | 1,120 | 2 |
 | `model.garden.forgetMeNots` | 0.87 × 0.28 × 0.84 m | 2,460 | 2 |
 | `model.garden.cosmos` | 0.89 × 0.88 × 0.84 m | 2,146 | 2 |
-| `model.garden.meadow` | 0.81 × 0.52 × 0.92 m | 2,548 | 3 |
+| `model.garden.meadow` | 0.87 × 0.57 × 0.91 m | 3,540 | 3 |
 | `model.garden.geraniums` | 0.42 × 0.65 × 0.47 m | 1,648 | 2 |
 | `model.garden.flowerBox` | 0.95 × 0.73 × 0.50 m | 2,912 | 2 |
 
@@ -130,8 +130,8 @@ shrub, the shrub with pink blossom, the garden hedge's block without its sprigs)
 | `model.garden.topiaryCone` | 0.64 × 1.80 × 0.66 m | 764 | 350 | 3 |
 | `model.garden.hedge` | 1.55 × 1.17 × 0.92 m | 660 | 204 | 2 |
 | `model.garden.hydrangea` | 1.20 × 0.96 × 1.18 m | 1,404 | 516 | 1 |
-| `model.garden.rosebush` | 0.93 × 0.86 × 0.95 m | 1,394 | 636 | 3 |
-| `model.garden.azalea` | 1.24 × 1.01 × 1.24 m | 2,260 | 828 | 2 |
+| `model.garden.rosebush` | 0.77 × 0.90 × 0.72 m | 1,920 | 810 | 3 |
+| `model.garden.azalea` | 1.16 × 1.01 × 1.15 m | 2,276 | 780 | 2 |
 | `model.garden.lavender` | 0.61 × 0.87 × 0.63 m | 872 | 264 | 3 |
 | `model.garden.fern` | 0.79 × 0.48 × 0.93 m | 1,288 | 576 | 1 |
 | `model.garden.grass` | 1.22 × 1.21 × 1.28 m | 1,120 | 480 | 2 |
@@ -160,12 +160,26 @@ the planter (plain, to stay within three draw calls), the soil mound, straw or p
 |---|---|---|---|---|
 | `model.garden.vegPatch` | 0.92 × 0.40 × 0.92 m | 1,590 | 540 | 3 |
 | `model.garden.tomatoes` | 0.80 × 1.19 × 0.80 m | 2,380 | 924 | 3 |
-| `model.garden.strawberries` | 0.88 × 0.21 × 0.88 m | 1,456 | 692 | 3 |
+| `model.garden.strawberries` | 0.88 × 0.21 × 0.88 m | 2,212 | 1,028 | 3 |
 | `model.garden.herbs` | 0.84 × 1.01 × 0.46 m | 1,294 | 444 | 3 |
 | `model.garden.pumpkins` | 1.11 × 0.27 × 0.95 m | 1,174 | 542 | 3 |
 
 `check-glb`: 5 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings. Each stage checked in
 play from a state with all four crops at each (picked, planted, growing, ripe).
+
+## The authenticity review's rebuild (G-29, G-38, 2026-10-21)
+
+- **Bonsai** (I-garden-09): on a bonsai stand at bench height, its top at 0.76 m (was a knee-high table at 0.38) with
+  a shelf below, so it is pruned standing at a working height (reference `bonsaiBench`: 75-95 cm). The sizes table
+  still reads its 1.35 m against `houseplantSmall`: the tree on the stand, as before.
+- **Rose bush** (M-garden-06): open, upright canes from a low leafy base, leaf clusters along them and a cupped rose
+  (`ROSE`, a revolved cup curled in over its middle) on each; the one at the front is the cut one.
+- **Azalea** (M-garden-06): 36 small, flat trusses all over it, down its sides (`dots` `far_every=2`: a far version
+  builds every other one, drawing every random number), not the 20 big rose-like heads.
+- **Meadow** (M-garden-06): long grass, 64 thin blades up to 0.5 m leaning every way and stalks gone to seed, over
+  low tussocks (a far version: every third blade).
+- **Strawberries** (M-garden-07): each plant a rosette of five spreading leaves, two upright in the middle and a dark
+  heart; `_crop(..., sink=(0, 0.04, 0.12))`, so a seedling sits flat on the straw rather than sunk into it.
 
 ## Rebuild
 

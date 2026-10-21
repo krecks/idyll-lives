@@ -113,7 +113,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `tools/art/blender/families/kids.py:443-464`, `web/public/content/catalog2/dining.json:744` (`highChair`, no `interactions`)
 - **Evidence:** A modelled part with no clip, left decorative for 0.3.0. A baby is never seated in the high chair, so nothing could use the tray. Wave: `kids/play/c1/highChair-no-uses.png` and `kids/play/child-c1/highChair-no-uses.png`: no uses for anyone. A baby is fed in the crib instead (I-kids-04). Seating a baby in it at a table, fed by an adult, is new behaviour.
-- **Status:** confirmed
+- **Status:** fixed (ba8bbd91)
+- **After:** The high chair seats a baby (*Sit in the high chair*, `baby`, pose sit, in its middle) and offers *Feed the baby* (`carried`). By day a grown-up's *Feed the baby* at the crib, with a high chair free on the lot, becomes a carry (`carry.rs`): over to the crib, the baby lifted out as the cuddle lifts them (`fixes/babies-crops/baby/feed-01-lifted-from-crib.png`), carried cradled in the arms (`feed-02-carried.png`; the baby's panel reads "In the arms"), laid into the high chair at the table (`feed-03-into-high-chair.png`), fed from beside it, stepped in to it (`feed-04-fed-in-high-chair.png`, the `feed` clips), then carried back to the cot (`feed-05-carried-back.png`); against `kids/play/c1/highChair-no-uses.png`. At night the feed stays at the crib, in the arms; dropped (the order cancelled) or left there when its 45 minutes are up, the baby is back in the crib. `review-baby` (`play` on it, or `fixes/babies-crops/baby/feed-log.txt`); sim tests `tests/high_chair.rs`. The tray stays fixed (its slide-out clip needs the model). The spoon is the props wave's (G-70).
 - **Source:** `docs/objects/open.md` Still open › Content and sim; `plan/release-0.3.0.md` §2.5; wave: office/kids
 
 ### I-kids-02 — A chair facing the kids' desk is used from behind its built-in chair
@@ -148,7 +149,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `crates/sim-core/src/content.rs:273-276` (slot 0 the baby's, the carers' slots by the changing table); `crates/sim-core/src/world.rs:322` (`slot_position`); `web/src/render/babylon/characters.ts:502-505` (`ACTIONS.clean`: `interact`, `spell`)
 - **Evidence:** `sheets/crib-care.png` (top right, `scenes/crib-elder-change-02.png`): the carer stands at the cot and works the hands over the rail at the lying baby for 10 minutes; the pad on the changing chest beside it (0.865 m, inside the 0.85–0.95 range) stays empty. A nappy is changed with the baby lying on the changing pad. Moving the baby to the pad and back (as `cuddle` lifts them) is new behaviour.
-- **Status:** open
+- **Status:** fixed (ba8bbd91)
+- **After:** *Change the baby* is `atSlot`: the carer stands in front of the changing table (the crib's carers' slot), facing the pad, with its own animation tag (`change`). The renderer (`CHANGE`, render only as the cuddle) turns them to the cot, lifts the baby out (`fixes/babies-crops/baby/change-01-lifting-from-cot.png`), lays them across the pad and works at them there (`change-02-on-the-pad.png`, against `scenes/crib-elder-change-02.png`), and near the end lifts them back into the cot. The sim keeps the baby in the cot's slot throughout. Sim test `the_baby_is_changed_at_the_changing_table`.
 - **Source:** pilot
 
 ### M-kids-01 — The cot's mattress is square
@@ -158,7 +160,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/kids.py:345-373` (`crib`: posts ±0.42 m both ways, `mattress` 0.80 × 0.80 at `CRIB_TOP` 0.56, `:291`)
 - **Evidence:** `sheets/obj-crib.png`, `clips/clips-crib-all-t99.png`: the cot is 0.88 m square in plan on the 1 × 1 half of its footprint; a cot is oblong (mattress 60 × 120 or 70 × 140 cm, `reference.json` `crib`). Its depth 0.93 m is over the 0.60–0.80 (±10 %) range for the same reason. The mattress height (0.56 m) and the rail top (0.92 m) are right. The check-glb warning "mattress 0.56 m, the model 0.780 m there (x 0.50)" is the changing pad under the second slot, not the cot (`BEDS.crib` applies to slot 0): a tool artefact.
-- **Status:** open
+- **Status:** fixed (e70de674)
+- **After:** an oblong cot, a 1.18 × 0.58 m mattress at 0.56 m running across the left of its tiles, its back on the wall's face, a 0.62 m changing chest at the right; the baby lies along it at slot 0 (`characters/furniture.json` `beds.crib` `across`; `check-glb` now measures a baby at its slot on a bed lain on across), the blanket folded at its feet, the carers reaching in over the front rail 0.25 m from the baby (`characters.ts` `CUDDLE.rail`, was 0.44). `fixes/blender-hobbies/play/crib-top-crib-play-00.png`, `crib-top-crib-cuddle-01.png`, `gallery/gallery-crib.png`.
 - **Source:** pilot
 
 ### I-kids-06 — Toys are played with standing over them, the hands out in the air
@@ -190,7 +193,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/kids.py:759-764` (`trainTable`: `frame` 1.8 × 0.84), `:1122` (`size=(1.8, 0.68, 0.84)`)
 - **Evidence:** `kids/sheets/obj-trainTable.png`: the table fills its 2 × 1 footprint, 1.80 m long against 0.90–1.30 m for a train table (1.43 with the 10 %; `tables/sizes-kids.md`). The top (0.44 m) is right; the H 0.68 is the trees on it. From the game camera it reads as a coffee table with a track on it.
-- **Status:** open
+- **Status:** fixed (e70de674)
+- **After:** 1.24 m long, centred on its 2 × 1 tiles (`kids.py` `TRAIN_W`), the town at its left beside the ring; the top 0.44 as it was. `fixes/blender-hobbies/gallery/gallery-trainTable.png`, `play/adult-trainTable-trains-01.png`, `child-trainTable-trains-01.png`.
 - **Source:** wave: office/kids
 
 ### M-kids-03 — Two descriptions say what the models don't show
@@ -212,7 +216,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Where:** `web/public/content/catalog2/dining.json:759` (`highChair` `seat.height` 0.62); `tools/art/blender/families/kids.py:443-450` (legs splayed to ±0.205 × −0.16…0.28)
 - **Evidence:** `tables/sizes-kids.md`: the model's seat is 0.609 m (inside the 0.50–0.60 range with the 1 cm tolerance), but the content's `seat` is 0.62, 2 cm over; W 0.444 and D 0.474 are a little under the 0.45 and 0.495 low ends (0.50–0.65 × 0.55–0.80 less 10 %): real high chairs splay their legs wide so they can't tip. `kids/sheets/obj-highChair.png`. Nothing sits in it today (I-kids-01), so only the content number matters once something does: 0.60 or under.
 - **Status:** fixed (a920f174)
-- **After:** `highChair` content seat 0.60 (the mesh's 0.609, inside the 1 cm tolerance). Nothing sits in it yet (I-kids-01). The narrow base is a model change, left to the Blender band.
+- **After:** `highChair` content seat 0.60 (the mesh's 0.609, inside the 1 cm tolerance). Nothing sits in it yet (I-kids-01). The narrow base is a model change, left to the Blender band. Blender band (e70de674): the legs splay to 0.54 × 0.55 m at the floor, the seat still 0.61 (`fixes/blender-hobbies/gallery/gallery-highChair.png`).
 - **Source:** wave: office/kids
 
 ### I-kids-08 — The kids' table is never a place to eat

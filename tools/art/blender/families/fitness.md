@@ -39,18 +39,21 @@ the bottom at rest; `characters.ts` `pedal`).
 
 ## The yoga mat
 
-At rest the mat lies rolled up at the back of its tile, with a foam block and a bottle. `unroll` (1 s, a
+A full 1.8 × 0.62 m mat on a 1 × 2 footprint (2026-10-21, review M-fitness-02: it unrolled to 0.9 m on one tile). At
+rest it lies rolled up at the back, on the wall's face, with a foam block and a bottle. `unroll` (1 s, a
 use: `uses: {yoga: unroll}`, back when the yoga ends) moves two parts together:
 
-- **The flat mat** (`mat`), its origin on its back edge, built full and squeezed to 0.001 deep: it grows to the
-  front (`G.grow`, axis Y).
+- **The flat mat** (`mat`), its origin under the roll's axis, built full and squeezed to 0.001 deep: it grows to the
+  front (`G.grow`, axis Y). Flattened there, it is mostly inside the roll (`check-glb` still warns of 42 % showing:
+  a 1.6 cm strip under the roll's curve, at the back on the floor).
 - **The roll** (`roll`), its origin on the floor under its axis: it rolls forward with the mat's edge (`G.slide`)
   and shrinks onto the floor (`G.squash` to 0.12), leaving a curled front edge.
 
 The mat is 1.6 cm thick: the house's floor is drawn 1 cm up, so a thinner one disappears. Rolled at rest, it
 stands off the middle of its footprint (its `Model`'s `centre`, which the gate checks it is centred on) and is
-shallower than it: picking follows the rolled mat as drawn, and the shadow the tile. Yoga is done sitting
-(`pose: sit`, content `seat` 0.03 m), so the resident sits cross-legged on the unrolled mat.
+shallower than it: picking follows the rolled mat as drawn, and the shadow the tiles. Yoga is a standing flow
+(`characters/clips/games.ts` `yoga`), the yogi stepped onto the mat 0.4 m in front of its middle (`YOGA_AT`), facing
+along it, so the dog's hands and the squat's heels stay on it.
 
 ## The weights
 
@@ -59,25 +62,31 @@ down, and curls a pair of dumbbells standing at the rack. The weight is a part o
 the hands (squashed to 0.001 in 0.2 s, `uses: {lift: …}`), and the game draws that part in the hands, so there
 is never two of it.
 
-- **Weight bench**: 2 cm forward of where the game placed it (both now stop at the wall's face), a padded bench (top 0.5 m, `BEDS`), a rack at the head end with the bar on red J-hooks (the
-  lifter's head lies under it), a leg roller, and two dumbbells on the floor by the feet. The bar with its plates
+- **Weight bench**: 2 cm forward of where the game placed it (both now stop at the wall's face), a flat padded bench
+  (top 0.44 m, `PAD_TOP`, `beds.weightBench`: a bench-press bench is 0.43–0.45, so the feet reach the floor either
+  side; 2026-10-21, review M-fitness-01: 0.50 m, with a leg roller at the foot where the shins would come down), a
+  rack at the head end with the bar on red J-hooks (the lifter's head lies under it), and two dumbbells on the floor
+  by the feet. The bar with its plates
   is `bar`, its origin at its middle (`BAR`); `bar_off` hides it (`"held": {"part": "bar", "grip": "bar"}`),
   `BAR_DELAY` (0.8 s) into the lift: the game draws the bar in the hands only once the lifter has sat down and
   lies back (0.98 s in), so it leaves the hooks then rather than vanishing for the lie-down.
 - **Dumbbell rack**: two tilted shelves of two hex dumbbell pairs each on A-frames (the lower shelf's heavier),
-  a rubber mat in front. The upper shelf's left pair (`LIFTED`) is two parts, `dumbbell_l` and `dumbbell_r`,
+  back on the wall's face (`RACK_SHIFT`), and a 0.7 × 0.48 m rubber mat filling the front of the tile, where the
+  lifter steps in to curl (`characters.ts` `STAND_BACK` -0.6; 2026-10-21, review I-fitness-02: they stood on the tile
+  in front, the mat empty between them and the rack). The upper shelf's left pair (`LIFTED`) is two parts, `dumbbell_l` and `dumbbell_r`,
   each with its origin at its middle; `pair_off` hides both (`"held": {"part": ["dumbbell_l", "dumbbell_r"],
   "grip": "pair"}`).
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
 | `model.treadmill` | 0.79 × 1.44 × 1.85 m | 2,736 | 2 | Frame, Pads |
-| `model.weightBench` | 0.90 × 1.20 × 1.85 m | 4,444 | 2 | Frame, Pads |
+| `model.weightBench` | 0.90 × 1.20 × 1.85 m | 3,924 | 2 | Frame, Pads |
 | `model.exerciseBike` | 0.53 × 1.11 × 0.90 m | 2,216 | 2 | Frame, Pads |
 | `model.yogaMat` | 0.92 × 0.23 × 0.27 m (rolled) | 768 | 3 | Mat |
-| `model.dumbbells` | 0.77 × 0.72 × 0.71 m | 3,996 | 3 | Rack, Weights |
+| `model.dumbbells` | 0.77 × 0.72 × 0.93 m | 3,996 | 3 | Rack, Weights |
 
-`check-glb`: 5 models, 0 failed. Khronos validator: 0 errors, 0 warnings each.
+`check-glb`: 5 models, 0 failed; warnings: the treadmill's belt loop (expected) and the yoga mat's flat strip (above).
+Khronos validator: 0 errors, 0 warnings each.
 
 ## Rebuild
 

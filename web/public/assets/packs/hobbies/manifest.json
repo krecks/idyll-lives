@@ -175,6 +175,9 @@
       "type": "model",
       "url": "../../models/hobbies/keyboardDigital.glb",
       "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
         "ebony": {
           "finish": "material.finish.gloss"
         },
@@ -714,6 +717,12 @@
       "type": "model",
       "url": "../../models/hobbies/workbench.glb",
       "materials": {
+        "ball_red": {
+          "finish": "material.finish.gloss"
+        },
+        "bench_frame": {
+          "finish": "material.finish.wood"
+        },
         "bench_steel": {
           "finish": "material.finish.metal"
         },
@@ -732,7 +741,13 @@
         "foot": {
           "finish": "material.finish.satin"
         },
-        "label": {
+        "hole": {
+          "finish": "material.finish.matte"
+        },
+        "jar": {
+          "finish": "material.finish.satin"
+        },
+        "pegboard": {
           "finish": "material.finish.matte"
         },
         "plank": {
@@ -756,11 +771,15 @@
       "paint": [
         {
           "material": "bench_top",
-          "label": "Wood"
+          "label": "Top"
         },
         {
-          "material": "bench_steel",
-          "label": "Metal"
+          "material": "bench_frame",
+          "label": "Frame"
+        },
+        {
+          "material": "pegboard",
+          "label": "Tool board"
         }
       ]
     },

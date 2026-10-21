@@ -408,31 +408,35 @@ def orchid():
 
 
 def bonsai():
-    """Bonsai: a blue glazed tray on a little wooden table, a twisting trunk, cloud-pruned foliage pads and
-    one stray sprig, which shrinks away while a resident prunes it."""
+    """Bonsai: a blue glazed tray on a wooden bonsai stand at bench height (its top 0.76 m, a shelf below), a twisting
+    trunk, cloud-pruned foliage pads and one stray sprig, which shrinks away while a resident prunes it."""
     P = palette(body='#3E5A78', wood='#6A4A32', bark='#6E5A4C', leaf='#3A6A30', leaf_dark='#346028', leaf_light='#467A38',
                 stem='#5E5040')
-    G.cube('table_top', (0.62, 0.4, 0.04), at=(0, 0, 0.36), material=P.wood, bevel=0.008)
+    up = 0.38                                                          # the stand's top over the old knee-high table's
+    G.cube('table_top', (0.62, 0.4, 0.04), at=(0, 0, 0.36 + up), material=P.wood, bevel=0.008)
     for x in (-0.27, 0.27):
         for y in (-0.16, 0.16):
-            G.cube(f'table_leg{x}{y}', (0.045, 0.045, 0.34), at=(x, y, 0.17), material=P.wood, bevel=0.005)
-    G.cube('tray', (0.46, 0.3, 0.07), at=(0, 0, 0.415), material=P.body, bevel=0.012)
-    G.cube('moss', (0.42, 0.26, 0.02), at=(0, 0, 0.45), material=P.moss)
+            G.cube(f'table_leg{x}{y}', (0.05, 0.05, 0.34 + up), at=(x, y, (0.34 + up) / 2), material=P.wood, bevel=0.005)
+    G.cube('table_shelf', (0.56, 0.34, 0.025), at=(0, 0, 0.16), material=P.wood, bevel=0.005)
+    G.cube('tray', (0.46, 0.3, 0.07), at=(0, 0, 0.415 + up), material=P.body, bevel=0.012)
+    G.cube('moss', (0.42, 0.26, 0.02), at=(0, 0, 0.45 + up), material=P.moss)
     # Bonsai trunks are wood here, not bark: one draw call fewer, and a trunk this short hardly bends in the wind.
-    tube('trunk', [(0.02, 0, 0.44), (-0.05, 0.0, 0.58), (0.04, 0.01, 0.7), (-0.06, 0.0, 0.8)], 0.032, 0.016, P.wood, verts=8)
-    tube('branch', [(-0.05, 0.0, 0.58), (0.08, 0.02, 0.64), (0.18, 0.03, 0.68)], 0.016, 0.008, P.wood, verts=6)
-    tube('branch2', [(0.03, 0.01, 0.69), (-0.12, -0.02, 0.73), (-0.2, -0.03, 0.72)], 0.012, 0.007, P.wood, verts=6)
+    tube('trunk', [(0.02, 0, 0.44 + up), (-0.05, 0.0, 0.58 + up), (0.04, 0.01, 0.7 + up), (-0.06, 0.0, 0.8 + up)], 0.032, 0.016,
+         P.wood, verts=8)
+    tube('branch', [(-0.05, 0.0, 0.58 + up), (0.08, 0.02, 0.64 + up), (0.18, 0.03, 0.68 + up)], 0.016, 0.008, P.wood, verts=6)
+    tube('branch2', [(0.03, 0.01, 0.69 + up), (-0.12, -0.02, 0.73 + up), (-0.2, -0.03, 0.72 + up)], 0.012, 0.007, P.wood, verts=6)
     for i, (x, y, z, r, sx, sy) in enumerate([(-0.07, 0.0, 0.83, 0.12, 1.4, 1.0), (0.17, 0.03, 0.7, 0.09, 1.3, 1.0),
                                               (-0.19, -0.03, 0.75, 0.08, 1.3, 0.9), (0.02, 0.06, 0.73, 0.07, 1.2, 1.0)]):
-        G.boulder(f'pad{i}', r, at=(x, y, z - 0.035), material=[P.leaf, P.leaf_dark, P.leaf_light][i % 3],
+        G.boulder(f'pad{i}', r, at=(x, y, z + up - 0.035), material=[P.leaf, P.leaf_dark, P.leaf_light][i % 3],
                   scale=(sx, sy, 0.45), seed=i * 1.9 + 0.3, noise=0.3, subdivisions=2)
     still = G.join_all('bonsai')
     # The stray sprig, sticking up out of the top pad: a twig and a tuft, all on foliage (one draw call).
     with G.new_parts() as parts:
-        tube('sprig_twig', [(-0.06, -0.03, 0.83), (-0.11, -0.09, 0.88), (-0.17, -0.15, 0.92)], 0.006, 0.004, P.stem, verts=4)
+        tube('sprig_twig', [(-0.06, -0.03, 0.83 + up), (-0.11, -0.09, 0.88 + up), (-0.17, -0.15, 0.92 + up)], 0.006, 0.004, P.stem,
+             verts=4)
         for i, (yaw, tilt) in enumerate([(200, 20), (260, 35), (320, 15), (230, 65), (150, 30)]):
-            leaf(f'sprig_leaf{i}', (-0.17, -0.15, 0.915), yaw, tilt, 0.065, 0.04, P.leaf_light, shape='oval', rows=3, ring=4)
-    sprig = G.join(parts, 'sprig', origin=(-0.06, -0.03, 0.83))
+            leaf(f'sprig_leaf{i}', (-0.17, -0.15, 0.915 + up), yaw, tilt, 0.065, 0.04, P.leaf_light, shape='oval', rows=3, ring=4)
+    sprig = G.join(parts, 'sprig', origin=(-0.06, -0.03, 0.83 + up))
     G.settle([still, sprig])
     G.squash(sprig, 'trim', 0.001, seconds=0.8)
     return [still, sprig]
@@ -724,11 +728,22 @@ def meadow():
                 bloom2='#F6C21E', bloom3='#A880E0', bloom4='#8CB4F8', bloom5='#FFFFFF', centre='#E8B436')
     rng = random.Random(62)
     grass = [P.leaf, P.stem, P.leaf_dark, P.leaf_light]
-    for i, (x, y, _) in enumerate(spiral(5, 0.3, rng)):
-        lump(f'tussock{i}', 0.15, (x, y, 0), grass[i % 4], scale=(1, 1, 0.55), seed=i * 1.1)
-    for i, (x, y, a) in enumerate(spiral(26, 0.42, rng)):
-        blade(f'grass{i}', (x * 0.76, y * 0.76, 0), a + rng.uniform(-40, 40), rng.uniform(68, 85), rng.uniform(0.25, 0.4), 0.04,
-              grass[i % 4], droop=0.3)
+    for i, (x, y, _) in enumerate(spiral(5, 0.3, rng)):                # low tussocks at the grass's foot
+        lump(f'tussock{i}', 0.12, (x, y, 0), grass[i % 4], scale=(1, 1, 0.4), seed=i * 1.1)
+    # Long grass, the most of it: tall, thin blades leaning every way, and stalks gone to seed (a pale, thin head);
+    # a far version builds every third blade (drawing every random number, so the flowers stand where they do).
+    for i, (x, y, a) in enumerate(spiral(64, 0.36, rng)):
+        length = rng.uniform(0.28, 0.48)
+        tilt = rng.uniform(70, 87)
+        yaw = a + rng.uniform(-50, 50)
+        lean = rng.uniform(-0.06, 0.06)
+        if LOW[0] and i % 3:
+            continue
+        blade(f'grass{i}', (x * 0.85, y * 0.85, 0), yaw, tilt, length, 0.028, grass[i % 4], droop=0.22)
+        if i % 6 == 0:
+            head = (x * 0.8 + lean, y * 0.8 - lean, length * 1.02)
+            stem(f'seed_stalk{i}', (x * 0.85, y * 0.85, 0), head, P.leaf_light, r=0.003)
+            G.cone(f'seed{i}', 0.011, 0.003, 0.09, at=(head[0], head[1], head[2] + 0.04), material=P.leaf_light, verts=low(5, 3))
     for i, (x, y, a) in enumerate(spiral(16, 0.4, rng)):
         h = rng.uniform(0.26, 0.48)
         yaw, tilt = rng.uniform(0, 360), rng.uniform(0, 30)
@@ -820,8 +835,9 @@ def shrub(P, rng, n, w, h, cols, name='bush'):
          seed=rng.random() * 9)
 
 
-def dots(rng, n, centre, radii, size, materials, name, band=(-0.3, 0.95), out=1.0, flat=0.8, segments=8, rings=5):
-    """Flowers spread over a shrub's crown (an ellipsoid at `centre`, `radii`), on its upper part."""
+def dots(rng, n, centre, radii, size, materials, name, band=(-0.3, 0.95), out=1.0, flat=0.8, segments=8, rings=5, far_every=1):
+    """Flowers spread over a shrub's crown (an ellipsoid at `centre`, `radii`), on its upper part; a far version builds
+    every `far_every`th (drawing every random number)."""
     cx, cy, cz = centre
     ga = math.pi * (3 - math.sqrt(5))
     for i in range(n):
@@ -829,6 +845,8 @@ def dots(rng, n, centre, radii, size, materials, name, band=(-0.3, 0.95), out=1.
         a = i * ga + rng.uniform(-0.3, 0.3)
         ring = math.sqrt(max(0.0, 1 - t * t))
         at = (cx + radii[0] * ring * math.cos(a) * out, cy + radii[1] * ring * math.sin(a) * out, cz + radii[2] * t * out - size / 2)
+        if LOW[0] and i % far_every:
+            continue
         lump(f'{name}{i}', size / 2, at, materials[i % len(materials)], scale=(1, 1, flat), seed=i * 0.77,
              segments=segments, rings=rings)
 
@@ -941,24 +959,46 @@ def hydrangea():
     return G.settle([G.join_all('hydrangea')])
 
 
+# A rose: a cup of petals, its rim curled in over a tight middle (the profile turns back in and up again).
+ROSE = [(0, 0), (0.02, 0.004), (0.048, 0.026), (0.058, 0.052), (0.046, 0.068), (0.026, 0.056), (0.012, 0.064), (0, 0.054)]
+
+
 def rosebush():
-    """Rose bush: a dark-leaved shrub dotted with red roses; one rose at the front, which a prune cuts."""
+    """Rose bush: an open shrub of upright, arching canes from a low leafy base, dark leaves in clusters along them,
+    each cane tipped by a cupped red rose; the rose at the front, which a prune cuts."""
     P = palette(leaf='#2C4C26', leaf_dark='#365A2C', leaf_light='#3F6632', stem='#4A7038', bloom='#C8203A')
     rng = random.Random(73)
-    shrub(P, rng, 5, 1.02, 0.94, [P.leaf, P.leaf_dark, P.leaf_light, P.stem, P.stem])
-    dots(rng, 15, (0, 0, 0.5), (0.46, 0.46, 0.4), 0.1, [P.bloom], 'rose', out=0.88, segments=7, rings=4)
-    still = G.join_all('rosebush')
-    at = (0.05, -0.42, 0.62)
-    return _with_part('rose', still, lambda: lump('cut_rose', 0.06, at, P.bloom, scale=(1, 1, 0.8), segments=8, rings=5),
-                      (at[0], at[1], at[2] + 0.04), 'cut')
+    leafy = [P.leaf, P.leaf_dark, P.leaf_light]
+    for i, (x, y, _) in enumerate(spiral(3, 0.16, rng)):
+        lump(f'base{i}', 0.2, (x, y, 0), leafy[i % 3], scale=(1, 1, 0.75), seed=i * 1.3 + rng.random(), noise=0.3)
+    canes = []
+    for i, (x, y, a) in enumerate(spiral(9, 0.3, rng)):
+        h = rng.uniform(0.6, 0.84)
+        foot, tip = Vector((x * 0.3, y * 0.3, 0.05)), Vector((x * 1.3, y * 1.3, h))
+        bend = Vector((x * 1.05, y * 1.05, h * 0.6))
+        canes.append((foot, bend, tip, a, rng.uniform(8, 28)))
+    front = min(range(len(canes)), key=lambda i: canes[i][2].y)              # the cane nearest the front (-y)
+    for i, (foot, bend, tip, a, tilt) in enumerate(canes):
+        tube(f'cane{i}', [foot, bend, tip - Vector((0, 0, 0.01))], 0.011, 0.006, P.stem, verts=4)
+        for k, f in enumerate((0.45, 0.78)[:low(2, 1)]):               # leaf clusters along the cane
+            at = bend.lerp(tip, f - 0.3) if f > 0.6 else foot.lerp(bend, f * 1.6)
+            lump(f'leaves{i}_{k}', 0.085, at - Vector((0, 0, 0.05)), leafy[(i + k) % 3], scale=(1.2, 1.2, 0.8),
+                 seed=i * 2.3 + k, noise=0.3, segments=6, rings=4)
+        if i != front:
+            cupped(f'rose{i}', ROSE, tip, P.bloom, math.degrees(a), tilt, segments=low(6, 3))
+    foot, bend, tip, a, tilt = canes[front]
+    return _with_part('rose', G.join_all('rosebush'), lambda: cupped('cut_rose', ROSE, tip, P.bloom, math.degrees(a), tilt,
+                                                                      segments=low(6, 3)), tuple(tip), 'cut')
 
 
 def azalea():
-    """Azalea: a wide shrub smothered in pink flowers (one material, the colour part); shaggy sprigs on top, which a trim takes off."""
+    """Azalea: a wide, low mound smothered in small flat trusses of pink flowers (one material, the colour part), down
+    its sides as well as on top; shaggy sprigs on top, which a trim takes off."""
     P = palette(blossom='#F0549C')
     rng = random.Random(74)
     shrub(P, rng, 6, 1.12, 0.92, [getattr(P, k) for k in ('leaf_dark', 'leaf', 'leaf_light', 'stem', 'leaf_light')])
-    dots(rng, 20, (0, 0, 0.5), (0.54, 0.54, 0.42), 0.2, [P.blossom], 'flowers', flat=0.6)
+    dots(rng, 36, (0, 0, 0.5), (0.56, 0.56, 0.43), 0.13, [P.blossom], 'flowers', band=(-0.5, 0.95), out=0.97, flat=0.42,
+         segments=6, rings=4, far_every=2)
     still = G.join_all('azalea')
     at = (-0.05, 0.05, 0.94)
     return _with_part('sprigs', still, lambda: sprigs('sprig', P, at, 0.14), at, 'trim')
@@ -1060,9 +1100,11 @@ HARVESTED = dict(picked=(1, 1, 0.5), sink=0.6)
 CROP = dict(picked=0.001, growing=0.001, planted=0.001)
 
 
-def _crop(still, origin, leaves, crop, harvested=False):
+def _crop(still, origin, leaves, crop, harvested=False, sink=SINK):
     """The still part, and the leaves and crop `leaves()` and `crop()` make as the growth clip's two parts.
-    `harvested`: picking takes the plants too (a vegetable patch), not only their crop (tomatoes)."""
+    `harvested`: picking takes the plants too (a vegetable patch), not only their crop (tomatoes); `sink`: how far
+    the plants go into the soil at each stage, shares of their height (low plants on a bed sink less: `SINK` would
+    bury them)."""
     if LOW[0]:                                                         # a far version: all one still part, ripe
         leaves()
         crop()
@@ -1075,7 +1117,7 @@ def _crop(still, origin, leaves, crop, harvested=False):
     fruit = G.join(parts, 'crop', origin=origin)
     G.settle([still, plants, fruit])
     height = G.measure([plants])[1][2] - plants.location[2]           # the plants' top over their origin
-    sink = [s * height for s in SINK]
+    sink = [s * height for s in sink]
     stages = dict(PLANTS)
     if harvested:
         stages['picked'] = HARVESTED['picked']
@@ -1165,10 +1207,17 @@ def strawberries():
     flowers = spiral(4, 0.3, rng)
 
     def leaves():
+        # Each plant a dense rosette round its crown: five leaves spreading on their stalks, two standing up in the
+        # middle, over a dark heart, so it closes even flattened to a seedling.
         for i, (x, y, a) in enumerate(crowns):
-            for j in range(3):
-                leaf(f'crown{i}_{j}', (x, y, 0.04), a + j * 120, 45, 0.14, 0.11, [P.leaf, P.leaf_dark, P.leaf_light][(i + j) % 3],
-                     shape='heart', droop=0.3, fold=0.3, rows=4, ring=4)
+            if not LOW[0]:                                             # a far version: hidden under the leaves
+                lump(f'heart{i}', 0.04, (x, y, 0.03), P.leaf, scale=(1, 1, 0.8), noise=0.2, seed=i * 1.7, segments=6, rings=4)
+            for j in range(5):
+                leaf(f'crown{i}_{j}', (x, y, 0.045), a + j * 72, 36, 0.13, 0.1, [P.leaf, P.leaf_dark, P.leaf_light][(i + j) % 3],
+                     shape='heart', droop=0.3, fold=0.3, rows=3, ring=4)
+            for j in range(2):
+                leaf(f'inner{i}_{j}', (x, y, 0.05), a + 36 + j * 180, 70, 0.1, 0.08, P.leaf_light, shape='heart', droop=0.25,
+                     fold=0.35, rows=3, ring=4)
 
     def crop():
         for i, (x, y, a) in enumerate(berries):
@@ -1177,7 +1226,7 @@ def strawberries():
             stem(f'flower_stem{i}', (x, y, 0.04), (x, y, 0.2), P.stalk, r=0.003)   # plain, as the berries
             star(f'flower{i}', (x, y, 0.2), 0.022, 5, P.bloom5, 0, 10, inner=0.8, cup=0.1)
             dome(f'eye{i}', (x, y, 0.2), 0.008, 0.005, P.centre)
-    return _crop(still, (0, 0, 0.05), leaves, crop)
+    return _crop(still, (0, 0, 0.05), leaves, crop, sink=(0, 0.04, 0.12))   # seedlings: flat rosettes on the straw
 
 
 def herbs():
@@ -1250,7 +1299,7 @@ FAMILY = G.Family(
      G.Model('bostonFern', boston_fern, size=(0.734, 0.979, 0.792), key='model.garden.bostonFern', tolerance=TOLERANCE, paint=[('body', 'Pot')]),
      G.Model('palm', palm, size=(0.770, 0.893, 0.693), key='model.garden.palm', tolerance=TOLERANCE, paint=[('body', 'Pot')]),
      G.Model('orchid', orchid, size=(0.431, 1.198, 0.381), key='model.garden.orchid', tolerance=TOLERANCE, paint=[('body', 'Pot')]),
-     G.Model('bonsai', bonsai, size=(0.62, 0.974, 0.407), key='model.garden.bonsai', tolerance=TOLERANCE, paint=[('body', 'Pot')],
+     G.Model('bonsai', bonsai, size=(0.62, 1.354, 0.407), key='model.garden.bonsai', tolerance=TOLERANCE, paint=[('body', 'Pot')],
              motions={'uses': {'prune': 'trim'}}),
      # G2: flowers (with G3 and G4, each with a far version: they stand outside, seen in the town overview)
      G.Model('flowerbed', flowerbed, size=(0.94, 0.475, 0.94), key='model.flowerbed', tolerance=TOLERANCE, far=far_of(flowerbed), paint=[('wood', 'Box')]),
@@ -1265,7 +1314,7 @@ FAMILY = G.Family(
      G.Model('lupins', lupins, size=(0.84, 0.987, 0.84), key='model.garden.lupins', tolerance=TOLERANCE, far=far_of(lupins), paint=BED),
      G.Model('forgetMeNots', forget_me_nots, size=(0.866, 0.28, 0.84), key='model.garden.forgetMeNots', tolerance=TOLERANCE, far=far_of(forget_me_nots), paint=BED),
      G.Model('cosmos', cosmos, size=(0.885, 0.879, 0.84), key='model.garden.cosmos', tolerance=TOLERANCE, far=far_of(cosmos), paint=BED),
-     G.Model('meadow', meadow, size=(0.811, 0.517, 0.919), key='model.garden.meadow', tolerance=TOLERANCE, far=far_of(meadow),
+     G.Model('meadow', meadow, size=(0.872, 0.575, 0.91), key='model.garden.meadow', tolerance=TOLERANCE, far=far_of(meadow),
              motions={'uses': {'pickFlower': 'pick'}}),
      G.Model('geraniums', geraniums, size=(0.424, 0.65, 0.468), key='model.garden.geraniums', tolerance=TOLERANCE, far=far_of(geraniums), paint=[('body', 'Pot'), ('bloom', 'Flowers')]),
      G.Model('flowerBox', flower_box, size=(0.945, 0.732, 0.505), key='model.garden.flowerBox', tolerance=TOLERANCE, far=far_of(flower_box), paint=[('body', 'Box')]),
@@ -1283,9 +1332,9 @@ FAMILY = G.Family(
              motions={'uses': {'trim': 'trim'}}),
      G.Model('hydrangea', hydrangea, size=(1.196, 0.957, 1.182), key='model.garden.hydrangea', tolerance=TOLERANCE, far=far_of(hydrangea),
              paint=[('blossom', 'Flowers')]),
-     G.Model('rosebush', rosebush, size=(0.925, 0.861, 0.951), key='model.garden.rosebush', tolerance=TOLERANCE, far=far_of(rosebush),
+     G.Model('rosebush', rosebush, size=(0.771, 0.903, 0.722), key='model.garden.rosebush', tolerance=TOLERANCE, far=far_of(rosebush),
              paint=[('bloom', 'Roses')], motions={'uses': {'prune': 'cut'}}),
-     G.Model('azalea', azalea, size=(1.239, 1.013, 1.238), key='model.garden.azalea', tolerance=TOLERANCE, far=far_of(azalea),
+     G.Model('azalea', azalea, size=(1.158, 1.013, 1.152), key='model.garden.azalea', tolerance=TOLERANCE, far=far_of(azalea),
              paint=[('blossom', 'Flowers')], motions={'uses': {'trim': 'trim'}}),
      G.Model('lavender', lavender, size=(0.607, 0.865, 0.63), key='model.garden.lavender', tolerance=TOLERANCE, far=far_of(lavender),
              paint=[('bloom', 'Flowers')], motions={'uses': {'cut': 'cut'}}),

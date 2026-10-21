@@ -115,6 +115,7 @@ def _turned(parts, name, pivot, x=0.0, z=0.0):
     back backwards), `z` about the vertical. The turn is baked in when the part is joined again."""
     obj = G.join(parts, name)
     G.set_origin(obj, F.at(*pivot))
+    obj.rotation_mode = 'XYZ'   # (a joined part keeps its first part's mode: a rod's is quaternion, which ignores an Euler turn)
     obj.rotation_euler = (math.radians(x), 0, math.radians(z))
     return obj
 
@@ -445,25 +446,46 @@ def deskSimple():
     return G.meshes()
 
 
+# The corner desk: an L of two 0.7 m wings along the back and the left (the walls of a room's corner), the inner
+# corner cut on the diagonal, and its own swivel chair in the inner corner facing it, both wings in reach (content
+# `places`: `CORNER_SEAT`, turned to face the corner). Review M-office-01: it was a 1.86 m square slab with one
+# corner cut, read as an island, its middle a metre from any edge.
+CORNER_WING = 0.7
+CORNER_CUT = -0.06      # the diagonal edge: game x + depth = this
+CORNER_SEAT = (0.11, 0.11)   # the chair's seat (game x, depth): 0.2 m back from the diagonal edge
+
+
 def deskCorner():
     e = 0.93
+    i = -e + CORNER_WING                     # the wings' inner edges
     with G.new_parts():
-        # an L of white laminate, its inner corner cut on the diagonal
-        _slab('top', [(-e, -e), (e, -e), (e, 0.33), (0.33, e), (-e, e)], DT - 0.035, 0.035, M.laminate)
-        # oak panels: the left end, the right end, the left wing's front end and a modesty panel
+        # an L of white laminate
+        cut = [(CORNER_CUT - i, i), (i, CORNER_CUT - i)]
+        _slab('top', [(-e, -e), (e, -e), (e, i), *cut, (i, e), (-e, e)], DT - 0.035, 0.035, M.laminate)
+        # oak panels at the outer ends and along the back and the left, and a drawer pedestal under each wing
         h = DT - 0.035
         _box('panel_left', 0.03, h, 1.8, (-0.89, h / 2, 0), M.oak_panel, bevel=0.004)
-        _box('panel_right', 0.03, h, 0.6, (0.89, h / 2, -0.6), M.oak_panel, bevel=0.004)
-        _box('panel_front', 0.56, h, 0.03, (-0.6, h / 2, 0.89), M.oak_panel, bevel=0.004)
+        _box('panel_right', 0.03, h, CORNER_WING - 0.04, (0.89, h / 2, -e + CORNER_WING / 2), M.oak_panel, bevel=0.004)
+        _box('panel_front', CORNER_WING - 0.04, h, 0.03, (-e + CORNER_WING / 2, h / 2, 0.89), M.oak_panel, bevel=0.004)
         _box('panel_back', 1.74, 0.4, 0.02, (0, 0.45, -0.89), M.oak_panel, bevel=0.004)
-        # a drawer pedestal in the back left
-        _box('pedestal', 0.42, 0.6, 0.55, (-0.62, 0.3, -0.6), M.drawers, bevel=0.008)
-        for i in range(3):
-            y = 0.5 - i * 0.18
-            _box(f'pedestal_front{i}', 0.4, 0.16, 0.012, (-0.62, y, -0.319), M.drawers, bevel=0.004)
-            _pull(f'pedestal_pull{i}', -0.62, y + 0.045, -0.313, 0.14, M.frame)
+        for k, (x, z, turn) in enumerate(((0.5, -0.6, 0), (-0.6, 0.5, 1))):
+            w, d = (0.42, 0.55) if not turn else (0.55, 0.42)
+            _box(f'pedestal{k}', w, 0.6, d, (x, 0.3, z), M.drawers, bevel=0.008)
+            for j in range(3):
+                y = 0.5 - j * 0.18
+                if turn:   # its drawers to the inner side, towards the chair
+                    _box(f'pedestal{k}_front{j}', 0.012, 0.16, 0.4, (x + 0.281, y, z), M.drawers, bevel=0.004)
+                    _box(f'pedestal{k}_pull{j}', 0.014, 0.012, 0.14, (x + 0.294, y + 0.045, z), M.frame, bevel=0.004)
+                else:
+                    _box(f'pedestal{k}_front{j}', 0.4, 0.16, 0.012, (x, y, z + 0.281), M.drawers, bevel=0.004)
+                    _pull(f'pedestal{k}_pull{j}', x, y + 0.045, z + 0.287, 0.14, M.frame)
+    with G.new_parts() as chair:
+        _desk_chair(M.chair, z=0.0)
+    seat = _turned(chair, 'chair', (0, 0, 0), z=135)
+    seat.location.x -= CORNER_SEAT[0]
+    seat.location.y -= CORNER_SEAT[1]
     G.join_all('deskCorner')
-    G.settle()
+    G.settle(centre=False)
     return G.meshes()
 
 
@@ -650,8 +672,8 @@ FAMILY = G.Family(
     'office', M,
     [G.Model('deskSimple', deskSimple, size=(1.5, 0.74, 0.69), key='model.deskSimple', centre=(0, -0.085),
              paint=[('oak', 'Top'), *DESK]),
-     G.Model('deskCorner', deskCorner, size=(1.86, 0.74, 1.86), key='model.deskCorner',
-             paint=[('laminate', 'Top'), ('oak_panel', 'Frame'), ('drawers', 'Drawers')]),
+     G.Model('deskCorner', deskCorner, size=(1.86, 1.009, 1.86), key='model.deskCorner',
+             paint=[('laminate', 'Top'), ('oak_panel', 'Frame'), ('drawers', 'Drawers'), ('chair', 'Chair')]),
      G.Model('deskStanding', deskStanding, size=(0.96, 1.54, 0.63), key='model.deskStanding', centre=(0, -0.115),
              motions={'uses': {'browse': 'tray_out', 'code': 'tray_out'}},
              paint=[('birch', 'Top'), ('frame', 'Frame'), ('shelf', 'Shelf')]),

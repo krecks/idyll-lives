@@ -55,6 +55,7 @@
           "label": "Tend the vegetables",
           "anim": "tend",
           "minutes": 30,
+          "tends": 0.15,
           "pose": "stand",
           "autonomous": true,
           "effects": { "fun": 0.15, "hygiene": -0.08 },

@@ -1008,8 +1008,8 @@
       "group": "dining",
       "slots": 2,
       "places": [
-        { "at": [-0.5, -0.22] },
-        { "at": [0.5, -0.22] }
+        { "at": [-0.62, 0.1], "facing": 90 },
+        { "at": [0.62, 0.1], "facing": -90 }
       ],
       "decor": 0.3,
       "description": "A glass-topped table for two with chairs: breakfast and coffee in style.",
@@ -1017,12 +1017,12 @@
         "height": 0.76,
         "kind": "table",
         "size": [
-          1.7,
-          0.62
+          0.9,
+          0.8
         ],
         "at": [
           0,
-          0.16
+          0.1
         ]
       },
       "interactions": [
@@ -1079,21 +1079,21 @@
       "group": "dining",
       "slots": 2,
       "places": [
-        { "at": [-0.5, -0.22] },
-        { "at": [0.5, -0.22] }
+        { "at": [-0.62, 0.1], "facing": 90 },
+        { "at": [0.62, 0.1], "facing": -90 }
       ],
       "decor": 0.5,
-      "description": "A solid oak table set for four. Lingering over a long meal here is the best part of the day.",
+      "description": "A solid oak table for two with breadboard ends and its chairs. Lingering over a long meal here is the best part of the day.",
       "surface": {
-        "height": 0.765,
+        "height": 0.76,
         "kind": "table",
         "size": [
-          1.76,
-          0.66
+          0.9,
+          0.8
         ],
         "at": [
           0,
-          0.15
+          0.1
         ]
       },
       "interactions": [
@@ -2292,6 +2292,7 @@
         {
           "id": "outfit",
           "label": "Pick an outfit",
+          "changesOutfit": true,
           "anim": "clean",
           "minutes": 10,
           "effects": {
@@ -2321,6 +2322,7 @@
         {
           "id": "outfit",
           "label": "Pick an outfit",
+          "changesOutfit": true,
           "anim": "clean",
           "minutes": 10,
           "effects": {
@@ -3532,13 +3534,18 @@
       "name": "Digital piano",
       "model": "model.keyboardDigital",
       "footprint": [
-        1,
+        2,
         1
       ],
       "price": 650,
       "category": "hobbies",
       "group": "music",
-      "description": "A slim keyboard on a stand with a bench: piano practice for a smaller room and budget.",
+      "seat": {
+        "height": 0.48,
+        "forward": 0.18,
+        "facing": "back"
+      },
+      "description": "A console digital piano, 88 weighted keys and three pedals, with a bench: piano practice without the upright's price.",
       "interactions": [
         {
           "id": "play",
@@ -3808,7 +3815,7 @@
       "model": "model.yogaMat",
       "footprint": [
         1,
-        1
+        2
       ],
       "price": 45,
       "category": "fitness",

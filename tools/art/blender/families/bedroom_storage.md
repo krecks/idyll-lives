@@ -33,7 +33,9 @@ by the existing `model.<id>` keys. Built
 
 ## The clips (BR3)
 
-All are played for the `outfit` use (`motions.uses.outfit`):
+All are played for the `outfit` use (`motions.uses.outfit`), and held open for the whole of it: the resident
+changes into another outfit there (content `changesOutfit`, halfway through) and the drawer or the doors shut as
+they leave (until 2026-10-21 they shut after 2.5 or 3 s, before the change):
 
 | Model | Clip | Moves | Hold |
 |---|---|---|---|
@@ -42,7 +44,9 @@ All are played for the `outfit` use (`motions.uses.outfit`):
 | `dresserLow` | `drawer_open` | the middle drawer of the middle column, 30 cm | 2.5 s |
 | `wardrobe` | `doors_open` | both doors swing out 100° in 1.2 s | 3 s |
 | `armoire` | `doors_open` | both doors, 100° | 3 s |
-| `wardrobeSingle` | `door_open` | its door, hinged on the left (the old part's handle is on the right), 100° | 3 s |
+| `wardrobeSingle` | `door_open` | its 0.58 m door, hinged on the left (the old part's handle is on the right), 100° | 3 s |
+
+The chest, the low dresser and the wardrobes' doors stay open for the whole "Pick an outfit" use (G-69: no `hold` there), and shut as the resident leaves.
 
 The dresser's old part has two columns of three drawers; the model has two small drawers over two wide ones,
 so "the middle drawer" is one drawer.
@@ -53,31 +57,41 @@ The blanket chest's lid (`lid`, hinged along its back edge at 0.455 m; the chest
 it) lifts 95° (`lid_open`, 0.9 s, held 2 s) for the content's "Take out a blanket" (`takeBlanket`, `fetch`, 3
 minutes, comfort; not autonomous). It costs the chest a third draw call.
 
-The three-drawer nightstand's top drawer (`drawer`, origin on the carcass face, box behind it, folded clothes in it)
-slides out 30 cm (`drawer_open`, as the dressers') for the content's "Pick an outfit" (`outfit`, the dressers' use,
-but not autonomous there, so generated houses play as before), held 2.5 s: a second draw call. The hamper's lid
+The three-drawer nightstand's top drawer (`drawer`, origin on the carcass face, box behind it; a biscuit tin, two
+chocolate bars and a paperback in it) slides out 30 cm (`drawer_open`, as the dressers') for the content's "Grab a
+snack from the drawer" (`snack`, `SNACK_DRAWER`), held 2.5 s: a second draw call. It was keyed to "Pick an outfit"
+with clothes in it until 2026-10-21, when the content gave the drawer the snack (I-bedroom-05). The hamper's lid
 (`lid`, hinged at its back; the basket is hollow with washing in it) lifts 70° (`lid_open`, 0.7 s; any further and
 it goes into the wall the hamper stands at) for the whole of the content's "Sort the washing" (`sortWashing`,
 `clean`, 5 minutes, comfort, chores; not autonomous): a third draw call. (Washing that goes from the hamper to the
 washer would need a laundry loop in the sim.)
+
+## Sizes
+
+The modern and the three-drawer nightstands are 0.47 m deep, as the classic one (their case's front at game depth
+0, `NS_FRONT`; the top 0.46 deep), and the tall chest 0.51 (`CHEST_FRONT` 0.04): until 2026-10-21 they were
+0.63–0.66 m, as deep as their tile, reaching past a bed's pillows (M-bedroom-02). The content `surface`s follow
+(0.58 × 0.46 at -0.2; 0.88 × 0.48 at -0.19). The single wardrobe is 0.60 m wide with a 0.58 m door (`WS_W`; it was
+0.90 with a door as wide as a room's, M-bedroom-03). The wardrobes' box on the hat shelf is 0.13 m high and inside
+the side: it came up through the carcass's top (and the single one's side).
 
 ## The models
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
 | `model.nightstand` | 0.54 × 0.66 × 0.47 m | 1,936 | 2 | Body, Handles (a book and a mug on top, books in the niche) |
-| `model.nightstandModern` | 0.58 × 0.56 × 0.63 m | 1,616 | 2 | Body, Handles (oak top and legs) |
+| `model.nightstandModern` | 0.58 × 0.56 × 0.47 m | 1,616 | 2 | Body, Handles (oak top and legs) |
 | `model.nightstandRound` | 0.54 × 0.57 × 0.56 m | 2,396 | 2 | Body, Handles |
-| `model.nightstandDrawers` | 0.58 × 0.60 × 0.63 m | 1,572 | 2 | Body, Handles |
+| `model.nightstandDrawers` | 0.58 × 0.60 × 0.47 m | 1,544 | 2 | Body, Handles |
 | `model.nightstandLamp` | 0.54 × 1.08 × 0.47 m | 2,472 | 3 | Body, Shade (glows `#FFD9A0` at night) |
 | `model.cedarChest` | 0.97 × 0.505 × 0.52 m | 1,572 | 3 | Body, Handles |
 | `model.laundryHamper` | 0.48 × 0.63 × 0.48 m | 2,544 | 3 | Hamper |
 | `model.benchBedEnd` | 1.60 × 0.47 × 0.42 m | 1,680 | 2 | Frame, Cushion |
 | `model.dresser` | 1.44 × 1.35 × 0.54 m | 3,420 | 3 | Body, Handles (a picture, a vase and a box on top) |
 | `model.wardrobe` | 1.84 × 2.41 × 0.63 m | 4,428 | 3 | Body (the doors), Handles (boxes on top) |
-| `model.chestOfDrawers` | 0.88 × 1.16 × 0.66 m | 2,004 | 2 | Body, Handles |
+| `model.chestOfDrawers` | 0.88 × 1.16 × 0.51 m | 2,004 | 2 | Body, Handles |
 | `model.dresserLow` | 1.82 × 0.80 × 0.635 m | 2,936 | 3 | Body, Handles |
-| `model.wardrobeSingle` | 0.90 × 2.28 × 0.62 m | 2,220 | 2 | Body, Handles (a box on top) |
+| `model.wardrobeSingle` | 0.60 × 2.28 × 0.62 m | 1,788 | 2 | Body, Handles (a box on top) |
 | `model.armoire` | 1.86 × 2.11 × 0.63 m | 5,676 | 3 | Body, Handles |
 
 `check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.

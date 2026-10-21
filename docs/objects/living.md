@@ -22,7 +22,7 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 | `sofaThree` Three-seat sofa | 3x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions, Legs, Pillows, Throw | Use | `sink_in`. Three residents at once (`slots: 3`, was 2). |
 | `sofaDesign` Designer sofa | 2x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions, Frame, Legs | Use | `sink_in`. |
 | `sofaThreeSeat` Three-seater sofa | 3x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions, Legs, Pillow, Second pillow | Use | `sink_in`. |
-| `sofaBed` Sofa bed | 2x1 · floor | relax:relax doze:nap pullOut:fetch foldAway:fetch | living / seating | Upholstery, Cushions, Legs, Bedding, Pillow, Second pillow | Held open | `bed_out`: the mattress pulls out forward from under the seat for doze and "Pull out the bed" and stays out until "Fold the bed away" (relax only while folded); `beds` height 0.44 and `fwd` 0.6 (head on the seat; `cargo check-glb` measures the mattress pulled out at 0.44); pulling it out and folding it away the resident stands 1 m further back, clear of the mattress (`STAND_BACK`). |
+| `sofaBed` Sofa bed | 2x1 · floor | relax:relax doze:nap sleep:sleep pullOut:fetch foldAway:fetch | living / seating | Upholstery, Cushions, Legs, Bedding, Pillow, Second pillow | Held open | `bed_out`: the mattress pulls out forward from under the seat for doze, "Sleep the night" and "Pull out the bed" and stays out until "Fold the bed away" (relax only while folded; the last one up folds it after a night or a doze); "Sleep the night" is a spare bed's (content `spare`): a night for whoever has no other bed free, and the living room stays a living room (G-61); `beds` height 0.44 and `fwd` 0.6 (head on the seat; `cargo check-glb` measures the mattress pulled out at 0.44); pulling it out and folding it away the resident stands 1 m further back, clear of the mattress (`STAND_BACK`). |
 | `wallBed` Fold-down wall bed | 2x3 · floor | sleep:sleep nap:nap foldDown:fetch foldUp:fetch | living / seating | Cabinet, Bed frame, Mattress, Pillows, Throw, Inside & shelves, Handle | Held open | `bed_down`: the bed turns down 90° on a hinge at the cabinet's foot to fill the footprint in front, for sleep, nap and "Fold down", and stays down while open; "Fold up" closes it. In `BLANKET_BEDS`; `BEDS` height 0.46. |
 | `sectionalMiddle` Sectional: middle seat | 1x1 · floor | relax:relax doze:nap | living / sectionals | Upholstery, Cushions, Legs | Use | `sink_in`. |
 | `sectionalArmLeft` Sectional: left arm | 1x1 · floor | relax:relax doze:nap | living / sectionals | Upholstery, Cushions, Legs | Use | `sink_in`. |
@@ -55,10 +55,10 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 | `armchairLeather` Leather armchair | 1x1 · floor | sit:sit read:read | living / seating | Frame, Upholstery | Use | `sink_in`. |
 | `armchairDesign` Executive lounge chair | 1x1 · floor | relax:relax doze:nap | living / seating | Frame, Upholstery, Base | Static | Static (moulded shell). Renamed from "Designer lounge chair", its text now the model's (chrome five-star base, no bent wood). |
 | `armchairWingback` Wingback armchair | 1x1 · floor | sit:sit read:read | living / seating | Upholstery, Cushion, Legs | Use | `sink_in`. |
-| `recliner` Recliner | 1x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions & footrest | Use | `recline`: the seat and back tip 25° and the footrest swings up 80° for relax and doze; the resident reclines with it (`ride`), the legs out on the footrest (content `seat.legs: "out"`). |
+| `recliner` Recliner | 1x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions & footrest | Use | `recline`: the seat and back tip 25° and glide 8 cm forward (a wall-hugger's) and the footrest swings up 80° for relax and doze; the resident reclines with it (`ride`), the head on the head cushion, the legs out on the footrest (content `seat.legs: "out"`). 0.92 × 0.99 × 0.80 m, a high back with a head cushion (it was 0.84 × 0.70, the back below the shoulders, M-living-04). |
 | `rockingChair` Rocking chair | 1x1 · floor | relax:relax read:read | living / seating | Wood, Cushion | Loop (E1) | `rock`: rocks ±6° while sat in (E1), the rider with it. |
-| `pouf` Leather pouf | 1x1 · floor | sit:sit | living / seating | Leather, Buttons, Legs | Use | `sink_in`. |
-| `ottoman` Tufted ottoman | 1x1 · floor | sit:sit | living / seating | Upholstery, Buttons, Feet | Use | `sink_in`. |
+| `pouf` Leather pouf | 1x1 · floor | sit:sit | living / seating | Leather, Buttons, Legs | Use | `sink_in`. A footstool: the feet go up on it from a seat in front (`footstools`). |
+| `ottoman` Tufted ottoman | 1x1 · floor | sit:sit | living / seating | Upholstery, Buttons, Feet | Use | `sink_in`. A footstool: the feet go up on it from a seat in front (`footstools`). |
 | `floorCushion` Floor cushion | 1x1 · floor | sit:sit | living / seating | Cushion, Piping, Button | Use | `sink_in`. |
 | `beanBag` Bean bag | 1x1 · floor | flop:relax | living / seating | Bag, Seat | Use | `squash`: the bag flattens 15% for flop. |
 
@@ -66,6 +66,11 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 - Each standing free, sat on in all four facings, by day and at night, on WebGPU and WebGL2, Medium and Low, every
   colour part its own colour. `sink_in` plays and holds while sat on (sit, and read on the leather and wingback
   chairs) and shuts when the resident gets up.
+- Feet up (G-69, 2026-10-21): a resident sitting in an armchair or on a sofa (or any seat but those below) with a
+  pouf or an ottoman in front of them, within reach and nobody on it, puts their feet up on it: the legs out,
+  the heels on its top, turned to it if it's a little to one side (characters.ts `footstoolFor`, `feetUp`;
+  `docs/characters-format.md`). An armchair with one in front of it is sat in from beside it. The recliner
+  doesn't pair: its own footrest comes up (`legs: out`), nor do the chaise, the tubs and the bikes.
 - The recliner's back and seat tip back with the sitter riding them and the footrest swings up for relax and doze,
   the sitter's legs out along it (2026-10-21);
   the rocking chair rocks with its rider for relax and read and stops after; the bean bag flattens for flop (a

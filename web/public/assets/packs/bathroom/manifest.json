@@ -497,6 +497,9 @@
         "glass": {
           "finish": "material.finish.glass"
         },
+        "grip": {
+          "finish": "material.finish.glass"
+        },
         "grout": {
           "finish": "material.finish.satin"
         },
@@ -512,7 +515,17 @@
       },
       "motions": {
         "uses": {
-          "shower": "water_on"
+          "shower": [
+            {
+              "clip": "door_open",
+              "hold": 1.5,
+              "out": 1.5
+            },
+            {
+              "clip": "water_on",
+              "delay": 2.0
+            }
+          ]
         }
       },
       "paint": [
@@ -542,7 +555,7 @@
           "finish": "material.finish.gloss"
         },
         "curtain": {
-          "finish": "material.finish.fabric"
+          "finish": "material.finish.satin"
         },
         "fittings": {
           "finish": "material.finish.chrome"
@@ -568,7 +581,16 @@
       },
       "motions": {
         "uses": {
-          "shower": "water_on"
+          "shower": [
+            {
+              "clip": "curtain_draw",
+              "delay": 1.0
+            },
+            {
+              "clip": "water_on",
+              "delay": 1.8
+            }
+          ]
         }
       },
       "paint": [
