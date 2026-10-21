@@ -351,19 +351,21 @@ def birdFeeder():
     return objs
 
 
-# --- the garden hammock (2x1): a canvas sling hung from a curved cedar stand, rocking for the resident ----------
-HOOK = (0.88, 1.02)    # the hooks' (x, height): the sling swings about the line between them
-LOW, END, XS = 0.475, 0.86, 0.72   # the sling's low point, its ends' height and its ends' x
+# --- the garden hammock (3x1): a canvas sling 2 m long hung from a curved cedar stand, rocking for the resident
+# (2026-10-21: 2x1, its sling 1.44 m, grown-ups lying in it with the knees up: M-packs-06, Q-07) ------------------
+HOOK = (1.38, 1.1)     # the hooks' (x, height): the sling swings about the line between them
+LOW, END, XS = 0.49, 0.9, 1.0      # the sling's low point, its ends' height and its ends' x
+PILLOW = 0.76          # the pillow's x (towards the left end): `furniture.json` `head`
 
 
 def gardenHammock():
     F = G.GameFrame()
     with G.new_parts() as still:
-        F.box('beam', 1.7, 0.08, 0.1, (0, 0.05, 0.0), M.cedar_wood, bevel=0.02)
+        F.box('beam', 2.7, 0.08, 0.1, (0, 0.05, 0.0), M.cedar_wood, bevel=0.02)
         for s in (-1, 1):
-            F.box(_name('foot'), 0.1, 0.05, 0.62, (s * 0.66, 0.035, 0.0), M.cedar_wood_dark, bevel=0.015)
+            F.box(_name('foot'), 0.1, 0.05, 0.62, (s * 1.16, 0.035, 0.0), M.cedar_wood_dark, bevel=0.015)
             # the curved arm, in three pieces from the beam's end up to its hook
-            pts = [(s * 0.6, 0.07), (s * 0.74, 0.4), (s * 0.85, 0.75), (s * 0.9, 1.08)]
+            pts = [(s * 1.1, 0.07), (s * 1.24, 0.4), (s * 1.35, 0.78), (s * 1.4, 1.16)]
             for a, b in zip(pts, pts[1:]):
                 G.rod(_name('arm'), F.at(a[0], a[1], 0), F.at(b[0], b[1], 0), 0.04, material=M.cedar_wood, verts=8)
                 F.sphere(_name('arm_joint'), 0.04, (b[0], b[1], 0), M.cedar_wood, segments=8, rings=6)
@@ -372,7 +374,7 @@ def gardenHammock():
     G.join(still, 'body', origin=(0, 0, 0))
     # The sling: striped canvas sagging between two spreader bars, roped to the hooks, a pillow at one end.
     with G.new_parts() as sling:
-        segs, width = 12, 0.62
+        segs, width = 16, 0.62
         stripes = ('canvas', 'stripe', 'canvas', 'canvas', 'stripe', 'canvas')
         for i in range(segs):
             u0, u1 = i / segs, (i + 1) / segs
@@ -390,7 +392,11 @@ def gardenHammock():
             for z in (-0.3, 0.0, 0.3):
                 G.rod(_name('rope'), F.at(s * HOOK[0], HOOK[1], 0), F.at(s * XS, END + 0.01, z), 0.008, material=M.rope,
                       verts=5)
-        F.box('pillow', 0.36, 0.11, 0.3, (-0.54, 0.73, 0.0), M.pillow, rot=(0, 28, 0), bevel=0.045, bevel_segments=2)
+        u = -PILLOW / XS                                   # the sling's top and slope under the pillow
+        y = LOW + (END - LOW) * u * u + 0.0125
+        slope = math.degrees(math.atan(2 * (END - LOW) * PILLOW / XS ** 2))
+        F.box('pillow', 0.36, 0.11, 0.3, (-PILLOW, y + 0.045, 0.0), M.pillow, rot=(0, slope, 0), bevel=0.045,
+              bevel_segments=2)
     sling = G.hinged(G.join(sling, 'sling'), F.at(0, HOOK[1], 0))
     objs = G.settle(centre=False)
     G.rock(sling, 'sway', 8, seconds=2.4, axis='X')
@@ -635,7 +641,7 @@ FAMILY = G.Family(
      G.Model('birdFeeder', birdFeeder, size=(0.705, 1.783, 0.679), key='model.natureLover.birdFeeder',
              centre=(0.01, -0.05), motions={'uses': {'birdwatch': 'bird'}},
              paint=[('cedar', 'Wood'), ('roof', 'Roof')]),
-     G.Model('gardenHammock', gardenHammock, size=(1.88, 1.11, 0.68), key='model.natureLover.gardenHammock',
+     G.Model('gardenHammock', gardenHammock, size=(2.88, 1.19, 0.68), key='model.natureLover.gardenHammock',
              motions={'loops': {'swing': 'sway', 'doze': 'sway'}, 'ride': 'sway'},
              paint=[('cedar_wood', 'Wood'), ('canvas', 'Fabric'), ('stripe', 'Stripes')]),
      G.Model('cedarShower', cedarShower, size=(0.9, 2.082, 0.882), key='model.natureLover.cedarShower',

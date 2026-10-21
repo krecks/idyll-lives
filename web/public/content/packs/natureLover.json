@@ -145,7 +145,7 @@
       "name": "Garden hammock",
       "model": "model.natureLover.gardenHammock",
       "outdoors": true,
-      "footprint": [2, 1],
+      "footprint": [3, 1],
       "price": 650,
       "category": "outdoor",
       "slots": 1,
