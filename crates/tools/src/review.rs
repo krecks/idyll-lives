@@ -10,10 +10,12 @@
 //!
 //! The content is read as the game reads it (sim-core merges base.json and its includes, so `default_anim` and
 //! the defaults apply), and raw for what sim-core keeps no copy of (`model`, `category`, `group`, a use's `when`,
-//! `leaves` and its tags in order). Sizes and heights are `cargo check-glb`'s (`checkglb::measures`); the
-//! manifests give each model's `motions`; the renderer's `ACTIONS` (characters.ts) and action sounds
-//! (audio/world.ts) are read from its source. A category is the docs/objects page the object is on: its buy
-//! category, or `packs` for a personality pack's objects.
+//! `leaves` and its tags in order). Sizes and heights are `cargo check-glb`'s (`checkglb::measures`), with what
+//! the review measures besides: a top its kind has and its content hasn't, a table's H without its seats and a
+//! stair's top step (`h_of`; docs/review/reference.md, "How to use this"). The manifests give each model's
+//! `motions`; the renderer's `ACTIONS` (characters.ts) and action sounds (audio/world.ts) are read from its
+//! source. A category is the docs/objects page the object is on: its buy category, or `packs` for a personality
+//! pack's objects.
 
 use crate::checkglb::{self, Height, Measure, Paths};
 use regex::Regex;
@@ -101,12 +103,11 @@ pub fn within(v: f64, [lo, hi]: [f64; 2], tolerance: f64) -> bool {
     v >= lo * (1.0 - tolerance) - SLACK && v <= hi * (1.0 + tolerance) + SLACK
 }
 
-/// What `within` found wrong, as a table cell: `H 1.21 > 1.10 (0.78–1.00 ±10 %)`; a strict range's value to the
-/// millimetre (`top 0.766 > 0.76`).
+/// What `within` found wrong, as a table cell, to the millimetre (to the centimetre, 1.2104 over 1.21 read "1.21 >
+/// 1.21"): `H 1.215 > 1.100 (0.78–1.00 ±10 %)`, `top 0.766 > 0.760 (0.71–0.76)`.
 fn outside(name: &str, v: f64, [lo, hi]: [f64; 2], tolerance: f64) -> String {
     let (l, h) = (lo * (1.0 - tolerance), hi * (1.0 + tolerance));
-    let digits = if tolerance > 0.0 { 2 } else { 3 };
-    let side = if v < l { format!("{v:.digits$} < {l:.2}") } else { format!("{v:.digits$} > {h:.2}") };
+    let side = if v < l { format!("{v:.3} < {l:.3}") } else { format!("{v:.3} > {h:.3}") };
     let allowance = if tolerance > 0.0 { format!(" ±{:.0} %", tolerance * 100.0) } else { String::new() };
     format!("{name} {side} ({lo:.2}–{hi:.2}{allowance})")
 }
@@ -406,10 +407,17 @@ pub struct SizeRow {
     pub kind: Option<String>,
     /// W x H x D (m, game axes: across its front, up, front to back).
     pub size: Option<[f64; 3]>,
-    /// The seat, top and mattress the game uses and what its model has there (m).
+    /// The seat, top and mattress the game uses and what its model has there (m; the mattress at slot 0).
     pub seat: Option<(f64, Option<f64>)>,
     pub surface: Option<(f64, Option<f64>)>,
     pub mattress: Option<(f64, Option<f64>)>,
+    /// Its model's top where the content has no `surface` and its kind has one (`checkglb::Measure::top`): within
+    /// `TOP_NEAR` of the kind's range, else None (and the nearest is in `outside`).
+    pub top: Option<f64>,
+    /// The H compared where it isn't the whole model's, and what it is (`h_of`).
+    pub h: Option<(&'static str, f64)>,
+    /// A stair's steps: how many, and the rise of each (m).
+    pub steps: Option<(usize, f64)>,
     /// What is outside its kind's ranges.
     pub outside: Vec<String>,
     /// Why it couldn't be checked (no kind, a kind `kinds` doesn't have, an unreadable model).
@@ -431,16 +439,35 @@ fn height_of(heights: &[Height], whats: &[&str]) -> Option<(f64, Option<f64>)> {
     heights.iter().find(|h| whats.contains(&h.what)).map(|h| (h.expected, h.mesh))
 }
 
+/// How far from its kind's top range (a share of each end, as `within`'s tolerance) a top found where the content
+/// has none may be and still count as its top: a face looking up any farther is something else (a shelf, a seat).
+pub const TOP_NEAR: f64 = 0.20;
+
+/// The H to compare where the model's whole height isn't the kind's (`kind`): a stair's top step (the storey it
+/// climbs, which its kind gives, not the handrail over it); for a kind with a top and no seat (a table or a desk
+/// alone: a set's kind, with a seat, has the set's ranges), one sat at whose model carries its seats, the table
+/// alone (`checkglb::Measure::table`: not its chairs' backs).
+fn h_of(m: &Measure, kind: &Kind) -> Option<(&'static str, f64)> {
+    match (m.steps, m.table) {
+        (Some((top, _)), _) => Some(("top step", top)),
+        (None, Some(table)) if kind.surface.is_some() && kind.seat.is_none() => Some(("table", table)),
+        _ => None,
+    }
+}
+
 /// `object` (its id, model, category and group) measured (`measure`), against its kind in `reference`. The
-/// functional heights are the model's where it has one there (else the game's), strictly in range.
+/// functional heights are the model's where it has one there (else the game's), strictly in range; the top,
+/// where the content has none, the model's top near the kind's range (`TOP_NEAR`).
 pub fn size_row(object: &Object, measure: Option<&Result<Measure, String>>, reference: &Reference) -> SizeRow {
     let mut row = SizeRow { id: object.id.clone(), name: object.name.clone(), page: object.page.clone(), ..SizeRow::default() };
+    let measured = measure.and_then(|m| m.as_ref().ok());
     match measure {
         Some(Ok(m)) => {
             row.size = Some(m.size);
             row.seat = height_of(&m.heights, &["seat"]);
             row.surface = height_of(&m.heights, &["surface"]);
             row.mattress = height_of(&m.heights, &["mattress", "lower bunk"]);
+            row.steps = m.steps.map(|(top, n)| (n, top / n as f64));
         }
         Some(Err(e)) => row.problem = Some(format!("unmeasured: {e}")),
         None => row.problem = Some("unmeasured: no model".into()),
@@ -454,24 +481,33 @@ pub fn size_row(object: &Object, measure: Option<&Result<Measure, String>>, refe
         row.problem = Some(format!("kind `{kind}` isn't in `kinds`"));
         return row;
     };
+    row.h = measured.and_then(|m| h_of(m, k));
     if let Some(size) = row.size {
-        for (name, v, range) in [("W", size[0], k.w), ("H", size[1], k.h), ("D", size[2], k.d)] {
+        let (h_name, h) = match row.h {
+            Some((by, h)) => (format!("H ({by})"), h),
+            None => ("H".into(), size[1]),
+        };
+        for (name, v, range) in [("W", size[0], k.w), (h_name.as_str(), h, k.h), ("D", size[2], k.d)] {
             if let Some(range) = range.filter(|r| !within(v, *r, reference.tolerance)) {
                 row.outside.push(outside(name, v, range, reference.tolerance));
             }
         }
     }
     if row.problem.is_none() {
-        for (name, found, range) in [("seat", row.seat, k.seat), ("top", row.surface, k.surface), ("mattress", row.mattress, k.mattress)] {
+        // A top the content hasn't: the model's, if near enough the range to be one.
+        let found_top = measured.and_then(|m| m.top).filter(|_| row.surface.is_none()).map(|(_, h)| h);
+        let near = |h: f64, range: [f64; 2]| within(h, range, TOP_NEAR);
+        row.top = found_top.zip(k.surface).filter(|(h, r)| near(*h, *r)).map(|(h, _)| h);
+        let top = row.surface.map(|(game, mesh)| mesh.unwrap_or(game)).or(row.top);
+        for (name, found, range) in [("seat", row.seat.map(|(game, mesh)| mesh.unwrap_or(game)), k.seat), ("top", top, k.surface), ("mattress", row.mattress.map(|(game, mesh)| mesh.unwrap_or(game)), k.mattress)] {
             let Some(range) = range else { continue };
             match found {
-                None => row.outside.push(format!("no {name} to measure ({:.2}–{:.2})", range[0], range[1])),
-                Some((game, mesh)) => {
-                    let v = mesh.unwrap_or(game);
-                    if !within(v, range, 0.0) {
-                        row.outside.push(outside(name, v, range, 0.0));
-                    }
+                None => {
+                    let nearest = if name == "top" { found_top.map(|h| format!("; the nearest face looking up {h:.3}")).unwrap_or_default() } else { String::new() };
+                    row.outside.push(format!("no {name} to measure ({:.2}–{:.2}{nearest})", range[0], range[1]));
                 }
+                Some(v) if !within(v, range, 0.0) => row.outside.push(outside(name, v, range, 0.0)),
+                Some(_) => {}
             }
         }
     }
@@ -481,7 +517,7 @@ pub fn size_row(object: &Object, measure: Option<&Result<Measure, String>>, refe
 /// A size row for a model key the reference lists in `ids` that no object draws (its size only).
 fn model_row(key: &str, size: &Result<[f64; 3], String>, reference: &Reference) -> SizeRow {
     let object = Object { id: key.into(), name: String::new(), page: "models".into(), model: key.into(), ..Object::default() };
-    let measure = size.clone().map(|size| Measure { model: key.into(), size, heights: Vec::new() });
+    let measure = size.clone().map(|size| Measure { model: key.into(), size, ..Measure::default() });
     size_row(&object, Some(&measure), reference)
 }
 
@@ -494,10 +530,25 @@ fn cell_height(h: Option<(f64, Option<f64>)>) -> String {
     }
 }
 
+/// W × H × D, with the H compared where it isn't the whole model's: `1.62 × 0.80 (table; 1.03 in all) × 0.87`,
+/// `0.86 × 2.80 (top step; 14 steps of 0.200; 3.68 in all) × 4.00`.
+fn size_cell(r: &SizeRow) -> String {
+    let Some(s) = r.size else { return "—".into() };
+    let h = match (r.h, r.steps) {
+        (Some((by, h)), Some((n, rise))) => format!("{h:.2} ({by}; {n} steps of {rise:.3}; {:.2} in all)", s[1]),
+        (Some((by, h)), None) => format!("{h:.2} ({by}; {:.2} in all)", s[1]),
+        (None, _) => format!("{:.2}", s[1]),
+    };
+    format!("{:.2} × {h} × {:.2}", s[0], s[2])
+}
+
 fn size_cells(r: &SizeRow) -> String {
     let name = if r.name.is_empty() { String::new() } else { format!(" {}", r.name) };
-    let size = r.size.map(|s| format!("{:.2} × {:.2} × {:.2}", s[0], s[1], s[2])).unwrap_or_else(|| "—".into());
-    format!("| `{}`{name} | {} | {size} | {} | {} | {} |", r.id, r.kind.as_deref().unwrap_or("—"), cell_height(r.seat), cell_height(r.surface), cell_height(r.mattress))
+    let top = match (r.surface, r.top) {
+        (None, Some(top)) => format!("{top:.2} (no content `surface`)"),
+        (surface, _) => cell_height(surface),
+    };
+    format!("| `{}`{name} | {} | {} | {} | {top} | {} |", r.id, r.kind.as_deref().unwrap_or("—"), size_cell(r), cell_height(r.seat), cell_height(r.mattress))
 }
 
 const SIZE_HEAD: &str = "| Object | Kind | W × H × D (m) | Seat | Top | Mattress |";
@@ -511,6 +562,13 @@ fn page_order(pages: impl IntoIterator<Item = String>) -> Vec<String> {
     all
 }
 
+/// {object id: its kind's top range}, for each object whose kind has one: what `checkglb::measures` looks for where
+/// the content has no `surface`.
+pub fn tops(objects: &[Object], reference: &Reference) -> BTreeMap<String, [f64; 2]> {
+    let top = |o: &Object| reference.kind_of(&o.id, &o.model, &o.category, &o.group).and_then(|k| reference.kind(k)).and_then(|k| k.surface);
+    objects.iter().filter_map(|o| Some((o.id.clone(), top(o)?))).collect()
+}
+
 /// `cargo review sizes`: (stdout, the files for `--md`, exit code: 1 if an object maps to no kind).
 pub fn sizes(objects: &[Object], measures: &checkglb::Measures, reference: &Reference) -> (String, BTreeMap<String, String>, i32) {
     let mut rows: Vec<SizeRow> = objects.iter().map(|o| size_row(o, measures.objects.get(&o.id), reference)).collect();
@@ -519,7 +577,7 @@ pub fn sizes(objects: &[Object], measures: &checkglb::Measures, reference: &Refe
         rows.push(model_row(key, &measures.models[key], reference));
     }
     let mut out = format!(
-        "# Sizes against {REFERENCE}\n\nOverall W × H × D within ±{:.0} % of the kind's range; seat, top and mattress heights (the model's, where it has one) strictly within it.\n",
+        "# Sizes against {REFERENCE}\n\nOverall W × H × D within ±{:.0} % of the kind's range (H: a stair's top step; a table's or a desk's without the seats its model carries); seat, top and mattress (slot 0's) heights (the model's, where it has one; a top the content hasn't, the model's near the range) strictly within it.\n",
         reference.tolerance * 100.0
     );
     let mut files = BTreeMap::new();
@@ -702,7 +760,7 @@ pub fn main(args: &[String]) -> i32 {
                     eprintln!("no {REFERENCE} yet: `cargo review sizes` compares with it (plan/authenticity-review.md §3.4)");
                     return Ok(2);
                 };
-                sizes(&objects, &checkglb::measures(&s.paths)?, &reference)
+                sizes(&objects, &checkglb::measures(&s.paths, &tops(&objects, &reference))?, &reference)
             }
             Some("uses") => {
                 let actions = action_keys(&s.read("web/src/render/babylon/characters.ts")?).map_err(|e| format!("characters.ts: {e}"))?;

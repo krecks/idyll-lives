@@ -1392,11 +1392,19 @@ impl Sampler {
     /// lies on a top, a vase or a pillow, and what is under it aren't its top). If none looks up (inside out),
     /// any face. None: nothing there.
     fn top(&self, x: f64, z: f64, near: f64) -> Option<f64> {
-        let mut found = self.line(x, z, true);
-        if found.is_empty() {
-            found = self.line(x, z, false);
-        }
-        found.into_iter().min_by(|a, b| (a - near).abs().total_cmp(&(b - near).abs()))
+        self.top_in(x, z, [near, near])
+    }
+
+    /// `top`, nearest the range `[lo, hi]` (of those in it, nearest its middle).
+    fn top_in(&self, x: f64, z: f64, [lo, hi]: [f64; 2]) -> Option<f64> {
+        let off = |h: f64| ((lo - h).max(h - hi).max(0.0), (h - (lo + hi) / 2.0).abs());
+        self.tops_at(x, z).into_iter().min_by(|a, b| off(*a).partial_cmp(&off(*b)).unwrap_or(std::cmp::Ordering::Equal))
+    }
+
+    /// The heights `top` chooses from at (x, depth): the faces looking up, or every face if none does.
+    fn tops_at(&self, x: f64, z: f64) -> Vec<f64> {
+        let found = self.line(x, z, true);
+        if found.is_empty() { self.line(x, z, false) } else { found }
     }
 
     /// The lowest and the highest face (m) on the vertical line at (x, depth); None: nothing there.
@@ -1404,6 +1412,66 @@ impl Sampler {
         let found = self.line(x, z, false);
         let lo = found.iter().copied().reduce(f64::min)?;
         Some((lo, found.into_iter().fold(lo, f64::max)))
+    }
+
+    /// A face's corners (m, game axes).
+    fn corners(&self, t: &Tri) -> [[f64; 3]; 3] {
+        let game = |v: [f64; 3]| [-v[0] * self.scale, v[1] * self.scale, v[2] * self.scale];
+        let at = |e: &[f64; 3]| game([t.a[0] + e[0], t.a[1] + e[1], t.a[2] + e[2]]);
+        [game(t.a), at(&t.e1), at(&t.e2)]
+    }
+
+    /// The box of its faces (m, game axes): (lowest corner, highest); None: no face.
+    fn extent(&self) -> Option<([f64; 3], [f64; 3])> {
+        let mut corners = self.tris.iter().flat_map(|t| self.corners(t));
+        let first = corners.next()?;
+        Some(corners.fold((first, first), |(lo, hi), c| ([0, 1, 2].map(|k| lo[k].min(c[k])), [0, 1, 2].map(|k| hi[k].max(c[k])))))
+    }
+
+    /// How high it reaches (m) without what stands beside its top `top` higher than it (a dining set's chairs'
+    /// backs): the highest of its faces that are no more than `OVER_TOP` over the top, or whose middle, seen from
+    /// above, is over the top (the box of the flat faces looking up within 1 cm of it: a vase, a screen on it).
+    /// None: no face looks up there.
+    fn height_by(&self, top: f64) -> Option<f64> {
+        const OVER_TOP: f64 = 0.02;
+        let flat_at = |t: &Tri, c: &[[f64; 3]; 3]| t.nrm[1] > 0.9 * hypot(&t.nrm) && c.iter().all(|v| (v[1] - top).abs() <= 0.01);
+        let mut area: Option<([f64; 2], [f64; 2])> = None;
+        for t in &self.tris {
+            let c = self.corners(t);
+            if flat_at(t, &c) {
+                for v in c {
+                    let (lo, hi) = area.get_or_insert(([v[0], v[2]], [v[0], v[2]]));
+                    *lo = [lo[0].min(v[0]), lo[1].min(v[2])];
+                    *hi = [hi[0].max(v[0]), hi[1].max(v[2])];
+                }
+            }
+        }
+        let (lo, hi) = area?;
+        let over = |c: &[[f64; 3]; 3]| {
+            let (x, z) = ((c[0][0] + c[1][0] + c[2][0]) / 3.0, (c[0][2] + c[1][2] + c[2][2]) / 3.0);
+            lo[0] <= x && x <= hi[0] && lo[1] <= z && z <= hi[1]
+        };
+        self.tris
+            .iter()
+            .map(|t| self.corners(t))
+            .filter(|c| c.iter().all(|v| v[1] <= top + OVER_TOP) || over(c))
+            .flat_map(|c| c.map(|v| v[1]))
+            .reduce(f64::max)
+    }
+
+    /// A stair's steps: on the line up its middle (across), front to back every centimetre, the highest face
+    /// looking up (a tread, not the handrails at its sides); the heights of those 2 cm or more up, a centimetre
+    /// apart or more, are its steps. (The top step's height, how many); None: none.
+    fn steps(&self) -> Option<(f64, usize)> {
+        let (lo, hi) = self.extent()?;
+        let x = (lo[0] + hi[0]) / 2.0;
+        let mut found: Vec<f64> = (0..=((hi[2] - lo[2]) * 100.0) as usize)
+            .filter_map(|k| self.line(x, lo[2] + k as f64 / 100.0, true).into_iter().reduce(f64::max))
+            .filter(|h| *h >= 0.02)
+            .collect();
+        found.sort_by(f64::total_cmp);
+        found.dedup_by(|a, b| *a - *b < 0.01);
+        Some((*found.last()?, found.len()))
     }
 }
 
@@ -1486,25 +1554,76 @@ impl Height {
     }
 }
 
+/// Where residents sit on a content object (`seat_of`): the seat's height (m), what says so, what a second source
+/// says when it says otherwise, and the hips' points (m, game axes).
+struct Seat {
+    h: f64,
+    source: &'static str,
+    disagrees: Option<String>,
+    points: Vec<[f64; 2]>,
+}
+
+/// Each slot's x (m right of the footprint's middle) of content object `object` (sim-core `slot_position`).
+fn slot_xs(object: &J) -> Vec<f64> {
+    let n = object.get("slots").and_then(J::num).map_or(1, |n| n.f().max(1.0) as usize);
+    let width = object.get("footprint").and_then(|f| f.at(0)).and_then(J::num).map_or(1.0, Num::f);
+    (0..n).map(|k| (k as f64 - (n as f64 - 1.0) / 2.0) * width / n as f64).collect()
+}
+
+/// The seat of content object `object` (furniture.json `seats`, else the content's `seat`, else `defaultSeat` for
+/// one sat on), the hips' point `fwd` forward of the middle at each slot (along the object for a bath, `along`).
+/// None: no one sits on it.
+fn seat_of(object: &J, furniture: &Furniture) -> Option<Seat> {
+    let id = object.get("id").map(J::key).unwrap_or_default();
+    let own = object.opt("seat");
+    let table = furniture.seats.get(&id);
+    let sits = || object.get("interactions").and_then(J::list).unwrap_or(&[]).iter().any(|i| i.get("pose").is_some_and(|p| p.key() == "sit"));
+    if own.is_none() && table.is_none() && !sits() {
+        return None;
+    }
+    let (seat, source) = match (table, own) {
+        (Some(t), _) => ((number(Some(t), "h", 0.45), number(Some(t), "fwd", 0.0)), "furniture.json `seats`"),
+        (None, Some(o)) => ((number(Some(o), "height", 0.45), number(Some(o), "forward", 0.0)), "content `seat`"),
+        (None, None) => ((number(Some(&furniture.default_seat), "h", 0.45), number(Some(&furniture.default_seat), "fwd", 0.0)), "furniture.json `defaultSeat`"),
+    };
+    let disagrees = match (table, own) {
+        (Some(_), Some(o)) => {
+            let theirs = (number(Some(o), "height", 0.0), number(Some(o), "forward", 0.0));
+            ((theirs.0 - seat.0).abs() > SAME || (theirs.1 - seat.1).abs() > SAME).then(|| {
+                format!(
+                    "content `seat` says {} m, {} forward; furniture.json `seats` says {} m, {} forward (furniture.json wins: characters.ts `seatOf`)",
+                    fixed(theirs.0, 2),
+                    fixed(theirs.1, 2),
+                    fixed(seat.0, 2),
+                    fixed(seat.1, 3)
+                )
+            })
+        }
+        _ => None,
+    };
+    let along = table.and_then(|t| t.get("along")).and_then(J::num).map(Num::f);
+    let points = match along {
+        Some(a) => vec![[a * seat.1, 0.0]],
+        None => slot_xs(object).into_iter().map(|x| [x, seat.1]).collect(),
+    };
+    Some(Seat { h: seat.0, source, disagrees, points })
+}
+
 /// The functional heights of content object `object` (`Facts::object`) drawn by the model `g` (its `entry`):
-/// - its seat (furniture.json `seats`, else the content's `seat`, else `defaultSeat` for one sat on), the hips'
-///   point `fwd` forward of the middle, at each slot (the worst reported; along the object for a bath, `along`);
+/// - its seat (`seat_of`), at each of its hips' points (the worst reported);
 /// - its top (content `surface`: at its `at`, else the middle);
 /// - its mattress (furniture.json `bunks`, `beds`, else `defaultBed` for one lain on; a hammock's sling at its
 ///   low point), `fwd` forward, at each slot (in the middle for one lain on across), held open if it opens;
+///   with `every_slot` false at slot 0 only (`cargo review sizes`: a crib's slot 1 is its changing table);
 /// - its lamp's light (content `light`, only with an `at`: the shade).
-fn heights(g: &Glb, entry: &J, object: &J, furniture: &Furniture) -> R<Vec<Height>> {
+fn heights(g: &Glb, entry: &J, object: &J, furniture: &Furniture, every_slot: bool) -> R<Vec<Height>> {
     let mut out = Vec::new();
     let id = object.get("id").map(J::key).unwrap_or_default();
     let poses: HashSet<String> = object.get("interactions").and_then(J::list).unwrap_or(&[]).iter().filter_map(|i| i.get("pose").map(J::key)).collect();
-    let slots = object.get("slots").and_then(J::num).map_or(1, |n| n.f().max(1.0) as usize);
-    let width = object.get("footprint").and_then(|f| f.at(0)).and_then(J::num).map_or(1.0, Num::f);
-    // Each slot's x (sim-core `slot_position`).
-    let slot_xs = |n: usize| -> Vec<f64> { (0..n).map(|k| (k as f64 - (n as f64 - 1.0) / 2.0) * width / n as f64).collect() };
-    let sat = object.opt("seat").is_some() || furniture.seats.get(&id).is_some() || poses.contains("sit");
+    let seat = seat_of(object, furniture);
     let lain = furniture.beds.get(&id).is_some() || furniture.bunks.get(&id).is_some() || poses.contains("lie");
     let lamp = object.opt("light").is_some_and(|l| l.opt("at").is_some());
-    if !(sat || lain || lamp || object.opt("surface").is_some()) {
+    if !(seat.is_some() || lain || lamp || object.opt("surface").is_some()) {
         return Ok(out);
     }
     // At rest (not `grown`: a tub's water grown to full would be its seat; so a yoga mat, rolled up at rest, has
@@ -1528,35 +1647,10 @@ fn heights(g: &Glb, entry: &J, object: &J, furniture: &Furniture) -> R<Vec<Heigh
     };
 
     // Seated.
-    let own = object.opt("seat");
-    let table = furniture.seats.get(&id);
-    if sat && let Some(s) = &rest {
-        let (seat, source) = match (table, own) {
-            (Some(t), _) => ((number(Some(t), "h", 0.45), number(Some(t), "fwd", 0.0)), "furniture.json `seats`"),
-            (None, Some(o)) => ((number(Some(o), "height", 0.45), number(Some(o), "forward", 0.0)), "content `seat`"),
-            (None, None) => ((number(Some(&furniture.default_seat), "h", 0.45), number(Some(&furniture.default_seat), "fwd", 0.0)), "furniture.json `defaultSeat`"),
-        };
-        let disagrees = match (table, own) {
-            (Some(_), Some(o)) => {
-                let theirs = (number(Some(o), "height", 0.0), number(Some(o), "forward", 0.0));
-                ((theirs.0 - seat.0).abs() > SAME || (theirs.1 - seat.1).abs() > SAME).then(|| {
-                    format!(
-                        "content `seat` says {} m, {} forward; furniture.json `seats` says {} m, {} forward (furniture.json wins: characters.ts `seatOf`)",
-                        fixed(theirs.0, 2),
-                        fixed(theirs.1, 2),
-                        fixed(seat.0, 2),
-                        fixed(seat.1, 3)
-                    )
-                })
-            }
-            _ => None,
-        };
-        let along = table.and_then(|t| t.get("along")).and_then(J::num).map(Num::f);
-        let points: Vec<[f64; 2]> = match along {
-            Some(a) => vec![[a * seat.1, 0.0]],
-            None => slot_xs(slots).into_iter().map(|x| [x, seat.1]).collect(),
-        };
-        height("seat", seat.0, source.into(), &points, s, None, disagrees);
+    if let Some(seat) = seat
+        && let Some(s) = &rest
+    {
+        height("seat", seat.h, seat.source.into(), &seat.points, s, None, seat.disagrees);
     }
 
     // On a top.
@@ -1599,7 +1693,9 @@ fn heights(g: &Glb, entry: &J, object: &J, furniture: &Furniture) -> R<Vec<Heigh
                     (None, _) => (number(Some(&furniture.default_bed), "h", 0.5), "furniture.json `defaultBed`"),
                 };
                 let across = bed.and_then(|b| b.get("across")).is_some_and(J::truthy);
-                let points: Vec<[f64; 2]> = if across { vec![[0.0, fwd]] } else { slot_xs(slots).into_iter().map(|x| [x, fwd]).collect() };
+                let xs = slot_xs(object);
+                let n = if every_slot { xs.len() } else { 1 };
+                let points: Vec<[f64; 2]> = if across { vec![[0.0, fwd]] } else { xs.into_iter().take(n).map(|x| [x, fwd]).collect() };
                 height("mattress", h, source.into(), &points, s, open, None);
             }
         }
@@ -1925,7 +2021,7 @@ fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>,
             // Its functional heights against the model (`heights`: warnings only).
             let mut found = content_warnings(fact, &lo, &(slo, shi), &sparts, scale, &g, &pose, entry)?;
             if let (Some(f), Some(furniture)) = (fact, furniture) {
-                found.extend(heights(&g, entry, &f.object, furniture)?.iter().flat_map(Height::warnings));
+                found.extend(heights(&g, entry, &f.object, furniture, true)?.iter().flat_map(Height::warnings));
             }
             for w in found {
                 let w = if many { format!("{w} (object {})", str_of(&fact.unwrap().id)) } else { w };
@@ -2131,11 +2227,75 @@ struct Model {
     entry: J,
 }
 
-/// A content object's model, its size (`Model`) and its functional heights (`heights`).
+/// A content object's model, its size (`Model`), its functional heights (`heights`, a mattress at slot 0 only)
+/// and what `cargo review sizes` measures besides.
+#[derive(Default)]
 pub struct Measure {
     pub model: String,
     pub size: [f64; 3],
     pub heights: Vec<Height>,
+    /// Its top where the content has no `surface` but its kind has one (`top_near`): where (m, game axes: right
+    /// of the footprint's middle, forward of it) and how high.
+    pub top: Option<([f64; 2], f64)>,
+    /// How high it reaches without its seats, for one sat at that has a top (`Sampler::height_by`).
+    pub table: Option<f64>,
+    /// A stair's (content `stairs`) top step's height and how many steps it has (`Sampler::steps`).
+    pub steps: Option<(f64, usize)>,
+}
+
+/// The top of an object with no content `surface` whose kind has one, `range` (m), measured as `heights`
+/// measures a seat: on vertical lines near the middle, the face looking up nearest the range. The lines are at
+/// the middle of its faces' box seen from above (a thing against a wall stands off its footprint's middle) and
+/// at the eight points a quarter of its width and depth from there: a worktop beside a basin or a hob in the
+/// middle, while a quarter in is still on a table's top, inside its rim or on its board. Lines within
+/// `SEAT_CLEAR` of a seat's hips (`seats`) are left out (a chair's seat or back is no top), unless none of the
+/// others finds a face (a stash box sat on: its top is its seat). Of the faces found, the highest that doesn't
+/// stand on another: one with a face 2 cm or more under it on its line that is what another line found is a
+/// thing on the top (a vase, a tool, a plate: the top goes on under it), while a basin's or a hob's floor is
+/// lower than the worktop round it, which has no top under it. (Where, how high); None: no face looks up there.
+fn top_near(s: &Sampler, range: [f64; 2], seats: &[[f64; 2]]) -> Option<([f64; 2], f64)> {
+    // (line, the face nearest the range there, every face there).
+    let on = |lines: Vec<[f64; 2]>| -> Vec<([f64; 2], f64, Vec<f64>)> { lines.iter().filter_map(|p| Some((*p, s.top_in(p[0], p[1], range)?, s.tops_at(p[0], p[1])))).collect() };
+    let mut found = on(top_lines(s, seats));
+    if found.is_empty() {
+        found = on(top_lines(s, &[]));
+    }
+    let stands = |(_, h, faces): &([f64; 2], f64, Vec<f64>)| faces.iter().any(|q| *q <= h - 0.02 && found.iter().any(|(_, other, _)| (other - q).abs() <= 0.01));
+    found.iter().filter(|f| !stands(f)).map(|(p, h, _)| (*p, *h)).max_by(|a, b| a.1.total_cmp(&b.1))
+}
+
+/// The vertical lines `top_near` looks along, those within `SEAT_CLEAR` of `seats` left out (m, game axes;
+/// across, then front to back).
+fn top_lines(s: &Sampler, seats: &[[f64; 2]]) -> Vec<[f64; 2]> {
+    const SEAT_CLEAR: f64 = 0.3;
+    let Some((lo, hi)) = s.extent() else { return Vec::new() };
+    let mid = [(lo[0] + hi[0]) / 2.0, (lo[2] + hi[2]) / 2.0];
+    let quarter = [(hi[0] - lo[0]) / 4.0, (hi[2] - lo[2]) / 4.0];
+    let grid = [-1.0, 0.0, 1.0].iter().flat_map(|i| [-1.0, 0.0, 1.0].map(|k| [mid[0] + i * quarter[0], mid[1] + k * quarter[1]]));
+    grid.filter(|p| seats.iter().all(|s| hypot(&[p[0] - s[0], p[1] - s[1]]) >= SEAT_CLEAR)).collect()
+}
+
+/// Measures content object `f` drawn by the model `m` (its `key`) for `cargo review sizes`; `top` is its kind's
+/// top range.
+fn measure(key: &str, m: &Model, f: &Facts, furniture: &Furniture, top: Option<[f64; 2]>) -> R<Measure> {
+    let mut out = Measure { model: key.into(), size: m.size, heights: heights(&m.file, &m.entry, &f.object, furniture, false)?, ..Measure::default() };
+    let seats = seat_of(&f.object, furniture).map(|s| s.points).unwrap_or_default();
+    let top = top.filter(|_| f.object.opt("surface").is_none());
+    if top.is_none() && seats.is_empty() && !f.stairs {
+        return Ok(out);
+    }
+    let Some(s) = Sampler::new(&m.file, &m.entry, None)? else { return Ok(out) };
+    out.top = top.and_then(|range| top_near(&s, range, &seats));
+    let on = out.heights.iter().find(|h| h.what == "surface").and_then(|h| h.mesh).or(out.top.map(|(_, h)| h));
+    if !seats.is_empty()
+        && let Some(on) = on
+    {
+        out.table = s.height_by(on);
+    }
+    if f.stairs {
+        out.steps = s.steps();
+    }
+    Ok(out)
 }
 
 /// Every model the manifests have a file for, measured ({key: its size, or why it can't be read}), and every
@@ -2154,8 +2314,9 @@ fn model(entry: &J, path: &str) -> R<Model> {
     Ok(Model { size: [0, 1, 2].map(|k| (hi[k].f() - lo[k].f()) * scale), file, entry: entry.clone() })
 }
 
-/// Measures every model and content object (`Measures`), for `cargo review sizes`.
-pub fn measures(paths: &Paths) -> Result<Measures, String> {
+/// Measures every model and content object (`Measures`), for `cargo review sizes`; `tops`: {object id: its
+/// kind's top range}, for those whose content has no `surface` (`top_near`).
+pub fn measures(paths: &Paths, tops: &BTreeMap<String, [f64; 2]>) -> Result<Measures, String> {
     let stack = manifests(paths, &join(&paths.assets, "manifest.json"))?;
     let defs = content(paths)?;
     let facts = content_objects(&defs)?;
@@ -2178,7 +2339,7 @@ pub fn measures(paths: &Paths) -> Result<Measures, String> {
             let measured = match read.get(k) {
                 None => Err(format!("no manifest has a model entry {k}")),
                 Some(Err(e)) => Err(e.clone()),
-                Some(Ok(m)) => heights(&m.file, &m.entry, &f.object, &furniture).map(|heights| Measure { model: k.clone(), size: m.size, heights }),
+                Some(Ok(m)) => measure(k, m, f, &furniture, tops.get(&str_of(&f.id)).copied()),
             };
             objects.insert(str_of(&f.id), measured);
         }
@@ -2317,7 +2478,7 @@ mod tests {
         };
         let object = json::loads_text(br#"{"id": "sofaBed", "footprint": [1, 1], "seat": {"height": 0.41, "forward": 0.08}, "interactions": [{"pose": "lie"}]}"#).unwrap();
         let entry = json::loads_text(br#"{"motions": {"open": "bed_out"}}"#).unwrap();
-        let found = heights(&g, &entry, &object, &furniture).unwrap();
+        let found = heights(&g, &entry, &object, &furniture, true).unwrap();
         let warnings: Vec<String> = found.iter().flat_map(Height::warnings).collect();
         assert_eq!(warnings, [
             "seat 0.44 m (furniture.json `seats`), the model 0.410 m there (x 0.00, depth 0.00): 3.0 cm lower",
@@ -2327,9 +2488,97 @@ mod tests {
         assert_eq!((mattress.open.as_deref(), mattress.at), (Some("bed_out"), [0.0, 0.6]));
         assert!(mattress.fits());
         // Not held open (no `motions.open`): nothing under the sleepers in front.
-        let shut = heights(&g, &J::Obj(Vec::new()), &object, &furniture).unwrap();
+        let shut = heights(&g, &J::Obj(Vec::new()), &object, &furniture, true).unwrap();
         let shut: Vec<String> = shut.iter().filter(|h| h.what == "mattress").flat_map(Height::warnings).collect();
         assert_eq!(shut, ["mattress 0.40 m (furniture.json `beds`): no model under it (x 0.00, depth 0.60)"]);
+    }
+
+    /// A model of flat quads facing up, a node each: `[height, x from, x to, depth from, depth to]` (glTF axes: game
+    /// x is the file's -x).
+    fn quads(quads: &[[f32; 5]]) -> Glb {
+        let mut bin = Vec::new();
+        for [y, x0, x1, z0, z1] in quads {
+            for v in [[*x0, *y, *z0], [*x0, *y, *z1], [*x1, *y, *z1], [*x1, *y, *z0]] {
+                bin.extend(v.iter().flat_map(|c: &f32| c.to_le_bytes()));
+            }
+        }
+        let at = bin.len();
+        bin.extend([0u16, 1, 2, 0, 2, 3].iter().flat_map(|i| i.to_le_bytes()));
+        let n = quads.len();
+        let nodes: Vec<String> = (0..n).map(|k| format!(r#"{{"name": "q{k}", "mesh": {k}}}"#)).collect();
+        let meshes: Vec<String> = (0..n).map(|k| format!(r#"{{"primitives": [{{"attributes": {{"POSITION": {k}}}, "indices": {n}}}]}}"#)).collect();
+        let mut views: Vec<String> = (0..n).map(|k| format!(r#"{{"byteOffset": {}, "byteLength": 48}}"#, k * 48)).collect();
+        views.push(format!(r#"{{"byteOffset": {at}, "byteLength": 12}}"#));
+        let mut accessors: Vec<String> = quads
+            .iter()
+            .enumerate()
+            .map(|(k, [y, x0, x1, z0, z1])| format!(r#"{{"bufferView": {k}, "componentType": 5126, "type": "VEC3", "count": 4, "min": [{x0}, {y}, {z0}], "max": [{x1}, {y}, {z1}]}}"#))
+            .collect();
+        accessors.push(format!(r#"{{"bufferView": {n}, "componentType": 5123, "type": "SCALAR", "count": 6}}"#));
+        let json = format!(
+            r#"{{"asset": {{"version": "2.0"}}, "scenes": [{{"nodes": [{}]}}], "nodes": [{}], "meshes": [{}], "bufferViews": [{}], "accessors": [{}]}}"#,
+            (0..n).map(|k| k.to_string()).collect::<Vec<_>>().join(", "),
+            nodes.join(", "),
+            meshes.join(", "),
+            views.join(", "),
+            accessors.join(", ")
+        );
+        parse_glb(&glb::tests::glb(&json, &bin)).unwrap()
+    }
+
+    #[test]
+    fn a_top_the_content_hasnt_a_table_without_its_chairs_and_a_stairs_steps() {
+        // A table: its top 0.74 m up (1.2 × 0.8), a shelf under it, a vase on it; a chair behind it, its seat 0.46
+        // m up and its back's top rail 1.0 m.
+        let table = quads(&[[0.74, -0.6, 0.6, -0.4, 0.4], [0.3, -0.6, 0.6, -0.4, 0.4], [0.95, -0.05, 0.05, -0.05, 0.05], [0.46, -0.25, 0.25, -0.7, -0.3], [1.0, -0.25, 0.25, -0.72, -0.68]]);
+        let s = Sampler::new(&table, &J::Obj(Vec::new()), None).unwrap().unwrap();
+        // The vase on the middle line and the shelf under every one don't move it.
+        let (at, top) = top_near(&s, [0.72, 0.76], &[]).unwrap();
+        assert!((top - 0.74).abs() < 1e-6, "{at:?} {top}");
+        // Out of the range, it is still the top (the review calls it a top if near enough): the vase, in the
+        // range, stands on what the other lines found.
+        assert!((top_near(&s, [0.85, 0.95], &[]).unwrap().1 - 0.74).abs() < 1e-6);
+        // A sink: its worktop 0.9 m up at the back, the basin's floor 0.75 m in front (on six lines of nine).
+        let sink = quads(&[[0.9, -0.5, 0.5, -0.5, -0.2], [0.75, -0.5, 0.5, -0.2, 0.5]]);
+        let (at, top) = top_near(&Sampler::new(&sink, &J::Obj(Vec::new()), None).unwrap().unwrap(), [0.76, 0.91], &[]).unwrap();
+        assert!((top - 0.9).abs() < 1e-6 && at[1] < -0.2, "{at:?} {top}");
+        // The lines: its middle (0, -0.16) and a quarter of its 1.2 × 1.12 m round it; those within 0.3 m of a
+        // seat's hips are left out (over the chair's seat, and the middle), unless the others find nothing.
+        let cm = |lines: Vec<[f64; 2]>| -> Vec<[i64; 2]> { lines.iter().map(|p| p.map(|v| (v * 100.0).round() as i64)).collect() };
+        let all = top_lines(&s, &[]);
+        assert_eq!(cm(all), [[-30, -44], [-30, -16], [-30, 12], [0, -44], [0, -16], [0, 12], [30, -44], [30, -16], [30, 12]]);
+        assert_eq!(cm(top_lines(&s, &[[0.0, -0.4]])), [[-30, -44], [-30, -16], [-30, 12], [0, 12], [30, -44], [30, -16], [30, 12]]);
+        let seated = [[0.3, -0.1], [-0.05, -0.44], [-0.3, -0.16], [0.0, 0.0]];
+        assert_eq!(cm(top_lines(&s, &seated)), [[30, -44]], "the one line left, off the table");
+        assert!((top_near(&s, [0.72, 0.76], &seated).unwrap().1 - 0.74).abs() < 1e-6, "so all the lines");
+        // Without the chair's back: the vase, over the top, counts.
+        assert!((s.height_by(0.74).unwrap() - 0.95).abs() < 1e-6);
+        assert_eq!(s.height_by(0.5), None, "nothing flat there");
+
+        // A stair of three treads, a rail at its side.
+        let stair = quads(&[[0.2, -0.4, 0.4, 0.2, 0.6], [0.4, -0.4, 0.4, -0.2, 0.2], [0.6, -0.4, 0.4, -0.6, -0.2], [1.5, 0.45, 0.5, -0.6, 0.6]]);
+        let s = Sampler::new(&stair, &J::Obj(Vec::new()), None).unwrap().unwrap();
+        let (top, n) = s.steps().unwrap();
+        assert_eq!(((top * 100.0).round(), n), (60.0, 3));
+    }
+
+    #[test]
+    fn the_review_takes_a_cribs_mattress_at_slot_0() {
+        // A crib's mattress 0.5 m up at slot 0 (game x -1 to 0: the file's 0 to 1), its changing pad 0.8 m at slot 1.
+        let g = quads(&[[0.5, 0.0, 1.0, -0.5, 0.5], [0.8, -1.0, 0.0, -0.5, 0.5]]);
+        let furniture = Furniture {
+            seats: J::Obj(Vec::new()),
+            default_seat: json::loads_text(br#"{"h": 0.45, "fwd": 0}"#).unwrap(),
+            beds: json::loads_text(br#"{"crib": {"h": 0.5}}"#).unwrap(),
+            default_bed: json::loads_text(br#"{"h": 0.5}"#).unwrap(),
+            bunks: J::Obj(Vec::new()),
+        };
+        let object = json::loads_text(br#"{"id": "crib", "footprint": [2, 1], "slots": 2, "interactions": [{"pose": "lie"}]}"#).unwrap();
+        let mattress = |every: bool| heights(&g, &J::Obj(Vec::new()), &object, &furniture, every).unwrap().into_iter().find(|h| h.what == "mattress").map(|h| (h.at, h.mesh)).unwrap();
+        assert_eq!(mattress(false), ([-0.5, 0.0], Some(0.5)));
+        let (at, mesh) = mattress(true);
+        assert_eq!(at, [0.5, 0.0], "the gate takes the worst slot");
+        assert!((mesh.unwrap() - 0.8).abs() < 1e-6);
     }
 
     #[test]

@@ -25,7 +25,7 @@ fn height(what: &'static str, expected: f64, mesh: Option<f64>) -> Height {
 }
 
 fn measured(size: [f64; 3], heights: Vec<Height>) -> Result<Measure, String> {
-    Ok(Measure { model: String::new(), size, heights })
+    Ok(Measure { model: String::new(), size, heights, ..Measure::default() })
 }
 
 #[test]
@@ -43,11 +43,14 @@ fn a_range_takes_the_tolerance_at_each_end_and_functional_heights_none() {
     // H 1.05 is within 1.00 + 10 %; D 0.40 is under 0.45 - 10 %; the seat, strict, is 1 cm over.
     let row = review::size_row(&chair, Some(&measured([0.5, 1.05, 0.4], vec![height("seat", 0.49, Some(0.49))])), &r);
     assert_eq!(row.kind.as_deref(), Some("dining-chair"));
-    assert_eq!(row.outside, ["D 0.40 < 0.41 (0.45–0.60 ±10 %)", "seat 0.490 > 0.48 (0.42–0.48)"]);
-    assert!(row.status().starts_with("out: D 0.40"));
+    assert_eq!(row.outside, ["D 0.400 < 0.405 (0.45–0.60 ±10 %)", "seat 0.490 > 0.480 (0.42–0.48)"]);
+    assert!(row.status().starts_with("out: D 0.400"));
+    // To the millimetre: 1.2104 is in 1.00 + 10 % (half a millimetre of slack), 1.211 isn't, and says so.
+    assert_eq!(review::size_row(&chair, Some(&measured([0.5, 1.1004, 0.5], vec![height("seat", 0.46, None)])), &r).status(), "ok");
+    assert_eq!(review::size_row(&chair, Some(&measured([0.5, 1.1011, 0.5], vec![height("seat", 0.46, None)])), &r).outside, ["H 1.101 > 1.100 (0.78–1.00 ±10 %)"]);
     // The model's height where it has one; the game's where it hasn't (nothing under the seat).
     let row = review::size_row(&chair, Some(&measured([0.5, 0.9, 0.5], vec![height("seat", 0.46, Some(0.40))])), &r);
-    assert_eq!(row.outside, ["seat 0.400 < 0.42 (0.42–0.48)"]);
+    assert_eq!(row.outside, ["seat 0.400 < 0.420 (0.42–0.48)"]);
     let row = review::size_row(&chair, Some(&measured([0.5, 0.9, 0.5], vec![height("seat", 0.46, None)])), &r);
     assert_eq!(row.status(), "ok");
     // A kind's height the object has none of.
@@ -60,7 +63,57 @@ fn a_range_takes_the_tolerance_at_each_end_and_functional_heights_none() {
     let mut ids = r;
     ids.ids.insert("sofaBed".into(), "sofa-bed".into());
     let row = review::size_row(&bed, Some(&measured([2.0, 0.9, 0.9], vec![height("seat", 0.44, Some(0.44)), height("lower bunk", 0.44, Some(0.39))])), &ids);
-    assert_eq!(row.outside, ["mattress 0.390 < 0.40 (0.40–0.50)"]);
+    assert_eq!(row.outside, ["mattress 0.390 < 0.400 (0.40–0.50)"]);
+}
+
+#[test]
+fn a_top_the_content_hasnt_a_table_without_its_seats_and_a_stairs_top_step() {
+    let r = reference();
+    let table = object("table", "kitchen", "dining");
+    let with = |size: [f64; 3], heights: Vec<Height>, f: &dyn Fn(&mut Measure)| -> Result<Measure, String> {
+        let mut m = measured(size, heights).unwrap();
+        f(&mut m);
+        Ok(m)
+    };
+    // Its kind has a top, its content none: the model's, near the range (0.72–0.76 less or more 20 %).
+    let row = review::size_row(&table, Some(&with([1.2, 0.75, 0.8], vec![], &|m| m.top = Some(([0.0, 0.0], 0.74)))), &r);
+    assert_eq!((row.top, row.status().as_str()), (Some(0.74), "ok"));
+    let (_, files, _) = review::sizes(std::slice::from_ref(&table), &Measures { models: BTreeMap::new(), objects: BTreeMap::from([("table".to_string(), with([1.2, 0.75, 0.8], vec![], &|m| m.top = Some(([0.0, 0.0], 0.74))))]) }, &r);
+    assert!(files["sizes-kitchen.md"].contains("| `table` table | dining-table | 1.20 × 0.75 × 0.80 | — | 0.74 (no content `surface`) | — | ok |"), "{}", files["sizes-kitchen.md"]);
+    let row = review::size_row(&table, Some(&with([1.2, 0.75, 0.8], vec![], &|m| m.top = Some(([0.0, 0.0], 0.70)))), &r);
+    assert_eq!(row.outside, ["top 0.700 < 0.720 (0.72–0.76)"]);
+    // Farther than that it's something else (a shelf, a seat): no top, and the nearest face says what there is.
+    let row = review::size_row(&table, Some(&with([1.2, 0.75, 0.8], vec![], &|m| m.top = Some(([0.0, 0.0], 0.45)))), &r);
+    assert_eq!((row.top, row.outside.as_slice()), (None, ["no top to measure (0.72–0.76; the nearest face looking up 0.450)".to_string()].as_slice()));
+    // The content's top wins over the model's found one.
+    let row = review::size_row(&table, Some(&with([1.2, 0.75, 0.8], vec![height("surface", 0.75, Some(0.75))], &|m| m.top = Some(([0.0, 0.0], 0.70)))), &r);
+    assert_eq!((row.top, row.status().as_str()), (None, "ok"));
+
+    // A table's kind (a top, no seat) whose model carries its chairs: H is the table's.
+    let row = review::size_row(&table, Some(&with([1.6, 1.03, 0.9], vec![height("seat", 0.46, Some(0.46)), height("surface", 0.75, Some(0.75))], &|m| m.table = Some(0.76))), &r);
+    assert_eq!((row.h, row.status().as_str()), (Some(("table", 0.76)), "ok"));
+    let row = review::size_row(&table, Some(&with([1.6, 1.03, 0.9], vec![height("surface", 0.75, Some(0.75))], &|m| m.table = Some(1.0))), &r);
+    assert_eq!(row.outside, ["H (table) 1.000 > 0.858 (0.72–0.78 ±10 %)"]);
+    // A set's kind (with a seat) has the whole set's ranges: its H stays the model's.
+    let mut set = object("diningOak", "kitchen", "dining");
+    set.model = "model.diningOak".into();
+    let row = review::size_row(&set, Some(&with([1.6, 1.12, 0.9], vec![height("seat", 0.46, Some(0.46)), height("surface", 0.75, Some(0.75))], &|m| m.table = Some(0.76))), &r);
+    assert_eq!((row.h, row.outside.as_slice()), (None, ["H 1.120 > 1.100 (0.78–1.00 ±10 %)".to_string()].as_slice()));
+    // A desk's kind gives no top: its H is still the model's.
+    let row = review::size_row(&object("desk", "office", "desks"), Some(&with([1.4, 1.2, 0.8], vec![], &|m| m.table = Some(0.75))), &r);
+    assert_eq!(row.h, None);
+
+    // A stair's H is its top step (the storey it climbs), not its rails over it.
+    let stairs = object("stairs", "living", "");
+    let m = with([0.86, 3.68, 4.0], vec![], &|m| m.steps = Some((2.8, 14)));
+    let row = review::size_row(&stairs, Some(&m), &r);
+    assert_eq!((row.h, row.steps.map(|(n, rise)| (n, (rise * 1000.0).round())), row.status().as_str()), (Some(("top step", 2.8)), Some((14, 200.0)), "ok"));
+    let (_, files, _) = review::sizes(&[stairs], &Measures { models: BTreeMap::new(), objects: BTreeMap::from([("stairs".to_string(), m)]) }, &r);
+    assert!(files["sizes-living.md"].contains("| 0.86 × 2.80 (top step; 14 steps of 0.200; 3.68 in all) × 4.00 |"), "{}", files["sizes-living.md"]);
+
+    // What `measures` is asked to look for: each object's kind's top range.
+    let tops = review::tops(&[table, set, object("chair", "kitchen", "chairs")], &r);
+    assert_eq!(tops, BTreeMap::from([("diningOak".to_string(), [0.72, 0.76]), ("table".to_string(), [0.72, 0.76])]));
 }
 
 #[test]
@@ -91,7 +144,7 @@ fn the_kind_is_by_id_then_model_then_category_and_group_then_group() {
     assert!(text.contains("- `ghost` (kids, group ``, model.ghost): kind `no-such-kind` isn't in `kinds`"), "{text}");
     assert!(text.contains("## kitchen: 0 of 1 outside"), "{text}");
     // A model key in `ids` that no object draws is measured too.
-    assert!(text.contains("## models: 1 of 1 outside") && text.contains("H 0.90 > 0.77 (0.30–0.70 ±10 %)"), "{text}");
+    assert!(text.contains("## models: 1 of 1 outside") && text.contains("H 0.900 > 0.770 (0.30–0.70 ±10 %)"), "{text}");
     assert_eq!(files.keys().collect::<Vec<_>>(), ["sizes-kids.md", "sizes-kitchen.md", "sizes-models.md"]);
     assert!(files["sizes-kitchen.md"].contains("| `stool` stool | bar-stool | 0.40 × 0.75 × 0.40 | 0.72 | — | — | ok |"), "{}", files["sizes-kitchen.md"]);
     assert!(files["sizes-kids.md"].contains("| no kind |"));
