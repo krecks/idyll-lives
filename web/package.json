@@ -18,6 +18,7 @@
     "llm": "node ../tools/llm/fetch.mjs",
     "check:llm": "node ../tools/llm/check.mjs",
     "devices:llm": "node ../tools/llm/devices.mjs",
+    "check:clips": "node --experimental-strip-types ../tools/characters/check_clips.ts --body all --stage all",
     "assets": "node ../tools/assets/optimize.mjs",
     "decoders": "node ../tools/assets/decoders.mjs"
   },
