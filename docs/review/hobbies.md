@@ -289,7 +289,7 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Fix class:** code
 - **Where:** `tools/art/blender/families/hobbies.py:781-783` (the cue, part of the still body), `:776-779` (the racked balls, still); the `held` grips (`web/src/render/babylon/characters.ts:371`: `bar`, `pair`, `guitar`, `pole`) have nothing for a cue
 - **Evidence:** `hobbies/extra/two.png` (top view): the cue lies across the cloth and the fifteen balls stay racked under the floating triangle through "Shoot pool" (30) and "Practise trick shots" (60). The model has the cue, and the game already draws an object's own part in the hands (`held`: the bar, the dumbbells, the guitars, the mop), but a cue held along the forearms is a new grip, and the balls breaking and spreading a new clip. Related to I-held-01 (held ledger: props the models don't have).
-- **Status:** open
+- **Status:** later (G-70, props in hand: new behaviour, owner decision 3)
 - **Source:** wave: hobbies
 
 ### I-hobbies-06 — Darts are thrown from 1.4 m, not from the oche at 2.37

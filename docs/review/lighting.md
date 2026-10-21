@@ -160,7 +160,7 @@ Not tied to one row: M-lighting-01, M-lighting-02 (every lamp).
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/lighting.py:423` (`ARC`: from the base at `(-0.3, -0.3)` to the shade at `(0.22, 0.18)`), `:427`; `web/public/content/catalog2/lighting.json:120` (footprint 1 × 1, `light.at` `[0.245, 0.2]`)
 - **Evidence:** `lighting/sheets/obj-lampFloorArc.png`: the shade hangs about 0.7 m from the base, over the same tile. An arc lamp exists to reach 1.2–2 m over a sofa or a table from behind it (the reference's use, "light a sofa or a table from above", W up to 1.8 m); this one has to stand beside the sofa, where a plain floor lamp would. A 2-tile reach (footprint 1 × 1 with the shade over the next tile, as things hung over others are) needs the sim to allow it.
-- **Status:** fixed in the sim (2b7cf0d8); the model's half later (recorded in `tools/art/blender/families/lighting.md`)
+- **Status:** fixed in part (2b7cf0d8): the sim's half; the model's half later (recorded in `tools/art/blender/families/lighting.md`)
 - **After:** content `overhang` (`[right, front]` tiles from a 1×1 floor thing) lets a shade reach over the next tile: taken from walking and from anything tall, hanging low or at head height (furniture may stand under it, as under a lamp at head height), no wall across the arm, not off the lot or over the stairs (`layers::an_arc_lamp_reaches_over_the_sofa_in_front_of_it`). Not set on `lampFloorArc` until its model reaches over the next tile (then `overhang: [[0, 1]]`, `light.at` and build mode's and `housegen.ts`'s placing).
 - **Source:** wave: lighting
 

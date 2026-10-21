@@ -899,10 +899,9 @@ fn two_at_the_table_talk_over_the_meal_and_eat_up_after() {
     assert_eq!(w.content.socials[social].id, "chat", "nothing to get up from the meal for");
     for _ in 0..(5.0 / sim_core::MINUTES_PER_TICK) as u32 {
         w.tick_once();
-        for x in 0..2 {
-            assert_eq!(w.sims[x].pose, sim_core::content::Pose::Sit, "{} got up from the meal", w.sims[x].name);
-            let p = w.sims[x].pos;
-            assert!((p[0] - seats[x][0]).hypot(p[1] - seats[x][1]) < 0.05, "{} left the seat", w.sims[x].name);
+        for (sim, seat) in w.sims.iter().zip(&seats) {
+            assert_eq!(sim.pose, sim_core::content::Pose::Sit, "{} got up from the meal", sim.name);
+            assert!((sim.pos[0] - seat[0]).hypot(sim.pos[1] - seat[1]) < 0.05, "{} left the seat", sim.name);
         }
     }
     // The talk over, they eat up.

@@ -869,6 +869,6 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/packs/cheerful.json` (`cheerful.sunriseLamp`, interaction `stretch`)
 - **Evidence:** `shipped_content::every_personality_lives_well_with_all_packs` failed after the packs merge ("few Sims asleep at night"): at 3:00 on two of four nights a resident was out of bed doing *Sunrise stretches* at the lamp (`Using`, 3–19 minutes in), a use with no time of day.
-- **Status:** fixed (coordinator, merge of the packs wave)
+- **Status:** fixed (3cb6c1af, the coordinator's merge of the packs wave)
 - **After:** the use has `hours: [5, 11]` (G-64's condition): free will and orders take it only from 5:00 to 11:00; the test passes again, all sim-core tests green.
 - **Source:** fix: coordinator (packs merge)

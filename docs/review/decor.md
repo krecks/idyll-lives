@@ -148,7 +148,7 @@ Notes: the lead "curtains off-centre on the stage window" is closed. The stage's
 - **Fix class:** motion
 - **Where:** `tools/art/blender/families/decor.py:8-9` ("the grandfather clock's trunk door and pendulum are still, so the hands keep it within 4 draw calls") and `:374`
 - **Evidence:** `decor/clips/clips-grandfatherClock-all-t99.png`: the hands turn with the game's time, the pendulum (behind the glazed trunk door) never swings; a running longcase clock's pendulum swings all the time (about 1 s a beat). The model's own docstring says the door opens to wind it, but no clip does (`motions` has only `clock`). The draw-call budget is the reason given; a pendulum swing is one more rotating part.
-- **Status:** fixed (abfc32d9), the pendulum; the trunk door stays still
+- **Status:** fixed in part (abfc32d9): the pendulum; the trunk door stays still (a fifth draw would be over the budget)
 - **After:** the pendulum is its own part and swings ±4°, a beat each 0.8 s, all the time near the camera (`pendulum`, `idle`, `G.rock`), seen through the door's window (`fixes/motions/g1718/views/clock-t0.4.png`). The draw it takes comes from the case: polished satin walnut, not the textured wood (4 draws). The trunk door doesn't open: a fifth draw would be over the budget, and the clock is wound at its dial (the docstring no longer says the door opens to wind it).
 - **Source:** wave: decor
 

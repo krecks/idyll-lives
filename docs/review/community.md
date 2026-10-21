@@ -370,7 +370,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/public/content/community.json:280` (`fountainTown` `wish`: `anim: look`), `:37` (`parkBench` `feedBirds`: `anim: sit`); `web/src/render/babylon/characters.ts:523` (`ACTIONS.look`: `idle`, `foldArms`)
 - **Evidence:** `sheets/obj-fountainTown.png` (`play/shops-town/fountainTown-wish-01.png`): the wisher stands at the rim, arms folded, for 5 minutes; no throw. `sheets/obj-parkBench.png` (`play/shops-town/parkBench-feedBirds-01.png`): "Feed the pigeons" is the bench's sit, hands in the lap, no birds on the ground. A toss (an `interact` throw toward the basin) is a table change; the coin and the crumbs are I-held-01, the birds new behaviour.
-- **Status:** open
+- **Status:** later (G-70, props in hand: new behaviour, owner decision 3; the coin toss alone is a clip and table change that could go first)
 - **Source:** community wave (play)
 
 ### I-community-12 — The hay stack's promised seat and the coop's eggs: two farm things with a clear use and none

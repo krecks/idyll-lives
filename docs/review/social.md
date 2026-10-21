@@ -97,7 +97,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters.ts:530` (`ACTIONS.phone`), `web/src/render/babylon/characters/clips/idle.ts:132` (`phonePose`)
 - **Evidence:** The rubric records that no phone, book, cup or cutlery prop exists today. Props in hand are new behaviour: filed as `code` only, planned separately (§9, decision 3). Cross-cutting wave: every phone action, at every stage that may use one, holds an empty hand to the ear (`social/sheets/phone.png`, `social/scenes/phone-text-01.png`, `social/scenes/phone-call-01.png`); the same at the objects that use `phone` (the video-call nook, the shortwave radio, `systems/sheets/act-phone-meditate-idle.png`). The phone booth is the one place a receiver is there (its model).
-- **Status:** confirmed
+- **Status:** later (G-70, props in hand: new behaviour, owner decision 3); was confirmed
 - **Source:** `plan/authenticity-review.md` §3.3 (I7) and §9 (decision 3); wave: cross-cutting
 
 ### I-social-02 — Success and failure look the same: a refused hug or kiss is two people standing still, and a bad joke is laughed at
@@ -151,7 +151,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** decision
 - **Where:** `web/public/content/base.json:1678` (`tryForBaby`: `animation: kiss`, 30 minutes, no place)
 - **Evidence:** `social/pairs/tryForBaby-adult-ya-01.png`: Ada and Ben stand kissing in the front garden for half an hour, the children a few metres off. Trying for a baby needs a place and privacy (a bed, a closed door). For the owner: keep it a kiss (the game's tone), or make it a use of a double bed behind a door, which is new behaviour (`code`).
-- **Status:** open
+- **Status:** later (G-72; Q-21: kept as it is until the privacy flag, then moved to a bed)
 - **Source:** wave: cross-cutting
 
 ### I-social-06 — Nobody ever talks seated: a social stands both of them up

@@ -37,6 +37,8 @@ The 15 object ledgers follow `docs/objects/<cat>.md` group by group and hold all
 
 **Consolidated (2026-10-21)** into [docs/authenticity-review.md](../authenticity-review.md): 36 findings with a shared cause moved to [systems.md](systems.md) and [residents.md](residents.md), keeping their ids, with a pointer (`### <id> — moved to <ledger>.md`) left where they were; 15 duplicates closed into the older finding; every open finding put in one fix group (G-01 to G-72) or listed as not checked.
 
+**Phase 4 (2026-10-21 to 2026-10-22):** each finding's Status says what came of it (`fixed` with its commits, `fixed in part`, `later`, `won't fix`, `closed`, `not checked` or `open`), and an **After:** line names the evidence, under `bench-results/review/fixes/<agent>/`. The fix agents filed 41 more findings (Source `fix: <agent>`). What was fixed and what is left: [docs/authenticity-review.md](../authenticity-review.md) §8 and §9.
+
 ## Writing a finding
 
 From [§4 of the plan](../../plan/authenticity-review.md#4-findings-format-and-severity):
@@ -76,7 +78,7 @@ In a ledger's Findings section a finding is written as:
 - **Fix class:** motion
 - **Where:** `web/public/assets/packs/kitchen/manifest.json` (`freezer_open`)
 - **Evidence:** `review/kitchen/fridge-*.png`; what was seen, measured or compared
-- **Status:** one of `open`, `seeded (from <source>)`, `confirmed`, `confirmed and widened`, `confirmed fixed on <item>`, `not checked (<why>)`, `closed (<why>)`; in Phase 4 also `fixed (<commit>)`, `later`, `won't fix (<why>)`
+- **Status:** one of `open`, `seeded (from <source>)`, `confirmed`, `confirmed and widened`, `confirmed fixed on <item>`, `not checked (<why>)`, `closed (<why>)`; in Phase 4 also `fixed (<commit>)`, `fixed in part (<commit>): <what is left>`, `later (<why>)`, `won't fix (<why>)`
 - **Source:** who found it, in which pass
 ```
 

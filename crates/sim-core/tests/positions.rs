@@ -165,9 +165,9 @@ fn beds_are_got_into_from_the_side_and_left_that_way() {
         w.apply(Command::Use { sim, object: 0, interaction: 0 }).unwrap();
     }
     assert!(until(&mut w, 15, |w| {
-        for s in 0..2 {
-            if w.sims[s].pose == Pose::Stand {
-                from[s] = w.sims[s].tile();
+        for (tile, sim) in from.iter_mut().zip(&w.sims) {
+            if sim.pose == Pose::Stand {
+                *tile = sim.tile();
             }
         }
         (0..2).all(|s| w.sims[s].pose == Pose::Lie)
@@ -251,9 +251,9 @@ fn a_bike_is_got_onto_from_its_side_and_a_sofas_end_seat_from_in_front_of_it() {
         w.apply(Command::Use { sim, object: 0, interaction: 0 }).unwrap();
     }
     assert!(until(&mut w, 15, |w| {
-        for s in 0..3 {
-            if w.sims[s].pose == Pose::Stand {
-                from[s] = w.sims[s].tile();
+        for (tile, sim) in from.iter_mut().zip(&w.sims) {
+            if sim.pose == Pose::Stand {
+                *tile = sim.tile();
             }
         }
         (0..3).all(|s| w.sims[s].pose == Pose::Sit)

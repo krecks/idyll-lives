@@ -309,7 +309,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** clip
 - **Where:** `web/src/render/babylon/characters.ts:136` (`GAIT_MAX_RATE`), `web/src/render/babylon/characters/clips/locomotion.ts:208`
 - **Evidence:** After R1-05's jog switch (76ac264), foot slide at height 1.0 with no traits: adults at speed 3 50–53 %, speeds 4–5 83–95 %. Children walk at the adults' 1.5 m/s on short legs.
-- **Status:** fixed (3872d23a) at speeds 2 and 3; speeds 4 and 5 reduced, the rest won't fix (no gait steps at 45–90 m/s without strobing)
+- **Status:** fixed in part (3872d23a): speeds 2 and 3; speeds 4 and 5 reduced, the rest won't fix (no gait steps at 45–90 m/s without strobing)
 - **After:** a third gear, `runAlong` (5.8 m/s, a 3.5 m stride in 0.6 s, up to 4×, `RUN_MAX_RATE`), takes over when the jog would need more than 3×. Steady-state foot slide (`gait-table.txt`, the runtime's choice, height 1, no traits / the fastest ×1.38): speed 3 adults, teens and elders 50–59 % → 0 % (3–9 % for the fastest), children 71–72 % → 11–14 %; speed 2 children 4–8 % → 0; speeds 4–5 83–92 % → 56–78 %. In play (`gait-after.json`, round trips on the review stage) speed 1 has no slide; the stage is too small for a steady walk at speed 3 and up. `bench-results/review/fixes/clips-standing/``strips/sheets/runAlong*`.
 - **Source:** `docs/release-0.2.0-review.md` §2.1 and §3.1 (R1-05)
 
@@ -320,7 +320,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters.ts` (walker interpolation)
 - **Evidence:** R1-04's rest: a walker standing in one snapshot wasn't interpolated (jumps up to 4.6 m at speed 5). CHANGELOG 0.3.0 (Fixes) says "Walks no longer jump at the start and the end": confirm and close.
-- **Status:** seeded (from `docs/release-0.2.0-review.md` §4 R1-04 (rest)); not checked in the pilot
+- **Status:** not checked (needs a headed, timed run at speeds 4–5; CHANGELOG 0.3.0 says walks no longer jump); seeded from `docs/release-0.2.0-review.md` §4 R1-04 (rest)
 - **Source:** `docs/release-0.2.0-review.md` §4 (R1-04 rest); `plan/release-0.3.0.md` §3.2; `CHANGELOG.md` 0.3.0 Fixes
 
 ### A-residents-05 — After a hidden tab, someone who sat down meanwhile replays the sit-down
@@ -330,7 +330,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters.ts` (a rig drawn again)
 - **Evidence:** R1-12's fix covers residents coming back into view, not a hidden tab: they count as on screen while it is hidden. It ends on its own.
-- **Status:** seeded (from `docs/release-0.2.0-review.md` §4 R1-12 (hidden tab)); not checked in the pilot (headless pages are never hidden)
+- **Status:** not checked (a hidden tab: headless pages are never hidden); seeded from `docs/release-0.2.0-review.md` §4 R1-12 (hidden tab)
 - **Source:** `docs/release-0.2.0-review.md` §4 (R1-12 hidden tab, new), target 0.2.1
 
 ### A-residents-06 — Walkers jog on the spot for about 0.25 s after a hidden tab
@@ -340,7 +340,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters.ts` (walking speed estimate)
 - **Evidence:** Speed is estimated from the distance covered over the capped 0.1 s frame (8.7–22 m → 13.2 m/s), past the jog switch, then fades back over about 0.3 s. Seen in all four hidden-tab runs.
-- **Status:** seeded (from `docs/release-0.2.0-review.md` §4 "Jogging after a hidden tab"); not checked in the pilot
+- **Status:** not checked (a hidden tab: headless pages are never hidden); seeded from `docs/release-0.2.0-review.md` §4 "Jogging after a hidden tab"
 - **Source:** `docs/release-0.2.0-review.md` §4 (new, R1), target 0.2.1
 
 ### A-residents-07 — Body language doesn't follow feelings; only the face does
@@ -350,7 +350,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters.ts:684` (face moods)
 - **Evidence:** A known gap named in the rubric. Emotional body language is new behaviour: filed as `code`, planned separately (§9, decision 3).
-- **Status:** confirmed (pilot: `residents/face-female.png` has 18 distinct moods; no clip or layer changes with them)
+- **Status:** later (G-71, body language: new behaviour, owner decision 3); was confirmed (pilot: `residents/face-female.png` has 18 distinct moods; no clip or layer changes with them)
 - **Source:** `plan/authenticity-review.md` §3.2 (A6) and §9 (decision 3)
 
 ### A-residents-08 — No turn-on-the-spot clip
@@ -360,7 +360,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters/clips/locomotion.ts`, `web/src/render/babylon/characters.ts` (turning)
 - **Evidence:** Residents turn in place without stepping. A turn-on-the-spot clip is new behaviour: filed only, planned separately (§9, decision 3).
-- **Status:** confirmed (pilot: residents turn in place to face each object, no steps, in every `play/*-00.png`)
+- **Status:** later (G-71, turning on the spot: new behaviour, owner decision 3); was confirmed (pilot: residents turn in place to face each object, no steps, in every `play/*-00.png`)
 - **Source:** `plan/authenticity-review.md` §3.2 (A4) and §9 (decision 3)
 
 ### A-residents-09 — Seated feet don't reach the floor for children, teens and elder women

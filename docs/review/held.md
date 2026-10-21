@@ -112,7 +112,7 @@ Not tied to one row: I-held-01.
 - **Evidence:** A known gap named in the rubric: reading (`lantern`), sips (`drink`) and eating (`eat`) show no prop. The phone is I-social-01. Props in hand are new behaviour: filed as `code`, planned separately (§9, decision 3).
   Pilot, the base objects: the same gap for tools. Watering the plant (`water`) with no can, trimming the shrub (`prune`) with no shears, painting at the easel with no brush (the brush jar stays full), feeding the baby with no bottle, the book at the bookshelf, the coffee at the dining table (`play/plant-water-01.png`, `play/bush-trim-01.png`, `play/easel-paint-01.png`, `scenes/crib-adult-feed-02.png`, `play/bookshelf-read-01.png`, `scenes/dining-coffee-02.png`). The only props drawn today are the cooking tools on a station (`STATION_PROPS`, `characters.ts:546`) and the parts a resident lifts off an object (`held`: the barbell).
   Wave held, the items: the plate, the slice or the bowl is put down in front of the diner and eaten with bare hands. Fine for finger food (pizza slice, treats, snack, sandwich, toast, cheese board); a meal, a slice of pie, reheated leftovers, takeout, ice cream and noodles want cutlery or chopsticks, and the smoothie a glass (`held/inhand/bbq-06.png`, `held/inhand/meal-06.png`). The only cutlery in the game is drawn on the dirty plate, after the meal (`held/sheets/obj-item.plateDirty.png`).
-- **Status:** confirmed (pilot, for the base objects; wave held, for the eaten items)
+- **Status:** later (G-70, props in hand: new behaviour, owner decision 3); was confirmed (pilot, for the base objects; wave held, for the eaten items)
 - **Source:** `plan/authenticity-review.md` §3.3 (I7) and §9 (decision 3); pilot; wave: held
 
 ### M-held-01 — Five items borrow a model that shows something else
@@ -144,7 +144,7 @@ Not tied to one row: I-held-01.
 - **Fix class:** model
 - **Where:** `web/public/content/base.json` items `iceCreamCone`, `crisps`, `fruit`, `pastry` (`item.treatPlate`), `hotDog`, `shopSandwich` (`item.sandwich`); new models in `tools/art/blender/families/held.py`
 - **Evidence:** seen while fixing G-67 (no run of its own): the food fetched at the ice cream cart, the snack machine, the market stall, the bakery case, the hot dog stand and the grocery shelf is now carried to a bench or a café table and eaten there, so it is drawn: an ice cream, a packet of crisps, a piece of fruit and a pastry as the plate of cookies and a cupcake, a hot dog as a filled sandwich. A cone, a packet, an apple, a pastry in a paper bag and a hot dog in its bun would fix it, with M-held-01's small models.
-- **Status:** fixed (eab099da) for the hot dog and the cart's ice cream; models recorded for the rest
+- **Status:** fixed in part (eab099da): the hot dog and the cart's ice cream; the other models recorded in `tools/art/blender/families/held.md`, later
 - **After:** content only: `hotDog` is carried in the kraft takeaway box (`item.takeout`, radius 0.13) and `iceCreamCone` as the dessert bowl of scoops (`item.iceCream`, 0.08). Still to be made, recorded in `tools/art/blender/families/held.md`: a cone or paper cup, a hot dog in its bun, a packet of crisps, an apple and a pastry in a paper bag (`crisps`, `fruit`, `pastry` keep the treat plate meanwhile; `shopSandwich` the sandwich, which fits).
 - **Source:** fix: cooking
 
