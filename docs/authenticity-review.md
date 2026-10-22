@@ -21,19 +21,18 @@ A `decision` finding takes the severity of its worse outcome. Line numbers refer
 
 ### 1.1 After Phase 4 (2026-10-22)
 
-**Findings: 341.** The 300 of the review and 41 more the fix agents found while fixing and re-checking (6 S2, 35 S3; Source `fix: <agent>` in the ledgers). By status (from each ledger finding's Status line):
+**Findings: 342.** The 300 of the review and 42 more found while fixing and re-checking (7 S2, 35 S3; Source `fix: <agent>` in the ledgers). By status (from each ledger finding's Status line), after the follow-up that checked the 11 left "not checked" (§9.5, 2026-10-22):
 
 | Status | S1 | S2 | S3 | Total |
 |---|---|---|---|---|
-| fixed | 8 | 102 | 164 | 274 |
+| fixed | 8 | 103 | 170 | 281 |
 | fixed in part | | 1 | 8 | 9 |
 | fixed in 0.3.0 (confirmed by the review) | | 1 | 1 | 2 |
 | later | | 4 | 6 | 10 |
 | won't fix | | | 7 | 7 |
-| closed (duplicates, decor by decision 4, not a defect) | | 9 | 16 | 25 |
-| not checked | | | 11 | 11 |
+| closed (duplicates, decor by decision 4, not a defect, not reproduced, by design) | | 9 | 21 | 30 |
 | open | | | 3 | 3 |
-| **Total** | **8** | **117** | **216** | **341** |
+| **Total** | **8** | **118** | **216** | **342** |
 
 Every S1 is fixed. Of the S2s, everything is fixed but the four that wait for props in hand and body language (G-70, G-71, owner decision 3) and the vendors' half of I-community-09. What is left, and why, is in §9.
 
@@ -939,22 +938,22 @@ The tooling left to improve is in §7.
 | M-garden-08 | S3 | The cactus trio and the succulent bowl are floor pots by design (Q-08). |
 | M-town-07 | S3 | The kerb stays flat (Q-13). |
 
-### 9.5 Not checked
+### 9.5 Not checked, then checked (follow-up, 2026-10-22)
 
-None could be checked headless or in the review's states. §10 says how a person can.
+The 11 the review's headless harness couldn't reach were checked afterwards with the setup each needed (headed and timed runs, a tab really hidden over CDP, Build mode, a basement, packed gardens, repeated loads, the shaders in the page, reduce motion in the colour studio). Evidence: `bench-results/review/followup/<id>/`, logs `log-renderer.md` and `log-sim-agent.md` there.
 
-| Finding | Sev. | What it would take |
+| Finding | Result | What was found |
 |---|---|---|
-| A-residents-04 | S3 | A headed, timed run at speeds 4–5 (0.3.0 says walks no longer jump at the start and end). |
-| A-residents-05, A-residents-06 | S3 | A hidden tab, headed: switch away mid-walk and mid-sit, and back. |
-| A-social-02 | S3 | Not reproduced; watch children near a hug in a long play. |
-| A-systems-01 | S3 | Furniture resizing is off since 0.3.0; check when it comes back. |
-| A-town-01 | S3 | The household creator's preview with reduce motion on. |
-| I-garden-01 | S3 | A crowded garden in play (`tests/crowded_garden.rs` couldn't reproduce it). |
-| M-houses-01 | S3 | Build mode with a wall thing held over lowered walls. |
-| M-living-02 | S3 | The stairs from a basement view. |
-| M-town-03 | S3 | A far road's lane markings over several page loads, compared pixel by pixel. |
-| M-town-08 | S3 | Two materials alike but for planar UVs in one scene, and a look at the shader each draws with. |
+| A-residents-04 | closed (not reproduced) | Headed, every rig sampled each frame at speeds 4 and 5: no walk's first or last frame moves more than its usual step; only the 2–3 m snaps into a use, by design. |
+| A-residents-05, A-residents-06 | fixed (29b6e53f) | Behind another tab for 15 s, the sit-down was replayed and walkers came back running at 13 m/s. A frame gap over 0.5 s now redraws everyone as just come into view. |
+| A-social-02 | closed (not reproduced) | 381 hugs over three days with free will on: no child walked up to a hugging pair. A child listening in on a chat no longer waits beside the pair when its friend is hugged (3ecc7a7f). |
+| A-systems-01 | closed (not reproduced) | Resized fridge, toilet, filing cabinet, washer and wall bed: every part moves on its new hinge (since 94381476). Left: a stretched door, drawers' original travel. Resizing (`RESIZING`, `buildmode.ts`) can be switched back on as far as moving parts go; which objects look right resized is the owner's call. |
+| A-town-01 | fixed (4746eecf) | The colour studio and the catalog pictures ran the wind with reduce motion on; they follow it now, and the system setting takes effect at once. |
+| I-garden-01 | fixed (e780cf3a, bd2125aa) | In 15 of 67 packed gardens a told use was dropped: the resident tried one tile only. They now walk to the first use tile there is a way to (`crowded-garden` state). |
+| M-houses-01 | closed (by design) | `cutWallItems` shows every wall thing while one is held, "as what may be in its way". Showing only those on the wall under the held one would be a design change. |
+| M-living-02 | fixed (5b1e7152) | The ground dug away over a basement also hid models in the shared plain finish: the stairs lost their top 0.5 m. Only the landscape is dug now. |
+| M-town-03 | closed (not reproduced) | 15 loads on both backends and every preset: 0.000 % of pixels off by more than 2. |
+| M-town-08 | fixed (51f1f4f7) | The siding drew with the sidewalk's planar-UV shader (same defines); the vertex plugin now sets its own. |
 
 ## 10. Manual test checklist
 
