@@ -16,9 +16,61 @@ Bath Bits) until checked in play, then went back to `tabletop` and their old gro
   leaves `satin` green, so none needs a textured finish. Glass that is seen through is `glass` (a second draw call):
   the cookie jar, the wine glasses and the snow globe. Elsewhere glass is opaque `gloss` (the blender's jug shows the
   smoothie as its lower half).
-- **Triangles** under the 1,500 target (226–1,496). Spheres are 6–14 segments; small parts fewer.
+- **Triangles** at most half the size class's target, as they're placed many times on every lot: 750 under 0.35 m,
+  2,000 for the five larger (`espressoMachineSmall`, `plateSet`, `teapotSet`, `vaseFlowers`, `monitor`). The table
+  below has each.
 - **Player colour**: the main part's material, labelled `Body` (the cookie jar: its `Lid`); sets of like things (mugs,
   books, towels, blocks) list each one.
+
+## The models (detail pass, 2026-10-22)
+
+Rebuilt with the forms and the kit (README "The toolkit"): turned things are lofted rings (`turned`: a profile of
+(r, z) rows, few sides, rims kept sharp and few-sided bodies shaded round), handles, spouts and stems swept
+(`G.kit.fillet` round their bends), slabs extruded with their holes (`slab`), flat faces a single polygon (`disc`: a
+drink's surface), the plants' leaves and flowers plants.py's. Sixteen were over half the target before (up to
+1,496); every one is under it now, with more on it. Sizes, centres, parts, clips and draws as before.
+
+| Model | Size (w × h × d) | Triangles (before) | Draws | What it has |
+|---|---|---|---|---|
+| `kettle` | 0.23 × 0.24 × 0.17 m | 724 (696) | 1 (+lid) | jug body swelling to the shoulder on a power base, beak spout, D handle in one piece, red switch, water window; the lid and knob turned |
+| `toaster` | 0.28 × 0.23 × 0.15 m | 710 (584) | 1 | rounded body on a plinth, two slots with toast (crust round the crumb), lever in its guide, browning dial and pointer, cancel button, chrome trim |
+| `blender` | 0.18 × 0.36 × 0.15 m | 736 (648) | 1 | tapering base with a dial and two buttons, collar, soft-square jug (smoothie its lower half), handle in one piece, lid and filler cap |
+| `standMixer` | 0.30 × 0.36 × 0.17 m | 708 (1,180) | 1 | rounded base, column, lofted tilt head swelling to its nose with a chrome band and hub, speed lever, steel bowl with batter, beater (a cut-out paddle) |
+| `espressoMachineSmall` | 0.23 × 0.31 × 0.39 m | 1,874 (844) | 1 | body rounded over the top, head with buttons and light, group, portafilter with two spouts, slotted grate over the drip tray, gauge (bezel, face, needle), steam knob and bent wand, water tank, cup-warmer rail on posts, a cup with crema and handle, a cup upturned on top |
+| `knifeBlock` | 0.12 × 0.30 × 0.23 m | 584 (352) | 1 | leaning block with eased edges on its foot, six knives (a steel bolster under each riveted handle, sized to its blade) |
+| `utensilCrock` | 0.13 × 0.32 × 0.12 m | 708 (668) | 1 | glazed crock with a rolled lip and a blue band; wooden spoon (one swept piece), slotted spatula, balloon whisk (two wire loops), ladle with its bowl |
+| `cuttingBoard` | 0.34 × 0.10 × 0.23 m | 724 (792) | 1 | board with a hand hole, a lofted bloomer with three scores, two tomatoes with calyxes, two slices with their cut faces, a cook's knife (blade, bolster, handle) |
+| `breadBin` | 0.34 × 0.21 × 0.20 m | 536 (380) | 1 (+roll-top) | body between D-shaped wooden ends (eased), a toe rail; the roll-top's wooden bar pull (`kit.pull`) |
+| `spiceJars` | 0.30 × 0.11 × 0.12 m | 700 (792) | 1 | rack with shaped ends, back board and round front rail; five shouldered jars with paper labels and screw lids |
+| `cookieJar` | 0.16 × 0.25 × 0.16 m | 604 (696) | 2 | glass jar with shoulder and neck, four cookies, glazed lid with a turned knob |
+| `fruitBowl` | 0.28 × 0.19 × 0.28 m | 726 (1,088) | 1 | bowl on a foot ring; red and green apples (shaped, stalks), two oranges with navels, two bananas (five-sided, dark tips) |
+| `plateSet` | 0.38 × 0.10 × 0.32 m | 990 (988) | 1 | dinner and side plates (foot ring, well, rim) with blue bands, napkin, a four-tined fork, a knife with its blade shaped, tumbler |
+| `cakeStand` | 0.28 × 0.26 × 0.28 m | 724 (1,352) | 1 | footed stand with a knop, layer cake with filling, icing running down in drips, six piped rosettes, cherry and stalk |
+| `teapotSet` | 0.40 × 0.17 × 0.26 m | 1,856 (1,496) | 1 | tray with a gallery and hand holes in its ends, round teapot with a band, curving spout, loop handle, lid and knob; two cups of tea on saucers |
+| `mugs` | 0.22 × 0.09 × 0.21 m | 746 (1,092) | 1 | three mugs with thick rims and coffee, one-piece loop handles, a tea bag's string and tag |
+| `wineGlasses` | 0.21 × 0.30 × 0.19 m | 690 (960) | 2 | bottle with shoulders, label and foil capsule; two open glasses (foot, stem, bowl) with wine |
+| `candlesticks` | 0.17 × 0.33 × 0.07 m | 608 (840) | 2 | turned brass sticks (stepped foot, knop, drip pan), candles with rounded tops, curled wicks, a run of wax; teardrop flames |
+| `bookStack` | 0.25 × 0.13 × 0.20 m | 372 (344) | 1 | four hardbacks, boards proud of the page block, rounded spines with gilt bands, a ribbon marker |
+| `booksUpright` | 0.32 × 0.21 × 0.13 m | 692 (624) | 1 | arched brass bookends with a round cut-out on their feet; eight books, boards proud of the pages, rounded spines, paper bands |
+| `vaseFlowers` | 0.18 × 0.41 × 0.17 m | 1,444 (1,428) | 1 | vase with belly and flared lip; daisies (ray petals, raised eyes), small daisies, three tulips, a cosmos, on curving stems, leaves on stems and at the neck |
+| `vaseSmall` | 0.08 × 0.28 × 0.08 m | 532 (492) | 1 | bud vase with slim neck and lip; one rose (two cupped rings round a furled bud), sepals, a leaf on the stem |
+| `potSucculent` | 0.16 × 0.14 × 0.16 m | 732 (524) | 1 | pot with a rim on grit; an echeveria: three tiers of fat upturned leaves round a heart |
+| `potCactus` | 0.18 × 0.32 × 0.13 m | 686 (896) | 1 | terracotta pot with a rolled rim on sand; a ribbed column with two ribbed arms bent up (fillet), a pink flower with its eye |
+| `potSmall` | 0.16 × 0.26 × 0.16 m | 728 (1,008) | 1 | glossy pot with a rim, soil; a peace lily: arching pointed leaves on stalks, two white spathes with spadices on tall stems |
+| `photoFrame` | 0.18 × 0.23 × 0.11 m | 288 (260) | 1 | moulded frame (`kit.moulding`, mitred), back board, white mount, a photo of a hillside with sun and a figure, strut |
+| `tableClock` | 0.11 × 0.16 × 0.05 m | 722 (976) | 3 | drum case rolled at the back with a raised bezel, face with flat hour marks, domed bells, hammer, carrying loop, splayed legs on bun feet |
+| `globe` | 0.21 × 0.31 × 0.24 m | 728 (940) | 1 | the continents as the sphere's own faces in land colour, tilted in a brass meridian ring with pole pins, turned column and foot |
+| `snowGlobe` | 0.13 × 0.18 × 0.13 m | 800 (804) | 2 | turned base with a brass band and a collar round the dome's foot; inside a snowy mound, a three-tier fir, a cabin with a snowy roof, a snowman, flakes |
+| `trophy` | 0.15 × 0.23 × 0.13 m | 694 (780) | 1 | two-step plinth with plaque, turned stem with a knop, flaring cup with a rolled rim, scrolled handles |
+| `sculptureSmall` | 0.15 × 0.22 × 0.12 m | 400 (652) | 1 | a Möbius band on edge (a flat band turning half over), brass ball, plinth with a name plate |
+| `soapSet` | 0.26 × 0.17 × 0.12 m | 742 (668) | 1 | stone tray, pump dispenser (collar, pump, spout in one piece), tumbler with two toothbrushes (bristles), soap on drainer ridges |
+| `towelStack` | 0.27 × 0.15 × 0.20 m | 684 (456) | 1 | three folded towels, each two soft layers, a woven band across the front |
+| `perfumeTray` | 0.28 × 0.14 × 0.18 m | 684 (688) | 1 | mirrored tray in a mitred brass gallery; faceted bottle with a brass stopper, a round flacon on its edge with an atomizer tube and bulb, a tall bottle with a cap |
+| `deskOrganiser` | 0.27 × 0.16 × 0.20 m | 524 (344) | 1 | two-tier letter tray (scooped sides, back, posts), paper and a loose sheet in each; pen pot with two capped, clipped pens and a sharpened pencil |
+| `laptopClosed` | 0.32 × 0.02 × 0.22 m | 336 (324) | 1 (+lid) | base and lid with rounded corners and eased edges, hinge barrel, thumb notch, ports, logo |
+| `monitor` | 0.54 × 0.46 × 0.34 m | 1,486 (404) | 1 | rounded foot, curved neck, puffed back housing, slim bezel round the screen, logo and power light; keyboard of 57 separate keys; lofted mouse with a wheel |
+| `stuffedToy` | 0.19 × 0.28 × 0.19 m | 722 (1,300) | 1 | pear-shaped body and round head (lofted), tummy and muzzle, nose, eyes, cupped ears with pale insides, arms and legs swept, paws, foot pads, a bow and knot |
+| `toyBlocks` | 0.22 × 0.20 × 0.17 m | 692 (226) | 1 | five blocks with rounded edges, a raised letter (A, L, T, H, O: outlines with holes) on two faces each, a prism roof |
 
 ## Parts left decorative for 0.3.0
 
@@ -42,7 +94,7 @@ speed); its red hub stays on the face. Three draws: the body and the two hands.
 
 `candlesticks` was drawn with its flames lit all day and dark at night (review M-tabletop-01). Its two flames are now
 one part of their own (`flames`, one more draw: two), built lit and sunk 3.4 cm into the candles' tops at rest, hidden
-in the wax (1.1 cm across to their 1.5). `lit` slides them up over the wicks (`G.slide`, 0.6 s) and is the model's
+in the wax (1.3 cm across to their 2.2). `lit` slides them up over the wicks (`G.slide`, 0.6 s) and is the model's
 `night` clip, held open dusk to dawn: by day the wicks are dark, at night the flames stand on them. The flame's
 material glows (`#FFC46A`, as the lantern's): bright while the room's lights are on, out with them (a dark room's
 candles show their flames unlit). Its height is the candles' at rest: 0.33 m.
