@@ -78,14 +78,53 @@ const { BALL_PIT, PLAY_TENT } = await import('../../web/src/render/babylon/chara
 /** Seats whose top ends short of a child's knees (characters.ts `Seat.front`, `perch`). */
 const DEEP: [string, any][] = Object.entries(JSON.parse(readFileSync(new URL('../../web/src/render/babylon/characters/furniture.json', import.meta.url), 'utf8')).seats).filter(([, s]: [string, any]) => s.front !== undefined) as [string, any][];
 const { BUNK_DOWN, BUNK_UP, RIDE_HORSE, RIDE_ROUND, RIDE_SEESAW, RIDE_SPRING, RIDE_SWING, SLIDE, SWING_S } = await import('../../web/src/render/babylon/characters/clips/rides.ts');
-/** The foosball's clips, one per lane in each size (characters.ts STEP_IN). */
-const FOOS_LANED = FOOS.flatMap(({ clip, min }: any) => FOOS_LANES.map((_: number, lane: number) => ({ clip: foosClip(clip, lane), min })));
 const { EYEPIECE, PICK_APPLE, PICK_LEMON, SHOWER_CHILD } = await import('../../web/src/render/babylon/characters/clips/uses.ts');
 const { BOARD, CLOCK, FEEDER, PUT_AWAY } = await import('../../web/src/render/babylon/characters/clips/reach.ts');
 const { SHOT } = await import('../../web/src/render/babylon/characters/clips/shot.ts');
 const { KNEEL_TABLE, SIT_LOW } = await import('../../web/src/render/babylon/characters/clips/low.ts');
-/** The clips made in sizes for reaching up (the wall cupboards, the clock, the feeder, the whiteboard), the hoop shot and the low tops (clips/reach.ts, shot.ts, low.ts), each with its length (s); all loop. */
-const MORE_SIZED: [any[], number][] = [...Object.values(PUT_AWAY).map((sizes: any): [any[], number] => [sizes, 3.2]), [CLOCK, 4.5], [FEEDER, 4], [BOARD, 6], [SHOT, 3.2], [KNEEL_TABLE, 6], [SIT_LOW, 5]];
+
+/** A clip's sizes (the tallest first): the shortest resident each is for (m) and its clips (one per lane for the laned ones). */
+type Sized = { min: number; clips: string[] }[];
+const one = (sizes: any[]): Sized => sizes.map(({ clip, min }: any) => ({ min, clips: [clip] }));
+const laned = (sizes: any[], lanes: readonly number[], name: (clip: string, lane: number) => string): Sized => sizes.map(({ clip, min }: any) => ({ min, clips: lanes.map((_, lane) => name(clip, lane)) }));
+/**
+ * The clips made in sizes (the tallest first), as characters.ts `STEP_IN` uses them, with whether they loop and their
+ * length (s): the fountain's, the climbing frame's and the games' (clips/street.ts, games.ts); children's play (play.ts);
+ * the slide's round, the bunk's ladder and the rides (rides.ts); the telescope's eyepiece, the fruit trees and the
+ * shower, a child's without the turn (uses.ts); reaching up to the wall cupboards, the clock, the feeder and the
+ * whiteboard, the hoop shot and the low tops (reach.ts, shot.ts, low.ts).
+ */
+const SIZED: [sizes: Sized, loop: boolean, seconds: number][] = [
+  [one(FOUNTAIN), true, 3],
+  [laned(CLIMB, CLIMB_LANES, climbClip), true, 13],
+  [laned(FOOS, FOOS_LANES, foosClip), true, 3.2],
+  [one(POOL), true, 8],
+  [one(SMASH), true, 3.4],
+  [one(BOULDER), true, 16],
+  [one(BALL_PIT), true, 12],
+  [one(PLAY_TENT), true, 24],
+  [one(SLIDE), true, 14],
+  [one(BUNK_UP), false, 7],
+  [one(BUNK_DOWN), false, 6.5],
+  [one(RIDE_HORSE), true, 2.4],
+  [one(RIDE_SPRING), true, 2],
+  [one(RIDE_SEESAW), true, 2.8],
+  [one(RIDE_ROUND), true, 2.4],
+  [one(RIDE_SWING), true, SWING_S],
+  [one(EYEPIECE), true, 6],
+  [one(PICK_APPLE), false, 3.3],
+  [one(PICK_LEMON), false, 3.3],
+  [[{ min: SHOWER_CHILD, clips: ['shower'] }, { min: 0, clips: ['showerChild'] }], true, 14],
+  ...Object.values(PUT_AWAY).map((sizes: any): [Sized, boolean, number] => [one(sizes), true, 3.2]),
+  [one(CLOCK), true, 4.5],
+  [one(FEEDER), true, 4],
+  [one(BOARD), true, 6],
+  [one(SHOT), true, 3.2],
+  [one(KNEEL_TABLE), true, 6],
+  [one(SIT_LOW), true, 5],
+];
+/** Every sized clip, with its list's loop flag and length. */
+const SIZED_CLIPS = SIZED.flatMap(([sizes, loop, seconds]) => sizes.flatMap(({ clips }) => clips.map((clip) => ({ clip, loop, seconds }))));
 
 /** The socials' clips (clips/social.ts) and their lengths (s). */
 const SOCIAL: Record<string, number> = {
@@ -100,26 +139,12 @@ const RUNTIME: Record<string, boolean> = {
   interact: false, pickUp: false, dance: true, punchJab: false, punchCross: false, hit: false, kneel: true, crouch: true,
   eat: false, water: true, harvest: true, pick: true, pickHigh: true, foldArms: true, no: true, yes: false, phone: true, rail: true, spell: true,
   push: true, plant: false, lantern: true, babyLieAsleep: true, babyLieAwake: true,
-  // The drinking fountain and the climbing frame, in sizes (and the frame's in lanes: characters.ts STEP_IN, clips/street.ts).
-  fountainDrink181: true, fountainDrink163: true, fountainDrink147: true, fountainDrink129: true, fountainDrink112: true,
-  climb172a: true, climb147a: true, climb112a: true, climb172b: true, climb147b: true, climb112b: true,
-  // Games and sport at things (characters.ts ACTIONS, STEP_IN; clips/games.ts), the sized ones in each size.
+  // Games and sport at things (characters.ts ACTIONS; clips/games.ts), those in one size.
   dartThrow: true, pingPong: true, yoga: true,
   // The socials' gestures and reactions, and the phone held in front (characters.ts GESTURES, ACTIONS; clips/social.ts).
   ...Object.fromEntries(Object.keys(SOCIAL).map((clip) => [clip, true])),
-  ...Object.fromEntries([POOL, FOOS_LANED, SMASH, BOULDER].flatMap((sizes: any[]) => sizes.map(({ clip }: any) => [clip, true]))),
-  // The slide's round, the bunk's ladder and the rides (characters.ts STEP_IN, BUNK_LADDER, RIDES; clips/rides.ts), in sizes.
-  ...Object.fromEntries([SLIDE].flatMap((sizes: any[]) => sizes.map(({ clip }: any) => [clip, true]))),
-  ...Object.fromEntries([BUNK_UP, BUNK_DOWN].flatMap((sizes: any[]) => sizes.map(({ clip }: any) => [clip, false]))),
-  ...Object.fromEntries([RIDE_HORSE, RIDE_SPRING, RIDE_SEESAW, RIDE_ROUND, RIDE_SWING].flatMap((sizes: any[]) => sizes.map(({ clip }: any) => [clip, true]))),
-  // The telescope's eyepiece and the fruit trees, in sizes (characters.ts STEP_IN, clips/uses.ts); the shower, a child's without the turn.
-  eyepiece181: true, eyepiece163: true, eyepiece147: true, eyepiece129: true, eyepiece112: true,
-  pickApple177: false, pickApple147: false, pickApple112: false, pickLemon177: false, pickLemon147: false, pickLemon112: false,
-  shower: true, showerChild: true,
-  // Children's play inside things (characters.ts STEP_IN; clips/play.ts).
-  ...Object.fromEntries([BALL_PIT, PLAY_TENT].flatMap((sizes: any[]) => sizes.map(({ clip }: any) => [clip, true]))),
-  // Reaching up, the hoop shot and the low tops, in sizes (characters.ts STEP_IN, `tuckIn`); brushing the hair seated and lying curled up on the side.
-  ...Object.fromEntries(MORE_SIZED.flatMap(([sizes]) => sizes.map(({ clip }: any) => [clip, true]))),
+  // The clips made in sizes (`SIZED`); brushing the hair seated and lying curled up on the side.
+  ...Object.fromEntries(SIZED_CLIPS.map(({ clip, loop }) => [clip, loop])),
   brushHair: true, lieCurl: true,
 };
 /** Phase-2 clips (the runtime picks them up later) and whether they loop. */
@@ -130,13 +155,9 @@ const LENGTH: Record<string, number> = {
   ...Object.fromEntries(FLOOR_SITS.flatMap(({ name }: any) => [[`sit${name}`, 1.7], [`sitDown${name}`, 1.6], [`standUp${name}`, 1.47]])),
   dance: 1.0, punchJab: 0.87, punchCross: 1.0, hit: 0.33, kneel: 5.2, crouch: 2.9, eat: 1.33, water: 3.8, harvest: 2.5, pick: 3, pickHigh: 3.2, plant: 2.8, foldArms: 2.5,
   yes: 2.5, no: 2.5, phone: 2.9, lantern: 2.5, rail: 2.5, spell: 2.1, push: 2.7, babyLieAsleep: 9, babyLieAwake: 6,
-  fountainDrink181: 3, fountainDrink163: 3, fountainDrink147: 3, fountainDrink129: 3, fountainDrink112: 3, climb172a: 13, climb147a: 13, climb112a: 13, climb172b: 13, climb147b: 13, climb112b: 13,
   dartThrow: 7.2, pingPong: 1.8, yoga: 48,
   ...SOCIAL,
-  ...Object.fromEntries(([[POOL, 8], [FOOS_LANED, 3.2], [SMASH, 3.4], [BOULDER, 16], [BALL_PIT, 12], [PLAY_TENT, 24], [SLIDE, 14], [BUNK_UP, 7], [BUNK_DOWN, 6.5], [RIDE_HORSE, 2.4], [RIDE_SPRING, 2], [RIDE_SEESAW, 2.8], [RIDE_ROUND, 2.4], [RIDE_SWING, SWING_S]] as [any[], number][]).flatMap(([sizes, s]) => sizes.map(({ clip }: any) => [clip, s]))),
-  eyepiece181: 6, eyepiece163: 6, eyepiece147: 6, eyepiece129: 6, eyepiece112: 6, pickApple177: 3.3, pickApple147: 3.3, pickApple112: 3.3, pickLemon177: 3.3, pickLemon147: 3.3, pickLemon112: 3.3,
-  shower: 14, showerChild: 14,
-  ...Object.fromEntries(MORE_SIZED.flatMap(([sizes, s]) => sizes.map(({ clip }: any) => [clip, s]))),
+  ...Object.fromEntries(SIZED_CLIPS.map(({ clip, seconds }) => [clip, seconds])),
   brushHair: 5, lieCurl: 2.4,
 };
 /** The baby lying in the crib: how far out to the side a joint may reach (m, reference skeleton: about 0.23 m on a baby, whose crib's bars are about 0.4 m from its middle). */
@@ -149,16 +170,6 @@ const PLANTED = new Set(['interact', 'pickUp', 'eat', 'yes', 'punchJab', 'punchC
 const SEAT: Record<string, number> = { child: 0.31 };
 const SEAT_HEIGHT = 0.45;
 const STAGES = ['baby', 'child', 'teen', 'youngAdult', 'adult', 'elder'];
-/** The clips made in sizes (the tallest first, `min` the height each starts at), as characters.ts `STEP_IN` uses them: the fountain's, the climbing frame's and the games' (clips/games.ts). */
-const SIZED: { min: number; clips: string[] }[][] = [
-  FOUNTAIN.map(({ clip, min }: any) => ({ min, clips: [clip] })),
-  CLIMB.map(({ clip, min }: any) => ({ min, clips: CLIMB_LANES.map((_: number, lane: number) => climbClip(clip, lane)) })),
-  FOOS.map(({ clip, min }: any) => ({ min, clips: FOOS_LANES.map((_: number, lane: number) => foosClip(clip, lane)) })),
-  ...[POOL, SMASH, BOULDER, BALL_PIT, PLAY_TENT, SLIDE, BUNK_UP, BUNK_DOWN, RIDE_HORSE, RIDE_SPRING, RIDE_SEESAW, RIDE_ROUND, RIDE_SWING].map((sizes: any[]) => sizes.map(({ clip, min }: any) => ({ min, clips: [clip] }))),
-  ...[EYEPIECE, PICK_APPLE, PICK_LEMON].map((sizes) => sizes.map(({ clip, min }: any) => ({ min, clips: [clip] }))),
-  [{ min: SHOWER_CHILD, clips: ['shower'] }, { min: 0, clips: ['showerChild'] }],
-  ...MORE_SIZED.map(([sizes]) => sizes.map(({ clip, min }: any) => ({ min, clips: [clip] }))),
-];
 /** The runtime's hip roll while walking, per body (rad), read from characters.ts so the two can't drift apart. */
 const GAIT_SWAY: Record<string, number> = (() => {
   const src = readFileSync(new URL('../../web/src/render/babylon/characters.ts', import.meta.url), 'utf8');
@@ -337,7 +348,7 @@ for (const [name, target] of Object.entries(LENGTH)) {
 /** The clips a resident of `sk`'s height plays (of the sized ones, the size characters.ts `stepFit` picks; a baby only its own). */
 function clipsAt(sk: Skeleton): [string, any][] {
   const other = new Set<string>();
-  for (const sizes of SIZED) {
+  for (const [sizes] of SIZED) {
     const pick = sizes.find(({ min }) => sk.height >= min) ?? sizes[sizes.length - 1];
     for (const s of sizes) if (s !== pick) for (const c of s.clips) other.add(c);
   }
