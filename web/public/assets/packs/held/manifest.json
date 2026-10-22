@@ -6,6 +6,12 @@
       "type": "model",
       "url": "../../models/held/ingredients.glb",
       "materials": {
+        "bun": {
+          "finish": "material.finish.satin"
+        },
+        "bun_base": {
+          "finish": "material.finish.matte"
+        },
         "carrot": {
           "finish": "material.finish.satin"
         },
@@ -51,7 +57,13 @@
       "type": "model",
       "url": "../../models/held/mealPot.glb",
       "materials": {
+        "beef": {
+          "finish": "material.finish.satin"
+        },
         "carrot": {
+          "finish": "material.finish.satin"
+        },
+        "carrot_core": {
           "finish": "material.finish.satin"
         },
         "iron": {
@@ -59,6 +71,9 @@
         },
         "iron_inside": {
           "finish": "material.finish.metal"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
         },
         "pea": {
           "finish": "material.finish.satin"
@@ -105,7 +120,13 @@
         "cracker": {
           "finish": "material.finish.matte"
         },
+        "dish": {
+          "finish": "material.finish.gloss"
+        },
         "grape": {
+          "finish": "material.finish.gloss"
+        },
+        "jam": {
           "finish": "material.finish.gloss"
         },
         "leaf": {
@@ -120,6 +141,9 @@
       "type": "model",
       "url": "../../models/held/grillPlatter.glb",
       "materials": {
+        "butter": {
+          "finish": "material.finish.satin"
+        },
         "char": {
           "finish": "material.finish.matte"
         },
@@ -130,6 +154,9 @@
           "finish": "material.finish.gloss"
         },
         "corn": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
           "finish": "material.finish.satin"
         },
         "patty": {
@@ -156,7 +183,13 @@
         "cob": {
           "finish": "material.finish.matte"
         },
+        "corn": {
+          "finish": "material.finish.satin"
+        },
         "crumb": {
+          "finish": "material.finish.matte"
+        },
+        "napkin": {
           "finish": "material.finish.matte"
         },
         "smear": {
@@ -171,6 +204,9 @@
       "type": "model",
       "url": "../../models/held/pizza.glb",
       "materials": {
+        "cheese_brown": {
+          "finish": "material.finish.satin"
+        },
         "dough": {
           "finish": "material.finish.matte"
         },
@@ -252,7 +288,13 @@
       "type": "model",
       "url": "../../models/held/mealPlate.glb",
       "materials": {
+        "beef": {
+          "finish": "material.finish.satin"
+        },
         "carrot": {
+          "finish": "material.finish.satin"
+        },
+        "carrot_core": {
           "finish": "material.finish.satin"
         },
         "china": {
@@ -260,6 +302,9 @@
         },
         "china_well": {
           "finish": "material.finish.gloss"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
         },
         "pea": {
           "finish": "material.finish.satin"
@@ -276,6 +321,9 @@
       "type": "model",
       "url": "../../models/held/pizzaSlice.glb",
       "materials": {
+        "cheese_brown": {
+          "finish": "material.finish.satin"
+        },
         "china": {
           "finish": "material.finish.gloss"
         },
@@ -324,6 +372,9 @@
         "icing": {
           "finish": "material.finish.satin"
         },
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
         "tomato": {
           "finish": "material.finish.gloss"
         }
@@ -344,6 +395,9 @@
         },
         "filling": {
           "finish": "material.finish.gloss"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
         },
         "pastry": {
           "finish": "material.finish.matte"
@@ -393,6 +447,9 @@
         "crumb": {
           "finish": "material.finish.matte"
         },
+        "pea": {
+          "finish": "material.finish.satin"
+        },
         "smear": {
           "finish": "material.finish.matte"
         },
@@ -411,7 +468,13 @@
         "board": {
           "finish": "material.finish.wood"
         },
+        "board_dark": {
+          "finish": "material.finish.wood"
+        },
         "carrot": {
+          "finish": "material.finish.satin"
+        },
+        "carrot_core": {
           "finish": "material.finish.satin"
         },
         "grip": {
@@ -429,7 +492,16 @@
       "type": "model",
       "url": "../../models/held/pan.glb",
       "materials": {
+        "beef": {
+          "finish": "material.finish.satin"
+        },
+        "broccoli": {
+          "finish": "material.finish.satin"
+        },
         "carrot": {
+          "finish": "material.finish.satin"
+        },
+        "carrot_core": {
           "finish": "material.finish.satin"
         },
         "grip": {
@@ -440,6 +512,12 @@
         },
         "pea": {
           "finish": "material.finish.satin"
+        },
+        "pepper_red": {
+          "finish": "material.finish.gloss"
+        },
+        "pepper_yellow": {
+          "finish": "material.finish.gloss"
         },
         "stew": {
           "finish": "material.finish.satin"
@@ -492,6 +570,9 @@
         "choc_ice": {
           "finish": "material.finish.satin"
         },
+        "chocolate": {
+          "finish": "material.finish.satin"
+        },
         "steel": {
           "finish": "material.finish.metal"
         },
@@ -500,6 +581,9 @@
         },
         "vanilla": {
           "finish": "material.finish.satin"
+        },
+        "wafer": {
+          "finish": "material.finish.matte"
         }
       }
     },
@@ -521,6 +605,9 @@
         },
         "steel": {
           "finish": "material.finish.metal"
+        },
+        "strawberry": {
+          "finish": "material.finish.satin"
         }
       }
     },
@@ -552,8 +639,14 @@
       "type": "model",
       "url": "../../models/held/smoothie.glb",
       "materials": {
+        "berry": {
+          "finish": "material.finish.satin"
+        },
         "glass": {
           "finish": "material.finish.gloss"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
         },
         "smoothie": {
           "finish": "material.finish.satin"
@@ -562,6 +655,9 @@
           "finish": "material.finish.satin"
         },
         "straw": {
+          "finish": "material.finish.satin"
+        },
+        "straw_stripe": {
           "finish": "material.finish.satin"
         }
       }
@@ -584,6 +680,9 @@
         },
         "paper_red": {
           "finish": "material.finish.matte"
+        },
+        "wire": {
+          "finish": "material.finish.metal"
         }
       }
     },
@@ -609,14 +708,17 @@
         "kraft_fold": {
           "finish": "material.finish.matte"
         },
-        "kraft_inside": {
-          "finish": "material.finish.matte"
-        },
         "lettuce": {
           "finish": "material.finish.satin"
         },
         "patty": {
           "finish": "material.finish.satin"
+        },
+        "sesame": {
+          "finish": "material.finish.satin"
+        },
+        "tomato": {
+          "finish": "material.finish.gloss"
         }
       }
     },
@@ -636,6 +738,9 @@
         "grease": {
           "finish": "material.finish.matte"
         },
+        "jam": {
+          "finish": "material.finish.gloss"
+        },
         "leaf": {
           "finish": "material.finish.satin"
         }
@@ -654,11 +759,17 @@
         "grease": {
           "finish": "material.finish.matte"
         },
+        "grip": {
+          "finish": "material.finish.satin"
+        },
         "peel": {
           "finish": "material.finish.wood"
         },
         "smear_sauce": {
           "finish": "material.finish.matte"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
         }
       }
     },
@@ -677,6 +788,9 @@
         },
         "smear_filling": {
           "finish": "material.finish.matte"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
         }
       }
     }
