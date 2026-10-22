@@ -90,7 +90,13 @@
       "type": "model",
       "url": "../../models/kitchen/farmhouseSink.glb",
       "materials": {
+        "board": {
+          "finish": "material.finish.satin"
+        },
         "body": {
+          "finish": "material.finish.gloss"
+        },
+        "bottle": {
           "finish": "material.finish.gloss"
         },
         "chrome": {
@@ -99,14 +105,17 @@
         "dark": {
           "finish": "material.finish.satin"
         },
-        "metal": {
-          "finish": "material.finish.metal"
+        "egg": {
+          "finish": "material.finish.matte"
         },
         "plant": {
           "finish": "material.finish.satin"
         },
         "porcelain": {
           "finish": "material.finish.gloss"
+        },
+        "pot": {
+          "finish": "material.finish.satin"
         },
         "trim": {
           "finish": "material.finish.satin"
@@ -150,7 +159,13 @@
       "type": "model",
       "url": "../../models/kitchen/counterSinkDouble.glb",
       "materials": {
+        "board": {
+          "finish": "material.finish.satin"
+        },
         "body": {
+          "finish": "material.finish.gloss"
+        },
+        "bottle": {
           "finish": "material.finish.gloss"
         },
         "chrome": {
@@ -158,6 +173,9 @@
         },
         "dark": {
           "finish": "material.finish.satin"
+        },
+        "egg": {
+          "finish": "material.finish.matte"
         },
         "metal": {
           "finish": "material.finish.metal"
@@ -167,6 +185,9 @@
         },
         "porcelain": {
           "finish": "material.finish.gloss"
+        },
+        "pot": {
+          "finish": "material.finish.satin"
         },
         "stone": {
           "finish": "material.finish.gloss"
@@ -225,11 +246,23 @@
         "body": {
           "finish": "material.finish.gloss"
         },
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
         "carton": {
           "finish": "material.finish.satin"
         },
         "chrome": {
           "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "egg": {
+          "finish": "material.finish.matte"
+        },
+        "gasket": {
+          "finish": "material.finish.satin"
         },
         "liner": {
           "finish": "material.finish.matte"
@@ -240,11 +273,17 @@
         "produce": {
           "finish": "material.finish.satin"
         },
+        "seal": {
+          "finish": "material.finish.satin"
+        },
         "shelf": {
           "finish": "material.finish.gloss"
         },
         "trim": {
           "finish": "material.finish.satin"
+        },
+        "wine2": {
+          "finish": "material.finish.gloss"
         }
       },
       "motions": {
@@ -273,6 +312,9 @@
       "type": "model",
       "url": "../../models/kitchen/fridgeBuiltIn.glb",
       "materials": {
+        "board": {
+          "finish": "material.finish.satin"
+        },
         "bottle": {
           "finish": "material.finish.gloss"
         },
@@ -285,7 +327,13 @@
         "dark": {
           "finish": "material.finish.satin"
         },
+        "egg": {
+          "finish": "material.finish.matte"
+        },
         "frozen": {
+          "finish": "material.finish.satin"
+        },
+        "gasket": {
           "finish": "material.finish.satin"
         },
         "icecream": {
@@ -297,13 +345,28 @@
         "panel": {
           "finish": "material.finish.satin"
         },
+        "peas": {
+          "finish": "material.finish.satin"
+        },
         "produce": {
+          "finish": "material.finish.satin"
+        },
+        "produce2": {
+          "finish": "material.finish.satin"
+        },
+        "seal": {
           "finish": "material.finish.satin"
         },
         "shelf": {
           "finish": "material.finish.gloss"
         },
+        "trim": {
+          "finish": "material.finish.satin"
+        },
         "water": {
+          "finish": "material.finish.gloss"
+        },
+        "wine2": {
           "finish": "material.finish.gloss"
         }
       },
@@ -331,6 +394,9 @@
       "type": "model",
       "url": "../../models/kitchen/fridgeFrenchDoor.glb",
       "materials": {
+        "board": {
+          "finish": "material.finish.satin"
+        },
         "bottle": {
           "finish": "material.finish.gloss"
         },
@@ -340,13 +406,34 @@
         "chrome": {
           "finish": "material.finish.chrome"
         },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "egg": {
+          "finish": "material.finish.matte"
+        },
         "frozen": {
+          "finish": "material.finish.satin"
+        },
+        "gasket": {
+          "finish": "material.finish.satin"
+        },
+        "icecream": {
           "finish": "material.finish.satin"
         },
         "liner": {
           "finish": "material.finish.matte"
         },
+        "peas": {
+          "finish": "material.finish.satin"
+        },
         "produce": {
+          "finish": "material.finish.satin"
+        },
+        "produce2": {
+          "finish": "material.finish.satin"
+        },
+        "seal": {
           "finish": "material.finish.satin"
         },
         "shelf": {
@@ -357,6 +444,12 @@
         },
         "trim": {
           "finish": "material.finish.satin"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        },
+        "wine2": {
+          "finish": "material.finish.gloss"
         }
       },
       "motions": {
@@ -387,11 +480,26 @@
       "type": "model",
       "url": "../../models/kitchen/fridgeRetro.glb",
       "materials": {
+        "board": {
+          "finish": "material.finish.satin"
+        },
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
         "carton": {
           "finish": "material.finish.satin"
         },
         "chrome": {
           "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "egg": {
+          "finish": "material.finish.matte"
+        },
+        "gasket": {
+          "finish": "material.finish.satin"
         },
         "liner": {
           "finish": "material.finish.matte"
@@ -402,10 +510,22 @@
         "mint2": {
           "finish": "material.finish.gloss"
         },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
         "produce": {
           "finish": "material.finish.satin"
         },
+        "produce2": {
+          "finish": "material.finish.satin"
+        },
         "shelf": {
+          "finish": "material.finish.gloss"
+        },
+        "trim": {
+          "finish": "material.finish.satin"
+        },
+        "wine2": {
           "finish": "material.finish.gloss"
         }
       },
@@ -463,6 +583,9 @@
       "type": "model",
       "url": "../../models/kitchen/wineFridge.glb",
       "materials": {
+        "board": {
+          "finish": "material.finish.satin"
+        },
         "chrome": {
           "finish": "material.finish.chrome"
         },
@@ -472,10 +595,22 @@
         "doorframe": {
           "finish": "material.finish.satin"
         },
+        "gasket": {
+          "finish": "material.finish.satin"
+        },
+        "gold": {
+          "finish": "material.finish.metal"
+        },
         "liner": {
           "finish": "material.finish.matte"
         },
         "panel": {
+          "finish": "material.finish.satin"
+        },
+        "produce": {
+          "finish": "material.finish.satin"
+        },
+        "seal": {
           "finish": "material.finish.satin"
         },
         "shelf": {
@@ -485,6 +620,9 @@
           "finish": "material.finish.glass"
         },
         "stone": {
+          "finish": "material.finish.gloss"
+        },
+        "water": {
           "finish": "material.finish.gloss"
         },
         "wine": {
@@ -522,10 +660,19 @@
       "type": "model",
       "url": "../../models/kitchen/fridgeMiniRetro.glb",
       "materials": {
+        "board": {
+          "finish": "material.finish.satin"
+        },
         "bottle": {
           "finish": "material.finish.gloss"
         },
         "carton": {
+          "finish": "material.finish.satin"
+        },
+        "egg": {
+          "finish": "material.finish.matte"
+        },
+        "gasket": {
           "finish": "material.finish.satin"
         },
         "gold": {
@@ -548,6 +695,9 @@
         },
         "shelf": {
           "finish": "material.finish.gloss"
+        },
+        "trim": {
+          "finish": "material.finish.satin"
         },
         "uni_blue": {
           "finish": "material.finish.satin"

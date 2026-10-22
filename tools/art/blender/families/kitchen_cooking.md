@@ -35,7 +35,7 @@ hob and the oven windows are opaque glossy black (`hob`, a plain finish) rather 
 | `heat` | gloss | the hob counter's and the electric cooker's ring glowing red (gloss, so it reads by day) |
 | `charcoal` | satin | the microwave's body |
 | `display` | gloss | the microwave's display |
-| `tray` | metal | the oven tower's tray; a dishwasher's rack |
+| `tray` | metal | the oven tower's tray, the ovens' racks and runners, a dishwasher's tub, baskets and inner door |
 | `pot`, `pan` | metal / satin | the stock pot and frying pan on the gas range |
 | `steel` | metal | a stainless appliance front (a dishwasher's door) |
 | `toaster` | gloss | the breakfast counter's toaster body |
@@ -43,7 +43,10 @@ hob and the oven windows are opaque glossy black (`hob`, a plain finish) rather 
 | `bean` | gloss | the coffee machine's bean hopper |
 | `cup` | gloss | the cup under the spout |
 | `coffee` | gloss | the coffee stream |
-| `fruit` | gloss | the breakfast counter's fruit and toast |
+| `fruit` | gloss | the breakfast counter's oranges and smoothie, the microwave's soup |
+| `bread`, `crumb` | satin | the oven tower's rolls; toast (crust and face) |
+| `banana` | satin | the banana in the fruit bowl |
+| `towel` | satin | the tea towel over the range cooker's rail (plain, no draw call of its own) |
 
 ## Clips
 
@@ -54,12 +57,12 @@ then the clips keyed (`settle()` must come before `swing()`/`slide()`).
 
 | Model | Size (w × h × d) | Triangles | Draws | Moving parts | Clips (uses) |
 |---|---|---|---|---|---|
-| `model.stoveElectric` | 0.600 × 0.980 × 0.659 m | 2,280 | 4 | oven door, knob, hot ring | `oven_open` 1.4 s (bake); `burner_on` 0.5 s: the knob turns and the front ring on its side glows red (cook) |
-| `model.stoveGas` | 0.920 × 1.113 × 0.704 m | 2,904 | 4 | oven door, knob, flame | `oven_open` (bake); `burner_on` (cook, gourmet) |
-| `model.wallOven` | 0.700 × 2.110 × 0.706 m | 1,668 | 3 | upper door, tray | `oven_open` 1.4 s: door drops and tray slides 10 cm (roast, bake) |
-| `model.rangeCooker` | 1.580 × 1.140 × 0.754 m | 3,632 | 4 | left oven door, knob, flame | `oven_open` (bake); `burner_on` (cook, gourmet) |
-| `model.cooktopCounter` | 1.000 × 0.955 × 0.660 m | 2,188 | 3 | knob, hot ring | `burner_on` (cook): the knob turns, the front-right ring glows red |
-| `model.microwave` | 1.000 × 1.250 × 0.670 m | 2,076 | 4 | door, turntable | `door_open` 1.0 s, `hold` 1.2 s (reheat); `turntable` loops (reheat) |
+| `model.stoveElectric` | 0.600 × 0.980 × 0.660 m | 2,944 | 4 | oven door, knob, hot ring | `oven_open` 1.4 s (bake); `burner_on` 0.5 s: the knob turns and the front ring on its side glows red (cook) |
+| `model.stoveGas` | 0.920 × 1.111 × 0.720 m | 3,984 | 4 | oven door, knob, flame | `oven_open` (bake); `burner_on` (cook, gourmet) |
+| `model.wallOven` | 0.700 × 2.110 × 0.708 m | 4,738 | 3 | upper door, tray | `oven_open` 1.4 s: door drops and tray slides 10 cm (roast, bake) |
+| `model.rangeCooker` | 1.580 × 1.141 × 0.761 m | 4,880 | 4 | left oven door, knob, flame | `oven_open` (bake); `burner_on` (cook, gourmet) |
+| `model.cooktopCounter` | 1.000 × 0.956 × 0.660 m | 2,708 | 3 | knob, hot ring | `burner_on` (cook): the knob turns, the front-right ring glows red |
+| `model.microwave` | 1.000 × 1.250 × 0.666 m | 3,764 | 4 | door, turntable | `door_open` 1.0 s, `hold` 1.2 s (reheat); `turntable` loops (reheat) |
 
 Seen from the front, the microwave's controls are on the right and its door hinges on its left edge (game +x is
 the viewer's left) and swings 100°; its glass turntable turns a full turn every 2 s
@@ -87,16 +90,49 @@ Its blender lid lifts for `blend` (the jug blades need E1).
 
 | Model | Size (w × h × d) | Triangles | Draws | Moving parts | Clips (uses) |
 |---|---|---|---|---|---|
-| `model.coffeeMachine` | 1.000 × 1.400 × 0.665 m | 1,748 | 3 | cup, coffee stream | `brew` 0.6 s: cup slides under the spout, stream grows (espresso) |
-| `model.breakfastCounter` | 1.000 × 1.380 × 0.665 m | 2,224 | 4 | lever, toast, lid | `toast_down` (toast); `blend` 0.4 s: lid lifts (smoothie) |
-| `model.dishwasher` | 1.000 × 0.950 × 0.685 m | 1,592 | 3 | door (0.58 m), rack | `door_open` 0.9 s: door drops 85°, rack slides 30 cm, open for the whole use (dishes; clearing away at it, the `wash` tag) |
-| `model.dishwasherCompact` | 1.000 × 0.950 × 0.660 m | 1,808 | 3 | door (0.43 m), rack | `door_open` 0.9 s (dishes, `wash`), as the dishwasher |
+| `model.coffeeMachine` | 1.000 × 1.400 × 0.666 m | 4,262 | 3 | cup, coffee stream | `brew` 0.6 s: cup slides under the spout, stream grows (espresso) |
+| `model.breakfastCounter` | 1.000 × 1.380 × 0.666 m | 4,944 | 4 | lever, toast, lid | `toast_down` (toast); `blend` 0.4 s: lid lifts (smoothie) |
+| `model.dishwasher` | 1.000 × 0.950 × 0.687 m | 3,124 | 3 | door (0.58 m), rack | `door_open` 0.9 s: door drops 85°, rack slides 30 cm, open for the whole use (dishes; clearing away at it, the `wash` tag) |
+| `model.dishwasherCompact` | 1.000 × 0.950 × 0.660 m | 3,604 | 3 | door (0.43 m), rack | `door_open` 0.9 s (dishes, `wash`), as the dishwasher |
 
 The coffee machine and both dishwashers take 3 draw calls; the breakfast counter takes 4 (its three
 moving parts each cost one). `check-glb`: 31 models, 0 failed; its five warnings are those same draw counts
 (the gas range, the range cooker, the electric cooker, the microwave, the breakfast counter). Khronos glTF validator: 0 errors, 0 warnings
 each). The ten sat in Validate › Cookers and
 Validate › Appliances until checked in play.
+
+## The detail pass (2026-10-22)
+
+Same sizes (within 2 %), centres, parts, pivots, clips, `motions`, paint and draw calls; more of what a real one has.
+Shared parts: `_knob` (a turned skirt, grip and dished cap with a pointer line), `_burner` (a spreader, a cap and a
+cast-iron pan support: a square of bar with four fingers), `_flame` (a ring with twelve blue tongues), `_hob_ring` (a
+printed double ring), `_oven` (the cavity cut out of the carcass with a boolean, `_hollow`, its walls dark enamel, a wire
+rack on runners and a lamp: an open door shows an oven, not a dark face), `_oven_door`/`_oven_face` (a dark frame
+round a black window, an inner pane, a round bar handle on stand-offs in one piece), `_strip` (a rounded fascia with a
+clock display), `_shaker` and `_pull` (shaker fronts and one-piece bar pulls on every cabinet), `_stock_pot`,
+`_frying_pan`, `_tray`, `_cup`, `_canister`, `_basket` (a dishwasher's wire basket), `_fillet` (round a bent tube's
+corners without the Catmull-Rom overshoot `kit.tube` makes between a long span and a short one).
+
+- **stoveElectric**: printed zones, a rounded splash guard with a vent, a fascia with a clock, a real oven, a drawer
+  with a bar pull.
+- **stoveGas**: four burners under pan supports, a stock pot (rolled rim, loop handles, lid and knob) and a frying pan
+  with its long handle, five knobs on a fascia, a real oven, a drawer. The turning knob's origin stays where it was.
+- **wallOven**: a cornice with a cove moulding, a framed lower oven, a control panel with two knobs and a clock
+  between the ovens, shaker doors above and below; the upper oven real, its tray a rolled-rim tray of six rolls.
+- **rangeCooker**: six burners under pan supports, a stock pot, a splash back with a chrome trim, a fascia with a
+  clock, two framed ovens (the left one real), the rail one bent tube with its posts, a striped tea towel over it.
+- **cooktopCounter**: a steel trim round the hob, printed zones and touch controls, a fascia with knobs, two deep
+  shaker drawers with pulls. (No pan on it: the model is no taller than the hob.)
+- **microwave**: a rounded body hollowed by a boolean, side vents, feet, a control column (display, buttons, dial,
+  release), a framed door with a swept grip, a roller ring; the turntable a turned glass plate with a bowl of soup.
+- **coffeeMachine**: a rounded body, a cup-warmer with its rail, a group head and portafilter, a slotted drip tray, a
+  gauge, buttons, a steam wand, a tapered hopper with a lid, a canister and a sugar bowl; the cup on a saucer, with crema.
+- **breakfastCounter**: a rounded toaster (slots, dial, crumb tray, lever slot), toast with a crust and face, a tapered
+  blender base with buttons, a jug with a handle, a turned lid, a fruit bowl with oranges, an apple and a banana.
+- **dishwasher**, **dishwasherCompact**: the tub cut into the carcass (steel), a spray arm, an upper basket of cups,
+  the lower basket of standing plates and a bowl, a fascia with a display and a button, the door's inner panel and
+  detergent flap, shaker fronts beside it. The compact one's carcass stood 2 cm proud of its door and drawers, hiding
+  them: it now stops at their backs (the door's hinge is where it was).
 
 ## Rebuild
 
