@@ -21,6 +21,9 @@
         "stone": {
           "finish": "material.finish.gloss"
         },
+        "teal": {
+          "finish": "material.finish.gloss"
+        },
         "trim": {
           "finish": "material.finish.satin"
         },
@@ -63,17 +66,14 @@
         "body": {
           "finish": "material.finish.satin"
         },
-        "brass": {
-          "finish": "material.finish.metal"
-        },
         "chrome": {
           "finish": "material.finish.chrome"
         },
         "dark": {
           "finish": "material.finish.satin"
         },
-        "metal": {
-          "finish": "material.finish.metal"
+        "paper": {
+          "finish": "material.finish.matte"
         },
         "porcelain": {
           "finish": "material.finish.gloss"
@@ -236,9 +236,6 @@
         "fabric": {
           "finish": "material.finish.fabric"
         },
-        "metal": {
-          "finish": "material.finish.metal"
-        },
         "water": {
           "finish": "material.finish.gloss"
         }
@@ -278,6 +275,9 @@
         },
         "seat": {
           "finish": "material.finish.gloss"
+        },
+        "trim": {
+          "finish": "material.finish.satin"
         },
         "water": {
           "finish": "material.finish.gloss"
@@ -324,6 +324,9 @@
         },
         "seat": {
           "finish": "material.finish.gloss"
+        },
+        "trim": {
+          "finish": "material.finish.satin"
         },
         "water": {
           "finish": "material.finish.gloss"
@@ -377,6 +380,9 @@
         "seat": {
           "finish": "material.finish.gloss"
         },
+        "trim": {
+          "finish": "material.finish.satin"
+        },
         "water": {
           "finish": "material.finish.gloss"
         }
@@ -416,6 +422,9 @@
         },
         "seat_wood": {
           "finish": "material.finish.wood"
+        },
+        "trim": {
+          "finish": "material.finish.satin"
         },
         "water": {
           "finish": "material.finish.gloss"
@@ -460,6 +469,12 @@
         "seat": {
           "finish": "material.finish.gloss"
         },
+        "stone": {
+          "finish": "material.finish.gloss"
+        },
+        "trim": {
+          "finish": "material.finish.satin"
+        },
         "water": {
           "finish": "material.finish.gloss"
         }
@@ -488,6 +503,12 @@
       "type": "model",
       "url": "../../models/bathroom/shower.glb",
       "materials": {
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
         "fittings": {
           "finish": "material.finish.chrome"
         },
@@ -502,6 +523,12 @@
         },
         "grout": {
           "finish": "material.finish.satin"
+        },
+        "sage": {
+          "finish": "material.finish.gloss"
+        },
+        "teal": {
+          "finish": "material.finish.gloss"
         },
         "tile": {
           "finish": "material.finish.satin"
@@ -555,6 +582,9 @@
           "finish": "material.finish.gloss"
         },
         "curtain": {
+          "finish": "material.finish.satin"
+        },
+        "dark": {
           "finish": "material.finish.satin"
         },
         "fittings": {
@@ -623,6 +653,9 @@
         "bottle": {
           "finish": "material.finish.gloss"
         },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
         "fittings_dark": {
           "finish": "material.finish.metal"
         },
@@ -676,6 +709,12 @@
       "type": "model",
       "url": "../../models/bathroom/showerRain.glb",
       "materials": {
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
         "fittings_dark": {
           "finish": "material.finish.metal"
         },
@@ -684,6 +723,12 @@
         },
         "glass": {
           "finish": "material.finish.glass"
+        },
+        "groove": {
+          "finish": "material.finish.matte"
+        },
+        "sage": {
+          "finish": "material.finish.gloss"
         },
         "tray_stone": {
           "finish": "material.finish.matte"
@@ -894,6 +939,9 @@
           "finish": "material.finish.gloss",
           "mirror": "front"
         },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
         "porcelain": {
           "finish": "material.finish.gloss"
         },
@@ -967,6 +1015,9 @@
           "finish": "material.finish.satin"
         },
         "sage": {
+          "finish": "material.finish.gloss"
+        },
+        "teal": {
           "finish": "material.finish.gloss"
         },
         "towel_blue": {
