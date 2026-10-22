@@ -865,6 +865,21 @@ def sprigs(name, P, centre, spread, n=5, length=0.09):
                  [P.leaf_light, P.leaf][k % 2], shape='lance', droop=0.2, fold=0.2, rows=2, ring=3)
 
 
+def perches(n, seed, centres, per=14, up=(0.35, 1.25), inset=0.02, gap=0.2, facing=0.2, bare=()):
+    """A shrub's or a hedge's perches (the entry's `perches`, gamekit/perch.py), found on it as it stands: where `per`
+    lines in from round and above towards each of `centres` meet its leaves, `inset` metres in, facing up (their
+    normal's z over `facing`), with nothing over them, spread over it at least `gap` apart; `bare` adds points on bare
+    stems that stand in the open (a rose's canes). Up to `n`. Its own random numbers (`seed`), so the shrub's are as
+    they were; nothing on a far version."""
+    if G.is_low():
+        return
+    rng = random.Random(seed)
+    aims = [a for c in centres for a in G.perch.around(c, rng, per, up)]
+    found = [p for p, _ in G.perch.surface(aims, inset, reach=4.0, headroom=0.15, facing=facing)]
+    found += G.perch.bare(bare, headroom=0.15)
+    G.perch.keep(G.perch.spread(found, n, gap))
+
+
 def _with_part(name, still, build, origin, clip, kind='squash'):
     """Joins what `build` makes into a moving part `name` (origin at `origin`), settles, and shrinks it away."""
     if LOW[0]:                                                         # a far version: all one still part
@@ -883,7 +898,9 @@ def bush():
     P = palette()
     rng = random.Random(31)
     shrub(P, rng, 5, 1.12, 0.95, [getattr(P, k) for k in ('leaf_dark', 'leaf', 'leaf_light', 'stem', 'leaf_light')])
-    return G.settle([G.join_all('bush')])
+    still = G.join_all('bush')
+    perches(6, 131, [(0, 0, 0.45)])
+    return G.settle([still])
 
 
 def bush_small():
@@ -891,7 +908,9 @@ def bush_small():
     P = palette()
     rng = random.Random(32)
     shrub(P, rng, 5, 0.86, 0.72, [getattr(P, k) for k in ('leaf_dark', 'leaf', 'leaf_light', 'leaf')], name='bush_small')
-    return G.settle([G.join_all('bushSmall')])
+    still = G.join_all('bushSmall')
+    perches(5, 132, [(0, 0, 0.35)])
+    return G.settle([still])
 
 
 def bush_flowering():
@@ -901,7 +920,14 @@ def bush_flowering():
     shrub(P, rng, 5, 1.22, 1.03, [getattr(P, k) for k in ('leaf_dark', 'leaf', 'leaf_light', 'stem', 'leaf_light')], name='bush_flowering')
     dots(rng, 14, (0, 0, 0.55), (0.59, 0.59, 0.48), 0.17, [P.blossom, P.blossom2, P.blossom3, P.blossom4], 'blossom',
          band=(-0.2, 0.95), out=0.94)
-    return G.settle([G.join_all('bushFlowering')])
+    still = G.join_all('bushFlowering')
+    perches(6, 133, [(0, 0, 0.5)])
+    return G.settle([still])
+
+
+def hedge_top(h):
+    """Where a hedge segment's perch lines aim: along its top, a little under it."""
+    return [(x, 0.0, h * 0.55) for x in (-0.55, -0.18, 0.18, 0.55)]
 
 
 def street_hedge():
@@ -909,7 +935,9 @@ def street_hedge():
     street.ts spaces them about 1.05 m apart)."""
     P = palette(leaf=SHRUB[1], leaf_light=SHRUB[2], stem=SHRUB[3])
     hedge_block(P, 1.5, 0.915, 0.85)                     # 1.55 x 1.0 x 0.85 m over all, as its old part
-    return G.settle([G.join_all('hedge')])
+    still = G.join_all('hedge')
+    perches(6, 134, hedge_top(0.915), per=6, up=(0.6, 1.4))
+    return G.settle([still])
 
 
 def boxwood():
@@ -919,6 +947,7 @@ def boxwood():
     lump('ball2', 0.15, (0.1, 0.1, 0.48), P.leaf_light, scale=(1, 1, 0.7), noise=0.15, seed=2.0)
     lump('ball3', 0.13, (-0.18, -0.12, 0.38), P.leaf_dark, scale=(1, 1, 0.75), noise=0.15, seed=4.0)
     still = G.join_all('boxwood')
+    perches(4, 135, [(0, 0, 0.34)])
     return _with_part('sprigs', still, lambda: sprigs('sprig', P, (0.02, -0.03, 0.66), 0.12), (0.02, -0.03, 0.66), 'trim')
 
 
@@ -930,6 +959,7 @@ def topiary_cone():
     G.cone('cone', 0.33, 0.012, 1.3, at=(0, 0, top + 0.82), material=P.leaf, verts=low(14, 8))
     G.cone('cone2', 0.25, 0.01, 0.9, at=(-0.02, 0.02, top + 0.97), material=P.leaf_light, verts=low(9, 6), rot=(0, 0, 20))
     still = G.join_all('topiaryCone')
+    perches(4, 136, [(0, 0, top + z) for z in (0.45, 0.75, 1.05)], up=(0.15, 0.7), facing=0.1)
     tip = (0.0, 0.0, top + 1.22)                                       # sprigs reach out of the cone's sides there
     return _with_part('sprigs', still, lambda: sprigs('sprig', P, tip, 0.1, n=5, length=0.12), tip, 'trim')
 
@@ -946,6 +976,7 @@ def garden_hedge():
     P = palette(leaf=SHRUB[1], leaf_light=SHRUB[2], stem=SHRUB[3])
     hedge_block(P, 1.5, 1.12, 0.92)
     still = G.join_all('hedge')
+    perches(6, 137, hedge_top(1.12), per=6, up=(0.6, 1.4))
     at = (0.1, 0.0, 1.06)
     return _with_part('sprigs', still, lambda: sprigs('sprig', P, at, 0.4, n=7), at, 'trim')
 
@@ -956,7 +987,9 @@ def hydrangea():
     rng = random.Random(72)
     shrub(P, rng, 5, 1.0, 0.82, [getattr(P, k) for k in ('leaf_dark', 'leaf', 'leaf_light', 'stem', 'leaf_light')])
     dots(rng, 11, (0, 0, 0.52), (0.48, 0.48, 0.42), 0.28, [P.blossom], 'mophead')
-    return G.settle([G.join_all('hydrangea')])
+    still = G.join_all('hydrangea')
+    perches(5, 138, [(0, 0, 0.45)])
+    return G.settle([still])
 
 
 # A rose: a cup of petals, its rim curled in over a tight middle (the profile turns back in and up again).
@@ -986,6 +1019,8 @@ def rosebush():
                  seed=i * 2.3 + k, noise=0.3, segments=6, rings=4)
         if i != front:
             cupped(f'rose{i}', ROSE, tip, P.bloom, math.degrees(a), tilt, segments=low(6, 3))
+    # Perches: on the canes (half way up their arch) and the leafy base.
+    perches(5, 140, [(0, 0, 0.3)], per=8, bare=[bend.lerp(tip, 0.45) + Vector((0, 0, 0.014)) for _, bend, tip, _, _ in canes])
     foot, bend, tip, a, tilt = canes[front]
     return _with_part('rose', G.join_all('rosebush'), lambda: cupped('cut_rose', ROSE, tip, P.bloom, math.degrees(a), tilt,
                                                                       segments=low(6, 3)), tuple(tip), 'cut')
@@ -1000,6 +1035,7 @@ def azalea():
     dots(rng, 36, (0, 0, 0.5), (0.56, 0.56, 0.43), 0.13, [P.blossom], 'flowers', band=(-0.5, 0.95), out=0.97, flat=0.42,
          segments=6, rings=4, far_every=2)
     still = G.join_all('azalea')
+    perches(5, 139, [(0, 0, 0.45)])
     at = (-0.05, 0.05, 0.94)
     return _with_part('sprigs', still, lambda: sprigs('sprig', P, at, 0.14), at, 'trim')
 

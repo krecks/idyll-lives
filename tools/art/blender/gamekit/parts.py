@@ -6,6 +6,7 @@ import math
 import bpy
 from mathutils import Matrix, Vector
 
+from . import perch
 from .scene import meshes
 
 # The (game x, depth) the model being built is centred on: its Model's `centre`, set by Family.make, so
@@ -122,6 +123,7 @@ def settle(objs=None, centre=True, floor=True):
         shift = Vector((0, 0, drop))
     for o in objs:
         o.location += shift
+    perch.shift(shift)                                # the perches found on it move with it
     return objs
 
 

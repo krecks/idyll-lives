@@ -126,6 +126,59 @@ def xy(p):
     return (p[0], p[2], p[1])
 
 
+# ---- perches: where the game's birds sit (the entry's `perches`, gamekit/perch.py) ---------------------------
+# Found on the built tree, never drawn: lines in from outside towards each clump of its crown (out from the trunk,
+# a little up) meet its leaves, and a perch is a few centimetres in from there, on the outer twigs, with nothing
+# hanging over it; conifers' on their tiers' rims, a few on bare limbs. Each tree's own random numbers (`seed`),
+# so the tree's are as they were and the meshes don't change.
+
+def clump_aims(clumps, rng, per=3, up=(0.17, 0.95)):
+    """`per` lines in towards each drawn clump of a crown (`crown`'s clumps), out from the trunk +- 50 degrees,
+    `up` radians up from level (steeper over the crown's top)."""
+    aims = []
+    for (mx, my, mz), _, t, drawn in clumps:
+        if not drawn:
+            continue
+        out = math.hypot(mx, my) > 0.25
+        lift = (up[0], up[1] + 0.35 * max(0.0, t))
+        aims += G.perch.around((mx, my, mz), rng, per, lift, math.atan2(my, mx) if out else None, 0.9 if out else math.pi)
+    return aims
+
+
+def tier_aims(rng, feet, per=4):
+    """`per` lines in from round each conifer tier towards its axis a little over its foot (`feet`: (x, y, z) each),
+    from a little above: they meet the tier near its rim, where its boughs end."""
+    aims = []
+    for foot in feet:
+        aims += G.perch.around(foot, rng, per, (0.15, 0.5))
+    return aims
+
+
+def limb_tops(base, tips, d, along=(0.45, 0.6, 0.75)):
+    """Points on top of limbs (`limbs`: from `base` to each of `tips`, about `d` across, tapering to half), `along`
+    them."""
+    out = []
+    for tip in tips:
+        b, t = Vector(base), Vector(tip)
+        for f in along:
+            out.append(b + (t - b) * f + Vector((0, 0, 1.1 * d / 2 * (1 - f / 2) + 0.01)))   # (limbs are up to 1.1 d across)
+    return out
+
+
+def perch_on(n, aims, inset=0.03, gap=0.45, bare=(), bare_n=0, extra=(), facing=0.2):
+    """Keeps up to `n` perches on the tree as it stands: where `aims` meet its leaves, `inset` metres in, spread round
+    it at least `gap` apart; with up to `bare_n` of `bare` (points on bare limbs) that stand in the open, and
+    `extra` (a conifer's tip); only on leaves facing up a little at least (`facing`, their normal's z: the cypress's
+    stand upright). Nothing on a far version."""
+    if G.is_low():
+        return
+    open_limbs = G.perch.spread(G.perch.bare(bare), bare_n, gap) if bare_n else []
+    leaves = [p for p, _ in G.perch.surface(aims, inset, facing=facing)] + [p for p, _ in G.perch.surface(extra, inset * 2, facing=-1)]
+    kept = G.perch.spread(leaves, n - len(open_limbs), gap)
+    print(f'[gamekit] perches: {len(kept)} on the leaves (of {len(leaves)} found), {len(open_limbs)} on bare limbs')
+    G.perch.keep(kept + open_limbs)
+
+
 # ---- broadleaves --------------------------------------------------------------------------------------
 
 def oak():
@@ -134,10 +187,12 @@ def oak():
     rng = random.Random(11)
     trunk(P, 3.4, 0.62)
     limbs(P, rng, (0, 0, 2.9), [xy(t) for t in ([1.5, 4.6, 0.5], [-1.4, 4.5, -0.6], [0.3, 5.0, -1.3], [-0.4, 5.1, 1.2])], 0.3)
-    crown('crown', rng, (0, 0, 5.5), (2.7, 2.7, 1.8), 10, shades(P), size=0.7, spread=0.75, core=0.82)
-    crown('side', rng, (1.7, 0.7, 4.6), (1.4, 1.4, 1.0), 3, shades(P), size=0.85, bottom=-0.6, core=0.7)
-    crown('side2', rng, (-1.6, -0.8, 4.7), (1.4, 1.4, 1.1), 3, shades(P), size=0.85, bottom=-0.6, core=0.7)
-    return G.settle([G.join_all('oak')])
+    clumps = crown('crown', rng, (0, 0, 5.5), (2.7, 2.7, 1.8), 10, shades(P), size=0.7, spread=0.75, core=0.82)
+    clumps += crown('side', rng, (1.7, 0.7, 4.6), (1.4, 1.4, 1.0), 3, shades(P), size=0.85, bottom=-0.6, core=0.7)
+    clumps += crown('side2', rng, (-1.6, -0.8, 4.7), (1.4, 1.4, 1.1), 3, shades(P), size=0.85, bottom=-0.6, core=0.7)
+    still = G.join_all('oak')
+    perch_on(24, clump_aims(clumps, random.Random(111)))
+    return G.settle([still])
 
 
 def maple():
@@ -148,9 +203,11 @@ def maple():
     trunk(P, 3.0, 0.48, taper=0.66)
     limbs(P, rng, (0, 0, 2.6), [xy(t) for t in ([1.2, 4.2, 0.4], [-1.1, 4.3, -0.4], [0.2, 4.4, -1.2], [-0.3, 4.3, 1.1],
                                                [0.0, 4.9, 0.0])], 0.22)
-    crown('crown', rng, (0, 0, 5.0), (2.35, 2.35, 2.1), 26, shades(P), size=0.5, spread=0.82, squash=0.9, noise=0.24, core=0.9,
-          bottom=-0.6)
-    return G.settle([G.join_all('maple')])
+    clumps = crown('crown', rng, (0, 0, 5.0), (2.35, 2.35, 2.1), 26, shades(P), size=0.5, spread=0.82, squash=0.9, noise=0.24, core=0.9,
+                   bottom=-0.6)
+    still = G.join_all('maple')
+    perch_on(24, clump_aims(clumps, random.Random(112), per=2))
+    return G.settle([still])
 
 
 def birch():
@@ -165,10 +222,12 @@ def birch():
         rr = 0.15 - z * 0.012
         G.cube(f'mark{i}', (0.11, 0.03, 0.035), at=(rr * math.sin(math.radians(a)), rr * math.cos(math.radians(a)), z),
                material=P.birch_mark, rot=(0, 0, -a))
-    limbs(P, rng, (0, 0, 3.6), [xy(t) for t in ([0.9, 5.0, 0.3], [-0.8, 5.2, -0.3], [0.2, 5.6, 0.9], [-0.3, 4.9, -0.9])], 0.1,
-          P.birch_bark)
-    crown('crown', rng, (0, 0, 5.8), (1.6, 1.6, 2.4), 13, shades(P), size=0.52, spread=0.8, noise=0.34, core=0.72)
-    return G.settle([G.join_all('birch')])
+    tips = [xy(t) for t in ([0.9, 5.0, 0.3], [-0.8, 5.2, -0.3], [0.2, 5.6, 0.9], [-0.3, 4.9, -0.9])]
+    limbs(P, rng, (0, 0, 3.6), tips, 0.1, P.birch_bark)
+    clumps = crown('crown', rng, (0, 0, 5.8), (1.6, 1.6, 2.4), 13, shades(P), size=0.52, spread=0.8, noise=0.34, core=0.72)
+    still = G.join_all('birch')
+    perch_on(20, clump_aims(clumps, random.Random(113), per=5), bare=limb_tops((0, 0, 3.6), tips, 0.1), bare_n=4)
+    return G.settle([still])
 
 
 def cherry():
@@ -177,11 +236,14 @@ def cherry():
     rng = random.Random(14)
     trunk(P, 1.9, 0.45, taper=0.7)
     limbs(P, rng, (0, 0, 1.7), [xy(t) for t in ([1.6, 3.2, 0.5], [-1.5, 3.1, -0.4], [0.3, 3.4, -1.5], [-0.4, 3.3, 1.4])], 0.22)
-    crown('crown', rng, (0, 0, 3.9), (2.7, 2.7, 1.45), 14, shades(P), size=0.6, squash=0.75, noise=0.32, spread=0.78, core=0.8,
-          bottom=-0.55)
+    clumps = crown('crown', rng, (0, 0, 3.9), (2.7, 2.7, 1.45), 14, shades(P), size=0.6, squash=0.75, noise=0.32, spread=0.78,
+                   core=0.8, bottom=-0.55)
     lump('leaves', 0.4, (2.0, -0.9, 3.25), P.green, scale=(1, 1, 0.62), seed=1.0)
     lump('leaves2', 0.35, (-1.8, 1.2, 3.38), P.green2, scale=(1, 1, 0.64), seed=2.0)
-    return G.settle([G.join_all('cherry')])
+    still = G.join_all('cherry')
+    green = [((2.0, -0.9, 3.5), None, 0.0, True), ((-1.8, 1.2, 3.6), None, 0.0, True)]   # the two green clumps
+    perch_on(22, clump_aims(clumps + green, random.Random(114)))
+    return G.settle([still])
 
 
 # A resident picking fruit (`pickApple*`, `pickLemon*` in web/src/render/babylon/characters/clips/uses.ts, fitted to
@@ -228,8 +290,9 @@ def apple():
     rng = random.Random(15)
     trunk(P, 2.1, 0.4, taper=0.7)
     limbs(P, rng, (0, 0, 1.9), [xy(t) for t in ([1.3, 3.1, 0.4], [-1.2, 3.0, -0.4], [0.2, 3.3, -1.3], [-0.2, 3.2, 1.2])], 0.2)
-    crown('crown', rng, (0, 0, 3.6), (2.2, 2.2, 1.65), 12, shades(P), size=0.64, spread=0.76, core=0.84)
+    clumps = crown('crown', rng, (0, 0, 3.6), (2.2, 2.2, 1.65), 12, shades(P), size=0.64, spread=0.76, core=0.84)
     still = G.join_all('apple')
+    perch_on(20, clump_aims(clumps, random.Random(115), per=5))                  # (on the leaves, before the fruit)
     at = (-0.05, -0.7, 1.84)
 
     def fruit():
@@ -254,12 +317,13 @@ def japanese_maple():
     limbs(P, rng, (0, 0, 0.45), [xy(t) for t in ([0.75, 2.45, 0.3], [-0.65, 2.35, -0.4], [0.1, 2.6, -0.75], [-0.2, 2.3, 0.75],
                                                   [0.45, 2.55, 0.55], [-0.55, 2.6, 0.3])], 0.15)
     G.cone('foot', 0.21, 0.105, 0.3, at=(0, 0, 0.15), material=P.bark, verts=low(7, 5))
-    crown('crown0', rng, (0, 0, 1.55), (0.5, 0.5, 0.38), 5, shades(P)[1:], size=0.75, squash=0.68, noise=0.3, spread=0.7, core=0.7)
-    crown('crown', rng, (0, 0, 2.7), (1.95, 1.95, 0.6), 9, shades(P), size=0.66, squash=0.68, noise=0.32, spread=0.8, core=0.75)
-    crown('crown2', rng, (0.2, -0.1, 3.25), (1.45, 1.45, 0.55), 7, shades(P)[1:], size=0.7, squash=0.68, noise=0.32, spread=0.8,
-          core=0.7)
-    crown('crown3', rng, (-0.1, 0.1, 3.65), (0.85, 0.85, 0.4), 3, shades(P)[2:], size=0.9, squash=0.7, noise=0.3)
+    clumps = crown('crown0', rng, (0, 0, 1.55), (0.5, 0.5, 0.38), 5, shades(P)[1:], size=0.75, squash=0.68, noise=0.3, spread=0.7, core=0.7)
+    clumps += crown('crown', rng, (0, 0, 2.7), (1.95, 1.95, 0.6), 9, shades(P), size=0.66, squash=0.68, noise=0.32, spread=0.8, core=0.75)
+    clumps += crown('crown2', rng, (0.2, -0.1, 3.25), (1.45, 1.45, 0.55), 7, shades(P)[1:], size=0.7, squash=0.68, noise=0.32,
+                     spread=0.8, core=0.7)
+    clumps += crown('crown3', rng, (-0.1, 0.1, 3.65), (0.85, 0.85, 0.4), 3, shades(P)[2:], size=0.9, squash=0.7, noise=0.3)
     still = G.join_all('japaneseMaple')
+    perch_on(18, clump_aims(clumps, random.Random(116)), gap=0.35)  # (before the sprigs)
     at = (0.0, 0.0, 3.87)
     return _with_part('sprigs', still, lambda: sprigs('sprig', P, at, 0.35, n=6, length=0.22), at, 'trim')
 
@@ -302,7 +366,10 @@ def magnolia():
                 blooms.append((at - d * 0.05, a, lean))
     for i, (at, a, lean) in enumerate(blooms):
         cupped(f'bloom{i}', GOBLET, at, cols[i % 4], 90 - math.degrees(a), 8 + 40 * lean, segments=low(6, 3))
-    return G.settle([G.join_all('magnolia')])
+    still = G.join_all('magnolia')
+    green = [((1.5, 0.8, 2.95), None, 0.0, True), ((-1.3, -0.9, 3.65), None, 0.0, True)]   # the two green clumps
+    perch_on(20, clump_aims(clumps + green, random.Random(117), per=5), gap=0.35)
+    return G.settle([still])
 
 
 def streamer(name, top, heading, reach, drop, width, material):
@@ -333,8 +400,9 @@ def willow():
     rng = random.Random(18)
     cols = shades(P)
     trunk(P, 2.7, 0.62, taper=0.65)
-    limbs(P, rng, (0, 0, 2.4), [(2.0 * math.cos(a), 2.0 * math.sin(a), 4.3) for a in (0.3, 1.6, 2.9, 4.2, 5.4)], 0.24)
-    crown('crown', rng, (0, 0, 4.7), (2.3, 2.3, 1.4), 9, cols, size=0.68, squash=0.7, core=0.85, bottom=-0.3)
+    tips = [(2.0 * math.cos(a), 2.0 * math.sin(a), 4.3) for a in (0.3, 1.6, 2.9, 4.2, 5.4)]
+    limbs(P, rng, (0, 0, 2.4), tips, 0.24)
+    clumps = crown('crown', rng, (0, 0, 4.7), (2.3, 2.3, 1.4), 9, cols, size=0.68, squash=0.7, core=0.85, bottom=-0.3)
     # Hanging curtains: long, thin leafy streamers all round, out of the crown's edge and straight down to about half
     # a metre off the lawn, in two staggered rows with gaps between them, so whoever sits by the trunk shows through.
     n = low(68, 20)
@@ -346,7 +414,12 @@ def willow():
         foot = rng.uniform(0.45, 0.8) if outer else rng.uniform(0.9, 1.5)
         streamer(f'strand{i}', (rr * math.cos(a), rr * math.sin(a), top), a + rng.uniform(-0.15, 0.15), rng.uniform(0.25, 0.45),
                  top - foot, rng.uniform(0.15, 0.2), cols[rng.randint(1, 4)])
-    return G.settle([G.join_all('willow')])
+    still = G.join_all('willow')
+    # On the crown's top, from above (lower, the lines would meet the curtains), and on the limbs under it, inside
+    # the curtain.
+    perch_on(20, clump_aims(clumps, random.Random(118), per=8, up=(0.55, 1.2)), bare=limb_tops((0, 0, 2.4), tips, 0.24, (0.3, 0.45, 0.6)),
+             bare_n=4)
+    return G.settle([still])
 
 
 # ---- conifers -----------------------------------------------------------------------------------------
@@ -363,6 +436,10 @@ def conifer(rng, tiers, base_d, z0, step, h, cols, top_d=0.5, tilt=4.0, offset=0
                rot=(rng.uniform(-tilt, tilt), rng.uniform(-tilt, tilt), rng.uniform(0, 360)))
 
 
+# A conifer's or the cypress's top, from straight above (a blackbird's song post).
+TOP = [((0.02, 0.0, 6.0), (0, 0, 1))]
+
+
 def pine():
     """Pine: a tall bare trunk and six broad tiers narrowing to a point, the lowest from 2.35 m: residents walk under
     its boughs."""
@@ -371,7 +448,10 @@ def pine():
     trunk(P, 3.8, 0.38, taper=0.55, verts=8)
     conifer(rng, 6, 6.0, 2.35, 1.0, 2.1, shades(P, 4), top_d=0.9, tilt=3, offset=0.2)
     G.cone('tip', 0.25, 0.02, 1.3, at=(0, 0, 8.55), material=P.leaf3, verts=low(8, 5))
-    return G.settle([G.join_all('pine')])
+    still = G.join_all('pine')
+    feet = [(0, 0, 2.35 + i * 1.0 + 0.2) for i in range(6)]
+    perch_on(20, tier_aims(random.Random(119), feet), inset=0.04, extra=TOP)
+    return G.settle([still])
 
 
 def spruce():
@@ -382,7 +462,10 @@ def spruce():
     trunk(P, 3.0, 0.36, taper=0.6, verts=7)
     conifer(rng, 9, 5.0, 2.2, 0.82, 1.85, shades(P, 4), top_d=0.7, tilt=2, offset=0.08)
     G.cone('tip', 0.21, 0.02, 1.2, at=(0, 0, 9.9), material=P.leaf4, verts=low(8, 5))
-    return G.settle([G.join_all('spruce')])
+    still = G.join_all('spruce')
+    feet = [(0, 0, 2.2 + i * 0.82 + 0.18) for i in range(9)]
+    perch_on(22, tier_aims(random.Random(120), feet, per=3), inset=0.04, extra=TOP)
+    return G.settle([still])
 
 
 def cypress():
@@ -402,7 +485,11 @@ def cypress():
         lump(f'tuft{i}', 0.17, (rr * math.cos(a), rr * math.sin(a), z - 0.6), cols[(i + 2) % 4], scale=(1, 1, 2.6), noise=0.25,
              seed=i * 2.1)
     G.cone('tip', 0.16, 0.02, 1.3, at=(0, 0, 7.3), material=cols[3], verts=low(8, 5))
-    return G.settle([G.join_all('cypress')])
+    still = G.join_all('cypress')
+    prng = random.Random(121)
+    aims = [a for z in (1.9, 2.7, 3.5, 4.3, 5.1, 5.9, 6.6) for a in G.perch.around((0, 0, z), prng, 3, (0.1, 0.6))]
+    perch_on(15, aims, gap=0.4, extra=TOP, facing=-0.1)
+    return G.settle([still])
 
 
 # ---- in a pot -----------------------------------------------------------------------------------------
@@ -414,8 +501,9 @@ def lemon_tree():
     rng = random.Random(86)
     top = pot(P, 0.3, 0.5, r_bottom=0.22, rim=0.016)
     tube('trunk', [(0, 0, top - 0.02), (0.04, 0.02, 1.07)], 0.035, 0.02, P.bark, verts=6)
-    crown('crown', rng, (0, 0, 1.47), (0.66, 0.66, 0.56), 10, shades(P, 4), size=0.62, core=0.8)
+    clumps = crown('crown', rng, (0, 0, 1.47), (0.66, 0.66, 0.56), 10, shades(P, 4), size=0.62, core=0.8)
     still = G.join_all('lemonTree')
+    perch_on(12, clump_aims(clumps, random.Random(122), per=5), inset=0.02, gap=0.2)   # (on the leaves, before the lemons)
     at = (0.1, -0.6, 1.62)
 
     def fruit():
