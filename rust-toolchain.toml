@@ -1,7 +1,8 @@
 # The Rust that builds and checks the game, here and in CI (.github/workflows/pages.yml). Bump it
 # on purpose: a new stable can bring new clippy lints, and clippy (-D warnings) gates releases.
+# 1.97.1, not 1.97.0: 1.97.0 miscompiles `review::size_row` on x86-64 (a SIGSEGV in ll-tools' tests/review.rs).
 [toolchain]
-channel = "1.97.0"
+channel = "1.97.1"
 components = ["clippy", "rustfmt"]
 targets = ["wasm32-unknown-unknown"]
 profile = "minimal"

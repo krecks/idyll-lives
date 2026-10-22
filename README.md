@@ -46,7 +46,7 @@ Everything else (jobs, skills, money, building, the garden, every control and th
 
 ## Run it
 
-Requirements: Rust through rustup (the version is pinned in `rust-toolchain.toml`: 1.97.0 with clippy, rustfmt and the `wasm32-unknown-unknown` target), `wasm-bindgen-cli` 0.2.129 (it must match the `wasm-bindgen` crate in `Cargo.lock`), Node 22 and pnpm.
+Requirements: Rust through rustup (the version is pinned in `rust-toolchain.toml`: 1.97.1 with clippy, rustfmt and the `wasm32-unknown-unknown` target), `wasm-bindgen-cli` 0.2.129 (it must match the `wasm-bindgen` crate in `Cargo.lock`), Node 22 and pnpm.
 
 ```sh
 rustup toolchain install       # in the repo: the pinned toolchain, as CI does
