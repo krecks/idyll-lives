@@ -60,7 +60,7 @@ A `decision` finding takes the severity of its worse outcome.
 |---|---|---|---|---|---|
 | `fridge` | OK | A-kitchen-03 | OK | A-kitchen-03 S2 motion: freezer door opens at use start, not at the hand | `kitchen/sheets/obj-fridge.png` |
 
-Shots stay in the review worktree's gitignored `bench-results/review/<cat>/`, not in git. The Shots cell names the object's contact sheet (`<cat>/sheets/obj-<id>.png`, from `check.mjs sheet`) and at most two more shots, as paths under `bench-results/review/`.
+Shots stay in the main checkout's gitignored `bench-results/review/<cat>/`, not in git. The Shots cell names the object's contact sheet (`<cat>/sheets/obj-<id>.png`, from `check.mjs sheet`) and at most two more shots, as paths under `bench-results/review/`.
 
 Under each group, a table **Real uses against the content's** (I1) lists each item's real-world uses next to the content's uses.
 

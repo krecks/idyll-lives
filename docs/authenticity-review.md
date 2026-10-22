@@ -61,7 +61,7 @@ Every S1 is fixed. Of the S2s, everything is fixed but the four that wait for pr
 - 541 buyable objects in 15 object ledgers (kitchen 72, bathroom 26, bedroom 27, living 50, office 14, kids 20, hobbies 19, fitness 5, tabletop 39, decor 22, lighting 21, outdoor 43, garden 53, community and farm 36, personality packs 94);
 - 45 held items and tools, 161 resident rows (bodies, stages, hair, clothes, clips, `ACTIONS` entries, procedural layers), 83 house parts, 42 town things, 30 social rows and 46 system rows (cooking, baby care, lamps, doors, open states, crops, visitors).
 
-**Evidence.** 8,509 shots, of them 605 contact sheets (one per object), and 67 play logs (`play.jsonl`: pose, clip and motion events per use), 5.6 GB in the review worktree's gitignored `bench-results/review/`. Each wave's steps, commands and problems are in its `bench-results/review/<cat>/review-log.md`.
+**Evidence.** 8,509 shots, of them 605 contact sheets (one per object), and 67 play logs (`play.jsonl`: pose, clip and motion events per use), 5.6 GB in the main checkout's gitignored `bench-results/review/`. Each wave's steps, commands and problems are in its `bench-results/review/<cat>/review-log.md`.
 
 **Findings.** 300 filed: 8 S1, 111 S2, 181 S3. At the consolidation:
 - 36 findings whose cause is shared moved to [systems.md](review/systems.md) (24) and [residents.md](review/residents.md) (12), keeping their ids, with a pointer left where they were.
@@ -1104,7 +1104,7 @@ Triage with the owner on 2026-10-21:
 
 ### 11.2 Re-check
 
-Each fix agent made the Phase 0 evidence again for what it changed and closed each finding in its ledger with an **After:** line naming the after shot beside the finding's before shot. The evidence and each agent's log (`log.md`: what it changed, the checks, the balance and soak numbers, the save version, its decisions) are in the review worktree's gitignored `bench-results/review/fixes/<agent>/`:
+Each fix agent made the Phase 0 evidence again for what it changed and closed each finding in its ledger with an **After:** line naming the after shot beside the finding's before shot. The evidence and each agent's log (`log.md`: what it changed, the checks, the balance and soak numbers, the save version, its decisions) are in the main checkout's gitignored `bench-results/review/fixes/<agent>/`:
 
 | Agent | Groups and findings | Evidence |
 |---|---|---|
