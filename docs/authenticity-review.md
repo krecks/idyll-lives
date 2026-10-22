@@ -2,7 +2,7 @@
 
 The review of every model, animation and interaction in the game against the real thing, planned in [plan/authenticity-review.md](../plan/authenticity-review.md). It started on 2026-10-21 from `main` at e725166 (v0.3.0), on the branch `review/authenticity`. Its record is one ledger per category in [docs/review/](review/README.md); this document consolidates them for the owner's triage.
 
-**Status (2026-10-22):** Phases 0–4 are done on `review/authenticity`: the review, the owner's triage (2026-10-21) and the Phase 4 fixes, by 30 fix agents and a coordinator. Every finding's Status in its ledger says what came of it. The branch waits for the owner's sign-off (§11.3).
+**Status (2026-10-22):** done and signed off. Phases 0–4 (the review, the owner's triage on 2026-10-21, the Phase 4 fixes by 30 fix agents and a coordinator) and a follow-up that checked the 11 findings left unchecked (§9.5) are merged into `main` and ship in 0.3.1. Every finding's Status in its ledger says what came of it.
 - §1 sums up what was covered, found and fixed; §2 says how.
 - §3 lists every S1 and S2 finding by category, with its fix group, as filed; S3 findings are counted, with a pointer to the ledger.
 - §4 lists the 72 fix groups and the order proposed for them.
@@ -1186,4 +1186,4 @@ Balance after the last fix (`sweep-sim`, 180 days): median weekly savings $407, 
 
 **(h) "Have a drink at the bar" on a counter stool reads as alcohol,** and a 7-year-old took it in the smoke test. It is a soft drink. *Recommendation:* rename it "Have a soft drink at the counter" (content). **Done:** the counter stool's is "Have a soft drink at the counter", the high bar stool's "Have a soft drink at the bar"; the party bar's own stools keep "Have a drink at the bar" (a grown-ups' bar).
 
-**Sign-off:** the owner accepted every recommendation (a)–(h) on 2026-10-22; (g) and (h) were fixed before the merge. `review/authenticity` was merged into `main` locally, not pushed.
+**Sign-off:** the owner accepted every recommendation (a)–(h) on 2026-10-22; (g) and (h) were fixed before the merge. `review/authenticity` was merged into `main`; it ships as 0.3.1.

@@ -2,9 +2,11 @@
 
 All notable changes to Idyll Lives. Versions follow [semantic versioning](https://semver.org); each release is a git tag `vX.Y.Z`.
 
-## Unreleased
+## 0.3.1 — 2026-10-22
 
-After 0.3.0 every model, animation and interaction in the game was reviewed against the real thing, and what the review found was fixed: 274 of its 341 findings, every one that broke belief among them, and nine more in part (details in `docs/authenticity-review.md`). Residents now use things the way people do: from the right place and side, at the right height, facing each other across a table, with someone to play against, and only what their age allows. Things are at their real sizes, light stays in its room, doors open for the one going through, and a use sounds like the thing.
+**Play it in your browser:** https://krecks.github.io/idyll-lives/
+
+After 0.3.0 every model, animation and interaction in the game was reviewed against the real thing, and what the review found was fixed: 281 of its 342 findings, every one that broke belief among them, and nine more in part (details in `docs/authenticity-review.md`). Residents now use things the way people do: from the right place and side, at the right height, facing each other across a table, with someone to play against, and only what their age allows. Things are at their real sizes, light stays in its room, doors open for the one going through, and a use sounds like the thing.
 
 ### Residents and how they move
 - **Each in their own place:** two at a double sink, a pool table or a shop counter stand apart, each at their own end or basin, facing it. A cook waiting for a busy counter steps aside. Darts are thrown from the oche, and a visitor knocks at the front door, facing it.
@@ -63,6 +65,9 @@ After 0.3.0 every model, animation and interaction in the game was reviewed agai
 - **`pnpm check:clips`** checks every resident clip on both bodies at every life stage, in CI, against a baseline that is now empty; CI also runs the tools' tests (the model gate over every shipped model).
 - **Saves:** the save format is version 32 (30 adds the laundry, 31 the outfit each resident wears, 32 the day a pupil last went to school, so a load no longer takes 6 points off every pupil's grade as a missed day). 0.3.0's saves (version 29) load and play on, with one dirty and one washed load of laundry and everyone in the creator's outfit. Things standing where a grown footprint now reaches may overlap it in an old save.
 - **The ledgers** of the review are in `docs/review/`, one per category, with every finding's status and its commits.
+
+### Saves
+- 0.3.1 writes save format 32. 0.3.0's saves load and play on; 0.3.0 can't open 0.3.1's (it keeps them and skips them).
 
 ### Known
 - **Props in hand, body language and privacy** are still to come: books, cups, cutlery, the phone, the cue and the shaker are mimed; the body doesn't show feelings and residents turn on the spot without steps; a bathroom in use opens for anyone walking in, and "Try for a baby" is a long standing kiss.
