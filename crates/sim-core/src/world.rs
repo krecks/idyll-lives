@@ -5174,7 +5174,6 @@ fn seat_near_object(
             !o.broken() && o.can_use(sim.id, def.slots) && o.sits(def, content.life.stage(sim.age), rules.seat_tags, rules.seat_avoid)
         })
         .filter(|o| access(ctx, sim, ctx.object_plot[o.id as usize]) != Access::None)
-        .filter(|o| faces(o))
         .map(|o| {
             let (fx, fz) = ctx
                 .index
@@ -5182,15 +5181,16 @@ fn seat_near_object(
                 .approach_of(o.id)
                 .unwrap_or_else(|| o.front_tile(content));
             (
-                o.id,
+                o,
                 ctx.nav
                     .stairs
                     .distance([fx as f32 + 0.5, fz as f32 + 0.5], target),
             )
         })
-        .filter(|&(_, d)| d <= inter.seat_near)
+        // (Near enough before which way it faces: that picks a slot, and looks for footstools.)
+        .filter(|&(o, d)| d <= inter.seat_near && faces(o))
         .min_by(|a, b| a.1.total_cmp(&b.1))
-        .map(|(o, _)| o)
+        .map(|(o, _)| o.id)
 }
 
 /// A seat taken for a `seatFacing` use looks at the thing within this of straight ahead...
