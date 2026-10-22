@@ -1391,6 +1391,9 @@ pub struct World {
     /// not when only objects, residents or households do: views can then leave the lot out.
     pub(crate) lot_version: u32,
     pub(crate) briefs: Vec<SimBrief>,
+    /// What each household has to work on as the tick's step started (`work_waiting`), kept
+    /// from tick to tick like `briefs`.
+    work: Vec<u8>,
     /// Where Sims leave town for work.
     pub exits: Vec<[f32; 2]>,
     /// Opaque presentation data from the lot/town file, saved unchanged.
@@ -1648,6 +1651,7 @@ impl World {
             reach_version: 0,
             lot_version: 1,
             briefs: Vec::new(),
+            work: Vec::new(),
             exits: Vec::new(),
             meta: serde_json::Value::Null,
             undo: Vec::new(),
@@ -2835,7 +2839,8 @@ impl World {
         self.briefs = briefs;
         crate::lod::plan(self);
         let hour = crate::clock::hour(tick);
-        let work = self.work_waiting();
+        let mut work = std::mem::take(&mut self.work);
+        self.fill_work_waiting(&mut work);
         {
             let World {
                 content,
@@ -2888,6 +2893,7 @@ impl World {
                 step_sim(sim, &ctx, objects, items, rng);
             }
         }
+        self.work = work;
         crate::partners::update(self);
         self.broadcast();
         self.apply_messes();
@@ -3088,21 +3094,24 @@ impl World {
     /// What each household has to work on (`WorkOn` bits, by household): dirty dishes or food
     /// gone off of theirs, a load of dirty washing, a load washed.
     pub(crate) fn work_waiting(&self) -> Vec<u8> {
+        let mut work = Vec::new();
+        self.fill_work_waiting(&mut work);
+        work
+    }
+
+    /// `work_waiting`, into `work`.
+    fn fill_work_waiting(&self, work: &mut Vec<u8>) {
         use crate::content::WorkOn;
-        let mut work: Vec<u8> = self
-            .households
-            .iter()
-            .map(|h| {
-                let has = |kind: WorkOn, loads: f32| if loads >= 1.0 { kind.bit() } else { 0 };
-                has(WorkOn::Laundry, h.laundry[0]) | has(WorkOn::Washed, h.laundry[1])
-            })
-            .collect();
+        work.clear();
+        work.extend(self.households.iter().map(|h| {
+            let has = |kind: WorkOn, loads: f32| if loads >= 1.0 { kind.bit() } else { 0 };
+            has(WorkOn::Laundry, h.laundry[0]) | has(WorkOn::Washed, h.laundry[1])
+        }));
         for it in self.items.list.iter().filter(|it| it.to_clear(&self.content)) {
             if let Some(w) = work.get_mut(it.household as usize) {
                 *w |= WorkOn::Dishes.bit();
             }
         }
-        work
     }
 
     /// Applies a player command. Build and buy edits can be undone (`Command::Undo`) until time
