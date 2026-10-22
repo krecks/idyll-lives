@@ -32,6 +32,9 @@
         "gold": {
           "finish": "material.finish.metal"
         },
+        "ink": {
+          "finish": "material.finish.gloss"
+        },
         "leaf": {
           "finish": "material.finish.satin"
         },
@@ -98,6 +101,12 @@
           "finish": "material.finish.gloss",
           "glow": "#FFD27A"
         },
+        "gold": {
+          "finish": "material.finish.metal"
+        },
+        "ink": {
+          "finish": "material.finish.gloss"
+        },
         "ivory": {
           "finish": "material.finish.satin"
         },
@@ -145,6 +154,9 @@
       "materials": {
         "blushd": {
           "finish": "material.finish.satin"
+        },
+        "gold": {
+          "finish": "material.finish.metal"
         },
         "ivory": {
           "finish": "material.finish.satin"

@@ -35,12 +35,12 @@ and home.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.neat.steamMopDock` | 0.79 × 1.25 × 0.71 m | 2,152 | 3 | Body, Mop |
-| `model.neat.laundryCenter` | 1.82 × 1.74 × 0.62 m | 6,286 | 3 | Body, Washer & dryer |
-| `model.neat.rainShowerTower` | 0.90 × 2.18 × 0.90 m | 2,528 | 4 | Body, Bench |
-| `model.neat.organizerDesk` | 1.60 × 1.25 × 0.90 m | 4,064 | 3 | Body, Wood, Chair |
-| `model.neat.robotVacuumDock` | 0.86 × 0.52 × 0.86 m | 2,100 | 3 | Body, Trim, Rug |
-| `model.neat.entryConsole` | 0.87 × 1.81 × 0.32 m | 4,188 | 3 | Body, Wood |
+| `model.neat.steamMopDock` | 0.79 × 1.25 × 0.71 m | 3,036 (was 2,152) | 3 | Body, Mop |
+| `model.neat.laundryCenter` | 1.82 × 1.74 × 0.63 m | 7,278 (was 6,286) | 3 | Body, Washer & dryer |
+| `model.neat.rainShowerTower` | 0.90 × 2.20 × 0.90 m | 4,176 (was 2,528) | 4 | Body, Bench |
+| `model.neat.organizerDesk` | 1.60 × 1.25 × 0.91 m | 5,592 (was 4,064) | 3 | Body, Wood, Chair |
+| `model.neat.robotVacuumDock` | 0.86 × 0.52 × 0.86 m | 2,882 (was 2,100) | 3 | Body, Trim, Rug |
+| `model.neat.entryConsole` | 0.87 × 1.81 × 0.32 m | 4,308 (was 4,188) | 3 | Body, Wood |
 
 The plan's colour part is "Body" for all six: the white frames and docks (`body`), the robot's white dock and
 robot (`appliance`) and the shower's tiles (`tile`).
@@ -52,6 +52,26 @@ the resident): the mop comes out of its dock (`mop`), the washer's door opens (`
 resident (`steamShower`), the resident sits at the desk (`sort`), the robot rolls out and home (`program`) and the
 key tray drawer opens and shuts (`tidy`). At night (`office-night`, WebGL): the desk at all four facings in the
 yard, the laundry centre, mop dock, robot, shower and console coloured.
+
+## Detail pass (2026-10-22)
+
+Appliances, docks, bins and bottles lofted through rounded rectangles, portholes and drums turned, towels and cushions
+stuffed, poles, rails and hooks swept in one piece. Same keys, sizes, parts, clips, paint and draws.
+- **Mop dock:** a rounded tower, a C-clip round the pole, the refill shelf on extruded brackets, a bucket with a rolled
+  rim and a bail handle, stuffed spare pads; the mop's head and pad stuffed, a turned swivel, a looped grip, a lofted tank.
+- **Laundry centre:** rounded cabinets with a control strip, detergent drawer, display and turned dial; the porthole a
+  turned chrome ring with a domed window round a turned drum; woven baskets (lofted in ridges, a dark rim); towels folded
+  plump; a lofted iron with a swept handle on a shaped ironing board; the rail bent in one piece; shirts cut from their
+  outline (shoulders, sleeves, hem) on swept wooden hangers and hooks. The shirts stood 9 cm into the wall at first and
+  the old ones 1 cm: the model's `centre` is (0.01, -0.1175) now (it was -0.127; the model doesn't move).
+- **Rain shower:** a tray with a linear drain, tiles jointed in a grid, a niche with bottles, the frame swept, the rain
+  head soft on a bent arm with a wall rose, turned jets, buttons; the bench slats on shaped legs.
+- **Organizer desk:** lofted bins with a chrome label holder, its card and a grip; a calculator and label maker with
+  keys, a ledger with a ribbon, a turned pen cup; the chair padded on splayed tapered legs.
+- **Robot vacuum:** a turned rug with a border, the dock lofted with a bin behind its window and a ramp; the robot turned
+  with its lid's seam, a bumper, the lidar turret and a six-bristle side brush; a snake plant of upright twisted leaves.
+- **Entry console:** tapered legs, a slatted shoe shelf with lofted shoes, a moulded mirror frame (`G.kit.moulding`), J
+  hooks, a stuffed tote with handles and a draped scarf, tulips (`plants.cupped`) with strap leaves, a `G.kit.knob`.
 
 ## Rebuild
 

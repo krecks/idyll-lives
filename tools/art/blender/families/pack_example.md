@@ -34,14 +34,30 @@ The old part's step was buried in the tub's surround; there is none.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.chefStove` | 1.62 × 2.55 × 0.66 m | 6,828 | 4 | Body, Handles & knobs, Tiles |
-| `model.whirlpoolTub` | 1.86 × 0.93 × 1.86 m | 7,104 | 4 | Tub, Surround, Headrests |
+| `model.chefStove` | 1.62 × 2.55 × 0.66 m | 10,416 (was 6,828) | 4 | Body, Handles & knobs, Tiles |
+| `model.whirlpoolTub` | 1.86 × 0.93 × 1.86 m | 7,352 (was 7,104) | 4 | Tub, Surround, Headrests |
 
 `check-glb`: 2 models, 0 failed; the two 4-draw warnings above. Khronos validator: 0 errors, 0 warnings each.
 Clips bench at rest, open and mid-loop on WebGPU and WebGL, coloured. In play (`wants-asking`, WebGPU): the stove in
 the living room cooked on (door down, then shut, flame on throughout); the tub in the yard soaked in (water up,
 bubbles, the resident sitting in the water). At night (`office-night`, WebGL): the stove in all four facings and
 the tub in the yard.
+
+## Detail pass (2026-10-22)
+
+Rebuilt with the forms and the kit, a helper per kind of part, so the pack people copy shows how (same keys, sizes,
+parts, clips, paint and draws):
+- **Stove:** the oven doors `G.kit.shaker` frames round a black window with a `G.kit.pull` bar; the left oven's mouth
+  cut into the carcass (`G.cut`), so the dropped door opens onto an enamel inside with two wire racks (bent with
+  `G.kit.fillet` + `G.kit.tube`) and a loaf on a tray; turned knobs on chrome skirts and flared burners under enamel
+  caps (`G.revolve`); each grate a mitred frame (`G.kit.moulding`) with fingers reaching in; the hood lofted in one
+  piece from its band up into the telescoped chimney, a baffle filter under it; the utensil rail bent out from the wall
+  in one piece, S-hooks swept, the spatula's blade cut with slots (`G.extrude` with holes), the whisk four swept loops;
+  the stock pot with its rim, lid, knob and swept loop handles, the omelette `G.soft_box`, pepper and salt mills turned.
+- **Tub:** the acrylic shell one `G.loft` (under the rim, over its flat top, rolling into the basin, down to the
+  floor); the cedar cladding a slab a side extruded from an outline grooved between its boards; the foot rail a
+  moulding round the base; jets with a nozzle in a chrome ring; headrests and towels stuffed; candles with dished tops;
+  the plant's leaves `plants.leaf` blades (the family imports `plants`, as garden_decor does).
 
 ## Rebuild
 

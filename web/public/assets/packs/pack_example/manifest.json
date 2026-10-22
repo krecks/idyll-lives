@@ -18,6 +18,9 @@
         "copper": {
           "finish": "material.finish.metal"
         },
+        "crust": {
+          "finish": "material.finish.satin"
+        },
         "dark": {
           "finish": "material.finish.satin"
         },

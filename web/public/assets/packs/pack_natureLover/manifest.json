@@ -36,8 +36,14 @@
         "soil": {
           "finish": "material.finish.matte"
         },
+        "stem": {
+          "finish": "material.finish.satin"
+        },
         "tomato": {
           "finish": "material.finish.gloss"
+        },
+        "yellow": {
+          "finish": "material.finish.satin"
         }
       },
       "motions": {
@@ -75,6 +81,9 @@
         "can": {
           "finish": "material.finish.metal"
         },
+        "carrot": {
+          "finish": "material.finish.satin"
+        },
         "cedar_dark": {
           "finish": "material.finish.satin"
         },
@@ -91,6 +100,9 @@
           "finish": "material.finish.satin"
         },
         "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_dark": {
           "finish": "material.finish.foliage"
         },
         "leaf_light": {
@@ -119,6 +131,9 @@
         },
         "steel": {
           "finish": "material.finish.metal"
+        },
+        "stem": {
+          "finish": "material.finish.satin"
         },
         "terra": {
           "finish": "material.finish.satin"
@@ -160,6 +175,9 @@
         "bird_yellow": {
           "finish": "material.finish.satin"
         },
+        "carrot": {
+          "finish": "material.finish.satin"
+        },
         "cedar": {
           "finish": "material.finish.satin"
         },
@@ -168,6 +186,9 @@
         },
         "dark": {
           "finish": "material.finish.satin"
+        },
+        "eye": {
+          "finish": "material.finish.gloss"
         },
         "house": {
           "finish": "material.finish.satin"
@@ -181,6 +202,9 @@
         "lilac": {
           "finish": "material.finish.satin"
         },
+        "pebble": {
+          "finish": "material.finish.satin"
+        },
         "pink": {
           "finish": "material.finish.satin"
         },
@@ -190,8 +214,14 @@
         "seed": {
           "finish": "material.finish.matte"
         },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
         "steel": {
           "finish": "material.finish.metal"
+        },
+        "stem": {
+          "finish": "material.finish.satin"
         },
         "tube": {
           "finish": "material.finish.gloss"
@@ -277,6 +307,9 @@
         "copper": {
           "finish": "material.finish.metal"
         },
+        "green": {
+          "finish": "material.finish.satin"
+        },
         "green_light": {
           "finish": "material.finish.satin"
         },
@@ -337,6 +370,9 @@
         "leaf_dark": {
           "finish": "material.finish.foliage"
         },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
         "mister": {
           "finish": "material.finish.gloss"
         },
@@ -347,9 +383,6 @@
           "finish": "material.finish.satin"
         },
         "rug": {
-          "finish": "material.finish.matte"
-        },
-        "soil": {
           "finish": "material.finish.matte"
         },
         "toadstool": {
@@ -430,6 +463,9 @@
           "finish": "material.finish.satin"
         },
         "white": {
+          "finish": "material.finish.satin"
+        },
+        "yellow": {
           "finish": "material.finish.satin"
         }
       },

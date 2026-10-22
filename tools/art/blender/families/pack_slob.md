@@ -30,12 +30,12 @@ it (`ride: recline`), tipping back with it.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.slob.microwaveCart` | 0.72 × 1.10 × 0.78 m | 2,944 | 2 | Body |
-| `model.slob.beanbag` | 0.89 × 0.66 × 0.87 m | 2,116 | 2 | Body |
-| `model.slob.snackNightstand` | 0.90 × 0.45 × 0.73 m | 1,652 | 3 | Body, Top |
-| `model.slob.spritzStation` | 0.69 × 1.62 × 0.80 m | 2,000 | 3 | Body |
-| `model.slob.arcadeCabinet` | 0.77 × 1.88 × 0.78 m | 1,676 | 2 | Body, Sides |
-| `model.slob.gamingRecliner` | 1.77 × 1.10 × 0.87 m | 2,764 | 3 | Body, Stripes |
+| `model.slob.microwaveCart` | 0.74 × 1.10 × 0.78 m | 5,136 (was 2,944) | 2 | Body |
+| `model.slob.beanbag` | 0.88 × 0.66 × 0.87 m | 1,478 (was 2,116) | 2 | Body |
+| `model.slob.snackNightstand` | 0.89 × 0.45 × 0.73 m | 3,672 (was 1,652) | 3 | Body, Top |
+| `model.slob.spritzStation` | 0.68 × 1.62 × 0.80 m | 3,988 (was 2,000) | 3 | Body |
+| `model.slob.arcadeCabinet` | 0.77 × 1.88 × 0.78 m | 2,636 (was 1,676) | 2 | Body, Sides |
+| `model.slob.gamingRecliner` | 1.77 × 1.10 × 0.87 m | 6,844 (was 2,764) | 3 | Body, Stripes |
 
 Body is the cart's red frame, the bag, the nightstand, the spritz station's purple shelves, the arcade cabinet and
 the recliner's leatherette. The nightstand's top, the cabinet's side panels and the recliner's stripes are extra
@@ -47,6 +47,27 @@ the beanbag (flop, seated), the recliner (marathon, seated), the nightstand (mid
 drawer out), the cart (nuke) and the arcade (chaseHighScore) used by a resident; the arcade cabinet at all four
 facings, the cart, nightstand and spritz station turned; the recliner, beanbag, cart and nightstand bought
 coloured; the same at night (`office-night`, WebGL).
+
+## Detail pass (2026-10-22)
+
+Same keys, sizes, parts, clips and paint; draws the same or fewer.
+- **Microwave cart:** lofted trays with a raised lip, round posts on castors (plate, fork, tyred wheel), the handle bent
+  in one piece with a grip; the microwave's cavity cut into its case (`G.cut`) with a turntable and a bowl of noodles, its
+  door a `G.kit.shaker` round the window with a swept handle, soft keys, a turned dial; stuffed dinners and pizza box, a
+  cool box with a handle; cans turned with ring pulls.
+- **Beanbag:** one lofted, wrinkled body (`G.jitter`) rising into a back, with a hollow where the sitter sinks: the
+  content's seat is 0.30 m, 5 cm forward, and the old bag was 0.41 there (the gate warned 11 cm); 0.31 now. The dimple's
+  own part (`bag_light`) is gone: 2 draws (3 before), fewer triangles. Piped seam and a carry loop; a lofted controller,
+  a puffed chip bag.
+- **Snack nightstand:** a rounded cabinet, the pad piped and buttoned, a `G.kit.shaker` front panel, swept pulls, feet;
+  chip bags puffed and crimped in the drawer, a cookie, a candy bar; a turned alarm clock with its bells lying over, a
+  sock, a magazine.
+- **Spritz station:** rounded shelves, the mirror's frame turned, spray cans necked with caps, lofted bottles, the hung
+  towel draped over its bar, soft heaps of laundry with a sleeve trailing; the trigger bottle lofted with a swept trigger.
+- **Arcade cabinet:** the sides extruded from the classic profile (kick, jutting deck, sloping screen, marquee hood), the
+  side art following it, the screen puffed under its bezel, turned buttons, coin slots, a turned boot under the stick.
+- **Gaming recliner:** base, arms and back stuffed and piped, the seat stitched in channels, a lofted mini fridge with a
+  handle, a console with vents, a headset on a swept band with turned ear cups, a lofted controller.
 
 ## Rebuild
 

@@ -40,12 +40,12 @@ the shell at x = ±0.5 where the heart narrows, as they do in the old part: the 
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.romantic.candlelitTable` | 1.80 × 1.10 × 0.80 m | 4,216 | 3 | Body, Fabric, Tablecloth |
-| `model.romantic.heartTub` | 1.87 × 0.78 × 1.82 m | 5,264 | 3 | Body, Fabric |
-| `model.romantic.vanity` | 0.80 × 1.64 × 0.82 m | 4,404 | 3 | Body, Fabric, Rose gold |
-| `model.romantic.gramophone` | 0.74 × 1.58 × 0.70 m | 2,720 | 3 | Body, Horn |
-| `model.romantic.letterBureau` | 0.84 × 1.18 × 0.91 m | 2,788 | 3 | Body, Fabric |
-| `model.romantic.roseArbourSwing` | 1.84 × 2.63 × 0.82 m | 7,036 | 3 | Body, Fabric |
+| `model.romantic.candlelitTable` | 1.80 × 1.10 × 0.80 m | 5,594 (was 4,216) | 3 | Body, Fabric, Tablecloth |
+| `model.romantic.heartTub` | 1.87 × 0.78 × 1.82 m | 6,260 (was 5,264) | 3 | Body, Fabric |
+| `model.romantic.vanity` | 0.80 × 1.62 × 0.82 m | 4,238 (was 4,404) | 2 | Body, Fabric, Rose gold |
+| `model.romantic.gramophone` | 0.74 × 1.58 × 0.70 m | 4,884 (was 2,720) | 3 | Body, Horn |
+| `model.romantic.letterBureau` | 0.84 × 1.19 × 0.91 m | 3,018 (was 2,788) | 3 | Body, Fabric |
+| `model.romantic.roseArbourSwing` | 1.83 × 2.61 × 0.82 m | 11,734 (was 7,036) | 3 | Body, Fabric |
 
 Body is the table's gold legs, the tub's shell, the vanity's and bureau's ivory, the gramophone's cabinet and the
 arbour's paint; Fabric the chairs' velvet, the towels, the pouf and the swing's cushion. The gramophone has no
@@ -58,6 +58,28 @@ from behind, the swing mid-rock from the side, the cut bloom zoomed. In play (`w
 the table (candlelitDinner, seated, candles lit), the tub (petalBath, seated in the filled water), the swing (swing,
 seated, rocking) and the gramophone (listen) used by a resident; the vanity at all four facings, the gramophone and
 bureau turned; the table, tub and arbour bought coloured; the same at night (`office-night`, WebGL).
+
+## Detail pass (2026-10-22)
+
+Roses are three thick turned cups (outer petals flaring, inner, bud: thick, so their insides show from above) with
+`plants.leaf` leaves. Same keys, sizes, parts, clips, paint and draws.
+- **Candlelit table:** the cloth lofted in one piece, rolling over the edge and falling in soft folds; the runner draped
+  over both ends; chairs with a stuffed seat and a rounded back (extruded, bevelled) on tapered legs; plates turned with
+  a gold rim, a dessert with cream and a berry, forks and knives, wine in turned glasses; dripped candles and teardrop
+  flames; petals as leaf blades on the cloth.
+- **Heart tub:** the shell lofted through heart-shaped rings (up the outside, over a rolled rim, down to the floor) on an
+  eased plinth; the ice bucket with ring handles, a lofted bottle with foil; rolled towels; petals on the water as petal
+  blades, heaps of foam.
+- **Vanity:** a rounded top, the apron scalloped either side of the drawer, `G.kit.cabriole` legs, the oval mirror in a
+  swept moulded frame on a stand, lofted perfume bottles with turned stoppers, a necklace, a buttoned pouf on a ring with
+  feet, a `G.kit.knob` and a lipstick and compact in the drawer.
+- **Gramophone:** a moulded cabinet top, raised-panel doors, brass corners, a bent crank, the horn's neck swept and its
+  petals' seams, a grooved record, a turned sound box with its face.
+- **Letter bureau:** the apron's lower edge shaped, tapered square legs, an arched crest, envelopes standing tied with
+  ribbon, the flap a `G.kit.shaker` with a knob, a quill with a vane (`plants.leaf`), a turned wax seal.
+- **Rose arbour:** the arches swept, the lattice laths each one sweep, climbing canes up the posts with leaves in threes
+  and blooms, a leafy arch; the swing slatted with spindles between rails, swept arms, a stuffed cushion and pillows.
+  11,734 triangles (its class, over 2.5 m, is 12,000).
 
 ## Rebuild
 

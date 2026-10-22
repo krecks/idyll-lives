@@ -82,9 +82,6 @@
         "bag_green": {
           "finish": "material.finish.satin"
         },
-        "bag_light": {
-          "finish": "material.finish.satin"
-        },
         "bag_red": {
           "finish": "material.finish.satin"
         },
@@ -93,6 +90,9 @@
         },
         "bag_yellow": {
           "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
         },
         "dark": {
           "finish": "material.finish.satin"
@@ -104,6 +104,9 @@
           "finish": "material.finish.gloss"
         },
         "tyre": {
+          "finish": "material.finish.satin"
+        },
+        "white": {
           "finish": "material.finish.satin"
         }
       },
@@ -161,6 +164,9 @@
           "finish": "material.finish.gloss"
         },
         "pop_green": {
+          "finish": "material.finish.gloss"
+        },
+        "pop_purple": {
           "finish": "material.finish.gloss"
         },
         "pop_red": {
@@ -362,6 +368,12 @@
           "finish": "material.finish.satin"
         },
         "stripe": {
+          "finish": "material.finish.satin"
+        },
+        "tyre": {
+          "finish": "material.finish.satin"
+        },
+        "white": {
           "finish": "material.finish.satin"
         },
         "window": {

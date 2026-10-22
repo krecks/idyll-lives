@@ -57,13 +57,13 @@ the lettuce sits 2 cm into the soil, so flattened it is hidden.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.natureLover.veggieBed` | 1.87 × 1.30 × 0.91 m | 4,780 | 4 | Wood, Posts & rails |
-| `model.natureLover.pottingBench` | 1.76 × 1.79 × 0.60 m | 7,704 | 4 | Wood, Frame |
-| `model.natureLover.birdFeeder` | 0.71 × 1.78 × 0.68 m | 3,372 | 3 | Wood, Roof |
-| `model.natureLover.gardenHammock` | 2.88 × 1.19 × 0.68 m | 2,704 | 3 | Wood, Fabric, Stripes |
-| `model.natureLover.cedarShower` | 0.90 × 2.08 × 0.88 m | 5,736 | 3 | Wood, Copper |
-| `model.natureLover.mossTerrarium` | 0.48 × 1.17 × 0.70 m | 2,140 | 3 | Wood |
-| `model.natureLover.glasshouse` | 1.89 × 2.48 × 1.86 m | 7,496 | 4 | Wood, Frame, Cushions |
+| `model.natureLover.veggieBed` | 1.87 × 1.30 × 0.91 m | 7,076 (was 4,780) | 4 | Wood, Posts & rails |
+| `model.natureLover.pottingBench` | 1.76 × 1.79 × 0.60 m | 6,992 (was 7,704) | 4 | Wood, Frame |
+| `model.natureLover.birdFeeder` | 0.71 × 1.79 × 0.69 m | 5,624 (was 3,372) | 3 | Wood, Roof |
+| `model.natureLover.gardenHammock` | 2.88 × 1.18 × 0.68 m | 2,920 (was 2,704) | 3 | Wood, Fabric, Stripes |
+| `model.natureLover.cedarShower` | 0.90 × 2.08 × 0.88 m | 3,772 (was 5,736) | 3 | Wood, Copper |
+| `model.natureLover.mossTerrarium` | 0.48 × 1.17 × 0.70 m | 3,588 (was 2,140) | 3 | Wood |
+| `model.natureLover.glasshouse` | 1.88 × 2.48 × 1.86 m | 6,798 (was 7,496) | 4 | Wood, Frame, Cushions |
 
 `check-glb`: 7 models, 0 failed; warnings left: the veggie bed's, the glasshouse's and the potting bench's 4
 draw calls (above).
@@ -77,6 +77,36 @@ the plants kept). At night (`office-night`, WebGL): the glasshouse at all four f
 feeder and potting bench coloured. Not seen used in play: the potting bench, the terrarium and `pickSnack`
 (clips bench only). Residents lie along the depth, across the 2 × 1 hammock's sling, as on the old part: the
 lying direction is the engine's, not the model's.
+
+## Detail pass (2026-10-22)
+
+Every plant is now leaves (`plants.leaf`: closed, bent blades, `notch` cutting fern fronds, tomato and carrot leaves
+into leaflets) and flower faces (`plants.star`) on swept stems, in place of lumpy balls and rods; pots are turned with a
+rolled rim and a soil mound, open below the soil (never seen). Same keys, sizes, parts, clips, paint and draws.
+- **Veggie bed:** chamfered boards between posts with pyramid caps, a moulded cap rail mitred round the top
+  (`G.kit.moulding`), the soil puffed and uneven; lettuces as cupped rosettes round a heart, feathery carrot tops,
+  tomato plants winding up tapered stakes with toothed leaves and trusses of tomatoes under their calyces, a courgette's
+  big heart-shaped leaves on stalks with two swept courgettes and their flowers; a seed packet on its stick.
+- **Potting bench:** planked worktop and slatted shelf, a tongue-and-groove back board (one slab extruded from a grooved
+  outline), a peg rail with a trowel (an extruded blade) and a hand fork (swept tines), a reel of twine; herbs in rosettes,
+  a flowering pot with starred flowers on stems, seedling trays of sprouts, a lofted watering can with its rose and bent
+  handle, stuffed sacks with rolled tops, stacked pots; the seedling and bouquet built of leaves and flower faces.
+- **Bird feeder:** a post in a steel socket, the tray with a mitred lip on braces, the house's gable walls cut with a
+  round entry (`G.extrude` with a hole) under a two-board roof and a ridge cap, a perch dowel; the seed tube with a domed
+  lid, a dish with ports and a perch; a goldfinch and the landing bluebird are `G.kit.songbird`s; a stone-edged round bed
+  of flowering clumps at the foot.
+- **Hammock:** a laminated arm swept in one piece each side (no rods and spheres), the beam and feet rounded; the sling
+  a sweep per stripe with hemmed edges, round spreader bars, seven cords to a rope ring each end and a rope to the hook;
+  the pillow stuffed. The hooks stay the stand's dark wood (steel would be a draw on the still part).
+- **Cedar shower:** the copper pipe one bent tube from its floor flange up, over and down to a domed rain head, wall
+  clips, a turned valve with a swept lever; a corner post; the towel draped over a copper bar; an extruded soap shelf
+  with a soft soap; a potted plant of strap leaves.
+- **Moss terrarium:** a turned pedestal with collars, a lipped plate, a mossy mound (jittered), two tiered firs, a fern,
+  two toadstools; a lofted mister with a trigger; a braided round rug; the cloche turned with a rim and a knob.
+- **Glasshouse:** gutters along the eaves, triangular gable glass (`G.extrude`), stepping stones in the gravel; a bench of
+  slats on shaped ends with stuffed cushions (thinner: the gate's seat check found the first 2.7 cm high); orchids with
+  leaves and arching spikes of blooms, ferns cut into leaflets, potted palms, hanging baskets on three chains with
+  trailing stems.
 
 ## Rebuild
 
