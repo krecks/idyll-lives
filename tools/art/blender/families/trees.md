@@ -86,9 +86,51 @@ picked apple at 1.84, 0.7 m out), cherry 2.77, maple 3.19, oak 3.90, birch 4.66.
   the picked lemon stays at 1.62 m, on the crown's front, as `FRUIT.lemon` in `clips/uses.ts` has it.
 - The trunks the shade sit leans on are as they were (`furniture.json` `seats` rows unchanged).
 
+## Perches (2026-10-22)
+
+Every tree's entry has `perches`: the places the game's birds (`birds.py`) sit on it. Each is `[x, y, z]` in the
+model's game axes (x, height, depth: Blender (−x, z, −y)), in metres, at rest, before the entry's `scale` and the
+instance's turn. They are found on the tree as built (`gamekit/perch.py`, `perch_on`, `clump_aims`, `tier_aims`):
+
+- A broadleaf's crown: lines come in from outside towards each clump `crown` returns (out from the trunk ±50°,
+  10–55° up, steeper over the top). Where a line meets the leaves, the perch is 3 cm further in, on the outer twigs,
+  so a bird's feet are among the leaves and its body shows. A perch is kept only where the leaves face up a little at
+  least and nothing hangs over it within 25 cm. The rest are spread round the crown: the highest first, then each the
+  farthest from those kept, 35–45 cm apart at least.
+- The willow's crown gets lines from above only (lower ones would meet the curtains). Then a few perches go on bare
+  limbs: the birch has one, and the willow four under its crown inside the curtain. These are points on a limb's
+  top with nothing over it and not inside the leaves (`limb_tops`, `G.perch.bare`).
+- The conifers: the lines aim just over each tier's foot from a little above, so they meet the tier near its rim
+  where its boughs end. The top (`TOP`) is a song post. The cypress's upright column takes upright leaves too.
+- The fruit trees, the Japanese maple and the lemon tree: found on the still part before the fruit and the sprigs are
+  built, so no bird sits on an apple that is picked away.
+
+Finding them casts rays at the meshes and draws its own random numbers (each tree its own seed, 111–122), so the
+meshes and the far versions are what they were. The rebuild gave the same triangles and sizes as the table above,
+and the committed .glb files are unchanged: perches only add data. `cargo check-glb` fails a perch that isn't three
+numbers or lies over 1 cm outside the model's box. `--preview` renders `<id>@perches.png` and `<id>@perches.top.png`
+with a red ball where each bird would sit.
+
+| Model | Perches |
+|---|---|
+| `model.tree` | 19 |
+| `model.tree.maple` | 24 |
+| `model.tree.birch` | 16 (1 on a bare limb) |
+| `model.tree.blossom` | 20 |
+| `model.tree.fruit` | 16 |
+| `model.tree.japaneseMaple` | 18 |
+| `model.tree.magnolia` | 18 |
+| `model.tree.willow` | 17 (4 on bare limbs) |
+| `model.pine` | 17 (its top among them) |
+| `model.spruce` | 21 (its top among them) |
+| `model.cypress` | 15 (its top among them) |
+| `model.garden.lemonTree` | 12 |
+
+The shrubs and hedges in `plants.py` have 4–6 each, found the same way (`perches` there).
+
 ## Rebuild
 
 ```
 cargo art trees            # the .glb files, the pack, check-glb
-cargo art trees --preview  # previews/trees/<id>.png, <id>.far.png, <id>@<clip>.png
+cargo art trees --preview  # previews/trees/<id>.png, <id>.far.png, <id>@<clip>.png, <id>@perches.png
 ```
