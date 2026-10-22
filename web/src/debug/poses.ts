@@ -19,7 +19,7 @@
  * it), `?beds=wallBed,sofaBed:doze` (the same, the first use lying down unless one is named),
  * `?clip=walk` (every Sim plays that clip: `__characters.force`), `?clip=walk&strip=8` (a filmstrip:
  * the clip held at 8 times through it, on a man, a woman, a child, a teen and an elder; no stations),
- * `?bottom=bottom.skirt` (everyone who can wears that bottom),
+ * `?bottom=bottom.skirt` (everyone who can wears that bottom; `?top=top.jacket` the same for a top),
  * `?stage=teen` (a life stage: baby, child, teen, youngAdult, adult or elder) everyone placed is at,
  * where sim-core lets that stage take the place (a baby only lies in a crib; children and teens
  * don't care for a baby, flirt or kiss), with the game's look for it (stoop, grey hair); with
@@ -306,6 +306,7 @@ function seatStation(spec: string, lie: boolean): Station {
 const seats = params.get('seats')?.split(',').filter(Boolean);
 const beds = params.get('beds')?.split(',').filter(Boolean);
 const bottom = params.get('bottom');
+const top = params.get('top');
 /** `?only=`: stations whose label, object id or activity tag is one of these. */
 const named = (o: string, s: Station) => o === s.label || o === s.def || o === s.tag;
 const stations: Station[] = strip
@@ -400,6 +401,7 @@ const look = (id: number, female: boolean, stage?: string, height = 1, build = 1
     build,
     ...(stage ? { stage } : {}),
     ...(bottom ? { bottom } : {}),
+    ...(top ? { top } : {}),
   },
   traits: [],
   perks: [],

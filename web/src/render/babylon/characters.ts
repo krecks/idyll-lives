@@ -5241,11 +5241,11 @@ export class Characters {
     }
   }
 
-  /** A base body's heights for the towel and swimwear (`OutfitFit`), from its joints at rest. */
+  /** A base body's heights for the towel, swimwear and an open jacket's shirt (`OutfitFit`), from its joints at rest. */
   private outfitFit(base: BodyData): OutfitFit {
     const set = this.set!;
     const y = (bone: string) => Matrix.FromArray(base.inverseBind, set.bone[bone] * 16).invert().m[13];
-    return { chest: (y('spine_03') + y('upperarm_l')) / 2, hip: y('thigh_l'), knee: y('calf_l') };
+    return { chest: (y('spine_03') + y('upperarm_l')) / 2, hip: y('thigh_l'), knee: y('calf_l'), neck: y('neck_01') - 0.01 };
   }
 
   /**

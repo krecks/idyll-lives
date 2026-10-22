@@ -66,6 +66,12 @@ export interface OutfitParams {
   shoe: [number, number, number];
   /** 1 if the top is painted over the bottom (its hem below the waistband), else 0. */
   over: number;
+  /** What shows in an open jacket's V (`SHIRTS`; 0: none, the top's own colour). */
+  shirt: number;
+  /** Its neck line (m, the base body's height; `OutfitFit.neck`): the shirt shows below it, above it only its collar. */
+  neck: number;
+  /** 1 for clothes without hems, cuffs or a waistband (the towel, swimwear), else 0. */
+  plain: number;
   /** Age (0 young .. 1 elder): the shader deepens the skin's cavities with it. */
   age: number;
   hair: [number, number, number];
@@ -119,6 +125,16 @@ function skinColour(hex: string | undefined): [number, number, number] {
 
 const OFF = -10;
 
+/** What shows in an open jacket's V (`OutfitParams.shirt`; their colours are material.ts `SHIRTS`). */
+const SHIRTS = { white: 1, charcoal: 2, grey: 3 } as const;
+
+/** The shirt under `topPart` in `top` (linear): a suit's is white, a jacket's a tee that stands out from it. */
+function shirtUnder(topPart: string, top: readonly number[], r: number): number {
+  if (topPart === 'top.suit') return SHIRTS.white;
+  if (topPart !== 'top.jacket') return 0;
+  return luminance(top) > 0.2 ? SHIRTS.charcoal : r < 0.5 ? SHIRTS.white : SHIRTS.grey;
+}
+
 /**
  * What a Sim wears for what it does (characters.ts `wearFor`): its `day` clothes; pyjamas for a
  * night's sleep in bed (`night`: a long top and trousers in a sleep colour); its day clothes with the
@@ -134,11 +150,15 @@ export const WEARS: readonly Wear[] = ['day', 'night', 'rest', 'towel', 'swim'];
 export const SHELL_BITS = { top: 1, bottom: 2, shoes: 4 } as const;
 const ALL_SHELLS = SHELL_BITS.top | SHELL_BITS.bottom | SHELL_BITS.shoes;
 
-/** A base body's heights at rest (m, its fields' heights) the bath clothes are cut by: under the arms, the hips' and the knees' joints. */
+/**
+ * A base body's heights at rest (m, its fields' heights) the bath clothes are cut by: under the arms, the hips' and
+ * the knees' joints; and an open jacket's neck line, 1 cm under `neck_01` (as clothes.rs cuts the shell).
+ */
 export interface OutfitFit {
   chest: number;
   hip: number;
   knee: number;
+  neck: number;
 }
 
 const TOWELS = ['#F2EFE8', '#CFE0E6', '#E9D8C4', '#D8E3CF'];
@@ -181,6 +201,7 @@ export function outfitFor(
   outfit = 0,
 ): OutfitParams {
   const day = dayOutfit(id, gender, spareLook(id, gender, appearance, body, outfit), body, wear === 'night');
+  if (fit) day.neck = fit.neck;
   if (wear === 'day') return day;
   const c = [...day.cuts] as OutfitParams['cuts'];
   // Barefoot.
@@ -191,10 +212,10 @@ export function outfitFor(
     // A long top and trousers.
     const t = cut('top.long');
     const b = cut('bottom.trousers');
-    return { ...day, cuts: [t.sleeve ?? c[0], t.hem ?? c[1], t.crew ?? OFF, t.scoop ?? OFF, b.waist ?? c[4], b.leg ?? c[5], OFF], over: 0, bare: ALL_SHELLS };
+    return { ...day, cuts: [t.sleeve ?? c[0], t.hem ?? c[1], t.crew ?? OFF, t.scoop ?? OFF, b.waist ?? c[4], b.leg ?? c[5], OFF], over: 0, shirt: 0, bare: ALL_SHELLS };
   }
   const waist = cut('bottom.trousers').waist ?? 1;
-  const f = fit ?? { chest: waist + 0.25, hip: waist - 0.15, knee: waist - 0.5 };
+  const f = fit ?? { chest: waist + 0.25, hip: waist - 0.15, knee: waist - 0.5, neck: waist + 0.4 };
   const thigh = f.hip - f.knee;
   const r = (k: number) => hash(id * 31 + k);
   const male = gender === 'male';
@@ -202,13 +223,13 @@ export function outfitFor(
     const towel = hexToLinear(pick(TOWELS, r(10)), TOWELS[0]);
     // The bottom's cut alone: from under the arms (round the hips) to mid-thigh (above the knees).
     const [top, hem] = male ? [waist + 0.01, f.knee + 0.15 * thigh] : [f.chest, f.knee + 0.6 * thigh];
-    return { ...day, bottom: towel, cuts: [OFF, 10, OFF, OFF, top, hem, OFF], over: 0, bare: ALL_SHELLS };
+    return { ...day, bottom: towel, cuts: [OFF, 10, OFF, OFF, top, hem, OFF], over: 0, shirt: 0, plain: 1, bare: ALL_SHELLS };
   }
   const suit = hexToLinear(pick(SWIMWEAR, r(11)), SWIMWEAR[0]);
   // Trunks; or a swimsuit, the tank top's cut down to the top of the legs.
-  if (male) return { ...day, bottom: suit, cuts: [OFF, 10, OFF, OFF, waist - 0.03, f.knee + 0.65 * thigh, OFF], over: 0, bare: ALL_SHELLS };
+  if (male) return { ...day, bottom: suit, cuts: [OFF, 10, OFF, OFF, waist - 0.03, f.knee + 0.65 * thigh, OFF], over: 0, shirt: 0, plain: 1, bare: ALL_SHELLS };
   const t = cut('top.tank');
-  return { ...day, top: suit, cuts: [t.sleeve ?? -0.62, f.hip - 0.035, t.crew ?? OFF, t.scoop ?? 0, OFF, 10, OFF], over: 0, bare: ALL_SHELLS };
+  return { ...day, top: suit, cuts: [t.sleeve ?? -0.62, f.hip - 0.035, t.crew ?? OFF, t.scoop ?? 0, OFF, 10, OFF], over: 0, shirt: 0, plain: 1, bare: ALL_SHELLS };
 }
 
 /** Day outfit (or its colours as pyjamas, `sleep`). */
@@ -266,6 +287,10 @@ function dayOutfit(id: number, gender: string, appearance: Appearance | null | u
     bottom,
     shoe: hexToLinear(isHex(appearance?.shoesColor) ? appearance!.shoesColor : s.colour, '#3A3330'),
     over: t.over ? 1 : 0,
+    shirt: shirtUnder(topPart, top, r(12)),
+    // (Without the body's joints, from the waistband: `outfitFor` puts in the neck line when it has them.)
+    neck: (body.garments['bottom.trousers']?.waist ?? 1) + 0.4,
+    plain: 0,
     age: appearance?.stage === 'elder' ? 1 : appearance?.stage === 'adult' ? 0.4 : 0,
     hair,
     eyes: hexToLinear(appearance?.eyes ?? EYE_COLOURS[Math.floor(r(9) * EYE_COLOURS.length)], '#6B4226'),
@@ -282,7 +307,8 @@ export function writeOutfit(o: OutfitParams, row: Float32Array, offset: number):
   row.set([o.top[0], o.top[1], o.top[2], c[1]], offset + 4);
   row.set([o.bottom[0], o.bottom[1], o.bottom[2], c[2]], offset + 8);
   row.set([o.hair[0], o.hair[1], o.hair[2], c[3]], offset + 12);
-  row.set([o.over, o.age, 0, c[4]], offset + 16);
+  // (r: over the bottom 1, or 1 + the shirt + its neck line / 4; else 0, or -1 if plain.)
+  row.set([o.over ? 1 + (o.shirt ? o.shirt + o.neck / 4 : 0) : -o.plain, o.age, 0, c[4]], offset + 16);
   row.set([o.skinRef[0], o.skinRef[1], o.skinRef[2], c[5]], offset + 20);
   row.set([o.shoe[0], o.shoe[1], o.shoe[2], c[6]], offset + 24);
   row.set([o.eyes[0], o.eyes[1], o.eyes[2], o.scalp], offset + 28);
