@@ -140,7 +140,7 @@ function shirtUnder(topPart: string, top: readonly number[], r: number): number 
  * night's sleep in bed (`night`: a long top and trousers in a sleep colour); its day clothes with the
  * shoes off for a nap on a bed (`rest`); a towel in the shower, the bath and the sauna (`towel`: wrapped
  * under the arms, or round the hips for a man); swimwear in a hot tub (`swim`: a swimsuit, or trunks).
- * All are painted on the body; the shells the day clothes have (a jacket, a skirt, the soles) are drawn
+ * All are painted on the body; the shells the day clothes have (a jacket, a skirt, the shoes) are drawn
  * only with the day clothes (`bare`), so a change of clothes adds nothing to draw.
  */
 export type Wear = 'day' | 'night' | 'rest' | 'towel' | 'swim';

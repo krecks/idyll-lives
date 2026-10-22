@@ -23,8 +23,9 @@ export interface MeshPart {
   /**
    * Per-vertex shader fields (4 per vertex): body = sleeve parameter, height, crew / scoop neckline
    * distances (clothes painting; on the head, crew = scoop = -1 - scalp weight); shells = hem
-   * distance, flag (1 sole), category (0 top, 1 bottom, 2 shoes); eyes = offset from the iris centre
-   * (m), iris radius, pupil radius. See crates/tools/src/characters/garments.rs and face.rs.
+   * distance, flag (1 sole, 4 light midsole, 5 polished), category (0 top, 1 bottom, 2 shoes), on
+   * shoes the distance across the instep; eyes = offset from the iris centre (m), iris radius, pupil
+   * radius. See crates/tools/src/characters/garments.rs and face.rs.
    */
   fields: Float32Array;
   /**
