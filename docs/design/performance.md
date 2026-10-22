@@ -210,3 +210,35 @@ now), and the mirror no longer makes a pipeline in play.
 
 The remaining big win would be patching streamed models into the stand-in meshes instead of building
 again; the patch path above makes that less urgent.
+
+## Steady state: the shadow map and the mirror picking (2026-10-22)
+
+The floor above is draw-call bound: 476 draws at about 8.5 µs each (5.8 ms of the frame), while 1.5 M
+triangles cost 0.30 ms (`diag=nonature`) and MSAA 0.18 ms (`diag=noaa`). Two of those costs were paid
+for nothing.
+
+**The sun's map was drawn every frame.** `SunShadows` draws it again when something in it moved, and
+a Sim's every pose counts as a move; the pose redraws were capped only by `?shadowrate`, which
+defaulted to 0 (every change). So 181 casters, 0.9 ms of CPU and 0.25–0.6 ms of the GPU, every frame
+of play. The presets now carry `shadowRate` (Low 15 Hz, Medium and High 30 Hz); `?shadowrate` still
+overrides it. The sun's step, the walls, a thing placed or hidden still draw it at once, and nothing
+draws it while the game is paused.
+
+**The mirrors picked their glasses every frame.** `Mirrors.update` placed every mirror in the world,
+ranked them, worked out which the camera could see and which reflections to redraw — on every frame,
+though a reflection is drawn at most `rate` times a second (10 on Medium) and none of that work is
+needed on the frames between. It now returns at once unless a reflection is due and the camera (or a
+resident in its view) moved since it was drawn; `changed` (the light, lamps, things placed, a door
+opening) is never held back, so a glass still follows its door. A held reflection is looked up
+through the camera it was drawn for, so it stays on the glass.
+
+Interleaved A/B, three runs each, production build, village orbit by day, no vsync:
+
+| | fps | p50 ms | CPU draw ms | GPU ms | draws (shadow) |
+|---|---|---|---|---|---|
+| before | 162.9 / 167.2 / 175.6 | 5.6–6.0 | 5.18 / 5.44 / 5.55 | 4.33 / 4.43 / 4.72 | 476 (181) |
+| after | 183.9 / 205.3 / 205.9 | 4.7–5.4 | 4.37 / 4.41 / 4.91 | 3.68 / 3.76 / 4.23 | 328–331 (33–37) |
+
+About a millisecond of the frame and 22 fps back, and the picture at rest is unchanged: the mirror
+camera's frame differs in 337 of 2 073 600 pixels (0.016 %), none of them on the glass. The mirror
+scene (`cam=mirror`) went from 145.7 fps to 161–180.

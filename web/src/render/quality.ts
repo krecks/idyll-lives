@@ -23,6 +23,14 @@ export interface QualitySettings {
    */
   shadowMapSize: number;
   /**
+   * How many times a second the sun's map is drawn again for the residents' poses (a breathing Sim
+   * would draw it every frame: 181 casters, 0.9 ms of CPU and 0.6 ms of the GPU on the M3). Everything
+   * else that changes it (the sun's step, the walls, a thing placed or hidden) draws it at once; while
+   * the game is paused nothing does. 0: every change (about 22 fps fewer on the village orbit, Medium,
+   * WebGPU). `?shadowrate=<Hz>` overrides it.
+   */
+  shadowRate: number;
+  /**
    * 4: 4× multisampling of the HDR scene (smooth edges): 3.0 ms of Medium's 10.6 ms by day; about
    * 100 MB of memory traffic a frame at 1080p, about 4.5 ms on Intel. 1: FXAA instead (a cheap
    * filter pass; edges a little softer).
@@ -128,9 +136,9 @@ export interface RenderQuality extends QualitySettings {
 }
 
 export const QUALITY: Record<GraphicsPreset, QualitySettings> = {
-  low: { shadowMapSize: 1024, msaaSamples: 1, anisotropy: 4, clusteredLamps: false, mirrors: 1, mirrorScale: 0.4, mirrorRate: 10, lightingStep: 10, lawnDensity: 0.5, landscapeShadows: false, streetShadows: false, characterShadows: false, mergedObjectShadows: true, streetLod: 1, snapshotRendering: true, ambientRange: 0, birds: { count: 6, range: 18 } },
-  medium: { shadowMapSize: 2048, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 1, mirrorScale: 0.5, mirrorRate: 10, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, snapshotRendering: true, ambientRange: 40, birds: { count: 24, range: 35 } },
-  high: { shadowMapSize: 4096, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 2, mirrorScale: 0.75, mirrorRate: 0, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, snapshotRendering: true, ambientRange: 60, birds: { count: 40, range: 50 } },
+  low: { shadowMapSize: 1024, shadowRate: 15, msaaSamples: 1, anisotropy: 4, clusteredLamps: false, mirrors: 1, mirrorScale: 0.4, mirrorRate: 10, lightingStep: 10, lawnDensity: 0.5, landscapeShadows: false, streetShadows: false, characterShadows: false, mergedObjectShadows: true, streetLod: 1, snapshotRendering: true, ambientRange: 0, birds: { count: 6, range: 18 } },
+  medium: { shadowMapSize: 2048, shadowRate: 30, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 1, mirrorScale: 0.5, mirrorRate: 10, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, snapshotRendering: true, ambientRange: 40, birds: { count: 24, range: 35 } },
+  high: { shadowMapSize: 4096, shadowRate: 30, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 2, mirrorScale: 0.75, mirrorRate: 0, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, snapshotRendering: true, ambientRange: 60, birds: { count: 40, range: 50 } },
 };
 
 export const GRAPHICS_PRESETS = Object.keys(QUALITY) as GraphicsPreset[];

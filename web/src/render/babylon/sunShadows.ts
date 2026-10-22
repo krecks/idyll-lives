@@ -9,7 +9,7 @@
  * the game is paused (Buy and Build mode too) it isn't drawn at all.
  *
  * A Sim's every breath would draw it anew, so the poses (and the street's moving doors) are
- * throttled: `?shadowrate=<Hz>` caps how often they redraw it (0: every change, the default).
+ * throttled to the preset's `shadowRate`: `?shadowrate=<Hz>` overrides it (0: every change).
  */
 
 import { Frustum, Plane, RenderTargetTexture, type AbstractMesh, type Scene, type ShadowGenerator } from './core';
@@ -31,12 +31,14 @@ export class SunShadows {
   constructor(
     private readonly generator: ShadowGenerator,
     scene: Scene,
+    rate: number,
   ) {
     this.map = generator.getShadowMap()!;
     this.map.refreshRate = RenderTargetTexture.REFRESHRATE_RENDER_ONCE;
     this.map.getCustomRenderList = (_pass, casters, count) => (this.overview || !casters ? null : this.cull(casters, count));
-    const rate = Number(new URLSearchParams(location.search).get('shadowrate'));
-    this.interval = Number.isFinite(rate) && rate > 0 ? 1000 / Math.min(240, rate) : 0;
+    const asked = new URLSearchParams(location.search).get('shadowrate');
+    const hz = asked !== null && Number.isFinite(Number(asked)) ? Number(asked) : rate;
+    this.interval = hz > 0 ? 1000 / Math.min(240, hz) : 0;
     // A pose redraw held back waits for the interval to pass, then draws on the next frame.
     scene.onBeforeRenderObservable.add(() => {
       if (!this.pending || performance.now() - this.lastDraw < this.interval) return;
