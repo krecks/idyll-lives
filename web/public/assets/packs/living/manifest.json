@@ -24,6 +24,9 @@
         "frame": {
           "finish": "material.finish.satin"
         },
+        "gilt": {
+          "finish": "material.finish.satin"
+        },
         "inside": {
           "finish": "material.finish.matte"
         },
@@ -32,6 +35,9 @@
         },
         "metal": {
           "finish": "material.finish.metal"
+        },
+        "pages": {
+          "finish": "material.finish.satin"
         },
         "pillow": {
           "finish": "material.finish.fabric"
@@ -940,6 +946,9 @@
         "brass": {
           "finish": "material.finish.metal"
         },
+        "magazine_navy": {
+          "finish": "material.finish.matte"
+        },
         "magazine_teal": {
           "finish": "material.finish.matte"
         },
@@ -974,6 +983,15 @@
         "glass": {
           "finish": "material.finish.glass"
         },
+        "leaf_light": {
+          "finish": "material.finish.satin"
+        },
+        "magazine_navy": {
+          "finish": "material.finish.matte"
+        },
+        "magazine_teal": {
+          "finish": "material.finish.matte"
+        },
         "plant": {
           "finish": "material.finish.satin"
         },
@@ -1003,6 +1021,9 @@
           "finish": "material.finish.metal"
         },
         "magazine_navy": {
+          "finish": "material.finish.matte"
+        },
+        "magazine_teal": {
           "finish": "material.finish.matte"
         },
         "marble": {
@@ -1082,6 +1103,9 @@
         },
         "magazine_teal": {
           "finish": "material.finish.matte"
+        },
+        "pages": {
+          "finish": "material.finish.satin"
         },
         "walnut_warm": {
           "finish": "material.finish.wood"
