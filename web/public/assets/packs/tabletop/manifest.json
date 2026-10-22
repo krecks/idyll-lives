@@ -14,6 +14,9 @@
         },
         "kettle": {
           "finish": "material.finish.gloss"
+        },
+        "red": {
+          "finish": "material.finish.gloss"
         }
       },
       "paint": [
@@ -125,10 +128,16 @@
         "espresso": {
           "finish": "material.finish.metal"
         },
+        "glass_pale": {
+          "finish": "material.finish.gloss"
+        },
         "paper": {
           "finish": "material.finish.matte"
         },
         "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "red": {
           "finish": "material.finish.gloss"
         },
         "steel": {
@@ -151,6 +160,9 @@
         },
         "knife_block": {
           "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
         }
       },
       "paint": [
@@ -169,6 +181,9 @@
       "url": "../../models/tabletop/utensilCrock.glb",
       "materials": {
         "crock": {
+          "finish": "material.finish.gloss"
+        },
+        "crock_band": {
           "finish": "material.finish.gloss"
         },
         "dark": {
@@ -215,6 +230,9 @@
         },
         "steel": {
           "finish": "material.finish.metal"
+        },
+        "tomato_flesh": {
+          "finish": "material.finish.satin"
         }
       },
       "paint": [
@@ -445,6 +463,12 @@
         },
         "mug_c": {
           "finish": "material.finish.gloss"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "yellow": {
+          "finish": "material.finish.satin"
         }
       },
       "paint": [
@@ -534,6 +558,9 @@
         "book_d": {
           "finish": "material.finish.matte"
         },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
         "pages": {
           "finish": "material.finish.matte"
         },
@@ -582,6 +609,9 @@
         "brass": {
           "finish": "material.finish.metal"
         },
+        "pages": {
+          "finish": "material.finish.matte"
+        },
         "paper": {
           "finish": "material.finish.matte"
         }
@@ -623,6 +653,9 @@
         "leaf": {
           "finish": "material.finish.satin"
         },
+        "leaf_light": {
+          "finish": "material.finish.satin"
+        },
         "orange": {
           "finish": "material.finish.satin"
         },
@@ -658,9 +691,6 @@
         },
         "white": {
           "finish": "material.finish.satin"
-        },
-        "yellow": {
-          "finish": "material.finish.satin"
         }
       },
       "paint": [
@@ -675,6 +705,9 @@
       "url": "../../models/tabletop/potSucculent.glb",
       "materials": {
         "pot_pale": {
+          "finish": "material.finish.matte"
+        },
+        "sand": {
           "finish": "material.finish.matte"
         },
         "succulent": {
@@ -722,6 +755,9 @@
       "type": "model",
       "url": "../../models/tabletop/potSmall.glb",
       "materials": {
+        "crumb": {
+          "finish": "material.finish.matte"
+        },
         "leaf": {
           "finish": "material.finish.satin"
         },
@@ -733,6 +769,9 @@
         },
         "soil": {
           "finish": "material.finish.matte"
+        },
+        "white": {
+          "finish": "material.finish.satin"
         }
       },
       "paint": [
@@ -763,6 +802,9 @@
         },
         "teapot_trim": {
           "finish": "material.finish.gloss"
+        },
+        "yellow": {
+          "finish": "material.finish.satin"
         }
       },
       "paint": [
@@ -850,6 +892,9 @@
         },
         "glass": {
           "finish": "material.finish.glass"
+        },
+        "red": {
+          "finish": "material.finish.gloss"
         },
         "snow": {
           "finish": "material.finish.satin"
@@ -1011,6 +1056,15 @@
       "type": "model",
       "url": "../../models/tabletop/deskOrganiser.glb",
       "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "crumb": {
+          "finish": "material.finish.matte"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
         "organiser": {
           "finish": "material.finish.satin"
         },
@@ -1073,6 +1127,9 @@
         },
         "screen": {
           "finish": "material.finish.gloss"
+        },
+        "white": {
+          "finish": "material.finish.satin"
         }
       },
       "paint": [
@@ -1123,6 +1180,9 @@
           "finish": "material.finish.satin"
         },
         "block_e": {
+          "finish": "material.finish.satin"
+        },
+        "white": {
           "finish": "material.finish.satin"
         }
       },
