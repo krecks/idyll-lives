@@ -38,6 +38,11 @@
 //!   packed with garden things at random (`garden_cluster`, `Packed(31)`: what buying allowed).
 //!   The first sun lounger, at (10, 16) facing −z, has both its sides shut in by the beds round
 //!   it and only its foot free (I-garden-01): `check.mjs play --use-existing sunLounger`.
+//! - `review-resized`: `garden_home()` with things that have moving parts bought resized, each
+//!   against a wall of the room (`RESIZED`: a fridge two tiles wide and 30 cm taller, a toilet,
+//!   a filing cabinet, a washing machine, a wall bed three by three): their clips with the
+//!   resize (A-systems-01; resizing is off in Buy mode, `RESIZING` in `buildmode.ts`).
+//!   `review-resized-base`: the same things at their own size.
 
 mod common;
 
@@ -416,4 +421,33 @@ fn crowded_garden() {
         world.objects[at as usize].users.contains(&Some(0)) && world.sims[0].pose == sim_core::content::Pose::Lie
     });
     assert!(on, "Ada lies on the shut-in lounger");
+}
+
+/// Things with moving parts in `garden_home()`'s room, each against a wall: `(def, x, z, rot,
+/// size in cm, cm taller)` as `review-resized` resizes them (A-systems-01).
+const RESIZED: [(&str, i32, i32, i32, [u16; 2], i16); 5] = [
+    ("fridge", 4, 10, 2, [200, 100], 30),
+    ("toilet", 7, 10, 2, [100, 100], 25),
+    ("filingCabinet", 13, 10, 2, [100, 100], 40),
+    ("laundryWasher", 16, 10, 2, [200, 100], 20),
+    ("wallBed", 12, 3, 0, [300, 300], 30),
+];
+
+#[test]
+fn review_resized() {
+    for (resized, name) in [(true, "review-resized"), (false, "review-resized-base")] {
+        let (mut world, _) = common::garden_home();
+        for (def, x, z, rot, size, tall) in RESIZED {
+            let (size, tall) = if resized { (Some(size), Some(tall)) } else { (None, None) };
+            world
+                .apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, rot]), colors: Default::default(), turn: None, offset: None, size, tall })
+                .unwrap_or_else(|e| panic!("{def}: {e}"));
+            let o = world.objects.last().unwrap();
+            assert_eq!(o.tall, tall.unwrap_or(0), "{def} as bought");
+        }
+        for i in 0..world.sims.len() {
+            set_needs(&mut world, i, 0.5, &[]);
+        }
+        common::dump_state(&world, name);
+    }
 }
