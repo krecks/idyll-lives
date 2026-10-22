@@ -260,3 +260,8 @@ export function ramp(t: number, a: number, b: number): number {
 export function lerpV(a: Vec, b: Vec, t: number): Vec {
   return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 }
+/** A direction in the clip's frame turned by `yaw` degrees (as the pelvis turns it: + towards the clip's +x, the body's right). */
+export function turned(v: Vec, yaw: number): Vec {
+  const a = (yaw * Math.PI) / 180;
+  return [v[0] * Math.cos(a) + v[2] * Math.sin(a), v[1], -v[0] * Math.sin(a) + v[2] * Math.cos(a)];
+}

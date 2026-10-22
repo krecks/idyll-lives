@@ -17,7 +17,7 @@ import { cycle, mix, reference, type ClipDef, type PoseSpec, type Vec } from './
 import { breathe, hangArms, TAU } from './idle';
 import { liePose } from './lie';
 import { SEAT_MOVE, seatedBody } from './seated';
-import { addV, armIK, footIK, lerpV, smooth, sub, wrist } from './ik';
+import { addV, armIK, footIK, lerpV, smooth, sub, turned, wrist } from './ik';
 import type { Fit, Size } from './street';
 
 // --- tracks -------------------------------------------------------------------------------------
@@ -44,12 +44,6 @@ function value<T extends number | Vec>(keys: readonly K<T>[], t: number, lift: V
     return (how === 'lift' && moved ? addV(v, lift, Math.sin(Math.PI * u)) : v) as T;
   }
   return keys[keys.length - 1][1];
-}
-
-/** A direction in the clip's frame turned by `yaw` degrees (as the pelvis turns it: + towards the clip's +x, the body's right). */
-function turned(v: Vec, yaw: number): Vec {
-  const a = (yaw * Math.PI) / 180;
-  return [v[0] * Math.cos(a) + v[2] * Math.sin(a), v[1], -v[0] * Math.sin(a) + v[2] * Math.cos(a)];
 }
 
 type Side = 'l' | 'r';

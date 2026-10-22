@@ -8,7 +8,7 @@
 
 import { clip, cycle, reference, type ClipDef, type PoseSpec, type Vec } from './dsl';
 import { breathe, bump, hangArms, stand, TAU } from './idle';
-import { armIK, elbow, footIK, hang, len, lerpV, pointOn, ramp, smooth, sub, wrist } from './ik';
+import { armIK, elbow, footIK, hang, len, lerpV, pointOn, ramp, smooth, sub, turned, wrist } from './ik';
 import { SHARES_177, SHARES_181, sizes, type Fit, type Size } from './street';
 
 /**
@@ -189,8 +189,8 @@ const SHOWER_STEPS = [
 /** A foot's ankle offset from rest with the body turned `yaw` degrees about its middle (and the foot turned with it). */
 function turnedFoot(side: 'l' | 'r', yaw: number): Vec {
   const a = reference().joint(`foot_${side}`);
-  const r = (yaw * Math.PI) / 180;
-  return [a[0] * Math.cos(r) + a[2] * Math.sin(r) - a[0], 0, -a[0] * Math.sin(r) + a[2] * Math.cos(r) - a[2]];
+  const t = turned(a, yaw);
+  return [t[0] - a[0], 0, t[2] - a[2]];
 }
 
 /**
