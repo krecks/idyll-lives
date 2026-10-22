@@ -1,9 +1,15 @@
 # The kit: furniture parts more than one family makes, built once here so a better one improves every model that
-# uses it. Each takes a GameFrame (`frame`, game axes: x, height, depth) and the family's material, and adds one mesh.
+# uses it. Each takes a GameFrame (`frame`, game axes: x, height, depth) and the family's material, and adds its mesh.
 #
 #   G.kit.tube(F, 'rail', [(0, 0.2, 0), (0, 0.8, 0), (0.3, 0.9, 0)], 0.012, M.chrome)
 #   G.kit.cabriole(F, 'leg_fl', 0.31, 0.3, 0.18, M.walnut, 0.02, 0.02)
-from . import forms
+#   G.kit.pull(F, 'pull', 0, 0.45, 0.02, 0.12, M.brass)          # a bar pull on a front at depth 0.02
+#   G.kit.shaker(F, 'door', 0.6, 1.8, (0, 1, 0.15), 0.02, M.white)  # a frame-and-panel door
+import math
+
+from mathutils import Vector
+
+from . import forms, shapes
 
 
 def tube(frame, name, points, r, material, verts=8, round=3, scale=1.0):
@@ -21,4 +27,64 @@ def cabriole(frame, name, x, z, h, material, sx, sz, r=0.024, verts=6):
                        r, material, verts=verts, resolution=2, scale=[1.0, 1.05, 0.7, 1.1, 1.15])
 
 
-__all__ = ['cabriole', 'forms', 'tube']
+def fillet(points, radius, steps=3):
+    """The path through `points` (any axes) with each inner corner rounded to about `radius` (`steps` points round
+    it, on a curve that never overshoots, however uneven the spacing: Catmull-Rom loops on a short leg beside a long
+    one). For handles, bent rails and draped cloth swept with `resolution` 1."""
+    pts = [Vector(p) for p in points]
+    out = [pts[0]]
+    for a, p, c in zip(pts, pts[1:], pts[2:]):
+        d1, d2 = a - p, c - p
+        if d1.length < 1e-9 or d2.length < 1e-9 or d1.angle(d2) > 3.1415:
+            out.append(p)
+            continue
+        t = min(radius / max(1e-6, math.tan(d1.angle(d2) / 2)), d1.length * 0.5, d2.length * 0.5)
+        p1, p2 = p + d1.normalized() * t, p + d2.normalized() * t
+        for i in range(steps + 1):
+            k = i / steps
+            out.append(p1 * (1 - k) ** 2 + p * 2 * k * (1 - k) + p2 * k * k)
+    out.append(pts[-1])
+    return [tuple(p) for p in out]
+
+
+def pull(frame, name, x, y, face, length, material, r=0.006, out=0.03, upright=False, verts=8):
+    """A bar pull in one piece: out from a front at game depth `face` on two round stand-offs `length` apart
+    (across it, or `upright`), its bends rounded: a drawer's or a door's handle."""
+    h, b = length / 2, min(0.012, out * 0.45)
+    ends = [(-h, face - 0.003), (-h, face + out), (h, face + out), (h, face - 0.003)]
+    pts = [(x, y + u, z) if upright else (x + u, y, z) for u, z in ends]
+    return frame.sweep(name, fillet(pts, b), r, material, verts=verts)
+
+
+def knob(frame, name, x, y, face, r, material, segments=12):
+    """A turned knob on a front at game depth `face`: a rose against it, a waisted neck and a domed head `r` round."""
+    prof = [(0, 0), (r * 0.75, 0), (r * 0.7, r * 0.15), (r * 0.36, r * 0.35), (r * 0.42, r * 0.75), (r * 0.95, r * 1.05),
+            (r, r * 1.35), (r * 0.8, r * 1.7), (r * 0.4, r * 1.88), (0, r * 1.92)]
+    return shapes.revolve(name, prof, at=frame.at(x, y, face), material=material, segments=segments, rot=(90, 0, 0))
+
+
+def shaker(frame, name, w, h, at, t, material, rail=0.06, panel=None, recess=0.005, raised=False):
+    """A frame-and-panel front `w` x `h`, `t` thick, centred at game `at`, facing the front (a cabinet's door, a
+    drawer's front): a frame `rail` wide round a panel set back `recess`, flat, or `raised` (its edges chamfered
+    up to a field); `panel`: the panel's own material. Returns (frame, panel)."""
+    hole = forms.rounded_rect(w - 2 * rail, h - 2 * rail, 0.003, corner=1)
+    fr = frame.extrude(name, forms.rounded_rect(w, h, 0.003, corner=1), t, at, material, holes=[hole],
+                       bevel=min(0.004, t * 0.2), bevel_segments=1)
+    # (a hair inside the opening, not into the frame: a vertex buried in it would bake black, `shade.py`)
+    pw, ph = w - 2 * rail - 0.002, h - 2 * rail - 0.002
+    if not raised:
+        return fr, frame.box(f'{name}_panel', pw, ph, t - 2 * recess, at, panel or material, bevel=0.002, bevel_segments=1)
+    # a raised panel: a thin edge inside the frame, rising over a wide shallow chamfer to a flat field
+    x, y, z = at
+    b = min(rail * 0.7, pw * 0.25, ph * 0.25)
+
+    def loop(hw, hh, d):
+        return [frame.at(x + u, y + v, d) for u, v in ((hw, hh), (-hw, hh), (-hw, -hh), (hw, -hh))]
+    front = z + t / 2
+    pn = forms.loft(f'{name}_panel', [loop(pw / 2, ph / 2, z - t / 2 + 0.002), loop(pw / 2, ph / 2, front - recess - 0.004),
+                                      loop(pw / 2 - b, ph / 2 - b, front - recess * 0.2)],
+                    material=panel or material, smooth=False)
+    return fr, pn
+
+
+__all__ = ['cabriole', 'fillet', 'forms', 'knob', 'pull', 'shaker', 'tube']

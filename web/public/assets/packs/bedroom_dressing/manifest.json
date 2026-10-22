@@ -81,6 +81,9 @@
       "type": "model",
       "url": "../../models/bedroom_dressing/mirrorWall.glb",
       "materials": {
+        "bristle": {
+          "finish": "material.finish.matte"
+        },
         "brush": {
           "finish": "material.finish.gloss"
         },
@@ -90,6 +93,12 @@
         "mirror": {
           "finish": "material.finish.gloss",
           "mirror": "front"
+        },
+        "paste": {
+          "finish": "material.finish.gloss"
+        },
+        "paste_cap": {
+          "finish": "material.finish.gloss"
         },
         "wall_frame": {
           "finish": "material.finish.metal"

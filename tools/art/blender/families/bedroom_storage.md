@@ -79,22 +79,32 @@ the side: it came up through the carcass's top (and the single one's side).
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.nightstand` | 0.54 × 0.66 × 0.47 m | 1,936 | 2 | Body, Handles (a book and a mug on top, books in the niche) |
-| `model.nightstandModern` | 0.58 × 0.56 × 0.47 m | 1,616 | 2 | Body, Handles (oak top and legs) |
-| `model.nightstandRound` | 0.54 × 0.57 × 0.56 m | 2,396 | 2 | Body, Handles |
-| `model.nightstandDrawers` | 0.58 × 0.60 × 0.47 m | 1,544 | 2 | Body, Handles |
-| `model.nightstandLamp` | 0.54 × 1.08 × 0.47 m | 2,472 | 3 | Body, Shade (glows `#FFD9A0` at night) |
-| `model.cedarChest` | 0.97 × 0.505 × 0.52 m | 1,572 | 3 | Body, Handles |
-| `model.laundryHamper` | 0.48 × 0.63 × 0.48 m | 2,544 | 3 | Hamper |
-| `model.benchBedEnd` | 1.60 × 0.47 × 0.42 m | 1,680 | 2 | Frame, Cushion |
-| `model.dresser` | 1.44 × 1.35 × 0.54 m | 3,420 | 3 | Body, Handles (a picture, a vase and a box on top) |
-| `model.wardrobe` | 1.84 × 2.41 × 0.63 m | 4,428 | 3 | Body (the doors), Handles (boxes on top) |
-| `model.chestOfDrawers` | 0.88 × 1.16 × 0.51 m | 2,004 | 2 | Body, Handles |
-| `model.dresserLow` | 1.82 × 0.80 × 0.635 m | 2,936 | 3 | Body, Handles |
-| `model.wardrobeSingle` | 0.60 × 2.28 × 0.62 m | 1,788 | 2 | Body, Handles (a box on top) |
-| `model.armoire` | 1.86 × 2.11 × 0.63 m | 5,676 | 3 | Body, Handles |
+| `model.nightstand` | 0.54 × 0.66 × 0.46 m | 1,884 | 2 | Body, Handles (a shaped apron, a turned knob; a book with pages and a mug of coffee on top, books in the niche) |
+| `model.nightstandModern` | 0.58 × 0.56 × 0.47 m | 1,416 | 2 | Body, Handles (rounded oak top, splayed oak legs, a black bar pull, a lidded box in the niche) |
+| `model.nightstandRound` | 0.54 × 0.57 × 0.56 m | 2,468 | 2 | Body, Handles (a swelling drum, the drawer front between two seams, a turned knob, a moulded top) |
+| `model.nightstandDrawers` | 0.58 × 0.60 × 0.47 m | 1,968 | 2 | Body, Handles (rounded case and top, bar pulls; a lidded biscuit tin and a paperback in the drawer) |
+| `model.nightstandLamp` | 0.54 × 1.09 × 0.46 m | 3,284 | 3 | Body, Shade (glows `#FFD9A0` at night; brass foot and collar, trimmed shade on a harp, a finial) |
+| `model.cedarChest` | 0.96 × 0.505 × 0.52 m | 3,212 | 3 | Body, Handles (bracket-cut plinth, two raised panels in frames, iron corner brackets and drop handles, a brass lock; a framed raised field on the lid) |
+| `model.laundryHamper` | 0.47 × 0.63 × 0.48 m | 3,620 | 3 | Hamper (woven staves, braided bands and rim, a domed lid with a loop; rumpled washing, a sleeve over the rim) |
+| `model.benchBedEnd` | 1.60 × 0.47 × 0.42 m | 2,320 | 2 | Frame, Cushion (each end one bent brass tube, glides; a piped, buttoned, puffed cushion) |
+| `model.dresser` | 1.44 × 1.35 × 0.54 m | 4,688 | 4 | Body, Handles (bracket feet, a shaped apron, bar pulls, a moulded top; a framed picture on an easel, a turned vase, a lidded box with a clasp) |
+| `model.wardrobe` | 1.84 × 2.41 × 0.63 m | 5,036 | 3 | Body (the doors), Handles (frame-and-panel doors, hinge knuckles; clothes on wire hangers, lidded boxes with labels) |
+| `model.chestOfDrawers` | 0.88 × 1.16 × 0.51 m | 3,012 | 2 | Body, Handles (frame-and-panel drawer fronts, bar pulls, a rounded top) |
+| `model.dresserLow` | 1.82 × 0.80 × 0.64 m | 3,796 | 4 | Body, Handles (rounded case, splayed tapered legs, a shadow line under the top, black bar pulls) |
+| `model.wardrobeSingle` | 0.60 × 2.28 × 0.62 m | 2,012 | 2 | Body, Handles (a frame-and-panel door, hinge knuckles, clothes on hangers, a lidded box on top) |
+| `model.armoire` | 1.86 × 2.11 × 0.63 m | 6,296 | 3 | Body, Handles (a swept crown moulding and base moulding, turned bun feet, beaded stiles, doors with two raised panels each, turned knobs, an escutcheon) |
 
-`check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
+### Detail (2026-10-22)
+
+Rebuilt with the forms and the kit (`G.kit.pull`, `knob`, `shaker`, `fillet`), same sizes, centres, tops, parts, clips
+and draws. Fronts are `_front` ('plain': rounded; 'shaker': a frame round a recessed panel), hardware is turned or
+swept in one piece, tops rounded (`_top`), clothes on wire hangers with sloping shoulders (`_hanger`). A panel set in a
+frame stops a hair inside the opening, and no bead or cove wraps a carcass's edge: a vertex buried in another part
+bakes black (`shade.py`) and a face with only corner vertices goes dark all over (the shaker panels and the dresser's
+side did, in the lit preview).
+
+`check-glb`: 0 failed; warnings: 4 draw calls on the dresser and the low dresser (their drawers carry metal pulls,
+as before). Khronos validator: 0 errors, 0 warnings each.
 
 ## Rebuild
 
