@@ -163,7 +163,7 @@ Family: `tools/art/blender/families/living.py`.
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| `stairs` Staircase | OK | OK | OK | M-living-02 S3 code (seeded; not checked: no basement view) | `sheets/obj-stairs.png`, `scenes/stairs-*.png` |
+| `stairs` Staircase | OK | OK | OK | M-living-02 S3 code (fixed) | `sheets/obj-stairs.png`, `scenes/stairs-*.png` |
 
 ### Real uses against the content's (I1)
 
@@ -193,7 +193,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/house.ts` (the stairwell and the storey cut-away)
 - **Evidence:** Seen from some basement views the stairs lose part of their top end. It is the renderer's cut-away, not the model.
-- **Status:** not checked (neither the pilot's nor the living wave's evidence has a basement view; for the houses wave)
+- **Status:** fixed (5b1e7152)
+- **After:** the cause was the ground dug away over the basement: its plugin went on the landscape's materials, and the landscape's rocks share the plain finish with every model, so the stairs' stringer and rails (plain) lost all above 0.5 m under the ground, in the basement and in the stairwell from the ground; only the landscape's own meshes are dug now. Basement, walls up / cutaway / down, six angles: whole to the top; the village home's stairwell rail drawn again: `bench-results/review/followup/M-living-02/before/s-1-up-back.png`, `after/s-1-up-back.png`, `sheet-after*.png`, `village-stairwell-before.png`, `village-stairwell-after.png`
 - **Source:** `docs/objects/open.md` Still open › Rendering
 
 ### A-living-01 — The bean bag's snoozer lay flat at bed height, legs in the air

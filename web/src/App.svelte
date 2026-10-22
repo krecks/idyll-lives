@@ -8,7 +8,7 @@
   import { fetchState, loadDebugReport } from './debug/report';
   import { loadGameData } from './game/session';
   import { latestSave, UnloadableSave } from './persistence/saves';
-  import { settings } from './settings/settings.svelte';
+  import { settings, systemMotion } from './settings/settings.svelte';
   import { app } from './ui/app.svelte';
   import { services } from './ui/services';
   import { game, toast } from './ui/state.svelte';
@@ -186,9 +186,10 @@
     };
   });
 
-  // Live render settings (style, effects) while no game is running.
+  // Live render settings (style, effects; the system's reduce motion too) while no game is running.
   $effect(() => {
     const s = $state.snapshot(settings);
+    void systemMotion.reduced;
     if (app.screen !== 'game') host.applyMenuSettings(s);
   });
 

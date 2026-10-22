@@ -108,9 +108,9 @@ Painted garments and their shells: `crates/tools/src/characters/garments.rs`, `c
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| Clip `walk` | n/a | A-residents-03, A-residents-04 | OK | A-residents-03 S3 clip (seeded; speed 3+ not run in the pilot); A-residents-04 S3 code (seeded; not run) | `residents/strip-walk.png`, `scenes/stairs-*.png` |
+| Clip `walk` | n/a | A-residents-03, A-residents-04 | OK | A-residents-03 S3 clip (seeded; speed 3+ not run in the pilot); A-residents-04 S3 code (closed: not reproduced) | `residents/strip-walk.png`, `scenes/stairs-*.png` |
 | Clip `jog` | n/a | A-residents-10 | OK | A-residents-10 S3 clip (confirmed by check:clips) | `residents/strip-jog.png`, `play/treadmill-run-01.png` |
-| Clip `jogAlong` | n/a | A-residents-02, A-residents-03, A-residents-06 | n/a | A-residents-02 S3 clip (seeded; confirmed: seam known); A-residents-03 S3 clip (seeded); A-residents-06 S3 code (seeded) | `residents/strip-jogAlong.png` |
+| Clip `jogAlong` | n/a | A-residents-02, A-residents-03, A-residents-06 | n/a | A-residents-02 S3 clip (seeded; confirmed: seam known); A-residents-03 S3 clip (seeded); A-residents-06 S3 code (fixed) | `residents/strip-jogAlong.png` |
 
 ## Clips: seated.ts (9)
 
@@ -120,7 +120,7 @@ Painted garments and their shells: `crates/tools/src/characters/garments.rs`, `c
 |---|---|---|---|---|---|
 | Clip `sit` | n/a | A-residents-09 | OK | A-residents-09 S2 clip (confirmed) | `residents/strip-sit.png`, `sheets/seat-*.png` |
 | Clip `sitTalk` | n/a | OK | n/a |  | `residents/strip-sitTalk.png` |
-| Clip `sitDown` | n/a | A-residents-05 | OK | A-residents-05 S3 code (seeded; hidden tab not run) | `residents/strip-sitDown.png` |
+| Clip `sitDown` | n/a | A-residents-05 | OK | A-residents-05 S3 code (fixed) | `residents/strip-sitDown.png` |
 | Clip `standUp` | n/a | A-residents-01 | OK | A-residents-01 S2 code (seeded; the glide not timed in the pilot) | `residents/strip-standUp.png` |
 | Clip `sitHands` | n/a | OK | OK |  | `residents/strip-sitHands.png`, `play/computerDesk-code-01.png`, `play/piano-play-01.png` |
 | Clip `sitHandsNear` | n/a | OK | n/a |  | `residents/strip-sitHandsNear.png` |
@@ -320,7 +320,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters.ts` (walker interpolation)
 - **Evidence:** R1-04's rest: a walker standing in one snapshot wasn't interpolated (jumps up to 4.6 m at speed 5). CHANGELOG 0.3.0 (Fixes) says "Walks no longer jump at the start and the end": confirm and close.
-- **Status:** not checked (needs a headed, timed run at speeds 4–5; CHANGELOG 0.3.0 says walks no longer jump); seeded from `docs/release-0.2.0-review.md` §4 R1-04 (rest)
+- **Status:** closed (not reproduced: headed, every rig sampled each frame, 5 residents walking 30 m legs at speeds 4 and 5: no walk's first or last move exceeds its median per-frame move (0.75 m at 4, 1.5 m at 5; starts and ends ramp); the only bigger single moves are 2–3 m snaps into a use, past `SNAP_DISTANCE`, by design); seeded from `docs/release-0.2.0-review.md` §4 R1-04 (rest)
+- **After:** `bench-results/review/followup/A-residents-04/summary.txt`, `trace-speed4.json`, `trace-speed5.json`
 - **Source:** `docs/release-0.2.0-review.md` §4 (R1-04 rest); `plan/release-0.3.0.md` §3.2; `CHANGELOG.md` 0.3.0 Fixes
 
 ### A-residents-05 — After a hidden tab, someone who sat down meanwhile replays the sit-down
@@ -330,7 +331,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters.ts` (a rig drawn again)
 - **Evidence:** R1-12's fix covers residents coming back into view, not a hidden tab: they count as on screen while it is hidden. It ends on its own.
-- **Status:** not checked (a hidden tab: headless pages are never hidden); seeded from `docs/release-0.2.0-review.md` §4 R1-12 (hidden tab)
+- **Status:** fixed (29b6e53f); seeded from `docs/release-0.2.0-review.md` §4 R1-12 (hidden tab)
+- **After:** a frame over 0.5 s after the last (a hidden tab draws none) draws every resident as come into view. Hidden 15 s for real (raw CDP, another tab in front; Playwright keeps its pages visible) while two sat down: before, both played `sitDown` from the start on return; after, both are in `sit` at full weight on the first frame: `bench-results/review/followup/A-residents-05/return-before-tab-15000.txt`, `return-after-tab-15000.txt`
 - **Source:** `docs/release-0.2.0-review.md` §4 (R1-12 hidden tab, new), target 0.2.1
 
 ### A-residents-06 — Walkers jog on the spot for about 0.25 s after a hidden tab
@@ -340,7 +342,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters.ts` (walking speed estimate)
 - **Evidence:** Speed is estimated from the distance covered over the capped 0.1 s frame (8.7–22 m → 13.2 m/s), past the jog switch, then fades back over about 0.3 s. Seen in all four hidden-tab runs.
-- **Status:** not checked (a hidden tab: headless pages are never hidden); seeded from `docs/release-0.2.0-review.md` §4 "Jogging after a hidden tab"
+- **Status:** fixed (29b6e53f); seeded from `docs/release-0.2.0-review.md` §4 "Jogging after a hidden tab"
+- **After:** the same run: before, both walkers came back in `runAlong` at a 13.19 m/s estimate, `walk` again after ~0.3 s; after, `walk` throughout, the estimate 0 → 1.5 m/s in ~0.15 s: `bench-results/review/followup/A-residents-05/return-*-tab-15000.txt`
 - **Source:** `docs/release-0.2.0-review.md` §4 (new, R1), target 0.2.1
 
 ### A-residents-07 — Body language doesn't follow feelings; only the face does

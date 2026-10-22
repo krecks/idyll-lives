@@ -66,16 +66,15 @@ interface Tweaks {
   srgbColors?: boolean;
   planarUV?: boolean;
 }
-let pendingTweaks: Tweaks = {};
 
 class VertexTweaksPlugin extends MaterialPluginBase {
-  private readonly tweaks: Tweaks;
-
-  constructor(material: Material, tweaks: Tweaks) {
-    // The base constructor already asks for the shader code, before `this.tweaks` exists.
-    pendingTweaks = tweaks;
-    super(material, 'VertexTweaks', 200, undefined, true, false);
-    this.tweaks = tweaks;
+  constructor(
+    material: Material,
+    private readonly tweaks: Tweaks,
+  ) {
+    // (Its own defines: an effect is shared by materials with the same defines, so one with planar
+    // UVs and one without would otherwise draw with whichever compiled first.)
+    super(material, 'VertexTweaks', 200, { TWEAK_SRGB_COLORS: false, TWEAK_PLANAR_UV: false }, true, false);
     this._enable(true);
   }
 
@@ -87,21 +86,21 @@ class VertexTweaksPlugin extends MaterialPluginBase {
     return true;
   }
 
+  override prepareDefines(defines: MaterialDefines): void {
+    defines.TWEAK_SRGB_COLORS = !!this.tweaks.srgbColors;
+    defines.TWEAK_PLANAR_UV = !!this.tweaks.planarUV;
+  }
+
   override getCustomCode(shaderType: string, shaderLanguage?: ShaderLanguage): Nullable<{ [pointName: string]: string }> {
     if (shaderType !== 'vertex') return null;
-    const wgsl = shaderLanguage === ShaderLanguage.WGSL;
-    const tweaks = this.tweaks ?? pendingTweaks;
-    const code: { [pointName: string]: string } = {};
-    if (tweaks.planarUV) {
-      code.CUSTOM_VERTEX_UPDATE_POSITION = '#ifdef UV1\nuvUpdated = positionUpdated.xz;\n#endif\n';
-    }
-    if (tweaks.srgbColors) {
-      const body = wgsl
+    const body =
+      shaderLanguage === ShaderLanguage.WGSL
         ? 'vertexOutputs.vColor = vec4f(pow(max(vertexOutputs.vColor.rgb, vec3f(0.0)), vec3f(2.2)), vertexOutputs.vColor.a);'
         : 'vColor = vec4(pow(max(vColor.rgb, vec3(0.0)), vec3(2.2)), vColor.a);';
-      code.CUSTOM_VERTEX_MAIN_END = `#if defined(VERTEXCOLOR) || defined(INSTANCESCOLOR) && defined(INSTANCES)\n${body}\n#endif\n`;
-    }
-    return code;
+    return {
+      CUSTOM_VERTEX_UPDATE_POSITION: '#if defined(TWEAK_PLANAR_UV) && defined(UV1)\nuvUpdated = positionUpdated.xz;\n#endif\n',
+      CUSTOM_VERTEX_MAIN_END: `#ifdef TWEAK_SRGB_COLORS\n#if defined(VERTEXCOLOR) || defined(INSTANCESCOLOR) && defined(INSTANCES)\n${body}\n#endif\n#endif\n`,
+    };
   }
 }
 
@@ -320,6 +319,11 @@ export class DigState {
   on = false;
   below = -0.5;
   /**
+   * The landscape's meshes, the only ones dug away: their finishes are shared (a rock's plain
+   * finish is every model's), and the stairs down rise out of the basement through `rect`.
+   */
+  readonly meshes = new WeakSet<AbstractMesh>();
+  /**
    * The basement itself is in view: everything lit inside `rect` is underground then, out of the
    * sun (see `UndergroundPlugin`), with `lit` the share of the sun, the sky fill and the
    * environment (sky ambient and reflections) that still reaches it.
@@ -508,7 +512,7 @@ finalRadianceScaled *= underground.z;
   }
 }
 
-/** Drops the fragments of the landscape (terrain, lawn) inside the dug-out rectangle (`DigState`). */
+/** Drops the fragments of the landscape (terrain, lawn, woods: `DigState.meshes`) inside the dug-out rectangle (`DigState`). */
 class DigPlugin extends MaterialPluginBase {
   constructor(
     material: Material,
@@ -534,9 +538,9 @@ class DigPlugin extends MaterialPluginBase {
   override hardBindForSubMesh(_ubo: UniformBuffer, _scene: Scene, _engine: AbstractEngine, subMesh: SubMesh): void {
     const effect = subMesh.effect;
     if (!effect) return;
-    const { rect, on, below } = this.state;
+    const { rect, on, below, meshes } = this.state;
     effect.setFloat4('digRect', rect.x, rect.y, rect.z, rect.w);
-    effect.setFloat4('digSpan', on ? 1 : 0, below, 0, 0);
+    effect.setFloat4('digSpan', on && meshes.has(subMesh.getMesh()) ? 1 : 0, below, 0, 0);
   }
 
   override getCustomCode(shaderType: string, shaderLanguage?: ShaderLanguage): Nullable<{ [pointName: string]: string }> {
@@ -686,12 +690,17 @@ export class MaterialLibrary {
   readonly rooms: RoomLightState;
   private readonly dug = new WeakSet<Material>();
 
-  /** Makes `material` (the landscape's ground and lawn) follow `dig`. */
-  digInto(material: Material | null): void {
+  /** Makes `mesh` (the landscape's ground, lawn, woods and rocks) follow `dig`. */
+  digInto(mesh: AbstractMesh): void {
+    this.dig.meshes.add(mesh);
+    this.digMaterial(mesh.material);
+  }
+
+  private digMaterial(material: Material | null): void {
     if (!material || this.dug.has(material)) return;
     this.dug.add(material);
     const parts = (material as Material & { subMaterials?: (Material | null)[] }).subMaterials;
-    if (parts) return parts.forEach((m) => this.digInto(m));
+    if (parts) return parts.forEach((m) => this.digMaterial(m));
     if (!(material instanceof PBRMaterial || material instanceof StandardMaterial)) return;
     new DigPlugin(material, this.dig);
     // (It may have been compiled without it.)
