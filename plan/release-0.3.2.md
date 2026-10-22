@@ -1,8 +1,8 @@
 # Idyll Lives 0.3.2 — Release Plan
 
-- **Branch:** `main`
+- **Branch:** `main`; tag `v0.3.2` on be0dbdf0
 - **Base:** v0.3.1 at `d4caf7b7`
-- **Status:** Prepared (2026-10-22): version, notes and docs set; gates in §3.
+- **Status:** **Released 2026-10-22**: https://github.com/krecks/idyll-lives/releases/tag/v0.3.2 (CI 39743492102, dry run 39743507553, the tag's deploy 39745777006, live checks passed).
 - **Release type:** a feature: birds (renderer, audio and models only; the simulation and saves are as in 0.3.1)
 
 ## 1. What ships
@@ -35,7 +35,10 @@ Birds: blue tits, chaffinches, willow warblers, blackbirds and collared doves in
 
 The birds in play (headless, the village scene): 24 on Medium, 0.02–0.05 ms of main-thread time a frame; from 18:00 at speed 4 every bird was roosting by 21:18, none ever inside a house, no page errors.
 
-## 4. Release steps
+## 4. Release steps (all done 2026-10-22)
+
+Live: menu v0.3.2, Credits "Version 0.3.2 (build be0dbdf)", Shared memory on, a played household at 60 fps with no page errors and 24 birds (9 collared doves, 5 chaffinches, 5 blackbirds, 3 blue tits, 2 warblers), the LLM file 255,530,880 bytes, the vector estimator 119,568,968, `models/birds/blackbird.glb` 200.
+
 
 1. `git push origin main`.
 2. Dry run: `gh workflow run pages.yml --ref main -f deploy=false`, watched to the end.
