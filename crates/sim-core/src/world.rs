@@ -383,30 +383,23 @@ impl ObjectInstance {
         if slot == 0 && def.places.is_empty() && def.interactions.iter().any(|i| i.baby && !i.baby_bed()) {
             return c;
         }
-        if let Some(p) = def.places.get(slot) {
-            // Its place, turned with it (a freely turned one too: the place is on its model) and
-            // moved out with its size.
-            let a = self.angle();
-            let [x, z] = [0, 1].map(|k| p.at[k] * self.extent[k] as f32 / 100.0 / def.footprint[k].max(1) as f32);
-            return [c[0] + a.cos() * x + a.sin() * z, c[1] - a.sin() * x + a.cos() * z];
-        }
-        let n = def.slots.max(1) as f32;
-        // Bunks lie one above the other: both in the middle (a hair apart, so the renderer can
-        // tell the lower bunk from the upper one).
-        let spread = if def.bunk { 0.04 } else { self.extent[0] as f32 / 100.0 / n };
-        let offset = (slot as f32 - (n - 1.0) / 2.0) * spread;
-        let yaw = self.yaw();
-        // Local +x (the object's right) after rotation.
-        [c[0] + yaw.cos() * offset, c[1] - yaw.sin() * offset]
+        let [x, z] = self.slot_local(def, slot);
+        // Its place turns with it, a free turn too (the place is on its model); the spread across
+        // its width only by its `rot`.
+        let a = if slot < def.places.len() { self.angle() } else { self.yaw() };
+        [c[0] + a.cos() * x + a.sin() * z, c[1] - a.sin() * x + a.cos() * z]
     }
 
     /// Where `slot`'s user is in the object's own frame, before its free turn: metres to its
     /// right and to its front of the middle of its tiles (`slot_position` without the offset).
     pub(crate) fn slot_local(&self, def: &crate::content::ObjectDef, slot: usize) -> [f32; 2] {
+        // Its place, moved out with its size.
         if let Some(p) = def.places.get(slot) {
             return [0, 1].map(|k| p.at[k] * self.extent[k] as f32 / 100.0 / def.footprint[k].max(1) as f32);
         }
         let n = def.slots.max(1) as f32;
+        // Bunks lie one above the other: both in the middle (a hair apart, so the renderer can
+        // tell the lower bunk from the upper one).
         let spread = if def.bunk { 0.04 } else { self.extent[0] as f32 / 100.0 / n };
         [(slot as f32 - (n - 1.0) / 2.0) * spread, 0.0]
     }
@@ -1398,6 +1391,9 @@ pub struct World {
     /// not when only objects, residents or households do: views can then leave the lot out.
     pub(crate) lot_version: u32,
     pub(crate) briefs: Vec<SimBrief>,
+    /// What each household has to work on as the tick's step started (`work_waiting`), kept
+    /// from tick to tick like `briefs`.
+    work: Vec<u8>,
     /// Where Sims leave town for work.
     pub exits: Vec<[f32; 2]>,
     /// Opaque presentation data from the lot/town file, saved unchanged.
@@ -1655,6 +1651,7 @@ impl World {
             reach_version: 0,
             lot_version: 1,
             briefs: Vec::new(),
+            work: Vec::new(),
             exits: Vec::new(),
             meta: serde_json::Value::Null,
             undo: Vec::new(),
@@ -2842,7 +2839,8 @@ impl World {
         self.briefs = briefs;
         crate::lod::plan(self);
         let hour = crate::clock::hour(tick);
-        let work = self.work_waiting();
+        let mut work = std::mem::take(&mut self.work);
+        self.fill_work_waiting(&mut work);
         {
             let World {
                 content,
@@ -2895,6 +2893,7 @@ impl World {
                 step_sim(sim, &ctx, objects, items, rng);
             }
         }
+        self.work = work;
         crate::partners::update(self);
         self.broadcast();
         self.apply_messes();
@@ -3095,21 +3094,24 @@ impl World {
     /// What each household has to work on (`WorkOn` bits, by household): dirty dishes or food
     /// gone off of theirs, a load of dirty washing, a load washed.
     pub(crate) fn work_waiting(&self) -> Vec<u8> {
+        let mut work = Vec::new();
+        self.fill_work_waiting(&mut work);
+        work
+    }
+
+    /// `work_waiting`, into `work`.
+    fn fill_work_waiting(&self, work: &mut Vec<u8>) {
         use crate::content::WorkOn;
-        let mut work: Vec<u8> = self
-            .households
-            .iter()
-            .map(|h| {
-                let has = |kind: WorkOn, loads: f32| if loads >= 1.0 { kind.bit() } else { 0 };
-                has(WorkOn::Laundry, h.laundry[0]) | has(WorkOn::Washed, h.laundry[1])
-            })
-            .collect();
+        work.clear();
+        work.extend(self.households.iter().map(|h| {
+            let has = |kind: WorkOn, loads: f32| if loads >= 1.0 { kind.bit() } else { 0 };
+            has(WorkOn::Laundry, h.laundry[0]) | has(WorkOn::Washed, h.laundry[1])
+        }));
         for it in self.items.list.iter().filter(|it| it.to_clear(&self.content)) {
             if let Some(w) = work.get_mut(it.household as usize) {
                 *w |= WorkOn::Dishes.bit();
             }
         }
-        work
     }
 
     /// Applies a player command. Build and buy edits can be undone (`Command::Undo`) until time
@@ -4133,23 +4135,17 @@ pub(crate) fn footstool_slots(content: &Content, objects: &[ObjectInstance], sea
     }
     let a = o.angle();
     let (fwd, right) = ([a.sin(), a.cos()], [a.cos(), -a.sin()]);
-    let stools: Vec<[f32; 2]> = objects
-        .iter()
-        .filter(|s| content.objects[s.def].footstool && !s.broken())
-        .map(|s| {
-            let c = s.centre(content);
-            [c[0] + s.offset[0] as f32 / 100.0, c[1] + s.offset[1] as f32 / 100.0]
-        })
-        .collect();
-    (0..(def.slots as usize).min(32)).fold(0, |mask, k| {
-        let p = o.place_at(def, k);
-        let before = stools.iter().any(|s| {
-            let d = [s[0] - p[0], s[1] - p[1]];
+    let n = (def.slots as usize).min(32);
+    let places: [[f32; 2]; 32] = std::array::from_fn(|k| if k < n { o.place_at(def, k) } else { [0.0; 2] });
+    objects.iter().filter(|s| content.objects[s.def].footstool && !s.broken()).fold(0, |mask, s| {
+        let c = s.centre(content);
+        let s = [c[0] + s.offset[0] as f32 / 100.0, c[1] + s.offset[1] as f32 / 100.0];
+        (0..n).fold(mask, |mask, k| {
+            let d = [s[0] - places[k][0], s[1] - places[k][1]];
             let ahead = d[0] * fwd[0] + d[1] * fwd[1];
             let side = d[0] * right[0] + d[1] * right[1];
-            (0.3..=1.2).contains(&ahead) && side.abs() <= 0.35
-        });
-        if before { mask | 1 << k } else { mask }
+            if (0.3..=1.2).contains(&ahead) && side.abs() <= 0.35 { mask | 1 << k } else { mask }
+        })
     })
 }
 
@@ -5181,7 +5177,6 @@ fn seat_near_object(
             !o.broken() && o.can_use(sim.id, def.slots) && o.sits(def, content.life.stage(sim.age), rules.seat_tags, rules.seat_avoid)
         })
         .filter(|o| access(ctx, sim, ctx.object_plot[o.id as usize]) != Access::None)
-        .filter(|o| faces(o))
         .map(|o| {
             let (fx, fz) = ctx
                 .index
@@ -5189,15 +5184,16 @@ fn seat_near_object(
                 .approach_of(o.id)
                 .unwrap_or_else(|| o.front_tile(content));
             (
-                o.id,
+                o,
                 ctx.nav
                     .stairs
                     .distance([fx as f32 + 0.5, fz as f32 + 0.5], target),
             )
         })
-        .filter(|&(_, d)| d <= inter.seat_near)
+        // (Near enough before which way it faces: that picks a slot, and looks for footstools.)
+        .filter(|&(o, d)| d <= inter.seat_near && faces(o))
         .min_by(|a, b| a.1.total_cmp(&b.1))
-        .map(|(o, _)| o)
+        .map(|(o, _)| o.id)
 }
 
 /// A seat taken for a `seatFacing` use looks at the thing within this of straight ahead...
@@ -5743,8 +5739,8 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
                 // At their own spot, come to it (the end of a ping-pong table, their basin at a
                 // double sink: `stand_spot`), facing the way it says; else facing the thing.
                 let slot = obj.slot_of(sim.id).unwrap_or(0);
-                let spot = (!inter.carried && !inter.at_slot).then(|| crate::surface::stand_spot(content, &ctx.nav, obj, slot, inter.whole || inter.leaves.is_some())).flatten().filter(|&(_, p, _)| (p[0] - sim.pos[0]).hypot(p[1] - sim.pos[1]) < 0.75);
-                if let Some((_, p, yaw)) = spot {
+                let spot = (!inter.carried && !inter.at_slot).then(|| crate::surface::at_stand_spot(content, &ctx.nav, obj, slot, inter.whole || inter.leaves.is_some(), sim.pos)).flatten();
+                if let Some((p, yaw)) = spot {
                     sim.pos = p;
                     sim.yaw = yaw;
                 } else {

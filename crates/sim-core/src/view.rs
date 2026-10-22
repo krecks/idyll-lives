@@ -1504,12 +1504,8 @@ struct SimInfo<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     stage: Option<&'a str>,
     /// The outfit they're in (`Sim::outfit`; 0, the creator's, left out).
-    #[serde(skip_serializing_if = "is_zero_u8")]
+    #[serde(skip_serializing_if = "is_zero")]
     outfit: u8,
-}
-
-fn is_zero_u8(n: &u8) -> bool {
-    *n == 0
 }
 
 fn is_zero_u32(n: &u32) -> bool {

@@ -633,6 +633,8 @@ pub struct LifeRules {
     pub days_per_year: f32,
     /// Oldest first stage last; a resident is in the last stage whose `from` they have reached.
     pub stages: Vec<LifeStage>,
+    /// Every stage but a baby's (0 without stages).
+    pub not_baby: StageMask,
     /// Ages new residents get when nothing says otherwise.
     pub start_age: [f32; 2],
     /// Working residents retire at this age (None: never), with a weekly pension of
@@ -1297,11 +1299,7 @@ pub struct ScheduleWindow {
 
 impl ScheduleWindow {
     pub fn contains(&self, hour: f32) -> bool {
-        if self.from <= self.to {
-            (self.from..self.to).contains(&hour)
-        } else {
-            hour >= self.from || hour < self.to
-        }
+        in_hours([self.from, self.to], hour)
     }
 }
 
@@ -1559,6 +1557,9 @@ pub struct Content {
     pub animations: Vec<String>,
     /// Index of the `talk` animation (conversations), if content defines it.
     pub talk_anim: Option<usize>,
+    /// Index of the `cuddle` animation (a baby carried is shown as its lift), if content
+    /// defines it.
+    pub cuddle_anim: Option<usize>,
     /// Whether any feeling has `effects` (Sims then fold them into their modifiers).
     pub buff_feelings: bool,
     /// What routine blocks can be for, how plans steer residents, and life goals.
@@ -3464,6 +3465,7 @@ impl Content {
         }
         let life = LifeRules {
             days_per_year: raw.life.days_per_year.unwrap_or(2.0).max(0.1),
+            not_baby: if stages.is_empty() { 0 } else { every_stage & !babies },
             stages,
             start_age: [start_age[0].min(start_age[1]), start_age[0].max(start_age[1])],
             retire_at: raw.life.retire_at,
@@ -4065,6 +4067,7 @@ impl Content {
 
         let buff_feelings = feelings.iter().any(|m| m.effects.is_some());
         let talk_anim = anim_index(TALK_ANIM);
+        let cuddle_anim = anim_index("cuddle");
         let (activities, planner, goals) =
             crate::planner::parse(&raw.activities, &raw.planner, &raw.goals, &tag_index, &feelings)?;
         let phone = crate::phone::parse(&raw.phone, &ix, &animations, &life.stages)?;
@@ -4107,6 +4110,7 @@ impl Content {
             build,
             animations,
             talk_anim,
+            cuddle_anim,
             buff_feelings,
             activities,
             planner,

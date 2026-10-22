@@ -240,10 +240,6 @@ fn is_zero_i64(n: &i64) -> bool {
     *n == 0
 }
 
-fn is_zero_u8(n: &u8) -> bool {
-    *n == 0
-}
-
 fn is_zero_u32(n: &u32) -> bool {
     *n == 0
 }
@@ -331,7 +327,7 @@ pub struct SimSave {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grade: Option<f32>,
     /// The outfit they're in (`Sim::outfit`; absent before v31, or the creator's: 0).
-    #[serde(default, skip_serializing_if = "is_zero_u8")]
+    #[serde(default, skip_serializing_if = "is_zero")]
     pub outfit: u8,
     /// The day a pupil last went to school or missed it (`Sim::school_day`; absent before v32).
     #[serde(default, rename = "schoolDay", skip_serializing_if = "Option::is_none")]

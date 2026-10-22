@@ -2348,7 +2348,7 @@ fn top_lines(s: &Sampler, seats: &[[f64; 2]]) -> Vec<[f64; 2]> {
     let mid = [(lo[0] + hi[0]) / 2.0, (lo[2] + hi[2]) / 2.0];
     let quarter = [(hi[0] - lo[0]) / 4.0, (hi[2] - lo[2]) / 4.0];
     let grid = [-1.0, 0.0, 1.0].iter().flat_map(|i| [-1.0, 0.0, 1.0].map(|k| [mid[0] + i * quarter[0], mid[1] + k * quarter[1]]));
-    grid.filter(|p| seats.iter().all(|s| hypot(&[p[0] - s[0], p[1] - s[1]]) >= SEAT_CLEAR)).collect()
+    grid.filter(|p| seats.iter().all(|s| dist(p, s) >= SEAT_CLEAR)).collect()
 }
 
 /// Measures content object `f` drawn by the model `m` (its `key`) for `cargo review sizes`; `top` is its kind's

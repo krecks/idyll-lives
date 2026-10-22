@@ -189,7 +189,7 @@ fn doing(world: &World, s: &Sim) -> Doing {
         let at = if *stage == 0 { *from } else { *to };
         let using = matches!(phase, Phase::Using { .. });
         let anim = match baby {
-            Some(_) => world.content.animations.iter().position(|a| a == "cuddle"),
+            Some(_) => world.content.cuddle_anim,
             None => world.content.cooking.put_away_anim,
         }
         .filter(|_| using);
