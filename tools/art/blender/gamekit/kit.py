@@ -7,6 +7,8 @@
 #   G.kit.shaker(F, 'door', 0.6, 1.8, (0, 1, 0.15), 0.02, M.white)  # a frame-and-panel door
 #   G.kit.songbird(F, 'robin', 0.3, 1.47, -0.1, M.brown, M.red, M.beak, M.eye, turn=-20)   # perched, feet at the point
 #   G.kit.moulding(F, 'frame', [(0.25, 1.0), (0.25, 1.7), (-0.25, 1.7), (-0.25, 1.0)], [(0, 0), (0, 0.03), (0.03, 0.03), (0.03, 0)], M.gilt, at=-0.43)
+#   G.kit.scroll(F, 'curl', (0, 0.66, 0.2), (0.62, 0.2), M.iron, turns=-1.1)  # a scroll in the depth-height plane
+#   G.kit.bench_end(F, 'end', 0.8, 0.415, 0.19, -0.21, (0.885, -0.27), M.iron, arm=0.68)  # a cast-iron bench end
 import math
 
 from mathutils import Vector
@@ -164,4 +166,70 @@ def songbird(frame, name, x, y, z, body, breast, beak, eye=None, turn=0.0, size=
     return made
 
 
-__all__ = ['cabriole', 'fillet', 'forms', 'knob', 'moulding', 'pull', 'shaker', 'songbird', 'tube']
+def scroll(frame, name, start, centre, material, turns=1.1, end=0.25, t=0.02, w=0.03, steps=10, profile=None):
+    """A flat iron scroll in the depth-height plane at the game x of `start`: from `start` (x, height, depth) it
+    curls round `centre` (height, depth) by `turns`, its radius closing to `end` of where it began, tapering as it
+    goes: a bench arm's or a bracket's end."""
+    x, y0, z0 = start
+    cy, cz = centre
+    r0 = math.hypot(y0 - cy, z0 - cz)
+    a0 = math.atan2(y0 - cy, z0 - cz)
+    sign = 1 if turns > 0 else -1
+    pts = []
+    for i in range(steps + 1):
+        k = i / steps
+        r = r0 * (1 - (1 - end) * k)
+        a = a0 + sign * math.tau * abs(turns) * k
+        pts.append((x, cy + r * math.sin(a), cz + r * math.cos(a)))
+    prof = profile or forms.rounded_rect(t, w, min(t, w) * 0.3, corner=1)
+    return frame.sweep(name, pts, None, material, profile=prof, up=(1, 0, 0), scale=lambda f: 1 - 0.45 * f)
+
+
+def bench_end(frame, name, x, seat, front, back, top, material, arm=None, t=0.026, w=0.045, foot=0.06, steps=3,
+              corner=1, scrolls=True):
+    """A cast-iron bench end in one plane at game x, each member a flat bar `t` thick and `w` deep: the back leg
+    rising in one curve into the upright, leaning back to `top` (height, depth); the front leg, straight up and, with
+    an `arm` height, bent back into the armrest that meets the upright, its front curling down in a scroll; the seat
+    rail between them at `seat` (its top, under the slats); pad feet `foot` long at `front` and `back` (their depths).
+    `steps` rounds the curves (1 for a far version), `corner` the bars' edges (0: square), `scrolls` the curls."""
+    prof = forms.rounded_rect(t, w, min(t, w) * 0.3 if corner else 0, corner=max(1, corner))
+    ty, tz = top
+    rail = seat - w / 2
+    bz = back + 0.045                      # where the upright passes the seat rail
+    made = []
+    # the back leg into the upright: evenly spaced points, curved through (no corner to overshoot)
+    pts = [(x, 0.0, back), (x, seat * 0.5, back + 0.03), (x, rail, bz),
+           (x, rail + (ty - rail) * 0.5, (bz + tz) / 2 + 0.012), (x, ty, tz)]
+    made.append(frame.sweep(f'{name}_back', pts, None, material, profile=prof, up=(1, 0, 0), resolution=steps))
+
+    def upright_z(y):                      # the upright's depth at height y (above the seat), for the arm to meet
+        f = (y - rail) / (ty - rail)
+        return bz + (tz - bz) * f + 0.012 * math.sin(math.pi * f)
+    fz = front - 0.015
+    if arm is None:
+        pts = [(x, 0.0, front), (x, rail, fz)]
+        made.append(frame.sweep(f'{name}_front', pts, None, material, profile=prof, up=(1, 0, 0)))
+    else:
+        pts = fillet([(x, 0.0, front), (x, rail, fz), (x, arm - w / 2, fz - 0.005), (x, arm - w / 2, upright_z(arm) + w / 2)],
+                     0.05, steps=max(1, steps))
+        made.append(frame.sweep(f'{name}_front', pts, None, material, profile=prof, up=(1, 0, 0)))
+        if scrolls:
+            r = 0.038
+            made.append(scroll(frame, f'{name}_scroll', (x, arm - w / 2, fz - 0.012), (arm - w / 2 - r, fz - 0.012),
+                               material, turns=-1.2, t=t, w=w * 0.75, steps=4 * max(1, steps)))
+    if scrolls:
+        # a stretcher sagging between the legs, and a curl in the angle of the front leg and the seat rail
+        made.append(frame.sweep(f'{name}_stretcher', [(x, 0.13, front - 0.01), (x, 0.1, (front + back) / 2),
+                                                       (x, 0.13, back + 0.02)], None, material, profile=prof, up=(1, 0, 0),
+                                resolution=steps, scale=0.75))
+        made.append(scroll(frame, f'{name}_bracket', (x, rail - w * 0.6, fz - w * 0.4), (rail - w * 0.6 - 0.035, fz - 0.06),
+                           material, turns=0.85, t=t, w=w * 0.6, steps=4 * max(1, steps)))
+    made.append(frame.sweep(f'{name}_rail', [(x, rail, fz + 0.01), (x, rail, bz - 0.01)], None, material, profile=prof,
+                            up=(1, 0, 0)))
+    for z in (front, back):
+        made.append(frame.box(f'{name}_foot{z}', t + 0.02, 0.02, foot, (x, 0.01, z), material,
+                              bevel=0.006 if corner else 0.0, bevel_segments=1))
+    return made
+
+
+__all__ = ['bench_end', 'cabriole', 'fillet', 'forms', 'knob', 'moulding', 'pull', 'scroll', 'shaker', 'songbird', 'tube']

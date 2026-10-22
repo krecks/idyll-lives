@@ -1,7 +1,7 @@
 # The town's shop fittings and café furniture (CM4): the shop counter with its till, the bakery case,
 # the grocery shelves, the café table and the bentwood café chair. Notes: shops.md.
 #
-# They stand on town lots, seen from far and by the dozen, so each has a far version (`far=0.25`, E7).
+# They stand on town lots, seen from far and by the dozen, so each has a far version (a quarter of the triangles, E7).
 # The parts are placed in game axes (`F`), where the game places them: the counter, the case and the
 # shelves sit back on their 2 x 1 tiles as theirs do (`G.settle(centre=False)` and `centre=` on the
 # Model), the café chair's seat 2 cm forward. Two clips: the till's cash drawer slides out to the front
@@ -55,8 +55,10 @@ M = G.Palette(
     good4=('#9DAF8C', 'gloss'), good5=('#E8902E', 'gloss'), good6=('#3E5470', 'gloss'),
     good7=('#F2F0EA', 'gloss'), good8=('#8C5A3C', 'gloss'), good9=('#E9A6B4', 'gloss'),
     tinLid=('#B9BDC1', 'metal'),     # tins' and jars' lids
+    bell=('#C8CCD0', 'chrome'),      # the counter's service bell
     # the café table and chair
     marble=('#EDEAE4', 'gloss'),     # the table's top; its main part
+    vein=('#BDB8AF', 'gloss'),       # the grey veins in its marble
     iron=('#2B302E', 'metal'),       # its cast-iron foot
     bentwood=('#5A3B26', 'wood'),    # the chair's frame; its main part
     cane=('#D9C7A7', 'fabric'),      # its woven seat
@@ -108,49 +110,22 @@ def _prism(name, profile, a0, a1, material, axis='x', shift=0.0):
     return obj
 
 
-def _catmull(points, steps=4):
-    """A smooth path through `points` (game (x, height, depth)), `steps` samples a span."""
-    pts = [points[0]] + list(points) + [points[-1]]
-    out = []
-    for i in range(1, len(pts) - 2):
-        p0, p1, p2, p3 = pts[i - 1], pts[i], pts[i + 1], pts[i + 2]
-        for s in range(steps):
-            t = s / steps
-            out.append(tuple(0.5 * (2 * p1[k] + (-p0[k] + p2[k]) * t + (2 * p0[k] - 5 * p1[k] + 4 * p2[k] - p3[k]) * t * t
-                                     + (-p0[k] + 3 * p1[k] - 3 * p2[k] + p3[k]) * t ** 3) for k in range(3)))
-    out.append(points[-1])
-    return out
-
-
-def _tube(F, name, points, radius, material, steps=4):
-    """A round bar bent through `points` (game axes), capped: bentwood and cast-iron curves."""
-    cu = bpy.data.curves.new(name, 'CURVE')
-    cu.dimensions = '3D'
-    cu.bevel_depth = radius
-    cu.bevel_resolution = 1
-    cu.use_fill_caps = True
-    path = _catmull(points, steps)
-    sp = cu.splines.new('POLY')
-    sp.points.add(len(path) - 1)
-    for p, q in zip(sp.points, path):
-        p.co = (*F.at(*q), 1.0)
-    obj = bpy.data.objects.new(name, cu)
-    bpy.context.collection.objects.link(obj)
-    obj.data.materials.append(material)
-    bpy.ops.object.select_all(action='DESELECT')
-    obj.select_set(True)
-    bpy.context.view_layer.objects.active = obj
-    bpy.ops.object.convert(target='MESH')
-    bpy.ops.object.shade_smooth()
-    return bpy.context.view_layer.objects.active
-
-
 # --- the shop counter: 2x1, an oak counter with a till, a sweet jar and a magazine rack -------------
 def _tilted(cx, cy, cz, deg, dz, up):
     """A point on a plane through (cx, cy, cz) tilted `deg` back (its back edge higher): `dz` towards
     the front along it, `up` off it."""
     t = math.radians(deg)
     return (cx, cy - dz * math.sin(t) + up * math.cos(t), cz + dz * math.cos(t) + up * math.sin(t))
+
+
+def _jar(F, name, x, y, z, r, h, body, lid):
+    """A sweet jar standing at game (x, y, z): a round body, a rounded shoulder, a neck and a domed lid with a knob."""
+    bx, by, bz = F.at(x, y, z)
+    rows = [(0.0, 0.92), (0.01, 1.0), (0.78, 1.0), (0.88, 0.92), (0.93, 0.8), (0.95, 0.78)]
+    G.loft(name, [G.ring(r * k, r * k, bz + h * t, 20, at=(bx, by)) for t, k in rows], material=body)
+    G.revolve(f'{name}_lid', [(0, h * 0.94), (r * 0.82, h * 0.94), (r * 0.84, h * 0.97), (r * 0.8, h * 1.0),
+                              (r * 0.5, h * 1.06), (r * 0.18, h * 1.08), (r * 0.2, h * 1.12), (0, h * 1.14)],
+              at=(bx, by, bz), material=lid, segments=16)
 
 
 def shopCounter():
@@ -160,20 +135,24 @@ def shopCounter():
     with G.new_parts() as still:
         F.box('plinth', 1.84, 0.08, 0.64, (0, 0.04, Z - 0.01), M.walnut, bevel=0.004)
         F.box('carcass', 1.9, 0.84, 0.7, (0, 0.5, Z), M.counter, bevel=0.008)
-        F.box('worktop', 1.96, 0.05, 0.78, (0, 0.945, Z), M.walnut, bevel=0.01)
-        # the front: walnut rails and stiles framing three raised oak panels
-        F.box('rail_top', 1.9, 0.06, 0.02, (0, 0.87, FRONT + 0.01), M.walnut, bevel=0.004)
+        # the worktop: walnut with a rounded nose along its front, a cove moulding under it
+        F.extrude('worktop', [(-0.47, 0.92), (0.29, 0.92), (0.302, 0.924), (0.31, 0.936), (0.312, 0.95), (0.308, 0.962),
+                              (0.296, 0.969), (0.28, 0.97), (-0.47, 0.97)], 1.96, (0, 0, 0), M.walnut, plane='side')
+        F.sweep('cove', [(-0.95, 0.905, FRONT + 0.008), (0.95, 0.905, FRONT + 0.008)], None, M.walnut,
+                profile=[(0.012, -0.01), (0.012, 0.012), (-0.012, 0.012), (-0.012, 0.004), (0.0, 0.0), (0.006, -0.01)])
+        # the front: three frame-and-panel bays, walnut frames round raised oak panels, a walnut kick rail
         F.box('rail_bottom', 1.9, 0.08, 0.02, (0, 0.12, FRONT + 0.01), M.walnut, bevel=0.004)
-        for i, x in enumerate((-0.925, -0.31, 0.31, 0.925)):
-            F.box(f'stile{i}', 0.05, 0.68, 0.02, (x, 0.5, FRONT + 0.01), M.walnut, bevel=0.004)
         for i, x in enumerate((-0.6175, 0.0, 0.6175)):
-            F.box(f'field{i}', 0.42, 0.5, 0.024, (x, 0.5, FRONT + 0.012), M.counter, bevel=0.008)
+            G.kit.shaker(F, f'bay{i}', 0.615, 0.74, (x, 0.53, FRONT + 0.012), 0.024, M.walnut, rail=0.07,
+                         panel=M.counter, raised=True)
         # the back, the shopkeeper's side: two cupboard doors with knobs
         for i, x in enumerate((-0.47, 0.47)):
-            F.box(f'back_door{i}', 0.86, 0.7, 0.016, (x, 0.5, Z - 0.355), M.counter, bevel=0.005)
-            F.sphere(f'back_knob{i}', 0.016, (x - 0.36 * (1 if x > 0 else -1), 0.74, Z - 0.37), M.trim,
-                     segments=8, rings=5)
-        # the till: a case holding the drawer, a keypad sloping up to the back and a display on a post
+            for part in G.kit.shaker(F, f'back_door{i}', 0.86, 0.7, (x, 0.5, Z - 0.358), 0.018, M.counter, rail=0.07):
+                part.rotation_euler[2] = math.pi               # facing the back
+            G.kit.knob(F, f'back_knob{i}', x - 0.36 * (1 if x > 0 else -1), 0.74, Z - 0.367, 0.014, M.trim).rotation_euler[0] = \
+                math.radians(-90)
+        # the till: a case holding the drawer, a keypad sloping up to the back and a display on a post, a receipt
+        # printer with its paper curling out
         F.box('till_case', 0.38, 0.09, 0.34, (TX, TOP + 0.045, TZ), M.till, bevel=0.008)
         kc = (TX, TOP + 0.115, TZ - 0.04)
         F.box('till_keypad', 0.34, 0.05, 0.2, kc, M.till, bevel=0.008, rot=(12, 0, 0))
@@ -186,11 +165,17 @@ def shopCounter():
         F.box('till_display', 0.22, 0.1, 0.03, (TX, TOP + 0.255, TZ - 0.13), M.till, bevel=0.006, rot=(-15, 0, 0))
         # its screen on the display's face, which leans back 15 degrees
         F.box('till_screen', 0.18, 0.07, 0.006, (TX, TOP + 0.255 + 0.0047, TZ - 0.13 + 0.0174), M.screen, rot=(-15, 0, 0))
+        F.box('printer', 0.12, 0.08, 0.12, (TX - 0.27, TOP + 0.04, TZ - 0.05), M.till, bevel=0.012)
+        F.sweep('receipt', [(TX - 0.27, TOP + 0.075, TZ - 0.07), (TX - 0.27, TOP + 0.11, TZ - 0.06),
+                            (TX - 0.27, TOP + 0.12, TZ - 0.02), (TX - 0.27, TOP + 0.1, TZ + 0.01)], None, M.page,
+                profile=G.rounded_rect(0.07, 0.002, 0.0), up=(0, 0, 1), resolution=2)
+        # a bell to ring for service
+        G.revolve('bell', [(0, 0), (0.045, 0), (0.045, 0.008), (0.04, 0.012), (0.035, 0.03), (0.022, 0.045),
+                           (0.008, 0.05), (0.006, 0.062), (0.01, 0.066), (0, 0.068)], at=F.at(0.05, TOP, 0.18),
+                  material=M.bell, segments=14)
         # the sweet jar: a gloss jar with sweets pressed to its sides, as if seen through it
         JX, JZ = -0.2, 0.05
-        F.cyl('jar', 0.085, 0.2, (JX, TOP + 0.1, JZ), M.jar, verts=20)
-        F.cone('jar_shoulder', 0.085, 0.06, 0.03, (JX, TOP + 0.215, JZ), M.jar, verts=20)
-        F.cyl('jar_lid', 0.068, 0.035, (JX, TOP + 0.247, JZ), M.jarLid, verts=20, bevel=0.006)
+        _jar(F, 'jar', JX, TOP, JZ, 0.085, 0.23, M.jar, M.jarLid)
         sweets = (M.sweet1, M.sweet2, M.sweet3, M.sweet4, M.sweet5)
         k = 0
         for row, y in enumerate((0.03, 0.075, 0.12, 0.165)):
@@ -199,16 +184,22 @@ def shopCounter():
                 F.sphere(f'sweet{row}{j}', 0.021, (JX + 0.075 * math.sin(a), TOP + y, JZ + 0.075 * math.cos(a)),
                          sweets[k % 5], segments=6, rings=4)
                 k += 3
-        # the magazine rack: a walnut stand with four magazines leaning back
+        # the magazine rack: a walnut stand with a lip, four magazines leaning back
         RX, RZ = -0.66, -0.24
         F.box('rack_base', 0.52, 0.03, 0.18, (RX, TOP + 0.015, RZ), M.walnut, bevel=0.004)
+        F.box('rack_lip', 0.52, 0.04, 0.012, (RX, TOP + 0.04, RZ + 0.084), M.walnut, bevel=0.004)
         F.box('rack_back', 0.52, 0.22, 0.015, (RX, TOP + 0.13, RZ - 0.09), M.walnut, bevel=0.004, rot=(-15, 0, 0))
+        for s in (-1, 1):
+            F.extrude(f'rack_end{s}', [(-0.09, 0.0), (0.09, 0.0), (0.09, 0.05), (-0.06, 0.24), (-0.09, 0.24)], 0.012,
+                      (RX + s * 0.254, TOP, RZ), M.walnut, plane='side')
         for i, mag in enumerate((M.mag1, M.mag2, M.mag3, M.mag4)):
             x, z = RX - 0.18 + i * 0.12, RZ - 0.045 + (i % 2) * 0.03
             F.box(f'magazine{i}', 0.16, 0.23, 0.01, (x, TOP + 0.145, z), mag, rot=(-15, 0, 0))
             up, t = 0.09, math.radians(15)   # the title strip near the top of its leaning cover
             F.box(f'masthead{i}', 0.13, 0.03, 0.004, (x, TOP + 0.145 + up * math.cos(t) + 0.0018,
                                                        z - up * math.sin(t) + 0.0068), M.page, rot=(-15, 0, 0))
+            F.box(f'cover{i}', 0.09, 0.08, 0.004, (x, TOP + 0.11, z + 0.0068 + 0.035 * math.sin(t)), M.page,
+                  rot=(-15, 0, 0))
     G.join(still, 'counter', origin=(0, 0, 0))
 
     # the cash drawer: a front under the keypad and a tray of notes and coins hidden in the case at rest
@@ -231,6 +222,13 @@ def shopCounter():
 
 
 # --- the bakery case: 2x1, a cream cabinet under a glass display, its back doors sliding ------------
+def _arc(z0, y0, z1, y1, steps=8, inset=0.0):
+    """A quarter ellipse from (z0, y0) at the bottom front, curving up and back to (z1, y1): the display's curved
+    front (game depth, height), `inset` in from it."""
+    return [(z1 + (z0 - z1 - inset) * math.cos(math.pi / 2 * i / steps), y0 + (y1 - y0 - inset) * math.sin(math.pi / 2 * i / steps))
+            for i in range(steps + 1)]
+
+
 def bakeryCase():
     F = G.GameFrame(shift=0.04)   # 4 cm forward: the worktop's back on the wall face (-0.43)
     Z, FRONT, DECK = -0.04, 0.36, 0.78
@@ -239,49 +237,58 @@ def bakeryCase():
         F.box('plinth', 1.86, 0.06, 0.76, (0, 0.03, Z), M.rim, bevel=0.004)
         F.box('cabinet', 1.9, 0.68, 0.8, (0, 0.4, Z), M.case, bevel=0.01)
         F.box('deck', 1.94, 0.04, 0.86, (0, 0.76, Z), M.rim, bevel=0.008)
-        # the front: a band of colour over three panels
+        # the front: a band of colour over three raised panels
         F.box('band', 1.9, 0.08, 0.016, (0, 0.62, FRONT + 0.008), M.stripe, bevel=0.003)
         for i, x in enumerate((-0.62, 0.0, 0.62)):
-            F.box(f'panel{i}', 0.54, 0.38, 0.016, (x, 0.33, FRONT + 0.008), M.case, bevel=0.006)
-            F.box(f'moulding{i}', 0.46, 0.3, 0.012, (x, 0.33, FRONT + 0.018), M.case, bevel=0.005)
-        # the display: walnut ends, sloping front glass, glass top and rails
+            G.kit.shaker(F, f'panel{i}', 0.56, 0.4, (x, 0.33, FRONT + 0.01), 0.02, M.case, rail=0.06, raised=True)
+        # the display: walnut ends and a glass front curving up and back to the glass top, rails, a mirror-back frame
+        front = _arc(0.38, DECK, 0.2, 1.29)
         for s in (-1, 1):
             x = s * 0.935
-            _prism(f'end{s}', [(-0.45, DECK), (0.38, DECK), (0.2, 1.29), (-0.45, 1.29)], x - 0.015, x + 0.015, M.rim, shift=F.shift)
-        lean = math.degrees(math.atan2(0.19, 0.48))
-        F.box('glass_front', 1.84, math.hypot(0.19, 0.48), 0.01, (0, DECK + 0.24, 0.27), M.glass, rot=(-lean, 0, 0))
-        F.box('glass_top', 1.84, 0.01, 0.6, (0, 1.265, -0.125), M.glass)
+            F.extrude(f'end{s}', [(-0.45, DECK)] + front + [(-0.45, 1.29)], 0.03, (x, 0, 0), M.rim, plane='side')
+        outer = _arc(0.37, DECK, 0.2, 1.265)
+        inner = _arc(0.37, DECK, 0.2, 1.265, inset=0.01)
+        F.extrude('glass_front', outer + inner[::-1], 1.84, (0, 0, 0), M.glass, plane='side')
+        F.box('glass_top', 1.84, 0.01, 0.62, (0, 1.265, -0.115), M.glass)
         F.box('rail_front', 1.9, 0.03, 0.05, (0, 1.275, 0.18), M.rim, bevel=0.004)
         F.box('rail_back', 1.9, 0.03, 0.05, (0, 1.275, BACK), M.rim, bevel=0.004)
         F.box('track', 1.84, 0.02, 0.05, (0, DECK + 0.01, BACK), M.rim, bevel=0.003)
+        F.box('sill', 1.88, 0.02, 0.05, (0, DECK + 0.01, 0.36), M.rim, bevel=0.004)
         # the fixed back pane, in the rear track on the left
         F.box('glass_back', 0.93, 0.44, 0.008, (-0.455, 1.02, BACK - 0.01), M.glass)
         # a glass shelf over the back row, on two brackets
         F.box('glass_shelf', 1.84, 0.01, 0.28, (0, 1.03, -0.25), M.glass)
         for s in (-1, 1):
             F.box(f'bracket{s}', 0.02, 0.025, 0.28, (s * 0.905, 1.015, -0.25), M.rim)
-        # the bakes: a front row of buns, tarts and loaves on doilies, cakes and biscuits behind, and
-        # croissants and cupcakes on the shelf
+        # the bakes: a front row of buns, tarts and loaves on doilies with price cards, cakes and biscuits behind,
+        # and croissants and cupcakes on the shelf
         for i in range(6):
             x = -0.75 + i * 0.3
-            F.cyl(f'doily{i}', 0.11, 0.006, (x, DECK + 0.003, 0.14), M.tray, verts=16)
-            F.box(f'tray{i}', 0.26, 0.012, 0.2, (x, DECK + 0.006, -0.2), M.tray, bevel=0.003)
+            F.cyl(f'doily{i}', 0.11, 0.006, (x, DECK + 0.003, 0.14), M.tray, verts=14)
+            F.box(f'tray{i}', 0.26, 0.012, 0.2, (x, DECK + 0.006, -0.2), M.tray, bevel=0.003, bevel_segments=1)
+            F.box(f'card{i}', 0.06, 0.04, 0.004, (x + 0.09, DECK + 0.03, 0.25), M.tray, rot=(-20, 0, 0))
+            F.box(f'card_price{i}', 0.04, 0.008, 0.002, (x + 0.09, DECK + 0.03, 0.2525), M.choc, rot=(-20, 0, 0))
             k = i % 3
             if k == 0:
                 for j, (dx, dz) in enumerate(((-0.045, -0.03), (0.045, -0.03), (0.0, 0.04))):
                     F.sphere(f'bun{i}{j}', 0.045, (x + dx, DECK + 0.03, 0.14 + dz), M.bun, scale=(1, 1, 0.7),
-                             segments=10, rings=6)
+                             segments=10, rings=5)
+                    F.sphere(f'glaze{i}{j}', 0.022, (x + dx, DECK + 0.058, 0.14 + dz), M.cream, scale=(1, 1, 0.3),
+                             segments=6, rings=3)
             elif k == 1:
-                F.cyl(f'tart{i}', 0.085, 0.03, (x, DECK + 0.021, 0.14), M.pastry, verts=16, bevel=0.008)
-                F.cyl(f'tart_fill{i}', 0.07, 0.008, (x, DECK + 0.037, 0.14), M.jam if i < 3 else M.lemon, verts=16)
+                bx, by, bz = F.at(x, DECK + 0.006, 0.14)
+                G.loft(f'tart{i}', [_fluted(r, bz + h, 14, 0.08) for r, h in ((0.075, 0.0), (0.086, 0.028), (0.08, 0.03))],
+                       material=M.pastry, at=(bx, by, 0))
+                F.cyl(f'tart_fill{i}', 0.07, 0.008, (x, DECK + 0.032, 0.14), M.jam if i < 3 else M.lemon, verts=14)
             else:
-                F.box(f'loaf{i}', 0.19, 0.08, 0.1, (x, DECK + 0.046, 0.14), M.crust, bevel=0.03, bevel_segments=2)
+                F.soft(f'loaf{i}', 0.19, 0.08, 0.1, (x, DECK + 0.046, 0.14), M.crust, round=0.035, puff=0.012, flat=2)
                 for j in range(3):
-                    F.box(f'score{i}{j}', 0.012, 0.004, 0.08, (x - 0.05 + j * 0.05, DECK + 0.087, 0.14), M.pastry)
+                    F.box(f'score{i}{j}', 0.012, 0.004, 0.08, (x - 0.05 + j * 0.05, DECK + 0.093, 0.14), M.pastry, rot=(0, 20, 0))
             if i % 2 == 0:
                 cake = M.icing if i != 2 else M.choc
-                F.cyl(f'cake{i}', 0.09, 0.07, (x, DECK + 0.047, -0.2), M.sponge, verts=16)
-                F.cyl(f'cake_top{i}', 0.088, 0.012, (x, DECK + 0.087, -0.2), cake, verts=16, bevel=0.005)
+                F.cyl(f'cake{i}', 0.09, 0.07, (x, DECK + 0.047, -0.2), M.sponge, verts=14)
+                F.cyl(f'cake_top{i}', 0.088, 0.012, (x, DECK + 0.087, -0.2), cake, verts=14, bevel=0.005, bevel_segments=1)
+                F.cyl(f'cake_band{i}', 0.0905, 0.01, (x, DECK + 0.045, -0.2), cake, verts=14)
                 for j in range(3):
                     a = math.radians(j * 120 + 30)
                     F.sphere(f'cherry{i}{j}', 0.013, (x + 0.05 * math.sin(a), DECK + 0.1, -0.2 + 0.05 * math.cos(a)),
@@ -289,18 +296,25 @@ def bakeryCase():
             else:
                 for j in range(4):
                     F.cyl(f'biscuit{i}{j}', 0.04, 0.012, (x - 0.055 + (j % 2) * 0.11, DECK + 0.02 + (j // 2) * 0.012,
-                                                          -0.2 + (j % 2) * 0.02), M.pastry if j % 2 else M.choc, verts=10)
+                                                          -0.2 + (j % 2) * 0.02), M.pastry if j % 2 else M.choc, verts=8)
         for i in range(5):
             x = -0.72 + i * 0.36
             if i % 2 == 0:
                 for j, dx in enumerate((-0.06, 0.06)):
-                    F.sphere(f'croissant{i}{j}', 0.05, (x + dx, 1.06, -0.24), M.crust, scale=(1.5, 0.8, 0.55),
-                             segments=10, rings=6, rot=(0, 0, 25 if j else -25))
+                    # a croissant: a crescent of pastry, plump in the middle, curling to its tips
+                    t = -1 if j else 1
+                    pts = [(x + dx + 0.06 * math.cos(math.radians(a)) * t, 1.06 - 0.01 * (1 - abs(math.sin(math.radians(a)))),
+                            -0.27 + 0.04 * math.sin(math.radians(a))) for a in range(-80, 81, 32)]
+                    F.sweep(f'croissant{i}{j}', pts, 0.026, M.crust, verts=6, resolution=2,
+                            scale=lambda f: 0.35 + 0.65 * math.sin(math.pi * f))
             else:
                 for j, dx in enumerate((-0.065, 0.0, 0.065)):
-                    F.cone(f'cupcake{i}{j}', 0.022, 0.03, 0.04, (x + dx, 1.055, -0.24), M.tray, verts=10)
-                    F.sphere(f'frosting{i}{j}', 0.032, (x + dx, 1.085, -0.24), M.cream if j != 1 else M.icing,
-                             scale=(1, 1, 0.75), segments=8, rings=5)
+                    bx, by, bz = F.at(x + dx, 1.035, -0.24)
+                    G.loft(f'cupcake{i}{j}', [_fluted(r, bz + h, 8, 0.12, per=2) for r, h in ((0.022, 0.0), (0.03, 0.04))],
+                           material=M.tray, at=(bx, by, 0))
+                    G.revolve(f'frosting{i}{j}', [(0, 0.038), (0.032, 0.04), (0.03, 0.055), (0.022, 0.058), (0.02, 0.07),
+                                                  (0.01, 0.076), (0.004, 0.088), (0, 0.09)],
+                              at=(bx, by, bz), material=M.cream if j != 1 else M.icing, segments=8)
     G.join(still, 'case', origin=(0, 0, 0))
 
     # the back door: the right-hand pane, in the front track, sliding left in front of the fixed one
@@ -312,22 +326,47 @@ def bakeryCase():
     G.slide(door, 'door', (0.84, 0, 0), seconds=DOOR_SECONDS)   # Blender +x is the game's -x: to the left
 
 
+def _fluted(r, z, flutes, depth, per=3):
+    """A ring of `flutes` flutes round radius `r` at Blender height `z`, about the origin (a tart's fluted case, a
+    cupcake's paper cup, a gondola's post)."""
+    n = flutes * per
+    return [(r * (1 - depth * (0.5 + 0.5 * math.cos(flutes * math.tau * i / n))) * math.cos(math.tau * i / n),
+             r * (1 - depth * (0.5 + 0.5 * math.cos(flutes * math.tau * i / n))) * math.sin(math.tau * i / n), z)
+            for i in range(n)]
+
+
 # --- the grocery shelves: 2x1, a metal gondola of tins, packets and jars, sandwiches at the bottom ---
+def _bottle(name, foot, r, h, material, cap, frame):
+    """A bottle standing at game point `foot`: a round body, a shoulder, a neck and its cap."""
+    bx, by, bz = frame.at(*foot)
+    rings = [(0.0, 0.92), (0.03, 1.0), (0.6, 1.0), (0.76, 0.55), (0.86, 0.38), (0.94, 0.38)]
+    G.loft(name, [G.ring(r * k, r * k, bz + h * t, 8, at=(bx, by)) for t, k in rings], material=material)
+    frame.cyl(f'{name}_cap', r * 0.42, h * 0.07, (foot[0], foot[1] + h * 0.965, foot[2]), cap, verts=8)
+
+
 def groceryShelf():
     F = G.GameFrame()
     goods = (M.good1, M.good2, M.good3, M.good4, M.good5, M.good6, M.good7, M.good8, M.good9)
     with G.new_parts() as still:
+        # the gondola: shaped sides (their front edge rounded off at the top), a slotted back, a kick plate on
+        # feet, a top cap carrying a coloured header strip
+        side = [(-0.43, 0.0), (0.04, 0.0), (0.04, 1.6), (0.0, 1.68), (-0.08, 1.7), (-0.43, 1.7)]
         for s in (-1, 1):
-            F.box(f'side{s}', 0.04, 1.72, 0.47, (s * 0.94, 0.86, -0.195), M.shelf, bevel=0.008)
+            F.extrude(f'side{s}', side, 0.04, (s * 0.94, 0, 0), M.shelf, plane='side', bevel=0.006, bevel_segments=1)
         F.box('back', 1.84, 1.62, 0.025, (0, 0.89, -0.4175), M.shelf, bevel=0.004)
+        for k in range(9):                               # the back's slots, between the shelves
+            F.box(f'slot{k}', 0.012, 1.4, 0.004, (-0.8 + 0.2 * k, 0.92, -0.404), M.trim)
         F.box('kick', 1.84, 0.1, 0.44, (0, 0.05, -0.19), M.trim, bevel=0.004)
         F.box('cap', 1.92, 0.04, 0.48, (0, 1.70, -0.19), M.trim, bevel=0.006)
+        F.box('header', 1.84, 0.03, 0.003, (0, 1.70, 0.0495), M.good5)
         k = 1
         for row, y in enumerate((0.115, 0.52, 0.92, 1.32)):
             F.box(f'shelf{row}', 1.84, 0.025, 0.44, (0, y, -0.19), M.shelf, bevel=0.003)
+            # a price channel along the front: a dark lip holding a white strip and its tags
             F.box(f'lip{row}', 1.84, 0.045, 0.012, (0, y - 0.004, 0.036), M.trim, bevel=0.003)
+            F.box(f'strip{row}', 1.8, 0.022, 0.003, (0, y - 0.004, 0.0425), M.label)
             for t in range(4):
-                F.box(f'tag{row}{t}', 0.06, 0.028, 0.004, (-0.66 + t * 0.44, y - 0.004, 0.044), M.label)
+                F.box(f'tag{row}{t}', 0.06, 0.03, 0.004, (-0.66 + t * 0.44, y - 0.004, 0.045), [M.good5, M.good1][t % 2])
             x, top = -0.89, y + 0.0125
             n = 0
             while x < 0.84:
@@ -342,21 +381,22 @@ def groceryShelf():
                                z - 0.035, z + 0.035, M.bread, axis='z')
                     F.box(f'{name}_fill', 0.075, 0.014, 0.072, (cx, top + 0.05, -0.06), M.filling)
                     F.box(f'{name}_sticker', 0.05, 0.03, 0.074, (cx, top + 0.022, -0.06), c)
-                elif k % 3 == 0:  # tins, two deep
+                elif k % 3 == 0:  # tins, two deep, a label round each
                     w = 0.1
                     for j, z in enumerate((-0.28, -0.15, -0.02)):
                         F.cyl(f'{name}_{j}', 0.045, 0.12, (x + w / 2, top + 0.06, z), c, verts=10)
                         F.cyl(f'{name}_lid{j}', 0.04, 0.006, (x + w / 2, top + 0.123, z), M.tinLid, verts=10)
-                elif k % 5 == 0:  # jars
+                    F.cyl(f'{name}_label', 0.0455, 0.05, (x + w / 2, top + 0.06, -0.02), M.label, verts=10)
+                elif k % 5 == 0:  # bottles of sauce and oil
                     w = 0.11
                     for j, z in enumerate((-0.2, -0.02)):
-                        F.cyl(f'{name}_{j}', 0.045, 0.14, (x + w / 2, top + 0.07, z), c, verts=10)
-                        F.cyl(f'{name}_lid{j}', 0.047, 0.03, (x + w / 2, top + 0.155, z), M.tinLid, verts=10)
-                else:             # packets
+                        _bottle(f'{name}_{j}', (x + w / 2, top, z), 0.04, 0.2 + 0.02 * (k % 2), c, M.tinLid, F)
+                else:             # packets, a label on each and a window on some
                     w = min(0.13 + (k % 3) * 0.03, 0.92 - x)
                     h = 0.18 + (k % 4) * 0.04
                     F.box(name, w - 0.02, h, 0.3, (x + w / 2, top + h / 2, -0.15), c, bevel=0.006, bevel_segments=1)
                     F.box(f'{name}_label', w - 0.06, h * 0.3, 0.004, (x + w / 2, top + h * 0.55, 0.002), M.label)
+                    F.box(f'{name}_band', w - 0.02, 0.02, 0.004, (x + w / 2, top + h * 0.85, 0.002), M.good7 if c is not M.good7 else M.good1)
                 x += w + 0.015
     G.join(still, 'shelves', origin=(0, 0, 0))
     G.settle(centre=False)
@@ -365,22 +405,50 @@ def groceryShelf():
 # --- the café table: 1x1, a round marble top on a cast-iron tripod foot -----------------------------
 def cafeTable():
     F = G.GameFrame()
+    low, full = G.low, not G.is_low()            # its far version: the same build, coarser, without the veins and curls
     with G.new_parts() as still:
-        F.cyl('top', 0.31, 0.03, (0, TABLE_TOP - 0.015, 0), M.marble, verts=36, bevel=0.008)
-        F.cyl('collar', 0.07, 0.03, (0, TABLE_TOP - 0.045, 0), M.iron, verts=16, bevel=0.004)
+        # the marble top, its edge moulded: a square fillet over a rounded nose
+        G.revolve('top', [(0, TABLE_TOP - 0.03), (0.29, TABLE_TOP - 0.03), (0.305, TABLE_TOP - 0.024),
+                          (0.31, TABLE_TOP - 0.012), (0.308, TABLE_TOP - 0.004), (0.3, TABLE_TOP), (0, TABLE_TOP)],
+                  material=M.marble, segments=low(32, 16))
+        # grey veins wandering across the marble
+        for k, (x0, z0, x1, z1) in enumerate(((-0.24, -0.1, 0.2, 0.17), (-0.05, -0.26, 0.12, 0.05), (0.08, 0.2, 0.26, -0.02))):
+            if not full:
+                break
+            pts = []
+            for j in range(6):
+                f = j / 5
+                pts.append((x0 + (x1 - x0) * f + 0.025 * math.sin(7 * f + k), TABLE_TOP + 0.0006,
+                            z0 + (z1 - z0) * f + 0.02 * math.cos(5 * f + 2 * k)))
+            F.sweep(f'vein{k}', pts, None, M.vein, profile=G.rounded_rect(0.001, 0.006 - 0.002 * (k % 2), 0.0),
+                    resolution=2, scale=lambda f: 0.4 + 0.6 * math.sin(math.pi * f))
+        G.revolve('collar', [(0, TABLE_TOP - 0.03), (0.07, TABLE_TOP - 0.03), (0.07, TABLE_TOP - 0.04), (0.05, TABLE_TOP - 0.05),
+                             (0.03, TABLE_TOP - 0.075), (0, TABLE_TOP - 0.075)], material=M.iron, segments=low(14, 6))
+        # the spider under the top: three scrolled arms
         for i in range(3):
-            a = math.radians(i * 120 + 60)
-            G.rod(f'spider{i}', F.at(0.05 * math.sin(a), TABLE_TOP - 0.05, 0.05 * math.cos(a)),
-                  F.at(0.2 * math.sin(a), TABLE_TOP - 0.032, 0.2 * math.cos(a)), 0.01, M.iron, verts=8)
-        F.cyl('column', 0.024, 0.56, (0, 0.40, 0), M.iron, verts=12)
-        F.sphere('knop', 0.04, (0, 0.34, 0), M.iron, scale=(1, 1, 1.3), segments=12, rings=8)
-        F.cone('hub', 0.07, 0.035, 0.1, (0, 0.13, 0), M.iron, verts=16)
+            arm = F.sweep(f'spider{i}', [(0, TABLE_TOP - 0.06, 0.04), (0, TABLE_TOP - 0.04, 0.11), (0, TABLE_TOP - 0.031, 0.18)],
+                          None, M.iron, profile=G.rounded_rect(0.012, 0.014, 0.0), up=(1, 0, 0), resolution=low(2, 1))
+            arm.rotation_euler[2] = math.radians(i * 120 + 60)
+            if full:
+                curl = G.kit.scroll(F, f'spider_curl{i}', (0, TABLE_TOP - 0.031, 0.18), (TABLE_TOP - 0.05, 0.18), M.iron,
+                                    turns=-0.9, end=0.35, t=0.012, w=0.012, steps=6, profile=G.rounded_rect(0.012, 0.012, 0.0))
+                curl.rotation_euler[2] = math.radians(i * 120 + 60)
+        # the column: fluted, a turned knop, flaring into the hub
+        if full:
+            G.loft('column', [_fluted(0.024, 0.2, 8, 0.15), _fluted(0.022, TABLE_TOP - 0.07, 8, 0.15)], material=M.iron)
+        else:
+            F.cyl('column', 0.023, TABLE_TOP - 0.27, (0, (TABLE_TOP + 0.13) / 2, 0), M.iron, verts=6)
+        G.revolve('knop', [(0, 0.29), (0.026, 0.29), (0.04, 0.31), (0.045, 0.34), (0.04, 0.37), (0.026, 0.39), (0, 0.39)],
+                  material=M.iron, segments=low(12, 6))
+        G.revolve('hub', [(0, 0.08), (0.07, 0.08), (0.075, 0.1), (0.06, 0.12), (0.04, 0.16), (0.03, 0.21), (0, 0.21)],
+                  material=M.iron, segments=low(14, 6))
+        # three curved legs sweeping out and down, each ending in a scrolled toe on a round foot
         for i in range(3):
             a = math.radians(i * 120)
             pts = [(r * math.sin(a), y, r * math.cos(a)) for r, y in
                    ((0.04, 0.16), (0.1, 0.13), (0.17, 0.07), (0.23, 0.03), (0.265, 0.018))]
-            _tube(F, f'leg{i}', pts, 0.018, M.iron)
-            F.cyl(f'foot{i}', 0.03, 0.018, (0.27 * math.sin(a), 0.009, 0.27 * math.cos(a)), M.iron, verts=12)
+            F.sweep(f'leg{i}', pts, 0.018, M.iron, verts=low(6, 4), resolution=low(2, 1), scale=[1.1, 1.0, 0.85, 0.8, 0.85])
+            F.cyl(f'foot{i}', 0.03, 0.018, (0.27 * math.sin(a), 0.009, 0.27 * math.cos(a)), M.iron, verts=low(10, 6))
     G.join(still, 'table', origin=(0, 0, 0))
     G.settle(centre=False)
 
@@ -390,45 +458,93 @@ def cafeChair():
     F = G.GameFrame()
     C = SEAT_FORWARD   # the seat's centre, 2 cm forward
     with G.new_parts() as still:
-        F.cyl('seat', 0.205, 0.035, (0, SEAT - 0.04, C), M.bentwood, verts=28)
-        F.cyl('cane', 0.188, 0.03, (0, SEAT - 0.017, C), M.cane, verts=28)
-        G.torus('seat_rim', 0.196, 0.012, F.at(0, SEAT - 0.012, C), M.bentwood, major_segments=28, minor_segments=6)
-        # the front legs, splaying a little, and the ring that braces all four
+        # the seat: a bentwood ring, the woven cane dished a little inside it
+        F.cyl('seat', 0.2, 0.03, (0, SEAT - 0.042, C), M.bentwood, verts=24)
+        bx, by, _ = F.at(0, 0, C)
+        G.loft('cane', [G.ring(0.19, 0.19, SEAT - 0.03, 24, at=(bx, by)), G.ring(0.19, 0.19, SEAT - 0.012, 24, at=(bx, by)),
+                        G.ring(0.12, 0.12, SEAT - 0.016, 24, at=(bx, by)), G.ring(0.001, 0.001, SEAT - 0.018, 24, at=(bx, by))],
+               material=M.cane)
+        F.sweep('seat_rim', [(0.198 * math.cos(math.tau * i / 24), SEAT - 0.012, C + 0.198 * math.sin(math.tau * i / 24))
+                             for i in range(24)], 0.012, M.bentwood, verts=6, closed=True)
+        # the front legs, tapering and splaying a little, and the ring that braces all four
         for s in (-1, 1):
-            G.rod(f'leg{s}', F.at(s * 0.13, SEAT - 0.05, C + 0.13), F.at(s * 0.145, 0.0, C + 0.16), 0.016,
-                  M.bentwood, verts=10)
-        G.torus('leg_ring', 0.212, 0.011, F.at(0, 0.22, -0.0124), M.bentwood, major_segments=28, minor_segments=6)
-        # one bent piece: the back legs rising past the seat into the bow of the back
+            F.sweep(f'leg{s}', [(s * 0.13, SEAT - 0.04, C + 0.13), (s * 0.14, 0.22, C + 0.148), (s * 0.145, 0.0, C + 0.16)],
+                    0.017, M.bentwood, verts=8, resolution=2, scale=[1.0, 0.9, 0.75])
+            # the little bent brackets under the seat, from each front leg to the seat ring
+            F.sweep(f'knee{s}', [(s * 0.133, SEAT - 0.2, C + 0.135), (s * 0.11, SEAT - 0.12, C + 0.1),
+                                 (s * 0.09, SEAT - 0.06, C + 0.09)], 0.008, M.bentwood, verts=6, resolution=2)
+        F.sweep('leg_ring', [(0.212 * math.cos(math.tau * i / 24), 0.22, -0.0124 + 0.212 * math.sin(math.tau * i / 24))
+                             for i in range(24)], 0.011, M.bentwood, verts=6, closed=True)
+        # one bent piece: the back legs rising past the seat into the bow of the back, tapering to the feet
         side = [(0.152, 0.0, -0.192), (0.15, 0.22, -0.178), (0.152, 0.44, -0.165), (0.148, 0.66, -0.19),
                 (0.14, 0.82, -0.215), (0.09, 0.915, -0.226)]
         bow = [(-x, y, z) for x, y, z in side] + [(0.0, 0.935, -0.23)] + list(reversed(side))
-        _tube(F, 'bow', bow, 0.016, M.bentwood)
+        F.sweep('bow', bow, 0.016, M.bentwood, verts=8, resolution=3,
+                scale=lambda f: 0.75 + 0.25 * min(1.0, 4 * min(f, 1 - f)))
         # the inner loop of the back
         side = [(0.075, SEAT - 0.01, -0.17), (0.08, 0.6, -0.186), (0.065, 0.71, -0.2)]
         loop = [(-x, y, z) for x, y, z in side] + [(0.0, 0.75, -0.206)] + list(reversed(side))
-        _tube(F, 'loop', loop, 0.012, M.bentwood)
+        F.sweep('loop', loop, 0.012, M.bentwood, verts=6, resolution=3)
     G.join(still, 'chair', origin=(0, 0, 0))
     G.settle(centre=False)
 
 
 _FAR = 0.25   # placed on town lots, seen from afar: a quarter of the triangles (E7)
+FAR_FEET = 0.01      # (m) a far version keeps every vertex this close to the floor, as gamekit's far= does
+
+
+def _far(build, ratio=_FAR):
+    """A far version as gamekit's `far=ratio` (the model at rest, still, joined, decimated to `ratio`, its feet
+    kept), but with the vertices that sit on one another merged first: the cans' turned ends meet on their axis in
+    many vertices, and decimating them unmerged tore the drinks machine's cabinet into spikes 26 cm below the floor
+    (and the café table's legs away);
+    and its outermost faces kept, so its box stays the model's."""
+    import bmesh
+    import bpy
+
+    def far():
+        build()
+        bpy.context.scene.frame_set(1)
+        for o in G.meshes():
+            o.animation_data_clear()
+        obj = G.join(G.meshes(), f'{build.__name__}_far', origin=(0, 0, 0))
+        bm = bmesh.new()
+        bm.from_mesh(obj.data)
+        bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
+        bm.to_mesh(obj.data)
+        bm.free()
+        # its feet and its outermost faces are kept whole, so it stands and measures as the model does
+        lo = [min(v.co[i] for v in obj.data.vertices) for i in range(3)]
+        hi = [max(v.co[i] for v in obj.data.vertices) for i in range(3)]
+
+        def free(v):
+            return v.co.z > FAR_FEET and all(lo[i] + 0.003 < v.co[i] < hi[i] - 0.003 for i in range(3))
+        keep = obj.vertex_groups.new(name='decimate')
+        keep.add([v.index for v in obj.data.vertices if free(v)], 1.0, 'REPLACE')
+        decimate = obj.modifiers.new('far', 'DECIMATE')
+        decimate.ratio = ratio
+        decimate.vertex_group = 'decimate'
+        return [obj]
+    far.__name__ = f'{build.__name__}_far'
+    return far
+
 
 FAMILY = G.Family(
     'shops', M,
     [G.Model('shopCounter', shopCounter, size=(1.96, 1.276, 0.78), key='model.shopCounter', centre=(0, -0.04),
              # buying a little something pops the till's drawer
              motions={'uses': {'treat': 'till'}, 'hold': TILL_HOLD},
-             paint=[('counter', 'Counter'), ('walnut', 'Trim')], far=_FAR),
+             paint=[('counter', 'Counter'), ('walnut', 'Trim')], far=_far(shopCounter)),
      G.Model('bakeryCase', bakeryCase, size=(1.94, 1.29, 0.86), key='model.bakeryCase', centre=(0, 0.0),
              # buying a pastry slides the back door aside
              motions={'uses': {'pastry': 'door'}, 'hold': DOOR_HOLD},
-             paint=[('case', 'Counter'), ('rim', 'Trim')], far=_FAR),
+             paint=[('case', 'Counter'), ('rim', 'Trim')], far=_far(bakeryCase)),
      G.Model('groceryShelf', groceryShelf, size=(1.92, 1.72, 0.48), key='model.groceryShelf', centre=(0, -0.19),
-             paint=[('shelf', 'Shelves'), ('trim', 'Trim')], far=_FAR),
+             paint=[('shelf', 'Shelves'), ('trim', 'Trim')], far=_far(groceryShelf)),
      G.Model('cafeTable', cafeTable, size=(0.62, 0.745, 0.62), key='model.cafeTable',
-             paint=[('marble', 'Top'), ('iron', 'Frame')], far=_FAR),
+             paint=[('marble', 'Top'), ('iron', 'Frame')], far=G.far_of(cafeTable)),
      G.Model('cafeChair', cafeChair, size=(0.446, 0.952, 0.472), key='model.cafeChair', centre=(0, -0.008),
-             paint=[('bentwood', 'Frame'), ('cane', 'Seat')], far=_FAR)],
+             paint=[('bentwood', 'Frame'), ('cane', 'Seat')], far=_far(cafeChair))],
     comment='Blender-built shop fittings and café furniture for the town '
             '(tools/art/blender/families/shops.py). Listed in the base manifest\'s packs. Each has a far '
             'version for the town overview. The till\'s cash drawer slides out (`till`) while a resident '

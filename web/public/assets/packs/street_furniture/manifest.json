@@ -51,6 +51,9 @@
         "chrome": {
           "finish": "material.finish.chrome"
         },
+        "dark": {
+          "finish": "material.finish.matte"
+        },
         "granite": {
           "finish": "material.finish.matte"
         },
@@ -112,6 +115,9 @@
         "glass": {
           "finish": "material.finish.glass"
         },
+        "map": {
+          "finish": "material.finish.matte"
+        },
         "paper": {
           "finish": "material.finish.matte"
         },
@@ -168,6 +174,9 @@
         "cork": {
           "finish": "material.finish.matte"
         },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
         "note_blue": {
           "finish": "material.finish.satin"
         },
@@ -199,6 +208,9 @@
       "type": "model",
       "url": "../../models/street_furniture/phoneBooth.glb",
       "materials": {
+        "blue": {
+          "finish": "material.finish.gloss"
+        },
         "body": {
           "finish": "material.finish.gloss"
         },
@@ -210,6 +222,9 @@
         },
         "glass": {
           "finish": "material.finish.glass"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
         },
         "sign": {
           "finish": "material.finish.matte",
