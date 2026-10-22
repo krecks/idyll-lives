@@ -184,3 +184,43 @@ fn school_grades_homework_and_finishing_school() {
     assert!(done.n.unwrap() >= 70);
     assert!(w.sims[1].feelings.iter().any(|f| w.content.feelings[f.def].id == "proud"));
 }
+
+#[test]
+fn a_save_and_load_after_school_costs_no_missed_day() {
+    let content = SCHOOL.replace(
+        r#""school":{"start":8,"hours":7,"days":[0,1,2,3,4],"skills":{"intelligence":1}}"#,
+        r#""school":{"start":8,"hours":7,"days":[0,1,2,3,4],"skills":{"intelligence":1},
+            "grades":{"attend":2,"mood":0,"missed":6,"start":60,"good":60}}"#,
+    );
+    let town = r#"{"width":10,"depth":10,
+        "plots":[{"name":"Home","x":0,"z":0,"w":10,"d":10,"entry":[5.5,9.5]}],
+        "households":[{"name":"Player","plot":0,"player":true}],
+        "objects":[], "exits":[[5.5,9.9]],
+        "sims":[{"name":"Ada","x":4.5,"z":3.5,"age":35},{"name":"Kit","x":5.5,"z":3.5,"age":12}]}"#;
+    let mut w = World::from_json(&content, town, 1).unwrap();
+    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    // Home from Monday's school by 18:00, a day's grade the better.
+    let evening = sim_core::clock::tick_at(sim_core::clock::day(w.tick), 18.0 * 60.0).unwrap();
+    while w.tick < evening {
+        w.tick_once();
+    }
+    assert!((w.sims[1].grade - 62.0).abs() < 0.01, "a school day: {}", w.sims[1].grade);
+    let saved: serde_json::Value = serde_json::from_str(&w.save_json()).unwrap();
+    assert_eq!(saved["version"], sim_core::save::SAVE_VERSION);
+    let after_load = |save: &serde_json::Value| {
+        let mut back = World::from_save_json(&content, &save.to_string()).unwrap();
+        for _ in 0..60 * 20 {
+            back.tick_once();
+        }
+        back.sims[1].grade
+    };
+    // Loaded, the day is still the one they went to school, not one missed.
+    assert!((after_load(&saved) - 62.0).abs() < 0.01, "after a load: {}", after_load(&saved));
+    // A save from before the school day was kept (v31): after school has begun, today counts as seen to.
+    let mut v31 = saved.clone();
+    v31["version"] = 31.into();
+    for s in v31["sims"].as_array_mut().unwrap() {
+        s.as_object_mut().unwrap().remove("schoolDay");
+    }
+    assert!((after_load(&v31) - 62.0).abs() < 0.01, "after loading a v31 save: {}", after_load(&v31));
+}

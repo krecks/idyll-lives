@@ -46,8 +46,9 @@
 //! that doesn't change when other objects are sold or moved (absent: assigned on load), and
 //! `next_object_id` keeps ids from being reused after the highest one is sold; 30 = washing
 //! piles up (`households[].laundry`: loads dirty and washed; absent: one of each); 31 = the
-//! outfit a resident changed into (`sims[].outfit`; older files: 0, the creator's). Older
-//! files load. Saves
+//! outfit a resident changed into (`sims[].outfit`; older files: 0, the creator's); 32 = the
+//! day a pupil last went to school or missed it (`sims[].schoolDay`; older files: today once
+//! school has begun, so a load never costs a missed day). Older files load. Saves
 //! written before feelings were renamed from "moodlets" store them under `moodlets`; a serde
 //! alias still reads it.
 
@@ -65,7 +66,7 @@ use crate::planner::{BlockResult, Goal, HomeWish, Outcome, Planner, Reason, Rout
 use crate::world::{GameMode, Household, Plot, Task, TaskKind, World};
 use crate::{Error, MINUTES_PER_TICK, clock::MAX_SPEED};
 
-pub const SAVE_VERSION: u32 = 31;
+pub const SAVE_VERSION: u32 = 32;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -332,6 +333,9 @@ pub struct SimSave {
     /// The outfit they're in (`Sim::outfit`; absent before v31, or the creator's: 0).
     #[serde(default, skip_serializing_if = "is_zero_u8")]
     pub outfit: u8,
+    /// The day a pupil last went to school or missed it (`Sim::school_day`; absent before v32).
+    #[serde(default, rename = "schoolDay", skip_serializing_if = "Option::is_none")]
+    pub school_day: Option<u32>,
     pub pos: [f32; 2],
     pub yaw: f32,
     /// Sorted so identical worlds produce identical save files.
@@ -717,6 +721,7 @@ impl World {
                     pension: s.pension,
                     grade: content.life.stage_at(s.age).is_some_and(|st| st.school).then_some(s.grade).and_then(some_finite),
                     outfit: s.outfit,
+                    school_day: content.life.stage_at(s.age).is_some_and(|st| st.school).then_some(s.school_day),
                     pos,
                     yaw: finite(s.yaw, 0.0),
                     needs: content
@@ -1090,6 +1095,15 @@ impl World {
             }
             // (v31: residents change outfits; before it everyone wore the creator's.)
             sim.outfit = if save.version >= 31 { s.outfit % crate::world::OUTFITS } else { 0 };
+            // (v32: the school day is kept; before it, once today's school has begun it counts as
+            // seen to, or the load would mark the day missed.)
+            sim.school_day = match s.school_day {
+                Some(day) if save.version >= 32 => day,
+                _ => match crate::life::school_today(content, sim, tick) {
+                    Some((_, start, _)) if tick > start => crate::clock::day(tick),
+                    _ => 0,
+                },
+            };
             for (i, need) in content.needs.iter().enumerate() {
                 sim.needs[i] = s
                     .needs
