@@ -9,6 +9,9 @@
         "chrome": {
           "finish": "material.finish.chrome"
         },
+        "cream": {
+          "finish": "material.finish.satin"
+        },
         "cushion": {
           "finish": "material.finish.satin"
         },
@@ -127,6 +130,9 @@
         "dark": {
           "finish": "material.finish.satin"
         },
+        "dial": {
+          "finish": "material.finish.gloss"
+        },
         "field_a": {
           "finish": "material.finish.satin"
         },
@@ -212,6 +218,9 @@
         "soil": {
           "finish": "material.finish.matte"
         },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
         "teak": {
           "finish": "material.finish.satin"
         },
@@ -271,6 +280,9 @@
           "finish": "material.finish.metal"
         },
         "lamp": {
+          "finish": "material.finish.gloss"
+        },
+        "needle": {
           "finish": "material.finish.gloss"
         },
         "stones": {

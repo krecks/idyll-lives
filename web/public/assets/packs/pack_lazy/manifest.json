@@ -112,6 +112,9 @@
         "heater": {
           "finish": "material.finish.satin"
         },
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
         "lilac": {
           "finish": "material.finish.fabric"
         },
@@ -193,6 +196,9 @@
           "finish": "material.finish.satin"
         },
         "screen": {
+          "finish": "material.finish.gloss"
+        },
+        "screen_light": {
           "finish": "material.finish.gloss"
         },
         "steel": {
@@ -290,6 +296,9 @@
           "finish": "material.finish.gloss"
         },
         "ring": {
+          "finish": "material.finish.gloss"
+        },
+        "screen": {
           "finish": "material.finish.gloss"
         },
         "screen_light": {

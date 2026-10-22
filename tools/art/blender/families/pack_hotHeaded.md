@@ -38,12 +38,12 @@ moving part one more. So that it stays at 3:
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.hotHeaded.heavyBag` | 0.86 × 2.01 × 0.86 m | 3,112 | 2 | Body (the bag) |
-| `model.hotHeaded.smashBin` | 0.85 × 0.64 × 0.88 m | 3,300 | 3 | Body (the crate) |
-| `model.hotHeaded.thunderDrums` | 1.89 × 1.28 × 0.90 m | 5,672 | 3 | Body (the shells) |
-| `model.hotHeaded.coolDownCushion` | 0.90 × 0.24 × 0.90 m | 2,748 | 3 | Body (the zafu) |
-| `model.hotHeaded.grudgeJournal` | 0.84 × 1.00 × 0.68 m | 2,844 | 3 | Body (the desk's wood) |
-| `model.hotHeaded.coldPlunge` | 0.86 × 0.86 × 1.39 m | 7,140 | 3 | Body (the cedar cladding) |
+| `model.hotHeaded.heavyBag` | 0.86 × 2.01 × 0.86 m | 5,564 | 2 | Body (the bag) |
+| `model.hotHeaded.smashBin` | 0.85 × 0.64 × 0.88 m | 2,860 | 3 | Body (the crate) |
+| `model.hotHeaded.thunderDrums` | 1.89 × 1.29 × 0.90 m | 7,914 | 3 | Body (the shells) |
+| `model.hotHeaded.coolDownCushion` | 0.90 × 0.24 × 0.90 m | 3,918 | 3 | Body (the zafu) |
+| `model.hotHeaded.grudgeJournal` | 0.84 × 1.00 × 0.68 m | 3,540 | 3 | Body (the desk's wood) |
+| `model.hotHeaded.coldPlunge` | 0.87 × 0.86 × 1.39 m | 5,182 | 3 | Body (the cedar cladding) |
 
 The desk's lamp is a little lower than the old part's (1.02 m against 1.11 m), the only size that differs by more
 than 2 %.
@@ -54,6 +54,38 @@ from the side, the drawer from behind). In play (`wants-asking`, WebGPU): the dr
 plunge, the desk, the crate and the cushion used, each clip playing (the crate's lid shut again after its hold);
 all six turned to rot 2 in the yard, the plunge and drums to rot 0, 1 and 3; colours on the clips bench; at night
 (`office-night`, WebGL) in the house.
+
+## Detail pass (2026-10-22)
+
+Rebuilt with the forms and the kit, keeping every key, size, centre, part, hinge, clip, `motions` and `paint`
+(triangles before → after: bag 3,112 → 5,564, crate 3,300 → 2,860, drums 5,672 → 7,914, cushion 2,748 → 3,918,
+desk 2,844 → 3,540, plunge 7,140 → 5,182; draws unchanged). The crate and the plunge came down: their boxes' bevels
+were the default two segments (108 triangles a board); one segment is enough at this size.
+
+- `heavyBag`: the upright and boom bent from one square tube (`kit.fillet`), gussets, a round brace with flanges, a
+  T foot with rubber caps; weight plates turned with a raised rim on L-shaped pegs; gloves with swept thumbs, turned
+  cuffs and straps, hung by their laces. The bag: a rounded leather body, raised straps and seams, a flame logo (an
+  outline), a turned swivel, four D-rings and four chains of oval links.
+- `smashBin`: slats set a hair out of true, steel corner brackets, a stencilled arrow; jagged shards (outlines); a
+  jittered straw bed; a turned stool on splayed legs with a foot ring; soft goggles with lenses and a strap round
+  the post.
+- `thunderDrums`: drums with hoops and lugs (the toms' hoops now sit on their shells' ends: the old offsets put them
+  on the wrong side of the tilt), a bass drum with a port, spurs, a pedal and beater; tripod stands with braces,
+  clamps and rubber feet; a hi-hat with its pedal; cymbals with bells, felts and wingnuts; a padded throne; a rug with
+  a border; sticks on the floor tom; the amp with a grille panel, a recessed speaker cone, knobs, a light, a handle
+  and corner caps.
+- `coolDownCushion`: a soft tufted zabuton; a singing bowl on a ring cushion and turned stand, a mallet; a candle on a
+  dish; a potted plant of swept leaves; a leaf-shaped incense holder, the stick with its ash. The zafu: lofted with
+  pleats round its side gathering into its buttoned top, piping and a carrying loop.
+- `grudgeJournal`: hairpin legs (one swept rod each), the journal with curved pages and a ribbon, a pen with its
+  clip, jittered crumples, a waste bin with a crumple in it, a ribbed cactus (fluted loft) with a flower, a jointed
+  lamp with a spring and a deep shade; the chair with swept legs, a curved upholstered back and rail. The drawer: an
+  inset front and a bar pull towards the writer, letters with flaps.
+- `coldPlunge`: cedar boards a hair proud or shy, corner posts, two steel bands swept round, a moulded rim in one
+  piece; bevelled ice; the housing with end caps; the chiller with a slotted grille (an outline with holes), buttons,
+  feet and hoses arching into the tub (`kit.fillet`), a soft towel with a band, a lofted bottle.
+
+`check-glb`: 6 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
 
 ## Rebuild
 

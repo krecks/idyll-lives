@@ -42,12 +42,12 @@ already moves, so it costs no draw. A mist puff of its own would be a fourth dra
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.loner.quietPod` | 0.84 × 1.54 × 0.77 m | 3,300 | 3 | Body, Wood, Cushions |
-| `model.loner.shortwaveRadio` | 0.84 × 1.33 × 0.68 m | 3,564 | 3 | Body, Wood, Seat |
-| `model.loner.puzzleTable` | 0.87 × 1.01 × 0.72 m | 2,516 | 3 | Body, Wood |
-| `model.loner.bonsaiBench` | 0.86 × 1.31 × 0.75 m | 5,056 | 3 | Body, Wood, Pot |
-| `model.loner.soloSauna` | 0.94 × 2.09 × 1.71 m | 3,728 | 4 | Wood, Trim |
-| `model.loner.deliveryHatch` | 0.84 × 1.95 × 0.84 m | 2,232 | 3 | Body, Wood |
+| `model.loner.quietPod` | 0.84 × 1.55 × 0.78 m | 7,472 | 3 | Body, Wood, Cushions |
+| `model.loner.shortwaveRadio` | 0.84 × 1.33 × 0.68 m | 3,526 | 3 | Body, Wood, Seat |
+| `model.loner.puzzleTable` | 0.86 × 1.01 × 0.72 m | 4,530 | 3 | Body, Wood |
+| `model.loner.bonsaiBench` | 0.86 × 1.31 × 0.75 m | 4,706 | 3 | Body, Wood, Pot |
+| `model.loner.soloSauna` | 0.94 × 2.09 × 1.70 m | 5,004 | 4 | Wood, Trim |
+| `model.loner.deliveryHatch` | 0.84 × 1.95 × 0.84 m | 2,680 | 3 | Body, Wood |
 
 The plan's colour parts are "Body, Wood" for all six; the sauna is all wood, so its parts are the cedar (Wood)
 and the dark cedar trim (the door pull).
@@ -58,6 +58,37 @@ on the bench (`&colors=`). In play (`wants-asking`, WebGPU): all six bought in t
 the hood swings over the seated reader), the sauna (`sweat`: the door opens and shuts after 1.5 s with the resident
 seated inside), the radio (`tune`) and the hatch (`order`: it opens as the resident arrives) used. At night
 (`office-night`, WebGL): the sauna at all four facings in the yard, the other five coloured.
+
+## Detail pass (2026-10-22)
+
+Rebuilt with the forms and the kit, keeping every key, size, centre, part, hinge, clip, `motions` and `paint`
+(triangles before → after: pod 3,300 → 7,472, radio 3,564 → 3,526, puzzle 2,516 → 4,530, bonsai 5,056 → 4,706,
+sauna 3,728 → 5,004, hatch 2,232 → 2,680; draws unchanged). The radio desk stays under its 4,000 (0.35–1 m) target;
+the bonsai's pads are jittered boulders, cheaper than its spheres were.
+
+- `quietPod`: the shell in soft panels (a piped bucket, the back, wings with rolled front edges and piping, linings),
+  a turned foot and stem; a piped seat cushion (top 0.45), a buttoned back cushion, a head roll; a book, a folded
+  blanket, a gooseneck lamp. The hood: padded channels (soft) and a rolled lip.
+- `shortwaveRadio`: a spindle chair swept in one piece (shaped seat, raked posts, bowed crest), a desk on splayed
+  legs; the receiver with a chrome-bezelled dial and its scale, a meter with its needle, turned knobs, a slotted
+  grille, a bent carry handle; a lofted microphone on a swept stem, headphones on a swept band with a cord, a logbook
+  and a pencil, a mug. The dial is a turned knob with a skirt.
+- `puzzleTable`: jigsaw pieces with knobs and sockets that nest (outlines), loose pieces, the box with a sun on its
+  picture, the magnifier's clamp and joint; the same chair and desk as the radio's.
+- `bonsaiBench`: a slatted teak top and shelf, a back rail; a lofted tray pot on feet, roots gripping it, a tapering
+  twisting trunk (one sweep, jittered) and swept branches, jittered foliage pads; a coil of copper wire, a mister with
+  its trigger, shears with blades and loops, rimmed spare pots, a soft sack with its top rolled. The twig: a tapered
+  sweep and jittered tufts.
+- `soloSauna`: the side walls in boards with a dark base board, a fascia round the roof; slats rounded, the bench's
+  and tier's skirts in upright boards; the heater's vents and a cedar guard, more stones; a banded bucket and a cupped
+  ladle; a louvred lamp, a thermometer with its face and needle; a towel over the bench's edge. The door: a bent cedar
+  pull on roses.
+- `deliveryHatch`: a moulded frame round the hatch (`kit.moulding`), a nosed cap, scroll brackets under the ledge, a
+  soft bag, a lidded cup with a band, a bezelled screen, plaque screws, a drawer pull and letter flap, a bordered mat.
+  The door: its window framed, a bar pull.
+
+`check-glb`: 6 models, 0 failed; the sauna's 4-draw warning (as before). Khronos validator: 0 errors, 0 warnings
+each.
 
 ## Rebuild
 
