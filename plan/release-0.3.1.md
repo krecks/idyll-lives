@@ -1,8 +1,8 @@
 # Idyll Lives 0.3.1 — Release Plan
 
-- **Branch:** `main` (pushed 2026-10-22)
+- **Branch:** `main`; tag `v0.3.1` on d4caf7b7
 - **Base:** v0.3.0 at `e725166`
-- **Status:** Prepared (2026-10-22): version, notes and docs set, local gates run (§3), `main` pushed. Dry run, tag, live checks and the GitHub release are still to do (§4).
+- **Status:** **Released 2026-10-22**: https://github.com/krecks/idyll-lives/releases/tag/v0.3.1 (dry run 39724920321, the tag's deploy 39726588344, live checks passed).
 - **Release type:** authenticity: every model, animation and interaction checked against the real thing, and what was found fixed
 
 ## 1. What ships
@@ -47,10 +47,10 @@ Not run locally: `node tools/bench/render.mjs` (headed timing; the review's ligh
 ## 4. Still to do (by the owner's go-ahead)
 
 1. ~~`git push origin main`~~ done 2026-10-22.
-2. Dry run: `gh workflow run pages.yml --ref main -f deploy=false`, then `gh run watch $(gh run list --workflow pages.yml -L1 --json databaseId -q '.[0].databaseId') --exit-status`.
-3. Tag and push: `git tag -a v0.3.1 -m "Idyll Lives 0.3.1: the authenticity review"`, `git push origin v0.3.1`; watch the tag's run (`--event push`), starting no other run while it waits.
-4. Live checks: the menu and Credits show 0.3.1 (build `<tagged commit>`); F3 Shared memory on, a game runs; `llm/lfm2.5-350m/model_q4.onnx_dataz` 200 and 255,530,880 bytes; `voice/supertonic-3/vector_estimator.onnxz` 119,568,968 bytes; a 0.3.0 save loads.
-5. `gh release create v0.3.1 --verify-tag --title "Idyll Lives 0.3.1" --notes-file plan/release-0.3.1-notes.md`.
+2. ~~Dry run~~ done: the first (39721490811, on cfaa270b) failed with a SIGSEGV in `ll-tools`' `tests/review.rs` on x86-64, a miscompile of `review::size_row` by Rust 1.97.0 (reproduced in an amd64 container; valgrind: an invalid read at review.rs:551; 1.97.1 passes); d4caf7b7 pins 1.97.1 and the second (39724920321) passed. `gh workflow run pages.yml --ref main -f deploy=false`, then `gh run watch $(gh run list --workflow pages.yml -L1 --json databaseId -q '.[0].databaseId') --exit-status`.
+3. ~~Tag and push~~ done (39726588344): `git tag -a v0.3.1 -m "Idyll Lives 0.3.1: the authenticity review"`, `git push origin v0.3.1`; watch the tag's run (`--event push`), starting no other run while it waits.
+4. ~~Live checks~~ done: menu v0.3.1, Credits "Version 0.3.1 (build d4caf7b)", Shared memory on, a played household runs at 60 fps with no page errors, the LLM file 200 and 255,530,880 bytes, the vector estimator 119,568,968 bytes. Not run: loading a 0.3.0 save on the live site (`old_saves.rs` covers the migration). The checks: the menu and Credits show 0.3.1 (build `<tagged commit>`); F3 Shared memory on, a game runs; `llm/lfm2.5-350m/model_q4.onnx_dataz` 200 and 255,530,880 bytes; `voice/supertonic-3/vector_estimator.onnxz` 119,568,968 bytes; a 0.3.0 save loads.
+5. ~~Release~~ done: `gh release create v0.3.1 --verify-tag --title "Idyll Lives 0.3.1" --notes-file plan/release-0.3.1-notes.md`.
 6. Manual checklist before or after tagging: `docs/authenticity-review.md` §10 (the pie menu greying, a headed listen to the new sounds, a joiner walking into a group were never shot by an agent).
 
 ## 5. Risks
