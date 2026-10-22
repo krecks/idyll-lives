@@ -28,8 +28,8 @@ export interface MeshPart {
    */
   fields: Float32Array;
   /**
-   * Per-vertex tone (4 per vertex): x = lip / cheek blush, y = cavity darkening (the mouth plate is
-   * 1), z = hair clump bands, w reserved.
+   * Per-vertex tone (4 per vertex): x = lip / cheek blush, y = shade drawn by hand (the mouth plate
+   * is 1), z = hair clump bands, w = the baked occlusion (0 open .. 1 enclosed).
    */
   tone: Float32Array;
   /**

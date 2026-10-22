@@ -3,14 +3,14 @@
  * shared pose texture (the same texture that holds the skinning matrices; one row per Sim) and the
  * per-vertex `simField` and `simTone` attributes (docs/characters-format.md):
  *
- * - body: the Sim's skin colour, with the tone's blush (lips, cheeks) and cavity darkening; the
+ * - body: the Sim's skin colour, with the tone's blush (x: lips, cheeks) and the line between the lips (y); the
  *   clothes are painted on it: where a garment's cut covers the body's fields the skin takes the
  *   top, bottom or shoe colour (anti-aliased edges; a top cut `over` the bottom wins over it, else
  *   the bottom wins), rougher than skin; under hair, the scalp (head skin whose crew field is
- *   -1 - scalp weight) takes the hair colour;
+ *   -1 - scalp weight) takes the hair colour; then all of it shaded by the baked occlusion (tone.w);
  * - cloth: shells (jackets, skirts, shoes) in the flat top / bottom / shoe colour, soles darker; seated,
- *   moved by their tone (xyz: the seated corrective) as far as texel 4 b says;
- * - hair: the hair colour, with the tone's clump bands;
+ *   moved by their tone (xyz: the seated corrective) as far as texel 4 b says; shaded by tone.w;
+ * - hair: the hair colour, with the tone's clump bands, shaded by tone.w;
  * - brow: brows in the hair colour (darker); lash: lashes, near black;
  * - mouth: teeth, and the mouth plate darkened by its tone;
  * - eye: the eyeballs drawn procedurally: sclera, the iris in the Sim's eye colour with a darker
@@ -25,7 +25,7 @@
  *   1: top colour rgb, top: hem height
  *   2: bottom colour rgb, top: crew neckline cut
  *   3: hair colour rgb, top: scoop neckline cut
- *   4: r = 1 if the top is painted over the bottom, g = age (deeper cavities: elders 1), b = how far
+ *   4: r = 1 if the top is painted over the bottom, g = age (deeper creases: elders 1), b = how far
  *      the shells take their seated shape (characters.ts `writeSit`), bottom: waist height
  *   5: skin reference colour rgb (the skin is tinted relative to it; 1), bottom: leg cut
  *   6: shoe colour rgb, shoes: top height
@@ -172,6 +172,14 @@ const GUARD = '#if defined(SIMCHAR) && defined(INSTANCES) && defined(BAKED_VERTE
 const CLOTH_MICRO = '0.15';
 /** Hair is matte: no more glossy than this (the sheen gives it its soft highlight). */
 const HAIR_MICRO = '0.38';
+/**
+ * The baked occlusion (tone.w, 0 open .. 1 enclosed) takes the colour down to x (1 - AO_DARK) at most,
+ * as the furniture's baked grey does (gamekit/shade.py), there once two thirds of the sky are hidden
+ * (AO_GAIN: a resident's creases are shallower than a sofa's); the body's deepen with age (texel 4 g).
+ */
+const AO_DARK = '0.8';
+const AO_GAIN = '1.5';
+const AO_AGE = '0.6';
 
 function wgsl(shaderType: string, off: number, morph: MorphBinding | null): { [pointName: string]: string } {
   if (shaderType === 'vertex') {
@@ -266,9 +274,10 @@ let simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, simC
 #ifdef SIMBODY
 {
   let simRef = textureLoad(simDataTexture, vec2<i32>(${off + 5}, simRow), 0);
-  // Skin: the Sim's colour (relative to the reference), blushed and darkened in cavities by the tone.
+  // Skin: the Sim's colour (relative to the reference), blushed by the tone (x), the line between the lips
+  // darkened (y).
   var skin = simA.rgb * clamp(surfaceAlbedo / max(simRef.rgb, vec3f(0.01)), vec3f(0.0), vec3f(2.0));
-  skin = skin * mix(vec3f(1.0), vec3f(0.98, 0.62, 0.6), clamp(simT.x, 0.0, 1.0)) * (1.0 - (0.45 + 0.2 * simT4.y) * clamp(simT.y, 0.0, 1.0));
+  skin = skin * mix(vec3f(1.0), vec3f(0.98, 0.62, 0.6), clamp(simT.x, 0.0, 1.0)) * (1.0 - 0.45 * clamp(simT.y, 0.0, 1.0));
   let scalp = clamp(-simF.z - 1.0, 0.0, 1.0) * textureLoad(simDataTexture, vec2<i32>(${off + 7}, simRow), 0).w;
   skin = mix(skin, textureLoad(simDataTexture, vec2<i32>(${off + 3}, simRow), 0).rgb * 0.7, scalp);
   let cTop = textureLoad(simDataTexture, vec2<i32>(${off + 1}, simRow), 0).rgb;
@@ -276,7 +285,7 @@ let simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, simC
   let cShoe = textureLoad(simDataTexture, vec2<i32>(${off + 6}, simRow), 0).rgb;
   let topOver = mix(mix(skin, cBottom, simBottom), cTop, simTop);
   let topUnder = mix(mix(skin, cTop, simTop), cBottom, simBottom);
-  surfaceAlbedo = mix(select(topUnder, topOver, simT4.x > 0.5), cShoe, simShoe);
+  surfaceAlbedo = mix(select(topUnder, topOver, simT4.x > 0.5), cShoe, simShoe) * (1.0 - ${AO_DARK} * clamp((${AO_GAIN} + ${AO_AGE} * simT4.y) * simT.w, 0.0, 1.0));
 }
 #endif
 #ifdef SIMCLOTH
@@ -286,12 +295,12 @@ let simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, simC
   let cBottom = textureLoad(simDataTexture, vec2<i32>(${off + 2}, simRow), 0).rgb;
   let cShoe = textureLoad(simDataTexture, vec2<i32>(${off + 6}, simRow), 0).rgb;
   let c = select(select(cShoe, cBottom, simF.z < 1.5), cTop, simF.z < 0.5);
-  surfaceAlbedo = surfaceAlbedo * c * select(1.0, 0.35, simF.z > 1.5 && abs(simF.y - 1.0) < 0.5);
+  surfaceAlbedo = surfaceAlbedo * c * select(1.0, 0.35, simF.z > 1.5 && abs(simF.y - 1.0) < 0.5) * (1.0 - ${AO_DARK} * clamp(${AO_GAIN} * simT.w, 0.0, 1.0));
 }
 #endif
 #ifdef SIMHAIR
-// The hair colour in clumps (tone.z), darker deep in (tone.y).
-surfaceAlbedo = textureLoad(simDataTexture, vec2<i32>(${off + 3}, simRow), 0).rgb * (1.0 + 0.45 * (simT.z - 0.5)) * (1.0 - 0.5 * clamp(simT.y, 0.0, 1.0));
+// The hair colour in clumps (tone.z), darker deep in (tone.y) and where it is enclosed (tone.w).
+surfaceAlbedo = textureLoad(simDataTexture, vec2<i32>(${off + 3}, simRow), 0).rgb * (1.0 + 0.45 * (simT.z - 0.5)) * (1.0 - 0.5 * clamp(simT.y, 0.0, 1.0)) * (1.0 - ${AO_DARK} * clamp(${AO_GAIN} * simT.w, 0.0, 1.0));
 #endif
 #ifdef SIMBROW
 surfaceAlbedo = textureLoad(simDataTexture, vec2<i32>(${off + 3}, simRow), 0).rgb * 0.45;
@@ -434,7 +443,7 @@ float simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, si
 {
   vec4 simRef = texelFetch(simDataTexture, ivec2(${off + 5}, simRow), 0);
   vec3 skin = simA.rgb * clamp(surfaceAlbedo / max(simRef.rgb, vec3(0.01)), vec3(0.0), vec3(2.0));
-  skin = skin * mix(vec3(1.0), vec3(0.98, 0.62, 0.6), clamp(simT.x, 0.0, 1.0)) * (1.0 - (0.45 + 0.2 * simT4.y) * clamp(simT.y, 0.0, 1.0));
+  skin = skin * mix(vec3(1.0), vec3(0.98, 0.62, 0.6), clamp(simT.x, 0.0, 1.0)) * (1.0 - 0.45 * clamp(simT.y, 0.0, 1.0));
   float scalp = clamp(-simF.z - 1.0, 0.0, 1.0) * texelFetch(simDataTexture, ivec2(${off + 7}, simRow), 0).w;
   skin = mix(skin, texelFetch(simDataTexture, ivec2(${off + 3}, simRow), 0).rgb * 0.7, scalp);
   vec3 cTop = texelFetch(simDataTexture, ivec2(${off + 1}, simRow), 0).rgb;
@@ -442,7 +451,7 @@ float simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, si
   vec3 cShoe = texelFetch(simDataTexture, ivec2(${off + 6}, simRow), 0).rgb;
   vec3 topOver = mix(mix(skin, cBottom, simBottom), cTop, simTop);
   vec3 topUnder = mix(mix(skin, cTop, simTop), cBottom, simBottom);
-  surfaceAlbedo = mix(simT4.x > 0.5 ? topOver : topUnder, cShoe, simShoe);
+  surfaceAlbedo = mix(simT4.x > 0.5 ? topOver : topUnder, cShoe, simShoe) * (1.0 - ${AO_DARK} * clamp((${AO_GAIN} + ${AO_AGE} * simT4.y) * simT.w, 0.0, 1.0));
 }
 #endif
 #ifdef SIMCLOTH
@@ -451,11 +460,11 @@ float simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, si
   vec3 cBottom = texelFetch(simDataTexture, ivec2(${off + 2}, simRow), 0).rgb;
   vec3 cShoe = texelFetch(simDataTexture, ivec2(${off + 6}, simRow), 0).rgb;
   vec3 c = simF.z < 0.5 ? cTop : simF.z < 1.5 ? cBottom : cShoe;
-  surfaceAlbedo = surfaceAlbedo * c * (simF.z > 1.5 && abs(simF.y - 1.0) < 0.5 ? 0.35 : 1.0);
+  surfaceAlbedo = surfaceAlbedo * c * (simF.z > 1.5 && abs(simF.y - 1.0) < 0.5 ? 0.35 : 1.0) * (1.0 - ${AO_DARK} * clamp(${AO_GAIN} * simT.w, 0.0, 1.0));
 }
 #endif
 #ifdef SIMHAIR
-surfaceAlbedo = texelFetch(simDataTexture, ivec2(${off + 3}, simRow), 0).rgb * (1.0 + 0.45 * (simT.z - 0.5)) * (1.0 - 0.5 * clamp(simT.y, 0.0, 1.0));
+surfaceAlbedo = texelFetch(simDataTexture, ivec2(${off + 3}, simRow), 0).rgb * (1.0 + 0.45 * (simT.z - 0.5)) * (1.0 - 0.5 * clamp(simT.y, 0.0, 1.0)) * (1.0 - ${AO_DARK} * clamp(${AO_GAIN} * simT.w, 0.0, 1.0));
 #endif
 #ifdef SIMBROW
 surfaceAlbedo = texelFetch(simDataTexture, ivec2(${off + 3}, simRow), 0).rgb * 0.45;

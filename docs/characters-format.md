@@ -151,17 +151,32 @@ hairline and chin as before.
 
 ## Tone (4 per vertex)
 
-x = lip / cheek blush (0..1; on the tongue part, the tongue's red), y = cavity darkening (armpits,
-between fingers, under the chin, between the lips, deep in the hair; the mouth plate is 1), z = hair
-clump bands (0..1), w reserved. The eyelids take the tone of the skin they lie on (build.rs). Every
-stage uses the base stage's tone; the shader deepens the cavities with the resident's age
-(appearance texel 4 g).
+x = lip / cheek blush (0..1; on the tongue part, the tongue's red), y = shade drawn by hand (the
+line between the lips, the teeth's sides, deep in the hair; the mouth plate is 1), z = hair clump
+bands (0..1), w = the baked ambient occlusion (below). The eyelids take the tone of the skin they lie
+on, w included, and its shading normals (build.rs). Every stage uses the base stage's tone.
+
+w is how much of the sky a vertex does not see at rest, 0 (open) to 1 (enclosed), in 32 steps
+(`ao.rs`, after the furniture's `gamekit/shade.py`): 48 rays per vertex over the hemisphere about its
+normal (cosine-weighted, a Fibonacci spiral twisted by the vertex's index), started 1.5 mm off the
+surface; a hit counts `1 - (d / 0.34 m)^2`. A vertex whose rays mostly meet a back face first is
+buried in another part and stays 0. What occludes what:
+
+- `body`: itself (its lids and lips included) and the teeth and tongue, not the eyes;
+- `lod.body`: the same, its own bake;
+- shells: themselves and `body`; their `lod.` copies themselves and `lod.body`;
+- `hair.*`, `hair.beard`: themselves, `body` and the eyes (one body serves every style and outfit,
+  so hair and clothes don't shade the skin).
+
+The shader takes the colour (after the painted clothes, on the body) times `1 - 0.8 min(k w, 1)`: as
+dark as the furniture's at most, reached once two thirds of the sky are hidden (k = 1.5; on the
+body 1.5 + 0.6 age, appearance texel 4 g, so elders' creases are deeper).
 
 The jacket, suit and skirt shells use their tone's xyz for their seated shape instead (m, in the
-rest space, before skinning; w 0): what moves each vertex from where a seated pose (`seated_pose`
-with the thighs turned 76° forward, as `sit` has them) skins it to where its seated shape is skinned
-(the skirt without its flare, its hollows between the legs bridged, the jacket without its hem's
-flare), out of the seated skin and no lower than the seat (`seated_tone`, clothes.rs). The runtime
+rest space, before skinning; w is still the occlusion): what moves each vertex from where a seated
+pose (`seated_pose` with the thighs turned 76° forward, as `sit` has them) skins it to where its
+seated shape is skinned (the skirt without its flare, its hollows between the legs bridged, the
+jacket without its hem's flare), out of the seated skin and no lower than the seat (`seated_tone`, clothes.rs). The runtime
 adds it as far as the thighs are turned forward (`writeSit`: from 15° to 76°, the mean of both, at
 the body's size; appearance texel 4 b), so a seated skirt lies on the lap and the jacket's hem on it
 instead of standing out round the seat as they hang standing.

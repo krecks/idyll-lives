@@ -5,7 +5,8 @@
 //! Per family and life stage it asks the head interface (head.rs) where the face is, then builds
 //! the body (body.rs), the face (face.rs: eyes, lids, lashes, brows, mouth and the morph channels),
 //! the hair (hair.rs) and the clothes (clothes.rs), merges the face's skin pieces into the body,
-//! and writes the base stage (young adult) whole and the other stages as deltas. Then the checks
+//! bakes the base stage's ambient occlusion into tone.w (ao.rs; the stages share it), and writes
+//! the base stage (young adult) whole and the other stages as deltas. Then the checks
 //! run. Everything is deterministic (seeded).
 
 use std::io;
@@ -14,6 +15,7 @@ use std::sync::Arc;
 
 use serde::Serialize;
 
+use super::ao;
 use super::body::{Meta, body_fields_and_tone, build_body};
 use super::clothes::{Cut, Cuts, build_clothes, garment_cuts};
 use super::contract::channels;
@@ -58,6 +60,9 @@ fn assemble(family: &str, stage: &str, cuts: Option<&Cuts>) -> Assembled {
     let mut lod_list: Vec<Mesh> = vec![strip(&bd.lod)];
     lod_list.extend(extras.iter().filter(|m| m.skin_tone).map(strip));
     let mut parts = vec![("body".to_string(), merge(&body_list.iter().collect::<Vec<_>>())), ("lod.body".to_string(), merge(&lod_list.iter().collect::<Vec<_>>()))];
+    let n_lids: usize = extras.iter().filter(|m| m.skin_tone).map(Mesh::len).sum();
+    // (Not the low-detail body's: its coarse socket would turn them inside out.)
+    lid_normals(&mut parts[0].1, n_skin, n_lids);
     parts.extend(f.parts.iter().cloned());
     parts.extend(build_hair(family, stage, &head, &p));
     let cuts = match cuts {
@@ -66,6 +71,44 @@ fn assemble(family: &str, stage: &str, cuts: Option<&Cuts>) -> Assembled {
     };
     parts.extend(build_clothes(family, stage, &cuts));
     Assembled { parts, meta: bd.meta, p, head, face: f, n_skin, n_lod, cuts }
+}
+
+/// The lids (`n_lids` vertices after the `n_skin` of the skin) shaded as the skin they lie on: their
+/// normals the mean of the nearest skin's (not the face's forward lean they are made with), so a lid
+/// is no lighter than its socket, open or closed.
+fn lid_normals(m: &mut Mesh, n_skin: usize, n_lids: usize) {
+    const LID_NEAR: usize = 3;
+    let near = KdTree::new(&m.pos[..n_skin]);
+    for i in n_skin..n_skin + n_lids {
+        let s: V3 = near.query(&m.pos[i], LID_NEAR).iter().map(|&(_, j)| m.nor[j]).sum();
+        m.nor[i] = s.normalize();
+    }
+}
+
+/// Ambient occlusion into every toned part's tone.w (ao.rs), at rest: the bodies by themselves (the
+/// lids and lips are in them) and the mouth (not the eyes: the lower lids would take a dark crescent
+/// from the eyeball); the shells by the body (the low-detail ones by the low-detail body) and
+/// themselves; the hair and beard by the body, the eyes and themselves. The lids then take the shade
+/// of the skin they lie on (`build_family`).
+fn bake_ao(parts: &mut [(String, Mesh)]) {
+    let get = |parts: &[(String, Mesh)], name: &str| parts.iter().find(|e| e.0 == name).map(|e| e.1.clone()).unwrap_or_else(|| panic!("no part {name}"));
+    let (body, lod) = (get(parts, "body"), get(parts, "lod.body"));
+    let face = ["eyes", "teeth", "tongue"].map(|n| get(parts, n));
+    let [eyes, teeth, tongue] = &face;
+    for (name, m) in parts.iter_mut() {
+        let around: Vec<&Mesh> = if name == "body" || name == "lod.body" {
+            vec![teeth, tongue]
+        } else if name.starts_with("lod.") {
+            vec![&lod]
+        } else if ["top.", "bottom.", "shoes."].iter().any(|p| name.starts_with(p)) {
+            vec![&body]
+        } else if name.starts_with("hair.") {
+            vec![&body, eyes]
+        } else {
+            continue;
+        };
+        ao::bake(m, &around, ao::REACH);
+    }
 }
 
 /// A body's (or a stage's) skeleton and metadata in rig.json.
@@ -126,7 +169,9 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
         m.fields = f;
         m.tone = t;
     }
-    // The face's skin pieces: the lids take the tone of the skin they lie on, the lips keep theirs.
+    bake_ao(&mut base.parts);
+    // The face's skin pieces: the lids take the tone of the skin they lie on (its shade too), the lips
+    // keep theirs.
     for (name, k0) in [("body", base.n_skin), ("lod.body", base.n_lod)] {
         let m = part(&mut base.parts, name);
         let near = KdTree::new(&m.pos[..k0]);
@@ -138,17 +183,19 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
             let n = piece.pos.len();
             for (i, q) in piece.pos.iter().enumerate() {
                 m.tone[k + i] = if piece.skin_tone {
-                    // (The lightest of the skin round each lid vertex: not the shade deep in the socket.)
+                    // (The mean of the skin round each lid vertex, so a lid is blushed and shaded as its
+                    // socket is.)
                     let nb = near.query(q, 16);
-                    let mut t = [f64::INFINITY; 4];
+                    let mut t = [0.0; 4];
                     for &(_, j) in &nb {
                         for (tc, &sc) in t.iter_mut().zip(&m.tone[j]) {
-                            *tc = tc.min(sc);
+                            *tc += sc / nb.len() as f64;
                         }
                     }
                     t
                 } else {
-                    piece.tone[i]
+                    let [x, y, z, _] = piece.tone[i];
+                    [x, y, z, m.tone[k + i][3]]
                 };
             }
             k += n;

@@ -66,7 +66,7 @@ export interface OutfitParams {
   shoe: [number, number, number];
   /** 1 if the top is painted over the bottom (its hem below the waistband), else 0. */
   over: number;
-  /** Age (0 young .. 1 elder): the shader deepens the skin's cavities with it. */
+  /** Age (0 young .. 1 elder): the shader deepens the body's baked creases with it. */
   age: number;
   hair: [number, number, number];
   /** Iris colour (linear rgb). */
