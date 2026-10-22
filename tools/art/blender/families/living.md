@@ -21,16 +21,16 @@ sofa's 0.425 m.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.sofa` (camel back, cabriole legs) | 1.88 × 0.94 × 0.82 m | 7,028 | 3 | Upholstery, Cushions, Frame, Legs, Pillow, Second pillow |
-| `model.loveseat` | 1.84 × 0.83 × 0.84 m | 1,788 | 3 | Upholstery, Cushions, Legs, Pillow |
-| `model.sofaThree` | 2.82 × 0.87 × 0.86 m | 2,460 | 3 | Upholstery, Cushions, Legs, Pillows, Throw |
-| `model.sofaDesign` (brass rail and legs) | 1.87 × 0.72 × 0.82 m | 1,996 | 3 | Upholstery, Cushions, Frame, Legs |
-| `model.sofaThreeSeat` | 2.86 × 0.82 × 0.88 m | 2,352 | 3 | Upholstery, Cushions, Legs, Pillow, Second pillow |
-| `model.sectionalMiddle` | 1.00 × 0.82 × 0.88 m | 848 | 3 | Upholstery, Cushions, Legs |
-| `model.sectionalArmLeft` (arm at +x) | 1.00 × 0.82 × 0.88 m | 1,036 | 3 | Upholstery, Cushions, Legs |
-| `model.sectionalArmRight` (arm at −x) | 1.00 × 0.82 × 0.88 m | 1,036 | 3 | Upholstery, Cushions, Legs |
-| `model.sectionalCorner` | 1.00 × 0.82 × 0.89 m | 1,412 | 3 | Upholstery, Cushions, Legs, Pillow |
-| `model.chaise` (1 × 2) | 0.96 × 0.82 × 1.90 m | 1,144 | 3 | Upholstery, Cushions, Legs, Throw |
+| `model.sofa` (camel back, cabriole legs) | 1.88 × 0.94 × 0.82 m | 6,084 | 3 | Upholstery, Cushions, Frame, Legs, Pillow, Second pillow |
+| `model.loveseat` | 1.84 × 0.83 × 0.84 m | 5,644 | 3 | Upholstery, Cushions, Legs, Pillow |
+| `model.sofaThree` | 2.82 × 0.87 × 0.86 m | 7,456 | 3 | Upholstery, Cushions, Legs, Pillows, Throw |
+| `model.sofaDesign` (brass rail and legs) | 1.87 × 0.72 × 0.82 m | 5,936 | 3 | Upholstery, Cushions, Frame, Legs |
+| `model.sofaThreeSeat` | 2.86 × 0.82 × 0.88 m | 6,556 | 3 | Upholstery, Cushions, Legs, Pillow, Second pillow |
+| `model.sectionalMiddle` | 1.00 × 0.82 × 0.88 m | 2,656 | 3 | Upholstery, Cushions, Legs |
+| `model.sectionalArmLeft` (arm at +x) | 1.00 × 0.82 × 0.88 m | 3,196 | 3 | Upholstery, Cushions, Legs |
+| `model.sectionalArmRight` (arm at −x) | 1.00 × 0.82 × 0.88 m | 3,196 | 3 | Upholstery, Cushions, Legs |
+| `model.sectionalCorner` | 1.00 × 0.82 × 0.89 m | 3,816 | 3 | Upholstery, Cushions, Legs, Pillow |
+| `model.chaise` (1 × 2) | 0.96 × 0.82 × 1.90 m | 3,384 | 3 | Upholstery, Cushions, Legs, Throw |
 
 `check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Seen in play (WebGPU and
 WebGL, day and night, all four facings across the set): residents sit on each, and `sink_in` plays and holds.
@@ -61,17 +61,17 @@ Built as the sofas are, from the old primitive parts (`armchair_bergere` and the
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.armchair` (bergère) | 0.74 × 0.98 × 0.80 m | 3,880 | 3 | Upholstery, Cushion, Frame, Legs, Pillow |
-| `model.armchairLounge` | 0.82 × 0.83 × 0.84 m | 1,224 | 3 | Upholstery, Cushions, Legs |
-| `model.armchairLeather` | 0.73 × 0.95 × 0.85 m | 1,348 | 3 | Frame, Upholstery |
-| `model.armchairDesign` | 0.76 × 0.96 × 0.85 m | 1,756 | 2 | Frame, Upholstery, Base |
-| `model.armchairWingback` | 0.84 × 1.10 × 0.80 m | 1,788 | 3 | Upholstery, Cushion, Legs |
-| `model.recliner` | 0.92 × 0.99 × 0.80 m | 1,436 | 3 | Upholstery, Cushions & footrest |
-| `model.rockingChair` | 0.53 × 1.03 × 0.90 m | 1,148 | 2 | Wood, Cushion |
-| `model.pouf` | 0.72 × 0.47 × 0.50 m | 1,032 | 3 | Leather, Buttons, Legs |
-| `model.ottoman` | 0.62 × 0.45 × 0.62 m | 1,672 | 3 | Upholstery, Buttons, Feet |
-| `model.floorCushion` | 0.62 × 0.14 × 0.62 m | 1,120 | 1 | Cushion, Piping, Button |
-| `model.beanBag` | 0.84 × 0.70 × 0.84 m | 1,824 | 1 | Bag, Seat |
+| `model.armchair` (bergère) | 0.74 × 0.98 × 0.80 m | 3,964 | 3 | Upholstery, Cushion, Frame, Legs, Pillow |
+| `model.armchairLounge` | 0.82 × 0.83 × 0.84 m | 3,736 | 3 | Upholstery, Cushions, Legs |
+| `model.armchairLeather` | 0.73 × 0.95 × 0.85 m | 3,964 | 3 | Frame, Upholstery |
+| `model.armchairDesign` | 0.76 × 0.96 × 0.85 m | 3,588 | 2 | Frame, Upholstery, Base |
+| `model.armchairWingback` | 0.84 × 1.10 × 0.80 m | 3,840 | 3 | Upholstery, Cushion, Legs |
+| `model.recliner` | 0.92 × 0.99 × 0.80 m | 3,716 | 3 | Upholstery, Cushions & footrest |
+| `model.rockingChair` | 0.53 × 1.03 × 0.90 m | 3,732 | 2 | Wood, Cushion |
+| `model.pouf` | 0.72 × 0.47 × 0.50 m | 2,892 | 3 | Leather, Buttons, Legs |
+| `model.ottoman` | 0.62 × 0.45 × 0.62 m | 3,688 | 3 | Upholstery, Buttons, Feet |
+| `model.floorCushion` | 0.62 × 0.14 × 0.62 m | 2,176 | 1 | Cushion, Piping, Button |
+| `model.beanBag` | 0.84 × 0.70 × 0.84 m | 2,500 | 1 | Bag, Seat |
 
 `check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Seen in play on WebGPU (all four facings across the set) and
 WebGL at night: residents sit, recline, rock and flop on each, and each clip plays.
@@ -92,15 +92,15 @@ for the side, nesting and console tables). Still, but for two:
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.coffeeTable` | 1.30 × 0.42 × 0.74 m | 1,428 | 3 | Wood, Knob |
-| `model.coffeeTableGlass` | 1.30 × 0.60 × 0.74 m | 1,764 | 2 | Frame, Glass |
-| `model.coffeeTableMarble` | 0.88 × 0.58 × 0.88 m | 1,164 | 1 | Top, Base |
-| `model.sideTable` | 0.55 × 0.55 × 0.45 m | 708 | 2 | Wood, Knob |
-| `model.coffeeTableRound` | 0.84 × 0.42 × 0.84 m | 884 | 2 | Top, Base |
-| `model.coffeeTableLong` | 1.66 × 0.42 × 0.72 m | 864 | 2 | Top, Legs |
-| `model.nestingTables` | 0.57 × 0.51 × 0.55 m | 1,080 | 2 | Top, Small table, Legs |
-| `model.sideTableRound` | 0.52 × 0.56 × 0.52 m | 964 | 1 | Top, Base |
-| `model.consoleTable` | 1.80 × 0.80 × 0.56 m | 1,024 | 3 | Top, Legs, Baskets |
+| `model.coffeeTable` | 1.30 × 0.42 × 0.74 m | 2,124 | 3 | Wood, Knob |
+| `model.coffeeTableGlass` | 1.30 × 0.60 × 0.74 m | 2,428 | 2 | Frame, Glass |
+| `model.coffeeTableMarble` | 0.88 × 0.58 × 0.88 m | 2,436 | 1 | Top, Base |
+| `model.sideTable` | 0.55 × 0.55 × 0.45 m | 720 | 2 | Wood, Knob |
+| `model.coffeeTableRound` | 0.84 × 0.42 × 0.84 m | 2,036 | 2 | Top, Base |
+| `model.coffeeTableLong` | 1.66 × 0.42 × 0.72 m | 1,056 | 2 | Top, Legs |
+| `model.nestingTables` | 0.57 × 0.51 × 0.55 m | 1,128 | 2 | Top, Small table, Legs |
+| `model.sideTableRound` | 0.52 × 0.56 × 0.52 m | 1,396 | 1 | Top, Base |
+| `model.consoleTable` | 1.80 × 0.80 × 0.56 m | 2,360 | 3 | Top, Legs, Baskets |
 
 `check-glb`: 0 failed. Khronos validator: 0 errors, 0 warnings each. Seen in play on WebGPU (each bought, all four
 facings across the set; the drawer opening while a resident flips through a magazine) and on the WebGL clips bench.
@@ -133,15 +133,15 @@ models' tops now start at the wall's face, 1–4 cm in front of the rectangles' 
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts | Clip |
 |---|---|---|---|---|---|
-| `model.bookshelf` | 0.90 × 1.92 × 0.38 m | 3,512 | 3 | Frame, Back | `book_out` (read, study, homework) |
-| `model.bookcaseLow` | 0.92 × 1.17 × 0.38 m | 2,172 | 3 | Frame, Back | `book_out` (read) |
-| `model.bookcaseWide` (2 × 1) | 1.86 × 2.00 × 0.47 m | 6,056 | 3 | Frame, Back | `book_out` (read, study, homework) |
-| `model.shelvingIndustrial` (2 × 1) | 1.86 × 1.83 × 0.53 m | 6,196 | 2 | Frame, Shelves | — |
-| `model.bookcaseTall` | 0.90 × 2.00 × 0.34 m | 3,860 | 3 | Frame, Back | `book_out` (read, study) |
-| `model.bookcaseCorner` | 0.90 × 1.90 × 0.34 m | 3,416 | 2 | Frame, Back | `book_out` (read) |
-| `model.cubeShelf` | 0.80 × 0.80 × 0.36 m | 1,476 | 2 | Frame, Back | — |
-| `model.ladderShelf` | 0.64 × 1.80 × 0.36 m | 2,340 | 3 | Frame, Shelves | — |
-| `model.displayCabinet` | 0.86 × 1.91 × 0.45 m | 2,580 | 3 | Frame, Back | — (door a part of its own, left decorative in 0.3.0) |
+| `model.bookshelf` | 0.90 × 1.92 × 0.38 m | 4,136 | 3 | Frame, Back | `book_out` (read, study, homework) |
+| `model.bookcaseLow` | 0.92 × 1.17 × 0.38 m | 2,820 | 3 | Frame, Back | `book_out` (read) |
+| `model.bookcaseWide` (2 × 1) | 1.86 × 2.00 × 0.47 m | 7,244 | 3 | Frame, Back | `book_out` (read, study, homework) |
+| `model.shelvingIndustrial` (2 × 1) | 1.86 × 1.83 × 0.53 m | 6,776 | 2 | Frame, Shelves | — |
+| `model.bookcaseTall` | 0.90 × 2.00 × 0.34 m | 4,584 | 3 | Frame, Back | `book_out` (read, study) |
+| `model.bookcaseCorner` | 0.90 × 1.90 × 0.34 m | 4,196 | 2 | Frame, Back | `book_out` (read) |
+| `model.cubeShelf` | 0.80 × 0.80 × 0.36 m | 2,676 | 2 | Frame, Back | — |
+| `model.ladderShelf` | 0.64 × 1.80 × 0.36 m | 3,416 | 3 | Frame, Shelves | — |
+| `model.displayCabinet` | 0.86 × 1.91 × 0.45 m | 3,536 | 3 | Frame, Back | — (door a part of its own, left decorative in 0.3.0) |
 
 `check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Seen in the gallery beside the
 old parts, on the clips bench (WebGPU), and in play: the bookshelf read at (`book_out` plays, held while reading),
@@ -167,12 +167,67 @@ house generator place it (`cfg.stairs`), not the buy catalog, which leaves stair
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.stairs` | 0.86 × 3.68 × 4.00 m | 3,400 | 2 | Treads, Railing |
+| `model.stairs` | 0.86 × 3.68 × 4.00 m | 5,468 | 2 | Treads, Railing |
 
 `check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings. Seen in play (WebGPU, and WebGL2 at
 night): generated houses with a flight up (facing 2) and flights down to the basement (facings 0, 1 and 3), a
 resident walking up and down each; the stairwell from the floor above and from the ground over stairs down; the
 colour studio.
+
+## The detail pass (2026-10-22)
+
+Every model but the two worked examples (`model.armchair`, `model.sofa`, rebuilt the day before) rebuilt with the
+forms (gamekit/forms.py), same keys, sizes, centres, nodes, clips, motions, paint and draws; the triangles in the
+tables above. The helpers in living.py:
+
+- **`_cushion`** is a `F.soft` box: rounded, puffed on its two largest faces, piped round both seams (`piping`
+  None: none). `keep_top=True` for a seat cushion: its puffed middle where the old box's top was, its edges lower,
+  so the seat stays at the content height (the gate checks within 2 cm; a puff on top of the old top was 2.5 cm
+  high). **`_panel`**: firm upholstery (a base, an arm, a back), rounded, welted. Never puff a part across its
+  width or depth at the model's edge: `soft_box` puffs both faces, and the model grows (the sofas did, 1–2 cm).
+- **`_leg`** (a turned leg: collar, taper, splay), **`_throw`** (a throw swept over a seat's front edge,
+  wobbled), **`_rolled_arm`** (an English arm: its section swept, a welt round its scroll), **`_press`** (tufts
+  pressed into a top), **`_round_rings`**/**`_disc`** (turned things lofted from (height, radius) rows: table
+  tops with moulded edges, feet, vases, finials), **`_shell`** (a dished plywood shell), **`_top`** (a table top
+  with rounded corners and eased edges), **`_turned_leg`**, **`_knob`** (a turned knob), **`_fillet`** (a polyline
+  with its corners rounded, for bent tube: a Catmull-Rom sweep through close corner points bulges past them, which
+  stood the console table 1.3 cm taller), **`_basket`**, **`_plant_bowl`**.
+
+What each has now:
+
+- **Sofas and sectionals**: welted bases, track arms boxed to the base's foot and welted (the loveseat, the lounge
+  chair, the three-seater, the sectionals, the chaise, the sofa bed), piped and puffed seat and back cushions,
+  plump pillows, splayed turned legs; the three-seat sofa English rolled arms with welted scrolls and a throw draped
+  over its seat's front; the designer sofa a buttoned, piped back in two rows of tufts, a bent brass front rail
+  turning into the arms, brass arm caps rolling over the front, tapering splayed brass legs in cups; the chaise a
+  throw draped over its foot.
+- **Armchairs**: the leather armchair's back legs bend up into the raked posts in one piece, teak paddle arms, a back
+  cushion in three stitched channels; the designer chair dished plywood shells, piped cushions, cast arms in one bent
+  piece, a waisted column and five flat cast spokes; the wingback an arched back, shaped wings, rolled arms with
+  welts, a deck raised on cabriole front legs and raked back legs; the recliner pillow-top arms and a bustle back
+  (lumbar roll, back cushion, head cushion); the rocking chair one swept strip per rocker, turned legs and posts,
+  paddle arms, bowed spindles, a curved crest rail, stretchers, a saddled seat and the cushion's ties; the pouf
+  welted, its top tufted; the ottoman a bellied drum, welts, bun feet, a domed top tufted to seven buttons; the floor
+  cushion boxed and welted, tufted to its button; the bean bag a slumped, wrinkled loft with the seat panel (`bag_seat`)
+  as the faces of its dent, and a carry strap.
+- **Tables**: tops with rounded corners and eased edges, or turned with moulded edges; the coffee table turned legs
+  under square blocks, side aprons, stretchers under the slats, a fielded drawer front and a turned knob, a second
+  magazine; the glass table bent-tube frames in closed loops, feet, a leafy plant, a turned vase, books on the
+  shelf; the marble table a moulded edge, a tulip foot with a waist, swept veins; the round table a reeded drum; the
+  long table sled frames of square tube, a lidded box and a book; the nesting tables bent-rod leg frames; the
+  console table bent square-tube ends, rails, woven baskets with rolled rims and rope handles.
+- **Wall bed**: a cove cornice and bead, edged shelves, books with pages and gilt bands; the bed a piped, puffed
+  mattress (its middle at 0.46), puffed pillows, a soft throw, fielded door panels, a bent bar handle on roses and a
+  folding foot with bracket ends. **Sofa bed**: as the sofas, one long seat cushion with a welt down its middle (two
+  cushions showed the tucked mattress in the gap between them), the mattress rounded, a thin top sheet, a bent-tube
+  leg.
+- **Staircase**: bullnose treads over a cove, a moulded capping on the strings, newels with a collar and a ball
+  finial, balusters with a knuckle, a handrail in one moulded piece.
+- **Shelves** (lighter): a bead under each top, lipped shelf fronts, turned vases, pots with rolled rims and lumpy
+  foliage with a few long leaves, frames with a moulding round the photo, knobs turned; the display cabinet a cove
+  cornice, beads and bun feet; the cube shelf's bins soft with rolled rims.
+
+`cargo art living`: 0 failed, no warnings for these models. Khronos validator: 0 errors, 0 warnings each.
 
 ## Rebuild
 
