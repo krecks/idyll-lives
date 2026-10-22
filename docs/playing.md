@@ -42,7 +42,7 @@ Create a world (a small, medium or dense town, a farm, a seaside village, a moun
 | R, Delete | Rotate / sell the object in hand or selected (Build › Furnish) |
 | Esc | Steps back: put down what's in hand, leave Build, close the journal, stop following, close a resident's panel — then the pause menu (save, load, settings, quit) |
 | F3 | Performance overlay (with *Save debug report*) |
-| F8 | Save a debug report: screenshot, game state, settings, the build's version and commit, and recent errors. With `pnpm dev` it goes to `debug-reports/<time>/` in the project; open `?debugReport=<time>` to load it with the same camera. Other builds download it as a file, which any build can play: paste it into Settings › Interface › Diagnostics › Game state. |
+| F8 | Save a debug report: screenshot, game state, settings, the build's version and commit, and recent errors. With `bun run dev` it goes to `debug-reports/<time>/` in the project; open `?debugReport=<time>` to load it with the same camera. Other builds download it as a file, which any build can play: paste it into Settings › Interface › Diagnostics › Game state. |
 
 ## Graphics
 

@@ -6,21 +6,21 @@
   "type": "module",
   "scripts": {
     "wasm": "cd .. && cargo build -p sim-wasm --target wasm32-unknown-unknown --release --locked && wasm-bindgen target/wasm32-unknown-unknown/release/sim_wasm.wasm --target web --out-dir web/src/core/wasm-pkg",
-    "dev": "npm run wasm && npm run voice && npm run llm && vite",
-    "build": "npm run wasm && npm run voice && npm run llm && vite build",
+    "dev": "bun run wasm && bun run voice && bun run llm && vite",
+    "build": "bun run wasm && bun run voice && bun run llm && vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "lint": "eslint src",
     "test:sim": "cd .. && cargo test -p sim-core",
-    "voice": "cd .. && cargo build -p voice-wasm --target wasm32-unknown-unknown --release --locked && wasm-bindgen target/wasm32-unknown-unknown/release/voice_wasm.wasm --target web --out-dir web/src/voice/wasm-pkg && node tools/voice/fetch.mjs",
+    "voice": "cd .. && cargo build -p voice-wasm --target wasm32-unknown-unknown --release --locked && wasm-bindgen target/wasm32-unknown-unknown/release/voice_wasm.wasm --target web --out-dir web/src/voice/wasm-pkg && bun tools/voice/fetch.mjs",
     "test:voice": "cd .. && cargo test -p voice --release",
-    "check:voice": "node ../tools/voice/check.mjs",
-    "llm": "node ../tools/llm/fetch.mjs",
-    "check:llm": "node ../tools/llm/check.mjs",
-    "devices:llm": "node ../tools/llm/devices.mjs",
-    "check:clips": "node --experimental-strip-types ../tools/characters/check_clips.ts --body all --stage all",
-    "assets": "node ../tools/assets/optimize.mjs",
-    "decoders": "node ../tools/assets/decoders.mjs"
+    "check:voice": "bun ../tools/voice/check.mjs",
+    "llm": "bun ../tools/llm/fetch.mjs",
+    "check:llm": "bun ../tools/llm/check.mjs",
+    "devices:llm": "bun ../tools/llm/devices.mjs",
+    "check:clips": "bun ../tools/characters/check_clips.ts --body all --stage all",
+    "assets": "bun ../tools/assets/optimize.mjs",
+    "decoders": "bun ../tools/assets/decoders.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "9.30.0",
@@ -47,5 +47,6 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.71.1",
     "vite": "^8.3.4"
-  }
+  },
+  "packageManager": "bun@1.4.3"
 }

@@ -104,7 +104,6 @@ After the pilot (2026-10-21) the owner approved: M14's head ratios based on the 
 Known tool problems, kept here rather than in a ledger:
 
 - **The lamp build checks only the light's height, not `at`** (`_bulb`, `tools/art/blender/families/lighting.py:94`). From `docs/objects/open.md` L158.
-- **`pnpm wasm` doesn't run in a worktree with a symlinked `node_modules`** (pnpm's deps check); its cargo + wasm-bindgen command works. From `docs/objects/open.md` L159.
 - **`partBox` bounds spheres and tori up to 5 % / 2.5 % bigger than Babylon draws them** (never smaller; `web/src/render/babylon/models.ts:377`). It matters when measuring the code-built fallback models. From `docs/objects/open.md` L137.
 - **Previews overwrite each other:** ids used in two families (bench, flowers, hedge, arcadeCabinet, puzzleTable, recliner) write the same preview file (`previews/` under `tools/art/blender`, made by `cargo art --preview` and ignored by git), and 161 models have no preview. From `plan/authenticity-review.md` §5.2 (E1).
 

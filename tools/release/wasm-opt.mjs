@@ -1,9 +1,9 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * Optimises the game's WebAssembly (the simulation and the voice) for release with binaryen's
  * wasm-opt (the exact-pinned `binaryen` devDependency): `-O3`, and the name and producers
  * sections stripped. Production builds only: vite.config.ts runs it on the built `dist/assets/`
- * files, so `npm run wasm` for the dev server keeps the names (readable stack traces) and builds
+ * files, so `bun run wasm` for the dev server keeps the names (readable stack traces) and builds
  * no slower.
  *
  * - The features are passed explicitly, the set rustc writes into the files (`target_features`,
@@ -13,8 +13,8 @@
  * - About 48 s for the simulation on an M3 (binaryen.js is slow), so results are kept in
  *   `web/.assets/wasm-opt/{release,names}/` by the input's SHA-256 and a rebuild of the same wasm is instant.
  *
- *   node tools/release/wasm-opt.mjs <file.wasm>...           optimises the files in place
- *   node tools/release/wasm-opt.mjs --names <file.wasm>...   keeps the name section, for crash stacks
+ *   bun tools/release/wasm-opt.mjs <file.wasm>...           optimises the files in place
+ *   bun tools/release/wasm-opt.mjs --names <file.wasm>...   keeps the name section, for crash stacks
  *
  * The `--names` variant runs the same optimisations but leaves the names in, so its function
  * numbers match the shipped wasm and a stack from the site can be read with it.
@@ -79,7 +79,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   const names = args[0] === '--names';
   const files = names ? args.slice(1) : args;
-  if (!files.length) throw new Error('usage: node tools/release/wasm-opt.mjs [--names] <file.wasm>...');
+  if (!files.length) throw new Error('usage: bun tools/release/wasm-opt.mjs [--names] <file.wasm>...');
   await Promise.all(
     files.map(async (file) => {
       const start = performance.now();

@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * The language model benchmark (`web/src/llm/bench.ts`): starts Vite, opens `llm-bench.html` in
  * Chromium with WebGPU and runs the game's own worker and prompts with no game around it, once
@@ -7,11 +7,11 @@
  * (tokens a second) and the game's five test lines end to end. Writes every report as JSON under
  * `bench-results/llm-<time>/`.
  *
- * Needs `pnpm install` and `pnpm llm` first, and Playwright: `PLAYWRIGHT=<path to
+ * Needs `bun install` and `bun run llm` first, and Playwright: `PLAYWRIGHT=<path to
  * playwright/index.mjs>` if it isn't installed, `CHROME=<executable>` for a browser of your own.
  * Usage (from the repo root or `web/`):
  *
- *   node tools/llm/bench.mjs [options]
+ *   bun tools/llm/bench.mjs [options]
  *     --port 5399        Vite's port (it starts its own; `--url http://localhost:5399` uses a running one)
  *     --tokens 96        tokens a decode run may write
  *     --runs 3           decode runs (median, min, max)

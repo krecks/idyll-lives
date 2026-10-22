@@ -7,6 +7,8 @@
   import { perfEnd, perfPhase, perfStart, perfTimeAsync } from './debug/perf';
   import { fetchState, loadDebugReport } from './debug/report';
   import { loadGameData } from './game/session';
+  import { prefetchNow } from './assets/stream';
+  import { menuAssetUrls } from './game/streamPlan';
   import { latestSave, UnloadableSave } from './persistence/saves';
   import { settings, systemMotion } from './settings/settings.svelte';
   import { app } from './ui/app.svelte';
@@ -68,6 +70,8 @@
 
   /** Longest wait for one start-up step (a stuck step must not keep the menu away). */
   const STEP_LIMIT_MS = 45_000;
+  /** Portraits draw in the background; the menu must not wait long for them. */
+  const PORTRAIT_LIMIT_MS = 8_000;
   const within = (p: Promise<unknown>) => Promise.race([p, new Promise((resolve) => setTimeout(resolve, STEP_LIMIT_MS))]);
 
   /**
@@ -85,8 +89,25 @@
     bench?.prepareBench();
     try {
       step('Loading game data', 0.05);
-      await perfTimeAsync('boot: loadGameData', loadGameData);
+      const data = await perfTimeAsync('boot: loadGameData', loadGameData);
       app.dataReady = true;
+      // What the menus and character creation show: every icon and the character set. Fetched
+      // now so nothing the player can reach before Play is left to stream.
+      step('Loading menu assets', 0.08);
+      // (If this runs past the step limit, its progress must not drag the bar back afterwards.)
+      let reportingMenuAssets = true;
+      try {
+        await perfTimeAsync('boot: menu assets', () =>
+          within(
+            prefetchNow(menuAssetUrls(data.assets), (done, total) => {
+              if (!reportingMenuAssets) return;
+              step(`Loading menu assets (${done}/${total})`, 0.08 + 0.06 * (done / Math.max(1, total)));
+            }),
+          ),
+        );
+      } finally {
+        reportingMenuAssets = false;
+      }
     } catch (err) {
       console.error('[boot] the game data failed to load', err);
       app.fatal = err instanceof Error ? err.message : String(err);
@@ -111,12 +132,17 @@
       // the first menu frames (each new look compiles a set of character shaders).
       if (draft) {
         step('Drawing portraits', 0.4);
+        // The cards show the portraits as they arrive; booting the menu should not wait for a
+        // slow first shader compile (or a missing environment texture).
         await perfTimeAsync('boot: portraits', () =>
-          Promise.all(
-            draft.households.flatMap((h) =>
-              h.household.members.map((m) => services.previews?.portrait({ gender: m.gender, appearance: m.appearance }) ?? Promise.resolve(null)),
+          Promise.race([
+            Promise.all(
+              draft.households.flatMap((h) =>
+                h.household.members.map((m) => services.previews?.portrait({ gender: m.gender, appearance: m.appearance }) ?? Promise.resolve(null)),
+              ),
             ),
-          ),
+            new Promise((resolve) => setTimeout(resolve, PORTRAIT_LIMIT_MS)),
+          ]),
         );
       }
     } catch (err) {
@@ -199,21 +225,17 @@
   });
 
   /**
-   * Prepare the next game in the background so starting it is instant: the latest save
-   * while on the main menu, the chosen house while picking a home, the chosen household while
-   * picking one to play. All build hidden behind the menus' town.
+   * Prepare the next game in the background so Continue is instant: the latest save while on the
+   * main menu. A house or household picked from a menu starts with its own loading screen (the
+   * house's data is fetched there, then the rest of the town streams in play).
    */
   $effect(() => {
     if (!app.dataReady || app.booting) return;
     const screen = app.screen;
-    const slot = app.homeSlot;
-    const home = slot === null ? null : app.homeRequest(slot);
-    const play = app.playSlot === null ? null : app.playRequest(app.playSlot);
     const snapshot = $state.snapshot(settings);
     let cancelled = false;
     // On the main menu, let the entrance animation and the camera's glide finish first (the
-    // latest save is not urgent). Picking a home or a household is: start at once, the build
-    // yields between its slices so the camera keeps moving.
+    // latest save is not urgent).
     const settle = screen === 'menu';
     const timer = setTimeout(async () => {
       if (settle) await menuScene.settled();
@@ -234,10 +256,6 @@
             if (!shown) toast(err.message, 7000);
           }
         }
-      } else if (screen === 'home' && home) {
-        await host.prepare(home, snapshot, false).catch(() => {});
-      } else if (screen === 'play' && play) {
-        await host.prepare(play, snapshot, false).catch(() => {});
       }
     }, settle ? 500 : 250);
     return () => {

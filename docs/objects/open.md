@@ -181,8 +181,6 @@ it left is here, with its id; §9 of the review says what each would take.
 
 ### Tools
 - The lamp build (`_bulb`) checks only the light's height, not `at`.
-- `pnpm wasm` doesn't run in a worktree with a symlinked `node_modules` (pnpm's deps check); its cargo +
-  wasm-bindgen command works.
 - The review's tooling leftovers (`cargo review sizes`' measuring, `check.mjs play` with one resident, the debug
   states) are in [docs/authenticity-review.md](../authenticity-review.md) §7.
 

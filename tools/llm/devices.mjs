@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * The device test (`web/src/talk/devices.svelte.ts`) in a real browser: starts Vite, opens the
  * game with `?debug` in Chromium with WebGPU, runs `__llmBench()` and prints (the language model
@@ -8,11 +8,11 @@
  * and which setup is used (none: the model's lines are switched off). Exits non-zero if a setup that ran
  * wrote garbage (logits that aren't numbers).
  *
- * Needs `pnpm wasm`, `pnpm voice` and `pnpm llm` first, and Playwright:
+ * Needs `bun run wasm`, `bun run voice` and `bun run llm` first, and Playwright:
  * `PLAYWRIGHT=<path to playwright/index.mjs>` if it isn't installed, `CHROME=<executable>` for
  * a browser of your own (Chrome or Chrome for Testing: `chrome-headless-shell` has no GPU).
  * In a window, for the display's real timing; `HEADLESS=1` runs without one (still on the real
- * GPU, frames at 60 a second). Usage: `node tools/llm/devices.mjs`.
+ * GPU, frames at 60 a second). Usage: `bun tools/llm/devices.mjs`.
  */
 
 import { spawn } from 'node:child_process';

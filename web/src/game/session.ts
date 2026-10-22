@@ -5,6 +5,7 @@
  */
 
 import { AssetRegistry } from '../assets/registry';
+import { prefetch, prefetchNow, planStream, whenStreamSettled } from '../assets/stream';
 import { Content } from '../content/content';
 import { SaveRefused, SimBridge, type FrameState } from '../core/bridge';
 import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, SocialEvent, WorldStructure } from '../core/protocol';
@@ -39,6 +40,7 @@ import { play } from '../ui/sfx';
 import { householdBonds, householdSpawns, lookAtStage, lookFromSeed, palette, type Appearance, type HouseholdDraft } from './household';
 import { PointerInput } from './input';
 import { assembleTown, loadTemplates, useTownContent, type NeighbourhoodDraft } from './town';
+import { gameAssetPlan } from './streamPlan';
 import { perfEnd, perfPhase, perfStart, perfTime, perfTimeAsync } from '../debug/perf';
 import { UiMirror } from './uiUpdates';
 
@@ -209,6 +211,8 @@ export async function startSession(
   let resumeSpeed: number | null = null;
   let revealed = false;
   let warmed = false;
+  /** The world has been built once: later ones are patches or rare rebuilds, and need no warm-up. */
+  let warmedFramesOnce = false;
   let disposed = false;
   /** The scene build in progress; disposing waits for it so it can't add to the next session's scene. */
   let building: Promise<unknown> = Promise.resolve();
@@ -357,6 +361,10 @@ export async function startSession(
   let speedBeforeBuy: number | null = null;
   let autosaveTimer: ReturnType<typeof setInterval> | undefined;
   let prefetchTimer: ReturnType<typeof setTimeout> | undefined;
+  /** The viewed house's files (the second loading screen); made once, on the first built view. */
+  let homeAssets: Promise<void> | null = null;
+  /** Everything after the house: streamed once the game is revealed. */
+  let restUrls: string[] = [];
   let autosaveMinutes = -1;
   /** The performance overlay setting last applied (F3 opens and closes the overlay in between). */
   let showFps: boolean | null = null;
@@ -911,8 +919,10 @@ export async function startSession(
    * for only so long, so saving works while nothing is drawn.
    */
   const store = async (name: string, id: string, autosave: boolean): Promise<string> => {
-    const picture = document.hidden ? Promise.resolve(null) : Promise.race([renderer.captureThumbnail(THUMBNAIL.width, THUMBNAIL.height), new Promise<null>((resolve) => setTimeout(resolve, THUMBNAIL_WAIT_MS, null))]);
-    const [data, taken] = await Promise.all([bridge.requestSave(), picture]);
+    const picture = document.hidden
+      ? Promise.resolve(null)
+      : Promise.race([perfTimeAsync('save: picture', () => renderer.captureThumbnail(THUMBNAIL.width, THUMBNAIL.height)), new Promise<null>((resolve) => setTimeout(resolve, THUMBNAIL_WAIT_MS, null))]);
+    const [data, taken] = await Promise.all([perfTimeAsync('save: data', () => bridge.requestSave()), picture]);
     thumbnail = taken ?? thumbnail;
     const record: SaveRecord = {
       id,
@@ -927,7 +937,7 @@ export async function startSession(
       game: gameId,
       data,
     };
-    await writeSave(record);
+    await perfTimeAsync('save: write', () => writeSave(record));
     return id;
   };
   /** Saves into the older of the game's two autosaves. */
@@ -1048,12 +1058,25 @@ export async function startSession(
       }
     }
     const plot = viewPlot === null ? null : w.plots[viewPlot];
-    const buildSpan = perfStart('session: renderer setWorld');
     const view = plot ? { x: plot.x, z: plot.z, w: plot.w, d: plot.d } : null;
     worldSound.setWorld(w, view);
-    const build = renderer.setWorld(w, view).then((value) => {
-      perfEnd(buildSpan);
-      return value;
+    if (!homeAssets) {
+      // First the house (the loading screen waits for it), then the rest of the town (streamed
+      // after Play). Planning once keeps a later world update from restarting the indicator.
+      const plan = gameAssetPlan(content, assets, w, view);
+      planStream([...plan.home, ...plan.rest], 'Game data');
+      restUrls = plan.rest;
+      homeAssets = prefetchNow(plan.home, (done, total) => {
+        progress(`Fetching your home (${done}/${total})`, 0.3 + 0.35 * (done / Math.max(1, total)));
+      }).then(() => progress('Building the world', 0.65));
+    }
+    const build = homeAssets.then(async () => {
+      const buildSpan = perfStart('session: renderer setWorld');
+      try {
+        return await renderer.setWorld(w, view);
+      } finally {
+        perfEnd(buildSpan);
+      }
     });
     building = build.catch(() => {});
     if (feedback?.effects.length) void build.then(() => feedback.effects.forEach((fx) => renderer.buildEffect(fx)), () => {});
@@ -1063,13 +1086,17 @@ export async function startSession(
         // Compile the game's own look (its lighting and cutaway) while the menu still covers it.
         // (When the game is only prepared in the background, it waits until it is started: the
         // mirror's clip-plane shaders take a long frame, which must not land on a visible menu.)
-        if (warm) {
+        if (warm && !warmed) {
           warmed = true;
           const frame = await perfTimeAsync('session: first frame', firstFrame);
           if (frame) await perfTimeAsync('session: warm game', () => renderer.warmGame(frame));
           else perfPhase('session: warm game (no frame)');
         } else perfPhase('session: warm game (deferred)');
-        return perfTimeAsync('session: warm frames', () => renderer.framesRendered(WARM_FRAMES));
+        // Only the first world is drawn a few times to compile what it shows: a later one is
+        // patched in place (an object opened, a crop grown), and warms nothing new.
+        const frames = warmedFramesOnce ? 1 : WARM_FRAMES;
+        warmedFramesOnce = true;
+        return perfTimeAsync('session: warm frames', () => renderer.framesRendered(frames));
       })
       .then(() => {
         progress('Drawing portraits', 0.9);
@@ -1475,6 +1502,8 @@ export async function startSession(
       if (frame) await perfTimeAsync('session: warm game', () => renderer.warmGame(frame));
       else perfPhase('session: warm game (no frame)');
       await perfTimeAsync('session: warm frames', () => renderer.framesRendered(WARM_FRAMES));
+      // A save's picture is drawn into its own target: compile its shaders now, not at the first autosave.
+      await perfTimeAsync('session: warm thumbnail', () => renderer.captureThumbnail(THUMBNAIL.width, THUMBNAIL.height));
     },
     reveal() {
       if (revealed) return;
@@ -1508,11 +1537,23 @@ export async function startSession(
         else controls.setBuildTab('furnish');
       }
       perfPhase(`session: reveal ${game.mode} ${game.buildTab} storey ${game.storey} walls ${game.wallMode}`);
-      prefetchTimer = setTimeout(() => {
-        // (Not while benchmarking: drawing the pictures would show in the measurements.)
+      // The house is cached by now: stream the rest of the town while the player is in it. Its
+      // models are built into the world once the stream is over (each settle used to rebuild it).
+      void (async () => {
+        await homeAssets;
+        if (disposed) return;
+        renderer.holdModelRefresh(true);
+        prefetch(restUrls);
+        // The catalog's pictures are built only once the stream is quiet, in idle moments.
+        await whenStreamSettled();
+        renderer.holdModelRefresh(false);
         if (disposed || BENCH) return;
-        services.items.prefetch(content.shop.map((def) => ({ model: def.model, footprint: def.footprint ?? [1, 1] })));
-      }, PREFETCH_PICTURES_MS);
+        prefetchTimer = setTimeout(() => {
+          // (Not while benchmarking: drawing the pictures would show in the measurements.)
+          if (disposed || BENCH) return;
+          services.items.prefetch(content.shop.map((def) => ({ model: def.model, footprint: def.footprint ?? [1, 1] })));
+        }, PREFETCH_PICTURES_MS);
+      })();
     },
     save(name, slotId) {
       return store(name, slotId ?? crypto.randomUUID(), false);

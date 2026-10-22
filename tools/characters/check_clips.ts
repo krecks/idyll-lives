@@ -1,7 +1,7 @@
 /**
  * Checks the residents' clips (web/src/render/babylon/characters/clips) baked on the built rig:
  *
- *     node --experimental-strip-types tools/characters/check_clips.ts [rig.json] [--body male|female|all]
+ *     bun tools/characters/check_clips.ts [rig.json] [--body male|female|all]
  *         [--stage <stage>[,<stage>…]|all] [--update-baseline]
  *
  * - `--body`: the bodies to check on (default `male`, the reference).
@@ -54,20 +54,6 @@
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
-import { registerHooks } from 'node:module';
-
-// The web sources import without extensions (Vite resolves them); add `.ts` here.
-registerHooks({
-  resolve(specifier, context, next) {
-    try {
-      return next(specifier, context);
-    } catch (err) {
-      if (specifier.startsWith('.')) return next(`${specifier}.ts`, context);
-      throw err;
-    }
-  },
-});
-
 const { clipDefs } = await import('../../web/src/render/babylon/characters/clips/index.ts');
 const { bake } = await import('../../web/src/render/babylon/characters/clips/dsl.ts');
 const { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } = await import('../../web/src/render/babylon/characters/clips/street.ts');

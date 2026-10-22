@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * Checks the language model that writes residents' lines as the browser's worker runs it
  * (`engine.mjs`: its 4-bit build, the worker's own `generate.ts`; on the CPU here, four threads),
@@ -16,7 +16,7 @@
  * - sampled replies differ by seed;
  * - and prints the time per line.
  *
- * Needs `pnpm llm` first. Usage (from web/): `pnpm check:llm` (`DEBUG=1` also prints the raw replies).
+ * Needs `bun run llm` first. Usage (from web/): `bun run check:llm` (`DEBUG=1` also prints the raw replies).
  */
 
 import { readFileSync } from 'node:fs';

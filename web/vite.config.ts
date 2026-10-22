@@ -171,7 +171,7 @@ function optimizedAssets(): Plugin {
  * The release WebAssembly: once the build has written the simulation's and the voice's wasm, they
  * are optimised and stripped by binaryen's wasm-opt (tools/release/wasm-opt.mjs: -O3, no name or
  * producers sections; about a minute the first time, then cached). The dev server, and
- * `npm run wasm` behind it, keep them as built.
+ * `bun run wasm` behind it, keep them as built.
  */
 function releaseWasm(): Plugin {
   let outDir = '';
@@ -370,7 +370,7 @@ The game itself is free software under the GNU General Public License v3.0 or la
 
 export default defineConfig({
   plugins: [svelte(), debugReports(), earlyEnvironment(), optimizedAssets(), minifiedManifests(), dataBundle(), isolationWorker(), releaseWasm(), collectPackages(), thirdPartyLicenses()],
-  // The game's version (one number for web and Rust; `node ../tools/release/version.mjs <x.y.z>` bumps it).
+  // The game's version (one number for web and Rust; `bun ../tools/release/version.mjs <x.y.z>` bumps it).
   define: { __APP_VERSION__: JSON.stringify(pkg.version), __APP_COMMIT__: JSON.stringify(COMMIT), __BUILD_ID__: JSON.stringify(BUILD_ID) },
   server: { headers: crossOriginIsolation, ...(linkedModules ? { fs: { allow: [searchForWorkspaceRoot(process.cwd()), linkedModules] } } : {}) },
   ...(linkedModules ? { cacheDir: fileURLToPath(new URL('./.vite-cache', import.meta.url)) } : {}),

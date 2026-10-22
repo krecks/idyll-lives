@@ -439,6 +439,11 @@ export interface Renderer {
    * after a while without them (drawing stopped, a hidden tab): nothing waits for frames forever.
    */
   framesRendered(frames: number): Promise<void>;
+  /**
+   * Holds the rebuilds that streamed model files set off (one when the stream is over, instead of
+   * one per settle): the game streams the rest of the town behind the house.
+   */
+  holdModelRefresh(on: boolean): void;
   /** Drawing broke for good (`RenderFailure`); a failed frame is otherwise logged and the next one drawn. */
   onFailure: ((why: RenderFailure, error?: unknown) => void) | null;
   /**

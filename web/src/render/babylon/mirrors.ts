@@ -113,6 +113,8 @@ interface Item {
 }
 
 export class Mirrors {
+  /** Warming the pipelines of everything drawn, not just what the glass shows (see `warm`). */
+  private warmAll = false;
   /** The reflections that may be live at once (null: not made, or let go). */
   private readonly pool: (Reflection | null)[];
   private readonly square: Mesh;
@@ -413,6 +415,12 @@ export class Mirrors {
     if (!meshes) return null;
     const list = r.list;
     list.length = 0;
+    // Warming: everything the world draws is drawn once, so each material's pipeline is made for this
+    // target before the game shows (a pipeline first used mid-play costs a frame: ~30–100 ms).
+    if (this.warmAll) {
+      for (let i = 0; i < count; i++) list.push(meshes[i]);
+      return list;
+    }
     for (let i = 0; i < count; i++) {
       const mesh = meshes[i];
       if (mesh.alwaysSelectAsActiveMesh) {
@@ -478,12 +486,19 @@ export class Mirrors {
       textures = this.reflecting;
     }
     const saved: { texture: MirrorTexture; size: { width: number; height: number } }[] = [];
-    for (const texture of textures) {
-      const now = texture.getSize();
-      saved.push({ texture, size: { width: now.width, height: now.height } });
-      if (size > 0) texture.resize({ width: size, height: size });
-      texture.resetRefreshCounter();
-      texture.render();
+    // (Everything the world draws, not only what the glass shows: a resident walking into it, or a thing
+    // built, would otherwise have its pipeline made in the frame it is first seen in.)
+    this.warmAll = true;
+    try {
+      for (const texture of textures) {
+        const now = texture.getSize();
+        saved.push({ texture, size: { width: now.width, height: now.height } });
+        if (size > 0) texture.resize({ width: size, height: size });
+        texture.resetRefreshCounter();
+        texture.render();
+      }
+    } finally {
+      this.warmAll = false;
     }
     return () => {
       if (size > 0) for (const { texture, size: old } of saved) texture.resize(old);

@@ -182,7 +182,7 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
   - `cargo test -p sim-core --test shipped_content` checks every object's and item's model has its file
     (and its `far` file) once the manifests are stacked (a pack left out of `packs` fails it), every
     interaction has an animation, and the categories and groups exist.
-  - Changed the sim? Run `cargo test -p sim-core`, then `npm run wasm` in `web/` before testing in the
+  - Changed the sim? Run `cargo test -p sim-core`, then `bun run wasm` in `web/` before testing in the
     browser.
 
 ## A moving part (door, lid, drawer, fold-down bed)
@@ -302,13 +302,13 @@ with its own dev server on a port you give it (options and the rules for ports a
 [tools/bench/README.md](../../bench/README.md)). Pictures go to `bench-results/check-<time>/` or `--out`:
 
 ```sh
-node tools/bench/check.mjs gallery --port 5227 --keys model.<id> --cols 4
-node tools/bench/check.mjs clips --port 5227 --keys model.<id> --times 0,0.3,0.6,1,99
-node tools/bench/check.mjs play --port 5227 --object <id> --at 23,14,0 --use <interaction> --shots 6
+bun tools/bench/check.mjs gallery --port 5227 --keys model.<id> --cols 4
+bun tools/bench/check.mjs clips --port 5227 --keys model.<id> --times 0,0.3,0.6,1,99
+bun tools/bench/check.mjs play --port 5227 --object <id> --at 23,14,0 --use <interaction> --shots 6
 ```
 
 Add `--renderer webgl` for WebGL2 and `--quality low` for the Low preset. By hand, or for what the script
-doesn't do, start your own dev server from your checkout (`cd web && npx vite --port <free port> --strictPort`,
+doesn't do, start your own dev server from your checkout (`cd web && bunx vite --port <free port> --strictPort`,
 never one that's already running) and drive Playwright headless with full Chrome for Testing, at 1 % volume
 (`page.addInitScript(quiet)` from `tools/bench/quiet.mjs`):
 

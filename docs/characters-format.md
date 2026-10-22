@@ -9,8 +9,8 @@ clips and the runtime (`web/src/render/babylon/characters*`). Everything here is
 cargo characters build                                # writes web/public/assets/characters, then checks it
 cargo characters check [set dir]                      # the set against this contract
 cargo characters diff <a> <b>                         # two sets, within the quantisation
-node --experimental-strip-types tools/characters/check_clips.ts   # the clips against the rig (see Checking clips)
-cd web && pnpm check:clips                            # the same on both bodies at every life stage (CI)
+bun tools/characters/check_clips.ts                   # the clips against the rig (see Checking clips)
+cd web && bun run check:clips                         # the same on both bodies at every life stage (CI)
 ```
 
 The build is deterministic (seeded noise only): the same code gives the same bytes.
@@ -359,7 +359,7 @@ hips over a planted foot slides on hips wider for their legs than the reference'
 woman's): place the feet for them (`footIK`'s `wide`, a size per height) or keep the hips still. The known failures are in `tools/characters/clip-baseline.json`: they
 print as `known` and don't fail, one that no longer fails prints as `fixed` (take it out), and only
 a new one exits 1. `--update-baseline` rewrites the file for the bodies and stages checked. CI runs
-`pnpm check:clips` (in `web/`: `--body all --stage all`).
+`bun run check:clips` (in `web/`: `--body all --stage all`).
 
 In dev, editing a clip file re-bakes the clips in place (Vite HMR).
 

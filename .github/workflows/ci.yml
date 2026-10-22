@@ -38,13 +38,10 @@ jobs:
       - name: Simulation tests
         run: cargo test -p sim-core --locked
 
-      # pnpm only runs the clip check's script below: nothing is installed, as it needs no packages.
-      - uses: pnpm/action-setup@v4
+      # Bun only runs the clip check's script below: nothing is installed, as it needs no packages.
+      - uses: oven-sh/setup-bun@v2
         with:
-          version: 11.22.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
+          bun-version: 1.4.3
 
       # The generated_* tests are ignored because they need sample files; make them here so they
       # run instead of passing without checking anything.
@@ -54,15 +51,15 @@ jobs:
           CARGO_PROFILE_RELEASE_LTO: 'false'
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '16'
         run: |
-          node --experimental-strip-types tools/housegen/sample.ts /tmp/houses.json
-          node --experimental-transform-types tools/worlds/sample.ts /tmp/worlds.json
+          bun tools/housegen/sample.ts /tmp/houses.json
+          bun tools/worlds/sample.ts /tmp/worlds.json
           HOUSES=/tmp/houses.json WORLDS=/tmp/worlds.json cargo test -p sim-core --release --locked --test generated_houses --test generated_worlds -- --ignored
 
       # The residents' clips on both bodies at every life stage; the known failures are in
       # tools/characters/clip-baseline.json, so only a new one fails.
       - name: Clip check
         working-directory: web
-        run: pnpm --config.verify-deps-before-run=false check:clips
+        run: bun run check:clips
 
       # The repo's tools (crates/tools): a fresh character build against the committed set and its
       # checks, the object gate over every shipped model (no Blender), and the content and texture

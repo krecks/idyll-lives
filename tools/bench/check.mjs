@@ -1,10 +1,10 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * Checking a model in a real browser, headless on the real GPU, at 1 % volume: the screenshots each
  * object task takes. Starts its own Vite from this checkout on the port given (or uses `--url`, a
  * server you started yourself from this checkout), and writes PNGs (and a JSON log) to `--out`.
  *
- *   node tools/bench/check.mjs <what> --port 5227 [options]
+ *   bun tools/bench/check.mjs <what> --port 5227 [options]
  *
  *   gallery   the gallery (`/gallery.html`)
  *               --keys model.sofa,model.lamp   which models (required)
@@ -68,7 +68,7 @@
  * (each must answer 200), and every HTTP error, failed request, page error and console error is
  * logged with the job it happened in (`<what>-<run>.json`, `play-<run>.jsonl`).
  *
- * Needs `pnpm wasm` first (play), and Playwright: `PLAYWRIGHT=<path to playwright/index.mjs>` if it
+ * Needs `bun run wasm` first (play), and Playwright: `PLAYWRIGHT=<path to playwright/index.mjs>` if it
  * isn't installed in web/, `CHROME=<executable>` for a browser of your own (Chrome or Chrome for
  * Testing, not `chrome-headless-shell`, which draws in software). See tools/bench/README.md.
  */
@@ -147,7 +147,7 @@ for (const [name, path, needed] of served
   : []) {
   const answer = await fetch(base + path).then((r) => r.status, (err) => String(err));
   log.setup[name] = answer;
-  if (answer !== 200 && needed) fail(`${base}${path} answered ${answer}, not 200 (copy the wasm packages into this checkout, run \`pnpm wasm\`; see tools/bench/README.md)`);
+  if (answer !== 200 && needed) fail(`${base}${path} answered ${answer}, not 200 (copy the wasm packages into this checkout, run \`bun run wasm\`; see tools/bench/README.md)`);
   if (answer !== 200) console.warn(`check: ${base}${path} answered ${answer}`);
 }
 

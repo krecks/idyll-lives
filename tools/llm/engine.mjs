@@ -1,9 +1,9 @@
 /**
- * The language model in Node, as the browser's LLM worker runs it: its 4-bit build from
+ * The language model in Bun, as the browser's LLM worker runs it: its 4-bit build from
  * `web/public/llm/`, the tokenizer (`@huggingface/tokenizers`), and every reply written by
- * `web/src/llm/generate.ts` (the worker's own code). Node has no WebGPU, so ONNX Runtime Web
+ * `web/src/llm/generate.ts` (the worker's own code). Bun has no WebGPU, so ONNX Runtime Web
  * runs it on the CPU here (its WASM build: slow with 4-bit weights, but the same loop and the
- * same text). Used by `check.mjs`. Needs `pnpm llm` first.
+ * same text). Used by `check.mjs`. Needs `bun run llm` first.
  */
 
 import { readFileSync } from 'node:fs';

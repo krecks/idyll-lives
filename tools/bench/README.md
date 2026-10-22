@@ -7,25 +7,29 @@ The game has a rendering benchmark built in: open it with `?bench=<scene>` (`web
 | `render.mjs` | Starts Vite (or uses `--url`), opens `?bench=` in Chromium on the real GPU at 1920×1080 and device pixel ratio 1, once per preset × backend × scenario × CPU slow-down × diagnostic, and writes JSON and a markdown table to `bench-results/<time>/` (medians with `--runs`). `--shots <dir>` takes reference screenshots of 9 fixed poses; `--compare <dirA> <dirB>` counts the pixels that differ. |
 | `tools.mjs` | Times the repo's Rust tools (`crates/tools`: the character build and check, the object gate, the content editor, the texture commands), the release binaries run directly, median of `--runs` after a warm-up plus peak memory, into `bench-results/tools-<time>/`. It compared them with the Python scripts they replaced while those were in the tree (2026-10-20: 2–14× faster, `tex process` 0.8×). |
 | `scene.mjs` | Makes a scene, `web/public/bench/<name>.json.gz`: a new game as the menus make one, with a household of four in the first home for sale, played at full speed to `--hour` on day 1, paused and saved. |
+| `profile.mjs` | Profiles the **real game** instead of the bench scene: opens `?state=<name>&profile&debug&quality=<preset>` on the dev server (or `--build` for `vite preview`, where only `?bench=` exists), presses `--speed`, records its own animation-frame gaps for `--secs`, then reads `window.__perfReport()`. Writes `frames.json`, `perf.json` and `report.md` (gap p50/p95/p99/max, counts over 20/33/50/100 ms, dropped frames and long tasks by phase, worst frames, slowest spans) to `bench-results/profile-<time>/`. A server already answering on `--port` is reused. Findings: [docs/design/performance.md](../../docs/design/performance.md). |
 
-Both need `pnpm wasm` first and Playwright (`PLAYWRIGHT=<path to playwright/index.mjs>` if it isn't installed, `CHROME=<executable>` for a browser of your own: Chrome or Chrome for Testing, not `chrome-headless-shell`, which draws in software). Measurements run in a window, so their timing is the real display's. Shots and `scene.mjs`, which time nothing, run headless: no window takes the focus, and it's still the real GPU. `--headless` and `--headed` choose for either. A window's shots come out about 2 of 255 brighter than headless ones (the screen's colour profile), so compare shots taken the same way: two headless runs of the same build differ in at most 0.12 % of their pixels. Both play the game at 1 % volume (`quiet.mjs`).
+Both need `bun run wasm` first and Playwright (`PLAYWRIGHT=<path to playwright/index.mjs>` if it isn't installed, `CHROME=<executable>` for a browser of your own: Chrome or Chrome for Testing, not `chrome-headless-shell`, which draws in software). Measurements run in a window, so their timing is the real display's. Shots and `scene.mjs`, which time nothing, run headless: no window takes the focus, and it's still the real GPU. `--headless` and `--headed` choose for either. A window's shots come out about 2 of 255 brighter than headless ones (the screen's colour profile), so compare shots taken the same way: two headless runs of the same build differ in at most 0.12 % of their pixels. Both play the game at 1 % volume (`quiet.mjs`).
 
 ```sh
 # The production build (what players get), presets × both backends, no vsync, median of 3
-node tools/bench/render.mjs --preview --build --presets low,medium,high --backends webgpu,webgl --scenarios orbit-day,orbit-night --throughput --runs 3
+bun tools/bench/render.mjs --preview --build --presets low,medium,high --backends webgpu,webgl --scenarios orbit-day,orbit-night --throughput --runs 3
 
 # What a feature costs: Medium with and without shadows and nature
-node tools/bench/render.mjs --preview --presets medium --diags none,noshadows,nonature --throughput --runs 3
+bun tools/bench/render.mjs --preview --presets medium --diags none,noshadows,nonature --throughput --runs 3
 
 # At 3x CPU slow-down (CDP), standing in for slower laptops
-node tools/bench/render.mjs --preview --throttle 1,3
+bun tools/bench/render.mjs --preview --throttle 1,3
 
 # Does Medium still look the same? Shots of a change against shots of the base
-node tools/bench/render.mjs --preview --shots /tmp/shots-new --presets medium
-node tools/bench/render.mjs --compare /tmp/shots-base /tmp/shots-new --out /tmp/shots-diff
+bun tools/bench/render.mjs --preview --shots /tmp/shots-new --presets medium
+bun tools/bench/render.mjs --compare /tmp/shots-base /tmp/shots-new --out /tmp/shots-diff
 
 # A new scene
-node tools/bench/scene.mjs --name village --world medium --hour 18
+bun tools/bench/scene.mjs --name village --world medium --hour 18
+
+# The real game (a debug state), 90 s at 5x speed, Medium
+bun tools/bench/profile.mjs --state readme-village --speed 5 --secs 90 --preset medium
 ```
 
 The options are documented at the top of each script. To compare two builds, measure them back to back on the same machine, with nothing else running, and take medians of at least 3 runs; GPU times on Apple hardware vary by about ±1 ms between runs. Shots of two runs of the same build taken in a window differed by at most 1 of 255 in a few pixels, apart from a far road's lane markings (P1-17 in the release review); headless ones in at most 0.12 % of their pixels (above).
@@ -112,21 +116,21 @@ Common options: `--quality low|medium|high` (`?quality=`), `--renderer webgl`, `
 `--extra 'k=v&k=v'`, `--headed` (a window, only to measure timing).
 
 ```sh
-node tools/bench/check.mjs gallery --port 5227 --keys model.dartboard,model.tableClock
-node tools/bench/check.mjs gallery --port 5227 --keys model.fridge,model.diningChair --scale all --camera game
-node tools/bench/check.mjs gallery --port 5227 --each --keys model.fridge,model.toilet,model.bed
-node tools/bench/check.mjs clips --port 5227 --keys model.fridge --clip door_open --times 0,0.2,0.4,99
-node tools/bench/check.mjs clips --port 5227 --each --keys model.fridge,model.toilet,model.bed --times 0,0.5,99
-node tools/bench/check.mjs play --port 5227 --state review-stage --objects toilet,fridge,bed,dartboard@15,12,3 --use all
-node tools/bench/check.mjs play --port 5227 --state review-stage --objects-file /path/to/kitchen.txt
-node tools/bench/check.mjs play --port 5227 --state review-stage --objects officeChair --with deskSimple@10,13,2 --name chair
-node tools/bench/check.mjs play --port 5227 --state review-stage --objects cafeChair --use coffee --with cafeTable@10,13,0
-node tools/bench/check.mjs play --port 5227 --state review-stage --use-existing crib --sim 4 --name crib-elder
-node tools/bench/check.mjs play --port 5227 --state review-stage --objects chefStove --skills cooking=5
-node tools/bench/check.mjs play --port 5227 --state review-garden --use-existing garden.tomatoes,raisedBed --use harvest
-node tools/bench/check.mjs play --port 5227 --state review-stage-night --objects telescope@10,22,0,lamp
-node tools/bench/check.mjs play --port 5227 --object toiletClassic --at 23,14,0 --use use --shots 6 --every 500
-node tools/bench/check.mjs play --port 5227 --object toiletClassic --at 24,17,1 --state office-night --renderer webgl --quality low
+bun tools/bench/check.mjs gallery --port 5227 --keys model.dartboard,model.tableClock
+bun tools/bench/check.mjs gallery --port 5227 --keys model.fridge,model.diningChair --scale all --camera game
+bun tools/bench/check.mjs gallery --port 5227 --each --keys model.fridge,model.toilet,model.bed
+bun tools/bench/check.mjs clips --port 5227 --keys model.fridge --clip door_open --times 0,0.2,0.4,99
+bun tools/bench/check.mjs clips --port 5227 --each --keys model.fridge,model.toilet,model.bed --times 0,0.5,99
+bun tools/bench/check.mjs play --port 5227 --state review-stage --objects toilet,fridge,bed,dartboard@15,12,3 --use all
+bun tools/bench/check.mjs play --port 5227 --state review-stage --objects-file /path/to/kitchen.txt
+bun tools/bench/check.mjs play --port 5227 --state review-stage --objects officeChair --with deskSimple@10,13,2 --name chair
+bun tools/bench/check.mjs play --port 5227 --state review-stage --objects cafeChair --use coffee --with cafeTable@10,13,0
+bun tools/bench/check.mjs play --port 5227 --state review-stage --use-existing crib --sim 4 --name crib-elder
+bun tools/bench/check.mjs play --port 5227 --state review-stage --objects chefStove --skills cooking=5
+bun tools/bench/check.mjs play --port 5227 --state review-garden --use-existing garden.tomatoes,raisedBed --use harvest
+bun tools/bench/check.mjs play --port 5227 --state review-stage-night --objects telescope@10,22,0,lamp
+bun tools/bench/check.mjs play --port 5227 --object toiletClassic --at 23,14,0 --use use --shots 6 --every 500
+bun tools/bench/check.mjs play --port 5227 --object toiletClassic --at 24,17,1 --state office-night --renderer webgl --quality low
 ```
 
 On the test run of 2026-10-21 (headless, Medium, one core) an object took 9–26 s with all its uses (a

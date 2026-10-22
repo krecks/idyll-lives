@@ -1,11 +1,11 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * Renders the same lines for a set of residents, as the game would say them, to compare voices
  * by ear: WAV files, an index, and per voice the median pitch and two spectral centroids (the
  * whole band, and voiced frames below 5 kHz, which follows the formants: the size of the voice).
  *
- * Usage (needs `pnpm voice` first):
- *   node tools/voice/samples.mjs <out-dir> [label=path/to/voices.ts ...]
+ * Usage (needs `bun run voice` first):
+ *   bun tools/voice/samples.mjs <out-dir> [label=path/to/voices.ts ...]
  * Each label is a version of `web/src/voice/voices.ts` (default: `after=` the current one), e.g.
  * `before=/tmp/voices-old.ts after=web/src/voice/voices.ts` (made with `git show <rev>:web/src/voice/voices.ts`).
  */
@@ -18,7 +18,7 @@ import { engine, say as sayLine, voices } from './engine.mjs';
 const web = new URL('../../web/', import.meta.url);
 const [outDir, ...versionArgs] = process.argv.slice(2);
 if (!outDir) {
-  console.error('usage: node tools/voice/samples.mjs <out-dir> [label=voices.ts ...]');
+  console.error('usage: bun tools/voice/samples.mjs <out-dir> [label=voices.ts ...]');
   process.exit(1);
 }
 const versions = (versionArgs.length ? versionArgs : [`after=${new URL('src/voice/voices.ts', web).pathname}`]).map((a) => {

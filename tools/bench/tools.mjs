@@ -1,11 +1,11 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * Timing the repo's tools (crates/tools): each case's Rust binary and, while its Python
  * predecessor is still in the tree, the Python script beside it. Median and best wall time of
  * `--runs` after one warm-up, and peak memory (`/usr/bin/time -l`, macOS). Writes results.json and
  * summary.md to `--out` (default <repo>/bench-results/tools-<time>/).
  *
- *   node tools/bench/tools.mjs [--runs 5] [--only characters-build,check-glb] [--out <dir>]
+ *   bun tools/bench/tools.mjs [--runs 5] [--only characters-build,check-glb] [--out <dir>]
  *                              [--tex-src <dir>]   (Poly Haven/ambientCG sources for `tex process`)
  *                              [--content <dir>]   (content with a Validate category, for `content`)
  *                              [--content-id <id> --content-group <group>]   (`content in --dry-run`)

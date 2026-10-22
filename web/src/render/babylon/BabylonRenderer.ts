@@ -43,7 +43,6 @@ import {
   Quaternion,
   Scene,
   SceneInstrumentation,
-  CreateScreenshotAsync,
   ShadowGenerator,
   StandardMaterial,
   TransformNode,
@@ -56,7 +55,7 @@ import {
   type AbstractEngine,
   type AbstractMesh,
   type PerformanceMonitor,
-  type RenderTargetTexture,
+  RenderTargetTexture,
   type RenderTargetWrapper,
 } from './core';
 import { benchDiag } from '../../debug/benchFlags';
@@ -104,7 +103,7 @@ import { fieldLayers, Street } from './street';
 import { MaterialLibrary, WINDOWLESS_BITS, type DarkTiles } from './materials';
 import { refreshSoftLook, shadingFromSettings } from './softLook';
 import { Geo, LOOK as CUT } from './geometry';
-import { buildModel, motionsOf, onModelFileArrived, paintColors, painted, placementVariation, prefetchModels, standInOf, withGlows, type ModelTemplate, type StandIn } from './models';
+import { buildModel, motionsOf, onModelFileArrived, paintColors, painted, placementVariation, standInOf, withGlows, type ModelTemplate, type Motions, type StandIn } from './models';
 import { TemplateCache } from './templateCache';
 import { compressedTextureFeatures, noteWebGpuFailed, webGpuFailed } from './loaders';
 import { Characters, GAME_RATE, MAX_CHARACTERS } from './characters';
@@ -167,6 +166,13 @@ type ShadowSource = { mesh: Mesh; matrices: Float32Array };
  * (quality `clusteredLamps`); otherwise each is a forward light and only a few fit.
  * `?lights=forward|clustered` forces one for testing.
  */
+/**
+ * The build helpers (the cursor, the ghost, the grid, the previews, the handles and the marker over a
+ * selected Sim): drawn in the world, never in a reflection (a mirror showing the cursor is wrong, and
+ * their materials' pipelines would then be made the first time one of them fell in a reflection).
+ */
+const HELPER_MESH = /^(cursor|ghostArrow|buildGrid|preview-|model\.marker|resizeArrow)/;
+
 const ROOM_LIGHTS = 4;
 const CLUSTERED_LIGHTS = 32;
 /** Range (m) of an interior light while it is dark: it then covers next to no cluster tiles (see `applyRoomLights`). */
@@ -244,6 +250,33 @@ interface PlacedObject {
   shadow?: PopTarget;
   /** Things on a top: the object whose top it is (they're in hand with it). */
   host?: number;
+  /** What it was built from: to place it again (its picking box) without a build (`patchWorld`). */
+  built?: { template: ModelTemplate; motions?: Motions };
+}
+
+/**
+ * Everything an object is drawn from, but its open state and growth (drawn without a build, `patchWorld`).
+ * (Wear, quality and what it's worth don't change the model: they'd rebuild it for nothing.)
+ */
+function objectKey(o: ObjectPlacement): string {
+  return JSON.stringify([o.id, o.def, o.x, o.z, o.rot, o.turn, o.offset, o.size, o.tall, o.lift, o.w, o.d, o.colors]);
+}
+
+/** The same part of the town in view (the messages make a new rect each time). */
+function sameView(a: ViewRect | null, b: ViewRect | null): boolean {
+  return a === b || (!!a && !!b && a.x === b.x && a.z === b.z && a.w === b.w && a.d === b.d);
+}
+
+/** Rendered rows come back bottom-up (both backends): the save's picture, as a JPEG data URL. */
+function thumbnailUrl(data: Uint8Array, width: number, height: number): string {
+  const img = new ImageData(width, height);
+  const row = width * 4;
+  for (let y = 0; y < height; y++) img.data.set(data.subarray((height - 1 - y) * row, (height - y) * row), y * row);
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  canvas.getContext('2d')!.putImageData(img, 0, 0);
+  return canvas.toDataURL('image/jpeg', 0.8);
 }
 
 const MAX_SIMS = MAX_CHARACTERS;
@@ -324,6 +357,8 @@ export class BabylonRenderer implements Renderer {
   /** Which casters the shadow map draws, and when (see sunShadows.ts). */
   private sunShadows!: SunShadows;
   private post: DefaultRenderingPipeline | null = null;
+  /** The target the save's picture is drawn into (made on demand, then kept: warmed at boot by `warm()`). */
+  private thumbTarget: RenderTargetTexture | null = null;
   private nightGrade: NightGrade | null = null;
   private instrumentation!: SceneInstrumentation;
   /** Main-thread ms per frame, smoothed (see `stats`). */
@@ -400,6 +435,8 @@ export class BabylonRenderer implements Renderer {
   private filesTimer: ReturnType<typeof setTimeout> | null = null;
   /** When the first of the files waiting came (`performance.now()`): the wait for more is capped from then. */
   private filesSince = 0;
+  /** Held: files that come are noted but nothing is built again until it's let go (`holdModelRefresh`). */
+  private modelsHeld = false;
   private unlistenFiles: (() => void) | null = null;
   /** `dispose` has run: nothing more is built. */
   private disposed = false;
@@ -431,6 +468,7 @@ export class BabylonRenderer implements Renderer {
   private warmFrames = 0;
   /** The game's own look has been warmed once (the shaders are shared by the households). */
   private gameWarmed = false;
+  /** The game's reflections have had their pipelines made once (the menu's own warm; the households share them). */
   private mirrorWarmed = false;
   private skyMirrorWarmed = false;
   private worldBuilding = false;
@@ -445,6 +483,8 @@ export class BabylonRenderer implements Renderer {
   private snapshotDue: 'record' | 'reset' | null = null;
   /** Drawing to do in the next frame, before the scene is drawn (see `warmGame`). */
   private beforeDraw: (() => void) | null = null;
+  /** A game world was just built: draw its reflections once, in the next frame, to make their pipelines. */
+  private warmMirrors = false;
   private readonly warmPose = { alpha: 0, beta: 0, radius: 0, x: 0, y: 0, z: 0, ox: 0, oy: 0 };
   /** Lot being shown; null = everything. */
   private view: ViewRect | null = null;
@@ -894,7 +934,7 @@ export class BabylonRenderer implements Renderer {
     this.unlistenFiles = onModelFileArrived(scene, (url) => this.fileArrived(url));
     // Reflections show the game world (not the shadow-only copies or the overview).
     const q = this.quality;
-    this.mirrors = new Mirrors(scene, { count: this.diag.has('nomirrors') ? 0 : q.mirrors, scale: q.mirrorScale, samples: q.msaaSamples, rate: q.mirrorRate }, (mesh) => (mesh.layerMask & LAYER_WORLD) !== 0);
+    this.mirrors = new Mirrors(scene, { count: this.diag.has('nomirrors') ? 0 : q.mirrors, scale: q.mirrorScale, samples: q.msaaSamples, rate: q.mirrorRate }, (mesh) => (mesh.layerMask & LAYER_WORLD) !== 0 && !HELPER_MESH.test(mesh.name));
     if (new URLSearchParams(location.search).has('profile')) {
       const render = MirrorTexture.prototype.render;
       MirrorTexture.prototype.render = function (this: MirrorTexture, ...args: Parameters<typeof render>) {
@@ -914,16 +954,89 @@ export class BabylonRenderer implements Renderer {
   /** The newest world waiting to be built, and the builds in progress (see `setWorld`). */
   private nextWorld: { world: WorldStructure; view: ViewRect | null } | null = null;
   private worldBuilds: Promise<void> | null = null;
+  /** The world the meshes on screen were built from, and the storey that build showed. */
+  private builtWorld: WorldStructure | null = null;
+  private builtStorey = 0;
+  /** The next `setWorld` must build, even if the world looks the same: its templates changed (`refreshModels`). */
+  private rebuildNext = false;
 
   /**
    * Builds `world`. One build runs at a time: worlds arriving meanwhile (two edits in one frame,
    * a multi-edit build) wait for it, and only the newest of them is built next. Resolves when
    * the newest world is built.
+   *
+   * A world that only changes what's drawn without a build (an object opened or closed, a crop's
+   * growth stage) is applied to the meshes already built, `patchWorld`.
    */
   setWorld(world: WorldStructure, view: ViewRect | null): Promise<void> {
+    if (this.rebuildNext) this.rebuildNext = false;
+    else if (this.patchable(world, view)) {
+      this.patchWorld(world);
+      return Promise.resolve();
+    }
     this.lastWorld = world;
     this.nextWorld = { world, view };
     return (this.worldBuilds ??= this.buildWorlds());
+  }
+
+  /**
+   * Whether `world` differs from the built one only in ways the meshes already on screen can take:
+   * no new walls, floors, furniture or clothes, the same storey in view. (The simulation sends a
+   * world message for every opened door and every growth stage, `structure_version` in
+   * `crates/sim-core/src/world.rs`: those used to rebuild the whole town.)
+   */
+  private patchable(world: WorldStructure, view: ViewRect | null): boolean {
+    const why = this.unpatchable(world, view);
+    if (!why) return true;
+    if (this.debug) console.info('[render] world built:', why);
+    return false;
+  }
+
+  /** What keeps `world` from being patched into the meshes on screen (null: nothing, it can be). */
+  private unpatchable(world: WorldStructure, view: ViewRect | null): string | null {
+    const built = this.builtWorld;
+    if (!built) return 'never built';
+    if (this.worldBuilding) return 'building';
+    if (this.townMode) return 'town';
+    if (this.storey !== this.builtStorey) return `storey ${this.storey} built ${this.builtStorey}`;
+    if (!sameView(view, this.view)) return 'view';
+    if (built.width !== world.width || built.depth !== world.depth || built.storeys !== world.storeys) return 'size';
+    if (built.storeyDepth !== world.storeyDepth || built.basement !== world.basement) return 'storeys';
+    // The lot itself (walls, rooms, floors, fences) is what costs a build; a lean message never has it.
+    if (built.lotVersion !== world.lotVersion) return 'lot';
+    if (built.objects.length !== world.objects.length) return 'object count';
+    if (built.sims.length !== world.sims.length) return 'sim count';
+    for (let i = 0; i < world.objects.length; i++) {
+      if (objectKey(built.objects[i]) !== objectKey(world.objects[i])) return `object ${world.objects[i].id} ${world.objects[i].def}`;
+    }
+    for (let i = 0; i < world.sims.length; i++) {
+      const [a, b] = [built.sims[i], world.sims[i]];
+      if (a.id !== b.id || a.gender !== b.gender || a.stage !== b.stage || a.name !== b.name) return `sim ${b.id}`;
+      if (JSON.stringify(a.appearance) !== JSON.stringify(b.appearance)) return `sim look ${b.id}`;
+    }
+    return null;
+  }
+
+  /** Applies a `patchable` world in place: what's drawn of an object, its open state and growth. */
+  private patchWorld(world: WorldStructure): void {
+    const started = performance.now();
+    const byId = new Map(world.objects.map((o) => [o.id, o]));
+    for (const p of this.placed) {
+      const o = byId.get(p.id);
+      if (!o || !p.built) continue;
+      // What's drawn of it can change shape (an opening clip); its tiles never do.
+      const [px, pz, pw, pd] = this.pickBox(o, p.built.template, p.built.motions);
+      // As in `buildObjects`: the box is near corner plus size, so maxX/maxZ are derived here.
+      [p.minX, p.minZ, p.maxX, p.maxZ] = [px, pz, px + pw, pz + pd];
+    }
+    // The motion layer reads both live every frame: a door swings, a crop grows, without a build.
+    this.motion.patch(world.objects);
+    this.lastWorld = world;
+    this.builtWorld = world;
+    this.showItems();
+    this.resetSnapshot();
+    perfRecord('render: patch world', started, performance.now() - started);
+    if (this.debug) console.info('[render] world patched (no rebuild)');
   }
 
   private async buildWorlds(): Promise<void> {
@@ -957,6 +1070,8 @@ export class BabylonRenderer implements Renderer {
       if (this.storey >= this.storeys.count || this.storey < this.storeys.lowest) this.setStorey(this.storey);
       perfPhase('render: build world');
       await perfTimeAsync('render: buildWorld', () => this.buildWorld(world, view));
+      this.builtWorld = world;
+      this.builtStorey = this.storey;
       perfPhase('render: warm shaders');
       await perfTimeAsync('render: warmShaders', () => this.warmShaders(until));
     } finally {
@@ -968,6 +1083,10 @@ export class BabylonRenderer implements Renderer {
     if (this.townMode) {
       await Promise.race([this.scene.whenReadyAsync(), new Promise((resolve) => setTimeout(resolve, Math.max(0, until - performance.now())))]);
       this.warmFrames = WARM_WORLD_FRAMES;
+    } else {
+      // (The game itself has no menu to warm it: its reflections are drawn once in a frame of their own,
+      // so a resident walking into the glass later doesn't make a pipeline in the frame it is seen in.)
+      this.warmMirrors = true;
     }
   }
 
@@ -1099,9 +1218,7 @@ export class BabylonRenderer implements Renderer {
     if (this.templates.disposeStale()) this.resetSnapshot();
     void this.settleBirds(world);
     this.lastLightMinute = -1;
-    // Then the other lots' furniture downloads in the background (the camera may follow someone there).
-    const elsewhere = world.objects.filter((o) => !this.inView(o.x + o.w / 2, o.z + o.d / 2, 0));
-    prefetchModels(elsewhere.map((o) => this.objectModel(o)).filter((key) => this.deps.assets.has(key, 'model')).map((key) => this.deps.assets.get(key, 'model')));
+    // (The rest of the town streams once the game is revealed: see `game/streamPlan.ts`.)
     if (this.debug) console.info(`[render] setWorld ${(performance.now() - started).toFixed(1)} ms${lotBuilt ? '' : ' (lot kept)'}`);
   }
 
@@ -2106,14 +2223,53 @@ export class BabylonRenderer implements Renderer {
     }
   }
 
+  /**
+   * The save's picture: the scene drawn small into a target kept for it. (Drawing the whole scene
+   * again through `CreateScreenshotAsync` made a fresh target each save, and every material's shader
+   * variant for it: a ~100 ms frame once a minute. The target and its shaders are made once, and
+   * warmed at boot, so a save's picture costs a small render and a read-back.)
+   */
   async captureThumbnail(width: number, height: number): Promise<string | null> {
-    this.drawOnce();
     try {
-      return await CreateScreenshotAsync(this.engine, this.camera, { width, height }, 'image/jpeg', 0.8);
+      const rtt = (this.thumbTarget ??= this.makeThumbTarget(width, height));
+      const scene = this.scene;
+      const cam = this.camera;
+      const [prevTarget, prevCam] = [cam.outputRenderTarget, scene.activeCamera];
+      cam.outputRenderTarget = rtt;
+      scene.activeCamera = cam;
+      try {
+        scene.render();
+      } finally {
+        cam.outputRenderTarget = prevTarget;
+        scene.activeCamera = prevCam;
+      }
+      return await new Promise<string | null>((resolve) => {
+        this.engine.onEndFrameObservable.addOnce(() => {
+          void (async () => {
+            try {
+              const pixels = (await rtt.readPixels(0, 0, null, true, false)) as Uint8Array | null;
+              resolve(pixels ? thumbnailUrl(pixels, width, height) : null);
+            } catch (err) {
+              console.warn('[render] thumbnail capture failed', err);
+              resolve(null);
+            }
+          })();
+        });
+      });
     } catch (err) {
       console.warn('[render] thumbnail capture failed', err);
       return null;
     }
+  }
+
+  private makeThumbTarget(width: number, height: number): RenderTargetTexture {
+    const rtt = new RenderTargetTexture('saveThumbnail', { width, height }, this.scene, {
+      generateMipMaps: false,
+      samples: this.post?.samples ?? 1,
+      doNotChangeAspectRatio: true,
+    });
+    rtt.clearColor = this.scene.clearColor;
+    return rtt;
   }
 
   cameraPose(): CameraPose {
@@ -2519,6 +2675,8 @@ export class BabylonRenderer implements Renderer {
     if (this.filesTimer) clearTimeout(this.filesTimer);
     this.filesTimer = null;
     this.filesArrived.clear();
+    this.thumbTarget?.dispose();
+    this.thumbTarget = null;
     this.characters?.dispose();
     this.items?.dispose();
     this.overview?.dispose();
@@ -3066,6 +3224,11 @@ export class BabylonRenderer implements Renderer {
       const before = this.beforeDraw;
       this.beforeDraw = null;
       before?.();
+      if (this.warmMirrors) {
+        this.warmMirrors = false;
+        this.scene.updateTransformMatrix();
+        this.mirrors.warm(0)();
+      }
       this.applySnapshotDue();
       const tScene = performance.now();
       this.scene.render();
@@ -4180,7 +4343,45 @@ export class BabylonRenderer implements Renderer {
     return paintColors(this.deps.assets.get(this.objectModel(o), 'model'), o.colors);
   }
 
-  /** Returns the body meshes whose sun shadows are in `objectShadowMerge` (Low): they cast no shadow of their own. */
+  /**
+   * Where a click on `o` lands, in its storey's row space: its own tiles, or what's drawn of it (see
+   * `buildObjects`). Something held open (a wall bed folded down) by its whole tiles.
+   * Returns the near corner and its size `[x, z, w, d]`, not the far corner.
+   */
+  private pickBox(o: ObjectPlacement, template: ModelTemplate, motions: Motions | undefined): [number, number, number, number] {
+    const def = this.deps.content.object(o.def);
+    const layer = def?.layer;
+    const centre = objectCentre(o);
+    const D = this.rowOf(this.storeyOf(o.z));
+    const z = o.z - D;
+    const [ox, oz] = [centre.x - o.x - o.w / 2, centre.z - o.z - o.d / 2];
+    const { turn, size } = placementVariation(this.deps.assets.get(this.objectModel(o), 'model')?.vary ?? 0, o.x, o.z);
+    // Something small on a top is picked by its own disc, not the whole tile (the table around it stays
+    // clickable). Anything else by what's drawn of it (a pot on a rug leaves the rug around it clickable),
+    // never past its tiles; something held open (a wall bed folded down) by its whole tiles.
+    const radius = this.deps.content.radius(def);
+    let [px, pz] = layer === 'surface' ? [centre.x - radius * 1.2, centre.z - D - radius * 1.2] : [o.x + ox, z + oz];
+    let [pw, pd] = layer === 'surface' ? [radius * 2.4, radius * 2.4] : [o.w, o.d];
+    const shape = o.open && motions?.open ? undefined : template.outline;
+    if (layer !== 'surface' && shape) {
+      const yaw = (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180 + turn;
+      const [c, s] = [Math.cos(yaw), Math.sin(yaw)];
+      // Model x and z turned by the yaw (as `RotationYawPitchRoll`: x -> (c, -s), z -> (s, c)).
+      const xs: number[] = [];
+      const zs: number[] = [];
+      for (const mx of [shape.minX, shape.maxX]) {
+        for (const mz of [shape.minZ, shape.maxZ]) {
+          xs.push(centre.x + (mx * c + mz * s) * size);
+          zs.push(centre.z - D + (-mx * s + mz * c) * size);
+        }
+      }
+      const [x0, x1] = [Math.max(o.x + ox, Math.min(...xs) - 0.03), Math.min(o.x + ox + o.w, Math.max(...xs) + 0.03)];
+      const [z0, z1] = [Math.max(z + oz, Math.min(...zs) - 0.03), Math.min(z + oz + o.d, Math.max(...zs) + 0.03)];
+      if (x1 > x0 && z1 > z0) [px, pz, pw, pd] = [x0, z0, x1 - x0, z1 - z0];
+    }
+    return [px, pz, pw, pd];
+  }
+
   private async buildObjects(world: WorldStructure): Promise<Set<Mesh>> {
     // Things on the storeys up to the one in view, each lifted to its storey (from its lot rows).
     // From the ground up, stairs down to the basement show in their stairwell too.
@@ -4231,38 +4432,16 @@ export class BabylonRenderer implements Renderer {
         const k = this.storeyOf(o.z);
         const D = this.rowOf(k);
         // Things on a top stand on it.
-        const [y0, z] = [k * WALL_HEIGHT + (o.lift ?? 0), o.z - D];
+        const [y0] = [k * WALL_HEIGHT + (o.lift ?? 0)];
         // Things that stand anywhere on their tile are moved off its middle (picking and the shadow follow).
         const centre = objectCentre(o);
-        const [ox, oz] = [centre.x - o.x - o.w / 2, centre.z - o.z - o.d / 2];
         Quaternion.RotationYawPitchRollToRef((o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180 + turn, 0, 0, this.qTmp);
         Matrix.ComposeToRef(this.vScale.setAll(size), this.qTmp, this.vTmp.set(centre.x, y0, centre.z - D), this.mOut);
         this.mOut.copyToArray(matrices, i * 16);
         const def = this.deps.content.object(o.def);
         const layer = def?.layer;
         const bottom = layer === 'wall' || layer === 'ceiling' ? Math.max(0, Math.min(template.bottom ?? 0, template.height - 0.05)) : 0;
-        // Something small on a top is picked by its own disc, not the whole tile (the table around it stays clickable).
-        // Anything else by what's drawn of it (a pot on a rug leaves the rug around it clickable),
-        // never past its tiles; something held open (a wall bed folded down) by its whole tiles.
-        let [px, pz] = layer === 'surface' ? [centre.x - this.deps.content.radius(def) * 1.2, centre.z - D - this.deps.content.radius(def) * 1.2] : [o.x + ox, z + oz];
-        let [pw, pd] = layer === 'surface' ? [this.deps.content.radius(def) * 2.4, this.deps.content.radius(def) * 2.4] : [o.w, o.d];
-        const shape = o.open && motions?.open ? undefined : template.outline;
-        if (layer !== 'surface' && shape) {
-          const yaw = (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180 + turn;
-          const [c, s] = [Math.cos(yaw), Math.sin(yaw)];
-          // Model x and z turned by the yaw (as `RotationYawPitchRoll`: x -> (c, -s), z -> (s, c)).
-          const xs: number[] = [];
-          const zs: number[] = [];
-          for (const mx of [shape.minX, shape.maxX]) {
-            for (const mz of [shape.minZ, shape.maxZ]) {
-              xs.push(centre.x + (mx * c + mz * s) * size);
-              zs.push(centre.z - D + (-mx * s + mz * c) * size);
-            }
-          }
-          const [x0, x1] = [Math.max(o.x + ox, Math.min(...xs) - 0.03), Math.min(o.x + ox + o.w, Math.max(...xs) + 0.03)];
-          const [z0, z1] = [Math.max(z + oz, Math.min(...zs) - 0.03), Math.min(z + oz + o.d, Math.max(...zs) + 0.03)];
-          if (x1 > x0 && z1 > z0) [px, pz, pw, pd] = [x0, z0, x1 - x0, z1 - z0];
-        }
+        const [px, pz, pw, pd] = this.pickBox(o, template, motions);
         this.placed.push({
           id: o.id,
           y0,
@@ -4276,6 +4455,7 @@ export class BabylonRenderer implements Renderer {
           host: layer === 'surface' ? tops.get(`${o.x}:${o.z}`) : undefined,
           // (Its glow, if any, goes with the body: springing into place, held in buy mode.)
           pop: { meshes: [...template.meshes.filter((_, j) => !motion || motion.parts[j] < 0), ...glowOf(-1)], matrices, index: i, ...(partCount ? { moving: { parts, poses: restPoses(partCount) } } : {}) },
+          built: { template, motions },
         });
         if (motion && motions) {
           // A lamp's fan turns while it's on; a fire's flames (its uses' clips) burn while it's lit.
@@ -4497,6 +4677,7 @@ export class BabylonRenderer implements Renderer {
     const now = performance.now();
     if (!this.filesArrived.size) this.filesSince = now;
     this.filesArrived.add(url);
+    if (this.modelsHeld) return;
     if (this.filesTimer) clearTimeout(this.filesTimer);
     this.filesTimer = setTimeout(
       () => {
@@ -4505,6 +4686,19 @@ export class BabylonRenderer implements Renderer {
       },
       Math.max(0, Math.min(FILES_SETTLE_MS, this.filesSince + FILES_WAIT_MS - now)),
     );
+  }
+
+  /**
+   * Holds the builds that streamed model files would set off, then lets them go at once. The game
+   * streams the rest of the town after the house is in: left alone, each settle (1.5 s, or 5 s at
+   * most after the first) rebuilt the whole world, shader warm-up and all.
+   */
+  holdModelRefresh(on: boolean): void {
+    this.modelsHeld = on;
+    if (on || !this.filesArrived.size) return;
+    if (this.filesTimer) clearTimeout(this.filesTimer);
+    this.filesTimer = null;
+    void this.refreshModels();
   }
 
   /**
@@ -4533,7 +4727,26 @@ export class BabylonRenderer implements Renderer {
     }
     this.refreshTown(urls);
     // (No session: back in the menus, `clear` let the world go, and `templatesInUse` with it.)
-    if (drawn && this.lastWorld) void this.setWorld(this.lastWorld, this.view).catch(() => {});
+    if (!drawn || !this.lastWorld) return;
+    // Build what the world draws of them a frame at a time first (the old ones are still drawn), so the
+    // build below finds its templates ready instead of making them all in one frame: the models that
+    // came with the stream cost ~45 ms to build, which as one task is a visible hitch.
+    this.refreshes++;
+    try {
+      const built = new Set<string>();
+      for (const o of this.lastWorld.objects) {
+        const [key, build] = this.objectTemplate(o);
+        if (built.has(key) || this.templates.peek(key)) continue;
+        built.add(key);
+        await this.pace();
+        await this.template(key, build).catch(() => {});
+      }
+    } finally {
+      this.refreshes--;
+    }
+    // (The templates it draws changed: this one builds, though the world looks the same.)
+    this.rebuildNext = true;
+    void this.setWorld(this.lastWorld, this.view).catch(() => {});
   }
 
   /**

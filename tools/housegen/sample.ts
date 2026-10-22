@@ -8,22 +8,14 @@
  * without children, no bathroom off the room the front door opens into, the front door into a
  * shared room, no way through a bathroom, a laundry or a bedroom. Problems are listed (and the exit code is 1).
  *
- * Run: node --experimental-strip-types tools/housegen/sample.ts out.json [houses per lot size]
+ * Run: bun tools/housegen/sample.ts out.json [houses per lot size]
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
-import { register } from 'node:module';
 import type { ObjectDef } from '../../web/src/content/content.ts';
 import type { HouseGenConfig, Residents } from '../../web/src/game/housegen.ts';
 import type { HouseTemplate } from '../../web/src/game/town.ts';
 
-// The game's modules import each other without extensions (Vite finds them); so does Node, with this.
-register(
-  'data:text/javascript,' +
-    encodeURIComponent(`export async function resolve(spec, ctx, next) {
-      try { return await next(spec, ctx); } catch (e) { if (/^\\.\\.?\\//.test(spec) && !/\\.[a-z]+$/.test(spec)) return next(spec + '.ts', ctx); throw e; }
-    }`),
-);
 const { generateHouse, objectInfos } = await import('../../web/src/game/housegen.ts');
 
 const root = new URL('../../web/public/content/', import.meta.url);
