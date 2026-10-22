@@ -166,21 +166,17 @@ pub struct Use {
 
 /// The buyable objects of the content in `dir` (web/public/content), in the content's order.
 pub fn objects(dir: &Path) -> Result<Vec<Object>, String> {
-    let read = |name: &str| std::fs::read_to_string(dir.join(name)).map_err(|e| format!("{}: {e}", dir.join(name).display()));
-    let base = read("base.json")?;
-    let includes: Vec<String> = serde_json::from_str::<Value>(&base).ok().and_then(|v| v.get("include").cloned()).and_then(|v| serde_json::from_value(v).ok()).unwrap_or_default();
-    let parts = includes.iter().map(|n| read(n)).collect::<Result<Vec<_>, _>>()?;
-    let merged = sim_core::merge_content(&base, &parts.iter().map(String::as_str).collect::<Vec<_>>()).map_err(|e| e.to_string())?;
+    let files = crate::content::load(dir)?;
+    let (base, includes) = files.split_first().ok_or("no base.json")?;
+    let merged = sim_core::merge_content(&base.text, &includes.iter().map(|f| f.text.as_str()).collect::<Vec<_>>()).map_err(|e| e.to_string())?;
     let content = sim_core::Content::from_json(&merged).map_err(|e| e.to_string())?;
     let merged: Value = serde_json::from_str(&merged).map_err(|e| e.to_string())?;
     let raw: HashMap<&str, &Value> = merged["objects"].as_array().into_iter().flatten().filter_map(|o| Some((o.get("id")?.as_str()?, o))).collect();
     // A personality pack's objects are on docs/objects/packs.md, whatever their category.
     let mut packed = HashSet::new();
-    for (name, text) in includes.iter().zip(&parts) {
-        if name.starts_with("packs/") {
-            let file: Value = serde_json::from_str(text).map_err(|e| format!("{name}: {e}"))?;
-            packed.extend(file["objects"].as_array().into_iter().flatten().filter_map(|o| o["id"].as_str().map(String::from)));
-        }
+    for f in includes.iter().filter(|f| f.path.starts_with(dir.join("packs"))) {
+        let file: Value = serde_json::from_str(&f.text).map_err(|e| format!("{}: {e}", f.path.display()))?;
+        packed.extend(file["objects"].as_array().into_iter().flatten().filter_map(|o| o["id"].as_str().map(String::from)));
     }
     let text = |v: Option<&Value>| v.and_then(Value::as_str).unwrap_or_default().to_string();
     let strs = |v: &Value| -> Vec<String> { v.as_array().into_iter().flatten().filter_map(|s| s.as_str().map(String::from)).collect() };
@@ -271,28 +267,18 @@ pub fn objects(dir: &Path) -> Result<Vec<Object>, String> {
 
 /// {model key: its entry's `motions`} of the manifests (web/public/assets/manifest.json and the packs it lists,
 /// depth first, a later entry replacing an earlier one), for the entries that have one.
-pub fn motions(assets: &Path) -> Result<BTreeMap<String, Value>, String> {
-    fn stack(path: &Path, out: &mut BTreeMap<String, Value>, depth: usize) -> Result<(), String> {
-        if depth > 20 {
-            return Err(format!("{}: packs nested too deep", path.display()));
-        }
-        let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
-        let m: Value = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
-        for (key, entry) in m["entries"].as_object().into_iter().flatten() {
-            if entry["type"] == "model" {
-                match entry.get("motions").filter(|m| m.is_object()) {
-                    Some(motions) => out.insert(key.clone(), motions.clone()),
+pub fn motions(paths: &Paths) -> Result<BTreeMap<String, Value>, String> {
+    let mut out = BTreeMap::new();
+    for (_, m) in checkglb::manifests(paths, &Path::new(&paths.assets).join("manifest.json").to_string_lossy())? {
+        for (key, entry) in m.get("entries").and_then(|e| e.entries()).unwrap_or_default() {
+            if entry.get("type").and_then(|t| t.str()) == Some("model") {
+                match entry.get("motions").filter(|m| m.entries().is_some()) {
+                    Some(motions) => out.insert(key.clone(), motions.to_value()),
                     None => out.remove(key),
                 };
             }
         }
-        for pack in m["packs"].as_array().into_iter().flatten().filter_map(Value::as_str) {
-            stack(&path.parent().unwrap_or(Path::new(".")).join(pack), out, depth + 1)?;
-        }
-        Ok(())
     }
-    let mut out = BTreeMap::new();
-    stack(&assets.join("manifest.json"), &mut out, 0)?;
     Ok(out)
 }
 
@@ -828,7 +814,7 @@ pub fn main(args: &[String]) -> i32 {
             Some("uses") => {
                 let actions = action_keys(&s.read("web/src/render/babylon/characters.ts")?).map_err(|e| format!("characters.ts: {e}"))?;
                 let sounds = action_sounds(&s.read("web/src/audio/world.ts")?).map_err(|e| format!("world.ts: {e}"))?;
-                let (text, files) = uses(&objects, &motions(Path::new(&s.paths.assets))?, &actions, &sounds, reference.as_ref());
+                let (text, files) = uses(&objects, &motions(&s.paths)?, &actions, &sounds, reference.as_ref());
                 (text, files, 0)
             }
             _ => {

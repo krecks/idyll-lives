@@ -270,7 +270,7 @@ fn the_shipped_content_reads() {
     assert_eq!(by("toilet").uses[0].end_sound.as_deref(), Some("flush"));
     assert_eq!(by("fountainTown").ambient.as_deref(), Some("fountain"));
     assert_eq!(by("wallOven").sounds.get("stir").map(String::as_str), Some("none"));
-    let motions = review::motions(Path::new(&paths.assets)).unwrap();
+    let motions = review::motions(&paths).unwrap();
     assert_eq!(motions["model.sofaBed"]["open"], "bed_out");
     let root = ll_tools::checkglb::repo_root();
     let actions = review::action_keys(&std::fs::read_to_string(format!("{root}/web/src/render/babylon/characters.ts")).unwrap()).unwrap();

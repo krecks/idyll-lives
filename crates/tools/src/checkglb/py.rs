@@ -88,6 +88,20 @@ impl J {
         if i < 0 { None } else { a.get(i as usize) }
     }
 
+    /// As a `serde_json::Value` (a NaN or an infinity as `null`: JSON has none).
+    pub fn to_value(&self) -> serde_json::Value {
+        use serde_json::Value;
+        match self {
+            J::Null => Value::Null,
+            J::Bool(b) => Value::Bool(*b),
+            J::Int(i) => Value::from(*i),
+            J::Float(f) => serde_json::Number::from_f64(*f).map_or(Value::Null, Value::Number),
+            J::Str(s) => Value::String(s.clone()),
+            J::Arr(a) => Value::Array(a.iter().map(J::to_value).collect()),
+            J::Obj(o) => Value::Object(o.iter().map(|(k, v)| (k.clone(), v.to_value())).collect()),
+        }
+    }
+
     /// A key in a dict: `{key: …}` where the key is this value (a string is itself; None and numbers as
     /// Python prints them).
     pub fn key(&self) -> String {
