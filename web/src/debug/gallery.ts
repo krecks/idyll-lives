@@ -18,6 +18,7 @@
  * away from the camera) and facing the camera: a man and a
  * woman (adult), a child (child), or a woman, a teen, a child and an elder (all). At most 64 are
  * drawn: the first models get theirs.
+ * `?renderer=webgl` draws with WebGL2 (default WebGPU).
  * `?camera=game` is the game's Live camera as a game starts (`BabylonRenderer.setupCamera`: radius
  * 24, beta 0.86, its longer lens), from the game's angle onto a model facing that camera, aimed at
  * the floor under the first model, or the one `?at=<key or index>` names; `__gallery.aim(n)` aims
@@ -30,6 +31,7 @@ import {
   Color3,
   Color4,
   DirectionalLight,
+  Engine,
   HemisphericLight,
   ImageProcessingConfiguration,
   Matrix,
@@ -39,6 +41,7 @@ import {
   ShadowGenerator,
   Vector3,
   WebGPUEngine,
+  type AbstractEngine,
 } from '../render/babylon/core';
 import { AssetRegistry } from '../assets/registry';
 import { Content } from '../content/content';
@@ -78,8 +81,15 @@ const GAME = { alpha: Math.PI * 0.38, beta: 0.86, radius: 24, fov: 0.7 };
 const game = params.get('camera') === 'game';
 const alpha = Number(params.get('alpha') ?? (game ? GAME.alpha : Math.PI / 2 - 0.6));
 const canvas = document.getElementById('c') as HTMLCanvasElement;
-const engine = new WebGPUEngine(canvas, { antialias: true, ...compressedTextureFeatures() });
-await engine.initAsync();
+// WebGPU, or WebGL2 with `?renderer=webgl` (as clips.ts; `check.mjs gallery --renderer webgl` asks for it).
+const engine: AbstractEngine = await (async () => {
+  if (params.get('renderer') !== 'webgl' && navigator.gpu) {
+    const gpu = new WebGPUEngine(canvas, { antialias: true, ...compressedTextureFeatures() });
+    await gpu.initAsync();
+    return gpu;
+  }
+  return new Engine(canvas, true);
+})();
 const scene = new Scene(engine);
 scene.clearColor = new Color4(0.62, 0.77, 0.9, 1);
 scene.imageProcessingConfiguration.toneMappingEnabled = true;

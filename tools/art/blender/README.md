@@ -401,6 +401,9 @@ never one that's already running) and drive Playwright headless with full Chrome
 - **Shading by corners.** The baked shading is per vertex, so a face is as dark as its corners: a big flat
   face whose corners sit in a crease (a recessed panel, glass in a rim) goes dark all over. Corners buried
   inside another part are left unshaded; give a face that meets a crease an edge band (`kit.shaker` does).
+- **`up` is Blender's.** `F.sweep` maps the points to game axes but passes `up` (which way a profile's first
+  side faces) as it is, in Blender axes (x left, y back, z up): `up=(0, 1, 0)` on a path along game x flipped a
+  plinth's profile down through the floor.
 - **Measuring parts in the making.** `with G.new_parts() as parts:` fills `parts` when the block ends: measure
   them after it, not inside.
 - **Blender errors.** Without `--python-exit-code 1`, Blender exits 0 on a Python error. `cargo art`
