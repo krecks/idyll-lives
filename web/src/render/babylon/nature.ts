@@ -74,6 +74,17 @@ const FOREST_SECTORS = 8;
 const TUFT_CELL = 64;
 const SPLIT_TRIANGLES = 36_000;
 
+/** A tree or bush of the woods as placed: its model, where it stands, its size across and up, and its turn. */
+export interface WoodsPlant {
+  key: string;
+  x: number;
+  y: number;
+  z: number;
+  scale: number;
+  up: number;
+  yaw: number;
+}
+
 export interface NatureResult {
   meshes: Mesh[];
   /**
@@ -174,6 +185,8 @@ export class Landscape {
   private lawnMask: LawnMask | null = null;
   /** Each model's plants as built, to build again when a file they were built without comes (`rebuild`). */
   private batches: Batch[] = [];
+  /** The woods' trees and bushes near the town (full models), where birds may live (`woodsNear`). */
+  private nearWoods: WoodsPlant[] = [];
 
   /**
    * `lawnDensity`: the share of the lawn's tufts and flowers drawn (Low: half); `lawnLod` 1 draws
@@ -198,6 +211,11 @@ export class Landscape {
       world,
       world.meta?.name ?? '',
     );
+  }
+
+  /** The woods' trees and bushes within `range` m of a point (those near the town only), for the birds. */
+  woodsNear(x: number, z: number, range: number): WoodsPlant[] {
+    return this.nearWoods.filter((p) => Math.hypot(p.x - x, p.z - z) < range);
   }
 
   /** Whether mountains rise round the town (the haze is thinner, so they're seen). */
@@ -461,6 +479,7 @@ export class Landscape {
    */
   private async forests(scene: Scene, assets: AssetRegistry, pace?: () => Promise<void>): Promise<void> {
     const rand = mulberry32(this.seed ^ 0x5eed);
+    this.nearWoods = [];
     const near = new Map<string, Matrix[]>();
     const far = new Map<string, Matrix[]>();
     const spacing = 4.2;
@@ -501,12 +520,13 @@ export class Landscape {
         else kind = rand() < 0.35 ? 'model.tree.maple' : 'model.tree';
         const tree = kind.startsWith('model.tree') || kind === 'model.pine' || kind === 'model.spruce';
         const scale = kind === 'model.rock' ? 0.6 + rand() * 0.7 : tree ? 0.75 + rand() * 0.6 : 0.8 + rand() * 0.6;
-        const m = Matrix.Compose(
-          new Vector3(scale, scale * (0.9 + rand() * 0.25), scale),
-          Quaternion.RotationAxis(Vector3.Up(), rand() * Math.PI * 2),
-          new Vector3(x, this.heightAt(x, z) - 0.05, z),
-        );
+        // (Drawn in this order, as ever: the same woods from the same seed.)
+        const up = scale * (0.9 + rand() * 0.25);
+        const yaw = rand() * Math.PI * 2;
+        const y = this.heightAt(x, z) - 0.05;
+        const m = Matrix.Compose(new Vector3(scale, up, scale), Quaternion.RotationAxis(Vector3.Up(), yaw), new Vector3(x, y, z));
         const close = dist < SHADOW_RANGE && kind !== 'model.rock';
+        if (close) this.nearWoods.push({ key: kind, x, y, z, scale, up, yaw });
         const bucket = close ? near : far;
         bucket.set(kind, [...(bucket.get(kind) ?? []), m]);
       }
@@ -997,6 +1017,26 @@ class NatureWindPlugin extends MaterialPluginBase {
       CUSTOM_VERTEX_UPDATE_POSITION: wgsl ? body : body.replace(/vec4f/g, 'vec4'),
     };
   }
+}
+
+/**
+ * Where the wind has bent a plant's point `h` m up its model (before the plant's scale) for the
+ * plant standing at (`px`, `pz`): the world offset (x, z) the vertex shader gives it (the bend, not
+ * the leaves' flutter), so what sits on a branch sways with it. Zero before the scene's wind exists.
+ */
+export function windBend(scene: Scene, px: number, pz: number, h: number, out: { x: number; z: number }): void {
+  const state = windState.get(scene);
+  if (!state || h <= 0) {
+    out.x = out.z = 0;
+    return;
+  }
+  const t = state.time;
+  const ph = px * 0.21 + pz * 0.17;
+  const gust = (0.6 + 0.4 * Math.sin(t * 0.37 + ph * 0.5)) * state.strength;
+  const sway = (Math.sin(t * 1.1 + ph) * 0.7 + Math.sin(t * 2.3 + ph * 1.7) * 0.3) * gust;
+  const bend = sway * WIND_KIND['material.finish.foliage'][0] * h * h;
+  out.x = 0.8 * bend;
+  out.z = 0.6 * bend;
 }
 
 /** How strongly the wind moves a scene's plants (1 as made; 0 still, for reduce motion). */

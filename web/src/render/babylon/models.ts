@@ -276,6 +276,45 @@ export async function buildModel(
   return failed.length ? { ...template, failed } : template;
 }
 
+/**
+ * A model whose named nodes (`names`: each with all below it) are moving parts of their own, though
+ * the file has no clips to move them (the birds' head, tail and wings, posed in code): the template,
+ * its `motion.parts` saying which part each mesh is (index into `names`, -1: a node under none of
+ * them) and `motion.rests` where each node is at rest (a missing one at the origin). Null without a
+ * file, or if it fails to load or to build (it is tried again in the background, as `buildModel`'s).
+ */
+export async function buildModelParts(scene: Scene, name: string, entry: ModelEntry | undefined, names: readonly string[]): Promise<ModelTemplate | null> {
+  if (!entry?.url) return null;
+  let file: LoadedFile;
+  try {
+    file = await loadFile(scene, entry.url);
+  } catch (err) {
+    if (!warnedFiles.has(entry.url)) console.warn(`[render] failed to load ${entry.url}, drawing nothing`, err);
+    warnedFiles.add(entry.url);
+    return null;
+  }
+  const partOf = (nodes: readonly string[] = []) => {
+    for (const n of nodes) {
+      const i = names.indexOf(n);
+      if (i >= 0) return i;
+    }
+    return -1;
+  };
+  const rests = names.map((n) => file.named?.get(n) ?? Matrix.Identity());
+  const split: LoadedFile = {
+    pieces: file.pieces.map((p) => ({ ...p, part: partOf(p.nodes), full: undefined })),
+    parts: names.map((n, i) => ({ name: n, pivot: rests[i].getTranslation(), rest: rests[i] })),
+    clips: new Map(),
+  };
+  try {
+    return buildGltf(scene, name, entry, split, [1, 1], undefined);
+  } catch (err) {
+    if (!warnedFiles.has(entry.url)) console.warn(`[render] failed to build ${name} from ${entry.url}, drawing nothing`, err);
+    warnedFiles.add(entry.url);
+    return null;
+  }
+}
+
 /** Files whose failure has been warned about (once per file for the page). */
 const warnedFiles = new Set<string>();
 
@@ -1047,6 +1086,8 @@ interface LoadedFile {
   parts: { name: string; pivot: Vector3; rest: Matrix }[];
   /** Its animations, by name, in the file's model space. */
   clips: Map<string, ModelClip>;
+  /** Every named node's place at rest in model space (`buildModelParts` makes moving parts of some by name). */
+  named?: Map<string, Matrix>;
 }
 
 interface FilePiece {
@@ -1056,6 +1097,8 @@ interface FilePiece {
   material: Material | null;
   /** The moving part it belongs to, or -1. */
   part: number;
+  /** The names of its node and the nodes above it, nearest first (`buildModelParts`). */
+  nodes?: string[];
   /** Where its part is grown, for a part scaled to nothing at rest: the shape its normals and UVs come from. */
   full?: VertexData;
 }
@@ -1229,7 +1272,9 @@ async function importFile(scene: Scene, url: string, now: boolean): Promise<Load
     if (!(node instanceof Mesh) || node.getTotalVertices() === 0) continue;
     const part = partOf(node);
     // Bake the full hierarchy transform so thin-instance matrices place the model directly.
-    const piece: FilePiece = { data: VertexData.ExtractFromMesh(node, true, true).transform(computeFromRoot(node)), material: node.material, part };
+    const nodes: string[] = [];
+    for (let n: Node | null = node; n; n = n.parent) if (n.name) nodes.push(n.name);
+    const piece: FilePiece = { data: VertexData.ExtractFromMesh(node, true, true).transform(computeFromRoot(node)), material: node.material, part, nodes };
     const group = part >= 0 ? grownBy[part] : null;
     if (group) {
       // Its normals at rest by the inverse transpose of its matrix (flattened, they lean towards the
@@ -1242,6 +1287,8 @@ async function importFile(scene: Scene, url: string, now: boolean): Promise<Load
     pieces.push(piece);
   }
   const parts = moved.map((node, i) => ({ name: node.name, pivot: rest[i].getTranslation(), rest: rest[i] }));
+  const named = new Map<string, Matrix>();
+  for (const node of [...result.transformNodes, ...result.meshes]) if (node.name && !named.has(node.name)) named.set(node.name, computeFromRoot(node).clone());
   // (Each read with the others at rest: a part inside another is read with it closed.)
   const clips = new Map(
     result.animationGroups.map((group) => {
@@ -1254,7 +1301,7 @@ async function importFile(scene: Scene, url: string, now: boolean): Promise<Load
   // The nodes and clips go; the materials stay with the file.
   for (const node of [...result.transformNodes, ...result.meshes]) node.dispose(true, false);
   for (const group of result.animationGroups) group.dispose();
-  return { pieces, parts, clips };
+  return { pieces, parts, clips, named };
 }
 
 /** Sets `data`'s normals to `local` (a node's own) taken to model space by `world`'s inverse transpose, as a normal goes. */
@@ -1481,7 +1528,8 @@ function buildFromFile(scene: Scene, name: string, entry: ModelEntry, file: Load
     outline,
     ...(mirrors.length ? { mirrors } : {}),
     ...(glows.length ? { glows } : {}),
-    ...(file.parts.length && file.clips.size
+    // (A file's parts are what its clips move; `buildModelParts` names its own, without clips.)
+    ...(file.parts.length
       ? { motion: { parts, clips: buildClips(file.clips, space, shifts), names: file.parts.map((p) => p.name), rests: file.parts.map((p) => p.rest.multiply(space)) } }
       : {}),
   };
