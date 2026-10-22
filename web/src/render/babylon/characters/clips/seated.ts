@@ -189,8 +189,6 @@ export const FLOOR_SITS: readonly FloorSit[] = [
     hands: [-0.1, 0.24, 0.3],
   },
 ];
-/** The floor cushion's height (`FLOOR_SITS`' `Floor`). */
-export const FLOOR_SEAT = 0.14;
 
 /** Its pelvis offset (as `SEAT_MOVE`). */
 function floorMove(f: FloorSit): Vec {
