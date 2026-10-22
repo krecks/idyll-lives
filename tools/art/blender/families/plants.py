@@ -935,6 +935,14 @@ def _put(obj, at, yaw=0.0, tilt=0.0, lift=0.0):
     return obj
 
 
+def dome(name, at, r, h, material, yaw=0.0, tilt=0.0, lift=0.004):
+    """A flower's centre: a low dome on its face (none on a far version: too small to see)."""
+    if LOW[0]:
+        return None
+    G.sphere(name, 1.0, material=material, segments=low(6, 4), rings=3, scale=(r, r, h))
+    return _put(bpy.context.object, at, yaw, tilt, lift)
+
+
 def star(name, at, r, n, material, yaw=0.0, tilt=0.0, inner=0.5, depth=0.008, cup=0.2):
     """A flower's face: a thin star of `n` petals, `r` across its radius, the petals lifted by `cup` (a fraction
     of their reach), facing up and leaning `tilt` degrees towards `yaw`."""

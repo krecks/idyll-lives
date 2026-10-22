@@ -399,8 +399,10 @@ def jitter(obj, amount, size=0.3, seed=0.0, up=1.0):
     bpy.context.view_layer.update()   # matrix_world as placed, not as it was before (it is read below)
     for v in obj.data.vertices:
         p = obj.matrix_world @ v.co
-        n = vnoise.noise_vector(Vector((p.x / size + seed, p.y / size - seed, p.z / size + seed * 0.5)))
-        v.co += Vector((n.x, n.y, n.z * up)) * amount
+        q = Vector((p.x / size + seed, p.y / size - seed, p.z / size + seed * 0.5))
+        # three samples of `noise` far apart, not `noise_vector`, which differs from one Blender process to the next
+        n = [vnoise.noise(q + Vector(o)) for o in ((0, 0, 0), (31.4, 17.7, 5.9), (-13.3, 47.1, 29.2))]
+        v.co += Vector((n[0], n[1], n[2] * up)) * amount
     obj.data.update()
     return obj
 
