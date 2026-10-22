@@ -4126,23 +4126,17 @@ pub(crate) fn footstool_slots(content: &Content, objects: &[ObjectInstance], sea
     }
     let a = o.angle();
     let (fwd, right) = ([a.sin(), a.cos()], [a.cos(), -a.sin()]);
-    let stools: Vec<[f32; 2]> = objects
-        .iter()
-        .filter(|s| content.objects[s.def].footstool && !s.broken())
-        .map(|s| {
-            let c = s.centre(content);
-            [c[0] + s.offset[0] as f32 / 100.0, c[1] + s.offset[1] as f32 / 100.0]
-        })
-        .collect();
-    (0..(def.slots as usize).min(32)).fold(0, |mask, k| {
-        let p = o.place_at(def, k);
-        let before = stools.iter().any(|s| {
-            let d = [s[0] - p[0], s[1] - p[1]];
+    let n = (def.slots as usize).min(32);
+    let places: [[f32; 2]; 32] = std::array::from_fn(|k| if k < n { o.place_at(def, k) } else { [0.0; 2] });
+    objects.iter().filter(|s| content.objects[s.def].footstool && !s.broken()).fold(0, |mask, s| {
+        let c = s.centre(content);
+        let s = [c[0] + s.offset[0] as f32 / 100.0, c[1] + s.offset[1] as f32 / 100.0];
+        (0..n).fold(mask, |mask, k| {
+            let d = [s[0] - places[k][0], s[1] - places[k][1]];
             let ahead = d[0] * fwd[0] + d[1] * fwd[1];
             let side = d[0] * right[0] + d[1] * right[1];
-            (0.3..=1.2).contains(&ahead) && side.abs() <= 0.35
-        });
-        if before { mask | 1 << k } else { mask }
+            if (0.3..=1.2).contains(&ahead) && side.abs() <= 0.35 { mask | 1 << k } else { mask }
+        })
     })
 }
 
