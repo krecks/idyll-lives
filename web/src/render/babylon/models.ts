@@ -208,6 +208,13 @@ export interface BuildOptions {
    * until the file comes (`onModelFileArrived`).
    */
   standIn?: StandIn;
+  /**
+   * Named nodes (each with all below it) made moving parts of their own, though the file has no clips
+   * to move them (the birds' head, tail and wings, posed in code): the template's `motion.parts` says
+   * which part each mesh is (index into `parts`, -1: a node under none of them) and `motion.rests`
+   * where each node is at rest (a missing one at the origin); the file's own clips are left out.
+   */
+  parts?: readonly string[];
 }
 
 /** What shapes a stand-in box: the thing's content layer and, on a top, its radius. */
@@ -260,7 +267,7 @@ export async function buildModel(
         continue;
       }
       try {
-        const template = buildGltf(scene, name, entry, file, footprint, options.resize);
+        const template = buildGltf(scene, name, entry, options.parts ? splitParts(file, options.parts) : file, footprint, options.resize);
         return failed.length ? { ...template, failed } : template;
       } catch (err) {
         // One that loads but can't be built won't build when tried again either: not `failed`.
@@ -276,23 +283,8 @@ export async function buildModel(
   return failed.length ? { ...template, failed } : template;
 }
 
-/**
- * A model whose named nodes (`names`: each with all below it) are moving parts of their own, though
- * the file has no clips to move them (the birds' head, tail and wings, posed in code): the template,
- * its `motion.parts` saying which part each mesh is (index into `names`, -1: a node under none of
- * them) and `motion.rests` where each node is at rest (a missing one at the origin). Null without a
- * file, or if it fails to load or to build (it is tried again in the background, as `buildModel`'s).
- */
-export async function buildModelParts(scene: Scene, name: string, entry: ModelEntry | undefined, names: readonly string[]): Promise<ModelTemplate | null> {
-  if (!entry?.url) return null;
-  let file: LoadedFile;
-  try {
-    file = await loadFile(scene, entry.url);
-  } catch (err) {
-    if (!warnedFiles.has(entry.url)) console.warn(`[render] failed to load ${entry.url}, drawing nothing`, err);
-    warnedFiles.add(entry.url);
-    return null;
-  }
+/** A file with its named nodes `names` (each with all below it) as its moving parts, and no clips (`BuildOptions.parts`). */
+function splitParts(file: LoadedFile, names: readonly string[]): LoadedFile {
   const partOf = (nodes: readonly string[] = []) => {
     for (const n of nodes) {
       const i = names.indexOf(n);
@@ -301,18 +293,11 @@ export async function buildModelParts(scene: Scene, name: string, entry: ModelEn
     return -1;
   };
   const rests = names.map((n) => file.named?.get(n) ?? Matrix.Identity());
-  const split: LoadedFile = {
+  return {
     pieces: file.pieces.map((p) => ({ ...p, part: partOf(p.nodes), full: undefined })),
     parts: names.map((n, i) => ({ name: n, pivot: rests[i].getTranslation(), rest: rests[i] })),
     clips: new Map(),
   };
-  try {
-    return buildGltf(scene, name, entry, split, [1, 1], undefined);
-  } catch (err) {
-    if (!warnedFiles.has(entry.url)) console.warn(`[render] failed to build ${name} from ${entry.url}, drawing nothing`, err);
-    warnedFiles.add(entry.url);
-    return null;
-  }
 }
 
 /** Files whose failure has been warned about (once per file for the page). */
@@ -1086,7 +1071,7 @@ interface LoadedFile {
   parts: { name: string; pivot: Vector3; rest: Matrix }[];
   /** Its animations, by name, in the file's model space. */
   clips: Map<string, ModelClip>;
-  /** Every named node's place at rest in model space (`buildModelParts` makes moving parts of some by name). */
+  /** Every named node's place at rest in model space (`BuildOptions.parts` makes moving parts of some by name). */
   named?: Map<string, Matrix>;
 }
 
@@ -1097,7 +1082,7 @@ interface FilePiece {
   material: Material | null;
   /** The moving part it belongs to, or -1. */
   part: number;
-  /** The names of its node and the nodes above it, nearest first (`buildModelParts`). */
+  /** The names of its node and the nodes above it, nearest first (`BuildOptions.parts`). */
   nodes?: string[];
   /** Where its part is grown, for a part scaled to nothing at rest: the shape its normals and UVs come from. */
   full?: VertexData;
@@ -1427,18 +1412,24 @@ function buildGltf(scene: Scene, name: string, entry: ModelEntry, file: LoadedFi
   }
 }
 
+/**
+ * A model entry's own placement of its file's model space: its `scale`, `rotationY` and `offset`;
+ * with `fit`, only its turn (the fit is found from the geometry built, `fitInto`).
+ */
+export function entrySpace(entry: ModelEntry): Matrix {
+  const fit = (entry as ModelEntry & ModelExtras).fit;
+  const s = fit ? 1 : (entry.scale ?? 1);
+  const [ox, oy, oz] = entry.offset ?? [0, 0, 0];
+  return Matrix.Compose(new Vector3(s, s, s), Quaternion.RotationAxis(Vector3.Up(), ((entry.rotationY ?? 0) * Math.PI) / 180), fit ? Vector3.Zero() : new Vector3(ox, oy, oz));
+}
+
 /** `buildGltf`'s build. */
 function buildFromFile(scene: Scene, name: string, entry: ModelEntry, file: LoadedFile, footprint: [number, number], resize?: Resize): ModelTemplate {
   const extras = entry as ModelEntry & ModelExtras;
   const fit = extras.fit;
-  const s = fit ? 1 : (entry.scale ?? 1);
   const [ox, oy, oz] = entry.offset ?? [0, 0, 0];
   // The file's model space to this build's: `scale`, `rotationY` and `offset`, or `fit`.
-  let space = Matrix.Compose(
-    new Vector3(s, s, s),
-    Quaternion.RotationAxis(Vector3.Up(), ((entry.rotationY ?? 0) * Math.PI) / 180),
-    fit ? Vector3.Zero() : new Vector3(ox, oy, oz),
-  );
+  let space = entrySpace(entry);
   const overrides = extras.materials ?? {};
   const finishes = MaterialLibrary.for(scene);
   const overrideFor = (m: Material | null): MaterialOverride | undefined => (m && (overrides[m.name] ?? namedFinish(m.name, finishes))) ?? overrides['*'];
@@ -1528,7 +1519,7 @@ function buildFromFile(scene: Scene, name: string, entry: ModelEntry, file: Load
     outline,
     ...(mirrors.length ? { mirrors } : {}),
     ...(glows.length ? { glows } : {}),
-    // (A file's parts are what its clips move; `buildModelParts` names its own, without clips.)
+    // (A file's parts are what its clips move; `BuildOptions.parts` names its own, without clips.)
     ...(file.parts.length
       ? { motion: { parts, clips: buildClips(file.clips, space, shifts), names: file.parts.map((p) => p.name), rests: file.parts.map((p) => p.rest.multiply(space)) } }
       : {}),

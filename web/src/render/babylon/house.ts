@@ -1613,6 +1613,19 @@ export class HouseBuilder {
   }
 
   /**
+   * The top of a neighbouring house's roof (m), as `silhouettes` builds it on its box of walls (the
+   * plot's `house`, its roof style and storeys): for the birds, who fly over it.
+   */
+  roofTop(plot: { x: number; z: number; house: [number, number, number, number]; roof?: [number, number]; storeys?: number }): number {
+    const s = this.schemeWith(houseScheme(plot.x, plot.z), plot.roof);
+    const [x0, z0, x1, z1] = plot.house;
+    const walls = WALL_HEIGHT * (plot.storeys ?? 1);
+    // A flat roof's fascia; a pitched one (`addRoof`) rises over half the shorter span and its eaves, capped.
+    if (s.shape === 'flat') return walls + 0.2;
+    return walls + (Math.min(x1 - x0, z1 - z0) / 2 + T) * s.pitch + ROOF_THICKNESS + 0.07;
+  }
+
+  /**
    * Neighbouring houses as dressed boxes: the house's own doors and windows where they lie on
    * the box outline (framed, with muntins, curtains and shutters), corner boards, a porch with a
    * gabled canopy over the front door, a chimney on some roofs, and a garage at the end of the

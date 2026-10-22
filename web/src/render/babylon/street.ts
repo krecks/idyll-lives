@@ -33,6 +33,7 @@ import { Geo, type V3 } from './geometry';
 import type { HouseBuilder, SilhouetteSpec } from './house';
 import { encodeFinish, MaterialLibrary } from './materials';
 import { buildModel, placementVariation, withGlows, type ModelTemplate, type StandIn } from './models';
+import type { PlantPlacement } from './nature';
 import { TemplateCache } from './templateCache';
 import { perfEnd, perfStart, perfTime, perfTimeAsync } from '../../debug/perf';
 
@@ -962,7 +963,7 @@ export class Street {
     for (const [key, template] of this.templates) if (!batches.some(([k]) => k === key)) void template.then((t) => withGlows(t).forEach((m) => m.setEnabled(false)));
     this.glows = [];
     this.used = new Set(batches.filter(([, items]) => items.length).map(([key]) => key));
-    this.placedModels = batches.map(([key, items]) => ({ key, items, flat: key === FOLIAGE.hedge }));
+    this.plants = batches.flatMap(([key, items]) => items.map(([x, z, s, sy, yaw]): PlantPlacement => ({ key, x, y: 0, z, sx: s, sy, sz: key === FOLIAGE.hedge ? 1 : s, yaw })));
     for (const [key, items, cast] of batches) {
       await pace?.();
       const meshes = await perfTimeAsync(`street: batch ${key}`, () => this.instances(key, items, key === FOLIAGE.hedge, this.footprints.get(key), this.standIns.get(key), pace));
@@ -984,14 +985,11 @@ export class Street {
   private glow = new Color3(1, 0.8, 0.5);
 
   /**
-   * The models the last build drew from thin instances, each instance [x, z, scale across, scale up,
-   * yaw] (`flat`: not scaled along its z, a hedge's depth): where the birds find the street's bushes,
-   * hedges and public places' trees.
+   * The models the last build drew from thin instances, as placed (a hedge isn't scaled along its
+   * depth): where the birds find the street's bushes, hedges and public places' trees. A new array
+   * only when the street is built again.
    */
-  get placed(): readonly { key: string; items: readonly (readonly [number, number, number, number, number])[]; flat: boolean }[] {
-    return this.placedModels;
-  }
-  private placedModels: { key: string; items: readonly Inst[]; flat: boolean }[] = [];
+  plants: readonly PlantPlacement[] = [];
 
   /** Every mesh currently drawn (including the foliage templates in use). */
   get all(): readonly Mesh[] {
@@ -1016,7 +1014,7 @@ export class Street {
   /** Removes what was built (the foliage templates are kept, hidden, for the next build). */
   clear(): void {
     this.used.clear();
-    this.placedModels = [];
+    this.plants = [];
     for (const mesh of this.meshes) mesh.dispose(false, false);
     this.meshes = [];
     this.casters = [];

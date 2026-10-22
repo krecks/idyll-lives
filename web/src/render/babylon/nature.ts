@@ -74,14 +74,15 @@ const FOREST_SECTORS = 8;
 const TUFT_CELL = 64;
 const SPLIT_TRIANGLES = 36_000;
 
-/** A tree or bush of the woods as placed: its model, where it stands, its size across and up, and its turn. */
-export interface WoodsPlant {
+/** A tree, bush or hedge as placed (the garden's, the street's, the woods'): its model, where it stands, its scale (x, up, z) and turn. */
+export interface PlantPlacement {
   key: string;
   x: number;
   y: number;
   z: number;
-  scale: number;
-  up: number;
+  sx: number;
+  sy: number;
+  sz: number;
   yaw: number;
 }
 
@@ -98,7 +99,7 @@ export interface NatureResult {
 
 // ---- Deterministic noise ------------------------------------------------------------
 
-function mulberry32(seed: number): () => number {
+export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;
@@ -109,7 +110,7 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-function hash(x: number, z: number, seed: number): number {
+export function hash(x: number, z: number, seed: number): number {
   let h = (Math.imul(x, 374761393) + Math.imul(z, 668265263) + Math.imul(seed, 2147483647)) | 0;
   h = Math.imul(h ^ (h >>> 13), 1274126177);
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
@@ -158,7 +159,7 @@ function fbm(x: number, z: number, seed: number, octaves = 4): number {
   return sum;
 }
 
-const smoothstep = (a: number, b: number, x: number) => {
+export const smoothstep = (a: number, b: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
 };
@@ -177,8 +178,6 @@ export class Landscape {
   private readonly passZ: number | null;
   /** The roads out of town (the ground is levelled under them). */
   private readonly roads: CountryRoads;
-  /** Farm fields in town (no lawn on them). */
-  private readonly fields: { x: number; z: number; w: number; d: number }[];
   /** Lawn tufts and flowers, per model, whole and in groups (see `TUFT_CELL`). */
   private lawn: LawnLayer[] = [];
   /** What `refreshLawn` last hid, for the lawn built again since (`rebuild`). */
@@ -186,7 +185,9 @@ export class Landscape {
   /** Each model's plants as built, to build again when a file they were built without comes (`rebuild`). */
   private batches: Batch[] = [];
   /** The woods' trees and bushes near the town (full models), where birds may live (`woodsNear`). */
-  private nearWoods: WoodsPlant[] = [];
+  private nearWoods: PlantPlacement[] = [];
+  /** `woodsNear`'s last answer, and where it was asked (the same array while that's unchanged). */
+  private woodsAsked: { at: string; plants: readonly PlantPlacement[] } | null = null;
 
   /**
    * `lawnDensity`: the share of the lawn's tufts and flowers drawn (Low: half); `lawnLod` 1 draws
@@ -201,7 +202,6 @@ export class Landscape {
     this.w = world.width;
     this.d = groundDepth(world);
     this.land = { ...DEFAULT_LANDSCAPE, ...world.meta?.world?.landscape };
-    this.fields = world.meta?.world?.fields ?? [];
     this.ring = world.meta?.world ? WORLD_RING : RING;
     const streets = (world.meta?.streets ?? []).filter((s) => s.w >= s.d).sort((a, b) => a.z - b.z);
     const main = streets[Math.floor((streets.length - 1) / 2)];
@@ -213,9 +213,11 @@ export class Landscape {
     );
   }
 
-  /** The woods' trees and bushes within `range` m of a point (those near the town only), for the birds. */
-  woodsNear(x: number, z: number, range: number): WoodsPlant[] {
-    return this.nearWoods.filter((p) => Math.hypot(p.x - x, p.z - z) < range);
+  /** The woods' trees and bushes within `range` m of a point (those near the town only), for the birds: the same array when asked the same again. */
+  woodsNear(x: number, z: number, range: number): readonly PlantPlacement[] {
+    const at = `${x},${z},${range}`;
+    if (this.woodsAsked?.at !== at) this.woodsAsked = { at, plants: this.nearWoods.filter((p) => Math.hypot(p.x - x, p.z - z) < range) };
+    return this.woodsAsked.plants;
   }
 
   /** Whether mountains rise round the town (the haze is thinner, so they're seen). */
@@ -480,6 +482,7 @@ export class Landscape {
   private async forests(scene: Scene, assets: AssetRegistry, pace?: () => Promise<void>): Promise<void> {
     const rand = mulberry32(this.seed ^ 0x5eed);
     this.nearWoods = [];
+    this.woodsAsked = null;
     const near = new Map<string, Matrix[]>();
     const far = new Map<string, Matrix[]>();
     const spacing = 4.2;
@@ -526,7 +529,7 @@ export class Landscape {
         const y = this.heightAt(x, z) - 0.05;
         const m = Matrix.Compose(new Vector3(scale, up, scale), Quaternion.RotationAxis(Vector3.Up(), yaw), new Vector3(x, y, z));
         const close = dist < SHADOW_RANGE && kind !== 'model.rock';
-        if (close) this.nearWoods.push({ key: kind, x, y, z, scale, up, yaw });
+        if (close) this.nearWoods.push({ key: kind, x, y, z, sx: scale, sy: up, sz: scale, yaw });
         const bucket = close ? near : far;
         bucket.set(kind, [...(bucket.get(kind) ?? []), m]);
       }
@@ -550,7 +553,7 @@ export class Landscape {
    */
   private async lawns(scene: Scene, assets: AssetRegistry, world: WorldStructure, pace?: () => Promise<void>): Promise<void> {
     const rand = mulberry32(this.seed ^ 0x1a3d);
-    const covered = [...(world.meta?.streets ?? []), ...(world.meta?.paths ?? []), ...this.fields];
+    const covered = unlawned(world);
     const onPavement = (x: number, z: number) => covered.some((r) => x >= r.x && x < r.x + r.w && z >= r.z && z < r.z + r.d);
     const tufts: Matrix[] = [];
     const flowers: Matrix[] = [];
@@ -618,20 +621,7 @@ export class Landscape {
    * On a tile split by a diagonal wall, each tuft follows the half it stands in.
    */
   refreshLawn(world: WorldStructure): void {
-    const hidden = new Uint8Array(world.width * world.depth);
-    for (let i = 0; i < hidden.length; i++) if (world.rooms[i] !== 0) hidden[i] = 1;
-    // Split tiles: 2 = half 0 indoors, 3 = half 1 indoors, 4 = both (bit 1 marks "per half").
-    const splitAxis = new Map<number, 'dp' | 'dn'>();
-    for (const d of world.diagonals ?? []) {
-      const i = d.z * world.width + d.x;
-      const [a, b] = [d.rooms[0] !== 0, d.rooms[1] !== 0];
-      hidden[i] = a && b ? 1 : a ? 2 : b ? 3 : 0;
-      splitAxis.set(i, d.axis);
-    }
-    for (const o of world.objects) {
-      for (let z = o.z; z < o.z + o.d; z++) for (let x = o.x; x < o.x + o.w; x++) hidden[z * world.width + x] = 1;
-    }
-    this.lawnMask = { width: world.width, hidden, splitAxis };
+    this.lawnMask = lawnMask(world);
     this.hideLawn(this.lawn, this.lawnMask);
   }
 
@@ -728,10 +718,34 @@ interface LawnLayer {
 }
 
 /** Where the lawn is hidden (`refreshLawn`): per town tile, and the split tiles' diagonals. */
-interface LawnMask {
+export interface LawnMask {
   width: number;
+  /** 1 indoors or under furniture; on a tile split by a diagonal wall, 2 or 3: only its half 0 or 1 indoors. */
   hidden: Uint8Array;
   splitAxis: Map<number, 'dp' | 'dn'>;
+}
+
+/** The town's ground where no lawn grows at all: its streets, paths and fields (the birds forage on the lawn). */
+export function unlawned(world: WorldStructure): readonly { x: number; z: number; w: number; d: number }[] {
+  return [...(world.meta?.streets ?? []), ...(world.meta?.paths ?? []), ...(world.meta?.world?.fields ?? [])];
+}
+
+/** Where the lawn that grows is hidden now: the tiles indoors (or the half of a split tile that is) and under furniture. */
+export function lawnMask(world: WorldStructure): LawnMask {
+  const hidden = new Uint8Array(world.width * world.depth);
+  for (let i = 0; i < hidden.length; i++) if (world.rooms[i] !== 0) hidden[i] = 1;
+  // Split tiles: 2 = half 0 indoors, 3 = half 1 indoors, 4 = both (bit 1 marks "per half").
+  const splitAxis = new Map<number, 'dp' | 'dn'>();
+  for (const d of world.diagonals ?? []) {
+    const i = d.z * world.width + d.x;
+    const [a, b] = [d.rooms[0] !== 0, d.rooms[1] !== 0];
+    hidden[i] = a && b ? 1 : a ? 2 : b ? 3 : 0;
+    splitAxis.set(i, d.axis);
+  }
+  for (const o of world.objects) {
+    for (let z = o.z; z < o.z + o.d; z++) for (let x = o.x; x < o.x + o.w; x++) hidden[z * world.width + x] = 1;
+  }
+  return { width: world.width, hidden, splitAxis };
 }
 
 /** The meshes of `batches`: which cast shadows, and which are drawn only in the game or only in the menus' town (see `NatureResult`). */
@@ -871,6 +885,11 @@ function clearTreeSpot(x: number, z: number, world: WorldStructure, view: { x: n
   return null;
 }
 
+/** The garden dressing (`natureDecor`'s) as placed, for the birds. */
+export function decorPlants(decor: readonly [string, Decor][]): PlantPlacement[] {
+  return decor.flatMap(([key, items]) => items.map(([x, z, s, yaw]) => ({ key, x, y: 0, z, sx: s, sy: s, sz: s, yaw })));
+}
+
 /**
  * Splits the house builder's garden dressing (`model.tree` lot trees, `model.bush` foundation
  * shrubs; items are [x, z, scale, yaw]) into species. Lot trees mix oaks, maples, blossom, fruit,
@@ -919,13 +938,37 @@ export function natureDecor(key: string, items: Decor, world?: WorldStructure, v
 const windState = new WeakMap<Scene, { time: number; strength: number }>();
 
 /**
+ * The wind's bend, as the vertex shader draws it and `windSway` follows it for what sits on a
+ * branch: a sway of two sines along `dir`, in gusts, phased by where each plant stands, bending a
+ * point by `bend` × its height in its model squared (m).
+ */
+const WIND = {
+  /** Which way it blows (x, z). */
+  dir: [0.8, 0.6],
+  /** Phase per metre (x, z), so neighbours sway out of step. */
+  phase: [0.21, 0.17],
+  /** Gusts: `base + amp · sin(t · rate + phase · ph)`. */
+  gust: { base: 0.6, amp: 0.4, rate: 0.37, phase: 0.5 },
+  /** The sway: `Σ weight · sin(t · rate + phase · ph)`. */
+  sway: [
+    { weight: 0.7, rate: 1.1, phase: 1 },
+    { weight: 0.3, rate: 2.3, phase: 1.7 },
+  ],
+  /** Bend (m per m² of height, per unit of sway). */
+  bend: 0.0022,
+} as const;
+
+/**
  * Per finish (primitive parts' `material`): x bend (per m^2 of height), y flutter amplitude (m),
  * z flutter speed, w flutter ramp (1/m).
  */
 const WIND_KIND: Record<string, [number, number, number, number]> = {
-  'material.finish.bark': [0.0022, 0, 0, 0],
-  'material.finish.foliage': [0.0022, 0.012, 3.1, 1.5],
+  'material.finish.bark': [WIND.bend, 0, 0, 0],
+  'material.finish.foliage': [WIND.bend, 0.012, 3.1, 1.5],
 };
+
+/** A number as a shader's float literal. */
+const glsl = (n: number) => (Number.isInteger(n) ? n.toFixed(1) : String(n));
 
 /**
  * Vertex-shader wind for plants (parts on the `bark` and `foliage` finishes): a slow
@@ -967,7 +1010,7 @@ class NatureWindPlugin extends MaterialPluginBase {
     const k = this.kind;
     // A model's part grown from nothing (`windStill`, models.ts) bends but doesn't flutter: flat at rest, it stays hidden.
     const still = (subMesh.getMesh().metadata as { windStill?: boolean } | null)?.windStill;
-    effect.setFloat4('natureWind', this.state.time, this.state.strength, 0.8, 0.6);
+    effect.setFloat4('natureWind', this.state.time, this.state.strength, WIND.dir[0], WIND.dir[1]);
     effect.setFloat4('natureWindKind', k[0], still ? 0 : k[1], k[2], k[3]);
   }
 
@@ -982,6 +1025,7 @@ class NatureWindPlugin extends MaterialPluginBase {
     const f3 = wgsl ? 'vec3f' : 'vec3';
     const f2 = wgsl ? 'vec2f' : 'vec2';
     const decl = (name: string, type: string) => (wgsl ? `var ${name}: ${type === 'float' ? 'f32' : type === 'vec3' ? 'vec3f' : type}` : `${type} ${name}`);
+    const { gust: g, phase, sway } = WIND;
     const body = `
 #ifdef NATUREWIND
 {
@@ -997,10 +1041,10 @@ class NatureWindPlugin extends MaterialPluginBase {
   scl = max(${f3}(length(${v('world0')}.xyz), length(${v('world1')}.xyz), length(${v('world2')}.xyz)), ${f3}(0.0001));
 #endif
   ${decl('t', 'float')} = ${u('natureWind')}.x;
-  ${decl('ph', 'float')} = dot(inst.xz, ${f2}(0.21, 0.17));
+  ${decl('ph', 'float')} = dot(inst.xz, ${f2}(${glsl(phase[0])}, ${glsl(phase[1])}));
   ${decl('h', 'float')} = max(positionUpdated.y, 0.0);
-  ${decl('gust', 'float')} = (0.6 + 0.4 * sin(t * 0.37 + ph * 0.5)) * ${u('natureWind')}.y;
-  ${decl('sway', 'float')} = (sin(t * 1.1 + ph) * 0.7 + sin(t * 2.3 + ph * 1.7) * 0.3) * gust;
+  ${decl('gust', 'float')} = (${glsl(g.base)} + ${glsl(g.amp)} * sin(t * ${glsl(g.rate)} + ph * ${glsl(g.phase)})) * ${u('natureWind')}.y;
+  ${decl('sway', 'float')} = (${sway.map((s) => `sin(t * ${glsl(s.rate)} + ph * ${glsl(s.phase)}) * ${glsl(s.weight)}`).join(' + ')}) * gust;
   ${decl('kind', 'vec4f')} = ${u('natureWindKind')};
   ${decl('fp', 'float')} = dot(positionUpdated, ${f3}(3.1, 1.7, 2.3)) + ph * 3.0;
   ${decl('fl', 'float')} = kind.y * min(h * kind.w, 1.0) * gust;
@@ -1020,23 +1064,36 @@ class NatureWindPlugin extends MaterialPluginBase {
 }
 
 /**
- * Where the wind has bent a plant's point `h` m up its model (before the plant's scale) for the
- * plant standing at (`px`, `pz`): the world offset (x, z) the vertex shader gives it (the bend, not
- * the leaves' flutter), so what sits on a branch sways with it. Zero before the scene's wind exists.
+ * How far the wind bends a plant standing at (`px`, `pz`) now, per m² of height up its model (m,
+ * along `windDirection`): a point `h` m up (before the plant's scale) is where the vertex shader
+ * draws it (the bend, not the leaves' flutter) this times `h²` away, so what sits on a branch sways
+ * with it. Zero before the scene's wind exists.
  */
-export function windBend(scene: Scene, px: number, pz: number, h: number, out: { x: number; z: number }): void {
+export function windSway(scene: Scene, px: number, pz: number): number {
   const state = windState.get(scene);
-  if (!state || h <= 0) {
-    out.x = out.z = 0;
-    return;
-  }
+  if (!state) return 0;
   const t = state.time;
-  const ph = px * 0.21 + pz * 0.17;
-  const gust = (0.6 + 0.4 * Math.sin(t * 0.37 + ph * 0.5)) * state.strength;
-  const sway = (Math.sin(t * 1.1 + ph) * 0.7 + Math.sin(t * 2.3 + ph * 1.7) * 0.3) * gust;
-  const bend = sway * WIND_KIND['material.finish.foliage'][0] * h * h;
-  out.x = 0.8 * bend;
-  out.z = 0.6 * bend;
+  const ph = px * WIND.phase[0] + pz * WIND.phase[1];
+  const g = WIND.gust;
+  const gust = (g.base + g.amp * Math.sin(t * g.rate + ph * g.phase)) * state.strength;
+  let sway = 0;
+  for (const s of WIND.sway) sway += Math.sin(t * s.rate + ph * s.phase) * s.weight;
+  return sway * gust * WIND.bend;
+}
+
+/**
+ * The way (x, z) the wind bends a plant instance turned `yaw` and scaled `sx` across and `sz` deep:
+ * the wind's direction in the world, but for a plant scaled unevenly (a hedge), as the shader bends
+ * it in the model's own space (its `lw`).
+ */
+export function windDirection(yaw: number, sx: number, sz: number, out: { x: number; z: number }): void {
+  // The instance's x and z axes in the world (`Quaternion.RotationAxis(Up, yaw)`), and the wind along each.
+  const [c, s] = [Math.cos(yaw), Math.sin(yaw)];
+  const [dx, dz] = WIND.dir;
+  const along = dx * c - dz * s;
+  const across = (dx * s + dz * c) * (sz / sx) ** 2;
+  out.x = along * c + across * s;
+  out.z = -along * s + across * c;
 }
 
 /** How strongly the wind moves a scene's plants (1 as made; 0 still, for reduce motion). */

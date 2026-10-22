@@ -9,7 +9,7 @@
  *   blackbirds low in bushes and on the lawn, collared doves in pairs, high up, on the roof ridge and
  *   walking the lawn.
  * - Perched on a perch point of its plant (manifest `perches`, model space; swaying with the branch
- *   as the wind bends it, `windBend`): small jerky glances of the head, a flick of the tail, preening
+ *   as the wind bends it, `windSway`): small jerky glances of the head, a flick of the tail, preening
  *   now and then, a hop to a nearby twig, a turn on the spot. Small birds fidget; doves sit long.
  * - Flying: short hops within a plant, flights between plants, to the lawn and the roof, along a
  *   curve kept clear of the houses (their walls and roofs, a height per tile): a take-off burst; tits,
@@ -19,22 +19,28 @@
  *   pecking, looking up; never on paths, patios, in rooms or under furniture.
  * - Wary: a resident within a few metres, or the camera diving close, sends them up into the
  *   nearest plant away from it; they keep off the lawn for a while after.
- * - The day: busiest at dawn and early evening, quieter at midday; at dusk each flies home to roost
- *   (head turned back into its feathers, puffed up) and wakes at first light.
+ * - The day: busiest at dawn and early evening, quieter at midday (`birdActivity`, as the songs
+ *   heard); at dusk each flies home to roost (head turned back into its feathers, puffed up) and
+ *   wakes at first light.
  * - Time: the birds' clock runs with the game's (paused: they hold still; at speeds 3-5 they hurry
  *   only a little, `RATE`). Reduce motion: no flights or hops but the one home; slow, eased head turns.
  *
  * Drawn as thin instances, a buffer per species and part (body, head, tail, the two spread wings);
- * only the birds that moved are written each frame, nothing is allocated per frame.
+ * a bird is written only when its pose has changed by more than a hair since it was last written
+ * (one settled asleep on a still branch is not), only the parts that changed (the wings only in
+ * flight), and only those parts' buffers go up; nothing is allocated per frame.
  */
 
-import { Matrix, Quaternion, Vector3, type Mesh, type Scene } from './core';
+import { Matrix, Quaternion, Vector3, VertexBuffer, type Mesh, type Scene } from './core';
 import type { AssetRegistry } from '../../assets/registry';
 import type { ModelEntry, Vec3 } from '../../assets/types';
 import { groundDepth, type WorldStructure } from '../../core/protocol';
-import type { SeenBird, ViewRect } from '../types';
-import { buildModelParts, type ModelTemplate } from './models';
-import { windBend } from './nature';
+import { birdActivity, type SeenBird, type ViewRect } from '../types';
+import { buildModel, entrySpace, type ModelTemplate } from './models';
+import { hash, lawnMask, mulberry32, smoothstep, unlawned, windDirection, windSway, type PlantPlacement } from './nature';
+import { angleDelta as turn } from './overview';
+import { TemplateCache } from './templateCache';
+import { WALL_HEIGHT } from './walls';
 
 export type BirdSpecies = 'blueTit' | 'chaffinch' | 'warbler' | 'blackbird' | 'collaredDove';
 
@@ -45,32 +51,78 @@ const HEAD = 1;
 const TAIL = 2;
 const WING_L = 3;
 const WING_R = 4;
+const ALL_PARTS = (1 << PARTS.length) - 1;
+
+/** How a kind of flight goes: the curve's lift (m) out of the start (plus per metre flown) and into the end (to the lawn, to a perch), and its bounds. */
+interface Flight {
+  lift: [number, number];
+  land: [number, number];
+  /** Metres a bound (0: none), how far it rises and falls (m), and the beat's phase above which it flaps (cos). */
+  bound: number;
+  boundAmp: number;
+  flapsAbove: number;
+  /** Glides on held wings now and then. */
+  glides: boolean;
+}
+
+/** `bounding`: flap bursts with shut wings between (an undulating line); `direct`: low and straight, short glides; `steady`: even flapping with glides. */
+const FLIGHT: Record<'bounding' | 'direct' | 'steady', Flight> = {
+  bounding: { lift: [0.5, 0.1], land: [0.8, 0.25], bound: 2.2, boundAmp: 0.16, flapsAbove: -0.1, glides: false },
+  // Low and straight: just above the lawn if it can.
+  direct: { lift: [0.3, 0.03], land: [0.35, 0.15], bound: 3.5, boundAmp: 0.06, flapsAbove: -0.6, glides: false },
+  steady: { lift: [0.8, 0.12], land: [1.2, 0.4], bound: 0, boundAmp: 0, flapsAbove: 0, glides: true },
+};
+
+/** How a species gets about on the lawn. */
+interface Gait {
+  /** How far from its plant's edge it comes down (m, up to). */
+  reach: number;
+  /** A move: so many hops or paces (fewest, and up to how many more), each so long (m) and taking so long (s); its hops' height (m; a walk: none, the head bobs). */
+  steps: [number, number];
+  stride: number;
+  pace: number;
+  lift: number;
+  bobs: boolean;
+  /** The head while moving (pitch), and the pause after a move (s). */
+  headPitch: number;
+  pause: [number, number];
+  /** Share of its turns that are pecks, and the most pecks at once. */
+  pecks: number;
+  peckMax: number;
+  /** Stands tall and cocks its head to listen (a blackbird). */
+  listens: boolean;
+}
+
+const GAIT: Record<'hop' | 'run' | 'walk', Gait> = {
+  hop: { reach: 3.5, steps: [1, 3], stride: 0.11, pace: 0.15, lift: 0.035, bobs: false, headPitch: 0.1, pause: [0.3, 1.5], pecks: 0.45, peckMax: 3, listens: false },
+  run: { reach: 3.5, steps: [4, 6], stride: 0.13, pace: 0.09, lift: 0.015, bobs: false, headPitch: -0.1, pause: [0.8, 2.5], pecks: 0.45, peckMax: 3, listens: true },
+  // A dove walks, its head bobbing: thrust forward, then held still as the body catches up.
+  walk: { reach: 5, steps: [3, 5], stride: 0.09, pace: 0.32, lift: 0, bobs: true, headPitch: 0.1, pause: [0.3, 1.5], pecks: 0.55, peckMax: 4, listens: false },
+};
 
 /** How a species looks and behaves. Times in the birds' seconds, distances in metres, angles in radians. */
 interface Species {
   id: BirdSpecies;
   /** Its song (`audio/birdsong.ts` species). */
   song: string;
-  /** Size when the manifest doesn't say (`bird.length`, `bird.wingspan`). */
-  length: number;
-  wingspan: number;
   /**
    * Drawn this much larger than life: at real size a tit is 5 px and a blackbird 10 px from the
    * game's usual camera, specks; the small ones grow most (the game's apples and flowers are a
    * little larger than life too), so they still differ in size as they should.
    */
   show: number;
-  /** `bounding`: flap bursts with shut wings between (an undulating line); `direct`: low and straight, short glides; `steady`: even flapping with glides. */
-  flight: 'bounding' | 'direct' | 'steady';
+  flight: keyof typeof FLIGHT;
   /** Cruising speed (m/s) and wingbeats a second (kept low enough to read at 60 fps). */
   speed: number;
   flapHz: number;
-  /** Seconds between glances, and how fast the head snaps round (1/s). */
+  /** Seconds between glances, and how fast the head snaps round (1/s); whether it cocks its head to look up and down (the small ones). */
   glance: [number, number];
   snap: number;
-  /** Seconds between tail flicks (null: none) and how far the tail flicks up. */
+  cock: boolean;
+  /** Seconds between tail flicks (null: none, but as it lands), how far the tail flicks up and how long it's held there (s). */
   flick: [number, number] | null;
   flickAmp: number;
+  flickHold: number;
   preen: [number, number];
   /** Seconds between hops within its plant and between flights away, at the busiest time of day. */
   hop: [number, number];
@@ -78,10 +130,10 @@ interface Species {
   /** Share of its flights that go down to the lawn, and how long it stays there. */
   ground: number;
   groundStay: [number, number];
-  gait: 'hop' | 'run' | 'walk';
+  gait: keyof typeof GAIT;
   /** Share of its flights to the roof ridge. */
   roof: number;
-  /** How close (m) a resident may come before it flies up (on the lawn; half that perched low). */
+  /** How close (m) a resident may come before it flies up (on the lawn; 0.6 of that perched low). */
   wary: number;
   /** Hours it wakes and goes to roost. */
   wake: number;
@@ -96,32 +148,33 @@ interface Species {
 
 const SPECIES: Species[] = [
   {
-    id: 'blueTit', song: 'tit', length: 0.115, wingspan: 0.19, show: 1.6, flight: 'bounding', speed: 5.5, flapHz: 15,
-    glance: [0.25, 1.0], snap: 40, flick: [1, 3], flickAmp: 0.35, preen: [20, 50], hop: [1.5, 5], fly: [12, 35],
+    id: 'blueTit', song: 'tit', show: 1.6, flight: 'bounding', speed: 5.5, flapHz: 15,
+    glance: [0.25, 1.0], snap: 40, cock: true, flick: [1, 3], flickAmp: 0.35, flickHold: 0.12, preen: [20, 50], hop: [1.5, 5], fly: [12, 35],
     ground: 0, groundStay: [0, 0], gait: 'hop', roof: 0, wary: 2.5, wake: 5.2, roost: 20.4, pair: false, height: 0.6,
     habitat: [3, 2, 2],
   },
   {
-    id: 'chaffinch', song: 'finch', length: 0.15, wingspan: 0.26, show: 1.5, flight: 'bounding', speed: 6.5, flapHz: 13,
-    glance: [0.4, 1.6], snap: 30, flick: [2, 6], flickAmp: 0.25, preen: [25, 60], hop: [3, 9], fly: [15, 45],
+    id: 'chaffinch', song: 'finch', show: 1.5, flight: 'bounding', speed: 6.5, flapHz: 13,
+    glance: [0.4, 1.6], snap: 30, cock: true, flick: [2, 6], flickAmp: 0.25, flickHold: 0.12, preen: [25, 60], hop: [3, 9], fly: [15, 45],
     ground: 0.45, groundStay: [10, 40], gait: 'hop', roof: 0, wary: 3, wake: 5.1, roost: 20.5, pair: false, height: 0.5,
     habitat: [3, 2, 1.5],
   },
   {
-    id: 'warbler', song: 'warbler', length: 0.12, wingspan: 0.19, show: 1.6, flight: 'bounding', speed: 5, flapHz: 15,
-    glance: [0.2, 0.8], snap: 40, flick: [1, 3], flickAmp: 0.3, preen: [20, 40], hop: [0.8, 3], fly: [10, 30],
+    id: 'warbler', song: 'warbler', show: 1.6, flight: 'bounding', speed: 5, flapHz: 15,
+    glance: [0.2, 0.8], snap: 40, cock: true, flick: [1, 3], flickAmp: 0.3, flickHold: 0.12, preen: [20, 40], hop: [0.8, 3], fly: [10, 30],
     ground: 0, groundStay: [0, 0], gait: 'hop', roof: 0, wary: 2.5, wake: 5.1, roost: 20.5, pair: false, height: 0.45,
     habitat: [2, 0.5, 2.5],
   },
   {
-    id: 'blackbird', song: 'blackbird', length: 0.25, wingspan: 0.36, show: 1.35, flight: 'direct', speed: 7, flapHz: 11,
-    glance: [0.6, 2.2], snap: 22, flick: [3, 8], flickAmp: 0.5, preen: [30, 80], hop: [6, 15], fly: [15, 40],
+    // (A blackbird raises its tail as it lands, and holds it up longer.)
+    id: 'blackbird', song: 'blackbird', show: 1.35, flight: 'direct', speed: 7, flapHz: 11,
+    glance: [0.6, 2.2], snap: 22, cock: false, flick: [3, 8], flickAmp: 0.5, flickHold: 0.35, preen: [30, 80], hop: [6, 15], fly: [15, 40],
     ground: 0.65, groundStay: [15, 60], gait: 'run', roof: 0, wary: 3.5, wake: 4.9, roost: 21, pair: false, height: 0.25,
     habitat: [1.5, 1, 3],
   },
   {
-    id: 'collaredDove', song: 'dove', length: 0.32, wingspan: 0.5, show: 1.25, flight: 'steady', speed: 9, flapHz: 7,
-    glance: [1.5, 5], snap: 8, flick: null, flickAmp: 0, preen: [40, 120], hop: [15, 40], fly: [30, 90],
+    id: 'collaredDove', song: 'dove', show: 1.25, flight: 'steady', speed: 9, flapHz: 7,
+    glance: [1.5, 5], snap: 8, cock: false, flick: null, flickAmp: 0.15, flickHold: 0.12, preen: [40, 120], hop: [15, 40], fly: [30, 90],
     ground: 0.4, groundStay: [20, 70], gait: 'walk', roof: 0.35, wary: 4, wake: 5.6, roost: 20.1, pair: true, height: 0.85,
     habitat: [2, 1.5, 0.2],
   },
@@ -137,35 +190,36 @@ const MAX_STEP = 0.1;
 /** Clearance kept over roofs and walls in flight (m), and round them (m). */
 const CLEAR = 0.7;
 const CLEAR_SIDE = 0.45;
-/** Height of a house above its storeys' walls, for one whose roof isn't known (m). */
+/** Height of the viewed house above its storeys' walls while its roof isn't known (m). */
 const ROOF_RISE = 3.4;
-const STOREY = 3;
 /** A flight shorter than this is a hop (m). */
 const HOP_MAX = 1.6;
 /** The camera this close (m) scares a bird up. */
 const CAMERA_WARY = 1.8;
-
-/** A tree, bush or hedge as the renderer placed it: its model, where it stands, its scale (x, up, z) and turn. */
-export interface PlantPlacement {
-  key: string;
-  x: number;
-  y: number;
-  z: number;
-  sx: number;
-  sy: number;
-  sz: number;
-  yaw: number;
-}
+/** A resident higher than this (m: upstairs) doesn't scare the birds; nor one by a bird perched higher. */
+const THREAT_HEIGHT = 2.6;
+const LOW_PERCH = 2.2;
+/** Least change of a bird's pose that's drawn: its place (m), its turns (rad), puff and the spread of its wings. */
+const STILL_M = 0.0015;
+const STILL_RAD = 0.004;
+const STILL_SCALE = 0.002;
 
 /** Where the birds live (`Birds.setHabitat`). */
 export interface BirdHabitat {
   world: WorldStructure;
   view: ViewRect | null;
-  plants: PlantPlacement[];
+  /**
+   * The trees, bushes and hedges, in groups as their owners keep them (the viewed lot's garden, its
+   * things outdoors, the street's, the woods'): a group passed again unchanged (the same array) is
+   * not looked through again.
+   */
+  plants: readonly (readonly PlantPlacement[])[];
   /** Points along the viewed house's roof ridge (x, y, z each), where doves sit while the roof shows. */
   ridge: number[];
   /** Top of the viewed house's roof (m), if known. */
   roofTop: number | null;
+  /** The top of another house's roof (m), as the street builds it (`HouseBuilder.roofTop`). */
+  houseTop: (plot: { x: number; z: number; house: [number, number, number, number]; roof?: [number, number]; storeys?: number }) => number;
   /** The hour now (birds new to the habitat start asleep at night). */
   hour: number;
 }
@@ -178,12 +232,13 @@ export interface BirdQuality {
   range: number;
 }
 
-/** What `Birds.update` needs of a frame. */
+/** What `Birds.update` needs of a frame (the caller keeps one and fills it in). */
 export interface BirdFrame {
   /** Real seconds since the last frame, and the game's speed (`GAME_RATE` index). */
   dt: number;
   speed: number;
   hour: number;
+  /** The camera's position (kept, not copied: read as it is then). */
   camera: Vector3;
   /** Residents' heads (x, y, z each), how many, and which are drawn. */
   residents: Float32Array;
@@ -211,6 +266,11 @@ interface Plant {
   roosts: number[];
   /** Fixed by where it stands. */
   seed: number;
+  /** The way the wind bends it (x, z per m of sway, `windDirection`), and its sway now (m per m² of height) as of frame `swayed`. */
+  windX: number;
+  windZ: number;
+  sway: number;
+  swayed: number;
 }
 
 type State = 'perch' | 'fly' | 'ground' | 'roost';
@@ -220,12 +280,14 @@ interface Bird {
   key: string;
   id: number;
   sp: Species;
-  /** Index of its species' look (`looks`), and its slot in that look's buffers. */
-  look: number;
+  /** Its species' look as drawn, and its slot in the look's buffers. */
+  look: Look | null;
   slot: number;
   size: number;
   home: number;
   partner: Bird | null;
+  /** The second of a pair: it follows its partner about. */
+  follower: boolean;
   /** Its own hours (a little off its species'), and the perch of its home it roosts on. */
   wake: number;
   roost: number;
@@ -273,7 +335,6 @@ interface Bird {
   dur: number;
   t: number;
   bounds: number;
-  bound: number;
   hop: boolean;
   /** Ground: when it leaves, its next move, and the move under way (from, to, time, length). */
   leaveAt: number;
@@ -283,90 +344,85 @@ interface Bird {
   stepDur: number;
   steps: number;
   peck: number;
-  /** Where it was last frame (its heading and climb in flight). */
-  px: number;
-  py: number;
-  pz: number;
-  /** Not yet moved: made before the hour was known, it starts on its roost if it's night. */
+  /**
+   * Not yet moved: made before the frame's hour was known (the habitat's may be the renderer's
+   * default), it goes to its roost on the first frame if that says night.
+   */
   fresh: boolean;
-  /** Its matrices need writing. */
-  dirty: boolean;
+  /** Its pose as last written (`Pose`; NaN: to be written whole). */
+  drawn: Float32Array;
 }
 
-/** A species' model as drawn: its parts' meshes and their buffers, and the nodes' pivots. */
+/** A bird's pose as written (`Bird.drawn`): what each part depends on. */
+const enum Pose {
+  X, Y, Z, Yaw, Pitch, Roll, Hy, Hp, Hr, Bob, Tail, Puff, Spread, Flap, Count,
+}
+
+/** A species' model as drawn: its parts' meshes and their buffers, and the nodes' pivots (no meshes: its file failed, drawn as nothing until it comes). */
 interface Look {
-  sp: Species;
-  meshes: Mesh[][];
+  /** All its meshes (for `TemplateCache`), and by part. */
+  meshes: Mesh[];
+  parts: Mesh[][];
   buffers: Float32Array[];
   pivots: Vector3[];
-  /** Feet to the body's middle (m, model) and the perched body's nose-up angle (rad). */
+  /** Feet to the body's middle (m, model) and the perched body's nose-up angle (rad), its length (m). */
   centre: number;
   pitch: number;
   length: number;
   capacity: number;
   count: number;
-  /** A part's buffer was written this frame. */
-  dirty: boolean;
+  /** The parts whose buffers were written this frame (bits by part). */
+  dirty: number;
+  failed?: string[];
 }
 
-const smooth = (a: number, b: number, x: number) => {
-  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
-  return t * t * (3 - 2 * t);
-};
+type BirdEntry = ModelEntry & { bird: { length: number; perchHeight: number; pitch: number } };
+/** A plant's model: its perches (model space) and what they're on (check-glb makes sure one with perches says). */
+type PlantEntry = ModelEntry & { perches?: Vec3[]; habitat: 'tree' | 'conifer' | 'bush' | 'hedge'; fit?: unknown };
+
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const between = (r: () => number, [a, b]: readonly [number, number]) => a + r() * (b - a);
 const rnd = Math.random;
-/** Shortest turn from angle `a` to `b`. */
-const turn = (a: number, b: number) => {
-  let d = (b - a) % (Math.PI * 2);
-  if (d > Math.PI) d -= Math.PI * 2;
-  if (d < -Math.PI) d += Math.PI * 2;
-  return d;
-};
+/** A number fixed by a place (to a tenth of a metre). */
+const placeHash = (x: number, z: number, salt: number) => hash(Math.round(x * 10), Math.round(z * 10), salt);
+/** Randoms from a seed in 0..1. */
+const seeded = (seed: number) => mulberry32(Math.floor(seed * 4294967296));
+/** Its pose value `a` differs from `b` by more than `still` (always, if it was never written: NaN). */
+const changed = (a: number, b: number, still: number) => !(Math.abs(a - b) <= still);
 
-function hash(x: number, z: number, salt: number): number {
-  let h = (Math.imul(Math.round(x * 10) | 0, 374761393) + Math.imul(Math.round(z * 10) | 0, 668265263) + Math.imul(salt, 2147483647)) | 0;
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+// Scratch, so frames allocate nothing.
+const qTurn = new Quaternion();
+const mWorld = new Matrix();
+const mBase = new Matrix();
+const mPose = new Matrix();
+const mTurn = new Matrix();
+const mOut = new Matrix();
+const vScale = new Vector3();
+const vAt = new Vector3();
+const vPivot = new Vector3();
+const vBody = new Vector3();
+
+/** Makes a part's pose `m` turn about `p` (its translation part set so `p` stays put), then shifted `dz` forward. */
+function about(m: Matrix, p: Vector3, dz = 0): Matrix {
+  Vector3.TransformNormalToRef(p, m, vPivot);
+  return m.setTranslationFromFloats(p.x - vPivot.x, p.y - vPivot.y, p.z - vPivot.z + dz);
 }
 
-function seeded(seed: number): () => number {
-  let a = Math.floor(seed * 4294967296) >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-/** How busy the birds are at an hour (0..1): most at dawn and in the early evening, least round midday. */
-function activity(hour: number): number {
-  const dawn = Math.exp(-(((hour - 6.5) / 1.6) ** 2));
-  const evening = Math.exp(-(((hour - 18) / 1.4) ** 2));
-  const midday = Math.exp(-(((hour - 13) / 1.8) ** 2));
-  return Math.min(1, 0.5 + 0.5 * Math.max(dawn, 0.85 * evening) - 0.2 * midday);
-}
-
-type BirdExtras = ModelEntry & { perches?: Vec3[]; bird?: { length?: number; wingspan?: number; perchHeight?: number; pitch?: number } };
-
-/** A model entry's own placement (`scale`, `rotationY`, `offset`) applied to a point of its model. */
-function inSpace(entry: ModelEntry, [x, y, z]: Vec3, out: Vector3): Vector3 {
-  const s = entry.scale ?? 1;
-  const a = ((entry.rotationY ?? 0) * Math.PI) / 180;
-  const [c, n] = [Math.cos(a), Math.sin(a)];
-  const [ox, oy, oz] = entry.offset ?? [0, 0, 0];
-  return out.set((x * c + z * n) * s + ox, y * s + oy, (-x * n + z * c) * s + oz);
+/** A part's pose after the bird's placement (`mBase`), into its buffer at `o`. */
+function put(pose: Matrix, buffer: Float32Array, o: number): void {
+  pose.multiplyToRef(mBase, mOut).copyToArray(buffer, o);
 }
 
 export class Birds {
   private birds: Bird[] = [];
   private plants: Plant[] = [];
-  private readonly looks: (Look | null)[] = SPECIES.map(() => null);
-  private readonly building: (Promise<Look | null> | null)[] = SPECIES.map(() => null);
+  private readonly looks: TemplateCache<Look>;
+  /** The looks drawing birds now. */
+  private inUse: Look[] = [];
   private quality: BirdQuality = { count: 0, range: 0 };
   private habitat: BirdHabitat | null = null;
+  /** The plants of each group of placements (`BirdHabitat.plants`), as found for the view and range last asked. */
+  private readonly groups = new WeakMap<readonly PlantPlacement[], { near: string; plants: Plant[] }>();
   /** The town's ground tiles: 1 where no bird forages (paths, rooms, patios, furniture, houses). */
   private blocked = new Uint8Array(0);
   /** The houses: x0, z0, x1, z1 (their walls) and the roof's top (m) each. */
@@ -374,38 +430,43 @@ export class Birds {
   private width = 0;
   private depth = 0;
   private clock = 0;
+  private frame = 0;
   /** Birds' seconds per real second now (`RATE`), and a slow-motion factor for checks (`?debug`'s `__birdTime`). */
   private rate = 1;
   timeScale = 1;
   private hour = 12;
+  /** How busy the birds are this frame (`birdActivity`). */
+  private busy = 1;
   private calm = false;
   private roofOn = false;
   private visible = true;
   private ticket = 0;
-  /** Smoothed main-thread time of `update` (ms), and what the birds did, for `__birds`: flights, hops, visits to the lawn and the roof, scares (by a resident, the camera), and frames a bird in flight was inside a house's walls or roof. */
+  /** Residents outdoors on the ground this frame (x, z each) and how many: they scare the birds near them. */
+  private threats = new Float32Array(0);
+  private threatCount = 0;
+  /** Which perches of a plant are taken (`occupy`). */
+  private taken = new Uint8Array(32);
+  /**
+   * Smoothed main-thread time of `update` (ms), and what the birds did, for `__birds`: flights, hops,
+   * visits to the lawn and the roof, scares (by a resident, the camera), and (`?debug` only) frames a
+   * bird in flight was inside a house's walls or roof.
+   */
   private cost = 0;
   private readonly debugInside: unknown[] = [];
   private readonly stats = { flights: 0, hops: 0, lawn: 0, roof: 0, scaredBy: 0, scaredCamera: 0, inside: 0 };
   private readonly seen: SeenBird[] = [];
-  /** Where the camera was last frame. */
-  private readonly eye = new Vector3();
-
-  // Scratch, so frames allocate nothing.
-  private readonly bend = { x: 0, z: 0 };
-  private readonly q = new Quaternion();
-  private readonly rot = new Matrix();
-  private readonly world = new Matrix();
-  private readonly pose = new Float32Array(16);
-  private readonly base = new Float32Array(16);
-  private readonly vS = new Vector3();
-  private readonly vT = new Vector3();
-  private readonly v = new Vector3();
+  /** The camera (`BirdFrame.camera`). */
+  private eye = new Vector3();
   private readonly at = new Float32Array(3);
 
   constructor(
     private readonly scene: Scene,
     private readonly assets: AssetRegistry,
-  ) {}
+    /** `?debug`: the checks `__birds` reports (`inside`, `roof`) are made. */
+    private readonly debugging = false,
+  ) {
+    this.looks = new TemplateCache<Look>(scene);
+  }
 
   setQuality(quality: BirdQuality): void {
     this.quality = quality;
@@ -416,15 +477,14 @@ export class Birds {
   setVisible(visible: boolean): void {
     if (visible === this.visible) return;
     this.visible = visible;
-    for (const look of this.looks) for (const list of look?.meshes ?? []) for (const mesh of list) mesh.setEnabled(visible && look!.count > 0);
+    this.looks.forEachBuilt((look) => {
+      for (const mesh of look.meshes) mesh.setEnabled(visible && look.count > 0);
+    });
   }
 
   /** A model file that had failed has come: a bird model built without it is built again. */
   fileArrived(url: string): void {
-    const i = SPECIES.findIndex((sp) => this.assets.get(`model.bird.${sp.id}`, 'model')?.url === url);
-    if (i < 0 || !this.habitat || this.building[i]) return;
-    this.dropLook(i);
-    void this.setHabitat(this.habitat);
+    if (this.looks.invalidate(url).length && this.habitat) void this.setHabitat(this.habitat);
   }
 
   /**
@@ -435,80 +495,23 @@ export class Birds {
     const ticket = ++this.ticket;
     this.habitat = habitat;
     this.hour = habitat.hour;
-    const { world, view } = habitat;
-    this.grids(world, habitat.roofTop);
-    const range = this.quality.range;
-    const near = (x: number, z: number) => {
-      if (!view) return false;
-      const dx = Math.max(view.x - x, 0, x - (view.x + view.w));
-      const dz = Math.max(view.z - z, 0, z - (view.z + view.d));
-      return Math.hypot(dx, dz) <= range;
-    };
-    const placements = this.quality.count > 0 ? habitat.plants.filter((p) => near(p.x, p.z)) : [];
-    const plants: Plant[] = [];
-    for (const p of placements) {
-      const plant = this.plantOf(p);
-      if (plant) plants.push(plant);
-    }
-    if (habitat.ridge.length >= 3) {
-      const perches = Float32Array.from(habitat.ridge);
-      const n = perches.length / 3;
-      const mid = Math.floor(n / 2);
-      plants.push({ key: 'roof', kind: 'roof', conifer: false, x: perches[mid * 3], y: 0, z: perches[mid * 3 + 2], perches, heights: new Float32Array(n), top: perches[1], radius: 0, roosts: [mid], seed: hash(perches[0], perches[2], 7) });
-    }
-    // The species there may be (those with a model).
-    const available = SPECIES.map((sp) => this.assets.has(`model.bird.${sp.id}`, 'model'));
-    const looks = await Promise.all(SPECIES.map((_, i) => (available[i] && plants.length ? this.lookOf(i) : Promise.resolve(null))));
+    this.grids(habitat);
+    const plants = this.quality.count > 0 ? this.gather(habitat) : [];
+    // The species there may be (those with a model, once it's built).
+    const looks = await Promise.all(SPECIES.map((sp) => (plants.length && this.assets.has(`model.bird.${sp.id}`, 'model') ? this.lookOf(sp) : null)));
     if (ticket !== this.ticket) return;
-    const usable = looks.map((l) => !!l);
-    const old = new Map(this.birds.map((b) => [b.key, b]));
-    const birds: Bird[] = [];
-    // Plants nearest the lot first, so a smaller preset keeps the birds nearest (always the same ones).
-    const centre = view ? [view.x + view.w / 2, view.z + view.d / 2] : [0, 0];
-    const order = plants.map((_, i) => i).filter((i) => plants[i].kind !== 'roof');
-    order.sort((a, b) => Math.hypot(plants[a].x - centre[0], plants[a].z - centre[1]) - Math.hypot(plants[b].x - centre[0], plants[b].z - centre[1]));
-    for (const i of order) {
-      if (birds.length >= this.quality.count) break;
-      const plant = plants[i];
-      const r = seeded(plant.seed);
-      // A big tree two or three, a small one one or two; a bush or a stretch of hedge now and then.
-      const n = plant.kind === 'tree' ? (plant.top > 6 ? 2 + Math.floor(r() * 2) : 1 + Math.floor(r() * 2)) : r() < (plant.top > 1.2 ? 0.25 : 0.12) ? 1 : 0;
-      let roosting = 0;
-      const roostOf = () => plant.roosts[roosting++ % plant.roosts.length];
-      for (let k = 0; k < n && birds.length < this.quality.count; k++) {
-        const sp = this.pickSpecies(plant, r(), usable);
-        if (!sp) break;
-        const key = `${Math.round(plant.x * 10)},${Math.round(plant.z * 10)},${k}`;
-        const first = this.makeBird(old.get(key), key, sp, i, plants, roostOf());
-        birds.push(first);
-        if (sp.pair && birds.length < this.quality.count) {
-          const mate = this.makeBird(old.get(`${key}m`), `${key}m`, sp, i, plants, roostOf());
-          mate.partner = first;
-          first.partner = mate;
-          birds.push(mate);
-        }
-      }
-    }
+    const birds = this.populate(plants, looks.map((l) => !!l?.meshes.length), habitat.view);
     this.plants = plants;
     this.birds = birds;
-    // Each species' buffers, sized to its birds.
-    for (let i = 0; i < SPECIES.length; i++) {
-      const look = looks[i];
-      if (!look) continue;
-      const mine = birds.filter((b) => b.sp === SPECIES[i]);
-      mine.forEach((b, slot) => {
-        b.look = i;
-        b.slot = slot;
-        b.dirty = true;
-      });
-      this.size(look, mine.length);
-    }
-    for (let i = 0; i < SPECIES.length; i++) if (this.looks[i] && !birds.some((b) => b.look === i)) this.size(this.looks[i]!, 0);
+    this.assignSlots(birds, looks);
+    // (Built without its file and since built again: nothing draws the old one now.)
+    this.looks.disposeStale();
   }
 
   /** The birds as the world's sound hears them: where each is, and whether it may sing (perched, awake). */
   heard(): readonly SeenBird[] {
     const out = this.seen;
+    const eye = this.eye;
     out.length = this.birds.length;
     for (let i = 0; i < this.birds.length; i++) {
       const b = this.birds[i];
@@ -519,7 +522,7 @@ export class Birds {
       s.y = b.y + 0.1;
       s.z = b.z;
       s.perched = this.visible && b.state === 'perch' && b.preenUntil < this.clock;
-      s.distance = Math.hypot(b.x - this.eye.x, b.y - this.eye.y, b.z - this.eye.z);
+      s.distance = Math.hypot(b.x - eye.x, b.y - eye.y, b.z - eye.z);
     }
     return out;
   }
@@ -544,7 +547,7 @@ export class Birds {
         y: Math.round(b.y * 100) / 100,
         z: Math.round(b.z * 100) / 100,
         home: this.plants[b.home]?.key ?? '',
-        drawn: this.visible && !!this.looks[b.look],
+        drawn: this.visible && !!b.look,
       })),
     };
   }
@@ -564,20 +567,22 @@ export class Birds {
     return (b.state as State) === 'fly';
   }
 
-  /** Moves the birds a frame on; true if any moved (the snapshot is recorded again). */
+  /** Moves the birds a frame on; true if any was drawn anew (the snapshot is recorded again). */
   update(f: BirdFrame): boolean {
     if (!this.birds.length) return false;
     const started = performance.now();
     this.rate = (RATE[f.speed | 0] ?? RATE[RATE.length - 1]) * this.timeScale;
     const dt = Math.min(MAX_STEP, f.dt * this.rate);
     this.clock += dt;
+    this.frame++;
     this.hour = f.hour;
+    this.busy = birdActivity(f.hour);
     this.calm = f.calm;
-    this.eye.copyFrom(f.camera);
-    if (f.roof !== this.roofOn) this.roofOn = f.roof;
+    this.eye = f.camera;
+    this.roofOn = f.roof;
+    this.findThreats(f);
     let moved = false;
     for (const b of this.birds) {
-      b.dirty = false;
       if (b.fresh) {
         b.fresh = false;
         if (!this.awake(b) && b.state === 'perch') {
@@ -586,19 +591,16 @@ export class Birds {
           b.perch = b.roostPerch;
         }
       }
-      if (dt > 0) this.think(b, f);
+      if (dt > 0) this.think(b);
       if (b.state === 'perch' || b.state === 'roost') this.sit(b, dt);
       else if (b.state === 'fly') this.fly(b, dt);
       else this.forage(b, dt);
-      if (b.dirty && this.visible) {
-        this.write(b);
-        moved = true;
-      }
+      if (this.visible && this.write(b)) moved = true;
     }
-    for (const look of this.looks) {
-      if (!look?.dirty) continue;
-      look.dirty = false;
-      for (const list of look.meshes) for (const mesh of list) mesh.thinInstanceBufferUpdated('matrix');
+    for (const look of this.inUse) {
+      if (!look.dirty) continue;
+      for (let k = 0; k < PARTS.length; k++) if (look.dirty & (1 << k)) for (const mesh of look.parts[k]) mesh.thinInstanceBufferUpdated('matrix');
+      look.dirty = 0;
     }
     this.cost += (performance.now() - started - this.cost) * 0.05;
     return moved;
@@ -606,33 +608,124 @@ export class Birds {
 
   dispose(): void {
     this.ticket++;
-    for (let i = 0; i < this.looks.length; i++) this.dropLook(i);
+    this.looks.forEachBuilt((look) => {
+      for (const mesh of look.meshes) mesh.dispose(false, false);
+    });
+    this.looks.clear();
+    this.looks.disposeStale();
+    this.inUse = [];
     this.birds = [];
     this.plants = [];
   }
 
   // ---- habitat ------------------------------------------------------------------------------
 
-  /** The town's lawn mask per ground tile, and the houses as boxes. */
-  private grids(world: WorldStructure, roofTop: number | null): void {
+  /** The plants within range of the view with perches (each group's found once for a view and range), and the roof ridge. */
+  private gather({ plants: groups, view, ridge }: BirdHabitat): Plant[] {
+    const range = this.quality.range;
+    const near = view ? `${view.x},${view.z},${view.w},${view.d},${range}` : '';
+    const plants: Plant[] = [];
+    for (const group of groups) {
+      let found = this.groups.get(group);
+      if (found?.near !== near) {
+        found = { near, plants: [] };
+        for (const p of group) {
+          if (!view) continue;
+          const dx = Math.max(view.x - p.x, 0, p.x - (view.x + view.w));
+          const dz = Math.max(view.z - p.z, 0, p.z - (view.z + view.d));
+          if (dx * dx + dz * dz > range * range) continue;
+          const plant = this.plantOf(p);
+          if (plant) found.plants.push(plant);
+        }
+        this.groups.set(group, found);
+      }
+      plants.push(...found.plants);
+    }
+    if (ridge.length >= 3) {
+      const perches = Float32Array.from(ridge);
+      const n = perches.length / 3;
+      const mid = Math.floor(n / 2);
+      plants.push({ key: 'roof', kind: 'roof', conifer: false, x: perches[mid * 3], y: 0, z: perches[mid * 3 + 2], perches, heights: new Float32Array(n), top: perches[1], radius: 0, roosts: [mid], seed: placeHash(perches[0], perches[2], 7), windX: 0, windZ: 0, sway: 0, swayed: -1 });
+    }
+    return plants;
+  }
+
+  /** Each plant's birds (nearest the lot first, so a smaller preset keeps the birds nearest: always the same ones), of the species `usable` says. */
+  private populate(plants: Plant[], usable: boolean[], view: ViewRect | null): Bird[] {
+    const old = new Map(this.birds.map((b) => [b.key, b]));
+    const birds: Bird[] = [];
+    const [cx, cz] = view ? [view.x + view.w / 2, view.z + view.d / 2] : [0, 0];
+    const order = plants.map((_, i) => i).filter((i) => plants[i].kind !== 'roof');
+    const far = (i: number) => (plants[i].x - cx) ** 2 + (plants[i].z - cz) ** 2;
+    order.sort((a, b) => far(a) - far(b));
+    const count = this.quality.count;
+    for (const i of order) {
+      if (birds.length >= count) break;
+      const plant = plants[i];
+      const r = seeded(plant.seed);
+      // A big tree two or three, a small one one or two; a bush or a stretch of hedge now and then.
+      const n = plant.kind === 'tree' ? (plant.top > 6 ? 2 + Math.floor(r() * 2) : 1 + Math.floor(r() * 2)) : r() < (plant.top > 1.2 ? 0.25 : 0.12) ? 1 : 0;
+      let roosting = 0;
+      const roostOf = () => plant.roosts[roosting++ % plant.roosts.length];
+      for (let k = 0; k < n && birds.length < count; k++) {
+        const sp = this.pickSpecies(plant, r(), usable);
+        if (!sp) break;
+        const key = `${Math.round(plant.x * 10)},${Math.round(plant.z * 10)},${k}`;
+        const first = this.makeBird(old.get(key), key, sp, i, plants, roostOf());
+        birds.push(first);
+        if (sp.pair && birds.length < count) {
+          const mate = this.makeBird(old.get(`${key}m`), `${key}m`, sp, i, plants, roostOf());
+          mate.partner = first;
+          mate.follower = true;
+          first.partner = mate;
+          birds.push(mate);
+        }
+      }
+    }
+    return birds;
+  }
+
+  /** Each species' buffers, sized to its birds, and each bird's slot in them (written whole next frame). */
+  private assignSlots(birds: Bird[], looks: (Look | null)[]): void {
+    const inUse: Look[] = [];
+    for (let i = 0; i < SPECIES.length; i++) {
+      const look = looks[i]?.meshes.length ? looks[i] : null;
+      let slot = 0;
+      for (const b of birds) {
+        if (b.sp !== SPECIES[i]) continue;
+        b.look = look;
+        b.slot = slot++;
+        b.drawn[0] = NaN;
+      }
+      if (look) inUse.push(look);
+      if (look) this.size(look, slot);
+    }
+    // Species no longer about.
+    for (const look of this.inUse) if (!inUse.includes(look)) this.size(look, 0);
+    this.inUse = inUse;
+  }
+
+  /** The town's lawn mask per ground tile (the landscape's lawn, less the patios and round the houses), and the houses as boxes. */
+  private grids({ world, view, roofTop, houseTop }: BirdHabitat): void {
     const w = (this.width = world.width);
     const d = (this.depth = groundDepth(world));
     const blocked = (this.blocked = new Uint8Array(w * d));
     const fill = (x0: number, z0: number, x1: number, z1: number) => {
       for (let z = Math.max(0, Math.floor(z0)); z < Math.min(d, Math.ceil(z1)); z++) for (let x = Math.max(0, Math.floor(x0)); x < Math.min(w, Math.ceil(x1)); x++) blocked[z * w + x] = 1;
     };
-    for (let i = 0; i < w * d; i++) if (world.rooms[i] !== 0) blocked[i] = 1;
-    for (const r of [...(world.meta?.streets ?? []), ...(world.meta?.paths ?? []), ...(world.meta?.world?.fields ?? [])]) fill(r.x, r.z, r.x + r.w, r.z + r.d);
+    // Where no lawn grows (paved, fields, indoors, under furniture), and the patios.
+    const { hidden } = lawnMask(world);
+    for (let i = 0; i < w * d; i++) if (hidden[i]) blocked[i] = 1;
+    for (const r of unlawned(world)) fill(r.x, r.z, r.x + r.w, r.z + r.d);
     for (const [x, z] of world.floors ?? []) if (z < d) blocked[z * w + x] = 1;
-    for (const o of world.objects) if (o.z < d) fill(o.x, o.z, o.x + o.w, o.z + o.d);
     // Houses: their walls up to their roofs' tops (the viewed one's roof as built, if known).
     const boxes: number[] = [];
-    const view = this.habitat?.view;
     for (const p of world.plots) {
-      if (!p.house) continue;
-      const [x0, z0, x1, z1] = p.house;
+      const house = p.house;
+      if (!house) continue;
+      const [x0, z0, x1, z1] = house;
       const viewed = !!view && p.x === view.x && p.z === view.z;
-      boxes.push(x0, z0, x1, z1, viewed && roofTop !== null ? roofTop : (p.storeys ?? 1) * STOREY + ROOF_RISE);
+      boxes.push(x0, z0, x1, z1, viewed && roofTop !== null ? roofTop : houseTop({ ...p, house }));
       fill(x0 - 0.3, z0 - 0.3, x1 + 0.3, z1 + 0.3);
     }
     // The viewed house as it is now (rooms built past its box).
@@ -644,7 +737,7 @@ export class Birds {
           [x0, z0, x1, z1] = [Math.min(x0, x), Math.min(z0, z), Math.max(x1, x + 1), Math.max(z1, z + 1)];
         }
       }
-      if (x1 > x0) boxes.push(x0, z0, x1, z1, roofTop ?? (world.storeys ?? 1) * STOREY + ROOF_RISE);
+      if (x1 > x0) boxes.push(x0, z0, x1, z1, roofTop ?? (world.storeys ?? 1) * WALL_HEIGHT + ROOF_RISE);
     }
     this.boxes = Float32Array.from(boxes);
   }
@@ -684,23 +777,26 @@ export class Birds {
 
   /** A placed plant's perches in the world, if its model has any. */
   private plantOf(p: PlantPlacement): Plant | null {
-    const entry = this.assets.get(p.key, 'model') as BirdExtras | undefined;
-    if (!entry) return null;
-    const points = entry.perches;
-    if (!points?.length) return null;
+    const entry = this.assets.get(p.key, 'model') as PlantEntry | undefined;
+    const points = entry?.perches;
+    // (A model fitted to a size (`fit`) is placed by its built geometry: its perches can't be.)
+    if (!entry || !points?.length || entry.fit) return null;
+    const space = entrySpace(entry);
     const perches = new Float32Array(points.length * 3);
     const heights = new Float32Array(points.length);
     const [c, s] = [Math.cos(p.yaw), Math.sin(p.yaw)];
     let top = 0;
     let radius = 0;
     const depth: number[] = [];
-    points.forEach((point, i) => {
-      const m = inSpace(entry, point, this.v);
+    const m = new Vector3();
+    points.forEach(([x, y, z], i) => {
+      Vector3.TransformCoordinatesFromFloatsToRef(x, y, z, space, m);
       const [lx, ly, lz] = [m.x * p.sx, m.y * p.sy, m.z * p.sz];
       perches[i * 3] = p.x + lx * c + lz * s;
       perches[i * 3 + 1] = p.y + ly;
       perches[i * 3 + 2] = p.z - lx * s + lz * c;
-      heights[i] = m.y;
+      // (As the shader: nothing below the model's ground bends.)
+      heights[i] = Math.max(0, m.y);
       top = Math.max(top, ly);
       const out = Math.hypot(lx, lz);
       radius = Math.max(radius, out);
@@ -708,9 +804,9 @@ export class Birds {
       depth.push(out - ly * 0.3);
     });
     const roosts = points.map((_, i) => i).sort((a, b) => depth[a] - depth[b]);
-    const conifer = /spruce|pine|cypress|fir/i.test(p.key);
-    const tree = /(^|\.)(tree|spruce|pine|cypress|willow|palm)/i.test(p.key) || top > 2.6;
-    return { key: p.key, kind: tree ? 'tree' : 'bush', conifer, x: p.x, y: p.y, z: p.z, perches, heights, top, radius, roosts, seed: hash(p.x, p.z, 0xb1d) };
+    const wind = { x: 0, z: 0 };
+    windDirection(p.yaw, p.sx, p.sz, wind);
+    return { key: p.key, kind: entry.habitat === 'tree' || entry.habitat === 'conifer' ? 'tree' : 'bush', conifer: entry.habitat === 'conifer', x: p.x, y: p.y, z: p.z, perches, heights, top, radius, roosts, seed: placeHash(p.x, p.z, 0xb1d), windX: wind.x, windZ: wind.z, sway: 0, swayed: -1 };
   }
 
   private pickSpecies(plant: Plant, roll: number, usable: boolean[]): Species | null {
@@ -752,18 +848,18 @@ export class Birds {
         old.state = 'perch';
       }
       old.partner = null;
-      old.dirty = true;
+      old.follower = false;
       return old;
     }
     const plant = plants[home];
     const b: Bird = {
-      key, id, sp, look: -1, slot: 0, size, home, partner: null, wake, roost, roostPerch,
+      key, id, sp, look: null, slot: 0, size, home, partner: null, follower: false, wake, roost, roostPerch,
       state: 'perch', plant: home, perch: 0, x: plant.x, y: plant.y, z: plant.z, yaw: r() * Math.PI * 2, turnTo: NaN, pitch: 0, roll: 0,
       hy: 0, hp: 0, hr: 0, bob: 0, hyTo: 0, hpTo: 0, hrTo: 0, tail: 0, spread: 0, flap: 0, phase: 0, puff: 1,
       nextGlance: 0, nextFlick: r() * 3, nextPreen: between(r, sp.preen), preenUntil: -1, flickAt: -10, nextHop: between(r, sp.hop), nextFly: between(r, sp.fly),
-      singUntil: -1, waryUntil: -1, path: new Float32Array(12), dur: 0, t: 0, bounds: 0, bound: 0, hop: false,
-      leaveAt: 0, nextStep: 0, step: new Float32Array(4), stepT: 0, stepDur: 0, steps: 0, peck: -1, px: plant.x, py: plant.y, pz: plant.z,
-      fresh: true, dirty: true,
+      singUntil: -1, waryUntil: -1, path: new Float32Array(12), dur: 0, t: 0, bounds: 0, hop: false,
+      leaveAt: 0, nextStep: 0, step: new Float32Array(4), stepT: 0, stepDur: 0, steps: 0, peck: -1,
+      fresh: true, drawn: new Float32Array(Pose.Count).fill(NaN),
     };
     // Asleep on its roost when the game starts at night.
     const asleep = !this.awake(b);
@@ -781,120 +877,121 @@ export class Birds {
   }
 
   /** Decides what a bird does next. */
-  private think(b: Bird, f: BirdFrame): void {
+  private think(b: Bird): void {
     const now = this.clock;
-    const awake = this.awake(b);
     if (b.state === 'roost') {
-      if (awake) {
+      if (this.awake(b)) {
         b.state = 'perch';
         // Wakes with a shake and a preen.
         b.preenUntil = now + 1.5 + rnd() * 2;
         b.nextFly = now + between(rnd, b.sp.fly) * 0.5;
-        b.dirty = true;
       }
       return;
     }
     if (b.state === 'fly') return;
     // Dusk: home to roost.
-    if (!awake) {
-      if (b.state === 'perch' && b.plant === b.home && b.perch === b.roostPerch) {
-        b.state = 'roost';
-        b.dirty = true;
-      } else this.flyTo(b, b.home, b.roostPerch, 0.8);
+    if (!this.awake(b)) {
+      if (b.state === 'perch' && b.plant === b.home && b.perch === b.roostPerch) b.state = 'roost';
+      else this.flyTo(b, b.home, b.roostPerch, 0.8);
       return;
     }
-    if (this.scared(b, f)) return;
+    if (this.scared(b)) return;
     // Someone else on the roof ridge's perch when the roof goes: off it.
     if (b.state === 'perch' && this.plants[b.plant]?.kind === 'roof' && !this.roofOn) {
       this.flyAway(b, b.x, b.z);
       return;
     }
-    if (f.calm) {
+    if (this.calm) {
       // Calm: whoever's on the lawn goes home, slowly; nobody else flies about.
       if (b.state === 'ground' && now >= b.leaveAt) this.flyTo(b, b.home, this.perchFor(b, this.plants[b.home]), 0.6);
       return;
     }
-    const busy = activity(this.hour);
-    // A dove's mate follows it about.
-    const mate = b.partner;
-    const follows = !!mate && b.key.endsWith('m') && mate.state !== 'fly';
-    if (b.state === 'ground') {
-      if (follows && mate!.state !== 'ground') b.leaveAt = Math.min(b.leaveAt, now + 0.5 + rnd());
-      if (now >= b.leaveAt) {
-        if (follows && mate!.plant >= 0) this.flyTo(b, mate!.plant, this.nearPerch(this.plants[mate!.plant], mate!.perch, b), 1);
-        else this.flyHome(b);
-      }
-      return;
-    }
+    if (b.state === 'ground') this.onLawn(b, now);
+    else this.perched(b, now);
+  }
+
+  /** The partner a dove's mate follows about (not while that one's in the air). */
+  private leader(b: Bird): Bird | null {
+    return b.follower && b.partner && b.partner.state !== 'fly' ? b.partner : null;
+  }
+
+  /** On the lawn: home when its time's up (or soon after its partner left). */
+  private onLawn(b: Bird, now: number): void {
+    const mate = this.leader(b);
+    if (mate && mate.state !== 'ground') b.leaveAt = Math.min(b.leaveAt, now + 0.5 + rnd());
+    if (now < b.leaveAt) return;
+    if (mate && mate.plant >= 0) this.flyTo(b, mate.plant, this.nearPerch(mate.plant, mate.perch, b), 1);
+    else this.flyHome(b);
+  }
+
+  /** Perched: now and then off somewhere (after its partner), a hop to the next twig, a turn. */
+  private perched(b: Bird, now: number): void {
     if (b.singUntil > now || b.preenUntil > now) return;
-    if (follows && (mate!.plant !== b.plant || mate!.state === 'ground')) {
-      if (b.nextFly > now + 1.5) b.nextFly = now + 0.4 + rnd() * 1.2;
-    }
+    const mate = this.leader(b);
+    if (mate && (mate.plant !== b.plant || mate.state === 'ground') && b.nextFly > now + 1.5) b.nextFly = now + 0.4 + rnd() * 1.2;
     if (now >= b.nextFly) {
-      b.nextFly = now + between(rnd, b.sp.fly) / (0.4 + busy);
-      if (follows) {
-        if (mate!.state === 'ground') {
-          const a = rnd() * Math.PI * 2;
-          const r = 0.4 + rnd() * 0.5;
-          this.flyDown(b, mate!.x + Math.cos(a) * r, mate!.z + Math.sin(a) * r, 0.7);
-        } else this.flyTo(b, mate!.plant, this.nearPerch(this.plants[mate!.plant], mate!.perch, b), 1);
-      } else this.flyOff(b);
+      b.nextFly = now + between(rnd, b.sp.fly) / (0.4 + this.busy);
+      if (mate) this.followMate(b, mate);
+      else this.flyOff(b);
       return;
     }
-    if (now >= b.nextHop) {
-      b.nextHop = now + between(rnd, b.sp.hop) / (0.5 + busy * 0.5);
-      const plant = this.plants[b.plant];
-      if (!plant || plant.kind === 'roof') {
-        // Along the ridge a little, or a turn.
-        if (plant) this.flyTo(b, b.plant, Math.max(0, Math.min(plant.perches.length / 3 - 1, b.perch + (rnd() < 0.5 ? -1 : 1))), 1);
-        return;
-      }
-      const next = this.nearPerch(plant, b.perch, b);
-      if (next !== b.perch) this.flyTo(b, b.plant, next, 1);
-      // A turn on the spot, in a flick (`sit`).
-      else b.turnTo = b.yaw + (rnd() < 0.5 ? -1 : 1) * (0.6 + rnd() * 1.6);
-      b.dirty = true;
+    if (now < b.nextHop) return;
+    b.nextHop = now + between(rnd, b.sp.hop) / (0.5 + this.busy * 0.5);
+    const plant = this.plants[b.plant];
+    if (!plant || plant.kind === 'roof') {
+      // Along the ridge a little, or a turn.
+      if (plant) this.flyTo(b, b.plant, Math.max(0, Math.min(plant.perches.length / 3 - 1, b.perch + (rnd() < 0.5 ? -1 : 1))), 1);
+      return;
     }
+    const next = this.nearPerch(b.plant, b.perch, b);
+    if (next !== b.perch) this.flyTo(b, b.plant, next, 1);
+    // A turn on the spot, in a flick (`sit`).
+    else b.turnTo = b.yaw + (rnd() < 0.5 ? -1 : 1) * (0.6 + rnd() * 1.6);
+  }
+
+  /** After its partner: down beside it on the lawn, or to a perch near its. */
+  private followMate(b: Bird, mate: Bird): void {
+    if (mate.state === 'ground') {
+      const a = rnd() * Math.PI * 2;
+      const r = 0.4 + rnd() * 0.5;
+      this.flyDown(b, mate.x + Math.cos(a) * r, mate.z + Math.sin(a) * r, 0.7);
+    } else this.flyTo(b, mate.plant, this.nearPerch(mate.plant, mate.perch, b), 1);
+  }
+
+  /** The residents outdoors on the ground (not upstairs, not indoors behind the walls), once a frame. */
+  private findThreats(f: BirdFrame): void {
+    if (this.threats.length < f.residentCount * 2) this.threats = new Float32Array(f.residentCount * 2);
+    let n = 0;
+    for (let i = 0; i < f.residentCount; i++) {
+      if (!f.visible[i]) continue;
+      const hx = f.residents[i * 3];
+      const hz = f.residents[i * 3 + 2];
+      if (f.residents[i * 3 + 1] > THREAT_HEIGHT || this.topAt(hx, hz) > 0) continue;
+      this.threats[n * 2] = hx;
+      this.threats[n * 2 + 1] = hz;
+      n++;
+    }
+    this.threatCount = n;
   }
 
   /** A resident or the camera close: up into the nearest plant away from them. True if it fled. */
-  private scared(b: Bird, f: BirdFrame): boolean {
-    if (f.calm && b.state !== 'ground') return false;
-    const low = b.state === 'ground' || b.y - this.groundY() < 2.2;
+  private scared(b: Bird): boolean {
+    if (this.calm && b.state !== 'ground') return false;
     let threat = -1;
-    const reach = b.state === 'ground' ? b.sp.wary : b.sp.wary * 0.6;
-    if (low) {
-      for (let i = 0; i < f.residentCount; i++) {
-        if (!f.visible[i]) continue;
-        const hx = f.residents[i * 3];
-        const hy = f.residents[i * 3 + 1];
-        const hz = f.residents[i * 3 + 2];
-        // Upstairs, or indoors behind the walls: not a threat.
-        if (hy > 2.6 || !this.lawnOrOpen(hx, hz)) continue;
-        if (Math.hypot(hx - b.x, hz - b.z) < reach) threat = i;
-      }
+    if (b.state === 'ground' || b.y < LOW_PERCH) {
+      const reach = b.state === 'ground' ? b.sp.wary : b.sp.wary * 0.6;
+      const T = this.threats;
+      for (let k = 0; k < this.threatCount; k++) if ((T[k * 2] - b.x) ** 2 + (T[k * 2 + 1] - b.z) ** 2 < reach * reach) threat = k;
     }
-    const c = f.camera;
-    const camera = Math.hypot(c.x - b.x, c.y - b.y, c.z - b.z) < CAMERA_WARY;
+    const c = this.eye;
+    const camera = (c.x - b.x) ** 2 + (c.y - b.y) ** 2 + (c.z - b.z) ** 2 < CAMERA_WARY * CAMERA_WARY;
     if (threat < 0 && !camera) return false;
-    const [tx, tz] = threat >= 0 ? [f.residents[threat * 3], f.residents[threat * 3 + 2]] : [c.x, c.z];
     if (threat >= 0) this.stats.scaredBy++;
     else this.stats.scaredCamera++;
     b.waryUntil = this.clock + 20 + rnd() * 40;
-    this.flyAway(b, tx, tz);
+    if (threat >= 0) this.flyAway(b, this.threats[threat * 2], this.threats[threat * 2 + 1]);
+    else this.flyAway(b, c.x, c.z);
     return true;
-  }
-
-  /** Outdoors (a resident there can scare the birds). */
-  private lawnOrOpen(x: number, z: number): boolean {
-    const tx = Math.floor(x);
-    const tz = Math.floor(z);
-    if (tx < 0 || tz < 0 || tx >= this.width || tz >= this.depth) return true;
-    return this.topAt(x, z) === 0;
-  }
-
-  private groundY(): number {
-    return 0;
   }
 
   /** Off to somewhere else: another plant, the lawn or the roof (by species and the time of day). */
@@ -939,8 +1036,7 @@ export class Birds {
   /** Home from the lawn (or the nearest plant to it, if home is far). */
   private flyHome(b: Bird): void {
     const home = this.plants[b.home];
-    let pick = b.home;
-    if (Math.hypot(home.x - b.x, home.z - b.z) > 10) pick = this.nearestPlant(b.x, b.z, -1, b);
+    const pick = Math.hypot(home.x - b.x, home.z - b.z) > 10 ? this.nearestPlant(b) : b.home;
     this.flyTo(b, pick, this.perchFor(b, this.plants[pick]), 1);
   }
 
@@ -963,12 +1059,13 @@ export class Birds {
     this.flyTo(b, pick, perch, 1.15);
   }
 
-  private nearestPlant(x: number, z: number, except: number, b: Bird): number {
+  /** The plant nearest a bird (its home if there's none). */
+  private nearestPlant(b: Bird): number {
     let pick = b.home;
     let best = Infinity;
     for (let i = 0; i < this.plants.length; i++) {
-      if (i === except || this.plants[i].kind === 'roof') continue;
-      const d = Math.hypot(this.plants[i].x - x, this.plants[i].z - z);
+      if (this.plants[i].kind === 'roof') continue;
+      const d = Math.hypot(this.plants[i].x - b.x, this.plants[i].z - b.z);
       if (d < best) [best, pick] = [d, i];
     }
     return pick;
@@ -988,14 +1085,15 @@ export class Birds {
     return pick;
   }
 
-  /** A perch of `plant` near `perch` (within a hop), or `perch` itself. */
-  private nearPerch(plant: Plant, perch: number, b: Bird): number {
-    const p = plant.perches;
+  /** A free perch of plant `at` near `perch` (within a hop), or `perch` itself. */
+  private nearPerch(at: number, perch: number, b: Bird): number {
+    const p = this.plants[at].perches;
     const n = p.length / 3;
+    const taken = this.occupy(at, n, b);
     let pick = perch;
     let best = Infinity;
     for (let k = 0; k < n; k++) {
-      if (k === perch || this.taken(plant, k, b)) continue;
+      if (k === perch || taken[k]) continue;
       const d = Math.hypot(p[k * 3] - p[perch * 3], (p[k * 3 + 1] - p[perch * 3 + 1]) * 1.5, p[k * 3 + 2] - p[perch * 3 + 2]);
       const score = d + rnd() * 0.6;
       if (d < HOP_MAX && score < best) [best, pick] = [score, k];
@@ -1003,10 +1101,13 @@ export class Birds {
     return pick;
   }
 
-  /** Another bird sits on (or is flying to) that perch. */
-  private taken(plant: Plant, perch: number, b: Bird): boolean {
-    const i = this.plants.indexOf(plant);
-    return this.birds.some((o) => o !== b && o.plant === i && o.perch === perch && o.state !== 'ground');
+  /** Which of plant `at`'s `n` perches another bird than `b` sits on or is flying to (1 each). */
+  private occupy(at: number, n: number, b: Bird): Uint8Array {
+    if (this.taken.length < n) this.taken = new Uint8Array(n);
+    const taken = this.taken;
+    taken.fill(0, 0, n);
+    for (const o of this.birds) if (o !== b && o.plant === at && o.state !== 'ground' && o.perch >= 0) taken[o.perch] = 1;
+    return taken;
   }
 
   /** A spot on the lawn near `plant`, clear of people. */
@@ -1014,7 +1115,7 @@ export class Birds {
     if (!plant) return null;
     for (let k = 0; k < 10; k++) {
       const a = rnd() * Math.PI * 2;
-      const r = plant.radius + 0.6 + rnd() * (b.sp.gait === 'walk' ? 5 : 3.5);
+      const r = plant.radius + 0.6 + rnd() * GAIT[b.sp.gait].reach;
       const x = plant.x + Math.cos(a) * r;
       const z = plant.z + Math.sin(a) * r;
       if (this.lawn(x, z)) return [x, z];
@@ -1022,14 +1123,18 @@ export class Birds {
     return null;
   }
 
+  /** Where a perch is now, bent with its branch by the wind (each plant's sway found once a frame). */
   private perchPoint(plant: Plant, perch: number, out: Float32Array): void {
+    if (plant.swayed !== this.frame) {
+      plant.swayed = this.frame;
+      plant.sway = plant.windX || plant.windZ ? windSway(this.scene, plant.x, plant.z) : 0;
+    }
     const p = plant.perches;
     const h = plant.heights[perch];
-    if (h > 0) windBend(this.scene, plant.x, plant.z, h, this.bend);
-    else this.bend.x = this.bend.z = 0;
-    out[0] = p[perch * 3] + this.bend.x;
+    const bend = plant.sway * h * h;
+    out[0] = p[perch * 3] + bend * plant.windX;
     out[1] = p[perch * 3 + 1];
-    out[2] = p[perch * 3 + 2] + this.bend.z;
+    out[2] = p[perch * 3 + 2] + bend * plant.windZ;
   }
 
   /** Sets off to a perch (speed: times the species' cruise). */
@@ -1045,7 +1150,8 @@ export class Birds {
   /** Sets off down to the lawn at (x, z). */
   private flyDown(b: Bird, x: number, z: number, speed: number): void {
     if (!this.lawn(x, z)) return;
-    if (!this.plan(b, x, this.groundY(), z, speed, true)) return;
+    // (The town's ground is level, at 0.)
+    if (!this.plan(b, x, 0, z, speed, true)) return;
     b.plant = -1;
     b.perch = -1;
   }
@@ -1064,21 +1170,9 @@ export class Birds {
     const P = b.path;
     const hop = d < HOP_MAX && Math.abs(y - b.y) < 1.2;
     const [ux, uz] = d > 1e-3 ? [(x - b.x) / d, (z - b.z) / d] : [Math.sin(b.yaw), Math.cos(b.yaw)];
-    let lift0: number;
-    let lift1: number;
-    if (hop) {
-      lift0 = lift1 = 0.08 + d * 0.25;
-    } else if (sp.flight === 'direct') {
-      // Low and straight: just above the lawn if it can.
-      lift0 = 0.3 + d * 0.03;
-      lift1 = down ? 0.35 : 0.15;
-    } else if (sp.flight === 'steady') {
-      lift0 = 0.8 + d * 0.12;
-      lift1 = down ? 1.2 : 0.4;
-    } else {
-      lift0 = 0.5 + d * 0.1;
-      lift1 = down ? 0.8 : 0.25;
-    }
+    const style = FLIGHT[sp.flight];
+    const lift0 = hop ? 0.08 + d * 0.25 : style.lift[0] + d * style.lift[1];
+    const lift1 = hop ? lift0 : style.land[down ? 0 : 1];
     P[0] = b.x;
     P[1] = b.y;
     P[2] = b.z;
@@ -1117,18 +1211,16 @@ export class Birds {
     b.dur = hop ? 0.22 + d * 0.16 : length / v + 0.35;
     b.t = 0;
     b.hop = hop;
-    // Bounding flight: a bound every couple of metres.
-    b.bounds = sp.flight === 'bounding' && !hop ? Math.max(1, Math.round(length / 2.2)) : sp.flight === 'direct' && !hop ? Math.max(1, Math.round(length / 3.5)) : 0;
-    b.bound = 0;
+    // A bound every couple of metres (bounding; a blackbird's shallower ones).
+    b.bounds = style.bound && !hop ? Math.max(1, Math.round(length / style.bound)) : 0;
     b.state = 'fly';
     b.turnTo = NaN;
     if (hop) this.stats.hops++;
     else this.stats.flights++;
     if (down) this.stats.lawn++;
-    else if (this.topAt(x, z) > 0) this.stats.roof++;
+    else if (this.debugging && this.topAt(x, z) > 0) this.stats.roof++;
     b.singUntil = -1;
     b.preenUntil = -1;
-    b.dirty = true;
     return true;
   }
 
@@ -1158,6 +1250,7 @@ export class Birds {
   private fly(b: Bird, dt: number): void {
     if (dt <= 0) return;
     const sp = b.sp;
+    const style = FLIGHT[sp.flight];
     b.t = Math.min(b.dur, b.t + dt);
     const tau = b.t / b.dur;
     // Quick away, slowing to land.
@@ -1171,9 +1264,10 @@ export class Birds {
       P[11] = this.at[2];
     }
     this.bezier(P, s, this.at);
-    b.px = b.x;
-    b.py = b.y;
-    b.pz = b.z;
+    // (Where it was: its heading and climb.)
+    const px = b.x;
+    const py = b.y;
+    const pz = b.z;
     const x = this.at[0];
     let y = this.at[1];
     const z = this.at[2];
@@ -1181,23 +1275,21 @@ export class Birds {
     let flapping = true;
     if (b.bounds > 0) {
       const cycle = tau * b.bounds;
-      const amp = (sp.flight === 'direct' ? 0.06 : 0.16) * Math.sin(Math.PI * tau);
-      y += amp * Math.sin(cycle * Math.PI * 2);
-      const rising = Math.cos(cycle * Math.PI * 2) > (sp.flight === 'direct' ? -0.6 : -0.1);
-      flapping = rising || tau < 0.15 || tau > 0.82;
+      y += style.boundAmp * Math.sin(Math.PI * tau) * Math.sin(cycle * Math.PI * 2);
+      flapping = Math.cos(cycle * Math.PI * 2) > style.flapsAbove || tau < 0.15 || tau > 0.82;
     }
     b.x = x;
     b.y = y;
     b.z = z;
     // (A check: never through a house, short of perching on its ridge.)
-    if (y < this.topAt(x, z) - 0.3) {
+    if (this.debugging && y < this.topAt(x, z) - 0.3) {
       this.stats.inside++;
       if (this.debugInside.length < 20) this.debugInside.push({ species: b.sp.id, at: [x, y, z].map((v) => Math.round(v * 100) / 100), top: this.topAt(x, z), path: Array.from(b.path, (v) => Math.round(v * 100) / 100), hop: b.hop });
     }
     // Heading and bank from the way it goes.
-    const vx = (b.x - b.px) / dt;
-    const vy = (b.y - b.py) / dt;
-    const vz = (b.z - b.pz) / dt;
+    const vx = (x - px) / dt;
+    const vy = (y - py) / dt;
+    const vz = (z - pz) / dt;
     const vh = Math.hypot(vx, vz);
     if (vh > 0.2) {
       const want = Math.atan2(vx, vz);
@@ -1207,9 +1299,9 @@ export class Birds {
       b.yaw += step;
       b.roll = lerp(b.roll, Math.max(-0.7, Math.min(0.7, (-step / dt) * 0.12 * Math.min(1, vh / 4))), Math.min(1, dt * 6));
     }
-    const flare = smooth(0.78, 1, tau) * (b.hop ? 0.4 : 1);
+    const flare = smoothstep(0.78, 1, tau) * (b.hop ? 0.4 : 1);
     const climb = -Math.atan2(vy, Math.max(0.5, vh)) * 0.5;
-    const level = this.looks[b.look]?.pitch ?? 0;
+    const level = b.look?.pitch ?? 0;
     // Level in flight (the model sits nose-up), nose up to land.
     b.pitch = (b.hop ? level * 0.4 : level) * (1 - flare) + climb * (1 - flare) - flare * 0.65;
     // Wings: a burst to take off, beats (or shut, bounding), held out to glide, spread wide to land.
@@ -1222,7 +1314,7 @@ export class Birds {
       b.spread = 1;
       b.phase += dt * Math.PI * 2 * hz * 0.8;
       b.flap = 0.35 + 0.9 * Math.sin(b.phase) * (0.5 + 0.5 * flare);
-    } else if (sp.flight === 'steady' && Math.sin(tau * b.dur * 1.6) > 0.55 && tau > 0.2) {
+    } else if (style.glides && Math.sin(tau * b.dur * 1.6) > 0.55 && tau > 0.2) {
       // A dove's glide, wings held a little up.
       b.spread = 1;
       b.flap = lerp(b.flap, 0.18, Math.min(1, dt * 10));
@@ -1239,7 +1331,6 @@ export class Birds {
     b.hr = 0;
     b.tail = lerp(b.tail, flare * 0.5 + (flapping ? 0.05 : -0.1), Math.min(1, dt * 10));
     b.puff = 1;
-    b.dirty = true;
     if (b.t >= b.dur) this.land(b);
   }
 
@@ -1256,13 +1347,12 @@ export class Birds {
       b.nextHop = this.clock + between(rnd, b.sp.hop);
     } else {
       b.state = 'ground';
-      b.y = this.groundY();
+      b.y = 0;
       b.leaveAt = this.clock + between(rnd, b.sp.groundStay) * (b.waryUntil > this.clock ? 0.3 : 1);
       b.nextStep = this.clock + 0.4 + rnd();
       b.steps = 0;
       b.stepT = b.stepDur = 0;
     }
-    b.dirty = true;
   }
 
   /** Perched or roosting: on its branch as it sways, glancing, flicking, preening, singing, asleep. */
@@ -1270,12 +1360,9 @@ export class Birds {
     const plant = this.plants[b.plant];
     if (!plant) return;
     this.perchPoint(plant, b.perch, this.at);
-    if (this.at[0] !== b.x || this.at[1] !== b.y || this.at[2] !== b.z) {
-      b.x = this.at[0];
-      b.y = this.at[1];
-      b.z = this.at[2];
-      b.dirty = true;
-    }
+    b.x = this.at[0];
+    b.y = this.at[1];
+    b.z = this.at[2];
     if (dt <= 0) return;
     const now = this.clock;
     const sp = b.sp;
@@ -1284,7 +1371,6 @@ export class Birds {
       this.ease(b, 2.5, 0.45, 0, dt, 3);
       b.puff = lerp(b.puff, 1.1, Math.min(1, dt * 0.5));
       b.tail = lerp(b.tail, -0.05, Math.min(1, dt));
-      b.dirty = true;
       return;
     }
     b.puff = lerp(b.puff, b.singUntil > now ? 1.04 : 1, Math.min(1, dt * 2));
@@ -1304,13 +1390,11 @@ export class Birds {
       this.ease(b, side * 2.2 + Math.sin(now * 17) * 0.12, 0.55 + Math.sin(now * 23) * 0.1, side * 0.3, dt, 8);
     } else {
       if (now >= b.nextGlance) {
-        const calm = this.calm ? 3 : 1;
-        b.nextGlance = now + between(rnd, sp.glance) * calm;
+        b.nextGlance = now + between(rnd, sp.glance) * (this.calm ? 3 : 1);
         const back = rnd() < 0.25;
         b.hyTo = back ? 0 : (rnd() - 0.5) * 2.2;
         b.hpTo = back ? 0 : (rnd() - 0.6) * 0.5;
-        // Small birds cock the head to look up and down.
-        b.hrTo = sp.length < 0.2 && rnd() < 0.3 ? (rnd() - 0.5) * 0.8 : 0;
+        b.hrTo = sp.cock && rnd() < 0.3 ? (rnd() - 0.5) * 0.8 : 0;
       }
       this.ease(b, b.hyTo, b.hpTo, b.hrTo, dt, this.calm ? 3 : sp.snap);
       if (now >= b.nextPreen) {
@@ -1319,7 +1403,6 @@ export class Birds {
       }
     }
     this.flick(b, now);
-    b.dirty = true;
   }
 
   /** The tail's flick (up fast, down slower; a blackbird holds it up longer). */
@@ -1330,8 +1413,7 @@ export class Birds {
       b.flickAt = now;
     }
     const t = now - b.flickAt;
-    const hold = sp.id === 'blackbird' ? 0.35 : 0.12;
-    b.tail = t < 0 || t > 2 ? 0 : (t < 0.05 ? t / 0.05 : Math.exp(-(t - 0.05) / hold)) * (sp.flickAmp || 0.15);
+    b.tail = t < 0 || t > 2 ? 0 : (t < 0.05 ? t / 0.05 : Math.exp(-(t - 0.05) / sp.flickHold)) * sp.flickAmp;
   }
 
   /** Turns the head towards a pose, `rate` per second (high: a snap). */
@@ -1348,19 +1430,19 @@ export class Birds {
     if (dt <= 0) return;
     const now = this.clock;
     const sp = b.sp;
+    const gait = GAIT[sp.gait];
     if (b.stepT < b.stepDur) {
       // A move under way.
       b.stepT = Math.min(b.stepDur, b.stepT + dt);
       const s = b.stepT / b.stepDur;
       const S = b.step;
-      if (sp.gait === 'walk') {
-        // A dove walks, its head bobbing: thrust forward, then held still as the body catches up.
-        const e = s;
-        b.x = lerp(S[0], S[2], e);
-        b.z = lerp(S[1], S[3], e);
+      if (gait.bobs) {
+        // Walking at an even pace, the head thrust forward, then held still as the body catches up.
+        b.x = lerp(S[0], S[2], s);
+        b.z = lerp(S[1], S[3], s);
         const pace = (s * b.steps) % 1;
-        b.bob = (pace < 0.4 ? pace / 0.4 : 1 - (pace - 0.4) / 0.6) * 0.025 * (this.looks[b.look]?.length ?? 0.3) * 3;
-        b.y = this.groundY();
+        b.bob = (pace < 0.4 ? pace / 0.4 : 1 - (pace - 0.4) / 0.6) * 0.075 * (b.look?.length ?? 0);
+        b.y = 0;
       } else {
         const hops = Math.max(1, b.steps);
         const u = s * hops;
@@ -1369,11 +1451,10 @@ export class Birds {
         const e = (k + f * f * (3 - 2 * f)) / hops;
         b.x = lerp(S[0], S[2], e);
         b.z = lerp(S[1], S[3], e);
-        b.y = this.groundY() + Math.sin(Math.PI * f) * (sp.gait === 'run' ? 0.015 : 0.035);
+        b.y = Math.sin(Math.PI * f) * gait.lift;
       }
       b.yaw += turn(b.yaw, Math.atan2(S[2] - S[0], S[3] - S[1])) * Math.min(1, dt * 20);
-      this.ease(b, 0, sp.gait === 'run' ? -0.1 : 0.1, 0, dt, 12);
-      b.dirty = true;
+      this.ease(b, 0, gait.headPitch, 0, dt, 12);
       return;
     }
     b.bob = lerp(b.bob, 0, Math.min(1, dt * 8));
@@ -1382,14 +1463,13 @@ export class Birds {
       b.peck += dt;
       const n = Math.floor(b.peck / 0.22);
       const f = (b.peck % 0.22) / 0.22;
-      b.hp = (f < 0.4 ? f / 0.4 : 1 - (f - 0.4) / 0.6) * 1.0;
+      b.hp = f < 0.4 ? f / 0.4 : 1 - (f - 0.4) / 0.6;
       b.hy = lerp(b.hy, 0, Math.min(1, dt * 10));
       b.pitch = lerp(b.pitch, 0.2, Math.min(1, dt * 8));
       if (n >= b.steps) {
         b.peck = -1;
         b.pitch = 0;
       }
-      b.dirty = true;
       return;
     }
     b.pitch = lerp(b.pitch, 0, Math.min(1, dt * 8));
@@ -1398,195 +1478,197 @@ export class Birds {
       if (now >= b.nextGlance) {
         b.nextGlance = now + between(rnd, sp.glance) * (this.calm ? 3 : 1);
         b.hyTo = (rnd() - 0.5) * 1.6;
-        b.hpTo = sp.gait === 'run' ? -0.25 : (rnd() - 0.6) * 0.4;
-        b.hrTo = sp.gait === 'run' && rnd() < 0.5 ? (rnd() - 0.5) * 0.9 : 0;
+        b.hpTo = gait.listens ? -0.25 : (rnd() - 0.6) * 0.4;
+        b.hrTo = gait.listens && rnd() < 0.5 ? (rnd() - 0.5) * 0.9 : 0;
       }
       this.ease(b, b.hyTo, b.hpTo, b.hrTo, dt, this.calm ? 3 : sp.snap);
       this.flick(b, now);
-      b.dirty = true;
       return;
     }
     // Next: a peck or two, or a move.
-    if (rnd() < (sp.gait === 'walk' ? 0.55 : 0.45)) {
+    if (rnd() < gait.pecks) {
       b.peck = 0;
-      b.steps = 1 + Math.floor(rnd() * (sp.gait === 'walk' ? 4 : 3));
+      b.steps = 1 + Math.floor(rnd() * gait.peckMax);
       b.nextStep = now + 0.3 + rnd() * 0.6;
       return;
     }
-    const [hops, len, dur] = sp.gait === 'walk' ? [3 + Math.floor(rnd() * 5), 0.09, 0.32] : sp.gait === 'run' ? [4 + Math.floor(rnd() * 6), 0.13, 0.09] : [1 + Math.floor(rnd() * 3), 0.11, 0.15];
+    const hops = gait.steps[0] + Math.floor(rnd() * gait.steps[1]);
     // Keep near where it came down: wander, turning back towards its tree's side as it strays.
     const home = this.plants[b.home];
     const away = Math.hypot(b.x - home.x, b.z - home.z);
     let dir = b.yaw + (rnd() - 0.5) * 2.2;
     if (away > home.radius + 6) dir = Math.atan2(home.x - b.x, home.z - b.z) + (rnd() - 0.5);
     for (let k = 0; k < 6; k++) {
-      const tx = b.x + Math.sin(dir) * hops * len;
-      const tz = b.z + Math.cos(dir) * hops * len;
+      const tx = b.x + Math.sin(dir) * hops * gait.stride;
+      const tz = b.z + Math.cos(dir) * hops * gait.stride;
       if (this.lawn(tx, tz)) {
         const S = b.step;
         [S[0], S[1], S[2], S[3]] = [b.x, b.z, tx, tz];
         b.steps = hops;
         b.stepT = 0;
-        b.stepDur = hops * dur;
+        b.stepDur = hops * gait.pace;
         break;
       }
       dir += Math.PI / 3 + rnd();
     }
-    b.nextStep = now + b.stepDur + between(rnd, sp.gait === 'run' ? [0.8, 2.5] : [0.3, 1.5]);
+    b.nextStep = now + b.stepDur + between(rnd, gait.pause);
   }
 
   // ---- drawing ------------------------------------------------------------------------------
 
-  /** Writes a bird's matrices into its species' buffers. */
-  private write(b: Bird): void {
-    const look = this.looks[b.look];
-    if (!look || b.slot >= look.capacity) return;
+  /**
+   * Writes a bird's matrices into its species' buffers: the parts whose pose changed since they were
+   * last written (all of them if it moved, the wings only while spread). Whether it wrote any.
+   */
+  private write(b: Bird): boolean {
+    const look = b.look;
+    if (!look || b.slot >= look.capacity) return false;
+    const w = b.drawn;
+    const moved =
+      changed(w[Pose.X], b.x, STILL_M) || changed(w[Pose.Y], b.y, STILL_M) || changed(w[Pose.Z], b.z, STILL_M) ||
+      changed(w[Pose.Yaw], b.yaw, STILL_RAD) || changed(w[Pose.Pitch], b.pitch, STILL_RAD) || changed(w[Pose.Roll], b.roll, STILL_RAD);
+    let parts = moved ? ALL_PARTS : 0;
+    if (!moved) {
+      if (changed(w[Pose.Puff], b.puff, STILL_SCALE)) parts |= 1 << BODY;
+      if (changed(w[Pose.Hy], b.hy, STILL_RAD) || changed(w[Pose.Hp], b.hp, STILL_RAD) || changed(w[Pose.Hr], b.hr, STILL_RAD) || changed(w[Pose.Bob], b.bob, STILL_M)) parts |= 1 << HEAD;
+      if (changed(w[Pose.Tail], b.tail, STILL_RAD)) parts |= 1 << TAIL;
+    }
+    // Shut wings are hidden (scaled to nothing): written as they shut, open, or beat.
+    const wings = changed(w[Pose.Spread], b.spread, STILL_SCALE) || (b.spread > 0 && (moved || changed(w[Pose.Flap], b.flap, STILL_RAD)));
+    if (wings) parts |= (1 << WING_L) | (1 << WING_R);
+    else parts &= ~((1 << WING_L) | (1 << WING_R));
+    if (!parts) return false;
     const o = b.slot * 16;
     const s = b.size;
     // Placed by the body's middle (it pitches and rolls about that), feet down.
-    Quaternion.RotationYawPitchRollToRef(b.yaw, b.pitch, b.roll, this.q);
-    Matrix.ComposeToRef(this.vS.set(s, s, s), this.q, this.vT.set(b.x, b.y + look.centre * s, b.z), this.world);
-    const W = this.world.m;
-    const base = this.base;
-    for (let i = 0; i < 16; i++) base[i] = W[i];
-    base[12] -= look.centre * W[4];
-    base[13] -= look.centre * W[5];
-    base[14] -= look.centre * W[6];
-    // Body (puffed up about its middle).
-    const P = this.pose;
-    this.identity(P, b.puff);
-    this.pivot(P, 0, look.centre, 0);
-    mul(P, base, look.buffers[BODY], o);
-    // Head: yaw, pitch and a cock of it about the neck, and a dove's bob.
-    Matrix.RotationYawPitchRollToRef(b.hy, b.hp, b.hr, this.rot);
-    this.fromRot(this.rot, 1);
-    const n = look.pivots[HEAD];
-    this.pivot(P, n.x, n.y, n.z);
-    P[14] += b.bob;
-    mul(P, base, look.buffers[HEAD], o);
-    // Tail: up and down about its base.
-    Matrix.RotationXToRef(b.tail, this.rot);
-    this.fromRot(this.rot, 1);
-    const t = look.pivots[TAIL];
-    this.pivot(P, t.x, t.y, t.z);
-    mul(P, base, look.buffers[TAIL], o);
-    // Spread wings: beating about the shoulders (up: the tips rise), hidden while shut.
-    for (let part = WING_L; part <= WING_R; part++) {
-      const sign = part === WING_L ? -1 : 1;
-      Matrix.RotationZToRef(sign * b.flap, this.rot);
-      this.fromRot(this.rot, b.spread);
-      const w = look.pivots[part];
-      this.pivot(P, w.x, w.y, w.z);
-      mul(P, base, look.buffers[part], o);
+    Quaternion.RotationYawPitchRollToRef(b.yaw, b.pitch, b.roll, qTurn);
+    Matrix.ComposeToRef(vScale.setAll(s), qTurn, vAt.set(b.x, b.y + look.centre * s, b.z), mWorld);
+    Matrix.TranslationToRef(0, -look.centre, 0, mPose).multiplyToRef(mWorld, mBase);
+    if (parts & (1 << BODY)) {
+      // Puffed up about its middle.
+      Matrix.ScalingToRef(b.puff, b.puff, b.puff, mPose);
+      put(about(mPose, vBody.set(0, look.centre, 0)), look.buffers[BODY], o);
+      w[Pose.Puff] = b.puff;
     }
-    look.dirty = true;
-  }
-
-  private identity(P: Float32Array, s: number): void {
-    P.fill(0);
-    P[0] = P[5] = P[10] = s;
-    P[15] = 1;
-  }
-
-  /** The pose's rotation part from `m`, scaled by `s`. */
-  private fromRot(m: Matrix, s: number): void {
-    const R = m.m;
-    const P = this.pose;
-    for (let i = 0; i < 12; i++) P[i] = (i + 1) % 4 === 0 ? 0 : R[i] * s;
-    P[15] = 1;
-  }
-
-  /** Makes the pose turn about (x, y, z) rather than the origin. */
-  private pivot(P: Float32Array, x: number, y: number, z: number): void {
-    P[12] = x - (x * P[0] + y * P[4] + z * P[8]);
-    P[13] = y - (x * P[1] + y * P[5] + z * P[9]);
-    P[14] = z - (x * P[2] + y * P[6] + z * P[10]);
-  }
-
-  /** The species' model, its nodes as parts (null without its file, or if that fails). */
-  private lookOf(i: number): Promise<Look | null> {
-    const done = this.looks[i];
-    if (done) return Promise.resolve(done);
-    const building = this.building[i];
-    if (building) return building;
-    const sp = SPECIES[i];
-    const key = `model.bird.${sp.id}`;
-    const entry = this.assets.get(key, 'model') as BirdExtras | undefined;
-    const made = (async (): Promise<Look | null> => {
-      const template = entry ? await buildModelParts(this.scene, `bird:${sp.id}`, entry, PARTS) : null;
-      if (template?.meshes.length && template.motion) return this.lookFrom(sp, entry!, template);
-      for (const mesh of template?.meshes ?? []) mesh.dispose(false, false);
-      return null;
-    })().then((look) => {
-      this.building[i] = null;
-      this.looks[i] = look;
-      return look;
-    });
-    this.building[i] = made;
-    return made;
-  }
-
-  private lookFrom(sp: Species, entry: BirdExtras, template: ModelTemplate): Look {
-    const meshes: Mesh[][] = PARTS.map(() => []);
-    template.meshes.forEach((mesh, k) => meshes[Math.max(0, template.motion!.parts[k])].push(mesh));
-    const pivots = PARTS.map((_, k) => template.motion!.rests?.[k]?.getTranslation() ?? Vector3.Zero());
-    const bird = entry.bird ?? {};
-    return this.ready({
-      sp, meshes, pivots, buffers: [], capacity: 0, count: 0, dirty: false,
-      centre: bird.perchHeight ?? template.height * 0.45,
-      pitch: ((bird.pitch ?? 0) * Math.PI) / 180,
-      length: bird.length ?? sp.length,
-    });
-  }
-
-  private ready(look: Look): Look {
-    for (const list of look.meshes) {
-      for (const mesh of list) {
-        mesh.isPickable = false;
-        mesh.receiveShadows = true;
-        mesh.alwaysSelectAsActiveMesh = true;
-        mesh.doNotSyncBoundingInfo = true;
-        mesh.setEnabled(false);
+    if (parts & (1 << HEAD)) {
+      // Yaw, pitch and a cock of it about the neck, and a dove's bob.
+      Matrix.RotationYawPitchRollToRef(b.hy, b.hp, b.hr, mPose);
+      put(about(mPose, look.pivots[HEAD], b.bob), look.buffers[HEAD], o);
+      w[Pose.Hy] = b.hy;
+      w[Pose.Hp] = b.hp;
+      w[Pose.Hr] = b.hr;
+      w[Pose.Bob] = b.bob;
+    }
+    if (parts & (1 << TAIL)) {
+      // Up and down about its base.
+      Matrix.RotationXToRef(b.tail, mPose);
+      put(about(mPose, look.pivots[TAIL]), look.buffers[TAIL], o);
+      w[Pose.Tail] = b.tail;
+    }
+    if (wings) {
+      // Beating about the shoulders (up: the tips rise), hidden while shut.
+      for (let part = WING_L; part <= WING_R; part++) {
+        Matrix.ScalingToRef(b.spread, b.spread, b.spread, mPose).multiplyToRef(Matrix.RotationZToRef((part === WING_L ? -1 : 1) * b.flap, mTurn), mPose);
+        put(about(mPose, look.pivots[part]), look.buffers[part], o);
       }
+      w[Pose.Spread] = b.spread;
+      w[Pose.Flap] = b.flap;
     }
-    return look;
+    if (moved) {
+      w[Pose.X] = b.x;
+      w[Pose.Y] = b.y;
+      w[Pose.Z] = b.z;
+      w[Pose.Yaw] = b.yaw;
+      w[Pose.Pitch] = b.pitch;
+      w[Pose.Roll] = b.roll;
+    }
+    look.dirty |= parts;
+    return true;
   }
 
-  /** Gives a species' parts room for `count` birds (each written when it's next placed). */
+  /** The species' model, its nodes as parts (no meshes without its file, or if that fails: built again when it comes). */
+  private lookOf(sp: Species): Promise<Look> {
+    const key = `model.bird.${sp.id}`;
+    return this.looks.get(key, async () => {
+      const entry = this.assets.get(key, 'model') as BirdEntry | undefined;
+      const template = await buildModel(this.scene, `bird:${sp.id}`, entry, [1, 1], { parts: PARTS });
+      if (entry && template.meshes.length && template.motion) return lookFrom(entry, template);
+      for (const mesh of template.meshes) mesh.dispose(false, false);
+      return { meshes: [], parts: [], buffers: [], pivots: [], centre: 0, pitch: 0, length: 0, capacity: 0, count: 0, dirty: 0, failed: template.failed };
+    });
+  }
+
+  /** Gives a species' parts room for `count` birds (each written whole when it's next placed). */
   private size(look: Look, count: number): void {
     look.count = count;
     if (count > look.capacity || count === 0) {
       look.capacity = Math.max(1, count);
       look.buffers = PARTS.map(() => new Float32Array(look.capacity * 16));
     }
-    look.meshes.forEach((list, k) => {
+    look.parts.forEach((list, k) => {
       for (const mesh of list) {
         mesh.thinInstanceSetBuffer('matrix', look.buffers[k], 16, false);
         mesh.thinInstanceCount = count;
         mesh.setEnabled(this.visible && count > 0);
       }
     });
-    for (const b of this.birds) if (b.look >= 0 && this.looks[b.look] === look) this.write(b);
-    look.dirty = true;
-  }
-
-  private dropLook(i: number): void {
-    const look = this.looks[i];
-    this.looks[i] = null;
-    for (const list of look?.meshes ?? []) for (const mesh of list) mesh.dispose(false, false);
+    for (const b of this.birds) if (b.look === look) b.drawn[0] = NaN;
   }
 }
 
-/** out[o..o+16] = a × b (row vectors, as Babylon's matrices). */
-function mul(a: Float32Array, b: Float32Array, out: Float32Array, o: number): void {
-  for (let r = 0; r < 4; r++) {
-    const a0 = a[r * 4];
-    const a1 = a[r * 4 + 1];
-    const a2 = a[r * 4 + 2];
-    const a3 = a[r * 4 + 3];
-    out[o + r * 4] = a0 * b[0] + a1 * b[4] + a2 * b[8] + a3 * b[12];
-    out[o + r * 4 + 1] = a0 * b[1] + a1 * b[5] + a2 * b[9] + a3 * b[13];
-    out[o + r * 4 + 2] = a0 * b[2] + a1 * b[6] + a2 * b[10] + a3 * b[14];
-    out[o + r * 4 + 3] = a0 * b[3] + a1 * b[7] + a2 * b[11] + a3 * b[15];
+/** A species' look from its model, its parts hidden until it has birds. */
+function lookFrom(entry: BirdEntry, template: ModelTemplate): Look {
+  const parts: Mesh[][] = PARTS.map(() => []);
+  template.meshes.forEach((mesh, k) => parts[Math.max(0, template.motion!.parts[k])].push(mesh));
+  for (const mesh of template.meshes) {
+    mesh.isPickable = false;
+    mesh.receiveShadows = true;
+    mesh.alwaysSelectAsActiveMesh = true;
+    mesh.doNotSyncBoundingInfo = true;
+    mesh.setEnabled(false);
   }
+  return {
+    meshes: template.meshes, parts, buffers: [], capacity: 0, count: 0, dirty: 0,
+    pivots: PARTS.map((_, k) => template.motion!.rests?.[k]?.getTranslation() ?? Vector3.Zero()),
+    centre: entry.bird.perchHeight,
+    pitch: (entry.bird.pitch * Math.PI) / 180,
+    length: entry.bird.length,
+  };
+}
+
+/**
+ * The viewed house's roof ridge as the birds' perches: the roofs' highest points (`roofs`' vertices
+ * in the world), a perch every half metre along them from end to end; and the roof's top (m), null
+ * without a roof.
+ */
+export function roofRidge(roofs: readonly Mesh[]): { ridge: number[]; top: number | null } {
+  const p = new Vector3();
+  const each = (fn: (p: Vector3) => void) => {
+    for (const roof of roofs) {
+      const pos = roof.getVerticesData(VertexBuffer.PositionKind);
+      if (!pos) continue;
+      const m = roof.computeWorldMatrix(true);
+      for (let i = 0; i < pos.length; i += 3) fn(Vector3.TransformCoordinatesFromFloatsToRef(pos[i], pos[i + 1], pos[i + 2], m, p));
+    }
+  };
+  let top = -Infinity;
+  each((q) => (top = Math.max(top, q.y)));
+  if (top === -Infinity) return { ridge: [], top: null };
+  // Its ends: the top points' extent along it (a house's ridge runs along x or z), down its middle.
+  let [x0, x1, z0, z1] = [Infinity, -Infinity, Infinity, -Infinity];
+  each((q) => {
+    if (q.y <= top - 0.03) return;
+    x0 = Math.min(x0, q.x);
+    x1 = Math.max(x1, q.x);
+    z0 = Math.min(z0, q.z);
+    z1 = Math.max(z1, q.z);
+  });
+  const [mx, mz] = [(x0 + x1) / 2, (z0 + z1) / 2];
+  const [a, b] = x1 - x0 >= z1 - z0 ? [new Vector3(x0, top, mz), new Vector3(x1, top, mz)] : [new Vector3(mx, top, z0), new Vector3(mx, top, z1)];
+  const ridge: number[] = [];
+  const n = Math.floor(Math.hypot(b.x - a.x, b.z - a.z) / 0.5);
+  for (let k = 1; k < n; k++) ridge.push(a.x + ((b.x - a.x) * k) / n, a.y, a.z + ((b.z - a.z) * k) / n);
+  // A short ridge (a hipped roof's): its ends, and the point between.
+  if (n < 3) ridge.push(a.x, a.y, a.z, b.x, b.y, b.z);
+  return { ridge, top: Math.max(0, top) };
 }
