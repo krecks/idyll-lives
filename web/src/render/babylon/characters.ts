@@ -75,7 +75,7 @@ import { ENERGY_RATE, type VisemeTrack } from '../../voice/visemes';
 import { outfitFor, SHELL_BITS, WEARS, writeOutfit, type OutfitFit, type OutfitParams, type Wear } from './characters/outfit';
 import { BLANKET_WIDTH, blanketMaterial, buildBlanket, quiltTint, type BlanketShape } from './characters/blanket';
 import { BUNK_DOWN, BUNK_UP, RIDE_HORSE, RIDE_ROUND, RIDE_SEESAW, RIDE_SPRING, RIDE_SWING, SLIDE } from './characters/clips/rides';
-import { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } from './characters/clips/street';
+import { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN, type Size } from './characters/clips/street';
 import { FLOOR_SITS } from './characters/clips/seated';
 import { BALL_PIT, PLAY_TENT } from './characters/clips/play';
 import { BOULDER, FOOS, FOOS_LANES, foosClip, POOL, SMASH, YOGA_AT } from './characters/clips/games';
@@ -316,38 +316,40 @@ interface StepIn {
   over?: { at: number; h: number };
   square?: boolean;
 }
+/** `StepIn.by` from a clip's sizes, each from its shortest resident up: the size's clip, or the clips `clips` plays for it. */
+const bySize = (sizes: readonly Size[], clips: (clip: string) => readonly string[] = (clip) => [clip]): StepIn['by'] => sizes.map(({ clip, min, fit }) => [min, clips(clip), fit] as const);
 /** Eating a picked fruit (after the pick), bite by bite. */
 const EAT_FRUIT = ['eat', 'idle', 'eat', 'idle', 'eat', 'idle'];
 const STEP_IN: Record<string, StepIn> = {
-  drinkingFountain: { by: FOUNTAIN.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
+  drinkingFountain: { by: bySize(FOUNTAIN) },
   // Onto its floor (the plinth, 12 cm), facing the phone at the back.
   phoneBooth: { by: [[0, ['phone'], { to: -0.04, up: 0.12 }]], wait: 1, back: 0.25, out: 0.25 },
   // Side by side on the net (0.9 m wide, from -0.75 m), each round over the deck and down the pole.
-  climbingFrame: { by: CLIMB.map(({ clip, min, fit }) => [min, CLIMB_LANES.map((_, lane) => climbClip(clip, lane)), fit] as const), lanes: CLIMB_LANES, perLane: true },
+  climbingFrame: { by: bySize(CLIMB, (clip) => CLIMB_LANES.map((_, lane) => climbClip(clip, lane))), lanes: CLIMB_LANES, perLane: true },
   // A round from the run-out's foot: round to the ladder, up it, down the chute and back (`clips/rides.ts`).
-  slide: { by: SLIDE.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
+  slide: { by: bySize(SLIDE) },
   // Games and sport up against the thing (`clips/games.ts`): bent over the pool table's long rail (two players, one
   // on each long side), at a pair of the foosball rods (one each side), at the plate stack and the crate, up on the bouldering wall's crash
   // mat, and on the yoga mat's front end, facing along it.
-  poolTable: { by: POOL.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: [-0.55, 0.55], sides: true },
-  foosball: { by: FOOS.map(({ clip, min, fit }) => [min, FOOS_LANES.map((_, lane) => foosClip(clip, lane)), fit] as const), lanes: FOOS_LANES, perLane: true, square: true, sides: true },
-  'hotHeaded.smashBin': { by: SMASH.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
-  'energetic.boulderingWall': { by: BOULDER.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: [0] },
+  poolTable: { by: bySize(POOL), lanes: [-0.55, 0.55], sides: true },
+  foosball: { by: bySize(FOOS, (clip) => FOOS_LANES.map((_, lane) => foosClip(clip, lane))), lanes: FOOS_LANES, perLane: true, square: true, sides: true },
+  'hotHeaded.smashBin': { by: bySize(SMASH) },
+  'energetic.boulderingWall': { by: bySize(BOULDER), lanes: [0] },
   yogaMat: { by: [[0, ['yoga'], YOGA_AT]] },
   // Up to the board on the wall (its face 0.42 m behind the middle), writing on it at shoulder to head height
   // (clips/reach.ts); up to the wall cupboards over the worktop and the china cabinet, the doors opened and the
   // clean things put away up in them; to the clock's hood, winding it at the dial (a child at the trunk's chains).
-  whiteboard: { by: BOARD.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
-  ...Object.fromEntries(Object.entries(CUPBOARD_OF).map(([def, name]): [string, StepIn] => [def, { by: PUT_AWAY[name].map(({ clip, min, fit }) => [min, [clip], fit] as const), tag: 'fetch' }])),
-  grandfatherClock: { by: CLOCK.map(({ clip, min, fit }) => [min, [clip], fit] as const), tag: 'tinker' },
+  whiteboard: { by: bySize(BOARD) },
+  ...Object.fromEntries(Object.entries(CUPBOARD_OF).map(([def, name]): [string, StepIn] => [def, { by: bySize(PUT_AWAY[name]), tag: 'fetch' }])),
+  grandfatherClock: { by: bySize(CLOCK), tag: 'tinker' },
   // Out on the court (2.5 m from the hoop's middle, a lane each for two), shooting (clips/shot.ts).
-  basketballHoop: { by: SHOT.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: [-0.45, 0.45], tag: 'exercise' },
+  basketballHoop: { by: bySize(SHOT), lanes: [-0.45, 0.45], tag: 'exercise' },
   // Kneeling at the low train table's edge, the hands on its track and its little town, a lane each (clips/low.ts).
-  trainTable: { by: KNEEL_TABLE.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: KNEEL_LANES, tag: 'play' },
+  trainTable: { by: bySize(KNEEL_TABLE), lanes: KNEEL_LANES, tag: 'play' },
   // Into the shelter at the timetable's end, on the back glass past the bench.
   busStop: { by: [[0, [], { to: 0.05 }]], lanes: [-0.95] },
   // At the feeder's post, at its back left, clear of the bird bath: its house filled from a scoop (clips/reach.ts).
-  'kind.songbirdFeeder': { by: FEEDER.map(({ clip, min, fit }) => [min, [clip], fit] as const), lanes: [-0.2], tag: 'garden' },
+  'kind.songbirdFeeder': { by: bySize(FEEDER), lanes: [-0.2], tag: 'garden' },
   // At the microwave on the counter's right, the hands at its door.
   microwave: { by: [[0, [], { to: 0.55 }]], lanes: [-0.2] },
   // At the mic stand, singing into it.
@@ -355,15 +357,15 @@ const STEP_IN: Record<string, StepIn> = {
   // Up on the stage, each at a mic stand.
   'outgoing.karaokeStage': { by: [[0, [], { to: 0.36, up: 0.146 }]], lanes: [-0.36, 0.36] },
   // Bent down to the eyepiece of the tube aimed up (clips/uses.ts), from nearer than the tile.
-  telescope: { by: EYEPIECE.map(({ clip, min, fit }) => [min, [clip], fit] as const), tag: 'look' },
+  telescope: { by: bySize(EYEPIECE), tag: 'look' },
   // Picking the fruit hanging at the front (clips/uses.ts, fitted to where it hangs), then eating it; lemons are
   // picked for the kitchen (G-68), one after another.
-  'garden.apple': { by: PICK_APPLE.map(({ clip, min, fit }) => [min, [clip, ...EAT_FRUIT], fit] as const), tag: 'eat' },
-  'garden.lemonTree': { by: PICK_LEMON.map(({ clip, min, fit }) => [min, [clip], fit] as const), tag: 'harvest' },
+  'garden.apple': { by: bySize(PICK_APPLE, (clip) => [clip, ...EAT_FRUIT]), tag: 'eat' },
+  'garden.lemonTree': { by: bySize(PICK_LEMON), tag: 'harvest' },
   // Children's play (`clips/play.ts`): over the ball pit's rim into its middle, wading, jumping and sitting in the
   // balls; down at the play tent's door, crawling in to play on its mat and back out.
-  ballPit: { by: BALL_PIT.map(({ clip, min, fit }) => [min, [clip], fit] as const), over: BALL_PIT[0].fit.over },
-  playTent: { by: PLAY_TENT.map(({ clip, min, fit }) => [min, [clip], fit] as const) },
+  ballPit: { by: bySize(BALL_PIT), over: BALL_PIT[0].fit.over },
+  playTent: { by: bySize(PLAY_TENT) },
 };
 /** One clip played alone (`StepIn.perLane`), by name. */
 const LANE_SEQ = new Map<string, readonly string[]>();
