@@ -11,7 +11,7 @@
 
 import { cycle, mix, type ClipDef, type PoseSpec, type Vec } from './dsl';
 import { bump, hangArms, stand, TAU, type StandOptions } from './idle';
-import { armIK, smooth, wrist, type ArmOptions } from './ik';
+import { armIK, lerpV, smooth, wrist, type ArmOptions } from './ik';
 
 /** A hand placed by IK (`at`: the palm centre), weighted `w` (default 1) against the hanging arm. */
 type Hand = ArmOptions & { at: Vec; w?: number };
@@ -54,10 +54,6 @@ function body(p: number, o: StandOptions): PoseSpec {
   return stand({ breath: p, ...o });
 }
 
-/** A place eased from `a` to `b` by `t`. */
-function to(a: Vec, b: Vec, t: number): Vec {
-  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
-}
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 /** Compliment: the right hand opens out to the other, palm up ("you look lovely"), then two light claps of delight. */
@@ -71,7 +67,7 @@ function complimentPose(p: number): PoseSpec {
     ...arms(
       b,
       { at: [-0.03 - 0.05 * beat, 1.22, 0.3], w: clap, pronate: 5, hand: wrist('l', -5) },
-      { at: to([0.26, 1.13 + 0.03 * Math.sin(p * TAU * 3), 0.36], [0.03 + 0.05 * beat, 1.22, 0.3], r.k), w: r.w, pronate: lerp(-80, 5, r.k), hand: wrist('r', lerp(-15, -5, r.k)) },
+      { at: lerpV([0.26, 1.13 + 0.03 * Math.sin(p * TAU * 3), 0.36], [0.03 + 0.05 * beat, 1.22, 0.3], r.k), w: r.w, pronate: lerp(-80, 5, r.k), hand: wrist('r', lerp(-15, -5, r.k)) },
     ),
     ...OPEN,
   };
@@ -85,8 +81,8 @@ function deepTalkPose(p: number): PoseSpec {
   return {
     ...arms(
       b,
-      { at: to([-0.03, 1.1, 0.25 + tap], [0.12, 1.12, 0.15], think), pole: [-0.3, -1, 0], pronate: 10 + 60 * think, hand: wrist('l', -20 + 45 * think) },
-      { at: to([0.03, 1.1, 0.25 + tap], [0.03, 1.44, 0.17], think), pole: [0.5, -1, 0.1], pronate: 10 - 30 * think, hand: wrist('r', -25 - 30 * think) },
+      { at: lerpV([-0.03, 1.1, 0.25 + tap], [0.12, 1.12, 0.15], think), pole: [-0.3, -1, 0], pronate: 10 + 60 * think, hand: wrist('l', -20 + 45 * think) },
+      { at: lerpV([0.03, 1.1, 0.25 + tap], [0.03, 1.44, 0.17], think), pole: [0.5, -1, 0.1], pronate: 10 - 30 * think, hand: wrist('r', -25 - 30 * think) },
     ),
     ...OPEN,
   };
@@ -115,7 +111,7 @@ function sweetTalkPose(p: number): PoseSpec {
     ...arms(
       b,
       { at: [-0.02, 1.2, 0.2], pole: [-0.5, -1, -0.1], pronate: 10, hand: wrist('l', 10) },
-      { at: to([0.03, 1.2, 0.22], [0.2, 1.22, 0.45], reach), pole: [0.5, -1, -0.1], pronate: 10 + 40 * reach, hand: wrist('r', 10 - 10 * reach) },
+      { at: lerpV([0.03, 1.2, 0.22], [0.2, 1.22, 0.45], reach), pole: [0.5, -1, -0.1], pronate: 10 + 40 * reach, hand: wrist('r', 10 - 10 * reach) },
     ),
     ...OPEN,
   };
@@ -133,7 +129,7 @@ function arguePose(p: number): PoseSpec {
     ...arms(
       b,
       { at: [-0.24 - 0.02 * shake, 1.18, 0.32], w: what, pronate: -80, hand: wrist('l', -20) },
-      { at: to([0.24 + 0.02 * shake, 1.18, 0.32], [0.12, 1.32 - 0.24 * down, 0.38], r.k), w: r.w, pronate: lerp(-80, 0, r.k), hand: wrist('r', lerp(-20, 0, r.k)) },
+      { at: lerpV([0.24 + 0.02 * shake, 1.18, 0.32], [0.12, 1.32 - 0.24 * down, 0.38], r.k), w: r.w, pronate: lerp(-80, 0, r.k), hand: wrist('r', lerp(-20, 0, r.k)) },
     ),
     ...OPEN,
   };
@@ -164,7 +160,7 @@ function apologizePose(p: number): PoseSpec {
     ...arms(
       b,
       { at: [-0.3, 1.04, 0.22], w: open, pronate: -80, hand: wrist('l', -15) },
-      { at: to([-0.05, 1.28, 0.14], [0.3, 1.04, 0.22], r.k), w: r.w, pole: [lerp(0.6, 0.4, r.k), -1, lerp(-0.3, -0.2, r.k)], pronate: lerp(20, -80, r.k), hand: wrist('r', lerp(15, -15, r.k)) },
+      { at: lerpV([-0.05, 1.28, 0.14], [0.3, 1.04, 0.22], r.k), w: r.w, pole: [lerp(0.6, 0.4, r.k), -1, lerp(-0.3, -0.2, r.k)], pronate: lerp(20, -80, r.k), hand: wrist('r', lerp(15, -15, r.k)) },
     ),
     ...OPEN,
   };
@@ -180,8 +176,8 @@ function jokePose(p: number): PoseSpec {
   return {
     ...arms(
       b,
-      { at: to([-0.13 - 0.03 * s, 1.15, 0.3], [-0.4, 1.3, 0.22], t.k), w: t.w, pronate: lerp(-40, -80, t.k), hand: wrist('l', -15) },
-      { at: to([0.13 - 0.03 * s, 1.15, 0.3], [0.4, 1.3, 0.22], t.k), w: t.w, pronate: lerp(-40, -80, t.k), hand: wrist('r', -15) },
+      { at: lerpV([-0.13 - 0.03 * s, 1.15, 0.3], [-0.4, 1.3, 0.22], t.k), w: t.w, pronate: lerp(-40, -80, t.k), hand: wrist('l', -15) },
+      { at: lerpV([0.13 - 0.03 * s, 1.15, 0.3], [0.4, 1.3, 0.22], t.k), w: t.w, pronate: lerp(-40, -80, t.k), hand: wrist('r', -15) },
     ),
     ...OPEN,
   };
@@ -198,7 +194,7 @@ function introducePose(p: number): PoseSpec {
     ...arms(
       b,
       { at: [0, 0, 0], w: 0 },
-      { at: to([0.01, 1.25, 0.15], [0.12, 1.05 + pump, 0.42], r.k), w: r.w, pole: [lerp(0.6, 0.4, r.k), -1, lerp(-0.3, -0.2, r.k)], pronate: lerp(20, 0, r.k), hand: wrist('r', lerp(10, -5, r.k)) },
+      { at: lerpV([0.01, 1.25, 0.15], [0.12, 1.05 + pump, 0.42], r.k), w: r.w, pole: [lerp(0.6, 0.4, r.k), -1, lerp(-0.3, -0.2, r.k)], pronate: lerp(20, 0, r.k), hand: wrist('r', lerp(10, -5, r.k)) },
     ),
     ...OPEN,
   };
@@ -211,8 +207,8 @@ function askPartnerPose(p: number): PoseSpec {
   return {
     ...arms(
       b,
-      { at: to([-0.02, 1.0, 0.16], [-0.14, 1.1, 0.36], ask), pole: [-0.4, -1, -0.1], pronate: -30 - 50 * ask, hand: wrist('l', 0) },
-      { at: to([0.02, 1.0, 0.17], [0.14, 1.1, 0.36], ask), pole: [0.4, -1, -0.1], pronate: -30 - 50 * ask, hand: wrist('r', 0) },
+      { at: lerpV([-0.02, 1.0, 0.16], [-0.14, 1.1, 0.36], ask), pole: [-0.4, -1, -0.1], pronate: -30 - 50 * ask, hand: wrist('l', 0) },
+      { at: lerpV([0.02, 1.0, 0.17], [0.14, 1.1, 0.36], ask), pole: [0.4, -1, -0.1], pronate: -30 - 50 * ask, hand: wrist('r', 0) },
     ),
     ...OPEN,
   };
@@ -229,7 +225,7 @@ function breakUpPose(p: number): PoseSpec {
     ...arms(
       b,
       { at: [-0.06 - 0.26 * apart, 1.12, 0.34], w: cut, pronate: 85, hand: wrist('l', -5) },
-      { at: to([0.06 + 0.02 * Math.sin(p * TAU * 6), 1.58, 0.16], [0.06 + 0.26 * apart, 1.12, 0.34], r.k), w: r.w, pole: [lerp(0.8, 0.4, r.k), -1, -0.2], pronate: lerp(-20, 85, r.k), hand: wrist('r', lerp(20, -5, r.k)) },
+      { at: lerpV([0.06 + 0.02 * Math.sin(p * TAU * 6), 1.58, 0.16], [0.06 + 0.26 * apart, 1.12, 0.34], r.k), w: r.w, pole: [lerp(0.8, 0.4, r.k), -1, -0.2], pronate: lerp(-20, 85, r.k), hand: wrist('r', lerp(20, -5, r.k)) },
     ),
     ...OPEN,
   };
@@ -246,8 +242,8 @@ function prankPose(p: number): PoseSpec {
   return {
     ...arms(
       b,
-      { at: to([-0.22, 1.55, 0.25], [-0.04, 1.08, 0.16], t.k), w: t.w, pronate: lerp(-90, 20, t.k), hand: wrist('l', lerp(-30, 0, t.k)) },
-      { at: to([0.22, 1.55, 0.25], [0.18, 1.25, 0.42], t.k), w: t.w, pronate: lerp(-90, 0, t.k), hand: wrist('r', lerp(-30, 0, t.k)) },
+      { at: lerpV([-0.22, 1.55, 0.25], [-0.04, 1.08, 0.16], t.k), w: t.w, pronate: lerp(-90, 20, t.k), hand: wrist('l', lerp(-30, 0, t.k)) },
+      { at: lerpV([0.22, 1.55, 0.25], [0.18, 1.25, 0.42], t.k), w: t.w, pronate: lerp(-90, 0, t.k), hand: wrist('r', lerp(-30, 0, t.k)) },
     ),
     ...mix(OPEN, CLAW, boo),
   };

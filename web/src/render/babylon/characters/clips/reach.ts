@@ -14,7 +14,7 @@
 import { cycle, mix, reference, type ClipDef, type PoseSpec, type Vec } from './dsl';
 import { track, tiptoe, type Key } from './games';
 import { bump, hangArms, stand, TAU } from './idle';
-import { armIK, footIK, len, pointOn, smooth, sub, wrist, type ArmOptions } from './ik';
+import { armIK, footIK, len, lerpV, pointOn, smooth, sub, wrist, type ArmOptions } from './ik';
 import { SHARES_177, sizes, type Fit, type Size } from './street';
 
 /** The smallest share that reaches a wall cupboard's pulls or the clock's dial (a teen's; a child's doesn't). */
@@ -58,10 +58,6 @@ const AHEAD: Vec = [0, 1.45, 1.5];
 const REST_L: Vec = [-0.2, 0.9, 0.06];
 const REST_R: Vec = [0.2, 0.9, 0.06];
 
-function lerp3(a: Vec, b: Vec, k: number): Vec {
-  return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
-}
-
 /**
  * The body for reaching the hands' places (a null hand hangs): how far up on tiptoe, the shoulder lifted and
  * leant in, the least that brings each place within reach, found by halving along one path (a place above the
@@ -71,8 +67,8 @@ function lerp3(a: Vec, b: Vec, k: number): Vec {
  */
 function upFor(l: Hand | null, r: Hand | null, look: Vec | null, p: number, o: { lean?: number; shift?: number; tip?: boolean } = {}): PoseSpec {
   const goals: [side: 'l' | 'r', at: Vec][] = [];
-  if (l) goals.push(['l', lerp3(REST_L, l.at, l.w ?? 1)]);
-  if (r) goals.push(['r', lerp3(REST_R, r.at, r.w ?? 1)]);
+  if (l) goals.push(['l', lerpV(REST_L, l.at, l.w ?? 1)]);
+  if (r) goals.push(['r', lerpV(REST_R, r.at, r.w ?? 1)]);
   const top = Math.max(0, ...goals.map(([, g]) => g[1]));
   // (How much of the path is up on tiptoe: places above about the shoulders' height; how far it leans in: as
   // far as a place is out in front of the shoulders.)
@@ -115,7 +111,7 @@ function upFor(l: Hand | null, r: Hand | null, look: Vec | null, p: number, o: {
     // (On the way from hanging: placed along the way from the hanging palm, and blended from the hanging arm.)
     const from = pointOn(hang, `hand_${s}`, [ref.grip[0] * -sx, ref.grip[1], ref.grip[2]]);
     const bones = [`upperarm_${s}`, `lowerarm_${s}`, `hand_${s}`] as const;
-    return mix(Object.fromEntries(bones.map((b) => [b, hang[b]])) as PoseSpec, armIK(s, lerp3(from, h.at, w), body, opts), w);
+    return mix(Object.fromEntries(bones.map((b) => [b, hang[b]])) as PoseSpec, armIK(s, lerpV(from, h.at, w), body, opts), w);
   };
   return { ...hang, ...arm('l', l), ...arm('r', r) };
 }
@@ -302,7 +298,7 @@ function clockPose(fit: ClockFit): (p: number) => PoseSpec {
     const roll = 45 * Math.sin(((t - 0.6) / 0.35) * TAU) * turning;
     const r = handOn(R, t, { pronate: 20 + roll, pole: [0.8, -0.6, -0.2], hand: wrist('r', -15, 0) });
     const l = handOn(L, t, { pronate: 70, pole: [-0.8, -0.6, -0.2], hand: wrist('l', -10, 0) });
-    const look = lerp3(o(0, 1.77, -0.04), placed(R, Math.min(3.9, Math.max(0.55, t)))[0], bump(t, 0.25, 4.1, 0.3));
+    const look = lerpV(o(0, 1.77, -0.04), placed(R, Math.min(3.9, Math.max(0.55, t)))[0], bump(t, 0.25, 4.1, 0.3));
     return upFor(l, r, look, p);
   };
 }
@@ -353,7 +349,7 @@ function feederPose(fit: FeederFit): (p: number) => PoseSpec {
     const tip = bump(t, 1.05, 1.6, 0.15) + bump(t, 1.7, 2.25, 0.15);
     const r: Hand = { at: track(R, t), pronate: -20 + 90 * tip, pole: [0.8, -0.6, -0.3], hand: wrist('r', -10 + 10 * tip, 15 * tip) };
     const l = handOn(L, t, { pronate: 80, pole: [-0.8, -0.6, -0.3], hand: wrist('l', -10, 0) });
-    return upFor(l, r, lerp3(AHEAD, over, bump(t, 0.2, 3.1, 0.4)), p);
+    return upFor(l, r, lerpV(AHEAD, over, bump(t, 0.2, 3.1, 0.4)), p);
   };
 }
 
