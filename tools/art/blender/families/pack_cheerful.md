@@ -38,14 +38,43 @@ Deviations from the plan:
   hinge: swung, it would sweep through the backrest or out past the footprint;
 - the hammock's throw is left out (it read as a blob on the cupped sling).
 
-| Model | Size (w × h × d) | Triangles | Draws | Colour parts |
+## Detail pass (2026-10-22)
+
+Rebuilt with the forms and the kit (README "The toolkit"); keys, sizes, centres, parts, clips, motions, paint and
+draws as before. Triangles in the table below (was: before the pass).
+- `jukebox`: the cabinet and plinth extruded from rounded outlines; the arch one extruded piece with the window cut
+  through it, its bands stepping out; sunburst rays behind the record; the song cards in a chrome frame with rows
+  of titles; six turned push buttons in chrome rings; a moulded brass grille frame (`kit.moulding`) with chrome
+  bars bursting from a hub; turned feet, caps and collars on the bubble tubes; two grooves on the record.
+- `karaokeMachine`: a rounded cabinet with a band round its sides and front; each driver one turned piece (flange,
+  rolled surround painted in the trim colour, dished cone, dust cap); a rounded port; top knobs; bent carrying
+  handles; the screen in a rounded case on a hinged neck, a bouncing ball over the lyrics; the stage rug's border;
+  a weighted mic foot, clutch and screw; the spotlight's can turned with a lip, cooling fins, a yoke bent round it
+  with knobs; the mic's boom bent, a tapered handle and band.
+- `mocktailCart`: rounded shelves, each gallery one closed loop on spindles; turned finials, feet caps; a grip on
+  the handle; the canopy's stripes swept in an arch; a lofted jug with juice in its mouth, a spout and handle; ice
+  bucket handles; a lumpy pineapple with a crown of extruded leaves; a halved lemon; straws bent once; citrus
+  wheels on two rims; lofted syrup bottles with label bands and pourers; a rounded fridge drawer with a seam and
+  bar pull; a turned shaker with its cap.
+- `rainbowHammock`: the stand's beam, posts curving out and braces swept, rounded feet, turned post tops; the
+  sling's edges corded, tassels in the stripes' colours hanging from them; round spreader bars with ball ends;
+  rings and bent hooks; seven ropes a side; a stuffed pillow.
+- `sunriseLamp`: a stepped turned base, a collar on the stem, a dimmer on the foot; the case a turned drum with a
+  rolled edge; clouds in the dawn sky; a halo round the sun; the rolled mat's layers drawn as spirals on its ends; a
+  cork block.
+- `partyBooth`: a piped, stuffed seat; the backrest seven swept channels rolling over, piped along the top; piped
+  wings; each side of the frame one bent brass tube on a foot; a rounded marquee; the bulbs on wires; round and
+  square confetti; a rounded tablet; a striped popcorn bowl; both curtains pleated with a heading and a turned-up
+  hem.
+
+| Model | Size (w × h × d) | Triangles (2026-10-22) | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.cheerful.jukebox` | 0.75 × 1.43 × 0.50 m | 4,324 | 4 | Body, Trim |
-| `model.cheerful.karaokeMachine` | 0.76 × 1.76 × 0.85 m | 3,684 | 3 | Body, Trim, Rug |
-| `model.cheerful.mocktailCart` | 0.84 × 1.64 × 0.57 m | 6,852 | 3 | Body, Trim, Frame |
-| `model.cheerful.rainbowHammock` | 2.84 × 1.17 × 0.70 m | 3,048 | 3 | Body, Trim, Pillow |
-| `model.cheerful.sunriseLamp` | 0.78 × 1.64 × 0.87 m | 2,868 | 2 | Body, Trim, Mat |
-| `model.cheerful.partyBooth` | 1.90 × 1.64 × 1.83 m | 7,972 | 3 | Body, Trim, Curtain |
+| `model.cheerful.jukebox` | 0.75 × 1.43 × 0.50 m | 5,728 (was 4,324) | 4 | Body, Trim |
+| `model.cheerful.karaokeMachine` | 0.76 × 1.76 × 0.85 m | 4,688 (was 3,684) | 3 | Body, Trim, Rug |
+| `model.cheerful.mocktailCart` | 0.84 × 1.64 × 0.57 m | 6,638 (was 6,852) | 3 | Body, Trim, Frame |
+| `model.cheerful.rainbowHammock` | 2.84 × 1.17 × 0.70 m | 4,536 (was 3,048) | 3 | Body, Trim, Pillow |
+| `model.cheerful.sunriseLamp` | 0.78 × 1.64 × 0.87 m | 3,580 (was 2,868) | 2 | Body, Trim, Mat |
+| `model.cheerful.partyBooth` | 1.90 × 1.64 × 1.83 m | 7,652 (was 7,972) | 3 | Body, Trim, Curtain |
 
 The painted materials: the jukebox `cherry`, `amber`; the karaoke `speaker`, `speaker_trim`, `stage`; the cart
 `mint`, `canopy`, `brass`; the hammock `wood`, `spreader`, `pillow`; the lamp `housing`, `lamp_metal`, `yoga`; the

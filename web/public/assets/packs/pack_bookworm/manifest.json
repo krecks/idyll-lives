@@ -39,6 +39,9 @@
         "cushion": {
           "finish": "material.finish.satin"
         },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
         "fabric": {
           "finish": "material.finish.fabric"
         },
@@ -48,6 +51,9 @@
         "mug_a": {
           "finish": "material.finish.gloss"
         },
+        "page": {
+          "finish": "material.finish.matte"
+        },
         "panel": {
           "finish": "material.finish.wood"
         },
@@ -56,6 +62,9 @@
         },
         "pillow_b": {
           "finish": "material.finish.satin"
+        },
+        "tea": {
+          "finish": "material.finish.gloss"
         },
         "throw": {
           "finish": "material.finish.fabric"
@@ -124,6 +133,12 @@
         "honey": {
           "finish": "material.finish.wood"
         },
+        "land": {
+          "finish": "material.finish.satin"
+        },
+        "page": {
+          "finish": "material.finish.matte"
+        },
         "panel": {
           "finish": "material.finish.wood"
         }
@@ -176,11 +191,11 @@
         "cushion": {
           "finish": "material.finish.satin"
         },
-        "dark": {
-          "finish": "material.finish.satin"
-        },
         "honey": {
           "finish": "material.finish.wood"
+        },
+        "ink": {
+          "finish": "material.finish.gloss"
         },
         "lamp_amber": {
           "finish": "material.finish.satin"
@@ -199,6 +214,9 @@
         },
         "shade": {
           "finish": "material.finish.satin"
+        },
+        "tea": {
+          "finish": "material.finish.gloss"
         }
       },
       "motions": {
@@ -253,7 +271,13 @@
         "linen": {
           "finish": "material.finish.satin"
         },
+        "page": {
+          "finish": "material.finish.matte"
+        },
         "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "tea": {
           "finish": "material.finish.gloss"
         }
       },
@@ -324,6 +348,12 @@
         "log": {
           "finish": "material.finish.satin"
         },
+        "log_end": {
+          "finish": "material.finish.satin"
+        },
+        "page": {
+          "finish": "material.finish.matte"
+        },
         "porcelain": {
           "finish": "material.finish.gloss"
         },
@@ -338,6 +368,9 @@
         },
         "stone": {
           "finish": "material.finish.satin"
+        },
+        "tea": {
+          "finish": "material.finish.gloss"
         },
         "velvet": {
           "finish": "material.finish.fabric"
@@ -415,6 +448,9 @@
         },
         "shade": {
           "finish": "material.finish.satin"
+        },
+        "tea": {
+          "finish": "material.finish.gloss"
         }
       },
       "motions": {

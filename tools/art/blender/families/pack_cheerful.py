@@ -8,6 +8,10 @@
 # (`sway`, a loop they ride), the sun rises in the lamp's frame (`sunrise`; its sky glows at night) and the
 # booth's side curtain is drawn aside (`curtain`).
 #
+# Built with the forms and the kit (README "The toolkit"): bodies extruded from rounded outlines and bevelled,
+# chrome and brass bent in one sweep, turned and lofted glassware, stuffed and channelled upholstery (`F.soft`,
+# swept channels), pleated curtains with a heading and a hem.
+#
 # Run:  cargo art pack_cheerful [--only jukebox] [--preview]
 import math
 import os
@@ -15,6 +19,7 @@ import sys
 
 import bmesh
 import bpy
+from mathutils import Vector
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -97,6 +102,9 @@ M = G.Palette(
     bulb_d=('#8CC63F', 'gloss'),
     bulb_e=('#B8A1E3', 'gloss'),
     bulb_f=('#F28C28', 'gloss'),
+    # added with the detail pass
+    cloud=('#FFF1E2', 'satin'),        # the sunrise scene's clouds
+    cork=('#C9A27A', 'matte'),         # the yoga block
 )
 
 BULBS = ('bulb_a', 'bulb_b', 'bulb_c', 'bulb_d', 'bulb_e', 'bulb_f')   # by name: made anew after each reset
@@ -147,44 +155,86 @@ def _slab(F, name, pts, z0, z1, mat, bevel=0.0):
     return _obj(name, verts, faces, [mat], bevel=bevel)
 
 
-def _ring(F, name, outer, inner, z0, z1, mat):
-    """A flat frame between two outlines of as many points, `outer` round `inner`, from depth `z0` to `z1`."""
-    n = len(outer)
-    verts = [F.at(x, y, z1) for x, y in outer] + [F.at(x, y, z1) for x, y in inner]
-    verts += [F.at(x, y, z0) for x, y in outer] + [F.at(x, y, z0) for x, y in inner]
-    faces = []
-    for i in range(n):
-        j = (i + 1) % n
-        faces += [(i, j, n + j, n + i), (2 * n + i, 3 * n + i, 3 * n + j, 2 * n + j),
-                  (i, 2 * n + i, 2 * n + j, j), (n + i, n + j, 3 * n + j, 3 * n + i)]
-    return _obj(name, verts, faces, [mat])
-
-
 def _tomb(hw, yb, yc, n=18):
     """An arch-topped outline: straight sides `hw` either side of x = 0 from `yb` up to `yc`, a half circle over."""
     return [(-hw, yb), (hw, yb)] + [(hw * math.cos(math.pi * k / n), yc + hw * math.sin(math.pi * k / n))
                                     for k in range(n + 1)]
 
 
-def _pleats(F, name, x, y0, y1, z0, z1, folds, amp, mat, t=0.012):
-    """A pleated curtain hanging in the plane `x` from `y1` down to `y0`, along the depth `z0`..`z1`."""
-    steps = folds * 4
-    rows = []
-    for i in range(steps + 1):
-        z = z0 + (z1 - z0) * i / steps
-        dx = amp * math.sin(math.pi * 2 * i / 4)
-        rows.append([F.at(x + dx - t / 2, y1, z), F.at(x + dx + t / 2, y1, z),
-                     F.at(x + dx + t / 2, y0, z), F.at(x + dx - t / 2, y0, z)])
-    verts = [v for r in rows for v in r]
-    faces = [(0, 1, 2, 3), (4 * steps + 3, 4 * steps + 2, 4 * steps + 1, 4 * steps)]
-    for i in range(steps):
-        a, b = 4 * i, 4 * (i + 1)
-        faces += [(a + k, a + (k + 1) % 4, b + (k + 1) % 4, b + k) for k in range(4)]
-    return _obj(name, verts, faces, [mat], sharp=60)
+def _paint(obj, material, test):
+    """Gives the faces of `obj` whose middle (its own axes, Blender) passes `test` another material: a band, a
+    surround, a label, with no more triangles."""
+    obj.data.materials.append(material)
+    k = len(obj.data.materials) - 1
+    for p in obj.data.polygons:
+        if test(p.center):
+            p.material_index = k
+    return obj
+
+
+def _aim(obj, direction):
+    """Turns a part built along Blender +Z (a revolve) to point along `direction` (Blender)."""
+    obj.rotation_mode = 'QUATERNION'
+    obj.rotation_quaternion = Vector(direction).to_track_quat('Z', 'Y')
+    return obj
+
+
+def _around(F, name, w, d, r, y, z_back, front, profile, mat, corner=3):
+    """A band swept round a rounded block's front and sides (not its back, on the wall): the block `w` wide, from
+    depth `z_back` to `front`, its upright corners rounded by `r`, at height `y`. `profile` is the band's
+    cross-section (u up, v out)."""
+    zc = (z_back + front) / 2
+    loop = G.rounded_rect(w, front - z_back, r, corner=corner)
+    pts = [(x, y, zc + z) for x, z in loop]
+    # from the back of the right side round the front to the back of the left side
+    k = max(range(len(pts)), key=lambda i: (pts[i][2] < z_back + 0.02 and pts[i][0] > 0, -pts[i][2]))
+    pts = pts[k:] + pts[:k]
+    pts = [p for p in pts if p[2] > z_back + 0.015]
+    pts = [(pts[0][0], y, z_back + 0.005)] + pts + [(pts[-1][0], y, z_back + 0.005)]
+    return F.sweep(name, pts, None, mat, profile=profile, up=(0, 0, 1))
 
 
 def _bulb(F, x, y, z, k, r=0.028):
-    F.sphere(_name('bulb'), r, (x, y, z), getattr(M, BULBS[k % len(BULBS)]), segments=8, rings=6)
+    F.sphere(_name('bulb'), r, (x, y, z), getattr(M, BULBS[k % len(BULBS)]), segments=6, rings=4)
+
+
+def _pleats(F, name, x, y0, y1, z0, z1, folds, amp, mat, t=0.01, plane='x'):
+    """A pleated curtain hanging from `y1` (its heading) down to `y0` (its hem), along `z0`..`z1` in the plane at
+    `x` (or along x, `z0`..`z1` being x, in the plane at depth `x`: plane 'z'). Its folds are shallow under the
+    heading tape, deepen as it falls and drift a little; a turned-up hem thickens its foot."""
+    n = folds * 4
+    h = y1 - y0
+    rows = [(y0, 1.0, 1.5, 0.0), (y0 + 0.012, 1.0, 1.5, 0.02), (y0 + 0.04, 1.0, 1.0, 0.05), (y0 + h * 0.4, 0.92, 1.0, 0.25),
+            (y1 - 0.07, 0.72, 1.0, 0.4), (y1 - 0.06, 0.4, 1.3, 0.42), (y1, 0.36, 1.3, 0.42)]
+    verts, m = [], 0
+    for y, af, tf, phase in rows:
+        front = [(z0 + (z1 - z0) * k / n, amp * af * math.sin(2 * math.pi * folds * k / n + phase) + t * tf / 2)
+                 for k in range(n + 1)]
+        ring = front + [(u, o - t * tf) for u, o in reversed(front)]
+        m = len(ring)
+        verts += [F.at(x + o, y, u) if plane == 'x' else F.at(u, y, x + o) for u, o in ring]
+    faces = []
+    for r in range(len(rows) - 1):
+        a, b = r * m, (r + 1) * m
+        faces += [(a + i, a + (i + 1) % m, b + (i + 1) % m, b + i) for i in range(m)]
+    for base in (0, (len(rows) - 1) * m):   # the top and bottom edges across the cloth's thickness
+        faces += [(base + k, base + k + 1, base + m - 2 - k, base + m - 1 - k) for k in range(n)]
+    return _obj(name, verts, faces, [mat], sharp=70)
+
+
+def _tumbler(F, x, z, drink, y=None, h=0.11, r=0.034, straw=None, slice_=None):
+    """A tumbler full of `drink` (opaque: no glass draw): a thick clear foot, the drink, a clear rim, a bendy straw
+    and (`slice_`, a material) a citrus wheel on the rim."""
+    y = TOP if y is None else y
+    F.cyl(_name('tumbler_foot'), r * 0.85, 0.012, (x, y + 0.006, z), M.tumbler, verts=12)
+    G.revolve(_name('tumbler'), [(0, 0), (r * 0.86, 0), (r * 0.98, h - 0.012), (0, h - 0.012)],
+              at=F.at(x, y + 0.012, z), material=drink, segments=12)
+    G.torus(_name('rim'), r * 0.98, 0.004, at=F.at(x, y + h, z), material=M.tumbler, major_segments=12, minor_segments=3)
+    G.kit.tube(F, _name('straw'), G.kit.fillet([(x + 0.008, y + 0.03, z), (x + 0.018, y + h + 0.04, z - 0.006),
+                                                (x + 0.045, y + h + 0.06, z - 0.01)], 0.01, steps=2),
+               0.0035, straw or M.coral, verts=5, round=1)
+    if slice_:
+        F.cyl(_name('slice'), 0.024, 0.006, (x - r * 0.9, y + h - 0.004, z), slice_, rot=(0, 0, 90), verts=12)
 
 
 # --- the sunburst jukebox (1x1): an arch-topped cabinet, a record window, bubble tubes either side -------------
@@ -194,42 +244,79 @@ ARCH = 1.08     # the height of the arch's centre
 def jukebox():
     F = G.GameFrame()
     zf = WALL + 0.46      # the cabinet's front
+    zc = WALL + 0.23
     with G.new_parts() as still:
-        F.box('plinth', 0.74, 0.08, 0.48, (0, 0.04, WALL + 0.24), M.chrome, bevel=0.015)
-        F.box('cabinet', 0.7, 0.8, 0.46, (0, 0.48, WALL + 0.23), M.cherry, bevel=0.03, bevel_segments=3)
-        F.box('belt', 0.71, 0.03, 0.47, (0, 0.865, WALL + 0.235), M.chrome, bevel=0.008)
-        # the arched top round the record window, its bands stepping out, a cavity behind it
-        _ring(F, 'arch', _tomb(0.35, 0.88, ARCH), _tomb(0.2, 0.9, ARCH), WALL, zf, M.cherry)
-        _ring(F, 'arch_band', _tomb(0.3, 0.885, ARCH), _tomb(0.25, 0.895, ARCH), zf, zf + 0.022, M.amber)
-        _ring(F, 'arch_inner', _tomb(0.25, 0.895, ARCH), _tomb(0.2, 0.9, ARCH), zf, zf + 0.012, M.sunny)
+        F.extrude('plinth', G.rounded_rect(0.74, 0.48, 0.04, corner=2), 0.08, (0, 0.04, WALL + 0.24), M.chrome,
+                  plane='top', bevel=0.012, bevel_segments=2)
+        F.extrude('cabinet', G.rounded_rect(0.7, 0.46, 0.05, corner=3), 0.8, (0, 0.48, zc), M.cherry, plane='top',
+                  bevel=0.02, bevel_segments=2)
+        _around(F, 'belt', 0.712, 0.47, 0.055, 0.865, WALL, zf + 0.006, G.rounded_rect(0.03, 0.012, 0.005, corner=1),
+                M.chrome)
+        # the arched top round the record window, its bands stepping out, a sunburst on the window's back
+        F.extrude('arch', _tomb(0.35, 0.88, ARCH), 0.46, (0, 0, zc), M.cherry, holes=[_tomb(0.2, 0.9, ARCH)],
+                  bevel=0.02, bevel_segments=2)
+        F.extrude('arch_band', _tomb(0.3, 0.885, ARCH), 0.022, (0, 0, zf + 0.011), M.amber,
+                  holes=[_tomb(0.25, 0.895, ARCH)], bevel=0.005, bevel_segments=1)
+        F.extrude('arch_inner', _tomb(0.25, 0.895, ARCH), 0.012, (0, 0, zf + 0.006), M.sunny,
+                  holes=[_tomb(0.2, 0.9, ARCH)])
         _slab(F, 'window', _tomb(0.2, 0.9, ARCH), WALL, WALL + 0.04, M.window)
-        for k in range(3):                                           # the record stack in the window's foot
-            F.cyl(_name('stack'), 0.13, 0.008, (0, 0.906 + 0.009 * k, -0.17), M.vinyl, verts=28)
-        F.cyl('stack_label', 0.04, 0.03, (0, 0.92, -0.17), M.label, verts=16)
-        # the front: song cards under a chrome bar, four buttons, a speaker cloth in a brass frame
-        F.box('cards', 0.46, 0.1, 0.02, (0, 0.71, zf + 0.008), M.cards, bevel=0.006)
-        F.box('cards_bar', 0.48, 0.014, 0.026, (0, 0.768, zf + 0.01), M.chrome, bevel=0.005)
-        for k, (x, m) in enumerate(((-0.15, M.label), (-0.05, M.coral), (0.05, M.mint), (0.15, M.sky))):
-            F.cyl(_name('button'), 0.017, 0.03, (x, 0.625, zf + 0.012), m, rot=(90, 0, 0), verts=12)
-        F.box('grille_frame', 0.52, 0.32, 0.016, (0, 0.4, zf + 0.004), M.brass, bevel=0.01)
-        F.box('grille', 0.48, 0.28, 0.016, (0, 0.4, zf + 0.01), M.grille, bevel=0.006)
-        for x in (-0.12, 0.0, 0.12):                                 # chrome slats over the cloth
-            F.box(_name('slat'), 0.012, 0.28, 0.012, (x, 0.4, zf + 0.022), M.chrome, bevel=0.004)
-        # the bubble tubes at the front corners, chrome capped
+        for k in range(9):                                          # rays from behind the record
+            a = math.radians(10 + 20 * k)
+            F.box(_name('ray'), 0.012, 0.2, 0.004, (0.14 * math.cos(a), 0.92 + 0.14 * math.sin(a), WALL + 0.042),
+                  M.sunny, rot=(0, math.degrees(a) - 90, 0))
+        for k in range(3):                                          # the record stack in the window's foot
+            F.cyl(_name('stack'), 0.13, 0.008, (0, 0.906 + 0.009 * k, -0.17), M.vinyl, verts=24)
+        F.cyl('stack_label', 0.04, 0.03, (0, 0.92, -0.17), M.label, verts=12)
+        F.cyl('spindle', 0.006, 0.05, (0, 0.94, -0.17), M.chrome, verts=6)
+        # the song cards in a chrome frame, two rows of titles; a row of push buttons under it
+        F.extrude('cards_frame', G.rounded_rect(0.48, 0.12, 0.012, corner=2), 0.016, (0, 0.71, zf + 0.008), M.chrome,
+                  holes=[G.rounded_rect(0.44, 0.09, 0.006, corner=1)], bevel=0.003, bevel_segments=1)
+        F.box('cards', 0.44, 0.09, 0.01, (0, 0.71, zf + 0.004), M.cards)
+        for r, y in enumerate((0.73, 0.69)):
+            for k in range(5):
+                F.box(_name('title'), 0.06, 0.008, 0.002, (-0.17 + 0.085 * k, y, zf + 0.01), (M.coral, M.window)[(k + r) % 2])
+        for k, (x, m) in enumerate(((-0.15, M.label), (-0.09, M.coral), (-0.03, M.mint), (0.03, M.sky), (0.09, M.label),
+                                    (0.15, M.coral))):
+            G.revolve(_name('button'), [(0, 0), (0.016, 0), (0.016, 0.01), (0.012, 0.018), (0, 0.02)],
+                      at=F.at(x, 0.625, zf), material=m, segments=10, rot=(90, 0, 0))
+            G.torus(_name('button_ring'), 0.018, 0.003, at=F.at(x, 0.625, zf + 0.002), material=M.chrome, rot=(90, 0, 0),
+                    major_segments=10, minor_segments=3)
+        # the speaker: cloth in a moulded brass frame, chrome bars bursting out from its foot
+        G.kit.moulding(F, 'grille_frame', [(-0.26, 0.24), (0.26, 0.24), (0.26, 0.56), (-0.26, 0.56)],
+                       [(0.0, 0.0), (0.0, 0.01), (0.008, 0.016), (0.02, 0.016), (0.026, 0.008), (0.026, 0.0)], M.brass,
+                       at=zf)
+        F.box('grille', 0.48, 0.28, 0.012, (0, 0.4, zf + 0.004), M.grille)
+        for k in range(7):
+            a = math.radians(30 + 20 * k)
+            c, s = math.cos(a), math.sin(a)
+            reach = min((0.235 / abs(c)) if abs(c) > 1e-3 else 9, 0.29 / s)
+            F.sweep(_name('burst'), [(0.03 * c, 0.255 + 0.03 * s, zf + 0.014), (reach * c, 0.255 + reach * s, zf + 0.014)],
+                    None, M.chrome, profile=G.rounded_rect(0.008, 0.01, 0.003, corner=1), up=(0, 0, 1))
+        F.cyl('burst_hub', 0.04, 0.012, (0, 0.255, zf + 0.012), M.chrome, rot=(90, 0, 0), verts=12)
+        # the bubble tubes at the front corners: turned chrome feet and caps, collars, bubbles rising in them
         for s in (-1, 1):
-            G.revolve(_name('tube'), [(0, 0), (0.035, 0), (0.035, 0.86), (0, 0.86)], at=F.at(s * 0.33, 0.12, zf - 0.01),
-                      material=M.amber, segments=16)
-            F.cyl(_name('tube_foot'), 0.045, 0.05, (s * 0.33, 0.12, zf - 0.01), M.chrome, verts=16, bevel=0.01)
-            F.sphere(_name('tube_cap'), 0.045, (s * 0.33, 1.0, zf - 0.01), M.chrome, segments=14, rings=8)
+            x, z = s * 0.33, zf - 0.01
+            G.revolve(_name('tube'), [(0, 0), (0.035, 0), (0.035, 0.86), (0, 0.86)], at=F.at(x, 0.12, z),
+                      material=M.amber, segments=14)
+            G.revolve(_name('tube_foot'), [(0, 0), (0.045, 0), (0.046, 0.02), (0.04, 0.035), (0.042, 0.05), (0, 0.05)],
+                      at=F.at(x, 0.095, z), material=M.chrome, segments=14)
+            G.revolve(_name('tube_cap'), [(0, 0), (0.042, 0), (0.046, 0.016), (0.04, 0.03), (0.024, 0.046),
+                                          (0.012, 0.062), (0.016, 0.072), (0, 0.08)], at=F.at(x, 0.97, z),
+                      material=M.chrome, segments=14)
+            for y in (0.4, 0.68):
+                G.torus(_name('tube_collar'), 0.037, 0.006, at=F.at(x, y, z), material=M.chrome, major_segments=14,
+                        minor_segments=3)
             for k in range(5):                                       # bubbles rising in the tubes
-                F.sphere(_name('bubble'), 0.012, (s * 0.33, 0.25 + 0.15 * k + 0.04 * (k % 2), zf + 0.022),
-                         M.sunny, segments=8, rings=5)
+                F.sphere(_name('bubble'), 0.012, (x, 0.25 + 0.15 * k + 0.04 * (k % 2), z + 0.032), M.sunny, segments=6,
+                         rings=4)
     G.join(still, 'body', origin=(0, 0, 0))
     # The record on top of the stack, lying flat, hinged on its front edge: `record` swings it up into the window.
     zr = -0.17 + 0.13
     with G.new_parts() as rec:
         F.cyl('record', 0.13, 0.008, (0, 0.937, -0.17), M.vinyl, verts=32)
-        G.torus('record_groove', 0.095, 0.004, at=F.at(0, 0.941, -0.17), material=M.vinyl, major_segments=28, minor_segments=4)
+        for r in (0.07, 0.1):
+            G.torus(_name('record_groove'), r, 0.003, at=F.at(0, 0.941, -0.17), material=M.vinyl, major_segments=24,
+                    minor_segments=3)
     rec = G.hinged(G.join(rec, 'record'), F.at(0, 0.937, zr))
     # Its label, a part inside it: `spin` turns it (and a coral stripe across it, to see it turn) while the record plays.
     with G.new_parts() as lab:
@@ -253,71 +340,111 @@ def _tilt(c, ang, dy, dz):
 MIC = (0.18, 0.2)     # the mic stand's foot (x, depth)
 
 
+def _driver(F, name, y, z, r, segments=24):
+    """A speaker driver facing the front at height `y`, its flange on the face at depth `z`: a flange, a rolled
+    rubber surround, the cone dished in and a domed dust cap, one turned piece (the surround in the trim colour)."""
+    prof = [(r + 0.02, -0.01), (r + 0.02, 0.003), (r + 0.008, 0.005), (r + 0.002, 0.012), (r - 0.008, 0.016),
+            (r - 0.017, 0.011), (r - 0.022, 0.003), (r * 0.36, -0.04), (r * 0.33, -0.036), (r * 0.24, -0.028),
+            (r * 0.12, -0.023), (0, -0.022)]
+    d = G.revolve(name, prof, at=F.at(0, y, z), material=M.cone, segments=segments, rot=(90, 0, 0))
+    return _paint(d, M.speaker_trim, lambda c: math.hypot(c.x, c.y) > r - 0.024)
+
+
 def karaokeMachine():
     F = G.GameFrame()
     w, h, d = 0.5, 0.86, 0.415
     zf = WALL + d
     with G.new_parts() as still:
-        F.box('cabinet', w, h - 0.03, d, (0, 0.03 + (h - 0.03) / 2, WALL + d / 2), M.speaker, bevel=0.035, bevel_segments=3)
-        F.box('band', w + 0.006, 0.04, d + 0.004, (0, h - 0.12, WALL + d / 2 + 0.001), M.speaker_trim, bevel=0.01)
+        F.extrude('cabinet', G.rounded_rect(w, d, 0.05, corner=3), h - 0.03, (0, 0.03 + (h - 0.03) / 2, WALL + d / 2),
+                  M.speaker, plane='top', bevel=0.03, bevel_segments=2)
+        _around(F, 'band', w + 0.006, d, 0.053, h - 0.12, WALL, zf + 0.003, G.rounded_rect(0.04, 0.008, 0.003, corner=1),
+                M.speaker_trim)
         for fx in (-w / 2 + 0.06, w / 2 - 0.06):
             for fz in (WALL + 0.06, zf - 0.06):
-                F.cyl(_name('foot'), 0.025, 0.03, (fx, 0.015, fz), M.speaker_trim, verts=10)
-        for y, r in ((0.36, 0.17), (0.66, 0.075)):                       # woofer and tweeter
-            G.torus(_name('surround'), r, 0.016, at=F.at(0, y, zf + 0.004), material=M.speaker_trim, rot=(90, 0, 0),
-                    major_segments=28, minor_segments=6)
-            F.cone(_name('cone'), r * 0.95, r * 0.3, 0.05, (0, y, zf - 0.02), M.cone, rot=(-90, 0, 0), verts=28)
-            F.sphere(_name('dust_cap'), r * 0.32, (0, y, zf - 0.0), M.steel, scale=(1, 0.5, 1), segments=14, rings=8)
-        F.box('port', 0.22, 0.04, 0.012, (0, 0.11, zf + 0.002), M.cone, bevel=0.012)
-        F.box('light_strip', 0.3, 0.012, 0.006, (0, 0.15, zf + 0.004), M.label, bevel=0.003)
-        for s in (-1, 1):
-            F.box(_name('handle'), 0.012, 0.05, 0.14, (s * (w / 2 + 0.004), h - 0.25, WALL + d / 2), M.speaker_trim, bevel=0.005)
-        # the lyrics screen on a neck, leaning back
+                G.revolve(_name('foot'), [(0, 0), (0.022, 0), (0.026, 0.02), (0.022, 0.03), (0, 0.03)],
+                          at=F.at(fx, 0, fz), material=M.speaker_trim, segments=10)
+        _driver(F, 'woofer', 0.36, zf, 0.17)
+        _driver(F, 'tweeter', 0.66, zf, 0.075, segments=16)
+        F.extrude('port', G.rounded_rect(0.22, 0.04, 0.02, corner=3), 0.012, (0, 0.11, zf + 0.002), M.cone,
+                  holes=[G.rounded_rect(0.2, 0.024, 0.012, corner=3)])
+        F.box('port_hole', 0.2, 0.024, 0.004, (0, 0.11, zf - 0.002), M.dark)
+        F.box('light_strip', 0.3, 0.012, 0.006, (0, 0.15, zf + 0.004), M.label, bevel=0.003, bevel_segments=1)
+        for k in range(3):                                           # the knobs and the volume ring on the top
+            F.cyl(_name('top_knob'), 0.014, 0.014, (-0.15 + 0.05 * k, h + 0.007, WALL + 0.36), M.steel, verts=10)
+        for s in (-1, 1):                                            # a carrying handle in each side
+            G.kit.tube(F, _name('handle'), G.kit.fillet([(s * (w / 2 - 0.004), h - 0.25, WALL + 0.14),
+                                                         (s * (w / 2 + 0.014), h - 0.25, WALL + 0.15),
+                                                         (s * (w / 2 + 0.014), h - 0.25, WALL + 0.27),
+                                                         (s * (w / 2 - 0.004), h - 0.25, WALL + 0.28)], 0.01),
+                       0.007, M.speaker_trim, verts=6, round=1)
+        # the lyrics screen in a rounded case on a hinged neck, leaning back
         sc = (0, 1.08, -0.2)
-        F.box('neck', 0.06, 0.1, 0.04, (0, 0.9, -0.22), M.dark, bevel=0.008)
-        F.box('screen', 0.46, 0.34, 0.04, sc, M.dark, rot=(-10, 0, 0), bevel=0.012)
+        F.sweep('neck', [(0, 0.86, -0.22), (0, 0.92, -0.215), (0, 0.96, -0.21)], None, M.dark,
+                profile=G.rounded_rect(0.06, 0.035, 0.012, corner=2), up=(1, 0, 0))
+        F.cyl('neck_hinge', 0.016, 0.08, (0, 0.95, -0.21), M.dark, rot=(0, 90, 0), verts=10)
+        F.extrude('screen', G.rounded_rect(0.46, 0.34, 0.025, corner=3), 0.04, sc, M.dark, rot=(-10, 0, 0), bevel=0.01,
+                  bevel_segments=1)
         F.box('screen_face', 0.42, 0.29, 0.004, _tilt(sc, 10, 0, 0.021), M.lyrics, rot=(-10, 0, 0))
         for dy, wl, m in ((0.06, 0.3, M.white), (0.01, 0.24, M.label), (-0.04, 0.28, M.white), (-0.09, 0.18, M.white)):
             F.box(_name('lyric'), wl, 0.022, 0.003, _tilt(sc, 10, dy, 0.024), m, rot=(-10, 0, 0))
-        # the round stage rug with its star, the mic stand's foot and lower tube
-        F.cyl('stage', 0.3, 0.01, (0.02, 0.005, 0.1), M.stage, verts=40)
+        F.sphere('bouncing_ball', 0.012, _tilt(sc, 10, 0.045, 0.026), M.label, segments=6, rings=4)
+        # the round stage rug with its border and star, the mic stand's weighted foot and lower tube
+        F.cyl('stage', 0.3, 0.01, (0.02, 0.005, 0.1), M.stage, verts=32)
+        G.torus('stage_edge', 0.296, 0.006, at=F.at(0.02, 0.008, 0.1), material=M.star, major_segments=32,
+                minor_segments=3).scale = (1, 1, 0.5)
         star = [(0.02 + (0.13 if k % 2 == 0 else 0.055) * math.sin(math.pi * k / 5),
                  0.1 + (0.13 if k % 2 == 0 else 0.055) * math.cos(math.pi * k / 5)) for k in range(10)]
         verts = [(-x, -z, 0.0105) for x, z in star] + [(-x, -z, 0.006) for x, z in star]
         faces = [tuple(range(10)), tuple(range(19, 9, -1))] + [(i, (i + 1) % 10, 10 + (i + 1) % 10, 10 + i) for i in range(10)]
         _obj('star', verts, faces, [M.star])
         mx, mz = MIC
-        G.revolve('mic_foot', [(0, 0), (0.13, 0), (0.125, 0.012), (0.03, 0.03), (0, 0.032)], at=F.at(mx, 0.01, mz),
-                  material=M.stand, segments=24)
-        G.rod('mic_tube', F.at(mx, 0.03, mz), F.at(mx, 1.0, mz), 0.013, material=M.chrome, verts=12)
-        F.cyl('mic_clutch', 0.02, 0.04, (mx, 1.0, mz), M.stand, verts=12)
-        # the spotlight on its pole, aimed at the stage
+        G.revolve('mic_foot', [(0, 0), (0.13, 0), (0.13, 0.008), (0.122, 0.014), (0.06, 0.022), (0.03, 0.03), (0.02, 0.05),
+                               (0, 0.05)], at=F.at(mx, 0.01, mz), material=M.stand, segments=20)
+        G.kit.tube(F, 'mic_tube', [(mx, 0.05, mz), (mx, 1.0, mz)], 0.013, M.chrome, verts=10, round=1)
+        G.revolve('mic_clutch', [(0, 0), (0.02, 0), (0.022, 0.006), (0.022, 0.034), (0.018, 0.04), (0, 0.04)],
+                  at=F.at(mx, 0.98, mz), material=M.stand, segments=10)
+        G.kit.tube(F, 'clutch_screw', [(mx, 1.0, mz), (mx + 0.04, 1.0, mz)], 0.005, M.stand, verts=6, round=1)
+        # the spotlight on its pole, aimed at the stage: a finned can on a yoke, a lens in its rim
         px, pz = -0.32, 0.3
-        G.revolve('spot_foot', [(0, 0), (0.12, 0), (0.115, 0.012), (0.025, 0.028), (0, 0.03)], at=F.at(px, 0, pz),
-                  material=M.stand, segments=24)
-        G.rod('spot_pole', F.at(px, 0.02, pz), F.at(px, 1.62, pz), 0.012, material=M.stand, verts=10)
+        G.revolve('spot_foot', [(0, 0), (0.12, 0), (0.12, 0.008), (0.112, 0.014), (0.03, 0.026), (0.02, 0.04), (0, 0.04)],
+                  at=F.at(px, 0, pz), material=M.stand, segments=20)
+        G.kit.tube(F, 'spot_pole', [(px, 0.03, pz), (px, 1.6, pz)], 0.012, M.stand, verts=8, round=1)
         head, aim = (px, 1.66, pz), (0.1, 1.2, 0.9)
-        v = [aim[i] - head[i] for i in range(3)]
-        n = math.sqrt(sum(c * c for c in v))
-        u = [c / n for c in v]
-        back = [head[i] - u[i] * 0.09 for i in range(3)]
-        front = [head[i] + u[i] * 0.09 for i in range(3)]
-        G.rod('spot_can', F.at(*back), F.at(*front), 0.07, material=M.dark, verts=20)
-        lens_end = [front[i] + u[i] * 0.006 for i in range(3)]
-        G.rod('spot_lens', F.at(*front), F.at(*lens_end), 0.06, material=M.lens, verts=20)
-        G.torus('spot_yoke', 0.085, 0.008, at=F.at(*head), material=M.stand, rot=(0, 90, 0), major_segments=16,
-                minor_segments=4)
+        u = Vector([aim[i] - head[i] for i in range(3)]).normalized()
+        d_b = Vector(F.at(*aim)) - Vector(F.at(*head))
+        can = G.revolve('spot_can', [(0, -0.1), (0.045, -0.1), (0.058, -0.085), (0.064, -0.06), (0.064, 0.07),
+                                     (0.074, 0.082), (0.074, 0.094), (0.066, 0.094), (0.062, 0.09), (0, 0.09)],
+                        at=F.at(*head), material=M.dark, segments=16)
+        _aim(can, d_b)
+        for k in range(3):
+            fin = G.torus(_name('spot_fin'), 0.068, 0.004, at=F.at(*[head[i] - u[i] * (0.04 - 0.025 * k) for i in range(3)]),
+                          material=M.dark, major_segments=16, minor_segments=3)
+            _aim(fin, d_b)
+        lens = G.cylinder('spot_lens', 0.06, 0.004, at=F.at(*[head[i] + u[i] * 0.088 for i in range(3)]), material=M.lens,
+                          verts=16)
+        _aim(lens, d_b)
+        side = Vector((u[2], 0, -u[0])).normalized()        # across the can, level (game)
+        ends = [tuple(head[i] + side[i] * s * 0.085 for i in range(3)) for s in (-1, 1)]
+        G.kit.tube(F, 'spot_yoke', G.kit.fillet([ends[0], (ends[0][0], 1.6, ends[0][2]), (px, 1.6, pz),
+                                                 (ends[1][0], 1.6, ends[1][2]), ends[1]], 0.02), 0.008, M.stand, verts=6,
+                   round=1)
+        for e in ends:
+            F.sphere(_name('spot_knob'), 0.014, e, M.stand, segments=8, rings=4)
     G.join(still, 'body', origin=(0, 0, 0))
     # The upper tube, boom and microphone, lowered 25 cm into the tube: `mic_up` raises them to singing height.
     mx, mz = MIC
     drop = 0.25
     with G.new_parts() as mic:
         top = 1.35 - drop
-        G.rod('mic_upper', F.at(mx, 0.75 - drop, mz), F.at(mx, top, mz), 0.008, material=M.chrome, verts=10)
+        G.kit.tube(F, 'mic_upper', [(mx, 0.75 - drop, mz), (mx, top, mz)], 0.008, M.chrome, verts=8, round=1)
         tip = (mx - 0.05, top + 0.07, mz + 0.08)
-        G.rod('mic_boom', F.at(mx, top, mz), F.at(*tip), 0.007, material=M.chrome, verts=8)
-        G.rod('mic_handle', F.at(*tip), F.at(tip[0] - 0.015, tip[1] + 0.05, tip[2] + 0.07), 0.017, material=M.dark, verts=12)
-        F.sphere('mic_grille', 0.03, (tip[0] - 0.02, tip[1] + 0.068, tip[2] + 0.095), M.steel, segments=12, rings=8)
+        G.kit.tube(F, 'mic_boom', G.kit.fillet([(mx, top - 0.02, mz), (mx, top + 0.02, mz), tip], 0.02), 0.007, M.chrome,
+                   verts=6, round=1)
+        end = (tip[0] - 0.015, tip[1] + 0.05, tip[2] + 0.07)
+        F.sweep('mic_handle', [tip, end], 0.017, M.dark, verts=10, scale=[0.7, 1.0])
+        g = (tip[0] - 0.02, tip[1] + 0.068, tip[2] + 0.095)
+        F.sphere('mic_grille', 0.03, g, M.steel, segments=10, rings=6)
+        F.sweep('mic_band', [end, tuple(end[i] + (g[i] - end[i]) * 0.35 for i in range(3))], 0.024, M.dark, verts=10)
     mic = G.hinged(G.join(mic, 'mic'), F.at(mx, 1.0, mz))
     objs = G.settle(centre=False)
     G.slide(mic, 'mic_up', (0, 0, drop), seconds=0.8)
@@ -326,18 +453,17 @@ def karaokeMachine():
 
 # --- the fizz & sunshine mocktail cart (1x1): a brass bar cart under a striped canopy ---------------------------
 TOP = 0.815     # the top shelf's top
-
-
-def _tumbler(F, x, z, drink, y=TOP, h=0.11, r=0.034):
-    """A tumbler full of `drink` (opaque: no glass draw), its rim and foot clear, with a straw."""
-    F.cyl(_name('tumbler_foot'), r * 0.85, 0.012, (x, y + 0.006, z), M.tumbler, verts=16)
-    G.revolve(_name('tumbler'), [(0, 0), (r * 0.86, 0), (r * 0.98, h - 0.012), (0, h - 0.012)],
-              at=F.at(x, y + 0.012, z), material=drink, segments=16)
-    G.torus(_name('rim'), r * 0.98, 0.004, at=F.at(x, y + h, z), material=M.tumbler, major_segments=16, minor_segments=4)
-    G.rod(_name('straw'), F.at(x + 0.01, y + 0.03, z), F.at(x + 0.03, y + h + 0.06, z - 0.01), 0.004, material=M.coral, verts=6)
-
-
 SHAKER = (0.06, 0.08)   # the shaker's foot (x, depth), tipping over to the left
+
+
+def _bottle(F, name, x, y, z, r, h, material, cap):
+    """A syrup bottle standing on `y`: a lofted body with a shoulder and neck, a label band, a chrome pourer."""
+    bx, by, bz = F.at(x, y, z)
+    rows = [(0.0, 0.92), (0.02, 1.0), (0.62, 1.0), (0.76, 0.6), (0.84, 0.38), (0.95, 0.38)]
+    b = G.loft(name, [G.ring(r * k, r * k, bz + h * t, 10, at=(bx, by)) for t, k in rows], material=material)
+    _paint(b, M.porcelain, lambda c: 0.2 * h < c.z - bz < 0.5 * h)
+    G.revolve(f'{name}_pourer', [(0, 0), (r * 0.42, 0), (r * 0.42, 0.012), (r * 0.15, 0.03), (0, 0.032)],
+              at=(bx, by, bz + h * 0.95), material=cap, segments=8)
 
 
 def mocktailCart():
@@ -345,75 +471,98 @@ def mocktailCart():
     zb, zf = -0.29, 0.17
     with G.new_parts() as still:
         for y in (0.3, 0.8):
-            F.box(_name('shelf'), 0.78, 0.03, 0.46, (0, y, -0.06), M.mint, bevel=0.012)
-            for z in (zb, zf):
-                G.rod(_name('gallery'), F.at(-0.39, y + 0.06, z), F.at(0.39, y + 0.06, z), 0.006, material=M.brass, verts=8)
-            for x in (-0.39, 0.39):
-                G.rod(_name('gallery_end'), F.at(x, y + 0.06, zb), F.at(x, y + 0.06, zf), 0.006, material=M.brass, verts=8)
+            F.extrude(_name('shelf'), G.rounded_rect(0.78, 0.46, 0.03, corner=2), 0.03, (0, y, -0.06), M.mint,
+                      plane='top', bevel=0.008, bevel_segments=1)
+            gal = G.rounded_rect(0.78, 0.46, 0.04, corner=2)
+            F.sweep(_name('gallery'), [(x, y + 0.06, -0.06 + z) for x, z in gal], 0.006, M.brass, verts=6, closed=True)
+            for x in (-0.2, 0.0, 0.2):
+                for z in (zb, zf):
+                    G.kit.tube(F, _name('spindle'), [(x, y + 0.015, z), (x, y + 0.06, z)], 0.0035, M.brass, verts=4,
+                               round=1)
         for x in (-0.39, 0.39):
             for z in (zb, zf):
                 y0 = 0.07 if z == zf else 0.0
-                G.rod(_name('post'), F.at(x, y0, z), F.at(x, 1.6, z), 0.012, material=M.brass, verts=10)
-                F.sphere(_name('finial'), 0.018, (x, 1.6, z), M.brass, segments=10, rings=6)
+                G.kit.tube(F, _name('post'), [(x, y0, z), (x, 1.6, z)], 0.012, M.brass, verts=8, round=1)
+                G.revolve(_name('finial'), [(0, 0), (0.014, 0), (0.018, 0.008), (0.012, 0.016), (0, 0.022)],
+                          at=F.at(x, 1.598, z), material=M.brass, segments=8)
             G.torus(_name('wheel'), 0.055, 0.016, at=F.at(x, 0.071, zf), material=M.tyre, rot=(0, 90, 0),
-                    major_segments=18, minor_segments=8)
-            F.cyl(_name('hub'), 0.02, 0.05, (x, 0.071, zf), M.brass, rot=(0, 90, 0), verts=10)
-            F.cyl(_name('cap'), 0.016, 0.02, (x, 0.01, zb), M.brass, verts=10)
-        G.rod('handle', F.at(-0.39, 0.95, zb), F.at(-0.39, 0.95, zf), 0.012, material=M.brass, verts=10)
-        # the striped canopy with a scalloped valance at the front and sides
+                    major_segments=16, minor_segments=6)
+            F.cyl(_name('hub'), 0.03, 0.04, (x, 0.071, zf), M.brass, rot=(0, 90, 0), verts=10)
+            G.revolve(_name('cap'), [(0, 0), (0.018, 0), (0.016, 0.014), (0.012, 0.02), (0, 0.02)], at=F.at(x, 0, zb),
+                      material=M.dark, segments=8)
+        G.kit.tube(F, 'handle', [(-0.39, 0.95, zb), (-0.39, 0.95, zf)], 0.012, M.brass, verts=8, round=1)
+        F.sweep('handle_grip', [(-0.39, 0.95, zb + 0.1), (-0.39, 0.95, zf - 0.1)], 0.017, M.porcelain, verts=8)
+        # the striped canopy, arched front to back, with a scalloped valance at the front and sides
         for i in range(6):
             m = M.canopy if i % 2 else M.canopy_white
-            F.box(_name('canopy'), 0.14, 0.03, 0.56, (-0.35 + i * 0.14, 1.62, -0.05), m, bevel=0.006)
-            pts = [(-0.07, 1.605), (0.07, 1.605)] + [(0.07 * math.cos(math.pi * k / 8), 1.56 - 0.07 * math.sin(math.pi * k / 8))
-                                                     for k in range(9)]
-            _slab(F, _name('scallop'), [(-0.35 + i * 0.14 + px, py) for px, py in pts], 0.218, 0.23, m)
+            x = -0.35 + i * 0.14
+            pts = [(x, 1.6 + 0.024 * (1 - ((2 * k / 8) - 1) ** 2) + 0.006, -0.33 + 0.56 * k / 8) for k in range(9)]
+            F.sweep(_name('canopy'), pts, None, m, profile=G.rounded_rect(0.012, 0.142, 0.004, corner=1), up=(0, 0, 1))
+            pts = [(-0.07, 1.605), (0.07, 1.605)] + [(0.07 * math.cos(math.pi * k / 6), 1.56 - 0.07 * math.sin(math.pi * k / 6))
+                                                     for k in range(7)]
+            _slab(F, _name('scallop'), [(x + px, py) for px, py in pts], 0.218, 0.23, m)
         for s in (-1, 1):
             for i in range(4):
                 z = -0.26 + i * 0.14
                 m = M.canopy if i % 2 else M.canopy_white
-                pts = [(z - 0.07, 1.605), (z + 0.07, 1.605)] + [(z + 0.07 * math.cos(math.pi * k / 8),
-                                                                1.56 - 0.07 * math.sin(math.pi * k / 8)) for k in range(9)]
+                pts = [(z - 0.07, 1.605), (z + 0.07, 1.605)] + [(z + 0.07 * math.cos(math.pi * k / 6),
+                                                                1.56 - 0.07 * math.sin(math.pi * k / 6)) for k in range(7)]
                 verts = [F.at(s * 0.41 + s * 0.006 * j, y, zz) for j in (1, -1) for zz, y in pts]
                 nn = len(pts)
                 faces = [tuple(range(nn)), tuple(range(2 * nn - 1, nn - 1, -1))]
                 faces += [(k, (k + 1) % nn, nn + (k + 1) % nn, nn + k) for k in range(nn)]
                 _obj(_name('scallop_side'), verts, faces, [m])
         # the top: a jug of juice, an ice bucket, a pineapple, citrus and three drinks
-        G.revolve('jug', [(0, 0), (0.05, 0), (0.06, 0.08), (0.05, 0.17), (0.055, 0.2), (0.045, 0.2), (0, 0.19)],
-                  at=F.at(-0.25, TOP, -0.17), material=M.porcelain, segments=18)
-        F.cyl('jug_juice', 0.047, 0.01, (-0.25, TOP + 0.19, -0.17), M.juice, verts=16)
-        G.torus('jug_handle', 0.04, 0.008, at=F.at(-0.31, TOP + 0.11, -0.17), material=M.porcelain, rot=(90, 0, 0),
-                major_segments=12, minor_segments=6)
+        jx, jz = -0.25, -0.17
+        bx, by, bz = F.at(jx, TOP, jz)
+        G.loft('jug', [G.ring(r, r, bz + h, 14, at=(bx, by)) for h, r in ((0, 0.048), (0.01, 0.055), (0.08, 0.06),
+                                                                           (0.15, 0.05), (0.19, 0.046), (0.2, 0.05))],
+               material=M.porcelain)
+        F.cyl('jug_juice', 0.044, 0.002, (jx, TOP + 0.201, jz), M.juice, verts=12)
+        F.cone('jug_spout', 0.02, 0.008, 0.03, (jx + 0.05, TOP + 0.195, jz), M.porcelain, rot=(0, -50, 0), verts=8)
+        F.sweep('jug_handle', G.kit.fillet([(jx - 0.055, TOP + 0.17, jz), (jx - 0.095, TOP + 0.16, jz),
+                                            (jx - 0.09, TOP + 0.06, jz), (jx - 0.058, TOP + 0.04, jz)], 0.02, steps=2),
+                None, M.porcelain, profile=G.rounded_rect(0.016, 0.008, 0.003, corner=1), up=(0, 1, 0))
         G.revolve('bucket', [(0, 0), (0.06, 0), (0.08, 0.12), (0.075, 0.12), (0.055, 0.01), (0, 0.01)],
-                  at=F.at(0.2, TOP, -0.17), material=M.chrome, segments=20)
+                  at=F.at(0.2, TOP, -0.17), material=M.chrome, segments=16)
+        for s in (-1, 1):
+            G.torus(_name('bucket_ring'), 0.016, 0.003, at=F.at(0.2 + s * 0.08, TOP + 0.095, -0.17), material=M.chrome,
+                    rot=(90, 0, 90), major_segments=8, minor_segments=3)
         for k, (dx, dz) in enumerate(((-0.02, 0.0), (0.02, 0.015), (0.0, -0.025), (0.03, -0.01))):
             F.box(_name('ice'), 0.03, 0.03, 0.03, (0.2 + dx, TOP + 0.11 + 0.008 * (k % 2), -0.17 + dz), M.ice,
-                  rot=(10 * k, 20, 15 * k), bevel=0.005)
-        F.sphere('pineapple', 0.055, (0.3, TOP + 0.08, 0.06), M.pineapple, scale=(1, 1, 1.45), segments=14, rings=10)
-        for k in range(5):
-            a = 72 * k
-            F.cone(_name('crown'), 0.022, 0.0, 0.11, (0.3 + 0.012 * G.cosd(a), TOP + 0.2, 0.06 + 0.012 * G.sind(a)), M.leaf,
-                   rot=(18 * G.sind(a), 18 * G.cosd(a), 0), verts=5)
+                  rot=(10 * k, 20, 15 * k), bevel=0.005, bevel_segments=1)
+        # the pineapple: a lumpy body and a crown of long leaves
+        G.jitter(F.sphere('pineapple', 0.055, (0.3, TOP + 0.08, 0.06), M.pineapple, scale=(1, 1, 1.45), segments=12,
+                          rings=8), 0.004, size=0.02, seed=4.0)
+        leaf = G.smooth_outline([(0.0, 0.0), (0.012, 0.03), (0.006, 0.1), (0.0, 0.13), (-0.006, 0.1), (-0.012, 0.03)], 1)
+        for k in range(7):
+            a = 51 * k
+            lean = 18 + 10 * (k % 2)
+            F.extrude(_name('crown'), leaf, 0.004, (0.3 + 0.008 * G.cosd(a), TOP + 0.155, 0.06 + 0.008 * G.sind(a)), M.leaf,
+                      rot=(lean * G.sind(a), lean * G.cosd(a), -a))
         for x, z, r, m in ((0.15, 0.1, 0.034, M.lemon), (0.21, 0.13, 0.03, M.lime), (0.17, 0.02, 0.038, M.orange)):
-            F.sphere(_name('citrus'), r, (x, TOP + r, z), m, segments=12, rings=8)
-        _tumbler(F, -0.1, 0.1, M.drink_pink)
-        _tumbler(F, -0.22, 0.06, M.drink_sun)
-        _tumbler(F, -0.33, 0.1, M.drink_teal)
+            F.sphere(_name('citrus'), r, (x, TOP + r, z), m, scale=(1, 1, 0.95), segments=10, rings=6)
+        F.cyl('lemon_half', 0.034, 0.006, (0.24, TOP + 0.003, 0.0), M.porcelain, verts=10)
+        F.cyl('lemon_face', 0.03, 0.006, (0.24, TOP + 0.006, 0.0), M.lemon, verts=10)
+        _tumbler(F, -0.1, 0.1, M.drink_pink, slice_=M.lemon)
+        _tumbler(F, -0.22, 0.06, M.drink_sun, straw=M.sky)
+        _tumbler(F, -0.33, 0.1, M.drink_teal, slice_=M.lime)
         # below: a little fridge drawer and three syrup bottles
-        F.box('fridge', 0.3, 0.2, 0.22, (-0.15, 0.415, -0.1), M.fridge, bevel=0.025)
-        F.box('fridge_handle', 0.12, 0.012, 0.012, (-0.15, 0.47, 0.016), M.chrome, bevel=0.004)
+        F.extrude('fridge', G.rounded_rect(0.3, 0.2, 0.03, corner=2), 0.22, (-0.15, 0.415, -0.1), M.fridge, bevel=0.01,
+                  bevel_segments=1)
+        F.box('fridge_seam', 0.27, 0.004, 0.004, (-0.15, 0.49, 0.011), M.chrome)
+        G.kit.pull(F, 'fridge_handle', -0.15, 0.46, 0.01, 0.12, M.chrome, r=0.005, out=0.02)
         for i, m in enumerate((M.drink_pink, M.drink_teal, M.drink_sun)):
-            G.revolve(_name('syrup'), [(0, 0), (0.032, 0), (0.034, 0.15), (0.012, 0.2), (0.012, 0.23), (0, 0.23)],
-                      at=F.at(0.12 + i * 0.09, 0.315, -0.12), material=m, segments=14)
-            F.cyl(_name('syrup_cap'), 0.014, 0.02, (0.12 + i * 0.09, 0.555, -0.12), M.chrome, verts=10)
+            _bottle(F, _name('syrup'), 0.12 + i * 0.09, 0.315, -0.12, 0.033, 0.24, m, M.chrome)
     G.join(still, 'body', origin=(0, 0, 0))
     # The cocktail shaker, hinged on its foot's left edge: `shake` tips it over the pink drink.
     sx, sz = SHAKER
     with G.new_parts() as shaker:
-        G.revolve('shaker', [(0, 0), (0.036, 0), (0.042, 0.13), (0.036, 0.15), (0.02, 0.18), (0.012, 0.2), (0, 0.205)],
-                  at=F.at(sx, TOP, sz), material=M.chrome, segments=20)
-        G.torus('shaker_band', 0.04, 0.004, at=F.at(sx, TOP + 0.12, sz), material=M.chrome, major_segments=20,
-                minor_segments=4)
+        G.revolve('shaker', [(0, 0), (0.034, 0), (0.036, 0.004), (0.042, 0.12), (0.044, 0.124), (0.038, 0.13),
+                             (0.036, 0.15), (0.022, 0.172), (0.014, 0.176), (0.016, 0.19), (0.012, 0.205), (0, 0.206)],
+                  at=F.at(sx, TOP, sz), material=M.chrome, segments=16)
+        G.torus('shaker_band', 0.04, 0.004, at=F.at(sx, TOP + 0.06, sz), material=M.chrome, major_segments=16,
+                minor_segments=3)
     shaker = G.hinged(G.join(shaker, 'shaker'), F.at(sx - 0.036, TOP, sz))
     objs = G.settle(centre=False)
     G.swing(shaker, 'shake', 35, seconds=0.6, axis='Y')
@@ -437,16 +586,21 @@ def _sling_y(u, v):
 
 def rainbowHammock():
     F = G.GameFrame()
+    beam = G.rounded_rect(0.07, 0.09, 0.02, corner=1)
     with G.new_parts() as still:
-        F.box('beam', 2 * POST_X - 0.04, 0.07, 0.09, (0, 0.05, 0), M.wood, bevel=0.02)
+        # the base beam, its ends rounded, and the two posts curving up and out from it to the hooks
+        F.sweep('beam', [(-(POST_X - 0.1), 0.05, 0), (POST_X - 0.1, 0.05, 0)], None, M.wood, profile=beam, up=(0, 0, 1))
         for s in (-1, 1):
-            G.rod(_name('post'), F.at(s * (POST_X - 0.1), 0.04, 0), F.at(s * POST_X, HOOK + 0.05, 0), 0.036, material=M.wood,
-                  verts=10)
-            F.box(_name('foot'), 0.09, 0.045, 0.62, (s * (POST_X - 0.06), 0.0225, 0), M.wood, bevel=0.015)
-            F.sphere(_name('post_top'), 0.042, (s * POST_X, HOOK + 0.05, 0), M.wood, segments=12, rings=8)
+            F.sweep(_name('post'), [(s * (POST_X - 0.16), 0.04, 0), (s * (POST_X - 0.1), 0.3, 0),
+                                    (s * (POST_X - 0.04), 0.75, 0), (s * POST_X, HOOK + 0.05, 0)], None, M.wood,
+                    profile=G.rounded_rect(0.07, 0.07, 0.02, corner=1), up=(0, 0, 1), resolution=3)
+            G.revolve(_name('post_top'), [(0, 0), (0.04, 0), (0.042, 0.02), (0.03, 0.034), (0.012, 0.042), (0, 0.042)],
+                      at=F.at(s * POST_X, HOOK + 0.05, 0), material=M.wood, segments=12)
+            F.extrude(_name('foot'), G.rounded_rect(0.62, 0.045, 0.02, corner=2), 0.09, (s * (POST_X - 0.1), 0.0225, 0),
+                      M.wood, plane='side', bevel=0.008, bevel_segments=1)
             for z in (-0.18, 0.18):                                   # braces from the foot to the post
-                G.rod(_name('brace'), F.at(s * (POST_X - 0.06), 0.04, z * 1.5), F.at(s * (POST_X - 0.065), 0.32, 0), 0.016,
-                      material=M.wood, verts=8)
+                F.sweep(_name('brace'), [(s * (POST_X - 0.1), 0.04, z * 1.5), (s * (POST_X - 0.11), 0.34, 0)], None, M.wood,
+                        profile=G.rounded_rect(0.04, 0.03, 0.01, corner=1), up=(0, 0, 1))
     G.join(still, 'body', origin=(0, 0, 0))
     # The sling, its spreader bars and ropes, the hooks, the pillow and the throw: `sway` rocks them about the hooks.
     with G.new_parts() as sling:
@@ -473,20 +627,36 @@ def rainbowHammock():
                 faces.append((at(0, i, j), at(0, i, j + 1), at(1, i, j + 1), at(1, i, j)))
                 mats.append(stripe(j))
         _obj('sling', verts, faces, [getattr(M, s) for s in STRIPES], face_mats=mats, sharp=50)
+        # a corded edge along each long side, and a fringe of tassels hanging from it
+        for j, side in ((0, -1), (nv, 1)):
+            edge = [(x0 + (x1 - x0) * i / nu, _sling_y(i / nu, j / nv) - t / 2, side * SLING_W / 2) for i in range(nu + 1)]
+            F.sweep(_name('edge_cord'), edge, 0.008, M.rope, verts=5)
+            for i in range(2, nu - 1, 2):
+                x, y, z = edge[i]
+                G.kit.tube(F, _name('tassel'), [(x, y, z + side * 0.004), (x, y - 0.09, z + side * 0.012)], 0.005,
+                           getattr(M, STRIPES[(i // 2) % 6]), verts=4, round=1, scale=[0.7, 1.2])
         for s in (-1, 1):
             bx = s * (SLING_X + 0.015)
-            F.box(_name('spreader'), 0.045, 0.045, SLING_W + 0.08, (bx, SLING_END - 0.01, 0), M.spreader, bevel=0.012)
+            F.sweep(_name('spreader'), [(bx, SLING_END - 0.01, -(SLING_W / 2 + 0.014)), (bx, SLING_END - 0.01, SLING_W / 2 + 0.014)],
+                    0.022, M.spreader, verts=10)
+            for z in (-1, 1):
+                F.sphere(_name('spreader_end'), 0.026, (bx, SLING_END - 0.01, z * (SLING_W / 2 + 0.014)), M.spreader,
+                         segments=10, rings=6)
             hook = (s * (POST_X - 0.02), HOOK, 0)
-            G.torus(_name('hook'), 0.03, 0.007, at=F.at(*hook), material=M.lamp_metal, rot=(90, 0, 0),
-                    major_segments=12, minor_segments=5)
-            for z in (-0.33, -0.11, 0.11, 0.33):
-                G.rod(_name('rope'), F.at(s * (POST_X - 0.03), HOOK - 0.03, 0), F.at(bx, SLING_END + 0.01, z), 0.006,
-                      material=M.rope, verts=6)
+            G.torus(_name('ring'), 0.03, 0.007, at=F.at(*hook), material=M.lamp_metal, rot=(90, 0, 0), major_segments=12,
+                    minor_segments=4)
+            G.kit.tube(F, _name('hook'), G.kit.fillet([(s * (POST_X - 0.02), HOOK + 0.05, 0), (s * (POST_X - 0.02), HOOK + 0.032, 0),
+                                                       (s * (POST_X - 0.045), HOOK + 0.03, 0),
+                                                       (s * (POST_X - 0.048), HOOK + 0.05, 0)], 0.01), 0.005, M.lamp_metal,
+                       verts=5, round=1)
+            for z in (-0.33, -0.22, -0.11, 0.0, 0.11, 0.22, 0.33):
+                G.kit.tube(F, _name('rope'), [(s * (POST_X - 0.04), HOOK - 0.03, 0), (bx, SLING_END + 0.012, z)], 0.005,
+                           M.rope, verts=4, round=1)
         # the pillow at the left end, lying on the slope
         u = (-PILLOW - x0) / (x1 - x0)
         slope = math.degrees(math.atan((SLING_END - SLING_LOW) * 4 * (2 * u - 1) / (x1 - x0)))
-        F.box('pillow', 0.36, 0.11, 0.3, (-PILLOW, _sling_y(u, 0.5) + 0.05, 0), M.pillow, rot=(0, slope, 0),
-              bevel=0.045, bevel_segments=3)
+        F.soft('pillow', 0.36, 0.11, 0.3, (-PILLOW, _sling_y(u, 0.5) + 0.05, 0), M.pillow, rot=(0, slope, 0), round=0.04,
+               puff=0.03, flat=2)
     sling = G.hinged(G.join(sling, 'sling'), F.at(0, HOOK, 0))
     objs = G.settle(centre=False)
     G.rock(sling, 'sway', 5, seconds=2.4, axis='X')
@@ -508,32 +678,56 @@ def _hills(cy, r, top, waves, amp, phase, n=40):
         y = min(y, math.sqrt(max(r * r - x * x, 0.0)))
         pts.append((x, y))
     lo = [(x, -math.sqrt(max(r * r - x * x, 0.0))) for x, _ in pts]
-    pts = [(x, y) for x, y in pts]
     out = pts + lo[::-1][1:-1]                                     # along the top, back along the circle's foot
     return [(x, cy + y) for x, y in out]
+
+
+def _spiral(F, name, x, y, z, r0, r1, turns, material, side):
+    """A spiral line on the end of a rolled mat at game x `x` (its end face), round (y, z): the layers of the roll."""
+    pts = []
+    n = int(turns * 14)
+    for k in range(n + 1):
+        f = k / n
+        a = math.tau * turns * f
+        r = r0 + (r1 - r0) * f
+        pts.append((x + side * 0.002, y + r * math.sin(a), z + r * math.cos(a)))
+    return F.sweep(name, pts, 0.0025, material, verts=4)
 
 
 def sunriseLamp():
     F = G.GameFrame()
     cx, cy, cz = SUN_C
     with G.new_parts() as still:
-        G.revolve('base', [(0, 0), (0.13, 0), (0.13, 0.015), (0.1, 0.03), (0.03, 0.04), (0, 0.04)], at=F.at(cx, 0, cz),
-                  material=M.housing, segments=28)
-        G.rod('stem', F.at(cx, 0.03, cz), F.at(cx, cy - 0.3, cz), 0.016, material=M.lamp_metal, verts=12)
-        F.cyl('case', 0.385, 0.06, (cx, cy, cz - 0.03), M.housing, rot=(90, 0, 0), verts=48, bevel=0.012)
-        G.torus('ring', 0.37, 0.022, at=F.at(cx, cy, cz + 0.012), material=M.lamp_metal, rot=(90, 0, 0),
-                major_segments=48, minor_segments=8)
-        F.cyl('dawn', SUN_R + 0.01, 0.006, (cx, cy, cz + 0.003), M.dawn, rot=(90, 0, 0), verts=48)
+        G.revolve('base', [(0, 0), (0.13, 0), (0.13, 0.012), (0.122, 0.02), (0.1, 0.028), (0.04, 0.036), (0.03, 0.05),
+                           (0, 0.05)], at=F.at(cx, 0, cz), material=M.housing, segments=24)
+        G.kit.tube(F, 'stem', [(cx, 0.04, cz - 0.03), (cx, cy - 0.37, cz - 0.03)], 0.016, M.lamp_metal, verts=10, round=1)
+        G.revolve('stem_collar', [(0, 0), (0.024, 0), (0.026, 0.01), (0.02, 0.03), (0.018, 0.05), (0, 0.05)],
+                  at=F.at(cx, cy - 0.41, cz - 0.03), material=M.lamp_metal, segments=10)
+        F.cyl('dimmer', 0.018, 0.014, (cx + 0.07, 0.04, cz + 0.06), M.lamp_metal, verts=10)
+        # the case: a shallow round drum, its edge rolled, the ring round the scene's face
+        G.revolve('case', [(0, -0.06), (0.37, -0.06), (0.384, -0.05), (0.39, -0.03), (0.386, -0.008), (0.37, 0.0),
+                           (0, 0.0)], at=F.at(cx, cy, cz), material=M.housing, segments=40, rot=(90, 0, 0))
+        G.torus('ring', 0.355, 0.02, at=F.at(cx, cy, cz + 0.006), material=M.lamp_metal, rot=(90, 0, 0),
+                major_segments=40, minor_segments=6)
+        F.cyl('dawn', SUN_R + 0.01, 0.006, (cx, cy, cz + 0.003), M.dawn, rot=(90, 0, 0), verts=40)
+        for k, (dx, dy, w) in enumerate(((-0.14, 0.17, 0.16), (0.12, 0.22, 0.12), (0.2, 0.08, 0.09))):
+            cloud = G.smooth_outline([(-w / 2, 0), (w / 2, 0), (w / 2, 0.012), (w * 0.25, 0.03), (0, 0.022), (-w * 0.2, 0.036),
+                                      (-w / 2, 0.012)], 2)
+            F.extrude(_name('cloud'), [(cx + dx + u, cy + dy + v) for u, v in cloud], 0.004, (0, 0, cz + 0.024), M.cloud)
         _slab(F, 'hills_far', _hills(cy, SUN_R, -0.06, 3, 0.03, 0.4), cz + 0.032, cz + 0.038, M.hills_far)
         _slab(F, 'hills', _hills(cy, SUN_R, -0.12, 2, 0.035, 2.2), cz + 0.038, cz + 0.046, M.hills)
-        # the yoga mat, its far end rolled up
-        F.box('mat', 0.6, 0.008, 0.38, (0, 0.004, 0.13), M.yoga, bevel=0.002)
-        F.cyl('mat_roll', 0.06, 0.6, (0, 0.06, 0.38), M.yoga_roll, rot=(0, 90, 0), verts=20)
-        F.cyl('mat_roll_end', 0.035, 0.602, (0, 0.06, 0.38), M.yoga, rot=(0, 90, 0), verts=16)
+        # the yoga mat, its far end rolled up (the layers drawn on its ends), and a cork block on it
+        F.box('mat', 0.6, 0.008, 0.38, (0, 0.004, 0.13), M.yoga, bevel=0.002, bevel_segments=1)
+        F.cyl('mat_roll', 0.06, 0.6, (0, 0.06, 0.38), M.yoga_roll, rot=(0, 90, 0), verts=16)
+        for s in (-1, 1):
+            _spiral(F, _name('roll_layers'), s * 0.3, 0.06, 0.38, 0.012, 0.054, 2.6, M.yoga, s)
+        F.box('block', 0.22, 0.075, 0.14, (-0.2, 0.0455, 0.06), M.cork, rot=(0, 0, 15), bevel=0.008, bevel_segments=1)
     G.join(still, 'body', origin=(0, 0, 0))
     # The sun, set behind the hills: `sunrise` raises it into the sky, which glows at night (`dawn`'s `glow`).
     with G.new_parts() as sun:
-        F.cyl('sun', 0.13, 0.004, (cx, cy - 0.19, cz + 0.011), M.sun, rot=(90, 0, 0), verts=36)
+        F.cyl('sun', 0.13, 0.004, (cx, cy - 0.19, cz + 0.011), M.sun, rot=(90, 0, 0), verts=32)
+        G.torus('sun_halo', 0.11, 0.004, at=F.at(cx, cy - 0.19, cz + 0.014), material=M.cloud, rot=(90, 0, 0),
+                major_segments=24, minor_segments=3).scale = (1, 1, 0.4)
     sun = G.hinged(G.join(sun, 'sun'), F.at(cx, cy - 0.19, cz + 0.011))
     objs = G.settle(centre=False)
     G.slide(sun, 'sunrise', (0, 0, SUN_RISE), seconds=1.5)
@@ -541,27 +735,42 @@ def sunriseLamp():
 
 
 # --- the confetti party booth (2x2): a horseshoe booth for two under a bulb-lit frame, a table with a tablet ----
+def _channels(F, name, x0, x1, n, y0, top, z0, z1, lean, mat):
+    """A channelled back: `n` stuffed channels side by side from x0 to x1, each rising from the seat at `y0`
+    (depth `z0`) to `top`, leaning back to `z1` and rolling over at the top."""
+    cw = (x1 - x0) / n
+    for i in range(n):
+        x = x0 + cw * (i + 0.5)
+        F.sweep(_name(name), [(x, y0, z0), (x, (y0 + top) / 2, (z0 + z1) / 2 - 0.01), (x, top - 0.05, z1), (x, top - 0.015, z1 - lean)],
+                None, mat, profile=G.rounded_rect(cw * 1.02, 0.17, 0.06, corner=1), up=(1, 0, 0), resolution=2,
+                scale=[1.0, 1.04, 1.0, 0.85])
+
+
 def partyBooth():
     F = G.GameFrame()
+    zr, xr, yr = 0.82, 0.88, 1.58
     with G.new_parts() as still:
-        F.box('seat_base', 1.3, 0.38, 0.62, (0, 0.19, -0.05), M.booth, bevel=0.06, bevel_segments=3)
-        F.box('seat', 1.3, 0.1, 0.58, (0, 0.4, -0.04), M.booth, bevel=0.045, bevel_segments=3)
-        F.box('backrest', 1.86, 0.62, 0.22, (0, 0.72, -0.44), M.booth, rot=(-8, 0, 0), bevel=0.07, bevel_segments=3)
-        for x in (-0.31, 0.31):                                       # tufting lines on the backrest
-            F.box(_name('tuft'), 0.02, 0.5, 0.02, (x, 0.74, -0.32), M.booth, rot=(-8, 0, 0), bevel=0.008)
-        F.box('backrest_piping', 1.86, 0.03, 0.22, (0, 1.05, -0.48), M.piping, bevel=0.012)
-        F.box('back_panel', 1.9, 1.6, 0.06, (0, 0.8, WALL2 + 0.03), M.panel, bevel=0.015)
+        F.soft('seat_base', 1.3, 0.36, 0.62, (0, 0.18, -0.05), M.booth, round=0.05, flat=1, round_segments=1)
+        F.soft('seat', 1.3, 0.088, 0.58, (0, 0.394, -0.04), M.booth, round=0.035, puff=0.012, piping=0.006,
+               piping_material=M.piping, flat=2)
+        F.box('kick', 1.26, 0.04, 0.02, (0, 0.02, 0.27), M.panel)
+        # the channelled backrest, its rolled top piped in yellow
+        _channels(F, 'channel', -0.93, 0.93, 7, 0.38, 1.05, -0.3, -0.42, 0.06, M.booth)
+        F.sweep('backrest_piping', [(-0.93, 1.04, -0.475), (0.93, 1.04, -0.475)], 0.012, M.piping, verts=8)
+        F.extrude('back_panel', G.rounded_rect(1.9, 1.6, 0.04, corner=2), 0.06, (0, 0.8, WALL2 + 0.03), M.panel,
+                  bevel=0.012, bevel_segments=1)
         for s in (-1, 1):
-            F.box(_name('wing'), 0.3, 0.72, 1.0, (s * 0.8, 0.36, 0.4), M.booth, bevel=0.07, bevel_segments=3)
-            F.box(_name('wing_piping'), 0.3, 0.03, 1.0, (s * 0.8, 0.73, 0.4), M.piping, bevel=0.012)
-            F.box(_name('wing_base'), 0.28, 0.06, 0.96, (s * 0.8, 0.03, 0.4), M.booth, bevel=0.02)
-        # the bulb-lit frame over it: posts on the wings, rails along the sides and the front
-        zr, xr, yr = 0.82, 0.88, 1.58
+            F.soft(_name('wing'), 0.3, 0.7, 1.0, (s * 0.8, 0.37, 0.4), M.booth, round=0.06, piping=0.008,
+                   piping_material=M.piping, flat=1, round_segments=1)
+            F.box(_name('wing_base'), 0.28, 0.04, 0.96, (s * 0.8, 0.02, 0.4), M.panel, bevel=0.01, bevel_segments=1)
+        # the bulb-lit frame over it: each side one bent brass tube, from the wing's front up and back to the panel
         for s in (-1, 1):
-            G.rod(_name('post'), F.at(s * xr, 0.74, zr), F.at(s * xr, yr, zr), 0.018, material=M.brass, verts=10)
-            G.rod(_name('rail'), F.at(s * xr, yr, WALL2 + 0.06), F.at(s * xr, yr, zr), 0.014, material=M.brass, verts=10)
-            F.sphere(_name('corner'), 0.03, (s * xr, yr, zr), M.brass, segments=12, rings=8)
-        F.box('marquee', 1.76, 0.12, 0.05, (0, yr, zr), M.panel, bevel=0.012)
+            G.kit.tube(F, _name('frame'), G.kit.fillet([(s * xr, 0.72, zr), (s * xr, yr, zr), (s * xr, yr, WALL2 + 0.06)],
+                                                       0.06), 0.016, M.brass, verts=8, round=1)
+            G.revolve(_name('frame_foot'), [(0, 0), (0.03, 0), (0.03, 0.01), (0.02, 0.02), (0, 0.02)],
+                      at=F.at(s * xr, 0.715, zr), material=M.brass, segments=10)
+        F.extrude('marquee', G.rounded_rect(1.76, 0.12, 0.06, corner=4), 0.05, (0, yr, zr), M.panel, bevel=0.01,
+                  bevel_segments=1)
         for i in range(9):
             _bulb(F, -0.72 + i * 0.18, yr, zr + 0.03, i, r=0.026)
         # the marquee bulbs and confetti on the back panel
@@ -569,27 +778,36 @@ def partyBooth():
             x = -0.84 + i * 0.14
             _bulb(F, x, 1.53, WALL2 + 0.065, i, r=0.03)
             _bulb(F, x + 0.07, 1.28 + 0.06 * math.sin(i), WALL2 + 0.063, i + 3, r=0.024)
+        G.kit.tube(F, 'bulb_wire', [(-0.77 + 0.14 * i, 1.28 + 0.06 * math.sin(i) + 0.02, WALL2 + 0.062) for i in range(13)],
+                   0.0025, M.stand, verts=4, round=2)
+        G.kit.tube(F, 'bulb_wire_top', [(-0.86, 1.555, WALL2 + 0.062), (0.86, 1.555, WALL2 + 0.062)], 0.0025, M.stand,
+                   verts=4, round=1)
         for i, (x, y) in enumerate([(-0.6, 1.08), (-0.3, 1.18), (0.1, 1.1), (0.45, 1.15), (0.7, 1.05), (-0.05, 1.4),
                                     (0.3, 1.38), (-0.45, 1.4), (0.62, 1.42), (-0.75, 1.22)]):
-            F.box(_name('confetti'), 0.05, 0.05, 0.008, (x, y, WALL2 + 0.064), getattr(M, BULBS[i % 6]), rot=(0, 30 * i, 0))
-        # the round table with the party tablet, two drinks and a bowl of popcorn
+            if i % 2:
+                F.box(_name('confetti'), 0.05, 0.05, 0.008, (x, y, WALL2 + 0.064), getattr(M, BULBS[i % 6]), rot=(0, 30 * i, 0))
+            else:
+                F.cyl(_name('confetti'), 0.026, 0.008, (x, y, WALL2 + 0.064), getattr(M, BULBS[i % 6]), rot=(90, 0, 0), verts=8)
+        # the round table with the party tablet, two drinks and a striped bowl of popcorn
         tz = 0.52
-        F.cyl('table', 0.31, 0.035, (0, 0.72, tz), M.white, verts=40, bevel=0.01)
-        G.revolve('table_stem', [(0.2, 0), (0.2, 0.025), (0.05, 0.05), (0.035, 0.1), (0.035, 0.7), (0, 0.705)],
-                  at=F.at(0, 0, tz), material=M.brass, segments=24)
-        F.box('tablet_foot', 0.12, 0.012, 0.08, (0, 0.743, 0.62), M.dark, bevel=0.004)
+        F.cyl('table', 0.31, 0.035, (0, 0.72, tz), M.white, verts=32, bevel=0.01, bevel_segments=1)
+        G.revolve('table_stem', [(0.2, 0), (0.2, 0.012), (0.18, 0.022), (0.06, 0.045), (0.035, 0.1), (0.035, 0.68),
+                                 (0.06, 0.7), (0, 0.705)], at=F.at(0, 0, tz), material=M.brass, segments=20)
+        F.box('tablet_foot', 0.12, 0.012, 0.08, (0, 0.743, 0.62), M.dark, bevel=0.004, bevel_segments=1)
         tc = (0, 0.86, 0.6)
-        F.box('tablet', 0.34, 0.22, 0.02, tc, M.dark, rot=(12, 0, 0), bevel=0.008)
+        F.extrude('tablet', G.rounded_rect(0.34, 0.22, 0.02, corner=2), 0.02, tc, M.dark, rot=(12, 0, 0), bevel=0.005,
+                  bevel_segments=1)
         F.box('tablet_face', 0.31, 0.19, 0.004, _tilt(tc, -12, 0, -0.011), M.tablet_face, rot=(12, 0, 0))
         _tumbler(F, -0.18, 0.4, M.drink_sun, y=0.7375)
-        _tumbler(F, 0.18, 0.4, M.drink_teal, y=0.7375)
-        G.revolve('popcorn_bowl', [(0, 0), (0.05, 0), (0.09, 0.05), (0.085, 0.052), (0.045, 0.006), (0, 0.006)],
-                  at=F.at(0.14, 0.7375, 0.66), material=M.white, segments=18)
-        for k in range(9):
-            a = 40 * k
+        _tumbler(F, 0.18, 0.4, M.drink_teal, y=0.7375, straw=M.piping)
+        bowl = G.revolve('popcorn_bowl', [(0, 0), (0.05, 0), (0.09, 0.05), (0.085, 0.052), (0.045, 0.006), (0, 0.006)],
+                         at=F.at(0.14, 0.7375, 0.66), material=M.white, segments=16)
+        _paint(bowl, M.bulb_c, lambda c: math.atan2(c.y, c.x) % (math.pi / 4) < math.pi / 8)
+        for k in range(7):
+            a = 51 * k
             r = 0.04 if k % 3 else 0.015
             F.sphere(_name('popcorn'), 0.022, (0.14 + r * G.cosd(a), 0.79 + 0.008 * (k % 2), 0.66 + r * G.sind(a)),
-                     M.popcorn, segments=7, rings=5)
+                     M.popcorn, segments=6, rings=4)
         # the left curtain, gathered at the back
         _pleats(F, 'curtain_left', -xr, 0.77, yr - 0.02, WALL2 + 0.07, WALL2 + 0.45, 4, 0.03, M.curtain)
     G.join(still, 'body', origin=(0, 0, 0))

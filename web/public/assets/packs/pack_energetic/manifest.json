@@ -181,6 +181,9 @@
         "cap": {
           "finish": "material.finish.satin"
         },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
         "hoop_base": {
           "finish": "material.finish.satin"
         },
@@ -275,6 +278,9 @@
         },
         "smoothie": {
           "finish": "material.finish.gloss"
+        },
+        "stem": {
+          "finish": "material.finish.satin"
         },
         "worktop": {
           "finish": "material.finish.gloss"
