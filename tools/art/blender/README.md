@@ -133,7 +133,7 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
      `G.rounded_rect` and `G.smooth_outline` draw outlines;
    - `G.soft_box` (`F.soft`): cushions, pillows, mattresses: rounded, puffed, with piping;
    - `G.mirrored`, `G.cut` (a boolean), `G.jitter` (a hand-made wobble);
-   - `G.kit`: whole parts more than one family uses (`kit.tube`, `kit.cabriole`).
+   - `G.kit`: whole parts more than one family uses (`kit.tube`, `kit.cabriole`, `kit.moulding`).
 
    Spend the triangles where they show (silhouettes, edges, what a hand touches) and keep hidden parts plain
    (`families/living.py` armchair and sofa, `kitchen.py` fridge, `trees.py` oak). End with:
@@ -405,7 +405,7 @@ never one that's already running) and drive Playwright headless with full Chrome
 | `materials.py` | `Palette` (colour + finish), `mat` (one material by hand), `FINISHES` (read from the base manifest) |
 | `shapes.py` | the primitives: `cube`, `sphere`, `cylinder`, `cone`, `torus`, `rod`, `revolve`, `boulder` |
 | `forms.py` | what primitives can't make: `sweep`, `loft`/`ring`, `extrude` (with holes), `soft_box`, `rounded_rect`, `smooth_outline`, `mirrored`, `cut`, `jitter` |
-| `kit.py` | parts several families use, in game axes: `tube`, `cabriole` |
+| `kit.py` | parts several families use, in game axes: `tube`, `cabriole`, `moulding` (a profile run round an outline, its corners mitred: picture frames, panel beads, plinths, cornices) |
 | `place.py` | `GameFrame`: parts placed in game coordinates (`at`, `box`, `cyl`, `cone`, `sphere`); `depths=` redraws a thing's numbers at another depth (the kitchen counters' one depth) |
 | `parts.py` | `new_parts`, `join`, `join_all`, `set_origin`, `hinged`, `turn`, `settle`, `measure`, `game_size`, `check_size`; `fit` (third-party files only: it stretches) |
 | `motion.py` | the clips: `swing` (turn), `slide` (move), `grow` (appear from nothing), `squash` (scale), `spin` (whole turns home), `rock` (out, past rest and home), `turns` (parts out and back in turn), `scroll` (one repeat on, a belt), `path` (through keys), `stages` (a crop's growth); `clips` |
