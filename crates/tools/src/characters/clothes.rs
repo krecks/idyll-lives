@@ -264,8 +264,18 @@ fn jacket(family: &str, stage: &str, gid: &str, lod: bool) -> Mesh {
     let mut d = shell_dense(&lay.src, dense);
     let extra: Vec<Dense> = verts.iter().map(|&v| d[v]).collect();
     d.extend(extra);
+    // The hem distance (m, on the base body, so every stage shares it): from each vertex to the nearest open
+    // edge (hem, lapels, neck; not a sleeve's end, which sinks into the painted sleeve), for the shader's band.
+    let base = surface(family, BASE_STAGE);
+    let bp = lerp_src(&lay.src, if lod { &base.lod_pos } else { &base.pos });
+    let open: Vec<[usize; 2]> = boundary_edges(&lay.idx).into_iter().filter(|e| !(skip[e[0]] && skip[e[1]])).collect();
+    let to_edge = |q: &V3, [a, c]: [usize; 2]| {
+        let e = bp[c] - bp[a];
+        (q - (bp[a] + e * clip((q - bp[a]).dot(&e) / e.norm_squared().max(1e-12), 0.0, 1.0))).norm()
+    };
+    let hem_d: Vec<f64> = bp.iter().map(|q| open.iter().map(|&e| to_edge(q, e)).fold(0.05, f64::min)).collect();
     let n = pos.len();
-    let fields = (0..n).map(|i| [if i < n0 { 0.05 } else { 0.0 }, 0.0, TOP, 0.0]).collect();
+    let fields = (0..n).map(|i| [if i < n0 { hem_d[i] } else { 0.0 }, 0.0, TOP, 0.0]).collect();
     let clear = if cuts.contains("bottom.skirt") { JACKET_CLEAR } else { SKIRT_CLEAR };
     let tone = seated_tone(family, stage, &pos, &d, &shape(false).0, clear * k);
     Mesh { pos, nor: nor_all, idx, dense: d, fields, tone, ..Mesh::default() }
@@ -407,8 +417,7 @@ fn collar(family: &str, stage: &str, gid: &str, cuts: &Cuts) -> Mesh {
     }
     let nor = smooth_normals(&pos, &idx);
     let n = pos.len();
-    let nt = th.len();
-    let fields = (0..n).map(|i| [[0.03, 0.0, 0.0][i / nt], 0.0, TOP, 0.0]).collect();
+    let fields = vec![[0.05, 0.0, TOP, 0.0]; n];
     Mesh { pos, idx, nor, dense, fields, tone: vec![[0.0; 4]; n], ..Mesh::default() }
 }
 

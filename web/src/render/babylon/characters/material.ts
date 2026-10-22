@@ -299,8 +299,8 @@ let simHemBottom = max(simHem(simT4.w - simF.y, ${BAND.waistband}), simHem(simF.
 let simHemShoe = simHem(gShoe, ${BAND.welt}) * simPlain;
 #endif
 #ifdef SIMCLOTH
-// A skirt's hem (fields.x: the distance from it).
-let simHemShell = simHem(simF.x, ${BAND.hem}) * select(0.0, 1.0, abs(simF.y - 3.0) < 0.5);
+// A skirt's or a jacket's hem (fields.x: the distance from it; a collar's is out of reach).
+let simHemShell = simHem(simF.x, ${BAND.hem}) * select(0.0, 1.0, abs(simF.y - 3.0) < 0.5 || simF.z < 0.5);
 #endif
 #ifdef SIMEYE
 let simR = length(simF.xy);
@@ -515,7 +515,7 @@ vec2 simHemBottom = max(simHem(simT4.w - simF.y, ${BAND.waistband}), simHem(simF
 vec2 simHemShoe = simHem(gShoe, ${BAND.welt}) * simPlain;
 #endif
 #ifdef SIMCLOTH
-vec2 simHemShell = simHem(simF.x, ${BAND.hem}) * (abs(simF.y - 3.0) < 0.5 ? 1.0 : 0.0);
+vec2 simHemShell = simHem(simF.x, ${BAND.hem}) * (abs(simF.y - 3.0) < 0.5 || simF.z < 0.5 ? 1.0 : 0.0);
 #endif
 #ifdef SIMEYE
 float simR = length(simF.xy);

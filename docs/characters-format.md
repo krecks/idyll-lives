@@ -202,9 +202,10 @@ little darker (lighter on dark cloth), with a thin stitch line in it. The band i
 2.4 cm at a top's or a leg's hem, a 1.6 cm rib at a crew neck, a 1.1 cm binding at a scoop, a 3.4 cm
 waistband and a 1.2 cm cuff at the sock's top (m on the fields, as the cuts). Bands and stitches fade
 out as they come under a few pixels: they show at the closest game camera (6 m) and are gone at the
-default one (24 m). The skirt's shell has the hem band too, from its `fields.x`. The jacket's, the
-suit's and the collars' `fields.x` are not distances (0.05 outside and 0 on the rim; 0.03 at the
-neckline and 0 beyond), so they have none.
+default one (24 m). The skirt's, the jacket's and the suit's shells have the hem band too, from
+their `fields.x`: the distance from the hem (the jacket's: from its nearest open edge, the hem, the
+lapels and the neck, not the sleeves' ends; 0 on the turned rim). The collars have none (0.05: out
+of reach).
 
 The shirt under an open jacket or suit has its own colour (outfit.ts `shirtUnder`): white under a
 suit, a charcoal tee under a light jacket, a white or grey one under a dark one. It is painted on the
