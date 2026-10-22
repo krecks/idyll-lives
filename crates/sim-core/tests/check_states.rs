@@ -33,6 +33,11 @@
 //!   `BABY_TABLE`), for the baby's care (G-66): Ada (0) feeding Eve (5) from the crib carries her
 //!   to the high chair and feeds her there, and changes her at the crib's changing table
 //!   (`check.mjs play --use-existing crib --use feed`, `--use change`). Eve's hunger and bladder low.
+//! - `crowded-garden`: `common::garden_home()` (two parents and two children in the front yard,
+//!   Saturday noon, free will off, needs at 0.5) with its back garden from (5, 14) to (15, 22)
+//!   packed with garden things at random (`garden_cluster`, `Packed(31)`: what buying allowed).
+//!   The first sun lounger, at (10, 16) facing −z, has both its sides shut in by the beds round
+//!   it and only its foot free (I-garden-01): `check.mjs play --use-existing sunLounger`.
 
 mod common;
 
@@ -389,4 +394,26 @@ fn review_garden() {
     for (def, id) in &ripe {
         takes(&mut world, 0, def, id);
     }
+}
+
+#[test]
+fn crowded_garden() {
+    let (mut world, _) = common::garden_home();
+    common::garden_cluster(&mut world, 0, common::GARDEN_PATCH, common::Cluster::Packed(31), None);
+    for i in 0..world.sims.len() {
+        set_needs(&mut world, i, 0.5, &[]);
+    }
+    // The lounger whose sides are shut in by the beds round it, its foot free.
+    let lounger = world.objects.iter().find(|o| world.content.objects[o.def].id == "sunLounger").expect("a lounger in the crowd");
+    assert_eq!((lounger.x, lounger.z, lounger.rot), (10, 16, 2), "the first lounger is the shut-in one");
+    let (object, at) = (lounger.stable, lounger.id);
+    common::dump_state(&world, "crowded-garden");
+    // Ada gets onto it all the same, from its foot.
+    let sunbathe = world.content.objects[world.objects[at as usize].def].interactions.iter().position(|i| i.id == "sunbathe").unwrap();
+    world.apply(Command::Use { sim: 0, object, interaction: sunbathe }).unwrap();
+    let on = (0..(30.0 / MINUTES_PER_TICK) as u32).any(|_| {
+        world.tick_once();
+        world.objects[at as usize].users.contains(&Some(0)) && world.sims[0].pose == sim_core::content::Pose::Lie
+    });
+    assert!(on, "Ada lies on the shut-in lounger");
 }
