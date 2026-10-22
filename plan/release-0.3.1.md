@@ -1,8 +1,8 @@
 # Idyll Lives 0.3.1 — Release Plan
 
-- **Branch:** `main` (local; not pushed yet)
+- **Branch:** `main` (pushed 2026-10-22)
 - **Base:** v0.3.0 at `e725166`
-- **Status:** Prepared (2026-10-22): version, notes and docs set, local gates run (§3). Push, dry run, tag, live checks and the GitHub release are still to do (§4).
+- **Status:** Prepared (2026-10-22): version, notes and docs set, local gates run (§3), `main` pushed. Dry run, tag, live checks and the GitHub release are still to do (§4).
 - **Release type:** authenticity: every model, animation and interaction checked against the real thing, and what was found fixed
 
 ## 1. What ships
@@ -46,7 +46,7 @@ Not run locally: `node tools/bench/render.mjs` (headed timing; the review's ligh
 
 ## 4. Still to do (by the owner's go-ahead)
 
-1. `git push origin main` (main is ahead of origin/main by the review's commits and this one).
+1. ~~`git push origin main`~~ done 2026-10-22.
 2. Dry run: `gh workflow run pages.yml --ref main -f deploy=false`, then `gh run watch $(gh run list --workflow pages.yml -L1 --json databaseId -q '.[0].databaseId') --exit-status`.
 3. Tag and push: `git tag -a v0.3.1 -m "Idyll Lives 0.3.1: the authenticity review"`, `git push origin v0.3.1`; watch the tag's run (`--event push`), starting no other run while it waits.
 4. Live checks: the menu and Credits show 0.3.1 (build `<tagged commit>`); F3 Shared memory on, a game runs; `llm/lfm2.5-350m/model_q4.onnx_dataz` 200 and 255,530,880 bytes; `voice/supertonic-3/vector_estimator.onnxz` 119,568,968 bytes; a 0.3.0 save loads.
