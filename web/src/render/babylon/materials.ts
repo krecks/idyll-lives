@@ -66,16 +66,15 @@ interface Tweaks {
   srgbColors?: boolean;
   planarUV?: boolean;
 }
-let pendingTweaks: Tweaks = {};
 
 class VertexTweaksPlugin extends MaterialPluginBase {
-  private readonly tweaks: Tweaks;
-
-  constructor(material: Material, tweaks: Tweaks) {
-    // The base constructor already asks for the shader code, before `this.tweaks` exists.
-    pendingTweaks = tweaks;
-    super(material, 'VertexTweaks', 200, undefined, true, false);
-    this.tweaks = tweaks;
+  constructor(
+    material: Material,
+    private readonly tweaks: Tweaks,
+  ) {
+    // (Its own defines: an effect is shared by materials with the same defines, so one with planar
+    // UVs and one without would otherwise draw with whichever compiled first.)
+    super(material, 'VertexTweaks', 200, { TWEAK_SRGB_COLORS: false, TWEAK_PLANAR_UV: false }, true, false);
     this._enable(true);
   }
 
@@ -87,21 +86,21 @@ class VertexTweaksPlugin extends MaterialPluginBase {
     return true;
   }
 
+  override prepareDefines(defines: MaterialDefines): void {
+    defines.TWEAK_SRGB_COLORS = !!this.tweaks.srgbColors;
+    defines.TWEAK_PLANAR_UV = !!this.tweaks.planarUV;
+  }
+
   override getCustomCode(shaderType: string, shaderLanguage?: ShaderLanguage): Nullable<{ [pointName: string]: string }> {
     if (shaderType !== 'vertex') return null;
-    const wgsl = shaderLanguage === ShaderLanguage.WGSL;
-    const tweaks = this.tweaks ?? pendingTweaks;
-    const code: { [pointName: string]: string } = {};
-    if (tweaks.planarUV) {
-      code.CUSTOM_VERTEX_UPDATE_POSITION = '#ifdef UV1\nuvUpdated = positionUpdated.xz;\n#endif\n';
-    }
-    if (tweaks.srgbColors) {
-      const body = wgsl
+    const body =
+      shaderLanguage === ShaderLanguage.WGSL
         ? 'vertexOutputs.vColor = vec4f(pow(max(vertexOutputs.vColor.rgb, vec3f(0.0)), vec3f(2.2)), vertexOutputs.vColor.a);'
         : 'vColor = vec4(pow(max(vColor.rgb, vec3(0.0)), vec3(2.2)), vColor.a);';
-      code.CUSTOM_VERTEX_MAIN_END = `#if defined(VERTEXCOLOR) || defined(INSTANCESCOLOR) && defined(INSTANCES)\n${body}\n#endif\n`;
-    }
-    return code;
+    return {
+      CUSTOM_VERTEX_UPDATE_POSITION: '#if defined(TWEAK_PLANAR_UV) && defined(UV1)\nuvUpdated = positionUpdated.xz;\n#endif\n',
+      CUSTOM_VERTEX_MAIN_END: `#ifdef TWEAK_SRGB_COLORS\n#if defined(VERTEXCOLOR) || defined(INSTANCESCOLOR) && defined(INSTANCES)\n${body}\n#endif\n#endif\n`,
+    };
   }
 }
 
