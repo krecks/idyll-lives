@@ -18,7 +18,7 @@ import { breathe, hangArms, TAU } from './idle';
 import { liePose } from './lie';
 import { SEAT_MOVE, seatedBody } from './seated';
 import { addV, armIK, footIK, lerpV, smooth, sub, turned, wrist } from './ik';
-import type { Fit, Size } from './street';
+import { REF_HEIGHT, type Fit, type Size } from './street';
 
 // --- tracks -------------------------------------------------------------------------------------
 
@@ -138,6 +138,14 @@ class Round {
     });
     return out;
   }
+}
+
+/**
+ * Sizes named by their heights (m, the tallest first: the clip's name in cm), each for residents from half way to
+ * the next one down, fitted by `fit` (as street.ts `sizes`, but by height and with the legs' share given).
+ */
+function byHeight<F>(name: string, heights: readonly number[], fit: (h: number, i: number) => F): { clip: string; min: number; fit: F }[] {
+  return heights.map((h, i) => ({ clip: `${name}${Math.round(h * 100)}`, min: i < heights.length - 1 ? (h + heights[i + 1]) / 2 : 0, fit: fit(h, i) }));
 }
 
 /** The reference skeleton's rest places (the clip's metres), found while baking. */
@@ -296,11 +304,7 @@ const SLIDE_HEIGHTS = [1.25, 1.12, 0.99];
 /** A child's legs for their height (`pelvisScale` / height, rig.json). */
 const CHILD_LEGS = 0.509;
 /** The round in a size per height: the climber stands `to` m in front of the slide's middle, at the run-out's foot. */
-export const SLIDE: Size<SlideFit>[] = SLIDE_HEIGHTS.map((h, i) => ({
-  clip: `slide${Math.round(h * 100)}`,
-  min: i < SLIDE_HEIGHTS.length - 1 ? (h + SLIDE_HEIGHTS[i + 1]) / 2 : 0,
-  fit: { s: CHILD_LEGS * h, to: 1.25 },
-}));
+export const SLIDE: Size<SlideFit>[] = byHeight('slide', SLIDE_HEIGHTS, (h) => ({ s: CHILD_LEGS * h, to: 1.25 }));
 /** A round's length (s). */
 const SLIDE_S = 14;
 
@@ -472,8 +476,7 @@ const BUNK_SIZES: readonly (readonly [h: number, s: number])[] = [
   [1.12, 0.57],
 ];
 type BunkFit = Fit & { h: number };
-const bunkSizes = (name: string): Size<BunkFit>[] =>
-  BUNK_SIZES.map(([h, s], i) => ({ clip: `${name}${Math.round(h * 100)}`, min: i < BUNK_SIZES.length - 1 ? (h + BUNK_SIZES[i + 1][0]) / 2 : 0, fit: { s, to: 0, h } }));
+const bunkSizes = (name: string): Size<BunkFit>[] => byHeight(name, BUNK_SIZES.map(([h]) => h), (h, i) => ({ s: BUNK_SIZES[i][1], to: 0, h }));
 /** Up the ladder into the upper bunk and lain down (characters.ts `BUNK_LADDER`, getting into bed), and back down it getting up. */
 export const BUNK_UP = bunkSizes('bunkUp');
 export const BUNK_DOWN = bunkSizes('bunkDown');
@@ -491,7 +494,7 @@ const BUNK_DOWN_AT = { sat: 0.12, down: 0.8 };
  */
 function lainOnBunk(fit: BunkFit): PoseSpec {
   const lie = liePose(0);
-  const root: Vec = [0, (BUNK.top + (0.1 * fit.h) / 1.77) / fit.s, (fit.h - 0.91) / fit.s];
+  const root: Vec = [0, (BUNK.top + (0.1 * fit.h) / REF_HEIGHT) / fit.s, (fit.h - 0.91) / fit.s];
   const { pelvis } = rest();
   const p = lie.pelvis ?? [0, 0, 0];
   // (Turned a whole way round, as the round ends sat facing the foot end: blended into, it doesn't turn back.)
@@ -642,11 +645,10 @@ const RIDE_SIZES: readonly (RideFit & { h: number })[] = [
   { h: 1.47, s: 0.83, drop: 0.123 },
   { h: 1.12, s: 0.57, drop: 0.099 },
 ];
-type RideSize = { clip: string; min: number; fit: RideFit };
 /** A ride's clips in the sizes of `RIDE_SIZES` from `from` down to `to` (indices), named `name` and the height (cm). */
-function rideSizes(name: string, from: number, to: number): RideSize[] {
+function rideSizes(name: string, from: number, to: number) {
   const own = RIDE_SIZES.slice(from, to + 1);
-  return own.map((f, i) => ({ clip: `${name}${Math.round(f.h * 100)}`, min: i < own.length - 1 ? (f.h + own[i + 1].h) / 2 : 0, fit: f }));
+  return byHeight(name, own.map(({ h }) => h), (_, i): RideFit => own[i]);
 }
 /** The seated pelvis (the clip's metres): `sit`'s. */
 const SAT: Vec = [0, 0.947 + SEAT_MOVE[1], SEAT_MOVE[2]];

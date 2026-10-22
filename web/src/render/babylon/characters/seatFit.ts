@@ -9,6 +9,8 @@
  * forward). Pure maths, shared with the checker.
  */
 
+import { REF_HEIGHT } from './clips/street';
+
 /**
  * A leg in a clip (`measureLegs`; body space, scale 1, in the y-z plane): the hip's height and depth,
  * the thigh's and the calf's lengths and their directions (rad from straight down towards the front).
@@ -31,8 +33,6 @@ export interface LegSide {
  * - `stretch`: relaxing (`relax`, `nap`, `watch`), the feet this much further forward (m, likewise).
  */
 export const SEAT_FIT = { slope: 0.3, clear: 0.08, rim: 0.16, stretch: 0.12 };
-/** The reference body's height (m), which the lengths above are for. */
-const REF_HEIGHT = 1.77;
 
 /**
  * Turns a leg (`fit`) so its ankle reaches (`y`, `z`) (the knee bent forward; out of reach, straightened
