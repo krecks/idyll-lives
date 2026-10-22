@@ -7,6 +7,7 @@ The game has a rendering benchmark built in: open it with `?bench=<scene>` (`web
 | `render.mjs` | Starts Vite (or uses `--url`), opens `?bench=` in Chromium on the real GPU at 1920×1080 and device pixel ratio 1, once per preset × backend × scenario × CPU slow-down × diagnostic, and writes JSON and a markdown table to `bench-results/<time>/` (medians with `--runs`). `--shots <dir>` takes reference screenshots of 9 fixed poses; `--compare <dirA> <dirB>` counts the pixels that differ. |
 | `tools.mjs` | Times the repo's Rust tools (`crates/tools`: the character build and check, the object gate, the content editor, the texture commands), the release binaries run directly, median of `--runs` after a warm-up plus peak memory, into `bench-results/tools-<time>/`. It compared them with the Python scripts they replaced while those were in the tree (2026-10-20: 2–14× faster, `tex process` 0.8×). |
 | `scene.mjs` | Makes a scene, `web/public/bench/<name>.json.gz`: a new game as the menus make one, with a household of four in the first home for sale, played at full speed to `--hour` on day 1, paused and saved. |
+| `profile.mjs` | Profiles the **real game** instead of the bench scene: opens `?state=<name>&profile&debug&quality=<preset>` on the dev server (or `--build` for `vite preview`, where only `?bench=` exists), presses `--speed`, records its own animation-frame gaps for `--secs`, then reads `window.__perfReport()`. Writes `frames.json`, `perf.json` and `report.md` (gap p50/p95/p99/max, counts over 20/33/50/100 ms, dropped frames and long tasks by phase, worst frames, slowest spans) to `bench-results/profile-<time>/`. A server already answering on `--port` is reused. Findings: [docs/design/performance.md](../../docs/design/performance.md). |
 
 Both need `bun run wasm` first and Playwright (`PLAYWRIGHT=<path to playwright/index.mjs>` if it isn't installed, `CHROME=<executable>` for a browser of your own: Chrome or Chrome for Testing, not `chrome-headless-shell`, which draws in software). Measurements run in a window, so their timing is the real display's. Shots and `scene.mjs`, which time nothing, run headless: no window takes the focus, and it's still the real GPU. `--headless` and `--headed` choose for either. A window's shots come out about 2 of 255 brighter than headless ones (the screen's colour profile), so compare shots taken the same way: two headless runs of the same build differ in at most 0.12 % of their pixels. Both play the game at 1 % volume (`quiet.mjs`).
 
@@ -26,6 +27,9 @@ bun tools/bench/render.mjs --compare /tmp/shots-base /tmp/shots-new --out /tmp/s
 
 # A new scene
 bun tools/bench/scene.mjs --name village --world medium --hour 18
+
+# The real game (a debug state), 90 s at 5x speed, Medium
+bun tools/bench/profile.mjs --state readme-village --speed 5 --secs 90 --preset medium
 ```
 
 The options are documented at the top of each script. To compare two builds, measure them back to back on the same machine, with nothing else running, and take medians of at least 3 runs; GPU times on Apple hardware vary by about ±1 ms between runs. Shots of two runs of the same build taken in a window differed by at most 1 of 255 in a few pixels, apart from a far road's lane markings (P1-17 in the release review); headless ones in at most 0.12 % of their pixels (above).
