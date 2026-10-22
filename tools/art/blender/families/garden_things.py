@@ -18,13 +18,13 @@ import random
 import sys
 
 import bpy
-from mathutils import Vector
+from mathutils import Vector, noise
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gamekit as G  # noqa: E402
-from plants import LOW, far_of, leaf, low, lump, star  # noqa: E402
+from plants import LOW, dome, far_of, leaf, low, lump, star  # noqa: E402
 from gamekit.motion import _clip, last_frame  # noqa: E402
 
 SPEC = dict(
@@ -41,9 +41,13 @@ SPEC = dict(
     rush=('#6A4A2E', 'matte'),           # the bulrushes' heads
     koi=('#E8742E', 'satin'),
     koi_white=('#F6F2EC', 'satin'),
+    mud=('#4A4234', 'matte'),            # the wet margin under the coping stones
+    frog=('#6E9A3A', 'satin'),
+    iris=('#7A5CC4', 'satin'),           # the flag irises at the front
     # the planter box
     box_trim=('#7A5A40', 'wood'),
     soil=('#4A3A2C', 'matte'),
+    bracket=('#3A3D41', 'metal'),        # the planter box's steel corner brackets and screws
     leaf=('#4F8A3E', 'foliage'),
     leaf_dark=('#3B7034', 'foliage'),
     leaf_light=('#6FAA52', 'foliage'),
@@ -74,6 +78,8 @@ SPEC = dict(
     # the sundial
     dial=('#B87333', 'metal'),           # copper
     dial_mark=('#6E4A2A', 'metal'),
+    lichen=('#C8C29A', 'matte'),
+    moss=('#5E7A3A', 'matte'),           # moss at the stepping stones' edges (plain: no foliage draw)         # pale patches on the sundial's steps
     # the lights
     lantern=('#2F3236', 'metal'),        # the lamp's lantern frame and roof (the player's "Lantern")
     pane=('#F6EBCF', 'satin', {'glow': '#FFD596'}),    # frosted panes, lit at night
@@ -201,36 +207,112 @@ WATER_Y = 0.07           # the surface: the koi lies hidden under it at rest
 KOI = (0.18, 0.12)       # where the koi comes up (game x, depth)
 
 
+def _flag(name, r, at, yaw, h, seed, material, sx=1.0, sz=1.0, n=8):
+    """A flat stone: an irregular rounded outline `r` across its radius (stretched sx by sz), `h` thick, its
+    edges chamfered and its faces a little uneven, its middle at game `at`, turned `yaw` degrees."""
+    rng = random.Random(seed)
+    pts = []
+    for k in range(n):
+        a = math.tau * (k + rng.uniform(-0.18, 0.18)) / n
+        rr = r * rng.uniform(0.82, 1.08)
+        pts.append((rr * sx * math.cos(a), rr * sz * math.sin(a)))
+    c, s = G.cosd(yaw), G.sind(yaw)
+    pts = [(x * c - z * s, x * s + z * c) for x, z in G.smooth_outline(pts, passes=1)]
+    # a slab lofted through its outline: a little in at the foot, full at the waist, chamfered in to the top
+    cx, cy, cz = at
+    rows = [(0.9, -h / 2), (1.0, -h / 2 + h * 0.5), (0.86, h / 2)]
+    stone = G.loft(name, [[F.at(cx + x * k, cy + y, cz + z * k) for x, z in pts] for k, y in rows], material=material)
+    return G.jitter(stone, 0.007, size=0.12, seed=seed, up=0.5)
+
+
+def _koi(x, y, z):
+    """The koi, nose to game +x (its node turns it): a lofted white body with an orange saddle and crown, a fanned
+    tail, a dorsal fin and two pectoral fins."""
+    # (along, half width, half height): nose to the tail's root
+    rows = [(0.13, 0.004, 0.004), (0.115, 0.018, 0.016), (0.09, 0.026, 0.026), (0.05, 0.03, 0.034), (0.0, 0.029, 0.033),
+            (-0.05, 0.022, 0.025), (-0.09, 0.012, 0.014), (-0.115, 0.006, 0.008)]
+    n = 10
+    G.loft('koi_body', [[F.at(x + u, y + hh * math.sin(math.tau * k / n), z + hw * math.cos(math.tau * k / n))
+                         for k in range(n)] for u, hw, hh in rows], material=M.koi_white)
+    # the orange saddle over the back, a hair proud of the white body, and the crown on the head
+    for name, part in (('koi_patch', rows[3:7]), ('koi_crown', rows[1:3])):
+        G.loft(name, [[F.at(x + u, y + 0.001 + hh * 1.05 * math.sin(math.pi * (k + 0.5) / 7),
+                            z + hw * 1.05 * math.cos(math.pi * (k + 0.5) / 7)) for k in range(7)] for u, hw, hh in part],
+               material=M.koi)
+    F.sweep('koi_tail', [(x - 0.11, y, z), (x - 0.165, y + 0.004, z)], None, M.koi,
+            profile=[(-0.0045, -0.0015), (0.0045, -0.0015), (0.0045, 0.0015), (-0.0045, 0.0015)], up=(0, 1, 0),
+            scale=[1.0, 7.0])
+    F.extrude('koi_fin', [(0.05, 0.0), (-0.03, 0.0), (-0.05, 0.007), (0.0, 0.011)], 0.003, (x, y + 0.024, z), M.koi,
+              plane='front')
+    for side in (-1, 1):
+        F.sweep(f'koi_side_fin{side}', [(x + 0.07, y - 0.012, z + side * 0.026), (x + 0.045, y - 0.02, z + side * 0.058)],
+                None, M.koi_white, profile=[(-0.008, -0.001), (0.008, -0.001), (0.008, 0.001), (-0.008, 0.001)],
+                up=(0, 1, 0), scale=[0.5, 1.4])
+
+
+def _frog(x, y, z, turn):
+    """A frog squatting on a lily pad at game (x, y, z), looking `turn` degrees round from the front."""
+    c, s = G.cosd(turn), G.sind(turn)
+
+    def at(u, v, w):
+        return (x + v * s + u * c, y + w, z + v * c - u * s)
+    rows = [(-0.03, 0.012, 0.008, 0.012), (-0.018, 0.022, 0.016, 0.018), (0.0, 0.025, 0.019, 0.02),
+            (0.018, 0.021, 0.013, 0.019), (0.03, 0.011, 0.006, 0.016)]
+    n = 8
+    G.loft('frog', [[F.at(*at(hw * math.cos(math.tau * k / n), v, wc + hh * math.sin(math.tau * k / n))) for k in range(n)]
+                    for v, hw, hh, wc in rows], material=M.frog)
+    for k in (-1, 1):
+        F.sphere(f'frog_eye{k}', 0.0065, at(k * 0.012, 0.016, 0.031), M.frog, segments=6, rings=4)
+        F.sphere(f'frog_pupil{k}', 0.0035, at(k * 0.0148, 0.0185, 0.0335), M.dark, segments=6, rings=4)
+        # the haunches folded at its sides, the front legs straight down
+        F.sweep(f'frog_leg{k}', [at(k * 0.02, -0.02, 0.012), at(k * 0.03, -0.002, 0.007), at(k * 0.02, 0.014, 0.003)],
+                0.006, M.frog, verts=6, scale=[1.2, 1.0, 0.6])
+        F.sweep(f'frog_arm{k}', [at(k * 0.013, 0.014, 0.012), at(k * 0.016, 0.022, 0.001)], 0.003, M.frog, verts=5)
+
+
 def pond():
     _own('pond')
     rng = random.Random(101)
     with G.new_parts() as still:
         rx, rz = POND
-        # the water: an opaque gloss block to the surface, its sides hidden under the stones
+        # the water: an opaque gloss block to the surface, its sides hidden under the stones; deeper in the middle
         F.cyl('water', 1.0, WATER_Y, (0, WATER_Y / 2, 0), M.water, verts=32, scale=(rx - 0.04, rz - 0.04, 1))
         F.cyl('deep', 1.0, 0.002, (0.05, WATER_Y + 0.001, 0.03), M.water_deep, verts=24, scale=(0.5, 0.42, 1))
-        # the rim: flat stones round the edge, a few smaller ones and pebbles between them
-        n = 18
+        # the margin: a band of dark wet mud at the water's edge, under the coping stones' lips
+        G.torus('margin', 1.0, 0.03, at=F.at(0, WATER_Y - 0.012, 0), material=M.mud, major_segments=32,
+                minor_segments=4).scale = (rx - 0.12, rz - 0.12, 0.6)
+        # the rim: big flat coping stones lapping over the edge, smaller ones set behind in their gaps, pebbles
+        n = 15
         for i in range(n):
             a = i / n * math.tau + rng.uniform(-0.05, 0.05)
-            r = rng.uniform(0.15, 0.19)
-            x, z = rx * math.cos(a), rz * math.sin(a)
-            G.boulder(f'stone{i}', r, at=F.at(x, 0, z), material=M.body, scale=(1.15, 0.8, 0.36),
-                      rot=(0, 0, math.degrees(a) + 90), seed=i * 1.37, noise=0.25, subdivisions=2)
-        for i in range(10):
-            a = (i + 0.5) / 10 * math.tau + rng.uniform(-0.1, 0.1)
+            r = rng.uniform(0.17, 0.2)
+            x, z = (rx - 0.03) * math.cos(a), (rz - 0.03) * math.sin(a)
+            h = rng.uniform(0.07, 0.09)
+            _flag(f'stone{i}', r, (x, WATER_Y + h / 2 - 0.025, z), -math.degrees(a), h, i * 1.37 + 3, M.body,
+                  sx=0.72, sz=1.15, n=6)
+        for i in range(n):
+            a = (i + 0.5) / n * math.tau + rng.uniform(-0.08, 0.08)
+            r = rng.uniform(0.1, 0.13)
+            x, z = (rx + 0.06) * math.cos(a), (rz + 0.08) * math.sin(a)
+            h = rng.uniform(0.04, 0.055)
+            _flag(f'back_stone{i}', r, (x, h / 2, z), -math.degrees(a), h, i * 2.11 + 40, M.body, sx=0.8, sz=1.1, n=5)
+        for i in range(12):
+            a = (i + 0.3) / 12 * math.tau + rng.uniform(-0.1, 0.1)
             x, z = (rx + 0.1) * math.cos(a), (rz + 0.1) * math.sin(a)
-            G.boulder(f'pebble{i}', rng.uniform(0.05, 0.07), at=F.at(x, 0, z), material=M.pebble, scale=(1.2, 1, 0.6),
+            G.boulder(f'pebble{i}', rng.uniform(0.035, 0.05), at=F.at(x, 0, z), material=M.pebble, scale=(1.2, 1, 0.6),
                       seed=i * 2.9, noise=0.3, subdivisions=1)
-        # lily pads, each with a notch, and two flowers
+        # lily pads, each with a notch, two flowers, a bud and a frog on a pad of its own
         for i, (x, z, r) in enumerate([(-0.3, 0.2, 0.11), (0.28, -0.24, 0.09), (0.42, 0.3, 0.08), (-0.16, -0.36, 0.085),
-                                        (-0.02, 0.44, 0.07), (-0.44, -0.08, 0.075)]):
+                                        (-0.02, 0.44, 0.07), (-0.44, -0.08, 0.075), (0.0, 0.3, 0.09)]):
             _pad(f'pad{i}', r, (x, WATER_Y + 0.003, z), rng.uniform(0, 360), M.pad)
         for (x, z), petal in (((-0.27, 0.2), M.lily), ((0.26, -0.22), M.lily_white)):
-            for k, (rr, tilt) in enumerate(((0.055, 0), (0.04, 0))):
-                star(f'lily{x}_{k}', F.at(x, WATER_Y + 0.012 + 0.012 * k, z), rr, 8, petal, yaw=22.5 * k, inner=0.45,
-                     depth=0.008, cup=0.55 + 0.3 * k)
-            F.sphere(f'lily_heart{x}', 0.014, (x, WATER_Y + 0.03, z), M.lily_heart, segments=8, rings=5)
+            for k, rr in enumerate((0.058, 0.042, 0.027)):
+                star(f'lily{x}_{k}', F.at(x, WATER_Y + 0.01 + 0.011 * k, z), rr, 8, petal, yaw=22.5 * k, inner=0.4,
+                     depth=0.006, cup=0.5 + 0.35 * k)
+            F.sphere(f'lily_heart{x}', 0.011, (x, WATER_Y + 0.037, z), M.lily_heart, segments=6, rings=4)
+        G.revolve('lily_bud', [(0, 0), (0.016, 0.014), (0.015, 0.036), (0.006, 0.056), (0, 0.06)],
+                  at=F.at(0.4, WATER_Y - 0.004, 0.26), material=M.lily, segments=8)
+        _frog(0.0, WATER_Y + 0.006, 0.3, 25)
         # reeds and bulrushes at the back left, rising out of the shallows by the stones
         for i in range(11):
             x, z = -0.6 + rng.uniform(-0.12, 0.12), -0.44 + rng.uniform(-0.1, 0.08)
@@ -239,27 +321,42 @@ def pond():
         for i in range(3):
             x, z = -0.62 + i * 0.07, -0.46 + (i % 2) * 0.06
             h = 0.6 + i * 0.06
-            G.rod(f'rush_stem{i}', F.at(x, WATER_Y - 0.01, z), F.at(x, h + 0.08, z), 0.005, material=M.reed, verts=5)
-            F.cyl(f'rush{i}', 0.016, 0.11, (x, h, z), M.rush, verts=8)
+            F.sweep(f'rush_stem{i}', [(x, WATER_Y - 0.01, z), (x + 0.008, h * 0.6, z), (x + 0.012, h + 0.08, z)], 0.005,
+                    M.reed, verts=5, resolution=2, scale=[1.0, 0.9, 0.5])
+            bx, by, _ = F.at(x + 0.011, 0, z)
+            G.loft(f'rush{i}', [G.ring(r, r, h + dy, 8, at=(bx, by)) for dy, r in
+                                ((-0.058, 0.005), (-0.05, 0.015), (0.0, 0.018), (0.05, 0.015), (0.058, 0.005))],
+                   material=M.rush)
+        # flag irises at the front right: sword leaves in a fan and two flowers
+        for i in range(7):
+            yaw = 150 + i * 14 + rng.uniform(-6, 6)
+            leaf(f'iris{i}', F.at(0.64 + rng.uniform(-0.03, 0.03), WATER_Y - 0.01, 0.36 + rng.uniform(-0.03, 0.03)), yaw,
+                 rng.uniform(72, 84), rng.uniform(0.3, 0.4), 0.028, M.reed, shape='strap', droop=0.04, thick=0.005,
+                 fold=0.15, rows=3, ring=3)
+        for i, (x, z, h) in enumerate(((0.62, 0.36, 0.4), (0.68, 0.33, 0.34))):
+            F.sweep(f'iris_stem{i}', [(x, WATER_Y, z), (x, h, z)], 0.004, M.reed, verts=4)
+            for k in range(3):
+                a = 120 * k + 30 * i
+                F.sweep(f'iris_fall{i}{k}', [(x, h, z), (x + 0.028 * G.sind(a), h + 0.008, z + 0.028 * G.cosd(a)),
+                                             (x + 0.042 * G.sind(a), h - 0.022, z + 0.042 * G.cosd(a))], None, M.iris,
+                        profile=[(-0.009, -0.0015), (0.009, -0.0015), (0.009, 0.0015), (-0.009, 0.0015)], up=(0, 1, 0),
+                        scale=[0.4, 1.2, 0.5])
+                b = a + 60
+                F.sweep(f'iris_std{i}{k}', [(x, h, z), (x + 0.012 * G.sind(b), h + 0.04, z + 0.012 * G.cosd(b))],
+                        None, M.iris, profile=[(-0.006, -0.0015), (0.006, -0.0015), (0.006, 0.0015), (-0.006, 0.0015)],
+                        up=(0, 1, 0), scale=[0.5, 1.0])
     G.join(still, 'pond', origin=(0, 0, 0))
     # the ripples: three faint rings round where the koi comes up, spreading and settling all the time
     with G.new_parts() as rings:
         for k, r in enumerate((0.1, 0.19, 0.28)):
-            G.torus(f'ring{k}', r, 0.006, at=F.at(KOI[0], WATER_Y, KOI[1]), material=M.ripple, major_segments=28,
+            G.torus(f'ring{k}', r, 0.006, at=F.at(KOI[0], WATER_Y, KOI[1]), material=M.ripple, major_segments=22,
                     minor_segments=4).scale = (1, 0.9, 0.35)
     ripples = G.hinged(G.join(rings, 'ripples'), F.at(KOI[0], WATER_Y, KOI[1]))
     # the koi, under the surface at rest (the opaque water hides it); it rises until its back is out
     with G.new_parts() as fish:
         x, z = KOI
         y = 0.035
-        F.sphere('koi_body', 0.5, (x, y, z), M.koi, scale=(0.26, 0.075, 0.05), segments=14, rings=8)
-        F.sphere('koi_patch', 0.5, (x - 0.03, y + 0.004, z), M.koi_white, scale=(0.1, 0.07, 0.048), segments=10, rings=6)
-        F.sphere('koi_head', 0.5, (x + 0.1, y + 0.002, z), M.koi_white, scale=(0.07, 0.06, 0.042), segments=10, rings=6)
-        F.cone('koi_tail', 0.035, 0.002, 0.08, (x - 0.15, y, z), M.koi, rot=(0, 90, 0), verts=6,
-               scale=(0.4, 1, 1))
-        F.box('koi_fin', 0.08, 0.02, 0.006, (x - 0.01, y + 0.022, z), M.koi, rot=(0, 0, 0), bevel=0.003)
-        for s in (-1, 1):
-            F.box(f'koi_side_fin{s}', 0.03, 0.004, 0.035, (x + 0.05, y - 0.012, z + s * 0.045), M.koi, bevel=0.0015)
+        _koi(x, y, z)
     koi = G.hinged(G.join(fish, 'koi'), F.at(x, y, z))
     koi.rotation_euler[2] = math.radians(25)        # heading a little to the front (a node turn, not baked)
     G.settle()
@@ -273,15 +370,17 @@ def pond():
     return G.meshes()
 
 
-def _pad(name, r, at, yaw, material, n=14):
-    """A lily pad: a thin disc `r` across with a notch cut to its middle, lying at game `at`."""
+def _pad(name, r, at, yaw, material, n=11):
+    """A lily pad: a thin disc `r` across with a notch cut to its middle, its rim turned up a little, lying at game
+    `at`."""
     verts, faces = [], []
     gap = 0.5
     top, bottom = [], []
     for i in range(n + 1):
         a = gap / 2 + (math.tau - gap) * i / n
-        top.append((r * math.cos(a), r * math.sin(a), 0.003))
-        bottom.append((r * math.cos(a), r * math.sin(a), -0.003))
+        lift = 0.006 * (1 + 0.5 * math.sin(3 * a))
+        top.append((r * math.cos(a), r * math.sin(a), 0.003 + lift))
+        bottom.append((r * math.cos(a), r * math.sin(a), -0.001 + lift))
     verts = top + bottom + [(0, 0, 0.003), (0, 0, -0.003)]
     m = n + 1
     ct, cb = 2 * m, 2 * m + 1
@@ -303,7 +402,8 @@ def planterBox():
     rng = random.Random(58)
     z0 = -0.1                          # the old part's trough stands 10 cm back on its tile
     w, d, h = 0.9, 0.42, 0.44
-    for s in (-1, 1):
+    full = not G.is_low()
+    for s in (-1, 1):                  # corner posts, their feet chamfered off the ground
         for e in (-1, 1):
             F.box(f'leg{s}{e}', 0.06, h, 0.06, (s * (w / 2 - 0.03), h / 2, z0 + e * (d / 2 - 0.03)), M.box_trim,
                   bevel=low(0.008, 0), bevel_segments=1)
@@ -314,11 +414,29 @@ def planterBox():
         for s in (-1, 1):
             F.box(f'end{k}{s}', 0.03, 0.115, d - 0.1, (s * (w / 2 - 0.035), y, z0), M.body, bevel=low(0.006, 0), bevel_segments=1)
     F.box('floor', w - 0.08, 0.02, d - 0.08, (0, 0.08, z0), M.body)
-    for e in (-1, 1):                  # the rim capping the planks
-        F.box(f'rim{e}', w + 0.04, 0.03, 0.06, (0, h + 0.015, z0 + e * (d / 2 - 0.01)), M.box_trim, bevel=low(0.008, 0), bevel_segments=1)
-    for s in (-1, 1):
-        F.box(f'rim_end{s}', 0.06, 0.03, d - 0.08, (s * (w / 2 - 0.01), h + 0.015, z0), M.box_trim, bevel=low(0.008, 0), bevel_segments=1)
-    F.box('soil', w - 0.08, 0.03, d - 0.08, (0, h - 0.025, z0), M.soil)
+    # a batten down the middle of each long side, screwed to the planks
+    for e in (-1, 1):
+        F.box(f'batten{e}', 0.06, h - 0.1, 0.02, (0, 0.07 + (h - 0.1) / 2, z0 + e * (d / 2 - 0.01)), M.box_trim,
+              bevel=low(0.005, 0), bevel_segments=1)
+        if full:
+            for k in range(3):
+                F.cyl(f'screw{e}{k}', 0.006, 0.004, (0, 0.13 + k * 0.125, z0 + e * (d / 2 + 0.001)), M.bracket,
+                      rot=(90, 0, 0), verts=6)
+    # the cap rail: one moulded frame round the top, its corners mitred, its outer edge rounded over
+    hw, hd = w / 2 + 0.02, d / 2 + 0.02
+    rail = [(hw, z0 - hd), (hw, z0 + hd), (-hw, z0 + hd), (-hw, z0 - hd)]
+    G.kit.moulding(F, 'rim', rail, [(0.0, 0.0), (0.0, low(0.02, 0.03)), (low(0.008, 0.0), 0.03), (0.07, 0.03), (0.07, 0.0)],
+                   M.box_trim, at=h, plane='top')
+    # steel corner brackets on the front, bolted through
+    if full:
+        for s in (-1, 1):
+            x, zf = s * (w / 2 - 0.03), z0 + d / 2 + 0.002
+            for y in (0.12, h - 0.06):
+                F.box(f'bracket{s}{y}', 0.075, 0.06, 0.004, (x, y, zf), M.bracket)
+                F.box(f'bracket_side{s}{y}', 0.004, 0.06, 0.05, (s * (w / 2 + 0.002), y, zf - 0.025), M.bracket)
+                for b in (-1, 1):
+                    F.cyl(f'bolt{s}{y}{b}', 0.006, 0.005, (x + b * 0.022, y, zf + 0.003), M.bracket, rot=(90, 0, 0), verts=6)
+    soil = F.box('soil', w - 0.08, 0.03, d - 0.08, (0, h - 0.025, z0), M.soil)
     # leafy clumps along the box, flowers over them, and a few leaves trailing over the front
     greens = [M.leaf, M.leaf_dark, M.leaf_light]
     clumps = []
@@ -328,7 +446,7 @@ def planterBox():
         zz = z0 + (0.065 if row else -0.06) + rng.uniform(-0.02, 0.02)
         clumps.append((lump(f'clump{i}', 0.075 * rng.uniform(0.9, 1.15), F.at(x, h - 0.04, zz), greens[i % 3],
                             scale=(1.25, 1.15, 1.2), seed=i * 1.3, noise=0.32), Vector(F.at(x, 0, zz))))
-    # flowers sitting on the clumps, leaning outwards with the leaves under them
+    # flowers sitting on the clumps, leaning outwards with the leaves under them, a yellow eye in each
     cols = [M.bloom, M.bloom2, M.bloom3, M.bloom4, M.bloom5]
     for i in range(22):
         clump, c = clumps[(i * 5) % 12]
@@ -338,8 +456,9 @@ def planterBox():
         at.z = (max(near) if near else h + 0.15) - 0.006
         star(f'flower{i}', tuple(at), 0.032, 5, cols[i % 5], yaw=math.degrees(a), tilt=rr / 0.06 * 50, inner=0.6,
              cup=0.15)
-        if not LOW[0]:
-            G.sphere(f'eye{i}', 0.009, at=tuple(at + Vector((0, 0, 0.006))), material=M.eye, segments=6, rings=3)
+        if full and i % 2 == 0:
+            dome(f'eye{i}', tuple(at + Vector((0, 0, 0.003))), 0.008, 0.005, M.eye, yaw=math.degrees(a),
+                 tilt=rr / 0.06 * 50)
     for i, x in enumerate((-0.3, -0.1, 0.12, 0.3)):
         for k in range(2):
             size = rng.uniform(0.12, 0.16)
@@ -357,19 +476,44 @@ def planterBox():
 def birdhouse():
     _own('birdhouse')
     with G.new_parts():
-        F.box('post', 0.07, 1.52, 0.07, (0, 0.76, 0), M.post, bevel=0.01)
-        F.box('bracket', 0.2, 0.025, 0.2, (0, 1.505, 0), M.post, bevel=0.006)
-        # the house: a gabled box, its ridge running front to back
+        # the post, its edges chamfered, on a little collar of earth; a platform on two braces carries the house
+        F.box('post', 0.07, 1.52, 0.07, (0, 0.76, 0), M.post, bevel=0.01, bevel_segments=1)
+        G.revolve('mound', [(0, 0), (0.1, 0), (0.07, 0.025), (0.04, 0.035), (0, 0.035)], at=F.at(0, 0, 0),
+                  material=M.soil, segments=10)
+        F.box('bracket', 0.2, 0.025, 0.2, (0, 1.505, 0), M.post, bevel=0.006, bevel_segments=1)
+        for e in (-1, 1):
+            F.sweep(f'brace{e}', [(0, 1.36, e * 0.035), (0, 1.49, e * 0.09)], None, M.post,
+                    profile=[(-0.012, -0.015), (0.012, -0.015), (0.012, 0.015), (-0.012, 0.015)], up=(1, 0, 0))
+        # the house: a gabled box, its ridge running front to back, clad in lapped boards down its sides
         _prism('house', [(-0.12, 1.5), (0.12, 1.5), (0.12, 1.76), (0, 1.86), (-0.12, 1.76)], -0.11, 0.11, M.body)
         for s in (-1, 1):
-            F.box(f'roof{s}', 0.2, 0.022, 0.29, (s * 0.075, 1.83, 0), M.roof, rot=(0, -s * 40, 0), bevel=0.005)
-        F.box('ridge', 0.03, 0.03, 0.3, (0, 1.9, 0), M.roof, bevel=0.008)
-        F.cyl('hole', 0.034, 0.008, (0, 1.68, 0.108), M.dark, rot=(90, 0, 0), verts=16)
-        F.cyl('hole_ring', 0.042, 0.006, (0, 1.68, 0.11), M.post, rot=(90, 0, 0), verts=16)
-        G.rod('perch', F.at(0, 1.6, 0.11), F.at(0, 1.6, 0.17), 0.007, material=M.post, verts=8)
-        F.box('floor', 0.27, 0.02, 0.25, (0, 1.505 + 0.012, 0), M.body, bevel=0.004)
+            for k in range(5):
+                y = 1.545 + k * 0.05
+                F.box(f'board{s}{k}', 0.008, 0.05, 0.215, (s * 0.124, y, 0), M.body, rot=(0, -s * 4, 0))
+        # the front: a gable board proud of the wall, the round hole through it into the dark, a ring round it
+        gable = [(-0.125, 1.52), (0.125, 1.52), (0.125, 1.765), (0, 1.865), (-0.125, 1.765)]
+        hole = [(0.033 * math.cos(math.tau * k / 14), 1.68 + 0.033 * math.sin(math.tau * k / 14)) for k in range(14)]
+        F.extrude('front', gable, 0.012, (0, 0, 0.114), M.body, holes=[hole])
+        F.cyl('hole', 0.035, 0.002, (0, 1.68, 0.111), M.dark, rot=(90, 0, 0), verts=14)
+        G.torus('hole_ring', 0.04, 0.006, at=F.at(0, 1.68, 0.121), material=M.post, rot=(90, 0, 0), major_segments=14,
+                minor_segments=4)
+        # the perch: a dowel out under the hole, a robin on it looking along the front
+        F.sweep('perch', [(0, 1.6, 0.11), (0, 1.6, 0.165)], 0.007, M.post, verts=8)
+        G.kit.songbird(F, 'robin', 0.0, 1.607, 0.142, M.robin, M.robin_breast, M.beak, M.dark, turn=90, size=0.85)
+        # the roof: two overhanging boards with a fascia under their eaves and a rounded ridge cap
+        for s in (-1, 1):
+            F.box(f'roof{s}', 0.2, 0.022, 0.29, (s * 0.075, 1.83, 0), M.roof, rot=(0, -s * 40, 0), bevel=0.005,
+                  bevel_segments=1)
+            for k in range(3):         # shingle courses: each a strip lapped over the one below
+                t = 0.042 + k * 0.048
+                F.box(f'shingle{s}{k}', 0.06, 0.012, 0.292, (s * (0.161 - t * G.cosd(40)), 1.777 + t * G.sind(40), 0),
+                      M.roof, rot=(0, -s * 40, 0), bevel=0.002, bevel_segments=1)
+        F.sweep('ridge', [(0, 1.9, -0.15), (0, 1.9, 0.15)], None, M.roof,
+                profile=G.rounded_rect(0.03, 0.034, 0.012, corner=2), up=(0, 0, 1))
+        F.box('floor', 0.27, 0.02, 0.25, (0, 1.505 + 0.012, 0), M.body, bevel=0.004, bevel_segments=1)
         for s in (-1, 1):              # corner trim
-            F.box(f'trim{s}', 0.02, 0.26, 0.02, (s * 0.12, 1.63, 0.105), M.plate, bevel=0.004)
+            F.box(f'trim{s}', 0.02, 0.26, 0.02, (s * 0.12, 1.63, 0.105), M.plate, bevel=0.004, bevel_segments=1)
+            F.box(f'trim_back{s}', 0.02, 0.26, 0.02, (s * 0.12, 1.63, -0.105), M.plate, bevel=0.004, bevel_segments=1)
     G.join_all('birdhouse')
     G.settle()
     return G.meshes()
@@ -380,19 +524,31 @@ FEED_Z = -0.2      # the hook's plane (the old part's)
 
 
 def _feeder(x):
-    """A seed tube hanging from the hook's end at `x`: glass round the seed, a green cap and tray, a perch ring."""
+    """A seed tube hanging from the hook's end at `x`: a wire bail, a domed green lid, the glass tube full of seed
+    with two feeding ports and their pegs, a base and a seed tray with a lip, a perch ring on four spokes."""
     z = FEED_Z
-    G.rod(_name('hanger'), F.at(x, 1.78, z), F.at(x, 1.705, z), 0.003, material=M.iron, verts=4)
-    F.cone(_name('cap'), 0.075, 0.02, 0.06, (x, 1.68, z), M.feeder, verts=16)
-    F.cyl(_name('cap_rim'), 0.072, 0.012, (x, 1.651, z), M.feeder, verts=16)
+    bx, by, _ = F.at(x, 0, z)
+    # the bail: a loop over the hook's tip, down to the lid's knob
+    F.sweep(_name('hanger'), [(x - 0.012, 1.705, z), (x - 0.012, 1.765, z), (x, 1.782, z), (x + 0.012, 1.765, z),
+                              (x + 0.012, 1.705, z)], 0.0025, M.iron, verts=4, resolution=2)
+    G.revolve(_name('cap'), [(0.0, 1.645), (0.074, 1.645), (0.076, 1.655), (0.068, 1.668), (0.048, 1.69),
+                             (0.022, 1.703), (0.012, 1.712), (0.0, 1.716)], at=(bx, by, 0), material=M.feeder,
+              segments=14)
     F.cyl(_name('tube'), 0.055, 0.2, (x, 1.545, z), M.feeder_glass, verts=14)
     F.cyl(_name('tube_seed'), 0.048, 0.17, (x, 1.53, z), M.seed, verts=12)
-    F.cyl(_name('tray'), 0.09, 0.014, (x, 1.44, z), M.feeder, verts=18)
-    F.cyl(_name('base'), 0.06, 0.02, (x, 1.455, z), M.feeder, verts=14)
+    for y, a in ((1.6, 0), (1.5, 90)):           # feeding ports, each with a peg to stand on
+        c, s = G.cosd(a), G.sind(a)
+        for k in (-1, 1):
+            F.sweep(_name('port'), [(x + k * 0.05 * c, y, z + k * 0.05 * s), (x + k * 0.062 * c, y, z + k * 0.062 * s)],
+                    0.012, M.feeder, verts=8)
+            F.sweep(_name('peg'), [(x + k * 0.05 * c, y - 0.022, z + k * 0.05 * s),
+                                   (x + k * 0.1 * c, y - 0.022, z + k * 0.1 * s)], 0.0025, M.iron, verts=4)
+    G.revolve(_name('tray'), [(0.0, 1.433), (0.09, 1.433), (0.094, 1.447), (0.088, 1.452), (0.083, 1.441),
+                              (0.06, 1.441), (0.06, 1.465), (0.0, 1.465)], at=(bx, by, 0), material=M.feeder, segments=16)
     G.torus(_name('perch'), 0.1, 0.005, at=F.at(x, 1.47, z), material=M.iron, major_segments=20, minor_segments=4)
     for a in (0, 90, 180, 270):
-        G.rod(_name('spoke'), F.at(x + 0.06 * G.cosd(a), 1.452, z + 0.06 * G.sind(a)),
-              F.at(x + 0.1 * G.cosd(a), 1.47, z + 0.1 * G.sind(a)), 0.003, material=M.iron, verts=4)
+        F.sweep(_name('spoke'), [(x + 0.06 * G.cosd(a), 1.452, z + 0.06 * G.sind(a)),
+                                 (x + 0.1 * G.cosd(a), 1.47, z + 0.1 * G.sind(a))], 0.003, M.iron, verts=4)
 
 
 def birdFeederPole():
@@ -400,21 +556,28 @@ def birdFeederPole():
     pole = M.body
     with G.new_parts() as still:
         z = FEED_Z
-        G.rod('pole', F.at(0, 0, z), F.at(0, 1.88, z), 0.013, material=pole, verts=10)
-        F.sphere('finial', 0.022, (0, 1.89, z), pole, segments=10, rings=6)
-        F.box('foot_bar', 0.16, 0.012, 0.025, (0, 0.18, z), pole, bevel=0.004)      # the bar it's trodden in by
+        # the pole: a spike into the lawn, a step bar to tread it in, an acorn finial
+        F.sweep('pole', [(0, 0, z), (0, 0.06, z), (0, 1.86, z)], 0.013, pole, verts=10, scale=[0.4, 1.0, 1.0])
+        G.revolve('finial', [(0.0, 0.0), (0.016, 0.0), (0.016, 0.008), (0.022, 0.016), (0.02, 0.034), (0.011, 0.05),
+                             (0.0, 0.058)], at=F.at(0, 1.855, z), material=pole, segments=10)
+        F.sweep('foot_bar', G.kit.fillet([(-0.085, 0.14, z), (-0.085, 0.18, z), (0.085, 0.18, z), (0.085, 0.14, z)], 0.015),
+                0.007, pole, verts=6)
+        F.cyl('collar', 0.02, 0.03, (0, 1.735, z), pole, verts=10, bevel=0.004, bevel_segments=1)
         for s in (-1, 1):
-            # each arm curls out from the pole and down into a hook
-            pts = [(0, 1.74), (s * 0.12, 1.82), (s * 0.24, 1.85), (s * 0.3, 1.83), (s * 0.32, 1.78)]
-            for a, b in zip(pts, pts[1:]):
-                G.rod(_name('arm'), F.at(a[0], a[1], z), F.at(b[0], b[1], z), 0.009, material=pole, verts=8)
-                F.sphere(_name('arm_joint'), 0.009, (b[0], b[1], z), pole, segments=8, rings=5)
+            # each arm in one piece: out from the pole's collar, curling over and down into a hook
+            pts = [(0, 1.735, z), (s * 0.06, 1.79, z), (s * 0.15, 1.835, z), (s * 0.24, 1.85, z), (s * 0.3, 1.835, z),
+                   (s * 0.322, 1.8, z), (s * 0.32, 1.775, z), (s * 0.305, 1.765, z)]
+            F.sweep(f'arm{s}', pts, 0.009, pole, verts=6, resolution=3, scale=[1.2, 1.0, 1.0, 1.0, 1.0, 1.0, 0.9, 0.8])
+            # a scroll under it, stiffening the bend
+            F.sweep(f'scroll{s}', [(0, 1.68, z), (s * 0.05, 1.7, z), (s * 0.1, 1.76, z), (s * 0.085, 1.79, z),
+                                   (s * 0.07, 1.775, z)], 0.005, pole, verts=5, resolution=2)
             _feeder(s * 0.32)
-        _bird(0.32, 1.47, FEED_Z + 0.1, M.robin, M.robin_breast, turn=-20)            # the robin, always there
+        G.kit.songbird(F, 'robin', 0.32, 1.475, FEED_Z + 0.1, M.robin, M.robin_breast, M.beak, M.dark, turn=-20,
+                       size=0.8)                                                      # the robin, always there
     G.join(still, 'feeders', origin=(0, 0, 0))
     # the blue tit that comes to the other feeder's perch, built full size and scaled to nothing
     with G.new_parts() as bird:
-        _bird(-0.32, 1.47, FEED_Z + 0.1, M.tit, M.tit_breast, turn=25)
+        G.kit.songbird(F, 'tit', -0.32, 1.475, FEED_Z + 0.1, M.tit, M.tit_breast, M.beak, M.dark, turn=25, size=0.75)
     bird = G.join(bird, 'bird', origin=F.at(-0.32, 1.47, FEED_Z + 0.1))
     bird.scale = (0.001, 0.001, 0.001)
     G.settle(centre=False)
@@ -443,33 +606,80 @@ def dogHouse():
     _own('dogHouse')
     zc, d = -0.03, 0.84                # the old part's body: 0.8 wide, centred 3-4 cm back
     front = zc + d / 2
+    slope = math.degrees(math.atan2(0.28, 0.4))
+    cs, sn = G.cosd(slope), G.sind(slope)
+    rng = random.Random(7)
     with G.new_parts():
-        F.box('base', 0.84, 0.04, 0.9, (0, 0.02, zc), M.plinth, bevel=0.008)
+        F.box('base', 0.84, 0.04, 0.9, (0, 0.02, zc), M.plinth, bevel=0.008, bevel_segments=1)
         _prism('house', [(-0.4, 0.04), (0.4, 0.04), (0.4, 0.62), (0, 0.9), (-0.4, 0.62)], zc - d / 2, front, M.body)
+        # lapped boards down the sides and the back: each a strip proud of the wall, its lower edge out a little
+        for k in range(7):
+            y = 0.08 + k * 0.08
+            for s in (-1, 1):
+                F.box(f'side_board{s}{k}', 0.008, 0.082, d - 0.04, (s * 0.403, y, zc), M.body, rot=(0, s * 3, 0))
+            F.box(f'back_board{k}', 0.76, 0.082, 0.008, (0, y, zc - d / 2 - 0.003), M.body, rot=(3, 0, 0))
+        # the front: a gable board with the arched doorway through it, its boards' laps either side of the door
+        gable = [(-0.4, 0.04), (0.4, 0.04), (0.4, 0.62), (0, 0.9), (-0.4, 0.62)]
+        arch = [(0.15, 0.04), (0.15, 0.3)] + [(0.15 * G.cosd(a), 0.3 + 0.15 * G.sind(a)) for a in range(15, 180, 15)] + \
+            [(-0.15, 0.3), (-0.15, 0.04)]
+        hole = [(0.15, 0.045)] + arch[1:-1] + [(-0.15, 0.045)]
+        F.extrude('front', gable, 0.012, (0, 0, front + 0.006), M.body, holes=[hole])
+        for k in range(1, 9):
+            y = 0.04 + k * 0.08
+            half = 0.4 if y <= 0.62 else 0.4 * (0.9 - y) / 0.28
+            if half < 0.05:
+                continue
+            spans = [(-half, half)] if y > 0.46 else [(-half, -0.17), (0.17, half)]
+            if 0.3 < y <= 0.46:
+                gap = (0.15 ** 2 - (y - 0.3) ** 2) ** 0.5 + 0.02
+                spans = [(-half, -gap), (gap, half)]
+            for i, (a, b) in enumerate(spans):
+                F.box(f'lap{k}{i}', b - a, 0.006, 0.004, ((a + b) / 2, y, front + 0.013), M.body)
+        # the dark inside, seen through the doorway, and a trim round the arch
+        F.box('door', 0.3, 0.42, 0.01, (0, 0.25, front - 0.002), M.dark)
+        F.sweep('door_trim', [(x, y, front + 0.016) for x, y in arch], None, M.plate,
+                profile=[(-0.006, -0.018), (0.006, -0.018), (0.006, 0.018), (-0.006, 0.018)], up=(0, -1, 0))
+        F.box('sill', 0.36, 0.025, 0.05, (0, 0.05, front + 0.015), M.plate, bevel=0.006, bevel_segments=1)
         for s in (-1, 1):              # corner boards
             for e in (-1, 1):
-                F.box(f'corner{s}{e}', 0.04, 0.58, 0.04, (s * 0.395, 0.33, zc + e * (d / 2 - 0.005)), M.plate, bevel=0.006)
-        # the roof: two slopes of four overlapping shingle rows, and a ridge board
-        slope = math.degrees(math.atan2(0.28, 0.4))
+                F.box(f'corner{s}{e}', 0.04, 0.58, 0.04, (s * 0.395, 0.33, zc + e * (d / 2 - 0.005)), M.plate, bevel=0.006,
+                      bevel_segments=1)
+            # the bargeboards up the front gable's edges
+            F.sweep(f'barge{s}', [(s * 0.47, 0.885 - 0.47 * 0.7, front + 0.035), (0, 0.885, front + 0.035)], None, M.plate,
+                    profile=[(-0.01, -0.03), (0.01, -0.03), (0.01, 0.03), (-0.01, 0.03)], up=(0, -1, 0))
+        # the roof: an underlay board a slope, four courses of shingles lapped over it, staggered, and a ridge cap
+        T = 0.47 / cs                  # down each slope, from the ridge to the eave
         for s in (-1, 1):
+            def on(t, out):
+                """The game (x, height) `t` down the slope from the ridge, `out` off the walls' line."""
+                return (s * (t * cs + out * sn), 0.9 - t * sn + out * cs)
+            x, y = on(T / 2, 0.015)
+            F.box(f'underlay{s}', T, 0.03, 0.94, (x, y, zc), M.roof, rot=(0, -s * slope, 0))
             for k in range(4):
-                t = (k + 0.5) / 4
-                x = s * (0.02 + t * 0.46)
-                y = 0.935 - t * 0.46 * math.tan(math.radians(slope)) - 0.012 * k
-                F.box(f'shingle{s}{k}', 0.15, 0.035, 0.92, (x, y, zc), M.roof, rot=(0, -s * slope, 0), bevel=0.006)
-        F.box('ridge', 0.08, 0.05, 0.94, (0, 0.95, zc), M.roof, bevel=0.012)
-        # the arched door and its frame
-        F.box('door', 0.3, 0.26, 0.02, (0, 0.04 + 0.13, front), M.dark)
-        F.cyl('door_arch', 0.15, 0.02, (0, 0.3, front), M.dark, rot=(90, 0, 0), verts=20)
-        F.box('sill', 0.36, 0.025, 0.04, (0, 0.05, front + 0.01), M.plate, bevel=0.006)
+                t0 = T - k * 0.135
+                x, y = on(t0 - 0.085, 0.038 + 0.009 * k)
+                width, off = 0.94 / 6, (0.94 / 12 if k % 2 else 0)
+                edges = sorted({max(-0.47, min(0.47, -0.47 + off + i * width)) for i in range(-1, 8)})
+                for i, (a, b) in enumerate(zip(edges, edges[1:])):
+                    if b - a < 0.02:
+                        continue
+                    tilt = rng.uniform(-1.2, 1.2)
+                    F.box(f'shingle{s}{k}{i}', 0.17, 0.016, b - a - 0.006, (x, y, zc + (a + b) / 2), M.roof,
+                          rot=(tilt, -s * (slope + 2), 0))
+        F.sweep('ridge', [(0, 0.948, zc - 0.47), (0, 0.948, zc + 0.47)], None, M.roof,
+                profile=G.rounded_rect(0.05, 0.09, 0.022, corner=2), up=(0, 0, 1))
         # the name plate in the gable
-        F.box('plate', 0.26, 0.075, 0.015, (0, 0.6, front + 0.005), M.plate, bevel=0.006)
+        F.box('plate', 0.26, 0.075, 0.015, (0, 0.6, front + 0.016), M.plate, bevel=0.006, bevel_segments=1)
         for i, ch in enumerate('REX'):
-            _letter(ch, (1 - i) * 0.06, 0.6, front + 0.015, 0.042, M.dark)
-        # the water bowl by the door
+            _letter(ch, (1 - i) * 0.06, 0.6, front + 0.026, 0.042, M.dark)
+        # the water bowl by the door, and a chew bone on the plinth
         G.revolve('bowl', [(0, 0), (0.055, 0), (0.065, 0.04), (0.058, 0.045), (0.05, 0.012), (0, 0.012)],
                   at=F.at(0.29, 0, 0.43), material=M.bowl, segments=18)
         F.cyl('bowl_water', 0.052, 0.004, (0.29, 0.034, 0.43), M.bowl_water, verts=18)
+        F.sweep('bone', [(-0.3, 0.05, 0.4), (-0.22, 0.05, 0.43)], 0.009, M.plate, verts=6)
+        for k, (bx, bz) in enumerate(((-0.3, 0.4), (-0.22, 0.43))):
+            for j in (-1, 1):
+                F.sphere(f'bone_knob{k}{j}', 0.013, (bx + j * 0.006, 0.052, bz - j * 0.012), M.plate, segments=8, rings=5)
     G.join_all('dogHouse')
     G.settle(centre=False)
     return G.meshes()
@@ -479,30 +689,38 @@ def dogHouse():
 def sundial():
     _own('sundial')
     with G.new_parts():
-        F.box('step', 0.36, 0.06, 0.36, (0, 0.03, 0), M.body, bevel=0.01)
-        G.revolve('pedestal', [(0, 0.06), (0.15, 0.06), (0.15, 0.1), (0.13, 0.13), (0.1, 0.16), (0.085, 0.3),
-                               (0.075, 0.5), (0.085, 0.66), (0.1, 0.7), (0.12, 0.73), (0.16, 0.78), (0.17, 0.81),
-                               (0.17, 0.85), (0, 0.85)], at=F.at(0, 0, 0), material=M.body, segments=24)
-        F.cyl('dial', 0.15, 0.012, (0, 0.856, 0), M.dial, verts=28)
-        G.torus('dial_rim', 0.148, 0.006, at=F.at(0, 0.862, 0), material=M.dial, major_segments=28, minor_segments=5)
-        for a in range(0, 360, 30):    # the hour marks, longer at the quarters
-            r = 0.11 if a % 90 else 0.105
+        # two square steps, their top edges chamfered, a few patches of lichen on them
+        F.box('step', 0.36, 0.045, 0.36, (0, 0.0225, 0), M.body, bevel=0.008, bevel_segments=1)
+        F.box('step2', 0.3, 0.03, 0.3, (0, 0.06, 0), M.body, bevel=0.006, bevel_segments=1)
+        for i, (x, z, r) in enumerate(((0.13, 0.12, 0.02), (-0.11, 0.15, 0.014), (0.12, -0.14, 0.017))):
+            F.cyl(f'lichen{i}', r, 0.002, (x, 0.045, z), M.lichen, verts=7, scale=(1.3, 1, 1))
+        # the baluster: a torus and a scotia at its foot, a swelling vase, a ringed neck and a spreading capital
+        G.revolve('pedestal', [(0, 0.075), (0.125, 0.075), (0.125, 0.095), (0.135, 0.105), (0.13, 0.12), (0.11, 0.128),
+                               (0.095, 0.14), (0.1, 0.155), (0.09, 0.17), (0.085, 0.22), (0.098, 0.32), (0.1, 0.4),
+                               (0.088, 0.5), (0.068, 0.6), (0.06, 0.64), (0.072, 0.652), (0.072, 0.668), (0.06, 0.678),
+                               (0.066, 0.7), (0.09, 0.73), (0.125, 0.765), (0.14, 0.78), (0.14, 0.79), (0, 0.79)],
+                  at=F.at(0, 0, 0), material=M.body, segments=20)
+        # a square cap stone, chamfered, the dial on it
+        F.box('cap', 0.32, 0.05, 0.32, (0, 0.815, 0), M.body, bevel=0.012, bevel_segments=1)
+        F.box('cap_top', 0.29, 0.012, 0.29, (0, 0.846, 0), M.body, bevel=0.004, bevel_segments=1)
+        F.cyl('dial', 0.15, 0.012, (0, 0.856, 0), M.dial, verts=28, bevel=0.002, bevel_segments=1)
+        G.torus('dial_rim', 0.146, 0.006, at=F.at(0, 0.862, 0), material=M.dial, major_segments=28, minor_segments=4)
+        G.torus('chapter_ring', 0.088, 0.0025, at=F.at(0, 0.862, 0), material=M.dial_mark, major_segments=24,
+                minor_segments=3)
+        for a in range(0, 360, 30):    # the hour marks, longer at the quarters, a dot at each half hour
+            r = 0.115 if a % 90 else 0.11
             F.box(f'mark{a}', 0.008, 0.003, 0.03 if a % 90 else 0.04, (r * G.sind(a), 0.8635, r * G.cosd(a)),
                   M.dial_mark, rot=(0, 0, -a))
-        F.cyl('boss', 0.018, 0.006, (0, 0.865, 0), M.dial_mark, verts=12)
-        # the gnomon: a triangle along the noon line, its edge at the latitude's angle
-        verts = []
-        for sx in (-0.004, 0.004):
-            verts += [F.at(sx, 0.862, 0.11), F.at(sx, 0.862, -0.1), F.at(sx, 0.862 + 0.1, -0.1)]
-        faces = [(0, 1, 2), (5, 4, 3), (0, 3, 4, 1), (1, 4, 5, 2), (2, 5, 3, 0)]
-        g = _mesh('gnomon', verts, faces, M.dial)
-        bpy.context.view_layer.objects.active = g
-        bpy.ops.object.select_all(action='DESELECT')
-        g.select_set(True)
-        bpy.ops.object.mode_set(mode='EDIT')
-        bpy.ops.mesh.select_all(action='SELECT')
-        bpy.ops.mesh.normals_make_consistent(inside=False)
-        bpy.ops.object.mode_set(mode='OBJECT')
+            F.cyl(f'dot{a}', 0.004, 0.003, (0.118 * G.sind(a + 15), 0.8635, 0.118 * G.cosd(a + 15)), M.dial_mark, verts=5)
+        # a compass rose in the middle: an eight-pointed star
+        rose = [((0.06 if k % 4 == 0 else 0.035 if k % 2 == 0 else 0.012) * G.cosd(22.5 * k),
+                 (0.06 if k % 4 == 0 else 0.035 if k % 2 == 0 else 0.012) * G.sind(22.5 * k)) for k in range(16)]
+        F.extrude('rose', rose, 0.002, (0, 0.8625, 0), M.dial_mark, plane='top')
+        F.cyl('boss', 0.014, 0.008, (0, 0.866, 0), M.dial_mark, verts=10, bevel=0.002, bevel_segments=1)
+        # the gnomon: a plate along the noon line, its edge at the latitude's angle, pierced
+        hole = [(-0.055 + 0.018 * G.cosd(a), 0.03 + 0.018 * G.sind(a)) for a in range(0, 360, 36)]
+        F.extrude('gnomon', [(0.11, 0.0), (-0.1, 0.0), (-0.1, 0.1), (-0.085, 0.1)], 0.008, (0, 0.862, 0), M.dial,
+                  plane='side', holes=[hole])
     G.join_all('sundial')
     G.settle()
     return G.meshes()
@@ -515,18 +733,36 @@ STONE_H = 0.04
 
 def steppingStones():
     _own('steppingStones')
+    rng = random.Random(31)
     with G.new_parts():
         for i, (x, z, d, r) in enumerate(STONES):
             s = G.boulder(f'stone{i}', d / 2, at=F.at(x, 0, z), material=M.body, rot=(0, 0, r), seed=i * 3.1 + 0.4,
-                          noise=0.24, subdivisions=2)
-            # flatten it into a slab: a level top with rounded edges, its bottom on the ground
+                          noise=0.24, subdivisions=3)
+            # flatten it into a slab: a worn, faintly uneven top with rounded edges, its bottom on the ground
             bpy.context.view_layer.update()
             top = max(v.co.z for v in s.data.vertices)
             for v in s.data.vertices:
                 k = v.co.z / top
-                v.co.z = STONE_H * min(1.0, k * 2.2) ** 0.6
+                edge = min(1.0, k * 2.2)
+                relief = noise.noise(Vector((v.co.x * 9 + i, v.co.y * 9 - i, 0.5)))
+                v.co.z = (STONE_H - 0.0045) * edge ** 0.6 + (0.0025 + 0.002 * relief) * edge ** 4
                 v.co.y *= 0.86
             s.data.update()
+        # moss creeping in at the stones' edges, a scatter of gravel between them
+        for i, (x, z, d, r) in enumerate(STONES):
+            for k in range(3):
+                a = rng.uniform(0, math.tau)
+                rr = d / 2 * rng.uniform(0.75, 0.9)
+                mx = max(-0.2, min(0.2, x + rr * math.cos(a)))
+                G.boulder(f'moss{i}{k}', rng.uniform(0.035, 0.045), at=F.at(mx, 0.026, z + 0.86 * rr * math.sin(a)),
+                          material=M.moss, scale=(1.5, 1.0, 0.12), rot=(0, 0, rng.uniform(0, 180)), seed=i * 5 + k, noise=0.4,
+                          subdivisions=1)
+        for i in range(14):
+            x, z = rng.uniform(-0.25, 0.25), rng.uniform(-1.2, 1.2)
+            if any(abs(x - sx) < d * 0.45 and abs(z - sz) < d * 0.4 for sx, sz, d, _ in STONES):
+                continue
+            G.boulder(f'gravel{i}', rng.uniform(0.014, 0.022), at=F.at(x, 0, z), material=M.pebble, scale=(1.3, 1.0, 0.6),
+                      seed=i * 1.9, noise=0.35, subdivisions=1)
     G.join_all('steppingStones')
     G.settle()
     return G.meshes()
@@ -540,31 +776,54 @@ def lampPost():
     _own('lampPost')
     post, frame = M.body, M.lantern
     sq = 2 ** 0.5
+
+    def square(h, y, r):
+        """A square ring of half side `r` at game height `y`, turned to face the front: a loft section."""
+        return [F.at(r * x, y, r * z) for x, z in ((1, 1), (-1, 1), (-1, -1), (1, -1))]
     with G.new_parts():
-        G.revolve('base', [(0, 0), (0.15, 0), (0.15, 0.03), (0.125, 0.05), (0.1, 0.12), (0.07, 0.16), (0.05, 0.3),
-                           (0.045, 0.34), (0, 0.34)], at=F.at(0, 0, 0), material=post, segments=low(16, 8))
-        F.cyl('ring', 0.055, 0.03, (0, 0.33, 0), post, verts=12)
-        F.cyl('pole', 0.035, 1.72, (0, 0.34 + 0.86, 0), post, verts=12)
-        F.cyl('collar', 0.05, 0.04, (0, 2.06, 0), post, verts=12)
+        # the base: a plinth, a torus, a bell and a waisted neck, turned in one piece
+        G.revolve('base', [(0, 0), (0.15, 0), (0.15, 0.022), (0.14, 0.03), (0.135, 0.045), (0.142, 0.06), (0.128, 0.075),
+                           (0.105, 0.09), (0.098, 0.13), (0.08, 0.18), (0.062, 0.24), (0.052, 0.3), (0.058, 0.315),
+                           (0.058, 0.335), (0.045, 0.345), (0, 0.345)], at=F.at(0, 0, 0), material=post, segments=low(16, 8))
+        # the shaft: fluted, a plain neck and collars over it
+        flutes = [((0.035 if k % 2 == 0 else 0.03) * math.cos(math.pi * k / 10), (0.035 if k % 2 == 0 else 0.03)
+                   * math.sin(math.pi * k / 10)) for k in range(20)]
+        F.sweep('pole', [(0, 0.34, 0), (0, 1.75, 0)], None, post, profile=flutes, up=(0, 0, 1), angle=60,
+                scale=[1.08, 0.94])
+        F.cyl('pole_neck', 0.031, 0.32, (0, 1.9, 0), post, verts=12)
+        for y, r in ((0.36, 0.05), (1.76, 0.042), (2.06, 0.05)):
+            G.revolve(f'collar{y}', [(0, -0.02), (r * 0.8, -0.02), (r, -0.01), (r, 0.01), (r * 0.8, 0.02), (0, 0.02)],
+                      at=F.at(0, y, 0), material=post, segments=12)
+        # the ladder bar a lamplighter leant his ladder on, its ends turned into balls
+        F.sweep('ladder_bar', [(-0.13, 1.95, 0), (0.13, 1.95, 0)], 0.009, post, verts=8)
+        for s in (-1, 1):
+            F.sphere(f'bar_ball{s}', 0.017, (s * 0.135, 1.95, 0), post, segments=10, rings=6)
         F.cone('cup', 0.045, 0.1, 0.07, (0, 2.115, 0), post, verts=12)
-        for k in range(4):             # brackets from the post to the lantern's floor corners
+        # four scroll brackets from the collar out under the lantern's corners, each curling back in
+        for k in range(4):
             a = 45 + 90 * k
-            G.rod(f'bracket{k}', F.at(0.03 * G.cosd(a), 2.03, 0.03 * G.sind(a)),
-                  F.at(0.1 * G.cosd(a), 2.14, 0.1 * G.sind(a)), 0.007, material=post, verts=5)
-        # the lantern: four frosted panes, wider at the top, in a frame under a pyramid roof
+            c, s = G.cosd(a), G.sind(a)
+            pts = [(0.035, 2.0), (0.07, 2.02), (0.105, 2.07), (0.11, 2.12), (0.095, 2.145), (0.08, 2.13), (0.085, 2.115)]
+            F.sweep(f'bracket{k}', [(r * c, y, r * s) for r, y in pts], 0.0065, post, verts=5, resolution=2,
+                    scale=[1.2, 1.0, 1.0, 1.0, 0.9, 0.8, 0.7])
+        # the lantern: four frosted panes, wider at the top, in a frame of corner bars and bands under a flared roof
         F.cone('panes', 0.09 * sq, 0.125 * sq, 0.32, (0, LAMP_Y, 0), M.pane, verts=4, rot=(0, 0, 45), smooth=False)
-        F.cone('lantern_floor', 0.11 * sq, 0.11 * sq, 0.025, (0, LAMP_Y - 0.165, 0), frame, verts=4, rot=(0, 0, 45),
-               smooth=False)
-        F.cone('lantern_top', 0.135 * sq, 0.135 * sq, 0.03, (0, LAMP_Y + 0.172, 0), frame, verts=4, rot=(0, 0, 45),
-               smooth=False)
+        G.loft('lantern_floor', [square(0, LAMP_Y - 0.19, 0.08), square(0, LAMP_Y - 0.17, 0.112),
+                                 square(0, LAMP_Y - 0.155, 0.112), square(0, LAMP_Y - 0.15, 0.1)], material=frame, smooth=False)
         for k in range(4):
             a = 45 + 90 * k
             lo, hi = 0.094 * sq, 0.129 * sq
-            G.rod(f'frame{k}', F.at(lo * G.cosd(a), LAMP_Y - 0.16, lo * G.sind(a)),
-                  F.at(hi * G.cosd(a), LAMP_Y + 0.16, hi * G.sind(a)), 0.009, material=frame, verts=5)
-        F.cone('roof', 0.16 * sq, 0.025, 0.15, (0, LAMP_Y + 0.267, 0), frame, verts=4, rot=(0, 0, 45), smooth=False)
-        F.cyl('vent', 0.035, 0.04, (0, LAMP_Y + 0.365, 0), frame, verts=10)
-        F.sphere('finial', 0.03, (0, LAMP_Y + 0.405, 0), frame, segments=10, rings=6)
+            F.sweep(f'frame{k}', [(lo * G.cosd(a), LAMP_Y - 0.16, lo * G.sind(a)), (hi * G.cosd(a), LAMP_Y + 0.16, hi * G.sind(a))],
+                    None, frame, profile=[(-0.008, -0.008), (0.008, -0.008), (0.008, 0.008), (-0.008, 0.008)], up=(0, 0, 1))
+        for y, r in ((LAMP_Y + 0.07, 0.117),):     # a band round the panes, two thirds up
+            G.loft('band', [square(0, y - 0.008, r), square(0, y + 0.008, r + 0.003)], material=frame, smooth=False)
+        # the roof: an eave lip, a concave pyramid flaring out over the panes, a vent drum, a crown and a spike
+        G.loft('roof', [square(0, LAMP_Y + 0.155, 0.13), square(0, LAMP_Y + 0.168, 0.16), square(0, LAMP_Y + 0.185, 0.16),
+                        square(0, LAMP_Y + 0.215, 0.12), square(0, LAMP_Y + 0.26, 0.075), square(0, LAMP_Y + 0.31, 0.045),
+                        square(0, LAMP_Y + 0.335, 0.03)], material=frame, smooth=False)
+        G.revolve('crown', [(0, 0.0), (0.04, 0.0), (0.042, 0.035), (0.032, 0.045), (0.022, 0.05), (0.024, 0.07),
+                            (0.014, 0.085), (0.006, 0.12), (0, 0.135)], at=F.at(0, LAMP_Y + 0.3, 0), material=frame,
+                  segments=low(12, 6))
         _near_light('lampPost', LAMP_Y)
     G.join_all('lampPost')
     G.settle()
@@ -583,30 +842,54 @@ def _wire_y(x):
 
 def stringLights():
     _own('stringLights')
+    rng = random.Random(23)
     with G.new_parts() as still:
         for s in (-1, 1):
             x = s * POST_X
-            G.revolve(f'pot{s}', [(0, 0), (0.1, 0), (0.12, 0.27), (0.125, 0.3), (0.105, 0.3), (0.1, 0.28), (0, 0.28)],
+            # a tapered pot with a rolled rim, gravel over its soil, a few leaves of ivy at the post's foot
+            G.revolve(f'pot{s}', [(0, 0), (0.095, 0), (0.1, 0.012), (0.117, 0.25), (0.125, 0.262), (0.127, 0.29),
+                                  (0.121, 0.3), (0.108, 0.3), (0.104, 0.28), (0, 0.28)],
                       at=F.at(x, 0, 0), material=M.planter, segments=18)
-            F.cyl(f'pot_soil{s}', 0.1, 0.01, (x, 0.275, 0), M.soil, verts=14)
-            F.box(f'post{s}', 0.07, 2.12, 0.07, (x, 0.2 + 1.06, 0), M.body, bevel=0.008)
-            F.cone(f'cap{s}', 0.055, 0.01, 0.05, (x, 2.345, 0), M.body, verts=4, rot=(0, 0, 45), smooth=False)
+            F.cyl(f'pot_soil{s}', 0.104, 0.01, (x, 0.275, 0), M.soil, verts=14)
+            for k in range(5):
+                a = rng.uniform(0, math.tau)
+                r = rng.uniform(0.05, 0.085)
+                G.boulder(f'gravel{s}{k}', 0.014, at=F.at(x + r * math.cos(a), 0.279, r * math.sin(a)), material=M.pebble,
+                          scale=(1.2, 1, 0.6), seed=k * 1.7 + s, noise=0.3, subdivisions=1)
+            for k in range(4):
+                a = 90 * k + 45 + rng.uniform(-20, 20)
+                leaf(f'ivy{s}{k}', F.at(x + 0.04 * G.cosd(a), 0.28, 0.04 * G.sind(a)), -a + 90, rng.uniform(25, 45),
+                     0.07, 0.045, M.reed, shape='oval', droop=0.25, thick=0.004, fold=0.15, rows=3, ring=3)
+            # the post: chamfered, a pyramid cap on a collar, a steel eye screwed in for the wire, a hook below it
+            F.box(f'post{s}', 0.07, 2.12, 0.07, (x, 0.2 + 1.06, 0), M.body, bevel=0.008, bevel_segments=1)
+            F.box(f'collar{s}', 0.082, 0.02, 0.082, (x, 2.3, 0), M.body, bevel=0.004, bevel_segments=1)
+            F.cone(f'cap{s}', 0.058, 0.008, 0.06, (x, 2.34, 0), M.body, verts=4, rot=(0, 0, 45), smooth=False)
             G.torus(f'eye{s}', 0.018, 0.004, at=F.at(x - s * 0.045, WIRE_Y, 0), material=M.wire, rot=(90, 0, 0),
                     major_segments=10, minor_segments=4)
+            F.sweep(f'eye_shank{s}', [(x - s * 0.035, WIRE_Y - 0.018, 0), (x - s * 0.02, WIRE_Y - 0.018, 0)], 0.003, M.wire,
+                    verts=4)
+            F.sweep(f'hook{s}', G.kit.fillet([(x - s * 0.035, 1.2, 0), (x - s * 0.06, 1.2, 0), (x - s * 0.06, 1.24, 0)], 0.01),
+                    0.004, M.wire, verts=5)
     G.join(still, 'posts', origin=(0, 0, 0))
     with G.new_parts() as string:
         x0 = POST_X - 0.04
-        n = 16
-        pts = [(-x0 + 2 * x0 * i / n, _wire_y(-x0 + 2 * x0 * i / n)) for i in range(n + 1)]
-        for (ax, ay), (bx, by) in zip(pts, pts[1:]):
-            G.rod(_name('wire'), F.at(ax, ay, 0), F.at(bx, by, 0), 0.005, material=M.wire, verts=5)
+        n = 24
+        # the wire in one piece, sagging between the eyes, a drop to each socket
+        F.sweep('wire', [(-x0 + 2 * x0 * i / n, _wire_y(-x0 + 2 * x0 * i / n), 0) for i in range(n + 1)], 0.0045, M.wire,
+                verts=5)
         heights = []
         for i in range(BULBS):
             x = -x0 + 2 * x0 * (i + 0.5) / BULBS
             y = _wire_y(x)
-            F.cyl(_name('socket'), 0.012, 0.035, (x, y - 0.02, 0), M.socket, verts=8)
-            F.sphere(_name('bulb'), 0.035, (x, y - 0.07, 0), M.bulb, scale=(1, 1, 1.3), segments=10, rings=7)
-            heights.append(y - 0.07)
+            # the socket: a clip round the wire and a ribbed holder; the bulb a festoon globe on a short neck
+            bx, by, bz = F.at(x, 0, 0)
+            G.loft(_name('socket'), [G.ring(r, r, y + dy, 6, at=(bx, by)) for dy, r in
+                                     ((-0.05, 0.011), (-0.042, 0.014), (-0.03, 0.014), (-0.026, 0.012), (-0.016, 0.012),
+                                      (-0.008, 0.008), (0.002, 0.006))], material=M.socket)
+            G.loft(_name('bulb'), [G.ring(r, r, y + dy, 8, at=(bx, by)) for dy, r in
+                                   ((-0.05, 0.009), (-0.058, 0.012), (-0.068, 0.026), (-0.085, 0.035), (-0.105, 0.034),
+                                    (-0.122, 0.024), (-0.13, 0.01), (-0.133, 0.003))], material=M.bulb)
+            heights.append(y - 0.09)
         _near_light('stringLights', sum(heights) / len(heights))
     string = G.hinged(G.join(string, 'string'), F.at(0, WIRE_Y, 0))
     G.settle(centre=False)

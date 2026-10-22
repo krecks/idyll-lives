@@ -5,6 +5,7 @@
 #   G.kit.cabriole(F, 'leg_fl', 0.31, 0.3, 0.18, M.walnut, 0.02, 0.02)
 #   G.kit.pull(F, 'pull', 0, 0.45, 0.02, 0.12, M.brass)          # a bar pull on a front at depth 0.02
 #   G.kit.shaker(F, 'door', 0.6, 1.8, (0, 1, 0.15), 0.02, M.white)  # a frame-and-panel door
+#   G.kit.songbird(F, 'robin', 0.3, 1.47, -0.1, M.brown, M.red, M.beak, M.eye, turn=-20)   # perched, feet at the point
 #   G.kit.moulding(F, 'frame', [(0.25, 1.0), (0.25, 1.7), (-0.25, 1.7), (-0.25, 1.0)], [(0, 0), (0, 0.03), (0.03, 0.03), (0.03, 0)], M.gilt, at=-0.43)
 import math
 
@@ -120,4 +121,47 @@ def moulding(frame, name, outline, profile, material, at=0.0, plane='front', ang
     return forms._object(name, vs, faces, material, True, angle)
 
 
-__all__ = ['cabriole', 'fillet', 'forms', 'knob', 'moulding', 'pull', 'shaker', 'tube']
+def songbird(frame, name, x, y, z, body, breast, beak, eye=None, turn=0.0, size=1.0, head=0.0, low=False):
+    """A small songbird (a robin, a tit, a sparrow) perched with its feet at game (x, y, z), facing the front turned
+    `turn` degrees towards +x: a lofted body tapering into a fanned tail, a `breast` patch, a pointed `beak`, `eye`s,
+    thin legs down to the perch. `size` 1 is a robin (14 cm long); `head` tips the head down (degrees: drinking,
+    pecking); `low` takes fewer sides and no eyes (a far version). About 350 triangles. Returns its pieces."""
+    c, s = math.cos(math.radians(turn)), math.sin(math.radians(turn))
+    dip = math.radians(head)
+
+    def at(u, v, w):
+        """The game point `u` across (to the bird's right), `v` forward and `w` up from its feet (at size 1)."""
+        if v > 0.03:                                       # the head and beak tip down about the neck
+            dv, dw = v - 0.03, w - 0.048
+            v, w = 0.03 + dv * math.cos(dip) + dw * math.sin(dip), 0.048 - dv * math.sin(dip) + dw * math.cos(dip)
+        u, v, w = u * size, v * size, w * size
+        return frame.at(x + v * s + u * c, y + w, z + v * c - u * s)
+    # (forward, half width, half height, centre height): from the tail's root to the face
+    rows = [(-0.05, 0.010, 0.010, 0.040), (-0.035, 0.022, 0.024, 0.036), (-0.012, 0.029, 0.031, 0.034),
+            (0.012, 0.027, 0.030, 0.038), (0.03, 0.02, 0.022, 0.048), (0.045, 0.02, 0.02, 0.058),
+            (0.06, 0.016, 0.015, 0.06), (0.07, 0.007, 0.007, 0.059)]
+    n = 6 if low else 10
+    sections = [[at(hw * math.cos(math.tau * k / n), v, wc + hh * math.sin(math.tau * k / n)) for k in range(n)]
+                for v, hw, hh, wc in rows]
+    made = [forms.loft(name, sections, material=body)]
+    made.append(forms.sweep(f'{name}_beak', [at(0, 0.066, 0.058), at(0, 0.088, 0.057)], 0.0055 * size, material=beak,
+                            verts=5 if low else 6, scale=[1.0, 0.15]))
+    breast_at = Vector(at(0, 0.01, 0.034))
+    made.append(shapes.sphere(f'{name}_breast', 1.0, at=tuple(breast_at), material=breast, rot=(0, 0, -turn),
+                              scale=(0.026 * size, 0.027 * size, 0.025 * size), segments=8 if low else 10,
+                              rings=5 if low else 6))
+    # the tail: a thin fan, cocked a little up
+    made.append(forms.sweep(f'{name}_tail', [at(0, -0.04, 0.041), at(0, -0.088, 0.054)], None, material=body,
+                            profile=[(-0.0018, -0.008), (0.0018, -0.008), (0.0018, 0.008), (-0.0018, 0.008)],
+                            up=(0, 0, 1), scale=[0.9 * size, 1.8 * size]))
+    if eye is not None and not low:
+        for k in (-1, 1):
+            made.append(shapes.sphere(f'{name}_eye{k}', 0.0042 * size, at=at(k * 0.0148, 0.055, 0.062), material=eye,
+                                      segments=6, rings=4))
+    for k in (-1, 1):
+        made.append(forms.sweep(f'{name}_leg{k}', [at(k * 0.008, 0.0, 0.026), at(k * 0.009, 0.004, 0.0),
+                                                   at(k * 0.009, 0.016, 0.0)], 0.0016 * size, material=beak, verts=4))
+    return made
+
+
+__all__ = ['cabriole', 'fillet', 'forms', 'knob', 'moulding', 'pull', 'shaker', 'songbird', 'tube']

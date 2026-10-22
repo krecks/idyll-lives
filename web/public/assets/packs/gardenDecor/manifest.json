@@ -9,6 +9,12 @@
         "beard": {
           "finish": "material.finish.satin"
         },
+        "buckle": {
+          "finish": "material.finish.metal"
+        },
+        "eye": {
+          "finish": "material.finish.gloss"
+        },
         "hat": {
           "finish": "material.finish.satin"
         },
@@ -47,8 +53,14 @@
         "beak": {
           "finish": "material.finish.satin"
         },
+        "bird_breast": {
+          "finish": "material.finish.satin"
+        },
         "bird_brown": {
           "finish": "material.finish.satin"
+        },
+        "eye": {
+          "finish": "material.finish.gloss"
         },
         "stone": {
           "finish": "material.finish.matte"
@@ -154,6 +166,9 @@
         },
         "wood": {
           "finish": "material.finish.wood"
+        },
+        "wood_dark": {
+          "finish": "material.finish.satin"
         }
       },
       "paint": [

@@ -61,18 +61,52 @@ rider's rocks on the saddle, the merry-go-round's goes round sitting on the plat
 
 `far=0.25` decimates the model at rest. On the chess table that folded the inlaid board into spikes, so it has a far
 build of its own (`parkChessTableFar`): the table, the squares and the stools at fewer sides and only the two kings
-(1,216 triangles, under half the full model's). Its revolves take 12 sides so its bounds stay those of the full model.
+(1,784 triangles, under half the full model's). Its revolves take 12 sides so its bounds stay those of the full model.
 
-| Model | Size (w × h × d) | Triangles (far) | Draws | Colour parts |
+| Model | Size (w × h × d) | Triangles (far), before → after | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.slide` | 0.75 × 2.81 × 1.93 m | 2,020 (498) | 2 | Frame, Slide, Roof |
-| `model.climbingFrame` | 1.81 × 3.45 × 1.99 m | 1,656 (382) | 3 | Frame, Roof, Net |
-| `model.seesaw` | 2.50 × 0.85 × 0.42 m | 1,808 (452) | 2 | Frame, Seats, Plank |
-| `model.springRider` | 0.40 × 0.95 × 0.96 m | 3,172 (792) | 2 | Horse, Saddle, Spring |
-| `model.merryGoRound` | 1.96 × 1.04 × 1.96 m | 2,924 (721) | 2 | Platform, Rails, Stripes |
-| `model.basketballHoop` | 1.20 × 3.71 × 0.97 m | 2,912 (714) | 2 | Frame, Backboard, Hoop |
-| `model.pingPongTable` | 2.74 × 0.92 × 1.86 m | 1,148 (276) | 1 | Table, Legs |
-| `model.parkChessTable` | 1.44 × 0.85 × 0.70 m | 3,468 (1,216) | 2 | Table, Stools |
+| `model.slide` | 0.75 × 2.80 × 1.94 m | 2,020 (498) → 4,308 (1,066) | 2 | Frame, Slide, Roof |
+| `model.climbingFrame` | 1.82 × 3.45 × 1.99 m | 1,656 (406) → 5,564 (1,322) | 3 | Frame, Roof, Net |
+| `model.seesaw` | 2.50 × 0.85 × 0.42 m | 1,808 (452) → 3,964 (974) | 2 | Frame, Seats, Plank |
+| `model.springRider` | 0.40 × 0.95 × 0.96 m | 3,172 (792) → 3,768 (936) | 2 | Horse, Saddle, Spring |
+| `model.merryGoRound` | 1.96 × 1.04 × 1.96 m | 2,924 (714) → 4,044 (1,003) | 2 | Platform, Rails, Stripes |
+| `model.basketballHoop` | 1.20 × 3.70 × 0.97 m | 2,912 (714) → 3,804 (944) | 2 | Frame, Backboard, Hoop |
+| `model.pingPongTable` | 2.74 × 0.92 × 1.83 m | 1,148 (276) → 1,688 (396) | 1 | Table, Legs |
+| `model.parkChessTable` | 1.45 × 0.85 × 0.70 m | 3,468 (1,216) → 5,544 (1,784) | 2 | Table, Stools |
+
+## Detail pass (2026-10-22)
+
+Rebuilt with the forms and the kit (one-piece bent tube through `kit.fillet`, sweeps, lofts, extrudes with holes,
+soft boxes, `kit.moulding`), keeping every size, centre, part, clip, `motions`, paint slot, draw count and the
+heights and places the game seats and animates residents by (`clips/rides.ts`, `street.ts`): the deck, ladder,
+chute and arch of the slide, the net's ropes and the pole of the climbing frame, the seats and grips of the seesaw,
+the saddle, handles and pegs of the spring rider, the merry-go-round's rail curve and platform, the rim.
+
+- **Slide**: posts on base plates with ball caps, a guard each side (a bent-tube loop round a red panel with a
+  porthole) in place of the two rails, beams round the top, a deck of five boards, a hipped roof lofted with an eave
+  lip; the ladder's rails one bent tube each from the ground up to the handrails and over to the posts, grooved
+  treads; the chute's walls rolled over into lips and its run-out's end rolled under; a bar between the run-out's legs.
+- **Climbing frame**: chamfered posts in steel shoes, a deck of nine boards, knee braces, flat balusters, sawn rafters,
+  gables, five shingle courses a slope and a rounded ridge; the net as ropes through rows of knots, a bar along its
+  top; the fireman's pole in one bent piece with a bracket; a rippling flag with a ball on its pole.
+- **Seesaw**: A-frames of bent tube with cross bars and bolted feet, axle nuts, half-buried tyre bumpers; a plank with
+  rounded ends on a steel channel, moulded seats (soft, top at 0.56 m) with a lip at the outer end, rubber pads under
+  the ends, handles as one bent loop each with the grips where the hands go.
+- **Spring rider**: a lofted barrel, a neck swept up and arched over into the head, a muzzle, ears, bent legs with
+  hooves, a mane in locks, a forelock, a swept tail; a padded saddle (top at the content's 0.62 m) with a cantle and
+  flaps; a handle bar through the head with grips; the coil one sweep on a bolted base.
+- **Merry-go-round**: a bolted ground plate and turned hub; the deck on a dished skirt, anti-slip ribs between the
+  stripes, a turned column with a collar and a knob; the rails (the same curve) with rubber grips where the riders'
+  hands go and foot plates.
+- **Basketball hoop**: a moulded ballast base with a fill cap and two wheels, a telescoping pole with its clamp
+  collar, bent arms with a strut, the board in a moulded steel frame with a pad along its foot, the shooter's square
+  one outline, a flanged rim bracket and spring housing, net hooks; the net's strands each one cord (`swish` as before).
+- **Ping-pong table**: a steel band round the top's edge and an apron under it, tapered concrete piers with an arch
+  through them and steel caps, the net as a plate with slots, a band, posts and clamps; bats with a wooden blade,
+  rubber face and flared handle.
+- **Park chess table**: a moulded pedestal, a top with a chamfered edge and a band under it, the board in a border,
+  turned stools; knights and bishops join the game (a knight's head swept), a cross-barred king, a taken pawn beside
+  the board. The far version builds from the same pedestal, top and stools at 12 sides.
 
 `check-glb`: 8 models, 0 failed, no warnings (the seesaw, built for 2 × 1 tiles, was widened to the content's
 3 × 1 with its seats at ±0.75 m, so picking and the shadow match the model). Khronos
