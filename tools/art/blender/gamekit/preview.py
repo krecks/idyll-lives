@@ -72,12 +72,11 @@ def preview_perches(path):
     from . import perch
     from .materials import mat
     from .scene import meshes
+    from .shapes import sphere
     before = set(meshes())
     red = mat('perch_marker', '#FF2020', roughness=0.5)
     for i, p in enumerate(perch.PERCHES):
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.06, location=p + Vector((0, 0, 0.05)), segments=8, ring_count=5)
-        bpy.context.object.name = f'perch_marker{i}'
-        bpy.context.object.data.materials.append(red)
+        sphere(f'perch_marker{i}', 0.06, at=p + Vector((0, 0, 0.05)), material=red, segments=8, rings=5, smooth=False)
     preview(path)
     preview(path[:-4] + '.top.png', 'top')
     for o in meshes():

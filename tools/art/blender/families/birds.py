@@ -68,6 +68,11 @@ def P(x, f, u):
     return Vector((x, -f, u))
 
 
+def perch_height(S):
+    """How far the body's middle stands over the feet (the entry's `bird.perchHeight`)."""
+    return S['leg'] + S['depth'] * 0.47
+
+
 def _mesh(name, verts, faces):
     """A closed mesh from `verts` and `faces` [(indices, material)], its normals outwards, smooth."""
     mats = list(dict.fromkeys(m for _, m in faces))
@@ -151,7 +156,7 @@ class Bird:
         p = math.radians(S['pitch'])
         self.a = Vector((0, math.cos(p), math.sin(p)))         # (x, f, u): the body's axis, rump to breast
         self.n = Vector((0, -math.sin(p), math.cos(p)))        # square to it, up
-        self.c = Vector((0, S['bodyAt'], S['leg'] + S['depth'] * 0.47))   # the body's middle over the feet
+        self.c = Vector((0, S['bodyAt'], perch_height(S)))                 # the body's middle over the feet
 
     # (x, f, u) -> Blender
     @staticmethod
@@ -268,7 +273,7 @@ class Bird:
             c = base + d * (T * f)
             rings.append([self.b(c + Vector((W * w, 0, 0))), self.b(c + up * W * th), self.b(c - Vector((W * w, 0, 0))),
                           self.b(c - up * W * th * 0.6)])
-        bands = Z['tail']
+        bands = Z.get('tail', TAIL)
         return loft('tail', rings, lambda i, j: getattr(self.M, bands[max(0, min(i, 2))])), self.b(base)
 
     def wing(self, side):
@@ -364,8 +369,9 @@ def _tube(name, points, r0, r1, material):
 # [(along the span 0 .. 1, leading edge, trailing edge: chords forward of the shoulder)], `tail` its shape (SQUARE ...),
 # `legR` and `toe` the legs' thickness and the toes' length, `ring` an eye ring, and `zones`: which material each face
 # of the body (by `t` rump 0 .. neck 1 and degrees round from the top), the head (by `s` back -1 .. front 1 and
-# degrees), the folded wing (shoulder .. tip), the tail (base .. end) and the spread wing (top front, middle, back for
-# each length out from the body) takes.
+# degrees), the folded wing (shoulder .. tip), the tail (base .. end; default `TAIL`, all `tail`) and the spread wing
+# (top front, middle, back for each length out from the body) takes.
+TAIL = ['tail', 'tail', 'tail']
 
 # Tails: a tit's and a finch's square-ended, a warbler's short, a blackbird's long and round-ended, a dove's long and broad.
 SQUARE = [(0.0, 0.16, 0.22), (0.45, 0.27, 0.11), (0.8, 0.33, 0.06), (1.0, 0.33, 0.04)]
@@ -407,7 +413,6 @@ BLUE_TIT = dict(
     pitch=34, head=0.0145, neck=0.55, neckUp=60, bill=0.0045, billW=0.0045, billH=0.0042, billDroop=4, billLow=0.1,
     eye=0.2, eyeAt=0.3, legR=0.0012, toe=0.009, tailDown=28, tipOver=0.32, chord=0.042, planform=ROUNDED, tail=SQUARE,
     zones=dict(body=tit_body, head=tit_head, folded=['wing', 'wing', 'bar', 'flight', 'flight'],
-               tail=['tail', 'tail', 'tail'],
                wing=[('wing', 'bar', 'flight'), ('wing', 'bar', 'flight'), ('wing', 'flight', 'flight'),
                      ('flight', 'flight', 'flight'), ('flight', 'flight', 'flight')]),
 )
@@ -441,7 +446,6 @@ CHAFFINCH = dict(
     pitch=27, head=0.0158, neck=0.55, neckUp=55, bill=0.0085, billW=0.0068, billH=0.0068, billDroop=6, billLow=0.12,
     eye=0.19, eyeAt=0.28, legR=0.0013, toe=0.011, tailDown=22, tipOver=0.3, chord=0.054, planform=ROUNDED, tail=SQUARE,
     zones=dict(body=finch_body, head=finch_head, folded=['bar', 'wing', 'bar', 'flight', 'flight'],
-               tail=['tail', 'tail', 'tail'],
                wing=[('bar', 'bar', 'flight'), ('wing', 'bar', 'flight'), ('wing', 'bar', 'flight'),
                      ('flight', 'flight', 'flight'), ('flight', 'flight', 'flight')]),
 )
@@ -475,7 +479,6 @@ WARBLER = dict(
     pitch=26, head=0.0124, neck=0.55, neckUp=50, bill=0.0068, billW=0.003, billH=0.0028, billDroop=3, billLow=0.1,
     eye=0.2, eyeAt=0.3, legR=0.0011, toe=0.009, tailDown=18, tipOver=0.3, chord=0.04, planform=ROUNDED, tail=SQUARE,
     zones=dict(body=warbler_body, head=warbler_head, folded=['wing', 'wing', 'wing', 'flight', 'flight'],
-               tail=['tail', 'tail', 'tail'],
                wing=[('wing', 'flight', 'flight'), ('wing', 'flight', 'flight'), ('wing', 'flight', 'flight'),
                      ('flight', 'flight', 'flight'), ('flight', 'flight', 'flight')]),
 )
@@ -499,7 +502,6 @@ BLACKBIRD = dict(
     pitch=20, head=0.0235, neck=0.62, neckUp=45, bill=0.019, billW=0.008, billH=0.0085, billDroop=6, billLow=0.1,
     eye=0.17, eyeAt=0.28, ring=True, legR=0.0022, toe=0.02, tailDown=14, tipOver=0.3, chord=0.085, planform=ROUNDED, tail=LONG,
     zones=dict(body=blackbird_body, head=blackbird_head, folded=['wing', 'wing', 'wing', 'flight', 'flight'],
-               tail=['tail', 'tail', 'tail'],
                wing=[('wing', 'flight', 'flight'), ('wing', 'flight', 'flight'), ('wing', 'flight', 'flight'),
                      ('flight', 'flight', 'flight'), ('flight', 'flight', 'flight')]),
 )
@@ -548,7 +550,7 @@ def bird(S, colours):
 
 def facts(S):
     """The entry's `bird`: what the renderer needs of its size (`perchHeight`: the body's middle over the feet)."""
-    return {'length': S['length'], 'wingspan': S['wingspan'], 'perchHeight': round(S['leg'] + S['depth'] * 0.47, 3), 'pitch': S['pitch']}
+    return {'length': S['length'], 'wingspan': S['wingspan'], 'perchHeight': round(perch_height(S), 3), 'pitch': S['pitch']}
 
 
 # (wingspan, height, length over the ground: bill to tail tip as it sits) as measured; `centre` its box's middle
