@@ -1457,6 +1457,9 @@ export class Characters {
   private readonly rideT = new Vector3();
   /** Action tag per `sim.action` index (from the snapshot layout). */
   private actionTags: readonly string[] = [];
+  /** The `cuddle` and `change` actions' indexes in `actionTags` (-1: none). */
+  private cuddleAction = -1;
+  private changeAction = -1;
   private scratch!: PoseScratch;
   private qA!: Float32Array;
   private pA!: Float32Array;
@@ -2501,8 +2504,8 @@ export class Characters {
     const H = layout.headerLen;
     const S = layout.simStride;
     const k = layout.sim;
-    const act = k.action !== undefined && k.object !== undefined ? this.actionTags.indexOf('cuddle') : -1;
-    const changing = k.action !== undefined && k.object !== undefined ? this.actionTags.indexOf('change') : -1;
+    const act = k.action !== undefined && k.object !== undefined ? this.cuddleAction : -1;
+    const changing = k.action !== undefined && k.object !== undefined ? this.changeAction : -1;
     const step = dt * animRate;
     // Seconds of animation per game minute at this speed.
     const perMinute = gameRate > 0 ? animRate / gameRate : Infinity;
@@ -2918,7 +2921,11 @@ export class Characters {
     const S = layout.simStride;
     const k = layout.sim;
     const NB = set.bones.length;
-    if (layout.actions && layout.actions !== this.actionTags) this.actionTags = layout.actions;
+    if (layout.actions && layout.actions !== this.actionTags) {
+      this.actionTags = layout.actions;
+      this.cuddleAction = layout.actions.indexOf('cuddle');
+      this.changeAction = layout.actions.indexOf('change');
+    }
     const hasAction = k.action !== undefined && k.object !== undefined;
 
     // Group conversations: those listening in (role 3, the one who started it as partner), and
