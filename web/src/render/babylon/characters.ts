@@ -169,6 +169,15 @@ const GESTURES: Record<string, Gesture> = {
   prank: { speak: 'prank' },
   apologize: { speak: 'apologize', bad: 'foldArms', flop: 'rebuffed' },
 };
+/** A social's gestures (`GESTURES`) over its animation code's (`ANIM_GESTURES`), per code then social id, merged once. */
+const MERGED_GESTURES = new Map<number, Map<string, Gesture>>();
+function gesturesOf(anim: number, social: string): Gesture {
+  let bySocial = MERGED_GESTURES.get(anim);
+  if (!bySocial) MERGED_GESTURES.set(anim, (bySocial = new Map()));
+  let g = bySocial.get(social);
+  if (!g) bySocial.set(social, (g = { ...ANIM_GESTURES[anim], ...GESTURES[social] }));
+  return g;
+}
 /**
  * A refused hug or kiss (`Anim.Hug`, `Anim.Kiss`, snapshot `outcome` 2, shown from the start): the one asked
  * leans away with a hand up (`refuse`) and steps back `back` m; the one who asked stays where they stood,
@@ -1335,6 +1344,10 @@ const ON_FLOOR = new Set(FLOOR_SITS.flatMap((f) => [`sit${f.name}`, `sitDown${f.
 function floorSit(h: number): string {
   return h < 0.07 ? 'Ground' : h < 0.2 ? 'Floor' : '';
 }
+/** The clips of each way of sitting (`floorSit`): sitting, sitting down and getting up. */
+const SIT_CLIPS: Record<string, { sit: string; down: string; up: string }> = Object.fromEntries(
+  ['', ...FLOOR_SITS.map((f) => f.name)].map((n) => [n, { sit: `sit${n}`, down: `sitDown${n}`, up: `standUp${n}` }]),
+);
 /** Clips whose legs are placed by `legTo`: sitting (pedalling, legs out along a chaise) and lying (in a hammock). */
 const LEG_CLIPS = ['sit', 'sitHands', 'lie'] as const;
 
@@ -1452,6 +1465,8 @@ export class Characters {
   /** Where an object's moving seat has its riders now (`ObjectMotion.ride`): world space, from rest. */
   private rideOf: ((objectId: number) => Matrix | null) | null = null;
   private readonly rideM = new Matrix();
+  /** The lanes others have taken on what `freeLane` looks at (scratch). */
+  private readonly lanesTaken: number[] = [];
   private readonly rideQ = new Quaternion();
   private readonly rideS = new Vector3();
   private readonly rideT = new Vector3();
@@ -1545,8 +1560,8 @@ export class Characters {
   private clock = 0;
   /** Sit / lie pelvis offsets per body (computed once from the clips). */
   private readonly sitPelvis = new Map<string, SeatFit>();
-  /** The same for the floor clips (`sitFloor`), by body and floor sit: `<body>|<FloorSit name>`. */
-  private readonly floorPelvis = new Map<string, SeatFit>();
+  /** The same for the floor clips (`sitFloor`), per body, then floor sit (`FloorSit.name`). */
+  private readonly floorPelvis = new Map<string, ReadonlyMap<string, SeatFit>>();
   /** Per body, then clip (`LEG_CLIPS`): where its legs are in the clip, for placing the feet (`legTo`). */
   private readonly legFits = new Map<string, Map<string, LegFit>>();
   /** Which way the sun's light goes (the renderer's sun), for the shade under a tree (`shadeSide`). */
@@ -1694,11 +1709,7 @@ export class Characters {
       const m = /^(index|middle|ring|pinky|thumb|fingers)_0(\d)/.exec(n);
       if (m) this.fingerMask[b] = FINGER_OPEN[m[1]] * (JOINT_OPEN[Number(m[2]) - 1] ?? 1);
     });
-    for (const body of set.bodies.values()) {
-      this.sitPelvis.set(body.name, this.measureSit(body));
-      for (const f of FLOOR_SITS) this.floorPelvis.set(`${body.name}|${f.name}`, this.measureSit(body, `sit${f.name}`));
-      this.legFits.set(body.name, this.measureLegs(body));
-    }
+    for (const body of set.bodies.values()) this.measureBody(body);
     const lying = [...set.bodies.values()].map((body) => ({
       body,
       ...this.lyingPose(body),
@@ -1826,11 +1837,7 @@ export class Characters {
         const stage = s.appearance?.stage;
         if (stage && stage !== base.stage) {
           const b = await loadStage(set, base, stage).catch((err) => (console.warn('[render] life stage unavailable', base.name, stage, err), null));
-          if (b && !this.sitPelvis.has(b.name)) {
-            this.sitPelvis.set(b.name, this.measureSit(b));
-            for (const f of FLOOR_SITS) this.floorPelvis.set(`${b.name}|${f.name}`, this.measureSit(b, `sit${f.name}`));
-            this.legFits.set(b.name, this.measureLegs(b));
-          }
+          if (b && !this.sitPelvis.has(b.name)) this.measureBody(b);
           // Its own quilt, draped over its own lying pose: a child's feet stand up higher for its size than a
           // grown-up's quilt made smaller covers (their shoes showed through it halfway down the bed).
           if (b && !this.blankets.has(b.name) && this.quilt) this.addQuilt(b, this.lyingPose(b));
@@ -3422,7 +3429,7 @@ export class Characters {
       // A seat on the floor (a floor cushion) is sat on cross-legged, by its own clips.
       const floor = floorSit(seat.h - (obj?.lift ?? 0));
       rig.floorSat = floor;
-      const sp = (floor ? this.floorPelvis.get(`${rig.body.name}|${floor}`) : this.sitPelvis.get(rig.body.name))!;
+      const sp = (floor ? this.floorPelvis.get(rig.body.name)?.get(floor) : this.sitPelvis.get(rig.body.name))!;
       rootY = seat.h - sp.y * rig.scale;
       // (Facing the object's back, its forward is the Sim's back.)
       rootFwd = (seat.back ? -seat.fwd : seat.fwd) - sp.z * rig.scale + (floor ? 0 : this.perch(rig, seat, sp));
@@ -3438,8 +3445,8 @@ export class Characters {
       } else if (act?.sit) key = typeof act.sit === 'function' ? act.sit(rig.useDef) : act.sit;
       else if (!known && obj && SIT_HANDS.has(obj.def)) key = 'sitHands';
       else key = 'sit';
-      if (floor) key = `sit${floor}`;
-      const down = `sitDown${floor}`;
+      if (floor) key = SIT_CLIPS[floor].sit;
+      const down = SIT_CLIPS[floor].down;
       // (Walked in to the seat first, `WALK_IN`: sitting down once there.)
       if ((rig.lastPose === Pose.Stand || rig.walkDown) && rig.cur.key !== down) {
         key = down;
@@ -3486,7 +3493,7 @@ export class Characters {
         case Anim.Flirt:
         case Anim.Argue: {
           // The social's own gestures and how it's taken (`GESTURES`).
-          const g = { ...ANIM_GESTURES[social], ...GESTURES[rig.socialId] };
+          const g = gesturesOf(social, rig.socialId);
           const nod = hash(Math.floor(time / 3) + i) < 0.4;
           const listen = g.listen ?? (outcome === 1 && nod ? 'yes' : outcome === 2 && nod ? 'no' : 'idle');
           if (role === 1) key = outcome === 2 && g.flop ? g.flop : me ? (g.speak ?? 'talk') : outcome === 1 && g.good === 'laugh' ? 'laugh' : listen;
@@ -3629,7 +3636,7 @@ export class Characters {
     }
     if (dir?.hands !== undefined) hands = dir.hands;
     // (From the floor, its own clip: `sitFloor`.)
-    const up = rig.lastPose === Pose.Sit ? `standUp${rig.floorSat}` : RISING.has(rig.cur.key) && rig.cur.key.startsWith('standUp') ? rig.cur.key : 'standUp';
+    const up = rig.lastPose === Pose.Sit ? SIT_CLIPS[rig.floorSat].up : RISING.has(rig.cur.key) && rig.cur.key.startsWith('standUp') ? rig.cur.key : 'standUp';
     // Up from the upper bunk: down its ladder to the tile in front (`BUNK_LADDER`), sim-core waiting for them.
     const down = rig.upperBunk && rig.bed && pose === Pose.Stand && !this.force ? this.sizedClip(rig, BUNK_LADDER.down) : '';
     const climbDown = !!down && !moving && (rig.lastPose === Pose.Lie || (rig.cur.key === down && rig.cur.time < rig.cur.clip!.duration - 0.25));
@@ -3905,7 +3912,9 @@ export class Characters {
   private freeLane(rig: SimRig, into: StepIn, obj: PlacedObject): number {
     if (!into.lanes) return 0;
     const f = this.stepFacing(rig, obj, into);
-    const taken = this.sims.filter((r) => r && r !== rig && r.inside === into && r.useId === rig.useId && Math.abs(wrapAngle(r.inFacing - f)) < 0.1).map((r) => r!.inLane);
+    const taken = this.lanesTaken;
+    taken.length = 0;
+    for (const r of this.sims) if (r && r !== rig && r.inside === into && r.useId === rig.useId && Math.abs(wrapAngle(r.inFacing - f)) < 0.1) taken.push(r.inLane);
     const across = (rig.x - obj.cx) * Math.cos(f) - (rig.z - obj.cz) * Math.sin(f);
     let best = NaN;
     for (const x of into.lanes) if (!taken.includes(x) && !(Math.abs(x - across) >= Math.abs(best - across))) best = x;
@@ -5425,6 +5434,13 @@ export class Characters {
       base += n;
     }
     return { positions: out, chestZ, feetZ };
+  }
+
+  /** A body's seated pelvis offsets (`sitPelvis`, `floorPelvis`) and its legs in the clips (`legFits`). */
+  private measureBody(body: BodyData): void {
+    this.sitPelvis.set(body.name, this.measureSit(body));
+    this.floorPelvis.set(body.name, new Map(FLOOR_SITS.map((f) => [f.name, this.measureSit(body, SIT_CLIPS[f.name].sit)])));
+    this.legFits.set(body.name, this.measureLegs(body));
   }
 
   /** Where each leg is in the clips whose feet are placed (`LEG_CLIPS`), at their start (body space, scale 1). */
