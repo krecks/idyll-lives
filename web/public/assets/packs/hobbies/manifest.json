@@ -118,6 +118,9 @@
         "amp_trim": {
           "finish": "material.finish.satin"
         },
+        "ball_red": {
+          "finish": "material.finish.gloss"
+        },
         "black": {
           "finish": "material.finish.gloss"
         },
@@ -175,6 +178,9 @@
       "type": "model",
       "url": "../../models/hobbies/keyboardDigital.glb",
       "materials": {
+        "ball_red": {
+          "finish": "material.finish.gloss"
+        },
         "brass": {
           "finish": "material.finish.metal"
         },
@@ -229,6 +235,9 @@
       "materials": {
         "chrome": {
           "finish": "material.finish.chrome"
+        },
+        "cue": {
+          "finish": "material.finish.satin"
         },
         "cymbal": {
           "finish": "material.finish.metal"
@@ -560,6 +569,9 @@
         "ball_red": {
           "finish": "material.finish.gloss"
         },
+        "ball_white": {
+          "finish": "material.finish.gloss"
+        },
         "ball_yellow": {
           "finish": "material.finish.gloss"
         },
@@ -649,8 +661,14 @@
       "type": "model",
       "url": "../../models/hobbies/easel.glb",
       "materials": {
+        "ball_blue": {
+          "finish": "material.finish.gloss"
+        },
         "ball_red": {
           "finish": "material.finish.gloss"
+        },
+        "can": {
+          "finish": "material.finish.metal"
         },
         "canvas": {
           "finish": "material.finish.matte"
@@ -729,6 +747,9 @@
         },
         "bench_top": {
           "finish": "material.finish.wood"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
         },
         "can": {
           "finish": "material.finish.metal"
@@ -824,6 +845,9 @@
       "type": "model",
       "url": "../../models/hobbies/sewingTable.glb",
       "materials": {
+        "ball_red": {
+          "finish": "material.finish.gloss"
+        },
         "basket": {
           "finish": "material.finish.matte"
         },
@@ -835,6 +859,12 @@
         },
         "fabric_pink": {
           "finish": "material.finish.satin"
+        },
+        "foot": {
+          "finish": "material.finish.satin"
+        },
+        "label": {
+          "finish": "material.finish.matte"
         },
         "machine": {
           "finish": "material.finish.gloss"
@@ -851,10 +881,16 @@
         "sew_table": {
           "finish": "material.finish.satin"
         },
+        "sun": {
+          "finish": "material.finish.matte"
+        },
         "thread_red": {
           "finish": "material.finish.satin"
         },
         "thread_teal": {
+          "finish": "material.finish.satin"
+        },
+        "vice": {
           "finish": "material.finish.satin"
         }
       },
@@ -918,6 +954,15 @@
         "glass": {
           "finish": "material.finish.glass"
         },
+        "ink": {
+          "finish": "material.finish.matte"
+        },
+        "jar": {
+          "finish": "material.finish.satin"
+        },
+        "label": {
+          "finish": "material.finish.matte"
+        },
         "liquid_blue": {
           "finish": "material.finish.gloss"
         },
@@ -960,6 +1005,9 @@
       "type": "model",
       "url": "../../models/hobbies/potteryWheel.glb",
       "materials": {
+        "ball_red": {
+          "finish": "material.finish.gloss"
+        },
         "chrome": {
           "finish": "material.finish.chrome"
         },
@@ -1018,8 +1066,14 @@
         "ball_red": {
           "finish": "material.finish.gloss"
         },
+        "ball_yellow": {
+          "finish": "material.finish.gloss"
+        },
         "blush": {
           "finish": "material.finish.matte"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
         },
         "craft_metal": {
           "finish": "material.finish.metal"
@@ -1029,6 +1083,9 @@
         },
         "cup": {
           "finish": "material.finish.gloss"
+        },
+        "label": {
+          "finish": "material.finish.matte"
         },
         "pages": {
           "finish": "material.finish.matte"
@@ -1052,6 +1109,9 @@
           "finish": "material.finish.matte"
         },
         "tape_gold": {
+          "finish": "material.finish.matte"
+        },
+        "tree": {
           "finish": "material.finish.matte"
         }
       },

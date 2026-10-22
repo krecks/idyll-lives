@@ -21,6 +21,9 @@
         "bottle": {
           "finish": "material.finish.gloss"
         },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
         "dark": {
           "finish": "material.finish.satin"
         },
@@ -77,6 +80,9 @@
         },
         "red": {
           "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
         }
       },
       "motions": {
@@ -105,6 +111,9 @@
         "accent": {
           "finish": "material.finish.satin"
         },
+        "block": {
+          "finish": "material.finish.matte"
+        },
         "body": {
           "finish": "material.finish.satin"
         },
@@ -112,6 +121,9 @@
           "finish": "material.finish.satin"
         },
         "pads": {
+          "finish": "material.finish.satin"
+        },
+        "red": {
           "finish": "material.finish.satin"
         },
         "steel": {
@@ -148,6 +160,9 @@
           "finish": "material.finish.satin"
         },
         "mat": {
+          "finish": "material.finish.matte"
+        },
+        "mat_edge": {
           "finish": "material.finish.matte"
         }
       },
