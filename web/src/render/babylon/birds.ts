@@ -1329,6 +1329,7 @@ export class Birds {
     b.hy = lerp(b.hy, 0, Math.min(1, dt * 12));
     b.hp = lerp(b.hp, -b.pitch * 0.5, Math.min(1, dt * 12));
     b.hr = 0;
+    b.bob = 0;
     b.tail = lerp(b.tail, flare * 0.5 + (flapping ? 0.05 : -0.1), Math.min(1, dt * 10));
     b.puff = 1;
     if (b.t >= b.dur) this.land(b);
@@ -1422,7 +1423,6 @@ export class Birds {
     b.hy += (y - b.hy) * k;
     b.hp += (p - b.hp) * k;
     b.hr += (r - b.hr) * k;
-    b.bob = 0;
   }
 
   /** On the lawn: hopping, running or walking about, pecking, looking up. */
