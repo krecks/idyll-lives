@@ -3443,7 +3443,7 @@ export class Characters {
       }
       rootFwd += this.tuckIn(rig, obj, seat, key !== down, step, fresh);
       // (At a low top, a kids' chair at a coffee table: bent over it, the size for their height.)
-      if (key === 'sitHands' && rig.tuckLow) key = (SIT_LOW.find(({ min }) => rig.body.height * rig.scale >= min) ?? SIT_LOW[SIT_LOW.length - 1]).clip;
+      if (key === 'sitHands' && rig.tuckLow) key = this.sizedClip(rig, SIT_LOW);
       else if (key === 'sitHands' && rig.tuckFar) key = 'sitHandsFar';
       // Feet up on a footstool in front, slid forward in the seat as far as that takes.
       if (!social && key !== down && !seat.legsOut && !seat.pedals && this.footstoolFor(rig, key, rootY, rootFwd)) {
@@ -3763,7 +3763,6 @@ export class Characters {
     return wrapAngle(f + (s * Math.PI) / 2);
   }
 
-  /** The clip of `sizes` (the bunk's ladder, `BUNK_LADDER`; a ride's, `RIDES`) for this resident's height. */
   /** Holding the grips of a thing stood on (`GRIPPED`): its clip for the resident's height, as a sequence of one. */
   private gripped(rig: SimRig, sizes: readonly { clip: string; min: number }[]): readonly string[] {
     const clip = this.sizedClip(rig, sizes);
@@ -3772,9 +3771,15 @@ export class Characters {
     return one;
   }
 
+  /** The clip of `sizes` (the bunk's ladder, `BUNK_LADDER`; a ride's, `RIDES`; `SIT_LOW`) for this resident's height. */
   private sizedClip(rig: SimRig, sizes: readonly { clip: string; min: number }[]): string {
+    return this.forHeight(rig, sizes, ({ min }) => min).clip;
+  }
+
+  /** The first of `sizes` (tallest first) this resident is as tall as (`min`: the shortest it is for), else the last. */
+  private forHeight<T>(rig: SimRig, sizes: readonly T[], min: (size: T) => number): T {
     const h = rig.body.height * rig.scale;
-    return (sizes.find(({ min }) => h >= min) ?? sizes[sizes.length - 1]).clip;
+    return sizes.find((size) => h >= min(size)) ?? sizes[sizes.length - 1];
   }
 
   /** The upper bunk's frame (`BUNK_LADDER`): its slot (sim-core `slot_position`, a hair to the right of the middle), facing the foot end. */
@@ -3877,8 +3882,7 @@ export class Characters {
 
   /** The size of `STEP_IN` entry `into` for this resident's height: [height, clips, where]. */
   private stepFit(rig: SimRig, into: StepIn): StepIn['by'][number] {
-    const h = rig.body.height * rig.scale;
-    return into.by.find(([min]) => h >= min) ?? into.by[into.by.length - 1];
+    return this.forHeight(rig, into.by, ([min]) => min);
   }
 
   /** The way `rig` faces using `obj` up against it (`STEP_IN`): its front, or (`sides`) the side of it they stand on, front or back. */
