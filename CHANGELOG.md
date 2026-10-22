@@ -2,6 +2,10 @@
 
 All notable changes to Idyll Lives. Versions follow [semantic versioning](https://semver.org); each release is a git tag `vX.Y.Z`.
 
+## Unreleased
+
+- **Birds:** blue tits, chaffinches, warblers, blackbirds and collared doves live in the trees, bushes and hedges round the lot. They sit on the twigs and sway with them, glance about, flick their tails and preen, hop from twig to twig, and fly between the gardens: tits and finches bound, blackbirds fly low, doves flap and glide, always over the houses, never through them. Blackbirds, chaffinches and doves come down to the lawn to hop, walk and peck, and fly up when someone comes near. They are busiest at dawn and in the evening and roost in their trees at night. The ones you can see sing from where they sit, louder nearer, and the blackbird has a song of its own. Low has 6 birds, Medium 24, High 40; with Reduce motion they stay perched.
+
 ## 0.3.1 — 2026-10-22
 
 **Play it in your browser:** https://krecks.github.io/idyll-lives/

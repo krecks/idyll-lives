@@ -88,6 +88,7 @@ import type {
   RendererDeps,
   RenderFailure,
   RenderStats,
+  SeenBird,
   Shading,
   TownShot,
   ViewRect,
@@ -111,6 +112,7 @@ import { ItemLayer } from './items';
 import { Mirrors, type MirrorInstance } from './mirrors';
 import { ResizeHandles } from './handles';
 import { installNature, Landscape, natureDecor, setWind, Sky } from './nature';
+import { Birds, type PlantPlacement } from './birds';
 import { LAYER_ALL, LAYER_TOWN, LAYER_WORLD } from './layers';
 import { NightGrade } from './nightGrade';
 import { BuildEffects, writeMoving, type PopTarget } from './buildFx';
@@ -350,6 +352,11 @@ export class BabylonRenderer implements Renderer {
   private stairwells: ViewRect[] = [];
   /** The viewed lot's garden trees and shrubs (`placeDecor`): hidden while its basement is in view. */
   private readonly decorMeshes = new Set<Mesh>();
+  /** Those trees and shrubs as placed (model, [x, z, scale, yaw] each), where birds live. */
+  private decorPlaced: [string, [number, number, number, number][]][] = [];
+  /** The garden birds (birds.ts). */
+  private birdLife!: Birds;
+  private readonly birdCamera = new Vector3();
   /** The Paint and Floor tools' previews in the real look: what they show, and the mesh. */
   private laid = {
     faces: { keys: [] as string[], cover: null as number | null, shown: '', mesh: null as Mesh | null },
@@ -876,6 +883,11 @@ export class BabylonRenderer implements Renderer {
     this.characters.setRide((id) => this.motion.ride(id));
     this.characters.setLoop((id) => this.motion.loopPhase(id));
     this.characters.setSun(() => this.sun.direction);
+    // Garden birds. `?debug`: `__birds()` lists them (species, state, place) with what they did and
+    // the cost of a frame; `__birdFly(id, where)` sends one off; `__birdTime(scale)` slows their clock.
+    this.birdLife = new Birds(scene, this.deps.assets);
+    this.birdLife.setQuality(this.quality.birds);
+    if (this.debug) Object.assign(window, { __birds: () => this.birdLife.debug(), __birdFly: (id: number, where: 'plant' | 'ground' | 'roof' | 'home' = 'plant') => this.birdLife.debugFly(id, where), __birdTime: (scale: number) => (this.birdLife.timeScale = scale) });
     this.items = new ItemLayer(scene, this.deps.assets, this.deps.content);
     this.items.onChange = () => this.resetSnapshot();
     // A model file that failed has come: what was drawn without it (a box, or nothing) is built again.
@@ -1085,6 +1097,7 @@ export class BabylonRenderer implements Renderer {
     this.showItems();
     // Built without the boxes of files that came (set aside before this build began, `refreshModels`): they go.
     if (this.templates.disposeStale()) this.resetSnapshot();
+    void this.settleBirds(world);
     this.lastLightMinute = -1;
     // Then the other lots' furniture downloads in the background (the camera may follow someone there).
     const elsewhere = world.objects.filter((o) => !this.inView(o.x + o.w / 2, o.z + o.d / 2, 0));
@@ -1156,6 +1169,7 @@ export class BabylonRenderer implements Renderer {
     // (After the moving parts: residents on a moving seat go with it.)
     this.characters.update(frame, this.simInView, this.simShadowMatrices, this.storey);
     this.pullChairs();
+    this.updateBirds(frame, minute);
 
     // Sims who moved (or breathed: anyone in view while the game runs) cast anew.
     if (this.characters.posed && this.quality.characterShadows) this.sunShadows.moved(false);
@@ -1340,6 +1354,94 @@ export class BabylonRenderer implements Renderer {
     if (d.y > -1e-6 || o.y <= y) return null;
     const t = (y - o.y) / d.y;
     return { x: o.x + d.x * t, z: o.z + d.z * t + this.rowOf(this.storey) };
+  }
+
+  birds(): readonly SeenBird[] {
+    // (Behind the overview the game world isn't drawn.)
+    return this.townMode ? [] : this.birdLife.heard();
+  }
+
+  birdSings(id: number, seconds: number): void {
+    this.birdLife.sings(id, seconds);
+  }
+
+  /**
+   * Where the birds live, now that the lot is built: the viewed lot's garden trees and shrubs, the
+   * garden things outdoors (catalog trees, hedges, roses), the street's bushes, hedges and public
+   * places' trees, the woods nearby, and the viewed house's roof ridge.
+   */
+  private async settleBirds(world: WorldStructure): Promise<void> {
+    const plants: PlantPlacement[] = [];
+    for (const [key, items] of this.decorPlaced) for (const [x, z, s, yaw] of items) plants.push({ key, x, y: 0, z, sx: s, sy: s, sz: s, yaw });
+    const gd = world.storeyDepth ?? world.depth;
+    for (const o of world.objects) {
+      if (o.z >= gd) continue;
+      const centre = objectCentre(o);
+      // Indoors (a fiddle-leaf fig in the lounge): not a bird's.
+      if (world.rooms[Math.floor(centre.z) * world.width + Math.floor(centre.x)] !== 0) continue;
+      const key = this.objectModel(o);
+      const entry = this.deps.assets.get(key, 'model');
+      if (!entry) continue;
+      const { turn, size } = placementVariation(entry.vary ?? 0, o.x, o.z);
+      plants.push({ key, x: centre.x, y: o.lift ?? 0, z: centre.z, sx: size, sy: size, sz: size, yaw: (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180 + turn });
+    }
+    for (const { key, items, flat } of this.street.placed) for (const [x, z, s, sy, yaw] of items) plants.push({ key, x, y: 0, z, sx: s, sy, sz: flat ? 1 : s, yaw });
+    const v = this.view;
+    const woods = this.natureIn.world?.landscape;
+    if (v && woods) for (const p of woods.woodsNear(v.x + v.w / 2, v.z + v.d / 2, Math.hypot(v.w, v.d) / 2 + this.quality.birds.range)) plants.push({ key: p.key, x: p.x, y: p.y, z: p.z, sx: p.scale, sy: p.up, sz: p.scale, yaw: p.yaw });
+    // The roof ridge: the roofs' highest points, a perch every half metre along them.
+    let roofTop: number | null = null;
+    const ridge: number[] = [];
+    const tops: [number, number, number][] = [];
+    for (const roof of this.roofs) {
+      const pos = roof.getVerticesData(VertexBuffer.PositionKind);
+      if (!pos) continue;
+      roof.computeWorldMatrix(true);
+      const m = roof.getWorldMatrix();
+      let top = -Infinity;
+      const pts: Vector3[] = [];
+      for (let i = 0; i < pos.length; i += 3) {
+        const p = Vector3.TransformCoordinates(this.vTmp.set(pos[i], pos[i + 1], pos[i + 2]), m);
+        top = Math.max(top, p.y);
+        pts.push(p);
+      }
+      roofTop = Math.max(roofTop ?? 0, top);
+      for (const p of pts) if (p.y > top - 0.03) tops.push([p.x, p.y, p.z]);
+    }
+    if (tops.length >= 2) {
+      // Along the ridge from one end to the other.
+      let [a, b] = [tops[0], tops[1]];
+      let far = 0;
+      for (const p of tops) for (const q of tops) if (Math.hypot(p[0] - q[0], p[2] - q[2]) > far) [far, a, b] = [Math.hypot(p[0] - q[0], p[2] - q[2]), p, q];
+      const n = Math.floor(far / 0.5);
+      for (let k = 1; k < n; k++) ridge.push(a[0] + ((b[0] - a[0]) * k) / n, a[1], a[2] + ((b[2] - a[2]) * k) / n);
+      // A short ridge (a hipped roof's): its ends, and the point between.
+      if (n < 3) ridge.push(a[0], a[1], a[2], b[0], b[1], b[2]);
+    }
+    const minute = this.fixedHour !== null ? this.fixedHour * 60 : this.lastMinute;
+    await this.birdLife.setHabitat({ world, view: v, plants, ridge, roofTop, hour: (minute / 60) % 24 });
+  }
+
+  /** The birds a frame on (with the game's clock; they're hidden with the garden over the basement). */
+  private updateBirds(frame: FrameState, minute: number): void {
+    const { curr, layout } = frame;
+    const h = layout.header;
+    const calmHours = h.calm !== undefined && curr[h.calm] > 0;
+    this.birdLife.setVisible(this.storey >= 0);
+    this.birdCamera.copyFrom(this.camera.globalPosition);
+    const moved = this.birdLife.update({
+      dt: this.frameDt / 1000,
+      speed: calmHours ? 4 : curr[h.speed] | 0,
+      hour: (minute / 60) % 24,
+      camera: this.birdCamera,
+      residents: this.characters.heads,
+      residentCount: this.simCount,
+      visible: this.characters.visible,
+      calm: this.reducedMotion,
+      roof: this.roofShown && this.storey >= 0,
+    });
+    // (As the ambient clips: drawn again, the sun's shadows not.)
+    if (moved && this.webgpu?.snapshotRendering) this.webgpu.snapshotRenderingReset();
   }
 
   project(x: number, y: number, z: number, out: { x: number; y: number }): boolean {
@@ -2440,6 +2542,7 @@ export class BabylonRenderer implements Renderer {
     this.unwatchPixelRatio?.();
     this.unlistenFiles?.();
     this.unlistenMarker?.();
+    this.birdLife?.dispose();
     if (this.filesTimer) clearTimeout(this.filesTimer);
     this.filesTimer = null;
     this.filesArrived.clear();
@@ -3582,7 +3685,8 @@ export class BabylonRenderer implements Renderer {
       void roof.material?.forceCompilationAsync(roof).catch(() => {});
     }
     // Garden dressing split into species (hedges or mixed shrub borders, varied lot trees).
-    for (const [key, items] of [...natureDecor('model.bush', built.shrubs), ...natureDecor('model.tree', built.trees, world, this.view)]) {
+    this.decorPlaced = [...natureDecor('model.bush', built.shrubs), ...natureDecor('model.tree', built.trees, world, this.view)];
+    for (const [key, items] of this.decorPlaced) {
       await this.pace();
       void this.placeDecor(key, items);
     }
@@ -4414,6 +4518,7 @@ export class BabylonRenderer implements Renderer {
   /** A model file that failed has come: things drawn without it are built again in a moment (`refreshModels`), the ghost and the landscape's plants (`refreshNature`) now. */
   private fileArrived(url: string): void {
     this.ghostFileArrived(url);
+    this.birdLife.fileArrived(url);
     this.refreshNature(url);
     const now = performance.now();
     if (!this.filesArrived.size) this.filesSince = now;

@@ -122,6 +122,15 @@ shrub, the shrub with pink blossom, the garden hedge's block without its sprigs)
   roses their roses; the rest none. Each one's flower heads are all one material, the colour part, so "Flowers"
   colours every head (they cycled three or four shades of one hue until 2026-10-17, and the colour reached only the
   first; the geraniums' clusters too).
+- **Perches** (2026-10-22): where the game's birds sit (`birds.py`), the entry's `perches` in the model's game axes
+  (`perches`, `gamekit/perch.py`, as the trees' in trees.md). Lines come in from round and above towards the shrub's
+  middle, or along a hedge's top (`hedge_top`), and meet its leaves. The perch is 2 cm in from there, on leaves that
+  face up a little at least, with nothing over it within 15 cm, spread at least 20 cm apart. Found before the trimmed
+  sprigs and the cut rose are built. The rose bush's go on its canes, half way up their arch, and on its leafy base.
+  The bush has 6, `model.bush.small` 4, `model.bush.flowering` 6, `model.hedge` 6, the boxwood 4, the topiary 4
+  (on its cone), the garden hedge 6, the hydrangea 5, the rose bush 5 and the azalea 5. Lavender, ferns, grass and
+  hostas have none. Perches only add data: the meshes are unchanged (same triangles as the table), and so are the
+  committed files.
 
 | Model | Size (w × h × d) | Triangles | Far | Draws |
 |---|---|---|---|---|

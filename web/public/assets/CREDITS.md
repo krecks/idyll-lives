@@ -76,6 +76,13 @@ versions. An apple or a lemon shrinks away while it is picked, the Japanese mapl
 magnolia's goblets; with them the bonsai's stand, the rose bush, azalea, meadow and strawberries (`plants.py`) and
 the garden boulders (`garden_decor.py`), all original and CC0.
 
+The garden birds (`models/birds/blueTit.glb`, `chaffinch.glb`, `warbler.glb`, `blackbird.glb`, `collaredDove.glb`,
+override pack `packs/birds/manifest.json`) are built in Blender by `tools/art/blender/families/birds.py` on `gamekit`
+and exported as `.glb` (glTF, original, CC0): a blue tit, a male chaffinch, a willow warbler, a male blackbird and a
+collared dove at their field-guide sizes, each in five parts the game moves (body, head, tail, the two wings). The
+places they perch on the trees, shrubs and hedges (`perches` in the trees' and plants' packs) are found on those
+models by the same scripts (`gamekit/perch.py`), data only.
+
 The kitchen fridge (`models/kitchen/fridge.glb`, override pack `packs/kitchen/manifest.json`) is built in
 Blender by `tools/art/blender/families/kitchen.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
 

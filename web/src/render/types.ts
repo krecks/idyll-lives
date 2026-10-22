@@ -26,6 +26,20 @@ export interface ViewRect {
 }
 
 /** An orbit camera pose: angles in radians, distance and target in metres. */
+/** A garden bird as the renderer draws it (`Renderer.birds`). */
+export interface SeenBird {
+  id: number;
+  /** Its song (`audio/birdsong.ts` species name). */
+  song: string;
+  x: number;
+  y: number;
+  z: number;
+  /** Perched and awake, not busy: it may sing. */
+  perched: boolean;
+  /** Metres from the camera. */
+  distance: number;
+}
+
 export interface CameraPose {
   alpha: number;
   beta: number;
@@ -327,6 +341,10 @@ export interface Renderer {
   project(x: number, y: number, z: number, out: { x: number; y: number }): boolean;
   /** Interpolated world position above Sim `index`'s head from the last update; false if unknown. */
   simHead(index: number, out: { x: number; y: number; z: number }): boolean;
+  /** The garden birds drawn about the viewed lot (render/babylon/birds.ts), for the world's sound: kept and refilled, read it at once. */
+  birds(): readonly SeenBird[];
+  /** Bird `id` (`SeenBird.id`) sings for `seconds`: it lifts its head meanwhile. */
+  birdSings(id: number, seconds: number): void;
   /** Centres the camera on a world point. */
   focus(x: number, z: number): void;
   setHoverTile(tile: { x: number; z: number } | null): void;

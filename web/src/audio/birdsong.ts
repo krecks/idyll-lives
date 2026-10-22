@@ -122,6 +122,50 @@ export const SPECIES: Species[] = [
     },
   },
   {
+    // A blackbird: an unhurried, fluting phrase of mellow slurred whistles, never quite the same
+    // twice, trailing off into a soft, high twitter.
+    name: 'blackbird',
+    pitch: [1900, 2300],
+    vibrato: [9, 0.008],
+    flutter: 0.08,
+    overtone: 0.05,
+    fade: 0.03,
+    bright: 5000,
+    level: 0.9,
+    bout: [4, 9],
+    pause: [2.5, 5],
+    rest: [30, 70],
+    turns: true,
+    song: (r) => {
+      // Slurs it puts its phrases together from: rising, falling, a dip, a turn.
+      const slurs = [
+        [1, 1.12, 1.06],
+        [0.84, 0.94, 1],
+        [1.22, 1.1, 0.9],
+        [0.9, 1.24, 1.2, 1.02],
+        [1.02, 0.8, 0.82],
+        [1.34, 1.3, 1.18],
+        [0.95, 1.06, 0.98, 1.1],
+        [0.76, 0.86, 0.8],
+      ];
+      const notes: Note[] = [];
+      const count = 3 + Math.floor(r() * 4);
+      for (let i = 0; i < count; i++) {
+        const slur = slurs[Math.floor(r() * slurs.length)];
+        const key = 0.9 + r() * 0.25;
+        const last = i === count - 1;
+        notes.push({ len: 0.14 + r() * 0.18, gap: last ? 0.05 : 0.03 + r() * 0.07, pitch: slur.map((p) => p * key), level: 0.75 + r() * 0.25 });
+      }
+      // The twitter: a few quick, thin high notes, quieter.
+      const twitter = Math.floor(r() * 6);
+      for (let i = 0; i < twitter; i++) {
+        const p = 1.8 + r() * 0.5;
+        notes.push({ len: 0.03 + r() * 0.02, gap: 0.018, pitch: [p * 1.08, p, p * 1.12], level: 0.3 + r() * 0.12 });
+      }
+      return notes;
+    },
+  },
+  {
     // "Coo-COOO-coo", low and soft, like a collared dove; now and then.
     name: 'dove',
     pitch: [470, 560],

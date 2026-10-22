@@ -962,6 +962,7 @@ export class Street {
     for (const [key, template] of this.templates) if (!batches.some(([k]) => k === key)) void template.then((t) => withGlows(t).forEach((m) => m.setEnabled(false)));
     this.glows = [];
     this.used = new Set(batches.filter(([, items]) => items.length).map(([key]) => key));
+    this.placedModels = batches.map(([key, items]) => ({ key, items, flat: key === FOLIAGE.hedge }));
     for (const [key, items, cast] of batches) {
       await pace?.();
       const meshes = await perfTimeAsync(`street: batch ${key}`, () => this.instances(key, items, key === FOLIAGE.hedge, this.footprints.get(key), this.standIns.get(key), pace));
@@ -981,6 +982,16 @@ export class Street {
   }
 
   private glow = new Color3(1, 0.8, 0.5);
+
+  /**
+   * The models the last build drew from thin instances, each instance [x, z, scale across, scale up,
+   * yaw] (`flat`: not scaled along its z, a hedge's depth): where the birds find the street's bushes,
+   * hedges and public places' trees.
+   */
+  get placed(): readonly { key: string; items: readonly (readonly [number, number, number, number, number])[]; flat: boolean }[] {
+    return this.placedModels;
+  }
+  private placedModels: { key: string; items: readonly Inst[]; flat: boolean }[] = [];
 
   /** Every mesh currently drawn (including the foliage templates in use). */
   get all(): readonly Mesh[] {
@@ -1005,6 +1016,7 @@ export class Street {
   /** Removes what was built (the foliage templates are kept, hidden, for the next build). */
   clear(): void {
     this.used.clear();
+    this.placedModels = [];
     for (const mesh of this.meshes) mesh.dispose(false, false);
     this.meshes = [];
     this.casters = [];
