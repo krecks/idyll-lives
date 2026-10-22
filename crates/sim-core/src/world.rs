@@ -5736,8 +5736,8 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
                 // At their own spot, come to it (the end of a ping-pong table, their basin at a
                 // double sink: `stand_spot`), facing the way it says; else facing the thing.
                 let slot = obj.slot_of(sim.id).unwrap_or(0);
-                let spot = (!inter.carried && !inter.at_slot).then(|| crate::surface::stand_spot(content, &ctx.nav, obj, slot, inter.whole || inter.leaves.is_some())).flatten().filter(|&(_, p, _)| (p[0] - sim.pos[0]).hypot(p[1] - sim.pos[1]) < 0.75);
-                if let Some((_, p, yaw)) = spot {
+                let spot = (!inter.carried && !inter.at_slot).then(|| crate::surface::at_stand_spot(content, &ctx.nav, obj, slot, inter.whole || inter.leaves.is_some(), sim.pos)).flatten();
+                if let Some((p, yaw)) = spot {
                     sim.pos = p;
                     sim.yaw = yaw;
                 } else {

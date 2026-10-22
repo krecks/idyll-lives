@@ -1499,10 +1499,9 @@ fn extra_minutes(r: &RecipeDef, step: usize, mask: StationMask, carried: u16) ->
 fn face(sim: &mut Sim, ctx: &Ctx, o: &ObjectInstance) {
     let content = ctx.content;
     let c = o.centre(content);
-    let spot = o.slot_of(sim.id).and_then(|k| surface::stand_spot(content, &ctx.nav, o, k, false));
-    sim.yaw = match spot {
-        Some((_, p, yaw)) if (p[0] - sim.pos[0]).hypot(p[1] - sim.pos[1]) < 0.75 => yaw,
-        _ => (c[0] - sim.pos[0]).atan2(c[1] - sim.pos[1]),
+    sim.yaw = match o.slot_of(sim.id).and_then(|k| surface::at_stand_spot(content, &ctx.nav, o, k, false, sim.pos)) {
+        Some((_, yaw)) => yaw,
+        None => (c[0] - sim.pos[0]).atan2(c[1] - sim.pos[1]),
     };
     sim.pose = Pose::Stand;
 }

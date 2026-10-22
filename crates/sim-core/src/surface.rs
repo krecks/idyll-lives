@@ -616,6 +616,12 @@ pub fn stand_spot(content: &Content, nav: &NavGrid, obj: &ObjectInstance, slot: 
     Some((t, p, crate::world::wrap_angle(obj.angle() + PI)))
 }
 
+/// `stand_spot`, if someone at `pos` has come to it (within 0.75 m): the point and the way
+/// they face there.
+pub fn at_stand_spot(content: &Content, nav: &NavGrid, obj: &ObjectInstance, slot: usize, whole: bool, pos: [f32; 2]) -> Option<([f32; 2], f32)> {
+    stand_spot(content, nav, obj, slot, whole).filter(|&(_, p, _)| (p[0] - pos[0]).hypot(p[1] - pos[1]) < 0.75).map(|(_, p, yaw)| (p, yaw))
+}
+
 /// The table `seat` faces: the top covering its front tile, of a kind it tucks under (its
 /// `seatAt`), on the same storey with no wall between (`top_at`: the top over a tile on the lot).
 fn faced(
