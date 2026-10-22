@@ -2,6 +2,7 @@
 # ("Optimisation and registration").
 import json
 import os
+import re
 
 import bpy
 
@@ -46,6 +47,14 @@ def materials_used(objs=None):
     return {s.material.name for o in (objs if objs is not None else meshes()) for s in o.material_slots if s.material}
 
 
+def _points_on_a_line(text):
+    """`text` (JSON, indent=2) with each point of an entry's `perches` on one line, `[x, y, z]`, as centres.json writes
+    its points: indent=2 puts every number on a line of its own (a tree's 20 perches, 80 lines)."""
+    def compact(perches):
+        return re.sub(r'\[\s+([^\[\]]*?)\s+\]', lambda p: '[' + re.sub(r',\s+', ', ', p[1]) + ']', perches[0])
+    return re.sub(r'"perches": \[(?:\s*\[[^\[\]]*\],?)*\s*\]', compact, text)
+
+
 def write_pack(pack, entries, comment, code=(), known=None):
     """
     Writes the override pack `packs/<pack>/manifest.json` and lists it in the base manifest's `packs`.
@@ -85,8 +94,7 @@ def write_pack(pack, entries, comment, code=(), known=None):
     manifest = {'$comment': comment, 'version': 1, 'entries': kept}
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, 'w') as f:
-        json.dump(manifest, f, indent=2)
-        f.write('\n')
+        f.write(_points_on_a_line(json.dumps(manifest, indent=2)) + '\n')
     if rel not in base['packs']:
         base['packs'].append(rel)
         with open(os.path.join(ASSETS, 'manifest.json'), 'w') as f:
