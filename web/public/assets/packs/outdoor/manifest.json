@@ -65,6 +65,9 @@
         "cup": {
           "finish": "material.finish.gloss"
         },
+        "grate": {
+          "finish": "material.finish.metal"
+        },
         "handle": {
           "finish": "material.finish.wood"
         },
@@ -236,6 +239,18 @@
       "materials": {
         "bar_top": {
           "finish": "material.finish.wood"
+        },
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
+        "bottle_amber": {
+          "finish": "material.finish.gloss"
+        },
+        "bottle_clear": {
+          "finish": "material.finish.gloss"
+        },
+        "bottle_green": {
+          "finish": "material.finish.gloss"
         },
         "steel": {
           "finish": "material.finish.metal"
@@ -501,6 +516,9 @@
         "coals": {
           "finish": "material.finish.matte"
         },
+        "gauge": {
+          "finish": "material.finish.gloss"
+        },
         "grate": {
           "finish": "material.finish.metal"
         },
@@ -618,6 +636,9 @@
         },
         "log": {
           "finish": "material.finish.bark"
+        },
+        "log_end": {
+          "finish": "material.finish.matte"
         },
         "pit": {
           "finish": "material.finish.matte"

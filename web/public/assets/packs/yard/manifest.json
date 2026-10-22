@@ -97,6 +97,12 @@
         "carrot_top": {
           "finish": "material.finish.foliage"
         },
+        "green": {
+          "finish": "material.finish.satin"
+        },
+        "haft": {
+          "finish": "material.finish.satin"
+        },
         "leaf": {
           "finish": "material.finish.foliage"
         },
@@ -243,6 +249,9 @@
         "haft": {
           "finish": "material.finish.satin"
         },
+        "mortar": {
+          "finish": "material.finish.matte"
+        },
         "paving": {
           "finish": "material.finish.matte"
         },
@@ -281,6 +290,9 @@
         "bin": {
           "finish": "material.finish.wood"
         },
+        "can": {
+          "finish": "material.finish.metal"
+        },
         "compost": {
           "finish": "material.finish.matte"
         },
@@ -288,6 +300,9 @@
           "finish": "material.finish.satin"
         },
         "peel": {
+          "finish": "material.finish.satin"
+        },
+        "shell": {
           "finish": "material.finish.satin"
         }
       },
@@ -317,6 +332,9 @@
         },
         "brass": {
           "finish": "material.finish.metal"
+        },
+        "tyre": {
+          "finish": "material.finish.satin"
         }
       },
       "paint": [

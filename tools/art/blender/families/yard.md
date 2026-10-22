@@ -11,7 +11,25 @@ files' folder (`models/yard/` to `models/outdoor/`): the keys stay `model.<id>`.
 Each is built in place where the game places it (`F`, game axes), with `G.settle(centre=False)` and its
 `Model`'s `centre` where it stands off the footprint's middle. Outdoor things are drawn in the town overview, so
 each has a far version (`far=`): the model's own build at low detail (`G.far_of`), at rest, all one part, without
-the castle and the washing; the log store's is decimated (`far=0.25`).
+the castle and the washing; the log store's too since 2026-10-22 (it was decimated, `far=0.25`, which
+turned its logs to spikes).
+
+What each has since the detail pass (2026-10-22, with gamekit's forms and kit; the same sizes, heights, parts, clips,
+draws, paint and far versions, each far version at most half its model):
+
+| Model | Now |
+|---|---|
+| sandbox | two boards high a side, a mitred capping frame (`kit.moulding`), triangular corner seats, lumpy sand (`_ground`), a lofted bucket with its sand and wire handle, a spade laid in one line (blade, shaft, T grip), star moulds; the castle with the bucket's ridges and a door |
+| bikeRack | hoops each one bent tube on feet; the bike's tapered tubes, head tube, raked curved fork, curved seat stays, laced spokes from flanged hubs, C-section mudguards, a lofted saddle, swept-back bars, a cog; the stand's feet |
+| raisedBed | lettuces lofted (ruffled outer leaves round a cupped heart), carrot fronds (leaflets, tilted), tomato bushes up canes (the canes in the still part), calyxes on the tomatoes, lumpy soil, post caps |
+| shedSmall | weatherboards: each wall swept from a lapped saw-tooth section (`_lap_wall`), cut every 0.3 m so its shading isn't only its buried ends'; a moulded window frame, a sill, a lofted window box on brackets, corner boards, a drip cap, felt laps and drip edges, finials; T-hinges with bolts, a ring latch |
+| greenhouse | mortar courses on the dwarf wall (`mortar`), the path's joints, ridge finials, a glazing bar across each side bay, a kick panel on the door |
+| compostBin | post caps, galvanised nails, more on the heap (eggshells, `shell`), a shaped grip |
+| rainBarrel | one loft: a foot ring, two hoop bands, sixteen ribs between them, a rolled top; a domed lid with grips and a mesh inlet; a flanged tap with a bent spout and a lever |
+| clothesline | swept posts with caps, arms with end caps, bent braces, turned feet, tensioners; a lofted basket with a rim and handles, soft folded washing; the washing cut to shape (T-shirts, trousers with their legs, socks with their feet, a sheet with a soft hem, towels with woven bands) and pegs astride the line, all within the line's 16 mm when flattened |
+| firewoodStack | round, half and quarter logs (swept rough sections), pale sawn ends with darker hearts, the rack's ends bent tube on feet, a corrugated roof |
+
+Yard keeps G.jitter out (it gives other numbers in each Blender process: outdoor.md); its noise is `noise()` only.
 
 | Model | Moving part and clip | Played by |
 |---|---|---|
@@ -27,7 +45,7 @@ The rain barrel and the log store are still.
 
 - **The sandpit**: boards with capping rails all round, two corner seats at the back, sand with two heaps, a red
   bucket full of sand, a blue spade, a star mould turned out and its mould.
-- **The bike rack**: four galvanised hoops on a rail (each one bent tube, `_tube`, so no seams show where rods met),
+- **The bike rack**: four galvanised hoops on a rail (each one bent tube, `_bent`, so no seams show where rods met),
   a blue bike in front of them (frame, mudguards, spoked wheels, chain ring, cranks, chain, saddle, bars and bell),
   and a repair stand either side of the back wheel. The bars are 0.44 m wide and the bike stands on the tile's
   middle line, so the model keeps within 10 % of the old part's depth.
@@ -69,15 +87,15 @@ built, then dropped: the gate warned the models stood 7 cm off the old parts' ce
 
 | Model | Size (w × h × d) | Triangles | Far | Draws | Colour parts |
 |---|---|---|---|---|---|
-| sandbox | 1.98 × 0.36 × 1.98 | 2980 | 680 | 3 | Frame |
-| bikeRack | 1.80 × 0.83 × 0.58 | 3968 | 1716 | 3 | Rack, Bike |
-| raisedBed | 1.86 × 0.54 × 0.88 | 4764 | 1344 | 3 | Bed |
-| shedSmall | 1.98 × 2.37 × 1.91 | 4552 | 1548 | 3 | Wood, Roof, Door |
-| greenhouse | 1.81 × 2.40 × 2.84 | 6444 | 2304 | 4 | Frame, Wall |
-| compostBin | 0.84 × 0.78 × 0.79 | 3040 | 436 | 3 | Bin |
-| rainBarrel | 0.61 × 0.97 × 0.69 | 1656 | 612 | 1 | Barrel |
-| clothesline | 2.76 × 1.80 × 0.76 | 4972 | 684 | 3 | Posts, Washing |
-| firewoodStack | 1.00 × 1.10 × 0.38 | 2220 | 548 | 2 | Shelter |
+| sandbox | 1.98 × 0.35 × 1.98 | 3260 | 602 | 3 | Frame |
+| bikeRack | 1.80 × 0.83 × 0.58 | 5248 | 1784 | 3 | Rack, Bike |
+| raisedBed | 1.86 × 0.54 × 0.88 | 4888 | 1504 | 3 | Bed |
+| shedSmall | 1.98 × 2.37 × 1.91 | 5436 | 1180 | 3 | Wood, Roof, Door |
+| greenhouse | 1.81 × 2.43 × 2.84 | 6980 | 2380 | 4 | Frame, Wall |
+| compostBin | 0.84 × 0.78 × 0.79 | 2148 | 484 | 3 | Bin |
+| rainBarrel | 0.60 × 0.97 × 0.69 | 1744 | 536 | 1 | Barrel |
+| clothesline | 2.76 × 1.82 × 0.76 | 2812 | 940 | 3 | Posts, Washing |
+| firewoodStack | 1.00 × 1.10 × 0.38 | 3320 | 1316 | 2 | Shelter |
 
 `check-glb`: 0 failed; one warning, the greenhouse's 4 draws. Khronos validator: 0 errors, 0 warnings on every
 file and far file.

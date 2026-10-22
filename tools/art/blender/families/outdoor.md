@@ -4,9 +4,42 @@ The outdoor things. One pack, `packs/outdoor/manifest.json`. Each model is built
 old part stood (`F`, game axes), so seat heights (content `seat`) and table tops (content `surface`)
 stay where the game has them; models that stand off the middle of their footprint say so with `centre=`.
 
+2026-10-22 (detail pass, with gamekit's forms and kit; the same sizes, heights, parts, clips, draws and paint): cast
+ends and bent tubes in one piece, shaped and rounded boards, soft piped cushions, lofted cups, jugs, bottles and a
+basket, a parasol canopy sagging between its ribs, a mosaic of proud tiles, extruded stones and wedges. The common
+pieces (chairs, benches, tables, the parasol) keep to about half their size class's target: the town overview draws
+every lot's outdoor objects whole, and these have no far version. Helpers: `_bent` (kit.fillet + kit.tube), `_bar` (a
+rounded-rect section swept), `_plank` (an outline placed like a board), `_side_slab`, `_slab`, `_cup`, `_jug`,
+`_bottle`, `_mosaic`, `_cast_end`, `_flame`, `_log`, and `_jitter`: G.jitter's `noise_vector` gives other numbers in
+each Blender process, so a jittered model came out a little different on each run (the fire pit's centre moved 2 mm
+and failed the size check); `_jitter` uses `noise()`, which doesn't.
+
 2026-10-21 (authenticity review, Phase 4): the park bench's and the picnic table's heights, the bistro set's
 chairs, the garden bench, the hammock, the porch swing's seat, the swing set's frame, the hot tub's cover and bench
 and the grill's height and glow were rebuilt to real sizes (`docs/review/outdoor.md`, `systems.md` M-outdoor-01).
+
+What each has since the detail pass (2026-10-22):
+
+| Model | Now |
+|---|---|
+| bench | each cast end three one-piece bars (the back leg curling back over the top, the front leg running up into the arm, the seat rail), a scroll, an arched stretcher, an armrest, pad feet; carriage bolts |
+| patioSet | each chair's frame two bent tubes (over the top; under the seat's front), a tube round the seat, bowed back slats, seat slats with rounded ends, pivots; the table's framed top on two crossing U legs; a turned cup with a handle, a jug with a spout |
+| picnicTable | legs, bearers and cleats cut level and chamfered (side outlines), carriage bolts, the gingham laid across and hanging over both edges, a lofted wicker basket with a rim, lid flaps, a bent handle and a strap |
+| gardenChair, adirondackChair | arms tapering to round fronts, curved corbels, stringers rounded at the front, slats with rounded tops (11 cm seat slats), the garden chair's arched top rail, the Adirondack's bowed upper rail; a turned cup |
+| patioTableRound | a mosaic of proud tiles in rings (`_mosaic`: the grout a baked V between them), an iron band, a turned column with collars, a moulded foot |
+| patioTable4 | breadboard ends with pegs, arched aprons, tapered legs with eased corners, an H stretcher |
+| patioChair | a bent-tube back over the top, front legs running into the arms, a piped soft cushion, a seat frame, bowed slats, glides |
+| benchGarden3 | the park bench's cast ends on three frames (the middle one armless), bolts |
+| outdoorBar | a moulded counter, slatted ends, eighteen front slats with gaps, open shelves at the back with bottles and glasses (bottle_green, bottle_amber, bottle_clear), a one-piece bent foot rail with flanges |
+| parasol | the canopy lofted in one (eight panels sagging between the ribs, top and underside), a scalloped valance, ribs, struts and tips, a turned finial; a moulded base with its screw, the crank's housing and handle |
+| sunLounger | rails rounded at the ends, tapered legs with rails, piped soft cushions (the long one now meeting the seat's end, so the bed probe finds it), a towel laid over the foot and one rolled; a piped back pad and a plump pillow |
+| hammock | the sling's sides curling up where it sags (its middle line keeps its heights), turned spreader bars, five cords fanning to a ring and a rope to an eye hook, whipped hems, a soft pillow; the stand's base and posts cut level, rounded feet, post caps |
+| porchSwing | legs cut level meeting under a beam with cut-back ends, gussets; shaped arms on turned posts, an arched top rail, a front rail; two chains from the corners to a ring, one up to a hook; a piped cushion |
+| swingSet | round timbers tapering, the beam's end caps; belt seats sagging between their chains, clips, hanger rings round the beam |
+| hotTubCedar | one wall with a V between each of its 32 staves, a moulded rim, flat bands with lugs, a step with a nosing and a riser, rippled water and the jets' foam; a cover with a rounded edge, straps, clips and handles |
+| grill | a rolled lip, dampers, bent side handles, a grate ring and bars, patties and bent sausages, leg sockets, a wire rack, an ash pan, wheels with hub caps; a lid with a vent tab, a thermometer and a shielded handle |
+| grillStation | a moulded worktop, a tilted control panel with turned knobs and an igniter, framed stainless doors with bar pulls and hinges, a towel bar; the hood's dark end caps, bar handle and tilted gauge |
+| firePit | two courses of rough stones round a dark wall, ten rough wedge capstones (three pushed out a little so the bounds stay the old random stones'), logs with rough bark and pale sawn ends (`log_end`), flames as twisted lofted tongues |
 
 ## OU1. Patio seating and tables (Validate › Patio)
 
@@ -39,19 +72,20 @@ Built 2026-10-14; they sat in Validate › Patio until signed off (back to Outdo
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| bench | 1.74 × 0.89 × 0.53 | 2468 | 2 | Frame, Slats |
-| patioSet | 0.60 × 0.93 × 1.42 | 3088 | 2 | Frame, Slats |
-| picnicTable | 2.50 × 1.06 × 1.62 | 2908 | 3 | Frame, Planks, Cloth |
-| gardenChair | 0.84 × 1.04 × 0.76 | 2320 | 1 | Chair |
-| patioTableRound | 0.82 × 0.73 × 0.82 | 1624 | 1 | Frame, Top, Tiles |
-| patioTable4 | 1.60 × 0.74 × 0.79 | 1728 | 1 | Frame, Top |
-| patioChair | 0.46 × 0.93 × 0.45 | 1336 | 2 | Frame, Cushion |
-| adirondackChair | 0.88 × 1.10 × 0.79 | 2160 | 1 | Chair |
-| benchGarden3 | 1.91 × 0.91 × 0.60 | 2712 | 2 | Frame, Slats |
-| outdoorBar | 2.00 × 1.06 × 0.89 | 3052 | 2 | Body, Counter, Foot rail |
-| parasol | 2.21 × 2.46 × 2.21 | 1376 | 3 | Canopy, Pole, Edge |
+| bench | 1.74 × 0.89 × 0.53 | 3132 | 2 | Frame, Slats |
+| patioSet | 0.60 × 0.94 × 1.42 | 3328 | 2 | Frame, Slats |
+| picnicTable | 2.50 × 1.05 × 1.62 | 3488 | 3 | Frame, Planks, Cloth |
+| gardenChair | 0.84 × 1.04 × 0.75 | 2316 | 1 | Chair |
+| patioTableRound | 0.82 × 0.73 × 0.82 | 2412 | 1 | Frame, Top, Tiles |
+| patioTable4 | 1.60 × 0.74 × 0.79 | 2032 | 1 | Frame, Top |
+| patioChair | 0.46 × 0.93 × 0.45 | 1488 | 2 | Frame, Cushion |
+| adirondackChair | 0.88 × 1.10 × 0.79 | 2180 | 1 | Chair |
+| benchGarden3 | 1.90 × 0.90 × 0.60 | 3616 | 2 | Frame, Slats |
+| outdoorBar | 2.00 × 1.06 × 0.89 | 3288 | 2 | Body, Counter, Foot rail |
+| parasol | 2.23 × 2.43 × 2.23 | 3272 | 3 | Canopy, Pole, Edge |
 
-`check-glb`: 0 failed (the one warning above). Khronos validator: 0 errors, 0 warnings each.
+`check-glb`: 0 failed, no warnings (the Adirondack's seat probe fell between two slats: the seat slats are now
+11 cm deep). Khronos validator: 0 errors, 0 warnings each.
 
 **In the game** (2026-10-14, headless, WebGPU and WebGL2): the gallery next to the old parts; the clips bench
 (`stir`); in play, all eleven bought in a garden (one chair at each of the four facings, three recoloured), a
@@ -88,11 +122,11 @@ Built 2026-10-14; they sat in Validate › Loungers until signed off (back to Ou
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| sunLounger | 0.62 × 0.76 × 1.87 | 2428 | 3 | Frame, Cushions, Towel |
-| hammock | 1.00 × 1.20 × 2.80 | 1420 | 3 | Frame, Fabric, Stripes |
-| porchSwing | 1.92 × 2.06 × 0.91 | 2536 | 3 | Seat, Frame, Chains, Cushion |
-| swingSet | 1.92 × 1.98 × 1.51 | 1060 | 2 | Frame, Seats |
-| hotTubCedar | 1.89 × 0.92 × 1.90 | 3636 | 3 | Cedar, Cover |
+| sunLounger | 0.62 × 0.76 × 1.86 | 2376 | 3 | Frame, Cushions, Towel |
+| hammock | 1.00 × 1.20 × 2.80 | 2164 | 3 | Frame, Fabric, Stripes |
+| porchSwing | 1.92 × 2.05 × 0.92 | 2580 | 3 | Seat, Frame, Chains, Cushion |
+| swingSet | 1.92 × 1.99 × 1.51 | 1628 | 2 | Frame, Seats |
+| hotTubCedar | 1.88 × 0.93 × 1.90 | 4352 | 3 | Cedar, Cover |
 
 `check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
 
@@ -123,9 +157,9 @@ Built 2026-10-16; they sat in Validate › Grills until signed off (back to Outd
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| grill | 0.64 × 1.04 × 0.63 | 4396 | 2 | Body, Lid |
-| grillStation | 1.66 × 1.20 × 0.66 | 3576 | 3 | Cart, Hood |
-| firePit | 0.93 × 0.62 × 0.91 | 2488 | 3 | Bowl, Stones |
+| grill | 0.64 × 1.04 × 0.64 | 4434 | 2 | Body, Lid |
+| grillStation | 1.66 × 1.20 × 0.66 | 4016 | 3 | Cart, Hood |
+| firePit | 0.92 × 0.62 × 0.92 | 3006 | 3 | Bowl, Stones |
 
 `check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
 
