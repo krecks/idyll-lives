@@ -212,7 +212,7 @@ export async function startSession(
   let revealed = false;
   let warmed = false;
   /** The world has been built once: later ones are patches or rare rebuilds, and need no warm-up. */
-  let builtOnce = false;
+  let warmedFramesOnce = false;
   let disposed = false;
   /** The scene build in progress; disposing waits for it so it can't add to the next session's scene. */
   let building: Promise<unknown> = Promise.resolve();
@@ -1094,8 +1094,8 @@ export async function startSession(
         } else perfPhase('session: warm game (deferred)');
         // Only the first world is drawn a few times to compile what it shows: a later one is
         // patched in place (an object opened, a crop grown), and warms nothing new.
-        const frames = builtOnce ? 1 : WARM_FRAMES;
-        builtOnce = true;
+        const frames = warmedFramesOnce ? 1 : WARM_FRAMES;
+        warmedFramesOnce = true;
         return perfTimeAsync('session: warm frames', () => renderer.framesRendered(frames));
       })
       .then(() => {

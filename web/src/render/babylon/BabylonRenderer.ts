@@ -357,7 +357,7 @@ export class BabylonRenderer implements Renderer {
   /** Which casters the shadow map draws, and when (see sunShadows.ts). */
   private sunShadows!: SunShadows;
   private post: DefaultRenderingPipeline | null = null;
-  /** The target the save's picture is drawn into (made on the first capture, then kept). */
+  /** The target the save's picture is drawn into (made on demand, then kept: warmed at boot by `warm()`). */
   private thumbTarget: RenderTargetTexture | null = null;
   private nightGrade: NightGrade | null = null;
   private instrumentation!: SceneInstrumentation;
@@ -468,6 +468,7 @@ export class BabylonRenderer implements Renderer {
   private warmFrames = 0;
   /** The game's own look has been warmed once (the shaders are shared by the households). */
   private gameWarmed = false;
+  /** The game's reflections have had their pipelines made once (the menu's own warm; the households share them). */
   private mirrorWarmed = false;
   private skyMirrorWarmed = false;
   private worldBuilding = false;
@@ -958,8 +959,6 @@ export class BabylonRenderer implements Renderer {
   private builtStorey = 0;
   /** The next `setWorld` must build, even if the world looks the same: its templates changed (`refreshModels`). */
   private rebuildNext = false;
-  /** When `patchWorld` started (its span). */
-  private patchStart = 0;
 
   /**
    * Builds `world`. One build runs at a time: worlds arriving meanwhile (two edits in one frame,
@@ -1020,16 +1019,15 @@ export class BabylonRenderer implements Renderer {
 
   /** Applies a `patchable` world in place: what's drawn of an object, its open state and growth. */
   private patchWorld(world: WorldStructure): void {
-    this.patchStart = performance.now();
+    const started = performance.now();
     const byId = new Map(world.objects.map((o) => [o.id, o]));
     for (const p of this.placed) {
       const o = byId.get(p.id);
       if (!o || !p.built) continue;
-      const [minX, minZ, maxX, maxZ] = this.pickBox(o, p.built.template, p.built.motions);
-      p.minX = minX;
-      p.minZ = minZ;
-      p.maxX = maxX;
-      p.maxZ = maxZ;
+      // What's drawn of it can change shape (an opening clip); its tiles never do.
+      const [px, pz, pw, pd] = this.pickBox(o, p.built.template, p.built.motions);
+      // As in `buildObjects`: the box is near corner plus size, so maxX/maxZ are derived here.
+      [p.minX, p.minZ, p.maxX, p.maxZ] = [px, pz, px + pw, pz + pd];
     }
     // The motion layer reads both live every frame: a door swings, a crop grows, without a build.
     this.motion.patch(world.objects);
@@ -1037,7 +1035,7 @@ export class BabylonRenderer implements Renderer {
     this.builtWorld = world;
     this.showItems();
     this.resetSnapshot();
-    perfRecord('render: patch world', this.patchStart, performance.now() - this.patchStart);
+    perfRecord('render: patch world', started, performance.now() - started);
     if (this.debug) console.info('[render] world patched (no rebuild)');
   }
 
@@ -4345,10 +4343,10 @@ export class BabylonRenderer implements Renderer {
     return paintColors(this.deps.assets.get(this.objectModel(o), 'model'), o.colors);
   }
 
-  /** Returns the body meshes whose sun shadows are in `objectShadowMerge` (Low): they cast no shadow of their own. */
   /**
    * Where a click on `o` lands, in its storey's row space: its own tiles, or what's drawn of it (see
    * `buildObjects`). Something held open (a wall bed folded down) by its whole tiles.
+   * Returns the near corner and its size `[x, z, w, d]`, not the far corner.
    */
   private pickBox(o: ObjectPlacement, template: ModelTemplate, motions: Motions | undefined): [number, number, number, number] {
     const def = this.deps.content.object(o.def);
@@ -4358,11 +4356,12 @@ export class BabylonRenderer implements Renderer {
     const z = o.z - D;
     const [ox, oz] = [centre.x - o.x - o.w / 2, centre.z - o.z - o.d / 2];
     const { turn, size } = placementVariation(this.deps.assets.get(this.objectModel(o), 'model')?.vary ?? 0, o.x, o.z);
-    // Something small on a top is picked by its own disc, not the whole tile (the table around it stays clickable).
-    // Anything else by what's drawn of it (a pot on a rug leaves the rug around it clickable),
+    // Something small on a top is picked by its own disc, not the whole tile (the table around it stays
+    // clickable). Anything else by what's drawn of it (a pot on a rug leaves the rug around it clickable),
     // never past its tiles; something held open (a wall bed folded down) by its whole tiles.
-    let [px, pz] = layer === 'surface' ? [centre.x - this.deps.content.radius(def) * 1.2, centre.z - D - this.deps.content.radius(def) * 1.2] : [o.x + ox, z + oz];
-    let [pw, pd] = layer === 'surface' ? [this.deps.content.radius(def) * 2.4, this.deps.content.radius(def) * 2.4] : [o.w, o.d];
+    const radius = this.deps.content.radius(def);
+    let [px, pz] = layer === 'surface' ? [centre.x - radius * 1.2, centre.z - D - radius * 1.2] : [o.x + ox, z + oz];
+    let [pw, pd] = layer === 'surface' ? [radius * 2.4, radius * 2.4] : [o.w, o.d];
     const shape = o.open && motions?.open ? undefined : template.outline;
     if (layer !== 'surface' && shape) {
       const yaw = (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180 + turn;

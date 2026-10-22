@@ -421,7 +421,6 @@ export class Mirrors {
       for (let i = 0; i < count; i++) list.push(meshes[i]);
       return list;
     }
-
     for (let i = 0; i < count; i++) {
       const mesh = meshes[i];
       if (mesh.alwaysSelectAsActiveMesh) {

@@ -18,6 +18,8 @@ import type { Studio } from './studio';
 export const PORTRAIT_PX = 160;
 const BATCH = 16;
 const PER_FRAME = 6;
+/** Draws in a batch's first frame: those compile the portrait shaders, so they get their own task. */
+const FIRST_DRAW = 1;
 /** Rows posed per frame: each is a Sim's models built, so they'd otherwise land in one ~870 ms task. */
 const POSE_PER_FRAME = 2;
 const FIRST_ROW = 1;
@@ -126,11 +128,11 @@ export class Portraits {
 
   /** Before posing: starts the next batch, and points the portrait Sims' eyes at their cameras. */
   direct(studio: Studio, now: number): void {
-    if (!this.batch && this.queue.size) this.startBatch(studio, now);
+    if (!this.batch && this.queue.size) this.startBatch(now);
     const b = this.batch;
     if (!b) return;
     // Building a Sim's models is the expensive part: a couple a frame, not sixteen in one task.
-    for (let n = 0; b.posed < b.jobs.length && n < POSE_PER_FRAME; n++, b.posed++) this.pose(studio, b, b.posed);
+    for (let n = 0; b.posed < b.jobs.length && n < POSE_PER_FRAME; n++) this.pose(studio, b, b.posed++);
     const heads = studio.characters.heads;
     b.jobs.forEach((_, j) => {
       const row = FIRST_ROW + j;
@@ -151,7 +153,7 @@ export class Portraits {
   render(studio: Studio, now: number): void {
     const b = this.batch;
     if (!b || b.pending > 0 || b.next >= b.jobs.length) return;
-    // (Nothing is drawn before every row stands: `direct` poses them over a few frames.)
+    // Nothing is drawn before every row stands: `direct` poses them over a few frames.
     if (b.posed < b.jobs.length) return;
     if (!studio.ready()) {
       if (now - b.started > READY_TIMEOUT) this.finish(studio, true);
@@ -164,7 +166,7 @@ export class Portraits {
     const prevCam = scene.activeCamera;
     const drawn: { job: Job; rtt: RenderTargetTexture }[] = [];
     // The batch's first draws compile the portrait shaders: one a frame then, not six in one task (~850 ms at boot).
-    const limit = b.next === 0 ? 1 : PER_FRAME;
+    const limit = b.next === 0 ? FIRST_DRAW : PER_FRAME;
     while (b.next < b.jobs.length && drawn.length < limit) {
       const j = b.next++;
       const c = b.cams[j];
@@ -219,7 +221,7 @@ export class Portraits {
     this.failAll();
   }
 
-  private startBatch(_studio: Studio, now: number): void {
+  private startBatch(now: number): void {
     const jobs = [...this.queue.values()].slice(0, BATCH);
     for (const job of jobs) this.queue.delete(job.key);
     const cams = jobs.map(() => ({ x: 0, y: 0, z: 0 }));
