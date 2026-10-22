@@ -16,7 +16,7 @@ What it covers: what the town is drawn with outside the content objects: roads a
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
 | Street road surface | M-town-05 | n/a | n/a | M-town-05 S2 decision: 3.3 m between the kerbs with a centre line | `town/views/02-street-cars-h13.png`, `town/views/09-willow-street-h13.png` |
-| Lane markings | M-town-05, M-town-03 | n/a | n/a | M-town-03 S3 code (seeded; not checked); dashes 2.4 m every 5 m, 12 cm wide (`street.ts:754`): stylised, fine; they split a 3.3 m road into two 1.65 m lanes (M-town-05) | `town/views/02-street-cars-h13.png` |
+| Lane markings | M-town-05, M-town-03 | n/a | n/a | M-town-03 S3 code (closed: not reproduced); dashes 2.4 m every 5 m, 12 cm wide (`street.ts:754`): stylised, fine; they split a 3.3 m road into two 1.65 m lanes (M-town-05) | `town/views/02-street-cars-h13.png` |
 | Pavements and kerbs | M-town-07 | n/a | n/a | M-town-07 S3 decision: the kerb stands 3.3 cm over the road. Sidewalk 1.21 m plus a 0.14 m kerb: OK | `town/views/05-kerb-mailbox-hydrant-bin-h13.png` |
 | Driveways | OK | n/a | n/a | 2.3–3.0 m wide, from the street to 5.4 m past the house front, 0.3–0.6 m off its wall (`town.ts:582-596`): real single drives are 2.4–3 m | `town/views/04-neighbour-4-sycamore-garage-h13.png`, `town/views/09-willow-street-h13.png` |
 | Country roads out of town | OK | n/a | n/a | 6 m at the town's end narrowing to 5 m (`roads.ts:18-19`), a country lane's width; seen leaving the street's end (code, `views/10`) | `town/views/10-streetlights-along-h13.png` |
@@ -153,7 +153,7 @@ Family: `tools/art/blender/families/plants.py`; drawn by `nature.ts` and `street
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| Wind sway of plants and trees | n/a | A-town-01 | n/a | A-town-01 S3 code (seeded; not checked). The sway itself: a bend of 0.0022 m per m² of height (22 cm at the top of a 10 m tree) with gusts, periods of 3–6 s, leaves fluttering 1.2 cm, on real time, not game speed (`nature.ts:900-990`): believable | — (motion; stills can't show it) |
+| Wind sway of plants and trees | n/a | A-town-01 | n/a | A-town-01 S3 code (fixed). The sway itself: a bend of 0.0022 m per m² of height (22 cm at the top of a 10 m tree) with gusts, periods of 3–6 s, leaves fluttering 1.2 cm, on real time, not game speed (`nature.ts:900-990`): believable | — (motion; stills can't show it) |
 | Clouds | n/a | OK | n/a | A cloud band 3–32° above the horizon drifting slowly; still with reduce motion (`BabylonRenderer.ts:352`) | `town/views/10-streetlights-along-h13.png` |
 
 ## Findings
@@ -189,7 +189,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/roads.ts`
 - **Evidence:** A far road's lane markings render brighter or darker between page loads (0.03–0.12 % of pixels). Proposed: thaw or refreeze the shared landscape materials on the switch from the overview to the game.
-- **Status:** not checked (needs the same view over several page loads compared pixel by pixel; the village views were taken once)
+- **Status:** closed (not reproduced: `render.mjs --shots` on the village over 6 + 4 loads (wide-day-0, orbit-day-0, WebGPU), 3 (wide-day-0, WebGL2, Low/Medium/High) and 2 (all 9 poses × both backends), `--compare` against the first: 0.000 % of pixels off by more than 2 in every picture, the lane markings in view)
+- **After:** `bench-results/review/followup/M-town-03/before1..6`, `load1..4`, `gl-before1..3`, `all-before1..2`
 - **Source:** `docs/release-0.2.0-review.md` §4 (P1-17); `plan/release-0.3.0.md` §3.3 (likely defer)
 
 ### M-town-04 — Plain finishes on code-built models may all show as rough metal
@@ -209,7 +210,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/preview/stage.ts`, `web/src/render/babylon/nature.ts`
 - **Evidence:** R1-15 stilled the scene's decorative movement with reduce motion, except in the creator's preview; and a change of the system setting reaches the renderer only at the next settings change. Wave town: the preview's item scene installs the wind (`web/src/render/preview/itemScene.ts:34`) and nothing there calls `setWind` (only `BabylonRenderer.ts:1379` does); not seen in a running preview.
-- **Status:** not checked (needs the creator's preview running with reduce motion on; code points the same way)
+- **Status:** fixed (4746eecf)
+- **After:** with Playwright `reducedMotion: 'reduce'` and the setting on, a plant in the colour studio: its stage's wind was 1 (its clock running while turned) and the item pictures' studio's 1, the game's 0; now both 0 (1 with reduce motion off), two pictures of the stage at rest 11.1 % → 0.12 % of pixels apart. The system's reduce motion switched mid-game now reaches the renderer at once (it was read only at the next settings change): `bench-results/review/followup/A-town-01/before.json`, `after.json`, `after-motion-on.json`, `system-before.json`, `system-after.json`
 - **Source:** `docs/release-0.2.0-review.md` §4 (R1-15 rest), target 0.2.1, not in the 0.3.0 notes; wave: town
 
 ### M-town-05 — The street is 3.3 m between the kerbs, with a centre line
@@ -254,6 +256,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/materials.ts:70-104` (`VertexTweaksPlugin`: `planarUV` and `srgbColors` change its code but it declares no defines)
 - **Evidence:** Babylon caches an effect by shader name and defines. A plugin whose code differs between materials without a define of its own gets one material's shader reused for another with the same defines: G-57's `PatternPlugin` showed it (its stripes never appeared until it had `PATTERN_*` defines). `VertexTweaksPlugin` is built that way, so a surface with planar UVs (roads, the ground: `projection` `xz`) and one without, with otherwise the same defines, could draw with each other's UVs. Not seen in a view; found reading the code.
-- **Status:** not checked (needs two such materials in one scene, and a look at which shader each draws with)
+- **Status:** fixed (51f1f4f7)
+- **After:** reproduced with the game's library: the siding with vertex colours, without planar UVs, compiled for the sidewalk's mesh drew with the sidewalk's planar-UV effect (`uvUpdated = positionUpdated.xz` in its vertex code). `VertexTweaksPlugin` now has `TWEAK_PLANAR_UV` / `TWEAK_SRGB_COLORS` defines: separate effects in either order, on WebGPU and WebGL2; the 18 reference shots unchanged: `bench-results/review/followup/M-town-08/pair-before-plain-first.json`, `pair-after-*.json`, `all-after/`
 - **Source:** fix: town
 
