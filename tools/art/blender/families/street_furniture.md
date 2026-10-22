@@ -29,8 +29,8 @@ statue (metal). A `G.Palette` has one colour and finish per name, so each build 
 
 ## The clips
 
-- **Drinking fountain** (`water_on`, use `drink`): the arc of water from the bubbler's mouth into the bowl, a bent
-  tube joined with its origin at the mouth and scaled to 0.001 on all three axes at rest; `G.grow` on X, Y and Z
+- **Drinking fountain** (`water_on`, use `drink`): the arc of water from the bubbler's mouth into the bowl, a swept
+  tube with its origin at the mouth and scaled to 0.001 on all three axes at rest; `G.grow` on X, Y and Z
   grows it out of the mouth in 0.35 s. It is `spray`, gloss, never emissive. Played back when the drink ends.
 - **Post box** (`flap`, use `post`, `hold` 1 s): the slot's flap, hinged on its top edge in a housing proud of the
   pillar, swings 65° in (its bottom edge to the back) over a dark opening, in 0.5 s.
@@ -54,65 +54,78 @@ statue (metal). A `G.Palette` has one colour and finish per name, so each build 
 
 ## Far versions (E7)
 
-Every model has a `<id>.far.glb` for the town overview (the menus' town): `far=0.25`, the model at rest, joined
-and decimated to a quarter. For the drinking fountain and the statue, plain decimation lifted the bottom off the
-floor (the fountain's slab by 3.9 cm, and pushed it 7 cm wider a side; the statue's step by 0.7 cm), so those two
-use `_far(build)`: the same, but the vertices below 0.1 m are left out of the decimation (a vertex group on the
-Decimate modifier). Their far versions sit on the floor at the full model's size.
+Every model has a `<id>.far.glb` for the town overview (the menus' town). The lamp, the bench, the bin, the shelter,
+the post box, the notice board and the phone box use `far=0.25`: the model at rest, joined and decimated to a quarter.
+The drinking fountain, the town fountain and the statue use `_far(build)`: the same, but the vertices that sit on one
+another are merged first (turned parts meet on their axis in many vertices, and the fountains' pillars and copings
+decimated unmerged tore into spikes), the vertices below 0.1 m (the feet) and on the model's outermost faces are left
+out of the decimation. They sit on the floor at the full model's size.
 
 ## The models
 
-- **Street lamp**: a fluted cast-iron base, a pole with collars, a lamplighter's ladder bar with ball ends, and a
-  square lantern (frosted panes widening upwards in an iron frame) under a pyramid roof with a vent and finial. One
-  draw call.
-- **Park bench**: five wooden seat slats and three back slats, 2.5 m long, on three cast-iron supports (front and
-  back legs, the back upright, a seat rail, feet), with armrests and scrolls on the end supports; its three sitters
-  a metre apart on its three tiles (2026-10-21; it was 2.86 m, past a long bench's 1.8–2.5).
-- **Drinking fountain**: a stone slab, a turned stone pillar and bowl with a drain, a chrome bubbler at the back of
-  the bowl turned to the front, and a chrome foot pedal.
-- **Litter bin**: a green ribbed bin on an iron post with two straps, an iron rim round a dark opening, a label.
-- **Bus shelter**: four posts, a roof with a fascia, 1.2 m deep (2026-10-21; it was 0.98, the bench filling it), glass
-  at the back and the right-hand end in rails, a two-slat bench on brackets at the back (content `seat.forward`
-  -0.3), the timetable on the back glass and the stop's blue flag on the roof. The roof reaches 0.1 m past its tile
-  front and back.
-- **Post box**: a red pillar box on a black plinth, a band, a cornice and a dome, the slot's hooded housing with its
-  flap, the collection times and a crest.
-- **Notice board**: a cork board between two walnut posts, framed, under a little gabled roof; six pinned notices.
-- **Phone box**: a red kiosk, hollow and glazed on all four sides (three columns, eight rows of panes in glazing
-  bars), kick panels, a band with four TELEPHONE signs, a stepped cornice and a shallow dome. Inside, the phone on a
-  panel at the back and a shelf.
-- **Town fountain**: a square stone basin on a granite slab, straight rims to sit on, water; in the middle a foot,
-  a column, a wide lower bowl, a stem, a small top bowl and a knob. Water streams curve out over both bowls' lips
-  (six from the top bowl, eight from the lower) and splash into the water below; a jet rises from the knob.
-- **Founder's statue**: a granite plinth (step, die, cornice) with a brass plaque, and a bronze woman in a long coat
-  on a little base, pointing up and away with her right arm and holding a book in her left.
+Rebuilt in detail on 2026-10-22 with the forms and the kit, each at most half its size class's triangle target
+(they stand by the dozen on the town's lots and the town overview draws them all).
 
-| Model | Size (w × h × d) | Triangles | Far | Draws | Colour parts |
+- **Street lamp**: a square chamfered plinth, a fluted bell rising to a moulded collar, a fluted post with a collar part
+  way, a neck with the lamplighter's ladder bar (ball ends), four iron scrolls (`kit.scroll`) from a turned capital out
+  under the lantern; the lantern's frosted panes widening upwards in an iron frame between a moulded floor and top, a
+  hipped roof curving in, a vented crown and a turned finial. One draw call.
+- **Park bench**: five rounded slats and three back slats, 2.5 m long, with domed bolts, on three cast-iron supports in
+  one piece each (`kit.bench_end`: back leg into the upright, seat rail, stretcher, a curl under the seat; armrests
+  curling down in scrolls on the end two); its three sitters a metre apart on its three tiles.
+- **Drinking fountain**: a granite slab, a turned stone pillar (moulded base, fluted shaft, moulded capital), a bowl with
+  a rolled lip falling to a grated drain, a chrome bubbler bent forward in one piece on a turned foot, its mouth and an
+  arched guard, and a chrome foot pedal on a bent arm with a ribbed tread. The arc of water is one swept tube, thinning.
+- **Litter bin**: a green bin, pressed slats between two rolled beads, a rounded foot, a rolled iron rim round a dark
+  mouth with a black bag's edge over it, a label with a bin sign; on a square iron post with a pyramid cap, two curved
+  straps round its back.
+- **Bus shelter**: four posts on bolted foot plates, a curved roof on beams, a fascia with a blue stripe, a gutter; glass
+  at the back (two panes on a mullion) and the right-hand end in rails, white safety bands; a two-slat bench on
+  cantilevered brackets with slim legs; the timetable and a route map on the back glass; the stop's blue flag on the
+  roof with the bus on both faces.
+- **Post box**: a red pillar box turned in one piece (foot moulding, band, shaft, stepped cornice, domed cap) on a black
+  plinth, the door's outline cast round the front with a keyhole, the slot's arched hood, sill and cheeks round a dark
+  opening and its flap (with its word), the collection times in a framed plate, a brass crown over the slot.
+- **Notice board**: a cork board in a moulded walnut frame with a ledge, between two posts on iron feet, under a boarded
+  roof (three overlapping boards a side), a ridge and shaped barge boards; six pinned notices with lines of writing,
+  one a leaflet with tear-off strips.
+- **Phone box**: a red kiosk on a stepped plinth, glazed on all four sides (three columns, eight rows of panes), panelled
+  kick panels, a band with four TELEPHONE signs, a cornice, an arched pediment with a crown on each side and the shallow
+  dome between them; the door with a bar pull (`kit.pull`). Inside, the phone (case, dial, handset on its cradle, a
+  coiled cord, the coin box) on a panel, and a shelf of directories.
+- **Town fountain**: a square basin on a granite slab: walls on a plinth band, three raised panels a face, a moulded
+  coping with a rounded nose all round (`kit.moulding`, its top the seat), water; in the middle a moulded foot, a fluted
+  column, a capital, the wide lower bowl gadrooned underneath with a rolled lip, a waisted stem, the small top bowl
+  gadrooned too, a turned knob. Six streams from the top bowl and eight from the lower one, each one swept piece
+  thinning as it falls, splash into crowns of spray.
+- **Founder's statue**: a granite plinth (two steps, a moulded base, the die with a sunk panel on each face, a moulded
+  cornice) with a bevelled brass plaque of three raised lines; a bronze woman in a long coat falling in folds, its
+  lapels, collar and buttons, her right arm pointing up and away in one sleeve with a cuff, her left holding a book to
+  her side.
+
+| Model | Size (w × h × d) | Triangles (before) | Far | Draws | Colour parts |
 |---|---|---|---|---|---|
-| `model.streetLamp` | 0.66 × 4.24 × 0.47 m | 780 | 186 | 1 | Lamp post |
-| `model.parkBench` | 2.50 × 0.91 × 0.57 m | 2,160 | 540 | 2 | Frame |
-| `model.drinkingFountain` | 0.56 × 1.09 × 0.56 m | 1,524 | 380 | 2 | Pillar |
-| `model.litterBin` | 0.47 × 0.97 × 0.58 m | 1,704 | 412 | 1 | Bin |
-| `model.busStop` | 2.98 × 2.89 × 1.20 m | 2,616 | 646 | 3 | Frame |
-| `model.postBox` | 0.50 × 1.53 × 0.52 m | 2,132 | 528 | 2 | Box |
-| `model.noticeBoard` | 1.02 × 2.07 × 0.35 m | 1,320 | 324 | 2 | Frame |
-| `model.phoneBooth` | 0.95 × 2.70 × 0.95 m | 3,100 | 714 | 4 | Kiosk |
-| `model.fountainTown` | 2.96 × 2.47 × 2.94 m | 5,784 | 1,430 | 3 | Stone |
-| `model.townStatue` | 1.80 × 3.39 × 1.80 m | 2,476 | 614 | 1 | Statue |
+| `model.streetLamp` | 0.65 × 4.24 × 0.47 m | 2,732 (780) | 678 | 1 | Lamp post |
+| `model.parkBench` | 2.50 × 0.89 × 0.57 m | 3,892 (2,160) | 972 | 2 | Frame |
+| `model.drinkingFountain` | 0.56 × 1.09 × 0.56 m | 2,728 (1,524) | 570 | 2 | Pillar |
+| `model.litterBin` | 0.47 × 0.98 × 0.58 m | 1,600 (1,704) | 400 | 1 | Bin |
+| `model.busStop` | 2.98 × 2.89 × 1.21 m | 3,980 (2,616) | 968 | 3 | Frame |
+| `model.postBox` | 0.50 × 1.53 × 0.52 m | 2,810 (2,132) | 688 | 2 | Box |
+| `model.noticeBoard` | 1.02 × 2.07 × 0.35 m | 1,868 (1,320) | 436 | 2 | Frame |
+| `model.phoneBooth` | 0.95 × 2.70 × 0.95 m | 3,900 (3,100) | 920 | 4 | Kiosk |
+| `model.fountainTown` | 2.96 × 2.47 × 2.96 m | 5,452 (5,784) | 1,232 | 3 | Stone |
+| `model.townStatue` | 1.80 × 3.39 × 1.80 m | 3,410 (2,476) | 820 | 1 | Statue |
 
 Draws are counted as `check-glb` does, each moving part apart: the bench (iron, wood), the shelter (frame, wood,
 glass), the drinking fountain and the post box (body, the moving part), the notice board (plain, wood), the town
 fountain (body, jet, splashes). The lamp and the phone box take one more at night for their glow.
 
-`check-glb`: 10 models, 0 failed. Two warnings, both expected:
+`check-glb`: 10 models, 0 failed. One warning, expected:
 
 - **Phone box: 4 draw calls** (the most allowed, as the washer): the kiosk, its glazing, the door and the door's
   glazing. The plan's folding door would be two moving leaves, each with its own glass: 6 draws, over the limit, so
   the door is one leaf, as on the real red kiosk. Opaque panes would save one, but then the kiosk and its phone could
   not be seen through.
-- **Street lamp: depth 0.47 m against the old part's 0.65 m**: the old part's pyramid cap is measured across
-  its corners; the real lantern is 0.47 m a side, and the ladder bar makes it 0.66 m wide. Picking and the contact
-  shadow follow the old part.
 
 Khronos validator: 0 errors, 0 warnings on all twenty files (each model and its far version).
 

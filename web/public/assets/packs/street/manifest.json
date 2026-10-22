@@ -34,6 +34,12 @@
         "soil": {
           "finish": "material.finish.matte"
         },
+        "stake": {
+          "finish": "material.finish.satin"
+        },
+        "tie": {
+          "finish": "material.finish.satin"
+        },
         "trunk": {
           "finish": "material.finish.satin"
         }
@@ -49,6 +55,12 @@
         },
         "concrete": {
           "finish": "material.finish.matte"
+        },
+        "eye": {
+          "finish": "material.finish.foliage"
+        },
+        "eye_dark": {
+          "finish": "material.finish.foliage"
         },
         "leaf": {
           "finish": "material.finish.foliage"
@@ -162,6 +174,12 @@
           "finish": "material.finish.foliage"
         },
         "blue": {
+          "finish": "material.finish.foliage"
+        },
+        "eye": {
+          "finish": "material.finish.foliage"
+        },
+        "eye_dark": {
           "finish": "material.finish.foliage"
         },
         "pink": {

@@ -6,6 +6,9 @@
       "type": "model",
       "url": "../../models/shops/shopCounter.glb",
       "materials": {
+        "bell": {
+          "finish": "material.finish.chrome"
+        },
         "coin": {
           "finish": "material.finish.metal"
         },
@@ -223,6 +226,9 @@
           "finish": "material.finish.metal"
         },
         "marble": {
+          "finish": "material.finish.gloss"
+        },
+        "vein": {
           "finish": "material.finish.gloss"
         }
       },

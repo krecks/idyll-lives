@@ -206,6 +206,9 @@
         "inside": {
           "finish": "material.finish.satin"
         },
+        "label": {
+          "finish": "material.finish.satin"
+        },
         "lit_panel": {
           "finish": "material.finish.gloss",
           "glow": "#CFE8FF"
@@ -270,6 +273,9 @@
         },
         "slate": {
           "finish": "material.finish.matte"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
         },
         "timber": {
           "finish": "material.finish.wood"
