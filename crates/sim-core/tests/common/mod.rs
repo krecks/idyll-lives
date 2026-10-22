@@ -52,6 +52,132 @@ pub fn buy(w: &mut World, def: &str, x: i32, z: i32) -> u32 {
     w.objects.last().unwrap().stable
 }
 
+/// The patch of `garden_home()`'s back garden to crowd (`x0, z0, x1, z1`, exclusive), with
+/// free ground all round it.
+pub const GARDEN_PATCH: (i32, i32, i32, i32) = (5, 14, 15, 22);
+
+/// A house with a walled room at the front of its lot (a door at the front and one at the back)
+/// and a garden behind it, the household (household 0: two parents, Ada and Ben, and two
+/// children, Dee and Fin, no jobs) in the front yard at noon on a Saturday, free will off, plenty
+/// of money. (World, content.)
+pub fn garden_home() -> (World, String) {
+    let content = content();
+    let (w, d) = (22, 26);
+    let sim = |name: &str, gender: &str, age: f32, x: f64| json!({"name": name, "gender": gender, "age": age, "traits": ["cheerful"], "x": x, "z": 1.5});
+    let lot = json!({
+        "width": w, "depth": d,
+        "walls": [[3, 3, 19, 3], [19, 3, 19, 11], [19, 11, 3, 11], [3, 11, 3, 3]],
+        "doors": [{"x": 10, "z": 3, "axis": "x"}, {"x": 10, "z": 11, "axis": "x"}],
+        "objects": [],
+        "plots": [{"name": "Home", "x": 0, "z": 0, "w": w, "d": d, "entry": [w as f64 / 2.0, 1.5]}],
+        "households": [{"name": "The Gardeners", "plot": 0, "player": true, "funds": 10_000_000}],
+        "sims": [sim("Ada", "female", 40.0, 8.5), sim("Ben", "male", 41.0, 9.5), sim("Dee", "female", 9.0, 10.5), sim("Fin", "male", 7.0, 11.5)],
+        "relationships": [{"a": 2, "b": 0, "preset": "parent"}, {"a": 3, "b": 0, "preset": "parent"}, {"a": 2, "b": 1, "preset": "parent"}, {"a": 3, "b": 1, "preset": "parent"}],
+    });
+    let mut world = World::from_json(&content, &lot.to_string(), 5).unwrap();
+    for s in world.sims.iter_mut() {
+        s.job = None;
+        s.job_search_from = u32::MAX;
+    }
+    world.households[0].free_will = false;
+    world.tick = clock::tick_at(6, 12.0 * 60.0).unwrap();
+    world.tick_once();
+    (world, content)
+}
+
+/// One-tile garden things for a crowded garden's rows (`garden_cluster`): crops, plants, beds,
+/// small trees and seats.
+pub const GARDEN_SMALL: [&str; 16] = [
+    "garden.tomatoes", "garden.strawberries", "garden.pumpkins", "garden.vegPatch", "garden.roses", "garden.lavender",
+    "garden.hydrangea", "flowerbed", "planterBox", "garden.birdbath", "garden.apple", "garden.japaneseMaple",
+    "garden.willow", "gardenChair", "adirondackChair", "firePit",
+];
+/// Bigger garden things to pack in among them: beds, benches and swings, loungers, a table, a pond.
+pub const GARDEN_BIG: [&str; 12] = [
+    "raisedBed", "benchGarden3", "porchSwing", "sunLounger", "hammock", "patioSet", "picnicTable", "garden.pond",
+    "greenhouse", "swingSet", "seesaw", "hotTubCedar",
+];
+
+/// How a crowded garden is laid out (`garden_cluster`).
+#[derive(Debug, Clone, Copy)]
+pub enum Cluster {
+    /// Rows of one-tile things across the whole area, two rows back to back between one-tile
+    /// paths, each row facing its path; a bed or a bench now and then in a row.
+    Rows,
+    /// Everything (big and small) tried at random spots until nothing more goes in, with no paths
+    /// left on purpose: what buying allows is what stays.
+    Packed(u64),
+}
+
+/// Buys a crowded garden for `household` in `area` (`x0, z0, x1, z1`, exclusive; outdoors and
+/// free), facing `rot` (or any way, at random, with `None`), as `layout` lays it out. Every buy
+/// goes through `Command::Buy`, so what stands is what buying allowed. Their stable ids.
+pub fn garden_cluster(w: &mut World, household: u32, area: (i32, i32, i32, i32), layout: Cluster, rot: Option<i32>) -> Vec<u32> {
+    let (x0, z0, x1, z1) = area;
+    let mut ids = Vec::new();
+    let mut buy = |w: &mut World, def: &str, x: i32, z: i32, r: i32| {
+        let ok = w.apply(sim_core::Command::Buy { household, object: def.into(), at: Some([x, z, r]), colors: Default::default(), turn: None, offset: None, size: None, tall: None }).is_ok();
+        if ok {
+            ids.push(w.objects.last().unwrap().stable);
+        }
+        ok
+    };
+    let footprint = |w: &World, def: &str, r: i32| {
+        let [fw, fd] = w.content.objects[w.content.object_index(def).unwrap()].footprint.map(i32::from);
+        if r % 2 == 0 { (fw, fd) } else { (fd, fw) }
+    };
+    match layout {
+        Cluster::Rows => {
+            // Lines across the way they face: line k faces towards k + 1 (k % 3 == 0) or k - 1
+            // (k % 3 == 2), with a path between (k % 3 == 1).
+            let r = rot.unwrap_or(0).rem_euclid(4);
+            let across = if r % 2 == 0 { z1 - z0 } else { x1 - x0 };
+            let along = if r % 2 == 0 { x1 - x0 } else { z1 - z0 };
+            let mut n = 0;
+            for k in 0..across {
+                if k % 3 == 1 {
+                    continue;
+                }
+                // Facing on towards the far side (0 or 1) or back (2 or 3), turned with the area.
+                let towards = if k % 3 == 0 { r } else { (r + 2) % 4 };
+                let line = if r < 2 { k } else { across - 1 - k };
+                let mut a = 0;
+                while a < along {
+                    n += 1;
+                    let def = if n % 5 == 0 { GARDEN_BIG[n / 5 % 3] } else { GARDEN_SMALL[n % GARDEN_SMALL.len()] };
+                    let (fw, fd) = footprint(w, def, towards);
+                    let (x, z) = if r % 2 == 0 { (x0 + a, z0 + line) } else { (x0 + line, z0 + a) };
+                    let long = if r % 2 == 0 { fw } else { fd };
+                    let deep = if r % 2 == 0 { fd } else { fw };
+                    if deep == 1 && a + long <= along && buy(w, def, x, z, towards) {
+                        a += long;
+                    } else if buy(w, GARDEN_SMALL[n % 4], x, z, towards) {
+                        a += 1;
+                    } else {
+                        a += 1;
+                    }
+                }
+            }
+        }
+        Cluster::Packed(seed) => {
+            let mut rng = Lcg::new(seed);
+            let tiles = ((x1 - x0) * (z1 - z0)) as usize;
+            for _ in 0..tiles * 6 {
+                let def = if rng.below(3) == 0 { GARDEN_BIG[rng.below(GARDEN_BIG.len())] } else { GARDEN_SMALL[rng.below(GARDEN_SMALL.len())] };
+                let r = rot.unwrap_or(rng.below(4) as i32);
+                let (fw, fd) = footprint(w, def, r);
+                if fw > x1 - x0 || fd > z1 - z0 {
+                    continue;
+                }
+                let x = x0 + rng.below((x1 - x0 - fw + 1) as usize) as i32;
+                let z = z0 + rng.below((z1 - z0 - fd + 1) as usize) as i32;
+                buy(w, def, x, z, r);
+            }
+        }
+    }
+    ids
+}
+
 /// Everything that must hold at any moment.
 pub fn check(w: &World) {
     // Things for outside (content `outdoors`) stand outside.

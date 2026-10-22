@@ -4827,6 +4827,8 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
         return crate::cooking::start(sim, Task { kind, ..task }, ctx, objects, items);
     }
     let mut reserved_seat = None;
+    // (A seat near the thing to sit on for its use, `seatNear`: without one they stand at it.)
+    let mut seat_near = false;
     let (target, goal, tags) = match task.kind {
         TaskKind::Cook { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. } => {
             return crate::cooking::start(sim, task, ctx, objects, items);
@@ -4894,6 +4896,7 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             }
             if inter.seat_near > 0.0 && reserved_seat.is_none() {
                 reserved_seat = seat_near_object(sim, ctx, objects, object, inter);
+                seat_near = reserved_seat.is_some();
             }
             // From the tile by the slot they'll get (round to its place, `places`; onto a bed
             // from the side, `seat_approach`), or to their own spot along the front of a thing
@@ -5030,7 +5033,21 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             sim.use_seat = Some(seat);
         }
     }
-    let Some(waypoints) = walk_route(ctx, sim, goal, target) else {
+    // No way to the tile by their slot (beside a lounger, shut in by the beds round it), nor to
+    // the seat near it they'd take: from another tile it's used from, standing, as buying left a
+    // way to one (`keeps_reach`).
+    let mut waypoints = walk_route(ctx, sim, goal, target);
+    if waypoints.is_none()
+        && let TaskKind::Use { object, .. } = task.kind
+        && (sim.use_seat.is_none() || seat_near)
+    {
+        if let Some(seat) = sim.use_seat.take() {
+            objects[seat as usize].release(sim.id);
+        }
+        let tiles = crate::surface::use_tiles(content, objects, nav, &objects[object as usize]);
+        waypoints = tiles.into_iter().filter(|&t| t != goal).find_map(|t| walk_route(ctx, sim, t, [t.0 as f32 + 0.5, t.1 as f32 + 0.5]));
+    }
+    let Some(waypoints) = waypoints else {
         if let Some(seat) = sim.use_seat.take() {
             objects[seat as usize].release(sim.id);
         }
