@@ -52,6 +52,16 @@ const OVERHANG: f64 = 0.02;
 const SWEEP: f64 = 0.01;
 /// How far (m) a model's middle at rest may be off its `centre` (centres.json).
 const OFF_CENTRE: f64 = 0.02;
+/// A bird's `bird` (tools/art/blender/families/birds.py; the renderer flies it by code): its length bill to tail
+/// tip and wingspan (m, both needed), its body's middle over its feet (`perchHeight`, m) and how far its perched
+/// torso is raised from level (`pitch`, degrees).
+const BIRD_KEYS: [&str; 4] = ["length", "wingspan", "perchHeight", "pitch"];
+/// A bird's rigid parts, the nodes the renderer moves by name (a mesh's own node or one above it).
+const BIRD_PARTS: [&str; 5] = ["body", "head", "tail", "wing.L", "wing.R"];
+/// How far (a share) a bird's file may be off the length and wingspan its `bird` says.
+const BIRD_FIT: f64 = 0.05;
+/// How far (m) a perch (`perches`: where the game's birds sit on a tree or a hedge) may be outside the model's box.
+const PERCH_OUT: f64 = 0.01;
 
 /// Where the gate reads: the repo's assets, content and tools/art/blender/centres.json.
 pub struct Paths {
@@ -425,6 +435,161 @@ fn moved_nodes(gltf: &J) -> R<HashSet<usize>> {
         }
     }
     Ok(out)
+}
+
+/// A JSON number (not a bool), as f64.
+fn json_number(v: &J) -> Option<f64> {
+    match v {
+        J::Int(i) => Some(*i as f64),
+        J::Float(f) => Some(*f),
+        _ => None,
+    }
+}
+
+/// What is wrong with a bird entry's `bird` itself (`BIRD_KEYS`): no file needed.
+fn bird_fields(bird: &J) -> Vec<String> {
+    let Some(fields) = bird.entries() else {
+        return vec![format!("`bird` is {{\"length\", \"wingspan\", ...}} (metres), not {}", repr(bird))];
+    };
+    let mut errors = Vec::new();
+    let mut unknown: Vec<&str> = fields.iter().map(|(k, _)| k.as_str()).filter(|k| !BIRD_KEYS.contains(k)).collect();
+    unknown.sort();
+    if !unknown.is_empty() {
+        errors.push(format!("`bird`: unknown {} (it takes {})", unknown.join(", "), BIRD_KEYS.join(", ")));
+    }
+    for k in BIRD_KEYS {
+        let Some(v) = bird.get(k) else {
+            if k == "length" || k == "wingspan" {
+                errors.push(format!("`bird` has no `{k}`"));
+            }
+            continue;
+        };
+        let ok = match (k, json_number(v)) {
+            ("pitch", Some(p)) => (-90.0..=90.0).contains(&p),
+            (_, Some(m)) => m > 0.0,
+            _ => false,
+        };
+        if !ok {
+            let what = if k == "pitch" { "angle (degrees, -90 to 90)" } else { "length (metres, over 0)" };
+            errors.push(format!("`bird.{k}` {} is no {what}", repr(v)));
+        }
+    }
+    errors
+}
+
+/// A bird's file as `bird_errors` needs it: which of `BIRD_PARTS` it has, each part's vertices at rest (game axes),
+/// and the parts saved at scale 0.
+struct BirdParts {
+    names: BTreeSet<String>,
+    points: HashMap<String, Vec<[f64; 3]>>,
+    flat: Vec<String>,
+}
+
+fn bird_parts(g: &Glb) -> R<BirdParts> {
+    let empty = J::Arr(Vec::new());
+    let nodes = g.gltf.get("nodes").unwrap_or(&empty).list().unwrap_or(&[]);
+    let name = |i: usize| nodes.get(i).and_then(|n| n.get("name")).and_then(J::str).unwrap_or("");
+    let mut parent: HashMap<usize, usize> = HashMap::new();
+    for (i, n) in nodes.iter().enumerate() {
+        for c in n.get("children").and_then(J::list).unwrap_or(&[]) {
+            parent.insert(node_index(g.gltf.get("nodes").unwrap_or(&empty), c)?, i);
+        }
+    }
+    let mut parts = BirdParts { names: BTreeSet::new(), points: HashMap::new(), flat: Vec::new() };
+    for (i, n) in nodes.iter().enumerate() {
+        if BIRD_PARTS.contains(&name(i)) {
+            parts.names.insert(name(i).to_string());
+            if n.get("scale").and_then(J::list).is_some_and(|s| s.iter().any(|v| json_number(v).is_some_and(|v| v.abs() < 1e-6))) {
+                parts.flat.push(name(i).to_string());
+            }
+        }
+    }
+    for p in node_matrices(&g.gltf, None, None)? {
+        // The part a mesh is in: its own node, or the nearest one above it named as a part.
+        let (mut at, mut depth) = (Some(p.node), 0);
+        while let Some(i) = at.filter(|i| !BIRD_PARTS.contains(&name(*i)) && depth < 990) {
+            at = parent.get(&i).copied();
+            depth += 1;
+        }
+        let Some(part) = at.filter(|i| BIRD_PARTS.contains(&name(*i))) else { continue };
+        let out = parts.points.entry(name(part).to_string()).or_default();
+        for prim in primitives(&g.gltf, &p.mesh)? {
+            for v in positions(g, prim)? {
+                let q = apply(&p.m, &v);
+                out.push([-q[0].f(), q[1].f(), q[2].f()]);
+            }
+        }
+    }
+    Ok(parts)
+}
+
+/// What is wrong with a bird (its `bird`, already sound by `bird_fields`) against its file: its parts, its wings
+/// spread to its sides at scale 1, its wingspan across them, its length from bill (`head`) to tail tip (`tail`),
+/// and its body's middle within its height. `dims` is the file's size (game width, height, depth).
+fn bird_errors(bird: &J, parts: &BirdParts, dims: [f64; 3]) -> Vec<String> {
+    let mut errors = Vec::new();
+    let missing: Vec<&str> = BIRD_PARTS.iter().copied().filter(|p| !parts.names.contains(*p)).collect();
+    if !missing.is_empty() {
+        errors.push(format!("a bird's parts are nodes named {}: it has no {}", BIRD_PARTS.join(", "), missing.join(", ")));
+    }
+    for name in &parts.flat {
+        errors.push(format!("{name} is saved at scale 0: the renderer bakes each part as the file has it (the wings spread, at scale 1) and hides them itself"));
+    }
+    let wanted = |k: &str| bird.get(k).and_then(json_number).unwrap_or(0.0);
+    let off = |got: f64, want: f64| (got - want).abs() > BIRD_FIT * want;
+    let (span, length) = (wanted("wingspan"), wanted("length"));
+    if off(dims[0], span) {
+        errors.push(format!("{} m across its spread wings, its `bird.wingspan` says {} m (within {})", fixed(dims[0], 3), fixed(span, 3), percent(BIRD_FIT)));
+    }
+    let (head, tail) = (parts.points.get("head"), parts.points.get("tail"));
+    if let (Some(head), Some(tail)) = (head, tail) {
+        let far = head.iter().flat_map(|a| tail.iter().map(move |b| ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt())).fold(0.0, f64::max);
+        if off(far, length) {
+            errors.push(format!("{} m from bill to tail tip, its `bird.length` says {} m (within {})", fixed(far, 3), fixed(length, 3), percent(BIRD_FIT)));
+        }
+    }
+    for (name, side, where_) in [("wing.L", -1.0, "its left, game -x (glTF +x)"), ("wing.R", 1.0, "its right, game +x (glTF -x)")] {
+        if let Some(points) = parts.points.get(name).filter(|p| !p.is_empty()) {
+            let mid = points.iter().map(|p| p[0]).sum::<f64>() / points.len() as f64;
+            if mid * side <= 0.0 {
+                errors.push(format!("{name} reaches out the wrong way: a bird's {name} is spread to {where_}"));
+            }
+        }
+    }
+    if let Some(h) = bird.get("perchHeight").and_then(json_number)
+        && h > dims[1]
+    {
+        errors.push(format!("`bird.perchHeight` {} m is over the bird's height, {} m", fixed(h, 3), fixed(dims[1], 3)));
+    }
+    errors
+}
+
+/// What is wrong with an entry's `perches` (where the game's birds sit: [[x, y, z], ...] in the model's game axes,
+/// metres, before the entry's `scale`) against the model's box (`lo`, `hi`, game axes, at rest, scaled by `scale`).
+fn perch_errors(perches: &J, lo: [f64; 3], hi: [f64; 3], scale: f64) -> Vec<String> {
+    let Some(list) = perches.list() else {
+        return vec![format!("`perches` is a list of [x, y, z] (metres), not {}", repr(perches))];
+    };
+    if list.is_empty() {
+        return vec!["`perches` is empty: leave it out".into()];
+    }
+    let mut errors = Vec::new();
+    let mut outside = Vec::new();
+    for (i, p) in list.iter().enumerate() {
+        let xyz: Vec<f64> = p.list().unwrap_or(&[]).iter().filter_map(json_number).collect();
+        if xyz.len() != 3 || p.list().is_none_or(|l| l.len() != 3) {
+            errors.push(format!("`perches` {i}: {} is no [x, y, z]", repr(p)));
+            continue;
+        }
+        if (0..3).any(|k| xyz[k] * scale < lo[k] - PERCH_OUT || xyz[k] * scale > hi[k] + PERCH_OUT) {
+            outside.push(i);
+        }
+    }
+    if let Some(&first) = outside.first() {
+        let box_ = (0..3).map(|k| format!("{} to {}", fixed(lo[k] / scale, 2), fixed(hi[k] / scale, 2))).collect::<Vec<_>>().join(", ");
+        errors.push(format!("{} of {} perches outside the model (the first, {first}: {}; its box x, y, z: {box_})", outside.len(), list.len(), repr(&list[first])));
+    }
+    errors
 }
 
 /// The primitives of a mesh (`gltf['meshes'][i]['primitives']`).
@@ -1830,8 +1995,8 @@ fn check(fin: &Finishes, entry: &J, path: &str, far: Option<&str>, facts: Option
     }
     if let Some(far) = far {
         // Its far version (`far`): the same model, still, with far fewer triangles.
-        // (Without what the full model is checked for: its clips, colours and centre.)
-        let far_entry = J::Obj(entry.entries().unwrap_or(&[]).iter().filter(|(k, _)| k != "motions" && k != "paint").cloned().collect());
+        // (Without what the full model is checked for: its clips, colours and centre, a bird's parts and the perches.)
+        let far_entry = J::Obj(entry.entries().unwrap_or(&[]).iter().filter(|(k, _)| !["motions", "paint", "perches", "bird"].contains(&k.as_str())).cloned().collect());
         let (mut far_errors, mut far_warnings, far_info) = match check_file(fin, &far_entry, far, None, None, None) {
             Ok((e, w, i)) => (e, w, Some(i)),
             Err(err) => (vec![format!("cannot read {far}: {err}")], Vec::new(), None),
@@ -2141,6 +2306,19 @@ fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>,
             "{name} lies flattened at rest with {} of it outside anything opaque, so its flat shape shows: put its origin inside something opaque (README trap \"Grown from nothing\")",
             percent(share)
         ));
+    }
+
+    // A bird the renderer flies (`bird`): its parts and size against the file; where birds sit on the model
+    // (`perches`): inside it.
+    if let Some(bird) = entry.get("bird") {
+        let fields = bird_fields(bird);
+        if fields.is_empty() {
+            errors.extend(bird_errors(bird, &bird_parts(&g)?, dims.map(|d| d.f())));
+        }
+        errors.extend(fields);
+    }
+    if let Some(perches) = entry.get("perches") {
+        errors.extend(perch_errors(perches, lo.map(|v| v.f()), hi.map(|v| v.f()), scale.f()));
     }
 
     // Budgets.
@@ -2705,5 +2883,71 @@ mod tests {
             "`motions.clock.at` 'noon' is no time (minutes past twelve)",
         ]);
         assert_eq!(loops(&m).unwrap(), HashSet::from(["rock".to_string(), "h".to_string()]));
+    }
+
+    fn j(text: &str) -> J {
+        json::loads_text(text.as_bytes()).unwrap()
+    }
+
+    #[test]
+    fn a_birds_fields_are_its_sizes() {
+        assert!(bird_fields(&j(r#"{"length": 0.12, "wingspan": 0.185, "perchHeight": 0.03, "pitch": 34}"#)).is_empty());
+        assert!(bird_fields(&j(r#"{"length": 0.12, "wingspan": 0.185}"#)).is_empty(), "the rest is optional");
+        assert_eq!(bird_fields(&j(r#"{"length": 0, "span": 1, "pitch": 95, "perchHeight": true}"#)), [
+            "`bird`: unknown span (it takes length, wingspan, perchHeight, pitch)",
+            "`bird.length` 0 is no length (metres, over 0)",
+            "`bird` has no `wingspan`",
+            "`bird.perchHeight` True is no length (metres, over 0)",
+            "`bird.pitch` 95 is no angle (degrees, -90 to 90)",
+        ]);
+        assert_eq!(bird_fields(&j("[0.12]")), ["`bird` is {\"length\", \"wingspan\", ...} (metres), not [0.12]"]);
+    }
+
+    /// The blue tit as built (families/birds.py) against its `bird`, and against wrong ones.
+    #[test]
+    fn a_bird_is_checked_against_its_file() {
+        let path = join(&repo_root(), "web/public/assets/models/birds/blueTit.glb");
+        let g = parse_glb(&std::fs::read(&path).unwrap()).unwrap();
+        let parts = bird_parts(&g).unwrap();
+        assert_eq!(parts.names.iter().map(String::as_str).collect::<Vec<_>>(), ["body", "head", "tail", "wing.L", "wing.R"]);
+        assert!(parts.flat.is_empty());
+        let dims = [0.185, 0.072, 0.106];
+        assert!(bird_errors(&j(r#"{"length": 0.12, "wingspan": 0.185, "perchHeight": 0.03, "pitch": 34}"#), &parts, dims).is_empty());
+        let wrong = bird_errors(&j(r#"{"length": 0.2, "wingspan": 0.3, "perchHeight": 0.5}"#), &parts, dims);
+        assert_eq!(wrong.len(), 3, "{wrong:?}");
+        assert!(wrong[0].starts_with("0.185 m across its spread wings, its `bird.wingspan` says 0.300 m"), "{}", wrong[0]);
+        assert!(wrong[1].starts_with("0.12") && wrong[1].contains("from bill to tail tip, its `bird.length` says 0.200 m"), "{}", wrong[1]);
+        assert_eq!(wrong[2], "`bird.perchHeight` 0.500 m is over the bird's height, 0.072 m");
+        // Its wings swapped over, one part gone and one saved flat.
+        let mut points = parts.points;
+        let left = points.remove("wing.L").unwrap();
+        let right = points.insert("wing.R".into(), left).unwrap();
+        points.insert("wing.L".into(), right);
+        let mut names = parts.names;
+        names.remove("tail");
+        let broken = BirdParts { names, points, flat: vec!["wing.L".into()] };
+        let e = bird_errors(&j(r#"{"length": 0.12, "wingspan": 0.185}"#), &broken, dims);
+        assert_eq!(e[0], "a bird's parts are nodes named body, head, tail, wing.L, wing.R: it has no tail");
+        assert!(e[1].starts_with("wing.L is saved at scale 0"), "{}", e[1]);
+        assert_eq!(&e[2..], [
+            "wing.L reaches out the wrong way: a bird's wing.L is spread to its left, game -x (glTF +x)",
+            "wing.R reaches out the wrong way: a bird's wing.R is spread to its right, game +x (glTF -x)",
+        ]);
+    }
+
+    #[test]
+    fn perches_are_points_inside_the_model() {
+        let (lo, hi) = ([-1.0, 0.0, -1.0], [1.0, 4.0, 1.0]);
+        assert!(perch_errors(&j("[[0.5, 3.9, -0.5], [-1.005, 0, 1]]"), lo, hi, 1.0).is_empty(), "a centimetre out is in");
+        assert_eq!(perch_errors(&j("[[0, 5, 0], [0.5, 1], [1, 1, \"x\"], [0, 2, 0], [3, 1, 0]]"), lo, hi, 1.0), [
+            "`perches` 1: [0.5, 1] is no [x, y, z]",
+            "`perches` 2: [1, 1, 'x'] is no [x, y, z]",
+            "2 of 5 perches outside the model (the first, 0: [0, 5, 0]; its box x, y, z: -1.00 to 1.00, 0.00 to 4.00, -1.00 to 1.00)",
+        ]);
+        // Before the entry's `scale`: a tree drawn twice its size has its box twice as big, its perches as written.
+        assert!(perch_errors(&j("[[0, 3, 0]]"), [-2.0, 0.0, -2.0], [2.0, 8.0, 2.0], 2.0).is_empty());
+        assert_eq!(perch_errors(&j("[[0, 5, 0]]"), [-2.0, 0.0, -2.0], [2.0, 8.0, 2.0], 2.0).len(), 1);
+        assert_eq!(perch_errors(&j("[]"), lo, hi, 1.0), ["`perches` is empty: leave it out"]);
+        assert_eq!(perch_errors(&j("{\"a\": 1}"), lo, hi, 1.0), ["`perches` is a list of [x, y, z] (metres), not {'a': 1}"]);
     }
 }
