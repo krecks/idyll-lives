@@ -17,7 +17,7 @@ import {
 import type { AssetRegistry } from '../../assets/registry';
 import { MaterialLibrary } from '../babylon/materials';
 import type { StandIn } from '../babylon/models';
-import { installNature } from '../babylon/nature';
+import { installNature, setWind } from '../babylon/nature';
 
 /** What a thing whose file fails is pictured as (`BuildOptions.standIn`): a plain box on its footprint. */
 export const PICTURE_STAND_IN: StandIn = { layer: 'floor', radius: 0.12 };
@@ -30,8 +30,12 @@ export async function studioScene(engine: AbstractEngine, assets: AssetRegistry)
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0, 0, 0, 0);
   scene.skipPointerMovePicking = true;
-  // Foliage cards turn to face the camera here too (and sway a little in the turntable).
+  // Foliage cards turn to face the camera here too (and sway a little in the turntable), still with
+  // reduce motion as in the game: the setting (the page's `reduce-motion` class) or the system's,
+  // looked at as each frame is drawn.
   installNature(scene);
+  const system = matchMedia('(prefers-reduced-motion: reduce)');
+  scene.onBeforeRenderObservable.add(() => setWind(scene, system.matches || document.documentElement.classList.contains('reduce-motion') ? 0 : 1));
   const ip = scene.imageProcessingConfiguration;
   ip.toneMappingEnabled = true;
   ip.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES;

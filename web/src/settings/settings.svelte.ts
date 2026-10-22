@@ -242,6 +242,17 @@ function load(): Settings {
 
 export const settings: Settings = $state(load());
 
+/**
+ * The system's reduce motion, followed as it changes: the renderer takes it with the setting
+ * (`reducedMotion || …`), so what applies the settings to it reads this too, and runs again.
+ */
+export const systemMotion = $state({ reduced: false });
+if (typeof matchMedia === 'function') {
+  const query = matchMedia('(prefers-reduced-motion: reduce)');
+  systemMotion.reduced = query.matches;
+  query.addEventListener('change', () => (systemMotion.reduced = query.matches));
+}
+
 /** Settings are kept unless a benchmark changed them for its page alone (`unsavedSettings`). */
 let persist = true;
 

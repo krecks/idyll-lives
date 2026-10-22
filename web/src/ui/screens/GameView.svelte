@@ -3,7 +3,7 @@
   import { host } from '../../game/host';
   import type { GameSession } from '../../game/session';
   import { UnloadableSave } from '../../persistence/saves';
-  import { settings } from '../../settings/settings.svelte';
+  import { settings, systemMotion } from '../../settings/settings.svelte';
   import { app } from '../app.svelte';
   import Hud from '../Hud.svelte';
   import { game } from '../state.svelte';
@@ -56,9 +56,10 @@
     };
   });
 
-  // Live settings (effects, camera, free will, autosave).
+  // Live settings (effects, camera, free will, autosave; the system's reduce motion too).
   $effect(() => {
     const s = $state.snapshot(settings);
+    void systemMotion.reduced;
     session?.applySettings(s);
   });
 
