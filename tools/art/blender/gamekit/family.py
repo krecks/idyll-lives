@@ -62,11 +62,13 @@ class Model:
       bird       the entry's `bird` for a bird the game flies about by code (families/birds.py): {'length': bill to tail
                  tip, 'wingspan', 'perchHeight': its body's middle over its feet, 'pitch': degrees its perched torso is raised from level},
                  metres; `cargo check-glb` checks them against the file
+      habitat    what its perches are on, the entry's `habitat` beside them, so the game's birds needn't guess it from
+                 the key: 'tree' (broadleaved and fruit trees), 'conifer', 'bush' (shrubs) or 'hedge'
     Perches the build finds (`gamekit/perch.py`: a tree's outer twigs) are written as the entry's `perches`.
     """
 
     def __init__(self, id, build, size, key=None, tolerance=0.02, motions=None, paint=None, parts=None,
-                 centre=(0.0, 0.0), floor=True, far=None, sink=0.0, code=False, bird=None):
+                 centre=(0.0, 0.0), floor=True, far=None, sink=0.0, code=False, bird=None, habitat=None):
         self.id, self.build, self.size, self.key = id, build, size, key
         self.tolerance, self.motions, self.paint = tolerance, motions, paint
         self.parts = parts
@@ -74,6 +76,7 @@ class Model:
         self.far = far
         self.code = code
         self.bird = bird
+        self.habitat = habitat
 
 
 class Family:
@@ -173,6 +176,9 @@ class Family:
             if perches:
                 entry['perches'] = perches
                 print(f'[gamekit] {model.id}: {len(perches)} perches')
+            if model.habitat:
+                assert perches, f'{model.id}: `habitat` says what its perches are on, and it has none'
+                entry['habitat'] = model.habitat
             if model.far:
                 far = export_glb(os.path.join(ASSETS, 'models', self.name, f'{model.id}.far.glb'), self.make_far(model, objs))
                 entry['far'] = f'../../models/{self.name}/{model.id}.far.glb'

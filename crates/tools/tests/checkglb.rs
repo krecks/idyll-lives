@@ -98,7 +98,7 @@ fn every_object_is_measured() {
 
 /// The birds the renderer flies (`packs/birds`, families/birds.py) carry their sizes, and the trees, shrubs and hedges
 /// where they sit carry their perches (families/trees.py, plants.py): 12-30 a tree, 3-8 a shrub or hedge segment, each
-/// three numbers. The gate checks both against the files.
+/// three numbers, and their `habitat`. The gate checks both against the files.
 #[test]
 fn the_birds_and_their_perches_are_in_the_packs() {
     let paths = Paths::repo();
@@ -115,44 +115,47 @@ fn the_birds_and_their_perches_are_in_the_packs() {
         assert!(bird["perchHeight"].as_f64().is_some() && bird["pitch"].as_f64().is_some(), "{key}: {bird}");
         keys.push(key);
     }
-    let count = |pack: &serde_json::Value, key: &str| {
-        let perches = pack["entries"][key]["perches"].as_array().unwrap_or_else(|| panic!("{key} has no perches"));
+    // Each perched model's perches, and what they are on (`habitat`).
+    let count = |pack: &serde_json::Value, key: &str, habitat: &str| {
+        let entry = &pack["entries"][key];
+        let perches = entry["perches"].as_array().unwrap_or_else(|| panic!("{key} has no perches"));
         assert!(perches.iter().all(|p| p.as_array().is_some_and(|p| p.len() == 3 && p.iter().all(serde_json::Value::is_number))), "{key}");
+        assert_eq!(entry["habitat"], habitat, "{key}");
         perches.len()
     };
     let tree_keys = [
-        "model.tree",
-        "model.tree.maple",
-        "model.tree.birch",
-        "model.tree.blossom",
-        "model.tree.fruit",
-        "model.tree.japaneseMaple",
-        "model.tree.magnolia",
-        "model.tree.willow",
-        "model.pine",
-        "model.spruce",
-        "model.cypress",
-        "model.garden.lemonTree",
+        ("model.tree", "tree"),
+        ("model.tree.maple", "tree"),
+        ("model.tree.birch", "tree"),
+        ("model.tree.blossom", "tree"),
+        ("model.tree.fruit", "tree"),
+        ("model.tree.japaneseMaple", "tree"),
+        ("model.tree.magnolia", "tree"),
+        ("model.tree.willow", "tree"),
+        ("model.pine", "conifer"),
+        ("model.spruce", "conifer"),
+        ("model.cypress", "conifer"),
+        ("model.garden.lemonTree", "tree"),
     ];
-    for key in tree_keys {
-        let n = count(&trees, key);
+    for (key, habitat) in tree_keys {
+        let n = count(&trees, key, habitat);
         assert!((12..=30).contains(&n), "{key}: {n}");
         keys.push(key.to_string());
     }
     let shrub_keys = [
-        "model.bush",
-        "model.bush.small",
-        "model.bush.flowering",
-        "model.hedge",
-        "model.garden.boxwood",
-        "model.garden.topiaryCone",
-        "model.garden.hedge",
-        "model.garden.hydrangea",
-        "model.garden.rosebush",
-        "model.garden.azalea",
+        ("model.bush", "bush"),
+        ("model.bush.small", "bush"),
+        ("model.bush.flowering", "bush"),
+        ("model.hedge", "hedge"),
+        ("model.garden.boxwood", "bush"),
+        ("model.garden.topiaryCone", "bush"),
+        ("model.garden.hedge", "hedge"),
+        ("model.garden.hydrangea", "bush"),
+        ("model.garden.rosebush", "bush"),
+        ("model.garden.azalea", "bush"),
     ];
-    for key in shrub_keys {
-        let n = count(&plants, key);
+    for (key, habitat) in shrub_keys {
+        let n = count(&plants, key, habitat);
         assert!((3..=8).contains(&n), "{key}: {n}");
         keys.push(key.to_string());
     }

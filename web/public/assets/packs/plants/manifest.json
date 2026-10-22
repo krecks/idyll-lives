@@ -909,6 +909,7 @@
         [-0.299, 0.593, 0.023],
         [0.04, 0.589, 0.377]
       ],
+      "habitat": "bush",
       "far": "../../models/plants/bush.far.glb"
     },
     "model.garden.boxwood": {
@@ -936,6 +937,7 @@
         [-0.02, 0.457, 0.298],
         [0.105, 0.596, 0.162]
       ],
+      "habitat": "bush",
       "far": "../../models/plants/boxwood.far.glb"
     },
     "model.garden.topiaryCone": {
@@ -975,6 +977,7 @@
         [0.221, 0.891, -0.063],
         [-0.011, 1.165, 0.146]
       ],
+      "habitat": "bush",
       "far": "../../models/plants/topiaryCone.far.glb"
     },
     "model.garden.hedge": {
@@ -1004,6 +1007,7 @@
         [0.453, 1.121, 0.134],
         [-0.58, 1.108, -0.145]
       ],
+      "habitat": "hedge",
       "far": "../../models/plants/hedge.far.glb"
     },
     "model.garden.hydrangea": {
@@ -1039,6 +1043,7 @@
         [-0.17, 0.649, -0.21],
         [0.025, 0.571, 0.253]
       ],
+      "habitat": "bush",
       "far": "../../models/plants/hydrangea.far.glb"
     },
     "model.garden.rosebush": {
@@ -1079,6 +1084,7 @@
         [0.018, 0.413, -0.008],
         [0.276, 0.431, -0.012]
       ],
+      "habitat": "bush",
       "far": "../../models/plants/rosebush.far.glb"
     },
     "model.garden.azalea": {
@@ -1119,6 +1125,7 @@
         [0.066, 0.837, 0.176],
         [0.35, 0.646, -0.195]
       ],
+      "habitat": "bush",
       "far": "../../models/plants/azalea.far.glb"
     },
     "model.garden.lavender": {
@@ -1442,6 +1449,7 @@
         [0.056, 0.505, -0.163],
         [-0.13, 0.529, -0.089]
       ],
+      "habitat": "bush",
       "far": "../../models/plants/bushSmall.far.glb"
     },
     "model.bush.flowering": {
@@ -1481,6 +1489,7 @@
         [0.039, 0.728, -0.339],
         [-0.036, 0.773, 0.412]
       ],
+      "habitat": "bush",
       "far": "../../models/plants/bushFlowering.far.glb"
     },
     "model.hedge": {
@@ -1505,6 +1514,7 @@
         [-0.364, 0.985, -0.057],
         [0.131, 0.836, -0.306]
       ],
+      "habitat": "hedge",
       "far": "../../models/plants/streetHedge.far.glb"
     }
   }

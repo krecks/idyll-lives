@@ -46,6 +46,7 @@
         [-2.529, 5.801, 0.632],
         [-0.31, 5.907, -2.268]
       ],
+      "habitat": "tree",
       "far": "../../models/trees/oak.far.glb"
     },
     "model.tree.maple": {
@@ -97,6 +98,7 @@
         [0.826, 4.959, 1.874],
         [-1.711, 6.343, 0.562]
       ],
+      "habitat": "tree",
       "far": "../../models/trees/maple.far.glb"
     },
     "model.tree.birch": {
@@ -146,6 +148,7 @@
         [1.614, 5.641, -0.014],
         [-0.419, 4.283, -0.138]
       ],
+      "habitat": "tree",
       "far": "../../models/trees/birch.far.glb"
     },
     "model.tree.blossom": {
@@ -199,6 +202,7 @@
         [1.692, 5.06, 0.937],
         [-1.777, 4.871, -0.195]
       ],
+      "habitat": "tree",
       "far": "../../models/trees/cherry.far.glb"
     },
     "model.tree.fruit": {
@@ -270,6 +274,7 @@
         [-0.902, 5.042, -0.636],
         [-1.172, 4.859, -1.234]
       ],
+      "habitat": "tree",
       "far": "../../models/trees/apple.far.glb"
     },
     "model.tree.japaneseMaple": {
@@ -323,6 +328,7 @@
         [0.43, 3.392, 1.131],
         [0.225, 1.785, 0.194]
       ],
+      "habitat": "tree",
       "far": "../../models/trees/japaneseMaple.far.glb"
     },
     "model.tree.magnolia": {
@@ -383,6 +389,7 @@
         [-1.804, 3.916, -0.103],
         [-1.67, 3.361, -0.683]
       ],
+      "habitat": "tree",
       "far": "../../models/trees/magnolia.far.glb"
     },
     "model.tree.willow": {
@@ -427,6 +434,7 @@
         [-0.863, 3.367, -0.275],
         [0.58, 3.092, -0.153]
       ],
+      "habitat": "tree",
       "far": "../../models/trees/willow.far.glb"
     },
     "model.pine": {
@@ -465,6 +473,7 @@
         [-0.473, 4.794, 1.016],
         [0.422, 7.608, -0.083]
       ],
+      "habitat": "conifer",
       "far": "../../models/trees/pine.far.glb"
     },
     "model.spruce": {
@@ -510,6 +519,7 @@
         [-0.741, 3.947, 1.633],
         [-0.636, 6.795, -0.104]
       ],
+      "habitat": "conifer",
       "far": "../../models/trees/spruce.far.glb"
     },
     "model.cypress": {
@@ -549,6 +559,7 @@
         [-0.345, 2.149, 0.26],
         [0.173, 5.925, -0.111]
       ],
+      "habitat": "conifer",
       "far": "../../models/trees/cypress.far.glb"
     },
     "model.garden.lemonTree": {
@@ -609,6 +620,7 @@
         [-0.336, 1.464, -0.489],
         [0.348, 1.856, -0.227]
       ],
+      "habitat": "tree",
       "far": "../../models/trees/lemonTree.far.glb"
     }
   }

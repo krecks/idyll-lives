@@ -131,7 +131,8 @@ shrub, the shrub with pink blossom, the garden hedge's block without its sprigs)
   The bush has 6, `model.bush.small` 4, `model.bush.flowering` 6, `model.hedge` 6, the boxwood 4, the topiary 4
   (on its cone), the garden hedge 6, the hydrangea 5, the rose bush 5 and the azalea 5. Lavender, ferns, grass and
   hostas have none. Perches only add data: the meshes are unchanged (same triangles as the table), and so are the
-  committed files.
+  committed files. Beside them each entry's `habitat` says what they are on: `"hedge"` for the two hedges
+  (`model.hedge`, `model.garden.hedge`), `"bush"` for the other eight (the topiary and the boxwood too).
 
 | Model | Size (w × h × d) | Triangles | Far | Draws |
 |---|---|---|---|---|

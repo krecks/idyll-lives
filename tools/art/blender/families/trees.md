@@ -111,6 +111,11 @@ and the committed .glb files are unchanged: perches only add data. `cargo check-
 numbers or lies over 1 cm outside the model's box. `--preview` renders `<id>@perches.png` and `<id>@perches.top.png`
 with a red ball where each bird would sit.
 
+Beside them each entry says what they are on, `habitat` (the `Model`'s `habitat=`), so the game's birds needn't guess
+it from the key: `"conifer"` for the pine, spruce and cypress, `"tree"` for the rest (the fruit trees and the potted
+lemon tree too). The shrubs' and hedges' are `"bush"` and `"hedge"` (plants.md). `cargo check-glb` fails any other
+value, and a `habitat` without `perches`. The manifest writes each perch on one line.
+
 | Model | Perches |
 |---|---|
 | `model.tree` | 19 |

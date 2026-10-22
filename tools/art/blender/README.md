@@ -154,7 +154,8 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
    - **Perches** (trees, shrubs, hedges): where the game's birds sit, the entry's `perches`. The build finds them
      on its own meshes (`G.perch.around`, lines in from outside; `G.perch.find`, where they meet the leaves, spread
      and kept) with random numbers of its own, so the meshes don't change. `G.settle` moves them with the
-     model (`families/trees.py`, `plants.py` `perches`).
+     model (`families/trees.py`, `plants.py` `perches`). Its `Model` says what they are on, the entry's `habitat`
+     beside them: `habitat='tree'` (broadleaved and fruit trees), `'conifer'`, `'bush'` (shrubs) or `'hedge'`.
      `--preview` renders `<id>@perches.png` (and `.top`) with a red ball on each. A bird the game flies by code takes
      `bird={'length', 'wingspan', 'perchHeight', 'pitch'}` (`families/birds.py`, birds.md). The gate checks them all
      against the file.
