@@ -218,6 +218,9 @@ export function frontTile(x: number, z: number, w: number, d: number, rot: numbe
   return fronts[rot % 4];
 }
 
+/** A tile a resident could use a footprint from, and the tile of its own it's next to. */
+type Approach = { tile: [number, number]; inner: [number, number] };
+
 /**
  * The tiles beside a footprint a resident could use it from, best first (sim-core
  * `approach_tiles`): the front (and, along an even front edge, the other middle tile: the
@@ -226,21 +229,17 @@ export function frontTile(x: number, z: number, w: number, d: number, rot: numbe
  * of it, then its front (and the other middle tile), so it may stand with its screen to a wall. Each comes with the tile of its own it's next to; the caller
  * checks it's free and open.
  */
-export function approachCandidates(def: Shape | undefined, x: number, z: number, rot: number, size?: readonly [number, number]): { tile: [number, number]; inner: [number, number] }[] {
+export function approachCandidates(def: Shape | undefined, x: number, z: number, rot: number, size?: readonly [number, number]): Approach[] {
   const [w, d] = sizeOf(def, rot, size);
   const front = frontTile(x, z, w, d, rot);
   if (def?.approach !== 'around' && def?.approach !== 'behind') {
-    const inner: [number, number] = [front[0] - [0, 1, 0, -1][rot % 4], front[1] - [1, 0, -1, 0][rot % 4]];
-    const along = rot % 2 === 0 ? [1, 0, w] : [0, 1, d];
-    if (along[2] % 2 !== 0) return [{ tile: front, inner }];
-    return [
-      { tile: front, inner },
-      { tile: [front[0] + along[0], front[1] + along[1]], inner: [inner[0] + along[0], inner[1] + along[1]] },
-    ];
+    const at: Approach = { tile: front, inner: [front[0] - [0, 1, 0, -1][rot % 4], front[1] - [1, 0, -1, 0][rot % 4]] };
+    const next = otherMiddle(at, rot, w, d);
+    return next ? [at, next] : [at];
   }
   const [cx, cz] = [x + Math.floor((w - 1) / 2), z + Math.floor((d - 1) / 2)];
   // Beside each side (+z, +x, -z, -x).
-  const sides: { tile: [number, number]; inner: [number, number] }[] = [
+  const sides: Approach[] = [
     { tile: [cx, z + d], inner: [cx, z + d - 1] },
     { tile: [x + w, cz], inner: [x + w - 1, cz] },
     { tile: [cx, z - 1], inner: [cx, z] },
@@ -251,12 +250,16 @@ export function approachCandidates(def: Shape | undefined, x: number, z: number,
   // (and along an even front edge the other middle tile, as the front swaps when the house is turned).
   if (def?.approach === 'behind') {
     const order = [(r + 2) % 4, (r + 3) % 4, (r + 1) % 4, r].map((i) => sides[i]);
-    const along = r % 2 === 0 ? [1, 0, w] : [0, 1, d];
-    if (along[2] % 2 !== 0) return order;
-    const { tile, inner } = sides[r];
-    return [...order, { tile: [tile[0] + along[0], tile[1] + along[1]], inner: [inner[0] + along[0], inner[1] + along[1]] }];
+    const next = otherMiddle(sides[r], r, w, d);
+    return next ? [...order, next] : order;
   }
   return [r, (r + 2) % 4, (r + 3) % 4, (r + 1) % 4].map((i) => sides[i]);
+}
+
+/** Along an even front edge (rotated size `w`×`d`), the other middle tile beside the front one `at`; null along an odd one. */
+function otherMiddle(at: Approach, rot: number, w: number, d: number): Approach | null {
+  const [ax, az, n] = rot % 2 === 0 ? [1, 0, w] : [0, 1, d];
+  return n % 2 !== 0 ? null : { tile: [at.tile[0] + ax, at.tile[1] + az], inner: [at.inner[0] + ax, at.inner[1] + az] };
 }
 
 /**
@@ -271,7 +274,7 @@ export function approachTile(
   z: number,
   rot: number,
   size: readonly [number, number] | undefined,
-  standable: (c: { tile: [number, number]; inner: [number, number] }) => boolean,
+  standable: (c: Approach) => boolean,
 ): { tile: [number, number]; out: number } | null {
   const found = approachCandidates(def, x, z, rot, size).find(standable);
   if (!found) return null;
