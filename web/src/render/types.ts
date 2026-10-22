@@ -25,7 +25,6 @@ export interface ViewRect {
   d: number;
 }
 
-/** An orbit camera pose: angles in radians, distance and target in metres. */
 /**
  * How busy the garden birds are at an hour (0..1, by day; they roost at night): most at dawn and in
  * the early evening, least round midday. What they do (render/babylon/birds.ts) and how much they
@@ -52,6 +51,7 @@ export interface SeenBird {
   distance: number;
 }
 
+/** An orbit camera pose: angles in radians, distance and target in metres. */
 export interface CameraPose {
   alpha: number;
   beta: number;

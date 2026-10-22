@@ -2470,6 +2470,8 @@ export class BabylonRenderer implements Renderer {
     this.wallItemsHidden.clear();
     this.held = null;
     this.characters?.clear();
+    this.birdLife?.clear();
+    this.decorPlants = [];
     this.items?.clear();
     this.mirrors?.set([]);
     this.simCount = 0;

@@ -293,6 +293,8 @@ interface Bird {
   roost: number;
   roostPerch: number;
   state: State;
+  /** A flight it couldn't take (a house in the way): it thinks again from then. */
+  retryAt: number;
   /** The perch it's on or flying to (plant, perch index; -1: the lawn). */
   plant: number;
   perch: number;
@@ -377,8 +379,8 @@ interface Look {
 }
 
 type BirdEntry = ModelEntry & { bird: { length: number; perchHeight: number; pitch: number } };
-/** A plant's model: its perches (model space) and what they're on (check-glb makes sure one with perches says). */
-type PlantEntry = ModelEntry & { perches?: Vec3[]; habitat: 'tree' | 'conifer' | 'bush' | 'hedge'; fit?: unknown };
+/** A plant's model: its perches (model space) and what they're on (check-glb checks it's one of four; without one, a bush). */
+type PlantEntry = ModelEntry & { perches?: Vec3[]; habitat?: 'tree' | 'conifer' | 'bush' | 'hedge'; fit?: unknown };
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const between = (r: () => number, [a, b]: readonly [number, number]) => a + r() * (b - a);
@@ -606,6 +608,16 @@ export class Birds {
     return moved;
   }
 
+  /** The world is gone (`Renderer.clear`): no birds until the next habitat. */
+  clear(): void {
+    this.ticket++;
+    this.habitat = null;
+    this.birds = [];
+    this.plants = [];
+    for (const look of this.inUse) this.size(look, 0);
+    this.inUse = [];
+  }
+
   dispose(): void {
     this.ticket++;
     this.looks.forEachBuilt((look) => {
@@ -695,7 +707,8 @@ export class Birds {
         if (b.sp !== SPECIES[i]) continue;
         b.look = look;
         b.slot = slot++;
-        b.drawn[0] = NaN;
+        // (Its slot may have held another bird, its wings spread: every part written anew.)
+        b.drawn.fill(NaN);
       }
       if (look) inUse.push(look);
       if (look) this.size(look, slot);
@@ -854,7 +867,7 @@ export class Birds {
     const plant = plants[home];
     const b: Bird = {
       key, id, sp, look: null, slot: 0, size, home, partner: null, follower: false, wake, roost, roostPerch,
-      state: 'perch', plant: home, perch: 0, x: plant.x, y: plant.y, z: plant.z, yaw: r() * Math.PI * 2, turnTo: NaN, pitch: 0, roll: 0,
+      state: 'perch', retryAt: 0, plant: home, perch: 0, x: plant.x, y: plant.y, z: plant.z, yaw: r() * Math.PI * 2, turnTo: NaN, pitch: 0, roll: 0,
       hy: 0, hp: 0, hr: 0, bob: 0, hyTo: 0, hpTo: 0, hrTo: 0, tail: 0, spread: 0, flap: 0, phase: 0, puff: 1,
       nextGlance: 0, nextFlick: r() * 3, nextPreen: between(r, sp.preen), preenUntil: -1, flickAt: -10, nextHop: between(r, sp.hop), nextFly: between(r, sp.fly),
       singUntil: -1, waryUntil: -1, path: new Float32Array(12), dur: 0, t: 0, bounds: 0, hop: false,
@@ -888,11 +901,15 @@ export class Birds {
       }
       return;
     }
-    if (b.state === 'fly') return;
-    // Dusk: home to roost.
+    if (b.state === 'fly' || now < b.retryAt) return;
+    // Dusk: home to roost; with home out of reach, where it sits, or in the nearest plant.
     if (!this.awake(b)) {
       if (b.state === 'perch' && b.plant === b.home && b.perch === b.roostPerch) b.state = 'roost';
-      else this.flyTo(b, b.home, b.roostPerch, 0.8);
+      else if (!this.flyTo(b, b.home, b.roostPerch, 0.8)) {
+        const near = this.nearestPlant(b);
+        if (b.state === 'perch') b.state = 'roost';
+        else if (near !== b.home) this.flyTo(b, near, this.perchFor(b, this.plants[near]), 0.8);
+      }
       return;
     }
     if (this.scared(b)) return;
@@ -1138,13 +1155,18 @@ export class Birds {
   }
 
   /** Sets off to a perch (speed: times the species' cruise). */
-  private flyTo(b: Bird, plant: number, perch: number, speed: number): void {
+  /** Sets off for `perch` of `plant`; false if it can't (then it waits a moment before deciding again). */
+  private flyTo(b: Bird, plant: number, perch: number, speed: number): boolean {
     const target = this.plants[plant];
-    if (!target) return;
+    if (!target) return false;
     this.perchPoint(target, perch, this.at);
-    if (!this.plan(b, this.at[0], this.at[1], this.at[2], speed, false, plant === b.home)) return;
+    if (!this.plan(b, this.at[0], this.at[1], this.at[2], speed, false, plant === b.home)) {
+      b.retryAt = this.clock + 1 + rnd() * 1.5;
+      return false;
+    }
     b.plant = plant;
     b.perch = perch;
+    return true;
   }
 
   /** Sets off down to the lawn at (x, z). */
@@ -1612,7 +1634,7 @@ export class Birds {
         mesh.setEnabled(this.visible && count > 0);
       }
     });
-    for (const b of this.birds) if (b.look === look) b.drawn[0] = NaN;
+    for (const b of this.birds) if (b.look === look) b.drawn.fill(NaN);
   }
 }
 
@@ -1667,8 +1689,8 @@ export function roofRidge(roofs: readonly Mesh[]): { ridge: number[]; top: numbe
   const [a, b] = x1 - x0 >= z1 - z0 ? [new Vector3(x0, top, mz), new Vector3(x1, top, mz)] : [new Vector3(mx, top, z0), new Vector3(mx, top, z1)];
   const ridge: number[] = [];
   const n = Math.floor(Math.hypot(b.x - a.x, b.z - a.z) / 0.5);
-  for (let k = 1; k < n; k++) ridge.push(a.x + ((b.x - a.x) * k) / n, a.y, a.z + ((b.z - a.z) * k) / n);
-  // A short ridge (a hipped roof's): its ends, and the point between.
-  if (n < 3) ridge.push(a.x, a.y, a.z, b.x, b.y, b.z);
+  // A short ridge (a hipped roof's): its ends, and the point between (in order along it, as hops along it go).
+  if (n < 3) ridge.push(a.x, a.y, a.z, (a.x + b.x) / 2, a.y, (a.z + b.z) / 2, b.x, b.y, b.z);
+  else for (let k = 1; k < n; k++) ridge.push(a.x + ((b.x - a.x) * k) / n, a.y, a.z + ((b.z - a.z) * k) / n);
   return { ridge, top: Math.max(0, top) };
 }
