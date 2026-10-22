@@ -112,8 +112,10 @@ export interface QualitySettings {
   /**
    * Garden birds (render/babylon/birds.ts): at most `count` of them, living in the trees, bushes and
    * hedges within `range` m of the viewed lot. A draw per species and part (five parts, up to five
-   * species: up to 25 draws, fewer with fewer species about), no shadows; only the birds that moved
-   * are written each frame. The birds' own main-thread time a frame, M3 Pro headless, the village
+   * species: up to 25 draws, fewer with fewer species about), no shadows; only the birds whose pose
+   * changed are written each frame, only the parts that changed (wings only in flight), and only
+   * those parts' buffers uploaded (Medium at 8:00: about 12 of 24 birds and 14 of 25 buffers a frame,
+   * most of them swaying with their branches; at night about 3 and 6). The birds' own main-thread time a frame, M3 Pro headless, the village
    * at 8:00: Low 0.03 ms, Medium 0.05 ms, High 0.06 ms (CPU throttled 4×: 0.11 / 0.24 / 0.25 ms);
    * the frame's CPU within noise at 1× (±0.5 ms), +1.2–1.4 ms at 4× on Medium and High.
    */
