@@ -49,7 +49,8 @@
     "packs/yard/manifest.json",
     "packs/street/manifest.json",
     "packs/held/manifest.json",
-    "packs/ground/manifest.json"
+    "packs/ground/manifest.json",
+    "packs/birds/manifest.json"
   ],
   "entries": {
     "material.wall": {

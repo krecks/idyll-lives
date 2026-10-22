@@ -1,0 +1,293 @@
+{
+  "$comment": "Blender-built birds (tools/art/blender/families/birds.py): the blue tit, chaffinch, willow warbler, blackbird and collared dove the game flies about by code, perched, in five rigid parts the renderer moves (`body`, `head`, `tail`, `wing.L`, `wing.R`: the wings spread, which it flaps, and hides while perched). `bird`: length (bill to tail tip) and wingspan, the body's middle over the feet (`perchHeight`) and the perched torso's rise from level (`pitch`, degrees), in metres.",
+  "version": 1,
+  "entries": {
+    "model.bird.blueTit": {
+      "type": "model",
+      "url": "../../models/birds/blueTit.glb",
+      "materials": {
+        "back": {
+          "finish": "material.finish.matte"
+        },
+        "bar": {
+          "finish": "material.finish.matte"
+        },
+        "belly": {
+          "finish": "material.finish.matte"
+        },
+        "bill": {
+          "finish": "material.finish.satin"
+        },
+        "breast": {
+          "finish": "material.finish.matte"
+        },
+        "brow": {
+          "finish": "material.finish.matte"
+        },
+        "cap": {
+          "finish": "material.finish.matte"
+        },
+        "eye": {
+          "finish": "material.finish.gloss"
+        },
+        "face": {
+          "finish": "material.finish.matte"
+        },
+        "flight": {
+          "finish": "material.finish.matte"
+        },
+        "leg": {
+          "finish": "material.finish.satin"
+        },
+        "mask": {
+          "finish": "material.finish.matte"
+        },
+        "nape": {
+          "finish": "material.finish.matte"
+        },
+        "tail": {
+          "finish": "material.finish.matte"
+        },
+        "throat": {
+          "finish": "material.finish.matte"
+        },
+        "under": {
+          "finish": "material.finish.matte"
+        },
+        "wing": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "sink": 0.01,
+      "bird": {
+        "length": 0.12,
+        "wingspan": 0.185,
+        "perchHeight": 0.03,
+        "pitch": 34
+      }
+    },
+    "model.bird.chaffinch": {
+      "type": "model",
+      "url": "../../models/birds/chaffinch.glb",
+      "materials": {
+        "back": {
+          "finish": "material.finish.matte"
+        },
+        "bar": {
+          "finish": "material.finish.matte"
+        },
+        "belly": {
+          "finish": "material.finish.matte"
+        },
+        "bill": {
+          "finish": "material.finish.satin"
+        },
+        "breast": {
+          "finish": "material.finish.matte"
+        },
+        "cap": {
+          "finish": "material.finish.matte"
+        },
+        "eye": {
+          "finish": "material.finish.gloss"
+        },
+        "face": {
+          "finish": "material.finish.matte"
+        },
+        "flight": {
+          "finish": "material.finish.matte"
+        },
+        "leg": {
+          "finish": "material.finish.satin"
+        },
+        "nape": {
+          "finish": "material.finish.matte"
+        },
+        "tail": {
+          "finish": "material.finish.matte"
+        },
+        "throat": {
+          "finish": "material.finish.matte"
+        },
+        "under": {
+          "finish": "material.finish.matte"
+        },
+        "wing": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "sink": 0.01,
+      "bird": {
+        "length": 0.145,
+        "wingspan": 0.26,
+        "perchHeight": 0.033,
+        "pitch": 27
+      }
+    },
+    "model.bird.warbler": {
+      "type": "model",
+      "url": "../../models/birds/warbler.glb",
+      "materials": {
+        "back": {
+          "finish": "material.finish.matte"
+        },
+        "belly": {
+          "finish": "material.finish.matte"
+        },
+        "bill": {
+          "finish": "material.finish.satin"
+        },
+        "breast": {
+          "finish": "material.finish.matte"
+        },
+        "brow": {
+          "finish": "material.finish.matte"
+        },
+        "cap": {
+          "finish": "material.finish.matte"
+        },
+        "eye": {
+          "finish": "material.finish.gloss"
+        },
+        "face": {
+          "finish": "material.finish.matte"
+        },
+        "flight": {
+          "finish": "material.finish.matte"
+        },
+        "leg": {
+          "finish": "material.finish.satin"
+        },
+        "mask": {
+          "finish": "material.finish.matte"
+        },
+        "tail": {
+          "finish": "material.finish.matte"
+        },
+        "throat": {
+          "finish": "material.finish.matte"
+        },
+        "under": {
+          "finish": "material.finish.matte"
+        },
+        "wing": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "bird": {
+        "length": 0.11,
+        "wingspan": 0.19,
+        "perchHeight": 0.028,
+        "pitch": 26
+      }
+    },
+    "model.bird.blackbird": {
+      "type": "model",
+      "url": "../../models/birds/blackbird.glb",
+      "materials": {
+        "back": {
+          "finish": "material.finish.matte"
+        },
+        "belly": {
+          "finish": "material.finish.matte"
+        },
+        "bill": {
+          "finish": "material.finish.satin"
+        },
+        "breast": {
+          "finish": "material.finish.matte"
+        },
+        "cap": {
+          "finish": "material.finish.matte"
+        },
+        "eye": {
+          "finish": "material.finish.gloss"
+        },
+        "flight": {
+          "finish": "material.finish.matte"
+        },
+        "leg": {
+          "finish": "material.finish.satin"
+        },
+        "ring": {
+          "finish": "material.finish.satin"
+        },
+        "tail": {
+          "finish": "material.finish.matte"
+        },
+        "throat": {
+          "finish": "material.finish.matte"
+        },
+        "under": {
+          "finish": "material.finish.matte"
+        },
+        "wing": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "bird": {
+        "length": 0.25,
+        "wingspan": 0.36,
+        "perchHeight": 0.063,
+        "pitch": 20
+      }
+    },
+    "model.bird.collaredDove": {
+      "type": "model",
+      "url": "../../models/birds/collaredDove.glb",
+      "materials": {
+        "back": {
+          "finish": "material.finish.matte"
+        },
+        "belly": {
+          "finish": "material.finish.matte"
+        },
+        "bill": {
+          "finish": "material.finish.satin"
+        },
+        "breast": {
+          "finish": "material.finish.matte"
+        },
+        "cap": {
+          "finish": "material.finish.matte"
+        },
+        "collar": {
+          "finish": "material.finish.matte"
+        },
+        "eye": {
+          "finish": "material.finish.gloss"
+        },
+        "flight": {
+          "finish": "material.finish.matte"
+        },
+        "leg": {
+          "finish": "material.finish.satin"
+        },
+        "tail": {
+          "finish": "material.finish.matte"
+        },
+        "tailtip": {
+          "finish": "material.finish.matte"
+        },
+        "throat": {
+          "finish": "material.finish.matte"
+        },
+        "tip": {
+          "finish": "material.finish.matte"
+        },
+        "under": {
+          "finish": "material.finish.matte"
+        },
+        "wing": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "bird": {
+        "length": 0.32,
+        "wingspan": 0.51,
+        "perchHeight": 0.059,
+        "pitch": 16
+      }
+    }
+  }
+}
