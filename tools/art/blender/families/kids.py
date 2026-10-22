@@ -12,12 +12,19 @@
 # where the game puts residents. Seat and mattress heights are the renderer's (characters.ts `SEATS`,
 # `BEDS`; the content's `surface` and `seat`).
 #
+# Built with the forms (2026-10-22): mattresses, pillows, duvets and cushions are soft boxes, frames and rails
+# one swept piece, shaped boards (the car's sides, arched headboards and ends, the doll house's windows, the
+# toy box's lid) extruded outlines with their cut-outs, turned parts revolved, round bodies (the horse, the
+# teddy, the bean bag, the tent's canvas) lofted.
+#
 # Run:  cargo art kids [--only crib] [--preview]
 import math
 import os
 import sys
 
 import bpy
+from mathutils import Vector
+from mathutils import noise as vnoise
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -51,6 +58,7 @@ M = G.Palette(
     # the kids' bed
     kids_frame=('#9DC6CF', 'satin'),
     kids_bedding=('#F2C14E', 'fabric'),
+    kids_drawer=('#F4F1EA', 'satin'),   # the drawers under the bed
     mattress=('#F7F7F5', 'fabric'),
     sheet=('#FFFFFF', 'fabric'),        # the sheet turned down over a duvet's top edge, pillows
     teddy_small=('#C08A52', 'fabric'),
@@ -203,25 +211,6 @@ def _slab(name, pts, frame, material, out=0.0, thick=0.004):
     return _mesh(name, verts, faces, material)
 
 
-def _tube(name, pts, r, material, sides=10):
-    """A round tube along the game points `pts`, which lie in a plane across x (the rockers' bow)."""
-    verts = []
-    for i, p in enumerate(pts):
-        a, b = pts[max(i - 1, 0)], pts[min(i + 1, len(pts) - 1)]
-        t = _add(b, _mul(a, -1))
-        t = _mul(t, 1 / math.sqrt(sum(c * c for c in t)))
-        n = (0.0, -t[2], t[1])   # across x: (1, 0, 0) x t
-        for k in range(sides):
-            f = 2 * math.pi * k / sides
-            verts.append(_add(p, _mul((1, 0, 0), r * math.cos(f)), _mul(n, r * math.sin(f))))
-    faces = [(i * sides + k, i * sides + (k + 1) % sides, (i + 1) * sides + (k + 1) % sides, (i + 1) * sides + k)
-             for i in range(len(pts) - 1) for k in range(sides)]
-    obj = _mesh(name, verts, faces, material)
-    for poly in obj.data.polygons:
-        poly.use_smooth = True
-    return obj
-
-
 def _arc(r, a0, a1, n, cx=0.0, cy=0.0):
     """`n` + 1 points on a circle of radius `r` round (cx, cy), from `a0` to `a1` degrees."""
     return [(cx + r * math.cos(math.radians(a0 + (a1 - a0) * i / n)),
@@ -243,32 +232,85 @@ def _still(name, parts=None):
     return G.join(parts if parts is not None else G.meshes(), name, origin=(0, 0, 0))
 
 
+def _star(cx, cy, r, inner=0.45, n=5, turn=90.0):
+    """A star's outline round (cx, cy), its points `r` out and its notches `inner` of that, a point up."""
+    return [(cx + r * (1 if i % 2 == 0 else inner) * math.cos(math.radians(turn + 180 * i / n)),
+             cy + r * (1 if i % 2 == 0 else inner) * math.sin(math.radians(turn + 180 * i / n))) for i in range(2 * n)]
+
+
+def _heart(cx, cy, r, n=20):
+    """A heart's outline round (cx, cy), about `r` across from its middle."""
+    pts = []
+    for i in range(n):
+        t = math.tau * i / n
+        x = 16 * math.sin(t) ** 3
+        y = 13 * math.cos(t) - 5 * math.cos(2 * t) - 2 * math.cos(3 * t) - math.cos(4 * t)
+        pts.append((cx + r * x / 16, cy + r * (y + 2) / 16))
+    return list(reversed(pts))
+
+
+def _moon(cx, cy, r, n=10):
+    """A crescent moon's outline round (cx, cy): an outer arc and a narrower inner one, its horns to the right."""
+    outer = _arc(r, 70, 290, n, cx, cy)
+    inner = [(cx + r * 0.42 + r * 0.82 * math.cos(math.radians(a)), cy + r * 0.82 * math.sin(math.radians(a)))
+             for a in (255 - 150 * i / n for i in range(n + 1))]
+    return outer + inner[1:-1]
+
+
+def _turned(name, x, z, profile, material, segments=10, y=0.0):
+    """A turned part: `profile` [(radius, height over y)] revolved about the upright through game (x, z)."""
+    return G.revolve(name, profile, at=F.at(x, y, z), material=material, segments=segments)
+
+
+def _rumple(obj, amount, above, seed, size=0.2):
+    """Rumples a cover's top: its vertices above height `above` moved up or down by smooth noise, up to `amount`,
+    never sideways, so its bounds across stay put (as bedroom.py's)."""
+    bpy.context.view_layer.update()
+    mw = obj.matrix_world
+    for v in obj.data.vertices:
+        p = mw @ v.co
+        if p.z > above:
+            v.co.z += vnoise.noise(Vector((p.x / size + seed, p.y / size - seed, seed))) * amount
+    obj.data.update()
+    return obj
+
+
+def _mattress(name, w, h, d, top, z, x=0.0, material=None, puff=0.006, piping=0.006, round=0.03, flat=3):
+    """A mattress `w` x `d`, `h` deep, the middle of its top at `top` (where the game lays the sleeper): rounded,
+    a hair puffed, a piped seam round its top and bottom."""
+    return F.soft(name, w, h - 2 * puff, d, (x, top - h / 2, z), material or M.mattress, round=round, puff=puff,
+                  flat=flat, piping=piping)
+
+
+def _soft_pillow(name, w, h, d, x, top, z, material, tilt=8, seed=0.0):
+    """A pillow on `top`, `h` thick in the middle: plump, thinning to its seams, a little crumpled."""
+    p = F.soft(name, w, h * 0.42, d, (x, top + h / 2 - 0.01, z), material, rot=(tilt, 0, 0),
+               round=min(h * 0.2, 0.03), puff=h * 0.29, flat=2)
+    return G.jitter(p, 0.004, size=0.12, seed=seed + x * 7, up=0.4)
+
+
 # --- beds: a duvet whose top third turns down (as bedroom.py) ----------------------------------------------
 DUVET = 0.05      # the duvet's top above the mattress top
 FLAP = 0.045      # the flap's thickness
 
 
-def _pillow(name, w, h, d, x, top, z, tilt=8):
-    F.box(name, w, h, d, (x, top + h / 2 - 0.01, z), M.sheet, rot=(tilt, 0, 0), bevel=min(h, d) * 0.42,
-          bevel_segments=3)
-
-
-def _duvet(top, half, z_fold, z_foot, drape, material):
-    """The duvet's lower two thirds, from the fold to the foot, draped down the sides and the foot end."""
-    over = 0.02
+def _duvet(top, half, z_fold, z_foot, drape, material, seed=0.0):
+    """The duvet's lower two thirds, from the fold to the foot, draped down the sides and the foot end, puffed on
+    top (its middle at `DUVET`) and a little rumpled."""
+    over, puff = 0.02, 0.01
     y0, y1 = top - drape, top + DUVET
-    F.box('duvet', 2 * (half + over), y1 - y0, z_foot + over - z_fold, (0, (y0 + y1) / 2, (z_fold + z_foot + over) / 2),
-          material, bevel=0.022, bevel_segments=3)
+    d = F.soft('duvet', 2 * (half + over), y1 - y0 - 2 * puff, z_foot + over - z_fold,
+               (0, (y0 + y1) / 2, (z_fold + z_foot + over) / 2), material, round=0.03, puff=puff, flat=4)
+    return _rumple(d, 0.004, top, seed)
 
 
 def _flap(top, half, z_top, z_fold, material):
     """The duvet's top third with the sheet turned down over its head edge, hinged across its fold."""
     with G.new_parts() as parts:
         y = top + DUVET - FLAP / 2
-        F.box('flap', 2 * (half + 0.012), FLAP, z_fold - z_top, (0, y, (z_top + z_fold) / 2), material,
-              bevel=0.02, bevel_segments=3)
-        F.box('flap_sheet', 2 * (half + 0.016), FLAP + 0.008, 0.12, (0, y, z_top + 0.05), M.sheet,
-              bevel=0.02, bevel_segments=3)
+        F.soft('flap', 2 * (half + 0.012), FLAP - 0.01, z_fold - z_top, (0, y, (z_top + z_fold) / 2), material,
+               round=0.018, puff=0.005, flat=3)
+        F.soft('flap_sheet', 2 * (half + 0.016), FLAP + 0.008, 0.12, (0, y, z_top + 0.05), M.sheet, round=0.02)
     return G.hinged(G.join(parts, 'duvet_flap'), F.at(0, top + DUVET + 0.003, z_fold))
 
 
@@ -288,6 +330,23 @@ def _turn_down(top, half, z_top, z_foot, drape, material):
     return G.meshes()
 
 
+def _teddy(x, y, z, material, eye, r=0.06):
+    """A little teddy sitting at (x, y, z) (its seat), facing the front: a pear of a body, a head with a snout,
+    round ears, stubby arms and legs, bead eyes and nose."""
+    F.sphere('teddy_body', r, (x, y + r * 0.95, z), material, scale=(0.95, 0.85, 1.1), segments=12, rings=8)
+    F.sphere('teddy_head', r * 0.78, (x, y + r * 2.6, z + r * 0.05), material, segments=12, rings=8)
+    F.sphere('teddy_snout', r * 0.32, (x, y + r * 2.45, z + r * 0.75), material, scale=(1.1, 1, 0.8), segments=8, rings=6)
+    F.sphere('teddy_nose', r * 0.12, (x, y + r * 2.55, z + r * 1.0), eye, segments=6, rings=4)
+    for s in (-1, 1):
+        F.sphere(f'teddy_ear{s}', r * 0.28, (x + s * r * 0.58, y + r * 3.2, z), material, scale=(1, 1, 0.6),
+                 segments=8, rings=6)
+        F.sphere(f'teddy_eye{s}', r * 0.09, (x + s * r * 0.3, y + r * 2.8, z + r * 0.68), eye, segments=6, rings=4)
+        F.sweep(f'teddy_arm{s}', [(x + s * r * 0.7, y + r * 1.5, z), (x + s * r * 0.95, y + r * 0.9, z + r * 0.5)],
+                r * 0.26, material, verts=8, scale=[1.0, 0.9])
+        F.sweep(f'teddy_leg{s}', [(x + s * r * 0.45, y + r * 0.35, z + r * 0.2), (x + s * r * 0.55, y + r * 0.3, z + r * 1.2)],
+                r * 0.32, material, verts=8, scale=[1.0, 1.05])
+
+
 # --- KD1: the crib and its changing table ------------------------------------------------------------------
 # An oblong cot, a 1.18 x 0.58 m mattress (a 60 x 120 cot's; review M-kids-01: it was 0.80 m square) running
 # across the left of the 2 x 1 tiles, its back on the wall's face, and a changing chest at the right. The baby lies
@@ -302,54 +361,77 @@ COT_LEN = COT_X[1] - COT_X[0] - 0.05     # between the posts
 COT_DEP = COT_Z[1] - COT_Z[0] - 0.05
 
 
-def _spindles(name, a, b, along, material, n, y=0.69, h=0.42):
-    """`n` spindles between `a` and `b` along x (`along` 'x') or depth ('z'), the other coordinate fixed."""
+def _spindles(name, a, b, along, material, n, y0=0.47, y1=0.9):
+    """`n` round spindles between `a` and `b` along x (`along` 'x') or depth ('z'), the other coordinate fixed,
+    from rail to rail."""
     for i in range(n):
         t = a + (b - a) * (i + 0.5) / n
         x, z = (t, along[1]) if along[0] == 'x' else (along[1], t)
-        F.box(f'{name}{i}', 0.022, h, 0.022, (x, y, z), material, bevel=0.005, bevel_segments=1)
+        F.sweep(f'{name}{i}', [(x, y0, z), (x, y1, z)], 0.011, material, verts=8)
 
 
 def _crib_rails(name, z):
-    """A long side's top and bottom rails and spindles, between the posts."""
-    F.box(f'{name}_top', COT_LEN + 0.01, 0.04, 0.04, (COT_MID[0], 0.9, z), M.crib, bevel=0.01)
-    F.box(f'{name}_bottom', COT_LEN + 0.01, 0.04, 0.04, (COT_MID[0], 0.47, z), M.crib, bevel=0.01)
+    """A long side's top and bottom rails and spindles, between the posts: the top rail rounded over to hold."""
+    F.sweep(f'{name}_top', [(COT_X[0] + 0.02, 0.9, z), (COT_X[1] - 0.02, 0.9, z)], None, M.crib,
+            profile=G.rounded_rect(0.042, 0.04, 0.016, corner=2), up=(0, 0, 1))
+    F.box(f'{name}_bottom', COT_LEN + 0.01, 0.04, 0.035, (COT_MID[0], 0.47, z), M.crib, bevel=0.008, bevel_segments=1)
     _spindles(f'{name}_spindle', COT_X[0] + 0.03, COT_X[1] - 0.03, ('x', z), M.crib, 11)
+
+
+def _finial(name, x, z, y, material):
+    """A turned finial on a post's top at height `y`: a collar, a waist and a ball."""
+    return _turned(name, x, z, [(0.0, 0.0), (0.025, 0.0), (0.025, 0.006), (0.012, 0.016), (0.02, 0.026),
+                                (0.021, 0.036), (0.013, 0.047), (0.0, 0.05)], material, segments=8, y=y)
+
+
+def _crib_end(name, x, hole):
+    """A solid end board between the posts at `x`, its top arched, a shape cut through it."""
+    z0, z1 = COT_Z[0] + 0.025, COT_Z[1] - 0.025
+    n = 10
+    top = [(z1 - (z1 - z0) * i / n, 0.885 + 0.04 * math.sin(math.pi * i / n)) for i in range(n + 1)]
+    F.extrude(name, [(z0, 0.43), (z1, 0.43)] + top, 0.022, (x, 0, 0), M.crib, plane='side', holes=[hole],
+              bevel=0.006, bevel_segments=1)
 
 
 def _changing_table():
     x, z, w = 0.635, -0.18, 0.62
-    for sx in (-1, 1):
-        for sz in (-1, 1):
-            F.box(f'foot{sx}{sz}', 0.05, 0.04, 0.05, (x + sx * (w / 2 - 0.04), 0.02, z + sz * 0.21), M.crib, bevel=0.008)
-    F.box('chest', w - 0.02, 0.74, 0.5, (x, 0.41, z), M.crib, bevel=0.012)
-    for i, y in enumerate((0.16, 0.4, 0.64)):
-        F.box(f'drawer{i}', w - 0.08, 0.21, 0.015, (x, y, z + 0.2575), M.crib_wood, bevel=0.006)
-        G.sphere(f'knob{i}', 0.018, at=F.at(x, y, z + 0.272), material=M.crib, scale=(1, 0.7, 1), segments=12, rings=8)
-    F.box('chest_top', w + 0.02, 0.025, 0.52, (x, 0.7925, z), M.crib_wood, bevel=0.006)
-    F.box('pad', w - 0.08, 0.06, 0.42, (x, 0.835, z + 0.01), M.crib_bedding, bevel=0.025, bevel_segments=3)
-    F.box('guard_back', w, 0.08, 0.025, (x, 0.845, z - 0.245), M.crib, bevel=0.008)
+    F.box('plinth', w - 0.06, 0.05, 0.44, (x, 0.025, z - 0.01), M.crib, bevel=0.006, bevel_segments=1)
+    F.box('chest', w - 0.02, 0.73, 0.5, (x, 0.415, z), M.crib, bevel=0.01, bevel_segments=2)
+    for i, y in enumerate((0.165, 0.4, 0.635)):
+        G.kit.shaker(F, f'drawer{i}', w - 0.08, 0.215, (x, y, z + 0.259), 0.018, M.crib_wood, rail=0.035, recess=0.004)
+        G.kit.knob(F, f'knob{i}', x, y, z + 0.268, 0.014, M.crib, segments=8)
+    F.box('chest_top', w + 0.02, 0.025, 0.52, (x, 0.7925, z), M.crib_wood, bevel=0.008, bevel_segments=2)
+    # a contoured changing pad: a soft middle between two raised bolsters, a guard rail round its back and sides
+    F.soft('pad', w - 0.1, 0.035, 0.42, (x, 0.825, z + 0.01), M.crib_bedding, round=0.014, puff=0.006, flat=2)
     for s in (-1, 1):
-        F.box(f'guard{s}', 0.025, 0.08, 0.5, (x + s * (w / 2 - 0.01), 0.845, z), M.crib, bevel=0.008)
+        F.soft(f'pad_side{s}', 0.075, 0.06, 0.42, (x + s * (w / 2 - 0.085), 0.838, z + 0.01), M.crib_bedding,
+               round=0.026, flat=1)
+    gx0, gx1, gz0, gz1 = x - w / 2 + 0.0125, x + w / 2 - 0.0125, z - 0.245, z + 0.25
+    pts = G.kit.fillet([(gx0, 0.845, gz1), (gx0, 0.845, gz0), (gx1, 0.845, gz0), (gx1, 0.845, gz1)], 0.04)
+    F.sweep('guard', pts, None, M.crib, profile=G.rounded_rect(0.08, 0.025, 0.011, corner=2), up=(0, 0, 1))
 
 
 def _mobile():
-    """The mobile: a hub on the arm's end, four arms and a toy on a string under each, turning about the hub."""
+    """The mobile: a turned hub on the arm's end, four arms curving down, and a toy on a string under each (a star,
+    a heart, a moon and a ball), each facing out, turning about the hub."""
     hx, hy, hz = CRIB_X, 0.975, -0.17   # over the baby, clear of arms reaching in over the front rail
     with G.new_parts() as parts:
-        F.cyl('hub', 0.03, 0.025, (hx, hy, hz), M.mobile, verts=16)
-        toys = (M.mobile, M.mobile_pink, M.mobile_blue, M.mobile_pink)
-        for k, m in enumerate(toys):
+        _turned('hub', hx, hz, [(0.0, 0.0), (0.03, 0.0), (0.032, 0.007), (0.026, 0.018), (0.012, 0.026), (0.0, 0.028)],
+                M.mobile, segments=12, y=hy - 0.0125)
+        toys = (('star', M.mobile), ('heart', M.mobile_pink), ('moon', M.mobile_blue), ('ball', M.mobile_pink))
+        for k, (kind, m) in enumerate(toys):
             a = math.radians(90 * k + 45)
-            x, z = hx + 0.12 * math.cos(a), hz + 0.12 * math.sin(a)
-            G.rod(f'arm{k}', F.at(hx, hy, hz), F.at(x, hy - 0.01, z), 0.005, material=M.mobile, verts=6)
-            G.rod(f'string{k}', F.at(x, hy - 0.01, z), F.at(x, 0.875, z), 0.0015, material=M.crib, verts=4)
-            if k % 2 == 0:  # a star
-                _slab(f'star{k}', [(0.04 * math.cos(math.radians(90 + 72 * i)), 0.04 * math.sin(math.radians(90 + 72 * i)))
-                                   for i in range(5)], _plane((x, 0.84, z), (1, 0, 0), (0, 1, 0)), m, out=-0.008,
-                      thick=0.016)
-            else:           # a ball
-                G.sphere(f'ball{k}', 0.032, at=F.at(x, 0.845, z), material=m, segments=12, rings=8)
+            c, s = math.cos(a), math.sin(a)
+            x, z = hx + 0.12 * c, hz + 0.12 * s
+            F.sweep(f'arm{k}', [(hx, hy, hz), (hx + 0.06 * c, hy + 0.004, hz + 0.06 * s), (x, hy - 0.012, z)], 0.0045,
+                    M.mobile, verts=6, resolution=3)
+            F.sweep(f'string{k}', [(x, hy - 0.012, z), (x, 0.872, z)], 0.0015, M.crib, verts=4)
+            turn = (0, 0, math.degrees(a) - 90)   # its face out from the hub
+            if kind == 'ball':
+                F.sphere(f'ball{k}', 0.03, (x, 0.845, z), m, segments=12, rings=8)
+                continue
+            outline = {'star': _star(0, 0, 0.042), 'heart': _heart(0, 0, 0.034), 'moon': _moon(0, 0, 0.036)}[kind]
+            F.extrude(f'{kind}{k}', outline, 0.014, (x, 0.84, z), m, rot=turn, bevel=0.004, bevel_segments=1)
     return G.hinged(G.join(parts, 'mobile'), F.at(hx, hy, hz))
 
 
@@ -357,24 +439,25 @@ def crib():
     cx, cz = COT_MID
     for x in COT_X:
         for z in COT_Z:
-            F.box(f'post{x}{z}', 0.05, 0.92, 0.05, (x, 0.46, z), M.crib, bevel=0.012)
-            G.sphere(f'cap{x}{z}', 0.025, at=F.at(x, 0.93, z), material=M.crib, segments=12, rings=8)
-    F.box('platform', COT_LEN + 0.04, 0.04, COT_DEP + 0.04, (cx, 0.44, cz), M.crib, bevel=0.008)
-    F.box('mattress', COT_LEN, 0.1, COT_DEP, (cx, CRIB_TOP - 0.05, cz), M.crib_bedding, bevel=0.03, bevel_segments=3)
-    # the blanket folded at the foot end (the baby's head to the left, characters.ts `BEDS` `across`)
-    F.box('blanket', 0.2, 0.035, COT_DEP - 0.08, (COT_X[1] - 0.17, CRIB_TOP + 0.015, cz), M.crib_blanket, bevel=0.014,
-          bevel_segments=3)
-    F.box('blanket_stripe', 0.03, 0.036, COT_DEP - 0.075, (COT_X[1] - 0.22, CRIB_TOP + 0.015, cz), M.mobile_blue,
-          bevel=0.01)
+            F.box(f'post{x}{z}', 0.05, 0.92, 0.05, (x, 0.46, z), M.crib, bevel=0.01, bevel_segments=2)
+            _finial(f'cap{x}{z}', x, z, 0.92, M.crib)
+    F.box('platform', COT_LEN + 0.04, 0.04, COT_DEP + 0.04, (cx, 0.44, cz), M.crib, bevel=0.008, bevel_segments=1)
+    _mattress('mattress', COT_LEN, 0.1, COT_DEP, CRIB_TOP, cz, x=cx, material=M.crib_bedding, round=0.025, flat=2)
+    # the blanket folded at the foot end (the baby's head to the left, characters.ts `BEDS` `across`), a band near
+    # its fold
+    b = F.soft('blanket', 0.2, 0.028, COT_DEP - 0.08, (COT_X[1] - 0.17, CRIB_TOP + 0.017, cz), M.crib_blanket,
+               round=0.012, puff=0.005, flat=2)
+    G.jitter(b, 0.002, size=0.1, seed=3.0, up=0.5)
+    F.box('blanket_stripe', 0.03, 0.036, COT_DEP - 0.076, (COT_X[1] - 0.22, CRIB_TOP + 0.017, cz), M.mobile_blue,
+          bevel=0.012, bevel_segments=2)
     _crib_rails('back', COT_Z[0])
-    for x in COT_X:
-        F.box(f'end_top{x}', 0.04, 0.04, COT_DEP + 0.03, (x, 0.9, cz), M.crib, bevel=0.01)
-        F.box(f'end_bottom{x}', 0.04, 0.04, COT_DEP + 0.03, (x, 0.47, cz), M.crib, bevel=0.01)
-        _spindles(f'end{x}', COT_Z[0] + 0.03, COT_Z[1] - 0.03, ('z', x), M.crib, 5)
-    # the mobile's arm, clamped to the back rail
-    G.rod('arm_up', F.at(CRIB_X, 0.9, COT_Z[0]), F.at(CRIB_X, 1.0, COT_Z[0]), 0.008, material=M.mobile, verts=8)
-    G.rod('arm_over', F.at(CRIB_X, 1.0, COT_Z[0]), F.at(CRIB_X, 1.0, -0.17), 0.008, material=M.mobile, verts=8)
-    G.rod('arm_drop', F.at(CRIB_X, 1.0, -0.17), F.at(CRIB_X, 0.985, -0.17), 0.006, material=M.mobile, verts=8)
+    # the ends: solid boards between the posts, arched, a heart cut through the head's and a star the foot's
+    _crib_end('end_head', COT_X[0], [(COT_Z[0] + 0.315 + u, 0.71 + v) for u, v in _heart(0, 0, 0.07)])
+    _crib_end('end_foot', COT_X[1], [(COT_Z[0] + 0.315 + u, 0.7 + v) for u, v in _star(0, 0, 0.08)])
+    # the mobile's arm, bent from one tube and clamped to the back rail
+    F.box('clamp', 0.035, 0.07, 0.06, (CRIB_X, 0.9, COT_Z[0] + 0.005), M.mobile, bevel=0.008, bevel_segments=1)
+    pts = G.kit.fillet([(CRIB_X, 0.88, -0.37), (CRIB_X, 1.0, -0.37), (CRIB_X, 1.0, -0.17), (CRIB_X, 0.985, -0.17)], 0.05)
+    F.sweep('arm', pts, 0.008, M.mobile, verts=8)
     _changing_table()
     _still('body')
 
@@ -392,159 +475,303 @@ def crib():
 KIDS_TOP = 0.44   # the mattress top (characters.ts BEDS.kidsBed)
 
 
+def _bun(name, x, z, h, r, material, segments=10):
+    """A turned bun foot `h` tall, `r` round."""
+    return _turned(name, x, z, [(0.0, 0.0), (r * 0.8, 0.0), (r, h * 0.2), (r * 1.02, h * 0.45), (r * 0.82, h * 0.7),
+                                (r * 0.9, h * 0.85), (r * 0.9, h), (0.0, h)], material, segments=segments)
+
+
 def kidsBed():
     for sx in (-1, 1):
         for sz in (-1, 1):
-            F.box(f'foot{sx}{sz}', 0.06, 0.07, 0.06, (sx * 0.42, 0.035, sz * 0.88), M.kids_frame, bevel=0.01)
-    F.box('base', 0.96, 0.24, 1.88, (0, 0.18, 0.01), M.kids_frame, bevel=0.03)
-    F.box('mattress', 0.88, 0.16, 1.82, (0, KIDS_TOP - 0.08, 0.02), M.mattress, bevel=0.04, bevel_segments=3)
-    # a headboard with an arched top, and bunting across it; its back on the wall's face (depth -0.93)
-    F.box('headboard', 0.96, 0.5, 0.04, (0, 0.32, -0.91), M.kids_frame, bevel=0.012)
-    F.cyl('arch', 0.48, 0.04, (0, 0.5, -0.91), M.kids_frame, rot=(90, 0, 0), scale=(1, 0.55, 1), verts=32)
-    G.rod('bunting', F.at(-0.4, 0.66, -0.887), F.at(0.4, 0.66, -0.887), 0.003, material=M.kids_bedding, verts=4)
+            _bun(f'foot{sx}{sz}', sx * 0.4, sz * 0.86, 0.07, 0.032, M.kids_frame)
+    # the base: a box with a rounded rim round its top, two drawers under the bed on its near side
+    F.box('base', 0.94, 0.24, 1.88, (0, 0.18, 0.01), M.kids_frame, bevel=0.02, bevel_segments=2)
+    rim = G.rounded_rect(0.93, 1.85, 0.06, corner=3)
+    F.sweep('rim', [(u, 0.3, 0.01 + v) for u, v in rim], None, M.kids_frame, profile=G.rounded_rect(0.034, 0.03, 0.012, corner=1),
+            up=(0, 0, 1), closed=True, angle=60)
+    for k, zc in enumerate((-0.42, 0.44)):
+        F.box(f'drawer{k}', 0.012, 0.17, 0.8, (-0.474, 0.175, zc), M.kids_drawer, bevel=0.006, bevel_segments=1)
+        F.extrude(f'drawer_grip{k}', G.rounded_rect(0.13, 0.035, 0.017, corner=3), 0.004, (-0.4785, 0.22, zc),
+                  M.kids_frame, plane='side')
+    _mattress('mattress', 0.86, 0.16, 1.8, KIDS_TOP, 0.02)
+    # a headboard with an arched top, a moon and two stars cut through it, and bunting draped across it; its back
+    # on the wall's face (depth -0.93)
+    arch = [(0.48 * math.cos(math.pi * i / 16), 0.5 + 0.264 * math.sin(math.pi * i / 16)) for i in range(17)]
+    holes = [_moon(0.0, 0.675, 0.048), _star(-0.21, 0.655, 0.036), _star(0.21, 0.655, 0.036)]
+    F.extrude('headboard', [(-0.48, 0.07), (0.48, 0.07)] + arch, 0.04, (0, 0, -0.91), M.kids_frame, holes=holes,
+              bevel=0.008, bevel_segments=2)
+    sag = [(-0.43 + 0.86 * i / 10, 0.6 - 0.035 * math.sin(math.pi * i / 10)) for i in range(11)]
+    F.sweep('bunting', [(x, y, -0.886) for x, y in sag], 0.003, M.kids_bedding, verts=5, resolution=2)
     flags = (M.pennant_a, M.pennant_b, M.pennant_c, M.pennant_a, M.pennant_b)
     for k, m in enumerate(flags):
         x = -0.3 + 0.15 * k
-        _slab(f'pennant{k}', [(-0.045, 0.0), (0.045, 0.0), (0.0, -0.08)],
-              _plane((x, 0.665, -0.89), (1, 0, 0), (0, 1, 0)), m, thick=0.004)
-    # a guard rail along the right side
-    for z in (-0.6, -0.2, 0.2):
-        F.box(f'rail_post{z}', 0.025, 0.38, 0.025, (0.475, 0.49, z), M.kids_frame, bevel=0.006)
-    F.box('rail_top', 0.03, 0.03, 0.88, (0.475, 0.675, -0.2), M.kids_frame, bevel=0.01)
-    _pillow('pillow', 0.58, 0.12, 0.28, 0, KIDS_TOP, -0.73)
-    # a little teddy in the corner by the pillow
-    G.sphere('teddy_body', 0.06, at=F.at(-0.36, KIDS_TOP + 0.06, -0.8), material=M.teddy_small, scale=(1, 0.9, 1.1),
-             segments=12, rings=8)
-    G.sphere('teddy_head', 0.045, at=F.at(-0.36, KIDS_TOP + 0.16, -0.81), material=M.teddy_small, segments=12, rings=8)
-    for s in (-1, 1):
-        G.sphere(f'teddy_ear{s}', 0.016, at=F.at(-0.36 + s * 0.035, KIDS_TOP + 0.2, -0.81), material=M.teddy_small,
-                 segments=8, rings=6)
+        y = 0.6 - 0.035 * math.sin(math.pi * (x + 0.43) / 0.86)
+        F.extrude(f'pennant{k}', [(-0.042, 0.0), (0.042, 0.0), (0.0, -0.075)], 0.003, (x, y + 0.002, -0.886), m,
+                  rot=(0, 0, (k - 2) * 2.5))
+    # a guard rail along the right side, bent from one tube, two spindles in it
+    pts = G.kit.fillet([(0.475, 0.3, -0.62), (0.475, 0.675, -0.62), (0.475, 0.675, 0.22), (0.475, 0.3, 0.22)], 0.06)
+    F.sweep('rail', pts, 0.015, M.kids_frame, verts=10)
+    for z in (-0.34, -0.06):
+        F.sweep(f'rail_spindle{z}', [(0.475, 0.3, z), (0.475, 0.665, z)], 0.01, M.kids_frame, verts=8)
+    _soft_pillow('pillow', 0.58, 0.12, 0.3, 0, KIDS_TOP, -0.72, M.sheet, seed=1.0)
+    _teddy(-0.33, KIDS_TOP - 0.004, -0.79, M.teddy_small, M.eye)
     return _turn_down(KIDS_TOP, 0.435, -0.5, 0.93, 0.12, M.kids_bedding)
 
 
 # --- KD1: the race car bed -----------------------------------------------------------------------------------
 CAR_TOP = 0.5     # the mattress top (the renderer's default bed height)
+CAR_SILL = 0.45   # the cockpit's sides, either side of the mattress
+
+
+def _car_arc(cz, cy, r, a0, a1, n):
+    return [(cz + r * math.cos(math.radians(a0 + (a1 - a0) * i / n)), cy + r * math.sin(math.radians(a0 + (a1 - a0) * i / n)))
+            for i in range(n + 1)]
+
+
+def _car_side():
+    """The car's side seen from the right (game depth, height): a low nose rounding up to the bonnet, the sill along
+    the cockpit, the tail rising behind, and an arch over each wheel."""
+    out = [(-0.93, 0.6), (-0.93, 0.09)] + _car_arc(-0.91, 0.09, 0.02, 180, 270, 2)[1:]
+    for wz in (-0.6, 0.6):
+        out += _car_arc(wz, 0.18, 0.215, 211.6, -31.6, 12)
+    out += _car_arc(0.9, 0.14, 0.07, 270, 360, 4) + _car_arc(0.89, 0.46, 0.08, 0, 90, 4)
+    out += [(0.66, 0.542), (0.63, 0.5), (0.6, CAR_SILL + 0.02)]
+    out += [(-0.74, CAR_SILL + 0.02), (-0.79, CAR_SILL + 0.06)] + _car_arc(-0.86, 0.56, 0.05, 30, 90, 3)
+    return out
+
+
+def _wheel(name, x, z, side):
+    """A wheel at (x, z): a rounded tyre and a dished hub with a cap, its axle across."""
+    tyre = [(0.105, -0.04), (0.16, -0.04), (0.174, -0.035), (0.18, -0.02), (0.18, 0.02), (0.174, 0.035), (0.16, 0.04),
+            (0.105, 0.04)]
+    hub = [(0.0, 0.0425), (0.028, 0.0425), (0.034, 0.036), (0.08, 0.032), (0.098, 0.036), (0.106, 0.03),
+           (0.106, -0.03), (0.0, -0.03)]
+    for part, prof, m in (('tyre', tyre, M.dark), ('hub', hub, M.hub)):
+        G.revolve(f'{part}{name}', prof, at=F.at(x, 0.18, z), material=m, segments=16, rot=(0, -90 * side, 0))
 
 
 def kidsBedCar():
-    # the tail end's back on the wall's face (depth -0.93)
-    F.box('chassis', 0.94, 0.3, 1.9, (0, 0.22, 0.02), M.car, bevel=0.1, bevel_segments=4)
-    F.box('mattress', 0.84, 0.16, 1.44, (0, CAR_TOP - 0.08, -0.06), M.mattress, bevel=0.04, bevel_segments=3)
-    # the bonnet at the foot: stripes, headlights, a grille
-    F.box('bonnet', 0.94, 0.42, 0.32, (0, 0.38, 0.81), M.car, bevel=0.06, bevel_segments=4)
+    # the body: the two sides (arched over the wheels), the bonnet and tail between them, the deck under the
+    # mattress; the tail end's back on the wall's face (depth -0.93)
+    side = _car_side()
     for s in (-1, 1):
-        F.box(f'stripe{s}', 0.08, 0.006, 0.18, (s * 0.09, 0.592, 0.81), M.car_stripe, bevel=0.002)
+        F.extrude(f'side{s}', side, 0.06, (s * 0.44, 0, 0), M.car, plane='side', bevel=0.02, bevel_segments=1)
+    nose = [(0.6, 0.12), (0.92, 0.12), (0.97, 0.17)] + _car_arc(0.89, 0.46, 0.08, 0, 90, 4) + [(0.66, 0.542), (0.6, 0.5)]
+    F.extrude('bonnet', nose, 0.84, (0, 0, 0), M.car, plane='side', bevel=0.03, bevel_segments=2)
+    F.extrude('tail', [(-0.93, 0.32), (-0.79, 0.32), (-0.79, CAR_SILL + 0.06)] + _car_arc(-0.86, 0.56, 0.05, 30, 90, 3)
+              + [(-0.93, 0.61)], 0.84, (0, 0, 0), M.car, plane='side', bevel=0.02, bevel_segments=2)
+    F.box('deck', 0.84, 0.26, 1.42, (0, 0.21, -0.08), M.car, bevel=0.01, bevel_segments=1)
+    _mattress('mattress', 0.8, 0.16, 1.4, CAR_TOP, -0.08)
+    # the bonnet: two stripes over it, a grille with bars, headlights in their rims
+    for s in (-1, 1):
+        F.extrude(f'stripe{s}', G.rounded_rect(0.08, 0.22, 0.01, corner=1), 0.004, (s * 0.09, 0.543, 0.77), M.car_stripe,
+                  plane='top')
         G.sphere(f'headlight{s}', 0.06, at=F.at(s * 0.3, 0.45, 0.965), material=M.headlight, scale=(1, 0.35, 0.8),
-                 segments=14, rings=8)
-        # a number roundel on each side
-        F.cyl(f'roundel{s}', 0.07, 0.006, (s * 0.471, 0.22, 0.0), M.car_stripe, rot=(0, 90, 0), verts=20)
-    F.box('grille', 0.36, 0.08, 0.01, (0, 0.3, 0.972), M.dark, bevel=0.004)
-    # the tail and its spoiler
-    F.box('tail', 0.94, 0.26, 0.14, (0, 0.47, -0.86), M.car, bevel=0.06, bevel_segments=3)
+                 segments=12, rings=6)
+        F.sweep(f'headlight_rim{s}', [(s * 0.3 + 0.064 * math.cos(math.tau * i / 12), 0.45 + 0.05 * math.sin(math.tau * i / 12),
+                                       0.97) for i in range(12)], 0.007, M.hub, verts=5, closed=True)
+        # a number roundel on each side, a 7 on it
+        F.cyl(f'roundel{s}', 0.07, 0.006, (s * 0.473, 0.3, 0.0), M.car_stripe, rot=(0, 90, 0), verts=20)
+        seven = [(-0.03, 0.035), (0.032, 0.035), (0.032, 0.022), (-0.004, -0.04), (-0.02, -0.04), (0.014, 0.022),
+                 (-0.03, 0.022)]
+        F.extrude(f'number{s}', [(u * s, v) for u, v in seven], 0.004, (s * 0.477, 0.3, 0.0), M.dark, plane='side')
+        # a racing stripe down each side, under the sill
+        F.extrude(f'side_stripe{s}', G.rounded_rect(1.0, 0.03, 0.012, corner=2), 0.003, (s * 0.4715, 0.4, -0.02),
+                  M.car_stripe, plane='side')
+    F.extrude('grille', G.rounded_rect(0.38, 0.11, 0.03, corner=3), 0.012, (0, 0.3, 0.97), M.dark, plane='front')
+    for k in range(3):
+        F.box(f'grille_bar{k}', 0.34, 0.01, 0.008, (0, 0.27 + 0.03 * k, 0.978), M.hub, bevel=0.003, bevel_segments=1)
+    # the tail's spoiler: a wing on two struts between end plates
     for s in (-1, 1):
-        F.box(f'strut{s}', 0.04, 0.12, 0.04, (s * 0.3, 0.66, -0.9), M.dark, bevel=0.008)
-        F.box(f'endplate{s}', 0.02, 0.09, 0.09, (s * 0.4, 0.73, -0.885), M.dark, bevel=0.006)
-    F.box('wing', 0.8, 0.03, 0.08, (0, 0.735, -0.89), M.dark, bevel=0.01)
-    # the wheels
+        F.extrude(f'strut{s}', [(-0.885, 0.6), (-0.865, 0.6), (-0.885, 0.72), (-0.905, 0.72)], 0.03, (s * 0.3, 0, 0), M.dark,
+                  plane='side', bevel=0.004, bevel_segments=1)
+        F.extrude(f'endplate{s}', G.rounded_rect(0.09, 0.09, 0.02, corner=2), 0.018, (s * 0.4, 0.73, -0.885), M.dark,
+                  plane='side', bevel=0.004, bevel_segments=1)
+    # an aerofoil, thick at its leading edge (u up, v back from it)
+    wing = [(0.0, 0.0), (0.012, 0.004), (0.018, 0.02), (0.016, 0.045), (0.008, 0.077), (0.002, 0.077), (-0.004, 0.05),
+            (-0.006, 0.02), (-0.004, 0.004)]
+    F.sweep('wing', [(-0.39, 0.725, -0.852), (0.39, 0.725, -0.852)], None, M.dark, profile=wing, up=(0, 0, 1), angle=50)
     for sx in (-1, 1):
         for sz in (-1, 1):
-            F.cyl(f'tyre{sx}{sz}', 0.18, 0.08, (sx * 0.45, 0.18, sz * 0.6), M.dark, rot=(0, 90, 0), verts=24)
-            F.cyl(f'hub{sx}{sz}', 0.09, 0.085, (sx * 0.45, 0.18, sz * 0.6), M.hub, rot=(0, 90, 0), verts=16)
-    _pillow('pillow', 0.5, 0.12, 0.26, 0, CAR_TOP, -0.64, tilt=12)
-    return _turn_down(CAR_TOP, 0.42, -0.42, 0.66, 0.1, M.car_bedding)
+            _wheel(f'{sx}{sz}', sx * 0.45, sz * 0.6, sx)
+    _soft_pillow('pillow', 0.5, 0.12, 0.26, 0, CAR_TOP, -0.64, M.sheet, tilt=12, seed=2.0)
+    return _turn_down(CAR_TOP, 0.4, -0.42, 0.66, 0.1, M.car_bedding)
 
 
 # --- KD1: the high chair -------------------------------------------------------------------------------------
+def _on_leg(sx, zf, zt, y, top=0.575, foot=0.008):
+    """The point at height `y` on a high chair's leg from (sx * 0.25, foot, zf) up to (sx * 0.14, top, zt)."""
+    t = (y - foot) / (top - foot)
+    return (sx * (0.25 + (0.14 - 0.25) * t), y, zf + (zt - zf) * t)
+
+
 def highChair():
-    # the legs splayed wide at the floor, 0.54 m each way, so it can't tip (review M-kids-04: 0.44 x 0.47)
+    # the legs splayed wide at the floor, 0.54 m each way, so it can't tip (review M-kids-04: 0.44 x 0.47); each
+    # tapers to a rubber foot, a stretcher between each side's pair, a footrest across the front pair
+    legs = ((-0.2, -0.07), (0.32, 0.17))
     for sx in (-1, 1):
-        for zf, zt in ((-0.2, -0.07), (0.32, 0.17)):
-            G.rod(f'leg{sx}{zf}', F.at(sx * 0.25, 0.0, zf), F.at(sx * 0.14, 0.57, zt), 0.0175, material=M.chair_legs,
-                  verts=10)
-    F.box('footrest', 0.36, 0.025, 0.1, (0, 0.32, 0.23), M.chair_white, bevel=0.008)
-    F.box('seat', 0.38, 0.05, 0.36, (0, 0.58, 0.05), M.chair_white, bevel=0.015)
-    F.box('cushion', 0.32, 0.04, 0.3, (0, 0.62, 0.06), M.chair_cushion, bevel=0.015, bevel_segments=3)
-    F.box('back', 0.36, 0.32, 0.04, (0, 0.78, -0.12), M.chair_white, rot=(-6, 0, 0), bevel=0.03, bevel_segments=3)
-    F.box('back_cushion', 0.28, 0.22, 0.02, (0, 0.77, -0.095), M.chair_cushion, rot=(-6, 0, 0), bevel=0.008)
+        for zf, zt in legs:
+            F.sweep(f'leg{sx}{zf}', [(sx * 0.14, 0.575, zt), (sx * 0.2495, 0.012, zf)], 0.0175, M.chair_legs, verts=10,
+                    scale=[1.15, 1.0])
+            F.cyl(f'foot{sx}{zf}', 0.016, 0.014, (sx * 0.25, 0.007, zf), M.dark, verts=8)
+        a, b = _on_leg(sx, *legs[0], 0.2), _on_leg(sx, *legs[1], 0.2)
+        F.sweep(f'stretcher{sx}', [a, b], 0.011, M.chair_legs, verts=8)
+    fa, fb = _on_leg(-1, *legs[1], 0.32), _on_leg(1, *legs[1], 0.32)
+    F.sweep('footrest_bar', [fa, fb], 0.012, M.chair_legs, verts=8)
+    F.extrude('footrest', G.rounded_rect(0.34, 0.09, 0.03, corner=3), 0.02, (0, 0.34, 0.225), M.chair_white, plane='top',
+              bevel=0.006, bevel_segments=1)
+    # the seat: a moulded shell, a cushion in it; a curved back with its own cushion, rolled arms
+    F.soft('seat', 0.38, 0.05, 0.36, (0, 0.58, 0.05), M.chair_white, round=0.02, flat=1)
+    F.soft('cushion', 0.31, 0.03, 0.3, (0, 0.618, 0.06), M.chair_cushion, round=0.012, puff=0.007, piping=0.004, flat=2,
+           round_segments=1)
+    F.extrude('back', G.rounded_rect(0.36, 0.32, 0.07, corner=3), 0.03, (0, 0.78, -0.12), M.chair_white, rot=(-6, 0, 0),
+              bevel=0.01, bevel_segments=2)
+    F.soft('back_cushion', 0.28, 0.23, 0.022, (0, 0.77, -0.097), M.chair_cushion, rot=(-6, 0, 0), round=0.01, puff=0.006,
+           piping=0.004, flat=2, round_segments=1)
     for s in (-1, 1):
-        F.box(f'arm{s}', 0.04, 0.16, 0.32, (s * 0.17, 0.7, 0.05), M.chair_white, bevel=0.015)
+        pts = G.kit.fillet([(s * 0.17, 0.6, -0.1), (s * 0.17, 0.75, -0.1), (s * 0.17, 0.75, 0.16), (s * 0.17, 0.6, 0.2)], 0.05)
+        F.sweep(f'arm{s}', pts, None, M.chair_white, profile=G.rounded_rect(0.034, 0.04, 0.014, corner=1), up=(1, 0, 0))
+    # a harness: two straps down from the back to a buckle on the cushion
+    for s in (-1, 1):
+        F.sweep(f'strap{s}', [(s * 0.07, 0.85, -0.098), (s * 0.06, 0.7, -0.09), (s * 0.03, 0.645, 0.0), (0, 0.64, 0.07)],
+                None, M.chair_cushion, profile=G.rounded_rect(0.004, 0.03, 0.002, corner=1), up=(0, 1, 0), resolution=2)
+    F.box('buckle', 0.04, 0.012, 0.04, (0, 0.645, 0.08), M.dark, bevel=0.005, bevel_segments=1)
     _still('body')
-    # the tray, its own part so it can slide out once the chair has a use
+    # the tray, its own part so it can slide out once the chair has a use: a rim round it, a cup well, a bowl
     with G.new_parts() as parts:
-        F.box('tray', 0.44, 0.025, 0.18, (0, 0.792, 0.2), M.chair_white, bevel=0.01)
-        F.box('tray_lip', 0.4, 0.02, 0.012, (0, 0.81, 0.283), M.chair_white, bevel=0.005)
-        F.box('tray_mat', 0.34, 0.004, 0.12, (0, 0.806, 0.2), M.chair_cushion, bevel=0.002)
+        F.extrude('tray', G.rounded_rect(0.44, 0.17, 0.05, corner=4), 0.02, (0, 0.792, 0.2), M.chair_white, plane='top',
+                  bevel=0.006, bevel_segments=1)
+        rim = G.rounded_rect(0.424, 0.154, 0.042, corner=3)
+        F.sweep('tray_rim', [(u, 0.804, 0.2 + v) for u, v in rim], 0.006, M.chair_white, verts=6, closed=True)
+        F.extrude('tray_mat', G.rounded_rect(0.24, 0.11, 0.03, corner=3), 0.003, (-0.05, 0.8035, 0.2), M.chair_cushion,
+                  plane='top')
+        _turned('bowl', 0.13, 0.2, [(0.0, 0.0), (0.022, 0.0), (0.034, 0.012), (0.04, 0.03), (0.036, 0.031), (0.03, 0.016),
+                                    (0.0, 0.012)], M.toy_green, segments=12, y=0.802)
+        F.sweep('spoon', [(0.06, 0.806, 0.17), (0.1, 0.81, 0.23), (0.15, 0.83, 0.235)], 0.0035, M.toy_yellow, verts=5)
     G.join(parts, 'tray')
     _place()
     return G.meshes()
 
 
 # --- KD2: the toy box and the toy chest ----------------------------------------------------------------------
-def _box_shell(w, h, d, z, y0, body, inside, name='box'):
-    """An open box of walls on a floor, `y0` to `h`, with a hidden false bottom near the top for the toys."""
-    yc = (y0 + h) / 2
-    F.box(f'{name}_floor', w, 0.03, d, (0, y0 + 0.015, z), body, bevel=0.006)
-    F.box(f'{name}_front', w, h - y0, 0.025, (0, yc, z + d / 2 - 0.0125), body, bevel=0.008)
-    F.box(f'{name}_back', w, h - y0, 0.025, (0, yc, z - d / 2 + 0.0125), body, bevel=0.008)
-    for s in (-1, 1):
-        F.box(f'{name}_side{s}', 0.025, h - y0, d - 0.05, (s * (w / 2 - 0.0125), yc, z), body, bevel=0.008)
-    F.box(f'{name}_fill', w - 0.05, 0.01, d - 0.05, (0, h - 0.15, z), inside)
+def _walls(name, w, d, y0, y1, z, t, material, r=0.03, x=0.0):
+    """An open box's four walls in one piece, `t` thick, w x d outside, their corners rounded, from y0 up to y1."""
+    out = G.rounded_rect(w, d, r, corner=3)
+    hole = G.rounded_rect(w - 2 * t, d - 2 * t, max(0.004, r - t), corner=3)
+    return F.extrude(name, out, y1 - y0, (x, (y0 + y1) / 2, z), material, plane='top', holes=[hole])
+
+
+def _block(name, x, y, z, s, material, face, turn=0.0, tip=0.0):
+    """A toy block `s` across standing on its bottom at height `y`: rounded, a raised square on its faces."""
+    cube = F.box(name, s, s, s, (x, y + s / 2, z), material, rot=(tip, 0, turn), bevel=s * 0.12, bevel_segments=2)
+    face_obj = F.box(f'{name}_face', s * 0.62, s * 0.62, s * 1.04, (x, y + s / 2, z), face, rot=(tip, 0, turn),
+                     bevel=s * 0.05, bevel_segments=1)
+    return cube, face_obj
 
 
 def _toys_inside(top, z):
-    """Toys heaped inside a box, seen with the lid open."""
+    """Toys heaped inside a box, seen with the lid open: a ball, two blocks, a teddy and a toy car's wheels."""
     G.sphere('in_ball', 0.075, at=F.at(0.16, top - 0.07, z + 0.05), material=M.ball_blue, segments=14, rings=8)
-    F.box('in_block', 0.09, 0.09, 0.09, (-0.2, top - 0.1, z + 0.02), M.toy_red, rot=(0, 0, 20), bevel=0.012)
-    F.box('in_block2', 0.08, 0.08, 0.08, (-0.08, top - 0.1, z - 0.08), M.toy_green, rot=(10, 0, -15), bevel=0.012)
-    G.sphere('in_plush', 0.07, at=F.at(0.0, top - 0.08, z + 0.06), material=M.plush, scale=(1, 0.9, 1),
-             segments=12, rings=8)
-    for s in (-1, 1):
-        G.sphere(f'in_plush_ear{s}', 0.022, at=F.at(s * 0.045, top - 0.02, z + 0.06), material=M.plush,
-                 segments=8, rings=6)
+    F.sphere('in_ball_band', 0.0755, (0.16, top - 0.07, z + 0.05), M.ball_yellow, scale=(1, 0.3, 1), segments=14, rings=4)
+    _block('in_block', -0.2, top - 0.145, z + 0.02, 0.09, M.toy_red, M.toy_yellow, turn=20)
+    _block('in_block2', -0.08, top - 0.14, z - 0.08, 0.08, M.toy_green, M.paper, turn=-15, tip=10)
+    _teddy(0.0, top - 0.17, z + 0.07, M.plush, M.eye, r=0.05)
 
 
 def toyBox():
     z = -0.18
-    _box_shell(0.8, 0.46, 0.5, z, 0.0, M.toybox, M.toybox_inside)
-    for k, (x, m) in enumerate(((-0.25, M.toy_red), (0.0, M.toy_green), (0.25, M.toy_blue))):
-        F.box(f'tile{k}', 0.16, 0.14, 0.012, (x, 0.26, 0.076), m, bevel=0.008)
-        F.box(f'tile_in{k}', 0.08, 0.07, 0.004, (x, 0.26, 0.084), M.toybox_inside, bevel=0.003)
+    F.box('box_floor', 0.78, 0.03, 0.48, (0, 0.03, z), M.toybox_inside)
+    _walls('box_walls', 0.8, 0.5, 0.0, 0.445, z, 0.025, M.toybox)
+    # hand holds cut through the ends
+    walls = bpy.data.objects['box_walls']
+    for s in (-1, 1):
+        G.cut(walls, F.extrude(f'grip{s}', G.rounded_rect(0.13, 0.035, 0.0175, corner=3), 0.1, (s * 0.4, 0.37, z),
+                               M.toybox, plane='side'))
+    # a rounded rim along the walls' top edge, under the lid
+    rim = G.rounded_rect(0.775, 0.475, 0.018, corner=3)
+    F.sweep('box_rim', [(u, 0.445, z + v) for u, v in rim], None, M.toybox, profile=G.rounded_rect(0.016, 0.03, 0.007, corner=1),
+            up=(0, 0, 1), closed=True)
+    F.box('fill', 0.75, 0.01, 0.45, (0, 0.31, z), M.toybox_inside)
+    # the front: a star, a circle and a triangle set into it, each in its frame
+    shapes_ = (_star(0, 0, 0.06), [(0.055 * math.cos(math.tau * i / 16), 0.055 * math.sin(math.tau * i / 16)) for i in range(16)],
+               [(0.0, 0.06), (-0.06, -0.045), (0.06, -0.045)])
+    for k, (x, m, outline) in enumerate(((-0.25, M.toy_red, shapes_[0]), (0.0, M.toy_green, shapes_[1]),
+                                         (0.25, M.toy_blue, shapes_[2]))):
+        F.extrude(f'tile{k}', G.rounded_rect(0.16, 0.15, 0.025, corner=2), 0.008, (x, 0.24, 0.072), M.toybox_inside,
+                  bevel=0.003, bevel_segments=1)
+        F.extrude(f'shape{k}', outline, 0.012, (x, 0.24, 0.074), m, bevel=0.003, bevel_segments=1)
     _toys_inside(0.46, z)
     # blocks left out on the floor in front
-    F.box('floor_block0', 0.1, 0.1, 0.1, (0.32, 0.05, 0.25), M.toy_green, bevel=0.015)
-    F.box('floor_block1', 0.1, 0.1, 0.1, (0.2, 0.05, 0.3), M.toy_red, rot=(0, 0, 30), bevel=0.015)
-    F.box('floor_block2', 0.1, 0.1, 0.1, (0.27, 0.15, 0.27), M.toy_blue, rot=(0, 0, 12), bevel=0.015)
+    _block('floor_block0', 0.32, 0.0, 0.25, 0.1, M.toy_green, M.toy_yellow)
+    _block('floor_block1', 0.2, 0.0, 0.3, 0.1, M.toy_red, M.paper, turn=30)
+    _block('floor_block2', 0.27, 0.1, 0.27, 0.1, M.toy_blue, M.toy_yellow, turn=12)
     _still('body')
     with G.new_parts() as parts:
-        F.box('lid', 0.82, 0.05, 0.52, (0, 0.485, z), M.toybox_lid, bevel=0.015, bevel_segments=3)
-        F.box('lid_grip', 0.16, 0.025, 0.03, (0, 0.475, z + 0.27), M.toybox_lid, bevel=0.01)
+        # the lid: a rounded board, a finger notch in its front edge, a piano hinge along its back
+        notch = [(0.05 - 0.1 * i / 8, 0.25 - 0.022 * math.sin(math.pi * i / 8)) for i in range(9)]
+        outline = [(0.41, -0.258), (0.41, 0.25)] + notch + [(-0.41, 0.25), (-0.41, -0.258)]
+        F.extrude('lid', outline, 0.042, (0, 0.486, z), M.toybox_lid, plane='top', bevel=0.012, bevel_segments=2)
+        F.extrude('lid_panel', G.rounded_rect(0.66, 0.36, 0.03, corner=3), 0.006, (0, 0.508, z - 0.01), M.toybox_lid,
+                  plane='top', bevel=0.003, bevel_segments=1)
+        F.cyl('hinge', 0.006, 0.7, (0, 0.462, z - 0.252), M.handle, rot=(0, 90, 0), verts=8)
     lid = G.hinged(G.join(parts, 'lid'), F.at(0, 0.46, z - 0.26))
     _place()
     G.swing(lid, 'lid_open', -100, seconds=1.0, axis='X')
     return G.meshes()
 
 
+def _arch(z0, z1, y0, rise, n=10):
+    """A domed lid's cross-section seen from the side (game depth, height): flat from z0 to z1 at y0, arched `rise`
+    over it."""
+    pts = [(z0, y0), (z1, y0)]
+    for i in range(n + 1):
+        a = math.pi * i / n
+        pts.append(((z0 + z1) / 2 + (z1 - z0) / 2 * math.cos(a), y0 + 0.012 + (rise - 0.012) * math.sin(a)))
+    return pts
+
+
 def toyChest():
     z = -0.18
     for sx in (-1, 1):
         for sz in (-1, 1):
-            G.sphere(f'foot{sx}{sz}', 0.03, at=F.at(sx * 0.36, 0.03, z + sz * 0.19), material=M.chest_trim,
-                     segments=12, rings=8)
-    _box_shell(0.8, 0.44, 0.46, z, 0.04, M.chest, M.chest_inside)
-    F.box('band', 0.8, 0.06, 0.02, (0, 0.32, 0.055), M.chest_trim, bevel=0.006)
+            _bun(f'foot{sx}{sz}', sx * 0.36, z + sz * 0.19, 0.045, 0.03, M.chest_trim, segments=8)
+    F.box('box_floor', 0.78, 0.03, 0.44, (0, 0.055, z), M.chest_inside)
+    _walls('box_walls', 0.8, 0.46, 0.04, 0.44, z, 0.025, M.chest, r=0.012)
+    F.box('fill', 0.75, 0.01, 0.41, (0, 0.29, z), M.chest_inside)
+    # planks: grooves across the front and the ends
+    for y in (0.17, 0.3):
+        F.box(f'groove_front{y}', 0.79, 0.006, 0.004, (0, y, z + 0.23), M.chest_inside)
+        for s in (-1, 1):
+            F.box(f'groove_end{y}{s}', 0.004, 0.006, 0.45, (s * 0.4, y, z), M.chest_inside)
+    # the bands and straps, iron corners, a bail handle on each end
+    F.box('band', 0.81, 0.05, 0.012, (0, 0.33, z + 0.235), M.chest_trim, bevel=0.004, bevel_segments=1)
     for s in (-1, 1):
-        F.box(f'strap{s}', 0.05, 0.4, 0.02, (s * 0.3, 0.24, 0.056), M.chest_trim, bevel=0.006)
-        F.box(f'band_side{s}', 0.02, 0.06, 0.46, (s * 0.405, 0.32, z), M.chest_trim, bevel=0.006)
-        G.torus(f'handle{s}', 0.04, 0.009, at=F.at(s * 0.415, 0.33, z), material=M.handle, rot=(90, 0, 90),
-                major_segments=16, minor_segments=6)
+        F.box(f'strap{s}', 0.05, 0.4, 0.012, (s * 0.3, 0.24, z + 0.235), M.chest_trim, bevel=0.004, bevel_segments=1)
+        F.box(f'band_side{s}', 0.012, 0.05, 0.47, (s * 0.405, 0.33, z), M.chest_trim, bevel=0.004, bevel_segments=1)
+        for k, (y0, dy) in enumerate(((0.04, 0.075), (0.44, -0.075))):   # iron corner plates on the front
+            F.extrude(f'corner{s}{k}', [(s * 0.4, y0), (s * 0.4 - s * 0.065, y0), (s * 0.4, y0 + dy)], 0.004, (0, 0, z + 0.232),
+                      M.handle)
+        F.box(f'handle_plate{s}', 0.006, 0.05, 0.12, (s * 0.403, 0.4, z), M.handle, bevel=0.003, bevel_segments=1)
+        pts = G.kit.fillet([(s * 0.41, 0.4, z - 0.045), (s * 0.416, 0.355, z - 0.045), (s * 0.416, 0.355, z + 0.045),
+                            (s * 0.41, 0.4, z + 0.045)], 0.012)
+        F.sweep(f'handle{s}', pts, 0.006, M.handle, verts=6)
     _toys_inside(0.44, z)
     _still('body')
     with G.new_parts() as parts:
-        F.box('lid', 0.84, 0.09, 0.5, (0, 0.485, z), M.chest, bevel=0.035, bevel_segments=4)
-        F.box('lid_band', 0.84, 0.03, 0.02, (0, 0.47, z + 0.245), M.chest_trim, bevel=0.006)
-        for s in (-1, 1):
-            F.box(f'lid_strap{s}', 0.05, 0.096, 0.5, (s * 0.3, 0.486, z), M.chest_trim, bevel=0.03, bevel_segments=3)
-        F.box('latch', 0.06, 0.07, 0.012, (0, 0.445, z + 0.257), M.handle, bevel=0.006)
+        # the lid, domed from back to front, bound with straps over the dome, a hasp and lock plate at its front
+        F.extrude('lid', _arch(z - 0.25, z + 0.25, 0.44, 0.085), 0.84, (0, 0, 0), M.chest, plane='side', bevel=0.01,
+                  bevel_segments=1)
+        for k, x in enumerate((-0.3, 0.3, -0.416, 0.416)):
+            w = 0.05 if k < 2 else 0.012
+            band = [(z + 0.246 * math.cos(math.pi * i / 10), 0.452 + 0.077 * math.sin(math.pi * i / 10)) for i in range(11)]
+            F.sweep(f'lid_strap{k}', [(x, y, d) for d, y in band], None, M.chest_trim,
+                    profile=G.rounded_rect(w, 0.008, 0.002, corner=1), up=(1, 0, 0))
+        F.box('lid_band', 0.84, 0.03, 0.012, (0, 0.455, z + 0.249), M.chest_trim, bevel=0.004, bevel_segments=1)
+        F.extrude('latch', G.rounded_rect(0.06, 0.075, 0.012, corner=2), 0.008, (0, 0.44, z + 0.257), M.handle,
+                  bevel=0.002, bevel_segments=1)
+        F.extrude('keyhole', [(0.0, 0.012), (0.007, 0.006), (0.004, -0.018), (-0.004, -0.018), (-0.007, 0.006)], 0.003,
+                  (0, 0.43, z + 0.2615), M.eye)
     lid = G.hinged(G.join(parts, 'lid'), F.at(0, 0.44, z - 0.25))
     _place()
     G.swing(lid, 'lid_open', -100, seconds=1.0, axis='X')
@@ -555,55 +782,97 @@ def toyChest():
 ROOF_RISE = 0.18
 
 
+def _window(name, x, y, z, w, h, frame, glass, shutters=None):
+    """A window on a front at depth `z`: a moulded frame round its glass, glazing bars, a sill, and shutters."""
+    F.extrude(f'{name}_frame', _rect(-w / 2, -h / 2, w / 2, h / 2), 0.008, (x, y, z), frame,
+              holes=[_rect(-w / 2 + 0.012, -h / 2 + 0.012, w / 2 - 0.012, h / 2 - 0.012)], bevel=0.002, bevel_segments=1)
+    F.box(f'{name}_glass', w - 0.022, h - 0.022, 0.004, (x, y, z - 0.002), glass)
+    F.box(f'{name}_bar_v', 0.007, h - 0.022, 0.004, (x, y, z + 0.001), frame)
+    F.box(f'{name}_bar_h', w - 0.022, 0.007, 0.004, (x, y, z + 0.001), frame)
+    F.box(f'{name}_sill', w + 0.02, 0.01, 0.016, (x, y - h / 2 - 0.004, z + 0.004), frame, bevel=0.003, bevel_segments=1)
+    if shutters:
+        for s in (-1, 1):
+            F.box(f'{name}_shutter{s}', w * 0.42, h, 0.005, (x + s * (w / 2 + w * 0.21 + 0.004), y, z - 0.001), shutters,
+                  bevel=0.0015, bevel_segments=1)
+            for k in range(3):
+                F.box(f'{name}_louvre{s}{k}', w * 0.32, 0.004, 0.003, (x + s * (w / 2 + w * 0.21 + 0.004), y - h / 3 + h / 3 * k,
+                                                                        z + 0.002), shutters)
+
+
 def dollHouse():
     z = -0.16
-    F.box('base', 0.8, 0.04, 0.42, (0, 0.02, -0.15), M.house_floor, bevel=0.008)
-    F.box('back', 0.76, 0.66, 0.02, (0, 0.37, -0.34), M.house, bevel=0.004)
+    F.box('base', 0.8, 0.04, 0.42, (0, 0.02, -0.15), M.house_floor, bevel=0.008, bevel_segments=2)
+    F.box('back', 0.76, 0.66, 0.02, (0, 0.37, -0.34), M.house, bevel=0.004, bevel_segments=1)
     F.box('paper_down', 0.72, 0.31, 0.004, (0, 0.205, -0.328), M.wallpaper)
     F.box('paper_up', 0.72, 0.30, 0.004, (0, 0.53, -0.328), M.wallpaper_up)
     for s in (-1, 1):
-        F.box(f'side{s}', 0.02, 0.66, 0.38, (s * 0.37, 0.37, z), M.house, bevel=0.004)
+        F.box(f'side{s}', 0.02, 0.66, 0.38, (s * 0.37, 0.37, z), M.house, bevel=0.004, bevel_segments=1)
+        # corner boards up the front edges of the sides
+        F.box(f'corner_board{s}', 0.024, 0.66, 0.016, (s * 0.37, 0.37, 0.03), M.house_trim, bevel=0.003, bevel_segments=1)
     F.box('floor_down', 0.72, 0.006, 0.36, (0, 0.043, z), M.house_floor)
-    F.box('floor_up', 0.72, 0.02, 0.37, (0, 0.37, z), M.house_floor, bevel=0.003)
-    F.box('ceiling', 0.76, 0.02, 0.38, (0, 0.69, z), M.house, bevel=0.003)
-    # the gables and the roof
+    F.box('floor_up', 0.72, 0.02, 0.37, (0, 0.37, z), M.house_floor, bevel=0.003, bevel_segments=1)
+    F.box('ceiling', 0.76, 0.02, 0.38, (0, 0.69, z), M.house, bevel=0.003, bevel_segments=1)
+    # the gables, a round window in the front one, and the roof: two slabs with courses of shingles, a ridge, a
+    # chimney
     gable = [(-0.38, 0.0), (0.38, 0.0), (0.0, ROOF_RISE)]
     for k, zg in enumerate((0.03, -0.35)):
         _slab(f'gable{k}', gable, _plane((0, 0.7, zg), (1, 0, 0), (0, 1, 0)), M.house, thick=0.02)
-    F.cyl('gable_window', 0.045, 0.012, (0, 0.77, 0.05), M.house_trim, rot=(90, 0, 0), verts=20)
-    F.cyl('gable_glass', 0.033, 0.014, (0, 0.77, 0.05), M.house_window, rot=(90, 0, 0), verts=20)
+    G.torus('gable_window', 0.042, 0.008, at=F.at(0, 0.77, 0.052), material=M.house_trim, rot=(90, 0, 0),
+            major_segments=16, minor_segments=4)
+    F.cyl('gable_glass', 0.036, 0.008, (0, 0.77, 0.05), M.house_window, rot=(90, 0, 0), verts=16)
     a = math.degrees(math.atan2(ROOF_RISE, 0.38))
-    run = 0.23 * math.cos(math.radians(a))
+    ca, sa = math.cos(math.radians(a)), math.sin(math.radians(a))
+    run = 0.23 * ca
     for s in (-1, 1):
-        y = 0.7 + ROOF_RISE - run * math.tan(math.radians(a)) + 0.015 / math.cos(math.radians(a))
-        F.box(f'roof{s}', 0.46, 0.03, 0.44, (s * run, y, z), M.roof, rot=(0, -s * a, 0), bevel=0.006)
-    # the rooms' furniture: a sofa, a table and a rug downstairs, a bed, a lamp and a picture up
-    F.box('rug', 0.26, 0.004, 0.16, (-0.05, 0.048, -0.12), M.wallpaper_up)
-    F.box('sofa', 0.2, 0.06, 0.08, (-0.17, 0.08, -0.28), M.toy_blue, bevel=0.012)
-    F.box('sofa_back', 0.2, 0.06, 0.03, (-0.17, 0.13, -0.31), M.toy_blue, bevel=0.01)
-    F.box('table', 0.12, 0.012, 0.08, (0.18, 0.12, -0.2), M.house_door, bevel=0.003)
-    F.cyl('table_leg', 0.008, 0.07, (0.18, 0.08, -0.2), M.house_door, verts=8)
-    F.box('bed', 0.2, 0.05, 0.12, (-0.18, 0.405, -0.26), M.toy_pink, bevel=0.01)
-    F.box('bed_pillow', 0.06, 0.03, 0.08, (-0.25, 0.44, -0.26), M.house_trim, bevel=0.01)
-    F.box('cupboard', 0.1, 0.14, 0.06, (0.2, 0.45, -0.3), M.toy_yellow, bevel=0.006)
-    F.box('picture', 0.1, 0.08, 0.006, (0.0, 0.56, -0.324), M.toy_green, bevel=0.002)
-    _still('body')
-    # the front wall, hinged on its left edge
-    with G.new_parts() as parts:
-        F.box('front', 0.76, 0.66, 0.02, (0, 0.37, 0.04), M.house, bevel=0.004)
-        F.box('door', 0.12, 0.2, 0.008, (-0.2, 0.14, 0.054), M.house_door, bevel=0.003)
-        F.box('door_frame', 0.14, 0.215, 0.004, (-0.2, 0.145, 0.051), M.house_trim, bevel=0.002)
-        G.sphere('door_knob', 0.007, at=F.at(-0.165, 0.14, 0.06), material=M.toy_yellow, segments=8, rings=6)
-        for k, (x, y) in enumerate(((0.18, 0.2), (-0.18, 0.54), (0.18, 0.54))):
-            F.box(f'window{k}', 0.13, 0.13, 0.006, (x, y, 0.052), M.house_trim, bevel=0.003)
-            F.box(f'glass{k}', 0.105, 0.105, 0.006, (x, y, 0.054), M.house_window)
-            F.box(f'bar_v{k}', 0.008, 0.105, 0.004, (x, y, 0.0575), M.house_trim)
-            F.box(f'bar_h{k}', 0.105, 0.008, 0.004, (x, y, 0.0575), M.house_trim)
-        F.box('flower_box', 0.14, 0.03, 0.025, (0.18, 0.125, 0.06), M.house_door, bevel=0.004)
+        y = 0.7 + ROOF_RISE - run * math.tan(math.radians(a)) + 0.015 / ca
+        F.box(f'roof{s}', 0.46, 0.03, 0.44, (s * run, y, z), M.roof, rot=(0, -s * a, 0), bevel=0.006, bevel_segments=1)
+        # four courses of shingles, each a strip lying on the roof, its lower edge proud of the one under it
         for k in range(4):
-            G.sphere(f'flower{k}', 0.014, at=F.at(0.135 + 0.03 * k, 0.148, 0.062), material=(M.toy_pink, M.toy_yellow)[k % 2],
-                     segments=8, rings=6)
-        F.box('step', 0.16, 0.02, 0.012, (-0.2, 0.035, 0.057), M.house_trim, bevel=0.003)
+            d = 0.075 + 0.1 * k                # down the slope from the ridge, the strip's middle
+            F.box(f'shingles{s}{k}', 0.11, 0.008, 0.43, (s * (d * ca + 0.034 * sa), 0.7 + ROOF_RISE - d * sa + 0.034 * ca, z),
+                  M.roof, rot=(0, -s * (a + 7), 0), bevel=0.003, bevel_segments=1)
+    F.cyl('ridge', 0.012, 0.44, (0, 0.894, z), M.house_trim, rot=(90, 0, 0), verts=8)
+    F.box('chimney', 0.07, 0.12, 0.08, (0.2, 0.82, -0.25), M.roof, bevel=0.004, bevel_segments=1)
+    F.box('chimney_cap', 0.085, 0.015, 0.095, (0.2, 0.8875, -0.25), M.house_trim, bevel=0.003, bevel_segments=1)
+    # the rooms: downstairs a sofa, a table with a lamp, a rug and the stairs; upstairs a bed, a cupboard and a picture
+    F.box('rug', 0.26, 0.004, 0.16, (-0.05, 0.048, -0.12), M.wallpaper_up, bevel=0.0015, bevel_segments=1)
+    F.soft('sofa', 0.2, 0.05, 0.08, (-0.17, 0.073, -0.28), M.toy_blue, round=0.012, round_segments=1, flat=1)
+    F.soft('sofa_back', 0.2, 0.07, 0.03, (-0.17, 0.125, -0.31), M.toy_blue, round=0.012, round_segments=1, flat=1)
+    for s in (-1, 1):
+        F.box(f'sofa_arm{s}', 0.025, 0.065, 0.09, (-0.17 + s * 0.1, 0.09, -0.285), M.toy_blue, bevel=0.008, bevel_segments=1)
+    F.cyl('table', 0.045, 0.01, (0.06, 0.1, -0.2), M.house_door, verts=14)
+    F.cyl('table_leg', 0.006, 0.055, (0.06, 0.0735, -0.2), M.house_door, verts=6)
+    F.cone('lamp', 0.018, 0.01, 0.022, (0.06, 0.122, -0.2), M.wallpaper, verts=10)
+    for k in range(6):   # the stairs up the right wall
+        F.box(f'stair{k}', 0.1, 0.05 * (k + 1), 0.045, (0.3, 0.025 * (k + 1) + 0.046, -0.06 - 0.045 * k), M.house_floor)
+    F.soft('bed', 0.2, 0.045, 0.12, (-0.18, 0.405, -0.26), M.toy_pink, round=0.012, round_segments=1, flat=1)
+    F.box('bed_head', 0.012, 0.07, 0.13, (-0.285, 0.415, -0.26), M.house_door, bevel=0.003, bevel_segments=1)
+    F.box('bed_pillow', 0.05, 0.02, 0.08, (-0.25, 0.437, -0.26), M.house_trim, bevel=0.008, bevel_segments=1)
+    F.box('cupboard', 0.1, 0.14, 0.06, (0.2, 0.45, -0.3), M.toy_yellow, bevel=0.006, bevel_segments=1)
+    F.box('cupboard_split', 0.003, 0.12, 0.062, (0.2, 0.45, -0.3), M.house_door)
+    F.box('picture_frame', 0.11, 0.09, 0.005, (0.0, 0.56, -0.324), M.house_door, bevel=0.002, bevel_segments=1)
+    F.box('picture', 0.09, 0.07, 0.006, (0.0, 0.56, -0.324), M.toy_green)
+    _still('body')
+    # the front wall, hinged on its left edge: a panelled door under a little porch roof, windows with shutters,
+    # a flower box
+    with G.new_parts() as parts:
+        F.box('front', 0.76, 0.66, 0.02, (0, 0.37, 0.04), M.house, bevel=0.004, bevel_segments=1)
+        F.box('skirt', 0.76, 0.04, 0.008, (0, 0.06, 0.052), M.house_trim, bevel=0.002, bevel_segments=1)
+        F.box('band', 0.76, 0.014, 0.008, (0, 0.37, 0.052), M.house_trim, bevel=0.002, bevel_segments=1)
+        G.kit.shaker(F, 'door', 0.11, 0.19, (-0.2, 0.135, 0.054), 0.008, M.house_door, rail=0.02, recess=0.002)
+        F.extrude('door_frame', [(0.072, 0.0), (0.072, 0.21), (-0.072, 0.21), (-0.072, 0.0), (-0.058, 0.0), (-0.058, 0.196),
+                                 (0.058, 0.196), (0.058, 0.0)], 0.006, (-0.2, 0.04, 0.054), M.house_trim)
+        G.sphere('door_knob', 0.007, at=F.at(-0.165, 0.135, 0.062), material=M.toy_yellow, segments=6, rings=4)
+        F.extrude('porch', [(-0.09, 0.0), (0.09, 0.0), (0.0, 0.045)], 0.02, (-0.2, 0.255, 0.064), M.roof, bevel=0.003,
+                  bevel_segments=1)
+        for k, (x, y) in enumerate(((0.18, 0.2), (-0.18, 0.54), (0.18, 0.54))):
+            _window(f'window{k}', x, y, 0.054, 0.12, 0.13, M.house_trim, M.house_window, shutters=M.wallpaper_up)
+        F.box('flower_box', 0.14, 0.03, 0.022, (0.18, 0.11, 0.061), M.house_door, bevel=0.004, bevel_segments=1)
+        for k in range(5):
+            F.sphere(f'leaf{k}', 0.012, (0.13 + 0.025 * k, 0.128, 0.063), M.grass, segments=5, rings=3)
+            F.sphere(f'flower{k}', 0.009, (0.13 + 0.025 * k, 0.136, 0.066), (M.toy_pink, M.toy_yellow)[k % 2],
+                     segments=5, rings=3)
+        F.box('step', 0.16, 0.02, 0.012, (-0.2, 0.035, 0.057), M.house_trim, bevel=0.003, bevel_segments=1)
     front = G.hinged(G.join(parts, 'front_wall'), F.at(-0.38, 0.37, 0.04))
     _place(forward=-0.05)
     G.swing(front, 'front_open', 120, seconds=1.0)
@@ -618,39 +887,81 @@ def _rocker_y(z):
     return ROCK_R - math.sqrt(ROCK_R * ROCK_R - z * z) + 0.022
 
 
+def _hoop(zc, yc, rx, ry, n=12, square=2.0):
+    """A loop round the depth axis at game depth `zc`: an ellipse `rx` across and `ry` up round height `yc`, as
+    Blender points, for a body lofted front to back."""
+    return [F.at(p[0], yc + p[1], zc) for p in G.ring(rx, ry, 0, n, square=square)]
+
+
 def rockingHorse():
-    end = math.degrees(math.asin(0.37 / ROCK_R))
-    pts = [math.sin(math.radians(-end + 2 * end * i / 16)) * ROCK_R for i in range(17)]
-    for x in (-0.12, 0.12):
-        _tube(f'rocker{x}', [(x, _rocker_y(z), z) for z in pts], 0.022, M.rocker)
-        for z in (pts[0], pts[-1]):
-            G.sphere(f'rocker_end{x}{z}', 0.026, at=F.at(x, _rocker_y(z) + 0.01, z), material=M.rocker, segments=10, rings=6)
+    # the rockers: two bows curling up at their ends, a stretcher between them at each end
+    zs = [0.35 * (-1 + 2 * i / 14) for i in range(15)]
+    for x in (-0.125, 0.125):
+        e = _rocker_y(0.35)
+        pts = [(x, e + 0.04, -0.371), (x, e + 0.016, -0.364)] + [(x, _rocker_y(z), z) for z in zs] \
+            + [(x, e + 0.016, 0.364), (x, e + 0.04, 0.371)]
+        F.sweep(f'rocker{x}', pts, None, M.rocker, profile=G.rounded_rect(0.045, 0.039, 0.01, corner=1), up=(0, 0, 1))
     for z in (-0.3, 0.3):
-        G.rod(f'stretcher{z}', F.at(-0.12, _rocker_y(z), z), F.at(0.12, _rocker_y(z), z), 0.016, material=M.rocker, verts=8)
+        F.sweep(f'stretcher{z}', [(-0.125, _rocker_y(z) + 0.01, z), (0.125, _rocker_y(z) + 0.01, z)], 0.016, M.rocker, verts=8)
+    # the legs, tapering to hooves on the rockers
     for sx in (-1, 1):
         for sz in (-1, 1):
-            G.rod(f'leg{sx}{sz}', F.at(sx * 0.06, 0.42, sz * 0.16), F.at(sx * 0.12, _rocker_y(sz * 0.22) + 0.015, sz * 0.22),
-                  0.022, material=M.horse, verts=10)
-    G.sphere('body', 0.1, at=F.at(0, 0.45, 0.0), material=M.horse, scale=(1, 2.6, 1.05), segments=20, rings=12)
-    for k, (x, y, z) in enumerate(((0.09, 0.47, -0.1), (-0.09, 0.44, 0.06), (0.085, 0.42, 0.12), (-0.08, 0.48, -0.14))):
-        G.sphere(f'spot{k}', 0.03, at=F.at(x, y, z), material=M.spot, scale=(0.35, 1, 0.8), segments=10, rings=6)
-    G.rod('neck', F.at(0, 0.48, 0.16), F.at(0, 0.7, 0.3), 0.055, material=M.horse, verts=14)
-    G.sphere('head', 0.06, at=F.at(0, 0.73, 0.37), material=M.horse, scale=(0.9, 2.0, 1.0), rot=(25, 0, 0),
-             segments=16, rings=10)
-    G.torus('bridle', 0.05, 0.007, at=F.at(0, 0.7, 0.43), material=M.saddle, rot=(-65, 0, 0),
-            major_segments=16, minor_segments=5)
+            foot = (sx * 0.125, _rocker_y(sz * 0.22) + 0.045, sz * 0.22)
+            F.sweep(f'leg{sx}{sz}', [(sx * 0.055, 0.44, sz * 0.14), (sx * 0.085, 0.27, sz * 0.19), foot], 0.03, M.horse,
+                    verts=10, resolution=2, scale=[1.0, 0.72, 0.68])
+            F.cyl(f'hoof{sx}{sz}', 0.019, 0.032, (foot[0], foot[1] - 0.012, foot[2]), M.dark, verts=8)
+    # the body: a barrel lofted from rump to chest
+    rings = [(-0.275, 0.475, 0.004, 0.004), (-0.268, 0.474, 0.05, 0.06), (-0.24, 0.47, 0.082, 0.092),
+             (-0.17, 0.46, 0.094, 0.1), (-0.05, 0.452, 0.09, 0.098), (0.08, 0.458, 0.09, 0.1), (0.17, 0.475, 0.08, 0.094),
+             (0.225, 0.495, 0.055, 0.066), (0.242, 0.505, 0.004, 0.004)]
+    G.loft('body', [_hoop(*r, n=14) for r in rings], material=M.horse)
+    for k, (x, y, z) in enumerate(((0.088, 0.48, -0.12), (-0.089, 0.44, 0.06), (0.085, 0.42, 0.11), (-0.083, 0.49, -0.16),
+                                   (0.075, 0.38, -0.02), (-0.07, 0.39, -0.08))):
+        F.sphere(f'spot{k}', 0.028, (x, y, z), M.spot, scale=(0.3, 1, 0.8), segments=8, rings=4)
+    # the neck and the head, swept and tapering, a muzzle on its end
+    F.sweep('neck', [(0, 0.47, 0.16), (0, 0.6, 0.235), (0, 0.72, 0.29)], None, M.horse,
+            profile=[(0.062 * math.cos(math.tau * i / 12), 0.048 * math.sin(math.tau * i / 12)) for i in range(12)],
+            up=(0, 0, 1), resolution=3, scale=[1.0, 0.85, 0.78])
+    F.sweep('head', [(0, 0.76, 0.28), (0, 0.735, 0.36), (0, 0.69, 0.43)], None, M.horse,
+            profile=[(0.05 * math.cos(math.tau * i / 12), 0.04 * math.sin(math.tau * i / 12)) for i in range(12)],
+            up=(0, 0, 1), resolution=3, scale=[1.0, 0.85, 0.72])
+    F.sphere('muzzle', 0.034, (0, 0.686, 0.443), M.horse, scale=(1.0, 1.05, 1.0), segments=12, rings=8)
+    F.sphere('poll', 0.045, (0, 0.765, 0.29), M.horse, segments=12, rings=8)
     for s in (-1, 1):
-        G.sphere(f'eye{s}', 0.012, at=F.at(s * 0.05, 0.765, 0.37), material=M.eye, segments=8, rings=6)
-        F.cone(f'ear{s}', 0.018, 0.003, 0.05, (s * 0.03, 0.8, 0.32), M.horse, verts=8)
-    G.rod('mane', F.at(0, 0.52, 0.12), F.at(0, 0.79, 0.29), 0.026, material=M.mane, verts=10)
-    G.rod('forelock', F.at(0, 0.79, 0.29), F.at(0, 0.8, 0.34), 0.02, material=M.mane, verts=8)
-    G.cone('tail', 0.028, 0.012, 0.22, at=F.at(0, 0.376, -0.305), material=M.mane, rot=(-150, 0, 0), verts=10)
-    F.box('saddle', 0.2, 0.025, 0.2, (0, 0.548, -0.02), M.saddle, bevel=0.01, bevel_segments=3)
+        F.sphere(f'eye{s}', 0.011, (s * 0.034, 0.755, 0.35), M.eye, segments=6, rings=4)
+        F.sphere(f'nostril{s}', 0.006, (s * 0.016, 0.69, 0.474), M.eye, segments=6, rings=4)
+        F.cone(f'ear{s}', 0.018, 0.003, 0.05, (s * 0.028, 0.8, 0.3), M.horse, verts=8, rot=(-12, s * 10, 0))
+    # the bridle round the muzzle, reins back to the saddle
+    F.sweep('bridle', [(0.04 * math.cos(math.tau * i / 12), 0.69 + 0.038 * math.sin(math.tau * i / 12), 0.42)
+                       for i in range(12)], 0.005, M.saddle, verts=5, closed=True)
     for s in (-1, 1):
-        F.box(f'saddle_flap{s}', 0.012, 0.09, 0.14, (s * 0.1, 0.5, -0.02), M.saddle, bevel=0.004)
-    G.rod('handle', F.at(-0.11, 0.68, 0.28), F.at(0.11, 0.68, 0.28), 0.009, material=M.handle, verts=8)
+        F.sweep(f'rein{s}', [(s * 0.04, 0.69, 0.42), (s * 0.07, 0.6, 0.3), (s * 0.08, 0.565, 0.13)], 0.004, M.saddle,
+                verts=4, resolution=3)
+    # the mane down the crest and a forelock, the tail
+    mane = F.sweep('mane', [(0, 0.52, 0.1), (0, 0.635, 0.18), (0, 0.755, 0.245), (0, 0.8, 0.295), (0, 0.79, 0.34)], None,
+                   M.mane, profile=G.rounded_rect(0.05, 0.026, 0.01, corner=1), up=(0, 0, 1), resolution=2,
+                   scale=[0.7, 1.0, 1.0, 0.8, 0.5])
+    G.jitter(mane, 0.006, size=0.04, seed=4.0)
+    tail = F.sweep('tail', [(0, 0.5, -0.265), (0, 0.49, -0.31), (0, 0.42, -0.345), (0, 0.33, -0.35)], 0.024, M.mane,
+                   verts=8, resolution=2, scale=[0.8, 1.15, 1.0, 0.4])
+    G.jitter(tail, 0.005, size=0.04, seed=5.0)
+    # the saddle on a cloth, its flaps, stirrups on leathers; the seat where the game seats the rider (0.56)
+    F.soft('saddle', 0.2, 0.024, 0.21, (0, 0.545, -0.02), M.saddle, round=0.01, puff=0.004, flat=2, round_segments=1)
+    F.soft('pommel', 0.08, 0.03, 0.04, (0, 0.56, 0.075), M.saddle, round=0.012, round_segments=1, flat=1)
+    F.soft('cantle', 0.12, 0.03, 0.035, (0, 0.562, -0.115), M.saddle, round=0.012, round_segments=1, flat=1)
     for s in (-1, 1):
-        G.sphere(f'grip{s}', 0.018, at=F.at(s * 0.115, 0.68, 0.28), material=M.rocker, segments=10, rings=6)
+        F.box(f'saddle_flap{s}', 0.012, 0.1, 0.15, (s * 0.098, 0.49, -0.02), M.saddle, rot=(0, s * 8, 0), bevel=0.005,
+              bevel_segments=1)
+        F.sweep(f'leather{s}', [(s * 0.104, 0.52, 0.0), (s * 0.107, 0.36, 0.0)], None, M.saddle,
+                profile=G.rounded_rect(0.003, 0.016, 0.001, corner=1), up=(0, 0, 1))
+        G.torus(f'stirrup{s}', 0.018, 0.004, at=F.at(s * 0.107, 0.345, 0.0), material=M.handle, rot=(0, 90, 0),
+                major_segments=10, minor_segments=4)
+    # the handle through the head, a turned wooden grip on each end
+    F.sweep('handle', [(-0.085, 0.68, 0.28), (0.085, 0.68, 0.28)], 0.008, M.handle, verts=8)
+    for s in (-1, 1):
+        G.revolve(f'grip{s}', [(0.0, -0.028), (0.011, -0.028), (0.016, -0.016), (0.017, 0.0), (0.015, 0.018),
+                               (0.009, 0.028), (0.0, 0.028)], at=F.at(s * 0.1, 0.68, 0.28), material=M.rocker,
+                  segments=8, rot=(0, 90, 0))
     # the whole horse rocks, its origin on the rockers' centre; the rider rides it
     horse = G.join(G.meshes(), 'horse', origin=F.at(0, ROCK_R, 0))
     _place()
@@ -660,6 +971,8 @@ def rockingHorse():
 
 # --- KD2: the play tent --------------------------------------------------------------------------------------
 TENT_R, TENT_H = 0.46, 1.3
+CANVAS_TOP = 0.86   # how far up the canvas runs (of the height); above it the poles cross bare, lashed together
+FRONT_SIDE = 1      # the side between corners 1 and 2 faces the front (+depth)
 
 
 def _tent_face(k):
@@ -675,23 +988,58 @@ def _tent_face(k):
 DOOR = [(-0.16, 0.0), (0.16, 0.0), (0.13, 0.35), (0.05, 0.56), (-0.05, 0.56), (-0.13, 0.35)]
 
 
+def _canvas_point(i, u, t, out=0.0):
+    """A point on the canvas: on side `i` (corner i to i + 1), `u` along it, `t` of the way up; the cloth between
+    the poles sags in a little (not the front, taut round its door), `out` metres off it."""
+    a0, a1 = math.radians(60 * i), math.radians(60 * (i + 1))
+    x = TENT_R * ((1 - u) * math.cos(a0) + u * math.cos(a1))
+    z = TENT_R * ((1 - u) * math.sin(a0) + u * math.sin(a1))
+    sag = 0.0 if i == FRONT_SIDE else 0.035 * math.sin(math.pi * u) * (0.4 + 0.6 * math.sin(math.pi * min(t / 0.7, 1.0)))
+    k = (1 - t) * (1 - sag) + out / TENT_R
+    return (x * k, TENT_H * t, z * k)
+
+
+def _canvas_ring(t, out=0.0, n=4):
+    return [F.at(*_canvas_point(i, j / n, t, out)) for i in range(6) for j in range(n)]
+
+
 def playTent():
-    corners = [(TENT_R * math.cos(math.radians(60 * i)), 0.0, TENT_R * math.sin(math.radians(60 * i))) for i in range(6)]
+    G.loft('canvas', [_canvas_ring(t) for t in (0.0, 0.12, 0.26, 0.4, 0.55, 0.7, CANVAS_TOP)], material=M.canvas)
+    # a hem round its foot
+    G.loft('hem', [_canvas_ring(t, 0.004) for t in (0.0, 0.045)], material=M.flap, caps=False, smooth=False)
     apex = (0.0, TENT_H, 0.0)
-    _mesh('canvas', corners + [apex], [(i, (i + 1) % 6, 6) for i in range(6)] + [tuple(range(5, -1, -1))], M.canvas)
+    corners = [(TENT_R * math.cos(math.radians(60 * i)), 0.0, TENT_R * math.sin(math.radians(60 * i))) for i in range(6)]
     for i, c in enumerate(corners):
         d = _add(apex, _mul(c, -1))
         length = math.sqrt(sum(v * v for v in d))
         foot = _add(c, _mul(d, -0.012 / length))
         top = _add(apex, _mul(d, 0.28 / length))
-        G.rod(f'pole{i}', F.at(*_add(foot, (0, 0.01, 0))), F.at(*top), 0.0125, material=M.poles, verts=8)
-    F.cyl('floor_mat', 0.36, 0.03, (0, 0.015, 0), M.tent_mat, verts=24)
+        F.sweep(f'pole{i}', [_add(foot, (0, 0.01, 0)), top], 0.0125, M.poles, verts=8, scale=[1.0, 0.8])
+    # the rope lashing the poles where they cross
+    for k, y in enumerate((1.135, 1.16, 1.185)):
+        r = TENT_R * (1 - y / TENT_H) + 0.014
+        G.torus(f'lashing{k}', r, 0.005, at=F.at(0, y, 0), material=M.canvas, major_segments=12, minor_segments=4)
+    # a round padded mat on the floor, two cushions on it
+    _turned('floor_mat', 0, 0, [(0.0, 0.0), (0.345, 0.0), (0.362, 0.008), (0.365, 0.02), (0.35, 0.03), (0.0, 0.031)],
+            M.tent_mat, segments=24)
+    F.soft('cushion0', 0.3, 0.12, 0.09, (-0.11, 0.09, -0.2), M.flap, rot=(-12, 0, 18), round=0.04, puff=0.025, flat=2)
+    F.soft('cushion1', 0.26, 0.11, 0.08, (0.14, 0.085, -0.18), M.tent_mat, rot=(-10, 0, -22), round=0.035, puff=0.022,
+           flat=2)
     front, _ = _tent_face(0)
     _slab('door', DOOR, front, M.tent_door, out=0.002, thick=0.003)
-    F.cyl('roll', 0.022, 0.2, (0, 0.0, 0), M.flap, verts=10, rot=(0, 90, 0)).location = F.at(
-        *_add(front[0], _mul(front[2], 0.575), _mul(front[3], 0.02)))
-    # bunting round the front three faces
+    roll_at = _add(front[0], _mul(front[2], 0.575), _mul(front[3], 0.02))
+    F.cyl('roll', 0.022, 0.2, (0, 0.0, 0), M.flap, verts=10, rot=(0, 90, 0)).location = F.at(*roll_at)
+    # the ties the flap is rolled up with, hanging from the roll
+    for s in (-1, 1):
+        p = _add(roll_at, _mul(front[1], s * 0.06))
+        F.sweep(f'tie{s}', [_add(p, _mul(front[3], 0.022)), _add(p, _mul(front[2], -0.06), _mul(front[3], 0.026)),
+                            _add(p, _mul(front[2], -0.12), _mul(front[1], s * 0.01), _mul(front[3], 0.024))], None, M.canvas,
+                profile=G.rounded_rect(0.003, 0.016, 0.001, corner=1), up=(0, 0, 1), resolution=2)
+    # bunting on a string round the front three faces
     flags = (M.toy_red, M.toy_yellow, M.toy_blue, M.toy_green, M.toy_red)
+    tb = 0.7 / _tent_face(0)[1]
+    F.sweep('bunting', [_canvas_point(i, j / 4, tb, 0.007) for i in (0, 1, 2) for j in range(4)] + [_canvas_point(3, 0, tb, 0.007)],
+            0.002, M.canvas, verts=4)
     for k in (-1, 0, 1):
         frame, _ = _tent_face(k)
         for j in (range(-1, 2) if k == 0 else (0,)):
@@ -727,15 +1075,27 @@ def _ball_grid(r_max, step, y, offset=0.0):
     return pts
 
 
+PADS = 12   # the foam wall's padded channels round the pit
+
+
+def _pad_ring(r, y, puff, n=48):
+    """A loop round the pit at height `y`: radius `r`, padded out by `puff` in each channel, creased between."""
+    return [F.at((r + puff * abs(math.sin(PADS / 2 * math.tau * i / n))) * math.cos(math.tau * i / n), y,
+                 (r + puff * abs(math.sin(PADS / 2 * math.tau * i / n))) * math.sin(math.tau * i / n)) for i in range(n)]
+
+
 def ballPit():
     balls = _balls()
-    G.revolve('pit', [(0, 0), (0.45, 0), (0.46, 0.015), (0.46, 0.34), (0.42, 0.34), (0.42, 0.32), (0, 0.32)],
-              at=F.at(0, 0, 0), material=M.pit, segments=32)
-    G.torus('rim', 0.43, 0.035, at=F.at(0, 0.36, 0), material=M.pit_rim, major_segments=32, minor_segments=8)
-    for k in range(8):
-        a = math.radians(45 * k + 22.5)
-        F.cyl(f'dot{k}', 0.045, 0.004, (0.462 * math.cos(a), 0.17, 0.462 * math.sin(a)), balls[k % 5],
-              rot=(90, 0, 45 * k + 22.5 - 90), verts=14)
+    # the pit: a foam wall in padded channels on a floor, a puffed roll round the top, the balls' level inside
+    G.loft('pit', [_pad_ring(0.445, 0.0, 0.0), _pad_ring(0.452, 0.012, 0.008), _pad_ring(0.452, 0.33, 0.008),
+                   _pad_ring(0.42, 0.345, 0.0)], material=M.pit)
+    n = 48
+    F.sweep('rim', [(0.43 * math.cos(math.tau * i / n), 0.36, 0.43 * math.sin(math.tau * i / n)) for i in range(n)], 0.035,
+            M.pit_rim, verts=8, closed=True, scale=lambda w: 0.86 + 0.14 * abs(math.sin(PADS * math.pi * w)))
+    for k in range(6):
+        a = math.radians(60 * k + 15)
+        F.cyl(f'dot{k}', 0.045, 0.004, (0.461 * math.cos(a), 0.17, 0.461 * math.sin(a)), balls[k % 5],
+              rot=(90, 0, 60 * k + 15 - 90), verts=10)
     F.cyl('fill', 0.42, 0.01, (0, 0.335, 0), M.pit_fill, verts=24)
     lower = _ball_grid(0.37, 0.085, 0.37)
     for k, (x, y, z) in enumerate(lower):
@@ -759,29 +1119,80 @@ TRAIN_W = 1.24    # the table's length: a train table is 0.9-1.3 m (review M-kid
 TABLE_TOP = 0.44
 
 
-def _wagon(name, angle, parts_fn):
-    """A piece of the train on the ring at `angle` (degrees round the ring, game), facing along it."""
-    a = math.radians(angle)
-    x, z = RING_X + RING_R * math.cos(a), RING_Z + RING_R * math.sin(a)
-    for obj in parts_fn(name, x, z):
-        obj.rotation_euler[2] = a    # along the ring (a game angle round the ring is the same Blender turn, + 180)
+def _train_piece(name, a, build):
+    """A piece of the train made by `build(name, y)` along its own depth axis at the middle (x across, its front to
+    -depth, standing on the track's top `y`), then turned onto the ring at `a` degrees round it."""
+    with G.new_parts() as parts:
+        build(name, TABLE_TOP + 0.012)
+    obj = G.join(parts, name, origin=F.at(0, TABLE_TOP, 0))
+    ar = math.radians(a)
+    obj.location = F.at(RING_X + RING_R * math.cos(ar), TABLE_TOP, RING_Z + RING_R * math.sin(ar))
+    obj.rotation_euler[2] = ar
+    return obj
 
 
-def _engine(name, x, z):
-    y = TABLE_TOP + 0.012
-    return [F.box(f'{name}_body', 0.05, 0.05, 0.11, (x, y + 0.035, z), M.train, bevel=0.01),
-            F.box(f'{name}_cab', 0.055, 0.05, 0.045, (x, y + 0.08, z), M.train, bevel=0.008)]
+def _train_wheels(name, y, zs):
+    for k, z in enumerate(zs):
+        for s in (-1, 1):
+            F.cyl(f'{name}_wheel{k}{s}', 0.013, 0.007, (s * 0.027, y + 0.013, z), M.dark, rot=(0, 90, 0), verts=10)
+
+
+def _engine(name, y):
+    """A wooden toy engine: a boiler with a chimney and a dome, a cab with a roof, three wheels a side."""
+    F.box(f'{name}_chassis', 0.05, 0.012, 0.12, (0, y + 0.016, 0), M.train, bevel=0.003, bevel_segments=1)
+    F.cyl(f'{name}_boiler', 0.022, 0.075, (0, y + 0.042, -0.02), M.train, rot=(90, 0, 0), verts=12)
+    F.cyl(f'{name}_smokebox', 0.0235, 0.01, (0, y + 0.042, -0.058), M.dark, rot=(90, 0, 0), verts=12)
+    F.cone(f'{name}_chimney', 0.009, 0.013, 0.03, (0, y + 0.074, -0.042), M.dark, verts=10)
+    F.sphere(f'{name}_dome', 0.011, (0, y + 0.064, -0.012), M.toy_yellow, segments=8, rings=5)
+    F.box(f'{name}_cab', 0.054, 0.052, 0.042, (0, y + 0.048, 0.037), M.train, bevel=0.004, bevel_segments=1)
+    F.box(f'{name}_roof', 0.064, 0.008, 0.054, (0, y + 0.078, 0.037), M.dark, bevel=0.003, bevel_segments=1)
+    for s in (-1, 1):
+        F.box(f'{name}_window{s}', 0.004, 0.018, 0.022, (s * 0.027, y + 0.058, 0.037), M.water)
+    F.box(f'{name}_buffer', 0.044, 0.01, 0.008, (0, y + 0.018, -0.063), M.dark, bevel=0.002, bevel_segments=1)
+    _train_wheels(name, y, (-0.038, 0.0, 0.038))
+
+
+def _wagon(colour, cargo):
+    def build(name, y):
+        F.box(f'{name}_chassis', 0.05, 0.012, 0.09, (0, y + 0.016, 0), M.toy_yellow, bevel=0.003, bevel_segments=1)
+        _walls(f'{name}_tub', 0.054, 0.08, y + 0.022, y + 0.052, 0, 0.006, colour, r=0.008)
+        F.box(f'{name}_tub_floor', 0.046, 0.006, 0.072, (0, y + 0.025, 0), colour)
+        cargo(name, y)
+        _train_wheels(name, y, (-0.028, 0.028))
+    return build
+
+
+def _tree(name, x, z, h, y=TABLE_TOP):
+    """A toy tree: a trunk and two cones of leaves, one over the other."""
+    F.cyl(f'{name}_trunk', 0.012, 0.04, (x, y + 0.02, z), M.trunk, verts=8)
+    F.cone(f'{name}_low', 0.055, 0.012, h * 0.55, (x, y + 0.035 + h * 0.275, z), M.tree, verts=10)
+    F.cone(f'{name}_high', 0.042, 0.0, h * 0.5, (x, y + 0.035 + h * 0.75, z), M.tree, verts=10)
+
+
+def _archway(ro, ho, ri, hi, n=8):
+    """An arch's outline (x, height) standing on the ground: `ro` out and `ho` up to where its top rounds over, an
+    opening `ri` and `hi` likewise through it."""
+    return ([(ro, 0.0), (ro, ho)] + _arc(ro, 0, 180, n, 0.0, ho)[1:] + [(-ri, 0.0)] + _arc(ri, 180, 0, n, 0.0, hi)
+            + [(ri, 0.0)])
 
 
 def trainTable():
+    # the table: round tapered legs, an apron, the board with a raised lip round it, a shelf below with two bins
     for sx in (-1, 1):
         for sz in (-1, 1):
-            F.box(f'leg{sx}{sz}', 0.06, 0.36, 0.06, (sx * (TRAIN_W / 2 - 0.08), 0.18, sz * 0.34), M.train_table, bevel=0.01)
-    F.box('frame', TRAIN_W, 0.06, 0.84, (0, 0.38, 0), M.train_table, bevel=0.012)
-    F.box('grass', TRAIN_W - 0.04, 0.03, 0.8, (0, 0.425, 0), M.grass, bevel=0.006)
-    for s in (-1, 1):
-        F.box(f'lip_x{s}', TRAIN_W, 0.03, 0.02, (0, 0.425, s * 0.41), M.train_table, bevel=0.006)
-        F.box(f'lip_z{s}', 0.02, 0.03, 0.8, (s * (TRAIN_W / 2 - 0.01), 0.425, 0), M.train_table, bevel=0.006)
+            F.sweep(f'leg{sx}{sz}', [(sx * (TRAIN_W / 2 - 0.08), 0.36, sz * 0.34), (sx * (TRAIN_W / 2 - 0.08), 0.0, sz * 0.34)],
+                    0.03, M.train_table, verts=12, scale=[1.0, 0.78])
+    F.box('frame', TRAIN_W - 0.02, 0.06, 0.82, (0, 0.38, 0), M.train_table, bevel=0.012, bevel_segments=2)
+    F.box('grass', TRAIN_W - 0.04, 0.03, 0.8, (0, 0.425, 0), M.grass, bevel=0.006, bevel_segments=1)
+    lip = G.rounded_rect(TRAIN_W - 0.02, 0.82, 0.03, corner=3)
+    F.sweep('lip', [(u, 0.432, v) for u, v in lip], None, M.train_table, profile=G.rounded_rect(0.036, 0.02, 0.008, corner=1),
+            up=(0, 0, 1), closed=True)
+    F.box('shelf', TRAIN_W - 0.16, 0.02, 0.62, (0, 0.1, 0), M.train_table, bevel=0.005, bevel_segments=1)
+    for k, (x, m) in enumerate(((-0.25, M.toy_red), (0.12, M.toy_blue))):
+        _walls(f'bin{k}', 0.3, 0.26, 0.11, 0.22, 0.02, 0.008, m, r=0.02, x=x)
+        F.box(f'bin_floor{k}', 0.29, 0.006, 0.25, (x, 0.113, 0.02), m)
+    F.box('bin_block0', 0.05, 0.05, 0.05, (-0.3, 0.185, 0.05), M.toy_yellow, rot=(0, 0, 20), bevel=0.006, bevel_segments=1)
+    F.sphere('bin_ball', 0.035, (0.08, 0.19, 0.0), M.ball_yellow, segments=10, rings=6)
     # the ring of wooden track, with two grooves
     G.revolve('track', [(RING_R - 0.04, 0), (RING_R + 0.04, 0), (RING_R + 0.04, 0.012), (RING_R - 0.04, 0.012),
                         (RING_R - 0.04, 0)], at=F.at(RING_X, TABLE_TOP - 0.002, RING_Z), material=M.track, segments=40,
@@ -789,44 +1200,48 @@ def trainTable():
     for r in (RING_R - 0.016, RING_R + 0.016):
         G.torus(f'groove{r}', r, 0.003, at=F.at(RING_X, TABLE_TOP + 0.0105, RING_Z), material=M.track_groove,
                 major_segments=40, minor_segments=4)
-    # the town: a station, a pond, a road and trees
-    F.box('station', 0.2, 0.1, 0.12, (-0.4, TABLE_TOP + 0.05, -0.22), M.toy_yellow, bevel=0.006)
-    F.box('station_roof', 0.24, 0.02, 0.16, (-0.4, TABLE_TOP + 0.11, -0.22), M.toy_red, bevel=0.006)
-    F.box('station_door', 0.05, 0.07, 0.004, (-0.4, TABLE_TOP + 0.035, -0.158), M.house_door)
-    F.cyl('pond', 0.13, 0.006, (-0.3, TABLE_TOP + 0.003, 0.17), M.water, scale=(1.3, 1, 1), verts=24)
-    F.box('road', 0.3, 0.004, 0.08, (-0.4, TABLE_TOP + 0.002, -0.06), M.track_groove)
-    for k, (x, z, h) in enumerate(((-0.55, -0.3, 0.2), (-0.2, -0.33, 0.16), (-0.55, 0.3, 0.18), (0.55, -0.33, 0.16))):
-        F.cyl(f'trunk{k}', 0.012, 0.04, (x, TABLE_TOP + 0.02, z), M.trunk, verts=8)
-        F.cone(f'tree{k}', 0.05, 0.0, h, (x, TABLE_TOP + 0.04 + h / 2, z), M.tree, verts=10)
+    # a tunnel the track runs through on the right, grass over its top, a stone portal at each end
+    tx, tz = RING_X + RING_R, RING_Z
+    F.extrude('tunnel', _archway(0.072, 0.09, 0.045, 0.075), 0.12, (tx, TABLE_TOP, tz), M.grass, bevel=0.008,
+              bevel_segments=1)
+    for s in (-1, 1):
+        F.extrude(f'portal{s}', _archway(0.06, 0.08, 0.045, 0.075, n=6), 0.01, (tx, TABLE_TOP, tz + s * 0.062), M.spot,
+                  bevel=0.002, bevel_segments=1)
+    # the station on the left of the track: a platform, a building with a pitched roof, a signal
+    F.box('platform', 0.05, 0.02, 0.26, (-0.09, TABLE_TOP + 0.01, RING_Z), M.spot, bevel=0.004, bevel_segments=1)
+    F.box('station', 0.1, 0.09, 0.2, (-0.16, TABLE_TOP + 0.045, RING_Z), M.toy_yellow, bevel=0.005, bevel_segments=1)
+    F.extrude('station_roof', [(-0.065, 0.0), (0.065, 0.0), (0.0, 0.05)], 0.22, (-0.16, TABLE_TOP + 0.09, RING_Z), M.toy_red,
+              bevel=0.004, bevel_segments=1)
+    F.box('station_door', 0.004, 0.06, 0.04, (-0.108, TABLE_TOP + 0.03, RING_Z), M.house_door)
+    for s in (-1, 1):
+        F.box(f'station_window{s}', 0.004, 0.03, 0.035, (-0.108, TABLE_TOP + 0.055, RING_Z + s * 0.06), M.water)
+    F.cyl('signal_post', 0.005, 0.14, (-0.09, TABLE_TOP + 0.07, RING_Z + 0.17), M.dark, verts=6)
+    F.box('signal', 0.016, 0.04, 0.014, (-0.09, TABLE_TOP + 0.13, RING_Z + 0.17), M.dark, bevel=0.003, bevel_segments=1)
+    F.sphere('signal_light', 0.006, (-0.09, TABLE_TOP + 0.14, RING_Z + 0.178), M.toy_red, segments=6, rings=4)
+    # the town: a road with its line, a house, a pond with stones round it, trees
+    F.box('road', 0.08, 0.004, 0.8, (-0.3, TABLE_TOP + 0.002, 0), M.track_groove)
+    for k in range(5):
+        F.box(f'road_line{k}', 0.008, 0.002, 0.07, (-0.3, TABLE_TOP + 0.005, -0.32 + 0.16 * k), M.paper)
+    F.box('house', 0.11, 0.08, 0.1, (-0.5, TABLE_TOP + 0.04, -0.25), M.house, bevel=0.004, bevel_segments=1)
+    F.extrude('house_roof', [(-0.065, 0.0), (0.065, 0.0), (0.0, 0.05)], 0.12, (-0.5, TABLE_TOP + 0.08, -0.25), M.roof,
+              bevel=0.003, bevel_segments=1)
+    F.box('house_door', 0.03, 0.045, 0.004, (-0.5, TABLE_TOP + 0.0225, -0.199), M.house_door)
+    F.cyl('pond', 0.09, 0.006, (-0.49, TABLE_TOP + 0.003, 0.2), M.water, verts=20)
+    for k in range(7):
+        a = math.tau * k / 7
+        F.sphere(f'stone{k}', 0.014, (-0.49 + 0.103 * math.cos(a), TABLE_TOP + 0.004, 0.2 + 0.103 * math.sin(a)), M.spot,
+                 scale=(1.2, 1, 0.6), segments=6, rings=4)
+    for k, (x, z, h) in enumerate(((-0.55, -0.02, 0.2), (-0.17, -0.3, 0.16), (-0.17, 0.3, 0.18), (0.55, -0.33, 0.16),
+                                   (0.56, 0.33, 0.14))):
+        _tree(f'tree{k}', x, z, h)
     _still('body')
     # the train: an engine and two wagons, turning round the ring's middle
     with G.new_parts() as parts:
-        y = TABLE_TOP + 0.012
-
-        def engine(name, x, z):
-            objs = _engine(name, x, z)
-            objs.append(F.cyl(f'{name}_chimney', 0.012, 0.035, (x, y + 0.075, z), M.dark, verts=10))
-            return objs
-
-        def wagon(colour, cargo):
-            def make(name, x, z):
-                objs = [F.box(f'{name}_tub', 0.05, 0.035, 0.09, (x, y + 0.03, z), colour, bevel=0.006)]
-                objs.append(cargo(name, x, z))
-                return objs
-            return make
-
-        ball = lambda n, x, z: G.sphere(f'{n}_ball', 0.022, at=F.at(x, y + 0.06, z), material=M.ball_yellow,  # noqa: E731
-                                        segments=10, rings=6)
-        log = lambda n, x, z: F.box(f'{n}_log', 0.03, 0.025, 0.08, (x, y + 0.055, z), M.trunk, bevel=0.008)  # noqa: E731
-        _wagon('engine', 90, engine)
-        _wagon('wagon0', 90 + 28, wagon(M.toy_blue, ball))
-        _wagon('wagon1', 90 + 52, wagon(M.toy_green, log))
-        for k, angle in enumerate((90, 90 + 28, 90 + 52)):
-            a = math.radians(angle)
-            for s in (-1, 1):
-                F.cyl(f'wheels{k}{s}', 0.014, 0.008, (RING_X + (RING_R + s * 0.016) * math.cos(a), y + 0.012,
-                                                      RING_Z + (RING_R + s * 0.016) * math.sin(a)), M.dark,
-                      rot=(0, 90, math.degrees(a)), verts=10)
+        _train_piece('engine', 90, _engine)
+        _train_piece('wagon0', 90 + 28, _wagon(M.toy_blue, lambda n, y: F.sphere(f'{n}_ball', 0.022, (0, y + 0.065, 0),
+                                                                                    M.ball_yellow, segments=10, rings=6)))
+        _train_piece('wagon1', 90 + 52, _wagon(M.toy_green, lambda n, y: F.cyl(f'{n}_log', 0.014, 0.08, (0, y + 0.06, 0),
+                                                                                  M.trunk, rot=(90, 0, 0), verts=8)))
     train = G.join(parts, 'train', origin=F.at(RING_X, TABLE_TOP, RING_Z))
     _place()
     G.spin(train, 'train', turns=-1, seconds=6.0, axis='Z')
@@ -834,23 +1249,59 @@ def trainTable():
 
 
 # --- KD2: the play mat ---------------------------------------------------------------------------------------
+MAT_TILE = 0.44   # each foam tile's side; four interlock in the middle of the mat
+
+
+def _jigsaw(p0, p1, side):
+    """An edge from p0 to p1 (game x, depth) with a jigsaw knob in its middle bulging to `side` (+1: left of the way
+    along it, -1: right), as foam tiles lock."""
+    (x0, z0), (x1, z1) = p0, p1
+    L = math.hypot(x1 - x0, z1 - z0)
+    ux, uz = (x1 - x0) / L, (z1 - z0) / L
+    nx, nz = -uz * side, ux * side
+
+    def at(t, o):
+        return (x0 + ux * t + nx * o, z0 + uz * t + nz * o)
+    m, neck, r, out = L / 2, 0.02, 0.032, 0.04
+    pts = [at(0, 0), at(m - neck, 0)]
+    for i in range(9):   # round the knob, from its near side over its far end to the other side
+        a = math.radians(220 - 260 * i / 8)
+        pts.append(at(m + r * math.cos(a), out + r * math.sin(a)))
+    return pts + [at(m + neck, 0), at(L, 0)]
+
+
 def playMat():
-    F.box('mat', 0.92, 0.02, 0.92, (0, 0.01, 0), M.mat, bevel=0.008, bevel_segments=3)
-    for (x, z), m in zip(((-0.22, -0.22), (0.22, -0.22), (-0.22, 0.22), (0.22, 0.22)),
-                         (M.mat_yellow, M.mat_pink, M.mat_green, M.mat_white)):
-        F.box(f'tile{x}{z}', 0.4, 0.006, 0.4, (x, 0.021, z), m, bevel=0.004)
-    y = 0.024
-    blocks = (((-0.3, -0.15), M.toy_red, 10), ((-0.18, -0.24), M.toy_blue, 35), ((0.26, 0.14), M.toy_green, 50),
-              ((-0.28, 0.24), M.toy_yellow, 70))
-    for k, ((x, z), m, r) in enumerate(blocks):
-        F.box(f'block{k}', 0.09, 0.09, 0.09, (x, y + 0.045, z), m, rot=(0, 0, r), bevel=0.012)
-    F.box('block_top', 0.09, 0.09, 0.09, (-0.29, y + 0.135, -0.16), M.toy_green, rot=(0, 0, 25), bevel=0.012)
+    # four foam tiles locking in the middle, each with a shape pressed out of it, on a backing in the mat's colour
+    F.extrude('mat', G.rounded_rect(0.92, 0.92, 0.02, corner=2), 0.012, (0, 0.006, 0), M.mat, plane='top', bevel=0.003,
+              bevel_segments=1)
+    T = MAT_TILE
+    ez = {sx: _jigsaw((0, 0), (sx * T, 0), sx) for sx in (-1, 1)}     # the edges along depth 0, out from the middle
+    ex = {sz: _jigsaw((0, 0), (0, sz * T), -sz) for sz in (-1, 1)}    # along x 0
+    tiles = {(-1, -1): M.mat_yellow, (1, -1): M.mat_pink, (-1, 1): M.mat_green, (1, 1): M.mat_white}
+    marks = {(-1, -1): _star(0, 0, 0.09), (1, -1): _heart(0, 0, 0.075), (-1, 1): _moon(0, 0, 0.08),
+             (1, 1): [(0.08 * math.cos(math.tau * i / 16), 0.08 * math.sin(math.tau * i / 16)) for i in range(16)]}
+    mark_colours = {(-1, -1): M.mat_pink, (1, -1): M.mat_yellow, (-1, 1): M.mat_white, (1, 1): M.mat_green}
+    for (sx, sz), m in tiles.items():
+        outline = ez[sx] + [(sx * T, sz * T)] + list(reversed(ex[sz]))[:-1]
+        F.extrude(f'tile{sx}{sz}', outline, 0.01, (0, 0.017, 0), m, plane='top')
+        cx, cz = sx * T / 2, sz * T / 2
+        F.extrude(f'mark{sx}{sz}', [(cx + u, cz - v) for u, v in marks[(sx, sz)]], 0.004, (0, 0.0225, 0),
+                  mark_colours[(sx, sz)], plane='top')
+    y = 0.022
+    blocks = (((-0.3, -0.15), M.toy_red, M.toy_yellow, 10), ((-0.18, -0.24), M.toy_blue, M.paper, 35),
+              ((0.26, 0.14), M.toy_green, M.toy_yellow, 50), ((-0.28, 0.24), M.toy_yellow, M.toy_red, 70))
+    for k, ((x, z), m, face, r) in enumerate(blocks):
+        _block(f'block{k}', x, y, z, 0.09, m, face, turn=r)
+    _block('block_top', -0.29, y + 0.09, -0.16, 0.09, M.toy_green, M.paper, turn=25)
     G.sphere('ball', 0.06, at=F.at(0.3, y + 0.06, -0.25), material=M.ball_red, segments=14, rings=8)
+    F.sphere('ball_band', 0.0605, (0.3, y + 0.06, -0.25), M.ball_yellow, scale=(1, 0.3, 1), rot=(0, 30, 0), segments=14,
+             rings=4)
     _still('body')
     # the tower the resident builds: three blocks, grown up from the mat
     with G.new_parts() as parts:
-        for k, (m, r) in enumerate(((M.toy_blue, 0), (M.toy_yellow, 18), (M.toy_red, -12))):
-            F.box(f'tower{k}', 0.09, 0.09, 0.09, (0.04, y + 0.045 + 0.09 * k, 0.12), m, rot=(0, 0, r), bevel=0.012)
+        for k, (m, face, r) in enumerate(((M.toy_blue, M.toy_yellow, 0), (M.toy_yellow, M.toy_red, 18),
+                                          (M.toy_red, M.paper, -12))):
+            _block(f'tower{k}', 0.04, y + 0.09 * k, 0.12, 0.09, m, face, turn=r)
     tower = G.join(parts, 'tower', origin=F.at(0.04, 0.012, 0.12))   # squeezed into the mat until it grows
     tower.scale[2] = 0.001
     _place(forward=0.03)    # its back on the wall's face
@@ -859,22 +1310,46 @@ def playMat():
 
 
 # --- KD2: the giant teddy bear and the kids' bean bag ---------------------------------------------------------
+def _upright(name, rings, material, z=0.0, n=16):
+    """A body lofted up through `rings` [(height, half width, half depth)], round the upright at game depth `z`."""
+    return G.loft(name, [G.ring(rx, rz, y, n, at=(0.0, -z)) for y, rx, rz in rings], material=material)
+
+
 def teddyBear():
-    G.sphere('body', 0.25, at=F.at(0, 0.28, -0.02), material=M.fur, scale=(1, 0.84, 1), segments=20, rings=12)
-    G.sphere('belly', 0.15, at=F.at(0, 0.3, 0.165), material=M.fur_light, scale=(0.95, 0.45, 0.85), segments=16, rings=10)
-    G.sphere('head', 0.2, at=F.at(0, 0.68, 0.0), material=M.fur, scale=(1, 0.9, 0.95), segments=20, rings=12)
-    G.sphere('muzzle', 0.08, at=F.at(0, 0.64, 0.16), material=M.fur_light, scale=(1, 0.75, 0.75), segments=14, rings=8)
-    G.sphere('nose', 0.028, at=F.at(0, 0.67, 0.22), material=M.eye, scale=(1.2, 0.8, 0.8), segments=10, rings=6)
+    # the body: a pear sitting on the floor; the head: round, fuller at the cheeks
+    _upright('body', [(0.02, 0.004, 0.004), (0.03, 0.14, 0.12), (0.08, 0.215, 0.18), (0.2, 0.248, 0.21), (0.32, 0.24, 0.2),
+                      (0.42, 0.2, 0.17), (0.5, 0.14, 0.12), (0.54, 0.06, 0.05), (0.55, 0.004, 0.004)], M.fur, z=-0.02, n=16)
+    F.sphere('belly', 0.15, (0, 0.27, 0.15), M.fur_light, scale=(0.95, 0.4, 0.95), segments=12, rings=7)
+    _upright('head', [(0.5, 0.004, 0.004), (0.51, 0.09, 0.08), (0.55, 0.16, 0.14), (0.62, 0.2, 0.18), (0.69, 0.205, 0.185),
+                      (0.76, 0.185, 0.165), (0.82, 0.14, 0.125), (0.86, 0.07, 0.06), (0.87, 0.004, 0.004)], M.fur, z=0.0, n=12)
+    F.sphere('muzzle', 0.08, (0, 0.635, 0.155), M.fur_light, scale=(1, 0.75, 0.72), segments=12, rings=8)
+    F.sphere('nose', 0.026, (0, 0.668, 0.21), M.eye, scale=(1.3, 0.8, 0.85), segments=10, rings=6)
     for s in (-1, 1):
-        G.sphere(f'eye{s}', 0.02, at=F.at(s * 0.075, 0.73, 0.165), material=M.eye, segments=10, rings=6)
-        G.sphere(f'ear{s}', 0.07, at=F.at(s * 0.15, 0.85, -0.02), material=M.fur, scale=(1, 0.55, 1), segments=12, rings=8)
-        G.sphere(f'ear_in{s}', 0.045, at=F.at(s * 0.15, 0.85, 0.0), material=M.fur_light, scale=(1, 0.3, 1), segments=10, rings=6)
-        G.sphere(f'arm{s}', 0.07, at=F.at(s * 0.25, 0.36, 0.06), material=M.fur, scale=(1, 1, 1.85), rot=(-20, 0, s * 15),
-                 segments=12, rings=8)
-        G.sphere(f'leg{s}', 0.09, at=F.at(s * 0.14, 0.08, 0.18), material=M.fur, scale=(1, 1.7, 0.8), segments=14, rings=8)
-        G.sphere(f'pad{s}', 0.06, at=F.at(s * 0.14, 0.09, 0.33), material=M.fur_light, scale=(1, 0.25, 1.1), segments=12, rings=6)
-        G.cone(f'bow{s}', 0.045, 0.012, 0.09, at=F.at(s * 0.055, 0.5, 0.17), material=M.bow, rot=(0, s * 90, 0), verts=10)
-    G.sphere('knot', 0.022, at=F.at(0, 0.5, 0.175), material=M.bow, segments=10, rings=6)
+        # the mouth stitched under the nose
+        F.sweep(f'mouth{s}', [(0, 0.648, 0.214), (0, 0.628, 0.212), (s * 0.016, 0.62, 0.207), (s * 0.03, 0.628, 0.198)], 0.0025,
+                M.eye, verts=4, resolution=2)
+        F.sphere(f'eye{s}', 0.02, (s * 0.075, 0.73, 0.163), M.eye, segments=8, rings=5)
+        F.sphere(f'ear{s}', 0.07, (s * 0.15, 0.85, -0.02), M.fur, scale=(1, 0.55, 1), segments=10, rings=6)
+        F.sphere(f'ear_in{s}', 0.045, (s * 0.15, 0.85, 0.0), M.fur_light, scale=(1, 0.3, 1), segments=8, rings=5)
+        # the arms reaching forward, a paw pad on each
+        F.sweep(f'arm{s}', [(s * 0.17, 0.46, 0.02), (s * 0.235, 0.36, 0.06), (s * 0.255, 0.28, 0.12)], 0.068, M.fur, verts=10,
+                resolution=2, scale=[0.95, 0.92, 0.85])
+        F.sphere(f'paw{s}', 0.058, (s * 0.26, 0.27, 0.13), M.fur, segments=10, rings=7)
+        F.sphere(f'paw_pad{s}', 0.036, (s * 0.245, 0.25, 0.17), M.fur_light, scale=(0.9, 0.4, 0.9), rot=(-30, 0, s * 20),
+                 segments=8, rings=5)
+        # the legs out in front, a pad on each foot
+        F.sweep(f'leg{s}', [(s * 0.13, 0.1, 0.0), (s * 0.14, 0.088, 0.18), (s * 0.145, 0.086, 0.3)], 0.085, M.fur, verts=10,
+                resolution=2, scale=[1.0, 0.95, 0.9])
+        F.sphere(f'foot{s}', 0.077, (s * 0.145, 0.086, 0.3), M.fur, scale=(1, 0.45, 1), segments=10, rings=7)
+        F.sphere(f'pad{s}', 0.06, (s * 0.145, 0.09, 0.33), M.fur_light, scale=(1, 0.25, 1.1), segments=10, rings=5)
+        # the bow at the neck: two loops of ribbon and their tails
+        loop = [(s * (0.012 + 0.07 * (1 - math.cos(a)) / 2), 0.505 + 0.032 * math.sin(a), 0.19 - 0.012 * (1 - math.cos(a)) / 2)
+                for a in (math.tau * i / 10 for i in range(10))]
+        F.sweep(f'bow{s}', loop, None, M.bow, profile=G.rounded_rect(0.006, 0.026, 0.002, corner=1), up=(0, 0, 1),
+                closed=True)
+        F.sweep(f'bow_tail{s}', [(s * 0.008, 0.5, 0.19), (s * 0.03, 0.46, 0.195), (s * 0.045, 0.42, 0.185)], None, M.bow,
+                profile=G.rounded_rect(0.005, 0.022, 0.002, corner=1), up=(0, 0, 1), resolution=2)
+    F.sphere('knot', 0.02, (0, 0.505, 0.193), M.bow, scale=(1, 0.8, 1.1), segments=10, rings=6)
     bear = G.join(G.meshes(), 'bear', origin=(0, 0, 0))
     _place()
     G.squash(bear, 'squish', (1.06, 1.06, 0.9), seconds=0.5)
@@ -882,10 +1357,22 @@ def teddyBear():
 
 
 def beanBagKids():
-    G.sphere('bag', 0.31, at=F.at(0, 0.18, 0.02), material=M.bag, scale=(1, 1, 0.58), segments=24, rings=14)
-    G.sphere('back', 0.26, at=F.at(0, 0.32, -0.15), material=M.bag, scale=(1, 0.58, 0.81), rot=(-12, 0, 0),
-             segments=24, rings=14)
-    _slab('tag', _arc(0.045, 0, 330, 11), _board((0, 0.24, 0.315), 30), M.bag_patch, out=-0.002, thick=0.006)
+    # a sack lofted up from the floor, leaning back into its back rest, a seat pressed into its front where the game
+    # sits a child (0.24, furniture.json `seats`), creased all over; a handle on its back, a label on its front
+    rings = [(0.0, 0.004, 0.004, 0.03), (0.004, 0.25, 0.26, 0.03), (0.05, 0.305, 0.315, 0.025), (0.13, 0.31, 0.315, 0.02),
+             (0.2, 0.3, 0.3, 0.012), (0.26, 0.28, 0.27, -0.005), (0.32, 0.255, 0.22, -0.05), (0.38, 0.235, 0.18, -0.09),
+             (0.44, 0.205, 0.145, -0.125), (0.49, 0.155, 0.11, -0.15), (0.515, 0.09, 0.07, -0.16), (0.528, 0.004, 0.004, -0.165)]
+    bag = G.loft('bag', [G.ring(rx, rz, y, 24, at=(0.0, -z)) for y, rx, rz, z in rings], material=M.bag)
+    for v in bag.data.vertices:
+        gx, gz, gy = -v.co.x, -v.co.y, v.co.z
+        d = math.hypot(gx / 0.24, (gz - 0.07) / 0.2)
+        if gy > 0.12 and d < 1:
+            v.co.z -= 0.17 * (1 - d * d) ** 2 * min(1.0, (gy - 0.12) / 0.12)
+    bag.data.update()
+    _rumple(bag, 0.014, 0.03, 7.0, size=0.08)   # up and down only: its bounds (the size and centre checks) stay put
+    _slab('tag', _arc(0.045, 0, 330, 11), _board((0, 0.2, 0.315), 20), M.bag_patch, out=-0.004, thick=0.006)
+    F.sweep('handle', [(-0.05, 0.47, -0.27), (-0.03, 0.495, -0.29), (0.03, 0.495, -0.29), (0.05, 0.47, -0.27)], None,
+            M.bag_patch, profile=G.rounded_rect(0.006, 0.03, 0.002, corner=1), up=(0, 0, 1), resolution=2)
     bag = G.join(G.meshes(), 'bag', origin=(0, 0, 0))
     _place()
     G.squash(bag, 'squash', (1.04, 1.04, 0.85), seconds=0.5)
@@ -893,35 +1380,65 @@ def beanBagKids():
 
 
 # --- KD3: the kids' desk (and its chair), table and chair -----------------------------------------------------
+def _back_knob(name, x, y, face, r, material, segments=8):
+    """A turned knob on a front at game depth `face` that faces the back (-depth): kit.knob turned round."""
+    prof = [(0, 0), (r * 0.75, 0), (r * 0.7, r * 0.15), (r * 0.36, r * 0.35), (r * 0.42, r * 0.75), (r * 0.95, r * 1.05),
+            (r, r * 1.35), (r * 0.8, r * 1.7), (r * 0.4, r * 1.88), (0, r * 1.92)]
+    return G.revolve(name, prof, at=F.at(x, y, face), material=material, segments=segments, rot=(-90, 0, 0))
+
+
+def _crayon(name, a, b, material, r=0.005):
+    """A crayon from `a` to its sharpened tip at `b` (game points), a paper wrapper round its middle."""
+    k = 0.82
+    mid = tuple(p + (q - p) * k for p, q in zip(a, b))
+    F.sweep(name, [a, mid, b], r, material, verts=6, scale=[1.0, 1.0, 0.25])
+
+
 def kidsDesk():
+    # the desk: round legs tapering to the floor, side stretchers and a foot bar, a rounded wooden top with an
+    # upstand along its far edge
     for x in (-0.34, 0.34):
         for z in (0.02, 0.38):
-            F.cyl(f'leg{x}{z}', 0.02, 0.545, (x, 0.2725, z), M.kdesk, verts=12)
-    F.box('top', 0.76, 0.03, 0.44, (0, 0.56, 0.2), M.kdesk_top, bevel=0.01)
-    F.box('apron', 0.64, 0.06, 0.38, (0, 0.515, 0.2), M.kdesk, bevel=0.006)
-    F.box('paper', 0.3, 0.004, 0.22, (-0.12, 0.577, 0.2), M.paper)
-    F.box('drawing', 0.2, 0.002, 0.14, (-0.12, 0.5795, 0.2), M.chalk_blue)
-    F.cyl('cup', 0.035, 0.08, (0.24, 0.615, 0.3), M.toy_yellow, verts=14)
-    for k, (dx, m) in enumerate(((-0.012, M.toy_red), (0.01, M.toy_blue), (0.0, M.toy_green))):
-        G.rod(f'crayon{k}', F.at(0.24 + dx, 0.6, 0.3 + dx), F.at(0.24 + dx * 2.5, 0.69, 0.3 + 0.012 * (k - 1)), 0.005,
-              material=m, verts=6)
-    # the chair, joined to the desk: its seat where the game sits a child (SEATS.kidsDesk)
-    F.box('seat', 0.42, 0.04, 0.4, (0, 0.32, -0.2), M.kdesk_chair, bevel=0.012)
-    F.box('seat_top', 0.38, 0.03, 0.36, (0, 0.35, -0.19), M.kdesk_chair, bevel=0.012)
+            F.sweep(f'leg{x}{z}', [(x, 0.545, z), (x, 0.0, z)], 0.021, M.kdesk, verts=10, scale=[1.0, 0.8])
+        F.sweep(f'stretcher{x}', [(x, 0.12, 0.02), (x, 0.12, 0.38)], 0.009, M.kdesk, verts=8)
+    F.sweep('foot_bar', [(-0.34, 0.1, 0.02), (0.34, 0.1, 0.02)], 0.011, M.kdesk, verts=8)
+    F.extrude('top', G.rounded_rect(0.76, 0.44, 0.03, corner=3), 0.03, (0, 0.56, 0.2), M.kdesk_top, plane='top', bevel=0.006,
+              bevel_segments=2)
+    F.box('apron', 0.64, 0.06, 0.38, (0, 0.515, 0.2), M.kdesk, bevel=0.006, bevel_segments=1)
+    F.box('upstand', 0.72, 0.045, 0.016, (0, 0.5975, 0.404), M.kdesk, bevel=0.006, bevel_segments=2)
+    # on it: a sheet of paper with a drawing, a pot of crayons
+    F.box('paper', 0.3, 0.004, 0.22, (-0.12, 0.577, 0.2), M.paper, rot=(0, 0, 6))
+    F.box('drawing', 0.2, 0.002, 0.14, (-0.12, 0.5795, 0.2), M.chalk_blue, rot=(0, 0, 6))
+    F.extrude('drawing_sun', [(0.022 * math.cos(math.tau * i / 10), 0.022 * math.sin(math.tau * i / 10)) for i in range(10)],
+              0.002, (-0.06, 0.581, 0.15), M.paint_yellow, plane='top')
+    F.extrude('drawing_hill', [(-0.1, 0.0), (0.1, 0.0)] + [(0.1 - 0.2 * i / 6, -0.035 * math.sin(math.pi * i / 6)) for i in range(7)],
+              0.002, (-0.12, 0.581, 0.265), M.paint_green, plane='top', rot=(0, 0, 6))
+    _turned('cup', 0.24, 0.3, [(0.0, 0.0), (0.03, 0.0), (0.036, 0.075), (0.033, 0.077), (0.028, 0.012), (0.0, 0.012)],
+            M.toy_yellow, segments=14, y=0.575)
+    for k, (dx, dz, m) in enumerate(((-0.012, -0.006, M.toy_red), (0.01, 0.004, M.toy_blue), (0.0, 0.012, M.toy_green))):
+        _crayon(f'crayon{k}', (0.24 + dx, 0.59, 0.3 + dz), (0.24 + dx * 2.5, 0.69, 0.3 + dz * 2), m)
+    # the chair, joined to the desk: its seat where the game sits a child (SEATS.kidsDesk), a curved back on two posts
+    F.extrude('seat', G.rounded_rect(0.4, 0.38, 0.05, corner=3), 0.03, (0, 0.35, -0.19), M.kdesk_chair, plane='top',
+              bevel=0.008, bevel_segments=2)
+    F.box('seat_rail', 0.34, 0.04, 0.32, (0, 0.315, -0.2), M.kdesk_chair, bevel=0.006, bevel_segments=1)
     for s in (-1, 1):
-        F.box(f'front_leg{s}', 0.035, 0.31, 0.035, (s * 0.18, 0.155, -0.03), M.kdesk_chair, bevel=0.008)
-        F.box(f'back_post{s}', 0.035, 0.68, 0.035, (s * 0.18, 0.34, -0.38), M.kdesk_chair, bevel=0.008)
-    F.box('backrest', 0.4, 0.1, 0.035, (0, 0.61, -0.38), M.kdesk_chair, bevel=0.015)
-    F.box('back_rail', 0.4, 0.04, 0.03, (0, 0.44, -0.38), M.kdesk_chair, bevel=0.01)
+        F.sweep(f'front_leg{s}', [(s * 0.17, 0.32, -0.04), (s * 0.18, 0.0, -0.025)], 0.0175, M.kdesk_chair, verts=8,
+                scale=[1.0, 0.85])
+        F.sweep(f'back_post{s}', [(s * 0.18, 0.0, -0.38), (s * 0.18, 0.66, -0.38)], 0.0175, M.kdesk_chair, verts=8)
+        F.sphere(f'post_cap{s}', 0.019, (s * 0.18, 0.662, -0.38), M.kdesk_chair, segments=8, rings=5)
+        F.sweep(f'rung{s}', [(s * 0.178, 0.12, -0.03), (s * 0.18, 0.12, -0.38)], 0.009, M.kdesk_chair, verts=6)
+    for name, y, h in (('backrest', 0.61, 0.1), ('back_rail', 0.44, 0.04)):
+        F.sweep(name, [(-0.19, y, -0.374), (0.0, y, -0.385), (0.19, y, -0.374)], None, M.kdesk_chair,
+                profile=G.rounded_rect(h, 0.02, 0.008, corner=2), up=(0, 0, 1), resolution=3)
     _still('body')
     # the pencil drawer under the top, pulled out towards the child
     with G.new_parts() as parts:
-        F.box('drawer_front', 0.4, 0.05, 0.015, (0, 0.512, 0.0025), M.kdesk, bevel=0.005)
+        F.box('drawer_front', 0.4, 0.05, 0.015, (0, 0.512, 0.0025), M.kdesk, bevel=0.005, bevel_segments=2)
         F.box('drawer_tray', 0.38, 0.04, 0.3, (0, 0.512, 0.15), M.kdesk)
-        G.sphere('drawer_knob', 0.012, at=F.at(0, 0.512, -0.01), material=M.handle, segments=10, rings=6)
+        _back_knob('drawer_knob', 0, 0.512, -0.005, 0.01, M.handle)
         for k, m in enumerate((M.toy_red, M.toy_blue, M.toy_green, M.toy_yellow)):
-            G.rod(f'pencil{k}', F.at(-0.12 + 0.07 * k, 0.536, 0.03), F.at(-0.1 + 0.07 * k, 0.536, 0.2), 0.005,
-                  material=m, verts=6)
+            _crayon(f'pencil{k}', (-0.12 + 0.07 * k, 0.536, 0.03), (-0.1 + 0.07 * k, 0.536, 0.2), m)
+        F.box('eraser', 0.04, 0.012, 0.025, (0.15, 0.538, 0.12), M.chalk_pink, bevel=0.003, bevel_segments=1)
     drawer = G.join(parts, 'drawer')
     _place()
     G.slide(drawer, 'drawer_open', (0, 0.15, 0), seconds=0.6)
@@ -929,27 +1446,36 @@ def kidsDesk():
 
 
 def kidsTable():
-    F.box('top', 0.64, 0.035, 0.64, (0, 0.4825, 0), M.ktable_top, bevel=0.03, bevel_segments=3)
-    F.box('apron', 0.54, 0.05, 0.54, (0, 0.44, 0), M.ktable, bevel=0.008)
+    # a rounded top with a band in the frame's colour round its edge, a rounded apron, turned legs on bun feet
+    F.extrude('top', G.rounded_rect(0.632, 0.632, 0.08, corner=4), 0.03, (0, 0.485, 0), M.ktable_top, plane='top',
+              bevel=0.008, bevel_segments=2)
+    band = G.rounded_rect(0.632, 0.632, 0.08, corner=4)
+    F.sweep('band', [(u, 0.481, v) for u, v in band], None, M.ktable, profile=G.rounded_rect(0.016, 0.008, 0.003, corner=1),
+            up=(0, 0, 1), closed=True)
+    _walls('apron', 0.52, 0.52, 0.415, 0.47, 0, 0.02, M.ktable, r=0.05)
+    prof = [(0.0, 0.0), (0.02, 0.0), (0.03, 0.012), (0.03, 0.026), (0.021, 0.042), (0.018, 0.1), (0.016, 0.26),
+            (0.019, 0.34), (0.026, 0.37), (0.022, 0.39), (0.025, 0.47), (0.0, 0.47)]
     for sx in (-1, 1):
         for sz in (-1, 1):
-            F.cyl(f'leg{sx}{sz}', 0.025, 0.465, (sx * 0.26, 0.2325, sz * 0.26), M.ktable, verts=14)
-            G.sphere(f'foot{sx}{sz}', 0.028, at=F.at(sx * 0.26, 0.018, sz * 0.26), material=M.ktable, scale=(1, 1, 0.65),
-                     segments=12, rings=6)
+            _turned(f'leg{sx}{sz}', sx * 0.235, sz * 0.235, prof, M.ktable, segments=10)
     G.join_all('kidsTable')
     _place()
     return G.meshes()
 
 
 def kidsChair():
-    F.box('seat', 0.32, 0.03, 0.3, (0, 0.29, 0.05), M.kchair_seat, bevel=0.012)
-    F.box('back', 0.32, 0.18, 0.03, (0, 0.48, -0.1), M.kchair, rot=(-6, 0, 0), bevel=0.03, bevel_segments=3)
-    F.cyl('back_hole', 0.035, 0.032, (0, 0.5, -0.1), M.kchair_seat, rot=(84, 0, 0), verts=16)
+    # a rounded seat, legs splayed a little, the back legs running up into posts behind a back with a heart cut
+    # through it, rungs along the sides and across the front
+    F.extrude('seat', G.rounded_rect(0.32, 0.3, 0.05, corner=3), 0.03, (0, 0.29, 0.05), M.kchair_seat, plane='top',
+              bevel=0.008, bevel_segments=2)
     for sx in (-1, 1):
-        for z in (-0.07, 0.17):
-            F.cyl(f'leg{sx}{z}', 0.0175, 0.28, (sx * 0.13, 0.14, z), M.kchair, verts=10)
-        F.cyl(f'post{sx}', 0.015, 0.2, (sx * 0.13, 0.4, -0.09), M.kchair, verts=8)
-        G.rod(f'rung{sx}', F.at(sx * 0.13, 0.1, -0.07), F.at(sx * 0.13, 0.1, 0.17), 0.01, material=M.kchair, verts=8)
+        F.sweep(f'leg{sx}', [(sx * 0.13, 0.28, 0.165), (sx * 0.135, 0.0, 0.172)], 0.0175, M.kchair, verts=8, scale=[1.0, 0.85])
+        F.sweep(f'post{sx}', G.kit.fillet([(sx * 0.135, 0.0, -0.075), (sx * 0.13, 0.28, -0.07), (sx * 0.13, 0.5, -0.1)], 0.06),
+                0.016, M.kchair, verts=8)
+        F.sweep(f'rung{sx}', [(sx * 0.133, 0.1, -0.072), (sx * 0.133, 0.1, 0.168)], 0.009, M.kchair, verts=6)
+    F.sweep('rung_front', [(-0.133, 0.14, 0.168), (0.133, 0.14, 0.168)], 0.008, M.kchair, verts=6)
+    F.extrude('back', G.rounded_rect(0.32, 0.18, 0.06, corner=3), 0.028, (0, 0.48, -0.1), M.kchair, rot=(-6, 0, 0),
+              holes=[_heart(0, 0.005, 0.04)], bevel=0.008, bevel_segments=2)
     G.join_all('kidsChair')
     _place()
     return G.meshes()
@@ -958,38 +1484,46 @@ def kidsChair():
 # --- KD3: the picture-book shelf -----------------------------------------------------------------------------
 SHELVES = ((0.12, -0.1), (0.40, -0.17), (0.68, -0.24))    # (height, front lip's depth)
 BOOK_TILT = 14
+BOOK_H = 0.115    # half a book's height: the top row's tops clear the top board
 
 
 def _book(name, x, y, z, cover, picture):
-    """A picture book stood face out, leaning back; its middle at (x, y, z)."""
+    """A picture book stood face out, leaning back; its middle at (x, y, z): two boards round a block of pages that
+    shows white along its top, a picture and a title band on its front."""
     frame = _board((x, y, z), BOOK_TILT)
-    pts = [(-0.09, -0.12), (0.09, -0.12), (0.09, 0.12), (-0.09, 0.12)]
-    yield _slab(name, pts, frame, cover, out=-0.01, thick=0.02)
-    yield _slab(f'{name}_pic', [(-0.05, -0.02), (0.05, -0.02), (0.05, 0.08), (-0.05, 0.08)], frame, picture,
-                out=0.01, thick=0.002)
+    yield _slab(name, _rect(-0.09, -BOOK_H, 0.09, BOOK_H), frame, cover, out=0.006, thick=0.004)
+    yield _slab(f'{name}_back', _rect(-0.09, -BOOK_H, 0.09, BOOK_H), frame, cover, out=-0.01, thick=0.004)
+    yield _slab(f'{name}_spine', _rect(-0.093, -BOOK_H, -0.087, BOOK_H), frame, cover, out=-0.01, thick=0.02)
+    yield _slab(f'{name}_pages', _rect(-0.087, 0.003 - BOOK_H, 0.086, BOOK_H - 0.003), frame, M.paper, out=-0.006, thick=0.012)
+    yield _slab(f'{name}_pic', _rect(-0.055, -0.03, 0.055, 0.075), frame, picture, out=0.01, thick=0.002)
+    yield _slab(f'{name}_title', _rect(-0.06, -0.085, 0.06, -0.06), frame, M.paper, out=0.01, thick=0.002)
 
 
 def kidsBookshelf():
-    side = [(0.46, 0.0), (0.06, 0.0), (0.06, 0.2), (0.235, 0.9), (0.46, 0.9)]   # (back from the front, height)
+    # the sides: a curve from the foot up to the top, set back as it rises, a star cut through each
+    side = G.smooth_outline([(-0.46, 0.0), (-0.06, 0.0), (-0.06, 0.2), (-0.15, 0.62), (-0.235, 0.9), (-0.46, 0.9)], passes=2)
+    side = [(-0.46, 0.0), (-0.06, 0.0)] + [p for p in side if p[1] > 0.02 and p[0] > -0.44] + [(-0.46, 0.9)]
     for s in (-1, 1):
-        _slab(f'side{s}', [(-d, y) for d, y in side], _plane((s * 0.36, 0, 0), (0, 0, 1), (0, 1, 0)), M.kshelf,
-              out=-0.0125, thick=0.025)
-    F.box('back', 0.72, 0.9, 0.02, (0, 0.45, -0.45), M.kshelf, bevel=0.004)
-    F.box('top', 0.77, 0.025, 0.26, (0, 0.9125, -0.33), M.kshelf_top, bevel=0.008)
-    F.box('plinth', 0.7, 0.06, 0.02, (0, 0.03, -0.07), M.kshelf_top, bevel=0.004)
+        F.extrude(f'side{s}', side, 0.025, (s * 0.3725, 0, 0), M.kshelf, plane='side', holes=[_star(-0.34, 0.78, 0.045)],
+                  bevel=0.006, bevel_segments=1)
+    F.box('back', 0.72, 0.9, 0.02, (0, 0.45, -0.45), M.kshelf, bevel=0.004, bevel_segments=1)
+    F.extrude('top', G.rounded_rect(0.77, 0.26, 0.02, corner=2), 0.025, (0, 0.9125, -0.33), M.kshelf_top, plane='top',
+              bevel=0.008, bevel_segments=2)
+    F.box('plinth', 0.7, 0.06, 0.02, (0, 0.03, -0.07), M.kshelf_top, bevel=0.004, bevel_segments=1)
     lips = (M.toy_red, M.toy_blue, M.toy_yellow)
     covers = ((M.book_teal, M.toy_yellow), (M.book_rust, M.toy_blue), (M.book_blue, M.toy_red),
               (M.book_ochre, M.toy_green), (M.book_sage, M.toy_pink), (M.book_rose, M.toy_blue),
               (M.book_rust, M.toy_green), (M.book_blue, M.toy_yellow), (M.book_teal, M.toy_red))
     out = None
     for i, (y, z) in enumerate(SHELVES):
-        F.box(f'shelf{i}', 0.7, 0.02, z + 0.44, (0, y, (z - 0.44) / 2), M.kshelf, bevel=0.003)
-        F.box(f'lip{i}', 0.7, 0.08, 0.015, (0, y + 0.04, z), lips[i], bevel=0.004)
+        F.box(f'shelf{i}', 0.72, 0.02, z + 0.44, (0, y, (z - 0.44) / 2), M.kshelf, bevel=0.003, bevel_segments=1)
+        F.extrude(f'lip{i}', G.rounded_rect(0.72, 0.08, 0.025, corner=3), 0.015, (0, y + 0.04, z), lips[i], bevel=0.004,
+                  bevel_segments=1)
         for j, x in enumerate((-0.22, 0.0, 0.22)):
             cover, picture = covers[3 * i + j]
             bz = z - 0.04
-            by = y + 0.01 + 0.12 * math.cos(math.radians(BOOK_TILT))
-            bz -= 0.12 * math.sin(math.radians(BOOK_TILT))
+            by = y + 0.01 + BOOK_H * math.cos(math.radians(BOOK_TILT))
+            bz -= BOOK_H * math.sin(math.radians(BOOK_TILT))
             if (i, j) == (1, 1):
                 with G.new_parts() as parts:
                     list(_book(f'book{i}{j}', x, by, bz, cover, picture))
@@ -1032,17 +1566,38 @@ def _rect(x0, y0, x1, y1):
     return [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
 
 
+def _tilted(y, z0, tilt, d=0.0):
+    """Where a board leaning back by `tilt` degrees through (height 0.5, depth z0) is at height `y`, `d` in front of
+    its middle plane."""
+    t = math.radians(tilt)
+    return z0 - (y - 0.5) * math.tan(t) + d / math.cos(t)
+
+
 def kidsChalkboard():
     t = math.radians(EASEL_TILT)
+    # two frames leaning together, a slate in each; their stiles run down to the floor as feet
     for k, (z, tilt) in enumerate(((0.11, -EASEL_TILT), (-0.11, EASEL_TILT))):
-        F.box(f'frame{k}', 0.62, 0.96, 0.03, (0, 0.5, z), M.chalk_frame, rot=(tilt, 0, 0), bevel=0.01)
-        F.box(f'slate{k}', 0.52, 0.8, 0.036, (0, 0.5, z), M.slate, rot=(tilt, 0, 0), bevel=0.004)
-    F.cyl('top_bar', 0.015, 0.66, (0, 0.975, 0.0), M.chalk_frame, rot=(0, 90, 0), verts=10)
-    # the chalk tray across the front, three sticks of chalk
-    F.box('tray', 0.54, 0.02, 0.07, (0, 0.102, 0.25), M.chalk_frame, bevel=0.006)
-    F.box('tray_lip', 0.54, 0.03, 0.01, (0, 0.12, 0.285), M.chalk_frame, bevel=0.004)
+        F.extrude(f'frame{k}', G.rounded_rect(0.62, 0.96, 0.03, corner=2), 0.03, (0, 0.5, z), M.chalk_frame, rot=(tilt, 0, 0),
+                  holes=[G.rounded_rect(0.52, 0.8, 0.006, corner=1)], bevel=0.006, bevel_segments=2)
+        F.box(f'slate{k}', 0.522, 0.802, 0.036, (0, 0.5, z), M.slate, rot=(tilt, 0, 0))
+    # the hinge bar across the top, a turned knob on each end
+    F.cyl('top_bar', 0.015, 0.6, (0, 0.975, 0.0), M.chalk_frame, rot=(0, 90, 0), verts=10)
+    for s in (-1, 1):
+        G.revolve(f'bar_end{s}', [(0.0, 0.0), (0.017, 0.0), (0.019, 0.01), (0.014, 0.02), (0.0, 0.03)],
+                  at=F.at(s * 0.3, 0.975, 0.0), material=M.chalk_frame, segments=10, rot=(0, -90 * s, 0))
+        # a cord between the frames, so they can't spread
+        zi = _tilted(0.45, 0.11, EASEL_TILT, -0.015)
+        F.sweep(f'cord{s}', [(s * 0.285, 0.45, zi), (s * 0.285, 0.415, 0.0), (s * 0.285, 0.45, -zi)], 0.003, M.slate, verts=4,
+                resolution=3)
+    # the chalk tray across the front: chalk, a duster
+    F.box('tray', 0.54, 0.02, 0.07, (0, 0.102, 0.25), M.chalk_frame, bevel=0.006, bevel_segments=2)
+    F.box('tray_lip', 0.54, 0.03, 0.01, (0, 0.12, 0.285), M.chalk_frame, bevel=0.004, bevel_segments=1)
+    for s in (-1, 1):
+        F.box(f'tray_end{s}', 0.01, 0.025, 0.07, (s * 0.265, 0.12, 0.25), M.chalk_frame, bevel=0.003, bevel_segments=1)
     for k, (x, m) in enumerate(((-0.12, M.chalk_white), (0.0, M.chalk_yellow), (0.1, M.chalk_pink))):
-        F.cyl(f'chalk{k}', 0.007, 0.08, (x, 0.12, 0.258), m, rot=(0, 90, 0), verts=6)
+        F.cyl(f'chalk{k}', 0.007, 0.08, (x, 0.12, 0.258), m, rot=(0, 90, 10 * (k - 1)), verts=6)
+    F.box('duster', 0.08, 0.022, 0.035, (0.19, 0.123, 0.252), M.chalk_frame, bevel=0.005, bevel_segments=1)
+    F.box('duster_felt', 0.078, 0.008, 0.033, (0.19, 0.11, 0.252), M.slate, bevel=0.002, bevel_segments=1)
     # the board's face: a sun drawn already
     face = _board((0, 0.5 + 0.0185 * math.sin(t), 0.11 + 0.0185 * math.cos(t)), EASEL_TILT)
     _slab('sun', [(-0.13 + 0.055 * math.cos(math.radians(a)), 0.25 + 0.055 * math.sin(math.radians(a)))
@@ -1068,7 +1623,9 @@ def kidsChalkboard():
 
 
 def _leg(name, x, z0, z1):
-    G.rod(name, F.at(x, 0.0, z0), F.at(x, 1.2, z1), 0.0175, material=M.easel, verts=8)
+    """An easel's leg from the floor at depth z0 up to the hinge at z1, 1.2 m up: a rounded batten."""
+    F.sweep(name, [(x, 0.0, z0), (x, 1.2, z1)], None, M.easel, profile=G.rounded_rect(0.03, 0.036, 0.01, corner=2),
+            up=(1, 0, 0))
 
 
 def kidsEasel():
@@ -1076,15 +1633,34 @@ def kidsEasel():
     for s in (-1, 1):
         _leg(f'leg_front{s}', s * 0.3, 0.3, 0.0)
         _leg(f'leg_back{s}', s * 0.3, -0.3, 0.0)
+        F.box(f'board{s}', 0.58, 0.64, 0.01, (0, 0.82, s * 0.104), M.easel, rot=(-s * EASEL_TILT, 0, 0), bevel=0.003,
+              bevel_segments=1)
         F.box(f'paper{s}', 0.56, 0.62, 0.012, (0, 0.82, s * 0.11), M.paper, rot=(-s * EASEL_TILT, 0, 0))
-        F.box(f'tray{s}', 0.6, 0.03, 0.1, (0, 0.48, s * 0.21), M.easel, bevel=0.006)
-        F.box(f'tray_lip{s}', 0.6, 0.035, 0.012, (0, 0.5, s * 0.255), M.easel, bevel=0.004)
-        F.box(f'clip{s}', 0.12, 0.04, 0.02, (0, 1.12, s * 0.035), M.easel, rot=(-s * EASEL_TILT, 0, 0), bevel=0.006)
-    G.rod('top_bar', F.at(-0.33, 1.17, 0.0), F.at(0.33, 1.17, 0.0), 0.015, material=M.easel, verts=8)
+        # the tray: a shelf with a lip and ends
+        F.box(f'tray{s}', 0.6, 0.03, 0.1, (0, 0.48, s * 0.21), M.easel, bevel=0.006, bevel_segments=2)
+        F.box(f'tray_lip{s}', 0.6, 0.035, 0.012, (0, 0.5, s * 0.255), M.easel, bevel=0.004, bevel_segments=1)
+        # a spring clip holding the paper, and a stay folding between the legs
+        F.box(f'clip{s}', 0.12, 0.04, 0.02, (0, 1.12, s * 0.035), M.easel, rot=(-s * EASEL_TILT, 0, 0), bevel=0.006,
+              bevel_segments=1)
+        F.cyl(f'clip_spring{s}', 0.008, 0.1, (0, 1.142, s * 0.03), M.handle, rot=(0, 90, 0), verts=8)
+        F.sweep(f'stay{s}', [(s * 0.3, 0.4, 0.2), (s * 0.3, 0.37, 0.0), (s * 0.3, 0.4, -0.2)], 0.005, M.handle, verts=5,
+                resolution=2)
+    F.sweep('top_bar', [(-0.315, 1.17, 0.0), (0.315, 1.17, 0.0)], 0.015, M.easel, verts=8)
+    for s in (-1, 1):
+        G.revolve(f'bar_end{s}', [(0.0, 0.0), (0.017, 0.0), (0.019, 0.008), (0.0, 0.016)], at=F.at(s * 0.315, 1.17, 0.0),
+                  material=M.easel, segments=8, rot=(0, -90 * s, 0))
+    # open paint pots on the front tray, each with its paint, a jar of brushes
     for k, m in enumerate((M.ball_red, M.ball_yellow, M.ball_blue, M.ball_green)):
-        F.cyl(f'pot{k}', 0.025, 0.05, (-0.18 + 0.12 * k, 0.52, 0.22), m, verts=12)
-        F.cyl(f'pot_lid{k}', 0.02, 0.004, (-0.18 + 0.12 * k, 0.547, 0.22), M.paper, verts=12)
-    G.rod('brush', F.at(0.1, 0.505, 0.19), F.at(0.25, 0.51, 0.24), 0.005, material=M.easel, verts=6)
+        x = -0.2 + 0.1 * k
+        _turned(f'pot{k}', x, 0.21, [(0.0, 0.0), (0.024, 0.0), (0.026, 0.045), (0.022, 0.045), (0.02, 0.006), (0.0, 0.006)],
+                M.paper, segments=12, y=0.495)
+        F.cyl(f'paint{k}', 0.021, 0.004, (x, 0.53, 0.21), m, verts=12)
+    _turned('jar', 0.22, 0.21, [(0.0, 0.0), (0.028, 0.0), (0.03, 0.07), (0.026, 0.07), (0.024, 0.006), (0.0, 0.006)],
+            M.water, segments=12, y=0.495)
+    for k, (dx, dz, m) in enumerate(((-0.01, 0.0, M.paint_red), (0.008, -0.006, M.paint_blue), (0.0, 0.008, M.paint_yellow))):
+        a, b = (0.22 + dx * 0.5, 0.505, 0.21 + dz * 0.5), (0.22 + dx * 3, 0.66, 0.21 + dz * 3)
+        F.sweep(f'brush{k}', [a, b], 0.0035, M.easel, verts=5)
+        F.cone(f'bristles{k}', 0.004, 0.0015, 0.022, (b[0], b[1] + 0.009, b[2]), m, verts=6)
     _still('body')
     # the painting: a sky, a sun, a flower and some grass, painted on from the left
     face = _board((0, 0.82 + 0.0065 * math.sin(t), 0.11 + 0.0065 * math.cos(t)), EASEL_TILT)

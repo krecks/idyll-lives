@@ -57,8 +57,14 @@
       "type": "model",
       "url": "../../models/kids/kidsBed.glb",
       "materials": {
+        "eye": {
+          "finish": "material.finish.gloss"
+        },
         "kids_bedding": {
           "finish": "material.finish.fabric"
+        },
+        "kids_drawer": {
+          "finish": "material.finish.satin"
         },
         "kids_frame": {
           "finish": "material.finish.satin"
@@ -157,6 +163,15 @@
         },
         "chair_white": {
           "finish": "material.finish.satin"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "toy_green": {
+          "finish": "material.finish.satin"
+        },
+        "toy_yellow": {
+          "finish": "material.finish.satin"
         }
       },
       "paint": [
@@ -177,6 +192,18 @@
         "ball_blue": {
           "finish": "material.finish.gloss"
         },
+        "ball_yellow": {
+          "finish": "material.finish.gloss"
+        },
+        "eye": {
+          "finish": "material.finish.gloss"
+        },
+        "handle": {
+          "finish": "material.finish.metal"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
         "plush": {
           "finish": "material.finish.satin"
         },
@@ -187,6 +214,9 @@
           "finish": "material.finish.satin"
         },
         "toy_red": {
+          "finish": "material.finish.satin"
+        },
+        "toy_yellow": {
           "finish": "material.finish.satin"
         },
         "toybox": {
@@ -222,6 +252,9 @@
         "ball_blue": {
           "finish": "material.finish.gloss"
         },
+        "ball_yellow": {
+          "finish": "material.finish.gloss"
+        },
         "chest": {
           "finish": "material.finish.satin"
         },
@@ -231,8 +264,14 @@
         "chest_trim": {
           "finish": "material.finish.satin"
         },
+        "eye": {
+          "finish": "material.finish.gloss"
+        },
         "handle": {
           "finish": "material.finish.metal"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
         },
         "plush": {
           "finish": "material.finish.satin"
@@ -241,6 +280,9 @@
           "finish": "material.finish.satin"
         },
         "toy_red": {
+          "finish": "material.finish.satin"
+        },
+        "toy_yellow": {
           "finish": "material.finish.satin"
         }
       },
@@ -264,6 +306,9 @@
       "type": "model",
       "url": "../../models/kids/dollHouse.glb",
       "materials": {
+        "grass": {
+          "finish": "material.finish.satin"
+        },
         "house": {
           "finish": "material.finish.satin"
         },
@@ -321,6 +366,9 @@
       "type": "model",
       "url": "../../models/kids/rockingHorse.glb",
       "materials": {
+        "dark": {
+          "finish": "material.finish.satin"
+        },
         "eye": {
           "finish": "material.finish.gloss"
         },
@@ -463,7 +511,19 @@
         "grass": {
           "finish": "material.finish.satin"
         },
+        "house": {
+          "finish": "material.finish.satin"
+        },
         "house_door": {
+          "finish": "material.finish.satin"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "roof": {
+          "finish": "material.finish.satin"
+        },
+        "spot": {
           "finish": "material.finish.satin"
         },
         "toy_blue": {
@@ -523,6 +583,9 @@
         "ball_red": {
           "finish": "material.finish.gloss"
         },
+        "ball_yellow": {
+          "finish": "material.finish.gloss"
+        },
         "mat": {
           "finish": "material.finish.fabric"
         },
@@ -537,6 +600,9 @@
         },
         "mat_yellow": {
           "finish": "material.finish.fabric"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
         },
         "toy_blue": {
           "finish": "material.finish.satin"
@@ -626,6 +692,9 @@
         "chalk_blue": {
           "finish": "material.finish.matte"
         },
+        "chalk_pink": {
+          "finish": "material.finish.matte"
+        },
         "handle": {
           "finish": "material.finish.metal"
         },
@@ -637,6 +706,12 @@
         },
         "kdesk_top": {
           "finish": "material.finish.wood"
+        },
+        "paint_green": {
+          "finish": "material.finish.matte"
+        },
+        "paint_yellow": {
+          "finish": "material.finish.matte"
         },
         "paper": {
           "finish": "material.finish.matte"
@@ -748,6 +823,9 @@
         "kshelf_top": {
           "finish": "material.finish.satin"
         },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
         "toy_blue": {
           "finish": "material.finish.satin"
         },
@@ -841,6 +919,9 @@
         "easel": {
           "finish": "material.finish.wood"
         },
+        "handle": {
+          "finish": "material.finish.metal"
+        },
         "paint_blue": {
           "finish": "material.finish.matte"
         },
@@ -855,6 +936,9 @@
         },
         "paper": {
           "finish": "material.finish.matte"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
         }
       },
       "motions": {
