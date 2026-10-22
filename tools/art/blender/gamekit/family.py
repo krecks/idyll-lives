@@ -6,11 +6,11 @@ import sys
 
 import bpy
 
-from . import motion, parts
+from . import motion, parts, perch
 from .export import export_glb, materials_used, stats, write_pack
 from .manifest import known_keys, played, write_centres  # the keys, `motions` and centres as the gate reads them
 from .parts import check_size, join
-from .preview import preview, preview_clips
+from .preview import preview, preview_clips, preview_perches
 from .scene import ASSETS, PREVIEWS, meshes, reset
 
 # A decimated far version (`far=ratio`) keeps every vertex up to this height (m) over the model's lowest point.
@@ -59,16 +59,21 @@ class Model:
                  build function of its own (`G.far_of(build)`: the model's build again at low detail,
                  gamekit/far.py); the entry's `far`. For what is placed by the hundred or seen far off:
                  trees, street props.
+      bird       the entry's `bird` for a bird the game flies about by code (families/birds.py): {'length': bill to tail
+                 tip, 'wingspan', 'perchHeight': its body's middle over its feet, 'pitch': degrees its perched torso is raised from level},
+                 metres; `cargo check-glb` checks them against the file
+    Perches the build finds (`gamekit/perch.py`: a tree's outer twigs) are written as the entry's `perches`.
     """
 
     def __init__(self, id, build, size, key=None, tolerance=0.02, motions=None, paint=None, parts=None,
-                 centre=(0.0, 0.0), floor=True, far=None, sink=0.0, code=False):
+                 centre=(0.0, 0.0), floor=True, far=None, sink=0.0, code=False, bird=None):
         self.id, self.build, self.size, self.key = id, build, size, key
         self.tolerance, self.motions, self.paint = tolerance, motions, paint
         self.parts = parts
         self.centre, self.floor, self.sink = centre, floor, sink
         self.far = far
         self.code = code
+        self.bird = bird
 
 
 class Family:
@@ -92,6 +97,7 @@ class Family:
     def make(self, model):
         """Builds one model in an empty scene and checks it; returns its objects."""
         reset()
+        perch.clear()
         parts.CENTRE = model.centre
         try:
             objs = model.build() or meshes()
@@ -134,6 +140,7 @@ class Family:
         entries, centres = {}, {}
         for model in models:
             objs = self.make(model)
+            perches = perch.game()                         # before a far version is built
             if '--preview' in args:
                 # By family: an id may be in two (bench, flowers, hedge ...), and one family's render would overwrite the other's.
                 stem = os.path.join(PREVIEWS, self.name, model.id)
@@ -141,6 +148,9 @@ class Family:
                 preview(stem + '.png')
                 preview_clips(stem)
                 print(f'[gamekit] previewed {self.key(model)} -> {stem}.png')
+                if perches:
+                    print(f'[gamekit] {model.id}: {len(perches)} perches')
+                    preview_perches(stem + '@perches.png')
                 if model.far:
                     self.make_far(model, objs)
                     preview(stem + '.far.png')
@@ -158,6 +168,11 @@ class Family:
                 entry['parts'] = model.parts
             if model.sink:
                 entry['sink'] = model.sink
+            if model.bird:
+                entry['bird'] = model.bird
+            if perches:
+                entry['perches'] = perches
+                print(f'[gamekit] {model.id}: {len(perches)} perches')
             if model.far:
                 far = export_glb(os.path.join(ASSETS, 'models', self.name, f'{model.id}.far.glb'), self.make_far(model, objs))
                 entry['far'] = f'../../models/{self.name}/{model.id}.far.glb'

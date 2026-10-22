@@ -151,6 +151,12 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
      lifts the model off the floor. Draw every random number the full build draws, so the far version's
      parts stand where the model's do (`families/plants.py`, `trees.py`). The gate fails a far version
      whose lowest point is more than 0.5 cm off the model's.
+   - **Perches** (trees, shrubs, hedges): where the game's birds sit, the entry's `perches`. The build finds them
+     on its own meshes (`G.perch.around` and `surface`, lines in from outside meeting the leaves; `spread`;
+     `G.perch.keep`) with random numbers of its own, so the meshes don't change. `G.settle` moves them with the
+     model (`families/trees.py` `perch_on`, `plants.py` `perches`). `--preview` renders `<id>@perches.png` (and
+     `.top`) with a red ball on each. A bird the game flies by code takes `bird={'length', 'wingspan', 'perchHeight',
+     'pitch'}` (`families/birds.py`, birds.md). The gate checks both against the file.
 5. **Look**: `cargo art <family> --preview`, then open `previews/<family>/<id>.png`. The preview looks at the front
    three-quarter, so sides facing away (the inside of side shelves) may not show; the game will.
 6. **Export**: `cargo art <family>`.
@@ -388,9 +394,10 @@ never one that's already running) and drive Playwright headless with full Chrome
 | `parts.py` | `new_parts`, `join`, `join_all`, `set_origin`, `hinged`, `turn`, `settle`, `measure`, `game_size`, `check_size`; `fit` (third-party files only: it stretches) |
 | `motion.py` | the clips: `swing` (turn), `slide` (move), `grow` (appear from nothing), `squash` (scale), `spin` (whole turns home), `rock` (out, past rest and home), `turns` (parts out and back in turn), `scroll` (one repeat on, a belt), `path` (through keys), `stages` (a crop's growth); `clips` |
 | `export.py` | `export_glb` (the fixed export settings), `write_pack`, `stats`, `materials_used` |
-| `preview.py` | `preview` (front three-quarter, Workbench), `preview_clips` |
+| `preview.py` | `preview` (front three-quarter, Workbench; or `view=` side, front, top), `preview_clips`, `preview_perches` |
 | `family.py` | `Model`, `Family` and its `run`: the command line every family script ends with |
 | `far.py` | `far_of` (a far version from the model's own build at low detail), `low`, `is_low` |
+| `perch.py` | `G.perch`: where birds sit on a model, found on its meshes (`around`, `surface`, `bare`, `spread`, `keep`), the entry's `perches` |
 | `manifest.py` | plain Python, no bpy: the manifests and content as the gate reads them (`manifests`, `known_keys`, `played`), and centres.json (`read_centres`, `write_centres`) |
 | `review.py` | run by `cargo check-glb --preview`: re-imports each checked file and renders `previews/<family>/rt_<name>.png` |
 | `centres.py` | run by `cargo art --centres`: imports every family (no build) and writes centres.json |
