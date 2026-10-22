@@ -129,7 +129,7 @@ export interface RenderQuality extends QualitySettings {
 
 export const QUALITY: Record<GraphicsPreset, QualitySettings> = {
   low: { shadowMapSize: 1024, msaaSamples: 1, anisotropy: 4, clusteredLamps: false, mirrors: 1, mirrorScale: 0.4, mirrorRate: 10, lightingStep: 10, lawnDensity: 0.5, landscapeShadows: false, streetShadows: false, characterShadows: false, mergedObjectShadows: true, streetLod: 1, snapshotRendering: true, ambientRange: 0, birds: { count: 6, range: 18 } },
-  medium: { shadowMapSize: 2048, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 1, mirrorScale: 0.5, mirrorRate: 30, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, snapshotRendering: true, ambientRange: 40, birds: { count: 24, range: 35 } },
+  medium: { shadowMapSize: 2048, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 1, mirrorScale: 0.5, mirrorRate: 10, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, snapshotRendering: true, ambientRange: 40, birds: { count: 24, range: 35 } },
   high: { shadowMapSize: 4096, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 2, mirrorScale: 0.75, mirrorRate: 0, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, snapshotRendering: true, ambientRange: 60, birds: { count: 40, range: 50 } },
 };
 

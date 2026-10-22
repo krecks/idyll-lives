@@ -1,10 +1,14 @@
 # Where the time goes (measured 2026-10-22)
 
-Why the game sometimes stutters, measured on the branch `perf/stutter-measurements`. The short
-answer: **steady rendering is not the problem** — the renderer holds 120 fps with no long tasks.
-The hitches come from *rebuilding the whole rendered world* whenever the simulation says the
-structure changed, and from the background asset stream doing the same when a file arrives after
-Play. Both scale with how fast the game is played.
+Why the game stuttered, measured and then fixed on the branch `perf/stutter-measurements`. The short
+answer: **steady rendering was not the problem** — the renderer holds 120 fps with no long tasks. The
+hitches came from *rebuilding the whole rendered world* whenever the simulation said the structure
+changed, from the background asset stream doing the same when a file arrived after Play, and from
+Babylon making reflection pipelines in the first frame that needed them. All three scaled with how
+fast the game was played.
+
+Measured first (sections below), then fixed; see [What was fixed](#what-was-fixed) for the changes and
+the after numbers.
 
 ## How it was measured
 
@@ -148,18 +152,61 @@ dropped frame is 25–40 ms, so most of what a player feels is invisible to `?pr
 overlay — the benchmark can look clean while the game hitches. Counts over 20 ms are the useful
 signal (the profiler does report them).
 
-## What would fix it, in order of payoff
+## What was fixed
 
-1. **Do not rebuild the world for a structure message that only changes a few objects.** Either diff
-   the message in the session (objects by id: rebuild only the changed templates/meshes, keep the
-   rest), or have the simulation say *what* changed (opened object ids, grown crop ids) so the
-   renderer can patch those meshes instead of the lot.
-2. **Patch streamed models into the meshes that stand in for them** instead of `setWorld`. The
-   renderer already knows which template keys each arrived url invalidates; swapping the meshes for
-   those keys avoids the street/object rebuild and most of the 1 s warm.
-3. **Throttle the stream rebuilds** to one per few seconds while the player is not looking at the
-   affected lot (the town's street does not need to be rebuilt while the camera is inside a house).
-4. Lower `DROP_MS` to about 20 ms so `?profile` records what players feel.
+The four causes and the blind spot, on this branch:
 
-None of these are done on this branch: it carries the measurements, the profiler tool and this
-write-up.
+1. **Patch the world instead of rebuilding it.** `BabylonRenderer.setWorld` now compares the incoming
+   world with the one it built (`unpatchable`) and, when only objects opened/closed or crops grew,
+   applies it in place: `patchWorld` recomputes the picking box of every placed object
+   (`pickBox`, now shared with the build) and `objectMotion.patch` moves `open`/`stage` on the live
+   motions — the clips are read each frame, so doors swing and crops advance with no rebuild. The
+   comparison ignores what does not shape the mesh (`wear`, `quality`, `sellValue`, `repairCost`) and
+   the lot by `lotVersion` only (lean world messages re-parse `plots`/`meta`, so references never
+   match). A patch costs **0.2–0.6 ms**; rebuilds in play at 5× went from 14 a minute to 0.
+2. **Hold the stream's rebuilds until the town has streamed**, then build once
+   (`renderer.holdModelRefresh` from the reveal tail in `web/src/game/session.ts`), and **pre-build the
+   arrived templates a frame at a time** before that rebuild, so the models that came with the stream
+   are not all built in its first frame.
+3. **Warm the reflections where the pipelines are made.** The menu warmed them through `warmGame`,
+   which the in-game session never runs; `buildOne` now sets `warmMirrors`, and the frame loop calls
+   `mirrors.warm(0)` once after each build, drawing every caster into the reflection (with
+   `warmAll`) so no material's pipeline is created mid-play. Build helpers are no longer reflected
+   (`HELPER_MESH`), and Medium's `mirrorRate` is 10 instead of 30 (it was 30 at 30 fps; at 120 fps
+   that was a reflection every 4 frames for no visible gain).
+4. **Warm the save thumbnail at boot** (`session: warm thumbnail`, 336 ms inside the loading screen)
+   instead of on the first autosave, and capture it from a kept render target rather than a fresh
+   screenshot of the whole scene.
+5. **`DROP_MS` 50 → 20** in `web/src/debug/perf.ts`, so `?profile` records the 25–40 ms hitches a
+   player feels on a 120 Hz display.
+6. Boot portraits are posed two a frame (`POSE_PER_FRAME`) and the batch draws one portrait on its
+   first frame, which spreads the work; the remaining boot long task is the first draw of the
+   portrait target (cold pipeline), not the posing.
+
+After, same state, Medium/WebGPU, 60 s after Play (`bench-results/profile-final*`):
+
+| speed | fps | p50 | p95 | p99 | max | > 20 ms | > 33 ms | > 50 ms |
+|---|---|---|---|---|---|---|---|---|
+| 1× (90 s) | 119.9 | 8.3 | 8.8 | 9.3 | 16.8 | 2 | 0 | 0 |
+| 5× | 114.2–116.7 | 8.3 | 9.0–9.2 | 16.7–25.0 | 108–141 | 88–101 | 36–49 | 2 |
+
+The 925 ms freeze is gone, the once-a-minute autosave hitch is gone (it is a 336 ms warm at boot
+now), and the mirror no longer makes a pipeline in play.
+
+### What is left
+
+- **The one stream-settle rebuild**, once per load (~25 s in, when the rest of the town has streamed):
+  118 ms, of which `mirror` pipeline creation for the newly streamed models is 94 ms. It happens in the
+  same frame because the new world is drawn the moment the build finishes. Spreading the reflection
+  warm across frames would need a hidden warm target, so the reflection pipelines are made for the
+  target format without drawing into the visible mirror.
+- **Night variants at 5×** (`glow`, `simBlanket`, `gardenPools`, `simShadows` are enabled only later in
+  the day): 50–82 ms frames as their reflection pipelines are made, three or four times in a 5× minute.
+  At 1× they are spread over the day and did not show in a 90 s run (max 16.8 ms).
+- **Boot**: portraits 819 ms, `warm game` 503 ms, world build 1421 ms, town overview 442 ms — all in
+  the loading screen, which is what it is for.
+- **Structural rebuilds still rebuild the lot** when the structure really changes (storey switched,
+  residents in or out, furniture added): 11–45 ms, rare.
+
+The remaining big win would be patching streamed models into the stand-in meshes instead of building
+again; the patch path above makes that less urgent.

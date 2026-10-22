@@ -172,6 +172,19 @@ export class ObjectMotion {
     this.unlit = unlit;
   }
 
+  /**
+   * What opened or closed, or grew, since the world was built: the clips follow on from here
+   * (a door swings, a crop moves on a stage) without the world being built again.
+   */
+  patch(objects: readonly ObjectPlacement[]): void {
+    for (const o of objects) {
+      const moving = this.objects.get(o.id);
+      if (!moving) continue;
+      moving.open = !!o.open;
+      moving.stage = o.growth;
+    }
+  }
+
   /** The objects of a newly built world; those still mid-clip are posed again. */
   set(objects: MovingObject[]): void {
     const before = this.objects;

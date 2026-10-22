@@ -18,6 +18,8 @@ import type { Studio } from './studio';
 export const PORTRAIT_PX = 160;
 const BATCH = 16;
 const PER_FRAME = 6;
+/** Rows posed per frame: each is a Sim's models built, so they'd otherwise land in one ~870 ms task. */
+const POSE_PER_FRAME = 2;
 const FIRST_ROW = 1;
 const ROW_X = 40;
 const ROW_SPACING = 3;
@@ -58,6 +60,8 @@ interface Batch {
   frames: number;
   next: number;
   pending: number;
+  /** Rows posed so far: posing them all in one task took ~870 ms at boot, so it's spread over frames. */
+  posed: number;
   cams: { x: number; y: number; z: number }[];
 }
 
@@ -125,6 +129,8 @@ export class Portraits {
     if (!this.batch && this.queue.size) this.startBatch(studio, now);
     const b = this.batch;
     if (!b) return;
+    // Building a Sim's models is the expensive part: a couple a frame, not sixteen in one task.
+    for (let n = 0; b.posed < b.jobs.length && n < POSE_PER_FRAME; n++, b.posed++) this.pose(studio, b, b.posed);
     const heads = studio.characters.heads;
     b.jobs.forEach((_, j) => {
       const row = FIRST_ROW + j;
@@ -145,6 +151,8 @@ export class Portraits {
   render(studio: Studio, now: number): void {
     const b = this.batch;
     if (!b || b.pending > 0 || b.next >= b.jobs.length) return;
+    // (Nothing is drawn before every row stands: `direct` poses them over a few frames.)
+    if (b.posed < b.jobs.length) return;
     if (!studio.ready()) {
       if (now - b.started > READY_TIMEOUT) this.finish(studio, true);
       return;
@@ -155,7 +163,9 @@ export class Portraits {
     const cam = this.ensureCamera(studio);
     const prevCam = scene.activeCamera;
     const drawn: { job: Job; rtt: RenderTargetTexture }[] = [];
-    while (b.next < b.jobs.length && drawn.length < PER_FRAME) {
+    // The batch's first draws compile the portrait shaders: one a frame then, not six in one task (~850 ms at boot).
+    const limit = b.next === 0 ? 1 : PER_FRAME;
+    while (b.next < b.jobs.length && drawn.length < limit) {
       const j = b.next++;
       const c = b.cams[j];
       const rtt = this.renderTarget(studio, drawn.length);
@@ -209,17 +219,20 @@ export class Portraits {
     this.failAll();
   }
 
-  private startBatch(studio: Studio, now: number): void {
+  private startBatch(_studio: Studio, now: number): void {
     const jobs = [...this.queue.values()].slice(0, BATCH);
     for (const job of jobs) this.queue.delete(job.key);
     const cams = jobs.map(() => ({ x: 0, y: 0, z: 0 }));
-    this.batch = { jobs, started: now, frames: 0, next: 0, pending: 0, cams };
-    jobs.forEach((job, j) => {
-      const row = FIRST_ROW + j;
-      studio.setRow(row, { look: job.look, x: ROW_X + j * ROW_SPACING, z: 0, yaw: 0 });
-      const dir: StageDirection = { still: true, time: 0.6, face: PORTRAIT_FACE, lookAt: cams[j], hands: 0.6 };
-      studio.characters.directions[row] = dir;
-    });
+    this.batch = { jobs, started: now, frames: 0, next: 0, pending: 0, posed: 0, cams };
+  }
+
+  /** Puts portrait `j` on its row, still, with a friendly face and eye contact. */
+  private pose(studio: Studio, b: Batch, j: number): void {
+    const job = b.jobs[j];
+    const row = FIRST_ROW + j;
+    studio.setRow(row, { look: job.look, x: ROW_X + j * ROW_SPACING, z: 0, yaw: 0 });
+    const dir: StageDirection = { still: true, time: 0.6, face: PORTRAIT_FACE, lookAt: b.cams[j], hands: 0.6 };
+    studio.characters.directions[row] = dir;
   }
 
   /** Ends the batch and empties its rows; on failure, unanswered requests get null. */

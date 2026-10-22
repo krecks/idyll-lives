@@ -45,8 +45,12 @@ const LOG = params.has('profile');
 const MAX_ENTRIES = 500;
 const MAX_TASKS = 200;
 const MAX_DROPS = 200;
-/** A frame longer than this is a hitch worth naming (a display shows 60, 90 or 120 a second). */
-const DROP_MS = 50;
+/**
+ * A frame longer than this is a hitch worth naming. 20 ms: a frame that takes a fifth of a 60 Hz
+ * frame's time (or half a 120 Hz one) is already felt as a stutter, and at 50 ms most of them went
+ * unrecorded.
+ */
+const DROP_MS = 20;
 
 const entries: PerfEntry[] = [];
 const longTasks: LongTask[] = [];

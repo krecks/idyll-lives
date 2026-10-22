@@ -211,6 +211,8 @@ export async function startSession(
   let resumeSpeed: number | null = null;
   let revealed = false;
   let warmed = false;
+  /** The world has been built once: later ones are patches or rare rebuilds, and need no warm-up. */
+  let builtOnce = false;
   let disposed = false;
   /** The scene build in progress; disposing waits for it so it can't add to the next session's scene. */
   let building: Promise<unknown> = Promise.resolve();
@@ -917,8 +919,10 @@ export async function startSession(
    * for only so long, so saving works while nothing is drawn.
    */
   const store = async (name: string, id: string, autosave: boolean): Promise<string> => {
-    const picture = document.hidden ? Promise.resolve(null) : Promise.race([renderer.captureThumbnail(THUMBNAIL.width, THUMBNAIL.height), new Promise<null>((resolve) => setTimeout(resolve, THUMBNAIL_WAIT_MS, null))]);
-    const [data, taken] = await Promise.all([bridge.requestSave(), picture]);
+    const picture = document.hidden
+      ? Promise.resolve(null)
+      : Promise.race([perfTimeAsync('save: picture', () => renderer.captureThumbnail(THUMBNAIL.width, THUMBNAIL.height)), new Promise<null>((resolve) => setTimeout(resolve, THUMBNAIL_WAIT_MS, null))]);
+    const [data, taken] = await Promise.all([perfTimeAsync('save: data', () => bridge.requestSave()), picture]);
     thumbnail = taken ?? thumbnail;
     const record: SaveRecord = {
       id,
@@ -933,7 +937,7 @@ export async function startSession(
       game: gameId,
       data,
     };
-    await writeSave(record);
+    await perfTimeAsync('save: write', () => writeSave(record));
     return id;
   };
   /** Saves into the older of the game's two autosaves. */
@@ -1082,13 +1086,17 @@ export async function startSession(
         // Compile the game's own look (its lighting and cutaway) while the menu still covers it.
         // (When the game is only prepared in the background, it waits until it is started: the
         // mirror's clip-plane shaders take a long frame, which must not land on a visible menu.)
-        if (warm) {
+        if (warm && !warmed) {
           warmed = true;
           const frame = await perfTimeAsync('session: first frame', firstFrame);
           if (frame) await perfTimeAsync('session: warm game', () => renderer.warmGame(frame));
           else perfPhase('session: warm game (no frame)');
         } else perfPhase('session: warm game (deferred)');
-        return perfTimeAsync('session: warm frames', () => renderer.framesRendered(WARM_FRAMES));
+        // Only the first world is drawn a few times to compile what it shows: a later one is
+        // patched in place (an object opened, a crop grown), and warms nothing new.
+        const frames = builtOnce ? 1 : WARM_FRAMES;
+        builtOnce = true;
+        return perfTimeAsync('session: warm frames', () => renderer.framesRendered(frames));
       })
       .then(() => {
         progress('Drawing portraits', 0.9);
@@ -1494,6 +1502,8 @@ export async function startSession(
       if (frame) await perfTimeAsync('session: warm game', () => renderer.warmGame(frame));
       else perfPhase('session: warm game (no frame)');
       await perfTimeAsync('session: warm frames', () => renderer.framesRendered(WARM_FRAMES));
+      // A save's picture is drawn into its own target: compile its shaders now, not at the first autosave.
+      await perfTimeAsync('session: warm thumbnail', () => renderer.captureThumbnail(THUMBNAIL.width, THUMBNAIL.height));
     },
     reveal() {
       if (revealed) return;
@@ -1527,13 +1537,16 @@ export async function startSession(
         else controls.setBuildTab('furnish');
       }
       perfPhase(`session: reveal ${game.mode} ${game.buildTab} storey ${game.storey} walls ${game.wallMode}`);
-      // The house is cached by now: stream the rest of the town while the player is in it.
+      // The house is cached by now: stream the rest of the town while the player is in it. Its
+      // models are built into the world once the stream is over (each settle used to rebuild it).
       void (async () => {
         await homeAssets;
         if (disposed) return;
+        renderer.holdModelRefresh(true);
         prefetch(restUrls);
         // The catalog's pictures are built only once the stream is quiet, in idle moments.
         await whenStreamSettled();
+        renderer.holdModelRefresh(false);
         if (disposed || BENCH) return;
         prefetchTimer = setTimeout(() => {
           // (Not while benchmarking: drawing the pictures would show in the measurements.)
