@@ -1297,11 +1297,7 @@ pub struct ScheduleWindow {
 
 impl ScheduleWindow {
     pub fn contains(&self, hour: f32) -> bool {
-        if self.from <= self.to {
-            (self.from..self.to).contains(&hour)
-        } else {
-            hour >= self.from || hour < self.to
-        }
+        in_hours([self.from, self.to], hour)
     }
 }
 
