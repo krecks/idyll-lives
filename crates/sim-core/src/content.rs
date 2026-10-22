@@ -633,6 +633,8 @@ pub struct LifeRules {
     pub days_per_year: f32,
     /// Oldest first stage last; a resident is in the last stage whose `from` they have reached.
     pub stages: Vec<LifeStage>,
+    /// Every stage but a baby's (0 without stages).
+    pub not_baby: StageMask,
     /// Ages new residents get when nothing says otherwise.
     pub start_age: [f32; 2],
     /// Working residents retire at this age (None: never), with a weekly pension of
@@ -3460,6 +3462,7 @@ impl Content {
         }
         let life = LifeRules {
             days_per_year: raw.life.days_per_year.unwrap_or(2.0).max(0.1),
+            not_baby: if stages.is_empty() { 0 } else { every_stage & !babies },
             stages,
             start_age: [start_age[0].min(start_age[1]), start_age[0].max(start_age[1])],
             retire_at: raw.life.retire_at,

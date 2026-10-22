@@ -14,7 +14,7 @@
 //! use it. `Links` caches what depends only on where objects and walls stand; it is rebuilt with
 //! the object index when the structure changes.
 
-use crate::content::{Approach, Content, DEFAULT_RADIUS, Layer, Pose, StageMask, Surface};
+use crate::content::{Approach, Content, DEFAULT_RADIUS, Layer, Pose, Surface};
 use crate::lot::Edge;
 use crate::path::NavGrid;
 use crate::world::{MAX_OFFSET, ObjectInstance};
@@ -807,7 +807,7 @@ pub fn dining_seat(
     let food = tag("food");
     let comfy = food | tag("lounge");
     // (Every stage but a baby's: a seat for fewer is made for them.)
-    let anyone: StageMask = content.life.stages.iter().enumerate().filter(|(_, s)| !s.baby).fold(0, |m, (i, _)| m | 1 << i);
+    let anyone = content.life.not_baby;
     let mut best: Option<(DiningRank, bool, f32, u32, Option<u32>)> = None;
     for &id in candidates {
         let Some(o) = objects.get(id as usize) else { continue };
