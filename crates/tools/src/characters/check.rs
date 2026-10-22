@@ -172,6 +172,7 @@ pub fn check(out: &Path) -> bool {
     let mut moved: BTreeSet<String> = BTreeSet::new();
     let shell = shell_re(false);
     let stage_scale = rig.at("stageScale").f64();
+    let tone_scale = rig.at("toneScale").f64();
     for (fam, body) in rig.at("bodies").obj() {
         let fam = fam.as_str();
         let buf = std::fs::read(out.join(body.at("mesh").str())).expect("mesh");
@@ -228,6 +229,11 @@ pub fn check(out: &Path) -> bool {
             }
             if idx.iter().any(|&i| i as usize >= n) {
                 fail(format!("{fam}:{name} index out of range"));
+            }
+            // The baked occlusion (tone.w) is a share of the sky: 0..1 on every part.
+            let tone = i16s(&buf, e.at("tone").usize(), n * 4);
+            if tone.chunks(4).any(|t| !(0.0..=1.0).contains(&(t[3] as f64 / tone_scale))) {
+                fail(format!("{fam}:{name} has tone.w outside 0..1"));
             }
             if let Some(bg) = budget(name)
                 && tris > bg

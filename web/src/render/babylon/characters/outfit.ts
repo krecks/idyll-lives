@@ -72,7 +72,7 @@ export interface OutfitParams {
   neck: number;
   /** 1 for clothes without hems, cuffs or a waistband (the towel, swimwear), else 0. */
   plain: number;
-  /** Age (0 young .. 1 elder): the shader deepens the skin's cavities with it. */
+  /** Age (0 young .. 1 elder): the shader deepens the body's baked creases with it. */
   age: number;
   hair: [number, number, number];
   /** Iris colour (linear rgb). */

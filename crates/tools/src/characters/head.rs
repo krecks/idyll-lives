@@ -187,27 +187,16 @@ pub fn head_cage(cage: &mut Cage, family: &str, stage: &str) -> Vec<usize> {
     }
     let mut ids = Vec::new();
     for r in 0..ROWS.len() {
-        let mut cav = [0.0; 12];
         let mut blush = [0.0; 12];
-        // (Tone is the base stage's for every stage; the shader deepens cavities with age.)
+        // (Tone is the base stage's for every stage.)
         if r == 3 {
             blush[2] = 0.32 + 0.2 * yg;
             blush[10] = blush[2];
             blush[3] = 0.2 + 0.15 * yg;
             blush[9] = blush[3];
             blush[0] = 0.15;
-            // Under the eyes.
-            cav[2] = 0.08;
-            cav[10] = 0.08;
         }
-        if r == 2 {
-            // Beside the nose; cheek folds.
-            cav[1] = 0.15;
-            cav[11] = 0.15;
-            cav[2] = 0.1;
-            cav[10] = 0.1;
-        }
-        let tags = RingTags { cav: Per::Each(&cav), blush: Per::Each(&blush), ..Default::default() };
+        let tags = RingTags { blush: Per::Each(&blush), ..Default::default() };
         ids.push(cage.ring(&grid[r], Per::All(&w), "head", Some(&dd[r]), tags));
     }
     for r in 0..ROWS.len() - 1 {
@@ -235,7 +224,7 @@ pub fn head_cage(cage: &mut Cage, family: &str, stage: &str) -> Vec<usize> {
             base.push(bpt);
             offs.push(q - bpt);
         }
-        let tags = RingTags { blush: Per::All(0.35), cav: Per::All(0.25), ..Default::default() };
+        let tags = RingTags { blush: Per::All(0.35), ..Default::default() };
         let e = cage.ring(&base, Per::All(&w), "ear", Some(&offs), tags);
         cage.band(&lp, &e, &[]);
         cage.cap(&e);

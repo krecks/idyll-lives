@@ -17,8 +17,8 @@
 //! Fields (docs/characters-format.md): x = sleeve parameter (-1 torso, 0 shoulder .. 1 wrist, over
 //! 1 on the hand: the arm's share of a vertex blends from the torso's -1 at the armhole), y = height,
 //! z / w = the crew and scoop (male: V) necklines, metres below a smooth curve round the neck
-//! (positive: covered); on the head -1 - scalp weight. Tone: x = blush (cheeks, nose, ears), y =
-//! cavities (armpits, the crotch, between the fingers, under the chin, the eye sockets).
+//! (positive: covered); on the head -1 - scalp weight. Tone: x = blush (cheeks, nose, ears); the
+//! shade in the creases is baked into w afterwards (ao.rs).
 
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
@@ -269,8 +269,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
                 continue;
             }
             if let Some(&(i, sd)) = root_index.get(&(r, k)) {
-                let cav = if i == 1 { 0.55 } else if i == 0 || i == 2 { 0.25 } else { 0.0 };
-                ids.push(c.add(q, arm_w(i, sd), "torso", None, Tags { arm: 0.5, cav, blush: 0.0 }));
+                ids.push(c.add(q, arm_w(i, sd), "torso", None, Tags { arm: 0.5, blush: 0.0 }));
             } else {
                 ids.push(c.add(q, tw(r, k), "torso", None, Tags::default()));
             }
@@ -282,7 +281,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
         vec![("pelvis", 0.4), ("thigh_l", 0.3), ("thigh_r", 0.3)],
         "torso",
         None,
-        Tags { cav: 0.35, ..Tags::default() },
+        Tags::default(),
     );
     // Shoulder cap: the neck's sides.
     let mut cap: HashMap<&str, usize> = HashMap::new();
@@ -324,8 +323,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
         nh[k][1] += 0.012 * h;
     }
     let nw: Weights = vec![("neck_01", 0.55), ("Head", 0.45)];
-    let ncav = [0.45, 0.25, 0.0, 0.0, 0.0, 0.0, 0.0, 0.25];
-    let nh_id = c.ring(&nh, Per::All(&nw), "neck", None, RingTags { cav: Per::Each(&ncav), ..Default::default() });
+    let nh_id = c.ring(&nh, Per::All(&nw), "neck", None, RingTags::default());
     c.band(&n0, &nh_id, &[]);
     let jaw = head_cage(&mut c, family, stage);
     c.join(&nh_id, &jaw, &[0, 2, 4, 5, 6, 7, 8, 10]);
@@ -370,8 +368,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
         c.join(&wrist, &p1, &[0, 1, 2, 3, 5, 6, 7, 8]);
         let p2_pts = palm_ring(0.9, 1.0);
         let w2: Weights = vec![(nm("hand"), 0.5), (nm("fingers_01"), 0.5)];
-        let pcav = [0.0, 0.2, 0.2, 0.0, 0.0, 0.12, 0.12, 0.12, 0.0, 0.0];
-        let p2 = c.ring(&p2_pts, Per::All(&w2), "hand", None, RingTags { arm: Per::All(1.0), cav: Per::Each(&pcav), ..Default::default() });
+        let p2 = c.ring(&p2_pts, Per::All(&w2), "hand", None, arm1());
         c.band(&p1, &p2, &[8]);
         let at = |k: usize, v: f64| order.iter().position(|&(a, b)| a == k && b == v).unwrap();
         // Fingers: one per distal quad of the knuckle ring, curled a little towards the palm.
@@ -432,15 +429,15 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
         };
         let nm = |n: &str| bone(format!("{n}_{sd}"));
         let (jt, jk, ja) = (pj(nm("thigh")), pj(nm("calf")), pj(nm("foot")));
-        let rings: [(V3, f64, f64, f64, Weights, f64); 4] = [
-            (jt + (jk - jt) * 0.24, 1.0, 0.98, 1.06, vec![(nm("thigh"), 0.92), ("pelvis", 0.08)], 0.0),
-            (jt + (jk - jt) * 0.86, 0.68, 0.70, 0.64, vec![(nm("thigh"), 0.75), (nm("calf"), 0.25)], 0.0),
-            (jk + (ja - jk) * 0.22, 0.64, 0.64, 0.74, vec![(nm("calf"), 0.85), (nm("thigh"), 0.15)], 0.1),
-            (ja + (jk - ja) * 0.1, 0.42, 0.42, 0.44, vec![(nm("calf"), 0.5), (nm("foot"), 0.5)], 0.0),
+        let rings: [(V3, f64, f64, f64, Weights); 4] = [
+            (jt + (jk - jt) * 0.24, 1.0, 0.98, 1.06, vec![(nm("thigh"), 0.92), ("pelvis", 0.08)]),
+            (jt + (jk - jt) * 0.86, 0.68, 0.70, 0.64, vec![(nm("thigh"), 0.75), (nm("calf"), 0.25)]),
+            (jk + (ja - jk) * 0.22, 0.64, 0.64, 0.74, vec![(nm("calf"), 0.85), (nm("thigh"), 0.15)]),
+            (ja + (jk - ja) * 0.1, 0.42, 0.42, 0.44, vec![(nm("calf"), 0.5), (nm("foot"), 0.5)]),
         ];
         let mut prev = lp;
         let sx = if sd == "r" { 1.0 } else { -1.0 };
-        for (k, (cc, a, bf, bb, w, cav)) in rings.iter().enumerate() {
+        for (k, (cc, a, bf, bb, w)) in rings.iter().enumerate() {
             let mut pts = ring_pts(*cc, x, z, r_th * a, r_th * bf, r_th * bb, &psi, 2.1);
             if k == 0 {
                 // The thigh's top stops short of the midline (a baby's plump thighs would cross
@@ -449,8 +446,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
                     q[0] = sx * (sx * q[0]).max(CROTCH_GAP * r_th);
                 }
             }
-            let cavs: Vec<f64> = psi.iter().map(|&a| if a.cos() < -0.5 { *cav } else { 0.0 }).collect();
-            let cur = c.ring(&pts, Per::All(w), "leg", None, RingTags { cav: Per::Each(&cavs), ..Default::default() });
+            let cur = c.ring(&pts, Per::All(w), "leg", None, RingTags::default());
             c.band(&prev, &cur, &[]);
             prev = cur;
         }
@@ -545,17 +541,16 @@ pub fn topology() -> &'static Topology {
 #[derive(Clone)]
 pub struct TagArrays {
     pub arm: Vec<f64>,
-    pub cav: Vec<f64>,
     pub blush: Vec<f64>,
 }
 
 impl TagArrays {
     fn of(t: &[Tags]) -> Self {
-        TagArrays { arm: t.iter().map(|t| t.arm).collect(), cav: t.iter().map(|t| t.cav).collect(), blush: t.iter().map(|t| t.blush).collect() }
+        TagArrays { arm: t.iter().map(|t| t.arm).collect(), blush: t.iter().map(|t| t.blush).collect() }
     }
 
     fn subdivided(&self, m: &Csr) -> Self {
-        TagArrays { arm: m.apply1(&self.arm), cav: m.apply1(&self.cav), blush: m.apply1(&self.blush) }
+        TagArrays { arm: m.apply1(&self.arm), blush: m.apply1(&self.blush) }
     }
 }
 
@@ -831,7 +826,7 @@ pub fn body_fields_and_tone(family: &str, mesh: &Mesh, p: &[V3; NB], head: &Head
     let (pos, tags, region) = if lod { (&s.lod_pos, &s.lod_tags, &s.lod_region) } else { (&s.pos, &s.tags, &s.region) };
     let k = pos.len();
     let mut f = fields_of(family, pos, &tags.arm, region, p, head);
-    let mut tone: Vec<[f64; 4]> = (0..k).map(|i| [clip(tags.blush[i], 0.0, 1.0), clip(tags.cav[i], 0.0, 1.0), 0.0, 0.0]).collect();
+    let mut tone: Vec<[f64; 4]> = (0..k).map(|i| [clip(tags.blush[i], 0.0, 1.0), 0.0, 0.0, 0.0]).collect();
     if n > k {
         // The face's pieces (lids, lips) inside the body: head fields; the nearest skin's tone.
         let extra = &mesh.pos[k..];

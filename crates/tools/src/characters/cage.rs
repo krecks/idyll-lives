@@ -10,7 +10,7 @@
 //! Every life stage and both families build the same vertices in the same order, so the topology
 //! is fixed and stages are deltas. Per vertex the cage carries its target point (on the designed
 //! surface), its skin weights (bone -> weight), a region name and tags (`arm`: 0 torso .. 1 arm,
-//! used by the sleeve field; `cav`: cavity darkening; `blush`), which subdivide like positions.
+//! used by the sleeve field; `blush`), which subdivide like positions.
 //!
 //! Torso rings have 12 vertices at 30 degree steps (0 = front, 90 = the resident's right, +x): the
 //! arms leave through the 2 x 2 patches at 60..120 / 240..300 degrees of the chest rings T5-T7, the
@@ -41,11 +41,10 @@ pub fn turn(a: V3, b: V3) -> M3 {
     M3::identity() + k + k * k / (1.0 + cs)
 }
 
-/// Per-vertex tags (`arm`, `cav`, `blush`).
+/// Per-vertex tags (`arm`, `blush`).
 #[derive(Clone, Copy, Default)]
 pub struct Tags {
     pub arm: f64,
-    pub cav: f64,
     pub blush: f64,
 }
 
@@ -66,13 +65,12 @@ impl<T: Copy> Per<'_, T> {
 
 pub struct RingTags<'a> {
     pub arm: Per<'a, f64>,
-    pub cav: Per<'a, f64>,
     pub blush: Per<'a, f64>,
 }
 
 impl Default for RingTags<'_> {
     fn default() -> Self {
-        RingTags { arm: Per::All(0.0), cav: Per::All(0.0), blush: Per::All(0.0) }
+        RingTags { arm: Per::All(0.0), blush: Per::All(0.0) }
     }
 }
 
@@ -121,7 +119,7 @@ impl Cage {
                     Per::All(v) => (*v).clone(),
                     Per::Each(v) => v[i].clone(),
                 };
-                let t = Tags { arm: tags.arm.at(i), cav: tags.cav.at(i), blush: tags.blush.at(i) };
+                let t = Tags { arm: tags.arm.at(i), blush: tags.blush.at(i) };
                 self.add(pts[i], wi, region, disp.map(|d| d[i]), t)
             })
             .collect()
