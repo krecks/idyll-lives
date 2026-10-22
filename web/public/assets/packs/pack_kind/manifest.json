@@ -39,6 +39,9 @@
         "grate": {
           "finish": "material.finish.satin"
         },
+        "heart": {
+          "finish": "material.finish.gloss"
+        },
         "hob": {
           "finish": "material.finish.satin"
         },
@@ -129,6 +132,9 @@
           "finish": "material.finish.gloss"
         },
         "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "leaf_light": {
           "finish": "material.finish.satin"
         },
         "mustard": {
@@ -323,6 +329,9 @@
           "finish": "material.finish.satin"
         },
         "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "leaf_light": {
           "finish": "material.finish.satin"
         },
         "lilac": {

@@ -44,12 +44,12 @@ Where the plan's table says "Loop (E1) … Until then static" (the plate), the l
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.lazy.snoozecloudBed` | 1.86 × 1.29 × 1.86 m | 4,772 | 3 | Body, Upholstery (the mattress), Throw |
-| `model.lazy.napPod` | 0.92 × 1.54 × 0.91 m | 4,308 | 3 | Body (the egg), Upholstery (the cushions), Hood |
-| `model.lazy.quiltTable` | 1.81 × 0.77 × 0.93 m | 3,696 | 3 | Body (the table top), Upholstery (the quilt), Poufs |
-| `model.lazy.deliveryLocker` | 0.86 × 1.96 × 0.81 m | 3,104 | 2 | Body, Doors, Trim |
-| `model.lazy.vibePlate` | 0.67 × 1.25 × 0.77 m | 1,452 | 2 | Body, Trim, Deck |
-| `model.lazy.smartHub` | 0.60 × 0.81 × 0.84 m | 2,236 | 3 | Body (the table), Speaker |
+| `model.lazy.snoozecloudBed` | 1.86 × 1.29 × 1.86 m | 7,904 | 3 | Body, Upholstery (the mattress), Throw |
+| `model.lazy.napPod` | 0.92 × 1.54 × 0.91 m | 6,702 | 3 | Body (the egg), Upholstery (the cushions), Hood |
+| `model.lazy.quiltTable` | 1.82 × 0.77 × 0.93 m | 7,608 | 3 | Body (the table top), Upholstery (the quilt), Poufs |
+| `model.lazy.deliveryLocker` | 0.86 × 1.96 × 0.81 m | 5,256 | 2 | Body, Doors, Trim |
+| `model.lazy.vibePlate` | 0.67 × 1.25 × 0.77 m | 2,862 | 2 | Body, Trim, Deck |
+| `model.lazy.smartHub` | 0.60 × 0.81 × 0.84 m | 2,282 | 3 | Body (the table), Speaker |
 
 `check-glb`: 6 models, 0 failed; one warning (the pod's depth, above). Khronos validator: 0 errors, 0 warnings
 each. Clips bench: every clip at rest and open on WebGPU and WebGL (the bed from the side, the quilt from behind).
@@ -57,6 +57,35 @@ In play (`wants-asking`, WebGPU): each object used by a resident: the bed's head
 and settling, the pod's hood over a power nap, sitting tucked in at the quilt table (the flap's lift seen on the clips bench; in play the poufs hide it), the locker door open for a takeout,
 shaking on the plate, programming on the hub; the quilt table turned to all four facings in the yard, the others to
 one or two; colours on the clips bench; at night (`office-night`, WebGL) in the house.
+
+## Detail pass (2026-10-22)
+
+Rebuilt with the forms and the kit, keeping every key, size, centre, part, hinge, clip, `motions` and `paint`
+(triangles before → after: bed 4,772 → 7,904, pod 4,308 → 6,702, quilt table 3,696 → 7,608, locker 3,104 → 5,256,
+plate 1,452 → 2,862, hub 2,236 → 2,282; draws unchanged).
+
+- `snoozecloudBed`: a piped soft base on turned birch feet; the headboard two clouds cut from outlines (the upper
+  envelope of their bumps) and bevelled round; a quilted soft mattress foot with piping, a folded throw with its
+  rolled fold (the old throw's drop hung inside the mattress), a remote with buttons. The head section: a piped soft
+  mattress, plump pillows, accent cushions.
+- `napPod`: the egg's lip rounded, more segments; a turned stem and base; a lofted, piped seat (top 0.45), buttons on
+  the back cushion, a soft pillow, a jittered shag rug. The hood: finer, piped along its front edge, its channels'
+  seams swept across it.
+- `quiltTable`: the quilt puffed over the top and stitched in rows, hanging down the front and ends in soft folds
+  (swept along a wavy path) to a band at its hem; a turned bowl of mandarins with a leaf, mugs with handles, a plate
+  of biscuits; soft poufs with piped tops, soft back cushions. The flap: soft, banded at its hem and top.
+- `deliveryLocker`: each door with a vent of slots (an outline with holes), a recessed pull, a status light and a
+  number plate; a keypad of keys, a camera, a logo; a taped parcel with its label, a soft takeout bag with its top
+  folded and handles.
+- `vibePlate`: a soft base with a lime band swept round it and feet; an oval column curving up to the console, the
+  handlebar bent from one tube (`kit.fillet`) with rounded grips; the console with a screen and buttons; a lofted
+  bottle. The deck: a ribbed pad with two footprints (outlines).
+- `smartHub`: splayed tapered legs, a lofted speaker with buttons by its ring, a dock with its slot, books with
+  pages, a turned robot vacuum with a bumper band, turret, wheels and side brush. The tablet: an app grid, a dock bar
+  and a camera.
+
+`check-glb`: 6 models, 0 failed, no warnings (the pod's depth warning is gone). Khronos validator: 0 errors,
+0 warnings each.
 
 ## Rebuild
 

@@ -39,12 +39,12 @@ satin book); the tub's ledge `wood`, the rest plain.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.gloomy.recordCabinet` | 0.90 × 0.92 × 0.81 m | 2,552 | 4 | Body, Trim |
-| `model.gloomy.cello` | 0.78 × 1.43 × 0.74 m | 3,924 | 3 | Body, Trim, Cello |
-| `model.gloomy.journalDesk` | 1.50 × 1.20 × 0.83 m | 2,768 | 3 | Body, Trim |
-| `model.gloomy.rainLamp` | 0.80 × 1.50 × 0.62 m | 5,334 | 3 | Body, Trim |
-| `model.gloomy.windowSeat` | 1.84 × 1.97 × 0.71 m | 3,668 | 3 | Body, Cushion, Trim |
-| `model.gloomy.soakingTub` | 1.86 × 0.92 × 1.85 m | 4,120 | 3 | Body, Trim |
+| `model.gloomy.recordCabinet` | 0.90 × 0.93 × 0.82 m | 3,922 | 4 | Body, Trim |
+| `model.gloomy.cello` | 0.78 × 1.43 × 0.74 m | 6,424 | 3 | Body, Trim, Cello |
+| `model.gloomy.journalDesk` | 1.50 × 1.20 × 0.83 m | 7,134 | 3 | Body, Trim |
+| `model.gloomy.rainLamp` | 0.81 × 1.50 × 0.62 m | 7,384 | 3 | Body, Trim |
+| `model.gloomy.windowSeat` | 1.84 × 1.97 × 0.71 m | 5,828 | 3 | Body, Cushion, Trim |
+| `model.gloomy.soakingTub` | 1.86 × 0.92 × 1.85 m | 6,848 | 3 | Body, Trim |
 
 The desk's apron runs only along its far edge and its ends (the old part's deep apron took the writer's hands).
 
@@ -55,6 +55,43 @@ record played (lid up, record turning), brooding on the window seat, writing at 
 the rain, soaking in the tub. At night (`office-night`, WebGL): the window seat in four facings, the tub, the
 cabinet, the desk and the lamp. Not seen: the cello in the night yard (no free spot for its facing), `doze` on the
 window seat.
+
+## Detail pass (2026-10-22)
+
+Rebuilt with the forms and the kit, keeping every key, size, centre, part, hinge, clip, `motions` and `paint`
+(triangles before → after: cabinet 2,552 → 3,922, cello 3,924 → 6,424, desk 2,768 → 7,134, lamp 5,334 → 7,384,
+window seat 3,668 → 5,828, tub 4,120 → 6,848; draws unchanged).
+
+- `recordCabinet`: splayed tapered legs with brass ferrules, an arched apron, a slatted door in a walnut frame (an
+  outline with a hole) with a brass bar pull (`kit.pull`), a record pulled half out of the LPs, the turntable's
+  pivot, S-curved tonearm (`kit.tube`), counterweight, headshell and speed buttons; a turned platter and record; the
+  lid a frame round a sunk panel; a candle with a melted top and drips on a dish; a lofted vase of branching twigs
+  with honesty pods. Trimmed to the 0.35–1 m target (slats unbevelled, 7-sided pods).
+- `cello`: the body lofted from a figure-eight outline, its plates arched over the ribs (a little shallow, to keep
+  the old 0.74 m depth), f-holes swept in S-curves, a tailpiece with fine tuners, a carved bridge (feet, kidneys, a
+  heart: an outline with a hole), a D-section neck, a tapering fingerboard, nut, pegbox, scroll (`kit.scroll`), pegs
+  with heads, four strings over the bridge, the end pin in its collar. The stool is turned with a padded, piped,
+  buttoned top on three splayed legs and a foot ring; the stand's feet, cup, post, cradle and a yoke round the neck
+  are swept; the bow is cambered with its frog, tip and hair; the music lies open with curved pages and staves.
+- `journalDesk`: cabriole legs (`kit.cabriole`), scalloped aprons, a gallery pierced by nine pointed arches, a
+  moulded shelf on scroll brackets; the journal open with ruled curved pages, a square inkwell with a brass collar
+  and a quill with its vane, books with boards and page blocks, a wilted rose and fallen petals, three dripping
+  candles on a brass dish. The chair: a buttoned plum back, sabre back legs, finials, a pointed crest, turned front
+  legs, an H stretcher.
+- `rainLamp`: a moulded base, tapered posts with brass collars, a pagoda canopy with a scalloped eave (lofted rings),
+  a turned finial; a boulder rock with moss; the figure in a lofted coat and hat under a scalloped umbrella with a J
+  handle; boulder pebbles.
+- `windowSeat`: the bench on a recessed plinth with two shaker drawers (`kit.shaker`) and brass pulls, a rounded
+  nosing; a sash of four lights (an outline with holes), a moulded casing (`kit.moulding`), a nosed sill and apron;
+  runs on the glass swept; candles on dishes, a mug with a handle; soft pillows. The seat part: a piped soft cushion,
+  a throw draped over its front edge (swept, jittered), a book.
+- `soakingTub`: a smoother tub profile with a rolled rim and a foot, two moon bands; the ledge's ends in raised
+  shaker panels, a bullnosed stone top (swept); dripping candles, soft folded towels with bands, a vase of arching
+  fern fronds, a soft mat with a fringe; foam as boulders. (Moon-phase discs on the tub were tried and dropped: their
+  vertices darkened the tub's long faces in the baked shading.)
+
+`check-glb`: 6 models, 0 failed; the record cabinet's 4-draw warning (as before). Khronos validator: 0 errors,
+0 warnings each.
 
 ## Rebuild
 
