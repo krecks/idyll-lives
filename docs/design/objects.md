@@ -116,6 +116,26 @@ instances, so these costs are per kind of object in view, plus the triangles of 
   objects; on the M3 Low is limited by geometry (graphics.md), so these budgets are set for Low;
   Medium and High have room to spare. Objects on the lot have no level of detail (below).
 
+## Detail
+
+Every model was rebuilt in more detail on 2026-10-22 (the median now spends 47 % of its target, up from 33 %).
+The standard it set, for new models too:
+
+- **Shapes as made, not as boxes.** A frame, rail, leg or handle bent from one piece is one `sweep`, never rods
+  joined by balls; turned and lofted bodies (`revolve`, `loft`/`ring`) for anything round; outlines with holes
+  (`extrude`) for carved aprons, headboards, grilles, cut-outs; stuffed things puffed and piped (`soft_box`).
+  Doors and drawers are frames round panels (`kit.shaker`), with pulls and knobs (`kit.pull`, `kit.knob`);
+  mouldings mitred (`kit.moulding`). `tools/art/blender/README.md` lists the forms and the kit.
+- **The details a real one has, where they read:** rims and lips, feet, hinges, seams, piping, the contents of
+  what opens (food in a fridge, clothes in a wardrobe, tools in a drawer), the clutter that says who owns it.
+- **Triangles where they show:** silhouettes, edges, what a hand touches; hidden parts stay plain. Things placed
+  many times (plants, street props, held and tabletop things, the ground) keep to half the target.
+- **Shading baked in** at export (below, "Baked shading"): creases and gaps darken with no texture. Give a face
+  that meets a crease an edge band, or its corners darken it all over.
+- **Judge it lit:** `cargo art <family> --preview --lit` renders as the game lights it (EEVEE, the finishes'
+  textures, the baked shading), beside the plain `--preview`; the game (`check.mjs gallery`, WebGPU and
+  `--renderer webgl`) is the last word.
+
 ## Materials, finishes, tints, styles and quality
 
 The game's surfaces are a dozen finishes, the `material.finish.*` entries of the base manifest:
