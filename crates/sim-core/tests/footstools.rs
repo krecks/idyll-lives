@@ -1,7 +1,8 @@
 //! A footstool in front of an armchair: it can be put there (the armchair is sat in from beside
 //! it then), and the armchair is still sat in; a fridge with its front blocked still isn't
 //! allowed. (The feet go up on it in the renderer: characters.ts `footstoolFor`.) A desk, sat
-//! at from behind, may stand with its screen to a wall, between other things.
+//! at from behind, may stand with its screen to a wall, between other things; with its back to
+//! one and its front tile taken, it is sat at from the other half of its front.
 
 use sim_core::command::{EdgeAxis, EdgeEdit, EdgeKind};
 use sim_core::content::Pose;
@@ -92,6 +93,34 @@ fn a_desk_stands_with_its_screen_to_the_wall_between_other_things() {
     buy(&mut w, "pouf", 6, 3, 0).unwrap();
     buy(&mut w, "pouf", 7, 3, 0).unwrap();
     assert!(buy(&mut w, "desk", 6, 2, 2).is_err(), "boxed in");
+}
+
+#[test]
+fn a_desk_with_its_back_to_the_wall_is_sat_at_from_the_other_half_of_its_front() {
+    // Back to a wall (along z 6), facing into the room, a fridge either side and a chair on its
+    // front tile: the other middle tile in front of it is as good (a generated house turned round
+    // swaps which is the front; "dense" 314192 had a writing desk with only that one free).
+    let mut w = world();
+    let wall: Vec<EdgeEdit> = (3..11).map(|x| EdgeEdit::new(EdgeAxis::H, x, 6, EdgeKind::Wall)).collect();
+    w.build(0, &wall).unwrap();
+    buy(&mut w, "fridge", 5, 6, 0).unwrap();
+    buy(&mut w, "fridge", 8, 6, 0).unwrap();
+    buy(&mut w, "desk", 6, 6, 0).unwrap();
+    buy(&mut w, "pouf", 6, 7, 0).expect("a chair on the desk's front tile, the other half still free");
+    let desk = w.objects.iter().find(|o| w.content.objects[o.def].id == "desk").unwrap().id;
+    w.apply(Command::Use { sim: 0, object: desk, interaction: 0 }).unwrap();
+    let mut from = None;
+    for _ in 0..10 * TICKS_PER_MINUTE {
+        if w.sims[0].pose == Pose::Sit {
+            break;
+        }
+        from = Some(w.sims[0].tile());
+        w.tick_once();
+    }
+    assert_eq!(w.sims[0].pose, Pose::Sit, "sat at the desk");
+    assert_eq!(from, Some((7, 7)), "from the other half of its front");
+    // With that taken too, nowhere to sit down from.
+    assert!(buy(&mut w, "pouf", 7, 7, 0).is_err(), "the desk's last way in kept free");
 }
 
 #[test]

@@ -223,7 +223,7 @@ export function frontTile(x: number, z: number, w: number, d: number, rot: numbe
  * `approach_tiles`): the front (and, along an even front edge, the other middle tile: the
  * simulation uses that one should the front be taken), then (seats used from `around`) behind,
  * left and right of its middle; a seat behind the work (`behind`: a desk) behind, left and right
- * of it, then its front, so it may stand with its screen to a wall. Each comes with the tile of its own it's next to; the caller
+ * of it, then its front (and the other middle tile), so it may stand with its screen to a wall. Each comes with the tile of its own it's next to; the caller
  * checks it's free and open.
  */
 export function approachCandidates(def: Shape | undefined, x: number, z: number, rot: number, size?: readonly [number, number]): { tile: [number, number]; inner: [number, number] }[] {
@@ -247,8 +247,15 @@ export function approachCandidates(def: Shape | undefined, x: number, z: number,
     { tile: [x - 1, cz], inner: [x, cz] },
   ];
   const r = rot % 4;
-  // A seat behind the work (a desk, sat at from behind it): behind, left, right, then its front.
-  if (def?.approach === 'behind') return [(r + 2) % 4, (r + 3) % 4, (r + 1) % 4, r].map((i) => sides[i]);
+  // A seat behind the work (a desk, sat at from behind it): behind, left, right, then its front
+  // (and along an even front edge the other middle tile, as the front swaps when the house is turned).
+  if (def?.approach === 'behind') {
+    const order = [(r + 2) % 4, (r + 3) % 4, (r + 1) % 4, r].map((i) => sides[i]);
+    const along = r % 2 === 0 ? [1, 0, w] : [0, 1, d];
+    if (along[2] % 2 !== 0) return order;
+    const { tile, inner } = sides[r];
+    return [...order, { tile: [tile[0] + along[0], tile[1] + along[1]], inner: [inner[0] + along[0], inner[1] + along[1]] }];
+  }
   return [r, (r + 2) % 4, (r + 3) % 4, (r + 1) % 4].map((i) => sides[i]);
 }
 
