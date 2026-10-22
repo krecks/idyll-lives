@@ -135,10 +135,12 @@ def _bezier(a, b, c, steps):
 # Game axes: the tower at the back (deck at 1.4 m), the ladder behind it, the chute running down to the front.
 SLIDE_TOP = (1.43, -0.29)   # (height, depth) where the chute leaves the deck
 SLIDE_END = (0.28, 0.95)    # and where its run-out ends
+SQ = [(-1, -1), (1, -1), (1, 1), (-1, 1)]
 
 
 def _chute(name, steps=22):
-    """The chute: a U-section trough swept down a smoothstep curve (flat at the top and at the run-out)."""
+    """The chute: a U-section trough swept down a smoothstep curve (flat at the top and at the run-out), a rolled lip
+    along the top of each wall. Returns the trough."""
     (y0, z0), (y1, z1) = SLIDE_TOP, SLIDE_END
     path = []
     for i in range(steps + 1):
@@ -149,7 +151,7 @@ def _chute(name, steps=22):
     w, h, th = 0.25, 0.16, 0.025
     section = [(-w, h), (-w, 0), (w, 0), (w, h), (w - th, h), (w - th, th), (-w + th, th), (-w + th, h)]
     n = len(section)
-    vs, faces = [], []
+    vs, faces, lips = [], [], ([], [])
     for i, p in enumerate(path):
         t = (path[min(i + 1, steps)] - path[max(i - 1, 0)]).normalized()
         up = t.cross(X).normalized()
@@ -157,6 +159,8 @@ def _chute(name, steps=22):
             up = -up
         for u, v in section:
             vs.append(p + X * u + up * v)
+        for k, u in enumerate((-w + th / 2, w - th / 2)):
+            lips[k].append(p + X * u + up * (h + 0.004))
     for i in range(steps):
         for k in range(n):
             k2 = (k + 1) % n
@@ -165,6 +169,11 @@ def _chute(name, steps=22):
         q = [base + k for k in range(n)]
         faces += [(q[0], q[1], q[6], q[7]), (q[1], q[2], q[5], q[6]), (q[2], q[3], q[4], q[5])]
     obj = _mesh(name, vs, faces, M.chute, smooth=False)
+    for k, pts in enumerate(lips):
+        G.sweep(f'{name}_lip{k}', pts, 0.019, material=M.chute, verts=8)
+    # the run-out's end, rolled under so no edge faces a child
+    G.sweep(f'{name}_end', [Vector(F.at(-w + 0.01, y1 + 0.004, z1 + 0.002)), Vector(F.at(w - 0.01, y1 + 0.004, z1 + 0.002))],
+            0.016, material=M.chute, verts=8)
     return obj
 
 
@@ -177,38 +186,55 @@ SLIDE_ARCH = (0.27, 0.55)   # the arch over the chute's mouth: half its width, i
 
 def slide():
     with G.new_parts():
-        # the tower: four posts, a deck, side rails, beams round the top and a roof
+        # the tower: four posts on base plates, a guard either side (a frame round a panel with a porthole), beams
+        # round the top under a hipped roof
         for x in (-0.28, 0.28):
             for z in (-0.31, -0.69):
                 F.cyl(f'post{x}{z}', 0.035, SLIDE_EAVES, (x, SLIDE_EAVES / 2, z), M.body, verts=12)
-            for k, y in enumerate((1.62, 1.86)):
-                G.rod(f'side{x}{k}', F.at(x, y, -0.31), F.at(x, y, -0.69), 0.02, material=M.body, verts=8)
-            G.rod(f'beam_side{x}', F.at(x, SLIDE_EAVES - 0.03, -0.31), F.at(x, SLIDE_EAVES - 0.03, -0.69), 0.025,
-                  material=M.body, verts=8)
+                F.box(f'base_plate{x}{z}', 0.12, 0.012, 0.12, (x, 0.006, z), M.steel, bevel=0.003, bevel_segments=1)
+                F.sphere(f'post_cap{x}{z}', 0.04, (x, SLIDE_EAVES, z), M.body, segments=10, rings=5)
+            loop = G.kit.fillet([(x, 1.62, -0.5), (x, 1.62, -0.655), (x, 1.86, -0.655), (x, 1.86, -0.345), (x, 1.62, -0.345), (x, 1.62, -0.5)],
+                                0.04)
+            F.sweep(f'guard{x}', loop[:-1], 0.02, M.body, verts=8, closed=True)
+            port = [(0.075 * math.cos(math.tau * k / 16), 0.075 * math.sin(math.tau * k / 16)) for k in range(16)]
+            F.extrude(f'panel{x}', G.rounded_rect(0.28, 0.21, 0.03, corner=2), 0.014, (x, 1.74, -0.5), M.roof, plane='side',
+                      holes=[port])
+            F.box(f'beam_side{x}', 0.05, 0.06, 0.44, (x, SLIDE_EAVES - 0.03, -0.5), M.body, bevel=0.008, bevel_segments=1)
         for z in (-0.31, -0.69):
-            G.rod(f'beam{z}', F.at(-0.28, SLIDE_EAVES - 0.03, z), F.at(0.28, SLIDE_EAVES - 0.03, z), 0.025,
-                  material=M.body, verts=8)
-        F.box('deck', 0.62, 0.05, 0.44, (0, 1.405, -0.5), M.tread, bevel=0.008)
+            F.box(f'beam{z}', 0.6, 0.06, 0.05, (0, SLIDE_EAVES - 0.03, z), M.body, bevel=0.008, bevel_segments=1)
+        # the deck: boards across, a frame under them
+        for i in range(5):
+            F.box(f'deck{i}', 0.62, 0.05, 0.082, (0, 1.405, -0.72 + 0.044 + i * 0.088), M.tread, bevel=0.006,
+                  bevel_segments=1)
         F.box('deck_frame', 0.6, 0.06, 0.06, (0, 1.35, -0.31), M.body)
         F.box('deck_frame_back', 0.6, 0.06, 0.06, (0, 1.35, -0.69), M.body)
-        G.cone('roof', 0.53, 0.02, 0.3, at=F.at(0, SLIDE_EAVES + 0.15, -0.5), material=M.roof, verts=4, rot=(0, 0, 45))
-        G.sphere('roof_knob', 0.035, at=F.at(0, SLIDE_EAVES + 0.31, -0.5), material=M.roof, segments=10, rings=6)
-        # the ladder behind, leaning on the deck; its rails go on up as handrails either side of the way in
+        # the roof: a hip with an eave lip, its slopes swept in, and a ball on top
+        def square(y, r):
+            return [F.at(r * a, y, -0.5 + r * b) for a, b in SQ]
+        G.loft('roof', [square(SLIDE_EAVES - 0.01, 0.31), square(SLIDE_EAVES, 0.375), square(SLIDE_EAVES + 0.03, 0.375),
+                        square(SLIDE_EAVES + 0.1, 0.26), square(SLIDE_EAVES + 0.2, 0.13), square(SLIDE_EAVES + 0.29, 0.02)],
+               material=M.roof, smooth=False)
+        F.sphere('roof_knob', 0.04, (0, SLIDE_EAVES + 0.3, -0.5), M.roof, segments=10, rings=6)
+        # the ladder behind, leaning on the deck; its rails, one bent tube each, go on up as handrails either side of
+        # the way in and over to the posts
         for x in (-0.25, 0.25):
-            G.rod(f'ladder{x}', F.at(x, 0.0, -0.94), F.at(x, 1.42, -0.7), 0.025, material=M.body, verts=8)
-            G.rod(f'ladder_hand{x}', F.at(x, 1.42, -0.7), F.at(x, 1.95, -0.69), 0.025, material=M.body, verts=8)
-            G.rod(f'ladder_rail{x}', F.at(x, 1.95, -0.69), F.at(x * 1.12, 1.95, -0.69), 0.025, material=M.body, verts=8)
+            F.sweep(f'ladder{x}', G.kit.fillet([(x, 0.0, -0.94), (x, 1.42, -0.7), (x, 1.95, -0.69), (x * 1.12, 1.95, -0.69)],
+                                                0.06), 0.025, M.body, verts=8)
+            F.cyl(f'ladder_foot{x}', 0.026, 0.012, (x, 0.006, -0.938), M.steel, verts=10)
         for i in range(1, 6):
             t = i / 6
-            F.box(f'rung{i}', 0.48, 0.03, 0.08, (0, 1.42 * t, -0.94 + 0.24 * t), M.tread, bevel=0.006)
+            F.box(f'rung{i}', 0.48, 0.03, 0.08, (0, 1.42 * t, -0.94 + 0.24 * t), M.tread, bevel=0.008, bevel_segments=1)
+            for g in (-1, 0, 1):            # grip grooves along each tread
+                F.box(f'groove{i}{g}', 0.46, 0.004, 0.006, (0, 1.42 * t + 0.015, -0.94 + 0.24 * t + g * 0.022), M.steel)
         # the chute, an arch over its mouth and the legs under its run-out
         _chute('chute')
         rx, ry = SLIDE_ARCH
-        arch = [F.at(rx * math.cos(math.pi * i / 14), SLIDE_TOP[0] + ry * math.sin(math.pi * i / 14), -0.27) for i in range(15)]
-        _tube('arch', arch, 0.018, M.body, verts=6)
+        arch = [(rx * math.cos(math.pi * i / 14), SLIDE_TOP[0] + ry * math.sin(math.pi * i / 14), -0.27) for i in range(15)]
+        F.sweep('arch', arch, 0.02, M.body, verts=8)
         for x in (-0.18, 0.18):
-            G.rod(f'leg{x}', F.at(x, 0.0, 0.84), F.at(x, 0.29, 0.84), 0.025, material=M.body, verts=8)
-            F.cyl(f'foot{x}', 0.045, 0.02, (x, 0.01, 0.84), M.steel, verts=10)
+            F.sweep(f'leg{x}', [(x, 0.0, 0.84), (x, 0.3, 0.84)], 0.025, M.body, verts=8)
+            F.box(f'foot{x}', 0.09, 0.012, 0.09, (x, 0.006, 0.84), M.steel, bevel=0.003, bevel_segments=1)
+        F.sweep('leg_bar', [(-0.18, 0.2, 0.84), (0.18, 0.2, 0.84)], 0.016, M.body, verts=6)
     G.join_all('slide')
     G.settle(centre=False)
     return G.meshes()
@@ -217,53 +243,84 @@ def slide():
 # --- the climbing frame ----------------------------------------------------------------------------------------
 # A wooden fort on four posts: a deck at 1.1 m, railings on three sides, a rope net up the front, a
 # fireman's pole beside it and a pitched roof with a flag.
+def _board(name, a, b, w, t, material):
+    """A sawn board from game point `a` to `b`, `w` wide (across, as near level as it goes) and `t` thick."""
+    return F.sweep(name, [a, b], None, material, profile=[(-w / 2, -t / 2), (w / 2, -t / 2), (w / 2, t / 2), (-w / 2, t / 2)],
+                   up=(0, 0, 1))
+
+
 def climbingFrame():
     deck = 1.1
     with G.new_parts():
         for x in (-0.85, 0.85):
             for z in (-0.85, 0.85):
-                F.box(f'post{x}{z}', 0.1, 2.3, 0.1, (x, 1.15, z), M.timber, bevel=0.01)
-        F.box('deck', 1.8, 0.06, 1.8, (0, deck, 0), M.timber, bevel=0.006)
+                F.box(f'post{x}{z}', 0.1, 2.3, 0.1, (x, 1.15, z), M.timber, bevel=0.012, bevel_segments=1)
+                F.box(f'shoe{x}{z}', 0.12, 0.08, 0.12, (x, 0.04, z), M.steel, bevel=0.004, bevel_segments=1)
+        # the deck: boards on two joists, knee braces from the posts up under it
+        for i in range(9):
+            F.box(f'deck{i}', 1.8, 0.06, 0.192, (0, deck, -0.9 + 0.1 + i * 0.2), M.timber, bevel=0.006, bevel_segments=1)
         for z in (-0.82, 0.82):
             F.box(f'joist{z}', 1.6, 0.12, 0.06, (0, deck - 0.09, z), M.timber)
-        # railings: a top and bottom rail and balusters on the back and both sides
+        for x in (-0.85, 0.85):
+            for z, dz in ((-0.85, 1), (0.85, -1)):
+                _board(f'brace{x}{z}', (x, deck - 0.4, z + dz * 0.05), (x, deck - 0.12, z + dz * 0.33), 0.07, 0.04, M.timber)
+        # railings: a top and bottom rail and flat balusters with rounded tops on the back and both sides
         for side in ('back', 'left', 'right'):
             for k, y in enumerate((deck + 0.12, deck + 0.5)):
                 if side == 'back':
-                    F.box(f'{side}_rail{k}', 1.6, 0.05, 0.05, (0, y, -0.85), M.timber)
+                    F.box(f'{side}_rail{k}', 1.6, 0.05, 0.05, (0, y, -0.85), M.timber, bevel=0.01, bevel_segments=1)
                 else:
                     x = -0.85 if side == 'left' else 0.85
-                    F.box(f'{side}_rail{k}', 0.05, 0.05, 1.6, (x, y, 0), M.timber)
+                    F.box(f'{side}_rail{k}', 0.05, 0.05, 1.6, (x, y, 0), M.timber, bevel=0.01, bevel_segments=1)
             for i in range(7):
                 c = -0.6 + i * 0.2
                 at = (c, deck + 0.31, -0.85) if side == 'back' else (-0.85 if side == 'left' else 0.85, deck + 0.31, c)
-                F.box(f'{side}_baluster{i}', 0.04, 0.34, 0.04, at, M.timber)
-        # the roof: two panels on rafters, a ridge beam, and beams across the front and back
-        for s in (-1, 1):
-            G.cube(f'roof{s}', (1.04, 1.96, 0.04), at=(s * 0.45, 0, 2.48), material=M.shingle, rot=(0, s * 30, 0),
-                   bevel=0.008)
-        F.box('ridge', 0.08, 0.08, 1.94, (0, 2.74, 0), M.timber)
+                w, d = (0.08, 0.02) if side == 'back' else (0.02, 0.08)
+                F.box(f'{side}_baluster{i}', w, 0.34, d, at, M.timber, bevel=0.006, bevel_segments=1)
+        # the roof: rafters, purlins, then five courses of shingles a slope lapping down from a ridge board, gables
         for z in (-0.85, 0.85):
-            F.box(f'beam{z}', 1.8, 0.1, 0.08, (0, 2.25, z), M.timber)
+            F.box(f'beam{z}', 1.8, 0.1, 0.08, (0, 2.25, z), M.timber, bevel=0.008, bevel_segments=1)
             for s in (-1, 1):
-                G.rod(f'rafter{z}{s}', F.at(s * 0.85, 2.3, z), F.at(0, 2.7, z), 0.03, material=M.timber, verts=6)
-        # the flag on the ridge, at the back
-        F.cyl('flagpole', 0.02, 0.8, (0, 3.05, -0.85), M.rail, verts=8)
-        F.box('flag', 0.32, 0.2, 0.015, (0.17, 3.33, -0.85), M.flag)
-        # the rope net up the front, from the deck's edge down to the ground a little out
+                _board(f'rafter{z}{s}', (s * 0.85, 2.3, z), (0, 2.71, z), 0.08, 0.05, M.timber)
+            F.extrude(f'gable{z}', [(-0.82, 2.3), (0.82, 2.3), (0, 2.68)], 0.02, (0, 0, z - 0.03 * (1 if z > 0 else -1)),
+                      M.timber)
+        slope = 30
+        for s in (-1, 1):
+            for k in range(5):
+                t = 0.06 + k * 0.2
+                x, y = s * (0.02 + t * G.cosd(slope)), 2.74 - t * G.sind(slope) + 0.02
+                F.box(f'shingle{s}{k}', 0.24, 0.03, 1.96, (x, y, 0), M.shingle, rot=(0, -s * (slope + 3), 0), bevel=0.006,
+                      bevel_segments=1)
+        F.sweep('ridge', [(0, 2.77, -0.97), (0, 2.77, 0.97)], None, M.shingle,
+                profile=G.rounded_rect(0.06, 0.12, 0.025, corner=2), up=(0, 0, 1))
+        # the flag on the ridge, at the back: a pole with a ball, the flag rippling out from it
+        F.cyl('flagpole', 0.018, 0.82, (0, 3.04, -0.85), M.rail, verts=8)
+        F.sphere('flag_ball', 0.03, (0, 3.45 - 0.03, -0.85), M.flag, segments=8, rings=5)
+        F.sweep('flag', [(0.01, 3.33, -0.85), (0.1, 3.33, -0.82), (0.2, 3.32, -0.87), (0.3, 3.31, -0.84)], None, M.flag,
+                profile=[(-0.1, -0.004), (0.1, -0.004), (0.1, 0.004), (-0.1, 0.004)], up=(0, 0, 1), resolution=3,
+                scale=[1.0, 0.98, 0.95, 0.9])
+        # the rope net up the front, from the deck's edge down to the ground a little out: a rope through each row of
+        # knots, the knots where they cross, a bar along the top and stakes at its foot
         top, bottom = (deck - 0.02, 0.86), (0.04, 0.96)
         xs = [-0.75 + i * 0.18 for i in range(6)]
-        for i, x in enumerate(xs):
-            G.rod(f'net_down{i}', F.at(x, *top), F.at(x, *bottom), 0.014, material=M.rope, verts=6)
+        rows = []
         for j in range(6):
             t = j / 5
-            y, z = top[0] + (bottom[0] - top[0]) * t, top[1] + (bottom[1] - top[1]) * t
-            G.rod(f'net_across{j}', F.at(xs[0], y, z), F.at(xs[-1], y, z), 0.014, material=M.rope, verts=6)
+            rows.append((top[0] + (bottom[0] - top[0]) * t, top[1] + (bottom[1] - top[1]) * t))
+        for i, x in enumerate(xs):
+            F.sweep(f'net_down{i}', [(x, deck + 0.02, 0.86), (x, *top), (x, *bottom), (x, 0.0, 0.97)], 0.014, M.rope, verts=6)
+        for j, (y, z) in enumerate(rows):
+            sag = [(xs[0] - 0.04, y, z)] + [p for a, b in zip(xs, xs[1:]) for p in ((a, y, z), ((a + b) / 2, y - 0.01, z))] + \
+                [(xs[-1], y, z), (xs[-1] + 0.04, y, z)]
+            F.sweep(f'net_across{j}', sag, 0.014, M.rope, verts=6)
+            for i, x in enumerate(xs):
+                F.sphere(f'knot{i}{j}', 0.022, (x, y, z), M.rope, segments=6, rings=4)
+        F.sweep('net_bar', [(xs[0] - 0.06, deck + 0.02, 0.88), (xs[-1] + 0.06, deck + 0.02, 0.88)], 0.03, M.timber, verts=8)
         for x in (xs[0], xs[-1]):
             F.cyl(f'peg{x}', 0.03, 0.06, (x, 0.03, 0.96), M.timber, verts=8)
-        # the fireman's pole, beside the net, hung from a bar off the front beam
-        F.cyl('pole', 0.025, 2.05, (0.55, 1.025, 0.95), M.rail, verts=10)
-        G.rod('pole_arm', F.at(0.55, 2.04, 0.95), F.at(0.55, 2.2, 0.85), 0.025, material=M.rail, verts=8)
+        # the fireman's pole, beside the net, hung from a bend off the front beam, a collar at its foot
+        F.sweep('pole', G.kit.fillet([(0.55, 0.0, 0.95), (0.55, 2.04, 0.95), (0.55, 2.2, 0.85)], 0.06), 0.025, M.rail, verts=10)
+        F.box('pole_bracket', 0.08, 0.1, 0.03, (0.55, 2.2, 0.83), M.steel, bevel=0.004, bevel_segments=1)
         F.cyl('pole_foot', 0.06, 0.02, (0.55, 0.01, 0.95), M.steel, verts=10)
     G.join_all('climbingFrame')
     G.settle(centre=False)
@@ -280,28 +337,41 @@ AXLE = 0.46
 def seesaw():
     with G.new_parts() as still:
         for z in (-0.17, 0.17):
-            for x in (-0.22, 0.22):
-                G.rod(f'leg{z}{x}', F.at(x, 0.02, z), F.at(0, AXLE, z), 0.028, material=M.body, verts=10)
-            F.box(f'foot{z}', 0.56, 0.04, 0.08, (0, 0.02, z), M.body, bevel=0.01)
-            F.cyl(f'boss{z}', 0.05, 0.05, (0, AXLE, z), M.steel, rot=(90, 0, 0), verts=16)
+            # each side of the stand an A of bent tube, its feet on a base plate, a boss for the axle at its apex
+            F.sweep(f'leg{z}', G.kit.fillet([(-0.22, 0.02, z), (0, AXLE, z), (0.22, 0.02, z)], 0.05), 0.028, M.body, verts=10)
+            F.box(f'foot{z}', 0.56, 0.04, 0.08, (0, 0.02, z), M.body, bevel=0.01, bevel_segments=1)
+            for x in (-0.24, 0.24):
+                F.cyl(f'bolt{z}{x}', 0.012, 0.012, (x, 0.044, z), M.steel, verts=6)
+            F.cyl(f'boss{z}', 0.05, 0.05, (0, AXLE, z), M.steel, rot=(90, 0, 0), verts=16, bevel=0.006, bevel_segments=1)
+            F.sweep(f'crossbar{z}', [(-0.12, 0.2, z), (0.12, 0.2, z)], 0.016, M.body, verts=8)
         G.rod('axle', F.at(0, AXLE, -0.21), F.at(0, AXLE, 0.21), 0.022, material=M.steel, verts=12)
-        for x in (-1.1, 1.1):   # rubber bumpers the low end comes down onto
-            F.cyl(f'bumper{x}', 0.1, 0.16, (x, 0.08, 0), M.rubber, verts=16)
-            G.torus(f'bumper_tyre{x}', 0.1, 0.03, at=F.at(x, 0.17, 0), material=M.rubber,
-                    major_segments=16, minor_segments=6)
+        for z in (-0.202, 0.202):
+            F.cyl(f'axle_nut{z}', 0.03, 0.012, (0, AXLE, z), M.steel, rot=(90, 0, 0), verts=6)
+        for x in (-1.1, 1.1):   # half-buried tyres the low end comes down onto
+            G.revolve(f'bumper{x}', [(0, 0.0), (0.12, 0.0), (0.13, 0.04), (0.13, 0.13), (0.12, 0.165), (0.09, 0.175),
+                                     (0.06, 0.165), (0.055, 0.15), (0, 0.15)], at=F.at(x, 0, 0), material=M.rubber,
+                      segments=18)
     G.join(still, 'stand', origin=(0, 0, 0))
     with G.new_parts() as parts:
-        F.box('plank', 2.5, 0.06, 0.24, (0, 0.48, 0), M.plank, bevel=0.015)
+        # the plank: rounded at its ends, a steel channel along its middle and straps over its ends
+        F.extrude('plank', G.rounded_rect(2.5, 0.24, 0.1, corner=4), 0.06, (0, 0.48, 0), M.plank, plane='top', bevel=0.012,
+                  bevel_segments=1)
+        F.box('channel', 0.8, 0.03, 0.12, (0, 0.44, 0), M.steel, bevel=0.004, bevel_segments=1)
         F.cyl('sleeve', 0.045, 0.14, (0, AXLE, 0), M.steel, rot=(90, 0, 0), verts=16)
-        F.box('bracket', 0.16, 0.04, 0.12, (0, 0.47, 0), M.steel, bevel=0.005)
+        F.box('bracket', 0.16, 0.04, 0.12, (0, 0.47, 0), M.steel, bevel=0.005, bevel_segments=1)
         for s in (-1, 1):
-            F.box(f'seat{s}', 0.36, 0.05, 0.3, (s * 0.75, 0.535, 0), M.seat, bevel=0.018)
-            G.rod(f'handle_post{s}', F.at(s * 0.47, 0.5, 0), F.at(s * 0.47, 0.82, 0), 0.022, material=M.rail, verts=10)
-            G.rod(f'handle_bar{s}', F.at(s * 0.47, 0.82, -0.14), F.at(s * 0.47, 0.82, 0.14), 0.02, material=M.rail,
-                  verts=10)
-            for z in (-0.1, 0.1):
-                G.rod(f'grip{s}{z}', F.at(s * 0.47, 0.82, z - 0.05), F.at(s * 0.47, 0.82, z + 0.05), 0.026,
-                      material=M.rubber, verts=10)
+            # a moulded seat, dished, a lip rising at its outer end; its top where the rider sits (0.56 m)
+            F.soft(f'seat{s}', 0.34, 0.04, 0.28, (s * 0.75, 0.532, 0), M.seat, round=0.018, puff=0.008, flat=2)
+            F.sweep(f'seat_lip{s}', [(s * 0.92, 0.535, -0.12), (s * 0.94, 0.6, -0.1), (s * 0.94, 0.6, 0.1),
+                                     (s * 0.92, 0.535, 0.12)], 0.02, M.seat, verts=8, resolution=2)
+            F.soft(f'pad{s}', 0.14, 0.03, 0.18, (s * 1.12, 0.435, 0), M.rubber, round=0.012)
+            # the handle: one bent tube rising either side of the plank and across, its grips where the hands go
+            F.sweep(f'handle{s}', G.kit.fillet([(s * 0.47, 0.49, -0.135), (s * 0.47, 0.82, -0.135), (s * 0.47, 0.82, 0.135),
+                                                (s * 0.47, 0.49, 0.135)], 0.035), 0.02, M.rail, verts=10)
+            for z in (-1, 1):
+                F.box(f'handle_plate{s}{z}', 0.08, 0.06, 0.008, (s * 0.47, 0.49, z * 0.128), M.steel, bevel=0.002,
+                      bevel_segments=1)
+                F.sweep(f'grip{s}{z}', [(s * 0.47, 0.82, z * 0.035), (s * 0.47, 0.82, z * 0.1)], 0.026, M.rubber, verts=10)
     plank = G.hinged(G.join(parts, 'plank'), F.at(0, AXLE, 0))
     G.settle(centre=False)
     G.rock(plank, 'seesaw', 12, seconds=1.4, axis='Y')
@@ -316,44 +386,73 @@ SPRING_TOP = 0.26
 HORSE_DRAWN = 0.42
 
 
+def _body_rings(rows, n=12):
+    """Loft rings along the horse's length: (depth, half width, half height, centre height) each, an ellipse."""
+    return [[F.at(hw * math.cos(math.tau * k / n), y + hh * math.sin(math.tau * k / n), z) for k in range(n)]
+            for z, hw, hh, y in rows]
+
+
 def springRider():
     with G.new_parts() as still:
-        F.cyl('base', 0.2, 0.03, (0, 0.015, 0), M.steel, verts=24, bevel=0.008)
+        # a round steel base plate bolted down, a plate for the coil on it, the coil swept in one piece
+        F.cyl('base', 0.2, 0.03, (0, 0.015, 0), M.steel, verts=24, bevel=0.008, bevel_segments=1)
+        for k in range(6):
+            a = math.tau * k / 6
+            F.cyl(f'base_bolt{k}', 0.012, 0.012, (0.17 * math.cos(a), 0.034, 0.17 * math.sin(a)), M.rubber, verts=6)
         F.cyl('base_plate', 0.13, 0.02, (0, 0.04, 0), M.steel, verts=20)
         turns, r = 3.5, 0.1
-        coil = []
-        for i in range(int(turns * 14) + 1):
-            a = math.tau * i / 14
-            y = 0.06 + (SPRING_TOP - 0.08) * i / (turns * 14)
-            coil.append(F.at(r * math.cos(a), y, r * math.sin(a)))
-        _tube('coil', coil, 0.018, M.spring, verts=6)
+        steps = int(turns * 12)
+        coil = [(r * math.cos(math.tau * i / 12), 0.06 + (SPRING_TOP - 0.08) * i / steps, r * math.sin(math.tau * i / 12))
+                for i in range(steps + 1)]
+        F.sweep('coil', coil, 0.018, M.spring, verts=6)
     G.join(still, 'spring', origin=(0, 0, 0))
     with G.new_parts() as parts:
         F.cyl('top_plate', 0.12, 0.02, (0, HORSE_DRAWN, 0), M.steel, verts=20)
         F.cyl('mount', 0.05, 0.1, (0, HORSE_DRAWN + 0.06, 0), M.steel, verts=12)
-        G.sphere('barrel', 0.15, at=F.at(0, 0.6, -0.02), material=M.horse, scale=(0.85, 2.15, 1.0), segments=20, rings=12)
-        G.rod('neck', F.at(0, 0.66, 0.18), F.at(0, 0.9, 0.29), 0.075, material=M.horse, verts=14)
-        G.sphere('head', 0.1, at=F.at(0, 0.96, 0.33), material=M.horse, scale=(0.85, 1.55, 1.0), rot=(-25, 0, 0),
-                 segments=16, rings=10)
-        G.sphere('muzzle', 0.07, at=F.at(0, 0.91, 0.44), material=M.mane, scale=(1.0, 1.1, 0.85), segments=14, rings=8)
+        # the body: a barrel lofted from the rump to the chest
+        G.loft('barrel', _body_rings([(-0.33, 0.03, 0.03, 0.62), (-0.3, 0.1, 0.11, 0.615), (-0.22, 0.13, 0.15, 0.6),
+                                      (-0.05, 0.125, 0.15, 0.59), (0.12, 0.125, 0.15, 0.6), (0.24, 0.11, 0.13, 0.63),
+                                      (0.3, 0.06, 0.07, 0.65)], 14), material=M.horse)
+        # the neck and head: one sweep up from the chest, arching over into the head, tapering to the muzzle
+        F.sweep('neck', [(0, 0.66, 0.18), (0, 0.8, 0.26), (0, 0.95, 0.29), (0, 1.0, 0.32), (0, 0.97, 0.39), (0, 0.92, 0.45)],
+                None, M.horse, profile=G.rounded_rect(0.16, 0.13, 0.06, corner=3), up=(0, -1, 0), resolution=3,
+                scale=[1.1, 0.95, 0.95, 1.05, 0.95, 0.75], angle=70)
+        F.sphere('muzzle', 0.07, (0, 0.91, 0.45), M.mane, scale=(1.0, 0.85, 1.0), segments=12, rings=7)
         for s in (-1, 1):
-            G.cone(f'ear{s}', 0.028, 0.004, 0.08, at=F.at(s * 0.045, 1.07, 0.29), material=M.horse, verts=8,
-                   rot=(15, s * 12, 0))
-            G.sphere(f'eye{s}', 0.016, at=F.at(s * 0.075, 1.0, 0.37), material=M.eye, segments=8, rings=6)
-            G.cylinder(f'nostril{s}', 0.01, 0.01, at=F.at(s * 0.03, 0.9, 0.51), material=M.eye, rot=(90, 0, 0), verts=8)
-            # legs: short stubs, front and back, so it reads as a horse
-            for z in (0.18, -0.2):
-                G.rod(f'leg{s}{z}', F.at(s * 0.08, 0.55, z), F.at(s * 0.1, 0.42, z + 0.04 * (1 if z > 0 else -1)),
-                      0.04, material=M.horse, verts=10)
-        F.box('mane', 0.04, 0.06, 0.26, (0, 0.96, 0.21), M.mane, rot=(-55, 0, 0), bevel=0.015)
-        F.box('forelock', 0.05, 0.04, 0.06, (0, 1.06, 0.34), M.mane, bevel=0.012)
-        G.rod('tail', F.at(0, 0.66, -0.31), F.at(0, 0.5, -0.41), 0.035, material=M.mane, verts=10)
-        F.box('saddle', 0.28, 0.05, 0.26, (0, 0.755, -0.04), M.saddle, bevel=0.02)
-        G.rod('handles', F.at(-0.16, 0.93, 0.24), F.at(0.16, 0.93, 0.24), 0.018, material=M.grip, verts=10)
+            F.sweep(f'ear{s}', [(s * 0.045, 1.03, 0.3), (s * 0.055, 1.08, 0.29), (s * 0.05, 1.1, 0.28)], 0.022, M.horse,
+                    verts=6, resolution=2, scale=[1.0, 0.7, 0.15])
+            F.sphere(f'eye{s}', 0.016, (s * 0.075, 1.0, 0.37), M.eye, segments=6, rings=4)
+            F.cyl(f'nostril{s}', 0.01, 0.01, (s * 0.03, 0.9, 0.512), M.eye, rot=(90, 0, 0), verts=8)
+            # legs: bent at the knee, tucked under as a rocking horse's are, hooves at their ends
+            for z, dz in ((0.18, 1), (-0.2, -1)):
+                F.sweep(f'leg{s}{z}', [(s * 0.08, 0.6, z), (s * 0.095, 0.5, z + dz * 0.04), (s * 0.1, 0.44, z + dz * 0.1)],
+                        0.04, M.horse, verts=10, resolution=2, scale=[1.1, 0.85, 0.75])
+                F.cyl(f'hoof{s}{z}', 0.032, 0.035, (s * 0.1, 0.43, z + dz * 0.115), M.eye, verts=10)
+        # the mane in locks down the neck, a forelock, the tail swept out and down
+        for i in range(6):
+            t = i / 5
+            y, z = 1.02 - 0.3 * t, 0.29 - 0.12 * t
+            F.sweep(f'mane{i}', [(0, y, z), (0, y + 0.03, z - 0.05), (0, y - 0.01, z - 0.09)], None, M.mane,
+                    profile=[(-0.022, -0.012), (0.022, -0.012), (0.022, 0.012), (-0.022, 0.012)], up=(0, 0, 1),
+                    resolution=2, scale=[1.0, 0.8, 0.3])
+        F.sphere('forelock', 0.03, (0, 1.07, 0.34), M.mane, scale=(0.9, 0.7, 1.3), segments=8, rings=5)
+        F.sweep('tail', [(0, 0.66, -0.31), (0, 0.655, -0.365), (0, 0.58, -0.405), (0, 0.5, -0.405)], 0.035, M.mane, verts=10,
+                resolution=2, scale=[0.8, 1.1, 1.0, 0.6])
+        # the saddle: a padded seat (its top where the rider sits), a cantle behind, flaps down the sides
+        F.soft('saddle', 0.27, 0.04, 0.26, (0, 0.75, -0.04), M.saddle, round=0.018, puff=0.01, flat=2, round_segments=1)
+        F.sweep('cantle', [(-0.1, 0.77, -0.17), (0, 0.8, -0.18), (0.1, 0.77, -0.17)], 0.018, M.saddle, verts=8,
+                resolution=2)
         for s in (-1, 1):
-            F.sphere(f'handle_end{s}', 0.026, (s * 0.16, 0.93, 0.24), M.grip, segments=10, rings=6)
-        G.rod('pegs', F.at(-0.19, 0.5, 0.06), F.at(0.19, 0.5, 0.06), 0.016, material=M.grip, verts=10)
+            F.box(f'flap{s}', 0.012, 0.12, 0.2, (s * 0.132, 0.69, -0.04), M.saddle, rot=(0, 0, s * 8), bevel=0.004,
+                  bevel_segments=1)
+        # the handles: a bar through the head, a rubber grip at each end; the foot pegs through the body
+        F.sweep('handles', [(-0.11, 0.93, 0.24), (0.11, 0.93, 0.24)], 0.014, M.steel, verts=8)
+        F.sweep('pegs', [(-0.15, 0.5, 0.06), (0.15, 0.5, 0.06)], 0.014, M.steel, verts=8)
         for s in (-1, 1):
+            F.sweep(f'handle_grip{s}', [(s * 0.1, 0.93, 0.24), (s * 0.16, 0.93, 0.24)], 0.022, M.grip, verts=10,
+                    scale=[1.0, 1.1])
+            F.sphere(f'handle_end{s}', 0.024, (s * 0.16, 0.93, 0.24), M.grip, segments=8, rings=5)
+            F.sweep(f'peg{s}', [(s * 0.13, 0.5, 0.06), (s * 0.18, 0.5, 0.06)], 0.022, M.grip, verts=10)
             F.cyl(f'peg_end{s}', 0.03, 0.02, (s * 0.19, 0.5, 0.06), M.grip, rot=(0, 90, 0), verts=10)
     horse = G.join(parts, 'horse')
     horse.data.transform(Matrix.Translation((0, 0, SPRING_TOP - HORSE_DRAWN)))
@@ -368,24 +467,44 @@ def springRider():
 # The platform turns once in 3.5 s about the hub; the riders ride round with it.
 def merryGoRound():
     with G.new_parts() as still:
-        F.cyl('ground_plate', 0.3, 0.03, (0, 0.015, 0), M.steel, verts=24, bevel=0.008)
-        F.cyl('hub', 0.16, 0.12, (0, 0.09, 0), M.steel, verts=20)
+        F.cyl('ground_plate', 0.3, 0.03, (0, 0.015, 0), M.steel, verts=24, bevel=0.008, bevel_segments=1)
+        for k in range(8):
+            a = math.tau * k / 8
+            F.cyl(f'plate_bolt{k}', 0.012, 0.01, (0.26 * math.cos(a), 0.034, 0.26 * math.sin(a)), M.rubber, verts=6)
+        G.revolve('hub', [(0, 0.03), (0.17, 0.03), (0.17, 0.05), (0.15, 0.06), (0.13, 0.13), (0.11, 0.15), (0, 0.15)],
+                  at=F.at(0, 0, 0), material=M.steel, segments=20)
     G.join(still, 'hub', origin=(0, 0, 0))
     with G.new_parts() as parts:
-        F.cyl('platform', 0.95, 0.08, (0, 0.22, 0), M.platform, verts=48, bevel=0.012)
+        # the deck: a disc on a dished steel skirt, a rail round its edge, the stripes, anti-slip ribs between them
+        G.revolve('platform', [(0, 0.18), (0.94, 0.18), (0.95, 0.19), (0.95, 0.25), (0.94, 0.26), (0, 0.26)],
+                  at=F.at(0, 0, 0), material=M.platform, segments=48, smooth=False)
         G.torus('edge', 0.95, 0.03, at=F.at(0, 0.22, 0), material=M.rail, major_segments=48, minor_segments=6)
-        F.cyl('skirt', 0.6, 0.05, (0, 0.155, 0), M.steel, verts=24)
+        G.revolve('skirt', [(0.12, 0.13), (0.3, 0.14), (0.62, 0.17), (0.8, 0.18), (0, 0.18)], at=F.at(0, 0, 0),
+                  material=M.steel, segments=24)
         for a in (45, -45):
             F.box(f'stripe{a}', 0.22, 0.008, 1.72, (0, 0.263, 0), M.deck, rot=(0, 0, a))
+        for k in range(4):
+            a = 90 * k
+            for j in (-1, 1):
+                b = math.radians(a + j * 22)
+                F.box(f'rib{k}{j}', 0.03, 0.006, 0.5, (0.6 * math.sin(b), 0.262, 0.6 * math.cos(b)), M.deck,
+                      rot=(0, 0, -(a + j * 22)))
         F.cyl('centre_disc', 0.2, 0.012, (0, 0.266, 0), M.deck, verts=24)
-        F.cyl('column', 0.05, 0.7, (0, 0.59, 0), M.rail, verts=14)
-        F.sphere('knob', 0.08, (0, 0.96, 0), M.deck, segments=14, rings=8)
+        # the column: a turned post, a collar where the rails meet it and a knob on top
+        G.revolve('column', [(0, 0.26), (0.08, 0.26), (0.08, 0.28), (0.055, 0.3), (0.05, 0.84), (0.07, 0.86), (0.07, 0.92),
+                             (0.05, 0.94), (0, 0.94)], at=F.at(0, 0, 0), material=M.rail, segments=14)
+        G.revolve('knob', [(0, 0.93), (0.05, 0.93), (0.08, 0.96), (0.075, 1.0), (0.04, 1.035), (0, 1.04)],
+                  at=F.at(0, 0, 0), material=M.deck, segments=14)
         for k in range(4):
             t = math.radians(45 + 90 * k)
             c, s = math.sin(t), math.cos(t)
-            pts = _bezier((0.05 * c, 0.9, 0.05 * s), (0.78 * c, 0.9, 0.78 * s), (0.78 * c, 0.25, 0.78 * s), 12)
-            _tube(f'rail{k}', [F.at(*p) for p in pts], 0.022, M.rail, verts=8)
-            F.cyl(f'rail_foot{k}', 0.04, 0.012, (0.78 * c, 0.266, 0.78 * s), M.steel, verts=10)
+            pts = _bezier((0.05 * c, 0.9, 0.05 * s), (0.78 * c, 0.9, 0.78 * s), (0.78 * c, 0.25, 0.78 * s), 14)
+            F.sweep(f'rail{k}', [tuple(p) for p in pts], 0.022, M.rail, verts=10)
+            F.cyl(f'rail_foot{k}', 0.045, 0.014, (0.78 * c, 0.266, 0.78 * s), M.steel, verts=10, bevel=0.004,
+                  bevel_segments=1)
+            # a rubber grip where the riders' hands go, down the rail beside them
+            g0, g1 = _bezier((0.05 * c, 0.9, 0.05 * s), (0.78 * c, 0.9, 0.78 * s), (0.78 * c, 0.25, 0.78 * s), 20)[10:16:5]
+            F.sweep(f'rail_grip{k}', [tuple(g0), tuple(g1)], 0.027, M.rubber, verts=10)
     platform = G.hinged(G.join(parts, 'platform'), (0, 0, 0))
     G.settle(centre=False)
     G.spin(platform, 'spin', turns=1, seconds=3.5, axis='Z')
@@ -401,7 +520,8 @@ BOARD_W, BOARD_H, BOARD_Y = 1.2, 0.8, 3.3   # the backboard: its width, height a
 
 
 def _net(name):
-    """A diamond-mesh net: strands zigzagging from the rim (r 0.21) to a narrower bottom ring (r 0.13)."""
+    """A diamond-mesh net: strands zigzagging from the rim (r 0.21) to a narrower bottom ring (r 0.13), each strand
+    one cord, a hem round the bottom."""
     y0, y1, r0, r1, n = RIM[0] - 0.01, RIM[0] - 0.38, 0.205, 0.13, 12
     z = RIM[1]
     with G.new_parts() as parts:
@@ -414,40 +534,63 @@ def _net(name):
                     a = math.tau * (i + d * (0.5 if j % 2 else 0)) / n
                     r = r0 + (r1 - r0) * t
                     pts.append((r * math.cos(a), y0 + (y1 - y0) * t, z + r * math.sin(a)))
-                for j in range(rows):
-                    G.rod(f'{name}{i}{d}{j}', F.at(*pts[j]), F.at(*pts[j + 1]), 0.006, material=M.net, verts=4)
+                F.sweep(f'{name}{i}{d}', pts, 0.006, M.net, verts=4)
         G.torus(f'{name}_hem', r1, 0.008, at=F.at(0, y1, z), material=M.net, major_segments=16, minor_segments=4)
     return G.join(parts, name)
 
 
 def basketballHoop():
     with G.new_parts() as still:
-        F.box('ballast', 0.62, 0.22, 0.6, (0, 0.11, -0.17), M.post, bevel=0.03)
-        F.box('ballast_lid', 0.5, 0.02, 0.48, (0, 0.225, -0.17), M.steel, bevel=0.008)
-        F.cyl('pole', 0.05, 3.2, (0, 1.75, -0.3), M.post, verts=14)
-        F.cyl('pole_cap', 0.055, 0.03, (0, 3.36, -0.3), M.steel, verts=14)
+        # the base: a moulded ballast tank, its fill cap, two wheels at its front edge for rolling it
+        bx, by, _ = F.at(0, 0, -0.17)
+        G.loft('ballast', [G.ring(0.31, 0.3, 0.0, 24, square=6, at=(bx, by)), G.ring(0.31, 0.3, 0.18, 24, square=6, at=(bx, by)),
+                           G.ring(0.28, 0.27, 0.22, 24, square=6, at=(bx, by)), G.ring(0.2, 0.19, 0.235, 24, square=5, at=(bx, by))],
+               material=M.post, angle=50)
+        F.cyl('ballast_cap', 0.05, 0.02, (0.16, 0.23, -0.05), M.steel, verts=12, bevel=0.004, bevel_segments=1)
+        for s in (-1, 1):
+            F.cyl(f'wheel{s}', 0.05, 0.035, (s * 0.24, 0.05, 0.14), M.rubber, rot=(0, 90, 0), verts=14, bevel=0.008,
+                  bevel_segments=1)
+        # the pole in two telescoping sections, a clamp collar between them; a cap on top
+        F.cyl('pole', 0.05, 1.85, (0, 0.21 + 0.925, -0.3), M.post, verts=14)
+        F.cyl('pole_upper', 0.044, 1.36, (0, 2.0 + 0.68, -0.3), M.post, verts=14)
+        G.revolve('pole_collar', [(0, -0.04), (0.058, -0.04), (0.062, -0.03), (0.062, 0.03), (0.055, 0.04), (0, 0.04)],
+                  at=F.at(0, 2.02, -0.3), material=M.steel, segments=14)
+        F.sweep('collar_knob', [(0, 2.02, -0.24), (0, 2.02, -0.2)], 0.012, M.rubber, verts=6)
+        F.cyl('pole_cap', 0.055, 0.03, (0, 3.36, -0.3), M.steel, verts=14, bevel=0.006, bevel_segments=1)
+        # two bent arms from the pole to the board's back, a strut between them
         for y, to in ((3.3, 3.45), (3.0, 3.08)):
-            G.rod(f'arm{y}', F.at(0, y, -0.3), F.at(0, to, 0.02), 0.025, material=M.post, verts=8)
+            F.sweep(f'arm{y}', G.kit.fillet([(0, y, -0.3), (0, y, -0.2), (0, to, 0.0)], 0.04), 0.025, M.post, verts=8)
+        F.sweep('arm_strut', [(0, 3.06, -0.18), (0, 3.38, -0.12)], 0.016, M.post, verts=6)
+        # the backboard: a white board in a steel frame, its border and the shooter's square, a pad along its foot
         bw, bh, by = BOARD_W, BOARD_H, BOARD_Y
-        F.box('board', bw, bh, 0.03, (0, by, 0.04), M.board, bevel=0.008)
-        for y in (by + bh / 2 - 0.015, by - bh / 2 + 0.015):
-            F.box(f'border{y}', bw, 0.03, 0.034, (0, y, 0.04), M.board_mark)
-        for x in (-bw / 2 + 0.015, bw / 2 - 0.015):
-            F.box(f'border{x}', 0.03, bh, 0.034, (x, by, 0.04), M.board_mark)
-        # the shooter's square, 0.59 x 0.45 m as on a regulation board, its foot level with the rim
-        tw, th = 0.59, 0.45
+        F.box('board', bw - 0.02, bh - 0.02, 0.025, (0, by, 0.04), M.board, bevel=0.004, bevel_segments=1)
+        G.kit.moulding(F, 'board_frame', [(bw / 2, by - bh / 2), (bw / 2, by + bh / 2), (-bw / 2, by + bh / 2), (-bw / 2, by - bh / 2)],
+                       [(0.0, -0.02), (0.0, 0.016), (0.022, 0.016), (0.022, -0.02)], M.post, at=0.04)
+        for y in (by + bh / 2 - 0.045, by - bh / 2 + 0.045):
+            F.box(f'border{y}', bw - 0.07, 0.03, 0.028, (0, y, 0.04), M.board_mark)
+        for x in (-bw / 2 + 0.045, bw / 2 - 0.045):
+            F.box(f'border{x}', 0.03, bh - 0.06, 0.028, (x, by, 0.04), M.board_mark)
+        tw, th = 0.59, 0.45       # the shooter's square, 0.59 x 0.45 m as on a regulation board, its foot level with the rim
         ty = RIM[0] + th / 2
-        for w, h, x, y in ((tw, 0.025, 0, ty + th / 2), (tw, 0.025, 0, ty - th / 2), (0.025, th, -tw / 2, ty),
-                           (0.025, th, tw / 2, ty)):
-            F.box(f'target{x}{y}', w, h, 0.034, (x, y, 0.045), M.board_mark)
-        F.box('rim_bracket', 0.16, 0.12, 0.05, (0, RIM[0] - 0.04, 0.075), M.rim, bevel=0.006)
+        F.extrude('target', G.rounded_rect(tw, th, 0.004, corner=1), 0.028, (0, ty, 0.045), M.board_mark,
+                  holes=[G.rounded_rect(tw - 0.05, th - 0.05, 0.003, corner=1)])
+        F.soft('pad', bw, 0.04, 0.06, (0, by - bh / 2 - 0.01, 0.04), M.rubber, round=0.015)
+        # the rim on a flanged bracket with its spring housing, little hooks for the net under it
+        F.box('rim_bracket', 0.16, 0.12, 0.05, (0, RIM[0] - 0.04, 0.075), M.rim, bevel=0.006, bevel_segments=1)
+        F.box('rim_spring', 0.06, 0.07, 0.04, (0, RIM[0] - 0.05, 0.1), M.steel, bevel=0.006, bevel_segments=1)
+        F.extrude('rim_flange', [(0.06, 0.0), (-0.06, 0.0), (-0.03, 0.12), (0.03, 0.12)], 0.006, (0, RIM[0] - 0.008, 0.06),
+                  M.rim, plane='top')
         G.torus('rim', 0.22, 0.012, at=F.at(*(0, RIM[0], RIM[1])), material=M.rim, major_segments=28, minor_segments=6)
-        # the ball, at rest on the ground in front
+        for k in range(12):
+            a = math.tau * k / 12
+            x, z = 0.215 * math.cos(a), RIM[1] + 0.215 * math.sin(a)
+            F.sweep(f'net_hook{k}', [(x, RIM[0] - 0.005, z), (x * 0.97, RIM[0] - 0.022, z - 0.0), (x * 0.95, RIM[0] - 0.014, z)],
+                    0.0025, M.rim, verts=3)
+        # the ball, at rest on the ground in front: its seams
         F.sphere('ball', 0.12, (0.3, 0.12, 0.32), M.ball, segments=16, rings=10)
-        G.torus('seam0', 0.121, 0.004, at=F.at(0.3, 0.12, 0.32), material=M.rubber, rot=(90, 0, 30),
-                major_segments=20, minor_segments=4)
-        G.torus('seam1', 0.121, 0.004, at=F.at(0.3, 0.12, 0.32), material=M.rubber, rot=(0, 0, 0),
-                major_segments=20, minor_segments=4)
+        for i, rot in enumerate(((90, 0, 30), (0, 0, 0), (90, 0, 120))):
+            G.torus(f'seam{i}', 0.1205, 0.0035, at=F.at(0.3, 0.12, 0.32), material=M.rubber, rot=rot,
+                    major_segments=20, minor_segments=3)
     G.join(still, 'hoop', origin=(0, 0, 0))
     net = G.hinged(_net('net'), F.at(0, RIM[0], RIM[1]))
     G.settle(centre=False)
@@ -463,30 +606,55 @@ def basketballHoop():
 PONG = (2.74, 0.76, 1.525)   # the top's length, height and width
 
 
+def _bat(x, z, a, rubber):
+    """A bat lying on the table at (x, z), its handle pointing `a` degrees round: a wooden blade, the rubber face, a
+    flared handle."""
+    top = PONG[1]
+    F.cyl(f'bat_blade{x}', 0.076, 0.006, (x, top + 0.003, z), M.bat_handle, verts=20)
+    F.cyl(f'bat{x}', 0.074, 0.004, (x, top + 0.008, z), rubber, verts=20, bevel=0.0015, bevel_segments=1)
+    dx, dz = math.sin(math.radians(a)), math.cos(math.radians(a))
+    F.sweep(f'bat_handle{x}', [(x + 0.06 * dx, top + 0.012, z + 0.06 * dz), (x + 0.1 * dx, top + 0.014, z + 0.1 * dz),
+                               (x + 0.165 * dx, top + 0.014, z + 0.165 * dz)], None, M.bat_handle,
+            profile=G.rounded_rect(0.024, 0.016, 0.007, corner=2), up=(0, 0, 1), scale=[1.4, 1.0, 1.15])
+
+
 def pingPongTable():
     length, top, width = PONG
     hl, hw = length / 2, width / 2
     with G.new_parts():
-        F.box('top', length, 0.03, width, (0, top - 0.015, 0), M.table_top, bevel=0.01)
+        # the top: a slab with a band round its edge, a steel frame under it
+        F.box('top', length, 0.03, width, (0, top - 0.015, 0), M.table_top, bevel=0.006, bevel_segments=1)
+        G.kit.moulding(F, 'top_band', [(hl, -hw), (hl, hw), (-hl, hw), (-hl, -hw)],
+                       [(0.0, -0.035), (0.0, -0.002), (0.006, -0.002), (0.006, -0.035)], M.steel, at=top, plane='top')
+        for z in (-hw + 0.1, hw - 0.1):
+            F.box(f'apron{z}', length - 0.3, 0.06, 0.04, (0, top - 0.06, z), M.steel, bevel=0.004, bevel_segments=1)
+        # two concrete legs: a tapered pier with an arch through it, on a broad foot
         for x in (-0.85, 0.85):
-            F.box(f'leg{x}', 0.12, top - 0.03, 1.0, (x, (top - 0.03) / 2, 0), M.concrete, bevel=0.015)
-            F.box(f'foot{x}', 0.22, 0.04, 1.12, (x, 0.02, 0), M.concrete, bevel=0.01)
+            leg = [(-0.5, 0.04), (0.5, 0.04), (0.42, top - 0.03), (-0.42, top - 0.03)]
+            arch = [(0.18 * math.cos(math.pi * k / 10), 0.04 + 0.32 * math.sin(math.pi * k / 10)) for k in range(11)]
+            hole = [(0.18, 0.12)] + [(px, py + 0.08) for px, py in arch[1:-1]] + [(-0.18, 0.12)]
+            F.extrude(f'leg{x}', leg, 0.12, (x, 0, 0), M.concrete, plane='side', holes=[hole], bevel=0.01, bevel_segments=1)
+            F.box(f'foot{x}', 0.22, 0.04, 1.12, (x, 0.02, 0), M.concrete, bevel=0.01, bevel_segments=1)
+            F.box(f'cap{x}', 0.16, 0.02, 0.88, (x, top - 0.04, 0), M.steel, bevel=0.004, bevel_segments=1)
         y = top + 0.001
         for w, d, x, z in ((length, 0.02, 0, hw - 0.01), (length, 0.02, 0, -hw + 0.01), (0.02, width, hl - 0.01, 0),
                            (0.02, width, -hl + 0.01, 0), (length, 0.003, 0, 0)):
             F.box(f'line{x}{z}', w, 0.003, d, (x, y, z), M.lines)
-        # the steel net: a plate between two posts, a white band along its top
+        # the steel net: a perforated plate (rows of holes as a darker band) between two posts clamped to the top
         net = width + 2 * 0.1525
-        F.box('net', 0.02, 0.135, net, (0, top + 0.0675, 0), M.steel)
-        F.box('net_band', 0.026, 0.02, net, (0, top + 0.1425, 0), M.lines)
-        for z in (-net / 2, net / 2):
-            F.box(f'net_post{z}', 0.04, 0.17, 0.03, (0, top + 0.08, z), M.steel, bevel=0.005)
+        F.box('net', 0.012, 0.13, net - 0.04, (0, top + 0.07, 0), M.steel)
+        for k in range(3):
+            F.box(f'net_slot{k}', 0.014, 0.012, net - 0.08, (0, top + 0.03 + k * 0.035, 0), M.rubber)
+        F.box('net_band', 0.026, 0.02, net, (0, top + 0.1425, 0), M.lines, bevel=0.004, bevel_segments=1)
+        for z in (-net / 2 + 0.015, net / 2 - 0.015):
+            F.box(f'net_post{z}', 0.04, 0.17, 0.03, (0, top + 0.08, z), M.steel, bevel=0.005, bevel_segments=1)
+            F.box(f'net_clamp{z}', 0.06, 0.05, 0.05, (0, top - 0.015, math.copysign(hw - 0.005, z)), M.steel, bevel=0.005,
+                  bevel_segments=1)
+            F.box(f'net_arm{z}', 0.03, 0.02, abs(z) - hw + 0.03, (0, top + 0.005, math.copysign((abs(z) + hw) / 2, z)),
+                  M.steel)
         # two bats and the ball
-        for colour, x, z, a in ((M.bat, -0.8, 0.3, 20), (M.bat_blue, 0.85, -0.32, 200)):
-            F.cyl(f'bat{x}', 0.075, 0.012, (x, top + 0.006, z), colour, verts=20)
-            dx, dz = 0.11 * math.sin(math.radians(a)), 0.11 * math.cos(math.radians(a))
-            G.rod(f'bat_handle{x}', F.at(x + 0.06 * dx / 0.11, top + 0.008, z + 0.06 * dz / 0.11),
-                  F.at(x + dx, top + 0.008, z + dz), 0.014, material=M.bat_handle, verts=8)
+        _bat(-0.8, 0.3, 20, M.bat)
+        _bat(0.85, -0.32, 200, M.bat_blue)
         F.sphere('ball', 0.02, (0.5, top + 0.02, -0.15), M.ping, segments=10, rings=6)
     G.join_all('pingPongTable')
     G.settle(centre=False)
@@ -511,54 +679,86 @@ def _square(i, j):
 
 
 def _stools(segments):
+    """The two stools: a turned stone mushroom, a moulded foot, a waisted stem, a seat with a rounded edge."""
     for s in (-1, 1):
-        G.revolve(f'stool{s}', [(0, 0), (0.11, 0), (0.11, 0.03), (0.07, 0.06), (0.06, 0.4), (0.12, 0.43),
-                                (0.12, 0.47), (0, 0.47)], at=F.at(s * STOOL, 0, 0), material=M.stool,
-                  segments=segments)
+        G.revolve(f'stool{s}', [(0, 0), (0.11, 0), (0.11, 0.025), (0.095, 0.035), (0.075, 0.06), (0.062, 0.12),
+                                (0.058, 0.3), (0.066, 0.37), (0.09, 0.41), (0.12, 0.43), (0.125, 0.45), (0.12, 0.465),
+                                (0.1, 0.47), (0, 0.47)], at=F.at(s * STOOL, 0, 0), material=M.stool, segments=segments)
 
 
-def _piece(name, kind, i, j, material):
-    """A low chess piece standing on square (i, j)."""
+def _pedestal(segments):
+    G.revolve('pedestal', [(0, 0), (0.17, 0), (0.17, 0.03), (0.15, 0.045), (0.11, 0.08), (0.09, 0.14), (0.08, 0.55),
+                           (0.09, 0.6), (0.12, 0.66), (0.13, 0.68), (0.12, 0.7), (0, 0.7)], at=F.at(0, 0, BOARD[1]),
+              material=M.stool, segments=segments)
+
+
+def _piece(name, kind, i, j, material, low=False):
+    """A chess piece standing on square (i, j): turned, a knight's head swept, the king's cross, the queen's crown."""
     x, z = _square(i, j)
     y = BOARD[0] + 0.002
     at = F.at(x, y, z)
+    seg = 8 if low else 10
+    foot = [(0, 0), (0.017, 0), (0.017, 0.005), (0.014, 0.008)]
     if kind == 'pawn':
-        G.revolve(name, [(0, 0), (0.016, 0), (0.016, 0.006), (0.011, 0.01), (0.007, 0.03), (0.011, 0.033),
-                         (0, 0.034)], at=at, material=material, segments=10)
-        G.sphere(f'{name}_head', 0.011, at=(at[0], at[1], at[2] + 0.042), material=material, segments=8, rings=5)
+        G.revolve(name, foot + [(0.008, 0.018), (0.006, 0.026), (0.011, 0.029), (0.006, 0.032), (0, 0.033)], at=at,
+                  material=material, segments=seg)
+        G.sphere(f'{name}_head', 0.011, at=(at[0], at[1], at[2] + 0.041), material=material, segments=8, rings=5)
     elif kind == 'rook':
-        G.revolve(name, [(0, 0), (0.018, 0), (0.018, 0.007), (0.012, 0.012), (0.011, 0.04), (0.016, 0.044),
-                         (0.016, 0.056), (0, 0.056)], at=at, material=material, segments=10)
+        G.revolve(name, foot + [(0.011, 0.014), (0.01, 0.038), (0.016, 0.042), (0.016, 0.056), (0.011, 0.056),
+                                (0.011, 0.05), (0, 0.05)], at=at, material=material, segments=seg)
+    elif kind == 'knight':
+        G.revolve(name, foot + [(0.012, 0.014), (0, 0.016)], at=at, material=material, segments=seg)
+        facing = -1 if name.startswith('black') else 1
+        F.sweep(f'{name}_head', [(x, y + 0.012, z), (x + facing * 0.004, y + 0.035, z), (x + facing * 0.012, y + 0.05, z),
+                                 (x + facing * 0.024, y + 0.044, z)], None, material,
+                profile=G.rounded_rect(0.02, 0.014, 0.005, corner=1), up=(0, 0, 1), resolution=2,
+                scale=[1.3, 0.9, 0.9, 0.6])
+    elif kind == 'bishop':
+        G.revolve(name, foot + [(0.008, 0.02), (0.006, 0.034), (0.011, 0.037), (0.007, 0.04), (0.01, 0.048),
+                                (0.008, 0.056), (0.003, 0.062), (0, 0.064)], at=at, material=material, segments=seg)
     else:   # king or queen: taller, with a cap
         h = 0.07 if kind == 'king' else 0.064
-        G.revolve(name, [(0, 0), (0.019, 0), (0.019, 0.007), (0.012, 0.014), (0.007, h - 0.02), (0.014, h - 0.012),
-                         (0.009, h), (0, h)], at=at, material=material, segments=10)
+        G.revolve(name, [(0, 0), (0.019, 0), (0.019, 0.007), (0.012, 0.014), (0.007, h - 0.02), (0.012, h - 0.016),
+                         (0.008, h - 0.013), (0.014, h - 0.004), (0.009, h), (0, h)], at=at, material=material, segments=seg)
         if kind == 'king':
             G.cube(f'{name}_cross', (0.006, 0.006, 0.022), at=(at[0], at[1], at[2] + h + 0.01), material=material)
+            G.cube(f'{name}_bar', (0.016, 0.006, 0.006), at=(at[0], at[1], at[2] + h + 0.013), material=material)
         else:
-            G.sphere(f'{name}_crown', 0.009, at=(at[0], at[1], at[2] + h + 0.004), material=material, segments=8, rings=5)
+            G.sphere(f'{name}_crown', 0.008, at=(at[0], at[1], at[2] + h + 0.004), material=material, segments=8, rings=5)
+
+
+WHITE = (('king', 4, 0), ('rook', 0, 0), ('pawn', 1, 1), ('pawn', 5, 1), ('pawn', 6, 2), ('queen', 2, 3),
+         ('knight', 5, 2), ('bishop', 3, 2))
+BLACK = (('king', 4, 7), ('rook', 7, 7), ('pawn', 2, 6), ('pawn', 3, 5), ('pawn', 6, 6), ('queen', 5, 5),
+         ('knight', 1, 5), ('bishop', 4, 6))
+
+
+def _top():
+    """The table's top: a slab with a chamfered edge and a moulded band under it, the board inlaid in a border."""
+    F.box('top', CHESS_TOP, 0.05, CHESS_TOP, (0, 0.735, BOARD[1]), M.stone, bevel=0.015, bevel_segments=2)
+    F.box('top_under', CHESS_TOP - 0.06, 0.02, CHESS_TOP - 0.06, (0, 0.705, BOARD[1]), M.stone, bevel=0.006,
+          bevel_segments=1)
+    F.box('board', 8 * SQUARE + 0.03, 0.003, 8 * SQUARE + 0.03, (0, BOARD[0] - 0.0005, BOARD[1]), M.square_dark)
+    F.box('board_light', 8 * SQUARE, 0.003, 8 * SQUARE, (0, BOARD[0] + 0.0005, BOARD[1]), M.square_light)
+    for i in range(8):
+        for j in range(8):
+            if (i + j) % 2 == 0:
+                x, z = _square(i, j)
+                F.box(f'sq{i}{j}', SQUARE, 0.003, SQUARE, (x, BOARD[0] + 0.001, z), M.square_dark)
 
 
 def parkChessTable():
     with G.new_parts() as still:
-        G.revolve('pedestal', [(0, 0), (0.17, 0), (0.17, 0.04), (0.1, 0.08), (0.08, 0.6), (0.12, 0.68), (0.12, 0.7),
-                               (0, 0.7)], at=F.at(0, 0, BOARD[1]), material=M.stool, segments=16)
-        F.box('top', CHESS_TOP, 0.06, CHESS_TOP, (0, 0.73, BOARD[1]), M.stone, bevel=0.015)
-        F.box('board', 8 * SQUARE + 0.02, 0.003, 8 * SQUARE + 0.02, (0, BOARD[0] - 0.0005, BOARD[1]), M.square_dark)
-        F.box('board_light', 8 * SQUARE, 0.003, 8 * SQUARE, (0, BOARD[0] + 0.0005, BOARD[1]), M.square_light)
-        for i in range(8):
-            for j in range(8):
-                if (i + j) % 2 == 0:
-                    x, z = _square(i, j)
-                    F.box(f'sq{i}{j}', SQUARE, 0.003, SQUARE, (x, BOARD[0] + 0.001, z), M.square_dark)
+        _pedestal(16)
+        _top()
         _stools(16)
-        # a game under way: white on the left, black across
-        for k, (kind, i, j) in enumerate((('king', 4, 0), ('rook', 0, 0), ('pawn', 1, 1), ('pawn', 5, 1),
-                                          ('pawn', 6, 2), ('queen', 2, 3))):
+        # a game under way: white on the left, black across; a taken black pawn at white's side of the board
+        for k, (kind, i, j) in enumerate(WHITE):
             _piece(f'white{k}', kind, i, j, M.piece_white)
-        for k, (kind, i, j) in enumerate((('king', 4, 7), ('rook', 7, 7), ('pawn', 2, 6), ('pawn', 3, 5),
-                                          ('pawn', 6, 6), ('queen', 5, 5))):
+        for k, (kind, i, j) in enumerate(BLACK):
             _piece(f'black{k}', kind, i, j, M.piece_black)
+        G.revolve('taken', [(0, 0), (0.017, 0), (0.017, 0.005), (0.008, 0.02), (0, 0.022)],
+                  at=F.at(-0.29, BOARD[0] - 0.002, 0.25), material=M.piece_black, segments=10)
     G.join(still, 'table', origin=(0, 0, 0))
     with G.new_parts() as parts:
         _piece('pawn', 'pawn', 4, 1, M.piece_white)
@@ -573,18 +773,11 @@ def parkChessTableFar():
     """Its far version by hand (decimating it folds the inlaid board into spikes): the table, the board's
     squares and the stools at fewer sides, the two kings, no other pieces."""
     with G.new_parts():
-        G.revolve('pedestal', [(0, 0), (0.17, 0), (0.17, 0.04), (0.1, 0.08), (0.08, 0.6), (0.12, 0.68), (0.12, 0.7),
-                               (0, 0.7)], at=F.at(0, 0, BOARD[1]), material=M.stool, segments=12)
-        F.box('top', CHESS_TOP, 0.06, CHESS_TOP, (0, 0.73, BOARD[1]), M.stone)
-        F.box('board_light', 8 * SQUARE, 0.003, 8 * SQUARE, (0, BOARD[0] + 0.0005, BOARD[1]), M.square_light)
-        for i in range(8):
-            for j in range(8):
-                if (i + j) % 2 == 0:
-                    x, z = _square(i, j)
-                    F.box(f'sq{i}{j}', SQUARE, 0.003, SQUARE, (x, BOARD[0] + 0.001, z), M.square_dark)
+        _pedestal(12)
+        _top()
         _stools(12)
-        _piece('white_king', 'king', 4, 0, M.piece_white)
-        _piece('black_king', 'king', 4, 7, M.piece_black)
+        _piece('white_king', 'king', 4, 0, M.piece_white, low=True)
+        _piece('black_king', 'king', 4, 7, M.piece_black, low=True)
     G.join_all('parkChessTable_far')
     G.settle(centre=False)
     return G.meshes()

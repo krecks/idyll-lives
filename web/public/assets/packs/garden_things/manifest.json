@@ -9,6 +9,15 @@
         "body": {
           "finish": "material.finish.matte"
         },
+        "dark": {
+          "finish": "material.finish.matte"
+        },
+        "frog": {
+          "finish": "material.finish.satin"
+        },
+        "iris": {
+          "finish": "material.finish.satin"
+        },
         "koi": {
           "finish": "material.finish.satin"
         },
@@ -23,6 +32,9 @@
         },
         "lily_white": {
           "finish": "material.finish.satin"
+        },
+        "mud": {
+          "finish": "material.finish.matte"
         },
         "pad": {
           "finish": "material.finish.satin"
@@ -89,6 +101,9 @@
         "box_trim": {
           "finish": "material.finish.wood"
         },
+        "bracket": {
+          "finish": "material.finish.metal"
+        },
         "eye": {
           "finish": "material.finish.satin"
         },
@@ -117,6 +132,9 @@
       "type": "model",
       "url": "../../models/garden_things/birdhouse.glb",
       "materials": {
+        "beak": {
+          "finish": "material.finish.satin"
+        },
         "body": {
           "finish": "material.finish.satin"
         },
@@ -129,8 +147,17 @@
         "post": {
           "finish": "material.finish.wood"
         },
+        "robin": {
+          "finish": "material.finish.satin"
+        },
+        "robin_breast": {
+          "finish": "material.finish.satin"
+        },
         "roof": {
           "finish": "material.finish.satin"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
         }
       },
       "paint": [
@@ -153,6 +180,9 @@
         },
         "body": {
           "finish": "material.finish.metal"
+        },
+        "dark": {
+          "finish": "material.finish.matte"
         },
         "feeder": {
           "finish": "material.finish.satin"
@@ -244,6 +274,9 @@
         },
         "dial_mark": {
           "finish": "material.finish.metal"
+        },
+        "lichen": {
+          "finish": "material.finish.matte"
         }
       },
       "paint": [
@@ -262,6 +295,12 @@
       "url": "../../models/garden_things/steppingStones.glb",
       "materials": {
         "body": {
+          "finish": "material.finish.matte"
+        },
+        "moss": {
+          "finish": "material.finish.matte"
+        },
+        "pebble": {
           "finish": "material.finish.matte"
         }
       },
@@ -310,8 +349,14 @@
           "finish": "material.finish.gloss",
           "glow": "#FFD9A0"
         },
+        "pebble": {
+          "finish": "material.finish.matte"
+        },
         "planter": {
           "finish": "material.finish.matte"
+        },
+        "reed": {
+          "finish": "material.finish.satin"
         },
         "socket": {
           "finish": "material.finish.satin"

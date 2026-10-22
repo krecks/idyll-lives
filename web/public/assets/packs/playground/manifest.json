@@ -138,6 +138,9 @@
         "mane": {
           "finish": "material.finish.matte"
         },
+        "rubber": {
+          "finish": "material.finish.matte"
+        },
         "saddle": {
           "finish": "material.finish.gloss"
         },
@@ -182,6 +185,9 @@
         },
         "rail": {
           "finish": "material.finish.metal"
+        },
+        "rubber": {
+          "finish": "material.finish.matte"
         },
         "steel": {
           "finish": "material.finish.metal"
@@ -284,6 +290,9 @@
         },
         "ping": {
           "finish": "material.finish.gloss"
+        },
+        "rubber": {
+          "finish": "material.finish.matte"
         },
         "steel": {
           "finish": "material.finish.metal"
