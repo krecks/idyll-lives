@@ -97,7 +97,7 @@ const FRUIT = { apple: [0.05, 1.84, 0.7], lemon: [-0.1, 1.62, 0.6] } as const;
 
 /** The pickers (`SHARES_177`: a grown-up, a teen, a child), and the feet's distance from the trunk for each (the shorter nearer, the fruit nearer overhead). */
 type PickFit = Fit & { fruit: readonly [x: number, y: number, z: number] };
-export const PICK_APPLE: Size<PickFit>[] = sizes('pickApple', SHARES_177, (s) => ({ s, to: s > 0.9 ? 1 : s > 0.7 ? 0.78 : 0.78, fruit: FRUIT.apple }));
+export const PICK_APPLE: Size<PickFit>[] = sizes('pickApple', SHARES_177, (s) => ({ s, to: s > 0.9 ? 1 : 0.78, fruit: FRUIT.apple }));
 export const PICK_LEMON: Size<PickFit>[] = sizes('pickLemon', SHARES_177, (s) => ({ s, to: s > 0.9 ? 0.95 : s > 0.7 ? 0.88 : 0.85, fruit: FRUIT.lemon }));
 /** The picking clip's length (s), and when (shares of it) the hand reaches the fruit, twists it off and is down with it. */
 const PICK_S = 3.3;
