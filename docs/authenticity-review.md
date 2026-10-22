@@ -840,7 +840,7 @@ Phase 4, by band and group. Commits are from each finding's Status line in its l
 
 ### 8.7 Found and fixed during Phase 4
 
-The fix agents' own findings (Source `fix: <agent>`): 36 of the 41 fixed and one in part; the other four are in §9 (I-garden-11, I-garden-12, M-hobbies-11, M-town-08).
+The fix agents' own findings (Source `fix: <agent>`): 36 of the 41 fixed and one in part; three are in §9 (I-garden-11, I-garden-12, M-hobbies-11), and M-town-08 was fixed in the follow-up (§9.5).
 
 | Area | Finding | Commit | What changed |
 |---|---|---|---|
