@@ -79,14 +79,32 @@ is never two of it.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.treadmill` | 0.79 × 1.44 × 1.85 m | 2,736 | 2 | Frame, Pads |
-| `model.weightBench` | 0.90 × 1.20 × 1.85 m | 3,924 | 2 | Frame, Pads |
-| `model.exerciseBike` | 0.53 × 1.11 × 0.90 m | 2,216 | 2 | Frame, Pads |
-| `model.yogaMat` | 0.92 × 0.23 × 0.27 m (rolled) | 768 | 3 | Mat |
-| `model.dumbbells` | 0.77 × 0.72 × 0.93 m | 3,996 | 3 | Rack, Weights |
+| `model.treadmill` | 0.79 × 1.44 × 1.85 m | 4,348 | 2 | Frame, Pads |
+| `model.weightBench` | 0.90 × 1.20 × 1.85 m | 5,048 | 2 | Frame, Pads |
+| `model.exerciseBike` | 0.53 × 1.11 × 0.90 m | 3,152 | 2 | Frame, Pads |
+| `model.yogaMat` | 0.92 × 0.23 × 0.27 m (rolled) | 1,952 | 3 | Mat |
+| `model.dumbbells` | 0.77 × 0.72 × 0.93 m | 3,240 | 3 | Rack, Weights |
 
-`check-glb`: 5 models, 0 failed; warnings: the treadmill's belt loop (expected) and the yoga mat's flat strip (above).
-Khronos validator: 0 errors, 0 warnings each.
+`check-glb`: 5 models, 0 failed; warnings: the treadmill's belt loop (expected) and the yoga mat's flat strip (29 %,
+was 42 %). Khronos validator: 0 errors, 0 warnings each.
+
+## Detail pass (2026-10-22)
+
+Rebuilt with the forms and the kit, the same keys, sizes, centres, parts, clips (the treadmill's `belt_run` scroll and
+its hood and cap covers as they were), motions, paint and draws; the held bar and dumbbells keep their origins.
+
+- **Treadmill**: a rounded deck and roller cap with the roller's ends, ribbed foot treads, a lofted motor hood with a
+  band and vents, transport wheels, oval uprights, handlebars bent in one piece with pulse plates and capped grips, a
+  rounded console with a bezel, speakers and a safety key on its lanyard, a turned bottle in a holder.
+- **Weight bench**: a piped pad, rounded beam, posts and feet with soft caps; uprights with peg holes and caps,
+  J-hooks on pinned sleeves; the bar with knurling, sleeves, shoulders, turned plates with a red band, spring collars.
+- **Exercise bike**: rounded stabilisers and beam, a profiled seat tube with a clamp and knob, a curved handlebar post,
+  dished flywheel covers with hubs, a lofted saddle on its rail, handlebars bent in one piece, a resistance cable, a
+  console with buttons; flat crank arms, pedal ends, a chainring.
+- **Yoga mat**: the roll's ends show its spiral, two straps round it; the flat mat has rounded corners and alignment
+  lines (`mat_edge`, a new matte colour); a soft foam block, a turned bottle with a label and a loop.
+- **Dumbbells** (and the bench's two): hex heads chamfered, flats down, knurled handles, end caps; the rack's A-frames
+  bent in one piece, tray shelves with lips and rubber liners, end caps, a brace; the floor mat in four tiles.
 
 ## Rebuild
 

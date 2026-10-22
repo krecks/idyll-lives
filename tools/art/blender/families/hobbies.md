@@ -97,29 +97,79 @@ round), since a loop can't wait.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.piano` | 1.54 × 1.48 × 0.83 m | 5,072 | 3 | Body, Trim |
-| `model.ukulele` | 0.35 × 0.84 × 0.26 m | 2,124 | 3 | Body & neck, Top, Stand |
-| `model.guitarElectric` | 0.46 × 1.00 × 0.58 m | 3,184 | 3 | Guitar, Amp |
-| `model.keyboardDigital` | 1.39 × 1.05 × 0.77 m | 3,584 | 2 | Body, Trim |
-| `model.drumKit` | 1.73 × 1.24 × 1.17 m | 5,940 | 3 | Shells, Hardware |
-| `model.guitarAcoustic` | 0.40 × 1.16 × 0.40 m | 2,832 | 3 | Body, Top, Stand |
-| `model.chessTable` | 0.64 × 0.92 × 0.89 m | 4,400 | 3 | Table, Chair |
-| `model.poolTable` | 2.50 × 0.81 × 1.40 m | 5,268 | 3 | Frame, Cloth |
-| `model.foosball` | 1.42 × 0.95 × 0.93 m | 7,224 | 3 | Table, Trim |
-| `model.dartboard` | 0.62 × 0.62 × 0.07 m | 1,844 | 2 | Board, Cabinet |
-| `model.arcadeCabinet` | 0.67 × 1.82 × 0.87 m | 1,532 | 2 | Cabinet, Art |
-| `model.puzzleTable` | 0.87 × 0.79 × 0.89 m | 2,256 | 3 | Table, Stool |
-| `model.easel` | 0.70 × 1.75 × 0.76 m | 2,004 | 3 | Wood, Metal |
-| `model.workbench` | 1.62 × 1.69 × 0.67 m | 5,884 | 3 | Top, Frame, Tool board |
-| `model.telescope` | 0.66 × 1.52 × 0.91 m | 1,724 | 2 | Tube, Tripod |
-| `model.sewingTable` | 0.90 × 1.08 × 0.89 m | 3,420 | 3 | Table, Machine |
-| `model.chemistrySet` | 0.92 × 1.40 × 0.50 m | 3,540 | 3 | Bench, Glassware |
-| `model.potteryWheel` | 0.60 × 0.54 × 0.88 m | 2,888 | 3 | Wheel, Stool |
-| `model.craftTable` | 1.70 × 0.90 × 0.89 m | 2,460 | 3 | Wood, Metal |
+| `model.piano` | 1.54 × 1.48 × 0.83 m | 6,216 | 3 | Body, Trim |
+| `model.ukulele` | 0.35 × 0.84 × 0.26 m | 2,864 | 3 | Body & neck, Top, Stand |
+| `model.guitarElectric` | 0.46 × 1.00 × 0.58 m | 5,400 | 3 | Guitar, Amp |
+| `model.keyboardDigital` | 1.39 × 1.05 × 0.77 m | 4,630 | 2 | Body, Trim |
+| `model.drumKit` | 1.73 × 1.24 × 1.17 m | 7,990 | 3 | Shells, Hardware |
+| `model.guitarAcoustic` | 0.40 × 1.16 × 0.40 m | 4,320 | 3 | Body, Top, Stand |
+| `model.chessTable` | 0.64 × 0.92 × 0.89 m | 3,972 | 3 | Table, Chair |
+| `model.poolTable` | 2.50 × 0.81 × 1.40 m | 5,492 | 3 | Frame, Cloth |
+| `model.foosball` | 1.42 × 0.95 × 0.93 m | 5,892 | 3 | Table, Trim |
+| `model.dartboard` | 0.62 × 0.62 × 0.07 m | 2,228 | 2 | Board, Cabinet |
+| `model.arcadeCabinet` | 0.67 × 1.82 × 0.87 m | 3,756 | 2 | Cabinet, Art |
+| `model.puzzleTable` | 0.87 × 0.79 × 0.89 m | 2,400 | 3 | Table, Stool |
+| `model.easel` | 0.70 × 1.75 × 0.76 m | 3,072 | 3 | Wood, Metal |
+| `model.workbench` | 1.62 × 1.69 × 0.67 m | 6,556 | 3 | Top, Frame, Tool board |
+| `model.telescope` | 0.66 × 1.52 × 0.91 m | 3,640 | 2 | Tube, Tripod |
+| `model.sewingTable` | 0.90 × 1.08 × 0.89 m | 5,068 | 3 | Table, Machine |
+| `model.chemistrySet` | 0.92 × 1.40 × 0.50 m | 4,976 | 3 | Bench, Glassware |
+| `model.potteryWheel` | 0.60 × 0.54 × 0.88 m | 3,620 | 3 | Wheel, Stool |
+| `model.craftTable` | 1.70 × 0.90 × 0.89 m | 3,260 | 3 | Wood, Metal |
 
-`check-glb`: 19 models, 0 failed; warnings: the dartboard floats (a wall thing), the chess table's 4,400 triangles
-(over the 4,000 aimed for at 0.92 m, under the 8,000 most), and the piano's seat (content 0.47 m, the bench 0.49:
-M-hobbies-10). Khronos validator: 0 errors, 0 warnings each.
+`check-glb`: 19 models, 0 failed; one warning: the dartboard floats (a wall thing). Khronos validator: 0 errors, 0
+warnings each.
+
+## Detail pass (2026-10-22)
+
+Every model rebuilt with the forms and the kit (`G.sweep`, `G.loft`, `G.extrude`, `F.soft`, `G.kit.*`), the same keys,
+sizes, centres, parts, pivots, clips, motions, paint and draws; the held instruments keep their origin (the foot) and
+axes. What each now has:
+
+- **Piano**: raised panels (`kit.shaker`) on the upper front and the kneeboard, a moulded lid nosing, scroll key
+  cheeks, turned legs on scrolled toes, brass candlesticks, swept pedals on a lyre; a piped bench cushion on turned
+  legs. The fallboard has a lip, a nameplate and hinges; the music desk an arched top pierced with fretwork.
+- **Guitar stands** (`_guitar_stand`): a tube post with a height collar, legs bent back in one piece, a cradle bent in
+  one piece with rubber sleeves, a rubber-lined yoke.
+- **Ukulele, guitars**: bodies are extruded outlines (`_figure8` bouts; the electric's double cutaway) with rounded
+  edges and inset tops, D-section swept necks, shaped heads, fret dots; the electric's saddles, tremolo arm, turned
+  knobs, switch and jack; the acoustic's binding, rosette rings, pickguard and pinned bridge. The amp's grille is
+  piped, its handle a strap.
+- **Digital piano**: side panels cut back under the keys, rounded cheeks and case top, speaker grilles, a music rest
+  with a ledge, swept pedals, headphones on a hook; a piped bench on X legs.
+- **Drum kit**: belled cymbals, lugs set on the tilted drums, tension rods on the kick, its port and badge, pedals
+  (heel, footboard, posts, cam, chain), two-stage stands with clamps, braces and rubber feet, boom counterweights, the
+  snare's strainer, basket and sticks, a lofted throne.
+- **Chess table**: a turned pedestal on three swept feet, a rounded top; knights carved in profile; the chair
+  (`_chair`, shared with the sewing table) has back posts in one piece from the floor, tapered legs, curved rails.
+- **Pool table**: mitred rails rounded over (`kit.moulding`), cushion noses between the pockets, leather pocket
+  mouths, diamond sights, turned legs, serpentine skirts, a cue in its parts, a rack with rounded corners.
+- **Foosball**: men cut in profile (head, body, legs, feet), turned handles, framed side panels, rod bearings,
+  tapered legs on levelling feet, ball-return slots.
+- **Dartboard**: a mitred cabinet moulding, the board's rounded edge (1 mm behind the printed face: level with it, it
+  z-fought in the game), a chalk ledge; turned dart barrels, kite flights.
+- **Arcade cabinet**: a T-moulding along the side's profile, a framed coin door with coin mechanisms, turned buttons
+  and start buttons, a curved screen, chrome marquee trim, speaker slots, a joystick boot.
+- **Jigsaw table**: turned legs, shaped aprons, a rimmed board, jigsaw-shaped loose pieces, the boxed puzzle.
+- **Easel**: tapered legs on shoes, a shaped clamp and wing nut, a profiled tray with a brush groove, a palette with
+  a thumb hole, paint tubes, brushes with ferrules; the painting's hill rolls and its stream winds.
+- **Workbench**: glue lines on the top, bolts, feet; pegboard holes as one flat mesh; shelf brackets, lidded jars, a
+  saw with its grip cut through, a combination spanner, pliers, a turned tape measure; a slatted crate, a paint can
+  with its bail, a toolbox with a soft lid, a swept drill, a claw hammer, a chamfered vice.
+- **Telescope**: telescopic legs with locks, a lobed tray with eyepiece holes, a shaped fork; a hollow dew shield,
+  tube rings with bolts, a dovetail, a focuser with knobs, the finder in two rings.
+- **Sewing table**: the machine one cast body over a rounded bed, dial, lever, bobbin cover, feed dogs, presser lever,
+  a turned spool, a routed thread; rumpled cloth, a pin cushion, scissors, turned reels, a basket with a handle; a
+  dished handwheel.
+- **Chemistry bench**: a steel frame, a lipped top, storage boxes, a periodic table, a rack with holes, flasks with
+  feet, a beaker's marks, a retort stand, a microscope with a cast base, three objectives and focus knobs.
+- **Pottery wheel**: a rounded housing with louvres, a rolled pan rim and seam, a profiled pedal, tools; the pot
+  thrown with rings and a hand's wobble (`G.jitter`).
+- **Craft table**: hairpin legs each one bent rod, a gridded cutting mat, binder rings, sharpened pencils, a ruler, a
+  craft knife, rolls of tape, glue.
+
+Flat details (key gaps, pegboard holes, the board's squares, glue lines) are one mesh of flat quads each
+(`_flat_quads`), not boxes: 56 key gaps went from 672 triangles to 112.
 
 ## Rebuild
 
