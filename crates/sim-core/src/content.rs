@@ -1557,6 +1557,9 @@ pub struct Content {
     pub animations: Vec<String>,
     /// Index of the `talk` animation (conversations), if content defines it.
     pub talk_anim: Option<usize>,
+    /// Index of the `cuddle` animation (a baby carried is shown as its lift), if content
+    /// defines it.
+    pub cuddle_anim: Option<usize>,
     /// Whether any feeling has `effects` (Sims then fold them into their modifiers).
     pub buff_feelings: bool,
     /// What routine blocks can be for, how plans steer residents, and life goals.
@@ -4064,6 +4067,7 @@ impl Content {
 
         let buff_feelings = feelings.iter().any(|m| m.effects.is_some());
         let talk_anim = anim_index(TALK_ANIM);
+        let cuddle_anim = anim_index("cuddle");
         let (activities, planner, goals) =
             crate::planner::parse(&raw.activities, &raw.planner, &raw.goals, &tag_index, &feelings)?;
         let phone = crate::phone::parse(&raw.phone, &ix, &animations, &life.stages)?;
@@ -4106,6 +4110,7 @@ impl Content {
             build,
             animations,
             talk_anim,
+            cuddle_anim,
             buff_feelings,
             activities,
             planner,
