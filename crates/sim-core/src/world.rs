@@ -383,30 +383,23 @@ impl ObjectInstance {
         if slot == 0 && def.places.is_empty() && def.interactions.iter().any(|i| i.baby && !i.baby_bed()) {
             return c;
         }
-        if let Some(p) = def.places.get(slot) {
-            // Its place, turned with it (a freely turned one too: the place is on its model) and
-            // moved out with its size.
-            let a = self.angle();
-            let [x, z] = [0, 1].map(|k| p.at[k] * self.extent[k] as f32 / 100.0 / def.footprint[k].max(1) as f32);
-            return [c[0] + a.cos() * x + a.sin() * z, c[1] - a.sin() * x + a.cos() * z];
-        }
-        let n = def.slots.max(1) as f32;
-        // Bunks lie one above the other: both in the middle (a hair apart, so the renderer can
-        // tell the lower bunk from the upper one).
-        let spread = if def.bunk { 0.04 } else { self.extent[0] as f32 / 100.0 / n };
-        let offset = (slot as f32 - (n - 1.0) / 2.0) * spread;
-        let yaw = self.yaw();
-        // Local +x (the object's right) after rotation.
-        [c[0] + yaw.cos() * offset, c[1] - yaw.sin() * offset]
+        let [x, z] = self.slot_local(def, slot);
+        // Its place turns with it, a free turn too (the place is on its model); the spread across
+        // its width only by its `rot`.
+        let a = if slot < def.places.len() { self.angle() } else { self.yaw() };
+        [c[0] + a.cos() * x + a.sin() * z, c[1] - a.sin() * x + a.cos() * z]
     }
 
     /// Where `slot`'s user is in the object's own frame, before its free turn: metres to its
     /// right and to its front of the middle of its tiles (`slot_position` without the offset).
     pub(crate) fn slot_local(&self, def: &crate::content::ObjectDef, slot: usize) -> [f32; 2] {
+        // Its place, moved out with its size.
         if let Some(p) = def.places.get(slot) {
             return [0, 1].map(|k| p.at[k] * self.extent[k] as f32 / 100.0 / def.footprint[k].max(1) as f32);
         }
         let n = def.slots.max(1) as f32;
+        // Bunks lie one above the other: both in the middle (a hair apart, so the renderer can
+        // tell the lower bunk from the upper one).
         let spread = if def.bunk { 0.04 } else { self.extent[0] as f32 / 100.0 / n };
         [(slot as f32 - (n - 1.0) / 2.0) * spread, 0.0]
     }
