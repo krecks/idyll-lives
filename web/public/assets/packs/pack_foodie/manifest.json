@@ -63,6 +63,9 @@
         "back": {
           "finish": "material.finish.matte"
         },
+        "basil": {
+          "finish": "material.finish.satin"
+        },
         "board": {
           "finish": "material.finish.satin"
         },
@@ -89,6 +92,9 @@
         },
         "cream_panel": {
           "finish": "material.finish.satin"
+        },
+        "crust": {
+          "finish": "material.finish.matte"
         },
         "honey": {
           "finish": "material.finish.satin"
@@ -189,6 +195,9 @@
         "teal": {
           "finish": "material.finish.satin"
         },
+        "tomato": {
+          "finish": "material.finish.gloss"
+        },
         "wicker": {
           "finish": "material.finish.satin"
         }
@@ -231,6 +240,9 @@
         },
         "book_teal": {
           "finish": "material.finish.satin"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
         },
         "cover": {
           "finish": "material.finish.satin"
@@ -297,6 +309,9 @@
         "brick_light": {
           "finish": "material.finish.matte"
         },
+        "crust": {
+          "finish": "material.finish.matte"
+        },
         "cup": {
           "finish": "material.finish.gloss"
         },
@@ -319,6 +334,9 @@
           "finish": "material.finish.metal"
         },
         "log": {
+          "finish": "material.finish.satin"
+        },
+        "log_end": {
           "finish": "material.finish.satin"
         },
         "mouth": {
@@ -347,9 +365,6 @@
         },
         "tomato": {
           "finish": "material.finish.gloss"
-        },
-        "wicker": {
-          "finish": "material.finish.satin"
         },
         "worktop": {
           "finish": "material.finish.gloss"
@@ -388,9 +403,6 @@
       "url": "../../models/pack_foodie/chefsIsland.glb",
       "materials": {
         "basil": {
-          "finish": "material.finish.satin"
-        },
-        "basil_light": {
           "finish": "material.finish.satin"
         },
         "black": {

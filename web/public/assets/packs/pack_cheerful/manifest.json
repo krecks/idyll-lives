@@ -152,6 +152,9 @@
         "coral": {
           "finish": "material.finish.gloss"
         },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
         "drink_pink": {
           "finish": "material.finish.gloss"
         },
@@ -189,6 +192,9 @@
           "finish": "material.finish.satin"
         },
         "porcelain": {
+          "finish": "material.finish.gloss"
+        },
+        "sky": {
           "finish": "material.finish.gloss"
         },
         "tumbler": {
@@ -282,6 +288,12 @@
       "type": "model",
       "url": "../../models/pack_cheerful/sunriseLamp.glb",
       "materials": {
+        "cloud": {
+          "finish": "material.finish.satin"
+        },
+        "cork": {
+          "finish": "material.finish.matte"
+        },
         "dawn": {
           "finish": "material.finish.satin",
           "glow": "#FFB070"
@@ -379,6 +391,9 @@
         },
         "popcorn": {
           "finish": "material.finish.matte"
+        },
+        "stand": {
+          "finish": "material.finish.satin"
         },
         "tablet_face": {
           "finish": "material.finish.gloss"

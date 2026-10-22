@@ -23,6 +23,34 @@ The espresso's clip keys two parts; the pizza oven's `door_off` keys two parts w
 with keyframes: the peel waits for the door, then goes up, forward, along and in, so it never passes through the
 dome or the door).
 
+**Detail pass (2026-10-22).** Rebuilt with the forms and the kit (README "The toolkit"); keys, sizes, centres,
+parts, clips, motions, paint and draws as before. Triangles in the table below (was: before the pass).
+- `herbGarden`: legs with rounded edges; a moulded rim round the trough (`kit.moulding`, `plane='top'`); bumpy
+  soil; basil of extruded leaves in tiers up a stem, rosemary of tapering stems, thyme as lumpy mounds; a saucer
+  under the sprig's pot, rolled pot rims; a shaped trowel; a woven basket with an arched handle; the sprig's leaves
+  extruded.
+- `deliPantry`: raised-panel doors (`kit.shaker`) with hinges and upright bar pulls; a crown moulding; shelf lips;
+  a rounded marble ledge; lofted jars with label bands and turned lids, a crock, oil and wine bottles; cheese
+  wheels with their rind painted, one cut; loaves wobbled with three slashes; lofted salami tied on strings; a
+  board with a hanging hole and a wedge of cheese; tomatoes with their calyx.
+- `espressoBar`: swept posts, castors in forks; shelf lips; a draped towel on its rail; the machine's body and
+  base rounded, the boiler's foot banded in brass, an eagle with wings, a gauge needle; a drip tray with a grate;
+  turned group heads and portafilters with tapered handles; levers bent; cups with crema and handles; a milk jug
+  with a handle; a syrup pump; lumpy sacks tied at the top.
+- `cookbookLectern`: three swept feet with pads; a turned column with rings; a rounded desk with a scalloped apron
+  and bracket; the page blocks swept from a curved section, rising from the spine; a curled turning page; a
+  ribbon hanging over the edge; brass page clips; cookbooks with page edges (`_pages`); a turned stool; a
+  recipe-card box with its lid propped open.
+- `pizzaOven`: logs crooked (`G.jitter`) with pale cut ends; a rounded hearth; the dome turned and wobbled; the
+  arch one extruded ring; bevelled voussoirs; a lofted flue on a collar and a turned cap; a shaker door with an
+  iron bar pull on the counter; a lumpy dough ball, a turned sauce bowl, a lofted oil bottle; the door's rim one
+  bent bar, a rail and an oak bar pull; the peel's blade a shaped outline, a tapered handle; the pizza with a
+  turned crust rim and basil leaves; lofted, leaning flames.
+- `chefsIsland`: a rounded top; shaker drawers and doors with brass bar pulls; the foot rail bent round to the
+  ends; a rounded hob with rings; a turned pan with a tapered handle, a stock pot with its lid, knob and handles; a
+  carrot with leaves, a tomato's calyx, a knife with its grip; cheese wedges on the plates; a menu stand; the
+  stools' legs tapered sweeps, a curved back rail.
+
 **Draw calls: 3 each, the pizza oven 4.** So that they stay at 3:
 - herbs, pots and soil are plain (satin, matte), the herb garden's cedar its one `wood`;
 - the pantry and the espresso cart are all plain (their oak-coloured shelves and tops satin), as their two moving
@@ -34,14 +62,14 @@ The pizza oven has three moving parts (door, peel, fire: the plan's door and pee
 shows through the grille door (a solid door would hide it for `warmUp`); `bakePizza` also lights it, so the door
 comes off a burning oven (the plan names `flames` for `warmUp` only).
 
-| Model | Size (w × h × d) | Triangles | Draws | Colour parts |
+| Model | Size (w × h × d) | Triangles (2026-10-22) | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.foodie.herbGarden` | 0.86 × 1.29 × 0.76 m | 6,708 | 3 | Body, Pots |
-| `model.foodie.deliPantry` | 0.88 × 1.99 × 0.57 m | 4,392 | 3 | Body, Worktop, Shelves |
-| `model.foodie.espressoBar` | 0.76 × 1.51 × 0.51 m | 5,364 | 3 | Body, Worktop, Machine |
-| `model.foodie.cookbookLectern` | 0.84 × 1.15 × 0.59 m | 2,276 | 3 | Body, Stool & ledge, Cookbook |
-| `model.foodie.pizzaOven` | 1.89 × 1.90 × 0.92 m | 5,056 | 4 | Body, Worktop, Brick |
-| `model.foodie.chefsIsland` | 1.86 × 1.13 × 0.89 m | 6,380 | 3 | Body, Worktop, Stools |
+| `model.foodie.herbGarden` | 0.86 × 1.29 × 0.76 m | 5,528 (was 6,708) | 3 | Body, Pots |
+| `model.foodie.deliPantry` | 0.88 × 1.99 × 0.57 m | 5,532 (was 4,392) | 3 | Body, Worktop, Shelves |
+| `model.foodie.espressoBar` | 0.76 × 1.51 × 0.51 m | 6,324 (was 5,364) | 3 | Body, Worktop, Machine |
+| `model.foodie.cookbookLectern` | 0.84 × 1.15 × 0.59 m | 2,644 (was 2,276) | 3 | Body, Stool & ledge, Cookbook |
+| `model.foodie.pizzaOven` | 1.89 × 1.90 × 0.92 m | 7,616 (was 5,056) | 4 | Body, Worktop, Brick |
+| `model.foodie.chefsIsland` | 1.86 × 1.13 × 0.89 m | 7,176 (was 6,380) | 3 | Body, Worktop, Stools |
 
 The herb garden has no worktop; its second part is the pots. The rosemary stands 7 cm over the old part's.
 
