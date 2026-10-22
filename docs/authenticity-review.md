@@ -1141,6 +1141,10 @@ Each fix agent made the Phase 0 evidence again for what it changed and closed ea
 
 Balance after the last fix (`sweep-sim`, 180 days): median weekly savings $407, richest household $11,887 after 60 days, 1.2 grades on average and 3 at most, inside PLAN.md's targets; the soak test passed 4 of 4, and the generated houses and worlds passed. Every agent's log has the numbers after its own change.
 
+**Final checks (2026-10-22, on the merged branch):**
+- **CI's checks:** clippy over all targets, the sim-core tests, the tools' tests, the model gate (587 models, 0 failed), svelte-check and eslint, the clip check (168 clips, 0 known failures, from 14 at the start), and the generated houses and worlds all pass. The generated-worlds check picks households at random; one draw failed on an unreachable desk, fixed as I-systems-17 (132 draws since, none failing).
+- **Browser smoke test** (`bench-results/review/smoke/index.md`), headless on WebGPU and WebGL2 at Medium and Low, six runs each: from the menus into a game, a family's day (cooking to the table, the baby, a child refused the wine fridge), the review stage at night (lamps, the fire, blankets, the bunk), games with a partner, a save and load, and the town by day and night. 23 of 24 pass, with no console, page or network errors. The one failure is the save (g).
+
 ### 11.3 Sign-off
 
 **Decisions for the owner at sign-off**, each with a recommendation:
@@ -1178,5 +1182,9 @@ Balance after the last fix (`sweep-sim`, 180 days): median weekly savings $407, 
 - **The lamps don't light the ground:** the clustered lamps lighting the terrain cost 1.5 ms on Medium, so garden and street lamps cast pools instead (G-60). *Recommendation:* accept.
 - **Silence over a wrong sound:** toast, the blender, the microwave and baking are silent until their sounds are made (G-53). *Recommendation:* accept.
 - **A hang-out cancelled half way loses its load** and leaves the line empty (the washing is claimed as the use starts, so no two uses take one load). *Recommendation:* accept; small.
+
+**(g) A save and load drops each pupil's grade by 6** (found by the smoke test; not from this review: `main` has it too). `Sim::school_day` (`world.rs`) isn't saved, so after a load `schedule_school` (`life.rs`) counts the day as missed and takes off `base.json`'s missed-day points. *Recommendation:* fix it before the merge: save `school_day` (version 32, absent: today, so an old save doesn't lose a day either) with a test.
+
+**(h) "Have a drink at the bar" on a counter stool reads as alcohol,** and a 7-year-old took it in the smoke test. It is a soft drink. *Recommendation:* rename it "Have a soft drink at the counter" (content).
 
 **Sign-off:** to come.
