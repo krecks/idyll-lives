@@ -319,6 +319,11 @@ export class DigState {
   on = false;
   below = -0.5;
   /**
+   * The landscape's meshes, the only ones dug away: their finishes are shared (a rock's plain
+   * finish is every model's), and the stairs down rise out of the basement through `rect`.
+   */
+  readonly meshes = new WeakSet<AbstractMesh>();
+  /**
    * The basement itself is in view: everything lit inside `rect` is underground then, out of the
    * sun (see `UndergroundPlugin`), with `lit` the share of the sun, the sky fill and the
    * environment (sky ambient and reflections) that still reaches it.
@@ -507,7 +512,7 @@ finalRadianceScaled *= underground.z;
   }
 }
 
-/** Drops the fragments of the landscape (terrain, lawn) inside the dug-out rectangle (`DigState`). */
+/** Drops the fragments of the landscape (terrain, lawn, woods: `DigState.meshes`) inside the dug-out rectangle (`DigState`). */
 class DigPlugin extends MaterialPluginBase {
   constructor(
     material: Material,
@@ -533,9 +538,9 @@ class DigPlugin extends MaterialPluginBase {
   override hardBindForSubMesh(_ubo: UniformBuffer, _scene: Scene, _engine: AbstractEngine, subMesh: SubMesh): void {
     const effect = subMesh.effect;
     if (!effect) return;
-    const { rect, on, below } = this.state;
+    const { rect, on, below, meshes } = this.state;
     effect.setFloat4('digRect', rect.x, rect.y, rect.z, rect.w);
-    effect.setFloat4('digSpan', on ? 1 : 0, below, 0, 0);
+    effect.setFloat4('digSpan', on && meshes.has(subMesh.getMesh()) ? 1 : 0, below, 0, 0);
   }
 
   override getCustomCode(shaderType: string, shaderLanguage?: ShaderLanguage): Nullable<{ [pointName: string]: string }> {
@@ -685,12 +690,17 @@ export class MaterialLibrary {
   readonly rooms: RoomLightState;
   private readonly dug = new WeakSet<Material>();
 
-  /** Makes `material` (the landscape's ground and lawn) follow `dig`. */
-  digInto(material: Material | null): void {
+  /** Makes `mesh` (the landscape's ground, lawn, woods and rocks) follow `dig`. */
+  digInto(mesh: AbstractMesh): void {
+    this.dig.meshes.add(mesh);
+    this.digMaterial(mesh.material);
+  }
+
+  private digMaterial(material: Material | null): void {
     if (!material || this.dug.has(material)) return;
     this.dug.add(material);
     const parts = (material as Material & { subMaterials?: (Material | null)[] }).subMaterials;
-    if (parts) return parts.forEach((m) => this.digInto(m));
+    if (parts) return parts.forEach((m) => this.digMaterial(m));
     if (!(material instanceof PBRMaterial || material instanceof StandardMaterial)) return;
     new DigPlugin(material, this.dig);
     // (It may have been compiled without it.)

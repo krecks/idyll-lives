@@ -2814,7 +2814,7 @@ export class BabylonRenderer implements Renderer {
     mesh.freezeWorldMatrix();
     mesh.layerMask = 0;
     // Dug away over a basement in view.
-    this.lib.digInto(mesh.material);
+    this.lib.digInto(mesh);
     // `?diag=nonature`: without the woods, rocks and lawn (the terrain, water and roads stay).
     if (this.diag.has('nonature') && mesh.hasThinInstances) mesh.setEnabled(false);
   }
