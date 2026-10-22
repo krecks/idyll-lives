@@ -171,6 +171,10 @@
       "type": "model",
       "url": "../../models/lighting/paperLantern.glb",
       "materials": {
+        "bulb": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFD9A0"
+        },
         "paper": {
           "finish": "material.finish.fabric",
           "glow": "#FFD9A0"

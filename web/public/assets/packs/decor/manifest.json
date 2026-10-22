@@ -36,6 +36,9 @@
         "frame_black": {
           "finish": "material.finish.satin"
         },
+        "haze": {
+          "finish": "material.finish.matte"
+        },
         "lake": {
           "finish": "material.finish.matte"
         },
@@ -93,7 +96,13 @@
         "hills": {
           "finish": "material.finish.matte"
         },
+        "olive": {
+          "finish": "material.finish.matte"
+        },
         "roof": {
+          "finish": "material.finish.matte"
+        },
+        "shore": {
           "finish": "material.finish.matte"
         },
         "tree": {
@@ -200,11 +209,17 @@
         "frame_white": {
           "finish": "material.finish.satin"
         },
+        "gilt": {
+          "finish": "material.finish.metal"
+        },
         "leaf": {
           "finish": "material.finish.foliage"
         },
         "leaf_light": {
           "finish": "material.finish.foliage"
+        },
+        "mustard": {
+          "finish": "material.finish.matte"
         },
         "oak": {
           "finish": "material.finish.wood"
@@ -458,6 +473,9 @@
         "brass": {
           "finish": "material.finish.metal"
         },
+        "brick": {
+          "finish": "material.finish.matte"
+        },
         "candle": {
           "finish": "material.finish.satin"
         },
@@ -485,8 +503,14 @@
         "log": {
           "finish": "material.finish.satin"
         },
+        "log_end": {
+          "finish": "material.finish.satin"
+        },
         "oak": {
           "finish": "material.finish.wood"
+        },
+        "olive": {
+          "finish": "material.finish.matte"
         },
         "picture": {
           "finish": "material.finish.matte"
@@ -574,6 +598,9 @@
         "rug": {
           "finish": "material.finish.fabric"
         },
+        "rug_accent": {
+          "finish": "material.finish.fabric"
+        },
         "rug_border": {
           "finish": "material.finish.fabric"
         }
@@ -592,6 +619,9 @@
         "rug": {
           "finish": "material.finish.fabric"
         },
+        "rug_accent": {
+          "finish": "material.finish.fabric"
+        },
         "rug_border": {
           "finish": "material.finish.fabric"
         }
@@ -608,6 +638,9 @@
       "url": "../../models/decor/rugRunner.glb",
       "materials": {
         "rug": {
+          "finish": "material.finish.fabric"
+        },
+        "rug_accent": {
           "finish": "material.finish.fabric"
         },
         "rug_border": {

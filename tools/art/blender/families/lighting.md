@@ -49,7 +49,8 @@ lamp's coral cap `#FFAA78`.
 
 - **Ceiling fan** (`blades`): the five blades and their irons, origin on the axis; `blades_turn` turns them
   once in 2.5 s (`G.spin`). The axis is on the tile's middle, so the blades sweep a circle 0.974 m across
-  inside the tile (the fan's box, reaching farther one way, is centred 3.3 cm off: its `centre`).
+  inside the tile (the fan's box, reaching farther one way, is centred 3.7 cm off: its `centre`, -0.0374 since the
+  blades' tips were rounded, 2026-10-22).
 - **Paper lantern**: still since 2026-10-21 (review A-lighting-01: a paper globe indoors hangs still without a
   draught; it swayed 2.5° in 2 s, `G.rock`). One node, joined.
 
@@ -62,6 +63,29 @@ Not on Low (E2); at rest they look as the old part.
   shade about where it hangs.
 - `_drum` is an open drum or cone shade with a wall thickness (4 segments turned 45° for the square ones).
 - `_trough` is the banker's half-round shade, open below, coming 20° past the axis so the tube bulb hides.
+
+## Detail pass (2026-10-22)
+
+Rebuilt with the forms and the kit: same keys, sizes (within 2 %), centres (the fan's re-measured), bulb heights,
+paint and draws; every lamp under its size class's target. Shared turned parts: `_turned` (a profile from a foot),
+`_canopy` (a ceiling cup with a cord grip), `_socket` (ribbed), `_pear` (a pear bulb), `_ring` (rolled rims, wires),
+`_loft` (rounded-square bodies, `G.loft`/`G.ring`); `_drum` takes `rims` (rolled bindings in the shade's own fabric)
+and `spider` (the wire fitter seen from above); cords, stems, arms and harps are `G.kit.tube` sweeps. Shades keep
+their materials and glows.
+- **Ceiling**: the pendant's and the industrial dome's rolled lips, collars and fitters, pear bulbs; the lantern's
+  glazing bars, head rails and hipped lid; the chandelier's turned column, S-scrolled arms and curved spokes (one
+  sweep each, no rod-and-sphere chains), bobeches and a finial; the fan's banded motor, ball cover and coupler,
+  extruded blades with rounded tips on curved irons (axis still on the tile's middle, `settle(centre=False)`); the
+  track's slotted channel, live end and finned spot cans aimed as before; the paper lantern's skin pinched in at each
+  rib, open top and bottom on wire rims, a lining and bulb seen through them.
+- **Wall**: turned back plates, the sconce's gooseneck arm and candle cup, the swing arm's bent arms, thumb screw and
+  rolled shade rim, the bulkhead's drip hood, screwed plate and cage bars arching over the lens.
+- **Floor**: stepped turned feet and bases, turned collars, the classic lamp's harp, knob and pull; the square lamp's
+  boss, coupling, switch, black-bound shade and fitter; the arc lamp's stem and arc one sweep with a sleeve and a
+  dimmer; the tripod's tapered legs on brass ferrules; the torchiere's petalled glass bowl (lofted), dimmer and cup.
+- **Table**: the side table's rounded top, aprons and tapered legs; brass foot rings, caps, harps and finials; the
+  banker's stepped base, upright curving into its cradle, brass band and bound ends, beaded chain; the mushroom's
+  flared stem and rolled cap lip; the lantern's rails, curved roof with knob, latch, and a candle with a drip and wick.
 
 ## Checks
 
@@ -77,26 +101,30 @@ Not on Low (E2); at rest they look as the old part.
   3 cm into the wall behind its plate (its hidden back half is flattened onto the wall face), so it is 0.11 m deep,
   as the model does.
 
+As of 2026-10-22 the gate shows only the floats warnings and one more: `lampFloorArc`'s content light (1.5 m at
+(0.245, 0.2)) is outside the lamp there (the bulb's bottom is 1.52 m), as it was before the detail pass; it goes with
+the arc's overhang still to do (M-lighting-06). Khronos validator: 0 errors, 0 warnings each.
+
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| ceilingPendant | 0.43 × 0.69 × 0.43 | 1,080 | 1 | Body, Shade |
-| ceilingLight | 0.36 × 0.60 × 0.36 | 1,040 | 1 | Body, Shade |
-| chandelier | 0.94 × 0.76 × 0.90 | 3,788 | 1 | Body, Globes |
-| pendantIndustrial | 0.38 × 0.87 × 0.38 | 1,592 | 1 | Body, Shade |
-| ceilingFan | 0.91 × 0.39 × 0.95 | 2,328 | 3 | Body, Blades |
-| trackLights | 0.94 × 0.30 × 0.19 | 936 | 1 | Body, Shade |
-| paperLantern | 0.54 × 0.68 × 0.54 | 2,204 | 2 | Paper, Ribs |
-| wallSconce | 0.20 × 0.25 × 0.27 | 764 | 2 | Body, Shade |
-| wallLampArm | 0.20 × 0.30 × 0.42 | 1,044 | 1 | Body, Shade |
-| wallLightOutdoor | 0.22 × 0.33 × 0.11 | 1,220 | 2 | Body, Shade |
-| lamp | 0.45 × 1.81 × 0.45 | 1,948 | 2 | Stand, Shade, Fittings |
-| floorLampSimple | 0.28 × 1.60 × 0.28 | 396 | 2 | Stand, Shade |
-| lampFloorArc | 0.85 × 1.86 × 0.81 | 3,240 | 1 | Stand, Shade, Base |
-| lampFloorTripod | 0.55 × 1.61 × 0.56 | 848 | 3 | Stand, Shade |
-| lampTorchiere | 0.40 × 1.85 × 0.40 | 1,112 | 2 | Stand, Shade, Base |
-| tableLamp | 0.66 × 0.92 × 0.42 | 1,292 | 3 | Base, Shade, Table |
-| lampTableRound | 0.34 × 0.58 × 0.34 | 1,152 | 2 | Base, Shade |
-| lampTableSquare | 0.21 × 0.54 × 0.21 | 376 | 2 | Base, Shade |
-| lampBanker | 0.30 × 0.39 × 0.16 | 536 | 1 | Base, Shade |
-| lampMushroom | 0.30 × 0.36 × 0.30 | 916 | 1 | Base, Shade |
-| lampLantern | 0.16 × 0.37 × 0.16 | 936 | 2 | Base, Glass |
+| ceilingPendant | 0.43 × 0.68 × 0.43 | 2,388 | 1 | Body, Shade |
+| ceilingLight | 0.36 × 0.60 × 0.36 | 1,248 | 1 | Body, Shade |
+| chandelier | 0.94 × 0.76 × 0.90 | 3,964 | 1 | Body, Globes |
+| pendantIndustrial | 0.38 × 0.87 × 0.38 | 3,108 | 1 | Body, Shade |
+| ceilingFan | 0.90 × 0.39 × 0.94 | 3,344 | 3 | Body, Blades |
+| trackLights | 0.94 × 0.30 × 0.19 | 2,692 | 1 | Body, Shade |
+| paperLantern | 0.54 × 0.68 × 0.54 | 3,820 | 2 | Paper, Ribs |
+| wallSconce | 0.20 × 0.25 × 0.27 | 1,372 | 2 | Body, Shade |
+| wallLampArm | 0.20 × 0.30 × 0.42 | 1,608 | 1 | Body, Shade |
+| wallLightOutdoor | 0.22 × 0.33 × 0.11 | 1,228 | 2 | Body, Shade |
+| lamp | 0.45 × 1.81 × 0.45 | 3,324 | 2 | Stand, Shade, Fittings |
+| floorLampSimple | 0.28 × 1.60 × 0.28 | 1,016 | 2 | Stand, Shade |
+| lampFloorArc | 0.85 × 1.86 × 0.81 | 3,312 | 1 | Stand, Shade, Base |
+| lampFloorTripod | 0.54 × 1.62 × 0.55 | 2,584 | 3 | Stand, Shade |
+| lampTorchiere | 0.40 × 1.85 × 0.40 | 2,284 | 2 | Stand, Shade, Base |
+| tableLamp | 0.66 × 0.92 × 0.42 | 3,220 | 3 | Base, Shade, Table |
+| lampTableRound | 0.34 × 0.58 × 0.34 | 3,380 | 2 | Base, Shade |
+| lampTableSquare | 0.22 × 0.54 × 0.22 | 976 | 2 | Base, Shade |
+| lampBanker | 0.30 × 0.39 × 0.16 | 2,536 | 1 | Base, Shade |
+| lampMushroom | 0.30 × 0.36 × 0.30 | 1,668 | 1 | Base, Shade |
+| lampLantern | 0.16 × 0.37 × 0.16 | 1,070 | 2 | Base, Glass |
