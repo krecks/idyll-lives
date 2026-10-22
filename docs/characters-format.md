@@ -123,7 +123,7 @@ Every body has:
 | `teeth`, `tongue` | teeth; the mouth plate (dark, tone.y = 1) and tongue | Head | `mouth` |
 | `hair.<style>` | every hairstyle but `none` (`short crop layered tousled sideSwept afro bob long ponytail braid bun`) | Head, blending to neck_01 / spine_03 below the jaw | `hair` |
 | `hair.beard` | facial hair (male only; hidden for baby, child, teen) | Head; follows the mouth's morphs | `hair` |
-| `top.*`, `bottom.*`, `shoes.*` | shells, only where the silhouette needs one: jacket and suit (torso and upper arms, open in a V; the sleeves are painted), the collars of polo and shirt, the skirt, every shoe's soles and the boots' cuffs | from the body | `cloth` (flat colour) |
+| `top.*`, `bottom.*`, `shoes.*` | shells, only where the silhouette needs one: jacket and suit (torso and upper arms, open in a V; the sleeves are painted), the collars of polo and shirt, the skirt, every shoe (below) | from the body | `cloth` (flat colour) |
 | `lod.<shell>` | a low-detail copy of every shell | | `cloth` |
 
 `hair.none` has no part: a bald resident's scalp keeps the skin colour (appearance texel 7 w = 0).
@@ -145,7 +145,7 @@ hairline and chin as before.
 | Part | x | y | z | w |
 |---|---|---|---|---|
 | body | sleeve parameter (-1 torso, 0 shoulder .. 1 wrist, > 1 hand) | height (m, base body) | crew neckline (m, > 0 covered: distance from the neck's axis plus depth below a curve round the neck's base); head: -1 - scalp weight | scoop neckline (women: round and low in front; men: a V); head: -1 - scalp weight |
-| shells | hem distance (m) | flag: 1 sole, 2 waistband, 3 skirt | category: 0 top, 1 bottom, 2 shoes | 0 |
+| shells | hem distance (m; a shoe's from its collar, negative on its lining) | flag: 1 sole, 2 waistband, 3 skirt, 4 light midsole, 5 polished | category: 0 top, 1 bottom, 2 shoes | shoes: across the instep (m from its middle; over 1 off its front), else 0 |
 | eyes | offset from the iris centre on the eye's front (m), x | y | iris radius (m) | pupil radius (m) |
 | hair | 0.1 (unused) | | | |
 
@@ -173,7 +173,7 @@ fields) decides where it covers:
 
 - top: `(sleeve - x) * 0.55 > 0`, `y > hem`, `z > crew` (if set), `w > scoop` (if set);
 - bottom: `y < waist`, `y > leg`, `x < -0.5` (not on the arms);
-- shoes: `y < shoe`.
+- shoes: `y < shoe`, the sock's top (under the shoe's shell, and the sock in its collar's opening).
 
 A top with `over: true` (its hem is below the waistband: shirt, jacket, suit) is painted over the
 bottom; otherwise the bottom wins. Shoes win over both. Edges are anti-aliased; painted cloth is
@@ -181,6 +181,18 @@ rougher than skin. Shoes have a `colour` (sRGB hex). Skirts set `skirt: true` an
 paints the thighs (the shell hangs over them). Babies don't wear skirts (the shell can't follow
 their drawn-up, spread legs): a baby whose outfit has one wears `bottom.shorts` in the top's colour,
 a romper (outfit.ts).
+
+A shoe's shell (`shoes.*`, clothes.rs `shoe`) is its upper and two soles. The upper is the foot's
+skin under the collar, lifted 3-6 mm off it (more on a toe box, round a heel counter, in a padded
+collar, at a boot's top; a dress shoe's toe drawn out forward) and skinned as the skin is, so it
+moves with the foot; its edges the collar crosses are split, and every point lies on the curved
+skin. The collar runs round the ankle, low at the sides (a boot's up the shin; a dress shoe's low,
+with a throat down the instep), its lining a band turned in to the skin. The sole stands a few mm out
+round the upper, from the floor (as the old soles: the clips and the seat fit stand on it) to its
+top; heels are thicker, and a heel's arch is lifted off the floor. Laces are bars across the
+instep (fields w and x); a sole is dark, or a light midsole over a dark outsole; dress shoes are
+polished. The low-detail copy is the low-detail body's skin, unsplit and unlined, on the same
+soles (fewer sides).
 
 What a resident wears changes with what it does (`Wear`, outfit.ts; characters.ts `wearFor`): its day
 clothes; pyjamas for a night's sleep in bed (a `sleep` use lying down: the `top.long` and
@@ -217,7 +229,7 @@ Garment ids per family (outfit.ts):
 | 3 | hair colour (plain) | top: scoop cut |
 | 4 | r = 1 if the top is `over` the bottom; g = age (0 young, 0.4 adult, 1 elder); b = how far the shells take their seated shape (0..1, at the body's size; below) | bottom: waist |
 | 5 | skin reference (1) | bottom: leg cut |
-| 6 | shoe colour | shoes: top height |
+| 6 | shoe colour | shoes: the sock's top |
 | 7 | eye colour | 1 if the resident wears hair (the scalp takes the hair colour) |
 
 Then 12 texels of face morph (channel, weight) pairs. Disabled cuts are -10 (+10 for "below" cuts).

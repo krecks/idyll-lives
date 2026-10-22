@@ -8,8 +8,9 @@
  *   top, bottom or shoe colour (anti-aliased edges; a top cut `over` the bottom wins over it, else
  *   the bottom wins), rougher than skin; under hair, the scalp (head skin whose crew field is
  *   -1 - scalp weight) takes the hair colour;
- * - cloth: shells (jackets, skirts, shoes) in the flat top / bottom / shoe colour, soles darker; seated,
- *   moved by their tone (xyz: the seated corrective) as far as texel 4 b says;
+ * - cloth: shells (jackets, skirts, shoes) in the flat top / bottom / shoe colour, soles darker; shoes
+ *   with a light midsole, a dark lining in the collar, laces and a polish (fields: flags 4 and 5, a
+ *   negative hem distance, w across the instep); seated, moved by their tone (xyz: the seated corrective) as far as texel 4 b says;
  * - hair: the hair colour, with the tone's clump bands;
  * - brow: brows in the hair colour (darker); lash: lashes, near black;
  * - mouth: teeth, and the mouth plate darkened by its tone;
@@ -172,6 +173,8 @@ const GUARD = '#if defined(SIMCHAR) && defined(INSTANCES) && defined(BAKED_VERTE
 const CLOTH_MICRO = '0.15';
 /** Hair is matte: no more glossy than this (the sheen gives it its soft highlight). */
 const HAIR_MICRO = '0.38';
+/** Polished shoes: glossier than the other shells. */
+const POLISH_MICRO = '0.55';
 
 function wgsl(shaderType: string, off: number, morph: MorphBinding | null): { [pointName: string]: string } {
   if (shaderType === 'vertex') {
@@ -287,6 +290,18 @@ let simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, simC
   let cShoe = textureLoad(simDataTexture, vec2<i32>(${off + 6}, simRow), 0).rgb;
   let c = select(select(cShoe, cBottom, simF.z < 1.5), cTop, simF.z < 0.5);
   surfaceAlbedo = surfaceAlbedo * c * select(1.0, 0.35, simF.z > 1.5 && abs(simF.y - 1.0) < 0.5);
+  // Shoes: a light midsole (flag 4), the collar's lining (a negative hem distance) dark, and laces:
+  // bars across the instep (fields.w: m off its middle; x: m from the collar) down to 6.5 cm from the
+  // collar, evened out when too small to draw.
+  let lBar = simF.x / 0.012;
+  let lAA = fwidth(lBar);
+  let lW = fwidth(simF.w);
+  let lace = (1.0 - smoothstep(0.009 - lW, 0.009 + lW, abs(simF.w))) * (1.0 - smoothstep(0.06, 0.065, simF.x)) * smoothstep(0.01, 0.014, simF.x) * mix(smoothstep(0.28 - lAA, 0.28 + lAA, abs(fract(lBar) - 0.5)), 0.44, smoothstep(0.25, 0.5, lAA));
+  let laceC = select(c * 0.45, mix(c, vec3f(0.85), 0.7), dot(c, vec3f(0.333)) < 0.3);
+  let shoe = simF.z > 1.5;
+  surfaceAlbedo = select(surfaceAlbedo, vec3f(0.8, 0.78, 0.74), shoe && abs(simF.y - 4.0) < 0.5);
+  surfaceAlbedo = mix(surfaceAlbedo, c * 0.3, select(0.0, 1.0 - smoothstep(-0.002, 0.0, simF.x), shoe));
+  surfaceAlbedo = mix(surfaceAlbedo, laceC, select(0.0, lace, shoe));
 }
 #endif
 #ifdef SIMHAIR
@@ -336,6 +351,11 @@ roughness = 1.0 - microSurface;
 #endif
 #ifdef SIMHAIR
 microSurface = min(microSurface, ${HAIR_MICRO});
+roughness = 1.0 - microSurface;
+#endif
+#ifdef SIMCLOTH
+// Polished shoes (fields: category 2, flag 5) are glossier.
+microSurface = mix(microSurface, ${POLISH_MICRO}, step(1.5, simF.z) * step(4.5, simF.y) * step(simF.y, 5.5));
 roughness = 1.0 - microSurface;
 #endif
 #endif
@@ -452,6 +472,16 @@ float simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, si
   vec3 cShoe = texelFetch(simDataTexture, ivec2(${off + 6}, simRow), 0).rgb;
   vec3 c = simF.z < 0.5 ? cTop : simF.z < 1.5 ? cBottom : cShoe;
   surfaceAlbedo = surfaceAlbedo * c * (simF.z > 1.5 && abs(simF.y - 1.0) < 0.5 ? 0.35 : 1.0);
+  // Shoes: a light midsole (flag 4), the collar's lining (a negative hem distance) dark, laces across the instep.
+  float lBar = simF.x / 0.012;
+  float lAA = fwidth(lBar);
+  float lW = fwidth(simF.w);
+  float lace = (1.0 - smoothstep(0.009 - lW, 0.009 + lW, abs(simF.w))) * (1.0 - smoothstep(0.06, 0.065, simF.x)) * smoothstep(0.01, 0.014, simF.x) * mix(smoothstep(0.28 - lAA, 0.28 + lAA, abs(fract(lBar) - 0.5)), 0.44, smoothstep(0.25, 0.5, lAA));
+  vec3 laceC = dot(c, vec3(0.333)) < 0.3 ? mix(c, vec3(0.85), 0.7) : c * 0.45;
+  bool shoe = simF.z > 1.5;
+  if (shoe && abs(simF.y - 4.0) < 0.5) surfaceAlbedo = vec3(0.8, 0.78, 0.74);
+  surfaceAlbedo = mix(surfaceAlbedo, c * 0.3, shoe ? 1.0 - smoothstep(-0.002, 0.0, simF.x) : 0.0);
+  surfaceAlbedo = mix(surfaceAlbedo, laceC, shoe ? lace : 0.0);
 }
 #endif
 #ifdef SIMHAIR
@@ -497,6 +527,11 @@ roughness = 1.0 - microSurface;
 #endif
 #ifdef SIMHAIR
 microSurface = min(microSurface, ${HAIR_MICRO});
+roughness = 1.0 - microSurface;
+#endif
+#ifdef SIMCLOTH
+// Polished shoes (fields: category 2, flag 5) are glossier.
+microSurface = mix(microSurface, ${POLISH_MICRO}, step(1.5, simF.z) * step(4.5, simF.y) * step(simF.y, 5.5));
 roughness = 1.0 - microSurface;
 #endif
 #endif

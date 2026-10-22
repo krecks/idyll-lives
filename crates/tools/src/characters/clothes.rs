@@ -8,7 +8,8 @@
 //!   skin;
 //! - `top.polo`, `top.shirt`: a turned-down collar round the neckline;
 //! - `bottom.skirt`: an A-line loft from the waistband to above the knees, swinging with the thighs;
-//! - `shoes.*`: a sole under each foot (darker), and a cuff round the shin at the top of `boots`.
+//! - `shoes.*`: an upper (the foot's skin under the collar, lifted off it: a toe box, a heel counter,
+//!   a collar with its lining turned in to the skin, laces) on a sole that stands out round it.
 //!
 //! Seated, the jacket and the skirt lie on the lap rather than keep the flare they hang with: their
 //! tone carries a seated corrective the runtime adds as the thighs turn forward (`seated_tone`).
@@ -26,14 +27,14 @@ use std::sync::Arc;
 
 use serde::Serialize;
 
-use super::body::{fields_of, region, seated_pose, surface, topology, tris};
+use super::body::{NR, fields_of, region, seated_pose, surface, topology, tris};
 use super::contract::garments;
-use super::garments::{ARM_M, BOTTOM, FLAG_SKIRT, FLAG_SOLE, Landmarks, SHOES, TOP};
+use super::garments::{ARM_M, BOTTOM, FLAG_MIDSOLE, FLAG_POLISHED, FLAG_SKIRT, FLAG_SOLE, Landmarks, SHOES, TOP};
 use super::head::head_frame;
 use super::json::OMap;
 use super::kdtree::KdTree;
 use super::meshops::{Src, boundary_edges, clip_by_field, smooth_normals};
-use super::np::{PI, clip, linspace, linspace_open, mean, percentile, py_mod, py_round, radians, sign, smoothstep, unique};
+use super::np::{PI, clip, linspace, linspace_open, py_mod, py_round, radians, sign, smoothstep, unique};
 use super::rig::{BASE_STAGE, NB, b, proportions};
 use super::{Cache, Dense, M3, Mesh, V3, v3};
 
@@ -107,15 +108,8 @@ pub fn garment_cuts(family: &str, p: &[V3; NB]) -> Cuts {
             ("bottom", "suit") => bottom(lm.waist + 0.01, lm.ankle + 0.02, false),
             ("bottom", "capri") => bottom(lm.waist, lm.knee - 0.45 * shin, false),
             ("bottom", "skirt") => bottom(lm.waist, lm.knee + 0.05, true),
-            ("shoes", n) => {
-                let shoe = match n {
-                    "sneakers" => lm.ankle + 0.03,
-                    "trainers" => lm.ankle + 0.035,
-                    "boots" => lm.ankle + 0.13,
-                    _ => lm.ankle + 0.012,
-                };
-                Cut { shoe: Some(shoe), colour: Some(shoe_colour(n)), ..Cut::default() }
-            }
+            // Painted up to the sock's top: under the shell, and the sock in its collar's opening.
+            ("shoes", n) => Cut { shoe: Some(lm.ankle + shoe_style(gid).sock), colour: Some(shoe_colour(n)), ..Cut::default() },
             _ => panic!("no garment {gid}"),
         };
         // Floats rounded to 4 places (Python's round).
@@ -645,103 +639,528 @@ fn seated_tone(family: &str, stage: &str, pos: &[V3], dense: &[Dense], hug: &[V3
         .collect()
 }
 
-/// A closed prism: the outline (x, z) from y0 to y1, capped (counter-clockwise outside).
-fn prism(outline: &[(f64, f64)], y0: f64, y1: f64, centre: (f64, f64)) -> (Vec<V3>, Vec<usize>) {
-    let k = outline.len();
-    let mut pos: Vec<V3> = outline.iter().map(|&(x, z)| v3(x, y0, z)).collect();
-    pos.extend(outline.iter().map(|&(x, z)| v3(x, y1, z)));
-    pos.push(v3(centre.0, y0, centre.1));
-    pos.push(v3(centre.0, y1, centre.1));
-    let mut idx = Vec::new();
-    for j in 0..k {
-        let (a, bb) = (j, (j + 1) % k);
-        idx.extend([a, bb, bb + k, a, bb + k, a + k]);
-        idx.extend([2 * k, bb, a]);
-        idx.extend([2 * k + 1, a + k, bb + k]);
-    }
-    (pos, idx)
+/// A shoe type's shape (m, on a body 1.7 m tall and scaled with the body; heights over the ankle
+/// joint are on the base body, as the cuts are).
+struct ShoeStyle {
+    /// The upper's lift off the skin, more on top of the toe box, round the heel counter, in a padded
+    /// collar and at a boot's top.
+    lift: f64,
+    toe: f64,
+    heel: f64,
+    pad: f64,
+    shaft: f64,
+    /// How far the toe is drawn out forward: a dress shoe's long toe.
+    point: f64,
+    /// The collar's height over the ankle joint at the back, the sides and the front (the tongue, or
+    /// a dress shoe's low throat, which ends at `throat` along the foot: the vamp covers the toes).
+    collar: [f64; 3],
+    throat: f64,
+    /// The sock's top over the ankle joint: the painted cut (`shoe`), above the collar's sides.
+    sock: f64,
+    /// The sole's thickness under the ball and under the heel, where the heel's thickness gives way to
+    /// the ball's (along the foot, 0 heel .. 1 toe), how far its edge stands out from the upper, the
+    /// arch's lift off the floor between the heel and the ball, and the light midsole's share of its edge.
+    sole: f64,
+    heel_h: f64,
+    block: (f64, f64),
+    welt: f64,
+    arch: f64,
+    midsole: f64,
+    laces: bool,
+    /// Polished leather (glossier).
+    polish: bool,
 }
 
-/// A sole under each foot (a rounded slab a little wider than the foot), and boots' cuffs.
-fn soles(family: &str, stage: &str, gid: &str, cuts: &Cuts, lod: bool) -> Mesh {
-    let s = surface(family, stage);
-    let p = &s.p;
-    let h = proportions(family, stage).h;
-    let k = h / 1.7;
-    let thick = match gid {
-        "shoes.sneakers" => 0.016,
-        "shoes.trainers" => 0.018,
-        "shoes.boots" => 0.02,
-        _ => 0.011,
-    } * k;
-    let (mut pos_all, mut idx_all, mut flag_all) = (Vec::new(), Vec::new(), Vec::new());
-    let rf = region("foot");
-    let segs = if lod { 10 } else { 16 };
-    for side in ["l", "r"] {
-        let sx = if side == "l" { -1.0 } else { 1.0 };
-        let pts: Vec<V3> = s.pos.iter().zip(&s.region).filter(|(q, r)| r[rf] > 0.5 && sign(q.x) == sx).map(|(q, _)| *q).collect();
-        let pc = percentile(&pts.iter().map(|q| q.y).collect::<Vec<_>>(), 40.0);
-        // Below the 40th percentile by more than a nanometre: the foot's rings are mirror-symmetric,
-        // so heights come in equal pairs, and the percentile can fall on one; a plain `< pc` took
-        // or dropped one of the pair by rounding noise (the sole's width moved by 2 mm).
-        let low: Vec<V3> = pts.iter().filter(|q| q.y < pc - 1e-9).copied().collect();
-        let cx = mean(&low.iter().map(|q| q.x).collect::<Vec<_>>());
-        let z0 = low.iter().map(|q| q.z).fold(f64::INFINITY, f64::min);
-        let z1 = low.iter().map(|q| q.z).fold(f64::NEG_INFINITY, f64::max);
-        let w = (low.iter().map(|q| q.x).fold(f64::NEG_INFINITY, f64::max) - low.iter().map(|q| q.x).fold(f64::INFINITY, f64::min)) / 2.0;
-        let a = linspace_open(0.0, 2.0 * PI, segs);
-        let l = (z1 - z0) / 2.0 + 0.005 * k;
-        let cz = (z0 + z1) / 2.0;
-        // A rounded rectangle (superellipse), a little narrower at the heel.
-        let e = 2.0 / 3.2;
-        let outline: Vec<(f64, f64)> = a
-            .iter()
-            .map(|&a| {
-                let (sa, ca) = (a.sin(), a.cos());
-                let ox = sign(sa) * sa.abs().powf(e) * (w + 0.005 * k) * (1.0 - 0.1 * (if ca < 0.0 { 1.0 } else { 0.0 }) * ca.abs());
-                let oz = sign(ca) * ca.abs().powf(e) * l;
-                (cx + ox, cz + oz)
-            })
-            .collect();
-        let (pp, idx) = prism(&outline, 0.0, thick, (cx, cz));
-        let idx = closed_outward(&pp, idx);
-        let n = pos_all.len();
-        idx_all.extend(idx.iter().map(|&i| i + n));
-        flag_all.extend(vec![FLAG_SOLE; pp.len()]);
-        pos_all.extend(pp);
-        if gid == "shoes.boots" {
-            // The cuff: a short tube round the shin at the boot's top, a little proud of the leg.
-            let pb = surface(family, BASE_STAGE).p;
-            let top_b = cuts.get(gid).unwrap().shoe.unwrap();
-            let (fb, cb) = (b(&format!("foot_{side}")), b(&format!("calf_{side}")));
-            let t = (top_b - pb[fb].y) / (pb[cb].y - pb[fb].y);
-            let yc = p[fb].y + t * (p[cb].y - p[fb].y);
-            let rl = region("leg");
-            let keep: Vec<bool> = s.pos.iter().zip(&s.region).map(|(q, r)| r[rl] > 0.3 && sign(q.x) == sx).collect();
-            let lp = section(&s.pos, &surface_tris(family), yc, &keep);
-            let lx: Vec<f64> = lp.iter().map(|q| q.x).collect();
-            let lz: Vec<f64> = lp.iter().map(|q| q.z).collect();
-            let c = v3(mean(&lx), yc, mean(&lz));
-            let span = |v: &[f64]| (v.iter().copied().fold(f64::NEG_INFINITY, f64::max) - v.iter().copied().fold(f64::INFINITY, f64::min)) / 2.0;
-            let rx = span(&lx) + 0.006 * k;
-            let rz = span(&lz) + 0.006 * k;
-            let cs = if lod { 8 } else { 12 };
-            let bb = linspace_open(0.0, 2.0 * PI, cs);
-            let ring = |y: f64, grow: f64| -> Vec<V3> { bb.iter().map(|&b| v3(c[0] + b.sin() * (rx + grow), y, c[2] + b.cos() * (rz + grow))).collect() };
-            let rows = [ring(yc - 0.022 * k, -0.004 * k), ring(yc - 0.016 * k, 0.0), ring(yc + 0.002 * k, 0.0), ring(yc + 0.004 * k, -0.005 * k)];
-            let (pp, idx) = strip(&rows, true);
-            let idx = outward(&pp, idx, (c[0], c[2]));
-            let n = pos_all.len();
-            idx_all.extend(idx.iter().map(|&i| i + n));
-            flag_all.extend(vec![0.0; pp.len()]);
-            pos_all.extend(pp);
+fn shoe_style(gid: &str) -> ShoeStyle {
+    match gid {
+        // Chunky: a padded collar, a round toe box, a thick white cup sole on a dark outsole, laces.
+        "shoes.sneakers" => ShoeStyle {
+            lift: 0.005,
+            toe: 0.003,
+            heel: 0.003,
+            pad: 0.002,
+            shaft: 0.0,
+            point: 0.0,
+            collar: [0.028, 0.018, 0.04],
+            throat: 1.0,
+            sock: 0.035,
+            sole: 0.02,
+            heel_h: 0.022,
+            block: (0.15, 0.6),
+            welt: 0.004,
+            arch: 0.0,
+            midsole: 0.5,
+            laces: true,
+            polish: false,
+        },
+        // Running shoes: chunkier still, a high heel counter, a thick white midsole rising to the heel.
+        "shoes.trainers" => ShoeStyle {
+            lift: 0.006,
+            toe: 0.004,
+            heel: 0.004,
+            pad: 0.003,
+            shaft: 0.0,
+            point: 0.0,
+            collar: [0.034, 0.024, 0.046],
+            throat: 1.0,
+            sock: 0.04,
+            sole: 0.022,
+            heel_h: 0.034,
+            block: (0.1, 0.7),
+            welt: 0.005,
+            arch: 0.0,
+            midsole: 0.8,
+            laces: true,
+            polish: false,
+        },
+        // Up the ankle, a little loose at the top, laced; a dark sole with a heel.
+        "shoes.boots" => ShoeStyle {
+            lift: 0.005,
+            toe: 0.006,
+            heel: 0.003,
+            pad: 0.0,
+            shaft: 0.004,
+            point: 0.0,
+            collar: [0.13, 0.125, 0.125],
+            throat: 1.0,
+            sock: 0.12,
+            sole: 0.02,
+            heel_h: 0.028,
+            block: (0.26, 0.31),
+            welt: 0.005,
+            arch: 0.005,
+            midsole: 0.0,
+            laces: true,
+            polish: false,
+        },
+        // Low and sleek: close to the foot, a throat down the instep, a long toe, polished, a thin sole
+        // and a heel.
+        _ => ShoeStyle {
+            lift: 0.003,
+            toe: 0.001,
+            heel: 0.002,
+            pad: 0.0,
+            shaft: 0.0,
+            point: 0.014,
+            collar: [-0.02, -0.03, -0.022],
+            throat: 0.45,
+            sock: 0.032,
+            sole: 0.011,
+            heel_h: 0.024,
+            block: (0.26, 0.31),
+            welt: 0.003,
+            arch: 0.006,
+            midsole: 0.0,
+            laces: false,
+            polish: true,
+        },
+    }
+}
+
+impl ShoeStyle {
+    /// The sole's top (m on a 1.7 m body) at `u` along the foot (0 heel .. 1 toe).
+    fn top(&self, u: f64) -> f64 {
+        self.sole + (self.heel_h - self.sole) * (1.0 - smoothstep(self.block.0, self.block.1, u))
+    }
+
+    /// The collar's height over the ankle joint at a point `dx` to the side of it, `dz` ahead and `u`
+    /// along the foot.
+    fn collar_at(&self, dx: f64, dz: f64, u: f64) -> f64 {
+        let c = dz / dx.hypot(dz).max(1e-9);
+        let [back, side, front] = self.collar;
+        side + (front - side) * c.max(0.0) + (back - side) * (-c).max(0.0) + 0.05 * smoothstep(self.throat - 0.03, self.throat + 0.03, u)
+    }
+}
+
+/// The upper below the sole's top (m on a 1.7 m body): cut there, inside the sole.
+const UPPER_IN_SOLE: f64 = 0.005;
+
+static FINER: Cache<(String, String, bool), Vec<V3>> = Cache::new();
+
+/// The next level of a body's surface, on its limit (level 2 under the body, level 1 under the
+/// low-detail body): there, the point a cut edge's middle lies on.
+fn finer(family: &str, stage: &str, lod: bool) -> Arc<Vec<V3>> {
+    FINER.get((family.to_string(), stage.to_string(), lod), || {
+        let s = surface(family, stage);
+        if lod { s.pos.clone() } else { topology().fine.apply(&s.ctrl) }
+    })
+}
+
+/// Per edge of a surface's triangles (its faces' own edges, and the diagonals they are cut along), the
+/// next level's vertex at its middle: an edge's point, or the face's (subdiv.rs: the `edges`' points
+/// come after the `n` vertices, then the faces').
+fn edge_mids(faces: &[Vec<usize>], edges: &[(usize, usize)], n: usize) -> std::collections::BTreeMap<(usize, usize), usize> {
+    let mut out: std::collections::BTreeMap<(usize, usize), usize> = edges.iter().enumerate().map(|(k, &e)| (e, n + k)).collect();
+    for (f, face) in faces.iter().enumerate() {
+        for (i, &a) in face.iter().enumerate() {
+            for &bv in face.iter().skip(i + 2) {
+                out.entry((a.min(bv), a.max(bv))).or_insert(n + edges.len() + f);
+            }
         }
     }
-    let dense = follow(&pos_all, &s);
-    let nor = smooth_normals(&pos_all, &idx_all);
-    let n = pos_all.len();
-    let fields = (0..n).map(|i| [0.0, flag_all[i], SHOES, 0.0]).collect();
-    Mesh { pos: pos_all, idx: idx_all, nor, dense, fields, tone: vec![[0.0; 4]; n], ..Mesh::default() }
+    out
+}
+
+/// A point on a body's triangles: up to three of its vertices (a triangle's, an edge's or one) and
+/// weights summing to 1.
+#[derive(Clone, Copy)]
+struct Bary {
+    v: [usize; 3],
+    w: [f64; 3],
+}
+
+impl Bary {
+    fn at(v: usize) -> Self {
+        Bary { v: [v; 3], w: [1.0, 0.0, 0.0] }
+    }
+
+    /// (1 - t) a + t b (both on one of the body's triangles).
+    fn lerp(a: &Bary, b: &Bary, t: f64) -> Self {
+        let (mut v, mut w, mut n) = ([0; 3], [0.0; 3], 0);
+        for (x, f) in [(a, 1.0 - t), (b, t)] {
+            for k in 0..3 {
+                let wk = x.w[k] * f;
+                if wk == 0.0 {
+                    continue;
+                }
+                match v[..n].iter().position(|&u| u == x.v[k]) {
+                    Some(j) => w[j] += wk,
+                    None => {
+                        assert!(n < 3, "a shoe's point off the body's triangles");
+                        (v[n], w[n]) = (x.v[k], wk);
+                        n += 1;
+                    }
+                }
+            }
+        }
+        for k in n..3 {
+            v[k] = v[0];
+        }
+        Bary { v, w }
+    }
+
+    /// Linear in the body's per-vertex values.
+    fn mix<T: Copy + std::ops::Mul<f64, Output = T> + std::ops::Add<Output = T>>(&self, arr: &[T]) -> T {
+        arr[self.v[0]] * self.w[0] + arr[self.v[1]] * self.w[1] + arr[self.v[2]] * self.w[2]
+    }
+
+    /// On the curved skin: the quadratic patch through its triangle's corners and the finer surface
+    /// at its edges' middles (`mid`: per pair (0, 1), (0, 2), (1, 2) of its vertices).
+    fn curved(&self, pos: &[V3], fine: &[V3], mid: &[usize; 3]) -> V3 {
+        let l = self.w;
+        let mut p = V3::zeros();
+        for i in 0..3 {
+            if l[i] != 0.0 {
+                p += pos[self.v[i]] * (l[i] * (2.0 * l[i] - 1.0));
+            }
+        }
+        for (k, (i, j)) in [(0, 1), (0, 2), (1, 2)].into_iter().enumerate() {
+            if l[i] != 0.0 && l[j] != 0.0 {
+                p += fine[mid[k]] * (4.0 * l[i] * l[j]);
+            }
+        }
+        p
+    }
+}
+
+/// A shoe's upper laid out on the base body: the skin under the collar and above the sole's inside,
+/// its edges the collar crosses split (twice, on the full body; so its edge is smooth however coarse the
+/// skin is there), cut exactly along both (stage independent), with what each vertex needs to be lifted.
+struct UpperLayout {
+    pts: Vec<Bary>,
+    /// Per point: the finer surface's vertices at its triangle's edges' middles (`finer`), so it lies on
+    /// the curved skin, not on the body's flat triangles (whose sag made the collar jagged).
+    mid: Vec<[usize; 3]>,
+    idx: Vec<usize>,
+    /// Per point: the lift along the normal and the toe's offset (m on a 1.7 m body), the distance from
+    /// the collar (m, the hem distance), across the instep (m; 1 elsewhere), and whether it lies on the
+    /// cut inside the sole (no lining there).
+    lift: Vec<f64>,
+    point: Vec<V3>,
+    hem: Vec<f64>,
+    across: Vec<f64>,
+    low: Vec<bool>,
+}
+
+static UPPERS: Cache<(String, String, bool), UpperLayout> = Cache::new();
+
+/// Triangles split at the middles of the edges `split` says (in 2, 3 or 4, so no T-junctions).
+fn refine(pts: &mut Vec<Bary>, idx: &[usize], split: impl Fn(usize, usize) -> bool) -> Vec<usize> {
+    let key = |a: usize, b: usize| (a.min(b), a.max(b));
+    let mut cut: std::collections::BTreeMap<(usize, usize), usize> = std::collections::BTreeMap::new();
+    for t in idx.chunks(3) {
+        for (a, b) in [(t[0], t[1]), (t[1], t[2]), (t[2], t[0])] {
+            if split(a, b) && !cut.contains_key(&key(a, b)) {
+                pts.push(Bary::lerp(&pts[a], &pts[b], 0.5));
+                cut.insert(key(a, b), pts.len() - 1);
+            }
+        }
+    }
+    let mut out = Vec::with_capacity(idx.len() * 2);
+    for t in idx.chunks(3) {
+        let m: Vec<Option<usize>> = [(t[0], t[1]), (t[1], t[2]), (t[2], t[0])].iter().map(|&(a, b)| cut.get(&key(a, b)).copied()).collect();
+        // Turned so the split edges come first (edge k joins corner k and k + 1; winding kept).
+        let r = match m.iter().filter(|e| e.is_some()).count() {
+            0 => {
+                out.extend_from_slice(t);
+                continue;
+            }
+            1 => m.iter().position(|e| e.is_some()).unwrap(),
+            2 => m.iter().position(|e| e.is_none()).map(|k| (k + 1) % 3).unwrap(),
+            _ => 0,
+        };
+        let (a, b, c) = (t[r], t[(r + 1) % 3], t[(r + 2) % 3]);
+        let (ab, bc, ca) = (m[r], m[(r + 1) % 3], m[(r + 2) % 3]);
+        match (ab, bc, ca) {
+            (Some(ab), None, None) => out.extend([a, ab, c, ab, b, c]),
+            (Some(ab), Some(bc), None) => out.extend([ab, b, bc, a, ab, bc, a, bc, c]),
+            (Some(ab), Some(bc), Some(ca)) => out.extend([a, ab, ca, ab, b, bc, ca, bc, c, ab, bc, ca]),
+            _ => unreachable!(),
+        }
+    }
+    out
+}
+
+fn upper_layout(family: &str, gid: &str, lod: bool) -> Arc<UpperLayout> {
+    UPPERS.get((family.to_string(), gid.to_string(), lod), || {
+        let s = surface(family, BASE_STAGE);
+        let fl = base_fields(family);
+        let st = shoe_style(gid);
+        let kb = proportions(family, BASE_STAGE).h / 1.7;
+        let (pos, nor): (&[V3], &[V3]) = if lod { (&s.lod_pos, &s.lod_nor) } else { (&s.pos, &s.nor) };
+        let (ff, reg): (&[[f64; 4]], &[[f64; NR]]) = if lod { (&fl.1, &s.lod_region) } else { (&fl.0, &s.region) };
+        let idx = if lod { topology().lod_tris.concat() } else { tris(family).to_vec() };
+        let topo = topology();
+        let mids = if lod {
+            edge_mids(&topo.faces, &topo.s.edges, topo.n)
+        } else {
+            edge_mids(&topo.s.quads.iter().map(|q| q.to_vec()).collect::<Vec<_>>(), &topo.s2.edges, topo.s.m.rows)
+        };
+        let mid_of = |p: &Bary| [(0, 1), (0, 2), (1, 2)].map(|(i, j)| if p.w[i] != 0.0 && p.w[j] != 0.0 { mids[&(p.v[i].min(p.v[j]), p.v[i].max(p.v[j]))] } else { usize::MAX });
+        let fine = finer(family, BASE_STAGE, lod);
+        let height: Vec<f64> = ff.iter().map(|f| f[1]).collect();
+        let rf = region("foot");
+        let pointed = if st.point > 0.0 { 1.0 } else { 0.0 };
+        // Per side: the ankle joint, and the foot's length (z at the heel and at the toe).
+        let feet = ["l", "r"].map(|side| {
+            let sx = if side == "l" { -1.0 } else { 1.0 };
+            let zs: Vec<f64> = (0..pos.len()).filter(|&i| reg[i][rf] > 0.5 && sign(pos[i].x) == sx).map(|i| pos[i].z).collect();
+            (sx, s.p[b(&format!("foot_{side}"))], zs.iter().copied().fold(f64::INFINITY, f64::min), zs.iter().copied().fold(f64::NEG_INFINITY, f64::max))
+        });
+        // A point's lift, toe offset, distance below the collar, across the instep and clip field.
+        let attrs = |p: &Bary| -> (f64, V3, f64, f64, f64) {
+            let q = p.curved(pos, &fine, &mid_of(p));
+            let Some(&(_, ja, z0, z1)) = feet.iter().find(|f| f.0 == sign(q.x)) else { return (0.0, V3::zeros(), 0.0, 1.0, -1.0) };
+            let n = p.mix(nor).normalize();
+            let fy = p.mix(&height);
+            let u = (q.z - z0) / (z1 - z0);
+            let (dx, dz) = ((q.x - ja.x).abs(), q.z - ja.z);
+            let up = n.y.max(0.0);
+            let collar = ja.y + st.collar_at(dx, dz, u);
+            let below = collar - fy;
+            let toe = smoothstep(0.6, 0.88, u);
+            let tip = smoothstep(0.65, 1.0, u).powi(2);
+            // Toe box (on top), heel counter (at the back, low), a padded collar, a boot's loose top.
+            let lift = st.lift * (1.0 - 0.6 * tip * up * pointed)
+                + st.toe * toe * (0.3 + 0.7 * up)
+                + st.heel * (1.0 - smoothstep(0.0, 0.25, u)) * (1.0 - up)
+                + st.pad * (1.0 - smoothstep(0.0, 0.015, below))
+                + st.shaft * smoothstep(ja.y + 0.03, collar, fy);
+            // A long toe: drawn forward (not narrowed: the toes would come through).
+            let point = v3(0.0, 0.0, st.point * tip);
+            // Across the instep: m off the foot's middle (exact between vertices: the foot's middle is
+            // a line of them), more than 1 off the front; the laces lie where this is small, down from
+            // the collar.
+            let across = if st.laces { dx + if dz > 0.5 * dx.hypot(dz) { 0.0 } else { 1.0 } } else { 1.0 };
+            // Under the collar, above the sole's inside (lifted as at the base), off the sole (the
+            // foot's flat underside).
+            let y = q.y + n.y * lift * kb;
+            let g = below.min(y - (st.top(u) - UPPER_IN_SOLE) * kb).min(n.y + 0.9);
+            (lift, point, below, across, g)
+        };
+        let mut pts: Vec<Bary> = (0..pos.len()).map(Bary::at).collect();
+        let mut tri = idx;
+        for _ in 0..if lod { 0 } else { 1 } {
+            let a: Vec<(f64, f64)> = pts.iter().map(&attrs).map(|a| (a.2, a.4)).collect();
+            // The edges the collar crosses (on the shoe: the clip field over 0 at an end).
+            tri = refine(&mut pts, &tri, |i, j| (a[i].1 > -0.01 || a[j].1 > -0.01) && (a[i].0 > 0.0) != (a[j].0 > 0.0));
+        }
+        let all: Vec<(f64, V3, f64, f64, f64)> = pts.iter().map(attrs).collect();
+        let g: Vec<f64> = all.iter().map(|a| a.4).collect();
+        let (cidx, src) = clip_by_field(&tri, &g);
+        let pts: Vec<Bary> = (0..src.0.len()).map(|i| Bary::lerp(&pts[src.0[i]], &pts[src.1[i]], src.2[i])).collect();
+        let lift = lerp_src(&src, &all.iter().map(|a| a.0).collect::<Vec<_>>());
+        let point = lerp_src(&src, &all.iter().map(|a| a.1).collect::<Vec<_>>());
+        let hem = lerp_src(&src, &all.iter().map(|a| a.2).collect::<Vec<_>>());
+        let across = lerp_src(&src, &all.iter().map(|a| a.3).collect::<Vec<_>>());
+        let mid: Vec<[usize; 3]> = pts.iter().map(mid_of).collect();
+        // The hem distance: how far from the collar's edge (the nearest point of it), so it runs down
+        // the instep as far as along the sides. Under the laces, how far down them from the collar's
+        // front (straight down the middle of the instep: linear, so the laces' bars stay straight
+        // across the big triangles there).
+        let at: Vec<V3> = pts.iter().zip(&mid).map(|(p, m)| p.curved(pos, &fine, m)).collect();
+        let edge: Vec<V3> = (0..at.len()).filter(|&i| src.0[i] != src.1[i] && hem[i].abs() < 1e-4).map(|i| at[i]).collect();
+        let mut hem: Vec<f64> = at.iter().zip(&hem).map(|(q, &h)| if h <= 0.0 { 0.0 } else { edge.iter().map(|e| (q - e).norm()).fold(f64::INFINITY, f64::min) }).collect();
+        for sx in [-1.0, 1.0] {
+            let laced: Vec<usize> = (0..at.len()).filter(|&i| sign(at[i].x) == sx && across[i] < 1.0).collect();
+            let middle = |i: &&usize| across[**i].abs() < 0.012;
+            let Some(&c) = laced.iter().filter(middle).filter(|&&i| hem[i] == 0.0).min_by(|&&i, &&j| across[i].abs().total_cmp(&across[j].abs())) else { continue };
+            let far = *laced.iter().filter(middle).min_by(|&&i, &&j| ((at[i] - at[c]).norm() - 0.06).abs().total_cmp(&((at[j] - at[c]).norm() - 0.06).abs())).unwrap();
+            let down = (at[far] - at[c]).normalize();
+            for &i in &laced {
+                hem[i] = (at[i] - at[c]).dot(&down).max(0.0);
+            }
+        }
+        // The cut inside the sole: new vertices on an edge, not at the collar.
+        let low = (0..src.0.len()).map(|i| src.0[i] != src.1[i] && hem[i] > 0.01).collect();
+        UpperLayout { pts, mid, idx: cidx, lift, point, hem, across, low }
+    })
+}
+
+/// A shoe's upper at `stage`: the layout's skin lifted off it (with the body's own weights, so it
+/// moves as the foot does), and a lining turned in from the collar to the skin.
+fn upper(family: &str, stage: &str, gid: &str, lod: bool) -> Mesh {
+    let lay = upper_layout(family, gid, lod);
+    let st = shoe_style(gid);
+    let s = surface(family, stage);
+    let k = proportions(family, stage).h / 1.7;
+    // (The body's normals: from its finer limit surface, so the shoe shades as smoothly as the skin.)
+    let (bpos, bnor, dense): (&[V3], &[V3], &[Dense]) = if lod { (&s.lod_pos, &s.lod_nor, &s.lod_dense) } else { (&s.pos, &s.nor, &s.dense) };
+    let fine = finer(family, stage, lod);
+    let nor: Vec<V3> = lay.pts.iter().map(|p| p.mix(bnor).normalize()).collect();
+    let pos: Vec<V3> = (0..lay.pts.len()).map(|i| lay.pts[i].curved(bpos, &fine, &lay.mid[i]) + nor[i] * lay.lift[i] * k + lay.point[i] * k).collect();
+    let mut d: Vec<Dense> = lay.pts.iter().map(|p| std::array::from_fn(|k| (0..3).map(|j| dense[p.v[j]][k] * p.w[j]).sum())).collect();
+    let n0 = pos.len();
+    let flag = if st.polish { FLAG_POLISHED } else { 0.0 };
+    let fields = (0..n0).map(|i| [lay.hem[i], flag, SHOES, lay.across[i]]);
+    let mut out = Mesh { pos, nor, idx: lay.idx.clone(), fields: fields.collect(), ..Mesh::default() };
+    if !lod {
+        // The lining: a band from the collar's edge in to the skin (its hem distance negative: drawn dark).
+        let depth = 0.85 * (st.lift + st.pad + st.shaft) * k;
+        let be: Vec<[usize; 2]> = boundary_edges(&out.idx).into_iter().filter(|e| !(lay.low[e[0]] && lay.low[e[1]])).collect();
+        let verts = unique(&be.concat());
+        let mut inner = vec![usize::MAX; n0];
+        for &v in &verts {
+            inner[v] = out.pos.len();
+            let (p, nv) = (out.pos[v], out.nor[v]);
+            out.pos.push(p - nv * depth);
+            out.fields.push([-depth, flag, SHOES, 1.0]);
+            d.push(d[v]);
+        }
+        for [a, bv] in be {
+            out.idx.extend([bv, a, inner[a], bv, inner[a], inner[bv]]);
+        }
+        out.nor.extend_from_slice(&smooth_normals(&out.pos, &out.idx)[n0..]);
+    }
+    let n = out.pos.len();
+    Mesh { dense: d, tone: vec![[0.0; 4]; n], ..out }
+}
+
+/// The sole under a foot's upper: a slab round the upper's foot (its widest, seen from above, from the
+/// full upper, so a low-detail sole matches) standing out by the welt, from the floor (the arch lifted
+/// off it) to the sole's top; its edge a light midsole over a dark outsole, or dark.
+fn sole(family: &str, stage: &str, gid: &str, up: &Mesh, side: f64, segs: usize) -> (Vec<V3>, Vec<usize>, Vec<f64>) {
+    let st = shoe_style(gid);
+    let k = proportions(family, stage).h / 1.7;
+    // (Not its lining.)
+    let keep: Vec<bool> = up.pos.iter().zip(&up.fields).map(|(q, f)| sign(q.x) == side && f[0] >= 0.0).collect();
+    let pts: Vec<V3> = up.pos.iter().zip(&keep).filter(|(_, k)| **k).map(|(q, _)| *q).collect();
+    let span = |f: fn(&V3) -> f64| (pts.iter().map(f).fold(f64::INFINITY, f64::min), pts.iter().map(f).fold(f64::NEG_INFINITY, f64::max));
+    let ((x0, x1), (z0, z1)) = (span(|q| q.x), span(|q| q.z));
+    let (cx, cz) = ((x0 + x1) / 2.0, (z0 + z1) / 2.0);
+    // The upper's outline low down (its vertices and its sections at a few heights), seen from above,
+    // in the foot's box scaled to a unit square (so the directions spread evenly round its length).
+    let ys = linspace(0.0, (st.heel_h + 0.03) * k, 7);
+    let mut low: Vec<V3> = pts.iter().filter(|q| q.y < ys[6]).copied().collect();
+    for &y in &ys[1..] {
+        low.extend(section(&up.pos, &up.idx, y, &keep));
+    }
+    let (hx, hz) = ((x1 - x0) / 2.0, (z1 - z0) / 2.0);
+    let ang = linspace_open(0.0, 2.0 * PI, segs);
+    let width = PI / segs as f64 * 0.75;
+    let mut r: Vec<f64> = ang
+        .iter()
+        .map(|&a| {
+            low.iter()
+                .map(|q| ((q.x - cx) / hx, (q.z - cz) / hz))
+                .filter(|(x, z)| (py_mod(x.atan2(*z) - a + PI, 2.0 * PI) - PI).abs() < width)
+                .map(|(x, z)| x.hypot(z))
+                .fold(f64::NAN, f64::max)
+        })
+        .collect();
+    // (A direction with no vertex near it takes the nearest that has one.)
+    for j in 0..segs {
+        if r[j].is_nan() {
+            r[j] = (1..segs).flat_map(|o| [r[(j + o) % segs], r[(j + segs - o) % segs]]).find(|v| !v.is_nan()).unwrap();
+        }
+    }
+    let u = |z: f64| clip((z - z0) / (z1 - z0), 0.0, 1.0);
+    let arch = |u: f64| st.arch * k * smoothstep(st.block.1 - 0.02, st.block.1 + 0.06, u) * (1.0 - smoothstep(0.5, 0.62, u));
+    // The outline, and its outward normals (seen from above).
+    let edge: Vec<(f64, f64)> = (0..segs).map(|j| (cx + ang[j].sin() * r[j] * hx, cz + ang[j].cos() * r[j] * hz)).collect();
+    let out: Vec<(f64, f64)> = (0..segs)
+        .map(|j| {
+            let (a, c) = (edge[(j + segs - 1) % segs], edge[(j + 1) % segs]);
+            let (tx, tz) = (c.0 - a.0, c.1 - a.1);
+            let l = tx.hypot(tz);
+            (-tz / l, tx / l)
+        })
+        .collect();
+    let ring = |grow: f64, y: &dyn Fn(f64) -> f64| -> Vec<V3> {
+        (0..segs)
+            .map(|j| {
+                let (x, z) = (edge[j].0 + out[j].0 * grow, edge[j].1 + out[j].1 * grow);
+                v3(x, y(u(z)), z)
+            })
+            .collect()
+    };
+    let welt = st.welt * k;
+    let top = |u: f64| st.top(u) * k;
+    let split = |u: f64| top(u) * (1.0 - st.midsole);
+    // Rows down its edge: a light midsole and a dark outsole meet at a seam (a row twice, one colour
+    // above it, the other below); else dark all the way down.
+    let (rows, mut flags) = if st.midsole > 0.0 {
+        let rows = vec![ring(welt, &top), ring(welt + 0.001 * k, &split), ring(welt + 0.001 * k, &split), ring(welt - 0.0015 * k, &arch)];
+        (rows, [FLAG_MIDSOLE, FLAG_MIDSOLE, FLAG_SOLE, FLAG_SOLE].iter().flat_map(|&f| vec![f; segs]).collect::<Vec<_>>())
+    } else {
+        (vec![ring(welt, &top), ring(welt - 0.0015 * k, &arch)], vec![FLAG_SOLE; 2 * segs])
+    };
+    let (mut pos, mut idx) = strip(&rows, true);
+    if st.midsole > 0.0 {
+        idx.drain(segs * 6..segs * 12);
+    }
+    let (ct, cb, last) = (pos.len(), pos.len() + 1, (rows.len() - 1) * segs);
+    pos.push(v3(cx, top(0.5), cz));
+    pos.push(v3(cx, arch(0.5), cz));
+    for j in 0..segs {
+        let j1 = (j + 1) % segs;
+        idx.extend([ct, j1, j, cb, last + j, last + j1]);
+    }
+    flags.extend([flags[0], FLAG_SOLE]);
+    let idx = closed_outward(&pos, idx);
+    (pos, idx, flags)
+}
+
+/// A shoe: the upper and a sole under each foot.
+fn shoe(family: &str, stage: &str, gid: &str, lod: bool) -> Mesh {
+    let s = surface(family, stage);
+    let up = upper(family, stage, gid, lod);
+    let full = if lod { upper(family, stage, gid, false) } else { up.clone() };
+    let (mut pos, mut flags) = (Vec::new(), Vec::new());
+    let mut idx = Vec::new();
+    for side in [-1.0, 1.0] {
+        let (p, i, f) = sole(family, stage, gid, &full, side, if lod { 10 } else { 18 });
+        let n = pos.len();
+        idx.extend(i.iter().map(|&v| v + n));
+        pos.extend(p);
+        flags.extend(f);
+    }
+    let dense = follow(&pos, &s);
+    let nor = smooth_normals(&pos, &idx);
+    let fields = flags.iter().map(|&f| [0.05, f, SHOES, 1.0]).collect();
+    let n = pos.len();
+    let sole = Mesh { pos, nor, idx, dense, fields, tone: vec![[0.0; 4]; n], ..Mesh::default() };
+    super::merge(&[&up, &sole])
 }
 
 /// Every shell of `family` at `stage`, each with a low-detail copy (`lod.<id>`).
@@ -765,8 +1184,8 @@ pub fn build_clothes(family: &str, stage: &str, cuts: &Cuts) -> Vec<(String, Mes
         out.push(("lod.bottom.skirt".into(), skirt_shell(family, stage, cuts, 12, 4)));
     }
     for gid in cuts.keys().filter(|g| g.starts_with("shoes.")) {
-        out.push((gid.to_string(), soles(family, stage, gid, cuts, false)));
-        out.push((format!("lod.{gid}"), soles(family, stage, gid, cuts, true)));
+        out.push((gid.to_string(), shoe(family, stage, gid, false)));
+        out.push((format!("lod.{gid}"), shoe(family, stage, gid, true)));
     }
     out
 }
