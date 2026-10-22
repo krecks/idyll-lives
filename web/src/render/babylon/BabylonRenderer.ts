@@ -883,8 +883,9 @@ export class BabylonRenderer implements Renderer {
     this.characters.setRide((id) => this.motion.ride(id));
     this.characters.setLoop((id) => this.motion.loopPhase(id));
     this.characters.setSun(() => this.sun.direction);
-    // Garden birds (`?debug&birdStandIn`: plain stand-ins where a bird has no model, and perches made up for plants without any).
-    this.birdLife = new Birds(scene, this.deps.assets, this.debug && new URLSearchParams(location.search).has('birdStandIn'));
+    // Garden birds. `?debug`: `__birds()` lists them (species, state, place) with what they did and
+    // the cost of a frame; `__birdFly(id, where)` sends one off; `__birdTime(scale)` slows their clock.
+    this.birdLife = new Birds(scene, this.deps.assets);
     this.birdLife.setQuality(this.quality.birds);
     if (this.debug) Object.assign(window, { __birds: () => this.birdLife.debug(), __birdFly: (id: number, where: 'plant' | 'ground' | 'roof' | 'home' = 'plant') => this.birdLife.debugFly(id, where), __birdTime: (scale: number) => (this.birdLife.timeScale = scale) });
     this.items = new ItemLayer(scene, this.deps.assets, this.deps.content);
@@ -1414,8 +1415,11 @@ export class BabylonRenderer implements Renderer {
       for (const p of tops) for (const q of tops) if (Math.hypot(p[0] - q[0], p[2] - q[2]) > far) [far, a, b] = [Math.hypot(p[0] - q[0], p[2] - q[2]), p, q];
       const n = Math.floor(far / 0.5);
       for (let k = 1; k < n; k++) ridge.push(a[0] + ((b[0] - a[0]) * k) / n, a[1], a[2] + ((b[2] - a[2]) * k) / n);
+      // A short ridge (a hipped roof's): its ends, and the point between.
+      if (n < 3) ridge.push(a[0], a[1], a[2], b[0], b[1], b[2]);
     }
-    await this.birdLife.setHabitat({ world, view: v, plants, ridge, roofTop });
+    const minute = this.fixedHour !== null ? this.fixedHour * 60 : this.lastMinute;
+    await this.birdLife.setHabitat({ world, view: v, plants, ridge, roofTop, hour: (minute / 60) % 24 });
   }
 
   /** The birds a frame on (with the game's clock; they're hidden with the garden over the basement). */

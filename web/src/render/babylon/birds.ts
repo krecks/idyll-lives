@@ -28,12 +28,12 @@
  * only the birds that moved are written each frame, nothing is allocated per frame.
  */
 
-import { Color3, Matrix, Mesh, MeshBuilder, Quaternion, StandardMaterial, Vector3, VertexBuffer, type Scene } from './core';
+import { Matrix, Quaternion, Vector3, type Mesh, type Scene } from './core';
 import type { AssetRegistry } from '../../assets/registry';
 import type { ModelEntry, Vec3 } from '../../assets/types';
 import { groundDepth, type WorldStructure } from '../../core/protocol';
 import type { SeenBird, ViewRect } from '../types';
-import { buildModel, buildModelParts, type ModelTemplate } from './models';
+import { buildModelParts, type ModelTemplate } from './models';
 import { windBend } from './nature';
 
 export type BirdSpecies = 'blueTit' | 'chaffinch' | 'warbler' | 'blackbird' | 'collaredDove';
@@ -54,6 +54,12 @@ interface Species {
   /** Size when the manifest doesn't say (`bird.length`, `bird.wingspan`). */
   length: number;
   wingspan: number;
+  /**
+   * Drawn this much larger than life: at real size a tit is 5 px and a blackbird 10 px from the
+   * game's usual camera, specks; the small ones grow most (the game's apples and flowers are a
+   * little larger than life too), so they still differ in size as they should.
+   */
+  show: number;
   /** `bounding`: flap bursts with shut wings between (an undulating line); `direct`: low and straight, short glides; `steady`: even flapping with glides. */
   flight: 'bounding' | 'direct' | 'steady';
   /** Cruising speed (m/s) and wingbeats a second (kept low enough to read at 60 fps). */
@@ -86,40 +92,38 @@ interface Species {
   height: number;
   /** Where it lives: weights in broadleaved trees, conifers and bushes. */
   habitat: [number, number, number];
-  /** The stand-in's colours (`?debug&birdStandIn`): body, head, wings, tail, beak. */
-  standIn: [string, string, string, string, string];
 }
 
 const SPECIES: Species[] = [
   {
-    id: 'blueTit', song: 'tit', length: 0.115, wingspan: 0.19, flight: 'bounding', speed: 5.5, flapHz: 15,
+    id: 'blueTit', song: 'tit', length: 0.115, wingspan: 0.19, show: 1.6, flight: 'bounding', speed: 5.5, flapHz: 15,
     glance: [0.25, 1.0], snap: 40, flick: [1, 3], flickAmp: 0.35, preen: [20, 50], hop: [1.5, 5], fly: [12, 35],
     ground: 0, groundStay: [0, 0], gait: 'hop', roof: 0, wary: 2.5, wake: 5.2, roost: 20.4, pair: false, height: 0.6,
-    habitat: [3, 2, 2], standIn: ['#9DB35A', '#3F7CC8', '#4B78B8', '#3E5F9C', '#2A2A2A'],
+    habitat: [3, 2, 2],
   },
   {
-    id: 'chaffinch', song: 'finch', length: 0.15, wingspan: 0.26, flight: 'bounding', speed: 6.5, flapHz: 13,
+    id: 'chaffinch', song: 'finch', length: 0.15, wingspan: 0.26, show: 1.5, flight: 'bounding', speed: 6.5, flapHz: 13,
     glance: [0.4, 1.6], snap: 30, flick: [2, 6], flickAmp: 0.25, preen: [25, 60], hop: [3, 9], fly: [15, 45],
     ground: 0.45, groundStay: [10, 40], gait: 'hop', roof: 0, wary: 3, wake: 5.1, roost: 20.5, pair: false, height: 0.5,
-    habitat: [3, 2, 1.5], standIn: ['#C47A5A', '#6A7E99', '#5A4A3A', '#4A4A44', '#B8B8B0'],
+    habitat: [3, 2, 1.5],
   },
   {
-    id: 'warbler', song: 'warbler', length: 0.12, wingspan: 0.19, flight: 'bounding', speed: 5, flapHz: 15,
+    id: 'warbler', song: 'warbler', length: 0.12, wingspan: 0.19, show: 1.6, flight: 'bounding', speed: 5, flapHz: 15,
     glance: [0.2, 0.8], snap: 40, flick: [1, 3], flickAmp: 0.3, preen: [20, 40], hop: [0.8, 3], fly: [10, 30],
     ground: 0, groundStay: [0, 0], gait: 'hop', roof: 0, wary: 2.5, wake: 5.1, roost: 20.5, pair: false, height: 0.45,
-    habitat: [2, 0.5, 2.5], standIn: ['#A9A86A', '#9C9B60', '#827F52', '#7E7B4E', '#6A5A40'],
+    habitat: [2, 0.5, 2.5],
   },
   {
-    id: 'blackbird', song: 'blackbird', length: 0.25, wingspan: 0.36, flight: 'direct', speed: 7, flapHz: 11,
+    id: 'blackbird', song: 'blackbird', length: 0.25, wingspan: 0.36, show: 1.35, flight: 'direct', speed: 7, flapHz: 11,
     glance: [0.6, 2.2], snap: 22, flick: [3, 8], flickAmp: 0.5, preen: [30, 80], hop: [6, 15], fly: [15, 40],
     ground: 0.65, groundStay: [15, 60], gait: 'run', roof: 0, wary: 3.5, wake: 4.9, roost: 21, pair: false, height: 0.25,
-    habitat: [1.5, 1, 3], standIn: ['#1E1E20', '#1E1E20', '#18181A', '#151517', '#E8A020'],
+    habitat: [1.5, 1, 3],
   },
   {
-    id: 'collaredDove', song: 'dove', length: 0.32, wingspan: 0.5, flight: 'steady', speed: 9, flapHz: 7,
+    id: 'collaredDove', song: 'dove', length: 0.32, wingspan: 0.5, show: 1.25, flight: 'steady', speed: 9, flapHz: 7,
     glance: [1.5, 5], snap: 8, flick: null, flickAmp: 0, preen: [40, 120], hop: [15, 40], fly: [30, 90],
     ground: 0.4, groundStay: [20, 70], gait: 'walk', roof: 0.35, wary: 4, wake: 5.6, roost: 20.1, pair: true, height: 0.85,
-    habitat: [2, 1.5, 0.2], standIn: ['#C9B9A6', '#C2B2A0', '#B5A390', '#A89684', '#3A3A3A'],
+    habitat: [2, 1.5, 0.2],
   },
 ];
 
@@ -162,6 +166,8 @@ export interface BirdHabitat {
   ridge: number[];
   /** Top of the viewed house's roof (m), if known. */
   roofTop: number | null;
+  /** The hour now (birds new to the habitat start asleep at night). */
+  hour: number;
 }
 
 /** The birds' preset knob (`QualitySettings.birds`). */
@@ -232,6 +238,8 @@ interface Bird {
   y: number;
   z: number;
   yaw: number;
+  /** Where it turns to on its perch (NaN: not turning). */
+  turnTo: number;
   pitch: number;
   roll: number;
   /** Head yaw, pitch, roll and bob (m forward), and where it's turning to. */
@@ -279,9 +287,10 @@ interface Bird {
   px: number;
   py: number;
   pz: number;
+  /** Not yet moved: made before the hour was known, it starts on its roost if it's night. */
+  fresh: boolean;
   /** Its matrices need writing. */
   dirty: boolean;
-  shown: boolean;
 }
 
 /** A species' model as drawn: its parts' meshes and their buffers, and the nodes' pivots. */
@@ -298,8 +307,6 @@ interface Look {
   count: number;
   /** A part's buffer was written this frame. */
   dirty: boolean;
-  /** The model's file (to build again when it comes after failing), or the stand-in. */
-  url: string | null;
 }
 
 const smooth = (a: number, b: number, x: number) => {
@@ -382,8 +389,6 @@ export class Birds {
   private readonly seen: SeenBird[] = [];
   /** Where the camera was last frame. */
   private readonly eye = new Vector3();
-  /** Perch points made up from a plant model's leaves for the stand-in, by model key (`?debug&birdStandIn`). */
-  private readonly madePerches = new Map<string, Promise<Vec3[]>>();
 
   // Scratch, so frames allocate nothing.
   private readonly bend = { x: 0, z: 0 };
@@ -400,8 +405,6 @@ export class Birds {
   constructor(
     private readonly scene: Scene,
     private readonly assets: AssetRegistry,
-    /** `?debug&birdStandIn`: species without a model drawn as plain shapes, plants without perches given some (testing only). */
-    private readonly standIn = false,
   ) {}
 
   setQuality(quality: BirdQuality): void {
@@ -418,8 +421,8 @@ export class Birds {
 
   /** A model file that had failed has come: a bird model built without it is built again. */
   fileArrived(url: string): void {
-    const i = this.looks.findIndex((l) => l?.url === url);
-    if (i < 0 || !this.habitat) return;
+    const i = SPECIES.findIndex((sp) => this.assets.get(`model.bird.${sp.id}`, 'model')?.url === url);
+    if (i < 0 || !this.habitat || this.building[i]) return;
     this.dropLook(i);
     void this.setHabitat(this.habitat);
   }
@@ -431,6 +434,7 @@ export class Birds {
   async setHabitat(habitat: BirdHabitat): Promise<void> {
     const ticket = ++this.ticket;
     this.habitat = habitat;
+    this.hour = habitat.hour;
     const { world, view } = habitat;
     this.grids(world, habitat.roofTop);
     const range = this.quality.range;
@@ -443,8 +447,7 @@ export class Birds {
     const placements = this.quality.count > 0 ? habitat.plants.filter((p) => near(p.x, p.z)) : [];
     const plants: Plant[] = [];
     for (const p of placements) {
-      const plant = await this.plantOf(p);
-      if (ticket !== this.ticket) return;
+      const plant = this.plantOf(p);
       if (plant) plants.push(plant);
     }
     if (habitat.ridge.length >= 3) {
@@ -453,8 +456,8 @@ export class Birds {
       const mid = Math.floor(n / 2);
       plants.push({ key: 'roof', kind: 'roof', conifer: false, x: perches[mid * 3], y: 0, z: perches[mid * 3 + 2], perches, heights: new Float32Array(n), top: perches[1], radius: 0, roosts: [mid], seed: hash(perches[0], perches[2], 7) });
     }
-    // The species there may be (a model, or the stand-in).
-    const available = SPECIES.map((sp) => this.standIn || this.assets.has(`model.bird.${sp.id}`, 'model'));
+    // The species there may be (those with a model).
+    const available = SPECIES.map((sp) => this.assets.has(`model.bird.${sp.id}`, 'model'));
     const looks = await Promise.all(SPECIES.map((_, i) => (available[i] && plants.length ? this.lookOf(i) : Promise.resolve(null))));
     if (ticket !== this.ticket) return;
     const usable = looks.map((l) => !!l);
@@ -488,7 +491,6 @@ export class Birds {
     }
     this.plants = plants;
     this.birds = birds;
-    if (this.standIn) console.info(`[birds] ${plants.length} plants (${placements.length} placed), ${birds.length} birds: ${SPECIES.map((sp) => `${sp.id} ${birds.filter((b) => b.sp === sp).length}`).join(', ')}`);
     // Each species' buffers, sized to its birds.
     for (let i = 0; i < SPECIES.length; i++) {
       const look = looks[i];
@@ -576,6 +578,14 @@ export class Birds {
     let moved = false;
     for (const b of this.birds) {
       b.dirty = false;
+      if (b.fresh) {
+        b.fresh = false;
+        if (!this.awake(b) && b.state === 'perch') {
+          b.state = 'roost';
+          b.plant = b.home;
+          b.perch = b.roostPerch;
+        }
+      }
       if (dt > 0) this.think(b, f);
       if (b.state === 'perch' || b.state === 'roost') this.sit(b, dt);
       else if (b.state === 'fly') this.fly(b, dt);
@@ -641,10 +651,10 @@ export class Birds {
 
   /** Whether a bird may stand on the ground here (lawn in the town, clear of everything). */
   private lawn(x: number, z: number): boolean {
-    const m = 0.18;
-    for (const [dx, dz] of [[0, 0], [m, m], [-m, m], [m, -m], [-m, -m]] as const) {
-      const tx = Math.floor(x + dx);
-      const tz = Math.floor(z + dz);
+    for (let k = 0; k < 5; k++) {
+      // The point and four round it, a bird's reach away.
+      const tx = Math.floor(x + (k === 0 ? 0 : k % 2 ? 0.18 : -0.18));
+      const tz = Math.floor(z + (k === 0 ? 0 : k < 3 ? 0.18 : -0.18));
       if (tx < 0 || tz < 0 || tx >= this.width || tz >= this.depth || this.blocked[tz * this.width + tx]) return false;
     }
     return true;
@@ -673,13 +683,10 @@ export class Birds {
   }
 
   /** A placed plant's perches in the world, if its model has any. */
-  private async plantOf(p: PlantPlacement): Promise<Plant | null> {
+  private plantOf(p: PlantPlacement): Plant | null {
     const entry = this.assets.get(p.key, 'model') as BirdExtras | undefined;
     if (!entry) return null;
-    let points = entry.perches;
-    // (Made-up ones are from the model as built: in its entry's placement already.)
-    const made = !points?.length;
-    if (made && this.standIn && /(^|\.)(tree|bush|hedge|spruce|pine|cypress|willow|rosebush|hydrangea|boxwood|lavender)/i.test(p.key)) points = await this.makePerches(p.key, entry);
+    const points = entry.perches;
     if (!points?.length) return null;
     const perches = new Float32Array(points.length * 3);
     const heights = new Float32Array(points.length);
@@ -688,7 +695,7 @@ export class Birds {
     let radius = 0;
     const depth: number[] = [];
     points.forEach((point, i) => {
-      const m = made ? this.v.set(point[0], point[1], point[2]) : inSpace(entry, point, this.v);
+      const m = inSpace(entry, point, this.v);
       const [lx, ly, lz] = [m.x * p.sx, m.y * p.sy, m.z * p.sz];
       perches[i * 3] = p.x + lx * c + lz * s;
       perches[i * 3 + 1] = p.y + ly;
@@ -704,59 +711,6 @@ export class Birds {
     const conifer = /spruce|pine|cypress|fir/i.test(p.key);
     const tree = /(^|\.)(tree|spruce|pine|cypress|willow|palm)/i.test(p.key) || top > 2.6;
     return { key: p.key, kind: tree ? 'tree' : 'bush', conifer, x: p.x, y: p.y, z: p.z, perches, heights, top, radius, roosts, seed: hash(p.x, p.z, 0xb1d) };
-  }
-
-  /**
-   * Stand-in perches for a plant model without any (testing only, `?debug&birdStandIn`): points on
-   * the top side of its leaves, spread out.
-   */
-  private makePerches(key: string, entry: ModelEntry): Promise<Vec3[]> {
-    let made = this.madePerches.get(key);
-    if (!made) {
-      made = buildModel(this.scene, `birds:perches:${key}`, entry, [1, 1]).then((t) => {
-        // The leaves' outer shell: the highest point in each 30 cm column, and the outermost in each
-        // sector and band of height (upper part of the plant only).
-        const tops = new Map<string, Vec3>();
-        const sides = new Map<string, Vec3>();
-        for (const mesh of t.meshes) {
-          const leafy = /foliage|leaf|needle|hedge|bush|crown/i.test(mesh.material?.name ?? '');
-          const pos = mesh.getVerticesData(VertexBuffer.PositionKind);
-          if (leafy && pos) {
-            for (let i = 0; i < pos.length; i += 3) {
-              const [x, y, z] = [pos[i], pos[i + 1], pos[i + 2]];
-              if (y < t.height * 0.35) continue;
-              const cell = `${Math.floor(x / 0.3)},${Math.floor(z / 0.3)}`;
-              if (!tops.has(cell) || tops.get(cell)![1] < y) tops.set(cell, [x, y, z]);
-              if (y < t.height * 0.6) continue;
-              const band = `${Math.floor(((Math.atan2(z, x) + Math.PI) / (Math.PI * 2)) * 12)},${Math.floor(y / 0.5)}`;
-              const was = sides.get(band);
-              if (!was || Math.hypot(was[0], was[2]) < Math.hypot(x, z)) sides.set(band, [x, y, z]);
-            }
-          }
-          mesh.dispose(false, false);
-        }
-        for (const g of t.glows ?? []) g.mesh.dispose(false, false);
-        // (The upper half of them: on the crown, not down between its lumps.)
-        const all = [...tops.values(), ...sides.values()].sort((a, b) => b[1] - a[1]);
-        // (A little over the highest corners: the faces between them stand higher.)
-        const points = all.slice(0, Math.ceil(all.length / 2)).map(([x, y, z]): Vec3 => [x, y + 0.05, z]);
-        // Farthest-point sampling: a dozen spread over the crown.
-        const picked: Vec3[] = [];
-        if (points.length) picked.push(points.reduce((a, b) => (b[1] > a[1] ? b : a)));
-        while (picked.length < Math.min(14, points.length)) {
-          let best = points[0];
-          let far = -1;
-          for (const p of points) {
-            const d = Math.min(...picked.map((q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2])));
-            if (d > far) [far, best] = [d, p];
-          }
-          picked.push(best);
-        }
-        return picked;
-      });
-      this.madePerches.set(key, made);
-    }
-    return made;
   }
 
   private pickSpecies(plant: Plant, roll: number, usable: boolean[]): Species | null {
@@ -777,7 +731,7 @@ export class Birds {
     for (let i = 0; i < key.length; i++) id = (Math.imul(id, 31) + key.charCodeAt(i)) >>> 0;
     // Its own randoms (the plant's only choose how many live there, and which).
     const r = seeded(id / 4294967296);
-    const size = 0.94 + r() * 0.12;
+    const size = sp.show * (0.95 + r() * 0.1);
     const wake = sp.wake + (r() - 0.5) * 0.5;
     const roost = sp.roost + (r() - 0.5) * 0.5;
     if (old && old.sp === sp) {
@@ -804,12 +758,12 @@ export class Birds {
     const plant = plants[home];
     const b: Bird = {
       key, id, sp, look: -1, slot: 0, size, home, partner: null, wake, roost, roostPerch,
-      state: 'perch', plant: home, perch: 0, x: plant.x, y: plant.y, z: plant.z, yaw: r() * Math.PI * 2, pitch: 0, roll: 0,
+      state: 'perch', plant: home, perch: 0, x: plant.x, y: plant.y, z: plant.z, yaw: r() * Math.PI * 2, turnTo: NaN, pitch: 0, roll: 0,
       hy: 0, hp: 0, hr: 0, bob: 0, hyTo: 0, hpTo: 0, hrTo: 0, tail: 0, spread: 0, flap: 0, phase: 0, puff: 1,
       nextGlance: 0, nextFlick: r() * 3, nextPreen: between(r, sp.preen), preenUntil: -1, flickAt: -10, nextHop: between(r, sp.hop), nextFly: between(r, sp.fly),
       singUntil: -1, waryUntil: -1, path: new Float32Array(12), dur: 0, t: 0, bounds: 0, bound: 0, hop: false,
       leaveAt: 0, nextStep: 0, step: new Float32Array(4), stepT: 0, stepDur: 0, steps: 0, peck: -1, px: plant.x, py: plant.y, pz: plant.z,
-      dirty: true, shown: false,
+      fresh: true, dirty: true,
     };
     // Asleep on its roost when the game starts at night.
     const asleep = !this.awake(b);
@@ -897,7 +851,8 @@ export class Birds {
       }
       const next = this.nearPerch(plant, b.perch, b);
       if (next !== b.perch) this.flyTo(b, b.plant, next, 1);
-      else b.yaw += (rnd() - 0.5) * 2.4;
+      // A turn on the spot, in a flick (`sit`).
+      else b.turnTo = b.yaw + (rnd() < 0.5 ? -1 : 1) * (0.6 + rnd() * 1.6);
       b.dirty = true;
     }
   }
@@ -911,7 +866,9 @@ export class Birds {
     if (low) {
       for (let i = 0; i < f.residentCount; i++) {
         if (!f.visible[i]) continue;
-        const [hx, hy, hz] = [f.residents[i * 3], f.residents[i * 3 + 1], f.residents[i * 3 + 2]];
+        const hx = f.residents[i * 3];
+        const hy = f.residents[i * 3 + 1];
+        const hz = f.residents[i * 3 + 2];
         // Upstairs, or indoors behind the walls: not a threat.
         if (hy > 2.6 || !this.lawnOrOpen(hx, hz)) continue;
         if (Math.hypot(hx - b.x, hz - b.z) < reach) threat = i;
@@ -954,7 +911,7 @@ export class Birds {
     }
     if (!plantOnly && sp.roof > 0 && this.roofOn && roll > 1 - sp.roof) {
       const roof = this.plants.findIndex((p) => p.kind === 'roof');
-      if (roof >= 0) {
+      if (roof >= 0 && Math.hypot(this.plants[roof].x - b.x, this.plants[roof].z - b.z) < 25) {
         this.flyTo(b, roof, Math.floor(rnd() * (this.plants[roof].perches.length / 3)), 1);
         return;
       }
@@ -1080,7 +1037,7 @@ export class Birds {
     const target = this.plants[plant];
     if (!target) return;
     this.perchPoint(target, perch, this.at);
-    if (!this.plan(b, this.at[0], this.at[1], this.at[2], speed, false)) return;
+    if (!this.plan(b, this.at[0], this.at[1], this.at[2], speed, false, plant === b.home)) return;
     b.plant = plant;
     b.perch = perch;
   }
@@ -1097,9 +1054,11 @@ export class Birds {
    * The flight's curve from where the bird is to (x, y, z): out and up, then in to land, lifted
    * over any house in the way. False (it stays) if the end is inside one.
    */
-  private plan(b: Bird, x: number, y: number, z: number, speed: number, down: boolean): boolean {
+  private plan(b: Bird, x: number, y: number, z: number, speed: number, down: boolean, home = false): boolean {
     const sp = b.sp;
     const d = Math.hypot(x - b.x, z - b.z);
+    // (Nothing further than the next garden or two, but home.)
+    if (d > 40 && !home) return false;
     // Never to a spot inside a house (its roof ridge is on it).
     if (this.topAt(x, z) > y + 0.2) return false;
     const P = b.path;
@@ -1162,6 +1121,7 @@ export class Birds {
     b.bounds = sp.flight === 'bounding' && !hop ? Math.max(1, Math.round(length / 2.2)) : sp.flight === 'direct' && !hop ? Math.max(1, Math.round(length / 3.5)) : 0;
     b.bound = 0;
     b.state = 'fly';
+    b.turnTo = NaN;
     if (hop) this.stats.hops++;
     else this.stats.flights++;
     if (down) this.stats.lawn++;
@@ -1174,7 +1134,10 @@ export class Birds {
 
   private bezier(P: Float32Array, s: number, out: Float32Array): void {
     const u = 1 - s;
-    const [a, c, e, f] = [u * u * u, 3 * u * u * s, 3 * u * s * s, s * s * s];
+    const a = u * u * u;
+    const c = 3 * u * u * s;
+    const e = 3 * u * s * s;
+    const f = s * s * s;
     out[0] = a * P[0] + c * P[3] + e * P[6] + f * P[9];
     out[1] = a * P[1] + c * P[4] + e * P[7] + f * P[10];
     out[2] = a * P[2] + c * P[5] + e * P[8] + f * P[11];
@@ -1211,7 +1174,9 @@ export class Birds {
     b.px = b.x;
     b.py = b.y;
     b.pz = b.z;
-    let [x, y, z] = [this.at[0], this.at[1], this.at[2]];
+    const x = this.at[0];
+    let y = this.at[1];
+    const z = this.at[2];
     // Bounding: rising while it flaps, falling with its wings shut.
     let flapping = true;
     if (b.bounds > 0) {
@@ -1323,6 +1288,13 @@ export class Birds {
       return;
     }
     b.puff = lerp(b.puff, b.singUntil > now ? 1.04 : 1, Math.min(1, dt * 2));
+    if (!Number.isNaN(b.turnTo)) {
+      // Turning round on the twig: quick, with a little lift off it.
+      const left = turn(b.yaw, b.turnTo);
+      b.yaw += left * Math.min(1, dt * 16);
+      b.y += Math.min(0.02, Math.abs(left) * 0.012);
+      if (Math.abs(left) < 0.02) b.turnTo = NaN;
+    }
     if (b.singUntil > now) {
       // Singing: head up, a little sway of it.
       this.ease(b, Math.sin(now * 3 + b.id) * 0.25, -0.45, 0, dt, 10);
@@ -1499,7 +1471,8 @@ export class Birds {
     this.pivot(P, t.x, t.y, t.z);
     mul(P, base, look.buffers[TAIL], o);
     // Spread wings: beating about the shoulders (up: the tips rise), hidden while shut.
-    for (const [part, sign] of [[WING_L, -1], [WING_R, 1]] as const) {
+    for (let part = WING_L; part <= WING_R; part++) {
+      const sign = part === WING_L ? -1 : 1;
       Matrix.RotationZToRef(sign * b.flap, this.rot);
       this.fromRot(this.rot, b.spread);
       const w = look.pivots[part];
@@ -1530,7 +1503,7 @@ export class Birds {
     P[14] = z - (x * P[2] + y * P[6] + z * P[10]);
   }
 
-  /** The species' model: its file (nodes as parts) or, testing, the stand-in. */
+  /** The species' model, its nodes as parts (null without its file, or if that fails). */
   private lookOf(i: number): Promise<Look | null> {
     const done = this.looks[i];
     if (done) return Promise.resolve(done);
@@ -1542,7 +1515,6 @@ export class Birds {
     const made = (async (): Promise<Look | null> => {
       const template = entry ? await buildModelParts(this.scene, `bird:${sp.id}`, entry, PARTS) : null;
       if (template?.meshes.length && template.motion) return this.lookFrom(sp, entry!, template);
-      if (this.standIn) return this.standInLook(sp);
       for (const mesh of template?.meshes ?? []) mesh.dispose(false, false);
       return null;
     })().then((look) => {
@@ -1560,61 +1532,10 @@ export class Birds {
     const pivots = PARTS.map((_, k) => template.motion!.rests?.[k]?.getTranslation() ?? Vector3.Zero());
     const bird = entry.bird ?? {};
     return this.ready({
-      sp, meshes, pivots, buffers: [], capacity: 0, count: 0, dirty: false, url: entry.url ?? null,
+      sp, meshes, pivots, buffers: [], capacity: 0, count: 0, dirty: false,
       centre: bird.perchHeight ?? template.height * 0.45,
       pitch: ((bird.pitch ?? 0) * Math.PI) / 180,
       length: bird.length ?? sp.length,
-    });
-  }
-
-  /** Plain shapes in the species' colours, to the model's contract (testing only). */
-  private standInLook(sp: Species): Look {
-    const L = sp.length;
-    const mat = (hex: string) => {
-      const m = new StandardMaterial(`birdStandIn:${hex}`, this.scene);
-      m.diffuseColor = Color3.FromHexString(hex).toLinearSpace();
-      m.specularColor = Color3.Black();
-      return m;
-    };
-    const [cBody, cHead, cWing, cTail, cBeak] = sp.standIn.map(mat);
-    const h = L * 0.42;
-    const part = (mesh: Mesh, material: StandardMaterial) => {
-      mesh.material = material;
-      mesh.bakeCurrentTransformIntoVertices();
-      return mesh;
-    };
-    const body = part(MeshBuilder.CreateSphere('birdBody', { segments: 8, diameterX: L * 0.36, diameterY: L * 0.36, diameterZ: L * 0.55 }, this.scene), cBody);
-    body.position.set(0, h, 0);
-    body.bakeCurrentTransformIntoVertices();
-    const legs = part(MeshBuilder.CreateBox('birdLegs', { width: L * 0.08, height: h * 0.7, depth: L * 0.04 }, this.scene), cBeak);
-    legs.position.set(0, h * 0.35, 0);
-    legs.bakeCurrentTransformIntoVertices();
-    const neck = new Vector3(0, h + L * 0.1, L * 0.2);
-    const head = part(MeshBuilder.CreateSphere('birdHead', { segments: 8, diameter: L * 0.26 }, this.scene), cHead);
-    head.position.set(0, neck.y + L * 0.08, neck.z + L * 0.05);
-    head.bakeCurrentTransformIntoVertices();
-    const beak = part(MeshBuilder.CreateCylinder('birdBeak', { height: L * 0.12, diameterTop: 0, diameterBottom: L * 0.06, tessellation: 6 }, this.scene), cBeak);
-    beak.rotation.x = Math.PI / 2;
-    beak.position.set(0, neck.y + L * 0.07, neck.z + L * 0.22);
-    beak.bakeCurrentTransformIntoVertices();
-    const tailAt = new Vector3(0, h, -L * 0.22);
-    const tail = part(MeshBuilder.CreateBox('birdTail', { width: L * 0.14, height: L * 0.03, depth: L * 0.32 }, this.scene), cTail);
-    tail.rotation.x = -0.25;
-    tail.position.set(0, h + L * 0.02, tailAt.z - L * 0.15);
-    tail.bakeCurrentTransformIntoVertices();
-    const span = sp.wingspan / 2;
-    const wings = [-1, 1].map((side) => {
-      const wing = part(MeshBuilder.CreateBox('birdWing', { width: span, height: L * 0.02, depth: L * 0.3 }, this.scene), cWing);
-      wing.position.set((side * span) / 2, h + L * 0.08, 0);
-      wing.bakeCurrentTransformIntoVertices();
-      return wing;
-    });
-    const shoulder = (side: number) => new Vector3(side * L * 0.1, h + L * 0.08, 0);
-    const bodyMesh = Mesh.MergeMeshes([body, legs], true, true, undefined, false, true)!;
-    const headMesh = Mesh.MergeMeshes([head, beak], true, true, undefined, false, true)!;
-    return this.ready({
-      sp, meshes: [[bodyMesh], [headMesh], [tail], [wings[0]], [wings[1]]], pivots: [Vector3.Zero(), neck, tailAt, shoulder(-1), shoulder(1)], buffers: [], capacity: 0, count: 0, dirty: false, url: null,
-      centre: h, pitch: 0, length: L,
     });
   }
 
@@ -1652,7 +1573,7 @@ export class Birds {
   private dropLook(i: number): void {
     const look = this.looks[i];
     this.looks[i] = null;
-    for (const list of look?.meshes ?? []) for (const mesh of list) mesh.dispose(false, look!.url === null);
+    for (const list of look?.meshes ?? []) for (const mesh of list) mesh.dispose(false, false);
   }
 }
 
