@@ -21,20 +21,30 @@ only manifest that defines these keys.
   `Model`, where `G.settle()` centres it (they stood centred on the tile, 15–22 cm off the wall, until
   2026-10-14). Their old parts (the base sink and the rest) reached 1–4 cm into
   the wall and were moved forward onto it.
-- **Basins.** `_basin` is a `G.revolve` with thickness (an oval bowl); `_rect_basin` is a rectangular shell
-  (floor and four thin walls) for the base cabinet sink, which has a rectangular worktop cut-out. The solid
-  cabinet top must not sit above the basin floor, so each sink has painted "shoulders" filling from the
-  basin floor up to the worktop — otherwise the painted cabinet shows through as the basin interior.
+- **Basins.** Each basin is one shell lofted through rings (`_lathe`, `_bowl_shell`): up the outside, over a
+  rounded rim and down the inside to its floor, so the inside faces up into the bowl. The base sink's is an
+  undermount steel basin under a worktop slab cut with a rounded opening. Its cabinet's hidden top stays 3 cm under
+  the basin's floor, with painted "shoulders" round the basin up to the worktop: a face within 1 cm of the basin's
+  floor made `cargo review` take the worktop for something standing on it (ll-tools `checkglb` test).
+- **The detail pass (2026-10-22).** Every model was rebuilt with the forms (`G.sweep`, `G.loft`, `F.extrude`,
+  `F.soft`, `G.kit.tube`): same keys, sizes, centres, heights, parts, pivots, clips, `motions`, paint and draws.
+  The family's helpers: `_lathe` (a loft through game rings: squareness, an egg's narrowing, a deeper back, a ring
+  moved forward), `_gooseneck` (a tap in one sweep: riser, half-circle arc, aerator, domed rose, side lever),
+  `_pull` (a one-piece bar pull), `_shaker` + `_panel` (a frame with a hole round a panel set 6 mm back; the
+  panel is a band and its middle, so the shading baked per vertex darkens only the band in the crease, not the
+  whole face), `_bends` (a path's corners turned in round bends as points, swept as they are: Catmull-Rom through
+  long runs beside short corner spans overshot by 12 cm), `_frame`, `_tray`, `_grate`, `_head`, `_hand_shower`,
+  `_bar_mixer`, `_caddy`, `_curtain` (one wavy sheet), `_bottle`, `_cup`, `_drain`, `_rose`/`_wall_rose`.
 
 ## The models
 
 | Model | Size (w × h × d) | Triangles | Draws | Note |
 |---|---|---|---|---|
-| `model.sink` | 0.86 × 1.26 × 0.62 m | 3,320 | 2 | base cabinet, shaker doors, rectangular inset basin, gooseneck |
-| `model.sinkPedestal` | 0.56 × 1.06 × 0.47 m | 1,540 | 2 | column, oval bowl, tap deck with soap and a tooth mug |
-| `model.vanityDouble` | 1.90 × 1.00 × 0.56 m | 4,396 | 3 | two-basin cabinet, two taps (no mirrors); worktop 0.76, rims 0.88 |
-| `model.sinkVessel` | 0.84 × 1.06 × 0.54 m | 1,920 | 3 | counter with a raised vessel bowl and a folded towel; worktop 0.76, rim 0.88 |
-| `model.sinkConsole` | 0.60 × 1.06 × 0.48 m | 1,108 | 3 | open console on two legs, oval bowl |
+| `model.sink` | 0.86 × 1.26 × 0.62 m | 3,480 | 2 | shaker doors and a false drawer front with bar pulls, sides in one piece, a worktop slab with a rounded opening over an undermount steel basin and its plug, a gooseneck with a lever, a soap pump |
+| `model.sinkPedestal` | 0.56 × 1.06 × 0.46 m | 2,724 | 2 | a waisted oval column flaring into its foot; one basin shell with a rolled rim, a flat tap deck at its back and the bowl set forward, an overflow slot, a plug; a mono tap, a soap on its dish, a tooth mug with a brush |
+| `model.vanityDouble` | 1.90 × 1.00 × 0.57 m | 5,864 | 3 | two drawers over four shaker doors with bar pulls, a recessed plinth, a soft-edged worktop with an upstand, two vessel bowls (shells, rolled rims, plugs), two goosenecks (no mirrors); worktop 0.76, rims 0.88 |
+| `model.sinkVessel` | 0.84 × 1.06 × 0.54 m | 4,264 | 3 | a drawer front with a black bar pull, a soft-edged top, a thin-walled vessel bowl, a tall black tap; the vanity on four tapered wooden legs with side rails and a slatted shelf, two towels folded in two layers each; worktop 0.76, rim 0.88 |
+| `model.sinkConsole` | 0.60 × 1.06 × 0.49 m | 2,420 | 3 | one basin shell (a rounded slab, a flat deck, the bowl set forward), a brass frame each side bent from the floor up and back under it to the wall (one tube, a foot, a wall plate), a towel bar with collars and a towel hanging over it (one swept sheet), a brass gooseneck and plug |
 
 `check-glb`: 0 failed; Khronos validator: 0 errors, 0 warnings. Each
 lists the parts the player may colour in `paint`, the `body` first.
@@ -64,9 +74,13 @@ old part (`catalog.double_vanity`) has none either.
 - **Seat heights.** The seat's top is the seat height: 0.43 m (`toilet`, `toiletCompact`), 0.44 m
   (`toiletSmart`), 0.445 m (`toiletWallHung`) and 0.45 m (`toiletClassic`). The wall-hung old part had its
   seat at 0.6 m; the model follows the content (0.45 m).
-- **Shapes.** The bowl is an oval revolve with thickness (`_bowl`), its inside down to a water disc; a foot
-  on the floor (`_foot`), or a wall-hung bowl on an oval porcelain block (`_column`) into the panel. The
-  seat is a flattened torus, the lid a bevelled oval disc.
+- **Shapes.** Egg-shaped from above (`EGG`, narrower to the front), as an elongated bowl is. The bowl is one
+  shell (`_bowl`): up the outside to a rounded rim and down the inside to a water disc. A waisted foot rising into
+  the bowl's underside (`_foot`) with a bolt cap each side, or a wall-hung bowl on a rounded porcelain block
+  (`_column`) into the panel. The seat is a rounded section swept round the egg (`_seat`) on two buffers, the lid
+  a domed loft, the hinges a knuckle on a post each. The cisterns are rounded lofts (`_cistern`) under a soft lid a
+  little proud of them (`_cistern_lid`; the classic's stepped, with a band round it), the flush levers a boss and
+  a swept arm (`_lever`). The roll (`_roll`) hangs on a one-piece holder with its loose end down the front.
 - **The lid** is the one moving part (`lid`), hinged across its back edge, on its underside; `lid_up`
   swings it 100° about X in 0.6 s, to lean on the cistern (the hinge is 8.6–9.5 cm in front of it so the
   lid just meets it). The smart toilet's lid is level with its seat housing (the bidet unit) and hinged on
@@ -77,11 +91,14 @@ old part (`catalog.double_vanity`) has none either.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.toilet` | 0.44 × 0.82 × 0.68 m | 3,364 | 2 | Bowl, Seat & lid, Cistern |
-| `model.toiletCompact` | 0.59 × 0.81 × 0.63 m | 3,532 | 2 | Bowl, Seat & lid, Cistern (a slim cistern, a push button, a roll on the wall) |
-| `model.toiletSmart` | 0.90 × 1.20 × 0.71 m | 3,232 | 2 | Bowl, Seat & lid, Cistern (the panel, with a display, a remote and a roll) |
-| `model.toiletClassic` | 0.47 × 0.88 × 0.71 m | 3,600 | 3 | Bowl, Seat & lid (wood), Cistern |
-| `model.toiletWallHung` | 0.60 × 1.10 × 0.67 m | 3,088 | 2 | Bowl, Seat & lid, Cistern (the boxed-in panel and flush plate) |
+| `model.toilet` | 0.44 × 0.81 × 0.68 m | 3,524 | 2 | Bowl, Seat & lid, Cistern |
+| `model.toiletCompact` | 0.59 × 0.81 × 0.63 m | 3,828 | 2 | Bowl, Seat & lid, Cistern (a slim cistern, a dual flush button in a ring, a roll on the wall) |
+| `model.toiletSmart` | 0.90 × 1.20 × 0.71 m | 3,980 | 2 | Bowl, Seat & lid, Cistern (the panel, with a shelf, a display with keys and a ready light, a remote in its holder and a roll; a seam on the housing) |
+| `model.toiletClassic` | 0.47 × 0.88 × 0.71 m | 3,724 | 3 | Bowl, Seat & lid (wood), Cistern (a stepped lid, a band, a lever with a ball end) |
+| `model.toiletWallHung` | 0.60 × 1.10 × 0.67 m | 3,224 | 2 | Bowl, Seat & lid, Cistern (the boxed-in panel with a stone top, a soft flush plate and buttons) |
+
+The close-coupled ones (under 1 m) keep under the 4,000-triangle target: the seat's section has 12 points round 32
+steps.
 
 `check-glb`: 0 failed; its warnings are the two wall mirrors floating above their origins (wall things). The
 compact and wall-hung toilets stood 2.5 and 5 cm into the wall; they stand on the wall face now (2026-10-14), the
@@ -113,21 +130,30 @@ Validate › Showers until checked in play.
   the use ends (`out`); the water comes on 2 s in, once it's shut. The resident is moved in by the sim at once
   (`inside`), so they are already in when it opens and step out while it opens again (A-bathroom-05).
 - **The stall's curtain** hangs along the whole open side (still) and across the front as its own part
-  (`curtain`): built drawn across, 14 pleats from the right corner, and gathered into that corner at rest
+  (`curtain`): built drawn across, one wavy sheet in 7 folds (`_curtain`) on 14 rings from the right corner, and
+  gathered into that corner at rest
   (scaled to 0.32 along the rail about its origin there); `curtain_draw` grows it across in 0.9 s, 1 s into the
   use, held till the use ends (A-bathroom-02). The water comes on at 1.8 s.
 - **Tiles** (`_tiled_walls`) are thin satin squares a little proud of a grout backing: the base shower 30 cm,
   the stall 25 cm. The walk-in shower's stone wall has grooved joints; the rain shower's walls are plain stone.
   The rain shower's front glass covers only the left half: the right half is the way in.
+- **Details (2026-10-22).** Trays are one loft with a raised lip round a floor falling to the drain (`_tray`), the
+  drains slotted grates (`_grate`). Frames are square-section sweeps bent round their corners (`_frame`). The base
+  shower has a bar mixer, a hand shower on a slide rail with its hose looping down, a corner shelf with bottles and
+  a domed head on a bent arm; the stall a bent L rail with wall roses, the side curtain a wavy sheet on 12 rings, a
+  riser bent up into its head, a lever mixer on a round plate and a wire caddy; the walk-in a linear grate, a floor
+  channel, a stay bar and a riser bent over into the arm in one tube; the rain shower a niche with two sills and
+  bottles, a bent arm, a nozzle-lined head and a lever mixer.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.shower` | 0.90 × 2.15 × 0.90 m | 2,968 | 4 | Tray, Frame, Head & tap, Tiles |
-| `model.showerStall` | 0.90 × 2.08 × 0.90 m | 2,212 | 3 | Tray, Rail, Head & tap, Curtain, Tiles |
-| `model.showerWalkIn` | 0.92 × 2.26 × 0.92 m | 2,348 | 3 | Floor, Frame, Head & tap, Wall |
-| `model.showerRain` | 0.94 × 2.19 × 0.93 m | 1,684 | 3 | Tray, Frame, Head & tap, Walls |
+| `model.shower` | 0.90 × 2.15 × 0.90 m | 4,484 | 4 | Tray, Frame, Head & tap, Tiles |
+| `model.showerStall` | 0.90 × 2.08 × 0.90 m | 4,892 | 3 | Tray, Rail, Head & tap, Curtain, Tiles |
+| `model.showerWalkIn` | 0.92 × 2.26 × 0.92 m | 3,392 | 3 | Floor, Frame, Head & tap, Wall |
+| `model.showerRain` | 0.94 × 2.18 × 0.93 m | 2,532 | 3 | Tray, Frame, Head & tap, Walls |
 
 `check-glb`: 0 failed; the base shower warns of its 4 draws (allowed, Q-05). Khronos validator: 0 errors, 0 warnings each.
+The clips bench (`/clips.html?keys=model.showerStall`) frames the stall from far off, before the detail pass too.
 
 ## B3 — the baths
 
@@ -149,12 +175,19 @@ Validate › Baths until checked in play.
 - **Sizes against the old parts.** The freestanding bath's filler stands beyond the tub's end (1.89 m
   wide, the old part's tub 1.80 m); the clawfoot's rolled rim makes it 0.83 m deep (0.78 m). Both fit
   their 2 × 1 tiles.
+- **Details (2026-10-22).** Each has a plug and an overflow plate (`_waste`). The built-in bath's front panel
+  carries a moulded frame; its deck mixer a pillar with a collar, a spout bent down over the water and two lever
+  handles on roses; a towel folded in two layers and a duck with a tail. The clawfoot tub has a rolled bead swept
+  round its rim, ball-and-claw feet (a curved leg, a ball, three swept claws), a filler bent in one tube with
+  cross handles on hubs and a telephone hand shower on a cradle, and a towel hanging over its back rim (one swept
+  sheet). The freestanding bath's filler is bent in one tube from a floor rose, with a mixer collar and lever, a
+  handset and its hose; its towel too hangs over the rim.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.bathtub` | 1.82 × 0.69 × 0.86 m | 2,144 | 3 | Tub, Panel, Taps, Towel (and a duck) |
-| `model.bathtubClawfoot` | 1.73 × 1.02 × 0.83 m | 4,428 | 3 | Tub, Feet, Taps, Towel |
-| `model.bathtubFreestanding` | 1.89 × 0.92 × 0.84 m | 2,248 | 3 | Tub, Taps, Towel |
+| `model.bathtub` | 1.82 × 0.69 × 0.87 m | 3,660 | 3 | Tub, Panel, Taps, Towel (and a duck) |
+| `model.bathtubClawfoot` | 1.73 × 1.02 × 0.83 m | 5,632 | 3 | Tub, Feet, Taps, Towel |
+| `model.bathtubFreestanding` | 1.89 × 0.92 × 0.83 m | 2,552 | 3 | Tub, Taps, Towel |
 
 `check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
 
@@ -177,15 +210,18 @@ their teeth there, and the tall cabinet's upper door while one takes a fresh tow
   fresh towel" (`takeTowel`, `fetch`, 2 minutes, comfort; not autonomous), held 1.5 s: a second draw call.
 - **Against the wall.** The tall cabinet stood 2 cm into the wall, as its old part did; both stand on the wall
   face now.
-- The mirror cabinet is an open box with two shelves, a cup and bottles behind its door, and a light strip on top.
-  The tall cabinet has an open niche between its doors with two folded towels, and behind its upper door a stack
-  of three towels, a shelf with two more and two bottles on them.
+- The mirror cabinet is an open box with two lipped shelves, hinges, a cup of toothbrushes, bottles (one a pump), a
+  jar with its lid and a tube of paste behind its soft-edged door (a bar pull, hinge plates, the flat mirror), and a
+  soft light bar on a bent arm from the wall. The round mirror's frame is a moulded section (flat behind, rounded to
+  the front) swept round the circle, its leather strap one swept band riveted to it and over a bent brass hook on a
+  wall rose. The tall cabinet has shaker doors with bar pulls and hinges, an open niche between them with two rolled
+  towels, and behind its upper door a stack of three soft folded towels, a shelf with two more and two bottles.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.mirrorCabinet` | 0.56 × 0.77 × 0.20 m | 1,308 | 2 | Cabinet, Frame |
-| `model.mirrorRound` | 0.64 × 0.77 × 0.05 m | 1,528 | 1 | Frame, Strap |
-| `model.bathCabinetTall` | 0.42 × 1.82 × 0.38 m | 2,260 | 2 | Cabinet, Frame, Towels |
+| `model.mirrorCabinet` | 0.56 × 0.77 × 0.20 m | 2,932 | 2 | Cabinet, Frame |
+| `model.mirrorRound` | 0.64 × 0.78 × 0.05 m | 1,740 | 1 | Frame, Strap |
+| `model.bathCabinetTall` | 0.42 × 1.82 × 0.38 m | 4,352 | 2 | Cabinet, Frame, Towels |
 
 `check-glb`: 0 failed. Khronos validator: 0 errors, 0 warnings each.
 
@@ -193,5 +229,5 @@ their teeth there, and the tall cabinet's upper door while one takes a fresh tow
 
 ```
 cargo art bathroom            # every .glb, the pack, check-glb
-cargo art bathroom --preview  # previews/bathroom/sink.png, sink@water_on.png, …
+cargo art bathroom --preview --lit  # previews/bathroom/sink.png, sink.lit.png, sink@water_on.png, …
 ```
