@@ -1515,7 +1515,7 @@ FAMILY = G.Family(
      G.Model('statueHorse', statueHorse, size=(0.46, 1.41, 0.44), key='model.statueHorse',
              paint=[('bronze', 'Body')]),
      G.Model('coatRack', coatRack, size=(0.431, 1.788, 0.355), key='model.coatRack', paint=[('oak', 'Body')]),
-     G.Model('hangingPlant', hangingPlant, size=(0.46, 1.83, 0.46), key='model.hangingPlant', floor=False,
+     G.Model('hangingPlant', hangingPlant, size=(0.46, 1.83, 0.47), key='model.hangingPlant', floor=False,
              motions={'uses': {'water': 'sway'}, 'hold': 0.8}, paint=[('pot_white', 'Pot'), ('cord', 'Cord')]),
      G.Model('fireplace', fireplace, size=(1.96, 2.8, 0.88), key='model.fireplace', centre=(0, 0.01),
              motions={'uses': {'relax': 'flames'}}, paint=[('surround', 'Surround'), ('oak', 'Mantel')]),
