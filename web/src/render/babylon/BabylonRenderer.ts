@@ -115,7 +115,7 @@ import { LAYER_ALL, LAYER_TOWN, LAYER_WORLD } from './layers';
 import { NightGrade } from './nightGrade';
 import { BuildEffects, writeMoving, type PopTarget } from './buildFx';
 import { tableRooms } from './tableTuck';
-import { GardenPools, type GardenPool } from './gardenPools';
+import { gardenPool, GardenPools } from './gardenPools';
 import { ObjectMotion, restPoses, slotOf, type MovingObject } from './objectMotion';
 import { TownOverview } from './overview';
 import { GameCameraRig } from './cameraRig';
@@ -185,10 +185,6 @@ const SHADED = Math.PI;
  * lamps than can light it. Room fill lights may reach further; their glow stops at this range.
  */
 const LAMP_MAX_RANGE = 7;
-/** A garden lamp's pool of light on the lawn (`gardenPool`): its middle's brightness per `intensity / height²` (the street lamp's 0.3, the street's own up to 0.6), at most this, and at least this wide (m). */
-const POOL_GAIN = 1.2;
-const POOL_MAX = 0.4;
-const POOL_RADIUS_MIN = 1.5;
 /** A room without a lamp gets this share of the light it had before lamps gave light. */
 const FILL_POWER = 0.35;
 /**
@@ -4736,13 +4732,18 @@ export class BabylonRenderer implements Renderer {
     this.overview?.setNight(l.lamps, this.glowColor);
   }
 
+  /** How far the shades' glow and the garden's pools are up (0..1): from dusk as the lamps come up, none in town. */
+  private get glowLevel(): number {
+    return this.townMode ? 0 : Math.min(1, Math.max(0, (this.lampsLevel - 0.35) / 0.5));
+  }
+
   /**
    * Lamp shades glow as the windows do: from dusk, as the lamps come up, and out with their room's
    * lights where everyone is asleep (`windowGlowOn`); a lamp's shade with the lamp (`lampOn`: off,
    * no glow). Screens are lit by use instead (see `writeScreenGlow`).
    */
   private applyGlow(): void {
-    const level = this.townMode ? 0 : Math.min(1, Math.max(0, (this.lampsLevel - 0.35) / 0.5));
+    const level = this.glowLevel;
     this.applyGardenPools();
     for (const g of this.glows) {
       if (g.screen) {
@@ -4766,8 +4767,7 @@ export class BabylonRenderer implements Renderer {
 
   /** The garden's pools of lamplight, as bright as its lamps are now (with the shades' glow). */
   private applyGardenPools(): void {
-    const level = this.townMode ? 0 : Math.min(1, Math.max(0, (this.lampsLevel - 0.35) / 0.5));
-    this.gardenPools?.update(level, (lamp) => (lamp === undefined ? 1 : (this.lampOn.get(lamp) ?? 1)), this.lampColor);
+    this.gardenPools?.update(this.glowLevel, (lamp) => (lamp === undefined ? 1 : (this.lampOn.get(lamp) ?? 1)), this.lampColor);
   }
 
   /**
@@ -4775,7 +4775,7 @@ export class BabylonRenderer implements Renderer {
    * they run; the glow mesh's vertex colour is the screen's, its instance colour the brightness.
    */
   private writeScreenGlow(g: { mesh: Mesh; colors: Float32Array; ids: number[] }): void {
-    const level = this.townMode ? 0 : Math.min(1, Math.max(0, (this.lampsLevel - 0.35) / 0.5));
+    const level = this.glowLevel;
     const t = this.screenTime / 1000;
     let changed = false;
     g.ids.forEach((id, i) => {
@@ -5059,30 +5059,7 @@ export class BabylonRenderer implements Renderer {
   }
 }
 
-/** Copies an orbit camera's angles, radius and target. */
-/**
- * Sets exposure without the configuration's change notice. Image processing runs as a post
- * process, where exposure is a uniform read each frame, but the notice marks every material dirty
- * (each walking every mesh: tens of ms per lighting step) for nothing; nothing else here listens
- * for it (bloom, which would, is off). The pass has exposure only while it isn't 1 (a define), so
- * crossing 1 still goes through the setter, as does everything should Babylon rename the field.
- */
 /** Smoothstep: eases 0..1 in and out. */
-/**
- * Where a garden lamp's light lands on the lawn (`GardenPools`): round its foot, as far as twice
- * its height (within its reach; a wall light aimed out, a smaller one in front of its wall, its
- * edge at the wall), as bright in the middle as its light there, `intensity / height²`, scaled to
- * the pools' look and capped (a fire pit's). `row`: the ground storey's first lot row.
- */
-function gardenPool(l: RoomLight, row: number): GardenPool {
-  const h = Math.max(l.y, 0.5);
-  const out = !!l.dir && l.dir[1] < 0 && Math.hypot(l.dir[0], l.dir[2]) > 0.1;
-  const radius = Math.min(Math.max((out ? 1.2 : 2) * h, POOL_RADIUS_MIN), l.range ?? 4.5);
-  const along = out ? (radius * 0.9) / Math.hypot(l.dir![0], l.dir![2]) : 0;
-  const strength = Math.min(((l.power ?? 1) * POOL_GAIN) / (h * h), POOL_MAX);
-  return { x: l.x + (l.dir?.[0] ?? 0) * along, y: 0, z: l.z - row + (l.dir?.[2] ?? 0) * along, radius, strength, lamp: l.lamp };
-}
-
 function ease(t: number): number {
   return t * t * (3 - 2 * t);
 }
@@ -5125,6 +5102,13 @@ function crosses(sa: number, sn: number, ea: number, en: number): number {
   return Math.abs(sa + ((ea - sa) * sn) / (sn - en)) <= 0.5 ? Math.sign(en - sn) : 0;
 }
 
+/**
+ * Sets exposure without the configuration's change notice. Image processing runs as a post
+ * process, where exposure is a uniform read each frame, but the notice marks every material dirty
+ * (each walking every mesh: tens of ms per lighting step) for nothing; nothing else here listens
+ * for it (bloom, which would, is off). The pass has exposure only while it isn't 1 (a define), so
+ * crossing 1 still goes through the setter, as does everything should Babylon rename the field.
+ */
 function setExposure(config: ImageProcessingConfiguration, value: number): void {
   // SAFETY: ImageProcessingConfiguration stores exposure in its private `_exposure` backing field.
   const fields = config as unknown as { _exposure?: number };
@@ -5147,6 +5131,7 @@ function depthBytes(rtw: RenderTargetWrapper): number {
   return texture.format === Constants.TEXTUREFORMAT_DEPTH16 ? 2 : texture.format === Constants.TEXTUREFORMAT_DEPTH32FLOAT_STENCIL8 ? 8 : 4;
 }
 
+/** Copies an orbit camera's angles, radius and target. */
 function copyPose(from: ArcRotateCamera, to: ArcRotateCamera): void {
   to.alpha = from.alpha;
   to.beta = from.beta;

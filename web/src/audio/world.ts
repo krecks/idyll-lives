@@ -106,7 +106,7 @@ export function soundOf(content: Content, tag: string, def: number, interaction:
     if (use?.id === 'washUp' || !object) return 'washUp';
     if (!use) return object.interactions.some((i) => i.anim === 'wash') ? 'washUp' : undefined;
     // Getting ready at a dressing table washes without a tap.
-    return use?.tags?.includes('handwash') ? 'tap' : undefined;
+    return use.tags?.includes('handwash') ? 'tap' : undefined;
   }
   return ACTION_SOUNDS[tag];
 }
@@ -128,6 +128,12 @@ function unknownSound(key: string): undefined {
   if (!unknown.has(key)) console.warn(`content: no world sound "${key}"`);
   unknown.add(key);
   return undefined;
+}
+
+/** What sounded on an update (`WorldSound.playing`): residents and things per loop, and the sounds played once. */
+interface Heard {
+  loops: Partial<Record<LoopKind, number>>;
+  once: { kind: OnceKind; at: number }[];
 }
 
 /** Something that sounds by itself (content `ambient`), where it stands. */
@@ -162,7 +168,7 @@ export class WorldSound {
   /** The definitions (index into `content.objectList`) of the world's objects, by their stable id. */
   private readonly defOf = new Map<number, number>();
   /** What sounded on the last update (`playing`). */
-  private heard: { loops: Partial<Record<LoopKind, number>>; once: { kind: OnceKind; at: number }[] } = { loops: {}, once: [] };
+  private heard: Heard = { loops: {}, once: [] };
   private readonly head = { x: 0, y: 0, z: 0 };
   private readonly screen = { x: 0, y: 0 };
   private disposed = false;
@@ -196,7 +202,7 @@ export class WorldSound {
   }
 
   /** What sounded on the last update: residents and things per loop, and the sounds played once (tests). */
-  playing(): { loops: Partial<Record<LoopKind, number>>; once: { kind: OnceKind; at: number }[] } {
+  playing(): Heard {
     return this.heard;
   }
 
@@ -231,7 +237,7 @@ export class WorldSound {
     const users = new Map<LoopKind, { n: number; pan: number }>();
     const seen = new Set<number>();
     const bathing = new Set<number>();
-    const once: { kind: OnceKind; at: number }[] = [];
+    const once: Heard['once'] = [];
     const here = new Set<number>();
     for (let i = 0; i < count; i++) {
       const o = layout.headerLen + i * layout.simStride;
