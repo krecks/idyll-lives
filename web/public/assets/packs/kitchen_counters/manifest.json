@@ -15,6 +15,12 @@
         "dark": {
           "finish": "material.finish.satin"
         },
+        "spoon": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
         "worktop": {
           "finish": "material.finish.gloss"
         }
@@ -53,8 +59,14 @@
         "dark": {
           "finish": "material.finish.satin"
         },
+        "porcelain": {
+          "finish": "material.finish.gloss"
+        },
         "spoon": {
           "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
         },
         "worktop": {
           "finish": "material.finish.gloss"
@@ -106,6 +118,12 @@
         "rust": {
           "finish": "material.finish.gloss"
         },
+        "spoon": {
+          "finish": "material.finish.satin"
+        },
+        "teal": {
+          "finish": "material.finish.gloss"
+        },
         "worktop": {
           "finish": "material.finish.gloss"
         }
@@ -138,8 +156,14 @@
         "dark": {
           "finish": "material.finish.satin"
         },
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
         "porcelain": {
           "finish": "material.finish.gloss"
+        },
+        "towel": {
+          "finish": "material.finish.satin"
         },
         "worktop": {
           "finish": "material.finish.gloss"
@@ -175,6 +199,12 @@
         },
         "dark": {
           "finish": "material.finish.satin"
+        },
+        "spoon": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
         },
         "worktop": {
           "finish": "material.finish.gloss"
@@ -266,6 +296,12 @@
         "porcelain": {
           "finish": "material.finish.gloss"
         },
+        "spoon": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
         "wood2": {
           "finish": "material.finish.satin"
         }
@@ -306,6 +342,12 @@
         },
         "navy": {
           "finish": "material.finish.satin"
+        },
+        "spoon": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
         },
         "vein": {
           "finish": "material.finish.gloss"
@@ -359,6 +401,9 @@
         },
         "sage": {
           "finish": "material.finish.gloss"
+        },
+        "spoon": {
+          "finish": "material.finish.satin"
         },
         "teal": {
           "finish": "material.finish.gloss"
@@ -414,6 +459,9 @@
         },
         "sage": {
           "finish": "material.finish.gloss"
+        },
+        "spoon": {
+          "finish": "material.finish.satin"
         },
         "teal": {
           "finish": "material.finish.gloss"
@@ -525,6 +573,9 @@
         },
         "chrome": {
           "finish": "material.finish.chrome"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
         },
         "oak": {
           "finish": "material.finish.wood"
@@ -679,6 +730,9 @@
         "soil": {
           "finish": "material.finish.matte"
         },
+        "spoon": {
+          "finish": "material.finish.satin"
+        },
         "teal": {
           "finish": "material.finish.gloss"
         },
@@ -743,6 +797,9 @@
         },
         "lid": {
           "finish": "material.finish.satin"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
         }
       },
       "motions": {
@@ -795,6 +852,12 @@
         },
         "dark": {
           "finish": "material.finish.satin"
+        },
+        "spoon": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
         },
         "worktop": {
           "finish": "material.finish.gloss"
