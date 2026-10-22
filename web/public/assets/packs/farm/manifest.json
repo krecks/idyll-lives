@@ -48,6 +48,9 @@
         "concrete": {
           "finish": "material.finish.matte"
         },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
         "silo": {
           "finish": "material.finish.metal"
         },
@@ -118,6 +121,9 @@
         "hay_dark": {
           "finish": "material.finish.fabric"
         },
+        "straw": {
+          "finish": "material.finish.matte"
+        },
         "twine": {
           "finish": "material.finish.matte"
         }
@@ -139,6 +145,9 @@
         },
         "hay_dark": {
           "finish": "material.finish.fabric"
+        },
+        "straw": {
+          "finish": "material.finish.matte"
         },
         "twine": {
           "finish": "material.finish.matte"
@@ -210,6 +219,9 @@
       "type": "model",
       "url": "../../models/farm/trough.glb",
       "materials": {
+        "iron": {
+          "finish": "material.finish.metal"
+        },
         "steel": {
           "finish": "material.finish.metal"
         },
@@ -245,6 +257,9 @@
           "finish": "material.finish.satin"
         },
         "iron": {
+          "finish": "material.finish.metal"
+        },
+        "trough": {
           "finish": "material.finish.metal"
         }
       },

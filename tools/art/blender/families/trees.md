@@ -3,13 +3,30 @@
 `trees.py` builds the G5 trees into `web/public/assets/models/trees/` and their entries in
 `packs/trees/manifest.json`: the oak (`model.tree`), maple, silver birch, cherry blossom, apple, Japanese maple,
 magnolia and weeping willow (`model.tree.*`), the pine, blue spruce and Italian cypress (`model.pine`, `model.spruce`,
-`model.cypress`) and the potted lemon tree (`model.garden.lemonTree`). Built 2026-10-14; they sat in Validate › Trees until checked in play. The
-shapes and helpers (`lump`, `tube`, `dots`, `sprigs`, `far_of`) come from `plants.py`.
+`model.cypress`) and the potted lemon tree (`model.garden.lemonTree`). Built 2026-10-14; they sat in Validate › Trees until checked in play.
+Rebuilt with real skeletons 2026-10-22 (the oak first, by hand, then the rest in its way). The leafy lumps and small
+helpers (`lump`, `tube`, `pot`, `cupped`, `sprigs`, `far_of`) come from `plants.py`; the tree builders are in
+`trees.py` (plants.py is shared, so they stay out of it).
 
 ## How a tree is made
 
-- **Crowns** (`crown`): leafy lumps over an ellipsoid, lighter towards the top, round a dark core, on bark limbs
-  (`limbs`) from a flared trunk (`trunk`); conifers are stacked cones (`conifer`), the cypress a column of lumps.
+- **Trunks** (`_trunk`): one swept, tapering piece through a few points (a lean, a wave), its bark wobbled by noise
+  (`G.jitter`, not on a far version), flared on root buttresses (`_roots`) that run out to just above the ground.
+- **Broadleaves** (`_branches`): bough tips spread evenly over the crown's ellipsoid (a golden-angle spiral), grouped
+  by bearing onto a few limbs; each limb runs from the trunk to part way to its tips' middle, bowed up and wandering
+  (`_bend`), and forks into a curving bough to each tip; tips over the middle go on a leader. At each tip a leaf
+  mass (`_mass`): a clump on the tip and two round it, a little below and out, lighter towards the top, with gaps
+  between the masses where the limbs show; a few dark lumps close the crown's heart (`_hearts`). The oak is built
+  the same way by hand. Its own shape per tree: the birch's slender white limbs up the stem and hanging masses,
+  the cherry's wide low limbs under flat blossom clouds, the apple's crooked trunk and gnarled limbs, the Japanese
+  maple's six S-curved stems under flat layered clouds, the magnolia's upswept stems, the willow's five limbs
+  rising and arching over with masses along their crests and curtains (`streamer`) hanging from them.
+- **Conifers** (`conifer`): whorls of boughs round the trunk, a tier at a time, each bough a spray of needles (a
+  gull-wing profile, `_pad_profile`, swept out level from high in the tier and drooping to its foot at the rim, wide
+  in the middle and narrowing to its tip, the spruce's tips turned up), a dark cone inside closing the whorl; the
+  lowest tiers' bare boughs show from below. The cypress is a lofted flame of foliage covered in upright sprays.
+- **Fruit and blooms** sit on the leaves as built: apples and lemons where lines in from round the crown meet the
+  leaves (`_hang`, a ray cast), the magnolia's goblets where lines out of each mass's tip clump leave it.
 - **Finishes:** leaves on `foliage`, trunks and limbs on `bark` (the nature shader sways and tints both), the
   birch's white bark and fruit plain.
 - **Trunk on the origin:** crowns are built round the trunk, so `settle` moves a lopsided crown's bounds only by a
@@ -33,28 +50,30 @@ shapes and helpers (`lump`, `tube`, `dots`, `sprigs`, `far_of`) come from `plant
 
 ## Far versions and the woods
 
-Each tree has a far version (`far_of`): every third clump of each crown, round a smooth core spanning all the full
-crown's clumps (their random numbers drawn as in the full build, so the core is measured, not guessed); conifers
-pointed cones of eight sides. It keeps the tree's size within 5 % at 18–40 % of its triangles. The far woods (`nature.ts` `forests`) used to draw the `*.far` old part keys whatever the model; they
+Each tree has a far version (`far_of`): the same build at low detail, every random number drawn in the same order:
+no boughs, one lump a mass spanning its clumps (so the crown keeps its size), the trunk and limbs on fewer sides, the
+conifers' sprays on three-point paths with a wedge profile, the willow's outer curtain only, half the magnolia's
+blooms. It keeps the tree's size within 5 % at 16–30 % of its triangles, and its foot where the model's is. The far woods (`nature.ts` `forests`) used to draw the `*.far` old part keys whatever the model; they
 now draw a file's own far version, so the woods match the town, and those keys are gone (2026-10-18, with the
 primitive parts). The town overview draws them too.
 
 | Model | Size (w × h × d) | Triangles | Far | Draws |
 |---|---|---|---|---|
-| `model.tree` | 5.49 × 7.47 × 5.23 m | 1,488 | 334 | 2 |
-| `model.tree.maple` | 4.98 × 7.31 × 5.34 m | 1,952 | 316 | 2 |
-| `model.tree.birch` | 3.45 × 8.18 × 3.29 m | 1,196 | 322 | 3 |
-| `model.tree.blossom` | 5.25 × 5.45 × 5.14 m | 1,360 | 286 | 2 |
-| `model.tree.fruit` | 4.47 × 5.57 × 4.38 m | 1,760 | 412 | 4 |
-| `model.tree.japaneseMaple` | 3.72 × 4.15 × 3.83 m | 2,248 | 538 | 3 |
-| `model.tree.magnolia` | 4.10 × 5.08 × 3.76 m | 3,136 | 592 | 3 |
-| `model.tree.willow` | 4.94 × 6.10 × 5.04 m | 4,944 | 732 | 2 |
-| `model.pine` | 6.03 × 9.20 × 6.05 m | 328 | 122 | 2 |
-| `model.spruce` | 5.19 × 10.50 × 5.15 m | 440 | 164 | 2 |
-| `model.cypress` | 1.01 × 7.95 × 1.02 m | 1,636 | 450 | 2 |
-| `model.garden.lemonTree` | 1.29 × 1.99 × 1.34 m | 1,736 | 698 | 4 |
+| `model.tree` | 5.27 × 7.35 × 5.04 m | 4,410 | 740 | 2 |
+| `model.tree.maple` | 5.09 × 7.15 × 5.38 m | 4,376 | 832 | 2 |
+| `model.tree.birch` | 3.35 × 8.27 × 3.52 m | 4,316 | 692 | 3 |
+| `model.tree.blossom` | 5.09 × 5.37 × 5.25 m | 3,880 | 734 | 2 |
+| `model.tree.fruit` | 4.33 × 5.39 × 4.41 m | 4,412 | 914 | 4 |
+| `model.tree.japaneseMaple` | 3.75 × 4.10 × 3.90 m | 3,786 | 692 | 3 |
+| `model.tree.magnolia` | 4.20 × 5.25 × 3.83 m | 4,346 | 936 | 3 |
+| `model.tree.willow` | 5.06 × 5.80 × 4.96 m | 4,196 | 1,214 | 2 |
+| `model.pine` | 5.94 × 9.21 × 6.17 m | 3,828 | 892 | 2 |
+| `model.spruce` | 5.23 × 10.50 × 5.40 m | 4,174 | 1,048 | 2 |
+| `model.cypress` | 1.03 × 7.95 × 1.05 m | 2,464 | 468 | 2 |
+| `model.garden.lemonTree` | 1.25 × 2.00 × 1.27 m | 3,896 | 1,168 | 4 |
 
-`check-glb`: 12 models, 0 failed; its one warning is the lemon tree's 4 draw calls. The sizes were held to the
+Each at most 4,500 triangles (trees stand by the thousand in the woods). `check-glb`: 12 models, 0 failed; its
+warnings are the apple's and the lemon tree's 4 draw calls (as before). The sizes were held to the
 old parts' bounds as they were built (those bounds counted each turned blob's or cone's whole box: the
 spruce's read 7.8 m for cones 5.4 m across); the oak's and maple's crowns were drawn in a little to match (`spread`
 0.75 to 0.71 and 0.78 to 0.74, 2026-10-15). Khronos validator: 0 errors, 0 warnings on all 24 files.
@@ -63,28 +82,30 @@ spruce's read 7.8 m for cones 5.4 m across); the oak's and maple's crowns were d
 
 A one-tile tree must let residents walk past and work at it from the next tile: what reaches past 0.75 m from the
 trunk stands above head height (the tallest resident is 1.77 m). Measured on the exported files, the lowest point
-farther than 0.85 m from the trunk: pine 2.19 m, spruce 2.15, Japanese maple 2.24 (its narrow first layer reaches
-0.8 m at 1.4-1.5 m, inside the reach of someone shaping it from the next tile), magnolia 2.48, apple 2.45 (but its
-picked apple at 1.84, 0.7 m out), cherry 2.77, maple 3.19, oak 3.90, birch 4.66. The willow's curtains come down to
+farther than 0.85 m from the trunk (the rebuild, 2026-10-22): pine 2.51 m, spruce 2.22, Japanese maple 2.35 (its narrow first layer stays
+inside 0.85 m at about 1.4-1.6 m, inside the reach of someone shaping it from the next tile), magnolia 2.41, apple 2.47
+(but its picked apple at 1.84, 0.7 m out), cherry 2.87, oak 3.31, maple 3.42, birch 4.01. The root buttresses reach
+0.4-0.75 m out, a few centimetres high. The willow's curtains come down to
 0.45 m by design (sitting inside the curtain is the willow), thin streamers with gaps, not solid wedges.
 
-- **Pine:** its lowest tier's foot at 2.35 m (was 1.4), tilted 3 degrees at most so its rim stays over 2.1 m.
+- **Pine:** its lowest tier's foot at 2.35 m (was 1.4); its sprays' tips droop to about 2.5 m.
 - **Blue spruce:** limbed up, its skirt from 2.2 m (was 0.35), 5.0 m across (was 5.4), on a 3 m trunk.
 - **Japanese maple:** a short trunk and six slender limbs, a narrow first layer at 1.55 m inside its tile, the broad
   tiers at 2.7, 3.25 and 3.65 m (were 2.0, 2.7, 3.2).
-- **Weeping willow:** the 26 solid cones and 8 inner ones are 68 `streamer`s, thin leafy ribbons (a lens across, four
-  points a row, smooth) out of the crown's edge and straight down to 0.45-0.8 m (the outer row) and 0.9-1.5 m (the
-  inner). 4,944 triangles: inside the 6,000 for a big thing placed often, and it is only bought (the woods and the
-  lots' dressing have none).
+- **Weeping willow:** the 26 solid cones and 8 inner ones are `streamer`s, thin leafy ribbons out of the crown's edge
+  and straight down to 0.45-0.8 m (the outer row) and 0.9-1.5 m (the inner): 68 lenses of four points a row (4,944
+  triangles), since 2026-10-22 60 wedges of three points a row, five rows (4,196 in all, under the trees' 4,500).
 - **Italian cypress:** a pencil about a metre across (was 2.1), the same 7.95 m.
-- **Maple:** not the oak's crown again: a Norway maple's dense, even dome of 26 small clumps round a large core, in a
-  cooler, deeper green, on a straight trunk with a leader.
-- **Magnolia:** its blooms are upright goblets (`GOBLET`, revolved), three over each clump of the upper crown, each
-  set where a line out from its clump's middle leaves the crown (a ray cast), so none stands off it. `crown` returns
-  its clumps for this.
+- **Maple:** not the oak's crown again: a Norway maple's dense, even dome (since 2026-10-22 eighteen leaf masses on
+  six steep limbs round a dark heart), in a cooler, deeper green, on a straight trunk with a leader.
+- **Magnolia:** its blooms are upright goblets (`GOBLET`, revolved), two over each mass of the upper crown and one on
+  the side of each lower one, each set where a line out from the mass's tip clump leaves the crown (a ray cast), so
+  none stands off it. `_mass` lists the clumps for this.
 - **Potted lemon tree** (M-garden-04): trunk and crown 0.38 m lower (crown middle 1.47 m), two metres tall in all;
   the picked lemon stays at 1.62 m, on the crown's front, as `FRUIT.lemon` in `clips/uses.ts` has it.
-- The trunks the shade sit leans on are as they were (`furniture.json` `seats` rows unchanged).
+- The trunks the shade sit leans on are as thick as they were at a sitter's back (`furniture.json` `seats` rows
+  unchanged): the rebuilt trunks' radius at 0.3-0.6 m is 0.1-0.33 m, each inside its `fwd`, with root buttresses
+  at the ground.
 
 ## Perches (2026-10-22)
 
@@ -118,18 +139,21 @@ value, and a `habitat` without `perches`. The manifest writes each perch on one 
 
 | Model | Perches |
 |---|---|
-| `model.tree` | 19 |
+| `model.tree` | 24 |
 | `model.tree.maple` | 24 |
-| `model.tree.birch` | 16 (1 on a bare limb) |
-| `model.tree.blossom` | 20 |
-| `model.tree.fruit` | 16 |
+| `model.tree.birch` | 20 (2 on bare limbs) |
+| `model.tree.blossom` | 22 |
+| `model.tree.fruit` | 20 |
 | `model.tree.japaneseMaple` | 18 |
-| `model.tree.magnolia` | 18 |
-| `model.tree.willow` | 17 (4 on bare limbs) |
-| `model.pine` | 17 (its top among them) |
+| `model.tree.magnolia` | 20 |
+| `model.tree.willow` | 20 (4 on bare limbs) |
+| `model.pine` | 18 (its top among them) |
 | `model.spruce` | 21 (its top among them) |
 | `model.cypress` | 15 (its top among them) |
 | `model.garden.lemonTree` | 12 |
+
+(After the rebuild, 2026-10-22: the clumps are the masses' clumps (`_mass`), the willow's limb perches on its arching
+limbs (`limb_points`), the conifers' aims at each whorl's foot.)
 
 The shrubs and hedges in `plants.py` have 4–6 each, found the same way (`perches` there).
 
