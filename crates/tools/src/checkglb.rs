@@ -62,6 +62,9 @@ const BIRD_PARTS: [&str; 5] = ["body", "head", "tail", "wing.L", "wing.R"];
 const BIRD_FIT: f64 = 0.05;
 /// How far (m) a perch (`perches`: where the game's birds sit on a tree or a hedge) may be outside the model's box.
 const PERCH_OUT: f64 = 0.01;
+/// What a model with `perches` is, its entry's `habitat` (families/trees.py, plants.py): a broadleaved or fruit tree,
+/// a conifer, a bush or shrub, or a hedge.
+const HABITATS: [&str; 4] = ["tree", "conifer", "bush", "hedge"];
 
 /// Where the gate reads: the repo's assets, content and tools/art/blender/centres.json.
 pub struct Paths {
@@ -583,6 +586,22 @@ fn perch_errors(perches: &J, lo: [f64; 3], hi: [f64; 3], scale: f64) -> Vec<Stri
     if let Some(&first) = outside.first() {
         let box_ = (0..3).map(|k| format!("{} to {}", fixed(lo[k] / scale, 2), fixed(hi[k] / scale, 2))).collect::<Vec<_>>().join(", ");
         errors.push(format!("{} of {} perches outside the model (the first, {first}: {}; its box x, y, z: {box_})", outside.len(), list.len(), repr(&list[first])));
+    }
+    errors
+}
+
+/// What is wrong with an entry's `habitat` (the kind of plant its `perches` are on, which sets the birds that sit
+/// there: one of `HABITATS`), if it has one.
+fn habitat_errors(entry: &J) -> Vec<String> {
+    let Some(habitat) = entry.get("habitat") else {
+        return Vec::new();
+    };
+    let mut errors = Vec::new();
+    if !habitat.str().is_some_and(|h| HABITATS.contains(&h)) {
+        errors.push(format!("`habitat` {} is none of {}", repr(habitat), HABITATS.join(", ")));
+    }
+    if entry.get("perches").is_none() {
+        errors.push("`habitat` without `perches`: it says what the perches are on".into());
     }
     errors
 }
@@ -1991,7 +2010,7 @@ fn check(fin: &Finishes, entry: &J, path: &str, far: Option<&str>, facts: Option
     if let Some(far) = far {
         // Its far version (`far`): the same model, still, with far fewer triangles.
         // (Without what the full model is checked for: its clips, colours and centre, a bird's parts and the perches.)
-        let far_entry = J::Obj(entry.entries().unwrap_or(&[]).iter().filter(|(k, _)| !["motions", "paint", "perches", "bird"].contains(&k.as_str())).cloned().collect());
+        let far_entry = J::Obj(entry.entries().unwrap_or(&[]).iter().filter(|(k, _)| !["motions", "paint", "perches", "habitat", "bird"].contains(&k.as_str())).cloned().collect());
         let (mut far_errors, mut far_warnings, far_info) = match check_file(fin, &far_entry, far, None, None, None) {
             Ok((e, w, i)) => (e, w, Some(i)),
             Err(err) => (vec![format!("cannot read {far}: {err}")], Vec::new(), None),
@@ -2304,7 +2323,7 @@ fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>,
     }
 
     // A bird the renderer flies (`bird`): its parts and size against the file; where birds sit on the model
-    // (`perches`): inside it.
+    // (`perches`): inside it, and what they are on (`habitat`).
     if let Some(bird) = entry.get("bird") {
         let fields = bird_fields(bird);
         if fields.is_empty() {
@@ -2315,6 +2334,7 @@ fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>,
     if let Some(perches) = entry.get("perches") {
         errors.extend(perch_errors(perches, lo.map(|v| v.f()), hi.map(|v| v.f()), scale.f()));
     }
+    errors.extend(habitat_errors(entry));
 
     // Budgets.
     let side = dims.iter().copied().reduce(|m, v| if v.f() > m.f() { v } else { m }).unwrap();
@@ -2944,5 +2964,20 @@ mod tests {
         assert_eq!(perch_errors(&j("[[0, 5, 0]]"), [-2.0, 0.0, -2.0], [2.0, 8.0, 2.0], 2.0).len(), 1);
         assert_eq!(perch_errors(&j("[]"), lo, hi, 1.0), ["`perches` is empty: leave it out"]);
         assert_eq!(perch_errors(&j("{\"a\": 1}"), lo, hi, 1.0), ["`perches` is a list of [x, y, z] (metres), not {'a': 1}"]);
+    }
+
+    #[test]
+    fn a_habitat_is_one_of_four_and_goes_with_perches() {
+        for h in HABITATS {
+            assert!(habitat_errors(&j(&format!(r#"{{"perches": [[0, 1, 0]], "habitat": "{h}"}}"#))).is_empty(), "{h}");
+        }
+        assert!(habitat_errors(&j(r#"{"perches": [[0, 1, 0]]}"#)).is_empty(), "optional");
+        assert!(habitat_errors(&j(r#"{"url": "a.glb"}"#)).is_empty());
+        assert_eq!(habitat_errors(&j(r#"{"perches": [[0, 1, 0]], "habitat": "shrub"}"#)), ["`habitat` 'shrub' is none of tree, conifer, bush, hedge"]);
+        assert_eq!(habitat_errors(&j(r#"{"perches": [[0, 1, 0]], "habitat": ["tree"]}"#)), ["`habitat` ['tree'] is none of tree, conifer, bush, hedge"]);
+        assert_eq!(habitat_errors(&j(r#"{"habitat": "Tree"}"#)), [
+            "`habitat` 'Tree' is none of tree, conifer, bush, hedge",
+            "`habitat` without `perches`: it says what the perches are on",
+        ]);
     }
 }
