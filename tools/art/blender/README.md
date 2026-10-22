@@ -394,6 +394,15 @@ never one that's already running) and drive Playwright headless with full Chrome
   mapped to see-through `glass` showed the brass behind a round mirror and the door behind a cabinet's:
   map it to `gloss`.
 - **Exports.** They differ on every run, so commit only what you meant to change.
+- **Curves that overshoot.** `sweep` (and `kit.tube`) with `resolution` over 1 curves through the points
+  (Catmull-Rom), which bulges past them where a long straight meets a short leg: a shower frame 12 cm too
+  big, a range's rail 2 cm past its posts. For bent tube and corners, round the corners with `kit.fillet`
+  and sweep at `resolution=1`; keep `resolution` for paths that are curves all along.
+- **Shading by corners.** The baked shading is per vertex, so a face is as dark as its corners: a big flat
+  face whose corners sit in a crease (a recessed panel, glass in a rim) goes dark all over. Corners buried
+  inside another part are left unshaded; give a face that meets a crease an edge band (`kit.shaker` does).
+- **Measuring parts in the making.** `with G.new_parts() as parts:` fills `parts` when the block ends: measure
+  them after it, not inside.
 - **Blender errors.** Without `--python-exit-code 1`, Blender exits 0 on a Python error. `cargo art`
   passes it.
 

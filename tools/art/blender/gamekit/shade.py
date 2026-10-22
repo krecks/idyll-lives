@@ -88,12 +88,19 @@ def _occlusion(obj, tree, local, reach):
         # a turn taking +Z onto the normal, twisted by the vertex's index so neighbours don't band
         turn = Vector((0, 0, 1)).rotation_difference(n).to_matrix() @ Matrix.Rotation(v.index * 2.399963, 3, 'Z')
         start = p + n * LIFT
-        blocked = 0.0
+        blocked, inside = 0.0, 0
         for d in DIRECTIONS:
-            hit, _, _, dist = tree.ray_cast(start, turn @ d, reach)
-            if hit is not None:
-                blocked += 1 - (dist / reach) ** 2
-        seen.append(1 - blocked / len(DIRECTIONS))
+            ray = turn @ d
+            hit, face, _, dist = tree.ray_cast(start, ray, reach)
+            if hit is None:
+                continue
+            if face.dot(ray) > 0:    # the back of a face: this vertex is inside another part, not under it
+                inside += 1
+                continue
+            blocked += 1 - (dist / reach) ** 2
+        # A vertex buried in another part (a panel's corner inside its frame, mirror glass in its rim) is hidden;
+        # shaded, it would darken the whole face it shares, so it stays open.
+        seen.append(1.0 if inside > len(DIRECTIONS) // 2 else 1 - blocked / len(DIRECTIONS))
     return seen
 
 

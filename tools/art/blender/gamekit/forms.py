@@ -396,6 +396,7 @@ def cut(obj, cutter, keep_cutter=False):
 def jitter(obj, amount, size=0.3, seed=0.0, up=1.0):
     """Moves `obj`'s vertices by smooth noise up to `amount` metres, in features about `size` across, the same every
     build for a `seed`: bark, a lumpy stone, a hand-made look. `up` scales the vertical part (0: only sideways)."""
+    bpy.context.view_layer.update()   # matrix_world as placed, not as it was before (it is read below)
     for v in obj.data.vertices:
         p = obj.matrix_world @ v.co
         n = vnoise.noise_vector(Vector((p.x / size + seed, p.y / size - seed, p.z / size + seed * 0.5)))
