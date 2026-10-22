@@ -125,7 +125,6 @@ it left is here, with its id; §9 of the review says what each would take.
   face a thing, without steps (A-residents-07, A-residents-08). New behaviour, planned separately.
 - **A child can't reach the fruit it picks** (I-garden-11): the picked apple hangs at 1.84 m, the lemon at 1.62 m.
   The owner's decision (the review recommends low fruit, built with I-garden-12's crown).
-- Other children gather round a hug and stand right next to the pair (A-social-02, not reproduced).
 - **Feet slide at game speeds 4 and 5** (56–78 % of the way: 45 and 90 m/s, faster than any gait steps without
   strobing); at speed 3 the run (`runAlong`) keeps grown-ups' and teens' feet on the ground, children slide 11–14 %
   (A-residents-03, G-25). The clip check's baseline (`tools/characters/clip-baseline.json`) is empty.
@@ -164,8 +163,6 @@ it left is here, with its id; §9 of the review says what each would take.
   small table and the display cabinet's door (decor, decision 4); the laundry basket's lid (not built). These are
   modelled parts without a clip, so no clip is orphaned.
 - **Uses end once every need they raise is full**, by design (I-systems-02); it makes clips easy to miss in checks.
-- **Residents didn't reach things in a crowded garden** once; a sim test of eleven in a row
-  (`crates/sim-core/tests/crowded_garden.rs`) couldn't reproduce it (I-garden-01, not checked).
 
 ### Models
 - **The home chess table seats one**, so chess at home stays *Practise chess*: it needs a 1 × 2 table with a chair at

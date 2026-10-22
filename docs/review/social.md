@@ -85,7 +85,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `crates/sim-core/src/conversation.rs:537` (`take_place`, where someone joining in stands; `GROUP_SPACING` 0.6 m at `:42`; the cause is not traced yet)
 - **Evidence:** Children nearby walk up to a hug and stand right against the two hugging, closer than anyone would. Cross-cutting wave: not seen. A hug isn't `joinable`, so nobody joins it as a listener; in `goodbye-hug` the housemate stays 1.2 m off (`social/sheets/goodbye.png`), and in the hug pairs on `review-social` nobody came over.
-- **Status:** not checked (not reproduced in the review states; the hug isn't joinable, so the cause is likely free will walking to the pair for something else)
+- **Status:** closed (not reproduced: in 381 hugs on `family-check` over three days with free will on and the three children lonely, nobody walked up to a hug; the 17 times someone stood within 1.2 m of one, they were there first: the hugger walked over to someone a child had just chatted with (idle at 0.9–1.0 m), a child listening in on the hugged one's chat waited for its next word (`Join`), or someone walked past; one told to chat with a hugger waits 1.7 m off, at the chat's distance, until the hug ends) — the listener waiting is fixed (3ecc7a7f)
+- **After:** one listening in no longer waits by a hug the leader is taken into (`regrouping`: not with the leader in someone else's social; `group_talk.rs` `a_lonely_housemate_joins_a_chat_at_home`). Logs: `bench-results/review/followup/A-social-02/hug-crowd-before.log`, `hug-crowd-after.log`, `chat-waits-for-hug.log`, the probe `hug_probe.rs`. Left as it is: the one who hugs steps up on the free tile nearest them beside the other (`approach_tile`), which can be beside a bystander (0.45 m once in 381).
 - **Source:** `docs/objects/open.md` Still open › Residents
 
 ### I-social-01 — Phone actions are mimed: there is no phone in the hand
