@@ -13,7 +13,7 @@
 import { cycle, type ClipDef, type PoseSpec, type Rot, type Vec } from './dsl';
 import { breathe, hangArms, TAU } from './idle';
 import { addV, armIK, footIK, lerpV, norm, pointOn, smooth, sub, wrist, type ArmOptions } from './ik';
-import { sizes, SHARES_172, type Fit, type Size } from './street';
+import { climbClip, sizes, SHARES_172, type Fit, type Size } from './street';
 
 // --- tracks: values keyed in time ---------------------------------------------------------------
 
@@ -267,8 +267,8 @@ export const FOOS: Size<FoosFit>[] = sizes('foosball', SHARES_172, (s) => ({ s, 
 export const FOOS_LANES = [-0.45, 0.075] as const;
 /** Half the spacing of each lane's two handles (m). */
 const FOOS_HANDS = [0.075, 0.15] as const;
-/** The clip of size `clip` for lane `lane` (an index of `FOOS_LANES`). */
-export const foosClip = (clip: string, lane: number): string => `${clip}${'ab'[lane]}`;
+/** The clip of size `clip` for lane `lane` (an index of `FOOS_LANES`), named as the climbing frame's. */
+export const foosClip = climbClip;
 const FOOS_S = 3.2;
 
 function foosPose(fit: FoosFit, lane: number): (p: number) => PoseSpec {
