@@ -107,12 +107,12 @@ const YOUNG_STAGES = new Set(['baby', 'child', 'teen']);
 /** Parts every Sim has (besides the body's skin, hair and clothes). */
 const FACE_PARTS: readonly string[] = ['eyes', 'brows', 'lashes', 'teeth', 'tongue'];
 
-/** The body's skin chunks a Sim wearing `parts` shows (those no worn garment hides completely). */
 /** A part's shell category as a `SHELL_BITS` bit (`top.jacket`, `lod.bottom.skirt`, `shoes.boots` ...); 0 for anything else. */
 function shellBit(part: string): number {
   const kind = /^(?:lod\.)?(top|bottom|shoes)\./.exec(part)?.[1] as keyof typeof SHELL_BITS | undefined;
   return kind ? SHELL_BITS[kind] : 0;
 }
+/** The body's skin chunks a Sim wearing `parts` shows (those no worn garment hides completely). */
 function skinChunks(body: BodyData, parts: readonly string[]): string[] {
   return Object.entries(body.bodyChunks)
     .filter(([, hiders]) => !hiders.some((h) => parts.includes(h)))
@@ -493,6 +493,8 @@ const BUNKS: Record<string, readonly number[]> = FURNITURE.bunks;
  * and depth (m, its own frame, as made); the top is its seat (`Seat.h`).
  */
 const FOOTSTOOLS: Record<string, readonly number[]> = FURNITURE.footstools;
+/** On a footrest (`Seat.rest`): the ankle this far (m, for the reference height) behind its front, the ball of the foot on it. */
+const REST_BACK = 0.09;
 /**
  * Feet up on a footstool (`Characters.feetUp`): the heels `heel` m in from its near edge (at most to its middle),
  * else as far in as the legs reach, at least `edge` m; the ankles `ankle` over its top (body scale 1), at most
@@ -500,8 +502,6 @@ const FOOTSTOOLS: Record<string, readonly number[]> = FURNITURE.footstools;
  * knees not drawn right up), slid forward in the seat up to `slide` m for it, slouching back `slouch` rad a metre
  * slid. Not for what is done with the hands or the legs on a seat (`NO_FEET_UP`).
  */
-/** On a footrest (`Seat.rest`): the ankle this far (m, for the reference height) behind its front, the ball of the foot on it. */
-const REST_BACK = 0.09;
 const FEET_UP = { heel: 0.14, edge: 0.03, ankle: 0.075, side: 0.3, reach: 0.995, near: 0.6, slide: 0.18, slouch: 1.4 };
 const NO_FEET_UP = new Set(['music', 'meditate', 'toilet', 'bath', 'wash']);
 /** Beds whose sleepers get a blanket (pack hammocks, sofas and nap pods don't). */
@@ -1542,9 +1542,8 @@ export class Characters {
   private clock = 0;
   /** Sit / lie pelvis offsets per body (computed once from the clips). */
   private readonly sitPelvis = new Map<string, SeatFit>();
-  /** The same for the floor clips (`sitFloor`). */
+  /** The same for the floor clips (`sitFloor`), by body and floor sit: `<body>|<FloorSit name>`. */
   private readonly floorPelvis = new Map<string, SeatFit>();
-  /** (By body and floor sit: `<body>|<FloorSit name>`.) */
   /** Per body, then clip (`LEG_CLIPS`): where its legs are in the clip, for placing the feet (`legTo`). */
   private readonly legFits = new Map<string, Map<string, LegFit>>();
   /** Which way the sun's light goes (the renderer's sun), for the shade under a tree (`shadeSide`). */

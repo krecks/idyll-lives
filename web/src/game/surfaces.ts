@@ -279,16 +279,16 @@ export function approachTile(
   return { tile: found.tile, out: dz > 0 ? 0 : dx > 0 ? 1 : dz < 0 ? 2 : 3 };
 }
 
-/**
- * The top a seat with a `seatAt` faces (sim-core `faced_table`): the one over the tile in front of
- * it, of a kind it tucks under, on the same storey (`storeyDepth`: rows per storey, 0 for one)
- * with no wall between (`wallBetween`).
- */
 /** A top that is sat at by a use of its own (a dining set with its chairs, a desk with its chair built in): no other seat is pulled up to it (sim-core `seats_itself`). */
 export function seatsItself(def: Shape | undefined): boolean {
   return !!def?.interactions?.some((i) => i.pose === 'sit');
 }
 
+/**
+ * The top a seat with a `seatAt` faces (sim-core `faced_table`): the one over the tile in front of
+ * it, of a kind it tucks under, on the same storey (`storeyDepth`: rows per storey, 0 for one)
+ * with no wall between (`wallBetween`).
+ */
 export function facedTable(content: Shapes, objects: readonly Placed[], seat: Placed, wallBetween: (ax: number, az: number, bx: number, bz: number) => boolean, storeyDepth = 0): Placed | null {
   const def = content.object(seat.def);
   const kinds = def?.seatAt ?? [];

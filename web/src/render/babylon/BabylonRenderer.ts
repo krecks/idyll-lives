@@ -5059,15 +5059,6 @@ export class BabylonRenderer implements Renderer {
   }
 }
 
-/** Copies an orbit camera's angles, radius and target. */
-/**
- * Sets exposure without the configuration's change notice. Image processing runs as a post
- * process, where exposure is a uniform read each frame, but the notice marks every material dirty
- * (each walking every mesh: tens of ms per lighting step) for nothing; nothing else here listens
- * for it (bloom, which would, is off). The pass has exposure only while it isn't 1 (a define), so
- * crossing 1 still goes through the setter, as does everything should Babylon rename the field.
- */
-/** Smoothstep: eases 0..1 in and out. */
 /**
  * Where a garden lamp's light lands on the lawn (`GardenPools`): round its foot, as far as twice
  * its height (within its reach; a wall light aimed out, a smaller one in front of its wall, its
@@ -5083,6 +5074,7 @@ function gardenPool(l: RoomLight, row: number): GardenPool {
   return { x: l.x + (l.dir?.[0] ?? 0) * along, y: 0, z: l.z - row + (l.dir?.[2] ?? 0) * along, radius, strength, lamp: l.lamp };
 }
 
+/** Smoothstep: eases 0..1 in and out. */
 function ease(t: number): number {
   return t * t * (3 - 2 * t);
 }
@@ -5125,6 +5117,13 @@ function crosses(sa: number, sn: number, ea: number, en: number): number {
   return Math.abs(sa + ((ea - sa) * sn) / (sn - en)) <= 0.5 ? Math.sign(en - sn) : 0;
 }
 
+/**
+ * Sets exposure without the configuration's change notice. Image processing runs as a post
+ * process, where exposure is a uniform read each frame, but the notice marks every material dirty
+ * (each walking every mesh: tens of ms per lighting step) for nothing; nothing else here listens
+ * for it (bloom, which would, is off). The pass has exposure only while it isn't 1 (a define), so
+ * crossing 1 still goes through the setter, as does everything should Babylon rename the field.
+ */
 function setExposure(config: ImageProcessingConfiguration, value: number): void {
   // SAFETY: ImageProcessingConfiguration stores exposure in its private `_exposure` backing field.
   const fields = config as unknown as { _exposure?: number };
@@ -5147,6 +5146,7 @@ function depthBytes(rtw: RenderTargetWrapper): number {
   return texture.format === Constants.TEXTUREFORMAT_DEPTH16 ? 2 : texture.format === Constants.TEXTUREFORMAT_DEPTH32FLOAT_STENCIL8 ? 8 : 4;
 }
 
+/** Copies an orbit camera's angles, radius and target. */
 function copyPose(from: ArcRotateCamera, to: ArcRotateCamera): void {
   to.alpha = from.alpha;
   to.beta = from.beta;

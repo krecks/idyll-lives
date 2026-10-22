@@ -2114,11 +2114,6 @@ export class HouseBuilder {
 }
 
 /**
- * Box args for a board lying on a wall face: `a0..a1` along the wall, `y0..y1` high,
- * protruding `out` metres from the face at `plane` along normal `n`.
- */
-/** A hex colour scaled in brightness (sRGB), for panel details. */
-/**
  * Glazing bars of a window between `g0` and `g1` along its wall: `bar(a0, a1, y0, y1)` puts one
  * through the opening (between the two panes, so it shows once through the clear glass).
  */
@@ -2142,12 +2137,17 @@ function muntins(win: WindowSpec, g0: number, g1: number, bar: (a0: number, a1: 
   }
 }
 
+/** A hex colour scaled in brightness (sRGB), for panel details. */
 function shade(hex: string, k: number): string {
   const v = parseInt(hex.slice(1), 16);
   const c = [(v >> 16) & 255, (v >> 8) & 255, v & 255].map((x) => Math.max(0, Math.min(255, Math.round(x * k))));
   return `#${c.map((x) => x.toString(16).padStart(2, '0')).join('')}`;
 }
 
+/**
+ * Box args for a board lying on a wall face: `a0..a1` along the wall, `y0..y1` high,
+ * protruding `out` metres from the face at `plane` along normal `n`.
+ */
 function span(axis: 'h' | 'v', plane: number, n: V3, a0: number, a1: number, y0: number, y1: number, out: number): [number, number, number, number, number, number] {
   const d0 = plane;
   const d1 = plane + (axis === 'h' ? n[2] : n[0]) * out;
