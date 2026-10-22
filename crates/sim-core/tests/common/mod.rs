@@ -151,9 +151,9 @@ pub fn garden_cluster(w: &mut World, household: u32, area: (i32, i32, i32, i32),
                     let deep = if r % 2 == 0 { fd } else { fw };
                     if deep == 1 && a + long <= along && buy(w, def, x, z, towards) {
                         a += long;
-                    } else if buy(w, GARDEN_SMALL[n % 4], x, z, towards) {
-                        a += 1;
                     } else {
+                        // (Else a crop there, if one goes in.)
+                        buy(w, GARDEN_SMALL[n % 4], x, z, towards);
                         a += 1;
                     }
                 }

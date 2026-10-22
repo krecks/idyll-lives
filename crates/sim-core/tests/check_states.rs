@@ -423,9 +423,12 @@ fn crowded_garden() {
     assert!(on, "Ada lies on the shut-in lounger");
 }
 
-/// Things with moving parts in `garden_home()`'s room, each against a wall: `(def, x, z, rot,
-/// size in cm, cm taller)` as `review-resized` resizes them (A-systems-01).
-const RESIZED: [(&str, i32, i32, i32, [u16; 2], i16); 5] = [
+/// A thing bought resized: `(def, x, z, rot, size in cm, cm taller)`.
+type Resized = (&'static str, i32, i32, i32, [u16; 2], i16);
+
+/// Things with moving parts in `garden_home()`'s room, each against a wall, as `review-resized`
+/// resizes them (A-systems-01).
+const RESIZED: [Resized; 5] = [
     ("fridge", 4, 10, 2, [200, 100], 30),
     ("toilet", 7, 10, 2, [100, 100], 25),
     ("filingCabinet", 13, 10, 2, [100, 100], 40),
