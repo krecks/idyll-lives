@@ -57,7 +57,7 @@ meal's ingredients, a cold drink), as the K1 fridges do, and holds it for 3.5 s.
 ## The sinks
 
 The two kitchen sinks share the fridge's `GameFrame` style and the family's palette (extended with
-`porcelain`, `stone`, `wood`, `metal`, `dark`, `plant`, `water`). Each has a `body` material (paint) and a
+`porcelain`, `stone`, `wood`, `metal`, `dark`, `plant`, `water`, `pot`). Each has a `body` material (paint) and a
 `water` moving part: the stream is built full length from the spout into the basin, hidden at rest (scaled
 to 0.001 along its axis), and a `water_on` clip grows it to 1 over 0.4 s. `motions` plays `water_on` for the
 `wash` animation tag, with no `hold`, so the water runs for the whole use and retracts afterwards (the `wash`
@@ -65,13 +65,22 @@ tag covers both the `wash` and `washUp` interactions). The double sink has a str
 (`water_on_0`, `water_on_1`) played for the resident in that slot (`slot`; 2026-10-21, review A-kitchen-03: one
 washer ran both taps).
 
+Detail pass (2026-10-22): each bowl is one lofted piece (`_bowl`: a flat rim round a rounded opening, the walls running
+down to a floor that dips to the drain; the farmhouse one square outside, an apron proud of the cabinet), with a
+chrome-ringed drain and strainer. The tap is one bent tube (`G.kit.tube`) on a turned escutcheon, with a spray head and
+a lever on a valve beside it. The cabinets have shaker doors (`_shaker`: a frame with a hole round a recessed panel)
+and bar pulls in one piece (`_pull`); the farmhouse worktop is one U-shaped slab round the basin, the double sink's
+stone worktop one slab with the two openings cut in it. A lofted soap dish with a bar of soap and a terracotta pot
+(`pot`) with a mound of herb leaves stand on the worktop.
+
 | Model | Size (w × h × d) | Triangles | Draws | Note |
 |---|---|---|---|---|
-| `model.farmhouseSink` | 1.000 × 1.253 × 0.670 m | 3,084 | 2 | apron-front basin, wooden worktop, plant and bottle |
-| `model.counterSinkDouble` | 2.000 × 1.265 × 0.660 m | 5,496 | 3 | two inset basins, a bridge tap each |
+| `model.farmhouseSink` | 1.000 × 1.253 × 0.667 m | 4,410 | 3 | fireclay apron basin, U-shaped wood worktop, face frame and shaker doors, gooseneck tap and lever, soap dish, potted herb |
+| `model.counterSinkDouble` | 2.000 × 1.263 × 0.660 m | 6,836 | 3 | two deep steel bowls set into a stone slab, four shaker doors, a gooseneck tap and lever each, soap dish, potted herb |
 
-`check-glb`: 0 failed; its one remaining warning is 4 draw calls on the French-door and wine fridges.
-Khronos validator: 0 errors, 0 warnings.
+The double sink is built in the counters' drawn depth (the worktop -0.43..0.23, as COUNTER66 drew it), its bowls 17 cm
+deep, the carcass stopping under them behind rails. `check-glb`: 0 failed; its warnings are 4 draw calls on the
+French-door and wine fridges. Khronos validator: 0 errors, 0 warnings.
 
 ## The K1 fridges
 
@@ -81,12 +90,36 @@ rack slide instead. The clip each use plays is in the pack's `motions`:
 
 | Model | Size (w × h × d) | Triangles | Draws | Moving parts | Clips (uses) |
 |---|---|---|---|---|---|
-| `model.fridgeMini` | 0.600 × 1.000 × 0.600 m | 2,194 | 2 | door | `fridge_open` 1.6 s (snack `fetch`, meal `cook`); `hold` 3 s |
-| `model.fridgeBuiltIn` | 0.840 × 2.025 × 0.656 m | 3,404 | 3 | fridge door, freezer door | `fridge_open` 1.75 s (fetch, cook, cold drink); `freezer_open` 1.75 s (frozen treat) |
-| `model.fridgeFrenchDoor` | 0.900 × 1.820 × 0.760 m | 2,756 | 4 | left door, right door, drawer | `fridge_open` 1.75 s (fetch, cook); `door_right` 1.75 s (cold drink); `freezer_open` 1.75 s (frozen treat) |
-| `model.fridgeRetro` | 0.720 × 1.640 × 0.725 m | 1,920 | 3 | door; the chrome lever inside it (`G.attach`) | `lever` turns 30° out (0.3 s, `hold` 0.4), then `fridge_open` 1.75 s (`delay` 0.3; fetch, cook, cold drink) |
-| `model.fridgeMiniRetro` | 0.574 × 0.860 × 0.580 m | 3,975 | 2 | door (its handle, "MARIE" letters and unicorn sticker on it) | `fridge_open` 1.6 s (fetch, cook, cold drink); `hold` 3 s |
-| `model.wineFridge` | 1.000 × 0.950 × 0.660 m | 2,532 | 4 | glass door, top shelf of bottles | `door_open` 1.5 s (wine `drink`), `hold` 2.5 s; `rack_out` 0.8 s, the shelf out 15 cm (`delay` 0.9, `hold` 0.9: out once the door is open, in before it shuts) |
+| `model.fridgeMini` | 0.600 × 1.000 × 0.605 m | 3,868 | 2 | door | `fridge_open` 1.6 s (snack `fetch`, meal `cook`); `hold` 3 s |
+| `model.fridgeBuiltIn` | 0.840 × 2.025 × 0.664 m | 5,960 | 3 | fridge door, freezer door | `fridge_open` 1.75 s (fetch, cook, cold drink); `freezer_open` 1.75 s (frozen treat) |
+| `model.fridgeFrenchDoor` | 0.900 × 1.820 × 0.756 m | 6,884 | 4 | left door, right door, drawer | `fridge_open` 1.75 s (fetch, cook); `door_right` 1.75 s (cold drink); `freezer_open` 1.75 s (frozen treat) |
+| `model.fridgeRetro` | 0.720 × 1.640 × 0.722 m | 4,662 | 3 | door; the chrome lever inside it (`G.attach`) | `lever` turns 30° out (0.3 s, `hold` 0.4), then `fridge_open` 1.75 s (`delay` 0.3; fetch, cook, cold drink) |
+| `model.fridgeMiniRetro` | 0.574 × 0.860 × 0.580 m | 3,729 | 2 | door (its handle, "MARIE" letters and unicorn sticker on it) | `fridge_open` 1.6 s (fetch, cook, cold drink); `hold` 3 s |
+| `model.wineFridge` | 1.000 × 0.950 × 0.660 m | 3,720 | 4 | glass door, top shelf of bottles | `door_open` 1.5 s (wine `drink`), `hold` 2.5 s; `rack_out` 0.8 s, the shelf out 15 cm (`delay` 0.9, `hold` 0.9: out once the door is open, in before it shuts) |
+
+What each has since the detail pass (2026-10-22), on the fridge's pattern (doors with seals, liners, bins and stock):
+- **fridgeMini**: sides rounded on their edges, a vented kick plate, an ice box with a flap and grip, a trimmed shelf, a
+  crisper with a grip cut in its front; a gable-top carton, a bottle and apples (with stalks) inside; a chopping board
+  with a hanging hole, a jar and an apple on top; the door rounded (`F.soft`), a badge, a one-piece bar handle, its
+  seal, liner and two bins with bottles, a can and a jar.
+- **fridgeBuiltIn**: shaker cabinet fronts (frame round a recessed, lightly puffed panel), a cornice with a cove
+  moulding swept round it, a vented kick plate; a water dispenser set into the fridge door (trim, recess, paddle,
+  spout, display, drip tray); round bar handles in one piece; inside, trimmed glass shelves, two crispers, two freezer
+  baskets with grips, food (carton, bottle, jam, apples, an orange, eggs, a tub, pizza, peas, ice cream); seals,
+  liners, bins with bottles, a carton, jars and butter on the doors.
+- **fridgeFrenchDoor**: steel sides rounded on their edges, a vented kick plate, rounded doors with slim handles, an
+  ice and water dispenser with its display on the door the viewer sees on the left, the flip mullion; inside, trimmed
+  shelves, two crispers and food (a cake, eggs, apples, jam, a tub); the doors' seals, liners, bins, bottles, jars and
+  butter; the freezer drawer a bin with pizzas, ice cream and peas in it.
+- **fridgeRetro**: the body one loft (rounded-square rings, the top rolling back) with the cavity cut out (a boolean,
+  its faces lined); a chrome kick grille, chrome hinges; a door with big rounded corners, a trim line, a chrome
+  nameplate, an escutcheon and a swept lever; inside an ice box with a flap and latch, a drip tray, shelves with
+  chrome rails, a crisper, glass milk bottles, a pie, apples and butter; railed door shelves with bottles and eggs.
+- **fridgeMiniRetro**: the brass D handle one bent tube (was rods joined by spheres); a door seal, a real door bin
+  with a can and a jar, a gable-top carton, apples with stalks, a bottle, a trimmed shelf.
+- **wineFridge**: rebuilt in drawn depths (worktop -0.43..0.23): racks with wooden lips and bottles lofted lying necks
+  out with foil capsules, a pale liner, a ceiling over the door, the door a framed pane (one slab with a hole) with a
+  display and a round bar handle, its seal; three drawers flush with the door with long pulls; a vented kick plate.
 
 The built-in's freezer door and the French-door freezer drawer play `freezer_open` for "Get some ice
 cream"; `model.fridge`'s freezer door does the same (`FRIDGE_USES`, by the interaction `frozenTreat`; the G-17

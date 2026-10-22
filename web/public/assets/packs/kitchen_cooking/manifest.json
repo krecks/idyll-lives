@@ -12,6 +12,9 @@
         "dark": {
           "finish": "material.finish.satin"
         },
+        "display": {
+          "finish": "material.finish.gloss"
+        },
         "enamel": {
           "finish": "material.finish.gloss"
         },
@@ -23,6 +26,12 @@
         },
         "hob": {
           "finish": "material.finish.gloss"
+        },
+        "plate": {
+          "finish": "material.finish.gloss"
+        },
+        "tray": {
+          "finish": "material.finish.metal"
         }
       },
       "motions": {
@@ -75,7 +84,13 @@
         "pan": {
           "finish": "material.finish.satin"
         },
+        "plate": {
+          "finish": "material.finish.gloss"
+        },
         "pot": {
+          "finish": "material.finish.metal"
+        },
+        "tray": {
           "finish": "material.finish.metal"
         }
       },
@@ -109,6 +124,9 @@
       "type": "model",
       "url": "../../models/kitchen_cooking/wallOven.glb",
       "materials": {
+        "bread": {
+          "finish": "material.finish.satin"
+        },
         "cab": {
           "finish": "material.finish.satin"
         },
@@ -118,7 +136,13 @@
         "dark": {
           "finish": "material.finish.satin"
         },
+        "display": {
+          "finish": "material.finish.gloss"
+        },
         "hob": {
+          "finish": "material.finish.gloss"
+        },
+        "plate": {
           "finish": "material.finish.gloss"
         },
         "tray": {
@@ -153,6 +177,9 @@
         "dark": {
           "finish": "material.finish.satin"
         },
+        "display": {
+          "finish": "material.finish.gloss"
+        },
         "enamel2": {
           "finish": "material.finish.gloss"
         },
@@ -162,10 +189,25 @@
         "grate": {
           "finish": "material.finish.satin"
         },
+        "heat": {
+          "finish": "material.finish.gloss"
+        },
         "hob": {
           "finish": "material.finish.gloss"
         },
+        "pan": {
+          "finish": "material.finish.satin"
+        },
+        "plate": {
+          "finish": "material.finish.gloss"
+        },
         "pot": {
+          "finish": "material.finish.metal"
+        },
+        "towel": {
+          "finish": "material.finish.satin"
+        },
+        "tray": {
           "finish": "material.finish.metal"
         }
       },
@@ -217,6 +259,9 @@
         "hob": {
           "finish": "material.finish.gloss"
         },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
         "worktop": {
           "finish": "material.finish.gloss"
         }
@@ -255,14 +300,23 @@
         "chrome": {
           "finish": "material.finish.chrome"
         },
+        "cup": {
+          "finish": "material.finish.gloss"
+        },
         "dark": {
           "finish": "material.finish.satin"
         },
         "display": {
           "finish": "material.finish.gloss"
         },
+        "fruit": {
+          "finish": "material.finish.gloss"
+        },
         "glass": {
           "finish": "material.finish.glass"
+        },
+        "hob": {
+          "finish": "material.finish.gloss"
         },
         "plate": {
           "finish": "material.finish.gloss"
@@ -332,6 +386,9 @@
         "dark": {
           "finish": "material.finish.satin"
         },
+        "heat": {
+          "finish": "material.finish.gloss"
+        },
         "steel": {
           "finish": "material.finish.metal"
         },
@@ -365,6 +422,15 @@
       "type": "model",
       "url": "../../models/kitchen_cooking/breakfastCounter.glb",
       "materials": {
+        "banana": {
+          "finish": "material.finish.satin"
+        },
+        "bean": {
+          "finish": "material.finish.gloss"
+        },
+        "bread": {
+          "finish": "material.finish.satin"
+        },
         "cab": {
           "finish": "material.finish.satin"
         },
@@ -374,8 +440,14 @@
         "chrome": {
           "finish": "material.finish.chrome"
         },
+        "crumb": {
+          "finish": "material.finish.satin"
+        },
         "dark": {
           "finish": "material.finish.satin"
+        },
+        "display": {
+          "finish": "material.finish.gloss"
         },
         "fruit": {
           "finish": "material.finish.gloss"
@@ -425,10 +497,16 @@
         "chrome": {
           "finish": "material.finish.chrome"
         },
+        "cup": {
+          "finish": "material.finish.gloss"
+        },
         "dark": {
           "finish": "material.finish.satin"
         },
         "display": {
+          "finish": "material.finish.gloss"
+        },
+        "plate": {
           "finish": "material.finish.gloss"
         },
         "steel": {
@@ -469,10 +547,16 @@
         "chrome": {
           "finish": "material.finish.chrome"
         },
+        "cup": {
+          "finish": "material.finish.gloss"
+        },
         "dark": {
           "finish": "material.finish.satin"
         },
         "display": {
+          "finish": "material.finish.gloss"
+        },
+        "plate": {
           "finish": "material.finish.gloss"
         },
         "steel": {
