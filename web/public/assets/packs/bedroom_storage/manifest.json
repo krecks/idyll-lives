@@ -15,11 +15,17 @@
         "brass": {
           "finish": "material.finish.metal"
         },
+        "coffee": {
+          "finish": "material.finish.gloss"
+        },
         "cream": {
           "finish": "material.finish.gloss"
         },
         "oak": {
           "finish": "material.finish.wood"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
         },
         "teal": {
           "finish": "material.finish.matte"
@@ -108,11 +114,14 @@
       "type": "model",
       "url": "../../models/bedroom_storage/nightstandDrawers.glb",
       "materials": {
-        "book3": {
+        "book2": {
           "finish": "material.finish.matte"
         },
         "brass": {
           "finish": "material.finish.metal"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
         },
         "plinth": {
           "finish": "material.finish.satin"
@@ -367,6 +376,9 @@
         "cloth4": {
           "finish": "material.finish.satin"
         },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
         "plinth": {
           "finish": "material.finish.satin"
         },
@@ -502,6 +514,9 @@
         },
         "cloth3": {
           "finish": "material.finish.satin"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
         },
         "plinth": {
           "finish": "material.finish.satin"

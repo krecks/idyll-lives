@@ -16,7 +16,7 @@ until checked in play.
 - **Gloss, not see-through.** The mirror materials map to `gloss`, as the old parts' mirrors: only the
   High preset reflects live, so elsewhere (the gallery, Low and Medium, a mirror beyond the nearest two) the
   pane shows as pale gloss, never what is behind it.
-- **Frames** are swept loops (`_loop`): a rounded-rectangle cross-section round a rounded rectangle or an
+- **Frames** are swept loops (`_loop`): a moulded cross-section (`_moulding`) round a rounded rectangle or an
   ellipse, so a frame is one closed mesh. The glass is set into the frame from the front: its face is behind
   the moulding's inner lip, so the reflection (2 mm in front of the face) stays under the lip.
 
@@ -24,10 +24,10 @@ until checked in play.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.mirror` | 0.80 × 1.86 × 0.56 m | 2,892 | 3 | Frame (wood) |
-| `model.dressingTable` | 0.86 × 1.53 × 0.85 m | 5,660 | 3 | Table (wood), Frame (brass) |
-| `model.mirrorWall` | 0.62 × 0.96 × 0.09 m | 1,136 | 2 | Frame (black metal) |
-| `model.mirrorFloor` | 0.56 × 1.78 × 0.45 m | 1,048 | 2 | Frame (brass) |
+| `model.mirror` | 0.80 × 1.86 × 0.56 m | 3,992 | 2 | Frame (wood) |
+| `model.dressingTable` | 0.86 × 1.53 × 0.86 m | 7,692 | 4 | Table (wood), Frame (brass) |
+| `model.mirrorWall` | 0.62 × 0.96 × 0.09 m | 1,312 | 1 | Frame (black metal) |
+| `model.mirrorFloor` | 0.56 × 1.78 × 0.45 m | 2,000 | 1 | Frame (brass) |
 
 - **`mirror`** — a cheval mirror: two turned posts on feet and a low stretcher, the swing frame between them on
   brass pivots at 0.95 m, a crest with a finial. Centred on its tile (its old part was 5 cm back).
@@ -50,6 +50,17 @@ until checked in play.
 - **`mirrorFloor`** — a full-length mirror in a slim brass frame, upright on a brass stand: two sled feet, a
   clamp up from each to the frame's bottom, a rear bar and a strut to a plate on the frame's back. Where its
   the game places it (`centre=(0, -0.155)`: the frame 5 cm behind the middle, the strut behind it).
+
+### Detail (2026-10-22)
+
+Rebuilt with the forms and the kit, same sizes, centres, glass boxes, parts, clip and draws. The frames are swept
+with a moulding (`_moulding`: a rounded outer edge, a cove, a bead and a lip standing in front of the glass). The glass
+stays one flat piece, but gridded (`_pane`; the dressing table's oval in rings, `_oval`): its edges are set into the
+frame, and with only its corner vertices buried there the baked shading (`shade.py`) greyed the whole pane; now only
+its rim darkens. The cheval mirror has shaped sled feet, more turnings, an arched crest and turned brass knobs; the
+dressing table turned shoes, an arched kneehole rail, faceted bottles, a piped and buttoned pouf, a tube stand with
+turned finials; the wall mirror a rolled-lip tray on bent brackets with a hollow cup, a toothbrush and a tube of
+toothpaste; the standing mirror sled feet turned up at the toe, clamp knobs and a strut folding at a hinge.
 
 `check-glb`: 0 failed. Warning: the wall mirror "floats
 93.6 cm above its origin" (it is on the wall, as it should be). Khronos validator: 0 errors, 0 warnings each.
