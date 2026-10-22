@@ -167,15 +167,100 @@ def limb_tops(base, tips, d, along=(0.45, 0.6, 0.75)):
 
 # ---- broadleaves --------------------------------------------------------------------------------------
 
+def _bough(name, pts, r0, r1, P, verts=6, res=3):
+    """A tapering, curving bark tube (`G.sweep`) through Blender `pts`, `r0` across at its start, `r1` at its end."""
+    k = r1 / r0
+    return G.sweep(name, pts, r0, material=P.bark, verts=low(verts, 3), resolution=low(res, 1),
+                   scale=lambda w: 1 + (k - 1) * w)
+
+
+def _bend(a, b, rng, lift=0.25, wander=0.18):
+    """Four points from `a` to `b`, bowed up by `lift` x its length and wandering sideways: a limb's line."""
+    a, b = Vector(a), Vector(b)
+    d = b - a
+    side = Vector((-d.y, d.x, 0)).normalized() if d.xy.length > 1e-6 else Vector((1, 0, 0))
+    pts = [a]
+    for f in (0.33, 0.66):
+        pts.append(a + d * f + Vector((0, 0, lift * d.length * math.sin(math.pi * f))) + side * rng.uniform(-wander, wander) * d.length * 0.3)
+    return pts + [b]
+
+
 def oak():
-    """Oak: a stout trunk, four big limbs and a broad, billowing crown with two low side crowns."""
+    """Oak: a stout trunk flared on root buttresses, branching low into five wide limbs that fork into boughs, each
+    bough ending in a mass of leaf clumps, lighter on top and darker below: a broad, broken crown whose limbs show
+    through the gaps between its masses."""
     P = palette(['#558238', '#64923E', '#76A246', '#8AB250', '#9EC25C'])
+    cols = shades(P)
     rng = random.Random(11)
-    trunk(P, 3.4, 0.62)
-    limbs(P, rng, (0, 0, 2.9), [xy(t) for t in ([1.5, 4.6, 0.5], [-1.4, 4.5, -0.6], [0.3, 5.0, -1.3], [-0.4, 5.1, 1.2])], 0.3)
-    clumps = crown('crown', rng, (0, 0, 5.5), (2.7, 2.7, 1.8), 10, shades(P), size=0.7, spread=0.75, core=0.82)
-    clumps += crown('side', rng, (1.7, 0.7, 4.6), (1.4, 1.4, 1.0), 3, shades(P), size=0.85, bottom=-0.6, core=0.7)
-    clumps += crown('side2', rng, (-1.6, -0.8, 4.7), (1.4, 1.4, 1.1), 3, shades(P), size=0.85, bottom=-0.6, core=0.7)
+    full = not G.is_low()
+    # the trunk: a slight lean and wave, flared at the foot, its base flat on the ground
+    trunk_pts = [(0, 0, 0), (0, 0, 0.3), (0.05, -0.03, 1.1), (-0.02, 0.04, 1.9), (0.03, 0.0, 2.7)]
+    stem = G.sweep('trunk', trunk_pts, 0.3, material=P.bark, verts=low(11, 5), resolution=low(3, 1),
+                   scale=[1.5, 1.08, 0.95, 0.88, 0.72])
+    if full:
+        G.jitter(stem, 0.035, 0.45, seed=4.0, up=0.0)
+    # root buttresses running out from the foot, ending just above the ground
+    for i in range(5):
+        a = math.tau * (i + rng.uniform(-0.2, 0.2)) / 5
+        reach = rng.uniform(0.5, 0.7)
+        root = [(0.12 * math.cos(a), 0.12 * math.sin(a), 0.55), (0.34 * math.cos(a), 0.34 * math.sin(a), 0.2),
+                (reach * math.cos(a), reach * math.sin(a), 0.085)]
+        _bough(f'root{i}', root, 0.17, 0.07, P, verts=5, res=1)
+    # five limbs from the top of the trunk, wide and only a little up; a leader carries on up the middle
+    off = rng.random() * math.tau + math.pi / 2                       # (turned: its broad side across)
+    ends = []
+    for i in range(5):
+        a = off + math.tau * i / 5 + rng.uniform(-0.25, 0.25)
+        z0 = rng.uniform(1.95, 2.6)
+        out, up = rng.uniform(1.15, 1.45), rng.uniform(3.6, 4.4)
+        end = Vector((out * math.cos(a), out * math.sin(a), up))
+        _bough(f'limb{i}', _bend((0.02, 0.0, z0), end, rng, lift=0.15), 0.16, 0.075, P, verts=5)
+        ends.append((a, end, out))
+    leader = Vector((0.1, -0.05, 4.9))
+    _bough('leader', _bend((0.03, 0.0, 2.6), leader, rng, lift=0.0, wander=0.3), 0.17, 0.07, P, verts=5)
+    # each limb forks into boughs, out and up; the leader into boughs fanning over the top. A mass of clumps at
+    # each bough's tip.
+    forks = [(f'b{i}_', end, a, 2 if i % 2 else 3, (1.65, 1.95), (0.75, 1.95)) for i, (a, end, _) in enumerate(ends)]
+    forks.append(('top_', leader, off, 4, (0.5, 1.2), (1.55, 2.2)))
+    clumps, n = [], 0
+    for prefix, base, a0, count, reach, rise in forks:
+        for j in range(count):
+            a = (a0 + (j - (count - 1) / 2) * 0.75 + rng.uniform(-0.2, 0.2)) if prefix != 'top_' else \
+                (a0 + math.tau * j / count + rng.uniform(-0.3, 0.3))
+            out = rng.uniform(*reach)
+            tip = Vector((out * math.cos(a), out * math.sin(a), base.z + rng.uniform(*rise)))
+            mid = base + (tip - base) * 0.5 + Vector((rng.uniform(-0.15, 0.15), rng.uniform(-0.15, 0.15), 0.2))
+            if full:
+                _bough(f'{prefix}{j}', [base, mid, tip], 0.07, 0.025, P, verts=5, res=2)
+            # the mass: a clump on the tip and two round it, a little below and out
+            for m in range(3):
+                if m == 0:
+                    at = tip
+                else:
+                    b = a + (m - 1.5) * 1.6 + rng.uniform(-0.4, 0.4)
+                    at = tip + Vector((0.42 * math.cos(b), 0.42 * math.sin(b), rng.uniform(-0.35, 0.05)))
+                size = rng.uniform(0.5, 0.64) * (1.0 if m == 0 else 0.86)
+                sx, sy, sq = rng.uniform(0.9, 1.15), rng.uniform(0.9, 1.15), rng.uniform(0.75, 0.88)
+                light = max(0.0, min(1.0, (at.z - 3.4) / 3.4))
+                col = cols[max(0, min(len(cols) - 1, round(light * (len(cols) - 1) + rng.uniform(-0.6, 0.6))))]
+                seed = n * 1.7 + rng.random()
+                half = (size * sx, size * sy, size * sq)
+                clumps.append(((at.x, at.y, at.z), half, 2 * light - 1, True))
+                if not full:                                         # far: one bigger clump stands for the mass
+                    if m:
+                        n += 1
+                        continue
+                    size *= 1.4
+                    half = (size * sx, size * sy, size * sq)
+                lump(f'clump{n}', size, (at.x, at.y, at.z - half[2]), col, scale=(sx, sy, sq), noise=0.34, seed=seed,
+                     segments=6, rings=5)
+                n += 1
+    # the crown's heart, dark, round the leader: it closes the middle, the gaps between the masses stay
+    for i in range(4):
+        a = off + math.tau * (i + 0.5) / 4 + rng.uniform(-0.3, 0.3)
+        size, seed = rng.uniform(0.75, 0.9), rng.random() * 9
+        at = (0.75 * math.cos(a), 0.75 * math.sin(a), rng.uniform(4.0, 4.7))
+        lump(f'heart{i}', size, at, cols[rng.randrange(2)], scale=(1, 1, 0.85), noise=0.3, seed=seed, segments=6, rings=5)
     still = G.join_all('oak')
     G.perch.find(24, clump_aims(clumps, random.Random(111)))
     return G.settle([still])

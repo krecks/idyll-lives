@@ -18,10 +18,16 @@
         "chrome": {
           "finish": "material.finish.chrome"
         },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
         "egg": {
           "finish": "material.finish.matte"
         },
         "frozen": {
+          "finish": "material.finish.satin"
+        },
+        "gasket": {
           "finish": "material.finish.satin"
         },
         "icecream": {
@@ -47,6 +53,9 @@
         },
         "trim": {
           "finish": "material.finish.satin"
+        },
+        "wine2": {
+          "finish": "material.finish.gloss"
         }
       },
       "motions": {

@@ -364,35 +364,50 @@ def sofa_classic():
     rail, scroll arms with carved faces, an apron rail with a shell, cabriole legs; two seat cushions."""
     with G.new_parts() as still:
         F.box('deck', 1.7, 0.18, 0.775, (0, 0.27, -0.048), M.linen, bevel=0.05, bevel_segments=3)
-        F.box('apron', 1.72, 0.05, 0.035, (0, 0.17, 0.33), M.walnut, bevel=0.012)
-        F.sphere('shell', 0.04, (0, 0.17, 0.35), M.walnut, scale=(1, 0.4, 0.75), segments=12, rings=8)
+        # the apron: a serpentine lower edge dropping to a lobe in the middle, a carved shell on it
+        edge = [(-0.86 + 1.72 * i / 28, 0.0) for i in range(29)]
+        edge = [(x, 0.152 - 0.009 * math.cos(math.tau * x / 0.43) - 0.03 * math.exp(-(x / 0.07) ** 2)) for x, _ in edge]
+        F.extrude('apron', [(0.86, 0.195), (-0.86, 0.195)] + edge, 0.035, (0, 0, 0.33), M.walnut, bevel=0.005,
+                  bevel_segments=1)
+        fan = [(0.0, 0.0)] + [(0.05 * (1 - 0.12 * (i % 2)) * math.cos(math.pi * i / 10),
+                               0.05 * (1 - 0.12 * (i % 2)) * math.sin(math.pi * i / 10)) for i in range(11)]
+        F.extrude('shell', fan, 0.018, (0, 0.14, 0.354), M.walnut, bevel=0.004, bevel_segments=1)
         F.box('back_board', 1.7, 0.42, 0.1, (0, 0.53, -0.385), M.linen, bevel=0.04, bevel_segments=3)
+        # the camel back: seven stuffed channels rising from the deck and rolling back under the rail
         for i in range(7):
             u = (i + 0.5) / 7
-            x = -0.84 + 1.68 * u
-            h = _hump(u) - 0.32
-            _cushion(f'channel{i}', 0.25, h, 0.17, (x, 0.32 + h / 2, -0.325), M.linen, rot=(-8, 0, 0))
-        pts = [F.at(-0.84 + 1.68 * i / 14, _hump(i / 14) + 0.015, -0.375) for i in range(15)]
-        for i in range(14):
-            G.rod(f'rail{i}', pts[i], pts[i + 1], 0.02, M.walnut, verts=10)
-        for i in range(15):
-            F.sphere(f'rail_joint{i}', 0.02, (-0.84 + 1.68 * i / 14, _hump(i / 14) + 0.015, -0.375), M.walnut, segments=10, rings=6)
+            x, t = -0.84 + 1.68 * u, _hump(u)
+            F.sweep(f'channel{i}', [(x, 0.33, -0.27), (x, (0.33 + t) / 2, -0.3), (x, t - 0.07, -0.325), (x, t - 0.04, -0.36)],
+                    None, M.linen, profile=G.rounded_rect(0.236, 0.15, 0.065, corner=2), up=(1, 0, 0), resolution=2,
+                    scale=[1.0, 1.03, 1.0, 0.85])
+        # the show-wood rail along the hump: one moulded piece
+        F.sweep('rail', [(-0.84 + 1.68 * i / 14, _hump(i / 14) + 0.015, -0.375) for i in range(15)], None, M.walnut,
+                profile=G.rounded_rect(0.046, 0.038, 0.013, corner=1), up=(0, 1, 0), resolution=2, angle=60)
         for s in (-1, 1):
             ax = s * 0.84
-            F.box(f'arm{s}', 0.16, 0.36, 0.735, (s * 0.83, 0.42, -0.048), M.linen, bevel=0.06, bevel_segments=3)
-            F.cyl(f'scroll{s}', 0.1, 0.695, (ax, 0.6, -0.028), M.linen, rot=(90, 0, 0), verts=20)
-            F.cyl(f'scroll_face{s}', 0.08, 0.03, (ax, 0.6, 0.335), M.walnut, rot=(90, 0, 0), verts=20, bevel=0.008)
-            F.box(f'arm_post{s}', 0.05, 0.28, 0.035, (ax, 0.38, 0.335), M.walnut, bevel=0.015)
-        _pillow('pillow_l', -0.6, 0.6, -0.215, M.pillow_rust, turn=-18, w=0.36, h=0.34)
-        _pillow('pillow_r', 0.6, 0.6, -0.215, M.pillow_sage, turn=18, w=0.34, h=0.32)
+            # the rolled arm: its cross-section (a panel rising into a roll that leans out) swept front to back
+            roll = [(0.6 + 0.1 * math.sin(math.radians(a)), s * (0.1 * math.cos(math.radians(a))))
+                    for a in range(-40, 230, 18)]
+            section = [(0.24, s * -0.085), (0.24, s * 0.07)] + roll + [(0.5, s * -0.085)]   # (height, x out)
+            F.sweep(f'arm{s}', [(ax, 0, -0.39), (ax, 0, 0.32)], None, M.linen, profile=section, angle=50)
+            F.cyl(f'scroll_face{s}', 0.085, 0.03, (ax, 0.6, 0.335), M.walnut, rot=(90, 0, 0), verts=20, bevel=0.008)
+            F.cyl(f'scroll_boss{s}', 0.03, 0.012, (ax, 0.6, 0.354), M.walnut, rot=(90, 0, 0), verts=12, bevel=0.004)
+            # a shaped post from the apron up to the scroll face, waisted in the middle
+            F.sweep(f'arm_post{s}', [(ax, 0.2, 0.338), (ax, 0.33, 0.346), (ax, 0.44, 0.34), (ax, 0.52, 0.337)], 0.024,
+                    M.walnut, verts=8, resolution=2, scale=[1.1, 0.75, 0.95, 1.0])
+        F.soft('pillow_l', 0.36, 0.34, 0.12, (-0.6, 0.6, -0.215), M.pillow_rust, rot=(-13, 0, 18), round=0.05,
+               puff=0.035, flat=2)
+        F.soft('pillow_r', 0.34, 0.32, 0.12, (0.6, 0.6, -0.215), M.pillow_sage, rot=(-13, 0, -18), round=0.05,
+               puff=0.035, flat=2)
         for x in (-0.82, 0.82):
             for z, dz in ((0.33, 1), (-0.38, -1)):
-                _cabriole(f'leg{x}{z}', x, z, 0.18, M.walnut_legs, 0.025 * (1 if x > 0 else -1), 0.02 * dz)
+                G.kit.cabriole(F, f'leg{x}{z}', x, z, 0.18, M.walnut_legs, 0.025 * (1 if x > 0 else -1), 0.02 * dz)
     G.join(still, 'sofa', origin=(0, 0, 0))
 
     def cushions():
         for s in (-1, 1):
-            _cushion(f'seat{s}', 0.78, 0.1, 0.595, (s * 0.4, 0.39, 0.033), M.linen_cushion)
+            F.soft(f'seat{s}', 0.78, 0.1, 0.595, (s * 0.4, 0.39, 0.033), M.linen_cushion, round=0.035, puff=0.016,
+                   piping=0.006)
         return 0.44
     _settled(_seat(cushions, 0.34, 0.033))
 
@@ -400,16 +415,6 @@ def sofa_classic():
 def _hump(u):
     """The camel back's top at `u` across (0 to 1)."""
     return 0.74 + 0.16 * math.exp(-((u - 0.5) / 0.22) ** 2)
-
-
-def _cabriole(name, x, z, h, mat, sx, sz):
-    """A cabriole leg from the frame at height `h` down to a ball foot: the knee out by (sx, sz), the
-    ankle back in."""
-    knee, ankle = F.at(x + sx, h * 0.62, z + sz), F.at(x + sx * 0.4, 0.05, z + sz * 0.4)
-    G.rod(f'{name}_thigh', F.at(x, h, z), knee, 0.024, mat, verts=10)
-    G.rod(f'{name}_shin', knee, ankle, 0.018, mat, verts=10)
-    F.sphere(f'{name}_knee', 0.024, (x + sx, h * 0.62, z + sz), mat, segments=10, rings=6)
-    F.sphere(f'{name}_foot', 0.026, (x + sx * 0.4, 0.026, z + sz * 0.4), mat, segments=10, rings=6)
 
 
 def _box_sofa(up, cush, legs, w, pillows=(), n=2):
@@ -537,30 +542,45 @@ def armchair_bergere():
         return 0.68 + 0.26 * math.sqrt(max(0.0, 1 - ((u - 0.5) / 0.56) ** 2))
     with G.new_parts() as still:
         F.box('deck', 0.66, 0.16, 0.715, (0, 0.26, -0.058), M.linen, bevel=0.05, bevel_segments=3)
-        F.box('apron', 0.68, 0.05, 0.035, (0, 0.17, 0.3), M.walnut, bevel=0.012)
+        # the apron: a serpentine lower edge dropping to a carved lobe in the middle
+        edge = [(-0.34 + 0.68 * i / 16, 0.0) for i in range(17)]
+        edge = [(x, 0.152 - 0.008 * math.cos(math.tau * x / 0.34) - 0.032 * math.exp(-(x / 0.045) ** 2)) for x, _ in edge]
+        F.extrude('apron', [(0.34, 0.195), (-0.34, 0.195)] + edge, 0.035, (0, 0, 0.3), M.walnut, bevel=0.005,
+                  bevel_segments=1)
+        # the back: six stuffed channels, each rising from the deck and rolling back over the arch
         for i in range(6):
             u = (i + 0.5) / 6
-            h = top(u) - 0.3
-            F.box(f'channel{i}', 0.11, h, 0.12, (-0.3 + 0.6 * u, 0.3 + h / 2, -0.33), M.linen, rot=(-10, 0, 0), bevel=0.04)
+            x, t = -0.3 + 0.6 * u, top(u)
+            F.sweep(f'channel{i}', [(x, 0.31, -0.29), (x, (0.31 + t) / 2, -0.32), (x, t - 0.05, -0.345), (x, t - 0.022, -0.385)],
+                    None, M.linen, profile=G.rounded_rect(0.112, 0.11, 0.05, corner=2), up=(1, 0, 0), resolution=2,
+                    scale=[1.0, 1.04, 1.0, 0.9])
+        # the show-wood frame round the back: one moulded rail along the arch
         pts = [(-0.34, 0.42, zb + 0.055)] + [(-0.34 + 0.68 * i / 12, top(i / 12) + 0.025, zb + 0.06) for i in range(13)] \
             + [(0.34, 0.42, zb + 0.055)]
-        for i in range(len(pts) - 1):
-            G.rod(f'frame{i}', F.at(*pts[i]), F.at(*pts[i + 1]), 0.0175, M.walnut, verts=8)
+        F.sweep('frame', pts, None, M.walnut, profile=G.rounded_rect(0.04, 0.034, 0.012, corner=1), up=(0, 1, 0),
+                angle=60)
         for s in (-1, 1):
             ax = s * 0.32
-            _cushion(f'arm_pad{s}', 0.1, 0.06, 0.605, (ax, 0.625, -0.022), M.linen)
-            F.box(f'arm_rail{s}', 0.06, 0.03, 0.685, (ax, 0.585, -0.003), M.walnut, bevel=0.012)
-            F.sphere(f'arm_scroll{s}', 0.032, (ax, 0.59, 0.33), M.walnut, scale=(1.1, 0.95, 0.8), segments=10, rings=6)
-            G.rod(f'arm_post{s}', F.at(ax, 0.3, 0.32), F.at(ax, 0.58, 0.3), 0.0225, M.walnut, verts=10)
+            F.soft(f'arm_pad{s}', 0.1, 0.06, 0.605, (ax, 0.628, -0.022), M.linen, round=0.026, puff=0.012, flat=2,
+                   round_segments=1)
+            # the rail runs forward under the pad and rolls down into a scroll
+            F.sweep(f'arm_rail{s}', [(ax, 0.585, -0.34), (ax, 0.585, 0.24), (ax, 0.59, 0.315), (ax, 0.565, 0.35),
+                                     (ax, 0.535, 0.335), (ax, 0.548, 0.312)],
+                    None, M.walnut, profile=G.rounded_rect(0.032, 0.058, 0.012, corner=1), resolution=2,
+                    scale=[1, 1, 1.05, 1.0, 0.8, 0.55], angle=60)
+            # a shaped post from the seat rail up to the scroll, waisted in the middle
+            F.sweep(f'arm_post{s}', [(ax, 0.29, 0.318), (ax, 0.4, 0.33), (ax, 0.5, 0.322), (ax, 0.56, 0.31)], 0.022,
+                    M.walnut, verts=8, resolution=2, scale=[1.1, 0.78, 0.9, 1.0])
             F.box(f'side{s}', 0.05, 0.25, 0.545, (ax, 0.45, -0.052), M.linen, bevel=0.02)
-        _pillow('pillow', 0, 0.6, -0.245, M.pillow_sage, w=0.34, h=0.3)
+        F.soft('pillow', 0.34, 0.3, 0.12, (0, 0.6, -0.245), M.pillow_sage, rot=(-13, 0, 0), round=0.05, puff=0.035, flat=2,
+               round_segments=1)
         for x in (-0.31, 0.31):
             for z, dz in ((0.3, 1), (-0.385, -1)):
-                _cabriole(f'leg{x}{z}', x, z, 0.18, M.walnut_legs, 0.02 * (1 if x > 0 else -1), 0.02 * dz)
+                G.kit.cabriole(F, f'leg{x}{z}', x, z, 0.18, M.walnut_legs, 0.02 * (1 if x > 0 else -1), 0.02 * dz)
     G.join(still, 'chair', origin=(0, 0, 0))
 
     def cushions():
-        _cushion('seat', 0.58, 0.1, 0.575, (0, 0.37, 0.013), M.linen_cushion)
+        F.soft('seat', 0.58, 0.1, 0.575, (0, 0.37, 0.013), M.linen_cushion, round=0.035, puff=0.016, piping=0.006)
         return 0.42
     _settled(_seat(cushions, 0.32, 0.013))
 

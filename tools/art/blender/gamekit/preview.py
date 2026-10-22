@@ -1,5 +1,9 @@
 # Previews: Workbench renders for eyeballing a build (not part of the pipeline; previews/ is ignored by
-# git). The game is the real check: docs/design/objects.md, "Validation".
+# git), and `lit` ones, lit and textured roughly as the game draws them. The game is the real check:
+# docs/design/objects.md, "Validation".
+import math
+import os
+
 import bpy
 from mathutils import Vector
 
@@ -24,11 +28,106 @@ def preview(path, view='three_quarter'):
     scene.display.shading.light = 'STUDIO'
     scene.display.shading.color_type = 'MATERIAL'
     scene.display.shading.show_shadows = True
+    return _render(path, view)
+
+
+def lit(path, view='three_quarter'):
+    """Renders the scene to `path` as the game lights it, roughly: EEVEE, a low sun from the front right and a pale
+    sky, each finish's roughness and metalness, the textured finishes' maps (fabric, wood, bark, foliage)
+    box-projected at their scale and tinted by the colour, on a floor that takes the shadow. What a player sees,
+    where `preview` shows the shapes. It adds nodes to the materials, so only a preview run (never an export)
+    calls it."""
+    scene = bpy.context.scene
+    scene.render.engine = 'BLENDER_EEVEE'
+    scene.eevee.taa_render_samples = 32
+    scene.view_settings.view_transform = 'AgX'
+    world = bpy.data.worlds.get('lit') or bpy.data.worlds.new('lit')
+    world.use_nodes = True
+    world.node_tree.nodes['Background'].inputs['Color'].default_value = (0.62, 0.72, 0.86, 1)
+    world.node_tree.nodes['Background'].inputs['Strength'].default_value = 0.9
+    scene.world = world
+    for m in bpy.data.materials:
+        _textured(m)
+    lo, hi = (Vector(v) for v in measure())
+    span = max(hi - lo)
+    added = []
+    sun = bpy.data.lights.new('lit_sun', 'SUN')
+    sun.energy = 3.2
+    sun.angle = math.radians(3)
+    added.append(bpy.data.objects.new('lit_sun', sun))
+    added[-1].rotation_euler = Vector((0.6, -0.9, 1.0)).to_track_quat('Z', 'Y').to_euler()   # the light comes from there
+    floor = bpy.data.meshes.new('lit_floor')
+    r = span * 4
+    floor.from_pydata([(-r, -r, lo.z), (r, -r, lo.z), (r, r, lo.z), (-r, r, lo.z)], [], [(0, 1, 2, 3)])
+    floor.materials.append(_floor())
+    added.append(bpy.data.objects.new('lit_floor', floor))
+    for o in added:
+        bpy.context.collection.objects.link(o)
+    try:
+        return _render(path, view, (lo, hi))
+    finally:
+        for o in added:
+            data, blocks = o.data, bpy.data.lights if o.type == 'LIGHT' else bpy.data.meshes
+            bpy.data.objects.remove(o, do_unlink=True)
+            blocks.remove(data)
+
+
+def _floor():
+    m = bpy.data.materials.get('lit_floor')
+    if m is None:
+        m = bpy.data.materials.new('lit_floor')
+        m.use_nodes = True
+        bsdf = m.node_tree.nodes['Principled BSDF']
+        bsdf.inputs['Base Color'].default_value = (0.42, 0.40, 0.36, 1)
+        bsdf.inputs['Roughness'].default_value = 0.9
+    return m
+
+
+def _textured(m):
+    """Gives a material on a textured finish its maps, once: the albedo (times the colour) and the normal map,
+    box-projected in the object's metres times the finish's `uvScale`, as the game's `boxProjectUVs` does."""
+    from .materials import TEXTURES
+    finish = m.get('finish')
+    if finish not in TEXTURES or m.get('lit') or not m.use_nodes:
+        return
+    m['lit'] = True
+    albedo, scale = TEXTURES[finish]
+    nodes, links = m.node_tree.nodes, m.node_tree.links
+    bsdf = nodes['Principled BSDF']
+    coords = nodes.new('ShaderNodeTexCoord')
+    mapping = nodes.new('ShaderNodeMapping')
+    mapping.inputs['Scale'].default_value = (scale, scale, scale)
+    links.new(coords.outputs['Object'], mapping.inputs['Vector'])
+
+    def image(name, colour):
+        tex = nodes.new('ShaderNodeTexImage')
+        tex.image = bpy.data.images.load(os.path.join(os.path.dirname(albedo), name), check_existing=True)
+        if not colour:
+            tex.image.colorspace_settings.name = 'Non-Color'
+        tex.projection = 'BOX'
+        tex.projection_blend = 0.2
+        links.new(mapping.outputs['Vector'], tex.inputs['Vector'])
+        return tex
+    mix = nodes.new('ShaderNodeMix')
+    mix.data_type = 'RGBA'
+    mix.blend_type = 'MULTIPLY'
+    mix.inputs['Factor'].default_value = 1.0
+    socket = {s.identifier: s for s in mix.inputs}
+    socket['A_Color'].default_value = bsdf.inputs['Base Color'].default_value
+    links.new(image(os.path.basename(albedo), True).outputs['Color'], socket['B_Color'])
+    links.new(next(s for s in mix.outputs if s.identifier == 'Result_Color'), bsdf.inputs['Base Color'])
+    normal = nodes.new('ShaderNodeNormalMap')
+    links.new(image('normal.jpg', False).outputs['Color'], normal.inputs['Color'])
+    links.new(normal.outputs['Normal'], bsdf.inputs['Normal'])
+
+
+def _render(path, view, bounds=None):
+    scene = bpy.context.scene
     scene.render.resolution_x = 640
     scene.render.resolution_y = 640
     scene.render.film_transparent = False
 
-    lo, hi = (Vector(v) for v in measure())
+    lo, hi = bounds or (Vector(v) for v in measure())
     span = max(hi - lo)
     target = (lo + hi) / 2
     loc = target + Vector(VIEWS[view]) * span

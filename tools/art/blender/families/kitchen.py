@@ -20,6 +20,7 @@ M = G.Palette(
     body=('#F3F3F1', 'gloss'),       # white cabinet and doors; the main part the player colours (`paint`)
     trim=('#B9BCBF', 'satin'),       # plinth and badge
     seal=('#3A3D41', 'satin'),       # the gap between the doors
+    gasket=('#C9CDD0', 'satin'),     # the doors' rubber seals, pale grey as on a white fridge
     chrome=('#D0D3D6', 'chrome'),    # bar handles
     liner=('#DCE0E3', 'matte'),      # inside walls
     shelf=('#E9ECEE', 'gloss'),      # shelves, divider, tub
@@ -87,27 +88,45 @@ def _bar(name, x, y0, y1, z, t=0.022, stand=0.03, frame=F):
 
 
 def _shell():
-    """The cabinet as five panels, so the doors open onto a real interior instead of a solid block."""
-    F.box('side_left', 0.03, 1.74, 0.622, (-0.355, 0.93, -0.144), M.body, bevel=0.006)
-    F.box('side_right', 0.03, 1.74, 0.622, (0.355, 0.93, -0.144), M.body, bevel=0.006)
-    F.box('top', 0.74, 0.03, 0.622, (0, 1.785, -0.144), M.body, bevel=0.006)
+    """The cabinet as five panels, so the doors open onto a real interior instead of a solid block. The sides are
+    rounded on their vertical edges, as a pressed-steel body is; the top's edges are rounded to meet them."""
+    side = G.rounded_rect(0.03, 0.622, 0.012, corner=2)
+    F.extrude('side_left', side, 1.74, (-0.355, 0.93, -0.144), M.body, plane='top', bevel=0.004, bevel_segments=1)
+    F.extrude('side_right', side, 1.74, (0.355, 0.93, -0.144), M.body, plane='top', bevel=0.004, bevel_segments=1)
+    F.box('top', 0.74, 0.03, 0.622, (0, 1.785, -0.144), M.body, bevel=0.012, bevel_segments=2)
     F.box('bottom', 0.74, 0.03, 0.622, (0, 0.075, -0.144), M.body, bevel=0.006)
     F.box('back', 0.74, 1.74, 0.03, (0, 0.93, -0.44), M.body, bevel=0.006)
+    # the front of the plinth: a vented kick plate over a dark recess, and the hinges' covers on the right
+    F.box('kick_recess', 0.66, 0.05, 0.01, (0, 0.035, 0.108), M.dark)
+    slot = G.rounded_rect(0.07, 0.012, 0.006, corner=1)
+    slots = [[(u + (i - 2.5) * 0.1, v) for u, v in slot] for i in range(6)]
+    F.extrude('kick_plate', G.rounded_rect(0.68, 0.05, 0.008, corner=1), 0.008, (0, 0.035, 0.117), M.seal, holes=slots)
+    for y in (1.224, 0.08):
+        F.box(f'hinge{y}', 0.024, 0.026, 0.05, (0.356, y, 0.19), M.trim, bevel=0.006, bevel_segments=1)
 
 
 def _interior():
-    """The liner, shelves and food, seen once the doors are open."""
-    F.box('liner_back', 0.678, 1.678, 0.006, (0, 0.93, -0.421), M.liner, bevel=0.002)
-    F.box('liner_left', 0.006, 1.678, 0.578, (-0.337, 0.93, -0.134), M.liner, bevel=0.002)
-    F.box('liner_right', 0.006, 1.678, 0.578, (0.337, 0.93, -0.134), M.liner, bevel=0.002)
-    F.box('liner_top', 0.678, 0.006, 0.578, (0, 1.767, -0.134), M.liner, bevel=0.002)
-    F.box('liner_bottom', 0.678, 0.006, 0.578, (0, 0.093, -0.134), M.liner, bevel=0.002)
+    """The liner, shelves with trimmed fronts, two crisper drawers and food, seen once the doors are open. The
+    shelves stop short of the door's bins."""
+    F.box('liner_back', 0.678, 1.678, 0.006, (0, 0.93, -0.421), M.liner, bevel=0.002, bevel_segments=1)
+    F.box('liner_left', 0.006, 1.678, 0.578, (-0.337, 0.93, -0.134), M.liner, bevel=0.002, bevel_segments=1)
+    F.box('liner_right', 0.006, 1.678, 0.578, (0.337, 0.93, -0.134), M.liner, bevel=0.002, bevel_segments=1)
+    F.box('liner_top', 0.678, 0.006, 0.578, (0, 1.767, -0.134), M.liner, bevel=0.002, bevel_segments=1)
+    F.box('liner_bottom', 0.678, 0.006, 0.578, (0, 0.093, -0.134), M.liner, bevel=0.002, bevel_segments=1)
     # the divider between the freezer (top) and the fridge (bottom), the freezer's floor
-    F.box('divider', 0.672, 0.02, 0.55, (0, 1.234, -0.13), M.shelf, bevel=0.002)
-    # three shelves in the fridge, one in the freezer
-    for i, y in enumerate((0.37, 0.66, 0.95)):
-        F.box(f'shelf{i}', 0.672, 0.008, 0.55, (0, y, -0.13), M.shelf, bevel=0.002)
-    F.box('shelf_freezer', 0.672, 0.008, 0.55, (0, 1.52, -0.13), M.shelf, bevel=0.002)
+    F.box('divider', 0.672, 0.02, 0.55, (0, 1.234, -0.13), M.shelf, bevel=0.002, bevel_segments=1)
+    # three shelves in the fridge, one in the freezer, each with a trim along its front
+    for i, y in enumerate((0.37, 0.66, 0.95, 1.52)):
+        F.box(f'shelf{i}', 0.672, 0.008, 0.49, (0, y, -0.16), M.shelf)
+        F.box(f'shelf_trim{i}', 0.672, 0.022, 0.01, (0, y - 0.004, 0.083), M.trim, bevel=0.003, bevel_segments=1)
+    # two crisper drawers under the lowest shelf, a grip cut along each front's top
+    for s in (-1, 1):
+        F.box(f'crisper{s}', 0.322, 0.24, 0.46, (s * 0.166, 0.226, -0.16), M.shelf)
+        F.extrude(f'crisper_front{s}', G.rounded_rect(0.322, 0.25, 0.012, corner=1), 0.012, (s * 0.166, 0.226, 0.076),
+                  M.carton, holes=[[(u, v + 0.09) for u, v in G.rounded_rect(0.14, 0.022, 0.011, corner=2)]])
+    # the lamp's housing and the thermostat's dial under the divider
+    F.box('lamp', 0.16, 0.035, 0.09, (0.17, 1.205, -0.2), M.liner, bevel=0.008, bevel_segments=1)
+    F.cyl('dial', 0.022, 0.014, (0.17, 1.18, -0.2), M.trim, verts=12)
     _fridge_food()
     _freezer_food()
 
@@ -117,8 +136,7 @@ def _fridge_food():
     top, mid, low = 0.954, 0.664, 0.374  # the fridge shelf surfaces
     F.box('milk', 0.085, 0.20, 0.085, (-0.20, top + 0.10, -0.14), M.carton, bevel=0.006)
     F.cone('milk_gable', 0.062, 0.0, 0.055, (-0.20, top + 0.2275, -0.14), M.carton, verts=4, rot=(0, 0, 45))
-    F.cyl('juice', 0.032, 0.20, (0.02, top + 0.10, -0.14), M.bottle, verts=16, bevel=0.004)
-    F.cyl('juice_cap', 0.014, 0.025, (0.02, top + 0.2125, -0.14), M.carton, verts=12)
+    _bottle('juice', (0.02, top, -0.14), 0.032, 0.22, M.bottle, M.carton)
     for i, x in enumerate((-0.20, -0.11, -0.02)):
         F.sphere(f'apple{i}', 0.038, (x, mid + 0.038, -0.15), M.produce, segments=10, rings=6)
     F.sphere('orange', 0.042, (0.13, mid + 0.042, -0.15), M.produce2, segments=10, rings=6)
@@ -136,27 +154,71 @@ def _freezer_food():
     F.box('peas', 0.11, 0.15, 0.06, (-0.14, shelf + 0.075, -0.16), M.peas, bevel=0.008)
 
 
-def _door(name, y, h, handle_y0, handle_y1, badge=False):
-    """A door, rounded and proud of the opening, its handle on the right and its hinge on the left as seen from the front."""
+def _bottle(name, foot, r, h, material, cap, verts=10):
+    """A bottle standing at game point `foot`: a round body, a shoulder, a neck and its cap."""
+    bx, by, bz = F.at(*foot)
+    rings = [(0.0, 0.9), (0.025, 1.0), (0.62, 1.0), (0.78, 0.5), (0.86, 0.36), (0.94, 0.36)]
+    G.loft(name, [G.ring(r * k, r * k, bz + h * t, verts, at=(bx, by)) for t, k in rings], material=material)
+    F.cyl(f'{name}_cap', r * 0.4, h * 0.06, (foot[0], foot[1] + h * 0.97, foot[2]), cap, verts=verts)
+
+
+def _door_bin(name, y, x0, x1, z0, z1):
+    """A bin on a door's inside: a tray with a lip along its inner edge, from game x0 to x1, z0 (inner) to z1."""
+    w, d = x1 - x0, z1 - z0
+    F.box(f'{name}_tray', w, 0.01, d, ((x0 + x1) / 2, y + 0.005, (z0 + z1) / 2), M.shelf)
+    F.box(f'{name}_lip', w, 0.05, 0.008, ((x0 + x1) / 2, y + 0.025, z0 + 0.004), M.shelf, bevel=0.003, bevel_segments=1)
+    for s in (x0, x1):
+        F.box(f'{name}_end{s}', 0.008, 0.05, d, (s, y + 0.025, (z0 + z1) / 2), M.shelf)
+
+
+def _handle(name, x, y0, y1, face):
+    """A bar handle in one piece: out from the door face at `face` on rounded stand-offs, up, and back in."""
+    out = face + 0.041
+    F.sweep(name, [(x, y0, face - 0.004), (x, y0, out - 0.012), (x, y0 + 0.012, out), (x, y1 - 0.012, out),
+                   (x, y1, out - 0.012), (x, y1, face - 0.004)],
+            None, M.chrome, profile=G.rounded_rect(0.016, 0.022, 0.007, corner=1), up=(1, 0, 0), resolution=2,
+            angle=60)
+
+
+def _door(name, y, h, handle_y0, handle_y1, badge=False, bins=()):
+    """A door, rounded and proud of the opening, its handle on the right and its hinge on the left as seen from
+    the front: a dark seal round its back, an inner liner and the bins on its inside (`bins`: their heights)."""
     with G.new_parts() as parts:
-        F.box(name, 0.728, h, 0.04, (0, y, 0.195), M.body, bevel=0.010)
-        _bar(f'handle_{name}', -0.3, handle_y0, handle_y1, 0.215)
+        F.soft(name, 0.728, h, 0.04, (0, y, 0.195), M.body, round=0.014)
+        _handle(f'handle_{name}', -0.3, handle_y0, handle_y1, 0.215)
         if badge:
-            F.box('badge', 0.1, 0.018, 0.004, (0.25, 1.74, 0.217), M.trim, bevel=0.002)
+            F.soft('badge', 0.1, 0.018, 0.006, (0.25, 1.74, 0.216), M.trim, round=0.003, round_segments=1)
+        seal = G.rounded_rect(0.7, h - 0.024, 0.03, corner=2)
+        F.sweep(f'{name}_seal', [(u, y + v, 0.172) for u, v in seal], 0.009, M.gasket, verts=5, closed=True)
+        F.box(f'{name}_liner', 0.64, h - 0.08, 0.008, (0, y, 0.172), M.liner)
+        for i, by in enumerate(bins):
+            _door_bin(f'{name}_bin{i}', by, -0.3, 0.3, 0.1, 0.168)
     return G.hinged(G.join(parts, name), F.at(0.364, y, 0.195))
 
 
 def fridge():
-    # the cabinet on a recessed plinth, opening onto a liner, shelves and food: the part that stays still
+    # the cabinet on a recessed plinth, opening onto a liner, shelves, drawers and food: the part that stays still
     with G.new_parts() as cabinet:
         F.box('plinth', 0.68, 0.06, 0.57, (0, 0.03, -0.17), M.trim, bevel=0.006)
         _shell()
         _interior()
         F.box('gap', 0.7, 0.014, 0.03, (0, 1.224, 0.187), M.seal, bevel=0.004)
     G.join(cabinet, 'cabinet', origin=(0, 0, 0))
-    # the freezer door over the fridge door, a clip each
-    freezer = _door('door_freezer', 1.51, 0.556, 1.274, 1.524, badge=True)
-    door = _door('door_fridge', 0.643, 1.146, 0.804, 1.164)
+    # the freezer door over the fridge door, a clip each; the fridge door's bins hold bottles, jars and butter
+    freezer = _door('door_freezer', 1.51, 0.556, 1.274, 1.524, badge=True, bins=(1.33,))
+    with G.new_parts() as stock:
+        F.box('ice_tray', 0.24, 0.035, 0.05, (-0.12, 1.358, 0.134), M.frozen, bevel=0.006, bevel_segments=1)
+    door = _door('door_fridge', 0.643, 1.146, 0.804, 1.164, bins=(0.2, 0.55, 0.9))
+    with G.new_parts() as stock2:
+        for i, (x, mat) in enumerate(((-0.22, M.bottle), (-0.13, M.wine2), (-0.04, M.produce2))):
+            _bottle(f'door_bottle{i}', (x, 0.21, 0.134), 0.03, 0.27 - 0.03 * i, mat, M.carton)
+        for i, x in enumerate((0.1, 0.19)):
+            F.cyl(f'jar{i}', 0.034, 0.09, (x, 0.605, 0.134), M.produce if i else M.egg, verts=10, bevel=0.004, bevel_segments=1)
+            F.cyl(f'jar_lid{i}', 0.036, 0.016, (x, 0.658, 0.134), M.trim, verts=10)
+        F.box('butter', 0.12, 0.05, 0.05, (-0.15, 0.935, 0.134), M.egg, bevel=0.008, bevel_segments=1)
+    # the door's stock moves with it
+    freezer = G.join([freezer, *stock], 'door_freezer')
+    door = G.join([door, *stock2], 'door_fridge')
     G.settle()   # where the game places it (`centre`), its back on the wall
     G.swing(freezer, 'freezer_open', FREEZER_ANGLE, DOOR_SECONDS)
     G.swing(door, 'fridge_open', FRIDGE_ANGLE, DOOR_SECONDS)

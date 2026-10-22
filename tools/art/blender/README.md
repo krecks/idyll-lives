@@ -52,6 +52,7 @@ game. Report what you checked, and anything you didn't.
 cargo art kitchen                  # build, export, register, check
 cargo art kitchen --only fridge    # one model
 cargo art garden_decor --preview   # previews/garden_decor/<id>.png (+ <id>@<clip>.png), no export
+cargo art living --preview --lit   # and <id>.lit.png: EEVEE, sun and sky, the finishes' textures (judge detail here)
 cargo art kitchen --no-pack        # export without writing the pack
 cargo art --all                    # every family (not _template)
 cargo art _template --preview      # the template only previews
@@ -124,7 +125,18 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
    - A lamp's shade or a screen that glows at night takes its glow's colour:
      `shade=('#F2E6CC', 'fabric', {'glow': '#FFD9A0'})`. Nothing glows by day.
 3. **Build** in a function, in metres, from `G.cube`/`sphere`/`cylinder`/`cone`/`torus`/`rod`/`revolve`/`boulder`
-   (sizes are full extents; `bevel` rounds edges). End with:
+   (sizes are full extents; `bevel` rounds edges) and the forms (`gamekit/forms.py`), which make what boxes can't:
+   - `G.sweep` (`F.sweep`): a round tube or any profile along a path, curved through the points (`resolution`),
+     tapering (`scale`): frames and rails in one piece, rolled arms, handles, cabriole legs, branches;
+   - `G.loft` through `G.ring`s (ellipses to rounded squares): bottles, vases, lamp bases;
+   - `G.extrude` (`F.extrude`): an outline with holes into a slab: a carved apron, a headboard, a grille;
+     `G.rounded_rect` and `G.smooth_outline` draw outlines;
+   - `G.soft_box` (`F.soft`): cushions, pillows, mattresses: rounded, puffed, with piping;
+   - `G.mirrored`, `G.cut` (a boolean), `G.jitter` (a hand-made wobble);
+   - `G.kit`: whole parts more than one family uses (`kit.tube`, `kit.cabriole`).
+
+   Spend the triangles where they show (silhouettes, edges, what a hand touches) and keep hidden parts plain
+   (`families/living.py` armchair and sofa, `kitchen.py` fridge, `trees.py` oak). End with:
    - `G.join_all('<id>')` for a model with no moving parts;
    - one `G.join` per part for a model with moving parts (below);
    - then `G.settle()`, which stands it on the floor, centred, by moving it, never scaling.
@@ -392,11 +404,13 @@ never one that's already running) and drive Playwright headless with full Chrome
 | `scene.py` | `reset`, `meshes`, the paths (`ASSETS`, `PREVIEWS`), `cosd`/`sind`; warns off Blender 5.2 |
 | `materials.py` | `Palette` (colour + finish), `mat` (one material by hand), `FINISHES` (read from the base manifest) |
 | `shapes.py` | the primitives: `cube`, `sphere`, `cylinder`, `cone`, `torus`, `rod`, `revolve`, `boulder` |
+| `forms.py` | what primitives can't make: `sweep`, `loft`/`ring`, `extrude` (with holes), `soft_box`, `rounded_rect`, `smooth_outline`, `mirrored`, `cut`, `jitter` |
+| `kit.py` | parts several families use, in game axes: `tube`, `cabriole` |
 | `place.py` | `GameFrame`: parts placed in game coordinates (`at`, `box`, `cyl`, `cone`, `sphere`); `depths=` redraws a thing's numbers at another depth (the kitchen counters' one depth) |
 | `parts.py` | `new_parts`, `join`, `join_all`, `set_origin`, `hinged`, `turn`, `settle`, `measure`, `game_size`, `check_size`; `fit` (third-party files only: it stretches) |
 | `motion.py` | the clips: `swing` (turn), `slide` (move), `grow` (appear from nothing), `squash` (scale), `spin` (whole turns home), `rock` (out, past rest and home), `turns` (parts out and back in turn), `scroll` (one repeat on, a belt), `path` (through keys), `stages` (a crop's growth); `clips` |
 | `export.py` | `export_glb` (the fixed export settings), `write_pack`, `stats`, `materials_used` |
-| `preview.py` | `preview` (front three-quarter, Workbench; or `view=` side, front, top), `preview_clips`, `preview_perches` |
+| `preview.py` | `preview` (front three-quarter, Workbench; or `view=` side, front, top), `lit` (EEVEE, as the game lights it: `--lit`), `preview_clips`, `preview_perches` |
 | `family.py` | `Model`, `Family` and its `run`: the command line every family script ends with |
 | `far.py` | `far_of` (a far version from the model's own build at low detail), `low`, `is_low` |
 | `perch.py` | `G.perch`: where birds sit on a model, found on its meshes (`around`; `find`: `surface`, `bare`, `spread`, `keep`), the entry's `perches` |

@@ -10,7 +10,7 @@ from . import motion, parts, perch
 from .export import export_glb, materials_used, stats, write_pack
 from .manifest import known_keys, played, write_centres  # the keys, `motions` and centres as the gate reads them
 from .parts import check_size, join
-from .preview import preview, preview_clips, preview_perches
+from .preview import lit, preview, preview_clips, preview_perches
 from .scene import ASSETS, PREVIEWS, meshes, reset
 
 # A decimated far version (`far=ratio`) keeps every vertex up to this height (m) over the model's lowest point.
@@ -117,6 +117,7 @@ class Family:
           (nothing)          build, check and export every model, then write the pack
           --only a,b         just these ids (the pack keeps the others' entries)
           --preview          render previews/<family>/<id>.png (and <id>@<clip>.png) instead of exporting
+          --lit              with --preview: <id>.lit.png too, lit and textured as the game draws it
           --no-pack          export without writing the pack
         """
         args = argv[argv.index('--') + 1:] if '--' in argv else []
@@ -149,6 +150,8 @@ class Family:
                 stem = os.path.join(PREVIEWS, self.name, model.id)
                 os.makedirs(os.path.dirname(stem), exist_ok=True)
                 preview(stem + '.png')
+                if '--lit' in args:
+                    lit(stem + '.lit.png')
                 preview_clips(stem)
                 print(f'[gamekit] previewed {self.key(model)} -> {stem}.png')
                 if perches:

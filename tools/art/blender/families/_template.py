@@ -46,10 +46,14 @@ def _box_walls():
 
 
 def chest():
-    # 2. The part that stays still: build it from primitives, then join it into one object. `new_parts`
-    #    collects what is made inside the block.
+    # 2. The part that stays still: build it from primitives and forms (gamekit/forms.py: `sweep`, `extrude`,
+    #    `soft_box`, `loft`), then join it into one object. `new_parts` collects what is made inside the block.
     with G.new_parts() as body:
-        G.cube('plinth', (W - 0.04, D - 0.04, 0.04), at=(0, 0, 0.02), material=M.trim, bevel=0.004)
+        # the plinth: its front outline, an arch cut up between two feet, extruded front to back
+        arch = [(x / 10 * 0.28, 0.025 * (1 - (x / 10) ** 2)) for x in range(10, -11, -1)]
+        G.extrude('plinth', [(-(W - 0.04) / 2, 0), (-0.28, 0)] + arch[::-1][1:-1] + [(0.28, 0), ((W - 0.04) / 2, 0),
+                  ((W - 0.04) / 2, 0.04), (-(W - 0.04) / 2, 0.04)], D - 0.04, at=(0, 0, 0), material=M.trim,
+                  bevel=0.004, bevel_segments=1)
         G.cube('drawer_case', (W, D, DRAWER), at=(0, 0, 0.04 + DRAWER / 2), material=M.body, bevel=0.004)
         _box_walls()
     G.join(body, 'body', origin=(0, 0, 0))
@@ -57,7 +61,7 @@ def chest():
     # 3. A moving part: its own object, joined from its pieces, its origin on the hinge. The lid hinges
     #    on its back edge (Blender +y), at the top of the walls.
     with G.new_parts() as lid:
-        G.cube('lid', (W + 0.02, D + 0.02, LID), at=(0, 0, H - LID / 2), material=M.trim, bevel=0.008)
+        G.soft_box('lid', (W + 0.02, D + 0.02, LID), at=(0, 0, H - LID / 2), material=M.trim, round=0.012)
         G.cube('lid_knob', (0.08, 0.02, 0.02), at=(0, -D / 2 - 0.02, H - LID / 2), material=M.brass, bevel=0.004)
     lid = G.hinged(G.join(lid, 'lid'), (0, D / 2 + 0.01, H - LID))
 
@@ -65,8 +69,10 @@ def chest():
     with G.new_parts() as drawer:
         G.cube('drawer', (W - 0.06, 0.02, DRAWER - 0.02), at=(0, -D / 2 - 0.01, 0.04 + DRAWER / 2),
                material=M.body, bevel=0.004)
-        G.cylinder('drawer_handle', 0.012, 0.14, at=(0, -D / 2 - 0.035, 0.04 + DRAWER / 2),
-                   material=M.brass, rot=(0, 90, 0), verts=10)
+        # a bow handle: one tube swept through four points, its bends rounded
+        z = 0.04 + DRAWER / 2
+        G.sweep('drawer_handle', [(-0.07, -D / 2 - 0.012, z), (-0.055, -D / 2 - 0.035, z), (0.055, -D / 2 - 0.035, z),
+                                  (0.07, -D / 2 - 0.012, z)], 0.007, material=M.brass, verts=8, resolution=4)
         # the tray behind the front, hidden in the case until the drawer is out
         G.cube('drawer_tray', (W - 0.1, D - 0.08, DRAWER - 0.04), at=(0, 0.02, 0.04 + DRAWER / 2),
                material=M.inside)

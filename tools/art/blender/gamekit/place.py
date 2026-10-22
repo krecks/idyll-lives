@@ -11,7 +11,7 @@
 # depth), ascending; depths between two pairs are mapped linearly, beyond the ends moved as the end is.
 # A box's back and front are mapped, so it keeps its place between them; anything else moves by its
 # middle (the 0.79-deep kitchen counters drawn 0.66 deep, as the old `shallow`).
-from . import shapes
+from . import forms, shapes
 
 
 class GameFrame:
@@ -56,3 +56,23 @@ class GameFrame:
     def sphere(self, name, r, at, material, **kw):
         """A sphere at a game position."""
         return shapes.sphere(name, r, at=self.at(*at), material=material, **kw)
+
+    def soft(self, name, w, h, d, at, material, puff=None, **kw):
+        """A soft box (`forms.soft_box`) of game width, height and depth at a game position; a `puff` of three is
+        game (x, height, depth) too."""
+        if isinstance(puff, (tuple, list)):
+            puff = (puff[0], puff[2], puff[1])
+        return forms.soft_box(name, (w, d, h), at=self.at(*at), material=material, puff=puff, **kw)
+
+    def sweep(self, name, points, radius, material, **kw):
+        """A tube or profile swept through game points (`forms.sweep`)."""
+        return forms.sweep(name, [self.at(*p) for p in points], radius, material=material, **kw)
+
+    def extrude(self, name, outline, depth, at, material, plane='front', **kw):
+        """A slab from a game outline (`forms.extrude`): 'front' (x, height), thick front to back; 'side' (depth,
+        height), thick across; 'top' (x, depth), thick upwards."""
+        flip = {'front': ('XZ', lambda u, v: (-u, v)), 'side': ('YZ', lambda u, v: (-u, v)),
+                'top': ('XY', lambda u, v: (-u, -v))}[plane]
+        loops = [[flip[1](*p) for p in loop] for loop in [outline, *kw.pop('holes', ())]]
+        return forms.extrude(name, loops[0], depth, at=self.at(*at), material=material, holes=loops[1:],
+                             plane=flip[0], **kw)

@@ -26,6 +26,18 @@ def _finishes():
 
 FINISHES = _finishes()
 
+
+def _textures():
+    """{'fabric': (albedo path, uvScale), ...}: the textured finishes' maps, for the lit previews (`preview.lit`)."""
+    with open(os.path.join(ASSETS, 'manifest.json')) as f:
+        entries = json.load(f)['entries']
+    prefix = 'material.finish.'
+    return {key[len(prefix):]: (os.path.join(ASSETS, e['texture']), e.get('uvScale', 1.0))
+            for key, e in entries.items() if key.startswith(prefix) and e.get('texture')}
+
+
+TEXTURES = _textures()
+
 _MATERIALS = {}
 
 
@@ -101,7 +113,9 @@ class Palette:
         if name not in colours:
             raise AttributeError(f'no colour {name!r} in the palette')
         color, finish = colours[name][:2]
-        return mat(name, color, **FINISHES[finish])
+        m = mat(name, color, **FINISHES[finish])
+        m['finish'] = finish  # for the lit previews; not exported (no glTF extras)
+        return m
 
     def finish(self, name):
         return f'material.finish.{self._colours[name][1]}'

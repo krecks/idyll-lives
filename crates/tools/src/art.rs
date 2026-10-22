@@ -4,6 +4,7 @@
 //!   cargo art kitchen --only fridge    one model of it (--only a,b: several)
 //!   cargo art --all                    every family
 //!   cargo art garden_decor --preview   render previews/ instead of exporting
+//!   cargo art garden_decor --preview --lit   and <id>.lit.png, lit and textured as the game draws it
 //!   cargo art kitchen --no-pack        export without writing the pack
 //!   cargo art --centres                write centres.json from every family (gamekit/centres.py, no build)
 //!
@@ -148,7 +149,7 @@ pub fn main(argv: &[String]) -> i32 {
     if names.is_empty() {
         return exit(format!("name a family ({}) or --all", families(&here).join(", ")));
     }
-    let mut passthrough: Vec<String> = ["--preview", "--no-pack"].iter().filter(|f| has(f)).map(|f| f.to_string()).collect();
+    let mut passthrough: Vec<String> = ["--preview", "--lit", "--no-pack"].iter().filter(|f| has(f)).map(|f| f.to_string()).collect();
     if let Some(id) = only {
         passthrough.extend(["--only".to_string(), id]);
     }
