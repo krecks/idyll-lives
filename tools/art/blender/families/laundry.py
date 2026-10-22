@@ -9,6 +9,7 @@
 # still while its washing is taken out to fold. The rail hangs on the wall at its real height; the rest are still.
 #
 # Run:  cargo art laundry [--only laundryWasher] [--preview]
+import math
 import os
 import sys
 
@@ -42,6 +43,9 @@ M = G.Palette(
     wicker_rim=('#B8955F', 'fabric'),
     mat=('#B9CCC4', 'fabric'),
     mat_pile=('#C9DAD3', 'fabric'),
+    towel_hem=('#7FAEB9', 'fabric'),     # the woven band across a towel's foot
+    towel_hem2=('#D9D5CA', 'fabric'),
+    wicker_band=('#B09A7C', 'satin'),    # the bands round the dryer's basket
 )
 
 WALL = -0.43   # the wall's face, game depth
@@ -50,77 +54,140 @@ DOOR_Y = 0.4    # the door's middle, height
 DOOR_R = 0.21   # the ring's radius
 
 
+def _rbox(F, name, w, h, d, at, mat, r=0.004, segs=1, **kw):
+    """A box with its edges chamfered (`segs` 1) or rounded (2 or more)."""
+    return F.box(name, w, h, d, at, mat, bevel=r, bevel_segments=segs, **kw)
+
+
+def _front_disc(F, name, profile, x, y, z, mat, segments=32):
+    """A turned part facing the front from game depth `z`: `profile` [(radius, out), ...] revolved about the depth axis."""
+    return G.revolve(name, profile, at=F.at(x, y, z), material=mat, segments=segments, rot=(90, 0, 0))
+
+
+def _lump(F, name, x, y, z, r, mat, scale=(1, 0.5, 0.8), seed=0.0, turn=0.0):
+    """A crumple of washing: a squashed ball, lumpy (Blender scale)."""
+    obj = G.sphere(name, r, at=F.at(x, y, z), material=mat, scale=scale, rot=(0, turn, 0), segments=10, rings=6)
+    return G.jitter(obj, r * 0.18, size=r * 0.9, seed=seed)
+
+
 # --- the washer and the dryer ---------------------------------------------------------------------------
-def _cabinet(F, led, dryer):
-    """The still cabinet: the body, a plinth, the control strip with a soap drawer or a filter, a knob, a
-    display and a light, and the door seal round the porthole."""
-    F.box('cabinet', 0.6, 0.84, 0.6, (0, 0.44, -0.16), M.body, bevel=0.03)
-    F.box('plinth', 0.56, 0.02, 0.56, (0, 0.01, -0.16), M.dark, bevel=0.006)
-    F.box('strip', 0.6, 0.13, 0.012, (0, 0.78, 0.144), M.panel, bevel=0.006)
-    F.box('drawer', 0.14, 0.07, 0.012, (-0.18, 0.78, 0.152), M.body, bevel=0.006)
-    F.box('drawer_grip', 0.08, 0.012, 0.008, (-0.18, 0.765, 0.16), M.dark, bevel=0.003)
-    F.box('display', 0.12, 0.05, 0.006, (0.02, 0.78, 0.153), M.dark, bevel=0.004)
-    F.box('light', 0.03, 0.016, 0.004, (0.02, 0.78, 0.158), led, bevel=0.002)
-    F.cyl('knob_skirt', 0.045, 0.012, (0.18, 0.78, 0.154), M.panel, rot=(90, 0, 0), verts=20)
-    F.cyl('seal', 0.2, 0.008, (0, DOOR_Y, 0.143), M.dark, rot=(90, 0, 0), verts=36)
+def _cabinet(F, led, dryer, ring):
+    """The still cabinet: the body under a top panel, a recessed plinth, the control strip with a soap drawer or a
+    filter, a program knob in its ring of settings, a display and buttons, the rubber bellows round the porthole."""
+    F.soft('cabinet', 0.6, 0.84, 0.6, (0, 0.44, -0.16), M.body, round=0.03, round_segments=2)
+    _rbox(F, 'top', 0.6, 0.014, 0.6, (0, 0.853, -0.16), M.body, r=0.006)
+    _rbox(F, 'plinth', 0.56, 0.02, 0.56, (0, 0.01, -0.16), M.dark, r=0.006)
+    F.box('kick', 0.5, 0.012, 0.002, (0, 0.035, 0.1405), M.dark)
+    _rbox(F, 'strip', 0.6, 0.13, 0.012, (0, 0.78, 0.144), M.panel, r=0.006)
+    # the soap drawer (washer) or the water tank (dryer): a front with a scoop grip, its compartments' marks
+    _rbox(F, 'drawer', 0.14, 0.07, 0.012, (-0.18, 0.78, 0.152), M.body, r=0.005)
+    _rbox(F, 'drawer_grip', 0.08, 0.012, 0.006, (-0.18, 0.759, 0.159), M.dark, r=0.003)
+    for k in range(3):
+        F.box(f'drawer_mark{k}', 0.012, 0.004, 0.001, (-0.225 + 0.03 * k, 0.8, 0.1585), M.dark)
+    # the display: the time left, the light by it, three buttons under
+    _rbox(F, 'display', 0.12, 0.05, 0.006, (0.02, 0.785, 0.153), M.dark, r=0.004)
+    for k, w in enumerate((0.012, 0.004, 0.012, 0.012)):
+        F.box(f'time{k}', w, 0.018, 0.001, (-0.005 + 0.016 * k, 0.79, 0.1562), led)
+    F.box('light', 0.03, 0.006, 0.002, (0.02, 0.769, 0.157), led)
+    for k in range(3):
+        _front_disc(F, f'button{k}', [(0, 0.0), (0.008, 0.0), (0.008, 0.004), (0.006, 0.006), (0, 0.006)],
+                    -0.02 + 0.04 * k, 0.738, 0.15, M.body, segments=8)
+    # the program knob's ring of settings
+    _front_disc(F, 'knob_skirt', [(0, 0.0), (0.046, 0.0), (0.046, 0.004), (0.04, 0.006), (0, 0.006)], 0.18, 0.78, 0.15,
+                M.panel, segments=24)
+    for k in range(10):
+        a = math.radians(-150 + k * 300 / 9)
+        F.box(f'setting{k}', 0.004, 0.004, 0.001, (0.18 + 0.056 * math.sin(a), 0.78 + 0.056 * math.cos(a), 0.1505),
+              M.dark if k % 3 else led)
+    # the bellows: a rubber lip round the opening, behind the door
+    _front_disc(F, 'seal', [(0.205, -0.004), (0.205, 0.0), (0.19, 0.004), (0.172, 0.0), (0.168, -0.01), (0.15, -0.012),
+                            (0.205, -0.004)],
+                0, DOOR_Y, 0.146, M.dark, segments=24)
     if dryer:
-        for k, y in enumerate((0.08, 0.105, 0.13)):
-            F.box(f'vent{k}', 0.4, 0.008, 0.01, (0, y, 0.142), M.door_dryer, bevel=0.003)
+        # the vents along the foot, the condenser's hatch beside them
+        for k, y in enumerate((0.075, 0.1, 0.125)):
+            _rbox(F, f'vent{k}', 0.4, 0.008, 0.01, (0, y, 0.142), M.door_dryer, r=0.003)
     else:
-        F.box('filter', 0.12, 0.06, 0.008, (0.2, 0.08, 0.142), M.panel, bevel=0.004)
+        _rbox(F, 'filter', 0.12, 0.06, 0.008, (0.2, 0.08, 0.142), M.panel, r=0.004)
+        F.box('filter_slot', 0.04, 0.006, 0.002, (0.2, 0.1, 0.1465), M.dark)
 
 
 def _door(F, ring):
-    """The door: a ring, its window and a handle on the right, hinged on its left edge."""
+    """The door: a turned ring with its window domed in it and a grip on the right, hinged on its left edge."""
     with G.new_parts() as parts:
-        F.cyl('door_back', DOOR_R + 0.012, 0.012, (0, DOOR_Y, 0.148), ring, rot=(90, 0, 0), verts=36)
-        G.torus('door_ring', DOOR_R - 0.012, 0.024, at=F.at(0, DOOR_Y, DOOR_Z + 0.006), material=ring,
-                rot=(90, 0, 0), major_segments=36, minor_segments=10)
-        F.cyl('window', DOOR_R - 0.025, 0.01, (0, DOOR_Y, DOOR_Z + 0.012), M.glass, rot=(90, 0, 0), verts=36)
-        F.box('handle', 0.03, 0.08, 0.03, (DOOR_R + 0.01, DOOR_Y, DOOR_Z + 0.02), ring, bevel=0.01)
+        _front_disc(F, 'door_ring', [(DOOR_R - 0.035, DOOR_Z - 0.006), (DOOR_R + 0.012, DOOR_Z - 0.006),
+                                     (DOOR_R + 0.012, DOOR_Z + 0.006), (DOOR_R + 0.004, DOOR_Z + 0.022),
+                                     (DOOR_R - 0.012, DOOR_Z + 0.03), (DOOR_R - 0.026, DOOR_Z + 0.026),
+                                     (DOOR_R - 0.035, DOOR_Z + 0.014), (DOOR_R - 0.035, DOOR_Z - 0.006)], 0, DOOR_Y, 0, ring,
+                    segments=32)
+        # the grip: a bar standing out of the ring's right side
+        F.sweep('handle', G.kit.fillet([(DOOR_R - 0.005, DOOR_Y - 0.045, DOOR_Z + 0.012),
+                                        (DOOR_R + 0.012, DOOR_Y - 0.045, DOOR_Z + 0.03),
+                                        (DOOR_R + 0.012, DOOR_Y + 0.045, DOOR_Z + 0.03),
+                                        (DOOR_R - 0.005, DOOR_Y + 0.045, DOOR_Z + 0.012)], 0.012),
+                None, ring, profile=G.rounded_rect(0.012, 0.022, 0.005, corner=1), up=(0, 1, 0), angle=50)
+        _front_disc(F, 'window', [(0, DOOR_Z + 0.028), (DOOR_R - 0.08, DOOR_Z + 0.024), (DOOR_R - 0.03, DOOR_Z + 0.012),
+                                  (DOOR_R - 0.025, DOOR_Z), (DOOR_R - 0.04, DOOR_Z - 0.004), (0, DOOR_Z - 0.004)],
+                    0, DOOR_Y, 0, M.glass, segments=32)
     door = G.join(parts, 'door')
     return G.hinged(door, F.at(-DOOR_R - 0.02, DOOR_Y, DOOR_Z))
 
 
-def _drum(F, washing):
-    """The drum's face behind the window: its dark inside, three paddles and the washing, joined round the
-    middle so it turns about its axis."""
+def _drum(F, washing, seed):
+    """The drum's face behind the window: its dark inside with a ring of holes, three lifters and the washing,
+    joined round the middle so it turns about its axis."""
     with G.new_parts() as parts:
         F.cyl('drum_face', 0.19, 0.006, (0, DOOR_Y, 0.146), M.drum, rot=(90, 0, 0), verts=32)
+        for k in range(12):
+            a = math.tau * k / 12
+            F.box(f'hole{k}', 0.008, 0.008, 0.001, (0.165 * math.cos(a), DOOR_Y + 0.165 * math.sin(a), 0.1492), M.paddle,
+                  rot=(0, math.degrees(a), 0))
         for k in range(3):
             a = 120 * k
             x, y = 0.14 * G.sind(a), DOOR_Y + 0.14 * G.cosd(a)
-            F.box(f'paddle{k}', 0.025, 0.07, 0.008, (x, y, 0.151), M.paddle, rot=(0, 0, -a), bevel=0.003)
+            F.extrude(f'paddle{k}', G.smooth_outline([(-0.016, -0.04), (0.016, -0.04), (0.01, 0.04), (-0.01, 0.04)],
+                                                     passes=1), 0.012, (x, y, 0.153), M.paddle, rot=(0, -a, 0),
+                      bevel=0.003, bevel_segments=1)
         for k, (m, dx, dy, r) in enumerate(washing):
-            G.sphere(f'wash{k}', r, at=F.at(dx, DOOR_Y + dy, 0.151), material=m, scale=(1, 0.18, 0.8),
-                     rot=(0, 15 * k, 0), segments=14, rings=8)
+            _lump(F, f'wash{k}', dx, DOOR_Y + dy, 0.153, r, m, scale=(1, 0.18, 0.8), seed=seed + k, turn=15 * k)
     drum = G.join(parts, 'drum')
     return G.hinged(drum, F.at(0, DOOR_Y, 0.146))
+
+
+def _folded(F, name, x, y, z, w, d, h, mat, turn=0.0):
+    """A folded towel lying on `y`: a soft slab, its folded edge rolled to the front."""
+    _rbox(F, name, w, h, d, (x, y + h / 2, z), mat, r=min(0.02, h * 0.45), segs=2, rot=(0, 0, turn))
 
 
 def _machine(dryer):
     F = G.GameFrame(shift=0.03)      # built 3 cm into the wall (as the old part was); moved onto its face
     led, ring = (M.led_dryer, M.door_dryer) if dryer else (M.led, M.door)
     with G.new_parts() as still:
-        _cabinet(F, led, dryer)
-        F.cyl('knob', 0.033, 0.03, (0.18, 0.78, 0.165), ring, rot=(90, 0, 0), verts=18, bevel=0.006)
+        _cabinet(F, led, dryer, ring)
+        _front_disc(F, 'knob', [(0, 0.0), (0.033, 0.0), (0.034, 0.014), (0.03, 0.026), (0, 0.028)], 0.18, 0.78, 0.154,
+                    ring, segments=18)
+        _rbox(F, 'knob_pointer', 0.006, 0.026, 0.006, (0.18, 0.795, 0.181), M.dark, r=0.002)
         if dryer:
-            # a wicker basket of dry washing on the top
+            # a wicker basket of dry washing on the top, its weave in bands, handles at its ends
             G.revolve('basket', [(0, 0), (0.185, 0), (0.21, 0.18), (0.195, 0.18), (0.17, 0.02), (0, 0.02)],
                       at=F.at(-0.06, 0.86, -0.14), material=M.wicker_plain, segments=24, scale=(1, 0.76, 1))
+            for k, (yy, r) in enumerate(((0.05, 0.193), (0.1, 0.199), (0.15, 0.205))):
+                loop = [(-0.06 + r * math.cos(math.tau * i / 24), 0.86 + yy, -0.14 + 0.76 * r * math.sin(math.tau * i / 24))
+                        for i in range(24)]
+                F.sweep(f'basket_band{k}', loop, 0.004, M.wicker_band, verts=4, closed=True)
             G.sphere('pile', 0.15, at=F.at(-0.06, 1.0, -0.14), material=M.wash_c, scale=(1, 0.75, 0.38),
                      segments=16, rings=8)
-            G.sphere('pile_top', 0.07, at=F.at(0.02, 1.05, -0.1), material=M.wash_a, scale=(1.1, 0.9, 0.5),
-                     segments=12, rings=8)
+            _lump(F, 'pile_top', 0.02, 1.05, -0.1, 0.07, M.wash_a, scale=(1.1, 0.9, 0.5), seed=4)
+            _lump(F, 'pile_sock', -0.15, 1.04, -0.08, 0.04, M.wash_b, scale=(1.2, 0.6, 0.5), seed=7)
         else:
             # folded towels on the top
-            F.box('fold0', 0.3, 0.08, 0.22, (0.08, 0.9, -0.1), M.wash_c, bevel=0.02)
-            F.box('fold1', 0.28, 0.04, 0.2, (0.08, 0.96, -0.1), M.wash_b, bevel=0.015)
+            _folded(F, 'fold0', 0.08, 0.86, -0.1, 0.3, 0.22, 0.06, M.wash_c)
+            _folded(F, 'fold1', 0.08, 0.92, -0.1, 0.28, 0.2, 0.056, M.wash_b, turn=4)
     G.join(still, 'body', origin=(0, 0, 0))
     washing = ([(M.wash_c, -0.05, -0.06, 0.08), (M.wash_b, 0.06, -0.08, 0.07), (M.wash_a, 0.0, 0.07, 0.06)]
                if dryer else
                [(M.wash_a, -0.04, -0.07, 0.08), (M.wash_b, 0.07, -0.05, 0.06), (M.wash_c, 0.02, 0.06, 0.07)])
-    drum = _drum(F, washing)
+    drum = _drum(F, washing, 1 if dryer else 0)
     door = _door(F, ring)
     G.settle(centre=False)
     G.swing(door, 'door_open', 110, seconds=1.0)
@@ -138,11 +205,17 @@ def laundryDryer():
 
 
 # --- the towel rail: two chrome bars on the wall, towels over them ----------------------------------------
-def _towel_over(F, name, x, w, bar_y, bar_z, drop_front, drop_back, material, t=0.012):
-    """A towel folded over a bar at (bar_y, bar_z): a rounded top and two flaps hanging down either side."""
-    F.box(f'{name}_top', w, 0.03, 0.04, (x, bar_y + 0.016, bar_z), material, bevel=0.012)
-    F.box(f'{name}_front', w, drop_front, t, (x, bar_y + 0.01 - drop_front / 2, bar_z + 0.022), material, bevel=0.005)
-    F.box(f'{name}_back', w, drop_back, t, (x, bar_y + 0.01 - drop_back / 2, bar_z - 0.022), material, bevel=0.005)
+def _drape(F, name, x, w, bar_y, bar_z, drop_front, drop_back, material, t=0.012, r=0.016, hem=None, sway=0.0):
+    """A towel hung over a bar at (bar_y, bar_z) in one piece: down the back, round the bar and down the front, its
+    flaps hanging a little apart below the fold; `hem` a band across the front flap near its foot."""
+    R = r + t / 2
+    pts = [(x, bar_y - drop_back + 0.01, bar_z - R - 0.004), (x, bar_y - drop_back * 0.5, bar_z - R - 0.002)]
+    pts += [(x, bar_y + R * math.sin(math.radians(a)), bar_z + R * math.cos(math.radians(a))) for a in range(180, -1, -30)]
+    pts += [(x, bar_y - drop_front * 0.5, bar_z + R + 0.002 + sway), (x, bar_y - drop_front + 0.01, bar_z + R + 0.004 + sway)]
+    F.sweep(name, pts, None, material, profile=G.rounded_rect(w, t, t * 0.45, corner=2), up=(1, 0, 0), angle=60)
+    if hem:
+        y = bar_y - drop_front + 0.06
+        F.box(f'{name}_hem', w + 0.002, 0.03, t + 0.002, (x, y, bar_z + R + 0.0035 + sway * 0.9), hem)
 
 
 def towelRail():
@@ -150,15 +223,16 @@ def towelRail():
     z = -0.36
     with G.new_parts() as parts:
         for y in (1.2, 0.95):
-            G.rod(f'bar{y}', F.at(-0.34, y, z), F.at(0.34, y, z), 0.0125, material=M.chrome, verts=12)
+            F.sweep(f'bar{y}', G.kit.fillet([(-0.34, y, WALL + 0.012), (-0.34, y, z), (0.34, y, z), (0.34, y, WALL + 0.012)],
+                                            0.03, 3), 0.0125, M.chrome, verts=12)
         for s in (-1, 1):
-            F.box(f'plate{s}', 0.05, 0.36, 0.012, (s * 0.34, 1.075, WALL + 0.006), M.chrome, bevel=0.005)
-            F.box(f'post{s}', 0.025, 0.31, 0.025, (s * 0.34, 1.075, z), M.chrome, bevel=0.008)
+            F.extrude(f'plate{s}', G.rounded_rect(0.05, 0.36, 0.025, corner=3), 0.012, (s * 0.34, 1.075, WALL + 0.006),
+                      M.chrome, bevel=0.004, bevel_segments=1)
             for y in (1.2, 0.95):
-                G.rod(f'arm{s}{y}', F.at(s * 0.34, y, WALL + 0.012), F.at(s * 0.34, y, z), 0.011,
-                      material=M.chrome, verts=10)
-        _towel_over(F, 'bath_towel', -0.07, 0.42, 1.2, z, 0.5, 0.38, M.towel)
-        _towel_over(F, 'hand_towel', 0.17, 0.26, 0.95, z, 0.3, 0.22, M.towel2)
+                G.revolve(f'rose{s}{y}', [(0, 0), (0.02, 0), (0.019, 0.006), (0.014, 0.012), (0, 0.013)],
+                          at=F.at(s * 0.34, y, WALL + 0.011), material=M.chrome, segments=14, rot=(90, 0, 0))
+        _drape(F, 'bath_towel', -0.07, 0.42, 1.2, z, 0.5, 0.38, M.towel, r=0.0125, hem=M.towel_hem)
+        _drape(F, 'hand_towel', 0.17, 0.26, 0.95, z, 0.3, 0.22, M.towel2, r=0.0125, hem=M.towel_hem2)
     G.join_all('towelRail')
     G.settle(centre=False, floor=False)   # on the wall, at its real height
     return G.meshes()
@@ -179,13 +253,17 @@ def towelLadder():
     top = 1.7
     with G.new_parts() as parts:
         for s in (-1, 1):
-            G.rod(f'rail{s}', F.at(s * 0.24, 0.0, LADDER_FOOT - 0.02), F.at(s * 0.24, top, _on_ladder(top) - 0.02),
-                  0.02, material=M.birch, verts=12)
+            # a squared rail, its edges and its top rounded off
+            a, b = (s * 0.24, 0.012, LADDER_FOOT - 0.02), (s * 0.24, top - 0.012, _on_ladder(top - 0.012) - 0.02)
+            F.sweep(f'rail{s}', [a, b], None, M.birch, profile=G.rounded_rect(0.04, 0.04, 0.01, corner=2),
+                    up=(1, 0, 0), angle=50)
+            G.sphere(f'rail_cap{s}', 0.02, at=F.at(s * 0.24, top - 0.012, _on_ladder(top - 0.012) - 0.02), material=M.birch,
+                     segments=10, rings=6)
         for k, y in enumerate((0.3, 0.63, 0.96, 1.29, 1.62)):
-            z = _on_ladder(y) - 0.02
-            G.rod(f'rung{k}', F.at(-0.24, y, z), F.at(0.24, y, z), 0.0125, material=M.birch, verts=10)
-        for k, (y, m) in enumerate(((0.63, M.towel3), (0.96, M.towel), (1.29, M.towel2))):
-            _towel_over(F, f'towel{k}', 0, 0.4, y, _on_ladder(y) - 0.02, 0.3, 0.26, m)
+            zz = _on_ladder(y) - 0.02
+            F.sweep(f'rung{k}', [(-0.24, y, zz), (0.24, y, zz)], 0.0125, M.birch, verts=10)
+        for k, (y, m, hem) in enumerate(((0.63, M.towel3, None), (0.96, M.towel, M.towel_hem), (1.29, M.towel2, M.towel_hem2))):
+            _drape(F, f'towel{k}', 0.01 * (k - 1), 0.4, y, _on_ladder(y) - 0.02, 0.3, 0.26, m, r=0.0125, hem=hem)
     G.join_all('towelLadder')
     G.settle(centre=False)
     return G.meshes()
@@ -195,19 +273,43 @@ def towelLadder():
 def laundryBasket():
     F = G.GameFrame()
     z = -0.2
+    bx, by, _ = F.at(0, 0, z)
     with G.new_parts() as parts:
-        G.revolve('basket', [(0, 0), (0.23, 0), (0.25, 0.02), (0.255, 0.33), (0.24, 0.33), (0.225, 0.03), (0, 0.03)],
-                  at=F.at(0, 0, z), material=M.wicker, segments=32, scale=(1, 0.78, 1))
-        G.torus('rim', 0.25, 0.02, at=F.at(0, 0.335, z), material=M.wicker_rim, major_segments=32,
-                minor_segments=8).scale = (1, 0.78, 1)
-        for k in range(6):
-            G.torus(f'weave{k}', 0.243 + 0.0018 * k, 0.006, at=F.at(0, 0.05 + 0.05 * k, z), material=M.wicker_rim,
-                    major_segments=32, minor_segments=5).scale = (1, 0.78, 1)
+        # the tub: woven rows (each a ring of over-and-under ripples, the next row's turned half a step), lofted up the
+        # outside to the rim and down the inside to the floor
+        n, rows = 40, 10
+        secs = []
+        for i in range(2 * rows + 1):
+            t = i / (2 * rows)
+            r = 0.23 + 0.025 * t
+            row = i // 2
+            ring = []
+            for k in range(n):
+                a = math.tau * k / n
+                # a row's middle bulges where its strand passes over a stake, sinks where it passes under; the next row
+                # the other way round, so the weave checks; the rows' seams sink a little
+                rr = r * (1 + 0.032 * math.cos(10 * a + math.pi * row) if i % 2 else 1 - 0.01 * (0 < i < 2 * rows))
+                ring.append((bx + rr * math.cos(a), by + 0.78 * rr * math.sin(a), 0.33 * t))
+            secs.append(ring)
+        for y, r in ((0.33, 0.236), (0.03, 0.222)):
+            secs.append([(bx + r * math.cos(math.tau * k / n), by + 0.78 * r * math.sin(math.tau * k / n), y) for k in range(n)])
+        # (the lining inside, plain: only its top shows)
+        G.loft('basket', secs, material=M.wicker, angle=25)
+        rim = [(0.25 * math.cos(math.tau * k / 40), 0.335, z - 0.78 * 0.248 * math.sin(math.tau * k / 40)) for k in range(40)]
+        F.sweep('rim', rim, None, M.wicker_rim, profile=G.rounded_rect(0.034, 0.034, 0.012, corner=2), closed=True,
+                up=(0, 0, 1), angle=60)
+        # a band of plaited rim at the foot
+        foot = [(0.232 * math.cos(math.tau * k / 32), 0.012, z - 0.78 * 0.232 * math.sin(math.tau * k / 32)) for k in range(32)]
+        F.sweep('foot_band', foot, 0.012, M.wicker_rim, verts=5, closed=True)
         for s in (-1, 1):
-            G.torus(f'handle{s}', 0.05, 0.012, at=F.at(s * 0.25, 0.29, z), material=M.wicker_rim, rot=(90, 0, 90),
-                    major_segments=16, minor_segments=6)
-        for k, (x, dz, m) in enumerate(((-0.08, 0.0, M.towel), (0.1, 0.03, M.towel2), (0.0, -0.06, M.wash_b))):
-            G.sphere(f'wash{k}', 0.15, at=F.at(x, 0.33, z + dz), material=m, scale=(1, 0.8, 0.4), segments=16, rings=8)
+            # a loop handle on each end
+            pts = [(s * 0.256, 0.24, z - 0.06), (s * 0.263, 0.29, z - 0.035), (s * 0.264, 0.305, z),
+                   (s * 0.263, 0.29, z + 0.035), (s * 0.256, 0.24, z + 0.06)]
+            F.sweep(f'handle{s}', pts, 0.008, M.wicker_rim, verts=6, resolution=2)
+        # clean washing heaped in it: folded towels and a crumpled shirt
+        _folded(F, 'wash0', -0.06, 0.3, z - 0.02, 0.3, 0.24, 0.06, M.towel, turn=8)
+        _folded(F, 'wash1', 0.07, 0.33, z + 0.03, 0.26, 0.2, 0.05, M.towel2, turn=-14)
+        _lump(F, 'wash2', 0.0, 0.345, z - 0.07, 0.12, M.wash_b, scale=(1.1, 0.8, 0.35), seed=3)
     G.join_all('laundryBasket')
     G.settle(centre=False)
     return G.meshes()
@@ -216,10 +318,15 @@ def laundryBasket():
 # --- the bath mat: a soft rounded mat with a raised pile -----------------------------------------------------
 def bathMat():
     with G.new_parts() as parts:
-        G.cube('mat', (0.76, 0.5, 0.016), at=(0, 0, 0.008), material=M.mat, bevel=0.007, bevel_segments=3)
-        G.cube('pile', (0.66, 0.4, 0.012), at=(0, 0, 0.016), material=M.mat_pile, bevel=0.005, bevel_segments=3)
+        G.soft_box('mat', (0.76, 0.5, 0.016), at=(0, 0, 0.008), material=M.mat, round=0.008, round_segments=2)
+        G.soft_box('pile', (0.66, 0.4, 0.012), at=(0, 0, 0.0165), material=M.mat_pile, round=0.006, puff=0.003,
+                   round_segments=2, flat=3)
         for s in (-1, 1):
-            G.cube(f'stripe{s}', (0.66, 0.025, 0.004), at=(0, s * 0.15, 0.0225), material=M.mat, bevel=0.0015)
+            G.cube(f'stripe{s}', (0.6, 0.025, 0.004), at=(0, s * 0.15, 0.0225), material=M.mat, bevel=0.0015,
+                   bevel_segments=1)
+    # a stitched seam round the mat's edge
+    seam = [(u, v, 0.0162) for u, v in G.rounded_rect(0.72, 0.46, 0.02, corner=2)]
+    G.sweep('seam', seam, 0.0016, material=M.mat_pile, verts=3, closed=True)
     G.join_all('bathMat')
     G.settle()
     return G.meshes()

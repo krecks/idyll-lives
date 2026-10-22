@@ -105,6 +105,9 @@
         "wash_c": {
           "finish": "material.finish.satin"
         },
+        "wicker_band": {
+          "finish": "material.finish.satin"
+        },
         "wicker_plain": {
           "finish": "material.finish.satin"
         }
@@ -142,6 +145,12 @@
         },
         "towel2": {
           "finish": "material.finish.fabric"
+        },
+        "towel_hem": {
+          "finish": "material.finish.fabric"
+        },
+        "towel_hem2": {
+          "finish": "material.finish.fabric"
         }
       },
       "paint": [
@@ -173,6 +182,12 @@
           "finish": "material.finish.fabric"
         },
         "towel3": {
+          "finish": "material.finish.fabric"
+        },
+        "towel_hem": {
+          "finish": "material.finish.fabric"
+        },
+        "towel_hem2": {
           "finish": "material.finish.fabric"
         }
       },

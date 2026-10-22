@@ -6,6 +6,9 @@
       "type": "model",
       "url": "../../models/office/deskSimple.glb",
       "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
         "drawers": {
           "finish": "material.finish.satin"
         },
@@ -17,6 +20,9 @@
         },
         "plastic": {
           "finish": "material.finish.satin"
+        },
+        "reveal": {
+          "finish": "material.finish.matte"
         }
       },
       "paint": [
@@ -38,6 +44,12 @@
       "type": "model",
       "url": "../../models/office/deskCorner.glb",
       "materials": {
+        "aluminium": {
+          "finish": "material.finish.metal"
+        },
+        "cactus": {
+          "finish": "material.finish.satin"
+        },
         "castor": {
           "finish": "material.finish.satin"
         },
@@ -47,20 +59,53 @@
         "chrome": {
           "finish": "material.finish.chrome"
         },
+        "coffee": {
+          "finish": "material.finish.gloss"
+        },
         "drawers": {
           "finish": "material.finish.satin"
         },
         "frame": {
           "finish": "material.finish.metal"
         },
+        "keycap": {
+          "finish": "material.finish.satin"
+        },
         "laminate": {
           "finish": "material.finish.satin"
+        },
+        "mug": {
+          "finish": "material.finish.gloss"
+        },
+        "notebook": {
+          "finish": "material.finish.matte"
         },
         "oak_panel": {
           "finish": "material.finish.wood"
         },
+        "pad": {
+          "finish": "material.finish.matte"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "pen": {
+          "finish": "material.finish.satin"
+        },
         "plastic": {
           "finish": "material.finish.satin"
+        },
+        "pot": {
+          "finish": "material.finish.gloss"
+        },
+        "reveal": {
+          "finish": "material.finish.matte"
+        },
+        "screen": {
+          "finish": "material.finish.gloss"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
         }
       },
       "paint": [
@@ -89,26 +134,50 @@
         "birch": {
           "finish": "material.finish.wood"
         },
+        "cactus": {
+          "finish": "material.finish.satin"
+        },
         "chrome": {
           "finish": "material.finish.chrome"
+        },
+        "coffee": {
+          "finish": "material.finish.gloss"
         },
         "frame": {
           "finish": "material.finish.metal"
         },
+        "keycap_light": {
+          "finish": "material.finish.satin"
+        },
         "keys": {
           "finish": "material.finish.satin"
+        },
+        "led": {
+          "finish": "material.finish.gloss"
+        },
+        "mug": {
+          "finish": "material.finish.gloss"
         },
         "pad": {
           "finish": "material.finish.matte"
         },
+        "pen": {
+          "finish": "material.finish.satin"
+        },
         "plastic": {
           "finish": "material.finish.satin"
+        },
+        "pot": {
+          "finish": "material.finish.gloss"
         },
         "screen": {
           "finish": "material.finish.gloss"
         },
         "shelf": {
           "finish": "material.finish.satin"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
         },
         "wallpaper": {
           "finish": "material.finish.gloss"
@@ -141,6 +210,9 @@
       "materials": {
         "brass": {
           "finish": "material.finish.metal"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
         },
         "inlay": {
           "finish": "material.finish.satin"
@@ -200,6 +272,9 @@
         "chrome": {
           "finish": "material.finish.chrome"
         },
+        "coffee": {
+          "finish": "material.finish.gloss"
+        },
         "drawers": {
           "finish": "material.finish.satin"
         },
@@ -227,11 +302,20 @@
         "pad": {
           "finish": "material.finish.matte"
         },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "pen": {
+          "finish": "material.finish.satin"
+        },
         "plastic": {
           "finish": "material.finish.satin"
         },
         "pot": {
           "finish": "material.finish.gloss"
+        },
+        "reveal": {
+          "finish": "material.finish.matte"
         },
         "screen": {
           "finish": "material.finish.gloss"
@@ -300,6 +384,9 @@
         "drawers": {
           "finish": "material.finish.satin"
         },
+        "folder": {
+          "finish": "material.finish.matte"
+        },
         "frame": {
           "finish": "material.finish.metal"
         },
@@ -308,6 +395,9 @@
         },
         "mug": {
           "finish": "material.finish.gloss"
+        },
+        "note3": {
+          "finish": "material.finish.matte"
         },
         "notebook": {
           "finish": "material.finish.matte"
@@ -367,11 +457,17 @@
         "chrome": {
           "finish": "material.finish.chrome"
         },
+        "coffee": {
+          "finish": "material.finish.gloss"
+        },
         "drawers": {
           "finish": "material.finish.satin"
         },
         "frame": {
           "finish": "material.finish.metal"
+        },
+        "keycap": {
+          "finish": "material.finish.satin"
         },
         "mug": {
           "finish": "material.finish.gloss"
@@ -383,6 +479,9 @@
           "finish": "material.finish.wood"
         },
         "pad": {
+          "finish": "material.finish.matte"
+        },
+        "paper": {
           "finish": "material.finish.matte"
         },
         "pen": {
@@ -457,6 +556,9 @@
         "mat": {
           "finish": "material.finish.matte"
         },
+        "pad": {
+          "finish": "material.finish.matte"
+        },
         "plastic": {
           "finish": "material.finish.satin"
         },
@@ -508,9 +610,6 @@
           "finish": "material.finish.metal"
         },
         "leather": {
-          "finish": "material.finish.satin"
-        },
-        "leather2": {
           "finish": "material.finish.satin"
         },
         "plastic": {
@@ -629,20 +728,41 @@
         "chrome": {
           "finish": "material.finish.chrome"
         },
+        "folder": {
+          "finish": "material.finish.matte"
+        },
         "label": {
           "finish": "material.finish.gloss"
         },
         "leaf": {
           "finish": "material.finish.foliage"
         },
+        "note": {
+          "finish": "material.finish.matte"
+        },
+        "note2": {
+          "finish": "material.finish.matte"
+        },
+        "note3": {
+          "finish": "material.finish.matte"
+        },
+        "note4": {
+          "finish": "material.finish.matte"
+        },
         "paper": {
           "finish": "material.finish.matte"
+        },
+        "pen": {
+          "finish": "material.finish.satin"
         },
         "plastic": {
           "finish": "material.finish.satin"
         },
         "pot": {
           "finish": "material.finish.gloss"
+        },
+        "reveal": {
+          "finish": "material.finish.matte"
         },
         "soil": {
           "finish": "material.finish.matte"
@@ -696,6 +816,12 @@
         "note2": {
           "finish": "material.finish.matte"
         },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "pen": {
+          "finish": "material.finish.satin"
+        },
         "plastic": {
           "finish": "material.finish.satin"
         }
@@ -720,9 +846,6 @@
       "type": "model",
       "url": "../../models/office/corkboard.glb",
       "materials": {
-        "chrome": {
-          "finish": "material.finish.chrome"
-        },
         "cork": {
           "finish": "material.finish.matte"
         },
@@ -734,6 +857,15 @@
         },
         "ink_blue": {
           "finish": "material.finish.gloss"
+        },
+        "ink_red": {
+          "finish": "material.finish.gloss"
+        },
+        "label": {
+          "finish": "material.finish.gloss"
+        },
+        "leafy": {
+          "finish": "material.finish.matte"
         },
         "note": {
           "finish": "material.finish.matte"

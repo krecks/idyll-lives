@@ -44,14 +44,33 @@ turning.
 - **Laundry basket**: a wicker tub (`fabric`) with a rim, woven bands and side handles, clean washing on top.
 - **Bath mat** (rug): a soft mat with a raised pile and two stripes, 2.5 cm high.
 
-| Model | Size (w × h × d) | Triangles | Draws | Colour parts |
+## Detail (2026-10-22)
+
+Rebuilt with the forms, same sizes, centres, parts, clips (the washer's drum loop: `delay` 3.5, `every` 1.1 for its
+1.2 s turn, unchanged), paint and draws:
+
+- **Washer and dryer:** a rounded cabinet under a top panel, a kick plinth; the control strip's soap drawer (or water
+  tank) with its marks, the time on the display, three buttons, the program knob turned with a pointer in a ring of
+  settings; rubber bellows turned round the opening. The door ring turned in one profile, its window domed, a grip bent
+  from flat bar. The drum's face: a ring of holes, three shaped lifters, lumpy washing (jittered). On top: folded
+  towels (washer), a basket bound with bands and a heap of washing with a sock (dryer).
+- **Towel rail:** each bar bent from one tube into the wall (`kit.fillet`), roses at the wall, rounded wall plates;
+  the towels draped over the bars in one piece, each with a woven hem.
+- **Towel ladder:** squared rails rounded at the top, round rungs, the towels draped over in one piece, two hemmed.
+- **Laundry basket:** a lofted wicker tub woven in checked rows, a rolled rim, a plaited foot band, two loop handles;
+  folded towels and a crumpled shirt in it.
+- **Bath mat:** a soft mat and a puffed pile, its stripes, a stitched seam round the pile.
+
+| Model | Size (w × h × d) | Triangles (before → now) | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.laundryWasher` | 0.60 × 0.98 × 0.65 m | 3,652 | 4 | Body, Door, Panel |
-| `model.laundryDryer` | 0.60 × 1.09 × 0.65 m | 4,284 | 4 | Body, Door, Panel |
-| `model.towelRail` | 0.73 × 0.60 × 0.10 m | 1,312 | 2 | Rail, Towels, Hand towel |
-| `model.towelLadder` | 0.52 × 1.71 × 0.36 m | 1,240 | 2 | Ladder, Towels, Second towel, Third towel |
-| `model.laundryBasket` | 0.54 × 0.39 × 0.42 m | 3,872 | 2 | Basket, Rim & weave |
-| `model.bathMat` | 0.76 × 0.03 × 0.50 m | 592 | 1 | Mat, Pile |
+| `model.laundryWasher` | 0.60 × 0.98 × 0.65 m | 3,652 → 3,644 | 4 | Body, Door, Panel |
+| `model.laundryDryer` | 0.60 × 1.09 × 0.65 m | 4,284 → 4,744 | 4 | Body, Door, Panel |
+| `model.towelRail` | 0.73 × 0.59 × 0.10 m | 1,312 → 1,728 | 2 | Rail, Towels, Hand towel |
+| `model.towelLadder` | 0.52 × 1.70 × 0.36 m | 1,240 → 1,272 | 2 | Ladder, Towels, Second towel, Third towel |
+| `model.laundryBasket` | 0.54 × 0.40 × 0.42 m | 3,872 → 3,640 | 2 | Basket, Rim & weave |
+| `model.bathMat` | 0.76 × 0.03 × 0.50 m | 592 → 840 | 1 | Mat, Pile |
+
+The new hem colours (`towel_hem`, `towel_hem2`) are `fabric` like the towels they're on, in the same draw.
 
 `check-glb`: 6 models, 0 failed. Khronos validator: 0 errors, 0 warnings each.
 

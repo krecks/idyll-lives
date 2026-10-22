@@ -49,16 +49,41 @@ on it, facing the flames; the old part had the cushion too. The model's depth is
 Other warnings left, by design: the portable TV's height (1.28 m with its ears out, 1.13 at rest), the wall TV floating
 above its origin (it hangs on the wall).
 
-| Model | Size at rest (w × h × d) | Triangles | Draws | Colour parts |
+## Detail (2026-10-22)
+
+Rebuilt with the forms and the kit, same sizes, centres, parts, clips, glow, paint and draws:
+
+- **TV:** the unit's doors framed round panels (`kit.shaker`) with slim upright bar pulls, a reveal round them, turned
+  feet; the set a rounded panel with a vented back (`_flat_screen`), a swept neck, an oval foot; a soundbar swept round
+  with a ribbed grille and a light; the pebbles (jittered) in their bowl on two books; a remote with its keys.
+- **Wall TV:** a bracket with two arms, the rounded panel, a standby light, a cable cover, a swept soundbar, ribbed.
+- **Portable TV:** a rounded cabinet; the bezel extruded round the opening, the tube lofted into a dome; turned knobs,
+  the channel dial's numbers, a badge; tapered legs in metal ferrules; the ears swept as telescoping sections on a
+  pivot.
+- **TV bench:** framed doors with bar pulls, a reveal, tapered legs; a plant of swept leaves in a rimmed pot, a game
+  controller; the TV's logo and the lid's finger grip.
+- **Home cinema:** bent sled feet, slab fronts with routed grips, a swept soundbar with a ribbed grille, the projector's
+  lens glass and vents, the player's disc slot, rounded towers on plinths with drivers (rim, cone, dust cap) in rings and
+  a badge; the screen case swept round, its pull bar and pull loop.
+- **Stereo:** splayed legs, the amplifier's brushed face with turned knobs and a power light, the turntable's arm on a
+  turned pivot with its counterweight, headshell and speed knob; a grooved record with a spindle on a lipped platter;
+  turned woofer cones, drivers for tweeters, bass ports.
+- **Boombox:** a rounded case, swept trim and speaker rings, ribbed grilles, tweeters, the handle bent in one piece with
+  a grip, a tapering aerial on a hinge, piano keys, a tuning needle, side dials, the cassette's label and the door's tab.
+- **Electric fireplace:** beads panelling the piers and the frieze (`kit.moulding`), a moulded firebox frame, a fluted
+  back, a switch; jittered logs and stones on the embers; the hearth cushion plump and piped (`F.soft`); the mantel on
+  two corbels, a lofted vase with a candle, a moulded picture frame with a landscape.
+
+| Model | Size at rest (w × h × d) | Triangles (before → now) | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.tv` | 0.91 × 1.07 × 0.44 m | 2,144 | 2 | Body (`tv_cabinet`), Trim (`tv_oak`) |
-| `model.tvWall` | 1.24 × 0.87 × 0.10 m | 492 | 1 | Body (`wall_frame`), Trim (`wall_bar`) |
-| `model.tvRetro` | 0.94 × 1.13 × 0.49 m | 1,892 | 3 | Body (`retro_wood`), Trim (`retro_bezel`) |
-| `model.tvStandLow` | 1.82 × 0.80 × 0.46 m | 2,688 | 3 | Bench (`bench`), TV (`bench_tv`) |
-| `model.homeCinema` | 1.88 × 1.65 × 0.45 m | 2,408 | 3 | Body (`cinema_unit`), Trim (`cinema_oak`) |
-| `model.stereo` | 0.92 × 0.84 × 0.42 m | 3,668 | 4 | Body (`stereo_wood`), Trim (`stereo_dark`) |
-| `model.boombox` | 0.60 × 0.95 × 0.44 m | 3,732 | 3 | Body (`boombox_body`), Trim (`boombox_trim`) |
-| `model.fireplaceElectric` | 1.76 × 1.31 × 0.92 m | 3,580 | 3 | Surround (`surround`), Firebox (`firebox`) |
+| `model.tv` | 0.91 × 1.07 × 0.44 m | 2,144 → 3,548 | 2 | Body (`tv_cabinet`), Trim (`tv_oak`) |
+| `model.tvWall` | 1.24 × 0.87 × 0.10 m | 492 → 884 | 1 | Body (`wall_frame`), Trim (`wall_bar`) |
+| `model.tvRetro` | 0.94 × 1.13 × 0.49 m | 1,892 → 3,452 | 3 | Body (`retro_wood`), Trim (`retro_bezel`) |
+| `model.tvStandLow` | 1.82 × 0.80 × 0.46 m | 2,688 → 4,452 | 3 | Bench (`bench`), TV (`bench_tv`) |
+| `model.homeCinema` | 1.88 × 1.65 × 0.45 m | 2,408 → 6,248 | 3 | Body (`cinema_unit`), Trim (`cinema_oak`) |
+| `model.stereo` | 0.92 × 0.84 × 0.42 m | 3,480 → 3,800 | 4 | Body (`stereo_wood`), Trim (`stereo_dark`) |
+| `model.boombox` | 0.60 × 0.95 × 0.44 m | 3,732 → 2,864 | 3 | Body (`boombox_body`), Trim (`boombox_trim`) |
+| `model.fireplaceElectric` | 1.76 × 1.32 × 0.92 m | 3,580 → 4,906 | 3 | Surround (`surround`), Firebox (`firebox`) |
 
 `check-glb`: 8 models, 0 failed, the warnings above. Khronos validator: 0 errors, 0 warnings each. Checked: the
 gallery next to the old parts; the clips bench (rest, 0.4 s, open) on WebGPU; in play (`bathroom-check`): each bought
