@@ -4732,13 +4732,18 @@ export class BabylonRenderer implements Renderer {
     this.overview?.setNight(l.lamps, this.glowColor);
   }
 
+  /** How far the shades' glow and the garden's pools are up (0..1): from dusk as the lamps come up, none in town. */
+  private get glowLevel(): number {
+    return this.townMode ? 0 : Math.min(1, Math.max(0, (this.lampsLevel - 0.35) / 0.5));
+  }
+
   /**
    * Lamp shades glow as the windows do: from dusk, as the lamps come up, and out with their room's
    * lights where everyone is asleep (`windowGlowOn`); a lamp's shade with the lamp (`lampOn`: off,
    * no glow). Screens are lit by use instead (see `writeScreenGlow`).
    */
   private applyGlow(): void {
-    const level = this.townMode ? 0 : Math.min(1, Math.max(0, (this.lampsLevel - 0.35) / 0.5));
+    const level = this.glowLevel;
     this.applyGardenPools();
     for (const g of this.glows) {
       if (g.screen) {
@@ -4762,8 +4767,7 @@ export class BabylonRenderer implements Renderer {
 
   /** The garden's pools of lamplight, as bright as its lamps are now (with the shades' glow). */
   private applyGardenPools(): void {
-    const level = this.townMode ? 0 : Math.min(1, Math.max(0, (this.lampsLevel - 0.35) / 0.5));
-    this.gardenPools?.update(level, (lamp) => (lamp === undefined ? 1 : (this.lampOn.get(lamp) ?? 1)), this.lampColor);
+    this.gardenPools?.update(this.glowLevel, (lamp) => (lamp === undefined ? 1 : (this.lampOn.get(lamp) ?? 1)), this.lampColor);
   }
 
   /**
@@ -4771,7 +4775,7 @@ export class BabylonRenderer implements Renderer {
    * they run; the glow mesh's vertex colour is the screen's, its instance colour the brightness.
    */
   private writeScreenGlow(g: { mesh: Mesh; colors: Float32Array; ids: number[] }): void {
-    const level = this.townMode ? 0 : Math.min(1, Math.max(0, (this.lampsLevel - 0.35) / 0.5));
+    const level = this.glowLevel;
     const t = this.screenTime / 1000;
     let changed = false;
     g.ids.forEach((id, i) => {
