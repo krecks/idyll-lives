@@ -15,7 +15,22 @@
         "grille": {
           "finish": "material.finish.matte"
         },
+        "grille_dark": {
+          "finish": "material.finish.matte"
+        },
+        "label": {
+          "finish": "material.finish.satin"
+        },
+        "led": {
+          "finish": "material.finish.gloss"
+        },
+        "led_red": {
+          "finish": "material.finish.gloss"
+        },
         "pebble": {
+          "finish": "material.finish.gloss"
+        },
+        "retro_bezel": {
           "finish": "material.finish.gloss"
         },
         "screen": {
@@ -24,6 +39,9 @@
         },
         "soundbar": {
           "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
         },
         "tv_cabinet": {
           "finish": "material.finish.wood"
@@ -55,6 +73,15 @@
         },
         "grille": {
           "finish": "material.finish.matte"
+        },
+        "grille_dark": {
+          "finish": "material.finish.matte"
+        },
+        "led": {
+          "finish": "material.finish.gloss"
+        },
+        "led_red": {
+          "finish": "material.finish.gloss"
         },
         "screen": {
           "finish": "material.finish.gloss",
@@ -134,6 +161,15 @@
         "black_metal": {
           "finish": "material.finish.metal"
         },
+        "grille": {
+          "finish": "material.finish.matte"
+        },
+        "led": {
+          "finish": "material.finish.gloss"
+        },
+        "led_red": {
+          "finish": "material.finish.gloss"
+        },
         "plant": {
           "finish": "material.finish.satin"
         },
@@ -143,6 +179,9 @@
         "screen": {
           "finish": "material.finish.gloss",
           "glow": "#8DB4E2"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
         }
       },
       "motions": {
@@ -177,7 +216,13 @@
         "cone": {
           "finish": "material.finish.satin"
         },
+        "glass_lens": {
+          "finish": "material.finish.gloss"
+        },
         "grille": {
+          "finish": "material.finish.matte"
+        },
+        "grille_dark": {
           "finish": "material.finish.matte"
         },
         "led": {
@@ -195,6 +240,9 @@
         },
         "screen_border": {
           "finish": "material.finish.matte"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
         },
         "tower": {
           "finish": "material.finish.satin"
@@ -261,6 +309,9 @@
           "finish": "material.finish.satin"
         },
         "steel": {
+          "finish": "material.finish.metal"
+        },
+        "steel_dark": {
           "finish": "material.finish.metal"
         },
         "stereo_dark": {
@@ -331,6 +382,12 @@
         "grille": {
           "finish": "material.finish.matte"
         },
+        "grille_dark": {
+          "finish": "material.finish.matte"
+        },
+        "led_red": {
+          "finish": "material.finish.gloss"
+        },
         "rec_black": {
           "finish": "material.finish.satin"
         },
@@ -386,11 +443,17 @@
         "candle": {
           "finish": "material.finish.gloss"
         },
+        "candle_wax": {
+          "finish": "material.finish.satin"
+        },
         "ember": {
           "finish": "material.finish.gloss",
           "glow": "#FF8A3C"
         },
         "firebox": {
+          "finish": "material.finish.gloss"
+        },
+        "firebox_line": {
           "finish": "material.finish.gloss"
         },
         "flame": {
@@ -415,6 +478,15 @@
         },
         "picture": {
           "finish": "material.finish.satin"
+        },
+        "print_hill": {
+          "finish": "material.finish.matte"
+        },
+        "print_sky": {
+          "finish": "material.finish.matte"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
         },
         "surround": {
           "finish": "material.finish.satin"

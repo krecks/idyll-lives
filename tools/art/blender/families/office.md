@@ -52,24 +52,58 @@ and its back the room. The chair is part of the still desk (no swivel) and its b
   wiped as the clip plays back at the end.
 - **Corkboard** (wall): cork in a wooden frame, five pinned notes. Static.
 
-| Model | Size (w × h × d) | Triangles | Draws | Colour parts |
-|---|---|---|---|---|
-| `model.deskSimple` | 1.50 × 0.74 × 0.69 m | 1,488 | 2 | Top, Frame, Drawers |
-| `model.deskCorner` | 1.86 × 1.01 × 1.86 m | 4,784 | 2 | Top, Frame, Drawers, Chair |
-| `model.deskStanding` | 0.96 × 1.54 × 0.63 m | 2,604 | 3 | Top, Frame, Shelf |
-| `model.deskExecutive` | 1.80 × 0.75 × 0.77 m | 2,624 | 2 | Top, Frame, Drawers, Handles, Desk pad |
-| `model.computerDesk` | 1.54 × 1.22 × 0.87 m | 6,728 | 3 | Top, Frame, Drawers, Keyboard tray, Chair |
-| `model.deskWriting` | 1.54 × 1.11 × 0.87 m | 4,944 | 3 | Top, Frame, Drawers, Chair |
-| `model.deskLaptop` | 0.90 × 1.01 × 0.87 m | 4,564 | 3 | Top, Frame, Drawer, Laptop, Chair |
-| `model.computerGaming` | 1.70 × 1.30 × 0.90 m | 6,944 | 3 | Desk, PC & monitors, Lights, Chair |
-| `model.chairExecutive` | 0.62 × 1.34 × 0.64 m | 2,864 | 2 | Frame, Seat |
-| `model.chairTask` | 0.62 × 1.05 × 0.60 m | 2,904 | 3 | Frame, Seat, Back |
-| `model.officeChair` | 0.62 × 1.16 × 0.62 m | 2,648 | 3 | Frame, Seat |
-| `model.filingCabinet` | 0.46 × 1.21 × 0.64 m | 3,340 | 3 | Cabinet, Handles |
-| `model.whiteboard` | 0.93 × 0.65 × 0.07 m | 1,608 | 2 | Board, Frame |
-| `model.corkboard` | 0.74 × 0.52 × 0.03 m | 1,212 | 2 | Board, Frame |
+## Detail (2026-10-22)
 
-`check-glb`: 14 models, 0 failed. Its warnings, all expected: the two boards float (wall things). Khronos
+Rebuilt with the forms and the kit, same sizes, centres, parts, clips, paint and draws:
+
+- **Chairs** (`_chair_base`, `_chair_seat`, shared by the three desk chairs and the desks' own chairs): five legs
+  swept tapering from a turned hub, twin-wheel castors (one wide wheel, `lite`, on the desks' chairs), a tapered
+  lift sleeve; the mechanism with its height lever and tension knob; a moulded shell under a piped seat; a spine bent
+  from the mechanism up to a plate on the back. The back is lofted (`_contour_rings`: rounded top and foot, a lumbar
+  swell, sides dished forward) on a plastic shell, a welt round its face (the office chair); the task chair's is a
+  mesh in a swept frame with a lumbar bar; the executive chair's four stitched leather pillows on a shell, with loop
+  arms bent from flat bar; the gaming chair's racing stripes and a headrest on two posts. T arms are a bent bar under
+  a padded rest.
+- **Desks:** square-tube frames each side bent in one piece (`_desk_frame`, the computer desk's sled sides) on glides;
+  slab drawer fronts with reveals and bar pulls bent from one rod (`_bar_pull`); tops rounded at the edges. On them:
+  monitors with a bezel, the picture, a rounded back and a curved neck to an oval foot (`_monitor`), keyboards with
+  their keys (`_keyboard`, the laptop's `_laptop_keys`), mice, cables, an architect's lamp (two arms, a knuckle, its
+  springs, a turned shade), a hollow mug of coffee, a ribbed cactus in a rimmed pot, notebooks with their pages and
+  band, pens with clips. The writing desk's drawer: a turned brass knob, letters with stamps, sharpened pencils. The
+  laptop desk: a hinge, a bezel and a logo on the lid, a charger. The gaming PC: a wrist rest, a lit mouse, speaker
+  drivers in rings, headphones on a hook, the case's top vent and buttons, cards behind the tinted side, swept fan
+  blades. The corner desk: an L top extruded with rounded edges, a cable grommet, a laptop, mug, paper tray, cactus
+  and notebook. The standing desk: telescoping columns with collars, tapered feet on levellers, a handset with its
+  display and buttons, the monitor's cable down the leg, a mug and a cactus. The simple desk: hairpin legs each bent
+  from one rod, screwed plates. The executive desk: raised-panel drawer fronts (`kit.shaker`) with brass bar pulls and
+  roses, a moulded plinth round each pedestal (`kit.moulding`), a panelled modesty board, a stitched border round the
+  leather pad, a letter opener.
+- **Filing cabinet:** pressed drawer fronts (`kit.shaker`), bar handles, chrome label holders with written cards, a
+  kick plinth, a key in the lock; hanging files with coloured tabs and papers in the open drawer, its rails; a letter
+  tray with sloped sides and a plant of swept leaves on top.
+- **Boards:** the whiteboard's aluminium frame one mitred profile (`kit.moulding`), a J-shaped marker tray, turned
+  markers with caps, magnets holding a sheet, the plan drawn in strokes (`_scrawl`: handwriting, an arrow, a ring, a
+  chart). The corkboard: a moulded frame, notes curling off the cork, turned push pins, a photo and a ticket.
+
+| Model | Size (w × h × d) | Triangles (before → now) | Draws | Colour parts |
+|---|---|---|---|---|
+| `model.deskSimple` | 1.50 × 0.74 × 0.69 m | 1,488 → 1,916 | 2 | Top, Frame, Drawers |
+| `model.deskCorner` | 1.86 × 1.01 × 1.86 m | 4,784 → 5,520 | 2 | Top, Frame, Drawers, Chair |
+| `model.deskStanding` | 0.96 × 1.54 × 0.63 m | 2,604 → 4,078 | 3 | Top, Frame, Shelf |
+| `model.deskExecutive` | 1.80 × 0.75 × 0.77 m | 2,624 → 4,344 | 2 | Top, Frame, Drawers, Handles, Desk pad |
+| `model.computerDesk` | 1.54 × 1.22 × 0.87 m | 6,728 → 7,396 | 3 | Top, Frame, Drawers, Keyboard tray, Chair |
+| `model.deskWriting` | 1.54 × 1.11 × 0.87 m | 4,944 → 4,944 | 3 | Top, Frame, Drawers, Chair |
+| `model.deskLaptop` | 0.90 × 1.01 × 0.87 m | 4,564 → 5,204 | 3 | Top, Frame, Drawer, Laptop, Chair |
+| `model.computerGaming` | 1.70 × 1.30 × 0.90 m | 6,944 → 7,692 | 3 | Desk, PC & monitors, Lights, Chair |
+| `model.chairExecutive` | 0.62 × 1.33 × 0.64 m | 2,864 → 6,648 | 2 | Frame, Seat |
+| `model.chairTask` | 0.61 × 1.06 × 0.60 m | 2,904 → 5,124 | 3 | Frame, Seat, Back |
+| `model.officeChair` | 0.61 × 1.16 × 0.62 m | 2,648 → 5,248 | 3 | Frame, Seat |
+| `model.filingCabinet` | 0.46 × 1.21 × 0.64 m | 3,340 → 3,520 | 3 | Cabinet, Handles |
+| `model.whiteboard` | 0.93 × 0.65 × 0.07 m | 1,608 → 3,100 | 2 | Board, Frame |
+| `model.corkboard` | 0.74 × 0.52 × 0.03 m | 1,212 → 1,516 | 2 | Board, Frame |
+
+The desks with their own chair spend about half their triangles on it: its castors and arms are lighter there
+(`lite`). `check-glb`: 14 models, 0 failed. Its warnings, all expected: the two boards float (wall things). Khronos
 validator: 0 errors, 0 warnings each.
 
 ## Rebuild
