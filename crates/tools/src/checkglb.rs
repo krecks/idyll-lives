@@ -345,12 +345,17 @@ type Pose = HashMap<(usize, &'static str), Vec<Num>>;
 
 /// The mesh nodes of the default scene (`Placed`), their parts where `pose` puts them; `worlds`, if given,
 /// gets every node's world matrix.
-fn node_matrices(gltf: &J, pose: Option<&Pose>, mut worlds: Option<&mut HashMap<usize, Matrix>>) -> R<Vec<Placed>> {
+fn node_matrices(gltf: &J, pose: Option<&Pose>, worlds: Option<&mut HashMap<usize, Matrix>>) -> R<Vec<Placed>> {
+    placed_in(gltf, &moved_nodes(gltf)?, pose, worlds)
+}
+
+/// `node_matrices` with `parts` as the nodes that are parts (`Placed::part`: the nearest of them above a mesh,
+/// or its own node), in place of the nodes the animations move (a bird's, by name).
+fn placed_in(gltf: &J, parts: &HashSet<usize>, pose: Option<&Pose>, mut worlds: Option<&mut HashMap<usize, Matrix>>) -> R<Vec<Placed>> {
     let empty = J::Arr(Vec::new());
     let nodes = gltf.get("nodes").unwrap_or(&empty);
     let scenes = gltf.get("scenes").cloned().unwrap_or(J::Arr(vec![J::Obj(Vec::new())]));
     let scene = index(&scenes, gltf.get("scene").unwrap_or(&J::Int(0)))?;
-    let moved = moved_nodes(gltf)?;
 
     fn local(n: &J, i: usize, pose: Option<&Pose>) -> R<Matrix> {
         if let Some(m) = n.get("matrix") {
@@ -398,7 +403,7 @@ fn node_matrices(gltf: &J, pose: Option<&Pose>, mut worlds: Option<&mut HashMap<
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn walk(nodes: &J, i: usize, parent: &Matrix, part: Option<usize>, pose: Option<&Pose>, moved: &HashSet<usize>, worlds: &mut Option<&mut HashMap<usize, Matrix>>, out: &mut Vec<Placed>, depth: usize) -> R<()> {
+    fn walk(nodes: &J, i: usize, parent: &Matrix, part: Option<usize>, pose: Option<&Pose>, parts: &HashSet<usize>, worlds: &mut Option<&mut HashMap<usize, Matrix>>, out: &mut Vec<Placed>, depth: usize) -> R<()> {
         if depth > 990 {
             return Err("maximum recursion depth exceeded".into());
         }
@@ -407,19 +412,19 @@ fn node_matrices(gltf: &J, pose: Option<&Pose>, mut worlds: Option<&mut HashMap<
         if let Some(w) = worlds.as_deref_mut() {
             w.insert(i, m);
         }
-        let part = if moved.contains(&i) { Some(i) } else { part };
+        let part = if parts.contains(&i) { Some(i) } else { part };
         if let Some(mesh) = n.get("mesh") {
             out.push(Placed { mesh: mesh.clone(), m, part, node: i });
         }
         for c in n.get("children").and_then(J::list).unwrap_or(&[]) {
-            walk(nodes, node_index(nodes, c)?, &m, part, pose, moved, worlds, out, depth + 1)?;
+            walk(nodes, node_index(nodes, c)?, &m, part, pose, parts, worlds, out, depth + 1)?;
         }
         Ok(())
     }
 
     let mut out = Vec::new();
     for i in scene.get("nodes").and_then(J::list).unwrap_or(&[]) {
-        walk(nodes, node_index(nodes, i)?, &IDENTITY, None, pose, &moved, &mut worlds, &mut out, 0)?;
+        walk(nodes, node_index(nodes, i)?, &IDENTITY, None, pose, parts, &mut worlds, &mut out, 0)?;
     }
     Ok(out)
 }
@@ -486,32 +491,22 @@ struct BirdParts {
 }
 
 fn bird_parts(g: &Glb) -> R<BirdParts> {
-    let empty = J::Arr(Vec::new());
-    let nodes = g.gltf.get("nodes").unwrap_or(&empty).list().unwrap_or(&[]);
+    let nodes = g.gltf.get("nodes").and_then(J::list).unwrap_or(&[]);
     let name = |i: usize| nodes.get(i).and_then(|n| n.get("name")).and_then(J::str).unwrap_or("");
-    let mut parent: HashMap<usize, usize> = HashMap::new();
-    for (i, n) in nodes.iter().enumerate() {
-        for c in n.get("children").and_then(J::list).unwrap_or(&[]) {
-            parent.insert(node_index(g.gltf.get("nodes").unwrap_or(&empty), c)?, i);
-        }
-    }
     let mut parts = BirdParts { names: BTreeSet::new(), points: HashMap::new(), flat: Vec::new() };
+    let mut named = HashSet::new();
     for (i, n) in nodes.iter().enumerate() {
         if BIRD_PARTS.contains(&name(i)) {
+            named.insert(i);
             parts.names.insert(name(i).to_string());
             if n.get("scale").and_then(J::list).is_some_and(|s| s.iter().any(|v| json_number(v).is_some_and(|v| v.abs() < 1e-6))) {
                 parts.flat.push(name(i).to_string());
             }
         }
     }
-    for p in node_matrices(&g.gltf, None, None)? {
-        // The part a mesh is in: its own node, or the nearest one above it named as a part.
-        let (mut at, mut depth) = (Some(p.node), 0);
-        while let Some(i) = at.filter(|i| !BIRD_PARTS.contains(&name(*i)) && depth < 990) {
-            at = parent.get(&i).copied();
-            depth += 1;
-        }
-        let Some(part) = at.filter(|i| BIRD_PARTS.contains(&name(*i))) else { continue };
+    // Each mesh in the part it is in: its own node, or the nearest one above it named as a part.
+    for p in placed_in(&g.gltf, &named, None, None)? {
+        let Some(part) = p.part else { continue };
         let out = parts.points.entry(name(part).to_string()).or_default();
         for prim in primitives(&g.gltf, &p.mesh)? {
             for v in positions(g, prim)? {
@@ -543,7 +538,7 @@ fn bird_errors(bird: &J, parts: &BirdParts, dims: [f64; 3]) -> Vec<String> {
     }
     let (head, tail) = (parts.points.get("head"), parts.points.get("tail"));
     if let (Some(head), Some(tail)) = (head, tail) {
-        let far = head.iter().flat_map(|a| tail.iter().map(move |b| ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt())).fold(0.0, f64::max);
+        let far = head.iter().flat_map(|a| tail.iter().map(move |b| dist(a, b))).fold(0.0, f64::max);
         if off(far, length) {
             errors.push(format!("{} m from bill to tail tip, its `bird.length` says {} m (within {})", fixed(far, 3), fixed(length, 3), percent(BIRD_FIT)));
         }
