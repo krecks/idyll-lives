@@ -4,22 +4,13 @@
  * writes their town files for the simulation to check
  * (`cargo test -p sim-core --test generated_worlds -- --ignored`, reading WORLDS).
  *
- * Run: node --experimental-transform-types tools/worlds/sample.ts worlds.json [worlds per kind]
+ * Run: bun tools/worlds/sample.ts worlds.json [worlds per kind]
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
-import { register } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import type { HouseGenConfig } from '../../web/src/game/housegen.ts';
 import type { Templates } from '../../web/src/game/town.ts';
-
-// The game's modules import each other without extensions (Vite finds them); so does Node, with this.
-register(
-  'data:text/javascript,' +
-    encodeURIComponent(`export async function resolve(spec, ctx, next) {
-      try { return await next(spec, ctx); } catch (e) { if (/^\\.\\.?\\//.test(spec) && !/\\.[a-z]+$/.test(spec)) return next(spec + '.ts', ctx); throw e; }
-    }`),
-);
 
 // The loaders fetch from the page's address: here, files under web/public.
 const root = new URL('../../web/public/', import.meta.url);

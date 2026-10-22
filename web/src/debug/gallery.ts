@@ -1,5 +1,5 @@
 /**
- * Dev-only model gallery (`pnpm dev`, then /gallery.html): draws manifest models in a grid with the
+ * Dev-only model gallery (`bun run dev`, then /gallery.html): draws manifest models in a grid with the
  * game's own loader, finishes and plant shader (wind, tint) under a noon sun, to check art without
  * starting a game. Not part of the build.
  *

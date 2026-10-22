@@ -104,7 +104,7 @@ import { fieldLayers, Street } from './street';
 import { MaterialLibrary, WINDOWLESS_BITS, type DarkTiles } from './materials';
 import { refreshSoftLook, shadingFromSettings } from './softLook';
 import { Geo, LOOK as CUT } from './geometry';
-import { buildModel, motionsOf, onModelFileArrived, paintColors, painted, placementVariation, prefetchModels, standInOf, withGlows, type ModelTemplate, type StandIn } from './models';
+import { buildModel, motionsOf, onModelFileArrived, paintColors, painted, placementVariation, standInOf, withGlows, type ModelTemplate, type StandIn } from './models';
 import { TemplateCache } from './templateCache';
 import { compressedTextureFeatures, noteWebGpuFailed, webGpuFailed } from './loaders';
 import { Characters, GAME_RATE, MAX_CHARACTERS } from './characters';
@@ -1099,9 +1099,7 @@ export class BabylonRenderer implements Renderer {
     if (this.templates.disposeStale()) this.resetSnapshot();
     void this.settleBirds(world);
     this.lastLightMinute = -1;
-    // Then the other lots' furniture downloads in the background (the camera may follow someone there).
-    const elsewhere = world.objects.filter((o) => !this.inView(o.x + o.w / 2, o.z + o.d / 2, 0));
-    prefetchModels(elsewhere.map((o) => this.objectModel(o)).filter((key) => this.deps.assets.has(key, 'model')).map((key) => this.deps.assets.get(key, 'model')));
+    // (The rest of the town streams once the game is revealed: see `game/streamPlan.ts`.)
     if (this.debug) console.info(`[render] setWorld ${(performance.now() - started).toFixed(1)} ms${lotBuilt ? '' : ' (lot kept)'}`);
   }
 

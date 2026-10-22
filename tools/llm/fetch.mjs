@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * Fetches the language model that writes residents' lines into `web/public/llm/` (not in git;
  * see `web/src/llm/models.ts`).
@@ -11,7 +11,7 @@
  * Everything is pinned to a revision and checked against its SHA-256. The weights are stored
  * gzipped (`model_q4.onnx_dataz`, about 13 % smaller; the browser unpacks them, `ml/assets.ts`).
  * Files already present with the right hash (unpacked) are kept. Big files are streamed. Usage:
- * `node tools/llm/fetch.mjs`.
+ * `bun tools/llm/fetch.mjs`.
  */
 
 import { createHash } from 'node:crypto';

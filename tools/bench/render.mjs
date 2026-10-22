@@ -1,11 +1,11 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * The rendering benchmark (`web/src/debug/bench.ts`) over a matrix: starts Vite, opens
  * `?bench=<scene>` in Chromium on the real GPU (WebGPU, and WebGL2 with `&renderer=webgl`)
  * at 1920×1080, device pixel ratio 1, once per preset × backend × scenario × CPU slow-down ×
  * diagnostic, and writes every result as JSON and a markdown table (medians when `--runs` > 1).
  *
- *   node tools/bench/render.mjs [options]
+ *   bun tools/bench/render.mjs [options]
  *     --port 5221              Vite's port (it starts its own; `--url http://localhost:5221` uses a running one)
  *     --preview                the production build (`vite preview` of web/dist: compressed textures and
  *                              models, minified code; what players get) instead of the dev server; `--build` builds it first
@@ -27,7 +27,7 @@
  *   --compare <dirA> <dirB>    pixel differences between two shot folders (and `--out` for the difference images)
  *   --headless / --headed      without or with a window (see below)
  *
- * Needs `pnpm wasm` first, and Playwright: `PLAYWRIGHT=<path to playwright/index.mjs>` if it isn't
+ * Needs `bun run wasm` first, and Playwright: `PLAYWRIGHT=<path to playwright/index.mjs>` if it isn't
  * installed, `CHROME=<executable>` for a browser of your own.
  *
  * Measurements run in windows (far off to the right, `--left`): their timing is the real

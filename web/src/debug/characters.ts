@@ -1,5 +1,5 @@
 /**
- * Dev-only character bench (`pnpm dev`, then /characters.html): residents in a grid, drawn by the
+ * Dev-only character bench (`bun run dev`, then /characters.html): residents in a grid, drawn by the
  * game's own `Characters` with stage directions (clip, held time, face) and a synthetic snapshot, to
  * check bodies, faces, hair and clothes without a game. Not part of the build.
  *

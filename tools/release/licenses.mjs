@@ -148,7 +148,7 @@ export function thirdPartyLicenses({ packageDirs, header }) {
     ['LFM2.5-350M language model (llm/lfm2.5-350m/)', 'LFM Open License v1.0', 'https://huggingface.co/LiquidAI/LFM2.5-350M', 'web/public/llm/lfm2.5-350m/LICENSE.txt'],
   ].map(([name, license, url, file]) => {
     const path = join(ROOT, file);
-    if (!existsSync(path)) throw new Error(`licenses: ${file} missing (run pnpm voice and pnpm llm)`);
+    if (!existsSync(path)) throw new Error(`licenses: ${file} missing (run bun run voice and bun run llm)`);
     return { name, version: '', license, url, files: [[file.split('/').pop(), readFileSync(path, 'utf8')]] };
   });
 

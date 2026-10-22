@@ -1,5 +1,5 @@
 /**
- * Dev-only clips bench (`pnpm dev`, then /clips.html): models side by side, each playing every clip
+ * Dev-only clips bench (`bun run dev`, then /clips.html): models side by side, each playing every clip
  * of its file in turn, the way the game plays it, so a model's moving parts can be checked without
  * setting up a game. Built with the game's own `buildModel` and `clipPose`. Not part of the build.
  *

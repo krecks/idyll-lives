@@ -1,5 +1,5 @@
 /**
- * Dev-only pose bench (`pnpm dev`, then /poses.html): Sims at real furniture, driven through the
+ * Dev-only pose bench (`bun run dev`, then /poses.html): Sims at real furniture, driven through the
  * game's own `Characters` with a synthetic snapshot, to check activity animations without
  * setting up a game. Not part of the build.
  *

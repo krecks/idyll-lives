@@ -41,7 +41,7 @@ import {
 import './loaders';
 import type { AbstractMesh, AnimationGroup, Material, Node } from './core';
 import { optimizedUrl } from '../../assets/registry';
-import { background, foreground, prefetch } from '../../assets/stream';
+import { background, foreground } from '../../assets/stream';
 import { paintSlots } from '../../assets/paint';
 import type { ModelEntry, PrimitivePart, Vec3 } from '../../assets/types';
 import type { PartColors } from '../../core/protocol';
@@ -1003,11 +1003,6 @@ interface MaterialOverride {
   glow?: string;
   /** A screen: lit only while a resident uses the object (a TV, a monitor), not with the room. */
   screen?: boolean;
-}
-
-/** Downloads the files of these models in the background, so they're at hand when shown. */
-export function prefetchModels(entries: Iterable<ModelEntry | undefined>): void {
-  prefetch([...entries].flatMap((e) => (e?.url ? [optimizedUrl(e.url)] : [])));
 }
 
 /** Idle time (ms) left below which `buildAhead` waits for the next idle moment. */

@@ -130,7 +130,9 @@ export class Studio {
       ip.contrast = 1.08;
       const lib = MaterialLibrary.for(scene).setAssets(deps.assets);
       const env = deps.assets.get('environment.sky', 'image');
-      if (env) await lib.loadEnvironment(env.url);
+      // The portraits are lit by the studio lights; an environment is only polish. Never hold
+      // up the first portrait (and the menu behind it) for a texture that may time out.
+      if (env) void lib.loadEnvironment(env.url);
       lib.setEnvironmentIntensity(0.7);
       lights(scene);
       const characters = new Characters(scene, deps.assets, lib);

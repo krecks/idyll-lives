@@ -5,6 +5,7 @@
  */
 
 import { AssetRegistry } from '../assets/registry';
+import { prefetch, prefetchNow, planStream, whenStreamSettled } from '../assets/stream';
 import { Content } from '../content/content';
 import { SaveRefused, SimBridge, type FrameState } from '../core/bridge';
 import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, SocialEvent, WorldStructure } from '../core/protocol';
@@ -39,6 +40,7 @@ import { play } from '../ui/sfx';
 import { householdBonds, householdSpawns, lookAtStage, lookFromSeed, palette, type Appearance, type HouseholdDraft } from './household';
 import { PointerInput } from './input';
 import { assembleTown, loadTemplates, useTownContent, type NeighbourhoodDraft } from './town';
+import { gameAssetPlan } from './streamPlan';
 import { perfEnd, perfPhase, perfStart, perfTime, perfTimeAsync } from '../debug/perf';
 import { UiMirror } from './uiUpdates';
 
@@ -357,6 +359,10 @@ export async function startSession(
   let speedBeforeBuy: number | null = null;
   let autosaveTimer: ReturnType<typeof setInterval> | undefined;
   let prefetchTimer: ReturnType<typeof setTimeout> | undefined;
+  /** The viewed house's files (the second loading screen); made once, on the first built view. */
+  let homeAssets: Promise<void> | null = null;
+  /** Everything after the house: streamed once the game is revealed. */
+  let restUrls: string[] = [];
   let autosaveMinutes = -1;
   /** The performance overlay setting last applied (F3 opens and closes the overlay in between). */
   let showFps: boolean | null = null;
@@ -1048,12 +1054,25 @@ export async function startSession(
       }
     }
     const plot = viewPlot === null ? null : w.plots[viewPlot];
-    const buildSpan = perfStart('session: renderer setWorld');
     const view = plot ? { x: plot.x, z: plot.z, w: plot.w, d: plot.d } : null;
     worldSound.setWorld(w, view);
-    const build = renderer.setWorld(w, view).then((value) => {
-      perfEnd(buildSpan);
-      return value;
+    if (!homeAssets) {
+      // First the house (the loading screen waits for it), then the rest of the town (streamed
+      // after Play). Planning once keeps a later world update from restarting the indicator.
+      const plan = gameAssetPlan(content, assets, w, view);
+      planStream([...plan.home, ...plan.rest], 'Game data');
+      restUrls = plan.rest;
+      homeAssets = prefetchNow(plan.home, (done, total) => {
+        progress(`Fetching your home (${done}/${total})`, 0.3 + 0.35 * (done / Math.max(1, total)));
+      }).then(() => progress('Building the world', 0.65));
+    }
+    const build = homeAssets.then(async () => {
+      const buildSpan = perfStart('session: renderer setWorld');
+      try {
+        return await renderer.setWorld(w, view);
+      } finally {
+        perfEnd(buildSpan);
+      }
     });
     building = build.catch(() => {});
     if (feedback?.effects.length) void build.then(() => feedback.effects.forEach((fx) => renderer.buildEffect(fx)), () => {});
@@ -1508,11 +1527,20 @@ export async function startSession(
         else controls.setBuildTab('furnish');
       }
       perfPhase(`session: reveal ${game.mode} ${game.buildTab} storey ${game.storey} walls ${game.wallMode}`);
-      prefetchTimer = setTimeout(() => {
-        // (Not while benchmarking: drawing the pictures would show in the measurements.)
+      // The house is cached by now: stream the rest of the town while the player is in it.
+      void (async () => {
+        await homeAssets;
+        if (disposed) return;
+        prefetch(restUrls);
+        // The catalog's pictures are built only once the stream is quiet, in idle moments.
+        await whenStreamSettled();
         if (disposed || BENCH) return;
-        services.items.prefetch(content.shop.map((def) => ({ model: def.model, footprint: def.footprint ?? [1, 1] })));
-      }, PREFETCH_PICTURES_MS);
+        prefetchTimer = setTimeout(() => {
+          // (Not while benchmarking: drawing the pictures would show in the measurements.)
+          if (disposed || BENCH) return;
+          services.items.prefetch(content.shop.map((def) => ({ model: def.model, footprint: def.footprint ?? [1, 1] })));
+        }, PREFETCH_PICTURES_MS);
+      })();
     },
     save(name, slotId) {
       return store(name, slotId ?? crypto.randomUUID(), false);

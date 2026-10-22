@@ -6,6 +6,7 @@
   import { settings, systemMotion } from '../../settings/settings.svelte';
   import { app } from '../app.svelte';
   import Hud from '../Hud.svelte';
+  import StreamIndicator from '../StreamIndicator.svelte';
   import { game } from '../state.svelte';
   import LoadingScreen from './LoadingScreen.svelte';
   import PauseMenu from './PauseMenu.svelte';
@@ -83,6 +84,7 @@
   <!-- An error in the interface: the crash screen, while the game (still running here) can be saved. -->
   <svelte:boundary onerror={interfaceFailed}>
     <div class="scaled hud-root" class:prelive={!live}><Hud /></div>
+    {#if live}<StreamIndicator />{/if}
     {#if app.loading}
       <LoadingScreen progress={app.loading} />
     {/if}

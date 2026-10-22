@@ -19,8 +19,8 @@ From the repo root:
 cargo characters build [out]     # about 6 s; writes the set, then checks it
 cargo characters check [set dir] # the set against the contract only
 cargo characters diff <a> <b>    # two sets against each other, within the quantisation
-node --experimental-strip-types tools/characters/check_clips.ts [rig.json] [--body male|female|all] [--stage <stage>[,…]|all] [--update-baseline]
-cd web && pnpm check:clips       # check_clips on both bodies at every life stage, as CI runs it
+bun tools/characters/check_clips.ts [rig.json] [--body male|female|all] [--stage <stage>[,…]|all] [--update-baseline]
+cd web && bun run check:clips    # check_clips on both bodies at every life stage, as CI runs it
 ```
 
 - The build is deterministic (seeded noise only). After a code change that shouldn't touch the
@@ -57,7 +57,7 @@ The generator's `.rs` files are in `crates/tools/src/characters/`.
 
 ## Benches
 
-Run the dev server without rebuilding the Rust packages: in `web/`, `npx vite` (or `pnpm dev`),
+Run the dev server without rebuilding the Rust packages: in `web/`, `bunx vite` (or `bun run dev`),
 then open:
 
 - `/characters.html`: a grid of residents to check bodies, faces, hair, clothes and skins.

@@ -43,7 +43,7 @@ missing or too slow. Measurements and research behind the choices are at the end
   phonemizer (`crates/voice`, Misaki's rules) only gives the mouth shapes their phonemes. The
   model's 44.1 kHz output is resampled to 24 kHz (`LineInputs::finish`) before trimming and
   shaping, so the mouth shapes and playback are as before.
-- **Tests:** `cargo test -p voice --release`; `pnpm check:voice` (ONNX Runtime Web in Node with
+- **Tests:** `cargo test -p voice --release`; `bun run check:voice` (ONNX Runtime Web in Bun with
   the worker's `supertonic.ts`: bit-identical across runs and sessions, golden hashes, every voice
   speaks and its median pitch, pitch, depth, speed and trimming checked).
 - **Measured (M3 Pro, Chrome, 2026-10-18):** lines of 1–5 sentences, spoken a piece at a time:
@@ -477,7 +477,7 @@ file; the web side merges them over it key by key (sim-core ignores `voice`). Se
 ## Modules
 
 Rust: `crates/voice` (engine, phonemizer, DSP) and `crates/voice-wasm` (the `wasm-bindgen`
-wrapper), built by a `pnpm voice` script next to the existing `wasm` script.
+wrapper), built by a `bun run voice` script next to the existing `wasm` script.
 
 Web code lives in `web/src/voice/`, behind one small interface used by the game session:
 
@@ -504,7 +504,7 @@ Web code lives in `web/src/voice/`, behind one small interface used by the game 
 | 6. Benchmark | "Test this computer", Auto mode (graphics card, processor fallback), live watchdog, F3 line. In 0.3.0. | Auto picks the right mode without frame drops; a slow machine steps down with a clear message. |
 | Later | Thoughts from the Planner (0.8) and from an in-browser language model; lip sync; persistent clip cache (IndexedDB, Opus via WebCodecs); a distilled male voice; more languages. | |
 
-Every phase keeps `pnpm check` clean and the frame-time budget checked, with voices on and off.
+Every phase keeps `bun run check` clean and the frame-time budget checked, with voices on and off.
 
 ## Research: a voice the player can shape (2026-10-11/12)
 
@@ -608,8 +608,8 @@ times slower (many small passes). Replaced by Supertonic 3 on the GPU. What was 
 - **Text:** the model reads plain text (`plain_text`: pronunciation marks dropped); our Rust
   phonemizer (`crates/voice`, Misaki's rules) now only gives the mouth shapes their phonemes.
 - **Tests:** `cargo test -p voice --release` (phonemizer against Misaki, the shaping, mouth shapes,
-  and every game line reads as plain text); `pnpm check:voice` (also in CI: ONNX Runtime Web in
-  Node with the worker's `pocket.ts`, bit-identical across runs and sessions, golden hashes;
+  and every game line reads as plain text); `bun run check:voice` (also in CI: ONNX Runtime Web in
+  Bun with the worker's `pocket.ts`, bit-identical across runs and sessions, golden hashes;
   pitch, depth and speed on the line, pitch in the clip, expression and trimming checked).
 - **Browser (`web/src/voice/`):** the worker with a Cache API download (`tts.worker.ts`; encoded
   voices are kept there too), the app-wide service and speed test (`service.svelte.ts`), the
@@ -658,7 +658,7 @@ files, the graph edits (`tools/voice/model.mjs`) and the KittenTTS tokenizer are
   the first time a voice is needed. It works with and without cross-origin isolation. Lines are
   made one at a time, by `voice/synth.ts` (the Node checks use the same code). Files the current
   version no longer uses (an older build's WASM, Paradee's model) are dropped from the cache.
-- **Model edits (`tools/voice/model.mjs`):** `npm run voice` (`tools/voice/fetch.mjs`) fetches the
+- **Model edits (`tools/voice/model.mjs`):** `bun run voice` (`tools/voice/fetch.mjs`) fetches the
   pinned upstream model and edits it in Node (a minimal protobuf reader/writer, so
   CI needs no Python): a `pitch` input multiplies the pitch curve, and the two random nodes are
   replaced by a counter-based hash of each value's position (h = (i·48271 + salt) mod 2³¹−1, then
@@ -670,8 +670,8 @@ files, the graph edits (`tools/voice/model.mjs`) and the KittenTTS tokenizer are
   time. The result is pinned by its own SHA-256 and named `kitten-nano-0.8-edit2.onnx` (a new
   edit gets a new name, so browsers never mix versions); its weights are also stored as int8
   (see "KittenTTS nano").
-- **Tests:** `npm run test:voice` (Rust: phonemizer against Misaki, ids, trimming, and every game
-  line tokenises for KittenTTS); `npm run check:voice` (also in CI: ONNX Runtime Web in Node with
+- **Tests:** `bun run test:voice` (Rust: phonemizer against Misaki, ids, trimming, and every game
+  line tokenises for KittenTTS); `bun run check:voice` (also in CI: ONNX Runtime Web in Bun with
   the browser's WASM and the worker's `synth.ts`, bit-identical across runs and sessions, against
   golden hashes, which hold on arm64 and x86-64; pitch, speed, depth, mixes and trimming checked).
 - **Browser (`web/src/voice/`):** voice worker with a Cache API download (`tts.worker.ts`),

@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * Fetches the resident voice model and the pronunciation dictionary into `web/public/voice/`
  * (not in git; see docs/design/voices.md).
@@ -13,7 +13,7 @@
  *
  * Everything is pinned to a revision and checked against its SHA-256 (the converted graphs too:
  * the conversion is deterministic), so every build speaks the same. Files already present with
- * the right hash (unpacked) are kept. Usage: `node tools/voice/fetch.mjs` (`pnpm voice` builds
+ * the right hash (unpacked) are kept. Usage: `bun tools/voice/fetch.mjs` (`bun run voice` builds
  * the voice WASM, then runs this).
  */
 

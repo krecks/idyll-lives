@@ -1,9 +1,9 @@
 /**
- * The voice engine in Node, as the browser's voice worker runs it: our voice WASM
- * (`web/src/voice/wasm-pkg`), ONNX Runtime Web (its WASM build: Node has no WebGPU, so here on
+ * The voice engine in Bun, as the browser's voice worker runs it: our voice WASM
+ * (`web/src/voice/wasm-pkg`), ONNX Runtime Web (its WASM build: Bun has no WebGPU, so here on
  * the CPU; the arithmetic differs from the GPU's only in rounding) and the files in
  * `web/public/voice/`, with every line made by `web/src/voice/supertonic.ts` (the worker's own
- * code). Used by `check.mjs` and `samples.mjs`. Needs `pnpm voice` first.
+ * code). Used by `check.mjs` and `samples.mjs`. Needs `bun run voice` first.
  */
 
 import { readFileSync } from 'node:fs';

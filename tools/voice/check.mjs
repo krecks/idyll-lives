@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * Checks the voices as the browser makes them (`engine.mjs`: our voice WASM, ONNX Runtime Web's
  * WASM build, the worker's own `supertonic.ts`), with Supertonic 3:
@@ -11,9 +11,9 @@
  *   length, depth the brightness; silence is trimmed;
  * - and prints the time per line.
  *
- * In Node the model runs on the CPU (no WebGPU): the game's GPU rounds a little differently, so
- * the golden hashes hold here, not in the browser. Needs `pnpm voice` first. Usage (from web/):
- * `pnpm check:voice` (`VOICE_THREADS` to change the threads, default 4).
+ * In Bun the model runs on the CPU (no WebGPU): the game's GPU rounds a little differently, so
+ * the golden hashes hold here, not in the browser. Needs `bun run voice` first. Usage (from web/):
+ * `bun run check:voice` (`VOICE_THREADS` to change the threads, default 4).
  */
 
 import { createHash } from 'node:crypto';

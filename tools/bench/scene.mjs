@@ -1,11 +1,11 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * Makes a benchmark scene (`web/public/bench/<name>.json.gz`, see web/src/debug/bench.ts): a new game
  * as the menus make one (the menu's valley, or a new world of `--world`; its neighbours as the
  * neighbourhood step makes them; a household of four in the first home for sale), played at full
  * speed to `--hour` (5 minutes before it) on day 1, paused and saved.
  *
- *   node tools/bench/scene.mjs --name village [--world medium|forest|mountain|…] [--hour 18] [--port 5221]
+ *   bun tools/bench/scene.mjs --name village [--world medium|forest|mountain|…] [--hour 18] [--port 5221]
  *
  * Starts its own Vite on `--port` (or uses `--url`). Needs Playwright like render.mjs, and runs
  * headless on the real GPU like it (`--headed` for a window).

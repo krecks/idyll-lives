@@ -1,8 +1,8 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 // One version for the whole game: web/package.json (shown in the menu and Credits), the Rust
 // workspace (Cargo.toml) and its crates' entries in Cargo.lock must always match.
-//   node tools/release/version.mjs          prints the version, fails if they differ (CI runs this)
-//   node tools/release/version.mjs 0.3.0    sets all three to 0.3.0 (then: commit, git tag v0.3.0;
+//   bun tools/release/version.mjs          prints the version, fails if they differ (CI runs this)
+//   bun tools/release/version.mjs 0.3.0    sets all three to 0.3.0 (then: commit, git tag v0.3.0;
 //                                          pushing the tag publishes the game, see .github/workflows/pages.yml)
 import { readFileSync, writeFileSync } from 'node:fs';
 

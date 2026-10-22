@@ -46,37 +46,37 @@ Everything else (jobs, skills, money, building, the garden, every control and th
 
 ## Run it
 
-Requirements: Rust through rustup (the version is pinned in `rust-toolchain.toml`: 1.97.1 with clippy, rustfmt and the `wasm32-unknown-unknown` target), `wasm-bindgen-cli` 0.2.129 (it must match the `wasm-bindgen` crate in `Cargo.lock`), Node 22 and pnpm.
+Requirements: Rust through rustup (the version is pinned in `rust-toolchain.toml`: 1.97.1 with clippy, rustfmt and the `wasm32-unknown-unknown` target), `wasm-bindgen-cli` 0.2.129 (it must match the `wasm-bindgen` crate in `Cargo.lock`), Bun 1.4 (the version is pinned in `web/package.json`).
 
 ```sh
 rustup toolchain install       # in the repo: the pinned toolchain, as CI does
 cargo install wasm-bindgen-cli --version 0.2.129
 cd web
-pnpm install
-pnpm dev          # builds both WASM modules, fetches the voice and language models, then starts Vite on http://localhost:5173
+bun install
+bun run dev      # builds both WASM modules, fetches the voice and language models, then starts Vite on http://localhost:5173
 ```
 
-The first `pnpm dev` or `pnpm build` downloads the voice model (398 MB as published, stored as 185 MB) and the language model (294 MB of weights, stored gzipped as 255 MB) into `web/public/voice/` and `web/public/llm/` (not in git). Every file is pinned and checked by SHA-256, and files already there are kept.
+The first `bun run dev` or `bun run build` downloads the voice model (398 MB as published, stored as 185 MB) and the language model (294 MB of weights, stored gzipped as 255 MB) into `web/public/voice/` and `web/public/llm/` (not in git). Every file is pinned and checked by SHA-256, and files already there are kept.
 
 | Command (in `web/`) | What it does |
 |---|---|
-| `pnpm dev` | `wasm`, `voice` and `llm`, then the dev server |
-| `pnpm build` / `pnpm preview` | Production build / serve it |
-| `pnpm wasm` | Build the simulation's WASM (release, `--locked`) |
-| `pnpm voice` | Build the voice WASM and fetch the voice model and dictionary (`tools/voice/fetch.mjs`) |
-| `pnpm llm` | Fetch the language model (`tools/llm/fetch.mjs`) |
-| `pnpm check` | Type-check TypeScript and Svelte |
-| `pnpm lint` | Lint the web code |
-| `pnpm test:sim` | Run the Rust simulation tests |
-| `pnpm test:voice` | Run the voice crate's tests (needs `pnpm voice` for the dictionary) |
-| `pnpm check:voice` | Check the voices in Node against golden hashes (`tools/voice/check.mjs`) |
-| `pnpm check:llm` | Check the language model's prompts, cleaning and golden lines in Node (`tools/llm/check.mjs`; several minutes). Run it by hand when a prompt, a cleaning rule or the model changes, not on every release |
-| `pnpm devices:llm` | Run the voices and language model's device test in Chromium (`tools/llm/devices.mjs`) |
-| `node ../tools/llm/bench.mjs` | Benchmark the language model on its own: the game's worker, model and prompts with no game around it (load, prompt, tokens a second, the game's five lines), cold and with the page reloaded; writes `bench-results/llm-*/` |
-| `pnpm assets` | Build or update the compressed asset copies (the build does this too) |
-| `pnpm decoders` | Refresh `public/decoders` after a Babylon upgrade |
+| `bun run dev` | `wasm`, `voice` and `llm`, then the dev server |
+| `bun run build` / `bun run preview` | Production build / serve it |
+| `bun run wasm` | Build the simulation's WASM (release, `--locked`) |
+| `bun run voice` | Build the voice WASM and fetch the voice model and dictionary (`tools/voice/fetch.mjs`) |
+| `bun run llm` | Fetch the language model (`tools/llm/fetch.mjs`) |
+| `bun run check` | Type-check TypeScript and Svelte |
+| `bun run lint` | Lint the web code |
+| `bun run test:sim` | Run the Rust simulation tests |
+| `bun run test:voice` | Run the voice crate's tests (needs `bun run voice` for the dictionary) |
+| `bun run check:voice` | Check the voices in Bun against golden hashes (`tools/voice/check.mjs`) |
+| `bun run check:llm` | Check the language model's prompts, cleaning and golden lines in Bun (`tools/llm/check.mjs`; several minutes). Run it by hand when a prompt, a cleaning rule or the model changes, not on every release |
+| `bun run devices:llm` | Run the voices and language model's device test in Chromium (`tools/llm/devices.mjs`) |
+| `bun ../tools/llm/bench.mjs` | Benchmark the language model on its own: the game's worker, model and prompts with no game around it (load, prompt, tokens a second, the game's five lines), cold and with the page reloaded; writes `bench-results/llm-*/` |
+| `bun run assets` | Build or update the compressed asset copies (the build does this too) |
+| `bun run decoders` | Refresh `public/decoders` after a Babylon upgrade |
 
-From the repo root: `cargo clippy --workspace --all-targets -- -D warnings` (CI gates on it), `node tools/bench/render.mjs` (the rendering benchmark, see [docs/design/graphics.md](docs/design/graphics.md)) and `node tools/release/version.mjs` (the version, see [Versions and releasing](#versions-and-releasing)).
+From the repo root: `cargo clippy --workspace --all-targets -- -D warnings` (CI gates on it), `bun tools/bench/render.mjs` (the rendering benchmark, see [docs/design/graphics.md](docs/design/graphics.md)) and `bun tools/release/version.mjs` (the version, see [Versions and releasing](#versions-and-releasing)).
 
 **The production build** also:
 - runs binaryen's `wasm-opt -O3` on both WASM files and strips their names (`tools/release/wasm-opt.mjs`; about a minute the first time, then cached in `web/.assets/wasm-opt`). The dev server keeps the WASM as built, with its names;
@@ -179,13 +179,13 @@ Pack authors: see [docs/content-packs.md](docs/content-packs.md). The look of th
 
 ## Versions and releasing
 
-The current version is **0.3.2**. One version number covers the whole game: `web/package.json` (shown in the main menu and Credits, with the commit it was built from), the Rust workspace in `Cargo.toml` and the workspace crates' entries in `Cargo.lock`. `node tools/release/version.mjs` prints it and fails if they differ (CI checks this); `node tools/release/version.mjs 0.3.0` sets all three. Each release is a git tag `vX.Y.Z` with notes in [CHANGELOG.md](CHANGELOG.md).
+The current version is **0.3.2**. One version number covers the whole game: `web/package.json` (shown in the main menu and Credits, with the commit it was built from), the Rust workspace in `Cargo.toml` and the workspace crates' entries in `Cargo.lock`. `bun tools/release/version.mjs` prints it and fails if they differ (CI checks this); `bun tools/release/version.mjs 0.3.0` sets all three. Each release is a git tag `vX.Y.Z` with notes in [CHANGELOG.md](CHANGELOG.md).
 
 Saves have their own format version, `SAVE_VERSION` in `crates/sim-core/src/save.rs`: 32 since 0.3.1, also in 0.3.2 (29 in 0.3.0, 23 in 0.2.0; 0.1.0 wrote 17). Older saves are migrated when they load, and `crates/sim-core/tests/old_saves.rs` loads real saves from 0.1.0 and the build after it. A save from a newer version is kept and skipped, and a damaged one is removed with a notice.
 
 **Releasing** (`.github/workflows/pages.yml`):
-1. `node tools/release/version.mjs <x.y.z>` (it updates `Cargo.lock` too, so no `cargo build` is needed), and a `## <x.y.z> — <date>` section in CHANGELOG.md, with the date set by hand. Commit both on `main`, and `git push origin main`: the dry run builds what GitHub has.
-2. A dry run on `main`: `gh workflow run pages.yml --ref main -f deploy=false`. `gh run watch` needs the run's id: `gh run list --workflow pages.yml -L1 --json databaseId -q '.[0].databaseId'`, then `gh run watch <id> --exit-status`. It runs everything a release runs (clippy with `-D warnings`, the simulation tests, tickbench, the voice tests, `pnpm check:voice`, `check` and `lint`, the build, a size check under 900 MB) without publishing. It works on any branch, and `-f deploy=true` publishes. Run it on `main` just before tagging: the caches it saves there (voice and language models, assets) can be read by the tag's run.
+1. `bun tools/release/version.mjs <x.y.z>` (it updates `Cargo.lock` too, so no `cargo build` is needed), and a `## <x.y.z> — <date>` section in CHANGELOG.md, with the date set by hand. Commit both on `main`, and `git push origin main`: the dry run builds what GitHub has.
+2. A dry run on `main`: `gh workflow run pages.yml --ref main -f deploy=false`. `gh run watch` needs the run's id: `gh run list --workflow pages.yml -L1 --json databaseId -q '.[0].databaseId'`, then `gh run watch <id> --exit-status`. It runs everything a release runs (clippy with `-D warnings`, the simulation tests, tickbench, the voice tests, `bun run check:voice`, `check` and `lint`, the build, a size check under 900 MB) without publishing. It works on any branch, and `-f deploy=true` publishes. Run it on `main` just before tagging: the caches it saves there (voice and language models, assets) can be read by the tag's run.
 3. Tag and push: `git tag -a v<x.y.z> -m "..."` and `git push origin v<x.y.z>`. The tag's run checks that the tag matches the version and that CHANGELOG.md has its heading, builds, and publishes to GitHub Pages. Pushes to `main` alone don't publish. Watch it as in step 2 (`gh run list --workflow pages.yml --event push -L1 …`), and don't start other runs while it waits: GitHub keeps only one waiting run per concurrency group and cancels the older one.
 4. Check the live site:
    - The menu shows the new version, and Credits "Version <x.y.z> (build <the tagged commit>)". (To find the version in the bundle, search `index-*.js` for it without double quotes: it sits in backticks.)

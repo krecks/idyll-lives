@@ -19,7 +19,7 @@ Run the checker after every change (see [Checking a pack](#checking-a-pack)).
 - Files are merged in that order: base, careers, then packs.
 - Keep ids unique across *all* files. Prefix ids with your pack's theme when in doubt
   (`zenTeaSet`, not `teaSet`), because another pack may want the obvious name.
-- **In a built site** (`pnpm build`, the published game) the content and the asset manifests are
+- **In a built site** (`bun run build`, the published game) the content and the asset manifests are
   also packed into one file, `bundle.json`, and the game reads them from there: editing a file
   in `dist/content/` changes nothing until you rebuild, or delete `dist/bundle.json` (the game
   then fetches the files one by one). The dev server has no bundle, and an art pack loaded with
@@ -399,7 +399,7 @@ replaces lines, under a top-level `voice` key with the same layout, per language
   same key, other keys stay. Prefer adding lines for your own objects to replacing the base game's.
 - Write 3–6 lines per key (a resident doesn't repeat their last few), short (most under 40
   characters), and right for children, teens and grown-ups alike. Babies don't speak.
-- Check them with `cargo test -p voice --release --test lines` (after `pnpm voice` has fetched
+- Check them with `cargo test -p voice --release --test lines` (after `bun run voice` has fetched
   the dictionary): every line must phonemize from the dictionary, and every key must name content
   that exists.
 

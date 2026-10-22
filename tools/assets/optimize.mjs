@@ -1,5 +1,5 @@
 // Compressed copies of the game's assets for the production build. The sources in
-// web/public/assets stay as they are (and are still what `pnpm dev` serves); `vite build` runs
+// web/public/assets stay as they are (and are still what `bun run dev` serves); `vite build` runs
 // this and ships the copies next to them, with an index the asset registry reads
 // (`assets/optimized.json`: source path -> compressed copy). Anything not in the index, such as
 // a modder's pack, loads as it is.
@@ -13,7 +13,7 @@
 //
 // Outputs are cached by content hash in web/.assets/cache, so only changed files are encoded.
 //
-// usage (in web/): node ../tools/assets/optimize.mjs [--force] [--jobs N]
+// usage (in web/): bun ../tools/assets/optimize.mjs [--force] [--jobs N]
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';

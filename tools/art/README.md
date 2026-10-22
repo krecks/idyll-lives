@@ -21,7 +21,7 @@ Texture flow: download (`cargo tex ph`) → `cargo tex process` (`cargo tex hous
 `web/public/assets/textures/` → `cargo tex materials` → merge its entries into `web/public/assets/manifest.json` by hand
 (they are few and stable). `cargo tex clouds` regenerates the sky's cloud layer.
 
-To look at the models without starting a game, run `pnpm dev` and open `/gallery.html` (dev only): it draws models in
+To look at the models without starting a game, run `bun run dev` and open `/gallery.html` (dev only): it draws models in
 a grid with the game's loader, finishes and plant shader (`?filter=garden`, `?keys=model.tree,model.pine`, `?cols=`,
 `?gap=`, `?pack=`; drag to orbit).
 

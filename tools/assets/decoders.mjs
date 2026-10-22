@@ -7,7 +7,7 @@
 //   @babylonjs/core version in web/package.json (Apache-2.0; zstddec BSD).
 //   meshopt geometry decoder: the meshoptimizer package that also encodes our models (MIT).
 //
-// usage (in web/): node ../tools/assets/decoders.mjs
+// usage (in web/): bun ../tools/assets/decoders.mjs
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
