@@ -94,6 +94,8 @@ pub struct Links {
     pub approach: Vec<(i32, i32)>,
     /// The top each thing on the `Surface` layer stands on (see `host_of`).
     pub host: Vec<Option<u32>>,
+    /// The seats facing each table (`table` the other way round), in id order.
+    seats: Vec<Vec<u32>>,
 }
 
 impl Links {
@@ -119,20 +121,27 @@ impl Links {
                 faced(content, objects, nav, o, at)
             })
             .collect();
-        let host: Vec<Option<u32>> = objects.iter().map(|o| host_of(content, objects, o)).collect();
+        let mut seats = vec![Vec::new(); objects.len()];
+        for (seat, t) in table.iter().enumerate() {
+            if let Some(list) = t.and_then(|t| seats.get_mut(t as usize)) {
+                list.push(seat as u32);
+            }
+        }
+        let tops: Vec<Top> = objects.iter().filter_map(|o| Top::of(content, o)).collect();
+        let host: Vec<Option<u32>> = objects.iter().map(|o| host_among(content, tops.iter().copied(), o)).collect();
         let base: Vec<(i32, i32)> = objects.iter().map(|o| approach_tile(content, nav, o)).collect();
         // A thing on a top with no free side: from a seat pulled up to the top, else the top's.
         let approach = objects
             .iter()
             .map(|o| match host[o.id as usize] {
                 Some(h) => rider_tiles(content, objects, nav, o, h).first().copied().unwrap_or_else(|| {
-                    let seat = table.iter().position(|t| *t == Some(h));
-                    base[seat.unwrap_or(h as usize)]
+                    let seat = seats.get(h as usize).and_then(|s| s.first());
+                    base[seat.map_or(h as usize, |&s| s as usize)]
                 }),
                 None => base[o.id as usize],
             })
             .collect();
-        Self { table, approach, host }
+        Self { table, approach, host, seats }
     }
 
     /// The top a thing on the `Surface` layer stands on (as of the last rebuild).
@@ -143,6 +152,11 @@ impl Links {
     /// The table `seat` is pulled up to.
     pub fn table_of(&self, seat: u32) -> Option<u32> {
         self.table.get(seat as usize).copied().flatten()
+    }
+
+    /// The seats pulled up to `table`, in id order.
+    pub fn seats_at(&self, table: u32) -> &[u32] {
+        self.seats.get(table as usize).map_or(&[], Vec::as_slice)
     }
 
     /// The tile object `id` is used from (as of the last rebuild).
@@ -270,14 +284,16 @@ pub fn host_at(content: &Content, objects: &[ObjectInstance], x: i32, z: i32) ->
 /// The object a thing on the `Surface` layer stands on (None for anything else, or a thing
 /// left with nothing under it).
 pub fn host_of(content: &Content, objects: &[ObjectInstance], obj: &ObjectInstance) -> Option<u32> {
+    host_among(content, objects.iter().filter_map(|o| Top::of(content, o)), obj)
+}
+
+/// `host_of`, of `tops` (in id order).
+fn host_among(content: &Content, mut tops: impl Iterator<Item = Top>, obj: &ObjectInstance) -> Option<u32> {
     if content.objects[obj.def].layer != Layer::Surface {
         return None;
     }
     let p = middle(content, obj);
-    objects
-        .iter()
-        .filter(|o| o.id != obj.id)
-        .find_map(|o| Top::of(content, o).filter(|t| t.covers(p)).map(|t| t.host))
+    tops.find(|t| t.host != obj.id && t.covers(p)).map(|t| t.host)
 }
 
 /// Things on the `Surface` layer standing on `host`, in id order.
@@ -460,9 +476,10 @@ pub fn seat_at_top(content: &Content, objects: &[ObjectInstance], links: &Links,
     let host = links.host_of(object)?;
     let p = middle(content, objects.get(object as usize)?);
     let rules = &content.cooking;
-    objects
+    links
+        .seats_at(host)
         .iter()
-        .filter(|o| links.table_of(o.id) == Some(host))
+        .filter_map(|&id| objects.get(id as usize))
         .filter(|o| {
             let def = &content.objects[o.def];
             !o.broken() && o.can_use(sim, def.slots) && o.sits(def, stage, rules.seat_tags, rules.seat_avoid)
