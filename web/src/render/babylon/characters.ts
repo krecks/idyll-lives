@@ -197,6 +197,13 @@ export const QUIET_SPEED = 4;
 /** Larger jumps between frames snap instead of sliding. */
 const SNAP_DISTANCE = 1.6;
 /**
+ * A frame this long after the last (s): back from a hidden tab (it draws no frames) or a long stall.
+ * The residents went on meanwhile, so each is drawn as if just come into view: one who sat down
+ * meanwhile doesn't sit down again, and no walking speed is estimated over the gap (walkers would
+ * run on the spot).
+ */
+const STALL = 0.5;
+/**
  * Walkers glide from snapshot to snapshot as far as they can walk between them (at speeds 4 and 5
  * a step covers metres; cutting corners of their path is the price): metres walked per tick
  * (`world::WALK_SPEED`), the fastest walkers' trait and perk factors (1.15 x 1.2 in the base game,
@@ -2888,6 +2895,7 @@ export class Characters {
     const { prev, curr, alpha, layout, now } = frame;
     let dt = this.lastNow ? (now - this.lastNow) / 1000 : 0;
     this.lastNow = now;
+    const stalled = dt > STALL;
     if (dt > 0.1) dt = 0.1;
     if (dt < 0) dt = 0;
     const speed = curr[layout.header.speed] | 0;
@@ -3012,7 +3020,7 @@ export class Characters {
       }
 
       // Position / speed / facing.
-      const appeared = !rig.visible;
+      const appeared = !rig.visible || stalled;
       if (appeared) {
         rig.x = tx;
         rig.z = tz;
@@ -3036,7 +3044,7 @@ export class Characters {
         const inst = dist / dt;
         rig.speed += (Math.min(inst, 20) - rig.speed) * (1 - Math.exp(-dt * 10));
       }
-      if (moving || dist > SNAP_DISTANCE || !rig.visible) {
+      if (moving || dist > SNAP_DISTANCE || appeared) {
         rig.x = gx;
         rig.z = gz;
         rig.walkT = -1;
