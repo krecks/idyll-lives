@@ -148,6 +148,12 @@ room has.
   finish decides), so choose the finish, not a number. An unmapped material keeps the file's own
   PBR material: a draw call of its own, a look that doesn't match the furniture, and (today) a
   material left behind each time the model is rebuilt. `cargo check-glb` warns of each one.
+- **Baked shading.** The export bakes how much sky each vertex sees into a grey vertex colour (COLOR_0,
+  `gamekit/shade.py`, 32 greys), and the game multiplies it into the part's colour (`restyledMesh`), the
+  player's colour too: creases, seams, the gaps between cushions and drawer reveals darken, with no
+  texture, UV or draw call (about 10 % more download). A part a clip takes away from its rest (a door, a
+  drawer, something grown or hidden) is shaded by itself only, so it doesn't carry the shadow of what it
+  left; the rest are shaded together at rest. `cargo check-glb` fails a COLOR_0 that isn't grey.
 - **Finishes by name.** A material named `<name>@<finish>` (`stone@matte`, `leaf@foliage`) is drawn
   with that finish without a `materials` entry (one in the entry still wins). Handy for files not made
   with gamekit, whose palettes write the map themselves.
@@ -357,6 +363,7 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
 | Selection | the model's mesh objects only | No cameras, lights or helpers in the file |
 | UVs | off unless textured | Nothing reads them; they split vertices and cost bytes |
 | Normals | on | Smooth and hard edges as modelled |
+| Vertex colours | the baked shading only (`ao` as COLOR_0) | The game multiplies it in; nothing else may colour a vertex |
 | Materials | exported, one-sided | Their names and colours drive the finishes |
 | Compression | none (no Draco) | The build adds meshopt; the game ships no Draco decoder |
 | Clips | moving parts only (`clips=True`): node rotation, translation or scale, first key at rest | Thin instances move whole nodes, not bones (below) |

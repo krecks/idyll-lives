@@ -48,6 +48,7 @@ def lit(path, view='three_quarter'):
     scene.world = world
     for m in bpy.data.materials:
         _textured(m)
+        _shaded(m)
     lo, hi = (Vector(v) for v in measure())
     span = max(hi - lo)
     added = []
@@ -119,6 +120,30 @@ def _textured(m):
     normal = nodes.new('ShaderNodeNormalMap')
     links.new(image('normal.jpg', False).outputs['Color'], normal.inputs['Color'])
     links.new(normal.outputs['Normal'], bsdf.inputs['Normal'])
+
+
+def _shaded(m):
+    """Multiplies a material's colour by the baked shading (`ao`, gamekit/shade.py), as the game does, once."""
+    from .shade import ATTRIBUTE
+    if m.get('shaded') or not m.use_nodes or m.name.startswith('lit_'):
+        return
+    m['shaded'] = True
+    nodes, links = m.node_tree.nodes, m.node_tree.links
+    bsdf = nodes['Principled BSDF']
+    ao = nodes.new('ShaderNodeVertexColor')
+    ao.layer_name = ATTRIBUTE
+    mix = nodes.new('ShaderNodeMix')
+    mix.data_type = 'RGBA'
+    mix.blend_type = 'MULTIPLY'
+    mix.inputs['Factor'].default_value = 1.0
+    socket = {s.identifier: s for s in mix.inputs}
+    base = bsdf.inputs['Base Color']
+    if base.links:
+        links.new(base.links[0].from_socket, socket['A_Color'])
+    else:
+        socket['A_Color'].default_value = base.default_value
+    links.new(ao.outputs['Color'], socket['B_Color'])
+    links.new(next(s for s in mix.outputs if s.identifier == 'Result_Color'), base)
 
 
 def _render(path, view, bounds=None):

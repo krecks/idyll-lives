@@ -11,6 +11,7 @@ from .export import export_glb, materials_used, stats, write_pack
 from .manifest import known_keys, played, write_centres  # the keys, `motions` and centres as the gate reads them
 from .parts import check_size, join
 from .preview import lit, preview, preview_clips, preview_perches
+from .shade import bake_ao
 from .scene import ASSETS, PREVIEWS, meshes, reset
 
 # A decimated far version (`far=ratio`) keeps every vertex up to this height (m) over the model's lowest point.
@@ -151,6 +152,7 @@ class Family:
                 os.makedirs(os.path.dirname(stem), exist_ok=True)
                 preview(stem + '.png')
                 if '--lit' in args:
+                    bake_ao(objs)
                     lit(stem + '.lit.png')
                 preview_clips(stem)
                 print(f'[gamekit] previewed {self.key(model)} -> {stem}.png')

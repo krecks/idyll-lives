@@ -409,7 +409,8 @@ never one that's already running) and drive Playwright headless with full Chrome
 | `place.py` | `GameFrame`: parts placed in game coordinates (`at`, `box`, `cyl`, `cone`, `sphere`); `depths=` redraws a thing's numbers at another depth (the kitchen counters' one depth) |
 | `parts.py` | `new_parts`, `join`, `join_all`, `set_origin`, `hinged`, `turn`, `settle`, `measure`, `game_size`, `check_size`; `fit` (third-party files only: it stretches) |
 | `motion.py` | the clips: `swing` (turn), `slide` (move), `grow` (appear from nothing), `squash` (scale), `spin` (whole turns home), `rock` (out, past rest and home), `turns` (parts out and back in turn), `scroll` (one repeat on, a belt), `path` (through keys), `stages` (a crop's growth); `clips` |
-| `export.py` | `export_glb` (the fixed export settings), `write_pack`, `stats`, `materials_used` |
+| `export.py` | `export_glb` (the fixed export settings, the shading baked first), `write_pack`, `stats`, `materials_used` |
+| `shade.py` | `bake_ao`: the creases' shading baked into a grey vertex colour (COLOR_0), which the game multiplies in |
 | `preview.py` | `preview` (front three-quarter, Workbench; or `view=` side, front, top), `lit` (EEVEE, as the game lights it: `--lit`), `preview_clips`, `preview_perches` |
 | `family.py` | `Model`, `Family` and its `run`: the command line every family script ends with |
 | `far.py` | `far_of` (a far version from the model's own build at low detail), `low`, `is_low` |

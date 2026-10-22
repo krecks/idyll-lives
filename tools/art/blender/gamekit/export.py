@@ -9,25 +9,30 @@ import bpy
 # The manifests as the game stacks them, and which keys the game draws (read as the gate reads them).
 from .manifest import known_keys, manifests
 from .scene import ASSETS, meshes
+from .shade import ATTRIBUTE, bake_ao
 
 
-def export_glb(path, objects=None, texcoords=False, clips=False):
+def export_glb(path, objects=None, texcoords=False, clips=False, shade=True):
     """
     Writes a .glb (all mesh objects unless given), +Y up so Blender -Y is the game's +Z front.
     Without textures the UVs stay out (`texcoords`): the game gives flat-coloured parts its own.
     `clips`: a model with moving parts writes its clips, one per NLA track name, and the scene's
-    current frame as the rest pose (frame 1, each clip's first key).
+    current frame as the rest pose (frame 1, each clip's first key). `shade` bakes the creases'
+    shading into each vertex first (gamekit/shade.py), written as COLOR_0.
     """
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    bpy.ops.object.select_all(action='DESELECT')
     objects = objects if objects is not None else meshes()
+    if shade:
+        bake_ao(objects)
+    bpy.ops.object.select_all(action='DESELECT')
     for o in objects:
         o.select_set(True)
     bpy.context.view_layer.objects.active = objects[0]
     extra = {'export_animation_mode': 'NLA_TRACKS'} if clips else {'export_animations': False}
     bpy.ops.export_scene.gltf(filepath=path, export_format='GLB', use_selection=True,
                               export_apply=True, export_yup=True, export_materials='EXPORT',
-                              export_texcoords=texcoords, **extra)
+                              export_texcoords=texcoords, export_vertex_color='NAME', export_vertex_color_name=ATTRIBUTE,
+                              export_all_vertex_colors=False, **extra)
     return path
 
 

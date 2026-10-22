@@ -629,6 +629,15 @@ fn positions(g: &Glb, prim: &J) -> R<Vec<Vec<Num>>> {
     Ok(out)
 }
 
+/// Whether a primitive's vertex colour (COLOR_0) is anything but grey. The game reads it as the shading baked into
+/// the model's creases (gamekit/shade.py) and multiplies it into the part's colour, so a colour in it would tint
+/// the part. One it can't read here (compressed) passes.
+fn coloured(g: &Glb, prim: &J) -> R<bool> {
+    let Some(index) = key(prim, "attributes")?.get("COLOR_0") else { return Ok(false) };
+    let Some(rows) = accessor(g, index)? else { return Ok(false) };
+    Ok(rows.iter().any(|v| v.len() >= 3 && ((v[0].f() - v[1].f()).abs() > 0.01 || (v[0].f() - v[2].f()).abs() > 0.01)))
+}
+
 /// An accessor's `min` and `max`.
 fn box_of(acc: &J) -> R<(Vec<Num>, Vec<Num>)> {
     let lo = nums(key(acc, "min")?, 0)?;
@@ -2192,6 +2201,9 @@ fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>,
             if key(prim, "attributes")?.has("TEXCOORD_0") && (!textured || finish.is_some()) {
                 flags.entry("uvs").or_default().insert(name.clone());
             }
+            if coloured(&g, prim)? {
+                flags.entry("coloured").or_default().insert(name.clone());
+            }
             if ov_on && ov.get("hide").is_some_and(J::truthy) {
                 continue;
             }
@@ -2239,6 +2251,10 @@ fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>,
         if let Some(names) = flags.get(flag).filter(|n| !n.is_empty()) {
             warnings.push(format!("materials {text}: {}", names.iter().cloned().collect::<Vec<_>>().join(", ")));
         }
+    }
+    if let Some(names) = flags.get("coloured").filter(|n| !n.is_empty()) {
+        let names = names.iter().cloned().collect::<Vec<_>>().join(", ");
+        errors.push(format!("materials with a coloured COLOR_0: {names} (the game multiplies it in as baked shading, grey: gamekit/shade.py)"));
     }
 
     // Units and origin: on the floor, centred on the footprint (models.ts lines files up by neither).
@@ -2708,6 +2724,29 @@ mod tests {
         assert_eq!(finish("stone@Matte"), None);
         assert_eq!(finish("stone@matte2"), None);
         assert_eq!(finish("stone"), None);
+    }
+
+    /// One triangle whose vertex colour is `colour` at each corner (normalised u16 RGBA, as Blender writes it).
+    fn shaded(colour: [u16; 4]) -> Glb {
+        let mut bin: Vec<u8> = [[0f32, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]].iter().flatten().flat_map(|c| c.to_le_bytes()).collect();
+        for _ in 0..3 {
+            bin.extend(colour.iter().flat_map(|c| c.to_le_bytes()));
+        }
+        let json = r#"{"asset": {"version": "2.0"}, "scenes": [{"nodes": [0]}], "nodes": [{"mesh": 0}],
+            "meshes": [{"primitives": [{"attributes": {"POSITION": 0, "COLOR_0": 1}}]}],
+            "bufferViews": [{"byteOffset": 0, "byteLength": 36}, {"byteOffset": 36, "byteLength": 24}],
+            "accessors": [{"bufferView": 0, "componentType": 5126, "type": "VEC3", "count": 3, "min": [0, 0, 0], "max": [1, 0, 1]},
+                {"bufferView": 1, "componentType": 5123, "normalized": true, "type": "VEC4", "count": 3}]}"#;
+        parse_glb(&glb::tests::glb(json, &bin)).unwrap()
+    }
+
+    #[test]
+    fn baked_shading_is_grey() {
+        let prim = |g: &Glb| key(item(&g.gltf, "meshes", &J::Int(0)).unwrap(), "primitives").unwrap().list().unwrap()[0].clone();
+        let grey = shaded([40000, 40000, 40000, 65535]);
+        assert!(!coloured(&grey, &prim(&grey)).unwrap());
+        let tinted = shaded([40000, 20000, 40000, 65535]);
+        assert!(coloured(&tinted, &prim(&tinted)).unwrap());
     }
 
     /// A sofa bed of two quads facing up: the seat (glTF x -0.5 to 0.1, so game x -0.1 to 0.5) 0.41 m up, and the

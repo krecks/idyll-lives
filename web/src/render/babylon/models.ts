@@ -1709,7 +1709,13 @@ function restyledMesh(scene: Scene, data: VertexData, material: Material | null,
   const c = ov.color ? Color3.FromHexString(ov.color) : material instanceof PBRMaterial ? material.albedoColor.toGammaSpace() : Color3.White();
   const count = positions.length / 3;
   const colors = new Float32Array(count * 4);
-  for (let i = 0; i < count; i++) colors.set([c.r, c.g, c.b, alpha], i * 4);
+  // The file's grey vertex colour is the shading baked into its creases (gamekit/shade.py), linear: the
+  // colour here is sRGB (the finish shader raises it to 2.2), so it takes the shading's 1/2.2 power.
+  const baked = data.colors && data.colors.length >= count * 4 ? data.colors : null;
+  for (let i = 0; i < count; i++) {
+    const k = baked ? Math.max(0, baked[i * 4]) ** (1 / 2.2) : 1;
+    colors.set([c.r * k, c.g * k, c.b * k, alpha], i * 4);
+  }
   mesh.setVerticesData(VertexBuffer.ColorKind, colors);
   mesh.refreshBoundingInfo();
   return mesh;
