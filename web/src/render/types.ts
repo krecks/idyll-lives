@@ -26,6 +26,18 @@ export interface ViewRect {
 }
 
 /** An orbit camera pose: angles in radians, distance and target in metres. */
+/**
+ * How busy the garden birds are at an hour (0..1, by day; they roost at night): most at dawn and in
+ * the early evening, least round midday. What they do (render/babylon/birds.ts) and how much they
+ * sing (audio/world.ts) both follow it, so what's seen and heard peak together.
+ */
+export function birdActivity(hour: number): number {
+  const dawn = Math.exp(-(((hour - 6.5) / 1.6) ** 2));
+  const evening = Math.exp(-(((hour - 18) / 1.4) ** 2));
+  const midday = Math.exp(-(((hour - 13) / 1.8) ** 2));
+  return Math.min(1, 0.5 + 0.5 * Math.max(dawn, 0.85 * evening) - 0.2 * midday);
+}
+
 /** A garden bird as the renderer draws it (`Renderer.birds`). */
 export interface SeenBird {
   id: number;

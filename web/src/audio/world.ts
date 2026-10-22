@@ -18,7 +18,7 @@
 import type { Content } from '../content/content';
 import type { FrameState } from '../core/bridge';
 import { storeyOfRow, storeyRow, type WorldStructure } from '../core/protocol';
-import { STOREY_HEIGHT, type Renderer, type ViewRect } from '../render/types';
+import { birdActivity, STOREY_HEIGHT, type Renderer, type ViewRect } from '../render/types';
 import { game } from '../ui/state.svelte';
 import { songSamples, SPECIES, VERSIONS, type Species, type Voice } from './birdsong';
 import { audioContext, bus, updateVolumes } from './mixer';
@@ -364,11 +364,7 @@ export class WorldSound {
 
   /** Stereo position from where the resident is on screen; off screen counts as far to the side. */
   private panAt(): number {
-    if (!this.renderer.project(this.head.x, this.head.y, this.head.z, this.screen)) return 0;
-    const width = window.innerWidth || 1;
-    const pan = Math.max(-1, Math.min(1, (this.screen.x / width) * 2 - 1)) * 0.7;
-    // Web Audio throws on a non-finite value (and that would stop the frame).
-    return Number.isFinite(pan) ? pan : 0;
+    return this.renderer.project(this.head.x, this.head.y, this.head.z, this.screen) ? screenPan(this.screen.x, 0.7) : 0;
   }
 
   /** A looping buffer, silent until faded in; it starts somewhere along the loop, so it never sounds the same twice. */
@@ -531,10 +527,24 @@ interface Bird {
   until: number;
   /** Its level and place, made on its first song. */
   out: { gain: GainNode; panner: StereoPannerNode } | null;
-  /** A bird in view (the renderer's `SeenBird.id`): its level by distance, and whether it may sing now. */
+  /** A bird in view (the renderer's `SeenBird.id`): its level by distance, whether it may sing now, and the tick it was last in view. */
   id?: number;
   near?: number;
   free?: boolean;
+  seenAt?: number;
+}
+
+/** A bird of `species` heard, its songs its own (pitch and pace from `r`, made from `seed`); not yet placed. */
+function hearBird(species: Species, seed: number, r: () => number): Bird {
+  const voice = { species: species.name, seed, pitch: between(r, species.pitch), pace: 0.92 + r() * 0.16, near: 1 };
+  return { species, voice, dawn: false, pan: 0, left: 0, next: 0, until: 0, out: null };
+}
+
+/** Stereo position from where something is on screen (`x`, px), `scale` of the way to the sides. */
+function screenPan(x: number, scale: number): number {
+  const pan = Math.max(-1, Math.min(1, (x / (window.innerWidth || 1)) * 2 - 1)) * scale;
+  // Web Audio throws on a non-finite value (and that would stop the frame).
+  return Number.isFinite(pan) ? pan : 0;
 }
 
 /**
@@ -546,32 +556,33 @@ interface Bird {
  */
 class Birds {
   private readonly flock: Bird[];
-  /** The birds in view, by their id. */
+  /** The birds in view, by their id; and everyone heard (the unseen and those), made again as those change. */
   private readonly seen = new Map<number, Bird>();
+  private everyone: Bird[];
+  private tick = 0;
   private readonly screen = { x: 0, y: 0 };
 
   /** `made` makes their songs (off the main thread). */
   constructor(private readonly made: WorkerSounds) {
     const r = random(0x5eed1e55);
     this.flock = FLOCK.map(({ species: name, pan, dawn = false }, i) => {
-      const species = SPECIES.find((sp) => sp.name === name) ?? SPECIES[0];
-      const pitch = between(r, species.pitch);
-      const pace = 0.92 + r() * 0.16;
-      const place = pan + (r() - 0.5) * 0.15;
-      const near = dawn ? 0.3 + r() * 0.15 : 0.45 + r() * 0.25;
-      return { species, voice: { species: species.name, seed: i, pitch, pace, near }, dawn, pan: place, left: 0, next: 0, until: 0, out: null };
+      const b = hearBird(SPECIES.find((sp) => sp.name === name) ?? SPECIES[0], i, r);
+      b.pan = pan + (r() - 0.5) * 0.15;
+      b.voice.near = dawn ? 0.3 + r() * 0.15 : 0.45 + r() * 0.25;
+      b.dawn = dawn;
+      return b;
     });
+    this.everyone = this.flock;
   }
 
   update(ac: AudioContext, out: AudioNode, now: number, hour: number, quiet: boolean, renderer: Renderer): void {
     const day = daylight(hour);
     const chorus = smooth(4.5, 5.5, hour) * (1 - smooth(7, 8.5, hour));
-    const midday = smooth(10.5, 12, hour) * (1 - smooth(14.5, 16.5, hour));
-    // How busy the birds are: most in the dawn chorus, least around midday, a little less in the evening.
-    const busy = day * Math.min(1, 0.5 - 0.25 * midday - 0.1 * smooth(14, 16, hour) + 0.5 * chorus);
+    // How busy the birds are (as the birds drawn): most at dawn and in the early evening, least around midday.
+    const busy = day * birdActivity(hour);
     const t = ac.currentTime;
     const heard = this.look(renderer, now);
-    const all = this.all();
+    const all = this.everyone;
     // Birds mostly take turns; in the dawn chorus up to three sing at once.
     const crowd = 1 + Math.round(2 * chorus);
     let singing = 0;
@@ -623,15 +634,11 @@ class Birds {
 
   /** Fades out whoever is singing. */
   hush(t: number): void {
-    for (const b of this.all()) if (b.out) fadeTo(b.out.gain, 0, t);
+    for (const b of this.everyone) if (b.out) fadeTo(b.out.gain, 0, t);
   }
 
   dispose(): void {
-    for (const b of this.all()) b.out?.panner.disconnect();
-  }
-
-  private all(): Bird[] {
-    return this.seen.size ? [...this.flock, ...this.seen.values()] : this.flock;
+    for (const b of this.everyone) b.out?.panner.disconnect();
   }
 
   /**
@@ -642,7 +649,9 @@ class Birds {
   private look(renderer: Renderer, now: number): boolean {
     const width = window.innerWidth || 1;
     const height = window.innerHeight || 1;
-    const here = new Set<number>();
+    const tick = ++this.tick;
+    let here = 0;
+    let changed = false;
     for (const s of renderer.birds()) {
       const on = s.distance < HEARD_RANGE && renderer.project(s.x, s.y, s.z, this.screen) && this.screen.x >= 0 && this.screen.x <= width && this.screen.y >= 0 && this.screen.y <= height;
       if (!on) continue;
@@ -650,26 +659,29 @@ class Birds {
       if (!b) {
         const species = SPECIES.find((sp) => sp.name === s.song);
         if (!species) continue;
-        const r = random(s.id);
         // (Seeds past the unseen birds': songs of its own.)
-        const voice = { species: species.name, seed: 1000 + (s.id % 1_000_000), pitch: between(r, species.pitch), pace: 0.92 + r() * 0.16, near: 0.9 };
-        b = { species, voice, dawn: false, pan: 0, left: 0, next: 0, until: 0, out: null, id: s.id };
+        b = hearBird(species, 1000 + (s.id % 1_000_000), random(s.id));
+        b.voice.near = 0.9;
+        b.id = s.id;
         this.seen.set(s.id, b);
+        changed = true;
       }
-      here.add(s.id);
+      b.seenAt = tick;
+      here++;
       b.free = s.perched;
-      const pan = Math.max(-1, Math.min(1, (this.screen.x / width) * 2 - 1)) * 0.8;
-      b.pan = Number.isFinite(pan) ? pan : 0;
+      b.pan = screenPan(this.screen.x, 0.8);
       b.near = Math.min(1.3, 8 / (s.distance + 4));
     }
     for (const [id, b] of this.seen) {
-      if (here.has(id)) continue;
+      if (b.seenAt === tick) continue;
       b.free = false;
       if (b.until > now - 2000) continue;
       b.out?.panner.disconnect();
       this.seen.delete(id);
+      changed = true;
     }
-    return here.size > 0;
+    if (changed) this.everyone = this.seen.size ? [...this.flock, ...this.seen.values()] : this.flock;
+    return here > 0;
   }
 
   /** Plays one version of the bird's song, from where it is. */
