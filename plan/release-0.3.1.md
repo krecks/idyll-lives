@@ -40,6 +40,8 @@ Run on the M3 Pro from the repository root (web/ for the pnpm ones). Results:
 | `pnpm lint` | clean | 15 s |
 | `pnpm build` | pass; `dist` 627 MB (CI fails over 900) | 1 min 30 s |
 
+After a `/simplify` pass on top of the release commit (30 `simplify:` commits, no behaviour change: the sim's snapshot and save hashes over 6 game days on four runs, all 168 clips and `cargo review` output identical before and after), clippy, sim-core (641), ll-tools (68), the generated houses and worlds, `check:clips`, svelte-check, eslint and `pnpm build` were run again and pass; tickbench within noise (755–878 ns/tick with socials).
+
 Not run locally: `node tools/bench/render.mjs` (headed timing; the review's lighting work measured Medium WebGPU at 3.35 → 3.47 ms GPU, the browser smoke test ran all presets on both backends without errors: `bench-results/review/smoke/index.md`).
 
 ## 4. Still to do (by the owner's go-ahead)
