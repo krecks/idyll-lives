@@ -2,7 +2,7 @@
 # `perches`: [[x, y, z], ...] in the model's own game axes (x, height, depth: Blender (-x, z, -y)), metres, at rest.
 #
 # A build finds them on its own geometry (`surface`: a line in from outside to where it meets the leaves, a little
-# way in) and keeps a spread of them (`spread`), then `keep`s them; `G.settle` moves them with the model and the
+# way in) and keeps a spread of them (`spread`), then `keep`s them (`find` does the three); `G.settle` moves them with the model and the
 # family writes them into the entry. They are data only: finding them casts rays at the built meshes and draws
 # no random number of the build's (each build that has perches gives its own `random.Random`), so the meshes are
 # what they were. A far version (`G.is_low()`) has none.
@@ -58,8 +58,7 @@ def surface(aims, inset, reach=8.0, headroom=0.25, facing=0.2):
     points and unit vectors), the line from `reach` metres out along `direction` back in towards `target` meets
     its first face. A perch is `inset` metres further in from there (a bird's feet among the outer twigs, its body
     showing), kept only where that face looks out (towards the line) and not down (its normal's z over `facing`)
-    and nothing hangs over it within `headroom` metres (a clump above it, a tier's rim). Returns
-    [(perch, surface point)].
+    and nothing hangs over it within `headroom` metres (a clump above it, a tier's rim). Returns the perches.
     """
     scene, depsgraph = _scene()
     out = []
@@ -74,7 +73,7 @@ def surface(aims, inset, reach=8.0, headroom=0.25, facing=0.2):
             continue
         if headroom and _cast(scene, depsgraph, at + normal * 0.02 + up * 0.01, up, headroom):
             continue
-        out.append((at - d * inset, at))
+        out.append(at - d * inset)
     return out
 
 
@@ -109,6 +108,29 @@ def spread(points, n, gap=0.0):
         kept.append(pts[i])
         near = [min(near[k], (pts[k] - pts[i]).length) for k in range(len(pts))]
     return kept
+
+
+def find(n, aims, inset=0.03, gap=0.45, facing=0.2, reach=8.0, headroom=0.25, extra=(), limbs=(), limbs_n=None,
+         limbs_headroom=0.3):
+    """
+    Keeps up to `n` perches on the model as it stands (`keep`; nothing on a far version): where `aims` meet its leaves
+    (`surface`: `inset` metres in, on leaves facing up over `facing` (the cypress's stand upright), within `reach`,
+    `headroom` clear), where `extra` do (twice as far in, at any facing: a conifer's top), and those of `limbs` (points on bare limbs or canes) that
+    stand in the open (`bare`, `limbs_headroom` clear), spread over it at least `gap` apart. With `limbs_n`, up to that
+    many of the limbs' are spread on their own and kept beside the leaves' (a tree's, which its crown's would crowd
+    out); without, they are spread with the leaves' (a rose's canes).
+    """
+    if LOW[0]:
+        return
+    leaves = surface(aims, inset, reach, headroom, facing) + surface(extra, inset * 2, reach, headroom, facing=-1)
+    open_limbs = bare(limbs, limbs_headroom)
+    if limbs_n is None:
+        kept = spread(leaves + open_limbs, n, gap)
+    else:
+        open_limbs = spread(open_limbs, limbs_n, gap) if limbs_n else []
+        kept = spread(leaves, n - len(open_limbs), gap) + open_limbs
+    print(f'[gamekit] perches: {len(kept)} kept, of {len(leaves)} on the leaves and {len(open_limbs)} on bare limbs')
+    keep(kept)
 
 
 def around(centre, rng, n, elevation=(0.15, 0.9), heading=None, turn=math.pi):

@@ -90,7 +90,7 @@ picked apple at 1.84, 0.7 m out), cherry 2.77, maple 3.19, oak 3.90, birch 4.66.
 
 Every tree's entry has `perches`: the places the game's birds (`birds.py`) sit on it. Each is `[x, y, z]` in the
 model's game axes (x, height, depth: Blender (−x, z, −y)), in metres, at rest, before the entry's `scale` and the
-instance's turn. They are found on the tree as built (`gamekit/perch.py`, `perch_on`, `clump_aims`, `tier_aims`):
+instance's turn. They are found on the tree as built (`gamekit/perch.py` `find`, `clump_aims`, `tier_aims`):
 
 - A broadleaf's crown: lines come in from outside towards each clump `crown` returns (out from the trunk ±50°,
   10–55° up, steeper over the top). Where a line meets the leaves, the perch is 3 cm further in, on the outer twigs,

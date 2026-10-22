@@ -870,14 +870,10 @@ def perches(n, seed, centres, per=14, up=(0.35, 1.25), inset=0.02, gap=0.2, faci
     lines in from round and above towards each of `centres` meet its leaves, `inset` metres in, facing up (their
     normal's z over `facing`), with nothing over them, spread over it at least `gap` apart; `bare` adds points on bare
     stems that stand in the open (a rose's canes). Up to `n`. Its own random numbers (`seed`), so the shrub's are as
-    they were; nothing on a far version."""
-    if G.is_low():
-        return
+    they were; nothing on a far version (`G.perch.find`)."""
     rng = random.Random(seed)
     aims = [a for c in centres for a in G.perch.around(c, rng, per, up)]
-    found = [p for p, _ in G.perch.surface(aims, inset, reach=4.0, headroom=0.15, facing=facing)]
-    found += G.perch.bare(bare, headroom=0.15)
-    G.perch.keep(G.perch.spread(found, n, gap))
+    G.perch.find(n, aims, inset, gap, facing, reach=4.0, headroom=0.15, limbs=bare, limbs_headroom=0.15)
 
 
 def _with_part(name, still, build, origin, clip, kind='squash'):

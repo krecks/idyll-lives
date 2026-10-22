@@ -126,7 +126,8 @@ shrub, the shrub with pink blossom, the garden hedge's block without its sprigs)
   (`perches`, `gamekit/perch.py`, as the trees' in trees.md). Lines come in from round and above towards the shrub's
   middle, or along a hedge's top (`hedge_top`), and meet its leaves. The perch is 2 cm in from there, on leaves that
   face up a little at least, with nothing over it within 15 cm, spread at least 20 cm apart. Found before the trimmed
-  sprigs and the cut rose are built. The rose bush's go on its canes, half way up their arch, and on its leafy base.
+  sprigs and the cut rose are built. The rose bush's canes are offered too, half way up their arch, but none stands
+  in the open (`G.perch.bare`), so its five are on its leafy base.
   The bush has 6, `model.bush.small` 4, `model.bush.flowering` 6, `model.hedge` 6, the boxwood 4, the topiary 4
   (on its cone), the garden hedge 6, the hydrangea 5, the rose bush 5 and the azalea 5. Lavender, ferns, grass and
   hostas have none. Perches only add data: the meshes are unchanged (same triangles as the table), and so are the
