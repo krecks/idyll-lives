@@ -269,7 +269,7 @@ pub fn objects(dir: &Path) -> Result<Vec<Object>, String> {
 /// depth first, a later entry replacing an earlier one), for the entries that have one.
 pub fn motions(paths: &Paths) -> Result<BTreeMap<String, Value>, String> {
     let mut out = BTreeMap::new();
-    for (_, m) in checkglb::manifests(paths, &Path::new(&paths.assets).join("manifest.json").to_string_lossy())? {
+    for (_, m) in checkglb::asset_manifests(paths)? {
         for (key, entry) in m.get("entries").and_then(|e| e.entries()).unwrap_or_default() {
             if entry.get("type").and_then(|t| t.str()) == Some("model") {
                 match entry.get("motions").filter(|m| m.entries().is_some()) {

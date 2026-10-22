@@ -121,16 +121,30 @@ pub fn centres_text(centres: &BTreeMap<String, [f64; 2]>) -> String {
 }
 
 /// [(path, manifest)] for a manifest and the packs it lists, depth first, in order. A manifest that can't
-/// be read is an error naming it.
+/// be read, or packs nested more than 20 deep (a pack listing itself), is an error naming it.
 pub fn manifests(paths: &Paths, path: &str) -> Result<Vec<(String, J)>, String> {
-    let m = read_json(path).map_err(|e| format!("{}: {e}", relpath(&normpath(path), &dirname(&paths.assets))))?;
-    let packs: Vec<J> = m.get("packs").and_then(J::list).map(|l| l.to_vec()).unwrap_or_default();
-    let mut out = vec![(path.to_string(), m)];
-    for pack in packs {
-        let pack = pack.str().ok_or_else(|| format!("expected str, bytes or os.PathLike object, not {}", glb::type_name(&pack)))?;
-        out.extend(manifests(paths, &normpath(&join(&dirname(path), pack)))?);
+    fn stack(paths: &Paths, path: &str, depth: usize, out: &mut Vec<(String, J)>) -> Result<(), String> {
+        let name = || relpath(&normpath(path), &dirname(&paths.assets));
+        if depth > 20 {
+            return Err(format!("{}: packs nested too deep", name()));
+        }
+        let m = read_json(path).map_err(|e| format!("{}: {e}", name()))?;
+        let packs: Vec<J> = m.get("packs").and_then(J::list).map(|l| l.to_vec()).unwrap_or_default();
+        out.push((path.to_string(), m));
+        for pack in packs {
+            let pack = pack.str().ok_or_else(|| format!("expected str, bytes or os.PathLike object, not {}", glb::type_name(&pack)))?;
+            stack(paths, &normpath(&join(&dirname(path), pack)), depth + 1, out)?;
+        }
+        Ok(())
     }
+    let mut out = Vec::new();
+    stack(paths, path, 0, &mut out)?;
     Ok(out)
+}
+
+/// `manifests` from the assets' own manifest (web/public/assets/manifest.json).
+pub fn asset_manifests(paths: &Paths) -> Result<Vec<(String, J)>, String> {
+    manifests(paths, &join(&paths.assets, "manifest.json"))
 }
 
 /// The game's content: base.json and the files its `include` lists, merged as the game merges them
@@ -185,7 +199,7 @@ fn content_keys(defs: &Content) -> R<BTreeMap<String, String>> {
 /// content object's and item's model, and every model entry of the manifests.
 pub fn known_keys(paths: &Paths) -> Result<BTreeSet<String>, String> {
     let mut known: BTreeSet<String> = content_keys(&content(paths)?)?.into_keys().filter(|k| !k.is_empty()).collect();
-    for (_path, m) in manifests(paths, &join(&paths.assets, "manifest.json"))? {
+    for (_path, m) in asset_manifests(paths)? {
         for (k, e) in m.get("entries").filter(|e| e.truthy()).and_then(J::entries).unwrap_or(&[]) {
             if e.get("type") == Some(&J::Str("model".into())) {
                 known.insert(k.clone());
@@ -2186,7 +2200,7 @@ pub fn gate(paths: &Paths, keys: &[String]) -> Report {
     let mut text = String::new();
     let fail = |text: String| Report { text, checked: Vec::new(), failed: 1 };
     let read = || -> Result<_, String> {
-        let stack = manifests(paths, &join(&paths.assets, "manifest.json"))?;
+        let stack = asset_manifests(paths)?;
         let defs = content(paths)?;
         Ok((stack, content_objects(&defs)?, content_keys(&defs)?, Furniture::read(paths)?))
     };
@@ -2393,7 +2407,7 @@ fn model(entry: &J, path: &str) -> R<Model> {
 /// Measures every model and content object (`Measures`), for `cargo review sizes`; `tops`: {object id: its
 /// kind's top range}, for those whose content has no `surface` (`top_near`).
 pub fn measures(paths: &Paths, tops: &BTreeMap<String, [f64; 2]>) -> Result<Measures, String> {
-    let stack = manifests(paths, &join(&paths.assets, "manifest.json"))?;
+    let stack = asset_manifests(paths)?;
     let defs = content(paths)?;
     let facts = content_objects(&defs)?;
     let furniture = Furniture::read(paths)?;
