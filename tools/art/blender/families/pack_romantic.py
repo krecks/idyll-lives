@@ -8,18 +8,24 @@
 # while the platter turns (`platter`, a loop), the bureau's writing flap drops (`fall_front`) and the arbour's
 # swing sways with its riders (`swing`, a loop) while a bloom is cut (`cut`).
 #
-# Run:  cargo art pack_romantic [--only heartTub] [--preview]
+# Roses are turned cups of petals round a bud (`_rose`), their leaves `plants.leaf`; the tablecloth is lofted and
+# falls in folds; the heart tub's shell is lofted through heart-shaped rings, its rim rolled; chairs and the pouf
+# are stuffed (`G.soft_box`), the vanity stands on `G.kit.cabriole` legs, its oval mirror in a swept frame; the
+# arbour's arch and the swing's arms are swept in one piece, its lattice too.
+#
+# Run:  cargo art pack_romantic [--only heartTub] [--preview] [--lit]
 import math
 import os
 import sys
 
 import bpy
-from mathutils import Matrix
+from mathutils import Matrix, Vector
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gamekit as G  # noqa: E402
-from gamekit import shapes  # noqa: E402
+from plants import leaf  # noqa: E402  (leaf blades: rose leaves, petals, the quill's vane)
 
 M = G.Palette(
     body=('#C9A54A', 'metal'),       # gold: the table's and chairs' legs; the main part of the table
@@ -68,60 +74,78 @@ M = G.Palette(
 )
 
 WALL = -0.43   # the wall's face in a 1-deep footprint, game depth
-_n = [0]
 
 
-def _name(stem):
-    _n[0] += 1
-    return f'{stem}{_n[0]}'
+def _sq(w, h=None):
+    """A square bar's profile, `w` across (`h` the other way)."""
+    h = w if h is None else h
+    return [(-w / 2, -h / 2), (w / 2, -h / 2), (w / 2, h / 2), (-w / 2, h / 2)]
 
 
-def _candle(F, x, z, y, h=0.22, holder=None):
-    """A candlestick standing on `y`; returns the wick's top (x, height, z) for its flame."""
-    G.revolve(_name('candlestick'), [(0, 0), (0.035, 0), (0.033, 0.012), (0.012, 0.025), (0.012, 0.045), (0.022, 0.06),
-                                     (0, 0.06)], at=F.at(x, y, z), material=holder or M.gold, segments=14)
-    F.cyl(_name('candle'), 0.014, h, (x, y + 0.06 + h / 2, z), M.wax, verts=12)
+def _candle(F, name, x, z, y, h=0.22, holder=None):
+    """A candlestick standing on `y`, its candle a little melted at the top; returns the wick's top (x, height, z)."""
+    G.revolve(f'{name}_stick', [(0, 0), (0.038, 0), (0.036, 0.01), (0.016, 0.022), (0.011, 0.04), (0.015, 0.05),
+                                (0.024, 0.056), (0.024, 0.062), (0, 0.062)], at=F.at(x, y, z), material=holder or M.gold,
+              segments=12)
+    G.revolve(name, [(0, 0), (0.014, 0), (0.014, h - 0.006), (0.011, h), (0.006, h - 0.004), (0, h - 0.003)],
+              at=F.at(x, y + 0.06, z), material=M.wax, segments=10)
+    F.cyl(f'{name}_wick', 0.0015, 0.012, (x, y + 0.06 + h + 0.003, z), M.ink, verts=4)
     return (x, y + 0.06 + h, z)
 
 
-def _flame(F, x, y, z, s=1.0):
-    F.sphere(_name('flame'), 0.012 * s, (x, y + 0.02 * s, z), M.flame, scale=(1, 1, 2.2), segments=10, rings=6)
-    F.sphere(_name('flame_core'), 0.007 * s, (x, y + 0.014 * s, z), M.flame_core, scale=(1, 1, 1.8), segments=8, rings=6)
+def _flame(F, name, x, y, z, s=1.0):
+    """A candle flame: a teardrop turned round, a brighter core inside it."""
+    G.revolve(name, [(0, 0), (0.008 * s, 0.006 * s), (0.011 * s, 0.016 * s), (0.008 * s, 0.03 * s), (0, 0.048 * s)],
+              at=F.at(x, y, z), material=M.flame, segments=8)
+    G.revolve(f'{name}_core', [(0, 0.002), (0.006 * s, 0.008 * s), (0.007 * s, 0.016 * s), (0, 0.03 * s)],
+              at=F.at(x, y - 0.001, z), material=M.flame_core, segments=6)
 
 
-def _rose(F, x, y, z, s=0.05, material=None):
-    """A bloom: an outer cup and a tighter heart."""
+def _rose(F, name, x, y, z, s=0.05, material=None, segments=7, tilt=0.0, yaw=0.0):
+    """A bloom `s` round, its foot at (x, y, z): a tight bud in two cups of petals, each a thick turned cup (seen into
+    from above, so it has an inside), the outer one flaring; turned `tilt` towards `yaw`."""
     m = material or M.rose
-    F.sphere(_name('rose'), s, (x, y, z), m, scale=(1, 1, 0.8), segments=10, rings=6)
-    G.torus(_name('petals'), s * 0.75, s * 0.32, at=F.at(x, y + s * 0.35, z), material=m, major_segments=10,
-            minor_segments=5)
+    made = [G.revolve(f'{name}_outer', [(0, 0), (s * 0.55, s * 0.1), (s * 0.95, s * 0.45), (s * 1.0, s * 0.62),
+                                       (s * 0.86, s * 0.58), (s * 0.5, s * 0.3), (0, s * 0.22)], material=m, segments=segments),
+            G.revolve(f'{name}_inner', [(0, s * 0.18), (s * 0.5, s * 0.3), (s * 0.66, s * 0.7), (s * 0.56, s * 0.74),
+                                       (s * 0.3, s * 0.52), (0, s * 0.5)], material=m, segments=segments - 1),
+            G.revolve(f'{name}_bud', [(0, s * 0.45), (s * 0.3, s * 0.55), (s * 0.28, s * 0.8), (0, s * 0.86)], material=m,
+                      segments=5)]
+    turn = (Matrix.Translation(F.at(x, y, z)) @ Matrix.Rotation(math.radians(-yaw), 4, 'Z') @
+            Matrix.Rotation(math.radians(-tilt), 4, 'X') @ Matrix.Rotation(math.radians(len(name) * 23), 4, 'Z'))
+    for o in made:
+        o.data.transform(turn)
+    return made
 
 
-def _wine_glass(F, x, y, z, wine=True):
-    G.revolve(_name('wine_glass'), [(0, 0), (0.03, 0), (0.03, 0.005), (0.004, 0.01), (0.004, 0.08), (0.032, 0.11),
-                                    (0.035, 0.17), (0.031, 0.17), (0, 0.09)], at=F.at(x, y, z), material=M.glassy, segments=12)
+def _rose_leaves(F, name, x, y, z, n=3, size=0.05, yaw0=0.0, material=None):
+    """A few rose leaves round a bloom's foot."""
+    for k in range(n):
+        leaf(f'{name}{k}', F.at(x, y, z), yaw0 + k * 360 / n, -10, size, size * 0.6, material or M.leaf, droop=0.25,
+             rows=3, ring=3)
+
+
+def _wine_glass(F, name, x, y, z, wine=True):
+    G.revolve(name, [(0, 0), (0.03, 0), (0.03, 0.005), (0.004, 0.01), (0.004, 0.08), (0.032, 0.11), (0.035, 0.17),
+                     (0.031, 0.17), (0, 0.09)], at=F.at(x, y, z), material=M.glassy, segments=10)
     if wine:
-        F.sphere(_name('wine'), 0.028, (x, y + 0.115, z), M.rosed, scale=(1, 1, 0.6), segments=10, rings=6)
+        G.revolve(f'{name}_wine', [(0, 0.088), (0.022, 0.1), (0.031, 0.125), (0, 0.125)], at=F.at(x, y, z), material=M.rosed,
+                  segments=10)
 
 
-def _velvet_chair(F, x, z=0.0, frame=None, seat=None, facing='front'):
-    """A slipper chair centred on (x, z): seat top 0.45, facing the object's `facing` ('front', 'back', 'right' or
-    'left': its back on the far side)."""
+def _velvet_chair(F, name, x, z=0.0, frame=None, seat=None, facing='front'):
+    """A slipper chair centred on (x, z): a stuffed seat (top 0.45) and a tall rounded back in velvet, on tapered
+    legs, facing the object's `facing` ('front' or 'back': its back on the far side)."""
     frame, seat = frame or M.body, seat or M.fabric
-    if facing in ('front', 'back'):
-        s = 1 if facing == 'front' else -1
-        F.box(_name('chair_seat'), 0.44, 0.1, 0.42, (x, 0.4, z), seat, bevel=0.04, bevel_segments=3)
-        F.box(_name('chair_back'), 0.42, 0.46, 0.09, (x, 0.7, z - s * 0.21), seat, rot=(-8 * s, 0, 0), bevel=0.04,
-              bevel_segments=3)
-        legs = [(dx, s * dz) for dx in (-0.18, 0.18) for dz in (0.16, -0.17)]
-    else:
-        s = 1 if facing == 'right' else -1
-        F.box(_name('chair_seat'), 0.42, 0.1, 0.44, (x, 0.4, z), seat, bevel=0.04, bevel_segments=3)
-        F.box(_name('chair_back'), 0.09, 0.46, 0.42, (x - s * 0.21, 0.7, z), seat, rot=(0, -8 * s, 0), bevel=0.04,
-              bevel_segments=3)
-        legs = [(s * dx, dz) for dz in (-0.18, 0.18) for dx in (0.16, -0.17)]
-    for dx, dz in legs:
-        F.cone(_name('chair_leg'), 0.012, 0.018, 0.36, (x + dx, 0.18, z + dz), frame, verts=8)
+    s = 1 if facing == 'front' else -1
+    F.soft(f'{name}_seat', 0.44, 0.1, 0.42, (x, 0.392, z), seat, round=0.04, puff=0.012, flat=2)
+    F.extrude(f'{name}_back', G.smooth_outline([(-0.21, 0.0), (0.21, 0.0), (0.21, 0.36), (0.12, 0.46), (-0.12, 0.46),
+                                                (-0.21, 0.36)], passes=2), 0.08, (x, 0.48, z - s * 0.177), seat,
+              rot=(-8 * s, 0, 0), bevel=0.03, bevel_segments=2)
+    for dx in (-0.18, 0.18):
+        for dz in (0.16, -0.17):
+            F.sweep(f'{name}_leg{dx}{dz}', [(x + dx, 0.36, z + s * dz), (x + dx * 1.08, 0.0, z + s * dz * 1.1)], 0.015, frame,
+                    verts=8, scale=[1.0, 0.6])
 
 
 # --- the candlelit bistro table (2x1): a diner at each end (x = +-0.62, z = 0.1) facing in across the top -------
@@ -133,11 +157,29 @@ def _end_chair(F, x, z):
     """A slipper chair at the table's end, seat centred on (x, z), its sitter facing in (+x from the left end, -x from
     the right): built facing the front, then turned a quarter about its seat's middle."""
     with G.new_parts() as parts:
-        _velvet_chair(F, 0.0, 0.0)
+        _velvet_chair(F, f'chair{x}', 0.0, 0.0)
     bpy.context.view_layer.update()                     # the last part's matrix is set only on an update
     turn = Matrix.Translation(F.at(x, 0, z)) @ Matrix.Rotation(math.radians(-90 if x < 0 else 90), 4, 'Z')
     for o in parts:
         o.matrix_world = turn @ o.matrix_world
+
+
+def _tablecloth(F, top, hw, hd, drop):
+    """The cloth over the 0.8 x 0.72 top, lofted in one piece: its flat top, the edge rolling over, a skirt falling
+    `drop` in soft folds that flare at the hem, then up its inside to under the table top (hidden)."""
+    bx, by, bz = F.at(0, top, TZ)
+    n = 48
+
+    def ring(rx, ry, y, fold=0.0, sq=9):
+        pts = G.ring(rx, ry, bz + y, n, square=sq, at=(bx, by))
+        if fold:
+            pts = [(bx + (px - bx) * (1 + fold * math.sin(10 * math.atan2(py - by, px - bx))), by + (py - by) *
+                    (1 + fold * math.sin(10 * math.atan2(py - by, px - bx))), pz) for px, py, pz in pts]
+        return pts
+    G.loft('cloth', [ring(0.0, 0.0, 0.0), ring(hw - 0.01, hd - 0.01, 0.0), ring(hw + 0.004, hd + 0.004, -0.006),
+                     ring(hw + 0.006, hd + 0.006, -0.03, 0.006), ring(hw + 0.009, hd + 0.009, -drop * 0.6, 0.014),
+                     ring(hw + 0.014, hd + 0.014, -drop, 0.02), ring(hw + 0.004, hd + 0.004, -drop, 0.02),
+                     ring(hw, hd, -0.03)], material=M.cloth)
 
 
 def candlelitTable():
@@ -145,41 +187,44 @@ def candlelitTable():
     top = 0.775
     with G.new_parts() as still:
         # a 0.8 x 0.72 top under a cloth that drops 12 cm all round, clear of the diners' knees
-        F.box('table_top', 0.8, 0.03, 0.72, (0, 0.745, TZ), M.oak, bevel=0.008)
-        F.box('cloth', 0.86, 0.012, 0.78, (0, 0.766, TZ), M.cloth, bevel=0.004)
-        for s in (-1, 1):
-            F.box(_name('cloth_front'), 0.86, 0.12, 0.012, (0, 0.71, TZ + s * 0.39), M.cloth)
-            F.box(_name('cloth_side'), 0.012, 0.12, 0.78, (s * 0.43, 0.71, TZ), M.cloth)
-        F.box('runner', 0.12, 0.004, 0.8, (0, 0.774, TZ), M.runner)
-        for x in (-0.36, 0.36):
-            for dz in (-0.3, 0.3):
-                F.cone(_name('table_leg'), 0.02, 0.014, 0.73, (x, 0.365, TZ + dz), M.body, verts=10)
+        F.box('table_top', 0.8, 0.03, 0.72, (0, 0.745, TZ), M.oak)
+        _tablecloth(F, 0.772, 0.41, 0.38, 0.12)
+        F.sweep('runner', G.kit.fillet([(0, 0.67, TZ - 0.396), (0, 0.775, TZ - 0.393), (0, 0.775, TZ + 0.393),
+                                        (0, 0.67, TZ + 0.396)], 0.012), None, M.runner, profile=_sq(0.003, 0.12), up=(0, 0, 1))
+        for x in (-0.33, 0.33):
+            for dz in (-0.27, 0.27):
+                F.sweep(f'table_leg{x}{dz}', [(x, 0.73, TZ + dz), (x, 0.0, TZ + dz)], 0.02, M.body, verts=10, scale=[1.0, 0.65])
         for s in (-1, 1):
             x = s * 0.22
-            F.cyl(_name('plate'), 0.13, 0.012, (x, 0.782, TZ), M.porcelain, verts=22)
-            G.torus(_name('plate_rim'), 0.122, 0.005, at=F.at(x, 0.788, TZ), material=M.gold, major_segments=22,
-                    minor_segments=4)
-            G.revolve(_name('dessert'), [(0, 0), (0.05, 0), (0.045, 0.04), (0.02, 0.055), (0, 0.055)],
-                      at=F.at(x, 0.788, TZ), material=M.dessert, segments=12)
-            F.sphere(_name('berry'), 0.012, (x, 0.85, TZ), M.rose, segments=8, rings=6)
-            for dz in (-0.16, 0.16):
-                F.box(_name('cutlery'), 0.17, 0.004, 0.012, (x, 0.778, TZ + dz), M.gold)
-            _wine_glass(F, x - s * 0.1, top, TZ - s * 0.22)          # at the diner's right hand
+            G.revolve(f'plate{s}', [(0, 0), (0.08, 0), (0.09, 0.006), (0.128, 0.014), (0.13, 0.016), (0.124, 0.016),
+                                    (0.085, 0.01), (0, 0.009)], at=F.at(x, top, TZ), material=M.porcelain, segments=22)
+            G.torus(f'plate_rim{s}', 0.126, 0.0025, at=F.at(x, top + 0.016, TZ), material=M.gold, major_segments=22,
+                    minor_segments=3)
+            G.revolve(f'dessert{s}', [(0, 0), (0.05, 0), (0.05, 0.035), (0.045, 0.045), (0.02, 0.052), (0, 0.053)],
+                      at=F.at(x, top + 0.009, TZ), material=M.dessert, segments=12)
+            G.revolve(f'cream{s}', [(0, 0), (0.03, 0), (0.026, 0.01), (0.012, 0.02), (0, 0.03)], at=F.at(x, top + 0.06, TZ),
+                      material=M.wax, segments=8)
+            F.sphere(f'berry{s}', 0.012, (x, top + 0.092, TZ), M.rose, segments=8, rings=5)
+            for k, dz in enumerate((-0.16, 0.16)):          # a fork and a knife either side of the plate
+                F.sweep(f'cutlery{s}{k}', [(x - 0.08, top + 0.004, TZ + dz), (x + 0.08, top + 0.004, TZ + dz)], None, M.gold,
+                        profile=_sq(0.003, 0.014 if k else 0.018), up=(0, 0, 1), scale=[1.0, 0.7] if k else [1.0, 1.3])
+            _wine_glass(F, f'wine_glass{s}', x - s * 0.1, top, TZ - s * 0.22)          # at the diner's right hand
             _end_chair(F, s * 0.62, TZ)
-        for x, z, h in CANDLES:
-            _candle(F, x, z, top, h)
-        G.revolve('bud_vase', [(0, 0), (0.025, 0), (0.03, 0.05), (0.012, 0.13), (0.015, 0.18), (0, 0.17)],
+        for k, (x, z, h) in enumerate(CANDLES):
+            _candle(F, f'candle{k}', x, z, top, h)
+        G.revolve('bud_vase', [(0, 0), (0.025, 0), (0.03, 0.05), (0.012, 0.13), (0.015, 0.18), (0.011, 0.18), (0, 0.17)],
                   at=F.at(0, top, TZ), material=M.glassy, segments=12)
-        G.rod('stem', F.at(0, 0.86, TZ), F.at(0.01, 1.04, TZ), 0.005, material=M.leaf, verts=6)
-        _rose(F, 0.01, 1.06, TZ, 0.045)
-        for x, z in ((-0.08, TZ + 0.3), (0.1, TZ - 0.32), (-0.3, TZ - 0.25), (0.28, TZ + 0.27)):
-            F.sphere(_name('petal'), 0.025, (x, 0.778, z), M.rose, scale=(1.2, 0.9, 0.25), segments=8, rings=4)
+        F.sweep('stem', [(0, 0.86, TZ), (0.006, 0.96, TZ), (0.01, 1.04, TZ)], 0.004, M.leaf, verts=5, resolution=2)
+        _rose(F, 'vase_rose', 0.01, 1.03, TZ, 0.045)
+        _rose_leaves(F, 'vase_leaf', 0.005, 0.98, TZ, n=2, size=0.045)
+        for k, (x, z) in enumerate(((-0.08, TZ + 0.3), (0.1, TZ - 0.32), (-0.3, TZ - 0.25), (0.28, TZ + 0.27), (0.05, TZ + 0.28))):
+            leaf(f'petal{k}', F.at(x, top + 0.004, z), k * 70, 4, 0.04, 0.035, M.rose, shape='petal', fold=0.4, rows=2, ring=3)
     G.join(still, 'body', origin=(0, 0, 0))
     # The two flames, joined with their origin on the shorter wick and built full size, then flattened:
     # `candles` grows them while the two dine; they glow at night (`flame`'s `glow`).
     with G.new_parts() as flames:
-        for x, z, h in CANDLES:
-            _flame(F, x, top + 0.06 + h, z, 1.1)
+        for k, (x, z, h) in enumerate(CANDLES):
+            _flame(F, f'flame{k}', x, top + 0.06 + h + 0.002, z, 1.1)
     low = min(h for _, _, h in CANDLES)
     flames = G.join(flames, 'flames', origin=F.at(0, top + 0.05 + low, TZ))   # flattened inside the wax at rest
     flames.scale[2] = 0.001
@@ -200,28 +245,9 @@ def _heart(k=1.0, n=72):
     return pts
 
 
-def _prism(name, outer, y0, y1, material, inner=None):
-    """A mesh between heights `y0` and `y1` over the outline `outer` (game x, depth), hollow inside `inner`."""
-    F = G.GameFrame()
-    n = len(outer)
-    verts = [F.at(x, y, z) for y in (y0, y1) for x, z in outer]
-    faces = [(i, (i + 1) % n, n + (i + 1) % n, n + i) for i in range(n)]
-    if inner is None:
-        faces += [tuple(range(n)), tuple(range(2 * n - 1, n - 1, -1))]
-    else:
-        verts += [F.at(x, y, z) for y in (y0, y1) for x, z in inner]
-        o = 2 * n
-        faces += [(o + i, o + n + i, o + n + (i + 1) % n, o + (i + 1) % n) for i in range(n)]     # the inner wall
-        faces += [(n + i, n + (i + 1) % n, o + n + (i + 1) % n, o + n + i) for i in range(n)]     # the rim
-        faces += [(i, o + i, o + (i + 1) % n, (i + 1) % n) for i in range(n)]                     # the underside
-    mesh = bpy.data.meshes.new(name)
-    mesh.from_pydata(verts, [], faces)
-    mesh.validate()
-    obj = bpy.data.objects.new(name, mesh)
-    bpy.context.collection.objects.link(obj)
-    obj.data.materials.append(material)
-    shapes._recalc_normals(obj)
-    return obj
+def _heart_ring(F, k, y, n=72):
+    """The heart outline scaled by `k` at height `y`, as a loft's ring (Blender points)."""
+    return [F.at(x, y, z) for x, z in _heart(k, n)]
 
 
 RIM, FLOOR, WATER = 0.54, 0.2, 0.47
@@ -230,35 +256,58 @@ RIM, FLOOR, WATER = 0.54, 0.2, 0.47
 def heartTub():
     F = G.GameFrame()
     with G.new_parts() as still:
-        _prism('plinth', _heart(1.04), 0.0, 0.08, M.ivory)
-        _prism('shell', _heart(0.96), 0.08, RIM, M.tub, inner=_heart(0.84))
-        _prism('tub_floor', _heart(0.85), 0.08, FLOOR, M.tub)
-        # an ice bucket with a bottle on the rim, towels, candles and roses on the floor
-        G.revolve('ice_bucket', [(0, 0), (0.045, 0), (0.06, 0.14), (0.055, 0.14), (0.04, 0.012), (0, 0.012)],
-                  at=F.at(0.6, RIM, 0.3), material=M.chrome, segments=16)
-        F.cyl('bottle', 0.03, 0.2, (0.6, RIM + 0.14, 0.3), M.bottle, rot=(0, 15, 0), verts=12)
-        F.box('towel_a', 0.34, 0.08, 0.24, (-0.78, 0.04, 0.78), M.cloth, bevel=0.03, bevel_segments=2)
-        F.box('towel_b', 0.32, 0.07, 0.22, (-0.78, 0.115, 0.78), M.fabric, bevel=0.03, bevel_segments=2)
-        for x, z, h in ((-0.85, -0.82, 0.3), (-0.72, -0.86, 0.2), (0.85, -0.82, 0.26), (0.73, -0.87, 0.18)):
-            wx, wy, wz = _candle(F, x, z, 0.0, h, holder=M.rosegold)
-            F.sphere(_name('flame'), 0.012, (wx, wy + 0.02, wz), M.flame_core, scale=(1, 1, 2), segments=8, rings=6)
-        G.revolve('floor_vase', [(0, 0), (0.06, 0), (0.08, 0.15), (0.05, 0.27), (0.055, 0.3), (0, 0.29)],
+        # the plinth, its edge eased; the shell in one loft: up the outside, over a rolled rim, down to the floor
+        G.loft('plinth', [_heart_ring(F, 1.03, 0.0), _heart_ring(F, 1.04, 0.01), _heart_ring(F, 1.04, 0.07),
+                          _heart_ring(F, 1.025, 0.08)], material=M.ivory)
+        G.loft('shell', [_heart_ring(F, 0.95, 0.075), _heart_ring(F, 0.96, 0.1), _heart_ring(F, 0.96, RIM - 0.03),
+                         _heart_ring(F, 0.955, RIM - 0.008), _heart_ring(F, 0.945, RIM), _heart_ring(F, 0.86, RIM),
+                         _heart_ring(F, 0.845, RIM - 0.012), _heart_ring(F, 0.84, RIM - 0.04), _heart_ring(F, 0.835, FLOOR + 0.04),
+                         _heart_ring(F, 0.815, FLOOR + 0.006), _heart_ring(F, 0.78, FLOOR), _heart_ring(F, 0.0, FLOOR)],
+               material=M.tub)
+        # an ice bucket with a bottle on the rim, rolled towels, candles and roses on the floor
+        G.revolve('ice_bucket', [(0, 0), (0.045, 0), (0.06, 0.13), (0.064, 0.135), (0.064, 0.142), (0.056, 0.142),
+                                 (0.052, 0.13), (0.04, 0.012), (0, 0.012)], at=F.at(0.6, RIM, 0.3), material=M.chrome,
+                  segments=16)
+        for s in (-1, 1):
+            G.torus(f'bucket_ring{s}', 0.012, 0.003, at=F.at(0.6 + s * 0.062, RIM + 0.11, 0.3), material=M.chrome,
+                    rot=(90, 0, 90), major_segments=8, minor_segments=3)
+        bx, by, bz = F.at(0.6, RIM + 0.012, 0.3)
+        bottle = G.loft('bottle', [G.ring(0.03 * k, 0.03 * k, bz + h, 10, at=(bx, by)) for h, k in
+                                   ((0.0, 0.95), (0.01, 1.0), (0.15, 1.0), (0.19, 0.42), (0.23, 0.38), (0.24, 0.0))],
+                        material=M.bottle)
+        bottle.data.transform(Matrix.Translation((bx, by, bz)) @ Matrix.Rotation(math.radians(15), 4, 'Y') @
+                              Matrix.Translation((-bx, -by, -bz)))
+        G.loft('bottle_foil', [G.ring(0.0135, 0.0135, bz + h, 10, at=(bx, by)) for h in (0.19, 0.236)], material=M.gold
+               ).data.transform(Matrix.Translation((bx, by, bz)) @ Matrix.Rotation(math.radians(15), 4, 'Y') @
+                                Matrix.Translation((-bx, -by, -bz)))
+        for k, (x, y, z, m) in enumerate(((-0.78, 0.045, 0.74, M.cloth), (-0.78, 0.045, 0.83, M.fabric), (-0.78, 0.13, 0.785, M.cloth))):
+            F.sweep(f'towel{k}', [(x - 0.17, y, z), (x + 0.16, y, z)], 0.045, m, verts=10)    # rolled towels, stacked
+            G.revolve(f'towel_end{k}', [(0, 0), (0.042, 0), (0.044, 0.004), (0.03, 0.006), (0, 0.004)],
+                      at=F.at(x + 0.16, y, z), material=m, segments=10, rot=(0, -90, 0))
+        for k, (x, z, h) in enumerate(((-0.85, -0.82, 0.3), (-0.72, -0.86, 0.2), (0.85, -0.82, 0.26), (0.73, -0.87, 0.18))):
+            wx, wy, wz = _candle(F, f'floor_candle{k}', x, z, 0.0, h, holder=M.rosegold)
+            G.revolve(f'floor_flame{k}', [(0, 0), (0.008, 0.006), (0.01, 0.016), (0, 0.04)], at=F.at(wx, wy + 0.003, wz),
+                      material=M.flame_core, segments=6)
+        G.revolve('floor_vase', [(0, 0), (0.06, 0), (0.08, 0.15), (0.05, 0.27), (0.055, 0.3), (0.05, 0.3), (0, 0.29)],
                   at=F.at(0.7, 0, 0.82), material=M.ivory, segments=16)
         for x, z, m in ((0.68, 0.84, M.rose), (0.74, 0.8, M.rose_pink)):
-            G.rod(_name('stem'), F.at(0.7, 0.25, 0.82), F.at(x, 0.42, z), 0.006, material=M.leaf, verts=6)
-            _rose(F, x, 0.44, z, 0.05, m)
+            F.sweep(f'vase_stem{x}', [(0.7, 0.25, 0.82), (x, 0.42, z)], 0.005, M.leaf, verts=5)
+            _rose(F, f'vase_rose{x}', x, 0.41, z, 0.05, m)
+            _rose_leaves(F, f'vase_leaf{x}', 0.5 * (0.7 + x), 0.36, 0.5 * (0.82 + z), n=2, size=0.05)
     G.join(still, 'body', origin=(0, 0, 0))
     # The water with its petals and bubbles, built full and flattened onto the tub's floor: `fill` raises it.
     with G.new_parts() as water:
-        _prism('water', _heart(0.845), FLOOR - 0.01, WATER, M.water)
+        G.loft('water', [_heart_ring(F, 0.845, FLOOR - 0.01, 48), _heart_ring(F, 0.845, WATER, 48)], material=M.water)
         for i in range(26):
             a = i * 2.39996
             rr = 0.1 + 0.5 * math.sqrt((i + 0.5) / 26)
             x, z = rr * math.cos(a) * 0.95, -0.05 + rr * math.sin(a) * 0.72
-            F.sphere(_name('petal'), 0.03, (x, WATER + 0.004, z), M.rose if i % 3 else M.rose_pink,
-                     scale=(1.3, 1.0, 0.2), rot=(0, 0, i * 37 % 180), segments=8, rings=4)
+            leaf(f'petal{i}', F.at(x, WATER + 0.002, z), i * 37, 6, 0.05, 0.045, M.rose if i % 3 else M.rose_pink,
+                 shape='petal', fold=0.45, rows=2, ring=3)
         for x, z in ((-0.18, -0.35), (0.25, -0.42), (0.05, 0.3), (-0.4, 0.05)):
-            F.sphere(_name('bubble'), 0.05, (x, WATER, z), M.bubble, scale=(1, 1, 0.5), segments=10, rings=6)
+            for k in range(4):                                     # foam: a little heap of bubbles
+                F.sphere(f'bubble{x}{z}{k}', 0.04 - 0.008 * k, (x + 0.03 * math.cos(k * 2.1), WATER + 0.004, z + 0.03 * math.sin(k * 2.1)),
+                         M.bubble, scale=(1, 1, 0.6), segments=8, rings=4)
     water = G.join(water, 'water', origin=F.at(0, FLOOR - 0.01, 0))   # hidden in the floor at rest
     water.scale[2] = 0.001
     objs = G.settle(centre=False)
@@ -270,47 +319,64 @@ def heartTub():
 def vanity():
     F = G.GameFrame()
     with G.new_parts() as still:
-        F.box('vanity_top', 0.8, 0.05, 0.36, (0, 0.735, -0.25), M.ivory, bevel=0.012)
-        F.box('apron', 0.76, 0.14, 0.33, (0, 0.64, -0.25), M.ivory, bevel=0.008)
-        F.box('drawer_hole', 0.36, 0.11, 0.01, (0, 0.635, -0.082), M.blushd)
-        for x in (-0.36, 0.36):
-            for z in (-0.4, -0.11):
-                F.cone(_name('leg'), 0.012, 0.02, 0.57, (x, 0.285, z), M.rosegold, verts=10)
-        # the oval mirror in a rose-gold frame on a little stand at the back
-        F.cyl('mirror_back', 0.25, 0.02, (0, 1.24, -0.415), M.rosegold, rot=(90, 0, 0), scale=(1, 1.44, 1), verts=36)
-        G.torus('mirror_frame', 0.26, 0.018, at=F.at(0, 1.24, -0.405), material=M.rosegold, rot=(90, 0, 0),
-                major_segments=36, minor_segments=6).scale = (1, 1.44, 1)
-        F.box('mirror_stand', 0.05, 0.14, 0.04, (0, 0.82, -0.41), M.rosegold, bevel=0.01)
+        F.extrude('vanity_top', G.rounded_rect(0.8, 0.36, 0.06, corner=4), 0.05, (0, 0.735, -0.25), M.ivory, plane='top',
+                  bevel=0.012, bevel_segments=2)
+        # the apron, its lower edge scalloped either side of the drawer; the drawer's opening
+        edge = [(-0.38 + 0.76 * i / 20, 0.0) for i in range(21)]
+        edge = [(x, 0.012 * abs(math.sin(math.pi * x / 0.19))) for x, _ in edge]
+        F.extrude('apron', [(0.38, 0.14), (-0.38, 0.14)] + edge, 0.3, (0, 0.57, -0.25), M.ivory, plane='front')
+        F.box('drawer_hole', 0.36, 0.11, 0.01, (0, 0.635, -0.098), M.blushd)
+        for x in (-0.34, 0.34):
+            for z in (-0.38, -0.12):
+                G.kit.cabriole(F, f'leg{x}{z}', x, z, 0.57, M.rosegold, 0.022 * (1 if x > 0 else -1), 0.02 * (1 if z > -0.25 else -1),
+                               r=0.018)
+        # the oval mirror in a moulded rose-gold frame, on a stand rising from the top's back
+        oval = [(0.25 * math.cos(math.tau * k / 36), 1.24 + 0.36 * math.sin(math.tau * k / 36)) for k in range(36)]
+        F.sweep('mirror_frame', [(x, y, -0.405) for x, y in oval], None, M.rosegold, closed=True,
+                profile=[(-0.012, -0.022), (0.012, -0.022), (0.016, 0.0), (0.012, 0.022), (-0.012, 0.022)], up=(0, 1, 0))
+        F.cyl('mirror_back', 0.25, 0.012, (0, 1.24, -0.418), M.rosegold, rot=(90, 0, 0), scale=(1, 1.44, 1), verts=36)
         F.cyl('mirror', 0.235, 0.004, (0, 1.24, -0.398), M.mirror, rot=(90, 0, 0), scale=(1, 1.44, 1), verts=36)
-        for i, (x, h, m) in enumerate(((-0.3, 0.12, M.perfume_a), (-0.22, 0.09, M.perfume_b), (-0.15, 0.14, M.perfume_c))):
-            G.revolve(_name('perfume'), [(0, 0), (0.03, 0), (0.03, h * 0.7), (0.01, h * 0.85), (0.01, h), (0, h)],
-                      at=F.at(x, 0.76, -0.22), material=m, segments=12)
-            F.sphere(_name('stopper'), 0.017, (x, 0.775 + h, -0.22), M.rosegold, segments=10, rings=6)
-        F.box('jewellery_box', 0.16, 0.08, 0.12, (0.25, 0.8, -0.22), M.blushd, bevel=0.015)
-        F.box('jewellery_lid', 0.17, 0.012, 0.13, (0.25, 0.846, -0.22), M.rosegold, bevel=0.004)
-        G.revolve('vase', [(0, 0), (0.03, 0), (0.04, 0.07), (0.025, 0.12), (0.03, 0.14), (0, 0.13)],
-                  at=F.at(0.1, 0.76, -0.36), material=M.ivory, segments=14)
-        for x, y, z, m in ((0.07, 0.95, -0.34, M.rose), (0.13, 0.96, -0.37, M.rose_pink), (0.1, 0.98, -0.33, M.ivory)):
-            _rose(F, x, y, z, 0.035, m)
-        for x, z in ((0.04, -0.36), (0.16, -0.35)):
-            F.sphere(_name('leaf'), 0.03, (x, 0.92, z), M.leaf, scale=(1.3, 0.6, 1), segments=8, rings=6)
-        # the pouf before it, tufted, on a rose-gold ring
-        G.revolve('pouf', [(0, 0), (0.19, 0), (0.21, 0.04), (0.21, 0.34), (0.2, 0.42), (0.17, 0.44), (0, 0.44)],
-                  at=F.at(0, 0.0, 0.17), material=M.velvet, segments=28)
-        G.torus('pouf_ring', 0.21, 0.012, at=F.at(0, 0.03, 0.17), material=M.rosegold, major_segments=28,
-                minor_segments=6)
+        F.sweep('mirror_stand', [(0, 0.76, -0.41), (0, 0.84, -0.412), (0, 0.9, -0.41)], None, M.rosegold,
+                profile=G.rounded_rect(0.012, 0.05, 0.005, corner=1), up=(0, 0, 1), scale=[1.3, 1.0, 1.1])
+        for k, (x, h, m) in enumerate(((-0.3, 0.12, M.perfume_a), (-0.22, 0.09, M.perfume_b), (-0.15, 0.14, M.perfume_c))):
+            bx, by, bz = F.at(x, 0.76, -0.22)
+            G.loft(f'perfume{k}', [G.ring(0.03 * kk, 0.022 * kk, bz + h * t, 8, square=sq, at=(bx, by)) for t, kk, sq in
+                                   ((0.0, 0.9, 4), (0.04, 1.0, 4), (0.7, 1.0, 4), (0.82, 0.4, 2), (1.0, 0.36, 2))],
+                   material=m, smooth=False)
+            G.revolve(f'stopper{k}', [(0, 0), (0.008, 0), (0.008, 0.008), (0.018, 0.02), (0.012, 0.036), (0, 0.04)],
+                      at=F.at(x, 0.76 + h, -0.22), material=M.rosegold, segments=8)
+        F.soft('jewellery_box', 0.16, 0.08, 0.12, (0.25, 0.8, -0.22), M.blushd, round=0.012, round_segments=1)
+        F.soft('jewellery_lid', 0.17, 0.016, 0.13, (0.25, 0.846, -0.22), M.rosegold, round=0.006, round_segments=1)
+        F.sweep('necklace', [(0.2, 0.86, -0.18), (0.24, 0.855, -0.155), (0.28, 0.86, -0.16), (0.3, 0.84, -0.16), (0.31, 0.77, -0.15)],
+                0.002, M.gold, verts=3, resolution=2)
+        G.revolve('vase', [(0, 0), (0.03, 0), (0.04, 0.07), (0.025, 0.12), (0.03, 0.14), (0.026, 0.14), (0, 0.13)],
+                  at=F.at(0.1, 0.76, -0.36), material=M.ivory, segments=12)
+        for k, (x, y, z, m) in enumerate(((0.07, 0.92, -0.34, M.rose), (0.13, 0.93, -0.37, M.rose_pink), (0.1, 0.95, -0.33, M.ivory))):
+            F.sweep(f'vase_stem{k}', [(0.1, 0.88, -0.36), (x, y, z)], 0.003, M.leaf, verts=4)
+            _rose(F, f'vase_rose{k}', x, y - 0.005, z, 0.035, m, tilt=15, yaw=k * 120)
+        _rose_leaves(F, 'vase_leaf', 0.1, 0.9, -0.36, n=3, size=0.045)
+        # the pouf before it: buttoned, on a rose-gold ring with four little feet
+        G.revolve('pouf', [(0, 0.03), (0.19, 0.03), (0.21, 0.07), (0.212, 0.34), (0.2, 0.42), (0.16, 0.44), (0.06, 0.43),
+                           (0, 0.425)], at=F.at(0, 0.0, 0.17), material=M.velvet, segments=24)
+        G.torus('pouf_ring', 0.212, 0.01, at=F.at(0, 0.04, 0.17), material=M.rosegold, major_segments=24, minor_segments=5)
+        for a in range(45, 360, 90):
+            F.sweep(f'pouf_foot{a}', [(0.17 * G.cosd(a), 0.04, 0.17 + 0.17 * G.sind(a)), (0.19 * G.cosd(a), 0.004, 0.17 + 0.19 * G.sind(a))],
+                    0.009, M.rosegold, verts=6, scale=[1.0, 0.7])
         for a in range(0, 360, 60):
-            F.sphere(_name('tuft'), 0.013, (0.11 * G.cosd(a), 0.44, 0.17 + 0.11 * G.sind(a)), M.blushd, segments=8,
-                     rings=6)
+            F.sphere(f'tuft{a}', 0.012, (0.11 * G.cosd(a), 0.432, 0.17 + 0.11 * G.sind(a)), M.blushd, scale=(1, 1, 0.6),
+                     segments=6, rings=4)
+        F.sphere('tuft_mid', 0.013, (0, 0.428, 0.17), M.blushd, scale=(1, 1, 0.6), segments=6, rings=4)
     G.join(still, 'body', origin=(0, 0, 0))
     # The middle drawer, pulled out to the front by `drawer_open`.
     with G.new_parts() as drawer:
-        F.box('drawer_front', 0.34, 0.1, 0.014, (0, 0.635, -0.075), M.ivory, bevel=0.005)
-        F.box('drawer_box', 0.32, 0.08, 0.26, (0, 0.635, -0.2), M.ivory)
-        F.sphere('drawer_knob', 0.018, (0, 0.635, -0.063), M.rosegold, segments=10, rings=6)
-        F.box('lipstick', 0.02, 0.06, 0.02, (-0.08, 0.69, -0.18), M.rose)
-        F.cyl('compact', 0.035, 0.012, (0.06, 0.68, -0.2), M.rosegold, verts=14)
-    drawer = G.hinged(G.join(drawer, 'drawer'), F.at(0, 0.635, -0.075))
+        F.box('drawer_front', 0.34, 0.1, 0.014, (0, 0.635, -0.091), M.ivory, bevel=0.004, bevel_segments=1)
+        F.box('drawer_box', 0.32, 0.08, 0.26, (0, 0.635, -0.22), M.ivory)
+        G.kit.knob(F, 'drawer_knob', 0, 0.635, -0.084, 0.012, M.rosegold, segments=10)
+        F.sweep('lipstick', [(-0.08, 0.676, -0.18), (-0.08, 0.676, -0.12)], 0.009, M.rosegold, verts=8)
+        F.sweep('lipstick_tip', [(-0.08, 0.676, -0.12), (-0.08, 0.676, -0.1)], 0.007, M.rose, verts=8, scale=[1.0, 0.6])
+        G.revolve('compact', [(0, 0), (0.035, 0), (0.036, 0.006), (0.034, 0.012), (0, 0.013)], at=F.at(0.06, 0.676, -0.2),
+                  material=M.rosegold, segments=14)
+    drawer = G.hinged(G.join(drawer, 'drawer'), F.at(0, 0.635, -0.084))
     objs = G.settle(centre=False)
     G.slide(drawer, 'drawer_open', (0, -0.2, 0), seconds=0.7)
     return objs
@@ -325,36 +391,57 @@ def gramophone():
     F = G.GameFrame()
     rx, ry, rz = RECORD
     with G.new_parts() as still:
-        F.box('cabinet', 0.62, 0.66, 0.4, (0, 0.38, WALL + 0.21), M.cabinet, bevel=0.012)
-        F.box('cabinet_top', 0.66, 0.03, 0.44, (0, 0.725, WALL + 0.22), M.walnut, bevel=0.008)
+        F.box('cabinet', 0.62, 0.66, 0.4, (0, 0.38, WALL + 0.21), M.cabinet, bevel=0.008, bevel_segments=1)
+        G.kit.moulding(F, 'cabinet_top', [(-0.33, WALL), (0.33, WALL), (0.33, WALL + 0.44), (-0.33, WALL + 0.44)],
+                       [(0.0, 0.0), (0.02, 0.0), (0.02, 0.03), (0.006, 0.03), (0.0, 0.02)], M.walnut, at=0.71, plane='top')
+        F.box('cabinet_top_board', 0.62, 0.03, 0.4, (0, 0.725, WALL + 0.22), M.walnut)
         for s in (-1, 1):
-            F.box(_name('cabinet_door'), 0.28, 0.5, 0.012, (s * 0.15, 0.4, WALL + 0.415), M.door, bevel=0.006)
-            F.box(_name('door_inset'), 0.2, 0.4, 0.006, (s * 0.15, 0.4, WALL + 0.423), M.cabinet, bevel=0.003)
-            F.sphere(_name('door_knob'), 0.016, (s * 0.03, 0.42, WALL + 0.43), M.gold, segments=10, rings=6)
+            G.kit.shaker(F, f'cabinet_door{s}', 0.28, 0.5, (s * 0.15, 0.4, WALL + 0.416), 0.012, M.door, rail=0.045,
+                         panel=M.cabinet, raised=True)
+            G.kit.knob(F, f'door_knob{s}', s * 0.03, 0.42, WALL + 0.422, 0.011, M.gold, segments=8)
         for x in (-0.27, 0.27):
             for z in (WALL + 0.06, WALL + 0.36):
-                G.revolve(_name('foot'), [(0, 0), (0.02, 0), (0.03, 0.03), (0.025, 0.05), (0, 0.05)],
+                G.revolve(f'foot{x}{z}', [(0, 0), (0.02, 0), (0.03, 0.03), (0.025, 0.05), (0, 0.05)],
                           at=F.at(x, 0, z), material=M.gold, segments=10)
-        # the gramophone: a walnut case, the horn on its neck from the back
-        F.box('case', 0.38, 0.13, 0.36, (0, 0.805, -0.18), M.walnut, bevel=0.012)
+        # the gramophone: a walnut case with brass corners and band, its crank; the horn on a swept neck from the back
+        F.box('case', 0.38, 0.13, 0.36, (0, 0.805, -0.18), M.walnut, bevel=0.01, bevel_segments=2)
         F.box('case_band', 0.385, 0.02, 0.365, (0, 0.82, -0.18), M.gold)
-        F.cyl('crank_boss', 0.02, 0.03, (-0.205, 0.8, -0.18), M.gold, rot=(0, 90, 0), verts=10)
-        G.rod('crank', F.at(-0.22, 0.8, -0.18), F.at(-0.25, 0.74, -0.18), 0.006, material=M.gold, verts=6)
-        F.cyl('arm_base', 0.03, 0.03, (ARM[0], 0.885, ARM[2]), M.gold, verts=12)
-        G.rod('horn_neck', F.at(0.0, 0.87, -0.34), F.at(0.0, 1.06, -0.32), 0.022, material=M.horn, verts=12)
-        G.revolve('horn', [(0.02, 0), (0.03, 0.08), (0.06, 0.2), (0.12, 0.32), (0.23, 0.42), (0.24, 0.43),
-                           (0.225, 0.43), (0.115, 0.335), (0.055, 0.215), (0.025, 0.09), (0.012, 0.0)],
-                  at=F.at(0.0, 1.05, -0.32), material=M.horn, segments=28, rot=(34, 0, 0))
+        for x in (-0.19, 0.19):
+            for z in (-0.36, 0.0):
+                F.box(f'case_corner{x}{z}', 0.022, 0.13, 0.022, (x, 0.805, z), M.gold, bevel=0.004, bevel_segments=1)
+        G.revolve('crank_boss', [(0, 0), (0.024, 0), (0.024, 0.01), (0.014, 0.02), (0, 0.02)], at=F.at(-0.19, 0.8, -0.18),
+                  material=M.gold, segments=10, rot=(0, 90, 0))
+        F.sweep('crank', G.kit.fillet([(-0.205, 0.8, -0.18), (-0.24, 0.8, -0.18), (-0.24, 0.74, -0.15), (-0.27, 0.74, -0.15)], 0.012),
+                0.005, M.gold, verts=5)
+        F.sweep('crank_handle', [(-0.27, 0.74, -0.15), (-0.31, 0.74, -0.15)], 0.009, M.walnut, verts=6)
+        G.revolve('arm_base', [(0, 0), (0.032, 0), (0.03, 0.012), (0.018, 0.02), (0.016, 0.03), (0, 0.03)],
+                  at=F.at(ARM[0], 0.87, ARM[2]), material=M.gold, segments=12)
+        F.sweep('horn_neck', [(0.0, 0.85, -0.3), (0.0, 0.93, -0.36), (0.0, 1.01, -0.35), (0.0, 1.06, -0.32)], 0.022, M.horn,
+                verts=10, resolution=3, scale=[1.0, 0.9, 0.8, 0.75])
+        horn = [(0.02, 0), (0.03, 0.08), (0.06, 0.2), (0.12, 0.32), (0.23, 0.42), (0.24, 0.43), (0.225, 0.43), (0.115, 0.335),
+                (0.055, 0.215), (0.025, 0.09), (0.012, 0.0)]
+        G.revolve('horn', horn, at=F.at(0.0, 1.05, -0.32), material=M.horn, segments=28, rot=(34, 0, 0))
+        hx, hy, hz = F.at(0.0, 1.05, -0.32)
+        tilt = Matrix.Translation((hx, hy, hz)) @ Matrix.Rotation(math.radians(34), 4, 'X')
+        for k in range(8):                                         # the seams between the horn's petals
+            a = math.tau * (k + 0.5) / 8
+            pts = [tuple(tilt @ Vector((r * math.cos(a) * 1.01, r * math.sin(a) * 1.01, h))) for r, h in horn[:6]]
+            G.sweep(f'horn_seam{k}', pts, 0.0035, material=M.gold, verts=4)
         # record sleeves leant on the cabinet and a rose on its top
         F.box('sleeve_a', 0.3, 0.3, 0.012, (0.22, 0.15, 0.2), M.sleeve_a, rot=(-12, 20, 0))
         F.box('sleeve_b', 0.3, 0.3, 0.012, (0.2, 0.15, 0.22), M.sleeve_b, rot=(-18, 14, 0))
-        G.rod('rose_stem', F.at(-0.22, 0.75, -0.06), F.at(-0.1, 0.752, 0.0), 0.006, material=M.leaf, verts=6)
-        _rose(F, -0.22, 0.765, -0.06, 0.05)
+        F.cyl('sleeve_disc', 0.07, 0.004, (0.22, 0.155, 0.208), M.paper, rot=(-12 + 90, 20, 0), verts=14)
+        F.sweep('rose_stem', [(-0.22, 0.745, -0.06), (-0.16, 0.746, -0.03), (-0.1, 0.745, 0.0)], 0.004, M.leaf, verts=5,
+                resolution=2)
+        _rose(F, 'cabinet_rose', -0.24, 0.742, -0.07, 0.05, tilt=70, yaw=240)
+        _rose_leaves(F, 'rose_leaf', -0.15, 0.748, -0.025, n=2, size=0.04)
     G.join(still, 'body', origin=(0, 0, 0))
     # The platter and record, origin on the spindle: `platter` turns them while the record plays.
     with G.new_parts() as platter:
         F.cyl('platter', 0.15, 0.012, (rx, ry - 0.008, rz), M.gold, verts=32)
-        F.cyl('record', 0.145, 0.008, (rx, ry + 0.002, rz), M.record, verts=32)
+        grooves = [(0, 0), (0.145, 0)] + [(0.145 - 0.012 * k - (0.006 if j else 0), 0.006 if j else 0.0075)
+                                          for k in range(7) for j in (0, 1)] + [(0.05, 0.007), (0, 0.007)]
+        G.revolve('record', grooves, at=F.at(rx, ry - 0.002, rz), material=M.record, segments=32)
         F.cyl('label', 0.05, 0.009, (rx, ry + 0.003, rz), M.rose, verts=20)
         F.box('label_mark', 0.04, 0.0095, 0.008, (rx + 0.02, ry + 0.003, rz), M.paper)
         F.cyl('spindle', 0.005, 0.02, (rx, ry + 0.01, rz), M.gold, verts=6)
@@ -362,9 +449,13 @@ def gramophone():
     # The tone arm, resting off the record beside it: `needle` swings it onto the record about its pivot.
     ax, ay, az = ARM
     with G.new_parts() as arm:
-        F.cyl('arm_pivot', 0.018, 0.04, (ax, ay + 0.005, az), M.gold, verts=10)
-        G.rod('arm_tube', F.at(ax, ay + 0.02, az), F.at(ax + 0.02, ay + 0.03, az + 0.2), 0.008, material=M.gold, verts=8)
-        F.cyl('sound_box', 0.03, 0.018, (ax + 0.02, ay + 0.025, az + 0.22), M.gold, rot=(90, 0, 0), verts=14)
+        G.revolve('arm_pivot', [(0, 0), (0.02, 0), (0.02, 0.03), (0.014, 0.04), (0, 0.042)], at=F.at(ax, ay - 0.012, az),
+                  material=M.gold, segments=10)
+        F.sweep('arm_tube', [(ax, ay + 0.02, az), (ax + 0.012, ay + 0.03, az + 0.1), (ax + 0.02, ay + 0.03, az + 0.2)], 0.008,
+                M.gold, verts=8, resolution=3, scale=[1.0, 0.85, 0.7])
+        G.revolve('sound_box', [(0, 0), (0.03, 0), (0.032, 0.006), (0.032, 0.014), (0.03, 0.018), (0, 0.018)],
+                  at=F.at(ax + 0.02, ay + 0.025, az + 0.212), material=M.gold, segments=14, rot=(90, 0, 0))
+        F.cyl('sound_face', 0.024, 0.004, (ax + 0.02, ay + 0.025, az + 0.231), M.paper, rot=(90, 0, 0), verts=12)
         G.rod('stylus', F.at(ax + 0.02, ay + 0.02, az + 0.22), F.at(ax + 0.02, ry + 0.006, az + 0.22), 0.002,
               material=M.chrome, verts=4)
     arm = G.hinged(G.join(arm, 'tone_arm'), F.at(ax, ay, az))
@@ -387,44 +478,51 @@ def letterBureau():
     hz = WALL + 0.012 + 0.05          # the hutch's middle depth (0.1 deep)
     hf = hz + 0.05                    # its front
     with G.new_parts() as still:
-        F.box('desk_top', 0.84, 0.03, DESK_D, (0, 0.745, WALL + DESK_D / 2), M.ivory, bevel=0.01)
-        F.box('apron', 0.8, 0.1, DESK_D - 0.03, (0, 0.68, WALL + (DESK_D - 0.03) / 2), M.ivory, bevel=0.008)
-        F.box('drawer', 0.3, 0.06, 0.01, (0, 0.68, WALL + DESK_D - 0.022), M.blush, bevel=0.004)
-        F.sphere('drawer_knob', 0.014, (0, 0.68, WALL + DESK_D - 0.015), M.gold, segments=8, rings=6)
+        F.box('desk_top', 0.84, 0.03, DESK_D, (0, 0.745, WALL + DESK_D / 2), M.ivory, bevel=0.01, bevel_segments=2)
+        edge = [(-0.4 + 0.8 * i / 16, 0.0) for i in range(17)]
+        edge = [(x, 0.02 + 0.018 * math.cos(math.pi * x / 0.4) ** 2) for x, _ in edge]
+        F.extrude('apron', [(0.4, 0.1), (-0.4, 0.1)] + edge, DESK_D - 0.03, (0, 0.63, WALL + (DESK_D - 0.03) / 2), M.ivory)
+        F.box('drawer', 0.3, 0.06, 0.012, (0, 0.69, WALL + DESK_D - 0.023), M.blush, bevel=0.004, bevel_segments=1)
+        G.kit.knob(F, 'drawer_knob', 0, 0.69, WALL + DESK_D - 0.017, 0.01, M.gold, segments=8)
         for x in (-0.39, 0.39):
             for z in (WALL + 0.03, WALL + DESK_D - 0.04):
-                F.cone(_name('leg'), 0.012, 0.02, 0.63, (x, 0.315, z), M.ivory, verts=10)
-        # the pigeonhole hutch facing the writer, its back on the wall, a gold crest
-        F.box('hutch_back', 0.8, 0.38, 0.02, (0, 0.95, WALL + 0.01), M.ivory, bevel=0.004)
+                F.sweep(f'leg{x}{z}', [(x, 0.73, z), (x, 0.08, z), (x, 0.0, z)], None, M.ivory,
+                        profile=G.rounded_rect(0.034, 0.034, 0.008, corner=1), up=(0, 1, 0), scale=[1.0, 0.55, 0.62])
+        # the pigeonhole hutch facing the writer, its back on the wall, an arched gold crest
+        F.box('hutch_back', 0.8, 0.38, 0.02, (0, 0.95, WALL + 0.01), M.ivory, bevel=0.004, bevel_segments=1)
         for x in (-0.4, 0.4):
-            F.box(_name('hutch_side'), 0.02, 0.38, 0.1, (x, 0.95, hz), M.ivory, bevel=0.004)
-            F.box(_name('hutch_panel'), 0.004, 0.28, 0.07, (x * 1.026, 0.95, hz), M.blush, bevel=0.002)
-        F.box('hutch_top', 0.84, 0.025, 0.11, (0, 1.15, hz), M.ivory, bevel=0.006)
-        F.box('crest', 0.84, 0.02, 0.11, (0, 1.17, hz), M.gold, bevel=0.004)
+            F.box(f'hutch_side{x}', 0.02, 0.38, 0.1, (x, 0.95, hz), M.ivory, bevel=0.004, bevel_segments=1)
+            F.box(f'hutch_panel{x}', 0.004, 0.28, 0.07, (x * 1.026, 0.95, hz), M.blush, bevel=0.002, bevel_segments=1)
+        F.box('hutch_top', 0.84, 0.025, 0.11, (0, 1.15, hz), M.ivory, bevel=0.006, bevel_segments=1)
+        crest = [(-0.42, 0.0), (0.42, 0.0)] + [(0.42 - 0.84 * i / 16, 0.012 + 0.012 * math.sin(math.pi * i / 16)) for i in range(17)]
+        F.extrude('crest', crest[::-1], 0.11, (0, 1.1625, hz), M.gold)
         for x in (-0.2, 0.0, 0.2):
-            F.box(_name('divider'), 0.012, 0.36, 0.09, (x, 0.95, hz + 0.005), M.ivory)
+            F.box(f'divider{x}', 0.012, 0.36, 0.09, (x, 0.95, hz + 0.005), M.ivory)
         F.box('shelf', 0.78, 0.012, 0.09, (0, 0.97, hz + 0.005), M.ivory)
-        for x, y, m in ((-0.3, 1.0, M.paper), (-0.1, 1.0, M.blush), (0.3, 1.0, M.envelope), (-0.3, 0.8, M.paper),
-                        (0.1, 0.8, M.envelope)):
-            F.box(_name('letters'), 0.14, 0.08, 0.06, (x, y + 0.015, hz), m)
+        for k, (x, y, m) in enumerate(((-0.3, 1.0, M.paper), (-0.1, 1.0, M.blush), (0.3, 1.0, M.envelope), (-0.3, 0.8, M.paper),
+                                       (0.1, 0.8, M.envelope))):
+            for j in range(3):                                      # envelopes standing in the pigeonhole, a ribbon round them
+                F.box(f'letter{k}{j}', 0.13, 0.085 - 0.01 * j, 0.004, (x + 0.004 * j, y + 0.018, hz - 0.02 + 0.016 * j), m)
+            F.box(f'letter_ribbon{k}', 0.01, 0.09, 0.05, (x, y + 0.02, hz - 0.004), M.rose)
         # on the desk either side of the flap: an inkpot and a quill, a wax seal, a candle
-        G.revolve('inkpot', [(0, 0), (0.03, 0), (0.03, 0.035), (0.012, 0.045), (0.012, 0.06), (0, 0.06)],
+        G.revolve('inkpot', [(0, 0), (0.03, 0), (0.03, 0.035), (0.012, 0.045), (0.012, 0.06), (0.015, 0.062), (0, 0.062)],
                   at=F.at(0.33, 0.76, -0.2), material=M.ink, segments=12)
-        G.rod('quill', F.at(0.33, 0.8, -0.2), F.at(0.25, 0.98, -0.25), 0.004, material=M.paper, verts=6)
-        F.sphere('quill_vane', 0.02, (0.27, 0.93, -0.24), M.paper, scale=(0.5, 0.25, 3.5), rot=(0, 30, 0), segments=8,
-                 rings=6)
-        F.cyl('wax_seal', 0.025, 0.012, (0.32, 0.766, -0.07), M.rosed, verts=12)
-        F.box('wax_stick', 0.012, 0.012, 0.1, (0.3, 0.766, -0.11), M.rose, rot=(0, 0, 30))
-        wx, wy, wz = _candle(F, -0.33, -0.15, 0.76, 0.14)
-        F.sphere('candle_flame', 0.011, (wx, wy + 0.02, wz), M.flame_core, scale=(1, 1, 2), segments=8, rings=6)
-        _velvet_chair(F, 0.0, CHAIR_Z, frame=M.ivory, facing='back')
+        F.sweep('quill', [(0.33, 0.8, -0.2), (0.29, 0.9, -0.225), (0.25, 0.98, -0.25)], 0.003, M.paper, verts=4, resolution=2)
+        leaf('quill_vane', F.at(0.31, 0.86, -0.212), 125, 62, 0.15, 0.04, M.paper, shape='lance', droop=0.15, fold=0.05,
+             rows=5, ring=3)
+        G.revolve('wax_seal', [(0, 0), (0.026, 0), (0.028, 0.006), (0.024, 0.012), (0, 0.011)], at=F.at(0.32, 0.76, -0.07),
+                  material=M.rosed, segments=12)
+        F.sweep('wax_stick', [(0.29, 0.766, -0.15), (0.31, 0.766, -0.06)], 0.006, M.rose, verts=6)
+        wx, wy, wz = _candle(F, 'desk_candle', -0.33, -0.15, 0.76, 0.14)
+        G.revolve('candle_flame', [(0, 0), (0.008, 0.006), (0.01, 0.016), (0, 0.04)], at=F.at(wx, wy + 0.003, wz),
+                  material=M.flame_core, segments=6)
+        _velvet_chair(F, 'chair', 0.0, CHAIR_Z, frame=M.ivory, facing='back')
     G.join(still, 'body', origin=(0, 0, 0))
     # The writing flap, closed up over the lower middle pigeonholes, hinged on its foot: `fall_front` drops it
     # towards the writer onto the desk, a letter on its inside.
     with G.new_parts() as flap:
-        F.box('flap', 0.5, 0.2, 0.018, (0, 0.87, hf + 0.009), M.ivory, bevel=0.005)
-        F.box('flap_panel', 0.42, 0.14, 0.006, (0, 0.87, hf + 0.021), M.blush, bevel=0.003)
-        F.sphere('flap_knob', 0.012, (0, 0.95, hf + 0.026), M.gold, segments=8, rings=6)
+        G.kit.shaker(F, 'flap', 0.5, 0.2, (0, 0.87, hf + 0.009), 0.018, M.ivory, rail=0.04, panel=M.blush, recess=0.004)
+        G.kit.knob(F, 'flap_knob', 0, 0.95, hf + 0.018, 0.01, M.gold, segments=8)
         F.box('flap_letter', 0.2, 0.14, 0.003, (-0.08, 0.87, hf - 0.002), M.paper, rot=(0, 0, 6))
         F.box('flap_envelope', 0.14, 0.1, 0.003, (0.13, 0.86, hf - 0.002), M.envelope, rot=(0, 0, -8))
     flap = G.hinged(G.join(flap, 'flap'), F.at(0, 0.77, hf + 0.009))
@@ -439,63 +537,96 @@ ARCH = [(-0.88 + 1.76 * t / 8, 2.12 + 0.3 * math.sin(math.pi * t / 8)) for t in 
 BLOOM = (-0.84, 1.36, 0.35)   # the bloom that is cut
 
 
+def _climber(F, name, x, z, y0, y1, k0):
+    """Climbing roses up a post: a cane winding up it, leaves in threes along it, a bloom every so often."""
+    n = 13
+    F.sweep(f'{name}_cane', [(x + 0.03 * math.cos(t * 1.7), y0 + (y1 - y0) * t / 6 - 0.3 * (t == 0), z + 0.03 * math.sin(t * 1.7))
+                             for t in range(7)], 0.006, M.leaf_dark, verts=4, resolution=2)
+    for i in range(n):
+        y = y0 + (y1 - y0) * i / (n - 1)
+        a = i * 137.5 + k0 * 40
+        for j in range(3):
+            leaf(f'{name}_leaf{i}_{j}', F.at(x, y + 0.03 * j, z), a + 120 * j, 10 + 15 * ((i + j) % 2), 0.1 - 0.008 * j, 0.07,
+                 M.leaf if (i + j + k0) % 2 else M.leaf_dark, droop=0.35, rows=3, ring=3)
+        if i % 3 == 1:
+            _rose(F, f'{name}_rose{i}', x + 0.07 * G.cosd(a), y + 0.02, z + 0.07 * G.sind(a), 0.045,
+                  M.rose if (i + k0) % 2 else M.rose_pink, tilt=40, yaw=-a + 90)
+
+
 def roseArbourSwing():
     F = G.GameFrame()
     with G.new_parts() as still:
         for x in (-0.88, 0.88):
             for z in (-0.36, 0.36):
-                F.box(_name('post'), 0.07, 2.12, 0.07, (x, 1.06, z), M.frame, bevel=0.01)
-            for i in range(5):                                                   # the lattice
-                y0 = 0.2 + i * 0.36
-                for za, zb in ((-0.33, 0.33), (0.33, -0.33)):
-                    G.rod(_name('lattice'), F.at(x, y0, za), F.at(x, y0 + 0.36, zb), 0.012, material=M.frame, verts=4)
-        for z in (-0.36, 0.36):                                                  # the arch
-            for (x0, y0), (x1, y1) in zip(ARCH, ARCH[1:]):
-                G.rod(_name('arch'), F.at(x0, y0, z), F.at(x1, y1, z), 0.035, material=M.frame, verts=6)
+                F.box(f'post{x}{z}', 0.07, 2.12, 0.07, (x, 1.06, z), M.frame, bevel=0.008, bevel_segments=1)
+            # the lattice between the posts: diagonal laths each way, one sweep each
+            for i in range(-3, 5):
+                for sgn in (-1, 1):
+                    za, zb = -0.33, 0.33
+                    ya = 0.2 + i * 0.36
+                    pts = [(x, ya, za * sgn), (x, ya + 0.66, zb * sgn)]
+                    lo, hi = 0.2, 1.95                             # clip to the panel
+                    (_, y0, z0), (_, y1, z1) = pts
+                    t0, t1 = max(0.0, (lo - y0) / (y1 - y0)), min(1.0, (hi - y0) / (y1 - y0))
+                    if t1 <= t0:
+                        continue
+                    a = (x, y0 + (y1 - y0) * t0, z0 + (z1 - z0) * t0)
+                    b = (x, y0 + (y1 - y0) * t1, z0 + (z1 - z0) * t1)
+                    F.sweep(f'lattice{x}{i}{sgn}', [a, b], None, M.frame, profile=_sq(0.01, 0.022), up=(1, 0, 0))
+            for y in (0.2, 1.95):
+                F.box(f'lattice_rail{x}{y}', 0.03, 0.04, 0.66, (x, y, 0), M.frame, bevel=0.006, bevel_segments=1)
+        for z in (-0.36, 0.36):                                  # the arch, a curved rafter each side in one sweep
+            F.sweep(f'arch{z}', [(x, y, z) for x, y in ARCH], None, M.frame, profile=_sq(0.05, 0.06), up=(0, 0, 1),
+                    resolution=2)
         for x, y in ARCH[1:-1]:
-            F.box(_name('slat'), 0.04, 0.04, 0.82, (x, y + 0.03, 0), M.frame, bevel=0.006)
-        F.box('beam', 1.82, 0.08, 0.08, (0, BEAM, 0.0), M.frame, bevel=0.012)
-        # climbing roses: leafy clumps up the posts and over the arch, blooms among them
+            F.box(f'slat{x:.2f}', 0.04, 0.04, 0.82, (x, y + 0.03, 0), M.frame, bevel=0.006, bevel_segments=1)
+        F.box('beam', 1.82, 0.08, 0.08, (0, BEAM, 0.0), M.frame, bevel=0.012, bevel_segments=1)
+        for s in (-1, 1):
+            F.sweep(f'beam_eye{s}', [(s * 0.78, BEAM - 0.04, 0.0), (s * 0.78, BEAM - 0.06, 0.0)], 0.01, M.gold, verts=6)
+        # climbing roses up the posts and over the arch
         k = 0
-        jitter = (0.13, 0.71, 0.42, 0.88, 0.27, 0.56, 0.05, 0.93, 0.36, 0.64, 0.19, 0.81)
         for x in (-0.82, 0.82):
             for z in (-0.3, 0.3):
-                for y in (0.5, 1.1, 1.65):
-                    yy = y + jitter[k % 12] * 0.2
-                    G.boulder(_name('leaves'), 0.13, at=F.at(x, yy - 0.12, z), material=M.leaf if k % 2 else M.leaf_dark,
-                              scale=(0.8, 0.7, 1.15), seed=k * 1.7, noise=0.3, subdivisions=1)
-                    if (x, z, y) != (-0.82, 0.3, 1.1):
-                        _rose(F, x + (0.08 if x < 0 else -0.08), yy + 0.06, z + (0.06 if z < 0 else -0.06),
-                              0.045, M.rose if k % 3 else M.rose_pink)
-                    k += 1
+                _climber(F, f'climber{x}{z}', x, z, 0.35, 1.9, k)
+                k += 1
         for i, (x, y) in enumerate(ARCH[1:-1]):
-            G.boulder(_name('leaves'), 0.18, at=F.at(x, y - 0.02, 0), material=M.leaf_dark if i % 2 else M.leaf,
-                      scale=(0.9, 2.2, 0.55), seed=i * 2.3, noise=0.3, subdivisions=1)
-            _rose(F, x, y + 0.17, -0.25 + 0.17 * (i % 4), 0.05, M.rose if i % 2 else M.rose_pink)
+            for z in (-0.27, -0.13, 0.0, 0.13, 0.27):
+                leaf(f'arch_leaf{i}{z}', F.at(x, y + 0.06, z), i * 77 + z * 300, 15, 0.13, 0.09, M.leaf_dark if i % 2 else M.leaf,
+                     droop=0.4, rows=3, ring=3)
+                leaf(f'arch_leaf{i}{z}b', F.at(x, y + 0.06, z), i * 77 + z * 300 + 150, 20, 0.11, 0.08, M.leaf if i % 2 else M.leaf_dark,
+                     droop=0.4, rows=3, ring=3)
+            _rose(F, f'arch_rose{i}', x, y + 0.15, -0.25 + 0.17 * (i % 4), 0.05, M.rose if i % 2 else M.rose_pink)
     G.join(still, 'body', origin=(0, 0, 0))
     # The swing (seat top 0.45 over z = 0) with its arms, cushions and chains, hung from the beam: `swing` rocks
     # it, and the residents sitting on it ride it.
     with G.new_parts() as swing:
-        F.box('seat', 1.6, 0.05, 0.42, (0, 0.385, -0.01), M.frame, bevel=0.01)
-        F.box('seat_cushion', 1.56, 0.06, 0.4, (0, 0.42, 0.0), M.cushion, bevel=0.025, bevel_segments=2)
-        F.box('swing_back', 1.6, 0.42, 0.04, (0, 0.66, -0.24), M.frame, rot=(-10, 0, 0), bevel=0.01)
-        for x in (-0.55, -0.28, 0.0, 0.28, 0.55):
-            F.box(_name('back_rail'), 0.03, 0.4, 0.02, (x, 0.66, -0.215), M.frame, rot=(-10, 0, 0))
-        F.box('pillow_l', 0.36, 0.3, 0.1, (-0.6, 0.64, -0.15), M.rose, rot=(-12, 0, -15), bevel=0.04, bevel_segments=2)
-        F.box('pillow_r', 0.34, 0.28, 0.1, (0.62, 0.63, -0.15), M.ivory, rot=(-12, 0, 15), bevel=0.04, bevel_segments=2)
+        for k in range(5):                                         # the seat's slats, a frame round them
+            F.box(f'seat_slat{k}', 1.56, 0.03, 0.075, (0, 0.385, -0.17 + k * 0.08), M.frame, bevel=0.005, bevel_segments=1)
+        for z in (-0.21, 0.19):
+            F.box(f'seat_rail{z}', 1.6, 0.06, 0.03, (0, 0.37, z), M.frame, bevel=0.005, bevel_segments=1)
+        F.soft('seat_cushion', 1.5, 0.05, 0.38, (0, 0.425, -0.005), M.cushion, round=0.02, puff=0.008, flat=2)
+        for k in range(7):                                         # the back's spindles between two rails
+            x = -0.6 + k * 0.2
+            F.box(f'back_spindle{k}', 0.03, 0.38, 0.02, (x, 0.66, -0.215), M.frame, rot=(-10, 0, 0), bevel=0.004, bevel_segments=1)
+        for y in (0.48, 0.86):
+            F.box(f'back_rail{y}', 1.6, 0.04, 0.035, (0, y, -0.215 - (y - 0.66) * 0.18), M.frame, rot=(-10, 0, 0), bevel=0.006,
+                  bevel_segments=1)
+        F.soft('pillow_l', 0.36, 0.3, 0.1, (-0.6, 0.64, -0.15), M.rose, rot=(-12, 0, -15), round=0.04, puff=0.03, flat=2,
+               round_segments=1)
+        F.soft('pillow_r', 0.34, 0.28, 0.1, (0.62, 0.63, -0.15), M.ivory, rot=(-12, 0, 15), round=0.04, puff=0.03, flat=2,
+               round_segments=1)
         for s in (-1, 1):
-            F.box(_name('arm'), 0.05, 0.05, 0.42, (s * 0.78, 0.62, 0.0), M.frame, bevel=0.01)
-            F.box(_name('arm_post'), 0.04, 0.2, 0.04, (s * 0.78, 0.5, 0.17), M.frame)
-            G.rod(_name('chain'), F.at(s * 0.78, 0.64, 0.17), F.at(s * 0.78, BEAM - 0.04, 0.0), 0.008, material=M.gold,
-                  verts=6)
-            G.rod(_name('chain'), F.at(s * 0.78, 0.86, -0.26), F.at(s * 0.78, BEAM - 0.04, 0.0), 0.008, material=M.gold,
-                  verts=6)
+            F.sweep(f'arm{s}', [(s * 0.78, 0.86, -0.25), (s * 0.78, 0.63, -0.18), (s * 0.78, 0.62, 0.12), (s * 0.78, 0.6, 0.19)], None,
+                    M.frame, profile=G.rounded_rect(0.05, 0.04, 0.012, corner=1), up=(1, 0, 0), resolution=2)
+            F.box(f'arm_post{s}', 0.04, 0.2, 0.04, (s * 0.78, 0.5, 0.17), M.frame, bevel=0.005, bevel_segments=1)
+            for zc, yc in ((0.17, 0.64), (-0.26, 0.86)):
+                F.sweep(f'chain{s}{zc}', [(s * 0.78, yc, zc), (s * 0.78, BEAM - 0.06, 0.0)], 0.007, M.gold, verts=5)
     swing = G.hinged(G.join(swing, 'swing'), F.at(0, BEAM, 0.0))
     # The bloom a resident cuts, origin on its stem: `cut` shrinks it away.
     with G.new_parts() as bloom:
-        _rose(F, *BLOOM, s=0.06)
-        F.sphere('bloom_leaf', 0.03, (BLOOM[0] + 0.02, BLOOM[1] - 0.05, BLOOM[2] - 0.02), M.leaf, scale=(1.4, 0.6, 1),
-                 segments=8, rings=6)
+        _rose(F, 'bloom', BLOOM[0], BLOOM[1] - 0.03, BLOOM[2], 0.06, M.rose, tilt=35, yaw=90)
+        leaf('bloom_leaf', F.at(BLOOM[0] + 0.01, BLOOM[1] - 0.05, BLOOM[2] - 0.02), 200, 10, 0.07, 0.045, M.leaf, droop=0.3,
+             rows=3, ring=3)
     bloom = G.hinged(G.join(bloom, 'bloom'), F.at(BLOOM[0], BLOOM[1] - 0.06, BLOOM[2]))
     objs = G.settle(centre=False)
     G.rock(swing, 'swing', 7, seconds=2.0)

@@ -84,6 +84,9 @@
         "chrome": {
           "finish": "material.finish.chrome"
         },
+        "coral": {
+          "finish": "material.finish.gloss"
+        },
         "dark": {
           "finish": "material.finish.satin"
         },
@@ -100,6 +103,9 @@
           "finish": "material.finish.gloss"
         },
         "screen_glow": {
+          "finish": "material.finish.gloss"
+        },
+        "teal": {
           "finish": "material.finish.gloss"
         },
         "tile": {
@@ -161,6 +167,9 @@
         "body": {
           "finish": "material.finish.satin"
         },
+        "bottle_a": {
+          "finish": "material.finish.gloss"
+        },
         "bottle_b": {
           "finish": "material.finish.gloss"
         },
@@ -169,6 +178,9 @@
         },
         "chrome": {
           "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
         },
         "glass": {
           "finish": "material.finish.glass"
@@ -233,6 +245,9 @@
         },
         "body": {
           "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
         },
         "coral": {
           "finish": "material.finish.gloss"
@@ -323,6 +338,9 @@
         "steel": {
           "finish": "material.finish.metal"
         },
+        "stem": {
+          "finish": "material.finish.satin"
+        },
         "teal": {
           "finish": "material.finish.gloss"
         },
@@ -371,6 +389,9 @@
         },
         "coral": {
           "finish": "material.finish.gloss"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
         },
         "mirror": {
           "finish": "material.finish.chrome"

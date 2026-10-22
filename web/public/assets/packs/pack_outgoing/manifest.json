@@ -36,6 +36,15 @@
         "chrome": {
           "finish": "material.finish.chrome"
         },
+        "coral": {
+          "finish": "material.finish.gloss"
+        },
+        "cream": {
+          "finish": "material.finish.satin"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
         "glassy": {
           "finish": "material.finish.gloss"
         },
@@ -118,6 +127,9 @@
           "finish": "material.finish.fabric"
         },
         "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "lime": {
           "finish": "material.finish.satin"
         },
         "magenta": {
@@ -255,6 +267,9 @@
         },
         "leaf": {
           "finish": "material.finish.satin"
+        },
+        "porcelain": {
+          "finish": "material.finish.gloss"
         },
         "pot": {
           "finish": "material.finish.satin"

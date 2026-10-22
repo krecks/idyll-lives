@@ -36,12 +36,12 @@ each at night).
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.outgoing.partyBar` | 1.84 × 2.00 × 0.88 m | 7,872 | 3 | Body, Upholstery, Back bar |
-| `model.outgoing.conversationSectional` | 1.90 × 1.42 × 1.86 m | 4,612 | 3 | Body, Upholstery |
-| `model.outgoing.karaokeStage` | 1.90 × 1.63 × 0.89 m | 2,532 | 3 | Body, Speakers |
-| `model.outgoing.videoCallNook` | 0.84 × 1.28 × 0.79 m | 3,132 | 3 | Body, Upholstery, Wood |
-| `model.outgoing.danceFloor` | 1.92 × 2.33 × 1.88 m | 3,632 | 3 | Body, Speakers |
-| `model.outgoing.photoWall` | 0.90 × 2.16 × 0.49 m | 3,634 | 3 | Body, Board |
+| `model.outgoing.partyBar` | 1.84 × 2.00 × 0.88 m | 7,828 (was 7,872) | 3 | Body, Upholstery, Back bar |
+| `model.outgoing.conversationSectional` | 1.90 × 1.42 × 1.86 m | 7,940 (was 4,612) | 3 | Body, Upholstery |
+| `model.outgoing.karaokeStage` | 1.90 × 1.63 × 0.88 m | 3,668 (was 2,532) | 3 | Body, Speakers |
+| `model.outgoing.videoCallNook` | 0.84 × 1.28 × 0.78 m | 3,508 (was 3,132) | 3 | Body, Upholstery, Wood |
+| `model.outgoing.danceFloor` | 1.94 × 2.33 × 1.88 m | 4,112 (was 3,632) | 3 | Body, Speakers |
+| `model.outgoing.photoWall` | 0.90 × 2.14 × 0.49 m | 3,410 (was 3,634) | 3 | Body, Board |
 
 "Upholstery" (the plan's second colour part) fits the bar's stool tops, the sectional's cushions and the desk
 chair; the stage and the dance floor take their speakers instead, the photo wall its cork board.
@@ -52,6 +52,31 @@ there. In play (`wants-asking`, WebGPU, in the yard): the sectional (hangOut, se
 the loop going), the bar (mixDrinks) and the video-call corner (call, seated facing the desk, the ring up) used by
 a resident; the video-call corner at all four facings, the stage and photo wall turned; the bar and sectional
 bought coloured; the same at night (`office-night`, WebGL).
+
+## Detail pass (2026-10-22)
+
+Same keys, sizes, parts, clips, paint and draws.
+- **Party bar:** the fluted coral front one slab extruded from a scalloped outline, a cap and plinth, an oak top with a
+  rounded nose, the foot rail bent back into the counter; the back bar's doors raised-panel `G.kit.shaker`s with
+  `G.kit.knob`s, a gallery rail on each shelf, round brass uprights; bottles lofted (round and square) with labels,
+  wine with foil; the tap tower bent in one piece on a flange, a turned lever; a pint with its head, a turned shaker;
+  stools lofted, with foot-ring struts and domed bases.
+- **Sectional:** every panel and cushion `G.soft_box`: welted arms, piped back and seat cushions, plump pillows; tapered
+  brass feet; the console's legs tapered with stretchers, a turned lamp, a plant of heart leaves, a buttoned pouf with a
+  welt and a lipped tray.
+- **Karaoke stage:** a plank deck, turned speaker cones (surround, cone, dust cap), floor spots in yokes, tripod mic
+  stands of bent legs, the mics turned. Its screen's foot stood 1 cm into the wall (as the old one): moved, the `centre`
+  is (0, 0.012) now (it was 0.007).
+- **Video-call corner:** hairpin legs, a ring-light stand with a weighted foot and the yoke bent in one piece, a phone
+  with its screen, a laptop with keys and pad, a mug with a handle, a notebook and pen, a chair on a shell with tapered
+  legs.
+- **Dance floor:** the posts and beam are triangular box trusses (three chords, zigzag lacing), a moulded edge round
+  the base, moving-head spots, the mirror ball on a motor; tiles bevelled.
+- **Photo wall:** the board's frame a moulding, prints with round-headed pins, one sagging wire with sockets and bulbs,
+  lofted balloons on curling strings, a gift with a bow of two loops and tails.
+
+The bar keeps the gate's warning "seat 0.74 m (content `seat`): no model under it (x -0.50, depth 0.50)": the stools
+stand at depth 0.28 as before (the same warning on the file before this pass).
 
 ## Rebuild
 
