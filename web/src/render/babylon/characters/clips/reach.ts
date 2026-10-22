@@ -15,10 +15,8 @@ import { cycle, mix, reference, type ClipDef, type PoseSpec, type Vec } from './
 import { track, tiptoe, type Key } from './games';
 import { bump, hangArms, stand, TAU } from './idle';
 import { armIK, footIK, len, pointOn, smooth, sub, wrist, type ArmOptions } from './ik';
-import { sizes, type Fit, type Size } from './street';
+import { SHARES_177, sizes, type Fit, type Size } from './street';
 
-/** The sizes' shares of the reference body's size (1.77 m, 1.47 m, 1.12 m). */
-const SHARES = [1, 0.83, 0.63];
 /** The smallest share that reaches a wall cupboard's pulls or the clock's dial (a teen's; a child's doesn't). */
 const REACHES_UP = 0.75;
 /** From the shoulder to the palm's centre, a little short of straight (m, reference skeleton). */
@@ -181,7 +179,7 @@ export const CUPBOARDS: Record<string, Cupboard> = {
 export const CUPBOARD_OF: Record<string, string> = { wallCabinet: 'putAway', wallCabinetGlass: 'putAwayGlass', wallCabinetCorner: 'putAwayCorner', chinaCabinet: 'putAwayHutch' };
 type CupboardFit = Fit & { cupboard: Cupboard };
 export const PUT_AWAY: Record<string, Size<CupboardFit>[]> = Object.fromEntries(
-  Object.entries(CUPBOARDS).map(([name, c]) => [name, sizes(name, SHARES, (s) => ({ s, to: c.to(s), cupboard: c }))]),
+  Object.entries(CUPBOARDS).map(([name, c]) => [name, sizes(name, SHARES_177, (s) => ({ s, to: c.to(s), cupboard: c }))]),
 );
 const CUPBOARD_S = 3.2;
 
@@ -248,7 +246,7 @@ const HOLES = [0.065, 1.7, -0.044 + 0.07] as const;
 const HOOD = [-0.25, 1.74, -0.03] as const;
 const CHAINS = { x: 0.06, y: [0.78, 1.08], z: -0.12 } as const;
 type ClockFit = Fit;
-export const CLOCK: Size<ClockFit>[] = sizes('windClock', SHARES, (s) => ({ s, to: s > 0.9 ? 0.35 : s > 0.7 ? 0.3 : 0.25 }));
+export const CLOCK: Size<ClockFit>[] = sizes('windClock', SHARES_177, (s) => ({ s, to: s > 0.9 ? 0.35 : s > 0.7 ? 0.3 : 0.25 }));
 const CLOCK_S = 4.5;
 
 /**
@@ -319,7 +317,7 @@ function clockPose(fit: ClockFit): (p: number) => PoseSpec {
 const HOUSE = { top: 1.6, front: -0.13, mid: -0.22 };
 const TRAY = [0.0, 1.41, -0.08] as const;
 type FeederFit = Fit;
-export const FEEDER: Size<FeederFit>[] = sizes('fillFeeder', SHARES, (s) => ({ s, to: s > 0.9 ? 0.25 : s > 0.7 ? 0.22 : 0.18 }));
+export const FEEDER: Size<FeederFit>[] = sizes('fillFeeder', SHARES_177, (s) => ({ s, to: s > 0.9 ? 0.25 : s > 0.7 ? 0.22 : 0.18 }));
 const FEEDER_S = 4;
 
 /**
@@ -369,7 +367,7 @@ function feederPose(fit: FeederFit): (p: number) => PoseSpec {
 const FACE = -0.4155;
 const PEN = 0.065;
 type BoardFit = Fit & { lines: readonly number[] };
-export const BOARD: Size<BoardFit>[] = sizes('writeBoard', SHARES, (s) =>
+export const BOARD: Size<BoardFit>[] = sizes('writeBoard', SHARES_177, (s) =>
   s > 0.9 ? { s, to: 0.04, lines: [1.52, 1.43, 1.34] } : s > 0.7 ? { s, to: -0.02, lines: [1.43, 1.35, 1.27] } : { s, to: -0.08, lines: [1.3, 1.23, 1.16] },
 );
 const BOARD_S = 6;

@@ -14,13 +14,13 @@ import { cycle, type ClipDef, type PoseSpec, type Vec } from './dsl';
 import { arms, body, track, type Key } from './games';
 import { TAU } from './idle';
 import { wrist } from './ik';
-import { sizes, type Fit, type Size } from './street';
+import { SHARES_177, sizes, type Fit, type Size } from './street';
 
 /** The rim's height and how far out it is from the hoop's middle (m). */
 const RIM = { y: 2.94, z: 0.27 };
 type ShotFit = Fit & { push: boolean };
 /** Three sizes; the smallest shoots two-handed from the chest. */
-export const SHOT: Size<ShotFit>[] = sizes('hoopShot', [1, 0.83, 0.63], (s) => ({ s, to: 2.5, push: s < 0.7 }));
+export const SHOT: Size<ShotFit>[] = sizes('hoopShot', SHARES_177, (s) => ({ s, to: 2.5, push: s < 0.7 }));
 const SHOT_S = 3.2;
 /** When (s into the round) the ball is gathered, the dip, the jump, the release and the landing. */
 const T = { gather: 1.05, dip: 1.35, jump: 1.55, release: 1.72, land: 1.95, settle: 2.3 };

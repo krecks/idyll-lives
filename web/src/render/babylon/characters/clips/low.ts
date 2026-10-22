@@ -11,12 +11,10 @@ import { kneelBody } from './garden';
 import { bump, TAU } from './idle';
 import { armIK, len, pointOn, sub, wrist } from './ik';
 import { SEAT_MOVE, seatedBody } from './seated';
-import { sizes, type Fit, type Size } from './street';
+import { SHARES_177, sizes, type Fit, type Size } from './street';
 
 /** From the shoulder to the palm's centre, a little short of straight (m, reference skeleton). */
 const ARM = 0.56;
-/** The sizes' shares of the reference body's size (1.77 m, 1.47 m, 1.12 m). */
-const SHARES = [1, 0.83, 0.63];
 
 /** The least lean (deg, up to `most`) of `make`'s body that brings each of `goals` (side, palm place) within reach, all of it if they are out of reach. */
 function leanFor(make: (lean: number) => PoseSpec, goals: readonly (readonly ['l' | 'r', Vec])[], most: number): number {
@@ -46,7 +44,7 @@ type LowFit = Fit;
 /** The seated clip's seat (m up; the runtime fits it to each body and seat) and its hips' place ahead (`SEAT_MOVE`). */
 const SEAT_Y = 0.45;
 const LOW_S = 5;
-export const SIT_LOW: Size<LowFit>[] = sizes('sitHandsLow', SHARES, (s) => ({ s, to: 0 }));
+export const SIT_LOW: Size<LowFit>[] = sizes('sitHandsLow', SHARES_177, (s) => ({ s, to: 0 }));
 
 /**
  * At a low top: bent well forward over it from the hips, the left hand flat on it holding the paper, the right
@@ -93,7 +91,7 @@ function sitLowPose(fit: LowFit): (p: number) => PoseSpec {
 const TRAIN = { top: 0.44, track: 0.012, edge: 0.42, front: 0.3 };
 const KNEE = 0.1;
 type KneelFit = Fit;
-export const KNEEL_TABLE: Size<KneelFit>[] = sizes('kneelTable', SHARES, (s) => ({ s, to: TRAIN.edge + KNEE + 0.123 * s }));
+export const KNEEL_TABLE: Size<KneelFit>[] = sizes('kneelTable', SHARES_177, (s) => ({ s, to: TRAIN.edge + KNEE + 0.123 * s }));
 export const KNEEL_LANES = [0.42, -0.45] as const;
 const KNEEL_S = 6;
 

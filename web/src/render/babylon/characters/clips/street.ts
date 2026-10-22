@@ -43,6 +43,12 @@ export function sizes<F extends Fit>(name: string, shares: readonly number[], fi
     fit: { ...fit(s), s: s * legShare(s * REF_HEIGHT) },
   }));
 }
+/** The shares `sizes` is used with: five sizes, 181 cm down to 112 (163, 147, 129 between). */
+export const SHARES_181 = [1.02, 0.92, 0.83, 0.73, 0.63] as const;
+/** Three sizes: 177, 147 and 112 cm. */
+export const SHARES_177 = [1, 0.83, 0.63] as const;
+/** Three sizes: 172, 147 and 112 cm. */
+export const SHARES_172 = [0.97, 0.83, 0.63] as const;
 
 /**
  * The drinking fountain (street furniture, `model.drinkingFountain`): the water arcs from the spout to its
@@ -52,7 +58,7 @@ export function sizes<F extends Fit>(name: string, shares: readonly number[], fi
  * smallest (a child) up on the slab's front edge (8 cm); the feet nearer the smaller they are.
  */
 type FountainFit = Fit & { mouth: [y: number, z: number]; tip?: number };
-export const FOUNTAIN: Size<FountainFit>[] = sizes('fountainDrink', [1.02, 0.92, 0.83, 0.73, 0.63], (s) =>
+export const FOUNTAIN: Size<FountainFit>[] = sizes('fountainDrink', SHARES_181, (s) =>
   s < 0.68
     ? { s, to: 0.27, up: 0.08, mouth: [1.04, 0.09], tip: 0.035 }
     : s < 0.78
@@ -142,7 +148,7 @@ type ClimbFit = Fit & { reach: number; wide: number };
  * placed for those of the size's users (the tallest is for the men and the women), so that they stay put on
  * their skeletons as the hips turn over them, `footIK`'s `wide`.)
  */
-export const CLIMB: Size<ClimbFit>[] = sizes('climb', [0.97, 0.83, 0.63], (s) => ({ s, to: 0.9 + 0.24 * s, reach: s < 0.7 ? 3 : 4, wide: s < 0.7 ? 0.024 : s > 0.9 ? 0.004 : 0 }));
+export const CLIMB: Size<ClimbFit>[] = sizes('climb', SHARES_172, (s) => ({ s, to: 0.9 + 0.24 * s, reach: s < 0.7 ? 3 : 4, wide: s < 0.7 ? 0.024 : s > 0.9 ? 0.004 : 0 }));
 /** Where the climbers go up the net: m to the frame's right of its middle (their feet's middle). */
 export const CLIMB_LANES = [-0.53, -0.1] as const;
 /** The clip of size `clip` for lane `lane` (an index of `CLIMB_LANES`). */

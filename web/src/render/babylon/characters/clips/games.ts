@@ -13,7 +13,7 @@
 import { cycle, type ClipDef, type PoseSpec, type Rot, type Vec } from './dsl';
 import { breathe, hangArms, TAU } from './idle';
 import { addV, armIK, footIK, lerpV, norm, pointOn, smooth, sub, wrist, type ArmOptions } from './ik';
-import { sizes, type Fit, type Size } from './street';
+import { sizes, SHARES_172, type Fit, type Size } from './street';
 
 // --- tracks: values keyed in time ---------------------------------------------------------------
 
@@ -185,7 +185,7 @@ function dartPose(p: number): PoseSpec {
  * strokes, a slow back swing and the stroke through, then up to watch the balls and chalk the cue.
  */
 type PoolFit = Fit;
-export const POOL: Size<PoolFit>[] = sizes('poolShot', [0.97, 0.83, 0.63], (s) => ({ s, to: 0.72 + 0.32 * s }));
+export const POOL: Size<PoolFit>[] = sizes('poolShot', SHARES_172, (s) => ({ s, to: 0.72 + 0.32 * s }));
 const BED = 0.75;
 const POOL_S = 8;
 /** The stroke (m along the cue, + through): two practice strokes, the back swing, the shot. */
@@ -263,7 +263,7 @@ function poolPose(fit: PoolFit): (p: number) => PoseSpec {
  * moving rods, 0.8 s a round; the left blocking), the rods slid in and out; the head over the game.
  */
 type FoosFit = Fit;
-export const FOOS: Size<FoosFit>[] = sizes('foosball', [0.97, 0.83, 0.63], (s) => ({ s, to: 0.47 + 0.33 * s }));
+export const FOOS: Size<FoosFit>[] = sizes('foosball', SHARES_172, (s) => ({ s, to: 0.47 + 0.33 * s }));
 export const FOOS_LANES = [-0.45, 0.075] as const;
 /** Half the spacing of each lane's two handles (m). */
 const FOOS_HANDS = [0.075, 0.15] as const;
@@ -336,7 +336,7 @@ function pongPose(p: number): PoseSpec {
  * right shoulder, and thrown down into the crate overarm; a look in after it. The plate is mimed.
  */
 type SmashFit = Fit;
-export const SMASH: Size<SmashFit>[] = sizes('smashPlate', [0.97, 0.83, 0.63], (s) => ({ s, to: 0.48 + 0.15 * s }));
+export const SMASH: Size<SmashFit>[] = sizes('smashPlate', SHARES_172, (s) => ({ s, to: 0.48 + 0.15 * s }));
 const SMASH_S = 3.4;
 
 function smashPose(fit: SmashFit): (p: number) => PoseSpec {
@@ -392,7 +392,7 @@ function smashPose(fit: SmashFit): (p: number) => PoseSpec {
  * about 0.75 m.
  */
 type BoulderFit = Fit;
-export const BOULDER: Size<BoulderFit>[] = sizes('boulder', [0.97, 0.83, 0.63], (s) => ({ s, to: 0.12 + 0.05 * s, up: 0.22 }));
+export const BOULDER: Size<BoulderFit>[] = sizes('boulder', SHARES_172, (s) => ({ s, to: 0.12 + 0.05 * s, up: 0.22 }));
 const WALL = { lean: (12 * Math.PI) / 180, y: 0.02, z: -0.38 };
 /** The holds: (m to the wall's right of its middle, m up the panel from its foot), as the model has them. */
 const HOLDS: readonly (readonly [number, number])[] = [

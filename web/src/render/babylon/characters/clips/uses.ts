@@ -9,7 +9,7 @@
 import { clip, cycle, reference, type ClipDef, type PoseSpec, type Vec } from './dsl';
 import { breathe, bump, hangArms, stand, TAU } from './idle';
 import { armIK, elbow, footIK, hang, len, lerpV, pointOn, ramp, smooth, sub, wrist } from './ik';
-import { sizes, type Fit, type Size } from './street';
+import { SHARES_177, SHARES_181, sizes, type Fit, type Size } from './street';
 
 /**
  * The telescope (`model.telescope`) as it is used, its tube tilted up its `aim` (35° more, about the axle
@@ -22,7 +22,7 @@ const TUBE: [y: number, z: number] = [0.85, 0.15];
 /** The gaze into the eyepiece: this far (deg) below level. */
 const SCOPE_GAZE = 20;
 /** Sizes from 1.81 m down to 1.12 m, the feet nearer the eyepiece the smaller they are (less bent over it). */
-export const EYEPIECE: Size[] = sizes('eyepiece', [1.02, 0.92, 0.83, 0.73, 0.63], (s) => ({ s, to: 0.54 + 0.41 * (s - 0.63) }));
+export const EYEPIECE: Size[] = sizes('eyepiece', SHARES_181, (s) => ({ s, to: 0.54 + 0.41 * (s - 0.63) }));
 
 /**
  * Bent over by `bend` degrees (the most of it at the hips), the knees giving as it deepens, the hips `back`
@@ -95,11 +95,10 @@ function eyepiecePose(fit: Fit): (p: number) => PoseSpec {
  */
 const FRUIT = { apple: [0.05, 1.84, 0.7], lemon: [-0.1, 1.62, 0.6] } as const;
 
-/** The picker's shares of the reference size (a grown-up, a teen, a child), and the feet's distance from the trunk for each (the shorter nearer, the fruit nearer overhead). */
+/** The pickers (`SHARES_177`: a grown-up, a teen, a child), and the feet's distance from the trunk for each (the shorter nearer, the fruit nearer overhead). */
 type PickFit = Fit & { fruit: readonly [x: number, y: number, z: number] };
-const PICK_SHARES = [1, 0.83, 0.63];
-export const PICK_APPLE: Size<PickFit>[] = sizes('pickApple', PICK_SHARES, (s) => ({ s, to: s > 0.9 ? 1 : s > 0.7 ? 0.78 : 0.78, fruit: FRUIT.apple }));
-export const PICK_LEMON: Size<PickFit>[] = sizes('pickLemon', PICK_SHARES, (s) => ({ s, to: s > 0.9 ? 0.95 : s > 0.7 ? 0.88 : 0.85, fruit: FRUIT.lemon }));
+export const PICK_APPLE: Size<PickFit>[] = sizes('pickApple', SHARES_177, (s) => ({ s, to: s > 0.9 ? 1 : s > 0.7 ? 0.78 : 0.78, fruit: FRUIT.apple }));
+export const PICK_LEMON: Size<PickFit>[] = sizes('pickLemon', SHARES_177, (s) => ({ s, to: s > 0.9 ? 0.95 : s > 0.7 ? 0.88 : 0.85, fruit: FRUIT.lemon }));
 /** The picking clip's length (s), and when (shares of it) the hand reaches the fruit, twists it off and is down with it. */
 const PICK_S = 3.3;
 const PICK_AT = { reach: 0.42, twist: 0.6, down: 0.82 };
@@ -322,7 +321,7 @@ function strumPose(reach: number, up = 0): (p: number) => PoseSpec {
  * 0.12 m ahead (`PLATE_GRIP`, m: across, up from the deck, ahead). A size per height (characters.ts `GRIPPED`).
  */
 const PLATE_GRIP: Vec = [0.26, 0.96, 0.12];
-export const PLATE_HOLD: Size[] = sizes('plateHold', [1, 0.83, 0.63], (s) => ({ s, to: 0 }));
+export const PLATE_HOLD: Size[] = sizes('plateHold', SHARES_177, (s) => ({ s, to: 0 }));
 
 /** Standing on the plate holding both grips, the knees soft, the weight shifting a little while it shakes. */
 function platePose(fit: Fit): (p: number) => PoseSpec {
