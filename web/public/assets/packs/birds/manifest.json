@@ -27,6 +27,9 @@
         "cap": {
           "finish": "material.finish.matte"
         },
+        "edge": {
+          "finish": "material.finish.matte"
+        },
         "eye": {
           "finish": "material.finish.gloss"
         },
@@ -88,6 +91,9 @@
         "cap": {
           "finish": "material.finish.matte"
         },
+        "edge": {
+          "finish": "material.finish.matte"
+        },
         "eye": {
           "finish": "material.finish.gloss"
         },
@@ -100,7 +106,16 @@
         "leg": {
           "finish": "material.finish.satin"
         },
+        "mask": {
+          "finish": "material.finish.matte"
+        },
         "nape": {
+          "finish": "material.finish.matte"
+        },
+        "outer": {
+          "finish": "material.finish.matte"
+        },
+        "rump": {
           "finish": "material.finish.matte"
         },
         "tail": {
@@ -144,6 +159,9 @@
           "finish": "material.finish.matte"
         },
         "cap": {
+          "finish": "material.finish.matte"
+        },
+        "edge": {
           "finish": "material.finish.matte"
         },
         "eye": {
@@ -200,6 +218,9 @@
         "cap": {
           "finish": "material.finish.matte"
         },
+        "edge": {
+          "finish": "material.finish.matte"
+        },
         "eye": {
           "finish": "material.finish.gloss"
         },
@@ -239,6 +260,9 @@
         "back": {
           "finish": "material.finish.matte"
         },
+        "bar": {
+          "finish": "material.finish.matte"
+        },
         "belly": {
           "finish": "material.finish.matte"
         },
@@ -246,6 +270,9 @@
           "finish": "material.finish.satin"
         },
         "breast": {
+          "finish": "material.finish.matte"
+        },
+        "brow": {
           "finish": "material.finish.matte"
         },
         "cap": {
@@ -276,6 +303,9 @@
           "finish": "material.finish.matte"
         },
         "under": {
+          "finish": "material.finish.matte"
+        },
+        "undertail": {
           "finish": "material.finish.matte"
         },
         "wing": {

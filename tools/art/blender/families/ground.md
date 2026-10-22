@@ -40,10 +40,28 @@ group. The keys are unchanged.
 
 | Model | Size (w × h × d) | Triangles | Far | Draws |
 |---|---|---|---|---|
-| grassTuft | 0.12 × 0.29 × 0.14 | 24 | 8 | 1 |
-| flowers | 0.14 × 0.27 × 0.17 | 156 | 58 | 1 |
-| rock | 1.14 × 0.55 × 0.83 | 492 | 56 | 1 |
+| grassTuft | 0.12 × 0.29 × 0.14 | 30 (was 24) | 14 (was 8) | 1 |
+| flowers | 0.14 × 0.27 × 0.17 | 266 (was 156) | 64 (was 58) | 1 |
+| rock | 1.13 × 0.55 × 0.83 | 1,654 (was 492) | 56 (unchanged) | 1 |
 | marker | 0.23 × 0.34 × 0.06 | 1,344 | — | 1 |
+
+**Detail pass (2026-10-22).** Same keys, sizes, centres, finishes and draw calls:
+
+- **Grass tuft**: the four blades stand where they did; three short, narrow straight blades between them (the new
+  growth, `blade(joint=False)`, 2 triangles each) fill its foot. 30 triangles, 15 of them drawn (the old 12): kept
+  small, as the lawn draws it by the ten thousand (more blades measured as GPU time before; not re-measured).
+- **Wildflowers**: each leaf folded along its midrib (`blade(fold=…)`, 12 triangles; flat in the far version); the
+  three heads given their own kinds where they stood: an ox-eye daisy (thirteen narrow white rays round a broad
+  yellow disc), a buttercup (five yellow petals cupped up round an orange eye) and a cranesbill (five broad violet
+  petals, flat, round a pale eye, `eye_pale`); a daisy's bud nodding on a fourth stem, its green sepals cupping the
+  white (left out far off). All still `foliage`, one draw.
+- **Rock**: both boulders on finer spheres (`low(4, 1)`, `low(3, 1)`), pitted finer still (`grain`), five breaks on the
+  big one and two on the small; lichen in pale grey-green patches on the faces turned to the sky, the damp earthy band
+  at the foot (`_weather`; new plain colours `lichen`, `soil`), and two pebbles half sunk at its foot, inside its box,
+  so it is centred where it was. Its far version, the one the woods draw, is the same file as before (56 triangles,
+  no patches: one would take a whole face).
+- **Marker**: unchanged. It is a glyph the game draws unlit with an inverted-hull outline worked out from its normals;
+  more shape would not read, and its file came out byte for byte the same.
 
 The lawn always draws the full tuft and flowers (`lawns` builds them at level 0); their far versions are there for
 anything that draws them far off. `check-glb`: 4 models, 0 failed, no warnings. Khronos validator: 0 errors,

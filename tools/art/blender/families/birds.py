@@ -10,8 +10,9 @@
 #            and hides them (scale 0) while the bird is perched. At rest they are spread, at scale 1.
 #
 # No clips: the game moves the parts. A bird is a handful of pixels from the game's camera (6-95 m away, mostly
-# 15-30), so each is a few hundred triangles, lofted rings coloured by plumage zone, every material plain
-# (matte feathers, satin bill and legs, a gloss eye): one draw call for the lot.
+# 15-30), and up to 40 fly about at once, so each is a few hundred triangles (at most half its size's target:
+# 750 for the songbirds, more rings round for the blackbird and the dove): lofted rings coloured by plumage zone,
+# every material plain (matte feathers, satin bill and legs, a gloss eye): one draw call for the lot.
 #
 # Run:  cargo art birds [--only blueTit] [--preview]
 #       (--preview also renders each from the side, the front and above, and at 6 and 20 m beside a resident
@@ -32,22 +33,26 @@ import gamekit as G  # noqa: E402
 # matte, the bill and legs satin, the eye gloss: all plain, so a bird is one draw call.
 BASE = dict(
     back=('#8A9A5A', 'matte'),      # the mantle and the back of the body
+    rump=('#8A9A5A', 'matte'),      # the lower back over the tail (a chaffinch's olive-green)
     cap=('#3F7FC8', 'matte'),       # the crown
     brow=('#F2F2EE', 'matte'),      # over the eye (a tit's white band, a warbler's pale eyebrow)
-    mask=('#1E2430', 'matte'),      # the stripe through the eye
+    mask=('#1E2430', 'matte'),      # the stripe through the eye (a chaffinch's black forehead)
     face=('#F4F4F0', 'matte'),      # the cheek
     throat=('#1E2430', 'matte'),    # chin and throat
-    nape=('#3F6FB0', 'matte'),      # the back of the head
+    nape=('#3F6FB0', 'matte'),      # the back of the head and neck (a tit's dark blue collar)
     collar=('#1A1A1A', 'matte'),    # a dove's black half-collar
     breast=('#F2D23A', 'matte'),
     belly=('#E8D050', 'matte'),
     wing=('#4A82C8', 'matte'),      # the coverts, folded and spread
     bar=('#F2F2EE', 'matte'),       # wing bars and the chaffinch's shoulder patch
     flight=('#4F6E9A', 'matte'),    # the flight feathers
+    edge=('#4F6E9A', 'matte'),      # the flight feathers' pale edges, folded (a chaffinch's yellowish panel)
     tip=('#3E5578', 'matte'),       # the primaries' ends (a dove's dark wingtips)
     under=('#C8CCC8', 'matte'),     # under the spread wing
     tail=('#3F6FB0', 'matte'),
+    outer=('#3F6FB0', 'matte'),     # the outer tail feathers (a chaffinch's white)
     tailtip=('#EEEAE4', 'matte'),   # a dove's pale tail end
+    undertail=('#3F6FB0', 'matte'), # under the tail (a dove's black base)
     bill=('#2A2A2A', 'satin'),
     eye=('#121212', 'gloss'),
     ring=('#F2B828', 'satin'),      # a blackbird's eye ring
@@ -57,8 +62,16 @@ M = G.Palette(**BASE)
 
 
 def palette(**colours):
-    """The family's palette in one species' colours (the finishes stay the family's)."""
+    """The family's palette in one species' colours (the finishes stay the family's). A zone a species doesn't
+    colour takes the colour of the zone it stands for (`SAME`), so it never shows the family's placeholder."""
+    for zone, like in SAME.items():
+        if zone not in colours and like in colours:
+            colours[zone] = colours[like]
     return G.Palette(**{**BASE, **{k: (v, BASE[k][1]) for k, v in colours.items()}})
+
+
+# The zones added later, and the zone each stands for where a species doesn't colour it.
+SAME = dict(rump='back', edge='flight', outer='tail', undertail='tail')
 
 
 # ---- the build: a bird of `S` (a species' numbers, metres and degrees) ----------------------------------
@@ -130,13 +143,30 @@ def octahedron(name, at, r, material, squash=1.0):
     return _mesh(name, v, faces)
 
 
-# Where a body's ring points are, round from the top (degrees; 90 = the bird's left): faces centred at 0, 45 ... 315.
-BODY_RING = [22.5 + 45 * j for j in range(8)]
-# A head's: a top (the crown), an upper side, a narrow band through the eye, the cheek and the throat.
-HEAD_RING = [35, 62, 100, 150, 210, 260, 298, 325]
-# The body's stations from rump (0) to neck (1) and how full it is at each.
+# The body's stations from rump (0) to neck (1) and how full it is at each: `BODY_T`/`BODY_K` place the joints (the
+# shoulder, the tail's base), as they always have; the surface is drawn through them smoothly, at `STATIONS`.
 BODY_T = [0.0, 0.08, 0.2, 0.38, 0.58, 0.76, 0.9, 1.0]
 BODY_K = [0.32, 0.64, 0.87, 1.0, 1.0, 0.9, 0.7, 0.52]
+STATIONS = [0.0, 0.05, 0.14, 0.28, 0.46, 0.64, 0.79, 0.9, 1.0]
+
+
+def body_ring(n):
+    """A body's ring of `n` points round from the top (degrees; 90 = the bird's left), a face centred on the top and
+    on the underside (face centres at 0, 360/n ...)."""
+    return [180 / n * (2 * j + 1) for j in range(n)]
+
+
+# A head's ring: a face on the crown, then the upper side, the band over the eye, the band through it, the cheek and
+# the throat (each side mirrored), by its number of points.
+HEAD_RINGS = {
+    10: [20, 45, 70, 98, 135],
+    12: [14, 34, 54, 72, 98, 128],
+}
+
+
+def head_ring(n):
+    half = HEAD_RINGS[n]
+    return half + [360 - d for d in reversed(half)]
 
 
 def _mid(a, b):
@@ -157,16 +187,18 @@ class Bird:
         self.a = Vector((0, math.cos(p), math.sin(p)))         # (x, f, u): the body's axis, rump to breast
         self.n = Vector((0, -math.sin(p), math.cos(p)))        # square to it, up
         self.c = Vector((0, S['bodyAt'], perch_height(S)))                 # the body's middle over the feet
+        self.rings = S.get('rings', (10, 10, 5))               # points round the body, the head, a spread wing
 
     # (x, f, u) -> Blender
     @staticmethod
     def b(v):
         return P(v.x, v.y, v.z)
 
-    def body_point(self, t, deg, out=0.0):
-        """A point on the body's surface at `t` (rump 0 .. neck 1) and `deg` round from the top, `out` metres off it."""
+    def body_point(self, t, deg, out=0.0, smooth=False):
+        """A point on the body's surface at `t` (rump 0 .. neck 1) and `deg` round from the top, `out` metres off it;
+        `smooth`: its fullness eased between the stations (the surface), not straight (the joints, as they were)."""
         S = self.S
-        k = _interp(BODY_T, BODY_K, t)
+        k = (_ease if smooth else _interp)(BODY_T, BODY_K, t)
         th = math.radians(deg)
         centre = self.c + self.a * (S['body'] * (t - 0.5))
         hw, hh = S['width'] / 2 * k, S['depth'] / 2 * k
@@ -175,34 +207,46 @@ class Bird:
         return centre + sag + self.n * (hh * math.cos(th)) + Vector((hw * math.sin(th), 0, 0)) + normal * out
 
     def torso(self):
+        """The torso: rings eased from the rump round to the neck, every face the zone it is in (`zones.body`)."""
         S, Z = self.S, self.S['zones']
-        rings = [[self.b(self.body_point(t, d)) for d in BODY_RING] for t in BODY_T]
+        ts = S.get('stations', STATIONS)
+        ring = body_ring(self.rings[0])
+        n = len(ring)
+        rings = [[self.b(self.body_point(t, d, smooth=True)) for d in ring] for t in ts]
 
         def zone(i, j):
-            t = (BODY_T[max(0, min(i, 6))] + BODY_T[max(0, min(i + 1, 7))]) / 2
-            deg = _side(_mid(BODY_RING[j], BODY_RING[(j + 1) % 8]))
+            t = (ts[max(0, min(i, len(ts) - 1))] + ts[max(0, min(i + 1, len(ts) - 1))]) / 2
+            deg = _side(_mid(ring[j], ring[(j + 1) % n]))
             return getattr(self.M, Z['body'](t, deg))
         rump = self.b(self.c + self.a * (-S['body'] * 0.52))
         return loft('torso', rings, zone, start=rump)
 
     def folded_wing(self, side):
-        """A wing folded on the body's upper side, from the shoulder back over the rump to its tip over the tail."""
+        """A wing folded on the body's upper side, from the shoulder back over the rump to its tip over the tail: a
+        lens of five points round (its lower edge, two on its outer face, its upper edge, one against the body),
+        coloured band by band from the shoulder (`zones.folded`: the outer face's colour and its lower edge's)."""
         S, Z = self.S, self.S['zones']
-        st = [(0.76, 60, 0.14), (0.62, 63, 0.27), (0.5, 62, 0.29), (0.4, 58, 0.27), (0.16, 44, 0.17)]
+        st = [(0.78, 60, 0.12), (0.68, 63, 0.25), (0.58, 62, 0.29), (0.5, 61, 0.29), (0.38, 57, 0.27), (0.18, 45, 0.18)]
         rings = []
         for t, deg, w in st:
             centre = self.body_point(t, deg, S['depth'] * 0.03)
             outward = (self.body_point(t, deg, 1.0) - self.body_point(t, deg)).normalized()
             along = (self.body_point(t, deg + 8) - self.body_point(t, deg - 8)).normalized()
             half, thick = S['depth'] * w, S['depth'] * 0.06
-            ring = [centre - along * half, centre + outward * thick, centre + along * half, centre - outward * thick * 0.5]
+            ring = [centre - along * half, centre - along * half * 0.45 + outward * thick, centre + along * half * 0.4 + outward * thick,
+                    centre + along * half, centre - outward * thick * 0.5]
             rings.append([self.b(Vector((v.x * side, v.y, v.z))) for v in ring])
         tip = self.tail_base + self.tail_dir * (S['tailLen'] * S['tipOver']) + self.tail_up * S['width'] * 0.09
         tip = self.b(Vector((side * S['width'] * 0.1, tip.y, tip.z)))
-        bands = Z['folded']                                        # a zone for each length: shoulder .. tip
-        return loft(f'folded{side}', rings, lambda i, j: getattr(self.M, bands[max(0, i)]), end=tip)
+        bands = Z['folded']                                        # (outer face, lower edge) per band: shoulder .. tip
+
+        def zone(i, j):
+            main, edge = bands[max(0, min(i, len(bands) - 1))]
+            return getattr(self.M, edge if j == 0 else main)
+        return loft(f'folded{side}', rings, zone, end=tip)
 
     def legs(self):
+        """Each leg: a three-sided shank down to the foot, three toes spread forward and one back (to grip)."""
         S = self.S
         parts = []
         for side in (-1, 1):
@@ -210,10 +254,14 @@ class Bird:
             r = S['legR']
             top = self.b(Vector((x, 0.0, S['leg'] + S['depth'] * 0.25)))
             foot = self.b(Vector((x, 0.0, r)))
-            parts.append(_tube(f'leg{side}', [top, foot], r, r, self.M.leg))
+            parts.append(_tube(f'leg{side}', [top, foot], r, r * 0.9, self.M.leg))
             toe = S['toe']
-            parts.append(_tube(f'toes{side}', [self.b(Vector((x, -toe * 0.45, r))), self.b(Vector((x, toe, r)))], r, r * 0.7,
-                               self.M.leg))
+            heel = Vector((x, 0.0, r))
+            for k, (yaw, reach) in enumerate(((-24, 0.85), (0, 1.0), (24, 0.85), (180, 0.6))):
+                a = math.radians(yaw * side)
+                d = Vector((math.sin(a), math.cos(a), 0))
+                parts.append(_toe(f'toe{side}{k}', self.b(heel), self.b(heel + d * toe * reach - Vector((0, 0, r * 0.4))), r * 0.85,
+                                   self.M.leg))
         return parts
 
     def head(self):
@@ -224,29 +272,40 @@ class Bird:
         up = math.radians(S['neckUp'])
         hc = neck + Vector((0, math.cos(up), math.sin(up))) * R * S['neck']
         self.head_centre = hc
-        ss = [-0.72, -0.25, 0.25, 0.68]
+        ss = [-0.78, -0.42, -0.02, 0.38, 0.7]
+        ring = head_ring(self.rings[1])
+        n = len(ring)
 
         def at(s, deg, out=0.0):
             q = math.sqrt(max(0.04, 1 - s * s))
             th = math.radians(deg)
-            hw, hh = R * 0.9 * q, R * q
+            # (a little flatter than round, over and under: the crown as high as the old eight-sided head's)
+            hw, hh = R * 0.9 * q, R * q * 0.86
             return hc + Vector((hw * math.sin(th) * (1 + out), s * R, hh * math.cos(th) * (1 + out)))
-        rings = [[self.b(at(s, d)) for d in HEAD_RING] for s in ss]
+        rings = [[self.b(at(s, d)) for d in ring] for s in ss]
         back = self.b(hc + Vector((0, -R, 0.05 * R)))
         front = self.b(hc + Vector((0, R * 0.96, -0.1 * R)))
-        zs = [(-1.0 + ss[0]) / 2] + [(ss[i] + ss[i + 1]) / 2 for i in range(3)] + [(ss[-1] + 1) / 2]
+        zs = [(-1.0 + ss[0]) / 2] + [(ss[i] + ss[i + 1]) / 2 for i in range(len(ss) - 1)] + [(ss[-1] + 1) / 2]
 
         def zone(i, j):
-            deg = _side(_mid(HEAD_RING[j], HEAD_RING[(j + 1) % 8]))
+            deg = _side(_mid(ring[j], ring[(j + 1) % n]))
             return getattr(self.M, Z['head'](zs[i + 1], deg))
         parts = [loft('skull', rings, zone, start=back, end=front)]
-        # The bill: a four-sided point from the face, tipped down a little.
+        # The bill: from the face to its point, tipped down a little, its ridge (the culmen) curving down to the tip.
         base = hc + Vector((0, R * 0.78, -R * S['billLow']))
         drop = math.radians(S['billDroop'])
-        tipv = base + Vector((0, math.cos(drop), -math.sin(drop))) * (S['bill'] + R * 0.2)
+        fwd = Vector((0, math.cos(drop), -math.sin(drop)))
+        dn = Vector((0, math.sin(drop), math.cos(drop)))
+        tipv = base + fwd * (S['bill'] + R * 0.2)
         bw, bh = S['billW'] / 2, S['billH'] / 2
-        ring = [base + Vector((bw, 0, 0)), base + Vector((0, 0, bh)), base + Vector((-bw, 0, 0)), base + Vector((0, 0, -bh))]
-        parts.append(loft('bill', [[self.b(v) for v in ring]], lambda i, j: self.M.bill, end=self.b(tipv)))
+        mid = base + fwd * ((S['bill'] + R * 0.2) * 0.45) + dn * bh * 0.08
+
+        def bill_ring(c, f):
+            return [c + Vector((bw * f, 0, -bh * 0.15 * f)), c + dn * (bh * f) + Vector((bw * 0.55 * f, 0, 0)),
+                    c + dn * (bh * 1.08 * f), c + dn * (bh * f) - Vector((bw * 0.55 * f, 0, 0)),
+                    c - Vector((bw * f, 0, bh * 0.15 * f)), c - dn * (bh * 0.85 * f)]
+        parts.append(loft('bill', [[self.b(v) for v in bill_ring(base, 1.0)], [self.b(v) for v in bill_ring(mid, 0.58)]],
+                          lambda i, j: self.M.bill, end=self.b(tipv)))
         self.bill_tip = tipv
         # The eyes, on the band through them (a blackbird's in a yellow ring).
         for side in (-1, 1):
@@ -260,41 +319,61 @@ class Bird:
         return parts, self.b(neck)
 
     def tail(self):
-        """The tail from under the rump, back and down; returns it and its base (Blender)."""
+        """The tail from under the rump, back and down; returns it and its base (Blender). A flat fan of six points
+        round (its outer feathers' edges, the top and the underside), its end cut square and notched, or rounded."""
         S, Z = self.S, self.S['zones']
         d, up = self.tail_dir, self.tail_up
         base = self.tail_base
         T = S['tailLen']
         W = S['width']
         # Narrow and deep at the base (the coverts over and under it), spreading and thinning to its end: `tail`
-        # [(along it, half its width, its thickness), in body widths].
+        # [(along it, half its width, its thickness), in body widths]; `tailEnd` how much shorter its middle (a
+        # notch) or its outer feathers (a rounded end) are, in tail lengths.
+        notch = S.get('tailEnd', 0.0)
         rings = []
-        for f, w, th in S['tail']:
-            c = base + d * (T * f)
-            rings.append([self.b(c + Vector((W * w, 0, 0))), self.b(c + up * W * th), self.b(c - Vector((W * w, 0, 0))),
-                          self.b(c - up * W * th * 0.6)])
-        bands = Z.get('tail', TAIL)
-        return loft('tail', rings, lambda i, j: getattr(self.M, bands[max(0, min(i, 2))])), self.b(base)
+        last = len(S['tail']) - 1
+        for i, (f, w, th) in enumerate(S['tail']):
+            fo = fm = f
+            if i == last:
+                fo, fm = (f, f - notch) if notch > 0 else (f + notch, f)
+            co, cm = base + d * (T * fo), base + d * (T * fm)
+            x = Vector((W * w, 0, 0))
+            rings.append([self.b(co + x), self.b(cm + x * 0.62 + up * W * th), self.b(cm - x * 0.62 + up * W * th),
+                          self.b(co - x), self.b(cm - x * 0.62 - up * W * th * 0.6), self.b(cm + x * 0.62 - up * W * th * 0.6)])
+        tz = Z.get('tail', lambda k, part: 'tail')
+
+        def zone(i, j):
+            k = (S['tail'][max(0, min(i, last))][0] + S['tail'][max(0, min(i + 1, last))][0]) / 2
+            return getattr(self.M, tz(k, 'top' if j == 1 else 'under' if j == 4 else 'outer'))
+        return loft('tail', rings, zone), self.b(base)
 
     def wing(self, side):
-        """A wing spread for flight, level, from the shoulder out to `side` (1: the bird's left, Blender +x)."""
+        """A wing spread for flight, level, from the shoulder out to `side` (1: the bird's left, Blender +x): an
+        aerofoil lofted out through the `planform`, its trailing edge scalloped by the feathers' ends, its top in
+        bands front to back (the coverts, the greater coverts' tips where a wing bar is, the flight feathers)."""
         S, Z = self.S, self.S['zones']
         sh = self.shoulder
         span = S['wingspan'] / 2 - abs(sh.x)
         C = S['chord']
+        under = self.rings[2] - 4                                    # points under it: 1 or 2
+        rows = S['planform']
         rings = []
-        for u, lead, trail in S['planform']:
+        for u, lead, trail in rows:
             x = abs(sh.x) + span * u
             th = C * (0.11 * (1 - u) + 0.022)
             l, t_ = lead * C, trail * C
-            pts = [(l, 0.0), (l + (t_ - l) / 3, th * 0.7), (l + 2 * (t_ - l) / 3, th * 0.45), (t_, 0.0),
-                   (l + 2 * (t_ - l) / 3, -th * 0.2), (l + (t_ - l) / 3, -th * 0.3)]
+
+            def cut(f):
+                return l + (t_ - l) * f
+            pts = [(l, 0.0), (cut(0.3), th * 0.72), (cut(0.44), th * 0.6), (t_, 0.0)]
+            pts += [(cut(0.6), -th * 0.22)] if under == 1 else [(cut(0.66), -th * 0.18), (cut(0.3), -th * 0.3)]
             rings.append([self.b(Vector((side * x, sh.y + f, sh.z + z))) for f, z in pts])
-        bands = Z['wing']                                          # (top front, top middle, top back) per segment
+        wz = Z['wing']
+        parts = ('lead', 'bar', 'flight') + ('under',) * (under + 1)
 
         def zone(i, j):
-            i = max(0, min(i, len(bands) - 1))
-            return getattr(self.M, bands[i][j] if j < 3 else ('tip' if bands[i][2] == 'tip' else 'under'))
+            i = max(0, min(i, len(rows) - 2))
+            return getattr(self.M, wz((rows[i][0] + rows[i + 1][0]) / 2, parts[j]))
         return loft(f'wing{side}', rings, zone)
 
     def build(self):
@@ -338,6 +417,31 @@ def _interp(xs, ys, x):
     return ys[-1]
 
 
+def _ease(xs, ys, x):
+    """`ys` through `xs` on a smooth curve that never overshoots them (monotone cubic Hermite): a body's fullness
+    without the kinks a straight line between its stations makes."""
+    if x <= xs[0]:
+        return ys[0]
+    if x >= xs[-1]:
+        return ys[-1]
+    i = max(k for k in range(len(xs) - 1) if xs[k] <= x)
+
+    def secant(k):
+        return (ys[k + 1] - ys[k]) / (xs[k + 1] - xs[k])
+
+    def slope(k):
+        # (flat at a station that is a peak or a trough, so the curve never bulges past its stations)
+        if k == 0 or k == len(xs) - 1:
+            return secant(min(k, len(xs) - 2))
+        a, b = secant(k - 1), secant(k)
+        return 0.0 if a * b <= 0 else 2 * a * b / (a + b)
+    h = xs[i + 1] - xs[i]
+    f = (x - xs[i]) / h
+    m0, m1 = slope(i) * h, slope(i + 1) * h
+    return (ys[i] * (2 * f ** 3 - 3 * f ** 2 + 1) + m0 * (f ** 3 - 2 * f ** 2 + f) + ys[i + 1] * (-2 * f ** 3 + 3 * f ** 2)
+            + m1 * (f ** 3 - f ** 2))
+
+
 def _reach(a, base, d, length):
     """How far from `base` along `d` (unit) is `length` from `a`."""
     w = base - a
@@ -347,7 +451,7 @@ def _reach(a, base, d, length):
 
 
 def _tube(name, points, r0, r1, material):
-    """A three-sided rod (a leg, a toe)."""
+    """A three-sided rod (a leg)."""
     pts = [Vector(p) for p in points]
     t = (pts[-1] - pts[0]).normalized()
     a = t.orthogonal().normalized()
@@ -359,6 +463,15 @@ def _tube(name, points, r0, r1, material):
     return loft(name, rings, lambda i, j: material)
 
 
+def _toe(name, root, tip, r, material):
+    """A toe: three sides from `root` to a point at `tip`, lying on the perch (flat underneath)."""
+    root, tip = Vector(root), Vector(tip)
+    t = (tip - root).normalized()
+    side = t.cross(Vector((0, 0, 1))).normalized()
+    ring = [root + side * r, root + Vector((0, 0, r * 0.9)), root - side * r]
+    return loft(name, [[p + Vector((0, 0, -r * 0.5)) for p in ring]], lambda i, j: material, end=tip)
+
+
 # ---- the species ------------------------------------------------------------------------------------------
 # length bill to tail tip and wingspan (m) are the field guides'; the rest shapes it: `body` the torso's length,
 # `width`/`depth` across it, `bodyAt` how far the body's middle stands ahead of the feet, `leg` the leg showing,
@@ -366,129 +479,149 @@ def _tube(name, points, r0, r1, material):
 # neck (head radii) at `neckUp` degrees, `bill`, `billW`, `billH`, `billDroop`, `billLow`, `eye` (head radii),
 # `eyeAt` how far forward the eye is (-1 .. 1 along the head), `tailDown` (degrees below level), `tipOver` how far
 # down the tail the folded wingtips reach, `chord` the spread wing's depth at the body, `planform` its outline
-# [(along the span 0 .. 1, leading edge, trailing edge: chords forward of the shoulder)], `tail` its shape (SQUARE ...),
-# `legR` and `toe` the legs' thickness and the toes' length, `ring` an eye ring, and `zones`: which material each face
-# of the body (by `t` rump 0 .. neck 1 and degrees round from the top), the head (by `s` back -1 .. front 1 and
-# degrees), the folded wing (shoulder .. tip), the tail (base .. end; default `TAIL`, all `tail`) and the spread wing
-# (top front, middle, back for each length out from the body) takes.
-TAIL = ['tail', 'tail', 'tail']
+# [(along the span 0 .. 1, leading edge, trailing edge: chords forward of the shoulder)], `tail` its shape (SQUARE ...)
+# and `tailEnd` its end (a notch; negative: rounded), `legR` and `toe` the legs' thickness and the toes' length,
+# `ring` an eye ring, `rings` the points round the body, the head and a spread wing (10, 10, 5; the bigger birds
+# 12, 12, 6), `stations` the body's (STATIONS), and `zones`: which material each face of the body (by `t` rump 0 ..
+# neck 1 and degrees round from the top), the head (by `s` back -1 .. front 1 and degrees), the folded wing (outer
+# face and lower edge, for each band from the shoulder to the tip), the tail (by how far along and 'top', 'outer' or
+# 'under') and the spread wing (by how far out, 0 .. 1, and 'lead' (the coverts), 'bar', 'flight' or 'under') takes.
+# Face centres round from the top: the body's 0, 36, 72, 108, 144, 180 (12 round: 0, 30 ... 180); the head's 0, 32,
+# 57, 84, 116, 180 (12 round: 0, 24, 44, 63, 85, 113, 180).
 
-# Tails: a tit's and a finch's square-ended, a warbler's short, a blackbird's long and round-ended, a dove's long and broad.
-SQUARE = [(0.0, 0.16, 0.22), (0.45, 0.27, 0.11), (0.8, 0.33, 0.06), (1.0, 0.33, 0.04)]
-LONG = [(0.0, 0.15, 0.22), (0.4, 0.22, 0.1), (0.82, 0.26, 0.05), (1.0, 0.2, 0.035)]
-BROAD = [(0.0, 0.17, 0.2), (0.4, 0.27, 0.08), (0.8, 0.34, 0.045), (1.0, 0.3, 0.03)]
+# Tails: a tit's and a finch's square-ended and notched, a warbler's short, a blackbird's long and round-ended, a
+# dove's long and broad, rounded.
+SQUARE = [(0.0, 0.16, 0.22), (0.45, 0.27, 0.11), (0.8, 0.33, 0.06), (1.0, 0.34, 0.04)]
+LONG = [(0.0, 0.15, 0.22), (0.4, 0.22, 0.1), (0.82, 0.26, 0.05), (1.0, 0.23, 0.035)]
+BROAD = [(0.0, 0.17, 0.2), (0.4, 0.27, 0.08), (0.8, 0.34, 0.045), (1.0, 0.33, 0.03)]
 
-ROUNDED = [(0.0, 0.2, -0.84), (0.2, 0.27, -0.9), (0.42, 0.27, -0.9), (0.64, 0.18, -0.8), (0.84, 0.04, -0.66),
-           (1.0, -0.16, -0.46)]
-POINTED = [(0.0, 0.2, -0.85), (0.2, 0.27, -0.86), (0.42, 0.27, -0.78), (0.64, 0.12, -0.62), (0.84, -0.12, -0.52),
-           (1.0, -0.42, -0.5)]
+# Spread wings: (along the span, leading edge, trailing edge) in chords forward of the shoulder. The trailing edge
+# steps in and out, a feather's end and the notch to the next: the secondaries along the arm, then the primaries
+# fanning from the wrist (where the leading edge is furthest forward) to the tip. A songbird's is round-ended, a
+# dove's long and pointed.
+ROUNDED = [(0.0, 0.2, -0.84), (0.13, 0.25, -0.93), (0.25, 0.27, -0.85), (0.37, 0.28, -0.94), (0.47, 0.27, -0.86),
+           (0.58, 0.19, -0.9), (0.68, 0.11, -0.74), (0.78, 0.03, -0.78), (0.87, -0.05, -0.6), (0.94, -0.12, -0.6),
+           (1.0, -0.22, -0.42)]
+POINTED = [(0.0, 0.2, -0.85), (0.13, 0.25, -0.92), (0.25, 0.27, -0.84), (0.37, 0.27, -0.88), (0.47, 0.24, -0.78),
+           (0.58, 0.15, -0.76), (0.68, 0.06, -0.62), (0.78, -0.04, -0.6), (0.87, -0.16, -0.5), (0.94, -0.28, -0.52),
+           (1.0, -0.44, -0.5)]
 
 
 def tit_body(t, deg):
-    if deg < 30:
-        return 'back' if t < 0.86 else 'nape'
-    if deg < 70:
-        return 'back' if t < 0.86 else 'face'
-    if deg < 110:
-        return 'breast' if t > 0.35 else 'back'
-    return 'breast' if t > 0.3 else 'belly'
+    if t > 0.86 and deg < 130:                            # the neck: the dark blue collar round to the black bib
+        return 'nape'
+    if deg < 50:
+        return 'back'
+    if deg < 100:
+        return 'breast' if t > 0.32 else 'back'
+    if deg > 160 and 0.46 < t < 0.72:
+        return 'mask'                                     # the dark line down the belly
+    return 'breast' if t > 0.28 else 'belly'
 
 
 def tit_head(s, deg):
-    if deg < 60 and s > 0.6:
+    if deg < 70 and s > 0.55:
         return 'brow'                                     # the white forehead
-    if deg < 25:
-        return 'cap' if s > -0.75 else 'nape'
-    if deg < 60:
-        return 'brow' if s > -0.1 else ('cap' if s > -0.75 else 'nape')
+    if deg < 45:
+        return 'cap' if s > -0.6 else 'brow'              # the blue crown, ringed white behind
+    if deg < 70:
+        return 'brow' if s > -0.6 else 'nape'             # the white band over the eye, to the nape
     if deg < 100:
-        return 'mask'
+        return 'mask'                                     # the black stripe from the bill through the eye to the nape
     if deg < 150:
-        return 'face' if s > -0.6 else 'mask'
-    return 'throat' if s > -0.2 else 'breast'
+        return 'face' if s > -0.5 else 'nape'             # the white cheek, the dark blue collar behind it
+    return 'throat'                                       # the black bib
 
 
 BLUE_TIT = dict(
     name='blue tit', length=0.12, wingspan=0.185, body=0.058, width=0.036, depth=0.04, bodyAt=0.004, leg=0.011,
     pitch=34, head=0.0145, neck=0.55, neckUp=60, bill=0.0045, billW=0.0045, billH=0.0042, billDroop=4, billLow=0.1,
     eye=0.2, eyeAt=0.3, legR=0.0012, toe=0.009, tailDown=28, tipOver=0.32, chord=0.042, planform=ROUNDED, tail=SQUARE,
-    zones=dict(body=tit_body, head=tit_head, folded=['wing', 'wing', 'bar', 'flight', 'flight'],
-               wing=[('wing', 'bar', 'flight'), ('wing', 'bar', 'flight'), ('wing', 'flight', 'flight'),
-                     ('flight', 'flight', 'flight'), ('flight', 'flight', 'flight')]),
+    tailEnd=0.04,
+    zones=dict(body=tit_body, head=tit_head,
+               folded=[('wing', 'wing'), ('wing', 'wing'), ('bar', 'bar'), ('flight', 'edge'), ('flight', 'edge'), ('flight', 'flight')],
+               wing=lambda u, part: {'lead': 'wing' if u < 0.6 else 'flight', 'bar': 'bar' if u < 0.52 else 'flight',
+                                     'flight': 'flight', 'under': 'under'}[part]),
 )
-BLUE_TIT_COLOURS = dict(back='#93A35C', cap='#3D7ED0', brow='#F4F4F0', mask='#1C2438', face='#F6F6F2', throat='#1C2438',
-                        nape='#2C4A86', breast='#F4D234', belly='#E9D24E', wing='#4683CC', bar='#F2F2EC', flight='#4E6C98',
-                        tip='#3E5578', under='#CED2CE', tail='#3D70B4', bill='#2A2A2C', eye='#101010', leg='#6A7A92')
+BLUE_TIT_COLOURS = dict(back='#93A35C', rump='#8FA864', cap='#3D7ED0', brow='#F4F4F0', mask='#1C2438', face='#F6F6F2',
+                        throat='#1C2438', nape='#24427E', breast='#F4D234', belly='#E9DC7E', wing='#4683CC', bar='#F2F2EC',
+                        flight='#4E6C98', edge='#6E8EBC', tip='#3E5578', under='#CED2CE', tail='#3D70B4', bill='#2A2A2C',
+                        eye='#101010', leg='#6A7A92')
 
 
 def finch_body(t, deg):
-    if deg < 30:
-        return 'back' if t < 0.86 else 'nape'
-    if deg < 70:
-        return 'back' if t < 0.86 else 'face'
-    if deg < 110:
+    if deg < 50:
+        if t > 0.86:
+            return 'nape'                                 # the blue-grey nape
+        return 'back' if t > 0.22 else 'rump'             # the chestnut mantle, the olive-green rump
+    if deg < 100:
         return 'breast' if t > 0.32 else 'belly'
     return 'breast' if t > 0.45 else 'belly'
 
 
 def finch_head(s, deg):
-    if deg < 60:
-        return 'cap'
+    if deg < 50 and s > 0.55:
+        return 'mask'                                     # the black forehead over the bill
+    if deg < 70:
+        return 'cap'                                      # the blue-grey crown and nape
     if deg < 100:
-        return 'face' if s > -0.5 else 'cap'
-    if deg < 150:
-        return 'face'
-    return 'throat'
+        return 'face' if s > -0.4 else 'cap'
+    return 'face' if deg < 150 else 'throat'              # the rusty-pink cheek and throat
 
 
 CHAFFINCH = dict(
     name='chaffinch', length=0.145, wingspan=0.26, body=0.064, width=0.04, depth=0.042, bodyAt=0.004, leg=0.013,
     pitch=27, head=0.0158, neck=0.55, neckUp=55, bill=0.0085, billW=0.0068, billH=0.0068, billDroop=6, billLow=0.12,
     eye=0.19, eyeAt=0.28, legR=0.0013, toe=0.011, tailDown=22, tipOver=0.3, chord=0.054, planform=ROUNDED, tail=SQUARE,
-    zones=dict(body=finch_body, head=finch_head, folded=['bar', 'wing', 'bar', 'flight', 'flight'],
-               wing=[('bar', 'bar', 'flight'), ('wing', 'bar', 'flight'), ('wing', 'bar', 'flight'),
-                     ('flight', 'flight', 'flight'), ('flight', 'flight', 'flight')]),
+    tailEnd=0.05,
+    zones=dict(body=finch_body, head=finch_head,
+               # the white shoulder, the black coverts, the white bar, the black flight feathers' yellowish edges
+               folded=[('bar', 'bar'), ('wing', 'wing'), ('bar', 'bar'), ('flight', 'edge'), ('flight', 'edge'), ('flight', 'flight')],
+               tail=lambda k, part: 'outer' if part == 'outer' and k > 0.45 else 'tail',
+               wing=lambda u, part: {'lead': 'bar' if u < 0.3 else 'wing', 'bar': 'bar' if 0.13 < u < 0.58 else 'wing',
+                                     'flight': 'edge' if 0.58 < u < 0.72 else 'flight', 'under': 'under'}[part]),
 )
-CHAFFINCH_COLOURS = dict(back='#8C6448', cap='#6C88B0', nape='#6C88B0', face='#C98476', throat='#CB8676', breast='#CC8274',
-                         belly='#EEDCD2', wing='#33302E', bar='#F2F0EA', flight='#3C3632', under='#DAD4CC', tail='#3A3634',
-                         bill='#8C9CAC', eye='#101010', leg='#8C7262')
+CHAFFINCH_COLOURS = dict(back='#8C6448', rump='#7E8A50', cap='#6C88B0', nape='#6C88B0', mask='#1E1E20', face='#C98476',
+                         throat='#CB8676', breast='#CC8274', belly='#EEDCD2', wing='#33302E', bar='#F2F0EA', flight='#3C3632',
+                         edge='#C8C49A', under='#DAD4CC', tail='#3A3634', outer='#E8E6E0', bill='#8C9CAC', eye='#101010',
+                         leg='#8C7262')
 
 
 def warbler_body(t, deg):
-    if deg < 70:
+    if deg < 50:
         return 'back'
-    if deg < 110:
+    if deg < 100:
         return 'breast' if t > 0.4 else 'back'
     return 'breast' if t > 0.5 else 'belly'
 
 
 def warbler_head(s, deg):
-    if deg < 25:
+    if deg < 45:
         return 'cap'
-    if deg < 60:
-        return 'brow' if s > -0.3 else 'cap'
+    if deg < 70:
+        return 'brow' if s > -0.4 else 'cap'              # the pale yellow eyebrow
     if deg < 100:
-        return 'mask' if s > -0.5 else 'cap'
-    if deg < 150:
-        return 'face'
-    return 'throat'
+        return 'mask' if s > -0.55 else 'cap'             # the dusky line through the eye
+    return 'face' if deg < 150 else 'throat'
 
 
 WARBLER = dict(
     name='willow warbler', length=0.11, wingspan=0.19, body=0.05, width=0.03, depth=0.032, bodyAt=0.004, leg=0.013,
     pitch=26, head=0.0124, neck=0.55, neckUp=50, bill=0.0068, billW=0.003, billH=0.0028, billDroop=3, billLow=0.1,
     eye=0.2, eyeAt=0.3, legR=0.0011, toe=0.009, tailDown=18, tipOver=0.3, chord=0.04, planform=ROUNDED, tail=SQUARE,
-    zones=dict(body=warbler_body, head=warbler_head, folded=['wing', 'wing', 'wing', 'flight', 'flight'],
-               wing=[('wing', 'flight', 'flight'), ('wing', 'flight', 'flight'), ('wing', 'flight', 'flight'),
-                     ('flight', 'flight', 'flight'), ('flight', 'flight', 'flight')]),
+    tailEnd=0.03,
+    zones=dict(body=warbler_body, head=warbler_head,
+               folded=[('wing', 'wing'), ('wing', 'wing'), ('wing', 'wing'), ('flight', 'edge'), ('flight', 'edge'), ('flight', 'flight')],
+               wing=lambda u, part: {'lead': 'wing', 'bar': 'wing' if u < 0.55 else 'flight', 'flight': 'flight',
+                                     'under': 'under'}[part]),
 )
 WARBLER_COLOURS = dict(back='#86985A', cap='#86985A', brow='#ECE6A0', mask='#646A40', face='#DCD994', throat='#F0EAAA',
-                       breast='#EEE6A4', belly='#F2F0DC', wing='#7C8A58', flight='#6C764E', under='#E6E2C0', tail='#6E7852',
-                       bill='#8A7A5C', eye='#101010', leg='#B89A7A')
+                       breast='#EEE6A4', belly='#F2F0DC', wing='#7C8A58', flight='#6C764E', edge='#8E9C62', under='#E6E2C0',
+                       tail='#6E7852', bill='#8A7A5C', eye='#101010', leg='#B89A7A')
 
 
 def blackbird_body(t, deg):
-    if deg < 70:
+    if deg < 100:
         return 'back'
     return 'breast' if t > 0.4 else 'belly'
 
@@ -501,43 +634,54 @@ BLACKBIRD = dict(
     name='blackbird', length=0.25, wingspan=0.36, body=0.112, width=0.066, depth=0.07, bodyAt=0.008, leg=0.03,
     pitch=20, head=0.0235, neck=0.62, neckUp=45, bill=0.019, billW=0.008, billH=0.0085, billDroop=6, billLow=0.1,
     eye=0.17, eyeAt=0.28, ring=True, legR=0.0022, toe=0.02, tailDown=14, tipOver=0.3, chord=0.085, planform=ROUNDED, tail=LONG,
-    zones=dict(body=blackbird_body, head=blackbird_head, folded=['wing', 'wing', 'wing', 'flight', 'flight'],
-               wing=[('wing', 'flight', 'flight'), ('wing', 'flight', 'flight'), ('wing', 'flight', 'flight'),
-                     ('flight', 'flight', 'flight'), ('flight', 'flight', 'flight')]),
+    tailEnd=-0.05, rings=(12, 12, 6),
+    zones=dict(body=blackbird_body, head=blackbird_head,
+               folded=[('wing', 'wing'), ('wing', 'wing'), ('wing', 'wing'), ('flight', 'edge'), ('flight', 'edge'), ('flight', 'flight')],
+               wing=lambda u, part: {'lead': 'wing', 'bar': 'wing' if u < 0.55 else 'flight', 'flight': 'flight',
+                                     'under': 'under'}[part]),
 )
 BLACKBIRD_COLOURS = dict(back='#1C1C1E', cap='#1C1C1E', throat='#202022', breast='#1F1F21', belly='#232324', wing='#202020',
-                         flight='#28251F', under='#2C2A27', tail='#1C1C1C', bill='#F2A21E', eye='#0E0E0E', ring='#F4BC2A',
-                         leg='#3C3228')
+                         flight='#28251F', edge='#2E2B26', under='#2C2A27', tail='#1C1C1C', bill='#F2A21E', eye='#0E0E0E',
+                         ring='#F4BC2A', leg='#3C3228')
 
 
 def dove_body(t, deg):
-    if 0.86 < t < 0.97 and 20 < deg < 110:
-        return 'collar'                                    # the half-collar: round the back and sides of the neck
-    if deg < 70:
-        return 'back' if t < 0.9 else 'cap'
-    if deg < 110:
+    if 0.89 < t < 0.94 and deg < 100:
+        return 'collar'                                   # the black half-collar round the back and sides of the neck
+    if 0.94 < t < 0.975 and deg < 100:
+        return 'brow'                                     # its thin white edge
+    if deg < 50:
+        return 'back' if t < 0.82 else 'cap'
+    if deg < 100:
         return 'breast' if t > 0.4 else 'belly'
     return 'breast' if t > 0.45 else 'belly'
 
 
 def dove_head(s, deg):
-    if deg < 100:
-        return 'cap'
-    return 'throat'
+    return 'cap' if deg < 100 else 'throat'
+
+
+def dove_tail(k, part):
+    if part == 'under':
+        return 'undertail' if k < 0.55 else 'tailtip'    # black at the base underneath, a broad white end
+    return 'tailtip' if k > 0.82 or (part == 'outer' and k > 0.6) else 'tail'
 
 
 COLLARED_DOVE = dict(
     name='collared dove', length=0.32, wingspan=0.51, body=0.145, width=0.088, depth=0.088, bodyAt=0.012, leg=0.018,
     pitch=16, head=0.024, neck=0.62, neckUp=58, bill=0.012, billW=0.006, billH=0.0055, billDroop=12, billLow=0.15,
     eye=0.17, eyeAt=0.25, legR=0.0022, toe=0.02, tailDown=10, tipOver=0.42, chord=0.115, planform=POINTED, tail=BROAD,
-    zones=dict(body=dove_body, head=dove_head, folded=['wing', 'wing', 'wing', 'flight', 'tip'],
-               tail=['tail', 'tail', 'tailtip'],
-               wing=[('wing', 'wing', 'flight'), ('wing', 'wing', 'flight'), ('wing', 'flight', 'flight'),
-                     ('tip', 'tip', 'tip'), ('tip', 'tip', 'tip')]),
+    tailEnd=-0.06, rings=(12, 12, 6), stations=[0.0, 0.05, 0.14, 0.28, 0.46, 0.64, 0.8, 0.89, 0.94, 0.965, 1.0],
+    zones=dict(body=dove_body, head=dove_head, tail=dove_tail,
+               folded=[('wing', 'wing'), ('wing', 'wing'), ('bar', 'bar'), ('flight', 'flight'), ('flight', 'tip'), ('tip', 'tip')],
+               # the buff coverts, a blue-grey band along the arm, the dark primaries
+               wing=lambda u, part: {'lead': 'wing' if u < 0.5 else 'tip', 'bar': 'bar' if u < 0.5 else 'tip',
+                                     'flight': 'flight' if u < 0.5 else 'tip', 'under': 'under' if u < 0.75 else 'flight'}[part]),
 )
-COLLARED_DOVE_COLOURS = dict(back='#BBA88E', cap='#CFC2B6', throat='#D6C8BC', collar='#1C1A1A', breast='#D8C2B8',
-                             belly='#DCD4CC', wing='#C2B29C', flight='#A8A098', tip='#3E3A38', under='#DADAD8', tail='#AA9E8E',
-                             tailtip='#EEEAE4', bill='#2C2A2A', eye='#6E1E1E', leg='#B65C5C')
+COLLARED_DOVE_COLOURS = dict(back='#BBA88E', cap='#CFC2B6', brow='#ECE8E2', throat='#D6C8BC', collar='#1C1A1A',
+                             breast='#D8C2B8', belly='#DCD4CC', wing='#C2B29C', bar='#A8ACB0', flight='#9C9894', tip='#3E3A38',
+                             under='#DADAD8', tail='#AA9E8E', tailtip='#EEEAE4', undertail='#2A2828', bill='#2C2A2A',
+                             eye='#6E1E1E', leg='#B65C5C')
 
 
 def bird(S, colours):

@@ -4,11 +4,11 @@
 # its far version there, without a shadow); and the sparkle star over the selected resident (`model.marker`,
 # BabylonRenderer `setupMarker`). Notes: ground.md.
 #
-# The lawn's two cost what the old parts do (the tuft 24 triangles, of which the camera draws half, where the
-# old part's 36 were mostly degenerate cone tips and hidden caps; the flowers 156 in one draw call where the
-# old part took 192 in two): every part on `foliage`, which the nature shader sways and tints per instance, the
-# flowers' heads with their stems. Each has a far version (`far_of`). The rock is two lumps cut flat a little
-# under the ground, its far version (what the woods draw) 56 triangles. The marker is one closed pillow-shaped
+# The lawn's two stay cheap (the tuft 30 triangles, of which the camera draws half, where the old part's 36 were
+# mostly degenerate cone tips and hidden caps; the flowers 266 in one draw call where the old part took 192 in
+# two): every part on `foliage`, which the nature shader sways and tints per instance, the flowers' heads with
+# their stems. Each has a far version (`far_of`). The rock is two lumps cut flat a little under the ground,
+# weathered, with pebbles at its foot; its far version (what the woods draw) 56 triangles. The marker is one closed pillow-shaped
 # star, which the game draws in its own unlit material with an outline pushed out along its normals (inverted
 # hull): built smooth, its normals worked out from its shape, its origin at its middle, as the old part's.
 #
@@ -43,9 +43,12 @@ M = G.Palette(
     petal_violet=('#B48CF0', 'foliage'),
     eye=('#FFC72E', 'foliage'),
     eye_orange=('#F08A1E', 'foliage'),
+    eye_pale=('#F2ECF6', 'foliage'),     # a cranesbill's pale centre
     # the rock
     stone=('#8E8A82', 'matte'),
     stone_light=('#9A958C', 'matte'),
+    lichen=('#9FA28E', 'matte'),     # pale grey-green lichen on the tops
+    soil=('#6F675C', 'matte'),       # the damp, earthy foot
     # the marker: the game draws it in its own unlit material, tinted by the resident's mood
     star=('#FFFFFF', 'satin'),
 )
@@ -87,14 +90,16 @@ def _mesh(name, verts, faces, material, smooth=True, sky=0.0, recalc=True):
 SKY = 1.5
 
 
-def blade(name, base, yaw, lean, bend, length, width, material, mid=0.5):
+def blade(name, base, yaw, lean, bend, length, width, material, mid=0.5, joint=True, fold=0.0):
     """
     A grass blade (or a flower's leaf) from `base` (game x, depth) on the ground, `width` across there, leaning
     `lean` degrees from upright towards `yaw` (degrees round from game +x) and bending `bend` more by its tip,
-    `length` long, with one joint. A flat ribbon drawn from both sides: two faces back to back (each side its own
-    vertices and normals), of which the camera only ever draws the one turned to it, so a tuft costs the GPU what
-    the old part's thin cones did (a closed blade of three sides drew three times the triangles and measured
-    0.9 ms more over the village's lawns on WebGL). 6 triangles; 2 in a far version (no joint).
+    `length` long, with one joint (`joint`; without, a straight spike: a short blade). A flat ribbon drawn from both
+    sides: two faces back to back (each side its own vertices and normals), of which the camera only ever draws the
+    one turned to it, so a tuft costs the GPU what the old part's thin cones did (a closed blade of three sides drew
+    three times the triangles and measured 0.9 ms more over the village's lawns on WebGL). 6 triangles; 2 in a far
+    version (no joint). `fold`: folded along its midrib from the joint up, the midrib that share of its width out of
+    the ribbon (a leaf's channel): 12 triangles.
     """
     h = Vector((-math.cos(math.radians(yaw)), -math.sin(math.radians(yaw)), 0))   # game (cos, sin) on the ground
     up = Vector((0, 0, 1))
@@ -107,7 +112,12 @@ def blade(name, base, yaw, lean, bend, length, width, material, mid=0.5):
     d0, d1 = heading(lean), heading(lean + bend)
     p1 = p0 + d0 * (length * mid)
     tip = p1 + d1 * (length * (1 - mid))
-    if low(True, False):
+    if low(True, False) and fold:
+        out = across.cross(d0).normalized() * (fold * width)
+        side = [p0 + across * (width / 2), p0, p0 - across * (width / 2),
+                p1 + across * (width * 0.36), p1 + out, p1 - across * (width * 0.36), tip]
+        front = [(0, 1, 4, 3), (1, 2, 5, 4), (3, 4, 6), (4, 5, 6)]
+    elif low(True, False) and joint:
         side = [p0 + across * (width / 2), p0 - across * (width / 2), p1 - across * (width * 0.31), p1 + across * (width * 0.31), tip]
         front = [(0, 1, 2, 3), (3, 2, 4)]
     else:
@@ -124,7 +134,8 @@ def blade(name, base, yaw, lean, bend, length, width, material, mid=0.5):
 
 def grassTuft():
     """Four bent blades from a few millimetres round the middle, leaning out, in four greens (the old part's
-    three cones and the fourth colour): 24 triangles, 12 of them facing the camera."""
+    three cones and the fourth colour), and three short, narrow ones between them, the new growth: 30 triangles,
+    15 of them facing the camera (the old four: 24)."""
     rng = random.Random(41)
     colours = [M.blade, M.blade_light, M.blade_pale, M.blade_mid]
     for i in range(4):
@@ -133,6 +144,13 @@ def grassTuft():
         base = (math.cos(math.radians(yaw)) * r, math.sin(math.radians(yaw)) * r)
         blade(f'blade{i}', base, yaw, rng.uniform(4, 8), rng.uniform(10, 16), rng.uniform(0.27, 0.31),
               rng.uniform(0.032, 0.04), colours[i])
+    # (drawn after the four, so they stand where they did)
+    for i in range(3):
+        yaw = 45 + i * 120 + rng.uniform(-20, 20)
+        r = rng.uniform(0.002, 0.005)
+        base = (math.cos(math.radians(yaw)) * r, math.sin(math.radians(yaw)) * r)
+        blade(f'short{i}', base, yaw, rng.uniform(13, 18), 0, rng.uniform(0.13, 0.16), rng.uniform(0.02, 0.026),
+              colours[(i + 1) % 4], joint=False)
     return G.settle([G.join_all('grassTuft')])
 
 
@@ -159,26 +177,29 @@ def stem(name, base, top, radius, material, sway=0.012):
     return _mesh(name, verts, faces, material)
 
 
-def flower(name, at, radius, tilt, yaw, petals, eye):
+def flower(name, at, radius, tilt, yaw, petals, eye, n=5, notch=0.8, cup=0.0, disc=0.32, dome=0.011):
     """
-    A five-petalled flower head at `at` (a Blender point, the top of its stem) turned up `tilt` degrees towards
-    `yaw`: petals round a raised eye on top (its own colour), a shallow cone underneath, one closed shell of
-    30 triangles. A far version keeps the five petal tips and leaves out the eye: 10.
+    A flower head of `n` petals at `at` (a Blender point, the top of its stem) turned up `tilt` degrees towards
+    `yaw`: petals round a raised eye on top (its own colour, `disc` of the radius across, domed `dome` high), a
+    shallow cone underneath, one closed shell of 6n triangles. `notch`: how far out the notches between the petals
+    are (0.8: broad petals; 0.4: a daisy's separate rays); `cup`: how far the petals' tips rise (a buttercup's bowl).
+    A far version keeps the petal tips (at most eight) and leaves out the eye: 2 a tip.
     """
     full = low(True, False)
-    n = 5
+    tips = n if full else min(n, 8)
     rim = []
-    for i in range(n * (2 if full else 1)):
-        a = math.tau * i / (n * 2 if full else n)
-        r = radius if i % 2 == 0 or not full else radius * 0.8
-        rim.append(Vector((r * math.cos(a), r * math.sin(a), 0.004 if (i % 2 == 0 or not full) else 0.0)))
+    for i in range(tips * (2 if full else 1)):
+        a = math.tau * i / (tips * 2 if full else tips)
+        tip = i % 2 == 0 or not full
+        r = radius if tip else radius * notch
+        rim.append(Vector((r * math.cos(a), r * math.sin(a), (0.004 + cup) if tip else cup * 0.6)))
     turn = Matrix.Rotation(math.radians(yaw), 4, 'Z') @ Matrix.Rotation(math.radians(tilt), 4, 'Y')
     place = Matrix.Translation(at) @ turn
     verts, faces, colours = [], [], []
     if full:
-        inner = [Vector((radius * 0.32 * math.cos(math.tau * i / n + 0.0), radius * 0.32 * math.sin(math.tau * i / n), 0.005))
+        inner = [Vector((radius * disc * math.cos(math.tau * i / n), radius * disc * math.sin(math.tau * i / n), 0.005 + cup * 0.3))
                  for i in range(n)]
-        apex = Vector((0, 0, 0.011))
+        apex = Vector((0, 0, dome + cup * 0.3))
         bottom = Vector((0, 0, -0.008))
         verts = rim + inner + [apex, bottom]
         R, I, A, B = 0, len(rim), len(rim) + n, len(rim) + n + 1
@@ -193,11 +214,11 @@ def flower(name, at, radius, tilt, yaw, petals, eye):
             faces.append((B, R + (i + 1) % (2 * n), R + i))
             colours.append(0)
     else:
-        top, bottom = Vector((0, 0, 0.006)), Vector((0, 0, -0.008))
+        top, bottom = Vector((0, 0, 0.006 + cup * 0.5)), Vector((0, 0, -0.008))
         verts = rim + [top, bottom]
-        T, B = n, n + 1
-        for i in range(n):
-            faces += [(T, i, (i + 1) % n), (B, (i + 1) % n, i)]
+        T, B = tips, tips + 1
+        for i in range(tips):
+            faces += [(T, i, (i + 1) % tips), (B, (i + 1) % tips, i)]
             colours += [0, 0]
     obj = _mesh(name, [place @ v for v in verts], faces, petals)
     if full:
@@ -207,24 +228,59 @@ def flower(name, at, radius, tilt, yaw, petals, eye):
     return obj
 
 
-# Where the old part's three flowers stand: (game x, depth), height, petals, eye.
-FLOWERS = [((0.03, 0.02), 0.26, 'petal_white', 'eye'), ((-0.04, 0.03), 0.22, 'petal_yellow', 'eye_orange'),
-           ((0.0, -0.05), 0.19, 'petal_violet', 'eye')]
+def bud(name, at, r, h, tilt, yaw, sepals, petals):
+    """A closed flower bud on its stem's top `at` (Blender): green sepals cupping it from below, the white of its
+    petals showing at the top, five sides round, `h` long, leaning `tilt` degrees towards `yaw`: 15 triangles."""
+    turn = Matrix.Rotation(math.radians(yaw), 4, 'Z') @ Matrix.Rotation(math.radians(tilt), 4, 'Y')
+    place = Matrix.Translation(at) @ turn
+    ring = [Vector((r * math.cos(math.tau * i / 5), r * math.sin(math.tau * i / 5), h * 0.45)) for i in range(5)]
+    neck = [Vector((r * 0.55 * math.cos(math.tau * (i + 0.5) / 5), r * 0.55 * math.sin(math.tau * (i + 0.5) / 5), h * 0.8))
+            for i in range(5)]
+    verts = ring + neck + [Vector((0, 0, h)), Vector((0, 0, -0.002))]
+    T, B = 10, 11
+    faces, colours = [], []
+    for i in range(5):
+        j = (i + 1) % 5
+        faces += [(B, j, i), (i, j, 5 + i)]
+        colours += [0, 0]
+        faces += [(j, 5 + j, 5 + i), (5 + i, 5 + j, T)]
+        colours += [0, 1]
+    obj = _mesh(name, [place @ v for v in verts], faces, sepals)
+    obj.data.materials.append(petals)
+    for p, c in zip(obj.data.polygons, colours):
+        p.material_index = c
+    return obj
+
+
+# Where the old part's three flowers stand: (game x, depth), height, petals, eye, and the head's shape: an ox-eye
+# daisy's thirteen white rays round a broad yellow disc, a buttercup's five glossy yellow petals cupped up, a
+# cranesbill's five broad violet ones, flat, round a pale eye.
+FLOWERS = [((0.03, 0.02), 0.26, 'petal_white', 'eye', dict(n=13, notch=0.42, disc=0.36, dome=0.009)),
+           ((-0.04, 0.03), 0.22, 'petal_yellow', 'eye_orange', dict(n=5, notch=0.82, cup=0.008, disc=0.28)),
+           ((0.0, -0.05), 0.19, 'petal_violet', 'eye_pale', dict(n=5, notch=0.86, disc=0.26, dome=0.007))]
 
 
 def flowers():
-    """Wildflowers: five low leaves round three stems with a white, a yellow and a violet head where the
-    old part's stand, every part on `foliage`: 156 triangles in one draw call (the old part: 192 in two)."""
+    """Wildflowers: five low leaves, each folded along its midrib, round three stems with an ox-eye daisy, a
+    buttercup and a cranesbill where the old part's three heads stand, and a daisy's bud on a fourth, every part on
+    `foliage`, in one draw call."""
     rng = random.Random(42)
     for i in range(5):
         yaw = i * 72 + rng.uniform(-20, 20)
         blade(f'leaf{i}', (math.cos(math.radians(yaw)) * 0.006, math.sin(math.radians(yaw)) * 0.006), yaw,
-              rng.uniform(20, 28), rng.uniform(16, 24), rng.uniform(0.12, 0.15), rng.uniform(0.034, 0.042), M.leaf)
-    for i, ((x, z), h, petals, eye) in enumerate(FLOWERS):
+              rng.uniform(20, 28), rng.uniform(16, 24), rng.uniform(0.12, 0.15), rng.uniform(0.034, 0.042), M.leaf,
+              fold=0.22)
+    for i, ((x, z), h, petals, eye, shape) in enumerate(FLOWERS):
         top = Vector((-x, -z, h))
         stem(f'stem{i}', Vector((-x * 0.3, -z * 0.3, 0)), top, 0.0045, M.stem)
         tilt, yaw = rng.uniform(8, 22), math.degrees(math.atan2(-z, -x)) + rng.uniform(-30, 30)
-        flower(f'flower{i}', top, 0.037, tilt, yaw, getattr(M, petals), getattr(M, eye))
+        flower(f'flower{i}', top, 0.037, tilt, yaw, getattr(M, petals), getattr(M, eye), **shape)
+    # the bud, nodding on its own stem (left out far off; its numbers drawn either way)
+    tilt, yaw = rng.uniform(25, 35), rng.uniform(-30, 30)
+    if low(True, False):
+        top = Vector((-0.045, 0.035, 0.15))
+        stem('stem_bud', Vector((-0.012, 0.01, 0)), top, 0.0035, M.stem, sway=0.008)
+        bud('bud', top, 0.008, 0.022, tilt, 180 + yaw, M.leaf, M.petal_white)
     return G.settle([G.join_all('flowers')])
 
 
@@ -260,11 +316,13 @@ def _lump(obj, amount, scale, seed):
         v.co *= 1.0 + amount * _noise(p)
 
 
-def _stone(name, radius, at, material, scale, seed, top, subdivisions, fractures):
-    """A boulder `top` high (Blender z), roughened, with `fractures` (direction, depth: how far in from its
-    outside, metres) cut flat across it, then cut off under the ground."""
+def _stone(name, radius, at, material, scale, seed, top, subdivisions, fractures, grain=0.0):
+    """A boulder `top` high (Blender z), roughened (`grain`: and pitted finer still, metres), with `fractures`
+    (direction, depth: how far in from its outside, metres) cut flat across it, then cut off under the ground."""
     o = G.boulder(name, radius, at=at, material=material, scale=(1, 1, 1), seed=seed, noise=0.26, subdivisions=subdivisions)
     _lump(o, 0.08, 4.0, seed)
+    if grain:
+        _lump(o, grain, 14.0, seed + 5.1)
     o.data.transform(Matrix.Diagonal((*scale, 1.0)))
     for direction, depth in fractures:
         n = Vector(direction).normalized()
@@ -275,22 +333,51 @@ def _stone(name, radius, at, material, scale, seed, top, subdivisions, fractures
     return _cut(o, (0, 0, GROUND), (0, 0, -1))
 
 
+def _weather(obj, seed, lichen, soil, cover=0.25):
+    """Colours a stone's weathered faces (its rounded ones, not the fresh flat breaks): lichen in patches on what
+    faces the sky (smooth noise over `cover`), and the damp, earthy band where it goes into the ground."""
+    mats = list(obj.data.materials)
+    for m in (lichen, soil):
+        if m.name not in [x.name for x in mats]:
+            obj.data.materials.append(m)
+    names = [m.name for m in obj.data.materials]
+    world = obj.matrix_world
+    for p in obj.data.polygons:
+        if not p.use_smooth:
+            continue
+        c = world @ p.center
+        if c.z < 0.004:
+            p.material_index = names.index(soil.name)
+        elif p.normal.z > 0.45 and _noise(Vector((c.x * 7 + seed, c.y * 7 - seed, c.z * 7))) > cover:
+            p.material_index = names.index(lichen.name)
+
+
 def rock():
-    """A grey boulder and a lighter one leaning on it, lumpy (the old part's two blobs, where they stand), a few
-    faces split off flat, cut off under the ground, both plain matte: one draw call. Its far version, what the woods
-    draw (some hundreds of them), is two icosahedra lumped the same way, without the split faces (each cut adds
-    triangles): 56 triangles, few enough for the woods to keep drawing them as one mesh (nature.ts
-    `SPLIT_TRIANGLES`), as the old part's."""
-    fractures = [((0.35, -0.2, 1), 0.07), ((-0.9, 0.3, 0.35), 0.06), ((0.2, 1, 0.1), 0.05)]
+    """A grey boulder and a lighter one leaning on it, lumpy and pitted (the old part's two blobs, where they stand),
+    faces split off flat, lichen in patches on their tops and the damp soil line round their foot, cut off under the
+    ground, two pebbles at the foot, all plain matte: one draw call. Its far version, what the woods draw (some
+    hundreds of them), is two icosahedra lumped the same way, without the split faces (each cut adds triangles) or
+    the pebbles, lichen or soil line (a patch would take a whole face): 56 triangles, few enough for the woods to keep drawing them as
+    one mesh (nature.ts `SPLIT_TRIANGLES`), as the old part's."""
+    fractures = [((0.35, -0.2, 1), 0.07), ((-0.9, 0.3, 0.35), 0.06), ((0.2, 1, 0.1), 0.05), ((0.95, -0.15, 0.25), 0.035),
+                 ((-0.3, -1, 0.45), 0.03)]
     # (Far off, an icosahedron, its corners on the round and its faces inside it: a little wider to fill the same box.)
-    _stone('rock_main', 0.5, (0, 0, 0), M.stone, low((1.0, 0.85, 0.8), (1.08, 0.95, 0.8)), 1.3, 0.435, low(3, 1),
-           low(fractures, []))
-    _stone('rock_side', 0.25, (-0.42, -0.22, 0), M.stone_light, (1.0, 0.9, 0.9), 3.7, 0.24, low(2, 1),
-           low([((-0.5, -0.6, 1), 0.04)], []))
+    main = _stone('rock_main', 0.5, (0, 0, 0), M.stone, low((1.0, 0.85, 0.8), (1.08, 0.95, 0.8)), 1.3, 0.435, low(4, 1),
+                  low(fractures, []), grain=low(0.025, 0.0))
+    side = _stone('rock_side', 0.25, (-0.42, -0.22, 0), M.stone_light, (1.0, 0.9, 0.9), 3.7, 0.24, low(3, 1),
+                  low([((-0.5, -0.6, 1), 0.04), ((-1, 0.2, 0.3), 0.025)], []), grain=low(0.03, 0.0))
+    if low(True, False):
+        _weather(main, 1.3, M.lichen, M.soil)
+        _weather(side, 3.7, M.lichen, M.soil, cover=0.1)
+    lo, hi = G.measure([main, side])
+    if low(True, False):
+        # Two pebbles broken off it, half sunk at its foot (inside its box, so it is centred as it was).
+        for k, (x, y, r, sd) in enumerate(((0.36, -0.3, 0.07, 6.2), (-0.56, 0.08, 0.055, 8.9))):
+            peb = _stone(f'pebble{k}', r, (x, y, 0), M.stone_light if k else M.stone, (1.0, 0.8, 0.6), sd, 0.035, 2, [])
+            _weather(peb, sd, M.lichen, M.soil, cover=0.6)
     # Centred where the old part's lumps are (game x 8.5 cm, depth 1 cm), by hand: a far version is built
     # without the Model's `centre` set.
     obj = G.join_all('rock')
-    lo, hi = G.measure([obj])
     obj.location += Vector((-ROCK_CENTRE[0] - (lo[0] + hi[0]) / 2, -ROCK_CENTRE[1] - (lo[1] + hi[1]) / 2, 0))
     bpy.context.view_layer.update()
     return [obj]

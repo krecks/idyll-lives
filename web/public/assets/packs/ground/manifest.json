@@ -31,6 +31,9 @@
         "eye_orange": {
           "finish": "material.finish.foliage"
         },
+        "eye_pale": {
+          "finish": "material.finish.foliage"
+        },
         "leaf": {
           "finish": "material.finish.foliage"
         },
@@ -53,6 +56,12 @@
       "type": "model",
       "url": "../../models/ground/rock.glb",
       "materials": {
+        "lichen": {
+          "finish": "material.finish.matte"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
         "stone": {
           "finish": "material.finish.matte"
         },
