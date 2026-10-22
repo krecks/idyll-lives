@@ -777,8 +777,8 @@ const FRUIT_TREES = new Set(['garden.apple']);
 const TALL_FLOWERS = new Set(['garden.cosmos', 'garden.flowerBox', 'garden.lavender', 'garden.lilies', 'garden.lupins', 'garden.roses', 'garden.wheelbarrow']);
 /** Toys played with down on the floor at the box (`kneel`, as the play mat and the doll house). */
 const FLOOR_TOYS = new Set(['toyBox', 'toyChest']);
-/** Wall cupboards: things put away up in them (no squat to the floor). */
-const WALL_CUPBOARDS = new Set(['wallCabinet', 'wallCabinetGlass', 'wallCabinetCorner', 'chinaCabinet']);
+/** Wall cupboards (each with its putting away, `CUPBOARD_OF`): things put away up in them (no squat to the floor). */
+const WALL_CUPBOARDS = new Set(Object.keys(CUPBOARD_OF));
 const ACTIONS: Record<string, ActionAnim> = {
   eat: { stand: ['eat', 'idle'], upper: 'eat', hands: HANDS.hold },
   // Sips from a cup, spaced out.
