@@ -182,12 +182,29 @@ paints the thighs (the shell hangs over them). Babies don't wear skirts (the she
 their drawn-up, spread legs): a baby whose outfit has one wears `bottom.shorts` in the top's colour,
 a romper (outfit.ts).
 
+Each painted cut edge is drawn as fabric (material.ts `simHem`, `BAND`): a turned band along it, a
+little darker (lighter on dark cloth), with a thin stitch line in it. The band is 2.2 cm at a cuff,
+2.4 cm at a top's or a leg's hem, a 1.6 cm rib at a crew neck, a 1.1 cm binding at a scoop, a 3.4 cm
+waistband and a 1.2 cm welt where the shoes end (m on the fields, as the cuts). Bands and stitches fade
+out as they come under a few pixels: they show at the closest game camera (6 m) and are gone at the
+default one (24 m). The skirt's shell has the hem band too, from its `fields.x`. The jacket's, the
+suit's and the collars' `fields.x` are not distances (0.05 outside and 0 on the rim; 0.03 at the
+neckline and 0 beyond), so they have none.
+
+The shirt under an open jacket or suit has its own colour (outfit.ts `shirtUnder`): white under a
+suit, a charcoal tee under a light jacket, a white or grey one under a dark one. It is painted on the
+torso from the waistband up to the jacket's neck line (1 cm under `neck_01`, where clothes.rs cuts the
+shell outside the V; `OutfitFit.neck`), and above that only as a 1.2 cm collar at the neckline, so the
+jacket's colour still reaches the neck on the shoulders.
+
 What a resident wears changes with what it does (`Wear`, outfit.ts; characters.ts `wearFor`): its day
 clothes; pyjamas for a night's sleep in bed (a `sleep` use lying down: the `top.long` and
 `bottom.trousers` cuts in a sleep colour, barefoot); the day clothes barefoot for a nap on something
 slept in; a towel under a shower and sat in a bath (the bottom's cut alone, from under the arms, or
 round a man's hips, to the thigh); swimwear in a hot tub (a swimsuit, the `top.tank` cut down to the
-top of the legs, or trunks). Only the day clothes draw their shells: the others leave them out by the
+top of the legs, or trunks). Pyjamas have the bands of the cuts they reuse (cuffs, hems, a crew rib,
+an elastic waistband); the towel and swimwear are `plain` (no bands: a towel has no stitched cuff, and
+swimwear's edges are bound flat). Only the day clothes draw their shells: the others leave them out by the
 resident's row (`bare`), so a change of clothes draws nothing more. The towel's and swimwear's heights
 come from the base body's joints at rest (`OutfitFit`: under the arms half way between `spine_03` and
 `upperarm_l`, the hips and the knees).
@@ -215,7 +232,7 @@ Garment ids per family (outfit.ts):
 | 1 | top colour | top: hem |
 | 2 | bottom colour | top: crew cut |
 | 3 | hair colour (plain) | top: scoop cut |
-| 4 | r = 1 if the top is `over` the bottom; g = age (0 young, 0.4 adult, 1 elder); b = how far the shells take their seated shape (0..1, at the body's size; below) | bottom: waist |
+| 4 | r = 1 if the top is `over` the bottom, or 1 + n + y / 4 with a shirt under an open jacket (n: 1 white, 2 charcoal, 3 grey; y: the jacket's neck line, m), else 0, or -1 if `plain` (no bands); g = age (0 young, 0.4 adult, 1 elder); b = how far the shells take their seated shape (0..1, at the body's size; below) | bottom: waist |
 | 5 | skin reference (1) | bottom: leg cut |
 | 6 | shoe colour | shoes: top height |
 | 7 | eye colour | 1 if the resident wears hair (the scalp takes the hair colour) |
