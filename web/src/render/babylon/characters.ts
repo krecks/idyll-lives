@@ -4620,9 +4620,7 @@ export class Characters {
       turns[k] = turn[0];
       turns[k + 1] = turn[1];
       turns[k + 2] = -(turn[0] + turn[1]) + hang;
-      addRotation(this.add, thigh, 1, 0, 0, turns[k] * w);
-      addRotation(this.add, calf, 1, 0, 0, turns[k + 1] * w);
-      addRotation(this.add, foot, 1, 0, 0, turns[k + 2] * w);
+      this.bendLeg(turns, k, thigh, calf, foot, w);
     }
   }
 
@@ -4636,11 +4634,16 @@ export class Characters {
       [0, B.thigh_l, B.calf_l, B.foot_l],
       [4, B.thigh_r, B.calf_r, B.foot_r],
     ] as const) {
-      addRotation(this.add, thigh, 1, 0, 0, t[k] * w);
-      addRotation(this.add, calf, 1, 0, 0, t[k + 1] * w);
-      addRotation(this.add, foot, 1, 0, 0, t[k + 2] * w);
+      this.bendLeg(t, k, thigh, calf, foot, w);
       addRotation(this.add, thigh, 0, 0, 1, t[k + 3] * w);
     }
+  }
+
+  /** A leg bent at the hip, knee and ankle (about x) by the turns kept for it in `rig.seatTurn` (`turns[k..k + 2]`), at weight `w`. */
+  private bendLeg(turns: Float32Array, k: number, thigh: number, calf: number, foot: number, w: number): void {
+    addRotation(this.add, thigh, 1, 0, 0, turns[k] * w);
+    addRotation(this.add, calf, 1, 0, 0, turns[k + 1] * w);
+    addRotation(this.add, foot, 1, 0, 0, turns[k + 2] * w);
   }
 
   /**
@@ -4673,9 +4676,7 @@ export class Characters {
       // The foot level on the floor (the toes towards the bench's foot end).
       turns[k + 2] = -0.35;
       turns[k + 3] = Math.atan2(vx, -vy);
-      addRotation(this.add, thigh, 1, 0, 0, turns[k] * w);
-      addRotation(this.add, calf, 1, 0, 0, turns[k + 1] * w);
-      addRotation(this.add, foot, 1, 0, 0, turns[k + 2] * w);
+      this.bendLeg(turns, k, thigh, calf, foot, w);
       addRotation(this.add, thigh, 0, 0, 1, turns[k + 3] * w);
     }
   }
@@ -4794,9 +4795,7 @@ export class Characters {
       turns[k + 1] = legTurn[1];
       turns[k + 2] = -(legTurn[0] + legTurn[1]) * 0.3;
       turns[k + 3] = 0;
-      addRotation(this.add, thigh, 1, 0, 0, turns[k] * w);
-      addRotation(this.add, calf, 1, 0, 0, turns[k + 1] * w);
-      addRotation(this.add, foot, 1, 0, 0, turns[k + 2] * w);
+      this.bendLeg(turns, k, thigh, calf, foot, w);
       addRotation(this.add, thigh, 0, 1, 0, Math.atan2(side / s, z - fit.hz) * w);
     }
   }
