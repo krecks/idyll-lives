@@ -1,6 +1,7 @@
 //! Group conversations with the shipped content: while two residents chat, a lonely third one
 //! comes over and joins in (`conversation.rs`, socials with `joinable`); two sitting on the sofa
-//! talk from their seats, and the third walks over to listen.
+//! talk from their seats, and the third walks over to listen. One listening in doesn't stay to wait
+//! by a hug the leader is taken into (A-social-02).
 
 mod common;
 
@@ -164,4 +165,23 @@ fn a_lonely_housemate_joins_a_chat_at_home() {
         w.tick_once();
     }
     common::dump_state(&w, "group-talk");
+    // The talk broken off, and B hugs A (A-social-02): C, who was listening in, doesn't stand by
+    // the hug waiting for A's next word.
+    w.autonomy = false;
+    w.relationships.get_mut(a, b).friendship = 70.0;
+    w.relationships.get_mut(b, a).friendship = 70.0;
+    w.apply(Command::Cancel { sim: a as u32, index: 0 }).unwrap();
+    let hug = w.content.social_index("hug").unwrap();
+    w.apply(Command::Social { sim: b as u32, target: a as u32, social: hug }).unwrap();
+    let hugging = |w: &World| matches!(w.sims[b].current().map(|act| (act.task.kind, &act.phase)), Some((TaskKind::Social { social, .. }, Phase::Conversing { .. })) if social == hug);
+    let started = (0..(5.0 / sim_core::MINUTES_PER_TICK) as u64).find(|_| {
+        w.tick_once();
+        hugging(&w)
+    });
+    assert!(started.is_some(), "B hugs A: {:?}", w.sims[b].current().map(|act| act.task.kind));
+    for _ in 0..2 {
+        w.tick_once();
+    }
+    assert!(hugging(&w));
+    assert!(!matches!(w.sims[c].current().map(|act| act.task.kind), Some(TaskKind::Join { .. })), "C still waits for A beside the hug");
 }

@@ -583,7 +583,9 @@ fn middle(sims: &[Sim], a: usize, b: usize) -> [f32; 2] {
 /// `j` (or choosing what to do next), so it's worth `j` staying.
 fn regrouping(sims: &[Sim], l: usize, j: usize) -> bool {
     let s = &sims[l];
-    if s.away_until.is_some() || s.pose == Pose::Lie {
+    // (Nor taken into someone else's social: hugged, they aren't choosing the next one, and
+    // nobody stands by a hug waiting for it to end.)
+    if s.away_until.is_some() || s.pose == Pose::Lie || s.engaged_with.is_some() {
         return false;
     }
     match s.current.as_ref() {
