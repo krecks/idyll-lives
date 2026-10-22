@@ -725,6 +725,9 @@
         "flute": {
           "finish": "material.finish.wood"
         },
+        "lemon": {
+          "finish": "material.finish.satin"
+        },
         "plate_blue": {
           "finish": "material.finish.gloss"
         },
