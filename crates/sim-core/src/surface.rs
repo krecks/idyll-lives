@@ -353,8 +353,8 @@ pub fn approach_tile(content: &Content, nav: &NavGrid, obj: &ObjectInstance) -> 
 /// from beside it); for seats used from around, each tile in front of, behind, left and right of its
 /// middle that can be stood on, on the same storey with no wall or fence between; for a seat behind
 /// the work (`Approach::Behind`: a desk, sat at from behind it), the tiles behind, left and right
-/// of it that can be stood on, then its front if it can be (a desk may stand with its screen to a
-/// wall).
+/// of it that can be stood on, then its front if it can be, else (along an even front edge) the
+/// other middle tile if that can (a desk may stand with its screen to a wall).
 pub fn approach_tiles<'a>(
     content: &Content,
     nav: &'a NavGrid,
@@ -383,16 +383,17 @@ pub fn approach_tiles<'a>(
         1 | 3 if d % 2 == 0 => Some(((sides[r].0.0, sides[r].0.1 + 1), (sides[r].1.0, sides[r].1.1 + 1))),
         _ => None,
     };
-    let instead = twin.filter(|&t| !around && !behind && !standable(sides[r]) && standable(t)).map(|(t, _)| t);
+    let instead = twin.filter(|&t| !around && !standable(sides[r]) && standable(t)).map(|(t, _)| t);
     // (A seat with its front taken, a footstool there: from its left or right first, else still the front.)
     let seat = content.objects[obj.def].interactions.iter().any(|i| i.pose == Pose::Sit);
     let from_side = !around && !behind && instead.is_none() && seat && !standable(sides[r]);
-    // (A desk's front only if it can be stood on: it may have its screen to a wall.)
-    let only_front = (!around && !(behind && !standable(sides[r]))).then_some(front);
+    // (A desk's front only if it can be stood on, else the other middle tile if that can: it may
+    // have its screen to a wall, and its front swaps too when the house is turned round.)
+    let only_front = if behind { standable(sides[r]).then_some(front).or(instead) } else { (!around).then_some(front) };
     let (skip, take) = if around || behind { (0, 4 - behind as usize) } else if from_side { (2, 2) } else { (4, 0) };
     let beside = order.into_iter().skip(skip).take(take).map(move |i| sides[i]).filter_map(move |s| standable(s).then_some(s.0));
     let (front_first, front_last) = if from_side || behind { (None, only_front) } else { (only_front, None) };
-    instead.into_iter().chain(front_first).chain(beside).chain(front_last)
+    instead.filter(|_| !behind).into_iter().chain(front_first).chain(beside).chain(front_last)
 }
 
 /// The tiles a resident may use `obj`, a thing standing on `host`'s top, from, best first: at

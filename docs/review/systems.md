@@ -702,3 +702,14 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Status:** fixed (2cb0ca69)
 - **After:** a sold thing's tiles are taken again by whatever else takes them; the test passes, and so does the arc lamp's (`layers::an_arc_lamp_reaches_over_the_sofa_in_front_of_it`).
 - **Source:** fix: sweep-sim
+
+### I-systems-17 — A desk with its back to a wall and a chair on its front tile can't be sat at
+
+- **Severity:** S2
+- **Rubric:** I3
+- **Fix class:** code
+- **Where:** `crates/sim-core/src/surface.rs` `approach_tiles` (I-systems-14, 3dbfaa48: for `approach: behind` the other middle tile along an even front edge was left out); `web/src/game/surfaces.ts` `approachCandidates` (the same)
+- **Evidence:** CI's generated-worlds check on `review/authenticity` (e41ab47a): `"dense" 314192 ("Queen's Cross"): can't reach the deskWriting downstairs at 97,149`. The sampler's households are drawn with `Math.random`, so the furnishing differs per run; seeded, 8 of 12 draws had it. A bedroom 97–100 × 148–151 on a lot south of a street (the house turned round): a `deskSimple` at 97,148 with its `officeChair` at 98,149, and the writing desk at 97,149 turned (rot 1, 1×2) with its back to the west wall. Behind it the wall, left the `nightstandLamp` at 97,151, right the `deskSimple`, its front tile (98,149) the office chair: `use_tiles` was empty, though 98,150 beside the chair was free. The generator (`place`) kept its own front tile free, which the turn made the other middle tile; for everything else `approach_tiles` takes that one when the front is taken, but I-systems-14 excluded it for desks.
+- **Status:** fixed (b8956e80)
+- **After:** for a seat behind the work, after behind, left and right, the front if it can be stood on, else the other middle tile if that can; build mode's `approachCandidates` lists it too (the generator doesn't use it for desks, so the samples are unchanged). The desk's use tiles are now [98,150]; 60 seeded draws of "dense" 314192 and 72 of every kind pass, as do the 24 sample worlds and 180 houses. `footstools::a_desk_with_its_back_to_the_wall_is_sat_at_from_the_other_half_of_its_front` (a pouf on the front tile, sat at from the other half; with that taken too, refused) fails without the fix.
+- **Source:** fix: CI generated worlds
