@@ -134,7 +134,7 @@ impl Img {
         if self.ch == 1 {
             return self.clone();
         }
-        let px = self.px.chunks_exact(3).map(|p| luma(p[0], p[1], p[2])).collect();
+        let px = self.px.as_chunks::<3>().0.iter().map(|p| luma(p[0], p[1], p[2])).collect();
         Img { w: self.w, h: self.h, ch: 1, px }
     }
 
@@ -213,7 +213,7 @@ impl Img {
                     let src = &row[xmin * ch..(xmin + ks.len()) * ch];
                     if ch == 3 {
                         let mut s = [HALF; 3];
-                        for (p, &kv) in src.chunks_exact(3).zip(ks) {
+                        for (p, &kv) in src.as_chunks::<3>().0.iter().zip(ks) {
                             s[0] += p[0] as i32 * kv;
                             s[1] += p[1] as i32 * kv;
                             s[2] += p[2] as i32 * kv;

@@ -782,7 +782,7 @@ pub fn decode(d: &[u8]) -> Option<(usize, usize, usize, Vec<u8>)> {
                 }
                 h = u16::from_be_bytes([seg[1], seg[2]]) as usize;
                 w = u16::from_be_bytes([seg[3], seg[4]]) as usize;
-                for c in seg[6..].chunks_exact(3).take(seg[5] as usize) {
+                for c in seg[6..].as_chunks::<3>().0.iter().take(seg[5] as usize) {
                     comps.push(Comp { id: c[0], h: (c[1] >> 4) as usize, v: (c[1] & 15) as usize, tq: (c[2] & 3) as usize });
                 }
             }
@@ -935,7 +935,7 @@ fn scan(d: &[u8], pos: usize, sos: &[u8], w: usize, h: usize, comps: &[Comp], qt
     }
     let [cr_r, cb_b, cr_g, cb_g] = ycc_tables();
     let mut px = vec![0u8; w * h * 3];
-    for (i, o) in px.chunks_exact_mut(3).enumerate() {
+    for (i, o) in px.as_chunks_mut::<3>().0.iter_mut().enumerate() {
         let (y, cb, cr) = (full[0][i] as i32, full[1][i] as usize, full[2][i] as usize);
         o[0] = (y + cr_r[cr]).clamp(0, 255) as u8;
         o[1] = (y + ((cb_g[cb] + cr_g[cr]) >> 16)).clamp(0, 255) as u8;
