@@ -418,7 +418,9 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
         // the knuckle to a ring just short of the middle joint (fingers_01), and a ring before
         // the tip (fingers_02) turned a little about that joint towards the palm (the rest pose's
         // curl), narrowing; a 6-sided cap. The middle joint is fingers_02's (rig.rs), so a fist
-        // bends at the knuckle and there. (`ki`: the knuckle ring's index of column k, back or palm;
+        // bends at the knuckle and there, and the outer band, about as long as the inner one,
+        // folds its tip back onto the palm (`rigid_fingertips` keeps it round on level 1).
+        // (`ki`: the knuckle ring's index of column k, back or palm;
         // its sides are 4 and 10.)
         let ki = |k: usize, v: f64| {
             let i = order.iter().position(|&(a, b)| a == k && b == v).unwrap();
@@ -438,7 +440,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
             let loop_f = vec![p3[ki(fi, 1.0)], p3[ki(fi + 1, 1.0)], side(fi as isize), p3[ki(fi + 1, -1.0)], p3[ki(fi, -1.0)], side(fi as isize - 1)];
             // (Half width, half depth; distal length past the joint, in palm lengths. The palm side is fuller.)
             let (hw, hd) = ([0.088, 0.098, 0.1, 0.098][fi] * chub, [0.095, 0.105, 0.107, 0.105][fi] * chub);
-            let tip = [0.12, 0.16, 0.18, 0.16][fi] * (1.0 - 0.3 * yg);
+            let tip = [0.25, 0.29, 0.31, 0.29][fi] * (1.0 - 0.3 * yg);
             let zf = (zs[fi] + zs[fi + 1]) / 2.0 * 0.98;
             let spread = (fi as f64 - 1.5) * 0.05;
             // (A 6-ring round cc facing ax: half width, half depth on the back and on the palm side.)
@@ -715,7 +717,7 @@ fn make_surface(family: &str, stage: &str) -> Surface {
         .collect();
     let lod_pos: Vec<V3> = topo.a.apply(&ctrl).into_iter().map(sockets(family, stage, true)).collect();
     let tags = TagArrays::of(&arr.tags);
-    let dense1 = s.m.apply_n(&arr.dense);
+    let dense1 = rigid_fingertips(s.m.apply_n(&arr.dense), &pos, &p);
     let tags1 = tags.subdivided(&s.m);
     let region1 = s.m.apply_n(&region);
     // Head and neck, densely, without the ears (for the head interface's sdf and surface_z).
@@ -871,6 +873,25 @@ fn grip(family: &str, stage: &str) -> [f64; 3] {
     let lp = (k1 - wr).norm();
     let g = d * 0.62 * lp - u * 0.28 * lp;
     [g.x, g.y, g.z]
+}
+
+/// Level 1's fingers past the middle joint: subdividing blends `fingers_01` into `fingers_02` all
+/// along the outer segment, which a fist then folds flat (blended skinning collapses); instead the
+/// split follows the distance past the joint, all `fingers_02` from 0.06 palm lengths on.
+fn rigid_fingertips(mut dense: Vec<Dense>, pos: &[V3], p: &[V3; NB]) -> Vec<Dense> {
+    for sd in ["l", "r"] {
+        let (wr, i1, i2) = (p[b(&format!("hand_{sd}"))], b(&format!("fingers_01_{sd}")), b(&format!("fingers_02_{sd}")));
+        let lp = (p[i1] - wr).norm();
+        let d = unit(p[i1] - wr);
+        for (w, q) in dense.iter_mut().zip(pos) {
+            let t = w[i1] + w[i2];
+            if w[i2] > 0.0 {
+                let s = smoothstep(-0.06, 0.06, (q - p[i2]).dot(&d) / lp);
+                (w[i1], w[i2]) = (t * (1.0 - s), t * s);
+            }
+        }
+    }
+    dense
 }
 
 // Fields and tone -----------------------------------------------------------------------------

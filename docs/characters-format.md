@@ -165,14 +165,16 @@ weights are set per ring and subdivide with the positions. Every stage of a fami
 
 A hand is a palm with the ball of the thumb on it, a knuckle ring, four fingers and a thumb. A
 finger is a 6-sided tube in two bands: from the knuckles straight to just short of its middle
-joint (`fingers_02`'s joint), then on to a narrower ring before the rounded tip, curled a little at
-rest. Neighbouring fingers share the edges down into a crotch past the knuckles and stand apart
-beyond it, so the baked shade (tone w) darkens the gaps. The thumb is a 6-sided tube from the palm's
-thumb side and the palm next to it. Weights: the knuckle ring is about half `hand` and half
-`fingers_01` (more of the fingers' on the palm side), a finger `fingers_01` up to the middle joint
-and `fingers_02` past it, so the clips' fist (`GRIP`) bends at the knuckles and the middle joints
-and all four fingers curl together; the thumb's as before (`thumb_01` / `thumb_02`). A small
-child's hand is a little wider, its fingers plumper and shorter.
+joint (`fingers_02`'s joint, 0.42 palm lengths past the knuckle, so the outer band is about as long
+as the inner one), then on to a narrower ring before the rounded tip, curled a little at rest.
+Neighbouring fingers share the edges down into a crotch past the knuckles and stand apart beyond it,
+so the baked shade (tone w) darkens the gaps. The thumb is a 6-sided tube from the palm's thumb side
+and the palm next to it. Weights: the knuckle ring is about half `hand` and half `fingers_01` (more
+of the fingers' on the palm side), a finger `fingers_01` up to the middle joint and `fingers_02`
+past it (on `body` all of it from just past the joint, so the outer band stays round when it
+folds), so the clips' fist (`GRIP`) bends at the knuckles and the middle joints, the tips fold back
+onto the palm and all four fingers curl together; the thumb's as before (`thumb_01` / `thumb_02`).
+A small child's hand is a little wider, its fingers plumper and shorter.
 
 The head's cage (`head.rs`) is a grid of rows (from the jaw up) and columns (degrees round the head)
 under a crown patch: 8 rings of 12 round the whole head, and over the face a finer grid whose rows
@@ -360,7 +362,9 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
   left upper arm brings it down to the side.
 - `thigh` sets `thigh_l` and the mirrored `thigh_r` (x, -y, -z); `thigh_r` sets one side and wins.
   Bones a pose doesn't name rest. `move` is the pelvis offset from rest (m, reference skeleton).
-- Clips hold fists (`GRIP`); the runtime opens the hands towards the rest (open) pose per activity.
+- Clips hold fists (`GRIP`: the fingers 100 degrees at the knuckles and 110 at the middle joints, the
+  tips on the palm, the thumb across them); the runtime opens the hands towards the rest (open) pose
+  per activity.
 - Clips start from the relaxed stance (feet under the hips, upright, arms hanging loose); the
   runtime adds no stance corrections of its own (only the arms a little out over a skirt and an
   elder's stoop), so a clip looks in game as it was authored.
