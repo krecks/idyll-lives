@@ -743,8 +743,11 @@ const USE: Record<string, readonly string[]> = {
   tree: ['idle'],
 };
 
-/** Per finger and per joint (knuckle, middle, tip): share of the hand pose's opening (see `fingerMask`). */
-const FINGER_OPEN: Record<string, number> = { index: 1, middle: 0.93, ring: 0.86, pinky: 0.8, thumb: 0.9, fingers: 0.92 };
+/**
+ * Per finger and per joint (knuckle, middle, tip): share of the hand pose's opening (see `fingerMask`).
+ * (`fingers` opens fully: the grip's fist is tight, and its open hands keep about the curl they had.)
+ */
+const FINGER_OPEN: Record<string, number> = { index: 1, middle: 0.93, ring: 0.86, pinky: 0.8, thumb: 0.9, fingers: 1 };
 const JOINT_OPEN = [0.78, 0.9, 1];
 
 /** Finger pose: 0 = the clip's grip, 1 = open hand (rest pose). */

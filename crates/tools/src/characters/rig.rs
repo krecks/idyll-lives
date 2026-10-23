@@ -174,7 +174,9 @@ pub fn joints(family: &str, stage: &str) -> [V3; NB] {
         // Hands and feet are 1.15x real ones (the toy look), and relatively bigger on small people.
         let hs = (p.upper / ADULT.upper).powf(0.5);
         let k1 = wr + d * (0.055 * hs);
-        let k2 = k1 + d * (0.03 * hs);
+        // The fingers' middle joint, 0.42 palm lengths past the knuckle (a real proximal finger
+        // bone's share), so a fist's tips fold back onto the palm.
+        let k2 = k1 + d * (0.023 * hs);
         // The thumb's base (at the wrist end of the palm's thumb side) and its knuckle off the
         // palm, in palm lengths along the hand, towards the palm and forward (the thumb side).
         let palm = v3(-d[1], d[0], 0.0);
