@@ -2,7 +2,8 @@
  * What a game session will download: first the files the viewed house needs to be shown (its
  * furniture, the garden, the residents, the textures), then the rest of the town and the catalog.
  * `stream.planStream` turns this into the HUD's progress; the loading screens fetch `home` now,
- * `reveal` streams `rest` in the background.
+ * `reveal` streams `rest` in the background. The main menu already streams what doesn't depend on
+ * a world (`gameDataUrls`).
  */
 
 import type { AssetRegistry } from '../assets/registry';
@@ -79,11 +80,17 @@ export function menuAssetUrls(assets: AssetRegistry): string[] {
   return [...urls];
 }
 
+/** Every game's files, whatever its world: surfaces, the garden, the street, the residents and the catalog's and held items' models. */
+export function gameDataUrls(content: Content, assets: AssetRegistry): string[] {
+  const { home, rest } = gameAssetPlan(content, assets, { objects: [] }, null);
+  return [...home, ...rest];
+}
+
 /** The viewed house's files, and everything else this session may fetch. */
 export function gameAssetPlan(
   content: Content,
   assets: AssetRegistry,
-  world: WorldStructure,
+  world: Pick<WorldStructure, 'objects'>,
   view: Rect | null,
 ): { home: string[]; rest: string[] } {
   const home = new Set<string>();

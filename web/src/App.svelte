@@ -7,8 +7,8 @@
   import { perfEnd, perfPhase, perfStart, perfTimeAsync } from './debug/perf';
   import { fetchState, loadDebugReport } from './debug/report';
   import { loadGameData } from './game/session';
-  import { prefetchNow } from './assets/stream';
-  import { menuAssetUrls } from './game/streamPlan';
+  import { prefetchNow, streamGameData } from './assets/stream';
+  import { gameDataUrls, menuAssetUrls } from './game/streamPlan';
   import { latestSave, UnloadableSave } from './persistence/saves';
   import { settings, systemMotion } from './settings/settings.svelte';
   import { app } from './ui/app.svelte';
@@ -27,6 +27,7 @@
   import MenuBackdrop from './ui/screens/MenuBackdrop.svelte';
   import PlayHousehold from './ui/screens/PlayHousehold.svelte';
   import SettingsPanel from './ui/screens/SettingsPanel.svelte';
+  import StreamIndicator from './ui/StreamIndicator.svelte';
   import Toasts from './ui/Toasts.svelte';
 
   let gameLayer: HTMLDivElement;
@@ -87,9 +88,10 @@
     // `?bench=<scene>`: the benchmark's settings (for this page only) before anything reads them.
     const bench = BENCH ? await import('./debug/bench') : null;
     bench?.prepareBench();
+    let data: Awaited<ReturnType<typeof loadGameData>>;
     try {
       step('Loading game data', 0.05);
-      const data = await perfTimeAsync('boot: loadGameData', loadGameData);
+      data = await perfTimeAsync('boot: loadGameData', loadGameData);
       app.dataReady = true;
       // What the menus and character creation show: every icon and the character set. Fetched
       // now so nothing the player can reach before Play is left to stream.
@@ -152,6 +154,9 @@
     perfEnd(booted);
     app.booting = false;
     void perfTimeAsync('boot: game screen chunk', loadGameView);
+    // The rest of the game's data streams from the menu on (not while benchmarking: it would show
+    // in the measurements), once the menu's entrance is over.
+    if (!BENCH) void menuScene.settled().then(() => streamGameData(gameDataUrls(data.content, data.assets)));
     await openDebugReport();
     await bench?.runBench();
   }
@@ -309,6 +314,9 @@
     {#if app.overlay === 'settings'}<SettingsPanel />{:else if app.overlay === 'load'}<LoadGame />{:else}<Credits />{/if}
   </Modal>
 {/if}
+
+<!-- Over every screen (menus, loading screens, the game) until all of the game's data is cached. -->
+{#if !app.fatal}<StreamIndicator />{/if}
 
 {#if app.crash && !app.fatal}<CrashScreen crash={app.crash} />{/if}
 

@@ -6,7 +6,8 @@
  *
  * A plan (`planStream`) says what this session will eventually fetch, so the HUD can show how much
  * of the game's data is already streamed and cached. `prefetchNow` is the same download in the
- * foreground (the loading screens wait for it); `prefetch` is the background stream after Play.
+ * foreground (the loading screens wait for it); `prefetch` is the background stream after Play
+ * (and, from the main menu, `streamGameData`).
  */
 
 import { withBuild, withoutBuild } from './build';
@@ -139,6 +140,15 @@ export function planStream(urls: Iterable<string>, label: string): void {
     }
   }
   notify();
+}
+
+/**
+ * Streams the game's data in the background from the main menu, as the plan unless a game already
+ * planned its own (which takes these files in too).
+ */
+export function streamGameData(urls: string[]): void {
+  if (planned.size === 0) planStream(urls, 'Game data');
+  prefetch(urls);
 }
 
 /** Resolves once the plan has nothing left to fetch. */

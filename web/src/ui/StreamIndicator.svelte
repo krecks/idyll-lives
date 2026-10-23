@@ -1,7 +1,7 @@
 <script lang="ts">
   import { streamState } from '../assets/streamState.svelte';
 
-  /** Hidden a little while after the stream finishes; shown again when a new plan starts. */
+  /** Shown until every file of the plan is in (100 %), then hidden a little later; shown again when a new plan starts. */
   let shown = $state(false);
   let hideTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -30,8 +30,10 @@
 {/if}
 
 <style>
+  /* Over the menus' and loading screens' cards (z 50), under the update bar and the toasts. */
   .stream {
-    position: absolute;
+    position: fixed;
+    z-index: 52;
     left: 50%;
     bottom: calc(var(--edge) + 42px);
     transform: translateX(-50%);
