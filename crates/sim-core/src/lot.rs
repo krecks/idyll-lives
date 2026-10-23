@@ -617,9 +617,7 @@ impl Lot {
     /// separate rooms; any area touching the lot border is outdoors.
     pub fn compute_rooms(&mut self) {
         const UNSET: u16 = u16::MAX;
-        for h in &mut self.halves {
-            *h = [UNSET; 2];
-        }
+        self.halves.fill([UNSET; 2]);
         // A tile without a diagonal is one node (half 0); its half 1 copies it at the end.
         let split = |lot: &Lot, i: usize| lot.diags[i].is_some();
         let mut next_room = 1;
