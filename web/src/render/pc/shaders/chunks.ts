@@ -19,12 +19,16 @@
  *   `getGlossiness`, `getReflDir` (`diffusePS`, `metalnessPS`, `glossPS`, `reflDirPS`).
  * - `combine`: `combineColor` (`combinePS`): the engine's is `combineColorEngine`.
  * - `end`: replaces `endPS` (the colour, fog, tone mapping and gamma) where its defines say so.
+ * - `fogPS`: Babylon's haze in the game's materials (`fog.ts`); `reflectionEnvPS`, `reflectionEnvHQPS`:
+ *   the sky's reflection rising at a slant, as Babylon's environment BRDF had it (`envBrdf.ts`).
  *
  * Features run in the order of the Babylon plugins they port (their priority), as Babylon injected
- * them. Two engine-wide patches (`patchEngineChunks`, once per device) put the game's light where
- * no per-material chunk reaches: the sky's hemispheric fill and the split of the ambient from the
- * direct light (`litForwardBackendPS`), and the sun kept out of basements (`lightFunctionLightPS`).
- * They only act under the game's defines, so other materials draw as PlayCanvas has them.
+ * them. Engine-wide patches (`patchEngineChunks`, once per device) put the game's light where no
+ * per-material chunk reaches: the sky's hemispheric fill and the split of the ambient from the
+ * direct light (`litForwardBackendPS`), the sun kept out of basements (`lightFunctionLightPS`), and
+ * the lamps kept in their rooms (`clusteredLightPS`, `roomLights.ts`). They only act under the
+ * game's defines, so other materials draw as PlayCanvas has them. The lamps' falloff
+ * (`falloffInvSquaredPS`, `spotPS`) is Babylon's in the game's materials (`roomLights.ts` too).
  *
  * World positions in the fragment shader are PlayCanvas's (`vPositionW`, mirrored in z from game
  * space by the world root, `space.ts`): masks in game coordinates read `gamePos(vPositionW)`.
@@ -34,7 +38,10 @@
 import * as pc from '../engine';
 import { CUTAWAY } from './cutaway';
 import { DIAG_VIEW } from './diagView';
+import { gameReflection } from './envBrdf';
+import { gameFog } from './fog';
 import { SOFT_LOOK } from './softLook';
+import { ROOM_LIGHT_CODE } from './roomLights';
 import { PATTERN, PLAIN_FINISH, VERTEX_TWEAKS } from './surface';
 import { UNDERGROUND } from './underground';
 
@@ -129,12 +136,20 @@ export const ANCHORS = {
     combinePS: 'vec3 combineColor(vec3 albedo, vec3 sheenSpecularity, float clearcoatSpecularity) {',
     litForwardBackendPS: '#ifdef LIT_LIGHTING || LIT_REFLECTIONS',
     lightFunctionLightPS: 'vec3 lightColor = light{i}_color;',
+    clusteredLightDecode: 'ClusterLightData clusterLightData = decodeClusterLightCore(lightIndex);',
+    clusteredLightStart: '\tif (numClusteredLights <= 1)',
+    falloffInvSquaredPS: 'float getFalloffInvSquared(float lightRadius, vec3 lightDir) {',
+    spotPS: 'float getSpotEffect(vec3 lightSpotDir, float lightInnerConeAngle, float lightOuterConeAngle, vec3 lightDirNorm) {',
   },
   wgsl: {
     transformCoreVS: 'fn getLocalPosition(vertexPosition: vec3f) -> vec3f {',
     combinePS: 'fn combineColor(albedo: vec3f, sheenSpecularity: vec3f, clearcoatSpecularity: f32) -> vec3f {',
     litForwardBackendPS: '#ifdef LIT_LIGHTING || LIT_REFLECTIONS',
     lightFunctionLightPS: 'var lightColor: vec3f = uniform.light{i}_color;',
+    clusteredLightDecode: 'let clusterLightData: ClusterLightData = decodeClusterLightCore(lightIndex);',
+    clusteredLightStart: '\tif (uniform.numClusteredLights <= 1) {',
+    falloffInvSquaredPS: 'fn getFalloffInvSquared(lightRadius: f32, lightDir: vec3f) -> f32 {',
+    spotPS: 'fn getSpotEffect(lightSpotDir: vec3f, lightInnerConeAngle: f32, lightOuterConeAngle: f32, lightDirNorm: vec3f) -> f32 {',
   },
 } as const;
 
@@ -196,6 +211,17 @@ function build(device: pc.GraphicsDevice, lang: Language): Record<string, string
   out.endPS = ends.length ? `#if ${ends.map((e) => e.when).join(' || ')}\n${ends.map((e) => e.code).join('\n')}\n#else\n${engineEnd}\n#endif\n` : engineEnd;
 
   out.uv0VS = glsl ? UV0_GLSL : UV0_WGSL;
+  // The haze as Babylon's PBR drew it (`fog.ts`).
+  out.fogPS = gameFog(engineChunk(device, lang, 'fogPS'), lang, replaceOnce);
+  // The sky's reflection rising at a slant, as Babylon's environment BRDF had it (`envBrdf.ts`).
+  for (const chunk of ['reflectionEnvPS', 'reflectionEnvHQPS']) out[chunk] = gameReflection(engineChunk(device, lang, chunk), chunk, lang, replaceOnce);
+
+  // The lamps' falloff, Babylon's (`roomLights.ts`): the engine's functions renamed, ours in their place.
+  for (const chunk of ['falloffInvSquaredPS', 'spotPS'] as const) {
+    const anchor = ANCHORS[lang][chunk];
+    const code = ROOM_LIGHT_CODE[lang][chunk === 'spotPS' ? 'spot' : 'falloff'];
+    out[chunk] = `${replaceOnce(engineChunk(device, lang, chunk), chunk, anchor, anchor.replace(/(get\w+)\(/, '$1Engine('))}\n${code}`;
+  }
   return out;
 }
 
@@ -283,11 +309,7 @@ const ENGINE_PATCHES: Record<Language, { backend: string; sun: string }> = {
 const PATCHED = '// (idyll-lives: patched)';
 const patchedDevices = new WeakSet<pc.GraphicsDevice>();
 
-/**
- * Patches `device`'s engine chunks (once; before the first shader is built). A placeholder for the
- * room lights (stage 6): its skip goes after `decodeClusterLightCore(lightIndex)` in
- * `clusteredLightPS`.
- */
+/** Patches `device`'s engine chunks (once; before the first shader is built). */
 export function patchEngineChunks(device: pc.GraphicsDevice): void {
   if (patchedDevices.has(device)) return;
   patchedDevices.add(device);
@@ -302,6 +324,15 @@ export function patchEngineChunks(device: pc.GraphicsDevice): void {
     if (!light.includes(PATCHED)) {
       const anchor = ANCHORS[lang].lightFunctionLightPS;
       chunks.set('lightFunctionLightPS', `${PATCHED}\n${replaceOnce(light, 'lightFunctionLightPS', anchor, `${anchor}${ENGINE_PATCHES[lang].sun}`)}`);
+    }
+    // The lamps kept in their rooms, and out of the meshes they don't light (`roomLights.ts`).
+    const clustered = engineChunk(device, lang, 'clusteredLightPS');
+    if (!clustered.includes(PATCHED)) {
+      const room = ROOM_LIGHT_CODE[lang];
+      const decode = ANCHORS[lang].clusteredLightDecode;
+      const start = ANCHORS[lang].clusteredLightStart;
+      const skipped = replaceOnce(clustered, 'clusteredLightPS', decode, `${decode}${room.skip}`);
+      chunks.set('clusteredLightPS', `${PATCHED}\n${room.decl}\n${replaceOnce(skipped, 'clusteredLightPS', start, `${room.noLamps}${start}`)}`);
     }
   }
 }

@@ -17,7 +17,8 @@
 //!   cubemaps are mirrored in x), and `g = (d.x, d.y, -d.z)`. So face texel direction `e` of the
 //!   PlayCanvas cube shows Babylon's `R·(-e.x, e.y, -e.z)`: a half turn round y, then `R`.
 //! - Its ambient harmonics are evaluated at `d` itself (no mirror), so they are Babylon's
-//!   irradiance polynomial at `R·(d.x, d.y, -d.z)`, re-expressed in PlayCanvas's basis.
+//!   irradiance at `R·(d.x, d.y, -d.z)`, re-expressed in PlayCanvas's basis: the harmonics Babylon
+//!   made of the `.env`'s polynomial and lit with (`babylon_irradiance`), not the polynomial.
 //!
 //! The `.env` (version 2): an 8-byte magic, a JSON manifest ending at a NUL, then PNGs, six faces
 //! per mip (+x, -x, +y, -y, +z, -z), bottom row first, RGBD encoded (`rgb^2.2 / a`), and the sky's
@@ -253,7 +254,57 @@ pub fn convert(env: &BabylonEnv, size: usize) -> PcEnv {
             }
         }
     }
-    PcEnv { cube: Cube { size, faces }, sh: sh_from_polynomial(&env.polynomial) }
+    PcEnv { cube: Cube { size, faces }, sh: sh_from_polynomial(&babylon_irradiance(&env.polynomial)) }
+}
+
+/// The irradiance Babylon's PBR lit with, as a polynomial of the same form as the `.env`'s: not
+/// the `.env`'s polynomial itself but the spherical harmonics Babylon makes of it for its shaders
+/// (`SPHERICAL_HARMONICS`, on by default: `SphericalHarmonics.FromPolynomial`, then
+/// `preScaleForRendering`, evaluated by `harmonicsFunctions`' `computeEnvironmentIrradiance`).
+/// They aren't the same function: the harmonics come out sharper (for this sky about a quarter
+/// brighter straight up and half as bright straight down), and they are what the pictures showed.
+pub fn babylon_irradiance(p: &[[f64; 3]; 9]) -> [[f64; 3]; 9] {
+    let k = [
+        (1.0 / (4.0 * PI)).sqrt(),
+        -(3.0 / (4.0 * PI)).sqrt(),
+        (3.0 / (4.0 * PI)).sqrt(),
+        -(3.0 / (4.0 * PI)).sqrt(),
+        (15.0 / (4.0 * PI)).sqrt(),
+        -(15.0 / (4.0 * PI)).sqrt(),
+        (5.0 / (16.0 * PI)).sqrt(),
+        -(15.0 / (4.0 * PI)).sqrt(),
+        (15.0 / (16.0 * PI)).sqrt(),
+    ];
+    let mut out = [[0.0; 3]; 9];
+    for ch in 0..3 {
+        let [x, y, z, xx, yy, zz, yz, zx, xy] = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(|i| p[i][ch]);
+        // `FromPolynomial` (l00, l1-1, l10, l11, l2-2, l2-1, l20, l21, l22), times π and the basis constants.
+        let l = [
+            xx * 0.376127 + yy * 0.376127 + zz * 0.376126,
+            -y * 0.977204,
+            z * 0.977204,
+            -x * 0.977204,
+            xy * 1.16538,
+            -yz * 1.16538,
+            zz * 1.34567 - xx * 0.672834 - yy * 0.672834,
+            -zx * 1.16538,
+            xx * 1.16538 - yy * 1.16538,
+        ];
+        let l: [f64; 9] = std::array::from_fn(|i| l[i] * PI * k[i]);
+        // l00 + l1-1·y + l10·z + l11·x + l2-2·xy + l2-1·yz + l20·(3z² − 1) + l21·zx + l22·(x² − y²),
+        // its constant spread over x² + y² + z² (= 1 on the sphere).
+        let c = l[0] - l[6];
+        out[0][ch] = l[3];
+        out[1][ch] = l[1];
+        out[2][ch] = l[2];
+        out[3][ch] = c + l[8];
+        out[4][ch] = c - l[8];
+        out[5][ch] = c + 3.0 * l[6];
+        out[6][ch] = l[5];
+        out[7][ch] = l[7];
+        out[8][ch] = l[4];
+    }
+    out
 }
 
 /// Babylon's irradiance polynomial at `m` (`computeEnvironmentIrradiance`).
@@ -411,6 +462,26 @@ mod tests {
                 let want = eval_polynomial(&p, babylon_dir_for_normal(n), ch);
                 assert!((eval_sh(&sh, n, ch) - want).abs() < 1e-12, "{n:?}");
             }
+        }
+    }
+
+    /// Babylon's runtime irradiance (its harmonics, `computeEnvironmentIrradiance`) as the polynomial
+    /// `babylon_irradiance` gives, at a few directions worked out by hand from Babylon's code.
+    #[test]
+    fn babylon_irradiance_is_its_harmonics() {
+        let p = [[0.06, 0.07, 0.08], [0.37, 0.4, 0.5], [0.03, -0.02, 0.04], [0.63, 0.6, 0.66], [0.67, 0.7, 0.71], [0.64, 0.65, 0.68], [0.01, 0.03, -0.02], [0.02, -0.01, 0.009], [0.05, 0.04, -0.03]];
+        let q = babylon_irradiance(&p);
+        let (c0, c1, c2) = ((1.0 / (4.0 * PI)).sqrt(), (3.0 / (4.0 * PI)).sqrt(), (5.0 / (16.0 * PI)).sqrt());
+        for ch in 0..3 {
+            let [x, y, _, xx, yy, zz, ..] = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(|i| p[i][ch]);
+            let l00 = (xx + yy) * 0.376127 + zz * 0.376126;
+            let l20 = zz * 1.34567 - (xx + yy) * 0.672834;
+            // Straight up: l00 + l1-1 − l20 − l22 (each times π and its constant).
+            let up = PI * (l00 * c0 + y * 0.977204 * c1 - l20 * c2 - (xx - yy) * 1.16538 * (15.0 / (16.0 * PI)).sqrt());
+            assert!((eval_polynomial(&q, [0.0, 1.0, 0.0], ch) - up).abs() < 1e-12);
+            // Along +x: l00 + l11 − l20 + l22.
+            let east = PI * (l00 * c0 + x * 0.977204 * c1 - l20 * c2 + (xx - yy) * 1.16538 * (15.0 / (16.0 * PI)).sqrt());
+            assert!((eval_polynomial(&q, [1.0, 0.0, 0.0], ch) - east).abs() < 1e-12);
         }
     }
 

@@ -17,9 +17,10 @@
  *   are switched off, those in a player's colours let go of.
  *
  * Per frame (`update`): the object clips, the screens' glow and the sky following the camera; no
- * allocations. Lamps' light is stage 6 (`setLampsOff` only records which are off, for the clips and
- * the shades' glow), residents stage 7 (`tables` and `pullChairs` are ready for them), picking and
- * build mode stage 8 (`placed`), mirrors stage 9 (`mirrors`).
+ * allocations. The lamps' light is `lamps.ts`'s, which drives the shades' glow here (`applyGlow`:
+ * each lamp's fade, each room's lights; `setLampsOff` records which are off, for the clips).
+ * Residents are stage 7 (`tables` and `pullChairs` are ready for them), picking and build mode
+ * stage 8 (`placed`), mirrors stage 9 (`mirrors`).
  */
 
 import * as pc from './engine';
@@ -27,9 +28,10 @@ import { Instances, INSTANCE_COLOR } from './instancing';
 import { ItemLayer } from './items';
 import { shadowOnlyLayer } from './layers';
 import { MaterialLibrary } from './materials';
-import { buildModel, disposeTemplate, type MirrorSurface, type ModelTemplate } from './models';
+import { buildModel, disposeTemplate, glowByInstance, type MirrorSurface, type ModelTemplate } from './models';
 import { installNature, Landscape, setWind, Sky, windStill, type RoadBuilder } from './nature';
 import { ObjectMotion, writeInstance, type MovingObject, type PopTarget } from './objectMotion';
+import { ObjectShadows, type ShadowSource } from './objectShadows';
 import { toGame } from './space';
 import { tableRooms } from './tableTuck';
 import { TemplateCache } from './templateCache';
@@ -68,7 +70,7 @@ export interface LotHooks {
   pace(): Promise<void>;
   /** The sun's shadows draw again (`urgent`: now, not at the shadow rate). */
   shadowsMoved(urgent: boolean): void;
-  /** The landscapes drawn changed (their draws are `LotContents.landscapeDraws`: the lamps leave them out, stage 6). */
+  /** The landscapes drawn changed (their draws are `LotContents.landscapeDraws`: the lamps leave them out). */
   landscapeChanged?(): void;
 }
 
@@ -137,7 +139,7 @@ interface ModelDraws {
   glows: Instances[];
 }
 
-/** How lamps and rooms are lit now (stage 6 drives it): each lamp's level, each room's windows' glow and whether it's kept dark. */
+/** How lamps and rooms are lit now (`lamps.ts` drives it): each lamp's level, each room's windows' glow and whether it's kept dark. */
 export interface GlowLight {
   /** How far the shades glow (0 by day .. 1 at night). */
   level: number;
@@ -182,13 +184,15 @@ export class LotContents {
   /** Whether a moving part casts the sun's shadow (then its moves draw the shadows again). */
   private movingPartsCast = false;
   private glows: Glow[] = [];
-  private glowLight: GlowLight = { level: 0, lampOn: () => 1, roomOn: () => 1, dimmed: () => false };
+  private glowLight: GlowLight = { level: 0, lampOn: (id) => (this.lampsOff.has(id) ? 0 : 1), roomOn: () => 1, dimmed: () => false };
   /** The objects residents use this frame (screens are lit by it) and when that was. */
   private readonly screenOn = new Set<number>();
   private screenTime = 0;
   /** Contact shadows under the objects: the blob and this world's draw of it. */
   private readonly blob: { mesh: pc.Mesh; material: pc.StandardMaterial };
   private blobs: Instances | null = null;
+  /** Low's one sun-shadow caster for the objects' bodies (`QualitySettings.mergedObjectShadows`, `objectShadows.ts`); null on the others. */
+  private readonly objectShadows: ObjectShadows | null;
   /** Lamps (and fires) switched off, by object id (the sim's `lampsOff`). */
   private lampsOff: ReadonlySet<number> = new Set();
   private reducedMotion = false;
@@ -211,6 +215,7 @@ export class LotContents {
     // Wind sway and tint variation for the plant finishes (hooks them as the models load).
     installNature(app);
     this.shadowLayer = shadowOnlyLayer(app, sun);
+    this.objectShadows = quality.mergedObjectShadows ? new ObjectShadows(app.graphicsDevice, root, this.shadowLayer.id) : null;
     const clouds = deps.assets.has('image.clouds', 'image') ? deps.assets.get('image.clouds', 'image')!.url : undefined;
     this.sky = new Sky(app, root, SKY_RADIUS, clouds);
     this.items = new ItemLayer(app, root, deps.assets, deps.content);
@@ -289,7 +294,7 @@ export class LotContents {
     return set;
   }
 
-  /** The landscape's draws (the lamps leave them out, stage 6). */
+  /** The landscape's draws (the lamps leave them out: `MaterialLibrary.excludeFromLights`). */
   landscapeDraws(): pc.MeshInstance[] {
     const out: pc.MeshInstance[] = [];
     for (const n of this.natures.values()) for (const e of n.draws) for (const r of e.findComponents('render') as pc.RenderComponent[]) out.push(...r.meshInstances);
@@ -395,7 +400,7 @@ export class LotContents {
 
   /**
    * The time of day (each lighting update): the sky, the night clips (curtains drawn), and the
-   * shades' glow at the lamps' level (from dusk; the rooms' own state is stage 6's, `applyGlow`).
+   * shades' glow at the lamps' level (from dusk; the rooms' own state is `lamps.ts`'s, `applyGlow`).
    */
   applyLighting(l: Lighting): void {
     this.sky.update(l);
@@ -534,9 +539,8 @@ export class LotContents {
         windStill(draw.meshInstance, m);
         return draw;
       }),
-      // (Glows: unlit, added on top, their strength per instance in its colour, read by stage 6's
-      // glow; until then a glow is drawn whole where it's lit at all, and not by day.)
-      glows: (template.glows ?? []).map((g) => new Instances(device, this.root, g.mesh.mesh, g.mesh.material, { name: g.mesh.name, streams: [INSTANCE_COLOR], castShadows: false, receiveShadows: false })),
+      // (Glows: unlit, added on top, their strength per instance in its colour: `applyGlow`.)
+      glows: (template.glows ?? []).map((g) => new Instances(device, this.root, g.mesh.mesh, glowByInstance(this.app, g.mesh.material), { name: g.mesh.name, streams: [INSTANCE_COLOR], castShadows: false, receiveShadows: false })),
     };
     this.modelDraws.set(key, d);
     return d;
@@ -582,6 +586,8 @@ export class LotContents {
     const glows: Glow[] = [];
     const drawnKeys = new Set<string>();
     let partsCast = false;
+    // (Low: the opaque bodies cast from one merged mesh, `objectShadows.ts`.)
+    const shadowSources: ShadowSource[] = [];
     const m = this.vTmp;
     lists.forEach((list, n) => {
       const template = templates[n];
@@ -645,8 +651,15 @@ export class LotContents {
         draw.setMatrices(part < 0 ? matrices : parts[part].matrices, list.length);
         draw.update();
         draw.enabled = true;
+        // On Low an opaque mesh casts from the merged mesh (its body) or not at all (a moving part);
+        // something see-through casts from its own copies.
+        const material = draw.meshInstance.material;
+        const merged = !!this.objectShadows && !!material && material.blendType === pc.BLEND_NONE && !(material.alphaTest > 0);
+        const render = draw.entity.render;
+        if (render && render.castShadows === merged) render.castShadows = !merged;
+        if (merged && part < 0) shadowSources.push({ mesh: draw.mesh, matrices, count: list.length });
         // (A moving part casting makes its moves draw the shadows again.)
-        if (part >= 0 && draw.entity.render?.castShadows) partsCast = true;
+        if (part >= 0 && render?.castShadows) partsCast = true;
       });
       (template.glows ?? []).forEach(({ part, screen }, j) => {
         // Strengths per instance (`applyGlow`), by the room each stands in; on a moving part, its buffer.
@@ -665,6 +678,7 @@ export class LotContents {
       });
     });
     this.movingPartsCast = partsCast;
+    this.objectShadows?.build(shadowSources);
     // Models no longer drawn: their draws go off (their templates stay for the next build).
     for (const [key, d] of this.modelDraws) {
       if (drawnKeys.has(key)) continue;
@@ -816,6 +830,7 @@ export class LotContents {
     }
     this.blobs?.destroy();
     this.blobs = null;
+    this.objectShadows?.clear();
     this.templatesInUse.clear();
     this.retireTemplates();
     this.templates.dropFailed();
@@ -863,11 +878,11 @@ export class LotContents {
         this.wallItemsHidden.set(p.id, m);
         const gone = m.slice();
         gone.fill(0, 0, 12);
-        writeInstance(p.pop, gone);
+        this.write(p.pop, gone);
         this.hooks.shadowsMoved(true);
       } else if (!hide && saved) {
         this.wallItemsHidden.delete(p.id);
-        writeInstance(p.pop, saved);
+        this.write(p.pop, saved);
         this.hooks.shadowsMoved(true);
       }
     }
@@ -885,7 +900,7 @@ export class LotContents {
   pullChairs(pulled: ReadonlyMap<number, number>, held: number | null = null): void {
     for (const [id, was] of this.pulledIn) {
       if (pulled.has(id)) continue;
-      for (const { target, matrix } of was.saved) writeInstance(target, matrix);
+      for (const { target, matrix } of was.saved) this.write(target, matrix);
       this.pulledIn.delete(id);
       this.hooks.shadowsMoved(true);
     }
@@ -903,7 +918,7 @@ export class LotContents {
         const m = matrix.slice();
         m[12] += Math.sin(yaw) * by;
         m[14] += Math.cos(yaw) * by;
-        writeInstance(target as PopTarget, m);
+        this.write(target as PopTarget, m);
       }
       this.hooks.shadowsMoved(true);
     }
@@ -922,7 +937,7 @@ export class LotContents {
   // --- glows ---------------------------------------------------------------------------
 
   /**
-   * The shades' and fires' glow (stage 6 lights the rooms: `light` says how): each instance as
+   * The shades' and fires' glow (`lamps.ts` lights the rooms: `light` says how): each instance as
    * bright as its lamp, or its room's lights, at the lamps' level (by day too in a room without
    * windows); a glow with nothing lit isn't drawn. Screens are lit by use (`update`).
    */
@@ -936,7 +951,7 @@ export class LotContents {
       let lit = false;
       g.rooms.forEach((room, i) => {
         const lamp = g.lamps[i];
-        const lampOn = lamp >= 0 ? (this.lampsOff.has(lamp) ? 0 : 1) * light.lampOn(lamp) : room ? light.roomOn(room) : 1;
+        const lampOn = lamp >= 0 ? light.lampOn(lamp) : room ? light.roomOn(room) : 1;
         const f = (room && light.dimmed(room) ? 1 : light.level) * lampOn;
         g.colors.fill(f, i * 4, i * 4 + 3);
         g.colors[i * 4 + 3] = 1;
@@ -1058,6 +1073,13 @@ export class LotContents {
     this.templates.clear();
     this.items.dispose();
     this.sky.destroy();
+    this.objectShadows?.destroy();
+  }
+
+  /** Writes an object's copy anew (`writeInstance`), and on Low its body in the merged shadow caster. */
+  private write(target: PopTarget, matrix: ArrayLike<number>): void {
+    writeInstance(target, matrix);
+    this.objectShadows?.bake(target);
   }
 }
 

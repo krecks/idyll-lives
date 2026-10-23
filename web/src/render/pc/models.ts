@@ -30,7 +30,8 @@
 
 import * as pc from './engine';
 import { containerOptions, setupDecoders } from './loaders';
-import { DEFAULT_FINISH, encodeFinish, GAME_FRONT_FACE, MaterialLibrary } from './materials';
+import { DEFAULT_FINISH, encodeFinish, GAME_FRONT_FACE, INSTANCE_COLOR_SEMANTIC, MaterialLibrary } from './materials';
+import { installGameChunks } from './shaders/chunks';
 import { optimizedUrl } from '../../assets/registry';
 import { foreground } from '../../assets/stream';
 import type { ModelEntry, PrimitivePart, Vec3 } from '../../assets/types';
@@ -1081,6 +1082,9 @@ function glowMaterial(app: pc.AppBase): pc.StandardMaterial {
   material.diffuse.set(0, 0, 0);
   material.emissive.set(1, 1, 1);
   material.emissiveVertexColor = true;
+  // The glow's colour (linear) linearised once more, as the Babylon renderer drew it: its standard
+  // material's output was taken as sRGB (and linearised for the image processing).
+  (material as pc.StandardMaterial & { vertexColorGamma: boolean }).vertexColorGamma = true;
   material.blendType = pc.BLEND_ADDITIVE;
   material.depthWrite = false;
   // Its faces are the lit ones again, so it only has to win their own depth: a few steps of the
@@ -1094,4 +1098,30 @@ function glowMaterial(app: pc.AppBase): pc.StandardMaterial {
   material.update();
   glowMaterials.set(app, material);
   return material;
+}
+
+/** Each glow material's copy with a strength per instance (`glowByInstance`). */
+const instanceGlows = new WeakMap<pc.Material, pc.StandardMaterial>();
+
+/**
+ * A glow's material drawn with a strength per instance (the `INSTANCE_COLOR` stream, `instancing.ts`):
+ * its vertex colour (the glow's) times the instance's colour, as Babylon's thin instances' colour
+ * multiplied the glow's (a lamp's shade as bright as its lamp, a screen as its flicker), and was
+ * linearised with it (`vertexColorGamma`). Draws without that stream keep the glow's own material.
+ */
+export function glowByInstance(app: pc.AppBase, glow: pc.Material): pc.Material {
+  if (!(glow instanceof pc.StandardMaterial)) return glow;
+  let copy = instanceGlows.get(glow);
+  if (!copy) {
+    copy = glow.clone();
+    copy.name = `${glow.name}|instance`;
+    installGameChunks(copy, app.graphicsDevice);
+    // (Unlit: none of the look; the instance's colour scales the vertex colour, `shaders/surface.ts`.)
+    copy.setDefine('GAME_LOOK', false);
+    copy.setAttribute('game_instanceColor', INSTANCE_COLOR_SEMANTIC);
+    copy.setDefine('GAME_GLOW_TINT', '');
+    copy.update();
+    instanceGlows.set(glow, copy);
+  }
+  return copy;
 }

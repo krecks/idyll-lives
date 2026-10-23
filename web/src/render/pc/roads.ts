@@ -123,7 +123,8 @@ function letteringOf(app: pc.AppBase, name: string): pc.StandardMaterial {
   do ctx.font = `700 ${size}px sans-serif`;
   while (ctx.measureText(name).width > 460 && (size -= 4) > 24);
   ctx.fillText(name, 256, 124);
-  const texture = new pc.Texture(app.graphicsDevice, { name: 'welcomeSignText', width: 512, height: 192, format: pc.PIXELFORMAT_SRGBA8, mipmaps: true, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE });
+  // (A linear format: the material decodes it, `pow(c, 2.2)`, as Babylon did its gamma-space texture; `materials.ts` `textureWithFallback`.)
+  const texture = new pc.Texture(app.graphicsDevice, { name: 'welcomeSignText', width: 512, height: 192, format: pc.PIXELFORMAT_RGBA8, mipmaps: true, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE });
   texture.setSource(canvas);
   const mat = new pc.StandardMaterial();
   mat.name = 'welcomeSignText';

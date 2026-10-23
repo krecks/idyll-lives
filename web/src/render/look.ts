@@ -40,7 +40,7 @@ export interface Look {
   shadowsHue: number;
   shadowsDensity: number;
   /**
-   * Moonlight grade strength at night (0..1, faded in with the lamps; see babylon/nightGrade.ts).
+   * Moonlight grade strength at night (0..1, faded in with the lamps; see pc/nightGrade.ts).
    * Grass reflects almost no blue, so a blue moon alone renders nights dark green; the grade turns
    * dark tones blue-grey while lamps and lit windows stay warm.
    */

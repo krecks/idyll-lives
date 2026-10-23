@@ -118,14 +118,16 @@ export class Street {
     this.templates = new TemplateCache(app);
     this.root = new pc.Entity('street');
     parent.addChild(this.root);
-    // Streetlights' glass: unlit, its colour by the time of day (`setNight`).
+    // Streetlights' glass: unlit, its colour by the time of day (`setNight`). (Its colours, and the
+    // pools' and the lenses' strengths, are sRGB as PlayCanvas takes them: the Babylon renderer's
+    // were too, a standard material's output there being taken as sRGB and linearised; clamped to 1.)
     const glow = (this.glowMat = new pc.StandardMaterial());
     glow.name = 'streetLampGlass';
     glow.frontFace = GAME_FRONT_FACE;
     glow.useLighting = false;
     glow.useSkybox = false;
     glow.diffuse.set(0, 0, 0);
-    setLinear(glow.emissive, 0.6, 0.6, 0.56);
+    glow.emissive.set(0.6, 0.6, 0.56);
     glow.update();
     // Pools of lamplight on the ground: added, unlit, no fog (fog would add up to boxes).
     this.poolTexture = gradientTexture(this.device, 'streetLightPool', [
@@ -290,14 +292,14 @@ export class Street {
     this.lamps = lamps;
     const g = Math.min(1, Math.max(0, (lamps - 0.3) / 0.45));
     // Pale glass by day, a warm glow at night.
-    setLinear(this.glowMat.emissive, 0.62 + g * 1.7, 0.62 + g * 0.95, 0.58 + g * 0.2);
+    this.glowMat.emissive.set(Math.min(1, 0.62 + g * 1.7), Math.min(1, 0.62 + g * 0.95), Math.min(1, 0.58 + g * 0.2));
     this.glowMat.update();
-    setLinear(this.poolMat.emissive, 0.62 * g, 0.46 * g, 0.26 * g);
+    this.poolMat.emissive.set(0.62 * g, 0.46 * g, 0.26 * g);
     this.poolMat.update();
     // The models' glows (the path lights' lenses) with the streetlights: nothing by day.
     for (const [key, p] of this.placed) {
       for (const { draw, material } of p.glows) {
-        setLinear(material.emissive, g, g, g);
+        material.emissive.set(g, g, g);
         material.update();
         draw.enabled = g > 0 && draw.count > 0 && this.used.has(key);
       }
@@ -418,12 +420,6 @@ export class Street {
     this.lib.excludeFromLights([], [d.meshInstance]);
     return d;
   }
-}
-
-/** Sets an sRGB PlayCanvas colour from a linear one (the look's and Babylon's colours are linear). */
-function setLinear(c: pc.Color, r: number, g: number, b: number): void {
-  const s = (v: number) => Math.pow(Math.max(0, v), 1 / 2.2);
-  c.set(s(r), s(g), s(b), 1);
 }
 
 /**

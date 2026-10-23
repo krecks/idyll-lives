@@ -46,9 +46,12 @@ export class GardenPools {
     m.useSkybox = false;
     m.useFog = false;
     m.diffuse.set(0, 0, 0);
-    // The vertex colour (linear) times the gradient (as opacity), added: a pool switched off adds nothing.
+    // The vertex colour times the gradient (as opacity), added: a pool switched off adds nothing. (Taken
+    // as sRGB, linearised: the Babylon renderer's standard material's output was, the lamps' linear
+    // colour times the strength with it.)
     m.emissive.set(1, 1, 1);
     m.emissiveVertexColor = true;
+    (m as pc.StandardMaterial & { vertexColorGamma: boolean }).vertexColorGamma = true;
     m.opacityMap = this.texture;
     m.opacityMapChannel = 'r';
     m.blendType = pc.BLEND_ADDITIVEALPHA;

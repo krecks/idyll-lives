@@ -37,6 +37,7 @@ import { withBuild } from '../../assets/build';
 import { optimizedUrl, type AssetRegistry } from '../../assets/registry';
 import type { MaterialEntry } from '../../assets/types';
 import type { RGB } from '../shared/environment';
+import { WALL_HEIGHT } from '../shared/walls';
 import type { Shading } from '../types';
 
 export { INSTANCE_COLOR_SEMANTIC, WALL_CUT_SEMANTIC } from './shaders/chunks';
@@ -185,18 +186,86 @@ export class DigState {
   }
 }
 
+/** The rooms of the lot in view, a value per tile: 0 unknown (lit by every lamp), 1 outdoors, 2 and up a room. */
+export interface RoomMask {
+  /** The lot's corner (m) and size (tiles). */
+  x0: number;
+  z0: number;
+  w: number;
+  d: number;
+  /** The lowest storey given, and how many, each `d` rows of `tiles` (from the lowest up). */
+  storey: number;
+  storeys: number;
+  tiles: Uint16Array;
+}
+
+/** The room mask's size in texels: a lot is at most 256 tiles each way, and up to four storeys are shown. */
+const ROOM_MASK_W = 256;
+const ROOM_MASK_H = 256 * 4;
+
 /**
- * Which room each tile of the lot in view is in, so lamps light only their own: stage 6 of the
- * port (`babylon/roomLights.ts`; its shader skip goes in `clusteredLightPS`). A placeholder until
- * then: masking is off and nothing is masked.
+ * Which room each tile of the lot in view is in, so lamps light only their own (the port of
+ * `babylon/roomLights.ts`; the test is in the clustered lights' loop, `shaders/roomLights.ts`):
+ * `mask` has two bytes per tile (low, high) in its corner, `area` the lot (x0, z0 in metres, then w,
+ * d in tiles), `band` its storeys (the lowest, how many, the storey height, and 1 while masking:
+ * nothing is masked at 0). Uniforms only: masking costs no shader of its own.
  */
 export class RoomLightState {
-  /** Masking is on (clustered lamps); a define, so switching recompiles. */
+  /** Masking is on (every lamp lights, clustered: `lamps.ts`; the low preset's four don't keep to their rooms). */
   enabled = false;
+  readonly mask: pc.Texture;
+  readonly area = new pc.Vec4(0, 0, 0, 0);
+  readonly band = new pc.Vec4(0, 0, WALL_HEIGHT, 0);
+  private readonly bytes = new Uint8Array(ROOM_MASK_W * ROOM_MASK_H * 2);
+  private shown: RoomMask | null = null;
+
+  constructor(device: pc.GraphicsDevice) {
+    this.mask = new pc.Texture(device, {
+      name: 'roomLightMask',
+      width: ROOM_MASK_W,
+      height: ROOM_MASK_H,
+      format: pc.PIXELFORMAT_RG8,
+      mipmaps: false,
+      minFilter: pc.FILTER_NEAREST,
+      magFilter: pc.FILTER_NEAREST,
+      addressU: pc.ADDRESS_CLAMP_TO_EDGE,
+      addressV: pc.ADDRESS_CLAMP_TO_EDGE,
+      levels: [this.bytes],
+    });
+  }
 
   /** Shows `rooms` (null: none, every lamp lights everything). Returns whether anything changed. */
-  show(_rooms: unknown): boolean {
-    return false;
+  show(rooms: RoomMask | null): boolean {
+    if (!this.enabled) rooms = null;
+    const was = this.shown;
+    if (was === rooms) return false;
+    if (rooms && was && was.x0 === rooms.x0 && was.z0 === rooms.z0 && was.w === rooms.w && was.d === rooms.d && was.storey === rooms.storey && was.storeys === rooms.storeys && was.tiles.every((t, i) => t === rooms.tiles[i])) {
+      this.shown = rooms;
+      return false;
+    }
+    this.shown = rooms;
+    if (!rooms) {
+      this.band.w = 0;
+      return true;
+    }
+    const w = Math.min(rooms.w, ROOM_MASK_W);
+    const rows = Math.min(rooms.d * rooms.storeys, ROOM_MASK_H);
+    const bytes = this.bytes;
+    bytes.fill(0);
+    for (let z = 0; z < rows; z++) {
+      for (let x = 0; x < w; x++) {
+        const v = rooms.tiles[z * rooms.w + x];
+        const at = (z * ROOM_MASK_W + x) * 2;
+        bytes[at] = v & 255;
+        bytes[at + 1] = v >> 8;
+      }
+    }
+    const level = this.mask.lock();
+    (level as Uint8Array).set(bytes);
+    this.mask.unlock();
+    this.area.set(rooms.x0, rooms.z0, w, rooms.d);
+    this.band.set(rooms.storey, Math.min(rooms.storeys, Math.floor(ROOM_MASK_H / Math.max(1, rooms.d))), WALL_HEIGHT, 1);
+    return true;
   }
 }
 
@@ -269,19 +338,21 @@ export class MaterialLibrary {
   private readonly creators: ((key: string, material: pc.StandardMaterial) => void)[] = [];
   /** The ground dug away over a basement in view (see `digInto`), and the basements and windowless rooms kept dark. */
   readonly dig: DigState;
-  /** Which room each tile of the lot in view is in, so lamps light only their own (stage 6). */
-  readonly rooms = new RoomLightState();
+  /** Which room each tile of the lot in view is in, so lamps light only their own. */
+  readonly rooms: RoomLightState;
   /** The sky's hemispheric fill (linear, scaled by its intensity; `setSkyFill`). */
   private readonly skySky = new Float32Array(3);
   private readonly skyGround = new Float32Array(3);
   /** The shader features' state as global uniforms (`pushUniforms`). */
   private readonly uniforms: { id: pc.ScopeId; value: Float32Array; fill: (out: Float32Array) => void }[];
   private readonly mask: pc.ScopeId;
+  private readonly roomMask: pc.ScopeId;
 
   private constructor(readonly app: pc.AppBase) {
     const device = (this.device = app.graphicsDevice);
     patchEngineChunks(device);
     this.dig = new DigState(device);
+    this.rooms = new RoomLightState(device);
     const scope = device.scope;
     const d = SKY_FILL_DIRECTION;
     const len = Math.hypot(d.x, d.y, d.z);
@@ -325,9 +396,12 @@ export class MaterialLibrary {
       ],
       ['game_windowlessBand', 4, vec4(dig.band)],
       ['game_windowlessArea', 4, vec4(dig.area)],
+      ['game_roomLightArea', 4, vec4(this.rooms.area)],
+      ['game_roomLightBand', 4, vec4(this.rooms.band)],
     ];
     this.uniforms = table.map(([name, size, fill]) => ({ id: scope.resolve(name), value: new Float32Array(size), fill }));
     this.mask = scope.resolve('game_windowlessMask');
+    this.roomMask = scope.resolve('game_roomLightMask');
     this.pushUniforms();
     // The state as it is now, before every frame (a few uniforms: cheaper than tracking changes, no allocations).
     app.on('prerender', this.pushUniforms, this);
@@ -339,6 +413,7 @@ export class MaterialLibrary {
       u.id.setValue(u.value);
     }
     this.mask.setValue(this.dig.mask);
+    this.roomMask.setValue(this.rooms.mask);
   }
 
   /**
@@ -523,8 +598,14 @@ export class MaterialLibrary {
    * linear (the look's colours as Babylon used them), scaled by `intensity`.
    */
   setSkyFill(sky: RGB, ground: RGB, intensity: number): void {
-    this.skySky.set([sky.r * intensity, sky.g * intensity, sky.b * intensity]);
-    this.skyGround.set([ground.r * intensity, ground.g * intensity, ground.b * intensity]);
+    const s = this.skySky;
+    const g = this.skyGround;
+    s[0] = sky.r * intensity;
+    s[1] = sky.g * intensity;
+    s[2] = sky.b * intensity;
+    g[0] = ground.r * intensity;
+    g[1] = ground.g * intensity;
+    g[2] = ground.b * intensity;
   }
 
   /**
@@ -662,13 +743,14 @@ export class MaterialLibrary {
     }
   }
 
+  /** (`srgb`: colour, in gamma space; loaded as it is all the same and decoded where it is read, see `textureWithFallback`.) */
   private textureSlot(url: string, srgb: boolean, kind: 'white' | 'normal' | 'arm'): TextureSlot {
     const id = `${url}|${srgb ? 'srgb' : 'linear'}`;
     let slot = this.textures.get(id);
     if (slot) return slot;
-    const made: TextureSlot = { texture: standIn(this.device, kind, srgb), loaded: false, users: [] };
+    const made: TextureSlot = { texture: standIn(this.device, kind), loaded: false, users: [] };
     this.textures.set(id, made);
-    const job = textureWithFallback(this.app, url, srgb, this.anisotropy).then((texture) => {
+    const job = textureWithFallback(this.app, url, this.anisotropy).then((texture) => {
       made.loaded = true;
       if (!texture) return;
       made.texture = texture;
@@ -684,17 +766,17 @@ export class MaterialLibrary {
   }
 }
 
-/** 1 × 1 textures standing in while a surface's own load (same kind, so the shader stays the same). */
+/** 1 × 1 textures standing in while a surface's own load (same kind and format, so the shader stays the same). */
 const standIns = new WeakMap<pc.GraphicsDevice, Map<string, pc.Texture>>();
-function standIn(device: pc.GraphicsDevice, kind: 'white' | 'normal' | 'arm', srgb: boolean): pc.Texture {
+function standIn(device: pc.GraphicsDevice, kind: 'white' | 'normal' | 'arm'): pc.Texture {
   let byKind = standIns.get(device);
   if (!byKind) standIns.set(device, (byKind = new Map()));
-  const id = `${kind}|${srgb}`;
+  const id = kind;
   let tex = byKind.get(id);
   if (!tex) {
     // White albedo; a flat normal; AO 1, roughness 1, not metal.
     const texel = kind === 'normal' ? [128, 128, 255, 255] : kind === 'arm' ? [255, 255, 0, 255] : [255, 255, 255, 255];
-    tex = new pc.Texture(device, { name: `standIn-${id}`, width: 1, height: 1, format: srgb ? pc.PIXELFORMAT_SRGBA8 : pc.PIXELFORMAT_RGBA8, mipmaps: false, levels: [new Uint8Array(texel)] });
+    tex = new pc.Texture(device, { name: `standIn-${id}`, width: 1, height: 1, format: pc.PIXELFORMAT_RGBA8, mipmaps: false, levels: [new Uint8Array(texel)] });
     byKind.set(id, tex);
   }
   return tex;
@@ -703,14 +785,22 @@ function standIn(device: pc.GraphicsDevice, kind: 'white' | 'normal' | 'arm', sr
 /**
  * A texture from the build's compressed copy (KTX2) when there is one, else from the file; a copy
  * that fails to load falls back to the file. Resolves to null when neither loads.
+ *
+ * Always in a linear (UNORM) format, colour maps too, as Babylon loaded the game's textures (its
+ * `gammaSpace` textures, without sRGB buffers): a base or emissive colour map is then decoded where
+ * the material reads it, `pow(c, 2.2)` (PlayCanvas does so for an 8-bit or block format that isn't
+ * sRGB, `Texture.encoding`), and its mipmaps are averaged in gamma space (the GPU's, or the KTX2
+ * file's), as Babylon's were. A hardware sRGB format decodes with the exact sRGB curve and
+ * averages in linear light: 3–10 % brighter on the game's textured surfaces. Normal and packed
+ * maps are read as they are either way.
  */
-export function textureWithFallback(app: pc.AppBase, source: string, srgb: boolean, anisotropy?: number): Promise<pc.Texture | null> {
+export function textureWithFallback(app: pc.AppBase, source: string, anisotropy?: number): Promise<pc.Texture | null> {
   // Normal and ARM maps sit next to the albedo (`new URL(entry.normal, base)`), without the build's query.
   const url = withBuild(source);
   const copy = optimizedUrl(url);
   const load = (file: string) =>
     new Promise<pc.Texture>((resolve, reject) => {
-      const asset = new pc.Asset(file, 'texture', { url: file }, { srgb });
+      const asset = new pc.Asset(file, 'texture', { url: file }, { srgb: false });
       asset.once('load', () => resolve(asset.resource as pc.Texture));
       asset.once('error', (err: unknown) => reject(new Error(String(err))));
       app.assets.add(asset);

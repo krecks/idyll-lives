@@ -620,7 +620,7 @@ export class Sky {
       cm.cull = pc.CULLFACE_NONE;
       cm.opacity = 0;
       cm.update();
-      void textureWithFallback(app, cloudsUrl, true).then((tex) => {
+      void textureWithFallback(app, cloudsUrl).then((tex) => {
         if (!tex) return;
         tex.addressU = pc.ADDRESS_REPEAT;
         tex.addressV = pc.ADDRESS_CLAMP_TO_EDGE;

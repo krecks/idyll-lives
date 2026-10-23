@@ -4,7 +4,9 @@
  *
  * - Vertex tweaks. Vertex colours are authored in sRGB: PlayCanvas converts them itself
  *   (`vertexColorGamma`), and `GAME_SRGB_COLORS` does the same for a per-instance colour
- *   (`GAME_INSTANCE_COLOR`: the `INSTANCE_COLOR_SEMANTIC` stream, multiplied into the albedo).
+ *   (`GAME_INSTANCE_COLOR`: the `INSTANCE_COLOR_SEMANTIC` stream, multiplied into the albedo). A
+ *   glow's strength per instance (`GAME_GLOW_TINT`, `models.ts` `glowByInstance`) multiplies the
+ *   same stream into its (unlit, emissive) vertex colour, linearised as the glow's is.
  *   Planar UVs (`GAME_PLANAR_UV`) are the local XZ position in metres, for flat meshes built
  *   with 0..1 UVs such as roads (`uv0VS`, in `chunks.ts`).
  * - Patterns over a surface's texture: `GAME_PATTERN_STRIPES`, wallpaper's faint stripes 12.5 cm
@@ -34,6 +36,8 @@ export const VERTEX_TWEAKS: ShaderFeature = {
 #ifdef GAME_INSTANCE_COLOR
 	attribute vec4 game_instanceColor;
 	varying vec4 vGameTint;
+#elif defined(GAME_GLOW_TINT)
+	attribute vec4 game_instanceColor;
 #endif`,
     vsEnd: `
 #ifdef GAME_INSTANCE_COLOR
@@ -41,6 +45,9 @@ export const VERTEX_TWEAKS: ShaderFeature = {
 	#ifdef GAME_SRGB_COLORS
 		vGameTint.rgb = pow(max(vGameTint.rgb, vec3(0.0)), vec3(2.2));
 	#endif
+#endif
+#if defined(GAME_GLOW_TINT) && defined(VERTEX_COLOR)
+	vVertexColor *= vec4(pow(max(game_instanceColor.rgb, vec3(0.0)), vec3(2.2)), game_instanceColor.a);
 #endif`,
     psDecl: `
 #ifdef GAME_INSTANCE_COLOR
@@ -56,6 +63,8 @@ export const VERTEX_TWEAKS: ShaderFeature = {
 #ifdef GAME_INSTANCE_COLOR
 	attribute game_instanceColor: vec4f;
 	varying vGameTint: vec4f;
+#elif defined(GAME_GLOW_TINT)
+	attribute game_instanceColor: vec4f;
 #endif`,
     vsEnd: `
 #ifdef GAME_INSTANCE_COLOR
@@ -63,6 +72,9 @@ export const VERTEX_TWEAKS: ShaderFeature = {
 	#ifdef GAME_SRGB_COLORS
 		output.vGameTint = vec4f(pow(max(game_instanceColor.rgb, vec3f(0.0)), vec3f(2.2)), game_instanceColor.a);
 	#endif
+#endif
+#if defined(GAME_GLOW_TINT) && defined(VERTEX_COLOR)
+	output.vVertexColor = output.vVertexColor * vec4f(pow(max(game_instanceColor.rgb, vec3f(0.0)), vec3f(2.2)), game_instanceColor.a);
 #endif`,
     psDecl: `
 #ifdef GAME_INSTANCE_COLOR

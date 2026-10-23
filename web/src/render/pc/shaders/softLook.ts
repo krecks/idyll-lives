@@ -23,6 +23,7 @@
 import { settings } from '../../../settings/settings.svelte';
 import type { Shading } from '../../types';
 import type { ShaderFeature } from './chunks';
+import { SPECULAR_UNITS } from '../lightUnits';
 
 const LUM = { glsl: 'vec3(0.2126, 0.7152, 0.0722)', wgsl: 'vec3f(0.2126, 0.7152, 0.0722)' };
 
@@ -70,6 +71,16 @@ export const SOFT_LOOK: ShaderFeature = {
 #endif`,
     combine: `
 #ifdef GAME_LOOK
+	// Babylon occluded the light falling on a surface by its AO map as well as the sky's (an ARM
+	// map's red, with no ambient texture: \`ambientOcclusionForDirectDiffuse\`); PlayCanvas only the sky's.
+	#ifdef STD_AO
+		dDiffuseLight *= litArgs_ao;
+	#endif
+	// The lights' highlights at Babylon's strength: PlayCanvas's light is Babylon's / π (its Lambert
+	// has no 1 / π), but its GGX has Babylon's 1 / π (\`lightUnits.ts\` \`SPECULAR_UNITS\`).
+	#ifdef LIT_SPECULAR
+		dSpecularLight *= ${SPECULAR_UNITS};
+	#endif
 	// Babylon's diffuse colour: the base colour less what its dielectric reflects (DIELECTRIC).
 	vec3 gameAlbedo = albedo * ${DIELECTRIC};
 	vec3 gameDirect = gameAlbedo * dDiffuseLight;
@@ -122,6 +133,14 @@ export const SOFT_LOOK: ShaderFeature = {
 #endif`,
     combine: `
 #ifdef GAME_LOOK
+	// See the GLSL: the AO map occludes the direct light too, as Babylon's did.
+	#ifdef STD_AO
+		dDiffuseLight = dDiffuseLight * litArgs_ao;
+	#endif
+	// The lights' highlights at Babylon's strength (see the GLSL).
+	#ifdef LIT_SPECULAR
+		dSpecularLight = dSpecularLight * ${SPECULAR_UNITS};
+	#endif
 	let gameAlbedo = albedo * ${DIELECTRIC};
 	let gameDirect = gameAlbedo * dDiffuseLight;
 	#ifdef GAME_UNDERGROUND

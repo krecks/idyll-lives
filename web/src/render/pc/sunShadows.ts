@@ -13,13 +13,49 @@
  * turned with the sun, snapped to whole texels, its depth fitted to the casters, the casters culled
  * to it) is PlayCanvas's own.
  *
+ * Where the map ends, the sun shines as Babylon's did (an engine patch of `lightFunctionShadowPS`,
+ * `patchShadowEdge`): outside the map it is lit (PlayCanvas would read the map's edge texels there,
+ * smeared over the land beyond, with the casters' depths: shadow cut off along a diagonal), and the
+ * map's last stretch fades to lit in a circle (Babylon's `frustumEdgeFalloff`, `SHADOW_EDGE_FADE`),
+ * so the shadows end softly round the lot rather than at a square's edge. The menus' town has no fade.
+ *
+ * The map's size, filtering and bias are the preset's (`QualitySettings.shadowMapSize`, see
+ * `SunShadows.constructor`).
+ *
  * What only the shadow map draws (the house's lid over its rooms, which keeps the sun out of them
- * but through windows and doorways) is on a layer of its own that the sun lights and no camera
- * draws (`shadowOnlyLayer`).
+ * but through windows and doorways; the woods drawn whole; Low's merged object shadows) is on a
+ * layer of its own that the sun lights and no camera draws (`layers.ts` `shadowOnlyLayer`).
  */
 
 import * as pc from './engine';
+import { shadowOnlyLayer } from './layers';
 import { toEngine } from './space';
+import type { Language } from './shaders/chunks';
+
+export { shadowOnlyLayer } from './layers';
+
+/**
+ * The share of the map's half side, from its edge in, over which the game's shadows fade out (as
+ * radius² in the map's clip space, as Babylon's `frustumEdgeFalloff` was).
+ */
+const SHADOW_EDGE_FADE = 0.15;
+
+/**
+ * The receivers' offset along their normal before the map is read, in texels of the map (PlayCanvas's
+ * `normalOffsetBias`, metres: worked out from the square and the map's size). Babylon pushed its
+ * casters 2 cm in along theirs (`normalBias`, at 2048 texels over ~60 m: about 0.7 of a texel); a
+ * texel's worth keeps the acne off the lawn at Low's 1024 texels without the shadows letting go of
+ * their casters at High's 4096.
+ */
+const NORMAL_OFFSET_TEXELS = 0.75;
+
+/**
+ * The depth bias (PlayCanvas's `shadowBias`: a polygon offset of `-1000 ×` it, constant and per
+ * slope). Babylon added 0.15 % of its depth range (about 7 cm) to every caster; PlayCanvas fits
+ * the range to the casters and offsets by slope, which keeps the steep faces (roofs, the hills)
+ * clean at a much smaller number.
+ */
+const SHADOW_BIAS = 0.02;
 
 interface Square {
   /** The middle (PlayCanvas space) and the half side (m). */
@@ -45,6 +81,7 @@ function patch(app: pc.AppBase): void {
   const cull = sr.cull.bind(sr);
   const corners = Array.from({ length: 8 }, () => new pc.Vec3());
   const inverse = new pc.Mat4();
+  const offsets: [number, number, number][] = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1], [0, 0, 0], [0, 0, 0]];
   sr.cull = (light, comp, camera, casters, mask) => {
     const square = squares.get(light);
     if (!square) return cull(light, comp, camera, casters, mask);
@@ -53,8 +90,10 @@ function patch(app: pc.AppBase): void {
       // Eight points whose middle is the square's and whose farthest is its half side away, in the camera's space (`cull` turns them back into the world).
       inverse.copy(camera.node.getWorldTransform()).invert();
       const { centre: c, radius: r } = square;
-      const offsets: [number, number, number][] = [[r, 0, 0], [-r, 0, 0], [0, r, 0], [0, -r, 0], [0, 0, r], [0, 0, -r], [0, 0, 0], [0, 0, 0]];
-      offsets.forEach(([x, y, z], i) => inverse.transformPoint(corners[i].set(c.x + x, c.y + y, c.z + z), corners[i]));
+      for (let i = 0; i < 8; i++) {
+        const [x, y, z] = offsets[i];
+        inverse.transformPoint(corners[i].set(c.x + x * r, c.y + y * r, c.z + z * r), corners[i]);
+      }
       return corners;
     };
     try {
@@ -65,22 +104,81 @@ function patch(app: pc.AppBase): void {
   };
 }
 
-/** Each app's layer of what only the sun's shadow map draws (`shadowOnlyLayer`). */
-const shadowLayers = new WeakMap<pc.AppBase, pc.Layer>();
+/** Anchors of the edge patch in `lightFunctionShadowPS` (also in `tools/render/check_chunks.ts`). */
+export const SHADOW_EDGE_ANCHORS = {
+  glsl: {
+    coord: 'vec3 shadowCoord = getShadowSampleCoord{i}(shadowMatrix, light{i}_shadowParams, vPositionW, vec3(0.0), lightDirW, dLightDirNormW, dVertexNormalW);',
+    reads: ['getShadowPCF1x1', 'getShadowPCF3x3', 'getShadowPCF5x5'].map((f) => `return ${f}(SHADOWMAP_PASS(light{i}_shadowMap), shadowCoord, light{i}_shadowParams);`),
+  },
+  wgsl: {
+    coord: 'var shadowCoord: vec3f = getShadowSampleCoord{i}(shadowMatrix, uniform.light{i}_shadowParams, vPositionW, vec3f(0.0), &lightDirArg, dLightDirNormW, dVertexNormalW);',
+    reads: ['getShadowPCF1x1', 'getShadowPCF3x3', 'getShadowPCF5x5'].map((f) => `return ${f}(light{i}_shadowMap, light{i}_shadowMapSampler, shadowCoord, uniform.light{i}_shadowParams);`),
+  },
+} as const;
+
+const EDGE_CODE: Record<Language, { decl: string; fade: string }> = {
+  glsl: {
+    decl: `
+#ifndef GAME_SUN_EDGE
+#define GAME_SUN_EDGE
+	uniform float game_sunShadowFade;
+#endif
+`,
+    fade: `
+				vec2 gameSunClip = shadowCoord.xy * 2.0 - 1.0;
+				float gameSunFade = smoothstep(1.0 - game_sunShadowFade, 1.00000012, clamp(dot(gameSunClip, gameSunClip), 0.0, 1.0));
+				if (gameSunFade >= 1.0) { return 1.0; }`,
+  },
+  wgsl: {
+    decl: `
+#ifndef GAME_SUN_EDGE
+#define GAME_SUN_EDGE
+	uniform game_sunShadowFade: f32;
+#endif
+`,
+    fade: `
+				let gameSunClip = shadowCoord.xy * 2.0 - 1.0;
+				let gameSunFade = smoothstep(1.0 - uniform.game_sunShadowFade, 1.00000012, clamp(dot(gameSunClip, gameSunClip), 0.0, 1.0));
+				if (gameSunFade >= 1.0) { return 1.0; }`,
+  },
+};
+
+const PATCHED = '// (idyll-lives: shadow edge)';
+const edged = new WeakSet<pc.GraphicsDevice>();
+
+/** `code` with `anchor` replaced (exactly once: a missing anchor is an upgrade to look at). */
+function replaceOnce(code: string, anchor: string, replacement: string): string {
+  const at = code.indexOf(anchor);
+  if (at < 0 || code.indexOf(anchor, at + anchor.length) >= 0) throw new Error(`[render] shader chunk lightFunctionShadowPS: anchor not found once: ${anchor}`);
+  return code.slice(0, at) + replacement + code.slice(at + anchor.length);
+}
 
 /**
- * The layer of meshes only shadow maps draw (`shared/layers.ts` `LAYER_SHADOW_ONLY`): in the scene
- * and lit by the sun (`SunShadows` adds it to the sun's layers), so the sun's shadow map gathers
- * its casters, but on no camera.
+ * Patches `device`'s directional shadow lookup (once, before the first shader is built): lit outside
+ * the map, fading to lit over its last stretch (`game_sunShadowFade`, see the file's header).
  */
-export function shadowOnlyLayer(app: pc.AppBase): pc.Layer {
-  let layer = shadowLayers.get(app);
-  if (!layer) {
-    layer = new pc.Layer({ name: 'ShadowOnly' });
-    app.scene.layers.push(layer);
-    shadowLayers.set(app, layer);
+function patchShadowEdge(device: pc.GraphicsDevice): void {
+  if (edged.has(device)) return;
+  edged.add(device);
+  for (const lang of ['glsl', 'wgsl'] as const) {
+    const chunks = pc.ShaderChunks.get(device, lang === 'glsl' ? pc.SHADERLANGUAGE_GLSL : pc.SHADERLANGUAGE_WGSL);
+    let code = chunks.get('lightFunctionShadowPS');
+    if (typeof code !== 'string') throw new Error('[render] PlayCanvas has no shader chunk lightFunctionShadowPS');
+    if (code.includes(PATCHED)) continue;
+    const a = SHADOW_EDGE_ANCHORS[lang];
+    code = replaceOnce(code, a.coord, `${a.coord}${EDGE_CODE[lang].fade}`);
+    for (const read of a.reads) code = replaceOnce(code, read, `${read.replace(/^return (.*);$/, 'return mix($1, 1.0, gameSunFade);')}`);
+    chunks.set('lightFunctionShadowPS', `${PATCHED}\n${EDGE_CODE[lang].decl}${code}`);
   }
-  return layer;
+}
+
+export interface SunShadowOptions {
+  /** Texels a side (`QualitySettings.shadowMapSize`). */
+  size: number;
+  /** Pose-driven redraws a second at most (`QualitySettings.shadowRate`; 0: every change). */
+  rate: number;
+  /** The fade to lit at the map's edge (default `SHADOW_EDGE_FADE`, the game's; 0: none). */
+  fade?: number;
 }
 
 export class SunShadows {
@@ -90,30 +188,54 @@ export class SunShadows {
   private lastDraw = -Infinity;
   private pending = false;
   private overview = false;
+  private readonly size: number;
   private readonly square: Square = { centre: new pc.Vec3(), radius: 30 };
+  private readonly fadeId: pc.ScopeId;
+  private readonly fade: number;
 
-  constructor(app: pc.AppBase, sun: pc.Entity, rate: number) {
+  /**
+   * Shadows from `sun`'s light: a map of `options.size` texels a side, filtered as Babylon's
+   * (`QUALITY_MEDIUM`: 3×3 PCF on every preset), the receivers offset by a share of a texel.
+   */
+  constructor(app: pc.AppBase, sun: pc.Entity, options: SunShadowOptions) {
     patch(app);
+    patchShadowEdge(app.graphicsDevice);
+    this.fade = options.fade ?? SHADOW_EDGE_FADE;
+    this.fadeId = app.graphicsDevice.scope.resolve('game_sunShadowFade');
+    this.fadeId.setValue(this.fade);
     this.light = sun.light!;
-    this.interval = rate > 0 ? 1000 / Math.min(240, rate) : 0;
-    this.light.shadowUpdateMode = pc.SHADOWUPDATE_NONE;
-    squares.set(this.light.light, this.square);
-    const only = shadowOnlyLayer(app).id;
-    if (!this.light.layers.includes(only)) this.light.layers = [...this.light.layers, only];
+    this.size = options.size;
+    this.interval = options.rate > 0 ? 1000 / Math.min(240, options.rate) : 0;
+    const l = this.light;
+    l.shadowResolution = options.size;
+    l.shadowType = pc.SHADOW_PCF3_32F;
+    l.numCascades = 1;
+    l.shadowBias = SHADOW_BIAS;
+    l.shadowUpdateMode = pc.SHADOWUPDATE_NONE;
+    squares.set(l.light, this.square);
+    shadowOnlyLayer(app, sun);
+    this.applyBias();
+  }
+
+  /** The receivers' normal offset for the square's texels (`NORMAL_OFFSET_TEXELS`). */
+  private applyBias(): void {
+    this.light.normalOffsetBias = (NORMAL_OFFSET_TEXELS * 2 * this.square.radius) / this.size;
   }
 
   /** The square round the viewed lot: its middle (game space, on the ground) and half side (m). */
   setSquare(x: number, z: number, radius: number): void {
     toEngine(x, 0, z, this.square.centre);
     this.square.radius = radius;
+    this.applyBias();
     this.moved();
   }
 
-  /** The menus' town (fitted round the view, drawn every frame) or the game. */
+  /** The menus' town (fitted round the view, drawn every frame, no fade at its edge) or the game. */
   setOverview(on: boolean): void {
     this.overview = on;
     if (on) squares.delete(this.light.light);
     else squares.set(this.light.light, this.square);
+    this.fadeId.setValue(on ? 0 : this.fade);
     this.light.shadowUpdateMode = on ? pc.SHADOWUPDATE_REALTIME : pc.SHADOWUPDATE_NONE;
     this.moved();
   }

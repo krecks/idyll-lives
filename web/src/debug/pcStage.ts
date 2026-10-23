@@ -12,6 +12,7 @@ import { GameCamera } from '../render/pc/camera';
 import { createApp, createDevice } from '../render/pc/device';
 import { MaterialLibrary, SUN_LIGHT_MASK } from '../render/pc/materials';
 import { installNature } from '../render/pc/nature';
+import { pageLook } from '../render/pc/post';
 import { createWorldRoot, toEngine } from '../render/pc/space';
 import { SunShadows } from '../render/pc/sunShadows';
 import { AssetRegistry } from '../assets/registry';
@@ -63,7 +64,8 @@ export async function createStage(options: StageOptions): Promise<Stage> {
     canvas.height = Math.max(1, canvas.clientHeight);
   };
   size();
-  const device = await createDevice(canvas, params.get('renderer') === 'webgl');
+  // (Multisampled, as Babylon's pages' engines were: `antialias`.)
+  const device = await createDevice(canvas, params.get('renderer') === 'webgl', true);
   const app = createApp(canvas, device);
   const root = createWorldRoot(app);
   const base = import.meta.env.BASE_URL;
@@ -80,12 +82,11 @@ export async function createStage(options: StageOptions): Promise<Stage> {
   const camera = new GameCamera(app.root, { fov: options.fov ?? 0.8, near: options.near ?? 0.1, far: 2000 });
   const cam = camera.camera;
   cam.clearColor = new pc.Color(0.62, 0.77, 0.9, 1);
-  // (A diag view's materials skip the tone mapping themselves; the lawn keeps it, as on Babylon's pages.)
-  cam.toneMapping = pc.TONEMAP_ACES2;
-  cam.gammaCorrection = pc.GAMMA_SRGB;
+  // Babylon's pages' image processing, in the materials: ACES at an exposure of 1.1 (`post.ts`). A
+  // diag view's materials skip it themselves; the lawn and the models keep it, as on Babylon's pages.
+  pageLook(app, cam, 1.1);
   cam.aspectRatioMode = pc.ASPECT_MANUAL;
   cam.aspectRatio = canvas.width / canvas.height;
-  app.scene.exposure = 1.1;
   // Babylon's pages' hemispheric light: white from above, the lawn's green from below.
   lib.setSkyFill({ r: 1, g: 1, b: 1 }, { r: 0.32, g: 0.36, b: 0.25 }, options.sky);
   app.scene.ambientLight = new pc.Color(0, 0, 0);
@@ -99,11 +100,6 @@ export async function createStage(options: StageOptions): Promise<Stage> {
     // (Babylon's linear colour, as PlayCanvas takes it: sRGB.)
     color: new pc.Color(1, Math.pow(0.96, 1 / 2.2), Math.pow(0.88, 1 / 2.2)),
     mask: SUN_LIGHT_MASK,
-    shadowResolution: 2048,
-    numCascades: 1,
-    shadowType: pc.SHADOW_PCF3_32F,
-    shadowBias: 0.05,
-    normalOffsetBias: 0.02,
   });
   // A directional light shines along its entity's -y: turned from straight down to the sun's way.
   const to = toEngine(options.sun[0], options.sun[1], options.sun[2], new pc.Vec3()).normalize();
@@ -111,7 +107,8 @@ export async function createStage(options: StageOptions): Promise<Stage> {
   const axis = new pc.Vec3().cross(down, to);
   sun.setRotation(axis.length() > 1e-6 ? new pc.Quat().setFromAxisAngle(axis.normalize(), (Math.acos(Math.max(-1, Math.min(1, down.dot(to)))) * 180) / Math.PI) : pc.Quat.IDENTITY);
   app.root.addChild(sun);
-  const shadows = new SunShadows(app, sun, 0);
+  // (Babylon's pages: a 2048 map, no fade at its edge.)
+  const shadows = new SunShadows(app, sun, { size: 2048, rate: 0, fade: 0 });
 
   // As Babylon's `ArcRotateCamera`: no zoom limits, beta kept off the poles.
   const orbit = new OrbitControls({ alpha: options.alpha, beta: options.beta, radius: options.radius }, { radius: [0.01, Infinity], beta: [0.01, Math.PI - 0.01] });

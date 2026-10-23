@@ -5,17 +5,18 @@
  * says so once.
  *
  * No multisampling on the canvas: only the last full-screen pass draws to it. The scene itself is
- * smoothed in the post-processing (`QualitySettings.msaaSamples`, or FXAA).
+ * smoothed in the post-processing (`QualitySettings.msaaSamples`, or FXAA; `post.ts`). The dev
+ * pages draw straight onto a multisampled canvas (`antialias`), as Babylon's did.
  */
 
 import * as pc from './engine';
 import { noteWebGpuFailed, webGpuFailed } from '../shared/gpu';
 
-export async function createDevice(canvas: HTMLCanvasElement, forceWebGL: boolean): Promise<pc.GraphicsDevice> {
+export async function createDevice(canvas: HTMLCanvasElement, forceWebGL: boolean, antialias = false): Promise<pc.GraphicsDevice> {
   const wantGpu = !forceWebGL && !webGpuFailed() && 'gpu' in navigator && !!(await navigator.gpu.requestAdapter().catch(() => null));
   const device = await pc.createGraphicsDevice(canvas, {
     deviceTypes: wantGpu ? [pc.DEVICETYPE_WEBGPU, pc.DEVICETYPE_WEBGL2] : [pc.DEVICETYPE_WEBGL2],
-    antialias: false,
+    antialias,
     alpha: false,
     powerPreference: 'high-performance',
   });

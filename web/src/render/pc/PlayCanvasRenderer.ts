@@ -24,13 +24,16 @@ import { buildFences, swingGate, type Fences, type GateLeaf } from './fences';
 import { gardenPool, GardenPools } from './gardenPools';
 import { HouseBuilder, type HouseDoor } from './house';
 import { Instances } from './instancing';
+import { Lamps } from './lamps';
 import { LotContents } from './lotContents';
+import { ENV_UNITS, SKY_UNITS, SUN_UNITS } from './lightUnits';
 import { MaterialLibrary, SUN_LIGHT_MASK } from './materials';
 import { drawMesh, meshFrom } from './meshes';
 import { buildModel, onModelFileArrived, type ModelTemplate } from './models';
 import { natureDecor, windStill } from './nature';
+import { gameLook, gamePostOptions, PostProcessing } from './post';
 import { diagViewActive } from './shaders/diagView';
-import { shadingFromSettings } from './shaders/softLook';
+import { shadingFromSettings, softLookFromURL } from './shaders/softLook';
 import { drawRoads } from './roads';
 import { createWorldRoot, toEngine } from './space';
 import { Street } from './street';
@@ -93,7 +96,7 @@ const BETA_LIMITS = [0.3, 1.35] as const;
 const LENS = { fov: 0.7, near: 0.3, far: 1600 };
 /** Frames per second at most in the menus. */
 const MENU_FPS = 30;
-/** Light is recomputed when the game's clock moved this many minutes, at most every `LIGHT_MIN_MS`. */
+/** Light is recomputed when the game's clock moved this many minutes (fast: the preset's `lightingStep`), at most every `LIGHT_MIN_MS`. */
 const LIGHT_STEP = 0.5;
 const LIGHT_MIN_MS = 100;
 /** Frame after frame failing this many times is drawing broken for good. */
@@ -121,11 +124,8 @@ const BUILD_SLICE_MS = 8;
 const BASEMENT_SKY = 0.12;
 const BASEMENT_ENV = 0.12;
 
-/**
- * Babylon's PBR lit with `albedo / π` per unit of a directional light's intensity (its diffuse
- * BRDF), PlayCanvas with `albedo`: the look's sun intensities are Babylon's.
- */
-const SUN_UNITS = 1 / Math.PI;
+/** A directional light's way before it's turned (PlayCanvas shines it along its entity's -y). */
+const DOWN = new pc.Vec3(0, -1, 0);
 
 /** No neighbours' houses (to look through). */
 const NO_HOUSES: readonly (readonly [number, number, number, number])[] = [];
@@ -141,6 +141,14 @@ function objectKey(o: ObjectPlacement): string {
 /** The same part of the town in view (the messages make a new rect each time). */
 function sameView(a: ViewRect | null, b: ViewRect | null): boolean {
   return a === b || (!!a && !!b && a.x === b.x && a.z === b.z && a.w === b.w && a.d === b.d);
+}
+
+/** `?lightmix=sun,sky,env`: scales of the look's sun, sky fill and environment light (1 each by default). */
+function lightMixFromURL(): [number, number, number] | null {
+  const v = new URLSearchParams(location.search).get('lightmix');
+  if (!v) return null;
+  const [sun = 1, sky = 1, env = 1] = v.split(',').map(Number);
+  return [sun, sky, env].map((x) => (Number.isFinite(x) ? x : 1)) as [number, number, number];
 }
 
 /** A hex colour (sRGB) in linear light, as Babylon's `toLinearSpace`. */
@@ -163,6 +171,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** The world, in game space (`space.ts`). */
   private root!: pc.Entity;
   private camera!: GameCamera;
+  /** (Stage 6A.) Babylon's image processing, FXAA and night grade on the camera (`post.ts`). */
+  private post: PostProcessing | null = null;
   private sun!: pc.Entity;
   private sunShadows!: SunShadows;
   private disposed = false;
@@ -242,6 +252,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private street!: Street;
   /** What grows and stands on the lot: the landscape and sky, objects and their clips, items (stage 5, `lotContents.ts`). */
   private lot!: LotContents;
+  /** The viewed house's interior lights (Stage 6C, `lamps.ts`). */
+  private lamps!: Lamps;
   /**
    * The lot layer (roads and paths, the house on every storey, the basement's pit, the fences):
    * built again only when what it is made of changes (`lotKeyOf`), so buying, selling and moving
@@ -268,9 +280,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private gates: { fences: Fences; leaf: GateLeaf; open: number; towards: number }[] = [];
   /** Pools of lamplight on the lawn under the garden's lamps. */
   private gardenPools: GardenPools | null = null;
-  private readonly poolLampOn = (lamp: number | undefined) => (lamp !== undefined && this.lampsOff?.has(lamp) ? 0 : 1);
-  /** The lamps switched off (object ids; sim-core `lights.rs`). */
-  private lampsOff: ReadonlySet<number> | null = null;
+  private readonly poolLampOn = (lamp: number | undefined) => this.lamps.lampOn(lamp); // (Stage 6C: as its lamp fades, `lamps.ts`.)
   /** Night level of the lamps at the last lighting update (`Lighting.lamps`), the lamps' colour and the windows' glow (linear). */
   private lampsLevel = 0;
   private readonly lampColor = linearHex(LOOK.lampColor);
@@ -308,6 +318,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private rayValid = false;
   private readonly vTmp = new pc.Vec3();
   private readonly vTmp2 = new pc.Vec3();
+  private readonly qTmp = new pc.Quat();
+  private readonly colorTmp = new pc.Color();
+  /** `?lightmix=sun,sky,env` (dev server): each part of the daylight scaled, to compare them one by one with the Babylon renderer's. */
+  private readonly lightMix = import.meta.env.DEV ? lightMixFromURL() : null;
 
   private probe: FrameProbe | null = null;
   private readonly counts: FrameCounts = { drawCalls: 0, triangles: 0, shadowDrawCalls: 0, shadowTriangles: 0, mirrorDrawCalls: 0, mirrorTriangles: 0, lightingUpdates: 0, gpuFrames: 0, gpuMs: 0, residentsMs: 0 };
@@ -363,29 +377,27 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const cam = this.camera.camera;
     // (Not PlayCanvas's skybox: the environment atlas would draw as one.)
     cam.layers = cam.layers.filter((id) => id !== pc.LAYERID_SKYBOX);
-    // The diag views draw the colour itself (their materials leave tone mapping out too).
-    cam.toneMapping = diagViewActive ? pc.TONEMAP_LINEAR : pc.TONEMAP_ACES2;
-    cam.gammaCorrection = pc.GAMMA_SRGB;
+    // (Stage 6A.) The picture after the light: multisampling or FXAA, Babylon's image processing
+    // and the night grade (`post.ts`; the diag views and `?diag=linear` without them).
+    this.post = new PostProcessing(this.app, cam, gamePostOptions(this.quality.msaaSamples, this.diag, diagViewActive));
+    this.post.setLook(gameLook(LOOK));
 
     this.sun = new pc.Entity('sun');
     this.sun.addComponent('light', {
       type: 'directional',
       castShadows: !this.diag.has('noshadows'),
+      // (Its strength is in its colour, `applyLighting`.)
       intensity: 1,
-      shadowResolution: this.quality.shadowMapSize,
-      numCascades: 1,
-      shadowType: pc.SHADOW_PCF3_32F,
-      shadowBias: 0.05,
-      normalOffsetBias: 0.02,
       // (The menus' town: fitted round this much of the view.)
       shadowDistance: 400,
       // Meshes left out of the lamps keep the sun (`MaterialLibrary.excludeFromLights`).
       mask: SUN_LIGHT_MASK,
     });
     this.app.root.addChild(this.sun);
-    this.sunShadows = new SunShadows(this.app, this.sun, this.quality.shadowRate);
+    // The map's size, filtering and bias are the preset's (`sunShadows.ts`).
+    this.sunShadows = new SunShadows(this.app, this.sun, { size: this.quality.shadowMapSize, rate: this.quality.shadowRate });
     // (Stage 5, lotContents.ts: the landscape, sky, objects and items.)
-    this.lot = new LotContents(this.app, this.root, this.sun, this.camera.entity, this.deps, this.quality, { storey: () => this.storey, storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), inView: (x, z, m) => this.inView(x, z, m) }, { pace: () => this.pace(), shadowsMoved: (urgent) => this.sunShadows.moved(urgent) });
+    this.lot = new LotContents(this.app, this.root, this.sun, this.camera.entity, this.deps, this.quality, { storey: () => this.storey, storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), inView: (x, z, m) => this.inView(x, z, m) }, { pace: () => this.pace(), shadowsMoved: (urgent) => this.sunShadows.moved(urgent), landscapeChanged: () => this.lamps.exclude(this.lot.landscapeDraws()) /* (Stage 6C: lamps.ts) */ });
 
     // The viewed lot's house and the street round it (`house.ts`, `street.ts`).
     this.house = new HouseBuilder(this.app);
@@ -405,6 +417,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.storeyLayer = new pc.Entity('storeyLayer');
     this.root.addChild(this.storeyLayer);
     if (!this.diag.has('nolamps')) this.gardenPools = new GardenPools(this.app, this.root);
+    // (Stage 6C: the interior lights, `lamps.ts`.)
+    this.lamps = new Lamps(this.app, this.quality, { storey: () => this.storey, storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), town: () => this.townMode }, { house: this.house, lot: this.lot, pools: () => this.applyGardenPools() });
     this.unlistenFiles = onModelFileArrived(this.app, (url) => this.refreshStreet(url));
     this.applyWallMode();
 
@@ -545,6 +559,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     o.beta = pose.beta;
     o.radius = pose.radius;
     o.checkLimits();
+    // Placed: the next world doesn't turn it to its lot (as Babylon's `setCameraPose` had it).
+    this.cameraPlaced = true;
   }
 
   focus(x: number, z: number): void {
@@ -949,9 +965,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
 
   /**
-   * The lights of the viewed house on the storeys shown: so far the pools of lamplight under the
-   * garden's lamps (`gardenPools.ts`) and the rooms without windows kept out of daylight; the
-   * interior lights themselves come with stage 6 (`babylon/BabylonRenderer.ts` `placeRoomLights`).
+   * The lights of the viewed house on the storeys shown: the pools of lamplight under the garden's
+   * lamps (`gardenPools.ts`), the rooms without windows kept out of daylight, and the interior
+   * lights with the rooms they keep to (`lamps.ts`).
    */
   private placeRoomLights(world: WorldStructure, view: ViewRect | null): void {
     // Rooms and lamps on every storey shown (in lot rows: lifted to their height here).
@@ -965,16 +981,21 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const lights: RoomLight[] = this.lotRooms ? placeLights(world, inView, this.lotRooms, (def) => this.deps.content.object(def)?.light).filter((l) => shown(l.z)) : [];
     this.gardenPools?.set(lights.filter((l) => l.kind === 'lamp' && l.room === 0 && this.storeyOf(l.z) === 0).map((l) => gardenPool(l, this.rowOf(0))));
     this.applyGardenPools();
+    // (Stage 6C: the interior lights and the rooms they keep to, `lamps.ts`.)
+    this.lamps.markRooms(world, view);
+    this.lamps.place(lights);
   }
 
   /**
    * Finds the rooms without windows (`windowless`), and keeps those of the storey in view out of
    * daylight as the basement is: every one of their tiles in view, on the materials' mask
-   * (`DigState.darken`). (Their lamps lit by day too: stage 6.)
+   * (`DigState.darken`). (Their lamps lit by day too: `lamps.ts`.)
    */
   private markWindowless(world: WorldStructure, view: ViewRect | null): void {
     this.windowless = windowlessRooms(world, this.windowless);
-    this.dimming = darkTiles(world, view, this.storey, this.rowOf(this.storey), this.windowless.rooms).dimming;
+    const dark = darkTiles(world, view, this.storey, this.rowOf(this.storey), this.windowless.rooms);
+    this.dimming = dark.dimming;
+    this.lamps.setDimmed(dark.dimmed); // (Stage 6C: their lights on by day, `lamps.ts`.)
     this.applyDimming();
   }
 
@@ -1030,6 +1051,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.dimming = null;
     this.applyDimming();
     this.gardenPools?.set([]);
+    this.lamps.clear(); // (Stage 6C.)
     for (const p of this.decor.values()) for (const d of p.draws) d.enabled = false;
     this.lastWorld = this.builtWorld = null;
     this.cameraPlaced = false;
@@ -1265,15 +1287,19 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const minute = this.fixedHour !== null ? this.fixedHour * 60 : (curr[layout.header.minute] ?? this.lastMinute);
     this.lastMinute = minute;
     if (this.townMode) return;
+    const h = layout.header;
+    // At speed 3 and up, and in quiet hours, the preset's step (Low's ten minutes: each update re-colours the sun, sky and lamps).
+    const fast = curr[h.speed] >= 3 || (h.calm !== undefined && curr[h.calm] > 0);
+    const step = fast ? Math.max(LIGHT_STEP, this.quality.lightingStep) : LIGHT_STEP;
     const due = this.lastLightMinute < 0 || frame.now - this.lastLightAt >= LIGHT_MIN_MS;
-    if (due && Math.abs(minute - this.lastLightMinute) >= LIGHT_STEP) {
+    if (due && Math.abs(minute - this.lastLightMinute) >= step) {
       this.applyLighting(minute);
       this.lastLightMinute = minute;
       this.lastLightAt = frame.now;
     }
-    const h = layout.header;
     // Who is where: doors open for those going through, neighbours' windows glow while someone is up.
     this.findDarkRooms(frame);
+    this.lamps.frame(this.frameDt / 1000, this.darkRooms, this.awakeRooms); // (Stage 6C: lamps and glows fading, `lamps.ts`.)
     this.swingDoors(GAME_RATE[curr[h.speed] | 0] ?? 1);
     this.gameRig.frame(this.frameDt / 1000);
     this.lot.update(frame); // (Stage 5: the objects' clips, the screens.)
@@ -1291,46 +1317,64 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lot.setItems(items); // (Stage 5.)
   }
   setLampsOff(off: ReadonlySet<number>): void {
-    this.lot.setLampsOff(off); // (Stage 5: fans and fires; their light is stage 6.)
-    this.lampsOff = off;
+    this.lot.setLampsOff(off); // (Stage 5: fans and fires.)
+    this.lamps.setLampsOff(off); // (Stage 6C: their light and fades, `lamps.ts`.)
     this.applyGardenPools();
   }
   holdModelRefresh(_on: boolean): void {}
 
   // --- light ---------------------------------------------------------------------------
 
-  /** The time of day: the sun, the sky's fill, the fog and the clear colour (`shared/environment.ts`). */
+  /**
+   * The time of day (`shared/environment.ts`): the sun, the sky's fill, the environment's light,
+   * the fog and the clear colour, in PlayCanvas's units (`lightUnits.ts`). No allocations.
+   */
   private applyLighting(minute: number): void {
     this.counts.lightingUpdates++;
     const l = lightingAt(minute, LOOK, this.lighting);
+    const mix = this.lightMix;
+    if (mix) {
+      l.sunIntensity *= mix[0];
+      l.skyIntensity *= mix[1];
+      l.envIntensity *= mix[2];
+    }
     // A directional light shines along its entity's -y: turned from straight down to the sun's way (game space to PlayCanvas).
     const to = toEngine(l.sunDirection.x, l.sunDirection.y, l.sunDirection.z, this.vTmp).normalize();
-    const from = this.vTmp2.set(0, -1, 0);
-    const axis = new pc.Vec3().cross(from, to);
-    const angle = (Math.acos(Math.max(-1, Math.min(1, from.dot(to)))) * 180) / Math.PI;
-    this.sun.setRotation(axis.length() > 1e-6 ? new pc.Quat().setFromAxisAngle(axis.normalize(), angle) : pc.Quat.IDENTITY);
-    const light = this.sun.light!;
-    light.color = gammaColor(l.sunColor);
-    light.intensity = l.sunIntensity * SUN_UNITS;
+    const axis = this.vTmp2.cross(DOWN, to);
+    const sin = axis.length();
+    const angle = Math.atan2(sin, DOWN.dot(to)) * pc.math.RAD_TO_DEG;
+    this.sun.setRotation(sin > 1e-6 ? this.qTmp.setFromAxisAngle(axis.mulScalar(1 / sin), angle) : this.qTmp.set(0, 0, 0, 1));
+    // The look's colours are linear as Babylon used them; PlayCanvas takes sRGB and linearises it,
+    // so the strength goes into the colour (an intensity below 1 would be linearised with it).
+    this.sun.light!.color = gammaColor(l.sunColor, l.sunIntensity * SUN_UNITS, this.colorTmp);
     this.sunShadows.moved();
     // The sky's hemispheric fill (Babylon's hemispheric light) and its image-based light.
-    this.lib.setSkyFill(l.skyColor, l.groundColor, l.skyIntensity);
-    this.lib.setEnvironmentIntensity(l.envIntensity);
-    const clear = gammaColor(l.clearColor, 1);
-    this.camera.camera.clearColor = clear;
-    this.app.scene.fog.color = clear;
+    this.lib.setSkyFill(l.skyColor, l.groundColor, l.skyIntensity * SKY_UNITS);
+    this.lib.setEnvironmentIntensity(l.envIntensity * ENV_UNITS);
+    // The haze in the horizon's colour as Babylon's PBR had it: linearised twice (the renderer's
+    // `toLinearSpace`, then its materials': a deeper blue than the horizon), so it goes to PlayCanvas
+    // (which linearises what it's given) linearised once. The clear colour (behind the sky's dome)
+    // is drawn as it's given: linear, as Babylon's.
+    const c = l.clearColor;
+    this.app.scene.fog.color.set(toLinear(c.r), toLinear(c.g), toLinear(c.b), 1);
+    this.camera.camera.clearColor = this.colorTmp.set(toLinear(c.r), toLinear(c.g), toLinear(c.b), 1);
+    // (Stage 6A.) Babylon's exposure for the hour and the moonlight grade (`post.ts`: uniforms).
+    if (this.post) {
+      this.post.exposure = l.exposure * LOOK.exposure;
+      this.post.night = l.night * LOOK.nightGrade;
+    }
     // Under the ground (a basement in view, see `applyDig`) daylight doesn't reach.
     const seen = Math.max(l.exposure, 1e-3);
     this.lib.dig.lit.set(0, Math.min(1, BASEMENT_SKY / Math.max(l.skyIntensity * seen, 1e-3)), Math.min(1, BASEMENT_ENV / Math.max(l.envIntensity * seen, 1e-3)), 0);
     // Glowing windows outside at night, cool daylight in the panes by day; the street's lamps; the garden's pools.
     this.lampsLevel = l.lamps;
     this.lot.applyLighting(l); // (Stage 5: the sky, the night clips, the shades' glow.)
+    this.lamps.applyLighting(l); // (Stage 6C: the interior lights and the glows, `lamps.ts`.)
     const glow = Math.min(1, Math.max(0, (l.lamps - 0.35) / 0.5));
     const g = this.glowColor;
     const k = glow * glow * 1.6;
     this.lib.setEmissive(this.lib.surface('material.window', { vertexColors: true, cutaway: true }), this.emissiveTmp.set(g.r * k, g.g * k, g.b * k));
     const inner = (1 - l.lamps) * 0.9 + 0.05;
-    const c = l.clearColor;
     this.lib.setEmissive(this.lib.surface('material.window.inner', { vertexColors: true, cutaway: true }), this.emissiveTmp.set(toLinear(c.r) * inner, toLinear(c.g) * inner, toLinear(c.b) * inner));
     this.street?.setNight(l.lamps, this.glowColor);
     this.applyGardenPools();
@@ -1354,6 +1398,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.townMinute = minute;
     }
     this.townMode = true;
+    this.applyDig(); // (Stage 6C: no basement or windowless rooms kept dark in the town, as Babylon's enterTown.)
     this.sunShadows.setOverview(true);
     this.townMinuteGoal = minute;
     this.lastLightMinute = -1;
@@ -1368,6 +1413,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     return new Promise((resolve) => {
       const done = () => {
         this.townMode = false;
+        this.applyDig(); // (Stage 6C: the basement and windowless rooms dark again, as Babylon's leaveTown.)
         this.sunShadows.setOverview(false);
         this.flyingIn = false;
         this.orbit.enabled = true;
@@ -1481,8 +1527,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   // --- settings, stats, the benchmark --------------------------------------------------
 
   configure(options: LiveRenderOptions): void {
-    // Taken before the merge, which would otherwise hide the change.
-    const shading = options.shading;
+    // Taken before the merge, which would otherwise hide the change. (`?look=` on the dev server wins over the setting, as Babylon's plugin had it.)
+    const shading = options.shading === undefined ? undefined : (softLookFromURL() ?? options.shading);
     this.options = { ...this.options, ...options };
     if (shading !== undefined && shading !== this.shading) {
       // A define on every lit material: the next frames draw the other way (their shaders compile again).
@@ -1645,6 +1691,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.gardenPools?.destroy();
     for (const p of this.decor.values()) for (const d of p.draws) d.destroy();
     this.decor.clear();
+    this.post?.destroy(); // (Stage 6A.)
+    this.post = null;
     this.app?.destroy();
   }
 }
