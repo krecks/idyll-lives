@@ -15,7 +15,8 @@
 //! Torso rings have 12 vertices at 30 degree steps (0 = front, 90 = the resident's right, +x): the
 //! arms leave through the 2 x 2 patches at 60..120 / 240..300 degrees of the chest rings T5-T7, the
 //! legs through the halves of the hip ring T1 and the crotch vertex, the neck through the middle
-//! of the shoulder cap. Limbs and the neck have 8-vertex rings, the palm 10, fingers and thumbs 4.
+//! of the shoulder cap. Limbs and the neck have 8-vertex rings, the palm 10 (the knuckles 12),
+//! fingers and thumbs 6.
 
 use super::np::sign;
 use super::rig::{NB, b};
@@ -163,7 +164,7 @@ impl Cage {
         }
     }
 
-    /// Closes a 4-ring with one quad.
+    /// Closes a ring with one face.
     pub fn cap(&mut self, ring: &[usize]) {
         self.face(ring);
     }
