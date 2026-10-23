@@ -1,7 +1,8 @@
-//! Mesh helpers for the character build: normals, open edges, scalar-field clipping, weights.
-//! (meshops.py's welding, adjacency, Laplacian relaxation, geodesics and dense weights had no
-//! callers and are not ported.)
+//! Mesh helpers for the character build: normals, open edges, scalar-field clipping, weights, nearest
+//! points (`OnMesh`). (meshops.py's welding, adjacency, Laplacian relaxation, geodesics and dense weights
+//! had no callers and are not ported.)
 
+use super::kdtree::KdTree;
 use super::np::unique_rows;
 use super::{Dense, V3};
 
@@ -97,4 +98,73 @@ pub fn clip_by_field(idx: &[usize], g: &[f64]) -> (Vec<usize>, Src) {
         }
     }
     (faces, (out_a, out_b, out_t))
+}
+
+/// The barycentric weights of the point of triangle abc nearest p (Ericson, Real-Time Collision
+/// Detection 5.1.5).
+fn nearest_weights(p: V3, a: V3, b: V3, c: V3) -> [f64; 3] {
+    let (ab, ac, ap) = (b - a, c - a, p - a);
+    let (d1, d2) = (ab.dot(&ap), ac.dot(&ap));
+    if d1 <= 0.0 && d2 <= 0.0 {
+        return [1.0, 0.0, 0.0];
+    }
+    let bp = p - b;
+    let (d3, d4) = (ab.dot(&bp), ac.dot(&bp));
+    if d3 >= 0.0 && d4 <= d3 {
+        return [0.0, 1.0, 0.0];
+    }
+    let vc = d1 * d4 - d3 * d2;
+    if vc <= 0.0 && d1 >= 0.0 && d3 <= 0.0 {
+        let v = d1 / (d1 - d3);
+        return [1.0 - v, v, 0.0];
+    }
+    let cp = p - c;
+    let (d5, d6) = (ab.dot(&cp), ac.dot(&cp));
+    if d6 >= 0.0 && d5 <= d6 {
+        return [0.0, 0.0, 1.0];
+    }
+    let vb = d5 * d2 - d1 * d6;
+    if vb <= 0.0 && d2 >= 0.0 && d6 <= 0.0 {
+        let w = d2 / (d2 - d6);
+        return [1.0 - w, 0.0, w];
+    }
+    let va = d3 * d6 - d5 * d4;
+    if va <= 0.0 && d4 - d3 >= 0.0 && d5 - d6 >= 0.0 {
+        let w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+        return [0.0, 1.0 - w, w];
+    }
+    let den = 1.0 / (va + vb + vc);
+    let (v, w) = (vb * den, vc * den);
+    [1.0 - v - w, v, w]
+}
+
+/// The nearest point of a triangle mesh to a point, as its triangle's corners and their weights: to
+/// carry what the mesh has at its vertices (normals, tone) over to what lies on it.
+pub struct OnMesh {
+    pos: Vec<V3>,
+    tris: Vec<[usize; 3]>,
+    centres: KdTree,
+}
+
+impl OnMesh {
+    /// The triangles of `idx` whose corners are all among the first `n` of `pos`.
+    pub fn new(pos: &[V3], idx: &[usize], n: usize) -> Self {
+        let tris: Vec<[usize; 3]> = idx.chunks(3).filter(|t| t.iter().all(|&i| i < n)).map(|t| [t[0], t[1], t[2]]).collect();
+        let centres: Vec<V3> = tris.iter().map(|t| (pos[t[0]] + pos[t[1]] + pos[t[2]]) / 3.0).collect();
+        OnMesh { pos: pos.to_vec(), tris, centres: KdTree::new(&centres) }
+    }
+
+    /// The nearest point to p (of the triangles with the 16 nearest centres): its corners and weights.
+    pub fn at(&self, p: V3) -> ([usize; 3], [f64; 3]) {
+        let mut best = (f64::INFINITY, [0; 3], [0.0; 3]);
+        for (_, t) in self.centres.query(&p, 16) {
+            let [a, b, c] = self.tris[t];
+            let w = nearest_weights(p, self.pos[a], self.pos[b], self.pos[c]);
+            let d = (self.pos[a] * w[0] + self.pos[b] * w[1] + self.pos[c] * w[2] - p).norm_squared();
+            if d < best.0 {
+                best = (d, [a, b, c], w);
+            }
+        }
+        (best.1, best.2)
+    }
 }

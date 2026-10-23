@@ -154,26 +154,60 @@ pub fn occlusion(mesh: &Mesh, around: &[&Mesh], reach: f64) -> Vec<f64> {
     let mut all = vec![mesh];
     all.extend(around);
     let bvh = Bvh::new(&all);
-    let dirs = directions(SAMPLES);
+    (0..mesh.len()).map(|i| (enclosed(&bvh, mesh.pos[i], mesh.nor[i], i, reach) * LEVELS).round() / LEVELS).collect()
+}
+
+/// How enclosed a point with normal `n` is (0..1; buried: 0); `i` twists its rays.
+fn enclosed(bvh: &Bvh, p: V3, n: V3, i: usize, reach: f64) -> f64 {
     let z = Unit::new_normalize(v3(0.0, 0.0, 1.0));
-    (0..mesh.len())
-        .map(|i| {
-            let n = mesh.nor[i].try_normalize(1e-12).unwrap_or(*z);
-            // A turn taking +z onto the normal, twisted by the vertex's index so neighbours don't band.
-            let onto = Rotation3::rotation_between(&z, &n).unwrap_or_else(|| Rotation3::from_axis_angle(&V3::x_axis(), std::f64::consts::PI));
-            let turn = onto * Rotation3::from_axis_angle(&z, i as f64 * 2.399963);
-            let start = mesh.pos[i] + n * LIFT;
-            let (mut blocked, mut inside) = (0.0, 0);
-            for d in &dirs {
-                match bvh.cast(&start, &(turn * d), reach) {
-                    Some((_, true)) => inside += 1,
-                    Some((dist, false)) => blocked += 1.0 - (dist / reach).powi(2),
-                    None => {}
-                }
+    let n = n.try_normalize(1e-12).unwrap_or(*z);
+    // A turn taking +z onto the normal, twisted by the vertex's index so neighbours don't band.
+    let onto = Rotation3::rotation_between(&z, &n).unwrap_or_else(|| Rotation3::from_axis_angle(&V3::x_axis(), std::f64::consts::PI));
+    let turn = onto * Rotation3::from_axis_angle(&z, i as f64 * 2.399963);
+    let start = p + n * LIFT;
+    let (mut blocked, mut inside) = (0.0, 0);
+    for d in &directions(SAMPLES) {
+        match bvh.cast(&start, &(turn * d), reach) {
+            Some((_, true)) => inside += 1,
+            Some((dist, false)) => blocked += 1.0 - (dist / reach).powi(2),
+            None => {}
+        }
+    }
+    if inside > SAMPLES / 2 { 0.0 } else { blocked / SAMPLES as f64 }
+}
+
+/// `occlusion`, but for the vertices `over` picks (among the first `n`, on the triangles among them) the
+/// mean over the vertex's triangles weighted by how much of the shade there it carries (its barycentric
+/// weight; four points a triangle) rather than at the vertex alone: where a crease's shade is narrower
+/// than the triangles (the skin against the lips, beside the nose) the vertices alone catch it at a few
+/// of them, and the triangles spread it in spikes.
+pub fn occlusion_spread(mesh: &Mesh, around: &[&Mesh], reach: f64, n: usize, over: &dyn Fn(V3) -> bool) -> Vec<f64> {
+    let mut all = vec![mesh];
+    all.extend(around);
+    let bvh = Bvh::new(&all);
+    let mut occ = occlusion(mesh, around, reach);
+    let (mut num, mut den) = (vec![0.0; n], vec![0.0; n]);
+    let mut k = 0;
+    for t in mesh.idx.chunks(3).filter(|t| t.iter().all(|&i| i < n && over(mesh.pos[i]))) {
+        let area = (mesh.pos[t[1]] - mesh.pos[t[0]]).cross(&(mesh.pos[t[2]] - mesh.pos[t[0]])).norm();
+        // The centres of the triangle's four equal parts.
+        for w in [[2.0, 2.0, 8.0], [2.0, 8.0, 2.0], [8.0, 2.0, 2.0], [4.0, 4.0, 4.0]].map(|w| w.map(|v| v / 12.0)) {
+            let p: V3 = (0..3).map(|j| mesh.pos[t[j]] * w[j]).sum();
+            let nor: V3 = (0..3).map(|j| mesh.nor[t[j]] * w[j]).sum();
+            let a = enclosed(&bvh, p, nor, k, reach);
+            k += 1;
+            for j in 0..3 {
+                num[t[j]] += w[j] * a * area;
+                den[t[j]] += w[j] * area;
             }
-            if inside > SAMPLES / 2 { 0.0 } else { (blocked / SAMPLES as f64 * LEVELS).round() / LEVELS }
-        })
-        .collect()
+        }
+    }
+    for i in 0..n {
+        if den[i] > 0.0 {
+            occ[i] = (num[i] / den[i] * LEVELS).round() / LEVELS;
+        }
+    }
+    occ
 }
 
 /// Writes `occlusion` into `mesh`'s tone.w.

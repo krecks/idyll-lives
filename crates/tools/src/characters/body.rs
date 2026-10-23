@@ -24,7 +24,8 @@
 //! The head's cage is finer over the face (head.rs) than the LOD's: the LOD keeps the coarse grid
 //! (`Cage::lod_faces`), so `lod.body` has the face's extra cage vertices unused. On the head the drawn
 //! surface is snapped onto the smooth head between the cage's vertices (`Topology::snapped`), and the
-//! eye sockets are carved into every point of it (`head::sockets`).
+//! eye sockets are carved into every point of it (`head::sockets`); the lids cover them, so the skin is
+//! shaded as it is without them.
 
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
@@ -684,6 +685,8 @@ pub struct Surface {
     pub head_samples: Vec<V3>,
     pub head_normals: Vec<V3>,
     pub head_tris: Vec<[V3; 3]>,
+    /// The same triangles without the eye sockets (where the closed lids lie, face.rs).
+    pub bare_tris: Vec<[V3; 3]>,
     pub cranium: Vec<V3>,
 }
 
@@ -723,14 +726,13 @@ fn make_surface(family: &str, stage: &str) -> Surface {
     // Head and neck, densely, without the ears (for the head interface's sdf and surface_z).
     let fpos = topo.snapped(true, &base, &ctrl, &onto, &holes);
     // Normals from the finer (level-2) limit surface: smooth shading on the coarse level 1 (whose
-    // vertices are the first of level 2's).
-    let ftri: Vec<usize> = triangles(&topo.s2.quads, &fpos).concat();
-    let fnor = smooth_normals(&fpos, &ftri);
-    let nor = fnor[..pos.len()].to_vec();
-    let lod_nor = fnor[..topo.n].to_vec();
+    // vertices are the first of level 2's), as it is without the eye sockets: the lids cover them
+    // (face.rs), and the skin round a lid is shaded as the face it carries on.
     let bare = topo.snapped(true, &base, &ctrl, &onto, &|p| p);
     let bare_nor = smooth_normals(&bare, &triangles(&topo.s2.quads, &bare).concat());
-    let unsocketed = (bare[..pos.len()].to_vec(), bare_nor[..pos.len()].to_vec());
+    let nor = bare_nor[..pos.len()].to_vec();
+    let lod_nor = bare_nor[..topo.n].to_vec();
+    let unsocketed = (bare[..pos.len()].to_vec(), nor.clone());
     let freg = topo.fine_m.apply_n(&region);
     let (ri_head, ri_ear, ri_neck) = (super::body::region("head"), super::body::region("ear"), super::body::region("neck"));
     let mut ears = [[V3::zeros(); 2]; 2];
@@ -757,6 +759,8 @@ fn make_surface(family: &str, stage: &str) -> Surface {
         head_samples.push((fpos[t[0]] + fpos[t[1]] + fpos[t[2]]) / 3.0);
     }
     let head_tris = tri.iter().map(|t| [fpos[t[0]], fpos[t[1]], fpos[t[2]]]).collect();
+    let fbare = topo.snapped(true, &base, &flat_ctrl, &onto, &|p| p);
+    let bare_tris = tri.iter().map(|t| [fbare[t[0]], fbare[t[1]], fbare[t[2]]]).collect();
     let pr = proportions(family, stage);
     let hh = pr.hh * pr.h;
     let cranium = fpos.iter().zip(&freg).filter(|(p, r)| r[ri_head] > 0.99 && p.y > pr.h - hh + 0.6 * hh).map(|(p, _)| *p).collect();
@@ -779,6 +783,7 @@ fn make_surface(family: &str, stage: &str) -> Surface {
         head_samples,
         head_normals,
         head_tris,
+        bare_tris,
         cranium,
     }
 }
@@ -957,6 +962,37 @@ fn region_ix(name: &str) -> usize {
     region(name)
 }
 
+/// The face's age folds (`HeadFrame::fold`) per vertex of the skin (the triangles of `idx` among `pos`),
+/// as its triangles can show them: each vertex's the mean over its triangles weighted by how much of the
+/// colour there it carries (its barycentric weight). A line a few millimetres wide sampled at the
+/// vertices alone, which lie farther apart, came out in blotches.
+fn folds(pos: &[V3], idx: &[usize], head: &HeadFrame) -> Vec<f64> {
+    const N: usize = 6;
+    let (mut num, mut den) = (vec![0.0; pos.len()], vec![0.0; pos.len()]);
+    for t in idx.chunks(3).filter(|t| t.iter().all(|&i| i < pos.len())) {
+        let [a, b, c] = [pos[t[0]], pos[t[1]], pos[t[2]]];
+        let area = (b - a).cross(&(c - a)).norm();
+        // The centres of the triangle's N x N equal parts.
+        for i in 0..N {
+            for j in 0..N - i {
+                for (di, dj, ok) in [(1.0, 1.0, true), (2.0, 2.0, i + j + 2 <= N)] {
+                    if !ok {
+                        continue;
+                    }
+                    let (u, v) = ((i as f64 + di / 3.0) / N as f64, (j as f64 + dj / 3.0) / N as f64);
+                    let w = [1.0 - u - v, u, v];
+                    let f = head.fold(a * w[0] + b * w[1] + c * w[2]);
+                    for (&vi, wk) in t.iter().zip(w) {
+                        num[vi] += wk * f * area;
+                        den[vi] += wk * area;
+                    }
+                }
+            }
+        }
+    }
+    num.iter().zip(&den).map(|(n, d)| if *d > 0.0 { n / d } else { 0.0 }).collect()
+}
+
 /// Clothes fields and tone of the (base stage) body or its LOD; the face's pieces after the skin.
 pub fn body_fields_and_tone(family: &str, mesh: &Mesh, p: &[V3; NB], head: &HeadFrame) -> (Vec<[f64; 4]>, Vec<[f64; 4]>) {
     let s = surface(family, BASE_STAGE);
@@ -967,7 +1003,8 @@ pub fn body_fields_and_tone(family: &str, mesh: &Mesh, p: &[V3; NB], head: &Head
     let mut f = fields_of(family, pos, &tags.arm, region, p, head);
     // Blush (x) and, on the face, the age folds (z; the shader deepens them with age).
     let ri_head = region_ix("head");
-    let mut tone: Vec<[f64; 4]> = (0..k).map(|i| [clip(tags.blush[i], 0.0, 1.0), 0.0, if region[i][ri_head] > 0.5 { head.fold(pos[i]) } else { 0.0 }, 0.0]).collect();
+    let fold = folds(pos, &mesh.idx, head);
+    let mut tone: Vec<[f64; 4]> = (0..k).map(|i| [clip(tags.blush[i], 0.0, 1.0), 0.0, if region[i][ri_head] > 0.5 { fold[i] } else { 0.0 }, 0.0]).collect();
     if n > k {
         // The face's pieces (lids, lips) inside the body: head fields; the nearest skin's tone.
         let extra = &mesh.pos[k..];
