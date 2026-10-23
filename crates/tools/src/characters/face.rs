@@ -10,13 +10,14 @@
 //!   radius; the shader draws sclera, iris (the resident's eye colour), pupil and a catchlight.
 //! - Lids: upper and lower skin caps hugging the eyeball, their edges almond-shaped curves on it
 //!   with a rounded rim, shaded like the face round them (normals leaning to it; build.rs gives
-//!   them the tone of the skin they lie on); lashes a dark band along the upper rim (a flick at the
-//!   outer corner on women). Blinks meet a little below the middle; squints raise the lower lid's
-//!   middle most.
-//! - Brows: flattened capsules along the brow line, on the skin.
-//! - Mouth: upper and lower lip tubes meeting at the corners (tone.x tints them); between them a
-//!   dark plate (tone.y = 1) with the tongue on it, and the upper and lower teeth. Everything inside
-//!   the mouth stays between the lips' inner lines, so a closed mouth shows nothing of it.
+//!   them the tone of the skin they lie on, and the upper lid a crease, tone.y, where it comes out of
+//!   the socket); lashes a dark band along the upper rim (a flick at the outer corner on women).
+//!   Blinks meet a little below the middle; squints raise the lower lid's middle most.
+//! - Brows: flattened capsules along the brow line, on the skin, thickest at the inner end.
+//! - Mouth: full upper and lower lip tubes meeting at the corners, the upper with a cupid's bow
+//!   (tone.x tints them); between them a dark plate (tone.y = 1) with the tongue on it, and the
+//!   upper and lower teeth. Everything inside the mouth stays between the lips' inner lines, so a
+//!   closed mouth shows nothing of it.
 //!
 //! Every piece is made by one function of the face's parameters (`pieces`), with a fixed vertex
 //! layout; a channel is the pieces made with its parameters minus the pieces at rest, so units and
@@ -61,11 +62,14 @@ struct Style {
 
 fn style(family: &str) -> Style {
     if family == "male" {
-        Style { lip_u: 2.4, lip_l: 3.2, lip_z: 2.5, proud: 1.6, brow_h: 3.2, brow_z: 1.4, arch: 1.0, brow_tip: 0.5, lash: 1.2, flick: 0.3, upper: 63.0, lower: 121.0, tilt: 0.0 }
+        Style { lip_u: 3.1, lip_l: 4.0, lip_z: 3.0, proud: 1.6, brow_h: 3.2, brow_z: 1.4, arch: 1.0, brow_tip: 0.5, lash: 1.2, flick: 0.3, upper: 63.0, lower: 121.0, tilt: 0.0 }
     } else {
-        Style { lip_u: 2.9, lip_l: 3.8, lip_z: 2.7, proud: 1.8, brow_h: 2.5, brow_z: 1.1, arch: 2.8, brow_tip: 0.35, lash: 2.0, flick: 1.6, upper: 61.0, lower: 120.0, tilt: -3.0 }
+        Style { lip_u: 3.6, lip_l: 4.6, lip_z: 3.3, proud: 1.8, brow_h: 2.5, brow_z: 1.1, arch: 2.8, brow_tip: 0.35, lash: 2.0, flick: 1.6, upper: 61.0, lower: 120.0, tilt: -3.0 }
     }
 }
+
+/// How dark the upper lid's crease is (tone y).
+const LID_CREASE: f64 = 0.7;
 
 /// Lid columns: azimuth round the eye (degrees, 0 = front, + towards the outer corner).
 fn lid_theta() -> Vec<f64> {
@@ -78,7 +82,13 @@ fn lash_theta() -> Vec<f64> {
 
 /// Lip columns along the mouth (-1 = the resident's left corner), denser at the corners.
 fn lip_s() -> Vec<f64> {
-    linspace(-PI / 2.0, PI / 2.0, 9).iter().map(|v| v.sin()).collect()
+    linspace(-PI / 2.0, PI / 2.0, 11).iter().map(|v| v.sin()).collect()
+}
+
+/// The upper lip's cupid's bow: how much its top edge rises (0..1) along the mouth (-1..1), two
+/// peaks under the philtrum's ridges with a dip between.
+fn bow(s: f64) -> f64 {
+    (-((s.abs() - 0.3) / 0.2).powi(2)).exp()
 }
 
 fn teeth_s() -> Vec<f64> {
@@ -88,6 +98,9 @@ fn teeth_s() -> Vec<f64> {
 fn tongue_s() -> Vec<f64> {
     linspace(-0.6, 0.6, 7)
 }
+
+/// How high the cupid's bow's peaks stand (of the upper lip's half-height).
+const BOW: f64 = 0.22;
 
 /// How far the lower lip drops with the jaw fully open (mm).
 const JAW: f64 = 26.0;
@@ -437,7 +450,7 @@ impl Face {
     fn brow(&self, p: &Params, k: usize) -> Lip {
         let (h, mm, st) = (&self.h, self.mm, &self.st);
         let [a, b] = h.brows[k];
-        let t = linspace(0.0, 1.0, 6);
+        let t = linspace(0.0, 1.0, 8);
         // Towards the middle: +x for the left brow.
         let inward = if k == 0 { 1.0 } else { -1.0 };
         let inner = 11.0 * p.brow_inner + 1.0 * p.brow_outer[k] - 8.0 * p.brow_down[k] - 3.0 * p.sneer[k];
@@ -449,8 +462,8 @@ impl Face {
             let dx = (3.5 * p.brow_down[k] + 1.2 * p.sneer[k]) * mm * (1.0 - t).powf(1.5) * inward;
             let x = a[0] + (b[0] - a[0]) * t + dx;
             let y = a[1] + (b[1] - a[1]) * t + dy;
-            ry.push(st.brow_h * mm * interp(t, &[0.0, 0.25, 0.7, 1.0], &[0.85, 1.0, 0.8, st.brow_tip]));
-            let z_r = st.brow_z * mm * interp(t, &[0.0, 1.0], &[1.0, 0.7]);
+            ry.push(st.brow_h * mm * interp(t, &[0.0, 0.25, 0.7, 1.0], &[1.25, 1.1, 0.75, 0.8 * st.brow_tip]));
+            let z_r = st.brow_z * mm * interp(t, &[0.0, 1.0], &[1.25, 0.6]);
             rz.push(z_r);
             let z = self.surf(x, y);
             pts.push(self.project(v3(x, y, z), z_r * 0.75));
@@ -500,8 +513,11 @@ impl Face {
         let yl = col(&|i| y[i] - low[i] - 0.75 * ry_l[i]);
         let zu = col(&|i| self.mz(x[i], yu[i]) + proud[i] + fwd[i] + dz[i] - 1.5 * mm * p.roll_u * rc[i]);
         let zl = col(&|i| self.mz(x[i], yl[i]) + proud[i] + fwd[i] + dz[i] + mm * rc[i] * (3.0 * p.jaw_fwd - 2.5 * p.tuck - 1.5 * p.roll_l + 1.0 * p.shrug_l));
+        // The cupid's bow: the upper lip's top edge raised at its peaks (its middle line and radius up
+        // by the same, so the line between the lips stays).
+        let bw = col(&|i| BOW * ry_u[i] * bow(s[i]));
         let lips = [
-            ((0..n).map(|i| v3(x[i], yu[i], zu[i])).collect(), ry_u.clone(), rz.clone()),
+            ((0..n).map(|i| v3(x[i], yu[i] + bw[i], zu[i])).collect(), (0..n).map(|i| ry_u[i] + bw[i]).collect(), rz.clone()),
             ((0..n).map(|i| v3(x[i], yl[i], zl[i])).collect(), ry_l.clone(), rz),
         ];
         // The opening: between the lips' inner lines (a little inside each lip, so its edge hides).
@@ -579,7 +595,7 @@ fn dot7(a: &[f64; 7], c: &[f64]) -> f64 {
 
 /// Open ends: the corners are thin enough not to show them.
 fn lip_tube(lip: &Lip) -> (Vec<V3>, Vec<usize>) {
-    let m = loft(&lip.0, &lip.1, &lip.2, 6, v3(0.0, 1.0, 0.0), OPEN);
+    let m = loft(&lip.0, &lip.1, &lip.2, 8, v3(0.0, 1.0, 0.0), OPEN);
     (m.pos, m.idx)
 }
 
@@ -647,7 +663,13 @@ fn smooth_n(name: &str, pos: &[V3], idx: &[usize]) -> Vec<V3> {
 fn tone(name: &str, pos: &[V3], idx: &[usize], face: &Face) -> Vec<[f64; 4]> {
     let n = pos.len();
     let mut t = vec![[0.0; 4]; n];
-    if name == "lipU" || name == "lipL" {
+    if name.starts_with("lidU") {
+        // The crease: a soft line along the upper lid's second row, fading at the corners.
+        let k = lid_theta().len();
+        for j in 0..k {
+            t[k + j][1] = LID_CREASE * (PI * j as f64 / (k - 1) as f64).sin().sqrt();
+        }
+    } else if name == "lipU" || name == "lipL" {
         // The sides facing the other lip in shade: a dark line between the lips, so the mouth's
         // shape (a smile, a frown) reads even when it is a few pixels wide.
         let nn = smooth_normals(pos, idx);

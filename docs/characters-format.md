@@ -155,7 +155,7 @@ from above) towards a lighter tint; both even out under a pixel or two. The mate
 
 The body (`body.rs`) is a control cage of superellipse rings (`cage.rs`; the head's cage
 in `head.rs`) fitted so its limit surface passes through the ring points and subdivided once
-(`subdiv.rs`): `body` is about 4.3k triangles of skin plus the face's lids and lips (budget
+(`subdiv.rs`): `body` is about 5.2k triangles of skin plus the face's lids and lips (budget
 6k), `lod.body` the cage at its limit plus the lids (budget 1.4k; the fingers are on it too). Skin
 weights are set per ring and subdivide with the positions. Every stage of a family has the same cage.
 
@@ -169,6 +169,22 @@ thumb side and the palm next to it. Weights: the knuckle ring is about half `han
 and `fingers_02` past it, so the clips' fist (`GRIP`) bends at the knuckles and the middle joints
 and all four fingers curl together; the thumb's as before (`thumb_01` / `thumb_02`). A small
 child's hand is a little wider, its fingers plumper and shorter.
+
+The head's cage (`head.rs`) is a grid of rows (from the jaw up) and columns (degrees round the head)
+under a crown patch: 8 rings of 12 round the whole head, and over the face a finer grid whose rows
+and columns run only part of the way, each ending on a whole one (so every face is a quad, or a
+pentagon or hexagon where a line ends on its side): columns at 7 degrees beside the nose's middle
+(from the mouth to over the eyes) and at 40 at the eyes' outer corners (from the nose's tip to the
+brow), rows at the mouth and the nose's base (to 28 degrees) and under and over the eyes (to 50).
+The points lie on a smooth head (a soft union of a cranium, cheeks-and-jaw, a muzzle and a chin
+ellipsoid: the face from the nose down stands up rather than sloping back to the chin); the features
+are offsets on them: the nose (a bridge from between the eyes to a round tip over the nose's base,
+its wings beside the tip and the base), the upper lip rounded forward with a groove down its middle
+(the philtrum), the brow, the ears, and round each eye a smooth dish the eyeball's front half
+stands out of (the lids cover its rim). The LOD keeps the 8 x 12 grid (`Cage::lod_faces`): the
+finer grid's vertices are in `lod.body` but unused. On the face (`face.rs`): lids hugging the
+eyeballs, the upper with a crease; full lips, tubes along the mouth, the upper with a cupid's bow
+over the philtrum; brows thickest at the inner end.
 
 The head interface (`head_frame(family, stage)`, `head.rs`): `sdf` is a smooth signed distance
 to the head and neck as drawn (the ears left out; about 1 mm near the surface), `surface_z` the
@@ -188,9 +204,13 @@ hairline and chin as before.
 ## Tone (4 per vertex)
 
 x = lip / cheek blush (0..1; on the tongue part, the tongue's red), y = shade drawn by hand (the
-line between the lips, the teeth's sides, deep in the hair; the mouth plate is 1), z = hair clump
-bands (0..1: light in a lock's middle, dark in the parting between two), w = the baked ambient occlusion (below). The eyelids take the tone of the skin they lie
-on, w included, and its shading normals (build.rs). Every stage uses the base stage's tone.
+line between the lips, the upper lids' crease, the teeth's sides, deep in the hair; the mouth plate is
+1), z = hair clump bands (0..1: light in a lock's middle, dark in the parting between two) and on the
+body the face's age folds (0..1: a soft line from beside
+each nose wing down past the mouth's corner, `HeadFrame::fold`; the shader darkens the skin by
+`0.3 z age`, appearance texel 4 g, so young adults show none), w = the baked ambient occlusion (below).
+The eyelids take the tone of the skin they lie on, w included (the upper lid keeps its crease), and
+its shading normals (build.rs). Every stage uses the base stage's tone.
 
 w is how much of the sky a vertex does not see at rest, 0 (open) to 1 (enclosed), in 32 steps
 (`ao.rs`, after the furniture's `gamekit/shade.py`): 48 rays per vertex over the hemisphere about its
