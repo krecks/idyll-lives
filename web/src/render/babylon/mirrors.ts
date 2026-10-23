@@ -269,13 +269,14 @@ export class Mirrors {
     }
     const now = performance.now();
     const viewProj = camera.getTransformationMatrix();
+    const period = this.quality.rate > 0 ? 1000 / this.quality.rate : 0;
     // A reflection draws again at most `rate` times a second: until one is due, nothing it shows
     // can have changed in a way that matters, so the glasses keep their place and their held
     // reflection, and the picking that would re-place them waits for the frame that draws. What
     // `changed` reports is not held back: the glass follows its door as it moves.
-    if (this.quality.rate > 0 && !this.stale && !this.due(now, viewProj, residents)) return;
+    if (period && !this.stale && !this.due(now, viewProj, residents)) return;
     const eye = camera.globalPosition;
-    Frustum.GetPlanesToRef(camera.getTransformationMatrix(), this.view);
+    Frustum.GetPlanesToRef(viewProj, this.view);
     const ranked = this.ranked;
     ranked.length = 0;
     for (const item of this.items) {
@@ -302,7 +303,6 @@ export class Mirrors {
       if (chosen.has(item) && item.slot >= 0) free.delete(item.slot);
       else item.slot = -1;
     }
-    const period = this.quality.rate > 0 ? 1000 / this.quality.rate : 0;
     for (const item of this.items) {
       if (chosen.has(item) && item.slot < 0) {
         item.slot = free.values().next().value!;
@@ -332,7 +332,7 @@ export class Mirrors {
         r.texture.resetRefreshCounter();
         continue;
       }
-      if (this.stale || !same(item.face, r.drawnFace) || !same(viewProj, r.drawnViewProj) || (r.showsAnyone && residents?.moved)) r.dirty = true;
+      if (this.stale || !same(item.face, r.drawnFace) || this.seenMoving(r, viewProj, residents)) r.dirty = true;
       if (r.dirty && now >= r.due - EARLY) {
         r.texture.resetRefreshCounter();
         // Steady at `rate` while it keeps changing; after a still spell, not two draws in a row.
@@ -344,19 +344,26 @@ export class Mirrors {
   }
 
   /**
-   * Whether this frame can find anything to draw again: a reflection is due, and the camera moved
-   * since it was drawn or a resident in its view did.
+   * Whether this frame can find anything to draw again: a reflection is due, and it was marked to
+   * draw again, or the camera moved since it was drawn, or a resident in its view did.
    */
   private due(now: number, viewProj: Matrix, residents: MirrorResidents | null): boolean {
     let held = false;
-    for (const r of this.pool) {
+    for (const [i, r] of this.pool.entries()) {
       if (!r) continue;
       held = true;
       if (now < r.due - EARLY) continue;
-      if (!same(viewProj, r.drawnViewProj) || (r.showsAnyone && residents?.moved)) return true;
+      // Marked to draw again counts only while a glass still shows it: one no glass was given
+      // isn't drawn, so its mark would otherwise hold every frame to a full pick until let go.
+      if ((r.dirty && r.next?.slot === i) || this.seenMoving(r, viewProj, residents)) return true;
     }
     // No reflection held (none made yet, or all let go): the glasses have to be picked again.
     return !held;
+  }
+
+  /** The camera moved since `r` was drawn, or a resident in its view did. */
+  private seenMoving(r: Reflection, viewProj: Matrix, residents: MirrorResidents | null): boolean {
+    return !same(viewProj, r.drawnViewProj) || (r.showsAnyone && !!residents?.moved);
   }
 
   /** The glass's corners round all its faces, in its first face's plane. */

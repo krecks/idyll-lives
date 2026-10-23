@@ -279,10 +279,11 @@ export function resetSettings(keys?: readonly (keyof Settings)[]): void {
   for (const k of keys) (settings as unknown as Record<string, unknown>)[k] = structuredClone(DEFAULT_SETTINGS[k]);
 }
 
-/** Renderer quality: the graphics preset's (`render/quality.ts`); `?quality=low|medium|high` overrides it for testing, `?snapshot=0` turns snapshot rendering off. */
+/** Renderer quality: the graphics preset's (`render/quality.ts`); `?quality=low|medium|high` overrides it for testing, `?snapshot=0` turns snapshot rendering off, `?shadowrate=<Hz>` sets the shadow rate. */
 export function qualityFromSettings(s: Settings, params: URLSearchParams): RenderQuality {
   const asked = params.get('quality');
   const preset = isGraphicsPreset(asked) ? asked : s.graphics;
   const q = QUALITY[preset];
-  return { ...q, preset, snapshotRendering: q.snapshotRendering && params.get('snapshot') !== '0' };
+  const shadowRate = Number(params.get('shadowrate') ?? NaN);
+  return { ...q, preset, snapshotRendering: q.snapshotRendering && params.get('snapshot') !== '0', shadowRate: Number.isFinite(shadowRate) ? shadowRate : q.shadowRate };
 }

@@ -134,7 +134,7 @@ impl Img {
         if self.ch == 1 {
             return self.clone();
         }
-        let px = self.px.as_chunks::<3>().0.iter().map(|p| luma(p[0], p[1], p[2])).collect();
+        let px = self.px.as_chunks().0.iter().map(|&[r, g, b]| luma(r, g, b)).collect();
         Img { w: self.w, h: self.h, ch: 1, px }
     }
 
