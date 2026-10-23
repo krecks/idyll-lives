@@ -3326,7 +3326,7 @@ export class BabylonRenderer implements Renderer {
     shadows.normalBias = 0.02;
     // Physically, shadows block all direct sunlight; the environment fills them in.
     shadows.setDarkness(0);
-    this.sunShadows = new SunShadows(shadows, this.scene);
+    this.sunShadows = new SunShadows(shadows, this.scene, this.quality.shadowRate);
     if (new URLSearchParams(location.search).has('profile')) {
       const map = shadows.getShadowMap()!;
       const render = map.render.bind(map);
