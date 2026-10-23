@@ -1278,7 +1278,7 @@ export async function startSession(
       if (game.pauseMenu || game.mode !== 'build' || buildBuy.picking()) return false;
       const hit = renderer.pick(x, y);
       const g = hit.ground;
-      return buildBuy.press(g && inLot(g.x, g.z) ? g : null, hit.objectId, { x, y });
+      return buildBuy.press(g && inLot(g.x, g.z) ? g : null, { x, y });
     },
     release(x, y, moved) {
       const g = renderer.pick(x, y).ground;

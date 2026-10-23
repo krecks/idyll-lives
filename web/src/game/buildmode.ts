@@ -248,9 +248,8 @@ export class BuildBuyInput {
   private lastGround: Point | null = null;
   /** Move room: the room being carried (its tiles), and the tile it was picked up by. */
   private carrying: { tiles: Point[]; at: Point } | null = null;
-  /** Buy: an owned object carried by a drag (from where its middle was grabbed), until release. */
-  private dragging: { id: number } | null = null;
-  private grab: { dx: number; dz: number } | null = null;
+  /** Buy: an owned object picked up by a click is carried by the point it was clicked at (from its middle). */
+  private grab: { id: number; dx: number; dz: number } | null = null;
   /** Buy: an owned object being resized by an arrow, until release. */
   private resizing: Resizing | null = null;
   /** What the shown arrows were made from (redrawn only when it changes). */
@@ -412,7 +411,7 @@ export class BuildBuyInput {
     }
     // The arrow under the pointer lights up.
     const picked = (game.furnishing && game.buySelection !== null && !game.placing) || (this.openingTool() && this.openingSel !== null);
-    const hot = screen && !this.dragging && picked ? (this.preview.handleAt?.(screen.x, screen.y) ?? null) : null;
+    const hot = screen && picked ? (this.preview.handleAt?.(screen.x, screen.y) ?? null) : null;
     if (hot !== this.hotHandle) {
       this.hotHandle = hot;
       this.handlesKey = '';
@@ -527,7 +526,8 @@ export class BuildBuyInput {
     // The middle goes under the pointer (or where it was grabbed), off the tile grid in quarter
     // tiles (Shift: centimetres); stairs stay square on it.
     const step = def.stairs ? 0 : this.shift ? FREE_STEP : OFFSET_STEP;
-    const [gx, gz] = [ground.x + (this.grab?.dx ?? 0), ground.z + (this.grab?.dz ?? 0)];
+    const grab = this.grab?.id === placing.objectId ? this.grab : null;
+    const [gx, gz] = [ground.x + (grab?.dx ?? 0), ground.z + (grab?.dz ?? 0)];
     const cx = step ? Math.round(gx / step) * step : gx;
     const cz = step ? Math.round(gz / step) * step : gz;
     const at = (rot: number) => {
@@ -758,7 +758,13 @@ export class BuildBuyInput {
         // Moved: the original stays hidden until it shows up in its new place.
         this.preview.setHeldObject?.(null, !same);
         game.placing = null;
+        this.grab = null;
         this.preview.setPlacementGhost?.(null);
+        // Picked either way (it keeps its id wherever it goes), as it was before it was moved.
+        if (game.furnishing) {
+          game.buySelection = placing.objectId;
+          this.syncHandles();
+        }
       } else {
         // New purchases stay on the cursor so several can be placed in a row.
         const resized = this.resizeOf(p.def, p.size, p.tall);
@@ -766,14 +772,17 @@ export class BuildBuyInput {
       }
       return true;
     }
-    const home = this.home();
-    const obj = objectId === null ? undefined : game.objects.find((o) => o.id === objectId);
+    const obj = this.ownedAt(objectId);
     game.buySelection = null;
-    // Stairs are moved in Build mode (Stairs tool).
-    if (!obj || !home || this.content.object(obj.def)?.stairs || obj.x < home.x || obj.z < home.z || obj.x >= home.x + home.w || obj.z >= home.z + home.d) return true;
-    // Clicking something at home picks it: its panel (move, turn, restyle, sell) and its resize arrows.
-    game.buySelection = obj.id;
+    if (!obj) return true;
+    // Clicking something at home picks it up: it follows the pointer, by the point it was clicked
+    // at, with its panel (turn, restyle, sell), until a click puts it down (Esc: back where it was).
+    const c = objectCentre(obj);
+    this.grab = ground && { id: obj.id, dx: c.x - ground.x, dz: c.z - ground.z };
+    game.placing = { def: obj.def, rot: obj.rot, turn: obj.turn ?? 0, objectId: obj.id, size: ownSize(this.content, obj), tall: obj.tall ?? 0 };
+    this.handlesKey = '';
     this.syncHandles();
+    if (ground) this.hoverBuy(ground);
     return true;
   }
 
@@ -877,9 +886,9 @@ export class BuildBuyInput {
     this.preview.setResizeHandles?.(this.handlesFor(def, { ...this.frameOf(sel), rot: sel.rot, top: lift + box.height, bottom: lift + box.bottom }), this.hotHandle);
   }
 
-  /** Before undo or redo (they may move or remove it): an owned object in hand (carried, dragged or resized) goes back; a new purchase stays on the cursor. */
+  /** Before undo or redo (they may move or remove it): an owned object in hand (carried or resized) goes back; a new purchase stays on the cursor. */
   dropOwned(): void {
-    if (this.resizing || this.dragging || game.placing?.objectId != null) this.cancel();
+    if (this.resizing || game.placing?.objectId != null) this.cancel();
   }
 
   /** A new structure arrived: the picked object's arrows follow it. */
@@ -888,8 +897,8 @@ export class BuildBuyInput {
     this.syncHandles();
   }
 
-  /** Buy: pressing on an arrow of the picked object resizes it; on something at home, carries it. */
-  private pressBuy(ground: Point | null, objectId: number | null, screen: Point2 | null): boolean {
+  /** Buy: pressing on an arrow of the picked object resizes it (things are moved with clicks, not dragged). */
+  private pressBuy(ground: Point | null, screen: Point2 | null): boolean {
     if (game.placing || this.picking()) return false;
     const handle = screen && game.buySelection !== null ? (this.preview.handleAt?.(screen.x, screen.y) ?? null) : null;
     const sel = handle ? game.objects.find((o) => o.id === game.buySelection) : undefined;
@@ -917,17 +926,7 @@ export class BuildBuyInput {
       this.hoverResize(ground);
       return true;
     }
-    const obj = this.ownedAt(objectId);
-    if (!obj || !ground) return false;
-    // Carried by the point it was grabbed at.
-    const c = objectCentre(obj);
-    this.grab = { dx: c.x - ground.x, dz: c.z - ground.z };
-    this.dragging = { id: obj.id };
-    game.buySelection = null;
-    game.placing = { def: obj.def, rot: obj.rot, turn: obj.turn ?? 0, objectId: obj.id, size: ownSize(this.content, obj), tall: obj.tall ?? 0 };
-    this.preview.setLeftDragCamera?.(false);
-    this.hoverBuy(ground);
-    return true;
+    return false;
   }
 
   /**
@@ -990,8 +989,8 @@ export class BuildBuyInput {
     this.syncHandles();
   }
 
-  /** End of a Buy press: drops what was carried, or makes the resize. True if it was one of those. */
-  private releaseBuy(ground: Point | null, moved: boolean): boolean {
+  /** End of a Buy press: makes the resize. True if it was one. */
+  private releaseBuy(): boolean {
     const r = this.resizing;
     if (r) {
       this.resizing = null;
@@ -1009,34 +1008,7 @@ export class BuildBuyInput {
       this.syncHandles();
       return true;
     }
-    const drag = this.dragging;
-    if (!drag) return false;
-    this.dragging = null;
-    this.preview.setLeftDragCamera?.(true);
-    const p = moved ? this.placement(ground ?? this.lastHover ?? { x: 0, z: 0 }) : null;
-    this.grab = null;
-    game.placing = null;
-    this.preview.setPlacementGhost?.(null);
-    if (!moved) {
-      // A press without a drag picks it.
-      game.buySelection = drag.id;
-      this.syncHandles();
-      return true;
-    }
-    const was = game.objects.find((o) => o.id === drag.id);
-    const same = !!p && !!was && was.x === p.x && was.z === p.z && was.rot === p.rot && offsetKey(was.offset) === offsetKey(p.offset);
-    if (p?.valid && was && !same) {
-      this.send({ type: 'moveObject', household: game.home, object: drag.id, x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset });
-      this.preview.setHeldObject?.(null, true);
-    } else {
-      // Dropped where it can't go (or where it was): it goes back.
-      if (p && !p.valid) game.placeRefused++;
-      this.preview.setHeldObject?.(null);
-    }
-    // Picked either way (it keeps its id wherever it goes).
-    game.buySelection = drag.id;
-    this.syncHandles();
-    return true;
+    return false;
   }
 
   // ---- Doors and windows: resizing -------------------------------------------------
@@ -1680,8 +1652,8 @@ export class BuildBuyInput {
    * with a start already set by a click, will finish it on release). Returns true when the
    * gesture belongs to drawing; the camera then doesn't turn until the release.
    */
-  press(ground: Point | null, objectId: number | null = null, screen: Point2 | null = null): boolean {
-    if (game.furnishing) return this.pressBuy(ground, objectId, screen);
+  press(ground: Point | null, screen: Point2 | null = null): boolean {
+    if (game.furnishing) return this.pressBuy(ground, screen);
     if (this.openingTool() && this.pressOpening(ground, screen)) return true;
     if (this.floorTool() && ground) {
       // Floor: a drag covers the rectangle of tiles it spans; a click, one tile (Shift: the room).
@@ -1727,7 +1699,7 @@ export class BuildBuyInput {
   /** End of a drawing press: a drag builds the run; a click without moving only sets the start. */
   release(ground: Point | null, moved: boolean): void {
     if (this.releaseOpening()) return;
-    if (this.releaseBuy(ground, moved)) return;
+    if (this.releaseBuy()) return;
     if (!this.pressed) return;
     this.pressed = false;
     this.preview.setLeftDragCamera?.(true);
@@ -1810,7 +1782,7 @@ export class BuildBuyInput {
       this.handlesKey = '';
       this.syncHandles();
     }
-    if (this.resizing || this.dragging) this.cancel();
+    if (this.resizing) this.cancel();
     else this.cancelDrawing();
     this.pressed = this.dropped = false;
   }
@@ -1818,16 +1790,16 @@ export class BuildBuyInput {
   /** Escape: drop what's in hand. Returns true if there was something to cancel. */
   cancel(): boolean {
     this.carrying = null;
-    if (this.resizing || this.dragging) {
-      const id = this.resizing?.id ?? this.dragging?.id ?? null;
+    // Something owned in hand (or being resized) goes back where it was, still picked.
+    const held = this.resizing?.id ?? (game.furnishing ? (game.placing?.objectId ?? null) : null);
+    if (held !== null) {
       this.resizing = null;
-      this.dragging = null;
       this.grab = null;
       game.placing = null;
       this.preview.setHeldObject?.(null);
       this.preview.setLeftDragCamera?.(true);
       this.clearPreviews();
-      game.buySelection = id;
+      game.buySelection = held;
       this.handlesKey = '';
       this.syncHandles();
       return true;
