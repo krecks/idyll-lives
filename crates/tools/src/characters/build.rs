@@ -184,7 +184,7 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
             for (i, q) in piece.pos.iter().enumerate() {
                 m.tone[k + i] = if piece.skin_tone {
                     // (The mean of the skin round each lid vertex, so a lid is blushed and shaded as its
-                    // socket is.)
+                    // socket is; the upper lid's crease its own.)
                     let nb = near.query(q, 16);
                     let mut t = [0.0; 4];
                     for &(_, j) in &nb {
@@ -192,6 +192,7 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
                             *tc += sc / nb.len() as f64;
                         }
                     }
+                    t[1] = t[1].max(piece.tone[i][1]);
                     t
                 } else {
                     let [x, y, z, _] = piece.tone[i];

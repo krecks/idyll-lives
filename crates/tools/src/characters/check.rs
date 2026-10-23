@@ -17,7 +17,7 @@ use super::{V3, repo_root, v3};
 /// lod.body: the cage at its limit (~0.9k) plus the eyelids (~0.2k).
 fn budget(name: &str) -> Option<usize> {
     match name {
-        "body" => Some(4500),
+        "body" => Some(6000),
         "lod.body" => Some(1200),
         _ if name.starts_with("hair.") => Some(3000),
         _ if shell_re(true).is_match(name) => Some(1500),

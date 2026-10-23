@@ -5,7 +5,8 @@
 //!
 //! `Cage::add(point, weights, region, tags) -> vertex id`; `ring(points, ...) -> ids`;
 //! `band(a, b)` joins two rings with quads; `join(a, b, match)` joins rings of different sizes
-//! (some faces become pentagons).
+//! (some faces become pentagons). A face is in both the cage and the LOD's (`lod_faces`) unless it is
+//! added with `fine_face` or `lod_face`: the face's finer cage (head.rs) is left out of the LOD.
 //!
 //! Every life stage and both families build the same vertices in the same order, so the topology
 //! is fixed and stages are deltas. Per vertex the cage carries its target point (on the designed
@@ -82,6 +83,8 @@ pub struct Cage {
     pub region: Vec<&'static str>,
     pub tags: Vec<Tags>,
     pub faces: Vec<Vec<usize>>,
+    /// The LOD's faces: the cage's, with the head's coarser grid (some vertices unused).
+    pub lod_faces: Vec<Vec<usize>>,
     /// The shoulder cap's loop round the neck (body.rs sets it; the necklines are cut from it).
     pub neck_loop: Vec<usize>,
 }
@@ -126,10 +129,21 @@ impl Cage {
     }
 
     pub fn face(&mut self, ids: &[usize]) {
+        self.fine_face(ids);
+        self.lod_faces.push(ids.to_vec());
+    }
+
+    /// A face of the cage only (not the LOD's).
+    pub fn fine_face(&mut self, ids: &[usize]) {
         for (i, a) in ids.iter().enumerate() {
             assert!(!ids[i + 1..].contains(a), "{ids:?}");
         }
         self.faces.push(ids.to_vec());
+    }
+
+    /// A face of the LOD only.
+    pub fn lod_face(&mut self, ids: &[usize]) {
+        self.lod_faces.push(ids.to_vec());
     }
 
     /// Quads between rings a and b (same size, same direction, cyclic); `skip`: edges left open.

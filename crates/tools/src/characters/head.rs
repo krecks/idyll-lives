@@ -3,47 +3,103 @@
 //! builds the head from the cage here, the face puts its features on the frame and the hair fits
 //! over it, so each can be rebuilt on its own.
 //!
-//! The head cage is 8 rings of 12 vertices (`ROWS`, columns at `COLS` degrees round the head,
-//! 0 = the face, 90 = the resident's right) under a crown patch. Its vertices lie where rays from
-//! the head's middle leave a smooth head (`head_shape`: a soft union of a cranium, cheeks-and-jaw
-//! and chin ellipsoids, rounder on small children); an ear is pulled out of each side, and a small
-//! nose, a soft brow and an eye socket round each eyeball (its front a few mm proud of the face;
-//! the lids close over it) are offsets on single vertices. There is no mouth hole: the lips and the
-//! mouth plate sit on the face.
+//! The head cage is a grid of rows (`ROWS`, from the jaw up) and columns (`COLS`, degrees round the
+//! head, 0 = the face, 90 = the resident's right) under a crown patch: 8 rings of 12 vertices round
+//! the whole head, and over the face a finer grid of rows and columns that run only part of the way
+//! (each ends on a whole one, so every face is a rectangle of grid cells: a quad, or a pentagon or
+//! hexagon where a line ends on its side): columns beside the nose's middle (7 degrees) and at the
+//! eyes' outer corners (40), rows at the mouth, at the nose's base, under the eyes and over them.
+//! Its vertices lie where rays from the head's middle leave a smooth head (`head_shape`: a soft union
+//! of a cranium, cheeks-and-jaw, a muzzle and a chin ellipsoid, rounder on small children); an ear is
+//! pulled out of each side, and the features are offsets on the grid's vertices (`features`): the
+//! nose (bridge, tip, wings and base), the upper lip and philtrum, a soft brow, and round each
+//! eyeball a smooth dish the eye's front half stands out of (the lids close over it), so the cheek
+//! under it keeps facing forward. There is no mouth hole: the lips and the mouth plate sit on the
+//! face. The LOD keeps the 8 x 12 grid (cage.rs `lod_faces`).
 //!
 //! `HeadFrame::sdf` and `surface_z` are measured on the real (subdivided) head and neck without
 //! the ears, so the face features and the hair sit on what is drawn; `ears` bound the ears.
 //! `centre` / `radii` are a loose ellipsoid round the skull for code that wants a simple one.
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use super::cage::{Cage, Per, RingTags, Tags, Weights};
+use super::cage::{Cage, Tags, Weights};
 use super::kdtree::KdTree;
-use super::np::{PI, clip, linspace_open, mean, median, radians, sign};
+use super::np::{PI, clip, linspace_open, mean, median, radians, sign, smoothstep};
 use super::rig::{b, joints, proportions};
 use super::{Cache, V3, key, v3};
 
-/// Columns (degrees round the head's vertical axis; 0 = the face, + = the resident's right, +x).
-pub const COLS: [f64; 12] = [0.0, 14.0, 28.0, 50.0, 92.0, 122.0, 180.0, -122.0, -92.0, -50.0, -28.0, -14.0];
-/// The socket vertex (and its mirror, 12 - 2).
-const EYE_COL: usize = 2;
-/// The ear leaves through the face between these columns, rows 3-4.
-const EAR_COLS: (usize, usize) = (4, 5);
 /// Rows from the jaw up: elevation (degrees) of the ray from the head's middle (`MIDDLE`) at the
-/// front and at the back. The smooth head is a soft union of ellipsoids (`Shapes`): the cranium,
-/// the cheeks and jaw, the chin; the rows' vertices are where the rays leave it. The features
-/// (nose, brow, eye sockets, ears) are cage offsets on top (see cage.rs).
-const ROWS: [(f64, f64); 8] = [(-52.0, -35.0), (-42.0, -20.0), (-20.0, -2.0), (-8.0, 10.0), (6.0, 22.0), (24.0, 36.0), (46.0, 52.0), (68.0, 70.0)];
+/// front and at the back, and how far round the head the row runs (degrees either side of the face;
+/// 180: all round). The smooth head is a soft union of ellipsoids (`Shapes`): the cranium, the
+/// cheeks and jaw, the muzzle, the chin; the rows' vertices are where the rays leave it.
+const ROWS: [(f64, f64, f64); 12] = [
+    (-52.0, -35.0, 180.0),
+    (-42.0, -20.0, 180.0),
+    (-27.0, -9.0, 28.0),
+    (-20.0, -2.0, 180.0),
+    (-14.0, 4.0, 28.0),
+    (-8.0, 10.0, 180.0),
+    (-1.0, 16.0, 50.0),
+    (6.0, 22.0, 180.0),
+    (14.0, 29.0, 50.0),
+    (24.0, 36.0, 180.0),
+    (46.0, 52.0, 180.0),
+    (68.0, 70.0, 180.0),
+];
+/// The rows by name: under the chin, the chin, the mouth, the upper lip, the nose's base, its tip,
+/// under the eyes, the eyes' middle, over the eyes, the brow (then the forehead and the top).
+const JAW: usize = 0;
+const MOUTH: usize = 2;
+const LIP: usize = 3;
+const BASE: usize = 4;
+const TIP: usize = 5;
+const UNDER: usize = 6;
+const EYE: usize = 7;
+const LID: usize = 8;
+const BROW: usize = 9;
+const TOP: usize = 11;
+/// Columns round the head (degrees round its vertical axis; 0 = the face, + = the resident's right,
+/// +x), in order, and the rows each runs through (first, last).
+const COLS: [(f64, usize, usize); 16] = [
+    (0.0, JAW, TOP),
+    (7.0, MOUTH, LID),
+    (14.0, JAW, TOP),
+    (28.0, JAW, TOP),
+    (40.0, TIP, BROW),
+    (50.0, JAW, TOP),
+    (92.0, JAW, TOP),
+    (122.0, JAW, TOP),
+    (180.0, JAW, TOP),
+    (-122.0, JAW, TOP),
+    (-92.0, JAW, TOP),
+    (-50.0, JAW, TOP),
+    (-40.0, TIP, BROW),
+    (-28.0, JAW, TOP),
+    (-14.0, JAW, TOP),
+    (-7.0, MOUTH, LID),
+];
+/// The ear leaves through the face between the columns at 92 and 122 degrees (and their mirrors), from
+/// the nose tip's row to the eyes'.
+const EAR: (f64, f64) = (92.0, 122.0);
 /// (height above the chin, z), fractions of hh.
 const MIDDLE: (f64, f64) = (0.40, 0.0);
-/// How far the eye socket's vertex moves (the surface follows by about half).
-const SOCKET: f64 = 2.2;
+/// The eye socket: depth of the dish round the eye (eye radii in front of the eye's middle) at its
+/// middle and at its rim, the rim's inner and outer radius (eye radii from the eye's axis), and how much
+/// wider it is than high.
+const SOCKET: [f64; 4] = [0.25, 1.15, 0.8, 1.4];
+const SOCKET_WIDE: f64 = 1.1;
+/// The age folds' half-width (fractions of hh; `HeadFrame::fold`).
+const FOLD_WIDTH: f64 = 0.02;
 
-/// Per family: (centre, radii) of the cranium, the cheeks and jaw, the chin (fractions of hh from
-/// the chin and the Head joint's z), and the blend width.
+/// Per family: (centre, radii) of the cranium, the cheeks and jaw, the muzzle (the front of the face
+/// from the nose down, so it stands up rather than sloping back to the chin), the chin (fractions of
+/// hh from the chin and the Head joint's z), and the blend width.
 struct Shapes {
     cranium: (V3, V3),
     cheeks: (V3, V3),
+    muzzle: (V3, V3),
     chin: (V3, V3),
     blend: f64,
 }
@@ -53,14 +109,16 @@ fn shapes(family: &str) -> Shapes {
         Shapes {
             cranium: (v3(0.0, 0.56, -0.02), v3(0.375, 0.44, 0.445)),
             cheeks: (v3(0.0, 0.32, 0.07), v3(0.335, 0.31, 0.33)),
-            chin: (v3(0.0, 0.12, 0.21), v3(0.15, 0.11, 0.12)),
+            muzzle: (v3(0.0, 0.2, 0.15), v3(0.19, 0.15, 0.225)),
+            chin: (v3(0.0, 0.12, 0.26), v3(0.15, 0.11, 0.12)),
             blend: 0.14,
         }
     } else {
         Shapes {
             cranium: (v3(0.0, 0.56, -0.02), v3(0.37, 0.44, 0.44)),
             cheeks: (v3(0.0, 0.32, 0.07), v3(0.325, 0.30, 0.325)),
-            chin: (v3(0.0, 0.13, 0.20), v3(0.13, 0.10, 0.11)),
+            muzzle: (v3(0.0, 0.2, 0.15), v3(0.18, 0.15, 0.22)),
+            chin: (v3(0.0, 0.13, 0.25), v3(0.13, 0.10, 0.11)),
             blend: 0.14,
         }
     }
@@ -74,6 +132,22 @@ fn nose(family: &str) -> f64 {
 fn brow(family: &str) -> f64 {
     if family == "male" { 0.025 } else { 0.014 }
 }
+
+/// The nose: (row, column's degrees, then the offset out to the side, up and forward), in `nose`
+/// units, each side the same. The bridge rises from between the eyes to a round tip over the nose's
+/// base; its wings flare beside the tip and the base.
+const NOSE: [(usize, f64, [f64; 3]); 10] = [
+    (LID, 0.0, [0.0, 0.0, 0.12]),
+    (EYE, 0.0, [0.0, 0.0, 0.35]),
+    (EYE, 7.0, [0.0, 0.0, -0.05]),
+    (UNDER, 0.0, [0.0, 0.0, 0.8]),
+    (UNDER, 7.0, [0.0, 0.0, 0.08]),
+    (TIP, 0.0, [0.0, 0.0, 1.6]),
+    (TIP, 7.0, [0.08, -0.04, 0.4]),
+    (TIP, 14.0, [0.0, 0.0, 0.06]),
+    (BASE, 0.0, [0.0, 0.0, 0.2]),
+    (BASE, 7.0, [0.1, 0.0, 0.25]),
+];
 
 /// 0 for adult heads (1 / 6.5 of the height), 1 for babies (1 / 3.4).
 pub fn youth(stage_hh: f64) -> f64 {
@@ -101,11 +175,15 @@ pub fn head_shape(family: &str, stage: &str) -> impl Fn(V3) -> f64 {
     let s = shapes(family);
     let (cc, mut cr) = s.cranium;
     let (mut kc, mut kr) = s.cheeks;
-    let (nc, mut nr) = s.chin;
-    // Small children: a bigger, rounder cranium, chubby cheeks low on a short face, a small chin.
+    let (mut mc, mr) = s.muzzle;
+    let (mut nc, mut nr) = s.chin;
+    // Small children: a bigger, rounder cranium, chubby cheeks low on a short face, a flatter muzzle
+    // and a small chin.
     cr += v3(0.035, 0.0, 0.02) * yg;
     kc += v3(0.0, -0.03, -0.01) * yg;
     kr += v3(0.04, 0.0, 0.0) * yg;
+    mc += v3(0.0, -0.02, -0.03) * yg;
+    nc += v3(0.0, 0.0, -0.02) * yg;
     nr *= 1.0 - 0.3 * yg;
     if stage == "elder" {
         kr += v3(0.008, 0.0, 0.0);
@@ -113,6 +191,7 @@ pub fn head_shape(family: &str, stage: &str) -> impl Fn(V3) -> f64 {
     let bl = s.blend;
     move |p: V3| {
         let d = smin(ellipsoid_sd(p, cc, cr), ellipsoid_sd(p, kc, kr), bl);
+        let d = smin(d, ellipsoid_sd(p, mc, mr), 0.08);
         smin(d, ellipsoid_sd(p, nc, nr), 0.09)
     }
 }
@@ -131,83 +210,215 @@ fn cast(f: &impl Fn(V3) -> f64, o: V3, d: V3) -> V3 {
     o + d * lo
 }
 
-/// Adds the head to `cage`; returns its jaw ring (12 ids, `COLS` order) for the neck.
-pub fn head_cage(cage: &mut Cage, family: &str, stage: &str) -> Vec<usize> {
+/// Whether row r and column c meet at a vertex (both run there).
+fn at(r: usize, c: usize) -> bool {
+    let (deg, r0, r1) = COLS[c];
+    deg.abs() <= ROWS[r].2 && (r0..=r1).contains(&r)
+}
+
+/// Whether row r runs from column c to the next one.
+fn row_runs(r: usize, c: usize) -> bool {
+    let n = (c + 1) % COLS.len();
+    COLS[c].0.abs() <= ROWS[r].2 && COLS[n].0.abs() <= ROWS[r].2
+}
+
+/// Whether column c runs from row r to the next one.
+fn col_runs(c: usize, r: usize) -> bool {
+    let (_, r0, r1) = COLS[c];
+    r0 <= r && r < r1
+}
+
+/// The coarse grid (the LOD's): the rows and columns that run all round.
+fn coarse_row(r: usize) -> bool {
+    ROWS[r].2 >= 180.0
+}
+
+fn coarse_col(c: usize) -> bool {
+    let (_, r0, r1) = COLS[c];
+    r0 == 0 && r1 == ROWS.len() - 1
+}
+
+fn col_of(deg: f64) -> usize {
+    COLS.iter().position(|c| c.0 == deg).expect("column")
+}
+
+/// The faces of the grid's cells (row r to r + 1, column c to c + 1), the ears' openings left out:
+/// cells not parted by a row or column that runs between them make one face, a rectangle of cells
+/// whose corners (and the vertices along its sides, where a line ends on it) are its corners.
+/// `coarse`: only the lines that run all round (the LOD's grid).
+fn grid_faces(ids: &[Vec<Option<usize>>], coarse: bool) -> Vec<Vec<usize>> {
+    let (nr, nc) = (ROWS.len() - 1, COLS.len());
+    let keep_r = |r: usize| !coarse || coarse_row(r);
+    let keep_c = |c: usize| !coarse || coarse_col(c);
+    let vert = |r: usize, c: usize| if keep_r(r) && keep_c(c) { ids[r][c] } else { None };
+    // Union-find over the cells (cell k = r * nc + c).
+    let mut parent: Vec<usize> = (0..nr * nc).collect();
+    fn root(p: &mut [usize], mut k: usize) -> usize {
+        while p[k] != k {
+            p[k] = p[p[k]];
+            k = p[k];
+        }
+        k
+    }
+    for r in 0..nr {
+        for c in 0..nc {
+            let k = r * nc + c;
+            // The next column's cell, unless that column runs between them.
+            let cn = (c + 1) % nc;
+            if !(keep_c(cn) && col_runs(cn, r)) {
+                let (a, bb) = (root(&mut parent, k), root(&mut parent, r * nc + cn));
+                parent[a.max(bb)] = a.min(bb);
+            }
+            // The next row's cell, unless that row runs between them.
+            if r + 1 < nr && !(keep_r(r + 1) && row_runs(r + 1, c)) {
+                let (a, bb) = (root(&mut parent, k), root(&mut parent, (r + 1) * nc + c));
+                parent[a.max(bb)] = a.min(bb);
+            }
+        }
+    }
+    let ears = [EAR, (-EAR.1, -EAR.0)].map(|(a, _)| col_of(a));
+    let mut groups: BTreeMap<usize, Vec<(usize, usize)>> = BTreeMap::new();
+    for r in 0..nr {
+        for c in 0..nc {
+            let g = root(&mut parent, r * nc + c);
+            groups.entry(g).or_default().push((r, c));
+        }
+    }
+    let mut out = Vec::new();
+    for cells in groups.values() {
+        let r0 = cells.iter().map(|q| q.0).min().unwrap();
+        let r1 = cells.iter().map(|q| q.0).max().unwrap() + 1;
+        // Columns: the cells' first, counting round from it (no face crosses the face's middle or
+        // the back of the head, where whole columns run).
+        let cs: Vec<usize> = cells.iter().map(|q| q.1).collect();
+        let c0 = *cs.iter().min().unwrap();
+        let c1 = cs.iter().max().unwrap() + 1;
+        assert_eq!(cells.len(), (r1 - r0) * (c1 - c0), "head cage: a face that is not a rectangle of cells");
+        if (r0..r1).contains(&TIP) && ears.contains(&c0) {
+            continue;
+        }
+        assert!([(r0, c0), (r0, c1), (r1, c0), (r1, c1)].iter().all(|&(r, c)| vert(r, c % nc).is_some()), "head cage: a face without its corners");
+        let c1w = c1 % nc;
+        let mut f = Vec::new();
+        f.extend((c0..c1).filter_map(|c| vert(r0, c)));
+        f.extend((r0..r1).filter_map(|r| vert(r, c1w)));
+        f.extend((c0 + 1..=c1).rev().filter_map(|c| vert(r1, c % nc)));
+        f.extend((r0 + 1..=r1).rev().filter_map(|r| vert(r, c0)));
+        out.push(f);
+    }
+    out
+}
+
+/// Offsets of the grid's vertices: the nose, the philtrum, the brow and the eye sockets (see the module
+/// docs), metres.
+fn features(family: &str, stage: &str, grid: &[Vec<V3>], exists: &[Vec<bool>]) -> Vec<Vec<V3>> {
     let pr = proportions(family, stage);
     let j = joints(family, stage);
+    let hh = pr.hh * pr.h;
+    let yg = youth(pr.hh);
+    let eyes = [j[b("eye_l")], j[b("eye_r")]];
+    let eye_r = (0.075 + 0.02 * yg) * hh;
+    let mut dd = vec![vec![V3::zeros(); COLS.len()]; ROWS.len()];
+    let z = v3(0.0, 0.0, 1.0);
+    let young = 1.0 - 0.55 * yg;
+    let n = nose(family) * young * hh * (if stage == "elder" { 1.1 } else { 1.0 });
+    for (r, deg, [ox, oy, oz]) in NOSE {
+        for sx in if deg == 0.0 { vec![1.0] } else { vec![1.0, -1.0] } {
+            dd[r][col_of(sx * deg)] += v3(sx * ox, oy, oz) * n;
+        }
+    }
+    // The upper lip rounded forward over the teeth (so it faces ahead under the nose), with the
+    // philtrum, a soft groove, down its middle.
+    for (deg, k) in [(0.0, 0.08), (7.0, 0.16), (-7.0, 0.16), (14.0, 0.1), (-14.0, 0.1)] {
+        dd[LIP][col_of(deg)] += z * k * n;
+    }
+    let bw = brow(family) * (1.0 - 0.6 * yg) * hh;
+    for deg in [14.0, 28.0, 40.0, 50.0] {
+        for sx in [1.0, -1.0] {
+            dd[BROW][col_of(sx * deg)] += z * bw;
+        }
+    }
+    dd[BROW][0] += z * 0.5 * bw;
+    // Eye sockets: round each eye the face is set back to a dish (`SOCKET`) that the eye's front half
+    // stands out of, the lids over it; a smooth field over the grid, so the surface follows it whole.
+    let [deep, rim, r0, r1] = SOCKET;
+    for e in eyes {
+        for r in 0..ROWS.len() {
+            for c in 0..COLS.len() {
+                if !exists[r][c] {
+                    continue;
+                }
+                let q = grid[r][c] - e;
+                let rho = (q.x / SOCKET_WIDE).hypot(q.y) / eye_r;
+                let dish = e.z + eye_r * (deep + (rim - deep) * smoothstep(r0, r1, rho));
+                dd[r][c] += z * (dish - grid[r][c].z).min(0.0) * (1.0 - smoothstep(r1 - 0.2, r1 + 0.15, rho));
+            }
+        }
+    }
+    dd
+}
+
+/// Adds the head to `cage`; returns its jaw ring (12 ids, the ring's columns in order) for the neck.
+pub fn head_cage(cage: &mut Cage, family: &str, stage: &str) -> Vec<usize> {
+    let pr = proportions(family, stage);
     let h = pr.h;
     let hh = pr.hh * h;
     let chin = h - hh;
     let yg = youth(pr.hh);
     let f = head_shape(family, stage);
-    let th = COLS.map(radians);
-    let s = th.map(|t| (1.0 - t.cos()) / 2.0);
     let o = v3(0.0, MIDDLE.0, MIDDLE.1);
-    let eyes = [j[b("eye_l")], j[b("eye_r")]];
-    let eye_r = (0.075 + 0.02 * yg) * hh;
     let w: Weights = vec![("Head", 1.0)];
     let origin = v3(0.0, chin, 0.0);
-    // (8, 12) the smooth head.
+    // The smooth head at every row and column.
     let grid: Vec<Vec<V3>> = ROWS
         .iter()
-        .map(|&(ef, eb)| {
-            (0..12)
-                .map(|c| {
-                    let el = radians(ef + (eb - ef) * s[c]);
-                    let d = v3(el.cos() * th[c].sin(), el.sin(), el.cos() * th[c].cos());
+        .map(|&(ef, eb, _)| {
+            COLS.iter()
+                .map(|&(deg, _, _)| {
+                    let th = radians(deg);
+                    let el = radians(ef + (eb - ef) * (1.0 - th.cos()) / 2.0);
+                    let d = v3(el.cos() * th.sin(), el.sin(), el.cos() * th.cos());
                     cast(&f, o, d) * hh + origin
                 })
                 .collect()
         })
         .collect();
-    let mut dd = vec![vec![V3::zeros(); 12]; 8];
-    let z = v3(0.0, 0.0, 1.0);
-    let young = 1.0 - 0.55 * yg;
-    // A small round nose (tip, base, wings, bridge) and a soft brow.
-    let n = nose(family) * young * hh * (if stage == "elder" { 1.1 } else { 1.0 });
-    dd[3][0] += v3(0.0, 0.05 * n, n);
-    dd[2][0] += z * 0.3 * n;
-    for c in [1, 11] {
-        dd[3][c] += z * 0.06 * n;
-    }
-    dd[4][0] += z * 0.15 * n;
-    let bw = brow(family) * (1.0 - 0.6 * yg) * hh;
-    for c in [1, 2, 3, 9, 10, 11] {
-        dd[5][c] += z * bw;
-    }
-    dd[5][0] += z * 0.5 * bw;
-    // Eye sockets: the socket vertex pulls the face in behind the eyeball (its front stays proud).
-    for (k, cc) in [(0, 12 - EYE_COL), (1, EYE_COL)] {
-        let e = eyes[k];
-        let sx = sign(e[0]);
-        dd[4][cc] = (e + v3(-sx * 0.3 * eye_r, 0.0, 0.16 * eye_r) - grid[4][cc]) * SOCKET;
-        let inner = (cc as i64 - sx as i64).rem_euclid(12) as usize;
-        dd[4][inner] += v3(-sx * 0.1 * eye_r, 0.0, -0.45 * eye_r);
-        dd[3][cc] += v3(0.0, -0.1 * eye_r, -0.15 * eye_r);
-    }
-    let mut ids = Vec::new();
+    let exists: Vec<Vec<bool>> = (0..ROWS.len()).map(|r| (0..COLS.len()).map(|c| at(r, c)).collect()).collect();
+    let mut ids: Vec<Vec<Option<usize>>> = vec![vec![None; COLS.len()]; ROWS.len()];
+    let dd = features(family, stage, &grid, &exists);
     for r in 0..ROWS.len() {
-        let mut blush = [0.0; 12];
-        // (Tone is the base stage's for every stage.)
-        if r == 3 {
-            blush[2] = 0.32 + 0.2 * yg;
-            blush[10] = blush[2];
-            blush[3] = 0.2 + 0.15 * yg;
-            blush[9] = blush[3];
-            blush[0] = 0.15;
+        for c in 0..COLS.len() {
+            if !exists[r][c] {
+                continue;
+            }
+            // Blush on the cheeks under the eyes and the nose's tip (tone is the base stage's for
+            // every stage).
+            let blush = if r == TIP {
+                match COLS[c].0.abs() {
+                    0.0 => 0.15,
+                    28.0 => 0.32 + 0.2 * yg,
+                    50.0 => 0.2 + 0.15 * yg,
+                    _ => 0.0,
+                }
+            } else {
+                0.0
+            };
+            ids[r][c] = Some(cage.add(grid[r][c], w.clone(), "head", Some(dd[r][c]), Tags { blush, ..Default::default() }));
         }
-        let tags = RingTags { blush: Per::Each(&blush), ..Default::default() };
-        ids.push(cage.ring(&grid[r], Per::All(&w), "head", Some(&dd[r]), tags));
     }
-    for r in 0..ROWS.len() - 1 {
-        let skip: Vec<usize> = if r == 3 { vec![EAR_COLS.0, 12 - EAR_COLS.1] } else { vec![] };
-        let (a, bb) = (ids[r].clone(), ids[r + 1].clone());
-        cage.band(&a, &bb, &skip);
+    for fc in grid_faces(&ids, false) {
+        cage.fine_face(&fc);
     }
-    // Ears: from the face left open between columns 92 and 122 (and -122 .. -92), rows 3-4. The
-    // smooth head has a low dome there (the skull the hair fits over); the ear is the offset.
-    for (c0, c1) in [(EAR_COLS.0, EAR_COLS.1), (12 - EAR_COLS.1, 12 - EAR_COLS.0)] {
-        let lp = [ids[3][c0], ids[3][c1], ids[4][c1], ids[4][c0]];
+    for fc in grid_faces(&ids, true) {
+        cage.lod_face(&fc);
+    }
+    let ring = |r: usize| -> Vec<usize> { (0..COLS.len()).filter(|&c| coarse_col(c)).map(|c| ids[r][c].expect("ring")).collect() };
+    let id = |r: usize, deg: f64| ids[r][col_of(deg)].expect("vertex");
+    // Ears: from the face left open between columns 92 and 122 (and -122 .. -92), from the nose tip's
+    // row to the eyes'. The smooth head has a low dome there (the skull the hair fits over); the ear
+    // is the offset.
+    for (c0, c1) in [EAR, (-EAR.1, -EAR.0)] {
+        let lp = [id(TIP, c0), id(TIP, c1), id(EYE, c1), id(EYE, c0)];
         let p: Vec<V3> = lp.iter().map(|&i| cage.p[i]).collect();
         let m = super::np::mean_rows(&p);
         let sx = sign(m[0]);
@@ -224,14 +435,14 @@ pub fn head_cage(cage: &mut Cage, family: &str, stage: &str) -> Vec<usize> {
             base.push(bpt);
             offs.push(q - bpt);
         }
-        let tags = RingTags { blush: Per::All(0.35), ..Default::default() };
-        let e = cage.ring(&base, Per::All(&w), "ear", Some(&offs), tags);
+        let tags = Tags { blush: 0.35, ..Default::default() };
+        let e: Vec<usize> = (0..4).map(|i| cage.add(base[i], w.clone(), "ear", Some(offs[i]), tags)).collect();
         cage.band(&lp, &e, &[]);
         cage.cap(&e);
     }
-    // Crown: a 2 x 4 patch over row 7 (right edge columns 14..130, left edge -14..-130), its middle
-    // line on the head's top.
-    let top = ids[ROWS.len() - 1].clone();
+    // Crown: a 2 x 4 patch over the top row (right edge columns 14..122, left edge -14..-122), its
+    // middle line on the head's top.
+    let top = ring(TOP);
     let mut mid = Vec::new();
     for (el, az) in [(80.0, 0.0), (90.0, 0.0), (80.0, PI)] {
         let e = radians(el);
@@ -245,7 +456,7 @@ pub fn head_cage(cage: &mut Cage, family: &str, stage: &str) -> Vec<usize> {
         cage.face(&[left[jj], centre[jj], centre[jj + 1], left[jj + 1]]);
         cage.face(&[centre[jj], right[jj], right[jj + 1], centre[jj + 1]]);
     }
-    ids[0].clone()
+    ring(JAW)
 }
 
 /// The head of a family at a life stage (model space at rest, metres).
@@ -320,6 +531,18 @@ impl HeadFrame {
     /// z of the head's front surface at (x, y) (the skull centre's z where (x, y) misses it).
     pub fn surface_z(&self, x: f64, y: f64) -> f64 {
         front_z(&self.tris, x, y, self.centre[2])
+    }
+
+    /// The age folds (0..1) at a point of the face: a soft line from beside each nose wing down past
+    /// the mouth's corner (nasolabial), on the front of the face.
+    pub fn fold(&self, p: V3) -> f64 {
+        let q = (p.x.abs() / self.hh, (p.y - self.chin_y) / self.hh);
+        let (a, b) = ((0.08, 0.31), (0.135, 0.15));
+        let ab = (b.0 - a.0, b.1 - a.1);
+        let t = clip(((q.0 - a.0) * ab.0 + (q.1 - a.1) * ab.1) / (ab.0 * ab.0 + ab.1 * ab.1), 0.0, 1.0);
+        let d = (q.0 - a.0 - t * ab.0).hypot(q.1 - a.1 - t * ab.1);
+        let front = clip((p.z - self.mouth.z + 0.1 * self.hh) / (0.05 * self.hh), 0.0, 1.0);
+        (-(d / FOLD_WIDTH).powi(2)).exp() * front
     }
 
     /// Scalp weight (0..1) of a point: 1 well above the hairline, 0 on the face and neck.

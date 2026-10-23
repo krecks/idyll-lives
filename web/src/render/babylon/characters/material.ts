@@ -3,7 +3,8 @@
  * shared pose texture (the same texture that holds the skinning matrices; one row per Sim) and the
  * per-vertex `simField` and `simTone` attributes (docs/characters-format.md):
  *
- * - body: the Sim's skin colour, with the tone's blush (x: lips, cheeks) and the line between the lips (y); the
+ * - body: the Sim's skin colour, with the tone's blush (x: lips, cheeks), the line between the lips and the
+ *   lids' crease (y) and the face's age folds (z, deepened with age: texel 4 g); the
  *   clothes are painted on it: where a garment's cut covers the body's fields the skin takes the
  *   top, bottom or shoe colour (anti-aliased edges; a top cut `over` the bottom wins over it, else
  *   the bottom wins), rougher than skin, with a turned band and a stitch line along each cut edge
@@ -195,6 +196,8 @@ const SHIRTS = ['0.78, 0.78, 0.74', '0.036, 0.039, 0.046', '0.357, 0.376, 0.406'
 const AO_DARK = '0.8';
 const AO_GAIN = '1.5';
 const AO_AGE = '0.6';
+/** How dark the face's age folds (body tone.z) are on an elder (texel 4 g = 1); younger, less. */
+const FOLD = '0.3';
 
 function wgsl(shaderType: string, off: number, morph: MorphBinding | null): { [pointName: string]: string } {
   if (shaderType === 'vertex') {
@@ -316,9 +319,9 @@ let simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, simC
 {
   let simRef = textureLoad(simDataTexture, vec2<i32>(${off + 5}, simRow), 0);
   // Skin: the Sim's colour (relative to the reference), blushed by the tone (x), the line between the lips
-  // darkened (y).
+  // and the lids' crease darkened (y), and the age folds (z) as far as the Sim's age (texel 4 g).
   var skin = simA.rgb * clamp(surfaceAlbedo / max(simRef.rgb, vec3f(0.01)), vec3f(0.0), vec3f(2.0));
-  skin = skin * mix(vec3f(1.0), vec3f(0.98, 0.62, 0.6), clamp(simT.x, 0.0, 1.0)) * (1.0 - 0.45 * clamp(simT.y, 0.0, 1.0));
+  skin = skin * mix(vec3f(1.0), vec3f(0.98, 0.62, 0.6), clamp(simT.x, 0.0, 1.0)) * (1.0 - 0.45 * clamp(simT.y, 0.0, 1.0)) * (1.0 - ${FOLD} * clamp(simT.z * simT4.y, 0.0, 1.0));
   let scalp = clamp(-simF.z - 1.0, 0.0, 1.0) * textureLoad(simDataTexture, vec2<i32>(${off + 7}, simRow), 0).w;
   skin = mix(skin, textureLoad(simDataTexture, vec2<i32>(${off + 3}, simRow), 0).rgb * 0.7, scalp);
   var cTop = textureLoad(simDataTexture, vec2<i32>(${off + 1}, simRow), 0).rgb;
@@ -530,7 +533,7 @@ float simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, si
 {
   vec4 simRef = texelFetch(simDataTexture, ivec2(${off + 5}, simRow), 0);
   vec3 skin = simA.rgb * clamp(surfaceAlbedo / max(simRef.rgb, vec3(0.01)), vec3(0.0), vec3(2.0));
-  skin = skin * mix(vec3(1.0), vec3(0.98, 0.62, 0.6), clamp(simT.x, 0.0, 1.0)) * (1.0 - 0.45 * clamp(simT.y, 0.0, 1.0));
+  skin = skin * mix(vec3(1.0), vec3(0.98, 0.62, 0.6), clamp(simT.x, 0.0, 1.0)) * (1.0 - 0.45 * clamp(simT.y, 0.0, 1.0)) * (1.0 - ${FOLD} * clamp(simT.z * simT4.y, 0.0, 1.0));
   float scalp = clamp(-simF.z - 1.0, 0.0, 1.0) * texelFetch(simDataTexture, ivec2(${off + 7}, simRow), 0).w;
   skin = mix(skin, texelFetch(simDataTexture, ivec2(${off + 3}, simRow), 0).rgb * 0.7, scalp);
   vec3 cTop = texelFetch(simDataTexture, ivec2(${off + 1}, simRow), 0).rgb;

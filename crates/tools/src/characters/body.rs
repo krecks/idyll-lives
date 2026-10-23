@@ -1,5 +1,5 @@
 //! The residents' bodies: a control cage of superellipse rings (cage.rs) fitted so its limit
-//! surface passes through the ring points, subdivided once (subdiv.rs, about 3.5k triangles) for
+//! surface passes through the ring points, subdivided once (subdiv.rs, about 4k triangles) for
 //! `body`; the cage at its limit (about 0.9k triangles) is `lod.body`. Contract:
 //!
 //! - `build_body(family, stage)`: parts `body` and `lod.body` (pos, nor, idx (CCW out), dense,
@@ -17,8 +17,12 @@
 //! Fields (docs/characters-format.md): x = sleeve parameter (-1 torso, 0 shoulder .. 1 wrist, over
 //! 1 on the hand: the arm's share of a vertex blends from the torso's -1 at the armhole), y = height,
 //! z / w = the crew and scoop (male: V) necklines, metres below a smooth curve round the neck
-//! (positive: covered); on the head -1 - scalp weight. Tone: x = blush (cheeks, nose, ears); the
-//! shade in the creases is baked into w afterwards (ao.rs).
+//! (positive: covered); on the head -1 - scalp weight. Tone: x = blush (cheeks, nose, ears), z =
+//! the face's age folds (`HeadFrame::fold`); the shade in the creases is baked into w afterwards
+//! (ao.rs).
+//!
+//! The head's cage is finer over the face (head.rs) than the LOD's: the LOD keeps the coarse grid
+//! (`Cage::lod_faces`), so `lod.body` has the face's extra cage vertices unused.
 
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
@@ -500,8 +504,13 @@ impl Topology {
         let pos = &cage.p;
         let n = pos.len();
         let faces = orient(&cage.faces, pos);
-        if let Err(e) = check_closed(&faces, n) {
+        if let Err(e) = check_closed(&faces, Some(n)) {
             panic!("{e}");
+        }
+        // The LOD leaves the face's finer cage out (its vertices stay, unused).
+        let lod_faces = orient(&cage.lod_faces, pos);
+        if let Err(e) = check_closed(&lod_faces, None) {
+            panic!("LOD: {e}");
         }
         let s = subdivision(&faces, n);
         let n1 = s.m.rows;
@@ -509,7 +518,7 @@ impl Topology {
         let body = l1.matmul(&s.m);
         let a = body.head(n);
         let lu = a.to_dense().lu();
-        let lod_tris = polygon_triangles(&faces);
+        let lod_tris = polygon_triangles(&lod_faces);
         let q1: Vec<Vec<usize>> = s.quads.iter().map(|q| q.to_vec()).collect();
         let s2 = subdivision(&q1, n1);
         let l2 = limit_matrix(&s2.quads, s2.m.rows);
@@ -826,7 +835,9 @@ pub fn body_fields_and_tone(family: &str, mesh: &Mesh, p: &[V3; NB], head: &Head
     let (pos, tags, region) = if lod { (&s.lod_pos, &s.lod_tags, &s.lod_region) } else { (&s.pos, &s.tags, &s.region) };
     let k = pos.len();
     let mut f = fields_of(family, pos, &tags.arm, region, p, head);
-    let mut tone: Vec<[f64; 4]> = (0..k).map(|i| [clip(tags.blush[i], 0.0, 1.0), 0.0, 0.0, 0.0]).collect();
+    // Blush (x) and, on the face, the age folds (z; the shader deepens them with age).
+    let ri_head = region_ix("head");
+    let mut tone: Vec<[f64; 4]> = (0..k).map(|i| [clip(tags.blush[i], 0.0, 1.0), 0.0, if region[i][ri_head] > 0.5 { head.fold(pos[i]) } else { 0.0 }, 0.0]).collect();
     if n > k {
         // The face's pieces (lids, lips) inside the body: head fields; the nearest skin's tone.
         let extra = &mesh.pos[k..];
