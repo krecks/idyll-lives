@@ -130,9 +130,20 @@ Every body has:
 
 The body (`body.rs`) is a control cage of superellipse rings (`cage.rs`; the head's cage
 in `head.rs`) fitted so its limit surface passes through the ring points and subdivided once
-(`subdiv.rs`): `body` is about 3.5k triangles of skin plus the face's lids and lips (budget
-4.5k), `lod.body` the cage at its limit plus the lids (budget 1.2k). Skin weights are set per ring
-and subdivide with the positions. Every stage of a family has the same cage.
+(`subdiv.rs`): `body` is about 4.3k triangles of skin plus the face's lids and lips (budget
+6k), `lod.body` the cage at its limit plus the lids (budget 1.4k; the fingers are on it too). Skin
+weights are set per ring and subdivide with the positions. Every stage of a family has the same cage.
+
+A hand is a palm with the ball of the thumb on it, a knuckle ring, four fingers and a thumb. A
+finger is a 6-sided tube in two bands: from the knuckles straight to just short of its middle
+joint (`fingers_02`'s joint), then on to a narrower ring before the rounded tip, curled a little at
+rest. Neighbouring fingers share the edges down into a crotch past the knuckles and stand apart
+beyond it, so the baked shade (tone w) darkens the gaps. The thumb is a 6-sided tube from the palm's
+thumb side and the palm next to it. Weights: the knuckle ring is about half `hand` and half
+`fingers_01` (more of the fingers' on the palm side), a finger `fingers_01` up to the middle joint
+and `fingers_02` past it, so the clips' fist (`GRIP`) bends at the knuckles and the middle joints
+and all four fingers curl together; the thumb's as before (`thumb_01` / `thumb_02`). A small
+child's hand is a little wider, its fingers plumper and shorter.
 
 The head interface (`head_frame(family, stage)`, `head.rs`): `sdf` is a smooth signed distance
 to the head and neck as drawn (the ears left out; about 1 mm near the surface), `surface_z` the

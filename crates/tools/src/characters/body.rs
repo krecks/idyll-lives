@@ -1,6 +1,6 @@
 //! The residents' bodies: a control cage of superellipse rings (cage.rs) fitted so its limit
-//! surface passes through the ring points, subdivided once (subdiv.rs, about 3.5k triangles) for
-//! `body`; the cage at its limit (about 0.9k triangles) is `lod.body`. Contract:
+//! surface passes through the ring points, subdivided once (subdiv.rs, about 4.3k triangles) for
+//! `body`; the cage at its limit (about 1.1k triangles) is `lod.body`. Contract:
 //!
 //! - `build_body(family, stage)`: parts `body` and `lod.body` (pos, nor, idx (CCW out), dense,
 //!   arm), meta (`seatDrop`, `eyeY`, `grip`) and the joints;
@@ -353,62 +353,129 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
             prev = cur;
         }
         let wrist = prev;
-        // Palm: two 10-rings (4 across from the back of the hand (-z) to the thumb side, 1 deep).
+        // Palm: two 10-rings (4 across from the back of the hand (-z) to the thumb side, 1 deep),
+        // the ball of the thumb swelling on the palm side, then the knuckle ring: the same 5
+        // columns plus a vertex at each side.
         let k1j = pj(nm("fingers_01"));
         let lpm = (k1j - jwr).norm();
-        let (wp, tp) = (0.80 * lpm, 0.30 * lpm);
+        // (A small child's hand is a little wider, its fingers plumper and shorter.)
+        let (wp, tp) = ((0.80 + 0.12 * yg) * lpm, 0.30 * lpm);
         let zs: Vec<f64> = [-0.5, -0.25, 0.0, 0.25, 0.5].iter().zip([0.9, 1.0, 1.0, 1.0, 0.92]).map(|(&a, m)| a * wp * m).collect();
         let order: [(usize, f64); 10] = [(3, -1.0), (2, -1.0), (1, -1.0), (0, -1.0), (0, 1.0), (1, 1.0), (2, 1.0), (3, 1.0), (4, 1.0), (4, -1.0)];
-        let palm_ring = |tt: f64, scale: f64| -> Vec<V3> {
+        // (The thumb's ball: palm-side offsets (towards the palm, forward) of columns 3 and 4.)
+        let palm_ring = |tt: f64, scale: f64, ball: f64| -> Vec<V3> {
             let cc = jwr + d * (tt * lpm) - u * 0.06 * tp;
-            order.iter().map(|&(k, v)| cc + z * (zs[k] * scale) + u * (tp / 2.0) * v * (if k == 0 || k == 4 { 0.85 } else { 1.0 }) + d * 0.0).collect()
+            order
+                .iter()
+                .map(|&(k, v)| {
+                    let swell = if v < 0.0 && k >= 3 { ball * [0.0, 0.0, 0.0, 0.6, 1.0][k] * lpm } else { 0.0 };
+                    cc + z * (zs[k] * scale + 0.5 * swell) + u * ((tp / 2.0) * v * (if k == 0 || k == 4 { 0.85 } else { 1.0 }) - swell)
+                })
+                .collect()
         };
         let arm1 = || RingTags { arm: Per::All(1.0), ..Default::default() };
-        let p1 = c.ring(&palm_ring(0.32, 0.92), Per::All(&one(nm("hand"))), "hand", None, arm1());
+        let hand_w = one(nm("hand"));
+        let p1 = c.ring(&palm_ring(0.32, 0.92, 0.05), Per::All(&hand_w), "hand", None, arm1());
         c.join(&wrist, &p1, &[0, 1, 2, 3, 5, 6, 7, 8]);
-        let p2_pts = palm_ring(0.9, 1.0);
-        let w2: Weights = vec![(nm("hand"), 0.5), (nm("fingers_01"), 0.5)];
-        let p2 = c.ring(&p2_pts, Per::All(&w2), "hand", None, arm1());
-        c.band(&p1, &p2, &[8]);
-        let at = |k: usize, v: f64| order.iter().position(|&(a, b)| a == k && b == v).unwrap();
-        // Fingers: one per distal quad of the knuckle ring, curled a little towards the palm.
-        let lf = 0.034 * h * (pr.upper / 0.165).powf(0.5);
+        let p2 = c.ring(&palm_ring(0.64, 1.0, 0.04), Per::All(&hand_w), "hand", None, arm1());
+        c.band(&p1, &p2, &[8, 9]);
+        // The knuckle ring: the back over the knuckles (about half hand, half fingers_01), the
+        // palm's pads a little further out (more the fingers'), so the knuckles bend there;
+        // between the fingers the back dips a little.
+        let kn: Vec<V3> = {
+            let cc = jwr - u * 0.02 * lpm;
+            let (top, pad) = (0.11 * lpm, 0.15 * lpm);
+            let mut out: Vec<V3> = order
+                .iter()
+                .map(|&(k, v)| {
+                    let edge = if k == 0 || k == 4 { 0.85 } else { 1.0 };
+                    if v > 0.0 {
+                        cc + d * (1.0 * lpm) + z * (zs[k] * 0.98) + u * (top * edge - if k == 0 || k == 4 { 0.0 } else { 0.012 * lpm })
+                    } else {
+                        cc + d * (1.08 * lpm) + z * (zs[k] * 0.98) - u * (pad * edge)
+                    }
+                })
+                .collect();
+            // Order: palm side 3 .. 0, the pinky's side, back 0 .. 4, the index's side, palm side 4.
+            out.insert(4, cc + d * (1.04 * lpm) + z * (zs[0] * 0.98 - 0.02 * lpm) - u * (0.01 * lpm));
+            out.insert(10, cc + d * (1.04 * lpm) + z * (zs[4] * 0.98 + 0.02 * lpm) - u * (0.01 * lpm));
+            out
+        };
+        let wk = |f: f64| -> Weights { vec![(nm("hand"), 1.0 - f), (nm("fingers_01"), f)] };
+        let wks: Vec<Weights> = (0..12).map(|i| wk(if (5..10).contains(&i) { 0.45 } else if i == 4 || i == 10 { 0.6 } else { 0.7 })).collect();
+        let p3 = c.ring(&kn, Per::Each(&wks.iter().collect::<Vec<_>>()), "hand", None, arm1());
+        c.join(&p2, &p3, &[0, 1, 2, 3, 5, 6, 7, 8, 9, 11]);
+        // Fingers, pinky (-z) to index: each leaves the knuckle ring between two of its columns,
+        // a 6-ring (back two, the side towards the thumb, palm two, the other side) whose sides
+        // between two fingers are one vertex in the crotch (towards the palm, past the knuckles),
+        // so neighbours share the edges down into it and stand apart beyond it. Straight from
+        // the knuckle to a ring just short of the middle joint (fingers_01), and a ring before
+        // the tip (fingers_02) turned a little about that joint towards the palm (the rest pose's
+        // curl), narrowing; a 6-sided cap. The middle joint is fingers_02's (rig.rs), so a fist
+        // bends at the knuckle and there. (`ki`: the knuckle ring's index of column k, back or palm;
+        // its sides are 4 and 10.)
+        let ki = |k: usize, v: f64| {
+            let i = order.iter().position(|&(a, b)| a == k && b == v).unwrap();
+            i + usize::from(i >= 4) + usize::from(i >= 9)
+        };
+        let k2j = pj(nm("fingers_02"));
+        let (pivot_d, pivot_u) = ((k2j - jwr).dot(&d), (k2j - jwr).dot(&u));
+        let chub = 1.0 + 0.15 * yg;
+        let wc = wk(0.9);
+        let crotch: Vec<usize> = (1..4)
+            .map(|k| c.add(jwr + d * (1.2 * lpm) + z * (zs[k] * 0.98) - u * (0.045 * lpm), wc.clone(), "hand", None, Tags { arm: 1.0, blush: 0.0 }))
+            .collect();
+        let w01 = one(nm("fingers_01"));
+        let w02 = one(nm("fingers_02"));
         for fi in 0..4 {
-            let sel = [at(fi, 1.0), at(fi + 1, 1.0), at(fi + 1, -1.0), at(fi, -1.0)];
-            let loop_f: Vec<usize> = sel.iter().map(|&i| p2[i]).collect();
-            let base: Vec<V3> = sel.iter().map(|&i| p2_pts[i]).collect();
-            let m = mean_rows(&base);
-            let spread = (fi as f64 - 1.5) * 0.06;
-            let len = lf * [0.82, 0.95, 1.0, 0.93][fi];
-            let (tt, sc, curl): (f64, f64, f64) = (0.78, 0.98, 0.25);
-            let w: Weights = vec![(nm("fingers_01"), 0.3), (nm("fingers_02"), 0.7)];
-            let dirf = unit(d * curl.cos() - u * curl.sin() + z * spread);
-            let cc = m + dirf * len * tt;
-            let pts: Vec<V3> = base.iter().map(|bp| cc + (bp - m) * sc - dirf * ((bp - m).dot(&dirf)) * sc).collect();
-            let cur = c.ring(&pts, Per::All(&w), "hand", None, arm1());
-            c.band(&loop_f, &cur, &[]);
-            c.cap(&cur);
+            let side = |k: isize| if k < 0 { p3[4] } else if k > 2 { p3[10] } else { crotch[k as usize] };
+            let loop_f = vec![p3[ki(fi, 1.0)], p3[ki(fi + 1, 1.0)], side(fi as isize), p3[ki(fi + 1, -1.0)], p3[ki(fi, -1.0)], side(fi as isize - 1)];
+            // (Half width, half depth; distal length past the joint, in palm lengths. The palm side is fuller.)
+            let (hw, hd) = ([0.088, 0.098, 0.1, 0.098][fi] * chub, [0.095, 0.105, 0.107, 0.105][fi] * chub);
+            let tip = [0.12, 0.16, 0.18, 0.16][fi] * (1.0 - 0.3 * yg);
+            let zf = (zs[fi] + zs[fi + 1]) / 2.0 * 0.98;
+            let spread = (fi as f64 - 1.5) * 0.05;
+            // (A 6-ring round cc facing ax: half width, half depth on the back and on the palm side.)
+            let hex = |cc: V3, ax: V3, up: V3, hw: f64, back: f64, palm: f64| -> Vec<V3> {
+                let sd = unit(up.cross(&ax)) * sign(up.cross(&ax).dot(&z));
+                [(-0.5, 0.87), (0.5, 0.87), (1.0, 0.0), (0.5, -0.87), (-0.5, -0.87), (-1.0, 0.0)]
+                    .iter()
+                    .map(|&(a, b): &(f64, f64)| cc + sd * (a * hw * lpm) + up * (b * if b > 0.0 { back } else { palm } * lpm))
+                    .collect()
+            };
+            let pivot = jwr + d * pivot_d + u * pivot_u + z * (zf + spread * (pivot_d - lpm));
+            let a = hex(pivot - d * (0.04 * lpm), d, u, hw * 1.1, hd * 1.05, hd * 1.5);
+            let ra = c.ring(&a, Per::All(&w01), "hand", None, arm1());
+            c.band(&loop_f, &ra, &[]);
+            let rho: f64 = 0.2;
+            let (ad, au) = (d * rho.cos() - u * rho.sin(), u * rho.cos() + d * rho.sin());
+            let b = hex(pivot + ad * (tip * lpm) + z * (spread * tip * lpm), ad, au, hw * 0.95, hd * 0.85, hd * 1.15);
+            let rb = c.ring(&b, Per::All(&w02), "hand", None, arm1());
+            c.band(&ra, &rb, &[]);
+            c.cap(&rb);
         }
-        // Thumb: from the palm's thumb side between the two rings, a ring at its knuckle
-        // (thumb_02) and one before the tip, narrowing like a finger. Each ring is the base quad
-        // turned from facing forward to facing along the thumb (its corners keep their sides:
-        // wrist / tip of the hand, back / palm), so the bands don't twist.
-        let tl = vec![p1[8], p1[9], p2[9], p2[8]];
+        // Thumb: from the palm between the two rings, round its thumb side and the palm side next
+        // to it (the ball of the thumb), a 6-ring at its knuckle (thumb_02) and one before the
+        // tip, narrowing like a finger; a 6-sided cap. Each ring is the base loop turned from its
+        // own plane to facing along the thumb (wrist / tip of the hand, back / palm keep their
+        // sides), so the bands don't twist.
+        let tl = vec![p1[8], p1[9], p1[0], p2[0], p2[9], p2[8]];
         let base: Vec<V3> = tl.iter().map(|&i| c.p[i]).collect();
         let m = mean_rows(&base);
-        let side_d: Vec<f64> = base.iter().map(|bp| sign((bp - m).dot(&d))).collect();
-        let side_u: Vec<f64> = base.iter().map(|bp| sign((bp - m).dot(&u))).collect();
+        let up = unit((base[0] - base[2]) - d * (base[0] - base[2]).dot(&d));
+        let out = unit(d.cross(&up));
+        let out = out * sign(out.dot(&(z - u)));
         let t2 = pj(nm("thumb_02"));
-        let tip = unit(d * 0.8 - u * 0.35 + z * 0.4);
+        let tip = unit(d * 0.85 - u * 0.45 + z * 0.22);
         let mut prev_t = tl;
         let thumb: [(V3, V3, f64, f64, Weights); 2] = [
-            (t2, unit(unit(t2 - m) + tip), 0.15, 0.14, vec![(nm("thumb_01"), 0.5), (nm("thumb_02"), 0.5)]),
-            (t2 + tip * (0.42 * lpm), tip, 0.11, 0.105, vec![(nm("thumb_02"), 1.0)]),
+            (t2, unit(unit(t2 - m) + tip), 0.15, 0.135, vec![(nm("thumb_01"), 0.5), (nm("thumb_02"), 0.5)]),
+            (t2 + tip * (0.42 * lpm), tip, 0.11, 0.1, vec![(nm("thumb_02"), 1.0)]),
         ];
         for (cc, ax, thw, tht, w) in &thumb {
-            let r = turn(z, *ax);
-            let (rd, ru) = (r * d, r * u);
-            let pts: Vec<V3> = (0..4).map(|i| cc + (rd * (side_d[i] * thw) + ru * (side_u[i] * tht)) * lpm).collect();
+            let r = turn(out, *ax);
+            let (rd, ru) = (r * d, r * up);
+            let pts: Vec<V3> = [(-0.5, 0.87), (-1.0, 0.0), (-0.5, -0.87), (0.5, -0.87), (1.0, 0.0), (0.5, 0.87)].iter().map(|&(a, b)| cc + (rd * (a * thw) + ru * (b * tht)) * lpm).collect();
             let cur = c.ring(&pts, Per::All(w), "hand", None, arm1());
             c.band(&prev_t, &cur, &[]);
             prev_t = cur;
