@@ -525,13 +525,13 @@ The neighbourhood dressing (`render/babylon/street.ts`: sidewalks, kerbs, street
 |---|---|---|---|---|---|
 | `street/sidewalk/albedo.webp`, `normal.webp`, `arm.webp` | `material.sidewalk` | Concrete Pavement (1k; albedo made a greyscale detail map, resized to 512 px, ARM to 256 px, WebP) | Charlotte Baglioni | https://polyhaven.com/a/concrete_pavement | CC0 |
 
-## Resident voices (`../voice/`, fetched by `tools/voice/fetch.mjs`)
+## Resident voices (`../voice/`, fetched by `cargo fetch-voice`)
 
 Unlike the art above, these come with their own licences: the model under the **BigScience OpenRAIL-M** licence (with use restrictions), the dictionary under **Apache-2.0**. They are downloaded at build time, pinned and checked by SHA-256, and are not stored in git.
 
 | File | Source | Authors | URL | Licence |
 |---|---|---|---|---|
-| `supertonic-3/*.onnxz` | Supertonic 3 (revision `3cadd1ee`): duration predictor, text encoder, vector estimator and vocoder, **modified**: every float32 weight of 1,024 values or more stored as float16 and cast back to float32 when the model loads (`tools/voice/fp16.mjs`), then gzipped; nothing retrained (`supertonic-3/NOTICE`) | Supertone Inc. | https://huggingface.co/Supertone/supertonic-3, https://github.com/supertone-inc/supertonic | BigScience OpenRAIL-M (`supertonic-3/LICENSE.txt`) |
+| `supertonic-3/*.onnxz` | Supertonic 3 (revision `3cadd1ee`): duration predictor, text encoder, vector estimator and vocoder, **modified**: every float32 weight of 1,024 values or more stored as float16 and cast back to float32 when the model loads (`crates/tools/src/fp16.rs`), then gzipped; nothing retrained (`supertonic-3/NOTICE`) | Supertone Inc. | https://huggingface.co/Supertone/supertonic-3, https://github.com/supertone-inc/supertonic | BigScience OpenRAIL-M (`supertonic-3/LICENSE.txt`) |
 | `supertonic-3/tts.json`, `unicode_indexer.json`, `F1.json`…`F5.json`, `M1.json`…`M5.json` | Supertonic 3 (revision `3cadd1ee`): config, text indexer and ten voice styles, **unchanged** | Supertone Inc. | https://huggingface.co/Supertone/supertonic-3 | BigScience OpenRAIL-M (`supertonic-3/LICENSE.txt`) |
 | `en-us.lexz` | Misaki US English dictionaries (`us_gold`, `us_silver`), merged and gzipped | hexgrad | https://github.com/hexgrad/misaki | Apache-2.0 (`misaki-LICENSE.txt`) |
 
@@ -557,7 +557,7 @@ The tokenizer runs with **Tokenizers.js** (`@huggingface/tokenizers`), © Huggin
 
 **Inter** by Rasmus Andersson and the Inter Project Authors (`@fontsource-variable/inter`), SIL Open Font License 1.1: its licence ships next to the font files as `inter-LICENSE.txt`.
 
-## Decoders (`../decoders/`, refreshed by `tools/assets/decoders.mjs`)
+## Decoders (`../decoders/`, refreshed by `cargo decoders`)
 
 Production builds ship compressed copies of the assets above (KTX2 textures, meshopt models, made by `tools/assets/optimize.mjs`; the art itself is unchanged). The game decodes them with these files, served from its own folder instead of Babylon's CDN:
 

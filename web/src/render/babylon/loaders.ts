@@ -4,7 +4,7 @@
  * - The glTF 2.0 loader and its extensions are fetched on first use, not with the main script
  *   (Babylon's lazy registration, like `registerBuiltInLoaders` but for glTF only).
  * - Decoders (meshopt geometry, the KTX2 texture transcoder and its WASM) come from our own
- *   `decoders/` folder, a mirror of Babylon's CDN layout (`tools/assets/decoders.mjs`): the
+ *   `decoders/` folder, a mirror of Babylon's CDN layout (`cargo decoders`): the
  *   page is cross-origin isolated, and the game shouldn't depend on a CDN anyway.
  */
 

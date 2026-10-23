@@ -3,7 +3,10 @@
 [target.wasm32-unknown-unknown]
 rustflags = ["-C", "target-feature=+simd128"]
 
-# The repo's tools (crates/tools), run from the repo root. Their Python predecessors are gone.
+# The repo's tools (crates/tools), run from the repo root. Their Python and JavaScript predecessors
+# are gone. The release and fetch tools (decoders, fetch-llm, fetch-voice, licenses, release-version,
+# wasm-opt) are unoptimised: they wait on the network or on binaryen, so a release build would only
+# cost minutes of compiling.
 [alias]
 art = "run -q -p ll-tools --release --bin art --"
 characters = "run -q -p ll-tools --release --bin characters --"
@@ -11,3 +14,9 @@ check-glb = "run -q -p ll-tools --release --bin check-glb --"
 content = "run -q -p ll-tools --release --bin content --"
 review = "run -q -p ll-tools --release --bin review --"
 tex = "run -q -p ll-tools --release --bin tex --"
+decoders = "run -q -p ll-tools --bin decoders --"
+fetch-llm = "run -q -p ll-tools --bin fetch-llm --"
+fetch-voice = "run -q -p ll-tools --bin fetch-voice --"
+licenses = "run -q -p ll-tools --bin licenses --"
+release-version = "run -q -p ll-tools --bin release-version --"
+wasm-opt = "run -q -p ll-tools --bin wasm-opt --"

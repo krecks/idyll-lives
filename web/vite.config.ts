@@ -4,7 +4,7 @@ import { cp, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { basename, join, resolve } from 'node:path';
 import { lstatSync, readFileSync, realpathSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 
 // SharedArrayBuffer (zero-copy sim -> render snapshots, threads for the language model on the
 // CPU) requires cross-origin isolation. Where production hosting can't send these two headers
@@ -168,10 +168,20 @@ function optimizedAssets(): Plugin {
 }
 
 /**
+ * One of the repo's tools (`crates/tools`, through the cargo aliases in .cargo/config.toml), run
+ * from this folder: its output lines, or a build-stopping error.
+ */
+function runTool(args: string[]): string[] {
+  const result = spawnSync('cargo', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  if (result.status !== 0) throw new Error(`cargo ${args[0]}: ${(result.stderr || result.error?.message || 'failed').trim()}`);
+  return result.stdout.trim().split('\n').filter((line) => line.length > 0);
+}
+
+/**
  * The release WebAssembly: once the build has written the simulation's and the voice's wasm, they
- * are optimised and stripped by binaryen's wasm-opt (tools/release/wasm-opt.mjs: -O3, no name or
- * producers sections; about a minute the first time, then cached). The dev server, and
- * `bun run wasm` behind it, keep them as built.
+ * are optimised and stripped by binaryen's wasm-opt (`cargo wasm-opt`: -O3, no name or producers
+ * sections; about a minute the first time, then cached). The dev server, and `bun run wasm` behind
+ * it, keep them as built.
  */
 function releaseWasm(): Plugin {
   let outDir = '';
@@ -184,17 +194,10 @@ function releaseWasm(): Plugin {
       log = (line) => config.logger.info(line, { timestamp: true });
     },
     async closeBundle() {
-      const tool = await import(new URL('../tools/release/wasm-opt.mjs', import.meta.url).href);
       const dir = join(outDir, 'assets');
       const files = (await readdir(dir)).filter((f) => /^(sim|voice)_wasm_bg-[\w-]+\.wasm$/.test(f));
       if (!files.some((f) => f.startsWith('sim_'))) throw new Error(`release-wasm: no sim_wasm_bg-*.wasm in ${dir}`);
-      await Promise.all(
-        files.map(async (f) => {
-          const start = performance.now();
-          const { before, after, cached } = await tool.optimizeWasm(join(dir, f));
-          log(`wasm-opt ${f}: ${before} -> ${after} bytes${cached ? ' (cached)' : `, ${((performance.now() - start) / 1000).toFixed(0)} s`}`);
-        }),
-      );
+      for (const line of runTool(['wasm-opt', ...files.map((f) => join(dir, f))])) log(line);
     },
   };
 }
@@ -324,13 +327,22 @@ function isolationWorker(): Plugin {
 /** The npm packages whose code the bundles hold (the page's and the workers'), by directory. */
 const bundledPackages = new Set<string>();
 
+/** The directory of the npm package a bundled module came from (none for our own code). */
+function packageDir(id: string): string | undefined {
+  const path = id.replace(/^\0/, '').split('?')[0];
+  const i = path.lastIndexOf('/node_modules/');
+  if (i < 0) return undefined;
+  const parts = path.slice(i + '/node_modules/'.length).split('/');
+  const name = parts[0].startsWith('@') ? `${parts[0]}/${parts[1]}` : parts[0];
+  return path.slice(0, i + '/node_modules/'.length) + name;
+}
+
 /** Notes which npm packages end up in a bundle (the page's, and each worker's: see `worker.plugins`). */
 function collectPackages(): Plugin {
   return {
     name: 'collect-packages',
     apply: 'build',
     async generateBundle(_, bundle) {
-      const { packageDir } = await import(new URL('../tools/release/licenses.mjs', import.meta.url).href);
       for (const chunk of Object.values(bundle)) {
         if (chunk.type !== 'chunk') continue;
         for (const [id, mod] of Object.entries(chunk.modules)) {
@@ -343,7 +355,7 @@ function collectPackages(): Plugin {
 }
 
 /**
- * The licences of what the game ships that others made (tools/release/licenses.mjs):
+ * The licences of what the game ships that others made (`cargo licenses`):
  * dist/THIRD-PARTY-LICENSES.txt, and Inter's licence next to its font files. Linked from Credits.
  */
 function thirdPartyLicenses(): Plugin {
@@ -357,20 +369,18 @@ function thirdPartyLicenses(): Plugin {
       log = (line) => config.logger.info(line, { timestamp: true });
     },
     async closeBundle() {
-      const tool = await import(new URL('../tools/release/licenses.mjs', import.meta.url).href);
       const header = `Idyll Lives ${pkg.version} (build ${COMMIT}): software and models by others that the game includes, and their licences.
 The game itself is free software under the GNU General Public License v3.0 or later. The art is listed in assets/CREDITS.md.`;
-      const { text, counts } = tool.thirdPartyLicenses({ packageDirs: [...bundledPackages], header });
-      await writeFile(join(outDir, 'THIRD-PARTY-LICENSES.txt'), text);
+      const packages = [...bundledPackages].flatMap((dir) => ['--package', dir]);
+      for (const line of runTool(['licenses', '--header', header, '--out', join(outDir, 'THIRD-PARTY-LICENSES.txt'), ...packages])) log(line);
       await cp(fileURLToPath(new URL('./node_modules/@fontsource-variable/inter/LICENSE', import.meta.url)), join(outDir, 'assets/inter-LICENSE.txt'));
-      log(`THIRD-PARTY-LICENSES.txt: ${counts.npm} npm packages, ${counts.rust} Rust crates, ${counts.texts} licence texts`);
     },
   };
 }
 
 export default defineConfig({
   plugins: [svelte(), debugReports(), earlyEnvironment(), optimizedAssets(), minifiedManifests(), dataBundle(), isolationWorker(), releaseWasm(), collectPackages(), thirdPartyLicenses()],
-  // The game's version (one number for web and Rust; `bun ../tools/release/version.mjs <x.y.z>` bumps it).
+  // The game's version (one number for web and Rust; `cargo release-version <x.y.z>` bumps it).
   define: { __APP_VERSION__: JSON.stringify(pkg.version), __APP_COMMIT__: JSON.stringify(COMMIT), __BUILD_ID__: JSON.stringify(BUILD_ID) },
   server: { headers: crossOriginIsolation, ...(linkedModules ? { fs: { allow: [searchForWorkspaceRoot(process.cwd()), linkedModules] } } : {}) },
   ...(linkedModules ? { cacheDir: fileURLToPath(new URL('./.vite-cache', import.meta.url)) } : {}),

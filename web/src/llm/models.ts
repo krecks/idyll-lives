@@ -1,7 +1,7 @@
 /**
  * The language model that writes residents' lines, with what the worker needs to run it: where
  * its files are, its chat format, stop tokens and sampling defaults. Liquid AI's LFM2.5 350M,
- * self-hosted (fetched by `tools/llm/fetch.mjs`), used as its upstream 4-bit build: small to
+ * self-hosted (fetched by `cargo fetch-llm`), used as its upstream 4-bit build: small to
  * download, fast on the GPU (WebGPU). It runs only there (on the CPU 4-bit was too slow for
  * lines); without WebGPU residents say hand-written lines. The generation loop (`generate.ts`)
  * reads the model's cache inputs from the model itself.
@@ -50,7 +50,7 @@ export const MODEL: ModelSpec = {
   tokenizer: ['tokenizer.json', 3_297_793, '29d43b4be8e8a896fefd7cd836ca6d6b4eedd249f823866ce0453b368e646f49'],
   tokenizerConfig: ['tokenizer_config.json', 3_825, 'e70cd070c2696bf1b0f1ad303c34502753670cca6f844637821cb1c37e6bea8d'],
   graph: ['model_q4.onnx', 183_442, 'd1a705712e93aafaba1346b32245fa59e7857a46e2272003c0e8c524977e0de8'],
-  data: ['model_q4.onnx_dataz', 255_530_880, '71ec6ad38a4c463dcb3dba671d06a1d9861be3a23e51290d818b95c0b7d2a5db'],
+  data: ['model_q4.onnx_dataz', 254_923_309, '71ec6ad38a4c463dcb3dba671d06a1d9861be3a23e51290d818b95c0b7d2a5db'],
   chat: { bos: '<|startoftext|>' },
   stop: ['<|im_end|>', '<|endoftext|>'],
   defaults: DEFAULTS,

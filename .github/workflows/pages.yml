@@ -59,7 +59,7 @@ jobs:
           REF_TYPE: ${{ github.ref_type }}
           REF_NAME: ${{ github.ref_name }}
         run: |
-          version=$(bun tools/release/version.mjs)
+          version=$(cargo release-version)
           if [ "$REF_TYPE" = "tag" ]; then
             if [ "$REF_NAME" != "v$version" ]; then echo "::error::Tag $REF_NAME doesn't match version $version"; exit 1; fi
             if ! grep -qE "^## ${version//./\\.}( |$)" CHANGELOG.md; then echo "::error::CHANGELOG.md has no '## $version' heading"; exit 1; fi
@@ -107,17 +107,17 @@ jobs:
 
       # The voice model and dictionary (about 400 MB from Hugging Face and GitHub, stored as
       # float16) and the language model (about 260 MB), kept between runs so a release doesn't
-      # depend on those sites. The fetch scripts check every file's SHA-256 and fetch again what
-      # doesn't match, so an old cache can't slip through.
+      # depend on those sites. The fetch tools (cargo fetch-voice, cargo fetch-llm) check every
+      # file's SHA-256 and fetch again what doesn't match, so an old cache can't slip through.
       - uses: actions/cache@v4
         with:
           path: web/public/voice
-          key: voice-${{ hashFiles('tools/voice/fetch.mjs', 'tools/voice/fp16.mjs') }}
+          key: voice-${{ hashFiles('crates/tools/src/voicefetch.rs', 'crates/tools/src/fp16.rs', 'crates/tools/src/download.rs') }}
           restore-keys: voice-
       - uses: actions/cache@v4
         with:
           path: web/public/llm
-          key: llm-${{ hashFiles('tools/llm/fetch.mjs') }}
+          key: llm-${{ hashFiles('crates/tools/src/llmfetch.rs', 'crates/tools/src/download.rs') }}
           restore-keys: llm-
 
       - name: Install
@@ -167,7 +167,7 @@ jobs:
           mkdir -p .assets/wasm-names
           cp src/core/wasm-pkg/sim_wasm_bg.wasm .assets/wasm-names/sim_wasm_bg.wasm
           cp src/voice/wasm-pkg/voice_wasm_bg.wasm .assets/wasm-names/voice_wasm_bg.wasm
-          bun ../tools/release/wasm-opt.mjs --names .assets/wasm-names/sim_wasm_bg.wasm .assets/wasm-names/voice_wasm_bg.wasm
+          cargo wasm-opt --names .assets/wasm-names/sim_wasm_bg.wasm .assets/wasm-names/voice_wasm_bg.wasm
 
       - uses: actions/upload-artifact@v4
         with:

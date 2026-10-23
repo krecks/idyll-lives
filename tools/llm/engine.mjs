@@ -22,7 +22,7 @@ export const { formatChat } = await import(new URL('src/llm/chat.ts', web).href)
 export const SPEC = {
   dir: new URL('public/llm/lfm2.5-350m/', web),
   graph: 'model_q4.onnx',
-  /** The weights, gzipped as the site ships them (`tools/llm/fetch.mjs`); the graph names them without the `z`. */
+  /** The weights, gzipped as the site ships them (`cargo fetch-llm`); the graph names them without the `z`. */
   data: 'model_q4.onnx_dataz',
   chat: { bos: '<|startoftext|>' },
   stop: ['<|im_end|>', '<|endoftext|>'],

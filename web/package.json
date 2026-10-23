@@ -12,15 +12,15 @@
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "lint": "eslint src",
     "test:sim": "cd .. && cargo test -p sim-core",
-    "voice": "cd .. && cargo build -p voice-wasm --target wasm32-unknown-unknown --release --locked && wasm-bindgen target/wasm32-unknown-unknown/release/voice_wasm.wasm --target web --out-dir web/src/voice/wasm-pkg && bun tools/voice/fetch.mjs",
+    "voice": "cd .. && cargo build -p voice-wasm --target wasm32-unknown-unknown --release --locked && wasm-bindgen target/wasm32-unknown-unknown/release/voice_wasm.wasm --target web --out-dir web/src/voice/wasm-pkg && cargo fetch-voice",
     "test:voice": "cd .. && cargo test -p voice --release",
     "check:voice": "bun ../tools/voice/check.mjs",
-    "llm": "bun ../tools/llm/fetch.mjs",
+    "llm": "cd .. && cargo fetch-llm",
     "check:llm": "bun ../tools/llm/check.mjs",
     "devices:llm": "bun ../tools/llm/devices.mjs",
     "check:clips": "bun ../tools/characters/check_clips.ts --body all --stage all",
     "assets": "bun ../tools/assets/optimize.mjs",
-    "decoders": "bun ../tools/assets/decoders.mjs"
+    "decoders": "cd .. && cargo decoders"
   },
   "dependencies": {
     "@babylonjs/core": "9.30.0",

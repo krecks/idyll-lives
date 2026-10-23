@@ -16,7 +16,7 @@ missing or too slow. Measurements and research behind the choices are at the end
 ## Built so far
 
 - **Model (`web/src/voice/supertonic.ts`):** Supertonic 3 (Supertone, BigScience OpenRAIL-M),
-  four ONNX graphs with their weights stored as 16-bit floats (`tools/voice/fp16.mjs`, cast back
+  four ONNX graphs with their weights stored as 16-bit floats (`crates/tools/src/fp16.rs`, cast back
   to 32-bit when the model loads, so the GPU does the same arithmetic) and gzipped (`.onnxz`,
   unpacked in the worker): 185 MB instead of 398 as published. Measured against the published
   weights, on the GPU, a line differs less than it does between two random seeds (spectral
@@ -595,7 +595,7 @@ times slower (many small passes). Replaced by Supertonic 3 on the GPU. What was 
   clip cache relies on. No graph edits are needed.
 - **Voices (`PRESETS` in `web/src/voice/voices.ts`):** 24 bundled clips, twelve women's and
   twelve men's, from Kyutai's voice repository (VCTK, CC BY 4.0; Voice-Zero, CC0), each turned
-  by `tools/voice/fetch.mjs` into a clip as the encoder takes it (24 kHz, trimmed, at most 10 s,
+  by `cargo fetch-voice` into a clip as the encoder takes it (24 kHz, trimmed, at most 10 s,
   loudness evened out) and packed into one 16-bit file (11.3 MB). See "Voices".
 - **Shaping (`crates/voice/src/dsp.rs`, in the voice WASM):** our own TD-PSOLA moves pitch, size
   (formants, by resampling first) and speed independently. A voice's pitch and size can go
@@ -658,7 +658,7 @@ files, the graph edits (`tools/voice/model.mjs`) and the KittenTTS tokenizer are
   the first time a voice is needed. It works with and without cross-origin isolation. Lines are
   made one at a time, by `voice/synth.ts` (the Node checks use the same code). Files the current
   version no longer uses (an older build's WASM, Paradee's model) are dropped from the cache.
-- **Model edits (`tools/voice/model.mjs`):** `bun run voice` (`tools/voice/fetch.mjs`) fetches the
+- **Model edits (`tools/voice/model.mjs`):** `bun run voice` (`cargo fetch-voice`) fetches the
   pinned upstream model and edits it in Node (a minimal protobuf reader/writer, so
   CI needs no Python): a `pitch` input multiplies the pitch curve, and the two random nodes are
   replaced by a counter-based hash of each value's position (h = (i·48271 + salt) mod 2³¹−1, then
@@ -846,7 +846,7 @@ vectors, one per text length, fed as the `style` input, so two voices can be **m
 Its makers call the 0.8 ONNX models "legacy" (their KittenTTS 2 is 1.7B parameters); they are
 frozen but fine for us.
 
-- **Download and edits (`tools/voice/fetch.mjs`, `model.mjs`, `npz.mjs`):** the fp32 model
+- **Download and edits (`cargo fetch-voice`, `model.mjs`, `npz.mjs`):** the fp32 model
   (`kitten-tts-nano-0.8-fp32`, pinned revision and SHA-256) has its large float weights stored as
   int8 with one float scale per output channel and `DequantizeLinear` (`quantizeWeights`), so it
   is 15.5 MB but computes in float. (The upstream int8 build uses dynamic quantisation,

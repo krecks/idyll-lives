@@ -63,8 +63,8 @@ The first `bun run dev` or `bun run build` downloads the voice model (398 MB as 
 | `bun run dev` | `wasm`, `voice` and `llm`, then the dev server |
 | `bun run build` / `bun run preview` | Production build / serve it |
 | `bun run wasm` | Build the simulation's WASM (release, `--locked`) |
-| `bun run voice` | Build the voice WASM and fetch the voice model and dictionary (`tools/voice/fetch.mjs`) |
-| `bun run llm` | Fetch the language model (`tools/llm/fetch.mjs`) |
+| `bun run voice` | Build the voice WASM and fetch the voice model and dictionary (`cargo fetch-voice`) |
+| `bun run llm` | Fetch the language model (`cargo fetch-llm`) |
 | `bun run check` | Type-check TypeScript and Svelte |
 | `bun run lint` | Lint the web code |
 | `bun run test:sim` | Run the Rust simulation tests |
@@ -76,10 +76,10 @@ The first `bun run dev` or `bun run build` downloads the voice model (398 MB as 
 | `bun run assets` | Build or update the compressed asset copies (the build does this too) |
 | `bun run decoders` | Refresh `public/decoders` after a Babylon upgrade |
 
-From the repo root: `cargo clippy --workspace --all-targets -- -D warnings` (CI gates on it), `bun tools/bench/render.mjs` (the rendering benchmark, see [docs/design/graphics.md](docs/design/graphics.md)) and `bun tools/release/version.mjs` (the version, see [Versions and releasing](#versions-and-releasing)).
+From the repo root: `cargo clippy --workspace --all-targets -- -D warnings` (CI gates on it), `bun tools/bench/render.mjs` (the rendering benchmark, see [docs/design/graphics.md](docs/design/graphics.md)) and `cargo release-version` (the version, see [Versions and releasing](#versions-and-releasing)).
 
 **The production build** also:
-- runs binaryen's `wasm-opt -O3` on both WASM files and strips their names (`tools/release/wasm-opt.mjs`; about a minute the first time, then cached in `web/.assets/wasm-opt`). The dev server keeps the WASM as built, with its names;
+- runs binaryen's `wasm-opt -O3` on both WASM files and strips their names (`cargo wasm-opt`; about a minute the first time, then cached in `web/.assets/wasm-opt`). The dev server keeps the WASM as built, with its names;
 - writes `bundle.json`: the content, house templates and asset manifests every start needs, in one file. The files still ship one by one beside it;
 - writes `THIRD-PARTY-LICENSES.txt` with the licences of the code it bundles, and fails if one is missing;
 - gives every runtime fetch from `public/` the build's id (`?v=<id>`), so a new release's data doesn't mix with files cached from the last one. `voice/` and `llm/` are pinned by SHA-256 and left out, and `index.html` itself isn't versioned (Pages lets the browser keep it for 10 minutes).
@@ -179,18 +179,18 @@ Pack authors: see [docs/content-packs.md](docs/content-packs.md). The look of th
 
 ## Versions and releasing
 
-The current version is **0.3.2**. One version number covers the whole game: `web/package.json` (shown in the main menu and Credits, with the commit it was built from), the Rust workspace in `Cargo.toml` and the workspace crates' entries in `Cargo.lock`. `bun tools/release/version.mjs` prints it and fails if they differ (CI checks this); `bun tools/release/version.mjs 0.3.0` sets all three. Each release is a git tag `vX.Y.Z` with notes in [CHANGELOG.md](CHANGELOG.md).
+The current version is **0.3.2**. One version number covers the whole game: `web/package.json` (shown in the main menu and Credits, with the commit it was built from), the Rust workspace in `Cargo.toml` and the workspace crates' entries in `Cargo.lock`. `cargo release-version` prints it and fails if they differ (CI checks this); `cargo release-version 0.3.0` sets all three. Each release is a git tag `vX.Y.Z` with notes in [CHANGELOG.md](CHANGELOG.md).
 
 Saves have their own format version, `SAVE_VERSION` in `crates/sim-core/src/save.rs`: 32 since 0.3.1, also in 0.3.2 (29 in 0.3.0, 23 in 0.2.0; 0.1.0 wrote 17). Older saves are migrated when they load, and `crates/sim-core/tests/old_saves.rs` loads real saves from 0.1.0 and the build after it. A save from a newer version is kept and skipped, and a damaged one is removed with a notice.
 
 **Releasing** (`.github/workflows/pages.yml`):
-1. `bun tools/release/version.mjs <x.y.z>` (it updates `Cargo.lock` too, so no `cargo build` is needed), and a `## <x.y.z> — <date>` section in CHANGELOG.md, with the date set by hand. Commit both on `main`, and `git push origin main`: the dry run builds what GitHub has.
+1. `cargo release-version <x.y.z>` (it updates `Cargo.lock` too, so no `cargo build` is needed), and a `## <x.y.z> — <date>` section in CHANGELOG.md, with the date set by hand. Commit both on `main`, and `git push origin main`: the dry run builds what GitHub has.
 2. A dry run on `main`: `gh workflow run pages.yml --ref main -f deploy=false`. `gh run watch` needs the run's id: `gh run list --workflow pages.yml -L1 --json databaseId -q '.[0].databaseId'`, then `gh run watch <id> --exit-status`. It runs everything a release runs (clippy with `-D warnings`, the simulation tests, tickbench, the voice tests, `bun run check:voice`, `check` and `lint`, the build, a size check under 900 MB) without publishing. It works on any branch, and `-f deploy=true` publishes. Run it on `main` just before tagging: the caches it saves there (voice and language models, assets) can be read by the tag's run.
 3. Tag and push: `git tag -a v<x.y.z> -m "..."` and `git push origin v<x.y.z>`. The tag's run checks that the tag matches the version and that CHANGELOG.md has its heading, builds, and publishes to GitHub Pages. Pushes to `main` alone don't publish. Watch it as in step 2 (`gh run list --workflow pages.yml --event push -L1 …`), and don't start other runs while it waits: GitHub keeps only one waiting run per concurrency group and cancels the older one.
 4. Check the live site:
    - The menu shows the new version, and Credits "Version <x.y.z> (build <the tagged commit>)". (To find the version in the bundle, search `index-*.js` for it without double quotes: it sits in backticks.)
    - F3 shows Shared memory: on, and a game runs.
-   - The large files download in full, which only the live site can show: `llm/lfm2.5-350m/model_q4.onnx_dataz` returns 200 and is 255,530,880 bytes (gunzipped, its SHA-256 is the one in `tools/llm/fetch.mjs`), and `voice/supertonic-3/vector_estimator.onnxz` is 119,568,968 bytes.
+   - The large files download in full, which only the live site can show: `llm/lfm2.5-350m/model_q4.onnx_dataz` returns 200 and is 254,923,309 bytes (gunzipped, its SHA-256 is the one in `crates/tools/src/llmfetch.rs`), and `voice/supertonic-3/vector_estimator.onnxz` is 119,556,677 bytes.
 5. Publish the release notes: `gh release create v<x.y.z> --verify-tag --title "Idyll Lives <x.y.z>" --notes-file <the version's CHANGELOG section>`.
 
 **If a release goes wrong,** fix forward, or redeploy the last good build (`gh workflow run pages.yml --ref <tag> -f deploy=true`). 0.3.1 and 0.3.2 share save format 32, so 0.3.1 is a safe build to go back to; 0.3.0 can't open 0.3.1's saves (format 32), 0.2.0 can't open 0.3.0's (format 29), and v0.1.0 can't open 0.2.0's database (version 2): an older build keeps the newer saves and skips them, so it lists only the saves it can open. Nothing is lost; the saves come back with the newer build.

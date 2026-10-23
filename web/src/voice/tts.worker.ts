@@ -31,24 +31,24 @@ const CACHE = `${CACHE_PREFIX}v5`;
 const OLD_VOICES_PREFIX = 'littlelives-voices-';
 
 /**
- * Files under `voice/` (made by `tools/voice/fetch.mjs`), with sizes in bytes for the progress
+ * Files under `voice/` (made by `cargo fetch-voice`), with sizes in bytes for the progress
  * bar. The graphs come with their weights in 16-bit floats, gzipped (`.onnxz`: unpacked by
  * `fetchOnce`).
  */
 type File = [name: string, bytes: number];
 const MODEL_DIR = 'supertonic-3/';
 const MODELS = {
-  duration: ['duration_predictor.onnxz', 1_628_944],
-  text: ['text_encoder.onnxz', 16_780_989],
-  vector: ['vector_estimator.onnxz', 119_568_968],
-  vocoder: ['vocoder.onnxz', 47_204_410],
+  duration: ['duration_predictor.onnxz', 1_633_681],
+  text: ['text_encoder.onnxz', 16_783_293],
+  vector: ['vector_estimator.onnxz', 119_556_677],
+  vocoder: ['vocoder.onnxz', 47_191_753],
 } satisfies Record<keyof Engine['sessions'], File>;
 /** A voice style file is about 291 KB. */
 const STYLE_BYTES = 291_500;
 const SMALL: File[] = [
   [`${MODEL_DIR}tts.json`, 8_253],
   [`${MODEL_DIR}unicode_indexer.json`, 277_676],
-  ['en-us.lexz', 1_320_518],
+  ['en-us.lexz', 1_310_821],
 ];
 const VOICE_WASM_BYTES = 162_000;
 
