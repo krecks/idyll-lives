@@ -96,6 +96,9 @@ const SOCKET: [f64; 6] = [0.7, 0.3, 0.5, 1.0, 2.0, 0.5];
 const SOCKET_WIDE: [f64; 2] = [1.0, 1.2];
 const SOCKET_SOFT: f64 = 0.2;
 const SOCKET_LOD: f64 = 0.4;
+/// Under the lids the socket goes on down behind the eyeball (`sockets`): `SLOT[0]` eye radii behind its
+/// surface, rising `SLOT[1]` per eye radius past its edge.
+const SLOT: [f64; 2] = [0.06, 10.0];
 /// The age folds' half-width (fractions of hh; `HeadFrame::fold`).
 const FOLD_WIDTH: f64 = 0.02;
 
@@ -168,7 +171,8 @@ fn ellipsoid_sd(p: V3, c: V3, r: V3) -> f64 {
     k0 * (k0 - 1.0) / k1.max(1e-9)
 }
 
-fn smin(a: f64, b: f64, k: f64) -> f64 {
+/// A smooth minimum of a and b (blended over k).
+pub fn smin(a: f64, b: f64, k: f64) -> f64 {
     let h = clip(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
     b + (a - b) * h - k * h * (1.0 - h)
 }
@@ -219,8 +223,9 @@ fn cast(f: &impl Fn(V3) -> f64, o: V3, d: V3) -> V3 {
 /// The eye sockets carved into the drawn head (body.rs, on every point of the surface rather than on
 /// the cage, so they are as fine as the surface is; `lod`: on the low-detail body's): round each eye
 /// the face goes softly down into a shallow hollow (`SOCKET`) the eye's front stands out of, deepest
-/// at its corners (the lids cover the rest), so the eye shows between the lids, the face meets the lids
-/// a little past their edges and the hollow's sides are gentle.
+/// at its corners, and on down behind the eyeball (`SLOT`), so the eye shows between the lids right into
+/// their corners. The lids cover all of it (face.rs: they reach out to the face round it), and the skin
+/// is shaded and its shade baked as it is without it (body.rs, build.rs).
 pub fn sockets(family: &str, stage: &str, lod: bool) -> impl Fn(V3) -> V3 {
     let pr = proportions(family, stage);
     let j = joints(family, stage);
@@ -239,7 +244,12 @@ pub fn sockets(family: &str, stage: &str, lod: bool) -> impl Fn(V3) -> V3 {
             let deep = if lod { SOCKET_LOD } else { over + (side - over) * across };
             let wide = SOCKET_WIDE[usize::from(q.x * e.x > 0.0)];
             let d = ((q.x / wide).hypot(q.y) - r0).max(0.0);
-            z = smin(z, e.z + r * (deep + (cv + (ch - cv) * across) * d * d + c4 * d.powi(4)), SOCKET_SOFT * r);
+            let mut floor = deep + (cv + (ch - cv) * across) * d * d + c4 * d.powi(4);
+            if !lod {
+                let rho = q.x.hypot(q.y);
+                floor = floor.min((1.0 - rho * rho).max(0.0).sqrt() - SLOT[0] + SLOT[1] * (rho - 1.0).max(0.0));
+            }
+            z = smin(z, e.z + r * floor, SOCKET_SOFT * r);
         }
         v3(p.x, p.y, z)
     }
@@ -520,6 +530,8 @@ pub struct HeadFrame {
     pub samples: Vec<V3>,
     pub normals: Vec<V3>,
     pub tris: Vec<[V3; 3]>,
+    /// Its triangles as they would be without the eye sockets (the face the lids lie on, face.rs).
+    pub bare: Vec<[V3; 3]>,
     /// The samples' KD-tree, their typical spacing and lowest height (head.py's module caches).
     tree: KdTree,
     spacing: f64,
@@ -666,6 +678,7 @@ fn make_head_frame(family: &str, stage: &str) -> HeadFrame {
         samples,
         normals: srf.head_normals.clone(),
         tris: srf.head_tris.clone(),
+        bare: srf.bare_tris.clone(),
         tree,
         spacing,
         floor_y,

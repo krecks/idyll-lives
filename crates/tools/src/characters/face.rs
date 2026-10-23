@@ -8,11 +8,14 @@
 //! - Eyes: a sphere per eye on its eye bone, its pole to the front so the rings run round the iris.
 //!   Fields xy = offset from the iris centre on the eye's front (m), z = iris radius, w = pupil
 //!   radius; the shader draws sclera, iris (the resident's eye colour), pupil and a catchlight.
-//! - Lids: upper and lower skin caps hugging the eyeball, their edges almond-shaped curves on it
-//!   with a rounded rim, shaded like the face round them (normals leaning to it; build.rs gives
-//!   them the tone of the skin they lie on, and the upper lid a crease, tone.y, where it comes out of
-//!   the socket); lashes a dark band along the upper rim (a flick at the outer corner on women).
-//!   Blinks meet a little below the middle; squints raise the lower lid's middle most.
+//! - Lids: upper and lower skin over the eye's socket, from a seam on the face round the hollow carved
+//!   for the eye (head.rs `sockets`) to their edges, almond-shaped curves on the eyeball meeting on its
+//!   front at the corners, with a rounded rim; in between they lie on the face as it is without the
+//!   socket, or on the eye's bulge where that stands out (`Face::lid_z`), so a closed lid is the face
+//!   with the eye's round under it. build.rs shades them and gives them the tone of the face they lie
+//!   on, the upper lid a crease (tone.y) above its edge; lashes a dark band along the upper rim (a flick
+//!   at the outer corner on women). Blinks meet a little below the middle; squints raise the lower
+//!   lid's middle most.
 //! - Brows: flattened capsules along the brow line, on the skin, thickest at the inner end.
 //! - Mouth: full upper and lower lip tubes meeting at the corners, the upper with a cupid's bow
 //!   (tone.x tints them); between them a dark plate (tone.y = 1) with the tongue on it, and the
@@ -31,7 +34,7 @@ use std::sync::Arc;
 use nalgebra::{DMatrix, DVector};
 
 use super::contract::channels;
-use super::head::HeadFrame;
+use super::head::{HeadFrame, front_z, head_frame, smin};
 use super::kdtree::KdTree;
 use super::meshops::smooth_normals;
 use super::np::{PI, clip, interp, linspace, lstsq, radians, sign, smoothstep};
@@ -71,13 +74,32 @@ fn style(family: &str) -> Style {
 /// How dark the upper lid's crease is (tone y).
 const LID_CREASE: f64 = 0.7;
 
+/// The lids reach out over the eye's socket to the face (`Face::seams`): their outer row lies
+/// `LID_LIFT` mm in front of the face round the socket, `LID_MARGIN` eye radii past the hollow and at
+/// least `LID_REACH` from the eye's axis; in between they lie on the face, or on a bulge round the
+/// eyeball (`LID_BULGE` eye radii from its centre) where that stands out, blended over `LID_SOFT` eye
+/// radii (`Face::lid_z`).
+const LID_LIFT: f64 = 0.5;
+const LID_MARGIN: f64 = 0.25;
+const LID_REACH: f64 = 1.2;
+const LID_BULGE: f64 = 1.1;
+const LID_SOFT: f64 = 0.06;
+/// Where the rows between the seam and the edge lie, from the seam (0) to the edge (1): upper, lower.
+const LID_ROWS: ([f64; 2], f64) = ([0.45, 0.78], 0.5);
+/// Past `LID_CORNER.0` (of 90 degrees round the eye from its middle) the lid edges turn towards each
+/// other (`LID_CORNER.1` degrees times the square of how far past), so the lids meet on the eye's front at
+/// about 63 degrees rather than past its sides, where only the hollow behind it would show; past that,
+/// where they overlap by `LID_SHUT` degrees at rest, their edges lie on the face.
+const LID_CORNER: (f64, f64) = (0.4, 200.0);
+const LID_SHUT: (f64, f64) = (6.0, 14.0);
+
 /// Lid columns: azimuth round the eye (degrees, 0 = front, + towards the outer corner).
 fn lid_theta() -> Vec<f64> {
     linspace(-104.0, 104.0, 9)
 }
 
 fn lash_theta() -> Vec<f64> {
-    linspace(-62.0, 80.0, 9)
+    linspace(-54.0, 58.0, 9)
 }
 
 /// Lip columns along the mouth (-1 = the resident's left corner), denser at the corners.
@@ -272,14 +294,30 @@ pub struct Face {
     m0: (f64, f64),
     mcoef: Vec<f64>,
     mfloor: f64,
+    /// The face round the eyes without their sockets (the head's `bare` triangles there), and the base
+    /// stage's head and its face so (`lid_z`).
+    bare: Vec<[V3; 3]>,
+    base: (Arc<HeadFrame>, Vec<[V3; 3]>),
+    /// Per eye, upper and lower lid: where each lid column meets the face (`seams`).
+    seams: [[Vec<V3>; 2]; 2],
+}
+
+/// The triangles of a head without its sockets round its eyes.
+fn round_eyes(head: &HeadFrame) -> Vec<[V3; 3]> {
+    let (e, r) = (head.eyes[1], head.eye_r);
+    head.bare.iter().filter(|t| t.iter().any(|p| (p.y - e.y).abs() < 3.0 * r && (p.x.abs() - e.x).abs() < 3.0 * r)).copied().collect()
 }
 
 impl Face {
     fn new(family: &str, head: Arc<HeadFrame>) -> Self {
         let mm = 0.001 * head.hh / ADULT_HH;
         let hw = head.mouth_w / 2.0 * 0.92;
-        let mut f = Face { h: head, st: style(family), mm, hw, m0: (0.0, 0.0), mcoef: Vec::new(), mfloor: 0.0 };
+        let bare = round_eyes(&head);
+        let base = head_frame(family, BASE_STAGE);
+        let base = (base.clone(), round_eyes(&base));
+        let mut f = Face { h: head, st: style(family), mm, hw, m0: (0.0, 0.0), mcoef: Vec::new(), mfloor: 0.0, bare, base, seams: Default::default() };
         f.fit_mouth();
+        f.seams();
         f
     }
 
@@ -373,6 +411,58 @@ impl Face {
         merge(&out.iter().collect::<Vec<_>>())
     }
 
+    /// Where the lids of each eye meet the face: per lid column (`lid_theta`; the upper lid's over the
+    /// eye, the lower's under it, both at the eye's corners at the ends), on a line round the hollow the
+    /// socket is carved into the face (head.rs `sockets`), `LID_MARGIN` past its edge and at least
+    /// `LID_REACH` from the eye's axis, so the lids cover all of it.
+    fn seams(&mut self) {
+        let (h, bh) = (self.h.clone(), self.base.0.clone());
+        let (r, rb) = (h.eye_r, bh.eye_r);
+        let near = |t: &&[V3; 3]| t.iter().any(|p| (p.y - bh.eyes[1].y).abs() < 3.0 * rb && (p.x.abs() - bh.eyes[1].x).abs() < 3.0 * rb);
+        let skin: Vec<[V3; 3]> = bh.tris.iter().filter(near).copied().collect();
+        for k in 0..2 {
+            let (e, out) = (h.eyes[k], if k == 1 { 1.0 } else { -1.0 });
+            for (s, sy) in [1.0, -1.0].into_iter().enumerate() {
+                self.seams[k][s] = lid_theta()
+                    .iter()
+                    .map(|&th| {
+                        let a = radians(th * 90.0 / 104.0);
+                        let d = v3(out * a.sin(), sy * a.cos(), 0.0);
+                        // (Found on the base stage's head, in its eye's radii, as `lid_z` is.)
+                        let carved = |rho: f64| {
+                            let q = bh.eyes[k] + d * rho * rb;
+                            front_z(&self.base.1, q.x, q.y, bh.centre.z) - front_z(&skin, q.x, q.y, f64::INFINITY) > 0.02e-3 * bh.hh / ADULT_HH
+                        };
+                        let edge = (0..100).map(|i| 0.5 + 0.02 * i as f64).filter(|&rho| carved(rho)).fold(0.0, f64::max);
+                        let q = e + d * (edge + LID_MARGIN).max(LID_REACH) * r;
+                        v3(q.x, q.y, self.bare_z(q.x, q.y) + LID_LIFT * self.mm)
+                    })
+                    .collect();
+            }
+        }
+    }
+
+    /// z of the face at (x, y) without the eye sockets.
+    fn bare_z(&self, x: f64, y: f64) -> f64 {
+        front_z(&self.bare, x, y, self.h.centre.z)
+    }
+
+    /// z of the lids of eye k at (x, y) inside their seams: `LID_LIFT` in front of the face without its
+    /// socket, or on the eyeball's bulge (`LID_BULGE`) where that stands out of it, the two blended
+    /// (`LID_SOFT`): so a closed lid is the face with the eye's round under it. The face is the base
+    /// stage's, as far from its eye in its eye's radii: the channels are made on the base stage and
+    /// added to every stage, so a lid moves over the eye the same way at every stage and covers it.
+    fn lid_z(&self, k: usize, x: f64, y: f64) -> f64 {
+        let (e, r) = (self.h.eyes[k], self.h.eye_r);
+        let (bh, bare) = (&self.base.0, &self.base.1);
+        let (eb, rb) = (bh.eyes[k], bh.eye_r);
+        let (qx, qy) = ((x - e.x) / r, (y - e.y) / r);
+        let face = (front_z(bare, eb.x + qx * rb, eb.y + qy * rb, bh.centre.z) - eb.z) / rb + LID_LIFT * 0.001 / ADULT_HH * bh.hh / rb;
+        let rho2 = qx * qx + qy * qy;
+        let ball = if rho2 < LID_BULGE * LID_BULGE { (LID_BULGE * LID_BULGE - rho2).sqrt() } else { -1.0 };
+        e.z - r * smin(-face, -ball, LID_SOFT)
+    }
+
     /// Upper and lower lid edges of eye k (polar angle from the top of the eye, degrees) per `lid_theta`.
     fn lid_edges(&self, p: &Params, k: usize) -> (Vec<f64>, Vec<f64>) {
         let st = &self.st;
@@ -384,15 +474,18 @@ impl Face {
             let t = th / 90.0;
             let to = t;
             let inner = smoothstep(0.1, -0.9, to);
-            let u0 = st.upper + 27.0 * t * t + st.tilt * to;
-            let l0 = st.lower - 21.0 * t * t + 2.0 * to;
+            let (u0, l0) = (st.upper + 27.0 * t * t + st.tilt * to, st.lower - 21.0 * t * t + 2.0 * to);
+            // (Overlapping by 20 degrees at most.)
+            let corner = (LID_CORNER.1 * (t.abs() - LID_CORNER.0).max(0.0).powi(2)).min((l0 - u0) / 2.0 + 10.0);
+            let (u0, l0) = (u0 + corner, l0 - corner);
             let mut u = u0 - 12.0 * p.wide[k] - 10.0 * p.look_up[k] + 20.0 * p.look_down[k] + p.brow_down[k] * (3.0 + 12.0 * inner) + 5.0 * p.sneer[k] - 5.0 * p.brow_inner * inner;
             let mut l = l0 - 18.0 * p.squint[k] * (1.0 - 0.45 * t * t) - 8.0 * p.cheek[k] * (1.0 - 0.3 * t * t) + 8.0 * p.look_down[k] + 3.0 * p.wide[k] - 7.0 * p.sneer[k];
             let b = p.blink[k];
             if b != 0.0 {
+                // (Past the corners, where the lids already meet, they stay.)
                 let c = 0.52 * l0 + 0.48 * u0;
-                u += b * (c + 4.0 - u0);
-                l += b * (c - l0);
+                u += b * ((c + 4.0).max(u0) - u0);
+                l += b * (c.min(l0) - l0);
             }
             uu.push(u);
             ll.push(l);
@@ -417,30 +510,54 @@ impl Face {
         let lt = lid_theta();
         let n = lt.len();
         let row = |ph: &dyn Fn(usize) -> f64, rr: f64, th: &[f64]| -> Vec<V3> { (0..th.len()).map(|i| self.sph(k, ph(i), th[i], rr)).collect() };
-        // Upper: from close over the top of the eye (so it rises out of the socket rather than
-        // standing on the face) down to the edge, then the rim turning in to the eye.
-        let up = vec![
-            row(&|_| 6.0, r * 1.05, &lt),
-            row(&|i| 6.0 + (u[i] - 6.0) * 0.45, r * 1.09, &lt),
-            row(&|i| 6.0 + (u[i] - 6.0) * 0.78, r * 1.1, &lt),
-            row(&|i| u[i], ru, &lt),
-            row(&|i| u[i] + 3.0, r * 1.075, &lt),
-        ];
-        // Lower: from under the eye up to the edge, then its rim.
-        let lo = vec![row(&|_| 168.0, rl, &lt), row(&|i| (168.0 + l[i]) / 2.0, rl, &lt), row(&|i| l[i], rl, &lt), row(&|i| l[i] - 2.5, r * 1.075, &lt)];
+        // Rows from the seam (s: 0 upper, 1 lower) towards the edge, on the face or the eye's bulge.
+        let over = |s: usize, edge: &[V3], t: f64| -> Vec<V3> {
+            self.seams[k][s]
+                .iter()
+                .zip(edge)
+                .map(|(c, e)| {
+                    let q = c + (e - c) * t;
+                    v3(q.x, q.y, self.lid_z(k, q.x, q.y))
+                })
+                .collect()
+        };
+        // Past the eye's corners, where the lids meet at rest, their edges and rims lie on the face (raised
+        // by `dz`) instead of on the eye at its sides.
+        let (u0, l0) = self.lid_edges(&Params::default(), k);
+        let shut: Vec<f64> = (0..n).map(|i| smoothstep(LID_SHUT.0, LID_SHUT.1, u0[i] - l0[i])).collect();
+        let raised = |edge: Vec<V3>| -> (Vec<V3>, Vec<f64>) {
+            let dz: Vec<f64> = edge.iter().zip(&shut).map(|(q, s)| s * (self.lid_z(k, q.x, q.y) - q.z).max(0.0)).collect();
+            (edge.iter().zip(&dz).map(|(q, d)| q + v3(0.0, 0.0, *d)).collect(), dz)
+        };
+        let lift = |rim: Vec<V3>, dz: &[f64]| -> Vec<V3> { rim.iter().zip(dz).map(|(q, d)| q + v3(0.0, 0.0, *d)).collect() };
+        // Upper: from where it meets the face over the socket down to the edge on the eye, then the
+        // rim turning in to the eye.
+        let (eu, dzu) = raised(row(&|i| u[i], ru, &lt));
+        let [t1, t2] = LID_ROWS.0;
+        let up = vec![self.seams[k][0].clone(), over(0, &eu, t1), over(0, &eu, t2), eu, lift(row(&|i| u[i] + 3.0, r * 1.075, &lt), &dzu)];
+        // Lower: from the face under the eye up to the edge, then its rim.
+        let (el, dzl) = raised(row(&|i| l[i], rl, &lt));
+        let lo = vec![self.seams[k][1].clone(), over(1, &el, LID_ROWS.1), el, lift(row(&|i| l[i] - 2.5, r * 1.075, &lt), &dzl)];
         debug_assert_eq!(n, 9);
         // Lashes: a dark band along the upper rim, standing out and up; longer towards the outer corner.
         let st = &self.st;
         let ls = lash_theta();
         let ue: Vec<f64> = ls.iter().map(|&t| interp(t, &lt, &u)).collect();
+        let gap: Vec<f64> = u.iter().zip(&l).map(|(u, l)| u - l).collect();
         let mut lash = vec![Vec::new(), Vec::new(), Vec::new()];
         for (i, &th) in ls.iter().enumerate() {
             let to = th / 90.0;
             let ln = (st.lash * (0.55 + 0.45 * smoothstep(-0.7, 0.6, to)) + st.flick * smoothstep(0.3, 0.95, to)) * mm;
             let lift = 5.0 + 6.0 * smoothstep(0.2, 0.95, to) * (if st.flick > 1.0 { 1.0 } else { 0.0 });
-            lash[0].push(self.sph(k, ue[i] + 1.5, th, ru + 0.15 * mm));
-            lash[1].push(self.sph(k, ue[i] - 1.0, th, ru + 0.55 * ln));
-            lash[2].push(self.sph(k, ue[i] - lift * 0.6 - 1.0, th, ru + ln));
+            // (Out of the edge, and standing off the lid above it by as much as off the eye, raised by 1.5 mm
+            // at most where the eye is open there: where the edge lies deep in the eye's inner corner they
+            // stay in it. Where the lids meet they come out of the fold between them onto the face.)
+            let dz = v3(0.0, 0.0, interp(th, &lt, &dzu));
+            let shut = smoothstep(-6.0, 4.0, interp(th, &lt, &gap));
+            let off = |q: V3, d: f64| q + v3(0.0, 0.0, clip(self.lid_z(k, q.x, q.y) + d - q.z, 0.0, 1.5 * mm + shut * h.eye_r));
+            lash[0].push(self.sph(k, ue[i] + 1.5, th, ru + 0.15 * mm) + dz);
+            lash[1].push(off(self.sph(k, ue[i] - 1.0, th, ru + 0.55 * ln) + dz, 0.55 * ln));
+            lash[2].push(off(self.sph(k, ue[i] - lift * 0.6 - 1.0, th, ru + ln) + dz, ln));
         }
         (up, lo, lash)
     }
@@ -664,10 +781,10 @@ fn tone(name: &str, pos: &[V3], idx: &[usize], face: &Face) -> Vec<[f64; 4]> {
     let n = pos.len();
     let mut t = vec![[0.0; 4]; n];
     if name.starts_with("lidU") {
-        // The crease: a soft line along the upper lid's second row, fading at the corners.
+        // The crease: a soft line along the upper lid's row above the edge, fading at the corners.
         let k = lid_theta().len();
         for j in 0..k {
-            t[k + j][1] = LID_CREASE * (PI * j as f64 / (k - 1) as f64).sin().sqrt();
+            t[2 * k + j][1] = LID_CREASE * (PI * j as f64 / (k - 1) as f64).sin().sqrt();
         }
     } else if name == "lipU" || name == "lipL" {
         // The sides facing the other lip in shade: a dark line between the lips, so the mouth's
