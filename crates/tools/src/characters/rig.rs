@@ -190,9 +190,11 @@ pub fn joints(family: &str, stage: &str) -> [V3; NB] {
         set(&format!("foot_{s}"), v3(hx, hip * 0.096, -0.01));
         set(&format!("ball_{s}"), v3(hx, 0.012 * fs, -0.01 + 0.095 * fs));
     }
-    // Eyes: sphere centres, head-relative.
+    // Eyes: sphere centres, head-relative; their fronts about level with the face round them, so the
+    // sockets (head.rs) are shallow.
+    let eye_z = if family == "male" { 0.32 } else { 0.315 };
     for (s, sx) in [("l", 1.0), ("r", -1.0)] {
-        set(&format!("eye_{s}"), v3(-0.17 * hh * sx, chin + 0.44 * hh, 0.275 * hh));
+        set(&format!("eye_{s}"), v3(-0.17 * hh * sx, chin + 0.44 * hh, eye_z * hh));
     }
     j.map(|v| v * h)
 }

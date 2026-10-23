@@ -24,7 +24,7 @@ use super::hair::build_hair;
 use super::head::{HeadFrame, head_frame};
 use super::json::{OMap, to_string_py};
 use super::kdtree::KdTree;
-use super::np::py_round;
+use super::np::{py_round, smoothstep};
 use super::rig::{BASE_STAGE, BONES, CLIP_BONES, FACE_BONES, FAMILIES, NB, STAGES, head, leg_lengths, parents, skeleton, source_pelvis};
 use super::write::{FIELD_SCALE, MORPH_SCALE, NORMAL_SCALE, PartEntry, STAGE_SCALE, StagePart, TONE_SCALE, pack_morph, r4, write_parts, write_stage};
 use super::{Mesh, V3, merge};
@@ -39,6 +39,8 @@ struct Assembled {
     n_skin: usize,
     n_lod: usize,
     cuts: Cuts,
+    /// The body without its eye sockets (`lid_shading`).
+    unsocketed: (Vec<V3>, Vec<V3>),
 }
 
 fn part<'a>(parts: &'a mut [(String, Mesh)], name: &str) -> &'a mut Mesh {
@@ -61,8 +63,11 @@ fn assemble(family: &str, stage: &str, cuts: Option<&Cuts>) -> Assembled {
     lod_list.extend(extras.iter().filter(|m| m.skin_tone).map(strip));
     let mut parts = vec![("body".to_string(), merge(&body_list.iter().collect::<Vec<_>>())), ("lod.body".to_string(), merge(&lod_list.iter().collect::<Vec<_>>()))];
     let n_lids: usize = extras.iter().filter(|m| m.skin_tone).map(Mesh::len).sum();
-    // (Not the low-detail body's: its coarse socket would turn them inside out.)
-    lid_normals(&mut parts[0].1, n_skin, n_lids);
+    let lids: Vec<V3> = {
+        let shade = lid_shading(&parts[0].1, n_skin, &bd.unsocketed, &head);
+        parts[0].1.pos[n_skin..n_skin + n_lids].iter().map(|&q| shade(q)).collect()
+    };
+    parts[0].1.nor[n_skin..n_skin + n_lids].copy_from_slice(&lids);
     parts.extend(f.parts.iter().cloned());
     parts.extend(build_hair(family, stage, &head, &p));
     let cuts = match cuts {
@@ -70,18 +75,23 @@ fn assemble(family: &str, stage: &str, cuts: Option<&Cuts>) -> Assembled {
         None => garment_cuts(family, &p),
     };
     parts.extend(build_clothes(family, stage, &cuts));
-    Assembled { parts, meta: bd.meta, p, head, face: f, n_skin, n_lod, cuts }
+    Assembled { parts, meta: bd.meta, p, head, face: f, n_skin, n_lod, cuts, unsocketed: bd.unsocketed }
 }
 
-/// The lids (`n_lids` vertices after the `n_skin` of the skin) shaded as the skin they lie on: their
-/// normals the mean of the nearest skin's (not the face's forward lean they are made with), so a lid
-/// is no lighter than its socket, open or closed.
-fn lid_normals(m: &mut Mesh, n_skin: usize, n_lids: usize) {
+/// A lid's normal at a point, shaded as the skin it comes out of: where a lid meets the skin, the mean of
+/// the nearest skin's (`m`'s first `n_skin` vertices), and where it stands in front of the socket (the
+/// closed lid's middle) that of the skin as it would be without the socket (`skin`: the body's positions
+/// and normals so), not the eyeball's the lid is made round. So a lid, open or closed, carries on the
+/// face round it rather than showing as a patch. (Not the low-detail body's: its coarse socket would turn
+/// them inside out.)
+fn lid_shading<'a>(m: &Mesh, n_skin: usize, skin: &'a (Vec<V3>, Vec<V3>), head: &'a HeadFrame) -> impl Fn(V3) -> V3 + 'a {
     const LID_NEAR: usize = 3;
-    let near = KdTree::new(&m.pos[..n_skin]);
-    for i in n_skin..n_skin + n_lids {
-        let s: V3 = near.query(&m.pos[i], LID_NEAR).iter().map(|&(_, j)| m.nor[j]).sum();
-        m.nor[i] = s.normalize();
+    let (near, nor) = (KdTree::new(&m.pos[..n_skin]), m.nor[..n_skin].to_vec());
+    let over = KdTree::new(&skin.0);
+    move |q: V3| {
+        let mean = |tree: &KdTree, nor: &[V3]| -> V3 { tree.query(&q, LID_NEAR).iter().map(|&(_, j)| nor[j]).sum::<V3>().normalize() };
+        let out = smoothstep(0.0, 0.15 * head.eye_r, head.sdf(q));
+        (mean(&near, &nor) * (1.0 - out) + mean(&over, &skin.1) * out).normalize()
     }
 }
 
@@ -206,6 +216,8 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
     let mut morphs: Vec<(String, Deltas)> = base.face.morphs.clone();
     if let Some(face_d) = base.face.morphs.iter().find(|e| e.0 == "body").map(|e| e.1.clone()) {
         let n_lids: usize = base.face.body.iter().filter(|m| m.skin_tone).map(|m| m.pos.len()).sum();
+        let body = part(&mut base.parts, "body").clone();
+        let shade = lid_shading(&body, base.n_skin, &base.unsocketed, &head);
         for (name, k, count) in [("body", base.n_skin, None), ("lod.body", base.n_lod, Some(n_lids))] {
             let n = part(&mut base.parts, name).pos.len();
             let mut d = Deltas::new();
@@ -220,6 +232,12 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
                 let mut fnn = vec![V3::zeros(); n];
                 fp[k..k + dp.len()].copy_from_slice(dp);
                 fnn[k..k + dn.len()].copy_from_slice(dn);
+                if count.is_none() {
+                    // The body's lids are shaded the same way in every shape.
+                    for i in k..k + n_lids {
+                        fnn[i] = shade(body.pos[i] + fp[i]) - body.nor[i];
+                    }
+                }
                 d.insert(c, (fp, fnn));
             }
             match morphs.iter_mut().find(|e| e.0 == name) {

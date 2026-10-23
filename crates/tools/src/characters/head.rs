@@ -12,10 +12,11 @@
 //! Its vertices lie where rays from the head's middle leave a smooth head (`head_shape`: a soft union
 //! of a cranium, cheeks-and-jaw, a muzzle and a chin ellipsoid, rounder on small children); an ear is
 //! pulled out of each side, and the features are offsets on the grid's vertices (`features`): the
-//! nose (bridge, tip, wings and base), the upper lip and philtrum, a soft brow, and round each
-//! eyeball a smooth dish the eye's front half stands out of (the lids close over it), so the cheek
-//! under it keeps facing forward. There is no mouth hole: the lips and the mouth plate sit on the
-//! face. The LOD keeps the 8 x 12 grid (cage.rs `lod_faces`).
+//! nose (bridge, tip, wings and base), the upper lip and philtrum and a soft brow. body.rs draws the
+//! smooth head between the grid's vertices too (`onto_head`) and carves the eye sockets into every
+//! point of it (`sockets`): round each eyeball a shallow hollow its front stands out of, the lids over
+//! it. There is no mouth hole: the lips and the mouth plate sit on the face. The LOD keeps the 8 x 12
+//! grid (cage.rs `lod_faces`).
 //!
 //! `HeadFrame::sdf` and `surface_z` are measured on the real (subdivided) head and neck without
 //! the ears, so the face features and the hair sit on what is drawn; `ears` bound the ears.
@@ -26,7 +27,7 @@ use std::sync::Arc;
 
 use super::cage::{Cage, Tags, Weights};
 use super::kdtree::KdTree;
-use super::np::{PI, clip, linspace_open, mean, median, radians, sign, smoothstep};
+use super::np::{PI, clip, linspace_open, mean, median, radians, sign};
 use super::rig::{b, joints, proportions};
 use super::{Cache, V3, key, v3};
 
@@ -85,11 +86,16 @@ const COLS: [(f64, usize, usize); 16] = [
 const EAR: (f64, f64) = (92.0, 122.0);
 /// (height above the chin, z), fractions of hh.
 const MIDDLE: (f64, f64) = (0.40, 0.0);
-/// The eye socket: depth of the dish round the eye (eye radii in front of the eye's middle) at its
-/// middle and at its rim, the rim's inner and outer radius (eye radii from the eye's axis), and how much
-/// wider it is than high.
-const SOCKET: [f64; 4] = [0.25, 1.15, 0.8, 1.4];
-const SOCKET_WIDE: f64 = 1.1;
+/// The eye sockets (`sockets`), eye radii: a hollow behind the eyeball, `SOCKET[0]` in front of the eye's
+/// middle above and below it (where the lids cover it) and `SOCKET[1]` beside it (the eye's corners), a
+/// bowl rising out from `SOCKET[2]` from the eye's axis (`SOCKET_WIDE` times that towards the nose and
+/// towards the ear) as `c d^2 + SOCKET[5] d^4`, c from `SOCKET[3]` above and below to `SOCKET[4]` beside;
+/// the face goes softly down into it (a smooth min over `SOCKET_SOFT`). The low-detail body's coarse face
+/// has one vertex in each socket: it lies `SOCKET_LOD` in front of the eye's middle.
+const SOCKET: [f64; 6] = [0.7, 0.3, 0.5, 1.0, 2.0, 0.5];
+const SOCKET_WIDE: [f64; 2] = [1.0, 1.2];
+const SOCKET_SOFT: f64 = 0.2;
+const SOCKET_LOD: f64 = 0.4;
 /// The age folds' half-width (fractions of hh; `HeadFrame::fold`).
 const FOLD_WIDTH: f64 = 0.02;
 
@@ -210,6 +216,46 @@ fn cast(f: &impl Fn(V3) -> f64, o: V3, d: V3) -> V3 {
     o + d * lo
 }
 
+/// The eye sockets carved into the drawn head (body.rs, on every point of the surface rather than on
+/// the cage, so they are as fine as the surface is; `lod`: on the low-detail body's): round each eye
+/// the face goes softly down into a shallow hollow (`SOCKET`) the eye's front stands out of, deepest
+/// at its corners (the lids cover the rest), so the eye shows between the lids, the face meets the lids
+/// a little past their edges and the hollow's sides are gentle.
+pub fn sockets(family: &str, stage: &str, lod: bool) -> impl Fn(V3) -> V3 {
+    let pr = proportions(family, stage);
+    let j = joints(family, stage);
+    let r = (0.075 + 0.02 * youth(pr.hh)) * pr.hh * pr.h;
+    let eyes = [j[b("eye_l")], j[b("eye_r")]];
+    let [over, side, r0, cv, ch, c4] = SOCKET;
+    move |p: V3| {
+        let mut z = p.z;
+        for e in eyes {
+            let q = (p - e) / r;
+            if q.z <= 0.0 {
+                continue;
+            }
+            // (0 above and below the eye, 1 beside it.)
+            let across = q.x * q.x / (q.x * q.x + q.y * q.y + 0.1);
+            let deep = if lod { SOCKET_LOD } else { over + (side - over) * across };
+            let wide = SOCKET_WIDE[usize::from(q.x * e.x > 0.0)];
+            let d = ((q.x / wide).hypot(q.y) - r0).max(0.0);
+            z = smin(z, e.z + r * (deep + (cv + (ch - cv) * across) * d * d + c4 * d.powi(4)), SOCKET_SOFT * r);
+        }
+        v3(p.x, p.y, z)
+    }
+}
+
+/// Where the ray from the head's middle through a point (model space, metres) leaves the smooth head
+/// (`head_shape`): what body.rs fits the drawn head to between the cage's vertices.
+pub fn onto_head(family: &str, stage: &str) -> impl Fn(V3) -> V3 {
+    let pr = proportions(family, stage);
+    let hh = pr.hh * pr.h;
+    let origin = v3(0.0, pr.h - hh, 0.0);
+    let f = head_shape(family, stage);
+    let o = v3(0.0, MIDDLE.0, MIDDLE.1);
+    move |p: V3| cast(&f, o, ((p - origin) / hh - o).normalize()) * hh + origin
+}
+
 /// Whether row r and column c meet at a vertex (both run there).
 fn at(r: usize, c: usize) -> bool {
     let (deg, r0, r1) = COLS[c];
@@ -309,15 +355,11 @@ fn grid_faces(ids: &[Vec<Option<usize>>], coarse: bool) -> Vec<Vec<usize>> {
     out
 }
 
-/// Offsets of the grid's vertices: the nose, the philtrum, the brow and the eye sockets (see the module
-/// docs), metres.
-fn features(family: &str, stage: &str, grid: &[Vec<V3>], exists: &[Vec<bool>]) -> Vec<Vec<V3>> {
+/// Offsets of the grid's vertices: the nose, the philtrum and the brow (see the module docs), metres.
+fn features(family: &str, stage: &str) -> Vec<Vec<V3>> {
     let pr = proportions(family, stage);
-    let j = joints(family, stage);
     let hh = pr.hh * pr.h;
     let yg = youth(pr.hh);
-    let eyes = [j[b("eye_l")], j[b("eye_r")]];
-    let eye_r = (0.075 + 0.02 * yg) * hh;
     let mut dd = vec![vec![V3::zeros(); COLS.len()]; ROWS.len()];
     let z = v3(0.0, 0.0, 1.0);
     let young = 1.0 - 0.55 * yg;
@@ -339,22 +381,6 @@ fn features(family: &str, stage: &str, grid: &[Vec<V3>], exists: &[Vec<bool>]) -
         }
     }
     dd[BROW][0] += z * 0.5 * bw;
-    // Eye sockets: round each eye the face is set back to a dish (`SOCKET`) that the eye's front half
-    // stands out of, the lids over it; a smooth field over the grid, so the surface follows it whole.
-    let [deep, rim, r0, r1] = SOCKET;
-    for e in eyes {
-        for r in 0..ROWS.len() {
-            for c in 0..COLS.len() {
-                if !exists[r][c] {
-                    continue;
-                }
-                let q = grid[r][c] - e;
-                let rho = (q.x / SOCKET_WIDE).hypot(q.y) / eye_r;
-                let dish = e.z + eye_r * (deep + (rim - deep) * smoothstep(r0, r1, rho));
-                dd[r][c] += z * (dish - grid[r][c].z).min(0.0) * (1.0 - smoothstep(r1 - 0.2, r1 + 0.15, rho));
-            }
-        }
-    }
     dd
 }
 
@@ -385,7 +411,7 @@ pub fn head_cage(cage: &mut Cage, family: &str, stage: &str) -> Vec<usize> {
         .collect();
     let exists: Vec<Vec<bool>> = (0..ROWS.len()).map(|r| (0..COLS.len()).map(|c| at(r, c)).collect()).collect();
     let mut ids: Vec<Vec<Option<usize>>> = vec![vec![None; COLS.len()]; ROWS.len()];
-    let dd = features(family, stage, &grid, &exists);
+    let dd = features(family, stage);
     for r in 0..ROWS.len() {
         for c in 0..COLS.len() {
             if !exists[r][c] {
