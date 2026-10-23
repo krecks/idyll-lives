@@ -3,14 +3,20 @@
  * shared pose texture (the same texture that holds the skinning matrices; one row per Sim) and the
  * per-vertex `simField` and `simTone` attributes (docs/characters-format.md):
  *
- * - body: the Sim's skin colour, with the tone's blush (lips, cheeks) and cavity darkening; the
+ * - body: the Sim's skin colour, with the tone's blush (x: lips, cheeks), the line between the lips and the
+ *   lids' crease (y) and the face's age folds (z, deepened with age: texel 4 g); the
  *   clothes are painted on it: where a garment's cut covers the body's fields the skin takes the
  *   top, bottom or shoe colour (anti-aliased edges; a top cut `over` the bottom wins over it, else
- *   the bottom wins), rougher than skin; under hair, the scalp (head skin whose crew field is
- *   -1 - scalp weight) takes the hair colour;
- * - cloth: shells (jackets, skirts, shoes) in the flat top / bottom / shoe colour, soles darker; seated,
- *   moved by their tone (xyz: the seated corrective) as far as texel 4 b says;
- * - hair: the hair colour, with the tone's clump bands;
+ *   the bottom wins), rougher than skin, with a turned band and a stitch line along each cut edge
+ *   (cuffs, hems, a crew neck's rib, the waistband, the sock's cuff: `simHem`) and, in an open jacket's
+ *   V, the shirt under it; under hair, the scalp (head skin whose crew field is -1 - scalp weight)
+ *   takes the hair colour; then all of it shaded by the baked occlusion (tone.w);
+ * - cloth: shells (jackets, skirts, shoes) in the flat top / bottom / shoe colour, soles darker, a
+ *   skirt's hem banded; shoes with a light midsole, a dark lining in the collar, laces and a polish
+ *   (fields: flags 4 and 5, a negative hem distance, w across the instep); seated, moved by their tone
+ *   (xyz: the seated corrective) as far as texel 4 b says; shaded by tone.w;
+ * - hair: the hair colour, with the tone's clump bands and a sheen band round the crown (both lifted towards a
+ *   lighter tint on dark hair), shaded by tone.w;
  * - brow: brows in the hair colour (darker); lash: lashes, near black;
  * - mouth: teeth, and the mouth plate darkened by its tone;
  * - eye: the eyeballs drawn procedurally: sclera, the iris in the Sim's eye colour with a darker
@@ -25,8 +31,10 @@
  *   1: top colour rgb, top: hem height
  *   2: bottom colour rgb, top: crew neckline cut
  *   3: hair colour rgb, top: scoop neckline cut
- *   4: r = 1 if the top is painted over the bottom, g = age (deeper cavities: elders 1), b = how far
- *      the shells take their seated shape (characters.ts `writeSit`), bottom: waist height
+ *   4: r = 1 if the top is painted over the bottom (1 + n + y / 4: shirt n shows in an open
+ *      jacket's V, `SHIRTS`, below its neck line y m), 0 if not, -1 if not and plain (no bands: the
+ *      towel, swimwear); g = age (deeper creases: elders 1), b = how far the shells take their
+ *      seated shape (characters.ts `writeSit`), bottom: waist height
  *   5: skin reference colour rgb (the skin is tinted relative to it; 1), bottom: leg cut
  *   6: shoe colour rgb, shoes: top height
  *   7: eye colour rgb, 1 if the Sim wears hair (the scalp takes the hair colour)
@@ -172,6 +180,34 @@ const GUARD = '#if defined(SIMCHAR) && defined(INSTANCES) && defined(BAKED_VERTE
 const CLOTH_MICRO = '0.15';
 /** Hair is matte: no more glossy than this (the sheen gives it its soft highlight). */
 const HAIR_MICRO = '0.38';
+/** Polished shoes: glossier than the other shells. */
+const POLISH_MICRO = '0.55';
+/**
+ * Fabric along the painted cuts and a skirt's hem (`simHem`): a turned band per edge, its width and its
+ * stitch line's distance from the edge (m on the fields).
+ */
+const BAND = { cuff: '0.022, 0.012', hem: '0.024, 0.013', rib: '0.016, 0.015', binding: '0.011, 0.007', waistband: '0.034, 0.03', welt: '0.012, 0.008' };
+/** What shows in an open jacket's V (texel 4 r = 1 + n + its neck line / 4; outfit.ts `SHIRTS`): 1 white, 2 charcoal, 3 grey (linear). */
+const SHIRTS = ['0.78, 0.78, 0.74', '0.036, 0.039, 0.046', '0.357, 0.376, 0.406'];
+/**
+ * The baked occlusion (tone.w, 0 open .. 1 enclosed) takes the colour down to x (1 - AO_DARK) at most,
+ * as the furniture's baked grey does (gamekit/shade.py), there once two thirds of the sky are hidden
+ * (AO_GAIN: a resident's creases are shallower than a sofa's); the body's deepen with age (texel 4 g).
+ */
+const AO_DARK = '0.8';
+const AO_GAIN = '1.5';
+const AO_AGE = '0.6';
+/** How dark the face's age folds (body tone.z) are on an elder (texel 4 g = 1); younger, less. */
+const FOLD = '0.3';
+/** The occlusion's darkening, at `gain` per unit of tone.w. */
+const ao = (gain: string): string => `(1.0 - ${AO_DARK} * clamp(${gain} * simT.w, 0.0, 1.0))`;
+/** The painted cuts' bands on the body (`simHem`): the top's edges and the bottom's. */
+const HEM_TOP = `max(max(simHem((simA.w - simF.x) * 0.55, ${BAND.cuff}), simHem(simF.y - c1, ${BAND.hem})), max(simHem(simF.z - c2, ${BAND.rib}), simHem(simF.w - c3, ${BAND.binding}))) * simPlain`;
+const HEM_BOTTOM = `max(simHem(simT4.w - simF.y, ${BAND.waistband}), simHem(simF.y - c5, ${BAND.hem})) * simPlain`;
+/** A shoe's laces: across the instep between the eyelets, under the collar. */
+const LACE = `(1.0 - smoothstep(0.009 - lW, 0.009 + lW, abs(simF.w))) * (1.0 - smoothstep(0.06, 0.065, simF.x)) * smoothstep(0.01, 0.014, simF.x) * mix(smoothstep(0.28 - lAA, 0.28 + lAA, abs(fract(lBar) - 0.5)), 0.44, smoothstep(0.25, 0.5, lAA))`;
+/** The hair's highlight band: sharp along the strands up close, broad where they blur. */
+const HAIR_BAND = `mix(pow(hS, 6.0), 0.35 * hS * hS, smoothstep(0.08, 0.25, fwidth(hTH))) * smoothstep(0.0, 0.35, dot(normalW, hHalf)) * mix(0.6, 1.2, hClump)`;
 
 function wgsl(shaderType: string, off: number, morph: MorphBinding | null): { [pointName: string]: string } {
   if (shaderType === 'vertex') {
@@ -230,6 +266,22 @@ varying vSimSlot: f32;
 varying vSimField: vec4f;
 varying vSimTone: vec4f;
 var simDataTexture: texture_2d<f32>;
+#if defined(SIMBODY) || defined(SIMCLOTH)
+// Fabric: a band turned along a cut edge, w m wide, with a stitch line s m in, from d (m inside the
+// edge); x the band, y the stitch. Both fade out as they come under a few pixels (far away) rather than alias.
+fn simHem(d: f32, w: f32, s: f32) -> vec2f {
+  let fw = max(fwidth(d), 1e-6);
+  let band = (1.0 - smoothstep(w - fw, w + fw, d)) * smoothstep(1.5, 4.0, w / fw);
+  return vec2f(band, band * (1.0 - smoothstep(0.0, fw, abs(d - s) - 0.001)) * min(0.002 / fw, 1.0));
+}
+// The cloth's colour with its bands (h): a little darker, or lighter on dark cloth; the stitch more so.
+fn simFabric(c: vec3f, h: vec2f) -> vec3f {
+  let dark = 1.0 - smoothstep(0.015, 0.06, dot(c, vec3f(0.2126, 0.7152, 0.0722)));
+  let band = mix(c * 0.82, c * 1.4 + vec3f(0.006), dark);
+  let stitch = mix(c * 0.6, c * 1.9 + vec3f(0.02), dark);
+  return mix(mix(c, band, h.x), stitch, h.y);
+}
+#endif
 #endif
 `,
     CUSTOM_FRAGMENT_MAIN_BEGIN: `${GUARD}
@@ -252,6 +304,16 @@ let simTop = smoothstep(-1.0, 1.0, gTop / max(fwidth(gTop), 1e-5));
 let simBottom = smoothstep(-1.0, 1.0, gBottom / max(fwidth(gBottom), 1e-5));
 let simShoe = smoothstep(-1.0, 1.0, gShoe / max(fwidth(gShoe), 1e-5));
 let simCloth = max(max(simTop, simBottom), simShoe);
+// Fabric along the cuts: the cuffs, the top's hem, a crew neck's rib or a scoop's binding, the waistband,
+// the legs' hems and the shoes' welt; none on plain clothes (texel 4 r < 0: the towel, swimwear).
+let simPlain = select(1.0, 0.0, simT4.x < -0.5);
+let simHemTop = ${HEM_TOP};
+let simHemBottom = ${HEM_BOTTOM};
+let simHemShoe = simHem(gShoe, ${BAND.welt}) * simPlain;
+#endif
+#ifdef SIMCLOTH
+// A skirt's or a jacket's hem (fields.x: the distance from it; a collar's is out of reach).
+let simHemShell = simHem(simF.x, ${BAND.hem}) * select(0.0, 1.0, abs(simF.y - 3.0) < 0.5 || simF.z < 0.5);
 #endif
 #ifdef SIMEYE
 let simR = length(simF.xy);
@@ -266,17 +328,27 @@ let simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, simC
 #ifdef SIMBODY
 {
   let simRef = textureLoad(simDataTexture, vec2<i32>(${off + 5}, simRow), 0);
-  // Skin: the Sim's colour (relative to the reference), blushed and darkened in cavities by the tone.
+  // Skin: the Sim's colour (relative to the reference), blushed by the tone (x), the line between the lips
+  // and the lids' crease darkened (y), and the age folds (z) as far as the Sim's age (texel 4 g).
   var skin = simA.rgb * clamp(surfaceAlbedo / max(simRef.rgb, vec3f(0.01)), vec3f(0.0), vec3f(2.0));
-  skin = skin * mix(vec3f(1.0), vec3f(0.98, 0.62, 0.6), clamp(simT.x, 0.0, 1.0)) * (1.0 - (0.45 + 0.2 * simT4.y) * clamp(simT.y, 0.0, 1.0));
+  skin = skin * mix(vec3f(1.0), vec3f(0.98, 0.62, 0.6), clamp(simT.x, 0.0, 1.0)) * (1.0 - 0.45 * clamp(simT.y, 0.0, 1.0)) * (1.0 - ${FOLD} * clamp(simT.z * simT4.y, 0.0, 1.0));
   let scalp = clamp(-simF.z - 1.0, 0.0, 1.0) * textureLoad(simDataTexture, vec2<i32>(${off + 7}, simRow), 0).w;
   skin = mix(skin, textureLoad(simDataTexture, vec2<i32>(${off + 3}, simRow), 0).rgb * 0.7, scalp);
-  let cTop = textureLoad(simDataTexture, vec2<i32>(${off + 1}, simRow), 0).rgb;
-  let cBottom = textureLoad(simDataTexture, vec2<i32>(${off + 2}, simRow), 0).rgb;
-  let cShoe = textureLoad(simDataTexture, vec2<i32>(${off + 6}, simRow), 0).rgb;
+  var cTop = textureLoad(simDataTexture, vec2<i32>(${off + 1}, simRow), 0).rgb;
+  var cBottom = textureLoad(simDataTexture, vec2<i32>(${off + 2}, simRow), 0).rgb;
+  var cShoe = textureLoad(simDataTexture, vec2<i32>(${off + 6}, simRow), 0).rgb;
+  // Fabric: an open jacket's shirt (texel 4 r = 1 + n + its neck line / 4) on the torso, from the waist to the
+  // neck line and in a collar above it (the jacket shell covers the rest); then the bands.
+  let shirtN = floor(simT4.x) - 1.0;
+  let shirt = select(select(vec3f(${SHIRTS[2]}), vec3f(${SHIRTS[1]}), shirtN < 2.5), vec3f(${SHIRTS[0]}), shirtN < 1.5);
+  let neckY = fract(simT4.x) * 4.0;
+  let inV = max(1.0 - smoothstep(neckY - 0.008, neckY, simF.y), 1.0 - smoothstep(0.01, 0.014, simF.z - c2));
+  cTop = simFabric(mix(cTop, shirt, step(0.5, shirtN) * (1.0 - smoothstep(0.1, 0.3, simF.x)) * smoothstep(0.0, 0.01, simF.y - simT4.w) * inV), simHemTop);
+  cBottom = simFabric(cBottom, simHemBottom);
+  cShoe = simFabric(cShoe, simHemShoe);
   let topOver = mix(mix(skin, cBottom, simBottom), cTop, simTop);
   let topUnder = mix(mix(skin, cTop, simTop), cBottom, simBottom);
-  surfaceAlbedo = mix(select(topUnder, topOver, simT4.x > 0.5), cShoe, simShoe);
+  surfaceAlbedo = mix(select(topUnder, topOver, simT4.x > 0.5), cShoe, simShoe) * ${ao(`(${AO_GAIN} + ${AO_AGE} * simT4.y)`)};
 }
 #endif
 #ifdef SIMCLOTH
@@ -285,13 +357,42 @@ let simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, simC
   let cTop = textureLoad(simDataTexture, vec2<i32>(${off + 1}, simRow), 0).rgb;
   let cBottom = textureLoad(simDataTexture, vec2<i32>(${off + 2}, simRow), 0).rgb;
   let cShoe = textureLoad(simDataTexture, vec2<i32>(${off + 6}, simRow), 0).rgb;
-  let c = select(select(cShoe, cBottom, simF.z < 1.5), cTop, simF.z < 0.5);
+  let c = simFabric(select(select(cShoe, cBottom, simF.z < 1.5), cTop, simF.z < 0.5), simHemShell);
   surfaceAlbedo = surfaceAlbedo * c * select(1.0, 0.35, simF.z > 1.5 && abs(simF.y - 1.0) < 0.5);
+  // Shoes: a light midsole (flag 4), the collar's lining (a negative hem distance) dark, and laces:
+  // bars across the instep (fields.w: m off its middle; x: m from the collar) down to 6.5 cm from the
+  // collar, evened out when too small to draw.
+  let lBar = simF.x / 0.012;
+  let lAA = fwidth(lBar);
+  let lW = fwidth(simF.w);
+  let lace = ${LACE};
+  let laceC = select(c * 0.45, mix(c, vec3f(0.85), 0.7), dot(c, vec3f(0.333)) < 0.3);
+  let shoe = simF.z > 1.5;
+  surfaceAlbedo = select(surfaceAlbedo, vec3f(0.8, 0.78, 0.74), shoe && abs(simF.y - 4.0) < 0.5);
+  surfaceAlbedo = mix(surfaceAlbedo, c * 0.3, select(0.0, 1.0 - smoothstep(-0.002, 0.0, simF.x), shoe));
+  surfaceAlbedo = mix(surfaceAlbedo, laceC, select(0.0, lace, shoe)) * ${ao(AO_GAIN)};
 }
 #endif
 #ifdef SIMHAIR
-// The hair colour in clumps (tone.z), darker deep in (tone.y).
-surfaceAlbedo = textureLoad(simDataTexture, vec2<i32>(${off + 3}, simRow), 0).rgb * (1.0 + 0.45 * (simT.z - 0.5)) * (1.0 - 0.5 * clamp(simT.y, 0.0, 1.0));
+{
+  // The hair colour in clumps (tone.z: light in a lock's middle), darker deep in (tone.y) and where it is
+  // enclosed (tone.w). Multiplying can't show clumps on dark hair, so there they are lifted towards a lighter
+  // tint, as is a sheen band round the crown: where the strands (straight down the head, from the normal alone)
+  // lie square to the half-way vector between the view and a light from above (Kajiya-Kay without tangents or
+  // lights). Where they come under a pixel or two (far away) the clumps even out and the band softens.
+  let hc = textureLoad(simDataTexture, vec2<i32>(${off + 3}, simRow), 0).rgb;
+  let hDark = 1.0 - smoothstep(0.015, 0.1, dot(hc, vec3f(0.2126, 0.7152, 0.0722)));
+  let hTint = min(hc * 1.7 + vec3f(0.075, 0.066, 0.058), vec3f(1.0));
+  let hClump = mix(0.5, simT.z, 1.0 - smoothstep(0.2, 0.5, fwidth(simT.z)));
+  let hDown = normalize(vec3f(0.0, 1.0001, 0.0) - normalW * normalW.y);
+  let hHalf = normalize(viewDirectionW + vec3f(0.0, 1.0, 0.0));
+  let hTH = dot(hDown, hHalf);
+  let hS = 1.0 - hTH * hTH;
+  let hBand = ${HAIR_BAND};
+  var hCol = mix(hc * (1.0 + 0.45 * (hClump - 0.5)), hTint, 0.28 * hDark * hClump);
+  hCol = mix(hCol, hTint, hBand * mix(0.3, 0.75, hDark));
+  surfaceAlbedo = hCol * (1.0 - 0.5 * clamp(simT.y, 0.0, 1.0)) * ${ao(AO_GAIN)};
+}
 #endif
 #ifdef SIMBROW
 surfaceAlbedo = textureLoad(simDataTexture, vec2<i32>(${off + 3}, simRow), 0).rgb * 0.45;
@@ -336,6 +437,11 @@ roughness = 1.0 - microSurface;
 #endif
 #ifdef SIMHAIR
 microSurface = min(microSurface, ${HAIR_MICRO});
+roughness = 1.0 - microSurface;
+#endif
+#ifdef SIMCLOTH
+// Polished shoes (fields: category 2, flag 5) are glossier.
+microSurface = mix(microSurface, ${POLISH_MICRO}, step(1.5, simF.z) * step(4.5, simF.y) * step(simF.y, 5.5));
 roughness = 1.0 - microSurface;
 #endif
 #endif
@@ -399,6 +505,19 @@ varying float vSimSlot;
 varying vec4 vSimField;
 varying vec4 vSimTone;
 uniform highp sampler2D simDataTexture;
+#if defined(SIMBODY) || defined(SIMCLOTH)
+vec2 simHem(float d, float w, float s) {
+  float fw = max(fwidth(d), 1e-6);
+  float band = (1.0 - smoothstep(w - fw, w + fw, d)) * smoothstep(1.5, 4.0, w / fw);
+  return vec2(band, band * (1.0 - smoothstep(0.0, fw, abs(d - s) - 0.001)) * min(0.002 / fw, 1.0));
+}
+vec3 simFabric(vec3 c, vec2 h) {
+  float dark = 1.0 - smoothstep(0.015, 0.06, dot(c, vec3(0.2126, 0.7152, 0.0722)));
+  vec3 band = mix(c * 0.82, c * 1.4 + vec3(0.006), dark);
+  vec3 stitch = mix(c * 0.6, c * 1.9 + vec3(0.02), dark);
+  return mix(mix(c, band, h.x), stitch, h.y);
+}
+#endif
 #endif
 `,
     CUSTOM_FRAGMENT_MAIN_BEGIN: `${GUARD}
@@ -420,6 +539,13 @@ float simTop = smoothstep(-1.0, 1.0, gTop / max(fwidth(gTop), 1e-5));
 float simBottom = smoothstep(-1.0, 1.0, gBottom / max(fwidth(gBottom), 1e-5));
 float simShoe = smoothstep(-1.0, 1.0, gShoe / max(fwidth(gShoe), 1e-5));
 float simCloth = max(max(simTop, simBottom), simShoe);
+float simPlain = simT4.x < -0.5 ? 0.0 : 1.0;
+vec2 simHemTop = ${HEM_TOP};
+vec2 simHemBottom = ${HEM_BOTTOM};
+vec2 simHemShoe = simHem(gShoe, ${BAND.welt}) * simPlain;
+#endif
+#ifdef SIMCLOTH
+vec2 simHemShell = simHem(simF.x, ${BAND.hem}) * (abs(simF.y - 3.0) < 0.5 || simF.z < 0.5 ? 1.0 : 0.0);
 #endif
 #ifdef SIMEYE
 float simR = length(simF.xy);
@@ -434,15 +560,22 @@ float simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, si
 {
   vec4 simRef = texelFetch(simDataTexture, ivec2(${off + 5}, simRow), 0);
   vec3 skin = simA.rgb * clamp(surfaceAlbedo / max(simRef.rgb, vec3(0.01)), vec3(0.0), vec3(2.0));
-  skin = skin * mix(vec3(1.0), vec3(0.98, 0.62, 0.6), clamp(simT.x, 0.0, 1.0)) * (1.0 - (0.45 + 0.2 * simT4.y) * clamp(simT.y, 0.0, 1.0));
+  skin = skin * mix(vec3(1.0), vec3(0.98, 0.62, 0.6), clamp(simT.x, 0.0, 1.0)) * (1.0 - 0.45 * clamp(simT.y, 0.0, 1.0)) * (1.0 - ${FOLD} * clamp(simT.z * simT4.y, 0.0, 1.0));
   float scalp = clamp(-simF.z - 1.0, 0.0, 1.0) * texelFetch(simDataTexture, ivec2(${off + 7}, simRow), 0).w;
   skin = mix(skin, texelFetch(simDataTexture, ivec2(${off + 3}, simRow), 0).rgb * 0.7, scalp);
   vec3 cTop = texelFetch(simDataTexture, ivec2(${off + 1}, simRow), 0).rgb;
   vec3 cBottom = texelFetch(simDataTexture, ivec2(${off + 2}, simRow), 0).rgb;
   vec3 cShoe = texelFetch(simDataTexture, ivec2(${off + 6}, simRow), 0).rgb;
+  float shirtN = floor(simT4.x) - 1.0;
+  vec3 shirt = shirtN < 1.5 ? vec3(${SHIRTS[0]}) : shirtN < 2.5 ? vec3(${SHIRTS[1]}) : vec3(${SHIRTS[2]});
+  float neckY = fract(simT4.x) * 4.0;
+  float inV = max(1.0 - smoothstep(neckY - 0.008, neckY, simF.y), 1.0 - smoothstep(0.01, 0.014, simF.z - c2));
+  cTop = simFabric(mix(cTop, shirt, step(0.5, shirtN) * (1.0 - smoothstep(0.1, 0.3, simF.x)) * smoothstep(0.0, 0.01, simF.y - simT4.w) * inV), simHemTop);
+  cBottom = simFabric(cBottom, simHemBottom);
+  cShoe = simFabric(cShoe, simHemShoe);
   vec3 topOver = mix(mix(skin, cBottom, simBottom), cTop, simTop);
   vec3 topUnder = mix(mix(skin, cTop, simTop), cBottom, simBottom);
-  surfaceAlbedo = mix(simT4.x > 0.5 ? topOver : topUnder, cShoe, simShoe);
+  surfaceAlbedo = mix(simT4.x > 0.5 ? topOver : topUnder, cShoe, simShoe) * ${ao(`(${AO_GAIN} + ${AO_AGE} * simT4.y)`)};
 }
 #endif
 #ifdef SIMCLOTH
@@ -450,12 +583,36 @@ float simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, si
   vec3 cTop = texelFetch(simDataTexture, ivec2(${off + 1}, simRow), 0).rgb;
   vec3 cBottom = texelFetch(simDataTexture, ivec2(${off + 2}, simRow), 0).rgb;
   vec3 cShoe = texelFetch(simDataTexture, ivec2(${off + 6}, simRow), 0).rgb;
-  vec3 c = simF.z < 0.5 ? cTop : simF.z < 1.5 ? cBottom : cShoe;
+  vec3 c = simFabric(simF.z < 0.5 ? cTop : simF.z < 1.5 ? cBottom : cShoe, simHemShell);
   surfaceAlbedo = surfaceAlbedo * c * (simF.z > 1.5 && abs(simF.y - 1.0) < 0.5 ? 0.35 : 1.0);
+  // Shoes: a light midsole (flag 4), the collar's lining (a negative hem distance) dark, laces across the instep.
+  float lBar = simF.x / 0.012;
+  float lAA = fwidth(lBar);
+  float lW = fwidth(simF.w);
+  float lace = ${LACE};
+  vec3 laceC = dot(c, vec3(0.333)) < 0.3 ? mix(c, vec3(0.85), 0.7) : c * 0.45;
+  bool shoe = simF.z > 1.5;
+  if (shoe && abs(simF.y - 4.0) < 0.5) surfaceAlbedo = vec3(0.8, 0.78, 0.74);
+  surfaceAlbedo = mix(surfaceAlbedo, c * 0.3, shoe ? 1.0 - smoothstep(-0.002, 0.0, simF.x) : 0.0);
+  surfaceAlbedo = mix(surfaceAlbedo, laceC, shoe ? lace : 0.0) * ${ao(AO_GAIN)};
 }
 #endif
 #ifdef SIMHAIR
-surfaceAlbedo = texelFetch(simDataTexture, ivec2(${off + 3}, simRow), 0).rgb * (1.0 + 0.45 * (simT.z - 0.5)) * (1.0 - 0.5 * clamp(simT.y, 0.0, 1.0));
+{
+  // Clumps and a sheen band lifted towards a lighter tint on dark hair (see the WGSL).
+  vec3 hc = texelFetch(simDataTexture, ivec2(${off + 3}, simRow), 0).rgb;
+  float hDark = 1.0 - smoothstep(0.015, 0.1, dot(hc, vec3(0.2126, 0.7152, 0.0722)));
+  vec3 hTint = min(hc * 1.7 + vec3(0.075, 0.066, 0.058), vec3(1.0));
+  float hClump = mix(0.5, simT.z, 1.0 - smoothstep(0.2, 0.5, fwidth(simT.z)));
+  vec3 hDown = normalize(vec3(0.0, 1.0001, 0.0) - normalW * normalW.y);
+  vec3 hHalf = normalize(viewDirectionW + vec3(0.0, 1.0, 0.0));
+  float hTH = dot(hDown, hHalf);
+  float hS = 1.0 - hTH * hTH;
+  float hBand = ${HAIR_BAND};
+  vec3 hCol = mix(hc * (1.0 + 0.45 * (hClump - 0.5)), hTint, 0.28 * hDark * hClump);
+  hCol = mix(hCol, hTint, hBand * mix(0.3, 0.75, hDark));
+  surfaceAlbedo = hCol * (1.0 - 0.5 * clamp(simT.y, 0.0, 1.0)) * ${ao(AO_GAIN)};
+}
 #endif
 #ifdef SIMBROW
 surfaceAlbedo = texelFetch(simDataTexture, ivec2(${off + 3}, simRow), 0).rgb * 0.45;
@@ -497,6 +654,11 @@ roughness = 1.0 - microSurface;
 #endif
 #ifdef SIMHAIR
 microSurface = min(microSurface, ${HAIR_MICRO});
+roughness = 1.0 - microSurface;
+#endif
+#ifdef SIMCLOTH
+// Polished shoes (fields: category 2, flag 5) are glossier.
+microSurface = mix(microSurface, ${POLISH_MICRO}, step(1.5, simF.z) * step(4.5, simF.y) * step(simF.y, 5.5));
 roughness = 1.0 - microSurface;
 #endif
 #endif

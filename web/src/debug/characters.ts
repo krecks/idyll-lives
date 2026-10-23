@@ -6,12 +6,12 @@
  * URL (combine freely; each sheet is one row per family):
  * - `?family=male|female` (default both), `?stage=child` or `stage=all` (default: the body sheet,
  *   every stage, when no other sheet is asked for);
- * - `?hair=all` every hairstyle (and the beard), `?tops=all` every garment, `?skins=all` eight skin
- *   tones, `?builds=all` slim / as built / broad, `?face=moods|visemes` every mood (and the friendly
- *   resting face, a half and a full blink) / viseme;
+ * - `?hair=all` every hairstyle (and the beard; `?hair=long,beard` only those), `?tops=all` every
+ *   garment, `?skins=all` eight skin tones, `?builds=all` slim / as built / broad, `?face=moods|visemes`
+ *   every mood (and the friendly resting face, a half and a full blink) / viseme;
  * - `?clip=walk&t=0.4` the clip held at t seconds (default: idle, playing), `?view=side|back`,
  *   `?closeup=1` frames the heads, `?build=1.2`, `?cols=8`, `?gap=0.9`, `?labels=0`, `?hairColor=%23C89B5A`;
- * - `?alpha=…&beta=…&radius=…` the camera; `__bench.advance(s)` steps time when `?manual`;
+ * - `?alpha=…&beta=…&radius=…` the camera (`?y=1.2`: the height it looks at in a close-up); `__bench.advance(s)` steps time when `?manual`;
  * - The residents are shaded in the game's soft look (`softLook.ts`); `?look=classic` (dev only)
  *   draws the PBR shading they had before, to compare.
  * Sets `window.__ready` once everything is drawn.
@@ -68,7 +68,8 @@ if (!sheets.length || stageParam === 'all') {
 }
 for (const g of families) {
   if (params.has('hair')) {
-    const styles: string[] = [...HAIR_STYLES, ...(g === 'male' ? ['beard'] : [])];
+    const pick = params.get('hair')!.split(',');
+    const styles = [...HAIR_STYLES, ...(g === 'male' ? ['beard'] : [])].filter((h) => pick.includes('all') || pick.includes(h));
     rows.push(styles.map((h) => ({ label: h, gender: g, look: h === 'beard' ? { ...common(), hairStyle: 'short', beard: true } : { ...common(), hairStyle: h as HairStyle } })));
   }
   if (params.has('tops')) {
@@ -226,7 +227,7 @@ const camera = new ArcRotateCamera(
   Number(params.get('alpha') ?? Math.PI / 2),
   Number(params.get('beta') ?? (closeup ? Math.PI / 2 : 1.3)),
   Number(params.get('radius')) || (closeup ? Math.max(cols * gap * 1.5, lines * rowGap * 2.6) : Math.max(width * 0.75, lines * rowGap * 1.3, 3)),
-  new Vector3(0, closeup ? faceY : 0.85, 0),
+  new Vector3(0, closeup ? Number(params.get('y')) || faceY : 0.85, 0),
   scene,
 );
 camera.attachControl(canvas, true);

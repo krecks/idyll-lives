@@ -163,11 +163,6 @@ pub fn rot_x(a: f64) -> M3 {
     M3::new(1.0, 0.0, 0.0, 0.0, c, -s, 0.0, s, c)
 }
 
-pub fn rot_z(a: f64) -> M3 {
-    let (c, s) = (a.cos(), a.sin());
-    M3::new(c, -s, 0.0, s, c, 0.0, 0.0, 0.0, 1.0)
-}
-
 /// `p @ R.T` of one point.
 pub fn rot(r: &M3, p: V3) -> V3 {
     v3(p.x * r[(0, 0)] + p.y * r[(0, 1)] + p.z * r[(0, 2)], p.x * r[(1, 0)] + p.y * r[(1, 1)] + p.z * r[(1, 2)], p.x * r[(2, 0)] + p.y * r[(2, 1)] + p.z * r[(2, 2)])

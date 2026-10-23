@@ -47,8 +47,12 @@ interface Layer {
   additive: boolean;
 }
 
-/** The fist every clip holds (fingers curl towards the palm; the thumb turns in front of them and lies across). */
-export const GRIP: PoseSpec = { fingers_01: [0, 0, 70], fingers_02: [0, 0, 85], thumb_01: [11, -3, 12], thumb_02: [48, -16, -23] };
+/**
+ * The fist every clip holds: fingers curl past a right angle at the knuckles and more at the middle
+ * joints, so the tips fold back onto the palm (a closed fist from every side, no hole); the thumb
+ * turns in front of them and lies across.
+ */
+export const GRIP: PoseSpec = { fingers_01: [0, 0, 100], fingers_02: [0, 0, 110], thumb_01: [11, -3, 12], thumb_02: [48, -16, -23] };
 
 /** A clip: made by `clip` (keys) or `cycle` (a function of the phase); `layer` adds on top. */
 export class ClipDef {

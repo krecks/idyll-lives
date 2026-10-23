@@ -1,6 +1,6 @@
 //! The residents' bodies: a control cage of superellipse rings (cage.rs) fitted so its limit
-//! surface passes through the ring points, subdivided once (subdiv.rs, about 3.5k triangles) for
-//! `body`; the cage at its limit (about 0.9k triangles) is `lod.body`. Contract:
+//! surface passes through the ring points, subdivided once (subdiv.rs, about 5k triangles) for
+//! `body`; the cage at its limit (about 1.1k triangles) is `lod.body`. Contract:
 //!
 //! - `build_body(family, stage)`: parts `body` and `lod.body` (pos, nor, idx (CCW out), dense,
 //!   arm), meta (`seatDrop`, `eyeY`, `grip`) and the joints;
@@ -17,8 +17,15 @@
 //! Fields (docs/characters-format.md): x = sleeve parameter (-1 torso, 0 shoulder .. 1 wrist, over
 //! 1 on the hand: the arm's share of a vertex blends from the torso's -1 at the armhole), y = height,
 //! z / w = the crew and scoop (male: V) necklines, metres below a smooth curve round the neck
-//! (positive: covered); on the head -1 - scalp weight. Tone: x = blush (cheeks, nose, ears), y =
-//! cavities (armpits, the crotch, between the fingers, under the chin, the eye sockets).
+//! (positive: covered); on the head -1 - scalp weight. Tone: x = blush (cheeks, nose, ears), z =
+//! the face's age folds (`HeadFrame::fold`); the shade in the creases is baked into w afterwards
+//! (ao.rs).
+//!
+//! The head's cage is finer over the face (head.rs) than the LOD's: the LOD keeps the coarse grid
+//! (`Cage::lod_faces`), so `lod.body` has the face's extra cage vertices unused. On the head the drawn
+//! surface is snapped onto the smooth head between the cage's vertices (`Topology::snapped`), and the
+//! eye sockets are carved into every point of it (`head::sockets`); the lids cover them, so the skin is
+//! shaded as it is without them.
 
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
@@ -26,10 +33,10 @@ use std::sync::{Arc, OnceLock};
 use nalgebra::{DMatrix, DVector, Dyn, LU};
 
 use super::cage::{Cage, Per, RingTags, Tags, Weights, se, turn, unit};
-use super::head::{HeadFrame, head_cage, youth};
+use super::head::{HeadFrame, head_cage, onto_head, sockets, youth};
 use super::kdtree::KdTree;
 use super::meshops::smooth_normals;
-use super::np::{clip, lstsq, mean, mean_rows, radians, sign, unique};
+use super::np::{clip, lstsq, mean, mean_rows, radians, sign, smoothstep, unique};
 use super::rig::{BASE_STAGE, NB, b, joints, proportions};
 use super::sparse::Csr;
 use super::subdiv::{Subdivision, check_closed, limit_matrix, orient, polygon_triangles, subdivision, triangles};
@@ -269,8 +276,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
                 continue;
             }
             if let Some(&(i, sd)) = root_index.get(&(r, k)) {
-                let cav = if i == 1 { 0.55 } else if i == 0 || i == 2 { 0.25 } else { 0.0 };
-                ids.push(c.add(q, arm_w(i, sd), "torso", None, Tags { arm: 0.5, cav, blush: 0.0 }));
+                ids.push(c.add(q, arm_w(i, sd), "torso", None, Tags { arm: 0.5, blush: 0.0 }));
             } else {
                 ids.push(c.add(q, tw(r, k), "torso", None, Tags::default()));
             }
@@ -282,7 +288,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
         vec![("pelvis", 0.4), ("thigh_l", 0.3), ("thigh_r", 0.3)],
         "torso",
         None,
-        Tags { cav: 0.35, ..Tags::default() },
+        Tags::default(),
     );
     // Shoulder cap: the neck's sides.
     let mut cap: HashMap<&str, usize> = HashMap::new();
@@ -324,8 +330,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
         nh[k][1] += 0.012 * h;
     }
     let nw: Weights = vec![("neck_01", 0.55), ("Head", 0.45)];
-    let ncav = [0.45, 0.25, 0.0, 0.0, 0.0, 0.0, 0.0, 0.25];
-    let nh_id = c.ring(&nh, Per::All(&nw), "neck", None, RingTags { cav: Per::Each(&ncav), ..Default::default() });
+    let nh_id = c.ring(&nh, Per::All(&nw), "neck", None, RingTags::default());
     c.band(&n0, &nh_id, &[]);
     let jaw = head_cage(&mut c, family, stage);
     c.join(&nh_id, &jaw, &[0, 2, 4, 5, 6, 7, 8, 10]);
@@ -355,63 +360,131 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
             prev = cur;
         }
         let wrist = prev;
-        // Palm: two 10-rings (4 across from the back of the hand (-z) to the thumb side, 1 deep).
+        // Palm: two 10-rings (4 across from the back of the hand (-z) to the thumb side, 1 deep),
+        // the ball of the thumb swelling on the palm side, then the knuckle ring: the same 5
+        // columns plus a vertex at each side.
         let k1j = pj(nm("fingers_01"));
         let lpm = (k1j - jwr).norm();
-        let (wp, tp) = (0.80 * lpm, 0.30 * lpm);
+        // (A small child's hand is a little wider, its fingers plumper and shorter.)
+        let (wp, tp) = ((0.80 + 0.12 * yg) * lpm, 0.30 * lpm);
         let zs: Vec<f64> = [-0.5, -0.25, 0.0, 0.25, 0.5].iter().zip([0.9, 1.0, 1.0, 1.0, 0.92]).map(|(&a, m)| a * wp * m).collect();
         let order: [(usize, f64); 10] = [(3, -1.0), (2, -1.0), (1, -1.0), (0, -1.0), (0, 1.0), (1, 1.0), (2, 1.0), (3, 1.0), (4, 1.0), (4, -1.0)];
-        let palm_ring = |tt: f64, scale: f64| -> Vec<V3> {
+        // (The thumb's ball: palm-side offsets (towards the palm, forward) of columns 3 and 4.)
+        let palm_ring = |tt: f64, scale: f64, ball: f64| -> Vec<V3> {
             let cc = jwr + d * (tt * lpm) - u * 0.06 * tp;
-            order.iter().map(|&(k, v)| cc + z * (zs[k] * scale) + u * (tp / 2.0) * v * (if k == 0 || k == 4 { 0.85 } else { 1.0 }) + d * 0.0).collect()
+            order
+                .iter()
+                .map(|&(k, v)| {
+                    let swell = if v < 0.0 && k >= 3 { ball * [0.0, 0.0, 0.0, 0.6, 1.0][k] * lpm } else { 0.0 };
+                    cc + z * (zs[k] * scale + 0.5 * swell) + u * ((tp / 2.0) * v * (if k == 0 || k == 4 { 0.85 } else { 1.0 }) - swell)
+                })
+                .collect()
         };
         let arm1 = || RingTags { arm: Per::All(1.0), ..Default::default() };
-        let p1 = c.ring(&palm_ring(0.32, 0.92), Per::All(&one(nm("hand"))), "hand", None, arm1());
+        let hand_w = one(nm("hand"));
+        let p1 = c.ring(&palm_ring(0.32, 0.92, 0.05), Per::All(&hand_w), "hand", None, arm1());
         c.join(&wrist, &p1, &[0, 1, 2, 3, 5, 6, 7, 8]);
-        let p2_pts = palm_ring(0.9, 1.0);
-        let w2: Weights = vec![(nm("hand"), 0.5), (nm("fingers_01"), 0.5)];
-        let pcav = [0.0, 0.2, 0.2, 0.0, 0.0, 0.12, 0.12, 0.12, 0.0, 0.0];
-        let p2 = c.ring(&p2_pts, Per::All(&w2), "hand", None, RingTags { arm: Per::All(1.0), cav: Per::Each(&pcav), ..Default::default() });
-        c.band(&p1, &p2, &[8]);
-        let at = |k: usize, v: f64| order.iter().position(|&(a, b)| a == k && b == v).unwrap();
-        // Fingers: one per distal quad of the knuckle ring, curled a little towards the palm.
-        let lf = 0.034 * h * (pr.upper / 0.165).powf(0.5);
+        let p2 = c.ring(&palm_ring(0.64, 1.0, 0.04), Per::All(&hand_w), "hand", None, arm1());
+        c.band(&p1, &p2, &[8, 9]);
+        // The knuckle ring: the back over the knuckles (about half hand, half fingers_01), the
+        // palm's pads a little further out (more the fingers'), so the knuckles bend there;
+        // between the fingers the back dips a little.
+        let kn: Vec<V3> = {
+            let cc = jwr - u * 0.02 * lpm;
+            let (top, pad) = (0.11 * lpm, 0.15 * lpm);
+            let mut out: Vec<V3> = order
+                .iter()
+                .map(|&(k, v)| {
+                    let edge = if k == 0 || k == 4 { 0.85 } else { 1.0 };
+                    if v > 0.0 {
+                        cc + d * (1.0 * lpm) + z * (zs[k] * 0.98) + u * (top * edge - if k == 0 || k == 4 { 0.0 } else { 0.012 * lpm })
+                    } else {
+                        cc + d * (1.08 * lpm) + z * (zs[k] * 0.98) - u * (pad * edge)
+                    }
+                })
+                .collect();
+            // Order: palm side 3 .. 0, the pinky's side, back 0 .. 4, the index's side, palm side 4.
+            out.insert(4, cc + d * (1.04 * lpm) + z * (zs[0] * 0.98 - 0.02 * lpm) - u * (0.01 * lpm));
+            out.insert(10, cc + d * (1.04 * lpm) + z * (zs[4] * 0.98 + 0.02 * lpm) - u * (0.01 * lpm));
+            out
+        };
+        let wk = |f: f64| -> Weights { vec![(nm("hand"), 1.0 - f), (nm("fingers_01"), f)] };
+        let wks: Vec<Weights> = (0..12).map(|i| wk(if (5..10).contains(&i) { 0.45 } else if i == 4 || i == 10 { 0.6 } else { 0.7 })).collect();
+        let p3 = c.ring(&kn, Per::Each(&wks.iter().collect::<Vec<_>>()), "hand", None, arm1());
+        c.join(&p2, &p3, &[0, 1, 2, 3, 5, 6, 7, 8, 9, 11]);
+        // Fingers, pinky (-z) to index: each leaves the knuckle ring between two of its columns,
+        // a 6-ring (back two, the side towards the thumb, palm two, the other side) whose sides
+        // between two fingers are one vertex in the crotch (towards the palm, past the knuckles),
+        // so neighbours share the edges down into it and stand apart beyond it. Straight from
+        // the knuckle to a ring just short of the middle joint (fingers_01), and a ring before
+        // the tip (fingers_02) turned a little about that joint towards the palm (the rest pose's
+        // curl), narrowing; a 6-sided cap. The middle joint is fingers_02's (rig.rs), so a fist
+        // bends at the knuckle and there, and the outer band, about as long as the inner one,
+        // folds its tip back onto the palm (`rigid_fingertips` keeps it round on level 1).
+        // (`ki`: the knuckle ring's index of column k, back or palm;
+        // its sides are 4 and 10.)
+        let ki = |k: usize, v: f64| {
+            let i = order.iter().position(|&(a, b)| a == k && b == v).unwrap();
+            i + usize::from(i >= 4) + usize::from(i >= 9)
+        };
+        let k2j = pj(nm("fingers_02"));
+        let (pivot_d, pivot_u) = ((k2j - jwr).dot(&d), (k2j - jwr).dot(&u));
+        let chub = 1.0 + 0.15 * yg;
+        let wc = wk(0.9);
+        let crotch: Vec<usize> = (1..4)
+            .map(|k| c.add(jwr + d * (1.2 * lpm) + z * (zs[k] * 0.98) - u * (0.045 * lpm), wc.clone(), "hand", None, Tags { arm: 1.0, blush: 0.0 }))
+            .collect();
+        let w01 = one(nm("fingers_01"));
+        let w02 = one(nm("fingers_02"));
         for fi in 0..4 {
-            let sel = [at(fi, 1.0), at(fi + 1, 1.0), at(fi + 1, -1.0), at(fi, -1.0)];
-            let loop_f: Vec<usize> = sel.iter().map(|&i| p2[i]).collect();
-            let base: Vec<V3> = sel.iter().map(|&i| p2_pts[i]).collect();
-            let m = mean_rows(&base);
-            let spread = (fi as f64 - 1.5) * 0.06;
-            let len = lf * [0.82, 0.95, 1.0, 0.93][fi];
-            let (tt, sc, curl): (f64, f64, f64) = (0.78, 0.98, 0.25);
-            let w: Weights = vec![(nm("fingers_01"), 0.3), (nm("fingers_02"), 0.7)];
-            let dirf = unit(d * curl.cos() - u * curl.sin() + z * spread);
-            let cc = m + dirf * len * tt;
-            let pts: Vec<V3> = base.iter().map(|bp| cc + (bp - m) * sc - dirf * ((bp - m).dot(&dirf)) * sc).collect();
-            let cur = c.ring(&pts, Per::All(&w), "hand", None, arm1());
-            c.band(&loop_f, &cur, &[]);
-            c.cap(&cur);
+            let side = |k: isize| if k < 0 { p3[4] } else if k > 2 { p3[10] } else { crotch[k as usize] };
+            let loop_f = vec![p3[ki(fi, 1.0)], p3[ki(fi + 1, 1.0)], side(fi as isize), p3[ki(fi + 1, -1.0)], p3[ki(fi, -1.0)], side(fi as isize - 1)];
+            // (Half width, half depth; distal length past the joint, in palm lengths. The palm side is fuller.)
+            let (hw, hd) = ([0.088, 0.098, 0.1, 0.098][fi] * chub, [0.095, 0.105, 0.107, 0.105][fi] * chub);
+            let tip = [0.25, 0.29, 0.31, 0.29][fi] * (1.0 - 0.3 * yg);
+            let zf = (zs[fi] + zs[fi + 1]) / 2.0 * 0.98;
+            let spread = (fi as f64 - 1.5) * 0.05;
+            // (A 6-ring round cc facing ax: half width, half depth on the back and on the palm side.)
+            let hex = |cc: V3, ax: V3, up: V3, hw: f64, back: f64, palm: f64| -> Vec<V3> {
+                let sd = unit(up.cross(&ax)) * sign(up.cross(&ax).dot(&z));
+                [(-0.5, 0.87), (0.5, 0.87), (1.0, 0.0), (0.5, -0.87), (-0.5, -0.87), (-1.0, 0.0)]
+                    .iter()
+                    .map(|&(a, b): &(f64, f64)| cc + sd * (a * hw * lpm) + up * (b * if b > 0.0 { back } else { palm } * lpm))
+                    .collect()
+            };
+            let pivot = jwr + d * pivot_d + u * pivot_u + z * (zf + spread * (pivot_d - lpm));
+            let a = hex(pivot - d * (0.04 * lpm), d, u, hw * 1.1, hd * 1.05, hd * 1.5);
+            let ra = c.ring(&a, Per::All(&w01), "hand", None, arm1());
+            c.band(&loop_f, &ra, &[]);
+            let rho: f64 = 0.2;
+            let (ad, au) = (d * rho.cos() - u * rho.sin(), u * rho.cos() + d * rho.sin());
+            let b = hex(pivot + ad * (tip * lpm) + z * (spread * tip * lpm), ad, au, hw * 0.95, hd * 0.85, hd * 1.15);
+            let rb = c.ring(&b, Per::All(&w02), "hand", None, arm1());
+            c.band(&ra, &rb, &[]);
+            c.cap(&rb);
         }
-        // Thumb: from the palm's thumb side between the two rings, a ring at its knuckle
-        // (thumb_02) and one before the tip, narrowing like a finger. Each ring is the base quad
-        // turned from facing forward to facing along the thumb (its corners keep their sides:
-        // wrist / tip of the hand, back / palm), so the bands don't twist.
-        let tl = vec![p1[8], p1[9], p2[9], p2[8]];
+        // Thumb: from the palm between the two rings, round its thumb side and the palm side next
+        // to it (the ball of the thumb), a 6-ring at its knuckle (thumb_02) and one before the
+        // tip, narrowing like a finger; a 6-sided cap. Each ring is the base loop turned from its
+        // own plane to facing along the thumb (wrist / tip of the hand, back / palm keep their
+        // sides), so the bands don't twist.
+        let tl = vec![p1[8], p1[9], p1[0], p2[0], p2[9], p2[8]];
         let base: Vec<V3> = tl.iter().map(|&i| c.p[i]).collect();
         let m = mean_rows(&base);
-        let side_d: Vec<f64> = base.iter().map(|bp| sign((bp - m).dot(&d))).collect();
-        let side_u: Vec<f64> = base.iter().map(|bp| sign((bp - m).dot(&u))).collect();
+        let up = unit((base[0] - base[2]) - d * (base[0] - base[2]).dot(&d));
+        let out = unit(d.cross(&up));
+        let out = out * sign(out.dot(&(z - u)));
         let t2 = pj(nm("thumb_02"));
-        let tip = unit(d * 0.8 - u * 0.35 + z * 0.4);
+        let tip = unit(d * 0.85 - u * 0.45 + z * 0.22);
         let mut prev_t = tl;
         let thumb: [(V3, V3, f64, f64, Weights); 2] = [
-            (t2, unit(unit(t2 - m) + tip), 0.15, 0.14, vec![(nm("thumb_01"), 0.5), (nm("thumb_02"), 0.5)]),
-            (t2 + tip * (0.42 * lpm), tip, 0.11, 0.105, vec![(nm("thumb_02"), 1.0)]),
+            (t2, unit(unit(t2 - m) + tip), 0.15, 0.135, vec![(nm("thumb_01"), 0.5), (nm("thumb_02"), 0.5)]),
+            (t2 + tip * (0.42 * lpm), tip, 0.11, 0.1, vec![(nm("thumb_02"), 1.0)]),
         ];
         for (cc, ax, thw, tht, w) in &thumb {
-            let r = turn(z, *ax);
-            let (rd, ru) = (r * d, r * u);
-            let pts: Vec<V3> = (0..4).map(|i| cc + (rd * (side_d[i] * thw) + ru * (side_u[i] * tht)) * lpm).collect();
+            let r = turn(out, *ax);
+            let (rd, ru) = (r * d, r * up);
+            let pts: Vec<V3> = [(-0.5, 0.87), (-1.0, 0.0), (-0.5, -0.87), (0.5, -0.87), (1.0, 0.0), (0.5, 0.87)].iter().map(|&(a, b)| cc + (rd * (a * thw) + ru * (b * tht)) * lpm).collect();
             let cur = c.ring(&pts, Per::All(w), "hand", None, arm1());
             c.band(&prev_t, &cur, &[]);
             prev_t = cur;
@@ -432,15 +505,15 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
         };
         let nm = |n: &str| bone(format!("{n}_{sd}"));
         let (jt, jk, ja) = (pj(nm("thigh")), pj(nm("calf")), pj(nm("foot")));
-        let rings: [(V3, f64, f64, f64, Weights, f64); 4] = [
-            (jt + (jk - jt) * 0.24, 1.0, 0.98, 1.06, vec![(nm("thigh"), 0.92), ("pelvis", 0.08)], 0.0),
-            (jt + (jk - jt) * 0.86, 0.68, 0.70, 0.64, vec![(nm("thigh"), 0.75), (nm("calf"), 0.25)], 0.0),
-            (jk + (ja - jk) * 0.22, 0.64, 0.64, 0.74, vec![(nm("calf"), 0.85), (nm("thigh"), 0.15)], 0.1),
-            (ja + (jk - ja) * 0.1, 0.42, 0.42, 0.44, vec![(nm("calf"), 0.5), (nm("foot"), 0.5)], 0.0),
+        let rings: [(V3, f64, f64, f64, Weights); 4] = [
+            (jt + (jk - jt) * 0.24, 1.0, 0.98, 1.06, vec![(nm("thigh"), 0.92), ("pelvis", 0.08)]),
+            (jt + (jk - jt) * 0.86, 0.68, 0.70, 0.64, vec![(nm("thigh"), 0.75), (nm("calf"), 0.25)]),
+            (jk + (ja - jk) * 0.22, 0.64, 0.64, 0.74, vec![(nm("calf"), 0.85), (nm("thigh"), 0.15)]),
+            (ja + (jk - ja) * 0.1, 0.42, 0.42, 0.44, vec![(nm("calf"), 0.5), (nm("foot"), 0.5)]),
         ];
         let mut prev = lp;
         let sx = if sd == "r" { 1.0 } else { -1.0 };
-        for (k, (cc, a, bf, bb, w, cav)) in rings.iter().enumerate() {
+        for (k, (cc, a, bf, bb, w)) in rings.iter().enumerate() {
             let mut pts = ring_pts(*cc, x, z, r_th * a, r_th * bf, r_th * bb, &psi, 2.1);
             if k == 0 {
                 // The thigh's top stops short of the midline (a baby's plump thighs would cross
@@ -449,8 +522,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
                     q[0] = sx * (sx * q[0]).max(CROTCH_GAP * r_th);
                 }
             }
-            let cavs: Vec<f64> = psi.iter().map(|&a| if a.cos() < -0.5 { *cav } else { 0.0 }).collect();
-            let cur = c.ring(&pts, Per::All(w), "leg", None, RingTags { cav: Per::Each(&cavs), ..Default::default() });
+            let cur = c.ring(&pts, Per::All(w), "leg", None, RingTags::default());
             c.band(&prev, &cur, &[]);
             prev = cur;
         }
@@ -492,6 +564,9 @@ pub struct Topology {
     /// Cage -> its own limit points, and its LU (factored once).
     pub a: Csr,
     lu: LU<f64, Dyn, Dyn>,
+    /// Per level-1 and level-2 point, how far it is snapped onto the smooth head (`snapped`).
+    snap1: Vec<f64>,
+    snap2: Vec<f64>,
     pub lod_tris: Vec<[usize; 3]>,
     /// A second level, only to sample the head densely (head_frame).
     pub s2: Subdivision,
@@ -504,8 +579,13 @@ impl Topology {
         let pos = &cage.p;
         let n = pos.len();
         let faces = orient(&cage.faces, pos);
-        if let Err(e) = check_closed(&faces, n) {
+        if let Err(e) = check_closed(&faces, Some(n)) {
             panic!("{e}");
+        }
+        // The LOD leaves the face's finer cage out (its vertices stay, unused).
+        let lod_faces = orient(&cage.lod_faces, pos);
+        if let Err(e) = check_closed(&lod_faces, None) {
+            panic!("LOD: {e}");
         }
         let s = subdivision(&faces, n);
         let n1 = s.m.rows;
@@ -513,13 +593,28 @@ impl Topology {
         let body = l1.matmul(&s.m);
         let a = body.head(n);
         let lu = a.to_dense().lu();
-        let lod_tris = polygon_triangles(&faces);
         let q1: Vec<Vec<usize>> = s.quads.iter().map(|q| q.to_vec()).collect();
         let s2 = subdivision(&q1, n1);
         let l2 = limit_matrix(&s2.quads, s2.m.rows);
         let fine = l2.matmul(&s2.m).matmul(&s.m);
         let fine_m = s2.m.matmul(&s.m);
-        Topology { faces, n, s, body, a, lu, lod_tris, s2, fine, fine_m }
+        // Snapped: points of the head's cage alone, fading out where the neck's share comes in (none
+        // where an ear's does).
+        let share = |m: &Csr| -> Vec<f64> {
+            m.data
+                .iter()
+                .map(|row| {
+                    if row.iter().any(|&(c, _)| cage.region[c] == "ear") {
+                        return 0.0;
+                    }
+                    let head: f64 = row.iter().filter(|&&(c, _)| cage.region[c] == "head").map(|&(_, v)| v).sum();
+                    smoothstep(0.8, 1.0, head)
+                })
+                .collect()
+        };
+        let (snap1, snap2) = (share(&body), share(&fine));
+        let lod_tris = polygon_triangles(&lod_faces);
+        Topology { faces, n, s, body, a, lu, snap1, snap2, lod_tris, s2, fine, fine_m }
     }
 
     /// Cage positions whose limit points are `t` (splu's solve, here a dense LU).
@@ -534,6 +629,17 @@ impl Topology {
         }
         out
     }
+
+    /// Points of level 1 (`fine`: level 2) of the features' cage `ctrl`, with its smooth part (`base`,
+    /// the cage fitted to the smooth shape) moved onto that shape (`onto`) on the head, then the eye
+    /// sockets carved (`sockets`). The cage's limit passes through the smooth head only at its vertices:
+    /// between them the face grid's uneven spacing and the ends of its partial lines (3-valent vertices,
+    /// pentagons) dent it by up to 4 mm and turn its normals by up to 17 degrees, which showed as patches
+    /// on the cheeks; snapped, the head is the smooth one plus the features.
+    fn snapped(&self, fine: bool, base: &[V3], ctrl: &[V3], onto: &impl Fn(V3) -> V3, sockets: &impl Fn(V3) -> V3) -> Vec<V3> {
+        let (m, w) = if fine { (&self.fine, &self.snap2) } else { (&self.body, &self.snap1) };
+        m.apply(base).iter().zip(m.apply(ctrl)).zip(w).map(|((b, p), &w)| sockets(if w > 0.0 { p + (onto(*b) - b) * w } else { p })).collect()
+    }
 }
 
 pub fn topology() -> &'static Topology {
@@ -545,17 +651,16 @@ pub fn topology() -> &'static Topology {
 #[derive(Clone)]
 pub struct TagArrays {
     pub arm: Vec<f64>,
-    pub cav: Vec<f64>,
     pub blush: Vec<f64>,
 }
 
 impl TagArrays {
     fn of(t: &[Tags]) -> Self {
-        TagArrays { arm: t.iter().map(|t| t.arm).collect(), cav: t.iter().map(|t| t.cav).collect(), blush: t.iter().map(|t| t.blush).collect() }
+        TagArrays { arm: t.iter().map(|t| t.arm).collect(), blush: t.iter().map(|t| t.blush).collect() }
     }
 
     fn subdivided(&self, m: &Csr) -> Self {
-        TagArrays { arm: m.apply1(&self.arm), cav: m.apply1(&self.cav), blush: m.apply1(&self.blush) }
+        TagArrays { arm: m.apply1(&self.arm), blush: m.apply1(&self.blush) }
     }
 }
 
@@ -574,10 +679,14 @@ pub struct Surface {
     pub tags: TagArrays,
     pub region: Vec<[f64; NR]>,
     pub nor: Vec<V3>,
+    /// Level 1 as it would be without the eye sockets (`nor` is its normals): what the lids are shaded as.
+    pub unsocketed: Vec<V3>,
     pub ears: [[V3; 2]; 2],
     pub head_samples: Vec<V3>,
     pub head_normals: Vec<V3>,
     pub head_tris: Vec<[V3; 3]>,
+    /// The same triangles without the eye sockets (where the closed lids lie, face.rs).
+    pub bare_tris: Vec<[V3; 3]>,
     pub cranium: Vec<V3>,
 }
 
@@ -593,10 +702,13 @@ fn make_surface(family: &str, stage: &str) -> Surface {
     let (cage, p) = body_cage(family, stage);
     let arr = cage.arrays();
     assert_eq!(arr.t.len(), topo.n);
-    // The smooth shape is interpolated exactly; features are offsets on the fitted cage.
-    let ctrl: Vec<V3> = topo.solve(&arr.t).iter().zip(&arr.d).map(|(c, d)| c + d).collect();
+    // The smooth shape is interpolated at the cage's vertices and snapped onto between them; features
+    // are offsets on the fitted cage, the eye sockets carved after (`snapped`).
+    let base = topo.solve(&arr.t);
+    let ctrl: Vec<V3> = base.iter().zip(&arr.d).map(|(c, d)| c + d).collect();
+    let (onto, holes) = (onto_head(family, stage), sockets(family, stage, false));
     let s = &topo.s;
-    let pos = topo.body.apply(&ctrl);
+    let pos = topo.snapped(false, &base, &ctrl, &onto, &holes);
     let region: Vec<[f64; NR]> = cage
         .region
         .iter()
@@ -606,19 +718,21 @@ fn make_surface(family: &str, stage: &str) -> Surface {
             v
         })
         .collect();
-    let lod_pos = topo.a.apply(&ctrl);
+    let lod_pos: Vec<V3> = topo.a.apply(&ctrl).into_iter().map(sockets(family, stage, true)).collect();
     let tags = TagArrays::of(&arr.tags);
-    let dense1 = s.m.apply_n(&arr.dense);
+    let dense1 = rigid_fingertips(s.m.apply_n(&arr.dense), &pos, &p);
     let tags1 = tags.subdivided(&s.m);
     let region1 = s.m.apply_n(&region);
     // Head and neck, densely, without the ears (for the head interface's sdf and surface_z).
-    let fpos = topo.fine.apply(&ctrl);
+    let fpos = topo.snapped(true, &base, &ctrl, &onto, &holes);
     // Normals from the finer (level-2) limit surface: smooth shading on the coarse level 1 (whose
-    // vertices are the first of level 2's).
-    let ftri: Vec<usize> = triangles(&topo.s2.quads, &fpos).concat();
-    let fnor = smooth_normals(&fpos, &ftri);
-    let nor = fnor[..pos.len()].to_vec();
-    let lod_nor = fnor[..topo.n].to_vec();
+    // vertices are the first of level 2's), as it is without the eye sockets: the lids cover them
+    // (face.rs), and the skin round a lid is shaded as the face it carries on.
+    let bare = topo.snapped(true, &base, &ctrl, &onto, &|p| p);
+    let bare_nor = smooth_normals(&bare, &triangles(&topo.s2.quads, &bare).concat());
+    let nor = bare_nor[..pos.len()].to_vec();
+    let lod_nor = bare_nor[..topo.n].to_vec();
+    let unsocketed = bare[..pos.len()].to_vec();
     let freg = topo.fine_m.apply_n(&region);
     let (ri_head, ri_ear, ri_neck) = (super::body::region("head"), super::body::region("ear"), super::body::region("neck"));
     let mut ears = [[V3::zeros(); 2]; 2];
@@ -629,7 +743,7 @@ fn make_surface(family: &str, stage: &str) -> Surface {
         ears[e] = [(mx + mn) / 2.0, (mx - mn) / 2.0];
     }
     let flat_ctrl: Vec<V3> = ctrl.iter().zip(&arr.d).zip(&cage.region).map(|((c, d), r)| if *r == "ear" { c - d } else { c - d * 0.0 }).collect();
-    let fpos = topo.fine.apply(&flat_ctrl);
+    let fpos = topo.snapped(true, &base, &flat_ctrl, &onto, &holes);
     let hmask: Vec<bool> = freg.iter().map(|r| (r[ri_head] + r[ri_ear]) + r[ri_neck] > 0.5).collect();
     let q = &topo.s2.quads;
     let qm: Vec<[usize; 4]> = q.iter().filter(|q| q.iter().all(|&v| hmask[v])).copied().collect();
@@ -645,6 +759,8 @@ fn make_surface(family: &str, stage: &str) -> Surface {
         head_samples.push((fpos[t[0]] + fpos[t[1]] + fpos[t[2]]) / 3.0);
     }
     let head_tris = tri.iter().map(|t| [fpos[t[0]], fpos[t[1]], fpos[t[2]]]).collect();
+    let fbare = topo.snapped(true, &base, &flat_ctrl, &onto, &|p| p);
+    let bare_tris = tri.iter().map(|t| [fbare[t[0]], fbare[t[1]], fbare[t[2]]]).collect();
     let pr = proportions(family, stage);
     let hh = pr.hh * pr.h;
     let cranium = fpos.iter().zip(&freg).filter(|(p, r)| r[ri_head] > 0.99 && p.y > pr.h - hh + 0.6 * hh).map(|(p, _)| *p).collect();
@@ -662,10 +778,12 @@ fn make_surface(family: &str, stage: &str) -> Surface {
         tags: tags1,
         region: region1,
         nor,
+        unsocketed,
         ears,
         head_samples,
         head_normals,
         head_tris,
+        bare_tris,
         cranium,
     }
 }
@@ -690,6 +808,8 @@ pub struct Body {
     pub lod: Mesh,
     pub meta: Meta,
     pub joints: [V3; NB],
+    /// `body`'s positions without the eye sockets (`Surface::unsocketed`; its normals are so already).
+    pub unsocketed: Vec<V3>,
 }
 
 /// The body of `family` at `stage` (and its low-detail copy); see the module docs.
@@ -699,7 +819,7 @@ pub fn build_body(family: &str, stage: &str) -> Body {
     let body = Mesh { pos: s.pos.clone(), idx: tris(family).to_vec(), dense: s.dense.clone(), arm: s.tags.arm.clone(), nor: s.nor.clone(), ..Mesh::default() };
     let lod = Mesh { pos: s.lod_pos.clone(), idx: topo.lod_tris.concat(), dense: s.lod_dense.clone(), arm: s.lod_tags.arm.clone(), nor: s.lod_nor.clone(), ..Mesh::default() };
     let meta = Meta { seat_drop: seat_drop(&body, &s.p), eye_y: s.p[b("eye_l")].y, grip: grip(family, stage) };
-    Body { body, lod, meta, joints: s.p }
+    Body { body, lod, meta, joints: s.p, unsocketed: s.unsocketed.clone() }
 }
 
 fn rx(a: f64) -> M3 {
@@ -758,6 +878,25 @@ fn grip(family: &str, stage: &str) -> [f64; 3] {
     let lp = (k1 - wr).norm();
     let g = d * 0.62 * lp - u * 0.28 * lp;
     [g.x, g.y, g.z]
+}
+
+/// Level 1's fingers past the middle joint: subdividing blends `fingers_01` into `fingers_02` all
+/// along the outer segment, which a fist then folds flat (blended skinning collapses); instead the
+/// split follows the distance past the joint, all `fingers_02` from 0.06 palm lengths on.
+fn rigid_fingertips(mut dense: Vec<Dense>, pos: &[V3], p: &[V3; NB]) -> Vec<Dense> {
+    for sd in ["l", "r"] {
+        let (wr, i1, i2) = (p[b(&format!("hand_{sd}"))], b(&format!("fingers_01_{sd}")), b(&format!("fingers_02_{sd}")));
+        let lp = (p[i1] - wr).norm();
+        let d = unit(p[i1] - wr);
+        for (w, q) in dense.iter_mut().zip(pos) {
+            let t = w[i1] + w[i2];
+            if w[i2] > 0.0 {
+                let s = smoothstep(-0.06, 0.06, (q - p[i2]).dot(&d) / lp);
+                (w[i1], w[i2]) = (t * (1.0 - s), t * s);
+            }
+        }
+    }
+    dense
 }
 
 // Fields and tone -----------------------------------------------------------------------------
@@ -823,6 +962,37 @@ fn region_ix(name: &str) -> usize {
     region(name)
 }
 
+/// The face's age folds (`HeadFrame::fold`) per vertex of the skin (the triangles of `idx` among `pos`),
+/// as its triangles can show them: each vertex's the mean over its triangles weighted by how much of the
+/// colour there it carries (its barycentric weight). A line a few millimetres wide sampled at the
+/// vertices alone, which lie farther apart, came out in blotches.
+fn folds(pos: &[V3], idx: &[usize], head: &HeadFrame) -> Vec<f64> {
+    const N: usize = 6;
+    let (mut num, mut den) = (vec![0.0; pos.len()], vec![0.0; pos.len()]);
+    for t in idx.chunks(3).filter(|t| t.iter().all(|&i| i < pos.len())) {
+        let [a, b, c] = [pos[t[0]], pos[t[1]], pos[t[2]]];
+        let area = (b - a).cross(&(c - a)).norm();
+        // The centres of the triangle's N x N equal parts.
+        for i in 0..N {
+            for j in 0..N - i {
+                for (di, dj, ok) in [(1.0, 1.0, true), (2.0, 2.0, i + j + 2 <= N)] {
+                    if !ok {
+                        continue;
+                    }
+                    let (u, v) = ((i as f64 + di / 3.0) / N as f64, (j as f64 + dj / 3.0) / N as f64);
+                    let w = [1.0 - u - v, u, v];
+                    let f = head.fold(a * w[0] + b * w[1] + c * w[2]);
+                    for (&vi, wk) in t.iter().zip(w) {
+                        num[vi] += wk * f * area;
+                        den[vi] += wk * area;
+                    }
+                }
+            }
+        }
+    }
+    num.iter().zip(&den).map(|(n, d)| if *d > 0.0 { n / d } else { 0.0 }).collect()
+}
+
 /// Clothes fields and tone of the (base stage) body or its LOD; the face's pieces after the skin.
 pub fn body_fields_and_tone(family: &str, mesh: &Mesh, p: &[V3; NB], head: &HeadFrame) -> (Vec<[f64; 4]>, Vec<[f64; 4]>) {
     let s = surface(family, BASE_STAGE);
@@ -831,7 +1001,10 @@ pub fn body_fields_and_tone(family: &str, mesh: &Mesh, p: &[V3; NB], head: &Head
     let (pos, tags, region) = if lod { (&s.lod_pos, &s.lod_tags, &s.lod_region) } else { (&s.pos, &s.tags, &s.region) };
     let k = pos.len();
     let mut f = fields_of(family, pos, &tags.arm, region, p, head);
-    let mut tone: Vec<[f64; 4]> = (0..k).map(|i| [clip(tags.blush[i], 0.0, 1.0), clip(tags.cav[i], 0.0, 1.0), 0.0, 0.0]).collect();
+    // Blush (x) and, on the face, the age folds (z; the shader deepens them with age).
+    let ri_head = region_ix("head");
+    let fold = folds(pos, &mesh.idx, head);
+    let mut tone: Vec<[f64; 4]> = (0..k).map(|i| [clip(tags.blush[i], 0.0, 1.0), 0.0, if region[i][ri_head] > 0.5 { fold[i] } else { 0.0 }, 0.0]).collect();
     if n > k {
         // The face's pieces (lids, lips) inside the body: head fields; the nearest skin's tone.
         let extra = &mesh.pos[k..];

@@ -743,8 +743,11 @@ const USE: Record<string, readonly string[]> = {
   tree: ['idle'],
 };
 
-/** Per finger and per joint (knuckle, middle, tip): share of the hand pose's opening (see `fingerMask`). */
-const FINGER_OPEN: Record<string, number> = { index: 1, middle: 0.93, ring: 0.86, pinky: 0.8, thumb: 0.9, fingers: 0.92 };
+/**
+ * Per finger and per joint (knuckle, middle, tip): share of the hand pose's opening (see `fingerMask`).
+ * (`fingers` opens fully: the grip's fist is tight, and its open hands keep about the curl they had.)
+ */
+const FINGER_OPEN: Record<string, number> = { index: 1, middle: 0.93, ring: 0.86, pinky: 0.8, thumb: 0.9, fingers: 1 };
 const JOINT_OPEN = [0.78, 0.9, 1];
 
 /** Finger pose: 0 = the clip's grip, 1 = open hand (rest pose). */
@@ -5241,11 +5244,11 @@ export class Characters {
     }
   }
 
-  /** A base body's heights for the towel and swimwear (`OutfitFit`), from its joints at rest. */
+  /** A base body's heights for the towel, swimwear and an open jacket's shirt (`OutfitFit`), from its joints at rest. */
   private outfitFit(base: BodyData): OutfitFit {
     const set = this.set!;
     const y = (bone: string) => Matrix.FromArray(base.inverseBind, set.bone[bone] * 16).invert().m[13];
-    return { chest: (y('spine_03') + y('upperarm_l')) / 2, hip: y('thigh_l'), knee: y('calf_l') };
+    return { chest: (y('spine_03') + y('upperarm_l')) / 2, hip: y('thigh_l'), knee: y('calf_l'), neck: y('neck_01') - 0.01 };
   }
 
   /**
@@ -5755,10 +5758,9 @@ export class Characters {
       mat.backFaceCulling = false;
       mat.twoSidedLighting = true;
     } else if (kind === 'hair') {
+      // No PBR sheen: linked to the albedo it takes the diffuse colour down to (1 - intensity)^5 (8 % at
+      // 0.4), so every colour drew near black. The plugin draws a sheen band into the colour instead.
       mat.roughness = 0.5;
-      mat.sheen.isEnabled = true;
-      mat.sheen.intensity = 0.4;
-      mat.sheen.linkSheenWithAlbedo = true;
       mat.backFaceCulling = false;
       mat.twoSidedLighting = true;
     } else if (kind === 'brow' || kind === 'lash') {

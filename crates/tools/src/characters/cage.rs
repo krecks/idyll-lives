@@ -5,17 +5,19 @@
 //!
 //! `Cage::add(point, weights, region, tags) -> vertex id`; `ring(points, ...) -> ids`;
 //! `band(a, b)` joins two rings with quads; `join(a, b, match)` joins rings of different sizes
-//! (some faces become pentagons).
+//! (some faces become pentagons). A face is in both the cage and the LOD's (`lod_faces`) unless it is
+//! added with `fine_face` or `lod_face`: the face's finer cage (head.rs) is left out of the LOD.
 //!
 //! Every life stage and both families build the same vertices in the same order, so the topology
 //! is fixed and stages are deltas. Per vertex the cage carries its target point (on the designed
 //! surface), its skin weights (bone -> weight), a region name and tags (`arm`: 0 torso .. 1 arm,
-//! used by the sleeve field; `cav`: cavity darkening; `blush`), which subdivide like positions.
+//! used by the sleeve field; `blush`), which subdivide like positions.
 //!
 //! Torso rings have 12 vertices at 30 degree steps (0 = front, 90 = the resident's right, +x): the
 //! arms leave through the 2 x 2 patches at 60..120 / 240..300 degrees of the chest rings T5-T7, the
 //! legs through the halves of the hip ring T1 and the crotch vertex, the neck through the middle
-//! of the shoulder cap. Limbs and the neck have 8-vertex rings, the palm 10, fingers and thumbs 4.
+//! of the shoulder cap. Limbs and the neck have 8-vertex rings, the palm 10 (the knuckles 12),
+//! fingers and thumbs 6.
 
 use super::np::sign;
 use super::rig::{NB, b};
@@ -41,11 +43,10 @@ pub fn turn(a: V3, b: V3) -> M3 {
     M3::identity() + k + k * k / (1.0 + cs)
 }
 
-/// Per-vertex tags (`arm`, `cav`, `blush`).
+/// Per-vertex tags (`arm`, `blush`).
 #[derive(Clone, Copy, Default)]
 pub struct Tags {
     pub arm: f64,
-    pub cav: f64,
     pub blush: f64,
 }
 
@@ -66,13 +67,12 @@ impl<T: Copy> Per<'_, T> {
 
 pub struct RingTags<'a> {
     pub arm: Per<'a, f64>,
-    pub cav: Per<'a, f64>,
     pub blush: Per<'a, f64>,
 }
 
 impl Default for RingTags<'_> {
     fn default() -> Self {
-        RingTags { arm: Per::All(0.0), cav: Per::All(0.0), blush: Per::All(0.0) }
+        RingTags { arm: Per::All(0.0), blush: Per::All(0.0) }
     }
 }
 
@@ -84,6 +84,8 @@ pub struct Cage {
     pub region: Vec<&'static str>,
     pub tags: Vec<Tags>,
     pub faces: Vec<Vec<usize>>,
+    /// The LOD's faces: the cage's, with the head's coarser grid (some vertices unused).
+    pub lod_faces: Vec<Vec<usize>>,
     /// The shoulder cap's loop round the neck (body.rs sets it; the necklines are cut from it).
     pub neck_loop: Vec<usize>,
 }
@@ -121,17 +123,28 @@ impl Cage {
                     Per::All(v) => (*v).clone(),
                     Per::Each(v) => v[i].clone(),
                 };
-                let t = Tags { arm: tags.arm.at(i), cav: tags.cav.at(i), blush: tags.blush.at(i) };
+                let t = Tags { arm: tags.arm.at(i), blush: tags.blush.at(i) };
                 self.add(pts[i], wi, region, disp.map(|d| d[i]), t)
             })
             .collect()
     }
 
     pub fn face(&mut self, ids: &[usize]) {
+        self.fine_face(ids);
+        self.lod_faces.push(ids.to_vec());
+    }
+
+    /// A face of the cage only (not the LOD's).
+    pub fn fine_face(&mut self, ids: &[usize]) {
         for (i, a) in ids.iter().enumerate() {
             assert!(!ids[i + 1..].contains(a), "{ids:?}");
         }
         self.faces.push(ids.to_vec());
+    }
+
+    /// A face of the LOD only.
+    pub fn lod_face(&mut self, ids: &[usize]) {
+        self.lod_faces.push(ids.to_vec());
     }
 
     /// Quads between rings a and b (same size, same direction, cyclic); `skip`: edges left open.
@@ -165,7 +178,7 @@ impl Cage {
         }
     }
 
-    /// Closes a 4-ring with one quad.
+    /// Closes a ring with one face.
     pub fn cap(&mut self, ring: &[usize]) {
         self.face(ring);
     }

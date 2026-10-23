@@ -44,8 +44,9 @@ fn edges_of(faces: &[Vec<usize>]) -> (Vec<(usize, usize)>, Vec<Vec<usize>>) {
     (edges, face_edges)
 }
 
-/// Every edge is shared by exactly two faces, in opposite directions (a closed, oriented 2-manifold).
-pub fn check_closed(faces: &[Vec<usize>], n: usize) -> Result<(), String> {
+/// Every edge is shared by exactly two faces, in opposite directions (a closed, oriented 2-manifold);
+/// with `n`, every vertex below it is used.
+pub fn check_closed(faces: &[Vec<usize>], n: Option<usize>) -> Result<(), String> {
     let mut seen: HashMap<(usize, usize), usize> = HashMap::new();
     let mut order = Vec::new();
     for (fi, f) in faces.iter().enumerate() {
@@ -63,6 +64,7 @@ pub fn check_closed(faces: &[Vec<usize>], n: usize) -> Result<(), String> {
             return Err(format!("edge {a}-{b} of face {} is open", seen[&(a, b)]));
         }
     }
+    let Some(n) = n else { return Ok(()) };
     let mut used = vec![false; n];
     for f in faces {
         for &v in f {

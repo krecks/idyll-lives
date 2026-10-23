@@ -13,6 +13,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+pub mod ao;
 pub mod body;
 pub mod build;
 pub mod cage;
