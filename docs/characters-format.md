@@ -135,7 +135,11 @@ its outline and shades in clumps:
   leave the crown in a whorl, the grooves between them deepening to the hairline (none over the
   ears); a parting where the style has one (short and side-swept at the side, long and buns in the
   middle) is a groove the columns turn onto; short locks past the hairline at the temples and nape;
-  the rim goes round the ears (above an oval round each `ears` box, 3 mm out), as a cut does;
+  the rim comes down to the skin and goes round the ears in an arc, as a cut does: above an ellipse
+  round each ear's faces (seen from the head's centre, about 6 mm out), the hairline and the arc
+  rounded where they meet, on more columns there (7 for every 16 round the head, each side). The
+  afro's stands off the ears instead (its rim at the hairline, out past them) and closes under
+  itself in a hem, in to the skin and, over an ear, above its ellipse;
 - curtains (long, bob, layered) and fringes (bob) are sheets with a thickness: each row a closed
   section with rounded edges, a rounded hem curled in, in locks (thinner between them, the edge
   locks fuller), each lock's tip hanging lower than the partings either side of it. A curtain comes
