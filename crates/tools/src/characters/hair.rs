@@ -19,7 +19,8 @@
 //!
 //! Skinning: Head, blending below the jaw to neck_01 and spine_03 by height (tails and braids
 //! along their length), so hair that falls past the jaw follows the shoulders when the head turns.
-//! Nothing comes within 2.6 mm of the head.
+//! Nothing comes within 2.6 mm of the head, or 3 mm of the ears (`Ears`: the body's ear faces, which the
+//! head's `sdf` leaves out): caps go round them, curtains out over them, the beard stops in front.
 
 use super::contract::{BEARD_FAMILIES, HAIR_STYLES};
 use super::head::HeadFrame;
@@ -88,7 +89,7 @@ impl<'a> Scalp<'a> {
         let h = self.h;
         let d = Scalp::dirs(a, phi).component_mul(&h.radii);
         // Over the ears no further out than the skull ellipsoid (which holds the cranium), so the
-        // ears don't push the hair about; `finish` keeps it off them.
+        // ears don't push the hair about; caps go round them (`round_ear`), curtains out over them.
         let hi0 = if self.cranium {
             // Past the ellipsoid only away from the ears (the brow and forehead may stand out of it).
             let aa = (py_mod(a + PI, TAU) - PI).abs();
@@ -133,6 +134,171 @@ impl<'a> Scalp<'a> {
         let (p, n) = self.surface(a, phi);
         p + n * off
     }
+
+    /// The lowest a cap's rim may come down to at azimuth a (polar angle) to go round the ears: on
+    /// the skull ellipsoid, above an oval round each ear's box (`EAR_CLEAR` and a rim's thickness
+    /// out); pi away from them.
+    pub fn round_ear(&self, a: f64) -> f64 {
+        let h = self.h;
+        let m = EAR_CLEAR + CLEAR;
+        let mut lim = PI;
+        for [c, e] in h.ears {
+            if a.sin() * c.x <= 0.0 {
+                continue;
+            }
+            let inside = |phi: f64| {
+                let p = h.centre + Scalp::dirs(a, phi).component_mul(&h.radii);
+                ((p.z - c.z) / (e.z + m)).abs().powf(2.5) + ((p.y - c.y) / (e.y + m)).abs().powf(2.5) < 1.0
+            };
+            // Down from over the ear to the first point in its oval, then bisect within that step.
+            let Some(k) = (1..=100).find(|&k| inside(radians(50.0 + k as f64))) else { continue };
+            let (mut lo, mut hi) = (radians(49.0 + k as f64), radians(50.0 + k as f64));
+            for _ in 0..20 {
+                let mid = (lo + hi) / 2.0;
+                if inside(mid) {
+                    hi = mid;
+                } else {
+                    lo = mid;
+                }
+            }
+            lim = lim.min(lo);
+        }
+        lim
+    }
+}
+
+/// How far hair keeps off the ears (m); the check wants more than `EAR_MIN`.
+const EAR_CLEAR: f64 = 0.003;
+pub const EAR_MIN: f64 = 0.0015;
+
+/// The ears as drawn (the body's faces where it is ear; the head's `sdf` leaves them out), to keep
+/// hair off them: how far a point is into one.
+pub struct Ears {
+    ears: Vec<Ear>,
+}
+
+struct Ear {
+    /// Its side (sign of x) and its box grown by 2 cm.
+    side: f64,
+    lo: V3,
+    hi: V3,
+    /// The ear's own faces, and every face in the box (a ray out to the side crosses these an odd
+    /// number of times from inside the ear).
+    own: Vec<[V3; 3]>,
+    near: Vec<[V3; 3]>,
+}
+
+impl Ears {
+    /// From the body's positions and faces and each vertex's share of ear (region weight), round the
+    /// head interface's `ears` boxes.
+    pub fn new(boxes: &[[V3; 2]; 2], pos: &[V3], idx: &[usize], ear: &[f64]) -> Self {
+        let ears = boxes
+            .iter()
+            .map(|[c, e]| {
+                let (lo, hi) = (c - e - V3::repeat(0.02), c + e + V3::repeat(0.02));
+                let inb = |p: &V3| (0..3).all(|k| lo[k] <= p[k] && p[k] <= hi[k]);
+                let (mut own, mut near) = (Vec::new(), Vec::new());
+                for t in idx.chunks(3) {
+                    if !t.iter().any(|&i| inb(&pos[i])) {
+                        continue;
+                    }
+                    let tri = [pos[t[0]], pos[t[1]], pos[t[2]]];
+                    near.push(tri);
+                    if t.iter().map(|&i| ear[i]).sum::<f64>() > 0.9 && t.iter().all(|&i| pos[i].x * c.x > 0.0) {
+                        own.push(tri);
+                    }
+                }
+                Ear { side: c.x.signum(), lo, hi, own, near }
+            })
+            .collect();
+        Ears { ears }
+    }
+
+    /// The ears of a family at a stage (its body as built).
+    pub fn of(family: &str, stage: &str, h: &HeadFrame) -> Self {
+        let s = super::body::surface(family, stage);
+        let r = super::body::region("ear");
+        let ear: Vec<f64> = s.region.iter().map(|w| w[r]).collect();
+        Ears::new(&h.ears, &s.pos, &super::body::tris(family), &ear)
+    }
+
+    /// How far a point is into an ear (m; < 0: that far out of the nearest), and the way out of it;
+    /// None away from the ears.
+    pub fn depth(&self, p: V3) -> Option<(f64, V3)> {
+        let mut best: Option<(f64, V3)> = None;
+        for e in &self.ears {
+            if !(0..3).all(|k| e.lo[k] <= p[k] && p[k] <= e.hi[k]) || e.own.is_empty() {
+                continue;
+            }
+            let ray = v3(e.side, 0.0123, 0.0071).normalize();
+            let inside = e.near.iter().filter(|t| hit(p, ray, t).is_some()).count() % 2 == 1;
+            let q = e.own.iter().map(|t| closest(p, t)).min_by(|a, b| (a - p).norm_squared().total_cmp(&(b - p).norm_squared())).unwrap();
+            let d = (q - p).norm();
+            let out = if inside { q - p } else { p - q } / d.max(1e-9);
+            let v = if inside { d } else { -d };
+            if best.is_none_or(|b| v > b.0) {
+                best = Some((v, out));
+            }
+        }
+        best
+    }
+
+    /// Whether the segment p..q passes through an ear's surface.
+    pub fn cut(&self, p: V3, q: V3) -> bool {
+        let l = (q - p).norm();
+        let d = (q - p) / l.max(1e-12);
+        self.ears.iter().any(|e| (0..3).all(|k| e.lo[k] <= p[k].max(q[k]) && p[k].min(q[k]) <= e.hi[k]) && e.own.iter().any(|t| hit(p, d, t).is_some_and(|s| s < l)))
+    }
+}
+
+/// How far along the ray from o (d a unit vector) it crosses the triangle, if it does
+/// (Moller-Trumbore).
+fn hit(o: V3, d: V3, [a, b, c]: &[V3; 3]) -> Option<f64> {
+    let (e1, e2) = (b - a, c - a);
+    let pv = d.cross(&e2);
+    let det = e1.dot(&pv);
+    if det.abs() < 1e-14 {
+        return None;
+    }
+    let tv = o - a;
+    let u = tv.dot(&pv) / det;
+    let qv = tv.cross(&e1);
+    let v = d.dot(&qv) / det;
+    let t = e2.dot(&qv) / det;
+    (u >= 0.0 && v >= 0.0 && u + v <= 1.0 && t > 0.0).then_some(t)
+}
+
+/// The nearest point of a triangle to p (Ericson, Real-Time Collision Detection 5.1.5).
+fn closest(p: V3, [a, b, c]: &[V3; 3]) -> V3 {
+    let (ab, ac, ap) = (b - a, c - a, p - a);
+    let (d1, d2) = (ab.dot(&ap), ac.dot(&ap));
+    if d1 <= 0.0 && d2 <= 0.0 {
+        return *a;
+    }
+    let bp = p - b;
+    let (d3, d4) = (ab.dot(&bp), ac.dot(&bp));
+    if d3 >= 0.0 && d4 <= d3 {
+        return *b;
+    }
+    let vc = d1 * d4 - d3 * d2;
+    if vc <= 0.0 && d1 >= 0.0 && d3 <= 0.0 {
+        return a + ab * (d1 / (d1 - d3));
+    }
+    let cp = p - c;
+    let (d5, d6) = (ab.dot(&cp), ac.dot(&cp));
+    if d6 >= 0.0 && d5 <= d6 {
+        return *c;
+    }
+    let vb = d5 * d2 - d1 * d6;
+    if vb <= 0.0 && d2 >= 0.0 && d6 <= 0.0 {
+        return a + ac * (d2 / (d2 - d6));
+    }
+    let va = d3 * d6 - d5 * d4;
+    if va <= 0.0 && d4 - d3 >= 0.0 && d5 - d6 >= 0.0 {
+        return b + (c - b) * ((d4 - d3) / ((d4 - d3) + (d5 - d6)));
+    }
+    let den = 1.0 / (va + vb + vc);
+    a + ab * (vb * den) + ac * (vc * den)
 }
 
 /// The least distance to the head (sdf) at and round a point.
@@ -230,7 +396,10 @@ fn cap(sc: &Scalp, c: Cap) -> Comp {
                 Some(l) => l(a[j]),
                 None => sc.hairline(a[j]),
             };
-            l + c.tips.map_or(0.0, |t| t(a[j]) * lk[j].powf(1.5))
+            // Round the ears: no lower than over them anywhere out to the next columns either side,
+            // so the rim between two columns clears them too.
+            let ear = linspace(-1.0, 1.0, 9).iter().map(|&s| sc.round_ear(a[j] + s * step)).fold(PI, f64::min);
+            (l + c.tips.map_or(0.0, |t| t(a[j]) * lk[j].powf(1.5))).min(ear)
         })
         .collect();
     // How near a column is to the parting (1 on it), from where it starts down to the hairline.
@@ -572,8 +741,9 @@ fn tor(t: super::prims::Prim) -> Comp {
     comp(t.pos, t.idx, None, Some(z), Some(vec![0.4; n]), None)
 }
 
-pub fn build_hair(family: &str, _stage: &str, head: &HeadFrame, p: &[V3; NB]) -> Vec<(String, Mesh)> {
+pub fn build_hair(family: &str, stage: &str, head: &HeadFrame, p: &[V3; NB]) -> Vec<(String, Mesh)> {
     let h = head;
+    let ears = Ears::of(family, stage, h);
     let hh = h.hh;
     let sc = Scalp::new(h, true);
     let skin = Scalp::new(h, false);
@@ -703,7 +873,8 @@ pub fn build_hair(family: &str, _stage: &str, head: &HeadFrame, p: &[V3; NB]) ->
     let shoulder = p[b("clavicle_l")].y;
     let side_bot = |a: f64| interp(round(a), &[deg(70.0), deg(110.0), deg(150.0)], &[shoulder + 0.25 * hh, shoulder - 0.1 * hh, sp[1] - 0.5 * hh]);
     let lt = chin + 0.72 * hh;
-    let long_back = |y: f64| back(y) + 0.014 * hh;
+    // Further off the back at the shoulders, which rise and roll back under it when sitting down.
+    let long_back = |y: f64| back(y) - 0.036 * hh * (-((y - shoulder) / (0.2 * hh)).powi(2)).exp();
     lng.push(curtain(&sc, Curtain { a0: deg(66.0), a1: TAU - deg(66.0), top: &move |_| lt, bottom: &side_bot, off: 0.012 * hh, locks: 8, rows: 7, flare: 0.18, thick: 0.032 * hh, curl: 0.6, tip: 0.07 * hh, sharp: 2.5, back: Some(&long_back), wave: 0.004 * hh, seed: 0 }));
     for s in [-1.0, 1.0] {
         // Two locks either side of the parting, the outer one down past the cheek to the jaw.
@@ -805,9 +976,9 @@ pub fn build_hair(family: &str, _stage: &str, head: &HeadFrame, p: &[V3; NB]) ->
     let mut names: Vec<&str> = styles.iter().map(|s| s.0).collect();
     names.push("none");
     assert!(HAIR_STYLES.iter().all(|s| names.contains(s)) && names.len() == HAIR_STYLES.len());
-    let mut out: Vec<(String, Mesh)> = styles.into_iter().map(|(name, comps)| (format!("hair.{name}"), finish(&comps, h, p, false))).collect();
+    let mut out: Vec<(String, Mesh)> = styles.into_iter().map(|(name, comps)| (format!("hair.{name}"), finish(&comps, h, &ears, p, false))).collect();
     if BEARD_FAMILIES.contains(&family) {
-        out.push(("hair.beard".into(), finish(&[beard(&skin)], h, p, true)));
+        out.push(("hair.beard".into(), finish(&[beard(&skin)], h, &ears, p, true)));
     }
     out
 }
@@ -837,6 +1008,8 @@ fn beard(sc: &Scalp) -> Comp {
     let us = linspace(0.0, 1.0, rows);
     // The hole: an ellipse in (side distance, polar angle) round the mouth.
     let wx = (h.mouth_w / 2.0 + 0.04 * hh) / h.radii[0];
+    // The sideburns end in front of the ears (their boxes, EAR_CLEAR and the beard's thin edge clear).
+    let side = h.ears.iter().map(|[c, e]| (c.x.abs() - e.x).atan2(c.z + e.z + EAR_CLEAR + CLEAR - h.centre[2])).fold(radians(94.0), f64::min);
     let mut pg = Vec::new();
     let (mut z, mut y) = (Vec::new(), Vec::new());
     for &u in &us {
@@ -852,6 +1025,8 @@ fn beard(sc: &Scalp) -> Comp {
             let scale = if inside { 1.0 / r.max(1e-6) } else { 1.0 };
             let a2 = if inside { clip(hx * scale * wx / phi.sin().max(1e-3), -1.0, 1.0).asin() } else { aa };
             let phi2 = if inside { phm + hy * scale * sy } else { phi };
+            // The sides (past 60 degrees) drawn in to stop in front of the ears.
+            let a2 = if a2.abs() > radians(60.0) { a2.signum() * interp(a2.abs(), &[radians(60.0), radians(94.0)], &[radians(60.0), side]) } else { a2 };
             let edge = smoothstep(1.0, 1.6, r).min(smoothstep(0.0, 0.2, u)).min(smoothstep(radians(94.0), radians(78.0), aa.abs())).min(smoothstep(1.0, 0.8, u));
             let off = CLEAR + (0.02 * hh) * edge * (0.65 + 0.35 * lk[j]);
             row.push(sc.point(a2, phi2, off));
@@ -866,7 +1041,7 @@ fn beard(sc: &Scalp) -> Comp {
 }
 
 /// The components merged, pushed clear of the head, skinned, with fields and tone.
-fn finish(comps: &[Comp], h: &HeadFrame, p: &[V3; NB], head_only: bool) -> Mesh {
+fn finish(comps: &[Comp], h: &HeadFrame, ears: &Ears, p: &[V3; NB], head_only: bool) -> Mesh {
     let mut pos = Vec::new();
     let (mut idx, mut zz, mut yy, mut ff) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
     for c in comps {
@@ -876,6 +1051,14 @@ fn finish(comps: &[Comp], h: &HeadFrame, p: &[V3; NB], head_only: bool) -> Mesh 
         zz.extend(&c.z);
         yy.extend(&c.y);
         ff.extend(&c.f);
+    }
+    // The shapes go round or over the ears; whatever still comes within EAR_CLEAR of one is pushed off it.
+    for q in &mut pos {
+        if let Some((d, out)) = ears.depth(*q)
+            && d > -EAR_CLEAR
+        {
+            *q += out * (EAR_CLEAR + 0.0002 + d);
+        }
     }
     // Nothing closer than CLEAR to the head: push such vertices out along the field's gradient
     // (measured a little round each point, so the clearance holds after the positions are rounded
@@ -918,3 +1101,4 @@ fn finish(comps: &[Comp], h: &HeadFrame, p: &[V3; NB], head_only: bool) -> Mesh 
     let tone = (0..n).map(|i| [0.0, clip(yy[i], 0.0, 1.0), clip(zz[i], 0.0, 1.0), 0.0]).collect();
     Mesh { pos, idx, nor, dense, fields, tone, ..Mesh::default() }
 }
+
