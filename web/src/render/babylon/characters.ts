@@ -5755,10 +5755,9 @@ export class Characters {
       mat.backFaceCulling = false;
       mat.twoSidedLighting = true;
     } else if (kind === 'hair') {
+      // No PBR sheen: linked to the albedo it takes the diffuse colour down to (1 - intensity)^5 (8 % at
+      // 0.4), so every colour drew near black. The plugin draws a sheen band into the colour instead.
       mat.roughness = 0.5;
-      mat.sheen.isEnabled = true;
-      mat.sheen.intensity = 0.4;
-      mat.sheen.linkSheenWithAlbedo = true;
       mat.backFaceCulling = false;
       mat.twoSidedLighting = true;
     } else if (kind === 'brow' || kind === 'lash') {

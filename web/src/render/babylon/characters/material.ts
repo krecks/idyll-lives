@@ -14,7 +14,8 @@
  *   skirt's hem banded; shoes with a light midsole, a dark lining in the collar, laces and a polish
  *   (fields: flags 4 and 5, a negative hem distance, w across the instep); seated, moved by their tone
  *   (xyz: the seated corrective) as far as texel 4 b says; shaded by tone.w;
- * - hair: the hair colour, with the tone's clump bands, shaded by tone.w;
+ * - hair: the hair colour, with the tone's clump bands and a sheen band round the crown (both lifted towards a
+ *   lighter tint on dark hair), shaded by tone.w;
  * - brow: brows in the hair colour (darker); lash: lashes, near black;
  * - mouth: teeth, and the mouth plate darkened by its tone;
  * - eye: the eyeballs drawn procedurally: sclera, the iris in the Sim's eye colour with a darker
@@ -361,8 +362,25 @@ let simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, simC
 }
 #endif
 #ifdef SIMHAIR
-// The hair colour in clumps (tone.z), darker deep in (tone.y) and where it is enclosed (tone.w).
-surfaceAlbedo = textureLoad(simDataTexture, vec2<i32>(${off + 3}, simRow), 0).rgb * (1.0 + 0.45 * (simT.z - 0.5)) * (1.0 - 0.5 * clamp(simT.y, 0.0, 1.0)) * (1.0 - ${AO_DARK} * clamp(${AO_GAIN} * simT.w, 0.0, 1.0));
+{
+  // The hair colour in clumps (tone.z: light in a lock's middle), darker deep in (tone.y) and where it is
+  // enclosed (tone.w). Multiplying can't show clumps on dark hair, so there they are lifted towards a lighter
+  // tint, as is a sheen band round the crown: where the strands (straight down the head, from the normal alone)
+  // lie square to the half-way vector between the view and a light from above (Kajiya-Kay without tangents or
+  // lights). Where they come under a pixel or two (far away) the clumps even out and the band softens.
+  let hc = textureLoad(simDataTexture, vec2<i32>(${off + 3}, simRow), 0).rgb;
+  let hDark = 1.0 - smoothstep(0.015, 0.1, dot(hc, vec3f(0.2126, 0.7152, 0.0722)));
+  let hTint = min(hc * 1.7 + vec3f(0.075, 0.066, 0.058), vec3f(1.0));
+  let hClump = mix(0.5, simT.z, 1.0 - smoothstep(0.2, 0.5, fwidth(simT.z)));
+  let hDown = normalize(vec3f(0.0, 1.0001, 0.0) - normalW * normalW.y);
+  let hHalf = normalize(viewDirectionW + vec3f(0.0, 1.0, 0.0));
+  let hTH = dot(hDown, hHalf);
+  let hS = 1.0 - hTH * hTH;
+  let hBand = mix(pow(hS, 6.0), 0.35 * hS * hS, smoothstep(0.08, 0.25, fwidth(hTH))) * smoothstep(0.0, 0.35, dot(normalW, hHalf)) * mix(0.6, 1.2, hClump);
+  var hCol = mix(hc * (1.0 + 0.45 * (hClump - 0.5)), hTint, 0.28 * hDark * hClump);
+  hCol = mix(hCol, hTint, hBand * mix(0.3, 0.75, hDark));
+  surfaceAlbedo = hCol * (1.0 - 0.5 * clamp(simT.y, 0.0, 1.0)) * (1.0 - ${AO_DARK} * clamp(${AO_GAIN} * simT.w, 0.0, 1.0));
+}
 #endif
 #ifdef SIMBROW
 surfaceAlbedo = textureLoad(simDataTexture, vec2<i32>(${off + 3}, simRow), 0).rgb * 0.45;
@@ -568,7 +586,21 @@ float simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, si
 }
 #endif
 #ifdef SIMHAIR
-surfaceAlbedo = texelFetch(simDataTexture, ivec2(${off + 3}, simRow), 0).rgb * (1.0 + 0.45 * (simT.z - 0.5)) * (1.0 - 0.5 * clamp(simT.y, 0.0, 1.0)) * (1.0 - ${AO_DARK} * clamp(${AO_GAIN} * simT.w, 0.0, 1.0));
+{
+  // Clumps and a sheen band lifted towards a lighter tint on dark hair (see the WGSL).
+  vec3 hc = texelFetch(simDataTexture, ivec2(${off + 3}, simRow), 0).rgb;
+  float hDark = 1.0 - smoothstep(0.015, 0.1, dot(hc, vec3(0.2126, 0.7152, 0.0722)));
+  vec3 hTint = min(hc * 1.7 + vec3(0.075, 0.066, 0.058), vec3(1.0));
+  float hClump = mix(0.5, simT.z, 1.0 - smoothstep(0.2, 0.5, fwidth(simT.z)));
+  vec3 hDown = normalize(vec3(0.0, 1.0001, 0.0) - normalW * normalW.y);
+  vec3 hHalf = normalize(viewDirectionW + vec3(0.0, 1.0, 0.0));
+  float hTH = dot(hDown, hHalf);
+  float hS = 1.0 - hTH * hTH;
+  float hBand = mix(pow(hS, 6.0), 0.35 * hS * hS, smoothstep(0.08, 0.25, fwidth(hTH))) * smoothstep(0.0, 0.35, dot(normalW, hHalf)) * mix(0.6, 1.2, hClump);
+  vec3 hCol = mix(hc * (1.0 + 0.45 * (hClump - 0.5)), hTint, 0.28 * hDark * hClump);
+  hCol = mix(hCol, hTint, hBand * mix(0.3, 0.75, hDark));
+  surfaceAlbedo = hCol * (1.0 - 0.5 * clamp(simT.y, 0.0, 1.0)) * (1.0 - ${AO_DARK} * clamp(${AO_GAIN} * simT.w, 0.0, 1.0));
+}
 #endif
 #ifdef SIMBROW
 surfaceAlbedo = texelFetch(simDataTexture, ivec2(${off + 3}, simRow), 0).rgb * 0.45;
