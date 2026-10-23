@@ -2,6 +2,10 @@
 
 All notable changes to Idyll Lives. Versions follow [semantic versioning](https://semver.org); each release is a git tag `vX.Y.Z`.
 
+## Unreleased
+
+- **Textures:** every surface map, the 19 texture sets and the sidewalk, is now generated in code by `cargo tex synth` (`crates/tools/src/tex/synth.rs`) from tileable height fields, and is original CC0. The download/process pipeline is gone, along with its `ureq` dependency; `web/public/assets/CREDITS.md` and `tools/art/README.md` describe the new flow.
+
 ## 0.3.2 — 2026-10-22
 
 **Play it in your browser:** https://krecks.github.io/idyll-lives/

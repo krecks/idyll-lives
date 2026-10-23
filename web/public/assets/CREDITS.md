@@ -1,31 +1,9 @@
 # Third-party assets
 
 All of the third-party *art* below is **CC0 1.0 (public domain)**. You don't have to credit it, but we list it so it's easy to trace and replace. The voice model, the dictionary, the language model, the typeface and the decoders further down have their own licences, and so do the libraries the game is built with (`../THIRD-PARTY-LICENSES.txt`, written by every build: each one with its licence text).
-Downloaded 2026-10-07. Textures were resized and re-encoded (JPG). Fabric, wood, foliage, grass, wall, siding, roof, carpet, wallpaper and painted-wood albedo maps were converted to greyscale "detail" maps, so manifest, house and room colours set the hue.
-
-## Textures (`textures/`)
-
-| Folder | Source asset | Authors | URL | Licence |
-|---|---|---|---|---|
-| `floor_laminate/` | Laminate Floor 02 | Dario Barresi, Charlotte Baglioni | https://polyhaven.com/a/laminate_floor_02 | CC0 |
-| `wall_plaster/` | Painted Plaster Wall | Amal Kumar | https://polyhaven.com/a/painted_plaster_wall | CC0 |
-| `road_asphalt/` | Asphalt 02 | Rob Tuytel | https://polyhaven.com/a/asphalt_02 | CC0 |
-| `path_hexpaving/` | Hexagonal Concrete Paving | Stephan Seeliger | https://polyhaven.com/a/hexagonal_concrete_paving | CC0 |
-| `fabric_linen/` | Rough Linen | colormass, Rico Cilliers | https://polyhaven.com/a/rough_linen | CC0 |
-| `wood_oak/` | Oak Veneer 01 | Jenelle van Heerden | https://polyhaven.com/a/oak_veneer_01 | CC0 |
-| `bark/` | Bark Brown 02 | Rob Tuytel | https://polyhaven.com/a/bark_brown_02 | CC0 |
-| `foliage/` | Forest Leaves 03 | Rob Tuytel, Dimitrios Savva | https://polyhaven.com/a/forest_leaves_03 | CC0 |
-| `grass/` | Grass 001 | ambientCG (Lennart Demes) | https://ambientcg.com/view?id=Grass001 | CC0 |
-| `siding_wood/` | Wood Siding 009 (greyscale detail, board rows staggered) | ambientCG (Lennart Demes) | https://ambientcg.com/view?id=WoodSiding009 | CC0 |
-| `brick/` | Red Brick 03 | Rob Tuytel | https://polyhaven.com/a/red_brick_03 | CC0 |
-| `roof_shingles/` | Grey Roof Tiles 02 (greyscale detail) | Rob Tuytel | https://polyhaven.com/a/grey_roof_tiles_02 | CC0 |
-| `stone_foundation/` | Rustic Stone Wall 02 | Amal Kumar | https://polyhaven.com/a/rustic_stone_wall_02 | CC0 |
-| `floor_wood/` | Wood Floor 040 | ambientCG (Lennart Demes) | https://ambientcg.com/view?id=WoodFloor040 | CC0 |
-| `floor_tile/` | Tiles 141 | ambientCG (Lennart Demes) | https://ambientcg.com/view?id=Tiles141 | CC0 |
-| `carpet/` | Carpet 012 (greyscale detail) | ambientCG (Lennart Demes) | https://ambientcg.com/view?id=Carpet012 | CC0 |
-| `wallpaper/` | Plaster 001 (greyscale detail) | ambientCG (Lennart Demes) | https://ambientcg.com/view?id=Plaster001 | CC0 |
-| `painted_wood/` | Painted Wood 008 A (greyscale detail) | ambientCG (Lennart Demes) | https://ambientcg.com/view?id=PaintedWood008A | CC0 |
-| `grass_lush/` | Grass 004 (greyscale detail) | ambientCG (Lennart Demes) | https://ambientcg.com/view?id=Grass004 | CC0 |
+The textures under `textures/` and the sidewalk's are generated in code by `cargo tex synth`
+(`crates/tools/src/tex/synth.rs`): every albedo, normal and ARM map is original, tileable, and CC0. They are
+reproducible from the source tree; no downloaded texture maps are used.
 
 ## Environment (`env/`)
 
@@ -504,6 +482,7 @@ pan, the mixing bowl and the food on the grill that stand on a station while a r
 | File | What | How |
 |---|---|---|
 | `textures/sky/clouds.png` | Cloud band of the sky | `cargo tex clouds` (procedural noise, `crates/tools/src/tex.rs`) |
+| `textures/<set>/albedo.jpg`, `normal.jpg`, `arm.jpg`; `street/sidewalk/*.jpg` | All 20 surface sets (`bark` … `wood_oak`, `sidewalk`) | `cargo tex synth` (procedural height fields, `crates/tools/src/tex/synth.rs`) |
 | `icons/rotate.svg`, `wall.svg`, `door.svg`, `eraser.svg`, `eyedropper.svg`, `environment.svg`, `fence.svg`, `gate.svg`, `roof.svg`, `upgrade.svg`, `focused.svg`, `inspired.svg`, `energized.svg`, `relaxed.svg` | UI and emotion icons | Hand-written SVG in the style of the existing set |
 
 ## Characters (`characters/`)
@@ -519,11 +498,11 @@ expressions of TalkingHead by Mika Suominen (MIT, https://github.com/met4citizen
 
 ## Street and gardens (`street/`)
 
-The neighbourhood dressing (`render/babylon/street.ts`: sidewalks, kerbs, streetlights, mailboxes, hydrants, bins, cars, picket fences, flower beds; neighbour porches, chimneys and garages in `house.ts`) is built from primitives in code (original, CC0). The flower-clump models are Blender-built (`packs/street`, above); the hedges are the plants pack's (`models/plants/hedge.glb`). Only the sidewalk surface is third-party:
-
-| File | Used for | Source asset | Authors | URL | Licence |
-|---|---|---|---|---|---|
-| `street/sidewalk/albedo.webp`, `normal.webp`, `arm.webp` | `material.sidewalk` | Concrete Pavement (1k; albedo made a greyscale detail map, resized to 512 px, ARM to 256 px, WebP) | Charlotte Baglioni | https://polyhaven.com/a/concrete_pavement | CC0 |
+The neighbourhood dressing (`render/babylon/street.ts`: sidewalks, kerbs, streetlights, mailboxes, hydrants,
+bins, cars, picket fences, flower beds; neighbour porches, chimneys and garages in `house.ts`) is built from
+primitives in code (original, CC0). The flower-clump models are Blender-built (`packs/street`, above); the hedges
+are the plants pack's (`models/plants/hedge.glb`). The sidewalk surface is `cargo tex synth sidewalk`, generated
+like the other textures (original, CC0).
 
 ## Resident voices (`../voice/`, fetched by `tools/voice/fetch.mjs`)
 

@@ -14,4 +14,3 @@ nalgebra = "0.35"
 regex = "1"
 similar = "3"
 sim-core = { path = "../sim-core" }
-ureq = "3"

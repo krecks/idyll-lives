@@ -551,9 +551,9 @@
     "material.sidewalk": {
       "type": "material",
       "color": "#E4E0D8",
-      "texture": "street/sidewalk/albedo.webp",
-      "normal": "normal.webp",
-      "arm": "arm.webp",
+      "texture": "street/sidewalk/albedo.jpg",
+      "normal": "normal.jpg",
+      "arm": "arm.jpg",
       "uvScale": 0.556,
       "projection": "xz",
       "roughness": 1,
