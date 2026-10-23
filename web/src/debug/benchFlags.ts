@@ -4,11 +4,14 @@
  *
  * `?diag=…` works without `?bench` too (a comma list): it leaves features out of the picture to
  * measure what each costs, or freezes time for screenshots that compare pixel for pixel.
+ * `albedo` and `normals` draw every lit surface as its base colour or world normal instead of
+ * its shading (`render/babylon/diagView.ts`), and `nosims` leaves the residents out: geometry and
+ * colour compared without the lighting (the reference pictures for the PlayCanvas port).
  */
 
 export type BenchCamera = 'orbit' | 'wide' | 'build' | 'dusk' | 'mirror' | 'mirror-still';
 
-export const BENCH_DIAGS = ['noshadows', 'noaa', 'nonature', 'nolamps', 'nomirrors', 'noglass', 'nonight', 'freeze'] as const;
+export const BENCH_DIAGS = ['noshadows', 'noaa', 'nonature', 'nolamps', 'nomirrors', 'noglass', 'nonight', 'freeze', 'albedo', 'normals', 'nosims'] as const;
 export type BenchDiag = (typeof BENCH_DIAGS)[number];
 
 export interface BenchFlags {

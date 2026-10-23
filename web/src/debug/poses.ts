@@ -619,6 +619,8 @@ if (problems.length) {
 }
 
 const manual = params.has('manual');
+// Manual: the engine's own clock stands still too (wind, objects' ambient motion), so only `advance` moves anything.
+if (manual) engine.getDeltaTime = () => 0;
 function step(dt: number): void {
   clock += dt;
   writeSnapshot();

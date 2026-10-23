@@ -18,7 +18,8 @@
  * away from the camera) and facing the camera: a man and a
  * woman (adult), a child (child), or a woman, a teen, a child and an elder (all). At most 64 are
  * drawn: the first models get theirs.
- * `?renderer=webgl` draws with WebGL2 (default WebGPU).
+ * `?renderer=webgl` draws with WebGL2 (default WebGPU). `?still` stops time once the residents have
+ * settled (no wind, no motion): pictures that compare pixel for pixel.
  * `?camera=game` is the game's Live camera as a game starts (`BabylonRenderer.setupCamera`: radius
  * 24, beta 0.86, its longer lens), from the game's angle onto a model facing that camera, aimed at
  * the floor under the first model, or the one `?at=<key or index>` names; `__gallery.aim(n)` aims
@@ -53,7 +54,7 @@ import { Characters, MAX_CHARACTERS } from '../render/babylon/characters';
 import { MaterialLibrary } from '../render/babylon/materials';
 import { compressedTextureFeatures } from '../render/babylon/loaders';
 import { buildModel } from '../render/babylon/models';
-import { installNature } from '../render/babylon/nature';
+import { installNature, setWind } from '../render/babylon/nature';
 
 const params = new URLSearchParams(location.search);
 /** `?scale`: who stands beside each model, nearest first. */
@@ -96,6 +97,10 @@ scene.imageProcessingConfiguration.toneMappingEnabled = true;
 scene.imageProcessingConfiguration.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES;
 scene.imageProcessingConfiguration.exposure = 1.1;
 installNature(scene);
+// `?still`: time stands still (no wind, residents held at the idle once settled, object motion
+// paused), so the same picture every time (`tools/bench/render.mjs --pages`).
+const still = params.has('still');
+if (still) setWind(scene, 0);
 
 const sky = new HemisphericLight('sky', new Vector3(0, 1, 0), scene);
 sky.intensity = 0.55;
@@ -287,9 +292,10 @@ scene.onAfterRenderObservable.add(() => {
   }
 });
 let last = performance.now();
+if (still) engine.getDeltaTime = () => 0;
 engine.runRenderLoop(() => {
   const now = performance.now();
-  step(Math.min(0.1, (now - last) / 1000));
+  if (!still) step(Math.min(0.1, (now - last) / 1000));
   last = now;
   scene.render();
 });

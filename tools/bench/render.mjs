@@ -24,6 +24,8 @@
  *     --extra 'k=v&k=v'        more URL flags for every run
  *     --out <dir>              default <repo>/bench-results/<time>/
  *   --shots <dir>              fixed poses, paused (`diag=freeze`, `hud=0`): one PNG per preset × backend × pose
+ *     --pages [gallery,…]      with --shots: the dev pages instead (`PAGES`: the gallery, clips, residents and
+ *                              poses benches, each held still), one PNG per page × backend × diag
  *   --compare <dirA> <dirB>    pixel differences between two shot folders (and `--out` for the difference images)
  *   --headless / --headed      without or with a window (see below)
  *
@@ -70,6 +72,26 @@ const POSES = {
   'wide-day-0': 'cam=wide&hour=13&at=0',
   'wide-night-45': 'cam=wide&hour=21&at=45',
   'build-day-0': 'cam=build&hour=13&at=0',
+  // The home lot's mirror filling the view (not in the default list: `--poses mirror-day-0,…`).
+  'mirror-day-0': 'cam=mirror&hour=13&at=0',
+  'mirror-day-10': 'cam=mirror&hour=13&at=10',
+  'mirror-night-0': 'cam=mirror&hour=21&at=0',
+};
+
+/**
+ * Dev pages for `--shots --pages`: each held still (no wind, clips at a set time, residents' time
+ * stepped by hand) so the same build draws the same picture. `webgl`: whether the page can draw
+ * with WebGL2 (`renderer=webgl`); `prepare`: run in the page once it is ready (residents posed).
+ */
+const PAGES = {
+  'gallery-objects': { path: '/gallery.html', query: 'keys=model.sofa,model.armchair,model.bedDouble,model.fridge,model.bathtub,model.bookcaseTall,model.wardrobe,model.toilet,model.mirror,model.tableLamp&scale=adult&still', webgl: true },
+  'gallery-nature': { path: '/gallery.html', query: 'still', webgl: true },
+  clips: { path: '/clips.html', query: 'keys=model.fridge,model.sofa,model.wardrobe,model.shower&t=0.6', webgl: true },
+  characters: { path: '/characters.html', query: 'manual', webgl: false },
+  'characters-faces': { path: '/characters.html', query: 'manual&face=moods&family=female&cols=6&closeup=1&labels=0', webgl: false },
+  poses: { path: '/poses.html', query: 'manual&labels=0', webgl: false, prepare: () => window.__poses.advance(2) },
+  previews: { path: '/previews.html', query: '', webgl: true },
+  'poses-close': { path: '/poses.html', query: 'manual&only=sofa,sleep,cook,bath,piano,hug&cols=3&labels=0', webgl: false, prepare: () => window.__poses.advance(2) },
 };
 
 const args = process.argv.slice(2);
@@ -148,7 +170,7 @@ const browser = await chromium.launch({
 });
 
 /** Opens one benchmark page and waits for `key` on window (its result, or readiness for a screenshot). */
-async function open(query, throttle, key, timeoutMs) {
+async function open(query, throttle, key, timeoutMs, path = '/') {
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
   await context.addInitScript(quiet);
   const page = await context.newPage();
@@ -164,7 +186,7 @@ async function open(query, throttle, key, timeoutMs) {
   if (throttle > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: throttle });
   page.on('pageerror', (e) => console.error(`  page error: ${e.message}`));
   page.on('console', (m) => m.type() === 'error' && console.error(`  page: ${m.text().slice(0, 300)}`));
-  await page.goto(`${base}/?${query}`);
+  await page.goto(`${base}${path}?${query}`);
   await page.waitForFunction((k) => !!window[k], key, { timeout: timeoutMs, polling: 250 });
   return { context, page };
 }
@@ -173,7 +195,8 @@ const queryOf = (preset, backend, more) =>
   [`bench=${scene}`, `quality=${preset}`, backend === 'webgl' ? 'renderer=webgl' : '', `res=${res}`, more, extra].filter(Boolean).join('&');
 
 try {
-  if (has('shots')) await shots();
+  if (has('shots') && has('pages')) await pageShots();
+  else if (has('shots')) await shots();
   else await matrix();
 } finally {
   await browser.close();
@@ -256,7 +279,7 @@ function table(results) {
 }
 
 async function shots() {
-  const poses = list('poses', Object.keys(POSES).join(','));
+  const poses = list('poses', Object.keys(POSES).filter((p) => !p.startsWith('mirror')).join(','));
   for (const backend of backends) {
     for (const preset of presets) {
       for (const pose of poses) {
@@ -279,6 +302,39 @@ async function shots() {
     }
   }
   console.log(`shots in ${out}`);
+}
+
+/** The dev pages (`PAGES`), drawn still: one picture per page × backend × diag (the page's `__ready`). */
+async function pageShots() {
+  const names = list('pages', Object.keys(PAGES).join(','));
+  for (const backend of backends) {
+    for (const name of names) {
+      const p = PAGES[name];
+      if (!p) {
+        console.log(`no page ${name} (${Object.keys(PAGES).join(', ')})`);
+        continue;
+      }
+      if (backend === 'webgl' && !p.webgl) continue;
+      for (const diag of diags) {
+        const file = `${name}-${backend}${diag === 'none' ? '' : `-${diag}`}.png`;
+        process.stdout.write(`${file} … `);
+        const query = [p.query, backend === 'webgl' ? 'renderer=webgl' : '', diag === 'none' ? '' : `diag=${diag.replaceAll('+', ',')}`, extra].filter(Boolean).join('&');
+        try {
+          const { context, page } = await open(query, 1, '__ready', 240_000, p.path);
+          if (p.prepare) await page.evaluate(p.prepare);
+          // A moment for late loads (hair, props), then two more frames, then the picture.
+          await page.waitForTimeout(1500);
+          await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+          await page.screenshot({ path: join(out, file) });
+          await context.close();
+          console.log('ok');
+        } catch (err) {
+          console.log(`failed: ${err}`);
+        }
+      }
+    }
+  }
+  console.log(`page shots in ${out}`);
 }
 
 /** Per picture in both folders: how many pixels differ (by more than 2 and more than 16 of 255), the largest difference and the PSNR. */

@@ -101,6 +101,7 @@ import { patchRoomLights, type RoomMask } from './roomLights';
 import { HALF_WALL_HEIGHT, HouseBuilder, houseObjectKey, placeLights, WALL_HALF, WALL_HEIGHT, WALL_STUB, type DoorLeaf, type HouseSurfaces, type RoomLight, type RoomTiles } from './house';
 import { fieldLayers, Street } from './street';
 import { MaterialLibrary, WINDOWLESS_BITS, type DarkTiles } from './materials';
+import { diagViewActive } from './diagView';
 import { refreshSoftLook, shadingFromSettings } from './softLook';
 import { Geo, LOOK as CUT } from './geometry';
 import { buildModel, motionsOf, onModelFileArrived, paintColors, painted, placementVariation, standInOf, withGlows, type ModelTemplate, type Motions, type StandIn } from './models';
@@ -715,7 +716,8 @@ export class BabylonRenderer implements Renderer {
   // Scratch objects for allocation-free updates.
   private readonly mOut = new Matrix();
   private simCount = 0;
-  private readonly simInView = (x: number, z: number) => this.inView(x, z, SIM_VIEW_MARGIN);
+  /** Whether a resident at (x, z) is drawn: near the view (`?diag=nosims`: never). */
+  private readonly simInView = (x: number, z: number) => !this.diag.has('nosims') && this.inView(x, z, SIM_VIEW_MARGIN);
   private readonly residentRows = (mesh: AbstractMesh) => this.characters.rowsOf(mesh);
   private readonly vTmp = new Vector3();
   private readonly vScale = new Vector3();
@@ -3383,17 +3385,20 @@ export class BabylonRenderer implements Renderer {
     const aa = !this.diag.has('noaa');
     post.samples = aa ? q.msaaSamples : 1;
     post.fxaaEnabled = aa && q.msaaSamples <= 1;
-    post.imageProcessingEnabled = true;
+    // (`?diag=albedo|normals` draws the colour itself: no tone mapping, vignette or curves.)
+    post.imageProcessingEnabled = !diagViewActive;
     const ip = post.imageProcessing;
-    ip.toneMappingEnabled = true;
-    ip.vignetteEnabled = true;
-    ip.vignetteStretch = 0.5;
-    ip.vignetteColor = new Color4(0.02, 0.02, 0.04, 0);
-    ip.colorCurvesEnabled = true;
-    ip.colorCurves = new ColorCurves();
+    if (ip) {
+      ip.toneMappingEnabled = true;
+      ip.vignetteEnabled = true;
+      ip.vignetteStretch = 0.5;
+      ip.vignetteColor = new Color4(0.02, 0.02, 0.04, 0);
+      ip.colorCurvesEnabled = true;
+      ip.colorCurves = new ColorCurves();
+    }
     post.bloomEnabled = false;
     post.depthOfFieldEnabled = false;
-    if (!this.diag.has('nonight')) this.nightGrade = new NightGrade(this.camera, this.engine, this.webgpu !== null);
+    if (!this.diag.has('nonight') && !diagViewActive) this.nightGrade = new NightGrade(this.camera, this.engine, this.webgpu !== null);
   }
 
   private setupHelpers(): void {
@@ -4994,7 +4999,7 @@ export class BabylonRenderer implements Renderer {
     this.skyDome.update(l);
     this.lib.setEnvironmentIntensity(l.envIntensity);
     if (this.post) {
-      setExposure(this.post.imageProcessing.imageProcessingConfiguration, l.exposure * LOOK.exposure);
+      if (this.post.imageProcessing) setExposure(this.post.imageProcessing.imageProcessingConfiguration, l.exposure * LOOK.exposure);
       // Moonlit nights: blue-grey dark tones, warm lamps and windows (see nightGrade.ts).
       if (this.nightGrade) {
         this.nightGrade.amount = l.night * LOOK.nightGrade;

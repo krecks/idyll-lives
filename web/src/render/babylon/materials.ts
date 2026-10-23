@@ -48,6 +48,7 @@ import {
 import { withBuild } from '../../assets/build';
 import { optimizedUrl, type AssetRegistry } from '../../assets/registry';
 import type { MaterialEntry } from '../../assets/types';
+import { applyDiagView } from './diagView';
 import { applySoftLook } from './softLook';
 import { RoomLightPlugin, RoomLightState } from './roomLights';
 
@@ -791,6 +792,7 @@ export class MaterialLibrary {
     new UndergroundPlugin(material, this.dig);
     new RoomLightPlugin(material, this.rooms);
     applySoftLook(material);
+    applyDiagView(material);
     // (It may have been compiled without it.)
     material.markDirty(true);
     this.lit.add(material);
@@ -955,6 +957,7 @@ export class MaterialLibrary {
     new UndergroundPlugin(mat, this.dig);
     new RoomLightPlugin(mat, this.rooms);
     applySoftLook(mat);
+    applyDiagView(mat);
     this.lit.add(mat);
     this.freezeWhenReady(mat);
     return mat;
