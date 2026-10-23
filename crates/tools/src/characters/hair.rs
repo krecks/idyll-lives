@@ -5,9 +5,9 @@
 //!   shade deep in the hair, z: clump bands 0..1; w: the occlusion, baked later in build.rs).
 //!
 //! Every style starts from a skull cap: the scalp inside the hair's edge (the head interface's
-//! hairline, smoothed round and brought a little lower over the forehead and temples), cast onto
-//! the head's distance field, rounded part way out to the skull ellipsoid and pushed out by a
-//! thickness that varies over the head (volume on top, thin at the edge), in locks that leave the
+//! hairline, smoothed round and brought a little lower over the forehead and temples, going round
+//! each ear in an arc), cast onto the head's distance field, rounded part way out to the skull
+//! ellipsoid (down to the skin at the edge) and pushed out by a thickness that varies over the head (volume on top, thin at the edge), in locks that leave the
 //! crown in a whorl, with a parting and short tips past the hairline where the style has them. On
 //! it go curtains (sheets with a thickness hanging from the scalp's widest, closed round with
 //! rounded edges and hem, in locks with tips), fringes that follow the forehead as drawn (the
@@ -20,7 +20,8 @@
 //! Skinning: Head, blending below the jaw to neck_01 and spine_03 by height (tails and braids
 //! along their length), so hair that falls past the jaw follows the shoulders when the head turns.
 //! Nothing comes within 2.6 mm of the head, or 3 mm of the ears (`Ears`: the body's ear faces, which the
-//! head's `sdf` leaves out): caps go round them, curtains out over them, the beard stops in front.
+//! head's `sdf` leaves out): caps go round them in an arc (the afro's stands off them and closes
+//! under itself above them), curtains go out over them, the beard stops in front.
 
 use super::contract::{BEARD_FAMILIES, HAIR_STYLES};
 use super::head::HeadFrame;
@@ -45,6 +46,8 @@ pub struct Scalp<'a> {
     h: &'a HeadFrame,
     cranium: bool,
     hl: Periodic,
+    /// The ears as caps meet them (`round`).
+    ovals: Vec<Oval>,
 }
 
 impl<'a> Scalp<'a> {
@@ -72,7 +75,13 @@ impl<'a> Scalp<'a> {
             let t = x.abs();
             *v += radians(5.0) * smoothstep(radians(70.0), 0.0, t) + radians(8.0) * (-((t - radians(70.0)) / radians(28.0)).powi(2)).exp();
         }
-        Scalp { h, cranium, hl: Periodic::new(&fa, &fp, TAU) }
+        Scalp { h, cranium, hl: Periodic::new(&fa, &fp, TAU), ovals: Vec::new() }
+    }
+
+    /// The same, meeting the ears as drawn (an `Oval` round each).
+    pub fn round(mut self, ears: &Ears) -> Self {
+        self.ovals = ears.ears.iter().filter_map(|e| Oval::new(&self, &e.own)).collect();
+        self
     }
 
     /// Polar angle of the hairline at azimuth a.
@@ -86,6 +95,11 @@ impl<'a> Scalp<'a> {
 
     /// The skull surface point and normal at (a, phi) (cast along the normalised direction).
     pub fn surface(&self, a: f64, phi: f64) -> (V3, V3) {
+        self.rounded(a, phi, ROUND)
+    }
+
+    /// The same, rounded out to the skull ellipsoid by `round` (0..1) rather than `ROUND`.
+    fn rounded(&self, a: f64, phi: f64, round: f64) -> (V3, V3) {
         let h = self.h;
         let d = Scalp::dirs(a, phi).component_mul(&h.radii);
         // Over the ears no further out than the skull ellipsoid (which holds the cranium), so the
@@ -115,7 +129,7 @@ impl<'a> Scalp<'a> {
         let mut t = (lo + hi) / 2.0;
         if self.cranium {
             // Hair doesn't follow every bump of the skull: part way out to the smooth ellipsoid.
-            t += ROUND * (1.0 - t).max(0.0);
+            t += round * (1.0 - t).max(0.0);
         }
         let p = h.centre + d * t;
         let n = (p - h.centre).component_div(&h.radii.component_mul(&h.radii));
@@ -135,37 +149,180 @@ impl<'a> Scalp<'a> {
         p + n * off
     }
 
-    /// The lowest a cap's rim may come down to at azimuth a (polar angle) to go round the ears: on
-    /// the skull ellipsoid, above an oval round each ear's box (`EAR_CLEAR` and a rim's thickness
-    /// out); pi away from them.
-    pub fn round_ear(&self, a: f64) -> f64 {
-        let h = self.h;
-        let m = EAR_CLEAR + CLEAR;
-        let mut lim = PI;
-        for [c, e] in h.ears {
-            if a.sin() * c.x <= 0.0 {
-                continue;
-            }
-            let inside = |phi: f64| {
-                let p = h.centre + Scalp::dirs(a, phi).component_mul(&h.radii);
-                ((p.z - c.z) / (e.z + m)).abs().powf(2.5) + ((p.y - c.y) / (e.y + m)).abs().powf(2.5) < 1.0
-            };
-            // Down from over the ear to the first point in its oval, then bisect within that step.
-            let Some(k) = (1..=100).find(|&k| inside(radians(50.0 + k as f64))) else { continue };
-            let (mut lo, mut hi) = (radians(49.0 + k as f64), radians(50.0 + k as f64));
-            for _ in 0..20 {
-                let mid = (lo + hi) / 2.0;
-                if inside(mid) {
-                    hi = mid;
-                } else {
-                    lo = mid;
-                }
-            }
-            lim = lim.min(lo);
-        }
-        lim
+    /// The oval of the ear nearest azimuth a, if one was given.
+    fn oval(&self, a: f64) -> Option<&Oval> {
+        self.ovals.iter().min_by(|p, q| round(a - p.a).total_cmp(&round(a - q.a)))
     }
 }
+
+/// An ear as a cap meets it: an ellipse round it in the scalp's azimuth and polar angle (the ear's
+/// faces seen from the head's centre, fitted round and grown by `EAR_CLEAR` and a rim's thickness),
+/// in metres near it (`g`: m per rad of each, where the ear comes nearest the centre, so the margin
+/// holds); and how far the ear stands out of the scalp.
+struct Oval {
+    c: [f64; 2],
+    r: [f64; 2],
+    /// Its first axis's direction (cos, sin) in that plane.
+    e: [f64; 2],
+    g: [f64; 2],
+    /// Its middle's azimuth, and how far the ear reaches out past the scalp (m).
+    a: f64,
+    reach: f64,
+}
+
+impl Oval {
+    fn new(sc: &Scalp, own: &[[V3; 3]]) -> Option<Self> {
+        let h = sc.h;
+        let pts: Vec<V3> = own.iter().flatten().copied().collect();
+        if pts.is_empty() {
+            return None;
+        }
+        let q: Vec<V3> = pts.iter().map(|p| (p - h.centre).component_div(&h.radii)).collect();
+        let ang: Vec<[f64; 2]> = q.iter().map(|q| [q.x.atan2(q.z), clip(q.y / q.norm(), -1.0, 1.0).acos()]).collect();
+        let n = ang.len() as f64;
+        let (a0, p0) = (ang.iter().map(|v| v[0]).sum::<f64>() / n, ang.iter().map(|v| v[1]).sum::<f64>() / n);
+        let t = q.iter().map(|q| q.norm()).fold(f64::INFINITY, f64::min);
+        let e0 = Scalp::dirs(a0, p0).component_mul(&h.radii);
+        let d = 1e-4;
+        let g = [(Scalp::dirs(a0 + d, p0).component_mul(&h.radii) - e0).norm() / d * t, (Scalp::dirs(a0, p0 + d).component_mul(&h.radii) - e0).norm() / d * t];
+        let xy: Vec<[f64; 2]> = ang.iter().map(|v| [v[0] * g[0], v[1] * g[1]]).collect();
+        // Its long axis (principal), then the smallest ellipse of its box's proportions round it.
+        let m = [xy.iter().map(|v| v[0]).sum::<f64>() / n, xy.iter().map(|v| v[1]).sum::<f64>() / n];
+        let (mut sxx, mut sxy, mut syy) = (0.0, 0.0, 0.0);
+        for v in &xy {
+            let (dx, dy) = (v[0] - m[0], v[1] - m[1]);
+            sxx += dx * dx;
+            sxy += dx * dy;
+            syy += dy * dy;
+        }
+        let th = 0.5 * (2.0 * sxy).atan2(sxx - syy);
+        let e = [th.cos(), th.sin()];
+        let uv: Vec<[f64; 2]> = xy.iter().map(|v| [(v[0] - m[0]) * e[0] + (v[1] - m[1]) * e[1], -(v[0] - m[0]) * e[1] + (v[1] - m[1]) * e[0]]).collect();
+        let lo = [uv.iter().map(|v| v[0]).fold(f64::INFINITY, f64::min), uv.iter().map(|v| v[1]).fold(f64::INFINITY, f64::min)];
+        let hi = [uv.iter().map(|v| v[0]).fold(f64::NEG_INFINITY, f64::max), uv.iter().map(|v| v[1]).fold(f64::NEG_INFINITY, f64::max)];
+        let (mu, mv) = ((lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0);
+        let half = [(hi[0] - lo[0]) / 2.0, (hi[1] - lo[1]) / 2.0];
+        let k = uv.iter().map(|v| (((v[0] - mu) / half[0]).powi(2) + ((v[1] - mv) / half[1]).powi(2)).sqrt()).fold(0.0, f64::max);
+        // A little more than the margin: an ellipse grown by it along its axes is not quite its offset.
+        let grow = 1.15 * (EAR_CLEAR + CLEAR);
+        let c = [m[0] + mu * e[0] - mv * e[1], m[1] + mu * e[1] + mv * e[0]];
+        let reach = pts
+            .iter()
+            .zip(&ang)
+            .map(|(p, v)| {
+                let (s, nrm) = sc.surface(v[0], v[1]);
+                (p - s).dot(&nrm)
+            })
+            .fold(0.0, f64::max);
+        Some(Oval { c, r: [k * half[0] + grow, k * half[1] + grow], e, g, a: a0, reach })
+    }
+
+    /// A point's (azimuth, polar angle) along and across the oval's axes, in its radii.
+    fn local(&self, a: f64, phi: f64) -> [f64; 2] {
+        let (dx, dy) = (a * self.g[0] - self.c[0], phi * self.g[1] - self.c[1]);
+        [(dx * self.e[0] + dy * self.e[1]) / self.r[0], (-dx * self.e[1] + dy * self.e[0]) / self.r[1]]
+    }
+
+    /// How far out of the middle a point is (1 on the oval).
+    fn rho(&self, a: f64, phi: f64) -> f64 {
+        let [u, v] = self.local(a, phi);
+        u.hypot(v)
+    }
+
+    /// The oval's top (least polar angle) at azimuth a, if it reaches there.
+    fn top(&self, a: f64) -> Option<f64> {
+        let dx = a * self.g[0] - self.c[0];
+        let [c, s] = self.e;
+        let (r0, r1) = (self.r[0] * self.r[0], self.r[1] * self.r[1]);
+        let qa = s * s / r0 + c * c / r1;
+        let qb = 2.0 * dx * c * s * (1.0 / r0 - 1.0 / r1);
+        let qc = dx * dx * (c * c / r0 + s * s / r1) - 1.0;
+        let disc = qb * qb - 4.0 * qa * qc;
+        (disc >= 0.0).then(|| (self.c[1] + (-qb - disc.sqrt()) / (2.0 * qa)) / self.g[1])
+    }
+
+    /// A point pushed out onto the oval if it is inside.
+    fn out(&self, a: f64, phi: f64) -> (f64, f64) {
+        let rho = self.rho(a, phi);
+        if rho >= 1.0 {
+            return (a, phi);
+        }
+        let (dx, dy) = (a * self.g[0] - self.c[0], phi * self.g[1] - self.c[1]);
+        let k = 1.0 / rho.max(1e-6);
+        ((self.c[0] + dx * k) / self.g[0], (self.c[1] + dy * k) / self.g[1])
+    }
+
+    /// A point inside the oval taken out to it upwards (away from a point below its middle); one
+    /// outside as it is.
+    fn up(&self, a: f64, phi: f64) -> (f64, f64) {
+        if self.rho(a, phi) >= 1.0 {
+            return (a, phi);
+        }
+        let below = 0.5 * self.r[0].min(self.r[1]);
+        let (a0, p0) = (self.c[0] / self.g[0], (self.c[1] + below) / self.g[1]);
+        let (l0, l1) = (self.local(a0, p0), self.local(a, phi));
+        let d = [l1[0] - l0[0], l1[1] - l0[1]];
+        let (dd, ld, ll) = (d[0] * d[0] + d[1] * d[1], l0[0] * d[0] + l0[1] * d[1], l0[0] * l0[0] + l0[1] * l0[1]);
+        let t = (-ld + (ld * ld - dd * (ll - 1.0)).max(0.0).sqrt()) / dd.max(1e-12);
+        (a0 + t * (a - a0), p0 + t * (phi - p0))
+    }
+
+    /// The hair's edge round the ear from azimuth a0 to a1 (the hairline `hl` there, over the oval
+    /// where it would come down into it, rounded where the two meet), and `n` points along it between
+    /// its ends, closer together near the ear.
+    fn rim(&self, hl: &dyn Fn(f64) -> f64, a0: f64, a1: f64, n: usize) -> Vec<(f64, f64)> {
+        let g = self.g;
+        let line: Vec<[f64; 2]> = linspace(a0, a1, 801).iter().map(|&a| [a * g[0], hl(a).min(self.top(a).unwrap_or(PI)) * g[1]]).collect();
+        // Evenly along it, smoothed (the ends held by reflecting the line past them) and back out of
+        // the oval.
+        let m = 1201;
+        let line = along(&line, &|_| 1.0, &linspace(0.0, 1.0, m));
+        let sig = RIM_ROUND / (length(&line) / (m - 1) as f64);
+        let w = (3.0 * sig).ceil() as isize;
+        let at = |i: isize| -> [f64; 2] {
+            let (k, end) = if i < 0 { (-i, 0) } else if i >= m as isize { (2 * (m as isize - 1) - i, m - 1) } else { return line[i as usize] };
+            let p = line[k.clamp(0, m as isize - 1) as usize];
+            [2.0 * line[end][0] - p[0], 2.0 * line[end][1] - p[1]]
+        };
+        let smooth: Vec<[f64; 2]> = (0..m as isize)
+            .map(|i| {
+                let (mut sx, mut sy, mut sw) = (0.0, 0.0, 0.0);
+                for k in -w..=w {
+                    let wk = (-0.5 * (k as f64 / sig).powi(2)).exp();
+                    let p = at(i + k);
+                    sx += wk * p[0];
+                    sy += wk * p[1];
+                    sw += wk;
+                }
+                let (a, phi) = self.out(sx / sw / g[0], sy / sw / g[1]);
+                [a * g[0], phi * g[1]]
+            })
+            .collect();
+        // Spaced by length, twice as close near the ear.
+        let near = |q: [f64; 2]| 1.0 + smoothstep(1.8, 1.15, self.rho(q[0] / g[0], q[1] / g[1]));
+        let f: Vec<f64> = (1..=n).map(|k| k as f64 / (n + 1) as f64).collect();
+        along(&smooth, &near, &f).iter().map(|q| (q[0] / g[0], q[1] / g[1])).collect()
+    }
+}
+
+/// A polyline's length.
+fn length(line: &[[f64; 2]]) -> f64 {
+    line.windows(2).map(|w| (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1])).sum()
+}
+
+/// The points at shares `f` of the way along a polyline, its length weighted by `w` (at each segment's end).
+fn along(line: &[[f64; 2]], w: &dyn Fn([f64; 2]) -> f64, f: &[f64]) -> Vec<[f64; 2]> {
+    let mut s = vec![0.0];
+    for q in line.windows(2) {
+        s.push(s[s.len() - 1] + (q[1][0] - q[0][0]).hypot(q[1][1] - q[0][1]) * w(q[1]));
+    }
+    let total = s[s.len() - 1];
+    let (xs, ys): (Vec<f64>, Vec<f64>) = line.iter().map(|p| (p[0], p[1])).unzip();
+    f.iter().map(|&t| [interp(t * total, &s, &xs), interp(t * total, &s, &ys)]).collect()
+}
+
+/// How round the hair's edge is where it meets the ovals round the ears (m: the smoothing's width).
+const RIM_ROUND: f64 = 0.011;
 
 /// How far hair keeps off the ears (m); the check wants more than `EAR_MIN`.
 const EAR_CLEAR: f64 = 0.003;
@@ -346,8 +503,8 @@ type Field<'a> = &'a dyn Fn(f64, f64) -> f64;
 
 /// How far into a lock column j of a sheet or cap is: 0 on the parting between two locks (columns
 /// 4k), 1 in a lock's middle (4k + 2).
-fn lock_at(j: usize) -> f64 {
-    (PI * j as f64 / 4.0).sin().abs().powf(0.6)
+fn lock_at(j: f64) -> f64 {
+    (PI * j / 4.0).sin().abs().powf(0.6)
 }
 
 /// A fixed 0..1 for lock k of a component (seed), so lengths and tips vary from lock to lock.
@@ -375,7 +532,20 @@ struct Cap<'a> {
     part: Option<(f64, f64)>,
     /// Clump bands by azimuth and u (else the locks': light in their middles).
     bands: Option<Field<'a>>,
+    /// How it meets the ears.
+    ears: Meet,
 }
+
+/// How a cap meets the ears: `Round(n)`, its rim goes round each in an arc, with n more columns there;
+/// `Over`, it stands off them (the rim at the hairline) and closes under itself above them.
+#[derive(Clone, Copy, PartialEq)]
+enum Meet {
+    Round(usize),
+    Over,
+}
+
+/// The azimuths (from the front, rad) between which a cap's columns may move to go round an ear.
+const EAR_SPAN: [f64; 2] = [57.0 * PI / 180.0, 153.0 * PI / 180.0];
 
 /// How far round from the front azimuth a is (rad, 0..pi).
 fn round(a: f64) -> f64 {
@@ -383,53 +553,148 @@ fn round(a: f64) -> f64 {
 }
 
 /// The skull cap: rows from the crown down to the hairline, pushed out by the thickness, tapering to
-/// `edge` at the rim; in locks, with a parting.
+/// `edge` at the rim; in locks, with a parting. Round an ear (`Meet::Round`) the rim follows an arc
+/// over it (`Oval::rim`) on more columns, and the rows above bend round it too; over them
+/// (`Meet::Over`) the cap stands off the ear and closes under itself in a hem above it.
 fn cap(sc: &Scalp, c: Cap) -> Comp {
     let h = sc.h;
     let step = TAU / c.cols as f64;
     let turn = c.part.map_or(0.0, |(ap, _)| ap - (((ap + PI) / (4.0 * step)).round() * 4.0 * step - PI));
-    let a: Vec<f64> = linspace_open(-PI, PI, c.cols).iter().map(|&a| a + turn).collect();
-    let lk: Vec<f64> = (0..c.cols).map(lock_at).collect();
-    let lim: Vec<f64> = (0..c.cols)
-        .map(|j| {
-            let l = match c.limit {
-                Some(l) => l(a[j]),
-                None => sc.hairline(a[j]),
+    let base: Vec<f64> = linspace_open(-PI, PI, c.cols).iter().map(|&a| a + turn).collect();
+    let hl = |a: f64| match c.limit {
+        Some(l) => l(a),
+        None => sc.hairline(a),
+    };
+    // The columns: where each is in the locks (column j of the even layout, fractional between the
+    // ones added round an ear), its azimuth up on the head, its rim (azimuth, polar angle) and whether
+    // it goes round an ear.
+    let (mut ell, mut a, mut rim, mut moved) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+    let extra = match c.ears {
+        Meet::Round(n) => n,
+        Meet::Over => 0,
+    };
+    let span = |a: f64| (EAR_SPAN[0]..=EAR_SPAN[1]).contains(&round(a));
+    let mut j = 0;
+    while j < c.cols {
+        if extra == 0 || !span(base[j]) {
+            ell.push(j as f64);
+            a.push(base[j]);
+            rim.push((base[j], hl(base[j])));
+            moved.push(false);
+            j += 1;
+            continue;
+        }
+        let j0 = j;
+        while j < c.cols && span(base[j]) {
+            j += 1;
+        }
+        assert!(j0 > 0 && j < c.cols, "a cap's columns round an ear wrap past the back");
+        // Between the columns either side of the ear, the edge round it evenly.
+        let n = j - j0 + extra;
+        let (a0, a1) = (base[j0 - 1], base[j]);
+        let pts = match sc.oval((a0 + a1) / 2.0) {
+            Some(o) => o.rim(&hl, a0, a1, n),
+            None => (1..=n).map(|k| a0 + (a1 - a0) * k as f64 / (n + 1) as f64).map(|x| (x, hl(x))).collect(),
+        };
+        for (k, q) in pts.into_iter().enumerate() {
+            let f = (k + 1) as f64 / (n + 1) as f64;
+            ell.push((j0 - 1) as f64 + f * (j - j0 + 1) as f64);
+            a.push(a0 + f * (a1 - a0));
+            rim.push(q);
+            moved.push(true);
+        }
+    }
+    let cols = ell.len();
+    let lk: Vec<f64> = ell.iter().map(|&l| lock_at(l)).collect();
+    // Tips past the hairline, none where it goes round an ear.
+    let lim: Vec<f64> = (0..cols)
+        .map(|k| {
+            let (ra, rp) = rim[k];
+            let near = match sc.oval(ra) {
+                Some(o) if extra > 0 => smoothstep(1.25, 1.7, o.rho(ra, rp)),
+                _ => 1.0,
             };
-            // Round the ears: no lower than over them anywhere out to the next columns either side,
-            // so the rim between two columns clears them too.
-            let ear = linspace(-1.0, 1.0, 9).iter().map(|&s| sc.round_ear(a[j] + s * step)).fold(PI, f64::min);
-            (l + c.tips.map_or(0.0, |t| t(a[j]) * lk[j].powf(1.5))).min(ear)
+            rp + c.tips.map_or(0.0, |t| t(ra) * lk[k].powf(1.5)) * near
         })
         .collect();
-    // How near a column is to the parting (1 on it), from where it starts down to the hairline.
-    let parting = |j: usize, u: f64| {
+    // Each row's (azimuth, polar angle) by column: the columns round an ear turn onto their rims'
+    // azimuths down from the crown, the rows there eased (each point the mean of its neighbours) so
+    // they bend round the ear evenly.
+    let us = linspace(1.0, 1.0 / c.rows as f64, c.rows);
+    let ease = 0.45;
+    let mut node: Vec<Vec<(f64, f64)>> = us.iter().map(|&u| (0..cols).map(|k| (a[k] + (rim[k].0 - a[k]) * smoothstep(ease, 1.0, u), u * lim[k])).collect()).collect();
+    for _ in 0..60 {
+        let was = node.clone();
+        for i in 1..c.rows - 1 {
+            if us[i] <= ease {
+                break;
+            }
+            for k in (0..cols).filter(|&k| moved[k]) {
+                let (l, r) = (was[i][k - 1], was[i][k + 1]);
+                let (d, t) = (was[i - 1][k], was[i + 1][k]);
+                node[i][k] = ((l.0 + r.0 + d.0 + t.0) / 4.0, (l.1 + r.1 + d.1 + t.1) / 4.0);
+            }
+        }
+    }
+    // How near a point is to the parting (1 on it), from where it starts down to the hairline.
+    let parting = |a: f64, u: f64| {
         c.part.map_or(0.0, |(ap, u0)| {
-            let d = py_mod(a[j] - ap + PI, TAU) - PI;
+            let d = py_mod(a - ap + PI, TAU) - PI;
             (-(d / (0.6 * step)).powi(2)).exp() * smoothstep(u0, u0 + 0.35, u)
         })
     };
-    let us = linspace(1.0, 1.0 / c.rows as f64, c.rows);
+    // Over the ears: at least as far out as they reach, and a little more over them.
+    let over = |a: f64, phi: f64, more: f64| match sc.oval(a) {
+        Some(o) if c.ears == Meet::Over => (o.reach + EAR_CLEAR + CLEAR + more) * smoothstep(1.8, 1.0, o.rho(a, phi)),
+        _ => 0.0,
+    };
     let mut p = Vec::new();
     let (mut z, mut y) = (Vec::new(), Vec::new());
-    for &u in &us {
+    let mut rim_t = Vec::new();
+    for (i, &u) in us.iter().enumerate() {
         let mut ring = Vec::new();
-        for j in 0..c.cols {
+        for k in 0..cols {
+            let (ak, phi) = node[i][k];
             // The locks part from the crown in a whorl, the grooves between them deepening down to the hairline.
             // None over the ears (the cap is thinnest there).
-            let ear = (-((round(a[j]) - PI / 2.0) / 0.5).powi(2)).exp() * smoothstep(0.5, 0.8, u);
-            let groove = c.ridge * (1.0 - lk[j]) * smoothstep(0.25, 0.8, u) * (1.0 - ear);
-            let pt = parting(j, u);
-            let t = (c.thick)(a[j], u) * (1.0 - groove) * (1.0 - 0.8 * pt);
-            let t = t + (c.edge - t) * smoothstep(0.82, 1.0, u);
-            ring.push(sc.point(a[j] + WHORL * (1.0 - u).powi(2), u * lim[j], t.max(c.edge)));
+            let ear = (-((round(ak) - PI / 2.0) / 0.5).powi(2)).exp() * smoothstep(0.5, 0.8, u);
+            let groove = c.ridge * (1.0 - lk[k]) * smoothstep(0.25, 0.8, u) * (1.0 - ear);
+            let pt = parting(ak, u);
+            let t = (c.thick)(ak, u) * (1.0 - groove) * (1.0 - 0.8 * pt);
+            let t = (t + (c.edge - t) * smoothstep(0.82, 1.0, u)).max(c.edge).max(over(ak, phi, 0.003));
+            if i == 0 {
+                rim_t.push(t);
+            }
+            // A cut's edge comes down to the skin (the rows above are rounded out over it).
+            let (q, n) = sc.rounded(ak + WHORL * (1.0 - u).powi(2), phi, if c.ears == Meet::Over { ROUND } else { ROUND * smoothstep(1.0, 0.75, u) });
+            ring.push(q + n * t);
             z.push(match c.bands {
-                Some(bf) => bf(a[j], u),
-                None => 0.5 + (0.6 * lk[j] * (0.7 + 0.3 * jitter(j / 4, 3.0)) - 0.3 + 0.1 * (u * 9.0 + j as f64).sin()) * smoothstep(0.1, 0.6, u),
+                Some(bf) => bf(ak, u),
+                None => 0.5 + (0.6 * lk[k] * (0.7 + 0.3 * jitter((ell[k] / 4.0) as usize, 3.0)) - 0.3 + 0.1 * (u * 9.0 + ell[k]).sin()) * smoothstep(0.1, 0.6, u),
             });
             y.push(0.25 * smoothstep(0.85, 1.0, u) + 0.5 * groove + 0.6 * pt);
         }
         p.push(ring);
+    }
+    if c.ears == Meet::Over {
+        // Under the rim, up and in to the skin (so no scalp shows under it); over an ear, up and out of its
+        // oval (out past the ear on the way).
+        let d = 0.03;
+        let (mut hem, mut hz) = (vec![Vec::new(); 3], Vec::new());
+        for k in 0..cols {
+            let (ak, pr) = node[0][k];
+            let tr = rim_t[k];
+            let (qa, qp) = sc.oval(ak).map_or((ak, pr), |o| o.up(ak, pr));
+            let need = over(ak, pr, 0.0);
+            let (skin, n) = sc.rounded(qa, qp - 1.6 * d, 0.0);
+            hem[2].push(sc.point(ak, pr - 0.3 * d, (0.8 * tr).max(need).max(CLEAR)));
+            hem[1].push(sc.point(qa, qp - d, (0.45 * tr).max(need).max(CLEAR)));
+            hem[0].push(skin + n * CLEAR);
+            hz.push(z[k]);
+        }
+        p.splice(0..0, hem);
+        z.splice(0..0, hz.iter().chain(&hz).chain(&hz).copied().collect::<Vec<_>>());
+        y.splice(0..0, [1.0, 0.9, 0.5].iter().flat_map(|&v| std::iter::repeat_n(v, cols)).collect::<Vec<_>>());
     }
     let top = sc.point(0.0, 0.0, (c.thick)(0.0, 0.0));
     let (pos, idx, _) = rings_mesh(&p, None, Some(top));
@@ -516,7 +781,7 @@ fn slab(mid: &[Vec<V3>], nrm: &[Vec<V3>], half: &[Vec<f64>], curl: f64, bands: &
 /// Clump bands across a sheet's columns (whole locks at its edges): light in the locks' middles,
 /// varying from lock to lock.
 fn lock_bands(cols: usize, seed: f64) -> Vec<f64> {
-    (0..cols).map(|j| clip(0.15 + 0.7 * lock_at(j + 2) * (0.75 + 0.25 * jitter((j + 2) / 4, seed)), 0.0, 1.0)).collect()
+    (0..cols).map(|j| clip(0.15 + 0.7 * lock_at((j + 2) as f64) * (0.75 + 0.25 * jitter((j + 2) / 4, seed)), 0.0, 1.0)).collect()
 }
 
 /// How far out hair hangs at azimuth a, by height: the scalp's section there (a share of the skull
@@ -570,7 +835,7 @@ fn curtain(sc: &Scalp, c: Curtain) -> Comp {
     let cols = 4 * c.locks + 1;
     let a = linspace(c.a0, c.a1, cols);
     // Whole locks at the edges, the partings between them.
-    let lk: Vec<f64> = (0..cols).map(|j| lock_at(j + 2)).collect();
+    let lk: Vec<f64> = (0..cols).map(|j| lock_at((j + 2) as f64)).collect();
     let seed = c.seed as f64;
     let tt: Vec<f64> = a.iter().map(|&a| (c.top)(a)).collect();
     let bt: Vec<f64> = (0..cols).map(|j| (c.bottom)(a[j]) - c.tip * (0.35 + 0.65 * jitter((j + 2) / 4, seed)) * lk[j].powf(c.sharp)).collect();
@@ -637,7 +902,7 @@ struct Fringe<'a> {
 fn fringe(face: &Scalp, c: Fringe) -> Comp {
     let cols = 4 * c.locks + 1;
     let a = linspace(c.a0, c.a1, cols);
-    let lk: Vec<f64> = (0..cols).map(|j| lock_at(j + 2)).collect();
+    let lk: Vec<f64> = (0..cols).map(|j| lock_at((j + 2) as f64)).collect();
     let t0: Vec<f64> = a.iter().map(|&a| (c.top)(a)).collect();
     let t1: Vec<f64> = (0..cols).map(|j| at_height(face, a[j], (c.bottom)(a[j]) - c.tip * (0.5 + 0.5 * jitter((j + 2) / 4, c.seed)) * lk[j].powf(c.sharp), t0[j] + 0.02)).collect();
     let us = linspace(0.0, 1.0, c.rows);
@@ -745,7 +1010,7 @@ pub fn build_hair(family: &str, stage: &str, head: &HeadFrame, p: &[V3; NB]) -> 
     let h = head;
     let ears = Ears::of(family, stage, h);
     let hh = h.hh;
-    let sc = Scalp::new(h, true);
+    let sc = Scalp::new(h, true).round(&ears);
     let skin = Scalp::new(h, false);
     let brow_y = (h.brows[0][0].y + h.brows[0][1].y + h.brows[1][0].y + h.brows[1][1].y) / 4.0;
     let mut styles: Vec<(&str, Vec<Comp>)> = Vec::new();
@@ -776,16 +1041,16 @@ pub fn build_hair(family: &str, stage: &str, head: &HeadFrame, p: &[V3; NB]) -> 
     // over the forehead.
     let base = thick(0.05 * hh, 0.03 * hh, 0.028 * hh, Some(0.014 * hh));
     let quiffed = |a: f64, u: f64| base(a, u) + 0.022 * hh * (-(a / 0.6).powi(2)).exp() * smoothstep(0.35, 0.75, u) * smoothstep(1.0, 0.85, u);
-    styles.push(("short", vec![cap(&sc, Cap { thick: &quiffed, rows: 11, cols: 40, limit: None, edge: CLEAR, ridge: 0.35, tips: Some(&nape_tips), part: Some((deg(20.0), 0.3)), bands: None })]));
+    styles.push(("short", vec![cap(&sc, Cap { thick: &quiffed, rows: 11, cols: 40, limit: None, edge: CLEAR, ridge: 0.35, tips: Some(&nape_tips), part: Some((deg(20.0), 0.3)), bands: None, ears: Meet::Round(17) })]));
 
     // Crop: a thin cap, a squared hairline and a tiny fringe in short points.
     let front = sc.hairline(0.0) + deg(3.0);
     let square = |a: f64| if a.abs() < deg(55.0) { front + deg(4.0) * (a.abs() / deg(55.0)).powf(6.0) } else { sc.hairline(a) };
     let crop_tips = |a: f64| deg(3.0) * smoothstep(deg(60.0), deg(20.0), round(a)) + 0.5 * nape_tips(a);
-    styles.push(("crop", vec![cap(&sc, Cap { thick: &thick(0.022 * hh, 0.016 * hh, 0.016 * hh, Some(0.011 * hh)), rows: 8, cols: 40, limit: Some(&square), edge: CLEAR, ridge: 0.25, tips: Some(&crop_tips), part: None, bands: None })]));
+    styles.push(("crop", vec![cap(&sc, Cap { thick: &thick(0.022 * hh, 0.016 * hh, 0.016 * hh, Some(0.011 * hh)), rows: 8, cols: 40, limit: Some(&square), edge: CLEAR, ridge: 0.25, tips: Some(&crop_tips), part: None, bands: None, ears: Meet::Round(17) })]));
 
     // Layered: a cap and three flared tiers in pointed locks, the lowest to the jaw.
-    let mut lay = vec![cap(&sc, Cap { thick: &thick(0.05 * hh, 0.04 * hh, 0.04 * hh, None), rows: 9, cols: 32, limit: None, edge: CLEAR, ridge: 0.3, tips: None, part: None, bands: None })];
+    let mut lay = vec![cap(&sc, Cap { thick: &thick(0.05 * hh, 0.04 * hh, 0.04 * hh, None), rows: 9, cols: 32, limit: None, edge: CLEAR, ridge: 0.3, tips: None, part: None, bands: None, ears: Meet::Round(14) })];
     for (k, (yt, yb, off, fl)) in [(0.72, 0.5, 0.028, 0.06), (0.58, 0.3, 0.02, 0.09), (0.44, 0.08, 0.012, 0.12)].into_iter().enumerate() {
         let span = deg(62.0 + 6.0 * k as f64);
         let (top, bot) = (chin + yt * hh, chin + yb * hh);
@@ -798,7 +1063,7 @@ pub fn build_hair(family: &str, stage: &str, head: &HeadFrame, p: &[V3; NB]) -> 
     let mut rng = Pcg64::new(11);
     let tb = thick(0.034 * hh, 0.028 * hh, 0.026 * hh, Some(0.016 * hh));
     let lumpy = |a: f64, u: f64| tb(a, u) * (1.0 + 0.35 * noise3(v3(a.cos(), 2.0 * u, a.sin()), 5, 2.5));
-    let mut tou = vec![cap(&sc, Cap { thick: &lumpy, rows: 8, cols: 24, limit: None, edge: CLEAR, ridge: 0.3, tips: Some(&nape_tips), part: None, bands: None })];
+    let mut tou = vec![cap(&sc, Cap { thick: &lumpy, rows: 8, cols: 24, limit: None, edge: CLEAR, ridge: 0.3, tips: Some(&nape_tips), part: None, bands: None, ears: Meet::Round(10) })];
     for k in 0..22 {
         // Spread over the head on a spiral (each about as much of it), nudged.
         let a = py_mod(k as f64 * PI * (3.0 - 5f64.sqrt()) + rng.uniform(-0.2, 0.2) + PI, TAU) - PI;
@@ -812,7 +1077,7 @@ pub fn build_hair(family: &str, stage: &str, head: &HeadFrame, p: &[V3; NB]) -> 
     styles.push(("tousled", tou));
 
     // Side-swept: a cap with a high side parting and three locks swept from it across the forehead.
-    let mut sw = vec![cap(&sc, Cap { thick: &thick(0.045 * hh, 0.03 * hh, 0.028 * hh, Some(0.014 * hh)), rows: 9, cols: 36, limit: None, edge: CLEAR, ridge: 0.3, tips: Some(&nape_tips), part: Some((deg(45.0), 0.35)), bands: None })];
+    let mut sw = vec![cap(&sc, Cap { thick: &thick(0.045 * hh, 0.03 * hh, 0.028 * hh, Some(0.014 * hh)), rows: 9, cols: 36, limit: None, edge: CLEAR, ridge: 0.3, tips: Some(&nape_tips), part: Some((deg(45.0), 0.35)), bands: None, ears: Meet::Round(15) })];
     let fa = [0.75, 0.35, 0.0, -0.4, -0.75, -1.05];
     let fk = [0.55, 0.78, 0.92, 0.98, 1.02, 1.08];
     let fo = [0.05, 0.05, 0.048, 0.045, 0.038, 0.028];
@@ -856,10 +1121,10 @@ pub fn build_hair(family: &str, stage: &str, head: &HeadFrame, p: &[V3; NB]) -> 
         ((r_t - r_s - 0.02 * hh).max(0.02 * hh) + 0.06 * hh * puff(dir(a, u))) * (0.3 + 0.7 * smoothstep(1.0, 0.55, u))
     };
     let puff_bands = |a: f64, u: f64| 0.15 + 0.75 * puff(dir(a, u));
-    styles.push(("afro", vec![cap(&sc, Cap { thick: &rounded, rows: 16, cols: 44, limit: None, edge: CLEAR + 0.004 * hh, ridge: 0.0, tips: None, part: None, bands: Some(&puff_bands) })]));
+    styles.push(("afro", vec![cap(&sc, Cap { thick: &rounded, rows: 16, cols: 44, limit: None, edge: CLEAR + 0.004 * hh, ridge: 0.0, tips: None, part: None, bands: Some(&puff_bands), ears: Meet::Over })]));
 
     // Bob: a shell to the jaw in blunt locks with a curled-in hem, and a straight fringe.
-    let mut bob = vec![cap(&sc, Cap { thick: &thick(0.05 * hh, 0.04 * hh, 0.04 * hh, None), rows: 9, cols: 32, limit: None, edge: CLEAR, ridge: 0.15, tips: None, part: None, bands: None })];
+    let mut bob = vec![cap(&sc, Cap { thick: &thick(0.05 * hh, 0.04 * hh, 0.04 * hh, None), rows: 9, cols: 32, limit: None, edge: CLEAR, ridge: 0.15, tips: None, part: None, bands: None, ears: Meet::Round(14) })];
     let (bt, bb) = (chin + 0.72 * hh, chin + 0.06 * hh);
     bob.push(curtain(&sc, Curtain { a0: deg(58.0), a1: TAU - deg(58.0), top: &move |_| bt, bottom: &move |_| bb, off: 0.012 * hh, locks: 9, rows: 5, flare: 0.12, thick: 0.03 * hh, curl: 1.0, tip: 0.03 * hh, sharp: 1.5, back: None, wave: 0.0, seed: 0 }));
     let under = |a: f64| sc.hairline(a) * 0.8;
@@ -869,7 +1134,7 @@ pub fn build_hair(family: &str, stage: &str, head: &HeadFrame, p: &[V3; NB]) -> 
 
     // Long: a cap parted in the middle, the sides to the shoulders, the back to mid-back, all in locks
     // with pointed tips; a fringe either side of the parting framing the face.
-    let mut lng = vec![cap(&sc, Cap { thick: &thick(0.045 * hh, 0.035 * hh, 0.035 * hh, None), rows: 9, cols: 32, limit: None, edge: CLEAR, ridge: 0.15, tips: None, part: Some((0.0, 0.3)), bands: None })];
+    let mut lng = vec![cap(&sc, Cap { thick: &thick(0.045 * hh, 0.035 * hh, 0.035 * hh, None), rows: 9, cols: 32, limit: None, edge: CLEAR, ridge: 0.15, tips: None, part: Some((0.0, 0.3)), bands: None, ears: Meet::Round(14) })];
     let shoulder = p[b("clavicle_l")].y;
     let side_bot = |a: f64| interp(round(a), &[deg(70.0), deg(110.0), deg(150.0)], &[shoulder + 0.25 * hh, shoulder - 0.1 * hh, sp[1] - 0.5 * hh]);
     let lt = chin + 0.72 * hh;
@@ -887,7 +1152,7 @@ pub fn build_hair(family: &str, stage: &str, head: &HeadFrame, p: &[V3; NB]) -> 
 
     // Ponytail: a slicked cap, a band at the back of the head and a tapering tail in twisting locks.
     let b15 = |a: f64, _u: f64| 0.5 + 0.5 * (a * 15.0).sin();
-    let mut pt = vec![cap(&sc, Cap { thick: &thick(0.024 * hh, 0.018 * hh, 0.02 * hh, Some(0.012 * hh)), rows: 9, cols: 32, limit: None, edge: CLEAR, ridge: 0.2, tips: None, part: None, bands: None })];
+    let mut pt = vec![cap(&sc, Cap { thick: &thick(0.024 * hh, 0.018 * hh, 0.02 * hh, Some(0.012 * hh)), rows: 9, cols: 32, limit: None, edge: CLEAR, ridge: 0.2, tips: None, part: None, bands: None, ears: Meet::Round(14) })];
     let tie = sc.point(PI, deg(95.0), 0.03 * hh);
     pt.push(tor(torus(tie + v3(0.0, 0.0, -0.012 * hh), 0.05 * hh, 0.02 * hh, 12, 6, v3(0.0, 0.25, -1.0))));
     let mut tail = [
@@ -911,7 +1176,7 @@ pub fn build_hair(family: &str, stage: &str, head: &HeadFrame, p: &[V3; NB]) -> 
     styles.push(("ponytail", pt));
 
     // Braid: a cap and three strands plaited down the back, tied off with a tuft below the tie.
-    let mut br = vec![cap(&sc, Cap { thick: &thick(0.03 * hh, 0.024 * hh, 0.026 * hh, Some(0.018 * hh)), rows: 9, cols: 32, limit: None, edge: CLEAR, ridge: 0.2, tips: None, part: None, bands: Some(&b15) })];
+    let mut br = vec![cap(&sc, Cap { thick: &thick(0.03 * hh, 0.024 * hh, 0.026 * hh, Some(0.018 * hh)), rows: 9, cols: 32, limit: None, edge: CLEAR, ridge: 0.2, tips: None, part: None, bands: Some(&b15), ears: Meet::Round(14) })];
     let start = sc.point(PI, deg(120.0), 0.03 * hh);
     let len = 0.82 * hh;
     // The braid's middle at s (0 at the nape .. 1 at the tie).
@@ -948,7 +1213,7 @@ pub fn build_hair(family: &str, stage: &str, head: &HeadFrame, p: &[V3; NB]) -> 
     styles.push(("braid", br));
 
     // Buns: a cap and two buns high on each side, twisted, each with a band round its foot.
-    let mut bun = vec![cap(&sc, Cap { thick: &thick(0.026 * hh, 0.02 * hh, 0.022 * hh, Some(0.014 * hh)), rows: 9, cols: 32, limit: None, edge: CLEAR, ridge: 0.2, tips: None, part: Some((0.0, 0.3)), bands: Some(&b15) })];
+    let mut bun = vec![cap(&sc, Cap { thick: &thick(0.026 * hh, 0.02 * hh, 0.022 * hh, Some(0.014 * hh)), rows: 9, cols: 32, limit: None, edge: CLEAR, ridge: 0.2, tips: None, part: Some((0.0, 0.3)), bands: Some(&b15), ears: Meet::Round(14) })];
     for s in [-1.0, 1.0] {
         let c = sc.point(s * deg(118.0), deg(38.0), 0.13 * hh);
         let ax = (c - h.centre) / (c - h.centre).norm();
@@ -991,7 +1256,7 @@ fn beard(sc: &Scalp) -> Comp {
     let hh = h.hh;
     let (cols, rows) = (25, 12);
     let a = linspace(-radians(94.0), radians(94.0), cols);
-    let lk: Vec<f64> = (0..cols).map(|j| lock_at(j + 2)).collect();
+    let lk: Vec<f64> = (0..cols).map(|j| lock_at((j + 2) as f64)).collect();
     // Mouth direction (polar angle) and the hole round it.
     let qm = (h.mouth - h.centre).component_div(&h.radii);
     let phm = (qm[1] / qm.norm()).acos();
@@ -1101,4 +1366,3 @@ fn finish(comps: &[Comp], h: &HeadFrame, ears: &Ears, p: &[V3; NB], head_only: b
     let tone = (0..n).map(|i| [0.0, clip(yy[i], 0.0, 1.0), clip(zz[i], 0.0, 1.0), 0.0]).collect();
     Mesh { pos, idx, nor, dense, fields, tone, ..Mesh::default() }
 }
-
