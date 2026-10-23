@@ -5,9 +5,12 @@
  * Rough physical ratios behind the keys: on a clear day direct sun is ~4-5x the sky's diffuse
  * light on the ground; at golden hour they are about equal; at night the "camera" compensates
  * the faint moonlight with a higher exposure and a blue tint.
+ *
+ * Engine-neutral: it writes only the fields of its colours (`r`, `g`, `b`, sRGB 0..1) and vectors
+ * (`x`, `y`, `z`, game space), so a renderer can keep its engine's own types in them
+ * (`createLighting(() => new Color3(), () => new Vector3())`).
  */
 
-import { Color3, Vector3 } from './core';
 import type { Look } from '../look';
 
 const SUNRISE = 6;
@@ -15,15 +18,27 @@ const SUNSET = 20;
 /** Hours around sunrise/sunset over which the direct light fades out and back in (sun <-> moon). */
 const HANDOVER = 0.4;
 
-export interface Lighting {
-  sunDirection: Vector3;
+export interface RGB {
+  r: number;
+  g: number;
+  b: number;
+}
+
+export interface XYZ {
+  x: number;
+  y: number;
+  z: number;
+}
+
+export interface Lighting<C extends RGB = RGB, V extends XYZ = XYZ> {
+  sunDirection: V;
   sunIntensity: number;
-  sunColor: Color3;
+  sunColor: C;
   skyIntensity: number;
-  skyColor: Color3;
-  groundColor: Color3;
-  clearColor: Color3;
-  zenithColor: Color3;
+  skyColor: C;
+  groundColor: C;
+  clearColor: C;
+  zenithColor: C;
   exposure: number;
   /** Scale for image-based lighting (scene.environmentIntensity). */
   envIntensity: number;
@@ -36,7 +51,7 @@ export interface Lighting {
 }
 
 /** Writes lighting for `minuteOfDay` into `out` (no allocations after the first call). */
-export function lightingAt(minuteOfDay: number, look: Look, out: Lighting): Lighting {
+export function lightingAt<L extends Lighting>(minuteOfDay: number, look: Look, out: L): L {
   const keys = look.keys;
   const hour = (minuteOfDay / 60) % 24;
   let i = 0;
@@ -63,10 +78,10 @@ export function lightingAt(minuteOfDay: number, look: Look, out: Lighting): Ligh
   if (hour >= SUNRISE && hour <= SUNSET) {
     const arc = ((hour - SUNRISE) / (SUNSET - SUNRISE)) * Math.PI;
     out.sunUp = Math.sin(arc);
-    out.sunDirection.set(-Math.cos(arc), -(0.22 + out.sunUp * 0.9) * look.sunHeight, 0.45).normalize();
+    setNormalized(out.sunDirection, -Math.cos(arc), -(0.22 + out.sunUp * 0.9) * look.sunHeight, 0.45);
   } else {
     out.sunUp = 0;
-    out.sunDirection.set(0.35, -1, 0.25).normalize();
+    setNormalized(out.sunDirection, 0.35, -1, 0.25);
   }
   // The light switches between the sun's arc and the fixed moon at sunrise/sunset: fade it to
   // nothing across the switch so shadows never jump (the sky fill carries the scene meanwhile).
@@ -78,16 +93,22 @@ export function lightingAt(minuteOfDay: number, look: Look, out: Lighting): Ligh
   return out;
 }
 
-export function createLighting(): Lighting {
+/** A lighting to write into, its colours and vectors made by `color` and `vector` (plain objects by default). */
+export function createLighting<C extends RGB = RGB, V extends XYZ = XYZ>(
+  color: () => C = () => ({ r: 0, g: 0, b: 0 }) as C,
+  vector: () => V = () => ({ x: 0, y: 0, z: 0 }) as V,
+): Lighting<C, V> {
+  const sunDirection = vector();
+  setNormalized(sunDirection, 0, -1, 0);
   return {
-    sunDirection: new Vector3(0, -1, 0),
+    sunDirection,
     sunIntensity: 1,
-    sunColor: new Color3(),
+    sunColor: color(),
     skyIntensity: 1,
-    skyColor: new Color3(),
-    groundColor: new Color3(),
-    clearColor: new Color3(),
-    zenithColor: new Color3(),
+    skyColor: color(),
+    groundColor: color(),
+    clearColor: color(),
+    zenithColor: color(),
     exposure: 1,
     envIntensity: 1,
     lamps: 0,
@@ -100,13 +121,28 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-const hexCache = new Map<string, Color3>();
-function hex(value: string): Color3 {
+function setNormalized(v: XYZ, x: number, y: number, z: number): void {
+  const len = Math.hypot(x, y, z) || 1;
+  v.x = x / len;
+  v.y = y / len;
+  v.z = z / len;
+}
+
+/** `#rrggbb` as 0..1 channels (as Babylon's `Color3.FromHexString`), parsed once each. */
+const hexCache = new Map<string, readonly [number, number, number]>();
+function hex(value: string): readonly [number, number, number] {
   let c = hexCache.get(value);
-  if (!c) hexCache.set(value, (c = Color3.FromHexString(value)));
+  if (!c) {
+    const v = parseInt(value.slice(1, 7), 16);
+    hexCache.set(value, (c = [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255]));
+  }
   return c;
 }
 
-function lerpHex(a: string, b: string, t: number, out: Color3): void {
-  Color3.LerpToRef(hex(a), hex(b), t, out);
+function lerpHex(a: string, b: string, t: number, out: RGB): void {
+  const x = hex(a);
+  const y = hex(b);
+  out.r = x[0] + (y[0] - x[0]) * t;
+  out.g = x[1] + (y[1] - x[1]) * t;
+  out.b = x[2] + (y[2] - x[2]) * t;
 }

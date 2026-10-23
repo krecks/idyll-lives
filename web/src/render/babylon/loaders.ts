@@ -64,9 +64,4 @@ if (typeof GPUDevice !== 'undefined') {
   };
 }
 
-/** WebGPU had an adapter but failed to start once this session: later engines use WebGL2 straight away. */
-let webGpuBroken = false;
-export const webGpuFailed = (): boolean => webGpuBroken;
-export function noteWebGpuFailed(): void {
-  webGpuBroken = true;
-}
+export { noteWebGpuFailed, webGpuFailed } from '../shared/gpu';

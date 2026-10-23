@@ -95,7 +95,7 @@ import type {
   WallMode,
 } from '../types';
 import { resizeKey } from '../types';
-import { createLighting, lightingAt } from './environment';
+import { createLighting, lightingAt } from '../shared/environment';
 import { buildFences, swingGate, type GateLeaf } from './fences';
 import { applyShaderFixes } from './shaderFixes';
 import { patchRoomLights, type RoomMask } from './roomLights';
@@ -537,7 +537,7 @@ export class BabylonRenderer implements Renderer, RendererDebugHooks {
   /** Stops watching the device pixel ratio (see `applyResolution`). */
   private unwatchPixelRatio: (() => void) | null = null;
   private skyDome!: Sky;
-  private readonly lighting = createLighting();
+  private readonly lighting = createLighting(() => new Color3(), () => new Vector3());
   private lastLightMinute = -1;
   /** When the lighting was last updated in the game (`FrameState.now`; see `LIGHT_MIN_MS`). */
   private lastLightAt = 0;

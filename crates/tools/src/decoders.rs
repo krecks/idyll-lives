@@ -1,13 +1,21 @@
-//! `cargo decoders`: refreshes `web/public/decoders/`, the decoders Babylon would otherwise fetch
-//! from its CDN, which the cross-origin isolated page can't use. Same layout as the CDN
-//! (`render/babylon/loaders.ts` points `Tools.ScriptBaseUrl` there). Run after upgrading Babylon or
-//! meshoptimizer; the files are committed, so builds need no network. (Was tools/assets/decoders.mjs.)
+//! `cargo decoders`: refreshes `web/public/decoders/`, the texture and geometry decoders the
+//! engines would otherwise fetch from a CDN, which the cross-origin isolated page can't use. Run
+//! after upgrading PlayCanvas, Babylon or meshoptimizer; the files are committed, so builds need no
+//! network. (Was tools/assets/decoders.mjs.)
 //!
-//! - KTX2 (Basis Universal) texture decoder and transcoders: Babylon's CDN, pinned to the
-//!   `@babylonjs/core` version in `web/package.json` (Apache-2.0; zstddec BSD).
-//! - meshopt geometry decoder: the meshoptimizer package that also encodes our models (MIT).
+//! - `basis/`: PlayCanvas's Basis Universal transcoder (KTX2 textures; `render/pc/loaders.ts`),
+//!   from the engine's repository at the `playcanvas` version in `web/package.json` (Apache-2.0).
+//! - KTX2 (Basis Universal) texture decoder and transcoders for Babylon (the previews and dev
+//!   pages until they move to PlayCanvas): Babylon's CDN, pinned to the `@babylonjs/core` version
+//!   in `web/package.json`, in the CDN's layout (`render/babylon/loaders.ts` points
+//!   `Tools.ScriptBaseUrl` there) (Apache-2.0; zstddec BSD).
+//! - meshopt geometry decoder for Babylon: the meshoptimizer package that also encodes our models
+//!   (MIT). (PlayCanvas's side imports the package itself.)
 
 use crate::download::{self, agent};
+
+/// PlayCanvas's Basis transcoder (glue and WebAssembly), in its repository's examples.
+const FROM_PLAYCANVAS: [&str; 2] = ["basis.wasm.js", "basis.wasm.wasm"];
 
 /// Babylon's CDN files, under the version in `web/package.json`.
 const FROM_CDN: [&str; 10] = [
@@ -42,6 +50,14 @@ fn run() -> Result<(), String> {
     let cdn = format!("https://cdn.babylonjs.com/v{version}");
 
     let agent = agent();
+    let pc = pkg["dependencies"]["playcanvas"].as_str().or(pkg["devDependencies"]["playcanvas"].as_str()).ok_or("web/package.json: no playcanvas")?;
+    let pc_version = pc.trim_start_matches(|c: char| !c.is_ascii_digit());
+    for file in FROM_PLAYCANVAS {
+        let url = format!("https://raw.githubusercontent.com/playcanvas/engine/v{pc_version}/examples/assets/wasm/basis/{file}");
+        let bytes = download::download_unhashed(&agent, &url)?;
+        download::write(&out.join("basis").join(file), &bytes)?;
+        println!("basis/{file} ({:.0} KB, PlayCanvas {pc_version})", bytes.len() as f64 / 1024.0);
+    }
     for file in FROM_CDN {
         let url = format!("{cdn}/{file}");
         let bytes = download::download_unhashed(&agent, &url)?;

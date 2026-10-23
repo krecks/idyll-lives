@@ -25,6 +25,30 @@ export default ts.config(
       'svelte/no-useless-mustaches': 'off',
     },
   },
+  // PlayCanvas only through render/pc/engine.ts: the bare package resolves to its debug build under
+  // Vite's dev server (WebGPU validation around every draw). And the engine-neutral code and the
+  // PlayCanvas renderer never reach into Babylon.
+  {
+    files: ['src/**/*.ts', 'src/**/*.svelte'],
+    rules: {
+      'no-restricted-imports': ['error', { paths: [{ name: 'playcanvas', message: 'Import PlayCanvas through render/pc/engine.ts (the release build).' }] }],
+    },
+  },
+  {
+    files: ['src/render/shared/**/*.ts', 'src/render/pc/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [{ name: 'playcanvas', message: 'Import PlayCanvas through render/pc/engine.ts (the release build).' }],
+          patterns: [
+            { group: ['@babylonjs/*'], message: 'Engine-neutral and PlayCanvas code never imports Babylon.' },
+            { group: ['**/babylon/*', '**/babylon/**'], message: 'Engine-neutral and PlayCanvas code never imports render/babylon.' },
+          ],
+        },
+      ],
+    },
+  },
   { files: ['src/**/*.ts'], languageOptions: { parser: ts.parser } },
   { files: ['src/**/*.svelte', 'src/**/*.svelte.ts'], languageOptions: { parserOptions: { parser: ts.parser, svelteConfig } } },
 );

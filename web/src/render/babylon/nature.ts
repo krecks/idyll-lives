@@ -36,7 +36,7 @@ import {
 } from './core';
 import type { AssetRegistry } from '../../assets/registry';
 import { DEFAULT_LANDSCAPE, groundDepth, type LandscapeParams, type WorldStructure } from '../../core/protocol';
-import type { Lighting } from './environment';
+import type { Lighting } from '../shared/environment';
 import { MaterialLibrary } from './materials';
 import { buildModel } from './models';
 import { CountryRoads, ROAD_VERGE } from './roads';
@@ -1205,7 +1205,7 @@ export class Sky {
   }
 
   /** Horizon = fog/clear colour, zenith = deeper sky colour, plus a glow around the sun. */
-  update(l: Lighting): void {
+  update(l: Lighting<Color3, Vector3>): void {
     this.zenith.copyFrom(l.zenithColor);
     const sx = -l.sunDirection.x;
     const sy = -l.sunDirection.y;

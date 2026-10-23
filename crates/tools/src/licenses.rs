@@ -58,7 +58,10 @@ SOFTWARE.
 
 /// Shipped or adapted work with no npm package to read the licence from: its texts, as published,
 /// are kept in crates/tools/texts/.
-const KEPT: [(&str, &str, &str, &str); 1] = [("zstddec (decoders/zstddec.wasm, built by Babylon.js), with Zstandard", "MIT; BSD-3-Clause", "https://github.com/donmccurdy/zstddec", "zstddec-LICENSE")];
+const KEPT: [(&str, &str, &str, &str); 2] = [
+    ("zstddec (decoders/zstddec.wasm, built by Babylon.js), with Zstandard", "MIT; BSD-3-Clause", "https://github.com/donmccurdy/zstddec", "zstddec-LICENSE"),
+    ("Basis Universal transcoder (decoders/basis/, PlayCanvas's build)", "Apache-2.0", "https://github.com/BinomialLLC/basis_universal", "basis_universal-LICENSE"),
+];
 const ADAPTED: [(&str, &str, &str, &str); 1] = [("TalkingHead's emoji expressions, adapted for the residents' faces (render/shared/characters/face.ts)", "MIT", "https://github.com/met4citizen/TalkingHead", "TalkingHead-LICENSE")];
 
 /// The model and dictionary licences, fetched next to what they cover.
