@@ -100,42 +100,88 @@ pub fn clip_by_field(idx: &[usize], g: &[f64]) -> (Vec<usize>, Src) {
     (faces, (out_a, out_b, out_t))
 }
 
-/// The barycentric weights of the point of triangle abc nearest p (Ericson, Real-Time Collision
-/// Detection 5.1.5).
-fn nearest_weights(p: V3, a: V3, b: V3, c: V3) -> [f64; 3] {
+/// Where on triangle abc the point nearest p lies: a corner, an edge (its ends and how far along), or
+/// inside (the weights of b and c).
+enum Nearest {
+    Corner(usize),
+    Edge(usize, usize, f64),
+    Inside(f64, f64),
+}
+
+/// The point of triangle abc nearest p (Ericson, Real-Time Collision Detection 5.1.5).
+fn nearest(p: V3, a: V3, b: V3, c: V3) -> Nearest {
     let (ab, ac, ap) = (b - a, c - a, p - a);
     let (d1, d2) = (ab.dot(&ap), ac.dot(&ap));
     if d1 <= 0.0 && d2 <= 0.0 {
-        return [1.0, 0.0, 0.0];
+        return Nearest::Corner(0);
     }
     let bp = p - b;
     let (d3, d4) = (ab.dot(&bp), ac.dot(&bp));
     if d3 >= 0.0 && d4 <= d3 {
-        return [0.0, 1.0, 0.0];
+        return Nearest::Corner(1);
     }
     let vc = d1 * d4 - d3 * d2;
     if vc <= 0.0 && d1 >= 0.0 && d3 <= 0.0 {
-        let v = d1 / (d1 - d3);
-        return [1.0 - v, v, 0.0];
+        return Nearest::Edge(0, 1, d1 / (d1 - d3));
     }
     let cp = p - c;
     let (d5, d6) = (ab.dot(&cp), ac.dot(&cp));
     if d6 >= 0.0 && d5 <= d6 {
-        return [0.0, 0.0, 1.0];
+        return Nearest::Corner(2);
     }
     let vb = d5 * d2 - d1 * d6;
     if vb <= 0.0 && d2 >= 0.0 && d6 <= 0.0 {
-        let w = d2 / (d2 - d6);
-        return [1.0 - w, 0.0, w];
+        return Nearest::Edge(0, 2, d2 / (d2 - d6));
     }
     let va = d3 * d6 - d5 * d4;
     if va <= 0.0 && d4 - d3 >= 0.0 && d5 - d6 >= 0.0 {
-        let w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
-        return [0.0, 1.0 - w, w];
+        return Nearest::Edge(1, 2, (d4 - d3) / ((d4 - d3) + (d5 - d6)));
     }
     let den = 1.0 / (va + vb + vc);
-    let (v, w) = (vb * den, vc * den);
-    [1.0 - v - w, v, w]
+    Nearest::Inside(vb * den, vc * den)
+}
+
+/// The barycentric weights of the point of triangle abc nearest p.
+fn nearest_weights(p: V3, a: V3, b: V3, c: V3) -> [f64; 3] {
+    let mut w = [0.0; 3];
+    match nearest(p, a, b, c) {
+        Nearest::Corner(i) => w[i] = 1.0,
+        Nearest::Edge(i, j, t) => (w[i], w[j]) = (1.0 - t, t),
+        Nearest::Inside(v, x) => w = [1.0 - v - x, v, x],
+    }
+    w
+}
+
+/// The point of a triangle nearest p.
+pub fn nearest_point(p: V3, t: &[V3; 3]) -> V3 {
+    match nearest(p, t[0], t[1], t[2]) {
+        Nearest::Corner(i) => t[i],
+        Nearest::Edge(i, j, s) => t[i] + (t[j] - t[i]) * s,
+        Nearest::Inside(v, w) => t[0] + (t[1] - t[0]) * v + (t[2] - t[0]) * w,
+    }
+}
+
+/// How far along the ray from o (d a unit vector) it crosses the triangle, either side, if it does
+/// (Moller-Trumbore).
+pub fn ray_hit(o: V3, d: V3, [a, b, c]: &[V3; 3]) -> Option<f64> {
+    let (e1, e2) = (b - a, c - a);
+    let pv = d.cross(&e2);
+    let det = e1.dot(&pv);
+    if det.abs() < 1e-14 {
+        return None;
+    }
+    let tv = o - a;
+    let u = tv.dot(&pv) / det;
+    if !(0.0..=1.0).contains(&u) {
+        return None;
+    }
+    let qv = tv.cross(&e1);
+    let v = d.dot(&qv) / det;
+    if v < 0.0 || u + v > 1.0 {
+        return None;
+    }
+    let t = e2.dot(&qv) / det;
+    (t > 0.0).then_some(t)
 }
 
 /// The nearest point of a triangle mesh to a point, as its triangle's corners and their weights: to

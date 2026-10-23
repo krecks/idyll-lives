@@ -7,6 +7,7 @@
 
 use nalgebra::{Rotation3, Unit};
 
+use super::meshops::ray_hit;
 use super::{Mesh, V3, v3};
 
 /// Rays per vertex.
@@ -51,8 +52,9 @@ struct Bvh {
 }
 
 impl Bvh {
-    fn new(meshes: &[&Mesh]) -> Self {
-        let tris: Vec<[V3; 3]> = meshes.iter().flat_map(|m| m.idx.chunks(3).map(|t| [m.pos[t[0]], m.pos[t[1]], m.pos[t[2]]])).collect();
+    /// Over `mesh` and `around`.
+    fn new(mesh: &Mesh, around: &[&Mesh]) -> Self {
+        let tris: Vec<[V3; 3]> = [mesh].iter().chain(around).flat_map(|m| m.idx.chunks(3).map(|t| [m.pos[t[0]], m.pos[t[1]], m.pos[t[2]]])).collect();
         let mut b = Bvh { order: (0..tris.len()).collect(), tris, nodes: Vec::new() };
         if !b.tris.is_empty() {
             b.build(0, b.tris.len());
@@ -117,28 +119,11 @@ impl Bvh {
                 continue;
             }
             for &t in &self.order[nd.start..nd.end] {
-                let [a, b, c] = &self.tris[t];
-                // Möller-Trumbore, both sides.
-                let (e1, e2) = (b - a, c - a);
-                let p = d.cross(&e2);
-                let det = e1.dot(&p);
-                if det.abs() < 1e-14 {
-                    continue;
-                }
-                let s = o - a;
-                let u = s.dot(&p) / det;
-                if !(0.0..=1.0).contains(&u) {
-                    continue;
-                }
-                let q = s.cross(&e1);
-                let v = d.dot(&q) / det;
-                if v < 0.0 || u + v > 1.0 {
-                    continue;
-                }
-                let dist = e2.dot(&q) / det;
-                if dist > 1e-9 && dist < far {
+                let tri = &self.tris[t];
+                if let Some(dist) = ray_hit(*o, *d, tri).filter(|&dist| dist > 1e-9 && dist < far) {
                     far = dist;
-                    best = Some((dist, e1.cross(&e2).dot(d) > 0.0));
+                    let [a, b, c] = tri;
+                    best = Some((dist, (b - a).cross(&(c - a)).dot(d) > 0.0));
                 }
             }
         }
@@ -151,14 +136,19 @@ impl Bvh {
 /// `reach`, m). A vertex buried in another part (most rays first meet a back face) stays open:
 /// shaded, it would darken the faces it shares.
 pub fn occlusion(mesh: &Mesh, around: &[&Mesh], reach: f64) -> Vec<f64> {
-    let mut all = vec![mesh];
-    all.extend(around);
-    let bvh = Bvh::new(&all);
-    (0..mesh.len()).map(|i| (enclosed(&bvh, mesh.pos[i], mesh.nor[i], i, reach) * LEVELS).round() / LEVELS).collect()
+    let bvh = Bvh::new(mesh, around);
+    let dirs = directions(SAMPLES);
+    (0..mesh.len()).map(|i| vertex(&bvh, &dirs, mesh, i, reach)).collect()
 }
 
-/// How enclosed a point with normal `n` is (0..1; buried: 0); `i` twists its rays.
-fn enclosed(bvh: &Bvh, p: V3, n: V3, i: usize, reach: f64) -> f64 {
+/// `occlusion` at vertex `i`, rounded to `LEVELS`.
+fn vertex(bvh: &Bvh, dirs: &[V3], mesh: &Mesh, i: usize, reach: f64) -> f64 {
+    (enclosed(bvh, dirs, mesh.pos[i], mesh.nor[i], i, reach) * LEVELS).round() / LEVELS
+}
+
+/// How enclosed a point with normal `n` is (0..1; buried: 0), from rays along `dirs` (about +z);
+/// `i` twists them.
+fn enclosed(bvh: &Bvh, dirs: &[V3], p: V3, n: V3, i: usize, reach: f64) -> f64 {
     let z = Unit::new_normalize(v3(0.0, 0.0, 1.0));
     let n = n.try_normalize(1e-12).unwrap_or(*z);
     // A turn taking +z onto the normal, twisted by the vertex's index so neighbours don't band.
@@ -166,7 +156,7 @@ fn enclosed(bvh: &Bvh, p: V3, n: V3, i: usize, reach: f64) -> f64 {
     let turn = onto * Rotation3::from_axis_angle(&z, i as f64 * 2.399963);
     let start = p + n * LIFT;
     let (mut blocked, mut inside) = (0.0, 0);
-    for d in &directions(SAMPLES) {
+    for d in dirs {
         match bvh.cast(&start, &(turn * d), reach) {
             Some((_, true)) => inside += 1,
             Some((dist, false)) => blocked += 1.0 - (dist / reach).powi(2),
@@ -182,10 +172,8 @@ fn enclosed(bvh: &Bvh, p: V3, n: V3, i: usize, reach: f64) -> f64 {
 /// than the triangles (the skin against the lips, beside the nose) the vertices alone catch it at a few
 /// of them, and the triangles spread it in spikes.
 pub fn occlusion_spread(mesh: &Mesh, around: &[&Mesh], reach: f64, n: usize, over: &dyn Fn(V3) -> bool) -> Vec<f64> {
-    let mut all = vec![mesh];
-    all.extend(around);
-    let bvh = Bvh::new(&all);
-    let mut occ = occlusion(mesh, around, reach);
+    let bvh = Bvh::new(mesh, around);
+    let dirs = directions(SAMPLES);
     let (mut num, mut den) = (vec![0.0; n], vec![0.0; n]);
     let mut k = 0;
     for t in mesh.idx.chunks(3).filter(|t| t.iter().all(|&i| i < n && over(mesh.pos[i]))) {
@@ -194,7 +182,7 @@ pub fn occlusion_spread(mesh: &Mesh, around: &[&Mesh], reach: f64, n: usize, ove
         for w in [[2.0, 2.0, 8.0], [2.0, 8.0, 2.0], [8.0, 2.0, 2.0], [4.0, 4.0, 4.0]].map(|w| w.map(|v| v / 12.0)) {
             let p: V3 = (0..3).map(|j| mesh.pos[t[j]] * w[j]).sum();
             let nor: V3 = (0..3).map(|j| mesh.nor[t[j]] * w[j]).sum();
-            let a = enclosed(&bvh, p, nor, k, reach);
+            let a = enclosed(&bvh, &dirs, p, nor, k, reach);
             k += 1;
             for j in 0..3 {
                 num[t[j]] += w[j] * a * area;
@@ -202,17 +190,13 @@ pub fn occlusion_spread(mesh: &Mesh, around: &[&Mesh], reach: f64, n: usize, ove
             }
         }
     }
-    for i in 0..n {
-        if den[i] > 0.0 {
-            occ[i] = (num[i] / den[i] * LEVELS).round() / LEVELS;
-        }
-    }
-    occ
+    (0..mesh.len())
+        .map(|i| if i < n && den[i] > 0.0 { (num[i] / den[i] * LEVELS).round() / LEVELS } else { vertex(&bvh, &dirs, mesh, i, reach) })
+        .collect()
 }
 
-/// Writes `occlusion` into `mesh`'s tone.w.
-pub fn bake(mesh: &mut Mesh, around: &[&Mesh], reach: f64) {
-    let occ = occlusion(mesh, around, reach);
+/// Writes an occlusion (one per vertex) into `mesh`'s tone.w.
+pub fn bake(mesh: &mut Mesh, occ: Vec<f64>) {
     mesh.tone.resize(mesh.len(), [0.0; 4]);
     for (t, a) in mesh.tone.iter_mut().zip(occ) {
         t[3] = a;

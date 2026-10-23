@@ -40,12 +40,18 @@ struct Assembled {
     n_skin: usize,
     n_lod: usize,
     cuts: Cuts,
-    /// The body without its eye sockets (positions, normals: `lid_shading`, the occlusion bake).
-    unsocketed: (Vec<V3>, Vec<V3>),
+    /// The body's skin positions without its eye sockets (the occlusion bake), and its skin triangles on
+    /// them (`lid_shading`, the lids' tone).
+    unsocketed: Vec<V3>,
+    skin: OnMesh,
 }
 
 fn part<'a>(parts: &'a mut [(String, Mesh)], name: &str) -> &'a mut Mesh {
     &mut parts.iter_mut().find(|e| e.0 == name).unwrap_or_else(|| panic!("no part {name}")).1
+}
+
+fn get<'a>(parts: &'a [(String, Mesh)], name: &str) -> &'a Mesh {
+    &parts.iter().find(|e| e.0 == name).unwrap_or_else(|| panic!("no part {name}")).1
 }
 
 fn assemble(family: &str, stage: &str, cuts: Option<&Cuts>) -> Assembled {
@@ -64,8 +70,9 @@ fn assemble(family: &str, stage: &str, cuts: Option<&Cuts>) -> Assembled {
     lod_list.extend(extras.iter().filter(|m| m.skin_tone).map(strip));
     let mut parts = vec![("body".to_string(), merge(&body_list.iter().collect::<Vec<_>>())), ("lod.body".to_string(), merge(&lod_list.iter().collect::<Vec<_>>()))];
     let n_lids: usize = extras.iter().filter(|m| m.skin_tone).map(Mesh::len).sum();
+    let skin = OnMesh::new(&bd.unsocketed, &parts[0].1.idx, n_skin);
     let lids: Vec<V3> = {
-        let shade = lid_shading(&parts[0].1, n_skin, &bd.unsocketed);
+        let shade = lid_shading(&skin, &parts[0].1.nor);
         parts[0].1.pos[n_skin..n_skin + n_lids].iter().map(|&q| shade(q)).collect()
     };
     parts[0].1.nor[n_skin..n_skin + n_lids].copy_from_slice(&lids);
@@ -76,19 +83,18 @@ fn assemble(family: &str, stage: &str, cuts: Option<&Cuts>) -> Assembled {
         None => garment_cuts(family, &p),
     };
     parts.extend(build_clothes(family, stage, &cuts));
-    Assembled { parts, meta: bd.meta, p, head, face: f, n_skin, n_lod, cuts, unsocketed: bd.unsocketed }
+    Assembled { parts, meta: bd.meta, p, head, face: f, n_skin, n_lod, cuts, unsocketed: bd.unsocketed, skin }
 }
 
 /// A lid's normal at a point: the face's it lies on, the skin as it would be without the eye sockets
-/// (`bare`: the body's skin positions and normals so, on `m`'s skin triangles), at its nearest point, not
+/// (`skin`; `nor`: the body's normals, which are the skin's so), at its nearest point, not
 /// the eyeball's the lid is made round. The lids reach over the sockets out to the face (face.rs), where
 /// that is the skin's own, so a lid, open or closed, carries on the face round it rather than showing as a
 /// patch. (Not the low-detail body's: its coarse socket would turn them inside out.)
-fn lid_shading<'a>(m: &Mesh, n_skin: usize, bare: &'a (Vec<V3>, Vec<V3>)) -> impl Fn(V3) -> V3 + 'a {
-    let on = OnMesh::new(&bare.0, &m.idx, n_skin);
+fn lid_shading<'a>(skin: &'a OnMesh, nor: &'a [V3]) -> impl Fn(V3) -> V3 + 'a {
     move |q: V3| {
-        let (t, w) = on.at(q);
-        (bare.1[t[0]] * w[0] + bare.1[t[1]] * w[1] + bare.1[t[2]] * w[2]).normalize()
+        let (t, w) = skin.at(q);
+        (nor[t[0]] * w[0] + nor[t[1]] * w[1] + nor[t[2]] * w[2]).normalize()
     }
 }
 
@@ -99,9 +105,8 @@ fn lid_shading<'a>(m: &Mesh, n_skin: usize, bare: &'a (Vec<V3>, Vec<V3>)) -> imp
 /// `spread.0` of the body, where `spread.1` says) each vertex's shade is spread over its triangles
 /// (`ao::occlusion_spread`). The lids then take the shade of the skin they lie on (`build_family`).
 fn bake_ao(parts: &mut [(String, Mesh)], spread: (usize, &dyn Fn(V3) -> bool)) {
-    let get = |parts: &[(String, Mesh)], name: &str| parts.iter().find(|e| e.0 == name).map(|e| e.1.clone()).unwrap_or_else(|| panic!("no part {name}"));
-    let (body, lod) = (get(parts, "body"), get(parts, "lod.body"));
-    let face = ["eyes", "teeth", "tongue"].map(|n| get(parts, n));
+    let (body, lod) = (get(parts, "body").clone(), get(parts, "lod.body").clone());
+    let face = ["eyes", "teeth", "tongue"].map(|n| get(parts, n).clone());
     let [eyes, teeth, tongue] = &face;
     for (name, m) in parts.iter_mut() {
         let around: Vec<&Mesh> = if name == "body" || name == "lod.body" {
@@ -115,14 +120,8 @@ fn bake_ao(parts: &mut [(String, Mesh)], spread: (usize, &dyn Fn(V3) -> bool)) {
         } else {
             continue;
         };
-        if name == "body" {
-            let occ = ao::occlusion_spread(m, &around, ao::REACH, spread.0, spread.1);
-            for (t, a) in m.tone.iter_mut().zip(occ) {
-                t[3] = a;
-            }
-        } else {
-            ao::bake(m, &around, ao::REACH);
-        }
+        let occ = if name == "body" { ao::occlusion_spread(m, &around, ao::REACH, spread.0, spread.1) } else { ao::occlusion(m, &around, ao::REACH) };
+        ao::bake(m, occ);
     }
 }
 
@@ -187,7 +186,7 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
     // The skin is baked as it is without the eye sockets: they lie under the lids, which carry the face on
     // over them (face.rs), so the skin round a lid and the lid take the shade the face has there.
     let socketed = part(&mut base.parts, "body").pos[..base.n_skin].to_vec();
-    part(&mut base.parts, "body").pos[..base.n_skin].copy_from_slice(&base.unsocketed.0);
+    part(&mut base.parts, "body").pos[..base.n_skin].copy_from_slice(&base.unsocketed);
     bake_ao(&mut base.parts, (base.n_skin, &|p: V3| p.y > head.chin_y - 0.1 * head.hh));
     part(&mut base.parts, "body").pos[..base.n_skin].copy_from_slice(&socketed);
     // The face's skin pieces: the lids take the tone of the face they lie on (its shade too; the low-detail
@@ -195,7 +194,6 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
     for (name, k0) in [("body", base.n_skin), ("lod.body", base.n_lod)] {
         let m = part(&mut base.parts, name);
         let near = KdTree::new(&m.pos[..k0]);
-        let on = OnMesh::new(&base.unsocketed.0, &m.idx, k0);
         let mut k = k0;
         for piece in &base.face.body {
             if name == "lod.body" && !piece.skin_tone {
@@ -206,7 +204,7 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
                 m.tone[k + i] = if piece.skin_tone && name == "body" {
                     // (The face's tone at the lid's nearest point, as the face is without the socket; the
                     // upper lid's crease its own.)
-                    let (t, w) = on.at(*q);
+                    let (t, w) = base.skin.at(*q);
                     let at = |c: usize| (0..3).map(|j| m.tone[t[j]][c] * w[j]).sum::<f64>();
                     [at(0), piece.tone[i][1], at(2), at(3)]
                 } else if piece.skin_tone {
@@ -233,10 +231,10 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
     let mut morphs: Vec<(String, Deltas)> = base.face.morphs.clone();
     if let Some(face_d) = base.face.morphs.iter().find(|e| e.0 == "body").map(|e| e.1.clone()) {
         let n_lids: usize = base.face.body.iter().filter(|m| m.skin_tone).map(|m| m.pos.len()).sum();
-        let body = part(&mut base.parts, "body").clone();
-        let shade = lid_shading(&body, base.n_skin, &base.unsocketed);
+        let body = get(&base.parts, "body");
+        let shade = lid_shading(&base.skin, &body.nor);
         for (name, k, count) in [("body", base.n_skin, None), ("lod.body", base.n_lod, Some(n_lids))] {
-            let n = part(&mut base.parts, name).pos.len();
+            let n = get(&base.parts, name).pos.len();
             let mut d = Deltas::new();
             for (c, (dp, dn)) in &face_d {
                 let cnt = count.unwrap_or(dp.len());

@@ -212,10 +212,10 @@ export function outfitFor(
     // A long top and trousers.
     const t = cut('top.long');
     const b = cut('bottom.trousers');
-    return { ...day, cuts: [t.sleeve ?? c[0], t.hem ?? c[1], t.crew ?? OFF, t.scoop ?? OFF, b.waist ?? c[4], b.leg ?? c[5], OFF], over: 0, shirt: 0, bare: ALL_SHELLS };
+    return { ...day, cuts: [t.sleeve ?? c[0], t.hem ?? c[1], t.crew ?? OFF, t.scoop ?? OFF, b.waist ?? c[4], b.leg ?? c[5], OFF], over: 0, bare: ALL_SHELLS };
   }
   const waist = cut('bottom.trousers').waist ?? 1;
-  const f = fit ?? { chest: waist + 0.25, hip: waist - 0.15, knee: waist - 0.5, neck: waist + 0.4 };
+  const f = fit ?? { chest: waist + 0.25, hip: waist - 0.15, knee: waist - 0.5 };
   const thigh = f.hip - f.knee;
   const r = (k: number) => hash(id * 31 + k);
   const male = gender === 'male';
@@ -223,13 +223,13 @@ export function outfitFor(
     const towel = hexToLinear(pick(TOWELS, r(10)), TOWELS[0]);
     // The bottom's cut alone: from under the arms (round the hips) to mid-thigh (above the knees).
     const [top, hem] = male ? [waist + 0.01, f.knee + 0.15 * thigh] : [f.chest, f.knee + 0.6 * thigh];
-    return { ...day, bottom: towel, cuts: [OFF, 10, OFF, OFF, top, hem, OFF], over: 0, shirt: 0, plain: 1, bare: ALL_SHELLS };
+    return { ...day, bottom: towel, cuts: [OFF, 10, OFF, OFF, top, hem, OFF], over: 0, plain: 1, bare: ALL_SHELLS };
   }
   const suit = hexToLinear(pick(SWIMWEAR, r(11)), SWIMWEAR[0]);
   // Trunks; or a swimsuit, the tank top's cut down to the top of the legs.
-  if (male) return { ...day, bottom: suit, cuts: [OFF, 10, OFF, OFF, waist - 0.03, f.knee + 0.65 * thigh, OFF], over: 0, shirt: 0, plain: 1, bare: ALL_SHELLS };
+  if (male) return { ...day, bottom: suit, cuts: [OFF, 10, OFF, OFF, waist - 0.03, f.knee + 0.65 * thigh, OFF], over: 0, plain: 1, bare: ALL_SHELLS };
   const t = cut('top.tank');
-  return { ...day, top: suit, cuts: [t.sleeve ?? -0.62, f.hip - 0.035, t.crew ?? OFF, t.scoop ?? 0, OFF, 10, OFF], over: 0, shirt: 0, plain: 1, bare: ALL_SHELLS };
+  return { ...day, top: suit, cuts: [t.sleeve ?? -0.62, f.hip - 0.035, t.crew ?? OFF, t.scoop ?? 0, OFF, 10, OFF], over: 0, plain: 1, bare: ALL_SHELLS };
 }
 
 /** Day outfit (or its colours as pyjamas, `sleep`). */

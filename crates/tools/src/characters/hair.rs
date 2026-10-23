@@ -25,8 +25,8 @@
 
 use super::contract::{BEARD_FAMILIES, HAIR_STYLES};
 use super::head::HeadFrame;
-use super::meshops::smooth_normals;
-use super::np::{PI, Periodic, TAU, clip, interp, linspace, linspace_open, pairwise_sum, py_mod, radians, smoothstep};
+use super::meshops::{nearest_point, ray_hit, smooth_normals};
+use super::np::{PI, Periodic, TAU, clip, interp, linspace, linspace_open, mean_rows, pairwise_sum, py_mod, radians, smoothstep};
 use super::prims::{caps, ellipsoid, grid, loft, noise3, orient, rings_mesh, spline, torus};
 use super::rig::{NB, b};
 use super::{Mesh, V3, v3};
@@ -103,11 +103,10 @@ impl<'a> Scalp<'a> {
         let h = self.h;
         let d = Scalp::dirs(a, phi).component_mul(&h.radii);
         // Over the ears no further out than the skull ellipsoid (which holds the cranium), so the
-        // ears don't push the hair about; caps go round them (`round_ear`), curtains out over them.
+        // ears don't push the hair about; caps go round them (`Oval`), curtains out over them.
         let hi0 = if self.cranium {
             // Past the ellipsoid only away from the ears (the brow and forehead may stand out of it).
-            let aa = (py_mod(a + PI, TAU) - PI).abs();
-            let ear = (-((aa - PI / 2.0) / 0.6).powi(2)).exp() * (-((phi - PI / 2.0) / 0.5).powi(2)).exp();
+            let ear = (-((self::round(a) - PI / 2.0) / 0.6).powi(2)).exp() * (-((phi - PI / 2.0) / 0.5).powi(2)).exp();
             1.0 + 0.6 * (1.0 - smoothstep(0.15, 0.5, ear))
         } else {
             2.5
@@ -279,6 +278,7 @@ impl Oval {
         let line = along(&line, &|_| 1.0, &linspace(0.0, 1.0, m));
         let sig = RIM_ROUND / (length(&line) / (m - 1) as f64);
         let w = (3.0 * sig).ceil() as isize;
+        let kernel: Vec<f64> = (-w..=w).map(|k| (-0.5 * (k as f64 / sig).powi(2)).exp()).collect();
         let at = |i: isize| -> [f64; 2] {
             let (k, end) = if i < 0 { (-i, 0) } else if i >= m as isize { (2 * (m as isize - 1) - i, m - 1) } else { return line[i as usize] };
             let p = line[k.clamp(0, m as isize - 1) as usize];
@@ -287,8 +287,7 @@ impl Oval {
         let smooth: Vec<[f64; 2]> = (0..m as isize)
             .map(|i| {
                 let (mut sx, mut sy, mut sw) = (0.0, 0.0, 0.0);
-                for k in -w..=w {
-                    let wk = (-0.5 * (k as f64 / sig).powi(2)).exp();
+                for (k, &wk) in (-w..=w).zip(&kernel) {
                     let p = at(i + k);
                     sx += wk * p[0];
                     sy += wk * p[1];
@@ -388,8 +387,8 @@ impl Ears {
                 continue;
             }
             let ray = v3(e.side, 0.0123, 0.0071).normalize();
-            let inside = e.near.iter().filter(|t| hit(p, ray, t).is_some()).count() % 2 == 1;
-            let q = e.own.iter().map(|t| closest(p, t)).min_by(|a, b| (a - p).norm_squared().total_cmp(&(b - p).norm_squared())).unwrap();
+            let inside = e.near.iter().filter(|t| ray_hit(p, ray, t).is_some()).count() % 2 == 1;
+            let q = e.own.iter().map(|t| nearest_point(p, t)).min_by(|a, b| (a - p).norm_squared().total_cmp(&(b - p).norm_squared())).unwrap();
             let d = (q - p).norm();
             let out = if inside { q - p } else { p - q } / d.max(1e-9);
             let v = if inside { d } else { -d };
@@ -404,58 +403,8 @@ impl Ears {
     pub fn cut(&self, p: V3, q: V3) -> bool {
         let l = (q - p).norm();
         let d = (q - p) / l.max(1e-12);
-        self.ears.iter().any(|e| (0..3).all(|k| e.lo[k] <= p[k].max(q[k]) && p[k].min(q[k]) <= e.hi[k]) && e.own.iter().any(|t| hit(p, d, t).is_some_and(|s| s < l)))
+        self.ears.iter().any(|e| (0..3).all(|k| e.lo[k] <= p[k].max(q[k]) && p[k].min(q[k]) <= e.hi[k]) && e.own.iter().any(|t| ray_hit(p, d, t).is_some_and(|s| s < l)))
     }
-}
-
-/// How far along the ray from o (d a unit vector) it crosses the triangle, if it does
-/// (Moller-Trumbore).
-fn hit(o: V3, d: V3, [a, b, c]: &[V3; 3]) -> Option<f64> {
-    let (e1, e2) = (b - a, c - a);
-    let pv = d.cross(&e2);
-    let det = e1.dot(&pv);
-    if det.abs() < 1e-14 {
-        return None;
-    }
-    let tv = o - a;
-    let u = tv.dot(&pv) / det;
-    let qv = tv.cross(&e1);
-    let v = d.dot(&qv) / det;
-    let t = e2.dot(&qv) / det;
-    (u >= 0.0 && v >= 0.0 && u + v <= 1.0 && t > 0.0).then_some(t)
-}
-
-/// The nearest point of a triangle to p (Ericson, Real-Time Collision Detection 5.1.5).
-fn closest(p: V3, [a, b, c]: &[V3; 3]) -> V3 {
-    let (ab, ac, ap) = (b - a, c - a, p - a);
-    let (d1, d2) = (ab.dot(&ap), ac.dot(&ap));
-    if d1 <= 0.0 && d2 <= 0.0 {
-        return *a;
-    }
-    let bp = p - b;
-    let (d3, d4) = (ab.dot(&bp), ac.dot(&bp));
-    if d3 >= 0.0 && d4 <= d3 {
-        return *b;
-    }
-    let vc = d1 * d4 - d3 * d2;
-    if vc <= 0.0 && d1 >= 0.0 && d3 <= 0.0 {
-        return a + ab * (d1 / (d1 - d3));
-    }
-    let cp = p - c;
-    let (d5, d6) = (ab.dot(&cp), ac.dot(&cp));
-    if d6 >= 0.0 && d5 <= d6 {
-        return *c;
-    }
-    let vb = d5 * d2 - d1 * d6;
-    if vb <= 0.0 && d2 >= 0.0 && d6 <= 0.0 {
-        return a + ac * (d2 / (d2 - d6));
-    }
-    let va = d3 * d6 - d5 * d4;
-    if va <= 0.0 && d4 - d3 >= 0.0 && d5 - d6 >= 0.0 {
-        return b + (c - b) * ((d4 - d3) / ((d4 - d3) + (d5 - d6)));
-    }
-    let den = 1.0 / (va + vb + vc);
-    a + ab * (vb * den) + ac * (vc * den)
 }
 
 /// The least distance to the head (sdf) at and round a point.
@@ -505,6 +454,11 @@ type Field<'a> = &'a dyn Fn(f64, f64) -> f64;
 /// 4k), 1 in a lock's middle (4k + 2).
 fn lock_at(j: f64) -> f64 {
     (PI * j / 4.0).sin().abs().powf(0.6)
+}
+
+/// `lock_at` across `cols` columns starting half a lock in (whole locks at the edges).
+fn locks(cols: usize) -> Vec<f64> {
+    (0..cols).map(|j| lock_at((j + 2) as f64)).collect()
 }
 
 /// A fixed 0..1 for lock k of a component (seed), so lengths and tips vary from lock to lock.
@@ -781,7 +735,7 @@ fn slab(mid: &[Vec<V3>], nrm: &[Vec<V3>], half: &[Vec<f64>], curl: f64, bands: &
 /// Clump bands across a sheet's columns (whole locks at its edges): light in the locks' middles,
 /// varying from lock to lock.
 fn lock_bands(cols: usize, seed: f64) -> Vec<f64> {
-    (0..cols).map(|j| clip(0.15 + 0.7 * lock_at((j + 2) as f64) * (0.75 + 0.25 * jitter((j + 2) / 4, seed)), 0.0, 1.0)).collect()
+    locks(cols).iter().enumerate().map(|(j, l)| clip(0.15 + 0.7 * l * (0.75 + 0.25 * jitter((j + 2) / 4, seed)), 0.0, 1.0)).collect()
 }
 
 /// How far out hair hangs at azimuth a, by height: the scalp's section there (a share of the skull
@@ -835,7 +789,7 @@ fn curtain(sc: &Scalp, c: Curtain) -> Comp {
     let cols = 4 * c.locks + 1;
     let a = linspace(c.a0, c.a1, cols);
     // Whole locks at the edges, the partings between them.
-    let lk: Vec<f64> = (0..cols).map(|j| lock_at((j + 2) as f64)).collect();
+    let lk = locks(cols);
     let seed = c.seed as f64;
     let tt: Vec<f64> = a.iter().map(|&a| (c.top)(a)).collect();
     let bt: Vec<f64> = (0..cols).map(|j| (c.bottom)(a[j]) - c.tip * (0.35 + 0.65 * jitter((j + 2) / 4, seed)) * lk[j].powf(c.sharp)).collect();
@@ -902,7 +856,7 @@ struct Fringe<'a> {
 fn fringe(face: &Scalp, c: Fringe) -> Comp {
     let cols = 4 * c.locks + 1;
     let a = linspace(c.a0, c.a1, cols);
-    let lk: Vec<f64> = (0..cols).map(|j| lock_at((j + 2) as f64)).collect();
+    let lk = locks(cols);
     let t0: Vec<f64> = a.iter().map(|&a| (c.top)(a)).collect();
     let t1: Vec<f64> = (0..cols).map(|j| at_height(face, a[j], (c.bottom)(a[j]) - c.tip * (0.5 + 0.5 * jitter((j + 2) / 4, c.seed)) * lk[j].powf(c.sharp), t0[j] + 0.02)).collect();
     let us = linspace(0.0, 1.0, c.rows);
@@ -988,7 +942,7 @@ fn grooved(m: &mut super::prims::Prim, segs: usize, grooves: f64, depth: f64, tw
     let rings = m.t.len() / segs;
     let mut z = vec![0.5; m.pos.len()];
     for r in 0..rings {
-        let c = m.pos[r * segs..(r + 1) * segs].iter().fold(V3::zeros(), |s, p| s + p) / segs as f64;
+        let c = mean_rows(&m.pos[r * segs..(r + 1) * segs]);
         for q in 0..segs {
             let i = r * segs + q;
             let g = (TAU * q as f64 / segs as f64 * grooves + twist * m.t[i]).cos();
@@ -1256,7 +1210,7 @@ fn beard(sc: &Scalp) -> Comp {
     let hh = h.hh;
     let (cols, rows) = (25, 12);
     let a = linspace(-radians(94.0), radians(94.0), cols);
-    let lk: Vec<f64> = (0..cols).map(|j| lock_at((j + 2) as f64)).collect();
+    let lk = locks(cols);
     // Mouth direction (polar angle) and the hole round it.
     let qm = (h.mouth - h.centre).component_div(&h.radii);
     let phm = (qm[1] / qm.norm()).acos();

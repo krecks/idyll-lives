@@ -28,7 +28,7 @@ use std::sync::Arc;
 use super::cage::{Cage, Tags, Weights};
 use super::kdtree::KdTree;
 use super::np::{PI, clip, linspace_open, mean, median, radians, sign};
-use super::rig::{b, joints, proportions};
+use super::rig::{Proportions, b, joints, proportions};
 use super::{Cache, V3, key, v3};
 
 /// Rows from the jaw up: elevation (degrees) of the ray from the head's middle (`MIDDLE`) at the
@@ -163,6 +163,11 @@ pub fn youth(stage_hh: f64) -> f64 {
     clip((stage_hh - 1.0 / 6.5) / (1.0 / 3.4 - 1.0 / 6.5), 0.0, 1.0)
 }
 
+/// An eyeball's radius (m): the sockets are carved round it.
+fn eye_radius(pr: &Proportions) -> f64 {
+    (0.075 + 0.02 * youth(pr.hh)) * pr.hh * pr.h
+}
+
 /// Approximate signed distance to an ellipsoid (exact on its surface).
 fn ellipsoid_sd(p: V3, c: V3, r: V3) -> f64 {
     let q = (p - c).component_div(&r);
@@ -229,7 +234,7 @@ fn cast(f: &impl Fn(V3) -> f64, o: V3, d: V3) -> V3 {
 pub fn sockets(family: &str, stage: &str, lod: bool) -> impl Fn(V3) -> V3 {
     let pr = proportions(family, stage);
     let j = joints(family, stage);
-    let r = (0.075 + 0.02 * youth(pr.hh)) * pr.hh * pr.h;
+    let r = eye_radius(&pr);
     let eyes = [j[b("eye_l")], j[b("eye_r")]];
     let [over, side, r0, cv, ch, c4] = SOCKET;
     move |p: V3| {
@@ -638,9 +643,8 @@ fn make_head_frame(family: &str, stage: &str) -> HeadFrame {
     let j = joints(family, stage);
     let (hgt, hh) = (pr.h, pr.hh * pr.h);
     let chin_y = hgt - hh;
-    let yg = youth(pr.hh);
     let eyes = [j[b("eye_l")], j[b("eye_r")]];
-    let eye_r = (0.075 + 0.02 * yg) * hh;
+    let eye_r = eye_radius(&pr);
     // The cranium's ellipsoid: round the head above the ears (ears and face excluded).
     let cran = &srf.cranium;
     let zmin = cran.iter().map(|p| p.z).fold(f64::INFINITY, f64::min);

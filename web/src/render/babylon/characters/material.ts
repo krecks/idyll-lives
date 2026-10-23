@@ -199,6 +199,15 @@ const AO_GAIN = '1.5';
 const AO_AGE = '0.6';
 /** How dark the face's age folds (body tone.z) are on an elder (texel 4 g = 1); younger, less. */
 const FOLD = '0.3';
+/** The occlusion's darkening, at `gain` per unit of tone.w. */
+const ao = (gain: string): string => `(1.0 - ${AO_DARK} * clamp(${gain} * simT.w, 0.0, 1.0))`;
+/** The painted cuts' bands on the body (`simHem`): the top's edges and the bottom's. */
+const HEM_TOP = `max(max(simHem((simA.w - simF.x) * 0.55, ${BAND.cuff}), simHem(simF.y - c1, ${BAND.hem})), max(simHem(simF.z - c2, ${BAND.rib}), simHem(simF.w - c3, ${BAND.binding}))) * simPlain`;
+const HEM_BOTTOM = `max(simHem(simT4.w - simF.y, ${BAND.waistband}), simHem(simF.y - c5, ${BAND.hem})) * simPlain`;
+/** A shoe's laces: across the instep between the eyelets, under the collar. */
+const LACE = `(1.0 - smoothstep(0.009 - lW, 0.009 + lW, abs(simF.w))) * (1.0 - smoothstep(0.06, 0.065, simF.x)) * smoothstep(0.01, 0.014, simF.x) * mix(smoothstep(0.28 - lAA, 0.28 + lAA, abs(fract(lBar) - 0.5)), 0.44, smoothstep(0.25, 0.5, lAA))`;
+/** The hair's highlight band: sharp along the strands up close, broad where they blur. */
+const HAIR_BAND = `mix(pow(hS, 6.0), 0.35 * hS * hS, smoothstep(0.08, 0.25, fwidth(hTH))) * smoothstep(0.0, 0.35, dot(normalW, hHalf)) * mix(0.6, 1.2, hClump)`;
 
 function wgsl(shaderType: string, off: number, morph: MorphBinding | null): { [pointName: string]: string } {
   if (shaderType === 'vertex') {
@@ -298,8 +307,8 @@ let simCloth = max(max(simTop, simBottom), simShoe);
 // Fabric along the cuts: the cuffs, the top's hem, a crew neck's rib or a scoop's binding, the waistband,
 // the legs' hems and the shoes' welt; none on plain clothes (texel 4 r < 0: the towel, swimwear).
 let simPlain = select(1.0, 0.0, simT4.x < -0.5);
-let simHemTop = max(max(simHem((simA.w - simF.x) * 0.55, ${BAND.cuff}), simHem(simF.y - c1, ${BAND.hem})), max(simHem(simF.z - c2, ${BAND.rib}), simHem(simF.w - c3, ${BAND.binding}))) * simPlain;
-let simHemBottom = max(simHem(simT4.w - simF.y, ${BAND.waistband}), simHem(simF.y - c5, ${BAND.hem})) * simPlain;
+let simHemTop = ${HEM_TOP};
+let simHemBottom = ${HEM_BOTTOM};
 let simHemShoe = simHem(gShoe, ${BAND.welt}) * simPlain;
 #endif
 #ifdef SIMCLOTH
@@ -339,7 +348,7 @@ let simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, simC
   cShoe = simFabric(cShoe, simHemShoe);
   let topOver = mix(mix(skin, cBottom, simBottom), cTop, simTop);
   let topUnder = mix(mix(skin, cTop, simTop), cBottom, simBottom);
-  surfaceAlbedo = mix(select(topUnder, topOver, simT4.x > 0.5), cShoe, simShoe) * (1.0 - ${AO_DARK} * clamp((${AO_GAIN} + ${AO_AGE} * simT4.y) * simT.w, 0.0, 1.0));
+  surfaceAlbedo = mix(select(topUnder, topOver, simT4.x > 0.5), cShoe, simShoe) * ${ao(`(${AO_GAIN} + ${AO_AGE} * simT4.y)`)};
 }
 #endif
 #ifdef SIMCLOTH
@@ -356,12 +365,12 @@ let simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, simC
   let lBar = simF.x / 0.012;
   let lAA = fwidth(lBar);
   let lW = fwidth(simF.w);
-  let lace = (1.0 - smoothstep(0.009 - lW, 0.009 + lW, abs(simF.w))) * (1.0 - smoothstep(0.06, 0.065, simF.x)) * smoothstep(0.01, 0.014, simF.x) * mix(smoothstep(0.28 - lAA, 0.28 + lAA, abs(fract(lBar) - 0.5)), 0.44, smoothstep(0.25, 0.5, lAA));
+  let lace = ${LACE};
   let laceC = select(c * 0.45, mix(c, vec3f(0.85), 0.7), dot(c, vec3f(0.333)) < 0.3);
   let shoe = simF.z > 1.5;
   surfaceAlbedo = select(surfaceAlbedo, vec3f(0.8, 0.78, 0.74), shoe && abs(simF.y - 4.0) < 0.5);
   surfaceAlbedo = mix(surfaceAlbedo, c * 0.3, select(0.0, 1.0 - smoothstep(-0.002, 0.0, simF.x), shoe));
-  surfaceAlbedo = mix(surfaceAlbedo, laceC, select(0.0, lace, shoe)) * (1.0 - ${AO_DARK} * clamp(${AO_GAIN} * simT.w, 0.0, 1.0));
+  surfaceAlbedo = mix(surfaceAlbedo, laceC, select(0.0, lace, shoe)) * ${ao(AO_GAIN)};
 }
 #endif
 #ifdef SIMHAIR
@@ -379,10 +388,10 @@ let simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, simC
   let hHalf = normalize(viewDirectionW + vec3f(0.0, 1.0, 0.0));
   let hTH = dot(hDown, hHalf);
   let hS = 1.0 - hTH * hTH;
-  let hBand = mix(pow(hS, 6.0), 0.35 * hS * hS, smoothstep(0.08, 0.25, fwidth(hTH))) * smoothstep(0.0, 0.35, dot(normalW, hHalf)) * mix(0.6, 1.2, hClump);
+  let hBand = ${HAIR_BAND};
   var hCol = mix(hc * (1.0 + 0.45 * (hClump - 0.5)), hTint, 0.28 * hDark * hClump);
   hCol = mix(hCol, hTint, hBand * mix(0.3, 0.75, hDark));
-  surfaceAlbedo = hCol * (1.0 - 0.5 * clamp(simT.y, 0.0, 1.0)) * (1.0 - ${AO_DARK} * clamp(${AO_GAIN} * simT.w, 0.0, 1.0));
+  surfaceAlbedo = hCol * (1.0 - 0.5 * clamp(simT.y, 0.0, 1.0)) * ${ao(AO_GAIN)};
 }
 #endif
 #ifdef SIMBROW
@@ -531,8 +540,8 @@ float simBottom = smoothstep(-1.0, 1.0, gBottom / max(fwidth(gBottom), 1e-5));
 float simShoe = smoothstep(-1.0, 1.0, gShoe / max(fwidth(gShoe), 1e-5));
 float simCloth = max(max(simTop, simBottom), simShoe);
 float simPlain = simT4.x < -0.5 ? 0.0 : 1.0;
-vec2 simHemTop = max(max(simHem((simA.w - simF.x) * 0.55, ${BAND.cuff}), simHem(simF.y - c1, ${BAND.hem})), max(simHem(simF.z - c2, ${BAND.rib}), simHem(simF.w - c3, ${BAND.binding}))) * simPlain;
-vec2 simHemBottom = max(simHem(simT4.w - simF.y, ${BAND.waistband}), simHem(simF.y - c5, ${BAND.hem})) * simPlain;
+vec2 simHemTop = ${HEM_TOP};
+vec2 simHemBottom = ${HEM_BOTTOM};
 vec2 simHemShoe = simHem(gShoe, ${BAND.welt}) * simPlain;
 #endif
 #ifdef SIMCLOTH
@@ -566,7 +575,7 @@ float simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, si
   cShoe = simFabric(cShoe, simHemShoe);
   vec3 topOver = mix(mix(skin, cBottom, simBottom), cTop, simTop);
   vec3 topUnder = mix(mix(skin, cTop, simTop), cBottom, simBottom);
-  surfaceAlbedo = mix(simT4.x > 0.5 ? topOver : topUnder, cShoe, simShoe) * (1.0 - ${AO_DARK} * clamp((${AO_GAIN} + ${AO_AGE} * simT4.y) * simT.w, 0.0, 1.0));
+  surfaceAlbedo = mix(simT4.x > 0.5 ? topOver : topUnder, cShoe, simShoe) * ${ao(`(${AO_GAIN} + ${AO_AGE} * simT4.y)`)};
 }
 #endif
 #ifdef SIMCLOTH
@@ -580,12 +589,12 @@ float simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, si
   float lBar = simF.x / 0.012;
   float lAA = fwidth(lBar);
   float lW = fwidth(simF.w);
-  float lace = (1.0 - smoothstep(0.009 - lW, 0.009 + lW, abs(simF.w))) * (1.0 - smoothstep(0.06, 0.065, simF.x)) * smoothstep(0.01, 0.014, simF.x) * mix(smoothstep(0.28 - lAA, 0.28 + lAA, abs(fract(lBar) - 0.5)), 0.44, smoothstep(0.25, 0.5, lAA));
+  float lace = ${LACE};
   vec3 laceC = dot(c, vec3(0.333)) < 0.3 ? mix(c, vec3(0.85), 0.7) : c * 0.45;
   bool shoe = simF.z > 1.5;
   if (shoe && abs(simF.y - 4.0) < 0.5) surfaceAlbedo = vec3(0.8, 0.78, 0.74);
   surfaceAlbedo = mix(surfaceAlbedo, c * 0.3, shoe ? 1.0 - smoothstep(-0.002, 0.0, simF.x) : 0.0);
-  surfaceAlbedo = mix(surfaceAlbedo, laceC, shoe ? lace : 0.0) * (1.0 - ${AO_DARK} * clamp(${AO_GAIN} * simT.w, 0.0, 1.0));
+  surfaceAlbedo = mix(surfaceAlbedo, laceC, shoe ? lace : 0.0) * ${ao(AO_GAIN)};
 }
 #endif
 #ifdef SIMHAIR
@@ -599,10 +608,10 @@ float simCatch = 1.0 - smoothstep(0.2 * simF.z - simAA, 0.2 * simF.z + simAA, si
   vec3 hHalf = normalize(viewDirectionW + vec3(0.0, 1.0, 0.0));
   float hTH = dot(hDown, hHalf);
   float hS = 1.0 - hTH * hTH;
-  float hBand = mix(pow(hS, 6.0), 0.35 * hS * hS, smoothstep(0.08, 0.25, fwidth(hTH))) * smoothstep(0.0, 0.35, dot(normalW, hHalf)) * mix(0.6, 1.2, hClump);
+  float hBand = ${HAIR_BAND};
   vec3 hCol = mix(hc * (1.0 + 0.45 * (hClump - 0.5)), hTint, 0.28 * hDark * hClump);
   hCol = mix(hCol, hTint, hBand * mix(0.3, 0.75, hDark));
-  surfaceAlbedo = hCol * (1.0 - 0.5 * clamp(simT.y, 0.0, 1.0)) * (1.0 - ${AO_DARK} * clamp(${AO_GAIN} * simT.w, 0.0, 1.0));
+  surfaceAlbedo = hCol * (1.0 - 0.5 * clamp(simT.y, 0.0, 1.0)) * ${ao(AO_GAIN)};
 }
 #endif
 #ifdef SIMBROW

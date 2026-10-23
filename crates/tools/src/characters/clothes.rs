@@ -989,7 +989,7 @@ fn upper_layout(family: &str, gid: &str, lod: bool) -> Arc<UpperLayout> {
         };
         let mut pts: Vec<Bary> = (0..pos.len()).map(Bary::at).collect();
         let mut tri = idx;
-        for _ in 0..if lod { 0 } else { 1 } {
+        if !lod {
             let a: Vec<(f64, f64)> = pts.iter().map(&attrs).map(|a| (a.2, a.4)).collect();
             // The edges the collar crosses (on the shoe: the clip field over 0 at an end).
             tri = refine(&mut pts, &tri, |i, j| (a[i].1 > -0.01 || a[j].1 > -0.01) && (a[i].0 > 0.0) != (a[j].0 > 0.0));
@@ -1009,7 +1009,8 @@ fn upper_layout(family: &str, gid: &str, lod: bool) -> Arc<UpperLayout> {
         // across the big triangles there).
         let at: Vec<V3> = pts.iter().zip(&mid).map(|(p, m)| p.curved(pos, &fine, m)).collect();
         let edge: Vec<V3> = (0..at.len()).filter(|&i| src.0[i] != src.1[i] && hem[i].abs() < 1e-4).map(|i| at[i]).collect();
-        let mut hem: Vec<f64> = at.iter().zip(&hem).map(|(q, &h)| if h <= 0.0 { 0.0 } else { edge.iter().map(|e| (q - e).norm()).fold(f64::INFINITY, f64::min) }).collect();
+        let edge = KdTree::new(&edge);
+        let mut hem: Vec<f64> = at.iter().zip(&hem).map(|(q, &h)| if h <= 0.0 { 0.0 } else { edge.query(q, 1).first().map_or(f64::INFINITY, |e| e.0) }).collect();
         for sx in [-1.0, 1.0] {
             let laced: Vec<usize> = (0..at.len()).filter(|&i| sign(at[i].x) == sx && across[i] < 1.0).collect();
             let middle = |i: &&usize| across[**i].abs() < 0.012;
@@ -1150,15 +1151,15 @@ fn sole(family: &str, stage: &str, gid: &str, up: &Mesh, side: f64, segs: usize)
     (pos, idx, flags)
 }
 
-/// A shoe: the upper and a sole under each foot.
-fn shoe(family: &str, stage: &str, gid: &str, lod: bool) -> Mesh {
+/// A shoe: the upper and a sole under each foot (cut round `full`, the full-detail upper).
+fn shoe(family: &str, stage: &str, gid: &str, full: &Mesh, lod: bool) -> Mesh {
     let s = surface(family, stage);
-    let up = upper(family, stage, gid, lod);
-    let full = if lod { upper(family, stage, gid, false) } else { up.clone() };
+    let lod_up = lod.then(|| upper(family, stage, gid, true));
+    let up = lod_up.as_ref().unwrap_or(full);
     let (mut pos, mut flags) = (Vec::new(), Vec::new());
     let mut idx = Vec::new();
     for side in [-1.0, 1.0] {
-        let (p, i, f) = sole(family, stage, gid, &full, side, if lod { 10 } else { 18 });
+        let (p, i, f) = sole(family, stage, gid, full, side, if lod { 10 } else { 18 });
         let n = pos.len();
         idx.extend(i.iter().map(|&v| v + n));
         pos.extend(p);
@@ -1169,7 +1170,7 @@ fn shoe(family: &str, stage: &str, gid: &str, lod: bool) -> Mesh {
     let fields = flags.iter().map(|&f| [0.05, f, SHOES, 1.0]).collect();
     let n = pos.len();
     let sole = Mesh { pos, nor, idx, dense, fields, tone: vec![[0.0; 4]; n], ..Mesh::default() };
-    super::merge(&[&up, &sole])
+    super::merge(&[up, &sole])
 }
 
 /// Every shell of `family` at `stage`, each with a low-detail copy (`lod.<id>`).
@@ -1193,8 +1194,9 @@ pub fn build_clothes(family: &str, stage: &str, cuts: &Cuts) -> Vec<(String, Mes
         out.push(("lod.bottom.skirt".into(), skirt_shell(family, stage, cuts, 12, 4)));
     }
     for gid in cuts.keys().filter(|g| g.starts_with("shoes.")) {
-        out.push((gid.to_string(), shoe(family, stage, gid, false)));
-        out.push((format!("lod.{gid}"), shoe(family, stage, gid, true)));
+        let full = upper(family, stage, gid, false);
+        out.push((gid.to_string(), shoe(family, stage, gid, &full, false)));
+        out.push((format!("lod.{gid}"), shoe(family, stage, gid, &full, true)));
     }
     out
 }

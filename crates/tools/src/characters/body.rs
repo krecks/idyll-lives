@@ -679,8 +679,8 @@ pub struct Surface {
     pub tags: TagArrays,
     pub region: Vec<[f64; NR]>,
     pub nor: Vec<V3>,
-    /// Level 1 as it would be without the eye sockets, and its normals: what the lids are shaded as.
-    pub unsocketed: (Vec<V3>, Vec<V3>),
+    /// Level 1 as it would be without the eye sockets (`nor` is its normals): what the lids are shaded as.
+    pub unsocketed: Vec<V3>,
     pub ears: [[V3; 2]; 2],
     pub head_samples: Vec<V3>,
     pub head_normals: Vec<V3>,
@@ -732,7 +732,7 @@ fn make_surface(family: &str, stage: &str) -> Surface {
     let bare_nor = smooth_normals(&bare, &triangles(&topo.s2.quads, &bare).concat());
     let nor = bare_nor[..pos.len()].to_vec();
     let lod_nor = bare_nor[..topo.n].to_vec();
-    let unsocketed = (bare[..pos.len()].to_vec(), nor.clone());
+    let unsocketed = bare[..pos.len()].to_vec();
     let freg = topo.fine_m.apply_n(&region);
     let (ri_head, ri_ear, ri_neck) = (super::body::region("head"), super::body::region("ear"), super::body::region("neck"));
     let mut ears = [[V3::zeros(); 2]; 2];
@@ -808,8 +808,8 @@ pub struct Body {
     pub lod: Mesh,
     pub meta: Meta,
     pub joints: [V3; NB],
-    /// `body` without the eye sockets (positions, normals; `Surface::unsocketed`).
-    pub unsocketed: (Vec<V3>, Vec<V3>),
+    /// `body`'s positions without the eye sockets (`Surface::unsocketed`; its normals are so already).
+    pub unsocketed: Vec<V3>,
 }
 
 /// The body of `family` at `stage` (and its low-detail copy); see the module docs.

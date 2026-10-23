@@ -302,19 +302,19 @@ pub struct Face {
     seams: [[Vec<V3>; 2]; 2],
 }
 
-/// The triangles of a head without its sockets round its eyes.
-fn round_eyes(head: &HeadFrame) -> Vec<[V3; 3]> {
+/// Those of a head's triangles (`tris`: its `bare` or its `tris`) round its eyes.
+fn round_eyes(head: &HeadFrame, tris: &[[V3; 3]]) -> Vec<[V3; 3]> {
     let (e, r) = (head.eyes[1], head.eye_r);
-    head.bare.iter().filter(|t| t.iter().any(|p| (p.y - e.y).abs() < 3.0 * r && (p.x.abs() - e.x).abs() < 3.0 * r)).copied().collect()
+    tris.iter().filter(|t| t.iter().any(|p| (p.y - e.y).abs() < 3.0 * r && (p.x.abs() - e.x).abs() < 3.0 * r)).copied().collect()
 }
 
 impl Face {
     fn new(family: &str, head: Arc<HeadFrame>) -> Self {
         let mm = 0.001 * head.hh / ADULT_HH;
         let hw = head.mouth_w / 2.0 * 0.92;
-        let bare = round_eyes(&head);
+        let bare = round_eyes(&head, &head.bare);
         let base = head_frame(family, BASE_STAGE);
-        let base = (base.clone(), round_eyes(&base));
+        let base = (base.clone(), round_eyes(&base, &base.bare));
         let mut f = Face { h: head, st: style(family), mm, hw, m0: (0.0, 0.0), mcoef: Vec::new(), mfloor: 0.0, bare, base, seams: Default::default() };
         f.fit_mouth();
         f.seams();
@@ -418,8 +418,7 @@ impl Face {
     fn seams(&mut self) {
         let (h, bh) = (self.h.clone(), self.base.0.clone());
         let (r, rb) = (h.eye_r, bh.eye_r);
-        let near = |t: &&[V3; 3]| t.iter().any(|p| (p.y - bh.eyes[1].y).abs() < 3.0 * rb && (p.x.abs() - bh.eyes[1].x).abs() < 3.0 * rb);
-        let skin: Vec<[V3; 3]> = bh.tris.iter().filter(near).copied().collect();
+        let skin = round_eyes(&bh, &bh.tris);
         for k in 0..2 {
             let (e, out) = (h.eyes[k], if k == 1 { 1.0 } else { -1.0 });
             for (s, sy) in [1.0, -1.0].into_iter().enumerate() {
@@ -525,11 +524,11 @@ impl Face {
         // by `dz`) instead of on the eye at its sides.
         let (u0, l0) = self.lid_edges(&Params::default(), k);
         let shut: Vec<f64> = (0..n).map(|i| smoothstep(LID_SHUT.0, LID_SHUT.1, u0[i] - l0[i])).collect();
+        let lift = |rim: Vec<V3>, dz: &[f64]| -> Vec<V3> { rim.iter().zip(dz).map(|(q, d)| q + v3(0.0, 0.0, *d)).collect() };
         let raised = |edge: Vec<V3>| -> (Vec<V3>, Vec<f64>) {
             let dz: Vec<f64> = edge.iter().zip(&shut).map(|(q, s)| s * (self.lid_z(k, q.x, q.y) - q.z).max(0.0)).collect();
-            (edge.iter().zip(&dz).map(|(q, d)| q + v3(0.0, 0.0, *d)).collect(), dz)
+            (lift(edge, &dz), dz)
         };
-        let lift = |rim: Vec<V3>, dz: &[f64]| -> Vec<V3> { rim.iter().zip(dz).map(|(q, d)| q + v3(0.0, 0.0, *d)).collect() };
         // Upper: from where it meets the face over the socket down to the edge on the eye, then the
         // rim turning in to the eye.
         let (eu, dzu) = raised(row(&|i| u[i], ru, &lt));
