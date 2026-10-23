@@ -184,8 +184,12 @@ The points lie on a smooth head (a soft union of a cranium, cheeks-and-jaw, a mu
 ellipsoid: the face from the nose down stands up rather than sloping back to the chin); the features
 are offsets on them: the nose (a bridge from between the eyes to a round tip over the nose's base,
 its wings beside the tip and the base), the upper lip rounded forward with a groove down its middle
-(the philtrum), the brow, the ears, and round each eye a smooth dish the eyeball's front half
-stands out of (the lids cover its rim). The LOD keeps the 8 x 12 grid (`Cage::lod_faces`): the
+(the philtrum), the brow, the ears. Between the grid's vertices the drawn head is snapped onto the
+smooth one (the cage's limit alone dents it by up to 4 mm there, where the grid's spacing is uneven
+and its partial lines end: patches on the cheeks), and the eye sockets are carved into every point
+of it (`sockets`): round each eye a shallow hollow (the eyes' fronts are about level with the face
+round them) that the eyeball stands out of, deepest at the eye's corners, the lids over the rest; the
+LOD has one vertex in each, set back. The LOD keeps the 8 x 12 grid (`Cage::lod_faces`): the
 finer grid's vertices are in `lod.body` but unused. On the face (`face.rs`): lids hugging the
 eyeballs, the upper with a crease; full lips, tubes along the mouth, the upper with a cupid's bow
 over the philtrum; brows thickest at the inner end.
@@ -213,8 +217,10 @@ line between the lips, the upper lids' crease, the teeth's sides, deep in the ha
 body the face's age folds (0..1: a soft line from beside
 each nose wing down past the mouth's corner, `HeadFrame::fold`; the shader darkens the skin by
 `0.3 z age`, appearance texel 4 g, so young adults show none), w = the baked ambient occlusion (below).
-The eyelids take the tone of the skin they lie on, w included (the upper lid keeps its crease), and
-its shading normals (build.rs). Every stage uses the base stage's tone.
+The eyelids take the tone of the skin they lie on, w included (the upper lid keeps its crease); their
+shading normals are the skin's where they meet it and, where they stand in front of the socket (a
+closed lid's middle), the skin's as it would be without the socket, in every shape of the face
+(build.rs `lid_shading`). Every stage uses the base stage's tone.
 
 w is how much of the sky a vertex does not see at rest, 0 (open) to 1 (enclosed), in 32 steps
 (`ao.rs`, after the furniture's `gamekit/shade.py`): 48 rays per vertex over the hemisphere about its

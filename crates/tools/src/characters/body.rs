@@ -22,7 +22,9 @@
 //! (ao.rs).
 //!
 //! The head's cage is finer over the face (head.rs) than the LOD's: the LOD keeps the coarse grid
-//! (`Cage::lod_faces`), so `lod.body` has the face's extra cage vertices unused.
+//! (`Cage::lod_faces`), so `lod.body` has the face's extra cage vertices unused. On the head the drawn
+//! surface is snapped onto the smooth head between the cage's vertices (`Topology::snapped`), and the
+//! eye sockets are carved into every point of it (`head::sockets`).
 
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
@@ -30,10 +32,10 @@ use std::sync::{Arc, OnceLock};
 use nalgebra::{DMatrix, DVector, Dyn, LU};
 
 use super::cage::{Cage, Per, RingTags, Tags, Weights, se, turn, unit};
-use super::head::{HeadFrame, head_cage, youth};
+use super::head::{HeadFrame, head_cage, onto_head, sockets, youth};
 use super::kdtree::KdTree;
 use super::meshops::smooth_normals;
-use super::np::{clip, lstsq, mean, mean_rows, radians, sign, unique};
+use super::np::{clip, lstsq, mean, mean_rows, radians, sign, smoothstep, unique};
 use super::rig::{BASE_STAGE, NB, b, joints, proportions};
 use super::sparse::Csr;
 use super::subdiv::{Subdivision, check_closed, limit_matrix, orient, polygon_triangles, subdivision, triangles};
@@ -559,6 +561,9 @@ pub struct Topology {
     /// Cage -> its own limit points, and its LU (factored once).
     pub a: Csr,
     lu: LU<f64, Dyn, Dyn>,
+    /// Per level-1 and level-2 point, how far it is snapped onto the smooth head (`snapped`).
+    snap1: Vec<f64>,
+    snap2: Vec<f64>,
     pub lod_tris: Vec<[usize; 3]>,
     /// A second level, only to sample the head densely (head_frame).
     pub s2: Subdivision,
@@ -585,13 +590,28 @@ impl Topology {
         let body = l1.matmul(&s.m);
         let a = body.head(n);
         let lu = a.to_dense().lu();
-        let lod_tris = polygon_triangles(&lod_faces);
         let q1: Vec<Vec<usize>> = s.quads.iter().map(|q| q.to_vec()).collect();
         let s2 = subdivision(&q1, n1);
         let l2 = limit_matrix(&s2.quads, s2.m.rows);
         let fine = l2.matmul(&s2.m).matmul(&s.m);
         let fine_m = s2.m.matmul(&s.m);
-        Topology { faces, n, s, body, a, lu, lod_tris, s2, fine, fine_m }
+        // Snapped: points of the head's cage alone, fading out where the neck's share comes in (none
+        // where an ear's does).
+        let share = |m: &Csr| -> Vec<f64> {
+            m.data
+                .iter()
+                .map(|row| {
+                    if row.iter().any(|&(c, _)| cage.region[c] == "ear") {
+                        return 0.0;
+                    }
+                    let head: f64 = row.iter().filter(|&&(c, _)| cage.region[c] == "head").map(|&(_, v)| v).sum();
+                    smoothstep(0.8, 1.0, head)
+                })
+                .collect()
+        };
+        let (snap1, snap2) = (share(&body), share(&fine));
+        let lod_tris = polygon_triangles(&lod_faces);
+        Topology { faces, n, s, body, a, lu, snap1, snap2, lod_tris, s2, fine, fine_m }
     }
 
     /// Cage positions whose limit points are `t` (splu's solve, here a dense LU).
@@ -605,6 +625,17 @@ impl Topology {
             }
         }
         out
+    }
+
+    /// Points of level 1 (`fine`: level 2) of the features' cage `ctrl`, with its smooth part (`base`,
+    /// the cage fitted to the smooth shape) moved onto that shape (`onto`) on the head, then the eye
+    /// sockets carved (`sockets`). The cage's limit passes through the smooth head only at its vertices:
+    /// between them the face grid's uneven spacing and the ends of its partial lines (3-valent vertices,
+    /// pentagons) dent it by up to 4 mm and turn its normals by up to 17 degrees, which showed as patches
+    /// on the cheeks; snapped, the head is the smooth one plus the features.
+    fn snapped(&self, fine: bool, base: &[V3], ctrl: &[V3], onto: &impl Fn(V3) -> V3, sockets: &impl Fn(V3) -> V3) -> Vec<V3> {
+        let (m, w) = if fine { (&self.fine, &self.snap2) } else { (&self.body, &self.snap1) };
+        m.apply(base).iter().zip(m.apply(ctrl)).zip(w).map(|((b, p), &w)| sockets(if w > 0.0 { p + (onto(*b) - b) * w } else { p })).collect()
     }
 }
 
@@ -645,6 +676,8 @@ pub struct Surface {
     pub tags: TagArrays,
     pub region: Vec<[f64; NR]>,
     pub nor: Vec<V3>,
+    /// Level 1 as it would be without the eye sockets, and its normals: what the lids are shaded as.
+    pub unsocketed: (Vec<V3>, Vec<V3>),
     pub ears: [[V3; 2]; 2],
     pub head_samples: Vec<V3>,
     pub head_normals: Vec<V3>,
@@ -664,10 +697,13 @@ fn make_surface(family: &str, stage: &str) -> Surface {
     let (cage, p) = body_cage(family, stage);
     let arr = cage.arrays();
     assert_eq!(arr.t.len(), topo.n);
-    // The smooth shape is interpolated exactly; features are offsets on the fitted cage.
-    let ctrl: Vec<V3> = topo.solve(&arr.t).iter().zip(&arr.d).map(|(c, d)| c + d).collect();
+    // The smooth shape is interpolated at the cage's vertices and snapped onto between them; features
+    // are offsets on the fitted cage, the eye sockets carved after (`snapped`).
+    let base = topo.solve(&arr.t);
+    let ctrl: Vec<V3> = base.iter().zip(&arr.d).map(|(c, d)| c + d).collect();
+    let (onto, holes) = (onto_head(family, stage), sockets(family, stage, false));
     let s = &topo.s;
-    let pos = topo.body.apply(&ctrl);
+    let pos = topo.snapped(false, &base, &ctrl, &onto, &holes);
     let region: Vec<[f64; NR]> = cage
         .region
         .iter()
@@ -677,19 +713,22 @@ fn make_surface(family: &str, stage: &str) -> Surface {
             v
         })
         .collect();
-    let lod_pos = topo.a.apply(&ctrl);
+    let lod_pos: Vec<V3> = topo.a.apply(&ctrl).into_iter().map(sockets(family, stage, true)).collect();
     let tags = TagArrays::of(&arr.tags);
     let dense1 = s.m.apply_n(&arr.dense);
     let tags1 = tags.subdivided(&s.m);
     let region1 = s.m.apply_n(&region);
     // Head and neck, densely, without the ears (for the head interface's sdf and surface_z).
-    let fpos = topo.fine.apply(&ctrl);
+    let fpos = topo.snapped(true, &base, &ctrl, &onto, &holes);
     // Normals from the finer (level-2) limit surface: smooth shading on the coarse level 1 (whose
     // vertices are the first of level 2's).
     let ftri: Vec<usize> = triangles(&topo.s2.quads, &fpos).concat();
     let fnor = smooth_normals(&fpos, &ftri);
     let nor = fnor[..pos.len()].to_vec();
     let lod_nor = fnor[..topo.n].to_vec();
+    let bare = topo.snapped(true, &base, &ctrl, &onto, &|p| p);
+    let bare_nor = smooth_normals(&bare, &triangles(&topo.s2.quads, &bare).concat());
+    let unsocketed = (bare[..pos.len()].to_vec(), bare_nor[..pos.len()].to_vec());
     let freg = topo.fine_m.apply_n(&region);
     let (ri_head, ri_ear, ri_neck) = (super::body::region("head"), super::body::region("ear"), super::body::region("neck"));
     let mut ears = [[V3::zeros(); 2]; 2];
@@ -700,7 +739,7 @@ fn make_surface(family: &str, stage: &str) -> Surface {
         ears[e] = [(mx + mn) / 2.0, (mx - mn) / 2.0];
     }
     let flat_ctrl: Vec<V3> = ctrl.iter().zip(&arr.d).zip(&cage.region).map(|((c, d), r)| if *r == "ear" { c - d } else { c - d * 0.0 }).collect();
-    let fpos = topo.fine.apply(&flat_ctrl);
+    let fpos = topo.snapped(true, &base, &flat_ctrl, &onto, &holes);
     let hmask: Vec<bool> = freg.iter().map(|r| (r[ri_head] + r[ri_ear]) + r[ri_neck] > 0.5).collect();
     let q = &topo.s2.quads;
     let qm: Vec<[usize; 4]> = q.iter().filter(|q| q.iter().all(|&v| hmask[v])).copied().collect();
@@ -733,6 +772,7 @@ fn make_surface(family: &str, stage: &str) -> Surface {
         tags: tags1,
         region: region1,
         nor,
+        unsocketed,
         ears,
         head_samples,
         head_normals,
@@ -761,6 +801,8 @@ pub struct Body {
     pub lod: Mesh,
     pub meta: Meta,
     pub joints: [V3; NB],
+    /// `body` without the eye sockets (positions, normals; `Surface::unsocketed`).
+    pub unsocketed: (Vec<V3>, Vec<V3>),
 }
 
 /// The body of `family` at `stage` (and its low-detail copy); see the module docs.
@@ -770,7 +812,7 @@ pub fn build_body(family: &str, stage: &str) -> Body {
     let body = Mesh { pos: s.pos.clone(), idx: tris(family).to_vec(), dense: s.dense.clone(), arm: s.tags.arm.clone(), nor: s.nor.clone(), ..Mesh::default() };
     let lod = Mesh { pos: s.lod_pos.clone(), idx: topo.lod_tris.concat(), dense: s.lod_dense.clone(), arm: s.lod_tags.arm.clone(), nor: s.lod_nor.clone(), ..Mesh::default() };
     let meta = Meta { seat_drop: seat_drop(&body, &s.p), eye_y: s.p[b("eye_l")].y, grip: grip(family, stage) };
-    Body { body, lod, meta, joints: s.p }
+    Body { body, lod, meta, joints: s.p, unsocketed: s.unsocketed.clone() }
 }
 
 fn rx(a: f64) -> M3 {
