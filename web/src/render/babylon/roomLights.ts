@@ -19,7 +19,7 @@
 import { Constants, MaterialPluginBase, RawTexture, ShaderStore, Vector4, type AbstractEngine, type BaseTexture, type Material, type MaterialDefines, type Scene, type SubMesh, type UniformBuffer } from './core';
 import '@babylonjs/core/Shaders/ShadersInclude/pbrClusteredLightingFunctions.js';
 import '@babylonjs/core/ShadersWGSL/ShadersInclude/pbrClusteredLightingFunctions.js';
-import { WALL_HEIGHT } from './walls';
+import { WALL_HEIGHT } from '../shared/walls';
 
 /** The mask's size in texels: a lot is at most 256 tiles each way, and up to four storeys are shown. */
 const MASK_W = 256;

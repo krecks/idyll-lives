@@ -25,7 +25,7 @@ import { Pose, type SnapshotLayout } from '../core/snapshot';
 import type { Appearance, HairStyle } from '../game/household';
 import { HAIR_STYLES } from '../game/household';
 import { Characters, EXPRESSIONS, FRIENDLY, MAX_CHARACTERS, type StageDirection } from '../render/babylon/characters';
-import { GARMENTS } from '../render/babylon/characters/outfit';
+import { GARMENTS } from '../render/shared/characters/outfit';
 import { WALL_HEIGHT } from '../render/babylon/house';
 import { MaterialLibrary } from '../render/babylon/materials';
 import { VISEMES } from '../voice/visemes';

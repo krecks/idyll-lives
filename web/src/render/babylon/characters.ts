@@ -68,31 +68,31 @@ import type { Content, ItemDef, ObjectDef } from '../../content/content';
 import type { FrameState } from '../../core/bridge';
 import { colorsKey, objectCentre, storeyShown, type ObjectPlacement, type PartColors, type SimInfo, type WorldStructure } from '../../core/protocol';
 import { Pose } from '../../core/snapshot';
-import { loadCharacterSet, loadStage, type BodyData, type CharacterSet, type Clip } from './characters/data';
+import { loadCharacterSet, loadStage, type BodyData, type CharacterSet, type Clip } from '../shared/characters/data';
 import { APPEARANCE_TEXELS, CharacterPlugin, MORPH_TEXELS, type CharacterSurface, type MorphBinding } from './characters/material';
-import { FACE_KEYS, FaceMixer, NEUTRAL, type Face } from './characters/face';
+import { FACE_KEYS, FaceMixer, NEUTRAL, type Face } from '../shared/characters/face';
 import { ENERGY_RATE, type VisemeTrack } from '../../voice/visemes';
-import { outfitFor, SHELL_BITS, WEARS, writeOutfit, type OutfitFit, type OutfitParams, type Wear } from './characters/outfit';
+import { outfitFor, SHELL_BITS, WEARS, writeOutfit, type OutfitFit, type OutfitParams, type Wear } from '../shared/characters/outfit';
 import { BLANKET_WIDTH, blanketMaterial, buildBlanket, quiltTint, type BlanketShape } from './characters/blanket';
-import { BUNK_DOWN, BUNK_UP, RIDE_HORSE, RIDE_ROUND, RIDE_SEESAW, RIDE_SPRING, RIDE_SWING, SLIDE } from './characters/clips/rides';
-import { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN, type Size } from './characters/clips/street';
-import { FLOOR_SITS } from './characters/clips/seated';
-import { BALL_PIT, PLAY_TENT } from './characters/clips/play';
-import { BOULDER, FOOS, FOOS_LANES, foosClip, POOL, SMASH, YOGA_AT } from './characters/clips/games';
-import { EYEPIECE, PICK_APPLE, PICK_LEMON, PLATE_HOLD, SHOWER_CHILD } from './characters/clips/uses';
-import { KNEEL_LANES, KNEEL_TABLE, LOW_TOP, SIT_LOW } from './characters/clips/low';
-import { BOARD, CLOCK, CUPBOARD_OF, FEEDER, PUT_AWAY } from './characters/clips/reach';
-import { SHOT } from './characters/clips/shot';
+import { BUNK_DOWN, BUNK_UP, RIDE_HORSE, RIDE_ROUND, RIDE_SEESAW, RIDE_SPRING, RIDE_SWING, SLIDE } from '../shared/characters/clips/rides';
+import { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN, type Size } from '../shared/characters/clips/street';
+import { FLOOR_SITS } from '../shared/characters/clips/seated';
+import { BALL_PIT, PLAY_TENT } from '../shared/characters/clips/play';
+import { BOULDER, FOOS, FOOS_LANES, foosClip, POOL, SMASH, YOGA_AT } from '../shared/characters/clips/games';
+import { EYEPIECE, PICK_APPLE, PICK_LEMON, PLATE_HOLD, SHOWER_CHILD } from '../shared/characters/clips/uses';
+import { KNEEL_LANES, KNEEL_TABLE, LOW_TOP, SIT_LOW } from '../shared/characters/clips/low';
+import { BOARD, CLOCK, CUPBOARD_OF, FEEDER, PUT_AWAY } from '../shared/characters/clips/reach';
+import { SHOT } from '../shared/characters/clips/shot';
 // The seat and bed tables (`SEATS`, `BEDS`, `BUNKS` and their defaults) are data, read by `cargo check-glb` and
 // `cargo review` too; what their entries mean and why some are as they are: docs/characters-format.md "Seats and beds".
-import FURNITURE from './characters/furniture.json';
-import { feetDown, legTurn, perch, SEAT_FIT, seatSize, type LegSide } from './characters/seatFit';
+import FURNITURE from '../shared/characters/furniture.json';
+import { feetDown, legTurn, perch, SEAT_FIT, seatSize, type LegSide } from '../shared/characters/seatFit';
 import { furthestAhead, nearestAhead, type TableRoom } from './tableTuck';
 import { seatsItself } from '../../game/surfaces';
-import { addLocal, addRotation, blendInto, makeAdditive, PoseScratch, qmul, resetAdditive, rotate, sampleClip, skin, type Additive, type Placement } from './characters/pose';
+import { addLocal, addRotation, blendInto, makeAdditive, PoseScratch, qmul, resetAdditive, rotate, sampleClip, skin, type Additive, type Placement } from '../shared/characters/pose';
 import type { MaterialLibrary } from './materials';
 import { WALL_HEIGHT } from './house';
-import { LAYER_SHADOW_ONLY } from './layers';
+import { LAYER_SHADOW_ONLY } from '../shared/layers';
 import { buildModel, fileColour, ITEM_STAND_IN, onModelFileArrived, paintColors, painted, type ModelTemplate } from './models';
 import { paintSlots } from '../../assets/paint';
 import { TemplateCache } from './templateCache';
@@ -951,7 +951,7 @@ const DEFAULT_GRIP: readonly [number, number, number] = [-0.023, -0.062, 0];
 /** Looping clips in a use sequence play this long (s) per step. */
 const LOOP_STEP = 4;
 
-export type { Face } from './characters/face';
+export type { Face } from '../shared/characters/face';
 /** Expression per emotion id (content `emotions`, packs included); unknown ids stay neutral. */
 export const EXPRESSIONS: Record<string, Partial<Face>> = {
   happy: { mood: 'happy' },

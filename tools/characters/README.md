@@ -5,7 +5,7 @@ The residents are made in code. Nothing here downloads anything.
 - `cargo characters` (Rust, in `crates/tools/src/characters`, no Python): the bodies, faces, hair,
   beards and clothes of both families at every life stage. `cargo characters build` writes
   `web/public/assets/characters` (`rig.json` and the `.bin` files) and then checks it.
-- `web/src/render/babylon/characters/clips/`: the animation clips, in TypeScript, baked when the game
+- `web/src/render/shared/characters/clips/`: the animation clips, in TypeScript, baked when the game
   loads the character set (no clip file is shipped).
 - `check_clips.ts`: checks those clips against the built rig.
 
@@ -51,9 +51,9 @@ The generator's `.rs` files are in `crates/tools/src/characters/`.
 | garment cuts and shells | `clothes.rs`, `garments.rs` |
 | clips | `clips/*.ts` (`dsl.ts` for the format, `ik.ts` for arm and leg placement) |
 | how residents use clips, seats, beds, carried things | `web/src/render/babylon/characters.ts` |
-| colours, garments per family, pyjamas | `web/src/render/babylon/characters/outfit.ts` |
+| colours, garments per family, pyjamas | `web/src/render/shared/characters/outfit.ts` |
 | shading (skin, painted clothes, eyes, hair) | `web/src/render/babylon/characters/material.ts` |
-| moods and micro-expressions | `web/src/render/babylon/characters/face.ts` |
+| moods and micro-expressions | `web/src/render/shared/characters/face.ts` |
 
 ## Benches
 

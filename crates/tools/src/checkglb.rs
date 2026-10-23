@@ -74,7 +74,7 @@ pub struct Paths {
     pub assets: String,
     /// web/public/content
     pub content: String,
-    /// web/src/render/babylon/characters/furniture.json: where residents sit and lie on each object (`SEATS`,
+    /// web/src/render/shared/characters/furniture.json: where residents sit and lie on each object (`SEATS`,
     /// `BEDS`, `BUNKS` in characters.ts), for the height checks.
     pub furniture: String,
     /// tools/art/blender/centres.json: where each Blender-built model is centred at rest (its Model's
@@ -92,7 +92,7 @@ impl Paths {
             here: normpath(&join(&root, "tools/art/blender")),
             assets: normpath(&join(&root, "web/public/assets")),
             content: normpath(&join(&root, "web/public/content")),
-            furniture: normpath(&join(&root, "web/src/render/babylon/characters/furniture.json")),
+            furniture: normpath(&join(&root, "web/src/render/shared/characters/furniture.json")),
             centres: normpath(&join(&root, "tools/art/blender/centres.json")),
         }
     }

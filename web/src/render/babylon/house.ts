@@ -32,10 +32,10 @@ import type { DoorStyleDef, FloorCoveringDef, LightAim, RoofColorDef, RoofStyleD
 import { objectCentre, storeyOfRow, storeyRow, type StoreyLayout, type DiagonalWall, type Opening, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
 import { Cut, facing, Geo, LOOK, type V3 } from './geometry';
-import { LAYER_SHADOW_ONLY } from './layers';
+import { LAYER_SHADOW_ONLY } from '../shared/layers';
 import { MaterialLibrary, type SurfacePattern } from './materials';
 import { addHipPolygon, area, convexHull, diagonalEnds, halfAt, halfCentroid, halfTriangle, postOutline, WallFrame, type P2 } from './slanted';
-import { WALL_HALF, WALL_HEIGHT } from './walls';
+import { WALL_HALF, WALL_HEIGHT } from '../shared/walls';
 
 export { WALL_HALF, WALL_HEIGHT };
 export const WALL_STUB = 0.35;

@@ -2,7 +2,7 @@
 
 *Status: 0.3.1 (its review changed the lamps: each lights only its own room). Three presets (Low, Medium, High), Auto resolution and the paced frame rate cap are in. 0.3.0 cut Low's draws and triangles hard (below); it still hasn't been measured on Intel hardware. On the Intel laptops below, Medium's target is 30 fps; scaled from Mac measurements, 0.2.0's Medium is estimated at about 10–21 fps there by day (8–13 at night), so it probably falls short until someone measures it on a real laptop. Low is best effort. The release review has the findings behind this page ([release-0.2.0-review.md](../release-0.2.0-review.md), §2.5.1 and §3.5).*
 
-Code: `web/src/render/quality.ts` (the presets), `web/src/render/babylon/resolution.ts` (Auto resolution), `web/src/render/babylon/pacing.ts` (the FramePacer), `web/src/settings/settings.svelte.ts` (settings and their migration), `web/src/debug/bench.ts` and `benchFlags.ts` (the benchmark), `tools/bench/` (its runner).
+Code: `web/src/render/quality.ts` (the presets), `web/src/render/shared/resolution.ts` (Auto resolution), `web/src/render/shared/pacing.ts` (the FramePacer), `web/src/settings/settings.svelte.ts` (settings and their migration), `web/src/debug/bench.ts` and `benchFlags.ts` (the benchmark), `tools/bench/` (its runner).
 
 ## The presets
 

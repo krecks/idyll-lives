@@ -76,7 +76,7 @@ numbers match a crash stack from the site.
 | Tool | Why |
 |---|---|
 | `tools/voice/check.mjs`, `samples.mjs`, `tools/llm/check.mjs`, `devices.mjs` (and the `engine.mjs` they share) | They run the models the way the browser does: ONNX Runtime Web, plus the worker's own `web/src/voice/supertonic.ts` and `voices.ts`. Porting them means an ONNX runtime in Rust (`ort` or `tract`) and `supertonic.ts` in Rust. |
-| `tools/characters/check_clips.ts` | Reads the clip data that is generated into `web/src/render/babylon/characters/clips/`. |
+| `tools/characters/check_clips.ts` | Reads the clip data that is generated into `web/src/render/shared/characters/clips/`. |
 | `tools/bench/*.mjs` | Playwright: they drive a real browser and time the render. |
 | `tools/assets/optimize.mjs` | ktx2-encoder, sharp and gltf-transform: image and texture work with no Rust equivalent worth writing. |
 | `tools/housegen/sample.ts`, `tools/worlds/sample.ts` | Bun runs them; they are samples, not build steps. |

@@ -241,7 +241,7 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Severity:** S3
 - **Rubric:** M2
 - **Fix class:** renderer-table
-- **Where:** `web/src/render/babylon/characters/furniture.json:7` (`chessTable` h 0.46), `:45` (`sewingTable` h 0.46); the pad's top 0.475 m (`tools/art/blender/families/hobbies.py:261`, `_chair`)
+- **Where:** `web/src/render/shared/characters/furniture.json:7` (`chessTable` h 0.46), `:45` (`sewingTable` h 0.46); the pad's top 0.475 m (`tools/art/blender/families/hobbies.py:261`, `_chair`)
 - **Evidence:** `sizes-hobbies.md` measures both seats at 0.48 (0.475 in the family script); the renderer sits the resident at 0.46, 1.5 cm into the pad, outside the 1 cm tolerance the owner approved after the pilot (the pilot's M-hobbies-02 found the chess seat "fine" before that). One number each; neither content has a `seat` the heights check could compare.
 - **Status:** fixed (a920f174)
 - **After:** `seats.chessTable` and `sewingTable` 0.475, the pads' tops (`fixes/tables/play-b/b-chessTable-chess-01.png`, `b-sewingTable-sew-01.png`).

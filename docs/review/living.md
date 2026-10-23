@@ -180,7 +180,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S3
 - **Rubric:** M2
 - **Fix class:** renderer-table
-- **Where:** `web/src/render/babylon/characters/furniture.json:75` (`beds.sofaBed`), `tools/art/blender/families/living.py:249`, `web/public/content/catalog2/living.json:246`
+- **Where:** `web/src/render/shared/characters/furniture.json:75` (`beds.sofaBed`), `tools/art/blender/families/living.py:249`, `web/public/content/catalog2/living.json:246`
 - **Evidence:** Reported as a 0.44 m mattress against a 0.42 m sleeper height. At e725166 the content seat (0.44), `BEDS.sofaBed.h` (0.44) and `SB_MATTRESS` (0.44) agree, so it may have been fixed with the sofa-bed bug (0.3.0 §1.1). The three-way check (T2) should confirm, then close.
   Living wave: `cargo review sizes` measures the pulled-out mattress at 0.44 (`tables/sizes-living.md`), inside the sofa bed's 0.35–0.50; the content, `beds.sofaBed` and the mesh agree, and the dozer lies on it with the legs on the mattress, not in it (`living/play/chunk2/sofaBed-doze-01.png`).
 - **Status:** confirmed fixed on `sofaBed`
@@ -271,7 +271,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S3
 - **Rubric:** M2, A1
 - **Fix class:** content
-- **Where:** `web/src/render/babylon/characters/furniture.json:26` (`seats.armchairLounge` 0.42), `web/public/content/catalog2/living.json:497` (`rockingChair` seat 0.48), `:549` (`beanBag` seat 0.30)
+- **Where:** `web/src/render/shared/characters/furniture.json:26` (`seats.armchairLounge` 0.42), `web/public/content/catalog2/living.json:497` (`rockingChair` seat 0.48), `:549` (`beanBag` seat 0.30)
 - **Evidence:** The heights check (`heights.txt`) and `cargo review sizes`: the lounge chair's seat is 0.42 in `seats` against 0.45 in the mesh (3.0 cm in; its cushion sinks 2 cm, so the elder's thighs show a centimetre in, `living/sheets/age-armchairLounge.png`); the rocking chair's is 0.48 in the content against 0.458 in the mesh (the rider 2.2 cm above the cushion, rocking with it); the bean bag's is 0.30 against 0.458 (squashed 15 % for flop, about 0.39, so the sitter is about 9 cm into the bag: it reads as sinking in, which a bean bag does, but a child sinks to the chest with only the head and arms out, `living/sheets/age-beanBag.png`). The first two are outside the 1 cm tolerance; the bean bag's is a choice (A-living-01's fix) to keep, with a seat per life stage or a shallower one for children.
 - **Status:** fixed (a920f174)
 - **After:** `seats.armchairLounge` 0.44 (its cushion 0.45, sat a centimetre into), `rockingChair` content seat 0.46; the bean bag's 0.30 kept (sinking in, A-living-01's choice). `cargo check-glb`: the lounge chair's and the rocker's warnings gone; `fixes/tables/play-b/b-armchairLounge-sit-01.png`, `b-rockingChair-relax-01.png`.

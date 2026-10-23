@@ -234,7 +234,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S3
 - **Rubric:** M2, A1
 - **Fix class:** renderer-table
-- **Where:** `web/src/render/babylon/characters/furniture.json:34-36` (`seats`: `bathtub` 0.25, `bathtubClawfoot` 0.28, `bathtubFreestanding` 0.27); `tools/art/blender/families/bathroom.py:796`, `:837`, `:868` (the tubs' floors at 0.15, 0.17 and 0.15 m)
+- **Where:** `web/src/render/shared/characters/furniture.json:34-36` (`seats`: `bathtub` 0.25, `bathtubClawfoot` 0.28, `bathtubFreestanding` 0.27); `tools/art/blender/families/bathroom.py:796`, `:837`, `:868` (the tubs' floors at 0.15, 0.17 and 0.15 m)
 - **Evidence:** heights warnings (`cargo check-glb`): the model is 10.0, 11.0 and 12.0 cm lower than the seat at the hips. `h` is the seat surface (`characters.ts:146`) and `legsOut` rests the heels at that height (`:3473`), so the bather's seat and heels ride on nothing over the floor. Once the water is in (two thirds of the way up the tub, `fill`, 2.4 s after they sit) it hides the gap, but it shows in those first seconds, and the shins and knees break the surface (`bathroom/play/chunk1/bathtub-bath-01.png`, `bathroom/play/chunk1/bathtubClawfoot-bath-01.png`). Seats at the floors (0.15–0.17 m), or the floors raised to the seats, line them up; then check that the shoulders still clear the rim.
 - **Status:** fixed (96d54386)
 - **After:** The three baths' seats at their floors (0.15, 0.17, 0.15): the bather sits and rests the heels on the tub floor, the shoulders over the rim at every stage (`fixes/tables/after/baths-sheet.png`, `play-b/b-bathtub-bath-02.png`); the clawfoot bather's arm drapes over its higher rim. Heights warnings gone.

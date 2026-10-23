@@ -112,7 +112,7 @@ Added after, in the same spirit:
 Follow `tools/art/blender/README.md` ("Working as an agent: the loop") and `docs/design/objects.md`. In short:
 
 1. **Read** the content entry and the notes of the family it belongs in. The size, the top height (`surface`), the
-   seat height (`seat`), the mattress height (`beds` in `web/src/render/babylon/characters/furniture.json`, `BLANKET_BEDS` in `characters.ts`) and
+   seat height (`seat`), the mattress height (`beds` in `web/src/render/shared/characters/furniture.json`, `BLANKET_BEDS` in `characters.ts`) and
    the light position (`light`) are facts the model must keep; the family script asserts them.
 2. **Build** in a family (copy `families/_template.py`, or add to an existing family):
    - one material per part, named for what it is;

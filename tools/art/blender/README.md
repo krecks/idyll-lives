@@ -98,7 +98,7 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
   - Lying, the head is about 0.84 m behind that middle and the feet 0.86 m in front, whatever the
     footprint.
   - A bed's mattress is wherever its footprint's middle is. Its height is the renderer's
-    `beds` table in `web/src/render/babylon/characters/furniture.json` (default 0.5 m), not the model's.
+    `beds` table in `web/src/render/shared/characters/furniture.json` (default 0.5 m), not the model's.
 
 ## A new object
 

@@ -7,7 +7,7 @@ crib's front rail slides down (`side_down`) and its mobile turns (`mobile`, a lo
 themselves (`drawer_open`, `book_out`, `drawing`, `painting`). The high chair's tray is a part of its own; the train
 table's track is a ring, so the train can go round it.
 
-Kids' seats and beds keep their heights (`seats`, `beds` in `web/src/render/babylon/characters/furniture.json`; tops in
+Kids' seats and beds keep their heights (`seats`, `beds` in `web/src/render/shared/characters/furniture.json`; tops in
 `TOPS`). Toys a child holds in the hand are drawn by the character, not the object.
 
 **Who uses them** (content `stages`, 2026-10-21, G-45): the race car bed, rocking horse, kids' chair, kids' desk,

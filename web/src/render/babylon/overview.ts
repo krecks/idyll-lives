@@ -21,7 +21,7 @@ import { groundDepth, objectCentre, type ObjectPlacement, type PlotInfo, type Wo
 import type { LotHighlight, TownShot } from '../types';
 import { Geo, type V3 } from './geometry';
 import type { HouseBuilder } from './house';
-import { LAYER_TOWN } from './layers';
+import { LAYER_TOWN } from '../shared/layers';
 import type { MaterialLibrary } from './materials';
 import { buildModel, placementVariation, standInOf, type ModelTemplate } from './models';
 import { fieldLayers, Street } from './street';

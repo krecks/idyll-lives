@@ -46,7 +46,7 @@ import { paintSlots } from '../../assets/paint';
 import type { ModelEntry, PrimitivePart, Vec3 } from '../../assets/types';
 import type { PartColors } from '../../core/protocol';
 import { DEFAULT_FINISH, encodeFinish, MaterialLibrary } from './materials';
-import { WALL_HALF, WALL_HEIGHT } from './walls';
+import { WALL_HALF, WALL_HEIGHT } from '../shared/walls';
 import type { Content, ObjectDef } from '../../content/content';
 
 export type TintSlot = NonNullable<PrimitivePart['tint']>;

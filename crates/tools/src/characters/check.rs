@@ -63,13 +63,13 @@ struct Runtime {
 
 fn runtime_names() -> Runtime {
     let web = repo_root().join("web").join("src");
-    let face = read(&web.join("render/babylon/characters/face.ts"));
+    let face = read(&web.join("render/shared/characters/face.ts"));
     let units = ts_list(&face, "const UNITS");
     let moods_src = &face[face.find("export const MOODS").expect("MOODS")..face.find("/** Idle micro-movements").expect("micro-movements")];
     let mood_re = Regex::new(r"\b([a-z]+[A-Z][A-Za-z]+)\s*:").unwrap();
     let moods = mood_re.captures_iter(moods_src).map(|c| c[1].to_string()).collect();
     let visemes = ts_list(&read(&web.join("voice/visemes.ts")), "export const VISEMES");
-    let outfit = read(&web.join("render/babylon/characters/outfit.ts"));
+    let outfit = read(&web.join("render/shared/characters/outfit.ts"));
     let id_re = Regex::new(r"'([a-z]+\.[A-Za-z]+)'").unwrap();
     let fam_ids = |fam: &str| -> BTreeSet<String> {
         let mut ids = Vec::new();

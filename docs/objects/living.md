@@ -8,7 +8,7 @@ its rider (`rock`, E1); the coffee table's drawer opens for a magazine. The wall
 open (C1: content `leaves: open`, the clip held while the object is open), as the sofa bed and the futon
 (`bedroom.md`) are.
 
-Seats keep their height and depth (`seats` in `web/src/render/babylon/characters/furniture.json`, content `seat`); a seat that
+Seats keep their height and depth (`seats` in `web/src/render/shared/characters/furniture.json`, content `seat`); a seat that
 moves while sat on keeps the sitting pose believable. Shelf and table tops are the content `surface` heights.
 
 ## L1. Sofas and sectionals (12)

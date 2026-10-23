@@ -4,7 +4,7 @@
  */
 
 import { EXPRESSIONS, type Face } from '../babylon/characters';
-import { addRotation, type Additive } from '../babylon/characters/pose';
+import { addRotation, type Additive } from '../shared/characters/pose';
 import type { StageReaction } from '../types';
 
 export interface Performance {

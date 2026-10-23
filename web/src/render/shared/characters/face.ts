@@ -11,7 +11,7 @@
 
 import { VISEMES } from '../../../voice/visemes';
 import type { MorphSet } from './data';
-import { MORPH_PAIRS } from './material';
+import { MORPH_PAIRS } from './layout';
 
 /**
  * Facial adjustments (all roughly 0..1): smile / frown (lip corners up / down), smirk (one-sided

@@ -40,7 +40,7 @@ import { buildModel, entrySpace, type ModelTemplate } from './models';
 import { hash, lawnMask, mulberry32, smoothstep, unlawned, windDirection, windSway, type PlantPlacement } from './nature';
 import { angleDelta as turn } from './overview';
 import { TemplateCache } from './templateCache';
-import { WALL_HEIGHT } from './walls';
+import { WALL_HEIGHT } from '../shared/walls';
 
 export type BirdSpecies = 'blueTit' | 'chaffinch' | 'warbler' | 'blackbird' | 'collaredDove';
 

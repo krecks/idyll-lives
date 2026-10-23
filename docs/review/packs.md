@@ -444,7 +444,7 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Severity:** S2
 - **Rubric:** A1, M2
 - **Fix class:** renderer-table
-- **Where:** `web/src/render/babylon/characters/furniture.json:10-12` (`seats` `gloomy.soakingTub` 0.25, `romantic.heartTub` 0.35, `hotHeaded.coldPlunge` 0.35) and `:56-58` (`beds`, the same); `tools/art/blender/families/pack_romantic.py:205` (`heartTub`), `pack_hotHeaded.py:384` (`coldPlunge`), `pack_gloomy.py:417` (`soakingTub`)
+- **Where:** `web/src/render/shared/characters/furniture.json:10-12` (`seats` `gloomy.soakingTub` 0.25, `romantic.heartTub` 0.35, `hotHeaded.coldPlunge` 0.35) and `:56-58` (`beds`, the same); `tools/art/blender/families/pack_romantic.py:205` (`heartTub`), `pack_hotHeaded.py:384` (`coldPlunge`), `pack_gloomy.py:417` (`soakingTub`)
 - **Evidence:** `packs/sheets/obj-romantic.heartTub.png` (play: the knees come up over and through the near wall), `packs/sheets/age-romantic.heartTub.png`; the heights check (`heights.txt`): the heart tub's floor is at 0.20 under a 0.35 seat (15 cm), the soaking tub's at 0.095 under 0.25 (15.5 cm). `packs/play/chunk5/hotHeaded.coldPlunge-plunge-01.png`, `packs/sheets/age-hotHeaded.coldPlunge.png`: the plunger's shins and feet pass through the tub's front and show on the floor outside it at every stage but the child (the plunge is 0.86 × 1.39 with the seat in the middle; the heights check measures 0.596 there, the water). Seated bathers in a short tub need the legs drawn up inside or the seat moved back (`fwd`), each checked at every stage.
 - **Status:** fixed (96d54386)
 - **After:** The pack tubs sit on their floors at the back (soaking tub 0.10, heart tub 0.20, cold plunge 0.10) with the legs out and drawn up to a new `Seat.room` (0.7, 0.35, 0.5 m ahead of the hips): no shin or foot through a wall at the adult, teen, child or elder (`fixes/tables/after/heart-sheet.png`, `tubs-sheet.png`, `play-b/`). Their dead `beds` rows (no use lies in them) out; heights warnings gone. A turn towards each other in the heart tub waits for a facing per slot (G-62).
@@ -488,7 +488,7 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Severity:** S2
 - **Rubric:** M1, A1, A5
 - **Fix class:** decision
-- **Where:** `tools/art/blender/families/pack_cheerful.py:424-434` (`rainbowHammock`: `SLING_END, SLING_LOW`), `pack_natureLover.py:354-359` (`gardenHammock`: hooks at x 0.88); `web/src/render/babylon/characters/furniture.json:68-69` (`beds`, `across`, `sling`); `web/public/content/packs/cheerful.json:116`, `natureLover.json:144` (2 × 1 footprints)
+- **Where:** `tools/art/blender/families/pack_cheerful.py:424-434` (`rainbowHammock`: `SLING_END, SLING_LOW`), `pack_natureLover.py:354-359` (`gardenHammock`: hooks at x 0.88); `web/src/render/shared/characters/furniture.json:68-69` (`beds`, `across`, `sling`); `web/public/content/packs/cheerful.json:116`, `natureLover.json:144` (2 × 1 footprints)
 - **Evidence:** `packs/sheets/age-cheerful.rainbowHammock.png`, `packs/sheets/age-natureLover.gardenHammock.png`: the adult, the teen and the elder lie with the knees bent up and the feet at the far post; only the child fits. A hammock on a stand is 2.7–4 m long (`reference.md` `hammock`; space-saving stands 2.4–2.8). A 2 × 1 footprint can't hold one: a 3 × 1 footprint (model and content), a sitting-swinging pose, or accepting the knees is the owner's call.
 - **Status:** fixed (9e8bfe3b, 14de632d)
 - **After:** Q-07: both stand on 3 × 1 (content footprints), their slings 2 m between the spreader bars at ±1.0 (stands 2.84 and 2.88 m), `furniture.json` `sling` half 1.015 / 1.0, head 0.75 / 0.76: the adult, the teen and the elder lie near flat, the feet short of the bar (`fixes/blender-packs/poses/beds-adult.png`, `beds-teen.png`, `beds-elder.png`, `beds-child.png`; `play/day-cheerful.rainbowHammock-swing-01.png`, `day-natureLover.gardenHammock-doze-01.png`). 3 draws each.
@@ -565,7 +565,7 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Severity:** S3
 - **Rubric:** M2, A1
 - **Fix class:** renderer-table
-- **Where:** `web/src/render/babylon/characters/furniture.json:51` (`defaultSeat` 0.45, used by `hotHeaded.thunderDrums`), `:13` (`seats` `hotHeaded.coolDownCushion` 0.40), `:59` (`beds` `hotHeaded.coolDownCushion` 0.2, for a use that never lies), `:77` (`beds` `kind.hearthSettee` 0.44)
+- **Where:** `web/src/render/shared/characters/furniture.json:51` (`defaultSeat` 0.45, used by `hotHeaded.thunderDrums`), `:13` (`seats` `hotHeaded.coolDownCushion` 0.40), `:59` (`beds` `hotHeaded.coolDownCushion` 0.2, for a use that never lies), `:77` (`beds` `kind.hearthSettee` 0.44)
 - **Evidence:** The heights check (`heights.txt`): the drum stool's mesh is 0.475 under a 0.45 seat (2.5 cm into it), the pouf 0.45 under 0.40 (5 cm into it), the settee's cushion 0.36 under a 0.44 lie (8 cm over it: `packs/play/chunk5/kind.hearthSettee-quiltNap-01.png`). Each is small in the shots; together they are the three-way M2 check failing.
 - **Status:** fixed (a920f174)
 - **After:** The drum stool its own seat at 0.475 (was `defaultSeat` 0.45), the cool-down cushion's seat 0.45 and its dead `beds` row out (no use lies on it), the hearth settee's bed 0.36 (its cushion). The four heights warnings gone; `fixes/tables/play-b/b-hotHeaded.thunderDrums-drum-01.png`, `b-hotHeaded.coolDownCushion-breathe-01.png`, `b-kind.hearthSettee-quiltNap-02.png`.
@@ -598,7 +598,7 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Severity:** S2
 - **Rubric:** A1, I3
 - **Fix class:** renderer-table
-- **Where:** `web/src/render/babylon/characters/furniture.json:76` (`beds` `gloomy.windowSeat`: `h` 0.45, `across`), `web/public/content/packs/gloomy.json:193` (`doze`: `pose: lie`)
+- **Where:** `web/src/render/shared/characters/furniture.json:76` (`beds` `gloomy.windowSeat`: `h` 0.45, `across`), `web/public/content/packs/gloomy.json:193` (`doze`: `pose: lie`)
 - **Evidence:** `packs/play/chunk3/gloomy.windowSeat-doze-01.png`: the dozer lies prone, diagonally over the back of the cushion, the face on the window glass, the feet at the left pillow. `across` should lay them along the seat on the back, head to its left, as `kind.hearthSettee` does (`packs/play/chunk5/kind.hearthSettee-quiltNap-01.png`). The cushion between the two pillows is about 1.3 m clear, short for an adult lying flat (a curled-up side lie fits a window seat).
 - **Status:** fixed (0f613d59)
 - **After:** Played again after the merge (`fixes/tables/play-a/a-gloomy.windowSeat-doze-00.png`, `-01.png`): the dozer lies on the back along the cushion, head on the right-hand pillow, as on the hearth settee; no table row changed. The 1.3 m between the pillows is still short for a grown-up lying flat (the feet on the left pillow): a curled-up side lie is a clip for the resident-clip wave. Then (fix: clips-reach) checked again first: `poses.html?beds=gloomy.windowSeat:doze` at each stage still lay them flat on the back, the head on the right-hand pillow and a grown-up's feet over the left one; the face-down, across-the-cushion pose didn't reproduce (`fixes/clips-reach/poses/poses-windowSeat-doze-flat-before.png`). The window seat is now a `CURLED_BEDS` bed: its dozer plays `lieCurl` (clips/self.ts), curled up on the left side facing the room, the knees drawn up on the cushion, the head on the right-hand pillow on the forearm, about 1.1 m long for a grown-up (`fixes/clips-reach/poses/poses-windowSeat-doze-stages.png`, adult, teen, child, elder; play `play-a/a-gloomy.windowSeat-doze-01.png`, `play-teen/`, `play-child/`, `play-elder/`; `compare/A-packs-05.png`).
@@ -701,7 +701,7 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Severity:** S2
 - **Rubric:** I3, I2
 - **Fix class:** content
-- **Where:** `web/public/content/packs/romantic.json:101` (`vanity`: `primp` `pose: stand`, no `seat`); compare `web/src/render/babylon/characters/furniture.json:31` (`dressingTable`: seated facing the mirror, `back: true`)
+- **Where:** `web/public/content/packs/romantic.json:101` (`vanity`: `primp` `pose: stand`, no `seat`); compare `web/src/render/shared/characters/furniture.json:31` (`dressingTable`: seated facing the mirror, `back: true`)
 - **Evidence:** `packs/sheets/obj-romantic.vanity.png` (play): 20 minutes standing beside the pink pouf, half a metre from the mirror. A vanity is sat at, facing the mirror; the base `dressingTable` already does it.
 - **Status:** fixed (0cc15781)
 - **After:** Seat 0.44 m, forward 0.17, `facing: back`, primp `pose: sit`: sat on the pouf facing the mirror (`bench-results/review/fixes/content/g02/after-romantic.vanity-primp-01.png`).

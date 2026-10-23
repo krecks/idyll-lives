@@ -4,7 +4,7 @@
  */
 
 import { isGraphicsPreset, QUALITY, type GraphicsPreset, type RenderQuality } from '../render/quality';
-import { MIN_SCALE, type Resolution } from '../render/babylon/resolution';
+import { MIN_SCALE, type Resolution } from '../render/shared/resolution';
 import type { Shading } from '../render/types';
 
 export interface Settings {
@@ -15,7 +15,7 @@ export interface Settings {
    * shading; or `classic`, the PBR shading it replaced. Applies live.
    */
   shading: Shading;
-  /** `auto`: the screen's own resolution up to about 1920×1080 pixels; or a share of it along each side, 0.5..1 (`render/babylon/resolution.ts`). */
+  /** `auto`: the screen's own resolution up to about 1920×1080 pixels; or a share of it along each side, 0.5..1 (`render/shared/resolution.ts`). */
   resolution: Resolution;
   /** Frames per second at most (saves power and heat; 60 unless chosen); 0: no cap. */
   fpsCap: number;

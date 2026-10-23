@@ -6,7 +6,7 @@
  */
 
 import type { AssetRegistry } from '../../assets/registry';
-import { loadCharacterSet } from '../babylon/characters/data';
+import { loadCharacterSet } from '../shared/characters/data';
 import type { SimLook, SimPreviews, SimStage, Wardrobe } from '../types';
 import { cached, lookKey, Portraits } from './portraits';
 import { StageController } from './stage';

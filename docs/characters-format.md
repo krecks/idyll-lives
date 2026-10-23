@@ -2,7 +2,7 @@
 
 The residents (bodies, faces, hair, clothes) are generated in code by `cargo characters` (in Rust,
 `crates/tools/src/characters`), and their animation clips are made in code in
-`web/src/render/babylon/characters/clips`. This page is the contract between the generator, the
+`web/src/render/shared/characters/clips`. This page is the contract between the generator, the
 clips and the runtime (`web/src/render/babylon/characters*`). Everything here is original work.
 
 ```
@@ -495,7 +495,7 @@ In dev, editing a clip file re-bakes the clips in place (Vite HMR).
 
 ## Seats and beds
 
-`web/src/render/babylon/characters/furniture.json` holds where residents sit and lie, by object id: `seats`
+`web/src/render/shared/characters/furniture.json` holds where residents sit and lie, by object id: `seats`
 (`SEATS`), `defaultSeat`, `beds` (`BEDS`), `defaultBed`, `bunks` (`BUNKS`) and `footstools` (`FOOTSTOOLS`). `characters.ts` reads it with its
 `Seat` and `Bed` types (the fields are documented there); `cargo check-glb` measures the meshes against it and
 `cargo review sizes` against real-world sizes. An object in `seats` takes that seat over the content's `seat`

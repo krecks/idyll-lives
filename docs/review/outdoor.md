@@ -190,7 +190,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S3
 - **Rubric:** M2
 - **Fix class:** model
-- **Where:** `tools/art/blender/families/outdoor.py:153` (seat slats at 0.47 m, 3.5 cm thick: top 0.49); `web/src/render/babylon/characters/furniture.json:5` (`SEATS.bench` 0.45)
+- **Where:** `tools/art/blender/families/outdoor.py:153` (seat slats at 0.47 m, 3.5 cm thick: top 0.49); `web/src/render/shared/characters/furniture.json:5` (`SEATS.bench` 0.45)
 - **Evidence:** `cargo check-glb` heights warning (`model.bench seat 0.45 m … the model 0.491 m there: 4.1 cm higher`) and `sizes-outdoor.md` (seat 0.491 > 0.48, the top of the 0.42–0.48 range). In play (`play/bench-sit-01.png`, `sheets/seat-benchF.png`) the thighs hide the 4 cm the pelvis sinks into the slats, so it reads as seated; it fails the strict range by 1 cm and the three-way check by 4 cm. Lowering the slats to 0.45 fixes both; raising `SEATS.bench` alone would leave the seat out of range.
 - **Status:** fixed (b4306968)
 - **After:** the slats' top at 0.45 m (`BENCH_SEAT`), where `seats.bench` puts the sitter; `cargo check-glb` quiet for `model.bench` and `cargo review sizes` has it in range (`fixes/blender-outdoor/check-glb.txt`, `sizes.txt`); two sitters at every stage `fixes/blender-outdoor/poses/poses-seats-*-bench.png`, in play `play/garden-bench-sit-0*.png`.
@@ -201,7 +201,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S2
 - **Rubric:** M2, M3
 - **Fix class:** model
-- **Where:** `tools/art/blender/families/outdoor.py:200` (top planks at 0.61, 4 cm: top 0.63) and `:203` (bench planks at 0.38: top 0.40); `web/public/content/furniture.json:4577` (`surface.height` 0.63); `web/src/render/babylon/characters/furniture.json:47` (`SEATS.picnicTable` 0.40)
+- **Where:** `tools/art/blender/families/outdoor.py:200` (top planks at 0.61, 4 cm: top 0.63) and `:203` (bench planks at 0.38: top 0.40); `web/public/content/furniture.json:4577` (`surface.height` 0.63); `web/src/render/shared/characters/furniture.json:47` (`SEATS.picnicTable` 0.40)
 - **Evidence:** `tables/sizes-outdoor.md` (top 0.643 < 0.70, seat 0.400 < 0.42; reference `picnicTable` top 70–78, seat 42–48). The three ways agree with each other, so the check is quiet, but both heights are out of range, the top by 7 cm, and the gap between bench and top (0.23 m) is about 7 cm short of a real one's 0.28–0.32: the picnicker's knees and the table top nearly meet (`sheets/obj-picnicTable.png`, `extra/picnic-top/top-picnicTable-picnic-01.png`). Raise the top to about 0.73 and the benches to 0.44, with the content `surface` and `SEATS` row.
 - **Status:** fixed (b4306968)
 - **After:** the top at 0.73 m and the benches at 0.44 (content `surface` 0.73, `seats.picnicTable` 0.44), 0.29 m between them; `cargo review sizes`: seat 0.45, top 0.74, in range (its H 1.06 is the basket on the top). The two across the cloth with their knees under it: `fixes/blender-outdoor/poses/poses-seats-*-picnicTable_picnic.png` (adult, child, elder), in play `play/garden-picnicTable-picnic-0*.png`.
@@ -223,7 +223,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S2
 - **Rubric:** M1, M3, I3 (A1)
 - **Fix class:** model
-- **Where:** `tools/art/blender/families/outdoor.py:481-499` (stand base 1.86 m, posts at ±0.89; `_sling('sling', 0.62, 0.66, 0.6, 0.86, …)`: a bed 1.32 m long and 0.62 wide); `web/public/content/furniture.json:4703` (footprint 1 × 2); `web/src/render/babylon/characters/furniture.json:67` (`BEDS.hammock` sling)
+- **Where:** `tools/art/blender/families/outdoor.py:481-499` (stand base 1.86 m, posts at ±0.89; `_sling('sling', 0.62, 0.66, 0.6, 0.86, …)`: a bed 1.32 m long and 0.62 wide); `web/public/content/furniture.json:4703` (footprint 1 × 2); `web/src/render/shared/characters/furniture.json:67` (`BEDS.hammock` sling)
 - **Evidence:** `sizes-outdoor.md` (0.70 × 1.86 against a stand hammock's 1–1.6 × 2.7–4 m). An adult (1.75 m) on a 1.32 m sling lies in a V, knees up and head high (`sheets/obj-hammock.png`, `play/chunk2/hammock-doze-01.png`); the elder sits up in it (`sheets/age-hammock.png`, `play/chunk9-lie-elder/hammock-swing-01.png`). The packs' hammocks, lain across a longer bed, read right in the same pose shots (`poses/poses-only-hammock-default.png`). A longer stand and bed (footprint 1 × 3, about 2.8 m) is the fix.
 - **Status:** fixed (b4306968)
 - **After:** Q-07: a 2.8 m stand on 1 × 3 tiles (content `footprint`), a 1.96 m bed between the spreader bars 0.74 m wide (`beds.hammock` sling: low 0.52, end 0.84, half 0.98, the pillow 0.78 towards the head). Lain in at full length, the legs out along the sling, at every stage: `fixes/blender-outdoor/poses/poses-beds-*-hammock_*.png`, in play `play/garden-hammock-swing-0*.png`; `cargo review sizes` in range. Generated houses and worlds checked (CI's `generated_houses`, `generated_worlds`). The packs' hammocks (M-packs-06) are the packs wave's.
@@ -267,7 +267,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S3
 - **Rubric:** M2
 - **Fix class:** renderer-table
-- **Where:** `web/src/render/babylon/characters/furniture.json:48` (`SEATS.gardenChair` 0.40); `tools/art/blender/families/outdoor.py:244-245` (`_slatted_chair` seat slats, 0.40–0.42 sloping, their tops about 0.43)
+- **Where:** `web/src/render/shared/characters/furniture.json:48` (`SEATS.gardenChair` 0.40); `tools/art/blender/families/outdoor.py:244-245` (`_slatted_chair` seat slats, 0.40–0.42 sloping, their tops about 0.43)
 - **Evidence:** `cargo check-glb` heights warning (`model.gardenChair seat 0.40 m … the model 0.434 m there: 3.4 cm higher`). The mesh is inside the range (30–48), so the table row is what is off; in play the thighs hide it (`sheets/obj-gardenChair.png`). Set `SEATS.gardenChair.h` to 0.43.
 - **Status:** fixed (a920f174)
 - **After:** `seats.gardenChair` 0.43; its heights warning gone (`fixes/tables/play-b/b-gardenChair-sit-01.png`).
@@ -278,7 +278,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S2
 - **Rubric:** A8, M7, M6
 - **Fix class:** model
-- **Where:** `tools/art/blender/families/outdoor.py:590-597` (the cover one rigid disc, `G.hinged(… F.at(0, 0.84, -TUB_R - 0.02))`, `G.swing(cover, 'cover_off', -105, …)`); `:568-569` (the staves' inside: a floor at 0.12, no bench); `web/src/render/babylon/characters/furniture.json:37` (`SEATS.hotTubCedar` 0.35)
+- **Where:** `tools/art/blender/families/outdoor.py:590-597` (the cover one rigid disc, `G.hinged(… F.at(0, 0.84, -TUB_R - 0.02))`, `G.swing(cover, 'cover_off', -105, …)`); `:568-569` (the staves' inside: a floor at 0.12, no bench); `web/src/render/shared/characters/furniture.json:37` (`SEATS.hotTubCedar` 0.35)
 - **Evidence:** `clips/clips-hotTubCedar-all-t99.png`, `play/chunk2/hotTubCedar-soak-01.png`: opened, the 1.9 m cover stands on end behind the tub, its lower edge clear of the rim, a grey disc hanging in the air above the soaker. A hot tub's cover folds in half on its seam (the model has the seam, `cover_seam`) and lies back over a lifter or on the ground beside the tub. While rebuilding it: the sitter is placed at 0.35 over a floor at 0.12 with no bench under them, hidden only by the opaque water; a bench ring at 0.35 would make the three heights agree.
 - **Status:** fixed (b4306968)
 - **After:** `cover_off` (1.5 s) folds the cover back on its seam (one part, squashed to half its depth and twice its thickness about its back edge: two halves would be a fourth draw, as the shower door's, Q-05), lifts it, turns it down behind the tub and lowers it to hang there on its folded edge as on a lifter, its round edge just off the ground; a bench runs round the inside at 0.35 m under the soakers, so `seats.hotTubCedar` is on it (the heights warning gone). `fixes/blender-outdoor/clips/clips-hotTubCedar-cover_off-t*.png`, in play `play/garden-hotTubCedar-soak-0*.png`, `poses/poses-seats-*-hotTubCedar_soak.png`.
