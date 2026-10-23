@@ -62,7 +62,7 @@
  *            `<what>-<run>.json`, default the time it started, so runs into one `--out` keep theirs;
  *            given, `play`'s pictures start with it too);  --quality low|medium|high;  --renderer webgl;
  *            --size 1280x800;  --extra 'k=v&k=v' (more URL flags);  --headed (a window: only to
- *            measure timing).
+ *            measure timing);  --fresh (no kept browser profile: nothing cached between pages or runs).
  *
  * The setup fails loudly: the wasm and the asset manifest are fetched through the server first
  * (each must answer 200), and every HTTP error, failed request, page error and console error is
@@ -160,11 +160,26 @@ async function playwright() {
   }
 }
 const { chromium } = await playwright();
-const browser = await chromium.launch({
+const launchOptions = {
   headless: !has('headed'),
   ...(process.env.CHROME ? { executablePath: process.env.CHROME } : { channel: 'chromium' }),
   args: ['--enable-unsafe-webgpu', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'],
-});
+};
+/**
+ * The browser keeps a profile under `bench-results/.browser/` (one per kind and port, as
+ * `render.mjs`'s): its HTTP cache and compiled GPU shaders carry over between pages and runs, while
+ * the site's own storage is cleared before every page. `--fresh`: a new context per page, nothing kept.
+ */
+const fresh = has('fresh');
+const browser = fresh ? await chromium.launch(launchOptions) : null;
+const kept = fresh
+  ? null
+  : await chromium.launchPersistentContext(join(ROOT, 'bench-results', '.browser', `check-${has('headed') ? 'window' : 'headless'}-${port || 'sheet'}`), { ...launchOptions, viewport: { width, height }, deviceScaleFactor: 1 });
+if (kept) {
+  await setUp(kept);
+  // Its first window stays open (the browser with it); each page gets a window of its own (`newWindow`).
+  if (!kept.pages().length) await kept.newPage();
+}
 
 /** The job running (a picture, an object's use): what goes wrong in the page is logged with it. */
 let job = null;
@@ -312,13 +327,17 @@ function pageHelpers() {
   };
 }
 
-/**
- * A page at 1 % volume, the camera never taking over on its own (the director's delay 0), and free
- * will off unless `--free-will` (the game's setting applies to the player's household as a game
- * opens, over what a state says). Reused for every job of a run.
- */
-async function newPage() {
-  const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
+/** A new page in a window of its own (a kept browser's `newPage` opens a tab in its first window instead). */
+async function newWindow(context) {
+  const cdp = await context.newCDPSession(context.pages()[0]);
+  const page = context.waitForEvent('page');
+  await cdp.send('Target.createTarget', { url: 'about:blank', newWindow: true });
+  await cdp.detach();
+  return page;
+}
+
+/** The scripts every page of a context runs before the game's: quiet, the run's settings, the helpers. */
+async function setUp(context) {
   await context.addInitScript(quiet);
   await context.addInitScript((autonomy) => {
     const key = 'open-sims-wasm.settings';
@@ -331,7 +350,26 @@ async function newPage() {
     localStorage.setItem(key, JSON.stringify({ ...settings, directorDelay: 0, autonomy }));
   }, has('free-will'));
   await context.addInitScript(pageHelpers);
-  const page = await context.newPage();
+}
+
+/**
+ * A page at 1 % volume, the camera never taking over on its own (the director's delay 0), and free
+ * will off unless `--free-will` (the game's setting applies to the player's household as a game
+ * opens, over what a state says). Reused for every job of a run.
+ */
+async function newPage() {
+  let context = kept;
+  if (!context) {
+    context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
+    await setUp(context);
+  }
+  const page = kept ? await newWindow(kept) : await context.newPage();
+  // (A kept browser's site storage: cleared, so each page starts as a new player's would.)
+  if (kept && served) {
+    const cdp = await context.newCDPSession(page);
+    await cdp.send('Storage.clearDataForOrigin', { origin: new URL(base).origin, storageTypes: 'cookies,file_systems,indexeddb,local_storage,service_workers,cache_storage' });
+    await cdp.detach();
+  }
   page.on('pageerror', (err) => noteError(`page error: ${err.message}`));
   page.on('console', (m) => {
     if (m.type() === 'error' || (m.type() === 'warning' && /lights only|unavailable|failed/i.test(m.text()))) noteError(`console ${m.type()}: ${m.text()}`);
@@ -1013,7 +1051,8 @@ if (what === 'sheet') {
     return { tiles, ages };
   }
 
-  const page = await (await browser.newContext({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 1 })).newPage();
+  const page = kept ? await newWindow(kept) : await (await browser.newContext({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 1 })).newPage();
+  if (kept) await page.setViewportSize({ width: 1600, height: 1000 });
   const html = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
   /**
    * One sheet: `tiles` in a grid under `title`, each picture whole and labelled with its file; 1600
@@ -1071,5 +1110,5 @@ if (what === 'sheet') {
 
 writeFileSync(join(out, `${what}-${run}.json`), JSON.stringify(log, null, 2));
 console.log(`check: ${join(out, `${what}-${run}.json`)}`);
-await browser.close();
+await (kept ?? browser).close();
 vite?.kill();
