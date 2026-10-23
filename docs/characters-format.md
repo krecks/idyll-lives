@@ -128,6 +128,31 @@ Every body has:
 
 `hair.none` has no part: a bald resident's scalp keeps the skin colour (appearance texel 7 w = 0).
 
+Hair (`hair.rs`, up to 3,000 triangles a style, one draw) is closed shapes in locks, so it breaks
+its outline and shades in clumps:
+
+- every style has a skull cap: rows from the crown to the hairline in locks 4 columns wide, which
+  leave the crown in a whorl, the grooves between them deepening to the hairline (none over the
+  ears); a parting where the style has one (short and side-swept at the side, long and buns in the
+  middle) is a groove the columns turn onto; short locks past the hairline at the temples and nape;
+- curtains (long, bob, layered) and fringes (bob) are sheets with a thickness: each row a closed
+  section with rounded edges, a rounded hem curled in, in locks (thinner between them, the edge
+  locks fuller), each lock's tip hanging lower than the partings either side of it. A curtain comes
+  out from under the cap and falls straight from the scalp's widest, out over the ears, its inner
+  face no nearer the back than `back(y)`;
+- the long style's fringe is two lofted locks a side from the parting past the cheek; side-swept,
+  three locks swept across the forehead; tousled, a lumpy cap and 22 tapering locks lifting at their
+  tips; the afro, a rounded shell in 46 round puffs; the ponytail's tail, a loft in four twisting locks;
+  the braid, three strands plaited (each a loft), a tie and a tuft; buns, twisted, with a band.
+- the beard is a shell over the jaw in locks, their tips below the chin, thinning to the skin at
+  its lower edge.
+
+The shader (`hair` branch of `characters/material.ts`) takes the hair colour with the clump bands
+(tone.z), and on dark hair lifts the clumps and a sheen band round the crown (where the strands, taken
+straight down the head from the normal, lie square to the half-way vector between the view and a light
+from above) towards a lighter tint; both even out under a pixel or two. The material has no PBR sheen
+(linked to the albedo it took the colour down to 8 %).
+
 The body (`body.rs`) is a control cage of superellipse rings (`cage.rs`; the head's cage
 in `head.rs`) fitted so its limit surface passes through the ring points and subdivided once
 (`subdiv.rs`): `body` is about 3.5k triangles of skin plus the face's lids and lips (budget
@@ -153,7 +178,7 @@ hairline and chin as before.
 
 x = lip / cheek blush (0..1; on the tongue part, the tongue's red), y = shade drawn by hand (the
 line between the lips, the teeth's sides, deep in the hair; the mouth plate is 1), z = hair clump
-bands (0..1), w = the baked ambient occlusion (below). The eyelids take the tone of the skin they lie
+bands (0..1: light in a lock's middle, dark in the parting between two), w = the baked ambient occlusion (below). The eyelids take the tone of the skin they lie
 on, w included, and its shading normals (build.rs). Every stage uses the base stage's tone.
 
 w is how much of the sky a vertex does not see at rest, 0 (open) to 1 (enclosed), in 32 steps
@@ -496,10 +521,11 @@ See also `tools/characters/README.md`.
 ## Dev benches
 
 - `/characters.html`: a grid of residents. `?family=male|female`, `?stage=<id>|all` (default: every
-  stage), `?hair=all`, `?tops=all`, `?skins=all`, `?builds=all`, `?face=moods|visemes`,
+  stage), `?hair=all` (or `?hair=long,beard`: only those), `?tops=all`, `?skins=all`, `?builds=all`, `?face=moods|visemes`,
   `?clip=<name>&t=<s>`, `?view=side|back`, `?closeup=1`, `?build=1.2`, `?cols=`, `?manual`
   (`__bench.advance(s)`); sets `window.__ready`.
 - `/poses.html`: residents at real furniture, seats and beds, cooking, carrying, socials.
   `?only=<labels>` picks stations, `?seats=sofa,toilet` seats a man and a woman on each object,
   `?clip=<name>` plays one clip on everyone, `?clip=<name>&strip=8` shows it held at 8 times on a
-  man, a woman and a child; `?manual` with `__poses.advance(s)` and `__poses.focus(n)`.
+  man, a woman and a child; `?top=`, `?bottom=`, `?hair=braid` dress everyone who can wear it;
+  `?manual` with `__poses.advance(s)` and `__poses.focus(n)`.

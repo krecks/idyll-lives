@@ -19,7 +19,8 @@
  * it), `?beds=wallBed,sofaBed:doze` (the same, the first use lying down unless one is named),
  * `?clip=walk` (every Sim plays that clip: `__characters.force`), `?clip=walk&strip=8` (a filmstrip:
  * the clip held at 8 times through it, on a man, a woman, a child, a teen and an elder; no stations),
- * `?bottom=bottom.skirt` (everyone who can wears that bottom; `?top=top.jacket` the same for a top),
+ * `?bottom=bottom.skirt` (everyone who can wears that bottom; `?top=top.jacket` the same for a top;
+ * `?hair=braid` the same for a hairstyle, else women wear it long and men short),
  * `?stage=teen` (a life stage: baby, child, teen, youngAdult, adult or elder) everyone placed is at,
  * where sim-core lets that stage take the place (a baby only lies in a crib; children and teens
  * don't care for a baby, flirt or kiss), with the game's look for it (stoop, grey hair); with
@@ -46,7 +47,7 @@ import { Content } from '../content/content';
 import type { FrameState } from '../core/bridge';
 import type { ObjectPlacement, SimInfo } from '../core/protocol';
 import { Pose, type SnapshotLayout } from '../core/snapshot';
-import { lookAtStage, palette } from '../game/household';
+import { lookAtStage, palette, type HairStyle } from '../game/household';
 import { Characters, MAX_CHARACTERS } from '../render/babylon/characters';
 import { MaterialLibrary } from '../render/babylon/materials';
 import { buildModel, motionsOf, partPose } from '../render/babylon/models';
@@ -307,6 +308,7 @@ const seats = params.get('seats')?.split(',').filter(Boolean);
 const beds = params.get('beds')?.split(',').filter(Boolean);
 const bottom = params.get('bottom');
 const top = params.get('top');
+const hair = params.get('hair') as HairStyle | null;
 /** `?only=`: stations whose label, object id or activity tag is one of these. */
 const named = (o: string, s: Station) => o === s.label || o === s.def || o === s.tag;
 const stations: Station[] = strip
@@ -396,7 +398,7 @@ const look = (id: number, female: boolean, stage?: string, height = 1, build = 1
     body: female ? '#C9725F' : '#5F86C9',
     skin: ['#C08A64', '#8D5A3B', '#E8C0A0', '#6B4430'][id % 4],
     hair: ['#2B2320', '#7A4A2A', '#C9A15A', '#1A1A1A'][id % 4],
-    hairStyle: female ? 'long' : 'short',
+    hairStyle: hair ?? (female ? 'long' : 'short'),
     height,
     build,
     ...(stage ? { stage } : {}),
