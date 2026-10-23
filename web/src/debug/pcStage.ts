@@ -3,13 +3,15 @@
  * WebGL2 with `?renderer=webgl`), an app without its own frame loop, the world root in game space
  * (`pc/space.ts`), the game camera on an orbit (the player's dragging, `shared/orbit.ts`), a noon
  * sun with its shadow over a fixed square, the sky's light, a lawn, and the frame loop. The models'
- * finishes come from the manifest (`MaterialLibrary`). Not part of the build.
+ * finishes come from the manifest (`MaterialLibrary`), the plants' wind with them (`installNature`).
+ * Not part of the build.
  */
 
 import * as pc from '../render/pc/engine';
 import { GameCamera } from '../render/pc/camera';
 import { createApp, createDevice } from '../render/pc/device';
 import { MaterialLibrary, SUN_LIGHT_MASK } from '../render/pc/materials';
+import { installNature } from '../render/pc/nature';
 import { createWorldRoot, toEngine } from '../render/pc/space';
 import { SunShadows } from '../render/pc/sunShadows';
 import { AssetRegistry } from '../assets/registry';
@@ -66,8 +68,9 @@ export async function createStage(options: StageOptions): Promise<Stage> {
   const root = createWorldRoot(app);
   const base = import.meta.env.BASE_URL;
   const assets = await AssetRegistry.load(`${base}assets/manifest.json`, params.getAll('pack'));
-  // Finishes (fabric, wood, bark, foliage, ...) come from the manifest's material entries.
+  // Finishes (fabric, wood, bark, foliage, ...) come from the manifest's material entries; the plants' sway in the wind.
   const lib = MaterialLibrary.for(app).setAssets(assets);
+  installNature(app);
   const env = assets.get('environment.sky', 'image');
   // The sky lights the models (its reflections and ambient), as Babylon's pages had it; it isn't drawn behind them.
   if (env?.url) await lib.loadEnvironment(env.url);

@@ -97,6 +97,9 @@ import { buildModel, fileColour, onModelFileArrived, type ModelTemplate } from '
 import { ITEM_STAND_IN, paintColors, painted } from '../shared/modelEntry';
 import { paintSlots } from '../../assets/paint';
 import { TemplateCache } from './templateCache';
+import { GAME_RATE, QUIET_SPEED } from '../shared/gameSpeed';
+
+export { GAME_RATE, QUIET_SPEED } from '../shared/gameSpeed';
 
 /** Rows in the pose texture (= Sim capacity). */
 export const MAX_CHARACTERS = 64;
@@ -200,10 +203,6 @@ const KISS_FIT = { bend: 0.7, nod: 1.3, lift: 1.8, most: 0.45, lean: 0.06, waist
  * shorter one and `straighten` straightened up to a taller one, the arms doing the rest.
  */
 const AIM = { head: 0.85, reach: 0.55, most: 0.7, bend: 0.45, straighten: 0.3 };
-/** Sim ticks per frame step at each game speed (`clock::TICKS_PER_STEP`). */
-export const GAME_RATE = [0, 1, 3, 10, 30, 60];
-/** Speed while time skips through quiet hours (`clock::AUTO_FAST_SPEED`). */
-export const QUIET_SPEED = 4;
 /** Larger jumps between frames snap instead of sliding. */
 const SNAP_DISTANCE = 1.6;
 /**

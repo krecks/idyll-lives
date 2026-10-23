@@ -12,6 +12,10 @@
  * radius the square's half side), seen from the camera. Everything else (the light's camera
  * turned with the sun, snapped to whole texels, its depth fitted to the casters, the casters culled
  * to it) is PlayCanvas's own.
+ *
+ * What only the shadow map draws (the house's lid over its rooms, which keeps the sun out of them
+ * but through windows and doorways) is on a layer of its own that the sun lights and no camera
+ * draws (`shadowOnlyLayer`).
  */
 
 import * as pc from './engine';
@@ -61,6 +65,24 @@ function patch(app: pc.AppBase): void {
   };
 }
 
+/** Each app's layer of what only the sun's shadow map draws (`shadowOnlyLayer`). */
+const shadowLayers = new WeakMap<pc.AppBase, pc.Layer>();
+
+/**
+ * The layer of meshes only shadow maps draw (`shared/layers.ts` `LAYER_SHADOW_ONLY`): in the scene
+ * and lit by the sun (`SunShadows` adds it to the sun's layers), so the sun's shadow map gathers
+ * its casters, but on no camera.
+ */
+export function shadowOnlyLayer(app: pc.AppBase): pc.Layer {
+  let layer = shadowLayers.get(app);
+  if (!layer) {
+    layer = new pc.Layer({ name: 'ShadowOnly' });
+    app.scene.layers.push(layer);
+    shadowLayers.set(app, layer);
+  }
+  return layer;
+}
+
 export class SunShadows {
   private readonly light: pc.LightComponent;
   /** Milliseconds between pose-driven redraws (0: every change), and when the last one was made. */
@@ -76,6 +98,8 @@ export class SunShadows {
     this.interval = rate > 0 ? 1000 / Math.min(240, rate) : 0;
     this.light.shadowUpdateMode = pc.SHADOWUPDATE_NONE;
     squares.set(this.light.light, this.square);
+    const only = shadowOnlyLayer(app).id;
+    if (!this.light.layers.includes(only)) this.light.layers = [...this.light.layers, only];
   }
 
   /** The square round the viewed lot: its middle (game space, on the ground) and half side (m). */

@@ -10,13 +10,12 @@
  * and `?target=1.4` (a height) or `?target=x,y,z` (a point) change that. (`alpha=1.571` is straight
  * from the front, `-1.571` from the back.)
  *
- * Still to come on PlayCanvas: the plants (their wind and tint, stage 5 of the port: nature keys are
- * left out, and the default list shows nothing) and the residents `?scale=adult|child|all` stands
- * beside each model (stage 7): the room for them is kept, so the framing is the same, but nobody
- * stands there yet.
+ * Plants sway in the wind with their tint (`pc/nature.ts`). Still to come on PlayCanvas: the
+ * residents `?scale=adult|child|all` stands beside each model (stage 7): the room for them is kept,
+ * so the framing is the same, but nobody stands there yet.
  *
- * `?renderer=webgl` draws with WebGL2 (default WebGPU). `?still`: nothing moves (pictures that
- * compare pixel for pixel; `tools/bench/render.mjs --pages`).
+ * `?renderer=webgl` draws with WebGL2 (default WebGPU). `?still`: nothing moves, the wind dropped
+ * (pictures that compare pixel for pixel; `tools/bench/render.mjs --pages`).
  * `?camera=game` is the game's Live camera as a game starts (radius 24, beta 0.86, its longer lens),
  * from the game's angle onto a model facing that camera, aimed at the floor under the first model,
  * or the one `?at=<key or index>` names; `__gallery.aim(n)` aims it at model n. `alpha`, `beta`,
@@ -26,6 +25,7 @@
 import { createStage } from './pcStage';
 import { Instances } from '../render/pc/instancing';
 import { buildModel } from '../render/pc/models';
+import { setWind, windStill } from '../render/pc/nature';
 import { translation } from '../render/shared/math';
 
 const params = new URLSearchParams(location.search);
@@ -42,7 +42,7 @@ const APART = 0.6;
 const MAX_RESIDENTS = 64;
 /** The game's Live camera as a new game starts; `alpha` is its angle turned half round, onto a model's front facing it. */
 const GAME = { alpha: Math.PI * 0.38, beta: 0.86, radius: 24, fov: 0.7 };
-/** The plants, drawn with the wind and their tint on PlayCanvas from stage 5. */
+/** The default list: the plants. */
 const NATURE = /^model\.(tree|pine|bush|hedge|garden|flowers|flowerbed|plant)/;
 const game = params.get('camera') === 'game';
 const alpha = Number(params.get('alpha') ?? (game ? GAME.alpha : Math.PI / 2 - 0.6));
@@ -55,13 +55,13 @@ const stage = await createStage({
   ...(game ? { fov: GAME.fov, near: 0.3 } : {}),
 });
 const { app, assets, orbit } = stage;
+// `?still`: no wind (the plants stand still).
+if (params.has('still')) setWind(app, 0);
 
 // Every model the game knows, from the base manifest and the packs it lists (most models live in packs).
 const filter = params.get('filter');
-const asked = params.get('keys')?.split(',') ?? assets.keys('model').filter((k) => (filter ? k.includes(filter) : NATURE.test(k)) && !k.endsWith('.far'));
-const keys = asked.filter((k) => !NATURE.test(k));
-if (keys.length < asked.length) console.info(`[gallery] ${asked.length - keys.length} plants left out: they come with stage 5 of the PlayCanvas port`);
-if (asked.length === 0) console.warn(`[gallery] no models match ${filter ? `'${filter}'` : 'the default list'}`);
+const keys = params.get('keys')?.split(',') ?? assets.keys('model').filter((k) => (filter ? k.includes(filter) : NATURE.test(k)) && !k.endsWith('.far'));
+if (keys.length === 0) console.warn(`[gallery] no models match ${filter ? `'${filter}'` : 'the default list'}`);
 
 const cols = Number(params.get('cols')) || Math.max(1, Math.ceil(Math.sqrt(keys.length)));
 const rows = Math.ceil(keys.length / cols);
@@ -104,6 +104,7 @@ keys.forEach((key, i) => {
     const draw = new Instances(stage.device, stage.root, m.mesh, m.material, { name: m.name });
     draw.setMatrices(place, 1);
     draw.update();
+    windStill(draw.meshInstance, m);
   }
   if (params.get('labels') !== '0') {
     const el = document.createElement('span');

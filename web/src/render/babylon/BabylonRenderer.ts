@@ -101,7 +101,7 @@ import { applyShaderFixes } from './shaderFixes';
 import { patchRoomLights, type RoomMask } from './roomLights';
 import { HALF_WALL_HEIGHT, HouseBuilder, houseObjectKey, placeLights, WALL_HALF, WALL_HEIGHT, WALL_STUB, type DoorLeaf, type HouseSurfaces, type RoomLight, type RoomTiles } from './house';
 import { fieldLayers, Street } from './street';
-import { MaterialLibrary, WINDOWLESS_BITS, type DarkTiles } from './materials';
+import { MaterialLibrary, type DarkTiles } from './materials';
 import { diagViewActive } from './diagView';
 import { refreshSoftLook, shadingFromSettings } from './softLook';
 import { Geo, LOOK as CUT } from '../shared/geometry';
@@ -123,6 +123,8 @@ import { tableRooms } from './tableTuck';
 import { gardenPool, GardenPools } from './gardenPools';
 import { ObjectMotion, type MovingObject } from './objectMotion';
 import { restPoses, slotOf } from '../shared/objectMotion';
+import { DOOR_SWING, ease, goingThrough } from '../shared/doors';
+import { darkTiles, windowlessRooms } from '../shared/windowless';
 import { TownOverview } from './overview';
 import { GameCameraRig } from '../shared/cameraRig';
 import { renderScale, watchPixelRatio } from '../shared/resolution';
@@ -208,19 +210,6 @@ const FILL_POWER = 0.35;
 const BASEMENT_SKY = 0.12;
 const BASEMENT_ENV = 0.12;
 const NIGHT_EXPOSURE = Math.max(...LOOK.keys.map((k) => k.exposure));
-/**
- * Seconds a door or a gate takes to swing open or shut at speed 1 (quicker as the game runs
- * faster, up to 10x, as walkers' turns are). It opens for someone whose way crosses its doorway
- * within `DOOR_AHEAD` metres (sim-core `snapshot::AHEAD`: about a second's walk), or who stands
- * less than `DOORWAY` metres either side of it; open, it waits to shut until nobody walking is
- * within `DOOR_CLEAR` of it (a leaf is 0.83 m long).
- */
-const DOOR_SWING = 0.45;
-const DOOR_AHEAD = 1.5;
-const DOORWAY = 0.35;
-const DOOR_CLEAR = 1.1;
-/** Floats per resident in `movers`: where they are, the waypoint they walk to, where their way is `DOOR_AHEAD` on. */
-const MOVER = 6;
 /** Seconds over which a room's lights go out (or come back on) as its residents fall asleep (or wake). */
 const LIGHTS_OUT_FADE = 1.2;
 /** Seconds a lamp takes to go off or on at its switch. */
@@ -928,7 +917,7 @@ export class BabylonRenderer implements Renderer, RendererDebugHooks {
     await this.setupMarker();
     // (Their data loads with the first world that has residents, not with the menus.)
     this.characters = new Characters(scene, this.deps.assets, this.lib, this.deps.content, { refreshProps: true, castsShadows: this.quality.characterShadows });
-    this.characters.setRide((id) => this.motion.ride(id));
+    this.characters.setRide((id) => this.motion.rideMatrix(id));
     this.characters.setLoop((id) => this.motion.loopPhase(id));
     this.characters.setSun(() => this.sun.direction);
     // Garden birds. `?debug`: `__birds()` lists them (species, state, place) with what they did and
@@ -3980,68 +3969,8 @@ export class BabylonRenderer implements Renderer, RendererDebugHooks {
    * mask (`DigState.darken`).
    */
   private markWindowless(world: WorldStructure, view: ViewRect | null): void {
-    const W = world.width;
-    const room = (x: number, z: number) => (x >= 0 && z >= 0 && x < W && z < world.depth ? world.rooms[z * W + x] : 0);
-    // Which rooms have none only changes with the walls (new `rooms` and `openings` arrays).
-    const of = [world.rooms, world.openings, world.diagonals];
-    if (of.some((a, i) => a !== this.windowless.of[i])) {
-      // A window lets daylight into the rooms on both its sides (sim-core `rooms.rs`).
-      const lit = new Set<number>();
-      for (const o of world.openings ?? []) {
-        if (o.kind !== 'window') continue;
-        lit.add(room(o.x, o.z));
-        lit.add(o.axis === 'h' ? room(o.x, o.z - 1) : room(o.x - 1, o.z));
-      }
-      for (const d of world.diagonals ?? []) if (d.kind === 'window') for (const r of d.rooms) lit.add(r);
-      const rooms = new Set<number>();
-      for (const r of world.rooms) if (r !== 0 && !lit.has(r)) rooms.add(r);
-      for (const d of world.diagonals ?? []) for (const r of d.rooms) if (r !== 0 && !lit.has(r)) rooms.add(r);
-      this.windowless = { rooms, of };
-    }
-    const dark = this.windowless.rooms;
-
-    const dimmed = new Set<number>();
-    let dimming: DarkTiles | null = null;
-    if (view && this.storey >= 0 && dark.size) {
-      const row = this.rowOf(this.storey);
-      const [vw, vd] = [view.w, view.d];
-      // The view's tiles: dark whole, or the halves of one split by a diagonal wall that are; and
-      // the box round the dark ones (x0, z0, x1, z1, in the view), all the materials are given.
-      const tiles = new Uint8Array(vw * vd);
-      const box = [vw, vd, 0, 0];
-      const mark = (x: number, z: number, bits: number) => {
-        tiles[z * vw + x] = bits;
-        box.splice(0, 4, Math.min(box[0], x), Math.min(box[1], z), Math.max(box[2], x + 1), Math.max(box[3], z + 1));
-      };
-      const diagonals = new Map((world.diagonals ?? []).map((d) => [d.z * W + d.x, d]));
-      const B = WINDOWLESS_BITS;
-      for (let z = 0; z < vd; z++) {
-        for (let x = 0; x < vw; x++) {
-          const i = (z + view.z + row) * W + x + view.x;
-          const d = diagonals.get(i);
-          if (!d) {
-            if (!dark.has(world.rooms[i])) continue;
-            mark(x, z, B.tile);
-            dimmed.add(world.rooms[i]);
-            continue;
-          }
-          let bits = 0;
-          d.rooms.forEach((r, h) => {
-            if (!dark.has(r)) return;
-            bits |= h === 0 ? B.half0 : B.half1;
-            dimmed.add(r);
-          });
-          if (bits) mark(x, z, bits | (d.axis === 'dn' ? B.dn : 0));
-        }
-      }
-      if (dimmed.size) {
-        const [x0, z0, w, d] = [box[0], box[1], box[2] - box[0], box[3] - box[1]];
-        const crop = new Uint8Array(w * d);
-        for (let z = 0; z < d; z++) crop.set(tiles.subarray((z0 + z) * vw + x0, (z0 + z) * vw + x0 + w), z * w);
-        // From under the floor of the storey in view to just under the next one's.
-        dimming = { x0: view.x + x0, z0: view.z + z0, w, d, y0: this.storey * WALL_HEIGHT - 0.5, y1: (this.storey + 1) * WALL_HEIGHT - 0.02, tiles: crop };
-      }
-    }
+    this.windowless = windowlessRooms(world, this.windowless);
+    const { dimmed, dimming } = darkTiles(world, view, this.storey, this.rowOf(this.storey), this.windowless.rooms);
     this.dimmed = dimmed;
     this.dimming = dimming;
     this.applyDimming();
@@ -5404,49 +5333,6 @@ export class BabylonRenderer implements Renderer, RendererDebugHooks {
     const entry = this.deps.assets.get('environment.sky', 'image');
     if (entry) await this.lib.loadEnvironment(entry.url);
   }
-}
-
-/** Smoothstep: eases 0..1 in and out. */
-function ease(t: number): number {
-  return t * t * (3 - 2 * t);
-}
-
-/**
- * Whether someone in `movers` (`MOVER` floats each) goes through the 1 m doorway whose middle is
- * `centre`, in a wall or fence along x (`axis` 'h') or z: their way crosses it before `DOOR_AHEAD`
- * metres on, or they're in it. Walking past, or up to it and away, isn't. One that stands `open`
- * also stays so while anyone on the move is still within `DOOR_CLEAR` of it (the leaf would
- * sweep through them shutting). Returns the way they go across (+1 towards +z of an 'h' edge or
- * +x of a 'v' one, -1 the other), 0 for nobody.
- */
-function goingThrough(movers: readonly number[], axis: 'h' | 'v', centre: readonly [number, number], open: boolean): number {
-  // In the doorway's own terms: `a` along the edge from its middle, `n` across it.
-  const h = axis === 'h';
-  const [ca, cn] = h ? centre : [centre[1], centre[0]];
-  const [ia, iN] = h ? [0, 1] : [1, 0];
-  for (let i = 0; i < movers.length; i += MOVER) {
-    const pa = movers[i + ia] - ca;
-    const pn = movers[i + iN] - cn;
-    let wa = movers[i + 2 + ia] - ca;
-    let wn = movers[i + 2 + iN] - cn;
-    const qa = movers[i + 4 + ia] - ca;
-    const qn = movers[i + 4 + iN] - cn;
-    if ((Math.abs(pa) <= 0.5 && Math.abs(pn) < DOORWAY) || (open && pa * pa + pn * pn < DOOR_CLEAR * DOOR_CLEAR)) return qn >= pn ? 1 : -1;
-    // A waypoint further than the look ahead: where it looks to is on the way there.
-    if (Math.hypot(wa - pa, wn - pn) >= DOOR_AHEAD) {
-      wa = qa;
-      wn = qn;
-    }
-    const way = crosses(pa, pn, wa, wn) || crosses(wa, wn, qa, qn);
-    if (way) return way;
-  }
-  return 0;
-}
-
-/** Whether a step from `s` to `e` (along, across) crosses a 1 m doorway at the origin: its way across (±1), or 0. */
-function crosses(sa: number, sn: number, ea: number, en: number): number {
-  if (sn * en > 0 || sn === en) return 0;
-  return Math.abs(sa + ((ea - sa) * sn) / (sn - en)) <= 0.5 ? Math.sign(en - sn) : 0;
 }
 
 /**

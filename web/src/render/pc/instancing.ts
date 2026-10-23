@@ -19,6 +19,8 @@
  * The buffer grows as copies are added (doubling) and is written straight into the GPU buffer's
  * CPU copy, uploaded by `update` once per change. The draw is culled by the box round all its
  * copies (`update` works it out), or not at all (`cull: false`: things spread over the whole lot).
+ * The mesh and material stay their owner's: a draw destroyed never takes its mesh with it (a
+ * template's is shared by its draws, build after build; the template's owner destroys it).
  */
 
 import * as pc from './engine';
@@ -107,6 +109,10 @@ export class Instances {
     let draws = drawsOf.get(mesh);
     if (!draws) drawsOf.set(mesh, (draws = new Set()));
     draws.add(this);
+    byEntity.set(this.entity, this);
+    // The mesh is its owner's (a template's, a cache's): a draw holds it, never destroys it (a mesh
+    // instance destroyed lets go of its mesh, and destroys it once nothing else holds it).
+    mesh.incRefCount();
   }
 
   get enabled(): boolean {
@@ -173,12 +179,20 @@ export class Instances {
     for (let i = 0; i < this.count; i++) this.set(stream, i, values, i * stream.components);
   }
 
-  /** Uploads what changed (the whole buffer) and draws `count` copies, its box round them. */
-  update(): void {
+  /**
+   * Uploads what changed (the whole buffer) and draws `count` copies, its box round them (worked out
+   * again unless `bounds` is false: copies that stay about where they were, a fan's blades turning).
+   */
+  update(bounds = true): void {
     if (!this.buffer) return;
     this.buffer.unlock();
     this.meshInstance.instancingCount = this.count;
-    if (this.cull) this.updateBox();
+    if (this.cull && bounds) this.updateBox();
+  }
+
+  /** Whether it has been destroyed. */
+  get destroyed(): boolean {
+    return this.buffer === null;
   }
 
   /** The box round every copy (game space: the entity's own, under the root), from the mesh's. */
@@ -192,6 +206,8 @@ export class Instances {
     const d = this.data;
     for (let i = 0; i < this.count; i++) {
       const o = i * this.stride;
+      // (An all-zero matrix is a copy hidden: the lawn's indoors.)
+      if (d[o + 15] === 0) continue;
       for (let k = 0; k < 8; k++) {
         const x = c.x + (k & 1 ? h.x : -h.x);
         const y = c.y + (k & 2 ? h.y : -h.y);
@@ -207,15 +223,36 @@ export class Instances {
         if (pz > hi.z) hi.z = pz;
       }
     }
+    // (Every copy hidden: nothing to see, nowhere.)
+    if (lo.x > hi.x) {
+      lo.set(0, 0, 0);
+      hi.set(0, 0, 0);
+    }
     this.box.setMinMax(lo, hi);
     this.meshInstance.setCustomAabb(this.box);
   }
 
   /** Stops drawing and lets go of the buffer (the mesh and material are the template's). */
   destroy(): void {
+    if (!this.buffer) return;
     drawsOf.get(this.mesh)?.delete(this);
+    byEntity.delete(this.entity);
     this.entity.destroy();
-    this.buffer?.destroy();
+    this.mesh.decRefCount();
+    this.buffer.destroy();
     this.buffer = null;
   }
+}
+
+/** Each draw by its entity (`destroyDraw`). */
+const byEntity = new WeakMap<pc.Entity, Instances>();
+
+/**
+ * Takes down a draw by its entity: an instanced one (`Instances.destroy`: its buffer goes, the mesh
+ * stays its owner's), or any other entity (its own meshes go with it).
+ */
+export function destroyDraw(entity: pc.Entity): void {
+  const draw = byEntity.get(entity);
+  if (draw) draw.destroy();
+  else entity.destroy();
 }

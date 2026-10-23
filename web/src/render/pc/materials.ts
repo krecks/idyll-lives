@@ -265,6 +265,8 @@ export class MaterialLibrary {
   anisotropy = 8;
   /** Wall cutaway state read by every `cutaway` material. */
   readonly wallCut = new WallCutState();
+  /** Told of every material made from a manifest entry, before its first update (`onCreate`). */
+  private readonly creators: ((key: string, material: pc.StandardMaterial) => void)[] = [];
   /** The ground dug away over a basement in view (see `digInto`), and the basements and windowless rooms kept dark. */
   readonly dig: DigState;
   /** Which room each tile of the lot in view is in, so lamps light only their own (stage 6). */
@@ -337,6 +339,15 @@ export class MaterialLibrary {
       u.id.setValue(u.value);
     }
     this.mask.setValue(this.dig.mask);
+  }
+
+  /**
+   * Calls `fn` with each material made from now on from a manifest entry (its key, and the material
+   * before its first update): the shader features of a finish that aren't the library's own (the
+   * plants' wind, `nature.ts`). Copies (`instanceColored`) keep what `fn` set.
+   */
+  onCreate(fn: (key: string, material: pc.StandardMaterial) => void): void {
+    this.creators.push(fn);
   }
 
   setAssets(assets: AssetRegistry): this {
@@ -615,6 +626,7 @@ export class MaterialLibrary {
     if (options.cutaway) this.cutaway(mat);
     if (options.pattern === 'stripes') mat.setDefine('GAME_PATTERN_STRIPES', '');
     if (options.pattern === 'whitewash') mat.setDefine('GAME_PATTERN_WHITEWASH', '');
+    for (const fn of this.creators) fn(key, mat);
     this.light(mat);
     mat.update();
     return mat;

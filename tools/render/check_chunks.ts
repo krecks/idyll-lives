@@ -58,6 +58,11 @@ const NEEDED: { file: string; text: string; who: string }[] = [
   { file: 'scene/materials/standard-material-options-builder.js', text: 'options.litOptions.useVertexColorGamma = stdMat.vertexColorGamma;', who: 'materials.ts: vertex colours converted from sRGB (typed by hand there)' },
   { file: 'scene/materials/standard-material-options-builder.js', text: 'options.litOptions.ambientSH = !!stdMat.ambientSH;', who: 'materials.ts: the ambient harmonics (typed by hand there)' },
   { file: 'framework/app-base.js', text: 'this.fire("prerender");', who: 'materials.ts: the shader features\' state handed over before every frame' },
+  // render/pc/nature.ts: the plants' wind and tint, and the shadow-only layer (layers.ts).
+  ...both('common/vert/transformInstancing.js', 'attribute vec4 instance_line4;', 'attribute instance_line4: vec4f;', 'nature.ts: the wind reads the instance\'s matrix (`instance_line1..4`) in the vertex position hook'),
+  ...both('lit/vert/litMain.js', 'vVertexColor = gammaCorrectInput(vertex_color);', 'output.vVertexColor = gammaCorrectInputVec4(vertex_color);', 'nature.ts: the foliage\'s tint on the converted vertex colour, at the end of the vertex shader'),
+  { file: 'scene/shader-pass.js', text: 'this.defines.set(`${this.name.toUpperCase()}_PASS`, "");', who: 'nature.ts, cutaway.ts: SHADOW_PASS set in both stages of the shadow pass' },
+  { file: 'scene/renderer/shadow-renderer.js', text: 'if (layer._lightsSet.has(light)) {', who: 'layers.ts: a light casts from every layer it is on, drawn by a camera or not' },
 ];
 
 let failed = 0;
