@@ -7,6 +7,7 @@ pub mod checkglb;
 pub mod content;
 pub mod decoders;
 pub mod download;
+pub mod envconv;
 pub mod fp16;
 pub mod licenses;
 pub mod llmfetch;

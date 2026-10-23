@@ -50,8 +50,10 @@ import { Pose, type SnapshotLayout } from '../core/snapshot';
 import { lookAtStage, palette, type HairStyle } from '../game/household';
 import { Characters, MAX_CHARACTERS } from '../render/babylon/characters';
 import { MaterialLibrary } from '../render/babylon/materials';
-import { buildModel, motionsOf, partPose } from '../render/babylon/models';
-import { slotPlace } from '../render/babylon/objectMotion';
+import { buildModel } from '../render/babylon/models';
+import { partPose } from '../render/shared/modelClips';
+import { motionsOf } from '../render/shared/modelEntry';
+import { slotPlace } from '../render/shared/objectMotion';
 import { installNature } from '../render/babylon/nature';
 
 const P = Pose;

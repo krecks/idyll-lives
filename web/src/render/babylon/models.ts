@@ -41,16 +41,16 @@ import {
 import './loaders';
 import type { AbstractMesh, AnimationGroup, Material, Node } from './core';
 import { optimizedUrl } from '../../assets/registry';
-import { background, foreground } from '../../assets/stream';
-import { paintSlots } from '../../assets/paint';
+import { foreground } from '../../assets/stream';
 import type { ModelEntry, PrimitivePart, Vec3 } from '../../assets/types';
-import type { PartColors } from '../../core/protocol';
 import { DEFAULT_FINISH, encodeFinish, MaterialLibrary } from './materials';
 import { WALL_HALF, WALL_HEIGHT } from '../shared/walls';
-import type { Content, ObjectDef } from '../../content/content';
+import { CLIP_RATE, type ModelClip } from '../shared/modelClips';
+import { entrySpace as entrySpaceArray, namedFinish, tintInName, type BoneName, type ExtraShapes, type MaterialOverride, type ModelExtras, type Resize, type StandIn, type TintSlot } from '../shared/modelEntry';
+import { ModelFiles } from '../shared/modelFiles';
+import { partBox, resizeData, resizeMaps, resizes } from '../shared/modelParts';
 
-export type TintSlot = NonNullable<PrimitivePart['tint']>;
-export type BoneName = NonNullable<PrimitivePart['bone']>;
+export type { BoneName, TintSlot } from '../shared/modelEntry';
 
 export interface ModelTemplate {
   /** Meshes in model space; each receives the same instance matrices. */
@@ -110,78 +110,6 @@ export interface ModelMotion {
   rests?: Matrix[];
 }
 
-export interface ModelClip {
-  /** Seconds. */
-  duration: number;
-  /**
-   * Per part it moves (or carries: a part inside one it moves), its pose in model space, sampled
-   * `CLIP_RATE` times a second (16 floats each), and `depth`, how deep in the file's nodes the
-   * outermost node it moves of that part's is (0: the root's children), so a part posed by several
-   * clips at once takes the inner ones' poses first (`partPose`).
-   */
-  tracks: { part: number; poses: Float32Array; depth: number }[];
-}
-
-/** Samples per second of a clip's poses. */
-const CLIP_RATE = 30;
-
-/**
- * Where `clip` puts `part` at `seconds` (clamped to the clip) into `out`, relative to rest: its
- * vertices at rest times `out` are where they are then. False (and `out` untouched) if the clip
- * doesn't move that part.
- */
-export function clipPose(clip: ModelClip, part: number, seconds: number, out: Float32Array, offset = 0): boolean {
-  const track = clip.tracks.find((t) => t.part === part);
-  if (!track) return false;
-  const last = track.poses.length / 16 - 1;
-  const at = clamp(seconds * CLIP_RATE, 0, last);
-  const i = Math.min(Math.floor(at), Math.max(0, last - 1));
-  const f = last > 0 ? at - i : 0;
-  const a = i * 16;
-  const b = Math.min(i + 1, last) * 16;
-  // Samples are close together: blending the matrices is as good as turning between them.
-  for (let k = 0; k < 16; k++) out[offset + k] = track.poses[a + k] * (1 - f) + track.poses[b + k] * f;
-  return true;
-}
-
-/**
- * Where the clips playing (`playing`, each at its seconds) put `part` together, into `out` (as
- * `clipPose`): one clip's pose as it is; several multiply, the clips that move the part itself
- * before those that move a part it is inside (a record spinning on an arm that swings up: the spin
- * and then the swing), so each clip of a nested part plays as if the others did too. On one node, a
- * crop's growth clip (`kind` `growth`) comes first and the others play on top of it, about the part's
- * rest origin: a veggie bed's plants sway as they stand at their stage, seedlings by their own small
- * height. False (`out` untouched) if none moves it.
- */
-export function partPose(playing: readonly { clip: ModelClip; time: number; kind?: string }[], part: number, out: Float32Array, offset = 0): boolean {
-  let found = 0;
-  let first: { clip: ModelClip; time: number } | undefined;
-  for (const p of playing) {
-    if (!p.clip.tracks.some((t) => t.part === part)) continue;
-    if (!found++) first = p;
-  }
-  if (found <= 1) return found === 1 && clipPose(first!.clip, part, first!.time, out, offset);
-  const posed: { depth: number; growth: number; pose: Float32Array }[] = [];
-  for (const p of playing) {
-    const track = p.clip.tracks.find((t) => t.part === part);
-    if (!track) continue;
-    const pose = new Float32Array(16);
-    clipPose(p.clip, part, p.time, pose);
-    posed.push({ depth: track.depth, growth: p.kind === 'growth' ? 1 : 0, pose });
-  }
-  // Deepest first, and on one node the growth stage first (row vectors: a vertex times the first, then the next).
-  posed.sort((a, b) => b.depth - a.depth || b.growth - a.growth);
-  const acc = posed[0].pose;
-  const tmp = new Float32Array(16);
-  for (let n = 1; n < posed.length; n++) {
-    const m = posed[n].pose;
-    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) tmp[i * 4 + j] = acc[i * 4] * m[j] + acc[i * 4 + 1] * m[4 + j] + acc[i * 4 + 2] * m[8 + j] + acc[i * 4 + 3] * m[12 + j];
-    acc.set(tmp);
-  }
-  out.set(acc, offset);
-  return true;
-}
-
 /**
  * A mirror's reflecting face in model space: `matrix` takes the unit square (or, `round`, the
  * unit-diameter disc) in the xy plane, facing +z, onto the face, just in front of the glass.
@@ -215,31 +143,6 @@ export interface BuildOptions {
    * where each node is at rest (a missing one at the origin); the file's own clips are left out.
    */
   parts?: readonly string[];
-}
-
-/** What shapes a stand-in box: the thing's content layer and, on a top, its radius. */
-export interface StandIn {
-  /** `item`: food, a dish, something in a hand: a small block (`ITEM_STAND_IN`). */
-  layer: ObjectDef['layer'] | 'item';
-  /** Things on a top: the radius (m) of the disc they take (`Content.radius`). */
-  radius: number;
-}
-
-/** The stand-in of an item on a top or in a hand: a block about 10 cm across. */
-export const ITEM_STAND_IN: StandIn = { layer: 'item', radius: 0.05 };
-
-/** The box a kind of thing is drawn as without its model's file (`BuildOptions.standIn`). */
-export function standInOf(content: Content, def: ObjectDef | undefined): StandIn {
-  return { layer: def?.layer, radius: content.radius(def) };
-}
-
-/** A player's resizing: its own size (metres across and deep, before turning) and how much taller. */
-export interface Resize {
-  size: [number, number];
-  /** Centimetres taller (negative: shorter). */
-  tall: number;
-  /** Things hanging from the ceiling grow downwards. */
-  ceiling?: boolean;
 }
 
 export async function buildModel(
@@ -330,122 +233,8 @@ function standIn(scene: Scene, name: string, [w, d]: [number, number], { layer, 
   return { meshes, tints, bones, height: groups.height, bottom: groups.bottom, outline: { minX: lo[0], maxX: hi[0], minZ: lo[2], maxZ: hi[2] } };
 }
 
-/** Share of a model's height above which everything rises with it (seats, tops, backs; sim-core `Top::of`). */
-const RISE_FROM = 0.4;
-/** Along the floor: the band at each edge (m, at most this share of half the width) that moves with the edge unstretched. */
-const EDGE_BAND = 0.35;
-const EDGE_SHARE = 0.4;
-
-/** Whether `resize` changes a model of `from` tiles. */
-function resizes(from: readonly [number, number], resize: Resize): boolean {
-  return resize.size[0] !== from[0] || resize.size[1] !== from[1] || !!resize.tall;
-}
-
-/**
- * The resizing of a model of `from` tiles whose height runs from `bottom` to `top`, as a map per
- * axis (x, y, z) of where a point goes, and its slope there (how much the axis stretches).
- */
-function resizeMaps(from: readonly [number, number], resize: Resize, bottom: number, top: number): { maps: ((v: number) => number)[]; slopes: ((v: number) => number)[]; span: number } {
-  const [tw, td] = resize.size;
-  const dy = resize.tall / 100;
-  const span = Math.max(top - bottom, 1e-3);
-  // Upward (or, from the ceiling, downward): what lies past the line moves by `dy`.
-  const line = resize.ceiling ? top - RISE_FROM * span : bottom + RISE_FROM * span;
-  const lift = (v: number) => (resize.ceiling ? (v < line ? v - dy : v) : v > line ? v + dy : v);
-  // Along the floor: a band at each edge moves with it; the middle scales to fill.
-  const across = (half: number, half2: number) => {
-    const band = Math.min(EDGE_BAND, EDGE_SHARE * half);
-    const band2 = Math.min(band, EDGE_SHARE * half2);
-    const inner = half - band;
-    const inner2 = half2 - band2;
-    const map = (v: number) => {
-      const a = Math.abs(v);
-      const mapped = a <= inner ? (a * inner2) / Math.max(inner, 1e-6) : inner2 + ((a - inner) * band2) / band;
-      return Math.sign(v) * mapped;
-    };
-    const slope = (v: number) => (Math.abs(v) <= inner ? inner2 / Math.max(inner, 1e-6) : band2 / band);
-    return { map, slope };
-  };
-  const [x, z] = [across(from[0] / 2, tw / 2), across(from[1] / 2, td / 2)];
-  return { maps: [x.map, lift, z.map], slopes: [x.slope, () => 1, z.slope], span };
-}
-
-/**
- * A file's geometry resized by `resizeMaps`, point by point: the edges move out keeping their
- * thickness, the middle stretches, and what lies above the rise line rises (a triangle across it
- * stretches). Normals follow the stretch.
- */
-function resizeData(data: VertexData, maps: ((v: number) => number)[], slopes: ((v: number) => number)[]): void {
-  const pos = data.positions!;
-  const nor = data.normals;
-  for (let i = 0; i < pos.length; i += 3) {
-    const [x, y, z] = [pos[i], pos[i + 1], pos[i + 2]];
-    if (nor) {
-      // A normal scales by the inverse of the stretch.
-      const n = [nor[i] / slopes[0](x), nor[i + 1] / slopes[1](y), nor[i + 2] / slopes[2](z)];
-      const l = Math.hypot(n[0], n[1], n[2]) || 1;
-      for (let k = 0; k < 3; k++) nor[i + k] = n[k] / l;
-    }
-    pos[i] = maps[0](x);
-    pos[i + 1] = maps[1](y);
-    pos[i + 2] = maps[2](z);
-  }
-}
-
-/**
- * A part's exact bounds in model space (`lo`, `hi`: along x, y, z), turned as `partMesh` turns it:
- * a box by its corners, a cylinder or cone by its rings' corners, a round shape by its own extent (the
- * gate, crates/tools/src/checkglb.rs `bounds`, measures a file's boxes by their corners, turned the same
- * way). And which of its own axes lies along each model axis (-1: none; it's turned off the axes).
- */
-function partBox(p: PrimitivePart): { lo: number[]; hi: number[]; along: number[] } {
-  const [rx, ry, rz] = (p.rotate ?? [0, 0, 0]).map((d) => (d * Math.PI) / 180);
-  const m = Matrix.FromQuaternionToRef(Quaternion.FromEulerAngles(rx, ry, rz), new Matrix()).m;
-  // R[j][k]: model axis k of local axis j (row j: where local axis j goes).
-  const r = (j: number, k: number) => m[j * 4 + k];
-  const along = [0, 1, 2].map((k) => [0, 1, 2].find((j) => Math.abs(r(j, k)) > 0.999) ?? -1);
-  const [sx, sy, sz] = p.size;
-  const ellipsoid = (k: number, ax: number, ay: number, az: number) => Math.hypot(r(0, k) * ax, r(1, k) * ay, r(2, k) * az);
-  const shape = p.shape as PrimitivePart['shape'] | 'torus' | 'lathe';
-  let lo: number[];
-  let hi: number[];
-  if (shape === 'cylinder' || shape === 'cone') {
-    // `CreateCylinder`'s rings: `segments` corners from angle 0, scaled in x and z.
-    const n = p.segments ?? (shape === 'cone' ? 16 : 20);
-    const top = shape === 'cone' ? (p.taper ?? 0) : (p.taper ?? 1);
-    const points: number[][] = [];
-    for (const [d, y] of [[1, -sy / 2], [top, sy / 2]]) {
-      for (let j = 0; j < n; j++) points.push([(d / 2) * sx * Math.cos((2 * Math.PI * j) / n), y, (d / 2) * sz * Math.sin((2 * Math.PI * j) / n)]);
-    }
-    const dot = (q: number[], k: number) => q[0] * r(0, k) + q[1] * r(1, k) + q[2] * r(2, k);
-    lo = [0, 1, 2].map((k) => Math.min(...points.map((q) => dot(q, k))));
-    hi = [0, 1, 2].map((k) => Math.max(...points.map((q) => dot(q, k))));
-  } else if (shape === 'lathe') {
-    // Each profile point (radius, y) is a ring, scaled by the size.
-    const profile = (p as PrimitivePart & ExtraShapes).profile ?? [[0, -0.5], [0.5, -0.5], [0.5, 0.5], [0, 0.5]];
-    lo = [0, 1, 2].map((k) => Math.min(...profile.map(([d, y]) => r(1, k) * y * sy - d * Math.hypot(r(0, k) * sx, r(2, k) * sz))));
-    hi = [0, 1, 2].map((k) => Math.max(...profile.map(([d, y]) => r(1, k) * y * sy + d * Math.hypot(r(0, k) * sx, r(2, k) * sz))));
-  } else {
-    const half = [0, 1, 2].map((k) => {
-      if (shape === 'sphere' || shape === 'blob') return ellipsoid(k, sx / 2, sy / 2, sz / 2);
-      // `sy` tall overall, radius sx/2, then scaled to sz in z.
-      if (shape === 'capsule') return Math.abs(r(1, k)) * Math.max(0, sy / 2 - sx / 2) + ellipsoid(k, sx / 2, sx / 2, sz / 2);
-      if (shape === 'torus') {
-        // A ring (sx - sy across) swept by a tube sy thick, then scaled to sz in z.
-        const [q, ring, tube] = [sz / sx, (sx - sy) / 2, sy / 2];
-        return Math.hypot(r(0, k) * ring, r(2, k) * ring * q) + ellipsoid(k, tube, tube, tube * q);
-      }
-      // A box: model axis k gathers |R[j][k]| * size[j] from each local axis j.
-      return [0, 1, 2].reduce((sum, j) => sum + Math.abs(r(j, k)) * p.size[j], 0) / 2;
-    });
-    lo = half.map((h) => -h);
-    hi = half;
-  }
-  return { lo: p.at.map((c, k) => c + lo[k]), hi: p.at.map((c, k) => c + hi[k]), along };
-}
-
-/** The reflecting face of a mirror part (see `MirrorSurface`), placed as `partMesh` places the part. */
-function mirrorSurface(p: PrimitivePart): MirrorSurface {
+/** The reflecting face of a mirror part (see `MirrorSurface`), placed as `partMesh` places the part. (Exported for `tests/modelParts.test.ts`.) */
+export function mirrorSurface(p: PrimitivePart): MirrorSurface {
   const [sx, sy, sz] = p.size;
   const round = p.shape === 'cylinder';
   // The face's normal before the part turns: a disc's axis (y), a box's thinnest side.
@@ -533,7 +322,8 @@ interface BuiltGroups {
 /** Group key for parts drawn with the shared plain finish. */
 const PLAIN = 'plain';
 
-function partMesh(scene: Scene, p: PrimitivePart, lod: 0 | 1, index: number, alpha: number): Mesh {
+/** A primitive part's mesh in model space (exported for `tests/modelParts.test.ts`, against `shared/modelParts.ts` `partData`). */
+export function partMesh(scene: Scene, p: PrimitivePart, lod: 0 | 1, index: number, alpha: number): Mesh {
   const [sx, sy, sz] = p.size;
   const lo = lod === 1;
   let mesh: Mesh;
@@ -607,17 +397,6 @@ function partMesh(scene: Scene, p: PrimitivePart, lod: 0 | 1, index: number, alp
   }
   mesh.setVerticesData(VertexBuffer.ColorKind, colors);
   return mesh;
-}
-
-/** Shapes beyond the base schema. */
-interface ExtraShapes {
-  /**
-   * `lathe`: profile [radius, y] points in unit space (radius 0..0.5, y -0.5..0.5), revolved
-   * around the vertical axis and scaled by `size`. Walk the outer surface upwards and any inner
-   * surface downwards (the surface faces the right-hand side of the walk); bends sharper than
-   * 40 degrees get a hard edge.
-   */
-  profile?: [number, number][];
 }
 
 /** Surface of revolution from a profile (see `ExtraShapes.profile`), centred on the origin. */
@@ -844,118 +623,6 @@ function blobMesh(scene: Scene, sx: number, sy: number, sz: number, amount: numb
   return mesh;
 }
 
-/** Optional model entry fields beyond the base schema (read defensively; see the file header). */
-interface ModelExtras {
-  /** Exact size [width x, height y, depth z] in metres after `rotationY`; replaces `scale`. */
-  fit?: Vec3;
-  /** With `fit`: `back` puts the back (-Z) of the model on the footprint's back edge instead of centring it. */
-  align?: 'centre' | 'back';
-  /** Restyles materials by glTF material name; `*` applies to every material not listed. */
-  materials?: Record<string, MaterialOverride>;
-  /** Extra primitive parts drawn with the model (in the final, fitted space). */
-  parts?: PrimitivePart[];
-  /** When the file's clips play (`objectMotion.ts`). */
-  motions?: MotionsEntry;
-}
-
-/** A use's clip in a manifest's `motions.uses`: its name, or the name and its own `hold` (and `delay`, `every`, `slot`, `out`); or several of these. */
-type UseEntry = string | { clip: string; hold?: number; delay?: number; every?: number; slot?: number; out?: number; over?: 1 | -1 };
-
-/** A model entry's `motions` as the manifest writes it: when its clips play (see `Motions`). */
-interface MotionsEntry {
-  uses?: Record<string, UseEntry | UseEntry[]>;
-  hold?: number;
-  open?: string;
-  loops?: Record<string, string>;
-  idle?: string;
-  night?: string;
-  growth?: string;
-  ride?: string;
-  clock?: ClockClips;
-}
-
-/** When a model's clips play: while residents use the object, and while it's open. */
-export interface Motions {
-  /**
-   * The clips a use plays, by the interaction's id or, failing that, its animation tag (`fetch`,
-   * `drink`), each with the seconds after the use starts that it plays back (a door that closes
-   * again; absent: when the use ends). The manifest gives a clip's name (with the model's `hold`),
-   * `{clip, hold}`, or a list of them (a shower's door shutting after 1 s while its water runs on).
-   */
-  uses: Record<string, readonly UseClip[]>;
-  /**
-   * The clip a use plays round and round while it lasts (a rocking chair, a washer's drum), by
-   * interaction id or animation tag: from rest to rest, finishing its round when the use ends.
-   */
-  loops: Record<string, string>;
-  /** The clip held open while the object is open (a wall bed folded down; the sim's `open`, set by `leaves`). */
-  open?: string;
-  /** The clip that goes round all the time, near the camera (a ceiling fan, a fountain's water; `ambientRange`). */
-  idle?: string;
-  /** The clip held open from dusk to dawn, while the lamps are lit (curtains drawn), whoever is asleep. */
-  night?: string;
-  /**
-   * A crop's clip, held where its growth stage is (`GROWTH_TIMES`): ripe at rest, then picked,
-   * growing and just planted along it, so each stage plays on to the next.
-   */
-  growth?: string;
-  /** The clip whose (first) part carries the residents sitting or lying on the object: a rocking chair's seat, a swing. */
-  ride?: string;
-  /** A clock's hands, set from the game's time (`ClockClips`). */
-  clock?: ClockClips;
-}
-
-export interface UseClip {
-  clip: string;
-  /** Seconds after it starts that it plays back (absent: when the use ends). */
-  hold?: number;
-  /** Seconds after the use starts that it starts (a net swishing after the shot). */
-  delay?: number;
-  /** Plays again every so many seconds while the use lasts, from rest to rest each time (a net swishing after each shot). */
-  every?: number;
-  /** Only for the resident in this slot (content `slots`, from 0: the one nearest its place, `slotOf`, as sim-core's `slot_position` has them; a bunk's 1 is the upper one). */
-  slot?: number;
-  /** Opens again for so many seconds when the use ends (a phone box's door letting the caller out). */
-  out?: number;
-  /**
-   * Plays along with the use instead (the snapshot's `progress`): 1 from rest to its end over the use's minutes, -1
-   * from its end back to rest; the washing hung out piece by piece and taken in, a crop picked as the hands go (the
-   * sim's state changes when the use ends: content `gradual`, a crop's `picks`).
-   */
-  over?: 1 | -1;
-}
-
-/**
- * A clock's hands (`motions.clock`): each clip turns its hand once round from rest, the `hour` one
- * in twelve hours and the `minute` one in an hour, and the game holds each where the game's time
- * has it. `at`: the time the hands show at rest, in minutes past twelve (default 0: twelve o'clock).
- */
-export interface ClockClips {
-  hour?: string;
-  minute?: string;
-  at?: number;
-}
-
-/** Of a placed object's `colors`, those on parts its model lets the player paint; undefined for none. */
-export function paintColors(entry: ModelEntry | undefined, colors: PartColors | undefined): PartColors | undefined {
-  if (!colors) return undefined;
-  const shown = Object.fromEntries(paintSlots(entry).flatMap(({ material }) => (colors[material] ? [[material, colors[material]]] : [])));
-  return Object.keys(shown).length ? shown : undefined;
-}
-
-/**
- * `entry` with each part its `paint` names in its colour from `colors` (`#rrggbb` by material, a
- * placed object's colours), each keeping its finish (mapped by name or `*`); a material without a
- * finish has its file colour multiplied by it. The entry itself when nothing is painted.
- */
-export function painted(entry: ModelEntry | undefined, colors: PartColors | undefined): ModelEntry | undefined {
-  const shown = paintColors(entry, colors);
-  if (!entry || !shown) return entry;
-  const materials = { ...((entry as ModelEntry & ModelExtras).materials ?? {}) };
-  for (const [name, color] of Object.entries(shown)) materials[name] = { ...(materials[name] ?? namedFinish(name) ?? materials['*']), color };
-  return { ...entry, materials } as ModelEntry;
-}
-
 /**
  * The colour (sRGB hex) `entry`'s file gives its material `name`, as made (before the player paints
  * it), from the file as `scene` imported it (shared with its builds); undefined without one.
@@ -965,72 +632,6 @@ export async function fileColour(scene: Scene, entry: ModelEntry | undefined, na
   const file = await loadFile(scene, entry.url);
   const material = file.pieces.find((p) => p.material?.name === name)?.material;
   return material instanceof PBRMaterial ? material.albedoColor.toGammaSpace().toHexString() : undefined;
-}
-
-/** A model entry's `motions`, if it has any. */
-export function motionsOf(entry: ModelEntry | undefined): Motions | undefined {
-  const m = (entry as (ModelEntry & ModelExtras) | undefined)?.motions;
-  if (!m) return undefined;
-  const uses = Object.fromEntries(
-    Object.entries(m.uses ?? {}).map(([use, value]) => [use, (Array.isArray(value) ? value : [value]).map((u) => (typeof u === 'string' ? { clip: u, hold: m.hold } : { ...u, hold: u.hold ?? m.hold }))]),
-  );
-  const loops = m.loops ?? {};
-  const clock = m.clock?.hour || m.clock?.minute ? m.clock : undefined;
-  return Object.keys(uses).length || Object.keys(loops).length || m.open || m.idle || m.night || m.growth || clock
-    ? { uses, loops, open: m.open, idle: m.idle, night: m.night, growth: m.growth, ride: m.ride, clock }
-    : undefined;
-}
-
-interface MaterialOverride {
-  /** Replace with a game finish (`material.finish.*`) coloured by `color` (default: the file's colour). */
-  finish?: string;
-  /** sRGB hex: the finish colour, or (without `finish`) a multiplier on the file's base colour. */
-  color?: string;
-  roughness?: number;
-  metallic?: number;
-  /** Drop the meshes that use this material. */
-  hide?: boolean;
-  /**
-   * Mirror glass, reflecting the room live (`mirrors.ts`) from its face towards the front (+z) or
-   * the back: a flat piece (the face is across its thinnest side) of the still body, square or
-   * round as it is drawn.
-   */
-  mirror?: 'front' | 'back';
-  /**
-   * Glows in this colour (sRGB hex): a lamp's shade at night, as the lamps come on and out with its
-   * room's lights (`TemplateGlow`); a screen while a resident uses it, with `screen`.
-   */
-  glow?: string;
-  /** A screen: lit only while a resident uses the object (a TV, a monitor), not with the room. */
-  screen?: boolean;
-}
-
-/** Idle time (ms) left below which `buildAhead` waits for the next idle moment. */
-const IDLE_SLICE_MS = 6;
-
-/**
- * Runs `jobs` in idle moments, as many as fit in each, until they are done or `current()` turns
- * false: models built ahead without holding up a frame.
- */
-export function buildAhead(jobs: (() => void)[], current: () => boolean): void {
-  const more = () => {
-    if (jobs.length) idle(step);
-  };
-  const step = (deadline?: IdleDeadline) => {
-    if (!current()) return;
-    while (jobs.length) {
-      jobs.shift()!();
-      if (!deadline || deadline.timeRemaining() < IDLE_SLICE_MS) break;
-    }
-    more();
-  };
-  idle(step);
-}
-
-/** Runs `fn` when the page is idle (soon anyway; a short timeout where idle callbacks are missing). */
-function idle(fn: (deadline?: IdleDeadline) => void, timeout = 2000): void {
-  if ('requestIdleCallback' in window) requestIdleCallback(fn, { timeout });
-  else setTimeout(fn, 50);
 }
 
 /**
@@ -1083,47 +684,19 @@ interface FilePiece {
   full?: VertexData;
 }
 
-/**
- * After a file fails to load, how long (ms) until it's tried again in the background: each try that
- * fails waits for the next, and after the last nothing more is tried (until the browser comes back
- * online, when it starts over). Builds meanwhile still try it themselves, as ever.
- */
-const RETRY_AFTER_MS = [5_000, 30_000, 120_000];
+/** A scene's model files (`shared/modelFiles.ts`): they go with the scene. */
+const sceneFiles = new WeakMap<Scene, ModelFiles<LoadedFile>>();
 
-/** A scene's imported files and the ones that failed (they go with the scene). */
-interface SceneFiles {
-  /** Imported (or being imported), by URL. A failed one is dropped, so the next build tries it again. */
-  files: Map<string, Promise<LoadedFile>>;
-  /** Failed to load, by URL: how many background tries have been made, and the next one's timer. */
-  failed: Map<string, { tries: number; timer?: ReturnType<typeof setTimeout> }>;
-  /** Told when a file that failed has come (`onModelFileArrived`). */
-  arrived: Set<(url: string) => void>;
-}
-
-const sceneFiles = new WeakMap<Scene, SceneFiles>();
-
-function filesOf(scene: Scene): SceneFiles {
+function filesOf(scene: Scene): ModelFiles<LoadedFile> {
   const known = sceneFiles.get(scene);
   if (known) return known;
-  const state: SceneFiles = { files: new Map(), failed: new Map(), arrived: new Set() };
-  sceneFiles.set(scene, state);
-  // Back online: what failed (in an outage, most likely) is tried again from the start.
-  const online = () => {
-    for (const [url, f] of state.failed) {
-      clearTimeout(f.timer);
-      f.timer = undefined;
-      f.tries = 0;
-      scheduleRetry(scene, state, url);
-    }
-  };
-  window.addEventListener('online', online);
-  scene.onDisposeObservable.addOnce(() => {
-    window.removeEventListener('online', online);
-    for (const f of state.failed.values()) clearTimeout(f.timer);
-    state.failed.clear();
-    state.arrived.clear();
-  });
-  return state;
+  const files = new ModelFiles<LoadedFile>(
+    (url, now) => importFile(scene, url, now),
+    () => scene.isDisposed,
+  );
+  sceneFiles.set(scene, files);
+  scene.onDisposeObservable.addOnce(() => files.dispose());
+  return files;
 }
 
 /**
@@ -1132,9 +705,7 @@ function filesOf(scene: Scene): SceneFiles {
  * what stops it. A scene nobody listens to doesn't try its failed files in the background.
  */
 export function onModelFileArrived(scene: Scene, fn: (url: string) => void): () => void {
-  const { arrived } = filesOf(scene);
-  arrived.add(fn);
-  return () => arrived.delete(fn);
+  return filesOf(scene).onArrived(fn);
 }
 
 /**
@@ -1142,76 +713,12 @@ export function onModelFileArrived(scene: Scene, fn: (url: string) => void): () 
  * still being built when it came turned out to be built without it (`TemplateCache`).
  */
 export function retellModelFileArrived(scene: Scene, url: string): void {
-  tellArrived(filesOf(scene), url);
+  filesOf(scene).retell(url);
 }
 
-/**
- * The file at `url` as imported into `scene`, once. A failed import isn't kept, so each build tries
- * it again (none is held back or failed at once because of an earlier failure), and it's tried in the
- * background too (`scheduleRetry`). Only the import counts as the file failing, not a build from it
- * (`buildFromFile`): a file that loads but can't be built isn't fetched again. A background try imports in the slot it was given (`now` false), not as a load
- * someone waits for; a build that wants the file meanwhile shares the download already under way.
- */
-function loadFile(scene: Scene, url: string, now = true): Promise<LoadedFile> {
-  const state = filesOf(scene);
-  let file = state.files.get(url);
-  if (!file) {
-    const loading = importFile(scene, url, now);
-    state.files.set(url, (file = loading));
-    // (Both outcomes are handled here; whoever asked handles the rejection it's given.)
-    loading.then(
-      () => fileArrived(state, url),
-      () => state.files.get(url) === loading && state.files.delete(url),
-    );
-  }
-  file.catch(() => {
-    if (!state.failed.has(url)) state.failed.set(url, { tries: 0 });
-    scheduleRetry(scene, state, url);
-  });
-  return file;
-}
-
-/** A file loaded: one that had failed isn't tried in the background any more, and the listeners are told. */
-function fileArrived(state: SceneFiles, url: string): void {
-  const f = state.failed.get(url);
-  if (!f) return;
-  clearTimeout(f.timer);
-  state.failed.delete(url);
-  tellArrived(state, url);
-}
-
-function tellArrived(state: SceneFiles, url: string): void {
-  for (const fn of [...state.arrived]) {
-    try {
-      fn(url);
-    } catch (err) {
-      console.error(`[render] building again with ${url} failed`, err);
-    }
-  }
-}
-
-/** Sets the next background try of a failed file, unless one is set already or none are left. */
-function scheduleRetry(scene: Scene, state: SceneFiles, url: string): void {
-  const f = state.failed.get(url);
-  if (!f || f.timer !== undefined || f.tries >= RETRY_AFTER_MS.length || !state.arrived.size || scene.isDisposed) return;
-  // A load under way (a build's) is this try; if it fails, the next is set from here. Otherwise the
-  // try loads the file itself.
-  const sharedTry = () => {
-    const loading = state.files.get(url);
-    if (loading) loading.catch(() => scheduleRetry(scene, state, url));
-    return !!loading;
-  };
-  f.timer = setTimeout(() => {
-    f.timer = undefined;
-    f.tries++;
-    if (scene.isDisposed || !state.failed.has(url) || sharedTry()) return;
-    // It waits its turn behind what's on screen; by then the file may have come, or a build be loading it.
-    void background(async () => {
-      if (scene.isDisposed || !state.failed.has(url) || sharedTry()) return;
-      // `loadFile` notes the outcome (and sets the next try); the rejection itself is nobody's to handle.
-      await loadFile(scene, url, false).catch(() => {});
-    }).catch(() => {});
-  }, RETRY_AFTER_MS[f.tries]);
+/** The file at `url` as imported into `scene`, once (`ModelFiles.load`). */
+function loadFile(scene: Scene, url: string): Promise<LoadedFile> {
+  return filesOf(scene).load(url);
 }
 
 async function importFile(scene: Scene, url: string, now: boolean): Promise<LoadedFile> {
@@ -1352,19 +859,9 @@ function copyData(data: VertexData): VertexData {
   return copy;
 }
 
-/** A material named for its finish, `stone@matte` (`tunic@fabric#body`): drawn with `material.finish.matte` (unless the entry maps it), if `lib` has it. */
-function namedFinish(name: string, lib?: MaterialLibrary): MaterialOverride | undefined {
-  const named = /.@([a-z]+)$/.exec(name.replace(TINT_IN_NAME, ''));
-  const finish = named && `material.finish.${named[1]}`;
-  return finish && (!lib || lib.hasFinish(finish)) ? { finish } : undefined;
-}
-
-/** A tint slot in a material's name: `tunic#body` is tinted as a primitive part with `tint: 'body'` is. */
-const TINT_IN_NAME = /#(body|skin|hair)(?=@|\||$)/;
-
-/** The tint slot a file's material carries in its name (`TINT_IN_NAME`), or null. */
+/** The tint slot a file's material carries in its name (`tintInName`), or null. */
 function namedTint(material: Material | null): TintSlot | null {
-  return (material && (TINT_IN_NAME.exec(material.name)?.[1] as TintSlot | undefined)) ?? null;
+  return tintInName(material?.name);
 }
 
 /** Copies of a file's materials as entries draw them (as loaded, or restyled by `color`, `roughness`, `metallic`), by restyling. */
@@ -1407,15 +904,9 @@ function buildGltf(scene: Scene, name: string, entry: ModelEntry, file: LoadedFi
   }
 }
 
-/**
- * A model entry's own placement of its file's model space: its `scale`, `rotationY` and `offset`;
- * with `fit`, only its turn (the fit is found from the geometry built, `fitInto`).
- */
+/** A model entry's own placement of its file's model space (`shared/modelEntry.ts` `entrySpace`). */
 export function entrySpace(entry: ModelEntry): Matrix {
-  const fit = (entry as ModelEntry & ModelExtras).fit;
-  const s = fit ? 1 : (entry.scale ?? 1);
-  const [ox, oy, oz] = entry.offset ?? [0, 0, 0];
-  return Matrix.Compose(new Vector3(s, s, s), Quaternion.RotationAxis(Vector3.Up(), ((entry.rotationY ?? 0) * Math.PI) / 180), fit ? Vector3.Zero() : new Vector3(ox, oy, oz));
+  return Matrix.FromArray(entrySpaceArray(entry));
 }
 
 /** `buildGltf`'s build. */
@@ -1438,7 +929,7 @@ function buildFromFile(scene: Scene, name: string, entry: ModelEntry, file: Load
   const shifts = pivots.map(() => Vector3.Zero());
   if (resize && boxes.length && resizes(footprint, resize)) {
     const { maps, slopes } = resizeMaps(footprint, resize, Math.min(...boxes.map((b) => b.lo[1])), Math.max(...boxes.map((b) => b.hi[1])));
-    for (const p of pieces) for (const data of p.full ? [p.data, p.full] : [p.data]) resizeData(data, maps, slopes);
+    for (const p of pieces) for (const data of p.full ? [p.data, p.full] : [p.data]) resizeData({ positions: data.positions!, normals: data.normals }, maps, slopes);
     pivots.forEach((p, i) => shifts[i].set(maps[0](p.x) - p.x, maps[1](p.y) - p.y, maps[2](p.z) - p.z));
     boxes.splice(0, boxes.length, ...pieces.map((p) => dataBox(p.data)));
   }
@@ -1743,15 +1234,6 @@ function mergeByMaterial(meshes: Mesh[], name: string): Mesh[] {
     out.push(...group.filter((m) => !m.isDisposed()));
   }
   return out;
-}
-
-/**
- * The natural variation of a placed plant (manifest `vary`): its own turn (radians) and size,
- * fixed by the tile it stands on so it looks the same after a reload. None when `vary` is 0.
- */
-export function placementVariation(vary: number, x: number, z: number): { turn: number; size: number } {
-  if (!vary) return { turn: 0, size: 1 };
-  return { turn: hash3(x, z, 101) * Math.PI * 2, size: 1 + (hash3(x, z, 102) * 2 - 1) * vary };
 }
 
 // ---- small math helpers -------------------------------------------------------------

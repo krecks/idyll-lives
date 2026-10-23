@@ -87,13 +87,14 @@ import { SHOT } from '../shared/characters/clips/shot';
 // `cargo review` too; what their entries mean and why some are as they are: docs/characters-format.md "Seats and beds".
 import FURNITURE from '../shared/characters/furniture.json';
 import { feetDown, legTurn, perch, SEAT_FIT, seatSize, type LegSide } from '../shared/characters/seatFit';
-import { furthestAhead, nearestAhead, type TableRoom } from './tableTuck';
+import { furthestAhead, nearestAhead, type TableRoom } from '../shared/tableTuck';
 import { seatsItself } from '../../game/surfaces';
 import { addLocal, addRotation, blendInto, makeAdditive, PoseScratch, qmul, resetAdditive, rotate, sampleClip, skin, type Additive, type Placement } from '../shared/characters/pose';
 import type { MaterialLibrary } from './materials';
 import { WALL_HEIGHT } from './house';
 import { LAYER_SHADOW_ONLY } from '../shared/layers';
-import { buildModel, fileColour, ITEM_STAND_IN, onModelFileArrived, paintColors, painted, type ModelTemplate } from './models';
+import { buildModel, fileColour, onModelFileArrived, type ModelTemplate } from './models';
+import { ITEM_STAND_IN, paintColors, painted } from '../shared/modelEntry';
 import { paintSlots } from '../../assets/paint';
 import { TemplateCache } from './templateCache';
 

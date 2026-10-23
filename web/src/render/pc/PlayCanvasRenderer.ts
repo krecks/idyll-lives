@@ -5,8 +5,10 @@
  * kept as the reference until the port is done; see the plan in docs). What this one does so far:
  * the device (WebGPU, else WebGL2), frames paced in whole display refreshes, the game camera (the
  * player's orbit input, the director's shots) and the menus' overview camera, the time of day's
- * sun, sky and fog, the lot's walls and floors as the simulation builds them, picking the ground,
- * projecting points onto the screen, and the stats. The rest is stubbed where the port reaches it.
+ * sun, sky fill, environment lighting and fog, the lot's walls and floors as the simulation builds
+ * them in the material library's surfaces (`materials.ts`, with the soft look and the wall modes),
+ * picking the ground, projecting points onto the screen, and the stats. The rest is stubbed where
+ * the port reaches it.
  *
  * Game space is the Babylon renderer's left-handed one: everything in the world hangs under a root
  * mirrored in z (`space.ts`), and only cameras, lights and rays are converted.
@@ -15,7 +17,10 @@
 import * as pc from './engine';
 import { GameCamera } from './camera';
 import { createApp, createDevice } from './device';
+import { MaterialLibrary, SUN_LIGHT_MASK } from './materials';
 import { meshFrom } from './meshes';
+import { diagViewActive } from './shaders/diagView';
+import { shadingFromSettings } from './shaders/softLook';
 import { createWorldRoot, toEngine } from './space';
 import { SunShadows } from './sunShadows';
 import { benchDiag } from '../../debug/benchFlags';
@@ -55,6 +60,7 @@ import type {
   SeenBird,
   TownShot,
   ViewRect,
+  Shading,
   WallMode,
 } from '../types';
 
@@ -78,6 +84,13 @@ const MAX_FRAME_MS = 100;
 const HOLD_FRAMES = 2;
 /** Metres the sun's shadow square reaches past the viewed lot. */
 const SHADOW_MARGIN = 10;
+/** Height of the walls left standing in the cutaway modes (m; `babylon/house.ts` `WALL_STUB` until the house is ported). */
+const WALL_STUB = 0.35;
+/**
+ * Babylon's PBR lit with `albedo / π` per unit of a directional light's intensity (its diffuse
+ * BRDF), PlayCanvas with `albedo`: the look's sun intensities are Babylon's.
+ */
+const SUN_UNITS = 1 / Math.PI;
 
 /** A Babylon linear colour (the look's keys are used as linear there) as PlayCanvas takes it (sRGB, linearised when lit). */
 function gammaColor(c: RGB, scale = 1, out = new pc.Color()): pc.Color {
@@ -136,6 +149,15 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private worldEntities: pc.Entity[] = [];
   private ground: pc.Entity | null = null;
   private readonly materials = new Map<string, pc.StandardMaterial>();
+  /** The surfaces, the look and the environment lighting (`materials.ts`). */
+  private lib!: MaterialLibrary;
+  /** The shading the materials are drawn in (`shaders/softLook.ts`); the setting's at start. */
+  private shading: Shading = shadingFromSettings();
+  private walls: pc.Entity | null = null;
+  private wallsLow: pc.Entity | null = null;
+  private wallMode: WallMode = 'down';
+  /** The cutaway's look bits last given to the walls (-1: none yet). */
+  private cutLook = -1;
 
   private readonly cssSize = { width: 1, height: 1 };
   private sizeWatch: ResizeObserver | null = null;
@@ -187,7 +209,14 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.unwatchPixelRatio = watchPixelRatio(this.onResize);
     window.addEventListener('resize', this.onResize);
 
+    this.lib = MaterialLibrary.for(this.app).setAssets(this.deps.assets);
+    this.lib.anisotropy = this.quality.anisotropy;
+    this.lib.setShading(this.shading);
+    this.applyWallMode();
+
     const scene = this.app.scene;
+    // The sky is the game's own (its dome, later): the environment only lights.
+    scene.ambientLight = new pc.Color(0, 0, 0);
     // Distance fog in the horizon colour makes the hills fade into the sky (aerial haze).
     scene.fog.type = pc.FOG_EXP2;
     scene.fog.density = LOOK.fog;
@@ -195,7 +224,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.root = createWorldRoot(this.app);
     this.camera = new GameCamera(this.app.root, LENS);
     const cam = this.camera.camera;
-    cam.toneMapping = pc.TONEMAP_ACES2;
+    // (Not PlayCanvas's skybox: the environment atlas would draw as one.)
+    cam.layers = cam.layers.filter((id) => id !== pc.LAYERID_SKYBOX);
+    // The diag views draw the colour itself (their materials leave tone mapping out too).
+    cam.toneMapping = diagViewActive ? pc.TONEMAP_LINEAR : pc.TONEMAP_ACES2;
     cam.gammaCorrection = pc.GAMMA_SRGB;
 
     this.sun = new pc.Entity('sun');
@@ -210,6 +242,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       normalOffsetBias: 0.02,
       // (The menus' town: fitted round this much of the view.)
       shadowDistance: 400,
+      // Meshes left out of the lamps keep the sun (`MaterialLibrary.excludeFromLights`).
+      mask: SUN_LIGHT_MASK,
     });
     this.app.root.addChild(this.sun);
     this.sunShadows = new SunShadows(this.app, this.sun, this.quality.shadowRate);
@@ -225,6 +259,13 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (this.debug) Object.assign(window, { __scene: this.app.scene, __app: this.app, __renderer: this });
     this.applyLighting(this.lastMinute);
     this.applyCamera();
+    await this.setupEnvironment();
+  }
+
+  /** Image-based lighting from the sky (manifest key `environment.sky`; its PlayCanvas copy, `env.ts`). */
+  private async setupEnvironment(): Promise<void> {
+    const entry = this.deps.assets.get('environment.sky', 'image');
+    if (entry) await this.lib.loadEnvironment(entry.url);
   }
 
   // --- the frame loop ------------------------------------------------------------------
@@ -285,6 +326,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       else this.orbit.step(dt, Math.max(0.05, (dt * 60) / 1000));
       this.sunShadows.frame();
       this.applyCamera();
+      if (!this.townMode) this.updateCutaway();
       if (this.townMode) this.townListener?.();
       else this.onView?.();
       this.app.update(dt / 1000);
@@ -386,10 +428,15 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.root.addChild(entity);
       this.worldEntities.push(entity);
     };
-    // (Stage 3 of the port: the simulation's lot meshes in flat colours; the house builder and the
-    // material library come with stages 4 and 5.)
-    add('floors', world.meshes.floors, this.flat('floor', '#B48A60'));
-    add('walls', world.meshes.walls, this.flat('wall', '#E6E1D6'));
+    // (The simulation's plain lot meshes in the library's surfaces, as the Babylon renderer drew a
+    // lot whose wall layout it didn't know; the house builder, with its cutaway, comes with stage 5.)
+    add('floors', world.meshes.floors, this.lotMaterial('material.floor'));
+    const wall = this.lotMaterial('material.wall');
+    add('walls', world.meshes.walls, wall);
+    this.walls = this.worldEntities.find((e) => e.name === 'walls') ?? null;
+    add('wallsLow', world.meshes.wallsLow, wall);
+    this.wallsLow = this.worldEntities.find((e) => e.name === 'wallsLow') ?? null;
+    this.applyWallMode();
     this.showGround(world.width, world.depth);
     const v = view;
     this.sunShadows.setSquare(v ? v.x + v.w / 2 : world.width / 2, v ? v.z + v.d / 2 : world.depth / 2, Math.hypot(v?.w ?? world.width, v?.d ?? world.depth) / 2 + SHADOW_MARGIN);
@@ -403,6 +450,40 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private clearWorld(): void {
     for (const e of this.worldEntities) e.destroy();
     this.worldEntities = [];
+    this.walls = this.wallsLow = null;
+  }
+
+  private lotMaterial(key: string): pc.StandardMaterial {
+    // Generated geometry has explicit normals; don't depend on triangle winding.
+    return this.lib.surface(key, { doubleSided: true });
+  }
+
+  /** Walls up, cut away or down: the full walls or the low ones, and the cutaway state the wall materials read. */
+  private applyWallMode(): void {
+    const mode = this.wallMode;
+    if (this.walls) this.walls.enabled = mode === 'up';
+    if (this.wallsLow) this.wallsLow.enabled = mode !== 'up';
+    this.lib.wallCut.params.x = mode === 'down' ? 1 : 0;
+    this.lib.wallCut.params.y = WALL_STUB;
+    this.cutLook = -1;
+    this.updateCutaway();
+  }
+
+  /** Cutaway: walls facing the camera drop when the view direction crosses a quadrant. */
+  private updateCutaway(): void {
+    let bits = 0;
+    if (this.wallMode === 'cutaway') {
+      // Camera looks from its position towards the target: direction -(cos a, sin a) in xz.
+      const dx = -Math.cos(this.orbit.alpha);
+      const dz = -Math.sin(this.orbit.alpha);
+      if (dx > 0.3) bits |= 1;
+      if (dx < -0.3) bits |= 2;
+      if (dz > 0.3) bits |= 4;
+      if (dz < -0.3) bits |= 8;
+    }
+    if (bits === this.cutLook) return;
+    this.cutLook = bits;
+    this.lib.wallCut.look.set(bits & 1 ? 1 : 0, bits & 2 ? 1 : 0, bits & 4 ? 1 : 0, bits & 8 ? 1 : 0);
   }
 
   /** A flat matte material in an sRGB colour, two-sided (the simulation's meshes don't keep a winding). */
@@ -415,6 +496,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       m.metalness = 0;
       m.gloss = 0.15;
       m.cull = pc.CULLFACE_NONE;
+      // (In the look, the diag views and the environment's light like the library's own.)
+      this.lib.adopt(m);
       m.update();
       this.materials.set(key, m);
     }
@@ -469,10 +552,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.sun.setRotation(axis.length() > 1e-6 ? new pc.Quat().setFromAxisAngle(axis.normalize(), angle) : pc.Quat.IDENTITY);
     const light = this.sun.light!;
     light.color = gammaColor(l.sunColor);
-    light.intensity = l.sunIntensity;
+    light.intensity = l.sunIntensity * SUN_UNITS;
     this.sunShadows.moved();
-    // (The sky's hemispheric fill as a flat ambient until the look is ported, stage 6.)
-    this.app.scene.ambientLight = gammaColor(l.skyColor, l.skyIntensity * 0.6);
+    // The sky's hemispheric fill (Babylon's hemispheric light) and its image-based light.
+    this.lib.setSkyFill(l.skyColor, l.groundColor, l.skyIntensity);
+    this.lib.setEnvironmentIntensity(l.envIntensity);
     const clear = gammaColor(l.clearColor, 1);
     this.camera.camera.clearColor = clear;
     this.app.scene.fog.color = clear;
@@ -623,7 +707,14 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   // --- settings, stats, the benchmark --------------------------------------------------
 
   configure(options: LiveRenderOptions): void {
+    // Taken before the merge, which would otherwise hide the change.
+    const shading = options.shading;
     this.options = { ...this.options, ...options };
+    if (shading !== undefined && shading !== this.shading) {
+      // A define on every lit material: the next frames draw the other way (their shaders compile again).
+      this.shading = shading;
+      this.lib.setShading(shading);
+    }
     const s = Math.max(0.25, options.cameraSensitivity);
     this.orbit.angularSensibilityX = this.orbit.angularSensibilityY = 1000 / s;
     this.orbit.panningSensibility = 90 / s;
@@ -710,7 +801,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   // --- build and buy (stage 8) ---------------------------------------------------------
 
   setHoverTile(_tile: { x: number; z: number } | null): void {}
-  setWallMode(_mode: WallMode): void {}
+  setWallMode(mode: WallMode): void {
+    this.wallMode = mode;
+    this.applyWallMode();
+  }
   setPlacementGhost(_ghost: PlacementGhost | null): void {}
   setResizeHandles(_handles: readonly ResizeHandle[] | null, _hot?: string | null): void {}
   setHeldObject(_id: number | null, _moved?: boolean): void {}

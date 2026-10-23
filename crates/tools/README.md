@@ -15,6 +15,7 @@ Every tool's `src/<name>.rs` opens with what it does and its arguments; this pag
 | `cargo check-glb` | The gate for the game's glTF models: reads every `.glb` a model entry uses and checks what the game needs of it (was `tools/art/blender/check_glb.py`). |
 | `cargo content` | Moves catalog items into the Validate category and back (was `tools/content/validate.py`). |
 | `cargo decoders` | Refreshes `web/public/decoders/`, the decoders Babylon would otherwise fetch from its CDN, which the cross-origin isolated page can't use (was `tools/assets/decoders.mjs`). |
+| `cargo envconv` | The sky's lighting for PlayCanvas: converts the Babylon `.env` in `web/public/assets/env/` into a `.pcenv` (cube faces turned and mirrored into the PlayCanvas renderer's space, and the ambient as spherical harmonics). The output is committed; run it when the `.env` changes. |
 | `cargo fetch-voice` | The voice model and the pronunciation dictionary into `web/public/voice/` (was `tools/voice/fetch.mjs`, `fp16.mjs`). |
 | `cargo fetch-llm` | The language model into `web/public/llm/` (was `tools/llm/fetch.mjs`). |
 | `cargo review` | The authenticity review's first pass over every buyable object: `sizes`, `uses`. |

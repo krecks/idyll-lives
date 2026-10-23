@@ -1,8 +1,9 @@
 /**
- * Dev-only check of the PlayCanvas loaders (`render/pc/loaders.ts`, /pcload.html): loads the glTF
- * `?url=` (a production copy: meshopt geometry) and the KTX2 `?ktx=` (Basis ETC1S) through them and
- * draws both, the model beside a plane wearing the texture. `window.__result` says what loaded
- * (meshes, vertices, the texture's size and format); `__ready` once drawn.
+ * Dev-only check of the PlayCanvas loaders (`render/pc/loaders.ts`, /pcload.html; `?scene=materials`
+ * is the material library's, `pcmaterials.ts`): loads the glTF `?url=` (a production copy: meshopt
+ * geometry) and the KTX2 `?ktx=` (Basis ETC1S) through them and draws both, the model beside a
+ * plane wearing the texture. `window.__result` says what loaded (meshes, vertices, the texture's
+ * size and format); `__ready` once drawn.
  */
 
 import * as pc from '../render/pc/engine';

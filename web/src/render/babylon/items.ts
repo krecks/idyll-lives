@@ -13,7 +13,9 @@ import { Color3, Matrix, Mesh, MeshBuilder, Quaternion, StandardMaterial, Vector
 import type { AssetRegistry } from '../../assets/registry';
 import type { Content } from '../../content/content';
 import type { ItemPlacement } from '../../core/protocol';
-import { buildAhead, buildModel, ITEM_STAND_IN, onModelFileArrived, type ModelTemplate } from './models';
+import { buildModel, onModelFileArrived, type ModelTemplate } from './models';
+import { buildAhead } from '../shared/idle';
+import { ITEM_STAND_IN } from '../shared/modelEntry';
 import { TemplateCache } from './templateCache';
 
 /** Where items show: the storey in view, the storey of a lot row and how high each stands. */

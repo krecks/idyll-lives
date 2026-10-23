@@ -203,11 +203,12 @@ function releaseWasm(): Plugin {
 }
 
 /**
- * The sky's lighting (the base manifest's `environment.sky`, a 1 MB `.env`) starts downloading
- * with the page, next to the game's script and data, instead of once the renderer starts and asks
- * for it: a script in `index.html` fetches it, and `MaterialLibrary.loadEnvironment` takes the
- * bytes (`self.__skyEnv`). (Not a `<link rel=preload>`: under the isolation service worker Chrome
- * doesn't hand a preload to `fetch()`, and the file would download twice.)
+ * The sky's lighting starts downloading with the page, next to the game's script and data, instead
+ * of once the renderer starts and asks for it: a script in `index.html` fetches it, and
+ * `render/pc/env.ts` takes the bytes (`self.__skyEnv`). It is the PlayCanvas copy (`.pcenv`, 0.3 MB,
+ * `cargo envconv`) of the base manifest's `environment.sky` (the Babylon `.env` the previews still
+ * load themselves). (Not a `<link rel=preload>`: under the isolation service worker Chrome doesn't
+ * hand a preload to `fetch()`, and the file would download twice.)
  */
 function earlyEnvironment(): Plugin {
   let base = '/';
@@ -218,8 +219,10 @@ function earlyEnvironment(): Plugin {
     },
     transformIndexHtml() {
       const manifest = JSON.parse(readFileSync(new URL('./public/assets/manifest.json', import.meta.url), 'utf8')) as { entries: Record<string, { url?: string }> };
-      const file = manifest.entries['environment.sky']?.url;
-      if (!file) return [];
+      const env = manifest.entries['environment.sky']?.url;
+      if (!env) return [];
+      // (The PlayCanvas copy sits next to the `.env`: `render/pc/env.ts` `pcenvUrl`.)
+      const file = env.replace(/\.env$/, '.pcenv');
       // As the asset registry resolves it (src/assets/registry.ts, build.ts), so the URLs match.
       const url = new URL(file, `http://x${base}assets/manifest.json`);
       const href = JSON.stringify(`${url.pathname}${url.search ? `${url.search}&` : '?'}v=${BUILD_ID}`);

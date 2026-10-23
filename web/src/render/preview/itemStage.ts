@@ -14,8 +14,11 @@ import { Engine, FreeCamera, Matrix, TransformNode, Vector3, VertexBuffer, type 
 import type { AssetRegistry } from '../../assets/registry';
 import { colorsKey, type PartColors } from '../../core/protocol';
 import type { PopTarget } from '../babylon/buildFx';
-import { buildModel, motionsOf, painted, partPose, type ModelClip, type ModelTemplate, type Motions } from '../babylon/models';
-import { poseParts, restPoses } from '../babylon/objectMotion';
+import { buildModel, type ModelTemplate } from '../babylon/models';
+import { partPose, type ModelClip } from '../shared/modelClips';
+import { motionsOf, painted, type Motions } from '../shared/modelEntry';
+import { poseParts } from '../babylon/objectMotion';
+import { restPoses } from '../shared/objectMotion';
 import type { ItemStage } from '../types';
 import { boxCorners, contactShadow, PICTURE_STAND_IN, studioScene } from './itemScene';
 

@@ -8,6 +8,10 @@
   </head>
   <body>
     <canvas id="c"></canvas>
-    <script type="module" src="/src/debug/pcload.ts"></script>
+    <script type="module">
+      // `?scene=materials`: the material library's check (src/debug/pcmaterials.ts); else the loaders'.
+      const materials = new URLSearchParams(location.search).get('scene') === 'materials';
+      await (materials ? import('/src/debug/pcmaterials.ts') : import('/src/debug/pcload.ts'));
+    </script>
   </body>
 </html>
