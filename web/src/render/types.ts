@@ -68,7 +68,8 @@ export interface RenderStats {
   /** Main-thread time spent on a frame (game update and draw submission), smoothed, ms. */
   cpuMs: number;
   drawCalls: number;
-  snapshotRendering: boolean;
+  /** Whether the frame shown is one held still (`QualitySettings.holdStillFrames`), not drawn anew. */
+  holdStillFrames: boolean;
   /** Pixels drawn per frame (the render resolution), and its share of the screen's along each side (the resolution scale). */
   renderWidth: number;
   renderHeight: number;
@@ -323,6 +324,40 @@ export interface RoomOverlayTile {
 /** Why drawing broke: frame after frame failed, or the GPU was reset (its device or context lost). */
 export type RenderFailure = 'frames' | 'device';
 
+/** A clip playing on a placed object's moving parts (`RendererDebugHooks.objectClips`). */
+export interface ObjectClipInfo {
+  /** How it plays: opened by a use, round while used, every so often, always, by growth stage, by the clock, along a use. */
+  kind: 'use' | 'loop' | 'repeat' | 'idle' | 'growth' | 'clock' | 'over';
+  /** Seconds into it (0: at rest). */
+  time: number;
+  duration: number;
+}
+
+/** A model's clips that play without a use, by name (`RendererDebugHooks.objectMotions`). */
+export interface ObjectBackgroundClips {
+  idle?: string;
+  growth?: string;
+  night?: string;
+  clock?: { hour?: string; minute?: string };
+  /** Held open while the object is open. */
+  open?: string;
+}
+
+/**
+ * What the dev tools read from the renderer (`window.__renderer` with `?debug`; tools/bench/check.mjs):
+ * plain data in game space, so the tools don't depend on the engine.
+ */
+export interface RendererDebugHooks {
+  /** The clips on a placed object's moving parts, by clip name (null: it has none, or isn't drawn). */
+  objectClips(id: number): ReadonlyMap<string, ObjectClipInfo> | null;
+  /** Its model's clips that play without a use (null: its model has no clips). */
+  objectMotions(id: number): ObjectBackgroundClips | null;
+  /** Its body as drawn: its vertices in the world, x, y, z flat, at most `max` a mesh; null when it isn't drawn (yet). */
+  objectPoints(id: number, max?: number): Float32Array | null;
+  /** The game camera's lens and limits. */
+  cameraInfo(): { fov: number; radius: readonly [number, number]; beta: readonly [number, number] };
+}
+
 export interface Renderer {
   init(canvas: HTMLCanvasElement): Promise<void>;
   /**
@@ -397,6 +432,8 @@ export interface Renderer {
   setRoomOverlay(tiles: readonly RoomOverlayTile[]): void;
   /** Build/buy mode: subtle tile grid over a tile rectangle (null hides it). */
   setBuildGrid(rect: ViewRect | null): void;
+  /** Build tools: whether a left-drag turns the camera (off while a wall is being drawn). */
+  setLeftDragCamera(on: boolean): void;
   /**
    * Which storey is in view (0: the ground). Higher storeys are hidden, and build helpers,
    * previews and ground picks work on this storey's rows of the lot (see `WorldStructure.storeys`).

@@ -5,9 +5,16 @@
  * preallocated poses.
  */
 
-import type { ArcRotateCamera } from './core';
 import type { GameShot } from '../types';
-import { angleDelta, ease } from './overview';
+import { angleDelta, ease } from './angles';
+
+/** The camera the rig drives: an orbit pose (Babylon's `ArcRotateCamera`, or any with its fields). */
+export interface RigCamera {
+  alpha: number;
+  beta: number;
+  radius: number;
+  readonly target: { x: number; y: number; z: number };
+}
 
 interface Pose {
   alpha: number;
@@ -34,10 +41,12 @@ export class GameCameraRig {
   private readonly head = { x: 0, y: 0, z: 0 };
 
   constructor(
-    private readonly camera: ArcRotateCamera,
+    private readonly camera: RigCamera,
     private readonly limits: { radius: readonly [number, number]; beta: readonly [number, number] },
     /** Interpolated head position of resident `index`; false if not drawn. */
     private readonly simHead: (index: number, out: { x: number; y: number; z: number }) => boolean,
+    /** Stops what is left of the player's last drag (`OrbitControls.stopInertia`). */
+    private readonly stopInput: () => void,
   ) {}
 
   get active(): boolean {
@@ -63,9 +72,7 @@ export class GameCameraRig {
   /** Hands the camera back to the player where it is, without a jolt. */
   release(): void {
     this.shot = null;
-    const cam = this.camera;
-    cam.inertialAlphaOffset = cam.inertialBetaOffset = cam.inertialRadiusOffset = 0;
-    cam.inertialPanningX = cam.inertialPanningY = 0;
+    this.stopInput();
   }
 
   /** Advances and applies the pose. */
@@ -97,10 +104,11 @@ export class GameCameraRig {
     cam.alpha = c.alpha;
     cam.beta = c.beta;
     cam.radius = c.radius;
-    cam.target.copyFromFloats(c.tx, 0, c.tz);
+    cam.target.x = c.tx;
+    cam.target.y = 0;
+    cam.target.z = c.tz;
     // The director owns the camera: no leftover spin from the player's last drag.
-    cam.inertialAlphaOffset = cam.inertialBetaOffset = cam.inertialRadiusOffset = 0;
-    cam.inertialPanningX = cam.inertialPanningY = 0;
+    this.stopInput();
   }
 
   /** The shot's target: its point, or the middle of the residents it follows (when drawn). */

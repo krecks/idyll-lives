@@ -2,10 +2,9 @@
  * Small mesh builder for generated geometry (houses, roofs, helpers): flat-shaded polygons
  * with explicit normals, metre-scale UVs, sRGB vertex colours and an optional per-vertex
  * cutaway attribute (see `WallCutPlugin` in materials.ts). Winding is derived from the normal,
- * so meshes work with back-face culling.
+ * so meshes work with back-face culling. Engine-neutral: `meshData` hands the arrays to the
+ * renderer, which uploads them (`babylon/meshes.ts` `toMesh`).
  */
-
-import { Mesh, VertexData, type Scene } from './core';
 
 export type V3 = readonly [number, number, number];
 
@@ -17,6 +16,20 @@ export const Cut = { Keep: 0, Clamp: 1, Hide: 2 } as const;
 
 /** Cut mask bits: the wall hides what is behind it when the camera looks along +x, -x, +z, -z. */
 export const LOOK = { PosX: 1, NegX: 2, PosZ: 4, NegZ: 8, All: 15 } as const;
+
+/** A mesh's vertex arrays as a renderer uploads them (`Geo.meshData`). */
+export interface MeshData {
+  positions: Float32Array;
+  normals: Float32Array;
+  uvs: Float32Array;
+  indices: Uint16Array | Uint32Array;
+  /** sRGB vertex colours (RGBA), if asked for. */
+  colors?: Float32Array;
+  /** The cutaway attribute (`WALL_CUT_KIND`, 4 per vertex), if asked for. */
+  cut?: Float32Array;
+  /** Whether a vertex colour is translucent (the mesh then blends by vertex alpha). */
+  vertexAlpha: boolean;
+}
 
 export class Geo {
   readonly pos: number[] = [];
@@ -120,20 +133,17 @@ export class Geo {
     else this.idx.push(a, c, b);
   }
 
-  /** Uploads the geometry into a new static mesh (null when empty); `updatable` to change its vertices later. */
-  toMesh(name: string, scene: Scene, options: { colors?: boolean; cut?: boolean; updatable?: boolean } = {}): Mesh | null {
-    if (this.empty) return null;
-    const mesh = new Mesh(name, scene);
-    const data = new VertexData();
-    data.positions = new Float32Array(this.pos);
-    data.normals = new Float32Array(this.nor);
-    data.uvs = new Float32Array(this.uv);
-    data.indices = this.pos.length / 3 > 65535 ? new Uint32Array(this.idx) : new Uint16Array(this.idx);
-    if (options.colors) data.colors = new Float32Array(this.col);
-    data.applyToMesh(mesh, options.updatable ?? false);
-    if (options.cut) mesh.setVerticesData(WALL_CUT_KIND, new Float32Array(this.cut), false, 4);
-    if (options.colors && this.col.some((v, i) => i % 4 === 3 && v < 1)) mesh.hasVertexAlpha = true;
-    return mesh;
+  /** The geometry's arrays, with its colours and its cutaway attribute if asked for. */
+  meshData(options: { colors?: boolean; cut?: boolean } = {}): MeshData {
+    return {
+      positions: new Float32Array(this.pos),
+      normals: new Float32Array(this.nor),
+      uvs: new Float32Array(this.uv),
+      indices: this.pos.length / 3 > 65535 ? new Uint32Array(this.idx) : new Uint16Array(this.idx),
+      colors: options.colors ? new Float32Array(this.col) : undefined,
+      cut: options.cut ? new Float32Array(this.cut) : undefined,
+      vertexAlpha: !!options.colors && this.col.some((v, i) => i % 4 === 3 && v < 1),
+    };
   }
 }
 

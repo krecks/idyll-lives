@@ -84,7 +84,7 @@ answer 200 (a missing or linked wasm package otherwise gives pictures of an empt
 - **Speed.** `--walk` (3 = 10×, never more) on the way, `--speed` (1) from 3 tiles off the object once
   the resident is going to it, as short uses are over between frames at 30× (a cook's steps at the
   fridge and the counter go fast too).
-- **Logging.** In the page, every animation frame: each clip on the object (`__renderer.motion`: its kind,
+- **Logging.** In the page, every animation frame: each clip on the object (`__renderer.objectClips(id)`: its kind,
   length, furthest time, and when it moved, was open and back at rest) and each change in the
   resident's pose, `using`, animation and use. A record holds the object, the use (and its pose and anim),
   where it stands, `outcome` (`using`, `not taken`, `timeout`, `skipped`, `not bought`, `no uses`), when
@@ -195,7 +195,7 @@ states the tests write: `wants-asking` (its resident is asking to buy something 
 | `__camera(pose?)` | Reads the camera's pose; with a (partial) pose `{alpha, beta, radius, target: [x, y, z]}` or `{y}` (the height it looks at) puts it there. Stops the camera watching on its own. |
 | `__controls.follow(id, view?)` | The camera follows a resident; `view` `{radius, beta, alpha, y}` also zooms and aims (a dartboard above the resident: `y: 1.6`). `follow(null)` stops. The rest of `__controls` is the HUD's controls. |
 | `__content` | The game's content: `__content.object('<id>').interactions` for interaction indices. |
-| `__renderer`, `__scene` | The renderer (`__renderer.motion.states.get(objectId)`: the clips playing on an object) and the Babylon scene. |
+| `__renderer`, `__scene` | The renderer, whose `RendererDebugHooks` (web/src/render/types.ts) the tools use: `objectClips(id)` (the clips playing on an object), `objectMotions(id)`, `objectPoints(id)` (its vertices as drawn), `cameraInfo()` (lens and limits); and the engine's scene, for the console only. |
 | `__showPlot(i)`, `__items()`, `__crash(what)` | Look at another lot; the food and dishes about; fail on purpose. |
 
 ## Sharing one machine with other sessions

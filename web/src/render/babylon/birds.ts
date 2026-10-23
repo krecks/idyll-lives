@@ -38,7 +38,7 @@ import { groundDepth, type WorldStructure } from '../../core/protocol';
 import { birdActivity, type SeenBird, type ViewRect } from '../types';
 import { buildModel, entrySpace, type ModelTemplate } from './models';
 import { hash, lawnMask, mulberry32, smoothstep, unlawned, windDirection, windSway, type PlantPlacement } from './nature';
-import { angleDelta as turn } from './overview';
+import { angleDelta as turn } from '../shared/angles';
 import { TemplateCache } from './templateCache';
 import { WALL_HEIGHT } from '../shared/walls';
 

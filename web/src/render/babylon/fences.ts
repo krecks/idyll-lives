@@ -10,7 +10,8 @@
 import { VertexBuffer, type Mesh, type Scene } from './core';
 import type { FenceStyleDef } from '../../content/content';
 import type { FenceEdge } from '../../core/protocol';
-import { Geo } from './geometry';
+import { Geo } from '../shared/geometry';
+import { toMesh } from './meshes';
 import { MaterialLibrary } from './materials';
 import { Painter } from './street';
 
@@ -86,7 +87,7 @@ export function buildFences(scene: Scene, fences: readonly FenceEdge[], styles: 
     p.at(post.x, post.z, 0);
     postAt(p, post.style, post.gate);
   }
-  const mesh = p.geo.toMesh('fences', scene, { colors: true, cut: false, updatable: gates.length > 0 });
+  const mesh = toMesh(p.geo, 'fences', scene, { colors: true, cut: false, updatable: gates.length > 0 });
   if (!mesh) return null;
   if (gates.length) {
     // Room in its bounds for the leaves standing open.

@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "lint": "eslint src",
+    "test": "bun test tests",
     "test:sim": "cd .. && cargo test -p sim-core",
     "voice": "cd .. && cargo build -p voice-wasm --target wasm32-unknown-unknown --release --locked && wasm-bindgen target/wasm32-unknown-unknown/release/voice_wasm.wasm --target web --out-dir web/src/voice/wasm-pkg && cargo fetch-voice",
     "test:voice": "cd .. && cargo test -p voice --release",

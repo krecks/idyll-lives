@@ -11,7 +11,8 @@
 
 import { Color3, DynamicTexture, Mesh, MeshBuilder, StandardMaterial, type Scene } from './core';
 import type { WorldStructure } from '../../core/protocol';
-import { Geo, type V3 } from './geometry';
+import { Geo, type V3 } from '../shared/geometry';
+import { toMesh } from './meshes';
 import { MaterialLibrary } from './materials';
 
 /** Road widths (m): as wide as the town's streets where they leave it, narrower out in the country. */
@@ -200,13 +201,13 @@ export class CountryRoads {
       const sign = this.sign(scene, road);
       if (sign) out.push(...sign);
     }
-    const roads = surface.toMesh('countryRoads', scene, { colors: false });
+    const roads = toMesh(surface, 'countryRoads', scene, { colors: false });
     if (roads) {
       roads.material = lib.surface('material.road', { doubleSided: true });
       roads.receiveShadows = true;
       out.push(roads);
     }
-    const marks = lines.toMesh('countryRoadLines', scene, { colors: true });
+    const marks = toMesh(lines, 'countryRoadLines', scene, { colors: true });
     if (marks) {
       marks.material = lib.finish('material.finish.matte');
       marks.receiveShadows = true;
@@ -235,7 +236,7 @@ export class CountryRoads {
     g.box(1.2, 0, -0.06, 1.35, 1.9, 0.06);
     g.color('#2F5D3A');
     g.box(-1.5, 1.0, -0.05, 1.5, 2.1, 0.02);
-    const frame = g.toMesh('welcomeSign', scene, { colors: true });
+    const frame = toMesh(g, 'welcomeSign', scene, { colors: true });
     if (!frame) return null;
     frame.material = MaterialLibrary.for(scene).finish('material.finish.satin');
 

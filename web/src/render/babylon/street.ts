@@ -29,7 +29,8 @@ import type { AssetRegistry } from '../../assets/registry';
 import type { ModelEntry } from '../../assets/types';
 import { groundDepth, objectCentre, type PlotInfo, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
-import { Geo, type V3 } from './geometry';
+import { Geo, type V3 } from '../shared/geometry';
+import { toMesh } from './meshes';
 import type { HouseBuilder, SilhouetteSpec } from './house';
 import { encodeFinish, MaterialLibrary } from './materials';
 import { buildModel, placementVariation, withGlows, type ModelTemplate, type StandIn } from './models';
@@ -925,7 +926,7 @@ export class Street {
     // ---- meshes ---------------------------------------------------------------------------
     const meshesSpan = perfStart('street: meshes');
     const add = (geo: Geo, name: string, material: Material, opts: { cast?: boolean; plain?: boolean; colors?: boolean } = {}) => {
-      const mesh = geo.toMesh(name, this.scene, { colors: opts.colors ?? true, cut: false });
+      const mesh = toMesh(geo, name, this.scene, { colors: opts.colors ?? true, cut: false });
       if (!mesh) return;
       if (opts.plain) mesh.hasVertexAlpha = false;
       mesh.material = material;
@@ -938,7 +939,7 @@ export class Street {
     add(walk, 'streetSidewalks', this.lib.surface('material.sidewalk', { vertexColors: true }));
     add(props.geo, 'streetProps', this.lib.plainFinish(), { cast: true, plain: true });
     add(glow.geo, 'streetLamps', this.glowMat, { colors: false });
-    const poolMesh = pools.toMesh('streetLightPools', this.scene, { colors: false });
+    const poolMesh = toMesh(pools, 'streetLightPools', this.scene, { colors: false });
     if (poolMesh) {
       poolMesh.material = this.poolMat;
       poolMesh.isPickable = false;

@@ -285,5 +285,5 @@ export function qualityFromSettings(s: Settings, params: URLSearchParams): Rende
   const preset = isGraphicsPreset(asked) ? asked : s.graphics;
   const q = QUALITY[preset];
   const shadowRate = Number(params.get('shadowrate') ?? NaN);
-  return { ...q, preset, snapshotRendering: q.snapshotRendering && params.get('snapshot') !== '0', shadowRate: Number.isFinite(shadowRate) ? shadowRate : q.shadowRate };
+  return { ...q, preset, holdStillFrames: q.holdStillFrames && params.get('snapshot') !== '0', shadowRate: Number.isFinite(shadowRate) ? shadowRate : q.shadowRate };
 }

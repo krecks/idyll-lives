@@ -20,7 +20,7 @@
  *             sends each use, waits until the resident is at it and using it, takes pictures
  *             framing the object, then sells it and goes on to the next, all on one page. In the
  *             page, every animation frame, it logs the clips playing on the object
- *             (`__renderer.motion`) and the resident's pose and animation (`__sims()`). One JSON
+ *             (`__renderer.objectClips`, `RendererDebugHooks` in web/src/render/types.ts) and the resident's pose and animation (`__sims()`). One JSON
  *             line per use goes to `<out>/play-<run>.jsonl`.
  *               --objects toilet,fridge@23,14,0   which objects (`def` or `def@x,z,rot`), or
  *               --objects-file <path>   one a line (`#` comments), each
@@ -207,9 +207,9 @@ function pageHelpers() {
   function sample() {
     const t = Math.round(performance.now() - w.t0);
     w.frames++;
-    const states = window.__renderer?.motion?.states?.get(w.id);
-    for (const [name, c] of states ?? []) {
-      const duration = c.clip.duration;
+    const clips = window.__renderer?.objectClips?.(w.id);
+    for (const [name, c] of clips ?? []) {
+      const duration = c.duration;
       const clip = (w.clips[name] ??= { kind: c.kind, duration: +duration.toFixed(2), first: t, max: 0, state: 'rest', events: [] });
       clip.max = Math.max(clip.max, +c.time.toFixed(2));
       const state = c.time <= 1e-3 ? 'rest' : c.time >= duration - 1e-3 ? 'open' : 'moving';
@@ -217,7 +217,7 @@ function pageHelpers() {
       clip.state = state;
     }
     for (const [name, clip] of Object.entries(w.clips)) {
-      if (states?.has(name) || clip.state === 'rest') continue;
+      if (clips?.has(name) || clip.state === 'rest') continue;
       clip.state = 'rest';
       if (clip.events.length < MAX_EVENTS) clip.events.push([t, 'rest']);
     }
@@ -243,20 +243,7 @@ function pageHelpers() {
    * boxes: a box turned with the model is far bigger than a round crown.
    */
   function points(id) {
-    const pop = window.__renderer?.placed?.find((p) => p.id === id)?.pop;
-    if (!pop?.matrices) return null;
-    const m = pop.matrices.subarray(pop.index * 16, pop.index * 16 + 16);
-    const all = [];
-    for (const mesh of pop.meshes) {
-      const v = mesh.getVerticesData?.('position');
-      if (!v) continue;
-      const step = 3 * Math.max(1, Math.floor(v.length / 3 / 50_000));
-      for (let i = 0; i < v.length; i += step) {
-        const [x, y, z] = [v[i], v[i + 1], v[i + 2]];
-        all.push(x * m[0] + y * m[4] + z * m[8] + m[12], x * m[1] + y * m[5] + z * m[9] + m[13], x * m[2] + y * m[6] + z * m[10] + m[14]);
-      }
-    }
-    return all.length ? all : null;
+    return window.__renderer?.objectPoints?.(id, 50_000) ?? null;
   }
   /** The corners of what `points` gives (`lo`, `hi`: x, y, z), or null. */
   function bounds(id) {
@@ -278,7 +265,7 @@ function pageHelpers() {
    */
   function fit(id, { target, alpha, beta, keep = [0.9, 0.75] }) {
     const p = points(id);
-    const cam = window.__scene?.activeCamera;
+    const cam = window.__renderer?.cameraInfo?.();
     if (!p || !cam) return 0;
     const [sa, ca, sb, cb] = [Math.sin(alpha), Math.cos(alpha), Math.sin(beta), Math.cos(beta)];
     const tanUp = Math.tan(cam.fov / 2) * keep[1];
@@ -575,7 +562,7 @@ if (what === 'play') {
       const [fw, fd] = d?.footprint ?? [1, 1];
       const [w, dd] = o.rot % 2 ? [fd, fw] : [fw, fd];
       const box = window.__renderer?.objectBox?.(id) ?? null;
-      return { x: o.x, z: o.z, rot: o.rot, open: Boolean(o.open), growth: o.growth ?? null, mid: [o.x + w / 2, o.z + dd / 2], size: [w, dd], layer: d?.layer ?? 'floor', box, bounds: window.__check.bounds(id), fov: window.__scene?.activeCamera?.fov ?? 0.7 };
+      return { x: o.x, z: o.z, rot: o.rot, open: Boolean(o.open), growth: o.growth ?? null, mid: [o.x + w / 2, o.z + dd / 2], size: [w, dd], layer: d?.layer ?? 'floor', box, bounds: window.__check.bounds(id), fov: window.__renderer?.cameraInfo?.().fov ?? 0.7 };
     }, id);
 
   /** Models up to this tall (m) are looked at from the usual height; taller ones at their middle. */
@@ -613,8 +600,8 @@ if (what === 'play') {
     const took = await page.evaluate((view) => {
       window.__controls.follow(null);
       const pose = window.__camera(view);
-      const cam = window.__scene?.activeCamera;
-      return { ...pose, radius: Math.min(Math.max(pose.radius, cam?.lowerRadiusLimit ?? 0), cam?.upperRadiusLimit ?? Infinity) };
+      const [lo, hi] = window.__renderer?.cameraInfo?.().radius ?? [0, Infinity];
+      return { ...pose, radius: Math.min(Math.max(pose.radius, lo), hi) };
     }, view);
     const round = (v) => v.map((x) => +x.toFixed(2));
     return { alpha: +took.alpha.toFixed(3), beta: +took.beta.toFixed(3), radius: +took.radius.toFixed(2), target: round(took.target), height: +height.toFixed(2), bottom: +bottom.toFixed(2), from, ...(bounds ? { bounds: { lo: round(bounds.lo), hi: round(bounds.hi) } } : {}) };
@@ -680,7 +667,7 @@ if (what === 'play') {
     // A use's clips close as it ends (a door swinging shut): wait for them, a few seconds at most.
     await page
       .waitForFunction(
-        ({ id, held }) => ![...(window.__renderer?.motion?.states?.get(id) ?? [])].some(([name, c]) => ['use', 'loop', 'repeat'].includes(c.kind) && c.time > 1e-3 && !held.includes(name)),
+        ({ id, held }) => ![...(window.__renderer?.objectClips?.(id) ?? [])].some(([name, c]) => ['use', 'loop', 'repeat'].includes(c.kind) && c.time > 1e-3 && !held.includes(name)),
         { id, held },
         { timeout: 5_000, polling: 'raf' },
       )
@@ -690,7 +677,7 @@ if (what === 'play') {
   /** The clips that always run, or run without a use (ambient, growth, night, clock hands): not "a clip played". */
   const background = (id) =>
     page.evaluate((id) => {
-      const m = window.__renderer?.motion?.objects?.get(id)?.motions;
+      const m = window.__renderer?.objectMotions?.(id);
       return { names: m ? [m.idle, m.growth, m.night, m.clock?.hour, m.clock?.minute].filter(Boolean) : [], open: m?.open ?? null, any: Boolean(m) };
     }, id);
 
@@ -746,10 +733,10 @@ if (what === 'play') {
         const info = await page.evaluate(
           ({ sim, id }) => {
             const s = window.__sims().find((x) => x.id === sim);
-            const clips = window.__renderer?.motion?.states?.get(id);
+            const clips = window.__renderer?.objectClips?.(id);
             const o = window.__world().objects.find((x) => x.id === id);
             // Each clip playing on it: how far in (s), of how long, and how it plays.
-            const playing = clips ? Object.fromEntries([...clips].map(([name, c]) => [name, { time: +c.time.toFixed(2), duration: +c.clip.duration.toFixed(2), kind: c.kind }])) : null;
+            const playing = clips ? Object.fromEntries([...clips].map(([name, c]) => [name, { time: +c.time.toFixed(2), duration: +c.duration.toFixed(2), kind: c.kind }])) : null;
             return {
               t: Math.round(window.__check.watched()?.t ?? 0),
               object: o ? { x: o.x, z: o.z, rot: o.rot, open: Boolean(o.open) } : null,

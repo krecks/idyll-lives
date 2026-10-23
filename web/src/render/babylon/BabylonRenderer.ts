@@ -16,8 +16,6 @@
 
 import {
   ArcRotateCamera,
-  type ArcRotateCameraKeyboardMoveInput,
-  type ArcRotateCameraPointersInput,
   type Camera,
   Color3,
   Color4,
@@ -83,7 +81,10 @@ import type {
   RenderPassInfo,
   PlacementGhost,
   ResizeHandle,
+  ObjectBackgroundClips,
+  ObjectClipInfo,
   Renderer,
+  RendererDebugHooks,
   RendererDeps,
   RenderFailure,
   RenderStats,
@@ -103,7 +104,8 @@ import { fieldLayers, Street } from './street';
 import { MaterialLibrary, WINDOWLESS_BITS, type DarkTiles } from './materials';
 import { diagViewActive } from './diagView';
 import { refreshSoftLook, shadingFromSettings } from './softLook';
-import { Geo, LOOK as CUT } from './geometry';
+import { Geo, LOOK as CUT } from '../shared/geometry';
+import { toMesh } from './meshes';
 import { buildModel, motionsOf, onModelFileArrived, paintColors, painted, placementVariation, standInOf, withGlows, type ModelTemplate, type Motions, type StandIn } from './models';
 import { TemplateCache } from './templateCache';
 import { compressedTextureFeatures, noteWebGpuFailed, webGpuFailed } from './loaders';
@@ -120,8 +122,9 @@ import { tableRooms } from './tableTuck';
 import { gardenPool, GardenPools } from './gardenPools';
 import { ObjectMotion, restPoses, slotOf, type MovingObject } from './objectMotion';
 import { TownOverview } from './overview';
-import { GameCameraRig } from './cameraRig';
+import { GameCameraRig } from '../shared/cameraRig';
 import { renderScale, watchPixelRatio } from '../shared/resolution';
+import { OrbitControls } from '../shared/orbit';
 import { FramePacer } from '../shared/pacing';
 import { SunShadows } from './sunShadows';
 
@@ -347,7 +350,7 @@ interface NatureSet {
   coming: Mesh[];
 }
 
-export class BabylonRenderer implements Renderer {
+export class BabylonRenderer implements Renderer, RendererDebugHooks {
   private engine!: AbstractEngine;
   private webgpu: WebGPUEngine | null = null;
   private scene!: Scene;
@@ -414,8 +417,9 @@ export class BabylonRenderer implements Renderer {
   private frameDt = 0;
   /** Reduce motion: plants, clouds, the selection marker, the Build ghost and build effects keep still. */
   private reducedMotion = false;
-  /** The arrow keys' camera nudges per frame at 60 fps (see `paceKeys`). */
-  private keyNudge = { angularSpeed: 0, panningSensibility: 0, zoomingSensibility: 0 };
+  /** The game camera's input and motion (dragging, the wheel, the keys, inertia: `shared/orbit.ts`); the camera takes its pose each frame (`stepOrbit`). */
+  private readonly orbit = new OrbitControls({ alpha: -Math.PI * 0.62, beta: 0.86, radius: 24 }, { radius: RADIUS_LIMITS, beta: [0.3, 1.35] });
+  private detachOrbit: (() => void) | null = null;
   /** The watching director's hold on the game camera (see `setGameShot`). */
   private gameRig!: GameCameraRig;
   /** Resident the camera keeps centred while the player turns and zooms (`followSim`). */
@@ -1467,6 +1471,38 @@ export class BabylonRenderer implements Renderer {
     return p ? { height: p.height, bottom: p.bottom } : null;
   }
 
+  // --- dev tools (`RendererDebugHooks`) ----------------------------------------------------
+
+  objectClips(id: number): ReadonlyMap<string, ObjectClipInfo> | null {
+    return this.motion.clipsOf(id);
+  }
+
+  objectMotions(id: number): ObjectBackgroundClips | null {
+    return this.motion.motionsOf(id);
+  }
+
+  objectPoints(id: number, max = 50_000): Float32Array | null {
+    const pop = this.placed.find((p) => p.id === id)?.pop;
+    if (!pop) return null;
+    const m = pop.matrices.subarray(pop.index * 16, pop.index * 16 + 16);
+    const all: number[] = [];
+    for (const mesh of pop.meshes) {
+      const v = mesh.getVerticesData('position');
+      if (!v) continue;
+      const step = 3 * Math.max(1, Math.floor(v.length / 3 / max));
+      for (let i = 0; i < v.length; i += step) {
+        const [x, y, z] = [v[i], v[i + 1], v[i + 2]];
+        all.push(x * m[0] + y * m[4] + z * m[8] + m[12], x * m[1] + y * m[5] + z * m[9] + m[13], x * m[2] + y * m[6] + z * m[10] + m[14]);
+      }
+    }
+    return all.length ? Float32Array.from(all) : null;
+  }
+
+  cameraInfo(): { fov: number; radius: readonly [number, number]; beta: readonly [number, number] } {
+    const cam = this.camera;
+    return { fov: cam.fov, radius: [cam.lowerRadiusLimit ?? 0, cam.upperRadiusLimit ?? Infinity], beta: [cam.lowerBetaLimit ?? 0, cam.upperBetaLimit ?? Math.PI] };
+  }
+
   pickPlane(height: number): { x: number; z: number } | null {
     const [o, d] = [this.pickOrigin, this.pickDir];
     const y = this.storey * WALL_HEIGHT + height;
@@ -1593,9 +1629,9 @@ export class BabylonRenderer implements Renderer {
       this.resetSnapshot();
     }
     const s = Math.max(0.25, options.cameraSensitivity);
-    this.camera.angularSensibilityX = this.camera.angularSensibilityY = 1000 / s;
-    this.camera.panningSensibility = 90 / s;
-    this.camera.wheelDeltaPercentage = 0.012 * s;
+    this.orbit.angularSensibilityX = this.orbit.angularSensibilityY = 1000 / s;
+    this.orbit.panningSensibility = 90 / s;
+    this.orbit.wheelDeltaPercentage = 0.012 * s;
     // Frames are paced in whole display refreshes (`pacing.ts`), not by Babylon's `maxFPS`.
     this.applyPacing();
     const still = (this.reducedMotion = !!options.reducedMotion);
@@ -2157,8 +2193,7 @@ export class BabylonRenderer implements Renderer {
 
   /** Build tools: whether a left-drag turns the camera (off while a wall is being drawn). */
   setLeftDragCamera(on: boolean): void {
-    const pointers = this.camera.inputs.attached.pointers as ArcRotateCameraPointersInput | undefined;
-    if (pointers) pointers.buttons = on ? [0, 1, 2] : [1, 2];
+    this.orbit.buttons = on ? [0, 1, 2] : [1, 2];
   }
 
   setStorey(storey: number): void {
@@ -2296,7 +2331,7 @@ export class BabylonRenderer implements Renderer {
       frameMs: this.engine.getDeltaTime(),
       cpuMs: this.cpuMs,
       drawCalls: this.instrumentation.drawCallsCounter.current,
-      snapshotRendering: this.webgpu?.snapshotRendering ?? false,
+      holdStillFrames: this.webgpu?.snapshotRendering ?? false,
       renderWidth: this.engine.getRenderWidth(),
       renderHeight: this.engine.getRenderHeight(),
       renderScale: 1 / (this.engine.getHardwareScalingLevel() * window.devicePixelRatio),
@@ -2579,7 +2614,7 @@ export class BabylonRenderer implements Renderer {
       const p = cam.position;
       if (p.y >= land.heightAt(p.x, p.z) + 4) break;
       cam.beta = Math.max(0.3, cam.beta - 0.03);
-      cam.inertialBetaOffset = 0;
+      this.orbit.inertialBetaOffset = 0;
       cam.getViewMatrix(true);
     }
   }
@@ -2655,6 +2690,8 @@ export class BabylonRenderer implements Renderer {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.detachOrbit?.();
+    this.detachOrbit = null;
     this.onFailure = null;
     this.townTicket++;
     this.townListener = null;
@@ -2808,9 +2845,8 @@ export class BabylonRenderer implements Renderer {
     this.applyPacing();
     this.applyDig();
     copyPose(cam, this.parked);
-    cam.detachControl();
-    cam.inertialAlphaOffset = cam.inertialBetaOffset = cam.inertialRadiusOffset = 0;
-    cam.inertialPanningX = cam.inertialPanningY = 0;
+    this.orbit.enabled = false;
+    this.orbit.stopInertia();
     cam.lowerRadiusLimit = 2;
     cam.upperRadiusLimit = 1200;
     cam.lowerBetaLimit = 0.05;
@@ -2839,8 +2875,8 @@ export class BabylonRenderer implements Renderer {
     [cam.lowerRadiusLimit, cam.upperRadiusLimit] = RADIUS_LIMITS;
     cam.lowerBetaLimit = 0.3;
     cam.upperBetaLimit = 1.35;
-    cam.inertialAlphaOffset = cam.inertialBetaOffset = cam.inertialRadiusOffset = 0;
-    cam.attachControl(true);
+    this.orbit.inertialAlphaOffset = this.orbit.inertialBetaOffset = this.orbit.inertialRadiusOffset = 0;
+    this.orbit.enabled = true;
     this.updateShadowList();
     this.scene.fogDensity = LOOK.fog;
     this.applyLighting(this.lastMinute);
@@ -3211,8 +3247,8 @@ export class BabylonRenderer implements Renderer {
         c.shadowDrawCalls = c.shadowTriangles = c.mirrorDrawCalls = c.mirrorTriangles = 0;
         probe.before(start);
       }
-      const dt = (this.frameDt = Math.min(this.engine.getDeltaTime(), MAX_FRAME_MS));
-      this.paceKeys(dt);
+      this.frameDt = Math.min(this.engine.getDeltaTime(), MAX_FRAME_MS);
+      const dt = this.frameDt;
       // The time of the refresh this frame is for: even steps, as the frames will show.
       const tOn = performance.now();
       this.onFrame?.(this.pacer.frameTime || performance.now());
@@ -3232,6 +3268,7 @@ export class BabylonRenderer implements Renderer {
         this.mirrors.warm(0)();
       }
       this.applySnapshotDue();
+      if (!this.townMode) this.stepOrbit();
       const tScene = performance.now();
       this.scene.render();
       const sceneMs = performance.now() - tScene;
@@ -3269,18 +3306,25 @@ export class BabylonRenderer implements Renderer {
   };
 
   /**
-   * Babylon's keyboard camera input (arrows turn, Ctrl+arrows pan, +/- zoom) nudges the camera by
-   * a fixed amount per drawn frame: scaled by the frame's time, it moves as fast at any frame rate
-   * as at 60 fps.
+   * The player's camera input this frame (dragging, the wheel, the keys) and what is left of the
+   * last (inertia), on the pose the camera has now: what set it since (the director, `focus`, the
+   * view kept clear of hills) stays. The keys' nudges are per drawn frame (arrows turn, Ctrl+arrows
+   * pan, +/- zoom): scaled by the frame's time, they move as fast at any frame rate as at 60 fps.
    */
-  private paceKeys(dtMs: number): void {
-    const keys = this.camera.inputs.attached.keyboard as ArcRotateCameraKeyboardMoveInput | undefined;
-    if (!keys) return;
-    const k = Math.max(0.05, (dtMs * 60) / 1000);
-    const at60 = this.keyNudge;
-    keys.angularSpeed = at60.angularSpeed * k;
-    keys.panningSensibility = at60.panningSensibility / k;
-    keys.zoomingSensibility = at60.zoomingSensibility / k;
+  private stepOrbit(): void {
+    const cam = this.camera;
+    const o = this.orbit;
+    o.alpha = cam.alpha;
+    o.beta = cam.beta;
+    o.radius = cam.radius;
+    o.target.x = cam.target.x;
+    o.target.y = cam.target.y;
+    o.target.z = cam.target.z;
+    o.step(this.engine.getDeltaTime(), Math.max(0.05, (this.frameDt * 60) / 1000));
+    cam.alpha = o.alpha;
+    cam.beta = o.beta;
+    cam.radius = o.radius;
+    cam.target.copyFromFloats(o.target.x, o.target.y, o.target.z);
   }
 
   // --- setup -------------------------------------------------------------------------
@@ -3292,7 +3336,6 @@ export class BabylonRenderer implements Renderer {
     cam.lowerBetaLimit = 0.3;
     cam.upperBetaLimit = 1.35;
     cam.wheelDeltaPercentage = 0.012;
-    cam.panningSensibility = 90;
     cam.mapPanning = true;
     cam.inertia = 0.82;
     cam.panningInertia = 0.82;
@@ -3300,10 +3343,15 @@ export class BabylonRenderer implements Renderer {
     cam.maxZ = 1600;
     // A slightly longer lens than the default flattens perspective a little: the dollhouse look.
     cam.fov = 0.7;
-    cam.attachControl(true);
-    const keys = cam.inputs.attached.keyboard as ArcRotateCameraKeyboardMoveInput | undefined;
-    if (keys) this.keyNudge = { angularSpeed: keys.angularSpeed, panningSensibility: keys.panningSensibility, zoomingSensibility: keys.zoomingSensibility };
-    this.gameRig = new GameCameraRig(cam, { radius: RADIUS_LIMITS, beta: [0.3, 1.35] }, (i, out) => this.simHead(i, out));
+    const o = this.orbit;
+    o.wheelDeltaPercentage = cam.wheelDeltaPercentage;
+    o.panningSensibility = 90;
+    o.mapPanning = cam.mapPanning;
+    o.inertia = cam.inertia;
+    o.panningInertia = cam.panningInertia;
+    const canvas = this.engine.getRenderingCanvas();
+    if (canvas) this.detachOrbit = o.attach(canvas);
+    this.gameRig = new GameCameraRig(cam, { radius: RADIUS_LIMITS, beta: [0.3, 1.35] }, (i, out) => this.simHead(i, out), () => o.stopInertia());
     // Holds the game view while the town overview drives the camera (never drawn).
     this.parked = new ArcRotateCamera('parkedCamera', cam.alpha, cam.beta, cam.radius, Vector3.Zero(), this.scene);
     this.parked.fov = cam.fov;
@@ -3853,7 +3901,7 @@ export class BabylonRenderer implements Renderer {
     geo.poly([[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], [0, 0, -1]);
     geo.poly([[x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]], [1, 0, 0]);
     geo.poly([[x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]], [-1, 0, 0]);
-    const mesh = geo.toMesh('basementPit', this.scene, { colors: true });
+    const mesh = toMesh(geo, 'basementPit', this.scene, { colors: true });
     if (!mesh) return;
     mesh.material = this.lib.surface('material.soil', { vertexColors: true, doubleSided: true });
     mesh.receiveShadows = true;
@@ -5271,7 +5319,7 @@ export class BabylonRenderer implements Renderer {
   private scheduleSnapshot(): void {
     const engine = this.webgpu;
     const generation = ++this.snapshotGeneration;
-    if (!engine || !this.quality.snapshotRendering || !this.townMode) return;
+    if (!engine || !this.quality.holdStillFrames || !this.townMode) return;
     // A newer build (or pause) may have started by the time this runs; it records once it is done.
     const current = () => generation === this.snapshotGeneration && this.builds === 0 && this.townMode;
     this.scene.executeWhenReady(() => {

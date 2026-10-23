@@ -31,10 +31,11 @@ import { Color3, Vector3, type Material, type Mesh, type PBRMaterial, type Scene
 import type { DoorStyleDef, FloorCoveringDef, LightAim, RoofColorDef, RoofStyleDef, WallCoveringDef, WindowStyleDef } from '../../content/content';
 import { objectCentre, storeyOfRow, storeyRow, type StoreyLayout, type DiagonalWall, type Opening, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
-import { Cut, facing, Geo, LOOK, type V3 } from './geometry';
+import { Cut, facing, Geo, LOOK, type V3 } from '../shared/geometry';
+import { toMesh } from './meshes';
 import { LAYER_SHADOW_ONLY } from '../shared/layers';
 import { MaterialLibrary, type SurfacePattern } from './materials';
-import { addHipPolygon, area, convexHull, diagonalEnds, halfAt, halfCentroid, halfTriangle, postOutline, WallFrame, type P2 } from './slanted';
+import { addHipPolygon, area, convexHull, diagonalEnds, halfAt, halfCentroid, halfTriangle, postOutline, WallFrame, type P2 } from '../shared/slanted';
 import { WALL_HALF, WALL_HEIGHT } from '../shared/walls';
 
 export { WALL_HALF, WALL_HEIGHT };
@@ -525,7 +526,7 @@ export class HouseBuilder {
   private laid(name: string, parts: readonly Geo[], color: string, key: string, cut: boolean, pattern?: SurfacePattern): Mesh | null {
     const geo = new Geo().color(color);
     for (const part of parts) geo.append(part);
-    const mesh = geo.toMesh(name, this.scene, { colors: true, cut });
+    const mesh = toMesh(geo, name, this.scene, { colors: true, cut });
     if (!mesh) return null;
     mesh.material = this.material(key, cut, pattern);
     mesh.receiveShadows = true;
@@ -1562,7 +1563,7 @@ export class HouseBuilder {
     const roofs: Mesh[] = [];
     const add = (geo: Geo, name: string, key: string | Material, opts: { cut?: boolean; cast?: boolean; roof?: boolean; shadowOnly?: boolean; pattern?: SurfacePattern } = {}) => {
       const cut = !storey.preview && (opts.cut ?? true);
-      const mesh = geo.toMesh(name, this.scene, { colors: true, cut });
+      const mesh = toMesh(geo, name, this.scene, { colors: true, cut });
       if (!mesh) return;
       mesh.material = typeof key === 'string' ? this.material(key, cut, opts.pattern) : key;
       mesh.receiveShadows = !opts.shadowOnly;
@@ -1766,7 +1767,7 @@ export class HouseBuilder {
       [trim, 'silhouetteTrim', M.trim, true],
       [glass, 'silhouetteWindows', M.glass, false],
     ] as const) {
-      const mesh = geo.toMesh(name, this.scene, { colors: true, cut: true });
+      const mesh = toMesh(geo, name, this.scene, { colors: true, cut: true });
       if (!mesh) continue;
       mesh.material = this.material(key);
       mesh.receiveShadows = true;
@@ -1784,7 +1785,7 @@ export class HouseBuilder {
   neighbourWindows(panes: readonly Geo[], lit: boolean): Mesh | null {
     const geo = new Geo();
     for (const p of panes) geo.append(p);
-    const mesh = geo.toMesh(lit ? 'silhouetteWindowsLit' : 'silhouetteWindowsDark', this.scene, { colors: true, cut: true });
+    const mesh = toMesh(geo, lit ? 'silhouetteWindowsLit' : 'silhouetteWindowsDark', this.scene, { colors: true, cut: true });
     if (!mesh) return null;
     mesh.material = this.neighbourGlass(lit);
     mesh.receiveShadows = true;

@@ -19,13 +19,15 @@ import type { AssetRegistry } from '../../assets/registry';
 import type { Content } from '../../content/content';
 import { groundDepth, objectCentre, type ObjectPlacement, type PlotInfo, type WorldStructure } from '../../core/protocol';
 import type { LotHighlight, TownShot } from '../types';
-import { Geo, type V3 } from './geometry';
+import { Geo, type V3 } from '../shared/geometry';
+import { toMesh } from './meshes';
 import type { HouseBuilder } from './house';
 import { LAYER_TOWN } from '../shared/layers';
 import type { MaterialLibrary } from './materials';
 import { buildModel, placementVariation, standInOf, type ModelTemplate } from './models';
 import { fieldLayers, Street } from './street';
 import { TemplateCache } from './templateCache';
+import { angleDelta, ease } from '../shared/angles';
 
 /** Height that labels and fits allow for (roofs, chimneys, crowns). */
 const TOWN_HEIGHT = 7;
@@ -226,7 +228,7 @@ export class TownOverview {
       await pace?.();
       const g = new Geo();
       for (const r of rects) g.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0]);
-      const mesh = g.toMesh(name, this.scene);
+      const mesh = toMesh(g, name, this.scene);
       if (!mesh) continue;
       mesh.material = this.lib.surface(material, { doubleSided: true });
       mesh.receiveShadows = true;
@@ -315,7 +317,7 @@ export class TownOverview {
         [fill, 'lotFill'],
         [wall, 'lotWall'],
       ].map(([geo, name]) => {
-        const mesh = (geo as Geo).toMesh(name as string, this.scene, { colors: true })!;
+        const mesh = toMesh((geo as Geo), name as string, this.scene, { colors: true })!;
         mesh.hasVertexAlpha = true;
         mesh.material = this.glowMaterial;
         mesh.isPickable = false;
@@ -684,16 +686,4 @@ export class OverviewCamera {
     g.radius = hi;
     [g.ox, g.oy] = offsets(hi);
   }
-}
-
-export function ease(t: number): number {
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-}
-
-/** Shortest signed angle from a to b. */
-export function angleDelta(a: number, b: number): number {
-  let d = (b - a) % (Math.PI * 2);
-  if (d > Math.PI) d -= Math.PI * 2;
-  if (d < -Math.PI) d += Math.PI * 2;
-  return d;
 }

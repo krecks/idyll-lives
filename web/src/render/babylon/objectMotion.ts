@@ -28,6 +28,7 @@ import { GAME_RATE, QUIET_SPEED } from './characters';
 import { partPose, type ModelClip, type ModelMotion, type Motions } from './models';
 import type { FrameState } from '../../core/bridge';
 import { objectCentre, type ObjectPlacement } from '../../core/protocol';
+import type { ObjectClipInfo } from '../types';
 
 /** A placed object with moving parts. */
 export interface MovingObject {
@@ -183,6 +184,17 @@ export class ObjectMotion {
       moving.open = !!o.open;
       moving.stage = o.growth;
     }
+  }
+
+  /** The clips on object `id` and how far in each is (dev tools: `RendererDebugHooks.objectClips`). */
+  clipsOf(id: number): Map<string, ObjectClipInfo> | null {
+    const states = this.states.get(id);
+    return states ? new Map([...states].map(([name, c]) => [name, { kind: c.kind, time: c.time, duration: c.clip.duration }])) : null;
+  }
+
+  /** Object `id`'s model clips (dev tools: `RendererDebugHooks.objectMotions`). */
+  motionsOf(id: number): Motions | null {
+    return this.objects.get(id)?.motions ?? null;
   }
 
   /** The objects of a newly built world; those still mid-clip are posed again. */
