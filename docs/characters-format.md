@@ -135,17 +135,21 @@ its outline and shades in clumps:
   leave the crown in a whorl, the grooves between them deepening to the hairline (none over the
   ears); a parting where the style has one (short and side-swept at the side, long and buns in the
   middle) is a groove the columns turn onto; short locks past the hairline at the temples and nape;
+  the rim goes round the ears (above an oval round each `ears` box, 3 mm out), as a cut does;
 - curtains (long, bob, layered) and fringes (bob) are sheets with a thickness: each row a closed
   section with rounded edges, a rounded hem curled in, in locks (thinner between them, the edge
   locks fuller), each lock's tip hanging lower than the partings either side of it. A curtain comes
   out from under the cap and falls straight from the scalp's widest, out over the ears, its inner
-  face no nearer the back than `back(y)`;
+  face no nearer the back than `back(y)` (the long style's further off at the shoulders, which rise
+  under it sitting down);
 - the long style's fringe is two lofted locks a side from the parting past the cheek; side-swept,
   three locks swept across the forehead; tousled, a lumpy cap and 22 tapering locks lifting at their
   tips; the afro, a rounded shell in 46 round puffs; the ponytail's tail, a loft in four twisting locks;
   the braid, three strands plaited (each a loft), a tie and a tuft; buns, twisted, with a band.
 - the beard is a shell over the jaw in locks, their tips below the chin, thinning to the skin at
-  its lower edge.
+  its lower edge; the sideburns stop in front of the ears.
+- no hair comes within 2 mm of the head (`sdf`) or 1.5 mm of an ear (the body's ear faces), and no
+  edge passes through an ear, at every life stage at rest (`check`).
 
 The shader (`hair` branch of `characters/material.ts`) takes the hair colour with the clump bands
 (tone.z), and on dark hair lifts the clumps and a sheen band round the crown (where the strands, taken
@@ -553,7 +557,7 @@ See also `tools/characters/README.md`.
 
 - `/characters.html`: a grid of residents. `?family=male|female`, `?stage=<id>|all` (default: every
   stage), `?hair=all` (or `?hair=long,beard`: only those), `?tops=all`, `?skins=all`, `?builds=all`, `?face=moods|visemes`,
-  `?clip=<name>&t=<s>`, `?view=side|back`, `?closeup=1`, `?build=1.2`, `?cols=`, `?manual`
+  `?clip=<name>&t=<s>`, `?view=side|back`, `?closeup=1` (`?y=`: the height it looks at), `?build=1.2`, `?cols=`, `?manual`
   (`__bench.advance(s)`); sets `window.__ready`.
 - `/poses.html`: residents at real furniture, seats and beds, cooking, carrying, socials.
   `?only=<labels>` picks stations, `?seats=sofa,toilet` seats a man and a woman on each object,

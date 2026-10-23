@@ -8,6 +8,8 @@ use std::path::Path;
 use regex::Regex;
 
 use super::contract::{HAIR_STYLES, VISEMES, channels, garments, hair_parts, required_parts};
+use super::body;
+use super::hair::{EAR_MIN, Ears};
 use super::head::head_frame;
 use super::json::JValue;
 use super::np::{degrees, linspace_open, radians};
@@ -331,32 +333,53 @@ pub fn check(out: &Path) -> bool {
                 }
             }
         }
-        // Hair more than 2 mm off the head at every life stage (stage positions: base + deltas).
+        // Hair more than 2 mm off the head, and off the ears (no vertex in or within EAR_MIN of one,
+        // no edge through one), at every life stage (stage positions: base + deltas).
         for &stage in &STAGES {
             let hs = if stage == BASE_STAGE { h.clone() } else { head_frame(fam, stage) };
             let info = if stage == BASE_STAGE { None } else { body.at("stages").get(stage) };
             let sbuf = info.map(|i| std::fs::read(out.join(i.at("mesh").str())).expect("stage mesh"));
-            for (name, e) in parts.obj() {
-                if !name.starts_with("hair.") {
-                    continue;
-                }
+            let at = |name: &str| -> Vec<V3> {
+                let e = parts.at(name);
                 let n = e.at("vertices").usize();
                 let pos = f32s(&buf, e.at("positions").usize(), n * 3);
                 let d = match (info, &sbuf) {
                     (Some(i), Some(sb)) => Some(i16s(sb, i.at("parts").at(name).at("positions").usize(), n * 4)),
                     _ => None,
                 };
-                let gap = (0..n)
+                (0..n)
                     .map(|v| {
                         let mut p: V3 = v3(pos[3 * v] as f64, pos[3 * v + 1] as f64, pos[3 * v + 2] as f64);
                         if let Some(d) = &d {
                             p += v3(d[4 * v] as f64, d[4 * v + 1] as f64, d[4 * v + 2] as f64) / stage_scale;
                         }
-                        hs.sdf(p)
+                        p
                     })
-                    .fold(f64::INFINITY, f64::min);
+                    .collect()
+            };
+            // The ears: the body's faces where its skin (the first vertices, as body.rs made them) is ear.
+            let skin = body::surface(fam, stage);
+            let ri = body::region("ear");
+            let bpos = at("body");
+            let ear: Vec<f64> = (0..bpos.len()).map(|v| skin.region.get(v).map_or(0.0, |w| w[ri])).collect();
+            let be = parts.at("body");
+            let bidx: Vec<usize> = u16s(&buf, be.at("index").usize(), be.at("indices").usize()).iter().map(|&i| i as usize).collect();
+            let ears = Ears::new(&hs.ears, &bpos, &bidx, &ear);
+            for (name, e) in parts.obj() {
+                if !name.starts_with("hair.") {
+                    continue;
+                }
+                let pos = at(name);
+                let gap = pos.iter().map(|&p| hs.sdf(p)).fold(f64::INFINITY, f64::min);
                 if gap < 0.002 {
                     fail(format!("{fam}.{stage}:{name} comes within 2 mm of the head ({:.1} mm)", gap * 1000.0));
+                }
+                let into: Vec<f64> = pos.iter().filter_map(|&p| ears.depth(p)).map(|e| e.0).filter(|&d| d > -EAR_MIN).collect();
+                let idx = u16s(&buf, e.at("index").usize(), e.at("indices").usize());
+                let through = idx.chunks(3).flat_map(|t| [(t[0], t[1]), (t[1], t[2]), (t[2], t[0])]).filter(|&(a, b)| a < b && ears.cut(pos[a as usize], pos[b as usize])).count();
+                if !into.is_empty() || through > 0 {
+                    let deep = into.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+                    fail(format!("{fam}.{stage}:{name} passes into an ear ({} vertices, {:.1} mm deep; {through} edges through)", into.len(), deep * 1000.0));
                 }
             }
         }
