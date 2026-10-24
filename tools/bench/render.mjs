@@ -163,6 +163,8 @@ const servers = new Map();
 const browsers = new Map();
 let built = false;
 let nextPort = null;
+/** The port the browser profiles are named by: the first job's. */
+let profilePort = null;
 const quit = [];
 process.on('exit', () => {
   for (const kill of quit) kill();
@@ -170,6 +172,7 @@ process.on('exit', () => {
 
 /** The base URL of the server a job's pages come from (building `web/dist` first for `--build`, once). */
 async function serverFor(o) {
+  profilePort ??= o.port;
   if (o.url) return o.url;
   if (o.build && !built) {
     const build = spawn(`${WEB}node_modules/.bin/vite`, ['build'], { cwd: WEB, stdio: ['ignore', 'ignore', 'inherit'] });
@@ -221,8 +224,8 @@ async function browserFor(o) {
       kind,
       (async () => {
         if (o.fresh) return { browser: await chromium.launch(options) };
-        // (One profile per kind and port: two invocations at once, on their own ports, don't share one.)
-        const context = await chromium.launchPersistentContext(join(ROOT, 'bench-results', '.browser', `${kind}-${top.port}`), { ...options, ...VIEWPORT });
+        // (One profile per kind and port, the first job's: two invocations at once, on their own ports, don't share one.)
+        const context = await chromium.launchPersistentContext(join(ROOT, 'bench-results', '.browser', `${kind}-${profilePort ?? o.port}`), { ...options, ...VIEWPORT });
         await context.addInitScript(quiet);
         // Its first window stays open (the browser with it), out of the way like the others; each page gets a window of its own (`newWindow`).
         const first = context.pages()[0] ?? (await context.newPage());
