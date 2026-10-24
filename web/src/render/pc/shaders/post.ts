@@ -556,3 +556,31 @@ fn toneMap(color: vec3f) -> vec3f {
 }
 `,
 };
+
+/**
+ * `PAGE_TONE_MAPPING` with Babylon's contrast after it (`ImageProcessingConfiguration.contrast`,
+ * in the material as the previews' scenes had it): in gamma space, after the clamp, and back to
+ * linear for the engine's gamma output (`pow(x, 2.2)` undoes its `pow(x, 1 / 2.2)`). `contrast`
+ * goes into the code as a constant.
+ */
+export function pageToneMapping(contrast: number): Record<Language, string> {
+  const k = contrast.toFixed(4);
+  return {
+    glsl: `${ACES.glsl}
+vec3 toneMap(vec3 color) {
+	vec3 rgb = clamp(pow(gameAcesFitted(color * getExposure()), vec3(1.0 / 2.2)), 0.0, 1.0);
+	vec3 highContrast = rgb * rgb * (3.0 - 2.0 * rgb);
+	rgb = ${contrast < 1 ? `mix(vec3(0.5), rgb, ${k})` : `mix(rgb, highContrast, ${k} - 1.0)`};
+	return pow(rgb, vec3(2.2));
+}
+`,
+    wgsl: `${ACES.wgsl}
+fn toneMap(color: vec3f) -> vec3f {
+	var rgb = clamp(pow(gameAcesFitted(color * getExposure()), vec3f(1.0 / 2.2)), vec3f(0.0), vec3f(1.0));
+	let highContrast = rgb * rgb * (3.0 - 2.0 * rgb);
+	rgb = ${contrast < 1 ? `mix(vec3f(0.5), rgb, ${k})` : `mix(rgb, highContrast, ${k} - 1.0)`};
+	return pow(rgb, vec3f(2.2));
+}
+`,
+  };
+}

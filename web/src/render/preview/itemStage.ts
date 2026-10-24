@@ -10,17 +10,19 @@
  * each at its pace in the game.
  */
 
-import { Engine, FreeCamera, Matrix, TransformNode, Vector3, VertexBuffer, type Mesh, type Scene } from '../babylon/core';
+import * as pc from '../pc/engine';
 import type { AssetRegistry } from '../../assets/registry';
 import { colorsKey, type PartColors } from '../../core/protocol';
-import type { PopTarget } from '../babylon/buildFx';
-import { buildModel, type ModelTemplate } from '../babylon/models';
+import { buildModel, disposeTemplate, type ModelTemplate } from '../pc/models';
+import type { Instances } from '../pc/instancing';
+import { poseParts, type PopTarget } from '../pc/objectMotion';
+import { toEngine } from '../pc/space';
+import { transformPoint } from '../shared/math';
 import { partPose, type ModelClip } from '../shared/modelClips';
 import { motionsOf, painted, type Motions } from '../shared/modelEntry';
-import { poseParts } from '../babylon/objectMotion';
 import { restPoses } from '../shared/objectMotion';
 import type { ItemStage } from '../types';
-import { boxCorners, contactShadow, PICTURE_STAND_IN, studioScene } from './itemScene';
+import { boxCorners, contactShadow, IDENTITY, PICTURE_STAND_IN, placeModel, shadersCompiling, studioScene, texturesReady, type StudioModel, type StudioScene } from './itemScene';
 
 const FOV = 0.5;
 /** Starting view: three-quarter from the front, a little above (radians). */
@@ -31,8 +33,8 @@ const MAX_PITCH = 1.25;
 /** Distance as a share of what frames the whole thing (closer and further). */
 const MIN_ZOOM = 0.4;
 const MAX_ZOOM = 1.5;
-/** Give up waiting for a model's materials (ms). */
-const READY_TIMEOUT = 8000;
+/** Stages made (each canvas's id: PlayCanvas keeps its apps by it). */
+let stages = 0;
 
 /** A clip the stage plays, and how far it has played (seconds). */
 interface StageClip {
@@ -44,13 +46,12 @@ interface StageClip {
 
 export class ItemStageController implements ItemStage {
   /** Turns (`yaw`) about the middle of the model's bounds; `item` holds the model in it, moved so that middle is on its axis. */
-  private readonly root: TransformNode;
-  private readonly item: TransformNode;
-  private readonly camera: FreeCamera;
-  private readonly shadow: Mesh;
+  private readonly root: pc.Entity;
+  private readonly item: pc.Entity;
+  private readonly camera: pc.CameraComponent;
   private readonly resize: ResizeObserver;
-  private meshes: Mesh[] = [];
-  /** The model shown, and its one instance (in place) for posing its moving parts; null without any. */
+  /** The model shown (null before the first is built), and its one instance (in place) for posing its moving parts; null without any. */
+  private shown: StudioModel | null = null;
   private template: ModelTemplate | null = null;
   private target: PopTarget | null = null;
   /** Its clips that open (`use`) and its ambient one (`idle`), once the first model is built. */
@@ -62,8 +63,8 @@ export class ItemStageController implements ItemStage {
   private next: { colors: PartColors | undefined } | undefined;
   private building = false;
   private detached = false;
-  /** Where the camera looks (on the axis it turns about) and how far back it stands to see all of it (set by the first build). */
-  private readonly centre = new Vector3(0, 0.5, 0);
+  /** Where the camera looks (on the axis it turns about, game space) and how far back it stands to see all of it (set by the first build). */
+  private readonly centre = new pc.Vec3(0, 0.5, 0);
   private reach = 2;
   private yaw = START_YAW;
   private yawTarget = START_YAW;
@@ -76,42 +77,43 @@ export class ItemStageController implements ItemStage {
   /** Frames still to draw before the stage rests (nothing moves, nothing new). */
   private restless = 2;
   private dragging: { id: number; x: number; y: number; t: number } | null = null;
+  private frameId = 0;
+  private readonly eye = new pc.Vec3();
+  private readonly look = new pc.Vec3();
 
   private constructor(
-    private readonly engine: Engine,
-    private readonly scene: Scene,
+    private readonly scene: StudioScene,
     private readonly canvas: HTMLCanvasElement,
-    host: HTMLElement,
+    private readonly host: HTMLElement,
     private readonly assets: AssetRegistry,
     private readonly model: string,
     private readonly footprint: [number, number],
   ) {
-    this.root = new TransformNode('stageItem', scene);
+    const app = scene.app;
+    this.root = new pc.Entity('stageItem', app);
+    scene.root.addChild(this.root);
     // A wall thing hangs at the back of its tile, its origin the tile's middle: turned about that, it would swing out of view.
-    this.item = new TransformNode('stageItemModel', scene);
-    this.item.parent = this.root;
+    this.item = new pc.Entity('stageItemModel', app);
+    this.root.addChild(this.item);
     this.opens = new Promise((resolve) => (this.opened = resolve));
-    const cam = (this.camera = new FreeCamera('stageItemCamera', new Vector3(0, 2, 5), scene, false));
-    cam.fov = FOV;
-    cam.minZ = 0.05;
-    cam.maxZ = 60;
-    cam.inputs.clear();
-    scene.activeCamera = cam;
-    this.shadow = contactShadow(scene);
+    const cam = (this.camera = scene.camera);
+    cam.fov = (FOV * 180) / Math.PI;
+    cam.nearClip = 0.05;
+    cam.farClip = 60;
+    const shadow = contactShadow(scene, this.item);
     const [fw, fd] = footprint;
-    this.shadow.scaling.set(fw * 1.25 + 0.2, 1, fd * 1.25 + 0.2);
-    this.shadow.parent = this.item;
+    shadow.setLocalScale(fw * 1.25 + 0.2, 1, fd * 1.25 + 0.2);
 
     canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab;outline:none';
     canvas.setAttribute('aria-label', 'The item: drag or arrow keys to turn, scroll or +/- to come closer');
     canvas.tabIndex = 0;
     host.appendChild(canvas);
     this.resize = new ResizeObserver(() => {
-      engine.resize();
+      this.fit();
       this.restless = 2;
     });
     this.resize.observe(host);
-    engine.resize();
+    this.fit();
     canvas.addEventListener('pointerdown', this.onDown);
     canvas.addEventListener('pointermove', this.onMove);
     canvas.addEventListener('pointerup', this.onUp);
@@ -119,20 +121,18 @@ export class ItemStageController implements ItemStage {
     canvas.addEventListener('wheel', this.onWheel, { passive: false });
     canvas.addEventListener('dblclick', this.onDouble);
     canvas.addEventListener('keydown', this.onKey);
-    engine.runRenderLoop(this.tick);
+    this.frameId = requestAnimationFrame(this.tick);
   }
 
   /** A stage in `host` for `model`; throws when 3D is unavailable. */
-  static async create(host: HTMLElement, assets: AssetRegistry, model: string, footprint: [number, number]): Promise<ItemStageController> {
+  static async create(host: HTMLElement, assets: AssetRegistry, model: string, footprint: [number, number], backend: 'auto' | 'webgl' = 'auto'): Promise<ItemStageController> {
     const canvas = document.createElement('canvas');
-    const engine = new Engine(canvas, true, { premultipliedAlpha: true, alpha: true, stencil: false, adaptToDeviceRatio: true });
+    canvas.id = `item-stage-${++stages}`;
+    const scene = await studioScene(canvas, assets, { backend, antialias: true, alpha: true });
     try {
-      // Sharp enough on a high-density screen without drawing 9 pixels for every one.
-      engine.setHardwareScalingLevel(1 / Math.min(2, window.devicePixelRatio || 1));
-      const scene = await studioScene(engine, assets);
-      return new ItemStageController(engine, scene, canvas, host, assets, model, footprint);
+      return new ItemStageController(scene, canvas, host, assets, model, footprint);
     } catch (err) {
-      engine.dispose();
+      scene.destroy();
       throw err;
     }
   }
@@ -151,48 +151,61 @@ export class ItemStageController implements ItemStage {
     if (this.detached) return;
     this.detached = true;
     this.opened(false);
-    this.engine.stopRenderLoop(this.tick);
+    cancelAnimationFrame(this.frameId);
     this.resize.disconnect();
     this.canvas.remove();
-    this.scene.dispose();
-    this.engine.dispose();
+    // (A build under way lets go of its own model when it sees the stage gone.)
+    if (!this.building) this.destroyScene();
+  }
+
+  private destroyScene(): void {
+    this.shown?.destroy();
+    this.shown = null;
+    this.scene.destroy();
+  }
+
+  /** The canvas's drawing size: the host's, sharp enough on a high-density screen without drawing 9 pixels for every one. */
+  private fit(): void {
+    const ratio = Math.min(2, window.devicePixelRatio || 1);
+    const width = Math.max(1, Math.round(this.host.clientWidth * ratio));
+    const height = Math.max(1, Math.round(this.host.clientHeight * ratio));
+    if (this.canvas.width === width && this.canvas.height === height) return;
+    this.scene.app.setCanvasResolution(pc.RESOLUTION_FIXED, width, height);
   }
 
   /** Builds the latest colours asked for, one build at a time. */
   private async build(): Promise<void> {
     if (this.building) return;
     this.building = true;
+    const { app, lib } = this.scene;
     try {
       while (this.next && !this.detached) {
         const { colors } = this.next;
         this.next = undefined;
         const entry = this.assets.has(this.model, 'model') ? this.assets.get(this.model, 'model') : undefined;
         // Without its file, a plain box (built again with each colour asked for, which tries the file again).
-        const template = await buildModel(this.scene, `stage:${this.model}|${colorsKey(colors)}`, painted(entry, colors), this.footprint, { standIn: entry?.url ? PICTURE_STAND_IN : undefined });
-        const meshes = template.meshes;
-        const identity = Matrix.Identity().asArray() as unknown as Float32Array;
-        for (const mesh of meshes) {
-          mesh.parent = this.item;
-          mesh.isPickable = false;
-          mesh.thinInstanceSetBuffer('matrix', identity, 16, true);
-          mesh.alwaysSelectAsActiveMesh = true;
-          mesh.setEnabled(false);
+        const template = await buildModel(app, `stage:${this.model}|${colorsKey(colors)}`, painted(entry, colors), this.footprint, { standIn: entry?.url ? PICTURE_STAND_IN : undefined });
+        if (this.detached) {
+          disposeTemplate(template);
+          break;
         }
-        const ready = await this.whenReady(meshes);
+        const placed = placeModel(this.scene, this.item, template);
+        placed.show(false);
+        const ready = await texturesReady(lib);
         // Something newer was asked for meanwhile (or the stage went): this one is never shown.
         if (this.detached || (this.next && ready)) {
-          for (const mesh of meshes) mesh.dispose(false, false);
+          placed.destroy();
           continue;
         }
-        const first = !this.meshes.length;
-        for (const mesh of this.meshes) mesh.dispose(false, false);
-        this.meshes = meshes;
+        const first = !this.shown;
+        this.shown?.destroy();
+        this.shown = placed;
         this.template = template;
-        this.target = this.instance(template, identity);
+        this.target = this.instance(template, placed.draws);
         if (first) this.clips = stageClips(template, motionsOf(entry));
         // Posed where the one before was (half open, say) before it shows.
         if (this.target) poseParts(this.target, this.playing());
-        for (const mesh of meshes) mesh.setEnabled(true);
+        placed.show(true);
         if (first) this.frameModel();
         this.restless = 2;
         this.opened(this.clips.some((c) => c.kind === 'use'));
@@ -202,21 +215,18 @@ export class ItemStageController implements ItemStage {
       this.opened(false);
     } finally {
       this.building = false;
+      if (this.detached) this.destroyScene();
     }
   }
 
-  /** The model's one instance, in place (`placed`), its moving parts drawing from buffers of their own as in the game; null if it has none. */
-  private instance(template: ModelTemplate, placed: Float32Array): PopTarget | null {
+  /** The model's one instance, in place, its moving parts drawing from buffers of their own as in the game; null if it has none. */
+  private instance(template: ModelTemplate, draws: Instances[]): PopTarget | null {
     const motion = template.motion;
     const count = motion ? Math.max(-1, ...motion.parts) + 1 : 0;
     if (!motion || !count) return null;
-    const parts = Array.from({ length: count }, (_, k) => {
-      const meshes = template.meshes.filter((_, i) => motion.parts[i] === k);
-      const matrices = placed.slice();
-      for (const mesh of meshes) mesh.thinInstanceSetBuffer('matrix', matrices, 16, true);
-      return { meshes, matrices };
-    });
-    return { meshes: template.meshes.filter((_, i) => motion.parts[i] < 0), matrices: placed, index: 0, moving: { parts, poses: restPoses(count) } };
+    const placed = new Float32Array(IDENTITY);
+    const parts = Array.from({ length: count }, (_, k) => ({ meshes: draws.filter((_, i) => motion.parts[i] === k), matrices: placed.slice() }));
+    return { meshes: draws.filter((_, i) => motion.parts[i] < 0), matrices: placed, index: 0, moving: { parts, poses: restPoses(count) } };
   }
 
   /** The clips of the model shown, each where it has played to (`full`: those that open, fully open). */
@@ -252,53 +262,37 @@ export class ItemStageController implements ItemStage {
    * front), their middle moved onto the axis it turns about, so it is seen whole from any side.
    */
   private frameModel(): void {
-    const save = this.root.rotation.y;
-    this.root.rotation.y = 0;
-    this.item.position.setAll(0);
-    const corners = boxCorners(this.meshes);
+    const meshes = this.template?.meshes ?? [];
+    const corners = boxCorners(meshes);
     const lo = corners[0]?.clone();
     const hi = corners[corners.length - 1]?.clone();
     const parts = this.template?.motion?.parts;
     if (lo && hi && parts) {
       const open = this.playing(true);
       const pose = new Float32Array(16);
-      const posed = new Matrix();
-      const m = new Matrix();
-      const at = new Vector3();
-      this.meshes.forEach((mesh, i) => {
-        const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
-        if (parts[i] < 0 || !positions?.length || !partPose(open, parts[i], pose)) return;
+      const at = [0, 0, 0];
+      meshes.forEach((m, i) => {
+        const positions: number[] = [];
+        if (parts[i] < 0 || !partPose(open, parts[i], pose) || !m.mesh.getPositions(positions)) return;
         // Its vertices posed, not its box: a part grown from nothing (water, flames) lies flat at rest and its
         // pose grows it across the flat many times over, so a box's corners off the flat (a slanted shower's
         // rain, its flat turned) would land metres away, and the camera with them.
-        Matrix.FromArrayToRef(pose, 0, posed);
-        mesh.computeWorldMatrix(true).multiplyToRef(posed, m);
         for (let k = 0; k < positions.length; k += 3) {
-          Vector3.TransformCoordinatesFromFloatsToRef(positions[k], positions[k + 1], positions[k + 2], m, at);
-          lo.minimizeInPlace(at);
-          hi.maximizeInPlace(at);
+          transformPoint(pose, positions[k], positions[k + 1], positions[k + 2], at);
+          lo.set(Math.min(lo.x, at[0]), Math.min(lo.y, at[1]), Math.min(lo.z, at[2]));
+          hi.set(Math.max(hi.x, at[0]), Math.max(hi.y, at[1]), Math.max(hi.z, at[2]));
         }
       });
     }
-    this.root.rotation.y = save;
     if (!lo || !hi) return;
-    this.item.position.set(-(lo.x + hi.x) / 2, 0, -(lo.z + hi.z) / 2);
+    this.item.setLocalPosition(-(lo.x + hi.x) / 2, 0, -(lo.z + hi.z) / 2);
     this.centre.set(0, (lo.y + hi.y) / 2, 0);
-    const radius = Math.max(0.35, Vector3.Distance(lo, hi) / 2);
+    const radius = Math.max(0.35, lo.distance(hi) / 2);
     this.reach = (radius / Math.sin(FOV / 2)) * 1.02;
   }
 
-  private async whenReady(meshes: Mesh[]): Promise<boolean> {
-    const started = performance.now();
-    while (performance.now() - started < READY_TIMEOUT) {
-      if (this.detached) return false;
-      if (meshes.every((m) => m.isReady(true)) && this.shadow.isReady(true)) return true;
-      await new Promise((r) => setTimeout(r, 16));
-    }
-    return false;
-  }
-
   private readonly tick = () => {
+    this.frameId = requestAnimationFrame(this.tick);
     const now = performance.now() / 1000;
     const dt = this.lastNow ? Math.min(0.1, now - this.lastNow) : 0;
     this.lastNow = now;
@@ -316,12 +310,18 @@ export class ItemStageController implements ItemStage {
     // At rest, nothing is drawn: the GPU is the game's again.
     if (this.restless <= 0) return;
     this.restless--;
-    this.root.rotation.y = this.yaw;
+    // (A local turn about y under the world root is Babylon's rotation.y in game space.)
+    this.root.setLocalEulerAngles(0, (this.yaw * 180) / Math.PI, 0);
     const dist = this.reach * this.zoom;
     const c = this.centre;
-    this.camera.position.set(c.x, c.y + Math.sin(this.pitch) * dist, c.z + Math.cos(this.pitch) * dist);
-    this.camera.setTarget(c);
-    this.scene.render();
+    const entity = this.camera.entity;
+    entity.setPosition(toEngine(c.x, c.y + Math.sin(this.pitch) * dist, c.z + Math.cos(this.pitch) * dist, this.eye));
+    entity.lookAt(toEngine(c.x, c.y, c.z, this.look));
+    const app = this.scene.app;
+    app.update(dt);
+    app.render();
+    // (WebGL2: what is still compiling was left out, `asyncShaders`: drawn again until it's in.)
+    if (shadersCompiling(this.scene.device)) this.restless = 2;
   };
 
   private zoomTo(zoom: number): void {

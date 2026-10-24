@@ -7,7 +7,10 @@
  *
  * The residents are made from seeds (`lookFromSeed`, the same look every time); the objects are
  * the first `?count=12` objects of the shop in id order. `?renderer=webgl` draws with
- * WebGL2. Sets `window.__ready` once every picture has loaded.
+ * WebGL2. Sets `window.__ready` once every picture has loaded. `?debug` exposes the residents'
+ * previews as `__previews` (`render/preview/index.ts`): the household creator's stage can be
+ * attached from a script (`__previews.stage(host)`) and its studio inspected (`__previews.live`).
+ * Both preview apps are PlayCanvas apps of their own (`pc/device.ts` `createSideApp`).
  */
 
 import { AssetRegistry } from '../assets/registry';

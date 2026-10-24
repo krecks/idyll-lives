@@ -1,37 +1,33 @@
 /**
- * The preview studio: one small Babylon engine and scene running the game's own character
- * pipeline (`Characters`: the same meshes, materials, clips and face rig as in play) under soft
- * studio lights, on a transparent canvas.
+ * The preview studio: a small PlayCanvas app of its own (beside the game's, `createSideApp`) running
+ * the game's own character pipeline (`Characters`: the same meshes, materials, clips and face rig as
+ * in play) under soft studio lights, on a transparent canvas.
  *
  * Sims are driven like in the game, by a snapshot: a synthetic one in which every Sim stands
  * idle, plus stage directions (gestures, expressions, eye contact). Row 0 is the household
  * creator's stage; rows 1.. hold a batch of portraits, standing far off to the side.
+ *
+ * The app is passed explicitly everywhere (`new pc.Entity(name, app)`): the page's current app,
+ * PlayCanvas's default, stays the game's. Everything it caches is its own (per app or device:
+ * materials, the sky's lighting, the residents' shaders), and goes with it (`dispose`).
+ *
+ * Babylon drew each picture with its own `scene.render()`; here the stage's camera (onto the canvas)
+ * and the portraits' (into their targets) are drawn by one `app.render()` a frame (`draw`).
  */
 
-import {
-  Color3,
-  Color4,
-  DirectionalLight,
-  DynamicTexture,
-  Engine,
-  HemisphericLight,
-  ImageProcessingConfiguration,
-  MeshBuilder,
-  Scene,
-  StandardMaterial,
-  TransformNode,
-  Vector3,
-  WebGPUEngine,
-  type AbstractEngine,
-  type Mesh,
-} from '../babylon/core';
+import * as pc from '../pc/engine';
+import { Characters, MAX_CHARACTERS } from '../pc/characters';
+import { createDevice, createSideApp, destroySideApp } from '../pc/device';
+import { Instances } from '../pc/instancing';
+import { ENV_UNITS, SKY_UNITS, SUN_UNITS } from '../pc/lightUnits';
+import { contactBlob } from '../pc/lotContents';
+import { MaterialLibrary } from '../pc/materials';
+import { drawAfter } from '../pc/meshes';
+import { pageLook } from '../pc/post';
 import type { AssetRegistry } from '../../assets/registry';
 import type { FrameState } from '../../core/bridge';
 import type { SimInfo } from '../../core/protocol';
 import type { SnapshotLayout } from '../../core/snapshot';
-import { Characters, MAX_CHARACTERS } from '../babylon/characters';
-import { compressedTextureFeatures, noteWebGpuFailed, webGpuFailed } from '../babylon/loaders';
-import { MaterialLibrary } from '../babylon/materials';
 import type { SimLook } from '../types';
 
 export interface StudioDeps {
@@ -67,82 +63,142 @@ const LAYOUT: SnapshotLayout = {
   actions: [],
 };
 
+/**
+ * Babylon's studio image processing, in the materials (`ImageProcessingConfiguration`: ACES at this
+ * exposure, then this contrast; `pageLook`).
+ */
+const EXPOSURE = 1.15;
+const CONTRAST = 1.08;
+/** The sky's lighting (Babylon's `environmentIntensity`). */
+const ENVIRONMENT = 0.7;
+/** The first portraits wait this long (ms) for the sky's lighting at most (Babylon never waited, but its sky was there first). */
+const ENV_WAIT = 2000;
+/** Drawing size per CSS pixel, at most (Babylon's hardware scaling level 1 / 2). */
+const MAX_RATIO = 2;
+const TRANSPARENT = new pc.Color(0, 0, 0, 0);
+
 export class Studio {
   readonly rows: (Row | null)[] = [];
   /** The floor under the stage Sim: a pool of light and a soft shade (shown with the stage). */
-  readonly pool: TransformNode;
+  readonly pool: pc.Entity;
+  /** The camera the residents are seen by (the stage's; none: full detail, `Characters`). */
+  viewer: pc.CameraComponent | null = null;
   private readonly snap = new Float32Array(LAYOUT.capacity);
   private readonly frame: FrameState;
   private readonly shadows = new Float32Array(MAX_CHARACTERS * 16);
-  private readonly blob: Mesh;
+  private readonly blob: Instances;
+  private readonly decals: { texture: pc.Texture; material: pc.StandardMaterial }[] = [];
   private builtKey = '';
   private building = false;
   private disposed = false;
+  private envSettled = false;
+  private readonly born = performance.now();
+  private lastDraw = 0;
+  private frameId = 0;
 
   private constructor(
-    readonly engine: AbstractEngine,
-    readonly scene: Scene,
+    readonly app: pc.AppBase,
+    /** Game space (mirrored in z, as the game's world root: `pc/space.ts`). */
+    readonly root: pc.Entity,
     readonly characters: Characters,
     readonly canvas: HTMLCanvasElement,
-    readonly webgpu: boolean,
+    env: Promise<boolean> | null,
   ) {
     this.frame = { prev: this.snap, curr: this.snap, alpha: 0, steps: 1, layout: LAYOUT, now: 0 };
     const [blob, pool] = this.makeShadows();
     this.blob = blob;
     this.pool = pool;
+    if (env) void env.finally(() => (this.envSettled = true));
+    else this.envSettled = true;
   }
 
-  /** Creates the engine, scene and lights and loads the characters; throws when unavailable. */
+  get device(): pc.GraphicsDevice {
+    return this.app.graphicsDevice;
+  }
+
+  get webgpu(): boolean {
+    return this.app.graphicsDevice.isWebGPU;
+  }
+
+  /** Creates the app, lights and characters; throws when unavailable. */
   static async create(deps: StudioDeps): Promise<Studio> {
     const canvas = document.createElement('canvas');
     canvas.className = 'sim-studio';
-    let engine: AbstractEngine | null = null;
-    let webgpu = false;
     const forceWebGL = deps.backend() === 'webgl' || new URLSearchParams(location.search).get('renderer') === 'webgl';
-    if (!forceWebGL && !webGpuFailed() && (await WebGPUEngine.IsSupportedAsync)) {
-      const gpu = new WebGPUEngine(canvas, { antialias: true, adaptToDeviceRatio: true, premultipliedAlpha: true, ...compressedTextureFeatures() });
-      try {
-        await gpu.initAsync();
-        engine = gpu;
-        webgpu = true;
-      } catch (err) {
-        // As the game's renderer does: WebGL2 for the rest of the session.
-        console.warn('[previews] WebGPU failed to start; drawing with WebGL2', err);
-        noteWebGpuFailed();
-        try {
-          gpu.dispose();
-        } catch {
-          // Half started: nothing more to free.
-        }
-      }
-    }
-    engine ??= new Engine(canvas, true, { adaptToDeviceRatio: true, premultipliedAlpha: true, alpha: true, stencil: false });
-    engine.setHardwareScalingLevel(1 / Math.min(2, window.devicePixelRatio || 1));
+    // (Multisampled and transparent, as Babylon's engine was: the menus show through.)
+    const device = await createDevice(canvas, forceWebGL, true, true);
+    const app = createSideApp(canvas, device);
     try {
-      const scene = new Scene(engine);
-      scene.clearColor = new Color4(0, 0, 0, 0);
-      scene.skipPointerMovePicking = true;
-      scene.constantlyUpdateMeshUnderPointer = false;
-      const ip = scene.imageProcessingConfiguration;
-      ip.toneMappingEnabled = true;
-      ip.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES;
-      ip.exposure = 1.15;
-      ip.contrast = 1.08;
-      const lib = MaterialLibrary.for(scene).setAssets(deps.assets);
-      const env = deps.assets.get('environment.sky', 'image');
-      // The portraits are lit by the studio lights; an environment is only polish. Never hold
-      // up the first portrait (and the menu behind it) for a texture that may time out.
-      if (env) void lib.loadEnvironment(env.url);
-      lib.setEnvironmentIntensity(0.7);
-      lights(scene);
-      const characters = new Characters(scene, deps.assets, lib);
+      const root = new pc.Entity('studio', app);
+      root.setLocalScale(1, 1, -1);
+      app.root.addChild(root);
+      app.scene.ambientLight = new pc.Color(0, 0, 0);
+      app.scene.layers.getLayerById(pc.LAYERID_SKYBOX)!.enabled = false;
+      const lib = MaterialLibrary.for(app).setAssets(deps.assets);
+      const sky = deps.assets.get('environment.sky', 'image');
+      // The portraits are lit by the studio lights; the sky is only polish. The first portrait waits
+      // for it a moment at most (`ready`), never the menu behind it for a file that may time out.
+      const env = sky ? lib.loadEnvironment(sky.url) : null;
+      lib.setEnvironmentIntensity(ENVIRONMENT * ENV_UNITS);
+      lights(app, lib);
+      let studio: Studio | null = null;
+      const characters = new Characters(app, root, deps.assets, lib, undefined, { camera: () => studio?.viewer ?? null });
       if (!(await characters.init())) throw new Error('characters unavailable');
       characters.setEmotions(deps.emotions);
-      return new Studio(engine, scene, characters, canvas, webgpu);
+      studio = new Studio(app, root, characters, canvas, env);
+      return studio;
     } catch (err) {
-      engine.dispose();
+      destroySideApp(app);
       throw err;
     }
+  }
+
+  /** A camera of the studio's, in its look (Babylon's image processing, `pageLook`), off until used. */
+  camera(name: string, fov: number, near: number, far: number, priority: number): pc.CameraComponent {
+    const entity = new pc.Entity(name, this.app);
+    entity.addComponent('camera', { fov: (fov * 180) / Math.PI, nearClip: near, farClip: far, clearColor: TRANSPARENT, priority });
+    const camera = entity.camera!;
+    pageLook(this.app, camera, EXPOSURE, CONTRAST);
+    entity.enabled = false;
+    this.app.root.addChild(entity);
+    return camera;
+  }
+
+  /** Points `camera` from `eye` at `target` (game space). */
+  static aim(camera: pc.CameraComponent, eye: { x: number; y: number; z: number }, target: { x: number; y: number; z: number }): void {
+    camera.entity.setPosition(eye.x, eye.y, -eye.z);
+    camera.entity.lookAt(target.x, target.y, -target.z);
+  }
+
+  /** Sizes the canvas's drawing buffer to its box (up to 2 device pixels per CSS pixel). */
+  resize(): void {
+    const ratio = Math.min(MAX_RATIO, window.devicePixelRatio || 1);
+    const width = Math.max(1, Math.round(this.canvas.clientWidth * ratio));
+    const height = Math.max(1, Math.round(this.canvas.clientHeight * ratio));
+    if (width !== this.device.width || height !== this.device.height) this.app.setCanvasResolution(pc.RESOLUTION_FIXED, width, height);
+  }
+
+  /** Calls `frame(now)` every display frame until `stop` (Babylon's `runRenderLoop`). */
+  run(frame: (now: number) => void): void {
+    cancelAnimationFrame(this.frameId);
+    const tick = (now: number) => {
+      this.frameId = requestAnimationFrame(tick);
+      frame(now);
+    };
+    this.frameId = requestAnimationFrame(tick);
+  }
+
+  stop(): void {
+    cancelAnimationFrame(this.frameId);
+    this.frameId = 0;
+  }
+
+  /** Draws every enabled camera (the stage's onto the canvas, the portraits' into their targets). */
+  draw(now: number): void {
+    const dt = this.lastDraw ? Math.min(0.1, (now - this.lastDraw) / 1000) : 0;
+    this.lastDraw = now;
+    this.app.update(dt);
+    this.app.render();
   }
 
   /** Puts a Sim into row `i` (null empties it). New looks are rebuilt before the next pose. */
@@ -153,19 +209,21 @@ export class Studio {
     this.sync();
   }
 
-  /** Whether every row's current look is built (meshes exist; materials may still compile). */
+  /** Whether every row's current look is built (its draws exist; their shaders compile when first drawn). */
   get synced(): boolean {
     return !this.building && this.builtKey === this.structureKey();
   }
 
-  /** Whether every character mesh in use can be drawn (shaders compiled, textures loaded). */
+  /**
+   * Whether the Sims can be drawn as they should look: built, and the sky's lighting there (or given
+   * up on after a moment). The residents' materials have no textures, and PlayCanvas compiles a
+   * shader when it first draws with it (Babylon's `isReady` checked both).
+   */
   ready(): boolean {
-    if (!this.synced) return false;
-    for (const m of this.scene.meshes) if (m.name.startsWith('sim:') && m.isEnabled() && !m.isReady(true)) return false;
-    return true;
+    return this.synced && (this.envSettled || performance.now() - this.born > ENV_WAIT);
   }
 
-  /** Poses every Sim for this frame (same code path as the game). */
+  /** Poses every Sim for this frame (same code path as the game), and their contact shadows. */
   pose(now: number): void {
     const s = this.snap;
     const h = LAYOUT.header;
@@ -194,15 +252,25 @@ export class Studio {
     }
     this.frame.now = now;
     this.characters.update(this.frame, always, this.shadows);
-    this.blob.thinInstanceBufferUpdated('matrix');
+    const blob = this.blob;
+    const count = this.rows.length;
+    blob.setCount(count);
+    for (let i = 0; i < count; i++) blob.setMatrix(i, this.shadows, i * 16);
+    blob.update(false);
+    blob.enabled = count > 0;
   }
 
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.engine.stopRenderLoop();
-    this.scene.dispose();
-    this.engine.dispose();
+    this.stop();
+    this.characters.dispose();
+    this.blob.destroy();
+    for (const d of this.decals) {
+      d.material.destroy();
+      d.texture.destroy();
+    }
+    destroySideApp(this.app);
     this.canvas.remove();
   }
 
@@ -231,28 +299,35 @@ export class Studio {
    * with a soft shade falling away from the key light, so the Sim stands on something over
    * whatever the menus show behind the canvas.
    */
-  private makeShadows(): [Mesh, TransformNode] {
-    const scene = this.scene;
-    const decal = (name: string, size: number, draw: (ctx: CanvasRenderingContext2D, n: number) => void, color: Color3, order: number) => {
+  private makeShadows(): [Instances, pc.Entity] {
+    const app = this.app;
+    const square = contactBlob(app).mesh;
+    /** Babylon's unlit decal: `color` (sRGB, as Babylon's standard material took it) through the alpha `draw` paints, drawn in `order` (its `alphaIndex`). */
+    const decal = (name: string, draw: (ctx: CanvasRenderingContext2D, n: number) => void, color: pc.Color, order: number) => {
       const n = 256;
-      const tex = new DynamicTexture(name, n, scene, true);
-      const ctx = tex.getContext() as CanvasRenderingContext2D;
-      ctx.clearRect(0, 0, n, n);
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = n;
+      const ctx = canvas.getContext('2d')!;
       draw(ctx, n);
-      tex.update();
-      tex.hasAlpha = true;
-      const mat = new StandardMaterial(name, scene);
-      mat.disableLighting = true;
-      mat.diffuseColor = Color3.Black();
-      mat.specularColor = Color3.Black();
-      mat.emissiveColor = color;
-      mat.opacityTexture = tex;
-      mat.disableDepthWrite = true;
-      const mesh = MeshBuilder.CreateGround(name, { width: size, height: size }, scene);
-      mesh.material = mat;
-      mesh.isPickable = false;
-      mesh.alphaIndex = order;
-      return mesh;
+      const texture = new pc.Texture(app.graphicsDevice, { name, width: n, height: n, format: pc.PIXELFORMAT_RGBA8, mipmaps: true, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE });
+      texture.setSource(canvas);
+      const material = new pc.StandardMaterial();
+      material.name = name;
+      material.useLighting = false;
+      material.useSkybox = false;
+      material.useFog = false;
+      material.diffuse.set(0, 0, 0);
+      material.emissive = color;
+      material.opacityMap = texture;
+      material.opacityMapChannel = 'a';
+      // Babylon's `ALPHA_COMBINE`: the colour blended over, the alphas added. On the transparent
+      // canvas a shade over the platform hides more of the page behind it.
+      material.blendState = new pc.BlendState(true, pc.BLENDEQUATION_ADD, pc.BLENDMODE_SRC_ALPHA, pc.BLENDMODE_ONE_MINUS_SRC_ALPHA, pc.BLENDEQUATION_ADD, pc.BLENDMODE_ONE, pc.BLENDMODE_ONE);
+      material.depthWrite = false;
+      material.cull = pc.CULLFACE_NONE;
+      material.update();
+      this.decals.push({ texture, material });
+      return { material, order };
     };
     const radial = (stops: [number, number][]) => (ctx: CanvasRenderingContext2D, n: number) => {
       const g = ctx.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2);
@@ -260,61 +335,77 @@ export class Studio {
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, n, n);
     };
-    const blob = decal(
+    const black = new pc.Color(0, 0, 0);
+    const blobLook = decal(
       'studioBlob',
-      1,
       radial([
         [0, 0.6],
         [0.5, 0.32],
         [1, 0],
       ]),
-      Color3.Black(),
+      black,
       3,
     );
-    blob.thinInstanceSetBuffer('matrix', this.shadows, 16, false);
-    blob.alwaysSelectAsActiveMesh = true;
+    const blob = new Instances(app.graphicsDevice, this.root, square, blobLook.material, { name: 'studioBlob', castShadows: false, receiveShadows: false, capacity: MAX_CHARACTERS, cull: false });
+    drawAfter(blob.meshInstance, blobLook.order);
+    blob.enabled = false;
 
-    const floor = new TransformNode('studioFloor', scene);
+    const floor = new pc.Entity('studioFloor', app);
+    this.root.addChild(floor);
+    const place = (name: string, look: { material: pc.Material; order: number }, size: number) => {
+      const entity = new pc.Entity(name, app);
+      const mi = new pc.MeshInstance(square, look.material);
+      drawAfter(mi, look.order);
+      entity.addComponent('render', { meshInstances: [mi], castShadows: false, receiveShadows: false });
+      entity.setLocalScale(size, 1, size);
+      floor.addChild(entity);
+      return entity;
+    };
     // The platform: a frosted disc, brighter towards its rim, with a thin highlight edge.
-    const disc = decal(
+    const disc = place(
       'studioDisc',
+      decal(
+        'studioDisc',
+        (ctx, n) => {
+          const r = n / 2 - 3;
+          const g = ctx.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, r);
+          g.addColorStop(0, 'rgba(0,0,0,0.42)');
+          g.addColorStop(0.82, 'rgba(0,0,0,0.5)');
+          g.addColorStop(1, 'rgba(0,0,0,0.62)');
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(n / 2, n / 2, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = 'rgba(0,0,0,0.95)';
+          ctx.stroke();
+        },
+        new pc.Color(0.97, 0.96, 0.94),
+        0,
+      ),
       1.5,
-      (ctx, n) => {
-        const r = n / 2 - 3;
-        const g = ctx.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, r);
-        g.addColorStop(0, 'rgba(0,0,0,0.42)');
-        g.addColorStop(0.82, 'rgba(0,0,0,0.5)');
-        g.addColorStop(1, 'rgba(0,0,0,0.62)');
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(n / 2, n / 2, r, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = 'rgba(0,0,0,0.95)';
-        ctx.stroke();
-      },
-      new Color3(0.97, 0.96, 0.94),
-      0,
     );
-    disc.parent = floor;
-    disc.position.y = 0.002;
+    disc.setLocalPosition(0, 0.002, 0);
     // The Sim's shade on the platform, falling away from the key light (behind, to the right).
-    const shade = decal(
+    const shade = place(
       'studioShade',
-      1,
-      radial([
-        [0, 0.24],
-        [0.5, 0.12],
-        [1, 0],
-      ]),
-      Color3.Black(),
+      decal(
+        'studioShade',
+        radial([
+          [0, 0.24],
+          [0.5, 0.12],
+          [1, 0],
+        ]),
+        black,
+        1,
+      ),
       1,
     );
-    shade.parent = floor;
-    shade.scaling.set(0.95, 1, 1.5);
-    shade.rotation.y = -0.65;
-    shade.position.set(-0.22, 0.004, -0.3);
-    floor.setEnabled(false);
+    shade.setLocalScale(0.95, 1, 1.5);
+    // (Babylon's `rotation.y`, in game space: the same matrix under the mirrored root.)
+    shade.setLocalEulerAngles(0, (-0.65 * 180) / Math.PI, 0);
+    shade.setLocalPosition(-0.22, 0.004, -0.3);
+    floor.enabled = false;
     return [blob, floor];
   }
 }
@@ -340,25 +431,30 @@ function simInfo(id: number, look: SimLook): SimInfo & { outfitId: number } {
  * and the stage share it): a warm key from the upper left of the view, a cool fill from the right,
  * two rims from behind, and the game's sky environment for ambient and reflections.
  * (The camera looks down -z, so the view's left is +x.)
+ *
+ * Babylon's lights in the game's units (`lightUnits.ts`), as the dev pages have them
+ * (`debug/pcStage.ts`): directional lights at `SUN_UNITS`, their linear colour and strength as
+ * PlayCanvas takes them (sRGB, the strength in the colour); the hemispheric light as the library's
+ * sky fill (`SKY_UNITS`). Babylon's fill had a faint highlight (specular 0.15 of its colour): here
+ * none (PlayCanvas's lights have no specular colour of their own).
  */
-function lights(scene: Scene): void {
-  const key = new DirectionalLight('studioKey', new Vector3(-0.5, -0.58, -0.64), scene);
-  key.intensity = 2.9;
-  key.diffuse = new Color3(1, 0.95, 0.88);
-  key.specular = new Color3(1, 0.96, 0.9);
-  const fill = new DirectionalLight('studioFill', new Vector3(0.78, -0.2, -0.6), scene);
-  fill.intensity = 0.95;
-  fill.diffuse = new Color3(0.84, 0.9, 1);
-  fill.specular = new Color3(0.15, 0.15, 0.18);
-  const rim = new DirectionalLight('studioRim', new Vector3(0.45, -0.4, 0.8), scene);
-  rim.intensity = 2.8;
-  rim.diffuse = new Color3(1, 0.96, 0.92);
-  const rim2 = new DirectionalLight('studioRim2', new Vector3(-0.6, -0.3, 0.75), scene);
-  rim2.intensity = 1.5;
-  rim2.diffuse = new Color3(0.86, 0.92, 1);
-  const sky = new HemisphericLight('studioSky', new Vector3(0, 1, 0), scene);
-  sky.intensity = 0.35;
-  sky.diffuse = new Color3(0.95, 0.97, 1);
-  sky.groundColor = new Color3(0.45, 0.4, 0.38);
-  sky.specular = Color3.Black();
+function lights(app: pc.AppBase, lib: MaterialLibrary): void {
+  const directional = (name: string, dir: [number, number, number], intensity: number, color: [number, number, number], specular = true) => {
+    const gamma = (c: number) => Math.pow(c * intensity * SUN_UNITS, 1 / 2.2);
+    const entity = new pc.Entity(name, app);
+    entity.addComponent('light', { type: 'directional', castShadows: false, intensity: 1, color: new pc.Color(gamma(color[0]), gamma(color[1]), gamma(color[2])), affectSpecularity: specular });
+    // A directional light shines along its entity's -y: turned from straight down to the light's way (game space to PlayCanvas's).
+    const to = new pc.Vec3(dir[0], dir[1], -dir[2]).normalize();
+    const down = new pc.Vec3(0, -1, 0);
+    const axis = new pc.Vec3().cross(down, to);
+    const angle = (Math.acos(Math.max(-1, Math.min(1, down.dot(to)))) * 180) / Math.PI;
+    entity.setRotation(axis.length() > 1e-6 ? new pc.Quat().setFromAxisAngle(axis.normalize(), angle) : pc.Quat.IDENTITY);
+    app.root.addChild(entity);
+  };
+  directional('studioKey', [-0.5, -0.58, -0.64], 2.9, [1, 0.95, 0.88]);
+  directional('studioFill', [0.78, -0.2, -0.6], 0.95, [0.84, 0.9, 1], false);
+  directional('studioRim', [0.45, -0.4, 0.8], 2.8, [1, 0.96, 0.92]);
+  directional('studioRim2', [-0.6, -0.3, 0.75], 1.5, [0.86, 0.92, 1]);
+  lib.setSkyFill({ r: 0.95, g: 0.97, b: 1 }, { r: 0.45, g: 0.4, b: 0.38 }, 0.35 * SKY_UNITS);
+  lib.setSkyDirection({ x: 0, y: 1, z: 0 });
 }

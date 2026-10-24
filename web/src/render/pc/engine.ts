@@ -7,3 +7,10 @@
  */
 
 export * from 'playcanvas/build/playcanvas/src/index.js';
+
+/**
+ * The page's current app: the default of `new Entity()` (its `app` argument), made the newest
+ * app by PlayCanvas's `AppBase` constructor. A second app on the page (the previews') puts the
+ * game's back (`device.ts` `createSideApp`).
+ */
+export { getApplication, setApplication } from 'playcanvas/build/playcanvas/src/framework/globals.js';

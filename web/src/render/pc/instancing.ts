@@ -95,7 +95,9 @@ export class Instances {
     this.stride = stride;
     this.format = new pc.VertexFormat(device, elements);
     this.cull = options.cull ?? true;
-    this.entity = new pc.Entity(options.name ?? 'instances');
+    // On its parent's app: the page's current one may be another (`device.ts` `createSideApp`).
+    // SAFETY: an entity keeps its app in `_app` (the constructor's `app`; tools/render/check_chunks.ts).
+    this.entity = new pc.Entity(options.name ?? 'instances', (parent as unknown as { _app: pc.AppBase })._app);
     this.meshInstance = new pc.MeshInstance(mesh, material, this.entity);
     this.reserve(Math.max(1, options.capacity ?? 1));
     this.meshInstance.instancingCount = 0;

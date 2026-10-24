@@ -12,7 +12,7 @@ import * as pc from './engine';
 
 /** The world's root: game space, mirrored in z. */
 export function createWorldRoot(app: pc.AppBase): pc.Entity {
-  const root = new pc.Entity('world');
+  const root = new pc.Entity('world', app);
   root.setLocalScale(1, 1, -1);
   app.root.addChild(root);
   return root;

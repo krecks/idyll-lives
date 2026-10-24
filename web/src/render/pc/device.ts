@@ -12,12 +12,13 @@
 import * as pc from './engine';
 import { noteWebGpuFailed, webGpuFailed } from '../shared/gpu';
 
-export async function createDevice(canvas: HTMLCanvasElement, forceWebGL: boolean, antialias = false): Promise<pc.GraphicsDevice> {
+/** `alpha`: a canvas that shows the page through where nothing is drawn (the previews' stages; premultiplied). */
+export async function createDevice(canvas: HTMLCanvasElement, forceWebGL: boolean, antialias = false, alpha = false): Promise<pc.GraphicsDevice> {
   const wantGpu = !forceWebGL && !webGpuFailed() && 'gpu' in navigator && !!(await navigator.gpu.requestAdapter().catch(() => null));
   const device = await pc.createGraphicsDevice(canvas, {
     deviceTypes: wantGpu ? [pc.DEVICETYPE_WEBGPU, pc.DEVICETYPE_WEBGL2] : [pc.DEVICETYPE_WEBGL2],
     antialias,
-    alpha: false,
+    alpha,
     powerPreference: 'high-performance',
   });
   if (wantGpu && !device.isWebGPU) {
@@ -44,4 +45,30 @@ export function createApp(canvas: HTMLCanvasElement, device: pc.GraphicsDevice):
   cancelAnimationFrame(app.frameRequestId);
   app.frameRequestId = null;
   return app;
+}
+
+/**
+ * An app beside the game's on the same page (the previews', `render/preview`). The trap: PlayCanvas
+ * keeps one current app for the page (`getApplication()`, the default `app` of every `new Entity()`),
+ * and the `AppBase` constructor makes the newest app current, its `destroy` none. A second app made
+ * with `createApp` would take the game's entities made after it (their components added through
+ * its systems), and destroying it would leave the game none. So a second app is made here, the
+ * page's current app put back, and destroyed with `destroySideApp`. Its own code passes it
+ * explicitly (`new pc.Entity(name, app)`; `Instances` take their parent's).
+ */
+export function createSideApp(canvas: HTMLCanvasElement, device: pc.GraphicsDevice): pc.AppBase {
+  const current = pc.getApplication() as pc.AppBase | null | undefined;
+  const app = createApp(canvas, device);
+  pc.setApplication(current ?? null);
+  return app;
+}
+
+/** Destroys an app made by `createSideApp` (its device too); the page's current app stays current (the game's, made before or after it). */
+export function destroySideApp(app: pc.AppBase): void {
+  const current = pc.getApplication() as pc.AppBase | null | undefined;
+  // (PlayCanvas leaves a WebGL2 context to the garbage collector: let it go now, as a page may make and drop several.)
+  const gl = app.graphicsDevice.isWebGL2 ? (app.graphicsDevice as pc.WebglGraphicsDevice).gl : null;
+  app.destroy();
+  gl?.getExtension('WEBGL_lose_context')?.loseContext();
+  pc.setApplication(current && current !== app ? current : null);
 }

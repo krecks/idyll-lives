@@ -2,17 +2,18 @@
  * Head-and-shoulders portraits from the studio, cached by look.
  *
  * Requests are collected and drawn in batches: up to `BATCH` Sims stand in a row far off to the
- * side of the stage (rows 1..), held still with a friendly face and eye contact. Once their
- * materials are ready, a few portraits are drawn per frame into render targets, read back after
- * the frame, un-premultiplied and encoded (WebP, PNG where unsupported) into object URLs. The
- * cache outlives the engine, so the game asks for each look once per page.
+ * side of the stage (rows 1..), held still with a friendly face and eye contact. Once they are
+ * ready, a few portraits are drawn per frame, each by a camera of its own into a multisampled
+ * target (in the studio's frame, `Studio.draw`), read back after it, un-premultiplied and encoded
+ * (WebP, PNG where unsupported) into object URLs. The cache outlives the app, so the game asks for
+ * each look once per page.
  */
 
-import { Color4, FreeCamera, RenderTargetTexture, Vector3 } from '../babylon/core';
-import type { StageDirection } from '../babylon/characters';
-import { shadingFromSettings } from '../babylon/softLook';
+import * as pc from '../pc/engine';
+import type { StageDirection } from '../shared/characters/expressions';
+import { shadingFromSettings } from '../pc/shaders/softLook';
 import type { SimLook } from '../types';
-import type { Studio } from './studio';
+import { Studio } from './studio';
 
 /** Portrait size in pixels (displayed at up to ~64 CSS px, so 2-3x for sharp HiDPI avatars). */
 export const PORTRAIT_PX = 160;
@@ -31,8 +32,6 @@ const SETTLE_FRAMES = 3;
 const READY_TIMEOUT = 20_000;
 const CACHE_MAX = 400;
 const FOV = 0.3;
-/** Render-target rows come back bottom-up (both backends). */
-const FLIP_Y = true;
 /** Camera a little to the side (towards the key light) and above the eyes. */
 const ANGLE = 0.28;
 /**
@@ -79,7 +78,7 @@ export function lookKey(look: SimLook): string {
   return JSON.stringify([look.gender, sorted, legacy ? (look.id ?? 0) : null, shadingFromSettings()]);
 }
 
-/** Portrait URLs by look key, least recently used first (survives engine restarts). */
+/** Portrait URLs by look key, least recently used first (survives the app). */
 const cache = new Map<string, string>();
 
 export function cached(key: string): string | null {
@@ -102,9 +101,12 @@ function remember(key: string, url: string): void {
 export class Portraits {
   private readonly queue = new Map<string, Job>();
   private batch: Batch | null = null;
-  private targets: RenderTargetTexture[] = [];
-  private camera: FreeCamera | null = null;
-  private readonly target = new Vector3();
+  /** A camera and its target per portrait drawn in a frame. */
+  private slots: { camera: pc.CameraComponent; target: pc.RenderTarget }[] = [];
+  /** The portraits this frame draws (`collect` reads them back). */
+  private drawing: { job: Job; target: pc.RenderTarget }[] = [];
+  private drawingBatch: Batch | null = null;
+  private readonly target = { x: 0, y: 0, z: 0 };
 
   request(key: string, look: SimLook): Promise<string | null> {
     return new Promise((resolve) => {
@@ -149,75 +151,83 @@ export class Portraits {
     });
   }
 
-  /** After posing: draws ready portraits into render targets (read back after the frame). */
-  render(studio: Studio, now: number): void {
+  /** After posing: turns on a camera for each portrait ready to draw in this frame (`Studio.draw`); whether any is. */
+  prepare(studio: Studio, now: number): boolean {
     const b = this.batch;
-    if (!b || b.pending > 0 || b.next >= b.jobs.length) return;
+    if (!b || b.pending > 0 || b.next >= b.jobs.length) return false;
     // Nothing is drawn before every row stands: `direct` poses them over a few frames.
-    if (b.posed < b.jobs.length) return;
+    if (b.posed < b.jobs.length) return false;
     if (!studio.ready()) {
       if (now - b.started > READY_TIMEOUT) this.finish(studio, true);
-      return;
+      return false;
     }
-    if (++b.frames < SETTLE_FRAMES) return;
-    const scene = studio.scene;
-    const engine = studio.engine;
-    const cam = this.ensureCamera(studio);
-    const prevCam = scene.activeCamera;
-    const drawn: { job: Job; rtt: RenderTargetTexture }[] = [];
+    if (++b.frames < SETTLE_FRAMES) return false;
     // The batch's first draws compile the portrait shaders: one a frame then, not six in one task (~850 ms at boot).
     const limit = b.next === 0 ? FIRST_DRAW : PER_FRAME;
-    while (b.next < b.jobs.length && drawn.length < limit) {
+    while (b.next < b.jobs.length && this.drawing.length < limit) {
       const j = b.next++;
-      const c = b.cams[j];
-      const rtt = this.renderTarget(studio, drawn.length);
+      const slot = this.slot(studio, this.drawing.length);
       const top = studio.characters.heads[(FIRST_ROW + j) * 3 + 1];
-      cam.position.set(c.x, c.y, c.z);
-      this.target.set(ROW_X + j * ROW_SPACING, top - FRAME_DROP * (top / REF_TOP), 0);
-      cam.setTarget(this.target);
-      cam.outputRenderTarget = rtt;
-      scene.activeCamera = cam;
-      try {
-        scene.render();
-      } finally {
-        cam.outputRenderTarget = null;
-        scene.activeCamera = prevCam;
-      }
-      drawn.push({ job: b.jobs[j], rtt });
+      this.target.x = ROW_X + j * ROW_SPACING;
+      this.target.y = top - FRAME_DROP * (top / REF_TOP);
+      Studio.aim(slot.camera, b.cams[j], this.target);
+      slot.camera.entity.enabled = true;
+      this.drawing.push({ job: b.jobs[j], target: slot.target });
     }
-    b.pending = drawn.length;
-    const flipY = FLIP_Y;
-    engine.onEndFrameObservable.addOnce(() => {
-      for (const { job, rtt } of drawn) {
-        void (async () => {
-          let url: string | null = null;
-          let empty = false;
-          try {
-            const pixels = (await rtt.readPixels(0, 0, null, true, false)) as Uint8Array | null;
-            if (pixels && coverage(pixels) > 0.02) url = await encode(pixels, PORTRAIT_PX, PORTRAIT_PX, flipY);
-            else empty = true;
-          } catch (err) {
-            console.warn('[preview] portrait failed', err);
-          }
-          if (empty && ++job.misses < MAX_MISSES && !this.queue.has(job.key)) {
-            // Drawn before its shader variant for render targets was ready: draw it again.
-            this.queue.set(job.key, job);
-          } else {
-            if (url) remember(job.key, url);
-            for (const w of job.waiters) w(url);
-            job.waiters = [];
-          }
-          if (this.batch === b && --b.pending === 0 && b.next >= b.jobs.length) this.finish(studio, false);
-        })();
-      }
-    });
+    this.drawingBatch = b;
+    b.pending = this.drawing.length;
+    return this.drawing.length > 0;
   }
 
+  /**
+   * After the frame: reads back what `prepare` drew, and turns its cameras off. Each read is sent at
+   * once (`immediate`: on WebGPU the copy would otherwise wait in an encoder for the next frame, and
+   * its buffer be mapped before, empty). From the resolved texture itself (a read through the
+   * multisampled target is refused on WebGL2). The rows come back bottom-up on WebGL2
+   * (`readPixels`), top-down on WebGPU.
+   */
+  collect(studio: Studio): void {
+    const drawn = this.drawing;
+    const b = this.drawingBatch;
+    if (!drawn.length || !b) return;
+    this.drawing = [];
+    this.drawingBatch = null;
+    for (const slot of this.slots) slot.camera.entity.enabled = false;
+    const bottomUp = !studio.webgpu;
+    for (const { job, target } of drawn) {
+      void (async () => {
+        let url: string | null = null;
+        let empty = false;
+        try {
+          const pixels = (await target.colorBuffer.read(0, 0, PORTRAIT_PX, PORTRAIT_PX, { immediate: true })) as Uint8Array | null;
+          if (pixels && coverage(pixels) > 0.02) url = await encode(pixels, PORTRAIT_PX, PORTRAIT_PX, bottomUp);
+          else empty = true;
+        } catch (err) {
+          console.warn('[preview] portrait failed', err);
+        }
+        if (empty && ++job.misses < MAX_MISSES && !this.queue.has(job.key)) {
+          // Drawn empty (its shader not ready for the target yet): draw it again.
+          this.queue.set(job.key, job);
+        } else {
+          if (url) remember(job.key, url);
+          for (const w of job.waiters) w(url);
+          job.waiters = [];
+        }
+        if (this.batch === b && --b.pending === 0 && b.next >= b.jobs.length) this.finish(studio, false);
+      })();
+    }
+  }
+
+  /** Lets go of the cameras and targets (the studio goes: its app with them). */
   dispose(): void {
-    for (const t of this.targets) t.dispose();
-    this.targets = [];
-    this.camera?.dispose();
-    this.camera = null;
+    for (const { camera, target } of this.slots) {
+      camera.entity.destroy();
+      target.destroyTextureBuffers();
+      target.destroy();
+    }
+    this.slots = [];
+    this.drawing = [];
+    this.drawingBatch = null;
     this.failAll();
   }
 
@@ -249,30 +259,28 @@ export class Portraits {
     this.batch = null;
   }
 
-  private ensureCamera(studio: Studio): FreeCamera {
-    if (!this.camera) {
-      const cam = new FreeCamera('portraitCamera', new Vector3(0, 1.6, 2), studio.scene, false);
-      cam.fov = FOV;
-      cam.minZ = 0.2;
-      cam.maxZ = 4;
-      cam.inputs.clear();
-      this.camera = cam;
-    }
-    return this.camera;
-  }
-
-  private renderTarget(studio: Studio, i: number): RenderTargetTexture {
-    let rtt = this.targets[i];
-    if (!rtt) {
-      rtt = new RenderTargetTexture(`portrait${i}`, { width: PORTRAIT_PX, height: PORTRAIT_PX }, studio.scene, {
-        generateMipMaps: false,
-        samples: 4,
-        doNotChangeAspectRatio: true,
+  /** Portrait camera `i` of a frame, drawing into its own multisampled target (made on first use). */
+  private slot(studio: Studio, i: number): { camera: pc.CameraComponent; target: pc.RenderTarget } {
+    let slot = this.slots[i];
+    if (!slot) {
+      const texture = new pc.Texture(studio.device, {
+        name: `portrait${i}`,
+        width: PORTRAIT_PX,
+        height: PORTRAIT_PX,
+        format: pc.PIXELFORMAT_RGBA8,
+        mipmaps: false,
+        minFilter: pc.FILTER_LINEAR,
+        magFilter: pc.FILTER_LINEAR,
+        addressU: pc.ADDRESS_CLAMP_TO_EDGE,
+        addressV: pc.ADDRESS_CLAMP_TO_EDGE,
       });
-      rtt.clearColor = new Color4(0, 0, 0, 0);
-      this.targets[i] = rtt;
+      const target = new pc.RenderTarget({ name: `portrait${i}`, colorBuffer: texture, depth: true, samples: 4 });
+      // (Before the stage's camera, which draws onto the canvas.)
+      const camera = studio.camera(`portraitCamera${i}`, FOV, 0.2, 4, -PER_FRAME + i);
+      camera.renderTarget = target;
+      this.slots[i] = slot = { camera, target };
     }
-    return rtt;
+    return slot;
   }
 }
 

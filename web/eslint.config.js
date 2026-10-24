@@ -35,7 +35,26 @@ export default ts.config(
     },
   },
   {
-    files: ['src/render/shared/**/*.ts', 'src/render/pc/**/*.ts', 'src/debug/gallery.ts', 'src/debug/clips.ts', 'src/debug/characters.ts', 'src/debug/poses.ts', 'src/debug/pcStage.ts'],
+    files: [
+      'src/render/shared/**/*.ts',
+      'src/render/pc/**/*.ts',
+      'src/debug/gallery.ts',
+      'src/debug/clips.ts',
+      'src/debug/characters.ts',
+      'src/debug/poses.ts',
+      'src/debug/pcStage.ts',
+      // The preview app's residents (the household creator's stage, portraits, reactions) and their dev page.
+      'src/render/preview/index.ts',
+      'src/render/preview/studio.ts',
+      'src/render/preview/portraits.ts',
+      'src/render/preview/stage.ts',
+      'src/render/preview/reactions.ts',
+      'src/debug/previews.ts',
+      // The catalog's item pictures and the colour studio's stage.
+      'src/render/preview/items.ts',
+      'src/render/preview/itemStage.ts',
+      'src/render/preview/itemScene.ts',
+    ],
     rules: {
       'no-restricted-imports': [
         'error',

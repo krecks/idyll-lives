@@ -28,7 +28,7 @@
 
 import * as pc from './engine';
 import { NIGHT_TINT, nightAmount } from './nightGrade';
-import { composeChunks, FXAA, PAGE_TONE_MAPPING } from './shaders/post';
+import { composeChunks, FXAA, PAGE_TONE_MAPPING, pageToneMapping } from './shaders/post';
 import { curveUniforms, NEUTRAL_CURVES, vignetteUniforms, type ColorCurveSettings, type VignetteSettings } from '../shared/imageProcessing';
 
 export interface PostOptions {
@@ -323,12 +323,15 @@ export class PostProcessing {
  * The dev pages' look (`debug/pcStage.ts`): Babylon's pages did the image processing in each
  * material (exposure and ACES; the clear colour and the diag views' colour as they are, the
  * canvas multisampled), so here it is the camera's tone mapping, made Babylon's on the page's
- * device (`PAGE_TONE_MAPPING`). Before the first material compiles.
+ * device (`PAGE_TONE_MAPPING`; with `contrast`, Babylon's contrast after it, as the previews'
+ * scenes set it). Before the first material compiles.
  */
-export function pageLook(app: pc.AppBase, camera: pc.CameraComponent, exposure: number): void {
+export function pageLook(app: pc.AppBase, camera: pc.CameraComponent, exposure: number, contrast = 1): void {
   const device = app.graphicsDevice;
-  pc.ShaderChunks.get(device, pc.SHADERLANGUAGE_GLSL).set('tonemappingAces2PS', PAGE_TONE_MAPPING.glsl);
-  pc.ShaderChunks.get(device, pc.SHADERLANGUAGE_WGSL).set('tonemappingAces2PS', PAGE_TONE_MAPPING.wgsl);
+  // (With Babylon's contrast after it: the previews' scenes, `pageToneMapping`.)
+  const chunk = contrast === 1 ? PAGE_TONE_MAPPING : pageToneMapping(contrast);
+  pc.ShaderChunks.get(device, pc.SHADERLANGUAGE_GLSL).set('tonemappingAces2PS', chunk.glsl);
+  pc.ShaderChunks.get(device, pc.SHADERLANGUAGE_WGSL).set('tonemappingAces2PS', chunk.wgsl);
   camera.toneMapping = pc.TONEMAP_ACES2;
   camera.gammaCorrection = pc.GAMMA_SRGB;
   app.scene.exposure = exposure;
