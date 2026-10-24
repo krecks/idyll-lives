@@ -1056,10 +1056,9 @@ export class LotContents {
     return all.length ? Float32Array.from(all) : null;
   }
 
-  /** The object `id`'s box as drawn (picking: stage 8). */
-  objectBox(id: number): { height: number; bottom: number } | null {
-    const p = this.placed.find((p) => p.id === id);
-    return p ? { height: p.height, bottom: p.bottom } : null;
+  /** Whether the thing on a wall `id` is hidden with its wall now (`cutWallItems`: not picked then). */
+  wallItemHidden(id: number): boolean {
+    return this.wallItemsHidden.has(id);
   }
 
   dispose(): void {
@@ -1074,6 +1073,11 @@ export class LotContents {
     this.items.dispose();
     this.sky.destroy();
     this.objectShadows?.destroy();
+  }
+
+  /** Writes an object's copy anew (`write`): build mode's hand hides one and shows it again (stage 8, `placing.ts`). */
+  rewrite(target: PopTarget, matrix: ArrayLike<number>): void {
+    this.write(target, matrix);
   }
 
   /** Writes an object's copy anew (`writeInstance`), and on Low its body in the merged shadow caster. */

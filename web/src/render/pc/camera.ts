@@ -5,7 +5,7 @@
  */
 
 import * as pc from './engine';
-import { toEngine } from './space';
+import { toEngine, toGame } from './space';
 
 export interface Lens {
   /** Vertical field of view (radians), near and far planes (m). */
@@ -21,6 +21,7 @@ export class GameCamera {
   private readonly view = new pc.Mat4();
   private readonly viewProj = new pc.Mat4();
   private readonly clip = new pc.Vec4();
+  private readonly rayPoint = new pc.Vec3();
 
   constructor(parent: pc.Entity, lens: Lens, name = 'camera') {
     this.entity = new pc.Entity(name);
@@ -87,6 +88,34 @@ export class GameCamera {
     out.y = p.y;
     out.z = -p.z;
     return out;
+  }
+
+  /** The way the camera looks, in game space (unit length). */
+  forwardInGame(out: { x: number; y: number; z: number }): { x: number; y: number; z: number } {
+    const m = this.entity.getWorldTransform().data;
+    return toGame(this.rayPoint.set(-m[8], -m[9], -m[10]), out);
+  }
+
+  /**
+   * The ray through canvas point (`sx`, `sy`) of a canvas `width` × `height` CSS pixels, in game
+   * space: from where it crosses the near plane, `dir` of unit length (as Babylon's
+   * `createPickingRay`). No allocations.
+   */
+  ray(sx: number, sy: number, width: number, height: number, origin: { x: number; y: number; z: number }, dir: { x: number; y: number; z: number }): void {
+    // (The projection as of the last frame drawn, as `project`'s; the pose as it stands now.)
+    const p = this.camera.camera.projectionMatrix.data;
+    const m = this.entity.getWorldTransform().data;
+    // The view-space way through the point at a depth of 1 (the camera looks down its -z).
+    const vx = ((2 * sx) / width - 1 + p[8]) / p[0];
+    const vy = (1 - (2 * sy) / height + p[9]) / p[5];
+    const wx = m[0] * vx + m[4] * vy - m[8];
+    const wy = m[1] * vx + m[5] * vy - m[9];
+    const wz = m[2] * vx + m[6] * vy - m[10];
+    const near = this.camera.nearClip;
+    const len = Math.hypot(wx, wy, wz) || 1;
+    // (Back to game space, `space.ts`.)
+    toGame(this.rayPoint.set(m[12] + wx * near, m[13] + wy * near, m[14] + wz * near), origin);
+    toGame(this.rayPoint.set(wx / len, wy / len, wz / len), dir);
   }
 
   /**

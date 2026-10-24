@@ -103,7 +103,11 @@ export function quatAxisAngle(ax: number, ay: number, az: number, angle: number,
 
 /** Babylon's `Matrix.ComposeToRef(scale, rotation, translation)`: scaled, then turned, then moved. */
 export function compose(sx: number, sy: number, sz: number, q: Readonly<Quat>, tx: number, ty: number, tz: number, out: Mat4): Mat4 {
-  const [x, y, z, w] = q;
+  // (Read by index: a destructuring allocates an iterator until the function is optimised.)
+  const x = q[0];
+  const y = q[1];
+  const z = q[2];
+  const w = q[3];
   const x2 = x + x;
   const y2 = y + y;
   const z2 = z + z;

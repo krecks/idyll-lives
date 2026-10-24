@@ -135,6 +135,11 @@ const NEEDED: { file: string; text: string; who: string }[] = [
   { file: 'platform/graphics/webgl/webgl-graphics-device.js', text: 'activeTexture(textureUnit) {', who: 'poseTexture.ts: the unit it binds on' },
   { file: 'platform/graphics/webgl/webgl-graphics-device.js', text: 'setUnpackAlignment(alignment) {', who: 'poseTexture.ts: unpack state through the device\'s cache' },
   { file: 'platform/graphics/texture.js', text: 'this._needsUpload = true;', who: 'poseTexture.ts: a texture not yet on the GPU is sent whole by its first draw' },
+  // render/pc/layers.ts overLayer (stage 8, the thing in hand): the depth cleared as the layer starts.
+  { file: 'scene/renderer/render-pass-forward.js', text: 'scene.fire(EVENT_PRERENDER_LAYER, cameraComponent, layer, transparent);', who: 'layers.ts overLayer: its depth clear, inside the pass, just before the layer draws' },
+  { file: 'extras/render-passes/frame-pass-camera-frame.js', text: 'clearRenderTarget = false;', who: 'layers.ts overLayer: under CameraFrame only the first layer clears (the reason for its own clear)' },
+  { file: 'platform/graphics/webgpu/webgpu-graphics-device.js', text: 'this.clearRenderer.clear(this, this.renderTarget, options, this.defaultClearOptions);', who: 'layers.ts overLayer: the WebGPU device\'s clear (a quad in the pass)' },
+  { file: 'platform/graphics/webgl/webgl-graphics-device.js', text: 'clear(options) {', who: 'layers.ts overLayer: the WebGL device\'s clear' },
 ];
 
 let failed = 0;

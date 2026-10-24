@@ -5,8 +5,8 @@
  * kept as the reference until the port is done; see the plan in docs). What this one does so far:
  * the device (WebGPU, else WebGL2), frames paced in whole display refreshes, the game camera (the
  * player's orbit input, the director's shots) and the menus' overview camera, the time of day's
- * sun, sky fill, environment lighting and fog, picking the ground, projecting points onto the
- * screen, and the stats. The viewed lot: its house on every storey (`house.ts`: walls, floors,
+ * sun, sky fill, environment lighting and fog, picking (`picking.ts`: the ground, objects and items,
+ * analytic as Babylon's), projecting points onto the screen, and the stats. The viewed lot: its house on every storey (`house.ts`: walls, floors,
  * roofs, doors and windows, the cutaway and the wall modes, the storey in view, a basement with the
  * ground dug away over it, rooms without windows kept out of daylight, doors and gates swinging for
  * residents going through), its fences (`fences.ts`), roads and paths, and the street round it
@@ -20,11 +20,13 @@
  */
 
 import * as pc from './engine';
+import { BuildPreviews, mergeSurfaces } from './buildPreviews'; // (Stage 8C.)
 import { GameCamera } from './camera';
 import { Characters, MAX_CHARACTERS } from './characters';
 import { createApp, createDevice } from './device';
 import { buildFences, swingGate, type Fences, type GateLeaf } from './fences';
 import { gardenPool, GardenPools } from './gardenPools';
+import { HoverTile, ResizeHandles } from './handles';
 import { HouseBuilder, type HouseDoor } from './house';
 import { Instances } from './instancing';
 import { Lamps } from './lamps';
@@ -34,6 +36,8 @@ import { MaterialLibrary, SUN_LIGHT_MASK } from './materials';
 import { drawMesh, meshFrom } from './meshes';
 import { buildModel, onModelFileArrived, type ModelTemplate } from './models';
 import { natureDecor, windStill } from './nature';
+import { Placing } from './placing'; // (Stage 8B.)
+import { Picker } from './picking';
 import { gameLook, gamePostOptions, PostProcessing } from './post';
 import { diagViewActive } from './shaders/diagView';
 import { shadingFromSettings, softLookFromURL } from './shaders/softLook';
@@ -43,6 +47,7 @@ import { Street } from './street';
 import { SelectionMarker } from './selectionMarker';
 import { SunShadows } from './sunShadows';
 import { TemplateCache } from './templateCache';
+import { Thumbnails } from './thumbnail'; // (Stage 8D.)
 import { benchDiag } from '../../debug/benchFlags';
 import { LOOK } from '../look';
 import type { RenderQuality } from '../quality';
@@ -51,9 +56,10 @@ import { DOOR_SWING, ease, goingThrough } from '../shared/doors';
 import { createLighting, lightingAt, type RGB } from '../shared/environment';
 import { GAME_RATE } from '../shared/gameSpeed';
 import { Geo } from '../shared/geometry';
-import { houseObjectKey, placeLights, WALL_HEIGHT, WALL_STUB, type RoomLight, type RoomTiles } from '../shared/house';
+import { houseObjectKey, placeLights, WALL_HEIGHT, WALL_STUB, type HouseSurfaces, type RoomLight, type RoomTiles } from '../shared/house';
 import { compose, quatYawPitchRoll, toLinear, type Quat } from '../shared/math';
 import { OrbitControls } from '../shared/orbit';
+import { ModelRefresh } from '../shared/modelRefresh'; // (Stage 8B.)
 import { OverviewCamera } from '../shared/overviewCamera';
 import { FramePacer } from '../shared/pacing';
 import { standInOf } from '../shared/modelEntry';
@@ -254,6 +260,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private storey = 0;
   /** Build mode's helpers (stage 8) work in lot rows: this lifts them to the storey in view. */
   private storeyLayer!: pc.Entity;
+  /** (Stage 8C: Build mode's previews and overlays on it, the tile grid, `buildPreviews.ts`.) */
+  private previews!: BuildPreviews;
   /** The viewed lot's house, the street's houses (`house.ts`), and the street (`street.ts`). */
   private house!: HouseBuilder;
   private street!: Street;
@@ -261,6 +269,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private lot!: LotContents;
   /** The viewed house's interior lights (Stage 6C, `lamps.ts`). */
   private lamps!: Lamps;
+  /** (Stage 8B: buy mode's thing in hand, the object picked up, the effects, `placing.ts`; the rebuilds files that came set off, gathered, `shared/modelRefresh.ts`.) */
+  private placing!: Placing;
+  private readonly modelRefresh = new ModelRefresh((urls) => this.refreshStreet(urls));
   /**
    * The lot layer (roads and paths, the house on every storey, the basement's pit, the fences):
    * built again only when what it is made of changes (`lotKeyOf`), so buying, selling and moving
@@ -338,10 +349,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private unwatchPixelRatio: (() => void) | null = null;
   private renderScaleNow = 1;
 
-  /** The last pick's ray in game space (`pickPlane` & co.). */
-  private readonly rayFrom = { x: 0, y: 0, z: 0 };
-  private readonly rayDir = { x: 0, y: -1, z: 0 };
-  private rayValid = false;
+  /** Picking (`picking.ts`: the last pick's ray, for `pickPlane` & co.), the resize arrows and the hover tile (`handles.ts`). */
+  private picker!: Picker;
+  private handles!: ResizeHandles;
+  private hoverTile!: HoverTile;
+  private readonly eyeTmp = { x: 0, y: 0, z: 0 };
   private readonly vTmp = new pc.Vec3();
   private readonly vTmp2 = new pc.Vec3();
   private readonly qTmp = new pc.Quat();
@@ -451,10 +463,24 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.decorTemplates = new TemplateCache(this.app);
     this.storeyLayer = new pc.Entity('storeyLayer');
     this.root.addChild(this.storeyLayer);
+    // Picking, the resize arrows (in render space) and the hover tile (in lot rows, on the storey layer).
+    this.picker = new Picker(this.camera, this.lot, { storey: () => this.storey, storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), size: this.cssSize });
+    this.handles = new ResizeHandles(this.device, this.root);
+    this.hoverTile = new HoverTile(this.device, this.storeyLayer);
+    // (Stage 8C: the wall tools' previews, the Paint and Floor tools', the room overlay and the grid.)
+    this.previews = new BuildPreviews(this.app, this.storeyLayer, this.house, { content: this.deps.content, world: () => this.lastWorld, view: () => this.view, storey: () => this.storey, rowOf: (k) => this.rowOf(k), wallMode: () => this.wallMode });
     if (!this.diag.has('nolamps')) this.gardenPools = new GardenPools(this.app, this.root);
     // (Stage 6C: the interior lights, `lamps.ts`.)
     this.lamps = new Lamps(this.app, this.quality, { storey: () => this.storey, storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), town: () => this.townMode }, { house: this.house, lot: this.lot, pools: () => this.applyGardenPools() });
-    this.unlistenFiles = onModelFileArrived(this.app, (url) => this.refreshStreet(url));
+    // (Stage 8B: placing things, `placing.ts`; after the lamps, whose lights light the thing in hand.)
+    this.placing = new Placing(this.app, this.root, this.storeyLayer, this.camera.camera, this.deps, this.lot, { storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), town: () => this.townMode, shadowsMoved: () => this.sunShadows.moved() });
+    // A file that failed has come: the thing in hand and the landscape's plants are built with it now, the rest
+    // once the files settle (Stage 8B: `shared/modelRefresh.ts`, held while the town streams: `holdModelRefresh`).
+    this.unlistenFiles = onModelFileArrived(this.app, (url) => {
+      this.placing.fileArrived(url);
+      this.lot.refreshNature(url, () => this.disposed); // (Stage 5, lotContents.ts: the landscape's plants built again in place.)
+      this.modelRefresh.fileArrived(url);
+    });
     this.applyWallMode();
 
     const o = this.orbit;
@@ -540,6 +566,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       if (!this.townMode) this.updateCutaway();
       // (The marker faces the camera as it is now, after this frame's input.)
       this.placeMarker();
+      this.handles.frame(this.camera.eyeInGame(this.eyeTmp));
       if (this.townMode) this.townListener?.();
       else this.onView?.();
       this.app.update(dt / 1000);
@@ -757,6 +784,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   private async buildWorld(world: WorldStructure, view: ViewRect | null): Promise<void> {
     const started = performance.now();
+    this.placing.worldBuilding(); // (Stage 8B: the hand and the pops let go of the buffers this build replaces.)
     this.view = view;
     const { width, depth } = world;
     const [cx, cz] = [view ? view.x + view.w / 2 : width / 2, view ? view.z + view.d / 2 : depth / 2];
@@ -793,6 +821,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     await this.pace();
     await this.street.build(world, this.view, () => this.pace());
     await this.lot.buildObjects(world); // (Stage 5: the objects, their clips, contact shadows, items.)
+    this.placing.objectsBuilt(); // (Stage 8B: the thing in hand hidden in them.)
     await this.buildSims(world);
     this.applyWallMode();
     this.applyStoreys();
@@ -911,6 +940,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     let topped = false;
     let ground: { shrubs: [number, number, number, number][]; trees: [number, number, number, number][] } | null = null;
     const lotRooms = new Map<number, { n: number; sx: number; sz: number }>();
+    const surfaces: HouseSurfaces[] = []; // (Stage 8C: where the Paint and Floor tools lay their previews.)
     for (const k of order) {
       if (k > 0 && topped) continue;
       const shift = this.rowOf(k);
@@ -937,6 +967,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.roofs.push(...built.roofs.map((m) => m.entity));
       for (const [r, t] of built.rooms) lotRooms.set(r, t);
       for (const leaf of built.doors) this.doors.push({ leaf, open: -1 });
+      surfaces.push(built.surfaces); // (Stage 8C.)
       ground ??= { shrubs: built.shrubs, trees: built.trees };
     }
     // Stairs down: from the ground, a shaft round each flight (the rest of the basement stays hidden).
@@ -950,6 +981,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (!ground) {
       this.doors = [];
       this.lotRooms = null;
+      this.previews.setSurfaces(null); // (Stage 8C.)
       // Unknown wall layout: the simulation's plain meshes.
       const add = (name: string, data: WorldStructure['meshes']['walls'], material: pc.StandardMaterial) => {
         const mesh = meshFrom(this.device, data);
@@ -971,6 +1003,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       void this.placeDecor(key, items);
     }
     this.lotRooms = lotRooms;
+    this.previews.setSurfaces(mergeSurfaces(surfaces)); // (Stage 8C.)
   }
 
   /** Garden dressing as instances of a cached template (`deco:` keys): a draw per mesh, kept (hidden) for the next lot. */
@@ -1092,14 +1125,17 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.gardenPools?.update(this.glowLevel, this.poolLampOn, this.lampColor);
   }
 
-  /** A model file that failed has come: the street draws again what it drew without it (once no build runs). */
-  private refreshStreet(url: string): void {
-    for (const [, p] of this.decor) if (p.template.failed?.includes(url)) this.lotKey = '';
-    this.decorTemplates.invalidate(url);
-    // (Stage 5, lotContents.ts: the landscape's plants built again in place, the objects drawn without it with the world.)
-    this.lot.refreshNature(url, () => this.disposed);
-    const objects = this.lot.invalidate(url);
-    if (!this.street.invalidate(url) && this.lotKey !== '' && !objects) return;
+  /** Model files that failed have come (gathered, Stage 8B: `modelRefresh`): the world draws again what it drew without them (once no build runs). */
+  private refreshStreet(urls: readonly string[]): void {
+    let drawn = false;
+    for (const url of urls) {
+      for (const [, p] of this.decor) if (p.template.failed?.includes(url)) this.lotKey = '';
+      this.decorTemplates.invalidate(url);
+      // (Stage 5, lotContents.ts: the objects drawn without it with the world.)
+      const objects = this.lot.invalidate(url);
+      if (this.street.invalidate(url) || objects) drawn = true;
+    }
+    if (!drawn && this.lotKey !== '') return;
     void (async () => {
       while (this.worldBuilds) await this.worldBuilds.catch(() => {});
       if (this.disposed || !this.lastWorld || this.townMode) return;
@@ -1129,7 +1165,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.selectedSim = null;
     this.lastFrame = null;
     this.marker.place(null, 0, this.camera.entity, 0, true);
+    this.hoverTile.set(null);
+    this.previews.clear(); // (Stage 8C.)
     this.framedView = '';
+    this.placing.clear(); // (Stage 8B.)
     this.lot.clear(); // (Stage 5.)
     this.clearLot();
     this.lotParts = null;
@@ -1216,7 +1255,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     }
     if (bits === this.cutLook) return;
     this.cutLook = bits;
-    this.lot.cutWallItems(bits, this.wallMode === 'down'); // (Stage 5: things on the walls go with them.)
+    this.placing.cutWallItems(bits, this.wallMode === 'down'); // (Stage 5: things on the walls go with them; Stage 8B: but the one in hand, and none while something for a wall is.)
     this.lib.wallCut.look.set(bits & 1 ? 1 : 0, bits & 2 ? 1 : 0, bits & 4 ? 1 : 0, bits & 8 ? 1 : 0);
   }
 
@@ -1390,6 +1429,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.swingDoors(GAME_RATE[curr[h.speed] | 0] ?? 1);
     this.steerCamera(this.frameDt / 1000);
     this.lot.update(frame); // (Stage 5: the objects' clips, the screens.)
+    this.placing.frame(this.frameDt); // (Stage 8B: the effects, the thing in hand.)
     this.updateSims(frame);
     if (this.roofs.length && this.roofVisible() !== this.roofShown) {
       this.roofShown = !this.roofShown;
@@ -1407,7 +1447,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const count = (this.simCount = Math.min(curr[layout.header.simCount], MAX_CHARACTERS));
     const shadows = this.simShadowMatrices;
     this.characters.update(frame, this.simInView, shadows, this.storey);
-    this.lot.pullChairs(this.characters.pulled);
+    this.lot.pullChairs(this.characters.pulled, this.placing.held); // (Stage 8B: not the one in hand.)
     if (this.characters.posed && this.quality.characterShadows) this.sunShadows.moved(false);
     const blobs = this.simShadow;
     blobs.setCount(count);
@@ -1438,7 +1478,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lamps.setLampsOff(off); // (Stage 6C: their light and fades, `lamps.ts`.)
     this.applyGardenPools();
   }
-  holdModelRefresh(_on: boolean): void {}
+  holdModelRefresh(on: boolean): void {
+    this.modelRefresh.hold(on); // (Stage 8B.)
+  }
 
   // --- light ---------------------------------------------------------------------------
 
@@ -1486,6 +1528,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // Glowing windows outside at night, cool daylight in the panes by day; the street's lamps; the garden's pools.
     this.lampsLevel = l.lamps;
     this.lot.applyLighting(l); // (Stage 5: the sky, the night clips, the shades' glow.)
+    this.placing?.light(l); // (Stage 8B: the red ghost's light, as Babylon's lights had it.)
     this.lamps.applyLighting(l); // (Stage 6C: the interior lights and the glows, `lamps.ts`.)
     const glow = Math.min(1, Math.max(0, (l.lamps - 0.35) / 0.5));
     const g = this.glowColor;
@@ -1517,6 +1560,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.townMode = true;
     this.applyDig(); // (Stage 6C: no basement or windowless rooms kept dark in the town, as Babylon's enterTown.)
     this.sunShadows.setOverview(true);
+    this.hoverTile.set(null);
     this.townMinuteGoal = minute;
     this.lastLightMinute = -1;
     this.applyPacing();
@@ -1589,57 +1633,42 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   // --- picking -------------------------------------------------------------------------
 
   pick(x: number, y: number): PickResult {
-    this.setRay(x, y);
-    const ground = this.planeHit(0);
-    return { ground, objectId: null, itemId: null };
+    return this.picker.pick(x, y);
   }
 
   pickPlane(height: number): { x: number; z: number } | null {
-    return this.rayValid ? this.planeHit(height) : null;
+    return this.picker.pickPlane(height);
   }
 
-  pickVertical(_x: number, _z: number): number | null {
-    return null;
+  pickVertical(x: number, z: number): number | null {
+    return this.picker.pickVertical(x, z);
   }
 
-  pickOnWall(_axis: 'h' | 'v', _line: number, _storeyRow: number): { along: number; y: number } | null {
-    return null;
-  }
-
-  handleAt(_x: number, _y: number): string | null {
-    return null;
+  pickOnWall(axis: 'h' | 'v', line: number, storeyRow: number): { along: number; y: number } | null {
+    return this.picker.pickOnWall(axis, line, storeyRow);
   }
 
   objectBox(id: number): { height: number; bottom: number } | null {
-    return this.lot.objectBox(id); // (Stage 5.)
+    return this.picker.objectBox(id);
   }
 
-  /** The camera's ray through canvas point (`x`, `y`) (CSS pixels), in game space. */
-  private setRay(x: number, y: number): void {
-    const cam = this.camera.camera;
-    const eye = this.camera.entity.getPosition();
-    const far = cam.screenToWorld(x, y, cam.farClip, this.vTmp);
-    const dx = far.x - eye.x;
-    const dy = far.y - eye.y;
-    const dz = far.z - eye.z;
-    const len = Math.hypot(dx, dy, dz) || 1;
-    this.rayFrom.x = eye.x;
-    this.rayFrom.y = eye.y;
-    this.rayFrom.z = -eye.z;
-    this.rayDir.x = dx / len;
-    this.rayDir.y = dy / len;
-    this.rayDir.z = -dz / len;
-    this.rayValid = true;
+  setResizeHandles(handles: readonly ResizeHandle[] | null, hot: string | null = null): void {
+    // In render space: an upper storey's rows lie over the ground's, a storey's height up.
+    this.handles.set(
+      handles,
+      (h, out) => {
+        const k = this.storeyOf(h.z);
+        out.set(h.x, k * WALL_HEIGHT + h.y, h.z - this.rowOf(k));
+      },
+      hot,
+    );
   }
 
-  /** Where the last ray meets the level `height` (game space x, z), or null. */
-  private planeHit(height: number): { x: number; z: number } | null {
-    const d = this.rayDir;
-    if (Math.abs(d.y) < 1e-6) return null;
-    const t = (height - this.rayFrom.y) / d.y;
-    if (t <= 0) return null;
-    return { x: this.rayFrom.x + d.x * t, z: this.rayFrom.z + d.z * t };
+  handleAt(x: number, y: number): string | null {
+    return this.handles.at(x, y, this.projectPoint);
   }
+
+  private readonly projectPoint = (x: number, y: number, z: number, out: { x: number; y: number }) => this.project(x, y, z, out);
 
   // --- settings, stats, the benchmark --------------------------------------------------
 
@@ -1658,6 +1687,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.orbit.wheelDeltaPercentage = 0.012 * s;
     this.lot.setReducedMotion(!!options.reducedMotion); // (Stage 5: the wind, the clouds.)
     this.characters.reducedMotion = !!options.reducedMotion;
+    this.placing.reducedMotion = !!options.reducedMotion; // (Stage 8B.)
     this.applyPacing();
     this.applyResolution();
   }
@@ -1727,8 +1757,13 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     return n;
   }
 
-  captureThumbnail(_width: number, _height: number): Promise<string | null> {
-    return Promise.resolve(null);
+  // (Stage 8D: the save's picture, `thumbnail.ts`; made at the first, gone with the app.)
+  private thumbnails: Thumbnails | null = null;
+
+  captureThumbnail(width: number, height: number): Promise<string | null> {
+    if (this.disposed || !this.app) return Promise.resolve(null);
+    this.thumbnails ??= new Thumbnails(this.app, this.camera.camera, this.post, { wantFrame: () => void this.framesRendered(1), shadowsMoved: () => this.sunShadows.moved() });
+    return this.thumbnails.capture(width, height);
   }
 
   // --- residents, birds, voices (stage 7) ----------------------------------------------
@@ -1753,7 +1788,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   // --- build and buy (stage 8) ---------------------------------------------------------
 
-  setHoverTile(_tile: { x: number; z: number } | null): void {}
+  setHoverTile(tile: { x: number; z: number } | null): void {
+    this.hoverTile.set(tile);
+  }
+
   setWallMode(mode: WallMode): void {
     this.wallMode = mode;
     this.applyWallMode();
@@ -1770,15 +1808,39 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // Furniture and residents above it hide; the lot (every storey) is kept.
     if (this.lastWorld && !this.worldBuilding) void this.setWorld(this.lastWorld, this.view);
   }
-  setPlacementGhost(_ghost: PlacementGhost | null): void {}
-  setResizeHandles(_handles: readonly ResizeHandle[] | null, _hot?: string | null): void {}
-  setHeldObject(_id: number | null, _moved?: boolean): void {}
-  setEdgePreview(_edges: readonly EdgePreview[], _valid: boolean): void {}
-  setPaintPreview(_faces: readonly PaintPreviewFace[], _cover: number | null): void {}
-  setFloorPreview(_tiles: readonly { x: number; z: number }[], _floor: number | null): void {}
-  setRoomOverlay(_tiles: readonly RoomOverlayTile[]): void {}
-  setBuildGrid(_rect: ViewRect | null): void {}
-  buildEffect(_fx: BuildEffect): void {}
+  // (Stage 8B: placing things, `placing.ts`.)
+  setPlacementGhost(ghost: PlacementGhost | null): void {
+    this.placing.setPlacementGhost(ghost);
+  }
+
+  setHeldObject(id: number | null, moved = false): void {
+    this.placing.setHeldObject(id, moved);
+  }
+
+  // (Stage 8C: Build mode's previews and overlays, `buildPreviews.ts`.)
+  setEdgePreview(edges: readonly EdgePreview[], valid: boolean): void {
+    this.previews.setEdgePreview(edges, valid);
+  }
+
+  setPaintPreview(faces: readonly PaintPreviewFace[], cover: number | null): void {
+    this.previews.setPaintPreview(faces, cover);
+  }
+
+  setFloorPreview(tiles: readonly { x: number; z: number }[], floor: number | null): void {
+    this.previews.setFloorPreview(tiles, floor);
+  }
+
+  setRoomOverlay(tiles: readonly RoomOverlayTile[]): void {
+    this.previews.setRoomOverlay(tiles);
+  }
+
+  setBuildGrid(rect: ViewRect | null): void {
+    this.previews.setBuildGrid(rect);
+  }
+
+  buildEffect(fx: BuildEffect): void {
+    this.placing.buildEffect(fx); // (Stage 8B.)
+  }
 
   // --- dev tools (`RendererDebugHooks`) ------------------------------------------------
 
@@ -1801,6 +1863,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.characters?.dispose();
     this.simShadow?.destroy();
     this.marker?.destroy();
+    this.handles?.destroy();
+    this.hoverTile?.destroy();
+    this.previews?.destroy(); // (Stage 8C.)
+    this.placing?.dispose(); // (Stage 8B.)
+    this.modelRefresh.dispose();
     this.lot?.dispose(); // (Stage 5.)
     this.setActive(false);
     this.onFailure = null;

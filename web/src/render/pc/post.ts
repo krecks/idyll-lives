@@ -77,7 +77,7 @@ export const PLAIN_LOOK: PostLook = { contrast: 1, vignette: { weight: 0, stretc
 
 const SCENE_FORMATS = [pc.PIXELFORMAT_RGBA16F, pc.PIXELFORMAT_RGBA32F];
 
-/** Babylon's FXAA pass: `source` onto the canvas. */
+/** Babylon's FXAA pass: `source` onto the canvas (or `target`). */
 class FxaaPass extends pc.RenderPassShaderQuad {
   private readonly sourceId: pc.ScopeId;
   private readonly texelId: pc.ScopeId;
@@ -87,11 +87,12 @@ class FxaaPass extends pc.RenderPassShaderQuad {
     device: pc.GraphicsDevice,
     private readonly source: pc.Texture,
     night: boolean,
+    target: pc.RenderTarget | null = null,
   ) {
     super(device);
     const defines = new Map<string, string>();
     if (night) defines.set('GAME_NIGHT', '');
-    if (device.backBuffer?.isColorBufferSrgb(0)) defines.set('GAME_SRGB_TARGET', '');
+    if ((target ?? device.backBuffer)?.isColorBufferSrgb(0)) defines.set('GAME_SRGB_TARGET', '');
     if (/mali/i.test(driverInfo(device))) defines.set('MALI', '');
     this.shader = pc.ShaderUtils.createShader(device, {
       uniqueName: `GameFxaa-${[...defines.keys()].join('-')}`,
@@ -119,6 +120,29 @@ function driverInfo(device: pc.GraphicsDevice): string {
   const d = device as unknown as { unmaskedRenderer?: string; gpuAdapter?: { info?: { vendor?: string; architecture?: string; description?: string } } };
   const info = d.gpuAdapter?.info;
   return [d.unmaskedRenderer, info?.vendor, info?.architecture, info?.description].filter(Boolean).join(' ');
+}
+
+/** Babylon's half-float FXAA input, `width` × `height`: the compose draws into it, the FXAA pass from it. */
+function fxaaSource(device: pc.GraphicsDevice, width: number, height: number): pc.RenderTarget {
+  const texture = new pc.Texture(device, {
+    name: 'gameFxaaSource',
+    width: Math.max(1, width),
+    height: Math.max(1, height),
+    format: device.getRenderableHdrFormat([pc.PIXELFORMAT_RGBA16F], true) ?? pc.PIXELFORMAT_RGBA8,
+    mipmaps: false,
+    minFilter: pc.FILTER_LINEAR,
+    magFilter: pc.FILTER_LINEAR,
+    addressU: pc.ADDRESS_CLAMP_TO_EDGE,
+    addressV: pc.ADDRESS_CLAMP_TO_EDGE,
+  });
+  return new pc.RenderTarget({ name: 'gameFxaaSource', colorBuffer: texture, depth: false });
+}
+
+/** The game's chain on another camera (`PostProcessing.attach`). */
+export interface PostAttachment {
+  /** The target was resized to `width` × `height`. */
+  resize(width: number, height: number): void;
+  destroy(): void;
 }
 
 export class PostProcessing {
@@ -175,28 +199,11 @@ export class PostProcessing {
     }
     if (options.fxaa) {
       // The compose draws into this (Babylon's half-float FXAA input), the FXAA pass onto the canvas.
-      const texture = new pc.Texture(device, {
-        name: 'gameFxaaSource',
-        width: Math.max(1, device.width),
-        height: Math.max(1, device.height),
-        format: device.getRenderableHdrFormat([pc.PIXELFORMAT_RGBA16F], true) ?? pc.PIXELFORMAT_RGBA8,
-        mipmaps: false,
-        minFilter: pc.FILTER_LINEAR,
-        magFilter: pc.FILTER_LINEAR,
-        addressU: pc.ADDRESS_CLAMP_TO_EDGE,
-        addressV: pc.ADDRESS_CLAMP_TO_EDGE,
-      });
-      this.fxaaTarget = new pc.RenderTarget({ name: 'gameFxaaSource', colorBuffer: texture, depth: false });
+      this.fxaaTarget = fxaaSource(device, device.width, device.height);
       // (Before the frame: its passes take the camera's target, and size the scene by it.)
       camera.renderTarget = this.fxaaTarget;
     }
-    const frame = new pc.CameraFrame(app, camera);
-    frame.rendering.renderFormats = SCENE_FORMATS;
-    frame.rendering.samples = Math.max(1, options.samples);
-    frame.rendering.toneMapping = pc.TONEMAP_NONE;
-    frame.rendering.sharpness = 0;
-    frame.update();
-    this.frame = frame;
+    this.frame = this.cameraFrame(app, camera);
     if (this.fxaaTarget) {
       const fxaa = (this.fxaa = new FxaaPass(device, this.fxaaTarget.colorBuffer, options.night));
       fxaa.init(null);
@@ -208,6 +215,51 @@ export class PostProcessing {
     this.ids.nightTint.setValue(this.tint);
     device.on('resizecanvas', this.onResize);
     this.resized(device.width, device.height);
+  }
+
+  /** The chain's frame on `camera`: the scene in linear light, multisampled, composed by the image processing. */
+  private cameraFrame(app: pc.AppBase, camera: pc.CameraComponent): pc.CameraFrame {
+    const frame = new pc.CameraFrame(app, camera);
+    frame.rendering.renderFormats = SCENE_FORMATS;
+    frame.rendering.samples = Math.max(1, this.options.samples);
+    frame.rendering.toneMapping = pc.TONEMAP_NONE;
+    frame.rendering.sharpness = 0;
+    frame.update();
+    return frame;
+  }
+
+  /**
+   * The same picture from another camera, into `target` (the save's picture, `thumbnail.ts`): the
+   * game camera's passes at the target's size, with the same uniforms (the exposure, the look, the
+   * night are the device's, set once for both). The vignette keeps the canvas's proportions, as
+   * Babylon's did in its picture (its post-processes were the canvas's size).
+   */
+  attach(app: pc.AppBase, camera: pc.CameraComponent, target: pc.RenderTarget): PostAttachment {
+    if (!this.frame) {
+      // Straight into the target: the colour, encoded as the game camera's.
+      camera.toneMapping = this.camera.toneMapping;
+      camera.gammaCorrection = this.camera.gammaCorrection;
+      camera.renderTarget = target;
+      return { resize: () => {}, destroy: () => {} };
+    }
+    const source = this.options.fxaa ? fxaaSource(this.device, target.width, target.height) : null;
+    camera.renderTarget = source ?? target;
+    const frame = this.cameraFrame(app, camera);
+    let fxaa: FxaaPass | null = null;
+    if (source) {
+      fxaa = new FxaaPass(this.device, source.colorBuffer, this.options.night, target);
+      fxaa.init(target);
+      camera.framePasses = [...camera.framePasses, fxaa];
+    }
+    return {
+      resize: (width, height) => source?.resize(width, height),
+      destroy: () => {
+        frame.destroy();
+        fxaa?.destroy();
+        source?.destroyTextureBuffers();
+        source?.destroy();
+      },
+    };
   }
 
   /** Babylon's `ImageProcessingConfiguration.exposure` (the scene's colour times this, before tone mapping). */
