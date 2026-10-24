@@ -2,7 +2,7 @@
 
 - **Branch:** `fix/0.4.1`, merged into `main` by pull request; tag `v0.4.1` on the merge
 - **Base:** v0.4.0 at `b64e0cb1`
-- **Status:** Release candidate (2026-10-24)
+- **Status:** **Released 2026-10-24**: https://github.com/krecks/idyll-lives/releases/tag/v0.4.1 (PR #26 merged as 2035d7ba; CI 40126464236; dry runs 40126439431 on the branch, 40127727579 on main; the tag's deploy 40128805829; live checks passed).
 - **Release type:** fixes: the three points 0.4.0 left open (two fixed, one profiled)
 
 ## 1. What ships
@@ -45,6 +45,8 @@ Player notes: the `## 0.4.1` section of [CHANGELOG.md](../CHANGELOG.md), also in
 | `bun run check:voice` | pass |
 
 ## 5. Release steps
+
+All done 2026-10-24. Live: the bundle says 0.4.1, build 2035d7b; cross-origin isolated; the village benchmark plays on WebGPU and WebGL2 (60 fps headless) with no page errors; the large files unzip to their pinned SHA-256.
 
 1. Pull request `fix/0.4.1` → `main`; CI passes on it; merge (a merge commit).
 2. Dry run: `gh workflow run pages.yml --ref main -f deploy=false`, watched to the end.
