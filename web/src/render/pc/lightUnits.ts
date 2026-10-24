@@ -2,7 +2,7 @@
  * The look's daylight (`render/look.ts`, keyed in the Babylon renderer's units) in PlayCanvas's
  * units: one number per quantity, each with why it differs from Babylon's.
  *
- * Calibrated against the Babylon renderer's pictures (Stage 6 of the port: the bench poses with
+ * Calibrated against the Babylon renderer's pictures (during the port: the bench poses with
  * `?diag=linear,nosims`, the lit colour before any image processing, and `?lightmix=sun,sky,env`
  * lighting one part at a time, at 6:36, 9, 13, 16, 18:30, 19:30, 20:12 and 23:00), after the parts
  * of the light that were not a matter of units were made Babylon's: the sky's harmonics as Babylon

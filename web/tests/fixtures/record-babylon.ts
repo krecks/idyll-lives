@@ -12,8 +12,8 @@
 //   git worktree add bench-results/babylon-f15b839b f15b839b && (cd bench-results/babylon-f15b839b/web && bun install)
 //   cd web && bun tests/fixtures/record-babylon.ts --ref ../bench-results/babylon-f15b839b/web
 // Babylon and its renderer come from the checkout; the inputs and the shared code they go through
-// (the build effects' bursts, `ParticleSettings`) from this tree. (The Stage 2 checkout,
-// bench-results/babylon-ref, predates the renderer's `particleSystem`, `partMesh` and `mirrorSurface`.)
+// (the build effects' bursts, `ParticleSettings`) from this tree. (An earlier commit won't do: the
+// renderer gained `particleSystem`, `partMesh` and `mirrorSurface` during the port.)
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { f32, f64, u32, type Numbers } from './babylon';

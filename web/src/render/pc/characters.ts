@@ -390,7 +390,7 @@ export class Characters extends SharedCharacters<PartDraw, QuiltDraw, Prop> {
     return false;
   }
 
-  /** The resident rows the draw `mi` draws now (`rowsOf`), null for any other draw (stage 9's mirrors). */
+  /** The resident rows the draw `mi` draws now (`rowsOf`), null for any other draw (the mirrors). */
   rowsOfInstance(mi: pc.MeshInstance): { rows: Float32Array; count: number } | null {
     const part = this.pcView.partOf(mi);
     return part ? this.rowsOf(part) : null;

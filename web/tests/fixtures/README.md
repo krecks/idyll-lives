@@ -24,6 +24,6 @@ git worktree add bench-results/babylon-f15b839b f15b839b
 cd web && bun tests/fixtures/record-babylon.ts --ref ../bench-results/babylon-f15b839b/web
 ```
 
-`bench-results/babylon-ref`, the Stage 2 checkout, won't do. It predates the renderer's `particleSystem`, `partMesh` and `mirrorSurface`.
+An earlier commit won't do: the Babylon renderer gained `particleSystem`, `partMesh` and `mirrorSurface` during the port, and f15b839b is the last commit that has them.
 
 The script takes its inputs from this tree: the look's settings, the particle settings and the bursts. The tests check that the game's particle settings still match the recorded ones. After a deliberate change to those settings, record again.

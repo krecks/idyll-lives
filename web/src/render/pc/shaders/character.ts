@@ -13,7 +13,7 @@
  * - Skinned from the row, four influences (`game_simJoints`, `game_simWeights`): the model matrix is
  *   `matrix_model · instance · Σ wᵢ · boneᵢ` (`transformInstancingVS`, set per resident material,
  *   `RESIDENT_INSTANCING`), so the world position (`vPositionW`) and the normal (`mat3` of the model
- *   matrix, PlayCanvas's own for instanced draws) are the skinned ones every later stage reads: the
+ *   matrix, PlayCanvas's own for instanced draws) are the skinned ones everything after reads: the
  *   lamps' rooms, basements, the fog, the diag views.
  * - Rows a pass leaves out (`game_simShown`, 16 bits a component: `residentRowFilter`, all of them but
  *   in a mirror's reflection, which draws only the residents its glass shows) scale to nothing.

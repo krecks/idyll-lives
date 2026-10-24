@@ -13,7 +13,7 @@
  * - `normalVS`: an instanced draw's normal as Babylon's thin instances had it (`INSTANCE_NORMAL`).
  * - `vsLocal`: the vertex's local (game-space) position, `localPos`, after morphing and before the
  *   model matrix, in `transformCoreVS`'s `getLocalPosition` (instanced draws too). Wind and
- *   blankets (later stages) add their snippets here, or a `transformInstancingVS` of their own.
+ *   blankets add their snippets here, or a `transformInstancingVS` of their own.
  * - `psDecl`, `psStart`: `litUserDeclarationPS`, `litUserMainStartPS` (which runs in every pass,
  *   the shadow pass included).
  * - `albedo`, `metalness`, `gloss`, `reflDir`, `emissive`: after `getAlbedo`, `getMetalness`,
@@ -103,7 +103,7 @@ fn gamePos(p: vec3f) -> vec3f { return vec3f(p.x, p.y, -p.z); }
 const features: ShaderFeature[] = [COMMON, VERTEX_TWEAKS, PATTERN, CUTAWAY, UNDERGROUND, PLAIN_FINISH, SOFT_LOOK, DIAG_VIEW].sort((a, b) => a.priority - b.priority);
 
 /**
- * Adds a feature (a later stage's: wind, blankets). Before the first material is made: the chunks
+ * Adds a feature (wind, blankets). Before the first material is made: the chunks
  * are built once per device.
  */
 export function registerShaderFeature(feature: ShaderFeature): void {

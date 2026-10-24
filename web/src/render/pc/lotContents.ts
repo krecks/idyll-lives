@@ -20,8 +20,8 @@
  * Per frame (`update`): the object clips, the screens' glow and the sky following the camera; no
  * allocations. The lamps' light is `lamps.ts`'s, which drives the shades' glow here (`applyGlow`:
  * each lamp's fade, each room's lights; `setLampsOff` records which are off, for the clips).
- * Residents are stage 7 (`tables` and `pullChairs` are ready for them), picking and build mode
- * stage 8 (`placed`), mirrors stage 9 (`mirrors`).
+ * The residents use `tables` and `pullChairs`, picking and build mode `placed`, the mirrors
+ * `mirrors`.
  */
 
 import * as pc from './engine';
@@ -115,7 +115,7 @@ export interface PlacedObject {
   built?: { template: ModelTemplate; motions?: Motions };
 }
 
-/** A mirror's glass on an instance (stage 9 draws the reflections): its faces, and the buffer and index of the matrix it moves with. */
+/** A mirror's glass on an instance (`mirrors.ts` draws the reflections): its faces, and the buffer and index of the matrix it moves with. */
 export interface MirrorInstance {
   surfaces: MirrorSurface[];
   matrices: Float32Array;
@@ -175,9 +175,9 @@ export class LotContents {
   private readonly modelDraws = new Map<string, ModelDraws>();
   /** The objects as drawn by the last build. */
   placed: PlacedObject[] = [];
-  /** Mirror glass on the objects drawn (stage 9 reflects in it). */
+  /** Mirror glass on the objects drawn (`mirrors.ts` reflects in it). */
   mirrors: MirrorInstance[] = [];
-  /** The tables the seats face, by seat id, for the residents pulling their chairs up (stage 7). */
+  /** The tables the seats face, by seat id, for the residents pulling their chairs up. */
   tables = new Map<number, TableRoom>();
   private seatTurns = new Map<number, number>();
   private pulledIn = new Map<number, { by: number; saved: { target: PopTarget; matrix: Float32Array }[] }>();
@@ -908,7 +908,7 @@ export class LotContents {
     this.seatTurns = new Map(world.objects.filter((o) => this.tables.has(o.id)).map((o) => [o.id, o.rot]));
   }
 
-  /** Draws the chairs residents sit pulled up to a table (`pulled`: by chair, how far in, m), and those let go back where they stand (stage 7 calls it each frame). */
+  /** Draws the chairs residents sit pulled up to a table (`pulled`: by chair, how far in, m), and those let go back where they stand (the residents call it each frame). */
   pullChairs(pulled: ReadonlyMap<number, number>, held: number | null = null): void {
     for (const [id, was] of this.pulledIn) {
       if (pulled.has(id)) continue;
@@ -936,12 +936,12 @@ export class LotContents {
     }
   }
 
-  /** How object `id`'s seat has moved from rest (`ObjectMotion.ride`), for the residents on it (stage 7). */
+  /** How object `id`'s seat has moved from rest (`ObjectMotion.ride`), for the residents on it. */
   ride(id: number): Float32Array | null {
     return this.motion.ride(id);
   }
 
-  /** How far round object `id`'s loop is (a bike's pedals), for the rider's feet (stage 7). */
+  /** How far round object `id`'s loop is (a bike's pedals), for the rider's feet. */
   loopPhase(id: number): number | null {
     return this.motion.loopPhase(id);
   }
@@ -1087,7 +1087,7 @@ export class LotContents {
     this.objectShadows?.destroy();
   }
 
-  /** Writes an object's copy anew (`write`): build mode's hand hides one and shows it again (stage 8, `placing.ts`). */
+  /** Writes an object's copy anew (`write`): build mode's hand hides one and shows it again (`placing.ts`). */
   rewrite(target: PopTarget, matrix: ArrayLike<number>): void {
     this.write(target, matrix);
   }
@@ -1102,7 +1102,7 @@ export class LotContents {
 const blobs = new WeakMap<pc.AppBase, { mesh: pc.Mesh; material: pc.StandardMaterial }>();
 
 /**
- * Soft round contact shadows (objects per world; residents per frame, stage 7) from one radial
+ * Soft round contact shadows (objects per world; residents per frame) from one radial
  * texture: a flat square, black, its alpha the texture's, drawn over the floor without writing depth.
  */
 export function contactBlob(app: pc.AppBase): { mesh: pc.Mesh; material: pc.StandardMaterial } {
