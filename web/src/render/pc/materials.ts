@@ -326,7 +326,6 @@ export class MaterialLibrary {
   private readonly glows = new WeakMap<pc.StandardMaterial, pc.Color>();
   private shadowMaterials: [pc.StandardMaterial | null, pc.StandardMaterial | null] = [null, null];
   private sky: SkyLighting | null = null;
-  private envTimer: ReturnType<typeof setTimeout> | null = null;
   private soft = softLookWanted();
   private readonly device: pc.GraphicsDevice;
   /** Anisotropic filtering of the surfaces' textures (the graphics preset's `anisotropy`; set before the first surface). */
@@ -624,11 +623,10 @@ export class MaterialLibrary {
       const finish = (ok: boolean) => {
         if (done) return;
         done = true;
-        if (this.envTimer) clearTimeout(this.envTimer);
-        this.envTimer = null;
+        clearTimeout(timer);
         resolve(ok);
       };
-      this.envTimer = setTimeout(() => finish(false), 15000);
+      const timer = setTimeout(() => finish(false), 15000);
       void skyLighting(this.device, url).then((sky) => {
         if (sky && !this.app.graphicsDevice) return finish(false);
         if (sky) {

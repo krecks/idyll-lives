@@ -30,14 +30,16 @@ const built = new WeakMap<pc.GraphicsDevice, Map<string, Promise<SkyLighting | n
  */
 export function skyLighting(device: pc.GraphicsDevice, url: string): Promise<SkyLighting | null> {
   const file = new URL(url, location.href).href;
-  let byUrl = built.get(device);
-  if (!byUrl) built.set(device, (byUrl = new Map()));
+  const byUrl = built.get(device) ?? new Map<string, Promise<SkyLighting | null>>();
+  built.set(device, byUrl);
   let job = byUrl.get(file);
   if (!job) {
     job = load(file)
       .then((bytes) => build(device, bytes))
       .catch((err: unknown) => {
         console.warn(`[render] environment ${file} unavailable; using lights only`, err);
+        // (Not kept: the next request tries again.)
+        byUrl.delete(file);
         return null;
       });
     byUrl.set(file, job);
