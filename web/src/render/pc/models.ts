@@ -42,6 +42,7 @@ import { compose, invert, multiply, transformPoint, translation, type Mat4, type
 import { CLIP_RATE, type ModelClip } from '../shared/modelClips';
 import { entrySpace, namedFinish, tintInName, type BoneName, type MaterialOverride, type ModelExtras, type Resize, type StandIn, type TintSlot } from '../shared/modelEntry';
 import { ModelFiles } from '../shared/modelFiles';
+import { deviceDestroyed } from './device';
 import {
   computeNormals,
   copyData,
@@ -120,7 +121,7 @@ export function withGlows(t: ModelTemplate): ModelMesh[] {
 
 /** Lets go of a template's meshes (its materials are shared and stay). */
 export function disposeTemplate(t: { meshes: ModelMesh[]; glows?: { mesh: ModelMesh }[] }): void {
-  for (const m of [...t.meshes, ...(t.glows ?? []).map((g) => g.mesh)]) m.mesh.destroy();
+  for (const m of [...t.meshes, ...(t.glows ?? []).map((g) => g.mesh)]) if (!deviceDestroyed(m.mesh.device)) m.mesh.destroy();
 }
 
 /**

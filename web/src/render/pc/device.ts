@@ -12,6 +12,17 @@
 import * as pc from './engine';
 import { noteWebGpuFailed, webGpuFailed } from '../shared/gpu';
 
+const destroyed = new WeakSet<pc.GraphicsDevice>();
+
+/**
+ * Whether `device` has been destroyed (with its app, `destroyApp`). What it held went with it, so a
+ * late clean-up (a model that finished loading after its renderer was disposed) has nothing to free,
+ * and on WebGL2 can't: the device has no context left to free it with.
+ */
+export function deviceDestroyed(device: pc.GraphicsDevice): boolean {
+  return destroyed.has(device);
+}
+
 /** `alpha`: a canvas that shows the page through where nothing is drawn (the previews' stages; premultiplied). */
 export async function createDevice(canvas: HTMLCanvasElement, forceWebGL: boolean, antialias = false, alpha = false): Promise<pc.GraphicsDevice> {
   const wantGpu = !forceWebGL && !webGpuFailed() && 'gpu' in navigator && !!(await navigator.gpu.requestAdapter().catch(() => null));
@@ -28,6 +39,7 @@ export async function createDevice(canvas: HTMLCanvasElement, forceWebGL: boolea
   }
   // The drawing size is the renderer's (`applyResolution`): never the device's own pixel-ratio scaling.
   device.maxPixelRatio = 1;
+  device.once('destroy', () => destroyed.add(device));
   return device;
 }
 
@@ -63,12 +75,20 @@ export function createSideApp(canvas: HTMLCanvasElement, device: pc.GraphicsDevi
   return app;
 }
 
-/** Destroys an app made by `createSideApp` (its device too); the page's current app stays current (the game's, made before or after it). */
-export function destroySideApp(app: pc.AppBase): void {
-  const current = pc.getApplication() as pc.AppBase | null | undefined;
-  // (PlayCanvas leaves a WebGL2 context to the garbage collector: let it go now, as a page may make and drop several.)
+/**
+ * Destroys `app` and its device. PlayCanvas leaves a WebGL2 context to the garbage collector; it is
+ * let go now, as a page may make and drop several (and the browser drops its oldest past a limit,
+ * which may be one in use). The canvas can't draw again: the next app needs a fresh one.
+ */
+export function destroyApp(app: pc.AppBase): void {
   const gl = app.graphicsDevice.isWebGL2 ? (app.graphicsDevice as pc.WebglGraphicsDevice).gl : null;
   app.destroy();
   gl?.getExtension('WEBGL_lose_context')?.loseContext();
+}
+
+/** Destroys an app made by `createSideApp` (`destroyApp`); the page's current app stays current (the game's, made before or after it). */
+export function destroySideApp(app: pc.AppBase): void {
+  const current = pc.getApplication() as pc.AppBase | null | undefined;
+  destroyApp(app);
   pc.setApplication(current && current !== app ? current : null);
 }

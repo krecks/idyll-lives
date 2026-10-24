@@ -61,8 +61,6 @@ class GameHost {
   private readonly veil: HTMLDivElement;
   private renderer: Promise<Renderer> | null = null;
   private rendererKey = '';
-  /** The graphics API the current renderer was made with (a change needs a new canvas). */
-  private rendererBackend: Settings['renderer'] | null = null;
   private current: Entry | null = null;
   /** The previous session letting go of the renderer; the next one starts after it. */
   private teardown: Promise<void> = Promise.resolve();
@@ -96,8 +94,8 @@ class GameHost {
   }
 
   /**
-   * A fresh canvas for a new graphics API: a canvas that has held a WebGPU context can't give a
-   * WebGL2 one (and the other way round), so switching backend in Troubleshooting replaces it.
+   * A fresh canvas for a new renderer: the old one let its context go (`destroyApp`), and a canvas
+   * that has held a WebGPU context can't give a WebGL2 one (or the other way round) anyway.
    */
   private freshCanvas(): void {
     const fresh = sceneCanvas();
@@ -309,11 +307,10 @@ class GameHost {
     const key = JSON.stringify(RESTART_KEYS.map((k) => settings[k]));
     if (this.renderer && key === this.rendererKey) return this.renderer;
     const old = this.renderer;
-    const backendChanged = old !== null && this.rendererBackend !== settings.renderer;
     this.rendererKey = key;
     this.renderer = (async () => {
       (await old?.catch(() => null))?.dispose();
-      if (backendChanged) this.freshCanvas();
+      if (old) this.freshCanvas();
       const { content, assets } = await loadGameData();
       const params = new URLSearchParams(location.search);
       const renderer = new PlayCanvasRenderer({ assets, content, backend: settings.renderer }, qualityFromSettings(settings, params));
@@ -321,7 +318,6 @@ class GameHost {
       // reset, "Graphics were reset") offers to save and reload.
       renderer.onFailure = this.onRendererFailure;
       await renderer.init(this.canvas);
-      this.rendererBackend = settings.renderer;
       renderer.hold(this.covered);
       if (webGpuFailed() && settings.renderer !== 'webgl' && !this.toldFallback) {
         this.toldFallback = true;

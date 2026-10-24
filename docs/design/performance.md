@@ -397,7 +397,19 @@ So by Stage 7 the main thread did about a third of Babylon's work on WebGPU and 
 | high | WebGL2 | wide | 3.00 | 1.30 | 5.95 | 5.44 | 390 | 379 | 10.0 | 10.3 |
 
 - **Main thread:** PlayCanvas needs 2.3–3.2× less on WebGPU and 1.7–2.8× less on WebGL2, on every preset and scenario.
-- **GPU:** on WebGPU, 1.6–2.1× less on Medium and High and 24–30 % less on Low (except Build, 3.4 → 3.8 ms). On WebGL2, Medium and High are equal or lower; Low is 2–15 % higher (orbit-day 3.83 → 4.42 ms), the one place past the plan's +10 % bound. Not yet profiled; Low's FXAA, a pass of its own after the compose on PlayCanvas, is the first suspect.
+- **GPU:** on WebGPU, 1.6–2.1× less on Medium and High and 24–30 % less on Low (except Build, 3.4 → 3.8 ms). On WebGL2, Medium and High are equal or lower; Low is 2–15 % higher (orbit-day 3.83 → 4.42 ms), the one place past the plan's +10 % bound. Profiled for 0.4.1 (below): not the FXAA; nature's share is the one that stands out.
 - **Frames:** both hold 120 fps everywhere. PlayCanvas drops none (p99 at most 10.3 ms), where Babylon dropped a few in the wide view on High and Medium (p99 16.7 ms); its frame intervals do jitter more around 8.33 ms (p95 about 10 ms against Babylon's 8.4–9.9), with the same average.
 - **Shader compiles in play:** after `warmGame`, a scripted session (play, night, a mirror, walls, Build mode, the catalog, buying) compiles 1 shader and 1 pipeline, for the model bought for the first time (before the warm-up was ported: 32 shaders and 340 pipelines on WebGPU, which stalled the first seconds of play). `?diag=shaders` logs them.
 - The pictures, against Babylon's: the 54 lit benchmark shots differ by a median 0.74 % of pixels by more than 16 (2.5 of 255 on average), the albedo and normals views by 0.08 %, the mirror poses by 1.1 %, and the 15 Build-mode states replayed with Babylon's pointer by 0.06–1.6 % (`bench-results/stage11/`).
+
+### Low on WebGL2, profiled (0.4.1)
+
+2026-10-24, the same machine and method (`render.mjs --preview`, windows at 120 Hz, median of 3 runs; `bench-results/0.4.1/`). Low on WebGL2 against Babylon's single run: orbit-day 4.07–4.24 ms against 3.83 (+6–11 %), orbit-night 4.22 against 3.96, dusk 4.25 against 4.16, build 3.77 against 3.69, wide 4.67–4.76 against 4.03 (+16–18 %). Runs of one build differ by 0.2–0.3 ms, so only the wide view's gap is well clear of the noise. Passes, pixel samples, draws and triangles are Babylon's (4 passes, 7.3 M samples; 320 against 331 draws, 1.97 against 2.01 M triangles in the wide view): the difference is in what a pixel or a vertex costs, not in how much is drawn.
+
+What each part costs, one left out at a time (`diag=`, and on the dev server the preset's own knobs one by one):
+
+- **Nature** (`nonature`): −0.75 ms in the wide view (4.76 → 4.01), −0.06 ms in orbit-day. The only part whose cost stands out, and the view with the largest gap.
+- **Within the noise** (under 0.3 ms either way): the FXAA (`noaa`, −0.1 ms: not the suspect it was), the sun's shadows (`noshadows`) and its map's size (1024 or 2048), the lamps (`nolamps`; clustered or forward, `lights=forward`), anisotropy (4 or 1), merged shadow casters, the soft look against classic shading, the night grade and glass.
+
+Left for later: nature has no switches of its own yet (the woods, the lawn's tufts, the terrain), so which of them costs more than on Babylon isn't known. The Babylon reference checkout is gone, so Babylon can't be measured again beside it; the comparison is with the recorded runs.
+

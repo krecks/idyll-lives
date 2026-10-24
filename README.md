@@ -197,9 +197,9 @@ Pack authors: see [docs/content-packs.md](docs/content-packs.md). The look of th
 
 ## Versions and releasing
 
-The current version is **0.4.0**. One version number covers the whole game: `web/package.json` (shown in the main menu and Credits, with the commit it was built from), the Rust workspace in `Cargo.toml` and the workspace crates' entries in `Cargo.lock`. `cargo release-version` prints it and fails if they differ (CI checks this); `cargo release-version 0.3.0` sets all three. Each release is a git tag `vX.Y.Z` with notes in [CHANGELOG.md](CHANGELOG.md).
+The current version is **0.4.1**. One version number covers the whole game: `web/package.json` (shown in the main menu and Credits, with the commit it was built from), the Rust workspace in `Cargo.toml` and the workspace crates' entries in `Cargo.lock`. `cargo release-version` prints it and fails if they differ (CI checks this); `cargo release-version 0.3.0` sets all three. Each release is a git tag `vX.Y.Z` with notes in [CHANGELOG.md](CHANGELOG.md).
 
-Saves have their own format version, `SAVE_VERSION` in `crates/sim-core/src/save.rs`: 32 since 0.3.1, also in 0.3.2 and 0.4.0 (29 in 0.3.0, 23 in 0.2.0; 0.1.0 wrote 17). Older saves are migrated when they load, and `crates/sim-core/tests/old_saves.rs` loads real saves from 0.1.0 and the build after it. A save from a newer version is kept and skipped, and a damaged one is removed with a notice.
+Saves have their own format version, `SAVE_VERSION` in `crates/sim-core/src/save.rs`: 32 since 0.3.1, also in 0.3.2, 0.4.0 and 0.4.1 (29 in 0.3.0, 23 in 0.2.0; 0.1.0 wrote 17). Older saves are migrated when they load, and `crates/sim-core/tests/old_saves.rs` loads real saves from 0.1.0 and the build after it. A save from a newer version is kept and skipped, and a damaged one is removed with a notice.
 
 **Releasing** (`.github/workflows/pages.yml`):
 1. `cargo release-version <x.y.z>` (it updates `Cargo.lock` too, so no `cargo build` is needed), and a `## <x.y.z> — <date>` section in CHANGELOG.md, with the date set by hand. Commit both on `main`, and `git push origin main`: the dry run builds what GitHub has.
@@ -211,7 +211,7 @@ Saves have their own format version, `SAVE_VERSION` in `crates/sim-core/src/save
    - The large files download in full, which only the live site can show: `llm/lfm2.5-350m/model_q4.onnx_dataz` returns 200 and is 254,923,309 bytes (gunzipped, its SHA-256 is the one in `crates/tools/src/llmfetch.rs`), and `voice/supertonic-3/vector_estimator.onnxz` is 119,556,677 bytes (packed by the Rust fetch tools; files CI still has cached from the earlier tools are 255,530,880 and 119,568,968 bytes, and are as good: what matters is the unzipped SHA-256).
 5. Publish the release notes: `gh release create v<x.y.z> --verify-tag --title "Idyll Lives <x.y.z>" --notes-file <the version's CHANGELOG section>`.
 
-**If a release goes wrong,** fix forward, or redeploy the last good build (`gh workflow run pages.yml --ref <tag> -f deploy=true`). 0.3.1, 0.3.2 and 0.4.0 share save format 32, so 0.3.2 is a safe build to go back to; 0.3.0 can't open 0.3.1's saves (format 32), 0.2.0 can't open 0.3.0's (format 29), and v0.1.0 can't open 0.2.0's database (version 2): an older build keeps the newer saves and skips them, so it lists only the saves it can open. Nothing is lost; the saves come back with the newer build.
+**If a release goes wrong,** fix forward, or redeploy the last good build (`gh workflow run pages.yml --ref <tag> -f deploy=true`). 0.3.1 to 0.4.1 share save format 32, so 0.4.0 is a safe build to go back to (0.3.2 too); 0.3.0 can't open 0.3.1's saves (format 32), 0.2.0 can't open 0.3.0's (format 29), and v0.1.0 can't open 0.2.0's database (version 2): an older build keeps the newer saves and skips them, so it lists only the saves it can open. Nothing is lost; the saves come back with the newer build.
 
 Each CI run keeps the site's WASM with function names as an artifact for 90 days (`wasm-with-names-<sha>`). It runs the same optimisations as the site with the name section kept, so its function numbers match the shipped WASM and a crash stack from the site can be read with it.
 

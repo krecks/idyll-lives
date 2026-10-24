@@ -79,8 +79,9 @@ pub fn download(agent: &ureq::Agent, url: &str, expected: &str) -> Result<Vec<u8
 }
 
 /// Streams `url` to `path` (through a `.part` file), hashing on the way: a big model never sits in
-/// memory, and a wrong file never lands.
-pub fn download_to(agent: &ureq::Agent, url: &str, path: &Path, expected: &str) -> Result<(), String> {
+/// memory, and a wrong file never lands. With `limit`, an answer longer than that many bytes fails
+/// as soon as it passes it, rather than filling the disk before the hash can refuse it.
+pub fn download_to(agent: &ureq::Agent, url: &str, path: &Path, expected: &str, limit: Option<u64>) -> Result<(), String> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     }
@@ -90,11 +91,16 @@ pub fn download_to(agent: &ureq::Agent, url: &str, path: &Path, expected: &str) 
     let mut out = std::io::BufWriter::new(std::fs::File::create(&part).map_err(|e| format!("{}: {e}", part.display()))?);
     let mut hash = Sha256::new();
     let mut buf = vec![0u8; 1 << 16];
+    let mut total = 0u64;
     let copied = (|| {
         loop {
             let n = body.read(&mut buf).map_err(|e| format!("{url}: {e}"))?;
             if n == 0 {
                 break;
+            }
+            total += n as u64;
+            if let Some(limit) = limit.filter(|&l| total > l) {
+                return Err(format!("{url}: more than {limit} bytes"));
             }
             hash.update(&buf[..n]);
             out.write_all(&buf[..n]).map_err(|e| format!("{}: {e}", part.display()))?;
@@ -132,4 +138,46 @@ pub fn pack(from: &Path, to: &Path) -> Result<(), String> {
 /// Removes `path` if it's there (a folder and what's in it too).
 pub fn remove(path: &Path) {
     let _ = if path.is_dir() { std::fs::remove_dir_all(path) } else { std::fs::remove_file(path) };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::BufRead;
+
+    /// A server on localhost that answers one request with `body`; its URL.
+    fn serve(body: Vec<u8>) -> String {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/file", listener.local_addr().unwrap());
+        std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut reader = std::io::BufReader::new(stream.try_clone().unwrap());
+            let mut line = String::new();
+            while reader.read_line(&mut line).unwrap() > 2 {
+                line.clear();
+            }
+            let mut stream = stream;
+            let _ = write!(stream, "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len());
+            let _ = stream.write_all(&body);
+        });
+        url
+    }
+
+    #[test]
+    fn a_download_lands_whole_and_a_long_one_not_at_all() {
+        let dir = std::env::temp_dir().join(format!("ll-download-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("file.bin");
+        let body = vec![7u8; 200_000];
+        let sha = sha256_hex(&body);
+
+        download_to(&agent(), &serve(body.clone()), &path, &sha, Some(200_000)).unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), body);
+        std::fs::remove_file(&path).unwrap();
+
+        let err = download_to(&agent(), &serve(body), &path, &sha, Some(100_000)).unwrap_err();
+        assert!(err.ends_with("more than 100000 bytes"), "{err}");
+        assert!(!path.exists() && !with_suffix(&path, ".part").exists(), "nothing left behind");
+        remove(&dir);
+    }
 }
