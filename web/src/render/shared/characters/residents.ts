@@ -2,7 +2,7 @@
  * Sims as skinned, animated characters (bodies, faces, hair and clothes generated in code by
  * `cargo characters` (crates/tools/src/characters), clips made in code in `characters/clips`;
  * format in docs/characters-format.md): what they do and how they are posed, engine-neutral. The
- * engine draws them through a `ResidentView` (`view.ts`; `babylon/characters.ts`, `pc/characters.ts`).
+ * engine draws them through a `ResidentView` (`view.ts`; `pc/characters.ts`).
  * The tables the state machine plays from are in `actions.ts`, `seats.ts`, `socials.ts`,
  * `expressions.ts` and `parts.ts`; a resident's state in `rig.ts`.
  *
@@ -10,12 +10,11 @@
  * - One mesh per (body, part) — body, eyes, brows, lashes, teeth, tongue, each hairstyle and each garment
  *   (`top.*`, `bottom.*`, `shoes.*`) — drawn instanced (one instance per Sim wearing it).
  * - Skinning runs on the GPU: a float texture holds one row per Sim (all bone matrices, plus
- *   appearance texels, `layout.ts`), and each instance reads "its" row (in Babylon through its
- *   baked-vertex-animation path: start frame = end frame = row, speed 0). The CPU poses every visible
+ *   appearance texels, `layout.ts`), and each instance reads "its" row (on PlayCanvas an instance
+ *   attribute, `pc/characters.ts`). The CPU poses every visible
  *   Sim once per frame (clip sampling, crossfades, retargeting, look-at, face) and uploads the band of
  *   rows that changed in one write. Only buffer contents change per frame (bone texture, contact-shadow
- *   / ring / blanket instance matrices), never meshes. (WebGPU snapshot replays don't pick up the
- *   texture writes, so the game draws live; see `scheduleSnapshot` in BabylonRenderer.)
+ *   / ring / blanket instance matrices), never meshes.
  * - Clothes are painted on the body by its shader (each garment's cut over the body's fields);
  *   shells (`top.*`, `bottom.*`, `shoes.*` parts) are added only where the silhouette needs them.
  * - Small face parts (teeth, tongue, lashes, brows) are drawn only on faces big enough on screen to
@@ -23,7 +22,7 @@
  *   instance lists change per frame.
  * - Far from the camera a Sim switches to the low-detail body and shells (`lod.*` parts; with a gap
  *   between switching down and up), and every Sim casts its sun shadow from shadow-only copies of
- *   those (`shadowMeshes`, on `LAYER_SHADOW_ONLY`; none where Sims cast no shadows, `castsShadows`).
+ *   those (`shadowMeshes`, on the shadow-only layer; none where Sims cast no shadows, `castsShadows`).
  * - Life stages load the first time a Sim needs them (`loadStage`).
  * - No allocations per frame.
  *

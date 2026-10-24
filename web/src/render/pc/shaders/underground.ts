@@ -1,6 +1,6 @@
 /**
  * Daylight kept out of a basement in view and out of the rooms without windows on the storey in
- * view (the port of `UndergroundPlugin` in `babylon/materials.ts`): there the sun, the sky's fill
+ * view (the port of the Babylon renderer's `UndergroundPlugin`): there the sun, the sky's fill
  * and the environment are scaled down to `game_undergroundLit` (x, y, z), so only the lamps light
  * them, day and night.
  *

@@ -1,3 +1,8 @@
+// Ported from Babylon.js 9.30's shaders: `imageProcessingFunctions.fx` (`applyImageProcessing`,
+// `ACESFitted`, the colour curves) and `fxaa.fragment.fx`. Changed for Idyll Lives: in GLSL and WGSL
+// for PlayCanvas's compose and frame passes, every step driven by uniforms, the night grade added.
+// Babylon.js: Copyright 2023 The Babylon.js team, under the Apache License 2.0; its licence and notice
+// are in crates/tools/texts/Babylon.js-LICENSE and Babylon.js-NOTICE, and in a build's THIRD-PARTY-LICENSES.txt.
 /**
  * The picture after the light, in shader code (the port of Babylon.js 9.30's image processing,
  * `imageProcessingFunctions.fx` and `fxaa.fragment.fx`, which `post.ts` puts on the camera):

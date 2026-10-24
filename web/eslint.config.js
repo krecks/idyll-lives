@@ -26,44 +26,16 @@ export default ts.config(
     },
   },
   // PlayCanvas only through render/pc/engine.ts: the bare package resolves to its debug build under
-  // Vite's dev server (WebGPU validation around every draw). And the engine-neutral code and the
-  // PlayCanvas renderer never reach into Babylon.
+  // Vite's dev server (WebGPU validation around every draw). And no Babylon: the game draws with
+  // PlayCanvas (the Babylon renderer was removed in Stage 11 of the port).
   {
     files: ['src/**/*.ts', 'src/**/*.svelte'],
-    rules: {
-      'no-restricted-imports': ['error', { paths: [{ name: 'playcanvas', message: 'Import PlayCanvas through render/pc/engine.ts (the release build).' }] }],
-    },
-  },
-  {
-    files: [
-      'src/render/shared/**/*.ts',
-      'src/render/pc/**/*.ts',
-      'src/debug/gallery.ts',
-      'src/debug/clips.ts',
-      'src/debug/characters.ts',
-      'src/debug/poses.ts',
-      'src/debug/pcStage.ts',
-      // The preview app's residents (the household creator's stage, portraits, reactions) and their dev page.
-      'src/render/preview/index.ts',
-      'src/render/preview/studio.ts',
-      'src/render/preview/portraits.ts',
-      'src/render/preview/stage.ts',
-      'src/render/preview/reactions.ts',
-      'src/debug/previews.ts',
-      // The catalog's item pictures and the colour studio's stage.
-      'src/render/preview/items.ts',
-      'src/render/preview/itemStage.ts',
-      'src/render/preview/itemScene.ts',
-    ],
     rules: {
       'no-restricted-imports': [
         'error',
         {
           paths: [{ name: 'playcanvas', message: 'Import PlayCanvas through render/pc/engine.ts (the release build).' }],
-          patterns: [
-            { group: ['@babylonjs/*'], message: 'Engine-neutral and PlayCanvas code never imports Babylon.' },
-            { group: ['**/babylon/*', '**/babylon/**'], message: 'Engine-neutral and PlayCanvas code never imports render/babylon.' },
-          ],
+          patterns: [{ group: ['@babylonjs/*'], message: 'The game draws with PlayCanvas; Babylon is not a dependency.' }],
         },
       ],
     },

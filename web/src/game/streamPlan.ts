@@ -19,7 +19,7 @@ export interface Rect {
   d: number;
 }
 
-/** Garden dressing `natureDecor` may pick (see `render/babylon/nature.ts`). */
+/** Garden dressing `natureDecor` may pick (see `render/shared/nature.ts`). */
 const NATURE = [
   'model.tree',
   'model.tree.maple',
@@ -39,7 +39,7 @@ const NATURE = [
   'model.garden.boxwood',
 ];
 
-/** Street props (`render/babylon/street.ts`). */
+/** Street props (`render/shared/street.ts`). */
 const STREET = [
   'model.street.bench',
   'model.street.planter',

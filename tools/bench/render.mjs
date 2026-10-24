@@ -13,7 +13,8 @@
  *     --presets low,medium,high
  *     --backends webgpu,webgl
  *     --scenarios orbit-day,orbit-night,dusk,build,wide   (also mirror-day, mirror-night, mirror-still:
- *                              the home lot's mirror in view, the camera swinging before it or held)
+ *                              the home lot's mirror in view from inside its room, the walls up, the
+ *                              camera swinging before it or held)
  *     --throttle 1,3           CPU slow-down factors (CDP Emulation.setCPUThrottlingRate)
  *     --diags none,noshadows   one run each ('+' joins several: noshadows+noaa)
  *     --res 1                  render scale: 1, 0.5–1, or auto
@@ -65,7 +66,7 @@ const SCENARIOS = {
   dusk: 'cam=dusk',
   build: 'cam=build&hour=13',
   wide: 'cam=wide&hour=13',
-  // The home lot's mirror on screen all the time (not in the default list: `--scenarios mirror-day,…`).
+  // The home lot's mirror on screen all the time, the walls up (not in the default list: `--scenarios mirror-day,…`).
   'mirror-day': 'cam=mirror&hour=13',
   'mirror-night': 'cam=mirror&hour=21',
   'mirror-still': 'cam=mirror-still&hour=13',
@@ -81,9 +82,10 @@ const POSES = {
   'wide-day-0': 'cam=wide&hour=13&at=0',
   'wide-night-45': 'cam=wide&hour=21&at=45',
   'build-day-0': 'cam=build&hour=13&at=0',
-  // The home lot's mirror filling the view (not in the default list: `--poses mirror-day-0,…`).
+  // The home lot's mirror in the middle of the view, the walls up (not in the default list: `--poses mirror-day-0,…`):
+  // the swing's middle (at 0 s) and its far end (at 15 s).
   'mirror-day-0': 'cam=mirror&hour=13&at=0',
-  'mirror-day-10': 'cam=mirror&hour=13&at=10',
+  'mirror-day-15': 'cam=mirror&hour=13&at=15',
   'mirror-night-0': 'cam=mirror&hour=21&at=0',
 };
 

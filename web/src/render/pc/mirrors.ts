@@ -1,5 +1,5 @@
 /**
- * Mirror reflections on PlayCanvas (the port of `babylon/mirrors.ts`). Every mirror's glass (a
+ * Mirror reflections on PlayCanvas (ported from the Babylon renderer, removed: see git history up to f15b839b). Every mirror's glass (a
  * model's `mirrors`, `LotContents.mirrors`) gets a flat stand-in just in front of it; the few nearest
  * the camera that are on screen and face it show the room in a render target of their own, the scene
  * drawn once more by a reflection camera, at a share of the screen's size. The rest keep their glossy
@@ -11,7 +11,7 @@
  *   in place of Babylon's clip plane: no shader variants), narrowed to the glass's rectangle on screen
  *   and drawn only there (the camera's `rect`). So it draws what can be seen through the glass and
  *   nothing behind it: its frustum is the pyramid from the reflected eye through the glass, as
- *   Babylon's draw lists were. It draws the world layer (Babylon's `LAYER_WORLD`) in linear light into a
+ *   Babylon's draw lists were. It draws the world layer (Babylon's world camera mask) in linear light into a
  *   half-float target (no tone mapping, no gamma: the scene's own picture is linear), multisampled
  *   as the preset says, its size Babylon's (`MirrorTexture`'s ratio rounded to powers of two).
  * - Left out of every reflection (Babylon's render-list predicate): the glasses themselves and the
@@ -223,6 +223,8 @@ export class Mirrors {
   private residentCount = 0;
   /** Reflections drawn so far (the benchmark's count). */
   draws = 0;
+  /** The warm-up's frame (`warm`): the reflections draw everything, unculled. */
+  private warming = false;
 
   /**
    * Mirrors in `app`'s world (`root`, game space), seen by `game` (the game camera: its entity's pose
@@ -522,6 +524,62 @@ export class Mirrors {
     }
     this.stale = false;
     this.release(now);
+  }
+
+  /**
+   * Draws the reflections once in this frame with everything the world draws (no culling, every
+   * resident, the glasses and the build helpers too), and the glasses with them, so the pipelines a
+   * reflection needs (its target's, its turned faces') are made behind the loading veil, not in the
+   * frame a mirror first shows (a pipeline first used in play costs that frame tens of milliseconds;
+   * Babylon's `warm`). If no mirror reflects yet, the first ones take the slots. From the game
+   * camera's pose (what it sees doesn't matter: nothing is culled). Returns the undo, to run once
+   * the frame has drawn. None in a world without mirrors.
+   */
+  warm(): () => void {
+    const forced: Item[] = [];
+    const drawn: Reflection[] = [];
+    for (let i = 0; i < this.items.length && drawn.length < this.pool.length; i++) {
+      const item = this.items[i];
+      if (item.slot < 0) {
+        let free = -1;
+        for (let k = 0; k < this.pool.length && free < 0; k++) if (!this.items.some((x) => x.slot === k)) free = k;
+        if (free < 0) break;
+        item.slot = free;
+        forced.push(item);
+      }
+      const r = this.reflection(item.slot);
+      r.used = performance.now();
+      r.viewInv.copy(this.game.entity.getWorldTransform());
+      r.proj.copy(this.game.camera.projectionMatrix);
+      // (Part of the target, as a glass's rectangle is: the clear is then drawn, and its pipeline made too.)
+      r.rect.set(0, 0, 1, 0.5);
+      r.camera.rect = r.rect;
+      r.camera.scissorRect = r.rect;
+      r.camera.frustumCulling = false;
+      r.shows.fill(RESIDENT_ROWS_ALL);
+      r.showsAnyone = true;
+      r.entity.enabled = true;
+      for (const d of item.draws) {
+        d.material = r.material;
+        d.enabled = true;
+      }
+      drawn.push(r);
+    }
+    this.warming = drawn.length > 0;
+    return () => {
+      this.warming = false;
+      for (const r of drawn) {
+        r.camera.frustumCulling = true;
+        r.entity.enabled = false;
+        r.owner = null;
+        r.dirty = true;
+      }
+      for (const item of forced) {
+        item.slot = -1;
+        for (const d of item.draws) d.enabled = false;
+      }
+      this.changed();
+    };
   }
 
   /** The glasses off (none reflects). */
@@ -834,7 +892,7 @@ export class Mirrors {
    */
   private precull(camera: pc.CameraComponent | null): void {
     const r = this.reflectionOf(camera);
-    if (!r || !this.worldLayer) return;
+    if (!r || !this.worldLayer || this.warming) return;
     const list = this.worldLayer.meshInstances;
     for (let i = 0; i < list.length; i++) {
       const mi = list[i];
@@ -883,9 +941,26 @@ export class Mirrors {
     return n;
   }
 
-  /** The reflections' render targets made now (the benchmark's passes). */
+  /** The reflections' render targets made now. */
   get targets(): pc.RenderTarget[] {
     return this.pool.filter((r): r is Reflection => !!r).map((r) => r.target);
+  }
+
+  /** The render targets of the mirrors reflecting now, held ones too (the benchmark's passes, as Babylon's `reflecting`). */
+  get reflecting(): pc.RenderTarget[] {
+    const out: pc.RenderTarget[] = [];
+    for (const item of this.items) {
+      const r = item.slot >= 0 ? this.pool[item.slot] : null;
+      if (r) out.push(r.target);
+    }
+    return out;
+  }
+
+  /** Whether `target` is a reflection's (the benchmark's draw counts, per pass: no allocations). */
+  owns(target: pc.RenderTarget | null): boolean {
+    if (!target) return false;
+    for (const r of this.pool) if (r?.target === target) return true;
+    return false;
   }
 
   /** Where the mirrors are and which way they face (game space; the benchmark's mirror camera). */

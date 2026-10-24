@@ -1,5 +1,9 @@
+// The fade at the map's edge follows Babylon.js 9.30's shadow `frustumEdgeFalloff`. Changed for
+// Idyll Lives: as a patch of PlayCanvas's `lightFunctionShadowPS`.
+// Babylon.js: Copyright 2023 The Babylon.js team, under the Apache License 2.0; its licence and notice
+// are in crates/tools/texts/Babylon.js-LICENSE and Babylon.js-NOTICE, and in a build's THIRD-PARTY-LICENSES.txt.
 /**
- * The sun's shadow map in the game, as the Babylon renderer's (`babylon/sunShadows.ts`): it covers
+ * The sun's shadow map in the game, as the Babylon renderer's was: it covers
  * a fixed square round the viewed lot, so its texels keep their size and place while the camera
  * turns and the sun steps, and it is drawn again only when something in it changed (`moved`): the
  * sun's step, a resident's pose (throttled to the preset's `shadowRate`), a thing placed, the

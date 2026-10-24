@@ -76,7 +76,7 @@ export class FramePacer {
     return 1000 / this.interval;
   }
 
-  // Babylon calls these unbound (`const { requestAnimationFrame } = requester`): arrow functions.
+  // Arrow functions, so they work unbound (as Babylon's engine called them: `const { requestAnimationFrame } = requester`).
 
   readonly requestAnimationFrame = (fn: (time: number) => void): number => {
     this.callback = fn;

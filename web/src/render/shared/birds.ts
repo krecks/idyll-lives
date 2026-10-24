@@ -1,3 +1,7 @@
+// `rotationYawPitchRoll` is ported from Babylon.js 9.30 (`Matrix.RotationYawPitchRollToRef`,
+// `Matrix.FromQuaternionToRef`). Changed for Idyll Lives: on plain arrays.
+// Babylon.js: Copyright 2023 The Babylon.js team, under the Apache License 2.0; its licence and notice
+// are in crates/tools/texts/Babylon.js-LICENSE and Babylon.js-NOTICE, and in a build's THIRD-PARTY-LICENSES.txt.
 /**
  * Garden birds about the viewed lot: blue tits, chaffinches, warblers, blackbirds and collared doves
  * living in its trees, bushes and hedges (and the street's and the woods' near it). Presentation
@@ -32,7 +36,7 @@
  *
  * Engine-neutral: everything above and every number drawn (the parts' matrices, 16 floats each,
  * translation at 12, 13, 14, in game space: `shared/math.ts`, as Babylon's `Matrix` computed them,
- * in 32-bit floats) is here. The engine (`BirdView`: `babylon/birds.ts`, `pc/birds.ts`) builds each
+ * in 32-bit floats) is here. The engine (`BirdView`: `pc/birds.ts`) builds each
  * species' model with its parts as meshes, draws them instanced from the buffers it's handed, and
  * says how far the wind bends a plant.
  */
@@ -415,7 +419,7 @@ export function noBirdLook(failed?: string[]): BirdLook {
 }
 
 /**
- * What the birds ask of the engine that draws them (`babylon/birds.ts`, `pc/birds.ts`). Each species'
+ * What the birds ask of the engine that draws them (`pc/birds.ts`). Each species'
  * look is built once and kept (`look`); its parts' meshes draw instanced, one instance per bird, from
  * the buffers the birds' code writes in place (`setBuffers`, `updated`). Nothing is called per frame
  * with new arrays.

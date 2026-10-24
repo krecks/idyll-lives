@@ -1,3 +1,8 @@
+// Ported from Babylon.js 9.30: `ImageProcessingConfiguration.bind` and `ColorCurves` (`_bind`,
+// `getColorGradingDataToRef`, `FromHSBToRef`). Changed for Idyll Lives: pure functions that write
+// the uniforms of the PlayCanvas port of the shader.
+// Babylon.js: Copyright 2023 The Babylon.js team, under the Apache License 2.0; its licence and notice
+// are in crates/tools/texts/Babylon.js-LICENSE and Babylon.js-NOTICE, and in a build's THIRD-PARTY-LICENSES.txt.
 /**
  * The CPU half of Babylon's image processing (`ImageProcessingConfiguration.bind` and
  * `ColorCurves._bind` in Babylon.js 9.30): the uniforms its `applyImageProcessing` reads, worked

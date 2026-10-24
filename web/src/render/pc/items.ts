@@ -1,5 +1,5 @@
 /**
- * Food and dishes on tables, counters and floors on PlayCanvas (the port of `babylon/items.ts`;
+ * Food and dishes on tables, counters and floors on PlayCanvas (ported from the Babylon renderer, removed: see git history up to f15b839b;
  * sim-core `items.rs`, `ItemPlacement`): a pot of stew on the counter, plates in front of the
  * diners, dirty plates waiting for the sink.
  *

@@ -1,7 +1,7 @@
 /**
  * Build and Buy mode's pointers: the hover tile (`HoverTile`) and the resize handles (`ResizeHandles`).
  *
- * Resize handles (the port of `babylon/handles.ts`): blue arrows around the object picked in Buy
+ * Resize handles (ported from the Babylon renderer, removed: see git history up to f15b839b): blue arrows around the object picked in Buy
  * mode (or a window or door in Build mode), one per side it can grow towards and one pointing up
  * for its height. Arrows on the floor lie flat, arrows on a wall stand in its plane, the height
  * arrow turns to face the camera. They draw over everything (Babylon's rendering group 1: here

@@ -242,7 +242,8 @@ pub fn check(out: &Path) -> bool {
             {
                 fail(format!("{fam}:{name} has {tris} triangles (budget {bg})"));
             }
-            // Babylon front faces are clockwise: cross(b - a, c - a) points against the normals.
+            // The game's front faces are clockwise (Babylon's convention, kept under PlayCanvas's mirrored
+            // root): cross(b - a, c - a) points against the normals.
             let nrm = i16s(&buf, e.at("normals").usize(), n * 4);
             let pt = |i: u16| -> [f32; 3] { [pos[3 * i as usize], pos[3 * i as usize + 1], pos[3 * i as usize + 2]] };
             let nv = |i: u16| -> [f64; 3] { [nrm[4 * i as usize] as f64, nrm[4 * i as usize + 1] as f64, nrm[4 * i as usize + 2] as f64] };
@@ -262,7 +263,7 @@ pub fn check(out: &Path) -> bool {
             }
             let frac = if big > 0 { wrong as f64 / big as f64 } else { 0.0 };
             if frac > 0.05 {
-                fail(format!("{fam}:{name}: {} of the faces wind the wrong way for Babylon", pct(frac)));
+                fail(format!("{fam}:{name}: {} of the faces wind the wrong way (front faces are clockwise)", pct(frac)));
             }
             if let Some(m) = e.get("morph") {
                 let r: Vec<usize> = m.at("ranges").arr().iter().map(JValue::usize).collect();

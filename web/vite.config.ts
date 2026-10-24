@@ -43,8 +43,8 @@ function commit(): string {
 const COMMIT = commit();
 /**
  * This build's id, a query on runtime fetches from public/ (src/assets/build.ts): the commit in CI;
- * locally the commit and the build time, as the tree may hold changes. No dots: Babylon reads a
- * texture's type from the URL's last dot.
+ * locally the commit and the build time, as the tree may hold changes. No dots, so a URL's last dot
+ * is still its file's extension (loaders read a file's type from it).
  */
 const BUILD_ID = process.env.GITHUB_SHA ? COMMIT : `${COMMIT}-${Date.now().toString(36)}`;
 
@@ -206,9 +206,9 @@ function releaseWasm(): Plugin {
  * The sky's lighting starts downloading with the page, next to the game's script and data, instead
  * of once the renderer starts and asks for it: a script in `index.html` fetches it, and
  * `render/pc/env.ts` takes the bytes (`self.__skyEnv`). It is the PlayCanvas copy (`.pcenv`, 0.3 MB,
- * `cargo envconv`) of the base manifest's `environment.sky` (the Babylon `.env` the previews still
- * load themselves). (Not a `<link rel=preload>`: under the isolation service worker Chrome doesn't
- * hand a preload to `fetch()`, and the file would download twice.)
+ * `cargo envconv`) of the base manifest's `environment.sky`, a Babylon `.env` (envconv's source,
+ * which nothing loads at runtime). (Not a `<link rel=preload>`: under the isolation service worker
+ * Chrome doesn't hand a preload to `fetch()`, and the file would download twice.)
  */
 function earlyEnvironment(): Plugin {
   let base = '/';
@@ -392,6 +392,6 @@ export default defineConfig({
   // The voice and language model workers' imports: Vite's start-up scan doesn't reach worker
   // imports, so it would find them only when the first line is spoken, re-bundle and reload the page.
   optimizeDeps: { include: ['onnxruntime-web/wasm', 'onnxruntime-web/webgpu', '@huggingface/tokenizers'] },
-  // The main chunk is about 1.7 MB (Babylon by module, see render/babylon/core.ts): warn if it grows.
-  build: { target: 'es2022', chunkSizeWarningLimit: 2000 },
+  // The main chunk is about 2.5 MB (PlayCanvas's release build and the game): warn if it grows.
+  build: { target: 'es2022', chunkSizeWarningLimit: 2600 },
 });

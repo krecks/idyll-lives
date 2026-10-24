@@ -1,5 +1,5 @@
 /**
- * The residents' shader on PlayCanvas (the port of `CharacterPlugin`, `babylon/characters/material.ts`,
+ * The residents' shader on PlayCanvas (the port of the Babylon renderer's `CharacterPlugin`,
  * and of Babylon's baked-vertex-animation skinning it ran on). Materials: `characterMaterial.ts`.
  *
  * Every resident has a row of the pose texture (`game_simPoses`, RGBA32F, one per app; row layout in

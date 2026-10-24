@@ -1,5 +1,5 @@
 /**
- * Garden birds on PlayCanvas (the port of `babylon/birds.ts`): the engine-neutral birds
+ * Garden birds on PlayCanvas (ported from the Babylon renderer, removed: see git history up to f15b839b): the engine-neutral birds
  * (`shared/birds.ts`: who lives where, how they perch, fly, forage, sing and sleep, and every matrix
  * drawn) as instanced draws (`instancing.ts`), one per mesh of each species' model, its matrices in
  * game space under the world root; only the parts written in a frame go up. They receive the sun's

@@ -1,5 +1,5 @@
 /**
- * The PlayCanvas renderer's own layers (`shared/layers.ts` has Babylon's masks): what no camera draws
+ * The PlayCanvas renderer's own layers: what no camera draws
  * but the sun's shadow map does. PlayCanvas gathers a light's casters from every layer of the
  * composition the light is on, whether a camera renders that layer or not.
  */
@@ -9,7 +9,7 @@ import * as pc from './engine';
 const shadowLayers = new WeakMap<pc.AppBase, pc.Layer>();
 
 /**
- * The layer of draws that only cast the sun's shadow (Babylon's `LAYER_SHADOW_ONLY`: the woods near
+ * The layer of draws that only cast the sun's shadow (the Babylon renderer's shadow-only mask: the woods near
  * the town drawn whole for the shadow map while the game draws them in groups, the house's lid over
  * its rooms, the low preset's merged object shadows), made once per app. The sun lights it
  * (`SunShadows` puts it on the sun's light; `sun` does too, for a caller that has the sun).

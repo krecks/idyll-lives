@@ -1,5 +1,5 @@
 /**
- * The engine-neutral half of the landscape round the town (`babylon/nature.ts`, `pc/nature.ts` draw
+ * The engine-neutral half of the landscape round the town (`pc/nature.ts` draws
  * it): the land's shape (rolling hills, a valley's rim, mountains, fields, a sea or a lake, levelled
  * under the country roads), the terrain's colours, where the woods and the lawn's tufts grow, the
  * lawn hidden indoors, the garden dressing split into species, and the wind's numbers as both

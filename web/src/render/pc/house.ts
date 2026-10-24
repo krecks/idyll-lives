@@ -1,5 +1,5 @@
 /**
- * The house builder on PlayCanvas (the port of `babylon/house.ts`): the viewed lot's house and
+ * The house builder on PlayCanvas (ported from the Babylon renderer, removed: see git history up to f15b839b): the viewed lot's house and
  * the street's houses as the engine-neutral planner writes them (`shared/house.ts`: walls,
  * floors, roofs, doors and windows, the cutaway's data), each part one entity drawing one mesh
  * in the material library's surfaces, and the viewed house's clear glass glowing by room at

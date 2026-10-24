@@ -1,8 +1,8 @@
 /**
  * What the residents' engine-neutral code (`residents.ts`: clips, walking, sitting, faces, props,
  * quilts, the pose texture's data) asks of the engine that draws them: one `ResidentView` per
- * renderer or preview, created before the `Characters` it serves (`babylon/characters.ts`,
- * `pc/characters.ts`).
+ * renderer or preview, created before the `Characters` it serves
+ * (`pc/characters.ts`).
  *
  * The residents' code owns every number that is drawn: the pose texture's data (one row per
  * resident, `layout.ts`), each part mesh's rows, the props' and quilts' instance data and the
@@ -56,7 +56,7 @@ export interface ResidentView<M extends object, Q, P extends ResidentProp> {
   /**
    * The mesh of `body`'s part `part` (`BodyData.parts`; its vertex fields, morph slots and tone, skinned on the GPU
    * from the pose texture by the row of each instance), enabled, its rows given by `setPartRows` before the next
-   * frame. Its material by the part's surface (`parts.ts` `surfaceOf`; `babylon/characters/material.ts`).
+   * frame. Its material by the part's surface (`parts.ts` `surfaceOf`; `pc/characterMaterial.ts`).
    * `shadow`: its shadow-only copy, drawn into the sun's shadow map only (never by a camera), receiving no shadows.
    */
   createPart(body: BodyData, part: string, shadow: boolean): M;

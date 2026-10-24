@@ -1,5 +1,10 @@
+// `evaluate`, `slerp` and `decompose` are ported from Babylon.js 9.30 (`Animation.evaluate`,
+// `Quaternion.Slerp`, `Matrix.decompose`). Changed for Idyll Lives: on the clips' own tracks and
+// plain arrays.
+// Babylon.js: Copyright 2023 The Babylon.js team, under the Apache License 2.0; its licence and notice
+// are in crates/tools/texts/Babylon.js-LICENSE and Babylon.js-NOTICE, and in a build's THIRD-PARTY-LICENSES.txt.
 /**
- * Builds renderable templates from asset entries on PlayCanvas (the port of `babylon/models.ts`):
+ * Builds renderable templates from asset entries on PlayCanvas (ported from the Babylon renderer, removed: see git history up to f15b839b):
  * glTF files, or nothing when there's no file or it doesn't load (a plain box for things placed,
  * held or pictured, `BuildOptions.standIn`). A file that fails is tried again in the background,
  * and whoever drew the box builds it again once it comes (`onModelFileArrived`, `TemplateCache`).

@@ -3,7 +3,7 @@
  * with explicit normals, metre-scale UVs, sRGB vertex colours and an optional per-vertex
  * cutaway attribute (see `WallCutPlugin` in materials.ts). Winding is derived from the normal,
  * so meshes work with back-face culling. Engine-neutral: `meshData` hands the arrays to the
- * renderer, which uploads them (`babylon/meshes.ts` `toMesh`).
+ * renderer, which uploads them (`pc/meshes.ts` `meshFrom`).
  */
 
 export type V3 = readonly [number, number, number];

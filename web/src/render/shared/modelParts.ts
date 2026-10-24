@@ -1,3 +1,9 @@
+// Ported from Babylon.js 9.30: the mesh builders (`CreateCylinderVertexData`, `CreateSphereVertexData`,
+// `CreateTorusVertexData`, `CreateCapsuleVertexData`, `CreateIcoSphereVertexData`) and `VertexData`'s
+// `ComputeNormals`, `_FlipFaces` and `transform`. Changed for Idyll Lives: cut down to the options the
+// parts use, without their UVs, on plain arrays.
+// Babylon.js: Copyright 2023 The Babylon.js team, under the Apache License 2.0; its licence and notice
+// are in crates/tools/texts/Babylon.js-LICENSE and Babylon.js-NOTICE, and in a build's THIRD-PARTY-LICENSES.txt.
 /**
  * The geometry of models, engine-neutral: primitive parts (`PrimitivePart`: boxes with rounded
  * edges, cylinders, cones, spheres, capsules, tori, lathes, lumpy blobs) as vertex arrays in model
@@ -8,8 +14,8 @@
  *
  * The shapes are ports of Babylon.js's `CreateCylinderVertexData`, `CreateSphereVertexData`,
  * `CreateTorusVertexData`, `CreateCapsuleVertexData`, `CreateIcoSphereVertexData` and
- * `VertexData.ComputeNormals` (Apache-2.0, Copyright (c) Microsoft Corporation), cut down to the
- * options the parts use: the same vertices in the same order (`web/tests/modelParts.test.ts`).
+ * `VertexData.ComputeNormals`, cut down to the options the parts use: the same vertices in the
+ * same order (`web/tests/modelParts.test.ts`).
  * Their UVs are left out: every part gets metre-scale box-projected ones (`boxProjectUVs`).
  */
 

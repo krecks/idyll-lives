@@ -20,7 +20,7 @@ Flowers), then the G3 shrubs (Validate › Shrubs) and the G4 edibles (Validate 
 
 ## Wind
 
-The nature shader (`render/babylon/nature.ts`, `installNature`) hooks the shared `material.finish.foliage` and
+The nature shader (`render/pc/nature.ts`, `installNature`) hooks the shared `material.finish.foliage` and
 `bark` materials, which a file's parts mapped to those finishes are drawn with, so the files sway as the
 old parts do: with the wind on, two frames 1.5 s apart differ in about 9,500 pixels of the fern and none of the
 cacti (gallery, WebGPU). Heights are from the floor (the still part's origin), so the bend grows with the plant.

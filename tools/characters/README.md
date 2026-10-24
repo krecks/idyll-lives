@@ -50,9 +50,9 @@ The generator's `.rs` files are in `crates/tools/src/characters/`.
 | hairstyles and the beard | `hair.rs`, built from `prims.rs` |
 | garment cuts and shells | `clothes.rs`, `garments.rs` |
 | clips | `clips/*.ts` (`dsl.ts` for the format, `ik.ts` for arm and leg placement) |
-| how residents use clips, seats, beds, carried things | `web/src/render/babylon/characters.ts` |
+| how residents use clips, seats, beds, carried things | `web/src/render/shared/characters/` (`residents.ts`, `seats.ts`, `props.ts`) |
 | colours, garments per family, pyjamas | `web/src/render/shared/characters/outfit.ts` |
-| shading (skin, painted clothes, eyes, hair) | `web/src/render/babylon/characters/material.ts` |
+| shading (skin, painted clothes, eyes, hair) | `web/src/render/pc/characterMaterial.ts`, `web/src/render/pc/shaders/character.ts` |
 | moods and micro-expressions | `web/src/render/shared/characters/face.ts` |
 
 ## Benches

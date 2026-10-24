@@ -60,6 +60,11 @@ export class Placing {
     this.fx = new BuildEffects(app, root, camera);
   }
 
+  /** The thing in hand's red copy's materials, without and with vertex colours (the renderer's warm-up). */
+  get ghostMaterials(): readonly [pc.Material, pc.Material] {
+    return this.ghost.redCopy;
+  }
+
   set reducedMotion(on: boolean) {
     this.ghost.reducedMotion = on;
     this.fx.reducedMotion = on;

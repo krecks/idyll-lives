@@ -1,5 +1,5 @@
 /**
- * Moonlight grade (the port of `babylon/nightGrade.ts`): at night, moonlit tones lose their
+ * Moonlight grade (ported from the Babylon renderer, removed: see git history up to f15b839b): at night, moonlit tones lose their
  * colour and turn blue-grey while warm, lamp-lit pixels (windows, interiors, streetlight pools:
  * red above blue) and very bright ones keep their colour, so they pop.
  *

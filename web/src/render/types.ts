@@ -27,7 +27,7 @@ export interface ViewRect {
 
 /**
  * How busy the garden birds are at an hour (0..1, by day; they roost at night): most at dawn and in
- * the early evening, least round midday. What they do (render/babylon/birds.ts) and how much they
+ * the early evening, least round midday. What they do (render/shared/birds.ts) and how much they
  * sing (audio/world.ts) both follow it, so what's seen and heard peak together.
  */
 export function birdActivity(hour: number): number {
@@ -74,7 +74,7 @@ export interface RenderStats {
   renderWidth: number;
   renderHeight: number;
   renderScale: number;
-  /** The display's refresh rate as measured (Hz), and every how many refreshes a frame is drawn (the frame rate cap; `babylon/pacing.ts`). */
+  /** The display's refresh rate as measured (Hz), and every how many refreshes a frame is drawn (the frame rate cap; `shared/pacing.ts`). */
   refreshHz: number;
   refreshDivisor: number;
   /** GPU time per frame (ms) while it is measured (`measureGpu`); null: not measured, or the browser can't. */
@@ -142,14 +142,14 @@ export interface RendererDeps {
 }
 
 /**
- * How lit surfaces are drawn (`babylon/softLook.ts`): `soft`, the game's painterly shading, or
+ * How lit surfaces are drawn (`pc/shaders/softLook.ts`): `soft`, the game's painterly shading, or
  * `classic`, the PBR shading it replaced.
  */
 export type Shading = 'soft' | 'classic';
 
 /** Settings that can change while a game is running. */
 export interface LiveRenderOptions {
-  /** `auto` (native up to about 1920×1080 pixels) or a share of native resolution along each side, 0.5..1 (`babylon/resolution.ts`). */
+  /** `auto` (native up to about 1920×1080 pixels) or a share of native resolution along each side, 0.5..1 (`shared/resolution.ts`). */
   resolution: 'auto' | number;
   cameraSensitivity: number;
   /** Frames per second at most; 0: as many as the display shows. */
@@ -157,14 +157,14 @@ export interface LiveRenderOptions {
   /** Reduce motion (the setting or the system's): decorative movement in the scene stands still. */
   reducedMotion?: boolean;
   /**
-   * How lit surfaces are drawn (`babylon/softLook.ts`): `soft`, the game's painterly shading, or
+   * How lit surfaces are drawn (`pc/shaders/softLook.ts`): `soft`, the game's painterly shading, or
    * `classic`, the PBR shading it replaced. Absent: leave the scene's shading as it is.
    */
   shading?: Shading;
 }
 
 /** Translucent preview of an object being placed in buy mode. */
-/** Buy-mode feedback played in the world (see `render/babylon/buildFx.ts`). */
+/** Buy-mode feedback played in the world (see `render/shared/buildFx.ts`). */
 export interface BuildEffect {
   kind: 'place' | 'upgrade' | 'sell' | 'build' | 'remove';
   /** Tile rectangle it covers. */
@@ -178,7 +178,7 @@ export interface BuildEffect {
   y?: number;
 }
 
-/** An object the player resized (see `render/babylon/models.ts` `resizeMaps`): its kind's footprint (tiles) and its own size (m), across and deep before turning, and centimetres taller. */
+/** An object the player resized (see `render/shared/modelParts.ts` `resizeMaps`): its kind's footprint (tiles) and its own size (m), across and deep before turning, and centimetres taller. */
 export interface ObjectResize {
   from: [number, number];
   size: [number, number];
@@ -388,7 +388,7 @@ export interface Renderer {
   project(x: number, y: number, z: number, out: { x: number; y: number }): boolean;
   /** Interpolated world position above Sim `index`'s head from the last update; false if unknown. */
   simHead(index: number, out: { x: number; y: number; z: number }): boolean;
-  /** The garden birds drawn about the viewed lot (render/babylon/birds.ts), for the world's sound: kept and refilled, read it at once. */
+  /** The garden birds drawn about the viewed lot (render/shared/birds.ts), for the world's sound: kept and refilled, read it at once. */
   birds(): readonly SeenBird[];
   /** Bird `id` (`SeenBird.id`) sings for `seconds`: it lifts its head meanwhile. */
   birdSings(id: number, seconds: number): void;

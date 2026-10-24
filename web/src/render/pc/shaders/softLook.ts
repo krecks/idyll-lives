@@ -1,5 +1,5 @@
 /**
- * The soft look on PlayCanvas (the port of `babylon/softLook.ts`): PBR's light, drawn as a wide,
+ * The soft look on PlayCanvas (ported from the Babylon renderer's): PBR's light, drawn as a wide,
  * soft ramp in the light's own colour. The light that falls on the surface (the sun and the lamps,
  * with their cast shadows, and the sky's hemispheric fill) keeps its amount and colour but is
  * redrawn as a wide ramp; the environment around it (the sky's ambient, with its occlusion, and

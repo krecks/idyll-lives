@@ -1,6 +1,6 @@
 /**
- * The roads that connect a town with the world outside, as PlayCanvas draws them (the port of
- * `babylon/roads.ts`): the road surfaces, their centre lines and a "Welcome to …" sign by the way
+ * The roads that connect a town with the world outside, as PlayCanvas draws them (ported from
+ * the Babylon renderer, removed: see git history up to f15b839b): the road surfaces, their centre lines and a "Welcome to …" sign by the way
  * into town. Where they go (and the side roads of a town of several streets) is
  * `shared/countryRoads.ts`'s; the landscape (`nature.ts`) levels the ground under them and hands
  * them here (`Landscape.build`'s `buildRoads`).

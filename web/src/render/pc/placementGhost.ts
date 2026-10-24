@@ -168,6 +168,11 @@ export class PlacementGhostView {
     mesh.decRefCount();
   }
 
+  /** The red copy's materials, without and with vertex colours (the renderer's warm-up draws them once). */
+  get redCopy(): readonly [pc.Material, pc.Material] {
+    return this.redMaterials;
+  }
+
   /** The thing in hand, or none (`Renderer.setPlacementGhost`). Cheap: every pointer move. */
   set(ghost: PlacementGhost | null): void {
     if (!ghost) {

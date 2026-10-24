@@ -1,3 +1,7 @@
+// `compose` and `rotationOf` are ported from Babylon.js 9.30 (`Matrix.ComposeToRef`, `Matrix.decompose`,
+// `Quaternion.FromRotationMatrixToRef`). Changed for Idyll Lives: on the rig's own records.
+// Babylon.js: Copyright 2023 The Babylon.js team, under the Apache License 2.0; its licence and notice
+// are in crates/tools/texts/Babylon.js-LICENSE and Babylon.js-NOTICE, and in a build's THIRD-PARTY-LICENSES.txt.
 /**
  * A resident's animation state (`SimRig`, one per resident row) and its clip players, with the small helpers the
  * residents' code shares (`residents.ts`).

@@ -1,5 +1,5 @@
 /**
- * The landscape round the town on PlayCanvas (the port of `babylon/nature.ts`): terrain with
+ * The landscape round the town on PlayCanvas (ported from the Babylon renderer, removed: see git history up to f15b839b): terrain with
  * rolling hills, the sea or a lake, the country roads (drawn by whoever is handed them, `buildRoads`),
  * forests, lawn details, and the sky dome with its band of clouds. Everything is static and
  * instanced (`instancing.ts`: a draw call per model type, and in the game per area: the groups of
@@ -176,7 +176,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     mesh.setColors(colors);
     mesh.setIndices(indices);
     mesh.update(pc.PRIMITIVE_TRIANGLES);
-    return drawOf(parent, 'terrain', mesh, MaterialLibrary.for(app).surface('material.ground', { vertexColors: true }));
+    return drawOf(app, parent, 'terrain', mesh, MaterialLibrary.for(app).surface('material.ground', { vertexColors: true }));
   }
 
   /**
@@ -205,7 +205,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     mat.blendType = pc.BLEND_NORMAL;
     MaterialLibrary.for(app).adopt(mat);
     mat.update();
-    return drawOf(parent, 'water', mesh, mat);
+    return drawOf(app, parent, 'water', mesh, mat);
   }
 
   /** The woods (`woods`), each model instanced, in groups by sector round the town. */
@@ -235,9 +235,9 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   }
 }
 
-/** An entity drawing `mesh` with `material`, switched off, under `parent`; it receives shadows and casts none. */
-function drawOf(parent: pc.Entity, name: string, mesh: pc.Mesh, material: pc.Material): pc.Entity {
-  const entity = new pc.Entity(name);
+/** An entity of `app` drawing `mesh` with `material`, switched off, under `parent`; it receives shadows and casts none. */
+function drawOf(app: pc.AppBase, parent: pc.Entity, name: string, mesh: pc.Mesh, material: pc.Material): pc.Entity {
+  const entity = new pc.Entity(name, app);
   entity.addComponent('render', { meshInstances: [new pc.MeshInstance(mesh, material)], castShadows: false, receiveShadows: true });
   entity.enabled = false;
   parent.addChild(entity);
@@ -575,7 +575,7 @@ export class Sky {
     mat.emissiveVertexColor = true;
     mat.cull = pc.CULLFACE_NONE;
     mat.update();
-    this.dome = new pc.Entity('sky');
+    this.dome = new pc.Entity('sky', app);
     this.dome.addComponent('render', { meshInstances: [new pc.MeshInstance(mesh, mat)], castShadows: false, receiveShadows: false });
     // (It moves with the camera, which is always inside it.)
     this.dome.render!.meshInstances[0].cull = false;
@@ -630,7 +630,7 @@ export class Sky {
         cm.opacity = 1;
         cm.update();
       });
-      const entity = (this.band = new pc.Entity('clouds'));
+      const entity = (this.band = new pc.Entity('clouds', app));
       entity.addComponent('render', { meshInstances: [new pc.MeshInstance(band, cm)], castShadows: false, receiveShadows: false });
       entity.render!.meshInstances[0].cull = false;
       this.dome.addChild(entity);

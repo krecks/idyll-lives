@@ -6,10 +6,13 @@
 // moved out of the Babylon renderer (Stage 7), where a side-by-side run against the Babylon version before the
 // move showed no difference in any frame (bench-results/stage7b/equal.ts).
 //
-// Also: the Babylon matrix maths the residents' code carries (`rig.ts`) against Babylon's own, number for number.
+// Also: the Babylon matrix maths the residents' code carries (`rig.ts`) against Babylon's own, number for number
+// (fixtures recorded from Babylon 9.30 for the inputs recorded with them, `fixtures/babylon/residents.json`, made
+// by `fixtures/record-babylon.ts`, which needs a Babylon reference checkout to run again).
 import { describe, expect, test } from 'bun:test';
 import { readFileSync, existsSync } from 'node:fs';
-import { Matrix, Quaternion, Vector3 } from '@babylonjs/core/Maths/math.vector';
+import { quatYawPitchRoll } from '../src/render/shared/math';
+import { fixture, numbers as recorded, type Numbers } from './fixtures/babylon';
 
 const WEB = new URL('../', import.meta.url).pathname;
 
@@ -33,35 +36,37 @@ function hash(a: ArrayLike<number> | null | undefined, from = 0, to = a?.length 
 
 describe('Babylon matrix maths in rig.ts', async () => {
   const rig = await import('../src/render/shared/characters/rig');
+  const B = fixture<{
+    cases: number;
+    compose: { q: Numbers; t: Numbers; ride: Numbers; composed: Numbers; multiplied: Numbers; rotation: Numbers };
+    bindY: { inverseBinds: Numbers; heights: Numbers };
+  }>('residents');
   const bits = (a: ArrayLike<number>) => Array.from(Float32Array.from(a));
+  /** The `n`th run of `size` numbers. */
+  const nth = (a: ArrayLike<number> & { slice(from: number, to: number): ArrayLike<number> }, n: number, size: number) => Array.from(a.slice(n * size, (n + 1) * size));
   test('a placement carried by a ride, as Babylon composes, multiplies and decomposes it', () => {
-    const r = numbers(5);
-    const s = (k = 1) => (r() * 2 - 1) * k;
-    for (let n = 0; n < 200; n++) {
-      const q = Quaternion.RotationYawPitchRoll(s(3), s(1), s(0.5));
-      const t = new Vector3(s(9), s(2), s(9));
-      const ride = Matrix.Compose(new Vector3(1, 1, 1), Quaternion.RotationYawPitchRoll(s(0.3), s(0.3), s(0.3)), new Vector3(s(), s(), s()));
+    const [q, t, ride, composed, multiplied, rotation] = [B.compose.q, B.compose.t, B.compose.ride, B.compose.composed, B.compose.multiplied, B.compose.rotation].map((n) => recorded(n) as Float32Array);
+    expect(B.cases).toBe(200);
+    for (let n = 0; n < B.cases; n++) {
+      const [qx, qy, qz, qw] = nth(q, n, 4);
+      const [tx, ty, tz] = nth(t, n, 3);
       const ours = new Float32Array(16);
-      rig.compose(1, 1, 1, q.x, q.y, q.z, q.w, t.x, t.y, t.z, ours);
-      const theirs = Matrix.Compose(new Vector3(1, 1, 1), q, t);
-      expect(bits(ours)).toEqual(bits(theirs.m));
-      rig.multiply(ours, ride.m, ours);
-      theirs.multiplyToRef(ride, theirs);
-      expect(bits(ours)).toEqual(bits(theirs.m));
+      rig.compose(1, 1, 1, qx, qy, qz, qw, tx, ty, tz, ours);
+      expect(bits(ours)).toEqual(nth(composed, n, 16));
+      rig.multiply(ours, nth(ride, n, 16), ours);
+      expect(bits(ours)).toEqual(nth(multiplied, n, 16));
       const out = { qx: 0, qy: 0, qz: 0, qw: 1 };
       rig.rotationOf(ours, out);
-      const dq = new Quaternion();
-      theirs.decompose(new Vector3(), dq, new Vector3());
-      expect([out.qx, out.qy, out.qz, out.qw]).toEqual([dq.x, dq.y, dq.z, dq.w]);
+      expect([out.qx, out.qy, out.qz, out.qw]).toEqual(nth(rotation, n, 4));
     }
   });
   test("a bone's height at rest, as Babylon inverts the inverse bind matrix", () => {
-    const r = numbers(9);
+    const inverseBinds = recorded(B.bindY.inverseBinds) as Float32Array;
+    const heights = recorded(B.bindY.heights);
     const m = new Float32Array(32);
-    for (let n = 0; n < 200; n++) {
-      const a = Matrix.Compose(new Vector3(1, 1, 1), Quaternion.RotationYawPitchRoll(r() * 6, r() - 0.5, r() - 0.5), new Vector3(r() - 0.5, r() * 1.8, r() - 0.5)).invert();
-      m.set(a.m, 16);
-      expect(rig.bindY(m, 1)).toBe(Matrix.FromArray(m, 16).invert().m[13]);
+    for (let n = 0; n < B.cases; n++) {
+      m.set(nth(inverseBinds, n, 16), 16);
+      expect(rig.bindY(m, 1)).toBe(heights[n]);
     }
   });
 });
@@ -81,6 +86,7 @@ describe('residents', async () => {
   const { TemplateCache } = await import('../src/render/shared/templateCache');
   const { Pose } = await import('../src/core/snapshot');
   const { slotPlace } = await import('../src/render/shared/objectMotion');
+  const rig = await import('../src/render/shared/characters/rig');
   type View = import('../src/render/shared/characters/view').ResidentView<Part, Quilt, Prop>;
   type ResidentProp = import('../src/render/shared/characters/view').ResidentProp;
   type SnapshotLayout = import('../src/core/snapshot').SnapshotLayout;
@@ -332,7 +338,14 @@ describe('residents', async () => {
       characters.setTables(new Map(objects.map((o) => [o.id, { host: o.id, top: 0.75, boxes: Float32Array.of(-0.5, 0.5, 0.7, 0.76, 0.35, 1.1) }])));
       const ride = new Float32Array(16);
       let t = 0;
-      characters.setRide((id) => (objects[id]?.def === 'rockingHorse' ? Matrix.Compose(new Vector3(1, 1, 1), Quaternion.RotationYawPitchRoll(0, 0.2 * Math.sin(t * 3), 0), new Vector3(0, 0.03, 0)).copyToArray(ride) && ride : null));
+      const rock = [0, 0, 0, 1] as [number, number, number, number];
+      characters.setRide((id) => {
+        if (objects[id]?.def !== 'rockingHorse') return null;
+        // (As Babylon's `Matrix.Compose`, number for number: see the rig's maths above.)
+        quatYawPitchRoll(0, 0.2 * Math.sin(t * 3), 0, rock);
+        rig.compose(1, 1, 1, rock[0], rock[1], rock[2], rock[3], 0, 0.03, 0, ride);
+        return ride;
+      });
       characters.setSun(() => ({ x: -0.45, z: -0.35 }));
       characters.setLoop(() => (t * 0.4) % 1);
       characters.select(1);

@@ -7,7 +7,7 @@
  * in the one mesh: no draw of its own.
  *
  * Engine-neutral: `planFences` writes the geometry and the gates' leaves, `swungGate` where a
- * leaf's vertices go as it swings; `babylon/fences.ts` and `pc/fences.ts` draw them.
+ * leaf's vertices go as it swings; `pc/fences.ts` draws them.
  */
 
 import type { FenceStyleDef } from '../../content/content';

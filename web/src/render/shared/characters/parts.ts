@@ -49,7 +49,7 @@ export interface PartMesh<M> {
 export const Range = { Always: 0, Near: 1, Far: 2 } as const;
 export type Range = (typeof Range)[keyof typeof Range];
 
-/** The surface a part is drawn with (each engine's resident material, `babylon/characters/material.ts`). */
+/** The surface a part is drawn with (the engine's resident material, `pc/characterMaterial.ts`). */
 export type CharacterSurface = 'body' | 'cloth' | 'hair' | 'brow' | 'lash' | 'mouth' | 'eye';
 
 /** The surface part `part` is drawn with. */

@@ -1,5 +1,5 @@
 /**
- * Fences and gates the player builds on PlayCanvas (the port of `babylon/fences.ts`): one mesh of
+ * Fences and gates the player builds on PlayCanvas (ported from the Babylon renderer, removed: see git history up to f15b839b): one mesh of
  * every fence edge in its style, as `shared/fences.ts` writes it (posts on the grid corners they
  * share, a gate a framed leaf between two stout posts), in the plain finish. A gate swings open
  * for someone going through it (`swingGate`) by moving its vertices in the one mesh: no draw of

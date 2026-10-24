@@ -1,8 +1,8 @@
 # The ground cover, the woods' rocks and the selection marker: the lawn's grass tuft (`model.grassTuft`) and
 # wildflowers (`model.flowers`), drawn by the thousand as thin instances on every unpaved tile and round the town
-# (render/babylon/nature.ts `lawns`); the rock scattered in the woods (`model.rock`, nature.ts `forests`, always
+# (render/shared/nature.ts `lawns`); the rock scattered in the woods (`model.rock`, nature.ts `forests`, always
 # its far version there, without a shadow); and the sparkle star over the selected resident (`model.marker`,
-# BabylonRenderer `setupMarker`). Notes: ground.md.
+# render/pc/selectionMarker.ts). Notes: ground.md.
 #
 # The lawn's two stay cheap (the tuft 30 triangles, of which the camera draws half, where the old part's 36 were
 # mostly degenerate cone tips and hidden caps; the flowers 266 in one draw call where the old part took 192 in

@@ -1,3 +1,7 @@
+// `babylon_irradiance` is ported from Babylon.js 9.30 (`SphericalHarmonics.FromPolynomial`,
+// `preScaleForRendering`). Changed for Idyll Lives: in Rust, for the `.pcenv` it writes.
+// Babylon.js: Copyright 2023 The Babylon.js team, under the Apache License 2.0; its licence and notice
+// are in crates/tools/texts/Babylon.js-LICENSE and Babylon.js-NOTICE, and in a build's THIRD-PARTY-LICENSES.txt.
 //! `cargo envconv`: the sky's image-based lighting for PlayCanvas, converted from the Babylon `.env`
 //! the game has lit its world with (`web/public/assets/env/belfast_open_field.env`, prefiltered
 //! offline from a CC0 HDRI). Writes `<name>.pcenv` next to it, which `web/src/render/pc/env.ts`
@@ -9,7 +13,7 @@
 //!
 //! The game's world is Babylon's left-handed space, drawn by PlayCanvas under a root mirrored in z
 //! (`render/pc/space.ts`), and the `.env` was turned round the vertical (`rotationY`, 0.35π in
-//! `babylon/materials.ts`). Both are baked in here, so PlayCanvas samples the sky as it is without
+//! the Babylon renderer, removed: see git history up to f15b839b). Both are baked in here, so PlayCanvas samples the sky as it is without
 //! a rotation of its own:
 //!
 //! - Babylon looks up the cube at `R·g`, `g` the game-space direction and `R` its `rotationY`.
@@ -38,7 +42,7 @@ const ENV_MAGIC: [u8; 8] = [0x86, 0x16, 0x87, 0x96, 0xf6, 0xd6, 0x96, 0x36];
 pub const PCENV_MAGIC: &[u8; 8] = b"IDLLENV1";
 /// The faces written (PlayCanvas reprojects them into its 128 lighting source anyway).
 pub const OUT_SIZE: usize = 128;
-/// Babylon's `CubeTexture.rotationY` for the sky (`babylon/materials.ts` `loadEnvironment`).
+/// Babylon's `CubeTexture.rotationY` for the sky, as the Babylon renderer set it (`loadEnvironment`).
 pub const ROTATION_Y: f64 = PI * 0.35;
 
 pub fn main_with(args: &[String]) -> i32 {
@@ -86,6 +90,7 @@ pub struct PcEnv {
     pub sh: [[f64; 3]; 9],
 }
 
+#[allow(clippy::needless_range_loop)] // (Channels by index, as the polynomial is laid out.)
 pub fn read_env(bytes: &[u8]) -> Result<BabylonEnv, String> {
     if bytes.len() < 9 || bytes[..8] != ENV_MAGIC {
         return Err("not a Babylon .env (magic)".into());
@@ -324,6 +329,7 @@ pub fn eval_sh(sh: &[[f64; 3]; 9], n: [f64; 3], ch: usize) -> f64 {
 /// It is a quadratic form `b·m + mᵀAm` with `m = M n` (`M` linear), so in `n` it is
 /// `(Mᵀb)·n + nᵀ(MᵀAM)n`, and on the unit sphere (x² + y² + z² = 1) that is exactly the nine
 /// functions PlayCanvas evaluates.
+#[allow(clippy::needless_range_loop)] // (Matrix arithmetic by index.)
 pub fn sh_from_polynomial(p: &[[f64; 3]; 9]) -> [[f64; 3]; 9] {
     // M's columns: where the axes go.
     let cols = [babylon_dir_for_normal([1.0, 0.0, 0.0]), babylon_dir_for_normal([0.0, 1.0, 0.0]), babylon_dir_for_normal([0.0, 0.0, 1.0])];
@@ -468,6 +474,7 @@ mod tests {
     /// Babylon's runtime irradiance (its harmonics, `computeEnvironmentIrradiance`) as the polynomial
     /// `babylon_irradiance` gives, at a few directions worked out by hand from Babylon's code.
     #[test]
+    #[allow(clippy::needless_range_loop)]
     fn babylon_irradiance_is_its_harmonics() {
         let p = [[0.06, 0.07, 0.08], [0.37, 0.4, 0.5], [0.03, -0.02, 0.04], [0.63, 0.6, 0.66], [0.67, 0.7, 0.71], [0.64, 0.65, 0.68], [0.01, 0.03, -0.02], [0.02, -0.01, 0.009], [0.05, 0.04, -0.03]];
         let q = babylon_irradiance(&p);

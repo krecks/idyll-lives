@@ -24,7 +24,7 @@
  * - Models built in Blender (`.glb` files, downloaded like the rest), plus a CC0 concrete texture for the sidewalks.
  *
  * Engine-neutral: `planStreet` lays the street out and writes its geometry and its models'
- * instances (`StreetPlan`); the renderers' `Street`s (`babylon/street.ts`, `pc/street.ts`) draw it.
+ * instances (`StreetPlan`); the renderer's `Street` (`pc/street.ts`) draws it.
  */
 
 import type { ModelEntry } from '../../assets/types';
@@ -71,7 +71,7 @@ const FENCE_WHITE = '#F2F0EA';
 const RAIL_WOOD = '#8A6F52';
 /**
  * How far neighbours' fences (and hedges, their middle) keep from the viewed lot's edge: clear of
- * the pit dug round it while its basement is in view (`PIT_MARGIN` in BabylonRenderer).
+ * the pit dug round it while its basement is in view (`PIT_MARGIN` in PlayCanvasRenderer).
  */
 const LOT_CLEARANCE = { picket: 0.4, rail: 0.4, hedge: 0.8 };
 

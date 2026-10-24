@@ -1,6 +1,6 @@
 /**
- * Physically based materials and image-based lighting on PlayCanvas (the port of
- * `babylon/materials.ts`).
+ * Physically based materials and image-based lighting on PlayCanvas (ported from the Babylon
+ * renderer's material library).
  *
  * - Lot surfaces (walls, floors, roads, terrain) and the "finishes" of primitive parts (fabric, wood,
  *   ceramic, metal, ...) are `StandardMaterial`s in the metalness workflow, built from manifest
@@ -204,8 +204,8 @@ const ROOM_MASK_W = 256;
 const ROOM_MASK_H = 256 * 4;
 
 /**
- * Which room each tile of the lot in view is in, so lamps light only their own (the port of
- * `babylon/roomLights.ts`; the test is in the clustered lights' loop, `shaders/roomLights.ts`):
+ * Which room each tile of the lot in view is in, so lamps light only their own (ported from the
+ * Babylon renderer's room lights; the test is in the clustered lights' loop, `shaders/roomLights.ts`):
  * `mask` has two bytes per tile (low, high) in its corner, `area` the lot (x0, z0 in metres, then w,
  * d in tiles), `band` its storeys (the lowest, how many, the storey height, and 1 while masking:
  * nothing is masked at 0). Uniforms only: masking costs no shader of its own.

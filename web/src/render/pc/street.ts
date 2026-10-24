@@ -1,5 +1,5 @@
 /**
- * The neighbourhood around the viewed lot on PlayCanvas (the port of `babylon/street.ts`): the
+ * The neighbourhood around the viewed lot on PlayCanvas (ported from the Babylon renderer, removed: see git history up to f15b839b): the
  * street as `shared/street.ts` lays it out (`planStreet`: the neighbours' houses, sidewalks,
  * streetlights and their pools of light, kerbside furniture, cars, fences and hedges, gardens,
  * public places' things), drawn as a handful of meshes (one per material) and instanced models

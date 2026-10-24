@@ -1,6 +1,6 @@
 /**
- * Shader features of the surfaces themselves (the ports of `VertexTweaksPlugin`, `PatternPlugin`
- * and `PlainFinishPlugin` in `babylon/materials.ts`):
+ * Shader features of the surfaces themselves (the ports of the Babylon renderer's
+ * `VertexTweaksPlugin`, `PatternPlugin` and `PlainFinishPlugin`):
  *
  * - Vertex tweaks. Vertex colours are authored in sRGB: PlayCanvas converts them itself
  *   (`vertexColorGamma`), and `GAME_SRGB_COLORS` does the same for a per-instance colour

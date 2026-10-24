@@ -1,6 +1,6 @@
 /**
- * `?diag=albedo` and `?diag=normals` (`debug/benchFlags.ts`) on PlayCanvas (the port of
- * `babylon/diagView.ts`): every lit surface drawn as its base colour or its world normal instead
+ * `?diag=albedo` and `?diag=normals` (`debug/benchFlags.ts`) on PlayCanvas (ported from the
+ * Babylon renderer's diag view): every lit surface drawn as its base colour or its world normal instead
  * of its shading, for screenshots that compare geometry and colour with the lighting left out
  * (checked against the Babylon renderer's pictures).
  *

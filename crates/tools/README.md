@@ -14,7 +14,7 @@ Every tool's `src/<name>.rs` opens with what it does and its arguments; this pag
 | `cargo characters` | The residents generator: rig, body, face, hair and clothes from code, plus its checks (was `tools/characters/prim/`). |
 | `cargo check-glb` | The gate for the game's glTF models: reads every `.glb` a model entry uses and checks what the game needs of it (was `tools/art/blender/check_glb.py`). |
 | `cargo content` | Moves catalog items into the Validate category and back (was `tools/content/validate.py`). |
-| `cargo decoders` | Refreshes `web/public/decoders/`, the decoders Babylon would otherwise fetch from its CDN, which the cross-origin isolated page can't use (was `tools/assets/decoders.mjs`). |
+| `cargo decoders` | Refreshes `web/public/decoders/basis/`, PlayCanvas's Basis transcoder, which the cross-origin isolated page can't fetch from a CDN (was `tools/assets/decoders.mjs`). |
 | `cargo envconv` | The sky's lighting for PlayCanvas: converts the Babylon `.env` in `web/public/assets/env/` into a `.pcenv` (cube faces turned and mirrored into the PlayCanvas renderer's space, and the ambient as spherical harmonics). The output is committed; run it when the `.env` changes. |
 | `cargo fetch-voice` | The voice model and the pronunciation dictionary into `web/public/voice/` (was `tools/voice/fetch.mjs`, `fp16.mjs`). |
 | `cargo fetch-llm` | The language model into `web/public/llm/` (was `tools/llm/fetch.mjs`). |
@@ -51,10 +51,12 @@ What each release tool does, in more words than the table above:
   `web/.assets/wasm-opt/`; the dev server keeps the WASM with its names.
 - **`cargo licenses`** — `dist/THIRD-PARTY-LICENSES.txt` in production builds: the npm packages found
   in the bundles (the page's and every worker's), the Rust crates in both WASM files (`cargo metadata
-  --locked --offline`), files shipped as they are (Inter, the meshopt decoder), the texts kept in
-  [`texts/`](texts/) (the Zstandard decoder's, shipped as a file, and TalkingHead's, whose expressions
+  --locked --offline`), files shipped as they are (Inter), the texts kept in [`texts/`](texts/) (the
+  Basis Universal transcoder's, shipped as a file; Babylon.js's licence and notice, for the parts of
+  the renderer ported from it, each of which says so in a header; TalkingHead's, whose expressions
   are adapted in code) and the licences of the voice model, the dictionary and the language model,
-  each text once. The build fails if a licence text is missing.
+  each text once. The build fails if a licence text is missing; its test checks the kept texts and
+  that the files with Babylon.js code and their headers match its list (`BABYLON_PORTED`).
 
 Numbers to know:
 - `wasm-opt`: on an M3 Pro, the simulation's WASM took 48–55 s from cold and the voice's 3 s. Expect

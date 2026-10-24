@@ -8,10 +8,13 @@
 // before the move showed no difference in any frame (bench-results/stage9c/equal.ts).
 //
 // Also: the matrices a bird's parts are drawn with, against Babylon's own maths as the Babylon renderer wrote
-// them, number for number; and no bird ever flies through a house.
+// them, number for number (fixtures recorded from Babylon 9.30 for the poses recorded with them,
+// `fixtures/babylon/birds.json`, made by `fixtures/record-babylon.ts`, which needs a Babylon reference checkout
+// to run again); and no bird ever flies through a house.
 import { describe, expect, test } from 'bun:test';
 import { readFileSync, existsSync } from 'node:fs';
-import { Matrix, Quaternion, Vector3 } from '@babylonjs/core/Maths/math.vector';
+import { translation } from '../src/render/shared/math';
+import { fixture, numbers as recorded, type Numbers } from './fixtures/babylon';
 
 const WEB = new URL('../', import.meta.url).pathname;
 
@@ -69,7 +72,7 @@ describe('garden birds', async () => {
       if (known) return known;
       const entry = assets.get(key, 'model') as BirdEntry;
       const failed = id === 'warbler' && !warblerComes;
-      const rests = BIRD_PARTS.map((_, k) => Matrix.Translation(0.013 * k, 0.081 + 0.011 * k, k === 1 ? 0.043 : -0.031 * k).m);
+      const rests = BIRD_PARTS.map((_, k) => translation(0.013 * k, 0.081 + 0.011 * k, k === 1 ? 0.043 : -0.031 * k, new Float32Array(16)));
       const look: Look = { ...(failed ? noBirdLook([entry.url]) : birdLook(entry, rests)), species: id, shown: false, uploads: 0 };
       built.set(key, look);
       return look;
@@ -215,47 +218,40 @@ describe('garden birds', async () => {
   });
 
   test("a bird's parts drawn as the Babylon renderer computed them, number for number", async () => {
+    const B = fixture<{ fields: string[]; cases: number; inputs: Numbers; parts: Numbers }>('birds');
+    const inputs = recorded(B.inputs);
+    const want = recorded(B.parts);
     random = numbers(3);
     const birds = new Birds(view, assets);
+    const restore: (() => void)[] = [];
     try {
       birds.setQuality({ count: 40, range: 50 });
       await birds.setHabitat({ world, view: lot, plants: [garden, outdoor, street, woods], ridge: roof.ridge, roofTop: roof.top, houseTop, hour: 9 });
       const inner = birds as unknown as { birds: Record<string, number | Float32Array | BirdLook>[]; write(b: unknown): boolean };
-      const r = numbers(11);
-      const s = (k = 1) => (r() * 2 - 1) * k;
-      const qTurn = new Quaternion();
-      const [mWorld, mBase, mPose, mTurn, mOut] = [new Matrix(), new Matrix(), new Matrix(), new Matrix(), new Matrix()];
-      const about = (m: Matrix, p: Vector3, dz = 0) => {
-        const v = Vector3.TransformNormal(p, m);
-        return m.setTranslationFromFloats(p.x - v.x, p.y - v.y, p.z - v.z + dz);
-      };
+      for (const look of new Set(inner.birds.map((b) => b.look as BirdLook))) {
+        const { centre, pivots } = look;
+        restore.push(() => Object.assign(look, { centre, pivots }));
+      }
       const bits = (a: ArrayLike<number>) => Array.from(Float32Array.from(a));
       let checked = 0;
-      for (let n = 0; n < 300; n++) {
+      for (let n = 0; n < B.cases; n++) {
         const b = inner.birds[n % inner.birds.length];
         const look = b.look as BirdLook;
-        Object.assign(b, { x: s(30) + 30, y: r() * 8, z: s(30) + 30, yaw: s(7), pitch: s(1), roll: s(0.7), hy: s(2.5), hp: s(1), hr: s(0.5), bob: s(0.02), tail: s(0.6), puff: 1 + s(0.1), spread: n % 3 ? 1 : 0, flap: s(1.2) });
+        // The recorded pose, the bird's size, and its look's middle and pivots.
+        const v = Object.fromEntries(B.fields.map((f, i) => [f, inputs[n * B.fields.length + i]]));
+        const { centre, ...pose } = Object.fromEntries(Object.entries(v).filter(([f]) => !f.startsWith('pivot')));
+        Object.assign(b, pose);
+        look.centre = centre;
+        look.pivots = [look.pivots[0], ...[1, 2, 3, 4].map((k) => [v[`pivot${k}x`], v[`pivot${k}y`], v[`pivot${k}z`]] as const)];
         (b.drawn as Float32Array).fill(NaN);
         inner.write(b);
         const o = (b.slot as number) * 16;
-        const v = b as Record<string, number>;
-        // As babylon/birds.ts wrote them before the move.
-        Quaternion.RotationYawPitchRollToRef(v.yaw, v.pitch, v.roll, qTurn);
-        Matrix.ComposeToRef(new Vector3(v.size, v.size, v.size), qTurn, new Vector3(v.x, v.y + look.centre * v.size, v.z), mWorld);
-        Matrix.TranslationToRef(0, -look.centre, 0, mPose).multiplyToRef(mWorld, mBase);
-        const want = (pose: Matrix) => bits(pose.multiplyToRef(mBase, mOut).m);
-        const pivot = (k: number) => new Vector3(...look.pivots[k]);
-        expect(bits(look.buffers[0].subarray(o, o + 16))).toEqual(want(about(Matrix.ScalingToRef(v.puff, v.puff, v.puff, mPose), new Vector3(0, look.centre, 0))));
-        expect(bits(look.buffers[1].subarray(o, o + 16))).toEqual(want(about(Matrix.RotationYawPitchRollToRef(v.hy, v.hp, v.hr, mPose), pivot(1), v.bob)));
-        expect(bits(look.buffers[2].subarray(o, o + 16))).toEqual(want(about(Matrix.RotationXToRef(v.tail, mPose), pivot(2))));
-        for (let part = 3; part <= 4; part++) {
-          const m = Matrix.ScalingToRef(v.spread, v.spread, v.spread, mPose).multiplyToRef(Matrix.RotationZToRef((part === 3 ? -1 : 1) * v.flap, mTurn), mPose);
-          expect(bits(look.buffers[part].subarray(o, o + 16))).toEqual(want(about(m, pivot(part))));
-        }
+        for (let part = 0; part < 5; part++) expect(bits(look.buffers[part].subarray(o, o + 16))).toEqual(Array.from(want.slice((n * 5 + part) * 16, (n * 5 + part + 1) * 16)));
         checked++;
       }
       expect(checked).toBe(300);
     } finally {
+      for (const undo of restore) undo();
       birds.dispose();
       random = realRandom;
     }

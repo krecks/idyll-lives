@@ -5,7 +5,7 @@
  * smoothed and the interface is drawn at the screen's own resolution). A number draws that share of
  * the screen's resolution along each side (0.5..1), whatever the screen.
  *
- * `renderScale` is pure (no DOM, no Babylon), so it can be checked on its own.
+ * `renderScale` is pure (no DOM, no engine), so it can be checked on its own.
  */
 
 /** `auto`, or a share of native resolution along each side (`MIN_SCALE`..1). */

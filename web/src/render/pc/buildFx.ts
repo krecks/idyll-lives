@@ -1,5 +1,5 @@
 /**
- * Buy-mode feedback in the world on PlayCanvas (the port of `babylon/buildFx.ts`; what plays when,
+ * Buy-mode feedback in the world on PlayCanvas (ported from the Babylon renderer, removed: see git history up to f15b839b; what plays when,
  * the rings' spread, the pops' spring and the particles' simulation are `shared/buildFx.ts`'s):
  * the rings, sparkles and dust in one instanced quad draw (`shaders/buildFx.ts`), on the effects
  * layer, after the world's opaque draws and before its blended ones, as Babylon's particles were

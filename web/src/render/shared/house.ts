@@ -28,7 +28,7 @@
  *
  * Engine-neutral: `HousePlanner` writes the geometry (`Geo`) of each mesh with what it is drawn
  * with (`HousePart`: a surface of the material library, a room's clear glass, the contact
- * shadows) and the renderers upload it (`babylon/house.ts`, `pc/house.ts`), in this order.
+ * shadows) and the renderer uploads it (`pc/house.ts`), in this order.
  */
 
 import type { DoorStyleDef, FloorCoveringDef, LightAim, RoofColorDef, RoofStyleDef, WallCoveringDef, WindowStyleDef } from '../../content/content';
@@ -507,8 +507,8 @@ export function houseScheme(x: number, z: number): HouseScheme {
 export type LaidPreview = HousePart & { surface: { kind: 'surface'; key: string; pattern?: SurfacePattern } };
 
 /**
- * The house's (and the street's houses') geometry, engine-neutral: what the renderers' house
- * builders (`babylon/house.ts`, `pc/house.ts`) upload and draw.
+ * The house's (and the street's houses') geometry, engine-neutral: what the renderer's house
+ * builder (`pc/house.ts`) uploads and draws.
  */
 export class HousePlanner {
   private looks: HouseLooks = { coverings: [], floors: [], doors: [], windows: [] };

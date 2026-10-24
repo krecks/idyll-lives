@@ -1,6 +1,6 @@
 /**
- * The town overview behind the menus (main menu, new-game steps) on PlayCanvas, the port of
- * `babylon/overview.ts`: the whole neighbourhood at once, drawn with the game's own builders so it
+ * The town overview behind the menus (main menu, new-game steps) on PlayCanvas, ported from
+ * the Babylon renderer (removed: see git history up to f15b839b): the whole neighbourhood at once, drawn with the game's own builders so it
  * looks like the game. Every house is a dressed shell (`HouseBuilder.silhouetteMeshes` through
  * `Street`: porches, chimneys, garages, cars, fences, flower beds; the player's house,
  * `WorldMeta.home`, dressed as the game builds it), with its models' far versions, plus the road,
@@ -64,7 +64,7 @@ const COLORS: Record<'outline' | 'hover' | 'selected' | 'marked', RGB> = {
 const townLayers = new WeakMap<pc.AppBase, pc.Layer>();
 
 /**
- * The overview's layer (Babylon's `LAYER_TOWN` camera mask), right after the world layer in both
+ * The overview's layer (the Babylon renderer's town camera mask), right after the world layer in both
  * its opaque and blended halves; made once per app. No light is on it but the sun while the town is
  * shown (the lamps stay on the world layer).
  */

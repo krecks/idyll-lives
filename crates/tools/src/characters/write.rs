@@ -170,7 +170,7 @@ pub fn write_parts(path: &Path, parts: &[(String, Mesh)]) -> io::Result<OMap<Par
         let fields = blob.add(i16s(f.iter().flat_map(|v| v.map(|x| q(x, FIELD_SCALE, 32767.0)))));
         let t = if part.tone.is_empty() { &zeros } else { &part.tone };
         let tone = blob.add(i16s(t.iter().flat_map(|v| v.map(|x| q(x, TONE_SCALE, 32767.0)))));
-        // Clockwise for Babylon.
+        // Clockwise, the game's front faces.
         let index = blob.add(part.idx.chunks(3).flat_map(|t| [t[0], t[2], t[1]]).flat_map(|i| (i as u16).to_le_bytes()));
         let morph = part.morph.as_ref().map(|m| {
             let morph_verts = blob.add(m.verts.iter().flat_map(|&v| (v as u16).to_le_bytes()));

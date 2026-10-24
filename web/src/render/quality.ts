@@ -55,9 +55,9 @@ export interface QualitySettings {
    */
   mirrors: number;
   /**
-   * A reflection's resolution, as a share of the screen's along each side, rounded by Babylon to
-   * powers of two (at 1080p 1024×512 for 0.4 and 0.5, 1024×1024 for 0.75); multisampled as
-   * `msaaSamples` says. Memory while one reflects: Low +7 MB, Medium +25 MB, High +50 MB.
+   * A reflection's resolution, as a share of the screen's along each side, rounded to powers of
+   * two as Babylon's `MirrorTexture` did (at 1080p 1024×512 for 0.4 and 0.5, 1024×1024 for 0.75);
+   * multisampled as `msaaSamples` says. Memory while one reflects: Low +7 MB, Medium +25 MB, High +50 MB.
    */
   mirrorScale: number;
   /**
@@ -107,8 +107,8 @@ export interface QualitySettings {
   streetLod: 0 | 1;
   /**
    * The menus' town, standing still, drawn once and shown again until something in it changes,
-   * instead of drawn anew every frame (on WebGPU: Babylon's snapshot rendering, the draw commands
-   * recorded once and replayed). The game itself draws live. `?snapshot=0` turns it off.
+   * instead of drawn anew every frame: while it holds, nothing is drawn and the canvas keeps its
+   * last picture (`render/pc/heldFrames.ts`). The game itself draws live. `?snapshot=0` turns it off.
    */
   holdStillFrames: boolean;
   /**
@@ -122,7 +122,7 @@ export interface QualitySettings {
    */
   ambientRange: number;
   /**
-   * Garden birds (render/babylon/birds.ts): at most `count` of them, living in the trees, bushes and
+   * Garden birds (render/shared/birds.ts): at most `count` of them, living in the trees, bushes and
    * hedges within `range` m of the viewed lot. A draw per species and part (five parts, up to five
    * species: up to 25 draws, fewer with fewer species about), no shadows; only the birds whose pose
    * changed are written each frame, only the parts that changed (wings only in flight), and only

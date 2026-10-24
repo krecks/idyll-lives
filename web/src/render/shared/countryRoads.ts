@@ -1,6 +1,6 @@
 /**
- * The roads that connect a town with the world outside, as laid out (engine-neutral; each renderer
- * draws them: `babylon/roads.ts`, `pc/roads.ts`): from both ends of its street (the middle one, in a
+ * The roads that connect a town with the world outside, as laid out (engine-neutral; the renderer
+ * draws them: `pc/roads.ts`): from both ends of its street (the middle one, in a
  * town of several streets) a country road winds out across the land to the horizon, levelled into
  * the hills and kept off the water. A town of several streets also gets a side road at each end
  * joining its streets, where the country road begins.

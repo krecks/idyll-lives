@@ -1,3 +1,8 @@
+// `ParticleSim` is ported from Babylon.js 9.30's CPU particle system (`thinParticleSystem.ts`: its
+// creation and update queues, gradients and random draws). Changed for Idyll Lives: only what the
+// game's sparkles and dust use, on the game's own particle records.
+// Babylon.js: Copyright 2023 The Babylon.js team, under the Apache License 2.0; its licence and notice
+// are in crates/tools/texts/Babylon.js-LICENSE and Babylon.js-NOTICE, and in a build's THIRD-PARTY-LICENSES.txt.
 /**
  * Buy-mode feedback in the world, engine-neutral (each renderer's `buildFx.ts` draws it): a ring
  * that spreads over the footprint, sparkles for new and upgraded furniture, dust for walls going up
@@ -125,9 +130,6 @@ export abstract class BuildEffectsCore<T extends PopInstance> {
   protected abstract emit(kind: ParticleKind, fx: BuildEffect, count: number, y0: number, y1: number): void;
   /** A pop wrote its instance's matrix: it goes up (with its moving parts). */
   protected abstract popWritten(target: T): void;
-  /** A pop begins on `target` (Babylon: its buffers may be made again). */
-  protected popStarted(_target: T): void {}
-
   play(fx: BuildEffect): void {
     const cx = fx.x + fx.w / 2;
     const cz = fx.z + fx.d / 2;
@@ -160,7 +162,6 @@ export abstract class BuildEffectsCore<T extends PopInstance> {
     const o = target.index * 16;
     if (o + 16 > target.matrices.length) return;
     const base = target.matrices.slice(o, o + 16);
-    this.popStarted(target);
     const pop = { target, base, age: 0 };
     this.pops.push(pop);
     this.writePop(pop, 0);

@@ -11,7 +11,7 @@
     <dt>Simulation</dt>
     <dd>Rust compiled to WebAssembly, running in a Web Worker</dd>
     <dt>Rendering</dt>
-    <dd>Babylon.js (Apache-2.0) on WebGPU, with a WebGL2 fallback</dd>
+    <dd>PlayCanvas (MIT) on WebGPU, with a WebGL2 fallback; the camera controls, image processing, particles and some of the maths and shading are ported from Babylon.js (Apache-2.0), which drew the game until 0.3.2</dd>
     <dt>Interface</dt>
     <dd>Svelte 5 (MIT) and plain CSS</dd>
     <dt>Typeface</dt>
@@ -25,7 +25,7 @@
     </dd>
     <dt>Open-source libraries</dt>
     <dd>
-      Babylon.js, Svelte, serde, wasm-bindgen and the others the game is built with, each under its own licence: <a href="{base}THIRD-PARTY-LICENSES.txt" target="_blank" rel="noopener">the list and licence texts</a>; the art and models: <a href="{base}assets/CREDITS.md" target="_blank" rel="noopener">CREDITS.md</a>
+      PlayCanvas, Svelte, serde, wasm-bindgen and the others the game is built with (and the Babylon.js code ported into it), each under its own licence: <a href="{base}THIRD-PARTY-LICENSES.txt" target="_blank" rel="noopener">the list and licence texts</a>; the art and models: <a href="{base}assets/CREDITS.md" target="_blank" rel="noopener">CREDITS.md</a>
     </dd>
     <dt>Licence</dt>
     <dd>Free software under the GNU General Public License v3.0 (or later): you may use, study, share and modify it; if you distribute it or a modified version, you must make the source available under the same licence. Third-party parts keep their own licences (above; the art is CC0).</dd>

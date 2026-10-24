@@ -1,7 +1,8 @@
 # Checks every push to main and every pull request: clippy (the release gate) and the simulation's
-# tests, then the ignored sample tests that need files made first, the tools' tests and the
-# residents' clip check. The heavy release work — the wasm builds, models, web checks and Pages
-# deploy — stays in pages.yml, run by hand or on a tag.
+# tests, then the ignored sample tests that need files made first, the residents' clip check, the
+# renderer's quick checks (the PlayCanvas internals it relies on, its tests) and the tools' tests.
+# The heavy release work — the wasm builds, models, the other web checks and Pages deploy — stays in
+# pages.yml, run by hand or on a tag.
 name: CI
 
 on:
@@ -38,7 +39,7 @@ jobs:
       - name: Simulation tests
         run: cargo test -p sim-core --locked
 
-      # Bun only runs the clip check's script below: nothing is installed, as it needs no packages.
+      # Bun runs the clip check (no packages) and the renderer's checks (packages installed for them).
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.3
@@ -60,6 +61,18 @@ jobs:
       - name: Clip check
         working-directory: web
         run: bun run check:clips
+
+      # The renderer: the PlayCanvas shader chunks' anchor lines and private names it patches or
+      # reads, in the pinned release build (tools/render/check_chunks.ts), and its engine-neutral
+      # tests (web/tests, `bun test`). Neither needs the wasm builds.
+      - name: Install web packages
+        working-directory: web
+        run: bun install --frozen-lockfile
+      - name: Shader chunks and renderer tests
+        working-directory: web
+        run: |
+          bun run check:chunks
+          bun run test
 
       # The repo's tools (crates/tools): a fresh character build against the committed set and its
       # checks, the object gate over every shipped model (no Blender), and the content and texture

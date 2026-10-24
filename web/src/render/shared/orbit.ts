@@ -1,3 +1,9 @@
+// Ported from Babylon.js 9.30: `ArcRotateCamera`'s input and motion (`arcRotateCamera.ts`,
+// `cameraMovement.ts`, `arcRotateCameraMovement.ts`, the pointer, wheel and keyboard inputs). Changed
+// for Idyll Lives: an engine-neutral controller that owns the pose; touch, pointer lock, stored state,
+// interpolation and the limits the game doesn't set are left out.
+// Babylon.js: Copyright 2023 The Babylon.js team, under the Apache License 2.0; its licence and notice
+// are in crates/tools/texts/Babylon.js-LICENSE and Babylon.js-NOTICE, and in a build's THIRD-PARTY-LICENSES.txt.
 /**
  * The game's orbit camera controls: dragging turns and pans the camera, the wheel and the keys
  * zoom, turn and pan it, all with inertia, within its limits. Engine-neutral: it owns the pose
@@ -6,8 +12,7 @@
  * A port of Babylon.js 9.30's `ArcRotateCamera` input and motion (`arcRotateCamera.ts`
  * `_checkInputs` / `_applyRotationAndZoomDelta` / `_applyPanDelta` / `_checkLimits`,
  * `cameraMovement.ts`, `arcRotateCameraMovement.ts` and the pointer, mouse wheel and keyboard
- * inputs), so the camera moves exactly as it did: the same numbers in the same order. Babylon.js is
- * Copyright (c) Microsoft Corporation, under the Apache License 2.0 (THIRD-PARTY-LICENSES.txt).
+ * inputs), so the camera moves exactly as it did: the same numbers in the same order.
  * Left out: touch (pinch, two-finger pan; the game is desktop only), pointer lock, restoring a
  * stored state, interpolation, alpha limits and the target's height limit (the game sets none).
  *

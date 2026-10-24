@@ -1,6 +1,11 @@
+// The falloff follows Babylon.js 9.30's PBR lights (`computeDistanceLightFalloff_Physical`,
+// `computeDirectionalLightFalloff_Physical`, the glTF cone). Changed for Idyll Lives: as PlayCanvas
+// chunk overrides with its range window, in GLSL and WGSL.
+// Babylon.js: Copyright 2023 The Babylon.js team, under the Apache License 2.0; its licence and notice
+// are in crates/tools/texts/Babylon.js-LICENSE and Babylon.js-NOTICE, and in a build's THIRD-PARTY-LICENSES.txt.
 /**
- * Lamps light their own room, and the game's lamps fall off as Babylon's did (the port of
- * `babylon/roomLights.ts`, M-lighting-08, and of Babylon's physical light falloff).
+ * Lamps light their own room, and the game's lamps fall off as Babylon's did (ported from the
+ * Babylon renderer's room lights, M-lighting-08, and of Babylon's physical light falloff).
  *
  * Room lights. The lamps are clustered lights without shadows, so a lamp beside a wall would light
  * the room behind it. Every lit fragment knows its room, and every lamp its own, from a mask of the

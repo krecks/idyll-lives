@@ -5,7 +5,7 @@ One pack, `packs/ground/manifest.json`. None of them is an object the player buy
 group. The keys are unchanged.
 
 - **Grass tuft** (`model.grassTuft`): drawn by the ten thousand as thin instances on every unpaved tile and round
-  the town (`render/babylon/nature.ts` `lawns`, in squares the camera leaves out, half of them on Low). Four bent
+  the town (`render/shared/nature.ts` `lawns`, in squares the camera leaves out, half of them on Low). Four bent
   blades leaning out from the middle in the old part's three greens and the fourth, one draw call
   (`foliage`: the nature shader's wind and per-instance tint). Each blade is a flat ribbon with one joint drawn
   from both sides, two faces back to back with their own vertices (6 triangles), so the camera draws only the 12 of
@@ -29,7 +29,7 @@ group. The keys are unchanged.
   56 triangles (the old part at that level: 40), few enough that the woods still draw all of them as one mesh
   (`SPLIT_TRIANGLES`: 36,000 over every rock of the village's woods). Centred where the old part was (game x 8.5 cm,
   depth 1 cm: its `Model`'s `centre`, which the gate checks); its `sink` (0.115 m) is how far `check-glb` lets it reach under the floor.
-- **Marker** (`model.marker`): the sparkle star over the selected resident (`BabylonRenderer` `setupMarker`), which
+- **Marker** (`model.marker`): the sparkle star over the selected resident (`render/pc/selectionMarker.ts`), which
   the game draws in its own unlit material, shaded by its normals and tinted by mood, with an outline of the same
   mesh pushed out along its normals (an inverted hull), turned to the camera, bobbing and breathing. One closed
   shell: the old part's four concave rays and round core as a smooth union of their depths, the front and back

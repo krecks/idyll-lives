@@ -1,6 +1,6 @@
 /**
- * The wall cutaway and the dug-out ground (the ports of `WallCutPlugin` and `DigPlugin` in
- * `babylon/materials.ts`). Neither applies in the shadow pass, as in Babylon (whose shadow depth
+ * The wall cutaway and the dug-out ground (the ports of the Babylon renderer's
+ * `WallCutPlugin` and `DigPlugin`). Neither applies in the shadow pass, as in Babylon (whose shadow depth
  * shader had no plugins): the house casts with its walls at full height in every wall mode, the sun
  * coming in through windows and doorways.
  *

@@ -1,5 +1,5 @@
 /**
- * Pools of lamplight on the garden's ground on PlayCanvas (the port of `babylon/gardenPools.ts`):
+ * Pools of lamplight on the garden's ground on PlayCanvas (ported from the Babylon renderer, removed: see git history up to f15b839b):
  * under a lamp post, a street lamp, a fire pit or a bulkhead on the outside wall, as the street
  * draws them under its own lamps. The lamps' lights light what stands in the garden, but not the
  * ground (the landscape is kept out of the lamps). A pool is a disc on the ground, added to what's

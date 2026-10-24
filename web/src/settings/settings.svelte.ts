@@ -11,7 +11,7 @@ export interface Settings {
   /** The graphics preset (`render/quality.ts`): Medium unless chosen. */
   graphics: GraphicsPreset;
   /**
-   * How lit surfaces are drawn (`render/babylon/softLook.ts`): `soft`, the game's painterly
+   * How lit surfaces are drawn (`render/pc/shaders/softLook.ts`): `soft`, the game's painterly
    * shading; or `classic`, the PBR shading it replaced. Applies live.
    */
   shading: Shading;

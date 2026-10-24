@@ -187,8 +187,8 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
   living room a living room.
 - **Opening and closing.** For something that opens and stays open (the wall bed), use the interaction
   fields `when` and `leaves`, and the model's `motions.open` (below).
-- **Renderer tables** (`web/src/render/babylon/characters.ts`), keyed by object id:
-  - `BEDS`: mattress-top height, for anything residents lie on;
+- **Renderer tables** (`web/src/render/shared/characters/seats.ts`), keyed by object id:
+  - `BEDS` (from `furniture.json`'s `beds`): mattress-top height, for anything residents lie on;
   - `BLANKET_BEDS`: whether sleepers get a blanket. Then don't model a full duvet: it shows doubled.
 - **Tests.**
   - `cargo test -p sim-core --test shipped_content` checks every object's and item's model has its file

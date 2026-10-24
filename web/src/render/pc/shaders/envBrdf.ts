@@ -1,3 +1,7 @@
+// Follows Babylon.js 9.30's PBR Fresnel for lights (Schlick, F90 = 1). Changed for Idyll Lives: in
+// PlayCanvas's `fresnelSchlickPS` and `reflectionEnvPS`, the sky's reflection with Lagarde's term.
+// Babylon.js: Copyright 2023 The Babylon.js team, under the Apache License 2.0; its licence and notice
+// are in crates/tools/texts/Babylon.js-LICENSE and Babylon.js-NOTICE, and in a build's THIRD-PARTY-LICENSES.txt.
 /**
  * Fresnel as Babylon's PBR had it, in the game's lit materials (`GAME_LOOK`): `fresnelSchlickPS`
  * with its term replaced, and `reflectionEnvPS` (and its HQ twin) with `addReflection` wrapped.

@@ -116,6 +116,8 @@ const NEEDED: { file: string; text: string; who: string }[] = [
   ...both('lit/frag/reflectionEnv.js', 'void addReflection(vec3 reflDir, float gloss) {', 'fn addReflection(reflDir: vec3f, gloss: f32) {', 'shaders/envBrdf.ts: addReflection wrapped'),
   ...both('lit/frag/reflectionEnvHQ.js', 'void addReflection(vec3 reflDir, float gloss) {', 'fn addReflection(reflDir: vec3f, gloss: f32) {', 'shaders/envBrdf.ts: addReflection wrapped (HQ)'),
   ...both('lit/frag/fresnelSchlick.js', 'vec3 ret = specularity + (max(vec3(glossSq * specIntensity), specularity) - specularity) * fresnel;', 'let ret: vec3f = specularity + (max(vec3f(glossSq * specIntensity), specularity) - specularity) * fresnel;', 'shaders/envBrdf.ts: PlayCanvas\'s Fresnel that never rises, replaced by Babylon\'s Schlick term in the game\'s materials'),
+  // render/pc/shaders/bump.ts: normal maps at Babylon's strength.
+  ...both('standard/frag/normalMap.js', 'normalMap = mix(vec3(0.0, 0.0, 1.0), normalMap, material_bumpiness);', 'normalMap = mix(vec3f(0.0, 0.0, 1.0), normalMap, uniform.material_bumpiness);', 'shaders/bump.ts: the normal map\'s strength line, replaced in the game\'s materials'),
   // render/pc/shaders/softLook.ts: the AO map on the direct light, the lights' highlights scaled.
   ...both('standard/frag/stdFrontEnd.js', 'litArgs_ao = dAo;', 'litArgs_ao = dAo;', 'shaders/softLook.ts: litArgs_ao is the AO map (STD_AO) when the combine reads it'),
   ...both('lit/frag/lighting/lightFunctionLight.js', 'dSpecularLight += lightSpecular;', 'dSpecularLight = dSpecularLight + lightSpecular;', 'shaders/softLook.ts: the lights\' highlights in dSpecularLight, scaled in the combine (SPECULAR_UNITS)'),
@@ -151,6 +153,28 @@ const NEEDED: { file: string; text: string; who: string }[] = [
   { file: 'extras/render-passes/frame-pass-camera-frame.js', text: 'clearRenderTarget = false;', who: 'layers.ts overLayer: under CameraFrame only the first layer clears (the reason for its own clear)' },
   { file: 'platform/graphics/webgpu/webgpu-graphics-device.js', text: 'this.clearRenderer.clear(this, this.renderTarget, options, this.defaultClearOptions);', who: 'layers.ts overLayer: the WebGPU device\'s clear (a quad in the pass)' },
   { file: 'platform/graphics/webgl/webgl-graphics-device.js', text: 'clear(options) {', who: 'layers.ts overLayer: the WebGL device\'s clear' },
+  // render/pc/gpuTiming.ts (Stage 11B): the benchmark's GPU times, draws per pass and shader compiles.
+  { file: 'platform/graphics/gpu-profiler.js', text: 'report(renderVersion, timings, frameTime) {', who: 'gpuTiming.ts GpuTiming: each frame\'s timings as they come back, wrapped on the profiler' },
+  { file: 'platform/graphics/gpu-profiler.js', text: 'const allocations = this.pastFrameAllocations.get(renderVersion);', who: 'gpuTiming.ts GpuTiming: a report counts only for a frame the profiler asked about' },
+  { file: 'platform/graphics/gpu-profiler.js', text: 'this._passTimings.set(parsedName, (this._passTimings.get(parsedName) || 0) + timing);', who: 'gpuTiming.ts GpuTiming: the frame\'s passes by name, read after the report' },
+  { file: 'platform/graphics/webgpu/webgpu-query-set.js', text: 'const frameTime = count > 0 ? Number(maxTime - minTime) * 1e-6 : 0;', who: 'gpuTiming.ts GpuTiming: WebGPU\'s frame is its first pass\'s start to its last pass\'s end' },
+  { file: 'platform/graphics/webgpu/webgpu-graphics-device.js', text: 'this.setupTimeStampWrites(renderPassDesc, renderPass.name);', who: 'gpuTiming.ts GpuTiming: a pass\'s stamps named when its target is set, wrapped on the device' },
+  { file: 'platform/graphics/webgpu/webgpu-graphics-device.js', text: 'const computePassDesc = this.setupTimeStampWrites(void 0, name);', who: 'gpuTiming.ts GpuTiming: compute passes come without a descriptor' },
+  { file: 'platform/graphics/webgpu/webgpu-graphics-device.js', text: 'draw(primitive, indexBuffer, numInstances = 1, drawCommands, first = true, last = true, firstInstance = 0) {', who: 'gpuTiming.ts DrawCounts: the triangles of a draw, wrapped on the device (WebGPU)' },
+  { file: 'platform/graphics/webgl/webgl-graphics-device.js', text: 'draw(primitive, indexBuffer, numInstances, drawCommands, first = true, last = true, firstInstance = 0) {', who: 'gpuTiming.ts DrawCounts: the triangles of a draw, wrapped on the device (WebGL2)' },
+  { file: 'platform/graphics/webgpu/webgpu-graphics-device.js', text: 'startRenderPass(renderPass) {', who: 'gpuTiming.ts DrawCounts: the draws of a pass (WebGPU)' },
+  { file: 'platform/graphics/webgl/webgl-graphics-device.js', text: 'endRenderPass(renderPass) {', who: 'gpuTiming.ts DrawCounts: the draws of a pass (WebGL2)' },
+  { file: 'platform/graphics/shader.js', text: 'this.impl = graphicsDevice.createShaderImpl(this);', who: 'gpuTiming.ts ShaderWatch: every shader made goes through the device' },
+  { file: 'platform/graphics/graphics-device.js', text: 'this._shaderStats = {', who: 'gpuTiming.ts ShaderWatch: PlayCanvas\'s own counters, filled there' },
+  { file: 'platform/graphics/webgpu/webgpu-render-pipeline.js', text: 'cacheEntry.pipeline = this.create(', who: 'gpuTiming.ts ShaderWatch: a pipeline made on a cache miss, wrapped on the cache' },
+  { file: 'scene/light.js', text: 'get shadowMap() {', who: 'PlayCanvasRenderer.ts: the sun\'s shadow map\'s target (the benchmark\'s shadow pass)' },
+  { file: 'extras/render-passes/frame-pass-camera-frame.js', text: 'this.rt = this.createRenderTarget("SceneColor"', who: 'post.ts targets: the scene\'s target (the benchmark\'s scene pass)' },
+  // render/pc/shaderKeys.ts (Stage 11B): shaders and pipelines made once for what draws the same.
+  { file: 'scene/materials/standard-material.js', text: 'if (this.onUpdateShader) {', who: 'shaderKeys.ts: onUpdateShader runs before the shader\'s key is made' },
+  { file: 'scene/materials/standard-material-options-builder.js', text: 'options.litOptions.lightMaskDynamic = !!(mask & MASK_AFFECT_DYNAMIC);', who: 'shaderKeys.ts: lightMaskDynamic is set for lit materials only (an unlit one keeps the last)' },
+  { file: 'platform/graphics/vertex-format.js', text: 'this.renderingHash = stringIds.get(this.renderingHashString);', who: 'shaderKeys.ts: the vertex format\'s hash set in _evaluateHash (wrapped)' },
+  { file: 'platform/graphics/webgpu/webgpu-vertex-buffer-layout.js', text: 'offset: interleaved ? element.offset : 0,', who: 'shaderKeys.ts: a non-interleaved format\'s pipeline layout doesn\'t depend on its offsets' },
+  { file: 'platform/graphics/webgpu/webgpu-render-pipeline.js', text: 'lookupHashes[5] = vertexFormat0?.renderingHash ?? 0;', who: 'shaderKeys.ts: WebGPU\'s pipelines cached by the vertex format\'s hash' },
 ];
 
 let failed = 0;

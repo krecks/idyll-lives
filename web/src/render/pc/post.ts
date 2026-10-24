@@ -1,6 +1,7 @@
 /**
  * The picture after the light (the port of the game's Babylon `DefaultRenderingPipeline`,
- * `setupPostProcessing` and `applyLook` in `babylon/BabylonRenderer.ts`, and its night grade):
+ * `setupPostProcessing` and `applyLook` in the Babylon renderer, and its night grade; removed: see
+ * git history up to f15b839b):
  *
  * - The scene is drawn in linear light into a half-float target (Babylon's HDR pipeline texture),
  *   multisampled as the preset says (`QualitySettings.msaaSamples`: Babylon's `samples` on its first
@@ -296,6 +297,13 @@ export class PostProcessing {
   /** Bench reports: what Babylon's `benchInfo` had as `postSamples` and `fxaa`. */
   get samples(): number {
     return this.frame ? Math.max(1, this.options.samples) : 1;
+  }
+
+  /** Bench reports: the scene's target (the chain's first; null without a chain) and the FXAA pass's input (Low). */
+  get targets(): { scene: pc.RenderTarget | null; fxaa: pc.RenderTarget | null } {
+    // SAFETY: CameraFrame's (private) pass, PlayCanvas 2.23's `FramePassCameraFrame`, keeps the scene's target in `rt`.
+    const scene = (this.frame as unknown as { renderPassCamera?: { rt?: pc.RenderTarget | null } | null } | null)?.renderPassCamera?.rt ?? null;
+    return { scene, fxaa: this.fxaaTarget };
   }
 
   private resized(width: number, height: number): void {

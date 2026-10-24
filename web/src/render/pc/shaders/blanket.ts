@@ -1,5 +1,5 @@
 /**
- * Bed blankets on PlayCanvas (the port of `BlanketPlugin`, `babylon/characters/blanket.ts`): one quilt
+ * Bed blankets on PlayCanvas (the port of the Babylon renderer's `BlanketPlugin`): one quilt
  * mesh per body type (`shared/characters/blanket.ts`), drawn instanced, a copy per resident asleep
  * in a bed, in that bed's colours. Material: `blanketMaterial` (`characterMaterial.ts`).
  *

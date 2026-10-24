@@ -1,6 +1,6 @@
 /**
- * The residents' materials on PlayCanvas (the port of `babylon/characters/material.ts` and the
- * material half of the Babylon renderer's characters): standard materials without textures, every
+ * The residents' materials on PlayCanvas (ported from the Babylon renderer's resident
+ * material and the material half of its characters, removed: see git history up to f15b839b): standard materials without textures, every
  * colour the resident's own from its row of the pose texture and the part's per-vertex fields and
  * tone, skinned on the GPU from the same row (`shaders/character.ts`). The bed quilts' material too
  * (`blanketMaterial`, `shaders/blanket.ts`).

@@ -2,7 +2,7 @@
  * Bed quilts (residents sleep under the covers), engine-neutral: the quilt's shape, draped over a body's lying pose,
  * and its tint per bed. One quilt mesh per body type, drawn with one instance per resident asleep in a bed (none
  * at all while nobody is), in that bed's colours (`residents.ts` `writeBlanket`); the engines make the mesh and its
- * material (`babylon/characters/blanket.ts`).
+ * material (`pc/characterMaterial.ts` `blanketMaterial`, `pc/shaders/blanket.ts`).
  *
  * The quilt is a height field draped over the actual lying pose (the body skinned once on the CPU at
  * load): heights are tented and blurred so the cloth bridges between the feet, knees, hips and the

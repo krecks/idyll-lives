@@ -37,13 +37,11 @@ export const ENV_UNITS = 1.05;
 /**
  * The lights' highlights (the soft look's combine scales PlayCanvas's direct specular by it: the sun
  * and the lamps): PlayCanvas's GGX has Babylon's `1 / π` while its light is Babylon's / π
- * (`SUN_UNITS`), so by the units alone it would be π. Calibrated to 2.4: at π the noon sun's
- * highlight on the rough lawn near the camera came out brighter than Babylon's (+0.02 in linear;
- * PlayCanvas's normal maps are a little flatter, `bumpiness` mixing towards flat where Babylon
- * scales x and y, so the highlight is tighter), the morning's and afternoon's right; 2.4 splits it
- * (the sun alone at 9, 13 and 16: within 1.5 of 255 of Babylon's on average). The highlights rise
- * with Babylon's Schlick term towards grazing angles (`shaders/envBrdf.ts`); looking into the low
- * sun of the menus' golden hour, π would match a little better (−3 of 255 against −6 at 2.4) but the
- * noon shots worse. A string: it goes into the shaders.
+ * (`SUN_UNITS`), so by the units alone it would be π. With the normal maps and the Schlick term made
+ * Babylon's (`shaders/bump.ts`, `shaders/envBrdf.ts`), π still leaves the noon shots too bright
+ * (orbit-day-0 +2.6 of 255 on average, 3.5–3.8 off) while it suits the menus' golden hour, looking
+ * into the low sun (−3.9, against −6.1 at 2.4, which suits noon: +1.0, 2.8–3.1 off). 2.8 is the
+ * best of both together (noon +1.9, golden hour −4.9; dusk and night don't move). A string: it goes
+ * into the shaders.
  */
-export const SPECULAR_UNITS = '2.4';
+export const SPECULAR_UNITS = '2.8';

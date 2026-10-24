@@ -1,3 +1,8 @@
+// Follows Babylon.js 9.30's particle shaders (`particles.vertex.fx`, `particles.fragment.fx`: view-space
+// billboards and their blending). Changed for Idyll Lives: one instanced draw with the rings, in GLSL
+// and WGSL for PlayCanvas.
+// Babylon.js: Copyright 2023 The Babylon.js team, under the Apache License 2.0; its licence and notice
+// are in crates/tools/texts/Babylon.js-LICENSE and Babylon.js-NOTICE, and in a build's THIRD-PARTY-LICENSES.txt.
 /**
  * Build mode's effects in one instanced quad draw (`buildFx.ts`): its rings lying on the floor and
  * the sparkles and dust facing the camera, as Babylon drew them (its `StandardMaterial` rings and

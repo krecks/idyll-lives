@@ -1,19 +1,23 @@
 /**
- * The game's renderer on PlayCanvas (`Renderer`, `render/types.ts`).
+ * The game's renderer on PlayCanvas (`Renderer`, `render/types.ts`), ported stage by stage from the
+ * Babylon.js renderer it replaced (removed; its last version is in the git history up to f15b839b).
  *
- * Built up stage by stage from the Babylon renderer it replaces (`render/babylon/BabylonRenderer.ts`,
- * kept as the reference until the port is done; see the plan in docs). What this one does so far:
- * the device (WebGPU, else WebGL2), frames paced in whole display refreshes, the game camera (the
- * player's orbit input, the director's shots), the menus' town overview (`overview.ts`, on a layer
- * of its own, with its camera), the time of day's sun, sky fill, environment lighting and fog, picking (`picking.ts`: the ground, objects and items,
- * analytic as Babylon's), projecting points onto the screen, and the stats. The viewed lot: its house on every storey (`house.ts`: walls, floors,
+ * The device (WebGPU, else WebGL2), frames paced in whole display refreshes, the game camera (the
+ * player's orbit input, kept above the land, the director's shots), the menus' town overview
+ * (`overview.ts`, on a layer of its own, with its camera, its still frames held: `heldFrames.ts`),
+ * the time of day's sun and its shadows (`sunShadows.ts`), sky fill, environment lighting and fog,
+ * the lamps (`lamps.ts`), the picture chain (`post.ts`), picking (`picking.ts`: the ground, objects
+ * and items, analytic), projecting points onto the screen, and the stats and the benchmark's
+ * measures (`gpuTiming.ts`). The viewed lot: its house on every storey (`house.ts`: walls, floors,
  * roofs, doors and windows, the cutaway and the wall modes, the storey in view, a basement with the
  * ground dug away over it, rooms without windows kept out of daylight, doors and gates swinging for
- * residents going through), its fences (`fences.ts`), roads and paths, and the street round it
- * (`street.ts`: the neighbours' houses, sidewalks, street furniture, gardens). Its residents
- * (`characters.ts`): posed each frame, with their contact shadows, the chairs they pull up to
- * tables, their sun shadows, the selection ring, speech, and the camera following one. The rest is
- * stubbed where the port reaches it.
+ * residents going through), its fences (`fences.ts`), roads and paths, the street round it
+ * (`street.ts`: the neighbours' houses, sidewalks, street furniture, gardens), its things and the
+ * landscape (`lotContents.ts`), its mirrors (`mirrors.ts`) and the garden birds (`birds.ts`). Its
+ * residents (`characters.ts`): posed each frame, with their contact shadows, the chairs they pull up
+ * to tables, their sun shadows, the selection ring, speech, and the camera following one. Build mode
+ * (`placing.ts`, `buildPreviews.ts`, `handles.ts`) and the save's picture (`thumbnail.ts`). The
+ * warm-up behind the loading veil (`warmGame`) makes every pipeline the game draws with before play.
  *
  * Game space is the Babylon renderer's left-handed one: everything in the world hangs under a root
  * mirrored in z (`space.ts`), and only cameras, lights and rays are converted.
@@ -30,6 +34,7 @@ import { HoverTile, ResizeHandles } from './handles';
 import { HeldFrames } from './heldFrames'; // (Stage 9A.)
 import { HouseBuilder, type HouseDoor } from './house';
 import { Instances } from './instancing';
+import { overLayer } from './layers'; // (Stage 11B.)
 import { Lamps } from './lamps';
 import { contactBlob, LotContents } from './lotContents';
 import { ENV_UNITS, SKY_UNITS, SUN_UNITS } from './lightUnits';
@@ -38,6 +43,8 @@ import { drawMesh, meshFrom } from './meshes';
 import { Mirrors } from './mirrors'; // (Stage 9A.)
 import { buildModel, onModelFileArrived, type ModelTemplate } from './models';
 import { GameBirds } from './birds'; // (Stage 9C.)
+import { colorBytes, depthBytes, DrawCounts, GpuTiming, ShaderWatch, type PassKind } from './gpuTiming'; // (Stage 11B.)
+import { steadyShaderKeys } from './shaderKeys'; // (Stage 11B.)
 import { natureDecor, windStill } from './nature';
 import { TownOverview, townLayer } from './overview'; // (Stage 9B.)
 import { Placing } from './placing'; // (Stage 8B.)
@@ -146,6 +153,8 @@ const TOWN_CAMERA_LAYERS: readonly number[] = [pc.LAYERID_DEPTH, pc.LAYERID_IMME
 
 /** A directional light's way before it's turned (PlayCanvas shines it along its entity's -y). */
 const DOWN = new pc.Vec3(0, -1, 0);
+/** (Stage 11B: the warm-up's red copies, `drawRedCopies`.) */
+const IDENTITY = Float32Array.of(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
 
 /** No neighbours' houses (to look through). */
 const NO_HOUSES: readonly (readonly [number, number, number, number])[] = [];
@@ -390,6 +399,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private cpuMs = 0;
   private drawCalls = 0;
   private readonly gpuWanted = new Set<'overlay' | 'bench'>();
+  /** (Stage 11B: the benchmark's measures, `gpuTiming.ts`.) GPU time, draws per pass, shaders made. */
+  private gpuTiming!: GpuTiming;
+  private drawCounts!: DrawCounts;
+  private shaderWatch!: ShaderWatch;
+  /** (Stage 11B.) The warm-up's frame, drawn next (`warmGame`). */
+  private warmNext = false;
 
   constructor(
     private readonly deps: RendererDeps,
@@ -414,7 +429,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.sizeWatch.observe(canvas);
     const forceWebGL = this.deps.backend === 'webgl' || new URLSearchParams(location.search).get('renderer') === 'webgl';
     this.device = await createDevice(canvas, forceWebGL);
+    steadyShaderKeys();
+    // (Stage 11B.) Before anything compiles: every shader and pipeline is counted (`?diag=shaders` logs them).
+    this.shaderWatch = new ShaderWatch(this.device, this.diag.has('shaders'));
     this.app = createApp(canvas, this.device);
+    this.gpuTiming = new GpuTiming(this.device, this.passLabel);
+    this.drawCounts = new DrawCounts(this.device);
     // A GPU reset (driver update, a laptop switching GPUs, a crashed GPU process): what was on the
     // GPU is gone, and the game's own buffers can't be rebuilt in place.
     this.device.on('devicelost', () => this.onFailure?.('device'));
@@ -591,6 +611,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lastTime = time;
     const probe = this.probe;
     let updated = start;
+    if (probe) this.drawCounts.reset();
     try {
       probe?.before(start);
       this.onFrame?.(this.pacer.frameTime || performance.now());
@@ -610,10 +631,17 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       // (Stage 9A: the reflections drawn this frame, `mirrors.ts`; the menus' town held while it stands still, `heldFrames.ts`.)
       this.mirrors.frame(this.characters, this.simCount, this.townMode);
       this.held.active = this.townMode && !this.flyingIn && !this.worldBuilding && this.townBuilds === 0; // (Stage 9B: nor while the overview builds.)
-      if (this.held.draw(this.frameWaiters.length > 0)) {
-        this.app.render();
-        this.drawCalls = this.device._drawCallsPerFrame;
-        this.device._drawCallsPerFrame = 0;
+      // (Stage 11B: the warm-up's frame, `warmGame`, undone once drawn.)
+      const warm = this.warmNext ? this.warmFrame() : null;
+      this.warmNext = false;
+      try {
+        if (this.held.draw(this.frameWaiters.length > 0 || !!warm)) {
+          this.app.render();
+          this.drawCalls = this.device._drawCallsPerFrame;
+          this.device._drawCallsPerFrame = 0;
+        }
+      } finally {
+        warm?.();
       }
       this.failedFrames = 0;
     } catch (err) {
@@ -632,11 +660,17 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.cpuMs += (end - start - this.cpuMs) * 0.1;
     if (dt > 0) this.frameMs += (dt - this.frameMs) * 0.1;
     if (probe) {
+      // (Stage 11B: `gpuTiming.ts`.)
       const c = this.counts;
+      const d = this.drawCounts;
       c.drawCalls = this.drawCalls;
-      const gpu = this.device.gpuProfiler;
-      c.gpuMs = gpu?.enabled ? (gpu.frameTime ?? 0) : 0;
-      if (c.gpuMs > 0) c.gpuFrames++;
+      c.triangles = d.allTriangles;
+      c.shadowDrawCalls = d.draws[1];
+      c.shadowTriangles = d.triangles[1];
+      c.mirrorDrawCalls = d.draws[2];
+      c.mirrorTriangles = d.triangles[2];
+      c.gpuFrames = this.gpuTiming.frames;
+      c.gpuMs = this.gpuTiming.ms;
       probe.after(start, updated, end, c);
     }
   };
@@ -687,6 +721,26 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   followSim(index: number | null): void {
     this.followIndex = index;
+  }
+
+  /**
+   * Keeps the game camera above the land round the town (mountains rise close to it in some
+   * worlds): looking from higher up instead of from inside a hill. The eye at least 4 m over the
+   * land under it, the camera tilted up in steps of 0.03 rad (as the Babylon renderer's).
+   */
+  private keepCameraClear(): void {
+    const land = this.lot.landscape;
+    if (this.townMode || !land) return;
+    const o = this.orbit;
+    for (let k = 0; k < 20 && o.beta > 0.3; k++) {
+      // (The arc camera's eye: target + radius × (cos α sin β, cos β, sin α sin β), game space.)
+      const s = Math.sin(o.beta) * o.radius;
+      const x = o.target.x + Math.cos(o.alpha) * s;
+      const z = o.target.z + Math.sin(o.alpha) * s;
+      if (o.target.y + Math.cos(o.beta) * o.radius >= land.heightAt(x, z) + 4) break;
+      o.beta = Math.max(0.3, o.beta - 0.03);
+      o.inertialBetaOffset = 0;
+    }
   }
 
   /** The director's shot, or keeping a followed resident in the middle (game world only). */
@@ -1445,6 +1499,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lamps.frame(this.frameDt / 1000, this.darkRooms, this.awakeRooms); // (Stage 6C: lamps and glows fading, `lamps.ts`.)
     this.swingDoors(GAME_RATE[curr[h.speed] | 0] ?? 1);
     this.steerCamera(this.frameDt / 1000);
+    this.keepCameraClear();
     if (this.lot.update(frame)) this.mirrors.changed(); // (Stage 5: the objects' clips, the screens; Stage 9A: things moving, in the held reflections.)
     this.placing.frame(this.frameDt); // (Stage 8B: the effects, the thing in hand.)
     this.updateSims(frame);
@@ -1484,8 +1539,150 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.marker.place(shown ? this.markerHead : null, emotion, this.camera.entity, frame?.now ?? 0, !!this.options.reducedMotion);
   }
 
-  warmGame(_frame: FrameState): Promise<void> {
-    return this.framesRendered(1);
+  /**
+   * (Stage 11B.) The warm-up behind the loading veil: every pipeline the game draws with is made
+   * before it shows, so play doesn't stall on shader compiles (PlayCanvas compiles a shader, and on
+   * WebGPU makes a pipeline, in the frame that first draws with it: tens of milliseconds each, and
+   * the first frames of play would make hundreds). While the menus' town is up (the game built behind
+   * them), the game's own state is set first, as the Babylon renderer's `warmGame` did: its residents
+   * posed, its lighting, the dig and the cutaway, in a slice of its own. Then one frame of the game
+   * (`warmFrame`), the town back after it. `?diag=shaders` logs what is still made in play.
+   */
+  async warmGame(frame: FrameState): Promise<void> {
+    if (this.disposed) return;
+    this.shaderWatch.phase = 'warm-up';
+    if (this.townMode) {
+      // (The game's camera is the orbit's parked pose; `update` poses the residents for it.)
+      this.townMode = false;
+      try {
+        this.update(frame);
+      } finally {
+        this.townMode = true;
+        this.lastLightMinute = -1;
+      }
+    }
+    this.warmNext = true;
+    const t0 = performance.now();
+    await this.framesRendered(1);
+    this.shaderWatch.note(`warm-up frame done in ${Math.round(performance.now() - t0)} ms`);
+    this.shaderWatch.phase = this.townMode ? 'town' : 'game';
+  }
+
+  /**
+   * The warm-up's frame, set up in the frame loop right before it draws (`warmGame`); returns the
+   * undo, run once it has drawn. The game's view (in place of the town's, if that's up), drawn
+   * without culling: everything on the world's layers is drawn, what is behind the camera, in other
+   * rooms and beyond the view too, and what is hidden now (`drawHidden`); buy mode's red copy
+   * (`drawRedCopies`); the sun's map drawn; every reflection drawn with everything in it
+   * (`Mirrors.warm`: their targets and turned faces); the picture chain as the game has it (the
+   * multisampled scene, the image processing, Low's FXAA). The frame goes to the canvas, behind the
+   * veil; the sun's map, the reflections and the town's held frame are drawn again after.
+   *
+   * WebGPU makes its pipelines in the frame that first needs them (PlayCanvas has no asynchronous way
+   * there); WebGL2 could skip draws whose shaders still compile (`asyncCompile`, the previews' choice),
+   * but the game's held drawing (the sun's map, held reflections) would then keep a picture without
+   * them: the warm-up makes them all instead. What only a thing never seen before uses (a model bought
+   * for the first time) is still made when it first shows.
+   */
+  private warmFrame(): () => void {
+    const town = this.townMode;
+    if (town) this.showGame(true);
+    const cam = this.camera.camera;
+    cam.frustumCulling = false;
+    this.sunShadows.moved(true);
+    const hidden = this.drawHidden();
+    const red = this.drawRedCopies();
+    const mirrors = this.mirrors.warm();
+    return () => {
+      mirrors();
+      red();
+      hidden();
+      cam.frustumCulling = true;
+      if (town) this.showGame(false);
+      // (The map and the reflections drew what was hidden too: drawn again.)
+      this.sunShadows.moved();
+      this.held.changed();
+    };
+  }
+
+  /**
+   * For the warm-up's frame: what the world has but doesn't draw now drawn too, as Babylon's warm-up
+   * readied every mesh, hidden ones too: the storeys out of view, things hidden (the night's garden
+   * pools and glows by day, the build tools' helpers, the templates models are copied from), and the
+   * instanced draws that have no instances now (the residents' close-up face parts, lamp glows by day)
+   * with one (whatever its data: the frame is behind the veil). Entities with lights or cameras in them
+   * stay as they are (a light more would change every lit shader). Returns the undo.
+   */
+  private drawHidden(): () => void {
+    const entities: pc.Entity[] = [];
+    const visible: pc.MeshInstance[] = [];
+    const counts: pc.MeshInstance[] = [];
+    this.root.forEach((node) => {
+      const e = node as pc.Entity;
+      if (e.enabled || !(e instanceof pc.Entity) || e.findComponents('light').length || e.findComponents('camera').length) return;
+      e.enabled = true;
+      entities.push(e);
+    });
+    for (const layer of this.app.scene.layers.layerList) {
+      for (const mi of layer.meshInstances) {
+        if (!mi.visible) {
+          mi.visible = true;
+          visible.push(mi);
+        }
+        const data = mi.instancingData;
+        if (data && data.count === 0 && (data.vertexBuffer?.numVertices ?? 0) > 0) {
+          mi.instancingCount = 1;
+          counts.push(mi);
+        }
+      }
+    }
+    return () => {
+      for (const mi of counts) mi.instancingCount = 0;
+      for (const mi of visible) mi.visible = false;
+      for (let i = entities.length - 1; i >= 0; i--) entities[i].enabled = false;
+    };
+  }
+
+  /**
+   * For the warm-up's frame: buy mode's red copy of the thing in hand (where it can't go) over a mesh
+   * of each vertex layout the world's things have, on the over layer as the thing in hand is (which
+   * clears the depth before it, `layers.ts`). The red copy's shader goes with the mesh's layout, and
+   * a thing never seen before still makes its own. Returns the undo.
+   */
+  private drawRedCopies(): () => void {
+    const [plain, coloured] = this.placing.ghostMaterials;
+    const over = overLayer(this.app, this.camera.camera).id;
+    const seen = new Set<number>();
+    const made: Instances[] = [];
+    for (const mi of this.app.scene.layers.getLayerById(pc.LAYERID_WORLD)?.meshInstances ?? []) {
+      const mesh = mi.mesh;
+      const format = mesh?.vertexBuffer?.format;
+      if (!mi.instancingData || !mesh || !format || seen.has(format.renderingHash)) continue;
+      seen.add(format.renderingHash);
+      const colours = format.elements.some((e) => e.name === pc.SEMANTIC_COLOR);
+      const red = new Instances(this.device, this.storeyLayer, mesh, colours ? coloured : plain, { name: 'warmRedCopy', castShadows: false, receiveShadows: false, layers: [over], cull: false });
+      red.setCount(1);
+      red.setMatrix(0, IDENTITY);
+      red.update(false);
+      made.push(red);
+    }
+    return () => {
+      for (const red of made) red.destroy();
+    };
+  }
+
+  /** For the warm-up's frame in the menus' town: the game's view (`on`), or the town's back. */
+  private showGame(on: boolean): void {
+    this.townMode = !on;
+    this.showLayers(!on);
+    this.sunShadows.setOverview(!on);
+    this.applyDig();
+    if (on) {
+      this.applyLighting(this.lastMinute);
+      this.cutLook = -1;
+      this.updateCutaway();
+    } else this.lastLightMinute = -1;
+    this.applyCamera();
   }
 
   setItems(items: readonly ItemPlacement[]): void {
@@ -1651,6 +1848,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** The menus' town comes on screen: the overview's camera from where the game's is (whose pose the orbit keeps), its layer, its light. */
   private enterTown(): void {
     this.townMode = true;
+    this.shaderWatch.phase = 'town'; // (Stage 11B.)
     this.birdLife.setTown(true); // (Stage 9C.)
     this.applyPacing();
     this.applyDig(); // (Stage 6C: no basement or windowless rooms kept dark in the town, as Babylon's enterTown.)
@@ -1672,6 +1870,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** The game comes on screen again (the overview stays built, for the menus' next visit). */
   private leaveTown(): void {
     this.townMode = false;
+    this.shaderWatch.phase = 'game'; // (Stage 11B.)
     this.birdLife.setTown(false); // (Stage 9C.)
     this.applyDig(); // (Stage 6C: the basement and windowless rooms dark again, as Babylon's leaveTown.)
     this.showLayers(false);
@@ -1844,7 +2043,6 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
 
   stats(): RenderStats {
-    const gpu = this.device.gpuProfiler;
     return {
       backend: this.device.isWebGPU ? 'WebGPU' : 'WebGL2',
       preset: this.quality.preset,
@@ -1858,28 +2056,164 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       renderScale: this.renderScaleNow,
       refreshHz: this.pacer.refreshHz,
       refreshDivisor: this.pacer.divisor,
-      gpuMs: this.gpuWanted.size && gpu?.enabled && (gpu.frameTime ?? 0) > 0 ? (gpu.frameTime ?? null) : null,
+      gpuMs: this.gpuWanted.size ? this.gpuTiming.recentMs : null,
       residentsMs: this.characters?.updateMs ?? 0,
     };
   }
 
   setFrameProbe(probe: FrameProbe | null): void {
     this.probe = probe;
+    // (Stage 11B.) Draws and triangles per pass, counted only while something reads them.
+    if (probe) this.drawCounts.install(this.passKind);
+    else this.drawCounts.remove();
   }
 
   measureGpu(on: boolean, who: 'overlay' | 'bench' = 'overlay'): void {
     if (on) this.gpuWanted.add(who);
     else this.gpuWanted.delete(who);
-    if (this.device.gpuProfiler) this.device.gpuProfiler.enabled = this.gpuWanted.size > 0;
+    this.gpuTiming.enabled = this.gpuWanted.size > 0;
   }
 
-  gpuPasses(_reset?: boolean): { name: string; ms: number; frames: number }[] {
-    return [];
+  gpuPasses(reset = false): { name: string; ms: number; frames: number }[] {
+    return this.gpuTiming.passes(reset);
   }
 
+  /** The sun's shadow map's target (null: none made, or the sun casts none). */
+  private shadowTarget(): pc.RenderTarget | null {
+    const light = this.sun?.light;
+    // SAFETY: a light component's scene light (`LightComponent.light`) and its `shadowMap` are PlayCanvas 2.23's.
+    const map = light?.castShadows ? (light as unknown as { light?: { shadowMap?: { renderTargets: pc.RenderTarget[] } | null } }).light?.shadowMap : null;
+    return map?.renderTargets[0] ?? null;
+  }
+
+  /** What a pass into `target` draws, for the benchmark's counts (`DrawCounts`). */
+  private readonly passKind = (target: pc.RenderTarget | null): PassKind => (!target ? 0 : this.mirrors.owns(target) ? 2 : target === this.shadowTarget() ? 1 : 0);
+
+  /** The GPU timer's name for a pass into `target` (`GpuTiming`): the target's, as Babylon named its timers. */
+  private readonly passLabel = (target: pc.RenderTarget | null): string => {
+    if (!target) return 'canvas';
+    if (target === this.shadowTarget()) return 'shadow';
+    const post = this.post?.targets;
+    if (target === post?.scene) return 'scene';
+    if (target === post?.fxaa) return 'imageProcessing';
+    return target.name;
+  };
+
+  /**
+   * What the benchmark reports of the renderer (`debug/bench.ts`), with the Babylon renderer's
+   * meanings (see `gpuTiming.ts` for the measures):
+   *
+   * - `passes`: the targets a frame draws into, with their pixels, samples and bytes per sample, as
+   *   Babylon listed them: the sun's shadow map (while it has casters, drawn every frame or not), each
+   *   mirror reflecting now (held ones too), the scene's target, then the image processing onto the
+   *   canvas (on Low into the FXAA pass's input, then the FXAA onto the canvas), named as Babylon's. The
+   *   canvas counts 4 bytes of colour and 4 of depth, as Babylon's did. The one difference: PlayCanvas's
+   *   shadow map is depth alone, where Babylon's had a 2-byte colour target too.
+   * - `scene`: counts of what is drawn now. Babylon counted its meshes (hidden templates too); here
+   *   `meshes` are the draws (mesh instances) on the composition's layers, so the two engines' counts
+   *   don't compare, only runs of one engine (the bench's fingerprint: equal counts, the same scene).
+   *   `materials`: theirs, distinct. `shadowCasters`: the draws that cast in the sun's layers, shown, and
+   *   `shadowCasterTriangles` their triangles × instances (Babylon's render list). `natureInstances`:
+   *   the landscape's plant and rock instances the game camera's layer has (the woods' shadow-only
+   *   copies left out, as Babylon's layer mask left them out). `residents`, `mirrors`: the same as
+   *   Babylon's. `shaders`, `pipelines`: made so far (`ShaderWatch`; none should be made in play).
+   */
   benchInfo(): Record<string, unknown> & { passes: RenderPassInfo[] } {
-    // (The benchmark's counts so far; the rest comes with the bench support, stage 11.)
-    return { engine: `PlayCanvas ${pc.version}`, backend: this.device.isWebGPU ? 'webgpu' : 'webgl2', preset: this.quality.preset, passes: [], scene: { lightingUpdates: this.counts.lightingUpdates, mirrorDraws: this.mirrors.draws, mirrors: this.mirrors.count, mirrorsLive: this.mirrors.live, mirrorSpots: this.mirrors.spots /* (Stage 9A) */, residents: this.simCount, residentsDrawn: this.residentsDrawn() } };
+    const d = this.device;
+    const passes: RenderPassInfo[] = [];
+    const push = (name: string, t: pc.RenderTarget) => passes.push({ name, width: t.width, height: t.height, samples: Math.max(1, t.samples), colorBytes: colorBytes(t), depthBytes: depthBytes(t) });
+    const canvas = (name: string) => passes.push({ name, width: d.width, height: d.height, samples: 1, colorBytes: 4, depthBytes: 4 });
+    const scene = this.sceneCounts();
+    const map = this.shadowTarget();
+    if (map && scene.shadowCasters > 0) push('shadow', map);
+    this.mirrors.reflecting.forEach((t, i) => push(`mirror${i}`, t));
+    const targets = this.post?.targets;
+    if (targets?.scene) {
+      push('scene', targets.scene);
+      if (targets.fxaa) {
+        push('imageProcessing', targets.fxaa);
+        canvas('fxaa (canvas)');
+      } else canvas('imageProcessing (canvas)');
+    } else canvas('scene (canvas)');
+    // SAFETY: WebgpuGraphicsDevice keeps the adapter in `gpuAdapter`; WebglGraphicsDevice the unmasked names.
+    const info = d as unknown as { gpuAdapter?: { info?: Record<string, string> }; unmaskedRenderer?: string; unmaskedVendor?: string };
+    const adapter = info.gpuAdapter?.info;
+    return {
+      engine: `PlayCanvas ${pc.version}`,
+      backend: d.isWebGPU ? 'WebGPU' : 'WebGL2',
+      gpu: adapter ? { vendor: adapter.vendor, architecture: adapter.architecture, device: adapter.device, description: adapter.description } : { vendor: info.unmaskedVendor, renderer: info.unmaskedRenderer },
+      timerQuery: this.gpuTiming.available,
+      render: { width: d.width, height: d.height, renderScale: this.renderScaleNow, devicePixelRatio: window.devicePixelRatio, canvasMsaa: false },
+      quality: { ...this.quality, mirrors: this.mirrors.capacity, clusteredLamps: true, postSamples: this.post?.samples ?? 1, fxaa: this.post?.options.fxaa ?? false },
+      diag: [...this.diag],
+      passes,
+      scene: {
+        ...scene,
+        textures: (d as unknown as { textures?: Set<unknown> }).textures?.size ?? 0,
+        lights: scene.lights,
+        residents: this.simCount,
+        residentsDrawn: this.residentsDrawn(),
+        mirrors: this.mirrors.count,
+        mirrorsLive: this.mirrors.live,
+        mirrorSpots: this.mirrors.spots /* (Stage 9A) */,
+        mirrorDraws: this.mirrors.draws,
+        nightGrade: this.post?.night ?? 0,
+        lightingUpdates: this.counts.lightingUpdates,
+        shaders: this.shaderWatch.shaders,
+        pipelines: this.shaderWatch.pipelines,
+      },
+    };
+  }
+
+  /** The draws on the composition's layers now, and what of them the benchmark counts (`benchInfo`). */
+  private sceneCounts(): { meshes: number; enabledMeshes: number; activeMeshes: number; materials: number; lights: number; lampsLit: number; shadowCasters: number; shadowCasterTriangles: number; natureMeshes: number; natureInstances: number } {
+    const layers = this.app.scene.layers.layerList;
+    const all = new Set<pc.MeshInstance>();
+    for (const layer of layers) for (const mi of layer.meshInstances) all.add(mi);
+    const triangles = (mi: pc.MeshInstance) => ((mi.mesh?.primitive[0]?.count ?? 0) / 3) * (mi.instancingData ? mi.instancingCount : 1);
+    const shown = (mi: pc.MeshInstance) => mi.visible && mi.node.enabled && (!mi.instancingData || mi.instancingCount > 0);
+    const materials = new Set<pc.Material>();
+    let enabled = 0;
+    let active = 0;
+    for (const mi of all) {
+      if (mi.material) materials.add(mi.material);
+      if (shown(mi)) enabled++;
+      if (mi.visibleThisFrame) active++;
+    }
+    // The sun's casters: in its layers, casting, shown.
+    const sun = this.sun.light;
+    const casters = new Set<pc.MeshInstance>();
+    if (sun?.castShadows) {
+      for (const id of sun.layers) {
+        const layer = this.app.scene.layers.getLayerById(id);
+        if (layer) for (const mi of layer.meshInstances) if (mi.castShadow && shown(mi)) casters.add(mi);
+      }
+    }
+    let casterTriangles = 0;
+    for (const mi of casters) casterTriangles += triangles(mi);
+    // The landscape's instances in the game camera's world layer.
+    const world = new Set(this.app.scene.layers.getLayerById(pc.LAYERID_WORLD)?.meshInstances ?? []);
+    let natureMeshes = 0;
+    let natureInstances = 0;
+    for (const mi of this.lot.landscapeDraws()) {
+      if (!world.has(mi) || !mi.node.enabled) continue;
+      natureMeshes++;
+      if (mi.instancingData) natureInstances += mi.instancingCount;
+    }
+    const lights = this.app.root.findComponents('light') as pc.LightComponent[];
+    const on = lights.filter((l) => l.enabled && l.entity.enabled);
+    return {
+      meshes: all.size,
+      enabledMeshes: enabled,
+      activeMeshes: active,
+      materials: materials.size,
+      lights: on.length,
+      lampsLit: on.filter((l) => l.type !== 'directional' && l.intensity > 0).length,
+      shadowCasters: casters.size,
+      shadowCasterTriangles: Math.round(casterTriangles),
+      natureMeshes,
+      natureInstances,
+    };
   }
 
   /** Residents drawn now (the benchmark's). */
@@ -2032,6 +2366,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.decor.clear();
     this.post?.destroy(); // (Stage 6A.)
     this.post = null;
+    this.drawCounts?.remove(); // (Stage 11B.)
+    this.gpuTiming?.destroy();
+    this.shaderWatch?.destroy();
     this.app?.destroy();
   }
 }

@@ -75,7 +75,7 @@ the growth pose (`partPose`).
 ## Engine features
 
 Before this work an object clip played only while a resident used the object, or while the sim held it `open`
-(`web/src/render/babylon/objectMotion.ts`, `models.ts` `motionsOf` / `clipPose`): forward, held, then back, with one
+(then `web/src/render/babylon/objectMotion.ts`; now `render/shared/objectMotion.ts`, with `motionsOf` in `modelEntry.ts` and `clipPose` in `modelClips.ts`): forward, held, then back, with one
 `hold` per model. These features were added first (2026-10-14) so every kind of clip could be built. The family
 notes and scripts refer to them by these names.
 
@@ -84,7 +84,7 @@ notes and scripts refer to them by these names.
 | T0 | Clips bench and gamekit helpers | `/clips.html?keys=model.<id>` (`&clip=`, `&t=`, `&renderer=webgl`): every clip of each model in a loop (rest, play, hold, back), a button per clip, `t` to hold a time for screenshots. `G.spin(obj, clip, turns, seconds, axis)` (whole turns ending at rest), `G.rock(…, degrees, …)` (out, back past rest, home), `G.squash(obj, clip, scale, seconds)` (to any size and back: cushions, a held weight hidden), `G.grow`; the boulder shape is `G.boulder` |
 | E1 | Loops while in use | `motions.loops: {use: clip}`: repeats rest to rest for as long as the use lasts, finishes its round, never plays back. Runs on game time (stops when paused). `cargo check-glb` fails a loop that doesn't end at rest |
 | E2 | Ambient clips | `motions.idle: clip`, looping always; drawn only within `ambientRange` of the camera (Low 0, Medium 40 m, High 60 m), off on Low, shadows not redrawn for them. 94 ambient things cost 0.09 ms (clips) and 0.15–0.3 ms (frame) of CPU on an M3 Pro (`docs/design/graphics.md`) |
-| E3 | Night state | `motions.night: clip`, held while the lamp level is up, dusk to dawn (`house.ts`, `BabylonRenderer.ts`); curtains stay drawn over sleepers |
+| E3 | Night state | `motions.night: clip`, held while the lamp level is up, dusk to dawn (`house.ts`, `PlayCanvasRenderer.ts`); curtains stay drawn over sleepers |
 | E4 | Growth state | content `grows: {days, fallow}`, harvest `"when": "ripe"`, `"leaves": "picked"`; `motions.growth: clip`, made with `G.stages` (ripe at rest, then picked, growing, planted). The sim advances the stage, the renderer holds the clip there |
 | E5 | Per-use hold | `motions.uses: {use: [{clip, hold}, clip]}`: several clips per use, each with its own `hold` (a shower's door shuts after 1 s while the water runs) |
 | E6 | Mirrors from files | a material's `"mirror": "front"` (gamekit: `glass=('#hex', 'glass', 'front')`) |

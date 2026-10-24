@@ -1,8 +1,13 @@
+// Ported from Babylon.js 9.30: the arithmetic of `Matrix`, `Quaternion` and `Vector3` (`ComposeToRef`,
+// `RotationX/Y/Z`, `multiplyToRef`, `RotationYawPitchRollToRef`, `RotationAxis`, the transforms).
+// Changed for Idyll Lives: free functions on plain arrays.
+// Babylon.js: Copyright 2023 The Babylon.js team, under the Apache License 2.0; its licence and notice
+// are in crates/tools/texts/Babylon.js-LICENSE and Babylon.js-NOTICE, and in a build's THIRD-PARTY-LICENSES.txt.
 /**
  * Matrix and quaternion helpers in the game's conventions, engine-neutral: the same numbers
  * Babylon.js gives for the same calls (`Matrix.ComposeToRef`, `Quaternion.RotationYawPitchRollToRef`,
  * ...), so geometry and placements are the same whichever engine draws them. Checked against
- * Babylon by `web/tests/math.test.ts`.
+ * Babylon's numbers (recorded from Babylon 9.30) by `web/tests/math.test.ts`.
  *
  * Layout: 16 floats, translation at 12, 13, 14 (Babylon's matrices, and PlayCanvas's `Mat4.data`).
  * Babylon multiplies row vectors: `multiply(a, b)` applies `a` first, then `b`, which is

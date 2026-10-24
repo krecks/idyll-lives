@@ -1,3 +1,7 @@
+// Follows Babylon.js 9.30's PBR fog (`fogFragment.fx`: the eye's distance, the factor in linear space).
+// Changed for Idyll Lives: as two lines of PlayCanvas's `fogPS`.
+// Babylon.js: Copyright 2023 The Babylon.js team, under the Apache License 2.0; its licence and notice
+// are in crates/tools/texts/Babylon.js-LICENSE and Babylon.js-NOTICE, and in a build's THIRD-PARTY-LICENSES.txt.
 /**
  * The haze as Babylon's PBR drew it, in the game's lit materials (`GAME_LOOK`): `fogPS` with two
  * lines changed (anchors also in `tools/render/check_chunks.ts`).

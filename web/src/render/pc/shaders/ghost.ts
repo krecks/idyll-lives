@@ -1,3 +1,7 @@
+// Follows Babylon.js 9.30's `StandardMaterial` shader (`default.fragment.fx`: its diffuse and
+// hemispheric terms). Changed for Idyll Lives: without specular, in GLSL and WGSL for PlayCanvas.
+// Babylon.js: Copyright 2023 The Babylon.js team, under the Apache License 2.0; its licence and notice
+// are in crates/tools/texts/Babylon.js-LICENSE and Babylon.js-NOTICE, and in a build's THIRD-PARTY-LICENSES.txt.
 /**
  * Buy mode's red see-through copy of a thing that can't go there (`placementGhost.ts`), shaded as
  * Babylon's `StandardMaterial` shaded it (its Blinn-Phong `default.fragment.fx`, without specular):

@@ -1,5 +1,5 @@
 /**
- * Placed objects' moving parts on PlayCanvas (a fridge's doors; the port of `babylon/objectMotion.ts`):
+ * Placed objects' moving parts on PlayCanvas (a fridge's doors; ported from the Babylon renderer, removed: see git history up to f15b839b):
  * the engine-neutral motion (`shared/objectMotion.ts`: which clips play, how far each is) writing
  * into instanced draws (`instancing.ts`). Each instance's parts draw from buffers of their own
  * (`MovingTarget`), written only while something moves, and sent up once a frame however many of
