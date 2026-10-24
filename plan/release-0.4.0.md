@@ -12,7 +12,7 @@ The game draws with PlayCanvas 2.23 on WebGPU, with the WebGL2 fallback, instead
 - **Saves:** format 32, unchanged: 0.3.2 and 0.4.0 open each other's saves, so 0.3.2 is a safe build to redeploy if this one goes wrong.
 - **Not changed:** `crates/sim-core`, `crates/sim-wasm` and `crates/voice` (no diff since v0.3.2), so the simulation's long runs (`century`, `soak`, `balance`) and tickbench are as at 0.3.2 and weren't run again.
 - **Measured** (final checkpoint, village with 41 residents, M3 Pro, 1920×1080): the main thread does 2.3–3.2× less work on WebGPU and 1.7–2.8× less on WebGL2; after the warm-up a scripted session compiles 1 shader and 1 pipeline in play (32 and 340 before); the 54 lit benchmark shots differ from Babylon's by a median 0.74 % of pixels by more than 16.
-- **CI's generated houses fail on `main` too:** since PR #24 (303bafa0, 2026-10-22, the tools moved from Node to Bun) a few seeds give a house another layout for another household (`tools/housegen/sample.ts`, "another layout"; 4 locally, 7–10 in CI, different seeds each CI run). This branch doesn't touch house generation and `pages.yml` doesn't run the check; it is fixed separately.
+- **Generated houses, fixed here:** CI's generated-houses check had failed on `main` since PR #24 (303bafa0, 2026-10-22, the tools moved from Node to Bun): `housegen.ts` shuffled with `sort(() => rng() - 0.5)` (20 places), and JavaScriptCore's sort gave one seed other houses from call to call (4 layouts in 40 identical calls), so a house could come out otherwise for another household or another time. It shuffles with Fisher-Yates now (1 layout in 40; 0 problems in the sample). Every seed gives another house than before, so new towns get new houses; a saved town keeps its built houses.
 - **Known to be imperfect:** on Low with WebGL2 the GPU does 2–15 % more than Babylon did (not yet profiled; Low's FXAA, a pass of its own on PlayCanvas, is the first suspect). Frame intervals jitter a little more around the refresh (p95 about 10 ms at 120 Hz against Babylon's 8.4–9.9), with the same average.
 
 ## 2. Review
@@ -50,7 +50,7 @@ A code review of the branch against `main` (the whole port, read closely in the 
 | `bun run test` | pass (51) |
 | `bun run check:chunks` | 185 anchors and names found in PlayCanvas 2.23.0 |
 | Dry run of the branch (`pages.yml`, run 40112707629) | pass; `dist` 619 MB (CI fails over 900) |
-| CI: generated houses and worlds | **fails, as on `main` since 303bafa0** (see below) |
+| CI: generated houses and worlds (`--ignored`) | pass, after the fix below; two sample runs give the same houses byte for byte |
 
 ## 5. Release steps
 

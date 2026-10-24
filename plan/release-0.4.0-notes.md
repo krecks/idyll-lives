@@ -9,5 +9,6 @@ The game draws with **PlayCanvas** instead of Babylon.js.
 
 ### Also
 - **Saves:** unchanged (format 32): 0.3.2 and 0.4.0 open each other's saves.
+- **Generated houses:** a house is laid out the same every time and for whoever moves in, so the home you pick is the one you get. Since 0.3.2 the same house could come out with other rooms from one time to the next, in Safari especially. New towns get new houses; the towns in saved games keep theirs.
 - **Known:** on Low with WebGL2 the graphics processor does up to 15 % more work than it did with Babylon; everywhere else it does the same or less.
 - **The sky's light** is made straight from the CC0 HDRI it came from (Poly Haven's Belfast Open Field, `cargo envconv`), instead of from Babylon's packed copy of it; the lighting is unchanged.
