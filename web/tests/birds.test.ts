@@ -2,7 +2,7 @@
 // an engine draws them: a lot with a house, a street and gardens round it, through a day and a night (game speeds,
 // pauses, long frames, reduce motion, the roof shown and hidden, residents walking by, the camera diving close,
 // songs, flights sent off, the habitat built again, a smaller preset, a model file arriving late, `clear`), with
-// a fixed Math.random, gives the same birds, sounds heard and matrices drawn per second as recorded (`bun test`;
+// a fixed Math.random, gives the same birds, draws and sounds heard per second as recorded (`bun test`;
 // after a change meant to change how the birds behave, `bun test --update-snapshots`). The record was made when
 // the code moved out of the Babylon renderer (Stage 9), where a side-by-side run against the Babylon version
 // before the move showed no difference in any frame (bench-results/stage9c/equal.ts).
@@ -192,8 +192,11 @@ describe('garden birds', async () => {
           await birds.setHabitat(habitat([garden, outdoor, street, woods], frame.hour));
         }
         const moved = birds.update(frame);
-        const drawn = inner.inUse.map((l) => `${l.species} ${l.count} ${l.shown ? 'shown' : 'hidden'} ${l.uploads} ${l.buffers.map((b) => hash(b, 0, l.count * 16)).join(' ')}`);
-        second.push(`${moved}`, ...drawn, ...log.splice(0), JSON.stringify(birds.heard()));
+        // (Not the matrices' or positions' numbers: the birds' sin, cos and exp differ in their last bits
+        // between platforms, macOS on arm64 against Linux on x86-64.)
+        const drawn = inner.inUse.map((l) => `${l.species} ${l.count} ${l.shown ? 'shown' : 'hidden'} ${l.uploads}`);
+        const sung = birds.heard().map((b) => `${b.id} ${b.song}${b.perched ? ' perched' : ''}`);
+        second.push(`${moved}`, ...drawn, ...log.splice(0), sung.join(', '));
         for (const look of inner.inUse) for (const b of look.buffers) for (let i = 0; i < look.count * 16; i++) if (!Number.isFinite(b[i])) throw new Error(`frame ${f}: ${look.species} drawn with ${b[i]}`);
         if (f % 600 === 599) {
           const d = birds.debug();
