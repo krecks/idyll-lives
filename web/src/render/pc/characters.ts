@@ -57,6 +57,8 @@ export interface PartDraw {
   readonly shadow: boolean;
   enabled: boolean;
   count: number;
+  /** The rows it draws (4 numbers each, the resident's row first; `count` of them), as last written. */
+  rows: Float32Array | null;
 }
 
 /** A body's quilt as drawn (`ResidentView`'s `Q`). */
@@ -138,7 +140,7 @@ export class PlayCanvasResidentView implements ResidentView<PartDraw, QuiltDraw,
     draw.mesh.decRefCount();
     // Enabled, drawing nothing until its rows come (`setPartRows`).
     draw.enabled = false;
-    const pd: PartDraw = { draw, shadow, enabled: true, count: 0 };
+    const pd: PartDraw = { draw, shadow, enabled: true, count: 0, rows: null };
     this.parts.push(pd);
     this.byInstance.set(draw.meshInstance, pd);
     return pd;
@@ -162,6 +164,7 @@ export class PlayCanvasResidentView implements ResidentView<PartDraw, QuiltDraw,
     if (change === 'count') {
       // (The rows already uploaded: only how many of them are drawn.)
       mesh.count = mesh.draw.count = count;
+      mesh.rows = rows;
       mesh.draw.meshInstance.instancingCount = count;
       this.show(mesh);
       return;
@@ -179,6 +182,7 @@ export class PlayCanvasResidentView implements ResidentView<PartDraw, QuiltDraw,
     }
     d.update(false);
     mesh.count = count;
+    mesh.rows = rows;
     this.show(mesh);
   }
 
@@ -367,6 +371,23 @@ export class Characters extends SharedCharacters<PartDraw, QuiltDraw, Prop> {
     const view = new PlayCanvasResidentView(app, root, assets, { camera: options.camera });
     super(view, assets, content, { refreshProps: options.refreshProps, castsShadows: options.castsShadows });
     this.pcView = view;
+  }
+
+  /**
+   * Whether the draw `mi` draws any of the resident rows set in `bits` (16 a component, as
+   * `residentRowFilter`), null for any other draw (the mirrors: a part none of whose residents a
+   * glass shows isn't drawn there). No allocations.
+   */
+  drawsRows(mi: pc.MeshInstance, bits: Float32Array): boolean | null {
+    const part = this.pcView.partOf(mi);
+    if (!part) return null;
+    const rows = part.rows;
+    if (!rows) return false;
+    for (let j = 0; j < part.count; j++) {
+      const row = rows[j * 4] | 0;
+      if (Math.floor(bits[row >> 4] / 2 ** (row & 15)) % 2 === 1) return true;
+    }
+    return false;
   }
 
   /** The resident rows the draw `mi` draws now (`rowsOf`), null for any other draw (stage 9's mirrors). */

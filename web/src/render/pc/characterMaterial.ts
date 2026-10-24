@@ -52,6 +52,9 @@ export const RESIDENT_VERTEX = {
 
 /** The resident's row of the pose texture (0..63, a float), per copy beside its matrix. */
 export const RESIDENT_ROW: InstanceStream = { semantic: pc.SEMANTIC_ATTR10, components: 1 };
+/** Every one of 16 rows (a component of `residentRowFilter`'s). */
+export const RESIDENT_ROWS_ALL = 0xffff;
+
 /** A quilt's stretch and pull (m, local; `shaders/blanket.ts`), per copy. */
 export const BLANKET_EXT: InstanceStream = { semantic: pc.SEMANTIC_ATTR8, components: 2 };
 /** A quilt's bedding colour (linear rgb, `quiltTint`), per copy. */
@@ -164,6 +167,8 @@ interface AppResidents {
   morphs: pc.Texture;
   /** `game_simLayout`: first appearance texel, morph width, morph header (read at every draw: changed in place). */
   layout: Float32Array;
+  /** `game_simShown`: the rows drawn, 16 a component (read at every draw: changed in place; `residentRowFilter`). */
+  shown: Float32Array;
   materials: Map<string, pc.StandardMaterial>;
 }
 
@@ -179,6 +184,7 @@ function residentsOf(app: pc.AppBase): AppResidents {
       poses: none(pc.PIXELFORMAT_RGBA32F, [new Float32Array(4)]),
       morphs: none(pc.PIXELFORMAT_RGBA16F, [new Uint16Array(4)]),
       layout: new Float32Array([0, 1, 0, 0]),
+      shown: new Float32Array(4).fill(RESIDENT_ROWS_ALL),
       materials: new Map(),
     };
     apps.set(app, r);
@@ -190,6 +196,16 @@ function bind(r: AppResidents, material: pc.StandardMaterial): void {
   material.setParameter('game_simPoses', r.poses);
   material.setParameter('game_simMorphs', r.morphs);
   material.setParameter('game_simLayout', r.layout);
+  material.setParameter('game_simShown', r.shown);
+}
+
+/**
+ * The resident rows `app`'s resident materials draw: 16 rows a component, bit `row % 16` of component
+ * `row / 16`, all of them (`RESIDENT_ROWS_ALL`) unless a pass changes it in place for its draws and
+ * puts it back after (the mirrors draw only the residents their glass shows: `mirrors.ts`).
+ */
+export function residentRowFilter(app: pc.AppBase): Float32Array {
+  return residentsOf(app).shown;
 }
 
 /** The textures every resident material of `app` reads, now and later (once a set is loaded; no shader compiles). */

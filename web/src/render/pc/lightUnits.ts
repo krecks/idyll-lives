@@ -41,7 +41,9 @@ export const ENV_UNITS = 1.05;
  * highlight on the rough lawn near the camera came out brighter than Babylon's (+0.02 in linear;
  * PlayCanvas's normal maps are a little flatter, `bumpiness` mixing towards flat where Babylon
  * scales x and y, so the highlight is tighter), the morning's and afternoon's right; 2.4 splits it
- * (the sun alone at 9, 13 and 16: within 1.5 of 255 of Babylon's on average). A string: it goes
- * into the shaders.
+ * (the sun alone at 9, 13 and 16: within 1.5 of 255 of Babylon's on average). The highlights rise
+ * with Babylon's Schlick term towards grazing angles (`shaders/envBrdf.ts`); looking into the low
+ * sun of the menus' golden hour, π would match a little better (−3 of 255 against −6 at 2.4) but the
+ * noon shots worse. A string: it goes into the shaders.
  */
 export const SPECULAR_UNITS = '2.4';

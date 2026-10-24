@@ -144,6 +144,8 @@ export class Lamps {
   private changed = false;
   private readonly vTmp = new pc.Vec3();
   private readonly qTmp = new pc.Quat();
+  /** The lights or the glows changed (the mirrors' held reflections are drawn again: `mirrors.ts`). */
+  onChanged: (() => void) | null = null;
 
   constructor(
     app: pc.AppBase,
@@ -339,6 +341,7 @@ export class Lamps {
     this.glow.level = this.glowLevel;
     this.hooks.lot.applyGlow(this.glow);
     this.hooks.pools();
+    this.onChanged?.();
   }
 
   /** The interior lights at the night level of the last lighting update, out in rooms where everyone is asleep. */
@@ -370,6 +373,7 @@ export class Lamps {
       const reach = this.many ? Math.min(range, LAMP_MAX_RANGE) * REACH : range;
       if (lamp.light.range !== reach) lamp.light.range = reach;
     }
+    this.onChanged?.();
   }
 
   /** A room's fill is out: everyone there is asleep, or nobody awake is in a room without windows. */

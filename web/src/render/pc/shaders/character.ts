@@ -15,6 +15,8 @@
  *   `RESIDENT_INSTANCING`), so the world position (`vPositionW`) and the normal (`mat3` of the model
  *   matrix, PlayCanvas's own for instanced draws) are the skinned ones every later stage reads: the
  *   lamps' rooms, basements, the fog, the diag views.
+ * - Rows a pass leaves out (`game_simShown`, 16 bits a component: `residentRowFilter`, all of them but
+ *   in a mirror's reflection, which draws only the residents its glass shows) scale to nothing.
  * - Before skinning (`getLocalPosition`, `vsLocal`): the face morphs (`GAME_SIM_MORPH`: the set's
  *   morph texture `game_simMorphs`, its block per vertex in `game_simMorph`, the row's (channel,
  *   weight) pairs), position and normal (`normalCoreVS`'s `getLocalNormal` wrapped,
@@ -78,7 +80,7 @@ attribute vec4 instance_line2;
 attribute vec4 instance_line3;
 attribute vec4 instance_line4;
 mat4 getModelMatrix() {
-	return matrix_model * mat4(instance_line1, instance_line2, instance_line3, instance_line4) * gameSimSkin();
+	return matrix_model * mat4(instance_line1, instance_line2, instance_line3, instance_line4) * gameSimSkin() * gameSimShown();
 }
 `,
   wgsl: `
@@ -87,7 +89,7 @@ attribute instance_line2: vec4f;
 attribute instance_line3: vec4f;
 attribute instance_line4: vec4f;
 fn getModelMatrix() -> mat4x4f {
-	return uniform.matrix_model * mat4x4f(instance_line1, instance_line2, instance_line3, instance_line4) * gameSimSkin();
+	return uniform.matrix_model * mat4x4f(instance_line1, instance_line2, instance_line3, instance_line4) * gameSimSkin() * gameSimShown();
 }
 `,
 };
@@ -135,6 +137,13 @@ const VS_GLSL = {
 		ivec4 j = ivec4(game_simJoints + 0.5);
 		vec4 w = game_simWeights;
 		return gameSimBone(j.x, row) * w.x + gameSimBone(j.y, row) * w.y + gameSimBone(j.z, row) * w.z + gameSimBone(j.w, row) * w.w;
+	}
+	// The rows drawn (16 bits a component, residentRowFilter): 1, or 0 for a row left out (its copy collapses to nothing).
+	uniform vec4 game_simShown;
+	float gameSimShown() {
+		int row = int(game_simRow + 0.5);
+		float bits = floor(game_simShown[row / 16] / exp2(float(row % 16)));
+		return bits - 2.0 * floor(bits * 0.5);
 	}
 	#ifdef GAME_SIM_MORPH
 		attribute vec4 game_simMorph;
@@ -207,6 +216,13 @@ const VS_WGSL = {
 		let j = vec4i(game_simJoints + vec4f(0.5));
 		let w = game_simWeights;
 		return gameSimBone(j.x, row) * w.x + gameSimBone(j.y, row) * w.y + gameSimBone(j.z, row) * w.z + gameSimBone(j.w, row) * w.w;
+	}
+	// The rows drawn (16 bits a component, residentRowFilter): 1, or 0 for a row left out (its copy collapses to nothing).
+	uniform game_simShown: vec4f;
+	fn gameSimShown() -> f32 {
+		let row = i32(game_simRow + 0.5);
+		let bits = floor(uniform.game_simShown[row / 16] / exp2(f32(row % 16)));
+		return bits - 2.0 * floor(bits * 0.5);
 	}
 	#ifdef GAME_SIM_MORPH
 		attribute game_simMorph: vec4f;

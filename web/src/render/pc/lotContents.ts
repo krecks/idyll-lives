@@ -7,10 +7,11 @@
  * renderer's (`house.ts` and the rest).
  *
  * - Landscapes are kept by town (`Landscape.key`) and shared by the game world and the menus'
- *   overview when they show the same town (`useNature`; the overview's half is stage 9: it asks
- *   for its layer with `useNature('town', world)`). Plants drawn in groups show only in the game,
- *   those drawn whole only in the town; the woods near the town cast the sun's shadow in the game
- *   from their whole draws, on the shadow-only layer (`layers.ts`), on presets with `landscapeShadows`.
+ *   overview when they show the same town (`useNature`; the overview asks for its layer with
+ *   `useNature('town', world)`, drawn on the town layer, `townLayer`). Plants drawn in groups show
+ *   only in the game, those drawn whole only in the town; the woods near the town cast the sun's
+ *   shadow in the game from their whole draws, on the shadow-only layer (`layers.ts`), on presets
+ *   with `landscapeShadows`.
  * - Objects: one instanced draw per mesh of each model's template (a template per model, size and
  *   paint), kept from build to build (`TemplateCache`) and drawn with the copies of the world being
  *   built; a moving part's meshes draw from buffers of their own. Templates the world no longer uses
@@ -163,7 +164,7 @@ export class LotContents {
   private readonly natures = new Map<string, NatureSet>();
   private readonly natureIn: Record<'world' | 'town', NatureSet | null> = { world: null, town: null };
   private readonly natureTicket = { world: 0, town: 0 };
-  /** The overview's layer for the town's draws (stage 9; until then the town's are drawn on the world layer). */
+  /** The overview's layer for the town's draws (`overview.ts` `townLayer`; without it the town's are drawn on the world layer). */
   townLayer: number | null = null;
 
   /** Object templates by key, kept from build to build, and the ones the world being built uses. */
@@ -308,10 +309,15 @@ export class LotContents {
     for (const r of entity.findComponents('render') as pc.RenderComponent[]) for (const mi of r.meshInstances) this.lib.digInto(mi);
   }
 
-  /** Draws a landscape on the layers that use it (see the file's header). */
+  /**
+   * Draws a landscape on the layers that use it (see the file's header): what both draw on the world
+   * layer and the town's (each camera draws one of them, and the sun lights the one on screen), the
+   * whole plants on the town layer, and on the shadow-only layer too while the game casts from them.
+   */
   private showNature(n: NatureSet): void {
     const world = n.users.has('world');
     const town = n.users.has('town');
+    const townLayer = this.townLayer ?? pc.LAYERID_WORLD;
     const casters = new Set(this.quality.landscapeShadows ? n.casters : []);
     // `?diag=nonature`: without the woods, rocks and lawn (the terrain, water and roads stay).
     const plantsOff = this.diag.has('nonature');
@@ -319,24 +325,30 @@ export class LotContents {
       const render = e.render;
       const plant = !!render?.meshInstances[0]?.instancingData;
       const only = n.only.get(e);
-      let layer: number = pc.LAYERID_WORLD;
+      let first: number = pc.LAYERID_WORLD;
+      let second = -1;
       let on: boolean;
       let casts = casters.has(e);
-      if (!only) on = world || town;
-      else if (only === 'game') {
+      if (!only) {
+        on = world || town;
+        if (town) [first, second] = world && townLayer !== pc.LAYERID_WORLD ? [pc.LAYERID_WORLD, townLayer] : [townLayer, -1];
+      } else if (only === 'game') {
         on = world;
         casts = false;
       } else if (town) {
         on = true;
-        layer = this.townLayer ?? pc.LAYERID_WORLD;
+        first = townLayer;
+        // (The game casts its shadows from them too.)
+        if (world && casts) second = this.shadowLayer.id;
       } else {
         // The game draws these in groups: whole, they only cast its shadow.
         on = world && casts;
-        layer = this.shadowLayer.id;
+        first = this.shadowLayer.id;
       }
       e.enabled = on && !(plant && plantsOff);
       if (render) {
-        if (render.layers.length !== 1 || render.layers[0] !== layer) render.layers = [layer];
+        const layers = render.layers;
+        if (layers.length !== (second < 0 ? 1 : 2) || layers[0] !== first || (second >= 0 && layers[1] !== second)) render.layers = second < 0 ? [first] : [first, second];
         if (render.castShadows !== casts) render.castShadows = casts;
       }
     }

@@ -192,6 +192,8 @@ export class SunShadows {
   private readonly square: Square = { centre: new pc.Vec3(), radius: 30 };
   private readonly fadeId: pc.ScopeId;
   private readonly fade: number;
+  /** Something in the map changed (`moved`; `urgent`: not a resident's pose), for what else holds a picture of the world (the mirrors). */
+  onMoved: ((urgent: boolean) => void) | null = null;
 
   /**
    * Shadows from `sun`'s light: a map of `options.size` texels a side, filtered as Babylon's
@@ -245,6 +247,7 @@ export class SunShadows {
    * the walls, a thing placed) draw at once; a resident's pose may wait for the shadow rate.
    */
   moved(urgent = true): void {
+    this.onMoved?.(urgent);
     if (this.overview) return;
     const now = performance.now();
     if (this.interval <= 0 || urgent || now - this.lastDraw >= this.interval) {

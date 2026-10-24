@@ -23,6 +23,9 @@ export interface OverviewCameraTarget {
 /** How tall the town stands (m), framed with it. */
 export const OVERVIEW_TOWN_HEIGHT = 7;
 
+/** How near (radians, and parts of the radius) a settled camera comes to its goal before it's put there. */
+const SNAP = 1e-4;
+
 interface Pose {
   alpha: number;
   beta: number;
@@ -161,6 +164,16 @@ export class OverviewCamera {
       c.tz += (g.tz - c.tz) * k;
       c.ox += ((g.ox * c.radius) / g.radius - c.ox) * k;
       c.oy += ((g.oy * c.radius) / g.radius - c.oy) * k;
+      // Within a hair of the goal: there (a camera that keeps creeping is never still: held frames).
+      if (Math.abs(angleDelta(c.alpha, ga)) + Math.abs(g.beta - c.beta) < SNAP && Math.abs(g.radius / zoom - c.radius) + Math.abs(g.tx - c.tx) + Math.abs(g.tz - c.tz) < SNAP * c.radius) {
+        c.alpha = ga;
+        c.beta = g.beta;
+        c.radius = g.radius / zoom;
+        c.tx = g.tx;
+        c.tz = g.tz;
+        c.ox = (g.ox * c.radius) / g.radius;
+        c.oy = (g.oy * c.radius) / g.radius;
+      }
     }
     this.apply();
   }

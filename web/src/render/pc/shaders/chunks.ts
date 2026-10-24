@@ -22,7 +22,8 @@
  * - `combine`: `combineColor` (`combinePS`): the engine's is `combineColorEngine`.
  * - `end`: replaces `endPS` (the colour, fog, tone mapping and gamma) where its defines say so.
  * - `fogPS`: Babylon's haze in the game's materials (`fog.ts`); `reflectionEnvPS`, `reflectionEnvHQPS`:
- *   the sky's reflection rising at a slant, as Babylon's environment BRDF had it (`envBrdf.ts`).
+ *   the sky's reflection rising at a slant, as Babylon's environment BRDF had it, and `fresnelSchlickPS`:
+ *   Babylon's Schlick term for the lights' highlights (`envBrdf.ts`).
  *
  * Features run in the order of the Babylon plugins they port (their priority), as Babylon injected
  * them. Engine-wide patches (`patchEngineChunks`, once per device) put the game's light where no
@@ -40,7 +41,7 @@
 import * as pc from '../engine';
 import { CUTAWAY } from './cutaway';
 import { DIAG_VIEW } from './diagView';
-import { gameReflection } from './envBrdf';
+import { gameFresnel, gameReflection } from './envBrdf';
 import { gameFog } from './fog';
 import { SOFT_LOOK } from './softLook';
 import { ROOM_LIGHT_CODE } from './roomLights';
@@ -229,6 +230,8 @@ function build(device: pc.GraphicsDevice, lang: Language): Record<string, string
   out.fogPS = gameFog(engineChunk(device, lang, 'fogPS'), lang, replaceOnce);
   // The sky's reflection rising at a slant, as Babylon's environment BRDF had it (`envBrdf.ts`).
   for (const chunk of ['reflectionEnvPS', 'reflectionEnvHQPS']) out[chunk] = gameReflection(engineChunk(device, lang, chunk), chunk, lang, replaceOnce);
+  // The lights' highlights rising towards grazing angles, as Babylon's Schlick term had them (`envBrdf.ts`).
+  out.fresnelSchlickPS = gameFresnel(engineChunk(device, lang, 'fresnelSchlickPS'), lang, replaceOnce);
 
   // The lamps' falloff, Babylon's (`roomLights.ts`): the engine's functions renamed, ours in their place.
   for (const chunk of ['falloffInvSquaredPS', 'spotPS'] as const) {

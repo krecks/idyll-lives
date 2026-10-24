@@ -29,10 +29,21 @@ const NEEDED: { file: string; text: string; who: string }[] = [
   { file: 'scene/renderer/shadow-renderer-directional.js', text: 'cull(light, comp, camera, casters = null, cascadeMask = this.getCascadeMask(light))', who: 'sunShadows.ts: the cull it wraps' },
   { file: 'scene/renderer/shadow-renderer-directional.js', text: 'const frustumPoints = camera.getFrustumCorners(frustumNearDist, frustumFarDist);', who: 'sunShadows.ts: the corners it hands the fit' },
   { file: 'scene/renderer/shadow-renderer-directional.js', text: 'const cameraWorldMat = camera.node.getWorldTransform();', who: 'sunShadows.ts: corners given in the camera\'s space' },
+  // render/pc/mirrors.ts: the reflection cameras share the game camera's sun shadow matrices and pass.
+  { file: 'scene/light.js', text: 'getRenderData(camera, face) {', who: 'mirrors.ts: the sun\'s render data per camera, wrapped on the light' },
+  { file: 'scene/renderer/render-pass-forward.js', text: 'const shadowPass = renderer._shadowRendererDirectional.getLightRenderPass(light, camera);', who: 'mirrors.ts: the sun\'s pass per camera, asked of the instance (so wrapping it works)' },
+  { file: 'scene/renderer/culler.js', text: 'scene?.fire(EVENT_PRECULL, cameraComponent);', who: 'mirrors.ts: the helpers hidden from a reflection camera\'s cull' },
+  { file: 'scene/renderer/render-pass-forward.js', text: 'scene.fire(EVENT_PRERENDER_LAYER, cameraComponent, layer, transparent);', who: 'mirrors.ts: the residents\' rows set per reflection camera' },
   // render/pc/PlayCanvasRenderer.ts: draw calls per frame, read and reset each frame.
   { file: 'platform/graphics/graphics-device.js', text: 'this._drawCallsPerFrame = 0;', who: 'PlayCanvasRenderer.ts: draw calls' },
   // render/pc/device.ts: the app's own frame loop stopped once started.
   { file: 'framework/app-base.js', text: 'this.frameRequestId = hasFrameLoop ? requestAnimationFrame(this.tick) : null;', who: 'device.ts: createApp' },
+  // render/pc/device.ts, instancing.ts, engine.ts: a second app on the page (the previews') keeps the game's current.
+  { file: 'framework/app-base.js', text: 'setApplication(this);', who: 'device.ts: createSideApp (the constructor makes the newest app current)' },
+  { file: 'framework/globals.js', text: 'function setApplication(app) {', who: 'engine.ts: getApplication and setApplication, by path' },
+  { file: 'framework/entity.js', text: 'constructor(name, app = getApplication()) {', who: 'instancing.ts: an entity on its parent\'s app (`_app`), not the current one' },
+  // render/preview/portraits.ts: a read sent at once (otherwise its buffer is mapped before the copy is submitted).
+  { file: 'platform/graphics/webgpu/webgpu-graphics-device.js', text: 'async readBuffer(stagingBuffer, size, data = null, immediate = false) {', who: 'preview/portraits.ts: the portraits read back with `immediate`' },
   // render/pc/shaders/*, materials.ts, env.ts (and crates/tools/src/envconv.rs): the chunks the game's
   // shader features wrap and patch, and the engine's ways they rely on.
   ...both('common/vert/transformCore.js', 'vec3 getLocalPosition(vec3 vertexPosition) {', 'fn getLocalPosition(vertexPosition: vec3f) -> vec3f {', 'shaders/chunks.ts: the vertex position hook (the cutaway; wind and blankets later)'),
@@ -104,7 +115,7 @@ const NEEDED: { file: string; text: string; who: string }[] = [
   // render/pc/shaders/envBrdf.ts: the sky's reflection rising at a slant (PlayCanvas's Fresnel stays at F0).
   ...both('lit/frag/reflectionEnv.js', 'void addReflection(vec3 reflDir, float gloss) {', 'fn addReflection(reflDir: vec3f, gloss: f32) {', 'shaders/envBrdf.ts: addReflection wrapped'),
   ...both('lit/frag/reflectionEnvHQ.js', 'void addReflection(vec3 reflDir, float gloss) {', 'fn addReflection(reflDir: vec3f, gloss: f32) {', 'shaders/envBrdf.ts: addReflection wrapped (HQ)'),
-  ...both('lit/frag/fresnelSchlick.js', 'vec3 ret = specularity + (max(vec3(glossSq * specIntensity), specularity) - specularity) * fresnel;', 'let ret: vec3f = specularity + (max(vec3f(glossSq * specIntensity), specularity) - specularity) * fresnel;', 'shaders/envBrdf.ts: PlayCanvas\'s Fresnel that never rises (the reason for the wrap)'),
+  ...both('lit/frag/fresnelSchlick.js', 'vec3 ret = specularity + (max(vec3(glossSq * specIntensity), specularity) - specularity) * fresnel;', 'let ret: vec3f = specularity + (max(vec3f(glossSq * specIntensity), specularity) - specularity) * fresnel;', 'shaders/envBrdf.ts: PlayCanvas\'s Fresnel that never rises, replaced by Babylon\'s Schlick term in the game\'s materials'),
   // render/pc/shaders/softLook.ts: the AO map on the direct light, the lights' highlights scaled.
   ...both('standard/frag/stdFrontEnd.js', 'litArgs_ao = dAo;', 'litArgs_ao = dAo;', 'shaders/softLook.ts: litArgs_ao is the AO map (STD_AO) when the combine reads it'),
   ...both('lit/frag/lighting/lightFunctionLight.js', 'dSpecularLight += lightSpecular;', 'dSpecularLight = dSpecularLight + lightSpecular;', 'shaders/softLook.ts: the lights\' highlights in dSpecularLight, scaled in the combine (SPECULAR_UNITS)'),

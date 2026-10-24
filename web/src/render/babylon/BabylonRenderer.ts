@@ -116,6 +116,7 @@ import { Mirrors, type MirrorInstance } from './mirrors';
 import { ResizeHandles } from './handles';
 import { decorPlants, installNature, Landscape, natureDecor, setWind, Sky, type PlantPlacement } from './nature';
 import { Birds, roofRidge, type BirdFrame } from './birds';
+import { outdoorPlants } from '../shared/birds';
 import { LAYER_ALL, LAYER_TOWN, LAYER_WORLD } from '../shared/layers';
 import { NightGrade } from './nightGrade';
 import { BuildEffects, writeMoving, type PopTarget } from './buildFx';
@@ -1521,24 +1522,7 @@ export class BabylonRenderer implements Renderer, RendererDebugHooks {
     const woods = v && this.natureIn.world?.landscape?.woodsNear(v.x + v.w / 2, v.z + v.d / 2, Math.hypot(v.w, v.d) / 2 + this.quality.birds.range);
     const { ridge, top } = roofRidge(this.roofs);
     const minute = this.fixedHour !== null ? this.fixedHour * 60 : this.lastMinute;
-    await this.birdLife.setHabitat({ world, view: v, plants: [this.decorPlants, this.outdoorPlants(world), this.street.plants, woods ?? []], ridge, roofTop: top, houseTop: (plot) => this.house.roofTop(plot), hour: (minute / 60) % 24 });
-  }
-
-  /** The garden things outdoors that are plants as placed (catalog trees, hedges, roses; a fiddle-leaf fig in the lounge isn't a bird's). */
-  private outdoorPlants(world: WorldStructure): PlantPlacement[] {
-    const plants: PlantPlacement[] = [];
-    const gd = world.storeyDepth ?? world.depth;
-    for (const o of world.objects) {
-      if (o.z >= gd) continue;
-      const centre = objectCentre(o);
-      if (world.rooms[Math.floor(centre.z) * world.width + Math.floor(centre.x)] !== 0) continue;
-      const key = this.objectModel(o);
-      const entry = this.deps.assets.get(key, 'model');
-      if (!entry) continue;
-      const { turn, size } = placementVariation(entry.vary ?? 0, o.x, o.z);
-      plants.push({ key, x: centre.x, y: o.lift ?? 0, z: centre.z, sx: size, sy: size, sz: size, yaw: (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180 + turn });
-    }
-    return plants;
+    await this.birdLife.setHabitat({ world, view: v, plants: [this.decorPlants, outdoorPlants(world, this.deps.content, this.deps.assets), this.street.plants, woods ?? []], ridge, roofTop: top, houseTop: (plot) => this.house.roofTop(plot), hour: (minute / 60) % 24 });
   }
 
   /** The birds a frame on (with the game's clock; they're hidden with the garden over the basement). */
