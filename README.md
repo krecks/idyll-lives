@@ -208,7 +208,7 @@ Saves have their own format version, `SAVE_VERSION` in `crates/sim-core/src/save
 4. Check the live site:
    - The menu shows the new version, and Credits "Version <x.y.z> (build <the tagged commit>)". (To find the version in the bundle, search `index-*.js` for it without double quotes: it sits in backticks.)
    - F3 shows Shared memory: on, and a game runs.
-   - The large files download in full, which only the live site can show: `llm/lfm2.5-350m/model_q4.onnx_dataz` returns 200 and is 254,923,309 bytes (gunzipped, its SHA-256 is the one in `crates/tools/src/llmfetch.rs`), and `voice/supertonic-3/vector_estimator.onnxz` is 119,556,677 bytes.
+   - The large files download in full, which only the live site can show: `llm/lfm2.5-350m/model_q4.onnx_dataz` returns 200 and is 254,923,309 bytes (gunzipped, its SHA-256 is the one in `crates/tools/src/llmfetch.rs`), and `voice/supertonic-3/vector_estimator.onnxz` is 119,556,677 bytes (packed by the Rust fetch tools; files CI still has cached from the earlier tools are 255,530,880 and 119,568,968 bytes, and are as good: what matters is the unzipped SHA-256).
 5. Publish the release notes: `gh release create v<x.y.z> --verify-tag --title "Idyll Lives <x.y.z>" --notes-file <the version's CHANGELOG section>`.
 
 **If a release goes wrong,** fix forward, or redeploy the last good build (`gh workflow run pages.yml --ref <tag> -f deploy=true`). 0.3.1, 0.3.2 and 0.4.0 share save format 32, so 0.3.2 is a safe build to go back to; 0.3.0 can't open 0.3.1's saves (format 32), 0.2.0 can't open 0.3.0's (format 29), and v0.1.0 can't open 0.2.0's database (version 2): an older build keeps the newer saves and skips them, so it lists only the saves it can open. Nothing is lost; the saves come back with the newer build.

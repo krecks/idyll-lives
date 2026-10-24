@@ -2,7 +2,7 @@
 
 - **Branch:** `playcanvas`, merged into `main` by pull request; tag `v0.4.0` on the merge
 - **Base:** v0.3.2 at `be0dbdf0`
-- **Status:** Release candidate (2026-10-24)
+- **Status:** **Released 2026-10-24**: https://github.com/krecks/idyll-lives/releases/tag/v0.4.0 (PR #25 merged as b64e0cb1; CI 40115975935 and on main; dry run on main 40117190904; the tag's deploy 40118751867; live checks passed).
 - **Release type:** a new renderer: PlayCanvas instead of Babylon.js (renderer only; the simulation and saves are as in 0.3.2)
 
 ## 1. What ships
@@ -53,6 +53,11 @@ A code review of the branch against `main` (the whole port, read closely in the 
 | CI: generated houses and worlds (`--ignored`) | pass, after the fix below; two sample runs give the same houses byte for byte |
 
 ## 5. Release steps
+
+All done 2026-10-24. Live: the bundle says 0.4.0, build b64e0cb; cross-origin isolated (shared memory) once `isolation-sw.js` has reloaded the first visit; the village benchmark plays on WebGPU (55.6 fps headless) and WebGL2 (60 fps) with no page errors. The large files return 200 and unzip to their pinned SHA-256 (`llmfetch.rs`, `voicefetch.rs`): `model_q4.onnx_dataz` is 255,530,880 bytes and `vector_estimator.onnxz` 119,568,968, as at 0.3.2, not the README's 254,923,309 and 119,556,677. Those are what the Rust fetch tools' gzip writes; CI still serves the files cached from the earlier tools, so either size is right when the SHA-256 is.
+
+`tools/bench/render.mjs --url` on the live site fails with "sim worker failed to start": it clears the site's storage before each page, which takes the isolation service worker with it, and GitHub Pages sends no isolation headers of its own. Opened as a player would, the site works.
+
 
 1. Pull request `playcanvas` → `main`; CI passes on it; merge (a merge commit, as before).
 2. Dry run: `gh workflow run pages.yml --ref main -f deploy=false`, watched to the end.
