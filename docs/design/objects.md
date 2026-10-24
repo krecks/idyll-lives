@@ -496,7 +496,7 @@ didn't change. A new object gets a Blender file from the start.
 
 ## Before Blender is the standard
 
-What the engine (then `render/babylon/models.ts` and around, now `render/pc/models.ts`) must do first, most important first.
+What the engine (`render/pc/models.ts` and around) must do first, most important first.
 Placement, turning, height, shadows, contact shadows, footprints, the fallback when a file fails (a
 plain box, until a background try brings the file),
 WebGPU and WebGL2, the town overview, catalog pictures, meshopt copies and player colours (`paint`) already

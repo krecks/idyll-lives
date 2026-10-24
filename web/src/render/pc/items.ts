@@ -1,7 +1,7 @@
 /**
- * Food and dishes on tables, counters and floors on PlayCanvas (ported from the Babylon renderer, removed: see git history up to f15b839b;
- * sim-core `items.rs`, `ItemPlacement`): a pot of stew on the counter, plates in front of the
- * diners, dirty plates waiting for the sink.
+ * Food and dishes on tables, counters and floors on PlayCanvas (sim-core `items.rs`,
+ * `ItemPlacement`): a pot of stew on the counter, plates in front of the diners, dirty plates
+ * waiting for the sink.
  *
  * They change far more often than furniture (every serving taken, every plate put down), so they
  * are drawn apart from the world's objects: one instanced draw per mesh of each item model's
@@ -75,7 +75,7 @@ export class ItemLayer {
   ) {
     const mat = new pc.StandardMaterial();
     mat.name = 'itemMoldMat';
-    // (Babylon's standard material, in its own gamma space: as PlayCanvas takes colours.)
+    // (Colours in gamma space, as PlayCanvas takes them.)
     mat.diffuse.set(0.42, 0.5, 0.32);
     mat.specular.set(0, 0, 0);
     mat.opacity = 0.85;

@@ -2,11 +2,11 @@
  * The engine-neutral half of the landscape round the town (`pc/nature.ts` draws
  * it): the land's shape (rolling hills, a valley's rim, mountains, fields, a sea or a lake, levelled
  * under the country roads), the terrain's colours, where the woods and the lawn's tufts grow, the
- * lawn hidden indoors, the garden dressing split into species, and the wind's numbers as both
- * renderers' plant shaders sway them. Everything is generated deterministically from the town's seed,
- * so a loaded game looks the same, and both renderers place the same plants in the same order.
+ * lawn hidden indoors, the garden dressing split into species, and the wind's numbers as the
+ * plant shaders sway them. Everything is generated deterministically from the town's seed, so a
+ * loaded game looks the same, with the same plants in the same order.
  *
- * Placements are matrices in game space (Babylon's layout, `math.ts`): 16 floats each.
+ * Placements are matrices in game space (the layout of `math.ts`): 16 floats each.
  */
 
 import { DEFAULT_LANDSCAPE, groundDepth, type LandscapeParams, type WorldStructure } from '../../core/protocol';
@@ -126,19 +126,19 @@ export const smoothstep = (a: number, b: number, x: number) => {
 
 // ---- Colours ------------------------------------------------------------------------
 
-/** A colour as Babylon's `Color3` holds one (0..1 per channel). */
+/** A colour, 0..1 per channel. */
 interface Rgb {
   r: number;
   g: number;
   b: number;
 }
 
-/** An sRGB hex colour as Babylon's `Color3.FromHexString` reads it. */
+/** An sRGB hex colour (`#rrggbb`) as 0..1 channels (each byte / 255). */
 function hex(c: string): Rgb {
   return { r: parseInt(c.substring(1, 3), 16) / 255, g: parseInt(c.substring(3, 5), 16) / 255, b: parseInt(c.substring(5, 7), 16) / 255 };
 }
 
-/** Babylon's `Color3.LerpToRef` (`out` may be `a`). */
+/** The colour `t` of the way from `a` to `b`, per channel (`out` may be `a`). */
 function lerp(a: Rgb, b: Rgb, t: number, out: Rgb): void {
   out.r = a.r + (b.r - a.r) * t;
   out.g = a.g + (b.g - a.g) * t;
@@ -147,7 +147,7 @@ function lerp(a: Rgb, b: Rgb, t: number, out: Rgb): void {
 
 // ---- Placements ---------------------------------------------------------------------
 
-/** A placement's matrix: scaled, turned `yaw` about up, at (x, y, z) (Babylon's `Matrix.Compose`). */
+/** A placement's matrix: scaled, turned `yaw` about up, at (x, y, z) (`compose`, `math.ts`). */
 function placed(sx: number, sy: number, sz: number, yaw: number, x: number, y: number, z: number): Float32Array {
   return compose(sx, sy, sz, quatAxisAngle(0, 1, 0, yaw), x, y, z, new Float32Array(16)) as Float32Array;
 }
@@ -272,7 +272,7 @@ export function groupInstances(matrices: readonly ArrayLike<number>[], cell?: (x
 // ---- Landscape ----------------------------------------------------------------------
 
 /**
- * The land round a town and what grows on it, as both renderers build it (each engine's `Landscape`
+ * The land round a town and what grows on it, as the renderer builds it (`pc/nature.ts`'s `Landscape`
  * draws it). `R`: the engine's country roads (their layout is `CountryRoads`'s).
  */
 export class LandscapeLayout<R extends CountryRoads = CountryRoads> {

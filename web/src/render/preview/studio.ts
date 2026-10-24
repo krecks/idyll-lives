@@ -11,8 +11,8 @@
  * PlayCanvas's default, stays the game's. Everything it caches is its own (per app or device:
  * materials, the sky's lighting, the residents' shaders), and goes with it (`dispose`).
  *
- * Babylon drew each picture with its own `scene.render()`; here the stage's camera (onto the canvas)
- * and the portraits' (into their targets) are drawn by one `app.render()` a frame (`draw`).
+ * The stage's camera (onto the canvas) and the portraits' (into their targets) are drawn by one
+ * `app.render()` a frame (`draw`), not a render each.
  */
 
 import * as pc from '../pc/engine';
@@ -64,16 +64,16 @@ const LAYOUT: SnapshotLayout = {
 };
 
 /**
- * Babylon's studio image processing, in the materials (`ImageProcessingConfiguration`: ACES at this
- * exposure, then this contrast; `pageLook`).
+ * The studio's image processing, in the materials (ACES at this exposure, then this contrast;
+ * `pageLook`).
  */
 const EXPOSURE = 1.15;
 const CONTRAST = 1.08;
-/** The sky's lighting (Babylon's `environmentIntensity`). */
+/** The sky's lighting (its strength in the look's units, `ENV_UNITS`). */
 const ENVIRONMENT = 0.7;
-/** The first portraits wait this long (ms) for the sky's lighting at most (Babylon never waited, but its sky was there first). */
+/** The first portraits wait this long (ms) for the sky's lighting at most (up to 0.3.2 they never waited, the sky being there first). */
 const ENV_WAIT = 2000;
-/** Drawing size per CSS pixel, at most (Babylon's hardware scaling level 1 / 2). */
+/** Drawing size per CSS pixel, at most. */
 const MAX_RATIO = 2;
 const TRANSPARENT = new pc.Color(0, 0, 0, 0);
 
@@ -125,7 +125,7 @@ export class Studio {
     const canvas = document.createElement('canvas');
     canvas.className = 'sim-studio';
     const forceWebGL = deps.backend() === 'webgl' || new URLSearchParams(location.search).get('renderer') === 'webgl';
-    // (Multisampled and transparent, as Babylon's engine was: the menus show through.)
+    // (Multisampled and transparent: the menus show through.)
     const device = await createDevice(canvas, forceWebGL, true, true);
     const app = createSideApp(canvas, device);
     try {
@@ -153,7 +153,7 @@ export class Studio {
     }
   }
 
-  /** A camera of the studio's, in its look (Babylon's image processing, `pageLook`), off until used. */
+  /** A camera of the studio's, in its look (the image processing in the materials, `pageLook`), off until used. */
   camera(name: string, fov: number, near: number, far: number, priority: number): pc.CameraComponent {
     const entity = new pc.Entity(name, this.app);
     entity.addComponent('camera', { fov: (fov * 180) / Math.PI, nearClip: near, farClip: far, clearColor: TRANSPARENT, priority });
@@ -178,7 +178,7 @@ export class Studio {
     if (width !== this.device.width || height !== this.device.height) this.app.setCanvasResolution(pc.RESOLUTION_FIXED, width, height);
   }
 
-  /** Calls `frame(now)` every display frame until `stop` (Babylon's `runRenderLoop`). */
+  /** Calls `frame(now)` every display frame until `stop`. */
   run(frame: (now: number) => void): void {
     cancelAnimationFrame(this.frameId);
     const tick = (now: number) => {
@@ -217,7 +217,7 @@ export class Studio {
   /**
    * Whether the Sims can be drawn as they should look: built, and the sky's lighting there (or given
    * up on after a moment). The residents' materials have no textures, and PlayCanvas compiles a
-   * shader when it first draws with it (Babylon's `isReady` checked both).
+   * shader when it first draws with it, so both are waited for.
    */
   ready(): boolean {
     return this.synced && (this.envSettled || performance.now() - this.born > ENV_WAIT);
@@ -302,7 +302,7 @@ export class Studio {
   private makeShadows(): [Instances, pc.Entity] {
     const app = this.app;
     const square = contactBlob(app).mesh;
-    /** Babylon's unlit decal: `color` (sRGB, as Babylon's standard material took it) through the alpha `draw` paints, drawn in `order` (its `alphaIndex`). */
+    /** An unlit decal: `color` (sRGB) through the alpha `draw` paints, drawn in `order` (its `alphaIndex`). */
     const decal = (name: string, draw: (ctx: CanvasRenderingContext2D, n: number) => void, color: pc.Color, order: number) => {
       const n = 256;
       const canvas = document.createElement('canvas');
@@ -320,7 +320,7 @@ export class Studio {
       material.emissive = color;
       material.opacityMap = texture;
       material.opacityMapChannel = 'a';
-      // Babylon's `ALPHA_COMBINE`: the colour blended over, the alphas added. On the transparent
+      // The colour blended over, the alphas added. On the transparent
       // canvas a shade over the platform hides more of the page behind it.
       material.blendState = new pc.BlendState(true, pc.BLENDEQUATION_ADD, pc.BLENDMODE_SRC_ALPHA, pc.BLENDMODE_ONE_MINUS_SRC_ALPHA, pc.BLENDEQUATION_ADD, pc.BLENDMODE_ONE, pc.BLENDMODE_ONE);
       material.depthWrite = false;
@@ -402,7 +402,7 @@ export class Studio {
       1,
     );
     shade.setLocalScale(0.95, 1, 1.5);
-    // (Babylon's `rotation.y`, in game space: the same matrix under the mirrored root.)
+    // (A turn about y in game space: the same matrix under the mirrored root.)
     shade.setLocalEulerAngles(0, (-0.65 * 180) / Math.PI, 0);
     shade.setLocalPosition(-0.22, 0.004, -0.3);
     floor.enabled = false;
@@ -432,11 +432,11 @@ function simInfo(id: number, look: SimLook): SimInfo & { outfitId: number } {
  * two rims from behind, and the game's sky environment for ambient and reflections.
  * (The camera looks down -z, so the view's left is +x.)
  *
- * Babylon's lights in the game's units (`lightUnits.ts`), as the dev pages have them
- * (`debug/pcStage.ts`): directional lights at `SUN_UNITS`, their linear colour and strength as
- * PlayCanvas takes them (sRGB, the strength in the colour); the hemispheric light as the library's
- * sky fill (`SKY_UNITS`). Babylon's fill had a faint highlight (specular 0.15 of its colour): here
- * none (PlayCanvas's lights have no specular colour of their own).
+ * The lights' strengths are in the look's units, converted as the dev pages convert them
+ * (`lightUnits.ts`, `debug/pcStage.ts`): directional lights at `SUN_UNITS`, their linear colour and
+ * strength as PlayCanvas takes them (sRGB, the strength in the colour); the hemispheric light as the
+ * library's sky fill (`SKY_UNITS`). The fill had a faint highlight up to 0.3.2 (specular 0.15 of its
+ * colour): here none (PlayCanvas's lights have no specular colour of their own).
  */
 function lights(app: pc.AppBase, lib: MaterialLibrary): void {
   const directional = (name: string, dir: [number, number, number], intensity: number, color: [number, number, number], specular = true) => {

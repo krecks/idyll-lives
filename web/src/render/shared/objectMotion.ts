@@ -1,5 +1,5 @@
 /**
- * Placed objects' moving parts (a fridge's doors), engine-neutral (each renderer's
+ * Placed objects' moving parts (a fridge's doors), engine-neutral (the renderer's
  * `objectMotion.ts` hands over how its draws are written and sent up, `MotionHooks`): the clips of
  * their models (`ModelMotion`) played while residents use them, as the model entry's `motions` say. A use that starts opens
  * its clips (each `delay` seconds in, if it says; only the one for the resident's slot, if it

@@ -1,7 +1,7 @@
 /**
- * Bed blankets on PlayCanvas (the port of the Babylon renderer's `BlanketPlugin`): one quilt
- * mesh per body type (`shared/characters/blanket.ts`), drawn instanced, a copy per resident asleep
- * in a bed, in that bed's colours. Material: `blanketMaterial` (`characterMaterial.ts`).
+ * Bed blankets on PlayCanvas: one quilt mesh per body type (`shared/characters/blanket.ts`), drawn
+ * instanced, a copy per resident asleep in a bed, in that bed's colours. Material:
+ * `blanketMaterial` (`characterMaterial.ts`).
  *
  * `GAME_BLANKET`, per instance beside the matrix:
  * - `game_blanketExt` (m, local; `BLANKET_EXT`): x moves the quilt past the toes towards the bed's

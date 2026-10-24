@@ -1,11 +1,11 @@
 /**
- * The save's picture (Babylon's `captureThumbnail`): the game camera's view drawn small into a
- * target kept for it, with the game's look, and read back as a JPEG data URL (quality 0.8, as
- * Babylon's `thumbnailUrl`). Also the debug report's screenshot, at the canvas's size.
+ * The save's picture (`captureThumbnail`): the game camera's view drawn small into a target kept
+ * for it, with the game's look, and read back as a JPEG data URL (quality 0.8, `thumbnailUrl`).
+ * Also the debug report's screenshot, at the canvas's size.
  *
  * - A camera of its own, off but for the frame that draws a picture: it takes the game camera's
  *   place, lens, layers and clear colour, and draws into its target through the game's chain
- *   (`PostProcessing.attach`: the linear scene multisampled as the preset says, Babylon's image
+ *   (`PostProcessing.attach`: the linear scene multisampled as the preset says, the image
  *   processing, the night grade, Low's FXAA). The target and the chain are made once, and resized
  *   for a picture of another size.
  * - It draws in the renderer's next frame, before the game camera (WebGPU hands the canvas a new
@@ -18,8 +18,7 @@
  *   rows come back bottom-up on WebGL2 (`readPixels`) and top-down on WebGPU (`copyTextureToBuffer`):
  *   turned the right way up per backend.
  *
- * Babylon drew its picture with the game camera into a target the canvas's size (its post-processes'
- * own, the last of them sampling it down into the picture); this one is drawn at the picture's size.
+ * The picture is drawn at its own size, not drawn at the canvas's and sampled down.
  */
 
 import * as pc from './engine';
@@ -34,7 +33,7 @@ export interface ThumbnailHost {
 
 /** A picture not drawn by then (the loop stopped, frames failing) is given up. */
 const WAIT_MS = 3000;
-/** Babylon's (`thumbnailUrl`). */
+/** The JPEG's quality (`thumbnailUrl`). */
 const JPEG_QUALITY = 0.8;
 
 interface Request {
@@ -111,7 +110,7 @@ export class Thumbnails {
     c.nearClip = g.nearClip;
     c.farClip = g.farClip;
     c.clearColor = g.clearColor;
-    // (All of the game camera's layers, the thing in hand and build mode's effects too: Babylon's picture had every rendering group and its particles.)
+    // (All of the game camera's layers, the thing in hand and build mode's effects too: the picture shows what the screen does.)
     if (c.layers.length !== g.layers.length || c.layers.some((id, i) => id !== g.layers[i])) c.layers = g.layers.slice();
     this.entity.enabled = true;
     this.host.shadowsMoved();

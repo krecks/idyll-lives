@@ -341,7 +341,7 @@ function hash(text: string): string {
 class ItemStudio {
   private readonly camera: pc.CameraComponent;
   private readonly shadow: pc.Entity;
-  /** A target per picture size (multisampled, as Babylon's canvas was), made on first use. */
+  /** A target per picture size (multisampled), made on first use. */
   private readonly targets = new Map<number, pc.RenderTarget>();
   private last = performance.now();
 
@@ -398,7 +398,7 @@ class ItemStudio {
       const turned = new Float32Array(16);
       const urls: Promise<string>[] = [];
       for (const angle of angles) {
-        // Turned about y in game space, as Babylon's rotation.y (+x towards -z).
+        // Turned about y in game space (+x towards -z).
         const c = Math.cos(angle);
         const s = Math.sin(angle);
         turned.set([c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, 0, 0, 0, 1]);
@@ -456,7 +456,7 @@ class ItemStudio {
     return target;
   }
 
-  /** Points the camera so the model fills the picture at every angle drawn (game space, as Babylon's camera stood). */
+  /** Points the camera so the model fills the picture at every angle drawn (game space, the camera standing as it did up to 0.3.2). */
   private frame(corners: pc.Vec3[], angles: number[]): void {
     const dir = new pc.Vec3(Math.sin(YAW) * Math.cos(PITCH), Math.sin(PITCH), Math.cos(YAW) * Math.cos(PITCH));
     const forward = dir.clone().mulScalar(-1);
@@ -471,7 +471,7 @@ class ItemStudio {
       const c = Math.cos(a);
       const s = Math.sin(a);
       for (const v of corners) {
-        // Babylon's rotation.y turns +x towards -z.
+        // A turn about y in game space turns +x towards -z.
         p.set(v.x * c + v.z * s, v.y, -v.x * s + v.z * c);
         const r = p.dot(right);
         const u = p.dot(up);

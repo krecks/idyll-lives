@@ -1,9 +1,8 @@
 /**
- * Placed objects' moving parts on PlayCanvas (a fridge's doors; ported from the Babylon renderer, removed: see git history up to f15b839b):
- * the engine-neutral motion (`shared/objectMotion.ts`: which clips play, how far each is) writing
- * into instanced draws (`instancing.ts`). Each instance's parts draw from buffers of their own
- * (`MovingTarget`), written only while something moves, and sent up once a frame however many of
- * their instances moved.
+ * Placed objects' moving parts on PlayCanvas (a fridge's doors): the engine-neutral motion
+ * (`shared/objectMotion.ts`: which clips play, how far each is) writing into instanced draws
+ * (`instancing.ts`). Each instance's parts draw from buffers of their own (`MovingTarget`), written
+ * only while something moves, and sent up once a frame however many of their instances moved.
  */
 
 import type { Instances } from './instancing';
@@ -33,7 +32,7 @@ export function writeMoving(target: MotionTarget<Instances>, written?: Set<Insta
   const o = target.index * 16;
   base.set(target.matrices.subarray(o, o + 16));
   moving.parts.forEach(({ meshes, matrices }, k) => {
-    // (Babylon's `pose.multiply(base)`: posed in the part's own frame, then placed.)
+    // (`pose` then `base`: posed in the part's own frame, then placed.)
     posed.set(moving.poses.subarray(k * 16, k * 16 + 16));
     multiply(posed, base, posed);
     matrices.set(posed, o);

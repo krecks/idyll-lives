@@ -1,30 +1,28 @@
 /**
- * The picture after the light (the port of the game's Babylon `DefaultRenderingPipeline`,
- * `setupPostProcessing` and `applyLook` in the Babylon renderer, and its night grade; removed: see
- * git history up to f15b839b):
+ * The picture after the light: the post-processing chain, the look's image processing and the night
+ * grade.
  *
- * - The scene is drawn in linear light into a half-float target (Babylon's HDR pipeline texture),
- *   multisampled as the preset says (`QualitySettings.msaaSamples`: Babylon's `samples` on its first
- *   post-process), by PlayCanvas's `CameraFrame`, which then composes it onto the canvas.
- * - The compose runs Babylon's image processing (`shaders/post.ts`: exposure, vignette, ACES,
- *   gamma, contrast, colour curves) and then the moonlight grade (`nightGrade.ts`).
- * - FXAA where Babylon had it, on Low (no multisampling): the compose draws into a target of its
- *   own and Babylon's FXAA pass draws that onto the canvas, the grade at its end (Babylon's
- *   order: image processing, FXAA, grade).
+ * - The scene is drawn in linear light into a half-float target, multisampled as the preset says
+ *   (`QualitySettings.msaaSamples`), by PlayCanvas's `CameraFrame`, which then composes it onto the
+ *   canvas.
+ * - The compose runs the image processing (`shaders/post.ts`: exposure, vignette, ACES, gamma,
+ *   contrast, colour curves) and then the moonlight grade (`nightGrade.ts`).
+ * - FXAA on Low (no multisampling): the compose draws into a target of its own and the FXAA pass
+ *   draws that onto the canvas, the grade at its end (the order: image processing, FXAA, grade).
  * - `?diag=albedo|normals` and `?diag=linear` leave the image processing and the grade out (the
- *   colour itself, encoded for the screen); as on Babylon, without them only Low's FXAA is left,
- *   so Medium and High draw straight onto the canvas there. `?diag=noaa`: no multisampling, no
- *   FXAA; `?diag=nonight`: no grade.
+ *   colour itself, encoded for the screen); without them only Low's FXAA is left, so Medium and High
+ *   draw straight onto the canvas there. `?diag=noaa`: no multisampling, no FXAA; `?diag=nonight`:
+ *   no grade.
  *
- * The drawing size is the canvas's (`shared/resolution.ts`, `applyResolution`), all passes at
- * full size, as Babylon's post-processes were. Live changes (the exposure each lighting step, the
- * night's amount, the look) are uniform values: no shader compiles, nothing allocated.
+ * The drawing size is the canvas's (`shared/resolution.ts`, `applyResolution`), all passes at full
+ * size. Live changes (the exposure each lighting step, the night's amount, the look) are uniform
+ * values: no shader compiles, nothing allocated.
  *
- * Light units: the scene's linear colour is what Babylon's materials gave its image processing,
- * and the exposure is Babylon's (`l.exposure * LOOK.exposure`), so the light's strengths can
- * be Babylon's. Nothing else may tone-map: `scene.exposure` and the camera's tone mapping are
- * unused while the chain runs. The clear colour is drawn into the linear scene, so it is linear
- * too (`sceneLinear`).
+ * Light units: the scene's linear colour is in the look's units (`lightUnits.ts`), and the exposure
+ * is the look's (`l.exposure * LOOK.exposure`), so the look's strengths and exposures give the
+ * picture they were tuned for. Nothing else may tone-map: `scene.exposure` and the camera's tone
+ * mapping are unused while the chain runs. The clear colour is drawn into the linear scene, so it
+ * is linear too (`sceneLinear`).
  */
 
 import * as pc from './engine';
@@ -35,15 +33,15 @@ import { curveUniforms, NEUTRAL_CURVES, vignetteUniforms, type ColorCurveSetting
 export interface PostOptions {
   /** Multisampling of the scene (1: none). */
   samples: number;
-  /** Babylon's FXAA after the image processing. */
+  /** FXAA after the image processing. */
   fxaa: boolean;
-  /** Babylon's image processing (off: the colour itself, the diag views). */
+  /** The image processing (off: the colour itself, the diag views). */
   imageProcessing: boolean;
   /** The moonlight grade (`nightGrade.ts`). */
   night: boolean;
 }
 
-/** What the image processing does (Babylon's `ImageProcessingConfiguration`, ACES always). */
+/** What the image processing does (`shared/imageProcessing.ts`, ACES always). */
 export interface PostLook {
   contrast: number;
   /** Weight 0: no vignette. */
@@ -51,12 +49,12 @@ export interface PostLook {
   curves: ColorCurveSettings;
 }
 
-/** The game's options for `quality` and the bench's `?diag=` flags, as `setupPostProcessing` chose them on Babylon. */
+/** The game's options for `quality` and the bench's `?diag=` flags. */
 export function gamePostOptions(samples: number, diag: ReadonlySet<string>, colourItself: boolean): PostOptions {
   const aa = !diag.has('noaa');
   const imageProcessing = !colourItself && !diag.has('linear');
   return {
-    // (Without the image processing Babylon's pipeline had no pass to multisample but the FXAA, on Low.)
+    // (Without the image processing there is no pass to multisample but the FXAA, on Low.)
     samples: aa && imageProcessing ? samples : 1,
     fxaa: aa && samples <= 1,
     imageProcessing,
@@ -78,7 +76,7 @@ export const PLAIN_LOOK: PostLook = { contrast: 1, vignette: { weight: 0, stretc
 
 const SCENE_FORMATS = [pc.PIXELFORMAT_RGBA16F, pc.PIXELFORMAT_RGBA32F];
 
-/** Babylon's FXAA pass: `source` onto the canvas (or `target`). */
+/** The FXAA pass (`shaders/post.ts`): `source` onto the canvas (or `target`). */
 class FxaaPass extends pc.RenderPassShaderQuad {
   private readonly sourceId: pc.ScopeId;
   private readonly texelId: pc.ScopeId;
@@ -116,14 +114,14 @@ class FxaaPass extends pc.RenderPassShaderQuad {
   }
 }
 
-/** The GPU's name, where Babylon read it for its FXAA's `MALI` (`extractDriverInfo`). */
+/** The GPU's name, for the FXAA's `MALI` variant (on Mali GPUs). */
 function driverInfo(device: pc.GraphicsDevice): string {
   const d = device as unknown as { unmaskedRenderer?: string; gpuAdapter?: { info?: { vendor?: string; architecture?: string; description?: string } } };
   const info = d.gpuAdapter?.info;
   return [d.unmaskedRenderer, info?.vendor, info?.architecture, info?.description].filter(Boolean).join(' ');
 }
 
-/** Babylon's half-float FXAA input, `width` × `height`: the compose draws into it, the FXAA pass from it. */
+/** The half-float FXAA input, `width` × `height`: the compose draws into it, the FXAA pass from it. */
 function fxaaSource(device: pc.GraphicsDevice, width: number, height: number): pc.RenderTarget {
   const texture = new pc.Texture(device, {
     name: 'gameFxaaSource',
@@ -199,7 +197,7 @@ export class PostProcessing {
       chunks.set('composeMainEndPS', code.mainEnd);
     }
     if (options.fxaa) {
-      // The compose draws into this (Babylon's half-float FXAA input), the FXAA pass onto the canvas.
+      // The compose draws into this (the half-float FXAA input), the FXAA pass onto the canvas.
       this.fxaaTarget = fxaaSource(device, device.width, device.height);
       // (Before the frame: its passes take the camera's target, and size the scene by it.)
       camera.renderTarget = this.fxaaTarget;
@@ -232,8 +230,8 @@ export class PostProcessing {
   /**
    * The same picture from another camera, into `target` (the save's picture, `thumbnail.ts`): the
    * game camera's passes at the target's size, with the same uniforms (the exposure, the look, the
-   * night are the device's, set once for both). The vignette keeps the canvas's proportions, as
-   * Babylon's did in its picture (its post-processes were the canvas's size).
+   * night are the device's, set once for both). The vignette keeps the canvas's proportions, as it
+   * has in the game's picture.
    */
   attach(app: pc.AppBase, camera: pc.CameraComponent, target: pc.RenderTarget): PostAttachment {
     if (!this.frame) {
@@ -263,7 +261,7 @@ export class PostProcessing {
     };
   }
 
-  /** Babylon's `ImageProcessingConfiguration.exposure` (the scene's colour times this, before tone mapping). */
+  /** The image processing's exposure (the scene's colour times this, before tone mapping). */
   set exposure(value: number) {
     this.exposureNow = value;
     this.ids.exposure.setValue(value);
@@ -294,7 +292,7 @@ export class PostProcessing {
     this.resized(this.device.width, this.device.height);
   }
 
-  /** Bench reports: what Babylon's `benchInfo` had as `postSamples` and `fxaa`. */
+  /** Bench reports: `postSamples` and `fxaa`. */
   get samples(): number {
     return this.frame ? Math.max(1, this.options.samples) : 1;
   }
@@ -328,15 +326,15 @@ export class PostProcessing {
 }
 
 /**
- * The dev pages' look (`debug/pcStage.ts`): Babylon's pages did the image processing in each
- * material (exposure and ACES; the clear colour and the diag views' colour as they are, the
- * canvas multisampled), so here it is the camera's tone mapping, made Babylon's on the page's
- * device (`PAGE_TONE_MAPPING`; with `contrast`, Babylon's contrast after it, as the previews'
- * scenes set it). Before the first material compiles.
+ * The dev pages' look (`debug/pcStage.ts`): only exposure and ACES, done in each material (the
+ * clear colour and the diag views' colour as they are, the canvas multisampled), so here it is the
+ * camera's tone mapping, replaced on the page's device (`PAGE_TONE_MAPPING`; with
+ * `contrast`, the image processing's contrast after it, as the previews' scenes set it). Before the
+ * first material compiles.
  */
 export function pageLook(app: pc.AppBase, camera: pc.CameraComponent, exposure: number, contrast = 1): void {
   const device = app.graphicsDevice;
-  // (With Babylon's contrast after it: the previews' scenes, `pageToneMapping`.)
+  // (With the image processing's contrast after it: the previews' scenes, `pageToneMapping`.)
   const chunk = contrast === 1 ? PAGE_TONE_MAPPING : pageToneMapping(contrast);
   pc.ShaderChunks.get(device, pc.SHADERLANGUAGE_GLSL).set('tonemappingAces2PS', chunk.glsl);
   pc.ShaderChunks.get(device, pc.SHADERLANGUAGE_WGSL).set('tonemappingAces2PS', chunk.wgsl);

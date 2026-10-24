@@ -6,7 +6,7 @@
  *
  * No multisampling on the canvas: only the last full-screen pass draws to it. The scene itself is
  * smoothed in the post-processing (`QualitySettings.msaaSamples`, or FXAA; `post.ts`). The dev
- * pages draw straight onto a multisampled canvas (`antialias`), as Babylon's did.
+ * pages draw straight onto a multisampled canvas (`antialias`).
  */
 
 import * as pc from './engine';

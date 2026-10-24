@@ -7,12 +7,13 @@
  * The residents' code owns every number that is drawn: the pose texture's data (one row per
  * resident, `layout.ts`), each part mesh's rows, the props' and quilts' instance data and the
  * selection ring's matrix. The engine owns the meshes, materials and textures, and is told when
- * those numbers change. Matrices are 16 floats, translation at 12, 13, 14 (Babylon's matrices,
+ * those numbers change. Matrices are 16 floats, translation at 12, 13, 14 (as
  * PlayCanvas's `Mat4.data`), in game space (`shared/math.ts`). Nothing here is called per frame
  * with new arrays: every array is given once and rewritten in place.
  *
  * Calls come in the order a renderer builds its scene in (texture, quilts, ring at `init`; parts
- * as residents first wear them), so an engine that draws in creation order draws as Babylon did.
+ * as residents first wear them), so an engine that draws in creation order draws them as the game
+ * did up to 0.3.2.
  */
 
 import type { ModelEntry } from '../../../assets/types';
@@ -64,7 +65,7 @@ export interface ResidentView<M extends object, Q, P extends ResidentProp> {
   partEnabled(mesh: M, on: boolean): void;
   /**
    * The rows `mesh` draws from now on, all of them: `rows`, 4 numbers per instance (its resident's row twice, then
-   * two zeros: Babylon's baked-vertex-animation settings). `perFrame`: `partRows(mesh, n, 'rows')` rewrites the
+   * two zeros; the renderer reads the first, `pc/characters.ts`). `perFrame`: `partRows(mesh, n, 'rows')` rewrites the
    * array and its count per frame; otherwise it stays as it is (until `setPartRows` or `partRows(…, 'new')`).
    */
   setPartRows(mesh: M, rows: Float32Array, perFrame: boolean): void;

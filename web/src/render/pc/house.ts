@@ -1,9 +1,8 @@
 /**
- * The house builder on PlayCanvas (ported from the Babylon renderer, removed: see git history up to f15b839b): the viewed lot's house and
- * the street's houses as the engine-neutral planner writes them (`shared/house.ts`: walls,
- * floors, roofs, doors and windows, the cutaway's data), each part one entity drawing one mesh
- * in the material library's surfaces, and the viewed house's clear glass glowing by room at
- * night.
+ * The house builder on PlayCanvas: the viewed lot's house and the street's houses as the
+ * engine-neutral planner writes them (`shared/house.ts`: walls, floors, roofs, doors and windows,
+ * the cutaway's data), each part one entity drawing one mesh in the material library's surfaces,
+ * and the viewed house's clear glass glowing by room at night.
  *
  * Everything is in game space under the entity it is given (a storey's, lifted to its height,
  * under the world root). A door leaf that swings hangs on an entity of its own at its pivot,
@@ -30,9 +29,9 @@ export interface HouseMesh {
 }
 
 /**
- * A door leaf that swings: its parts hang on `pivot` (an entity at the point they turn about,
- * under the storey's), which the renderer turns about y (`close`, as Babylon's `rotation.y`) and
- * moves by `slide` from `base` (its place, as built).
+ * A door leaf that swings: its parts hang on `pivot` (an entity at the point they turn about, under
+ * the storey's), which the renderer turns about y (`close`, in game space) and moves by `slide`
+ * from `base` (its place, as built).
  */
 export type HouseDoor = Omit<DoorLeaf<never>, 'meshes'> & { pivot: pc.Entity; base: pc.Vec3 };
 

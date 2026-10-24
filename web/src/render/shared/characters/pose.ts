@@ -3,7 +3,7 @@
  * body, procedural additive rotations and skinning matrices.
  *
  * Quaternions are (x, y, z, w) in flat Float32Arrays; skinning matrices are written column-major
- * (Babylon's matrix array layout), one 4x4 per bone.
+ * (the game's matrix array layout, `shared/math.ts`), one 4x4 per bone.
  */
 
 import type { BodyData, CharacterSet, Clip } from './data';

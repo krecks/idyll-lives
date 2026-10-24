@@ -3,11 +3,10 @@
 // Babylon.js: Copyright 2023 The Babylon.js team, under the Apache License 2.0; its licence and notice
 // are in crates/tools/texts/Babylon.js-LICENSE and Babylon.js-NOTICE, and in a build's THIRD-PARTY-LICENSES.txt.
 /**
- * The sun's shadow map in the game, as the Babylon renderer's was: it covers
- * a fixed square round the viewed lot, so its texels keep their size and place while the camera
- * turns and the sun steps, and it is drawn again only when something in it changed (`moved`): the
- * sun's step, a resident's pose (throttled to the preset's `shadowRate`), a thing placed, the
- * walls. Casters outside the square aren't drawn. The menus' town is fitted round the camera's
+ * The sun's shadow map in the game: it covers a fixed square round the viewed lot, so its texels
+ * keep their size and place while the camera turns and the sun steps, and it is drawn again only
+ * when something in it changed (`moved`): the sun's step, a resident's pose (throttled to the
+ * preset's `shadowRate`), a thing placed, the walls. Casters outside the square aren't drawn. The menus' town is fitted round the camera's
  * view instead, and drawn every frame.
  *
  * PlayCanvas fits a directional light's map to the camera's view. For a light with a square, the
@@ -17,11 +16,11 @@
  * turned with the sun, snapped to whole texels, its depth fitted to the casters, the casters culled
  * to it) is PlayCanvas's own.
  *
- * Where the map ends, the sun shines as Babylon's did (an engine patch of `lightFunctionShadowPS`,
- * `patchShadowEdge`): outside the map it is lit (PlayCanvas would read the map's edge texels there,
- * smeared over the land beyond, with the casters' depths: shadow cut off along a diagonal), and the
- * map's last stretch fades to lit in a circle (Babylon's `frustumEdgeFalloff`, `SHADOW_EDGE_FADE`),
- * so the shadows end softly round the lot rather than at a square's edge. The menus' town has no fade.
+ * Where the map ends, the sun shines (an engine patch of `lightFunctionShadowPS`, `patchShadowEdge`):
+ * outside the map it is lit (PlayCanvas would read the map's edge texels there, smeared over the
+ * land beyond, with the casters' depths: shadow cut off along a diagonal), and the map's last
+ * stretch fades to lit in a circle (`frustumEdgeFalloff`, see the header; `SHADOW_EDGE_FADE`), so
+ * the shadows end softly round the lot rather than at a square's edge. The menus' town has no fade.
  *
  * The map's size, filtering and bias are the preset's (`QualitySettings.shadowMapSize`, see
  * `SunShadows.constructor`).
@@ -40,14 +39,14 @@ export { shadowOnlyLayer } from './layers';
 
 /**
  * The share of the map's half side, from its edge in, over which the game's shadows fade out (as
- * radius² in the map's clip space, as Babylon's `frustumEdgeFalloff` was).
+ * radius² in the map's clip space, as `frustumEdgeFalloff` has it).
  */
 const SHADOW_EDGE_FADE = 0.15;
 
 /**
  * The receivers' offset along their normal before the map is read, in texels of the map (PlayCanvas's
- * `normalOffsetBias`, metres: worked out from the square and the map's size). Babylon pushed its
- * casters 2 cm in along theirs (`normalBias`, at 2048 texels over ~60 m: about 0.7 of a texel); a
+ * `normalOffsetBias`, metres: worked out from the square and the map's size). Up to 0.3.2 the
+ * casters were pushed 2 cm in along theirs (at 2048 texels over ~60 m: about 0.7 of a texel); a
  * texel's worth keeps the acne off the lawn at Low's 1024 texels without the shadows letting go of
  * their casters at High's 4096.
  */
@@ -55,7 +54,7 @@ const NORMAL_OFFSET_TEXELS = 0.75;
 
 /**
  * The depth bias (PlayCanvas's `shadowBias`: a polygon offset of `-1000 ×` it, constant and per
- * slope). Babylon added 0.15 % of its depth range (about 7 cm) to every caster; PlayCanvas fits
+ * slope). Up to 0.3.2 every caster had 0.15 % of the depth range (about 7 cm) added; PlayCanvas fits
  * the range to the casters and offsets by slope, which keeps the steep faces (roofs, the hills)
  * clean at a much smaller number.
  */
@@ -200,8 +199,8 @@ export class SunShadows {
   onMoved: ((urgent: boolean) => void) | null = null;
 
   /**
-   * Shadows from `sun`'s light: a map of `options.size` texels a side, filtered as Babylon's
-   * (`QUALITY_MEDIUM`: 3×3 PCF on every preset), the receivers offset by a share of a texel.
+   * Shadows from `sun`'s light: a map of `options.size` texels a side, filtered by 3×3 PCF on every
+   * preset, the receivers offset by a share of a texel.
    */
   constructor(app: pc.AppBase, sun: pc.Entity, options: SunShadowOptions) {
     patch(app);

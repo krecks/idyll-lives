@@ -1,5 +1,5 @@
 /**
- * The game camera as PlayCanvas draws with it: an orbit pose in game space (Babylon's orbit
+ * The game camera as PlayCanvas draws with it: an orbit pose in game space (`shared/orbit.ts`'s
  * conventions: the eye at `target + radius * (cos α sin β, cos β, sin α sin β)`, y up) placed on a
  * PlayCanvas camera through `space.ts`, and points projected back onto the screen.
  */
@@ -43,8 +43,8 @@ export class GameCamera {
 
   /**
    * Places the camera at the orbit pose (game space): looking at `target` from `alpha`, `beta`,
-   * `radius`, the picture moved by (`ox`, `oy`) view units (Babylon's `targetScreenOffset`: the
-   * camera and its target both slid along the view's right and up).
+   * `radius`, the picture moved by (`ox`, `oy`) view units (the camera and its target both slid
+   * along the view's right and up).
    */
   setPose(alpha: number, beta: number, radius: number, tx: number, ty: number, tz: number, ox = 0, oy = 0): void {
     const sa = Math.sin(alpha);
@@ -55,7 +55,7 @@ export class GameCamera {
     let ey = ty + radius * cb;
     let ez = tz + radius * sa * sb;
     if (ox !== 0 || oy !== 0) {
-      // The view's right and up in game space (Babylon's left-handed look-at, up y).
+      // The view's right and up in game space (a left-handed look-at, up y).
       const fx = -ca * sb;
       const fy = -cb;
       const fz = -sa * sb;
@@ -98,8 +98,7 @@ export class GameCamera {
 
   /**
    * The ray through canvas point (`sx`, `sy`) of a canvas `width` × `height` CSS pixels, in game
-   * space: from where it crosses the near plane, `dir` of unit length (as Babylon's
-   * `createPickingRay`). No allocations.
+   * space: from where it crosses the near plane, `dir` of unit length. No allocations.
    */
   ray(sx: number, sy: number, width: number, height: number, origin: { x: number; y: number; z: number }, dir: { x: number; y: number; z: number }): void {
     // (The projection as of the last frame drawn, as `project`'s; the pose as it stands now.)
@@ -120,7 +119,7 @@ export class GameCamera {
 
   /**
    * Where the game-space point (x, y, z) shows on a canvas `width` × `height` CSS pixels: false when
-   * it is behind the camera, past its far plane or not a point (as Babylon's `Vector3.Project`).
+   * it is behind the camera, past its far plane or not a point.
    */
   project(x: number, y: number, z: number, width: number, height: number, out: { x: number; y: number }): boolean {
     // (From the entity as it stands now: the camera's own view matrix is brought up to date when it draws.)

@@ -2382,7 +2382,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private riding(ride: ArrayLike<number>): void {
     const pl = this.place;
     const m = this.rideM;
-    // (Babylon's `Matrix.ComposeToRef`, `multiplyToRef` and `decompose`, step for step in the same float32 matrices.)
+    // (The ported `compose`, `multiply` and `rotationOf` of `rig.ts`, step for step in the same float32 matrices.)
     compose(1, 1, 1, pl.qx, pl.qy, pl.qz, pl.qw, pl.x, pl.y, pl.z, m);
     multiply(m, ride, m);
     rotationOf(m, pl);
@@ -3642,7 +3642,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     quiltTint(bed.quilt?.colour ?? (bed.quilt && this.beddingColours.get(bed.quilt.key)) ?? QUILT_COLOUR, blanket.tint, d * 3);
     // Two Sims in one bed: offset the quilts a hair so their tops don't z-fight where they meet.
     const lift = (i % 2) * 0.004;
-    // Rows: x axis, y axis, z axis, translation (Babylon row-vector layout).
+    // Rows: x axis, y axis, z axis, translation (the game's row-vector layout, `shared/math.ts`).
     m[o] = fz * sx;
     m[o + 1] = 0;
     m[o + 2] = -fx * sx;

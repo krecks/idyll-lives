@@ -1,6 +1,6 @@
 /**
  * Renderer contract. The game talks to rendering only through this interface,
- * so the engine (Babylon.js today) can be swapped without touching sim, UI or input.
+ * so the engine (PlayCanvas today) can be swapped without touching sim, UI or input.
  */
 
 import type { AssetRegistry } from '../assets/registry';

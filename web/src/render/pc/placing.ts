@@ -1,5 +1,5 @@
 /**
- * Placing things in build and buy mode on PlayCanvas (the Babylon renderer's `setPlacementGhost`,
+ * Placing things in build and buy mode on PlayCanvas (the renderer's `setPlacementGhost`,
  * `setHeldObject`, `buildEffect` and what they drive), for `PlayCanvasRenderer.ts`:
  *
  * - The thing in hand (`placementGhost.ts`), and, while it's something for a wall, the things on

@@ -1,18 +1,19 @@
 /**
  * What the benchmark (`debug/bench.ts`) and the stats overlay measure of a PlayCanvas frame, with
- * the meanings the Babylon renderer gave them, so results from both stay comparable:
+ * the meanings they had up to 0.3.2, so results from before the renderer changed and after it stay
+ * comparable:
  *
- * - GPU time (`GpuTiming`): PlayCanvas's GPU profiler (`device.gpuProfiler`). On WebGPU every render
- *   pass is stamped (the 'timestamp-query' feature), and the whole frame is from its first pass's start
- *   to its last pass's end, as the Babylon renderer measured it (`spanPasses`): passes overlap, so their
- *   own times add up to more. Each pass is named by the target it draws into (`canvas`, `shadow`,
- *   `mirror0`, `scene`…; passes into one target add up, as Babylon's timer per target did). On WebGL2 the
- *   whole frame only (`EXT_disjoint_timer_query_webgl2`, as Babylon's `captureGPUFrameTime`), no passes.
+ * - GPU time (`GpuTiming`): PlayCanvas's GPU profiler (`device.gpuProfiler`). On WebGPU every
+ *   render pass is stamped (the 'timestamp-query' feature), and the whole frame is from its first
+ *   pass's start to its last pass's end (`spanPasses`): passes overlap, so their own times add up
+ *   to more. Each pass is named by the target it draws into (`canvas`, `shadow`, `mirror0`,
+ *   `scene`…; passes into one target add up). On WebGL2 the whole frame only
+ *   (`EXT_disjoint_timer_query_webgl2`), no passes.
  * - Draw calls and triangles (`DrawCounts`): every draw of the frame, the sun's shadow map and the
- *   reflections included (`device._drawCallsPerFrame`), and those of the shadow map's passes and of the
- *   reflections' passes on their own. Triangles are counted per draw (index count / 3 × instances), where
- *   Babylon summed its active meshes' indices: the same for meshes, and PlayCanvas's few full-screen
- *   triangles (post-processing) count too.
+ *   reflections included (`device._drawCallsPerFrame`), and those of the shadow map's passes and of
+ *   the reflections' passes on their own. Triangles are counted per draw (index count / 3 ×
+ *   instances), where results up to 0.3.2 summed the active meshes' indices: the same for meshes,
+ *   and PlayCanvas's few full-screen triangles (post-processing) count too.
  * - Shader compiles (`ShaderWatch`): shaders made (a WebGL2 program compiled and linked at its first
  *   draw; a WebGPU shader module) and, on WebGPU, render pipelines made. They fill
  *   `device._shaderStats` (PlayCanvas's release build leaves it at zero) and, with `?diag=shaders`,

@@ -1,8 +1,7 @@
 /**
  * Daylight kept out of a basement in view and out of the rooms without windows on the storey in
- * view (the port of the Babylon renderer's `UndergroundPlugin`): there the sun, the sky's fill
- * and the environment are scaled down to `game_undergroundLit` (x, y, z), so only the lamps light
- * them, day and night.
+ * view: there the sun, the sky's fill and the environment are scaled down to `game_undergroundLit`
+ * (x, y, z), so only the lamps light them, day and night.
  *
  * `gameUnder` is worked out once a fragment (`litUserMainStartPS`); the sun reads it where its
  * colour is read (an engine patch after `lightColor = light{i}_color`, `chunks.ts`), the sky's

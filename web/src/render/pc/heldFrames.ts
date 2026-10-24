@@ -1,10 +1,9 @@
 /**
- * Held frames (the preset's `holdStillFrames`, Babylon's snapshot rendering of the menus' town): a
- * view standing still is drawn once and shown again, not drawn anew, until something in it changes.
- * The canvas is the render target that holds it: a frame not drawn leaves the canvas's last picture
- * on screen (WebGPU's canvas keeps its last texture, WebGL2's its last drawing buffer), so a held
- * frame costs neither the CPU (no culling, no draw calls) nor the GPU. Babylon replayed its recorded
- * commands every frame instead, which saved only the CPU.
+ * Held frames (the preset's `holdStillFrames`, for the menus' town): a view standing still is drawn
+ * once and shown again, not drawn anew, until something in it changes. The canvas is the render
+ * target that holds it: a frame not drawn leaves the canvas's last picture on screen (WebGPU's
+ * canvas keeps its last texture, WebGL2's its last drawing buffer), so a held frame costs neither
+ * the CPU (no culling, no draw calls) nor the GPU.
  *
  * What changes a held view, each found without being told:
  * - the game camera's pose, lens, layers or picture size; the drawing's size (a resized canvas starts blank);

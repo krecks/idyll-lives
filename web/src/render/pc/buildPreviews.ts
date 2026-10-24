@@ -1,7 +1,6 @@
 /**
- * Build mode's previews and overlays on PlayCanvas (the ports of the Babylon renderer's
- * `setEdgePreview`, `setPaintPreview`, `setFloorPreview`, `setRoomOverlay` and `setBuildGrid`), all
- * on the storey layer (`storeyLayer`: they work in lot rows, and the layer lifts them to the storey
+ * Build mode's previews and overlays on PlayCanvas (`setEdgePreview`, `setPaintPreview`,
+ * `setFloorPreview`, `setRoomOverlay` and `setBuildGrid`), all on the storey layer (`storeyLayer`: they work in lot rows, and the layer lifts them to the storey
  * in view):
  *
  * - The wall tools' edges: where they can go, walls, doors and windows as the house would build them
@@ -15,10 +14,10 @@
  * - The tile grid: white lines on a transparent texture repeated once per tile, with fainter half-
  *   and quarter-tile lines that fade out with distance (its mipmaps).
  *
- * The films and the grid are Babylon's unlit `StandardMaterial`s: their colour, as Babylon's
- * standard materials emit it (`toLinear`), is a per-draw `material_emissive`, blended at a fixed
- * alpha, in the fog, writing no depth (as none of Babylon's blended draws do; the grid is also pulled
- * towards the camera, as Babylon's `zOffset` did). Updates rebuild only what changed, and nothing is
+ * The films and the grid are unlit `StandardMaterial`s: their colour, taken from gamma to linear
+ * (`toLinear`, `hexInto`), is a per-draw `material_emissive`, blended at a fixed alpha, in the fog,
+ * writing no depth (as none of the game's blended draws do; the grid is also pulled towards the
+ * camera by a depth bias). Updates rebuild only what changed, and nothing is
  * allocated while a preview stays as it is.
  */
 
@@ -50,14 +49,14 @@ const FILM_LOOK: Record<FilmKind, { color: string; alpha: number }> = {
 };
 const INVALID = '#E5484D';
 
-/** Babylon's `CreateBox` (size 1): its corners, normals and triangles, face by face. */
+/** A box of size 1: its corners, normals and triangles, face by face. */
 const BOX_POSITIONS = [
   1, -1, 1, -1, -1, 1, -1, 1, 1, 1, 1, 1, 1, 1, -1, -1, 1, -1, -1, -1, -1, 1, -1, -1, 1, 1, -1, 1, -1, -1, 1, -1, 1, 1, 1, 1, -1, 1, 1, -1, -1, 1, -1, -1, -1, -1, 1, -1, -1, 1, 1, -1, 1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1, 1, -1, -1, -1, -1, -1, -1, -1,
   1,
 ].map((v) => v / 2);
 const BOX_NORMALS = [0, 0, 1, 0, 0, -1, 1, 0, 0, -1, 0, 0, 0, 1, 0, 0, -1, 0].flatMap((_, i, n) => (i % 3 === 0 ? [0, 1, 2, 3].flatMap(() => [n[i], n[i + 1], n[i + 2]]) : []));
 const BOX_INDICES = [0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15, 16, 17, 18, 16, 18, 19, 20, 21, 22, 20, 22, 23];
-/** Babylon's `CreateGround` (1 × 1): corners (x, z), uvs, triangles. */
+/** A 1 × 1 ground quad: corners (x, z), uvs, triangles. */
 const GROUND_CORNERS = [-0.5, 0.5, 0.5, 0.5, -0.5, -0.5, 0.5, -0.5];
 const GROUND_UVS = [0, 1, 1, 1, 0, 0, 1, 0];
 const GROUND_INDICES = [3, 1, 0, 2, 3, 0];
@@ -81,9 +80,8 @@ export function mergeSurfaces(list: readonly HouseSurfaces[]): HouseSurfaces {
 }
 
 /**
- * A hex colour (`Color3.FromHexString`) as a Babylon film emits it (into `out`, linear): its standard
- * materials shade in gamma space, and their colour is taken to linear (`toLinearSpace`) as it leaves
- * the shader for the image processing.
+ * A hex colour as a film emits it (into `out`, linear): the films' colours are gamma-space values,
+ * taken to linear (`pow(c, 2.2)`) for the image processing that follows.
  */
 function hexInto(hex: string, out: Float32Array): Float32Array {
   out[0] = toLinear(parseInt(hex.slice(1, 3), 16) / 255);
@@ -92,7 +90,7 @@ function hexInto(hex: string, out: Float32Array): Float32Array {
   return out;
 }
 
-/** An unlit blended film: Babylon's `StandardMaterial` with lighting off, its emissive colour per draw. */
+/** An unlit blended film: a `StandardMaterial` with lighting off, its emissive colour per draw. */
 function filmMaterial(name: string, alpha: number, cull: number): pc.StandardMaterial {
   const m = new pc.StandardMaterial();
   m.name = name;
@@ -102,7 +100,7 @@ function filmMaterial(name: string, alpha: number, cull: number): pc.StandardMat
   m.emissive.set(1, 1, 1);
   m.opacity = alpha;
   m.blendType = pc.BLEND_NORMAL;
-  // (Babylon's blended draws don't write depth: `setAlphaMode` turns it off. A box's faces all show.)
+  // (The game's blended draws don't write depth. A box's faces all show.)
   m.depthWrite = false;
   m.frontFace = GAME_FRONT_FACE;
   m.cull = cull;
@@ -344,7 +342,7 @@ export class BuildPreviews {
       const key = `${rect.x},${rect.z},${rect.w},${rect.d}`;
       if (key !== this.gridRect) {
         this.gridRect = key;
-        // A 1 m ground scaled to the rectangle, its texture repeated once per tile (as Babylon's `uScale`, `vScale`).
+        // A 1 m ground scaled to the rectangle, its texture repeated once per tile.
         for (let k = 0; k < 4; k++) {
           g.positions[k * 3] = rect.x + rect.w * (GROUND_CORNERS[k * 2] + 0.5);
           g.positions[k * 3 + 1] = 0.03;
@@ -457,7 +455,7 @@ export class BuildPreviews {
       this.house.build({ ...world, walls, openings, diagonals }, view, { upper: storey !== 0, preview: true, standing: world }, next);
       hole = wallHoleFor(standing, storey, this.host.rowOf(storey));
     }
-    // (Babylon's preview casts no shadow.)
+    // (A preview casts no shadow.)
     for (const r of next.findComponents('render') as pc.RenderComponent[]) r.castShadows = false;
     // The shown preview goes as the next one comes (no gap moving from tile to tile).
     this.dropBuilt();
@@ -558,7 +556,7 @@ export class BuildPreviews {
 
   private makeOverlay(): OverlayDraw {
     const material = filmMaterial('room-overlay', 0.45, pc.CULLFACE_BACK);
-    // (Its colours as Babylon's instance colours come out of its standard material, see `hexInto`.)
+    // (Its colours as the films', see `hexInto`.)
     material.emissiveVertexColor = true;
     material.update();
     const mesh = new pc.Mesh(this.device);
@@ -572,9 +570,9 @@ export class BuildPreviews {
     const entity = new pc.Entity('room-overlay');
     const mi = new pc.MeshInstance(mesh, material);
     mi.cull = false;
-    // Sorted among the blended draws as Babylon's thin instances were: by the 1 m tile at the layer's
-    // origin. The Floor tool's film sorts there too, and Babylon drew it first (made first, a tie): a
-    // hair higher, this one is nearer a camera looking down, so drawn after it.
+    // Sorted among the blended draws by the 1 m tile at the layer's origin. The Floor tool's film
+    // sorts there too and goes first: a hair higher, this one is nearer a camera looking down, so drawn
+    // after it.
     mi.setCustomAabb(new pc.BoundingBox(new pc.Vec3(0, 0.01, 0), new pc.Vec3(0.5, 0, 0.5)));
     entity.addComponent('render', { meshInstances: [mi], castShadows: false, receiveShadows: false });
     this.layer.addChild(entity);
@@ -582,7 +580,7 @@ export class BuildPreviews {
   }
 
   /**
-   * The tile grid (Babylon's `DynamicTexture` of 128 px: white lines on transparent, the tile's edge
+   * The tile grid (a canvas texture of 128 px: white lines on transparent, the tile's edge
    * 3 px wide at full strength, the half-tile line 2 px at 0.55, the quarters 2 px at 0.3), repeated
    * once per tile with mipmaps, 4× anisotropic; drawn at 0.45 in a pale blue-white.
    */
@@ -616,7 +614,7 @@ export class BuildPreviews {
       addressU: pc.ADDRESS_REPEAT,
       addressV: pc.ADDRESS_REPEAT,
     });
-    // Rows bottom up, as Babylon uploads a canvas (`invertY`): the canvas's top row is at v = 1.
+    // Rows bottom up: the canvas's top row is at v = 1.
     const data = texture.lock() as Uint8Array;
     const row = size * 4;
     for (let y = 0; y < size; y++) data.set(pixels.subarray((size - 1 - y) * row, (size - y) * row), y * row);
@@ -634,7 +632,7 @@ export class BuildPreviews {
     material.opacity = 0.45;
     material.blendType = pc.BLEND_NORMAL;
     material.depthWrite = false;
-    // Babylon's `zOffset = -4` (a polygon offset factor): drawn over the floors and the lawn it lies on.
+    // A polygon offset factor of -4: drawn over the floors and the lawn it lies on.
     material.slopeDepthBias = -4;
     material.frontFace = GAME_FRONT_FACE;
     material.update();
@@ -650,7 +648,7 @@ export class BuildPreviews {
     mesh.update(pc.PRIMITIVE_TRIANGLES);
     const entity = new pc.Entity('buildGrid');
     const mi = new pc.MeshInstance(mesh, material);
-    // (Its colour map is decoded where it's read: an 8-bit texture without sRGB is taken as gamma, as Babylon's output is.)
+    // (Its colour map is decoded where it's read: an 8-bit texture without sRGB is taken as gamma, and so is its colour.)
     mi.setParameter('material_emissive', new Float32Array([toLinear(0.9), toLinear(0.95), 1]));
     entity.addComponent('render', { meshInstances: [mi], castShadows: false, receiveShadows: false });
     entity.enabled = false;

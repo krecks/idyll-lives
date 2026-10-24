@@ -3,11 +3,11 @@
  * own beside the game's (`createSideApp`: PlayCanvas's current app stays the game's, and everything
  * here is made on this app explicitly), its lights and shade.
  *
- * Light units: Babylon's studio lights, in the game's units (`lightUnits.ts`, as the game and the
- * dev pages take the look's): the directional lights' strengths in their colours (`SUN_UNITS`), the
- * hemispheric light as the soft look's sky fill (`SKY_UNITS`), the sky's reflections and ambient
- * (`ENV_UNITS`). The image processing is in the materials, as Babylon's scene had it: exposure,
- * ACES and contrast (`pageLook`).
+ * Light units: the studio's lights are in the look's units, converted as the game and the dev
+ * pages convert the look's (`lightUnits.ts`): the directional lights' strengths in their colours
+ * (`SUN_UNITS`), the hemispheric light as the soft look's sky fill (`SKY_UNITS`), the sky's
+ * reflections and ambient (`ENV_UNITS`). The image processing is in the materials: exposure, ACES
+ * and contrast (`pageLook`).
  */
 
 import * as pc from '../pc/engine';
@@ -26,7 +26,7 @@ import type { StandIn } from '../shared/modelEntry';
 /** What a thing whose file fails is pictured as (`BuildOptions.standIn`): a plain box on its footprint. */
 export const PICTURE_STAND_IN: StandIn = { layer: 'floor', radius: 0.12 };
 
-/** Babylon's studio image processing (in the materials): ACES at this exposure, then this contrast. */
+/** The studio's image processing (in the materials): ACES at this exposure, then this contrast. */
 const EXPOSURE = 1.2;
 const CONTRAST = 1.1;
 
@@ -176,9 +176,9 @@ export const IDENTITY: readonly number[] = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 
 /**
  * WebGL2 compiles a shader where the driver can (`KHR_parallel_shader_compile`), but PlayCanvas waits
  * for it at its first draw: a new model's first frame would hold the page (the game's frames) while
- * its shaders compile, where Babylon waited for them (`isReady`) before drawing. On a previews'
- * device, draws whose shaders are still compiling are left out of the frame instead (PlayCanvas's
- * own `asyncCompile`), and pictures are drawn once none is (`shadersCompiling`). Only the scene's
+ * its shaders compile. On a previews' device, draws whose shaders are still compiling are left out
+ * of the frame instead (PlayCanvas's own `asyncCompile`), and pictures are drawn once none is
+ * (`shadersCompiling`). Only the scene's
  * draws: one-off passes (the sky's lighting, made before) would be lost.
  */
 function asyncShaders(device: pc.GraphicsDevice): void {
@@ -210,23 +210,24 @@ export async function texturesReady(lib: MaterialLibrary): Promise<boolean> {
 }
 
 /**
- * Product-shot lighting: a warm key from the upper front, a cool fill, a rim and the sky. Babylon's
- * directions (game space: the way each shines) and strengths. Its fill's highlights were a tenth of
- * its light (`specular` 0.1); PlayCanvas's lights have all or none, and all came out nearer
- * Babylon's pictures (the 12 of `/previews.html`: 0.15 % fewer pixels off by more than 16).
+ * Product-shot lighting: a warm key from the upper front, a cool fill, a rim and the sky, with the
+ * directions (game space: the way each shines) and strengths the pictures had up to 0.3.2. The
+ * fill's highlights were a tenth of its light then (`specular` 0.1); PlayCanvas's lights have all
+ * or none, and all came out nearer those pictures (the 12 of `/previews.html`: 0.15 % fewer pixels
+ * off by more than 16).
  */
 function lights(app: pc.AppBase, lib: MaterialLibrary): void {
   directional(app, 'itemKey', [0.45, -0.75, -0.5], 2.6, [1, 0.96, 0.9]);
   directional(app, 'itemFill', [-0.8, -0.3, -0.4], 0.9, [0.86, 0.91, 1]);
   directional(app, 'itemRim', [-0.2, -0.4, 0.9], 1.6, [1, 1, 1]);
-  // Babylon's hemispheric light: white from straight above, a warm grey from below.
+  // The hemispheric light: white from straight above, a warm grey from below.
   lib.setSkyFill({ r: 1, g: 1, b: 1 }, { r: 0.5, g: 0.46, b: 0.42 }, 0.45 * SKY_UNITS);
   lib.setSkyDirection({ x: 0, y: 1, z: 0 });
 }
 
 function directional(app: pc.AppBase, name: string, way: [number, number, number], intensity: number, colour: [number, number, number]): void {
   const strength = intensity * SUN_UNITS;
-  // (Babylon's linear colour and strength as PlayCanvas takes them: sRGB, the strength in the colour.)
+  // (The linear colour and strength in the look's units as PlayCanvas takes them: sRGB, the strength in the colour.)
   const gamma = (c: number) => Math.pow(c * strength, 1 / 2.2);
   const light = new pc.Entity(name, app);
   light.addComponent('light', { type: 'directional', castShadows: false, intensity: 1, color: new pc.Color(gamma(colour[0]), gamma(colour[1]), gamma(colour[2])) });

@@ -1,9 +1,9 @@
 /**
- * The roads that connect a town with the world outside, as PlayCanvas draws them (ported from
- * the Babylon renderer, removed: see git history up to f15b839b): the road surfaces, their centre lines and a "Welcome to …" sign by the way
- * into town. Where they go (and the side roads of a town of several streets) is
- * `shared/countryRoads.ts`'s; the landscape (`nature.ts`) levels the ground under them and hands
- * them here (`Landscape.build`'s `buildRoads`).
+ * The roads that connect a town with the world outside, as PlayCanvas draws them: the road
+ * surfaces, their centre lines and a "Welcome to …" sign by the way into town. Where they go (and
+ * the side roads of a town of several streets) is `shared/countryRoads.ts`'s; the landscape
+ * (`nature.ts`) levels the ground under them and hands them here (`Landscape.build`'s
+ * `buildRoads`).
  */
 
 import * as pc from './engine';
@@ -85,7 +85,7 @@ function welcomeSign(app: pc.AppBase, name: string, road: Point[], parent: pc.En
   const frame = new pc.Entity('welcomeSign');
   parent.addChild(frame);
   frame.setLocalPosition(px, h, pz);
-  // (A turn about y in game space, as Babylon's `rotation.y`: the world root's mirror takes it into PlayCanvas's.)
+  // (A turn about y in game space: the world root's mirror takes it into PlayCanvas's.)
   frame.setLocalEulerAngles(0, ((Math.atan2(fx, fz) + Math.PI) * 180) / Math.PI, 0);
   drawMesh(frame, 'welcomeSignFrame', frameMesh, MaterialLibrary.for(app).finish('material.finish.satin'));
 
@@ -123,7 +123,7 @@ function letteringOf(app: pc.AppBase, name: string): pc.StandardMaterial {
   do ctx.font = `700 ${size}px sans-serif`;
   while (ctx.measureText(name).width > 460 && (size -= 4) > 24);
   ctx.fillText(name, 256, 124);
-  // (A linear format: the material decodes it, `pow(c, 2.2)`, as Babylon did its gamma-space texture; `materials.ts` `textureWithFallback`.)
+  // (A linear format: the material decodes it, `pow(c, 2.2)`, as it does every gamma-space colour texture; `materials.ts` `textureWithFallback`.)
   const texture = new pc.Texture(app.graphicsDevice, { name: 'welcomeSignText', width: 512, height: 192, format: pc.PIXELFORMAT_RGBA8, mipmaps: true, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE });
   texture.setSource(canvas);
   const mat = new pc.StandardMaterial();
@@ -133,7 +133,7 @@ function letteringOf(app: pc.AppBase, name: string): pc.StandardMaterial {
   mat.useMetalness = true;
   mat.metalness = 0;
   mat.gloss = 0.2;
-  // (Babylon's 0.25, linear.)
+  // (0.25 in linear light.)
   const e = Math.pow(0.25, 1 / 2.2);
   mat.emissive.set(e, e, e);
   MaterialLibrary.for(app).adopt(mat);

@@ -1,8 +1,8 @@
 /**
- * Instanced drawing on PlayCanvas, the port of Babylon's thin instances: one draw call for every
- * copy of a mesh (a template's mesh, `models.ts`), each copy placed by a matrix of its own.
+ * Instanced drawing on PlayCanvas: one draw call for every copy of a mesh (a template's mesh,
+ * `models.ts`), each copy placed by a matrix of its own.
  *
- * The matrices are in game space (Babylon's layout, `shared/math.ts`: 16 floats, translation at
+ * The matrices are in game space (the layout of `shared/math.ts`: 16 floats, translation at
  * 12, 13, 14, which is PlayCanvas's column-major `Mat4.data`), and the draw hangs under the world
  * root (`space.ts`): PlayCanvas's instancing transform is `matrix_model * instance`, so the root's
  * mirror applies to every copy, and its negative scale turns the faces' winding round with it.

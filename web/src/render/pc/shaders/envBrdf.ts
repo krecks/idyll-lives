@@ -3,23 +3,24 @@
 // Babylon.js: Copyright 2023 The Babylon.js team, under the Apache License 2.0; its licence and notice
 // are in crates/tools/texts/Babylon.js-LICENSE and Babylon.js-NOTICE, and in a build's THIRD-PARTY-LICENSES.txt.
 /**
- * Fresnel as Babylon's PBR had it, in the game's lit materials (`GAME_LOOK`): `fresnelSchlickPS`
+ * Fresnel as the look was tuned with, in the game's lit materials (`GAME_LOOK`): `fresnelSchlickPS`
  * with its term replaced, and `reflectionEnvPS` (and its HQ twin) with `addReflection` wrapped.
  *
  * PlayCanvas 2.23's Schlick term never rises for a surface with gloss below 1 (`getFresnel`:
  * `max(gloss² · F0, F0)` is F0), so every highlight and reflection stays at the reflectance face on
  * (`specularity`, 0.04 for a dielectric).
  *
- * - The lights (`getFresnel` of v·h, the sun's and the lamps'): Babylon's Schlick, `F0 + (1 − F0) ·
- *   (1 − v·h)⁵`, whatever the roughness. Looking towards a low sun, v·h is small and the rough
- *   ground's highlight rises to several times F0: the golden hour's sheen on the lawn and the
+ * - The lights (`getFresnel` of v·h, the sun's and the lamps'): the full Schlick term, `F0 + (1 −
+ *   F0) · (1 − v·h)⁵`, whatever the roughness. Looking towards a low sun, v·h is small and the
+ *   rough ground's highlight rises to several times F0: the golden hour's sheen on the lawn and the
  *   hillsides (without it the menus' golden-hour shot was about a tenth dark, and its sun shadows
  *   faint against the unlit ground).
  * - The sky's reflection (`getFresnel` of n·v, after `addReflection`): Lagarde's roughness-aware
- *   Schlick, `F0 + (max(gloss, F0) − F0) · (1 − n·v)⁵` (Babylon's environment BRDF also rises at a
- *   slant, rough surfaces too, but stays near F0 face on for them: Karis's fit of the split sum
- *   falls under F0 there and darkened the lawn at your feet). The reflection added is scaled by
- *   that over the Schlick term, so after PlayCanvas multiplies it by `getFresnel` it is Lagarde's.
+ *   Schlick, `F0 + (max(gloss, F0) − F0) · (1 − n·v)⁵` (the environment BRDF the look was tuned
+ *   with also rises at a slant, rough surfaces too, but stays near F0 face on for them; Karis's fit
+ *   of the split sum falls under F0 there and darkened the lawn at your feet). The reflection added
+ *   is scaled by that over the Schlick term, so after PlayCanvas multiplies it by `getFresnel` it
+ *   is Lagarde's.
  */
 
 import type { Language } from './chunks';

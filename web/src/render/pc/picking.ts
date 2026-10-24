@@ -1,11 +1,11 @@
 /**
- * Picking, as the Babylon renderer did it (`pick`, `pickPlane`, `pickVertical`, `pickOnWall`,
- * `objectBox`): analytic, on the CPU, no GPU picking. A ray from the game camera through the
- * pointer (`GameCamera.ray`, in game space through `space.ts`) meets the floor of the storey in
- * view, the placed objects' boxes (`LotContents.placed`, the ones prepared with the world: what's
- * drawn of each, never past its tiles; things on a wall that went with it aren't picked) and the
- * items' boxes (a plate on a table is picked before the table). Residents are picked by the game
- * on screen (`simHead` and `project`), walls not at all, as with Babylon.
+ * Picking (`pick`, `pickPlane`, `pickVertical`, `pickOnWall`, `objectBox`): analytic, on the CPU,
+ * no GPU picking. A ray from the game camera through the pointer (`GameCamera.ray`, in game space
+ * through `space.ts`) meets the floor of the storey in view, the placed objects' boxes
+ * (`LotContents.placed`, the ones prepared with the world: what's drawn of each, never past its
+ * tiles; things on a wall that went with it aren't picked) and the items' boxes (a plate on a table
+ * is picked before the table). Residents are picked by the game on screen (`simHead` and
+ * `project`), walls not at all.
  *
  * The world is drawn in render space: an upper storey's lot rows lie over the ground's (shifted
  * back by `rowOf`) and lifted by a storey's height, so what is answered in lot rows is shifted

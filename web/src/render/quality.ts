@@ -55,8 +55,8 @@ export interface QualitySettings {
    */
   mirrors: number;
   /**
-   * A reflection's resolution, as a share of the screen's along each side, rounded to powers of
-   * two as Babylon's `MirrorTexture` did (at 1080p 1024×512 for 0.4 and 0.5, 1024×1024 for 0.75);
+   * A reflection's resolution, as a share of the screen's along each side, rounded to the nearest
+   * power of two (at 1080p 1024×512 for 0.4 and 0.5, 1024×1024 for 0.75);
    * multisampled as `msaaSamples` says. Memory while one reflects: Low +7 MB, Medium +25 MB, High +50 MB.
    */
   mirrorScale: number;

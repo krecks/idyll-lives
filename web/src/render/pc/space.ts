@@ -1,8 +1,8 @@
 /**
- * Game space and PlayCanvas space. The game's world is Babylon's left-handed one, as the simulation,
- * the generators, the residents' files and the camera's angles have it (x east, y up, z north, a
- * yaw clockwise from above); PlayCanvas is right-handed. Everything in the world hangs under one
- * root mirrored in z (`worldRoot`), so it keeps its game-space numbers, and PlayCanvas, seeing the
+ * Game space and PlayCanvas space. The game's world is left-handed, as the simulation, the
+ * generators, the residents' files and the camera's angles have it (x east, y up, z north, a yaw
+ * clockwise from above); PlayCanvas is right-handed. Everything in the world hangs under one root
+ * mirrored in z (`worldRoot`), so it keeps its game-space numbers, and PlayCanvas, seeing the
  * root's negative scale, turns the faces' winding round with it (`worldScaleSign`). What lives
  * outside the root (cameras, lights) or crosses over (picking rays, points projected on screen,
  * mirror planes) is converted here and only here.

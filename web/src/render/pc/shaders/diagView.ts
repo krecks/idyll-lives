@@ -1,14 +1,14 @@
 /**
- * `?diag=albedo` and `?diag=normals` (`debug/benchFlags.ts`) on PlayCanvas (ported from the
- * Babylon renderer's diag view): every lit surface drawn as its base colour or its world normal instead
- * of its shading, for screenshots that compare geometry and colour with the lighting left out
- * (checked against the Babylon renderer's pictures).
+ * `?diag=albedo` and `?diag=normals` (`debug/benchFlags.ts`) on PlayCanvas: every lit surface drawn
+ * as its base colour or its world normal instead of its shading, for screenshots that compare
+ * geometry and colour with the lighting left out (also against the game's pictures up to 0.3.2).
  *
  * `endPS` is replaced (`GAME_DIAG_ALBEDO`, `GAME_DIAG_NORMALS`): no fog, no tone mapping, the
- * colour itself. The base colour as the soft look takes it (`BASE`: Babylon's diffuse colour, and
- * metals in their own colour, not PBR's black diffuse), in gamma space; the normal as
- * `n * 0.5 + 0.5` in game space (z mirrored back, `space.ts`), as Babylon's pictures have it. It is the last feature, after the others have set
- * the colour. Unlit materials keep their look (the library doesn't give them the define).
+ * colour itself. The base colour as the soft look takes it (`BASE`: the base colour less what its
+ * dielectric reflects, and metals in their own colour, not PBR's black diffuse), in gamma space;
+ * the normal as `n * 0.5 + 0.5` in game space (z mirrored back, `space.ts`), as the earlier
+ * pictures have it. It is the last feature, after the others have set the colour. Unlit materials
+ * keep their look (the library doesn't give them the define).
  */
 
 import { benchDiag } from '../../../debug/benchFlags';

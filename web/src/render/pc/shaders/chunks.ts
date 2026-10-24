@@ -10,7 +10,7 @@
  * code; the names and lines they rely on are checked by `tools/render/check_chunks.ts`. The slots:
  *
  * - `vsDecl`, `vsEnd`: `litUserDeclarationVS`, `litUserMainEndVS`.
- * - `normalVS`: an instanced draw's normal as Babylon's thin instances had it (`INSTANCE_NORMAL`).
+ * - `normalVS`: an instanced draw's normal corrected for uneven scale (`INSTANCE_NORMAL`).
  * - `vsLocal`: the vertex's local (game-space) position, `localPos`, after morphing and before the
  *   model matrix, in `transformCoreVS`'s `getLocalPosition` (instanced draws too). Wind and
  *   blankets add their snippets here, or a `transformInstancingVS` of their own.
@@ -21,18 +21,17 @@
  *   `reflDirPS`, `emissivePS`).
  * - `combine`: `combineColor` (`combinePS`): the engine's is `combineColorEngine`.
  * - `end`: replaces `endPS` (the colour, fog, tone mapping and gamma) where its defines say so.
- * - `fogPS`: Babylon's haze in the game's materials (`fog.ts`); `reflectionEnvPS`, `reflectionEnvHQPS`:
- *   the sky's reflection rising at a slant, as Babylon's environment BRDF had it, and `fresnelSchlickPS`:
- *   Babylon's Schlick term for the lights' highlights (`envBrdf.ts`); `normalMapPS`: normal maps at
- *   Babylon's strength (`bump.ts`).
+ * - `fogPS`: the game's haze in its materials (`fog.ts`); `reflectionEnvPS`, `reflectionEnvHQPS`:
+ *   the sky's reflection rising at a slant, and `fresnelSchlickPS`: the full Schlick term for the
+ *   lights' highlights (`envBrdf.ts`); `normalMapPS`: normal maps at the game's strength (`bump.ts`).
  *
- * Features run in the order of the Babylon plugins they port (their priority), as Babylon injected
- * them. Engine-wide patches (`patchEngineChunks`, once per device) put the game's light where no
- * per-material chunk reaches: the sky's hemispheric fill and the split of the ambient from the
- * direct light (`litForwardBackendPS`), the sun kept out of basements (`lightFunctionLightPS`), and
- * the lamps kept in their rooms (`clusteredLightPS`, `roomLights.ts`). They only act under the
- * game's defines, so other materials draw as PlayCanvas has them. The lamps' falloff
- * (`falloffInvSquaredPS`, `spotPS`) is Babylon's in the game's materials (`roomLights.ts` too).
+ * Features run in the order of their priority, lowest first. Engine-wide patches
+ * (`patchEngineChunks`, once per device) put the game's light where no per-material chunk reaches:
+ * the sky's hemispheric fill and the split of the ambient from the direct light
+ * (`litForwardBackendPS`), the sun kept out of basements (`lightFunctionLightPS`), and the lamps
+ * kept in their rooms (`clusteredLightPS`, `roomLights.ts`). They only act under the game's
+ * defines, so other materials draw as PlayCanvas has them. The lamps' falloff
+ * (`falloffInvSquaredPS`, `spotPS`) is the game's own in its materials (`roomLights.ts` too).
  *
  * World positions in the fragment shader are PlayCanvas's (`vPositionW`, mirrored in z from game
  * space by the world root, `space.ts`): masks in game coordinates read `gamePos(vPositionW)`.
@@ -71,7 +70,7 @@ export interface FeatureCode {
 
 export interface ShaderFeature {
   name: string;
-  /** The Babylon plugin's priority: lower runs first. */
+  /** The feature's priority: lower runs first. */
   priority: number;
   glsl: FeatureCode;
   wgsl: FeatureCode;
@@ -224,20 +223,20 @@ function build(device: pc.GraphicsDevice, lang: Language): Record<string, string
   const engineEnd = engineChunk(device, lang, 'endPS');
   out.endPS = ends.length ? `#if ${ends.map((e) => e.when).join(' || ')}\n${ends.map((e) => e.code).join('\n')}\n#else\n${engineEnd}\n#endif\n` : engineEnd;
 
-  // An instance's normal as Babylon's thin instances had it (`INSTANCE_NORMAL`).
+  // An instance's normal corrected for uneven scale (`INSTANCE_NORMAL`).
   out.normalVS = replaceOnce(engineChunk(device, lang, 'normalVS'), 'normalVS', ANCHORS[lang].normalVS, INSTANCE_NORMAL[lang]);
 
   out.uv0VS = glsl ? UV0_GLSL : UV0_WGSL;
-  // The haze as Babylon's PBR drew it (`fog.ts`).
+  // The game's haze (`fog.ts`).
   out.fogPS = gameFog(engineChunk(device, lang, 'fogPS'), lang, replaceOnce);
-  // The sky's reflection rising at a slant, as Babylon's environment BRDF had it (`envBrdf.ts`).
+  // The sky's reflection rising at a slant (`envBrdf.ts`).
   for (const chunk of ['reflectionEnvPS', 'reflectionEnvHQPS']) out[chunk] = gameReflection(engineChunk(device, lang, chunk), chunk, lang, replaceOnce);
-  // The lights' highlights rising towards grazing angles, as Babylon's Schlick term had them (`envBrdf.ts`).
+  // The lights' highlights rising towards grazing angles, by the full Schlick term (`envBrdf.ts`).
   out.fresnelSchlickPS = gameFresnel(engineChunk(device, lang, 'fresnelSchlickPS'), lang, replaceOnce);
-  // Normal maps at Babylon's strength (`bump.ts`).
+  // Normal maps at the game's strength (`bump.ts`).
   out.normalMapPS = gameNormalMap(engineChunk(device, lang, 'normalMapPS'), lang, replaceOnce);
 
-  // The lamps' falloff, Babylon's (`roomLights.ts`): the engine's functions renamed, ours in their place.
+  // The lamps' falloff, the game's own (`roomLights.ts`): the engine's functions renamed, ours in their place.
   for (const chunk of ['falloffInvSquaredPS', 'spotPS'] as const) {
     const anchor = ANCHORS[lang][chunk];
     const code = ROOM_LIGHT_CODE[lang][chunk === 'spotPS' ? 'spot' : 'falloff'];
@@ -247,12 +246,12 @@ function build(device: pc.GraphicsDevice, lang: Language): Record<string, string
 }
 
 /**
- * `normalVS`'s normal for an instanced draw of the game's lit materials: Babylon's thin instances'
- * (its PBR vertex shader), `normalize(M · (n / (|M₀|², |M₁|², |M₂|²)))` with M the model matrix's 3 × 3
- * (PlayCanvas's normal matrix for instanced draws), the inverse transpose for a matrix of axis scales
- * and a rotation: an instance scaled unevenly (a quilt fitted to its bed, a resized object) shades as
- * it did. The world root's mirror leaves the columns' lengths as they are; tangents keep the plain
- * matrix, as Babylon's did. (A collapsed copy, all zeros, gets no normal; it draws nothing.)
+ * `normalVS`'s normal for an instanced draw of the game's lit materials:
+ * `normalize(M · (n / (|M₀|², |M₁|², |M₂|²)))` with M the model matrix's 3 × 3 (PlayCanvas's normal
+ * matrix for instanced draws), the inverse transpose for a matrix of axis scales and a rotation: an
+ * instance scaled unevenly (a quilt fitted to its bed, a resized object) shades as it should. The
+ * world root's mirror leaves the columns' lengths as they are; tangents keep the plain matrix. (A
+ * collapsed copy, all zeros, gets no normal; it draws nothing.)
  */
 const INSTANCE_NORMAL: Record<Language, string> = {
   glsl: `#if defined(GAME_LOOK) && defined(INSTANCING)
@@ -320,7 +319,7 @@ const UV0_WGSL = `
 const ENGINE_PATCHES: Record<Language, { backend: string; sun: string }> = {
   glsl: {
     // The ambient PlayCanvas added (the sky's harmonics, occluded) is kept apart, and the sky's
-    // hemispheric fill comes in as direct light, as Babylon's hemispheric light did.
+    // hemispheric fill comes in as direct light, as a hemispheric light's does.
     backend: `
 	#if defined(GAME_LOOK) && defined(LIT_NEEDS_NORMAL)
 		gameAmbient = dDiffuseLight;

@@ -1,33 +1,32 @@
 /**
- * Mirror reflections on PlayCanvas (ported from the Babylon renderer, removed: see git history up to f15b839b). Every mirror's glass (a
- * model's `mirrors`, `LotContents.mirrors`) gets a flat stand-in just in front of it; the few nearest
- * the camera that are on screen and face it show the room in a render target of their own, the scene
- * drawn once more by a reflection camera, at a share of the screen's size. The rest keep their glossy
+ * Mirror reflections on PlayCanvas. Every mirror's glass (a model's `mirrors`, `LotContents.mirrors`)
+ * gets a flat stand-in just in front of it; the few nearest the camera that are on screen and face it
+ * show the room in a render target of their own, the scene drawn once more by a reflection camera, at
+ * a share of the screen's size. The rest keep their glossy
  * glass. A reflection is only drawn while its mirror is on screen.
  *
  * - The reflection camera: the game camera's view reflected in the glass's plane (`calculateTransform`:
  *   PlayCanvas space, a mirror's matrix, so `flipFaces`), and the game camera's projection with its
  *   near plane turned into the glass's plane (an oblique near plane, Lengyel's, in `calculateProjection`;
- *   in place of Babylon's clip plane: no shader variants), narrowed to the glass's rectangle on screen
- *   and drawn only there (the camera's `rect`). So it draws what can be seen through the glass and
- *   nothing behind it: its frustum is the pyramid from the reflected eye through the glass, as
- *   Babylon's draw lists were. It draws the world layer (Babylon's world camera mask) in linear light into a
- *   half-float target (no tone mapping, no gamma: the scene's own picture is linear), multisampled
- *   as the preset says, its size Babylon's (`MirrorTexture`'s ratio rounded to powers of two).
- * - Left out of every reflection (Babylon's render-list predicate): the glasses themselves and the
- *   build helpers, by name (`HELPER`), hidden from the reflection cameras' culling only.
- * - Residents: drawn in a reflection only if they stand where its glass shows them (Babylon's
- *   `rowsOf` filter): the resident shader skips the rows not set in `game_simShown`
- *   (`residentRowFilter`), which is set for each reflection camera's layers and put back after.
+ *   rather than a clip plane: no shader variants), narrowed to the glass's rectangle on screen and
+ *   drawn only there (the camera's `rect`). So it draws what can be seen through the glass and
+ *   nothing behind it: its frustum is the pyramid from the reflected eye through the glass. It draws
+ *   the world layer in linear light into a half-float target (no tone mapping, no gamma: the scene's
+ *   own picture is linear), multisampled as the preset says, its size a share of the drawing's
+ *   rounded to powers of two (`size`).
+ * - Left out of every reflection: the glasses themselves and the build helpers, by name (`HELPER`),
+ *   hidden from the reflection cameras' culling only.
+ * - Residents: drawn in a reflection only if they stand where its glass shows them: the resident
+ *   shader skips the rows not set in `game_simShown` (`residentRowFilter`), which is set for each
+ *   reflection camera's layers and put back after.
  * - The sun's shadow map: PlayCanvas keeps a directional light's matrices per camera. The reflection
  *   cameras use the game camera's (`getRenderData` on the sun's light), so a reflection drawn after
  *   frames without one still has the map's matrices of now, and the map is drawn at most once a frame
  *   for the game camera and its reflections together (`getLightRenderPass`).
  * - The glass: unlit, the reflection looked up through the game camera's view × projection when it was
- *   drawn (`game_mirrorLookup`, world position to the target's texture coordinates), as Babylon's
- *   `StandardMaterial` with the mirror texture shaded it: the reflection in gamma space times 0.92,
- *   plus a hint of the glass's own tint, taken back to linear (its `IS_REFLECTION_LINEAR` and image
- *   processing by post-process).
+ *   drawn (`game_mirrorLookup`, world position to the target's texture coordinates): the reflection
+ *   in gamma space times 0.92, plus a hint of the glass's own tint, taken back to linear (the image
+ *   processing comes after, on the whole picture).
  *
  * With a `rate` (Low and Medium) a reflection is drawn on demand and held in between ("held": its
  * camera is off and its target keeps the last picture): again when the camera moves, the mirror moves
@@ -86,9 +85,9 @@ const EARLY = 4;
 const STILL = 1e-5;
 /** Target texels round the glass's rectangle drawn too (the lookup filters across its edge). */
 const PAD = 2;
-/** The glass's own tint and the share of the reflection it passes (Babylon's emissive colour and `level`, gamma space). */
+/** The glass's own tint, added to the reflection it passes (0.92 of it, in the glass's shader), gamma space. */
 const TINT = new Float32Array([0.006, 0.008, 0.009]);
-/** Draws a reflection never shows: the glasses and the build helpers (Babylon's `HELPER_MESH`, by PlayCanvas names). */
+/** Draws a reflection never shows: the glasses and the build helpers, by their names. */
 const HELPER = /^(mirror:|cursor$|resize:|buildGrid$|preview-|room-overlay$|marker)/;
 
 /** The glass's emissive: the reflection through the drawn view (see the file's header). */
@@ -345,7 +344,11 @@ export class Mirrors {
     return (this.pool[i] = r);
   }
 
-  /** A reflection's size: Babylon's for its ratio of the drawing (`_bestReflectionRenderTargetDimension`). */
+  /**
+   * A reflection's size for its ratio of the drawing (`QualitySettings.mirrorScale`): each side
+   * scaled, eased up for small sizes and rounded to the nearest power of two, at most the drawing's
+   * own (its power of two below).
+   */
   private size(): [number, number] {
     const best = (dimension: number) => {
       const x = dimension * this.quality.scale;
@@ -531,7 +534,7 @@ export class Mirrors {
    * resident, the glasses and the build helpers too), and the glasses with them, so the pipelines a
    * reflection needs (its target's, its turned faces') are made behind the loading veil, not in the
    * frame a mirror first shows (a pipeline first used in play costs that frame tens of milliseconds;
-   * Babylon's `warm`). If no mirror reflects yet, the first ones take the slots. From the game
+   * `warmGame` calls it). If no mirror reflects yet, the first ones take the slots. From the game
    * camera's pose (what it sees doesn't matter: nothing is culled). Returns the undo, to run once
    * the frame has drawn. None in a world without mirrors.
    */
@@ -887,8 +890,8 @@ export class Mirrors {
 
   /**
    * A reflection camera culls without the glasses and the build helpers, and of the draws never culled
-   * (the residents' parts, their contact shadows, quilts, props and ring) only those it may show
-   * (Babylon's draw list): a part only with a resident its glass shows, the rest with anyone there.
+   * (the residents' parts, their contact shadows, quilts, props and ring) only those it may show: a
+   * part only with a resident its glass shows, the rest with anyone there.
    */
   private precull(camera: pc.CameraComponent | null): void {
     const r = this.reflectionOf(camera);
@@ -946,7 +949,7 @@ export class Mirrors {
     return this.pool.filter((r): r is Reflection => !!r).map((r) => r.target);
   }
 
-  /** The render targets of the mirrors reflecting now, held ones too (the benchmark's passes, as Babylon's `reflecting`). */
+  /** The render targets of the mirrors reflecting now, held ones too (the benchmark's passes). */
   get reflecting(): pc.RenderTarget[] {
     const out: pc.RenderTarget[] = [];
     for (const item of this.items) {

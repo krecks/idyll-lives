@@ -206,7 +206,7 @@ export class PlayCanvasResidentView implements ResidentView<PartDraw, QuiltDraw,
   createQuilt(name: string, geometry: QuiltGeometry, matrices: Float32Array, ext: Float32Array, tint: Float32Array): QuiltDraw {
     const mesh = new pc.Mesh(this.device);
     mesh.setPositions(geometry.positions);
-    // (Smooth, as Babylon's `VertexData.ComputeNormals` made them.)
+    // (Smooth normals, averaged over the faces round each vertex.)
     const normals = new Float32Array(geometry.positions.length);
     computeNormals(geometry.positions, geometry.indices, normals);
     mesh.setNormals(normals);
@@ -273,7 +273,7 @@ export class PlayCanvasResidentView implements ResidentView<PartDraw, QuiltDraw,
     m.opacityMapChannel = 'a';
     m.blendType = pc.BLEND_NORMAL;
     m.depthWrite = false;
-    // (Babylon's `zOffset` -4.)
+    // (Its depth pulled towards the camera, off the floor it lies on.)
     m.slopeDepthBias = -4;
     m.cull = pc.CULLFACE_NONE;
     m.update();

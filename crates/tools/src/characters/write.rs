@@ -10,7 +10,7 @@
 //! Each life stage other than the base: `<family>.<stage>.bin`, per part int16 position deltas
 //! from the base (x STAGE_SCALE) and int8 normals (x 127).
 //!
-//! Meshes come in counter-clockwise from outside (prims.rs); Babylon's front faces are clockwise
+//! Meshes come in counter-clockwise from outside (prims.rs); the game's front faces are clockwise
 //! in its left-handed space, so the writer turns every triangle round.
 
 use std::io;

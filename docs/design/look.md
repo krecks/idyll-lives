@@ -10,11 +10,11 @@ reflecting every frame on High), listed in
 The world has one look: soft, painterly shading with golden-hour light and blue moonlit nights.
 All art is original or CC0.
 
-Code: `web/src/render/look.ts` holds the look as data, in the units the Babylon renderer lit it
-with until 0.3.2; `web/src/render/pc/*` applies it on PlayCanvas (its units converted in
-`lightUnits.ts`, see [graphics.md](graphics.md#the-renderer)), and `shaders/softLook.ts` draws
-every lit surface in the soft shading below (Settings, Performance, Shading; the `classic` option
-brings back the PBR shading it replaced).
+Code: `web/src/render/look.ts` holds the look as data, in the units it was tuned in up to 0.3.2 (a
+sun or a lamp of strength 1 lights a white surface to 1/π); `web/src/render/pc/*` applies it on
+PlayCanvas (its units converted in `lightUnits.ts`, see [graphics.md](graphics.md#the-renderer)),
+and `shaders/softLook.ts` draws every lit surface in the soft shading below (Settings, Performance,
+Shading; the `classic` option brings back the PBR shading it replaced).
 
 ## Goals
 

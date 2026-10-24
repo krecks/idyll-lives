@@ -1,6 +1,5 @@
 /**
- * Buy mode's thing in hand (`Renderer.setPlacementGhost`), as the Babylon renderer drew it
- * (`setPlacementGhost`, `updateGhost`, `loadGhost`): the model itself where it fits, a red
+ * Buy mode's thing in hand (`Renderer.setPlacementGhost`): the model itself where it fits, a red
  * see-through copy where it can't go (pulsing), and a flat arrow on the tile a resident uses it
  * from, pointing out of it (green, or red), riding with it but turned by quarter turns only. It
  * glides to its tile and turns the short way round, floats a hand's breadth above the floor (or
@@ -10,10 +9,10 @@
  * Its own copy of the model (`buildModel`, once per model, size and colours; without its file the
  * box the placed thing would get, at once from then on until the file comes: `fileArrived`), one
  * instance per mesh (and the arrow), in lot rows under the storey layer; on the over layer
- * (`layers.ts`: Babylon's rendering group 1, over what stands in front of it), casting and taking
- * no shadow (the thing itself lit by the world's lights). Moving it costs a matrix per draw each frame: no
- * allocations, no shader compiles (the red copy's alpha and the arrow's colour are uniforms written in
- * place).
+ * (`layers.ts`: drawn after the world, the depth cleared, over what stands in front of it), casting
+ * and taking no shadow (the thing itself lit by the world's lights). Moving it costs a matrix per
+ * draw each frame: no allocations, no shader compiles (the red copy's alpha and the arrow's colour
+ * are uniforms written in place).
  */
 
 import * as pc from './engine';
@@ -39,7 +38,7 @@ function setScaled(out: Float32Array, x: number, y: number, z: number, k: number
   out[2] = z * k;
 }
 
-/** Whether a mesh has vertex colours (Babylon's `StandardMaterial` multiplies by them). */
+/** Whether a mesh has vertex colours (the red copy multiplies by them, `GAME_GHOST_COLORS`). */
 function hasColors(mesh: pc.Mesh): boolean {
   return !!mesh.vertexBuffer?.format.elements.some((e) => e.name === pc.SEMANTIC_COLOR);
 }
@@ -71,7 +70,7 @@ export class PlacementGhostView {
   /** The translucent tint where it can't go, and the arrow's material and draw. */
   /** The red copy's materials: for meshes without vertex colours, and with them (`shaders/ghost.ts`). */
   private readonly redMaterials: [pc.ShaderMaterial, pc.ShaderMaterial];
-  /** The red copy's light (game space, Babylon's units: `light`). */
+  /** The red copy's light (game space, the look's units unconverted: `light`). */
   private readonly sunDir = new Float32Array(3);
   private readonly sun = new Float32Array(3);
   private readonly sky = new Float32Array(3);
@@ -115,7 +114,7 @@ export class PlacementGhostView {
   ) {
     this.device = app.graphicsDevice;
     this.layer = overLayer(app, camera).id;
-    // Babylon's red `StandardMaterial` (`shaders/ghost.ts`), both sides, no depth written (Babylon's blended draws).
+    // The red Blinn-Phong copy (`shaders/ghost.ts`), both sides, blended, no depth written.
     const h = Math.hypot(0.2, 1, -0.3);
     const hemi = new Float32Array([0.2 / h, 1 / h, -0.3 / h]);
     this.redMaterials = [false, true].map((colors) => {
@@ -132,7 +131,7 @@ export class PlacementGhostView {
       red.blendType = pc.BLEND_NORMAL;
       red.depthWrite = false;
       red.cull = pc.CULLFACE_NONE;
-      // (The sky's hemispheric light comes from Babylon's way: its `HemisphericLight` direction, normalised.)
+      // (The sky's hemispheric light comes from (0.2, 1, -0.3), normalised, as the materials' sky fill, `SKY_FILL_DIRECTION`.)
       red.setParameter('gameGhostHemiDir', hemi);
       red.setParameter('gameGhostAlpha', this.redAlpha);
       red.setParameter('gameGhostSunDir', this.sunDir);
@@ -142,7 +141,7 @@ export class PlacementGhostView {
       red.update();
       return red;
     }) as [pc.ShaderMaterial, pc.ShaderMaterial];
-    // Babylon's unlit `StandardMaterial` in its emissive colour (`tint`), both sides, no depth written.
+    // Unlit, in its own colour (`tint`), both sides, no depth written.
     const arrowMat = (this.arrowMaterial = new pc.ShaderMaterial({
       uniqueName: 'GameGhostArrow',
       vertexGLSL: GHOST_VS.glsl,
@@ -249,7 +248,7 @@ export class PlacementGhostView {
     now[ALPHA] = this.valid ? 0.5 : still ? 0.36 : 0.36 + 0.14 * Math.sin(now[AGE] * 9);
     this.redAlpha[0] = now[ALPHA];
     this.arrowColor[3] = now[ALPHA] + 0.25;
-    // (Babylon's scaling, turn about y and place, written out: a helper given doubles boxes each one until it's inlined.)
+    // (Scale, turn about y and place, written out: a helper given doubles boxes each one until it's inlined.)
     const m = this.matrix;
     const c = Math.cos(now[YAW]) * s;
     const sn = Math.sin(now[YAW]) * s;
@@ -274,7 +273,7 @@ export class PlacementGhostView {
 
   /**
    * The light the red copy is shaded in (each lighting update): the sun (towards it) and the sky's
-   * colours at their strengths, in game space and Babylon's units, as Babylon's lights had them.
+   * colours at their strengths, in game space and the look's units as they are (`shaders/ghost.ts`).
    */
   light(l: Lighting): void {
     const d = l.sunDirection;
@@ -356,7 +355,7 @@ export class PlacementGhostView {
 
   /** Where it fits, the thing itself (and a green arrow); where it can't go, a red see-through copy. */
   private tint(): void {
-    // (Babylon's emissive colour in gamma space, taken to linear as its image processing did.)
+    // (The arrow's colour in gamma space, taken to linear for the image processing that follows.)
     const [r, g, b] = this.valid ? [0.55, 1.0, 0.6] : [1.0, 0.45, 0.42];
     this.arrowColor[0] = toLinear(r);
     this.arrowColor[1] = toLinear(g);

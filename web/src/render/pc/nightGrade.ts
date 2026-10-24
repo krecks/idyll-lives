@@ -1,17 +1,17 @@
 /**
- * Moonlight grade (ported from the Babylon renderer, removed: see git history up to f15b839b): at night, moonlit tones lose their
- * colour and turn blue-grey while warm, lamp-lit pixels (windows, interiors, streetlight pools:
- * red above blue) and very bright ones keep their colour, so they pop.
+ * Moonlight grade: at night, moonlit tones lose their colour and turn blue-grey while warm,
+ * lamp-lit pixels (windows, interiors, streetlight pools: red above blue) and very bright ones keep
+ * their colour, so they pop.
  *
  * Why a grade: lawns and leaves reflect almost no blue, so a blue moon and sky fill alone render a
  * night as dark olive green, and the colour curves can only tint multiplicatively (a weak filter
  * that cannot create blue).
  *
- * Babylon ran it as a pass of its own after the image processing (and the FXAA), attached only
- * while it was getting dark. Here it is a function at the end of the last full-screen pass the
- * picture already takes (`post.ts`: the compose, or the FXAA on Low), on the image-processed colour
- * clamped to 0..1 as Babylon's 8-bit pass input had it. By day its amount is 0, which leaves the
- * colour exactly as it is: no pass to attach, no shader to change.
+ * It comes after the image processing (and the FXAA), not as a pass of its own but as a function at
+ * the end of the last full-screen pass the picture already takes (`post.ts`: the compose, or the
+ * FXAA on Low), on the image-processed colour clamped to 0..1 (an 8-bit picture's range, which the
+ * grade was tuned on up to 0.3.2). By day its amount is 0, which leaves the colour exactly as it
+ * is: no pass to attach, no shader to change.
  */
 
 import type { Language } from './shaders/chunks';
@@ -19,7 +19,7 @@ import type { Language } from './shaders/chunks';
 /** Multiplier for the desaturated dark tones (display RGB). */
 export const NIGHT_TINT: readonly [number, number, number] = [0.8, 0.94, 1.45];
 
-/** Below this amount Babylon detached the pass: the grade is off. */
+/** Below this amount the grade is off. */
 export const NIGHT_OFF = 0.001;
 
 /** The grade's uniforms: `gameNightAmount` (0..1) and `gameNightTint`. */
@@ -48,7 +48,7 @@ fn gameNightGrade(c: vec3f) -> vec3f {
 `,
 };
 
-/** The grade's amount as Babylon applied it: none below `NIGHT_OFF` (its pass detached). */
+/** The grade's amount: none below `NIGHT_OFF`. */
 export function nightAmount(amount: number): number {
   return amount > NIGHT_OFF ? amount : 0;
 }

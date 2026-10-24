@@ -1,8 +1,6 @@
 /**
- * The wall cutaway and the dug-out ground (the ports of the Babylon renderer's
- * `WallCutPlugin` and `DigPlugin`). Neither applies in the shadow pass, as in Babylon (whose shadow depth
- * shader had no plugins): the house casts with its walls at full height in every wall mode, the sun
- * coming in through windows and doorways.
+ * The wall cutaway and the dug-out ground. Neither applies in the shadow pass: the house casts with
+ * its walls at full height in every wall mode, the sun coming in through windows and doorways.
  *
  * - `GAME_WALLCUT`: wall vertices drop in the vertex shader. Per vertex `game_wallCut` (the
  *   `WALL_CUT_SEMANTIC` stream, `Geo`'s `cut`) = [mask A, kind, mask B, 0]: the vertex is cut when

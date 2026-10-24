@@ -60,7 +60,7 @@ export interface HousePart {
   roof: boolean;
   /** Only the sun's shadow map sees it (no camera draws it, and it receives no shadows). */
   shadowOnly: boolean;
-  /** See-through glass: drawn after the other blended surfaces (Babylon's `alphaIndex` 10). */
+  /** See-through glass: drawn after the other blended surfaces (`pc/meshes.ts` `drawAfter`). */
   glass: boolean;
 }
 

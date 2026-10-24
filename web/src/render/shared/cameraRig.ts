@@ -8,7 +8,7 @@
 import type { GameShot } from '../types';
 import { angleDelta, ease } from './angles';
 
-/** The camera the rig drives: an orbit pose (Babylon's `ArcRotateCamera`, or any with its fields). */
+/** The camera the rig drives: an orbit pose (any camera with these fields). */
 export interface RigCamera {
   alpha: number;
   beta: number;

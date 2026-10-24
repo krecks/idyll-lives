@@ -1,9 +1,8 @@
 /**
- * Low's one sun-shadow caster for the lot's objects (`QualitySettings.mergedObjectShadows`, the
- * port of the Babylon renderer's `mergeObjectShadows`): every opaque body mesh's copies baked into
- * one mesh of game-space triangles, so the furniture costs the shadow map one draw, not one per
- * model mesh. The template meshes' own draws then don't cast (see-through ones still do, from their
- * own copies; moving parts don't cast on Low).
+ * Low's one sun-shadow caster for the lot's objects (`QualitySettings.mergedObjectShadows`): every
+ * opaque body mesh's copies baked into one mesh of game-space triangles, so the furniture costs the
+ * shadow map one draw, not one per model mesh. The template meshes' own draws then don't cast
+ * (see-through ones still do, from their own copies; moving parts don't cast on Low).
  *
  * It is drawn only by the sun's shadow map (the shadow-only layer, `layers.ts`). A copy written
  * anew (hidden: scaled to nothing, every vertex in one point and no triangle left; shown; moved)

@@ -1,13 +1,13 @@
 /**
- * Buy-mode feedback in the world on PlayCanvas (ported from the Babylon renderer, removed: see git history up to f15b839b; what plays when,
- * the rings' spread, the pops' spring and the particles' simulation are `shared/buildFx.ts`'s):
- * the rings, sparkles and dust in one instanced quad draw (`shaders/buildFx.ts`), on the effects
- * layer, after the world's opaque draws and before its blended ones, as Babylon's particles were
- * (`layers.ts`); the pops scale placed objects' instances (`objectMotion.ts` `PopTarget`).
+ * Buy-mode feedback in the world on PlayCanvas (what plays when, the rings' spread, the pops'
+ * spring and the particles' simulation are `shared/buildFx.ts`'s): the rings, sparkles and dust in
+ * one instanced quad draw (`shaders/buildFx.ts`), on the effects layer, after the world's opaque
+ * draws and before its blended ones (`layers.ts`); the pops scale placed objects' instances
+ * (`objectMotion.ts` `PopTarget`).
  *
- * Idle, the draw is off and nothing runs; while something plays, each game frame writes the
- * draw's instances (rings, then the sparkles, then the dust: Babylon's order) and sends them up
- * once. No allocations per frame.
+ * Idle, the draw is off and nothing runs; while something plays, each game frame writes the draw's
+ * instances (rings, then the sparkles, then the dust) and sends them up once. No allocations per
+ * frame.
  */
 
 import * as pc from './engine';
@@ -21,7 +21,7 @@ import type { BuildEffect } from '../types';
 /** Instances room is made for at first: every ring and particle there can be. */
 const CAPACITY = 8 + SPARKLES.capacity + DUST.capacity;
 
-/** The rings' colours (Babylon's emissive, gamma space), by effect. */
+/** The rings' colours (emissive, gamma space), by effect. */
 const RING_RGB = Object.fromEntries(Object.entries(RING_COLORS).map(([kind, hex]) => [kind, [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)])) as Record<BuildEffect['kind'], number[]>;
 
 export class BuildEffects extends BuildEffectsCore<PopTarget> {
@@ -49,7 +49,8 @@ export class BuildEffects extends BuildEffectsCore<PopTarget> {
     this.material.blendType = pc.BLEND_PREMULTIPLIED;
     this.material.depthWrite = false;
     this.material.cull = pc.CULLFACE_NONE;
-    // (Babylon's rings' `zOffset` -6; the camera-facing particles have no slope to take it.)
+    // (The rings' depth pulled towards the camera, off the floor they lie on; the camera-facing
+    // particles have no slope to take it.)
     this.material.slopeDepthBias = -6;
     this.textures = [ringCanvas(), sparkleCanvas(), puffCanvas()].map((canvas, i) => {
       const t = new pc.Texture(device, { name: ['buildRing', 'buildSparkle', 'buildPuff'][i], width: canvas.width, height: canvas.height, format: pc.PIXELFORMAT_RGBA8, mipmaps: true, minFilter: pc.FILTER_LINEAR_MIPMAP_LINEAR, magFilter: pc.FILTER_LINEAR, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE });
@@ -169,7 +170,7 @@ function canvasOf(n: number, paint: (ctx: CanvasRenderingContext2D) => void): HT
   return canvas;
 }
 
-/** The ring: a soft band near the edge (Babylon's `ringTexture`). */
+/** The ring: a soft band near the edge. */
 function ringCanvas(): HTMLCanvasElement {
   const n = 256;
   return canvasOf(n, (ctx) => {
@@ -184,7 +185,7 @@ function ringCanvas(): HTMLCanvasElement {
   });
 }
 
-/** A soft four-pointed twinkle (Babylon's `sparkleTexture`). */
+/** A soft four-pointed twinkle. */
 function sparkleCanvas(): HTMLCanvasElement {
   const n = 64;
   return canvasOf(n, (ctx) => {
@@ -207,7 +208,7 @@ function sparkleCanvas(): HTMLCanvasElement {
   });
 }
 
-/** A soft puff (Babylon's `puffTexture`). */
+/** A soft puff. */
 function puffCanvas(): HTMLCanvasElement {
   const n = 64;
   return canvasOf(n, (ctx) => {

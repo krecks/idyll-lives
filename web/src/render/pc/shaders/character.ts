@@ -1,6 +1,6 @@
 /**
- * The residents' shader on PlayCanvas (the port of the Babylon renderer's `CharacterPlugin`,
- * and of Babylon's baked-vertex-animation skinning it ran on). Materials: `characterMaterial.ts`.
+ * The residents' shader on PlayCanvas, skinned from a pose texture. Materials:
+ * `characterMaterial.ts`.
  *
  * Every resident has a row of the pose texture (`game_simPoses`, RGBA32F, one per app; row layout in
  * `shared/characters/layout.ts`): its bone matrices, then its appearance texels, then its face morph
@@ -25,15 +25,14 @@
  * - `game_simLayout`: x the first appearance texel (bones · 4), y the morph texture's width, z the
  *   texels of a part's morph header. Uniforms, not constants: one program per surface whatever the set.
  *
- * Fragment, the surfaces as Babylon's plugin drew them (see its file for what each does): the
- * colours in `getAlbedo` (`albedo` slot, by surface: `GAME_SIM_BODY`, `_CLOTH`, `_HAIR`, `_BROW`,
- * `_LASH`, `_EYE`, `_MOUTH`), the roughness in `getGlossiness` (`gloss`: painted clothes rougher,
- * hair matte, polished shoes glossy), the eye's catchlight in `getEmission` (`emissive`). The light
- * itself is the game's look, as for every lit material (`softLook.ts`, `roomLights.ts`,
- * `underground.ts`, `fog.ts`, `diagView.ts`).
+ * Fragment, by surface: the colours in `getAlbedo` (`albedo` slot, by surface: `GAME_SIM_BODY`,
+ * `_CLOTH`, `_HAIR`, `_BROW`, `_LASH`, `_EYE`, `_MOUTH`), the roughness in `getGlossiness`
+ * (`gloss`: painted clothes rougher, hair matte, polished shoes glossy), the eye's catchlight in
+ * `getEmission` (`emissive`). The light itself is the game's look, as for every lit material
+ * (`softLook.ts`, `roomLights.ts`, `underground.ts`, `fog.ts`, `diagView.ts`).
  *
  * Derivatives (`fwidth`) are taken in uniform control flow only (WGSL insists): branches are
- * `select`s and `mix`es, as in Babylon's WGSL.
+ * `select`s and `mix`es.
  */
 
 import { APPEARANCE_TEXELS, MORPH_TEXELS } from '../../shared/characters/layout';
@@ -572,7 +571,7 @@ const PS_WGSL = {
 #endif`,
 };
 
-/** The residents' feature, at the Babylon plugin's priority (after the cutaway, basements and plain finishes; before the look). */
+/** The residents' feature, after the cutaway, basements and plain finishes and before the look. */
 export const RESIDENT: ShaderFeature = {
   name: 'resident',
   priority: 230,

@@ -1,6 +1,6 @@
 /**
  * When the world is built again with model files that came after failing (engine-neutral; the
- * Babylon renderer's `fileArrived` and `holdModelRefresh`): the files are gathered, and the
+ * renderer's `fileArrived` and `holdModelRefresh`): the files are gathered, and the
  * rebuild (`flush`, with every file that came) waits until no file has come for
  * `FILES_SETTLE_MS` (after an outage many come one after another, for one rebuild), but at most
  * `FILES_WAIT_MS` from the first. While held (`hold`: the game streams the rest of the town behind

@@ -4,14 +4,14 @@
 // are in crates/tools/texts/Babylon.js-LICENSE and Babylon.js-NOTICE, and in a build's THIRD-PARTY-LICENSES.txt.
 /**
  * Buy mode's red see-through copy of a thing that can't go there (`placementGhost.ts`), shaded as
- * Babylon's `StandardMaterial` shaded it (its Blinn-Phong `default.fragment.fx`, without specular):
- * the sun's diffuse term and the sky's hemispheric one, in Babylon's light units and colours (game
- * space), summed on the red, plus the emissive grey, clamped, then times the mesh's vertex colours
- * where it has them (`GAME_GHOST_COLORS`: a model of the game's own parts keeps its colours under a
- * red tint; a file's model without them is the plain red), then taken to linear (`toLinearSpace`:
- * Babylon's image processing ran after, as the game's does). No environment light, no lamps (the
- * game's ghost had them only at night), no fog. Both sides with the front's normal (no two-sided
- * lighting), alpha blended (`gameGhostAlpha.x`: a vec4 written in place, nothing boxed per frame), no depth written.
+ * the original's Blinn-Phong, without specular: the sun's diffuse term and the sky's hemispheric
+ * one, at the look's light strengths unconverted and in its colours (game space), summed on the
+ * red, plus the emissive grey, clamped, then times the mesh's vertex colours where it has them
+ * (`GAME_GHOST_COLORS`: a model of the game's own parts keeps its colours under a red tint; a
+ * file's model without them is the plain red), then taken to linear (`pow(c, 2.2)`: the game's
+ * image processing runs after). No environment light, no lamps (the game's ghost had them only at
+ * night), no fog. Both sides with the front's normal (no two-sided lighting), alpha blended
+ * (`gameGhostAlpha.x`: a vec4 written in place, nothing boxed per frame), no depth written.
  *
  * Instanced as the game's draws are (`instancing.ts`: the matrix in game space, in `instance_line1..4`).
  *
@@ -123,9 +123,8 @@ fn fragmentMain(input: FragmentInput) -> FragmentOutput {
 };
 
 /**
- * The arrow on the tile the thing is used from (`placementGhost.ts`): Babylon's unlit
- * `StandardMaterial`, its emissive colour (`gameArrowColor`: linear, and its alpha), alpha blended.
- * Drawn with `GHOST_VS`.
+ * The arrow on the tile the thing is used from (`placementGhost.ts`): unlit, its emissive colour
+ * (`gameArrowColor`: linear, and its alpha), alpha blended. Drawn with `GHOST_VS`.
  */
 export const ARROW_PS: Record<Language, string> = {
   glsl: `

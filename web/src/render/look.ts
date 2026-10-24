@@ -32,7 +32,7 @@ export interface Look {
   contrast: number;
   /** Multiplies the time-of-day exposure. */
   exposure: number;
-  /** Colour grading (Babylon colour curves, -100..100). */
+  /** Colour grading (the colour curves' global saturation, -100..100). */
   saturation: number;
   /** Warm highlights / cool shadows split toning: hue (degrees) and density (0..100). */
   highlightsHue: number;

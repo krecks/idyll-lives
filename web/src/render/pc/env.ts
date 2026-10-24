@@ -1,9 +1,9 @@
 /**
- * The sky's image-based lighting on PlayCanvas: the `.pcenv` next to the manifest's
- * `environment.sky` (`cargo envconv` converts the Babylon `.env`, see `crates/tools/src/envconv.rs`):
- * six RGBE cube faces, already turned and mirrored into PlayCanvas's space (the world hangs under a
- * root mirrored in z, `space.ts`), and the sky's irradiance as PlayCanvas's nine ambient harmonics
- * (the polynomial Babylon lit its ambient with, re-expressed).
+ * The sky's image-based lighting on PlayCanvas: the manifest's `environment.sky`, a `.pcenv` that
+ * `cargo envconv` makes from the HDRI (see `crates/tools/src/envconv.rs`): six RGBE cube faces,
+ * already turned and mirrored into PlayCanvas's space (the world hangs under a root mirrored in z,
+ * `space.ts`), and the sky's irradiance as PlayCanvas's nine ambient harmonics (the ones the game's
+ * look was calibrated on, see envconv.rs).
  *
  * Built once per device: the faces become a lighting source and then PlayCanvas's environment atlas
  * (its own GGX prefiltering, on the GPU), which every scene of that device can share. The download
@@ -22,19 +22,14 @@ export interface SkyLighting {
 
 const MAGIC = 'IDLLENV1';
 
-/** The PlayCanvas copy of a Babylon `.env` (same folder, `.pcenv`); other URLs as they are. */
-export function pcenvUrl(url: string): string {
-  return url.replace(/\.env(?=$|[?#])/, '.pcenv');
-}
-
 const built = new WeakMap<pc.GraphicsDevice, Map<string, Promise<SkyLighting | null>>>();
 
 /**
- * The sky's lighting from `url` (a `.pcenv`, or the `.env` it was converted from) for `device`,
- * built on its first request; null when it can't be loaded (the scene is then lit without it).
+ * The sky's lighting from `url` (a `.pcenv`) for `device`, built on its first request; null when
+ * it can't be loaded (the scene is then lit without it).
  */
 export function skyLighting(device: pc.GraphicsDevice, url: string): Promise<SkyLighting | null> {
-  const file = new URL(pcenvUrl(url), location.href).href;
+  const file = new URL(url, location.href).href;
   let byUrl = built.get(device);
   if (!byUrl) built.set(device, (byUrl = new Map()));
   let job = byUrl.get(file);

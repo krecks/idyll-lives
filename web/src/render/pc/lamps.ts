@@ -1,6 +1,6 @@
 /**
- * The viewed house's interior lights on PlayCanvas (the port of the Babylon renderer's room lights:
- * `setupLights`, `placeRoomLights`, `markRoomLights`, `applyRoomLights`, the fades and `applyGlow`).
+ * The viewed house's interior lights on PlayCanvas: placing them, keeping them in their rooms,
+ * their fades and the glows.
  *
  * - The lights: the household's lamps first, then a dim fill from the ceiling of each room without
  *   one (`placeLights`, `shared/house.ts`). Clustered lights (PlayCanvas's clustered lighting, the
@@ -12,16 +12,16 @@
  *   lights instead (all of them points, so their shaders never change).
  * - Lamps light their own room (`shaders/roomLights.ts`): the rooms of the lot in view, a texel per
  *   tile on every storey shown (`markRooms`, `RoomLightState`); `?roomlights=0` turns it off to
- *   compare. With four lights (the low preset) they aren't kept in, as the Babylon renderer's
- *   forward lights weren't (`many`).
- * - Light units: Babylon's PBR lit `albedo / π · I / d²` (its physical falloff; a shade's cone as a
- *   spherical Gaussian), PlayCanvas `albedo · I · falloff`, with Babylon's falloff in the game's
- *   materials (`roomLights.ts`): the intensities are Babylon's / π (`LAMP_UNITS`). The falloff
- *   reaches zero at the light's range there (PlayCanvas's window, as Babylon's glTF falloff), where
- *   Babylon's clusters lit `1/d²` to the edge of the screen tiles round its range: the range is set
- *   twice as far (`REACH`), so a lamp lights its room as far as Babylon's did (within a few per
- *   cent, measured on the bench's night poses) and fades out beyond. Four lights end at their range,
- *   as Babylon's forward lights (glTF falloff) did.
+ *   compare. With four lights (the low preset) they aren't kept in (`many`): so few light the
+ *   house anyway.
+ * - Light units: in the look's units a lamp of strength `I` lights a surface to `albedo / π · I /
+ *   d²` (the physical falloff; a shade's cone as a spherical Gaussian), PlayCanvas to `albedo · I ·
+ *   falloff`, and the game's materials take the physical falloff (`roomLights.ts`): the look's
+ *   strengths / π (`LAMP_UNITS`, as `SUN_UNITS` in `lightUnits.ts`). The falloff reaches zero at the
+ *   light's range there (PlayCanvas's window), while the look was tuned with lamps lit `1/d²` to
+ *   well past their reach: the range is set twice as far (`REACH`), so a lamp lights its room as far
+ *   as it did when the look was tuned (within a few per cent, measured on the bench's night poses)
+ *   and fades out beyond. Four lights end at their range (the glTF falloff).
  * - Fades: a lamp switched off or on fades in a quarter of a second (`setLampsOff`); a room's fill
  *   goes out over a second or so as everyone in it falls asleep (or a windowless room empties), and
  *   its windows' glow with it, or with its lamps all switched off (`windowGlowOn`). In the basement
@@ -48,22 +48,22 @@ import type { ViewRect } from '../types';
 /** Interior lights without clustered lamps (the preset's `clusteredLamps` off), and with. */
 const ROOM_LIGHTS = 4;
 const CLUSTERED_LIGHTS = 32;
-/** Brightness of a lamp at night (times its content `intensity`), as Babylon's. */
+/** Brightness of a lamp at night (times its content `intensity`), in the look's units. */
 const LAMP_POWER = 7;
 /** A room without a lamp gets this share of the light it had before lamps gave light. */
 const FILL_POWER = 0.35;
 /**
- * Babylon's PBR lights `albedo / π` per unit of a point light's intensity at a metre (its diffuse
- * BRDF, with the physical `1/d²` falloff the game's materials take too), PlayCanvas `albedo`: the
- * Babylon renderer's lamp intensities / π.
+ * In the look's units a lamp of strength 1 lights a white surface a metre away to `1 / π` (a
+ * Lambert surface, with the physical `1/d²` falloff the game's materials take), PlayCanvas to 1:
+ * the look's lamp strengths / π (`lightUnits.ts`).
  */
 const LAMP_UNITS = 1 / Math.PI;
 /**
- * Furthest reach (m) of a light, as the Babylon renderer's lamp cluster binned them (the largest
- * bought lamp's range): room fills of big rooms reach no further.
+ * Furthest reach (m) of a light, the largest bought lamp's range: room fills of big rooms reach no
+ * further.
  */
 const LAMP_MAX_RANGE = 7;
-/** Range of a clustered light over its reach (see the file's header; forward lights: Babylon's glTF falloff ended at the range). */
+/** Range of a clustered light over its reach (see the file's header; forward lights end at the range). */
 const REACH = 2;
 /** A shade's cone (degrees from its direction): full along it, about a quarter at 45°, next to none side-on (`roomLights.ts`). */
 const SHADE_CONE = 90;
@@ -106,9 +106,9 @@ export class Lamps {
   /** Whether the lights are clustered (else forward lights: `?lights=forward` on WebGL2). */
   readonly clustered: boolean;
   /**
-   * Every lamp lights, each in its own room (the preset's `clusteredLamps`, the Babylon renderer's
-   * clustered lamps); else the four lights the biggest rooms get first light as Babylon's forward
-   * lights did, past their rooms' walls and to their range (a few lamps light the house anyway).
+   * Every lamp lights, each in its own room (the preset's `clusteredLamps`); else the four lights
+   * the biggest rooms get first light past their rooms' walls and to their range (a few lamps light
+   * the house anyway).
    */
   private readonly many: boolean;
   private readonly lib: MaterialLibrary;
@@ -180,7 +180,7 @@ export class Lamps {
         intensity: 0,
         range: 1,
         falloffMode: pc.LIGHTFALLOFF_INVERSESQUARED,
-        // (No inner cone: Babylon's physical cone, `roomLights.ts`; with four lights its glTF one.)
+        // (No inner cone: the physical cone, `roomLights.ts`; with four lights the glTF one.)
         innerConeAngle: this.many ? SHADE_CONE : 0,
         outerConeAngle: SHADE_CONE,
         castShadows: false,
@@ -462,7 +462,7 @@ function gamma(v: number): number {
   return Math.pow(Math.max(0, v), 1 / 2.2);
 }
 
-/** A hex colour (sRGB) in linear light, as Babylon's `toLinearSpace`. */
+/** A hex colour (sRGB) in linear light, `pow(c, 2.2)` as the materials decode colours. */
 function linearHex(hex: string): RGB {
   const v = parseInt(hex.slice(1), 16);
   const lin = (c: number) => Math.pow(c / 255, 2.2);

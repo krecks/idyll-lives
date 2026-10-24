@@ -443,10 +443,11 @@ export function alongWay(pl: Placement, ax: number, az: number, bx: number, bz: 
   }
 }
 
-// Babylon's matrix maths as the residents' code used it, number for number (the same float32 matrices, the same
-// order of operations): a placement carried by a ride (`Characters.riding`) and a bone's height at rest (`bindY`).
+// The ported matrix maths as the residents' code uses it, number for number (the same float32 matrices, the same
+// order of operations), so residents stand where they did up to 0.3.2: a placement carried by a ride
+// (`Characters.riding`) and a bone's height at rest (`bindY`).
 
-/** Babylon's `Matrix.ComposeToRef` of scale (`sx`, `sy`, `sz`), rotation (`qx` .. `qw`) and translation into `out`. */
+/** The original's `Matrix.ComposeToRef` of scale (`sx`, `sy`, `sz`), rotation (`qx` .. `qw`) and translation into `out`. */
 export function compose(sx: number, sy: number, sz: number, x: number, y: number, z: number, w: number, tx: number, ty: number, tz: number, out: Float32Array): void {
   const x2 = x + x;
   const y2 = y + y;
@@ -478,7 +479,7 @@ export function compose(sx: number, sy: number, sz: number, x: number, y: number
   out[15] = 1;
 }
 
-/** Babylon's `a.multiplyToRef(b, out)` (`a` applied first, then `b`; `out` may be `a` or `b`). */
+/** The original's `a.multiplyToRef(b, out)` (`a` applied first, then `b`; `out` may be `a` or `b`). */
 export function multiply(a: ArrayLike<number>, b: ArrayLike<number>, out: Float32Array): void {
   const a0 = a[0];
   const a1 = a[1];
@@ -530,7 +531,7 @@ export function multiply(a: ArrayLike<number>, b: ArrayLike<number>, out: Float3
   out[15] = a12 * b3 + a13 * b7 + a14 * b11 + a15 * b15;
 }
 
-/** Babylon's 4x4 cofactors of the first row (`determinant`, `InvertMatrixToArray`), into `COFACTORS`. */
+/** The 4x4 cofactors of the first row (the original's `determinant`, `InvertMatrixToArray`), into `COFACTORS`. */
 function cofactors(m: ArrayLike<number>): void {
   const m10 = m[4];
   const m11 = m[5];
@@ -557,7 +558,7 @@ function cofactors(m: ArrayLike<number>): void {
 }
 const COFACTORS = new Float64Array(4);
 
-/** The rotation of `m` (Babylon's `Matrix.decompose` with no scaling node: the scale taken out, `y` negated when mirrored) into `out`'s `qx` .. `qw`. */
+/** The rotation of `m` (the original's `Matrix.decompose` with no scaling node: the scale taken out, `y` negated when mirrored) into `out`'s `qx` .. `qw`. */
 export function rotationOf(m: Float32Array, out: { qx: number; qy: number; qz: number; qw: number }): void {
   let sx = Math.sqrt(m[0] * m[0] + m[1] * m[1] + m[2] * m[2]);
   let sy = Math.sqrt(m[4] * m[4] + m[5] * m[5] + m[6] * m[6]);
@@ -574,7 +575,7 @@ export function rotationOf(m: Float32Array, out: { qx: number; qy: number; qz: n
   sx = 1 / sx;
   sy = 1 / sy;
   sz = 1 / sz;
-  // (Through a float32 matrix, as Babylon's `MathTmp.Matrix[0]`.)
+  // (Through a float32 matrix, as the original's `MathTmp.Matrix[0]`.)
   const r = ROTATION;
   r[0] = m[0] * sx;
   r[1] = m[1] * sx;
@@ -585,7 +586,7 @@ export function rotationOf(m: Float32Array, out: { qx: number; qy: number; qz: n
   r[8] = m[8] * sz;
   r[9] = m[9] * sz;
   r[10] = m[10] * sz;
-  // Babylon's `Quaternion.FromRotationMatrixToRef`.
+  // The rotation matrix's quaternion (the original's `Quaternion.FromRotationMatrixToRef`).
   const m11 = r[0];
   const m12 = r[4];
   const m13 = r[8];
@@ -627,7 +628,7 @@ const ROTATION = new Float32Array(16);
 
 /**
  * The height of bone `b`'s joint at rest, from a body's inverse bind matrices (`m`, 16 floats a bone): the inverse's
- * translation y, as Babylon's `Matrix.FromArray(m, b * 16).invert().m[13]` (float32).
+ * translation y, as the original's `Matrix.FromArray(m, b * 16).invert().m[13]` (float32).
  */
 export function bindY(m: ArrayLike<number>, b: number): number {
   const o = b * 16;
@@ -635,13 +636,13 @@ export function bindY(m: ArrayLike<number>, b: number): number {
   for (let k = 0; k < 16; k++) a[k] = m[o + k];
   cofactors(a);
   const det = a[0] * COFACTORS[0] + a[1] * COFACTORS[1] + a[2] * COFACTORS[2] + a[3] * COFACTORS[3];
-  // (Not invertible: Babylon keeps the matrix as it was.)
+  // (Not invertible: the matrix is kept as it was, as the original's `invert` does.)
   if (det === 0) return a[13];
   return Math.fround(bindCofactor13(a) * (1 / det));
 }
 const BIND = new Float32Array(16);
 
-/** Babylon's `cofact_13` of `InvertMatrixToArray`: `+(m00 * det_21_32 - m01 * det_20_32 + m02 * det_20_31)`. */
+/** The original's `cofact_13` of `InvertMatrixToArray`: `+(m00 * det_21_32 - m01 * det_20_32 + m02 * det_20_31)`. */
 function bindCofactor13(m: ArrayLike<number>): number {
   const m20 = m[8];
   const m21 = m[9];

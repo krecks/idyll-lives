@@ -1,11 +1,10 @@
 /**
- * The town overview behind the menus (main menu, new-game steps) on PlayCanvas, ported from
- * the Babylon renderer (removed: see git history up to f15b839b): the whole neighbourhood at once, drawn with the game's own builders so it
- * looks like the game. Every house is a dressed shell (`HouseBuilder.silhouetteMeshes` through
- * `Street`: porches, chimneys, garages, cars, fences, flower beds; the player's house,
- * `WorldMeta.home`, dressed as the game builds it), with its models' far versions, plus the road,
- * garden paths and fields and every outdoor object (garden and park trees, benches, flower beds).
- * No interiors, no residents.
+ * The town overview behind the menus (main menu, new-game steps) on PlayCanvas: the whole
+ * neighbourhood at once, drawn with the game's own builders so it looks like the game. Every house
+ * is a dressed shell (`HouseBuilder.silhouetteMeshes` through `Street`: porches, chimneys, garages,
+ * cars, fences, flower beds; the player's house, `WorldMeta.home`, dressed as the game builds it),
+ * with its models' far versions, plus the road, garden paths and fields and every outdoor object
+ * (garden and park trees, benches, flower beds). No interiors, no residents.
  *
  * Also owns the overview's lot highlights: glowing outlines, a soft fill and a light wall round the
  * selected lot, an instance per plot whose colours are rewritten as they fade (`frame`).
@@ -41,19 +40,19 @@ const HIGHLIGHT_INSET = 0.55;
 const HIGHLIGHT_CORNER = 1.6;
 /** Per-plot highlight intensities ease towards their targets with this time constant (s). */
 const FADE = 0.12;
-/** How far (Babylon's `zOffset`: depth-buffer steps per slope) the highlights are drawn in front of what they lie on. */
+/** How far (depth-buffer steps per slope) the highlights are drawn in front of what they lie on. */
 const HIGHLIGHT_DEPTH_SLOPE = -6;
 
 /**
- * Room above 1 for the highlights' colours (the selected lot's blue is 1.25, and the strength goes to
- * 1.2): PlayCanvas clamps a vertex colour where it's read (`emissivePS`, `opacityPS`), Babylon took
- * them as they were. The material's emissive is this much stronger and the instance colours this
- * much weaker (linear), and an alpha over 1 goes into the colour (the glow is added by its alpha).
+ * Room above 1 for the highlights' colours (the selected lot's blue is 1.25, and the strength goes
+ * to 1.2): PlayCanvas clamps a vertex colour where it's read (`emissivePS`, `opacityPS`). The
+ * material's emissive is this much stronger and the instance colours this much weaker (linear), and
+ * an alpha over 1 goes into the colour (the glow is added by its alpha).
  */
 const GLOW_HEADROOM = 2;
 const HEADROOM_SRGB = 1 / Math.pow(GLOW_HEADROOM, 1 / 2.2);
 
-/** The highlights' colours (sRGB, as Babylon's standard material took them), outline, hover, selected and marked. */
+/** The highlights' colours (sRGB), outline, hover, selected and marked. */
 const COLORS: Record<'outline' | 'hover' | 'selected' | 'marked', RGB> = {
   outline: { r: 1, g: 0.97, b: 0.9 },
   hover: { r: 1, g: 0.98, b: 0.92 },
@@ -64,9 +63,9 @@ const COLORS: Record<'outline' | 'hover' | 'selected' | 'marked', RGB> = {
 const townLayers = new WeakMap<pc.AppBase, pc.Layer>();
 
 /**
- * The overview's layer (the Babylon renderer's town camera mask), right after the world layer in both
- * its opaque and blended halves; made once per app. No light is on it but the sun while the town is
- * shown (the lamps stay on the world layer).
+ * The overview's layer, right after the world layer in both its opaque and blended halves; made
+ * once per app. No light is on it but the sun while the town is shown (the lamps stay on the world
+ * layer).
  */
 export function townLayer(app: pc.AppBase): pc.Layer {
   let layer = townLayers.get(app);
@@ -150,7 +149,7 @@ export class TownOverview {
     mat.emissive.set(1, 1, 1);
     mat.emissiveIntensity = GLOW_HEADROOM;
     mat.emissiveVertexColor = true;
-    // (sRGB, linearised: the Babylon renderer's standard material's output was taken as sRGB.)
+    // (The colours are sRGB: linearised.)
     (mat as pc.StandardMaterial & { vertexColorGamma: boolean }).vertexColorGamma = true;
     mat.opacityVertexColor = true;
     mat.opacityVertexColorChannel = 'a';

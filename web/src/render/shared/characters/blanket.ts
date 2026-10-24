@@ -23,7 +23,7 @@ const DROP = 0.32;
 
 /** A quilt's mesh (`quiltGeometry`) and where its edges are. */
 export interface QuiltGeometry {
-  /** Vertices (x, y, z), its texture coordinates (u across, v metres from the top edge) and triangles (facing up, Babylon's winding: clockwise seen from above with +z towards the viewer's bottom); normals are the engine's to compute (smooth, from the triangles). */
+  /** Vertices (x, y, z), its texture coordinates (u across, v metres from the top edge) and triangles (facing up, the game's winding: clockwise seen from above with +z towards the viewer's bottom); normals are the engine's to compute (smooth, from the triangles). */
   positions: Float32Array;
   uvs: Float32Array;
   indices: number[];
@@ -161,7 +161,7 @@ export function quiltGeometry(lying: Float32Array, chestZ: number, feetZ: number
       const b = a + 1;
       const cc = a + W + 1;
       const d = a + W;
-      // Facing up (Babylon: clockwise seen from above with z towards the viewer's bottom).
+      // Facing up (the game's winding: clockwise seen from above with z towards the viewer's bottom).
       idx.push(a, d, cc, a, cc, b);
     }
   }
@@ -177,7 +177,7 @@ export const SHEET = 0.17;
 /** The cover's grey in the texture (sRGB byte): a quilt's tint is its bed's colour over it (`quiltTint`). */
 export const COVER = 0xe6;
 
-/** An sRGB hex colour channel (`#rrggbb`, from `at`) in linear light, as Babylon's `Color3.FromHexString(hex).toLinearSpace()`. */
+/** An sRGB hex colour channel (`#rrggbb`, from `at`) in linear light: the byte / 255, to the power 2.2 (the game's decoding). */
 function hexLinear(hex: string, at: number): number {
   return hex.substring(0, 1) !== '#' || hex.length !== 7 ? 0 : Math.pow(parseInt(hex.substring(at, at + 2), 16) / 255, 2.2);
 }

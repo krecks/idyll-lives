@@ -31,8 +31,7 @@ Downloaded 2026-10-07. Textures were resized and re-encoded (JPG). Fabric, wood,
 
 | File | Source asset | Authors | URL | Licence |
 |---|---|---|---|---|
-| `belfast_open_field.env` | Belfast Open Field (1k HDRI, prefiltered to a Babylon `.env`) | Dimitrios Savva, Jarod Guest | https://polyhaven.com/a/belfast_open_field | CC0 |
-| `belfast_open_field.pcenv` | The same, converted for PlayCanvas (`cargo envconv`) | Dimitrios Savva, Jarod Guest | https://polyhaven.com/a/belfast_open_field | CC0 |
+| `belfast_open_field.pcenv` | Belfast Open Field (1k HDRI), converted by `cargo envconv` | Dimitrios Savva, Jarod Guest | https://polyhaven.com/a/belfast_open_field | CC0 |
 
 ## Models
 

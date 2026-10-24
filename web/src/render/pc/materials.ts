@@ -1,16 +1,15 @@
 /**
- * Physically based materials and image-based lighting on PlayCanvas (ported from the Babylon
- * renderer's material library).
+ * Physically based materials and image-based lighting on PlayCanvas.
  *
  * - Lot surfaces (walls, floors, roads, terrain) and the "finishes" of primitive parts (fabric, wood,
  *   ceramic, metal, ...) are `StandardMaterial`s in the metalness workflow, built from manifest
  *   `material` entries: albedo, normal and packed AO/roughness/metal maps tiled in metres.
  * - Manifest colours are sRGB, as PlayCanvas takes them (it shades in linear space). Vertex and
  *   per-instance colours (primitive parts, Sim tints) are converted on the GPU (`shaders/surface.ts`).
- * - The environment (`.pcenv`, converted from the Babylon `.env` by `cargo envconv`, `env.ts`) lights
+ * - The environment (`.pcenv`, made from the sky's HDRI by `cargo envconv`, `env.ts`) lights
  *   everything with sky ambient (spherical harmonics) and reflections (the environment atlas); its
  *   intensity follows the time of day (`setEnvironmentIntensity`). The sky's hemispheric fill
- *   (`setSkyFill`) is the game's own term, Babylon's hemispheric light.
+ *   (`setSkyFill`) is the game's own term, a hemispheric light.
  *
  * - House surfaces can carry the cutaway (`cutaway`): walls drop to stubs in the vertex shader when
  *   the cutaway state says so (driven by a per-vertex attribute, see `shared/geometry.ts`), at no
@@ -24,8 +23,8 @@
  * The shader features are chunk overrides shared by every material (`shaders/chunks.ts`), switched
  * per material by defines. The state they read (the cutaway, the dug-out ground, the basements, the
  * sky's fill) is the library's, handed to the shaders as global uniforms before every frame: the
- * materials never need touching for it. Materials aren't frozen as Babylon's were; one is updated
- * (`material.update()`) only when something of its own changes.
+ * materials never need touching for it. A material is updated (`material.update()`) only when
+ * something of its own changes.
  */
 
 import * as pc from './engine';
@@ -63,11 +62,11 @@ export const SUN_LIGHT_BIT = 8;
 export const SUN_LIGHT_MASK = pc.MASK_AFFECT_DYNAMIC | SUN_LIGHT_BIT;
 
 /**
- * The front face of the game's meshes, for materials that cull: game-space meshes keep Babylon's
- * winding (counter-clockwise on screen, as drawn by Babylon), and the world root's mirror makes
- * PlayCanvas turn every material's front face round (`worldScaleSign`). Clockwise, turned round,
- * is the winding they have. (Materials adopted from glTF keep their own: the models decide, by how
- * they bake.)
+ * The front face of the game's meshes, for materials that cull: game-space meshes keep the game's
+ * winding (counter-clockwise on screen when the left-handed game space is drawn without a mirror),
+ * and the world root's mirror makes PlayCanvas turn every material's front face round
+ * (`worldScaleSign`). Clockwise, turned round, is the winding they have. (Materials adopted from
+ * glTF keep their own: the models decide, by how they bake.)
  */
 export const GAME_FRONT_FACE = pc.FRONTFACE_CW;
 
@@ -204,11 +203,11 @@ const ROOM_MASK_W = 256;
 const ROOM_MASK_H = 256 * 4;
 
 /**
- * Which room each tile of the lot in view is in, so lamps light only their own (ported from the
- * Babylon renderer's room lights; the test is in the clustered lights' loop, `shaders/roomLights.ts`):
- * `mask` has two bytes per tile (low, high) in its corner, `area` the lot (x0, z0 in metres, then w,
- * d in tiles), `band` its storeys (the lowest, how many, the storey height, and 1 while masking:
- * nothing is masked at 0). Uniforms only: masking costs no shader of its own.
+ * Which room each tile of the lot in view is in, so lamps light only their own (the test is in the
+ * clustered lights' loop, `shaders/roomLights.ts`): `mask` has two bytes per tile (low, high) in its
+ * corner, `area` the lot (x0, z0 in metres, then w, d in tiles), `band` its storeys (the lowest, how
+ * many, the storey height, and 1 while masking: nothing is masked at 0). Uniforms only: masking
+ * costs no shader of its own.
  */
 export class RoomLightState {
   /** Masking is on (every lamp lights, clustered: `lamps.ts`; the low preset's four don't keep to their rooms). */
@@ -276,7 +275,7 @@ export class RoomLightState {
 const LIGHT_CHANGE = 0.02;
 const LIGHT_CHANGE_MIN = 0.004;
 
-/** The sky's hemispheric fill comes from here (game space, as Babylon's `HemisphericLight`). */
+/** The sky's hemispheric fill comes from here (game space; the direction the look was tuned with). */
 const SKY_FILL_DIRECTION = { x: 0.2, y: 1, z: -0.3 };
 
 export interface SurfaceOptions {
@@ -593,8 +592,8 @@ export class MaterialLibrary {
   }
 
   /**
-   * The sky's hemispheric fill (Babylon's `HemisphericLight`): `sky` from above, `ground` from below,
-   * linear (the look's colours as Babylon used them), scaled by `intensity`.
+   * The sky's hemispheric fill (a hemispheric light): `sky` from above, `ground` from below, linear,
+   * scaled by `intensity`.
    */
   setSkyFill(sky: RGB, ground: RGB, intensity: number): void {
     const s = this.skySky;
@@ -615,7 +614,7 @@ export class MaterialLibrary {
   }
 
   /**
-   * Loads the sky's lighting (`url`: the manifest's `environment.sky`, whose `.pcenv` copy is read,
+   * Loads the sky's lighting (`url`: the manifest's `environment.sky`, a `.pcenv` read by
    * `env.ts`); resolves (without throwing) even when it fails, and at the latest after 15 s (the sky
    * still lights the scene once it's there).
    */
@@ -662,7 +661,7 @@ export class MaterialLibrary {
     mat.frontFace = GAME_FRONT_FACE;
     mat.useMetalness = true;
     mat.diffuse.fromString(entry.color);
-    // Babylon's tiling: uv · scale from the origin (PlayCanvas's tiling is from the top, `1 - scale` makes it the same).
+    // The manifest's tiling: uv · scale from the origin (PlayCanvas's tiling is from the top, `1 - scale` makes it the same).
     const scale = entry.uvScale ?? 1;
     const tiling = new pc.Vec2(scale, scale);
     const offset = new pc.Vec2(0, 1 - scale);
@@ -792,12 +791,12 @@ function standIn(device: pc.GraphicsDevice, kind: 'white' | 'normal' | 'arm'): p
  * A texture from the build's compressed copy (KTX2) when there is one, else from the file; a copy
  * that fails to load falls back to the file. Resolves to null when neither loads.
  *
- * Always in a linear (UNORM) format, colour maps too, as Babylon loaded the game's textures (its
- * `gammaSpace` textures, without sRGB buffers): a base or emissive colour map is then decoded where
- * the material reads it, `pow(c, 2.2)` (PlayCanvas does so for an 8-bit or block format that isn't
- * sRGB, `Texture.encoding`), and its mipmaps are averaged in gamma space (the GPU's, or the KTX2
- * file's), as Babylon's were. A hardware sRGB format decodes with the exact sRGB curve and
- * averages in linear light: 3–10 % brighter on the game's textured surfaces. Normal and packed
+ * Always in a linear (UNORM) format, colour maps too, as the look was tuned with them (gamma-space
+ * textures, without sRGB formats): a base or emissive colour map is then decoded where the material
+ * reads it, `pow(c, 2.2)` (PlayCanvas does so for an 8-bit or block format that isn't sRGB,
+ * `Texture.encoding`), and its mipmaps are averaged in gamma space (the GPU's, or the KTX2 file's).
+ * A hardware sRGB format decodes with the exact sRGB curve and averages in linear light: 3–10 %
+ * brighter on the game's textured surfaces. Normal and packed
  * maps are read as they are either way.
  */
 export function textureWithFallback(app: pc.AppBase, source: string, anisotropy?: number): Promise<pc.Texture | null> {

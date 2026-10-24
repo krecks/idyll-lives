@@ -4,8 +4,8 @@
 // Babylon.js: Copyright 2023 The Babylon.js team, under the Apache License 2.0; its licence and notice
 // are in crates/tools/texts/Babylon.js-LICENSE and Babylon.js-NOTICE, and in a build's THIRD-PARTY-LICENSES.txt.
 /**
- * Lamps light their own room, and the game's lamps fall off as Babylon's did (ported from the
- * Babylon renderer's room lights, M-lighting-08, and of Babylon's physical light falloff).
+ * Lamps light their own room (M-lighting-08), and the game's lamps fall off as they were tuned to,
+ * physically.
  *
  * Room lights. The lamps are clustered lights without shadows, so a lamp beside a wall would light
  * the room behind it. Every lit fragment knows its room, and every lamp its own, from a mask of the
@@ -21,16 +21,16 @@
  * run the clustered loop at all (the same patch's early return): the lamps never light them, and the
  * loop would only read the cluster for nothing.
  *
- * Falloff (per-material chunk overrides, `falloffInvSquaredPS` and `spotPS`): Babylon's PBR lit a
- * lamp's surface with `1/d²` (its physical falloff, the clusters' only one) and a shade's cone with a
- * spherical Gaussian (`computeDirectionalLightFalloff_Physical`: full along it, about a quarter 45°
- * off and next to none side-on, for a half-angle of 90°); its forward lights (four, on the low
- * preset) took the glTF falloff, the cone `saturate((cos - cos outer) / (cos inner - cos outer))²`.
- * PlayCanvas's own are `16/(d² + 1)` and a smoothstep across the cone. The game's materials
- * (`GAME_LOOK`) take Babylon's: the distance with PlayCanvas's window to zero at the light's range
- * (`getFalloffWindow`, as the glTF falloff had it; the many lamps' ranges are set past their reach
- * for it, `lamps.ts`), the physical cone for a light without an inner cone (its inner angle its
- * outer one) and the glTF cone for one with.
+ * Falloff (per-material chunk overrides, `falloffInvSquaredPS` and `spotPS`): the lamps were tuned
+ * with the physical falloff, `1/d²`, and a shade's cone as a spherical Gaussian (the original's
+ * `computeDirectionalLightFalloff_Physical`: full along it, about a quarter 45° off and next to
+ * none side-on, for a half-angle of 90°); the low preset's four lights with the glTF falloff, the
+ * cone `saturate((cos - cos outer) / (cos inner - cos outer))²`. PlayCanvas's own are `16/(d² + 1)`
+ * and a smoothstep across the cone. The game's materials (`GAME_LOOK`) take the tuned ones: the
+ * distance with PlayCanvas's window to zero at the light's range (`getFalloffWindow`, as the glTF
+ * falloff had it; the many lamps' ranges are set past their reach for it, `lamps.ts`), the physical
+ * cone for a light without an inner cone (its inner angle its outer one) and the glTF cone for one
+ * with.
  */
 
 import type { Language } from './chunks';
@@ -38,7 +38,7 @@ import type { Language } from './chunks';
 /** How far out along its normal a fragment is classed (m): off a wall's face, into the room it faces. */
 const OUT = '0.1';
 
-/** `-log2(1/100)`: Babylon's spot falloff, a hundredth of the light at the cone's edge. */
+/** `-log2(1/100)`: the physical spot falloff, a hundredth of the light at the cone's edge. */
 const CONE_EDGE = '6.64385618977';
 
 export const ROOM_LIGHT_CODE: Record<Language, { decl: string; skip: string; noLamps: string; falloff: string; spot: string }> = {

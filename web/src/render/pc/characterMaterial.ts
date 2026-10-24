@@ -1,8 +1,7 @@
 /**
- * The residents' materials on PlayCanvas (ported from the Babylon renderer's resident
- * material and the material half of its characters, removed: see git history up to f15b839b): standard materials without textures, every
- * colour the resident's own from its row of the pose texture and the part's per-vertex fields and
- * tone, skinned on the GPU from the same row (`shaders/character.ts`). The bed quilts' material too
+ * The residents' materials on PlayCanvas: standard materials without textures, every colour the
+ * resident's own from its row of the pose texture and the part's per-vertex fields and tone,
+ * skinned on the GPU from the same row (`shaders/character.ts`). The bed quilts' material too
  * (`blanketMaterial`, `shaders/blanket.ts`).
  *
  * PlayCanvas's own skinning and morphs aren't used: a skinned mesh instance can't be instanced, and
@@ -231,7 +230,7 @@ const srgb = (v: number): number => Math.pow(v, 1 / 2.2);
 
 /**
  * The material of `part` (of any body) for `app`, made the first time. Every resident's colours come
- * from its row; the material's own are Babylon's (white, the teeth's and tongue's).
+ * from its row; the material's own are white, the teeth's and the tongue's.
  */
 export function characterMaterial(app: pc.AppBase, part: string, options: CharacterMaterialOptions = {}): pc.StandardMaterial {
   const kind = surfaceOf(part);
@@ -253,7 +252,7 @@ export function characterMaterial(app: pc.AppBase, part: string, options: Charac
   mat.glossInvert = true;
   const rough: Record<CharacterSurface, number> = { body: 0.55, cloth: 0.85, hair: 0.5, brow: 0.6, lash: 0.6, mouth: 0.5, eye: 0.25 };
   mat.gloss = rough[kind];
-  // (Babylon's albedo colours, linear.)
+  // (The albedo colours, linear.)
   const albedo = part === 'teeth' ? [1, 0.96, 0.9] : part === 'tongue' ? [0.85, 0.8, 0.8] : kind === 'lash' ? [0.16, 0.12, 0.1] : [1, 1, 1];
   mat.diffuse.set(srgb(albedo[0]), srgb(albedo[1]), srgb(albedo[2]));
   if (kind === 'cloth' || kind === 'hair' || kind === 'brow' || kind === 'lash') {
@@ -262,7 +261,7 @@ export function characterMaterial(app: pc.AppBase, part: string, options: Charac
     mat.twoSidedLighting = true;
   }
   if (kind === 'mouth') {
-    // Warm, soft and hardly lit by the sky (the mouth hides most of it): Babylon's environment intensity.
+    // Warm, soft and hardly lit by the sky (the mouth hides most of it): the environment's light at 0.35.
     mat.reflectivity = 0.35;
     mat.ambient.set(srgb(0.35), srgb(0.35), srgb(0.35));
   }
@@ -306,11 +305,11 @@ function residentNormalCore(device: pc.GraphicsDevice, lang: Language): string {
 }
 
 /**
- * The quilts' material for `app` (Babylon's `blanketMaterial`): a soft quilted cover with a
- * turned-down white sheet band at the top, the cover grey so each copy takes its bed's colour over
- * it (`BLANKET_TINT`, `quiltTint`). `toeZ` and `footZ` (local z) are the stretch's range (`BLANKET_EXT`).
- * Its draws: position, normal and uv (u across, v metres from the top edge) per vertex, the matrix,
- * `BLANKET_EXT` and `BLANKET_TINT` per copy.
+ * The quilts' material for `app`: a soft quilted cover with a turned-down white sheet band at the
+ * top, the cover grey so each copy takes its bed's colour over it (`BLANKET_TINT`, `quiltTint`).
+ * `toeZ` and `footZ` (local z) are the stretch's range (`BLANKET_EXT`). Its draws: position, normal
+ * and uv (u across, v metres from the top edge) per vertex, the matrix, `BLANKET_EXT` and
+ * `BLANKET_TINT` per copy.
  */
 export function blanketMaterial(app: pc.AppBase, toeZ: number, footZ: number): pc.StandardMaterial {
   const device = app.graphicsDevice;
@@ -318,7 +317,7 @@ export function blanketMaterial(app: pc.AppBase, toeZ: number, footZ: number): p
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext('2d')!;
-  // Drawn as Babylon's (whose texture rows run bottom-up in v), turned over for PlayCanvas's (top-down).
+  // Drawn with v running bottom-up, turned over for PlayCanvas's textures (top-down).
   ctx.translate(0, size);
   ctx.scale(1, -1);
   // v (texture y) spans 2 m; the top `SHEET` is the sheet.
@@ -354,21 +353,22 @@ export function blanketMaterial(app: pc.AppBase, toeZ: number, footZ: number): p
   // (Linear bytes, decoded by the material as the game's colour maps are: `textureWithFallback`.)
   const tex = new pc.Texture(device, { name: 'simBlanket', width: size, height: size, format: pc.PIXELFORMAT_RGBA8, mipmaps: true, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE });
   tex.setSource(canvas);
-  // (Babylon's textures' default anisotropic filtering.)
+  // (Anisotropic filtering, 4×.)
   tex.anisotropy = 4;
 
   const mat = new pc.StandardMaterial();
   mat.name = 'simBlanket';
   mat.frontFace = GAME_FRONT_FACE;
   mat.diffuseMap = tex;
-  // Babylon's `vScale` 0.5 (v' = v · 0.5: PlayCanvas's tiling is from the top, `1 - tiling - offset`).
+  // Half the texture's height across a quilt (v' = v · 0.5: PlayCanvas's tiling is from the top,
+  // `1 - tiling - offset`).
   mat.diffuseMapTiling = new pc.Vec2(1 / BLANKET_WIDTH, 0.5);
   mat.diffuseMapOffset = new pc.Vec2(0, 0.5);
   mat.useMetalness = true;
   mat.metalness = 0;
   mat.glossInvert = true;
   mat.gloss = 0.88;
-  // Babylon's sheen: white at 0.45, as rough as the cloth.
+  // A sheen: white at 0.45, as rough as the cloth.
   mat.useSheen = true;
   mat.sheen.set(srgb(0.45), srgb(0.45), srgb(0.45));
   mat.sheenGloss = 1 - 0.88;

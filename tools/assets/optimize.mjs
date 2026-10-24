@@ -40,7 +40,7 @@ const SKIP = new Set([
  * Basis Universal ETC1S per kind of texture. Colour maps carry the sRGB transfer function, but the
  * renderer loads them in a linear format as it does the JPGs they replace, and its materials decode
  * them with `pow(c, 2.2)` (`textureWithFallback` in `web/src/render/pc/materials.ts`: the game's
- * colours as Babylon drew them, mipmaps averaged in gamma space); normal maps use the encoder's
+ * colours as they looked up to 0.3.2, mipmaps averaged in gamma space); normal maps use the encoder's
  * normal-map tuning; packed AO/roughness/metal data is linear.
  */
 const KTX2 = {

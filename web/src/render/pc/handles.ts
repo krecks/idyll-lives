@@ -1,16 +1,15 @@
 /**
  * Build and Buy mode's pointers: the hover tile (`HoverTile`) and the resize handles (`ResizeHandles`).
  *
- * Resize handles (ported from the Babylon renderer, removed: see git history up to f15b839b): blue arrows around the object picked in Buy
- * mode (or a window or door in Build mode), one per side it can grow towards and one pointing up
- * for its height. Arrows on the floor lie flat, arrows on a wall stand in its plane, the height
- * arrow turns to face the camera. They draw over everything (Babylon's rendering group 1: here
- * without the depth test, after every other blended draw) and keep about the same size on screen.
- * The game says where they go (`ResizeHandle`); picking them is by distance on screen.
+ * Resize handles: blue arrows around the object picked in Buy mode (or a window or door in Build
+ * mode), one per side it can grow towards and one pointing up for its height. Arrows on the floor
+ * lie flat, arrows on a wall stand in its plane, the height arrow turns to face the camera. They
+ * draw over everything (without the depth test, after every other blended draw) and keep about the
+ * same size on screen. The game says where they go (`ResizeHandle`); picking them is by distance on
+ * screen.
  *
- * In game space under the world root (`space.ts`), unlit, in Babylon's colours as its unlit
- * standard material showed them (the sRGB hex linearised before the image processing). No
- * allocations per frame or per `at`.
+ * In game space under the world root (`space.ts`), unlit, in their sRGB hex colours linearised
+ * before the image processing. No allocations per frame or per `at`.
  */
 
 import * as pc from './engine';
@@ -96,7 +95,7 @@ export class ResizeHandles {
       const p = a.at;
       const s = Math.min(2.6, Math.max(0.55, Math.hypot(eye.x - p.x, eye.y - p.y, eye.z - p.z) / REFERENCE));
       a.entity.setLocalScale(s, s, s);
-      // About the vertical, its face to the camera (Babylon's `BILLBOARDMODE_Y`).
+      // About the vertical, its face to the camera (a billboard turning about y only).
       if (a.facing) a.entity.setLocalEulerAngles(0, Math.atan2(eye.x - p.x, eye.z - p.z) * pc.math.RAD_TO_DEG, 0);
     }
   }
@@ -126,7 +125,7 @@ export class ResizeHandles {
     const draw = new pc.MeshInstance(mesh, this.material);
     drawAfter(draw, 127);
     entity.addComponent('render', { meshInstances: [draw], castShadows: false, receiveShadows: false });
-    // +x turned onto the direction (yaw clockwise from +x seen from above, as Babylon's y rotation).
+    // +x turned onto the direction (yaw clockwise from +x seen from above, a y rotation in game space).
     if (!up) entity.setLocalEulerAngles(0, Math.atan2(-h.dir[2], h.dir[0]) * pc.math.RAD_TO_DEG, 0);
     this.parent.addChild(entity);
     return { entity, draw, at: new pc.Vec3(), facing: up };
@@ -145,9 +144,8 @@ export class ResizeHandles {
 }
 
 /**
- * The tile under the pointer (Babylon's `cursor`): a flat square a little smaller than the tile, in
- * the accent colour, see-through. In lot rows under the storey layer, which lifts it to the storey
- * in view.
+ * The tile under the pointer: a flat square a little smaller than the tile, in the accent colour,
+ * see-through. In lot rows under the storey layer, which lifts it to the storey in view.
  */
 export class HoverTile {
   private readonly entity: pc.Entity;
@@ -190,7 +188,7 @@ export class HoverTile {
   }
 }
 
-/** An sRGB hex colour in linear light (what Babylon's unlit standard material passed on to the image processing). */
+/** An sRGB hex colour in linear light (what an unlit material passes on to the image processing). */
 function linearHex(hex: string): Float32Array {
   const v = parseInt(hex.slice(1), 16);
   return Float32Array.of(toLinear(((v >> 16) & 255) / 255), toLinear(((v >> 8) & 255) / 255), toLinear((v & 255) / 255));

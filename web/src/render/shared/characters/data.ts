@@ -4,9 +4,9 @@
  * morphs (see `MorphSet`) and the animation clips (made in code at load, `clips/`, unless the set
  * ships baked ones in `anims`).
  *
- * Space: Babylon's left-handed world, y up, characters face +z, their left is -x. Every rest local
+ * Space: the game's left-handed world, y up, characters face +z, their left is -x. Every rest local
  * rotation is the identity (optional `restQ` / `pre` / `post` default to it). Quaternions are
- * (x, y, z, w); matrices are column-major (Babylon's array layout).
+ * (x, y, z, w); matrices are column-major (the game's array layout, `shared/math.ts`).
  */
 
 import { withBuild } from '../../../assets/build';
@@ -17,7 +17,7 @@ export interface MeshPart {
   positions: Float32Array;
   normals: Float32Array;
   indices: Uint16Array;
-  /** Bone indices / weights (4 per vertex) as floats, as Babylon's skinning attributes expect. */
+  /** Bone indices / weights (4 per vertex) as floats (the resident material packs the indices into bytes). */
   joints: Float32Array;
   weights: Float32Array;
   /**

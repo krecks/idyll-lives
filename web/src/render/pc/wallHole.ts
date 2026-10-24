@@ -1,9 +1,9 @@
 /**
- * The wall hole (Babylon's `holeFor` and `swapBuilt`): while Build mode's preview of walls, doors
- * and windows stands in for a stretch of wall that is already built, that stretch of the built
- * walls isn't drawn, so the preview shows in its place. The cutaway shader drops the fragments of
- * every `cutaway` material near the segment (`WallCutState.hole`, `shaders/cutaway.ts`), in render
- * space: game space with an upper storey's rows over the ground's.
+ * The wall hole: while Build mode's preview of walls, doors and windows stands in for a stretch of
+ * wall that is already built, that stretch of the built walls isn't drawn, so the preview shows in
+ * its place. The cutaway shader drops the fragments of every `cutaway` material near the segment
+ * (`WallCutState.hole`, `shaders/cutaway.ts`), in render space: game space with an upper storey's
+ * rows over the ground's.
  */
 
 import type { WallCutState } from './materials';

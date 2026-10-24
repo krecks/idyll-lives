@@ -1,10 +1,10 @@
 /**
- * The landscape round the town on PlayCanvas (ported from the Babylon renderer, removed: see git history up to f15b839b): terrain with
- * rolling hills, the sea or a lake, the country roads (drawn by whoever is handed them, `buildRoads`),
- * forests, lawn details, and the sky dome with its band of clouds. Everything is static and
- * instanced (`instancing.ts`: a draw call per model type, and in the game per area: the groups of
- * `shared/nature.ts`), generated deterministically from the town's seed by the engine-neutral
- * layout (`LandscapeLayout`), so both renderers grow the same plants in the same places.
+ * The landscape round the town on PlayCanvas: terrain with rolling hills, the sea or a lake, the
+ * country roads (drawn by whoever is handed them, `buildRoads`), forests, lawn details, and the sky
+ * dome with its band of clouds. Everything is static and instanced (`instancing.ts`: a draw call
+ * per model type, and in the game per area: the groups of `shared/nature.ts`), generated
+ * deterministically from the town's seed by the engine-neutral layout (`LandscapeLayout`), so a
+ * town always grows the same plants in the same places.
  *
  * Trees, bushes, hedges, lawn tufts and the garden catalog's plants are Blender-built files
  * (tools/art/blender/families/plants.py, trees.py): crowns on the leafy `foliage` finish over `bark`
@@ -138,13 +138,13 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     hideLawn(this.lawn, this.lawnMask, uploadLawn);
   }
 
-  /** The ground: Babylon's `CreateGround` grid over the landscape's square, lifted to the land and coloured. */
+  /** The ground: a regular grid over the landscape's square, lifted to the land and coloured. */
   private async terrain(app: pc.AppBase, parent: pc.Entity, pace?: () => Promise<void>): Promise<pc.Entity> {
     const { size, segments } = this.terrainGrid();
     const n = segments + 1;
     const positions = new Float32Array(n * n * 3);
     const uvs = new Float32Array(n * n * 2);
-    // (Rows from the far edge, as Babylon's ground builder lays them, moved to the town's middle.)
+    // (Rows from the far edge, moved to the town's middle.)
     for (let row = 0, v = 0; row <= segments; row++) {
       for (let col = 0; col <= segments; col++, v++) {
         positions[v * 3] = (col * size) / segments - size / 2 + this.w / 2;
@@ -187,7 +187,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     const at = this.waterSheet();
     const h = at.size / 2;
     const mesh = new pc.Mesh(app.graphicsDevice);
-    // (Wound as Babylon's ground: its front up.)
+    // (Wound as the ground: its front up.)
     mesh.setPositions([at.x - h, at.y, at.z + h, at.x + h, at.y, at.z + h, at.x - h, at.y, at.z - h, at.x + h, at.y, at.z - h]);
     mesh.setNormals([0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0]);
     mesh.setUvs(0, [0, 1, 1, 1, 0, 0, 1, 0]);
@@ -392,16 +392,15 @@ const f = (n: number) => (Number.isInteger(n) ? n.toFixed(1) : String(n));
  * The wind (the port of `NatureWindPlugin`), on parts on the `bark` and `foliage` finishes: a slow
  * height-weighted bend with gusts plus leaf flutter, phased per instance by where it stands (its
  * matrix's translation; an instance's scale and turn are taken out of the flutter and the bend's
- * direction, as Babylon's thin instances did), and, on foliage, a small per-instance colour
+ * direction), and, on foliage, a small per-instance colour
  * variation so repeated trees don't look stamped. Short plants hardly move. The vertex's local
- * position (`vsLocal`), so the shadow pass could take it too; it doesn't, as Babylon's shadow
- * shader had no plugins (trees cast still: the sun's map is drawn again only when something in it
- * changes, `sunShadows.ts`).
+ * position (`vsLocal`), so the shadow pass could take it too; it doesn't: trees cast still shadows
+ * (the sun's map is drawn again only when something in it changes, `sunShadows.ts`).
  *
  * - `GAME_WIND`: `game_wind` (global: time, strength, direction x, z), `game_windKind` (the
  *   material's: `WIND_KIND`), `game_windFlutter` (1, and 0 on a draw of a part grown from nothing,
  *   `windStill`: flat at rest, it stays hidden).
- * - `GAME_WIND_TINT`: the foliage's tint, on its vertex colour (sRGB in Babylon's, so here its 2.2 power on the converted one).
+ * - `GAME_WIND_TINT`: the foliage's tint, on its vertex colour (an sRGB factor, so here its 2.2 power on the linear colour).
  *
  * No instance stream of its own: it reads only the instance's matrix (`instance_line1..4`).
  */
@@ -466,7 +465,7 @@ function windCode(lang: 'glsl' | 'wgsl'): ShaderFeature['glsl'] {
   return { vsDecl, vsLocal: local, vsEnd: end };
 }
 
-/** The plants' wind and tint (see `windCode`), at the Babylon plugin's priority. */
+/** The plants' wind and tint (see `windCode`), at its place among the shader features (`chunks.ts`: lower runs first). */
 export const NATURE_WIND: ShaderFeature = { name: 'natureWind', priority: 230, glsl: windCode('glsl'), wgsl: windCode('wgsl') };
 
 // (Before any device's chunks are built: they're built with every feature registered, once per device.)
@@ -531,17 +530,17 @@ export function windSway(app: pc.AppBase, px: number, pz: number): number {
 
 // ---- Sky ------------------------------------------------------------------------------
 
-/** The dome's sphere: Babylon's `CreateSphere` of 32 segments. */
+/** The dome's sphere: 32 segments (`sphereData`). */
 const SKY_SEGMENTS = 32;
 
 /**
  * Gradient sky dome with a glow around the sun (colours follow the time of day via vertex
- * colours) and a band of drifting clouds (`image.clouds`). Both follow the camera (`follow`), as
- * Babylon's `infiniteDistance` did, unlit and out of the fog.
+ * colours) and a band of drifting clouds (`image.clouds`). Both follow the camera (`follow`), so
+ * they are always as far away, unlit and out of the fog.
  *
- * Colours as Babylon's standard material drew them: its output, taken for gamma, is linearised
- * before the image processing, so the dome's linear vertex colours are linearised once more here,
- * and the clouds' emissive colour is handed over as an sRGB one (PlayCanvas linearises it).
+ * Colours as the look was tuned with: the sky's colour is taken for gamma and linearised before the
+ * image processing, so the dome's linear vertex colours are linearised once more here, and the
+ * clouds' emissive colour is handed over as an sRGB one (PlayCanvas linearises it).
  */
 export class Sky {
   readonly dome: pc.Entity;
@@ -582,8 +581,8 @@ export class Sky {
     parent.addChild(this.dome);
 
     if (cloudsUrl) {
-      // A slightly tapered open cylinder spanning ~3..32 degrees above the horizon: Babylon's
-      // `CreateCylinder` of 48 sides, both faces (its `DOUBLESIDE`: each drawn twice, uncull'd).
+      // A slightly tapered open cylinder spanning ~3..32 degrees above the horizon: 48 sides, its
+      // faces doubled (each drawn twice, uncull'd, so the clouds blend in twice).
       const r = radius * 0.94;
       const [bottom, top, height, sides] = [r, r * 0.85, r * 0.55, 48];
       const p: number[] = [];
@@ -593,7 +592,7 @@ export class Sky {
         for (let j = 0; j <= sides; j++) {
           const a = (j * Math.PI * 2) / sides;
           p.push(Math.cos(-a) * rr, -height / 2 + i * height + r * 0.31, Math.sin(-a) * rr);
-          // (`uScale` 2 baked in; Babylon's v up the band, PlayCanvas's from the image's top.)
+          // (`uScale` 2 baked in; the band's v runs up it, PlayCanvas's from the image's top.)
           uv.push((j / sides) * 2, 1 - i);
         }
       }
@@ -637,7 +636,7 @@ export class Sky {
     }
   }
 
-  /** Puts the sky round the camera (game space: its eye), as Babylon's `infiniteDistance`. */
+  /** Puts the sky round the camera (game space: its eye), so it never comes nearer. */
   follow(x: number, y: number, z: number): void {
     this.dome.setLocalPosition(x, y, z);
   }
@@ -646,7 +645,7 @@ export class Sky {
   drift(dt: number): void {
     if (!this.band) return;
     this.spin += dt * 0.000004;
-    // (Babylon's turn about y, in game space: degrees, the world root's mirror taken by the parent.)
+    // (A turn about y in game space: degrees, the world root's mirror taken by the parent.)
     this.band.setLocalEulerAngles(0, (this.spin * 180) / Math.PI, 0);
   }
 
@@ -675,7 +674,7 @@ export class Sky {
       glow.r = l.sunColor.r * g;
       glow.g = l.sunColor.g * g;
       glow.b = l.sunColor.b * g;
-      // Babylon's linear colour, linearised again as its standard material's output was (see the class).
+      // The linear colour, linearised again (see the class).
       this.colors[i * 4] = toLinear(toLinear(tmp.r + glow.r));
       this.colors[i * 4 + 1] = toLinear(toLinear(tmp.g + glow.g));
       this.colors[i * 4 + 2] = toLinear(toLinear(tmp.b + glow.b));

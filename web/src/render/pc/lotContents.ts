@@ -1,10 +1,9 @@
 /**
  * What grows and stands on the lot, for the PlayCanvas renderer (`PlayCanvasRenderer.ts` calls it
- * from `setWorld`, `clear`, `update` and the rest, in the Babylon renderer's order): the landscape
- * round the town and the sky (`nature.ts`), the placed objects with their moving parts
- * (`objectMotion.ts`), contact shadows and glows, the chairs pulled up to tables (`tableTuck.ts`),
- * and the food and dishes (`items.ts`). The house, fences, roads, street and garden pools are the
- * renderer's (`house.ts` and the rest).
+ * from `setWorld`, `clear`, `update` and the rest): the landscape round the town and the sky
+ * (`nature.ts`), the placed objects with their moving parts (`objectMotion.ts`), contact shadows
+ * and glows, the chairs pulled up to tables (`tableTuck.ts`), and the food and dishes (`items.ts`).
+ * The house, fences, roads, street and garden pools are the renderer's (`house.ts` and the rest).
  *
  * - Landscapes are kept by town (`Landscape.key`) and shared by the game world and the menus'
  *   overview when they show the same town (`useNature`; the overview asks for its layer with
@@ -366,7 +365,7 @@ export class LotContents {
    * the full model, where a far version did), in slices between frames and unseen, and swaps them
    * in: the rest of the landscape stays as it is, and what they replace is drawn until then and
    * destroyed after. No world is built again for it. (PlayCanvas compiles a shader as it's first
-   * drawn: the new draws come in a frame later than Babylon's waited for theirs.)
+   * drawn: nothing waits for the new draws' shaders before they are swapped in.)
    */
   private async rebuildNature(set: NatureSet, url: string, gone: () => boolean): Promise<void> {
     try {
@@ -562,7 +561,7 @@ export class LotContents {
    * Builds the objects of `world` on the storeys up to the one in view (each lifted to its storey,
    * from its lot rows; from the ground up, stairs down to the basement show in their stairwell too),
    * their contact shadows, the moving parts' clips, the tables the seats face; then switches off
-   * the templates no longer used. After the lot (the house) and the street, as the Babylon renderer.
+   * the templates no longer used. After the lot (the house) and the street.
    */
   async buildObjects(world: WorldStructure): Promise<void> {
     const v = this.view;
@@ -1130,11 +1129,11 @@ export function contactBlob(app: pc.AppBase): { mesh: pc.Mesh; material: pc.Stan
   material.opacityMapChannel = 'a';
   material.blendType = pc.BLEND_NORMAL;
   material.depthWrite = false;
-  // (Babylon's `zOffset` -3.)
+  // (Its depth pulled towards the camera, off the floor it lies on.)
   material.slopeDepthBias = -3;
   material.cull = pc.CULLFACE_NONE;
   material.update();
-  // Babylon's 1 m ground: a square on the floor, its UVs as Babylon's ground builder has them.
+  // A 1 m square on the floor, u along +x and v along +z.
   const mesh = new pc.Mesh(device);
   mesh.setPositions([-0.5, 0, 0.5, 0.5, 0, 0.5, -0.5, 0, -0.5, 0.5, 0, -0.5]);
   mesh.setNormals([0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0]);

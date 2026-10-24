@@ -1,19 +1,18 @@
 /**
- * The soft look on PlayCanvas (ported from the Babylon renderer's): PBR's light, drawn as a wide,
- * soft ramp in the light's own colour. The light that falls on the surface (the sun and the lamps,
- * with their cast shadows, and the sky's hemispheric fill) keeps its amount and colour but is
- * redrawn as a wide ramp; the environment around it (the sky's ambient, with its occlusion, and
- * the reflections) stays at a fraction, so shadows stay cool and readable instead of dark. A soft
- * rim, a little more saturation and no outlines finish it. Metals are shaded in their base colour;
- * unlit materials keep their own look.
+ * The soft look on PlayCanvas: PBR's light, drawn as a wide, soft ramp in the light's own colour.
+ * The light that falls on the surface (the sun and the lamps, with their cast shadows, and the
+ * sky's hemispheric fill) keeps its amount and colour but is redrawn as a wide ramp; the
+ * environment around it (the sky's ambient, with its occlusion, and the reflections) stays at a
+ * fraction, so shadows stay cool and readable instead of dark. A soft rim, a little more saturation
+ * and no outlines finish it. Metals are shaded in their base colour; unlit materials keep their own
+ * look.
  *
  * Where it sits: an engine patch (`chunks.ts`) moves the ambient PlayCanvas adds out of the direct
- * light (`gameAmbient`) and adds the sky's fill as direct light (`gameHemi`, Babylon's
- * hemispheric light: `mix(ground, sky, n·dir * 0.5 + 0.5)`). `combineColor` then has both apart:
- * the classic look adds them back (PBR, as Babylon drew it), the soft look (`GAME_SOFT`) ramps the
- * direct part. It replaces the colour before the emission, fog and tone mapping, so those still
- * apply, as in Babylon (where the plugin ran before fog and image processing, after the other
- * plugins: cutaway, basements, plain finishes).
+ * light (`gameAmbient`) and adds the sky's fill as direct light (`gameHemi`, a hemispheric light:
+ * `mix(ground, sky, n·dir * 0.5 + 0.5)`). `combineColor` then has both apart: the classic look adds
+ * them back (plain PBR), the soft look (`GAME_SOFT`) ramps the direct part. It replaces the colour
+ * before the emission, fog and tone mapping, so those still apply; among the features it comes
+ * after the others (cutaway, basements, plain finishes).
  *
  * It is the game's look (Settings, Performance, Shading: Soft). `classic` draws the PBR shading it
  * replaced, and switching is live: `MaterialLibrary.setShading` sets every lit material's define
@@ -28,10 +27,10 @@ import { SPECULAR_UNITS } from '../lightUnits';
 const LUM = { glsl: 'vec3(0.2126, 0.7152, 0.0722)', wgsl: 'vec3f(0.2126, 0.7152, 0.0722)' };
 
 /**
- * Babylon's PBR diffuse colour for a dielectric: the base colour less its reflectance at normal
- * incidence (F0 0.04: `surfaceAlbedo = base * (1 - F0) * (1 - metallic)`, its reflectivity block),
- * which PlayCanvas doesn't take off. The soft look and the diag view see the base colour as
- * Babylon's did: that, plus the metal's own colour.
+ * The diffuse colour of a dielectric as the look was tuned with (up to 0.3.2): the base colour less
+ * its reflectance at normal incidence (F0 0.04:
+ * `surfaceAlbedo = base * (1 - F0) * (1 - metallic)`), which PlayCanvas doesn't take off. The soft
+ * look and the diag view see the base colour so: that, plus the metal's own colour.
  */
 export const DIELECTRIC = '0.96';
 
@@ -71,17 +70,17 @@ export const SOFT_LOOK: ShaderFeature = {
 #endif`,
     combine: `
 #ifdef GAME_LOOK
-	// Babylon occluded the light falling on a surface by its AO map as well as the sky's (an ARM
-	// map's red, with no ambient texture: \`ambientOcclusionForDirectDiffuse\`); PlayCanvas only the sky's.
+	// The AO map occludes the light falling on a surface as well as the sky's (an ARM map's red,
+	// with no ambient texture), as the look was tuned; PlayCanvas occludes only the sky's.
 	#ifdef STD_AO
 		dDiffuseLight *= litArgs_ao;
 	#endif
-	// The lights' highlights at Babylon's strength: PlayCanvas's light is Babylon's / π (its Lambert
-	// has no 1 / π), but its GGX has Babylon's 1 / π (\`lightUnits.ts\` \`SPECULAR_UNITS\`).
+	// The lights' highlights at the look's strength: PlayCanvas's light is the look's / π (its Lambert
+	// has no 1 / π, \`lightUnits.ts\` \`SUN_UNITS\`), but its GGX keeps the 1 / π (\`SPECULAR_UNITS\`).
 	#ifdef LIT_SPECULAR
 		dSpecularLight *= ${SPECULAR_UNITS};
 	#endif
-	// Babylon's diffuse colour: the base colour less what its dielectric reflects (DIELECTRIC).
+	// The look's diffuse colour: the base colour less what its dielectric reflects (DIELECTRIC).
 	vec3 gameAlbedo = albedo * ${DIELECTRIC};
 	vec3 gameDirect = gameAlbedo * dDiffuseLight;
 	#ifdef GAME_UNDERGROUND
@@ -133,11 +132,11 @@ export const SOFT_LOOK: ShaderFeature = {
 #endif`,
     combine: `
 #ifdef GAME_LOOK
-	// See the GLSL: the AO map occludes the direct light too, as Babylon's did.
+	// See the GLSL: the AO map occludes the direct light too.
 	#ifdef STD_AO
 		dDiffuseLight = dDiffuseLight * litArgs_ao;
 	#endif
-	// The lights' highlights at Babylon's strength (see the GLSL).
+	// The lights' highlights at the look's strength (see the GLSL).
 	#ifdef LIT_SPECULAR
 		dSpecularLight = dSpecularLight * ${SPECULAR_UNITS};
 	#endif

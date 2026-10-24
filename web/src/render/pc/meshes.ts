@@ -32,7 +32,7 @@ export interface DrawOptions {
   receiveShadows?: boolean;
   /** Layer ids (default: the world layer). */
   layers?: number[];
-  /** Drawn after the other blended draws of a lower index (Babylon's `alphaIndex`; see `drawAfter`). */
+  /** Drawn after the other blended draws of a lower index (see `drawAfter`). */
   alphaIndex?: number;
 }
 
@@ -52,9 +52,9 @@ export function drawMesh(parent: pc.Entity, name: string, mesh: pc.Mesh, materia
 }
 
 /**
- * Babylon's `alphaIndex` on a PlayCanvas draw: blended draws go back to front within their draw
- * bucket, and a higher bucket goes first (`Layer._calculateSortDistances`), so a draw with a higher
- * index is put in a lower bucket.
+ * An alpha index on a PlayCanvas draw (drawn after the blended draws of a lower index): blended
+ * draws go back to front within their draw bucket, and a higher bucket goes first
+ * (`Layer._calculateSortDistances`), so a draw with a higher index is put in a lower bucket.
  */
 export function drawAfter(mi: pc.MeshInstance, alphaIndex: number): void {
   mi.drawBucket = 127 - alphaIndex;

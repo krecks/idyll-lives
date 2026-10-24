@@ -1,9 +1,9 @@
 /**
- * The neighbourhood around the viewed lot on PlayCanvas (ported from the Babylon renderer, removed: see git history up to f15b839b): the
- * street as `shared/street.ts` lays it out (`planStreet`: the neighbours' houses, sidewalks,
- * streetlights and their pools of light, kerbside furniture, cars, fences and hedges, gardens,
- * public places' things), drawn as a handful of meshes (one per material) and instanced models
- * (`model.street.*`, the foliage, the town's things: one draw per model mesh, `instancing.ts`).
+ * The neighbourhood around the viewed lot on PlayCanvas: the street as `shared/street.ts` lays it
+ * out (`planStreet`: the neighbours' houses, sidewalks, streetlights and their pools of light,
+ * kerbside furniture, cars, fences and hedges, gardens, public places' things), drawn as a handful
+ * of meshes (one per material) and instanced models (`model.street.*`, the foliage, the town's
+ * things: one draw per model mesh, `instancing.ts`).
  *
  * Static: built once per town layout round the viewed lot (`streetKey`) and kept across structure
  * versions; the models are kept (hidden) between builds in the street's own template cache. The
@@ -119,8 +119,8 @@ export class Street {
     this.root = new pc.Entity('street');
     parent.addChild(this.root);
     // Streetlights' glass: unlit, its colour by the time of day (`setNight`). (Its colours, and the
-    // pools' and the lenses' strengths, are sRGB as PlayCanvas takes them: the Babylon renderer's
-    // were too, a standard material's output there being taken as sRGB and linearised; clamped to 1.)
+    // pools' and the lenses' strengths, are sRGB as PlayCanvas takes them, as they were tuned;
+    // clamped to 1.)
     const glow = (this.glowMat = new pc.StandardMaterial());
     glow.name = 'streetLampGlass';
     glow.frontFace = GAME_FRONT_FACE;

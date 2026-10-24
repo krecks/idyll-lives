@@ -242,8 +242,8 @@ pub fn check(out: &Path) -> bool {
             {
                 fail(format!("{fam}:{name} has {tris} triangles (budget {bg})"));
             }
-            // The game's front faces are clockwise (Babylon's convention, kept under PlayCanvas's mirrored
-            // root): cross(b - a, c - a) points against the normals.
+            // The game's front faces are clockwise in its left-handed space (kept under PlayCanvas's
+            // mirrored root): cross(b - a, c - a) points against the normals.
             let nrm = i16s(&buf, e.at("normals").usize(), n * 4);
             let pt = |i: u16| -> [f32; 3] { [pos[3 * i as usize], pos[3 * i as usize + 1], pos[3 * i as usize + 2]] };
             let nv = |i: u16| -> [f64; 3] { [nrm[4 * i as usize] as f64, nrm[4 * i as usize + 1] as f64, nrm[4 * i as usize + 2] as f64] };

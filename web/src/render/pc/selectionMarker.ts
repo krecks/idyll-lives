@@ -1,11 +1,10 @@
 /**
- * The selection marker over the selected resident, as the Babylon renderer drew it (`setupMarker`,
- * `writeMarker`): `model.marker`, a small soft four-point sparkle star, unlit, its faces shaded by
- * vertex colours (a hot core, deeper towards the ray tips), with a thin deeper-toned outline (its
- * back faces pushed out along their normals: an inverted hull) and a faint additive glow disc
- * behind it. All three face the camera, float clear of the head with a slow bob and a breathing
- * pulse (none with reduced motion), grow a little with the camera's distance, and take the
- * resident's mood colour (`LOOK.marker`, by `EMOTION_MOOD`).
+ * The selection marker over the selected resident: `model.marker`, a small soft four-point sparkle
+ * star, unlit, its faces shaded by vertex colours (a hot core, deeper towards the ray tips), with a
+ * thin deeper-toned outline (its back faces pushed out along their normals: an inverted hull) and a
+ * faint additive glow disc behind it. All three face the camera, float clear of the head with a
+ * slow bob and a breathing pulse (none with reduced motion), grow a little with the camera's
+ * distance, and take the resident's mood colour (`LOOK.marker`, by `EMOTION_MOOD`).
  *
  * One copy each, drawn instanced from a matrix (game space, under the world root); the colour is a
  * per-draw `material_emissive` (linear), so nothing is uploaded but the three matrices. Without its
@@ -104,12 +103,12 @@ export class SelectionMarker {
     h.emissive.set(1, 1, 1);
     h.opacityMap = this.haloTexture;
     h.opacityMapChannel = 'a';
-    // (Babylon's `ALPHA_ADD`: the colour times its alpha, added.)
+    // (The colour times its alpha, added.)
     h.blendType = pc.BLEND_ADDITIVEALPHA;
     h.depthWrite = false;
     h.cull = pc.CULLFACE_NONE;
     h.update();
-    // Babylon's 1 m plane (in x and y, facing -z).
+    // A 1 m plane (in x and y, facing -z).
     const plane = new pc.Mesh(this.device);
     plane.setPositions([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0]);
     plane.setNormals([0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1]);

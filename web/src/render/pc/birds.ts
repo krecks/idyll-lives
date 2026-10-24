@@ -1,16 +1,16 @@
 /**
- * Garden birds on PlayCanvas (ported from the Babylon renderer, removed: see git history up to f15b839b): the engine-neutral birds
- * (`shared/birds.ts`: who lives where, how they perch, fly, forage, sing and sleep, and every matrix
- * drawn) as instanced draws (`instancing.ts`), one per mesh of each species' model, its matrices in
- * game space under the world root; only the parts written in a frame go up. They receive the sun's
- * shadows and cast none, and aren't culled (they're spread over the lot), as on Babylon.
+ * Garden birds on PlayCanvas: the engine-neutral birds (`shared/birds.ts`: who lives where, how
+ * they perch, fly, forage, sing and sleep, and every matrix drawn) as instanced draws
+ * (`instancing.ts`), one per mesh of each species' model, its matrices in game space under the
+ * world root; only the parts written in a frame go up. They receive the sun's shadows and cast
+ * none, and aren't culled (they're spread over the lot).
  *
- * `GameBirds` is the renderer's side of them, as Babylon's renderer had it: where they live once the
- * lot is built (the viewed lot's garden dressing, the garden things outdoors, the street's plants,
- * the woods nearby, the viewed house's roof ridge), what they're told each frame (the game's clock
- * and speed, the hour, the camera, the residents' heads, reduce motion, the roof), hidden with the
- * garden while the basement is in view and in the town overview, and what the world's sound hears of
- * them. Nothing is allocated per frame.
+ * `GameBirds` is the renderer's side of them: where they live once the lot is built (the viewed
+ * lot's garden dressing, the garden things outdoors, the street's plants, the woods nearby, the
+ * viewed house's roof ridge), what they're told each frame (the game's clock and speed, the hour,
+ * the camera, the residents' heads, reduce motion, the roof), hidden with the garden while the
+ * basement is in view and in the town overview, and what the world's sound hears of them. Nothing
+ * is allocated per frame.
  */
 
 import type * as pc from './engine';

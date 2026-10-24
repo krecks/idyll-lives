@@ -4,7 +4,7 @@
 // Babylon.js: Copyright 2023 The Babylon.js team, under the Apache License 2.0; its licence and notice
 // are in crates/tools/texts/Babylon.js-LICENSE and Babylon.js-NOTICE, and in a build's THIRD-PARTY-LICENSES.txt.
 /**
- * Buy-mode feedback in the world, engine-neutral (each renderer's `buildFx.ts` draws it): a ring
+ * Buy-mode feedback in the world, engine-neutral (`pc/buildFx.ts` draws it): a ring
  * that spreads over the footprint, sparkles for new and upgraded furniture, dust for walls going up
  * or coming down and a puff for things sold; and the "pop" that springs newly placed furniture into
  * place (its instance matrix is scaled for a moment). Everything is pooled and costs nothing when
@@ -13,11 +13,12 @@
  * - `BuildEffectsCore`: which effect plays what (`play`), the rings' pool and how they spread and
  *   fade, the pops' spring, and the bursts the particles start in (`Bursts`). An engine says how a
  *   ring is drawn, how particles are emitted and how a popped instance goes up.
- * - The particles are Babylon's CPU `ParticleSystem` as the game set it up (`SPARKLES`, `DUST`):
- *   the Babylon renderer still runs Babylon's; `ParticleSim` is the same simulation, step for step
- *   (Babylon.js 9.30 `thinParticleSystem`: its creation and update queues, in their order, drawing
- *   the same random numbers in the same order), for an engine that draws the particles itself
- *   (PlayCanvas: one instanced quad draw, `pc/buildFx.ts`). `tests/buildFx.test.ts` runs both.
+ * - The particles: a CPU particle system set up as the game's sparkles and dust need (`SPARKLES`,
+ *   `DUST`). `ParticleSim` is the ported simulation, step for step (the original's creation and
+ *   update queues, in their order, drawing the same random numbers in the same order), so they move
+ *   as they did up to 0.3.2; the renderer draws them itself (one instanced quad draw,
+ *   `pc/buildFx.ts`). `tests/buildFx.test.ts` checks it number for number against the particles
+ *   recorded in `web/tests/fixtures`.
  */
 
 import type { BuildEffect } from '../types';
@@ -31,7 +32,7 @@ export const POP_TIME = 0.6;
 /** Rings lie this far (m) above the floor. */
 export const RING_LIFT = 0.045;
 
-/** A ring's colour per effect (sRGB, as Babylon's emissive colour). */
+/** A ring's colour per effect (sRGB, drawn as it is: unlit). */
 export const RING_COLORS: Record<BuildEffect['kind'], string> = {
   place: '#FFC94D',
   upgrade: '#FFB020',
@@ -51,7 +52,7 @@ export interface RingState {
   /** The footprint's larger side (tiles). */
   size: number;
   age: number;
-  /** As drawn now: its width (m, a square), its alpha (Babylon's `visibility`), and whether it's drawn. */
+  /** As drawn now: its width (m, a square), its alpha (the whole ring's opacity), and whether it's drawn. */
   scale: number;
   alpha: number;
   on: boolean;
@@ -76,7 +77,7 @@ interface Burst {
 
 /**
  * The bursts queued on a particle system, in order: each new particle starts in the first one with
- * particles left (Babylon's `startPositionFunction`), three random numbers for x, y and z.
+ * particles left (the original's `startPositionFunction`), three random numbers for x, y and z.
  */
 export class Bursts {
   private readonly queue: Burst[] = [];
@@ -217,8 +218,8 @@ export abstract class BuildEffectsCore<T extends PopInstance> {
 
   /**
    * Damped spring from 0 to 1: grows in, overshoots by ~20% and settles. Squash and stretch on y.
-   * The scale goes before the placement (Babylon's `Matrix.Scaling(xz, y, xz).multiply(base)`: its
-   * rows scaled, in single precision as Babylon's matrices are).
+   * The scale goes before the placement (`Scaling(xz, y, xz)` times `base`: its rows scaled, in
+   * single precision as the game's matrices are, `shared/math.ts`).
    */
   private writePop(p: Pop<T>, age: number): void {
     const done = age >= POP_TIME;
@@ -241,11 +242,11 @@ export function popSpring(s: number): number {
 type RGBA = readonly [number, number, number, number];
 type XYZ = readonly [number, number, number];
 
-/** A particle system as the game sets Babylon's up (its `ParticleSystem` properties of the same names). */
+/** A particle system as the game sets it up (the original `ParticleSystem`'s properties of the same names). */
 export interface ParticleSettings {
   name: string;
   capacity: number;
-  /** Babylon's `BLENDMODE_ADD` (added, times its alpha) or `BLENDMODE_STANDARD` (blended over). */
+  /** `add`: added, times its alpha; `standard`: blended over. */
   blend: 'add' | 'standard';
   color1: RGBA;
   color2: RGBA;
@@ -314,12 +315,12 @@ export const DUST: ParticleSettings = {
   updateSpeed: 1 / 60,
 };
 
-/** Babylon's scene animation ratio for a frame of `ms` (its `getAnimationRatio`). */
+/** The animation ratio for a frame of `ms`: 1 for a frame at 60 fps (the original's `getAnimationRatio`). */
 export function animationRatio(ms: number): number {
   return ms * (60.0 / 1000.0);
 }
 
-/** Babylon's `RandomRange`: no random number drawn when the range is empty. */
+/** A random number in the range (the original's `RandomRange`): none drawn when the range is empty. */
 function randomRange(min: number, max: number): number {
   return min === max ? min : Math.random() * (max - min) + min;
 }
@@ -338,19 +339,19 @@ const ANGLE = 17;
 const SPIN = 18;
 
 /**
- * Babylon's CPU particle system for one `ParticleSettings` (a box emitter at the origin, world
- * space, billboards, no sheet, noise, drag or ramps), its particles in one array (`data`, `P`
- * floats each, `count` alive, in Babylon's order: one that dies takes the last one's place).
+ * The CPU particle system for one `ParticleSettings` (a box emitter at the origin, world space,
+ * billboards, no sheet, noise, drag or ramps), its particles in one array (`data`, `P` floats each,
+ * `count` alive, in the original's order: one that dies takes the last one's place).
  * Allocation-free once made.
  */
 export class ParticleSim {
   readonly data: Float32Array;
   count = 0;
-  /** Particles to make at the next step (Babylon's `manualEmitCount`). */
+  /** Particles to make at the next step (the original's `manualEmitCount`). */
   private pending = 0;
   readonly bursts = new Bursts();
   private readonly start = { x: 0, y: 0, z: 0 };
-  /** (Babylon keeps particles in doubles: so does the simulation, and `data` takes them as drawn.) */
+  /** (The simulation keeps particles in doubles, as the original does; `data` takes them as drawn.) */
   private readonly state: Float64Array;
 
   constructor(readonly settings: ParticleSettings) {
@@ -370,9 +371,9 @@ export class ParticleSim {
 
   /**
    * One step (a frame): the living particles move on (those whose life is over go), then those
-   * queued are made. `data` then has them as drawn. `ratio`: Babylon's animation ratio, the frame's
+   * queued are made. `data` then has them as drawn. `ratio`: the animation ratio, the frame's
    * milliseconds times 60 / 1000 (`animationRatio`); the step is `updateSpeed` times it, worked out
-   * as Babylon does.
+   * as the original does.
    */
   step(ratio: number): void {
     const s = this.state;
@@ -395,7 +396,7 @@ export class ParticleSim {
         s[o + AGE] = s[o + LIFE];
       }
       const ratio = s[o + AGE] / s[o + LIFE];
-      // (Babylon's update queue: colour, angle, direction, position, gravity, then the size gradients.)
+      // (The update queue, in the original's order: colour, angle, direction, position, gravity, then the size gradients.)
       for (let k = 0; k < 4; k++) s[o + CR + k] += s[o + SR + k] * seconds;
       if (s[o + CR + 3] < 0) s[o + CR + 3] = 0;
       s[o + ANGLE] += s[o + SPIN] * seconds;
@@ -423,7 +424,7 @@ export class ParticleSim {
     for (let i = 0, n = this.count * P; i < n; i++) this.data[i] = s[i];
   }
 
-  /** A new particle at `o`, Babylon's creation queue in order: life and power, position, direction, size, angle, colour. */
+  /** A new particle at `o`, the creation queue in the original's order: life and power, position, direction, size, angle, colour. */
   private create(o: number): void {
     const s = this.state;
     const set = this.settings;
@@ -439,11 +440,11 @@ export class ParticleSim {
     const dx = randomRange(d1[0], d2[0]);
     const dy = randomRange(d1[1], d2[1]);
     const dz = randomRange(d1[2], d2[2]);
-    // (Babylon's emit power 0 keeps the direction aside; the game's are never 0.)
+    // (The original keeps the direction aside at an emit power of 0; the game's are never 0.)
     s[o + DX] = dx * power;
     s[o + DX + 1] = dy * power;
     s[o + DX + 2] = dz * power;
-    // (Its scale is 1 by 1: Babylon draws no random numbers for it.)
+    // (Its scale is 1 by 1: no random numbers are drawn for it.)
     s[o + SIZE] = set.sizeGradients ? set.sizeGradients[0][1] : randomRange(set.minSize, set.maxSize);
     s[o + SPIN] = randomRange(set.minAngularSpeed, set.maxAngularSpeed);
     s[o + ANGLE] = 0;
@@ -452,7 +453,7 @@ export class ParticleSim {
     const c2 = set.color2;
     const dead = set.colorDead;
     for (let k = 0; k < 4; k++) {
-      // (Babylon's `Color4.LerpToRef`, then the step to the dead colour over its life.)
+      // (The colour `t` of the way from `color1` to `color2`, then the step to the dead colour over its life.)
       const c = c1[k] + (c2[k] - c1[k]) * t;
       s[o + CR + k] = c;
       s[o + SR + k] = (dead[k] - c) * (1 / s[o + LIFE]);
@@ -460,7 +461,7 @@ export class ParticleSim {
   }
 }
 
-/** A size gradient at `ratio` of the life (Babylon's `_GetCurrentGradientToRef`, then the lerp). */
+/** A size gradient at `ratio` of the life (the original's `_GetCurrentGradientToRef`, then the lerp). */
 function sizeAt(grads: readonly (readonly [number, number])[], ratio: number): number {
   if (grads[0][0] > ratio) return grads[0][1];
   for (let i = 0; i < grads.length - 1; i++) {

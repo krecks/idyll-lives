@@ -869,7 +869,7 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
 }
 
 /**
- * An instance's matrix (Babylon's layout, game space: `shared/math.ts`) into `out` at `offset`: at
+ * An instance's matrix (game space, in the layout of `shared/math.ts`) into `out` at `offset`: at
  * (x, 0, z), turned by `yaw`, scaled `s` across and `sy` up (`flat`: not along z, a hedge stretched
  * along its run).
  */

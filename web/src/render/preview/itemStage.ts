@@ -310,7 +310,7 @@ export class ItemStageController implements ItemStage {
     // At rest, nothing is drawn: the GPU is the game's again.
     if (this.restless <= 0) return;
     this.restless--;
-    // (A local turn about y under the world root is Babylon's rotation.y in game space.)
+    // (A local turn about y under the world root is a turn about y in game space: +x towards -z.)
     this.root.setLocalEulerAngles(0, (this.yaw * 180) / Math.PI, 0);
     const dist = this.reach * this.zoom;
     const c = this.centre;

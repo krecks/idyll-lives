@@ -56,7 +56,7 @@
   onMount(() => {
     host.mount(gameLayer);
     window.addEventListener('vite:preloadError', () => (app.newVersion = true));
-    // Also what was caught and only logged (Babylon's shaders are fetched on first use).
+    // Also a script file that didn't load whose error was caught and only logged.
     watchLog((entry) => {
       if (entry.level !== 'warn' && MISSING_FILE.test(entry.text)) app.newVersion = true;
     });

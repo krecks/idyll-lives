@@ -1,10 +1,9 @@
 /**
- * Pools of lamplight on the garden's ground on PlayCanvas (ported from the Babylon renderer, removed: see git history up to f15b839b):
- * under a lamp post, a street lamp, a fire pit or a bulkhead on the outside wall, as the street
- * draws them under its own lamps. The lamps' lights light what stands in the garden, but not the
- * ground (the landscape is kept out of the lamps). A pool is a disc on the ground, added to what's
- * there, unlit and without fog: one draw for all of them (a quad each, its brightness in its
- * vertex colour), none by day.
+ * Pools of lamplight on the garden's ground on PlayCanvas: under a lamp post, a street lamp, a fire
+ * pit or a bulkhead on the outside wall, as the street draws them under its own lamps. The lamps'
+ * lights light what stands in the garden, but not the ground (the landscape is kept out of the
+ * lamps). A pool is a disc on the ground, added to what's there, unlit and without fog: one draw
+ * for all of them (a quad each, its brightness in its vertex colour), none by day.
  */
 
 import * as pc from './engine';
@@ -47,8 +46,8 @@ export class GardenPools {
     m.useFog = false;
     m.diffuse.set(0, 0, 0);
     // The vertex colour times the gradient (as opacity), added: a pool switched off adds nothing. (Taken
-    // as sRGB, linearised: the Babylon renderer's standard material's output was, the lamps' linear
-    // colour times the strength with it.)
+    // as sRGB and linearised, the lamps' linear colour times the strength with it: the pools'
+    // brightness as the game drew them up to 0.3.2.)
     m.emissive.set(1, 1, 1);
     m.emissiveVertexColor = true;
     (m as pc.StandardMaterial & { vertexColorGamma: boolean }).vertexColorGamma = true;

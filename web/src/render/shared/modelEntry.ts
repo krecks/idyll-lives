@@ -220,8 +220,8 @@ export function tintInName(name: string | null | undefined): TintSlot | null {
 
 /**
  * A model entry's own placement of its file's model space: its `scale`, `rotationY` and `offset`;
- * with `fit`, only its turn (the fit is found from the geometry built, `fitInto`). Babylon's
- * `Matrix.Compose` layout (`shared/math.ts`).
+ * with `fit`, only its turn (the fit is found from the geometry built, `fitInto`). The matrix
+ * layout of `shared/math.ts` (`compose`).
  */
 export function entrySpace(entry: ModelEntry, out: Mat4 = new Float32Array(16)): Mat4 {
   const fit = (entry as ModelEntry & ModelExtras).fit;

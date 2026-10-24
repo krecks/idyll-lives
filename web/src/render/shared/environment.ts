@@ -128,7 +128,7 @@ function setNormalized(v: XYZ, x: number, y: number, z: number): void {
   v.z = z / len;
 }
 
-/** `#rrggbb` as 0..1 channels (as Babylon's `Color3.FromHexString`), parsed once each. */
+/** `#rrggbb` as 0..1 channels (each byte / 255), parsed once each. */
 const hexCache = new Map<string, readonly [number, number, number]>();
 function hex(value: string): readonly [number, number, number] {
   let c = hexCache.get(value);

@@ -9,13 +9,14 @@
  * edges, cylinders, cones, spheres, capsules, tori, lathes, lumpy blobs) as vertex arrays in model
  * space, and the operations a build does on a file's pieces (baking a transform in, merging,
  * resizing, fitting into a box, a mirror's face, the glowing faces). Game space (left-handed, y up)
- * and Babylon's conventions throughout, so either engine draws the same vertices: front faces wind
- * so that (a - b) x (c - b) points along the normal (`pushTri`), as Babylon's builders make them.
+ * and the game's conventions throughout: front faces wind so that (a - b) x (c - b) points along
+ * the normal (`pushTri`), as the builders make them.
  *
- * The shapes are ports of Babylon.js's `CreateCylinderVertexData`, `CreateSphereVertexData`,
+ * The shapes are ports of `CreateCylinderVertexData`, `CreateSphereVertexData`,
  * `CreateTorusVertexData`, `CreateCapsuleVertexData`, `CreateIcoSphereVertexData` and
  * `VertexData.ComputeNormals`, cut down to the options the parts use: the same vertices in the
- * same order (`web/tests/modelParts.test.ts`).
+ * same order, so models are built as they were up to 0.3.2 (`web/tests/modelParts.test.ts`, against
+ * the vertices recorded in `web/tests/fixtures`).
  * Their UVs are left out: every part gets metre-scale box-projected ones (`boxProjectUVs`).
  */
 
@@ -23,10 +24,10 @@ import type { PrimitivePart, Vec3 } from '../../assets/types';
 import { compose, identity, invert, multiply, quatFromEuler, rotationX, rotationY, rotationZ, scaling, transformNormal, transformPoint, translation, type Mat4, type Quat } from './math';
 import type { ExtraShapes, MaterialOverride, Resize } from './modelEntry';
 
-/** Vertex values: a file's (32-bit), or a builder's (64-bit, as Babylon keeps a builder's arrays: a box-projected UV's axis then ties the same way). */
+/** Vertex values: a file's (32-bit), or a builder's (64-bit, as the original builders keep theirs: a box-projected UV's axis then ties the same way). */
 export type Floats = Float32Array | Float64Array;
 
-/** A mesh's vertex arrays (Babylon's `VertexData`): positions, normals, UVs, RGBA colours, tangents (4 each), triangles. */
+/** A mesh's vertex arrays (as the original `VertexData`): positions, normals, UVs, RGBA colours, tangents (4 each), triangles. */
 export interface VData {
   positions: Floats;
   normals: Floats | null;
@@ -48,15 +49,15 @@ export function copyData(data: VData): VData {
   };
 }
 
-/** `data` from plain arrays (a builder's): in 64-bit floats as Babylon keeps them, or 32-bit as it keeps an updatable mesh's (`f32`). */
+/** `data` from plain arrays (a builder's): in 64-bit floats as a builder keeps them, or 32-bit as an updatable mesh's are (`f32`). */
 function vdata(positions: ArrayLike<number>, normals: ArrayLike<number>, indices: ArrayLike<number>, f32 = false): VData {
   const F = f32 ? Float32Array : Float64Array;
   return { positions: F.from(positions), normals: F.from(normals), indices: Uint32Array.from(indices) };
 }
 
 /**
- * Babylon's `VertexData.transform`: positions through `m`, normals and tangents through its
- * rotation and scale (not normalised), and the triangles turned round when `m` mirrors.
+ * Transforms vertex arrays (`VertexData.transform`): positions through `m`, normals and tangents
+ * through its rotation and scale (not normalised), and the triangles turned round when `m` mirrors.
  */
 export function transformData(data: VData, m: Readonly<Mat4>): VData {
   const v = [0, 0, 0];
@@ -80,7 +81,7 @@ export function transformData(data: VData, m: Readonly<Mat4>): VData {
   return data;
 }
 
-/** Babylon's `Mesh.bakeTransformIntoVertices`: as `transformData`, the normals (and tangents) normalised. */
+/** Bakes a transform into the vertices (`Mesh.bakeTransformIntoVertices`): as `transformData`, the normals (and tangents) normalised. */
 export function bakeData(data: VData, m: Readonly<Mat4>): VData {
   const v = [0, 0, 0];
   const p = data.positions;
@@ -104,7 +105,7 @@ export function bakeData(data: VData, m: Readonly<Mat4>): VData {
   return data;
 }
 
-/** Turns every triangle round (Babylon's `VertexData._FlipFaces`). */
+/** Turns every triangle round (`VertexData._FlipFaces`). */
 export function flipFaces(indices: Uint32Array | Uint16Array | number[]): void {
   for (let i = 0; i + 2 < indices.length; i += 3) {
     const t = indices[i + 1];
@@ -141,7 +142,7 @@ export function mergeData(list: readonly VData[]): VData {
   return { positions, normals: join('normals', 3), uvs: join('uvs', 2), colors: join('colors', 4), tangents: join('tangents', 4), indices };
 }
 
-/** Babylon's `VertexData.ComputeNormals` (no options): each vertex's faces' normals, averaged. */
+/** Vertex normals (`VertexData.ComputeNormals`, no options): each vertex's faces' normals, averaged. */
 export function computeNormals(positions: ArrayLike<number>, indices: ArrayLike<number>, normals: number[] | Float32Array): void {
   for (let i = 0; i < positions.length; i++) normals[i] = 0;
   const faces = (indices.length / 3) | 0;
@@ -178,7 +179,7 @@ export function computeNormals(positions: ArrayLike<number>, indices: ArrayLike<
   }
 }
 
-// ---- the shapes (Babylon's builders) ------------------------------------------------
+// ---- the shapes (the ported builders) -----------------------------------------------
 
 /** `CreateCylinderVertexData` for `height`, `diameterTop`, `diameterBottom`, `tessellation` (one ring, both caps). */
 export function cylinderData(height: number, diameterTop: number, diameterBottom: number, tessellation: number): VData {
@@ -400,7 +401,7 @@ export function icoSphereData(radius: number, subdivisions: number): VData {
     const vertex = (i1: number, i2: number) => {
       const x0 = lerp(corner[0], corner[2], i2 / subdivisions);
       const x1 = lerp(corner[1], corner[2], i2 / subdivisions);
-      // (The corner itself, normalised again in place, as Babylon's builder does.)
+      // (The corner itself, normalised again in place, as the original builder does.)
       const p = subdivisions === i2 ? corner[2] : lerp(x0, x1, i1 / (subdivisions - i2));
       normalize3(p);
       const n = [p[0] / radius, p[1] / radius, p[2] / radius];
@@ -557,7 +558,7 @@ export function latheData(profile: [number, number][], segments: number): VData 
 /** Lumpy sphere (foliage clumps, rocks): an icosphere displaced by smooth 3D noise. */
 export function blobData(sx: number, sy: number, sz: number, amount: number, subdivisions: number, seed: number): VData {
   const data = icoSphereData(0.5, subdivisions);
-  // (An updatable mesh's positions, as Babylon builds the blob.)
+  // (32-bit positions, as an updatable mesh has: the blob was built as one up to 0.3.2.)
   const pos = (data.positions = Float32Array.from(data.positions));
   for (let i = 0; i < pos.length; i += 3) {
     const x = pos[i] * 2;
@@ -592,8 +593,8 @@ export function blobData(sx: number, sy: number, sz: number, amount: number, sub
 }
 
 /**
- * Adds a triangle wound the way front faces are (Babylon's, which `VertexData.ComputeNormals`
- * derives): (a - b) x (c - b) points along the vertex normal.
+ * Adds a triangle wound the way front faces are (the game's, which `computeNormals` derives):
+ * (a - b) x (c - b) points along the vertex normal.
  */
 export function pushTri(pos: ArrayLike<number>, nor: ArrayLike<number>, out: number[], a: number, b: number, c: number): void {
   const ax = pos[a * 3] - pos[b * 3];
@@ -638,7 +639,7 @@ export function boxProjectUVs(data: VData): void {
 
 // ---- primitive parts ----------------------------------------------------------------
 
-/** A part's turn (`rotate`, degrees about x, y, z) as Babylon's `Quaternion.FromEulerAngles`. */
+/** A part's turn (`rotate`, degrees about x, y, z) as Euler angles (`quatFromEuler`). */
 function partTurn(p: PrimitivePart): Quat {
   const [rx, ry, rz] = (p.rotate ?? [0, 0, 0]).map((d) => (d * Math.PI) / 180);
   return quatFromEuler(rx, ry, rz);
@@ -774,7 +775,7 @@ export function partBox(p: PrimitivePart): { lo: number[]; hi: number[]; along: 
 /**
  * A mirror's reflecting face in model space: `matrix` takes the unit square (or, `round`, the
  * unit-diameter disc) in the xy plane, facing +z, onto the face, just in front of the glass.
- * Babylon's matrix layout (a point times the matrix).
+ * The game's matrix layout (`shared/math.ts`: a point times the matrix).
  */
 export interface MirrorFace {
   round: boolean;
@@ -1022,13 +1023,13 @@ export function glowData(pieces: { data: VData; color: string }[]): VData {
 
 // ---- small math helpers -------------------------------------------------------------
 
-/** Babylon's `Color3.FromHexString` (sRGB 0..1; black for anything but `#rrggbb`). */
+/** A hex colour as 0..1 channels (sRGB; black for anything but `#rrggbb`, as `Color3.FromHexString`). */
 export function hexColor(hex: string): [number, number, number] {
   if (hex.substring(0, 1) !== '#' || hex.length !== 7) return [0, 0, 0];
   return [parseInt(hex.substring(1, 3), 16) / 255, parseInt(hex.substring(3, 5), 16) / 255, parseInt(hex.substring(5, 7), 16) / 255];
 }
 
-/** Babylon's `Vector3.normalize`, in place. */
+/** Normalises `v` in place (`Vector3.normalize`: a zero or unit vector as it is). */
 function normalize3(v: number[]): number[] {
   const len = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
   if (len === 0 || len === 1) return v;
@@ -1039,7 +1040,7 @@ function normalize3(v: number[]): number[] {
   return v;
 }
 
-/** Babylon's `Matrix.determinant`. */
+/** The matrix's determinant (`Matrix.determinant`). */
 export function determinant(m: Readonly<Mat4>): number {
   const [m00, m01, m02, m03, m10, m11, m12, m13, m20, m21, m22, m23, m30, m31, m32, m33] = m;
   const d2233 = m22 * m33 - m32 * m23;

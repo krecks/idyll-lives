@@ -9,10 +9,10 @@ import * as pc from './engine';
 const shadowLayers = new WeakMap<pc.AppBase, pc.Layer>();
 
 /**
- * The layer of draws that only cast the sun's shadow (the Babylon renderer's shadow-only mask: the woods near
- * the town drawn whole for the shadow map while the game draws them in groups, the house's lid over
- * its rooms, the low preset's merged object shadows), made once per app. The sun lights it
- * (`SunShadows` puts it on the sun's light; `sun` does too, for a caller that has the sun).
+ * The layer of draws that only cast the sun's shadow (the woods near the town drawn whole for the
+ * shadow map while the game draws them in groups, the house's lid over its rooms, the low preset's
+ * merged object shadows), made once per app. The sun lights it (`SunShadows` puts it on the sun's
+ * light; `sun` does too, for a caller that has the sun).
  */
 export function shadowOnlyLayer(app: pc.AppBase, sun?: pc.Entity): pc.Layer {
   let layer = shadowLayers.get(app);
@@ -30,10 +30,9 @@ const effectLayers = new WeakMap<pc.AppBase, pc.Layer>();
 const overLayers = new WeakMap<pc.AppBase, pc.Layer>();
 
 /**
- * Babylon's particles' place in a frame (after the opaque draws, before the blended ones: its
- * rendering group's order): build mode's effects (`buildFx.ts`), blended only, so the layer is in
- * the composition only as blended, just before the world's blended draws. Made once per app; the
- * `camera` draws it.
+ * The build effects' place in a frame (after the opaque draws, before the blended ones): build
+ * mode's effects (`buildFx.ts`), blended only, so the layer is in the composition only as blended,
+ * just before the world's blended draws. Made once per app; the `camera` draws it.
  */
 export function effectsLayer(app: pc.AppBase, camera: pc.CameraComponent): pc.Layer {
   let layer = effectLayers.get(app);
@@ -48,12 +47,12 @@ export function effectsLayer(app: pc.AppBase, camera: pc.CameraComponent): pc.La
 }
 
 /**
- * Babylon's rendering group 1 (build mode's thing in hand, `placementGhost.ts`): drawn after the
- * world, the depth cleared before it (as Babylon clears it between its rendering groups), so it
- * shows over what stands in front of it, its own parts still in front of one another. In the
- * scene's picture (before the image processing: just before the immediate layer), lit by every
- * light that lights the world (the lights of a layer go into its shaders: the same as the world's,
- * the same shaders, and the same light clusters). Made once per app; the `camera` draws it.
+ * The over layer (build mode's thing in hand, `placementGhost.ts`): drawn after the world, the
+ * depth cleared before it, so it shows over what stands in front of it, its own parts still in
+ * front of one another. In the scene's picture (before the image processing: just before the
+ * immediate layer), lit by every light that lights the world (the lights of a layer go into its
+ * shaders: the same as the world's, the same shaders, and the same light clusters). Made once per
+ * app; the `camera` draws it.
  *
  * (The depth is cleared with the device's clear as the layer starts, on frames it has something to
  * draw: under the game's `CameraFrame` a layer's own `clearDepthBuffer` isn't honoured past the

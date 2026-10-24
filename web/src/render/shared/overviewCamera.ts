@@ -1,20 +1,21 @@
 /**
  * The menus' town overview camera: frames a shot's rectangle into its part of the screen, glides
  * between shots, drifts and sways, takes the player's orbit and zoom on top, and keeps above the
- * land. Engine-neutral: it writes an orbit pose (Babylon's orbit conventions, with a view offset
- * that moves the picture by `targetScreenOffset` view units) into any camera with those fields.
+ * land. Engine-neutral: it writes an orbit pose (the game's orbit conventions, `shared/orbit.ts`,
+ * with a view offset that moves the picture by `targetScreenOffset` view units) into any camera
+ * with those fields.
  */
 
 import type { TownShot } from '../types';
 import { angleDelta, ease } from './angles';
 
-/** The camera the overview drives: Babylon's `ArcRotateCamera`, or any with its fields. */
+/** The camera the overview drives: any with these fields. */
 export interface OverviewCameraTarget {
   alpha: number;
   beta: number;
   radius: number;
   readonly target: { x: number; y: number; z: number };
-  /** Moves the picture by this much in view units (Babylon's `targetScreenOffset`). */
+  /** Moves the picture by this much in view units (the camera and its target slid along the view's right and up). */
   readonly targetScreenOffset: { x: number; y: number };
   /** Vertical field of view (radians). */
   readonly fov: number;
@@ -32,7 +33,7 @@ interface Pose {
   radius: number;
   tx: number;
   tz: number;
-  /** View-space offset (`ArcRotateCamera.targetScreenOffset`), frames the focus off-centre. */
+  /** View-space offset (`targetScreenOffset`), frames the focus off-centre. */
   ox: number;
   oy: number;
 }
@@ -246,7 +247,7 @@ export class OverviewCamera {
     const hy = ((nt - nb) / 2) * 0.94 * zoom;
     const tanY = Math.tan(this.camera.fov / 2);
     const tanX = tanY * (W / H);
-    // Camera basis (left-handed, as Babylon's look-at).
+    // Camera basis (left-handed, as game space is).
     const sa = Math.sin(g.alpha);
     const ca = Math.cos(g.alpha);
     const sb = Math.sin(g.beta);

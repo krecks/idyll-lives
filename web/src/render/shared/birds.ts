@@ -35,8 +35,7 @@
  * and only those parts' buffers go up; nothing is allocated per frame.
  *
  * Engine-neutral: everything above and every number drawn (the parts' matrices, 16 floats each,
- * translation at 12, 13, 14, in game space: `shared/math.ts`, as Babylon's `Matrix` computed them,
- * in 32-bit floats) is here. The engine (`BirdView`: `pc/birds.ts`) builds each
+ * translation at 12, 13, 14, in game space: `shared/math.ts`, in 32-bit floats) is here. The engine (`BirdView`: `pc/birds.ts`) builds each
  * species' model with its parts as meshes, draws them instanced from the buffers it's handed, and
  * says how far the wind bends a plant.
  */
@@ -457,7 +456,7 @@ const seeded = (seed: number) => mulberry32(Math.floor(seed * 4294967296));
 /** Its pose value `a` differs from `b` by more than `still` (always, if it was never written: NaN). */
 const changed = (a: number, b: number, still: number) => !(Math.abs(a - b) <= still);
 
-// Scratch, so frames allocate nothing. (Matrices in 32-bit floats, as Babylon's.)
+// Scratch, so frames allocate nothing. (Matrices in 32-bit floats, as the game's are.)
 const qTurn: Quat = [0, 0, 0, 1];
 const mWorld = new Float32Array(16);
 const mBase = new Float32Array(16);
@@ -1684,7 +1683,7 @@ export class Birds<L extends BirdLook = BirdLook> {
   }
 }
 
-/** Babylon's `Matrix.RotationYawPitchRollToRef`: its quaternion's rotation matrix (`Matrix.FromQuaternionToRef`). */
+/** The rotation matrix of a yaw, pitch and roll: its quaternion's (`quatYawPitchRoll`), as the original `Matrix.RotationYawPitchRollToRef` makes it. */
 function rotationYawPitchRoll(yaw: number, pitch: number, roll: number, out: Float32Array): Float32Array {
   const q = quatYawPitchRoll(yaw, pitch, roll, qHead);
   const xx = q[0] * q[0];

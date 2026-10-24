@@ -1,6 +1,5 @@
 /**
- * The game's renderer on PlayCanvas (`Renderer`, `render/types.ts`), ported stage by stage from the
- * Babylon.js renderer it replaced (removed; its last version is in the git history up to f15b839b).
+ * The game's renderer on PlayCanvas (`Renderer`, `render/types.ts`).
  *
  * The device (WebGPU, else WebGL2), frames paced in whole display refreshes, the game camera (the
  * player's orbit input, kept above the land, the director's shots), the menus' town overview
@@ -19,8 +18,9 @@
  * (`placing.ts`, `buildPreviews.ts`, `handles.ts`) and the save's picture (`thumbnail.ts`). The
  * warm-up behind the loading veil (`warmGame`) makes every pipeline the game draws with before play.
  *
- * Game space is the Babylon renderer's left-handed one: everything in the world hangs under a root
- * mirrored in z (`space.ts`), and only cameras, lights and rays are converted.
+ * Game space is left-handed, y up (the space the game's geometry, models and numbers are made in):
+ * everything in the world hangs under a root mirrored in z (`space.ts`), and only cameras, lights and
+ * rays are converted.
  */
 
 import * as pc from './engine';
@@ -110,7 +110,7 @@ import type {
   WallMode,
 } from '../types';
 
-/** The game camera's zoom and tilt limits (as the Babylon renderer's). */
+/** The game camera's zoom and tilt limits. */
 const RADIUS_LIMITS = [6, 95] as const;
 const BETA_LIMITS = [0.3, 1.35] as const;
 /** Its lens: vertical field of view (a slightly long lens flattens the perspective: the dollhouse look), near and far (m). */
@@ -180,13 +180,13 @@ function lightMixFromURL(): [number, number, number] | null {
   return [sun, sky, env].map((x) => (Number.isFinite(x) ? x : 1)) as [number, number, number];
 }
 
-/** A hex colour (sRGB) in linear light, as Babylon's `toLinearSpace`. */
+/** A hex colour (sRGB) in linear light (`pow(c, 2.2)`). */
 function linearHex(hex: string): RGB {
   const v = parseInt(hex.slice(1), 16);
   return { r: toLinear(((v >> 16) & 255) / 255), g: toLinear(((v >> 8) & 255) / 255), b: toLinear((v & 255) / 255) };
 }
 
-/** A Babylon linear colour (the look's keys are used as linear there) as PlayCanvas takes it (sRGB, linearised when lit). */
+/** A linear colour (the look's keys are used as linear) as PlayCanvas takes it (sRGB, linearised when lit). */
 function gammaColor(c: RGB, scale = 1, out = new pc.Color()): pc.Color {
   const g = (v: number) => Math.pow(Math.max(0, v * scale), 1 / 2.2);
   return out.set(g(c.r), g(c.g), g(c.b), 1);
@@ -200,7 +200,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** The world, in game space (`space.ts`). */
   private root!: pc.Entity;
   private camera!: GameCamera;
-  /** Babylon's image processing, FXAA and night grade on the camera (`post.ts`). */
+  /** The image processing, FXAA and night grade on the camera (`post.ts`). */
   private post: PostProcessing | null = null;
   private sun!: pc.Entity;
   private sunShadows!: SunShadows;
@@ -390,7 +390,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private readonly vTmp2 = new pc.Vec3();
   private readonly qTmp = new pc.Quat();
   private readonly colorTmp = new pc.Color();
-  /** `?lightmix=sun,sky,env` (dev server): each part of the daylight scaled, to compare them one by one with the Babylon renderer's. */
+  /** `?lightmix=sun,sky,env` (dev server): each part of the daylight scaled, to compare them one by one with reference pictures. */
   private readonly lightMix = import.meta.env.DEV ? lightMixFromURL() : null;
 
   private probe: FrameProbe | null = null;
@@ -458,7 +458,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const cam = this.camera.camera;
     // (Not PlayCanvas's skybox: the environment atlas would draw as one.)
     cam.layers = cam.layers.filter((id) => id !== pc.LAYERID_SKYBOX);
-    // The picture after the light: multisampling or FXAA, Babylon's image processing
+    // The picture after the light: multisampling or FXAA, the image processing
     // and the night grade (`post.ts`; the diag views and `?diag=linear` without them).
     this.post = new PostProcessing(this.app, cam, gamePostOptions(this.quality.msaaSamples, this.diag, diagViewActive));
     this.post.setLook(gameLook(LOOK));
@@ -555,7 +555,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     await this.setupEnvironment();
   }
 
-  /** Image-based lighting from the sky (manifest key `environment.sky`; its PlayCanvas copy, `env.ts`). */
+  /** Image-based lighting from the sky (manifest key `environment.sky`, a `.pcenv` read by `env.ts`). */
   private async setupEnvironment(): Promise<void> {
     const entry = this.deps.assets.get('environment.sky', 'image');
     if (entry) await this.lib.loadEnvironment(entry.url);
@@ -700,7 +700,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     o.beta = pose.beta;
     o.radius = pose.radius;
     o.checkLimits();
-    // Placed: the next world doesn't turn it to its lot (as Babylon's `setCameraPose` had it).
+    // Placed: the next world doesn't turn it to its lot.
     this.cameraPlaced = true;
   }
 
@@ -726,7 +726,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /**
    * Keeps the game camera above the land round the town (mountains rise close to it in some
    * worlds): looking from higher up instead of from inside a hill. The eye at least 4 m over the
-   * land under it, the camera tilted up in steps of 0.03 rad (as the Babylon renderer's).
+   * land under it, the camera tilted up in steps of 0.03 rad.
    */
   private keepCameraClear(): void {
     const land = this.lot.landscape;
@@ -951,7 +951,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.sunShadows.moved();
   }
 
-  /** Turns the camera to (`x`, `z`) on the ground from where it is, as Babylon's `ArcRotateCamera.setTarget` re-aims it. */
+  /** Turns the camera to (`x`, `z`) on the ground from where it is: the eye stays, the radius and angles follow. */
   private aimAt(x: number, z: number): void {
     const o = this.orbit;
     const sb = Math.sin(o.beta);
@@ -1544,9 +1544,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    * before it shows, so play doesn't stall on shader compiles (PlayCanvas compiles a shader, and on
    * WebGPU makes a pipeline, in the frame that first draws with it: tens of milliseconds each, and
    * the first frames of play would make hundreds). While the menus' town is up (the game built behind
-   * them), the game's own state is set first, as the Babylon renderer's `warmGame` did: its residents
-   * posed, its lighting, the dig and the cutaway, in a slice of its own. Then one frame of the game
-   * (`warmFrame`), the town back after it. `?diag=shaders` logs what is still made in play.
+   * them), the game's own state is set first: its residents posed, its lighting, the dig and the
+   * cutaway, in a slice of its own. Then one frame of the game (`warmFrame`), the town back after
+   * it. `?diag=shaders` logs what is still made in play.
    */
   async warmGame(frame: FrameState): Promise<void> {
     if (this.disposed) return;
@@ -1606,12 +1606,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
 
   /**
-   * For the warm-up's frame: what the world has but doesn't draw now drawn too, as Babylon's warm-up
-   * readied every mesh, hidden ones too: the storeys out of view, things hidden (the night's garden
-   * pools and glows by day, the build tools' helpers, the templates models are copied from), and the
-   * instanced draws that have no instances now (the residents' close-up face parts, lamp glows by day)
-   * with one (whatever its data: the frame is behind the veil). Entities with lights or cameras in them
-   * stay as they are (a light more would change every lit shader). Returns the undo.
+   * For the warm-up's frame: what the world has but doesn't draw now drawn too, every mesh, hidden
+   * ones too: the storeys out of view, things hidden (the night's garden pools and glows by day, the
+   * build tools' helpers, the templates models are copied from), and the instanced draws that have
+   * no instances now (the residents' close-up face parts, lamp glows by day) with one (whatever its
+   * data: the frame is behind the veil). Entities with lights or cameras in them stay as they are (a
+   * light more would change every lit shader). Returns the undo.
    */
   private drawHidden(): () => void {
     const entities: pc.Entity[] = [];
@@ -1718,21 +1718,21 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const sin = axis.length();
     const angle = Math.atan2(sin, DOWN.dot(to)) * pc.math.RAD_TO_DEG;
     this.sun.setRotation(sin > 1e-6 ? this.qTmp.setFromAxisAngle(axis.mulScalar(1 / sin), angle) : this.qTmp.set(0, 0, 0, 1));
-    // The look's colours are linear as Babylon used them; PlayCanvas takes sRGB and linearises it,
+    // The look's colours are used as linear; PlayCanvas takes sRGB and linearises it,
     // so the strength goes into the colour (an intensity below 1 would be linearised with it).
     this.sun.light!.color = gammaColor(l.sunColor, l.sunIntensity * SUN_UNITS, this.colorTmp);
     this.sunShadows.moved();
-    // The sky's hemispheric fill (Babylon's hemispheric light) and its image-based light.
+    // The sky's hemispheric fill and its image-based light.
     this.lib.setSkyFill(l.skyColor, l.groundColor, l.skyIntensity * SKY_UNITS);
     this.lib.setEnvironmentIntensity(l.envIntensity * ENV_UNITS);
-    // The haze in the horizon's colour as Babylon's PBR had it: linearised twice (the renderer's
-    // `toLinearSpace`, then its materials': a deeper blue than the horizon), so it goes to PlayCanvas
-    // (which linearises what it's given) linearised once. The clear colour (behind the sky's dome)
-    // is drawn as it's given: linear, as Babylon's.
+    // The haze in the horizon's colour as the look was tuned with it: linearised twice (here, then
+    // in the materials: a deeper blue than the horizon), so it goes to PlayCanvas (which linearises
+    // what it's given) linearised once. The clear colour (behind the sky's dome) is drawn as it's
+    // given: linear.
     const c = l.clearColor;
     this.app.scene.fog.color.set(toLinear(c.r), toLinear(c.g), toLinear(c.b), 1);
     this.camera.camera.clearColor = this.colorTmp.set(toLinear(c.r), toLinear(c.g), toLinear(c.b), 1);
-    // Babylon's exposure for the hour and the moonlight grade (`post.ts`: uniforms).
+    // The look's exposure for the hour and the moonlight grade (`post.ts`: uniforms).
     if (this.post) {
       this.post.exposure = l.exposure * LOOK.exposure;
       this.post.night = l.night * LOOK.nightGrade;
@@ -1743,7 +1743,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // Glowing windows outside at night, cool daylight in the panes by day; the street's lamps; the garden's pools.
     this.lampsLevel = l.lamps;
     this.lot.applyLighting(l); // (the sky, the night clips, the shades' glow.)
-    this.placing?.light(l); // (the red ghost's light, as Babylon's lights had it.)
+    this.placing?.light(l); // (the red ghost's light: the sun and the sky, `placementGhost.ts`.)
     this.lamps.applyLighting(l); // (the interior lights and the glows, `lamps.ts`.)
     const glow = Math.min(1, Math.max(0, (l.lamps - 0.35) / 0.5));
     const g = this.glowColor;
@@ -1851,7 +1851,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.shaderWatch.phase = 'town';
     this.birdLife.setTown(true);
     this.applyPacing();
-    this.applyDig(); // (no basement or windowless rooms kept dark in the town, as Babylon's enterTown.)
+    this.applyDig(); // (no basement or windowless rooms kept dark in the town.)
     const o = this.orbit;
     const p = this.townPose;
     Object.assign(p, { alpha: o.alpha, beta: o.beta, radius: o.radius });
@@ -1872,7 +1872,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.townMode = false;
     this.shaderWatch.phase = 'game';
     this.birdLife.setTown(false);
-    this.applyDig(); // (the basement and windowless rooms dark again, as Babylon's leaveTown.)
+    this.applyDig(); // (the basement and windowless rooms dark again.)
     this.showLayers(false);
     this.sunShadows.setOverview(false);
     this.orbit.enabled = true;
@@ -1885,7 +1885,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
 
   /**
-   * What the camera draws and the sun lights (Babylon's camera mask and shadow list): while the menus'
+   * What the camera draws and the sun lights (the camera's layers and the sun's): while the menus'
    * town is shown, its layer in place of the world's and of build mode's (`TOWN_CAMERA_LAYERS` stay),
    * the sun on it alone (its casters are the overview's and the town's landscape); the game's again
    * after, with any layer added to them meanwhile.
@@ -2004,7 +2004,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   // --- settings, stats, the benchmark --------------------------------------------------
 
   configure(options: LiveRenderOptions): void {
-    // Taken before the merge, which would otherwise hide the change. (`?look=` on the dev server wins over the setting, as Babylon's plugin had it.)
+    // Taken before the merge, which would otherwise hide the change. (`?look=` on the dev server wins over the setting.)
     const shading = options.shading === undefined ? undefined : (softLookFromURL() ?? options.shading);
     this.options = { ...this.options, ...options };
     if (shading !== undefined && shading !== this.shading) {
@@ -2089,7 +2089,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** What a pass into `target` draws, for the benchmark's counts (`DrawCounts`). */
   private readonly passKind = (target: pc.RenderTarget | null): PassKind => (!target ? 0 : this.mirrors.owns(target) ? 2 : target === this.shadowTarget() ? 1 : 0);
 
-  /** The GPU timer's name for a pass into `target` (`GpuTiming`): the target's, as Babylon named its timers. */
+  /** The GPU timer's name for a pass into `target` (`GpuTiming`): the target's, as the bench's results name them. */
   private readonly passLabel = (target: pc.RenderTarget | null): string => {
     if (!target) return 'canvas';
     if (target === this.shadowTarget()) return 'shadow';
@@ -2100,23 +2100,23 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   };
 
   /**
-   * What the benchmark reports of the renderer (`debug/bench.ts`), with the Babylon renderer's
-   * meanings (see `gpuTiming.ts` for the measures):
+   * What the benchmark reports of the renderer (`debug/bench.ts`), its fields meaning what they mean
+   * in the bench's results up to 0.3.2, so runs compare (see `gpuTiming.ts` for the measures):
    *
-   * - `passes`: the targets a frame draws into, with their pixels, samples and bytes per sample, as
-   *   Babylon listed them: the sun's shadow map (while it has casters, drawn every frame or not), each
-   *   mirror reflecting now (held ones too), the scene's target, then the image processing onto the
-   *   canvas (on Low into the FXAA pass's input, then the FXAA onto the canvas), named as Babylon's. The
-   *   canvas counts 4 bytes of colour and 4 of depth, as Babylon's did. The one difference: PlayCanvas's
-   *   shadow map is depth alone, where Babylon's had a 2-byte colour target too.
-   * - `scene`: counts of what is drawn now. Babylon counted its meshes (hidden templates too); here
-   *   `meshes` are the draws (mesh instances) on the composition's layers, so the two engines' counts
-   *   don't compare, only runs of one engine (the bench's fingerprint: equal counts, the same scene).
-   *   `materials`: theirs, distinct. `shadowCasters`: the draws that cast in the sun's layers, shown, and
-   *   `shadowCasterTriangles` their triangles × instances (Babylon's render list). `natureInstances`:
-   *   the landscape's plant and rock instances the game camera's layer has (the woods' shadow-only
-   *   copies left out, as Babylon's layer mask left them out). `residents`, `mirrors`: the same as
-   *   Babylon's. `shaders`, `pipelines`: made so far (`ShaderWatch`; none should be made in play).
+   * - `passes`: the targets a frame draws into, with their pixels, samples and bytes per sample: the
+   *   sun's shadow map (while it has casters, drawn every frame or not), each mirror reflecting now
+   *   (held ones too), the scene's target, then the image processing onto the canvas (on Low into the
+   *   FXAA pass's input, then the FXAA onto the canvas), under those results' names. The canvas
+   *   counts 4 bytes of colour and 4 of depth. The one difference: the shadow map is depth alone,
+   *   where up to 0.3.2 it had a 2-byte colour target too.
+   * - `scene`: counts of what is drawn now. `meshes` are the draws (mesh instances) on the
+   *   composition's layers; up to 0.3.2 they counted meshes (hidden templates too), so those counts
+   *   don't compare with these, only runs since (the bench's fingerprint: equal counts, the same
+   *   scene). `materials`: theirs, distinct. `shadowCasters`: the draws that cast in the sun's layers,
+   *   shown, and `shadowCasterTriangles` their triangles × instances. `natureInstances`: the
+   *   landscape's plant and rock instances the game camera's layer has (the woods' shadow-only copies
+   *   left out). `residents`, `mirrors`: how many. `shaders`, `pipelines`: made so far (`ShaderWatch`;
+   *   none should be made in play).
    */
   benchInfo(): Record<string, unknown> & { passes: RenderPassInfo[] } {
     const d = this.device;

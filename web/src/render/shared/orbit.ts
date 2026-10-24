@@ -9,22 +9,22 @@
  * zoom, turn and pan it, all with inertia, within its limits. Engine-neutral: it owns the pose
  * (alpha, beta, radius, target, in game space) and the renderer copies it to its camera each frame.
  *
- * A port of Babylon.js 9.30's `ArcRotateCamera` input and motion (`arcRotateCamera.ts`
+ * A port of the orbit camera's input and motion named in the header (`arcRotateCamera.ts`
  * `_checkInputs` / `_applyRotationAndZoomDelta` / `_applyPanDelta` / `_checkLimits`,
  * `cameraMovement.ts`, `arcRotateCameraMovement.ts` and the pointer, mouse wheel and keyboard
- * inputs), so the camera moves exactly as it did: the same numbers in the same order.
+ * inputs), so the camera moves exactly as it did up to 0.3.2: the same numbers in the same order.
  * Left out: touch (pinch, two-finger pan; the game is desktop only), pointer lock, restoring a
  * stored state, interpolation, alpha limits and the target's height limit (the game sets none).
  *
- * Conventions as Babylon's left-handed orbit camera (game space): the camera stands at
+ * Conventions: a left-handed orbit camera (game space), the camera standing at
  * `target + radius * (cos α sin β, cos β, sin α sin β)`, y up.
  */
 
-/** Babylon's `Epsilon`: inertia below this stops. */
+/** Inertia below this stops (the original's `Epsilon`). */
 const EPSILON = 0.001;
 /** `CameraMovement.referenceFrameRate`: inertia is per frame at this rate, whatever the frame rate. */
 const REFERENCE_FPS = 60;
-/** A wheel delta in lines, in pixels (Babylon's `FfMultiplier`, Firefox). */
+/** A wheel delta in lines, in pixels (the original's `FfMultiplier`, Firefox). */
 const LINE_PIXELS = 40;
 
 const KEY = { up: [38], down: [40], left: [37], right: [39], zoomIn: [187, 107], zoomOut: [189, 109] };
@@ -32,7 +32,7 @@ const ALL_KEYS = new Set([...KEY.up, ...KEY.down, ...KEY.left, ...KEY.right, ...
 
 type Interaction = 'rotate' | 'pan' | 'zoom';
 
-/** What a pointer drag does (Babylon's default input map): Ctrl+left pans, left turns, right pans; the middle button nothing. */
+/** What a pointer drag does (the original's default input map): Ctrl+left pans, left turns, right pans; the middle button nothing. */
 function pointerInteraction(button: number, ctrl: boolean): Interaction | null {
   if (button === 0) return ctrl ? 'pan' : 'rotate';
   return button === 2 ? 'pan' : null;
@@ -45,7 +45,7 @@ function keyInteraction(key: number, ctrl: boolean, alt: boolean): Interaction {
   return alt ? 'zoom' : 'rotate';
 }
 
-/** Babylon's `CameraMovement`: input in pixels becomes a velocity with inertia, the same at any frame rate. */
+/** The camera's movement (the original's `CameraMovement`): input in pixels becomes a velocity with inertia, the same at any frame rate. */
 class Movement {
   rotationInertia = 0.9;
   zoomInertia = 0.9;
@@ -167,7 +167,7 @@ export class OrbitControls {
   buttons: readonly number[] = [0, 1, 2];
   /** Input taken (dragging, the wheel, the keys); off: the pose stays wherever it is set. */
   enabled = true;
-  /** Legacy-style panning inertia (Babylon's `inertialPanningX/Y`): what is left of a pan, applied and decayed each frame. */
+  /** Legacy-style panning inertia (the original's `inertialPanningX/Y`): what is left of a pan, applied and decayed each frame. */
   inertialPanningX = 0;
   inertialPanningY = 0;
 
@@ -192,9 +192,9 @@ export class OrbitControls {
   }
 
   /**
-   * Turning, zooming and panning that are left over (Babylon's `inertialAlphaOffset` & co.):
-   * setting one to 0 also stops that part of the input's motion, as Babylon's setters do (panning's
-   * doesn't: `inertialPanningX/Y` are plain fields there too).
+   * Turning, zooming and panning that are left over (the original's `inertialAlphaOffset` & co.):
+   * setting one to 0 also stops that part of the input's motion, as the original's setters do
+   * (panning's doesn't: `inertialPanningX/Y` are plain fields there too).
    */
   get inertialAlphaOffset(): number {
     return this.inertialAlpha !== 0 ? this.inertialAlpha : this.movement.rotationAccumulated.x !== 0 ? this.movement.rotationAccumulated.x : small(this.movement.rotationDelta.x);
@@ -218,7 +218,7 @@ export class OrbitControls {
     if (value === 0) this.movement.resetZoom();
   }
 
-  /** Stops what is left of the player's last turn, zoom and pan (as zeroing Babylon's inertial offsets does). */
+  /** Stops what is left of the player's last turn, zoom and pan (as zeroing the original's inertial offsets does). */
   stopInertia(): void {
     this.inertialAlphaOffset = this.inertialBetaOffset = this.inertialRadiusOffset = 0;
     this.inertialPanningX = this.inertialPanningY = 0;
@@ -278,7 +278,7 @@ export class OrbitControls {
       this.keys.length = 0;
       this.drag = null;
     };
-    // (Babylon's pointer input keeps the browser's menu off the canvas: a right-drag pans.)
+    // (The pointer input keeps the browser's menu off the canvas: a right-drag pans.)
     const menu = (e: Event) => e.preventDefault();
     element.addEventListener('pointerdown', down);
     element.addEventListener('pointermove', move);
@@ -314,7 +314,7 @@ export class OrbitControls {
    */
   step(dtMs: number, keyScale = 1): void {
     if (this.enabled) this.checkKeys(keyScale);
-    // Panning moves along the view as it was drawn last (Babylon's last view matrix), before this frame's turn.
+    // Panning moves along the view as it was drawn last (the last frame's view matrix), before this frame's turn.
     this.viewAlpha = this.alpha;
     this.viewBeta = this.beta;
     const m = this.movement;
@@ -341,7 +341,7 @@ export class OrbitControls {
     this.checkLimits();
   }
 
-  /** Keeps beta and the radius within the limits (a radius held at one stops zooming, as Babylon's `_checkLimits`). */
+  /** Keeps beta and the radius within the limits (a radius held at one stops zooming, as the original's `_checkLimits`). */
   checkLimits(): void {
     const { beta, radius } = this.limits;
     if (this.beta < beta[0]) this.beta = beta[0];
@@ -357,7 +357,7 @@ export class OrbitControls {
   }
 
   private rotateAndZoom(alpha: number, beta: number, radius: number): void {
-    // (Left-handed: Babylon's handedness multiplier is 1.)
+    // (Left-handed: the original's handedness multiplier is 1.)
     this.alpha += this.beta < 0 ? -alpha : alpha;
     this.beta += beta;
     this.radius -= radius;
@@ -369,7 +369,7 @@ export class OrbitControls {
     const ca = Math.cos(this.viewAlpha);
     const sb = Math.sin(this.viewBeta);
     const cb = Math.cos(this.viewBeta);
-    // The camera's forward (target - eye), right (up × forward, normalized) and up (forward × right), as Babylon's LookAtLH.
+    // The camera's forward (target - eye), right (up × forward, normalized) and up (forward × right), as a left-handed look-at (`LookAtLH`).
     const fx = -ca * sb;
     const fy = -cb;
     const fz = -sa * sb;
@@ -415,7 +415,7 @@ export class OrbitControls {
     if (delta) this.movement.zoomAccumulated += delta;
   }
 
-  /** Babylon's `_computeDeltaFromMouseWheelLegacyEvent`: a share of the radius, a little less going in than out. */
+  /** A wheel event's zoom (the original's `_computeDeltaFromMouseWheelLegacyEvent`): a share of the radius, a little less going in than out. */
   private wheelZoom(wheelDelta: number, radius: number): number {
     const d = wheelDelta * 0.01 * this.wheelDeltaPercentage * radius;
     return wheelDelta > 0 ? d / (1 + this.wheelDeltaPercentage) : d * (1 + this.wheelDeltaPercentage);
@@ -437,7 +437,7 @@ export class OrbitControls {
     }
   }
 
-  /** The held keys' input this frame (Babylon's keyboard input `checkInputs`). */
+  /** The held keys' input this frame (the original keyboard input's `checkInputs`). */
   private checkKeys(scale: number): void {
     if (!this.keys.length) return;
     const m = this.movement;
@@ -481,7 +481,7 @@ export class OrbitControls {
   }
 }
 
-/** Babylon's inertial-offset getters round a current-frame delta under `Epsilon` to 0. */
+/** As the original's inertial-offset getters: a current-frame delta under `Epsilon` is rounded to 0. */
 function small(delta: number): number {
   return Math.abs(delta) < EPSILON ? 0 : delta;
 }

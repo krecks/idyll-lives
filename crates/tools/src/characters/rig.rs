@@ -2,7 +2,7 @@
 //! family (`male`, `female`) at every life stage.
 //!
 //! Conventions (see docs/characters-format.md):
-//! - Babylon's left-handed space, metres, y up, the character faces +z, its left is -x;
+//! - the game's left-handed space, metres, y up, the character faces +z, its left is -x;
 //! - every rest local rotation is the identity, so a bone's frame at rest is model space and a
 //!   joint's local translation is just the offset from its parent's joint;
 //! - the rest pose is an A-pose: arms 45 degrees down, legs straight and vertical;

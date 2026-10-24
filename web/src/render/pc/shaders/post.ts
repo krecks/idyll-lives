@@ -4,25 +4,26 @@
 // Babylon.js: Copyright 2023 The Babylon.js team, under the Apache License 2.0; its licence and notice
 // are in crates/tools/texts/Babylon.js-LICENSE and Babylon.js-NOTICE, and in a build's THIRD-PARTY-LICENSES.txt.
 /**
- * The picture after the light, in shader code (the port of Babylon.js 9.30's image processing,
- * `imageProcessingFunctions.fx` and `fxaa.fragment.fx`, which `post.ts` puts on the camera):
+ * The picture after the light, in shader code (the ported image processing and FXAA, which
+ * `post.ts` puts on the camera):
  *
- * - `IMAGE_PROCESSING`: Babylon's `applyImageProcessing` in its own order: exposure; the vignette
- *   (multiplied, before tone mapping); ACES (`ACESFitted`, Babylon's, without the 1 / 0.6 that
- *   PlayCanvas's `TONEMAP_ACES2` adds); to gamma space as Babylon goes (`pow(x, 1 / 2.2)`, not the
- *   sRGB curve) and clamped; contrast; the colour curves (analytic, no LUT). Every step always
- *   runs, driven by uniforms: Babylon's steps it leaves out by a define (exposure 1, contrast 1, no
- *   vignette, neutral curves) are exactly no change here, so the look changes live without a
- *   shader compiling. Its uniforms: `shared/imageProcessing.ts`.
+ * - `IMAGE_PROCESSING`: the original's `applyImageProcessing` in its own order: exposure; the
+ *   vignette (multiplied, before tone mapping); ACES (`ACESFitted`, without the 1 / 0.6 that
+ *   PlayCanvas's `TONEMAP_ACES2` adds); to gamma space by `pow(x, 1 / 2.2)` (not the sRGB curve)
+ *   and clamped; contrast; the colour curves (analytic, no LUT). Every step always runs, driven by
+ *   uniforms: the steps the original leaves out by a define (exposure 1, contrast 1, no vignette,
+ *   neutral curves) are exactly no change here, so the look changes live without a shader
+ *   compiling. Its uniforms: `shared/imageProcessing.ts`.
  * - `composeChunks`: hosts it in PlayCanvas's compose pass (`composeDeclarationsPS`,
  *   `composeMainEndPS`), on the scene's linear colour (the compose's own tone mapping is
  *   `TONEMAP_NONE`, its vignette and LUT off), with the night grade after it (`nightGrade.ts`). The
  *   compose then encodes for its target (`gammaCorrectOutput`, the same `pow(x, 1 / 2.2)`), so the
- *   chunk hands it Babylon's display colour decoded the same way.
- * - `FXAA`: Babylon's FXAA 3.11 pass (quality preset 12), verbatim, on the image-processed colour,
- *   with the night grade at its end where it runs (Babylon's order: image processing, FXAA, grade).
- * - `PAGE_TONE_MAPPING`: the dev pages' look (Babylon's pages applied the image processing in
- *   each material: exposure and ACES only), as `tonemappingAces2PS`.
+ *   chunk hands it the display colour decoded the same way.
+ * - `FXAA`: FXAA 3.11 (quality preset 12), verbatim from the original, on the image-processed
+ *   colour, with the night grade at its end where it runs (the order: image processing, FXAA,
+ *   grade).
+ * - `PAGE_TONE_MAPPING`: the dev pages' look (the image processing in each material: exposure and
+ *   ACES only), as `tonemappingAces2PS`.
  *
  * GLSL (WebGL2) and WGSL (WebGPU) side by side. The engine lines this relies on are checked by
  * `tools/render/check_chunks.ts`.
@@ -31,7 +32,7 @@
 import { NIGHT_GRADE } from '../nightGrade';
 import type { Language } from './chunks';
 
-/** Babylon's `ACESFitted` (Stephen Hill's fit, MJP's BakingLab `ACES.hlsl`): input matrix, RRT + ODT fit, output matrix, clamped. */
+/** `ACESFitted` (Stephen Hill's fit, MJP's BakingLab `ACES.hlsl`): input matrix, RRT + ODT fit, output matrix, clamped. */
 export const ACES: Record<Language, string> = {
   glsl: `
 const mat3 gameAcesIn = mat3(vec3(0.59719, 0.07600, 0.02840), vec3(0.35458, 0.90834, 0.13383), vec3(0.04823, 0.01566, 0.83777));
@@ -66,9 +67,9 @@ fn gameAcesFitted(color: vec3f) -> vec3f {
 };
 
 /**
- * `gameImageProcessing(linear, uv)`: Babylon's display colour (gamma space) for the scene's linear
- * colour at `uv` (0..1 across the picture; the vignette is symmetric, so either way up). Uniforms:
- * `gameExposure`, `gameContrast`, `gameVignette1`/`2` (Babylon's `vignetteSettings1`/`2`) and
+ * `gameImageProcessing(linear, uv)`: the display colour (gamma space) for the scene's linear colour
+ * at `uv` (0..1 across the picture; the vignette is symmetric, so either way up). Uniforms:
+ * `gameExposure`, `gameContrast`, `gameVignette1`/`2` (the original's `vignetteSettings1`/`2`) and
  * `gameCurveNeutral`/`Positive`/`Negative` (`vCameraColorCurve*`).
  */
 export const IMAGE_PROCESSING: Record<Language, string> = {
@@ -155,11 +156,11 @@ fn gameSrgbDecode(c: vec3f) -> vec3f {
 };
 
 export interface ComposeOptions {
-  /** Babylon's image processing (off: the diag views and `?diag=linear`, which show the colour itself). */
+  /** The image processing (off: the diag views and `?diag=linear`, which show the colour itself). */
   imageProcessing: boolean;
   /** The night grade at the end (off where the FXAA pass has it, and with `?diag=nonight`). */
   night: boolean;
-  /** The compose draws for the FXAA pass: the colour unclamped above 1, as Babylon's half-float FXAA input had it. */
+  /** The compose draws for the FXAA pass: the colour unclamped above 1 (as a half-float input). */
   toFxaa: boolean;
 }
 
@@ -168,9 +169,9 @@ export function composeChunks(lang: Language, options: ComposeOptions): { declar
   if (!options.imageProcessing) return { declarations: '', mainEnd: '' };
   const declarations = `${IMAGE_PROCESSING[lang]}${options.night ? NIGHT_GRADE[lang] : ''}${SRGB_DECODE[lang]}`;
   const v3 = lang === 'glsl' ? 'vec3' : 'vec3f';
-  // (Babylon's next pass read the image-processed colour from a half-float texture before the
-  // FXAA, an 8-bit one before the grade; the canvas clamps. Negative values, which the compose's
-  // encoding can't take, are left out for the FXAA too.)
+  // (The FXAA reads the image-processed colour as from a half-float texture, unclamped above 1; the
+  // grade reads it clamped, as from an 8-bit one; the canvas clamps. Negative values, which the
+  // compose's encoding can't take, are left out for the FXAA too.)
   const range = options.toFxaa ? `max(result, ${v3}(0.0))` : `clamp(result, ${v3}(0.0), ${v3}(1.0))`;
   const mainEnd = `
 	result = gameImageProcessing(result, uv);
@@ -186,10 +187,10 @@ export function composeChunks(lang: Language, options: ComposeOptions): { declar
 }
 
 /**
- * Babylon's FXAA fragment shader (quality 12, `fxaa.fragment.fx`; `MALI` where Babylon set it),
- * reading `gameFxaaSource` (`gameFxaaTexel`: one texel), its eight neighbour coordinates worked
- * out here rather than in the vertex shader. `GAME_NIGHT`: the night grade on the result (clamped
- * to 0..1 first, as Babylon's grade read it); `GAME_SRGB_TARGET`: the target encodes itself.
+ * The FXAA fragment shader (quality 12, the original's `fxaa.fragment.fx`; `MALI` on Mali GPUs),
+ * reading `gameFxaaSource` (`gameFxaaTexel`: one texel), its eight neighbour coordinates worked out
+ * here rather than in the vertex shader. `GAME_NIGHT`: the night grade on the result (clamped to
+ * 0..1 first, as the grade was tuned on); `GAME_SRGB_TARGET`: the target encodes itself.
  */
 export const FXAA: Record<Language, string> = {
   glsl: `
@@ -545,9 +546,9 @@ fn fragmentMain(input: FragmentInput) -> FragmentOutput {
 };
 
 /**
- * The dev pages' tone mapping (`tonemappingAces2PS` replaced on their device): Babylon's pages
- * had the image processing in each material, exposure then ACES (`scene.exposure`, the engine's
- * `getExposure()`); the engine's gamma output after it is Babylon's `pow(x, 1 / 2.2)`.
+ * The dev pages' tone mapping (`tonemappingAces2PS` replaced on their device): the pages have the
+ * image processing in each material, exposure then ACES (`scene.exposure`, the engine's
+ * `getExposure()`); the engine's gamma output after it is the same `pow(x, 1 / 2.2)` as the game's.
  */
 export const PAGE_TONE_MAPPING: Record<Language, string> = {
   glsl: `${ACES.glsl}
@@ -563,10 +564,10 @@ fn toneMap(color: vec3f) -> vec3f {
 };
 
 /**
- * `PAGE_TONE_MAPPING` with Babylon's contrast after it (`ImageProcessingConfiguration.contrast`,
- * in the material as the previews' scenes had it): in gamma space, after the clamp, and back to
- * linear for the engine's gamma output (`pow(x, 2.2)` undoes its `pow(x, 1 / 2.2)`). `contrast`
- * goes into the code as a constant.
+ * `PAGE_TONE_MAPPING` with the image processing's contrast after it (the original's
+ * `ImageProcessingConfiguration.contrast`, in the material as the previews' scenes have it): in
+ * gamma space, after the clamp, and back to linear for the engine's gamma output (`pow(x, 2.2)`
+ * undoes its `pow(x, 1 / 2.2)`). `contrast` goes into the code as a constant.
  */
 export function pageToneMapping(contrast: number): Record<Language, string> {
   const k = contrast.toFixed(4);

@@ -3,14 +3,14 @@
 // Babylon.js: Copyright 2023 The Babylon.js team, under the Apache License 2.0; its licence and notice
 // are in crates/tools/texts/Babylon.js-LICENSE and Babylon.js-NOTICE, and in a build's THIRD-PARTY-LICENSES.txt.
 /**
- * The haze as Babylon's PBR drew it, in the game's lit materials (`GAME_LOOK`): `fogPS` with two
- * lines changed (anchors also in `tools/render/check_chunks.ts`).
+ * The haze as the look was tuned with (the PBR fog this follows), in the game's lit materials
+ * (`GAME_LOOK`): `fogPS` with two lines changed (anchors also in `tools/render/check_chunks.ts`).
  *
- * - The distance is the eye's (`length` of the view-space position, Babylon's `vFogDistance`), not
- *   the depth along the view (PlayCanvas's `gl_FragCoord.z / w`): the haze is as thick at the
- *   picture's sides as in its middle.
- * - The fog factor is taken into linear space (`pow(f, 2.2)`: Babylon's `fogFragment` does
- *   `fog = toLinearSpace(fog)` for PBR materials): the haze is about 2.2 times as strong near.
+ * - The distance is the eye's (`length` of the view-space position), not the depth along the view
+ *   (PlayCanvas's `gl_FragCoord.z / w`): the haze is as thick at the picture's sides as in its
+ *   middle.
+ * - The fog factor is taken into linear space (`pow(f, 2.2)`, as the original does for PBR
+ *   materials): the haze is about 2.2 times as strong near.
  *
  * Other materials (unlit decals, particles) keep PlayCanvas's own.
  */

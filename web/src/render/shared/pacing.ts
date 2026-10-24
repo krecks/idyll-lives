@@ -1,15 +1,15 @@
 /**
- * The frame rate cap, paced in whole display refreshes. Babylon's own cap (`engine.maxFPS`) draws
- * once enough time has piled up since the last frame: at 60 on a 120 Hz display, after a frame
- * that came a refresh late it draws the next one a refresh later to catch up, so frames stay on
- * screen for 1, 2 or 3 refreshes and motion judders. The pacer instead draws every `divisor`-th
+ * The frame rate cap, paced in whole display refreshes. A cap that draws once enough time has
+ * piled up since the last frame judders: at 60 on a 120 Hz display, after a frame that came a
+ * refresh late it draws the next one a refresh later to catch up, so frames stay on screen for 1,
+ * 2 or 3 refreshes. The pacer instead draws every `divisor`-th
  * refresh counted from the last frame drawn, measured with the timestamps `requestAnimationFrame`
  * gives (the refresh each frame is for).
  *
  * A cap the refresh rate doesn't divide becomes the nearest rate it does, up to a quarter above
  * the cap: 60 is 72 fps on a 144 Hz display, 60 on 120 Hz, 75 on 75 Hz; 30 is 36 on 144 Hz.
  *
- * It plugs into Babylon's render loop as `engine.customAnimationFrameRequester`, and keeps the
+ * The renderer asks it for frames as it would ask `requestAnimationFrame`, and it keeps the
  * timestamp of the refresh being drawn (`frameTime`) for the game's clocks. `pacingDivisor` is pure.
  */
 
@@ -54,7 +54,7 @@ export class FramePacer {
   divisor = 1;
   /** The `requestAnimationFrame` timestamp of the frame being drawn (ms, the `performance.now()` clock). */
   frameTime = 0;
-  /** Babylon's `ICustomAnimationFrameRequester`: the pending request (any non-zero id). */
+  /** The pending request (any non-zero id), for a caller that keeps one. */
   requestID?: number;
   private cap = 0;
   private callback: ((time: number) => void) | null = null;
@@ -76,7 +76,7 @@ export class FramePacer {
     return 1000 / this.interval;
   }
 
-  // Arrow functions, so they work unbound (as Babylon's engine called them: `const { requestAnimationFrame } = requester`).
+  // Arrow functions, so they work unbound (`const { requestAnimationFrame } = pacer`).
 
   readonly requestAnimationFrame = (fn: (time: number) => void): number => {
     this.callback = fn;

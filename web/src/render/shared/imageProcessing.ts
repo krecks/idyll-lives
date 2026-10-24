@@ -4,15 +4,15 @@
 // Babylon.js: Copyright 2023 The Babylon.js team, under the Apache License 2.0; its licence and notice
 // are in crates/tools/texts/Babylon.js-LICENSE and Babylon.js-NOTICE, and in a build's THIRD-PARTY-LICENSES.txt.
 /**
- * The CPU half of Babylon's image processing (`ImageProcessingConfiguration.bind` and
- * `ColorCurves._bind` in Babylon.js 9.30): the uniforms its `applyImageProcessing` reads, worked
- * out from the look's settings, for the PlayCanvas port of that shader (`render/pc/shaders/post.ts`).
- * The same numbers as Babylon's for the same settings (`tests/imageProcessing.test.ts`).
+ * The CPU half of the game's image processing: the uniforms the image processing shader
+ * (`render/pc/shaders/post.ts`, `applyImageProcessing`) reads, worked out from the look's settings.
+ * The same numbers as the original's for the same settings, checked against the uniforms recorded
+ * in `web/tests/fixtures` (`tests/imageProcessing.test.ts`).
  *
  * Pure: no engine, no DOM.
  */
 
-/** Babylon's `ColorCurves` (hue in degrees 0..360; density, saturation and exposure -100..100). */
+/** The colour curves (hue in degrees 0..360; density, saturation and exposure -100..100). */
 export interface ColorCurveSettings {
   globalHue: number;
   globalDensity: number;
@@ -133,7 +133,7 @@ export function curveUniforms(c: Readonly<ColorCurveSettings>, out: CurveUniform
   return out;
 }
 
-/** Babylon's vignette (multiply blend), as `ImageProcessingConfiguration` has it. */
+/** The vignette (multiply blend). */
 export interface VignetteSettings {
   /** Strength (`vignetteWeight`, 1.5 by default); 0 leaves the picture as it is. */
   weight: number;
@@ -141,7 +141,7 @@ export interface VignetteSettings {
   stretch: number;
   /** The colour the corners turn towards (linear, multiplied in before tone mapping). */
   color: readonly [number, number, number];
-  /** `vignetteCameraFov`: Babylon's default 0.5 rad, not the camera's own. */
+  /** `vignetteCameraFov`: 0.5 rad by default (the original's default), not the camera's own. */
   cameraFov?: number;
   centerX?: number;
   centerY?: number;

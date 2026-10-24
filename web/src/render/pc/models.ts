@@ -4,28 +4,26 @@
 // Babylon.js: Copyright 2023 The Babylon.js team, under the Apache License 2.0; its licence and notice
 // are in crates/tools/texts/Babylon.js-LICENSE and Babylon.js-NOTICE, and in a build's THIRD-PARTY-LICENSES.txt.
 /**
- * Builds renderable templates from asset entries on PlayCanvas (ported from the Babylon renderer, removed: see git history up to f15b839b):
- * glTF files, or nothing when there's no file or it doesn't load (a plain box for things placed,
- * held or pictured, `BuildOptions.standIn`). A file that fails is tried again in the background,
+ * Builds renderable templates from asset entries on PlayCanvas: glTF files, or nothing when there's
+ * no file or it doesn't load (a plain box for things placed, held or pictured, `BuildOptions.standIn`). A file that fails is tried again in the background,
  * and whoever drew the box builds it again once it comes (`onModelFileArrived`, `TemplateCache`).
  * A template is data (meshes with their materials, in model space): whoever draws it gives each
  * mesh its instances (`instancing.ts`), one draw call per mesh however many copies exist.
  *
  * Primitive parts (a character's limbs, the few parts a file can't carry) are merged per
- * (tint slot, finish) so a model costs one draw call per distinct finish, as the Babylon renderer
- * built them (`shared/modelParts.ts`: the same vertices). glTF entries may also carry `fit`,
- * `materials` (restyled with the game's finishes, mirror glass, glows) and `parts`: see
- * `shared/modelEntry.ts` `ModelExtras`.
+ * (tint slot, finish) so a model costs one draw call per distinct finish (`shared/modelParts.ts`
+ * builds their vertices). glTF entries may also carry `fit`, `materials` (restyled with the game's
+ * finishes, mirror glass, glows) and `parts`: see `shared/modelEntry.ts` `ModelExtras`.
  *
  * Game space. A file loads through PlayCanvas's glTF container (meshopt and KTX2 in the production
  * build: `loaders.ts`), but its geometry, nodes and animations are read here from the file's own
- * buffers and baked into model space as Babylon's loader placed them in its left-handed space: the
- * file's x turned round (Babylon's `__root__` node: scaled -1 in z, turned half round). So a model's
- * left and right are the Babylon renderer's, and the game's own numbers (`fit`, `offset`, parts,
- * clips' poses) apply unchanged. Its clips are sampled here too (`readClip`): the game plays them
- * itself (`shared/modelClips.ts`), not PlayCanvas's anim system.
+ * buffers and baked into model space, the game's left-handed space: the file's x turned round (a
+ * `__root__` node above the file's scene, scaled -1 in z and turned half round, `ROOT`). So a
+ * model's left and right are the ones the game's own numbers (`fit`, `offset`, parts, clips' poses)
+ * were made for. Its clips are sampled here too (`readClip`): the game plays them itself
+ * (`shared/modelClips.ts`), not PlayCanvas's anim system.
  *
- * Winding: every mesh keeps Babylon's winding in game space (its builders' front faces: `pushTri`),
+ * Winding: every mesh keeps the game's winding in game space (its builders' front faces: `pushTri`),
  * and the materials take that for the front under the world root's mirror (`GAME_FRONT_FACE`). A
  * file's triangles go the same way: its x turned round and its winding swapped, so they keep the
  * file's front faces, drawn with copies of its materials that take the game's front face too. Its
@@ -309,7 +307,7 @@ class PartGroups {
 }
 
 /**
- * A PlayCanvas mesh of `data` (game space, wound as Babylon's builders wind front faces: `pushTri`;
+ * A PlayCanvas mesh of `data` (game space, wound as the game's builders wind front faces: `pushTri`;
  * drawn with materials whose front face is `GAME_FRONT_FACE`).
  */
 export function uploadData(device: pc.GraphicsDevice, data: VData): pc.Mesh {
@@ -404,7 +402,7 @@ export async function fileColour(app: pc.AppBase, entry: ModelEntry | undefined,
   return material ? hexString(material.diffuse) : undefined;
 }
 
-/** A colour as Babylon's `Color3.toHexString` writes it. */
+/** A colour as `#RRGGBB`, upper case, each channel rounded to 0..255. */
 function hexString(c: pc.Color): string {
   const hex = (v: number) => Math.max(0, Math.min(255, Math.round(v * 255))).toString(16).toUpperCase().padStart(2, '0');
   return `#${hex(c.r)}${hex(c.g)}${hex(c.b)}`;
@@ -510,7 +508,7 @@ interface GltfAccessor {
 const COMPONENTS: Record<string, number> = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT2: 4, MAT3: 9, MAT4: 16 };
 const SIZES: Record<number, number> = { 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 };
 
-/** An accessor's values as floats (normalised integers as Babylon reads them), with their count per element. */
+/** An accessor's values as floats (normalised integers to 0..1 or -1..1), with their count per element. */
 function readAccessor(file: Container, index: number): { values: Float32Array; components: number } {
   const a = file.gltf.accessors![index];
   const components = COMPONENTS[a.type];
@@ -537,8 +535,8 @@ function readAccessor(file: Container, index: number): { values: Float32Array; c
 }
 
 /**
- * A file's node as Babylon's loader made it: its place (`position`, `rotationQuaternion`, `scaling`,
- * which the clips set), its parent (-1: the `__root__` node that takes glTF into left-handed space).
+ * A file's node: its place (`position`, `rotationQuaternion`, `scaling`, which the clips set), its
+ * parent (-1: the `__root__` node that takes glTF into left-handed space).
  */
 interface FileNode {
   name: string;
@@ -548,10 +546,10 @@ interface FileNode {
   s: number[];
 }
 
-/** Babylon's glTF `__root__`: scaled -1 in z and turned half round y, the file's x turned round. */
+/** The `__root__` above a file's scene: scaled -1 in z and turned half round y, the file's x turned round. */
 const ROOT = compose(1, 1, -1, [0, 1, 0, 0], 0, 0, 0, new Float32Array(16));
 
-/** A clip's channel as Babylon's loader keys it: frames at 60 a second, from 0 to its group's end (`AnimationGroup.normalize`). */
+/** A clip's channel: frames at 60 a second, from 0 to its group's end (every group starts at frame 0). */
 interface Track {
   node: number;
   prop: 't' | 'r' | 's';
@@ -560,14 +558,14 @@ interface Track {
   step: boolean;
 }
 
-/** A glTF animation: Babylon's animation group (from frame 0 to `to`). */
+/** A glTF animation as a group of tracks (from frame 0 to `to`). */
 interface Group {
   name: string;
   tracks: Track[];
   to: number;
 }
 
-/** Babylon's glTF frame rate (`targetFps`). */
+/** The frame rate the clips are keyed at. */
 const FPS = 60;
 
 async function importFile(app: pc.AppBase, url: string, now: boolean): Promise<LoadedFile> {
@@ -578,7 +576,7 @@ async function importFile(app: pc.AppBase, url: string, now: boolean): Promise<L
     if (n.matrix) [t, r, s] = decompose(n.matrix);
     return { name: n.name ?? `node${i}`, parent: -1, t: [...t], r: [...r] as Quat, s: [...s] };
   });
-  // The scene's nodes, in the file's order (Babylon's `result.meshes` order), each with its parent.
+  // The scene's nodes, in the file's order, each with its parent.
   const inScene = new Set<number>();
   const visit = (i: number, parent: number) => {
     inScene.add(i);
@@ -649,7 +647,7 @@ async function importFile(app: pc.AppBase, url: string, now: boolean): Promise<L
       const raw = readPrimitive(file, primitive);
       if (raw.positions.length === 0) return;
       const part = partOf(index);
-      // The names of its mesh and the nodes above it (Babylon names a node's second and later primitives' meshes apart).
+      // The names of its mesh and the nodes above it (a node's second and later primitives' meshes are named apart, `_primitive<p>`).
       const names: string[] = primitives.length > 1 ? [`${nodes[index].name}_primitive${p}`] : [];
       for (let n = index; n >= 0; n = nodes[n].parent) names.push(nodes[n].name);
       names.push('__root__');
@@ -712,7 +710,7 @@ function readPrimitive(file: Container, primitive: GltfPrimitive): VData {
   };
 }
 
-/** The file's animations as Babylon's loader keys them (translation, rotation and scale; empty ones left out). */
+/** The file's animations as tracks (translation, rotation and scale; empty ones left out). */
 function readGroups(file: Container, nodes: FileNode[]): Group[] {
   const groups: Group[] = [];
   (file.gltf.animations ?? []).forEach((animation, index) => {
@@ -754,7 +752,7 @@ function readGroups(file: Container, nodes: FileNode[]): Group[] {
   return groups;
 }
 
-/** A track's value at `frame`, as Babylon's `Animation.evaluate`: linear (a rotation spherically), or stepped. */
+/** A track's value at `frame` (`Animation.evaluate`, see the header): linear (a rotation spherically), or stepped. */
 function evaluate(track: Track, frame: number): number[] {
   const { frames, values } = track;
   let key = 0;
@@ -769,7 +767,7 @@ function evaluate(track: Track, frame: number): number[] {
   return track.prop === 'r' ? slerp(a, b, gradient) : a.map((v, k) => v + (b[k] - v) * gradient);
 }
 
-/** Babylon's `Quaternion.Slerp`. */
+/** Spherical interpolation of two quaternions (`Quaternion.Slerp`, see the header). */
 function slerp(left: number[], right: number[], amount: number): number[] {
   let dot = left[0] * right[0] + left[1] * right[1] + left[2] * right[2] + left[3] * right[3];
   let flip = false;
@@ -800,7 +798,7 @@ function readClip(group: Group, nodes: FileNode[], moved: number[], rest: Float3
   const samples = Math.max(2, Math.ceil(duration * CLIP_RATE) + 1);
   const animated = new Set(group.tracks.map((t) => t.node));
   // Per moving part: the depth of the outermost node of it, or around it, that the clip moves (-1: none).
-  // (Babylon's: the `__root__` node counts as a parent.)
+  // (The `__root__` node counts as a parent.)
   const depthOf = (node: number): number => {
     let depth = -1;
     let d = 1;
@@ -825,7 +823,7 @@ function readClip(group: Group, nodes: FileNode[], moved: number[], rest: Float3
   return { duration, tracks };
 }
 
-/** A node's `matrix` as translation, rotation and scale (Babylon's `Matrix.decompose`, without a mirror). */
+/** A node's `matrix` as translation, rotation and scale (`Matrix.decompose`, see the header, without a mirror). */
 function decompose(m: number[]): [number[], Quat, number[]] {
   const s = [Math.hypot(m[0], m[1], m[2]), Math.hypot(m[4], m[5], m[6]), Math.hypot(m[8], m[9], m[10])];
   if (determinant(m) <= 0) s[1] *= -1;
@@ -969,7 +967,7 @@ function buildFromFile(app: pc.AppBase, name: string, entry: ModelEntry, file: L
         return;
       }
       const material = fileMaterial(app, lib, source.material, ov);
-      // (Baked in Babylon's way, `transformData` turned its winding round with its x: turned back, the
+      // (Baked into game space, `transformData` turned its winding round with its x: turned back, the
       // builders' winding (`pushTri`), the file's front faces still in front for `GAME_FRONT_FACE`.)
       const own = copyData(data);
       flipFaces(own.indices);
@@ -1087,8 +1085,8 @@ function glowMaterial(app: pc.AppBase): pc.StandardMaterial {
   material.diffuse.set(0, 0, 0);
   material.emissive.set(1, 1, 1);
   material.emissiveVertexColor = true;
-  // The glow's colour (linear) linearised once more, as the Babylon renderer drew it: its standard
-  // material's output was taken as sRGB (and linearised for the image processing).
+  // The glow's colour (linear) linearised once more, as the look was tuned: the glow's colour is taken
+  // as sRGB (and linearised for the image processing).
   (material as pc.StandardMaterial & { vertexColorGamma: boolean }).vertexColorGamma = true;
   material.blendType = pc.BLEND_ADDITIVE;
   material.depthWrite = false;
@@ -1110,9 +1108,8 @@ const instanceGlows = new WeakMap<pc.Material, pc.StandardMaterial>();
 
 /**
  * A glow's material drawn with a strength per instance (the `INSTANCE_COLOR` stream, `instancing.ts`):
- * its vertex colour (the glow's) times the instance's colour, as Babylon's thin instances' colour
- * multiplied the glow's (a lamp's shade as bright as its lamp, a screen as its flicker), and was
- * linearised with it (`vertexColorGamma`). Draws without that stream keep the glow's own material.
+ * its vertex colour (the glow's) times the instance's colour (a lamp's shade as bright as its lamp,
+ * a screen as its flicker), linearised together (`vertexColorGamma`). Draws without that stream keep the glow's own material.
  */
 export function glowByInstance(app: pc.AppBase, glow: pc.Material): pc.Material {
   if (!(glow instanceof pc.StandardMaterial)) return glow;

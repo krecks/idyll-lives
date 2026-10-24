@@ -95,7 +95,8 @@ export interface BenchResult {
   /**
    * Scene counts at the start (meshes, materials, shadow casters and their triangles, plant instances,
    * residents, mirrors: `Renderer.benchInfo`): equal fingerprints mean two runs drew the same scene.
-   * The meshes and materials are PlayCanvas's draws (Babylon counted its meshes): compare runs of one engine.
+   * The meshes and materials are PlayCanvas's draws (runs before the PlayCanvas port counted meshes): compare runs
+   * since the port only.
    */
   fingerprint: string;
 }

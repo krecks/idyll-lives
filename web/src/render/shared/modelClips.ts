@@ -2,7 +2,7 @@
  * A model's clips as the game plays them (not the engines' animation systems): each moving part's
  * pose sampled `CLIP_RATE` times a second when the file is read (`models.ts` `readClip`), and
  * blended here between samples. Engine-neutral: the poses are 16-float matrices in game space,
- * Babylon's row-vector layout (`shared/math.ts`): a vertex times the pose.
+ * in the row-vector layout of `shared/math.ts`: a vertex times the pose.
  */
 
 export interface ModelClip {
