@@ -343,6 +343,8 @@ export class MaterialLibrary {
   /** The sky's hemispheric fill (linear, scaled by its intensity; `setSkyFill`). */
   private readonly skySky = new Float32Array(3);
   private readonly skyGround = new Float32Array(3);
+  /** Where it comes from (PlayCanvas space, unit length). */
+  private readonly skyDir = new Float32Array(3);
   /** The shader features' state as global uniforms (`pushUniforms`). */
   private readonly uniforms: { id: pc.ScopeId; value: Float32Array; fill: (out: Float32Array) => void }[];
   private readonly mask: pc.ScopeId;
@@ -354,10 +356,7 @@ export class MaterialLibrary {
     this.dig = new DigState(device);
     this.rooms = new RoomLightState(device);
     const scope = device.scope;
-    const d = SKY_FILL_DIRECTION;
-    const len = Math.hypot(d.x, d.y, d.z);
-    // (PlayCanvas space: the world is mirrored in z.)
-    const hemiDir = new Float32Array([d.x / len, d.y / len, -d.z / len]);
+    this.setSkyDirection(SKY_FILL_DIRECTION);
     const dig = this.dig;
     const cut = this.wallCut;
     const vec4 = (v: pc.Vec4) => (o: Float32Array) => {
@@ -369,7 +368,7 @@ export class MaterialLibrary {
     const table: [string, number, (out: Float32Array) => void][] = [
       ['game_hemiSky', 3, (o) => o.set(this.skySky)],
       ['game_hemiGround', 3, (o) => o.set(this.skyGround)],
-      ['game_hemiDir', 3, (o) => o.set(hemiDir)],
+      ['game_hemiDir', 3, (o) => o.set(this.skyDir)],
       ['game_wallCutLook', 4, vec4(cut.look)],
       ['game_wallCutParams', 4, vec4(cut.params)],
       ['game_wallHole', 4, vec4(cut.hole)],
@@ -606,6 +605,13 @@ export class MaterialLibrary {
     g[0] = ground.r * intensity;
     g[1] = ground.g * intensity;
     g[2] = ground.b * intensity;
+  }
+
+  /** Where the sky's fill comes from (game space; the game's is `SKY_FILL_DIRECTION`, the dev pages' straight up). */
+  setSkyDirection(d: { x: number; y: number; z: number }): void {
+    const len = Math.hypot(d.x, d.y, d.z);
+    // (PlayCanvas space: the world is mirrored in z.)
+    this.skyDir.set([d.x / len, d.y / len, -d.z / len]);
   }
 
   /**

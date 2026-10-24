@@ -13,7 +13,7 @@
 //! `leaves` and its tags in order). Sizes and heights are `cargo check-glb`'s (`checkglb::measures`), with what
 //! the review measures besides: a top its kind has and its content hasn't, a table's H without its seats and a
 //! stair's top step (`h_of`; docs/review/reference.md, "How to use this"). The manifests give each model's
-//! `motions`; the renderer's `ACTIONS` (characters.ts) and action sounds (audio/world.ts) are read from its
+//! `motions`; the renderer's `ACTIONS` (render/shared/characters/actions.ts) and action sounds (audio/world.ts) are read from its
 //! source. A category is the docs/objects page the object is on: its buy category, or `packs` for a personality
 //! pack's objects.
 
@@ -284,13 +284,13 @@ pub fn motions(paths: &Paths) -> Result<BTreeMap<String, Value>, String> {
 
 /// The body of `const <name>… = {` in TypeScript `source`, up to its closing `};` at the start of a line.
 fn ts_block<'a>(source: &'a str, name: &str) -> Result<&'a str, String> {
-    let head = Regex::new(&format!(r"(?m)^const {name}\b[^=]*= \{{\n")).unwrap();
+    let head = Regex::new(&format!(r"(?m)^(?:export )?const {name}\b[^=]*= \{{\n")).unwrap();
     let start = head.find(source).ok_or_else(|| format!("no `const {name} = {{` in the source"))?.end();
     let end = source[start..].find("\n};").ok_or_else(|| format!("`{name}` has no closing `}};`"))?;
     Ok(&source[start..start + end])
 }
 
-/// The action tags the renderer animates: the top-level keys of `ACTIONS` in characters.ts (`source`).
+/// The action tags the renderer animates: the top-level keys of `ACTIONS` in render/shared/characters/actions.ts (`source`).
 pub fn action_keys(source: &str) -> Result<BTreeSet<String>, String> {
     let key = Regex::new(r"(?m)^  ([A-Za-z_$][\w$]*|'[^']+'): ").unwrap();
     Ok(key.captures_iter(ts_block(source, "ACTIONS")?).map(|c| c[1].trim_matches('\'').to_string()).collect())
@@ -812,7 +812,7 @@ pub fn main(args: &[String]) -> i32 {
                 sizes(&objects, &checkglb::measures(&s.paths, &tops(&objects, &reference))?, &reference)
             }
             Some("uses") => {
-                let actions = action_keys(&s.read("web/src/render/babylon/characters.ts")?).map_err(|e| format!("characters.ts: {e}"))?;
+                let actions = action_keys(&s.read("web/src/render/shared/characters/actions.ts")?).map_err(|e| format!("actions.ts: {e}"))?;
                 let sounds = action_sounds(&s.read("web/src/audio/world.ts")?).map_err(|e| format!("world.ts: {e}"))?;
                 let (text, files) = uses(&objects, &motions(&s.paths)?, &actions, &sounds, reference.as_ref());
                 (text, files, 0)

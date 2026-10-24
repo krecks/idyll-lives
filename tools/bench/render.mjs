@@ -96,11 +96,11 @@ const PAGES = {
   'gallery-objects': { path: '/gallery.html', query: 'keys=model.sofa,model.armchair,model.bedDouble,model.fridge,model.bathtub,model.bookcaseTall,model.wardrobe,model.toilet,model.mirror,model.tableLamp&scale=adult&still', webgl: true },
   'gallery-nature': { path: '/gallery.html', query: 'still', webgl: true },
   clips: { path: '/clips.html', query: 'keys=model.fridge,model.sofa,model.wardrobe,model.shower&t=0.6', webgl: true },
-  characters: { path: '/characters.html', query: 'manual', webgl: false },
-  'characters-faces': { path: '/characters.html', query: 'manual&face=moods&family=female&cols=6&closeup=1&labels=0', webgl: false },
-  poses: { path: '/poses.html', query: 'manual&labels=0', webgl: false, prepare: () => window.__poses.advance(2) },
+  characters: { path: '/characters.html', query: 'manual', webgl: true },
+  'characters-faces': { path: '/characters.html', query: 'manual&face=moods&family=female&cols=6&closeup=1&labels=0', webgl: true },
+  poses: { path: '/poses.html', query: 'manual&labels=0', webgl: true, prepare: () => window.__poses.advance(2) },
   previews: { path: '/previews.html', query: '', webgl: true },
-  'poses-close': { path: '/poses.html', query: 'manual&only=sofa,sleep,cook,bath,piano,hug&cols=3&labels=0', webgl: false, prepare: () => window.__poses.advance(2) },
+  'poses-close': { path: '/poses.html', query: 'manual&only=sofa,sleep,cook,bath,piano,hug&cols=3&labels=0', webgl: true, prepare: () => window.__poses.advance(2) },
 };
 
 /** One run's options, from its command line or from one job of `--jobs`. */

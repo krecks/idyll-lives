@@ -156,11 +156,11 @@ const PLANTED = new Set(['interact', 'pickUp', 'eat', 'yes', 'punchJab', 'punchC
 const SEAT: Record<string, number> = { child: 0.31 };
 const SEAT_HEIGHT = 0.45;
 const STAGES = ['baby', 'child', 'teen', 'youngAdult', 'adult', 'elder'];
-/** The runtime's hip roll while walking, per body (rad), read from characters.ts so the two can't drift apart. */
+/** The runtime's hip roll while walking, per body (rad), read from render/shared/characters/actions.ts so the two can't drift apart. */
 const GAIT_SWAY: Record<string, number> = (() => {
-  const src = readFileSync(new URL('../../web/src/render/babylon/characters.ts', import.meta.url), 'utf8');
+  const src = readFileSync(new URL('../../web/src/render/shared/characters/actions.ts', import.meta.url), 'utf8');
   const m = /const GAIT_SWAY[^=]*=\s*\{([^}]*)\}/.exec(src);
-  if (!m) throw new Error('check_clips: GAIT_SWAY not found in characters.ts');
+  if (!m) throw new Error('check_clips: GAIT_SWAY not found in actions.ts');
   return Object.fromEntries(m[1].split(',').map((kv) => kv.split(':').map((s) => s.trim())).filter((kv) => kv.length === 2).map(([k, v]) => [k, Number(v)]));
 })();
 const BASELINE = new URL('./clip-baseline.json', import.meta.url).pathname;

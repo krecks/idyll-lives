@@ -10,8 +10,10 @@
  * roofs, doors and windows, the cutaway and the wall modes, the storey in view, a basement with the
  * ground dug away over it, rooms without windows kept out of daylight, doors and gates swinging for
  * residents going through), its fences (`fences.ts`), roads and paths, and the street round it
- * (`street.ts`: the neighbours' houses, sidewalks, street furniture, gardens). The rest is stubbed
- * where the port reaches it.
+ * (`street.ts`: the neighbours' houses, sidewalks, street furniture, gardens). Its residents
+ * (`characters.ts`): posed each frame, with their contact shadows, the chairs they pull up to
+ * tables, their sun shadows, the selection ring, speech, and the camera following one. The rest is
+ * stubbed where the port reaches it.
  *
  * Game space is the Babylon renderer's left-handed one: everything in the world hangs under a root
  * mirrored in z (`space.ts`), and only cameras, lights and rays are converted.
@@ -19,13 +21,14 @@
 
 import * as pc from './engine';
 import { GameCamera } from './camera';
+import { Characters, MAX_CHARACTERS } from './characters';
 import { createApp, createDevice } from './device';
 import { buildFences, swingGate, type Fences, type GateLeaf } from './fences';
 import { gardenPool, GardenPools } from './gardenPools';
 import { HouseBuilder, type HouseDoor } from './house';
 import { Instances } from './instancing';
 import { Lamps } from './lamps';
-import { LotContents } from './lotContents';
+import { contactBlob, LotContents } from './lotContents';
 import { ENV_UNITS, SKY_UNITS, SUN_UNITS } from './lightUnits';
 import { MaterialLibrary, SUN_LIGHT_MASK } from './materials';
 import { drawMesh, meshFrom } from './meshes';
@@ -37,6 +40,7 @@ import { shadingFromSettings, softLookFromURL } from './shaders/softLook';
 import { drawRoads } from './roads';
 import { createWorldRoot, toEngine } from './space';
 import { Street } from './street';
+import { SelectionMarker } from './selectionMarker';
 import { SunShadows } from './sunShadows';
 import { TemplateCache } from './templateCache';
 import { benchDiag } from '../../debug/benchFlags';
@@ -123,6 +127,9 @@ const BUILD_SLICE_MS = 8;
  */
 const BASEMENT_SKY = 0.12;
 const BASEMENT_ENV = 0.12;
+
+/** Residents this far (m) outside the viewed lot are still drawn (walking up to it). */
+const SIM_VIEW_MARGIN = 2;
 
 /** A directional light's way before it's turned (PlayCanvas shines it along its entity's -y). */
 const DOWN = new pc.Vec3(0, -1, 0);
@@ -307,6 +314,25 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private readonly decorScale = new Float32Array(16);
   private readonly decorQ: Quat = [0, 0, 0, 1];
 
+  /**
+   * The residents (`characters.ts`): posed each frame into the pose texture, with their contact shadows
+   * (a matrix each, `simShadowMatrices`); how many the snapshot has, who is selected (the marker over
+   * their head, `selectionMarker.ts`), who the camera keeps in the middle (`followSim`), the frame last
+   * posed, and the lot whose arrival the camera was turned to (`buildSims`).
+   */
+  private characters!: Characters;
+  private simShadow!: Instances;
+  private readonly simShadowMatrices = new Float32Array(MAX_CHARACTERS * 16);
+  private simCount = 0;
+  private marker!: SelectionMarker;
+  private selectedSim: number | null = null;
+  private lastFrame: FrameState | null = null;
+  private readonly markerHead = { x: 0, y: 0, z: 0 };
+  private followIndex: number | null = null;
+  private readonly followHead = { x: 0, y: 0, z: 0 };
+  private framedView = '';
+  private readonly simInView = (x: number, z: number) => !this.diag.has('nosims') && this.inView(x, z, SIM_VIEW_MARGIN);
+
   private readonly cssSize = { width: 1, height: 1 };
   private sizeWatch: ResizeObserver | null = null;
   private unwatchPixelRatio: (() => void) | null = null;
@@ -399,6 +425,15 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // (Stage 5, lotContents.ts: the landscape, sky, objects and items.)
     this.lot = new LotContents(this.app, this.root, this.sun, this.camera.entity, this.deps, this.quality, { storey: () => this.storey, storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), inView: (x, z, m) => this.inView(x, z, m) }, { pace: () => this.pace(), shadowsMoved: (urgent) => this.sunShadows.moved(urgent), landscapeChanged: () => this.lamps.exclude(this.lot.landscapeDraws()) /* (Stage 6C: lamps.ts) */ });
 
+    // The residents (`characters.ts`), on moving seats with them, and their contact shadows.
+    this.characters = new Characters(this.app, this.root, this.deps.assets, this.lib, this.deps.content, { refreshProps: true, castsShadows: this.quality.characterShadows, camera: () => this.camera.camera });
+    this.characters.setRide((id) => this.lot.ride(id));
+    this.characters.setLoop((id) => this.lot.loopPhase(id));
+    this.characters.setSun(() => this.lighting.sunDirection);
+    const blob = contactBlob(this.app);
+    this.simShadow = new Instances(this.device, this.root, blob.mesh, blob.material, { name: 'simShadows', castShadows: false, receiveShadows: false, capacity: MAX_CHARACTERS, cull: false });
+    this.marker = new SelectionMarker(this.app, this.root, this.deps.assets);
+
     // The viewed lot's house and the street round it (`house.ts`, `street.ts`).
     this.house = new HouseBuilder(this.app);
     const c = this.deps.content;
@@ -433,6 +468,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (this.debug) Object.assign(window, { __scene: this.app.scene, __app: this.app, __renderer: this });
     this.applyLighting(this.lastMinute);
     this.applyCamera();
+    void this.characters.init();
     await this.setupEnvironment();
   }
 
@@ -502,6 +538,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.applyCamera();
       this.lot.frame(dt); // (Stage 5: the sky round the camera.)
       if (!this.townMode) this.updateCutaway();
+      // (The marker faces the camera as it is now, after this frame's input.)
+      this.placeMarker();
       if (this.townMode) this.townListener?.();
       else this.onView?.();
       this.app.update(dt / 1000);
@@ -574,11 +612,25 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   setGameShot(shot: GameShot | null, cut = false): void {
     if (!shot) return this.gameRig.release();
+    this.followIndex = null;
     this.gameRig.setShot(shot, cut || this.townMode);
   }
 
-  followSim(_index: number | null): void {
-    // (Keeping a resident in the middle needs the residents: stage 7.)
+  followSim(index: number | null): void {
+    this.followIndex = index;
+  }
+
+  /** The director's shot, or keeping a followed resident in the middle (game world only). */
+  private steerCamera(dt: number): void {
+    if (this.gameRig.active) return this.gameRig.frame(dt);
+    const i = this.followIndex;
+    // Off the drawn lot (on the street, or arriving where the next lot is still being built):
+    // where they stand, so the camera keeps going with them.
+    if (i === null || (!this.simHead(i, this.followHead) && !(i < this.simCount && this.characters.spot(i, this.followHead)))) return;
+    const t = this.orbit.target;
+    const k = 1 - Math.exp(-dt / 0.5);
+    t.x += (this.followHead.x - t.x) * k;
+    t.z += (this.followHead.z - t.z) * k;
   }
 
   setLeftDragCamera(on: boolean): void {
@@ -741,10 +793,36 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     await this.pace();
     await this.street.build(world, this.view, () => this.pace());
     await this.lot.buildObjects(world); // (Stage 5: the objects, their clips, contact shadows, items.)
+    await this.buildSims(world);
     this.applyWallMode();
     this.applyStoreys();
     this.lastLightMinute = -1;
     if (this.debug) console.info(`[render] setWorld ${(performance.now() - started).toFixed(1)} ms${lotBuilt ? '' : ' (lot kept)'}`);
+  }
+
+  /**
+   * The residents of `world`, carrying on as they were (a world message comes with every change in
+   * it), pulling their chairs up to the tables the lot found. The first time a lot is shown, the
+   * camera looks from its entry's side (the cutaway opens the front wall onto the household
+   * arriving), unless it follows someone there.
+   */
+  private async buildSims(world: WorldStructure): Promise<void> {
+    this.characters.setTables(this.lot.tables);
+    await this.characters.build(world, 'residents');
+    const v = this.view;
+    const key = v ? `${v.x},${v.z},${v.w},${v.d}` : '';
+    const framing = !!v && key !== this.framedView;
+    if (framing) this.framedView = key;
+    if (framing && this.followIndex === null) {
+      const entry = world.plots.find((p) => p.x === v.x && p.z === v.z)?.entry;
+      const dx = entry ? entry[0] - (v.x + v.w / 2) : 0;
+      const dz = entry ? entry[1] - (v.z + v.d / 2) : 0;
+      if (Math.hypot(dx, dz) > 1) this.orbit.alpha = Math.atan2(dz, dx) - Math.PI * 0.12;
+    }
+    const emotions = this.deps.content.emotions.map((e) => e.id);
+    this.characters.setEmotions(emotions);
+    this.marker.setEmotions(emotions);
+    this.sunShadows.moved();
   }
 
   /** Turns the camera to (`x`, `z`) on the ground from where it is, as Babylon's `ArcRotateCamera.setTarget` re-aims it. */
@@ -1043,6 +1121,15 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
 
   clear(): void {
+    this.characters.clear();
+    this.simShadowMatrices.fill(0);
+    this.simShadow.setCount(0);
+    this.simShadow.update(false);
+    this.simCount = 0;
+    this.selectedSim = null;
+    this.lastFrame = null;
+    this.marker.place(null, 0, this.camera.entity, 0, true);
+    this.framedView = '';
     this.lot.clear(); // (Stage 5.)
     this.clearLot();
     this.lotParts = null;
@@ -1301,12 +1388,42 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.findDarkRooms(frame);
     this.lamps.frame(this.frameDt / 1000, this.darkRooms, this.awakeRooms); // (Stage 6C: lamps and glows fading, `lamps.ts`.)
     this.swingDoors(GAME_RATE[curr[h.speed] | 0] ?? 1);
-    this.gameRig.frame(this.frameDt / 1000);
+    this.steerCamera(this.frameDt / 1000);
     this.lot.update(frame); // (Stage 5: the objects' clips, the screens.)
+    this.updateSims(frame);
     if (this.roofs.length && this.roofVisible() !== this.roofShown) {
       this.roofShown = !this.roofShown;
       this.showRoofs();
     }
+  }
+
+  /**
+   * The residents posed into the pose texture (after the moving parts: residents on a moving seat go
+   * with it), the chairs they sit pulled up to a table, their contact shadows, and their shadows in the
+   * sun's map drawn again when they moved (at the preset's `shadowRate`).
+   */
+  private updateSims(frame: FrameState): void {
+    const { curr, layout } = frame;
+    const count = (this.simCount = Math.min(curr[layout.header.simCount], MAX_CHARACTERS));
+    const shadows = this.simShadowMatrices;
+    this.characters.update(frame, this.simInView, shadows, this.storey);
+    this.lot.pullChairs(this.characters.pulled);
+    if (this.characters.posed && this.quality.characterShadows) this.sunShadows.moved(false);
+    const blobs = this.simShadow;
+    blobs.setCount(count);
+    for (let i = 0; i < count; i++) blobs.setMatrix(i, shadows, i * 16);
+    blobs.update(false);
+    this.counts.residentsMs = this.characters.updateMs;
+    this.lastFrame = frame;
+  }
+
+  /** The selection marker over the selected resident's head (hidden in the town, or while they aren't drawn). */
+  private placeMarker(): void {
+    const frame = this.lastFrame;
+    const sel = this.selectedSim;
+    const shown = !this.townMode && !!frame && sel !== null && sel < this.simCount && this.characters.head(sel, this.markerHead);
+    const emotion = shown ? frame.curr[frame.layout.headerLen + sel * frame.layout.simStride + frame.layout.sim.emotion] : 0;
+    this.marker.place(shown ? this.markerHead : null, emotion, this.camera.entity, frame?.now ?? 0, !!this.options.reducedMotion);
   }
 
   warmGame(_frame: FrameState): Promise<void> {
@@ -1540,6 +1657,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.orbit.panningSensibility = 90 / s;
     this.orbit.wheelDeltaPercentage = 0.012 * s;
     this.lot.setReducedMotion(!!options.reducedMotion); // (Stage 5: the wind, the clouds.)
+    this.characters.reducedMotion = !!options.reducedMotion;
     this.applyPacing();
     this.applyResolution();
   }
@@ -1579,7 +1697,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       refreshHz: this.pacer.refreshHz,
       refreshDivisor: this.pacer.divisor,
       gpuMs: this.gpuWanted.size && gpu?.enabled && (gpu.frameTime ?? 0) > 0 ? (gpu.frameTime ?? null) : null,
-      residentsMs: 0,
+      residentsMs: this.characters?.updateMs ?? 0,
     };
   }
 
@@ -1599,7 +1717,14 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   benchInfo(): Record<string, unknown> & { passes: RenderPassInfo[] } {
     // (The benchmark's counts so far; the rest comes with the bench support, stage 11.)
-    return { engine: `PlayCanvas ${pc.version}`, backend: this.device.isWebGPU ? 'webgpu' : 'webgl2', preset: this.quality.preset, passes: [], scene: { lightingUpdates: this.counts.lightingUpdates, mirrorDraws: 0 } };
+    return { engine: `PlayCanvas ${pc.version}`, backend: this.device.isWebGPU ? 'webgpu' : 'webgl2', preset: this.quality.preset, passes: [], scene: { lightingUpdates: this.counts.lightingUpdates, mirrorDraws: 0, residents: this.simCount, residentsDrawn: this.residentsDrawn() } };
+  }
+
+  /** Residents drawn now (the benchmark's). */
+  private residentsDrawn(): number {
+    let n = 0;
+    for (let i = 0; i < this.simCount; i++) if (this.characters.visible[i]) n++;
+    return n;
   }
 
   captureThumbnail(_width: number, _height: number): Promise<string | null> {
@@ -1608,8 +1733,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   // --- residents, birds, voices (stage 7) ----------------------------------------------
 
-  simHead(_index: number, _out: { x: number; y: number; z: number }): boolean {
-    return false;
+  simHead(index: number, out: { x: number; y: number; z: number }): boolean {
+    return index < this.simCount && !!this.characters?.head(index, out);
   }
 
   birds(): readonly SeenBird[] {
@@ -1617,8 +1742,14 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
 
   birdSings(_id: number, _seconds: number): void {}
-  setSelectedSim(_id: number | null): void {}
-  setSpeech(_index: number, _track: VisemeTrack | null, _startTime: number): void {}
+  setSelectedSim(id: number | null): void {
+    this.selectedSim = id;
+    this.characters?.select(id);
+  }
+
+  setSpeech(index: number, track: VisemeTrack | null, startTime: number): void {
+    this.characters?.setSpeech(index, track, startTime);
+  }
 
   // --- build and buy (stage 8) ---------------------------------------------------------
 
@@ -1667,6 +1798,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.characters?.dispose();
+    this.simShadow?.destroy();
+    this.marker?.destroy();
     this.lot?.dispose(); // (Stage 5.)
     this.setActive(false);
     this.onFailure = null;

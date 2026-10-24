@@ -1,5 +1,5 @@
 /**
- * The stage the PlayCanvas dev pages draw on (`gallery.ts`, `clips.ts`): the device (WebGPU, or
+ * The stage the PlayCanvas dev pages draw on (`gallery.ts`, `clips.ts`, `characters.ts`, `poses.ts`): the device (WebGPU, or
  * WebGL2 with `?renderer=webgl`), an app without its own frame loop, the world root in game space
  * (`pc/space.ts`), the game camera on an orbit (the player's dragging, `shared/orbit.ts`), a noon
  * sun with its shadow over a fixed square, the sky's light, a lawn, and the frame loop. The models'
@@ -11,8 +11,10 @@ import * as pc from '../render/pc/engine';
 import { GameCamera } from '../render/pc/camera';
 import { createApp, createDevice } from '../render/pc/device';
 import { MaterialLibrary, SUN_LIGHT_MASK } from '../render/pc/materials';
+import { ENV_UNITS, SKY_UNITS, SUN_UNITS } from '../render/pc/lightUnits';
 import { installNature } from '../render/pc/nature';
 import { pageLook } from '../render/pc/post';
+import { DIAG_VIEW_DEFINE } from '../render/pc/shaders/diagView';
 import { createWorldRoot, toEngine } from '../render/pc/space';
 import { SunShadows } from '../render/pc/sunShadows';
 import { AssetRegistry } from '../assets/registry';
@@ -22,12 +24,17 @@ export interface StageOptions {
   /** The sky's light, and the sun's direction (game space: the way it shines). */
   sky: number;
   sun: [number, number, number];
+  /** The sun's strength (Babylon's units; 3.2), and the sky's in reflections and ambient (Babylon's `environmentIntensity`; 0.9). */
+  sunIntensity?: number;
+  environment?: number;
   /** The camera's pose and lens (Babylon's `ArcRotateCamera` defaults: a 0.8 rad field of view). */
   alpha: number;
   beta: number;
   radius: number;
   fov?: number;
   near?: number;
+  /** The wheel's zoom: Babylon's `wheelPrecision` (higher: slower; 20). */
+  wheelPrecision?: number;
 }
 
 export interface Stage {
@@ -49,10 +56,13 @@ export interface Stage {
   project(x: number, y: number, z: number, out: { x: number; y: number }): boolean;
   /** Clip-space x and y (-1..1 across the view) of the game-space point, as Babylon's view and projection give them. */
   ndc(x: number, y: number, z: number): [number, number];
-  /** A lawn `width` × `depth` metres round the origin (none with `?ground=0`: models alone, e.g. to compare diag views). */
-  lawn(width: number, depth: number): void;
-  /** Each frame, `frame(seconds since the last)` then the picture; from now on. */
-  run(frame: (dt: number) => void): void;
+  /** A lawn `width` × `depth` metres round the origin, of `colour` (none with `?ground=0`: models alone, e.g. to compare diag views). */
+  lawn(width: number, depth: number, colour?: string): void;
+  /**
+   * Each frame, `frame(seconds since the last)` then the picture; from now on. `still`: the app's
+   * own clock stands still (the wind), so only what the page moves moves (Babylon's pages' `getDeltaTime` held at 0).
+   */
+  run(frame: (dt: number) => void, still?: boolean): void;
 }
 
 const params = new URLSearchParams(location.search);
@@ -76,7 +86,8 @@ export async function createStage(options: StageOptions): Promise<Stage> {
   const env = assets.get('environment.sky', 'image');
   // The sky lights the models (its reflections and ambient), as Babylon's pages had it; it isn't drawn behind them.
   if (env?.url) await lib.loadEnvironment(env.url);
-  lib.setEnvironmentIntensity(0.9);
+  // (In the game's units, `lightUnits.ts`, as `PlayCanvasRenderer.applyLighting` sets them.)
+  lib.setEnvironmentIntensity((options.environment ?? 0.9) * ENV_UNITS);
   app.scene.layers.getLayerById(pc.LAYERID_SKYBOX)!.enabled = false;
 
   const camera = new GameCamera(app.root, { fov: options.fov ?? 0.8, near: options.near ?? 0.1, far: 2000 });
@@ -87,18 +98,21 @@ export async function createStage(options: StageOptions): Promise<Stage> {
   pageLook(app, cam, 1.1);
   cam.aspectRatioMode = pc.ASPECT_MANUAL;
   cam.aspectRatio = canvas.width / canvas.height;
-  // Babylon's pages' hemispheric light: white from above, the lawn's green from below.
-  lib.setSkyFill({ r: 1, g: 1, b: 1 }, { r: 0.32, g: 0.36, b: 0.25 }, options.sky);
+  // Babylon's pages' hemispheric light: white from straight above, the lawn's green from below.
+  lib.setSkyFill({ r: 1, g: 1, b: 1 }, { r: 0.32, g: 0.36, b: 0.25 }, options.sky * SKY_UNITS);
+  lib.setSkyDirection({ x: 0, y: 1, z: 0 });
   app.scene.ambientLight = new pc.Color(0, 0, 0);
 
+  const strength = (options.sunIntensity ?? 3.2) * SUN_UNITS;
+  const gamma = (c: number) => Math.pow(c * strength, 1 / 2.2);
   const sun = new pc.Entity('sun');
   sun.addComponent('light', {
     type: 'directional',
     castShadows: true,
-    // Babylon's 3.2: its PBR lit `albedo / π` per unit, PlayCanvas `albedo` (as the renderer's `SUN_UNITS`).
-    intensity: 3.2 / Math.PI,
-    // (Babylon's linear colour, as PlayCanvas takes it: sRGB.)
-    color: new pc.Color(1, Math.pow(0.96, 1 / 2.2), Math.pow(0.88, 1 / 2.2)),
+    // Babylon's linear colour and strength (in the game's units, `SUN_UNITS`) as PlayCanvas takes them: sRGB, the
+    // strength in the colour (as `PlayCanvasRenderer.applyLighting`: an intensity below 1 would be linearised with it).
+    intensity: 1,
+    color: new pc.Color(gamma(1), gamma(0.96), gamma(0.88)),
     mask: SUN_LIGHT_MASK,
   });
   // A directional light shines along its entity's -y: turned from straight down to the sun's way.
@@ -112,7 +126,7 @@ export async function createStage(options: StageOptions): Promise<Stage> {
 
   // As Babylon's `ArcRotateCamera`: no zoom limits, beta kept off the poles.
   const orbit = new OrbitControls({ alpha: options.alpha, beta: options.beta, radius: options.radius }, { radius: [0.01, Infinity], beta: [0.01, Math.PI - 0.01] });
-  orbit.wheelPrecision = 20;
+  orbit.wheelPrecision = options.wheelPrecision ?? 20;
   orbit.attach(canvas);
 
   const pose = () => camera.setPose(orbit.alpha, orbit.beta, orbit.radius, orbit.target.x, orbit.target.y, orbit.target.z);
@@ -146,22 +160,27 @@ export async function createStage(options: StageOptions): Promise<Stage> {
     pose,
     project: (x, y, z, out) => camera.project(x, y, z, canvas.clientWidth, canvas.clientHeight, out),
     ndc,
-    lawn(width, depth) {
+    lawn(width, depth, colour = '#6F9A3E') {
       if (params.get('ground') === '0') return;
       const material = new pc.StandardMaterial();
       material.name = 'ground';
-      material.diffuse = new pc.Color().fromString('#6F9A3E');
+      material.diffuse = new pc.Color().fromString(colour);
       material.useMetalness = true;
       material.metalness = 0;
       material.gloss = 0;
+      // Lit as the library's materials are (the sky's fill and its ambient), but in plain PBR and in
+      // every view: Babylon's pages' lawn was a PBR material of their own, outside the soft look and the diag views.
+      lib.adopt(material);
+      material.setDefine('GAME_SOFT', false);
+      if (DIAG_VIEW_DEFINE) material.setDefine(DIAG_VIEW_DEFINE, false);
       material.update();
-      // (Round the origin, the same either way along z: under the app's root, unmirrored, in its own winding.)
+      // (Round the origin, the same either way along z: in the world, as the game's ground.)
       const ground = new pc.Entity('ground');
       ground.addComponent('render', { type: 'plane', material, castShadows: false, receiveShadows: true });
       ground.setLocalScale(width, 1, depth);
-      app.root.addChild(ground);
+      root.addChild(ground);
     },
-    run(frame) {
+    run(frame, still = false) {
       let last = performance.now();
       const tick = (now: number) => {
         const dt = Math.min(0.1, (now - last) / 1000);
@@ -169,7 +188,7 @@ export async function createStage(options: StageOptions): Promise<Stage> {
         orbit.step(dt * 1000);
         pose();
         frame(dt);
-        app.update(dt);
+        app.update(still ? 0 : dt);
         app.render();
         requestAnimationFrame(tick);
       };

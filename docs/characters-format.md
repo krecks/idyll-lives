@@ -574,7 +574,7 @@ rider, the seesaw), which they settle onto as before rather than walk through.
 | body and clothes | `body.rs`, `cage.rs`, `subdiv.rs`, `clothes.rs`, `garments.rs`, `meshops.rs` |
 | face and hair | `face.rs`, `hair.rs`, `prims.rs`; the eye, hair and brow branches of `characters/material.ts`; `characters/face.ts` |
 | clips | `clips/*` (with `clips/ik.ts`) |
-| the runtime | `characters.ts` (activities, seats, beds, carrying, faces), `characters/{data,pose,material,outfit,blanket}.ts`; the creator in `ui/screens/CreateHousehold.svelte` and `render/preview` |
+| the runtime | `render/shared/characters/residents.ts` (activities, seats, beds, carrying, faces; its tables in `actions.ts`, `seats.ts`, `socials.ts`, `expressions.ts`, `parts.ts`; drawn through `view.ts` by `babylon/characters.ts` and `pc/characters.ts`), `shared/characters/{data,pose,outfit,blanket}.ts`, the engines' `characters/material.ts`; the creator in `ui/screens/CreateHousehold.svelte` and `render/preview` |
 
 See also `tools/characters/README.md`.
 

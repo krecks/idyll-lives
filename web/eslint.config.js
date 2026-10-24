@@ -35,7 +35,7 @@ export default ts.config(
     },
   },
   {
-    files: ['src/render/shared/**/*.ts', 'src/render/pc/**/*.ts', 'src/debug/gallery.ts', 'src/debug/clips.ts', 'src/debug/pcStage.ts'],
+    files: ['src/render/shared/**/*.ts', 'src/render/pc/**/*.ts', 'src/debug/gallery.ts', 'src/debug/clips.ts', 'src/debug/characters.ts', 'src/debug/poses.ts', 'src/debug/pcStage.ts'],
     rules: {
       'no-restricted-imports': [
         'error',

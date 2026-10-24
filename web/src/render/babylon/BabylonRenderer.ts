@@ -917,7 +917,7 @@ export class BabylonRenderer implements Renderer, RendererDebugHooks {
     await this.setupMarker();
     // (Their data loads with the first world that has residents, not with the menus.)
     this.characters = new Characters(scene, this.deps.assets, this.lib, this.deps.content, { refreshProps: true, castsShadows: this.quality.characterShadows });
-    this.characters.setRide((id) => this.motion.rideMatrix(id));
+    this.characters.setRide((id) => this.motion.ride(id));
     this.characters.setLoop((id) => this.motion.loopPhase(id));
     this.characters.setSun(() => this.sun.direction);
     // Garden birds. `?debug`: `__birds()` lists them (species, state, place) with what they did and

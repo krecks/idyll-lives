@@ -10,13 +10,15 @@
  * code; the names and lines they rely on are checked by `tools/render/check_chunks.ts`. The slots:
  *
  * - `vsDecl`, `vsEnd`: `litUserDeclarationVS`, `litUserMainEndVS`.
+ * - `normalVS`: an instanced draw's normal as Babylon's thin instances had it (`INSTANCE_NORMAL`).
  * - `vsLocal`: the vertex's local (game-space) position, `localPos`, after morphing and before the
  *   model matrix, in `transformCoreVS`'s `getLocalPosition` (instanced draws too). Wind and
  *   blankets (later stages) add their snippets here, or a `transformInstancingVS` of their own.
  * - `psDecl`, `psStart`: `litUserDeclarationPS`, `litUserMainStartPS` (which runs in every pass,
  *   the shadow pass included).
- * - `albedo`, `metalness`, `gloss`, `reflDir`: after `getAlbedo`, `getMetalness`,
- *   `getGlossiness`, `getReflDir` (`diffusePS`, `metalnessPS`, `glossPS`, `reflDirPS`).
+ * - `albedo`, `metalness`, `gloss`, `reflDir`, `emissive`: after `getAlbedo`, `getMetalness`,
+ *   `getGlossiness`, `getReflDir`, `getEmission` (`diffusePS`, `metalnessPS`, `glossPS`,
+ *   `reflDirPS`, `emissivePS`).
  * - `combine`: `combineColor` (`combinePS`): the engine's is `combineColorEngine`.
  * - `end`: replaces `endPS` (the colour, fog, tone mapping and gamma) where its defines say so.
  * - `fogPS`: Babylon's haze in the game's materials (`fog.ts`); `reflectionEnvPS`, `reflectionEnvHQPS`:
@@ -57,6 +59,7 @@ export interface FeatureCode {
   metalness?: string;
   gloss?: string;
   reflDir?: string;
+  emissive?: string;
   /** The body of `combineColor` (one feature at most: the soft look). */
   combine?: string;
   /** `endPS`'s replacement where the feature's defines are set (one feature at most: the diag view). */
@@ -127,12 +130,18 @@ const WRAPS = {
     glsl: { decl: 'void getReflDir(vec3 worldNormal, vec3 viewDir, float gloss, mat3 tbn) {', head: 'void getReflDir(vec3 worldNormal, vec3 viewDir, float gloss, mat3 tbn) {\n\tgetReflDirEngine(worldNormal, viewDir, gloss, tbn);' },
     wgsl: { decl: 'fn getReflDir(worldNormal: vec3f, viewDir: vec3f, gloss: f32, tbn: mat3x3f) {', head: 'fn getReflDir(worldNormal: vec3f, viewDir: vec3f, gloss: f32, tbn: mat3x3f) {\n\tgetReflDirEngine(worldNormal, viewDir, gloss, tbn);' },
   },
+  emissivePS: {
+    slot: 'emissive',
+    glsl: { decl: 'void getEmission() {', head: 'void getEmission() {\n\tgetEmissionEngine();' },
+    wgsl: { decl: 'fn getEmission() {', head: 'fn getEmission() {\n\tgetEmissionEngine();' },
+  },
 } as const;
 
 /** The anchors the overrides and patches rely on (also listed in `tools/render/check_chunks.ts`). */
 export const ANCHORS = {
   glsl: {
     transformCoreVS: 'vec3 getLocalPosition(vec3 vertexPosition) {',
+    normalVS: 'return normalize(dNormalMatrix * localNormal);',
     combinePS: 'vec3 combineColor(vec3 albedo, vec3 sheenSpecularity, float clearcoatSpecularity) {',
     litForwardBackendPS: '#ifdef LIT_LIGHTING || LIT_REFLECTIONS',
     lightFunctionLightPS: 'vec3 lightColor = light{i}_color;',
@@ -143,6 +152,7 @@ export const ANCHORS = {
   },
   wgsl: {
     transformCoreVS: 'fn getLocalPosition(vertexPosition: vec3f) -> vec3f {',
+    normalVS: 'return normalize(dNormalMatrix * localNormal);',
     combinePS: 'fn combineColor(albedo: vec3f, sheenSpecularity: vec3f, clearcoatSpecularity: f32) -> vec3f {',
     litForwardBackendPS: '#ifdef LIT_LIGHTING || LIT_REFLECTIONS',
     lightFunctionLightPS: 'var lightColor: vec3f = uniform.light{i}_color;',
@@ -153,14 +163,15 @@ export const ANCHORS = {
   },
 } as const;
 
-function engineChunk(device: pc.GraphicsDevice, lang: Language, name: string): string {
+/** The engine's chunk `name` in `lang` for `device` (as PlayCanvas has it, before any override). */
+export function engineChunk(device: pc.GraphicsDevice, lang: Language, name: string): string {
   const code = pc.ShaderChunks.get(device, lang === 'glsl' ? pc.SHADERLANGUAGE_GLSL : pc.SHADERLANGUAGE_WGSL).get(name);
   if (typeof code !== 'string') throw new Error(`[render] PlayCanvas has no shader chunk ${name}`);
   return code;
 }
 
 /** `code` with `anchor` replaced (exactly once: a missing anchor is an upgrade to look at). */
-function replaceOnce(code: string, name: string, anchor: string, replacement: string): string {
+export function replaceOnce(code: string, name: string, anchor: string, replacement: string): string {
   const at = code.indexOf(anchor);
   if (at < 0 || code.indexOf(anchor, at + anchor.length) >= 0) throw new Error(`[render] shader chunk ${name}: anchor not found once: ${anchor}`);
   return code.slice(0, at) + replacement + code.slice(at + anchor.length);
@@ -210,6 +221,9 @@ function build(device: pc.GraphicsDevice, lang: Language): Record<string, string
   const engineEnd = engineChunk(device, lang, 'endPS');
   out.endPS = ends.length ? `#if ${ends.map((e) => e.when).join(' || ')}\n${ends.map((e) => e.code).join('\n')}\n#else\n${engineEnd}\n#endif\n` : engineEnd;
 
+  // An instance's normal as Babylon's thin instances had it (`INSTANCE_NORMAL`).
+  out.normalVS = replaceOnce(engineChunk(device, lang, 'normalVS'), 'normalVS', ANCHORS[lang].normalVS, INSTANCE_NORMAL[lang]);
+
   out.uv0VS = glsl ? UV0_GLSL : UV0_WGSL;
   // The haze as Babylon's PBR drew it (`fog.ts`).
   out.fogPS = gameFog(engineChunk(device, lang, 'fogPS'), lang, replaceOnce);
@@ -224,6 +238,29 @@ function build(device: pc.GraphicsDevice, lang: Language): Record<string, string
   }
   return out;
 }
+
+/**
+ * `normalVS`'s normal for an instanced draw of the game's lit materials: Babylon's thin instances'
+ * (its PBR vertex shader), `normalize(M · (n / (|M₀|², |M₁|², |M₂|²)))` with M the model matrix's 3 × 3
+ * (PlayCanvas's normal matrix for instanced draws), the inverse transpose for a matrix of axis scales
+ * and a rotation: an instance scaled unevenly (a quilt fitted to its bed, a resized object) shades as
+ * it did. The world root's mirror leaves the columns' lengths as they are; tangents keep the plain
+ * matrix, as Babylon's did. (A collapsed copy, all zeros, gets no normal; it draws nothing.)
+ */
+const INSTANCE_NORMAL: Record<Language, string> = {
+  glsl: `#if defined(GAME_LOOK) && defined(INSTANCING)
+		vec3 gameScale2 = max(vec3(dot(dNormalMatrix[0], dNormalMatrix[0]), dot(dNormalMatrix[1], dNormalMatrix[1]), dot(dNormalMatrix[2], dNormalMatrix[2])), vec3(1e-20));
+		return normalize(dNormalMatrix * (localNormal / gameScale2));
+	#else
+		return normalize(dNormalMatrix * localNormal);
+	#endif`,
+  wgsl: `#if defined(GAME_LOOK) && defined(INSTANCING)
+		let gameScale2 = max(vec3f(dot(dNormalMatrix[0], dNormalMatrix[0]), dot(dNormalMatrix[1], dNormalMatrix[1]), dot(dNormalMatrix[2], dNormalMatrix[2])), vec3f(1e-20));
+		return normalize(dNormalMatrix * (localNormal / gameScale2));
+	#else
+		return normalize(dNormalMatrix * localNormal);
+	#endif`,
+};
 
 /** `uv0VS` for planar UVs (`GAME_PLANAR_UV`: the local XZ in metres); the engine's otherwise. */
 const UV0_GLSL = `

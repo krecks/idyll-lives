@@ -43,10 +43,11 @@ import {
   type UniformBuffer,
 } from '../core';
 import { APPEARANCE_TEXELS, MORPH_PAIRS, MORPH_TEXELS } from '../../shared/characters/layout';
+import type { CharacterSurface } from '../../shared/characters/parts';
 
 export { APPEARANCE_TEXELS, MORPH_PAIRS, MORPH_TEXELS };
 
-export type CharacterSurface = 'body' | 'cloth' | 'hair' | 'brow' | 'lash' | 'mouth' | 'eye';
+export type { CharacterSurface };
 
 /** The set's morph texture and its layout (texels per row, header texels per part block). */
 export interface MorphBinding {
