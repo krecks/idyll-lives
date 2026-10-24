@@ -27,7 +27,7 @@ import * as pc from './engine';
 import { BuildPreviews, mergeSurfaces } from './buildPreviews';
 import { GameCamera } from './camera';
 import { Characters, MAX_CHARACTERS } from './characters';
-import { createApp, createDevice } from './device';
+import { createApp, createDevice, destroyApp } from './device';
 import { buildFences, swingGate, type Fences, type GateLeaf } from './fences';
 import { gardenPool, GardenPools } from './gardenPools';
 import { HoverTile, ResizeHandles } from './handles';
@@ -2369,6 +2369,6 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.drawCounts?.remove();
     this.gpuTiming?.destroy();
     this.shaderWatch?.destroy();
-    this.app?.destroy();
+    if (this.app) destroyApp(this.app);
   }
 }
