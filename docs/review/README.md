@@ -2,6 +2,8 @@
 
 One ledger per category for the review of models, animations and interactions planned in [plan/authenticity-review.md](../../plan/authenticity-review.md). Each ledger has a table per group with a row per item, and a Findings section at the end. Known issues from earlier docs are already filed in them as seeded findings, for reviewers to confirm or close.
 
+Code references in the ledgers are to the tree as it was when each was written; those into `web/src/render/babylon/` are to the Babylon renderer, which the PlayCanvas one replaced after 0.3.2 (in git history up to f15b839b).
+
 Rubric: [§3 of the plan](../../plan/authenticity-review.md#3-rubrics). Real-world ranges: [reference.md](reference.md) (written before Phase 1). Evidence for a ledger goes in `bench-results/review/<cat>/`.
 
 ## Ledgers

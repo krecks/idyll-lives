@@ -2,7 +2,7 @@
 # tub, the street-name sign, the bus-stop sign, the pot by a front door, the garden path light, and the foliage of
 # the street (`flowers`). Notes: street.md.
 #
-# render/babylon/street.ts draws them as thin instances along the kerbs and in the neighbours' front gardens, dozens
+# render/pc/street.ts draws them as thin instances along the kerbs and in the neighbours' front gardens, dozens
 # to hundreds of copies, and the town overview draws them again from afar: each is small (a few hundred to a
 # thousand triangles), takes one or two draw calls, and has a far version, its own build at low detail
 # (`G.far_of`). They are still; the leaves and flowers are on the `foliage` finish, so the nature shader sways them
@@ -410,7 +410,7 @@ FAMILY = G.Family(
     comment='Blender-built street dressing (tools/art/blender/families/street.py): the kerbside bench, '
             'the planter with its little tree, the flower tub, the street-name sign, the bus-stop sign, '
             'the door pot, the garden path light and the flower clump that '
-            'render/babylon/street.ts draws as thin instances along the kerbs and front gardens. Listed '
+            'render/pc/street.ts draws as thin instances along the kerbs and front gardens. Listed '
             'in the base manifest\'s packs. Each has a far version for the town overview. Leaves and '
             'flowers are on the foliage finish, so they sway in the wind; the path light\'s lens glows at '
             'night.',

@@ -390,7 +390,7 @@ export interface WorldLook {
 }
 
 /**
- * How the land round a town looks (see `render/babylon/nature.ts`). `DEFAULT_LANDSCAPE` is the
+ * How the land round a town looks (see `render/shared/nature.ts`). `DEFAULT_LANDSCAPE` is the
  * classic valley every town had before worlds had kinds.
  */
 export interface LandscapeParams {

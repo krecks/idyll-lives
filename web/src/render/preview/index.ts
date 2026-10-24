@@ -1,18 +1,19 @@
 /**
- * `SimPreviews`: the household-creator stage and Sim portraits, from one small engine (`studio.ts`)
- * that runs only while it has work: a stage attached, or portraits to draw. It is disposed a few
- * seconds after the last of either, except while a game keeps it (`keep`): then it only stops
- * drawing, and new faces in play find its shaders compiled (portraits are cached for the page).
+ * `SimPreviews`: the household-creator stage and Sim portraits, from one small PlayCanvas app
+ * (`studio.ts`, beside the game's) that runs only while it has work: a stage attached, or portraits
+ * to draw. It is destroyed a few seconds after the last of either, except while a game keeps it
+ * (`keep`): then it only stops drawing, and new faces in play find its shaders compiled (portraits
+ * are cached for the page).
  */
 
 import type { AssetRegistry } from '../../assets/registry';
-import { loadCharacterSet } from '../babylon/characters/data';
+import { loadCharacterSet } from '../shared/characters/data';
 import type { SimLook, SimPreviews, SimStage, Wardrobe } from '../types';
 import { cached, lookKey, Portraits } from './portraits';
 import { StageController } from './stage';
 import { Studio, type StudioDeps } from './studio';
 
-/** Idle time (ms) before the engine is released. */
+/** Idle time (ms) before the app is released. */
 const RELEASE_AFTER = 4000;
 
 export function createSimPreviews(deps: StudioDeps): SimPreviews {
@@ -30,7 +31,7 @@ class Previews implements SimPreviews {
   private kept = false;
 
   constructor(private readonly deps: StudioDeps) {
-    // `?debug`: inspect from the console / test harness (`__previews.live` is the engine, if any).
+    // `?debug`: inspect from the console / test harness (`__previews.live` is the studio, if any).
     if (new URLSearchParams(location.search).has('debug')) Object.assign(window, { __previews: this });
   }
 
@@ -109,23 +110,24 @@ class Previews implements SimPreviews {
     clearTimeout(this.releaseTimer);
     if (this.looping) return;
     this.looping = true;
-    studio.engine.runRenderLoop(() => {
-      const now = performance.now();
+    studio.run((now) => {
       const stage = this.stageCtl;
       stage?.direct(now);
       this.portraits.direct(studio, now);
       studio.pose(now);
-      this.portraits.render(studio, now);
-      stage?.render();
+      // One frame draws the stage (onto the canvas) and the portraits ready (into their targets).
+      const portraits = this.portraits.prepare(studio, now);
+      if (stage || portraits) studio.draw(now);
+      this.portraits.collect(studio);
       if (!stage && !this.portraits.busy) {
-        studio.engine.stopRenderLoop();
+        studio.stop();
         this.looping = false;
         this.idleCheck();
       }
     });
   }
 
-  /** Releases the engine once neither the stage nor portraits have needed it for a while. */
+  /** Releases the app once neither the stage nor portraits have needed it for a while. */
   private idleCheck(): void {
     clearTimeout(this.releaseTimer);
     this.releaseTimer = window.setTimeout(() => {

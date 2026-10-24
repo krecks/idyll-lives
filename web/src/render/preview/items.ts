@@ -1,34 +1,41 @@
 /**
- * Catalog pictures of furniture: a small WebGL engine of its own that builds each model with the
- * game's own pipeline (`buildModel`: the same files and finishes as in play),
- * lights it like a product shot and reads the picture back into a cached image URL.
+ * Catalog pictures of furniture: a small PlayCanvas app of its own (beside the game's, on a device
+ * of its own: WebGPU, or WebGL2 as the game's setting says) that builds each model with the game's
+ * own pipeline (`buildModel`: the same files and finishes as in play), lights it like a product
+ * shot (`itemScene.ts`), draws it into a multisampled target of the picture's size and reads it
+ * back into a cached image URL.
  *
  * Requests are queued and drawn one model at a time: what's on screen first, in order (cards ask
  * when they scroll into view and withdraw when they leave), then pictures drawn ahead of time in
  * idle moments. Encoding a picture overlaps building the next model. Pictures are kept for the
  * page and, in Cache Storage, between visits (keyed by app version and the model's manifest
  * entry). Turntables (a model seen from `frames` angles around it) feed the detail pane's
- * preview. The engine is released a few seconds after the queue empties.
+ * preview. The app is released a few seconds after the queue empties.
+ *
+ * The game's frames come first: pictures drawn ahead of time wait for an idle moment, one model
+ * each, and a picture's read-back waits for the GPU without holding the main thread (`read`).
  */
 
-import { Camera, Engine, FreeCamera, Matrix, TransformNode, Vector3, type Mesh, type Scene } from '../babylon/core';
+import * as pc from '../pc/engine';
 import { withoutBuild } from '../../assets/build';
 import type { AssetRegistry } from '../../assets/registry';
 import { openCache } from '../../ml/assets';
 import { colorsKey, type PartColors } from '../../core/protocol';
-import { buildModel, painted } from '../babylon/models';
-import { shadingFromSettings } from '../babylon/softLook';
+import { buildModel } from '../pc/models';
+import { shadingFromSettings } from '../pc/shaders/softLook';
+import { toEngine } from '../pc/space';
+import { painted } from '../shared/modelEntry';
 import type { ItemPreviews, ItemStage } from '../types';
-import { boxCorners, contactShadow, PICTURE_STAND_IN, studioScene } from './itemScene';
+import { boxCorners, contactShadow, PICTURE_STAND_IN, placeModel, shadersCompiling, studioScene, texturesReady, type StudioScene } from './itemScene';
 import { ItemStageController } from './itemStage';
 
 /** Picture sizes in pixels (cards show ~80 CSS px; the detail's turntable ~200). */
 const THUMB_PX = 192;
 const TURN_PX = 320;
-/** Idle time (ms) before the engine is released. */
+/** Give up waiting for a model's shaders (ms): drawn then, without what isn't ready. */
+const SHADERS_TIMEOUT = 8000;
+/** Idle time (ms) before the app is released. */
 const RELEASE_AFTER = 5000;
-/** Give up waiting for a model's materials (ms). */
-const READY_TIMEOUT = 8000;
 const TURNTABLE_CACHE = 24;
 /** A picture of a box (its model's file failed) is handed out again for this long (ms) before the model is drawn again, its file tried again. */
 const BOX_AGAIN_MS = 30_000;
@@ -71,8 +78,9 @@ function thumbKey(model: string): string {
   return `${shadingFromSettings()}|${model}`;
 }
 
-export function createItemPreviews(assets: AssetRegistry): ItemPreviews {
-  return new ItemThumbnails(assets);
+/** `backend`: `webgl` forces WebGL2 (as the game's renderer setting does; `?renderer=webgl` too). */
+export function createItemPreviews(assets: AssetRegistry, backend: () => 'auto' | 'webgl' = () => 'auto'): ItemPreviews {
+  return new ItemThumbnails(assets, backend);
 }
 
 class ItemThumbnails implements ItemPreviews {
@@ -89,7 +97,10 @@ class ItemThumbnails implements ItemPreviews {
    */
   private readonly boxed = new Map<string, { urls: string[]; at: number; all: string[] }>();
 
-  constructor(private readonly assets: AssetRegistry) {}
+  constructor(
+    private readonly assets: AssetRegistry,
+    private readonly backend: () => 'auto' | 'webgl',
+  ) {}
 
   cachedThumbnail(model: string): string | null {
     return thumbs.get(thumbKey(model)) ?? null;
@@ -131,7 +142,7 @@ class ItemThumbnails implements ItemPreviews {
   async stage(host: HTMLElement, model: string, footprint: [number, number]): Promise<ItemStage | null> {
     if (this.unavailable) return null;
     try {
-      return await ItemStageController.create(host, this.assets, model, footprint);
+      return await ItemStageController.create(host, this.assets, model, footprint, this.backend());
     } catch (err) {
       console.warn('[preview] item stage unavailable', err);
       return null;
@@ -288,7 +299,7 @@ class ItemThumbnails implements ItemPreviews {
   }
 
   private open(): Promise<ItemStudio | null> {
-    this.studio ??= ItemStudio.create(this.assets).then(
+    this.studio ??= ItemStudio.create(this.assets, this.backend()).then(
       (studio) => (this.live = studio),
       (err: unknown) => {
         console.warn('[preview] 3D item pictures unavailable', err);
@@ -328,35 +339,28 @@ function hash(text: string): string {
 }
 
 class ItemStudio {
-  private readonly root: TransformNode;
-  private readonly camera: FreeCamera;
-  private readonly shadow: Mesh;
+  private readonly camera: pc.CameraComponent;
+  private readonly shadow: pc.Entity;
+  /** A target per picture size (multisampled), made on first use. */
+  private readonly targets = new Map<number, pc.RenderTarget>();
+  private last = performance.now();
 
-  private constructor(
-    private readonly engine: Engine,
-    private readonly scene: Scene,
-    private readonly canvas: HTMLCanvasElement,
-  ) {
-    this.root = new TransformNode('itemRoot', scene);
-    const cam = (this.camera = new FreeCamera('itemCamera', new Vector3(0, 2, 5), scene, false));
-    cam.mode = Camera.ORTHOGRAPHIC_CAMERA;
-    cam.minZ = 0.05;
-    cam.maxZ = 40;
-    cam.inputs.clear();
-    scene.activeCamera = cam;
-    this.shadow = contactShadow(scene);
+  private constructor(private readonly scene: StudioScene) {
+    const cam = (this.camera = scene.camera);
+    cam.projection = pc.PROJECTION_ORTHOGRAPHIC;
+    cam.aspectRatioMode = pc.ASPECT_MANUAL;
+    cam.aspectRatio = 1;
+    cam.nearClip = 0.05;
+    cam.farClip = 40;
+    this.shadow = contactShadow(scene, scene.root);
   }
 
-  static async create(assets: AssetRegistry): Promise<ItemStudio> {
+  static async create(assets: AssetRegistry, backend: 'auto' | 'webgl'): Promise<ItemStudio> {
+    // (Drawn into targets of its own: the canvas is only the device's.)
     const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = TURN_PX;
-    const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, premultipliedAlpha: true, alpha: true, stencil: false, adaptToDeviceRatio: false });
-    try {
-      return new ItemStudio(engine, await studioScene(engine, assets), canvas);
-    } catch (err) {
-      engine.dispose();
-      throw err;
-    }
+    canvas.id = 'item-pictures';
+    canvas.width = canvas.height = 16;
+    return new ItemStudio(await studioScene(canvas, assets, { backend, antialias: false, alpha: false }));
   }
 
   /**
@@ -365,71 +369,112 @@ class ItemStudio {
    * `boxed`: its file failed (to load or to build), and the picture is of a plain box in its place.
    */
   async draw(model: string, assets: AssetRegistry, footprint: [number, number], frames: number, size: number, colors?: PartColors): Promise<{ encoded: Promise<string[]>; boxed: boolean } | null> {
+    const { app, lib, root } = this.scene;
+    lib.setShading(shadingFromSettings());
     const entry = assets.has(model, 'model') ? assets.get(model, 'model') : undefined;
-    const template = await buildModel(this.scene, `thumb:${model}`, painted(entry, colors), footprint, { standIn: entry?.url ? PICTURE_STAND_IN : undefined });
-    const meshes = template.meshes;
+    const template = await buildModel(app, `thumb:${model}`, painted(entry, colors), footprint, { standIn: entry?.url ? PICTURE_STAND_IN : undefined });
+    const placed = placeModel(this.scene, root, template);
     try {
-      const identity = Matrix.Identity().asArray() as unknown as Float32Array;
-      for (const mesh of meshes) {
-        mesh.parent = this.root;
-        mesh.isPickable = false;
-        mesh.thinInstanceSetBuffer('matrix', identity, 16, true);
-        mesh.alwaysSelectAsActiveMesh = true;
-      }
-      this.root.rotation.y = 0;
-      const corners = boxCorners(meshes);
-      if (!corners.length || !(await this.whenReady(meshes))) return null;
+      const corners = boxCorners(template.meshes);
+      if (!corners.length || !(await texturesReady(lib))) return null;
 
       // The contact shadow is the model's own ground size, under its middle (it turns with the
       // model), not its footprint's: a mug's tile-sized shadow ran off the picture's edges.
       let [x0, x1, z0, z1] = [Infinity, -Infinity, Infinity, -Infinity];
       for (const v of corners) [x0, x1, z0, z1] = [Math.min(x0, v.x), Math.max(x1, v.x), Math.min(z0, v.z), Math.max(z1, v.z)];
       const [sx, sz] = [(x0 + x1) / 2, (z0 + z1) / 2];
-      this.shadow.scaling.set((x1 - x0) * 1.3 + 0.08, 1, (z1 - z0) * 1.3 + 0.08);
+      this.shadow.setLocalScale((x1 - x0) * 1.3 + 0.08, 1, (z1 - z0) * 1.3 + 0.08);
 
       const angles = Array.from({ length: frames }, (_, i) => (i * Math.PI * 2) / frames);
       this.frame(corners, angles);
-      this.engine.setSize(size, size);
+      const target = this.target(size);
+      this.camera.renderTarget = target;
+      // Its shaders compiled first, between the page's frames (WebGL2: `asyncShaders`).
+      for (const started = performance.now(); ; ) {
+        this.render();
+        if (!shadersCompiling(this.scene.device) || performance.now() - started > SHADERS_TIMEOUT) break;
+        await new Promise((r) => setTimeout(r, 16));
+      }
+      const turned = new Float32Array(16);
       const urls: Promise<string>[] = [];
       for (const angle of angles) {
-        this.root.rotation.y = angle;
-        this.shadow.rotation.y = angle;
-        // Babylon's rotation.y turns +x towards -z.
-        this.shadow.position.x = sx * Math.cos(angle) + sz * Math.sin(angle);
-        this.shadow.position.z = -sx * Math.sin(angle) + sz * Math.cos(angle);
-        this.scene.render();
-        urls.push(this.capture(size));
+        // Turned about y in game space (+x towards -z).
+        const c = Math.cos(angle);
+        const s = Math.sin(angle);
+        turned.set([c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, 0, 0, 0, 1]);
+        for (const draw of placed.draws) {
+          draw.setMatrices(turned, 1);
+          draw.update();
+        }
+        // (A local turn about y under the world root is the same turn in game space.)
+        this.shadow.setLocalEulerAngles(0, (angle * 180) / Math.PI, 0);
+        this.shadow.setLocalPosition(sx * c + sz * s, 0.004, -sx * s + sz * c);
+        this.render();
+        urls.push(this.capture(target, size));
       }
       return { encoded: Promise.all(urls), boxed: !!template.boxed };
     } finally {
-      for (const mesh of meshes) mesh.dispose(false, false);
+      placed.destroy();
     }
   }
 
   dispose(): void {
-    this.scene.dispose();
-    this.engine.dispose();
+    for (const target of this.targets.values()) {
+      target.destroyTextureBuffers();
+      target.destroy();
+    }
+    this.targets.clear();
+    this.scene.destroy();
   }
 
-  /** Points the camera so the model fills the picture at every angle drawn. */
-  private frame(corners: Vector3[], angles: number[]): void {
-    const dir = new Vector3(Math.sin(YAW) * Math.cos(PITCH), Math.sin(PITCH), Math.cos(YAW) * Math.cos(PITCH));
-    const forward = dir.scale(-1);
-    const right = Vector3.Cross(Vector3.Up(), forward).normalize();
-    const up = Vector3.Cross(forward, right).normalize();
+  /** One frame of the scene (the wind's clock moving on by the time since the last). */
+  private render(): void {
+    const now = performance.now();
+    const app = this.scene.app;
+    app.update(Math.min(0.1, (now - this.last) / 1000));
+    this.last = now;
+    app.render();
+  }
+
+  private target(size: number): pc.RenderTarget {
+    let target = this.targets.get(size);
+    if (!target) {
+      const texture = new pc.Texture(this.scene.device, {
+        name: `itemPicture${size}`,
+        width: size,
+        height: size,
+        format: pc.PIXELFORMAT_RGBA8,
+        mipmaps: false,
+        minFilter: pc.FILTER_LINEAR,
+        magFilter: pc.FILTER_LINEAR,
+        addressU: pc.ADDRESS_CLAMP_TO_EDGE,
+        addressV: pc.ADDRESS_CLAMP_TO_EDGE,
+      });
+      target = new pc.RenderTarget({ name: `itemPicture${size}`, colorBuffer: texture, depth: true, samples: 4 });
+      this.targets.set(size, target);
+    }
+    return target;
+  }
+
+  /** Points the camera so the model fills the picture at every angle drawn (game space, the camera standing as it did up to 0.3.2). */
+  private frame(corners: pc.Vec3[], angles: number[]): void {
+    const dir = new pc.Vec3(Math.sin(YAW) * Math.cos(PITCH), Math.sin(PITCH), Math.cos(YAW) * Math.cos(PITCH));
+    const forward = dir.clone().mulScalar(-1);
+    const right = new pc.Vec3().cross(pc.Vec3.UP, forward).normalize();
+    const up = new pc.Vec3().cross(forward, right).normalize();
     let minR = Infinity;
     let maxR = -Infinity;
     let minU = Infinity;
     let maxU = -Infinity;
-    const p = new Vector3();
+    const p = new pc.Vec3();
     for (const a of angles) {
       const c = Math.cos(a);
       const s = Math.sin(a);
       for (const v of corners) {
-        // Babylon's rotation.y turns +x towards -z.
+        // A turn about y in game space turns +x towards -z.
         p.set(v.x * c + v.z * s, v.y, -v.x * s + v.z * c);
-        const r = Vector3.Dot(p, right);
-        const u = Vector3.Dot(p, up);
+        const r = p.dot(right);
+        const u = p.dot(up);
         minR = Math.min(minR, r);
         maxR = Math.max(maxR, r);
         minU = Math.min(minU, u);
@@ -437,32 +482,46 @@ class ItemStudio {
       }
     }
     const half = Math.max(MIN_HALF, ((maxR - minR) / 2) * 1.14, ((maxU - minU) / 2) * 1.14);
-    const centre = right.scale((minR + maxR) / 2).add(up.scale((minU + maxU) / 2));
-    const cam = this.camera;
-    cam.position.copyFrom(centre.add(dir.scale(12)));
-    cam.setTarget(centre);
-    cam.orthoLeft = -half;
-    cam.orthoRight = half;
-    cam.orthoBottom = -half;
-    cam.orthoTop = half;
+    const centre = right.clone().mulScalar((minR + maxR) / 2).add(up.clone().mulScalar((minU + maxU) / 2));
+    const eye = centre.clone().add(dir.clone().mulScalar(12));
+    const entity = this.camera.entity;
+    entity.setPosition(toEngine(eye.x, eye.y, eye.z, new pc.Vec3()));
+    entity.lookAt(toEngine(centre.x, centre.y, centre.z, new pc.Vec3()));
+    this.camera.orthoHeight = half;
   }
 
-  /** Waits until every mesh can be drawn (shaders compiled, textures loaded). */
-  private async whenReady(meshes: Mesh[]): Promise<boolean> {
-    const started = performance.now();
-    while (performance.now() - started < READY_TIMEOUT) {
-      if (meshes.every((m) => m.isReady(true)) && this.shadow.isReady(true)) return true;
-      await new Promise((r) => setTimeout(r, 16));
+  /**
+   * Reads the frame just drawn back (recorded now, before the next one is drawn into the same
+   * target) and encodes it in the background. The rows come back bottom-up on WebGL2
+   * (`readPixels`) and top-down on WebGPU (`copyTextureToBuffer`); premultiplied, as drawn over
+   * the clear transparent black.
+   */
+  private async capture(target: pc.RenderTarget, size: number): Promise<string> {
+    // (From the texture itself, which the multisampled target resolves into at the end of its pass: WebGL2 can't read a multisampled framebuffer.)
+    const read = target.colorBuffer.read(0, 0, size, size, { immediate: true }) as Promise<Uint8Array> | undefined;
+    if (!read) throw new Error('read-back unavailable');
+    const pixels = await read;
+    const img = new ImageData(size, size);
+    const row = size * 4;
+    const bottomUp = !this.scene.device.isWebGPU;
+    const out = img.data;
+    for (let y = 0; y < size; y++) {
+      const from = (bottomUp ? size - 1 - y : y) * row;
+      out.set(pixels.subarray(from, from + row), y * row);
     }
-    return false;
-  }
-
-  /** Copies the frame just drawn (synchronously) and encodes it in the background. */
-  private async capture(size: number): Promise<string> {
-    const out = document.createElement('canvas');
-    out.width = out.height = size;
-    out.getContext('2d')!.drawImage(this.canvas, 0, 0, size, size, 0, 0, size, size);
-    const blob = await new Promise<Blob>((resolve, reject) => out.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/webp', 0.9));
+    // Straight alpha for the canvas (the edges and the shade were drawn over transparent black).
+    for (let i = 0; i < out.length; i += 4) {
+      const a = out[i + 3];
+      if (a === 0 || a === 255) continue;
+      const k = 255 / a;
+      out[i] = Math.min(255, out[i] * k);
+      out[i + 1] = Math.min(255, out[i + 1] * k);
+      out[i + 2] = Math.min(255, out[i + 2] * k);
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = size;
+    canvas.getContext('2d')!.putImageData(img, 0, 0);
+    const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/webp', 0.9));
     return URL.createObjectURL(blob);
   }
 }

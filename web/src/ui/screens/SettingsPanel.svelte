@@ -7,7 +7,7 @@
   import { untrack } from 'svelte';
   import { resetSettings, RESTART_KEYS, settings, type Settings } from '../../settings/settings.svelte';
   import type { GraphicsPreset } from '../../render/quality';
-  import { MIN_SCALE } from '../../render/babylon/resolution';
+  import { MIN_SCALE } from '../../render/shared/resolution';
   import { app } from '../app.svelte';
   import { services } from '../services';
   import { game, toast } from '../state.svelte';

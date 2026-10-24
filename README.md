@@ -1,6 +1,6 @@
 # Idyll Lives
 
-A home-building game with a living town, in the browser: you build and furnish a home, and its residents live in it on their own while you watch. Rust compiled to WebAssembly runs the simulation, Babylon.js draws it on the GPU (WebGPU, with a WebGL2 fallback) and the interface is Svelte 5. Desktop only.
+A home-building game with a living town, in the browser: you build and furnish a home, and its residents live in it on their own while you watch. Rust compiled to WebAssembly runs the simulation, PlayCanvas draws it on the GPU (WebGPU, with a WebGL2 fallback) and the interface is Svelte 5. Desktop only.
 
 **▶ Play it in your browser: https://krecks.github.io/idyll-lives/** (desktop Chrome, Edge, Brave or Safari; other browsers use the WebGL2 fallback). The language model for residents' lines needs WebGPU; voices use it when they can and otherwise run on the processor.
 
@@ -67,6 +67,8 @@ The first `bun run dev` or `bun run build` downloads the voice model (398 MB as 
 | `bun run llm` | Fetch the language model (`cargo fetch-llm`) |
 | `bun run check` | Type-check TypeScript and Svelte |
 | `bun run lint` | Lint the web code |
+| `bun run test` | The renderer's engine-neutral tests (`web/tests`, `bun test`) |
+| `bun run check:chunks` | Check that the PlayCanvas internals the renderer patches or reads are still there (`tools/render/check_chunks.ts`; run it after a PlayCanvas upgrade) |
 | `bun run test:sim` | Run the Rust simulation tests |
 | `bun run test:voice` | Run the voice crate's tests (needs `bun run voice` for the dictionary) |
 | `bun run check:voice` | Check the voices in Bun against golden hashes (`tools/voice/check.mjs`) |
@@ -74,9 +76,9 @@ The first `bun run dev` or `bun run build` downloads the voice model (398 MB as 
 | `bun run devices:llm` | Run the voices and language model's device test in Chromium (`tools/llm/devices.mjs`) |
 | `bun ../tools/llm/bench.mjs` | Benchmark the language model on its own: the game's worker, model and prompts with no game around it (load, prompt, tokens a second, the game's five lines), cold and with the page reloaded; writes `bench-results/llm-*/` |
 | `bun run assets` | Build or update the compressed asset copies (the build does this too) |
-| `bun run decoders` | Refresh `public/decoders` after a Babylon upgrade |
+| `bun run decoders` | Refresh `public/decoders` (PlayCanvas's Basis Universal transcoder for KTX2 textures) after a PlayCanvas upgrade (`cargo decoders`) |
 
-From the repo root: `cargo clippy --workspace --all-targets -- -D warnings` (CI gates on it), `bun tools/bench/render.mjs` (the rendering benchmark, see [docs/design/graphics.md](docs/design/graphics.md)) and `cargo release-version` (the version, see [Versions and releasing](#versions-and-releasing)).
+From the repo root: `cargo clippy --workspace --all-targets -- -D warnings` (CI gates on it), `bun tools/bench/render.mjs` (the rendering benchmark and reference screenshots, see [tools/bench/README.md](tools/bench/README.md) and [docs/design/graphics.md](docs/design/graphics.md)) and `cargo release-version` (the version, see [Versions and releasing](#versions-and-releasing)).
 
 **The production build** also:
 - runs binaryen's `wasm-opt -O3` on both WASM files and strips their names (`cargo wasm-opt`; about a minute the first time, then cached in `web/.assets/wasm-opt`). The dev server keeps the WASM as built, with its names;
@@ -91,17 +93,23 @@ From the repo root: `cargo clippy --workspace --all-targets -- -D warnings` (CI 
 | Option | What it does |
 |---|---|
 | `?quality=low\|medium\|high` | Overrides the graphics preset for this page |
-| `?renderer=webgl` | Draws with WebGL2 even where WebGPU works |
-| `?bench=village` | The rendering benchmark (also `forest`), with `&quality=`, `&hour=`, `&cam=orbit\|wide\|build\|dusk\|mirror`, `&res=`, `&cap=`, `&diag=` and more ([docs/design/graphics.md](docs/design/graphics.md)) |
+| `?renderer=webgl` | Draws with WebGL2 even where WebGPU works (the game, the previews and the dev pages) |
+| `?bench=village` | The rendering benchmark (also `forest`), with `&quality=`, `&hour=`, `&cam=orbit\|wide\|build\|dusk\|mirror\|mirror-still`, `&res=`, `&cap=`, `&diag=` and more ([docs/design/graphics.md](docs/design/graphics.md)) |
 | `?hour=13` | Holds the lighting at that hour |
-| `?diag=noshadows,nonature,…` | Leaves features out of the picture to measure what they cost; `freeze` stops time for screenshots |
-| `?debug` | Console helpers: `__controls`, `__world()`, `__sims()` (residents live: where, pose, what they use, needs), `__send(command)`, `__addFunds(n)`, `__camera(pose)`, `__showPlot(i)`, `__characters`, and `__crash('panic'\|'throw'\|'hang'\|'render')` to see how the game copes with a failure |
+| `?diag=…` | A comma list. `noshadows`, `noaa`, `nonature`, `nolamps`, `nomirrors`, `noglass`, `nonight` leave a feature out to measure what it costs; `freeze` stops time for screenshots; `albedo` and `normals` draw every lit surface as its base colour or world normal; `nosims` leaves the residents out; `linear` draws the light without tone mapping, exposure or grading; `shaders` logs every shader and pipeline compiled, with its material and phase |
+| `?debug` | Console helpers: `__controls`, `__world()`, `__sims()` (residents live: where, pose, what they use, needs), `__send(command)`, `__addFunds(n)`, `__camera(pose)`, `__showPlot(i)`, `__characters`, `__renderer` (its debug hooks), and `__crash('panic'\|'throw'\|'hang'\|'render')` to see how the game copes with a failure |
+| `?profile` | Logs where start-up and frames spend their time, with a summary once start-up settles (`debug/perf.ts`) |
 | `?seed=42` | The random seed of a new game |
 | `?pack=packs/my-art/manifest.json` | Loads an extra asset pack (can be repeated) |
 | `?look=soft\|classic` | Dev server only: draws in that shading whatever the setting says |
-| `?snapshot=0` | Turns off WebGPU snapshot rendering (the menus' town) |
-| `?lights=clustered\|forward` | Forces how lamps are lit |
+| `?snapshot=0` | Turns off held frames: the menus' town, standing still, is otherwise drawn once and shown again until something in it changes |
+| `?shadowrate=<Hz>` | How many times a second the sun's shadow map may be drawn again for the residents' poses (the preset's `shadowRate`; 0: on every change) |
+| `?lights=clustered\|forward` | Forces how lamps are lit: every lamp, or the four nearest the biggest rooms (as forward lights on WebGL2; WebGPU has only clustered lighting) |
+| `?roomlights=0` | Lets clustered lamps light other rooms than their own, to compare |
+| `?lightmix=sun,sky,env` | Scales the look's sun, sky fill and environment light (1 each), to compare one at a time |
 | `?state=<name>`, `?debugReport=<name>` | Dev server only: starts in a game state written by the simulation's tests (`DUMP_STATES=1 cargo test`), or in a saved debug report |
+
+The dev server also has pages of their own, not in the build: `/gallery.html` (every model), `/clips.html` (their animations), `/characters.html` and `/poses.html` (the residents), `/previews.html` (portraits and catalog pictures) and `/pcload.html` (the loaders and the material library). On the gallery, clips, characters and poses pages `?ground=0` leaves the lawn out, to compare `diag` views; their other flags are in [tools/bench/README.md](tools/bench/README.md).
 
 ## Architecture
 
@@ -122,17 +130,27 @@ Main thread                                   Sim worker
 | `crates/sim-core` | All game rules: needs, AI, pathfinding, town, social life, saves, geometry generation | Know about browsers, rendering or asset files |
 | `crates/sim-wasm` | JS bindings | Contain game logic |
 | `web/src/core` | Worker, bridge, protocol, snapshot channel | Render or touch the DOM |
-| `web/src/render` | Everything drawn; `types.ts` is the contract | Contain game rules; allocate per frame |
+| `web/src/render` | Everything drawn; `types.ts` is the contract (below) | Contain game rules; allocate per frame |
 | `web/src/assets` | Key → file resolution | Hard-code art anywhere else |
 | `web/src/ui` | Svelte components, design tokens (`theme.css`) | Talk to the worker directly (use `services.controls`) |
 | `web/src/game` | Wiring and input (the only place that knows every module) | Grow logic that belongs in a module |
 
 **Performance rules**
-- The CPU runs the game; the GPU draws it. The main thread reads one snapshot per tick and draws the world live; the menus' town replays recorded GPU commands (WebGPU snapshot rendering).
-- Every model is drawn with thin instances, one draw call per finish group (1–3 for most objects, see [docs/design/objects.md](docs/design/objects.md)); residents are thin instances whose matrix buffer is updated once per frame.
+- The CPU runs the game; the GPU draws it. The main thread reads one snapshot per tick and draws the world live; the menus' town, standing still, isn't drawn again until something in it changes (held frames).
+- Every model is drawn instanced, one draw call per finish group (1–3 for most objects, see [docs/design/objects.md](docs/design/objects.md)); residents are instanced too, posed from one texture of bone matrices of which only the changed rows are uploaded each frame.
 - No allocations in the frame loop or the sim tick. The snapshot layout is defined once, in Rust.
 - The UI gets changes only, at about 10 Hz, never the whole view and never per frame.
-- Import Babylon through `web/src/render/babylon/core.ts`, never from the `@babylonjs/core` root (that pulls in the whole engine).
+- Import PlayCanvas through `web/src/render/pc/engine.ts`, never as the bare `playcanvas` package (ESLint refuses it): under Vite's dev server the package's entry is PlayCanvas's debug build, which wraps every WebGPU draw in validation error scopes and costs a few frames a second on a full scene; `engine.ts` re-exports the release build by path.
+
+**The renderer** (`web/src/render`, details in [docs/design/graphics.md](docs/design/graphics.md#the-renderer)):
+
+| Folder | Holds |
+|---|---|
+| `render/pc` | The game's renderer on PlayCanvas 2.23 (`PlayCanvasRenderer.ts`, the `Renderer` of `types.ts`) and what it draws with: the house, street, nature, models, residents, lamps, mirrors, the overview, picking, build tools, post-processing; `shaders/` holds the game's shader features in GLSL and WGSL |
+| `render/shared` | What any engine would need, with no engine in it: the camera's controls (`orbit.ts`), the maths in the game's conventions, mesh builders, the residents' behaviour (`characters/`), birds, build effects, image-processing uniforms, frame pacing; tested by `bun run test` |
+| `render/preview` | The previews on PlayCanvas apps of their own: the household creator's resident, portraits, the catalog's pictures and turntables |
+
+Game space is left-handed (x east, y up, z north), as the simulation, the generators and the residents' files have it; PlayCanvas is right-handed, so the world hangs under one root mirrored in z and `render/pc/space.ts` is the only place that converts (cameras, lights, picking rays, projected points, mirror planes). The game's shader features reach PlayCanvas's standard material as chunk overrides gated by their own defines, plus a few engine-wide patches; `bun run check:chunks` (in CI) checks that every engine line they rely on is still there.
 
 ## Replacing art
 
@@ -179,13 +197,13 @@ Pack authors: see [docs/content-packs.md](docs/content-packs.md). The look of th
 
 ## Versions and releasing
 
-The current version is **0.3.2**. One version number covers the whole game: `web/package.json` (shown in the main menu and Credits, with the commit it was built from), the Rust workspace in `Cargo.toml` and the workspace crates' entries in `Cargo.lock`. `cargo release-version` prints it and fails if they differ (CI checks this); `cargo release-version 0.3.0` sets all three. Each release is a git tag `vX.Y.Z` with notes in [CHANGELOG.md](CHANGELOG.md).
+The current version is **0.4.0**. One version number covers the whole game: `web/package.json` (shown in the main menu and Credits, with the commit it was built from), the Rust workspace in `Cargo.toml` and the workspace crates' entries in `Cargo.lock`. `cargo release-version` prints it and fails if they differ (CI checks this); `cargo release-version 0.3.0` sets all three. Each release is a git tag `vX.Y.Z` with notes in [CHANGELOG.md](CHANGELOG.md).
 
-Saves have their own format version, `SAVE_VERSION` in `crates/sim-core/src/save.rs`: 32 since 0.3.1, also in 0.3.2 (29 in 0.3.0, 23 in 0.2.0; 0.1.0 wrote 17). Older saves are migrated when they load, and `crates/sim-core/tests/old_saves.rs` loads real saves from 0.1.0 and the build after it. A save from a newer version is kept and skipped, and a damaged one is removed with a notice.
+Saves have their own format version, `SAVE_VERSION` in `crates/sim-core/src/save.rs`: 32 since 0.3.1, also in 0.3.2 and 0.4.0 (29 in 0.3.0, 23 in 0.2.0; 0.1.0 wrote 17). Older saves are migrated when they load, and `crates/sim-core/tests/old_saves.rs` loads real saves from 0.1.0 and the build after it. A save from a newer version is kept and skipped, and a damaged one is removed with a notice.
 
 **Releasing** (`.github/workflows/pages.yml`):
 1. `cargo release-version <x.y.z>` (it updates `Cargo.lock` too, so no `cargo build` is needed), and a `## <x.y.z> — <date>` section in CHANGELOG.md, with the date set by hand. Commit both on `main`, and `git push origin main`: the dry run builds what GitHub has.
-2. A dry run on `main`: `gh workflow run pages.yml --ref main -f deploy=false`. `gh run watch` needs the run's id: `gh run list --workflow pages.yml -L1 --json databaseId -q '.[0].databaseId'`, then `gh run watch <id> --exit-status`. It runs everything a release runs (clippy with `-D warnings`, the simulation tests, tickbench, the voice tests, `bun run check:voice`, `check` and `lint`, the build, a size check under 900 MB) without publishing. It works on any branch, and `-f deploy=true` publishes. Run it on `main` just before tagging: the caches it saves there (voice and language models, assets) can be read by the tag's run.
+2. A dry run on `main`: `gh workflow run pages.yml --ref main -f deploy=false`. `gh run watch` needs the run's id: `gh run list --workflow pages.yml -L1 --json databaseId -q '.[0].databaseId'`, then `gh run watch <id> --exit-status`. It runs everything a release runs (clippy with `-D warnings`, the simulation tests, tickbench, the voice tests, `bun run check:voice`, `check`, `lint`, `check:chunks` and `test`, the build, a size check under 900 MB) without publishing. It works on any branch, and `-f deploy=true` publishes. Run it on `main` just before tagging: the caches it saves there (voice and language models, assets) can be read by the tag's run.
 3. Tag and push: `git tag -a v<x.y.z> -m "..."` and `git push origin v<x.y.z>`. The tag's run checks that the tag matches the version and that CHANGELOG.md has its heading, builds, and publishes to GitHub Pages. Pushes to `main` alone don't publish. Watch it as in step 2 (`gh run list --workflow pages.yml --event push -L1 …`), and don't start other runs while it waits: GitHub keeps only one waiting run per concurrency group and cancels the older one.
 4. Check the live site:
    - The menu shows the new version, and Credits "Version <x.y.z> (build <the tagged commit>)". (To find the version in the bundle, search `index-*.js` for it without double quotes: it sits in backticks.)
@@ -193,10 +211,10 @@ Saves have their own format version, `SAVE_VERSION` in `crates/sim-core/src/save
    - The large files download in full, which only the live site can show: `llm/lfm2.5-350m/model_q4.onnx_dataz` returns 200 and is 254,923,309 bytes (gunzipped, its SHA-256 is the one in `crates/tools/src/llmfetch.rs`), and `voice/supertonic-3/vector_estimator.onnxz` is 119,556,677 bytes.
 5. Publish the release notes: `gh release create v<x.y.z> --verify-tag --title "Idyll Lives <x.y.z>" --notes-file <the version's CHANGELOG section>`.
 
-**If a release goes wrong,** fix forward, or redeploy the last good build (`gh workflow run pages.yml --ref <tag> -f deploy=true`). 0.3.1 and 0.3.2 share save format 32, so 0.3.1 is a safe build to go back to; 0.3.0 can't open 0.3.1's saves (format 32), 0.2.0 can't open 0.3.0's (format 29), and v0.1.0 can't open 0.2.0's database (version 2): an older build keeps the newer saves and skips them, so it lists only the saves it can open. Nothing is lost; the saves come back with the newer build.
+**If a release goes wrong,** fix forward, or redeploy the last good build (`gh workflow run pages.yml --ref <tag> -f deploy=true`). 0.3.1, 0.3.2 and 0.4.0 share save format 32, so 0.3.2 is a safe build to go back to; 0.3.0 can't open 0.3.1's saves (format 32), 0.2.0 can't open 0.3.0's (format 29), and v0.1.0 can't open 0.2.0's database (version 2): an older build keeps the newer saves and skips them, so it lists only the saves it can open. Nothing is lost; the saves come back with the newer build.
 
 Each CI run keeps the site's WASM with function names as an artifact for 90 days (`wasm-with-names-<sha>`). It runs the same optimisations as the site with the name section kept, so its function numbers match the shipped WASM and a crash stack from the site can be read with it.
 
 ## Licence
 
-Idyll Lives is free software, released under the [GNU General Public License v3.0 (or later)](LICENSE). You may use, study, share, and modify it; if you distribute Idyll Lives or a modified version, you must make the source available under the same licence. Third-party parts keep their own licences: the art listed in [`web/public/assets/CREDITS.md`](web/public/assets/CREDITS.md) is CC0, the voice model (Supertone's Supertonic 3) is under the BigScience OpenRAIL-M licence (with its use restrictions), the dictionary is Apache-2.0, and the optional language model for residents' lines (Liquid AI's LFM2.5 350M) is under the LFM Open License v1.0 (all listed there). Every production build also writes `THIRD-PARTY-LICENSES.txt` with the licence texts of the code it bundles (Babylon.js, Svelte, ONNX Runtime Web, the Rust crates in the WASM and others); the in-game Credits link both.
+Idyll Lives is free software, released under the [GNU General Public License v3.0 (or later)](LICENSE). You may use, study, share, and modify it; if you distribute Idyll Lives or a modified version, you must make the source available under the same licence. Third-party parts keep their own licences: the art listed in [`web/public/assets/CREDITS.md`](web/public/assets/CREDITS.md) is CC0, the voice model (Supertone's Supertonic 3) is under the BigScience OpenRAIL-M licence (with its use restrictions), the dictionary is Apache-2.0, and the optional language model for residents' lines (Liquid AI's LFM2.5 350M) is under the LFM Open License v1.0 (all listed there). Every production build also writes `THIRD-PARTY-LICENSES.txt` with the licence texts of the code it bundles (PlayCanvas, Svelte, ONNX Runtime Web, the Rust crates in the WASM and others) and of the code ported into the game's own: parts of the renderer are ported from Babylon.js (Apache-2.0; each such file says so, and its licence and notice are in `crates/tools/texts/`); the in-game Credits link both.

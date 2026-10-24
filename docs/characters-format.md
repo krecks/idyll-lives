@@ -2,8 +2,9 @@
 
 The residents (bodies, faces, hair, clothes) are generated in code by `cargo characters` (in Rust,
 `crates/tools/src/characters`), and their animation clips are made in code in
-`web/src/render/babylon/characters/clips`. This page is the contract between the generator, the
-clips and the runtime (`web/src/render/babylon/characters*`). Everything here is original work.
+`web/src/render/shared/characters/clips`. This page is the contract between the generator, the
+clips and the runtime (`web/src/render/shared/characters/`, drawn by `web/src/render/pc/characters.ts`).
+Everything here is original work.
 
 ```
 cargo characters build                                # writes web/public/assets/characters, then checks it
@@ -17,13 +18,14 @@ The build is deterministic (seeded noise only): the same code gives the same byt
 
 ## Conventions
 
-- Babylon's left-handed space, metres, y up. A resident faces +z; their left is -x.
+- The game's left-handed space (Babylon's, which the PlayCanvas renderer keeps under its mirrored world
+  root), metres, y up. A resident faces +z; their left is -x.
 - Every rest local rotation is the identity. A bone's frame at rest is model space, and its local
   translation is the offset from its parent's joint. `restQ`, `pre`, `post` and `sourceRestQ` are
   absent or identity.
 - The rest pose is an A-pose: arms 45 degrees down, legs straight and vertical, a gently curled
   open hand.
-- Meshes are written with clockwise front faces (Babylon's left-handed convention). Inside the
+- Meshes are written with clockwise front faces (the left-handed convention, as Babylon had it). Inside the
   generator every mesh is counter-clockwise from outside; `write.py` turns the faces round.
 
 ## Skeleton (33 bones)
@@ -495,7 +497,7 @@ In dev, editing a clip file re-bakes the clips in place (Vite HMR).
 
 ## Seats and beds
 
-`web/src/render/babylon/characters/furniture.json` holds where residents sit and lie, by object id: `seats`
+`web/src/render/shared/characters/furniture.json` holds where residents sit and lie, by object id: `seats`
 (`SEATS`), `defaultSeat`, `beds` (`BEDS`), `defaultBed`, `bunks` (`BUNKS`) and `footstools` (`FOOTSTOOLS`). `characters.ts` reads it with its
 `Seat` and `Bed` types (the fields are documented there); `cargo check-glb` measures the meshes against it and
 `cargo review sizes` against real-world sizes. An object in `seats` takes that seat over the content's `seat`
@@ -572,9 +574,9 @@ rider, the seesaw), which they settle onto as before rather than walk through.
 |---|---|
 | the contract | `rig.rs`, `head.rs` (the head interface), `contract.rs`, `write.rs`, `build.rs`, `check.rs`, `check_clips.ts`, `clips/dsl.ts`, this page |
 | body and clothes | `body.rs`, `cage.rs`, `subdiv.rs`, `clothes.rs`, `garments.rs`, `meshops.rs` |
-| face and hair | `face.rs`, `hair.rs`, `prims.rs`; the eye, hair and brow branches of `characters/material.ts`; `characters/face.ts` |
+| face and hair | `face.rs`, `hair.rs`, `prims.rs`; the eye, hair and brow branches of `render/pc/shaders/character.ts`; `characters/face.ts` |
 | clips | `clips/*` (with `clips/ik.ts`) |
-| the runtime | `characters.ts` (activities, seats, beds, carrying, faces), `characters/{data,pose,material,outfit,blanket}.ts`; the creator in `ui/screens/CreateHousehold.svelte` and `render/preview` |
+| the runtime | `render/shared/characters/residents.ts` (activities, seats, beds, carrying, faces; its tables in `actions.ts`, `seats.ts`, `socials.ts`, `expressions.ts`, `parts.ts`; drawn through `view.ts` by `pc/characters.ts`), `shared/characters/{data,pose,outfit,blanket}.ts`, `pc/characterMaterial.ts` and `pc/shaders/character.ts` (the shading), `pc/poseTexture.ts`; the creator in `ui/screens/CreateHousehold.svelte` and `render/preview` |
 
 See also `tools/characters/README.md`.
 

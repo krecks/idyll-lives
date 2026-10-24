@@ -4,12 +4,22 @@ The game has a rendering benchmark built in: open it with `?bench=<scene>` (`web
 
 | Script | Does |
 |---|---|
-| `render.mjs` | Starts Vite (or uses `--url`), opens `?bench=` in Chromium on the real GPU at 1920×1080 and device pixel ratio 1, once per preset × backend × scenario × CPU slow-down × diagnostic, and writes JSON and a markdown table to `bench-results/<time>/` (medians with `--runs`). `--shots <dir>` takes reference screenshots of 9 fixed poses; `--compare <dirA> <dirB>` counts the pixels that differ. |
+| `render.mjs` | Starts Vite (or uses `--url`), opens `?bench=` in Chromium on the real GPU at 1920×1080 and device pixel ratio 1, once per preset × backend × scenario × CPU slow-down × diagnostic, and writes JSON and a markdown table to `bench-results/<time>/` (medians with `--runs`). `--shots <dir>` takes reference screenshots of 9 fixed poses (`--pages` the dev pages', held still: the gallery, clips, residents, poses and previews); `--compare <dirA> <dirB>` counts the pixels that differ. `--jobs <file.json>` runs a list of command lines in one invocation (see below). |
 | `tools.mjs` | Times the repo's Rust tools (`crates/tools`: the character build and check, the object gate, the content editor, the texture commands), the release binaries run directly, median of `--runs` after a warm-up plus peak memory, into `bench-results/tools-<time>/`. It compared them with the Python scripts they replaced while those were in the tree (2026-10-20: 2–14× faster, `tex process` 0.8×). |
 | `scene.mjs` | Makes a scene, `web/public/bench/<name>.json.gz`: a new game as the menus make one, with a household of four in the first home for sale, played at full speed to `--hour` on day 1, paused and saved. |
 | `profile.mjs` | Profiles the **real game** instead of the bench scene: opens `?state=<name>&profile&debug&quality=<preset>` on the dev server (or `--build` for `vite preview`, where only `?bench=` exists), presses `--speed`, records its own animation-frame gaps for `--secs`, then reads `window.__perfReport()`. Writes `frames.json`, `perf.json` and `report.md` (gap p50/p95/p99/max, counts over 20/33/50/100 ms, dropped frames and long tasks by phase, worst frames, slowest spans) to `bench-results/profile-<time>/`. A server already answering on `--port` is reused. Findings: [docs/design/performance.md](../../docs/design/performance.md). |
 
 Both need `bun run wasm` first and Playwright (`PLAYWRIGHT=<path to playwright/index.mjs>` if it isn't installed, `CHROME=<executable>` for a browser of your own: Chrome or Chrome for Testing, not `chrome-headless-shell`, which draws in software). Measurements run in a window, so their timing is the real display's. Shots and `scene.mjs`, which time nothing, run headless: no window takes the focus, and it's still the real GPU. `--headless` and `--headed` choose for either. A window's shots come out about 2 of 255 brighter than headless ones (the screen's colour profile), so compare shots taken the same way: two headless runs of the same build differ in at most 0.12 % of their pixels. Both play the game at 1 % volume (`quiet.mjs`).
+
+**One browser, kept.** `render.mjs` launches its browser once per invocation, with a profile under `bench-results/.browser/` (named after the port, so two runs on their own ports don't share one), and opens each page in a window of its own. The HTTP cache and the compiled GPU shaders carry over from page to page and to later invocations, which shortens the loads and shader compiles before a warm-up, not what is measured; the site's own storage is cleared before every page, so each starts as a new player's would. `--fresh` gives every page a new context with nothing kept. `--jobs <file.json>` takes a JSON list of command lines (each an array of the options above) and runs them in one go, sharing one Vite server per mode and one browser per kind:
+
+```json
+[
+  ["--shots", "bench-results/new/shots", "--headless", "--presets", "low,medium,high", "--backends", "webgpu,webgl"],
+  ["--shots", "bench-results/new/pages", "--pages", "gallery-objects,clips", "--diags", "none,albedo,normals", "--headless"],
+  ["--compare", "bench-results/base/shots", "bench-results/new/shots", "--out", "bench-results/new/shots-diff"]
+]
+```
 
 ```sh
 # The production build (what players get), presets × both backends, no vsync, median of 3
@@ -84,7 +94,7 @@ answer 200 (a missing or linked wasm package otherwise gives pictures of an empt
 - **Speed.** `--walk` (3 = 10×, never more) on the way, `--speed` (1) from 3 tiles off the object once
   the resident is going to it, as short uses are over between frames at 30× (a cook's steps at the
   fridge and the counter go fast too).
-- **Logging.** In the page, every animation frame: each clip on the object (`__renderer.motion`: its kind,
+- **Logging.** In the page, every animation frame: each clip on the object (`__renderer.objectClips(id)`: its kind,
   length, furthest time, and when it moved, was open and back at rest) and each change in the
   resident's pose, `using`, animation and use. A record holds the object, the use (and its pose and anim),
   where it stands, `outcome` (`using`, `not taken`, `timeout`, `skipped`, `not bought`, `no uses`), when
@@ -195,7 +205,7 @@ states the tests write: `wants-asking` (its resident is asking to buy something 
 | `__camera(pose?)` | Reads the camera's pose; with a (partial) pose `{alpha, beta, radius, target: [x, y, z]}` or `{y}` (the height it looks at) puts it there. Stops the camera watching on its own. |
 | `__controls.follow(id, view?)` | The camera follows a resident; `view` `{radius, beta, alpha, y}` also zooms and aims (a dartboard above the resident: `y: 1.6`). `follow(null)` stops. The rest of `__controls` is the HUD's controls. |
 | `__content` | The game's content: `__content.object('<id>').interactions` for interaction indices. |
-| `__renderer`, `__scene` | The renderer (`__renderer.motion.states.get(objectId)`: the clips playing on an object) and the Babylon scene. |
+| `__renderer`, `__scene` | The renderer, whose `RendererDebugHooks` (web/src/render/types.ts) the tools use: `objectClips(id)` (the clips playing on an object), `objectMotions(id)`, `objectPoints(id)` (its vertices as drawn), `cameraInfo()` (lens and limits); and the engine's scene, for the console only. |
 | `__showPlot(i)`, `__items()`, `__crash(what)` | Look at another lot; the food and dishes about; fail on purpose. |
 
 ## Sharing one machine with other sessions

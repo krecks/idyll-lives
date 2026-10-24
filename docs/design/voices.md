@@ -740,7 +740,7 @@ distilled from Kokoro's `af_heart` voice.
 | Speed (paper) | about 18× faster than real time, int8 ONNX, one CPU thread |
 | Limits | American English only, **one voice** (female), a faint buzz on some voiced sounds |
 
-It needs no GPU, so the GPU stays with Babylon.
+It needs no GPU, so the GPU stays with the renderer.
 
 What we measured ourselves (M-series Mac, one thread, "Hello! I'm hungry, I should cook
 something.", 2.95 s of audio):

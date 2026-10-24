@@ -1,0 +1,22 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`garden birds a day and a night of birds, as recorded 1`] = `
+[
+  "10 s: 28 birds {"perch":24,"ground":1,"hop":2,"fly":1} 2ee7b54d",
+  "20 s: 28 birds {"perch":19,"fly":4,"ground":3,"hop":2} 5f13efe7",
+  "30 s: 25 birds {"perch":15,"fly":6,"ground":4} d476eabf",
+  "40 s: 25 birds {"hop":1,"perch":17,"fly":3,"ground":4} a288e635",
+  "50 s: 25 birds {"perch":18,"ground":5,"fly":2} bfa41cb7",
+  "60 s: 25 birds {"perch":16,"fly":8,"ground":1} 175ab50d",
+  "70 s: 25 birds {"perch":24,"ground":1} 372bac07",
+  "80 s: 25 birds {"fly":2,"perch":20,"hop":1,"ground":2} c6065187",
+  "90 s: 25 birds {"roost":12,"fly":10,"perch":2,"ground":1} 16c4e967",
+  "100 s: 28 birds {"roost":27,"fly":1} 1a7f18af",
+  "110 s: 28 birds {"roost":28} e0c80e67",
+  "120 s: 28 birds {"roost":28} 60580e67",
+  "130 s: 28 birds {"roost":27,"fly":1} d5280e67",
+  "140 s: 28 birds {"perch":27,"fly":1} 763b8e87",
+  "150 s: 28 birds {"fly":12,"perch":11,"ground":4,"hop":1} cb082f87",
+  "{"flights":219,"hops":306,"lawn":27,"roof":7,"scaredBy":29,"scaredCamera":27,"inside":0}",
+]
+`;

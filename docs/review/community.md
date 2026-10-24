@@ -181,7 +181,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S3
 - **Rubric:** A7
 - **Fix class:** clip
-- **Where:** `web/src/render/babylon/characters/clips/street.ts:127` (`CLIMB`, lanes), `:156-157` (`ROUND`: when each lane's round reaches the deck, waits, crosses and swings, as shares of the climber's own 13 s loop), `web/src/render/babylon/characters.ts:2838-2851` (`freeLane`, `stepSeq`: a lane is chosen on stepping in, the loop runs on the climber's own clock)
+- **Where:** `web/src/render/shared/characters/clips/street.ts:127` (`CLIMB`, lanes), `:156-157` (`ROUND`: when each lane's round reaches the deck, waits, crosses and swings, as shares of the climber's own 13 s loop), `web/src/render/babylon/characters.ts:2838-2851` (`freeLane`, `stepSeq`: a lane is chosen on stepping in, the loop runs on the climber's own clock)
 - **Evidence:** Two climbers on the frame have a lane each, but if they start at other offsets they can still meet at the fireman's pole. The second lane's `wait` (0.34 → 0.50 of the round) holds it back only if both rounds started together: nothing ties the second climber's clock to the first's, so one who steps in half a round later reaches the pole while the first is still on it. `check:clips` doesn't test two climbers, and `check.mjs play` uses one resident.
 - **Status:** fixed (3872d23a)
 - **After:** a climber stepping in while someone is going round the same frame waits at their lane, standing, until the other's round comes back to its start (`inTurn`, `LANE_SYNC` 0.4 s), so the two lanes always go round in step and the second waits on the deck while the first slides. Two climbers (a child and a teen, the second sent 6 s later) waited 7 s and then ran 0.016 s apart for the rest of the use. `bench-results/review/fixes/clips-standing/``climb/` (`climb2-gap6.json`, the pictures at the pole).
@@ -263,7 +263,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S2
 - **Rubric:** M1, M3, I2
 - **Fix class:** model
-- **Where:** `tools/art/blender/families/playground.py:171` (`slide`: the deck's top 1.43 m; `rail_back` across the ladder's top at 1.86 m; the roof's eaves at 1.93 m; `hoop` 0.27 m round the chute's mouth at 1.43 m); the round that copes with it, `web/src/render/babylon/characters/clips/rides.ts` (`slidePose` steps 3-5)
+- **Where:** `tools/art/blender/families/playground.py:171` (`slide`: the deck's top 1.43 m; `rail_back` across the ladder's top at 1.86 m; the roof's eaves at 1.93 m; `hoop` 0.27 m round the chute's mouth at 1.43 m); the round that copes with it, `web/src/render/shared/characters/clips/rides.ts` (`slidePose` steps 3-5)
 - **Evidence:** `fixes/rides/slide-top.png`, `fixes/rides/slide/s-side-t0.550.png`–`t0.610.png`: the bar across the deck's back leaves 0.43 m over the deck where the ladder arrives, so a child gets in on hands and knees under it; the roof's eaves are 0.5 m over the deck, so a child sat at the top (about 0.6 m to the top of the head) ducks with the head at the eaves; the hoop over the chute's mouth rises 0.27 m over the chute's floor, so no one can slide through it sitting up, and the round goes down lain back. A real slide's platform has a metre or more over it, an open way in from the ladder between handrails, and a sit-down bar about 0.5 m up.
 - **Fix:** Blender wave: the roof up (the eaves at about 2.5 m), the back bar replaced by handrails either side of the ladder's top, the hoop larger (about 0.5 m) or a bar across. Then the round can stand on the deck and sit up to slide (`slidePose`).
 - **Status:** fixed (57bf91a8), the model; the round's own change is A-community-02
@@ -402,7 +402,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S3
 - **Rubric:** A1, I3
 - **Fix class:** clip
-- **Where:** `web/src/render/babylon/characters/clips/rides.ts` (`slidePose` steps 3–5: in on hands and knees "between the handrails", lain back under the arch and down the chute on the back); `tools/art/blender/families/playground.py` (`slide`: `SLIDE_EAVES` 2.46, `SLIDE_ARCH` rising 0.55)
+- **Where:** `web/src/render/shared/characters/clips/rides.ts` (`slidePose` steps 3–5: in on hands and knees "between the handrails", lain back under the arch and down the chute on the back); `tools/art/blender/families/playground.py` (`slide`: `SLIDE_EAVES` 2.46, `SLIDE_ARCH` rising 0.55)
 - **Evidence:** `fixes/blender-outdoor/play/child-slide-slide-0*.png`: the round was fitted to the old tower (a bar at 0.43 m over the deck, the eaves 0.5 m over it, a hoop 0.27 m over the chute). With M-community-07's model the child could step up off the ladder onto the deck between the handrails, stand under the roof, sit at the top and go down sitting up, holding the arch's sides at the start. The round still does what the old tower forced.
 - **Fix:** `slidePose` step 3 a step up and a stand on the deck, step 5 down the chute sat up (the back leant 20–30° back, not lain), the arch's sides let go at the push.
 - **Status:** fixed (2fdfb304)

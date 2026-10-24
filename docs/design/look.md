@@ -10,9 +10,11 @@ reflecting every frame on High), listed in
 The world has one look: soft, painterly shading with golden-hour light and blue moonlit nights.
 All art is original or CC0.
 
-Code: `web/src/render/look.ts` holds the look as data; `web/src/render/babylon/*` applies it, and
-`softLook.ts` draws every lit surface in the soft shading below (Settings, Performance, Shading;
-the `classic` option brings back the PBR shading it replaced).
+Code: `web/src/render/look.ts` holds the look as data, in the units it was tuned in up to 0.3.2 (a
+sun or a lamp of strength 1 lights a white surface to 1/π); `web/src/render/pc/*` applies it on
+PlayCanvas (its units converted in `lightUnits.ts`, see [graphics.md](graphics.md#the-renderer)),
+and `shaders/softLook.ts` draws every lit surface in the soft shading below (Settings, Performance,
+Shading; the `classic` option brings back the PBR shading it replaced).
 
 ## Goals
 
@@ -45,24 +47,23 @@ the `classic` option brings back the PBR shading it replaced).
 
 ## Shading
 
-Every lit PBR surface is drawn with the **soft look** (`softLook.ts`, a material plugin that works
-on WebGPU and WebGL2). It keeps the light PBR computed — the sun and the lamps, with their cast
+Every lit PBR surface is drawn with the **soft look** (`render/pc/shaders/softLook.ts`, a shader
+feature of the game's materials in GLSL and WGSL, for WebGPU and WebGL2). It keeps the light PBR computed — the sun and the lamps, with their cast
 shadows — and redraws it as a wide, soft ramp in the light's own colour, so golden hour stays
 golden, lamps stay warm and night stays dark. The environment (the sky, with its occlusion) fills
 the shade at just over half, tinted cool, so shadows read blue-grey rather than black. A gentle
 fresnel rim lifts silhouettes and a little extra saturation keeps the palette lively. There are no
 ink outlines: the look is soft and illustrative, not cel-shaded.
 
-The plugin replaces the material's colour just before fog and image processing, so ACES, the
-exposure and the night grade still apply, and it runs after the wall cutaway and the basements.
+It replaces the material's colour just before fog and image processing, so ACES, the exposure
+and the night grade still apply, and it runs after the wall cutaway and the basements.
 Metals shade in their base colour (PBR gives them no diffuse colour); unlit materials keep their own
 look. Water, the sky and glass panes that keep their reflections keep their own materials on
 purpose.
 
 It is the default (Settings, Performance, **Shading**). **Classic** draws the PBR shading it
-replaced, and switching is live: the plugin takes its define from the setting whenever a material's
-shaders are prepared, so the materials (the game's and the preview studios') are only marked dirty
-to redraw them the other way. The item pictures in Furnish and the portraits are drawn in the chosen
+replaced, and switching is live: every lit material (the game's and the preview studios') gets the
+other define and its shaders compile again (`MaterialLibrary.setShading`). The item pictures in Furnish and the portraits are drawn in the chosen
 shading and cached per shading; Furnish keeps its pictures between visits per app version, so a
 change to the look's code bumps the picture store's version in `preview/items.ts`. On the dev
 server `?look=soft|classic` overrides the setting.
@@ -81,7 +82,7 @@ server `?look=soft|classic` overrides the setting.
 
 ## Birds
 
-Garden birds live about the viewed lot (`render/babylon/birds.ts`; presentation only, nothing in the simulation or the save): blue tits, chaffinches, willow warblers, blackbirds and collared doves, Blender-built (`tools/art/blender/families/birds.py`) in five rigid parts the renderer moves (body, head, tail and the two spread wings, hidden while perched). They are drawn 1.25–1.6× life size, the small ones most: at real size a tit is about 5 px from the game's usual camera, and the game's apples and flowers are a little larger than life too, so they still differ in size as they should.
+Garden birds live about the viewed lot (`render/shared/birds.ts`, drawn by `render/pc/birds.ts`; presentation only, nothing in the simulation or the save): blue tits, chaffinches, willow warblers, blackbirds and collared doves, Blender-built (`tools/art/blender/families/birds.py`) in five rigid parts the renderer moves (body, head, tail and the two spread wings, hidden while perched). They are drawn 1.25–1.6× life size, the small ones most: at real size a tit is about 5 px from the game's usual camera, and the game's apples and flowers are a little larger than life too, so they still differ in size as they should.
 
 - **Homes:** each bird belongs to a plant near the lot (the lot's garden trees and shrubs, garden things outdoors, the street's bushes and hedges, the woods near the town), as many as its size and the preset allow (`birds` in [graphics.md](graphics.md)), made from where it stands, so a rebuild brings back the same birds. Species go by habitat: tits, finches and warblers in broadleaved trees and bushes, blackbirds low in bushes and on the lawn, collared doves in pairs, high up and on the roof ridge (while the roof shows).
 - **Perched:** on a perch point of the plant's model (manifest `perches`, on its outer twigs), swaying as the wind bends the branch (the vertex shader's bend, worked out on the CPU). Small jerky glances of the head, a cock of it, a flick of the tail (a blackbird holds it up a moment), preening now and then, a hop to a nearby twig or a turn on the spot. Small birds fidget; doves sit still and long. A bird that sings lifts its head and holds still.

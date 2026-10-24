@@ -23,50 +23,10 @@
 import type { Content, ObjectDef } from '../content/content';
 import { colorValues } from '../ui/buy/catalog';
 import { colorsKey, groundDepth, storeyOfRow, storeyRow, type StoreyLayout, MAX_HEAD, MAX_OFFSET, MAX_SHORTER, MAX_SIZE, MAX_TALLER, MIN_DOOR_HEAD, MIN_SIZE, MIN_WINDOW, objectCentre, type Command, type EdgeEdit, type FacePaint, type FloorPaint, type ObjectPlacement, type PartColors, type PlotInfo, type WorldStructure } from '../core/protocol';
-import type { BuildEffect, ObjectResize, Renderer, ResizeHandle, ViewRect } from '../render/types';
+import type { BuildEffect, ObjectResize, Renderer, ResizeHandle } from '../render/types';
 import type { Sound } from '../ui/sfx';
 import { game, type BuildTool } from '../ui/state.svelte';
 import { approachTile, covers, facedTable, fitOnTop, frontTile, ownSize, spotAt, topOf, type Top } from './surfaces';
-
-/** Preview calls the renderer offers in Build mode. */
-interface BuildPreview {
-  /** Paint tool: the wall faces a click would cover, dressed in wall covering `cover` (null: hidden). */
-  setPaintPreview(faces: readonly PaintFace[], cover: number | null): void;
-  /** Floor tool: the tiles a release would cover, laid with floor covering `floor` (null: hidden). */
-  setFloorPreview(tiles: readonly { x: number; z: number }[], floor: number | null): void;
-  setHeldObject(id: number | null, moved?: boolean): void;
-  /** Where the pointer's ray meets the level `height` metres above the floor in view (a table top). */
-  pickPlane(height: number): Point | null;
-  setPlacementGhost(
-    ghost: {
-      model: string;
-      def?: string;
-      /** Its parts' colours; absent: as made. */
-      colors?: PartColors;
-      x: number;
-      z: number;
-      rot: number;
-      turn?: number;
-      offset?: [number, number];
-      lift?: number;
-      w: number;
-      d: number;
-      resize?: ObjectResize;
-      front?: { x: number; z: number; out: number };
-      valid: boolean;
-      wall?: boolean;
-    } | null,
-  ): void;
-  setResizeHandles(handles: readonly ResizeHandle[] | null, hot?: string | null): void;
-  handleAt(x: number, y: number): string | null;
-  pickVertical(x: number, z: number): number | null;
-  pickOnWall(axis: 'h' | 'v', line: number, storeyRow: number): { along: number; y: number } | null;
-  objectBox(id: number): { height: number; bottom: number } | null;
-  setEdgePreview(edges: EdgeEdit[], valid: boolean): void;
-  setBuildGrid(rect: ViewRect | null): void;
-  /** Whether a left-drag turns the camera (off while drawing walls). */
-  setLeftDragCamera(on: boolean): void;
-}
 
 type Point = { x: number; z: number };
 /** A wall face to paint; `half` for a half wall (the preview's height). */
@@ -197,7 +157,7 @@ function bodyCrosses([x0, x1, z0, z1]: readonly [number, number, number, number]
 }
 
 export class BuildBuyInput {
-  private readonly preview: Partial<BuildPreview>;
+  private readonly preview: Renderer;
   /** What stands on each wall edge now (`h:x:z` / `v:x:z` / `dp:x:z` / `dn:x:z`), for previews and costs. */
   private edges = new Map<string, EdgeState>();
   /** Direction of the diagonal across each tile (`x:z`), if any. */
@@ -268,7 +228,7 @@ export class BuildBuyInput {
     private readonly content: Content,
     private readonly send: (command: Command) => void,
   ) {
-    this.preview = renderer as unknown as Partial<BuildPreview>;
+    this.preview = renderer;
     window.addEventListener('keydown', this.onModifiers);
     window.addEventListener('keyup', this.onModifiers);
     for (const type of ['pointerdown', 'pointermove', 'pointerup'] as const) window.addEventListener(type, this.onModifiers, true);
@@ -357,18 +317,18 @@ export class BuildBuyInput {
     this.openingSel = null;
     this.openingDrag = null;
     // Never leave the camera's left-drag switched off once drawing can't continue.
-    if (!this.pressed) this.preview.setLeftDragCamera?.(true);
+    if (!this.pressed) this.preview.setLeftDragCamera(true);
     const home = this.home();
-    this.preview.setBuildGrid?.(game.mode === 'build' && home ? { x: home.x, z: home.z, w: home.w, d: home.d } : null);
+    this.preview.setBuildGrid(game.mode === 'build' && home ? { x: home.x, z: home.z, w: home.w, d: home.d } : null);
     this.clearPreviews();
   }
 
   clearPreviews(): void {
-    this.preview.setPlacementGhost?.(null);
-    this.preview.setEdgePreview?.([], true);
+    this.preview.setPlacementGhost(null);
+    this.preview.setEdgePreview([], true);
     game.buildCost = 0;
-    this.preview.setPaintPreview?.([], null);
-    this.preview.setFloorPreview?.([], null);
+    this.preview.setPaintPreview([], null);
+    this.preview.setFloorPreview([], null);
     game.paintFaces = 0;
     game.floorTiles = 0;
     game.buildWallUp = false;
@@ -411,7 +371,7 @@ export class BuildBuyInput {
     }
     // The arrow under the pointer lights up.
     const picked = (game.furnishing && game.buySelection !== null && !game.placing) || (this.openingTool() && this.openingSel !== null);
-    const hot = screen && picked ? (this.preview.handleAt?.(screen.x, screen.y) ?? null) : null;
+    const hot = screen && picked ? (this.preview.handleAt(screen.x, screen.y) ?? null) : null;
     if (hot !== this.hotHandle) {
       this.hotHandle = hot;
       this.handlesKey = '';
@@ -584,7 +544,7 @@ export class BuildBuyInput {
     const tops = others.filter(onPlot).map((o) => topOf(this.content, o)).filter((t): t is Top => t !== null).sort((a, b) => b.height - a.height);
     let under: { top: Top; at: Point } | null = null;
     for (const top of tops) {
-      const at = this.preview.pickPlane?.(top.height);
+      const at = this.preview.pickPlane(top.height);
       if (at && covers(top, at.x, at.z)) {
         under = { top, at };
         break;
@@ -727,7 +687,7 @@ export class BuildBuyInput {
 
   private hoverBuy(ground: Point): void {
     const p = this.placement(ground);
-    if (!p) return this.preview.setPlacementGhost?.(null);
+    if (!p) return this.preview.setPlacementGhost(null);
     const colors = game.placing?.objectId != null ? game.objects.find((o) => o.id === game.placing!.objectId)?.colors : game.placing?.colors;
     // The arrow marks where it'll be used from (the other middle tile in front when the front is
     // taken; nowhere free, the front, red as the rest of it): nothing for things nobody uses (or on a top).
@@ -735,7 +695,7 @@ export class BuildBuyInput {
     const at = used ? approachTile(p.def, p.x, p.z, p.rot, p.rot % 2 === 0 ? [p.w, p.d] : [p.d, p.w], this.standable(game.placing?.objectId ?? null)) : null;
     const [fx, fz] = at?.tile ?? frontTile(p.x, p.z, p.w, p.d, p.rot);
     const resize = this.resizeOf(p.def, p.size, p.tall);
-    this.preview.setPlacementGhost?.({ model: p.def.model, def: p.def.id, colors, x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset, lift: p.lift, w: p.w, d: p.d, resize, front: used ? { x: fx, z: fz, out: at?.out ?? p.rot % 4 } : undefined, valid: p.valid, wall: p.def.layer === 'wall' });
+    this.preview.setPlacementGhost({ model: p.def.model, def: p.def.id, colors, x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset, lift: p.lift, w: p.w, d: p.d, resize, front: used ? { x: fx, z: fz, out: at?.out ?? p.rot % 4 } : undefined, valid: p.valid, wall: p.def.layer === 'wall' });
     if (game.placeValid !== p.valid) game.placeValid = p.valid;
     if (game.placeHint !== p.reason) game.placeHint = p.reason;
   }
@@ -756,10 +716,10 @@ export class BuildBuyInput {
         const same = was && was.x === p.x && was.z === p.z && was.rot === p.rot && (was.turn ?? 0) === p.turn && offsetKey(was.offset) === offsetKey(p.offset);
         if (!same) this.send({ type: 'moveObject', household: game.home, object: placing.objectId, x: p.x, z: p.z, rot: p.rot, turn: p.turn, offset: p.offset });
         // Moved: the original stays hidden until it shows up in its new place.
-        this.preview.setHeldObject?.(null, !same);
+        this.preview.setHeldObject(null, !same);
         game.placing = null;
         this.grab = null;
-        this.preview.setPlacementGhost?.(null);
+        this.preview.setPlacementGhost(null);
         // Picked either way (it keeps its id wherever it goes), as it was before it was moved.
         if (game.furnishing) {
           game.buySelection = placing.objectId;
@@ -873,17 +833,17 @@ export class BuildBuyInput {
     if (r && n) {
       const top = r.lift + r.box.height + (n.tall - r.tall) / 100;
       const handles = this.handlesFor(r.def, { cx: n.cx, cz: n.cz, ex: n.ex, ez: n.ez, rot: r.rot, top, bottom: r.lift + r.box.bottom });
-      return this.preview.setResizeHandles?.(handles, r.handle);
+      return this.preview.setResizeHandles(handles, r.handle);
     }
     const def = sel && this.content.object(sel.def);
-    const box = sel && this.preview.objectBox?.(sel.id);
+    const box = sel && this.preview.objectBox(sel.id);
     if (!sel || !def || !box) {
       // Picked but not drawn yet (the renderer is still placing the new structure): try again next time.
       if (sel) this.handlesKey = '';
-      return this.preview.setResizeHandles?.(null);
+      return this.preview.setResizeHandles(null);
     }
     const lift = sel.lift ?? 0;
-    this.preview.setResizeHandles?.(this.handlesFor(def, { ...this.frameOf(sel), rot: sel.rot, top: lift + box.height, bottom: lift + box.bottom }), this.hotHandle);
+    this.preview.setResizeHandles(this.handlesFor(def, { ...this.frameOf(sel), rot: sel.rot, top: lift + box.height, bottom: lift + box.bottom }), this.hotHandle);
   }
 
   /** Before undo or redo (they may move or remove it): an owned object in hand (carried or resized) goes back; a new purchase stays on the cursor. */
@@ -900,10 +860,10 @@ export class BuildBuyInput {
   /** Buy: pressing on an arrow of the picked object resizes it (things are moved with clicks, not dragged). */
   private pressBuy(ground: Point | null, screen: Point2 | null): boolean {
     if (game.placing || this.picking()) return false;
-    const handle = screen && game.buySelection !== null ? (this.preview.handleAt?.(screen.x, screen.y) ?? null) : null;
+    const handle = screen && game.buySelection !== null ? (this.preview.handleAt(screen.x, screen.y) ?? null) : null;
     const sel = handle ? game.objects.find((o) => o.id === game.buySelection) : undefined;
     const selDef = sel && this.content.object(sel.def);
-    const box = sel && this.preview.objectBox?.(sel.id);
+    const box = sel && this.preview.objectBox(sel.id);
     if (handle && sel && selDef && box) {
       const tall = sel.tall ?? 0;
       const frame = this.frameOf(sel);
@@ -921,8 +881,8 @@ export class BuildBuyInput {
         was: { x: sel.x, z: sel.z, offset: sel.offset },
         now: { ...frame, tall, x: sel.x, z: sel.z, w: sel.w, d: sel.d, offset: sel.offset, valid: true },
       };
-      this.preview.setLeftDragCamera?.(false);
-      this.preview.setHeldObject?.(sel.id);
+      this.preview.setLeftDragCamera(false);
+      this.preview.setHeldObject(sel.id);
       this.hoverResize(ground);
       return true;
     }
@@ -947,7 +907,7 @@ export class BuildBuyInput {
       const rr = r.rot % 4;
       const axis = rr % 2 === 0 ? 'h' : 'v';
       const line = rr === 0 ? Math.floor(r.cz - r.ez / 2) : rr === 2 ? Math.ceil(r.cz + r.ez / 2) : rr === 1 ? Math.floor(r.cx - r.ex / 2) : Math.ceil(r.cx + r.ex / 2);
-      const hit = this.preview.pickOnWall?.(axis, line, r.was.z) ?? null;
+      const hit = this.preview.pickOnWall(axis, line, r.was.z) ?? null;
       if (hit) ground = axis === 'h' ? { x: hit.along, z: ground?.z ?? r.cz } : { x: ground?.x ?? r.cx, z: hit.along };
     }
     const step = this.shift ? 0.01 : 1;
@@ -959,7 +919,7 @@ export class BuildBuyInput {
     if (ground && r.handle === 'z+') z1 = z0 + span(z0, Math.max(ground.z, z0));
     if (ground && r.handle === 'z-') z0 = z1 - span(z1, Math.min(ground.z, z1));
     if (r.handle === 'up') {
-      const h = this.preview.pickVertical?.(r.cx, r.cz) ?? null;
+      const h = this.preview.pickVertical(r.cx, r.cz) ?? null;
       if (h !== null) {
         r.from ??= h;
         const sign = layer === 'ceiling' ? -1 : 1;
@@ -982,7 +942,7 @@ export class BuildBuyInput {
     const fit = this.fits(x, z, w, d, r.rot, r.id, r.def, tiles, offset, size);
     r.now = { cx, cz, ex, ez, tall, x, z, w, d, offset, size, valid: fit === true };
     const obj = game.objects.find((o) => o.id === r.id);
-    this.preview.setPlacementGhost?.({ model: r.def.model, def: r.def.id, colors: obj?.colors, x, z, rot: r.rot, turn: r.turn, offset, lift: r.lift, w, d, resize: this.resizeOf(r.def, size, tall), valid: r.now.valid });
+    this.preview.setPlacementGhost({ model: r.def.model, def: r.def.id, colors: obj?.colors, x, z, rot: r.rot, turn: r.turn, offset, lift: r.lift, w, d, resize: this.resizeOf(r.def, size, tall), valid: r.now.valid });
     if (game.placeValid !== r.now.valid) game.placeValid = r.now.valid;
     const hint = fit === true ? null : (fit ?? "There's no room for it that size");
     if (game.placeHint !== hint) game.placeHint = hint;
@@ -994,14 +954,14 @@ export class BuildBuyInput {
     const r = this.resizing;
     if (r) {
       this.resizing = null;
-      this.preview.setLeftDragCamera?.(true);
+      this.preview.setLeftDragCamera(true);
       const n = r.now;
       const changed = n.size !== undefined && (n.cx !== r.cx || n.cz !== r.cz || n.ex !== r.ex || n.ez !== r.ez || n.tall !== r.tall);
       if (changed && n.valid && n.size) {
         this.send({ type: 'moveObject', household: game.home, object: r.id, x: n.x, z: n.z, rot: r.rot, offset: n.offset, size: n.size, tall: n.tall });
       }
-      this.preview.setHeldObject?.(null, changed && n.valid);
-      this.preview.setPlacementGhost?.(null);
+      this.preview.setHeldObject(null, changed && n.valid);
+      this.preview.setPlacementGhost(null);
       game.placeHint = null;
       game.placeValid = true;
       this.handlesKey = '';
@@ -1078,7 +1038,7 @@ export class BuildBuyInput {
     const key = r ? `o:${r.axis}:${r.line}:${r.start}:${r.len}:${r.sill}:${r.head}:${d?.handle ?? this.hotHandle}` : '';
     if (key === this.handlesKey) return;
     this.handlesKey = key;
-    this.preview.setResizeHandles?.(r ? this.openingHandles(r) : null, d?.handle ?? this.hotHandle);
+    this.preview.setResizeHandles(r ? this.openingHandles(r) : null, d?.handle ?? this.hotHandle);
   }
 
   /**
@@ -1086,10 +1046,10 @@ export class BuildBuyInput {
    * of the tool's kind in the style picked, picks it (another style is replaced, as a click does).
    */
   private pressOpening(ground: Point | null, screen: Point2 | null): boolean {
-    const handle = screen && this.openingSel ? (this.preview.handleAt?.(screen.x, screen.y) ?? null) : null;
+    const handle = screen && this.openingSel ? (this.preview.handleAt(screen.x, screen.y) ?? null) : null;
     if (handle && this.openingSel) {
       this.openingDrag = { handle, from: null, now: { ...this.openingSel }, valid: true };
-      this.preview.setLeftDragCamera?.(false);
+      this.preview.setLeftDragCamera(false);
       this.hoverOpening(ground);
       return true;
     }
@@ -1117,7 +1077,7 @@ export class BuildBuyInput {
     // Where the pointer is on the wall's own plane (the ground behind it would run away).
     void ground;
     const row = sel.axis === 'h' ? sel.line : sel.start;
-    const hit = this.preview.pickOnWall?.(sel.axis, sel.line, row) ?? null;
+    const hit = this.preview.pickOnWall(sel.axis, sel.line, row) ?? null;
     if (hit && d.handle === 'a+') now.len = clampN(Math.round(hit.along) - sel.start, 1, most);
     if (hit && d.handle === 'a-') {
       const end = sel.start + sel.len;
@@ -1146,7 +1106,7 @@ export class BuildBuyInput {
     d.valid = fits && this.edgesOnHome(edits) && game.affords(game.creative ? 0 : this.cost(edits));
     game.buildCost = game.creative ? 0 : this.cost(edits);
     game.buildValid = d.valid;
-    this.preview.setEdgePreview?.(this.runEdges(now).map((e) => ({ ...e, kind: sel.kind, style: sel.style, ...(now.sized ? { sill: sel.kind === 'window' ? now.sill : undefined, head: now.head } : {}) })), d.valid);
+    this.preview.setEdgePreview(this.runEdges(now).map((e) => ({ ...e, kind: sel.kind, style: sel.style, ...(now.sized ? { sill: sel.kind === 'window' ? now.sill : undefined, head: now.head } : {}) })), d.valid);
     this.syncHandles();
   }
 
@@ -1166,7 +1126,7 @@ export class BuildBuyInput {
     const sel = this.openingSel;
     if (!d) return false;
     this.openingDrag = null;
-    this.preview.setLeftDragCamera?.(true);
+    this.preview.setLeftDragCamera(true);
     const n = d.now;
     const changed = !!sel && (n.start !== sel.start || n.len !== sel.len || n.sill !== sel.sill || n.head !== sel.head);
     if (sel && changed && d.valid) {
@@ -1466,7 +1426,7 @@ export class BuildBuyInput {
       faces = this.painting;
     } else if (face) faces = this.shift ? this.roomFaces(face) : [face];
     faces = faces.filter((f) => this.edgesOnHome([{ ...f, kind: 'wall' }]));
-    this.preview.setPaintPreview?.(faces, faces.length ? game.buildLook.cover : null);
+    this.preview.setPaintPreview(faces, faces.length ? game.buildLook.cover : null);
     game.buildCost = game.creative ? 0 : this.paintCost(faces);
     game.paintFaces = faces.length;
     game.buildEdges = faces.length;
@@ -1523,7 +1483,7 @@ export class BuildBuyInput {
 
   private hoverFloor(ground: Point): void {
     const tiles = this.floorTiles(ground);
-    this.preview.setFloorPreview?.(tiles, tiles.length ? game.buildLook.floor : null);
+    this.preview.setFloorPreview(tiles, tiles.length ? game.buildLook.floor : null);
     game.buildCost = game.creative ? 0 : this.floorCost(tiles);
     game.floorTiles = tiles.length;
     game.buildEdges = tiles.length;
@@ -1584,8 +1544,8 @@ export class BuildBuyInput {
     game.buildCost = 0;
     if (!c) {
       const tiles = this.roomTiles(this.roomAt(t));
-      this.preview.setFloorPreview?.(tiles, tiles.length ? 0 : null);
-      this.preview.setEdgePreview?.([], true);
+      this.preview.setFloorPreview(tiles, tiles.length ? 0 : null);
+      this.preview.setEdgePreview([], true);
       game.buildValid = tiles.length > 0;
       return;
     }
@@ -1594,8 +1554,8 @@ export class BuildBuyInput {
     const moved = c.tiles.map((p) => ({ x: p.x + dx, z: p.z + dz }));
     // The simulation re-checks everything (furniture in the way, nobody shut in).
     const valid = moved.every((p) => this.onHomeTile(p) && (own.has(`${p.x}:${p.z}`) || (this.roomAt(p) === 0 && !this.diagonals.has(`${p.x}:${p.z}`))));
-    this.preview.setFloorPreview?.(moved, 0);
-    this.preview.setEdgePreview?.(this.roomEdges(c.tiles, dx, dz), valid);
+    this.preview.setFloorPreview(moved, 0);
+    this.preview.setEdgePreview(this.roomEdges(c.tiles, dx, dz), valid);
     game.buildValid = valid;
   }
 
@@ -1615,7 +1575,7 @@ export class BuildBuyInput {
       ? edges.every((e) => !walled(e))
       : !this.opening() || edges.every((e) => this.edgeState(e) !== 'open' && !(this.edgeState(e) === 'wall' && this.lookOf(e).form));
     const valid = inWall && this.edgesOnHome(edges) && this.diagonalsFit(edges) && game.affords(game.buildCost);
-    this.preview.setEdgePreview?.(edges, valid);
+    this.preview.setEdgePreview(edges, valid);
     game.buildEdges = edges.length;
     game.buildValid = valid;
     game.buildWallUp = game.buildTool === 'remove' && edges.length > 0 && edges.every((e) => e.kind === 'wall' || e.kind === 'fence');
@@ -1660,7 +1620,7 @@ export class BuildBuyInput {
       this.pressed = true;
       this.dropped = false;
       this.floorStart = this.shift ? null : this.tileOf(ground);
-      this.preview.setLeftDragCamera?.(false);
+      this.preview.setLeftDragCamera(false);
       this.hoverFloor(ground);
       return true;
     }
@@ -1669,7 +1629,7 @@ export class BuildBuyInput {
       this.pressed = true;
       this.dropped = false;
       this.painting = this.shift ? null : [];
-      this.preview.setLeftDragCamera?.(false);
+      this.preview.setLeftDragCamera(false);
       this.hoverPaint(ground);
       return true;
     }
@@ -1681,7 +1641,7 @@ export class BuildBuyInput {
       this.carrying = { tiles: this.roomTiles(room), at };
       this.pressed = true;
       this.dropped = false;
-      this.preview.setLeftDragCamera?.(false);
+      this.preview.setLeftDragCamera(false);
       this.hoverMove(ground);
       return true;
     }
@@ -1691,7 +1651,7 @@ export class BuildBuyInput {
     this.fresh = !game.buildStart;
     if (this.fresh) game.buildStart = this.corner(ground);
     this.lastGround = ground;
-    this.preview.setLeftDragCamera?.(false);
+    this.preview.setLeftDragCamera(false);
     this.hoverBuild(ground);
     return true;
   }
@@ -1702,7 +1662,7 @@ export class BuildBuyInput {
     if (this.releaseBuy()) return;
     if (!this.pressed) return;
     this.pressed = false;
-    this.preview.setLeftDragCamera?.(true);
+    this.preview.setLeftDragCamera(true);
     if (this.dropped) {
       this.dropped = false;
       this.painting = null;
@@ -1762,7 +1722,7 @@ export class BuildBuyInput {
     if (!this.pressed && !game.buildStart) return false;
     if (this.pressed) {
       this.dropped = true;
-      this.preview.setLeftDragCamera?.(true);
+      this.preview.setLeftDragCamera(true);
     }
     game.buildStart = null;
     this.clearPreviews();
@@ -1777,7 +1737,7 @@ export class BuildBuyInput {
   abortPress(): void {
     if (this.openingDrag) {
       this.openingDrag = null;
-      this.preview.setLeftDragCamera?.(true);
+      this.preview.setLeftDragCamera(true);
       this.clearPreviews();
       this.handlesKey = '';
       this.syncHandles();
@@ -1796,8 +1756,8 @@ export class BuildBuyInput {
       this.resizing = null;
       this.grab = null;
       game.placing = null;
-      this.preview.setHeldObject?.(null);
-      this.preview.setLeftDragCamera?.(true);
+      this.preview.setHeldObject(null);
+      this.preview.setLeftDragCamera(true);
       this.clearPreviews();
       game.buySelection = held;
       this.handlesKey = '';
@@ -1806,7 +1766,7 @@ export class BuildBuyInput {
     }
     if (this.pressed) {
       this.dropped = true;
-      this.preview.setLeftDragCamera?.(true);
+      this.preview.setLeftDragCamera(true);
     }
     if (game.placing || game.buildStart || game.buySelection !== null) {
       game.placing = null;

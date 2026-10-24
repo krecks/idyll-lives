@@ -577,7 +577,7 @@ pub fn materials() -> J {
         e
     };
     let mut e = J::Obj(vec![
-        ("environment.sky", J::Obj(vec![("type", s("image")), ("url", s("env/belfast_open_field.env"))])),
+        ("environment.sky", J::Obj(vec![("type", s("image")), ("url", s("env/belfast_open_field.pcenv"))])),
         ("material.wall", surf("#F4F0E8", "wall_plaster", 0.5, &[("normalStrength", f(0.7))])),
         ("material.floor", surf("#FFFFFF", "floor_laminate", 0.55, &[])),
         ("material.ground", with(surf("#FFFFFF", "grass", 0.3, &[("normalStrength", f(0.8)), ("projection", s("xz"))]), "sideColor", s("#C9B391"))),
@@ -697,7 +697,7 @@ mod tests {
         assert_eq!(py_fsum(std::iter::repeat_n(0.1, 10)), 1.0);
     }
 
-    /// `tests/fixtures/tex/materials.json` is what materials.py wrote.
+    /// `tests/fixtures/tex/materials.json` is what materials.py wrote (but for the sky's URL, since `cargo envconv`'s `.pcenv`).
     #[test]
     fn materials_bytes() {
         assert_eq!(materials_json(), include_str!("../tests/fixtures/tex/materials.json"));

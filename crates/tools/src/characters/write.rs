@@ -10,7 +10,7 @@
 //! Each life stage other than the base: `<family>.<stage>.bin`, per part int16 position deltas
 //! from the base (x STAGE_SCALE) and int8 normals (x 127).
 //!
-//! Meshes come in counter-clockwise from outside (prims.rs); Babylon's front faces are clockwise
+//! Meshes come in counter-clockwise from outside (prims.rs); the game's front faces are clockwise
 //! in its left-handed space, so the writer turns every triangle round.
 
 use std::io;
@@ -170,7 +170,7 @@ pub fn write_parts(path: &Path, parts: &[(String, Mesh)]) -> io::Result<OMap<Par
         let fields = blob.add(i16s(f.iter().flat_map(|v| v.map(|x| q(x, FIELD_SCALE, 32767.0)))));
         let t = if part.tone.is_empty() { &zeros } else { &part.tone };
         let tone = blob.add(i16s(t.iter().flat_map(|v| v.map(|x| q(x, TONE_SCALE, 32767.0)))));
-        // Clockwise for Babylon.
+        // Clockwise, the game's front faces.
         let index = blob.add(part.idx.chunks(3).flat_map(|t| [t[0], t[2], t[1]]).flat_map(|i| (i as u16).to_le_bytes()));
         let morph = part.morph.as_ref().map(|m| {
             let morph_verts = blob.add(m.verts.iter().flat_map(|&v| (v as u16).to_le_bytes()));

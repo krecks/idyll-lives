@@ -6,10 +6,11 @@
 //!   workers), with the licence files from each package.
 //! - The Rust crates compiled into the simulation's and the voice's WebAssembly: `cargo metadata`
 //!   for the dependencies of sim-wasm and voice-wasm, the licence files from Cargo's sources.
-//! - Files shipped as they are (the meshopt and Zstandard decoders), work adapted into the game's
-//!   own code (TalkingHead's expressions), and the licences that came with the voice model, the
-//!   dictionary and the language model (fetched next to them, see `cargo fetch-voice` and
-//!   `cargo fetch-llm`). The art is listed in assets/CREDITS.md.
+//! - Files shipped as they are (the Inter font, the Basis Universal transcoder), work adapted into
+//!   the game's own code (the parts of Babylon.js ported into the renderer, with Babylon's notice;
+//!   TalkingHead's expressions), and the licences that came with the voice model, the dictionary
+//!   and the language model (fetched next to them, see `cargo fetch-voice` and `cargo fetch-llm`).
+//!   The art is listed in assets/CREDITS.md.
 //!
 //! Identical texts (the Apache-2.0 licence of many crates) are printed once and referred to.
 
@@ -56,10 +57,47 @@ SOFTWARE.
     )
 }
 
-/// Shipped or adapted work with no npm package to read the licence from: its texts, as published,
-/// are kept in crates/tools/texts/.
-const KEPT: [(&str, &str, &str, &str); 1] = [("zstddec (decoders/zstddec.wasm, built by Babylon.js), with Zstandard", "MIT; BSD-3-Clause", "https://github.com/donmccurdy/zstddec", "zstddec-LICENSE")];
-const ADAPTED: [(&str, &str, &str, &str); 1] = [("TalkingHead's emoji expressions, adapted for the residents' faces (render/babylon/characters/face.ts)", "MIT", "https://github.com/met4citizen/TalkingHead", "TalkingHead-LICENSE")];
+/// A shipped or adapted work with no npm package to read the licence from: its name, licence, where
+/// it comes from, and its texts as published, kept in crates/tools/texts/.
+type Kept = (&'static str, &'static str, &'static str, &'static [&'static str]);
+
+const KEPT: [Kept; 1] = [("Basis Universal transcoder (decoders/basis/, PlayCanvas's build)", "Apache-2.0", "https://github.com/BinomialLLC/basis_universal", &["basis_universal-LICENSE"])];
+
+/// Others' code rewritten into the game's own. Babylon.js: the renderer's camera controls, matrix
+/// maths, mesh builders, particles, image processing and a few shader formulas were ported from
+/// Babylon.js 9.30 (each file says what, and how it was changed), so its licence (as published with
+/// `@babylonjs/core` 9.30.0) and the part of its NOTICE that covers them go with the game.
+const ADAPTED: [Kept; 2] = [
+    (
+        "Babylon.js 9.30, parts ported into the renderer: the camera controls, matrix maths, mesh builders, CPU particles, image processing and FXAA, and a few shader formulas (each file that holds them says what and how it was changed)",
+        "Apache-2.0",
+        "https://github.com/BabylonJS/Babylon.js",
+        &["Babylon.js-LICENSE", "Babylon.js-NOTICE"],
+    ),
+    ("TalkingHead's emoji expressions, adapted for the residents' faces (render/shared/characters/face.ts)", "MIT", "https://github.com/met4citizen/TalkingHead", &["TalkingHead-LICENSE"]),
+];
+
+/// The files that hold code ported from Babylon.js, each with a header that says so and where its
+/// licence is (`ported_files_credit_babylon` keeps this list and the headers in step).
+#[cfg(test)]
+const BABYLON_PORTED: [&str; 16] = [
+    "crates/tools/src/envconv.rs",
+    "web/src/render/pc/models.ts",
+    "web/src/render/pc/shaders/buildFx.ts",
+    "web/src/render/pc/shaders/envBrdf.ts",
+    "web/src/render/pc/shaders/fog.ts",
+    "web/src/render/pc/shaders/ghost.ts",
+    "web/src/render/pc/shaders/post.ts",
+    "web/src/render/pc/shaders/roomLights.ts",
+    "web/src/render/pc/sunShadows.ts",
+    "web/src/render/shared/birds.ts",
+    "web/src/render/shared/buildFx.ts",
+    "web/src/render/shared/characters/rig.ts",
+    "web/src/render/shared/imageProcessing.ts",
+    "web/src/render/shared/math.ts",
+    "web/src/render/shared/modelParts.ts",
+    "web/src/render/shared/orbit.ts",
+];
 
 /// The model and dictionary licences, fetched next to what they cover.
 const DATA: [(&str, &str, &str, &str); 3] = [
@@ -209,10 +247,11 @@ fn rust_crates(root: &Path) -> Result<Vec<Package>, String> {
     Ok(out)
 }
 
-/// One of the kept texts (`crates/tools/texts/`).
-fn kept(root: &Path, (name, license, url, file): (&str, &str, &str, &str)) -> Result<Package, String> {
-    let path = root.join("crates").join("tools").join("texts").join(file);
-    Ok(Package { name: name.to_string(), version: String::new(), license: license.to_string(), url: url.to_string(), files: vec![(file.to_string(), text_of(&path)?)] })
+/// One of the kept works, its texts from `crates/tools/texts/`.
+fn kept(root: &Path, (name, license, url, files): Kept) -> Result<Package, String> {
+    let dir = root.join("crates").join("tools").join("texts");
+    let files = files.iter().map(|file| Ok((file.to_string(), text_of(&dir.join(file))?))).collect::<Result<_, String>>()?;
+    Ok(Package { name: name.to_string(), version: String::new(), license: license.to_string(), url: url.to_string(), files })
 }
 
 /// A licence text, printed once however many packages share it.
@@ -246,7 +285,7 @@ pub fn third_party_licenses(package_dirs: &[String], header: &str) -> Result<(St
         let pkg = npm_package(&dir)?;
         Ok(Package { name: format!("{name} {} ({files})", pkg.version), version: String::new(), ..pkg })
     };
-    let mut shipped = vec![as_is("@fontsource-variable/inter", "the Inter font: assets/inter-*.woff2, its licence also in assets/inter-LICENSE.txt")?, as_is("meshoptimizer", "decoders/meshopt_decoder.js")?];
+    let mut shipped = vec![as_is("@fontsource-variable/inter", "the Inter font: assets/inter-*.woff2, its licence also in assets/inter-LICENSE.txt")?];
     for k in KEPT {
         shipped.push(kept(&root, k)?);
     }
@@ -291,7 +330,7 @@ pub fn third_party_licenses(package_dirs: &[String], header: &str) -> Result<(St
     section(&mut out, "JavaScript bundled into assets/*.js (npm packages)", &npm)?;
     section(&mut out, "Rust crates compiled into assets/sim_wasm_bg-*.wasm and voice_wasm_bg-*.wasm", &rust)?;
     section(&mut out, "Files shipped as they are", &shipped)?;
-    let adapted: Vec<Package> = ADAPTED.iter().map(|k| kept(&root, *k)).collect::<Result<_, _>>()?;
+    let adapted: Vec<Package> = ADAPTED.into_iter().map(|k| kept(&root, k)).collect::<Result<_, _>>()?;
     section(&mut out, "Adapted into the game's own code", &adapted)?;
     section(&mut out, "Voice model, dictionary and language model (the copies next to them are the same texts)", &data)?;
     out.push("== Licence texts ==".to_string());
@@ -388,8 +427,49 @@ mod tests {
     /// The order `localeCompare` gives: `@` and `-` before letters, whatever the case.
     #[test]
     fn names_collate_as_locale_compare_does() {
-        let mut names = vec!["svelte", "@babylonjs/core", "onnxruntime-web", "@fontsource-variable/inter", "binaryen"];
+        let mut names = vec!["svelte", "@huggingface/tokenizers", "onnxruntime-web", "@fontsource-variable/inter", "binaryen", "playcanvas"];
         names.sort_by(|a, b| collate(a, b));
-        assert_eq!(names, ["@babylonjs/core", "@fontsource-variable/inter", "binaryen", "onnxruntime-web", "svelte"]);
+        assert_eq!(names, ["@fontsource-variable/inter", "@huggingface/tokenizers", "binaryen", "onnxruntime-web", "playcanvas", "svelte"]);
+    }
+
+    /// Every kept text is there; Babylon.js's are the Apache License 2.0 and its notice.
+    #[test]
+    fn kept_texts_are_there() {
+        let root = repo_root();
+        for k in KEPT.into_iter().chain(ADAPTED) {
+            let p = kept(&root, k).unwrap_or_else(|e| panic!("{}: {e}", k.0));
+            assert!(p.files.iter().all(|(_, text)| !text.trim().is_empty()), "{}", p.name);
+        }
+        let babylon = kept(&root, ADAPTED[0]).expect("Babylon.js texts");
+        assert!(babylon.name.starts_with("Babylon.js"));
+        assert!(babylon.files[0].1.contains("Apache License") && babylon.files[0].1.contains("Version 2.0, January 2004"));
+        assert!(babylon.files[1].1.contains("Copyright 2023 The Babylon.js team"));
+    }
+
+    /// The files with code ported from Babylon.js say so in a header, and no other file does.
+    #[test]
+    fn ported_files_credit_babylon() {
+        fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
+            for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    walk(&path, out);
+                } else if path.extension().is_some_and(|e| e == "ts" || e == "rs" || e == "svelte") {
+                    out.push(path);
+                }
+            }
+        }
+        let root = repo_root();
+        let mut files = Vec::new();
+        walk(&root.join("web").join("src"), &mut files);
+        walk(&root.join("crates").join("tools").join("src"), &mut files);
+        let marker = ["crates/tools/texts/", "Babylon.js-LICENSE"].concat();
+        let mut credited: Vec<String> = files
+            .iter()
+            .filter(|path| std::fs::read_to_string(path).is_ok_and(|text| text.lines().take(12).any(|line| line.contains(&marker))))
+            .map(|path| path.strip_prefix(&root).unwrap_or(path).to_string_lossy().replace('\\', "/"))
+            .collect();
+        credited.sort();
+        assert_eq!(credited, BABYLON_PORTED, "BABYLON_PORTED and the files' headers differ");
     }
 }

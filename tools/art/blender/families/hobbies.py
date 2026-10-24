@@ -193,8 +193,8 @@ M = G.Palette(
 
 # --- helpers ----------------------------------------------------------------------------------------------
 def _axis(rx, ry, rz=0.0):
-    """The game direction of an old part's long axis (its local y) under its `rotate`: Babylon's
-    Euler degrees (yaw y, pitch x, roll z), read as Babylon reads them."""
+    """The game direction of an old part's long axis (its local y) under its `rotate`: Euler degrees
+    (yaw y, pitch x, roll z), read as the game reads them (`quatFromEuler` in render/shared/math.ts)."""
     rx, ry, rz = (math.radians(a) for a in (rx, ry, rz))
     cy, sy, cp, sp, cr, sr = (math.cos(ry / 2), math.sin(ry / 2), math.cos(rx / 2), math.sin(rx / 2),
                               math.cos(rz / 2), math.sin(rz / 2))

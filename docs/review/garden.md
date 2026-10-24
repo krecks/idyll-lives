@@ -388,7 +388,7 @@ Causes shared beyond this ledger, moved at the consolidation (2026-10-21): I-gar
 - **Severity:** S3
 - **Rubric:** I3, A1
 - **Fix class:** decision
-- **Where:** `tools/art/blender/families/trees.py` (`apple`: the picked apple at 1.84 m; `lemon_tree`: the lemon at 1.62 m); `web/src/render/babylon/characters/clips/uses.ts` (`PICK_APPLE`, `PICK_LEMON`: the child's size reaches up as far as it can)
+- **Where:** `tools/art/blender/families/trees.py` (`apple`: the picked apple at 1.84 m; `lemon_tree`: the lemon at 1.62 m); `web/src/render/shared/characters/clips/uses.ts` (`PICK_APPLE`, `PICK_LEMON`: the child's size reaches up as far as it can)
 - **Evidence:** `bench-results/review/fixes/clips-standing/sheet-pick.png` (right column): with G-21's pick a child of 1.1 m reaches up on tiptoe to about 1.45 m, the apple 0.4 m and the lemon 0.2 m above the hand, while the fruit shrinks away. Grown-ups and teens reach it. Real children pick the low fruit or are lifted up. A lower fruit of its own for a child (a second part the child's size picks), or picking only from 1.3 m up (an age or height rule, G-45's), are the choices.
 - **Status:** open
 - **Source:** fix: clips-standing
@@ -398,7 +398,7 @@ Causes shared beyond this ledger, moved at the consolidation (2026-10-21): I-gar
 - **Severity:** S3
 - **Rubric:** I3, M2
 - **Fix class:** model
-- **Where:** `tools/art/blender/families/trees.py:180-200` (`apple`: the crown's middle at 3.6 m, 1.65 m deep; only the front apple brought down within reach, 1.84 m, by G-21); `web/src/render/babylon/characters/clips/garden.ts` (`pickHigh`: the hand up to about 1.8 m)
+- **Where:** `tools/art/blender/families/trees.py:180-200` (`apple`: the crown's middle at 3.6 m, 1.65 m deep; only the front apple brought down within reach, 1.84 m, by G-21); `web/src/render/shared/characters/clips/garden.ts` (`pickHigh`: the hand up to about 1.8 m)
 - **Evidence:** `fixes/babies-crops/garden/apple-02-picking.png` (taken before G-21 brought the front apple down): picking the apples (`harvest`, G-68) the resident reaches up under the crown, whose lowest leaves and fruit hang at about 2.5–3 m; the hand stops at 1.8 m, in the air. One apple within reach (I-garden-05's) doesn't make the crown's dozen pickable. A garden apple tree (a dwarf or semi-dwarf on a garden lot) carries fruit from about 1 m up, picked standing or from a step; the 5.6 m model is an orchard standard's size. Bring the crown down (fruit from about 1.2 m) or give the use a ladder.
 - **Status:** later (model: the crown or low fruit within reach; recorded in `tools/art/blender/families/trees.md`, 4a09dc6e)
 - **After:** not a content or clip fix: `pickHigh` reaches about 1.8 m and only the one front apple hangs there; the rest from about 2.5 m. The model change is recorded: the crown's middle down to about 2.6 m, or six to eight apples on low twigs round its front half at 1.4–1.9 m; the clip and the content can stay.

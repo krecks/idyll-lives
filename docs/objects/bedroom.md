@@ -7,7 +7,7 @@ nightstands, wardrobes and drawers are built by `families/bedroom_storage.py` (n
 `families/bedroom_dressing.py` (notes: `families/bedroom_dressing.md`: `drawer_open`; the glass is a mirror part, E6).
 
 Mattress tops match `BEDS` (`BUNKS` for the bunk's two), and beds that get the game's blanket are in `BLANKET_BEDS`
-(`web/src/render/babylon/characters.ts`): a bed's own duvet sits under that blanket, turned down, and the blanket
+(`web/src/render/shared/characters/seats.ts`): a bed's own duvet sits under that blanket, turned down, and the blanket
 takes the duvet's colour (the "Bedding" part, as the player painted it or as made; `QUILT_PART` names the futon's own
 quilt and the wall bed's throw), so a bed keeps its colours with someone in it. Residents sleep the night in pyjamas
 (a long top and trousers, barefoot) and nap in their day clothes with the shoes off; on a lounger or a sofa they doze

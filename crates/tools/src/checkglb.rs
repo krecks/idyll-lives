@@ -74,7 +74,7 @@ pub struct Paths {
     pub assets: String,
     /// web/public/content
     pub content: String,
-    /// web/src/render/babylon/characters/furniture.json: where residents sit and lie on each object (`SEATS`,
+    /// web/src/render/shared/characters/furniture.json: where residents sit and lie on each object (`SEATS`,
     /// `BEDS`, `BUNKS` in characters.ts), for the height checks.
     pub furniture: String,
     /// tools/art/blender/centres.json: where each Blender-built model is centred at rest (its Model's
@@ -92,7 +92,7 @@ impl Paths {
             here: normpath(&join(&root, "tools/art/blender")),
             assets: normpath(&join(&root, "web/public/assets")),
             content: normpath(&join(&root, "web/public/content")),
-            furniture: normpath(&join(&root, "web/src/render/babylon/characters/furniture.json")),
+            furniture: normpath(&join(&root, "web/src/render/shared/characters/furniture.json")),
             centres: normpath(&join(&root, "tools/art/blender/centres.json")),
         }
     }
@@ -1144,8 +1144,9 @@ type Bounds = ([Num; 3], [Num; 3]);
 /// Each moving part's bounds (None: the still body), in the order they're met.
 type PartBounds = Vec<(Option<usize>, Bounds)>;
 
-/// The file's bounds in game axes (glTF x -> game -x, Babylon's loader), from each primitive's box through
-/// its node, and each moving part's (None: the still body), in the order they're met.
+/// The file's bounds in game axes (glTF x -> game -x, as `render/pc/models.ts` bakes a file), from
+/// each primitive's box through its node, and each moving part's (None: the still body), in the order
+/// they're met.
 fn bounds(gltf: &J, pose: &Pose) -> R<(Bounds, PartBounds)> {
     let accessors = gltf.get("accessors").cloned().unwrap_or(J::Arr(Vec::new()));
     let (inf, ninf) = (Num::F(f64::INFINITY), Num::F(f64::NEG_INFINITY));
@@ -2154,7 +2155,7 @@ fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>,
             };
             let n = key(counted, "count")?.num().map_or(0, |n| n.f() as i64);
             tris += n.div_euclid(3);
-            // Bounds: the accessor's box through the node matrix, then glTF x -> game -x (Babylon's loader).
+            // Bounds: the accessor's box through the node matrix, then glTF x -> game -x (as `render/pc/models.ts` bakes it).
             let (bl, bh) = box_of(pos)?;
             for cx in [bl[0], bh[0]] {
                 for cy in [bl[1], bh[1]] {

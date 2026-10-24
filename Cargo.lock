@@ -257,8 +257,9 @@ checksum = "65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a"
 
 [[package]]
 name = "ll-tools"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
+ "bytemuck",
  "flate2",
  "image",
  "nalgebra",
@@ -612,7 +613,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 
 [[package]]
 name = "sim-core"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -620,7 +621,7 @@ dependencies = [
 
 [[package]]
 name = "sim-wasm"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "serde_json",
  "sim-core",
@@ -743,7 +744,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "voice"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "flate2",
  "serde_json",
@@ -751,7 +752,7 @@ dependencies = [
 
 [[package]]
 name = "voice-wasm"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "voice",
  "wasm-bindgen",

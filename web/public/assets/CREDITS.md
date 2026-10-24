@@ -31,7 +31,7 @@ Downloaded 2026-10-07. Textures were resized and re-encoded (JPG). Fabric, wood,
 
 | File | Source asset | Authors | URL | Licence |
 |---|---|---|---|---|
-| `belfast_open_field.env` | Belfast Open Field (1k HDRI, prefiltered to a Babylon `.env`) | Dimitrios Savva, Jarod Guest | https://polyhaven.com/a/belfast_open_field | CC0 |
+| `belfast_open_field.pcenv` | Belfast Open Field (1k HDRI), converted by `cargo envconv` | Dimitrios Savva, Jarod Guest | https://polyhaven.com/a/belfast_open_field | CC0 |
 
 ## Models
 
@@ -511,15 +511,15 @@ pan, the mixing bowl and the food on the grill that stand on a station while a r
 The residents are generated in code (original, CC0): their bodies at every life stage, faces and
 their expressions and visemes, eyes, hair, beards and clothes by `cargo characters`
 (`crates/tools/src/characters`; `cargo characters build` writes `rig.json` and the `.bin` files),
-and their animation clips by `render/babylon/characters/clips` (baked when the game loads). Bed
-blankets are generated at runtime in `render/babylon/characters/blanket.ts`. No downloaded models,
+and their animation clips by `render/shared/characters/clips` (baked when the game loads). Bed
+blankets are generated at runtime in `render/shared/characters/blanket.ts`. No downloaded models,
 textures or animations are used. The facial expressions (`MOODS` in
-`render/babylon/characters/face.ts`) and the idle micro-expressions (`MICRO`) are adapted from the
+`render/shared/characters/face.ts`) and the idle micro-expressions (`MICRO`) are adapted from the
 expressions of TalkingHead by Mika Suominen (MIT, https://github.com/met4citizen/TalkingHead).
 
 ## Street and gardens (`street/`)
 
-The neighbourhood dressing (`render/babylon/street.ts`: sidewalks, kerbs, streetlights, mailboxes, hydrants, bins, cars, picket fences, flower beds; neighbour porches, chimneys and garages in `house.ts`) is built from primitives in code (original, CC0). The flower-clump models are Blender-built (`packs/street`, above); the hedges are the plants pack's (`models/plants/hedge.glb`). Only the sidewalk surface is third-party:
+The neighbourhood dressing (`render/shared/street.ts`, drawn by `render/pc/street.ts`: sidewalks, kerbs, streetlights, mailboxes, hydrants, bins, cars, picket fences, flower beds; neighbour porches, chimneys and garages in `house.ts`) is built from primitives in code (original, CC0). The flower-clump models are Blender-built (`packs/street`, above); the hedges are the plants pack's (`models/plants/hedge.glb`). Only the sidewalk surface is third-party:
 
 | File | Used for | Source asset | Authors | URL | Licence |
 |---|---|---|---|---|---|
@@ -559,13 +559,10 @@ The tokenizer runs with **Tokenizers.js** (`@huggingface/tokenizers`), © Huggin
 
 ## Decoders (`../decoders/`, refreshed by `cargo decoders`)
 
-Production builds ship compressed copies of the assets above (KTX2 textures, meshopt models, made by `tools/assets/optimize.mjs`; the art itself is unchanged). The game decodes them with these files, served from its own folder instead of Babylon's CDN:
+Production builds ship compressed copies of the assets above (KTX2 textures, meshopt models, made by `tools/assets/optimize.mjs`; the art itself is unchanged). The game decodes the textures with this file, served from its own folder instead of a CDN; the models' meshopt geometry is decoded by meshoptimizer's decoder (Arseny Kapoulkine, MIT), bundled into the game's code:
 
 | File(s) | What | Source | Authors | Licence |
 |---|---|---|---|---|
-| `babylon.ktx2Decoder.js`, `ktx2Transcoders/1/uastc_*.wasm` | KTX2 texture decoder and UASTC transcoders | Babylon.js 9.30.0 (cdn.babylonjs.com) | Babylon.js contributors | Apache-2.0 |
-| `ktx2Transcoders/1/msc_basis_transcoder.js`, `.wasm` | Basis Universal transcoder | Basis Universal, built by Babylon.js | Binomial LLC | Apache-2.0 |
-| `zstddec.wasm` | Zstandard decompression (UASTC KTX2) | zstddec, built by Babylon.js | Don McCurdy; Zstandard by Meta | MIT; BSD-3-Clause |
-| `meshopt_decoder.js` | meshopt geometry decoder | meshoptimizer 1.3.0 | Arseny Kapoulkine | MIT |
+| `basis/basis.wasm.js`, `basis/basis.wasm.wasm` | Basis Universal transcoder (KTX2 textures) | Basis Universal, PlayCanvas's build (its engine repository, at the `playcanvas` version the game uses) | Binomial LLC | Apache-2.0 |
 
 The build tools that make the compressed copies are not shipped: the Basis Universal encoder (Apache-2.0, through ktx2-encoder, MIT), glTF-Transform (MIT), meshoptimizer (MIT) and sharp (Apache-2.0, with libvips, LGPL-3.0).

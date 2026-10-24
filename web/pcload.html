@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Idyll Lives PlayCanvas loader check</title>
+    <link rel="icon" href="data:," />
+    <style>html, body { margin: 0; height: 100%; background: #9cc2e0; overflow: hidden; } canvas { width: 100%; height: 100%; display: block; }</style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <script type="module">
+      // `?scene=materials`: the material library's check (src/debug/pcmaterials.ts); else the loaders'.
+      const materials = new URLSearchParams(location.search).get('scene') === 'materials';
+      await (materials ? import('/src/debug/pcmaterials.ts') : import('/src/debug/pcload.ts'));
+    </script>
+  </body>
+</html>

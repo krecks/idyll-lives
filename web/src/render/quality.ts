@@ -55,9 +55,9 @@ export interface QualitySettings {
    */
   mirrors: number;
   /**
-   * A reflection's resolution, as a share of the screen's along each side, rounded by Babylon to
-   * powers of two (at 1080p 1024×512 for 0.4 and 0.5, 1024×1024 for 0.75); multisampled as
-   * `msaaSamples` says. Memory while one reflects: Low +7 MB, Medium +25 MB, High +50 MB.
+   * A reflection's resolution, as a share of the screen's along each side, rounded to the nearest
+   * power of two (at 1080p 1024×512 for 0.4 and 0.5, 1024×1024 for 0.75);
+   * multisampled as `msaaSamples` says. Memory while one reflects: Low +7 MB, Medium +25 MB, High +50 MB.
    */
   mirrorScale: number;
   /**
@@ -105,8 +105,12 @@ export interface QualitySettings {
   mergedObjectShadows: boolean;
   /** 1: the street's models' far versions, where they have one (fewer triangles); 0: full detail. */
   streetLod: 0 | 1;
-  /** WebGPU only: record draw commands once and replay them each frame (the menus' town). */
-  snapshotRendering: boolean;
+  /**
+   * The menus' town, standing still, drawn once and shown again until something in it changes,
+   * instead of drawn anew every frame: while it holds, nothing is drawn and the canvas keeps its
+   * last picture (`render/pc/heldFrames.ts`). The game itself draws live. `?snapshot=0` turns it off.
+   */
+  holdStillFrames: boolean;
   /**
    * Metres from the camera within which things' ambient clips play (a ceiling fan, clock hands, a
    * fountain's water: model `motions.idle`); 0: none, all at rest. Each moving thing rewrites its
@@ -118,7 +122,7 @@ export interface QualitySettings {
    */
   ambientRange: number;
   /**
-   * Garden birds (render/babylon/birds.ts): at most `count` of them, living in the trees, bushes and
+   * Garden birds (render/shared/birds.ts): at most `count` of them, living in the trees, bushes and
    * hedges within `range` m of the viewed lot. A draw per species and part (five parts, up to five
    * species: up to 25 draws, fewer with fewer species about), no shadows; only the birds whose pose
    * changed are written each frame, only the parts that changed (wings only in flight), and only
@@ -136,9 +140,9 @@ export interface RenderQuality extends QualitySettings {
 }
 
 export const QUALITY: Record<GraphicsPreset, QualitySettings> = {
-  low: { shadowMapSize: 1024, shadowRate: 15, msaaSamples: 1, anisotropy: 4, clusteredLamps: false, mirrors: 1, mirrorScale: 0.4, mirrorRate: 10, lightingStep: 10, lawnDensity: 0.5, landscapeShadows: false, streetShadows: false, characterShadows: false, mergedObjectShadows: true, streetLod: 1, snapshotRendering: true, ambientRange: 0, birds: { count: 6, range: 18 } },
-  medium: { shadowMapSize: 2048, shadowRate: 30, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 1, mirrorScale: 0.5, mirrorRate: 10, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, snapshotRendering: true, ambientRange: 40, birds: { count: 24, range: 35 } },
-  high: { shadowMapSize: 4096, shadowRate: 30, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 2, mirrorScale: 0.75, mirrorRate: 0, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, snapshotRendering: true, ambientRange: 60, birds: { count: 40, range: 50 } },
+  low: { shadowMapSize: 1024, shadowRate: 15, msaaSamples: 1, anisotropy: 4, clusteredLamps: false, mirrors: 1, mirrorScale: 0.4, mirrorRate: 10, lightingStep: 10, lawnDensity: 0.5, landscapeShadows: false, streetShadows: false, characterShadows: false, mergedObjectShadows: true, streetLod: 1, holdStillFrames: true, ambientRange: 0, birds: { count: 6, range: 18 } },
+  medium: { shadowMapSize: 2048, shadowRate: 30, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 1, mirrorScale: 0.5, mirrorRate: 10, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 40, birds: { count: 24, range: 35 } },
+  high: { shadowMapSize: 4096, shadowRate: 30, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 2, mirrorScale: 0.75, mirrorRate: 0, lightingStep: 0.5, lawnDensity: 1, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 60, birds: { count: 40, range: 50 } },
 };
 
 export const GRAPHICS_PRESETS = Object.keys(QUALITY) as GraphicsPreset[];

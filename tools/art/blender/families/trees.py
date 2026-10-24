@@ -421,7 +421,7 @@ def cherry():
     return G.settle([still])
 
 
-# A resident picking fruit (`pickApple*`, `pickLemon*` in web/src/render/babylon/characters/clips/uses.ts, fitted to
+# A resident picking fruit (`pickApple*`, `pickLemon*` in web/src/render/shared/characters/clips/uses.ts, fitted to
 # where the picked fruit hangs): it shrinks away as the hand closes on it, this long into the use.
 PICK_DELAY = 1.6
 

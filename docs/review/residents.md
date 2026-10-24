@@ -89,7 +89,7 @@ Painted garments and their shells: `crates/tools/src/characters/garments.rs`, `c
 
 ## Clips: idle.ts (8)
 
-`web/src/render/babylon/characters/clips/idle.ts`; lengths and uses in [docs/characters-format.md](../characters-format.md#clips).
+`web/src/render/shared/characters/clips/idle.ts`; lengths and uses in [docs/characters-format.md](../characters-format.md#clips).
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
@@ -104,7 +104,7 @@ Painted garments and their shells: `crates/tools/src/characters/garments.rs`, `c
 
 ## Clips: locomotion.ts (3)
 
-`web/src/render/babylon/characters/clips/locomotion.ts`; lengths and uses in [docs/characters-format.md](../characters-format.md#clips).
+`web/src/render/shared/characters/clips/locomotion.ts`; lengths and uses in [docs/characters-format.md](../characters-format.md#clips).
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
@@ -114,7 +114,7 @@ Painted garments and their shells: `crates/tools/src/characters/garments.rs`, `c
 
 ## Clips: seated.ts (9)
 
-`web/src/render/babylon/characters/clips/seated.ts`; lengths and uses in [docs/characters-format.md](../characters-format.md#clips).
+`web/src/render/shared/characters/clips/seated.ts`; lengths and uses in [docs/characters-format.md](../characters-format.md#clips).
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
@@ -130,7 +130,7 @@ Painted garments and their shells: `crates/tools/src/characters/garments.rs`, `c
 
 ## Clips: work.ts (10)
 
-`web/src/render/babylon/characters/clips/work.ts`; lengths and uses in [docs/characters-format.md](../characters-format.md#clips).
+`web/src/render/shared/characters/clips/work.ts`; lengths and uses in [docs/characters-format.md](../characters-format.md#clips).
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
@@ -147,7 +147,7 @@ Painted garments and their shells: `crates/tools/src/characters/garments.rs`, `c
 
 ## Clips: garden.ts (6)
 
-`web/src/render/babylon/characters/clips/garden.ts`; lengths and uses in [docs/characters-format.md](../characters-format.md#clips).
+`web/src/render/shared/characters/clips/garden.ts`; lengths and uses in [docs/characters-format.md](../characters-format.md#clips).
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
@@ -160,7 +160,7 @@ Painted garments and their shells: `crates/tools/src/characters/garments.rs`, `c
 
 ## Clips: action.ts (4)
 
-`web/src/render/babylon/characters/clips/action.ts`; lengths and uses in [docs/characters-format.md](../characters-format.md#clips).
+`web/src/render/shared/characters/clips/action.ts`; lengths and uses in [docs/characters-format.md](../characters-format.md#clips).
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
@@ -171,7 +171,7 @@ Painted garments and their shells: `crates/tools/src/characters/garments.rs`, `c
 
 ## Clips: lie.ts (1)
 
-`web/src/render/babylon/characters/clips/lie.ts`; lengths and uses in [docs/characters-format.md](../characters-format.md#clips).
+`web/src/render/shared/characters/clips/lie.ts`; lengths and uses in [docs/characters-format.md](../characters-format.md#clips).
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
@@ -179,7 +179,7 @@ Painted garments and their shells: `crates/tools/src/characters/garments.rs`, `c
 
 ## Clips: baby.ts (2)
 
-`web/src/render/babylon/characters/clips/baby.ts`; lengths and uses in [docs/characters-format.md](../characters-format.md#clips).
+`web/src/render/shared/characters/clips/baby.ts`; lengths and uses in [docs/characters-format.md](../characters-format.md#clips).
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
@@ -188,7 +188,7 @@ Painted garments and their shells: `crates/tools/src/characters/garments.rs`, `c
 
 ## Clips: street.ts (11)
 
-`web/src/render/babylon/characters/clips/street.ts`; lengths and uses in [docs/characters-format.md](../characters-format.md#clips).
+`web/src/render/shared/characters/clips/street.ts`; lengths and uses in [docs/characters-format.md](../characters-format.md#clips).
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
@@ -296,7 +296,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S3
 - **Rubric:** A1, A3
 - **Fix class:** clip
-- **Where:** `web/src/render/babylon/characters/clips/locomotion.ts:208`, `tools/characters/check_clips.ts`
+- **Where:** `web/src/render/shared/characters/clips/locomotion.ts:208`, `tools/characters/check_clips.ts`
 - **Evidence:** Fails since before fbf8883. The plan takes it as the baseline failure for T5.
 - **Status:** fixed (3872d23a)
 - **After:** the seam was the stance knee locking straight (the IK's reach clamp, 0° steps between 29–36° ones) and the run's `kick` landing and leaving at speed; the kick is squared (it starts and ends at rest) and `jogAlong` sinks 6 cm (the knees bent through the stance). `check:clips` no longer prints the seam; both baseline entries removed. `bench-results/review/fixes/clips-standing/``check-clips-after.txt`, `strips/sheets/jogAlong*`.
@@ -307,7 +307,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S3
 - **Rubric:** A1, A3
 - **Fix class:** clip
-- **Where:** `web/src/render/babylon/characters.ts:136` (`GAIT_MAX_RATE`), `web/src/render/babylon/characters/clips/locomotion.ts:208`
+- **Where:** `web/src/render/babylon/characters.ts:136` (`GAIT_MAX_RATE`), `web/src/render/shared/characters/clips/locomotion.ts:208`
 - **Evidence:** After R1-05's jog switch (76ac264), foot slide at height 1.0 with no traits: adults at speed 3 50–53 %, speeds 4–5 83–95 %. Children walk at the adults' 1.5 m/s on short legs.
 - **Status:** fixed in part (3872d23a): speeds 2 and 3; speeds 4 and 5 reduced, the rest won't fix (no gait steps at 45–90 m/s without strobing)
 - **After:** a third gear, `runAlong` (5.8 m/s, a 3.5 m stride in 0.6 s, up to 4×, `RUN_MAX_RATE`), takes over when the jog would need more than 3×. Steady-state foot slide (`gait-table.txt`, the runtime's choice, height 1, no traits / the fastest ×1.38): speed 3 adults, teens and elders 50–59 % → 0 % (3–9 % for the fastest), children 71–72 % → 11–14 %; speed 2 children 4–8 % → 0; speeds 4–5 83–92 % → 56–78 %. In play (`gait-after.json`, round trips on the review stage) speed 1 has no slide; the stage is too small for a steady walk at speed 3 and up. `bench-results/review/fixes/clips-standing/``strips/sheets/runAlong*`.
@@ -361,7 +361,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S3
 - **Rubric:** A4
 - **Fix class:** code
-- **Where:** `web/src/render/babylon/characters/clips/locomotion.ts`, `web/src/render/babylon/characters.ts` (turning)
+- **Where:** `web/src/render/shared/characters/clips/locomotion.ts`, `web/src/render/babylon/characters.ts` (turning)
 - **Evidence:** Residents turn in place without stepping. A turn-on-the-spot clip is new behaviour: filed only, planned separately (§9, decision 3).
 - **Status:** later (G-71, turning on the spot: new behaviour, owner decision 3); was confirmed (pilot: residents turn in place to face each object, no steps, in every `play/*-00.png`)
 - **Source:** `plan/authenticity-review.md` §3.2 (A4) and §9 (decision 3)
@@ -373,7 +373,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S2
 - **Rubric:** A1, A5
 - **Fix class:** clip
-- **Where:** `web/src/render/babylon/characters/clips/` (sit), `web/src/render/babylon/characters.ts` (seat fit per stage)
+- **Where:** `web/src/render/shared/characters/clips/` (sit), `web/src/render/babylon/characters.ts` (seat fit per stage)
 - **Evidence:** `pnpm check:clips` (`tools/characters/clip-baseline.json`): a child on the 0.31 m kids' chair has the feet 7 cm (male) and 8 cm (female) off the floor; a teen on a 0.45 m seat 7 cm and 9 cm; an elder woman on a 0.45 m seat 5 cm. Adults pass.
 - **Status:** fixed (d9c02ead)
 - **After:** the runtime fits the seated legs to each body and seat (`characters/seatFit.ts`: each ankle down to the floor, the thigh sloping off the seat's front up to 0.3 rad, past that the feet hang), and `check_clips` checks it: the child on the 0.31 m kids' chair, teens and elder women on a 0.45 m seat have the feet on the floor at every stage (the five `sit` `feet` entries are gone from `clip-baseline.json`, 14 known failures down to 9). A child on a grown-up's 0.45 m chair, a park bench or a bus shelter dangles the feet just short of the floor, the shins hanging, as children do. `bench-results/review/fixes/clips-seated/poses/sheets/age-kidsChair.png`, `age-diningChair-2.png`, `age-parkBench-2.png`, `age-busStop-2.png`, `age-cafeChair-2.png`, `age-rockingChair-2.png`, `age-pouf-2.png`; in game `bench-results/review/fixes/clips-seated/play-child/child-sofaThree-relax-0*.png`.
@@ -386,7 +386,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S3
 - **Rubric:** A1, A5
 - **Fix class:** clip
-- **Where:** `web/src/render/babylon/characters/clips/` (jog, climb)
+- **Where:** `web/src/render/shared/characters/clips/` (jog, climb)
 - **Evidence:** `pnpm check:clips`: a child's right foot slides 1.5 cm in `jog` (both bodies); the left foot slides 1.3–1.9 cm in `climb112a`/`climb112b`, and an elder woman's 1.1 cm in `climb172a`.
 - **Status:** fixed (3872d23a)
 - **After:** the child's `jog` slide was the kick's landing (fixed with A-residents-02); on the climbing frame a child's hips are wider for its legs than the reference's (0.12 m against 0.096 on its scale), so a planted foot moved as the hips turned: the feet are placed for such hips (`footIK` `wide`, 0.024 for the child's size, 0.004 for the tallest, the women's). All five baseline entries removed. `bench-results/review/fixes/clips-standing/``check-clips-after.txt`.
@@ -399,7 +399,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S2
 - **Rubric:** A1, A5
 - **Fix class:** clip
-- **Where:** `web/src/render/babylon/characters.ts` (seat fit per stage), sofa seat in `web/src/render/babylon/characters/furniture.json`
+- **Where:** `web/src/render/babylon/characters.ts` (seat fit per stage), sofa seat in `web/src/render/shared/characters/furniture.json`
 - **Evidence:** `poses.html?stage=elder`: the woman on the TV sofa has no shins and her boots stand apart on the floor; the adult version is fine. Shots: `poses-tvsofa-elder.png` against `poses-tvsofa-default.png` (Phase 0 gallery agent's scratch folder).
 - **Status:** fixed (d9c02ead)
 - **After:** on every deep seat (`furniture.json` `seats` `front`, where the seat ends in front, measured and checked by `cargo check-glb`: the sofas, the sectionals, the sofa bed, the armchairs, the ottoman, the bean bags and four pack seats; the recliners now sit with the legs out, G-04/G-05) the hips sit forward until the knees clear the front (`perch`), and the feet go down to the floor: the child sits on the front edge with the shins and feet showing instead of kneeling, teens, elders and the adults on the loveseat and the three-seat sofa keep their shins; the bean bag's sitters sit forward in it, the feet on the floor before it. `check_clips` checks the knees on each deep seat at every stage. `bench-results/review/fixes/clips-seated/poses/sheets/age-sofaThree.png` (the TV sofa, `poses.html`'s `sofaThree`, from the side), `age-sofaThree-2.png`, `age-sofa-2.png`, `age-loveseat-2.png`, `age-sofaDesign-2.png`, `age-armchairWingback-2.png`, `age-sectionalMiddle-2.png`, `age-ottoman-2.png`, `age-beanBag-2.png`; in game `bench-results/review/fixes/clips-seated/play-elder/elder-loveseat-relax-0*.png`, `elder-sofa-relax-0*.png`, `bench-results/review/fixes/clips-seated/play-child/child-armchairWingback-read-0*.png`.
@@ -410,7 +410,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S3
 - **Rubric:** A1, A3
 - **Fix class:** clip
-- **Where:** `web/src/render/babylon/characters/clips/street.ts:27` (`sizes`: a size's share `s` is of the height), used by the fountain's, the climbing frame's and the games' clips (`games.ts` `POOL`, `FOOS`, `SMASH`, `BOULDER`); `web/src/render/babylon/characters/pose.ts:268` (the clip's pelvis moved by the body's `pelvisScale`)
+- **Where:** `web/src/render/shared/characters/clips/street.ts:27` (`sizes`: a size's share `s` is of the height), used by the fountain's, the climbing frame's and the games' clips (`games.ts` `POOL`, `FOOS`, `SMASH`, `BOULDER`); `web/src/render/shared/characters/pose.ts:268` (the clip's pelvis moved by the body's `pelvisScale`)
 - **Evidence:** from the code and rig.json, not measured in a shot: the runtime moves a clip's pelvis by the body's `pelvisScale`, and a child's legs (and arms) are shorter for its height than a grown-up's: the male child's `pelvisScale` is 0.575 against a height share of 0.638 (the female's 0.554 against 0.653), teens and grown-ups within a few per cent. The `112` sizes are fitted to a body of share 0.63, so on a child every height and reach in them comes out about 9 % short: the climbing frame's deck (1.13 m) is stood on about 10 cm under its top, the bouldering wall's holds and the pool table's rail are reached for lower than they are. `fixes/rides/climbingFrame-child-deck.png` (the child crouched on the frame's deck, the feet hidden at the deck's top) doesn't settle it either way. The climbing frame's `climb112` slides of the child's left foot in `clip-baseline.json` may be the same cause: a child's hips are wider for its legs than the reference's, so the feet slide as the body turns over them. The slide's round, the bunk's ladder and the rides (`clips/rides.ts`, G-19, G-44, G-23) are fitted by the legs and pivot planted feet on the ball; the same fit for `sizes` (a size's share of the legs, not the height) would put the children's clips where the things are.
 - **Status:** fixed (e3e95ae3)
 - **After:** `sizes()` (`clips/street.ts`) fits each size by the legs: its `s` (the share the clip's metres are the object's over) is the height's share times `legShare(height)`, 0.9 for a child's heights (rig.json: `pelvisScale` / height is 0.90 of the reference's at both children, 1.0 for teens and grown-ups), blending to 1 from 1.25 to 1.4 m; the size picked by height, its `to` and its branches stay as they were. So every sized clip (the fountain, the climbing frame, the games, the eyepiece, the fruit trees, the cupboards, the clock, the feeder, the board, the hoop, the low tops, the ball pit, the tent) puts a child's feet and hands where the thing is. `fixes/sweep-render/legs/strip-deck.png` (Dee on the climbing frame's deck: the shoes on its boards, was sunk to the ankles in `before-climbingFrame-climb-02.png`), `strip-climb-fountain.png`, `strip-pit-boulder.png` (before above, after below). `check_clips.ts --body all --stage all`: 0 new, 0 known.
@@ -515,7 +515,7 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Severity:** S2
 - **Rubric:** I3, I16
 - **Fix class:** code
-- **Where:** `web/src/render/babylon/characters.ts:2373-2378` (`asleep`: lying in a `LYING` clip with tag `sleep` or `nap` → the night outfit); `web/src/render/babylon/characters/outfit.ts:149-154` (pyjamas recolour the top and bottom only; the shoe part stays)
+- **Where:** `web/src/render/babylon/characters.ts:2373-2378` (`asleep`: lying in a `LYING` clip with tag `sleep` or `nap` → the night outfit); `web/src/render/shared/characters/outfit.ts:149-154` (pyjamas recolour the top and bottom only; the shoe part stays)
 - **Evidence:** `bedroom/play/chunk1/bed-nap-01.png` and every bed's nap: the resident changes into pyjamas for a 30-minute nap at noon; `bedroom/extra/lounger-doze.png`: "Doze in the sun" on a sun lounger in the garden at 10:22 is in pink pyjamas, white shoes on. `bedroom/play/stage-elder/bedSingle-sleep-01.png`: the shoes go into bed (on the mattress at the foot while getting in). People nap in their clothes, take their shoes off for bed and dress for the night only at night. Pyjamas for `sleep` only, and no shoes with them, would do. Other items: every lying `nap` use: `kidsBed`, `kidsBedCar` (kids), `sofaBed`, `wallBed` (living), `sunLounger`, `hammock` (outdoor), `lazy.snoozecloudBed`, `cheerful.rainbowHammock`, `gloomy.windowSeat`, `natureLover.gardenHammock`, `kind.hearthSettee` (packs) (`tables/uses-*.md`). Cause in the renderer: for `residents.md` (row "Blankets and pyjamas in bed").
 - **Status:** fixed (f4925b24, d7190242); was confirmed and widened (consolidation: I-outdoor-02 merged)
 - **After:** what is worn follows the use (`wearFor`, `Wear` in outfit.ts): pyjamas (a long top and trousers, barefoot) only for `sleep` lying down; a nap on something slept in keeps the day clothes with the shoes off (`rest`); dozes on loungers, hammocks, sofas and the sofa bed keep the day clothes as they are. The shells (a skirt, a jacket, the soles) are left out by the Sim's row while not worn (`bare`), so the shoes come off as they lie back, half way through the crossfade (`fixes/clothes/game/nap-bed.png`, `beds-night-sleep*.png`, `nap-lounger.png`, `nap-sofaBed.png`; the scenes' log has each one's wear).
@@ -567,7 +567,7 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Severity:** S3
 - **Rubric:** I3
 - **Fix class:** decision
-- **Where:** `web/src/render/babylon/characters/outfit.ts:120` (day outfit or pyjamas only); `tools/art/blender/families/bathroom.py:552-554` (clear `glass` panels)
+- **Where:** `web/src/render/shared/characters/outfit.ts:120` (day outfit or pyjamas only); `tools/art/blender/families/bathroom.py:552-554` (clear `glass` panels)
 - **Evidence:** `play/shower-shower-01.png`: the day outfit stays on under the water and shows through the enclosure. Bed has its pyjamas; the bath and shower have nothing. A towel or swimwear-like outfit, frosted glass, or leaving it as the style's convention is the owner's call.
   Bathroom wave: every shower and every bath. Dressed under the rain in the stall, the walk-in and the rain shower (glass at `bathroom.py:637`, `:668-669`), and lying dressed in the bath water in all three tubs at every life stage (`bathroom/play/chunk1/showerStall-shower-01.png`, `bathroom/play/chunk1/bathtub-bath-01.png`, `bathroom/play/stage-elder/bathtub-bath-01.png`). The same outfit rule covers the tubs and showers of the other ledgers that use `bath` or `shower` (`gloomy.soakingTub`, `romantic.heartTub`, `hotHeaded.coldPlunge`, `hotTubCedar`, `whirlpoolTub` and the three pack showers), where a swimsuit is the real thing for the hot tubs.
 - **Status:** fixed (f4925b24, d7190242); was confirmed and widened (bathroom wave: all four showers and three baths; the other tubs named)
@@ -614,7 +614,7 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Severity:** S2
 - **Rubric:** I3, A1
 - **Fix class:** renderer-table
-- **Where:** `web/src/render/babylon/characters.ts:508` (`ACTIONS.tend`: `kneel` for every crop) and `:512` (`ACTIONS.harvest`: `harvest`, `plant` for every def but the herb planter); `web/src/render/babylon/characters/clips/garden.ts:37-44` (`harvestPose`: standing, bent 22–32°, the picking hand at 0.68–0.80 m)
+- **Where:** `web/src/render/babylon/characters.ts:508` (`ACTIONS.tend`: `kneel` for every crop) and `:512` (`ACTIONS.harvest`: `harvest`, `plant` for every def but the herb planter); `web/src/render/shared/characters/clips/garden.ts:37-44` (`harvestPose`: standing, bent 22–32°, the picking hand at 0.68–0.80 m)
 - **Evidence:**
   - Harvest: `extra/harvest/s-garden.strawberries-harvest.png` and `s-garden.pumpkins-harvest.png`: the resident stands bent a little with the hand at the knees, 0.4–0.5 m above berries at 0.07 m and pumpkins at 0.2 m; nothing is touched. At the veg patch (0.4 m, `s-garden.vegPatch-harvest.png`) the hand is at the box's rim; at the tomatoes (1.2 m) it is in the plant, which is right. The meadow's "Pick a wildflower" plays the same clip over a 0.5 m patch (`play/c3/garden.meadow-pickFlower-01.png`). Low crops want the crouch the `plant` clip already has (`garden.ts:110-135`), or a deeper harvest pose.
   - Tend: "Tie up and water" at the tomatoes is the weeding kneel (`play/c3/garden.tomatoes-tend-01.png`): right while planted, wrong at a ripe, staked 1.2 m plant, which is tied up standing.
@@ -647,7 +647,7 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Severity:** S2
 - **Rubric:** I3, A1
 - **Fix class:** clip
-- **Where:** `web/src/render/babylon/characters/clips/seated.ts` (the `sit` clip, made for a chair seat); `web/public/content/catalog2/living.json:617` (`floorCushion` seat 0.14), `web/src/render/babylon/characters/furniture.json:30` (`seats.fireplaceElectric`: 0.14, `fwd` 0.3, facing the fire)
+- **Where:** `web/src/render/shared/characters/clips/seated.ts` (the `sit` clip, made for a chair seat); `web/public/content/catalog2/living.json:617` (`floorCushion` seat 0.14), `web/src/render/shared/characters/furniture.json:30` (`seats.fireplaceElectric`: 0.14, `fwd` 0.3, facing the fire)
 - **Evidence:** The lead "legs below the floor on the floor cushion": on the 0.14 m cushion the resident sits with the knees bent as on a chair, so the shins go down through the floor, worst for the teen and the elder (`living/sheets/age-floorCushion.png`; the adult in play has the feet at the floor's edge, `living/play/chunk3/floorCushion-sit-01.png`). At the electric fireplace the same sit on its built-in cushion, 0.3 m in front, facing the fire, puts the knees and shins into the surround and the firebox among the flames (`living/play/chunk3/fireplaceElectric-relax-01.png`, `living/sheets/age-fireplaceElectric.png`). Real people sit on a floor cushion cross-legged or kneeling. A floor-sitting clip (cross-legged, for seats under about 0.25 m), or at least legs out (`legsOut`, as the chaise), with the fireplace's cushion moved back so the feet stop short of the surround. Other low seats may share it, not checked here: `yogaMat` (seat 0.03), `beanBagKids` (0.24, kids ledger).
 - **Status:** fixed (98b4def3)
 - **After:** a seat under 0.2 m is sat on cross-legged (`sitFloor`, `sitDownFloor` through a squat and a hand on the floor, `standUpFloor`; characters.ts `floorSit`): the knees out over the floor cushion, the ankles crossed in front, none under the floor (`check_clips` checks the knees and ankles at every stage). At the electric fireplace the sitter is on the back half of its hearth cushion (`seats.fireplaceElectric` `fwd` 0.36), the knees short of the surround. `bench-results/review/fixes/clips-seated/poses/sheets/age-floorCushion.png`, `age-floorCushion-2.png`, `age-fireplaceElectric.png`, `age-fireplaceElectric-2.png`, `bench-results/review/fixes/clips-seated/characters/strip-sitFloor-side.png`, `bench-results/review/fixes/clips-seated/strips/strip-sitDownFloor-all.png`, `strip-standUpFloor-all.png`; in game `bench-results/review/fixes/clips-seated/play-adult/adult-floorCushion-sit-0*.png`, `adult-fireplaceElectric-relax-0*.png`, `bench-results/review/fixes/clips-seated/play-elder/`, `bench-results/review/fixes/clips-seated/play-child/child-floorCushion-sit-0*.png`. The other low seats of the lead: the yoga mat has its own flow (G-26); `beanBagKids` (0.24 m) sits with the knees up and the feet on the floor (G-20).

@@ -9,7 +9,7 @@
  */
 
 import type { WorldStructure } from '../core/protocol';
-import { BabylonRenderer } from '../render/babylon/BabylonRenderer';
+import { PlayCanvasRenderer } from '../render/pc/PlayCanvasRenderer';
 import type { Renderer, RenderFailure } from '../render/types';
 import { qualityFromSettings, RESTART_KEYS, settings as liveSettings, type Settings } from '../settings/settings.svelte';
 import { app, type Progress } from '../ui/app.svelte';
@@ -17,7 +17,7 @@ import { perfTime, perfTimeAsync } from '../debug/perf';
 import { game, toast } from '../ui/state.svelte';
 import { basicReport, within } from '../debug/report';
 import { plainState } from '../debug/snapshot.svelte';
-import { webGpuFailed } from '../render/babylon/loaders';
+import { webGpuFailed } from '../render/shared/gpu';
 import type { HouseholdDraft } from './household';
 import { loadGameData, startSession, type GameSession, type StartRequest } from './session';
 
@@ -316,7 +316,7 @@ class GameHost {
       if (backendChanged) this.freshCanvas();
       const { content, assets } = await loadGameData();
       const params = new URLSearchParams(location.search);
-      const renderer = new BabylonRenderer({ assets, content, backend: settings.renderer }, qualityFromSettings(settings, params));
+      const renderer = new PlayCanvasRenderer({ assets, content, backend: settings.renderer }, qualityFromSettings(settings, params));
       // Drawing that broke for good can't be mended in place: the crash screen (or, after a GPU
       // reset, "Graphics were reset") offers to save and reload.
       renderer.onFailure = this.onRendererFailure;

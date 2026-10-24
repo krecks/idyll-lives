@@ -1,5 +1,5 @@
 /**
- * Checks the residents' clips (web/src/render/babylon/characters/clips) baked on the built rig:
+ * Checks the residents' clips (web/src/render/shared/characters/clips) baked on the built rig:
  *
  *     bun tools/characters/check_clips.ts [rig.json] [--body male|female|all]
  *         [--stage <stage>[,<stage>…]|all] [--update-baseline]
@@ -54,20 +54,20 @@
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
-const { clipDefs } = await import('../../web/src/render/babylon/characters/clips/index.ts');
-const { bake } = await import('../../web/src/render/babylon/characters/clips/dsl.ts');
-const { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } = await import('../../web/src/render/babylon/characters/clips/street.ts');
-const { BOULDER, FOOS, FOOS_LANES, foosClip, POOL, SMASH } = await import('../../web/src/render/babylon/characters/clips/games.ts');
-const { feetDown, legTurn, perch, SEAT_FIT, seatSize } = await import('../../web/src/render/babylon/characters/seatFit.ts');
-const { FLOOR_SITS } = await import('../../web/src/render/babylon/characters/clips/seated.ts');
-const { BALL_PIT, PLAY_TENT } = await import('../../web/src/render/babylon/characters/clips/play.ts');
+const { clipDefs } = await import('../../web/src/render/shared/characters/clips/index.ts');
+const { bake } = await import('../../web/src/render/shared/characters/clips/dsl.ts');
+const { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } = await import('../../web/src/render/shared/characters/clips/street.ts');
+const { BOULDER, FOOS, FOOS_LANES, foosClip, POOL, SMASH } = await import('../../web/src/render/shared/characters/clips/games.ts');
+const { feetDown, legTurn, perch, SEAT_FIT, seatSize } = await import('../../web/src/render/shared/characters/seatFit.ts');
+const { FLOOR_SITS } = await import('../../web/src/render/shared/characters/clips/seated.ts');
+const { BALL_PIT, PLAY_TENT } = await import('../../web/src/render/shared/characters/clips/play.ts');
 /** Seats whose top ends short of a child's knees (characters.ts `Seat.front`, `perch`). */
-const DEEP: [string, any][] = Object.entries(JSON.parse(readFileSync(new URL('../../web/src/render/babylon/characters/furniture.json', import.meta.url), 'utf8')).seats).filter(([, s]: [string, any]) => s.front !== undefined) as [string, any][];
-const { BUNK_DOWN, BUNK_UP, RIDE_HORSE, RIDE_ROUND, RIDE_SEESAW, RIDE_SPRING, RIDE_SWING, SLIDE, SWING_S } = await import('../../web/src/render/babylon/characters/clips/rides.ts');
-const { EYEPIECE, PICK_APPLE, PICK_LEMON, SHOWER_CHILD } = await import('../../web/src/render/babylon/characters/clips/uses.ts');
-const { BOARD, CLOCK, FEEDER, PUT_AWAY } = await import('../../web/src/render/babylon/characters/clips/reach.ts');
-const { SHOT } = await import('../../web/src/render/babylon/characters/clips/shot.ts');
-const { KNEEL_TABLE, SIT_LOW } = await import('../../web/src/render/babylon/characters/clips/low.ts');
+const DEEP: [string, any][] = Object.entries(JSON.parse(readFileSync(new URL('../../web/src/render/shared/characters/furniture.json', import.meta.url), 'utf8')).seats).filter(([, s]: [string, any]) => s.front !== undefined) as [string, any][];
+const { BUNK_DOWN, BUNK_UP, RIDE_HORSE, RIDE_ROUND, RIDE_SEESAW, RIDE_SPRING, RIDE_SWING, SLIDE, SWING_S } = await import('../../web/src/render/shared/characters/clips/rides.ts');
+const { EYEPIECE, PICK_APPLE, PICK_LEMON, SHOWER_CHILD } = await import('../../web/src/render/shared/characters/clips/uses.ts');
+const { BOARD, CLOCK, FEEDER, PUT_AWAY } = await import('../../web/src/render/shared/characters/clips/reach.ts');
+const { SHOT } = await import('../../web/src/render/shared/characters/clips/shot.ts');
+const { KNEEL_TABLE, SIT_LOW } = await import('../../web/src/render/shared/characters/clips/low.ts');
 
 /** A clip's sizes (the tallest first): the shortest resident each is for (m) and its clips (one per lane for the laned ones). */
 type Sized = { min: number; clips: string[] }[];
@@ -156,11 +156,11 @@ const PLANTED = new Set(['interact', 'pickUp', 'eat', 'yes', 'punchJab', 'punchC
 const SEAT: Record<string, number> = { child: 0.31 };
 const SEAT_HEIGHT = 0.45;
 const STAGES = ['baby', 'child', 'teen', 'youngAdult', 'adult', 'elder'];
-/** The runtime's hip roll while walking, per body (rad), read from characters.ts so the two can't drift apart. */
+/** The runtime's hip roll while walking, per body (rad), read from render/shared/characters/actions.ts so the two can't drift apart. */
 const GAIT_SWAY: Record<string, number> = (() => {
-  const src = readFileSync(new URL('../../web/src/render/babylon/characters.ts', import.meta.url), 'utf8');
+  const src = readFileSync(new URL('../../web/src/render/shared/characters/actions.ts', import.meta.url), 'utf8');
   const m = /const GAIT_SWAY[^=]*=\s*\{([^}]*)\}/.exec(src);
-  if (!m) throw new Error('check_clips: GAIT_SWAY not found in characters.ts');
+  if (!m) throw new Error('check_clips: GAIT_SWAY not found in actions.ts');
   return Object.fromEntries(m[1].split(',').map((kv) => kv.split(':').map((s) => s.trim())).filter((kv) => kv.length === 2).map(([k, v]) => [k, Number(v)]));
 })();
 const BASELINE = new URL('./clip-baseline.json', import.meta.url).pathname;

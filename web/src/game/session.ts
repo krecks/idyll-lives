@@ -137,7 +137,7 @@ export function loadGameData(): Promise<{ content: Content; assets: AssetRegistr
     services.assets = assets;
     useTownContent(content);
     services.previews = createSimPreviews({ assets, emotions: content.emotions.map((e) => e.id), backend: () => liveSettings.renderer });
-    services.items = createItemPreviews(assets);
+    services.items = createItemPreviews(assets, () => liveSettings.renderer);
     return { content, assets };
   });
   return shared;

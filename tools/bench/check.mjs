@@ -20,7 +20,7 @@
  *             sends each use, waits until the resident is at it and using it, takes pictures
  *             framing the object, then sells it and goes on to the next, all on one page. In the
  *             page, every animation frame, it logs the clips playing on the object
- *             (`__renderer.motion`) and the resident's pose and animation (`__sims()`). One JSON
+ *             (`__renderer.objectClips`, `RendererDebugHooks` in web/src/render/types.ts) and the resident's pose and animation (`__sims()`). One JSON
  *             line per use goes to `<out>/play-<run>.jsonl`.
  *               --objects toilet,fridge@23,14,0   which objects (`def` or `def@x,z,rot`), or
  *               --objects-file <path>   one a line (`#` comments), each
@@ -62,7 +62,7 @@
  *            `<what>-<run>.json`, default the time it started, so runs into one `--out` keep theirs;
  *            given, `play`'s pictures start with it too);  --quality low|medium|high;  --renderer webgl;
  *            --size 1280x800;  --extra 'k=v&k=v' (more URL flags);  --headed (a window: only to
- *            measure timing).
+ *            measure timing);  --fresh (no kept browser profile: nothing cached between pages or runs).
  *
  * The setup fails loudly: the wasm and the asset manifest are fetched through the server first
  * (each must answer 200), and every HTTP error, failed request, page error and console error is
@@ -160,11 +160,26 @@ async function playwright() {
   }
 }
 const { chromium } = await playwright();
-const browser = await chromium.launch({
+const launchOptions = {
   headless: !has('headed'),
   ...(process.env.CHROME ? { executablePath: process.env.CHROME } : { channel: 'chromium' }),
   args: ['--enable-unsafe-webgpu', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'],
-});
+};
+/**
+ * The browser keeps a profile under `bench-results/.browser/` (one per kind and port, as
+ * `render.mjs`'s): its HTTP cache and compiled GPU shaders carry over between pages and runs, while
+ * the site's own storage is cleared before every page. `--fresh`: a new context per page, nothing kept.
+ */
+const fresh = has('fresh');
+const browser = fresh ? await chromium.launch(launchOptions) : null;
+const kept = fresh
+  ? null
+  : await chromium.launchPersistentContext(join(ROOT, 'bench-results', '.browser', `check-${has('headed') ? 'window' : 'headless'}-${port || 'sheet'}`), { ...launchOptions, viewport: { width, height }, deviceScaleFactor: 1 });
+if (kept) {
+  await setUp(kept);
+  // Its first window stays open (the browser with it); each page gets a window of its own (`newWindow`).
+  if (!kept.pages().length) await kept.newPage();
+}
 
 /** The job running (a picture, an object's use): what goes wrong in the page is logged with it. */
 let job = null;
@@ -207,9 +222,9 @@ function pageHelpers() {
   function sample() {
     const t = Math.round(performance.now() - w.t0);
     w.frames++;
-    const states = window.__renderer?.motion?.states?.get(w.id);
-    for (const [name, c] of states ?? []) {
-      const duration = c.clip.duration;
+    const clips = window.__renderer?.objectClips?.(w.id);
+    for (const [name, c] of clips ?? []) {
+      const duration = c.duration;
       const clip = (w.clips[name] ??= { kind: c.kind, duration: +duration.toFixed(2), first: t, max: 0, state: 'rest', events: [] });
       clip.max = Math.max(clip.max, +c.time.toFixed(2));
       const state = c.time <= 1e-3 ? 'rest' : c.time >= duration - 1e-3 ? 'open' : 'moving';
@@ -217,7 +232,7 @@ function pageHelpers() {
       clip.state = state;
     }
     for (const [name, clip] of Object.entries(w.clips)) {
-      if (states?.has(name) || clip.state === 'rest') continue;
+      if (clips?.has(name) || clip.state === 'rest') continue;
       clip.state = 'rest';
       if (clip.events.length < MAX_EVENTS) clip.events.push([t, 'rest']);
     }
@@ -243,20 +258,7 @@ function pageHelpers() {
    * boxes: a box turned with the model is far bigger than a round crown.
    */
   function points(id) {
-    const pop = window.__renderer?.placed?.find((p) => p.id === id)?.pop;
-    if (!pop?.matrices) return null;
-    const m = pop.matrices.subarray(pop.index * 16, pop.index * 16 + 16);
-    const all = [];
-    for (const mesh of pop.meshes) {
-      const v = mesh.getVerticesData?.('position');
-      if (!v) continue;
-      const step = 3 * Math.max(1, Math.floor(v.length / 3 / 50_000));
-      for (let i = 0; i < v.length; i += step) {
-        const [x, y, z] = [v[i], v[i + 1], v[i + 2]];
-        all.push(x * m[0] + y * m[4] + z * m[8] + m[12], x * m[1] + y * m[5] + z * m[9] + m[13], x * m[2] + y * m[6] + z * m[10] + m[14]);
-      }
-    }
-    return all.length ? all : null;
+    return window.__renderer?.objectPoints?.(id, 50_000) ?? null;
   }
   /** The corners of what `points` gives (`lo`, `hi`: x, y, z), or null. */
   function bounds(id) {
@@ -278,7 +280,7 @@ function pageHelpers() {
    */
   function fit(id, { target, alpha, beta, keep = [0.9, 0.75] }) {
     const p = points(id);
-    const cam = window.__scene?.activeCamera;
+    const cam = window.__renderer?.cameraInfo?.();
     if (!p || !cam) return 0;
     const [sa, ca, sb, cb] = [Math.sin(alpha), Math.cos(alpha), Math.sin(beta), Math.cos(beta)];
     const tanUp = Math.tan(cam.fov / 2) * keep[1];
@@ -325,13 +327,17 @@ function pageHelpers() {
   };
 }
 
-/**
- * A page at 1 % volume, the camera never taking over on its own (the director's delay 0), and free
- * will off unless `--free-will` (the game's setting applies to the player's household as a game
- * opens, over what a state says). Reused for every job of a run.
- */
-async function newPage() {
-  const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
+/** A new page in a window of its own (a kept browser's `newPage` opens a tab in its first window instead). */
+async function newWindow(context) {
+  const cdp = await context.newCDPSession(context.pages()[0]);
+  const page = context.waitForEvent('page');
+  await cdp.send('Target.createTarget', { url: 'about:blank', newWindow: true });
+  await cdp.detach();
+  return page;
+}
+
+/** The scripts every page of a context runs before the game's: quiet, the run's settings, the helpers. */
+async function setUp(context) {
   await context.addInitScript(quiet);
   await context.addInitScript((autonomy) => {
     const key = 'open-sims-wasm.settings';
@@ -344,7 +350,26 @@ async function newPage() {
     localStorage.setItem(key, JSON.stringify({ ...settings, directorDelay: 0, autonomy }));
   }, has('free-will'));
   await context.addInitScript(pageHelpers);
-  const page = await context.newPage();
+}
+
+/**
+ * A page at 1 % volume, the camera never taking over on its own (the director's delay 0), and free
+ * will off unless `--free-will` (the game's setting applies to the player's household as a game
+ * opens, over what a state says). Reused for every job of a run.
+ */
+async function newPage() {
+  let context = kept;
+  if (!context) {
+    context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
+    await setUp(context);
+  }
+  const page = kept ? await newWindow(kept) : await context.newPage();
+  // (A kept browser's site storage: cleared, so each page starts as a new player's would.)
+  if (kept && served) {
+    const cdp = await context.newCDPSession(page);
+    await cdp.send('Storage.clearDataForOrigin', { origin: new URL(base).origin, storageTypes: 'cookies,file_systems,indexeddb,local_storage,service_workers,cache_storage' });
+    await cdp.detach();
+  }
   page.on('pageerror', (err) => noteError(`page error: ${err.message}`));
   page.on('console', (m) => {
     if (m.type() === 'error' || (m.type() === 'warning' && /lights only|unavailable|failed/i.test(m.text()))) noteError(`console ${m.type()}: ${m.text()}`);
@@ -575,7 +600,7 @@ if (what === 'play') {
       const [fw, fd] = d?.footprint ?? [1, 1];
       const [w, dd] = o.rot % 2 ? [fd, fw] : [fw, fd];
       const box = window.__renderer?.objectBox?.(id) ?? null;
-      return { x: o.x, z: o.z, rot: o.rot, open: Boolean(o.open), growth: o.growth ?? null, mid: [o.x + w / 2, o.z + dd / 2], size: [w, dd], layer: d?.layer ?? 'floor', box, bounds: window.__check.bounds(id), fov: window.__scene?.activeCamera?.fov ?? 0.7 };
+      return { x: o.x, z: o.z, rot: o.rot, open: Boolean(o.open), growth: o.growth ?? null, mid: [o.x + w / 2, o.z + dd / 2], size: [w, dd], layer: d?.layer ?? 'floor', box, bounds: window.__check.bounds(id), fov: window.__renderer?.cameraInfo?.().fov ?? 0.7 };
     }, id);
 
   /** Models up to this tall (m) are looked at from the usual height; taller ones at their middle. */
@@ -613,8 +638,8 @@ if (what === 'play') {
     const took = await page.evaluate((view) => {
       window.__controls.follow(null);
       const pose = window.__camera(view);
-      const cam = window.__scene?.activeCamera;
-      return { ...pose, radius: Math.min(Math.max(pose.radius, cam?.lowerRadiusLimit ?? 0), cam?.upperRadiusLimit ?? Infinity) };
+      const [lo, hi] = window.__renderer?.cameraInfo?.().radius ?? [0, Infinity];
+      return { ...pose, radius: Math.min(Math.max(pose.radius, lo), hi) };
     }, view);
     const round = (v) => v.map((x) => +x.toFixed(2));
     return { alpha: +took.alpha.toFixed(3), beta: +took.beta.toFixed(3), radius: +took.radius.toFixed(2), target: round(took.target), height: +height.toFixed(2), bottom: +bottom.toFixed(2), from, ...(bounds ? { bounds: { lo: round(bounds.lo), hi: round(bounds.hi) } } : {}) };
@@ -680,7 +705,7 @@ if (what === 'play') {
     // A use's clips close as it ends (a door swinging shut): wait for them, a few seconds at most.
     await page
       .waitForFunction(
-        ({ id, held }) => ![...(window.__renderer?.motion?.states?.get(id) ?? [])].some(([name, c]) => ['use', 'loop', 'repeat'].includes(c.kind) && c.time > 1e-3 && !held.includes(name)),
+        ({ id, held }) => ![...(window.__renderer?.objectClips?.(id) ?? [])].some(([name, c]) => ['use', 'loop', 'repeat'].includes(c.kind) && c.time > 1e-3 && !held.includes(name)),
         { id, held },
         { timeout: 5_000, polling: 'raf' },
       )
@@ -690,7 +715,7 @@ if (what === 'play') {
   /** The clips that always run, or run without a use (ambient, growth, night, clock hands): not "a clip played". */
   const background = (id) =>
     page.evaluate((id) => {
-      const m = window.__renderer?.motion?.objects?.get(id)?.motions;
+      const m = window.__renderer?.objectMotions?.(id);
       return { names: m ? [m.idle, m.growth, m.night, m.clock?.hour, m.clock?.minute].filter(Boolean) : [], open: m?.open ?? null, any: Boolean(m) };
     }, id);
 
@@ -746,10 +771,10 @@ if (what === 'play') {
         const info = await page.evaluate(
           ({ sim, id }) => {
             const s = window.__sims().find((x) => x.id === sim);
-            const clips = window.__renderer?.motion?.states?.get(id);
+            const clips = window.__renderer?.objectClips?.(id);
             const o = window.__world().objects.find((x) => x.id === id);
             // Each clip playing on it: how far in (s), of how long, and how it plays.
-            const playing = clips ? Object.fromEntries([...clips].map(([name, c]) => [name, { time: +c.time.toFixed(2), duration: +c.clip.duration.toFixed(2), kind: c.kind }])) : null;
+            const playing = clips ? Object.fromEntries([...clips].map(([name, c]) => [name, { time: +c.time.toFixed(2), duration: +c.duration.toFixed(2), kind: c.kind }])) : null;
             return {
               t: Math.round(window.__check.watched()?.t ?? 0),
               object: o ? { x: o.x, z: o.z, rot: o.rot, open: Boolean(o.open) } : null,
@@ -1026,7 +1051,8 @@ if (what === 'sheet') {
     return { tiles, ages };
   }
 
-  const page = await (await browser.newContext({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 1 })).newPage();
+  const page = kept ? await newWindow(kept) : await (await browser.newContext({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 1 })).newPage();
+  if (kept) await page.setViewportSize({ width: 1600, height: 1000 });
   const html = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
   /**
    * One sheet: `tiles` in a grid under `title`, each picture whole and labelled with its file; 1600
@@ -1084,5 +1110,5 @@ if (what === 'sheet') {
 
 writeFileSync(join(out, `${what}-${run}.json`), JSON.stringify(log, null, 2));
 console.log(`check: ${join(out, `${what}-${run}.json`)}`);
-await browser.close();
+await (kept ?? browser).close();
 vite?.kill();

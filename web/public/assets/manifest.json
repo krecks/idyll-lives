@@ -653,7 +653,7 @@
     },
     "environment.sky": {
       "type": "image",
-      "url": "env/belfast_open_field.env"
+      "url": "env/belfast_open_field.pcenv"
     },
     "material.finish.matte": {
       "type": "material",

@@ -96,7 +96,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S2
 - **Rubric:** I12, I7
 - **Fix class:** code
-- **Where:** `web/src/render/babylon/characters.ts:530` (`ACTIONS.phone`), `web/src/render/babylon/characters/clips/idle.ts:132` (`phonePose`)
+- **Where:** `web/src/render/babylon/characters.ts:530` (`ACTIONS.phone`), `web/src/render/shared/characters/clips/idle.ts:132` (`phonePose`)
 - **Evidence:** The rubric records that no phone, book, cup or cutlery prop exists today. Props in hand are new behaviour: filed as `code` only, planned separately (§9, decision 3). Cross-cutting wave: every phone action, at every stage that may use one, holds an empty hand to the ear (`social/sheets/phone.png`, `social/scenes/phone-text-01.png`, `social/scenes/phone-call-01.png`); the same at the objects that use `phone` (the video-call nook, the shortwave radio, `systems/sheets/act-phone-meditate-idle.png`). The phone booth is the one place a receiver is there (its model).
 - **Status:** later (G-70, props in hand: new behaviour, owner decision 3); was confirmed
 - **Source:** `plan/authenticity-review.md` §3.3 (I7) and §9 (decision 3); wave: cross-cutting
@@ -139,7 +139,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S2
 - **Rubric:** I12
 - **Fix class:** clip
-- **Where:** `web/public/content/base.json:1912` (`phone.anim: "phone"`, one animation for all five actions); `web/src/render/babylon/characters.ts:530` (`ACTIONS.phone`: `phone`, upper `phone`); `web/src/render/babylon/characters/clips/idle.ts:132` (`phonePose`: the right hand at the ear, the left arm across the waist)
+- **Where:** `web/public/content/base.json:1912` (`phone.anim: "phone"`, one animation for all five actions); `web/src/render/babylon/characters.ts:530` (`ACTIONS.phone`: `phone`, upper `phone`); `web/src/render/shared/characters/clips/idle.ts:132` (`phonePose`: the right hand at the ear, the left arm across the waist)
 - **Evidence:** `social/sheets/phone.png`: "Scroll the phone" and "Text" are the call pose, hand to the ear, the head nodding as if listening, for 10 and 20 minutes; only `call` (and `invite`, `askOver`, short calls) fit it. The objects that use `phone` get the same: a video call at the nook's laptop is held to the ear in front of the screen, and so is the shortwave radio (`systems/sheets/act-phone-meditate-idle.png`). Texting and scrolling look down at a phone held in front at chest height, thumbs moving (the reading clip `lantern`'s arms are close). A per-action `anim` (content) and a "phone in hand" clip.
 - **Status:** fixed (43ca1cc1, 2d887ff9)
 - **After:** a phone action's own `anim` (content `phone.actions[].anim`; tests/phone.rs `texting_and_scrolling_look_at_the_screen_a_call_is_at_the_ear`): texting and scrolling play `phoneScreen`, the phone held in both hands before the chest, the head bowed, the thumbs tapping and swiping (`phoneText`; seated as the upper body); calls, invitations and asking over stay at the ear (`bench-results/review/fixes/clips-social/sheets/phone.png`, `sheets/phone-sofa.png`; before `social/sheets/phone.png`). The phone itself is still mimed (I-social-01, G-70).

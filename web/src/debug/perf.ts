@@ -74,11 +74,6 @@ export function perfEnd(entry: PerfEntry, detail?: string): number {
   return entry.ms;
 }
 
-/** Records a span that already ended (a frame timed by the caller). */
-export function perfRecord(name: string, start: number, ms: number, detail?: string): void {
-  record({ name, start, ms, detail });
-}
-
 /** Times `fn` (sync) and records it. */
 export function perfTime<T>(name: string, fn: () => T, detail?: string): T {
   const entry = perfStart(name, detail);

@@ -9,8 +9,9 @@ publish = false
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
+bytemuck = "1"
 flate2 = "1"
-image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "hdr"] }
 nalgebra = "0.35"
 regex = "1"
 sha2 = "0.10"

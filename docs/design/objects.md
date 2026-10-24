@@ -13,7 +13,7 @@ An object is three things, joined by keys:
 | Part | Where | Owned by |
 |---|---|---|
 | The definition: footprint, layer, top, seat, slots, light, interactions, price | `web/public/content/*.json` (`objects`, see [content-packs.md](../content-packs.md#objects)) | The simulation. It never sees the model. |
-| The model entry: file, finishes, fallback | An asset manifest (`model.<family>.<id>`) | The renderer (`render/babylon/models.ts`) |
+| The model entry: file, finishes, fallback | An asset manifest (`model.<family>.<id>`) | The renderer (`render/pc/models.ts`) |
 | The model: one `.glb` | `web/public/assets/models/<family>/<id>.glb`, exported by a family script in `tools/art/blender/families/` | The art |
 
 The content must agree with the model (a seat at the seat's height, a top where the top is), and
@@ -144,7 +144,7 @@ The game's surfaces are a dozen finishes, the `material.finish.*` entries of the
 (see-through). A model's parts are coloured per part; all the plain finishes of a model merge into
 one mesh, so a model costs one draw call for its plain parts plus one per textured or see-through
 finish it uses. The plain finishes carry their roughness and metalness in the vertex colour's alpha
-(`encodeFinish`, read by `PlainFinishPlugin` in `render/babylon/materials.ts`; until 2026-10-15 the
+(`encodeFinish`, read by `PLAIN_FINISH` in `render/pc/shaders/surface.ts`; until 2026-10-15 the
 shader never saw it and drew every plain finish as rough metal). Metals mirror the sky just above the
 horizon where they would reflect the ground: the game looks down on everything, so anything upright
 and shiny (a handle, a steel fridge) would otherwise mirror the dark field of the sky map, which no
@@ -239,7 +239,7 @@ room has.
   what only shows while it moves), or `far=build_function` builds one of its own; `cargo check-glb`
   checks it (still, the same size, at most half the triangles). Give one to what is placed by the
   hundred or seen far off: trees and hedges, street lamps and benches, the farm's buildings.
-- **Plants and trees** (`render/babylon/nature.ts`) use a reduced build at a distance, for the far
+- **Plants and trees** (`render/shared/nature.ts`, drawn by `render/pc/nature.ts`) use a reduced build at a distance, for the far
   woods too: a file's `far` (`families/plants.py`). Its parts on `foliage` and `bark` take the nature
   shader's wind and tint.
 
@@ -496,7 +496,7 @@ didn't change. A new object gets a Blender file from the start.
 
 ## Before Blender is the standard
 
-What the engine (`render/babylon/models.ts` and around) must do first, most important first.
+What the engine (`render/pc/models.ts` and around) must do first, most important first.
 Placement, turning, height, shadows, contact shadows, footprints, the fallback when a file fails (a
 plain box, until a background try brings the file),
 WebGPU and WebGL2, the town overview, catalog pictures, meshopt copies and player colours (`paint`) already

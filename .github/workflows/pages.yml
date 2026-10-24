@@ -141,6 +141,8 @@ jobs:
           bun run check:voice
           bun run check
           bun run lint
+          bun run check:chunks
+          bun run test
 
       # Also optimises the wasm (binaryen) and writes THIRD-PARTY-LICENSES.txt.
       - name: Build

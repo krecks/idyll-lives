@@ -330,6 +330,18 @@ export function generateHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { wid
   return null;
 }
 
+/**
+ * `list` shuffled in place (Fisher-Yates). Not `sort(() => rng() - 0.5)`: what a sort does with such
+ * answers is up to the engine, and JavaScriptCore's gave one seed other houses from call to call.
+ */
+function shuffle<T>(rng: () => number, list: T[]): T[] {
+  for (let i = list.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [list[i], list[j]] = [list[j], list[i]];
+  }
+  return list;
+}
+
 function pick<T>(rng: () => number, list: readonly T[]): T {
   return list[Math.floor(rng() * list.length)];
 }
@@ -540,7 +552,7 @@ function fits(cfg: HouseGenConfig, k: Kind, w: number, d: number): boolean {
 /** Splits `rect` among `kinds` (a guillotine plan) so that `doors` can join the rooms; null if they don't fit. */
 function floorPlan(cfg: HouseGenConfig, rng: () => number, rect: Rect, kinds: Kind[], doors: (f: Floor) => boolean): Floor | null {
   for (let tries = 0; tries < 60; tries++) {
-    const order = [...kinds].sort(() => rng() - 0.5);
+    const order = shuffle(rng, [...kinds]);
     const rooms = split(cfg, rng, rect, order);
     if (rooms) {
       const floor: Floor = { rooms, edges: new Map(), objects: [], fronts: [], keep: new Set(), taken: new Set() };
@@ -765,8 +777,8 @@ function upperFloor(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, h
   // In the living room, the entrance hall or the dining room: a column on the left or right
   // outside wall, with room for the stairs and their foot.
   const spots: [number, Room][] = [];
-  for (const room of g.rooms.filter((r) => STAIR_ROOMS.includes(r.kind)).sort(() => rng() - 0.5)) {
-    for (const c of [house.x, house.x + house.w - 1].sort(() => rng() - 0.5)) if (c >= room.x && c < room.x + room.w) spots.push([c, room]);
+  for (const room of shuffle(rng, g.rooms.filter((r) => STAIR_ROOMS.includes(r.kind)))) {
+    for (const c of shuffle(rng, [house.x, house.x + house.w - 1])) if (c >= room.x && c < room.x + room.w) spots.push([c, room]);
   }
   for (const [c, room] of spots) {
     for (let z = room.z + room.d - len; z >= room.z + 1; z--) {
@@ -845,7 +857,7 @@ function basementFloor(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number
   // `dark`: along the room's only outside wall, which its windows need.
   type Spot = { across: boolean; u: number; first: boolean; room: Room; dark: boolean };
   const spots: Spot[] = [];
-  for (const room of g.rooms.filter((r) => DOWN_ROOMS.includes(r.kind)).sort(() => rng() - 0.5)) {
+  for (const room of shuffle(rng, g.rooms.filter((r) => DOWN_ROOMS.includes(r.kind)))) {
     // Its outside walls (towards the street, then clockwise).
     const out = [room.z === house.z, room.x + room.w === house.x + house.w, room.z + room.d === house.z + house.d, room.x === house.x];
     const only = out.filter(Boolean).length === 1;
@@ -861,15 +873,15 @@ function basementFloor(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number
   }
   // The kitchen last (it wants its floor for an island), and a room's only outside wall only if nothing else will do.
   const last = (s: Spot) => 2 * Number(s.dark) + Number(s.room.kind === 'kitchen');
-  spots.sort(() => rng() - 0.5).sort((a, b) => last(a) - last(b));
+  shuffle(rng, spots).sort((a, b) => last(a) - last(b));
   let total = 0;
   for (const { across, u, first, room } of spots) {
     const at = (a: number, b: number): [number, number] => (across ? [b, a] : [a, b]);
     const turn = (r: Rect): Rect => (across ? { x: r.z, z: r.x, w: r.d, d: r.w } : r);
     const [R, H] = [turn(room), turn(house)];
-    const starts = Array.from({ length: Math.max(0, R.d - len + 1) }, (_, i) => R.z + i).sort(() => rng() - 0.5);
+    const starts = shuffle(rng, Array.from({ length: Math.max(0, R.d - len + 1) }, (_, i) => R.z + i));
     for (const v of starts) {
-      for (const up of [true, false].sort(() => rng() - 0.5)) {
+      for (const up of shuffle(rng, [true, false])) {
         // Climbing towards higher `v` (the foot before the steps, the landing past them), or lower.
         const lv = up ? v + len : v - 1;
         const foot = up ? v - 1 : v + len;
@@ -942,7 +954,7 @@ function upperRooms(cfg: HouseGenConfig, rng: () => number, rest: Rect, kinds: K
       // Rooms to the two sides by the floor they want.
       const sides: [Kind[], Kind[]] = [[], []];
       const want = [0, 0];
-      for (const k of [...kinds].sort(() => rng() - 0.5)) {
+      for (const k of shuffle(rng, [...kinds])) {
         const i = want[0] <= want[1] ? 0 : 1;
         sides[i].push(k);
         want[i] += cfg.rooms[k].weight;
@@ -967,7 +979,7 @@ function row(cfg: HouseGenConfig, rng: () => number, r: Rect, kinds: Kind[], alo
   };
   if (kinds.some((k) => across < cfg.rooms[k].minSide || longest(k) < cfg.rooms[k].minSide)) return null;
   for (let tries = 0; tries < 6; tries++) {
-    const order = [...kinds].sort(() => rng() - 0.5);
+    const order = shuffle(rng, [...kinds]);
     const weight = order.reduce((n, k) => n + cfg.rooms[k].weight, 0);
     const rooms: Room[] = [];
     let at = 0;
@@ -1201,7 +1213,7 @@ function furnishRoom(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, 
     const count = slot.count ? between(rng, slot.count) : 1;
     for (let n = 0; n < count; n++) {
       if (!required(slot) && rng() >= (slot.chance ?? 1)) continue;
-      const options = slot.one.filter((d) => info(d)).sort(() => rng() - 0.5);
+      const options = shuffle(rng, slot.one.filter((d) => info(d)));
       let done = false;
       for (const def of options) {
         const across = slot.opposite ? sideOf.get(slot.opposite) : undefined;
@@ -1342,7 +1354,7 @@ function counterRun(f: Floor, r: Room, info: ObjectInfos, rng: () => number, run
   const pieces: { def: string; w: number; required: boolean }[] = [];
   for (const slot of run.with) {
     if (slot.chance !== undefined && rng() >= slot.chance) continue;
-    const def = slot.one.filter((d) => info(d)?.footprint[1] === 1).sort(() => rng() - 0.5)[0];
+    const def = shuffle(rng, slot.one.filter((d) => info(d)?.footprint[1] === 1))[0];
     if (def) pieces.push({ def, w: info(def)!.footprint[0], required: slot.chance === undefined || slot.chance >= 1 });
   }
   const segments = run.segments.filter((d) => info(d)?.footprint.every((n) => n === 1));
@@ -1353,14 +1365,14 @@ function counterRun(f: Floor, r: Room, info: ObjectInfos, rng: () => number, run
   const roomy = (side: number) => (side % 2 === 0 ? r.d : r.w) >= (run.clear ?? 0);
   for (const first of [true, false]) for (let len = longest; len >= Math.max(least, 1); len--) {
     if (len > least && !segment) continue;
-    const order = [...pieces.map((p) => p.def), ...Array<string>(len - least).fill(segment ?? '')].sort(() => rng() - 0.5);
-    for (const side of [0, 1, 2, 3].sort(() => rng() - 0.5)) {
+    const order = shuffle(rng, [...pieces.map((p) => p.def), ...Array<string>(len - least).fill(segment ?? '')]);
+    for (const side of shuffle(rng, [0, 1, 2, 3])) {
       if (roomy(side) !== first) continue;
       // Back to the wall on `side` (0 the side towards the street, then clockwise), as in `place`.
       const rot = [0, 3, 2, 1][side];
       const along = side % 2 === 0;
       if ((along ? r.d : r.w) < 2) continue;
-      const starts = Array.from({ length: (along ? r.w : r.d) - len + 1 }, (_, i) => i).sort(() => rng() - 0.5);
+      const starts = shuffle(rng, Array.from({ length: (along ? r.w : r.d) - len + 1 }, (_, i) => i));
       for (const s of starts) {
         const n = f.objects.length;
         const tiles: string[] = [];
@@ -1440,7 +1452,7 @@ function tableSet(f: Floor, r: Room, info: ObjectInfos, rng: () => number, set: 
   const want = between(rng, set.seats);
   const [least] = set.seats;
   if (!chair && least > 0) return false;
-  for (const def of set.tables.filter((d) => info(d)).sort(() => rng() - 0.5)) {
+  for (const def of shuffle(rng, set.tables.filter((d) => info(d)))) {
     const table = info(def)!;
     const [fw, fd] = table.footprint;
     const spots: { x: number; z: number; rot: number; score: number }[] = [];
@@ -1481,7 +1493,7 @@ function tableSet(f: Floor, r: Room, info: ObjectInfos, rng: () => number, set: 
       if (table.used && f.taken.has(key(front[0], front[1]))) continue;
       // Chairs along a desk's front only; stools along one side of an island (its back, if someone uses it).
       const [fs, bs] = [[2, 1, 0, 3][rot % 4], [0, 3, 2, 1][rot % 4]];
-      const one = (w === d ? [[0, 2], [1, 3]] : w > d ? [[0], [2]] : [[1], [3]]).sort(() => rng() - 0.5);
+      const one = shuffle(rng, w === d ? [[0, 2], [1, 3]] : w > d ? [[0], [2]] : [[1], [3]]);
       const choices = set.wall ? [[fs]] : set.oneSide ? (table.used ? [[bs]] : one) : [undefined];
       // Stools may stand on the kitchen's side of the way into an open living room (it stays open on the other).
       const free = (s: { x: number; z: number }) => inside(r, s.x, s.z) && !f.taken.has(key(s.x, s.z)) && (!f.keep.has(key(s.x, s.z)) || (!!set.oneSide && !!f.open?.has(key(s.x, s.z))));
@@ -1641,7 +1653,7 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
       const [wx, wz] = o.rot === 2 ? [x, o.z + pd - d] : o.rot === 3 ? [o.x + pw - w, z] : o.rot === 0 ? [x, o.z] : [o.x, z];
       if (hangs(backs) && fits(wx, wz, w, d, o.rot) && take(wx, wz, w, d, o.rot)) return true;
     }
-    for (const side of [0, 1, 2, 3].sort(() => rng() - 0.5)) {
+    for (const side of shuffle(rng, [0, 1, 2, 3])) {
       const rot = [0, 3, 2, 1][side];
       const [w, d] = rot % 2 === 0 ? [fw, fd] : [fd, fw];
       const spots: [number, number, string[]][] = [];
@@ -1649,7 +1661,7 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
       if (side === 2) for (let x = r.x; x + w <= r.x + r.w; x++) spots.push([x, r.z + r.d - d, Array.from({ length: w }, (_, i) => `h:${x + i}:${r.z + r.d}`)]);
       if (side === 3) for (let z = r.z; z + d <= r.z + r.d; z++) spots.push([r.x, z, Array.from({ length: d }, (_, i) => `v:${r.x}:${z + i}`)]);
       if (side === 1) for (let z = r.z; z + d <= r.z + r.d; z++) spots.push([r.x + r.w - w, z, Array.from({ length: d }, (_, i) => `v:${r.x + r.w}:${z + i}`)]);
-      spots.sort(() => rng() - 0.5);
+      shuffle(rng, spots);
       for (const [x, z, backs] of spots) if (hangs(backs) && fits(x, z, w, d, rot) && take(x, z, w, d, rot)) return true;
     }
     return false;
@@ -1700,7 +1712,7 @@ function place(f: Floor, r: Room, def: string, { footprint: [fw, fd], againstWal
       }
     }
   }
-  const sideList = [0, 1, 2, 3].sort(() => rng() - 0.5);
+  const sideList = shuffle(rng, [0, 1, 2, 3]);
   if (prefer !== undefined) sideList.sort((a, b) => (a === prefer ? -1 : b === prefer ? 1 : 0));
   type Spot = { side: number; rot: number; w: number; d: number; x: number; z: number };
   // Side by side (each side's spots shuffled only once it's reached).
@@ -1714,7 +1726,7 @@ function place(f: Floor, r: Room, def: string, { footprint: [fw, fd], againstWal
       if (side === 2) for (let x = r.x; x + w <= r.x + r.w; x++) along.push([x, r.z + r.d - d]);
       if (side === 3) for (let z = r.z; z + d <= r.z + r.d; z++) along.push([r.x, z]);
       if (side === 1) for (let z = r.z; z + d <= r.z + r.d; z++) along.push([r.x + r.w - w, z]);
-      along.sort(() => rng() - 0.5);
+      shuffle(rng, along);
       for (const [x, z] of along) yield { side, rot, w, d, x, z };
     }
   }

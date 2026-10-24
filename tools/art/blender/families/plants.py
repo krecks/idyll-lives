@@ -5,7 +5,7 @@
 # Leaves are closed, thin, bent blades (`leaf`; since the detail pass mostly `cut_leaf`, cut from an outline: lobes,
 # slits, leaflets) on the `foliage` finish, stems and trunks swept tubes (`tube`, `twig`), pots surfaces of revolution
 # (`pot`, `vessel`), shrubs woody skeletons under broken leaf masses (`leafy_shrub`), flowers separate petals (`rays`). The game's nature shader gives every part on `foliage`
-# (and `bark`) its wind sway and a per-instance tint (render/babylon/nature.ts); the pots, stands and
+# (and `bark`) its wind sway and a per-instance tint (render/pc/nature.ts); the pots, stands and
 # flowers stay still. Each model's pot is its `body`, the part the player colours. Only the bonsai moves:
 # a stray sprig shrinks away while a resident prunes it (`trim`).
 #

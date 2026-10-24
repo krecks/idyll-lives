@@ -5,7 +5,8 @@
 //! transform and rot_y had no callers and are not ported.)
 //!
 //! Winding: every primitive is counter-clockwise seen from outside (`cross(b - a, c - a)` points
-//! out, as `meshops::smooth_normals` expects); write.rs turns faces round for Babylon.
+//! out, as `meshops::smooth_normals` expects); write.rs turns faces round for the game
+//! (clockwise front faces).
 
 use super::meshops::smooth_normals;
 use super::np::{gradient, linspace, linspace_open, pairwise_sum, sign, PI, TAU};

@@ -273,7 +273,7 @@ fn the_shipped_content_reads() {
     let motions = review::motions(&paths).unwrap();
     assert_eq!(motions["model.sofaBed"]["open"], "bed_out");
     let root = ll_tools::checkglb::repo_root();
-    let actions = review::action_keys(&std::fs::read_to_string(format!("{root}/web/src/render/babylon/characters.ts")).unwrap()).unwrap();
+    let actions = review::action_keys(&std::fs::read_to_string(format!("{root}/web/src/render/shared/characters/actions.ts")).unwrap()).unwrap();
     assert!(actions.len() > 40 && actions.contains("serve") && !actions.contains("stand"), "{actions:?}");
     let sounds = review::action_sounds(&std::fs::read_to_string(format!("{root}/web/src/audio/world.ts")).unwrap()).unwrap();
     assert_eq!(sounds.get("shower").map(String::as_str), Some("shower"));

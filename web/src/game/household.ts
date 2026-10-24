@@ -2,7 +2,7 @@
 
 import type { AssetRegistry } from '../assets/registry';
 import type { Content, LifeStageDef } from '../content/content';
-import { GARMENTS, pickOutfit } from '../render/babylon/characters/outfit';
+import { GARMENTS, pickOutfit } from '../render/shared/characters/outfit';
 import { chosenPreset, presetByName, presetsFor, VOICE_RANGE, type VoiceChoice } from '../voice/voices';
 import type { Residents } from './housegen';
 

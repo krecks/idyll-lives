@@ -1,7 +1,8 @@
 /**
  * Dev-only clips bench (`bun run dev`, then /clips.html): models side by side, each playing every clip
  * of its file in turn, the way the game plays it, so a model's moving parts can be checked without
- * setting up a game. Built with the game's own `buildModel` and `clipPose`. Not part of the build.
+ * setting up a game. Built with the game's own `buildModel` and `partPose`, drawn by PlayCanvas
+ * (`pcStage.ts`). Not part of the build.
  *
  * How each clip plays follows the model entry's `motions`:
  * - a use's clip (`uses`, `open`, `night`, and clips nothing plays): at rest (and its `delay`), opening,
@@ -23,31 +24,16 @@
  * From the console: `__clips.set(t)` holds every clip at `t`, `__clips.play()` lets them run again,
  * `__clips.solo('name')` plays only that clip (`solo(null)`: all).
  */
-import {
-  ArcRotateCamera,
-  Color3,
-  Color4,
-  DirectionalLight,
-  Engine,
-  HemisphericLight,
-  ImageProcessingConfiguration,
-  Matrix,
-  MeshBuilder,
-  PBRMaterial,
-  Scene,
-  ShadowGenerator,
-  Vector3,
-  WebGPUEngine,
-  type AbstractEngine,
-} from '../render/babylon/core';
-import { AssetRegistry } from '../assets/registry';
+
+import { createStage } from './pcStage';
 import type { ModelEntry } from '../assets/types';
 import type { PartColors } from '../core/protocol';
-import { compressedTextureFeatures } from '../render/babylon/loaders';
-import { MaterialLibrary } from '../render/babylon/materials';
-import { buildModel, painted, partPose, type ModelClip, type ModelTemplate } from '../render/babylon/models';
-import { installNature } from '../render/babylon/nature';
-import { GROWTH_TIMES } from '../render/babylon/objectMotion';
+import { Instances } from '../render/pc/instancing';
+import { buildModel, type ModelTemplate } from '../render/pc/models';
+import { multiply, transformPoint, translation } from '../render/shared/math';
+import { partPose, type ModelClip } from '../render/shared/modelClips';
+import { painted } from '../render/shared/modelEntry';
+import { GROWTH_TIMES } from '../render/shared/objectMotion';
 
 /** How a clip plays (see the file header). */
 type Kind = 'use' | 'repeat' | 'loop' | 'idle' | 'growth' | 'clock';
@@ -62,38 +48,15 @@ const STAGE = 1.6;
 const GAP = 0.6;
 
 const params = new URLSearchParams(location.search);
-const canvas = document.getElementById('c') as HTMLCanvasElement;
-const engine: AbstractEngine = await (async () => {
-  if (params.get('renderer') !== 'webgl' && navigator.gpu) {
-    const gpu = new WebGPUEngine(canvas, { antialias: true, ...compressedTextureFeatures() });
-    await gpu.initAsync();
-    return gpu;
-  }
-  return new Engine(canvas, true);
-})();
-const scene = new Scene(engine);
-scene.clearColor = new Color4(0.62, 0.77, 0.9, 1);
-scene.imageProcessingConfiguration.toneMappingEnabled = true;
-scene.imageProcessingConfiguration.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES;
-scene.imageProcessingConfiguration.exposure = 1.1;
-installNature(scene);
-
-const sky = new HemisphericLight('sky', new Vector3(0, 1, 0), scene);
-sky.intensity = 0.6;
-sky.groundColor = new Color3(0.32, 0.36, 0.25);
-const sun = new DirectionalLight('sun', new Vector3(-0.45, -1, -0.35), scene);
-sun.intensity = 3.2;
-sun.diffuse = new Color3(1, 0.96, 0.88);
-const shadows = new ShadowGenerator(2048, sun);
-shadows.usePercentageCloserFiltering = true;
-shadows.bias = 0.002;
-
-const base = import.meta.env.BASE_URL;
-const assets = await AssetRegistry.load(`${base}assets/manifest.json`, params.getAll('pack'));
-const lib = MaterialLibrary.for(scene).setAssets(assets);
-const env = assets.get('environment.sky', 'image');
-if (env?.url) await lib.loadEnvironment(env.url);
-scene.environmentIntensity = 0.9;
+const stage = await createStage({
+  sky: 0.6,
+  sun: [-0.45, -1, -0.35],
+  alpha: Number(params.get('alpha') ?? Math.PI / 2),
+  beta: Number(params.get('beta') ?? 1.1),
+  radius: 1,
+  near: 0.02,
+});
+const { app, assets, root, orbit } = stage;
 
 /** `?colors=body:#hex,stone:#hex` as the parts' colours. */
 function colorsParam(): PartColors | undefined {
@@ -150,6 +113,8 @@ interface Shown {
 interface Bench {
   key: string;
   template: ModelTemplate;
+  /** Each mesh's draw (one copy). */
+  draws: Instances[];
   x: number;
   z: number;
   /** Its clips, in the order they take their turn (an `idle` one plays throughout). */
@@ -162,18 +127,15 @@ const labels = document.getElementById('labels')!;
 const cols = Number(params.get('cols')) || (keys.length <= 7 ? keys.length : Math.ceil(Math.sqrt(keys.length * 1.5)));
 for (const key of keys) {
   const entry = assets.get(key, 'model');
-  const template = await buildModel(scene, key, painted(entry, colors), [1, 1]);
+  const template = await buildModel(app, key, painted(entry, colors), [1, 1]);
   const of = kinds(entry);
   const clips = [...(template.motion?.clips ?? [])].map(([name, clip]) => ({ name, kind: 'use' as Kind, ...of.get(name), clip }));
   const label = document.createElement('span');
   label.textContent = key.replace(/^model\./, '');
   if (params.get('labels') === '0') label.hidden = true;
   labels.appendChild(label);
-  benches.push({ key, template, x: 0, z: 0, clips, label });
-  for (const mesh of template.meshes) {
-    mesh.receiveShadows = true;
-    shadows.addShadowCaster(mesh);
-  }
+  const draws = template.meshes.map((m) => new Instances(stage.device, root, m.mesh, m.material, { name: m.name }));
+  benches.push({ key, template, draws, x: 0, z: 0, clips, label });
 }
 
 // Rows of `cols`, each centred, the first model on the left as the camera sees it (from the front, -x is its right).
@@ -199,13 +161,7 @@ for (let row = 0; row * cols < benches.length; row++) {
 depth -= GAP * 2;
 for (const b of benches) b.z += depth / 2;
 
-const ground = MeshBuilder.CreateGround('ground', { width: widest + 8, height: depth + 8 }, scene);
-const gm = new PBRMaterial('ground', scene);
-gm.albedoColor = Color3.FromHexString('#6F9A3E').toLinearSpace();
-gm.roughness = 1;
-gm.metallic = 0;
-ground.material = gm;
-ground.receiveShadows = true;
+stage.lawn(widest + 8, depth + 8);
 
 /** Seconds one clip's turn takes. */
 function turnLength({ kind, clip, delay = 0, every = 0 }: Shown): number {
@@ -266,19 +222,21 @@ function times(b: Bench, seconds: number): { at: Map<string, number>; turn: stri
 }
 
 const posed = new Float32Array(16);
+const place = new Float32Array(16);
+const matrix = new Float32Array(16);
 /** Poses every model at `seconds` into the bench. */
 function poseAll(seconds: number): void {
   for (const b of benches) {
     const { template } = b;
     const { at, turn } = times(b, seconds);
-    const place = Matrix.Translation(b.x, 0, b.z);
+    translation(b.x, 0, b.z, place);
+    // As the game: every clip that moves the part poses it, together (`partPose`).
+    const playing = b.clips.flatMap((c) => (at.has(c.name) ? [{ clip: c.clip, time: at.get(c.name)!, kind: c.kind }] : []));
     for (let i = 0; i < template.meshes.length; i++) {
       const part = template.motion ? template.motion.parts[i] : -1;
-      // As the game: every clip that moves the part poses it, together (`partPose`).
-      const playing = b.clips.flatMap((c) => (at.has(c.name) ? [{ clip: c.clip, time: at.get(c.name)!, kind: c.kind }] : []));
       const moved = part >= 0 && partPose(playing, part, posed);
-      const m = moved ? Matrix.FromArray(posed).multiply(place) : place;
-      template.meshes[i].thinInstanceSetBuffer('matrix', m.asArray() as unknown as Float32Array, 16, true);
+      b.draws[i].setMatrices(moved ? multiply(posed, place, matrix) : place, 1);
+      b.draws[i].update();
     }
     const name = b.key.replace(/^model\./, '');
     b.label.textContent = !b.clips.length ? `${name} (no clips)` : turn ? `${name} · ${turn}` : name;
@@ -322,64 +280,58 @@ setSolo(solo);
 const tallest = Math.max(1, ...benches.map((b) => b.template.height));
 const top = Math.max(...benches.map((b) => b.template.height));
 const lowest = Math.min(...benches.map((b) => b.template.bottom ?? 0));
-const aim = new Vector3(0, lowest > 0.3 ? (lowest + top) / 2 : Math.min(0.75, tallest / 2), 0);
+const aim = orbit.target;
+aim.y = lowest > 0.3 ? (lowest + top) / 2 : Math.min(0.75, tallest / 2);
 const target = params.get('target')?.split(',').map(Number);
 if (target?.length === 1) aim.y = target[0];
-else if (target?.length === 3) aim.set(target[0], target[1], target[2]);
-const radius = Number(params.get('radius')) || Math.max(2.6, widest * 0.75 + depth * 0.8 + tallest * 0.4);
-const camera = new ArcRotateCamera('cam', Number(params.get('alpha') ?? Math.PI / 2), Number(params.get('beta') ?? 1.1), radius, aim, scene);
-camera.attachControl(canvas, true);
-camera.minZ = 0.02;
-camera.wheelPrecision = 20;
+else if (target?.length === 3) [aim.x, aim.y, aim.z] = target;
+orbit.radius = Number(params.get('radius')) || Math.max(2.6, widest * 0.75 + depth * 0.8 + tallest * 0.4);
 
 /** The corners of every model's parts as placed, at rest and with all its clips open (`t=99`). */
-function corners(): Vector3[] {
-  const out: Vector3[] = [];
+function corners(): number[][] {
+  const out: number[][] = [];
   for (const b of benches) {
     const open = b.clips.map((c) => ({ clip: c.clip, time: c.clip.duration, kind: c.kind }));
-    const place = Matrix.Translation(b.x, 0, b.z);
-    b.template.meshes.forEach((mesh, i) => {
-      const { minimum: lo, maximum: hi } = mesh.getBoundingInfo().boundingBox;
+    translation(b.x, 0, b.z, place);
+    b.template.meshes.forEach(({ mesh }, i) => {
+      const lo = mesh.aabb.getMin();
+      const hi = mesh.aabb.getMax();
       const part = b.template.motion ? b.template.motion.parts[i] : -1;
-      const own = mesh.computeWorldMatrix(true);
-      for (const at of part >= 0 && partPose(open, part, posed) ? [place, Matrix.FromArray(posed).multiply(place)] : [place]) {
-        const m = at.multiply(own);
-        for (let k = 0; k < 8; k++) out.push(Vector3.TransformCoordinates(new Vector3(k & 1 ? hi.x : lo.x, k & 2 ? hi.y : lo.y, k & 4 ? hi.z : lo.z), m));
+      for (const at of part >= 0 && partPose(open, part, posed) ? [place, multiply(posed, place, new Float32Array(16))] : [place]) {
+        for (let k = 0; k < 8; k++) out.push(Array.from(transformPoint(at, k & 1 ? hi.x : lo.x, k & 2 ? hi.y : lo.y, k & 4 ? hi.z : lo.z)));
       }
     });
   }
   return out;
 }
 /** Whether all of `points` are on screen, clear of the buttons along the top. */
-function inView(points: Vector3[]): boolean {
-  const m = camera.getViewMatrix(true).multiply(camera.getProjectionMatrix(true));
-  return points.every((p) => {
-    const q = Vector3.TransformCoordinates(p, m);
-    return Math.abs(q.x) <= 0.95 && q.y >= -0.95 && q.y <= 0.86;
+function inView(points: number[][]): boolean {
+  return points.every(([x, y, z]) => {
+    const [qx, qy] = stage.ndc(x, y, z);
+    return Math.abs(qx) <= 0.95 && qy >= -0.95 && qy <= 0.86;
   });
 }
 if (!params.get('radius')) {
   const points = corners();
   if (points.length && !inView(points)) {
-    if (!target) aim.y = (Math.min(...points.map((p) => p.y)) + Math.max(...points.map((p) => p.y))) / 2;
-    camera.setTarget(aim, false, false, true);
-    for (let n = 0; n < 80 && !inView(points); n++) camera.radius *= 1.04;
+    if (!target) aim.y = (Math.min(...points.map((p) => p[1])) + Math.max(...points.map((p) => p[1]))) / 2;
+    for (let n = 0; n < 80 && !inView(points); n++) orbit.radius *= 1.04;
   }
 }
 
-const projected = new Vector3();
-engine.runRenderLoop(() => {
+// The sun's shadow over everything shown.
+stage.shadows.setSquare(0, 0, Math.hypot(widest, depth) / 2 + 2);
+
+const projected = { x: 0, y: 0 };
+stage.run(() => {
   poseAll((performance.now() - started) / 1000);
-  scene.render();
   // Each name in front of its model.
-  const w = engine.getRenderWidth();
-  const h = engine.getRenderHeight();
-  const scale = canvas.clientWidth / w;
   for (const b of benches) {
     const o = b.template.outline;
-    Vector3.ProjectToRef(new Vector3(b.x + (o ? (o.minX + o.maxX) / 2 : 0), 0, b.z + (o ? o.maxZ : 0.5) + 0.12), Matrix.Identity(), scene.getTransformMatrix(), camera.viewport.toGlobal(w, h), projected);
-    b.label.style.transform = `translate(${projected.x * scale}px, ${projected.y * scale}px) translate(-50%, 0)`;
+    if (!stage.project(b.x + (o ? (o.minX + o.maxX) / 2 : 0), 0, b.z + (o ? o.maxZ : 0.5) + 0.12, projected)) continue;
+    b.label.style.transform = `translate(${projected.x}px, ${projected.y}px) translate(-50%, 0)`;
   }
 });
-addEventListener('resize', () => engine.resize());
-Object.assign(window, { __scene: scene, __clips: { set, play, solo: setSolo, benches }, __ready: true });
+poseAll(0);
+// (Two frames drawn before saying so: the shadow's and the picture's.)
+requestAnimationFrame(() => requestAnimationFrame(() => Object.assign(window, { __app: app, __scene: app.scene, __clips: { set, play, solo: setSolo, benches }, __ready: true })));

@@ -19,7 +19,7 @@ down: nothing behind the wall, so not the floor inside) and `ceiling` for the up
 ceiling, 30 cm under it, over the lamp, reaching 1.5 m further: the room lit from above, not a pool round its
 foot). The rest light all round. Since M-lighting-08 (2026-10-22) a lamp lights only its own room on Medium and High
 (clustered lamps): every lit fragment and every lamp are given their room from a mask of the lot in view, and a lamp
-in another room is skipped (`web/src/render/babylon/roomLights.ts`), so a wall's other side, the room behind and the
+in another room is skipped (`web/src/render/pc/shaders/roomLights.ts`), so a wall's other side, the room behind and the
 outside of the house stay dark; through an open doorway too (the light stops at the doorway). Low's few forward lamps
 are not masked, nor tiles split by a diagonal wall. `?roomlights=0` turns it off to compare.
 

@@ -9,7 +9,7 @@ stools and the K9 dining storage (`dining.md`).
 Doors and drawers follow the fridge: hinged parts built closed, `G.swing` / `G.slide`, a `hold` so they shut while
 the resident is still busy. Water grows from the tap (`water_on`) for the whole use. Counter and table tops keep
 their heights (the content's `surface`; every kitchen worktop is 0.95 m); chairs and
-stools keep their seat height (`seats` in `web/src/render/babylon/characters/furniture.json`). Clean things are put away in the
+stools keep their seat height (`seats` in `web/src/render/shared/characters/furniture.json`). Clean things are put away in the
 nearest cupboard or counter (cooking `putAwayAt: ["cupboard", "prep"]`): the wall cabinets and the dining storage are
 `cupboard` stations and open a door while it happens, the drawer counter its top drawer. A cupboard's `reach` (the wall
 cabinets' bottom shelf, 1.47 m; the china cabinet's knob, 1.45 m) keeps a child, whose hand reaches about 1.3 m, to a
