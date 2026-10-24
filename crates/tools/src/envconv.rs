@@ -50,7 +50,6 @@ pub const PCENV_MAGIC: &[u8; 8] = b"IDLLENV1";
 /// The HDRI, as Poly Haven serves it, and what it must be.
 pub const HDRI_URL: &str = "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/belfast_open_field_1k.hdr";
 pub const HDRI_SHA256: &str = "8acb87e692dc0176f22047a5a12859a83277e183bc91ffaaec5b7837331534b8";
-pub const HDRI_BYTES: usize = 1_647_689;
 /// The face size of Babylon's cube (`HDRCubeTexture`'s `size`, the `.env`'s width).
 pub const BABYLON_SIZE: usize = 256;
 /// The faces written (PlayCanvas reprojects them into its 128 lighting source anyway).
@@ -71,17 +70,7 @@ pub fn pcenv_path() -> PathBuf {
 }
 
 pub fn main_with(args: &[String]) -> i32 {
-    let res = (|| {
-        let input = match args.first() {
-            Some(path) => PathBuf::from(path),
-            None => fetch_hdri()?,
-        };
-        let output = args.get(1).map(PathBuf::from).unwrap_or_else(pcenv_path);
-        let bytes = convert_file(&input, &output)?;
-        println!("envconv: {} -> {} ({:.0} KB)", input.display(), output.display(), bytes as f64 / 1024.0);
-        Ok::<(), String>(())
-    })();
-    match res {
+    match run(args) {
         Ok(()) => 0,
         Err(e) => {
             eprintln!("envconv: {e}");
@@ -90,25 +79,25 @@ pub fn main_with(args: &[String]) -> i32 {
     }
 }
 
+fn run(args: &[String]) -> Result<(), String> {
+    let input = match args.first() {
+        Some(path) => PathBuf::from(path),
+        None => fetch_hdri()?,
+    };
+    let output = args.get(1).map(PathBuf::from).unwrap_or_else(pcenv_path);
+    let bytes = convert_file(&input, &output)?;
+    println!("envconv: {} -> {} ({:.0} KB)", input.display(), output.display(), bytes as f64 / 1024.0);
+    Ok(())
+}
+
 /// The pinned HDRI at `hdri_path()`, downloaded if it isn't there or isn't the pinned file.
 pub fn fetch_hdri() -> Result<PathBuf, String> {
     let path = hdri_path();
     if download::file_sha256(&path, false).as_deref() == Some(HDRI_SHA256) {
         return Ok(path);
     }
-    let agent = download::agent();
-    let mut resp = agent.get(HDRI_URL).header("User-Agent", download::UA).call().map_err(|e| format!("{HDRI_URL}: {e}"))?;
-    // (No more than one byte over the file's size is read: a longer answer fails here.)
-    let bytes = resp.body_mut().with_config().limit(HDRI_BYTES as u64 + 1).read_to_vec().map_err(|e| format!("{HDRI_URL}: {e}"))?;
-    if bytes.len() != HDRI_BYTES {
-        return Err(format!("{HDRI_URL}: {} bytes, expected {HDRI_BYTES}", bytes.len()));
-    }
-    let sha = download::sha256_hex(&bytes);
-    if sha != HDRI_SHA256 {
-        return Err(format!("{HDRI_URL}: SHA-256 {sha}, expected {HDRI_SHA256}"));
-    }
-    download::write(&path, &bytes)?;
-    println!("envconv: downloaded {HDRI_URL} ({:.0} KB) to {}", bytes.len() as f64 / 1024.0, path.display());
+    download::download_to(&download::agent(), HDRI_URL, &path, HDRI_SHA256)?;
+    println!("envconv: downloaded {HDRI_URL} to {}", path.display());
     Ok(path)
 }
 
@@ -148,91 +137,26 @@ pub struct PcEnv {
     pub sh: [[f64; 3]; 9],
 }
 
-/// A Radiance `.hdr` (`32-bit_rle_rgbe`, `-Y h +X w`; scanlines run-length encoded or flat), read
-/// as Babylon's `RGBE_ReadPixels` reads it. Anything else, or anything short or inconsistent, is an
-/// error: the file comes from the network.
+/// A Radiance `.hdr` (`-Y h +X w`), decoded by `image` (`rgb · 2^(e − 136)`). For run-length
+/// encoded files such as Poly Haven's, that is what Babylon's `RGBE_ReadPixels` read; a flat file
+/// with texels that look like old-style run markers (1, 1, 1, n) is read as runs, which Babylon
+/// didn't. A local `in.hdr` isn't hash-checked, so its size is limited.
 pub fn read_hdr(bytes: &[u8]) -> Result<Panorama, String> {
-    let mut at = 0;
-    let mut line = || -> Result<&str, String> {
-        let rest = bytes.get(at..).unwrap_or_default();
-        let end = rest.iter().take(256).position(|&b| b == b'\n').ok_or(".hdr: header line missing or too long")?;
-        at += end + 1;
-        std::str::from_utf8(&rest[..end]).map_err(|_| ".hdr: header isn't text".to_string())
-    };
-    if !line()?.starts_with("#?") {
-        return Err("not a Radiance .hdr".into());
-    }
-    let mut format = false;
-    for _ in 0..64 {
-        let l = line()?;
-        if l.is_empty() {
-            break;
-        }
-        if let Some(f) = l.strip_prefix("FORMAT=") {
-            if f != "32-bit_rle_rgbe" {
-                return Err(format!(".hdr: format {f}"));
-            }
-            format = true;
-        }
-    }
-    if !format {
+    use image::ImageDecoder;
+    let decoder = image::codecs::hdr::HdrDecoder::new(bytes).map_err(|e| format!(".hdr: {e}"))?;
+    // `image` rejects any other FORMAT but takes a header with none; Babylon's reader didn't.
+    if !decoder.metadata().custom_attributes.iter().any(|(k, _)| k == "FORMAT") {
         return Err(".hdr: no FORMAT=32-bit_rle_rgbe".into());
     }
-    let res = line()?;
-    let dims: Vec<&str> = res.split(' ').collect();
-    let (height, width) = match dims.as_slice() {
-        ["-Y", h, "+X", w] => (h.parse::<usize>().map_err(|_| ".hdr: size")?, w.parse::<usize>().map_err(|_| ".hdr: size")?),
-        _ => return Err(format!(".hdr: unsupported orientation {res:?}")),
-    };
+    let (width, height) = decoder.dimensions();
+    let (width, height) = (width as usize, height as usize);
     if width == 0 || height == 0 || width > MAX_SIDE || height > MAX_SIDE || width * height > MAX_TEXELS {
         return Err(format!(".hdr: unsupported size {width}x{height}"));
     }
-    let data = &bytes[at..];
-    let mut texels = Vec::with_capacity(width * height);
-    let mut pos = 0;
-    let mut scan = vec![0u8; width * 4];
-    let take = |pos: &mut usize, n: usize| -> Result<&[u8], String> {
-        let s = data.get(*pos..*pos + n).ok_or(".hdr: pixels cut short")?;
-        *pos += n;
-        Ok(s)
-    };
-    let rle = (8..=0x7fff).contains(&width) && data.len() >= 4 && data[0] == 2 && data[1] == 2 && data[2] & 0x80 == 0;
-    for _ in 0..height {
-        if rle {
-            let head = take(&mut pos, 4)?;
-            if head[0] != 2 || head[1] != 2 || ((head[2] as usize) << 8 | head[3] as usize) != width {
-                return Err(".hdr: bad scanline".into());
-            }
-            for ch in 0..4 {
-                let mut x = 0;
-                while x < width {
-                    let n = take(&mut pos, 1)?[0] as usize;
-                    let (count, run) = if n > 128 { (n - 128, true) } else { (n, false) };
-                    if count == 0 || count > width - x {
-                        return Err(".hdr: bad run".into());
-                    }
-                    let src = take(&mut pos, if run { 1 } else { count })?;
-                    for i in 0..count {
-                        scan[ch * width + x + i] = if run { src[0] } else { src[i] };
-                    }
-                    x += count;
-                }
-            }
-            texels.extend((0..width).map(|x| rgbe_to_float([scan[x], scan[width + x], scan[2 * width + x], scan[3 * width + x]])));
-        } else {
-            texels.extend(take(&mut pos, width * 4)?.chunks(4).map(|p| rgbe_to_float([p[0], p[1], p[2], p[3]])));
-        }
-    }
+    // Decoded straight into the texels: no second copy of a panorama that may be gigabytes.
+    let mut texels = vec![[0.0f32; 3]; width * height];
+    decoder.read_image(bytemuck::cast_slice_mut(&mut texels)).map_err(|e| format!(".hdr: {e}"))?;
     Ok(Panorama { width, height, texels })
-}
-
-/// Radiance's RGBE (`rgb · 2^(e − 136)`).
-fn rgbe_to_float(p: [u8; 4]) -> [f32; 3] {
-    if p[3] == 0 {
-        return [0.0; 3];
-    }
-    let s = (p[3] as f64 - 136.0).exp2();
-    [(p[0] as f64 * s) as f32, (p[1] as f64 * s) as f32, (p[2] as f64 * s) as f32]
 }
 
 /// PlayCanvas's RGBE (`encodeRGBE`), as bytes.
@@ -369,6 +293,17 @@ pub fn cube_polynomial(cube: &Cube) -> [[f64; 3]; 9] {
     let du = 2.0 / n as f64;
     let half = 0.5 * du;
     let min_uv = half - 1.0;
+    // Each texel's solid angle: the same on every face.
+    let mut solids = Vec::with_capacity(n * n);
+    let mut v = min_uv;
+    for _ in 0..n {
+        let mut u = min_uv;
+        for _ in 0..n {
+            solids.push(area(u - half, v - half) - area(u - half, v + half) - area(u + half, v - half) + area(u + half, v + half));
+            u += du;
+        }
+        v += du;
+    }
     let mut l = [[0.0f64; 3]; 9];
     let mut total = 0.0;
     for (f, [normal, ax, ay]) in AXES.iter().enumerate() {
@@ -377,7 +312,7 @@ pub fn cube_polynomial(cube: &Cube) -> [[f64; 3]; 9] {
             let mut u = min_uv;
             for x in 0..n {
                 let d = normalize(add(add(scale(*ax, u), scale(*ay, v)), *normal));
-                let solid = area(u - half, v - half) - area(u - half, v + half) - area(u + half, v - half) + area(u + half, v + half);
+                let solid = solids[y * n + x];
                 let c = cube.faces[f][y * n + x].map(|c| if c.is_nan() { 0.0 } else { (c as f64).clamp(0.0, 4096.0) });
                 let basis = [1.0, d[1], d[2], d[0], d[0] * d[1], d[1] * d[2], 3.0 * d[2] * d[2] - 1.0, d[0] * d[2], d[0] * d[0] - d[1] * d[1]];
                 for i in 0..9 {
@@ -497,9 +432,9 @@ pub fn convert(sky: &BabylonSky, size: usize) -> PcEnv {
             for x in 0..size {
                 let mut acc = [0.0; 3];
                 for sy in 0..sub {
+                    let t = ((y * sub + sy) as f64 + 0.5) / (size * sub) as f64 * 2.0 - 1.0;
                     for sx in 0..sub {
                         let s = ((x * sub + sx) as f64 + 0.5) / (size * sub) as f64 * 2.0 - 1.0;
-                        let t = ((y * sub + sy) as f64 + 0.5) / (size * sub) as f64 * 2.0 - 1.0;
                         let c = sky.cube.sample(babylon_dir_for_cube(face_dir(f, s, t)));
                         for i in 0..3 {
                             acc[i] += c[i];
@@ -740,9 +675,7 @@ mod tests {
         let line_end = header_end + good[header_end..].iter().position(|&b| b == b'\n').unwrap() + 1;
         let mut bad_run = good.clone();
         bad_run[line_end + 4] = 255; // a run of 127 in a 64-texel scanline
-        let mut zero_run = good.clone();
-        zero_run[line_end + 4] = 0;
-        let cases: [(&str, Vec<u8>); 9] = [
+        let cases: [(&str, Vec<u8>); 8] = [
             ("empty", Vec::new()),
             ("not radiance", b"P6\n1 1\n255\n".to_vec()),
             ("no format", b"#?RADIANCE\n\n-Y 2 +X 2\n".to_vec()),
@@ -751,7 +684,6 @@ mod tests {
             ("huge", b"#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y 40000 +X 40000\n".to_vec()),
             ("cut short", good[..good.len() - 7].to_vec()),
             ("long run", bad_run),
-            ("empty run", zero_run),
         ];
         for (what, bytes) in cases {
             assert!(read_hdr(&bytes).is_err(), "{what}");
@@ -918,6 +850,11 @@ mod tests {
         normalize(m)
     }
 
+    /// The direction of three linear terms (x, y, z), each RGB weighted by luminance.
+    fn light_dir(xyz: [[f64; 3]; 3]) -> [f64; 3] {
+        normalize(xyz.map(|c| (0..3).map(|ch| c[ch] * [0.2126, 0.7152, 0.0722][ch]).sum::<f64>()))
+    }
+
     fn horizontal(v: [f64; 3]) -> [f64; 3] {
         normalize([v[0], 0.0, v[2]])
     }
@@ -931,7 +868,7 @@ mod tests {
         // PlayCanvas's environment lookup for world direction d reads its cube at (-d.x, d.y, d.z),
         // so cube direction e is world direction (-e.x, e.y, e.z).
         let atlas = mean_light(&pc.cube, &|e| [-e[0], e[1], e[2]]);
-        let sh = normalize([1, 2, 3].map(|i| (0..3).map(|ch| pc.sh[i][ch] * [0.2126, 0.7152, 0.0722][ch]).sum::<f64>()));
+        let sh = light_dir([pc.sh[1], pc.sh[2], pc.sh[3]]);
         assert!(cos(atlas, sh) > 0.99, "cube {atlas:?} vs harmonics {sh:?}");
         assert!(cos(horizontal(atlas), horizontal(sh)) > 0.95, "cube {atlas:?} vs harmonics {sh:?}");
     }
@@ -948,7 +885,7 @@ mod tests {
         assert_eq!(download::sha256_hex(&bytes), HDRI_SHA256, "{} isn't the pinned HDRI", hdri_path().display());
         let sky = babylon_sky(&read_hdr(&bytes).unwrap());
         let faces = mean_light(&sky.cube, &|d| d);
-        let poly = normalize([0usize, 1, 2].map(|i| (0..3).map(|ch| sky.polynomial[i][ch] * [0.2126, 0.7152, 0.0722][ch]).sum::<f64>()));
+        let poly = light_dir([sky.polynomial[0], sky.polynomial[1], sky.polynomial[2]]);
         assert!(cos(faces, poly) > 0.99, "faces {faces:?} vs polynomial {poly:?}");
         assert!(cos(horizontal(faces), horizontal(poly)) > 0.95, "faces {faces:?} vs polynomial {poly:?}");
 

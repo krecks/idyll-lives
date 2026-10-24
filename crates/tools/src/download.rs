@@ -1,5 +1,5 @@
 //! What the tools that fetch pinned files share (`cargo fetch-voice`, `cargo fetch-llm`,
-//! `cargo decoders`): SHA-256 of what came down, gzip, and writes that only land whole.
+//! `cargo decoders`, `cargo envconv`): SHA-256 of what came down, gzip, and writes that only land whole.
 
 use sha2::{Digest, Sha256};
 use std::io::{Read, Write};
@@ -90,16 +90,22 @@ pub fn download_to(agent: &ureq::Agent, url: &str, path: &Path, expected: &str) 
     let mut out = std::io::BufWriter::new(std::fs::File::create(&part).map_err(|e| format!("{}: {e}", part.display()))?);
     let mut hash = Sha256::new();
     let mut buf = vec![0u8; 1 << 16];
-    loop {
-        let n = body.read(&mut buf).map_err(|e| format!("{url}: {e}"))?;
-        if n == 0 {
-            break;
+    let copied = (|| {
+        loop {
+            let n = body.read(&mut buf).map_err(|e| format!("{url}: {e}"))?;
+            if n == 0 {
+                break;
+            }
+            hash.update(&buf[..n]);
+            out.write_all(&buf[..n]).map_err(|e| format!("{}: {e}", part.display()))?;
         }
-        hash.update(&buf[..n]);
-        out.write_all(&buf[..n]).map_err(|e| format!("{}: {e}", part.display()))?;
-    }
-    out.flush().map_err(|e| format!("{}: {e}", part.display()))?;
+        out.flush().map_err(|e| format!("{}: {e}", part.display()))
+    })();
     drop(out);
+    if let Err(e) = copied {
+        let _ = std::fs::remove_file(&part);
+        return Err(e);
+    }
     let actual = format!("{:x}", hash.finalize());
     if actual != expected {
         let _ = std::fs::remove_file(&part);
