@@ -68,7 +68,7 @@ fn run() -> Result<(), String> {
         }
         println!("llm: downloading {name}");
         let target = out.join(name);
-        download::download_to(&agent, &format!("{}/{}", file.from, file.path), &target, file.sha256)?;
+        download::download_to(&agent, &format!("{}/{}", file.from, file.path), &target, file.sha256, None)?;
         if file.pack {
             println!("llm: packing {name}z");
             download::pack(&target, &path)?;

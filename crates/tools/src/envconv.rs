@@ -50,6 +50,8 @@ pub const PCENV_MAGIC: &[u8; 8] = b"IDLLENV1";
 /// The HDRI, as Poly Haven serves it, and what it must be.
 pub const HDRI_URL: &str = "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/belfast_open_field_1k.hdr";
 pub const HDRI_SHA256: &str = "8acb87e692dc0176f22047a5a12859a83277e183bc91ffaaec5b7837331534b8";
+/// Its size: a longer answer is refused as it comes.
+pub const HDRI_BYTES: u64 = 1_647_689;
 /// The face size of Babylon's cube (`HDRCubeTexture`'s `size`, the `.env`'s width).
 pub const BABYLON_SIZE: usize = 256;
 /// The faces written (PlayCanvas reprojects them into its 128 lighting source anyway).
@@ -96,7 +98,7 @@ pub fn fetch_hdri() -> Result<PathBuf, String> {
     if download::file_sha256(&path, false).as_deref() == Some(HDRI_SHA256) {
         return Ok(path);
     }
-    download::download_to(&download::agent(), HDRI_URL, &path, HDRI_SHA256)?;
+    download::download_to(&download::agent(), HDRI_URL, &path, HDRI_SHA256, Some(HDRI_BYTES))?;
     println!("envconv: downloaded {HDRI_URL} to {}", path.display());
     Ok(path)
 }
