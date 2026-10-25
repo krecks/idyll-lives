@@ -24,7 +24,6 @@
  */
 
 import * as pc from './engine';
-import { deviceDriverInfo } from './internals';
 import { BuildPreviews, mergeSurfaces } from './buildPreviews';
 import { GameCamera } from './camera';
 import { Characters, MAX_CHARACTERS } from './characters';
@@ -35,6 +34,7 @@ import { HoverTile, ResizeHandles } from './handles';
 import { HeldFrames } from './heldFrames';
 import { HouseBuilder, type HouseDoor } from './house';
 import { Instances } from './instancing';
+import { deviceDriverInfo } from './internals';
 import { overLayer } from './layers';
 import { Lamps } from './lamps';
 import { contactBlob, LotContents } from './lotContents';

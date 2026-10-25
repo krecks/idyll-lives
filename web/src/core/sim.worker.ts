@@ -13,7 +13,7 @@ import { createSharedSnapshot, SharedSnapshotWriter, type SnapshotLayout } from 
 interface WorkerScope {
   onmessage: ((e: MessageEvent<ToWorker>) => void) | null;
   postMessage(message: FromWorker, transfer?: Transferable[]): void;
-  /** Set by the wasm runtime: it calls this just before a Rust panic traps. */
+  /** Called by the wasm runtime just before a Rust panic traps; set below, where the runtime looks for it. */
   __wasmPanic?(message: string): void;
 }
 const scope = self as WorkerScope;

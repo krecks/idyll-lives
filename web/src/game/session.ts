@@ -46,7 +46,7 @@ import { UiMirror } from './uiUpdates';
 
 declare global {
   interface Window {
-    /** Test hook for automated browser checks: `session.ts` sets it, and only in development builds. */
+    /** What the benches drive the game through (`tools/bench/scene.mjs`); set only in development builds. */
     __osw?: Record<string, unknown>;
   }
 }

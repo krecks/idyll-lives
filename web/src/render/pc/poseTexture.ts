@@ -46,7 +46,7 @@ export class PoseTexture {
   readonly texture: pc.Texture;
   /** The CPU copy (the texture's level 0): `width` texels of 4 floats a row, `height` rows. */
   readonly data: Float32Array;
-  /** The WebGPU band write's origin, rewritten in place (the copy's other fields are made at the call). */
+  /** The WebGPU band write's origin, layout and extent, rewritten in place (no allocations per frame). */
   private readonly origin: [number, number, number] = [0, 0, 0];
   private readonly layout = { offset: 0, bytesPerRow: 0, rowsPerImage: 0 };
   private readonly size = { width: 0, height: 0 };

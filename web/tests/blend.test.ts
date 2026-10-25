@@ -265,7 +265,7 @@ describe('residents crossfade continuity', async () => {
   }
 
   function writeSnapshot(snap: Float32Array, t: number): void {
-    // (The fields this test writes, all of them present in its layout: the layout's own type leaves them optional.)
+    // The layout's own type leaves its fields optional; this test's layout has every one it writes.
     const k = layout.sim as Record<(typeof FIELDS)[number], number>;
     snap[layout.header.speed] = 1;
     snap[layout.header.simCount] = actors.length;

@@ -21,7 +21,7 @@ import type { VoiceParams } from './voices';
 interface WorkerScope {
   onmessage: ((e: MessageEvent<ToVoiceWorker>) => void) | null;
   postMessage(message: FromVoiceWorker, transfer?: Transferable[]): void;
-  /** Set by the wasm runtime: it calls this just before a Rust panic traps. */
+  /** Called by the wasm runtime just before a Rust panic traps; set below, where the runtime looks for it. */
   __wasmPanic?(message: string): void;
 }
 const scope = self as WorkerScope;

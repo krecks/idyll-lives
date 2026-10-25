@@ -11,6 +11,7 @@
 // by `fixtures/record-babylon.ts`, which needs a Babylon reference checkout to run again).
 import { describe, expect, test } from 'bun:test';
 import { readFileSync, existsSync } from 'node:fs';
+import { simFields } from '../src/core/snapshot';
 import { quatYawPitchRoll } from '../src/render/shared/math';
 import { fixture, numbers as recorded, type Numbers } from './fixtures/babylon';
 
@@ -274,7 +275,7 @@ describe('residents', async () => {
     maxSims: MAX_CHARACTERS,
     ticksPerSecond: 20,
     header: { tick: 0, day: 1, minute: 2, speed: 3, simCount: 4, structureVersion: 5 },
-    sim: Object.fromEntries(FIELDS.map((f, i) => [f, i])) as SnapshotLayout['sim'],
+    sim: simFields(FIELDS),
     actions,
     items,
   };

@@ -43,9 +43,9 @@
  */
 
 import * as pc from './engine';
-import { directionalShadows } from './internals';
 import { residentRowFilter, RESIDENT_ROWS_ALL } from './characterMaterial';
 import { Instances } from './instancing';
+import { directionalShadows } from './internals';
 import type { MirrorInstance } from './lotContents';
 import { multiply, transformNormal, transformPoint } from '../shared/math';
 import type { Language } from './shaders/chunks';

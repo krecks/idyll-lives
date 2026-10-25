@@ -112,13 +112,15 @@ function extended(below: AssetEntry | undefined, entry: AssetEntry): AssetEntry 
   return { ...entry, ...((entry.vary ?? below.vary) !== undefined ? { vary: entry.vary ?? below.vary } : {}) };
 }
 
+/** The file references an entry has: every kind of entry has one or two of `URL_FIELDS`. */
+type UrlFields = Partial<Record<(typeof URL_FIELDS)[number], string>>;
+
 /** Makes file references absolute relative to the manifest that declared them, with this build's query. */
 function resolveUrls(entry: AssetEntry, base: URL): AssetEntry {
-  const out = { ...entry };
-  const urls = out as Partial<Record<(typeof URL_FIELDS)[number], string>>;
+  const out = { ...entry } as AssetEntry & UrlFields;
   for (const field of URL_FIELDS) {
-    const value = urls[field];
-    if (value !== undefined) urls[field] = withBuild(new URL(value, base).href);
+    const url = out[field];
+    if (url !== undefined) out[field] = withBuild(new URL(url, base).href);
   }
   return out;
 }

@@ -31,11 +31,22 @@ export function deviceShaders(device: pc.GraphicsDevice): CompiledShader[] {
   return (device as unknown as { shaders?: CompiledShader[] }).shaders ?? [];
 }
 
+/**
+ * What a WebGPU adapter reports (`GPUAdapter.info`): the debug report and the FXAA's `MALI` variant read it.
+ * Named, not a record, so a field the browser stops reporting is a compile error.
+ */
+interface AdapterInfo {
+  vendor?: string;
+  architecture?: string;
+  device?: string;
+  description?: string;
+}
+
 /** The context's driver names: WebGL2's `unmasked*`, WebGPU's adapter (`WebgpuGraphicsDevice.gpuAdapter`). */
 export interface DriverInfo {
   unmaskedRenderer?: string;
   unmaskedVendor?: string;
-  gpuAdapter?: { info?: Record<string, string> };
+  gpuAdapter?: { info?: AdapterInfo };
 }
 
 /** `device`'s driver names, for the FXAA's `MALI` variant and the debug report. */
