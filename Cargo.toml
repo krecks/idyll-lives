@@ -4,7 +4,7 @@ members = ["crates/sim-core", "crates/sim-wasm", "crates/tools", "crates/voice",
 
 [workspace.package]
 edition = "2024"
-version = "0.4.1"
+version = "0.4.2"
 license = "GPL-3.0-or-later"
 
 [workspace.dependencies]
