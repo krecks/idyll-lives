@@ -74,6 +74,9 @@ export class CountryRoads {
   readonly links: Rect[] = [];
   /** Each road's bounding box (grown by its verge), for quick misses in `near`. */
   private readonly boxes: [number, number, number, number][] = [];
+  /** `near`'s last question and answer. */
+  private readonly asked = [NaN, NaN];
+  private answer: NearRoad | null = null;
 
   constructor(
     private readonly land: RoadLand,
@@ -143,8 +146,21 @@ export class CountryRoads {
     });
   }
 
+  /** Whether (x, z) is on a side road (`links`), or within `margin` m of one. */
+  onLink(x: number, z: number, margin = 0): boolean {
+    return this.links.some((r) => x > r.x - margin && x < r.x + r.w + margin && z > r.z - margin && z < r.z + r.d + margin);
+  }
+
   /** The road nearest a point within its width and verge (null: none that close). */
   near(x: number, z: number): NearRoad | null {
+    // (Asked twice at a point in a row, by the land's height and its colour: answered once.)
+    if (x === this.asked[0] && z === this.asked[1]) return this.answer;
+    this.asked[0] = x;
+    this.asked[1] = z;
+    return (this.answer = this.nearest(x, z));
+  }
+
+  private nearest(x: number, z: number): NearRoad | null {
     let best: NearRoad | null = null;
     this.roads.forEach((road, r) => {
       const [x0, z0, x1, z1] = this.boxes[r];

@@ -1,13 +1,12 @@
-# The ground cover, the woods' rocks and the selection marker: the lawn's grass tuft (`model.grassTuft`) and
-# wildflowers (`model.flowers`), drawn by the thousand as thin instances on every unpaved tile and round the town
-# (render/shared/nature.ts `lawns`); the rock scattered in the woods (`model.rock`, nature.ts `forests`, always
+# The ground cover, the woods' rocks and the selection marker: the lawn's wildflowers (`model.flowers`), drawn by
+# the thousand as thin instances on the town's tiles and round it (render/shared/nature.ts `lawns`; the grass
+# itself is built on the GPU, render/pc/grass.ts); the rock scattered in the woods (`model.rock`, nature.ts `forests`, always
 # its far version there, without a shadow); and the sparkle star over the selected resident (`model.marker`,
 # render/pc/selectionMarker.ts). Notes: ground.md.
 #
-# The lawn's two stay cheap (the tuft 30 triangles, of which the camera draws half, where the old part's 36 were
-# mostly degenerate cone tips and hidden caps; the flowers 266 in one draw call where the old part took 192 in
-# two): every part on `foliage`, which the nature shader sways and tints per instance, the flowers' heads with
-# their stems. Each has a far version (`far_of`). The rock is two lumps cut flat a little under the ground,
+# The flowers stay cheap (266 triangles in one draw call where the old part took 192 in two): every part on
+# `foliage`, which the nature shader sways and tints per instance, the heads with their stems. They have a far
+# version (`far_of`). The rock is two lumps cut flat a little under the ground,
 # weathered, with pebbles at its foot; its far version (what the woods draw) 56 triangles. The marker is one closed pillow-shaped
 # star, which the game draws in its own unlit material with an outline pushed out along its normals (inverted
 # hull): built smooth, its normals worked out from its shape, its origin at its middle, as the old part's.
@@ -29,11 +28,6 @@ import gamekit as G  # noqa: E402
 from gamekit.far import far_of, low  # noqa: E402
 
 M = G.Palette(
-    # the grass tuft: the old part's three greens and the fourth
-    blade=('#7C9E44', 'foliage'),
-    blade_light=('#8AAE4C', 'foliage'),
-    blade_pale=('#98BA56', 'foliage'),
-    blade_mid=('#84A648', 'foliage'),
     # the wildflowers: on `foliage` too, so the heads sway with their stems (one draw call)
     leaf=('#5E8436', 'foliage'),
     stem=('#4F7A30', 'foliage'),
@@ -128,30 +122,6 @@ def blade(name, base, yaw, lean, bend, length, width, material, mid=0.5, joint=T
     faces = front + [tuple(n + i for i in reversed(f)) for f in front]
     # Flat, its normals bent to the sky: upright, its faces drew dark against the lawn from above.
     return _mesh(name, side + side, faces, material, smooth=False, sky=SKY, recalc=False)
-
-
-# ---- the grass tuft --------------------------------------------------------------------------------------------
-
-def grassTuft():
-    """Four bent blades from a few millimetres round the middle, leaning out, in four greens (the old part's
-    three cones and the fourth colour), and three short, narrow ones between them, the new growth: 30 triangles,
-    15 of them facing the camera (the old four: 24)."""
-    rng = random.Random(41)
-    colours = [M.blade, M.blade_light, M.blade_pale, M.blade_mid]
-    for i in range(4):
-        yaw = i * 90 + rng.uniform(-25, 25)
-        r = rng.uniform(0.003, 0.008)
-        base = (math.cos(math.radians(yaw)) * r, math.sin(math.radians(yaw)) * r)
-        blade(f'blade{i}', base, yaw, rng.uniform(4, 8), rng.uniform(10, 16), rng.uniform(0.27, 0.31),
-              rng.uniform(0.032, 0.04), colours[i])
-    # (drawn after the four, so they stand where they did)
-    for i in range(3):
-        yaw = 45 + i * 120 + rng.uniform(-20, 20)
-        r = rng.uniform(0.002, 0.005)
-        base = (math.cos(math.radians(yaw)) * r, math.sin(math.radians(yaw)) * r)
-        blade(f'short{i}', base, yaw, rng.uniform(13, 18), 0, rng.uniform(0.13, 0.16), rng.uniform(0.02, 0.026),
-              colours[(i + 1) % 4], joint=False)
-    return G.settle([G.join_all('grassTuft')])
 
 
 # ---- the wildflowers -------------------------------------------------------------------------------------------
@@ -518,12 +488,11 @@ def marker():
 
 FAMILY = G.Family(
     'ground', M,
-    [G.Model('grassTuft', grassTuft, size=(0.121, 0.293, 0.135), key='model.grassTuft', far=far_of(grassTuft)),
-     G.Model('flowers', flowers, size=(0.143, 0.274, 0.165), key='model.flowers', far=far_of(flowers)),
+    [G.Model('flowers', flowers, size=(0.143, 0.274, 0.165), key='model.flowers', far=far_of(flowers)),
      G.Model('rock', rock, size=(1.137, 0.55, 0.829), key='model.rock', centre=ROCK_CENTRE, floor=False, far=far_of(rock),
              tolerance=0.05, sink=-GROUND),
      G.Model('marker', marker, size=(0.23, 0.34, 0.064), key='model.marker', floor=False, sink=0.17)],
-    comment='The lawn\'s grass tuft and wildflowers, the woods\' rocks and the selection marker, built in '
+    comment='The lawn\'s wildflowers, the woods\' rocks and the selection marker, built in '
             'Blender (tools/art/blender/families/ground.py).',
 )
 

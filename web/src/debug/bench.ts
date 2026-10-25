@@ -184,7 +184,7 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
   renderer.measureGpu(b.gpu, 'bench');
   renderer.setFrameProbe({
     before(now) {
-      const t = frozen ? b.at : (now - t0) / 1000;
+      const t = frozen || b.hold ? b.at : (now - t0) / 1000;
       if (mirror) {
         const m = MIRROR_PATH;
         const alpha = mirror.alpha + m.turn + (b.cam === 'mirror' ? m.swing * Math.sin((2 * Math.PI * t) / m.period) : 0);
@@ -193,7 +193,10 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
         const s = Math.sin(m.beta);
         const g = mirror.glass;
         renderer.setCameraPose({ alpha, beta: m.beta, radius: m.radius, target: [g[0] + k * Math.cos(alpha) * s, g[1] + k * Math.cos(m.beta), g[2] + k * Math.sin(alpha) * s] });
-      } else renderer.setCameraPose({ alpha: START_ALPHA + (2 * Math.PI * t) / path.period, beta: path.beta, radius: path.radius, target: centre });
+      } else {
+        const o = b.orbit;
+        renderer.setCameraPose({ alpha: START_ALPHA + (2 * Math.PI * t) / path.period, beta: o.beta ?? path.beta, radius: o.radius ?? path.radius, target: [centre[0] + o.tx, centre[1], centre[2] + o.tz] });
+      }
     },
     after(start, updated, end, c: FrameCounts) {
       if (!measuring) return;

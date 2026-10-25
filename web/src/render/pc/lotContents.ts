@@ -29,6 +29,7 @@ import { ItemLayer } from './items';
 import { shadowOnlyLayer } from './layers';
 import { MaterialLibrary } from './materials';
 import { buildModel, disposeTemplate, glowByInstance, type MirrorSurface, type ModelTemplate } from './models';
+import type { GrassPusher } from './grass';
 import { installNature, Landscape, setWind, Sky, windStill, type RoadBuilder } from './nature';
 import { ObjectMotion, writeInstance, type MovingObject, type PopTarget } from './objectMotion';
 import { ObjectShadows, type ShadowSource } from './objectShadows';
@@ -256,7 +257,7 @@ export class LotContents {
     const ticket = ++this.natureTicket[layer];
     let set = this.natures.get(key);
     if (!set) {
-      const landscape = new Landscape(world, this.quality.lawnDensity, this.quality.streetLod);
+      const landscape = new Landscape(world, this.quality.lawnDensity, this.quality.streetLod, this.quality.grass);
       const created: NatureSet = { key, landscape, draws: [], casters: [], only: new Map(), users: new Set(), pending: 0, ready: Promise.resolve(), refreshing: Promise.resolve() };
       created.ready = landscape.build(this.app, this.root, this.deps.assets, world, () => this.hooks.pace(), buildRoads).then((nature) => {
         perfTime('nature: meshes', () => {
@@ -426,11 +427,21 @@ export class LotContents {
     setWind(this.app, on ? 0 : 1);
   }
 
-  /** Each frame, game or overview, once the camera is placed: the sky round it, the clouds' drift (`dt` ms). */
+  /** Each frame, game or overview, once the camera is placed: the sky round it, the clouds' drift (`dt` ms), the grass in view. */
   frame(dt: number): void {
     const eye = toGame(this.camera.getPosition(), this.eye);
     this.sky.follow(eye.x, eye.y, eye.z);
     if (!this.reducedMotion) this.sky.drift(dt);
+    const camera = this.camera.camera;
+    if (!camera) return;
+    const { world, town } = this.natureIn;
+    world?.landscape.grassFrame(eye, camera);
+    if (town && town !== world) town.landscape.grassFrame(eye, camera);
+  }
+
+  /** The residents pushing the game world's grass aside (the nearest the eye first). */
+  pushGrass(pushers: readonly GrassPusher[]): void {
+    this.natureIn.world?.landscape.pushGrass(pushers);
   }
 
   // --- objects -------------------------------------------------------------------------

@@ -48,7 +48,7 @@ import { birdActivity, type SeenBird, type ViewRect } from '../types';
 import { angleDelta as turn } from './angles';
 import { compose, multiply, quatYawPitchRoll, rotationX, rotationZ, scaling, transformNormal, transformPoint, translation, type Quat } from './math';
 import { entrySpace, placementVariation } from './modelEntry';
-import { hash, lawnMask, mulberry32, smoothstep, unlawned, windDirection, type PlantPlacement } from './nature';
+import { bareTiles, hash, mulberry32, smoothstep, windDirection, type PlantPlacement } from './nature';
 import { WALL_HEIGHT } from './walls';
 
 export type BirdSpecies = 'blueTit' | 'chaffinch' | 'warbler' | 'blackbird' | 'collaredDove';
@@ -783,11 +783,9 @@ export class Birds<L extends BirdLook = BirdLook> {
     const fill = (x0: number, z0: number, x1: number, z1: number) => {
       for (let z = Math.max(0, Math.floor(z0)); z < Math.min(d, Math.ceil(z1)); z++) for (let x = Math.max(0, Math.floor(x0)); x < Math.min(w, Math.ceil(x1)); x++) blocked[z * w + x] = 1;
     };
-    // Where no lawn grows (paved, fields, indoors, under furniture), and the patios.
-    const { hidden } = lawnMask(world);
-    for (let i = 0; i < w * d; i++) if (hidden[i]) blocked[i] = 1;
-    for (const r of unlawned(world)) fill(r.x, r.z, r.x + r.w, r.z + r.d);
-    for (const [x, z] of world.floors ?? []) if (z < d) blocked[z * w + x] = 1;
+    // Where no lawn grows (paved, fields, indoors, under furniture, the patios).
+    const bare = bareTiles(world);
+    for (let i = 0; i < w * d; i++) if (bare[i]) blocked[i] = 1;
     // Houses: their walls up to their roofs' tops (the viewed one's roof as built, if known).
     const boxes: number[] = [];
     for (const p of world.plots) {

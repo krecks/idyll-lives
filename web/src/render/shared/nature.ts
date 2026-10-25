@@ -1,7 +1,7 @@
 /**
  * The engine-neutral half of the landscape round the town (`pc/nature.ts` draws
  * it): the land's shape (rolling hills, a valley's rim, mountains, fields, a sea or a lake, levelled
- * under the country roads), the terrain's colours, where the woods and the lawn's tufts grow, the
+ * under the country roads), the terrain's colours, where the woods and the lawn's flowers grow, the
  * lawn hidden indoors, the garden dressing split into species, and the wind's numbers as the
  * plant shaders sway them. Everything is generated deterministically from the town's seed, so a
  * loaded game looks the same, with the same plants in the same order.
@@ -28,6 +28,10 @@ const TERRAIN_SEGMENTS = 260;
 const SHADOW_RANGE = 28;
 /** Mountains: no trees above about this height (m). */
 const TREELINE = 12;
+/** The random draws a lawn tuft took (its scale, turn and spot), still taken so the flowers stand where they did. */
+const TUFT_DRAWS = 4;
+/** No lawn this close to a road's edge (m): the grass's blades lean, and would reach over it. */
+const LAWN_CLEAR = 0.6;
 /** Height of the sea or a lake (m); the shore is where the land meets it. */
 export const WATER_Y = -0.35;
 /** Sand from the shoreline up the bank (m). */
@@ -35,14 +39,13 @@ const BEACH = 8;
 /**
  * In the game, plants are drawn in groups the camera leaves out when they're out of view (a model
  * drawn as one mesh over the whole landscape never is): the woods in this many sectors round the
- * town, lawn tufts in squares of this size (m). A model part with fewer triangles in all than
- * `SPLIT_TRIANGLES` (bark, flowers) stays one mesh: the draw calls more would cost the main thread
- * more than the triangles they save. Each group is a mesh of its own, and every mesh costs the main
- * thread a little each frame whether drawn or not, so the squares are wide. The menus' town, which
+ * town. A model part with fewer triangles in all than `SPLIT_TRIANGLES` (bark, flowers) stays
+ * one mesh: the draw calls more would cost the main thread more than the triangles they save. Each
+ * group is a mesh of its own, and every mesh costs the main thread a little each frame whether
+ * drawn or not, so the sectors are wide. The menus' town, which
  * has the whole landscape in view, draws each part whole.
  */
 const FOREST_SECTORS = 8;
-const TUFT_CELL = 64;
 export const SPLIT_TRIANGLES = 36_000;
 
 /** A tree, bush or hedge as placed (the garden's, the street's, the woods'): its model, where it stands, its scale (x, up, z) and turn. */
@@ -76,17 +79,20 @@ export function hash(x: number, z: number, seed: number): number {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
-function valueNoise(x: number, z: number, seed: number): number {
+/** Value noise, 0..1; with a `period`, its lattice wraps round every `period` cells (a tileable noise). */
+function valueNoise(x: number, z: number, seed: number, period = 0): number {
   const xi = Math.floor(x);
   const zi = Math.floor(z);
   const xf = x - xi;
   const zf = z - zi;
   const u = xf * xf * (3 - 2 * xf);
   const v = zf * zf * (3 - 2 * zf);
-  const a = hash(xi, zi, seed);
-  const b = hash(xi + 1, zi, seed);
-  const c = hash(xi, zi + 1, seed);
-  const d = hash(xi + 1, zi + 1, seed);
+  const [x0, z0] = period ? [((xi % period) + period) % period, ((zi % period) + period) % period] : [xi, zi];
+  const [x1, z1] = period ? [(x0 + 1) % period, (z0 + 1) % period] : [xi + 1, zi + 1];
+  const a = hash(x0, z0, seed);
+  const b = hash(x1, z0, seed);
+  const c = hash(x0, z1, seed);
+  const d = hash(x1, z1, seed);
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
 }
 
@@ -107,12 +113,13 @@ function ridged(x: number, z: number, seed: number, octaves = 5): number {
   return Math.min(1, sum / 0.9);
 }
 
-function fbm(x: number, z: number, seed: number, octaves = 4): number {
+/** Fractal noise: `octaves` of `valueNoise`, each twice as fine and half as strong (0 .. 1 − 0.5^octaves); with a `period` (cells of the first), tileable. */
+export function fbm(x: number, z: number, seed: number, octaves = 4, period = 0): number {
   let sum = 0;
   let amp = 0.5;
   let freq = 1;
   for (let i = 0; i < octaves; i++) {
-    sum += amp * valueNoise(x * freq, z * freq, seed + i * 17);
+    sum += amp * valueNoise(x * freq, z * freq, seed + i * 17, period * freq);
     amp *= 0.5;
     freq *= 2;
   }
@@ -145,6 +152,26 @@ function lerp(a: Rgb, b: Rgb, t: number, out: Rgb): void {
   out.b = a.b + (b.b - a.b) * t;
 }
 
+/** The terrain's colours: a world's four greens (`LandscapeParams.grass`), and the rest. */
+function terrainPalette(greens: readonly string[]) {
+  const [lush, grass, meadow, hill] = greens.map(hex);
+  return {
+    lush,
+    grass,
+    meadow,
+    hill,
+    dirt: hex('#7C6748'),
+    sand: hex('#D8C89A'),
+    wetSand: hex('#A99A72'),
+    rock: hex('#7A7064'),
+    snow: hex('#F1F3F4'),
+    alpine: hex('#8FA266'),
+    crops: ['#C9B45C', '#7E6142', '#7A9C44', '#B5A35A', '#6C8A3C'].map(hex),
+    furrow: hex('#5F4733'),
+  };
+}
+type TerrainPalette = ReturnType<typeof terrainPalette>;
+
 // ---- Placements ---------------------------------------------------------------------
 
 /** A placement's matrix: scaled, turned `yaw` about up, at (x, y, z) (`compose`, `math.ts`). */
@@ -168,15 +195,14 @@ export interface Woods {
   sector: (x: number, z: number) => string;
 }
 
-/** The lawn as placed (`LandscapeLayout.lawns`): each model's matrices, the town tile under each (-1 outside it), and the groups the game draws it in. */
+/** The lawn's flowers as placed (`LandscapeLayout.lawns`): each model's matrices, and the town tile under each (-1 outside it). */
 export interface LawnPlacement {
   key: string;
   matrices: Float32Array[];
   tiles: number[];
-  cell?: (x: number, z: number) => string;
 }
 
-/** Lawn tufts or flowers as drawn: each instance's original matrix and town tile (-1 outside the town), its matrix as drawn (`shown`) and whether it's hidden. */
+/** Lawn flowers as drawn: each instance's original matrix and town tile (-1 outside the town), its matrix as drawn (`shown`) and whether it's hidden. */
 export interface LawnLayer<D> {
   /** What draws them (each engine's own). */
   draws: D[];
@@ -192,6 +218,29 @@ export interface LawnMask {
   /** 1 indoors or under furniture; on a tile split by a diagonal wall, 2 or 3: only its half 0 or 1 indoors. */
   hidden: Uint8Array;
   splitAxis: Map<number, 'dp' | 'dn'>;
+}
+
+/** Which half of a tile split by a diagonal wall (`axis`) a point (`fx`, `fz` within the tile) is in: a 'dp' wall's half 0 is fz < fx, a 'dn' wall's fx + fz < 1. */
+export function splitHalf(axis: 'dp' | 'dn', fx: number, fz: number): 0 | 1 {
+  return axis === 'dp' ? (fz < fx ? 0 : 1) : fx + fz < 1 ? 0 : 1;
+}
+
+/**
+ * Per tile of the town's ground, where no lawn grows now: `lawnMask`'s hidden tiles (2 or 3 on a
+ * split tile: only that half), and 1 on its streets, paths and fields (`unlawned`) and its patios
+ * (floor coverings outdoors). The grass's mask (`shared/grass.ts`) and the birds' lawn read it.
+ */
+export function bareTiles(world: WorldStructure, mask: LawnMask = lawnMask(world)): Uint8Array {
+  const w = world.width;
+  const d = groundDepth(world);
+  const bare = mask.hidden.slice(0, w * d);
+  for (const r of unlawned(world)) {
+    for (let z = Math.max(0, Math.floor(r.z)); z < Math.min(d, Math.ceil(r.z + r.d)); z++) {
+      for (let x = Math.max(0, Math.floor(r.x)); x < Math.min(w, Math.ceil(r.x + r.w)); x++) bare[z * w + x] = 1;
+    }
+  }
+  for (const [x, z] of world.floors ?? []) if (x >= 0 && z >= 0 && x < w && z < d) bare[z * w + x] = 1;
+  return bare;
 }
 
 /** The town's ground where no lawn grows at all: its streets, paths and fields (the birds forage on the lawn). */
@@ -218,9 +267,9 @@ export function lawnMask(world: WorldStructure): LawnMask {
 }
 
 /**
- * Hides the tufts and flowers of `layers` on the tiles `mask` hides them on (`refreshLawn`), and
- * shows the rest; `upload` is called with each layer whose matrices changed. On a tile split by a
- * diagonal wall, each tuft follows the half it stands in.
+ * Hides the flowers of `layers` on the tiles `mask` hides them on (`refreshLawn`), and shows the
+ * rest; `upload` is called with each layer whose matrices changed. On a tile split by a diagonal
+ * wall, each follows the half it stands in.
  */
 export function hideLawn<D>(layers: readonly LawnLayer<D>[], { width, hidden, splitAxis }: LawnMask, upload: (layer: LawnLayer<D>) => void): void {
   for (const layer of layers) {
@@ -229,12 +278,12 @@ export function hideLawn<D>(layers: readonly LawnLayer<D>[], { width, hidden, sp
       const t = layer.tiles[k];
       let hide = t >= 0 ? hidden[t] : 0;
       if (hide > 1) {
-        // The tuft's position within its tile decides its half.
+        // The flower's position within its tile decides its half.
         const fx = layer.base[k * 16 + 12] - (t % width);
         const fz = layer.base[k * 16 + 14] - Math.floor(t / width);
         const axis = splitAxis.get(t) ?? 'dp';
-        const half = axis === 'dp' ? (fz < fx ? 0 : 1) : fx + fz < 1 ? 0 : 1;
-        // Tufts right at the wall would poke through it.
+        const half = splitHalf(axis, fx, fz);
+        // Flowers right at the wall would poke through it.
         const nearWall = (axis === 'dp' ? Math.abs(fx - fz) : Math.abs(fx + fz - 1)) < 0.17;
         hide = half === hide - 2 || nearWall ? 1 : 0;
       }
@@ -293,7 +342,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   private woodsAsked: { at: string; plants: readonly PlantPlacement[] } | null = null;
 
   /**
-   * `lawnDensity`: the share of the lawn's tufts and flowers drawn (Low: half); `lawnLod` 1 draws
+   * `lawnDensity`: the share of the lawn's flowers drawn (Low: half); `lawnLod` 1 draws
    * them in their far versions (Low, as the street's models: `QualitySettings.streetLod`).
    */
   constructor(
@@ -434,17 +483,6 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    * into `colors`.
    */
   protected async shadeTerrain(positions: Float32Array | number[], colors: Float32Array, pace?: () => Promise<void>): Promise<void> {
-    // Lush, slightly yellow-green lawn (the classic life-sim look); greener on the hills. Each
-    // world has its own greens.
-    const [lush, grass, meadow, hill] = this.land.grass.map(hex);
-    const dirt = hex('#7C6748');
-    const sand = hex('#D8C89A');
-    const wetSand = hex('#A99A72');
-    const rock = hex('#7A7064');
-    const snow = hex('#F1F3F4');
-    const alpine = hex('#8FA266');
-    const crops = ['#C9B45C', '#7E6142', '#7A9C44', '#B5A35A', '#6C8A3C'].map(hex);
-    const furrow = hex('#5F4733');
     const tmp: Rgb = { r: 0, g: 0, b: 0 };
     let seen = 0;
     for (let i = 0, c = 0; i < positions.length; i += 3, c += 4) {
@@ -453,44 +491,76 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
       const z = positions[i + 2];
       const h = this.heightAt(x, z);
       positions[i + 1] = h;
-      const patch = fbm(x * 0.06, z * 0.06, this.seed + 99, 3);
-      const fine = fbm(x * 0.21, z * 0.21, this.seed + 31, 2);
-      lerp(lush, grass, smoothstep(0.3, 0.55, fine), tmp);
-      lerp(tmp, meadow, smoothstep(0.5, 0.75, patch), tmp);
-      lerp(tmp, hill, smoothstep(1, 10, h), tmp);
-      // Worn, earthy patches: sparse, and more common on the flat ground near the town.
-      const bare = smoothstep(0.66, 0.8, fbm(x * 0.09 + 13, z * 0.09 - 7, this.seed + 5, 3)) * (1 - smoothstep(2, 8, h));
-      lerp(tmp, dirt, bare * 0.85, tmp);
-      // Farmland: a patchwork of fields (wheat, ploughed earth, green crops) round the town.
-      const cell = this.fieldCell(x, z);
-      if (cell) {
-        const crop = crops[Math.floor(cell.kind * crops.length)];
-        lerp(tmp, crop, cell.weight * 0.9, tmp);
-        // Ploughed and planted fields show their furrows.
-        if (crop !== crops[0]) lerp(tmp, furrow, cell.weight * 0.35 * Math.max(0, Math.sin(cell.v * Math.PI * 1.4)), tmp);
-      }
-      // Mountains: bare rock above the trees and on steep faces, snow on the tops.
-      const top = this.land.mountains;
-      if (top) {
-        const steep = Math.hypot(this.heightAt(x + 1.5, z) - h, this.heightAt(x, z + 1.5) - h) / 1.5;
-        // Pale alpine meadow above the trees, then rock, then snow.
-        lerp(tmp, alpine, smoothstep(TREELINE * 0.8, TREELINE * 1.25, h + fine * 6) * 0.8, tmp);
-        lerp(tmp, rock, Math.max(smoothstep(top * 0.16, top * 0.28, h + fine * 12), smoothstep(0.7, 1.2, steep) * smoothstep(8, 18, h)) * 0.92, tmp);
-        lerp(tmp, snow, smoothstep(top * 0.33, top * 0.45, h + patch * 20) * (1 - smoothstep(1.5, 2.6, steep) * 0.5), tmp);
-      }
-      // A worn verge of dirt and gravel along the roads.
-      const road = this.roads.near(x, z);
-      if (road) lerp(tmp, dirt, 0.45 * (1 - smoothstep(road.width / 2, road.width / 2 + 2.2, road.dist)), tmp);
-      // Sand along the water, darker where it is wet.
-      const e = this.waterEdge(x, z);
-      if (e > -BEACH) {
-        lerp(tmp, e > -1.5 ? wetSand : sand, smoothstep(-BEACH, -BEACH * 0.45, e), tmp);
-      }
+      this.terrainColour(x, z, h, tmp);
       colors[c] = tmp.r;
       colors[c + 1] = tmp.g;
       colors[c + 2] = tmp.b;
       colors[c + 3] = 1;
     }
+  }
+
+  /** The terrain's palette (`terrainPalette`), made once. */
+  private palette: TerrainPalette | null = null;
+
+  /**
+   * The terrain's colour at (x, z), `h` high, into `out` (sRGB; it multiplies the grass detail
+   * texture), and how much of it is lawn, 0..1 (the grass grows there: not on worn patches,
+   * fields, rock, snow, road verges or sand; `shared/grass.ts`).
+   */
+  terrainColour(x: number, z: number, h: number, out: Rgb): number {
+    // Lush, slightly yellow-green lawn (the classic life-sim look); greener on the hills. Each
+    // world has its own greens.
+    const P = (this.palette ??= terrainPalette(this.land.grass));
+    // (Asked first, right after the caller's `heightAt` here: the mountains' slope below asks other points, and `near` keeps only its last answer.)
+    const road = this.roads.near(x, z);
+    let lawn = 1;
+    const patch = fbm(x * 0.06, z * 0.06, this.seed + 99, 3);
+    const fine = fbm(x * 0.21, z * 0.21, this.seed + 31, 2);
+    lerp(P.lush, P.grass, smoothstep(0.3, 0.55, fine), out);
+    lerp(out, P.meadow, smoothstep(0.5, 0.75, patch), out);
+    lerp(out, P.hill, smoothstep(1, 10, h), out);
+    // Worn, earthy patches: sparse, and more common on the flat ground near the town.
+    const bare = smoothstep(0.66, 0.8, fbm(x * 0.09 + 13, z * 0.09 - 7, this.seed + 5, 3)) * (1 - smoothstep(2, 8, h));
+    lerp(out, P.dirt, bare * 0.85, out);
+    lawn *= 1 - bare;
+    // Farmland: a patchwork of fields (wheat, ploughed earth, green crops) round the town.
+    const cell = this.fieldCell(x, z);
+    if (cell) {
+      const crop = P.crops[Math.floor(cell.kind * P.crops.length)];
+      lerp(out, crop, cell.weight * 0.9, out);
+      // Ploughed and planted fields show their furrows.
+      if (crop !== P.crops[0]) lerp(out, P.furrow, cell.weight * 0.35 * Math.max(0, Math.sin(cell.v * Math.PI * 1.4)), out);
+      lawn *= 1 - cell.weight;
+    }
+    // Mountains: bare rock above the trees and on steep faces, snow on the tops.
+    const top = this.land.mountains;
+    if (top) {
+      const steep = Math.hypot(this.heightAt(x + 1.5, z) - h, this.heightAt(x, z + 1.5) - h) / 1.5;
+      // Pale alpine meadow above the trees, then rock, then snow.
+      lerp(out, P.alpine, smoothstep(TREELINE * 0.8, TREELINE * 1.25, h + fine * 6) * 0.8, out);
+      const rocky = Math.max(smoothstep(top * 0.16, top * 0.28, h + fine * 12), smoothstep(0.7, 1.2, steep) * smoothstep(8, 18, h)) * 0.92;
+      lerp(out, P.rock, rocky, out);
+      const snowy = smoothstep(top * 0.33, top * 0.45, h + patch * 20) * (1 - smoothstep(1.5, 2.6, steep) * 0.5);
+      lerp(out, P.snow, snowy, out);
+      lawn *= (1 - rocky) * (1 - snowy);
+    }
+    // A worn verge of dirt and gravel along the roads (no grass on them, nor leaning over their edge).
+    if (road) {
+      const verge = 1 - smoothstep(road.width / 2, road.width / 2 + 2.2, road.dist);
+      lerp(out, P.dirt, 0.45 * verge, out);
+      lawn *= 1 - verge;
+      if (road.dist < road.width / 2 + LAWN_CLEAR) lawn = 0;
+    }
+    // The side roads joining the streets' ends, flat on the apron.
+    if (this.roads.onLink(x, z, LAWN_CLEAR)) lawn = 0;
+    // Sand along the water, darker where it is wet.
+    const e = this.waterEdge(x, z);
+    if (e > -BEACH) {
+      const sandy = smoothstep(-BEACH, -BEACH * 0.45, e);
+      lerp(out, e > -1.5 ? P.wetSand : P.sand, sandy, out);
+      lawn *= 1 - sandy;
+    }
+    return lawn;
   }
 
   /**
@@ -583,28 +653,25 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   }
 
   /**
-   * Grass tufts and wildflowers on the town's tiles. Every unpaved tile gets some; the ones
-   * indoors or under furniture are hidden by `refreshLawn` (rooms and furniture change in build mode).
+   * Wildflowers on the town's tiles and round it (the grass itself is drawn on the GPU,
+   * `shared/grass.ts`). The ones indoors or under furniture are hidden by `refreshLawn` (rooms and
+   * furniture change in build mode). The draws are the ones the lawn's tufts were placed with, in
+   * their order, so the flowers stand where they always have.
    */
   protected async lawns(world: WorldStructure, pace?: () => Promise<void>): Promise<LawnPlacement[]> {
     const rand = mulberry32(this.seed ^ 0x1a3d);
     const covered = unlawned(world);
     const onPavement = (x: number, z: number) => covered.some((r) => x >= r.x && x < r.x + r.w && z >= r.z && z < r.z + r.d);
-    const tufts: Float32Array[] = [];
     const flowers: Float32Array[] = [];
-    const tuftTiles: number[] = [];
     const flowerTiles: number[] = [];
     for (let z = 0; z < groundDepth(world); z++) {
       if (z % 4 === 0) await pace?.();
       for (let x = 0; x < world.width; x++) {
         const i = z * world.width + x;
         if (onPavement(x + 0.5, z + 0.5)) continue;
-        // Tufts are a few thin blades each: a dense, soft lawn.
+        // (Where the tufts were, before the grass: one or two a tile.)
         const n = rand() < 0.5 ? 2 : 1;
-        for (let k = 0; k < n; k++) {
-          tufts.push(scatter(x, z, rand, 0.7 + rand() * 0.6));
-          tuftTiles.push(i);
-        }
+        for (let k = 0; k < n * TUFT_DRAWS; k++) rand();
         if (rand() < 0.06) {
           flowers.push(scatter(x, z, rand, 0.8 + rand() * 0.5));
           flowerTiles.push(i);
@@ -620,28 +687,20 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
       if (dist === 0 || rand() < dist / 40 || this.waterEdge(x, z) > -BEACH * 0.6) continue;
       const road = this.roads.near(x, z);
       if (road && road.dist < road.width / 2 + 0.3) continue;
-      const m = scatter(x - 0.5, z - 0.5, rand, 0.8 + rand() * 0.7, this.heightAt(x, z));
-      if (rand() < 0.1) {
-        flowers.push(m);
-        flowerTiles.push(-1);
-      } else {
-        tufts.push(m);
-        tuftTiles.push(-1);
-      }
+      // (In this order, as ever: the scale, the turn, the spot, then whether it's a flower; nine in ten were tufts.)
+      const scale = 0.8 + rand() * 0.7;
+      const yaw = rand() * Math.PI * 2;
+      const px = x - 0.5 + rand();
+      const pz = z - 0.5 + rand();
+      if (rand() >= 0.1 || this.roads.onLink(px, pz)) continue;
+      flowers.push(placed(scale, scale, scale, yaw, px, this.heightAt(x, z), pz));
+      flowerTiles.push(-1);
     }
     // A lighter lawn keeps every so many of them, the same ones each time (the placement above is unchanged).
     const d = this.lawnDensity;
     const thin = <T>(list: T[]) => (d >= 1 ? list : list.filter((_, k) => Math.floor((k + 1) * d) > Math.floor(k * d)));
-    // About `TUFT_CELL` squares over the town; the tufts scattered round it join the squares at its edge
-    // (on their own they would be draws of a few tufts each).
-    const [tw, td] = [world.width, groundDepth(world)];
-    const [nx, nz] = [Math.max(1, Math.round(tw / TUFT_CELL)), Math.max(1, Math.round(td / TUFT_CELL))];
-    const square = (x: number, z: number) => `${Math.min(nx - 1, Math.max(0, Math.floor((x / tw) * nx)))},${Math.min(nz - 1, Math.max(0, Math.floor((z / td) * nz)))}`;
-    return [
-      { key: 'model.grassTuft', matrices: thin(tufts), tiles: thin(tuftTiles), cell: square },
-      // (Flowers are sparse: too few triangles for groups to pay.)
-      { key: 'model.flowers', matrices: thin(flowers), tiles: thin(flowerTiles) },
-    ];
+    // (Flowers are sparse: too few triangles for groups to pay.)
+    return [{ key: 'model.flowers', matrices: thin(flowers), tiles: thin(flowerTiles) }];
   }
 }
 
