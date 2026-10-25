@@ -43,6 +43,7 @@
  */
 
 import * as pc from './engine';
+import { directionalShadows } from './internals';
 import { residentRowFilter, RESIDENT_ROWS_ALL } from './characterMaterial';
 import { Instances } from './instancing';
 import type { MirrorInstance } from './lotContents';
@@ -270,7 +271,7 @@ export class Mirrors {
     const own = light.getRenderData;
     light.getRenderData = (camera, face) => own.call(light, camera && this.cameras.has(camera) ? this.game.camera : camera, face);
     this.unpatch.push(() => delete (light as { getRenderData?: unknown }).getRenderData);
-    const sr = (this.app.renderer as unknown as { _shadowRendererDirectional?: { getLightRenderPass(light: unknown, camera: pc.Camera): unknown } })._shadowRendererDirectional;
+    const sr = directionalShadows(this.app);
     if (!sr) return;
     const pass = sr.getLightRenderPass;
     sr.getLightRenderPass = (l, camera) => {

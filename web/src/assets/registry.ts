@@ -114,12 +114,13 @@ function extended(below: AssetEntry | undefined, entry: AssetEntry): AssetEntry 
 
 /** Makes file references absolute relative to the manifest that declared them, with this build's query. */
 function resolveUrls(entry: AssetEntry, base: URL): AssetEntry {
-  const out: Record<string, unknown> = { ...entry };
+  const out = { ...entry };
+  const urls = out as Partial<Record<(typeof URL_FIELDS)[number], string>>;
   for (const field of URL_FIELDS) {
-    const value = out[field];
-    if (typeof value === 'string') out[field] = withBuild(new URL(value, base).href);
+    const value = urls[field];
+    if (value !== undefined) urls[field] = withBuild(new URL(value, base).href);
   }
-  return out as unknown as AssetEntry;
+  return out;
 }
 
 const FALLBACK_ICON =

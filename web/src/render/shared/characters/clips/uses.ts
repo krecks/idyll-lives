@@ -63,7 +63,9 @@ function eyepiecePose(fit: Fit): (p: number) => PoseSpec {
   let eye: Vec = [0, 0, 0];
   const solve = () => {
     const ref = reference();
-    eye = ref.joint('eye_r').map((v, k) => v - ref.joint('Head')[k]) as unknown as Vec;
+    const socket = ref.joint('eye_r');
+    const head = ref.joint('Head');
+    eye = [socket[0] - head[0], socket[1] - head[1], socket[2] - head[2]];
     bend = 30;
     for (let k = 0; k < 60; k++) {
       const e = pointOn(stoopBody(bend, back, -eye[0], 0, SCOPE_GAZE), 'Head', eye);

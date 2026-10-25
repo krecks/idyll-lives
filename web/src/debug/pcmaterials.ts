@@ -13,6 +13,7 @@
 import * as pc from '../render/pc/engine';
 import { GameCamera } from '../render/pc/camera';
 import { createApp, createDevice } from '../render/pc/device';
+import { deviceShaders } from '../render/pc/internals';
 import { containerOptions, setupDecoders } from '../render/pc/loaders';
 import { encodeFinish, MaterialLibrary, SUN_LIGHT_MASK, WINDOWLESS_BITS } from '../render/pc/materials';
 import { meshFrom } from '../render/pc/meshes';
@@ -176,7 +177,7 @@ const tick = () => {
   app.update(1 / 60);
   app.render();
   if (++frames === 20) {
-    const shaders = (device as unknown as { shaders: pc.Shader[] }).shaders;
+    const shaders = deviceShaders(device);
     const failed = shaders.filter((s) => s.failed).map((s) => s.name);
     Object.assign(window, { __result: { ...result, shaders: shaders.length, failed, errors }, __ready: true, __lib: lib });
   }

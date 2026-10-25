@@ -46,8 +46,8 @@ export class PoseTexture {
   readonly texture: pc.Texture;
   /** The CPU copy (the texture's level 0): `width` texels of 4 floats a row, `height` rows. */
   readonly data: Float32Array;
-  /** The WebGPU band write's descriptors, rewritten in place (no allocations per frame). */
-  private readonly dest = { texture: null as unknown as GPUTexture, origin: [0, 0, 0] };
+  /** The WebGPU band write's origin, rewritten in place (the copy's other fields are made at the call). */
+  private readonly origin: [number, number, number] = [0, 0, 0];
   private readonly layout = { offset: 0, bytesPerRow: 0, rowsPerImage: 0 };
   private readonly size = { width: 0, height: 0 };
 
@@ -97,15 +97,14 @@ export class PoseTexture {
     if (device.isWebGPU) {
       const gpu = texture.impl.gpuTexture;
       if (!gpu) return;
-      const { dest, layout, size } = this;
-      dest.texture = gpu;
-      dest.origin[1] = lo;
+      const { origin, layout, size } = this;
+      origin[1] = lo;
       layout.offset = lo * stride * 4;
       layout.bytesPerRow = stride * 4;
       layout.rowsPerImage = rows;
       size.width = this.width;
       size.height = rows;
-      (device as unknown as WebgpuDeviceInternals).wgpu.queue.writeTexture(dest, this.data, layout, size);
+      (device as unknown as WebgpuDeviceInternals).wgpu.queue.writeTexture({ texture: gpu, origin }, this.data, layout, size);
       return;
     }
     const gl = device as unknown as WebglDeviceInternals;

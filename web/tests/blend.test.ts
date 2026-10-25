@@ -58,7 +58,7 @@ describe('residents crossfade continuity', async () => {
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json');
 
   /** The pose texture and nothing else: this test reads the bones, it draws nothing. */
-  let poses = new Float32Array(0);
+  let poses: Float32Array = new Float32Array(0);
   let width = 0;
   const view: View = {
     init(_set, data, w) {
@@ -188,7 +188,7 @@ describe('residents crossfade continuity', async () => {
       ...onBed,
     },
   ];
-  const sims = actors.map((a, i): SimInfo => ({
+  const sims = actors.map((_, i): SimInfo => ({
     id: i,
     name: `sim${i}`,
     household: 0,
@@ -265,14 +265,15 @@ describe('residents crossfade continuity', async () => {
   }
 
   function writeSnapshot(snap: Float32Array, t: number): void {
-    const k = layout.sim;
+    // (The fields this test writes, all of them present in its layout: the layout's own type leaves them optional.)
+    const k = layout.sim as Record<(typeof FIELDS)[number], number>;
     snap[layout.header.speed] = 1;
     snap[layout.header.simCount] = actors.length;
     actors.forEach((a, i) => {
       const o = layout.headerLen + i * layout.simStride;
       const f = front(objects[a.object] ?? chair);
       let [x, z] = [a.x, a.z];
-      let [pose, moving, held, tag] = [P.Stand, 0, '', ''];
+      let [pose, moving, held, tag]: [number, number, string, string] = [P.Stand, 0, '', ''];
       if (a.kind === 'cycle') {
         const s = stepAt(a, t);
         [pose, moving, held, tag] = [s.pose ?? P.Stand, s.moving ?? 0, s.held ?? '', s.tag ?? ''];

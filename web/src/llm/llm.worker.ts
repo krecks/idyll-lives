@@ -19,7 +19,7 @@ interface WorkerScope {
   onmessage: ((e: MessageEvent<ToLlmWorker>) => void) | null;
   postMessage(message: FromLlmWorker, transfer?: Transferable[]): void;
 }
-const scope = self as unknown as WorkerScope;
+const scope = self as WorkerScope;
 
 /** Bumped when the files change in place; older caches are deleted. (New files under new names don't need it.) */
 const CACHE_PREFIX = 'littlelives-llm-';

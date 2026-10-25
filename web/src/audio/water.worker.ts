@@ -16,7 +16,7 @@ interface WorkerScope {
   postMessage(message: SoundReply, transfer?: Transferable[]): void;
 }
 
-const scope = self as unknown as WorkerScope;
+const scope = self as WorkerScope;
 
 scope.onmessage = (e) => {
   const q = e.data;

@@ -16,12 +16,6 @@ import { fixture, numbers as recorded, type Numbers } from './fixtures/babylon';
 
 const WEB = new URL('../', import.meta.url).pathname;
 
-/** A fixed sequence of numbers in 0..1 (the same every run). */
-function numbers(seed: number): () => number {
-  let s = seed >>> 0;
-  return () => (s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 2 ** 32;
-}
-
 function hash(a: ArrayLike<number> | null | undefined, from = 0, to = a?.length ?? 0): string {
   if (!a) return '-';
   const f = new Float32Array(1);
@@ -119,8 +113,8 @@ describe('residents', async () => {
   const quilts: Quilt[] = [];
   const props: Prop[] = [];
   const log: string[] = [];
-  let ring = new Float32Array(16);
-  let poses = new Float32Array(0);
+  let ring: Float32Array = new Float32Array(16);
+  let poses: Float32Array = new Float32Array(0);
   let width = 0;
   const cam = { x: 0, y: 6, z: 12 };
   const view: View = {
@@ -247,29 +241,28 @@ describe('residents', async () => {
     } else actors.push({ station: n, x: cx, z: cz, yaw: 0, object: -1, partner: -1, role: 0, female: s.female });
   });
   const sims = actors.map(
-    (a, i): SimInfo =>
-      ({
-        id: i,
-        name: `sim${i}`,
-        household: 0,
-        gender: a.female ? 'female' : 'male',
-        attractedTo: [],
-        appearance: {
-          body: a.female ? '#C9725F' : '#5F86C9',
-          skin: ['#C08A64', '#8D5A3B', '#E8C0A0', '#6B4430'][i % 4],
-          hair: ['#2B2320', '#7A4A2A', '#C9A15A', '#1A1A1A'][i % 4],
-          hairStyle: a.female ? 'long' : 'short',
-          height: 1,
-          build: 1,
-          top: 'top.tee',
-          bottom: a.female ? 'bottom.skirt' : 'bottom.trousers',
-          shoes: 'shoes.sneakers',
-          ...(i % 5 === 3 ? { beard: true } : {}),
-          ...(a.baby ? { stage: 'baby' } : stations[a.station].stage ? { stage: stations[a.station].stage } : {}),
-        },
-        traits: [],
-        perks: [],
-      }) as unknown as SimInfo,
+    (a, i): SimInfo => ({
+      id: i,
+      name: `sim${i}`,
+      household: 0,
+      gender: a.female ? 'female' : 'male',
+      attractedTo: [],
+      appearance: {
+        body: a.female ? '#C9725F' : '#5F86C9',
+        skin: ['#C08A64', '#8D5A3B', '#E8C0A0', '#6B4430'][i % 4],
+        hair: ['#2B2320', '#7A4A2A', '#C9A15A', '#1A1A1A'][i % 4],
+        hairStyle: a.female ? 'long' : 'short',
+        height: 1,
+        build: 1,
+        top: 'top.tee',
+        bottom: a.female ? 'bottom.skirt' : 'bottom.trousers',
+        shoes: 'shoes.sneakers',
+        ...(i % 5 === 3 ? { beard: true } : {}),
+        ...(a.baby ? { stage: 'baby' } : stations[a.station].stage ? { stage: stations[a.station].stage } : {}),
+      },
+      traits: [],
+      perks: [],
+    }),
   );
   const actions = [...content.animations];
   const items = content.items.map((it) => it.id);
@@ -281,7 +274,7 @@ describe('residents', async () => {
     maxSims: MAX_CHARACTERS,
     ticksPerSecond: 20,
     header: { tick: 0, day: 1, minute: 2, speed: 3, simCount: 4, structureVersion: 5 },
-    sim: Object.fromEntries(FIELDS.map((f, i) => [f, i])) as unknown as SnapshotLayout['sim'],
+    sim: Object.fromEntries(FIELDS.map((f, i) => [f, i])) as SnapshotLayout['sim'],
     actions,
     items,
   };

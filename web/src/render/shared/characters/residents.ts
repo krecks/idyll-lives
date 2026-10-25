@@ -372,7 +372,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     if (new URLSearchParams(location.search).has('debug')) {
       Object.assign(window, { __characters: this, __stance: STANCE, __friendly: FRIENDLY });
       this.view.onDispose(() => {
-        const debug = window as unknown as { __characters?: unknown };
+        const debug = window as { __characters?: unknown };
         if (debug.__characters === this) delete debug.__characters;
       });
     }

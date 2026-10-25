@@ -1042,15 +1042,16 @@ export function mergeContent(files: [name: string, text: string][]): Json {
 
 /**
  * `b` laid over `a`: objects merge key by key at every depth, anything else (a list of lines)
- * is replaced. Neither input changes.
+ * is replaced. Neither input changes. The type of `a` is kept: a pack only overrides fields of the
+ * file it is laid over (a content pack's `talk`, a language pack's lines).
  */
-export function mergeDeep(a: Json, b: Json): Json {
-  const out: Json = { ...a };
+export function mergeDeep<T extends object>(a: T, b: object): T {
+  const out = { ...a } as Record<string, unknown>;
   for (const [key, value] of Object.entries(b)) {
     const prev = out[key];
     out[key] = isJsonObject(prev) && isJsonObject(value) ? mergeDeep(prev, value) : value;
   }
-  return out;
+  return out as T;
 }
 
 /** A file's text: from the build's bundle (`assets/bundle.ts`) when it's there, else fetched. */
