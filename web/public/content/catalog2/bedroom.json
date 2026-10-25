@@ -190,6 +190,20 @@
             "rest",
             "nap"
           ]
+        },
+        {
+          "id": "relax",
+          "label": "Sit and relax",
+          "anim": "relax",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.6
+          },
+          "tags": [
+            "rest",
+            "lounge"
+          ]
         }
       ]
     },

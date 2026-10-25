@@ -187,6 +187,7 @@ const STATIONS: Station[] = [
   { label: 'type', def: 'computerDesk', tag: 'type', pose: P.Sit, female: true },
   { label: 'piano', def: 'piano', tag: 'music', pose: P.Sit },
   { label: 'chaise feet up', def: 'chaise', tag: 'relax', pose: P.Sit, female: true },
+  { label: 'daybed lengthways', def: 'bedDaybed', tag: 'relax', pose: P.Sit, female: true },
   { label: 'exercise bike', def: 'exerciseBike', tag: 'exercise', pose: P.Sit },
   { label: 'cello', def: 'gloomy.cello', tag: 'music', pose: P.Sit, female: true },
   { label: 'drums', def: 'hotHeaded.thunderDrums', tag: 'music', pose: P.Sit },

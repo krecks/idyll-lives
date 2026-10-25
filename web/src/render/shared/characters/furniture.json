@@ -33,6 +33,7 @@
     "pouf": { "h": 0.46, "fwd": 0 },
     "sofaThreeSeat": { "h": 0.44, "fwd": 0.13, "front": 0.44 },
     "sofaBed": { "h": 0.44, "fwd": 0.08, "front": 0.39 },
+    "bedDaybed": { "h": 0.51, "fwd": -0.5, "legsOut": true },
     "sectionalMiddle": { "h": 0.44, "fwd": 0.13, "front": 0.44 },
     "sectionalArmLeft": { "h": 0.44, "fwd": 0.13, "front": 0.44 },
     "sectionalArmRight": { "h": 0.44, "fwd": 0.13, "front": 0.44 },

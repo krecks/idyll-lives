@@ -205,6 +205,7 @@ describe('residents', async () => {
     { def: 'shower', tag: 'shower' },
     { def: 'counter', tag: 'chop', held: 'ingredients' },
     { def: 'chaise', tag: 'relax', pose: P.Sit, female: true, stage: 'elder' },
+    { def: 'bedDaybed', tag: 'relax', pose: P.Sit, female: true },
     { social: 1 },
     { social: 6 },
     { held: 'mealPlate', walk: true, female: true },
