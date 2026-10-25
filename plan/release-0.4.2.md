@@ -2,7 +2,7 @@
 
 - **Branch:** `release/0.4.2` (the version and notes), merged into `main` by pull request; tag `v0.4.2` on the merge. The feature came first in `feat/procedural-grass` (PR #27, merged as efe1da33).
 - **Base:** v0.4.1 at `2035d7ba`
-- **Status:** in progress (2026-10-25)
+- **Status:** **Released 2026-10-25**: https://github.com/krecks/idyll-lives/releases/tag/v0.4.2 (PR #28 merged as c9066c66; CI 40219885966; dry run 40220615649 on main; the tag's deploy 40221704610; live checks passed).
 - **Release type:** a feature: the lawn's grass built on the GPU
 
 ## 1. What ships
@@ -46,6 +46,8 @@ PR #27's checks: `bun run check`, `lint`, `test` (61, with `tests/grass.test.ts`
 | `bun run check:voice` | pass |
 
 ## 5. Release steps
+
+All done 2026-10-25. Live: the build is c9066c6 (the release merge); the village benchmark plays on WebGPU and WebGL2 with the new grass and no page errors (`bench-results/live-0.4.2`).
 
 1. Pull request `release/0.4.2` → `main`; CI passes on it; merge (a merge commit).
 2. Dry run: `gh workflow run pages.yml --ref main -f deploy=false`, watched to the end.
