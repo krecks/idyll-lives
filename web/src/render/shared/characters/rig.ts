@@ -56,6 +56,16 @@ export interface Player {
   rootPitch: number;
   /** Placed in this frame (world: a point on the floor and a facing) instead of at the Sim: the bunk's ladder (`BUNK_LADDER`). */
   frame: Frame | null;
+  /**
+   * Holds `poseQ` / `poseP` instead of sampling the clip: the pose a fade had reached when another clip cut it
+   * short (`freezePlayer`). A fading-out player that stands still is what keeps an interrupted fade from jumping:
+   * its own clip would have carried on, or been dropped, either way not where the blend had got to.
+   */
+  frozen: boolean;
+  /** The held pose (bones x 4 quaternions; allocated on the first freeze, then reused). */
+  poseQ: Float32Array | null;
+  /** The held pelvis translation (3). */
+  poseP: Float32Array | null;
 }
 /** A place on the floor and a facing (world, the Sim's convention: `yaw` 0 faces +z). */
 export interface Frame {
@@ -74,6 +84,9 @@ export function player(): Player {
     rootFwd: 0,
     rootPitch: 0,
     frame: null,
+    frozen: false,
+    poseQ: null,
+    poseP: null,
   };
 }
 export function copyPlayer(from: Player, to: Player): void {
@@ -86,6 +99,13 @@ export function copyPlayer(from: Player, to: Player): void {
   to.rootFwd = from.rootFwd;
   to.rootPitch = from.rootPitch;
   to.frame = from.frame;
+  to.frozen = false;
+}
+/** `to` stops sampling its clip and holds `q` / `p` (a pose the blend had reached), until it is copied into again. */
+export function freezePlayer(to: Player, q: Float32Array, p: Float32Array): void {
+  (to.poseQ ??= new Float32Array(q.length)).set(q);
+  (to.poseP ??= new Float32Array(p.length)).set(p);
+  to.frozen = true;
 }
 export interface SimRig {
   id: number;
@@ -143,6 +163,9 @@ export interface SimRig {
   fadeRate: number;
   /** Upper-body layer (eating while seated, hugging). */
   upper: Player;
+  /** The upper clip `upper` is fading in from, and how far (`upperW` is the layer's own weight). */
+  upperPrev: Player;
+  upperFade: number;
   upperW: number;
   upperTarget: number;
   lookYaw: number;
@@ -337,7 +360,7 @@ export interface SimRig {
   speechSeg: number;
 }
 export function advance(p: Player, dt: number): void {
-  if (!p.clip) return;
+  if (!p.clip || p.frozen) return;
   p.time += dt * p.rate;
   if (p.clip.loop && p.time > p.clip.duration * 64) p.time %= p.clip.duration;
 }

@@ -66,7 +66,7 @@ import { lyingPose, measureLegs, measureSit, outfitFit, type PoseKit } from './m
 import { palmAt, placeFrame, placeProp } from './props';
 import { DETAIL_PX, FACE_PARTS, LOD_FAR_PX, LOD_NEAR_PX, MORPH_PX, type PartMesh, Range, YOUNG_STAGES, shellBit, skinChunks } from './parts';
 import { type Additive, type Placement, PoseScratch, addLocal, addRotation, blendInto, makeAdditive, resetAdditive, sampleClip, skin } from './pose';
-import { BABBLE, compose, type Frame, HEAD_MARGIN, MAX_CHARACTERS, type SimRig, UNIT, advance, alongWay, clamp, clampBuild, clampHeight, copyPlayer, embraceStep, eyesBelowTop, gettingIn, hash, lerp, lerpAngle, lieBack, lieCentre, multiply, player, ramp, rotationOf, setFrame, shoulderDrop, smooth, speaking, splitKey, unit, wrapAngle } from './rig';
+import { BABBLE, compose, type Frame, type Player, HEAD_MARGIN, MAX_CHARACTERS, type SimRig, UNIT, advance, alongWay, clamp, clampBuild, clampHeight, copyPlayer, embraceStep, eyesBelowTop, freezePlayer, gettingIn, hash, lerp, lerpAngle, lieBack, lieCentre, multiply, player, ramp, rotationOf, setFrame, shoulderDrop, smooth, speaking, splitKey, unit, wrapAngle } from './rig';
 import { type LegSide, SEAT_FIT, feetDown, legTurn, perch, seatSize } from './seatFit';
 import { BATH_WEAR, BEDS, BENCH_HIP, BENCH_KNEE, BLANKET_BEDS, BLANKET_MEET, BUNKS, type Bed, CLIP_HEIGHT, CURLED_BEDS, DEFAULT_BED, DEFAULT_SEAT, FEET_UP, FOOTSTOOLS, LEGS_OUT_DROP, LIE_CENTRE, LIE_ENTRY, type LegFit, NO_FEET_UP, ON_FLOOR, PEDAL, type PlacedObject, QUILT_COLOUR, QUILT_PART, REST_BACK, RISING, SEATS, SIDE_BEDS, SIDE_IN, SIT_CLIPS, SIT_FLEX, SIT_FROM, SLING, type Seat, type SeatFit, TUCK, floorSit, seatOf, slingTop } from './seats';
 import { AIM, Anim, EMBRACE, KISS_FIT, REFUSED, gesturesOf } from './socials';
@@ -80,6 +80,17 @@ export { GAME_RATE, QUIET_SPEED } from '../gameSpeed';
 export { MAX_CHARACTERS } from './rig';
 export { EXPRESSIONS, FRIENDLY, STANCE, type StageDirection } from './expressions';
 export type { Face } from './face';
+
+/** How fast an upper-layer clip fades in over the one it replaces (per second; a quarter of a second). */
+const UPPER_FADE_RATE = 4;
+
+/** `q` / `p` = the player's pose: its clip sampled at its time, or the pose it holds (`Player.frozen`). */
+function samplePlayer(set: CharacterSet, p: Player, q: Float32Array, t: Float32Array): void {
+  if (p.frozen && p.poseQ && p.poseP) {
+    q.set(p.poseQ);
+    t.set(p.poseP);
+  } else sampleClip(set, p.clip!, p.time, q, t);
+}
 
 export class Characters<M extends object, Q, P extends ResidentProp> {
   private set: CharacterSet | null = null;
@@ -128,6 +139,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private pA!: Float32Array;
   private qB!: Float32Array;
   private pB!: Float32Array;
+  private qC!: Float32Array;
+  private pC!: Float32Array;
   private add!: Additive;
   /** The posing scratch above, for measuring bodies (`measure.ts`). */
   private kit!: PoseKit;
@@ -310,8 +323,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     this.scratch = new PoseScratch(NB);
     this.qA = new Float32Array(NB * 4);
     this.qB = new Float32Array(NB * 4);
+    this.qC = new Float32Array(NB * 4);
     this.pA = new Float32Array(3);
     this.pB = new Float32Array(3);
+    this.pC = new Float32Array(3);
     this.add = makeAdditive(NB);
     this.kit = { set, qA: this.qA, pA: this.pA, add: this.add, scratch: this.scratch };
     // Upper body: spine_02 and everything above it (arms, neck, head); spine_01 half.
@@ -521,6 +536,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         w: 1,
         fadeRate: 4,
         upper: player(),
+        upperPrev: player(),
+        upperFade: 1,
         upperW: 0,
         upperTarget: 0,
         lookYaw: 0,
@@ -735,6 +752,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         cur: player(),
         prev: player(),
         upper: player(),
+        upperPrev: player(),
+        upperFade: 1,
         visible: true,
         x: 0,
         z: 0,
@@ -1517,9 +1536,11 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       advance(rig.cur, GAITS.has(rig.cur.key) || rig.cur.key === 'jog' ? dt : step);
       advance(rig.prev, GAITS.has(rig.prev.key) || rig.prev.key === 'jog' ? dt : step);
       advance(rig.upper, step);
+      advance(rig.upperPrev, step);
       // Carrying while walking: the arms bob in step with the feet.
       if (GAITS.has(rig.cur.key) && rig.upper.clip && rig.upper.key.startsWith('carry')) rig.upper.time = (rig.cur.time / rig.cur.clip!.duration) * rig.upper.clip.duration;
       rig.w = Math.min(1, rig.w + dt * rig.fadeRate * Math.max(1, animRate));
+      rig.upperFade = Math.min(1, rig.upperFade + dt * UPPER_FADE_RATE * Math.max(1, animRate));
       rig.upperW += clamp(rig.upperTarget - rig.upperW, -dt * 4, dt * 4);
       if (dir?.still) {
         rig.cur.time = dir.time ?? rig.cur.time;
@@ -1527,17 +1548,24 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         rig.upperW = 0;
       }
 
-      sampleClip(set, rig.cur.clip!, rig.cur.time, this.qA, this.pA);
+      samplePlayer(set, rig.cur, this.qA, this.pA);
       const w = smooth(rig.w);
       if (w < 1 && rig.prev.clip) {
-        sampleClip(set, rig.prev.clip, rig.prev.time, this.qB, this.pB);
+        samplePlayer(set, rig.prev, this.qB, this.pB);
         blendInto(this.qB, this.pB, this.qA, this.pA, w, null);
         this.qA.set(this.qB);
         this.pA.set(this.pB);
       }
       if (rig.upperW > 0.001 && rig.upper.clip) {
-        sampleClip(set, rig.upper.clip, rig.upper.time, this.qB, this.pB);
-        blendInto(this.qA, this.pA, this.qB, this.pB, smooth(rig.upperW), this.upperMask);
+        samplePlayer(set, rig.upper, this.qB, this.pB);
+        const f = smooth(rig.upperFade);
+        // (A new upper clip fades in over the one it replaced, as the lower pair does: at full layer weight, a
+        // straight swap would turn an arm by the whole difference in one frame.)
+        if (f < 1 && rig.upperPrev.clip) {
+          samplePlayer(set, rig.upperPrev, this.qC, this.pC);
+          blendInto(this.qC, this.pC, this.qB, this.pB, f, null);
+          blendInto(this.qA, this.pA, this.qC, this.pC, smooth(rig.upperW), this.upperMask);
+        } else blendInto(this.qA, this.pA, this.qB, this.pB, smooth(rig.upperW), this.upperMask);
       }
 
       if (this.force === 'rest') {
@@ -2089,6 +2117,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     // Upper-body layer.
     if (upper) {
       if (rig.upper.key !== upper) {
+        // (Faded in over the clip it replaces: `upperFade`.)
+        copyPlayer(rig.upper, rig.upperPrev);
+        rig.upperFade = 0;
         rig.upper.key = upper;
         rig.upper.clip = this.clip(upper);
         rig.upper.time = 0;
@@ -2102,6 +2133,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     if (fresh) {
       copyPlayer(rig.cur, rig.prev);
       rig.w = 1;
+      rig.upperFade = 1;
       rig.upperW = rig.upperTarget;
       rig.approach = reach;
       rig.hands = hands;
@@ -2479,9 +2511,24 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
 
   private start(rig: SimRig, key: string, fade: number, rate: number, repeat: boolean, rootY: number, rootFwd: number, pitch: number): void {
     const clip = this.clip(key);
-    // The fading-out player continues from the current blend.
-    if (rig.w < 0.5 && rig.prev.clip) {
-      // Mostly still the old one: keep it, replace the incoming.
+    const w = smooth(rig.w);
+    if (rig.w < 1 && rig.prev.clip) {
+      // A fade cut short. Neither end of it is where the pose had got to, so the fading-out player holds the pose
+      // the blend had reached (`freezePlayer`) and fades out of that: dropping to either end would jump by the
+      // blend's remaining distance, up to half the whole fade (`blend.test.ts`).
+      const y = lerp(rig.prev.rootY, rig.cur.rootY, w);
+      const fwd = lerp(rig.prev.rootFwd, rig.cur.rootFwd, w);
+      const pitchW = lerp(rig.prev.rootPitch, rig.cur.rootPitch, w);
+      const at = rig.prev.frame || rig.cur.frame ? this.framed(rig, w) : null;
+      samplePlayer(this.set!, rig.prev, this.qB, this.pB);
+      samplePlayer(this.set!, rig.cur, this.qC, this.pC);
+      blendInto(this.qB, this.pB, this.qC, this.pC, w, null);
+      copyPlayer(rig.cur, rig.prev);
+      rig.prev.rootY = y;
+      rig.prev.rootFwd = fwd;
+      rig.prev.rootPitch = pitchW;
+      if (at) rig.prev.frame = at;
+      freezePlayer(rig.prev, this.qB, this.pB);
     } else {
       copyPlayer(rig.cur, rig.prev);
     }
