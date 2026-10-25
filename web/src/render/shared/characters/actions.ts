@@ -233,8 +233,8 @@ export const BUNK_LADDER = { up: BUNK_UP, down: BUNK_DOWN, fade: 0.3, lie: 0.12 
 /** A baby in the crib plays its own lying clips (clips/baby.ts: legs drawn up, hands by the head), asleep or awake, at their own speed; crossfaded over `BABY_LIE_FADE` s when the baby falls asleep or wakes. */
 export const BABY_LIE = { asleep: 'babyLieAsleep', awake: 'babyLieAwake' } as const;
 export const BABY_LIE_FADE = 1.6;
-/** Every lying clip (`lie`, and the baby's). */
-export const LYING = new Set<string>(['lie', 'lieCurl', BABY_LIE.asleep, BABY_LIE.awake]);
+/** Every lying clip (`lie`, the side lies of the window seat and the daybed, and the baby's). */
+export const LYING = new Set<string>(['lie', 'lieCurl', 'lieSide', BABY_LIE.asleep, BABY_LIE.awake]);
 /**
  * A cuddle at the crib (action `cuddle`): the grown-up steps up to the rail, leans over it and lifts
  * the baby out, holds them cradled in the arms (head in the crook of the left arm) rocking gently,

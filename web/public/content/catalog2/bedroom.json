@@ -193,10 +193,10 @@
         },
         {
           "id": "relax",
-          "label": "Sit and relax",
+          "label": "Lie and relax",
           "anim": "relax",
           "minutes": 30,
-          "pose": "sit",
+          "pose": "lie",
           "effects": {
             "comfort": 0.6
           },

@@ -1,8 +1,8 @@
 /**
  * Two clips of a resident on their own at a piece of furniture: brushing the hair at the dressing table's
- * mirror (`brushHair`, the seated upper body, characters.ts `ACTIONS.wash`), and dozing curled up on the side
- * (`lieCurl`, characters.ts `CURLED_BEDS`: a seat too short to lie on flat, the window seat). Both are
- * body-relative: one size.
+ * mirror (`brushHair`, the seated upper body, characters.ts `ACTIONS.wash`), dozing curled up on the side
+ * (`lieCurl`, characters.ts `CURLED_BEDS`: a seat too short to lie on flat, the window seat) and lying on the
+ * side at full length (`lieSide`, `SIDE_BEDS`: a daybed). All are body-relative: one size.
  */
 
 import { cycle, type ClipDef, type PoseSpec, type Vec } from './dsl';
@@ -101,6 +101,37 @@ function curlPose(p: number): PoseSpec {
   };
 }
 
+/**
+ * Lying on the right side at full length (a daybed lounged on; made standing like `lie`, the runtime turning it
+ * flat): the body turned a quarter about its length so its front faces +x and its back -x (an object's back rail,
+ * its front in front of the sleeper), the legs along the mattress, the right one straight and the left drawn up a
+ * little over it, the right forearm under the cheek on the pillow and the left hand resting in front of the chest.
+ * The pelvis is lifted `SIDE.up` off the mattress (its side is under the joint, not its back).
+ */
+const SIDE = { back: -0.05, up: 0.005, turn: 90 };
+
+function sidePose(p: number): PoseSpec {
+  const b = Math.sin(p * TAU * 2);
+  const body: PoseSpec = {
+    move: [SIDE.back, 0, SIDE.up],
+    pelvis: [-4, SIDE.turn, 0],
+    spine_01: [2, 0, 0],
+    spine_02: [-1.4 * b, 0, 0],
+    spine_03: [-1.0 * b, 0, 0],
+    neck_01: [9, 4, 0],
+    Head: [7 + 0.6 * b, 7, 4],
+  };
+  const head = (v: Vec) => pointOn(body, 'Head', v);
+  return {
+    ...body,
+    ...footIK('r', [0.02, 0.005, -0.14], body, { foot: [30, 16, 0], pole: [1, 0, 0.2] }),
+    ...footIK('l', [0.09, 0.07, -0.11], body, { foot: [30, -10, 0], pole: [1, 0, 0.4] }),
+    // (The right hand under the cheek on the pillow, the left in front of the chest on the mattress.)
+    ...armIK('r', head([0.09, 0.02, 0.1]), body, { palm: true, pole: [0.2, -1, -0.3], pronate: 0, hand: wrist('r', 20, 0) }),
+    ...armIK('l', [0.2, 1.05, -0.07], body, { palm: true, pole: [-0.6, 0.2, 0.1], pronate: 80, hand: wrist('l', 20, 0) }),
+  };
+}
+
 export function selfClips(): ClipDef[] {
-  return [cycle('brushHair', { seconds: BRUSH_S, loop: true }, brushPose), cycle('lieCurl', { seconds: 2.4, loop: true }, curlPose)];
+  return [cycle('brushHair', { seconds: BRUSH_S, loop: true }, brushPose), cycle('lieCurl', { seconds: 2.4, loop: true }, curlPose), cycle('lieSide', { seconds: 2.4, loop: true }, sidePose)];
 }

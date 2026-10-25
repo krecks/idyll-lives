@@ -68,7 +68,7 @@ import { DETAIL_PX, FACE_PARTS, LOD_FAR_PX, LOD_NEAR_PX, MORPH_PX, type PartMesh
 import { type Additive, type Placement, PoseScratch, addLocal, addRotation, blendInto, makeAdditive, resetAdditive, sampleClip, skin } from './pose';
 import { BABBLE, compose, type Frame, HEAD_MARGIN, MAX_CHARACTERS, type SimRig, UNIT, advance, alongWay, clamp, clampBuild, clampHeight, copyPlayer, embraceStep, eyesBelowTop, gettingIn, hash, lerp, lerpAngle, lieBack, lieCentre, multiply, player, ramp, rotationOf, setFrame, shoulderDrop, smooth, speaking, splitKey, unit, wrapAngle } from './rig';
 import { type LegSide, SEAT_FIT, feetDown, legTurn, perch, seatSize } from './seatFit';
-import { BATH_WEAR, BEDS, BENCH_HIP, BENCH_KNEE, BLANKET_BEDS, BLANKET_MEET, BUNKS, type Bed, CLIP_HEIGHT, CURLED_BEDS, DEFAULT_BED, DEFAULT_SEAT, FEET_UP, FOOTSTOOLS, LEGS_OUT_DROP, LIE_CENTRE, LIE_ENTRY, type LegFit, NO_FEET_UP, ON_FLOOR, PEDAL, type PlacedObject, QUILT_COLOUR, QUILT_PART, REST_BACK, RISING, SEATS, SIDE_IN, SIT_CLIPS, SIT_FLEX, SIT_FROM, SLING, type Seat, type SeatFit, TUCK, floorSit, seatOf, slingTop } from './seats';
+import { BATH_WEAR, BEDS, BENCH_HIP, BENCH_KNEE, BLANKET_BEDS, BLANKET_MEET, BUNKS, type Bed, CLIP_HEIGHT, CURLED_BEDS, DEFAULT_BED, DEFAULT_SEAT, FEET_UP, FOOTSTOOLS, LEGS_OUT_DROP, LIE_CENTRE, LIE_ENTRY, type LegFit, NO_FEET_UP, ON_FLOOR, PEDAL, type PlacedObject, QUILT_COLOUR, QUILT_PART, REST_BACK, RISING, SEATS, SIDE_BEDS, SIDE_IN, SIT_CLIPS, SIT_FLEX, SIT_FROM, SLING, type Seat, type SeatFit, TUCK, floorSit, seatOf, slingTop } from './seats';
 import { AIM, Anim, EMBRACE, KISS_FIT, REFUSED, gesturesOf } from './socials';
 import { BLANKET_WIDTH, quiltGeometry, quiltTint } from './blanket';
 import { APPEARANCE_TEXELS, MORPH_TEXELS } from './layout';
@@ -1761,7 +1761,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       } else {
         // On the back, head towards the head of the bed (local -z), centred on the slot: the
         // `lie` clip (made standing) turned flat and slowed down.
-        key = obj && CURLED_BEDS.has(obj.def) ? 'lieCurl' : 'lie';
+        key = obj && CURLED_BEDS.has(obj.def) ? 'lieCurl' : obj && SIDE_BEDS.has(obj.def) ? 'lieSide' : 'lie';
         rootY = rig.bedH + lieBack(rig);
         rootFwd = lieCentre(rig) + rig.bedFwd;
         pitch = -Math.PI / 2;
