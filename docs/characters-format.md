@@ -522,6 +522,10 @@ Why some entries are as they are:
   front or a side, whichever the sun's light falls towards as they sit down (`shadeSide`; the renderer's sun).
 - Baths (`bathtub`, `bathtubClawfoot`, `bathtubFreestanding`): on the tub's floor, along the tub, the back at the
   end without the taps, the legs out along it towards them (`along`, `legsOut`).
+- `bedDaybed`: sat on lengthways as a sofa by day (0.51, its hips 0.5 m back of its middle, `legsOut`), facing the
+  foot end, the legs out along the mattress clear of the pillow. Its back rail runs along a long side, so a
+  lengthways sitter's back comes to the head-end arm rail; `along` would turn them across the bed, legs out over
+  the front rail.
 - The pack tubs (`gloomy.soakingTub`, `romantic.heartTub`, `hotHeaded.coldPlunge`): on the floor at the back, the
   legs out with only `room` m for them ahead of the hips, so the heels stop inside the front wall and the knees
   come up.

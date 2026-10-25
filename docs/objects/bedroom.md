@@ -30,7 +30,7 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 | `bedDouble` Double bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`. |
 | `bedQueenUpholstered` Upholstered queen bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`. |
 | `bedCanopy` Four-poster bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`; the canopy drapes are static. |
-| `bedDaybed` Daybed | 1x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Static | Static (a sofa by day). The sleeper's quilt is tucked in at the mattress's edges, inside its back, arms and rail (`BEDS` `tuck`, A-bedroom-05). |
+| `bedDaybed` Daybed | 1x2 · floor | sleep:sleep nap:nap relax:relax | bedroom / beds | Frame, Headboard, Bedding | Static | Static (a sofa by day). The sleeper's quilt is tucked in at the mattress's edges, inside its back, arms and rail (`BEDS` `tuck`, A-bedroom-05). Sat on lengthways as a sofa (`SEATS` `bedDaybed` 0.51 m, hips 0.5 m back of its middle, `legsOut`), facing the foot end: its back rail runs along a long side, so a lengthways sitter's back comes to the head-end arm rail, and `along` would turn them across the bed with their legs out over the front rail (I-bedroom-03). |
 
 **In play** (signed off 2026-10-16):
 - Each bed napped in, standing free in all four facings (`nap` plays the same clips as the 480-minute sleep). The

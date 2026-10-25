@@ -25,7 +25,7 @@ Family: `tools/art/blender/families/bedroom.py`.
 | `bedCanopy` Four-poster bed | M-bedroom-04 | A-bedroom-01, A-bedroom-03, A-bedroom-04 | I-bedroom-01 | M-bedroom-04 S2 code; A-bedroom-01 S3 motion; A-bedroom-03 S2 code; A-bedroom-04 S2 code; I-bedroom-01 S2 code | `bedroom/sheets/obj-bedCanopy.png`, `bedroom/play/chunk2/bedCanopy-sleep-02.png` |
 | `bedDaybed` Daybed | OK | A-bedroom-03 | I-bedroom-02, I-bedroom-03, I-bedroom-01 | A-bedroom-03 S2 code; I-bedroom-01 S2 code; I-bedroom-02 S3 renderer-table; I-bedroom-03 S3 content | `bedroom/sheets/obj-bedDaybed.png`, `bedroom/play/chunk2/bedDaybed-sleep-02.png` |
 
-Measured (`sizes-bedroom.md`, reference `bedSingle`, `bedDouble`, `bedKing`, `bedCanopy`, `bedLow`, `bunkBed`): every mattress top is in its range and agrees with `furniture.json` `beds` and the model (no `heights.txt` warning): single 0.50, bunk 0.44 and 1.38 (`bunks`), futon 0.40, king 0.59, oak double, queen and four-poster 0.52, daybed 0.51, `bed` 0.58. Overall sizes in range but `bed` and `bedFuton` (M-bedroom-01). The futon's H 0.995 against `bedLow`'s 0.80 is its back at rest, leaning up as a sofa's (a futon sofa bed, not the platform futon the kind describes): a reference artefact, not filed. Every bed has a frame, mattress, pillows and bedding; the bunk its guard rail and ladder (static); the four-poster its posts, valance and tied curtains; the daybed its back and arms. A sleeper lies on the mattress on every bed, a child, teen and elder too (`bedroom/play/stage-*/`).
+Measured (`sizes-bedroom.md`, reference `bedSingle`, `bedDouble`, `bedKing`, `bedCanopy`, `bedLow`, `bunkBed`): every mattress top is in its range and agrees with `furniture.json` `beds` and the model (no `heights.txt` warning): single 0.50, bunk 0.44 and 1.38 (`bunks`), futon 0.40, king 0.59, oak double, queen and four-poster 0.52, daybed 0.51, `bed` 0.58. The daybed's `seats` row (0.51) agrees with the model too (0.507 at the hips, 0.5 m back of its middle; `cargo check-glb` no heights warning). Overall sizes in range but `bed` and `bedFuton` (M-bedroom-01). The futon's H 0.995 against `bedLow`'s 0.80 is its back at rest, leaning up as a sofa's (a futon sofa bed, not the platform futon the kind describes): a reference artefact, not filed. Every bed has a frame, mattress, pillows and bedding; the bunk its guard rail and ladder (static); the four-poster its posts, valance and tied curtains; the daybed its back and arms. A sleeper lies on the mattress on every bed, a child, teen and elder too (`bedroom/play/stage-*/`).
 
 **Real uses against the content's (I1)**
 
@@ -39,7 +39,7 @@ Measured (`sizes-bedroom.md`, reference `bedSingle`, `bedDouble`, `bedKing`, `be
 | `bedDouble` | sleep, nap, read in bed | sleep (480), nap (30) | OK |
 | `bedQueenUpholstered` | sleep, nap, lie in | sleep (480), nap (30) | OK |
 | `bedCanopy` | sleep, nap, draw the curtains | sleep (480), nap (30); curtains static | OK (drawing the curtains would be new; the drapes are decor) |
-| `bedDaybed` | sit on it as a sofa by day; nap; a guest sleeps on it | sleep (480), nap (30) | sitting on it is missing (I-bedroom-03); the sleeper has no cover (I-bedroom-02) |
+| `bedDaybed` | sit on it as a sofa by day; nap; a guest sleeps on it | sleep (480), nap (30), sit and relax (30) | OK (the sleeper has no cover, I-bedroom-02) |
 
 ## BR2. Nightstands and small storage (8)
 
@@ -202,10 +202,10 @@ Measured: the dressing table's top 0.76 (72–78) and its pouf's seat 0.45 (42�
 - **Severity:** S3
 - **Rubric:** I1
 - **Fix class:** content
-- **Where:** `web/public/content/furniture.json:1980` (`bedFuton` interactions: sleep, nap, unfold, fold away); `web/public/content/catalog2/bedroom.json:159` (`bedDaybed`: sleep, nap)
+- **Where:** `web/public/content/furniture.json:1980` (`bedFuton` interactions: sleep, nap, unfold, fold away); `web/public/content/catalog2/bedroom.json:150` (`bedDaybed`: sleep, nap, and since 7d2964d4 sit and relax); `web/src/render/shared/characters/furniture.json:36` (`seats.bedDaybed`)
 - **Evidence:** `bedroom/sheets/obj-bedFuton.png` (folded, a sofa on a platform), `bedroom/sheets/obj-bedDaybed.png` (a back and two arms). Each is a sofa by day; folded, the futon's only use is to unfold it. The sofa bed has relax and doze (`catalog2/living.json`); a "Sit down" or "Relax" (the futon's with `when: closed`) on each would be the missing use.
-- **Status:** fixed in part (eaca9ed8): the futon; the daybed needs a renderer seat row
-- **After:** Folded, the futon offers "Sit and relax" on its front edge (content `seat` 0.40 m, forward 0.68: `bench-results/review/fixes/content/g09/seat68-bedFuton-relax-00.png`). The daybed is sat on lengthways, which content `seat` can't say (a `seats` row with `along` in `characters/furniture.json`).
+- **Status:** fixed (eaca9ed8 the futon; 7d2964d4 the daybed)
+- **After:** Folded, the futon offers "Sit and relax" on its front edge (content `seat` 0.40 m, forward 0.68: `bench-results/review/fixes/content/g09/seat68-bedFuton-relax-00.png`). The daybed is sat on lengthways, which content `seat` can't say: a `seats` row (`h` 0.51, `fwd` −0.5, `legsOut`) and "Sit and relax" (30 min, comfort 0.6) on it, the legs out along the mattress clear of the pillow and the back to the head-end arm rail (`cargo check-glb` measures the seat at 0.507 m there, no heights warning; the pose gallery draws it, `poses.ts` "daybed lengthways"). `along` can't be used: its quarter turn would put the legs out over the front rail and the back through the back rail.
 - **Source:** wave: bedroom
 
 ### I-bedroom-04 — "Pick an outfit" changes nothing: the resident keeps the same clothes

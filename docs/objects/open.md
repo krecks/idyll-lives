@@ -148,8 +148,6 @@ it left is here, with its id; §9 of the review says what each would take.
   their labels say so; vendors are later (Q-17).
 - **Laundry:** the resident stands at the washer for its whole wash and folds at the dryer with empty hands; the
   basket plays no part (I-bathroom-07: a timed machine is new behaviour).
-- **The daybed can't be sat on by day:** it needs a lengthways seat row (`along`) in `characters/furniture.json`
-  (I-bedroom-03; the folded futon has its sit).
 - **Worked from the edge:** the bonsai bench, the rose arbour's roses, the cookbook lectern and the streetball hoop
   are used from the object's edge, not at the part (I-packs-12; `places` can fix it now, and the lectern wants a
   reading hand pose).
