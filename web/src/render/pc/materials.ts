@@ -499,6 +499,14 @@ export class MaterialLibrary {
     return copy;
   }
 
+  /**
+   * Lets go of a material made or adopted here that is going (the landscape's own: its grass, its
+   * water): the library stops keeping and updating it. Its owner destroys it.
+   */
+  release(material: pc.Material): void {
+    if (material instanceof pc.StandardMaterial) this.lit.delete(material);
+  }
+
   /** Adopts a material created elsewhere (the glTF loader's) into the look, the sky's ambient, basements and lamps. */
   adopt(material: pc.Material | null): void {
     if (!(material instanceof pc.StandardMaterial) || this.lit.has(material)) return;

@@ -36,8 +36,11 @@ export interface BenchFlags {
   hud: boolean;
   /** GPU time measured (`gpu=0`: not, to see what measuring costs). */
   gpu: boolean;
-  /** With `freeze`: the camera path at this moment (s), held. */
+  /** With `freeze`: the camera path at this moment (s), held. With `hold=1` (and no `freeze`), the camera is held there while the game and the wind go on. */
   at: number;
+  hold: boolean;
+  /** The orbit's radius and angle from vertical instead of its path's (`radius=`, `beta=`), and its target moved by (`tx=`, `tz=`, m): a close look at the lawn. */
+  orbit: { radius: number | null; beta: number | null; tx: number; tz: number };
   diag: ReadonlySet<BenchDiag>;
   /** Free text kept with the result (the runner's matrix cell). */
   label: string;
@@ -79,6 +82,8 @@ function parse(): BenchFlags | null {
     hud: params.get('hud') !== '0',
     gpu: params.get('gpu') !== '0',
     at: num('at', 0, 0, 3600),
+    hold: params.get('hold') === '1',
+    orbit: { radius: params.has('radius') ? num('radius', 24, 2, 200) : null, beta: params.has('beta') ? num('beta', 0.9, 0.1, 1.5) : null, tx: num('tx', 0, -200, 200), tz: num('tz', 0, -200, 200) },
     diag,
     label: params.get('label') ?? '',
   };

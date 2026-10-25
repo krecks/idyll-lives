@@ -4,7 +4,8 @@ The last things on the ground and over the residents' heads, built 2026-10-16.
 One pack, `packs/ground/manifest.json`. None of them is an object the player buys: no content entry, no Validate
 group. The keys are unchanged.
 
-- **Grass tuft** (`model.grassTuft`): drawn by the ten thousand as thin instances on every unpaved tile and round
+- **Grass tuft** (`model.grassTuft`, **removed 2026-10-25**: the lawn's grass is built on the GPU now,
+  `web/src/render/pc/grass.ts`, `plan/procedural-grass.md`; what follows is the model as it was): drawn by the ten thousand as thin instances on every unpaved tile and round
   the town (`render/shared/nature.ts` `lawns`, in squares the camera leaves out, half of them on Low). Four bent
   blades leaning out from the middle in the old part's three greens and the fourth, one draw call
   (`foliage`: the nature shader's wind and per-instance tint). Each blade is a flat ribbon with one joint drawn
@@ -40,7 +41,6 @@ group. The keys are unchanged.
 
 | Model | Size (w × h × d) | Triangles | Far | Draws |
 |---|---|---|---|---|
-| grassTuft | 0.12 × 0.29 × 0.14 | 30 (was 24) | 14 (was 8) | 1 |
 | flowers | 0.14 × 0.27 × 0.17 | 266 (was 156) | 64 (was 58) | 1 |
 | rock | 1.13 × 0.55 × 0.83 | 1,654 (was 492) | 56 (unchanged) | 1 |
 | marker | 0.23 × 0.34 × 0.06 | 1,344 | — | 1 |

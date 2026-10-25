@@ -11,6 +11,10 @@
  *
  * - `vsDecl`, `vsEnd`: `litUserDeclarationVS`, `litUserMainEndVS`.
  * - `normalVS`: an instanced draw's normal corrected for uneven scale (`INSTANCE_NORMAL`).
+ * - `vsNormal`: before that, in `normalVS`'s `getNormal`, a feature's own normal (it returns
+ *   `normalize(dNormalMatrix * n)` with its local `n`; `getNormal` runs after `getLocalPosition`,
+ *   so a normal worked out there can be kept in a variable of its own: the grass's blades). The
+ *   first feature to return wins: one feature at most.
  * - `vsLocal`: the vertex's local (game-space) position, `localPos`, after morphing and before the
  *   model matrix, in `transformCoreVS`'s `getLocalPosition` (instanced draws too). Wind and
  *   blankets add their snippets here, or a `transformInstancingVS` of their own.
@@ -51,9 +55,30 @@ import { UNDERGROUND } from './underground';
 
 export type Language = 'glsl' | 'wgsl';
 
+/** A number as a shader's float literal. */
+export const float = (n: number): string => (Number.isInteger(n) ? n.toFixed(1) : String(n));
+
+/**
+ * What a feature's code generator writes the same way in both languages (`nature.ts`'s wind, the
+ * grass): the vector types, a uniform by name (`uniform.` in WGSL) and a local variable's
+ * declaration (`let`, or `var` when `mutable`, in WGSL; typed in GLSL).
+ */
+export function codeFor(lang: Language) {
+  const wgsl = lang === 'wgsl';
+  return {
+    wgsl,
+    v2: wgsl ? 'vec2f' : 'vec2',
+    v3: wgsl ? 'vec3f' : 'vec3',
+    v4: wgsl ? 'vec4f' : 'vec4',
+    u: (name: string) => (wgsl ? `uniform.${name}` : name),
+    decl: (name: string, type: string, mutable = false) => (wgsl ? `${mutable ? 'var' : 'let'} ${name}` : `${type} ${name}`),
+  };
+}
+
 export interface FeatureCode {
   vsDecl?: string;
   vsLocal?: string;
+  vsNormal?: string;
   vsEnd?: string;
   psDecl?: string;
   psStart?: string;
@@ -224,7 +249,7 @@ function build(device: pc.GraphicsDevice, lang: Language): Record<string, string
   out.endPS = ends.length ? `#if ${ends.map((e) => e.when).join(' || ')}\n${ends.map((e) => e.code).join('\n')}\n#else\n${engineEnd}\n#endif\n` : engineEnd;
 
   // An instance's normal corrected for uneven scale (`INSTANCE_NORMAL`).
-  out.normalVS = replaceOnce(engineChunk(device, lang, 'normalVS'), 'normalVS', ANCHORS[lang].normalVS, INSTANCE_NORMAL[lang]);
+  out.normalVS = replaceOnce(engineChunk(device, lang, 'normalVS'), 'normalVS', ANCHORS[lang].normalVS, `${joined(lang, 'vsNormal')}\n${INSTANCE_NORMAL[lang]}`);
 
   out.uv0VS = glsl ? UV0_GLSL : UV0_WGSL;
   // The game's haze (`fog.ts`).

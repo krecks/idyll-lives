@@ -17,7 +17,7 @@
  *                  on attributes the mesh doesn't use: not ATTR13, PlayCanvas's tangent)
  *
  * The buffer grows as copies are added (doubling) and is written straight into the GPU buffer's
- * CPU copy, uploaded by `update` once per change. The draw is culled by the box round all its
+ * CPU copy, uploaded by `update` once per change (only the copies drawn: the room past them isn't). The draw is culled by the box round all its
  * copies (`update` works it out), or not at all (`cull: false`: things spread over the whole lot).
  * The mesh and material stay their owner's: a draw destroyed never takes its mesh with it (a
  * template's is shared by its draws, build after build; the template's owner destroys it).
@@ -187,7 +187,8 @@ export class Instances {
    */
   update(bounds = true): void {
     if (!this.buffer) return;
-    this.buffer.unlock();
+    // Only the copies drawn (at least one's room: a new buffer's first upload makes it, whole).
+    this.buffer.unlock(0, Math.max(1, this.count) * this.stride * 4);
     this.meshInstance.instancingCount = this.count;
     if (this.cull && bounds) this.updateBox();
   }

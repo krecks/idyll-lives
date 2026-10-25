@@ -194,6 +194,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   readonly heads = new Float32Array(MAX_CHARACTERS * 3);
   /** Per Sim row: where they stand (x, z), drawn or not (NaN while away). */
   private readonly spots = new Float32Array(MAX_CHARACTERS * 2).fill(NaN);
+  /** The storey each Sim stands on (`update`; fractions on the stairs). */
+  private readonly storeys = new Float32Array(MAX_CHARACTERS);
   /** Per Sim row, for a conversation they started: how many listen in, and (up to) two of them. */
   private readonly groups = new Int16Array(MAX_CHARACTERS * 3);
   /** Per Sim row, for a conversation they started with others listening in: the middle of the group (x, z). */
@@ -1235,6 +1237,11 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     return true;
   }
 
+  /** Whether Sim `i` is drawn standing on the ground storey (not upstairs, on the stairs or in the basement). */
+  onGround(i: number): boolean {
+    return i >= 0 && i < MAX_CHARACTERS && !!this.visible[i] && Math.abs(this.storeys[i]) < 0.01;
+  }
+
   /** Where Sim `i` stands (x, z), also when not drawn (another lot); false while away or unknown. */
   spot(i: number, out: { x: number; z: number }): boolean {
     if (i < 0 || i >= MAX_CHARACTERS || Number.isNaN(this.spots[i * 2])) return false;
@@ -1343,6 +1350,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const away = curr[o + k.away] !== 0;
       this.spots[i * 2] = away ? NaN : tx;
       this.spots[i * 2 + 1] = tz;
+      this.storeys[i] = th;
       const show = !!rig && !away && inView(tx, tz) && storeyShown(Math.floor(th + 0.01), storey);
       if (!rig || !show) {
         if (this.visible[i]) {

@@ -6,7 +6,10 @@
  * deterministically from the town's seed by the engine-neutral layout (`LandscapeLayout`), so a
  * town always grows the same plants in the same places.
  *
- * Trees, bushes, hedges, lawn tufts and the garden catalog's plants are Blender-built files
+ * The lawn's grass is built on the GPU (`grass.ts`), drawn near the eye; past it the ground
+ * carries the lawn, its gusts too (`grassGround`).
+ *
+ * Trees, bushes, hedges, the lawn's flowers and the garden catalog's plants are Blender-built files
  * (tools/art/blender/families/plants.py, trees.py): crowns on the leafy `foliage` finish over `bark`
  * limbs, each tree and shrub with a far version for the distant woods. `installNature` gives those
  * two finishes the wind (`NATURE_WIND`, the port of `NatureWindPlugin`) and the foliage its
@@ -18,14 +21,16 @@
  */
 
 import * as pc from './engine';
+import { Grass, grassGround, type GrassPusher } from './grass';
 import { Instances } from './instancing';
 import { GAME_FRONT_FACE, MaterialLibrary, textureWithFallback } from './materials';
 import { buildModel, disposeTemplate, type ModelMesh, type ModelTemplate } from './models';
-import { registerShaderFeature, type ShaderFeature } from './shaders/chunks';
+import { codeFor, float, registerShaderFeature, type ShaderFeature } from './shaders/chunks';
 import type { AssetRegistry } from '../../assets/registry';
 import type { WorldStructure } from '../../core/protocol';
 import { CountryRoads } from '../shared/countryRoads';
 import type { Lighting } from '../shared/environment';
+import { grassField, type GrassQuality } from '../shared/grass';
 import { toLinear } from '../shared/math';
 import { computeNormals, sphereData } from '../shared/modelParts';
 import { groupInstances, hideLawn, LandscapeLayout, lawnLayer, lawnMask, smoothstep, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnLayer, type LawnMask } from '../shared/nature';
@@ -62,22 +67,28 @@ export type RoadBuilder = (roads: CountryRoads, parent: pc.Entity) => pc.Entity[
 
 /** The landscape as PlayCanvas draws it (its layout and growth: `shared/nature.ts`). */
 export class Landscape extends LandscapeLayout<CountryRoads> {
-  /** Lawn tufts and flowers, per model, whole and in groups. */
+  /** Lawn flowers, whole and in groups. */
   private lawn: LawnLayer<Instances>[] = [];
+  /** The lawn's grass (built with the rest; none before). */
+  private grass: Grass | null = null;
   /** What `refreshLawn` last hid, for the lawn built again since (`rebuild`). */
   private lawnMask: LawnMask | null = null;
   /** Each model's plants as built, to build again when a file they were built without comes (`rebuild`). */
   private batches: Batch[] = [];
   /** Its other draws (the terrain, the water, the roads). */
   private others: pc.Entity[] = [];
+  /** The water's material and the library that adopted it (its own: it goes with the landscape). */
+  private waterMaterial: { material: pc.StandardMaterial; lib: MaterialLibrary } | null = null;
 
-  constructor(world: WorldStructure, lawnDensity = 1, lawnLod: 0 | 1 = 0) {
+  /** `grassQuality`: how the grass is drawn (the preset's, `QualitySettings.grass`). */
+  constructor(world: WorldStructure, lawnDensity: number, lawnLod: 0 | 1, private readonly grassQuality: GrassQuality) {
     super(world, (land, w, name) => new CountryRoads(land, w, name), lawnDensity, lawnLod);
   }
 
   async build(app: pc.AppBase, parent: pc.Entity, assets: AssetRegistry, world: WorldStructure, pace?: () => Promise<void>, buildRoads?: RoadBuilder): Promise<NatureResult> {
     const draws: pc.Entity[] = [];
-    draws.push(await perfTimeAsync('nature: terrain', () => this.terrain(app, parent, pace)));
+    const ground = await perfTimeAsync('nature: terrain', () => this.terrain(app, parent, pace));
+    draws.push(ground);
     if (this.watered) draws.push(perfTime('nature: water', () => this.water(app, parent)));
     if (buildRoads) draws.push(...perfTime('nature: roads', () => buildRoads(this.roads, parent)));
     for (const e of draws) e.enabled = false;
@@ -85,8 +96,11 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     this.batches = [];
     await perfTimeAsync('nature: forests', () => this.forests(app, parent, assets, pace));
     await perfTimeAsync('nature: lawns', () => this.plantLawns(app, parent, assets, world, pace));
+    const field = await perfTimeAsync('nature: grass field', () => grassField(world, this, pace));
+    const grass = (this.grass = new Grass(app, parent, field, this.grassQuality));
+    grass.onGround(ground.render!.meshInstances[0]);
     const plants = gather(this.batches);
-    return { draws: [...draws, ...plants.draws], casters: plants.casters, only: plants.only };
+    return { draws: [...draws, ...plants.draws, ...grass.draws.map((d) => d.entity)], casters: plants.casters, only: plants.only };
   }
 
   /**
@@ -124,18 +138,36 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   dispose(): void {
     for (const b of this.batches) release(b.built);
     for (const e of this.others) e.destroy();
+    if (this.waterMaterial) {
+      this.waterMaterial.lib.release(this.waterMaterial.material);
+      this.waterMaterial.material.destroy();
+      this.waterMaterial = null;
+    }
+    this.grass?.dispose();
+    this.grass = null;
     this.batches = [];
     this.others = [];
     this.lawn = [];
   }
 
+  /** Each frame: the grass near the eye (game space) in view of the camera (`Grass.frame`). */
+  grassFrame(eye: { x: number; y: number; z: number }, camera: pc.CameraComponent): void {
+    this.grass?.frame(eye, camera.frustum);
+  }
+
+  /** The residents pushing the grass aside now (`Grass.setPushers`). */
+  pushGrass(pushers: readonly GrassPusher[]): void {
+    this.grass?.setPushers(pushers);
+  }
+
   /**
-   * Hides the lawn on tiles that are now indoors or under furniture, and shows it again elsewhere.
-   * On a tile split by a diagonal wall, each tuft follows the half it stands in.
+   * Hides the lawn on tiles that are now indoors or under furniture, and shows it again elsewhere:
+   * the flowers (on a tile split by a diagonal wall, each follows the half it stands in) and the grass.
    */
   refreshLawn(world: WorldStructure): void {
     this.lawnMask = lawnMask(world);
     hideLawn(this.lawn, this.lawnMask, uploadLawn);
+    this.grass?.refresh(world);
   }
 
   /** The ground: a regular grid over the landscape's square, lifted to the land and coloured. */
@@ -176,7 +208,10 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     mesh.setColors(colors);
     mesh.setIndices(indices);
     mesh.update(pc.PRIMITIVE_TRIANGLES);
-    return drawOf(app, parent, 'terrain', mesh, MaterialLibrary.for(app).surface('material.ground', { vertexColors: true }));
+    // (A copy of its own: the gusts' define is the landscape's.)
+    const material = MaterialLibrary.for(app).surface('material.ground', { vertexColors: true, variant: 'grass' });
+    grassGround(app.graphicsDevice, material);
+    return drawOf(app, parent, 'terrain', mesh, material);
   }
 
   /**
@@ -203,8 +238,10 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     mat.gloss = 0.12;
     mat.opacity = 0.9;
     mat.blendType = pc.BLEND_NORMAL;
-    MaterialLibrary.for(app).adopt(mat);
+    const lib = MaterialLibrary.for(app);
+    lib.adopt(mat);
     mat.update();
+    this.waterMaterial = { material: mat, lib };
     return drawOf(app, parent, 'water', mesh, mat);
   }
 
@@ -222,13 +259,13 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     }
   }
 
-  /** The lawn (`lawns`), each model instanced, the tufts in squares. */
+  /** The lawn's flowers (`lawns`), instanced. */
   private async plantLawns(app: pc.AppBase, parent: pc.Entity, assets: AssetRegistry, world: WorldStructure, pace?: () => Promise<void>): Promise<void> {
     this.lawn = [];
-    for (const { key, matrices, tiles, cell } of await this.lawns(world, pace)) {
+    for (const { key, matrices, tiles } of await this.lawns(world, pace)) {
       const lod = this.lawnLod;
-      const built = await instanced(app, parent, assets, key, matrices, lod, cell, pace);
-      this.batches.push(batch({ key, matrices, lod, cell, tiles }, false, built));
+      const built = await instanced(app, parent, assets, key, matrices, lod, undefined, pace);
+      this.batches.push(batch({ key, matrices, lod, tiles }, false, built));
       this.lawn.push(...lawnLayers(built, matrices, tiles));
     }
     this.refreshLawn(world);
@@ -385,9 +422,6 @@ function indexCount(m: ModelMesh): number {
 
 // ---- Wind and foliage shading -----------------------------------------------------------
 
-/** A number as a shader's float literal. */
-const f = (n: number) => (Number.isInteger(n) ? n.toFixed(1) : String(n));
-
 /**
  * The wind (the port of `NatureWindPlugin`), on parts on the `bark` and `foliage` finishes: a slow
  * height-weighted bend with gusts plus leaf flutter, phased per instance by where it stands (its
@@ -405,11 +439,8 @@ const f = (n: number) => (Number.isInteger(n) ? n.toFixed(1) : String(n));
  * No instance stream of its own: it reads only the instance's matrix (`instance_line1..4`).
  */
 function windCode(lang: 'glsl' | 'wgsl'): ShaderFeature['glsl'] {
-  const wgsl = lang === 'wgsl';
-  const v3 = wgsl ? 'vec3f' : 'vec3';
-  const v2 = wgsl ? 'vec2f' : 'vec2';
-  const u = (n: string) => (wgsl ? `uniform.${n}` : n);
-  const decl = (name: string, type: 'float' | 'vec3' | 'vec4', mutable = false) => (wgsl ? `${mutable ? 'var' : 'let'} ${name}` : `${type} ${name}`);
+  const { wgsl, v2, v3, u, decl } = codeFor(lang);
+  const f = float;
   const { gust: g, phase, sway } = WIND;
   const local = `
 #if defined(GAME_WIND) && !defined(SHADOW_PASS)

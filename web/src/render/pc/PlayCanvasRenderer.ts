@@ -67,6 +67,7 @@ import { DOOR_SWING, ease, goingThrough } from '../shared/doors';
 import { createLighting, lightingAt, type RGB } from '../shared/environment';
 import { GAME_RATE } from '../shared/gameSpeed';
 import { Geo } from '../shared/geometry';
+import { GrassPush } from '../shared/grass';
 import { houseObjectKey, placeLights, WALL_HEIGHT, WALL_STUB, type HouseSurfaces, type RoomLight, type RoomTiles } from '../shared/house';
 import { compose, quatYawPitchRoll, toLinear, type Quat } from '../shared/math';
 import { OrbitControls } from '../shared/orbit';
@@ -386,6 +387,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private handles!: ResizeHandles;
   private hoverTile!: HoverTile;
   private readonly eyeTmp = { x: 0, y: 0, z: 0 };
+  /** The residents pushing the lawn's grass aside (`pushGrass`). */
+  private readonly grassPush = new GrassPush();
+  private readonly grassHead = { x: 0, y: 0, z: 0 };
   private readonly vTmp = new pc.Vec3();
   private readonly vTmp2 = new pc.Vec3();
   private readonly qTmp = new pc.Quat();
@@ -620,7 +624,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       else this.orbit.step(dt, Math.max(0.05, (dt * 60) / 1000));
       this.sunShadows.frame();
       this.applyCamera();
-      this.lot.frame(dt); // (the sky round the camera.)
+      this.pushGrass(dt);
+      this.lot.frame(dt); // (the sky round the camera, the grass in view.)
       if (!this.townMode) this.updateCutaway();
       // (The marker faces the camera as it is now, after this frame's input.)
       this.placeMarker();
@@ -2233,6 +2238,20 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
 
   // --- residents, birds, voices ------------------------------------------------------
+
+  /** The residents walking on the ground in view push the grass aside, the nearest the eye first (`dt` ms); none in the menus' town (those pushing ease out). */
+  private pushGrass(dt: number): void {
+    const push = this.grassPush;
+    const eye = this.camera.eyeInGame(this.eyeTmp);
+    const head = this.grassHead;
+    push.begin();
+    for (let i = 0; i < (this.townMode ? 0 : this.simCount); i++) {
+      // (Ranked by how far they are from the eye as drawn, on whatever ground they stand.)
+      if (!this.characters?.onGround(i) || !this.characters.head(i, head)) continue;
+      push.add(i, head.x, head.z, Math.hypot(head.x - eye.x, head.y - eye.y, head.z - eye.z));
+    }
+    this.lot.pushGrass(push.end(dt / 1000));
+  }
 
   simHead(index: number, out: { x: number; y: number; z: number }): boolean {
     return index < this.simCount && !!this.characters?.head(index, out);
