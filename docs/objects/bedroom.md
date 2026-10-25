@@ -11,8 +11,8 @@ Mattress tops match `BEDS` (`BUNKS` for the bunk's two), and beds that get the g
 takes the duvet's colour (the "Bedding" part, as the player painted it or as made; `QUILT_PART` names the futon's own
 quilt and the wall bed's throw), so a bed keeps its colours with someone in it. Residents sleep the night in pyjamas
 (a long top and trousers, barefoot) and nap in their day clothes with the shoes off; on a lounger or a sofa they doze
-as they are (`wearFor`, `outfit.ts`). Every bed of BR1
-but the daybed is in `BLANKET_BEDS`, and all nine have their mattress tops in `BEDS`. Sleepers lie with the heels
+as they are (`wearFor`, `outfit.ts`). All nine beds of BR1 are in `BLANKET_BEDS` (the daybed too, since G-04)
+and have their mattress tops in `BEDS`. Sleepers lie with the heels
 and buttocks about 4 cm into the mattress and the legs on it; a child lies on it too (`lieBack` scales with the
 body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitchen.md`).
 
@@ -45,9 +45,9 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
   flatter). Getting up from the daybed was only half seen.
 - The daybed lain on its side (2026-10-25, `relax`, `poses.html?only=bedDaybed`): at full length on the right side,
   the back to the back rail, the legs along the mattress with the boots 0.3 m inside the foot end, the head on the
-  pillow with the right forearm under the cheek and the left hand in front of the chest; nothing clips, seen from the
-  side, the foot end and behind the back rail. Sleeping on it (`sleep`, with the quilt) reads the same, the quilt
-  mounding over the body. Not a sofa sit: the daybed's back rail runs along a long side (I-bedroom-03).
+  pillow, the right forearm under the cheek and the left hand in front of the chest; nothing clips, seen from the
+  side, the foot end and behind the back rail. Asleep on it (`sleep`, under the quilt), the quilt mounds over the
+  body the same way.
 - The four-poster's duvet foot stands 1.5 cm past the mattress's end, so it doesn't flicker. The daybed's back
   cushions are thin and close to the back, so a sleeper's shoulder and hip stay out of them.
 - Known, not changed (until G-51, below): two residents getting up from the same bed stand on the same spot for a moment (sim). The oak
@@ -73,7 +73,7 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 | `nightstandRound` Drum nightstand | 1x1 · floor | — | bedroom / nightstands | Body, Handles | Static | Static. |
 | `nightstandDrawers` Three-drawer nightstand | 1x1 · floor | snack:fetch | bedroom / nightstands | Body, Handles | Use | `drawer_open`: the top drawer, a biscuit tin, chocolate and a paperback in it, slides out for the snack (`SNACK_DRAWER`); `hold` 2.5 s. A snack from the drawer (fetched, then eaten sitting), not an outfit. 0.47 m deep (it was 0.63, M-bedroom-02). |
 | `nightstandLamp` Nightstand with lamp | 1x1 · floor | — | bedroom / storage | Body, Shade | Static | Static; the shade glows at night (N, E3/E8), the light at the shade. |
-| `cedarChest` Blanket chest | 1x1 · floor | takeBlanket:fetch | bedroom / storage | Body, Handles | Use | `lid_open`: the lid swings up 100° for takeBlanket; `hold` 2 s. |
+| `cedarChest` Blanket chest | 1x1 · floor | takeBlanket:fetch | bedroom / storage | Body, Handles | Use | `lid_open`: the lid swings up 95° for takeBlanket; `hold` 2 s. |
 | `laundryHamper` Laundry hamper | 1x1 · floor | sortWashing:clean | bedroom / storage | Hamper | Use | `lid_open`: the lid lifts for sortWashing. |
 | `benchBedEnd` Bed-end bench | 2x1 · floor | sit:sit | bedroom / storage | Frame, Cushion | Static | Static. |
 
@@ -91,8 +91,8 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `dresser` Chest of drawers | 2x1 · floor | outfit:clean | bedroom / storage | Body, Handles | Use | `drawer_open`: the middle drawer slides out 30 cm for outfit; `hold` 2.5 s. `drawer_open`: the middle drawer slides out 30 cm for outfit, open while they change. |
-| `wardrobe` Wardrobe | 2x1 · floor | outfit:clean | bedroom / storage | Body, Doors, Handles | Use | `doors_open`: both doors swing out 100° for outfit; `hold` 3 s. `doors_open`: both doors swing out 100° for outfit, open while they change. |
+| `dresser` Chest of drawers | 2x1 · floor | outfit:clean | bedroom / storage | Body, Handles | Use | `drawer_open`: the middle drawer slides out 30 cm for outfit and stays out while they change (no `hold`, I-bedroom-04). |
+| `wardrobe` Wardrobe | 2x1 · floor | outfit:clean | bedroom / storage | Body, Doors, Handles | Use | `doors_open`: both doors swing out 100° for outfit and stay open while they change (no `hold`, I-bedroom-04). |
 | `chestOfDrawers` Tall chest of drawers | 1x1 · floor | outfit:clean | bedroom / storage | Body, Handles | Use | `drawer_open`. 0.51 m deep (it was 0.66, M-bedroom-02). |
 | `dresserLow` Low dresser | 2x1 · floor | outfit:clean | bedroom / storage | Body, Handles | Use | `drawer_open`. |
 | `wardrobeSingle` Single wardrobe | 1x1 · floor | outfit:clean | bedroom / storage | Body, Handles | Use | `door_open`. 0.60 m wide, its one door 0.58 (it was 0.90 and 0.88, M-bedroom-03). |
@@ -101,7 +101,9 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 **In play** (signed off 2026-10-16):
 - Each standing free in all four facings, used for "Pick an outfit": the dresser's, tall chest's and low dresser's
   drawer slides out 30 cm; the wardrobe's and armoire's doors (`doors_open`) and the single wardrobe's door
-  (`door_open`) swing out onto the rail of clothes. Each shuts after its `hold`.
+  (`door_open`) swing out onto the rail of clothes. Each stays open for the whole use and shuts when it ends (no
+  `hold` since I-bedroom-04; only the nightstand's snack drawer, the blanket chest's lid and the dressing table's
+  drawer shut on a `hold`).
 - 2026-10-21 (G-69): "Pick an outfit" changes the clothes (content `changesOutfit`): halfway through, with the
   drawer or the doors open (held for the whole use now, no `hold`), the resident is in their next outfit (three
   in turn: the creator's, then two made from the id, `docs/characters-format.md`), walks off in it and keeps it,
@@ -127,7 +129,7 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 - The dressing table's drawer slides out for "Get ready", the resident on the pouf facing the mirror, and shuts after
   its `hold`.
 - The wall mirror hides with its wall when the wall is cut down for the camera (each wall thing knows which views
-  drop its wall, `BabylonRenderer.ts`).
+  drop its wall, `PlayCanvasRenderer.ts`).
 - Since the authenticity review (G-04): getting ready at the dressing table is brushing the hair in the mirror
   (`brushHair`, clips/self.ts, the seated upper body): four strokes from the crown down the right side, the head
   tilting into each, then the left hand smoothing the other side; the brush is mimed in the closed hand (a hand prop is
