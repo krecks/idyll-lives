@@ -1,17 +1,16 @@
 // Crossfade continuity: the residents' blending (`residents.ts` `start`, `choose`, the per-frame blend; `pose.ts`
-// `blendInto`) driven through a recording `ResidentView` with the activities scripted to churn — a Sim standing and
-// sitting on a chair every 0.35 s, one walking and stopping every 0.3 s, one carrying a thing and then sitting down
-// to eat it, one swapping a two-handed load for a one-handed one. Every frame, every bone's rotation is read out of
-// the pose texture (the skinning matrix's rotation, what the viewer sees) and compared with the frame before: a
-// crossfade must move each bone smoothly, so a single frame turning a bone further than the walk cycle ever does is
-// a pop, not motion. `bun test`.
+// `blendInto`) driven through a recording `ResidentView`, with five Sims scripted to churn — a chair sat on and
+// stood up from, a walk cut short by a dance, a two-handed load carried and then eaten, a two-handed load swapped
+// for a one-handed one, in and out of bed. Every frame, every bone's rotation is read out of the pose texture (the
+// skinning matrix's rotation, what the viewer sees) and compared with the frame before: a crossfade must move each
+// bone smoothly, so a single frame turning a bone further than a real fade does is a pop, not motion. `bun test`.
 //
 // (What this caught when written: `start` kept the old fading-out player only under `rig.w < 0.5`, so interrupting
 // a fade jumped up to half the fade's whole delta — 83° of a hand here, 57° where lying meets standing; and the
 // upper-body layer swapped clips at full weight — 79° of a hand for a two-handed load becoming one-handed. With
 // `freezePlayer` and the upper layer's own fade, no bone turns more than 19° in a frame anywhere in the script,
 // which is the fade itself: the widest handoff the clips have is 175° over a quarter second.)
-import { describe, expect, test } from 'bun:test';
+import { afterAll, describe, expect, test } from 'bun:test';
 import { readFileSync, existsSync } from 'node:fs';
 
 const WEB = new URL('../', import.meta.url).pathname;
@@ -25,6 +24,7 @@ describe('residents crossfade continuity', async () => {
       pathname: '/',
     },
   });
+  const realFetch = globalThis.fetch;
   globalThis.fetch = (async (input: string | URL | Request) => {
     const url = new URL(
       typeof input === 'string' ? input : input instanceof URL ? input.href : input.url,
@@ -33,6 +33,10 @@ describe('residents crossfade continuity', async () => {
     const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
     return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
   }) as typeof fetch;
+  // (The shim is process-wide: put the real one back for whatever runs next.)
+  afterAll(() => {
+    globalThis.fetch = realFetch;
+  });
   const { Content } = await import('../src/content/content');
   const { AssetRegistry } = await import('../src/assets/registry');
   const { Characters, MAX_CHARACTERS } = await import('../src/render/shared/characters/residents');
@@ -184,31 +188,34 @@ describe('residents crossfade continuity', async () => {
       ...onBed,
     },
   ];
-  const sims = actors.map(
-    (a, i): SimInfo =>
-      ({
-        id: i,
-        name: `sim${i}`,
-        household: 0,
-        gender: 'male',
-        attractedTo: [],
-        appearance: {
-          body: '#5F86C9',
-          skin: '#C08A64',
-          hair: '#2B2320',
-          hairStyle: 'short',
-          height: 1,
-          build: 1,
-          top: 'top.tee',
-          bottom: 'bottom.trousers',
-          shoes: 'shoes.sneakers',
-        },
-        traits: [],
-        perks: [],
-      }) as unknown as SimInfo,
-  );
+  const sims = actors.map((a, i): SimInfo => ({
+    id: i,
+    name: `sim${i}`,
+    household: 0,
+    gender: 'male',
+    attractedTo: [],
+    appearance: {
+      body: '#5F86C9',
+      skin: '#C08A64',
+      hair: '#2B2320',
+      hairStyle: 'short',
+      height: 1,
+      build: 1,
+      top: 'top.tee',
+      bottom: 'bottom.trousers',
+      shoes: 'shoes.sneakers',
+    },
+    traits: [],
+    perks: [],
+  }));
   const items = content.items.map((it) => it.id);
   const actions = [...content.animations];
+  /** An id's place in one of the snapshot's lists (`indexOf`, but a typo fails the test rather than reading as "none"). */
+  const indexOf = (list: readonly string[], id: string): number => {
+    const i = list.indexOf(id);
+    if (i < 0) throw new Error(`blend.test: '${id}' is not in the snapshot's list`);
+    return i;
+  };
   const FIELDS = [
     'id',
     'x',
@@ -242,7 +249,7 @@ describe('residents crossfade continuity', async () => {
       simCount: 4,
       structureVersion: 5,
     },
-    sim: Object.fromEntries(FIELDS.map((f, i) => [f, i])) as unknown as SnapshotLayout['sim'],
+    sim: Object.fromEntries(FIELDS.map((f, i) => [f, i])) as SnapshotLayout['sim'],
     actions,
     items,
   };
@@ -250,7 +257,11 @@ describe('residents crossfade continuity', async () => {
   function stepAt(a: Actor, t: number): Step {
     const total = a.script.reduce((sum, x) => sum + x.seconds, 0);
     let r = t % total;
-    return a.script.find((x) => (r -= x.seconds) < 0)!;
+    for (const step of a.script) {
+      r -= step.seconds;
+      if (r < 0) return step;
+    }
+    return a.script[a.script.length - 1];
   }
 
   function writeSnapshot(snap: Float32Array, t: number): void {
@@ -260,18 +271,11 @@ describe('residents crossfade continuity', async () => {
     actors.forEach((a, i) => {
       const o = layout.headerLen + i * layout.simStride;
       const f = front(objects[a.object] ?? chair);
-      let [x, z, yaw, pose, moving, held, tag] = [a.x, a.z, 0, P.Stand, 0, '', ''] as [
-        number,
-        number,
-        number,
-        number,
-        number,
-        string,
-        string,
-      ];
+      let [x, z] = [a.x, a.z];
+      let [pose, moving, held, tag] = [P.Stand, 0, '', ''];
       if (a.kind === 'cycle') {
-        const s2 = stepAt(a, t);
-        [pose, moving, held, tag] = [s2.pose ?? P.Stand, s2.moving ?? 0, s2.held ?? '', s2.tag ?? ''];
+        const s = stepAt(a, t);
+        [pose, moving, held, tag] = [s.pose ?? P.Stand, s.moving ?? 0, s.held ?? '', s.tag ?? ''];
         // (On the seat's tile, or about it: the position drifts smoothly either way, so no step in the snapshot is
         // ever a jump — only the activity's.)
         const base = a.object >= 0 ? f : a;
@@ -282,12 +286,13 @@ describe('residents crossfade continuity', async () => {
         [pose, tag, held] = sat ? [P.Sit, 'eat', 'ingredients'] : [P.Stand, '', 'ingredients'];
         [x, z] = [f.x, f.z];
       } else {
-        held = stepAt(a, t).seconds && Math.floor(t / 0.9) % 2 === 0 ? 'ingredients' : 'mealPlate';
+        // A two-handed load for a one-handed one, every `seconds`.
+        held = Math.floor(t / a.script[0].seconds) % 2 === 0 ? 'ingredients' : 'mealPlate';
       }
       snap[o + k.id] = i;
       snap[o + k.x] = x;
       snap[o + k.z] = z;
-      snap[o + k.yaw] = yaw;
+      snap[o + k.yaw] = 0;
       snap[o + k.pose] = pose;
       snap[o + k.moving] = moving;
       snap[o + k.social] = 0;
@@ -298,9 +303,9 @@ describe('residents crossfade continuity', async () => {
       snap[o + k.emotion] = 1;
       snap[o + k.away] = 0;
       snap[o + k.object] = a.object;
-      snap[o + k.action] = tag ? actions.indexOf(tag) : -1;
+      snap[o + k.action] = tag ? indexOf(actions, tag) : -1;
       snap[o + k.mood] = 0.5;
-      snap[o + k.held] = held ? items.indexOf(held) + 1 : 0;
+      snap[o + k.held] = held ? indexOf(items, held) + 1 : 0;
     });
   }
 
@@ -313,6 +318,10 @@ describe('residents crossfade continuity', async () => {
         castsShadows: true,
       });
       expect(await characters.init()).toBe(true);
+      // (The view's `init` is what hands over the pose texture: without it every Sim would be read out of row 0,
+      // and the comparison would measure one character five times.)
+      expect(width).toBeGreaterThan(0);
+      expect(poses.length).toBe(width * MAX_CHARACTERS * 4);
       characters.setEmotions(content.emotions.map((e) => e.id));
       await characters.build({ sims, objects });
       characters.setTables(
@@ -355,7 +364,11 @@ describe('residents crossfade continuity', async () => {
       const note = (deg: number, sim: number, bone: string, at: number) => {
         if (deg < 16) return;
         worst.push({ deg, sim, bone, at });
-        if (worst.length > 400) worst.sort((x, y) => y.deg - x.deg).length = 12;
+        // Keep only the worst few: the message needs the top of the list, not the whole run.
+        if (worst.length > 64) {
+          worst.sort((x, y) => y.deg - x.deg);
+          worst.length = 12;
+        }
       };
       for (let f = 0; f < FPS * SECONDS; f++) {
         const t = f / FPS;
@@ -365,7 +378,8 @@ describe('residents crossfade continuity', async () => {
           writeSnapshot(curr, (tick + 1) * 0.05);
         }
         frame.alpha = (t - tick * 0.05) / 0.05;
-        frame.now = now = 1000 + t * 1000;
+        now = 1000 + t * 1000;
+        frame.now = now;
         characters.update(frame, () => true, shadows);
         for (let i = 0; i < actors.length; i++) {
           // The skinning matrix of each bone, its rotation read out: what the viewer draws.

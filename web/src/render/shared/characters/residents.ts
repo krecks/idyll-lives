@@ -81,15 +81,18 @@ export { MAX_CHARACTERS } from './rig';
 export { EXPRESSIONS, FRIENDLY, STANCE, type StageDirection } from './expressions';
 export type { Face } from './face';
 
-/** How fast an upper-layer clip fades in over the one it replaces (per second; a quarter of a second). */
+/** How fast an upper-layer clip fades in over the one it replaces (per second; a quarter of a second, less when the
+ * action runs fast: scaled by `animRate` like the lower fade). */
 const UPPER_FADE_RATE = 4;
 
-/** `q` / `p` = the player's pose: its clip sampled at its time, or the pose it holds (`Player.frozen`). */
+/** `q` / `p` = the player's pose: its clip sampled at its time, or the pose it holds (`Player.frozen`). A player
+ * with neither (a rig that has not been given a clip yet) leaves `q` / `p` as they were. */
 function samplePlayer(set: CharacterSet, p: Player, q: Float32Array, t: Float32Array): void {
-  if (p.frozen && p.poseQ && p.poseP) {
-    q.set(p.poseQ);
-    t.set(p.poseP);
-  } else sampleClip(set, p.clip!, p.time, q, t);
+  const held = p.frozen;
+  if (held) {
+    q.set(held.q);
+    t.set(held.p);
+  } else if (p.clip) sampleClip(set, p.clip, p.time, q, t);
 }
 
 export class Characters<M extends object, Q, P extends ResidentProp> {
@@ -135,6 +138,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private cuddleAction = -1;
   private changeAction = -1;
   private scratch!: PoseScratch;
+  /** Pose scratch for the frame: `A` the blend in progress, `B` / `C` the players it blends (`update`, `start`).
+   * Allocated by `init`; `update` returns early until then (`set` is null). */
   private qA!: Float32Array;
   private pA!: Float32Array;
   private qB!: Float32Array;
@@ -1538,7 +1543,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       advance(rig.upper, step);
       advance(rig.upperPrev, step);
       // Carrying while walking: the arms bob in step with the feet.
-      if (GAITS.has(rig.cur.key) && rig.upper.clip && rig.upper.key.startsWith('carry')) rig.upper.time = (rig.cur.time / rig.cur.clip!.duration) * rig.upper.clip.duration;
+      if (rig.cur.clip && GAITS.has(rig.cur.key) && rig.upper.clip && rig.upper.key.startsWith('carry')) rig.upper.time = (rig.cur.time / rig.cur.clip.duration) * rig.upper.clip.duration;
       rig.w = Math.min(1, rig.w + dt * rig.fadeRate * Math.max(1, animRate));
       rig.upperFade = Math.min(1, rig.upperFade + dt * UPPER_FADE_RATE * Math.max(1, animRate));
       rig.upperW += clamp(rig.upperTarget - rig.upperW, -dt * 4, dt * 4);
@@ -1558,14 +1563,19 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       }
       if (rig.upperW > 0.001 && rig.upper.clip) {
         samplePlayer(set, rig.upper, this.qB, this.pB);
+        // A new upper clip fades in over the one it replaced, as the lower pair does: at full layer weight, a
+        // straight swap would turn an arm by the whole difference in one frame.
+        // (`srcQ` / `srcP` alias the scratch below: `blendInto` writes into the pair it is given first.)
+        let srcQ = this.qB;
+        let srcP = this.pB;
         const f = smooth(rig.upperFade);
-        // (A new upper clip fades in over the one it replaced, as the lower pair does: at full layer weight, a
-        // straight swap would turn an arm by the whole difference in one frame.)
         if (f < 1 && rig.upperPrev.clip) {
           samplePlayer(set, rig.upperPrev, this.qC, this.pC);
           blendInto(this.qC, this.pC, this.qB, this.pB, f, null);
-          blendInto(this.qA, this.pA, this.qC, this.pC, smooth(rig.upperW), this.upperMask);
-        } else blendInto(this.qA, this.pA, this.qB, this.pB, smooth(rig.upperW), this.upperMask);
+          srcQ = this.qC;
+          srcP = this.pC;
+        }
+        blendInto(this.qA, this.pA, srcQ, srcP, smooth(rig.upperW), this.upperMask);
       }
 
       if (this.force === 'rest') {
@@ -2117,7 +2127,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     // Upper-body layer.
     if (upper) {
       if (rig.upper.key !== upper) {
-        // (Faded in over the clip it replaces: `upperFade`.)
+        // (The clip it replaces keeps playing under the new one, faded out as `upperFade` rises.)
         copyPlayer(rig.upper, rig.upperPrev);
         rig.upperFade = 0;
         rig.upper.key = upper;
@@ -2511,41 +2521,43 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
 
   private start(rig: SimRig, key: string, fade: number, rate: number, repeat: boolean, rootY: number, rootFwd: number, pitch: number): void {
     const clip = this.clip(key);
-    const w = smooth(rig.w);
-    if (rig.w < 1 && rig.prev.clip) {
+    const set = this.set!;
+    const { prev, cur } = rig;
+    if (rig.w < 1 && prev.clip) {
       // A fade cut short. Neither end of it is where the pose had got to, so the fading-out player holds the pose
       // the blend had reached (`freezePlayer`) and fades out of that: dropping to either end would jump by the
       // blend's remaining distance, up to half the whole fade (`blend.test.ts`).
-      const y = lerp(rig.prev.rootY, rig.cur.rootY, w);
-      const fwd = lerp(rig.prev.rootFwd, rig.cur.rootFwd, w);
-      const pitchW = lerp(rig.prev.rootPitch, rig.cur.rootPitch, w);
-      const at = rig.prev.frame || rig.cur.frame ? this.framed(rig, w) : null;
-      samplePlayer(this.set!, rig.prev, this.qB, this.pB);
-      samplePlayer(this.set!, rig.cur, this.qC, this.pC);
+      const w = smooth(rig.w);
+      const heldY = lerp(prev.rootY, cur.rootY, w);
+      const heldFwd = lerp(prev.rootFwd, cur.rootFwd, w);
+      const heldPitch = lerp(prev.rootPitch, cur.rootPitch, w);
+      const at = prev.frame || cur.frame ? this.framed(rig, w) : null;
+      samplePlayer(set, prev, this.qB, this.pB);
+      samplePlayer(set, cur, this.qC, this.pC);
       blendInto(this.qB, this.pB, this.qC, this.pC, w, null);
-      copyPlayer(rig.cur, rig.prev);
-      rig.prev.rootY = y;
-      rig.prev.rootFwd = fwd;
-      rig.prev.rootPitch = pitchW;
-      if (at) rig.prev.frame = at;
-      freezePlayer(rig.prev, this.qB, this.pB);
+      copyPlayer(cur, prev);
+      // (`copyPlayer` takes the incoming clip's root: put back the one the held pose was blended at.)
+      prev.rootY = heldY;
+      prev.rootFwd = heldFwd;
+      prev.rootPitch = heldPitch;
+      if (at) prev.frame = at;
+      freezePlayer(prev, this.qB, this.pB);
     } else {
-      copyPlayer(rig.cur, rig.prev);
+      copyPlayer(cur, prev);
     }
-    const c = rig.cur;
-    const sameLoop = c.key === key && clip.loop;
+    const sameLoop = cur.key === key && clip.loop;
     // Walking into a jog and back: in step (both cycles start at the left heel's strike).
-    const inStep = GAITS.has(key) && GAITS.has(c.key) && c.clip ? ((c.time / c.clip.duration) % 1) * clip.duration : -1;
-    c.clip = clip;
-    c.key = key;
+    const inStep = GAITS.has(key) && GAITS.has(cur.key) && cur.clip ? ((cur.time / cur.clip.duration) % 1) * clip.duration : -1;
+    cur.clip = clip;
+    cur.key = key;
     // Walk cycles of the previous walk keep their phase.
-    c.time = sameLoop ? c.time : inStep >= 0 ? inStep : key === 'idle' || key === 'sit' || key === BABY_LIE.asleep || key === BABY_LIE.awake ? (rig.seed * 7) % clip.duration : 0;
-    c.rate = rate;
-    c.repeat = repeat;
-    c.rootY = rootY;
-    c.rootFwd = rootFwd;
-    c.rootPitch = pitch;
-    if (!rig.prev.clip) copyPlayer(c, rig.prev);
+    cur.time = sameLoop ? cur.time : inStep >= 0 ? inStep : key === 'idle' || key === 'sit' || key === BABY_LIE.asleep || key === BABY_LIE.awake ? (rig.seed * 7) % clip.duration : 0;
+    cur.rate = rate;
+    cur.repeat = repeat;
+    cur.rootY = rootY;
+    cur.rootFwd = rootFwd;
+    cur.rootPitch = pitch;
+    if (!prev.clip) copyPlayer(cur, prev);
     rig.w = 0;
     rig.fadeRate = 1 / Math.max(0.05, fade);
   }
