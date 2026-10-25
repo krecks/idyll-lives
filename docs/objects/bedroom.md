@@ -43,6 +43,11 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 - The lying pose was checked on every bed from the side at mattress height, and a child on the daybed and the bunk:
   heels and buttocks about 4 cm into the mattress, thighs and calves on it or 1–2 cm proud (a straight leg can't lie
   flatter). Getting up from the daybed was only half seen.
+- The daybed sat on lengthways (2026-10-25, `relax`, `poses.html?only=bedDaybed`): the hips on the mattress 0.5 m
+  back of its middle, the legs out along it with the heels on the mattress and the boots 0.6 m inside the foot end,
+  the back leaning toward the head end with the pillow behind the hips and 0.2 m clear of the head arm rail; nothing
+  clips, seen from the foot end, the side and behind the back rail. It is not a sofa sit: the daybed's back rail
+  runs along a long side (I-bedroom-03).
 - The four-poster's duvet foot stands 1.5 cm past the mattress's end, so it doesn't flicker. The daybed's back
   cushions are thin and close to the back, so a sleeper's shoulder and hip stay out of them.
 - Known, not changed (until G-51, below): two residents getting up from the same bed stand on the same spot for a moment (sim). The oak

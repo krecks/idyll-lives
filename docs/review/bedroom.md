@@ -34,7 +34,7 @@ Measured (`sizes-bedroom.md`, reference `bedSingle`, `bedDouble`, `bedKing`, `be
 | `bed` | sleep, nap, read in bed, sit on the edge | sleep (480), take a nap (30); two slots | OK (pilot) |
 | `bedSingle` | sleep, nap, read in bed | sleep (480), nap (30) | OK |
 | `bedBunk` | two sleep one above the other; climb the ladder | sleep (480), nap (30); slot 0 the lower bunk, slot 1 the upper | the right uses; the climb isn't there (A-bedroom-02) |
-| `bedFuton` | sit on it as a sofa; unfold to sleep; fold it away by day | sleep (480), nap (30), unfold (2), fold away (2) | sitting on it folded is missing (I-bedroom-03) |
+| `bedFuton` | sit on it as a sofa; unfold to sleep; fold it away by day | sleep (480), nap (30), unfold (2), fold away (2), sit and relax (30, folded) | OK (I-bedroom-03) |
 | `bedKing` | sleep, nap, lie in | sleep (480), nap (30) | OK |
 | `bedDouble` | sleep, nap, read in bed | sleep (480), nap (30) | OK |
 | `bedQueenUpholstered` | sleep, nap, lie in | sleep (480), nap (30) | OK |
@@ -205,7 +205,7 @@ Measured: the dressing table's top 0.76 (72–78) and its pouf's seat 0.45 (42�
 - **Where:** `web/public/content/furniture.json:1980` (`bedFuton` interactions: sleep, nap, unfold, fold away); `web/public/content/catalog2/bedroom.json:150` (`bedDaybed`: sleep, nap, and since 7d2964d4 sit and relax); `web/src/render/shared/characters/furniture.json:36` (`seats.bedDaybed`)
 - **Evidence:** `bedroom/sheets/obj-bedFuton.png` (folded, a sofa on a platform), `bedroom/sheets/obj-bedDaybed.png` (a back and two arms). Each is a sofa by day; folded, the futon's only use is to unfold it. The sofa bed has relax and doze (`catalog2/living.json`); a "Sit down" or "Relax" (the futon's with `when: closed`) on each would be the missing use.
 - **Status:** fixed (eaca9ed8 the futon; 7d2964d4 the daybed)
-- **After:** Folded, the futon offers "Sit and relax" on its front edge (content `seat` 0.40 m, forward 0.68: `bench-results/review/fixes/content/g09/seat68-bedFuton-relax-00.png`). The daybed is sat on lengthways, which content `seat` can't say: a `seats` row (`h` 0.51, `fwd` −0.5, `legsOut`) and "Sit and relax" (30 min, comfort 0.6) on it, the legs out along the mattress clear of the pillow and the back to the head-end arm rail (`cargo check-glb` measures the seat at 0.507 m there, no heights warning; the pose gallery draws it, `poses.ts` "daybed lengthways"). `along` can't be used: its quarter turn would put the legs out over the front rail and the back through the back rail.
+- **After:** Folded, the futon offers "Sit and relax" on its front edge (content `seat` 0.40 m, forward 0.68: `bench-results/review/fixes/content/g09/seat68-bedFuton-relax-00.png`). The daybed is sat on lengthways, which content `seat` can't say: a `seats` row (`h` 0.51, `fwd` −0.5, `legsOut`) and "Sit and relax" (30 min, comfort 0.6) on it, the legs out along the mattress clear of the pillow and the back to the head-end arm rail (`cargo check-glb` measures the seat at 0.507 m there, no heights warning; drawn from four sides, `fixes/content/g09/seat-bedDaybed-relax-00.png` from the foot end, `-01` the side, `-03` from behind the back rail: nothing clips, the hips on the mattress, the boots 0.6 m inside the foot end). `along` can't be used: its quarter turn would put the legs out over the front rail and the back through the back rail.
 - **Source:** wave: bedroom
 
 ### I-bedroom-04 — "Pick an outfit" changes nothing: the resident keeps the same clothes
