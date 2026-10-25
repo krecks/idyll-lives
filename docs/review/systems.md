@@ -82,7 +82,7 @@ Content `when` / `leaves` (crops below); the objects themselves are in their own
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| Open state: Futon bed (`bedFuton`): sleep, nap, unfold, foldAway | n/a | A-bedroom-03 | I-bedroom-03 | Going to bed unfolds it, the last one up folds it away (tests `open_objects.rs`); nobody folds it over a sleeper. A-bedroom-03 S2 code, I-bedroom-03 S3 content (bedroom ledger: in at the foot; no sitting on it folded) | `bedroom/sheets/obj-bedFuton.png` |
+| Open state: Futon bed (`bedFuton`): sleep, nap, unfold, foldAway | n/a | A-bedroom-03 | I-bedroom-03 | Going to bed unfolds it, the last one up folds it away (tests `open_objects.rs`); nobody folds it over a sleeper. A-bedroom-03 S2 code, I-bedroom-03 S3 content (bedroom ledger: in at the foot; no sitting on it folded, the daybed lain on its side) | `bedroom/sheets/obj-bedFuton.png` |
 | Open state: Cedar hot tub (`hotTubCedar`): soak, coverOn | n/a | OK | I-bathroom-03 | The cover off as they get in (stood up behind the tub), the last one out puts it back (`closeAfter`); I-bathroom-03 S2 code (residents ledger, widened there: soaking in clothes) | `outdoor/sheets/obj-hotTubCedar.png` |
 | Open state: Sofa bed (`sofaBed`): relax, doze, pullOut, foldAway | n/a | OK | OK | Relax only folded; pulled out for a doze and put away after; nobody opens it under someone sitting (tests). The sofa bed's own shots: living ledger | `living/play/chunk2/sofaBed-pullOut-01.png`, `living/play/chunk2/sofaBed-doze-01.png` |
 | Open state: Fold-down wall bed (`wallBed`): sleep, nap, foldDown, foldUp | n/a | OK | OK | Folded down from its foot, up by the last one up (tests); nobody folds it up over a sleeper | `living/sheets/obj-wallBed.png` |

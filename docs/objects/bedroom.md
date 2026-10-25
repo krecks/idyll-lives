@@ -30,7 +30,7 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 | `bedDouble` Double bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`. |
 | `bedQueenUpholstered` Upholstered queen bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`. |
 | `bedCanopy` Four-poster bed | 2x2 · floor | sleep:sleep nap:nap | bedroom / beds | Frame, Headboard, Bedding | Use | `turn_down`; the canopy drapes are static. |
-| `bedDaybed` Daybed | 1x2 · floor | sleep:sleep nap:nap relax:relax | bedroom / beds | Frame, Headboard, Bedding | Static | Static (a sofa by day). The sleeper's quilt is tucked in at the mattress's edges, inside its back, arms and rail (`BEDS` `tuck`, A-bedroom-05). Sat on lengthways as a sofa (`SEATS` `bedDaybed` 0.51 m, hips 0.5 m back of its middle, `legsOut`), facing the foot end: its back rail runs along a long side, so a lengthways sitter's back comes to the head-end arm rail, and `along` would turn them across the bed with their legs out over the front rail (I-bedroom-03). |
+| `bedDaybed` Daybed | 1x2 · floor | sleep:sleep nap:nap relax:relax | bedroom / beds | Frame, Headboard, Bedding | Static | Static (a sofa by day). The sleeper's quilt is tucked in at the mattress's edges, inside its back, arms and rail (`BEDS` `tuck`, A-bedroom-05). Lain on at full length on the side (`SIDE_BEDS`, the `lieSide` clip): turned a quarter about its length with the back to the back rail, the legs along the mattress clear of the pillow, the right forearm under the cheek. No sit: its back rail runs along a long side, so a lengthways sitter's back comes only to the head-end arm rail, and `along` would turn them across the bed with their legs out over the front rail (I-bedroom-03). |
 
 **In play** (signed off 2026-10-16):
 - Each bed napped in, standing free in all four facings (`nap` plays the same clips as the 480-minute sleep). The
@@ -43,11 +43,11 @@ body). Things with drawers and doors follow the fridge (hinge, `hold`; see `kitc
 - The lying pose was checked on every bed from the side at mattress height, and a child on the daybed and the bunk:
   heels and buttocks about 4 cm into the mattress, thighs and calves on it or 1–2 cm proud (a straight leg can't lie
   flatter). Getting up from the daybed was only half seen.
-- The daybed sat on lengthways (2026-10-25, `relax`, `poses.html?only=bedDaybed`): the hips on the mattress 0.5 m
-  back of its middle, the legs out along it with the heels on the mattress and the boots 0.6 m inside the foot end,
-  the back leaning toward the head end with the pillow behind the hips and 0.2 m clear of the head arm rail; nothing
-  clips, seen from the foot end, the side and behind the back rail. It is not a sofa sit: the daybed's back rail
-  runs along a long side (I-bedroom-03).
+- The daybed lain on its side (2026-10-25, `relax`, `poses.html?only=bedDaybed`): at full length on the right side,
+  the back to the back rail, the legs along the mattress with the boots 0.3 m inside the foot end, the head on the
+  pillow with the right forearm under the cheek and the left hand in front of the chest; nothing clips, seen from the
+  side, the foot end and behind the back rail. Sleeping on it (`sleep`, with the quilt) reads the same, the quilt
+  mounding over the body. Not a sofa sit: the daybed's back rail runs along a long side (I-bedroom-03).
 - The four-poster's duvet foot stands 1.5 cm past the mattress's end, so it doesn't flicker. The daybed's back
   cushions are thin and close to the back, so a sleeper's shoulder and hip stay out of them.
 - Known, not changed (until G-51, below): two residents getting up from the same bed stand on the same spot for a moment (sim). The oak
