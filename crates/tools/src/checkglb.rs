@@ -718,8 +718,8 @@ fn uses(motions: &J) -> Vec<(String, J)> {
 }
 
 /// {clip: what plays it} for an entry's `motions` (in the order they're first named): `uses`, `loops`,
-/// `open`, `idle`, `night`, `growth`, `ride` (the clip whose part carries its users) and `clock` (`hour`,
-/// `minute`: hands set by the time).
+/// `open`, `idle`, `night`, `growth`, `ride` (the clip whose part carries its users), `running` (round and
+/// round while a machine runs on its own) and `clock` (`hour`, `minute`: hands set by the time).
 fn played(motions: &J) -> R<Vec<(J, String)>> {
     let mut out: Vec<(J, String)> = Vec::new();
     let mut add = |clip: &J, by: String| {
@@ -733,7 +733,7 @@ fn played(motions: &J) -> R<Vec<(J, String)>> {
     for (name, clip) in motions.get("loops").filter(|l| l.truthy()).and_then(J::entries).unwrap_or(&[]) {
         add(clip, format!("loop {}", repr_str(name)));
     }
-    for kind in ["open", "idle", "night", "growth", "ride"] {
+    for kind in ["open", "idle", "night", "growth", "ride", "running"] {
         if let Some(clip) = motions.get(kind).filter(|c| c.truthy()) {
             add(clip, kind.into());
         }
@@ -748,14 +748,16 @@ fn played(motions: &J) -> R<Vec<(J, String)>> {
 }
 
 /// The clips of `motions` that go round, or from rest to rest (and so must end where they start): loops,
-/// `idle`, a use's clip that repeats (`every`) and a clock's hands (a whole turn). As dict keys.
+/// `idle`, `running`, a use's clip that repeats (`every`) and a clock's hands (a whole turn). As dict keys.
 fn loops(motions: &J) -> R<HashSet<String>> {
     let mut out = HashSet::new();
     for (_, clip) in motions.get("loops").filter(|l| l.truthy()).and_then(J::entries).unwrap_or(&[]) {
         out.insert(clip.key());
     }
-    if let Some(idle) = motions.get("idle").filter(|c| c.truthy()) {
-        out.insert(idle.key());
+    for kind in ["idle", "running"] {
+        if let Some(clip) = motions.get(kind).filter(|c| c.truthy()) {
+            out.insert(clip.key());
+        }
     }
     for (_, u) in uses(motions) {
         if u.get("every").is_some_and(J::truthy) {

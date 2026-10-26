@@ -106,11 +106,11 @@ their backs on the wall face (game depth -0.43).
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `laundryWasher` Washing machine | 1x1 · floor | laundry:clean | bathroom / laundry | Body, Door, Panel | Use + repeat | `door_open`: the round door swings 110° for laundry, `hold` 2.5 s (loading), then shuts; `drum_spin`: once it has shut (`delay` 3.5 s) the drum turns, a turn each 1.2 s, till the wash ends. Only with a load of dirty washing (`workOn`: about 0.4 a resident a day), which it washes for the dryer. |
-| `laundryDryer` Tumble dryer | 1x1 · floor | laundry:clean | bathroom / laundry | Body, Door, Panel | Use | `door_open`, as the washer, to take the washing out to fold; the drum stays still. Only with a washed load to dry and fold (`workOn`). |
+| `laundryWasher` Washing machine | 1x1 · floor | laundry:clean unload:clean | bathroom / laundry | Body, Door, Panel | Use + running | A machine that runs on its own (content `runs`, 60 minutes, the `washer` sound). *Load the washing* (5 min, a dirty load: `workOn`, about 0.4 a resident a day; the basket of washing carried there) opens the door (`door_open` 110°, `hold` 2.5 s); once loaded it washes with nobody there, the drum turning (`running`: `drum_spin`, a turn each 1.2 s). Done, *Take out the washing* (5 min) opens the door again, leaves a washed load and carries it on in the basket to the dryer or the line. |
+| `laundryDryer` Tumble dryer | 1x1 · floor | laundry:clean unload:clean | bathroom / laundry | Body, Door, Panel | Use + running | As the washer: *Load the dryer* (5 min, a washed load), it tumbles 45 minutes on its own (`drum_spin`, a turn each 1.8 s; the `dryer` sound), *Take out the dry laundry* (5 min) leaves a dry load and carries it, an armful, to the laundry basket. |
 | `towelRail` Towel rail | 1x1 · wall | — | bathroom / laundry | Rail, Towels, Hand towel | Static | Static. |
 | `towelLadder` Towel ladder | 1x1 · floor | — | bathroom / laundry | Ladder, Top towel, Middle towel, Bottom towel | Static | Static. |
-| `laundryBasket` Laundry basket | 1x1 · floor | — | bathroom / laundry | Basket, Rim & weave | Static | Static: a wicker basket with clean washing on top; no lid is built (`open.md`). |
+| `laundryBasket` Laundry basket | 1x1 · floor | fold:clean | bathroom / laundry | Basket, Rim & weave | Static | A wicker basket with clean washing on top; no lid is built (`open.md`). *Fold the laundry* (15 min, a dry load), a towel being folded in the hands (`holds`: `item.washingPiece`). A generated laundry room has one when there's room after the dryer (43 of 55 in 180 sample houses). |
 | `bathMat` Bath mat | 1x1 · rug | — | bathroom / laundry | Mat, Pile | Static | Static, flat. |
 
 **In play** (signed off 2026-10-16):
@@ -121,6 +121,12 @@ their backs on the wall face (game depth -0.43).
   door), and the dryer's doesn't tumble while the washing is folded.
 - The towel rail hangs on the walls, the towel ladder leans on them; the basket and bath mat stand free.
 - The towel ladder's colours are Top towel, Middle towel and Bottom towel, listed top to bottom (manifest labels).
+- Since 0.5.0 (I-bathroom-07) the washer and the dryer run on their own: loaded in 5 minutes, left to wash (60) or
+  dry (45) with their drum turning and their sound, emptied in 5. Carried between them: the basket of washing
+  (`item.washingBasket`) and an armful of dry washing (`item.washingArmful`), both built in `laundry.py`, shown only
+  (content `brings`, `holds`). Checked on `review-stage` in WebGPU and WebGL: the basket in the arms on the way to the
+  washer and from it to the dryer, the drum turning with nobody there and stopping once done, the armful to the
+  basket, the towel in the hands folding (2026-10-26).
 
 ## B5. Bathroom storage and mirrors (3)
 

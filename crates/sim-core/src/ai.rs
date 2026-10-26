@@ -197,6 +197,11 @@ mod tests {
             work_on: None,
             partner: false,
             alone: None,
+            loads: false,
+            unloads: false,
+            makes: None,
+            brings: None,
+            holds: None,
         }
     }
 

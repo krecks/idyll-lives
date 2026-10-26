@@ -135,6 +135,9 @@ pub struct ObjectInstance {
     /// A lamp (or a fire) switched off (see `lights.rs`); bought off, on with a lot or a house's
     /// file. Meaningless for other things.
     pub off: bool,
+    /// A machine's run (its kind `runs`; see `machines.rs`): None empty, the game minutes left
+    /// while it runs on its own, 0 done with the load still in it.
+    pub run: Option<f32>,
     /// Residents whose current use needs it closed (bits by sim id), so opening it under them is
     /// refused (`allows`). Derived from their tasks: set when the use reserves a slot, cleared
     /// when it ends; not saved (a reloaded use starts again and sets it).
@@ -179,6 +182,8 @@ impl ObjectInstance {
     pub fn allows(&self, inter: &crate::content::Interaction, me: u32) -> bool {
         self.fits(inter)
             && (!inter.ripe || self.ripe())
+            && (!inter.loads || self.run.is_none())
+            && (!inter.unloads || self.done())
             && (inter.leaves != Some(false) || self.users().all(|u| u == me))
             && (inter.leaves != Some(true) || self.closed_users & !(1 << me) == 0)
     }
@@ -193,6 +198,16 @@ impl ObjectInstance {
     /// Whether it's open or closed as `inter` wants (`when`).
     fn fits(&self, inter: &crate::content::Interaction) -> bool {
         inter.when.is_none_or(|w| w == self.open)
+    }
+
+    /// A machine running on its own (see `run`).
+    pub fn running(&self) -> bool {
+        self.run.is_some_and(|m| m > 0.0)
+    }
+
+    /// A machine done, its load still in it (see `run`).
+    pub fn done(&self) -> bool {
+        self.run.is_some_and(|m| m <= 0.0)
     }
 
     /// Its crop is ripe (see `growth`).
@@ -351,9 +366,9 @@ impl ObjectInstance {
     }
 
     /// Takes on the state `old`, this object before it was lifted out and placed again, had: its
-    /// stable id, turn, wear, open or closed, on or off, and crop.
+    /// stable id, turn, wear, open or closed, on or off, crop, and a machine's run.
     pub(crate) fn carry_state(&mut self, old: &ObjectInstance) {
-        (self.stable, self.turn, self.wear, self.open, self.off, self.growth) = (old.stable, old.turn, old.wear, old.open, old.off, old.growth);
+        (self.stable, self.turn, self.wear, self.open, self.off, self.growth, self.run) = (old.stable, old.turn, old.wear, old.open, old.off, old.growth, old.run);
     }
 
     pub(crate) fn release(&mut self, sim: u32) {
@@ -783,6 +798,9 @@ pub struct Sim {
     /// What they took up to work on this tick (`WorkOn` bits: a load of washing), settled with
     /// the household by `life::update`.
     pub(crate) worked: u8,
+    /// Loads of washing they left to work on next this tick (`WorkOn` bits: the wet washing out
+    /// of the washer; `Interaction::makes`), settled with `worked`.
+    pub(crate) made: u8,
     pub pos: [f32; 2],
     pub yaw: f32,
     pub pose: Pose,
@@ -1259,14 +1277,17 @@ pub struct Household {
     pub expecting: Option<Expecting>,
     /// The day a babysitter was booked for (see `life::childcare`).
     pub sitter_day: Option<u32>,
-    /// Loads of washing waiting: dirty (piling up as content `laundry` says), and washed, to
-    /// dry and fold (`content::WorkOn`).
-    pub laundry: [f32; 2],
+    /// Loads of washing waiting: dirty (piling up as content `laundry` says), washed, to dry,
+    /// and dried, to fold (`content::WorkOn::load`).
+    pub laundry: [f32; 3],
 }
 
 /// Loads of washing a new household has waiting, dirty and washed (one of each: there's always
-/// a bag of washing on moving in).
+/// a bag of washing on moving in); none dry yet.
 pub const LAUNDRY_AT_START: f32 = 1.0;
+
+/// A new household's washing waiting (`Household::laundry`).
+pub const LAUNDRY_START: [f32; 3] = [LAUNDRY_AT_START, LAUNDRY_AT_START, 0.0];
 
 /// A household expecting a baby: the parents and the day it's due.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -1558,7 +1579,7 @@ impl World {
                 routines: Vec::new(),
                 expecting: None,
                 sitter_day: None,
-                laundry: [LAUNDRY_AT_START; 2],
+                laundry: LAUNDRY_START,
             }]
         } else {
             lot_file
@@ -1575,7 +1596,7 @@ impl World {
                     routines: Vec::new(),
                     expecting: None,
                     sitter_day: None,
-                    laundry: [LAUNDRY_AT_START; 2],
+                    laundry: LAUNDRY_START,
                 })
                 .collect()
         };
@@ -1785,6 +1806,7 @@ impl World {
             // A crop comes ripe with a lot (bought, it is just planted: `buy_at`).
             growth: 1.0,
             off: false,
+            run: None,
         };
         let d = &self.content.objects[def];
         let name = &d.id;
@@ -2108,6 +2130,7 @@ impl World {
             buffs: Vec::new(),
             pending_spend: 0,
             worked: 0,
+            made: 0,
             pos: [*x, *z],
             yaw: 0.0,
             pose: Pose::Stand,
@@ -2922,6 +2945,9 @@ impl World {
         if tick.is_multiple_of(GROWTH_STEP_MINUTES * TICKS_PER_MINUTE) {
             self.grow(GROWTH_STEP_MINUTES as f32);
         }
+        if tick.is_multiple_of(crate::machines::STEP_MINUTES * TICKS_PER_MINUTE) {
+            crate::machines::run(self, crate::machines::STEP_MINUTES as f32);
+        }
     }
 
     /// Gives nearby residents a share of what a use gives (content `broadcast`: hearing the TV
@@ -3105,7 +3131,7 @@ impl World {
         work.clear();
         work.extend(self.households.iter().map(|h| {
             let has = |kind: WorkOn, loads: f32| if loads >= 1.0 { kind.bit() } else { 0 };
-            has(WorkOn::Laundry, h.laundry[0]) | has(WorkOn::Washed, h.laundry[1])
+            has(WorkOn::Laundry, h.laundry[0]) | has(WorkOn::Washed, h.laundry[1]) | has(WorkOn::Dried, h.laundry[2])
         }));
         for it in self.items.list.iter().filter(|it| it.to_clear(&self.content)) {
             if let Some(w) = work.get_mut(it.household as usize) {
@@ -3337,6 +3363,9 @@ impl World {
                         Some(w) if w != obj.open && obj.open => format!("the {name} is already open"),
                         Some(w) if w != obj.open => format!("the {name} is closed"),
                         _ if inter.ripe && !obj.ripe() => format!("the {name} isn't ripe yet"),
+                        _ if (inter.loads || inter.unloads) && obj.running() => format!("the {name} is still running"),
+                        _ if inter.loads && obj.done() => format!("the {name} is done: take the washing out first"),
+                        _ if inter.unloads && obj.run.is_none() => format!("there's nothing in the {name}"),
                         _ => format!("someone is using the {name}"),
                     }));
                 }
@@ -4119,7 +4148,8 @@ fn clock_time(hour: f32) -> String {
 
 /// `unmet` for `sim` during a step.
 fn conditions_met(ctx: &Ctx, sim: &Sim, obj: &ObjectInstance, inter: &crate::content::Interaction) -> bool {
-    let work = ctx.work.get(sim.household as usize).copied().unwrap_or(0);
+    // (With what they've just made too: the washing taken out, carried on to dry.)
+    let work = ctx.work.get(sim.household as usize).copied().unwrap_or(0) | sim.made;
     unmet(ctx.nav.lot, ctx.hour, obj, ctx.content, inter, work).is_none()
 }
 
@@ -4443,6 +4473,10 @@ fn pick_autonomous(
             } + care;
             if inter.trains_skills() && allowed == Access::Full {
                 s += training_interest(sim, content, inter) * boost / (1.0 + distance * 0.08);
+            }
+            // The washing waiting at home, the more the keener; a machine done, to be emptied.
+            if allowed == Access::Full {
+                s += crate::machines::pull(ctx.households[sim.household as usize].laundry, content, obj, inter) / (1.0 + distance * 0.08);
             }
             // The plan: a block's activity is the favourite (even with full needs); goals.
             let (plan, floor) = crate::planner::object_factor(content, sim, inter, night);
@@ -5470,6 +5504,9 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                     if sim.current.is_some() {
                         return;
                     }
+                } else if let Some(made) = inter.makes.filter(|_| !given_up && inter.after == 0) {
+                    // The washing taken out: on with it to the dryer or the line, or to fold it.
+                    sim.follow_up = crate::machines::carry_on(sim, ctx, objects, object, made);
                 } else if inter.carried {
                     // Fed in the high chair: back to the crib in the arms.
                     sim.follow_up = crate::carry::carry_back(sim, task, ctx, objects, object);
@@ -5596,9 +5633,10 @@ fn use_object(
             && access(ctx, sim, ctx.object_plot[obj.id as usize]) == Access::Full
             && training_interest(sim, content, inter) > MIN_AUTONOMY_SCORE;
         // A job that changes the thing as the hands go (hanging out the washing, a harvest) goes on to
-        // its end, and clothes are changed all the way, whatever it does for comfort.
+        // its end, and clothes are changed all the way, whatever it does for comfort; so does
+        // loading a machine or emptying it, or anything that leaves a load to work on next.
         // So does a game for two: one stopping would end it for the other.
-        let job = inter.gradual || inter.picks || inter.changes_outfit || inter.partner;
+        let job = inter.gradual || inter.picks || inter.changes_outfit || inter.partner || inter.loads || inter.unloads || inter.makes.is_some();
         elapsed >= inter.minutes || (any_gain && satisfied && !planned && !routine && !practising && !job) || drained
     };
     // Halfway through changing: in the next outfit, which views draw (a change of looks).
@@ -5778,7 +5816,7 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
 
 /// A use done that changed the object as the hands went (`Interaction::gradual`, a crop's
 /// `picks`): now it is so. The washing is out on the line (or in); the crop is picked, and lies
-/// fallow, then grows again.
+/// fallow, then grows again; a machine loaded runs, one emptied is empty (`machines::use_done`).
 fn leaves_at_end(sim: &mut Sim, content: &Content, o: &mut ObjectInstance, interaction: usize) {
     let Some(inter) = content.objects[o.def].interactions.get(interaction) else {
         return;
@@ -5793,6 +5831,7 @@ fn leaves_at_end(sim: &mut Sim, content: &Content, o: &mut ObjectInstance, inter
         o.growth = -1.0;
         sim.reshaped = true;
     }
+    crate::machines::use_done(sim, content, o, inter);
 }
 
 /// Just before they leave for work or school (`DayRhythm::ready_minutes`): what they do out of
@@ -6008,7 +6047,7 @@ fn follow_up(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], object: u32, tags
 
 /// The nearest working object on `plot` (but `except`) with an interaction that `fits`, one
 /// they may use and can get to, as a routine task.
-fn nearest(
+pub(crate) fn nearest(
     sim: &Sim,
     ctx: &Ctx,
     objects: &[ObjectInstance],

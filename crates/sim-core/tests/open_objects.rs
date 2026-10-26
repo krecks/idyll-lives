@@ -228,6 +228,8 @@ fn the_shipped_things_open_and_close_when_told() {
 
         let mut w = common::reload(&w, &content);
         assert!(w.objects[o].open, "{name}: still open after loading");
+        // (The washing dries on the line first: it comes in once its run is done, `machines.rs`.)
+        assert!(!w.objects[o].running() || until(&mut w, 200, |w| w.objects[o].done()), "{name}: done");
         w.apply(Command::Use { sim: 1, object: t.object, interaction: closes }).unwrap();
         let mut open_while_used = false;
         assert!(

@@ -8,8 +8,9 @@
  *   sound, louder the more residents make it, placed left or right like voices; the water sounds are
  *   made in `water.ts`, the things' in `things.ts`. What a use sounds like comes from the thing
  *   (content `sound` and `sounds`), else from its animation (`ACTION_SOUNDS`);
- * - things that sound by themselves (content `ambient`: a fountain), while their lot is looked at,
- *   some only while a use under them sounds (`ambientWhile`: a cooker hood over a hob in use);
+ * - things that sound by themselves (content `ambient`: a fountain; a machine running on its own, its
+ *   `runs.sound`: the washer loaded, nobody at it), while their lot is looked at, some only while a use
+ *   under them sounds (`ambientWhile`: a cooker hood over a hob in use);
  * - sounds as something happens: a fridge door as its use starts (a `sound` played once), a toilet's
  *   flush as its use ends (content `endSound`), a visitor's knock at the front door.
  *
@@ -245,7 +246,8 @@ export class WorldSound {
       const z = o.z - storeyRow(world, storey) + o.d / 2;
       if (!def || x < view.x || x > view.x + view.w || z < view.z || z > view.z + view.d) continue;
       for (const key of [...Object.values(def.sounds ?? {}), ...def.interactions.flatMap((i) => [i.sound, i.endSound])]) if (key !== undefined && isOnce(key)) this.onceHere.add(key);
-      const kind = def.ambient === undefined ? undefined : soundKind(def.ambient);
+      const key = def.ambient ?? (o.running ? def.runs?.sound : undefined);
+      const kind = key === undefined ? undefined : soundKind(key);
       // Broken (worn out), it's still.
       if (!kind || isOnce(kind) || (o.wear ?? 0) >= 1) continue;
       const under = def.ambientWhile === undefined ? undefined : soundKind(def.ambientWhile);

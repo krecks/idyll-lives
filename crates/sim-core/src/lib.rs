@@ -23,6 +23,7 @@ pub mod lifecycle;
 pub mod lights;
 pub mod lod;
 pub mod lot;
+pub mod machines;
 pub mod mesh;
 pub mod pack;
 pub mod phone;

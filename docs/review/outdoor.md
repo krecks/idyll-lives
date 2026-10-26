@@ -102,7 +102,7 @@ Family: `tools/art/blender/families/yard.py`.
 | `greenhouse` Greenhouse | OK | OK | I-outdoor-04, I-outdoor-05 | I-outdoor-04 S2 renderer-table; I-outdoor-05 S2 content | `sheets/obj-greenhouse.png` |
 | `compostBin` Compost bin | OK | OK | I-outdoor-04 | I-outdoor-04 S2 renderer-table | `sheets/obj-compostBin.png` |
 | `rainBarrel` Rain barrel | M-outdoor-06 | n/a | OK | M-outdoor-06 S2 decision | `sheets/obj-rainBarrel.png`, `extra/wall/wall-rainBarrel-no-uses.png` |
-| `clothesline` Washing line | OK | A-outdoor-02 | A-outdoor-02 | A-outdoor-02 S3 code | `sheets/obj-clothesline.png` |
+| `clothesline` Washing line | OK | A-outdoor-02 | A-outdoor-02 | A-outdoor-02 S3 code (fixed in 0.5.0: a line at a time; systems ledger) | `sheets/obj-clothesline.png` |
 | `firewoodStack` Log store | OK | n/a | OK | | `sheets/obj-firewoodStack.png` |
 
 Notes: the washing line's 0.76 m depth is outside the reference range, which is for a single line; three lines on 0.7 m T-arms are that deep (not filed). The tuner stands by the bike's front wheel while the lifted back wheel turns (polish, not filed). The shed is pottered in from its open door, which reads as rummaging in it.

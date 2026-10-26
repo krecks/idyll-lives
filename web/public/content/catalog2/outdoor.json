@@ -536,12 +536,21 @@
       "freeRotation": true,
       "group": "yard",
       "outdoors": true,
-      "description": "Three lines between two posts, washing pegged out in the sun.",
+      "description": "Three lines between two posts: the washing pegged out dries in the sun in three hours, then comes in to be folded.",
+      "runs": {
+        "minutes": 180
+      },
       "interactions": [
         {
           "id": "washing",
           "label": "Hang out the washing",
           "workOn": "washed",
+          "loads": true,
+          "brings": "washingBasket",
+          "hours": [
+            7,
+            19
+          ],
           "anim": "clean",
           "minutes": 20,
           "effects": {
@@ -560,6 +569,8 @@
         {
           "id": "takeIn",
           "label": "Take the washing in",
+          "unloads": true,
+          "makes": "dried",
           "anim": "clean",
           "minutes": 10,
           "effects": {

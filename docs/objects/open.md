@@ -146,8 +146,9 @@ it left is here, with its id; §9 of the review says what each would take.
   "Try for a baby" is a 30-minute standing kiss wherever the two are (I-systems-05, I-social-05). New behaviour.
 - **Nobody serves in town** (I-community-09): the carts, the stall, the bakery case and the café are self-serve, and
   their labels say so; vendors are later (Q-17).
-- **Laundry:** the resident stands at the washer for its whole wash and folds at the dryer with empty hands; the
-  basket plays no part (I-bathroom-07: a timed machine is new behaviour).
+- **Washing with nowhere to dry:** 40 of the 64 sample houses with a washer have no dryer, and no generated yard has
+  a washing line, so there the washed loads wait once washed (as before 0.5.0). The dishwasher and the neat pack's
+  laundry centre are still loaded and run in one use; a machine that runs on its own (content `runs`) would fit them.
 - **Worked from the edge:** the bonsai bench, the rose arbour's roses, the cookbook lectern and the streetball hoop
   are used from the object's edge, not at the part (I-packs-12; `places` can fix it now, and the lectern wants a
   reading hand pose).
@@ -168,8 +169,6 @@ it left is here, with its id; §9 of the review says what each would take.
   into the air; the crown down to about 2.6 m or low apples at 1.4–1.9 m (I-garden-12, `trees.md`).
 - **Food from town on a plate:** crisps, the stall's fruit and the pastry use the treat plate; a cone or paper cup,
   a hot dog in its bun, a crisp packet, an apple and a bagged pastry are to be made (M-held-03, `held.md`).
-- **One part where two would move apart**, to stay within four draws: the washing comes down onto the line all
-  together (A-outdoor-02).
 - **The bakery case's sliding door is on the baker's side** (I-community-09, with vendors).
 
 ### Tools
@@ -203,6 +202,11 @@ it left is here, with its id; §9 of the review says what each would take.
   oven's fire (and the fireplace's and the fire pit's), the phone box, the vending machines, basketball, karaoke
   singing, a bowed cello, the punch bag and the smash bin; a fridge door and the pedal bin's lid, once as they're
   used. The cooker hood hums while the hob under it is in use (I-kitchen-09, Q-19).
+- **Laundry (0.5.0):** the washer and the dryer are loaded in 5 minutes and run on their own (60 and 45 minutes, the
+  drum turning and their sound with nobody there), then someone takes the washing out and carries it on in the
+  basket to the dryer or the line; the dry washing is folded at the laundry basket, a towel in the hands
+  (I-bathroom-07). The washing line dries the washing in 3 hours and takes it down a line at a time, as it is
+  hung out (A-outdoor-02).
 
 ## Notes on the sim
 

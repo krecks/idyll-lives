@@ -337,6 +337,8 @@ export interface ObjectPlacement {
   open?: boolean;
   /** A crop's stage (content `grows`): 0 planted, 1 growing, 2 ripe, 3 picked; absent for other things. */
   growth?: number;
+  /** A machine running on its own (content `runs`: the washer's drum turning, its sound); sim-core `ObjectInstance::run`. */
+  running?: boolean;
   /** What the quick fix costs (worn things). */
   repairCost?: number;
 }

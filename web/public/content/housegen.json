@@ -222,7 +222,8 @@
       "furniture": [
         { "one": ["laundryWasher"] },
         { "one": ["laundryDryer"], "chance": 0.4 },
-        { "one": ["laundryBasket", "laundryHamper", "bathCabinetTall"], "chance": 0.5 }
+        { "one": ["laundryBasket"], "chance": 0.95 },
+        { "one": ["laundryHamper", "bathCabinetTall"], "chance": 0.3 }
       ],
       "wall": [{ "one": ["wallCabinet", "kitchenShelfWall"], "chance": 0.5 }],
       "ceiling": [{ "one": ["ceilingLight"], "chance": 0.5 }]

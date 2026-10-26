@@ -3,6 +3,29 @@
   "tags": [
     "toys"
   ],
+  "items": [
+    {
+      "id": "washingBasket",
+      "label": "Basket of washing",
+      "model": "item.washingBasket",
+      "hold": "both",
+      "radius": 0.25
+    },
+    {
+      "id": "washingArmful",
+      "label": "Armful of dry washing",
+      "model": "item.washingArmful",
+      "hold": "both",
+      "radius": 0.2
+    },
+    {
+      "id": "washingPiece",
+      "label": "Washing to fold",
+      "model": "item.washingPiece",
+      "hold": "both",
+      "radius": 0.15
+    }
+  ],
   "feelings": [
     {
       "id": "home.homeCooked",
@@ -2766,18 +2789,39 @@
       "price": 520,
       "category": "bathroom",
       "group": "laundry",
-      "description": "Clean clothes help a little with hygiene, and the tidy love doing the laundry.",
+      "description": "Load it and it washes by itself; take the washing out when it's done. Clean clothes help a little with hygiene, and the tidy love doing the laundry.",
+      "runs": {
+        "minutes": 60,
+        "sound": "washer"
+      },
       "interactions": [
         {
           "id": "laundry",
-          "label": "Do the laundry",
+          "label": "Load the washing",
           "workOn": "laundry",
+          "loads": true,
+          "brings": "washingBasket",
           "anim": "clean",
-          "sound": "washer",
-          "minutes": 30,
+          "minutes": 5,
           "effects": {
-            "hygiene": 0.12,
-            "comfort": 0.05
+            "hygiene": 0.06,
+            "comfort": 0.02
+          },
+          "tags": [
+            "chores",
+            "cleaning"
+          ]
+        },
+        {
+          "id": "unload",
+          "label": "Take out the washing",
+          "unloads": true,
+          "makes": "washed",
+          "anim": "clean",
+          "minutes": 5,
+          "effects": {
+            "hygiene": 0.06,
+            "comfort": 0.03
           },
           "tags": [
             "chores",
@@ -2797,18 +2841,38 @@
       "price": 420,
       "category": "bathroom",
       "group": "laundry",
-      "description": "Warm, fresh laundry to fold.",
+      "description": "Warm, fresh laundry: load the wet washing and it tumbles dry by itself, ready to fold.",
+      "runs": {
+        "minutes": 45,
+        "sound": "dryer"
+      },
       "interactions": [
         {
           "id": "laundry",
-          "label": "Fold the laundry",
+          "label": "Load the dryer",
           "workOn": "washed",
+          "loads": true,
+          "brings": "washingBasket",
           "anim": "clean",
-          "sound": "dryer",
-          "minutes": 20,
+          "minutes": 5,
           "effects": {
-            "comfort": 0.08,
-            "fun": 0.03
+            "comfort": 0.03
+          },
+          "tags": [
+            "chores",
+            "cleaning"
+          ]
+        },
+        {
+          "id": "unload",
+          "label": "Take out the dry laundry",
+          "unloads": true,
+          "makes": "dried",
+          "anim": "clean",
+          "minutes": 5,
+          "effects": {
+            "comfort": 0.03,
+            "fun": 0.01
           },
           "tags": [
             "chores",
