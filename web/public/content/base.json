@@ -2392,6 +2392,9 @@
         1,
         1
       ],
+      "sounds": {
+        "fetch": "fridgeDoor"
+      },
       "interactions": [
         {
           "id": "snack",
@@ -2464,6 +2467,7 @@
           "id": "coldDrink",
           "label": "Pour a cold drink",
           "anim": "drink",
+          "sound": "fridgeDoor",
           "minutes": 5,
           "effects": {
             "comfort": 0.05,
@@ -3044,6 +3048,7 @@
           "id": "run",
           "label": "Go for a run",
           "anim": "run",
+          "sound": "treadmill",
           "minutes": 60,
           "effects": {
             "fun": 0.1,
@@ -3351,6 +3356,7 @@
           "id": "tinker",
           "label": "Tinker",
           "anim": "tinker",
+          "sound": "tools",
           "minutes": 60,
           "effects": {
             "fun": 0.15,
@@ -4651,8 +4657,7 @@
             "oven"
           ],
           "minutes": 25,
-          "anim": "bake",
-          "sound": "none"
+          "anim": "bake"
         }
       ]
     },
@@ -4702,8 +4707,7 @@
             "oven"
           ],
           "minutes": 35,
-          "anim": "bake",
-          "sound": "none"
+          "anim": "bake"
         }
       ]
     },
@@ -4752,8 +4756,7 @@
             "oven"
           ],
           "minutes": 30,
-          "anim": "bake",
-          "sound": "none"
+          "anim": "bake"
         }
       ]
     },

@@ -675,6 +675,9 @@
         "ingredients"
       ],
       "description": "Two tall doors over a freezer drawer: room for everything, from snacks to a gourmet spread.",
+      "sounds": {
+        "fetch": "fridgeDoor"
+      },
       "interactions": [
         {
           "id": "snack",
@@ -748,6 +751,7 @@
           "id": "coldDrink",
           "label": "Pour a cold drink",
           "anim": "drink",
+          "sound": "fridgeDoor",
           "minutes": 5,
           "effects": {
             "comfort": 0.05,
@@ -776,6 +780,9 @@
         "ingredients"
       ],
       "description": "A rounded fifties fridge in mint green with a chrome lever handle.",
+      "sounds": {
+        "fetch": "fridgeDoor"
+      },
       "interactions": [
         {
           "id": "snack",
@@ -813,6 +820,7 @@
           "id": "coldDrink",
           "label": "Pour a cold drink",
           "anim": "drink",
+          "sound": "fridgeDoor",
           "minutes": 5,
           "effects": {
             "comfort": 0.05,
@@ -841,6 +849,9 @@
         "ingredients"
       ],
       "description": "A pastel-pink mini fridge with brass feet and a unicorn sticker on the door: a treat for a kid's room or a corner bar.",
+      "sounds": {
+        "fetch": "fridgeDoor"
+      },
       "interactions": [
         {
           "id": "snack",
@@ -878,6 +889,7 @@
           "id": "coldDrink",
           "label": "Pour a cold drink",
           "anim": "drink",
+          "sound": "fridgeDoor",
           "minutes": 5,
           "effects": {
             "comfort": 0.05,
@@ -923,6 +935,7 @@
           "id": "wine",
           "label": "Pour a glass of wine",
           "anim": "drink",
+          "sound": "fridgeDoor",
           "minutes": 10,
           "effects": {
             "comfort": 0.1,
@@ -999,6 +1012,9 @@
       "stations": [
         "bin"
       ],
+      "sounds": {
+        "clean": "binLid"
+      },
       "interactions": []
     },
     {
