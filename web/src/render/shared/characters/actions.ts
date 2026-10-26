@@ -10,9 +10,9 @@ import { KNEEL_LANES, KNEEL_TABLE } from './clips/low';
 import { BALL_PIT, PLAY_TENT } from './clips/play';
 import { BOARD, CLOCK, CUPBOARD_OF, FEEDER, PUT_AWAY } from './clips/reach';
 import { BUNK_DOWN, BUNK_UP, RIDE_HORSE, RIDE_ROUND, RIDE_SEESAW, RIDE_SPRING, RIDE_SWING, SLIDE } from './clips/rides';
-import { SHOT } from './clips/shot';
+import { SHOT, STREET_SHOT } from './clips/shot';
 import { CLIMB, CLIMB_LANES, FOUNTAIN, type Size, climbClip } from './clips/street';
-import { EYEPIECE, PICK_APPLE, PICK_HIGH, PICK_LEMON, PLATE_HOLD, SHOWER_CHILD } from './clips/uses';
+import { CUT_ROSE, EYEPIECE, LECTERN, PICK_APPLE, PICK_HIGH, PICK_LEMON, PLATE_HOLD, SHOWER_CHILD } from './clips/uses';
 
 /** Hip roll (rad) while walking, per body. */
 export const GAIT_SWAY: Record<string, number> = { female: 0.07, male: 0.015 };
@@ -157,6 +157,12 @@ export const STEP_IN: Record<string, StepIn> = {
   grandfatherClock: { by: bySize(CLOCK), tag: 'tinker' },
   // Out on the court (2.5 m from the hoop's middle, a lane each for two), shooting (clips/shot.ts).
   basketballHoop: { by: bySize(SHOT), lanes: [-0.45, 0.45], tag: 'exercise' },
+  // The streetball hoop's shot from its two places 2.2 m out, a pace apart (content `places`; clips/shot.ts).
+  'energetic.streetballHoop': { by: bySize(STREET_SHOT), lanes: [-0.45, 0.45], tag: 'exercise' },
+  // The arbour's roses tended at its front posts, the bloom there cut (clips/uses.ts), not at the seat.
+  'romantic.roseArbourSwing': { by: bySize(CUT_ROSE), lanes: [-0.84, 0.84], tag: 'prune' },
+  // Reading the cookbook open on the lectern, the hands on it (clips/uses.ts), from its place 0.52 m out.
+  'foodie.cookbookLectern': { by: bySize(LECTERN), tag: 'read' },
   // Kneeling at the low train table's edge, the hands on its track and its little town, a lane each (clips/low.ts).
   trainTable: { by: bySize(KNEEL_TABLE), lanes: KNEEL_LANES, tag: 'play' },
   // Into the shelter at the timetable's end, on the back glass past the bench.

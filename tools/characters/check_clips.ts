@@ -64,9 +64,9 @@ const { BALL_PIT, PLAY_TENT } = await import('../../web/src/render/shared/charac
 /** Seats whose top ends short of a child's knees (characters.ts `Seat.front`, `perch`). */
 const DEEP: [string, any][] = Object.entries(JSON.parse(readFileSync(new URL('../../web/src/render/shared/characters/furniture.json', import.meta.url), 'utf8')).seats).filter(([, s]: [string, any]) => s.front !== undefined) as [string, any][];
 const { BUNK_DOWN, BUNK_UP, RIDE_HORSE, RIDE_ROUND, RIDE_SEESAW, RIDE_SPRING, RIDE_SWING, SLIDE, SWING_S } = await import('../../web/src/render/shared/characters/clips/rides.ts');
-const { EYEPIECE, PICK_APPLE, PICK_HIGH, PICK_LEMON, SHOWER_CHILD } = await import('../../web/src/render/shared/characters/clips/uses.ts');
+const { CUT_ROSE, EYEPIECE, LECTERN, PICK_APPLE, PICK_HIGH, PICK_LEMON, SHOWER_CHILD } = await import('../../web/src/render/shared/characters/clips/uses.ts');
 const { BOARD, CLOCK, FEEDER, PUT_AWAY } = await import('../../web/src/render/shared/characters/clips/reach.ts');
-const { SHOT } = await import('../../web/src/render/shared/characters/clips/shot.ts');
+const { SHOT, STREET_SHOT } = await import('../../web/src/render/shared/characters/clips/shot.ts');
 const { KNEEL_TABLE, SIT_LOW } = await import('../../web/src/render/shared/characters/clips/low.ts');
 
 /** A clip's sizes (the tallest first): the shortest resident each is for (m) and its clips (one per lane for the laned ones). */
@@ -101,12 +101,15 @@ const SIZED: [sizes: Sized, loop: boolean, seconds: number][] = [
   [one(PICK_APPLE), false, 3.3],
   [one(PICK_LEMON), false, 3.3],
   [one(PICK_HIGH), true, 3.2],
+  [one(CUT_ROSE), true, 3.2],
+  [one(LECTERN), true, 6],
   [[{ min: SHOWER_CHILD, clips: ['shower'] }, { min: 0, clips: ['showerChild'] }], true, 14],
   ...Object.values(PUT_AWAY).map((sizes: any): [Sized, boolean, number] => [one(sizes), true, 3.2]),
   [one(CLOCK), true, 4.5],
   [one(FEEDER), true, 4],
   [one(BOARD), true, 6],
   [one(SHOT), true, 3.2],
+  [one(STREET_SHOT), true, 3.2],
   [one(KNEEL_TABLE), true, 6],
   [one(SIT_LOW), true, 5],
 ];

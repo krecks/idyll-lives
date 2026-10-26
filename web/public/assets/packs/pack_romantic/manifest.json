@@ -360,7 +360,11 @@
       },
       "motions": {
         "uses": {
-          "tendRoses": "cut"
+          "tendRoses": {
+            "clip": "cut",
+            "delay": 0.6,
+            "slot": 0
+          }
         },
         "loops": {
           "swing": "swing"

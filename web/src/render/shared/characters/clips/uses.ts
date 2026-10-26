@@ -219,6 +219,55 @@ function pickHighPose(fit: PickFit): (p: number) => PoseSpec {
 }
 
 /**
+ * Tending the climbing roses on the rose-arbour swing (`romantic.roseArbourSwing`, `pack_romantic.py`): from in front
+ * of a front post (`STEP_IN`'s lanes, 0.75 m out, a child 0.58), the bloom cut there (`BLOOM`, its stem 1.15 m up and
+ * 0.35 m out, `cut` shrinks it away) reached and snipped off twice a loop, as the apples are picked (`pickHighPose`),
+ * the cut ones held at the hip.
+ */
+export const CUT_ROSE: Size<PickFit>[] = sizes('cutRose', SHARES_177, (s) =>
+  s > 0.7 ? { s, to: 0.75, fruit: [0, 1.15 + GRIP.lemon, 0.35] } : { s, to: 0.58, fruit: [0, 1.15 + 0.05, 0.35] },
+);
+
+/**
+ * The cookbook lectern (`foodie.cookbookLectern`, `pack_foodie.py`): its open cookbook on the desk sloping 25° to the
+ * front, the pages' lower corners 1.02 m up and 0.12 m out from the middle, 0.17 m either side (`BOOK`); the reader
+ * stands at its place, 0.52 m out (content `places`).
+ */
+const BOOK = { x: 0.17, y: 1.02, z: 0.12, mid: [0, 1.09, -0.01] as Vec };
+export const LECTERN: Size[] = sizes('readLectern', SHARES_177, (s) => ({ s, to: 0.52 }));
+const LECTERN_S = 6;
+
+/**
+ * Reading at the lectern: leaning in a little, the hands resting on the book's lower corners, the head bowed to the
+ * page; once a loop the left hand lifts the page on its side and lays it over to the right (the model's `page` turns
+ * it as the reading starts), and goes back to its corner.
+ */
+function lecternPose(fit: Fit): (p: number) => PoseSpec {
+  const { s, to } = fit;
+  const o = (x: number, y: number, z: number): Vec => [x / s, y / s, (to - z) / s];
+  const left = o(-BOOK.x, BOOK.y, BOOK.z);
+  const right = o(BOOK.x, BOOK.y, BOOK.z);
+  const over = o(0.0, BOOK.y + 0.16, BOOK.z - 0.08);
+  const across = o(0.12, BOOK.y + 0.05, BOOK.z - 0.04);
+  const mid = o(BOOK.mid[0], BOOK.mid[1], BOOK.mid[2]);
+  const look = reachFor(mid);
+  return (p) => {
+    const t = p * LECTERN_S;
+    // The page turn: up off the corner, over the spine, down on the right, back to the corner.
+    const lift = bump(t, 0.3, 1.5, 0.35);
+    const lay = bump(t, 0.7, 1.9, 0.4);
+    const l = lerpV(lerpV(left, over, lift), across, lay * (1 - 0.5 * lift));
+    const { look: down } = look();
+    const body = reachBody(0, -8, down + 6 * lift, p);
+    return {
+      ...body,
+      ...armIK('l', l, body, { palm: true, pole: [-0.7, -0.6, -0.3], pronate: 80 - 40 * lift, hand: wrist('l', -15 + 25 * lift, 0) }),
+      ...armIK('r', right, body, { palm: true, pole: [0.7, -0.6, -0.3], pronate: 80, hand: wrist('r', -15, 0) }),
+    };
+  };
+}
+
+/**
  * Under the shower (the water falls from overhead, the head under it): when (shares of a round) the hair is
  * lathered, rinsed, the body turned a quarter to the left and soaped (the left arm, the right, the chest),
  * turned back, the face rinsed.
@@ -419,7 +468,8 @@ export function useClips(): ClipDef[] {
   return [
     ...EYEPIECE.map(({ clip, fit }) => cycle(clip, { seconds: 6, loop: true }, eyepiecePose(fit))),
     ...[...PICK_APPLE, ...PICK_LEMON].map(({ clip: name, fit }) => clip(name, { seconds: PICK_S, loop: false }, pickKeys(fit))),
-    ...PICK_HIGH.map(({ clip: name, fit }) => cycle(name, { seconds: 3.2, loop: true }, pickHighPose(fit))),
+    ...[...PICK_HIGH, ...CUT_ROSE].map(({ clip: name, fit }) => cycle(name, { seconds: 3.2, loop: true }, pickHighPose(fit))),
+    ...LECTERN.map(({ clip: name, fit }) => cycle(name, { seconds: LECTERN_S, loop: true }, lecternPose(fit))),
     cycle('shower', { seconds: SHOWER_S, loop: true, hands: 'open' }, showerPose(SHOWER_TURN, 0)),
     cycle('showerChild', { seconds: SHOWER_S, loop: true, hands: 'open' }, showerPose(0, SHOWER_TWIST)),
     cycle('strum', { seconds: 2, loop: true }, strumPose(GUITAR_REACH.long)),

@@ -1,6 +1,8 @@
 /**
  * Shooting hoops (`basketballHoop`, characters.ts `STEP_IN`: out on the court, a lane each for two): from
- * `SHOT.to` m out from the hoop's middle, its rim 2.94 m up and 0.27 m out (`playground.py` `RIM`). A round of
+ * `SHOT.to` m out from the hoop's middle, its rim 2.94 m up and 0.27 m out (`playground.py` `RIM`); and at the
+ * streetball hoop (`energetic.streetballHoop`, `STREET_SHOT`), its rim 2.4 m up and 0.22 m out
+ * (`pack_energetic.py` `RIM`), from 2.2 m out, where its two players stand (content `places`). A round of
  * a few dribbles, the ball gathered to the chest, the dip and a jump shot, the right hand under the ball and the
  * left at its side, let go at the top with the wrist flicked through, a landing on bent knees and the follow-through
  * held while the ball drops in, a look up at it. A child heaves it up two-handed from the chest instead, with
@@ -16,11 +18,13 @@ import { TAU } from './idle';
 import { wrist } from './ik';
 import { SHARES_177, sizes, type Fit, type Size } from './street';
 
-/** The rim's height and how far out it is from the hoop's middle (m). */
+/** The rim's height and how far out it is from the hoop's middle (m): the park's hoop and the streetball hoop. */
 const RIM = { y: 2.94, z: 0.27 };
-type ShotFit = Fit & { push: boolean };
+const STREET_RIM = { y: 2.4, z: 0.22 };
+type ShotFit = Fit & { push: boolean; rim: { y: number; z: number } };
 /** Three sizes; the smallest shoots two-handed from the chest. */
-export const SHOT: Size<ShotFit>[] = sizes('hoopShot', SHARES_177, (s) => ({ s, to: 2.5, push: s < 0.7 }));
+export const SHOT: Size<ShotFit>[] = sizes('hoopShot', SHARES_177, (s) => ({ s, to: 2.5, push: s < 0.7, rim: RIM }));
+export const STREET_SHOT: Size<ShotFit>[] = sizes('streetShot', SHARES_177, (s) => ({ s, to: 2.2, push: s < 0.7, rim: STREET_RIM }));
 const SHOT_S = 3.2;
 /** When (s into the round) the ball is gathered, the dip, the jump, the release and the landing. */
 const T = { gather: 1.05, dip: 1.35, jump: 1.55, release: 1.72, land: 1.95, settle: 2.3 };
@@ -33,7 +37,7 @@ const T = { gather: 1.05, dip: 1.35, jump: 1.55, release: 1.72, land: 1.95, sett
 function shotPose(fit: ShotFit): (p: number) => PoseSpec {
   const { s, to, push } = fit;
   // The rim from the eyes' place, in the clip's frame: its height and how far ahead.
-  const rim: Vec = [0, RIM.y / s, (to - RIM.z) / s];
+  const rim: Vec = [0, fit.rim.y / s, (to - fit.rim.z) / s];
   const aim = (Math.atan2(rim[1] - 1.6, rim[2]) * 180) / Math.PI;
   // The pelvis: low for the dip, up off the floor in the jump (a child's hop smaller), and the knees bent on landing.
   const up = push ? 0.06 : 0.13;
@@ -81,5 +85,5 @@ function shotPose(fit: ShotFit): (p: number) => PoseSpec {
 }
 
 export function shotClips(): ClipDef[] {
-  return SHOT.map(({ clip, fit }) => cycle(clip, { seconds: SHOT_S, loop: true }, shotPose(fit)));
+  return [...SHOT, ...STREET_SHOT].map(({ clip, fit }) => cycle(clip, { seconds: SHOT_S, loop: true }, shotPose(fit)));
 }

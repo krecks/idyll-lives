@@ -119,6 +119,7 @@
       "price": 280,
       "category": "kitchen",
       "slots": 1,
+      "places": [{ "at": [0, 0.52], "facing": 180 }],
       "description": "A stand of well-thumbed cookbooks. Studying recipes trains Cooking without burning a thing; leafing through food magazines is pure fun for food lovers.",
       "interactions": [
         {
