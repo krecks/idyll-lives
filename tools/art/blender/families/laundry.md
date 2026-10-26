@@ -3,7 +3,10 @@
 `laundry.py` builds the six B4 laundry models into `web/public/assets/models/laundry/` and their entries in
 `packs/laundry/manifest.json`: the washing machine (`model.laundryWasher`), the tumble dryer
 (`model.laundryDryer`), the towel rail (`model.towelRail`), the towel ladder (`model.towelLadder`), the laundry
-basket (`model.laundryBasket`) and the bath mat (`model.bathMat`). Built 2026-10-14; they sat in Validate › Laundry
+basket (`model.laundryBasket`) and the bath mat (`model.bathMat`); and since 0.5.0 three things carried doing the
+laundry (content `items`, shown in the hands by `brings` and `holds`): the basket of washing
+(`item.washingBasket`), an armful of dry washing (`item.washingArmful`) and a towel being folded
+(`item.washingPiece`). Built 2026-10-14; they sat in Validate › Laundry
 until checked in play.
 
 Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
@@ -33,6 +36,24 @@ dryer's basket of dry washing) is plain satin, so it costs no draw call.
 **Draw calls: 4** each (the most allowed, as the microwave): the cabinet, the door ring, the door's glass and
 the drum. `check-glb` warns of it. An opaque window would save one, but then the drum couldn't be seen
 turning.
+
+## Running on their own (0.5.0, I-bathroom-07)
+
+The machines run on their own once loaded (content `runs`). Their motions now: `{'uses': {'laundry': 'door_open',
+'unload': 'door_open'}, 'hold': 2.5, 'running': 'drum_spin'}`: loading and taking the washing out open the door,
+which shuts again after 2.5 s, and the drum goes round while the machine runs with nobody there, from rest to rest
+(`running`), a turn each 1.2 s on the washer (unchanged) and each 1.8 s on the dryer (new: its drum didn't turn
+before). The washer's file is as it was.
+
+The carried things, each one draw, base where it rests on the palms (`hold: both`):
+
+| Model | Size (w × h × d) | Triangles | What it is |
+|---|---|---|---|
+| `item.washingBasket` | 0.42 × 0.28 × 0.30 m | 1,688 | an oval wicker tub with bands, a rim and hand holes, washing heaped above it (all satin) |
+| `item.washingArmful` | 0.34 × 0.19 × 0.24 m | 1,100 | three towels folded loosely, a crumpled shirt and a sock on top (satin) |
+| `item.washingPiece` | 0.40 × 0.17 × 0.25 m | 176 | a towel half folded, its far half lifted over towards the hands, a woven band at its end (fabric) |
+
+`check-glb`: 0 failed. Khronos validator: 0 errors, 0 warnings on the dryer and the three.
 
 ## The rest
 

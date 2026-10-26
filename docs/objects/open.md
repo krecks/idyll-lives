@@ -146,8 +146,9 @@ it left is here, with its id; §9 of the review says what each would take.
   "Try for a baby" is a 30-minute standing kiss wherever the two are (I-systems-05, I-social-05). New behaviour.
 - **Nobody serves in town** (I-community-09): the carts, the stall, the bakery case and the café are self-serve, and
   their labels say so; vendors are later (Q-17).
-- **Laundry:** the resident stands at the washer for its whole wash and folds at the dryer with empty hands; the
-  basket plays no part (I-bathroom-07: a timed machine is new behaviour).
+- **Washing with nowhere to dry:** 40 of the 64 sample houses with a washer have no dryer, and no generated yard has
+  a washing line, so there the washed loads wait once washed (as before 0.5.0). The dishwasher and the neat pack's
+  laundry centre are still loaded and run in one use; a machine that runs on its own (content `runs`) would fit them.
 - **Worked from the edge:** the bonsai bench, the rose arbour's roses, the cookbook lectern and the streetball hoop
   are used from the object's edge, not at the part (I-packs-12; `places` can fix it now, and the lectern wants a
   reading hand pose).
@@ -172,8 +173,7 @@ it left is here, with its id; §9 of the review says what each would take.
 - **The arc lamp's arc stops at its own tile:** the sim allows a shade over the next tile (`overhang`) once the model
   reaches it (M-lighting-06, `lighting.md`).
 - **One part where two would fold or move apart**, to stay within four draws: the hot tub's cover folds back as one
-  squashed part, not two halves (A-outdoor-01); the washing comes down onto the line all together (A-outdoor-02);
-  the grandfather clock's trunk door stays shut (A-decor-01).
+  squashed part, not two halves (A-outdoor-01); the grandfather clock's trunk door stays shut (A-decor-01).
 - **Parts with a use but no clip:** the high chair's tray (babies sit in it since G-66), the kettle's lid, the bread
   bin's roll-top and the laptop's lid (used at their top since G-63); the bakery case's door is on the baker's side.
 
@@ -197,6 +197,11 @@ it left is here, with its id; §9 of the review says what each would take.
   chair is used (I-kids-01).
 - **Models:** the entry console's and the spritz station's mirrors on back boards (M-packs-01, M-packs-02); the party
   bar's back bar (M-packs-03); bathers' shins in the heart tub (A-packs-01); the power blender's blades (A-packs-02).
+- **Laundry (0.5.0):** the washer and the dryer are loaded in 5 minutes and run on their own (60 and 45 minutes, the
+  drum turning and their sound with nobody there), then someone takes the washing out and carries it on in the
+  basket to the dryer or the line; the dry washing is folded at the laundry basket, a towel in the hands
+  (I-bathroom-07). The washing line dries the washing in 3 hours and takes it down a line at a time, as it is
+  hung out (A-outdoor-02).
 
 ## Notes on the sim
 

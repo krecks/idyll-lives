@@ -324,6 +324,12 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   ```json
   "motions": { "idle": "blades_turn" }
   ```
+- **Running on its own:** `running` names a clip that goes round while the object runs on its own (content `runs`:
+  a washer loaded, its drum turning), nobody at it, from rest to rest like a loop, finishing its round when the run
+  ends. The sim says when (the placement's `running`); its sound is the object's `runs.sound`.
+  ```json
+  "motions": { "uses": { "laundry": "door_open", "unload": "door_open" }, "hold": 2.5, "running": "drum_spin" }
+  ```
 - **Clocks:** `clock` names a clock's hands: `hour` a clip turning its hand once round in 12 hours,
   `minute` one turning its hand once round in an hour (each a whole turn from rest, any length:
   `G.spin`), and `at` the time the hands show at rest, in minutes past twelve (the catalogue picture's
