@@ -531,6 +531,37 @@ impl World {
         Ok(id)
     }
 
+    /// Places a thing from an older save whose kind has grown since (the chess table: 1 × 1 until
+    /// save version 33, 2 × 1 since), which stood at `x`, `z` facing `rot`: over the tile it stood
+    /// on where it now fits, its own way round first and moved as little as it can; else at its
+    /// plot's first good free spot (`find_spot`). On a plot it must block nothing there
+    /// (`place_at_home`). None if it fits nowhere: the caller sells it back.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn place_grown(&mut self, def: usize, x: i32, z: i32, rot: u8, colors: crate::world::Colors, quality: u8, value: i64) -> Option<u32> {
+        let plot = self.plot_at(x, z);
+        let mut near: Vec<(i32, i32, u8)> = Vec::new();
+        for turn in 0..4u8 {
+            let r = (rot + turn) % 4;
+            let mut shifts: Vec<(i32, i32)> = (-1..=1).flat_map(|dx| (-1..=1).map(move |dz| (dx, dz))).collect();
+            shifts.sort_by_key(|&(dx, dz)| dx.abs() + dz.abs());
+            for (dx, dz) in shifts {
+                let covers = self
+                    .check_fit(def, x + dx, z + dz, r, Layout::default())
+                    .is_ok_and(|o| o.tiles(&self.content).any(|t| t == (x, z)));
+                if covers {
+                    near.push((x + dx, z + dz, r));
+                }
+            }
+        }
+        let Some(plot) = plot else {
+            // (A lot without plots, as the oldest saves: placed as anything loads, where it fits.)
+            return near.into_iter().find_map(|(cx, cz, r)| self.place(def, cx, cz, r, Layout::default(), colors.clone(), quality, value, None).ok());
+        };
+        let spots = self.find_spot(plot, def).into_iter().map(|(cx, cz, r, _)| (cx, cz, r));
+        let tries: Vec<(i32, i32, u8)> = near.into_iter().chain(spots).collect();
+        tries.into_iter().find_map(|(cx, cz, r)| self.place_at_home(plot, def, cx, cz, r, Layout::default(), colors.clone(), quality, value).ok())
+    }
+
     /// Places `old`, lifted out, back on the home plot at `x`, `z` (see `place_at_home`), keeping
     /// what it was (`ObjectInstance::carry_state`).
     pub(crate) fn replace_at_home(&mut self, plot: u32, old: &ObjectInstance, x: i32, z: i32, rot: u8, layout: Layout) -> Result<u32, Error> {

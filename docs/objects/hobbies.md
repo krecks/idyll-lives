@@ -88,7 +88,9 @@ table face the room, as tables do.
   order does the game's use for one instead (`alone`, Q-16): *Practise trick shots*, and the new *Practise
   foosball* (15 min, fun 0.2, the rods turning; only when told, as solo foosball isn't a pastime of its own). The
   chess table stayed *Practise chess* for one, with one chair, until 0.5.0 (M-hobbies-11): it seats two now, one at
-  each end, and *Play chess* fetches a partner, falling back to *Practise chess*.
+  each end, and *Play chess* fetches a partner, falling back to *Practise chess*. A save from before (version 32)
+  puts its 1 × 1 table back over the tile it stood on where the 2 × 1 one fits and blocks nothing, else at a free
+  spot at home, else sells it back for its value.
 - Since the authenticity review (G-51): the jigsaw table is sat at from behind its stool (`approach: behind`), else
   from beside it, and only with both blocked from the front, through the table; so was the chess table until 0.5.0,
   whose two chairs are reached from the tile behind each (`places`).

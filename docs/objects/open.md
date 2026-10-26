@@ -195,7 +195,8 @@ it left is here, with its id; §9 of the review says what each would take.
   on tiptoe takes it, and "Pick the apples" reaches one per size. The lemon tree has a lemon at 1.62, 1.42 and 1.1 m
   for a grown-up, a teen and a child. Placed apple trees aren't turned at random any more (`trees.md`).
 - **The home chess table seats two** (M-hobbies-11, Q-16): a chair at each end of 2 × 1 tiles, `places` facing each
-  other, and *Play chess* with a partner, *Practise chess* alone or with nobody free (`hobbies.md`).
+  other, and *Play chess* with a partner, *Practise chess* alone or with nobody free (`hobbies.md`). An older save's
+  table (save version 33) goes over its old tile where it fits, else at a free spot at home, else it is sold back.
 - **Worked at the part** (I-packs-12): the bonsai bench from 0.6 m out, at the tree; the lectern's book read with the
   hands on it from 0.52 m out (`readLectern*`); the streetball hoop shot from 2.2 m out with a jump shot fitted to
   its rim (`streetShot*`); the arbour's roses cut at a front post (`cutRose*`, `STEP_IN`: the swing's seats can't take
