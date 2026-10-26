@@ -27,7 +27,7 @@ import { pageLook } from '../pc/post';
 import type { AssetRegistry } from '../../assets/registry';
 import type { FrameState } from '../../core/bridge';
 import type { SimInfo } from '../../core/protocol';
-import type { SnapshotLayout } from '../../core/snapshot';
+import { simFields, type SnapshotLayout } from '../../core/snapshot';
 import type { SimLook } from '../types';
 
 export interface StudioDeps {
@@ -59,7 +59,7 @@ const LAYOUT: SnapshotLayout = {
   maxSims: MAX_CHARACTERS,
   ticksPerSecond: 20,
   header: { tick: 0, day: 1, minute: 2, speed: 3, simCount: 4, structureVersion: 5 },
-  sim: Object.fromEntries(FIELDS.map((f, i) => [f, i])) as unknown as SnapshotLayout['sim'],
+  sim: simFields(FIELDS),
   actions: [],
 };
 

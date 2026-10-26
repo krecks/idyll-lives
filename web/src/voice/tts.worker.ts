@@ -21,8 +21,10 @@ import type { VoiceParams } from './voices';
 interface WorkerScope {
   onmessage: ((e: MessageEvent<ToVoiceWorker>) => void) | null;
   postMessage(message: FromVoiceWorker, transfer?: Transferable[]): void;
+  /** Called by the wasm runtime just before a Rust panic traps; set below, where the runtime looks for it. */
+  __wasmPanic?(message: string): void;
 }
-const scope = self as unknown as WorkerScope;
+const scope = self as WorkerScope;
 
 /** Bumped when the files change; older caches are deleted. (New files under new names don't need it.) */
 const CACHE_PREFIX = 'littlelives-voice-';
@@ -59,7 +61,7 @@ let queue: Promise<void> = Promise.resolve();
 /** What our WebAssembly said as it panicked (its panic hook calls `__wasmPanic` just before the trap). */
 let panicked: string | null = null;
 
-(self as unknown as { __wasmPanic: (message: string) => void }).__wasmPanic = (message) => {
+scope.__wasmPanic = (message) => {
   panicked = message;
   console.error(`[voice] ${message}`);
 };
@@ -95,7 +97,9 @@ async function speak(id: number, text: string, voice: VoiceParams): Promise<void
     if (err instanceof WebAssembly.RuntimeError) {
       engine = null;
       loading = null;
-      scope.postMessage({ type: 'error', message: panicked ?? String(err), restart: true });
+      const said = panicked;
+      panicked = null;
+      scope.postMessage({ type: 'error', message: said ?? String(err), restart: true });
     }
   }
 }

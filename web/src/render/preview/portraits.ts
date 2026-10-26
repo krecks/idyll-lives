@@ -68,13 +68,11 @@ interface Batch {
 
 /** Cache key: everything that changes the picture, the shading included (not the height: framing follows the head; not the voice). */
 export function lookKey(look: SimLook): string {
-  const a = look.appearance as unknown as Record<string, unknown>;
-  const sorted = Object.keys(a)
-    .filter((k) => k !== 'height' && k !== 'voice')
-    .sort()
-    .map((k) => [k, a[k]]);
+  const sorted = Object.entries(look.appearance)
+    .filter(([k]) => k !== 'height' && k !== 'voice')
+    .sort(([a], [b]) => (a < b ? -1 : 1));
   // Without garments the outfit comes from the Sim's id (older saves).
-  const legacy = !a.top;
+  const legacy = !look.appearance.top;
   return JSON.stringify([look.gender, sorted, legacy ? (look.id ?? 0) : null, shadingFromSettings()]);
 }
 

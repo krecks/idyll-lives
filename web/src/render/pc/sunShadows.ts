@@ -31,6 +31,7 @@
  */
 
 import * as pc from './engine';
+import { directionalShadows } from './internals';
 import { shadowOnlyLayer } from './layers';
 import { toEngine } from './space';
 import type { Language } from './shaders/chunks';
@@ -70,15 +71,9 @@ interface Square {
 const squares = new WeakMap<object, Square>();
 const patched = new WeakSet<object>();
 
-interface DirectionalShadows {
-  cull(light: object, comp: object, camera: pc.Camera, casters?: object, mask?: number): void;
-}
-
 /** Hands the directional shadow renderer of `app` the squares of lights that have one. */
 function patch(app: pc.AppBase): void {
-  // SAFETY: the forward renderer keeps its directional shadow renderer in `_shadowRendererDirectional`
-  // (PlayCanvas 2.23, pinned); `check:chunks` checks the name is still there.
-  const sr = (app.renderer as unknown as { _shadowRendererDirectional?: DirectionalShadows })._shadowRendererDirectional;
+  const sr = directionalShadows(app);
   if (!sr || patched.has(sr)) return;
   patched.add(sr);
   const cull = sr.cull.bind(sr);

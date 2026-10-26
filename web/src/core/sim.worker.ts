@@ -13,8 +13,10 @@ import { createSharedSnapshot, SharedSnapshotWriter, type SnapshotLayout } from 
 interface WorkerScope {
   onmessage: ((e: MessageEvent<ToWorker>) => void) | null;
   postMessage(message: FromWorker, transfer?: Transferable[]): void;
+  /** Called by the wasm runtime just before a Rust panic traps; set below, where the runtime looks for it. */
+  __wasmPanic?(message: string): void;
 }
-const scope = self as unknown as WorkerScope;
+const scope = self as WorkerScope;
 
 const UI_INTERVAL_MS = 100;
 const STATS_INTERVAL_MS = 1000;
@@ -48,7 +50,7 @@ let panicNext = false;
 /** Sim steps run so far: published with each snapshot (the renderer's clock counts steps, not snapshots). */
 let simSteps = 0;
 
-(self as unknown as { __wasmPanic: (message: string) => void }).__wasmPanic = (message) => {
+scope.__wasmPanic = (message) => {
   panicked = message;
   console.error(`[sim] ${message}`);
 };
@@ -322,10 +324,11 @@ function stop(err: unknown): void {
   fail(err, true);
 }
 
-/** The error's message, or what the simulation said as it panicked. */
+/** The error's message, or what the simulation said as it panicked (said once: a later failure is its own). */
 function describe(err: unknown): string {
-  if (panicked !== null) return panicked;
-  return err instanceof Error ? err.message : String(err);
+  const said = panicked;
+  panicked = null;
+  return said ?? (err instanceof Error ? err.message : String(err));
 }
 
 /** `?debug`'s `__crash` (game/session.ts): fails on purpose, to see how the game copes. */

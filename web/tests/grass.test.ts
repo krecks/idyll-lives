@@ -20,7 +20,7 @@ function lot(): WorldStructure {
   return {
     version: 1,
     lotVersion: 1,
-    mode: 'life',
+    mode: 'living',
     width,
     depth,
     objects: [{ id: 1, def: 'sofa', x: 8, z: 2, rot: 0, w: 2, d: 1 } as WorldStructure['objects'][number]],
@@ -36,7 +36,7 @@ function lot(): WorldStructure {
     floors: [[6, 7, 1]],
     meta: { paths: [{ x: 0, z: 8, w: 4, d: 1 }] } as unknown as WorldStructure['meta'],
     meshes: {} as WorldStructure['meshes'],
-  } as WorldStructure;
+  };
 }
 
 /** Flat land, all lawn, one green. */

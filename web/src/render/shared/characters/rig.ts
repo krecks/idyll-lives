@@ -56,6 +56,12 @@ export interface Player {
   rootPitch: number;
   /** Placed in this frame (world: a point on the floor and a facing) instead of at the Sim: the bunk's ladder (`BUNK_LADDER`). */
   frame: Frame | null;
+  /**
+   * The pose it holds instead of sampling its clip (`freezePlayer`): where a fade had got to when another clip cut
+   * it short. A fading-out player that stands still is what keeps an interrupted fade from jumping: its own clip
+   * would have carried on, or been dropped, neither where the blend had got to.
+   */
+  frozen: { q: Float32Array; p: Float32Array } | null;
 }
 /** A place on the floor and a facing (world, the Sim's convention: `yaw` 0 faces +z). */
 export interface Frame {
@@ -74,8 +80,10 @@ export function player(): Player {
     rootFwd: 0,
     rootPitch: 0,
     frame: null,
+    frozen: null,
   };
 }
+/** `to` takes `from`'s clip and root — (source, destination) — and drops the pose it held: it samples its clip again. */
 export function copyPlayer(from: Player, to: Player): void {
   to.clip = from.clip;
   to.key = from.key;
@@ -86,6 +94,12 @@ export function copyPlayer(from: Player, to: Player): void {
   to.rootFwd = from.rootFwd;
   to.rootPitch = from.rootPitch;
   to.frame = from.frame;
+  to.frozen = null;
+}
+/** `to` (the destination first, as `copyPlayer` takes it last) stops sampling its clip and holds `q` / `p`, a pose
+ * the blend had reached, until it is copied into again. */
+export function freezePlayer(to: Player, q: Float32Array, p: Float32Array): void {
+  to.frozen = { q: Float32Array.from(q), p: Float32Array.from(p) };
 }
 export interface SimRig {
   id: number;
@@ -143,6 +157,9 @@ export interface SimRig {
   fadeRate: number;
   /** Upper-body layer (eating while seated, hugging). */
   upper: Player;
+  /** The upper clip `upper` is fading in from, and how far (`upperW` is the layer's own weight). */
+  upperPrev: Player;
+  upperFade: number;
   upperW: number;
   upperTarget: number;
   lookYaw: number;
@@ -337,7 +354,7 @@ export interface SimRig {
   speechSeg: number;
 }
 export function advance(p: Player, dt: number): void {
-  if (!p.clip) return;
+  if (!p.clip || p.frozen !== null) return;
   p.time += dt * p.rate;
   if (p.clip.loop && p.time > p.clip.duration * 64) p.time %= p.clip.duration;
 }
@@ -397,7 +414,11 @@ export function lerp(a: number, b: number, t: number): number {
 }
 /** Getting into bed: sitting down on its edge (until the crossfade to lying), as `choose` plays it. */
 export function gettingIn(rig: SimRig): boolean {
-  return (rig.lastPose === Pose.Stand && rig.cur.key !== 'sitDown') || (rig.cur.key === 'sitDown' && rig.cur.time < rig.cur.clip!.duration - 0.35);
+  const clip = rig.cur.clip;
+  return (
+    (rig.lastPose === Pose.Stand && rig.cur.key !== 'sitDown') ||
+    (rig.cur.key === 'sitDown' && clip !== null && rig.cur.time < clip.duration - 0.35)
+  );
 }
 /** 0 before `from`, easing to 1 over `length` after it. */
 export function ramp(t: number, from: number, length: number): number {

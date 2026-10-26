@@ -32,7 +32,7 @@ import { createStage } from './pcStage';
 import { Content } from '../content/content';
 import type { FrameState } from '../core/bridge';
 import type { ObjectPlacement, SimInfo } from '../core/protocol';
-import { Pose, type SnapshotLayout } from '../core/snapshot';
+import { Pose, simFields, type SnapshotLayout } from '../core/snapshot';
 import { lookAtStage, palette, type HairStyle } from '../game/household';
 import { Characters, MAX_CHARACTERS } from '../render/pc/characters';
 import { Instances } from '../render/pc/instancing';
@@ -187,6 +187,7 @@ const STATIONS: Station[] = [
   { label: 'type', def: 'computerDesk', tag: 'type', pose: P.Sit, female: true },
   { label: 'piano', def: 'piano', tag: 'music', pose: P.Sit },
   { label: 'chaise feet up', def: 'chaise', tag: 'relax', pose: P.Sit, female: true },
+  { label: 'daybed on its side', def: 'bedDaybed', tag: 'relax', pose: P.Lie, female: true },
   { label: 'exercise bike', def: 'exerciseBike', tag: 'exercise', pose: P.Sit },
   { label: 'cello', def: 'gloomy.cello', tag: 'music', pose: P.Sit, female: true },
   { label: 'drums', def: 'hotHeaded.thunderDrums', tag: 'music', pose: P.Sit },
@@ -499,7 +500,7 @@ const layout: SnapshotLayout = {
   maxSims: MAX_CHARACTERS,
   ticksPerSecond: 20,
   header: { tick: 0, day: 1, minute: 2, speed: 3, simCount: 4, structureVersion: 5 },
-  sim: Object.fromEntries(FIELDS.map((f, i) => [f, i])) as unknown as SnapshotLayout['sim'],
+  sim: simFields(FIELDS),
   actions,
   items,
 };

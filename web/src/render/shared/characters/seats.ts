@@ -175,6 +175,8 @@ export const LIE_ENTRY = 0.55;
 export const SIDE_IN = 0.2;
 /** Beds too short to lie on flat (a window seat's 1.3 m between its pillows): dozed on curled up on the side (`lieCurl`, clips/self.ts). */
 export const CURLED_BEDS = new Set(['gloomy.windowSeat']);
+/** Beds lain on at full length on the side rather than the back (a daybed, a sofa by day: `lieSide`, clips/self.ts). */
+export const SIDE_BEDS = new Set(['bedDaybed']);
 /**
  * Pedalling (`Characters.pedal`): a turn's length (s) when the object's loop isn't playing (the bike's
  * `pedals_turn`), and the ankle's place over the pedal's axle (m up and forward, body scale 1).

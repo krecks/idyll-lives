@@ -17,6 +17,7 @@ import { ENV_UNITS, SKY_UNITS, SUN_UNITS } from '../pc/lightUnits';
 import { MaterialLibrary } from '../pc/materials';
 import { disposeTemplate, type ModelTemplate } from '../pc/models';
 import { Instances } from '../pc/instancing';
+import { deviceShaders } from '../pc/internals';
 import { installNature, setWind, windStill } from '../pc/nature';
 import { pageLook } from '../pc/post';
 import { shadingFromSettings } from '../pc/shaders/softLook';
@@ -191,8 +192,7 @@ function asyncShaders(device: pc.GraphicsDevice): void {
 /** Whether a shader of `device` is still compiling (WebGL2; draws with it are left out, `asyncShaders`). */
 export function shadersCompiling(device: pc.GraphicsDevice): boolean {
   if (device.isWebGPU) return false;
-  const shaders = (device as unknown as { shaders: (pc.Shader & { ready: boolean; failed: boolean; impl: { isLinked(d: pc.GraphicsDevice): boolean } })[] }).shaders;
-  return shaders.some((s) => !s.ready && !s.failed && !s.impl.isLinked(device));
+  return deviceShaders(device).some((s) => !s.ready && !s.failed && !s.impl.isLinked(device));
 }
 
 /** Give up waiting for a model's textures (ms). */

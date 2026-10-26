@@ -474,6 +474,7 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | warmHands | yes | 7 | warming up standing at a fire (`ACTIONS.relax` at `WARM_AT`: the fire pit): leant a little to it, the hands held out over it, palms to the flames, turned now and then, then brought together and rubbed (clips/uses.ts) |
 | plateHold177, 147, 112 | yes | 3 | stood on the vibration plate (`GRIPPED`): both hands on its grips (fore-and-aft bars 0.26 m either side, 0.96 m over the deck, 0.12 m ahead), the weight shifting a little; the plate's buzz on top (`activityPose`); a size per height |
 | lieCurl | yes | 2.4 | dozing on a bed too short to lie on flat (`CURLED_BEDS`: the window seat): curled up on the left side facing the room, the knees drawn up, the head on the pillow on the left forearm; turned flat like `lie` |
+| lieSide | yes | 2.4 | lying at full length on the right side (`SIDE_BEDS`: the daybed): the back to the object's back rail, the legs along the mattress, the right one straight and the left a little over it, the right forearm under the cheek on the pillow, the left hand in front of the chest; turned flat like `lie` |
 
 ### Checking clips
 
@@ -538,7 +539,9 @@ Why some entries are as they are:
   from their models' builds).
 - `bedDouble`, `bedQueenUpholstered`, `bedCanopy`: their mattress tops; `bedDaybed` its daybed top, its quilt tucked in
   between the back, the arms and the rail (`tuck`: the quilt's width, no side drop showing; `foot` 0.12, the quilt ending
-  just past the toes inside the foot end's arm).
+  just past the toes inside the foot end's arm). The daybed is lain on at full length on the side (`SIDE_BEDS`, the
+  `lieSide` clip): turned a quarter about its length, its back to the back rail (a sofa by day is lounged on, not
+  lain flat on the back).
 - `sofaBed`: the head on the seat, the rest on the mattress pulled out in front (`bed_out`, `fwd`).
 - `gloomy.windowSeat`, `kind.hearthSettee` (2 wide): dozed on along the cushion, head to its left, whichever slot
   (the nap takes both, content `whole`).

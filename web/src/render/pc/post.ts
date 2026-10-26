@@ -26,6 +26,7 @@
  */
 
 import * as pc from './engine';
+import { deviceDriverInfo } from './internals';
 import { NIGHT_TINT, nightAmount } from './nightGrade';
 import { composeChunks, FXAA, PAGE_TONE_MAPPING, pageToneMapping } from './shaders/post';
 import { curveUniforms, NEUTRAL_CURVES, vignetteUniforms, type ColorCurveSettings, type VignetteSettings } from '../shared/imageProcessing';
@@ -116,7 +117,7 @@ class FxaaPass extends pc.RenderPassShaderQuad {
 
 /** The GPU's name, for the FXAA's `MALI` variant (on Mali GPUs). */
 function driverInfo(device: pc.GraphicsDevice): string {
-  const d = device as unknown as { unmaskedRenderer?: string; gpuAdapter?: { info?: { vendor?: string; architecture?: string; description?: string } } };
+  const d = deviceDriverInfo(device);
   const info = d.gpuAdapter?.info;
   return [d.unmaskedRenderer, info?.vendor, info?.architecture, info?.description].filter(Boolean).join(' ');
 }

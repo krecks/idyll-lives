@@ -44,6 +44,13 @@ import { gameAssetPlan } from './streamPlan';
 import { perfEnd, perfPhase, perfStart, perfTime, perfTimeAsync } from '../debug/perf';
 import { UiMirror } from './uiUpdates';
 
+declare global {
+  interface Window {
+    /** What the benches drive the game through (`tools/bench/scene.mjs`); set only in development builds. */
+    __osw?: Record<string, unknown>;
+  }
+}
+
 /** Click radius (CSS px) around a Sim's projected centre. */
 const SIM_PICK_RADIUS = 32;
 const STATS_INTERVAL_MS = 500;
@@ -1622,8 +1629,7 @@ export async function startSession(
   session.applySettings(settings);
   if (import.meta.env.DEV) {
     // Test hook for automated browser checks; not present in production builds.
-    // SAFETY: the window object has no index signature in TypeScript; the hook is ours.
-    (window as unknown as Record<string, unknown>).__osw = {
+    window.__osw = {
       simScreen(id: number) {
         const head = { x: 0, y: 0, z: 0 };
         const out = { x: 0, y: 0 };
@@ -1633,7 +1639,8 @@ export async function startSession(
         const head = { x: 0, y: 0, z: 0 };
         if (renderer.simHead(id, head)) renderer.focus(head.x, head.z);
       },
-      stats: () => renderer.stats(),      view: () => viewPlot,
+      stats: () => renderer.stats(),
+      view: () => viewPlot,
       project(x: number, y: number, z: number) {
         const out = { x: 0, y: 0 };
         return renderer.project(x, y, z, out) ? out : null;

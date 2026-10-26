@@ -34,6 +34,7 @@ import { HoverTile, ResizeHandles } from './handles';
 import { HeldFrames } from './heldFrames';
 import { HouseBuilder, type HouseDoor } from './house';
 import { Instances } from './instancing';
+import { deviceDriverInfo } from './internals';
 import { overLayer } from './layers';
 import { Lamps } from './lamps';
 import { contactBlob, LotContents } from './lotContents';
@@ -110,6 +111,15 @@ import type {
   Shading,
   WallMode,
 } from '../types';
+
+declare global {
+  interface Window {
+    /** The renderer's own hook for the dev tools and the benches (`?debug`); see `render/types.ts`. */
+    __renderer?: unknown;
+    __scene?: unknown;
+    __app?: unknown;
+  }
+}
 
 /** The game camera's zoom and tilt limits. */
 const RADIUS_LIMITS = [6, 95] as const;
@@ -2140,8 +2150,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
         canvas('fxaa (canvas)');
       } else canvas('imageProcessing (canvas)');
     } else canvas('scene (canvas)');
-    // SAFETY: WebgpuGraphicsDevice keeps the adapter in `gpuAdapter`; WebglGraphicsDevice the unmasked names.
-    const info = d as unknown as { gpuAdapter?: { info?: Record<string, string> }; unmaskedRenderer?: string; unmaskedVendor?: string };
+    const info = deviceDriverInfo(d);
     const adapter = info.gpuAdapter?.info;
     return {
       engine: `PlayCanvas ${pc.version}`,
@@ -2369,11 +2378,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.sizeWatch?.disconnect();
     this.unwatchPixelRatio?.();
     window.removeEventListener('resize', this.onResize);
-    const debug = window as unknown as { __renderer?: unknown; __scene?: unknown; __app?: unknown };
-    if (debug.__renderer === this) {
-      delete debug.__renderer;
-      delete debug.__scene;
-      delete debug.__app;
+    if (window.__renderer === this) {
+      delete window.__renderer;
+      delete window.__scene;
+      delete window.__app;
     }
     for (const w of this.frameWaiters.splice(0)) w.resolve();
     this.unlistenFiles?.();

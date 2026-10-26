@@ -6,6 +6,7 @@ What it covers: the behaviour that spans objects: cooking and its 9 recipes over
 - **Rubric:** [plan/authenticity-review.md §3](../../plan/authenticity-review.md#3-rubrics); real-world ranges in [reference.md](reference.md). Finding format and severities: [README.md](README.md#writing-a-finding).
 - **Columns:** M, A and I take `OK`, a finding id or `n/a`; `—` is pending. Findings lists the ids filed against the row, with severity and fix class; Shots names the evidence files.
 - **Seeded findings** (`Status: seeded`) are known issues copied in from earlier docs. Confirm or close them; don't file them again.
+- **Code references:** paths are the PlayCanvas renderer's (`web/src/render/pc/`, `PlayCanvasRenderer.ts`; both renamed when the renderer was ported from Babylon). Line numbers in `Where:` were taken before that port and no longer land on the code (some past the file's end): read the symbol named beside the number.
 - **Never looked at before** (`docs/objects/open.md` "Not looked at"): a meal from the fridge eaten at a pulled-in chair (eating was checked with the café's cake). Cross-cutting wave: seen, the sandwich eaten at the dining table on a pulled-in chair with its plate on the table (`held/inhand/sandwich-04.png`).
 - **Cross-cutting wave (2026-10-21):** the recipes from the held wave's runs on `family-check` (`held/inhand/<recipe>-NN.png` and `timeline.jsonl`; contact sheets `systems/sheets/cook-<recipe>-N.png`), the kitchen, outdoor and packs waves' station shots, and scenes of its own (`bench-results/review/scripts/scenes.mjs`, log in `systems/scenes/scenes.log`): baby care on `review-baby` (a copy of `review-stage` with the baby hungry and wet and free will on), lamps on `lamps-night` with free will on, the toilet and the front door on `bathroom-check` (also from above, `systems/doors-top/`), a visitor invited over on `calling-out` (a fixed camera on the lot's entry). Systems have no model of their own: M is `n/a`, the models are in their ledgers.
 
@@ -15,14 +16,14 @@ Steps from `base.json` `recipes` (station, clip, minutes).
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| `meal` Make a meal: ingredients (fetch, 3) → prep (chop, 10, optional) → stove/oven/microwave (stir, 20, optional) (minutes) | n/a | I-systems-07 | I-systems-04, I-systems-06 | Fridge (door open, the hands in it) → counter (board, chopping) → hob (pan on a lit burner) → the pot left on the hob → eaten at the island → dishes: a real kitchen flow. I-systems-07 S3 code (the prep bowl in the other hand while stirring); I-systems-06 S2 renderer-table (at an oven or microwave the step is the same stirring of a pan; not shot at a microwave); I-systems-04 S2 code (seeded: a child may cook) | `systems/sheets/cook-meal-1.png`, `systems/sheets/cook-eat.png` |
-| `gourmet` Cook a gourmet meal: ingredients (fetch, 3) → prep (chop, 20) → stove (stir, 45) (minutes) | n/a | I-systems-07 | OK | As `meal` at the stove; the dirty pot scraped and washed after. I-systems-07 S3 code | `systems/sheets/cook-gourmet-1.png`, `systems/sheets/cook-gourmet-2.png` |
-| `tastingMenu` Cook a tasting menu: ingredients (fetch, 3) → prep (chop, 30) → stove (stir, 45) (minutes) | n/a | I-systems-07 | OK | Prep and cook at the one chef's island, then the tasting board served there. I-systems-07 S3 code | `systems/sheets/cook-tastingMenu-1.png` |
-| `bbq` Grill dinner: ingredients (fetch, 3) → prep (chop, 10, optional) → grill (flip, 25) (minutes) | n/a | I-systems-07 | I-systems-01 | Out to the kettle grill with the bowl, food turned on the grate; the platter served on the kitchen counter. I-systems-07 S3 code (flipping with the bowl in hand); I-systems-01 S2 renderer-table (confirmed: the grill station's chopping board drawn on its grate) | `systems/sheets/cook-bbq-1.png`, `outdoor/play/chunk5-kitchen/grillStation-cook-01.png` |
-| `bbqFeast` Grill a barbecue feast: ingredients (fetch, 3) → prep (chop, 20) → grill (flip, 50) (minutes) | n/a | I-systems-07 | I-systems-01 | The `bbq` steps, longer (not run: the same stations and clips); at the grill station I-systems-01 (`outdoor/play/chunk5-kitchen/grillStation-feast-01.png`) | `outdoor/sheets/obj-grillStation.png` |
-| `pizza` Bake a wood-fired pizza: ingredients (fetch, 3) → prep (chop, 15, optional) → oven (stir, 25) (minutes) | n/a | I-systems-06 | I-systems-06 | I-systems-06 S2 renderer-table (the pizza is "baked" stirring a pan at the oven's side); the pizza then served on the kitchen counter, 6 m off, fine | `systems/sheets/cook-pizza-1.png` |
-| `bakedTreats` Bake treats: ingredients (fetch, 3) → prep (chop, 15, optional) → oven (stir, 35) (minutes) | n/a | I-systems-06 | I-systems-06 | I-systems-06 S2 renderer-table (at the stove the oven door drops open and the cook stirs a pan on the hob for 35 minutes, the bowl of batter in the other hand); the tray served on the counter | `systems/sheets/cook-bakedTreats-1.png`, `systems/sheets/cook-ovens.png` |
-| `pie` Bake a family pie: ingredients (fetch, 3) → prep (chop, 15, optional) → oven (stir, 30) (minutes) | n/a | I-systems-06 | I-systems-06 | I-systems-06 S2 renderer-table (the neighbourly oven: the pastry rolled on its worktop, then a pan stirred on its top) | `systems/sheets/cook-pie-1.png` |
+| `meal` Make a meal: ingredients (fetch, 3) → prep (chop, 10, optional) → stove (stir) / oven, microwave (bake), 20, optional (minutes) | n/a | I-kitchen-04 | I-systems-04, I-kitchen-05 | Fridge (door open, the hands in it) → counter (board, chopping) → hob (pan on a lit burner) → the pot left on the hob → eaten at the island → dishes: a real kitchen flow. I-kitchen-04 S2 code (the crate and the prep bowl put down on the station's top while the step is worked; fixed 57b3a576); I-kitchen-05 S2 renderer-table (at an oven or microwave the step is the `bake` tag now, not stirring a pan; not shot at a microwave; fixed 2dcc4ea0); I-systems-04 S2 code (recipes take `stages`: a child is refused; fixed 697544c2) | `systems/sheets/cook-meal-1.png`, `systems/sheets/cook-eat.png` |
+| `gourmet` Cook a gourmet meal: ingredients (fetch, 3) → prep (chop, 20) → stove (stir, 45) (minutes) | n/a | I-kitchen-04 | OK | As `meal` at the stove; the dirty pot scraped and washed after. I-kitchen-04 S2 code (fixed 57b3a576) | `systems/sheets/cook-gourmet-1.png`, `systems/sheets/cook-gourmet-2.png` |
+| `tastingMenu` Cook a tasting menu: ingredients (fetch, 3) → prep (chop, 30) → stove (stir, 45) (minutes) | n/a | I-kitchen-04 | OK | Prep and cook at the one chef's island, then the tasting board served there. I-kitchen-04 S2 code (fixed 57b3a576) | `systems/sheets/cook-tastingMenu-1.png` |
+| `bbq` Grill dinner: ingredients (fetch, 3) → prep (chop, 10, optional) → grill (flip, 25) (minutes) | n/a | I-kitchen-04 | I-systems-01 | Out to the kettle grill with the bowl, food turned on the grate; the platter served on the kitchen counter. I-kitchen-04 S2 code (the bowl put down to turn the food; fixed 57b3a576); I-systems-01 S2 renderer-table (confirmed: the grill station's chopping board drawn on its grate; fixed 65278fa4) | `systems/sheets/cook-bbq-1.png`, `outdoor/play/chunk5-kitchen/grillStation-cook-01.png` |
+| `bbqFeast` Grill a barbecue feast: ingredients (fetch, 3) → prep (chop, 20) → grill (flip, 50) (minutes) | n/a | I-kitchen-04 | I-systems-01 | The `bbq` steps, longer (not run: the same stations and clips); at the grill station I-systems-01 (`outdoor/play/chunk5-kitchen/grillStation-feast-01.png`), and I-kitchen-04's bowl put down as there | `outdoor/sheets/obj-grillStation.png` |
+| `pizza` Bake a wood-fired pizza: ingredients (fetch, 3) → prep (chop, 15, optional) → oven (bake, 25) (minutes) | n/a | I-kitchen-05 | I-kitchen-05 | The pizza slid in on a tray and the oven door shut (`bake`), not a pan stirred at its side (I-kitchen-05, fixed 2dcc4ea0); served on the kitchen counter, 6 m off, fine | `systems/sheets/cook-pizza-1.png` |
+| `bakedTreats` Bake treats: ingredients (fetch, 3) → mix (mix, 15, optional) → oven (bake, 35) (minutes) | n/a | I-kitchen-05 | I-kitchen-05 | The tray in the oven and the door shut for 35 minutes (I-kitchen-05, fixed 2dcc4ea0), the batter mixed at the counter before (the Mix step's own tag); the tray served on the counter | `systems/sheets/cook-bakedTreats-1.png`, `systems/sheets/cook-ovens.png` |
+| `pie` Bake a family pie: ingredients (fetch, 3) → make the pastry (mix, 15, optional) → oven (bake, 30) (minutes) | n/a | I-kitchen-05 | I-kitchen-05 | The neighbourly oven: the pastry rolled on its worktop, the pie dish in and the door shut (I-kitchen-05, fixed 2dcc4ea0) | `systems/sheets/cook-pie-1.png` |
 | `sandwich` Make a sandwich: ingredients (fetch, 2) → prep (chop, 7) (minutes) | n/a | OK | OK | Fridge → counter → eaten at the dining table with the plate drawn | `systems/sheets/cook-sandwich-1.png`, `held/inhand/sandwich-04.png` |
 
 Durations are by design (§9.2); none is an outlier against the others (the feasts and gourmet dishes 2–3× a plain meal).
@@ -33,13 +34,13 @@ Durations are by design (§9.2); none is an outlier against the others (the feas
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| Props on the station (board, pan, grill food) | n/a | OK | I-systems-01 | I-systems-01 S2 renderer-table (confirmed); the board on a counter and the pan on a hob are right (`cook-meal-1`), the pan on an oven's or a pizza oven's top is I-systems-06 | `systems/sheets/cook-meal-1.png`, `outdoor/play/chunk5-kitchen/grillStation-cook-01.png` |
+| Props on the station (board, pan, grill food) | n/a | OK | I-systems-01 | I-systems-01 S2 renderer-table (confirmed; fixed 65278fa4); the board on a counter and the pan on a hob are right (`cook-meal-1`), the pan on an oven's or a pizza oven's top was I-kitchen-05 (fixed 2dcc4ea0) | `systems/sheets/cook-meal-1.png`, `outdoor/play/chunk5-kitchen/grillStation-cook-01.png` |
 | Serving out (`serving`) | n/a | OK | OK | The dish put down on a counter by the last station (the pot on the hob, the tray, platter and pizza on the counter, the pie dish on the oven) | `systems/sheets/cook-pizza-1.png`, `systems/sheets/cook-pie-1.png` |
 | Eating at a table or seat | n/a | OK | OK | At the island on a bar stool and at the dining table on a pulled-in chair, `eat` with the hands at the mouth (no cutlery: I-held-01, held ledger); the white plate on the white island barely shows, only the food on it (`cook-eat.png`) | `systems/sheets/cook-eat.png` |
 | Scraping a plate | n/a | OK | OK | A minute at the bin (`clean`), then to the sink with the stack | `held/inhand/gourmet-08.png`, `held/inhand/bbq-09.png` |
-| Washing up (sink, dishwasher, bin) | n/a | OK | I-systems-03 | At the sink (`wash`); I-systems-03 S3 decision (seeded; not checked: no home without a sink and a bin was set up) | `held/inhand/meal-08.png` |
+| Washing up (sink, dishwasher, bin) | n/a | OK | I-systems-03 | At the sink (`wash`); I-systems-03 S3 decision (won't fix, Q-17: every generated home has a sink and a bin; owner, 2026-10-21) | `held/inhand/meal-08.png` |
 | Putting clean things away (`putAwayAt`) | n/a | OK | OK | `fetch` at a cupboard or counter, two minutes | `held/inhand/gourmet-11.png` |
-| Leftovers and spoiling | n/a | n/a | OK | 8 hours on a counter, 72 in the fridge (`cooking.spoilHours`, `storedSpoilHours`), spoilt food greyed (`items.ts:151`); waiting cooks: I-systems-10 S2 code (two cooks stand inside each other at the fridge) | `systems/sheets/baby.png` |
+| Leftovers and spoiling | n/a | n/a | OK | 8 hours on a counter, 72 in the fridge (`cooking.spoilHours`, `storedSpoilHours`), spoilt food greyed (`items.ts:151`); waiting cooks: I-systems-10 S2 code (two cooks stand inside each other at the fridge; fixed 36198175) | n/a (code read) |
 
 ## Baby care (7)
 
@@ -47,7 +48,7 @@ The crib (`base.json`), `babyWakes` and the cuddle lift (`characters.ts`).
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| `lie` Lie in the crib (sleep, 720 min) | n/a | OK | I-kids-03 | The baby lies on the mattress, asleep or awake (pilot); I-kids-03 S1 code (systems ledger: an adult told to lies in it) | `kids/sheets/obj-crib.png`, `systems/sheets/baby.png` |
+| `lie` Lie in the crib (sleep, 720 min) | n/a | OK | I-kids-03 | The baby lies on the mattress, asleep or awake (pilot); I-kids-03 S1 code (systems ledger: an adult told to lie in it) | `kids/sheets/obj-crib.png`, `systems/sheets/baby.png` |
 | `feed` Feed the baby (tend, 15 min) | n/a | I-kids-04 | I-kids-04 | I-kids-04 S2 renderer-table (confirmed again: Ada, on her own, kneels at the rail for the feed); I-held-01 S2 code (no bottle) | `systems/sheets/baby.png` |
 | `change` Change the baby (clean, 10 min) | n/a | I-kids-05 | I-kids-05 | I-kids-05 S2 code (confirmed again: changed over the rail, the changing chest beside it unused) | `systems/sheets/baby.png` |
 | `play` Play with the baby (play, 20 min) | n/a | OK | OK | Standing at the rail, the hands working over the baby (pilot `play/crib-play-01.png`) | `kids/sheets/obj-crib.png` |
@@ -63,20 +64,20 @@ The crib (`base.json`), `babyWakes` and the cuddle lift (`characters.ts`).
 |---|---|---|---|---|---|
 | Clicking a lamp on or off | n/a | OK | OK | `switchLamp`, the lighting wave's shots | `lighting/night/extra/lamp-switched-off.png`, `lighting/night/extra/lamp-switched-on.png` |
 | Residents switch a room's lamps on after dark and off as they leave | n/a | OK | OK | `lamps-night`, free will on: Ada walks into the dark room B and both its lamps come on as she comes in, room A's go off behind her; out of the house both are off; back in A, A's come on. Nobody walks to a switch (by design: "as at the switch by the door") | `systems/sheets/lamps.png` |
-| Lamp fades | n/a | OK | n/a | 1.2 s (`BabylonRenderer.ts:191` `LIGHTS_OUT_FADE`), the shade's glow with it | `systems/sheets/lamps.png` |
+| Lamp fades | n/a | OK | n/a | 1.2 s (`PlayCanvasRenderer.ts:191` `LIGHTS_OUT_FADE`), the shade's glow with it | `systems/sheets/lamps.png` |
 | Light coming from the shade | n/a | n/a | OK | The shade glows and the pool of light falls round the base; each lamp is judged in the lighting ledger | `lighting/night/extra/lamp-switched-on.png` |
 
 ## House doors (3)
 
-`BabylonRenderer.ts` `swingDoors` (the door models are in [houses.md](houses.md)).
+`PlayCanvasRenderer.ts` `swingDoors` (the door models are in [houses.md](houses.md)).
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| Front door: who opens it and when | n/a | A-houses-01 | OK | Shut; swings in as she walks up to it, open while she passes, shut behind her (`bathroom-check`); a visitor knocking stands still, so it stays shut until the host walks out. A-houses-01 S3 code (systems ledger, confirmed: by nearness, no hand). Fixed (e04bc6c0): only for someone going through it | `systems/sheets/doors.png`, `fixes/town/doors/swing1-past-0.png` |
-| Bathroom door: shut while in use | n/a | A-houses-01 | I-systems-05 | Opens as she walks in, shuts behind her and stays shut on the toilet and at the basin (from above, `systems/sheets/doors-top.png`). I-systems-05 S3 code (confirmed and widened: the drawing only; every other inside door stands open always) | `systems/sheets/doors-top.png` |
-| Garden door to the patio | n/a | A-houses-01 | OK | A door with outdoors on one side is a "front" door (`house.ts:293`, `:760`): shut, opening as someone passes, like the front door (code read; not shot apart). Fixed (e04bc6c0): opens only for someone going through, as the front door | `systems/sheets/doors.png` |
+| Front door: who opens it and when | n/a | A-houses-01 | OK | Shut; swings in as she walks up to it, open while she passes, shut behind her (`bathroom-check`); a visitor knocking stands still, so it stays shut until the host walks out. A-houses-01 S2 code (systems ledger, confirmed: by nearness, no hand; raised from S3). Fixed (e04bc6c0): only for someone going through it | `systems/sheets/doors.png`, `fixes/town/doors/swing1-past-0.png` |
+| Bathroom door: shut while in use | n/a | A-houses-01 | I-systems-05 | Opens as she walks in, shuts behind her and stays shut on the toilet and at the basin (from above, `systems/sheets/doors-top.png`). I-systems-05 S3 code (confirmed and widened: the drawing only; every other inside door stands open always); A-houses-01 S2 code (fixed e04bc6c0) | `systems/sheets/doors-top.png` |
+| Garden door to the patio | n/a | A-houses-01 | OK | A door with outdoors on one side is a "front" door (`house.ts:293`, `:760`): shut, opening as someone passes, like the front door (code read; not shot apart). A-houses-01 S2 code: fixed (e04bc6c0), opens only for someone going through, as the front door | `systems/sheets/doors.png` |
 
-## Objects that open (6)
+## Objects that open (5)
 
 Content `when` / `leaves` (crops below); the objects themselves are in their own ledgers.
 
@@ -86,8 +87,13 @@ Content `when` / `leaves` (crops below); the objects themselves are in their own
 | Open state: Cedar hot tub (`hotTubCedar`): soak, coverOn | n/a | OK | I-bathroom-03 | The cover off as they get in (stood up behind the tub), the last one out puts it back (`closeAfter`); I-bathroom-03 S2 code (residents ledger, widened there: soaking in clothes) | `outdoor/sheets/obj-hotTubCedar.png` |
 | Open state: Sofa bed (`sofaBed`): relax, doze, pullOut, foldAway | n/a | OK | OK | Relax only folded; pulled out for a doze and put away after; nobody opens it under someone sitting (tests). The sofa bed's own shots: living ledger | `living/play/chunk2/sofaBed-pullOut-01.png`, `living/play/chunk2/sofaBed-doze-01.png` |
 | Open state: Fold-down wall bed (`wallBed`): sleep, nap, foldDown, foldUp | n/a | OK | OK | Folded down from its foot, up by the last one up (tests); nobody folds it up over a sleeper | `living/sheets/obj-wallBed.png` |
-| Open state: Washing line (`clothesline`): washing, takeIn | n/a | A-systems-02 | OK | Hung out, it stays out until someone takes it in (autonomous); A-systems-02 S3 motion (all the washing on the line in 1.5 s at the start of a 20-minute use) | `outdoor/sheets/obj-clothesline.png` |
-| Resizing furniture with moving parts | n/a | A-systems-01 | n/a | A-systems-01 S3 code (seeded; not checked: resizing is off) | |
+| Open state: Washing line (`clothesline`): washing, takeIn | n/a | A-outdoor-02 | OK | Hung out, it stays out until someone takes it in (autonomous); A-outdoor-02 S3 motion (all the washing on the line in 1.5 s at the start of a 20-minute use; fixed in part, 7d186856) | `outdoor/sheets/obj-clothesline.png` |
+
+**Not an object that opens** (a row of its own, judged when resizing comes back; A-systems-01 is closed, not reproduced):
+
+| Item | M | A | I | Findings | Shots |
+|---|---|---|---|---|---|
+| Resizing furniture with moving parts | n/a | A-systems-01 | n/a | A-systems-01 S3 code (closed, not reproduced: the moving parts follow a resize, 5866e4ab; `followup/A-systems-01/`); resizing is off in 0.3.0 for reasons of its own | n/a (no resize in 0.3.0) |
 
 ## Crops (4)
 
@@ -109,7 +115,7 @@ Content `grows`; `harvest` from ripe to picked.
 | Knocking (`knock`) | n/a | I-systems-09 | I-systems-09 | I-systems-09 S3 code (the visitor stands 1.5 m before the door, turned to the middle of the lot, and knocks on the wall beside it) | `systems/sheets/knock.png` |
 | Answering the door, or turning away | n/a | OK | OK | The nearest free grown-up drops what they're doing (R2 leaves a meal in the kitchen), walks through the house and out of the door to the visitor (`life.rs:669` `door_host`); turned away at night or by someone who can't stand them (`answer`, code read; not shot) | `systems/sheets/knock.png` |
 | Greeting at the door | n/a | OK | OK | A chat on the doorstep, 1 m apart, facing each other (`visits.door.greet`) | `systems/sheets/knock.png`, `social/sheets/visit.png` |
-| What visitors use | n/a | n/a | I-systems-05 | I-systems-05 S3 code (seeded: no private flag) | |
+| What visitors use | n/a | n/a | I-systems-05 | I-systems-05 S3 code (confirmed: no private flag; later, G-72) | |
 | Farewell (`goodbyeHug`, `goodbye`) | n/a | OK | OK | A hug for a friend, a wave for others, then home (`goodbye-hug`, `goodbye-wave`; social ledger rows) | `social/sheets/goodbye.png` |
 
 ## Use length (1)
@@ -124,7 +130,7 @@ Sim rules over every use.
 
 Seeded from earlier docs first; add new findings after them in the same form.
 
-### A-systems-01 — Moving parts don't follow a resize, so furniture can't be resized
+### A-systems-01 — A resized thing's moving parts don't follow it (closed: not reproduced)
 
 - **Severity:** S3
 - **Rubric:** A10, M4
@@ -142,7 +148,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S2
 - **Rubric:** I13
 - **Fix class:** renderer-table
-- **Where:** `web/src/render/babylon/characters.ts:546` (`STATION_PROPS`) and `:2097` (`writeTool`)
+- **Where:** `web/src/render/pc/characters.ts:546` (`STATION_PROPS`) and `:2097` (`writeTool`)
 - **Evidence:** The chopping board and the food are drawn at the station's middle, a little towards the cook. On `grillStation` that is the grate, so the chopping happens on the grill. Cross-cutting wave: `outdoor/play/chunk5-kitchen/grillStation-cook-01.png` and `grillStation-feast-01.png` (the outdoor wave's runs): the orange board lies over the burning grate while the station's own wooden prep board, at its right end, stays bare. The kettle grill (`bbq`) and kitchen counters are right (`systems/sheets/cook-bbq-1.png`, `cook-meal-1.png`).
 - **Status:** fixed (65278fa4)
 - **After:** `STATION_SPOTS` (`writeTool`): the pan on the burner each cooker's clip lights (the gas range's flame, the range cooker's middle ring, the hob counter's hot ring, measured from those parts; the electric cooker's front ring on the turning knob's side) and the grill station's chopping board on its free counter, off the grate (`fixes/tables/play-b/b-stoveGas-cook-*.png`, `b-rangeCooker-cook-*.png`, `b-cooktopCounter-cook-*.png`, `b-grillStation-cook-*.png`). Its own prep board keeps its tray of patties.
@@ -193,7 +199,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S3
 - **Rubric:** I6
 - **Fix class:** code
-- **Where:** `web/src/render/babylon/BabylonRenderer.ts:3778` (`swingDoors`), `web/src/render/babylon/house.ts:757-760` (only front and bathroom doors move: "the others stand open"), `crates/sim-core/src/content.rs`
+- **Where:** `web/src/render/pc/PlayCanvasRenderer.ts:3778` (`swingDoors`), `web/src/render/pc/house.ts:757-760` (only front and bathroom doors move: "the others stand open"), `crates/sim-core/src/content.rs`
 - **Evidence:** No private flag exists, so nothing keeps a visitor from using a private thing, and the bathroom door shuts only in the drawing. A privacy flag is new behaviour: filed as `code`, planned separately (§9, decision 3). Cross-cutting wave: `systems/sheets/doors-top.png` (`bathroom-check`, from above): the bathroom door swings open as she walks in, shuts behind her and stays shut through the toilet and the basin; nothing in the sim knows. A bedroom's door, or any other inside one, stands open day and night, a sleeper's too.
 - **Status:** later (G-72, privacy: new behaviour, owner decision 3); was confirmed and widened
 - **Source:** `plan/authenticity-review.md` §3.3 (I6) and §9 (decision 3); wave: cross-cutting
@@ -205,7 +211,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S2
 - **Rubric:** I13, I3
 - **Fix class:** renderer-table
-- **Where:** `web/public/content/base.json:4396`, `:4440`, `:4483` (`pizza`, `bakedTreats`, `pie`: the oven step's `anim: stir`) and `:4176` (`meal`'s cook step at `stove`, `oven` or `microwave`, `stir`); `web/src/render/babylon/characters.ts:540` (`ACTIONS.stir`: `stir`, `interact`), `:546` (`STATION_PROPS.stir`: the pan)
+- **Where:** `web/public/content/base.json:4396`, `:4440`, `:4483` (`pizza`, `bakedTreats`, `pie`: the oven step's `anim: stir`) and `:4176` (`meal`'s cook step at `stove`, `oven` or `microwave`, `stir`); `web/src/render/pc/characters.ts:540` (`ACTIONS.stir`: `stir`, `interact`), `:546` (`STATION_PROPS.stir`: the pan)
 - **Evidence:** `systems/sheets/cook-ovens.png` (the kitchen wave's `kitchen/play/c5/stoveGas-bake-01.png`, `stoveElectric-bake-01.png`, `wallOven-bake-01.png`): baking at a stove the oven door drops open and stays open while the cook stirs a pan on the lit hob for 35 minutes, the prep bowl of batter in the other hand; at the oven tower, with no hob, she stirs at the open oven door. `systems/sheets/cook-pizza-1.png` (`held/inhand/pizza-04.png`): the pizza "baked" stirring a pan at the wood-fired oven's side; `cook-pie-1.png` the same at the neighbourly oven. Baking is putting the tray in, shutting the door and waiting (a check through the glass), then taking it out: an oven step of its own (`anim: bake` with a tray prop, the door open at the start and end).
 - **Status:** closed (duplicate of I-kitchen-05)
 - **Source:** wave: cross-cutting (held, kitchen and packs waves' runs)
@@ -217,7 +223,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S3
 - **Rubric:** I13, I7
 - **Fix class:** code
-- **Where:** `crates/sim-core/src/cooking.rs:1501` (`step_done`: `held` is set to what the step `holds` and kept until the next step ends), the renderer drawing `held` in the hand whatever the step (`web/src/render/babylon/characters.ts`, `writeHeld`)
+- **Where:** `crates/sim-core/src/cooking.rs:1501` (`step_done`: `held` is set to what the step `holds` and kept until the next step ends), the renderer drawing `held` in the hand whatever the step (`web/src/render/pc/characters.ts`, `writeHeld`)
 - **Evidence:** `systems/sheets/cook-meal-1.png`, `cook-bbq-1.png`, `cook-bakedTreats-1.png` (`held/inhand/meal-03.png`, `meal-04.png`, `bbq-05.png`, `bakedTreats-04.png`, `pie-04.png`, `tastingMenu-04.png`; the held wave's "Seen"): the cook stirs the pan or turns the food on the grill one-handed for 20–50 minutes with the bowl of chopped food held in the other. The bowl is tipped into the pan and put down as the step starts.
 - **Status:** closed (duplicate of I-kitchen-04)
 - **Source:** wave: cross-cutting (held wave's runs)
@@ -238,7 +244,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S3
 - **Rubric:** I15, A1
 - **Fix class:** code
-- **Where:** `crates/sim-core/src/world.rs:4917-4922` (`TaskKind::Visit` arriving: the yaw towards the plot's centre, at the plot's `entry`); `web/src/render/babylon/characters.ts:535` (`ACTIONS.knock`: `interact`, `idle`)
+- **Where:** `crates/sim-core/src/world.rs:4917-4922` (`TaskKind::Visit` arriving: the yaw towards the plot's centre, at the plot's `entry`); `web/src/render/pc/characters.ts:535` (`ACTIONS.knock`: `interact`, `idle`)
 - **Evidence:** `systems/sheets/knock.png` (`calling-out`, R10 invited over; `systems/scenes/scenes.log`): the visitor stops at the lot's entry (25.5, 27.5), 1.5 m in front of the front door (25.5, 26), turned 0.49 rad off it towards the middle of the lot, and knocks with the reach clip on the wall beside the doorway. A knock is at the door, an arm's length from it, facing it. The host coming out and the greeting are right.
 - **Status:** fixed (36198175)
 - **After:** the visitor walks to the front door (`life::knock_spot`: the door from outdoors nearest the plot's entry) and knocks 0.45 m out from it, facing it. `bench-results/review/fixes/positions/play/knock-00.png` (`calling-out`, R10 at 25.5, 26.45, yaw π, knocking) against `systems/sheets/knock.png`; sim test `tests/positions.rs` `a_visitor_knocks_at_the_front_door_facing_it`.
@@ -363,7 +369,7 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 
 ### I-outdoor-07 — Sets for two seat their pair side by side: the bistro set takes one, the picnic table two on one bench
 
-> Consolidation: raised from S3 to S2, as I-community-02 (community ledger, S2) is merged into it. The same cause reaches the seesaw's riders (side-on, not facing each other), the merry-go-round's four (in a row along one chord), the park chess players (shoulder to shoulder behind the board), the ping-pong player (at the long side by the net), and by the content `diningOak`, `diningGlass` and `romantic.candlelitTable` (built side by side: M-kitchen-01, M-packs-11). The renderer half: `web/src/render/babylon/characters.ts:240-249` (`Seat`: one facing per object, not per slot).
+> Consolidation: raised from S3 to S2, as I-community-02 (community ledger, S2) is merged into it. The same cause reaches the seesaw's riders (side-on, not facing each other), the merry-go-round's four (in a row along one chord), the park chess players (shoulder to shoulder behind the board), the ping-pong player (at the long side by the net), and by the content `diningOak`, `diningGlass` and `romantic.candlelitTable` (built side by side: M-kitchen-01, M-packs-11). The renderer half: `web/src/render/pc/characters.ts:240-249` (`Seat`: one facing per object, not per slot).
 >
 > Moved from outdoor.md at the consolidation (2026-10-21): the cause is shared, not one object's.
 
@@ -434,14 +440,14 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 
 ### I-kitchen-04 — Cooks chop with the crate in both hands and stir holding the bowl
 
-> Consolidation: I-held-03 (held ledger) and I-systems-07 (systems ledger) merged into it: the same in every recipe run (`held/inhand/timeline.jsonl`: `held: ingredients, action: chop`, `held: prepBowl, action: stir` and `flip`), at the grill too (`held/inhand/bbq-05.png`). The sim side is `crates/sim-core/src/cooking.rs:1501` (`held` kept through the next step), the drawing `web/src/render/babylon/characters.ts:2425` (`writeCarried`).
+> Consolidation: I-held-03 (held ledger) and I-systems-07 (systems ledger) merged into it: the same in every recipe run (`held/inhand/timeline.jsonl`: `held: ingredients, action: chop`, `held: prepBowl, action: stir` and `flip`), at the grill too (`held/inhand/bbq-05.png`). The sim side is `crates/sim-core/src/cooking.rs:1501` (`held` kept through the next step), the drawing `web/src/render/pc/characters.ts:2425` (`writeCarried`).
 >
 > Moved from kitchen.md at the consolidation (2026-10-21): the cause is shared, not one object's.
 
 - **Severity:** S2
 - **Rubric:** I13, A1, A2
 - **Fix class:** code
-- **Where:** `web/public/content/base.json:4135` (recipes: "Get ingredients" `holds: ingredients`, "Prep" `holds: prepBowl` from `:4166`, the sandwich's "Make it" holds nothing new, so the crate stays), `web/src/render/babylon/characters.ts:2331` (a carried item is drawn in both hands, with the carry clip, through every step), `:2097` (`writeTool`: the board and pan drawn on the station meanwhile)
+- **Where:** `web/public/content/base.json:4135` (recipes: "Get ingredients" `holds: ingredients`, "Prep" `holds: prepBowl` from `:4166`, the sandwich's "Make it" holds nothing new, so the crate stays), `web/src/render/pc/characters.ts:2331` (a carried item is drawn in both hands, with the carry clip, through every step), `:2097` (`writeTool`: the board and pan drawn on the station meanwhile)
 - **Evidence:** `kitchen/extra/meal-fridge-stoveGas-01.png` (chopping at the counter with the ingredient crate held at the chest, the board and knife on the top beside it); `-06.png` (stirring the pan on the hob holding the prep bowl in both hands, for the whole 20-minute Cook step); `kitchen/play/c5/counter-sandwich-01.png`, `butcherBlock-sandwich-01.png`, `kitchenIsland-sandwich-01.png` (the sandwich made holding the crate); `stoveElectric-bake-01.png`, `rangeCooker-cook-01.png` (the bowl at the hob). A cook puts the ingredients down to chop and tips the bowl into the pan. Set the carried item down on the station's top while a step is worked (and drop the bowl once the Cook step starts); new behaviour, so `code`. Items: every `prep` station (the counters, islands, butcher block, breakfast counter), every `stove` and `oven` station.
 - **Status:** fixed (57b3a576)
 - **After:** what the cook carried in is put down on the station's top while the step is worked, beside its tool, and picked up to move on (`SET_DOWN` in `characters.ts`: `chop`, `mix`, `stir`, `flip`; for a `bake` it is in the oven and not drawn); the sim still holds it between steps (`held`), so a save or a crying baby keeps it. In `family-hungry` (the family-check home, the two parents hungry) the crate stands on the counter by the board while chopping (`fixes/cooking/meal-stoveGas-03.png`), the prepped bowl on the cooker's top by the pan while stirring (`-06.png`), the crate by the mixing bowl for a bake's Mix (`fixes/cooking/bake-stoveElectric-03.png`) and nothing in hand at the oven (`-07.png`); against `kitchen/extra/meal-fridge-stoveGas-01.png`, `-06.png`.
@@ -456,7 +462,7 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Severity:** S2
 - **Rubric:** I13, I3, I7
 - **Fix class:** renderer-table
-- **Where:** `web/public/content/base.json:4135` (`meal` Cook `at: [stove, oven, microwave]`, `anim: stir`; `bakedTreats` from `:4401`, `pie` and `pizza` Bake `at: [oven]`, `anim: stir`); `web/src/render/babylon/characters.ts:546` (`STATION_PROPS`: `stir → tool.pan`), `:2102` (the pan at the station's `surface.height`, else `defaultSurfaceHeight` 0.9)
+- **Where:** `web/public/content/base.json:4135` (`meal` Cook `at: [stove, oven, microwave]`, `anim: stir`; `bakedTreats` from `:4401`, `pie` and `pizza` Bake `at: [oven]`, `anim: stir`); `web/src/render/pc/characters.ts:546` (`STATION_PROPS`: `stir → tool.pan`), `:2102` (the pan at the station's `surface.height`, else `defaultSurfaceHeight` 0.9)
 - **Evidence:**
   - Microwave: a meal whose only cooker is the microwave is "cooked" by stirring a frying pan of vegetables drawn on the worktop beside the shut microwave (`kitchen/extra/meal-fridge-microwave-06.png`).
   - Oven tower: the pan is drawn at 0.9 m through the shut lower oven door, the cook stirring at the tower's face (`kitchen/extra/meal-fridge-wallOven-06.png`).
@@ -473,7 +479,7 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Severity:** S2
 - **Rubric:** A10, I7, I13
 - **Fix class:** motion
-- **Where:** `web/public/assets/packs/kitchen_cooking/manifest.json:5`, `:49`, `:103`, `:141`, `:192`, `:238` (the cookers' and the microwave's `motions.uses` keyed by their own use ids: `cook`, `gourmet`, `bake`, `roast`, `reheat`); `crates/sim-core/src/snapshot.rs:140` (at a station that isn't the recipe's origin the interaction is -1, so only the step's tag, `stir`, reaches the renderer); `web/src/render/babylon/objectMotion.ts:413`
+- **Where:** `web/public/assets/packs/kitchen_cooking/manifest.json:5`, `:49`, `:103`, `:141`, `:192`, `:238` (the cookers' and the microwave's `motions.uses` keyed by their own use ids: `cook`, `gourmet`, `bake`, `roast`, `reheat`); `crates/sim-core/src/snapshot.rs:140` (at a station that isn't the recipe's origin the interaction is -1, so only the step's tag, `stir`, reaches the renderer); `web/src/render/pc/objectMotion.ts:413`
 - **Evidence:** `kitchen/extra/meal-fridge-stoveGas.json`: "Make a meal" started at the fridge, cooked on the gas range from 42.2 to 62.3 s with the `stir` clip and the pan drawn on its hob; no clip on the range moves (no `burner_on` flame, no knob), against `kitchen/play/c5/stoveGas-cook-01.png` where "Cook dinner" chosen at the range itself lights the ring. The same with only a microwave (`meal-fridge-microwave.json`: no `door_open`, no turntable) and only an oven tower (`meal-fridge-wallOven.json`: no `oven_open`). Free will chooses among every recipe use on every station object (the fridge's meal and gourmet, the counters' sandwich, the cookers' cook and bake: `world.rs:3894-3906`), so many meals are cooked on a cold hob. Also seen: the electric cooker's `knob_on` only turns a knob: its ring never glows, where the hob counter's does (`kitchen/clips/clips-stoveElectric-all-t99.png` against `clips-cooktopCounter-all-t99.png`). Key the hob clips by the `stir` tag as well (and the oven's by a bake step's own tag, I-kitchen-05), and give the electric cooker a glowing ring.
 - **Status:** fixed (2dcc4ea0)
 - **After:** every cooker's hob clip plays for `stir` too, the ovens' for `bake`, the microwave's door and plate for `bake` (the plate turning once the door has shut), the chef's stove's and the pack ovens' likewise. A meal started at the fridge lights the gas range's ring (`fixes/motions/recipes/meal-fridge-stoveGas.json`: `burner_on` 44.7–64.7 s, `-05.png`), opens the microwave and turns its plate (`meal-fridge-microwave.json`, `-06.png`) and the tower's oven (`meal-fridge-wallOven.json`); the electric cooker's front ring glows red with its knob (`burner_on`, `meal-fridge-stoveElectric-06.png`, `fixes/motions/g16/clips-stoveElectric-all-t99.png`).
@@ -556,7 +562,7 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Severity:** S2 (raised from S3: the bathroom door below)
 - **Rubric:** A12, A10, I6
 - **Fix class:** code
-- **Where:** `web/src/render/babylon/BabylonRenderer.ts:3778` (`swingDoors`); the rule at `:3794` (`target = passing || !(leaf.front || engaged)`: anyone moving within `DOOR_REACH` 1.3 m, `:189`, opens any door, an occupied bathroom's too)
+- **Where:** `web/src/render/pc/PlayCanvasRenderer.ts:3778` (`swingDoors`); the rule at `:3794` (`target = passing || !(leaf.front || engaged)`: anyone moving within `DOOR_REACH` 1.3 m, `:189`, opens any door, an occupied bathroom's too)
 - **Evidence:** Front and bathroom doors swing when someone walks near them; nobody reaches for the handle. Doors opened by hand are new behaviour: filed as `code`, planned separately (§9, decision 3).
   Wave houses, on `review-stage` (`houses/extra/houses.jsonl`):
   - Walking along the front wall outside, 0.7 m off it, past the door and not through it, Ada opens the front door fully (`swing1-past-0.png`; "swing1 past": open 0 → 1 as she passes x 4.5 → 5.4).
@@ -573,7 +579,7 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Severity:** S3
 - **Rubric:** A9, A10
 - **Fix class:** code
-- **Where:** `web/src/render/babylon/BabylonRenderer.ts:188` (`DOOR_SWING` 0.45 s), `:3781` (the step is real frame time, not game time)
+- **Where:** `web/src/render/pc/PlayCanvasRenderer.ts:188` (`DOOR_SWING` 0.45 s), `:3781` (the step is real frame time, not game time)
 - **Evidence:** At speed 1 the front door is fully open 0.6 m before Ada reaches it (`houses/extra/swing1-in-1.png`; "swing1 in"). At speed 3 she crosses the 2.6 m the door watches in about 0.3 s of real time, while the door takes 0.45 s: she is through it at 19 % open and the leaf shuts behind her at once (`houses/extra/swing-in-0.png`, her body through the near-shut leaf; "swing in": open 0.19 at z 5.7, 0.11 when she is inside). Scaling the swing by the game's speed (as walkers' turning is, `characters.ts:2324`), or the reach by the walker's speed, keeps the door ahead of her.
 - **Status:** fixed (e04bc6c0)
 - **After:** the swing keeps pace with the game (`DOOR_SWING` over the game's rate, up to 10x, as walkers' turns), and opening for the way 1.5 m ahead gives it about a second's walk of lead at any speed. At speed 3 the front door is fully open when Ada is 0.3 m short of the doorway (open 1 at z 5.7, where it was 0.19; `fixes/town/doors/swing-in-0.png` against `houses/extra/swing-in-0.png`).
@@ -586,7 +592,7 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Severity:** S2
 - **Rubric:** A12, M7
 - **Fix class:** code
-- **Where:** `web/src/render/babylon/fences.ts:42` and `:110` (`gate()`: one still mesh with the fences, the leaf drawn shut); `crates/sim-core/src/command.rs:389` (a gate is walked through); `web/src/render/babylon/BabylonRenderer.ts:3778` (`swingDoors` turns only house doors)
+- **Where:** `web/src/render/pc/fences.ts:42` and `:110` (`gate()`: one still mesh with the fences, the leaf drawn shut); `crates/sim-core/src/command.rs:389` (a gate is walked through); `web/src/render/pc/PlayCanvasRenderer.ts:3778` (`swingDoors` turns only house doors)
 - **Evidence:** On `review-stage` a picket gate in a run of fences: Ada walks through it, her body passing through the shut leaf (`town/extra/gate-walk-0.png` … `gate-walk-2.png`, `town/extra/sheet-fences.png`; `houses/extra/houses.jsonl` "gate"). The house's front door swings for her on the same lot. Swinging the leaf as `swingDoors` swings a front door (hinge on a post, a quarter turn away from the walker) is new behaviour (§9, decision 3).
 - **Status:** fixed (e04bc6c0)
 - **After:** a gate's leaf swings a quarter turn about its hinge post, away from the one coming through, by `goingThrough` as doors do, and shuts the way it opened once they're clear (`fences.ts` `swingGate`): it moves its vertices in the fences' one mesh, so it costs no draw. On `review-stage`, a picket gate in a run of fence: open from 0.7 m out as Ada walks in, fully open as she passes (`fixes/town/doors/gate-in-1.png` against `town/extra/gate-walk-1.png`), shut behind her; the same on the way back (`gate-out-*.png`); walking along the fence past it, it stays shut (`gate-past-0.png`).
@@ -599,7 +605,7 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Severity:** S3
 - **Rubric:** M7, M10
 - **Fix class:** code
-- **Where:** `web/src/render/babylon/BabylonRenderer.ts:3075` (the interior lights: `PointLight`s, no shadows), `:4714` ("a warm pool around it"); `web/src/render/babylon/house.ts:222` (one light per lamp at `light.height`, no direction, no room limit)
+- **Where:** `web/src/render/pc/PlayCanvasRenderer.ts:3075` (the interior lights: `PointLight`s, no shadows), `:4714` ("a warm pool around it"); `web/src/render/pc/house.ts:222` (one light per lamp at `light.height`, no direction, no room limit)
 - **Evidence:** A shade decides where a real lamp's light goes; here none does, and no wall stops it.
   - `lampTorchiere`: the uplighter's bowl glows and its light is a pool on the floor round its foot, the same as a shaded floor lamp's, walls up or cut away (`lighting/extra/lampTorchiere-night-wallsup.png`, `lighting/night/c2/lampTorchiere-no-uses.png`); a real one washes the ceiling, and the ceiling isn't drawn in Live mode either.
   - `wallSconce`, `wallLampArm`, `wallLightOutdoor`: a bright round disc on the wall centred on the fitting (`lighting/night/c1/wallSconce-no-uses.png`, `…/wallLampArm-no-uses.png`), not the up-and-down wash of a sconce or the arm lamp's pool on the chair below.
@@ -632,7 +638,7 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Severity:** S2
 - **Rubric:** M10
 - **Fix class:** code
-- **Where:** `web/src/render/babylon/models.ts:73` (`glows`), `tools/art/blender/families/outdoor.py:64`
+- **Where:** `web/src/render/pc/models.ts:73` (`glows`), `tools/art/blender/families/outdoor.py:64`
 - **Evidence:** A glowing material draws through the parts in front of it. `outdoor.py:64` now builds the grill's hot coals with no glow "which would show through its shut lid", so the grill may be worked round while the renderer still has the fault for other models. `extra/night/sheet-fire.png`: the grill cooking at 22:00 with the lid up shows dull red coals and no light on the cook; the fire pit beside it glows.
 - **Status:** fixed (0f7cf80f); the grill's coals glow again (b4306968)
 - **After:** the glow copy no longer takes a slope-scaled depth offset (`models.ts` `glowMesh`: `zOffsetUnits` -4 instead of `zOffset` -2). With the grill's coals made to glow for the check (a local manifest edit, not kept), the shut lid showed red specks of the coals from 9 m before (`fixes/lighting/webgpu-medium/grill-far-glowing-coals-before.png`) and none after (`grill-far-glowing-coals.png`, `grill-shut.png` in each folder); shades glow as before, no z-fighting. Not shot: the lid open (cooking needs the kitchen's ingredients on the stage). Giving `coal_hot` its glow back (`outdoor.py:64` and the manifest) is a model change for the Blender wave (G-35): done in b4306968 (`coal_hot` `glow` #FF7A2E in `packs/outdoor/manifest.json`; not shot cooking at night, as above).
@@ -654,7 +660,7 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Severity:** S2
 - **Rubric:** I3 (A1)
 - **Fix class:** code
-- **Where:** `crates/sim-core/src/world.rs` (`slot_position`: from the footprint's middle, without the object's `offset`); `web/src/render/babylon/objectMotion.ts` (`slotOf`, the same)
+- **Where:** `crates/sim-core/src/world.rs` (`slot_position`: from the footprint's middle, without the object's `offset`); `web/src/render/pc/objectMotion.ts` (`slotOf`, the same)
 - **Evidence:** found while fixing G-62 (code reading, not shot): anything but stairs stands up to half a tile off its footprint's middle (`offset`, placed with Shift), and the renderer draws it there (`protocol.ts` `objectCentre`), but the sim put its sitters and sleepers at the footprint's middle, up to 0.5 m off the seat or the mattress.
 - **Status:** fixed (aac64b84)
 - **After:** `slot_position` starts from the middle as drawn (the offset included), for places and the spread alike; `slotOf` likewise. Not shot.
@@ -665,7 +671,7 @@ Moved here at the consolidation (2026-10-21) from the ledgers they were first se
 - **Severity:** S3
 - **Rubric:** A10, I13
 - **Fix class:** motion
-- **Where:** `crates/sim-core/src/snapshot.rs` (`doing`, Cooking: at the recipe's origin the snapshot gives its interaction for every step done at that object); `web/src/render/babylon/objectMotion.ts` (`findUses`: a clip keyed by the interaction id wins over the step's tag); `tools/art/blender/families/pack_foodie.py` (`chefsIsland`: `{'uses': {'tastingMenu': 'drawer_open'}}`), `outdoor.py` (`grillStation`: `hood_up` for cook and feast)
+- **Where:** `crates/sim-core/src/snapshot.rs` (`doing`, Cooking: at the recipe's origin the snapshot gives its interaction for every step done at that object); `web/src/render/pc/objectMotion.ts` (`findUses`: a clip keyed by the interaction id wins over the step's tag); `tools/art/blender/families/pack_foodie.py` (`chefsIsland`: `{'uses': {'tastingMenu': 'drawer_open'}}`), `outdoor.py` (`grillStation`: `hood_up` for cook and feast)
 - **Evidence:** seen in the code and content while fixing G-16 (no run): the chef's island is a `prep` and a `stove` station, so "Cook a tasting menu" chosen at it preps and cooks there, and both steps play the drawer (`drawer_open`, `hold` 2.5) and nothing on its hob (it has no hob clip, so a tasting menu is cooked on a cold hob, as A-kitchen-02 was); the grill station ([`grill`, `prep`]) lifts its hood for the prep step as for the grilling. The neighbourly oven had the same fault (its oven open while the pastry was made on its worktop) and was fixed by keying its clip by the `bake` step's tag (2dcc4ea0). Key such objects' clips by the step tags (`chop`/`mix`, `stir`, `flip`) and give the island's hob a burner clip.
 - **Status:** fixed (57b3a576, db55d69b)
 - **After:** the recipe's own interaction now names only its last step at the object it was started from (`snapshot.rs`): the grill station lifts its hood for the grilling, not for the prep on its counter, and the chef's island opens its drawer for a `chop` at it (the prep) and no longer while the menu cooks. Its hob still has no burner clip (a model change). Seen in the code and the snapshot test; no run. The chef's island's clips are keyed by the step tags, not the use: `chop` (the prep step) opens the drawer (`hold` 2.5), `stir` (the cooking) grows a red hot ring under the copper pan (`burner_on`, its own part: the stools went plain to keep 3 draws), so the tasting menu is cooked on a hot hob (`bench-results/review/fixes/blender-packs/clips/clips-foodie.chefsIsland-*.png`, `play/day-foodie.chefsIsland-tastingMenu-01.png`).

@@ -63,6 +63,11 @@ describe('garden birds', async () => {
     uploads: number;
   }
   const log: string[] = [];
+  /** A bird's model URL: the fixtures set one, and a bird without a model is a fixture bug, not a case. */
+  const urlOf = (entry: BirdEntry): string => {
+    if (entry.url === undefined) throw new Error('birds.test: bird without a url');
+    return entry.url;
+  };
   let warblerComes = false;
   let wind = 0;
   const built = new Map<string, Look>();
@@ -73,7 +78,7 @@ describe('garden birds', async () => {
       const entry = assets.get(key, 'model') as BirdEntry;
       const failed = id === 'warbler' && !warblerComes;
       const rests = BIRD_PARTS.map((_, k) => translation(0.013 * k, 0.081 + 0.011 * k, k === 1 ? 0.043 : -0.031 * k, new Float32Array(16)));
-      const look: Look = { ...(failed ? noBirdLook([entry.url]) : birdLook(entry, rests)), species: id, shown: false, uploads: 0 };
+      const look: Look = { ...(failed ? noBirdLook([urlOf(entry)]) : birdLook(entry, rests)), species: id, shown: false, uploads: 0 };
       built.set(key, look);
       return look;
     },
@@ -184,7 +189,7 @@ describe('garden birds', async () => {
         if (f === 2250) await birds.setQuality({ count: 40, range: 50 });
         if (f === 3150) {
           warblerComes = true;
-          birds.fileArrived((assets.get('model.bird.warbler', 'model') as BirdEntry).url);
+          birds.fileArrived(urlOf(assets.get('model.bird.warbler', 'model') as BirdEntry));
           await new Promise((r) => setTimeout(r, 0));
         }
         if (f === 5400) {
@@ -223,7 +228,7 @@ describe('garden birds', async () => {
   test("a bird's parts drawn as the Babylon renderer computed them, number for number", async () => {
     const B = fixture<{ fields: string[]; cases: number; inputs: Numbers; parts: Numbers }>('birds');
     const inputs = recorded(B.inputs);
-    const want = recorded(B.parts);
+    const want = Array.from(recorded(B.parts));
     random = numbers(3);
     const birds = new Birds(view, assets);
     const restore: (() => void)[] = [];

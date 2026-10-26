@@ -82,6 +82,14 @@ export interface SnapshotLayout {
 export const Pose = { Stand: 0, Sit: 1, Lie: 2 } as const;
 
 /**
+ * A layout's `sim` indices for the fields it writes: `simFields(['id', 'x'])` gives `{ id: 0, x: 1 }`. The names
+ * are checked against the layout, so a field that does not exist is a compile error rather than a NaN write.
+ */
+export function simFields(fields: readonly (keyof SnapshotLayout['sim'])[]): SnapshotLayout['sim'] {
+  return Object.fromEntries(fields.map((f, i) => [f, i])) as SnapshotLayout['sim'];
+}
+
+/**
  * Bytes reserved before the snapshot floats: the Int32 sequence counter, then the Int32 number of
  * the sim step the snapshot shows (padded).
  */
