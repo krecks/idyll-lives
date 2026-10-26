@@ -34,20 +34,35 @@
       "price": 780,
       "category": "bathroom",
       "slots": 1,
-      "description": "Washer, dryer and a folding counter. Fresh clothes help a little with hygiene; deft hands (Dexterity 4+) press linens so crisp the resident sleeps better that night.",
+      "description": "Washer, dryer and a folding counter. Load it and it washes and dries by itself; take the laundry out when it's done. Fresh clothes help a little with hygiene; deft hands (Dexterity 4+) press linens so crisp the resident sleeps better that night.",
+      "runs": { "minutes": 90, "sound": "washer" },
       "interactions": [
         {
           "id": "laundry",
-          "label": "Wash and press the laundry",
+          "label": "Load the washing",
           "workOn": "laundry",
+          "loads": true,
+          "brings": "washingBasket",
           "anim": "clean",
-          "sound": "washer",
-          "minutes": 45,
+          "minutes": 5,
           "pose": "stand",
           "autonomous": true,
-          "effects": { "hygiene": 0.15, "fun": 0.15, "comfort": 0.05 },
+          "effects": { "hygiene": 0.075, "fun": 0.075, "comfort": 0.025 },
           "tags": ["chores", "cleaning"],
-          "skills": { "dexterity": 0.08 },
+          "skills": { "dexterity": 0.36 }
+        },
+        {
+          "id": "unload",
+          "label": "Take out the laundry",
+          "unloads": true,
+          "makes": "dried",
+          "anim": "clean",
+          "minutes": 5,
+          "pose": "stand",
+          "autonomous": true,
+          "effects": { "hygiene": 0.075, "fun": 0.075, "comfort": 0.025 },
+          "tags": ["chores", "cleaning"],
+          "skills": { "dexterity": 0.36 },
           "skill": "dexterity",
           "feeling": "neat.freshLinens",
           "feelingMinSkill": 4
@@ -238,6 +253,12 @@
         "neat.laundryCenter": {
           "interactions": {
             "laundry": [
+              "In goes the washing.",
+              "One load, washed and dried.",
+              "Sort the colours first."
+            ],
+            "unload": [
+              "Warm and fresh from the dryer.",
               "Wash, dry, press.",
               "Fresh laundry smells so good.",
               "No more wrinkles!"

@@ -309,7 +309,7 @@ Family: `tools/art/blender/families/pack_neat.py`.
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
 | `neat.steamMopDock` Steam mop dock | OK | OK | OK | | `packs/sheets/obj-neat.steamMopDock.png` |
-| `neat.laundryCenter` Stacked laundry centre | OK | A-packs-03 | I-packs-18 | A-packs-03 S2 motion; I-packs-18 S3 content | `packs/sheets/obj-neat.laundryCenter.png`, `packs/play/chunk2/neat.laundryCenter-laundry-01.png` |
+| `neat.laundryCenter` Stacked laundry centre | OK | OK | OK | A-packs-03 fixed (d2c9f0de); I-packs-18 fixed (eaca9ed8); since 2026-10-26 a machine that runs on its own | `packs/sheets/obj-neat.laundryCenter.png`, `packs/play/chunk2/neat.laundryCenter-laundry-01.png` |
 | `neat.rainShowerTower` Rainfall steam shower | OK | A-bathroom-01 | I-bathroom-02 | A-bathroom-01 S2 model (bathroom ledger: the glass door never opens); I-bathroom-02 S3 clip (residents ledger) | `packs/sheets/obj-neat.rainShowerTower.png` |
 | `neat.organizerDesk` Label-and-sort organizer desk | M-packs-05 | OK | OK | M-packs-05 S2 model | `packs/sheets/obj-neat.organizerDesk.png`, `packs/sheets/age-neat.organizerDesk.png` |
 | `neat.robotVacuumDock` Robot vacuum and dock | OK | I-packs-15 | I-packs-15, I-packs-05 | I-packs-15 S3 motion; I-packs-05 S2 content | `packs/sheets/obj-neat.robotVacuumDock.png` |
@@ -320,7 +320,7 @@ Family: `tools/art/blender/families/pack_neat.py`.
 | Item | Real uses | Content uses (minutes) | Verdict |
 |---|---|---|---|
 | `neat.steamMopDock` | take the mop and mop the floor | mop (30, the mop in hand) | OK |
-| `neat.laundryCenter` | load the washer, move it to the dryer, fold on the counter | laundry (45), fold (60) | OK; folding an hour (I-packs-18); the porthole stays open (A-packs-03) |
+| `neat.laundryCenter` | load the washer, move it to the dryer, fold on the counter | load (5), run alone (90), unload (5), fold (20) | OK; folding an hour (I-packs-18, fixed); the porthole stays open (A-packs-03, fixed); since 2026-10-26 the load runs on its own |
 | `neat.rainShowerTower` | shower, steam | steam shower (25) | OK |
 | `neat.organizerDesk` | sort and label, do the accounts | sort (40), ledger (60) | OK |
 | `neat.robotVacuumDock` | set a schedule and let it clean | program a routine (45) | the robot never cleans (I-packs-15); setting it is 45 on foot (I-packs-05) |

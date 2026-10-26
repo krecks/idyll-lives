@@ -128,8 +128,12 @@ their finding ids. What is still open is here, with its id; §9 of the review sa
   empty.
 
 ### Content and sim
-- **One-use machines:** the dishwasher and the neat pack's laundry centre are still loaded and run in one use; a
-  machine that runs on its own (content `runs`) would fit them.
+- **One-use machines:** the dishwasher is still loaded and run in one use. The neat pack's laundry centre is a
+  machine that runs on its own since 2026-10-26 (load 5 minutes, 90 alone, unload 5, then the basket's fold). The
+  dishwasher can't follow yet: it works on `dishes`, and `WorkOn::Dishes.load()` is `None` (there is no load to
+  run), `content.rs` refuses `makes: "Dishes"`, and `cooking.rs` `dishes_next` looks for a free `dishes` station
+  without checking `o.run`, so a converted dishwasher would be washed at while it ran. It wants a load for dishes
+  in the sim first.
 - **Vendors in older towns:** a café's or bakery's counter saved before 0.5.0 stands against its back wall, with no
   room behind it for a server, so it stays self-serve (new towns have the tile). Servers wear no apron and appear at
   their post at opening time rather than walking in.
