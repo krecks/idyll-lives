@@ -185,6 +185,32 @@ fn a_running_machine_is_saved_and_loaded_as_it_was() {
 }
 
 #[test]
+fn a_load_cut_short_goes_back_on_its_pile() {
+    let (mut w, content) = world();
+    let dirty = w.households[0].laundry[0];
+    order(&mut w, WASHER, "laundry").unwrap();
+    assert!(until(&mut w, 10, |w| using(w, WASHER, "laundry")));
+    until(&mut w, 2, |_| false);
+    assert!(w.households[0].laundry[0] < dirty - 0.9, "taken up as it starts: {:?}", w.households[0].laundry);
+    // Saved half way through loading: the load is on its pile (the use starts again on load).
+    let saved = World::from_save_json(&content, &w.save_json()).unwrap();
+    assert!(saved.households[0].laundry[0] > dirty - 0.1, "in the save: {:?}", saved.households[0].laundry);
+    // Cancelled: back on its pile, and the washer empty.
+    w.apply(Command::Cancel { sim: 0, index: 0 }).unwrap();
+    until(&mut w, 1, |_| false);
+    assert!(w.sims[0].current().is_none());
+    assert!(w.households[0].laundry[0] > dirty - 0.1, "given back: {:?}", w.households[0].laundry);
+    assert!(w.objects[WASHER as usize].run.is_none(), "not loaded");
+    // Done to the end, it's used: in the washer, not back on the pile.
+    order(&mut w, WASHER, "laundry").unwrap();
+    assert!(until(&mut w, 10, |w| using(w, WASHER, "laundry")));
+    assert!(until(&mut w, 10, |w| w.sims[0].current().is_none()));
+    until(&mut w, 1, |_| false);
+    assert!(w.objects[WASHER as usize].running());
+    assert!(w.households[0].laundry[0] < dirty - 0.9, "in the washer: {:?}", w.households[0].laundry);
+}
+
+#[test]
 fn an_older_save_takes_in_the_washing_left_out_and_has_none_dry() {
     let (mut w, content) = world();
     w.objects[LINE as usize].open = true;

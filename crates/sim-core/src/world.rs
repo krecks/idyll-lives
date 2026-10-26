@@ -801,6 +801,10 @@ pub struct Sim {
     /// Loads of washing they left to work on next this tick (`WorkOn` bits: the wet washing out
     /// of the washer; `Interaction::makes`), settled with `worked`.
     pub(crate) made: u8,
+    /// The load of washing taken up for the use they're at (`WorkOn` bits): given back if the use
+    /// doesn't get done (cancelled, called away: `end_activity`), none once it is
+    /// (`machines::use_done`). Not saved: a save gives it back (a reloaded use starts again).
+    pub(crate) taken: u8,
     pub pos: [f32; 2],
     pub yaw: f32,
     pub pose: Pose,
@@ -2138,6 +2142,7 @@ impl World {
             pending_spend: 0,
             worked: 0,
             made: 0,
+            taken: 0,
             pos: [*x, *z],
             yaw: 0.0,
             pose: Pose::Stand,
@@ -5700,9 +5705,13 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
             return;
         }
         sim.pending_spend += cost.max(0);
-        // A load of washing taken up as the use starts (`life::update` settles it).
+        // A load of washing taken up as the use starts (`life::update` settles it); given back if
+        // the use doesn't get done.
         if let Some(w) = inter.work_on {
             sim.worked |= w.bit();
+            if w.load().is_some() {
+                sim.taken = w.bit();
+            }
         }
     }
     let Some(act) = sim.current.as_mut() else {
@@ -6157,6 +6166,8 @@ pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [Obje
             sim.pos = [fx as f32 + 0.5, fz as f32 + 0.5];
         }
     }
+    // A load of washing taken up for a use that didn't get done goes back on its pile.
+    sim.made |= std::mem::take(&mut sim.taken);
     let held = sim.current.take().and_then(|act| held_object(act.task.kind));
     if let Some(o) = held.map(|o| o as usize).filter(|&o| o < objects.len()) {
         // Up from the upper bunk (its second slot, see `ObjectInstance::slot_position`): down its ladder first.
