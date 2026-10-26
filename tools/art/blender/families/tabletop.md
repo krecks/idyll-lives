@@ -85,7 +85,7 @@ part of its own (two draws):
   a loaf on the bin's floor (a soft box, 108 triangles, hidden at rest).
 - `laptopClosed`: the `lid`, hinged at its back edge, opens 105° in 0.8 s (`lid_open`) and stays open while the
   laptop is used (by its uses' animation, `type`: browse, code, write, homework). Under it, hidden at rest, the
-  screen (`laptop_screen`, dark glass that glows a cool white at night with the room's lights, `#A9C8E8`) and on the
+  screen (`laptop_screen`, dark glass lit a cool white while the laptop is used, `screen`, `#A9C8E8`) and on the
   base a keyboard and a touchpad.
 
 In play (`check.mjs play --state review-stage --objects kettle,breadBin,laptopClosed --use all`, headless WebGPU) each
