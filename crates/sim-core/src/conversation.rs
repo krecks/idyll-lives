@@ -810,6 +810,11 @@ fn meet<'a>(
     let (mut mine, middle) = halfway(sims[i].pos, &all);
     match way(sims, t, middle) {
         Some(waypoints) => {
+            // What `t` was still at (back on the sofa after listening in, say) ends as they set
+            // off: its slot freed (else the seat stays theirs while they walk away).
+            if sims[t].current.is_some() {
+                end_activity(&mut sims[t], content, objects);
+            }
             let goal = *waypoints.last().unwrap_or(&sims[t].pos);
             let task = Task { kind: TaskKind::MoveTo { x: goal[0], z: goal[1] }, directed: false, routine: false };
             sims[t].current = Some(Activity { task, phase: Phase::Routing { waypoints, next: 0 }, tags: 0 });

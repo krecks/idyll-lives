@@ -122,13 +122,11 @@ it left is here, with its id; §9 of the review says what each would take.
 - **No props in hand** (G-70): books, cups, cutlery, the phone, the cue, the bats and the bar cart's shaker are
   mimed, and the coin isn't tossed into the fountain (I-held-01, I-social-01, I-hobbies-05, I-kitchen-13,
   I-community-11). New behaviour, planned separately.
-- **No body language, no turning on the spot** (G-71): only the face shows feelings, and residents turn in place to
-  face a thing, without steps (A-residents-07, A-residents-08). New behaviour, planned separately.
 - **A child can't reach the fruit it picks** (I-garden-11): the picked apple hangs at 1.84 m, the lemon at 1.62 m.
   The owner's decision (the review recommends low fruit, built with I-garden-12's crown).
-- **Feet slide at game speeds 4 and 5** (56–78 % of the way: 45 and 90 m/s, faster than any gait steps without
-  strobing); at speed 3 the run (`runAlong`) keeps grown-ups' and teens' feet on the ground, children slide 11–14 %
-  (A-residents-03, G-25). The clip check's baseline (`tools/characters/clip-baseline.json`) is empty.
+- **Feet slide at game speeds 4 and 5** (48–81 % of the way: 45 and 90 m/s, faster than any gait steps without
+  strobing; A-residents-03, G-25): won't fix. The clip check's baseline (`tools/characters/clip-baseline.json`) is
+  empty.
 
 ### Content and sim
 - **No privacy** (G-72): a bathroom in use opens for anyone walking in (else they'd walk through its shut door), and
@@ -207,6 +205,13 @@ it left is here, with its id; §9 of the review says what each would take.
   basket to the dryer or the line; the dry washing is folded at the laundry basket, a towel in the hands
   (I-bathroom-07). The washing line dries the washing in 3 hours and takes it down a line at a time, as it is
   hung out (A-outdoor-02).
+
+### Fixed in 0.5.0
+- **Residents:** body language per emotion, the posture, the arms and the walk's swing over every clip as far as
+  what they do allows, and the pace from content `emotions` `walkSpeed` (G-71, A-residents-07); stepping round to turn
+  on the spot (G-71, A-residents-08); children's feet at game speed 3 (11–14 % slide, now none: the run's beat
+  quickens on shorter legs, `gait.ts`; A-residents-03 in part); getting out of bed before the lie has faded in (PR
+  #31's held pose, 7 cm in a frame, now none).
 
 ## Notes on the sim
 

@@ -7,8 +7,8 @@
  */
 
 import { add, cycle, reference, type ClipDef, type PoseSpec, type Vec } from './dsl';
-import { TAU } from './idle';
-import { apply, elbow, euler, footIK, hang, smooth, sub, wrist } from './ik';
+import { hangArms, stand, TAU } from './idle';
+import { addV, apply, elbow, euler, footIK, hang, smooth, sub, turned, wrist } from './ik';
 
 /** Reference walk: 1.1 m/s over a 1.1 s cycle (two steps). */
 const WALK_SPEED = 1.1;
@@ -232,6 +232,114 @@ function jogPose(p: number, g: Gait = JOG, swing = 24, bend = 12): PoseSpec {
   };
 }
 
+/**
+ * Turning on the spot (`turnR90`, `turnL180`, …: `turnClip`): stepping round to face a new way rather than pivoting on
+ * planted feet. Made in the turning body's own frame: as the clip plays the runtime turns the Sim by its share of the
+ * turn so far (`turnShare`, residents.ts), and each planted foot turns back against that in the clip, so it stays
+ * where it is on the floor, until it steps round on a low arc to its place for the new way, the foot on the side of
+ * the turn first. The hips keep midway between the ways the feet face (never more than half a step's turn from
+ * either), the weight over the foot that stays, the head looking ahead into the turn. The sizes are `TURN_ANGLES`,
+ * every 5° from 30° to an about-turn, each baked the first time a resident turns that far (`turnDef`; about a
+ * millisecond); the runtime plays the nearest and turns by the turn itself, and a turn 2.5° off its size slips the
+ * planted feet by under a centimetre in all (10° off, 3 cm).
+ *
+ * A planted foot turns about the body's upright in the clip, and on a body whose hips are wider for its legs than
+ * the reference's (a woman's by 0.7 cm, a child's by 2.2–2.6 cm, scaled to the reference's legs) the legs' turn
+ * would carry the foot round a wider circle than the floor's: so the feet are placed for hips `TURN_HIPS` wider, a
+ * grown-up's between the man's and the woman's, a child's its own (`turnClip`'s `child`).
+ */
+export const TURN_ANGLES: readonly number[] = Array.from({ length: 31 }, (_, k) => 30 + 5 * k);
+/** How much wider the hips are taken to be for their legs (m, reference skeleton), grown-ups' and children's. */
+const TURN_HIPS = { grownUp: 0.0035, child: 0.0245 };
+/** Seconds per step, the pause before the first and the settle after the last. */
+const TURN_STEP = 0.3;
+const TURN_LEAD = 0.06;
+const TURN_SETTLE = 0.14;
+/** Ankle lift at mid-step (m, reference skeleton). */
+const TURN_LIFT = 0.05;
+
+/** Steps for a turn of `deg`: two up to a right angle (out with the leading foot, the other brought round), three up to 150°, four for an about-turn. */
+function turnSteps(deg: number): number {
+  return deg <= 90 ? 2 : deg <= 150 ? 3 : 4;
+}
+
+/** The clip's name for a turn of `deg` (one of `TURN_ANGLES`) to the right (towards the body's +x) or the left, a grown-up's or a child's. */
+export function turnClip(deg: number, right: boolean, child = false): string {
+  return `turn${right ? 'R' : 'L'}${deg}${child ? 'Child' : ''}`;
+}
+
+/**
+ * At phase `p` of a turn of `deg`: how far round (share of the turn, 0..1) the leading foot (the one on the side of the
+ * turn) and the trailing one face, and how far through a step each is (0 planted, 1 at the top of its arc). Step `k`
+ * takes the leading foot when even, the trailing one when odd, round to a share of `(k + 2) / n`: each foot's last
+ * step brings it to the new way.
+ */
+function turnFeet(deg: number, p: number): { lead: number; trail: number; liftLead: number; liftTrail: number } {
+  const n = turnSteps(deg);
+  const t = p * turnSeconds(deg);
+  const out = { lead: 0, trail: 0, liftLead: 0, liftTrail: 0 };
+  for (let k = 0; k < n; k++) {
+    const u = Math.min(1, Math.max(0, (t - TURN_LEAD - k * TURN_STEP) / TURN_STEP));
+    const to = Math.min(1, (k + 2) / n);
+    if (k % 2 === 0) {
+      out.lead += (to - out.lead) * smooth(u);
+      out.liftLead = Math.max(out.liftLead, Math.sin(Math.PI * u));
+    } else {
+      out.trail += (to - out.trail) * smooth(u);
+      out.liftTrail = Math.max(out.liftTrail, Math.sin(Math.PI * u));
+    }
+  }
+  return out;
+}
+
+/** A turn's length (s). */
+export function turnSeconds(deg: number): number {
+  return TURN_LEAD + turnSteps(deg) * TURN_STEP + TURN_SETTLE;
+}
+
+/** How much of a turn of `deg` (0..1) the body has made at phase `p`: midway between the ways the feet face. */
+export function turnShare(deg: number, p: number): number {
+  const f = turnFeet(deg, p);
+  return (f.lead + f.trail) / 2;
+}
+
+/** The clip for a turn of `deg` (`turnClip`), to bake when it is first needed. */
+export function turnDef(deg: number, right: boolean, child: boolean): ClipDef {
+  return cycle(turnClip(deg, right, child), { seconds: turnSeconds(deg), loop: false }, (p) => turnPose(deg, right, child, p));
+}
+
+/** A turn's pose at phase p, in the frame of the turning body. */
+function turnPose(deg: number, right: boolean, child: boolean, p: number): PoseSpec {
+  const sgn = right ? 1 : -1;
+  const lead = right ? 'r' : 'l';
+  const f = turnFeet(deg, p);
+  const body = (f.lead + f.trail) / 2;
+  // The weight over the foot that stays (`stand`'s shift: -1 over the left leg), the hips dipping a little as a foot
+  // lifts; the head ahead into the turn, the chest a little behind it.
+  const toward = (side: 'l' | 'r') => (side === 'l' ? -1 : 1);
+  const shift = 0.8 * (f.liftLead * toward(lead === 'r' ? 'l' : 'r') + f.liftTrail * toward(lead));
+  const ahead = Math.min(25, deg * (turnShare(deg, Math.min(1, p + 0.15)) - body) * 0.8) * sgn;
+  const pose = stand({ shift, breath: p * 0.4, sink: 0.012 + 0.01 * Math.max(f.liftLead, f.liftTrail), head: [2, ahead, 0], twist: -0.5 * ahead });
+  const ref = reference();
+  const leg = (side: 'l' | 'r', share: number, lift: number): PoseSpec => {
+    // The foot's way relative to the body's (deg, + to the right): its rest place turned that far about the body's
+    // upright, raised on the arc, the toes pointing a little down off the floor, out as standing (`stand`).
+    // (Moved in by as much as wider hips would carry it out: `TURN_HIPS`.)
+    const rel = (share - body) * deg * sgn;
+    const rest = ref.joint(`foot_${side}`);
+    const inward: Vec = [(side === 'l' ? 1 : -1) * TURN_HIPS[child ? 'child' : 'grownUp'], 0, 0];
+    const at = addV(addV(sub(turned(rest, rel), rest), sub(inward, turned(inward, rel))), [0, TURN_LIFT * lift, 0]);
+    return footIK(side, at, pose, { foot: [12 * lift, rel + (side === 'l' ? -4 : 4), 0] });
+  };
+  const swing = 3 * (f.liftLead - f.liftTrail) * sgn;
+  return {
+    ...pose,
+    ...leg(lead, f.lead, f.liftLead),
+    ...leg(lead === 'r' ? 'l' : 'r', f.trail, f.liftTrail),
+    ...hangArms(4, 7, 14, { fwd: 4 + swing }, { fwd: 4 - swing }),
+  };
+}
+
 export function locomotionClips(): ClipDef[] {
   return [
     cycle('walk', { seconds: WALK_SECONDS, loop: true, speed: WALK_SPEED }, (p) => gaitPose(p, WALK)),
@@ -240,5 +348,6 @@ export function locomotionClips(): ClipDef[] {
     cycle('jogAlong', { seconds: JOG_SECONDS, loop: true, speed: JOG_SPEED }, (p) => jogPose(p, JOG_ALONG)),
     // Faster than the jog can step (game speeds 3 and up).
     cycle('runAlong', { seconds: RUN_SECONDS, loop: true, speed: RUN_SPEED }, (p) => jogPose(p, RUN, 40, 18)),
+    // (Turning on the spot: `turnDef`, baked as needed.)
   ];
 }

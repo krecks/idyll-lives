@@ -262,7 +262,7 @@ Code in `web/src/render/babylon/characters.ts`.
 
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
-| Face: expressions (moods) and blinks | OK | A-residents-07 | n/a | A-residents-07 S2 code (seeded; confirmed: the face carries every mood, the body none) | `residents/face-female.png`, `residents/chars-face.png` |
+| Face: expressions (moods) and blinks | OK | OK | n/a | A-residents-07 S2 code (seeded; confirmed: the face carries every mood, the body none; fixed 240be09b, b3859b30: a body layer per emotion and its pace) | `residents/face-female.png`, `residents/chars-face.png` |
 | Face: lip sync (visemes) | OK | OK | n/a |  | `residents/chars-visemes.png` |
 | Eyes: looking at people and things | OK | OK | n/a |  | `play/tv-watch-01.png`, `play/easel-paint-01.png` |
 | Elder's stoop | OK | OK | n/a |  | `residents/chars-elder-side.png`, `residents/chars-stages-side.png` |
@@ -271,7 +271,7 @@ Code in `web/src/render/babylon/characters.ts`.
 | Seat fit: pelvis `seatDrop` over the seat (`SEATS`, content `seat`) | n/a | A-residents-09, A-residents-11 | I-kids-03 | A-residents-09 S2 clip; A-residents-11 S2 clip (widened: the child in the bean bag); M-residents-02 S3 model (widened: every seated woman's skirt a hoop round the seat); M-outdoor-02 S3 model (outdoor ledger: the bench 4 cm into its slats); I-kids-03 S1 code (systems ledger: teens, adults and elders sit on the 0.31 m kids' chair as on any). Cross-cutting wave, over the other waves' age sheets (`<cat>/sheets/age-*.png`: 253, of which the dining chairs, bar stools, sofas, armchairs, bean bags, office chairs, kids' chair, fountain rim read): the pelvis sits on the seat at every stage and every height of seat; a child's feet dangle on adult chairs and bar stools (as a child's do), a teen's and an elder woman's hang a few cm off a 0.45 m seat (A-residents-09); deep low seats swallow short shins | `kitchen/sheets/age-diningChair.png`, `kitchen/sheets/age-barStool.png`, `living/sheets/age-beanBag.png`, `kids/sheets/age-kidsChair.png` |
 | Lie fit: `lie` turned flat on the mattress (`BEDS`, `LIE_*`) | n/a | A-fitness-01, A-bedroom-03 | OK | A-fitness-01 S2 clip (fitness ledger); I-kids-03 S1 code (systems ledger: an adult in the cot); A-bedroom-03 S2 code (residents ledger: into bed at the foot end, at every stage, the bunk's elder too); A-bedroom-02 S1 code (bedroom ledger: the upper bunk). Cross-cutting wave, over the bedroom, kids, living and packs age sheets: the sleeper lies on the mattress at every stage on every bed; `poses.html` puts only a child in the kids' bed (sim-core's stage rules for free will; a direct use skips them, I-kids-03) | `bedroom/sheets/age-bedBunk.png`, `kids/sheets/age-kidsBed.png`, `play/bed-sleep-02.png` |
 | Blankets and pyjamas in bed | M-bedroom-04 | A-bedroom-04 | I-bedroom-01 | M-bedroom-04 S2 code (one blue checked quilt on every bed); A-bedroom-04 S2 code (a stray quilt at the world origin); I-bedroom-01 S2 code (pyjamas for every nap, the shoes on); all three filed by the bedroom wave, moved here at the consolidation; all three fixed (f4925b24) | `play/bed-sleep-02.png`, `sheets/bedpose-0.png` |
-| Turning: towards travel, and on the spot | n/a | A-residents-08 | n/a | A-residents-08 S3 code (seeded; seen: residents turn in place at each use) | `play/*-00.png` |
+| Turning: towards travel, and on the spot | n/a | OK | n/a | A-residents-08 S3 code (seeded; seen: residents turn in place at each use; fixed 51503282: they step round) | `play/*-00.png` |
 | Approach: stepping to a use and back | n/a | OK | OK | A-bathroom-01 S2 model (bathroom ledger: through the shower door) | `play/*-00.png`, `play/shower-shower-00.png` |
 
 ## Findings
@@ -309,8 +309,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** clip
 - **Where:** `web/src/render/babylon/characters.ts:136` (`GAIT_MAX_RATE`), `web/src/render/shared/characters/clips/locomotion.ts:208`
 - **Evidence:** After R1-05's jog switch (76ac264), foot slide at height 1.0 with no traits: adults at speed 3 50–53 %, speeds 4–5 83–95 %. Children walk at the adults' 1.5 m/s on short legs.
-- **Status:** fixed in part (3872d23a): speeds 2 and 3; speeds 4 and 5 reduced, the rest won't fix (no gait steps at 45–90 m/s without strobing)
-- **After:** a third gear, `runAlong` (5.8 m/s, a 3.5 m stride in 0.6 s, up to 4×, `RUN_MAX_RATE`), takes over when the jog would need more than 3×. Steady-state foot slide (`gait-table.txt`, the runtime's choice, height 1, no traits / the fastest ×1.38): speed 3 adults, teens and elders 50–59 % → 0 % (3–9 % for the fastest), children 71–72 % → 11–14 %; speed 2 children 4–8 % → 0; speeds 4–5 83–92 % → 56–78 %. In play (`gait-after.json`, round trips on the review stage) speed 1 has no slide; the stage is too small for a steady walk at speed 3 and up. `bench-results/review/fixes/clips-standing/``strips/sheets/runAlong*`.
+- **Status:** fixed in part (3872d23a, 67177467): speeds 2 and 3, children's too; speeds 4 and 5 reduced, the rest won't fix (no gait steps at 45–90 m/s without strobing)
+- **After:** a third gear, `runAlong` (5.8 m/s, a 3.5 m stride in 0.6 s, up to 4×, `RUN_MAX_RATE`), takes over when the jog would need more than 3×. Steady-state foot slide (`gait-table.txt`, the runtime's choice, height 1, no traits / the fastest ×1.38): speed 3 adults, teens and elders 50–59 % → 0 % (3–9 % for the fastest), children 71–72 % → 11–14 %; speed 2 children 4–8 % → 0; speeds 4–5 83–92 % → 56–78 %. In play (`gait-after.json`, round trips on the review stage) speed 1 has no slide; the stage is too small for a steady walk at speed 3 and up. `bench-results/review/fixes/clips-standing/``strips/sheets/runAlong*`. Then (67177467): the run's cap quickens on shorter legs as the square root of their length (`gait.ts` `runMaxRate`, 5.3–5.4× on a child's, 4.3–4.4× on a teen's): at speed 3 children 11–14 % → 0 (the fastest 36–38 % → 15–17 %, teens' 4–9 % → 0); speeds 4–5 48–81 % (`web/tests/gait.test.ts`, `GAIT_TABLE=1`).
 - **Source:** `docs/release-0.2.0-review.md` §2.1 and §3.1 (R1-05)
 
 ### A-residents-04 — The start and end of a walk jump at speeds 4–5
@@ -353,7 +353,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters.ts:684` (face moods)
 - **Evidence:** A known gap named in the rubric. Emotional body language is new behaviour: filed as `code`, planned separately (§9, decision 3).
-- **Status:** later (G-71, body language: new behaviour, owner decision 3); was confirmed (pilot: `residents/face-female.png` has 18 distinct moods; no clip or layer changes with them)
+- **Status:** fixed (240be09b, b3859b30; G-71); was later (new behaviour, owner decision 3), confirmed (pilot: `residents/face-female.png` has 18 distinct moods; no clip or layer changes with them)
+- **After:** a layer over every clip per emotion (`characters/bodyLanguage.ts` `BEARINGS`, by the snapshot's emotion as the face): the back, the head, the shoulders, the arms, the elbows and the walk's arm swing (sad: the head 12° down, the back 8°, a swing under half the clip's; happy and energised: up straight, the arms loose, a third more swing; angry: upright, the arms in, the elbows bent 16°; tense: the shoulders drawn up). Only what the body is free to give: standing free or walking all of it (carrying, all but the arms); using a thing standing, inside one, in a hug, kiss, fight or cuddle only the head; seated the head and a third of the back; lying none. It eases in over about a second: `web/tests/blend.test.ts` switches emotions every 0.6 s, standing and walking, and no bone turns more than 3.7° a frame standing (34° switched at once). The pace is sim-core's: an emotion's `walkSpeed` (sad 0.88 … angry and energised 1.08). See them: `/characters.html?body=stand|walk&moods=sad,happy,angry`.
 - **Source:** `plan/authenticity-review.md` §3.2 (A6) and §9 (decision 3)
 
 ### A-residents-08 — No turn-on-the-spot clip
@@ -363,7 +364,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/shared/characters/clips/locomotion.ts`, `web/src/render/babylon/characters.ts` (turning)
 - **Evidence:** Residents turn in place without stepping. A turn-on-the-spot clip is new behaviour: filed only, planned separately (§9, decision 3).
-- **Status:** later (G-71, turning on the spot: new behaviour, owner decision 3); was confirmed (pilot: residents turn in place to face each object, no steps, in every `play/*-00.png`)
+- **Status:** fixed (51503282; G-71); was later (new behaviour, owner decision 3), confirmed (pilot: residents turn in place to face each object, no steps, in every `play/*-00.png`)
+- **After:** standing free, a turn of 35° or more steps round with a turn clip (`clips/locomotion.ts` `turnClip`, every 5° from 30° to 180° each way, a child's size apart, baked when first needed): the foot on the side of the turn steps out and the other follows (two steps, three, four for an about-turn), the Sim's yaw following the clip's steps (`turns.ts`) so a planted foot stays put. `check_clips` checks every size on every stage: a foot on the floor moves at most 0.81 cm in a turn. `web/tests/blend.test.ts`, three turns and a small pivot: the planted feet slide 6 cm (a grown-up) and 9 cm (a child) where pivoting slid 119 and 85 cm; no pop (the global per-frame checks), and a turn cut short by a walk goes on from its yaw.
 - **Source:** `plan/authenticity-review.md` §3.2 (A4) and §9 (decision 3)
 
 ### A-residents-09 — Seated feet don't reach the floor for children, teens and elder women

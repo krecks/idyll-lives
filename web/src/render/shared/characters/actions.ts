@@ -30,8 +30,9 @@ export const STALL = 0.5;
 /**
  * Walkers glide from snapshot to snapshot as far as they can walk between them (at speeds 4 and 5
  * a step covers metres; cutting corners of their path is the price): metres walked per tick
- * (`world::WALK_SPEED`), the fastest walkers' trait and perk factors (1.15 x 1.2 in the base game,
- * with room for packs) and some slack. Further than that, or not walking in both, is a jump.
+ * (`world::WALK_SPEED`), the fastest walkers' trait, perk and emotion factors (1.15 x 1.2 x 1.08,
+ * angry or energised, in the base game: 1.49) and some slack (packs' quicker walkers too). Further
+ * than that, or not walking in both, is a jump.
  */
 export const WALK_PER_TICK = 0.075;
 export const WALK_FASTEST = 1.5;
@@ -41,9 +42,9 @@ export const WALK_SLACK = 1.2;
  * (faster, they would only flicker; the feet slide instead). A walker who would need the walk faster
  * jogs along (`jogAlong`), one who would need the jog faster runs (`runAlong`, game speeds 3 and up,
  * children from 2), each going back to the slower gait below `JOG_BACK` of its switch. The run, the
- * last, goes on to `RUN_MAX_RATE` (about six strides a second): adults and teens keep their feet on
- * the ground at speed 3 (15 m/s; children run at up to 13 m/s there), and at speeds 4 and 5 (45 and
- * 90 m/s) no gait could.
+ * last, goes on to `RUN_MAX_RATE` (about six strides a second) on a grown-up's legs and quicker on
+ * shorter ones (`gait.ts` `runMaxRate`): everyone keeps their feet on the ground at speed 3 (15 m/s),
+ * and at speeds 4 and 5 (45 and 90 m/s) no gait could.
  */
 export const GAIT_MAX_RATE = 3;
 export const RUN_MAX_RATE = 4;

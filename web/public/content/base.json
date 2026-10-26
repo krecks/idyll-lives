@@ -770,6 +770,7 @@
       "label": "Happy",
       "icon": "icon.emotion.happy",
       "effects": {
+        "walkSpeed": 1.05,
         "tagPreference": {
           "friendly": 1.3
         }
@@ -793,6 +794,7 @@
       "label": "Angry",
       "icon": "icon.emotion.angry",
       "effects": {
+        "walkSpeed": 1.08,
         "tagPreference": {
           "mean": 3.5,
           "friendly": 0.5,
@@ -809,6 +811,7 @@
       "label": "Sad",
       "icon": "icon.emotion.sad",
       "effects": {
+        "walkSpeed": 0.88,
         "tagPreference": {
           "friendly": 1.3,
           "romantic": 0.5,
@@ -824,6 +827,7 @@
       "label": "Embarrassed",
       "icon": "icon.emotion.embarrassed",
       "effects": {
+        "walkSpeed": 0.95,
         "tagPreference": {
           "social": 0.6
         }
@@ -844,6 +848,7 @@
       "label": "Inspired",
       "icon": "icon.emotion.inspired",
       "effects": {
+        "walkSpeed": 1.03,
         "tagPreference": {
           "creative": 1.5
         }
@@ -854,6 +859,7 @@
       "label": "Energized",
       "icon": "icon.emotion.energized",
       "effects": {
+        "walkSpeed": 1.08,
         "tagPreference": {
           "fitness": 1.5,
           "rest": 0.8
@@ -865,6 +871,7 @@
       "label": "Relaxed",
       "icon": "icon.emotion.relaxed",
       "effects": {
+        "walkSpeed": 0.95,
         "tagPreference": {
           "rest": 1.4,
           "lounge": 1.4,

@@ -172,6 +172,17 @@ export interface SimRig {
    */
   feetUp: boolean;
   feet: Float32Array;
+  /** Body language (`bodyLanguage.ts` `bearing`): the bearing it has eased to, and how free the body is for it. */
+  bearing: Float32Array;
+  /**
+   * Turning on the spot (`turns.ts`): the turn clip playing ('' none), its size (deg), the yaw it started from and
+   * the turn it makes (rad), and whether `choose` has started its clip.
+   */
+  turnKey: string;
+  turnDeg: number;
+  turnFrom: number;
+  turnBy: number;
+  turnStarted: boolean;
   /**
    * A cuddle (`CUDDLE`): seconds since it began (-1: not cuddling) and since laying the baby back
    * down began (-1: not yet), game minutes so far, the pace of picking up / putting back, and the
@@ -237,6 +248,11 @@ export interface SimRig {
   fromBed: boolean;
   lieX: number;
   lieZ: number;
+  /**
+   * Getting out of bed: the root the lying body fading out had there (forward of `lieX`, `lieZ`), the lie's or, a lie
+   * still fading in cut short, that of the pose held where the fade had got to (`hold`).
+   */
+  lieFwd: number;
   /** The way they lay (kept while lying), for turning out of bed to the side sim-core turned them (`outOfBed`). */
   lieYaw: number;
   /**

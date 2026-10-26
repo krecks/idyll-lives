@@ -54,10 +54,13 @@ import { ENERGY_RATE, type VisemeTrack } from '../../../voice/visemes';
 import { GAME_RATE, QUIET_SPEED } from '../gameSpeed';
 import { paintColors } from '../modelEntry';
 import { type TableRoom, furthestAhead, nearestAhead } from '../tableTuck';
-import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOG_BACK, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PUSH_ONLY, RIDES, RUN_MAX_RATE, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, STRADDLED, STRUM, STRUM_SHORT, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_PER_TICK, WALK_SLACK, WALK_WAIT } from './actions';
+import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, STRADDLED, STRUM, STRUM_SHORT, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_PER_TICK, WALK_SLACK, WALK_WAIT } from './actions';
 import { LOW_TOP, SIT_LOW } from './clips/low';
 import { FLOOR_SITS } from './clips/seated';
 import { type BodyData, type CharacterSet, type Clip, loadCharacterSet, loadStage } from './data';
+import { BEARING_FLOATS, bearing } from './bodyLanguage';
+import { gaitFor } from './gait';
+import { TURN_FADE, isTurn, turnClipIn, turnDone, turnOnSpot, turnYaw } from './turns';
 import { ASLEEP, COLD, EXPRESSIONS, FRIENDLY, HUG, KISS, LAUGH, MOOD_COLD, MOOD_WARM, NONE, RELAX_ARMS, SOCIAL_FACES, STANCE, type StageDirection } from './expressions';
 import { FACE_KEYS, type Face, FaceMixer, NEUTRAL } from './face';
 import { type OutfitParams, SHELL_BITS, WEARS, type Wear, outfitFor, writeOutfit } from './outfit';
@@ -263,6 +266,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   updateMs = 0;
   /** Emotion id per snapshot emotion code - 1 (content `emotions`). */
   private emotionIds: readonly string[] = [];
+  /** Scratch: how free a body is for its body language this frame (`bodyLanguage`). */
+  private readonly freedom = { posture: 0, arms: 0, head: 0 };
   /** Stage directions per Sim row (character creator / portraits only; empty in game). */
   readonly directions: (StageDirection | null)[] = [];
   /** Selected Sim (selection ring), or null. */
@@ -554,6 +559,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         approach: 0,
         feetUp: false,
         feet: new Float32Array(4),
+        bearing: new Float32Array(BEARING_FLOATS),
+        turnKey: '',
+        turnDeg: 0,
+        turnFrom: 0,
+        turnBy: 0,
+        turnStarted: false,
         cuddleT: -1,
         cuddleOut: -1,
         cuddleMin: 0,
@@ -588,6 +599,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         fromBed: false,
         lieX: 0,
         lieZ: 0,
+        lieFwd: 0,
         lieYaw: 0,
         sideYaw: NaN,
         sideOut: 0,
@@ -1472,6 +1484,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       if (edge) faceYaw = rig.sideYaw;
       else if (pose === Pose.Lie && !Number.isNaN(rig.sideYaw) && rig.cur.key === 'lie' && rig.prev.key === 'sitDown' && rig.w < 1) turned = lerpAngle(rig.sideYaw, tyaw, smooth(rig.w));
       else if (pose === Pose.Stand && rig.fromBed && rig.cur.key === 'standUp' && rig.w < 1) turned = lerpAngle(rig.lieYaw, tyaw, smooth(rig.w));
+      // (And on the frame they get up, before `choose` starts it: turned already, the lying body would swing round by
+      // that frame's turn and back.)
+      else if (pose === Pose.Stand && rig.lastPose === Pose.Lie && rig.bed && !rig.upperBunk && !moving && !appeared) turned = rig.lieYaw;
       // A bed lain on across (`BEDS` `across`): turned a quarter, feet to its right.
       rig.lieAcross = pose === Pose.Lie && !!BEDS[(useObj ?? this.objectAt(rig.x, rig.z))?.def ?? '']?.across;
       if (rig.lieAcross) faceYaw = wrapAngle(tyaw + Math.PI / 2);
@@ -1525,7 +1540,11 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       // Walkers turn as quickly as the game runs (up to 10x): sped up, the corners of their way come sooner.
       const turn = moving ? clamp(gameRate, 1, 10) : 1;
       const maxTurn = (moving ? 9 : 6) * dt * turn;
-      rig.yaw = dir ? wrapAngle(faceYaw) : turned !== null ? wrapAngle(turned) : wrapAngle(rig.yaw + clamp(dyaw * (1 - Math.exp(-dt * 12 * turn)), -maxTurn, maxTurn));
+      // Standing free, a wide turn steps round (`turnOnSpot`): the yaw follows the turn clip's steps. (To the way the
+      // snapshot turns them, not the way the frames between snapshots have got to: sized for the whole turn.)
+      const goal = faceYaw === tyaw ? curr[o + k.yaw] : faceYaw;
+      const onSpot = dir || turned !== null ? null : turnOnSpot(set, rig, this.standsFree(rig, i, pose, moving, social, useObj, appeared), goal, rig.body.stage === 'child');
+      rig.yaw = dir ? wrapAngle(faceYaw) : turned !== null ? wrapAngle(turned) : onSpot !== null ? onSpot : wrapAngle(rig.yaw + clamp(dyaw * (1 - Math.exp(-dt * 12 * turn)), -maxTurn, maxTurn));
       rig.visible = true;
       this.visible[i] = 1;
       rig.tx = cx;
@@ -1549,6 +1568,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       advance(rig.prev, GAITS.has(rig.prev.key) || rig.prev.key === 'jog' ? dt : step);
       advance(rig.upper, step);
       advance(rig.upperPrev, step);
+      if (rig.turnKey && rig.turnStarted) rig.yaw = turnYaw(rig);
       // Carrying while walking: the arms bob in step with the feet.
       if (rig.cur.clip && GAITS.has(rig.cur.key) && rig.upper.clip && rig.upper.key.startsWith('carry')) rig.upper.time = (rig.cur.time / rig.cur.clip.duration) * rig.upper.clip.duration;
       rig.w = Math.min(1, rig.w + dt * rig.fadeRate * Math.max(1, animRate));
@@ -1741,7 +1761,6 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     fresh: boolean,
   ): void {
     const pair = partner ? Math.min(i, partner.id) : i;
-    const set = this.set!;
     const known = useObj !== undefined;
     const act = ACTIONS[tag];
     rig.tag = tag;
@@ -1880,12 +1899,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       // Walking, the cycle matched to the ground speed; faster than the walk can step (a sped-up
       // game, short legs), jogging along, and faster than that running (`GEARS`): the slowest gait
       // that needn't go faster than its pace, a slower one than now only well within it.
-      const legs = rig.body.pelvisScale * rig.scale;
-      const now = GEARS.indexOf(rig.cur.key);
-      let gear = 0;
-      while (gear < GEARS.length - 1 && set.clips.has(GEARS[gear + 1]) && rig.speed / (set.clips.get(GEARS[gear])!.speed * legs) > GAIT_MAX_RATE * (gear < now ? JOG_BACK : 1)) gear++;
-      key = GEARS[gear];
-      rate = clamp(rig.speed / (set.clips.get(key)!.speed * legs), 0.35, gear === GEARS.length - 1 ? RUN_MAX_RATE : GAIT_MAX_RATE);
+      // (The run's beat quicker on shorter legs: `runMaxRate`.)
+      const gait = gaitFor(rig.speed, rig.body.pelvisScale * rig.scale, GEARS.indexOf(rig.cur.key), this.gaitSpeed);
+      key = GEARS[gait.gear];
+      rate = gait.rate;
       fade = GAITS.has(rig.cur.key) ? 0.3 : 0.2;
       hands = HANDS.relaxed;
       rig.useObj = null;
@@ -2032,6 +2049,16 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       }
     }
     if (!inside && rig.inside) this.stepOut(rig, fresh);
+    // Turning on the spot (`turnOnSpot`): its clip on the legs and body until it has played, then what they do. The
+    // step towards a thing or a partner waits for it (stepping forward while turning would swing the body round).
+    if (rig.turnKey && turnDone(rig)) rig.turnKey = '';
+    if (rig.turnKey) {
+      key = rig.turnKey;
+      fade = TURN_FADE;
+      rate = 1;
+      repeat = false;
+      reach = rig.approach;
+    }
     rig.approach += (reach - rig.approach) * Math.min(1, step * reachRate);
     const dir = rig.dir;
     if (dir?.clip) {
@@ -2057,12 +2084,15 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       upper = '';
       frame = this.bedFrame(rig.bed!);
     } else if (down) rig.upperBunk = false;
+    // (Getting up out of bed this frame: `lieFwd`.)
+    let outOfBed = false;
     if (climbDown) {
       // (Not standing up as from another bed.)
     } else if (!moving && pose === Pose.Stand && (rig.lastPose === Pose.Sit || rig.lastPose === Pose.Lie) && rig.cur.key !== up && !this.force) {
       // Rising from a seat (or sitting up out of bed: the crossfade from lying leans the Sim up).
       key = up;
       rig.fromBed = rig.lastPose === Pose.Lie && !!rig.bed;
+      outOfBed = rig.fromBed;
       if (rig.fromBed) fade = 0.9;
       // (Off a seat: rising where it is, then stepping off to the tile: `riseX`.)
       rig.rising = rig.lastPose === Pose.Sit;
@@ -2119,7 +2149,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     } else if (cur.key === key && repeat && done && !cur.clip!.loop) {
       // Repeated one-shots (fights).
       this.start(rig, key, 0.3, rate, repeat, rootY, rootFwd, pitch);
-    } else if (cur.key !== key) {
+    } else if (cur.key !== key || (key === rig.turnKey && !rig.turnStarted)) {
+      // (A new turn starts its clip afresh, even over the end of the same one.)
       rig.stepTime = 0;
       this.start(rig, key, fade, rate, repeat, rootY, rootFwd, pitch);
     } else {
@@ -2129,6 +2160,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       cur.rootPitch = pitch;
     }
     rig.cur.frame = frame;
+    if (key === rig.turnKey) rig.turnStarted = true;
     // A ride in time with its loop (`RIDES` `sync`: the swing's pumping legs).
     if (pose === Pose.Sit && key === rig.cur.key && rig.useId >= 0 && RIDES[rig.useDef]?.sync) {
       const phase = this.loopOf?.(rig.useId);
@@ -2137,7 +2169,13 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     // (Down the bunk's ladder from lying: the lying body fading out lies where it lay, in the bed's frame.)
     if (frame && LYING.has(rig.prev.key) && rig.lastPose === Pose.Lie) rig.prev.frame = frame;
 
-    if (rig.fromBed && LYING.has(rig.prev.key)) rig.prev.rootFwd = (rig.lieX - rig.x) * fx + (rig.lieZ - rig.z) * fz + lieCentre(rig) + rig.bedFwd;
+    // The lying body fading out lies where it lay as the Sim moves off the bed: its root as it was when they got up
+    // (`lieFwd`: the lie's, or a held pose's where a lie still fading in was cut short; the lie's alone would move
+    // that one 7 cm in a frame, `blend.test.ts`).
+    if (rig.fromBed && LYING.has(rig.prev.key)) {
+      if (outOfBed) rig.lieFwd = rig.prev.rootFwd;
+      rig.prev.rootFwd = (rig.lieX - rig.x) * fx + (rig.lieZ - rig.z) * fz + rig.lieFwd;
+    }
 
     // Upper-body layer.
     if (upper) {
@@ -2435,9 +2473,60 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     rig.outT = k < 1 ? rig.outT + step : -1;
   }
 
+  /**
+   * Body language for the Sim's emotion (`bodyLanguage.ts`), as far as what they do leaves the body free: standing
+   * free or walking, all of it (but the arms, carrying); using a thing standing (its clips' hands on it), inside one,
+   * in a hug, a kiss, a fight or a cuddle, the head only; seated, the head and, sat plainly, some of the back; lying, a
+   * baby or directed (the creator, portraits), none.
+   */
+  private bodyLanguage(rig: SimRig, i: number, social: number, pose: number, moving: boolean, refused: boolean, dt: number): void {
+    const B = this.set!.bone;
+    const free = this.freedom;
+    const key = rig.cur.key;
+    free.posture = free.arms = 0;
+    free.head = 1;
+    if (rig.dir || rig.body.stage === 'baby' || pose === Pose.Lie || this.force) free.head = 0;
+    else if (pose === Pose.Sit) free.posture = key === 'sit' || key === 'sitTalk' ? 0.3 : 0;
+    else if (!(
+      social === Anim.Hug ||
+      social === Anim.Kiss ||
+      social === Anim.Fight ||
+      refused ||
+      rig.cuddleT >= 0 ||
+      rig.liftW > 0 ||
+      this.heldBy[i] >= 0 ||
+      rig.inside ||
+      (!moving && !!rig.useSeq?.includes(key))
+    )) {
+      free.posture = 1;
+      free.arms = rig.upperW > 0.05 ? 0 : 1;
+    }
+    const walking = key === 'walk' && rig.cur.clip;
+    bearing(rig.bearing, this.emotionIds[rig.emotion - 1] ?? '', free, walking ? (rig.cur.time / rig.cur.clip!.duration) % 1 : 0, walking ? smooth(rig.w) : 0, dt, this.add, B);
+  }
+
+  /**
+   * Standing free this frame, so that a wide turn can step round (`turnOnSpot`): on their feet and still, not walked
+   * in, inside a thing, up on one, getting up or climbing down, nor holding or lifting a baby or in an embrace or a
+   * fight (those place the body themselves); a baby never.
+   */
+  private standsFree(rig: SimRig, i: number, pose: number, moving: boolean, social: number, useObj: PlacedObject | null | undefined, appeared: boolean): boolean {
+    if (pose !== Pose.Stand || moving || appeared || this.force || rig.body.stage === 'baby' || this.heldBy[i] >= 0) return false;
+    if (rig.walkT >= 0 || rig.inside || rig.outT >= 0 || useObj?.stand || rig.rising || rig.fromBed || rig.riseK < 1) return false;
+    if (rig.cuddleT >= 0 || rig.liftW > 0 || !Number.isNaN(rig.faceX)) return false;
+    if (social === Anim.Hug || social === Anim.Kiss || social === Anim.Fight) return false;
+    // (Getting up, or down the bunk's ladder, until its clip is done: `choose` keeps it.)
+    if (rig.lastPose !== Pose.Stand || RISING.has(rig.cur.key) || rig.cur.key.startsWith('bunk')) return false;
+    return true;
+  }
+
+  /** A gait clip's ground speed at rate 1 on the reference legs (`gaitFor`), undefined for one the set doesn't have. */
+  private readonly gaitSpeed = (key: string): number | undefined => this.set?.clips.get(key)?.speed;
+
   private clip(key: string): Clip {
     const set = this.set!;
-    return set.clips.get(key) ?? set.clips.get('idle')!;
+    // (Turns on the spot are baked the first time they're played: `turnClipIn`.)
+    return set.clips.get(key) ?? turnClipIn(set, key) ?? set.clips.get('idle')!;
   }
 
   /** Length (s) of the clip played for `key` (0 before the set has loaded). */
@@ -2663,6 +2752,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     }
     // (A refused hug or kiss plays its own clips, `REFUSED`: nobody leans in or holds anyone.)
     const refused = rig.cur.key === 'refuse' || rig.cur.key === 'rebuffed';
+    if (this.force !== 'rest') this.bodyLanguage(rig, i, social, pose, moving, refused, dt);
     switch (social) {
       case Anim.Flirt:
         // A head tilt and a sway of the hips for the one listening (the flirt's own clip has its own).
@@ -3260,7 +3350,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private stance(rig: SimRig, pose: number, moving: boolean, dt: number): void {
     const B = this.set!.bone;
     const standing = pose === Pose.Stand && !moving && (!this.force || this.forceStance);
-    const arms = standing && rig.skirt && RELAX_ARMS.has(rig.cur.key) && !(rig.upperW > 0.05) && rig.cuddleT < 0 ? 1 : 0;
+    const arms = standing && rig.skirt && (RELAX_ARMS.has(rig.cur.key) || isTurn(rig.cur.key)) && !(rig.upperW > 0.05) && rig.cuddleT < 0 ? 1 : 0;
     rig.relaxArms += (arms - rig.relaxArms) * (rig.dir?.still ? 1 : Math.min(1, dt * 5));
     const a = smooth(clamp(rig.relaxArms, 0, 1));
     if (a > 1e-3) {

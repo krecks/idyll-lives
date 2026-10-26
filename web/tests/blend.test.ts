@@ -1,9 +1,10 @@
 // Crossfade continuity: the residents' blending (`residents.ts` `start`, `choose`, the per-frame blend; `pose.ts`
-// `blendInto`) driven through a recording `ResidentView`, with six Sims scripted to churn — a chair sat on and
+// `blendInto`) driven through a recording `ResidentView`, with ten Sims scripted to churn — a chair sat on and
 // stood up from, a walk cut short by a dance, a two-handed load carried and then eaten, a two-handed load swapped
-// for a one-handed one (now and then, and every 0.1 s), in and out of bed. Every frame, every bone's rotation and
-// the pelvis's position are read out of the pose texture (the skinning matrices, what the viewer sees) and compared
-// with the frame before: a crossfade must move the body smoothly, so a single frame turning a bone further than a
+// for a one-handed one (now and then, and every 0.1 s), in and out of bed, and out of it before the lie has faded
+// in; and turning on the spot, a grown-up and a child, and a turn cut short by a walk. Every frame, every bone's
+// rotation and the pelvis's position are read out of the pose texture (the skinning matrices, what the viewer sees)
+// and compared with the frame before: a crossfade must move the body smoothly, so a single frame turning a bone further than a
 // real fade does, or moving the body further than a Sim can, is a pop, not motion. `bun test`.
 //
 // (What this caught when written: `start` kept the old fading-out player only under `rig.w < 0.5`, so interrupting
@@ -13,7 +14,8 @@
 // which is the fade itself: the widest handoff the clips have is 175° over a quarter second. Later: an upper-layer
 // fade cut short by the next swap dropped the clip it was fading from, 61° of a hand; and a rise off a seat cut
 // short by a walk put the body on the tile in one frame, 43 cm; and, hidden before it had caught up, came back into
-// view on its way off the seat it had left, 62 cm from its place.)
+// view on its way off the seat it had left, 62 cm from its place. Then: getting out of bed before the lie had faded in
+// moved the held pose to the lie's own root, 7 cm in a frame, and 1 cm more turned the way they get up to.)
 import { afterAll, describe, expect, test } from 'bun:test';
 import { readFileSync, existsSync } from 'node:fs';
 
@@ -50,6 +52,7 @@ describe('residents crossfade continuity', async () => {
   const { Pose, simFields } = await import('../src/core/snapshot');
   const { slotPlace } = await import('../src/render/shared/objectMotion');
   const rig = await import('../src/render/shared/characters/rig');
+  const { LYING } = await import('../src/render/shared/characters/actions');
   type View = import('../src/render/shared/characters/view').ResidentView<
     object,
     object,
@@ -138,13 +141,21 @@ describe('residents crossfade continuity', async () => {
     tag?: string;
     moving?: number;
     held?: string;
+    /** The way they face (rad; 0 if not given). */
+    yaw?: number;
+    /** Their emotion (content `emotions` id; happy if not given). */
+    emotion?: string;
   }
   interface Actor {
     /** The activities in a cycle, each `seconds` long (a fade is 0.25–0.3 s, so these interrupt each other). */
     script: Step[];
     /** 'cycle': round the script; 'carry': standing with a load, then sat at the counter eating it (for good);
-     *  'swap': a two-handed load for a one-handed one, over and over. */
-    kind: 'cycle' | 'carry' | 'swap';
+     *  'swap': a two-handed load for a one-handed one, over and over; 'bed': round the script, lying at the bed's
+     *  slot (`x`, `z`) and standing on the tile in front of it, as sim-core places a sleeper; 'turn': standing at `x`,
+     *  `z` (walking on the spot when `moving`), facing each step's `yaw`. */
+    kind: 'cycle' | 'carry' | 'swap' | 'bed' | 'turn';
+    /** Life stage (the young adult's if not given). */
+    stage?: string;
     object: number;
     x: number;
     z: number;
@@ -195,7 +206,47 @@ describe('residents crossfade continuity', async () => {
       object: bed.id,
       ...onBed,
     },
+    // Lying down long enough to be lying (the sit on the edge done, the lie fading in), and up before the lie has
+    // faded in: the rise starts from a held pose that `choose`'s bed override reaches (`fromBed`).
+    {
+      kind: 'bed',
+      script: [{ seconds: 1.4, pose: P.Lie, tag: 'sleep' }, { seconds: 1.6 }],
+      object: bed.id,
+      ...onBed,
+    },
   ];
+  /** The actor whose rise from bed starts from a held pose. */
+  const RISER = actors.length - 1;
+  // Turning on the spot: a grown-up and a child turned 100°, then 169° the other way (an about-turn sized 180°), then
+  // 14° (a pivot), and a turn cut short by walking off a third of the way through.
+  const turns: Step[] = [
+    { seconds: 1.5, yaw: 0 },
+    { seconds: 1.8, yaw: 1.75 },
+    { seconds: 2.2, yaw: -1.2 },
+    { seconds: 1, yaw: -0.95 },
+  ];
+  actors.push(
+    { kind: 'turn', script: turns, object: -1, x: 20.5, z: 0 },
+    { kind: 'turn', script: turns, object: -1, x: 22.5, z: 0, stage: 'child' },
+    {
+      kind: 'turn',
+      script: [{ seconds: 1.5, yaw: 0 }, { seconds: 0.3, yaw: 2 }, { seconds: 0.6, yaw: 2, moving: 1 }, { seconds: 1.5, yaw: 2 }],
+      object: -1,
+      x: 24.5,
+      z: 0,
+    },
+  );
+  /** The turners, by actor. */
+  const TURNERS = [RISER + 1, RISER + 2, RISER + 3];
+  // A change of mood: standing, then walking on the spot, sad, happy, angry, embarrassed and energised by turns (the widest bearings
+  // there are, each after the other's opposite), each cut short before the last has eased in.
+  const moods: Step[] = ['sad', 'happy', 'angry', 'embarrassed', 'energized', 'sad'].map((emotion) => ({ seconds: 0.6, emotion }));
+  actors.push(
+    { kind: 'turn', script: moods, object: -1, x: 26.5, z: 0 },
+    { kind: 'turn', script: moods.map((m) => ({ ...m, moving: 1 })), object: -1, x: 28.5, z: 0 },
+  );
+  /** The moody ones, by actor. */
+  const MOODY = [RISER + 4, RISER + 5];
   // One Sim per actor, alike in everything but their name: the actors script the snapshot, not them.
   const sims = Array.from({ length: actors.length }, (_, i): SimInfo => ({
     id: i,
@@ -216,9 +267,11 @@ describe('residents crossfade continuity', async () => {
     },
     traits: [],
     perks: [],
+    ...(actors[i].stage ? { stage: actors[i].stage } : {}),
   }));
   const items = content.items.map((it) => it.id);
   const actions = [...content.animations];
+  const emotions = content.emotions.map((e) => e.id);
   /** An id's place in one of the snapshot's lists (`indexOf`, but a typo fails the test rather than reading as "none"). */
   const indexOf = (list: readonly string[], id: string): number => {
     const i = list.indexOf(id);
@@ -289,6 +342,13 @@ describe('residents crossfade continuity', async () => {
         // ever a jump — only the activity's. A walker's `object` is -1: it has no tile in front of anything.)
         const base = a.object >= 0 ? front(objects[a.object]) : a;
         [x, z] = [base.x, base.z + 0.5 * Math.sin(t * 1.3)];
+      } else if (a.kind === 'turn') {
+        const s = stepAt(a, t);
+        moving = s.moving ?? 0;
+      } else if (a.kind === 'bed') {
+        const s = stepAt(a, t);
+        [pose, tag] = [s.pose ?? P.Stand, s.tag ?? ''];
+        [x, z] = pose === P.Lie ? [a.x, a.z] : [front(objects[a.object]).x, front(objects[a.object]).z];
       } else if (a.kind === 'carry') {
         // Standing with a load, then sat at the counter eating it.
         const sat = t > a.script[0].seconds;
@@ -302,7 +362,8 @@ describe('residents crossfade continuity', async () => {
       snap[o + k.id] = i;
       snap[o + k.x] = x;
       snap[o + k.z] = z;
-      snap[o + k.yaw] = 0;
+      // (Out of bed turned to the side, as sim-core turns a sleeper getting up.)
+      snap[o + k.yaw] = a.kind === 'bed' && pose === P.Stand ? 1.2 : a.kind === 'turn' ? (stepAt(a, t).yaw ?? 0) : 0;
       snap[o + k.pose] = pose;
       snap[o + k.moving] = moving;
       snap[o + k.social] = 0;
@@ -310,7 +371,7 @@ describe('residents crossfade continuity', async () => {
       snap[o + k.outcome] = 0;
       snap[o + k.partner] = -1;
       snap[o + k.role] = 0;
-      snap[o + k.emotion] = 1;
+      snap[o + k.emotion] = indexOf(emotions, stepAt(a, t).emotion ?? 'happy') + 1;
       snap[o + k.away] = 0;
       snap[o + k.object] = a.object;
       snap[o + k.action] = tag ? indexOf(actions, tag) : -1;
@@ -347,9 +408,19 @@ describe('residents crossfade continuity', async () => {
         ),
       );
       characters.setSun(() => ({ x: -0.45, z: -0.35 }));
-      const { bones, sourcePelvis } = JSON.parse(readFileSync(`${WEB}public/assets/characters/rig.json`, 'utf8')) as {
+      const { bones, parents, sourcePelvis, bodies } = JSON.parse(readFileSync(`${WEB}public/assets/characters/rig.json`, 'utf8')) as {
         bones: string[];
+        parents: number[];
         sourcePelvis: [number, number, number];
+        bodies: Record<string, { stage: string; restT: number[]; stages: Record<string, { restT: number[] }> }>;
+      };
+      /** A joint's rest position on the male body at `stage` (the rest rotations are the identity): what its skinning matrix carries to the world. */
+      const restAt = (stage: string | undefined, joint: string): number[] => {
+        const body = bodies.male;
+        const restT = !stage || stage === body.stage ? body.restT : body.stages[stage].restT;
+        const at = [0, 0, 0];
+        for (let b = bones.indexOf(joint); b >= 0; b = parents[b]) for (let c = 0; c < 3; c++) at[c] += restT[b * 3 + c];
+        return at;
       };
       const pelvis = bones.indexOf('pelvis');
       const prev = new Float32Array(layout.capacity);
@@ -364,7 +435,7 @@ describe('residents crossfade continuity', async () => {
       };
       const shadows = new Float32Array(MAX_CHARACTERS * 16);
       const FPS = 60;
-      const SECONDS = 6;
+      const SECONDS = 8;
       let tick = 0;
       writeSnapshot(prev, 0);
       writeSnapshot(curr, 0);
@@ -381,6 +452,18 @@ describe('residents crossfade continuity', async () => {
       const HIDDEN = [2.37, 3] as const;
       let wasHidden = false;
       let reappeared = NaN;
+      // The bed's riser (its rig: `Characters` keeps them to itself): the clip it played the frame before, and how far
+      // (cm) its pelvis moved on each frame a rise from bed started, and whether that was from a held pose.
+      const riser = (characters as unknown as { sims: { cur: { key: string }; prev: { frozen: unknown; key: string } }[] }).sims[RISER];
+      let riserKey = '';
+      const rises: { cm: number; held: boolean }[] = [];
+      // The one standing through changes of mood: the most a bone turned in a frame.
+      let moodWorst = { deg: 0, bone: '', at: 0 };
+      // The turners: each foot's place every frame (world), whether a turn clip was playing, and their yaw at the end of
+      // each of the script's steps against the way it faced them.
+      const rigs = (characters as unknown as { sims: { cur: { key: string }; yaw: number }[] }).sims;
+      const feet = TURNERS.map(() => ({ l: [] as number[][], r: [] as number[][], turning: [] as boolean[] }));
+      const missed: number[] = [];
       // The worst turns seen, for the failure's message.
       const worst: { deg: number; sim: number; bone: string; at: number }[] = [];
       const note = (deg: number, sim: number, bone: string, at: number) => {
@@ -432,13 +515,32 @@ describe('residents crossfade continuity', async () => {
           } else if (t >= 0.5) {
             const prevQ = before[i];
             for (let b = 0; b < bones.length; b++) {
-              note(quatAngle(prevQ, b * 4, after, b * 4), i, bones[b], t);
+              const deg = quatAngle(prevQ, b * 4, after, b * 4);
+              note(deg, i, bones[b], t);
+              if (i === MOODY[0] && deg > moodWorst.deg) moodWorst = { deg, bone: bones[b], at: t };
             }
             const cm = Math.hypot(hip[0] - hips[i][0], hip[1] - hips[i][1], hip[2] - hips[i][2]) * 100;
             if (cm > farthest.cm) farthest = { cm, sim: i, at: t };
+            if (i === RISER && riser.cur.key === 'standUp' && riserKey !== 'standUp' && LYING.has(riser.prev.key)) rises.push({ cm, held: !!riser.prev.frozen });
           }
           before[i].set(after);
           hips[i] = hip;
+          if (i === RISER) riserKey = riser.cur.key;
+          const turner = TURNERS.indexOf(i);
+          if (turner >= 0) {
+            for (const side of ['l', 'r'] as const) {
+              const b = bones.indexOf(`foot_${side}`);
+              const fm = poses.subarray(row + b * 16, row + b * 16 + 16);
+              const [rx, ry, rz] = restAt(actors[i].stage, `foot_${side}`);
+              feet[turner][side].push([0, 1, 2].map((c) => fm[c] * rx + fm[4 + c] * ry + fm[8 + c] * rz + fm[12 + c]));
+            }
+            feet[turner].turning.push(/^turn[LR]\d/.test(rigs[i].cur.key));
+            // (A tenth of a second before the next step of a still turner's script, before the snapshot a tick ahead
+            // brings it: turned all the way.)
+            const a = actors[i];
+            const s = stepAt(a, t);
+            if (turner < 2 && t > 1 && stepAt(a, t + 0.1) !== s && stepAt(a, t + 0.1 - 1 / FPS) === s) missed.push(Math.abs(Math.atan2(Math.sin(rigs[i].yaw - (s.yaw ?? 0)), Math.cos(rigs[i].yaw - (s.yaw ?? 0)))));
+          }
         }
       }
       // The widest handoff there is (175°, `blend_analysis`) faded over 0.25 s moves 175° * 1.5 / 4 / 60 = 17.5° a
@@ -453,10 +555,39 @@ describe('residents crossfade continuity', async () => {
       expect(farthest.cm, `single-frame pelvis move: ${hipsAt}`).toBeLessThan(20);
       // (Standing, the pelvis is within a few cm of the Sim's place; the seat they rose from is 43 cm away.)
       expect(reappeared, 'pelvis from its place on coming back into view (cm)').toBeLessThan(15);
+      // Getting out of bed, the lying body fading out stays where it lay (`lieFwd`): the first frame of the rise moves
+      // the pelvis by the fade's first step alone, from a lie that had faded in and from one held part way (7 cm when
+      // the held pose was moved to the lie's own root; 1 cm more when the Sim turned that frame before the rise began).
+      expect(rises.some((r) => r.held), 'a rise from a held pose').toBe(true);
+      expect(Math.max(...rises.map((r) => r.cm)), 'pelvis on the first frame out of bed (cm)').toBeLessThan(0.2);
+      // Turning on the spot: the turners step round (a turn clip plays), face the way wanted by the end of each step of
+      // the script, and keep a foot on the floor where it is: its slide summed over the run from 1 s, three turns
+      // (100°, 169° and 54°) and a pivot (14°). Pivoting as before, every turn: 119 cm for the grown-up, 85 cm for the
+      // child; stepping round, 6 and 9 cm.
+      const slides = feet.map((f, n) => {
+        let cm = 0;
+        for (const side of ['l', 'r'] as const) {
+          const low = Math.min(...f[side].map((p) => p[1]));
+          for (let k = FPS; k < f[side].length; k++) {
+            const [a, b] = [f[side][k - 1], f[side][k]];
+            if (a[1] < low + 0.002 && b[1] < low + 0.002) cm += Math.hypot(b[0] - a[0], b[2] - a[2]) * 100;
+          }
+        }
+        return { who: `sim${TURNERS[n]}`, cm, frames: f.turning.filter(Boolean).length };
+      });
+      if (process.env.TURN_TABLE) console.log(slides, missed.map((r) => ((r * 180) / Math.PI).toFixed(1)));
+      for (const { who, frames } of slides.slice(0, 2)) expect(frames, `${who}: frames turning on the spot`).toBeGreaterThan(120);
+      expect(Math.max(...missed), 'off the way wanted at the end of a step (rad)').toBeLessThan(0.02);
+      for (const { who, cm } of slides.slice(0, 2)) expect(cm, `${who}: planted feet's slide (cm)`).toBeLessThan(12);
+      // A change of mood eases in: standing, no bone turns further in a frame than the idle's own fidgets do (3.7°, a
+      // hand; the bearing switched at once, sad to happy, turned the head 34°); walking, the global check above (39° of
+      // a forearm, the arms' swing and bend switched at once).
+      expect(moodWorst.deg, `single-frame turn through changes of mood: ${moodWorst.bone} at ${moodWorst.at.toFixed(2)} s`).toBeLessThan(5);
     } finally {
       performance.now = realNow;
     }
-  });
+    // (Eight seconds of ten Sims, every frame read back: longer than bun's 5 s default on a busy machine.)
+  }, 30_000);
 });
 
 /** The angle (deg) between two rotations in arrays `a` and `b`, at float offsets `oa` and `ob`. */
