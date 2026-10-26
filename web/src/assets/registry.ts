@@ -120,7 +120,8 @@ function resolveUrls(entry: AssetEntry, base: URL): AssetEntry {
   const out = { ...entry } as AssetEntry & UrlFields;
   for (const field of URL_FIELDS) {
     const url = out[field];
-    if (url !== undefined) out[field] = withBuild(new URL(url, base).href);
+    // (A hand-written pack can put anything there: `null` would become a file called `null`.)
+    if (typeof url === 'string') out[field] = withBuild(new URL(url, base).href);
   }
   return out;
 }
