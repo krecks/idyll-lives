@@ -17,8 +17,9 @@
 //! choose something in a room kept shut by someone else, unless it fills a need about to run
 //! out: they'd rather wait at the door. Kept out, a need that runs out counts as having nothing
 //! for it at home (the accident comes after its `graceMinutes`), and a toilet in a room kept
-//! shut counts as taken (a second bathroom is wished for, `rooms::opinions`). The renderer keeps
-//! the doors of a room kept shut shut (snapshot `sim::SHUTS`).
+//! shut counts as taken (a second bathroom is wished for, `rooms::opinions`). The renderer holds
+//! such a room's doors shut (snapshot `sim::SHUTS`). Nobody waits on their way out to work, home,
+//! a visit or the front door, nor on their way to someone to talk to: they go through.
 //!
 //! **The household's own things.** An object kind marked `private` (a wardrobe, a dresser, the
 //! bath cabinet) is used by nobody visiting: free will doesn't choose it and an order is refused
@@ -26,8 +27,9 @@
 //!
 //! **Trying for a baby.** When partners' social with the `conceive` effect goes well and the
 //! content has somewhere to try (`Interaction::conceive`, the double beds), the two go to bed
-//! (`to_bed`): to a free double bed at home in a room of its own (indoors, with a door, nobody
-//! else in it but a baby), where they lie under the covers for its time, the door shut. A baby
+//! (`after_step`): to a free double bed at home in a room of its own (indoors, with a door, nobody
+//! else in it but a baby), where they lie under the covers for its time, the door shut (with
+//! someone else in the room as they get there, they don't: `overlooked`). A baby
 //! may come of it once it has run its time (`lifecycle::conceive`, as before). Without such a bed
 //! the social isn't chosen, nor can the player ask for it.
 
@@ -227,6 +229,18 @@ pub(crate) fn wait_outside(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstan
         sim.remember_unreachable(task.kind, ctx.tick + retry);
     }
     true
+}
+
+/// Whether someone else is in the room of private use `doing` (`(object, interaction)`) besides
+/// `me`: not whoever does it with them, nor a baby. Then it isn't done (`world::progress`).
+pub(crate) fn overlooked(ctx: &Ctx, objects: &[ObjectInstance], me: u32, doing: (u32, usize)) -> bool {
+    let Some(o) = objects.get(doing.0 as usize) else { return false };
+    let lot = ctx.nav.lot;
+    let room = room_of_object(ctx.content, lot, o);
+    room != OUTDOORS
+        && ctx.briefs.iter().enumerate().any(|(j, b)| {
+            j as u32 != me && b.here && !b.away && !b.baby && room_of(lot, b.pos) == room && b.game.is_none_or(|g| (g.0, g.1) != doing)
+        })
 }
 
 /// Whether the content has somewhere to try for a baby (`Interaction::conceive`): then the

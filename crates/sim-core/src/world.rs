@@ -5388,6 +5388,15 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
             false
         }
         Phase::Using { elapsed } => {
+            // Done behind a shut door (`privacy.rs`): with someone else in the room as they get
+            // there, not at all.
+            if *elapsed == 0.0
+                && let TaskKind::Use { object, interaction } = act.task.kind
+                && content.objects[objects[object as usize].def].interactions.get(interaction).is_some_and(|i| i.private)
+                && crate::privacy::overlooked(ctx, objects, sim.id, (object, interaction))
+            {
+                return end_activity(sim, content, objects);
+            }
             // A game for two: not begun until the one they play with is at their place too, and
             // over once they've stopped (`partners::hold`).
             let mut over = false;

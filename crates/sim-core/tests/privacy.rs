@@ -361,3 +361,30 @@ fn a_bathroom_opening_onto_the_garden_isnt_kept_shut() {
     }
     assert!(went, "Ben went in");
 }
+
+#[test]
+fn not_with_someone_else_in_the_bedroom() {
+    let mut w = home(true);
+    in_love(&mut w);
+    let bed = 2;
+    let social = w.content.social_index("tryForBaby").unwrap();
+    w.apply(Command::Social { sim: 0, target: 1, social }).unwrap();
+    // On their way to bed, Gus is in the bedroom already (he got there first).
+    let mut moved = false;
+    for _ in 0..ticks(60.0) {
+        w.tick_once();
+        let going = w.sims[0].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Use { object, .. } if object == bed));
+        if going && !moved {
+            w.sims[2].pos = [12.5, 5.5];
+            moved = true;
+        }
+        for i in [0, 1] {
+            let trying = w.sims[i].current().is_some_and(|a| {
+                matches!(a.task.kind, TaskKind::Use { object, .. } if object == bed) && matches!(a.phase, Phase::Using { elapsed } if elapsed > 0.0)
+            });
+            assert!(!trying, "they went ahead with Gus in the room");
+        }
+    }
+    assert!(moved, "they set off for the bed");
+    assert!(w.households[0].expecting.is_none());
+}
