@@ -38,6 +38,8 @@ pub(crate) fn run(w: &mut World, minutes: f32) {
 /// A use of `o` done (not given up the moment it began): a load put in starts the machine; one
 /// taken out empties it; and what it `makes` is the household's to work on next.
 pub(crate) fn use_done(sim: &mut Sim, content: &Content, o: &mut ObjectInstance, inter: &Interaction) {
+    // (The load taken up for it is used: not given back.)
+    sim.taken = 0;
     if inter.loads && o.run.is_none() {
         o.run = content.objects[o.def].runs;
         sim.reshaped = true;
@@ -88,4 +90,13 @@ pub(crate) fn settle(laundry: &mut [f32; 3], worked: u8, made: u8, most: f32) {
             laundry[k] = (laundry[k] + 1.0).min(most);
         }
     }
+}
+
+/// A household's piles of washing with the loads its residents took up for uses under way given
+/// back (`Sim::taken`, `WorkOn` bits each), as a save keeps them: those uses start again on load.
+pub(crate) fn with_taken(mut laundry: [f32; 3], taken: impl Iterator<Item = u8>, most: f32) -> [f32; 3] {
+    for t in taken {
+        settle(&mut laundry, 0, t, most);
+    }
+    laundry
 }

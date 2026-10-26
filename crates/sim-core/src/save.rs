@@ -831,7 +831,8 @@ impl World {
                     routines: h.routines.iter().map(|r| routine_save(content, r)).collect(),
                     expecting: h.expecting,
                     sitter_day: h.sitter_day,
-                    laundry: Some(h.laundry.to_vec()),
+                    // (With a load taken up for a use under way: the use starts again on load.)
+                    laundry: Some(crate::machines::with_taken(h.laundry, self.sims.iter().filter(|s| s.household == h.id).map(|s| s.taken), content.laundry.map_or(1.0, |l| l.most)).to_vec()),
                 })
                 .collect(),
             plots: self
