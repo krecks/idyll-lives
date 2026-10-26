@@ -9,7 +9,7 @@ import * as pc from './engine';
 /** The forward renderer's directional shadow renderer (`Renderer._shadowRendererDirectional`). */
 export interface DirectionalShadows {
   cull(light: object, comp: object, camera: pc.Camera, casters?: object, mask?: number): void;
-  getLightRenderPass(light: object, camera: pc.Camera): unknown;
+  getLightRenderPass(light: object, camera: pc.Camera): object | null;
 }
 
 /** `app`'s directional shadow renderer, or `undefined` on a renderer that has none. */
@@ -42,7 +42,10 @@ interface AdapterInfo {
   description?: string;
 }
 
-/** The context's driver names: WebGL2's `unmasked*`, WebGPU's adapter (`WebgpuGraphicsDevice.gpuAdapter`). */
+/**
+ * The context's driver names, whichever its backend has: WebGL2's `unmasked*` on the device itself,
+ * WebGPU's adapter in `gpuAdapter` (so never both — the callers read what they find).
+ */
 export interface DriverInfo {
   unmaskedRenderer?: string;
   unmaskedVendor?: string;

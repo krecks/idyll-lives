@@ -90,8 +90,9 @@ export class PoseTexture {
   uploadRows(lo: number, hi: number): void {
     const device = this.device;
     const texture = this.texture as pc.Texture & TextureInternals;
-    // (Not on the GPU yet: the first draw uploads the level whole, as it is then.)
-    if (texture._needsUpload || hi < lo) return;
+    // (Not on the GPU yet: the first draw uploads the level whole, as it is then. A band outside the
+    // texture is a caller's mistake the driver would report as a validation error: send nothing.)
+    if (texture._needsUpload || hi < lo || lo < 0 || hi >= this.height) return;
     const stride = this.stride;
     const rows = hi - lo + 1;
     if (device.isWebGPU) {

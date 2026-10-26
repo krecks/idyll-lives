@@ -324,10 +324,11 @@ function stop(err: unknown): void {
   fail(err, true);
 }
 
-/** The error's message, or what the simulation said as it panicked. */
+/** The error's message, or what the simulation said as it panicked (said once: a later failure is its own). */
 function describe(err: unknown): string {
-  if (panicked !== null) return panicked;
-  return err instanceof Error ? err.message : String(err);
+  const said = panicked;
+  panicked = null;
+  return said ?? (err instanceof Error ? err.message : String(err));
 }
 
 /** `?debug`'s `__crash` (game/session.ts): fails on purpose, to see how the game copes. */

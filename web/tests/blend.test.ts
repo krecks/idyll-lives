@@ -16,6 +16,7 @@ import { readFileSync, existsSync } from 'node:fs';
 const WEB = new URL('../', import.meta.url).pathname;
 
 describe('residents crossfade continuity', async () => {
+  const realLocation = globalThis.location;
   Object.assign(globalThis, {
     location: {
       href: 'http://localhost/',
@@ -33,15 +34,16 @@ describe('residents crossfade continuity', async () => {
     const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
     return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
   }) as typeof fetch;
-  // (The shim is process-wide: put the real one back for whatever runs next.)
+  // (Both are process-wide: put the real ones back for whatever runs next.)
   afterAll(() => {
     globalThis.fetch = realFetch;
+    Object.assign(globalThis, { location: realLocation });
   });
   const { Content } = await import('../src/content/content');
   const { AssetRegistry } = await import('../src/assets/registry');
   const { Characters, MAX_CHARACTERS } = await import('../src/render/shared/characters/residents');
   const { TemplateCache } = await import('../src/render/shared/templateCache');
-  const { Pose } = await import('../src/core/snapshot');
+  const { Pose, simFields } = await import('../src/core/snapshot');
   const { slotPlace } = await import('../src/render/shared/objectMotion');
   const rig = await import('../src/render/shared/characters/rig');
   type View = import('../src/render/shared/characters/view').ResidentView<
@@ -188,7 +190,8 @@ describe('residents crossfade continuity', async () => {
       ...onBed,
     },
   ];
-  const sims = actors.map((_, i): SimInfo => ({
+  // One Sim per actor, alike in everything but their name: the actors script the snapshot, not them.
+  const sims = Array.from({ length: actors.length }, (_, i): SimInfo => ({
     id: i,
     name: `sim${i}`,
     household: 0,
@@ -249,7 +252,7 @@ describe('residents crossfade continuity', async () => {
       simCount: 4,
       structureVersion: 5,
     },
-    sim: Object.fromEntries(FIELDS.map((f, i) => [f, i])) as SnapshotLayout['sim'],
+    sim: simFields(FIELDS),
     actions,
     items,
   };
@@ -265,27 +268,27 @@ describe('residents crossfade continuity', async () => {
   }
 
   function writeSnapshot(snap: Float32Array, t: number): void {
-    // The layout's own type leaves its fields optional; this test's layout has every one it writes.
+    // (The layout's own type leaves its fields optional; this test's layout has every one it writes.)
     const k = layout.sim as Record<(typeof FIELDS)[number], number>;
     snap[layout.header.speed] = 1;
     snap[layout.header.simCount] = actors.length;
     actors.forEach((a, i) => {
       const o = layout.headerLen + i * layout.simStride;
-      const f = front(objects[a.object] ?? chair);
       let [x, z] = [a.x, a.z];
       let [pose, moving, held, tag]: [number, number, string, string] = [P.Stand, 0, '', ''];
       if (a.kind === 'cycle') {
         const s = stepAt(a, t);
         [pose, moving, held, tag] = [s.pose ?? P.Stand, s.moving ?? 0, s.held ?? '', s.tag ?? ''];
         // (On the seat's tile, or about it: the position drifts smoothly either way, so no step in the snapshot is
-        // ever a jump — only the activity's.)
-        const base = a.object >= 0 ? f : a;
+        // ever a jump — only the activity's. A walker's `object` is -1: it has no tile in front of anything.)
+        const base = a.object >= 0 ? front(objects[a.object]) : a;
         [x, z] = [base.x, base.z + 0.5 * Math.sin(t * 1.3)];
       } else if (a.kind === 'carry') {
         // Standing with a load, then sat at the counter eating it.
         const sat = t > a.script[0].seconds;
         [pose, tag, held] = sat ? [P.Sit, 'eat', 'ingredients'] : [P.Stand, '', 'ingredients'];
-        [x, z] = [f.x, f.z];
+        const spot = front(objects[a.object]);
+        [x, z] = [spot.x, spot.z];
       } else {
         // A two-handed load for a one-handed one, every `seconds`.
         held = Math.floor(t / a.script[0].seconds) % 2 === 0 ? 'ingredients' : 'mealPlate';

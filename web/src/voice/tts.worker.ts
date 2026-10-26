@@ -97,7 +97,9 @@ async function speak(id: number, text: string, voice: VoiceParams): Promise<void
     if (err instanceof WebAssembly.RuntimeError) {
       engine = null;
       loading = null;
-      scope.postMessage({ type: 'error', message: panicked ?? String(err), restart: true });
+      const said = panicked;
+      panicked = null;
+      scope.postMessage({ type: 'error', message: said ?? String(err), restart: true });
     }
   }
 }

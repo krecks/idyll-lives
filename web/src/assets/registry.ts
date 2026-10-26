@@ -56,10 +56,11 @@ export class AssetRegistry {
     return this.get(key, 'icon') ?? { type: 'icon', url: FALLBACK_ICON, mode: 'mask' };
   }
 
+  /** Says `problem` about `key` once (a lookup made every frame would otherwise fill the console). */
   private warnOnce(key: string, problem: string): void {
     if (this.warned.has(key)) return;
     this.warned.add(key);
-    console.warn(`[assets] '${key}' ${problem}; using fallback`);
+    console.warn(`[assets] '${key}' ${problem}`);
   }
 }
 

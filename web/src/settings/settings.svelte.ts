@@ -203,9 +203,7 @@ function sanitize(s: Settings): Settings {
     if (typeof s[k] !== 'boolean') asRecord(s)[k] = DEFAULT_SETTINGS[k];
   }
   // 0 is "no cap", so it isn't below the smallest cap the interface offers.
-  s.fpsCap = typeof s.fpsCap === 'number' && Number.isFinite(s.fpsCap) && s.fpsCap !== 0
-    ? Math.round(Math.min(500, Math.max(10, s.fpsCap)))
-    : s.fpsCap === 0 ? 0 : DEFAULT_SETTINGS.fpsCap;
+  s.fpsCap = s.fpsCap === 0 ? 0 : Math.round(clampNumber(s.fpsCap, 10, 500, DEFAULT_SETTINGS.fpsCap));
   s.autosaveMinutes = clampNumber(s.autosaveMinutes, 0, 60, DEFAULT_SETTINGS.autosaveMinutes);
   s.cameraSensitivity = clampNumber(s.cameraSensitivity, 0.5, 2, DEFAULT_SETTINGS.cameraSensitivity);
   s.uiScale = clampNumber(s.uiScale, 0.5, 2, DEFAULT_SETTINGS.uiScale);
@@ -242,7 +240,8 @@ function load(): Settings {
     for (const k of Object.keys(merged)) if (!(k in DEFAULT_SETTINGS)) delete asRecord(merged)[k];
     return sanitize(merged);
   } catch {
-    return { ...DEFAULT_SETTINGS };
+    // (`tipsSeen` by value: the copy must not share the defaults' array.)
+    return { ...DEFAULT_SETTINGS, tipsSeen: [] };
   }
 }
 

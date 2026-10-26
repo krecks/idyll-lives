@@ -1639,7 +1639,8 @@ export async function startSession(
         const head = { x: 0, y: 0, z: 0 };
         if (renderer.simHead(id, head)) renderer.focus(head.x, head.z);
       },
-      stats: () => renderer.stats(),      view: () => viewPlot,
+      stats: () => renderer.stats(),
+      view: () => viewPlot,
       project(x: number, y: number, z: number) {
         const out = { x: 0, y: 0 };
         return renderer.project(x, y, z, out) ? out : null;
