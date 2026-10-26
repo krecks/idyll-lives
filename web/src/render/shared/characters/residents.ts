@@ -54,10 +54,11 @@ import { ENERGY_RATE, type VisemeTrack } from '../../../voice/visemes';
 import { GAME_RATE, QUIET_SPEED } from '../gameSpeed';
 import { paintColors } from '../modelEntry';
 import { type TableRoom, furthestAhead, nearestAhead } from '../tableTuck';
-import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOG_BACK, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PUSH_ONLY, RIDES, RUN_MAX_RATE, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, STRADDLED, STRUM, STRUM_SHORT, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_PER_TICK, WALK_SLACK, WALK_WAIT } from './actions';
+import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, STRADDLED, STRUM, STRUM_SHORT, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_PER_TICK, WALK_SLACK, WALK_WAIT } from './actions';
 import { LOW_TOP, SIT_LOW } from './clips/low';
 import { FLOOR_SITS } from './clips/seated';
 import { type BodyData, type CharacterSet, type Clip, loadCharacterSet, loadStage } from './data';
+import { gaitFor } from './gait';
 import { ASLEEP, COLD, EXPRESSIONS, FRIENDLY, HUG, KISS, LAUGH, MOOD_COLD, MOOD_WARM, NONE, RELAX_ARMS, SOCIAL_FACES, STANCE, type StageDirection } from './expressions';
 import { FACE_KEYS, type Face, FaceMixer, NEUTRAL } from './face';
 import { type OutfitParams, SHELL_BITS, WEARS, type Wear, outfitFor, writeOutfit } from './outfit';
@@ -1884,12 +1885,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       // Walking, the cycle matched to the ground speed; faster than the walk can step (a sped-up
       // game, short legs), jogging along, and faster than that running (`GEARS`): the slowest gait
       // that needn't go faster than its pace, a slower one than now only well within it.
-      const legs = rig.body.pelvisScale * rig.scale;
-      const now = GEARS.indexOf(rig.cur.key);
-      let gear = 0;
-      while (gear < GEARS.length - 1 && set.clips.has(GEARS[gear + 1]) && rig.speed / (set.clips.get(GEARS[gear])!.speed * legs) > GAIT_MAX_RATE * (gear < now ? JOG_BACK : 1)) gear++;
-      key = GEARS[gear];
-      rate = clamp(rig.speed / (set.clips.get(key)!.speed * legs), 0.35, gear === GEARS.length - 1 ? RUN_MAX_RATE : GAIT_MAX_RATE);
+      // (The run's beat quicker on shorter legs: `runMaxRate`.)
+      const gait = gaitFor(rig.speed, rig.body.pelvisScale * rig.scale, GEARS.indexOf(rig.cur.key), this.gaitSpeed);
+      key = GEARS[gait.gear];
+      rate = gait.rate;
       fade = GAITS.has(rig.cur.key) ? 0.3 : 0.2;
       hands = HANDS.relaxed;
       rig.useObj = null;
@@ -2447,6 +2446,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     pl.z = lerp(rig.inZ, pl.z, k);
     rig.outT = k < 1 ? rig.outT + step : -1;
   }
+
+  /** A gait clip's ground speed at rate 1 on the reference legs (`gaitFor`), undefined for one the set doesn't have. */
+  private readonly gaitSpeed = (key: string): number | undefined => this.set?.clips.get(key)?.speed;
 
   private clip(key: string): Clip {
     const set = this.set!;

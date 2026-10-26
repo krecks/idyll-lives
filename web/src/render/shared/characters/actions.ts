@@ -41,9 +41,9 @@ export const WALK_SLACK = 1.2;
  * (faster, they would only flicker; the feet slide instead). A walker who would need the walk faster
  * jogs along (`jogAlong`), one who would need the jog faster runs (`runAlong`, game speeds 3 and up,
  * children from 2), each going back to the slower gait below `JOG_BACK` of its switch. The run, the
- * last, goes on to `RUN_MAX_RATE` (about six strides a second): adults and teens keep their feet on
- * the ground at speed 3 (15 m/s; children run at up to 13 m/s there), and at speeds 4 and 5 (45 and
- * 90 m/s) no gait could.
+ * last, goes on to `RUN_MAX_RATE` (about six strides a second) on a grown-up's legs and quicker on
+ * shorter ones (`gait.ts` `runMaxRate`): everyone keeps their feet on the ground at speed 3 (15 m/s),
+ * and at speeds 4 and 5 (45 and 90 m/s) no gait could.
  */
 export const GAIT_MAX_RATE = 3;
 export const RUN_MAX_RATE = 4;
