@@ -919,7 +919,7 @@ Planned separately, after this review (§11.1).
 | I-community-09 (in part) | S2 | Nobody serves in town: the food is self-serve. | Vendors and shopkeepers (Q-17, later). L. |
 | I-bathroom-04 (fixed) | S3 | About thirty uses still have no sound: the treadmill and bikes, the workbench, the ball games and darts, the arcade, the sewing machine, the pottery wheel, the coffee machines, the blender's motor, the microwave, the toaster, an oven's fan, the pizza oven, the fridge door, the bin lid, the vending machines, the phone box, the basketball, singing, a bowed cello, the punch bag and the smash bin. | New synthesised sounds (art), keyed by `sound`; the headed listening check G-53 left. M. |
 | A-residents-03 (in part) | S3 | Feet slide 56–78 % of the way at speeds 4 and 5. | Won't fix: no gait steps at 45–90 m/s without strobing. |
-| M-lighting-08 (fixed) | S3 | On Low the four forward lamps aren't kept to their room, nor are tiles split by a diagonal wall. | The same room mask in the forward lights' shader (§11.3 e). M. |
+| M-lighting-08 (fixed) | S3 | On Low the four forward lamps aren't kept to their room, nor are tiles split by a diagonal wall. | The same room mask in the forward lights' shader (§11.3 e). M. Done for 0.5.0: the mask on every preset, a room per half of a split tile. |
 | I-kitchen-09 (fixed) | S3 | The range hood's light and hum while the hob below is in use. | Later, as polish (Q-19). S. |
 | I-garden-08 (fixed) | S3 | No flower can be cut for a vase. | Later, with a vase to put them in (Q-18). M. |
 
@@ -949,7 +949,7 @@ The 11 the review's headless harness couldn't reach were checked afterwards with
 | A-systems-01 | closed (not reproduced) | Resized fridge, toilet, filing cabinet, washer and wall bed: every part moves on its new hinge (since 94381476). Left: a stretched door, drawers' original travel. Resizing (`RESIZING`, `buildmode.ts`) can be switched back on as far as moving parts go; which objects look right resized is the owner's call. |
 | A-town-01 | fixed (4746eecf) | The colour studio and the catalog pictures ran the wind with reduce motion on; they follow it now, and the system setting takes effect at once. |
 | I-garden-01 | fixed (e780cf3a, bd2125aa) | In 15 of 67 packed gardens a told use was dropped: the resident tried one tile only. They now walk to the first use tile there is a way to (`crowded-garden` state). |
-| M-houses-01 | closed (by design) | `cutWallItems` shows every wall thing while one is held, "as what may be in its way". Showing only those on the wall under the held one would be a design change. |
+| M-houses-01 | closed (by design) | `cutWallItems` shows every wall thing while one is held, "as what may be in its way". Showing only those on the wall under the held one would be a design change. Fixed for 0.5.0: the walls stand while one is held. |
 | M-living-02 | fixed (5b1e7152) | The ground dug away over a basement also hid models in the shared plain finish: the stairs lost their top 0.5 m. Only the landscape is dug now. |
 | M-town-03 | closed (not reproduced) | 15 loads on both backends and every preset: 0.000 % of pixels off by more than 2. |
 | M-town-08 | fixed (51f1f4f7) | The siding drew with the sidewalk's planar-UV shader (same defines); the vertex plugin now sets its own. |
