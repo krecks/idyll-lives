@@ -91,7 +91,7 @@ M = G.Palette(
     piece_light=('#F2EDE2', 'gloss'),
     piece_dark=('#1E1C1B', 'gloss'),
     pool_frame=('#6B4630', 'gloss'),   # the pool table's lacquered frame
-    cloth=('#2F7A57', 'fabric'),       # its baize
+    cloth=('#2F7A57', 'matte'),        # its baize (plain, not `fabric`: the balls' two parts take its draw call)
     pocket=('#141414', 'matte'),
     pearl=('#EDE6D6', 'gloss'),        # the rail sights
     rack=('#A8754A', 'gloss'),         # the triangle
@@ -1081,14 +1081,24 @@ def chessTable():
 
 
 # The pool table: a lacquered frame on four legs, a baize bed with cushions, six pockets and sights, the
-# fifteen balls racked at the foot and the cue ball at the head, and a cue lying on the cloth. The triangle
-# round the balls is lifted off, carried over the foot rail and hung on the foot end for pool and trick shots
-# (`rack_off`, G.path).
+# fifteen balls racked at the foot and the cue ball at the head. The triangle round the balls is lifted off,
+# carried over the foot rail and hung on the foot end for pool and trick shots (`rack_off`, G.path); at the
+# first shot the racked balls go (`racked_off`, squashed away) and the balls spread over the table come up
+# through the cloth (`spread`, grown from inside the slate, where they lie flat at rest), as the break leaves
+# them (review I-hobbies-05). The cue is in the players' hands (held.py `tool.cue`, one each), not on the cloth.
 BALL = 0.0285
 BED = 0.75         # the cloth's top: the rails' top 3.5 cm over it, at 0.785 m (a table is 0.74–0.79 to the rail; review
                    # M-hobbies-06: the cloth was at 0.785, the rails at 0.82)
 RAIL_TOP = BED + 0.035
 RACK_HUNG = (1.275, BED - 0.185)   # the rack's middle, hung on the foot end (game x, height): its apex at the rail's top
+# Where the fifteen balls lie after the break (game x, depth; the cloth runs to x ±1.13, depth ±0.58): most of them
+# down the foot half, where the rack was, a few run to the head end and the cushions.
+SPREAD = [(0.42, 0.05), (0.78, -0.31), (0.95, 0.22), (0.31, -0.4), (0.62, 0.44), (1.02, -0.05), (-0.18, 0.21),
+          (0.55, -0.08), (0.88, 0.47), (-0.45, -0.38), (0.15, 0.36), (0.71, 0.13), (1.05, -0.45), (-0.82, 0.12),
+          (0.36, -0.18)]
+# The first shot (s into a game): the rack lifted off and hung up (1.4 s) and the player bent over the cue, their
+# stroke through (clips/games.ts `STROKE`, 3.45 s into the 8 s round).
+BREAK = 4.6
 
 
 def poolTable():
@@ -1145,28 +1155,26 @@ def poolTable():
                 F.box(f'foot{s}{sz}', 0.19, 0.02, 0.19, (s * 1.08, 0.01, sz * 0.5), M.pool_frame, bevel=0.006,
                       bevel_segments=1)
         F.box('chalk', 0.022, 0.022, 0.022, (0.9, RAIL_TOP + 0.011, 0.65), M.ball_blue, bevel=0.002, bevel_segments=1)
-        # the racked balls, the apex to the head, and the cue ball
+        # the cue ball, at the head
+        G.sphere('cue_ball', BALL, at=F.at(-0.6, BED + BALL, 0), material=M.ball_white, segments=10, rings=7)
+    G.join(still, 'body', origin=(0, 0, 0))
+    # the racked balls, the apex to the head: squashed away to the rack's middle at the break
+    centre = apex + 4 * row * 2 / 3
+    with G.new_parts() as rb:
         k = 0
         for i in range(5):
             for j in range(i + 1):
                 G.sphere(f'ball{k}', BALL, at=F.at(apex + i * row, BED + BALL, (j - i / 2) * 2 * BALL),
                          material=colours[k], segments=10, rings=7)
                 k += 1
-        G.sphere('cue_ball', BALL, at=F.at(-0.6, BED + BALL, 0), material=M.ball_white, segments=10, rings=7)
-        # the cue on the cloth: a wrapped butt, a joint, a tapering shaft, a white ferrule and a chalked tip
-        a, b = (-1.02, BED + 0.014, 0.42), (0.36, BED + 0.007, 0.3)
-
-        def along(t):
-            return tuple(a[i] + (b[i] - a[i]) * t for i in range(3))
-        F.sweep('cue_butt', [along(0), along(0.3)], 0.014, M.cue_butt, verts=8, scale=[1.0, 0.86])
-        F.sweep('cue_wrap', [along(0.06), along(0.2)], 0.0142, M.ball_black, verts=8, scale=[1.0, 0.95])
-        F.sweep('cue_joint', [along(0.3), along(0.32)], 0.0122, M.pearl, verts=8)
-        F.sweep('cue_shaft', [along(0.32), along(0.99)], 0.0118, M.cue, verts=8, scale=[1.0, 0.55])
-        F.sweep('cue_ferrule', [along(0.99), along(1.0)], 0.0066, M.pearl, verts=8)
-        F.sphere('cue_tip', 0.0064, b, M.ball_blue, segments=8, rings=4)
-    G.join(still, 'body', origin=(0, 0, 0))
+    racked = G.join(rb, 'racked', origin=F.at(centre, BED + BALL, 0))
+    # the balls after the break, spread over the cloth (none in a pocket's mouth), flat inside the slate at rest
+    with G.new_parts() as sb:
+        for k, (x, z) in enumerate(SPREAD):
+            G.sphere(f'spread{k}', BALL, at=F.at(x, BED + BALL, z), material=colours[k], segments=10, rings=7)
+    spread = G.join(sb, 'spread', origin=F.at(0, BED - 0.04, 0))
+    spread.scale[2] = 0.001
     # the triangle: a frame with rounded corners round the rack
-    centre = apex + 4 * row * 2 / 3
     corners = [(apex, 0), (apex + 4 * row, -4 * BALL), (apex + 4 * row, 4 * BALL)]
     t = 0.016
     inr = 4 * BALL / math.sqrt(3)            # the centres' triangle's inradius
@@ -1179,6 +1187,8 @@ def poolTable():
         F.sweep('rack', loop, None, M.rack, profile=_rr(0.03, t, 0.004, 1), closed=True)
     rack = G.hinged(G.join(rp, 'rack'), F.at(centre, BED + 0.015, 0))
     G.settle(centre=False)
+    G.squash(racked, 'racked_off', 0.001, seconds=0.15)
+    G.grow(spread, 'spread', seconds=0.3, axis='Z')
     # Racked, the triangle is lifted off the balls, carried over the foot rail and hung up by its apex on the
     # table's foot end (its middle 2.5 cm past the rail, at the apron's height), out of the game's way.
     hung = (RACK_HUNG[0] - centre, RACK_HUNG[1] - (BED + 0.015))
@@ -2339,7 +2349,8 @@ FAMILY = G.Family(
      G.Model('chessTable', chessTable, size=(0.64, 0.92, 0.89), key='model.chessTable', centre=(0, 0.045),
              motions={'uses': {'chess': _after_sitting('move')}}, paint=[('table_wood', 'Table'), ('chair_wood', 'Chair')]),
      G.Model('poolTable', poolTable, size=(2.5, 0.807, 1.4), key='model.poolTable',
-             motions={'uses': {'pool': 'rack_off', 'trickShots': 'rack_off'}},
+             motions={'uses': {u: ['rack_off', {'clip': 'racked_off', 'delay': BREAK}, {'clip': 'spread', 'delay': BREAK}]
+                               for u in ('pool', 'trickShots')}},
              paint=[('pool_frame', 'Frame'), ('cloth', 'Cloth')]),
      G.Model('foosball', foosball, size=(1.42, 0.947, 0.935), key='model.foosball', centre=(0, 0.0375),
              motions={'loops': {'foosball': 'rods', 'practise': 'rods'}}, paint=[('foos', 'Table'), ('foos_trim', 'Trim')]),
