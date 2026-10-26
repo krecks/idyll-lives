@@ -270,6 +270,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** The shading the materials are drawn in (`shaders/softLook.ts`); the setting's at start. */
   private shading: Shading = shadingFromSettings();
   private wallMode: WallMode = 'down';
+  /** Something for a wall is in hand: the walls stand whatever `wallMode` says (`placing.ts`). */
+  private wallsRaised = false;
   /** The cutaway's look bits last given to the walls (-1: none yet). */
   private cutLook = -1;
 
@@ -543,7 +545,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     };
     this.held = new HeldFrames(this.app, this.camera.camera, this.sun, mq.holdStillFrames);
     // (placing things, `placing.ts`; after the lamps, whose lights light the thing in hand.)
-    this.placing = new Placing(this.app, this.root, this.storeyLayer, this.camera.camera, this.deps, this.lot, { storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), town: () => this.townMode, shadowsMoved: () => this.sunShadows.moved() });
+    this.placing = new Placing(this.app, this.root, this.storeyLayer, this.camera.camera, this.deps, this.lot, { storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), town: () => this.townMode, shadowsMoved: () => this.sunShadows.moved(), raiseWalls: (on) => this.raiseWalls(on) });
     // A file that failed has come: the thing in hand and the landscape's plants are built with it now, the rest
     // once the files settle (`shared/modelRefresh.ts`, held while the town streams: `holdModelRefresh`).
     this.unlistenFiles = onModelFileArrived(this.app, (url) => {
@@ -1321,9 +1323,24 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     return this.lib.surface(key, { doubleSided: true });
   }
 
-  /** Walls up, cut away or down: the cutaway state the wall materials read, the roofs, and the fallback's full or low walls. */
+  /** The walls as drawn: up while something for a wall is in hand, else as the player has them. */
+  private get shownWallMode(): WallMode {
+    return this.wallsRaised ? 'up' : this.wallMode;
+  }
+
+  /** Something for a wall in hand (`on`) or not: the walls stand meanwhile, so what hangs on them hangs on them. */
+  private raiseWalls(on: boolean): void {
+    if (on === this.wallsRaised) return;
+    this.wallsRaised = on;
+    this.applyWallMode();
+  }
+
+  /**
+   * Walls up, cut away or down (as shown: `shownWallMode`): the cutaway state the wall materials
+   * read, the roofs (the player's walls up only), and the fallback's full or low walls.
+   */
   private applyWallMode(): void {
-    const mode = this.wallMode;
+    const mode = this.shownWallMode;
     if (this.walls) this.walls.enabled = mode === 'up';
     if (this.wallsLow) this.wallsLow.enabled = mode !== 'up';
     this.roofShown = this.roofVisible();
@@ -1360,7 +1377,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** Cutaway: walls facing the camera drop when the view direction crosses a quadrant. */
   private updateCutaway(): void {
     let bits = 0;
-    if (this.wallMode === 'cutaway') {
+    if (this.shownWallMode === 'cutaway') {
       // Camera looks from its position towards the target: direction -(cos a, sin a) in xz.
       const dx = -Math.cos(this.orbit.alpha);
       const dz = -Math.sin(this.orbit.alpha);
@@ -1371,7 +1388,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     }
     if (bits === this.cutLook) return;
     this.cutLook = bits;
-    this.placing.cutWallItems(bits, this.wallMode === 'down'); // (things on the walls go with them: but the one in hand, and none while something for a wall is.)
+    this.placing.cutWallItems(bits, this.shownWallMode === 'down'); // (things on the walls go with them, but the one in hand.)
     this.lib.wallCut.look.set(bits & 1 ? 1 : 0, bits & 2 ? 1 : 0, bits & 4 ? 1 : 0, bits & 8 ? 1 : 0);
   }
 
