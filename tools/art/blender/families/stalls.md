@@ -19,8 +19,8 @@ floor).
   chassis with four spoked wheels (rounded tyres, rims, domed hubs) on axles, a push bar bent in one piece at its right
   (game +x) with a rubber grip, and a steel deck round a shallow freezer well with six turned tubs of scooped ice cream
   sunk into the top, a scoop resting on the back; the lids have pressed ribs, the sliding one a bent grip along it. Two lids on rails: the right
-  one fixed, the left one (`lid`) slides right over it, `lid_open`, 0.58 m in 1 s; `hold` 2 s, so it shuts while
-  the resident eats. A cone with a scoop stands on the back of the deck as a sign.
+  one fixed, the left one (`lid`) slides right over it, `lid_open`, 0.58 m in 1 s, a second into the sale (`delay`
+  1, `hold` 1.4: the game's vendor reaches in then, `characters/clips/serve.ts`). A cone with a scoop stands on the back of the deck as a sign.
   - **The parasol** stands in a socket at the back of the top, behind the lid's rails, and leans 11° forward so
     its canopy sits over the middle of the cart and inside the footprint's depth. A centred upright pole would
     pass through the sliding lid. The canopy is 16 gores, pink and white (`parasol`, `parasol_white`, a loft
@@ -31,7 +31,7 @@ floor).
   napkin pulled up, a stack of paper trays, four posts on feet and a striped awning (six slats, red and white, a
   scalloped valance) leaning down to the front. The hot plate (a steel tray, a ribbed dark plate, five bowed sausages
   and two split buns) has a hinged, rounded steel lid (`lid`) with a bar handle on its back edge:
-  `lid_open` lifts it 75° in 0.9 s while a resident buys a hot dog (no `hold`: up for the whole use).
+  `lid_open` lifts it 75° in 0.9 s a second into the sale, for 1.4 s, as the vendor behind it takes a sausage.
 
 ## The machines
 
@@ -62,8 +62,8 @@ placed ten times in the town, so it stays under half its size class's target (4,
 
 | Model | Size (w × h × d) | Triangles (far) | Draws | Clip | Colour parts |
 |---|---|---|---|---|---|
-| `model.iceCreamCart` | 1.73 × 2.35 × 0.96 m | 6,444 (1,543) | 3 | `lid_open` (iceCream, hold 2 s) | Body, Parasol, Bands |
-| `model.hotDogStand` | 1.58 × 2.38 × 0.98 m | 5,652 (1,382) | 3 | `lid_open` (hotDog) | Body, Awning |
+| `model.iceCreamCart` | 1.73 × 2.35 × 0.96 m | 6,444 (1,543) | 3 | `lid_open` (iceCream, delay 1 s, hold 1.4 s) | Body, Parasol, Bands |
+| `model.hotDogStand` | 1.58 × 2.38 × 0.98 m | 5,652 (1,382) | 3 | `lid_open` (hotDog, delay 1 s, hold 1.4 s) | Body, Awning |
 | `model.vendingSnack` | 0.90 × 1.88 × 0.75 m | 6,366 (1,440) | 3 | `drop` (snack) | Body |
 | `model.vendingDrink` | 0.90 × 1.88 × 0.79 m | 3,552 (770) | 2 | `drop` (drink) | Body |
 | `model.marketStall` | 1.84 × 2.14 × 0.98 m | 3,884 (898) | 3 | — | Body, Awning |
