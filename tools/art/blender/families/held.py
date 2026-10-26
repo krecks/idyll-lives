@@ -1,6 +1,8 @@
 # The things residents carry and cook with: the models of content `items` (`item.*`: a bag of shopping, a
-# prep bowl, a pot of stew, plates of food, dirty plates and pans) and the props drawn on a station's top
-# while a resident cooks there (`tool.*`: the chopping board, the pan, food on the grill). Notes: held.md.
+# prep bowl, a pot of stew, plates of food, dirty plates and pans, the food bought in town), the props drawn on a
+# station's top while a resident cooks there (`tool.*`: the chopping board, the pan, food on the grill) and the props
+# in a resident's hands while they use a thing (`tool.*`: a book, a cup, cutlery, a phone, a cue; actions.ts
+# `PROPS`). Notes: held.md.
 #
 # Each is drawn as the old part was (characters.ts `writeCarried`, `writeTool`; items.ts): its origin at
 # the middle of its base, front +Z in the game, lifted onto the palms, the top it stands on or the station.
@@ -1618,7 +1620,8 @@ FAMILY = G.Family(
         I('pastryBag', pastryBag, (0.128, 0.198, 0.072), 'item.pastryBag'),
     ],
     comment='Blender-built things residents carry and cook with (tools/art/blender/families/held.py): the '
-            'models of content `items` and the props drawn on a station while cooking. Listed in the base '
+            'models of content `items`, the props drawn on a station while cooking and those in the hands '
+            'while a thing is used. Listed in the base '
             'manifest\'s packs. The materials map onto the game\'s finishes, so each costs one draw call '
             '(the wooden boards two).',
 )
