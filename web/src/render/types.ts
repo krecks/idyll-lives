@@ -341,6 +341,8 @@ export interface ObjectBackgroundClips {
   clock?: { hour?: string; minute?: string };
   /** Held open while the object is open. */
   open?: string;
+  /** Round and round while the object runs on its own (content `runs`). */
+  running?: string;
 }
 
 /**

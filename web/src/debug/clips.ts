@@ -9,7 +9,7 @@
  *   held open, closing again (played backwards);
  * - a use's clip that repeats (`every`): at rest (and its `delay`), then from rest to rest twice, `every`
  *   seconds apart;
- * - a loop (`loops`): at rest, then round after round, stopping at rest;
+ * - a loop (`loops`, `running`): at rest, then round after round, stopping at rest;
  * - the ambient clip (`idle`): round after round, always, alongside the others;
  * - a clock's hands (`clock`): always, an hour of the game's time a second;
  * - the growth clip (`growth`): each stage in turn (planted, growing, ripe, picked), moving on to the
@@ -73,6 +73,7 @@ interface RawMotions {
   idle?: string;
   night?: string;
   growth?: string;
+  running?: string;
   clock?: { hour?: string; minute?: string; at?: number };
 }
 type RawUse = string | { clip: string; delay?: number; every?: number };
@@ -87,6 +88,7 @@ function kinds(entry: ModelEntry | undefined): Map<string, { kind: Kind; delay?:
     }
   }
   for (const clip of Object.values(m.loops ?? {})) out.set(clip, { kind: 'loop' });
+  if (m.running) out.set(m.running, { kind: 'loop' });
   if (m.idle) out.set(m.idle, { kind: 'idle' });
   if (m.growth) out.set(m.growth, { kind: 'growth' });
   if (m.clock?.hour) out.set(m.clock.hour, { kind: 'clock', period: 720, at: m.clock.at });

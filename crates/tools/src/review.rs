@@ -684,7 +684,7 @@ fn motions_cell(m: Option<&Value>) -> String {
             parts.push(format!("{part} {}", map.iter().map(|(k, v)| format!("{k}→{}", clip(v))).collect::<Vec<_>>().join(", ")));
         }
     }
-    for part in ["open", "idle", "night", "growth", "ride"] {
+    for part in ["open", "idle", "night", "growth", "ride", "running"] {
         if let Some(c) = m[part].as_str() {
             parts.push(format!("{part} {c}"));
         }

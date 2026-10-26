@@ -90,8 +90,18 @@ export interface InteractionDef {
   hours?: [number, number];
   /** Only under open sky: the object stands outside. */
   sky?: boolean;
-  /** Only with something to work on: dirty dishes, washing to do, a washed load to dry (sim-core `content::WorkOn`). */
-  workOn?: 'dishes' | 'laundry' | 'washed';
+  /** Only with something to work on: dirty dishes, washing to do, a washed load to dry, a dry one to fold (sim-core `content::WorkOn`). */
+  workOn?: 'dishes' | 'laundry' | 'washed' | 'dried';
+  /** Puts a load in a machine that runs on its own (the object's `runs`): only while it's empty; it runs once the use ends (sim-core `machines.rs`). */
+  loads?: boolean;
+  /** Takes the load out of a machine once its run is done: only then; it's empty again as the use ends. */
+  unloads?: boolean;
+  /** Leaves the household a load of washing to work on next, as the use ends (taken out washed, or dry): then on with it to what works on it. */
+  makes?: 'laundry' | 'washed' | 'dried';
+  /** An item carried in the arms on the way to it (the basket of washing to the dryer): only shown, the snapshot's `held`. */
+  brings?: string;
+  /** An item held in the hands while it's done (a towel being folded): only shown, as `brings`. */
+  holds?: string;
   /** A game for two, at an object with two places: played with someone free nearby, fetched to the other place (sim-core `partners.rs`). */
   partner?: boolean;
   /** With `partner`: the use (an id of the same object's) the player's order does instead with nobody free to play. */
@@ -255,6 +265,12 @@ export interface ObjectDef {
   sounds?: Record<string, string>;
   /** A world sound it makes by itself, used or not, while its lot is looked at (a fountain's water). */
   ambient?: string;
+  /**
+   * A machine that runs on its own (sim-core `machines.rs`): loaded by a use that `loads`, it runs `minutes` game
+   * minutes with nobody at it (the model's `running` clip, and `sound` while its lot is looked at), then waits, done,
+   * for a use that `unloads` it.
+   */
+  runs?: { minutes: number; sound?: string };
   /** Turns freely (at any angle, for looks); default: 1×1 objects of `objectRules.freeRotation` categories. */
   freeRotation?: boolean;
   /**

@@ -7,7 +7,8 @@
  *   of sound, louder the more residents make it, placed left or right like voices; the water sounds
  *   are made in `water.ts`. What a use sounds like comes from the thing (content `sound` and
  *   `sounds`), else from its animation (`ACTION_SOUNDS`);
- * - things that sound by themselves (content `ambient`: a fountain), while their lot is looked at;
+ * - things that sound by themselves (content `ambient`: a fountain; a machine running on its own, its `runs.sound`:
+ *   the washer loaded, nobody at it), while their lot is looked at;
  * - sounds as something happens: a toilet's flush as its use ends (content `endSound`), a
  *   visitor's knock at the front door.
  *
@@ -189,7 +190,8 @@ export class WorldSound {
     for (const o of world.objects) this.defOf.set(o.id, index.get(o.def) ?? -1);
     if (!view) return;
     for (const o of world.objects) {
-      const key = this.content.object(o.def)?.ambient;
+      const def = this.content.object(o.def);
+      const key = def?.ambient ?? (o.running ? def?.runs?.sound : undefined);
       const kind = key === undefined ? undefined : loopKind(key);
       // Broken (worn out), it's still.
       if (!kind || (o.wear ?? 0) >= 1) continue;

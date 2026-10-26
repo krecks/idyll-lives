@@ -58,13 +58,14 @@ def uses(motions):
 
 def played(motions):
     """{clip: what plays it} for an entry's `motions`: `uses`, `loops`, `open`, `idle`, `night`, `growth`,
-    `ride` (the clip whose part carries its users) and `clock` (`hour`, `minute`: hands set by the time)."""
+    `ride` (the clip whose part carries its users), `running` (round and round while a machine runs on its own) and
+    `clock` (`hour`, `minute`: hands set by the time)."""
     out = {}
     for use, u in uses(motions):
         out.setdefault(u['clip'], f'use {use!r}')
     for use, clip in (motions.get('loops') or {}).items():
         out.setdefault(clip, f'loop {use!r}')
-    for kind in ('open', 'idle', 'night', 'growth', 'ride'):
+    for kind in ('open', 'idle', 'night', 'growth', 'ride', 'running'):
         if motions.get(kind):
             out.setdefault(motions[kind], kind)
     for hand in ('hour', 'minute'):

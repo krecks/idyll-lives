@@ -9,7 +9,9 @@
  * rocking chair) goes round from rest to rest while the use lasts, then finishes its round. An
  * object that is open (the sim's `open`: a wall bed folded down) holds its `motions.open` clip
  * open as long as it stays so, and its `motions.night` clip (curtains drawn) from dusk to dawn,
- * whoever is asleep (a thing it lights, the candles' flames, only while its room's lights are on: `setUnlit`). A crop's `motions.growth` clip is held where its growth stage is, moving on
+ * whoever is asleep (a thing it lights, the candles' flames, only while its room's lights are on: `setUnlit`). A machine
+ * running on its own (the sim's `running`: a washer loaded, nobody at it) goes round its `motions.running` clip as a use's
+ * loop does, finishing its round once it stops. A crop's `motions.growth` clip is held where its growth stage is, moving on
  * to the next stage at the clip's own pace. An ambient clip (`idle`: a ceiling fan, a fountain's water) goes
  * round all the time (a lamp's only while it's switched on: the fan's blades with its light), but
  * only within `ambientRange` of the camera (none on Low), without the shadows being redrawn for it.
@@ -132,6 +134,8 @@ export interface MovingObject<D> {
   open?: boolean;
   /** A crop's growth stage (the placement's `growth`: 0 planted, 1 growing, 2 ripe, 3 picked). */
   stage?: number;
+  /** A machine running on its own (the placement's `running`): its `motions.running` clip goes round. */
+  running?: boolean;
   /** The slot (content `slots`, from 0) of a resident standing, sitting or lying at `x`, `z` (the snapshot's), for clips with a `slot`. */
   slotOf?: (x: number, z: number) => number;
   /** A lamp with a switch (content `light`): its `idle` clip (a ceiling fan's blades) goes round only while it's switched on. */
@@ -203,6 +207,8 @@ export class ObjectMotion<D> {
   constructor(private readonly hooks: MotionHooks<D>) {}
 
   private objects = new Map<number, MovingObject<D>>();
+  /** The ids of those running on their own (`findRunning`). */
+  private readonly running = new Set<number>();
   /** By object id, then clip name. Kept across world rebuilds, so a door mid-swing carries on. */
   private states = new Map<number, Map<string, ClipState>>();
   private clock = 0;
@@ -267,7 +273,15 @@ export class ObjectMotion<D> {
       if (!moving) continue;
       moving.open = !!o.open;
       moving.stage = o.growth;
+      moving.running = !!o.running;
     }
+    this.findRunning();
+  }
+
+  /** The objects running on their own now (`running`), whose `motions.running` clip goes round. */
+  private findRunning(): void {
+    this.running.clear();
+    for (const [id, o] of this.objects) if (o.running && o.motions.running) this.running.add(id);
   }
 
   /** The clips on object `id` and how far in each is (dev tools: `RendererDebugHooks.objectClips`). */
@@ -285,6 +299,7 @@ export class ObjectMotion<D> {
   set(objects: MovingObject<D>[]): void {
     const before = this.objects;
     this.objects = new Map(objects.map((o) => [o.id, o]));
+    this.findRunning();
     for (const id of [...this.states.keys()]) if (!this.objects.has(id)) this.states.delete(id);
     // What is open when first seen (a game loaded, a lot looked at) is shown open, without the
     // opening; what opens later (`update`) opens on screen.
@@ -330,6 +345,7 @@ export class ObjectMotion<D> {
 
   clear(): void {
     this.objects.clear();
+    this.running.clear();
     this.states.clear();
     this.clocks = [];
     this.clockShown.clear();
@@ -558,6 +574,11 @@ export class ObjectMotion<D> {
   /** Which objects residents use this frame, and the clip each use plays. */
   private findUses({ curr, layout }: FrameState, actionTags: readonly string[]): void {
     this.wanted.clear();
+    // Machines running on their own, nobody at them: round and round, as a use's loop (one `use` all the while).
+    for (const id of this.running) {
+      const clip = this.objects.get(id)?.motions.running;
+      if (clip) this.wanted.set(id, new Map([[clip, { use: 'running', kind: 'loop' }]]));
+    }
     const k = layout.sim;
     if (k.object === undefined || k.action === undefined) return;
     const H = layout.headerLen;
