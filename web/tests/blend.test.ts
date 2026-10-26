@@ -143,6 +143,8 @@ describe('residents crossfade continuity', async () => {
     held?: string;
     /** The way they face (rad; 0 if not given). */
     yaw?: number;
+    /** Their emotion (content `emotions` id; happy if not given). */
+    emotion?: string;
   }
   interface Actor {
     /** The activities in a cycle, each `seconds` long (a fade is 0.25–0.3 s, so these interrupt each other). */
@@ -236,6 +238,15 @@ describe('residents crossfade continuity', async () => {
   );
   /** The turners, by actor. */
   const TURNERS = [RISER + 1, RISER + 2, RISER + 3];
+  // A change of mood: standing, then walking on the spot, sad, happy, angry, embarrassed and energised by turns (the widest bearings
+  // there are, each after the other's opposite), each cut short before the last has eased in.
+  const moods: Step[] = ['sad', 'happy', 'angry', 'embarrassed', 'energized', 'sad'].map((emotion) => ({ seconds: 0.6, emotion }));
+  actors.push(
+    { kind: 'turn', script: moods, object: -1, x: 26.5, z: 0 },
+    { kind: 'turn', script: moods.map((m) => ({ ...m, moving: 1 })), object: -1, x: 28.5, z: 0 },
+  );
+  /** The moody ones, by actor. */
+  const MOODY = [RISER + 4, RISER + 5];
   // One Sim per actor, alike in everything but their name: the actors script the snapshot, not them.
   const sims = Array.from({ length: actors.length }, (_, i): SimInfo => ({
     id: i,
@@ -260,6 +271,7 @@ describe('residents crossfade continuity', async () => {
   }));
   const items = content.items.map((it) => it.id);
   const actions = [...content.animations];
+  const emotions = content.emotions.map((e) => e.id);
   /** An id's place in one of the snapshot's lists (`indexOf`, but a typo fails the test rather than reading as "none"). */
   const indexOf = (list: readonly string[], id: string): number => {
     const i = list.indexOf(id);
@@ -359,7 +371,7 @@ describe('residents crossfade continuity', async () => {
       snap[o + k.outcome] = 0;
       snap[o + k.partner] = -1;
       snap[o + k.role] = 0;
-      snap[o + k.emotion] = 1;
+      snap[o + k.emotion] = indexOf(emotions, stepAt(a, t).emotion ?? 'happy') + 1;
       snap[o + k.away] = 0;
       snap[o + k.object] = a.object;
       snap[o + k.action] = tag ? indexOf(actions, tag) : -1;
@@ -445,6 +457,8 @@ describe('residents crossfade continuity', async () => {
       const riser = (characters as unknown as { sims: { cur: { key: string }; prev: { frozen: unknown; key: string } }[] }).sims[RISER];
       let riserKey = '';
       const rises: { cm: number; held: boolean }[] = [];
+      // The one standing through changes of mood: the most a bone turned in a frame.
+      let moodWorst = { deg: 0, bone: '', at: 0 };
       // The turners: each foot's place every frame (world), whether a turn clip was playing, and their yaw at the end of
       // each of the script's steps against the way it faced them.
       const rigs = (characters as unknown as { sims: { cur: { key: string }; yaw: number }[] }).sims;
@@ -501,7 +515,9 @@ describe('residents crossfade continuity', async () => {
           } else if (t >= 0.5) {
             const prevQ = before[i];
             for (let b = 0; b < bones.length; b++) {
-              note(quatAngle(prevQ, b * 4, after, b * 4), i, bones[b], t);
+              const deg = quatAngle(prevQ, b * 4, after, b * 4);
+              note(deg, i, bones[b], t);
+              if (i === MOODY[0] && deg > moodWorst.deg) moodWorst = { deg, bone: bones[b], at: t };
             }
             const cm = Math.hypot(hip[0] - hips[i][0], hip[1] - hips[i][1], hip[2] - hips[i][2]) * 100;
             if (cm > farthest.cm) farthest = { cm, sim: i, at: t };
@@ -563,6 +579,10 @@ describe('residents crossfade continuity', async () => {
       for (const { who, frames } of slides.slice(0, 2)) expect(frames, `${who}: frames turning on the spot`).toBeGreaterThan(120);
       expect(Math.max(...missed), 'off the way wanted at the end of a step (rad)').toBeLessThan(0.02);
       for (const { who, cm } of slides.slice(0, 2)) expect(cm, `${who}: planted feet's slide (cm)`).toBeLessThan(12);
+      // A change of mood eases in: standing, no bone turns further in a frame than the idle's own fidgets do (3.7°, a
+      // hand; the bearing switched at once, sad to happy, turned the head 34°); walking, the global check above (39° of
+      // a forearm, the arms' swing and bend switched at once).
+      expect(moodWorst.deg, `single-frame turn through changes of mood: ${moodWorst.bone} at ${moodWorst.at.toFixed(2)} s`).toBeLessThan(5);
     } finally {
       performance.now = realNow;
     }

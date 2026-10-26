@@ -172,6 +172,8 @@ export interface SimRig {
    */
   feetUp: boolean;
   feet: Float32Array;
+  /** Body language (`bodyLanguage.ts` `bearing`): the bearing it has eased to, and how free the body is for it. */
+  bearing: Float32Array;
   /**
    * Turning on the spot (`turns.ts`): the turn clip playing ('' none), its size (deg), the yaw it started from and
    * the turn it makes (rad), and whether `choose` has started its clip.

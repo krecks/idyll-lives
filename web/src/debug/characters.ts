@@ -9,7 +9,9 @@
  *   every stage, when no other sheet is asked for);
  * - `?hair=all` every hairstyle (and the beard; `?hair=long,beard` only those), `?tops=all` every
  *   garment, `?skins=all` eight skin tones, `?builds=all` slim / as built / broad, `?face=moods|visemes`
- *   every mood (and the friendly resting face, a half and a full blink) / viseme;
+ *   every mood (and the friendly resting face, a half and a full blink) / viseme; `?body=stand|walk` every
+ *   emotion's body language (`bodyLanguage.ts`, through the snapshot's emotion, no stage directions), standing or
+ *   walking towards the camera at 1.3 m/s (`?moods=sad,happy`: only those);
  * - `?clip=walk&t=0.4` the clip held at t seconds (default: idle, playing), `?view=side|back`,
  *   `?closeup=1` frames the heads, `?build=1.2`, `?cols=8`, `?gap=0.9`, `?labels=0`, `?hairColor=%23C89B5A`;
  * - `?alpha=…&beta=…&radius=…` the camera (`?y=1.2`: the height it looks at in a close-up); `__bench.advance(s)` steps time when `?manual`;
@@ -42,6 +44,8 @@ interface Cell {
   look: Partial<Appearance>;
   face?: StageDirection['face'];
   viseme?: number;
+  /** An emotion id for the snapshot (`?body=`). */
+  emotion?: string;
 }
 
 const base = (gender: string): Appearance => ({
@@ -63,7 +67,12 @@ const stageParam = params.get('stage');
 const lifeStage = stageParam && stageParam !== 'all' ? stageParam : undefined;
 const build = params.get('build') ? Number(params.get('build')) : undefined;
 const common = (): Partial<Appearance> => ({ ...(lifeStage ? { stage: lifeStage } : {}), ...(build ? { build } : {}) });
-const sheets = ['hair', 'tops', 'skins', 'builds', 'face'].filter((k) => params.has(k));
+const sheets = ['hair', 'tops', 'skins', 'builds', 'face', 'body'].filter((k) => params.has(k));
+/** `?body=`: the emotions shown (every one the faces know), and whether they walk. */
+const body = params.get('body');
+const EMOTIONS = Object.keys(EXPRESSIONS);
+/** `?moods=sad,happy`: only those (with the neutral one first). */
+const shown = params.get('moods')?.split(',') ?? EMOTIONS;
 if (!sheets.length || stageParam === 'all') {
   for (const g of families) rows.push(STAGES.map((s) => ({ label: `${g} ${s}`, gender: g, look: { stage: s, ...(build ? { build } : {}) } })));
 }
@@ -100,6 +109,8 @@ for (const g of families) {
       { label: 'half blink', gender: g, look: common(), face: { lidU: 1 / 0.9 } },
       { label: 'blink', gender: g, look: common(), face: { mood: 'asleep' } },
     ]);
+  } else if (body) {
+    rows.push([{ label: 'neutral', gender: g, look: common() }, ...shown.map((m) => ({ label: m, gender: g, look: common(), emotion: m }))]);
   } else if (params.get('face') === 'visemes') {
     rows.push(VISEMES.map((v, i) => ({ label: v, gender: g, look: common(), viseme: i })));
   }
@@ -159,7 +170,10 @@ const clipName = params.get('clip');
 const held = params.get('t');
 const view = params.get('view');
 const yaw = view === 'side' ? Math.PI / 2 : view === 'back' ? Math.PI : 0;
+characters.setEmotions(EMOTIONS);
 placed.forEach((p) => {
+  // (Body language is off under stage directions: `?body=` leaves the residents to the snapshot.)
+  if (body) return;
   const dir: StageDirection = { face: p.face ?? null };
   if (clipName) dir.clip = clipName;
   if (held !== null) {
@@ -202,6 +216,8 @@ const shadowMatrices = new Float32Array(MAX_CHARACTERS * 16);
     snap[o + k.object] = -1;
     snap[o + k.action] = -1;
     snap[o + k.mood!] = 0.8;
+    snap[o + k.emotion] = p.emotion ? EMOTIONS.indexOf(p.emotion) + 1 : 0;
+    snap[o + k.moving] = body === 'walk' ? 1 : 0;
     snap[o + k.height!] = liftOf(p.line) / WALL_HEIGHT;
   }
 }
@@ -224,6 +240,8 @@ let clock = 0;
 function step(dt: number): void {
   clock += dt;
   frame.now = clock * 1000;
+  // Walking towards the camera (+z faces it), from a step back.
+  if (body === 'walk') for (const p of placed) snap[HEADER_LEN + p.i * STRIDE + layout.sim.z] = zOf(p.line) - 2 + 1.3 * clock;
   // Visemes: a one-segment voice line per resident, restarted so it never ends.
   const now = performance.now() / 1000;
   for (const p of placed) {

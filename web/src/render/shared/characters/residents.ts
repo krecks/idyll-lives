@@ -58,6 +58,7 @@ import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROU
 import { LOW_TOP, SIT_LOW } from './clips/low';
 import { FLOOR_SITS } from './clips/seated';
 import { type BodyData, type CharacterSet, type Clip, loadCharacterSet, loadStage } from './data';
+import { BEARING_FLOATS, bearing } from './bodyLanguage';
 import { gaitFor } from './gait';
 import { TURN_FADE, isTurn, turnClipIn, turnDone, turnOnSpot, turnYaw } from './turns';
 import { ASLEEP, COLD, EXPRESSIONS, FRIENDLY, HUG, KISS, LAUGH, MOOD_COLD, MOOD_WARM, NONE, RELAX_ARMS, SOCIAL_FACES, STANCE, type StageDirection } from './expressions';
@@ -265,6 +266,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   updateMs = 0;
   /** Emotion id per snapshot emotion code - 1 (content `emotions`). */
   private emotionIds: readonly string[] = [];
+  /** Scratch: how free a body is for its body language this frame (`bodyLanguage`). */
+  private readonly freedom = { posture: 0, arms: 0, head: 0 };
   /** Stage directions per Sim row (character creator / portraits only; empty in game). */
   readonly directions: (StageDirection | null)[] = [];
   /** Selected Sim (selection ring), or null. */
@@ -556,6 +559,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         approach: 0,
         feetUp: false,
         feet: new Float32Array(4),
+        bearing: new Float32Array(BEARING_FLOATS),
         turnKey: '',
         turnDeg: 0,
         turnFrom: 0,
@@ -2470,6 +2474,38 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   }
 
   /**
+   * Body language for the Sim's emotion (`bodyLanguage.ts`), as far as what they do leaves the body free: standing
+   * free or walking, all of it (but the arms, carrying); using a thing standing (its clips' hands on it), inside one,
+   * in a hug, a kiss, a fight or a cuddle, the head only; seated, the head and, sat plainly, some of the back; lying, a
+   * baby or directed (the creator, portraits), none.
+   */
+  private bodyLanguage(rig: SimRig, i: number, social: number, pose: number, moving: boolean, refused: boolean, dt: number): void {
+    const B = this.set!.bone;
+    const free = this.freedom;
+    const key = rig.cur.key;
+    free.posture = free.arms = 0;
+    free.head = 1;
+    if (rig.dir || rig.body.stage === 'baby' || pose === Pose.Lie || this.force) free.head = 0;
+    else if (pose === Pose.Sit) free.posture = key === 'sit' || key === 'sitTalk' ? 0.3 : 0;
+    else if (!(
+      social === Anim.Hug ||
+      social === Anim.Kiss ||
+      social === Anim.Fight ||
+      refused ||
+      rig.cuddleT >= 0 ||
+      rig.liftW > 0 ||
+      this.heldBy[i] >= 0 ||
+      rig.inside ||
+      (!moving && !!rig.useSeq?.includes(key))
+    )) {
+      free.posture = 1;
+      free.arms = rig.upperW > 0.05 ? 0 : 1;
+    }
+    const walking = key === 'walk' && rig.cur.clip;
+    bearing(rig.bearing, this.emotionIds[rig.emotion - 1] ?? '', free, walking ? (rig.cur.time / rig.cur.clip!.duration) % 1 : 0, walking ? smooth(rig.w) : 0, dt, this.add, B);
+  }
+
+  /**
    * Standing free this frame, so that a wide turn can step round (`turnOnSpot`): on their feet and still, not walked
    * in, inside a thing, up on one, getting up or climbing down, nor holding or lifting a baby or in an embrace or a
    * fight (those place the body themselves); a baby never.
@@ -2716,6 +2752,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     }
     // (A refused hug or kiss plays its own clips, `REFUSED`: nobody leans in or holds anyone.)
     const refused = rig.cur.key === 'refuse' || rig.cur.key === 'rebuffed';
+    if (this.force !== 'rest') this.bodyLanguage(rig, i, social, pose, moving, refused, dt);
     switch (social) {
       case Anim.Flirt:
         // A head tilt and a sway of the hips for the one listening (the flirt's own clip has its own).
