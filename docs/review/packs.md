@@ -99,7 +99,7 @@ Family: `tools/art/blender/families/pack_energetic.py`.
 | `energetic.boulderingWall` Home bouldering wall | OK | I-packs-03 | I-packs-03 | I-packs-03 S2 clip | `packs/sheets/obj-energetic.boulderingWall.png`, `packs/play/chunk2/energetic.boulderingWall-climb-01.png` |
 | `energetic.spinBike` Interactive spin bike | M-packs-09 | OK | OK | M-packs-09 S3 decision | `packs/sheets/obj-energetic.spinBike.png`, `packs/sheets/age-energetic.spinBike.png` |
 | `energetic.trampoline` Rebound trampoline | OK | OK | OK | | `packs/sheets/obj-energetic.trampoline.png` |
-| `energetic.streetballHoop` Streetball hoop | OK | OK | I-packs-12 | I-packs-12 S3 content | `packs/sheets/obj-energetic.streetballHoop.png` |
+| `energetic.streetballHoop` Streetball hoop | OK | OK | I-packs-12 | I-packs-12 S3 content (fixed, 0.5.0) | `packs/sheets/obj-energetic.streetballHoop.png` |
 | `energetic.powerBlender` Power blender station | OK | A-packs-02 | I-packs-19 | A-packs-02 S3 motion (seeded; confirmed); I-packs-19 S3 code | `packs/sheets/obj-energetic.powerBlender.png` |
 | `energetic.contrastShower` Contrast rain shower | OK | A-bathroom-01 | I-bathroom-02 | A-bathroom-01 S2 model (bathroom ledger: the glass door never opens); I-bathroom-02 S3 clip (residents ledger) | `packs/sheets/obj-energetic.contrastShower.png` |
 | `energetic.recoveryPod` Recovery pod | OK | OK | OK | | `packs/sheets/obj-energetic.recoveryPod.png`, `packs/play/chunk2/energetic.recoveryPod-recover-01.png` |
@@ -111,7 +111,7 @@ Family: `tools/art/blender/families/pack_energetic.py`.
 | `energetic.boulderingWall` | climb problems on the wall, rest on the mat | climb (60) | climbed on the floor beside the mat (I-packs-03) |
 | `energetic.spinBike` | a cycling class or ride | ride (45, seated, pedalling) | OK as a recumbent (M-packs-09) |
 | `energetic.trampoline` | bounce, play | bounce (30, on the mat) | OK |
-| `energetic.streetballHoop` | shoot hoops, play one on one | shoot hoops (40, 2 slots) | OK; shot from under the board (I-packs-12) |
+| `energetic.streetballHoop` | shoot hoops, play one on one | shoot hoops (40, 2 slots) | OK; shot from under the board (I-packs-12, fixed: from 2.2 m out) |
 | `energetic.powerBlender` | blend a smoothie and drink it | blend (4) | OK; the `cook` median (33) is for cooked meals, a smoothie is 2–5 |
 | `energetic.contrastShower` | shower, hot and cold | rinse (15) | OK |
 | `energetic.recoveryPod` | lie back under the canopy to recover | recover (45, lying) | OK |
@@ -141,7 +141,7 @@ Family: `tools/art/blender/families/pack_foodie.py`.
 | `foodie.herbGarden` Windowsill herb garden | OK | I-packs-06 | I-packs-06 | I-packs-06 S2 renderer-table | `packs/sheets/obj-foodie.herbGarden.png`, `packs/play/chunk1/foodie.herbGarden-tendHerbs-01.png` |
 | `foodie.deliPantry` Deli pantry | OK | OK | I-packs-19 | I-packs-19 S3 code | `packs/sheets/obj-foodie.deliPantry.png` |
 | `foodie.espressoBar` Espresso bar | OK | OK | I-held-01 | I-held-01 S2 code (held ledger: no cup) | `packs/sheets/obj-foodie.espressoBar.png` |
-| `foodie.cookbookLectern` Cookbook lectern | OK | OK | I-packs-12 | I-packs-12 S3 content | `packs/sheets/obj-foodie.cookbookLectern.png` |
+| `foodie.cookbookLectern` Cookbook lectern | OK | OK | I-packs-12 | I-packs-12 S3 content (fixed, 0.5.0) | `packs/sheets/obj-foodie.cookbookLectern.png` |
 | `foodie.pizzaOven` Wood-fired pizza oven | OK | OK | OK | | `packs/sheets/obj-foodie.pizzaOven.png`, `packs/extra/night/night-foodie.pizzaOven-bakePizza-01.png` |
 | `foodie.chefsIsland` Chef's island | M-packs-04 | OK | M-packs-04 | M-packs-04 S2 model | `packs/sheets/obj-foodie.chefsIsland.png`, `packs/sheets/age-foodie.chefsIsland.png` |
 
@@ -152,7 +152,7 @@ Family: `tools/art/blender/families/pack_foodie.py`.
 | `foodie.herbGarden` | water and trim herbs, pick some for cooking | tend herbs (20) | OK; the pose is the flower bed's kneel (I-packs-06) |
 | `foodie.deliPantry` | take out a snack or ingredients, make a board | nibble (2), cheese board (5) | OK; 5 min for a board is real (the `cook` median is for cooked meals) |
 | `foodie.espressoBar` | pull an espresso, steam milk, latte art | espresso (10), latte art (30) | OK |
-| `foodie.cookbookLectern` | follow a recipe while cooking, browse cookbooks | study recipes (60), food magazines (45), standing | OK; the open book isn't the one read (I-packs-12) |
+| `foodie.cookbookLectern` | follow a recipe while cooking, browse cookbooks | study recipes (60), food magazines (45), standing | OK; the open book isn't the one read (I-packs-12, fixed: read at the lectern) |
 | `foodie.pizzaOven` | fire it up, bake pizza, warm up by it | bake pizza (43), warm up (30) | OK |
 | `foodie.chefsIsland` | prepare and cook, eat at the counter on the stools | tasting menu (78), bar bite (20, on a stool) | OK; the stools are chair height (M-packs-04) |
 
@@ -261,7 +261,7 @@ Family: `tools/art/blender/families/pack_loner.py`.
 | `loner.quietPod` Hush-shell reading pod | OK | OK | I-held-01 | I-held-01 S2 code (held ledger: no book) | `packs/sheets/obj-loner.quietPod.png`, `packs/sheets/age-loner.quietPod.png` |
 | `loner.shortwaveRadio` Shortwave radio desk | OK | OK | OK | | `packs/sheets/obj-loner.shortwaveRadio.png`, `packs/sheets/age-loner.shortwaveRadio.png` |
 | `loner.puzzleTable` Jigsaw puzzle table | OK | OK | OK | | `packs/sheets/obj-loner.puzzleTable.png`, `packs/sheets/age-loner.puzzleTable.png` |
-| `loner.bonsaiBench` Bonsai potting bench | OK | OK | I-packs-12 | I-packs-12 S3 content | `packs/sheets/obj-loner.bonsaiBench.png` |
+| `loner.bonsaiBench` Bonsai potting bench | OK | OK | I-packs-12 | I-packs-12 S3 content (fixed, 0.5.0) | `packs/sheets/obj-loner.bonsaiBench.png` |
 | `loner.soloSauna` Cedar sauna for one | OK | I-packs-17 | I-packs-17, I-systems-04 | I-packs-17 S3 model; I-systems-04 S2 code (systems ledger: a child takes the sauna) | `packs/sheets/obj-loner.soloSauna.png`, `packs/play/chunk4/loner.soloSauna-sweat-02.png`, `packs/sheets/age-loner.soloSauna.png` |
 | `loner.deliveryHatch` No-knock delivery hatch | OK | OK | OK | | `packs/sheets/obj-loner.deliveryHatch.png` |
 
@@ -272,7 +272,7 @@ Family: `tools/art/blender/families/pack_loner.py`.
 | `loner.quietPod` | sit shut away, read | retreat (40), read (45) | OK |
 | `loner.shortwaveRadio` | tune the bands, talk to other operators | airwaves (45), tune (60) | OK |
 | `loner.puzzleTable` | work on a jigsaw | a piece (45), new puzzle (90) | OK |
-| `loner.bonsaiBench` | prune and wire the tree, water and mist it | shape (60), tend (15) | OK; worked from the bench's corner (I-packs-12) |
+| `loner.bonsaiBench` | prune and wire the tree, water and mist it | shape (60), tend (15) | OK; worked from the bench's corner (I-packs-12, fixed: at the tree) |
 | `loner.soloSauna` | sit and sweat, door shut | sweat (40) | OK; the door opens 1.5 s and shuts; the feet (I-packs-17) |
 | `loner.deliveryHatch` | take in a delivery without opening the door | order (5), treat (2) | OK |
 
@@ -361,7 +361,7 @@ Family: `tools/art/blender/families/pack_romantic.py`.
 | `romantic.vanity` Rose-gold vanity | OK | OK | I-packs-08 | I-packs-08 S2 content | `packs/sheets/obj-romantic.vanity.png` |
 | `romantic.gramophone` Moonlight gramophone | OK | OK | I-packs-05 | I-packs-05 S2 content | `packs/sheets/obj-romantic.gramophone.png` |
 | `romantic.letterBureau` Love-letter bureau | M-packs-05 | OK | OK | M-packs-05 S2 model | `packs/sheets/obj-romantic.letterBureau.png`, `packs/sheets/age-romantic.letterBureau.png` |
-| `romantic.roseArbourSwing` Rose-arbour swing | OK | OK | I-packs-12 | I-packs-12 S3 content | `packs/sheets/obj-romantic.roseArbourSwing.png`, `packs/sheets/age-romantic.roseArbourSwing.png` |
+| `romantic.roseArbourSwing` Rose-arbour swing | OK | OK | I-packs-12 | I-packs-12 S3 content (fixed, 0.5.0) | `packs/sheets/obj-romantic.roseArbourSwing.png`, `packs/sheets/age-romantic.roseArbourSwing.png` |
 
 ### Real uses against the content's (I1)
 
@@ -372,7 +372,7 @@ Family: `tools/art/blender/families/pack_romantic.py`.
 | `romantic.vanity` | sit at the mirror, make up, do the hair | primp (20, standing) | the stool is never sat on (I-packs-08); 20 vs the `wash` median 2 is getting ready, not a hand wash: not filed |
 | `romantic.gramophone` | put a record on, listen, dance | listen (45), waltz (30) | listening is 45 on foot (I-packs-05) |
 | `romantic.letterBureau` | write a letter or a poem | write a letter (60), a poem (45) | OK |
-| `romantic.roseArbourSwing` | swing for two, tend the roses | swing (40, 2 slots), tend roses (30) | OK; the roses tended at the seat (I-packs-12) |
+| `romantic.roseArbourSwing` | swing for two, tend the roses | swing (40, 2 slots), tend roses (30) | OK; the roses tended at the seat (I-packs-12, fixed: at a front post) |
 
 ## P16. Slob (6)
 
@@ -747,8 +747,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/packs/loner.json:109` (`bonsaiBench`), `romantic.json:160` (`roseArbourSwing` `tendRoses`), `foodie.json:102` (`cookbookLectern`, and `web/src/render/babylon/characters.ts:475`: `ACTIONS.read` holds a book that isn't there), `energetic.json:80` (`streetballHoop`)
 - **Evidence:** `packs/sheets/obj-loner.bonsaiBench.png`: the pruner stands at the bench's left corner by the soil bag, not at the tree in the middle; `packs/sheets/obj-romantic.roseArbourSwing.png` (tendRoses): the roses are on the posts and the top, the hands at the seat cushion; `packs/sheets/obj-foodie.cookbookLectern.png`: a step off the lectern, reading a mimed book at the chest beside the open one; `packs/sheets/obj-energetic.streetballHoop.png`: shooting from under the board, at the pole. Slot offsets (`slot_position`, `approach`) or a lectern-reading hand pose.
-- **Status:** open (needs code: G-62's per-slot place or a stand offset; the lectern's reading hand pose is a clip)
-- **After:** Not fixed in the content band: content has no field that moves a standing user along an object (slot positions are spread across the width; `stand` has no offset).
+- **Status:** fixed (f679389b)
+- **After:** Not fixed in the content band: content had no field that moves a standing user along an object. In 0.5.0, with G-62's `places`: the bonsai bench's user stands 0.6 m out (was 1 m; the bench's front 0.32 m out), the hands over the tree in its tray. The lectern's reader stands 0.52 m out and reads the book on it (`readLectern177`, `147`, `112`: the hands on the pages' lower corners, the head bowed, the left hand turning a page over once a loop), not a mimed one at the chest. The streetball hoop's two shoot from 2.2 m out (were 1 m, under the board), turned in to the rim, with the park hoop's jump shot fitted to this rim at 2.4 m (`streetShot177`, `147`, `112`). The arbour's roses can't take `places` (a place serves every use of its slot, and the swing's sitters are on the footprint), so *Tend the climbing roses* steps in to a front post instead (`STEP_IN` lanes at -0.84 and 0.84 m, 0.75 m out, a child 0.58) and reaches to the bloom there twice a loop (`cutRose177`, `147`, `112`); the bloom that is cut came down to 1.15 m (was 1.36) so a child reaches it too, and shrinks only for the one at its post (`slot` 0). `bench-results/release-0.5.0/F1/after/packs/``after-*.png`, and `before/packs/` the same uses before.
 - **Source:** wave: packs
 
 ### I-packs-13 — Smashing plates is a boxing combination in the air

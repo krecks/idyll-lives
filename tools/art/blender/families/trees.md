@@ -33,20 +33,30 @@ helpers (`lump`, `tube`, `pot`, `cupped`, `sprigs`, `far_of`) come from `plants.
   few centimetres.
 - **Clips:** `pick` shrinks one apple at the front for `pick` and `harvest`, 1.6 s into it (`PICK_DELAY`: the picker's
   hand closes on it then, `pickApple*`/`pickLemon*` in `characters/clips/uses.ts`, fitted to where it hangs; move
-  the fruit and those clips' `FRUIT` together). The apple hangs within reach, 1.84 m up and 0.7 m out under the
-  crown on a stalk into it (2026-10-21; it was 2.95 m up, 1.95 m out). `trim` the Japanese maple's stray sprigs
+  the fruit and those clips' `FRUIT` together). The apple hangs on a low bough 1.13 m up and 0.62 m out, where every
+  size of picker reaches it, a child on tiptoe too (I-garden-11, 2026-10-26; it was 1.84 m up and 0.7 m out from
+  2026-10-21, 2.95 m and 1.95 m before). `trim` the Japanese maple's stray sprigs
   for `shape`. Each is one more draw call (the apple and lemon trees come to four; `check-glb` warns).
 - **Ripeness (G-68, 2026-10-21):** the fruit trees `grows` in content: their fruit over the crown is a moving part
   (`_fruiting`) with the growth clip `ripen` (`motions.growth`, `G.stages`): in fruit at rest, gone (shrunk into the
   crown's middle) when picked and while it fruits again; the apple's front apple follows it too. The lemon tree's
   lemons are all picked at once, so its front lemon is one with the rest (no `pick` clip): still four draws.
-  Still to do (I-garden-12, a model change, 2026-10-22): "Pick the apples" (`harvest`, `pickHigh`: the hand up to
-  about 1.8 m, twice a loop for its 20 minutes) reaches under a crown whose fruit hangs from about 2.5 m (the
-  `dots` band from 3.6 m less 0.65 of the crown's 1.65 m depth): only the one front apple is within reach. A garden
-  apple (dwarf or semi-dwarf) carries fruit from about 1 m: bring the crown's middle down to about 2.6 m (the lowest
-  leaves at about 1.3 m, the tree about 4.3 m), or hang a ring of six to eight apples on low twigs round its front
-  half between 1.4 and 1.9 m, so `pickHigh` closes on fruit; the clip and the content can stay. Far
-  versions: all one still part, in fruit.
+  Far versions: all one still part, in fruit.
+- **Fruit within reach (I-garden-11, I-garden-12, 2026-10-26):** the apple tree is a garden semi-dwarf now: its trunk
+  opens at 1.2-1.5 m (was 1.65-2.05), the crown's middle at 2.6 m (`centre`, was 3.75), its leaves from 1.60 to 4.09 m
+  (were 2.2 to 5.4), the tree 4.11 m tall (was 5.39). Four laden boughs (`LOW_BOUGHS`) come out of it in front, each
+  from the trunk over its apples to a sprig of leaves, ending within 0.85 m of the trunk, with eight apples on them
+  from 1.12 to 1.75 m up (`PICKED`, `HARVEST`, `LOW_APPLES`; the crown's own nine, `_hang`, over its leaves). The
+  picked apple (`pick`) is at 1.13 m, 0.62 m out: a grown-up takes it at the chest, a child of 1.09-1.13 m at full
+  stretch on tiptoe (their palm reaches about 1.17-1.21 m on the 1.12 m clip). "Pick the apples" (`harvest`) reaches
+  one apple each: `pickHigh177` the one at 1.75 m, `pickHigh147` 1.45 m, `pickHigh112` 1.12 m (`uses.ts`, chosen by
+  height in `actions.ts`). The lemon tree has a lemon for each too: 1.62 m (a grown-up's), 1.42 (a teen's, on the
+  crown's front) and 1.1 (a child's, hung under the crown's front), all one part with the rest (`ripen`). The palm
+  lands 2-6 cm from the fruit's middle on the men's and boys' bodies and 4-11 cm on the women's and
+  girls' (the clips are sized to 1.77, 1.47 and 1.12 m): on the fruit (an apple is 0.2-0.22 m across, a lemon
+  0.14 by 0.18). Placed apple trees are no longer turned and sized at random (`vary` 0.12 taken off
+  `model.tree.fruit` in the base manifest), so the boughs face the tile in front at these heights; the house builder's
+  garden trees and the woods keep their own turn and size.
 
 ## Far versions and the woods
 
@@ -63,14 +73,14 @@ primitive parts). The town overview draws them too.
 | `model.tree.maple` | 5.09 × 7.15 × 5.38 m | 4,376 | 832 | 2 |
 | `model.tree.birch` | 3.35 × 8.27 × 3.52 m | 4,316 | 692 | 3 |
 | `model.tree.blossom` | 5.09 × 5.37 × 5.25 m | 3,880 | 734 | 2 |
-| `model.tree.fruit` | 4.33 × 5.39 × 4.41 m | 4,412 | 914 | 4 |
+| `model.tree.fruit` | 4.29 × 4.11 × 4.64 m | 4,484 | 1,250 | 4 |
 | `model.tree.japaneseMaple` | 3.75 × 4.10 × 3.90 m | 3,786 | 692 | 3 |
 | `model.tree.magnolia` | 4.20 × 5.25 × 3.83 m | 4,346 | 936 | 3 |
 | `model.tree.willow` | 5.06 × 5.80 × 4.96 m | 4,196 | 1,214 | 2 |
 | `model.pine` | 5.94 × 9.21 × 6.17 m | 3,828 | 892 | 2 |
 | `model.spruce` | 5.23 × 10.50 × 5.40 m | 4,174 | 1,048 | 2 |
 | `model.cypress` | 1.03 × 7.95 × 1.05 m | 2,464 | 468 | 2 |
-| `model.garden.lemonTree` | 1.25 × 2.00 × 1.27 m | 3,896 | 1,168 | 4 |
+| `model.garden.lemonTree` | 1.25 × 2.00 × 1.27 m | 4,024 | 1,216 | 4 |
 
 Each at most 4,500 triangles (trees stand by the thousand in the woods). `check-glb`: 12 models, 0 failed; its
 warnings are the apple's and the lemon tree's 4 draw calls (as before). The sizes were held to the
@@ -83,8 +93,9 @@ spruce's read 7.8 m for cones 5.4 m across); the oak's and maple's crowns were d
 A one-tile tree must let residents walk past and work at it from the next tile: what reaches past 0.75 m from the
 trunk stands above head height (the tallest resident is 1.77 m). Measured on the exported files, the lowest point
 farther than 0.85 m from the trunk (the rebuild, 2026-10-22): pine 2.51 m, spruce 2.22, Japanese maple 2.35 (its narrow first layer stays
-inside 0.85 m at about 1.4-1.6 m, inside the reach of someone shaping it from the next tile), magnolia 2.41, apple 2.47
-(but its picked apple at 1.84, 0.7 m out), cherry 2.87, oak 3.31, maple 3.42, birch 4.01. The root buttresses reach
+inside 0.85 m at about 1.4-1.6 m, inside the reach of someone shaping it from the next tile), magnolia 2.41, apple 1.72
+(2.47 before its crown came down for its fruit, 2026-10-26: a resident of 1.77 m walking past 1 m out brushes its
+lowest leaves; its low boughs end within 0.85 m, the sprigs at their tips to about 0.95 m), cherry 2.87, oak 3.31, maple 3.42, birch 4.01. The root buttresses reach
 0.4-0.75 m out, a few centimetres high. The willow's curtains come down to
 0.45 m by design (sitting inside the curtain is the willow), thin streamers with gaps, not solid wedges.
 

@@ -123,8 +123,6 @@ it left is here, with its id; §9 of the review says what each would take.
   the baby's bottle), the post box's card, the café's cake and the basketball (I-held-01); the phone box's receiver
   stays on its hook, its fourth draw call taken (I-social-01); no pigeons come down to the seed (I-community-11, new
   behaviour). A fork is 2 mm thick: from the game camera it is hardly seen.
-- **A child can't reach the fruit it picks** (I-garden-11): the picked apple hangs at 1.84 m, the lemon at 1.62 m.
-  The owner's decision (the review recommends low fruit, built with I-garden-12's crown).
 - **Feet slide at game speeds 4 and 5** (48–81 % of the way: 45 and 90 m/s, faster than any gait steps without
   strobing; A-residents-03, G-25): won't fix. The clip check's baseline (`tools/characters/clip-baseline.json`) is
   empty.
@@ -134,9 +132,6 @@ it left is here, with its id; §9 of the review says what each would take.
   their labels say so; vendors are later (Q-17).
 - **One-use machines:** the dishwasher and the neat pack's laundry centre are still loaded and run in one use; a
   machine that runs on its own (content `runs`) would fit them.
-- **Worked from the edge:** the bonsai bench, the rose arbour's roses, the cookbook lectern and the streetball hoop
-  are used from the object's edge, not at the part (I-packs-12; `places` can fix it now, and the lectern wants a
-  reading hand pose).
 - **The sounds want a listen by ear** (G-53): each was rendered and checked by its spectrum, timing and level, not
   heard (`bench-results/review/fixes/sounds/wav/`).
 - **Later, as polish:** the range hood's light while the hob below is in use (its hum is in; Q-19); flowers cut for
@@ -148,10 +143,6 @@ it left is here, with its id; §9 of the review says what each would take.
 - **Uses end once every need they raise is full**, by design (I-systems-02); it makes clips easy to miss in checks.
 
 ### Models
-- **The home chess table seats one**, so chess at home stays *Practise chess*: it needs a 1 × 2 table with a chair at
-  each end, `places` facing each other and a *Play chess* use with `partner` (M-hobbies-11).
-- **The apple tree's crown is out of reach:** only its front apple hangs within reach, so *Pick the apples* reaches
-  into the air; the crown down to about 2.6 m or low apples at 1.4–1.9 m (I-garden-12, `trees.md`).
 - **The bakery case's sliding door is on the baker's side** (I-community-09, with vendors).
 
 ### Tools
@@ -223,6 +214,19 @@ it left is here, with its id; §9 of the review says what each would take.
   the bladder empty the accident comes. Visitors leave the household's own things alone (`private`: wardrobes,
   dressers, the bath cabinet). *Try for a baby* is a short ask, then the two in a double bed under the covers for
   half an hour behind the bedroom's shut door (Q-21).
+
+### Fixed in 0.5.0
+- **Fruit within reach** (I-garden-11, I-garden-12, the owner's decision): the apple tree's crown came down to 2.6 m
+  and four low boughs carry eight apples from 1.12 to 1.75 m; the one picked to eat hangs at 1.13 m, where a child
+  on tiptoe takes it, and "Pick the apples" reaches one per size. The lemon tree has a lemon at 1.62, 1.42 and 1.1 m
+  for a grown-up, a teen and a child. Placed apple trees aren't turned at random any more (`trees.md`).
+- **The home chess table seats two** (M-hobbies-11, Q-16): a chair at each end of 2 × 1 tiles, `places` facing each
+  other, and *Play chess* with a partner, *Practise chess* alone or with nobody free (`hobbies.md`). An older save's
+  table (save version 33) goes over its old tile where it fits, else at a free spot at home, else it is sold back.
+- **Worked at the part** (I-packs-12): the bonsai bench from 0.6 m out, at the tree; the lectern's book read with the
+  hands on it from 0.52 m out (`readLectern*`); the streetball hoop shot from 2.2 m out with a jump shot fitted to
+  its rim (`streetShot*`); the arbour's roses cut at a front post (`cutRose*`, `STEP_IN`: the swing's seats can't take
+  `places` for it).
 
 ## Notes on the sim
 

@@ -113,6 +113,7 @@
       "price": 420,
       "category": "hobbies",
       "slots": 1,
+      "places": [{ "at": [0, 0.6], "facing": 180 }],
       "description": "A slow, silent craft: shaping a tiny tree builds Dexterity, and steady hands get more out of every session.",
       "interactions": [
         {

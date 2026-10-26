@@ -898,8 +898,8 @@ Planned separately, after this review (§11.1).
 
 | Finding | Sev. | What is left | What it would take |
 |---|---|---|---|
-| M-hobbies-11 (open) | S3 | The home chess table has one chair, so chess at home stays *Practise chess* (Q-16). | A 1 × 2 table with a chair at each end, as the park's; `slots: 2`, `places` facing each other, a *Play chess* use with `partner` and `alone: chess`. M. |
-| I-garden-12 (later) | S3 | Only the apple tree's front apple hangs within reach; *Pick the apples* reaches into the air under the crown. | The crown's middle down to about 2.6 m, or six to eight apples on low twigs at 1.4–1.9 m; recorded in `tools/art/blender/families/trees.md`. With it, low fruit for a child (I-garden-11). M. |
+| M-hobbies-11 (fixed in 0.5.0, f2f5ccfc) | S3 | The home chess table has one chair, so chess at home stays *Practise chess* (Q-16). | A 1 × 2 table with a chair at each end, as the park's; `slots: 2`, `places` facing each other, a *Play chess* use with `partner` and `alone: chess`. M. |
+| I-garden-12 (fixed in 0.5.0, 3f480b8c) | S3 | Only the apple tree's front apple hangs within reach; *Pick the apples* reaches into the air under the crown. | The crown's middle down to about 2.6 m, or six to eight apples on low twigs at 1.4–1.9 m; recorded in `tools/art/blender/families/trees.md`. With it, low fruit for a child (I-garden-11). M. |
 | M-held-03 (in part) | S3 | Crisps, the stall's fruit and the pastry come on the treat plate. | A cone or paper cup, a hot dog in its bun, a crisp packet, an apple and a pastry in a paper bag; recorded in `held.md`. M. |
 | M-lighting-06 (in part) | S3 | The sim lets a shade reach over the next tile (`overhang`); the arc lamp's model still stops at its own. | Rebuild `lampFloorArc` reaching over the next tile, then `overhang: [[0, 1]]`, its `light.at`, and build mode's and `housegen.ts`'s placing; recorded in `lighting.md`. M. |
 | A-outdoor-01 (fixed) | S2 | The hot tub's cover folds back as one part, squashed about its back edge, not in two halves. | Two halves are a fourth draw call, as the shower's door was (Q-05). S once the draw is allowed. |
@@ -913,8 +913,8 @@ Planned separately, after this review (§11.1).
 
 | Finding | Sev. | What is left | What it would take |
 |---|---|---|---|
-| I-packs-12 (open) | S3 | The bonsai, the roses on the arbour, the lectern and the streetball hoop are worked from the object's edge. | Possible now with G-62: `places` on each; a reading hand pose at the lectern (a clip). S–M. |
-| I-garden-11 (open) | S3 | A child can't reach the fruit it picks. | The owner's decision (§11.3 c). |
+| I-packs-12 (fixed in 0.5.0, f679389b) | S3 | The bonsai, the roses on the arbour, the lectern and the streetball hoop are worked from the object's edge. | Possible now with G-62: `places` on each; a reading hand pose at the lectern (a clip). S–M. |
+| I-garden-11 (fixed in 0.5.0, 3f480b8c) | S3 | A child can't reach the fruit it picks. | The owner's decision (§11.3 c). |
 | I-bathroom-07 (in part) | S3 | The resident stands at the washer for its 30 minutes and folds at the dryer with empty hands. | A timed machine (load it, it runs on its own, unload it) and a fold at the basket: new behaviour. M. |
 | I-community-09 (in part) | S2 | Nobody serves in town: the food is self-serve. | Vendors and shopkeepers (Q-17, later). L. |
 | I-bathroom-04 (fixed) | S3 | About thirty uses still have no sound: the treadmill and bikes, the workbench, the ball games and darts, the arcade, the sewing machine, the pottery wheel, the coffee machines, the blender's motor, the microwave, the toaster, an oven's fan, the pizza oven, the fridge door, the bin lid, the vending machines, the phone box, the basketball, singing, a bowed cello, the punch bag and the smash bin. | New synthesised sounds (art), keyed by `sound`; the headed listening check G-53 left. M. |

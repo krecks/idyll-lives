@@ -366,6 +366,10 @@
           "chess": {
             "clip": "move",
             "delay": 0.9
+          },
+          "play": {
+            "clip": "move",
+            "delay": 0.9
           }
         }
       },

@@ -89,8 +89,8 @@
       "freeRotation": true,
       "slots": 2,
       "places": [
-        { "at": [-0.45, 1], "facing": 156 },
-        { "at": [0.45, 1], "facing": -156 }
+        { "at": [-0.45, 2.2], "facing": 168 },
+        { "at": [0.45, 2.2], "facing": -168 }
       ],
       "description": "A weighted hoop for the driveway. Shooting around is fun and, with a friend, a little social too.",
       "interactions": [

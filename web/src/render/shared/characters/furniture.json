@@ -4,7 +4,7 @@
     "armchair": { "h": 0.42, "fwd": -0.013, "front": 0.31 },
     "bench": { "h": 0.45, "fwd": -0.03 },
     "toilet": { "h": 0.43, "fwd": -0.13 },
-    "chessTable": { "h": 0.475, "fwd": -0.2 },
+    "chessTable": { "h": 0.475, "fwd": 0 },
     "computerDesk": { "h": 0.44, "fwd": -0.17 },
     "diningTable": { "h": 0.46, "fwd": 0 },
     "gloomy.soakingTub": { "h": 0.1, "fwd": -0.25, "legsOut": true, "room": 0.7 },

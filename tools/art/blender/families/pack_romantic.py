@@ -534,7 +534,7 @@ def letterBureau():
 # --- the rose-arbour swing (2x1): a porch swing for two under an arch of climbing roses ---------------------
 BEAM = 2.1
 ARCH = [(-0.88 + 1.76 * t / 8, 2.12 + 0.3 * math.sin(math.pi * t / 8)) for t in range(9)]
-BLOOM = (-0.84, 1.36, 0.35)   # the bloom that is cut
+BLOOM = (-0.84, 1.15, 0.35)   # the bloom that is cut, where a child reaches too (`cutRose*` in characters/clips/uses.ts)
 
 
 def _climber(F, name, x, z, y0, y1, k0):
@@ -653,7 +653,8 @@ FAMILY = G.Family(
              centre=(0, 0.0255), motions={'uses': {'writeLetter': 'fall_front', 'writePoem': 'fall_front'}},
              paint=[('ivory', 'Body'), ('fabric', 'Fabric')]),
      G.Model('roseArbourSwing', roseArbourSwing, size=(1.844, 2.63, 0.821), key='model.romantic.roseArbourSwing',
-             centre=(0, 0.0), motions={'uses': {'tendRoses': 'cut'}, 'loops': {'swing': 'swing'}, 'ride': 'swing'},
+             centre=(0, 0.0), motions={'uses': {'tendRoses': {'clip': 'cut', 'delay': 0.6, 'slot': 0}}, 'loops': {'swing': 'swing'},
+                                       'ride': 'swing'},
              paint=[('frame', 'Body'), ('cushion', 'Fabric')])],
     comment='Blender-built romantic pack models (tools/art/blender/families/pack_romantic.py). Listed in '
             'the base manifest\'s packs. The materials map onto the game\'s finishes so a model costs one '

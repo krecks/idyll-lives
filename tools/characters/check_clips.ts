@@ -66,9 +66,9 @@ const { BALL_PIT, PLAY_TENT } = await import('../../web/src/render/shared/charac
 /** Seats whose top ends short of a child's knees (characters.ts `Seat.front`, `perch`). */
 const DEEP: [string, any][] = Object.entries(JSON.parse(readFileSync(new URL('../../web/src/render/shared/characters/furniture.json', import.meta.url), 'utf8')).seats).filter(([, s]: [string, any]) => s.front !== undefined) as [string, any][];
 const { BUNK_DOWN, BUNK_UP, RIDE_HORSE, RIDE_ROUND, RIDE_SEESAW, RIDE_SPRING, RIDE_SWING, SLIDE, SWING_S } = await import('../../web/src/render/shared/characters/clips/rides.ts');
-const { EYEPIECE, PICK_APPLE, PICK_LEMON, SHOWER_CHILD } = await import('../../web/src/render/shared/characters/clips/uses.ts');
+const { CUT_ROSE, EYEPIECE, LECTERN, PICK_APPLE, PICK_HIGH, PICK_LEMON, SHOWER_CHILD } = await import('../../web/src/render/shared/characters/clips/uses.ts');
 const { BOARD, CLOCK, FEEDER, PUT_AWAY } = await import('../../web/src/render/shared/characters/clips/reach.ts');
-const { SHOT } = await import('../../web/src/render/shared/characters/clips/shot.ts');
+const { SHOT, STREET_SHOT } = await import('../../web/src/render/shared/characters/clips/shot.ts');
 const { KNEEL_TABLE, SIT_LOW } = await import('../../web/src/render/shared/characters/clips/low.ts');
 const { TURN_ANGLES, turnClip, turnDef, turnSeconds, turnShare } = await import('../../web/src/render/shared/characters/clips/locomotion.ts');
 const { turned } = await import('../../web/src/render/shared/characters/clips/ik.ts');
@@ -109,12 +109,16 @@ const SIZED: [sizes: Sized, loop: boolean, seconds: number][] = [
   [one(EYEPIECE), true, 6],
   [one(PICK_APPLE), false, 3.3],
   [one(PICK_LEMON), false, 3.3],
+  [one(PICK_HIGH), true, 3.2],
+  [one(CUT_ROSE), true, 3.2],
+  [one(LECTERN), true, 6],
   [[{ min: SHOWER_CHILD, clips: ['shower'] }, { min: 0, clips: ['showerChild'] }], true, 14],
   ...Object.values(PUT_AWAY).map((sizes: any): [Sized, boolean, number] => [one(sizes), true, 3.2]),
   [one(CLOCK), true, 4.5],
   [one(FEEDER), true, 4],
   [one(BOARD), true, 6],
   [one(SHOT), true, 3.2],
+  [one(STREET_SHOT), true, 3.2],
   [one(KNEEL_TABLE), true, 6],
   [one(SIT_LOW), true, 5],
 ];
@@ -132,7 +136,7 @@ const RUNTIME: Record<string, boolean> = {
   // On the floor (clips/seated.ts FLOOR_SITS): cross-legged on a cushion, on the ground against a trunk.
   ...Object.fromEntries(FLOOR_SITS.flatMap(({ name }: any) => [[`sit${name}`, true], [`sitDown${name}`, false], [`standUp${name}`, false]])),
   interact: false, pickUp: false, dance: true, punchJab: false, punchCross: false, hit: false, kneel: true, crouch: true,
-  eat: false, water: true, harvest: true, pick: true, pickHigh: true, foldArms: true, no: true, yes: false, phone: true, rail: true, spell: true,
+  eat: false, water: true, harvest: true, pick: true, foldArms: true, no: true, yes: false, phone: true, rail: true, spell: true,
   push: true, plant: false, lantern: true, babyLieAsleep: true, babyLieAwake: true,
   // Games and sport at things (characters.ts ACTIONS; clips/games.ts), those in one size.
   dartThrow: true, pingPong: true, yoga: true,
@@ -152,7 +156,7 @@ const PHASE2: Record<string, boolean> = { lie: true, chop: true, stir: true, fli
 const LENGTH: Record<string, number> = {
   idle: 2.5, talk: 2.9, walk: 1.1, jog: 0.7, jogAlong: 0.7, runAlong: 0.6, sit: 1.7, sitTalk: 2.9, sitDown: 1.33, standUp: 1.07, sitHands: 1.7, sitHandsNear: 1.7, sitHandsFar: 1.7, interact: 2.0, pickUp: 0.87,
   ...Object.fromEntries(FLOOR_SITS.flatMap(({ name }: any) => [[`sit${name}`, 1.7], [`sitDown${name}`, 1.6], [`standUp${name}`, 1.47]])),
-  dance: 1.0, punchJab: 0.87, punchCross: 1.0, hit: 0.33, kneel: 5.2, crouch: 2.9, eat: 1.33, water: 3.8, harvest: 2.5, pick: 3, pickHigh: 3.2, plant: 2.8, foldArms: 2.5,
+  dance: 1.0, punchJab: 0.87, punchCross: 1.0, hit: 0.33, kneel: 5.2, crouch: 2.9, eat: 1.33, water: 3.8, harvest: 2.5, pick: 3, plant: 2.8, foldArms: 2.5,
   yes: 2.5, no: 2.5, phone: 2.9, lantern: 2.5, rail: 2.5, spell: 2.1, push: 2.7, babyLieAsleep: 9, babyLieAwake: 6,
   dartThrow: 7.2, pingPong: 1.8, yoga: 48,
   ...SOCIAL,

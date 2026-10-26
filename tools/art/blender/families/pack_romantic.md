@@ -17,7 +17,7 @@ bathers at 0.20 (`furniture.json` `romantic.heartTub`), the swing's seat top at 
 | `vanity` | the middle drawer with a lipstick and a compact in it: `drawer_open` pulls it 20 cm out (0.7 s), `hold` 2 s | `primp` |
 | `gramophone` | the tone arm, resting beside the record: `needle` swings it 30° onto the record (0.8 s); the platter and record: `platter` turns them once in 1.8 s (a loop) | `listen`, `waltz` (`uses` and `loops`) |
 | `letterBureau` | the writing flap over the lower middle pigeonholes, a letter on its inside, hinged on its foot: `fall_front` drops it 90° onto the desk towards the writer (0.8 s). Its back on the wall, the hutch on the desk's back, the chair in front | `writeLetter`, `writePoem` |
-| `roseArbourSwing` | the swing (seat, back, arms, cushions, chains), pivoting on the beam: `swing` rocks it 7° each way in 2 s (a loop) and the riders ride it (`ride`); a bloom on the front left post: `cut` shrinks it away (0.6 s) | `swing` (`loops`); `tendRoses` |
+| `roseArbourSwing` | the swing (seat, back, arms, cushions, chains), pivoting on the beam: `swing` rocks it 7° each way in 2 s (a loop) and the riders ride it (`ride`); a bloom on the front left post, 1.15 m up: `cut` shrinks it away (0.6 s), 0.6 s into the use, for the one tending that post (`slot` 0) | `swing` (`loops`); `tendRoses` |
 
 The gramophone's "L the platter spins (E1)" is built: the platter is a second moving part, and the model still
 takes 3 draws because nothing in it is textured. The vanity's mirror (E6) is mirror glass (`mirror`, `front`), a
@@ -80,6 +80,15 @@ Roses are three thick turned cups (outer petals flaring, inner, bud: thick, so t
 - **Rose arbour:** the arches swept, the lattice laths each one sweep, climbing canes up the posts with leaves in threes
   and blooms, a leafy arch; the swing slatted with spindles between rails, swept arms, a stuffed cushion and pillows.
   11,734 triangles (its class, over 2.5 m, is 12,000).
+
+## The roses tended at a post (I-packs-12, 0.5.0)
+
+*Tend the climbing roses* was played at the seat cushion from the tile in front. The tender now steps in to a front
+post (`STEP_IN` lanes at -0.84 and 0.84 m, 0.75 m out, a child 0.58, in `characters/actions.ts`) and reaches to the
+bloom there (`cutRose177`, `147`, `112` in `clips/uses.ts`). `BLOOM` came down from 1.36 to 1.15 m so a child's palm
+(1.14-1.18 m at full stretch) reaches it, and `cut` waits 0.6 s for the hand and plays only for slot 0 (the left
+post's tender). The swing keeps no `places`: a place serves every use of its slot, and the sitters' would be on the
+footprint, where a tender can't stand. 11,734 triangles, 3 draws, as before.
 
 ## Rebuild
 

@@ -588,8 +588,7 @@
       "vary": 0.12
     },
     "model.tree.fruit": {
-      "type": "model",
-      "vary": 0.12
+      "type": "model"
     },
     "model.tree.maple": {
       "type": "model",

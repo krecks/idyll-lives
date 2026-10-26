@@ -50,7 +50,7 @@ table face the room, as tables do.
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `chessTable` Chess table | 1x1 · floor | chess:play | hobbies / games | Table, Chair | Use | `move`: a pawn slides one square for chess, 0.9 s in, once the player has sat down (`delay`). A 0.64 × 0.48 m top, the taken pieces beside the board, since 2026-10-21 (G-40). One chair: *Practise chess* alone (Q-16); a game for two needs a second chair across the board (G-65, M-hobbies-11). |
+| `chessTable` Chess table | 2x1 · floor | chess:play play:play | hobbies / games | Table, Chair | Use | `move`: a pawn slides one square towards white for both uses, 0.9 s in, once the player has sat down (`delay`). A chair at each end facing over the board, 0.66 m out (`places`), the top 0.64 m between them, the taken pieces at each end (M-hobbies-11, 0.5.0). *Play chess* for two (`partner`), *Practise chess* alone, also with nobody free (`alone`, Q-16). |
 | `poolTable` Pool table | 3x2 · floor | pool:play trickShots:play | hobbies / games | Frame, Cloth | Use | `rack_off`: the triangle is lifted off the balls, carried over the foot rail and hung by its apex on the table's foot end (1.4 s, `G.path`) for pool and trick shots; it hung 25 cm over the balls before 2026-10-21. `racked_off` and `spread` at the first shot (`delay` 4.6 s): the racked balls go and the fifteen come up spread over the cloth as the break leaves them (G-70). Each player holds a cue (held.py `tool.cue`), none lies on the cloth. The rails' top at 0.785 m, the cloth at 0.75 (G-29: 0.82). |
 | `foosball` Foosball table | 2x1 · floor | foosball:play practise:play | hobbies / games | Table, Trim | Loop (E1) | `rods`: blue's defence and attack rods kick ±55° while played (E1). Eight rods since 2026-10-21 (G-41: four, every handle on the front), each team's handles on its own side, blue's to the front where the players stand. |
 | `dartboard` Dartboard | 1x1 · wall | darts:play | hobbies / games | Board, Cabinet | Use | `darts`: three darts grow in the board for darts. A dart in the thrower's hand from taking it to letting it go (held.py `tool.dart`, G-70). |
@@ -89,9 +89,13 @@ table face the room, as tables do.
   there and is over for both when either stops. With nobody free, free will doesn't choose them, and the player's
   order does the game's use for one instead (`alone`, Q-16): *Practise trick shots*, and the new *Practise
   foosball* (15 min, fun 0.2, the rods turning; only when told, as solo foosball isn't a pastime of its own). The
-  chess table stays *Practise chess* for one: its model has one chair (M-hobbies-11).
-- Since the authenticity review (G-51): the chess and jigsaw tables are sat at from behind their chair and stool
-  (`approach: behind`), else from beside them, and only with both blocked from the front, through the table.
+  chess table stayed *Practise chess* for one, with one chair, until 0.5.0 (M-hobbies-11): it seats two now, one at
+  each end, and *Play chess* fetches a partner, falling back to *Practise chess*. A save from before (version 32)
+  puts its 1 × 1 table back over the tile it stood on where the 2 × 1 one fits and blocks nothing, else at a free
+  spot at home, else sells it back for its value.
+- Since the authenticity review (G-51): the jigsaw table is sat at from behind its stool (`approach: behind`), else
+  from beside it, and only with both blocked from the front, through the table; so was the chess table until 0.5.0,
+  whose two chairs are reached from the tile behind each (`places`).
 
 ## H3. Crafts and science (7)
 

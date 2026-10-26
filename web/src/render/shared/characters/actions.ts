@@ -11,9 +11,9 @@ import { TOSS_LET_GO } from './clips/props';
 import { BALL_PIT, PLAY_TENT } from './clips/play';
 import { BOARD, CLOCK, CUPBOARD_OF, FEEDER, PUT_AWAY } from './clips/reach';
 import { BUNK_DOWN, BUNK_UP, RIDE_HORSE, RIDE_ROUND, RIDE_SEESAW, RIDE_SPRING, RIDE_SWING, SLIDE } from './clips/rides';
-import { SHOT } from './clips/shot';
+import { SHOT, STREET_SHOT } from './clips/shot';
 import { CLIMB, CLIMB_LANES, FOUNTAIN, type Size, climbClip } from './clips/street';
-import { EYEPIECE, PICK_APPLE, PICK_LEMON, PLATE_HOLD, SHOWER_CHILD } from './clips/uses';
+import { CUT_ROSE, EYEPIECE, LECTERN, PICK_APPLE, PICK_HIGH, PICK_LEMON, PLATE_HOLD, SHOWER_CHILD } from './clips/uses';
 
 /** Hip roll (rad) while walking, per body. */
 export const GAIT_SWAY: Record<string, number> = { female: 0.07, male: 0.015 };
@@ -159,6 +159,12 @@ export const STEP_IN: Record<string, StepIn> = {
   grandfatherClock: { by: bySize(CLOCK), tag: 'tinker' },
   // Out on the court (2.5 m from the hoop's middle, a lane each for two), shooting (clips/shot.ts).
   basketballHoop: { by: bySize(SHOT), lanes: [-0.45, 0.45], tag: 'exercise' },
+  // The streetball hoop's shot from its two places 2.2 m out, a pace apart (content `places`; clips/shot.ts).
+  'energetic.streetballHoop': { by: bySize(STREET_SHOT), lanes: [-0.45, 0.45], tag: 'exercise' },
+  // The arbour's roses tended at its front posts, the bloom there cut (clips/uses.ts), not at the seat.
+  'romantic.roseArbourSwing': { by: bySize(CUT_ROSE), lanes: [-0.84, 0.84], tag: 'prune' },
+  // Reading the cookbook open on the lectern, the hands on it (clips/uses.ts), from its place 0.52 m out.
+  'foodie.cookbookLectern': { by: bySize(LECTERN), tag: 'read' },
   // Kneeling at the low train table's edge, the hands on its track and its little town, a lane each (clips/low.ts).
   trainTable: { by: bySize(KNEEL_TABLE), lanes: KNEEL_LANES, tag: 'play' },
   // Into the shelter at the timetable's end, on the back glass past the bench.
@@ -298,6 +304,9 @@ export const WARM_AT = new Set(['firePit']);
 /** Showering (`ACTIONS.shower`), a grown-up's and a child's. */
 export const SHOWER_ONLY: readonly string[] = ['shower'];
 export const SHOWER_SMALL: readonly string[] = ['showerChild'];
+/** Picking the apples (`ACTIONS.harvest` at a fruit tree): the size for a picker's height (m), the tallest first. */
+const PICK_HIGH_SEQ = PICK_HIGH.map(({ clip, min }) => [min, [clip]] as const);
+const pickHigh = (height: number): readonly string[] => (PICK_HIGH_SEQ.find(([min]) => height >= min) ?? PICK_HIGH_SEQ[PICK_HIGH_SEQ.length - 1])[1];
 /** Crouched down (to hug the teddy, `HUGGED`). */
 export const CROUCH_ONLY: readonly string[] = ['crouch'];
 /**
@@ -442,7 +451,7 @@ export const VIDEO_CALLS = new Set(['outgoing.videoCallNook', 'cheerful.partyBoo
 export const WAIST_HIGH = new Set(['greenhouse', 'foodie.herbGarden', 'compostBin']);
 /** Crops picked down at the soil (strawberries, pumpkins, a meadow's flowers): the `plant` clip's crouch, not the bend over a bush. */
 export const LOW_CROPS = new Set(['garden.strawberries', 'garden.pumpkins', 'garden.meadow']);
-/** Fruit trees whose crop is picked reaching up into the crown (`pickHigh`): the apple tree's "Pick the apples" (G-68). */
+/** Fruit trees whose crop is picked reaching up to the low boughs (`pickHigh*`, by height): the apple tree's "Pick the apples" (G-68). */
 export const FRUIT_TREES = new Set(['garden.apple']);
 /** Flowers that bloom above about 0.7 m, smelt leaning in standing, a bloom held to the nose (`pick`), not crouched under. */
 export const TALL_FLOWERS = new Set(['garden.cosmos', 'garden.flowerBox', 'garden.lavender', 'garden.lilies', 'garden.lupins', 'garden.roses', 'garden.wheelbarrow']);
@@ -551,9 +560,9 @@ export const ACTIONS: Record<string, ActionAnim> = {
   // At the changing table, the baby on the pad (`CHANGE`): the hands busy over them.
   change: { stand: ['interact', 'spell'], hands: HANDS.relaxed },
   // (From the waist-high herb planter, standing; low crops crouched down to the soil.)
-  // (Fruit picked up in a tree's crown, `pickHigh`.)
+  // (Fruit picked from a tree's low boughs, `pickHigh*` for their height.)
   harvest: {
-    stand: (def) => (def === 'garden.herbs' ? ['pick'] : FRUIT_TREES.has(def) ? ['pickHigh'] : LOW_CROPS.has(def) ? ['plant', 'kneel'] : ['harvest', 'plant']),
+    stand: (def, height) => (def === 'garden.herbs' ? ['pick'] : FRUIT_TREES.has(def) ? pickHigh(height) : LOW_CROPS.has(def) ? ['plant', 'kneel'] : ['harvest', 'plant']),
     hands: HANDS.hold,
   },
   prune: { stand: ['interact', 'spell', 'interact'], hands: HANDS.grip },
