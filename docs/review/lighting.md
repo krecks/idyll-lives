@@ -78,7 +78,7 @@ Notes: the arc lamp's light (1.50) is 2 cm under its shade's rim (1.52–1.78, t
 |---|---|---|---|
 | `lamp` | switch it on and off, read by it | its switch in the pie menu (`session.ts:1163`); residents switch a room's lamps together at dusk and on leaving (`lights.rs`) | OK (the switch is its use) |
 | `floorLampSimple` | switch it on and off | its switch | OK |
-| `lampFloorArc` | light a sofa or a table from above | its switch | OK; it can't reach over a sofa (M-lighting-06) |
+| `lampFloorArc` | light a sofa or a table from above | its switch | OK; it reaches over a sofa in front of it (M-lighting-06 fixed) |
 | `lampFloorTripod` | switch it on and off | its switch | OK |
 | `lampTorchiere` | wash the ceiling with light | its switch | OK; it lights the floor (M-lighting-02) |
 
@@ -160,8 +160,9 @@ Not tied to one row: M-lighting-01, M-lighting-02 (every lamp).
 - **Fix class:** model
 - **Where:** `tools/art/blender/families/lighting.py:423` (`ARC`: from the base at `(-0.3, -0.3)` to the shade at `(0.22, 0.18)`), `:427`; `web/public/content/catalog2/lighting.json:120` (footprint 1 × 1, `light.at` `[0.245, 0.2]`)
 - **Evidence:** `lighting/sheets/obj-lampFloorArc.png`: the shade hangs about 0.7 m from the base, over the same tile. An arc lamp exists to reach 1.2–2 m over a sofa or a table from behind it (the reference's use, "light a sofa or a table from above", W up to 1.8 m); this one has to stand beside the sofa, where a plain floor lamp would. A 2-tile reach (footprint 1 × 1 with the shade over the next tile, as things hung over others are) needs the sim to allow it.
-- **Status:** fixed in part (2b7cf0d8): the sim's half; the model's half later (recorded in `tools/art/blender/families/lighting.md`)
+- **Status:** fixed (2b7cf0d8, the sim's half; the model's half: F2)
 - **After:** content `overhang` (`[right, front]` tiles from a 1×1 floor thing) lets a shade reach over the next tile: taken from walking and from anything tall, hanging low or at head height (furniture may stand under it, as under a lamp at head height), no wall across the arm, not off the lot or over the stairs (`layers::an_arc_lamp_reaches_over_the_sofa_in_front_of_it`). Not set on `lampFloorArc` until its model reaches over the next tile (then `overhang: [[0, 1]]`, `light.at` and build mode's and `housegen.ts`'s placing).
+  Then (2026-10-26, F2) the model's half: `lampFloorArc` is rebuilt reaching over the tile in front, its base where it was (the back left corner, its back on the wall face), the arc up to 2.05 m and down over the middle of the next tile, 1.33 m from the base, the shade from 1.6 to 1.8 m (3,632 triangles, 1 draw; was 3,312). Content: `overhang` [[0, 1]], `light.at` (0, 1), `light.height` 1.65 (at the bulb; the gate's old "light outside the lamp" warning is gone) and `freeRotation` false (the sim now refuses an `overhang` on a thing that turns freely, `layers::the_flags_are_for_their_own_layers`). Build mode checks the shade's tile as the sim does (on the plot, off the stairs, nothing tall or hanging there, no wall across, not under another shade; nobody stands there to use something; `game/surfaces.ts` `overhangTiles`, `tests/overhang.test.ts`). The house generator hangs the shade over a seat beside the lamp if it can, else over free floor it takes from walking; over the 180 sample houses 24 arc lamps, 2 over a sofa, all accepted by the sim (`generated_houses`, 0 problems). The gate counts the tiles a thing reaches over as its own. In play on `review-stage`: behind a sofa standing free and in the corner beside an armchair, the pools at night on their seats (`fixes/moving-parts/arc/arc-night-room.png`, by day `arc-day-room.png`, from above `arc-day-top.png`); a third bought with its shade into the first's was refused. The lamp build now checks `light.at` too (`_check_at`).
 - **Source:** wave: lighting
 
 ### M-lighting-07 — The table lamp's light is 10 cm above its shade

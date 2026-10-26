@@ -4,8 +4,8 @@
 # `lampTorchiere`) and the table lamps (LT4: `tableLamp`, `lampTableRound`, `lampTableSquare`, `lampBanker`,
 # `lampMushroom`, `lampLantern`). Notes: lighting.md.
 #
-# The light itself is the content's `light`; each lamp's bulb is placed near its `light.height` (asserted
-# against the content JSON). The shades, diffusers and bulbs glow at night (`glow`, E8); nothing glows by
+# The light itself is the content's `light`; each lamp's bulb is placed near its `light.height`, and once built
+# at its `light.at` where it gives one (both asserted against the content JSON). The shades, diffusers and bulbs glow at night (`glow`, E8); nothing glows by
 # day. Ceiling things hang from 2.8 m and wall things have their back on the wall face, both at their real
 # height (`floor=False`). One clip, ambient (`idle`): the ceiling fan's blades turn while it's on. The rest are
 # still (the paper lantern's sway went, 2026-10-21: a paper globe indoors hangs still).
@@ -72,29 +72,53 @@ CEILING = 2.8
 
 
 def _content_lights():
-    """{object id: light.height} from the content: the bulbs are placed against it."""
+    """{object id: its content `light`}: the bulbs are placed against it."""
     root = os.path.join(G.ASSETS, '..', 'content')
     out = {}
     for path in ('base.json', 'furniture.json', os.path.join('catalog2', 'lighting.json')):
         with open(os.path.join(root, path)) as f:
             for o in json.load(f).get('objects', []):
                 if 'light' in o:
-                    out[o['id']] = o['light']['height']
+                    out[o['id']] = o['light']
     return out
 
 
 LIGHTS = _content_lights()
+AT_TOLERANCE = 0.05   # how far across (m) a bulb may stand from the content's `light.at`
+BULBS = {}            # {object id: its bulb's material name}, for `_check_at` once the model is built
 
 
-def _near_light(id, y):
-    """Asserts a bulb at height `y` is within 25 cm of where the content puts the lamp's light."""
-    want = LIGHTS[id]
+def _near_light(id, y, material=None):
+    """Asserts a bulb at height `y` is within 25 cm of where the content puts the lamp's light; notes its material, so
+    that once the model is built and settled `_check_at` finds it across."""
+    want = LIGHTS[id]['height']
     assert abs(y - want) <= 0.25, f'{id}: bulb at {y:.2f} m, the content\'s light at {want:.2f} m'
+    BULBS[id] = (material or M.bulb).name
+
+
+def _check_at(id):
+    """Asserts the built lamp's bulb (the middle of the faces in its material, a diffuser's with it) stands within
+    `AT_TOLERANCE` across of the content's `light.at`, for a lamp that gives one (the arc lamp's shade, the table lamp
+    on its table); the others' light is at the footprint's middle, as the wall lights' is on purpose."""
+    at = LIGHTS.get(id, {}).get('at')
+    if at is None or id not in BULBS:
+        return
+    pts = []
+    for o in G.meshes():
+        names = [m.name.split('.')[0] if m else '' for m in o.data.materials]
+        for p in o.data.polygons:
+            if names and names[p.material_index] == BULBS[id].split('.')[0]:
+                pts += [o.matrix_world @ o.data.vertices[v].co for v in p.vertices]
+    assert pts, f'{id}: no faces in its bulb\'s material {BULBS[id]!r}'
+    x, z = -sum(p.x for p in pts) / len(pts), -sum(p.y for p in pts) / len(pts)   # game x, depth
+    off = math.hypot(x - at[0], z - at[1])
+    assert off <= AT_TOLERANCE, (f'{id}: bulb at ({x:.3f}, {z:.3f}), the content\'s light.at ({at[0]}, {at[1]}): '
+                                 f'{off * 100:.1f} cm off')
 
 
 def _bulb(F, id, r, at, material=None, scale=(1, 1, 1), segments=14, rings=8):
-    """The lamp's bulb at a game position (`_near_light`)."""
-    _near_light(id, at[1])
+    """The lamp's bulb at a game position (`_near_light`, `_check_at`)."""
+    _near_light(id, at[1], material)
     return F.sphere(f'{id}_bulb', r, at, material or M.bulb, scale=scale, segments=segments, rings=rings)
 
 
@@ -606,31 +630,41 @@ def _bezier(p, t):
                  for i in range(3))
 
 
-ARC = ((-0.3, 1.0, -0.3), (-0.3, 1.85, -0.3), (0.22, 2.0, 0.18), (0.22, 1.72, 0.18))
+# The arc lamp reaches over the tile in front of its own (content `overhang` [[0, 1]]): its base in the back left
+# corner of its tile, its back on the wall face, the arc rising to about 2 m and coming down over the middle of the
+# next tile, where its shade hangs over a sofa's seat, 1.33 m from the base across the floor. Built where it stands
+# (`settle(centre=False)`), so the shade's middle is the content's `light.at` as it is here.
+ARC_BASE = (-0.28, -0.28)          # the base's middle (game x, depth): its back on the wall face, -0.43
+ARC_SHADE_AT = (0.0, 1.0)          # the shade's middle: over the middle of the tile in front
+ARC_SHADE_Y = 1.7                  # the shade's middle height (1.6 to 1.8 m)
+ARC = ((ARC_BASE[0], 0.95, ARC_BASE[1]), (ARC_BASE[0], 2.0, ARC_BASE[1]),
+       (ARC_SHADE_AT[0], 2.3, ARC_SHADE_AT[1]), (ARC_SHADE_AT[0], ARC_SHADE_Y + 0.12, ARC_SHADE_AT[1]))
 ARC_SHADE = [[0.5, -0.5], [0.42, 0.2], [0.12, 0.5], [0, 0.5], [0, 0.4], [0.1, 0.4], [0.38, 0.15], [0.46, -0.5]]
 
 
 def lampFloorArc():
-    """A turned marble base in the back corner, a brass stem rising into one sweeping arc (a sleeve where the two
-    meet, a dimmer on the stem) and a dome shade with a rolled lip on its socket."""
+    """A turned marble base in the back corner, a brass stem rising into one sweeping arc over the next tile (a
+    sleeve where the two meet, a dimmer on the stem) and a dome shade with a rolled lip on its socket."""
     F = G.GameFrame()
+    bx, bz = ARC_BASE
+    sx, sz = ARC_SHADE_AT
     with G.new_parts():
         _turned(F, 'base', [(0, 0), (0.15, 0), (0.15, 0.034), (0.144, 0.047), (0.13, 0.055), (0.07, 0.06), (0, 0.06)],
-                (-0.3, 0, -0.3), M.marble, 36)
+                (bx, 0, bz), M.marble, 36)
         _turned(F, 'foot_collar', [(0, 0), (0.032, 0), (0.032, 0.01), (0.022, 0.026), (0.017, 0.04), (0, 0.04)],
-                (-0.3, 0.06, -0.3), M.arc, 16)
-        arc = [(-0.3, 0.09, -0.3), (-0.3, 0.55, -0.3)] + [_bezier(ARC, k / 14) for k in range(15)]
+                (bx, 0.06, bz), M.arc, 16)
+        arc = [(bx, 0.09, bz), (bx, 0.55, bz)] + [_bezier(ARC, k / 22) for k in range(23)]
         G.kit.tube(F, 'arc', arc, 0.0125, M.arc, verts=10, round=2)
         _turned(F, 'sleeve', [(0, 0), (0.017, 0), (0.019, 0.006), (0.019, 0.05), (0.017, 0.056), (0, 0.056)],
-                (-0.3, 0.97, -0.3), M.arc, 14)
-        F.box('dimmer', 0.03, 0.06, 0.022, (-0.3, 0.82, -0.282), M.arc, bevel=0.008, bevel_segments=2)
-        F.cyl('dimmer_knob', 0.007, 0.01, (-0.3, 0.83, -0.268), M.marble, rot=(90, 0, 0), verts=10)
-        _socket(F, 'socket', 0.02, 0.04, (0.22, 1.69, 0.18), M.arc, segments=12)
-        _lathe(F, 'shade', 0.36, 0.2, (0.22, 1.6, 0.18), ARC_SHADE, M.arc_shade, segments=36, liner=M.liner)
-        _ring(F, 'shade_lip', 0.176, (0.22, 1.504, 0.18), 0.005, M.arc_shade, segments=36, minor=5)
-        _bulb(F, 'lampFloorArc', 0.05, (0.22, 1.56, 0.18), scale=(1, 1, 0.75))
+                (bx, 0.92, bz), M.arc, 14)
+        F.box('dimmer', 0.03, 0.06, 0.022, (bx, 0.82, bz + 0.018), M.arc, bevel=0.008, bevel_segments=2)
+        F.cyl('dimmer_knob', 0.007, 0.01, (bx, 0.83, bz + 0.032), M.marble, rot=(90, 0, 0), verts=10)
+        _socket(F, 'socket', 0.02, 0.04, (sx, ARC_SHADE_Y + 0.09, sz), M.arc, segments=12)
+        _lathe(F, 'shade', 0.36, 0.2, (sx, ARC_SHADE_Y, sz), ARC_SHADE, M.arc_shade, segments=36, liner=M.liner)
+        _ring(F, 'shade_lip', 0.176, (sx, ARC_SHADE_Y - 0.096, sz), 0.005, M.arc_shade, segments=36, minor=5)
+        _bulb(F, 'lampFloorArc', 0.05, (sx, ARC_SHADE_Y - 0.04, sz), scale=(1, 1, 0.75))
     G.join_all('lampFloorArc')
-    G.settle()
+    G.settle(centre=False)
     return G.meshes()
 
 
@@ -859,7 +893,11 @@ IDLE_FAN = {'idle': 'blades_turn'}
 
 
 def _m(id, build, size, paint, **kw):
-    return G.Model(id, build, size=size, key=f'model.{id}', paint=paint, **kw)
+    def built():
+        objs = build()
+        _check_at(id)   # where it stands now, settled
+        return objs
+    return G.Model(id, built, size=size, key=f'model.{id}', paint=paint, **kw)
 
 
 FAMILY = G.Family(
@@ -881,8 +919,8 @@ FAMILY = G.Family(
         centre=(0, -0.375)),
      _m('lamp', lamp, (0.45, 1.808, 0.45), [('stand', 'Stand'), ('lamp_shade', 'Shade'), ('brass', 'Fittings')]),
      _m('floorLampSimple', floorLampSimple, (0.28, 1.6, 0.28), [('iron', 'Stand'), ('shade', 'Shade')]),
-     _m('lampFloorArc', lampFloorArc, (0.85, 1.861, 0.81), [('arc', 'Stand'), ('arc_shade', 'Shade'), ('marble', 'Base')],
-        centre=(0, -0.025)),   # its base's back on the wall face
+     _m('lampFloorArc', lampFloorArc, (0.611, 2.055, 1.611), [('arc', 'Stand'), ('arc_shade', 'Shade'), ('marble', 'Base')],
+        centre=(-0.1245, 0.3755)),   # its box's middle: the base's back on the wall face, the shade over the next tile
      _m('lampFloorTripod', lampFloorTripod, (0.554, 1.614, 0.557), [('walnut', 'Stand'), ('linen', 'Shade')]),
      _m('lampTorchiere', lampTorchiere, (0.4, 1.85, 0.4), [('brass', 'Stand'), ('bowl', 'Shade'), ('iron', 'Base')]),
      _m('tableLamp', tableLamp, (0.66, 0.92, 0.42), [('ceramic', 'Base'), ('shade', 'Shade'), ('oak', 'Table')]),

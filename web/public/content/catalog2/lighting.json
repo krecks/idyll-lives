@@ -127,21 +127,27 @@
       ],
       "price": 260,
       "category": "lighting",
-      "freeRotation": true,
+      "freeRotation": false,
       "group": "floor",
       "decor": 0.7,
+      "overhang": [
+        [
+          0,
+          1
+        ]
+      ],
       "light": {
         "aim": "down",
         "range": 4.5,
         "intensity": 1.0,
-        "height": 1.5,
+        "height": 1.65,
         "at": [
-          0.245,
-          0.2
+          0,
+          1.0
         ],
         "tiles": 10
       },
-      "description": "A brass arc reaching over the sofa from a marble base.",
+      "description": "A brass arc reaching from a marble base over the tile in front of it: stand it behind or beside the sofa, its shade over the seat.",
       "interactions": []
     },
     {

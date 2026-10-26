@@ -1449,7 +1449,17 @@ fn content_warnings(facts: Option<&Facts>, lo: &[Num; 3], (slo, shi): &Bounds, s
         let (w, d) = foot(f)?;
         let half = |n: Num| (n / Num::I(2)).f();
         let (nw, nd) = (((-w) / Num::I(2)).f(), ((-d) / Num::I(2)).f());
-        let over = [nw - slo[0].f(), shi[0].f() - half(w), nd - slo[2].f(), shi[2].f() - half(d)].into_iter().reduce(|m, v| if v > m { v } else { m }).unwrap();
+        // The tiles beside its own it reaches over at head height (content `overhang`, `[right, front]`: an arc
+        // lamp's shade over the next tile) are its too, at rest.
+        let (mut xlo, mut xhi, mut zlo, mut zhi) = (nw, half(w), nd, half(d));
+        for t in f.object.get("overhang").and_then(J::list).unwrap_or(&[]) {
+            let (r, fw) = (t.at(0).and_then(J::num).map_or(0.0, Num::f), t.at(1).and_then(J::num).map_or(0.0, Num::f));
+            xlo = xlo.min(r - 0.5);
+            xhi = xhi.max(r + 0.5);
+            zlo = zlo.min(fw - 0.5);
+            zhi = zhi.max(fw + 0.5);
+        }
+        let over = [xlo - slo[0].f(), shi[0].f() - xhi, zlo - slo[2].f(), shi[2].f() - zhi].into_iter().reduce(|m, v| if v > m { v } else { m }).unwrap();
         if over > OVERHANG {
             warnings.push(format!(
                 "reaches {} cm past its {} x {} footprint (x {} to {}, depth {} to {}): it overlaps what stands next to it",

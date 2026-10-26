@@ -3,13 +3,13 @@
 All 21 lamps are built by `tools/art/blender/families/lighting.py` (notes: `families/lighting.md`): the ceiling lights
 hang from 2.8 m at their real height, centred; the wall lights have their back on the wall face at their real
 height; the floor and table lamps stand centred (the arc lamp's base in the back corner, its back on the wall face,
-so its arc reaches out over the room).
+its arc reaching over the tile in front, content `overhang`).
 
 The light itself is the content's `light` (height, range, intensity, tiles); the model only shows where it comes
 from, and must put its bulb at its `light.height`. `_bulb` asserts each bulb within 25 cm of
-`light.height` (most are within 8 cm); it doesn't check `at`. Across, the light is at the footprint's middle unless
-the content's `light.at` [x, z] (object frame) moves it: the arc lamp's (0.245, 0.2) and the table lamp's (−0.12, 0)
-put it at their shade in every facing. The wall lights keep theirs at the middle, 13–38 cm out from the bulb.
+`light.height` (most are within 8 cm), and a lamp with a `light.at`, once built, within 5 cm of it across. Across,
+the light is at the footprint's middle unless the content's `light.at` [x, z] (object frame) moves it: the arc lamp's
+(0, 1), over the tile in front, and the table lamp's (−0.12, 0) put it at their shade in every facing. The wall lights keep theirs at the middle, 13–38 cm out from the bulb.
 
 Where the light goes is the content's `light.aim` (the renderer's room lights are spot lights): `down` under a shade
 that sends it down (the pendant's dome, the industrial pendant, the track heads, the swing-arm lamp, the arc lamp,
@@ -87,7 +87,7 @@ ceiling lamp outdoors (M-lighting-01).
 |---|---|---|---|---|---|---|
 | `lamp` Floor lamp | 1x1 · floor | — | lighting / floor | Stand, Shade, Fittings | Static | Static. The drum shade glows at night. |
 | `floorLampSimple` Simple floor lamp | 1x1 · floor | — | lighting / floor | Stand, Shade | Static | Static. The square shade glows at night. |
-| `lampFloorArc` Arc floor lamp | 1x1 · floor | — | lighting / floor | Stand, Shade, Base | Static | Static. The metal dome glows inside at night; the light is at the shade (`light.at`). Its shade still hangs over its own tile: the sim allows one over the next (content `overhang`, 2026-10-22), for when the model reaches there (M-lighting-06, `lighting.md`). |
+| `lampFloorArc` Arc floor lamp | 1x1 · floor | — | lighting / floor | Stand, Shade, Base | Static | Static. The metal dome glows inside at night; the light is at the shade (`light.at` (0, 1), height 1.65). Its arc rises to 2.05 m from its base in the back corner and its shade hangs over the middle of the tile in front (`overhang` [[0, 1]], 2026-10-26, M-lighting-06): over a sofa's seat or a chair there, or over floor nobody then walks on; nothing as tall as the wall or hanging low goes there. It turns in quarter turns only (no `freeRotation`: turned between, its shade would hang over a tile the sim doesn't keep for it). |
 | `lampFloorTripod` Tripod floor lamp | 1x1 · floor | — | lighting / floor | Stand, Shade | Static | Static. The linen shade glows at night. |
 | `lampTorchiere` Uplighter | 1x1 · floor | — | lighting / floor | Stand, Shade, Base | Static | Static. The bowl glows at night. |
 
@@ -97,6 +97,10 @@ ceiling lamp outdoors (M-lighting-01).
 - The floor lamp's "Fittings" colours its brass collars and harp; the arc lamp's and uplighter's "Base" their foot.
 - The arc lamp's light sits at its shade in every facing, against a wall and free (content `light.at`, `house.ts`).
 - The uplighter's coloured glass bowl tints faintly.
+- 2026-10-26: the arc lamp reaching over the next tile, bought on the stage behind a sofa standing free (its shade
+  over the sofa's right seat) and in the corner beside an armchair (its shade over the chair from the side), by day
+  and at night with its light on: the pools fall on the seats. A third bought with its shade into the first one's was
+  refused ("would hang into the arc floor lamp").
 
 ## LT4. Table lamps (6)
 

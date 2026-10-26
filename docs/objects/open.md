@@ -157,7 +157,8 @@ it left is here, with its id; §9 of the review says what each would take.
   a vase (Q-18).
 - **Parts with no use, left decorative:** the executive desk's drawer (I-office-02, won't fix); the nesting tables'
   small table and the display cabinet's door (decor, decision 4); the laundry basket's lid (not built). These are
-  modelled parts without a clip, so no clip is orphaned.
+  modelled parts without a clip, so no clip is orphaned. The grandfather clock's trunk door is not a part of its own
+  (A-decor-01, won't fix): it would be a fifth draw, over what the gate passes, and the clock is wound at its dial.
 - **Uses end once every need they raise is full**, by design (I-systems-02); it makes clips easy to miss in checks.
 
 ### Models
@@ -167,16 +168,11 @@ it left is here, with its id; §9 of the review says what each would take.
   into the air; the crown down to about 2.6 m or low apples at 1.4–1.9 m (I-garden-12, `trees.md`).
 - **Food from town on a plate:** crisps, the stall's fruit and the pastry use the treat plate; a cone or paper cup,
   a hot dog in its bun, a crisp packet, an apple and a bagged pastry are to be made (M-held-03, `held.md`).
-- **The arc lamp's arc stops at its own tile:** the sim allows a shade over the next tile (`overhang`) once the model
-  reaches it (M-lighting-06, `lighting.md`).
-- **One part where two would fold or move apart**, to stay within four draws: the hot tub's cover folds back as one
-  squashed part, not two halves (A-outdoor-01); the washing comes down onto the line all together (A-outdoor-02);
-  the grandfather clock's trunk door stays shut (A-decor-01).
-- **Parts with a use but no clip:** the high chair's tray (babies sit in it since G-66), the kettle's lid, the bread
-  bin's roll-top and the laptop's lid (used at their top since G-63); the bakery case's door is on the baker's side.
+- **One part where two would move apart**, to stay within four draws: the washing comes down onto the line all
+  together (A-outdoor-02).
+- **The bakery case's sliding door is on the baker's side** (I-community-09, with vendors).
 
 ### Tools
-- The lamp build (`_bulb`) checks only the light's height, not `at`.
 - The review's tooling leftovers (`cargo review sizes`' measuring, `check.mjs play` with one resident, the debug
   states) are in [docs/authenticity-review.md](../authenticity-review.md) §7.
 
@@ -194,7 +190,12 @@ it left is here, with its id; §9 of the review says what each would take.
 - **Content and sim:** small things on tops are used where they stand (I-tabletop-01, I-tabletop-04); the high
   chair is used (I-kids-01).
 - **Models:** the entry console's and the spritz station's mirrors on back boards (M-packs-01, M-packs-02); the party
-  bar's back bar (M-packs-03); bathers' shins in the heart tub (A-packs-01); the power blender's blades (A-packs-02).
+  bar's back bar (M-packs-03); bathers' shins in the heart tub (A-packs-01); the power blender's blades (A-packs-02);
+  the arc lamp reaching over the next tile, placed so by build mode and the house generator (M-lighting-06); the hot
+  tub's cover folding back in two halves (A-outdoor-01, a fourth draw).
+- **Moving parts with a use:** the kettle's lid, the bread bin's roll-top and the laptop's lid open for their uses
+  (I-tabletop-01); the high chair's tray slides out as the baby is put in (I-kids-01).
+- **Tools:** the lamp build checks the light's `at`, not only its height (M-lighting-06).
 - **Sounds** (I-bathroom-04, G-53): the uses that were silent sound like their things, synthesised
   (`web/src/audio/things.ts`): the treadmill and bikes, the workbench and the bike stand, pool, foosball, ping-pong,
   darts, the arcade cabinets, the sewing machine, the chemistry set, the pottery wheel, the coffee machines, the

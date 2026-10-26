@@ -275,6 +275,12 @@ export interface ObjectDef {
   hangsLow?: boolean;
   /** From the ceiling: hangs at head height (a chandelier, a low pendant), to hang over a table: nobody walks under it, but furniture goes under it. */
   headHeight?: boolean;
+  /**
+   * On the floor, 1×1: tiles beside its own it reaches over at head height, as `[right, front]` tiles from it (an
+   * arc lamp's shade over the sofa in front: `[[0, 1]]`). Furniture may stand there; nobody walks there, and
+   * nothing as tall as the wall, hanging low or at head height goes there (sim-core `overhang_tiles`).
+   */
+  overhang?: [number, number][];
   /** On the floor: built to stand back to a wall (a wall-hung toilet, a wall bed, a leaning ladder): it needs plain wall all along its back. */
   againstWall?: boolean;
   /** Bunk beds: the second slot lies on the upper bunk. */

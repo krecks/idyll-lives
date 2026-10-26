@@ -4,7 +4,7 @@ Things for babies and children, built by `tools/art/blender/families/kids.py` (n
 crib's front rail slides down (`side_down`) and its mobile turns (`mobile`, a loop); the beds turn their duvet down
 (`turn_down`, as the bedroom's); the toys open, rock, bob, squish and grow (`lid_open`, `front_open`, `rock`,
 `bounce`, `train`, `blocks`, `squish`, `squash`); the study things open a drawer, tip out a book and draw or paint
-themselves (`drawer_open`, `book_out`, `drawing`, `painting`). The high chair's tray is a part of its own; the train
+themselves (`drawer_open`, `book_out`, `drawing`, `painting`). The high chair's tray slides out as a baby is put in (`tray_out`); the train
 table's track is a ring, so the train can go round it.
 
 Kids' seats and beds keep their heights (`seats`, `beds` in `web/src/render/shared/characters/furniture.json`; tops in
@@ -28,7 +28,7 @@ pulled up to the kids' table before the dining table (a seat made for their age 
 | `crib` Crib | 2x1 · floor | lie:sleep feed:cuddle change:change play:play cuddle:cuddle | kids / — | Frame, Bedding, Mobile | Use | `side_down`: the front rail slides down 25 cm for feed, change and cuddle, and back up. L `mobile`: the mobile turns slowly while a grown-up plays with the baby (E1, `loops.play`). An oblong cot (a 1.18 × 0.58 m mattress), the baby lying along it (`beds.crib` `across`), since 2026-10-21 (G-40: square). |
 | `kidsBed` Kids' bed | 1x2 · floor | sleep:sleep nap:nap | kids / — | Frame, Bedding | Use | `turn_down`, as the beds (rolling over low half way, 2026-10-21). |
 | `kidsBedCar` Race car bed | 1x2 · floor | sleep:sleep nap:nap | kids / — | Car body, Bedding | Use | `turn_down`, as the beds; the car body is static. |
-| `highChair` High chair | 1x1 · floor | sit:sit feed:feed | kids / — | Frame, Bedding | Static | Static. (+use) the tray slides out. *Sit in the high chair* is a baby's (`baby`, put in by a carer, `carried`); *Feed the baby* is done from beside it. Its legs splay to 0.54 m each way since 2026-10-21 (G-40). |
+| `highChair` High chair | 1x1 · floor | sit:sit feed:feed | kids / — | Frame, Bedding | Use | `tray_out`: the tray slides 16 cm forward as the baby is put in (sit), held 1 s, then back in front of them; out again as they are taken out. *Sit in the high chair* is a baby's (`baby`, put in by a carer, `carried`); *Feed the baby* is done from beside it. Its legs splay to 0.54 m each way since 2026-10-21 (G-40). |
 
 **In play** (signed off 2026-10-16):
 - Against the four walls of the family house's living room: the crib's front rail slides down for feed, change and
@@ -38,7 +38,7 @@ pulled up to the kids' table before the dining table (a seat made for their age 
 - The kids' bed and race car bed turn their duvet down for sleep and nap, a child lying in them under the game's
   quilt, and shut when the use ends. A child lies on the mattress, legs level with its top (`lieBack` scales with
   the body); the car bed's quilt ends at its bonnet (`BEDS` `foot`).
-- The high chair is still in all four facings.
+- The high chair's tray slides out and back in all four facings (it is still at rest).
 - Since the authenticity review (G-66, 2026-10-21): by day "Feed the baby" at the crib, with a high chair on the lot,
   is done at the high chair: the grown-up lifts the baby out of the cot (the cuddle's lift), carries them in the arms
   (`CARRY`), lays them into the high chair, feeds them standing in beside it (`STAND_BACK` -0.5, `interact`/`spell`)
