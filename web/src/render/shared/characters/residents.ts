@@ -59,6 +59,7 @@ import { LOW_TOP, SIT_LOW } from './clips/low';
 import { FLOOR_SITS } from './clips/seated';
 import { type BodyData, type CharacterSet, type Clip, loadCharacterSet, loadStage } from './data';
 import { gaitFor } from './gait';
+import { TURN_FADE, isTurn, turnClipIn, turnDone, turnOnSpot, turnYaw } from './turns';
 import { ASLEEP, COLD, EXPRESSIONS, FRIENDLY, HUG, KISS, LAUGH, MOOD_COLD, MOOD_WARM, NONE, RELAX_ARMS, SOCIAL_FACES, STANCE, type StageDirection } from './expressions';
 import { FACE_KEYS, type Face, FaceMixer, NEUTRAL } from './face';
 import { type OutfitParams, SHELL_BITS, WEARS, type Wear, outfitFor, writeOutfit } from './outfit';
@@ -555,6 +556,11 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         approach: 0,
         feetUp: false,
         feet: new Float32Array(4),
+        turnKey: '',
+        turnDeg: 0,
+        turnFrom: 0,
+        turnBy: 0,
+        turnStarted: false,
         cuddleT: -1,
         cuddleOut: -1,
         cuddleMin: 0,
@@ -1530,7 +1536,11 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       // Walkers turn as quickly as the game runs (up to 10x): sped up, the corners of their way come sooner.
       const turn = moving ? clamp(gameRate, 1, 10) : 1;
       const maxTurn = (moving ? 9 : 6) * dt * turn;
-      rig.yaw = dir ? wrapAngle(faceYaw) : turned !== null ? wrapAngle(turned) : wrapAngle(rig.yaw + clamp(dyaw * (1 - Math.exp(-dt * 12 * turn)), -maxTurn, maxTurn));
+      // Standing free, a wide turn steps round (`turnOnSpot`): the yaw follows the turn clip's steps. (To the way the
+      // snapshot turns them, not the way the frames between snapshots have got to: sized for the whole turn.)
+      const goal = faceYaw === tyaw ? curr[o + k.yaw] : faceYaw;
+      const onSpot = dir || turned !== null ? null : turnOnSpot(set, rig, this.standsFree(rig, i, pose, moving, social, useObj, appeared), goal, rig.body.stage === 'child');
+      rig.yaw = dir ? wrapAngle(faceYaw) : turned !== null ? wrapAngle(turned) : onSpot !== null ? onSpot : wrapAngle(rig.yaw + clamp(dyaw * (1 - Math.exp(-dt * 12 * turn)), -maxTurn, maxTurn));
       rig.visible = true;
       this.visible[i] = 1;
       rig.tx = cx;
@@ -1554,6 +1564,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       advance(rig.prev, GAITS.has(rig.prev.key) || rig.prev.key === 'jog' ? dt : step);
       advance(rig.upper, step);
       advance(rig.upperPrev, step);
+      if (rig.turnKey && rig.turnStarted) rig.yaw = turnYaw(rig);
       // Carrying while walking: the arms bob in step with the feet.
       if (rig.cur.clip && GAITS.has(rig.cur.key) && rig.upper.clip && rig.upper.key.startsWith('carry')) rig.upper.time = (rig.cur.time / rig.cur.clip.duration) * rig.upper.clip.duration;
       rig.w = Math.min(1, rig.w + dt * rig.fadeRate * Math.max(1, animRate));
@@ -1746,7 +1757,6 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     fresh: boolean,
   ): void {
     const pair = partner ? Math.min(i, partner.id) : i;
-    const set = this.set!;
     const known = useObj !== undefined;
     const act = ACTIONS[tag];
     rig.tag = tag;
@@ -2035,6 +2045,16 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       }
     }
     if (!inside && rig.inside) this.stepOut(rig, fresh);
+    // Turning on the spot (`turnOnSpot`): its clip on the legs and body until it has played, then what they do. The
+    // step towards a thing or a partner waits for it (stepping forward while turning would swing the body round).
+    if (rig.turnKey && turnDone(rig)) rig.turnKey = '';
+    if (rig.turnKey) {
+      key = rig.turnKey;
+      fade = TURN_FADE;
+      rate = 1;
+      repeat = false;
+      reach = rig.approach;
+    }
     rig.approach += (reach - rig.approach) * Math.min(1, step * reachRate);
     const dir = rig.dir;
     if (dir?.clip) {
@@ -2125,7 +2145,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     } else if (cur.key === key && repeat && done && !cur.clip!.loop) {
       // Repeated one-shots (fights).
       this.start(rig, key, 0.3, rate, repeat, rootY, rootFwd, pitch);
-    } else if (cur.key !== key) {
+    } else if (cur.key !== key || (key === rig.turnKey && !rig.turnStarted)) {
+      // (A new turn starts its clip afresh, even over the end of the same one.)
       rig.stepTime = 0;
       this.start(rig, key, fade, rate, repeat, rootY, rootFwd, pitch);
     } else {
@@ -2135,6 +2156,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       cur.rootPitch = pitch;
     }
     rig.cur.frame = frame;
+    if (key === rig.turnKey) rig.turnStarted = true;
     // A ride in time with its loop (`RIDES` `sync`: the swing's pumping legs).
     if (pose === Pose.Sit && key === rig.cur.key && rig.useId >= 0 && RIDES[rig.useDef]?.sync) {
       const phase = this.loopOf?.(rig.useId);
@@ -2447,12 +2469,28 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     rig.outT = k < 1 ? rig.outT + step : -1;
   }
 
+  /**
+   * Standing free this frame, so that a wide turn can step round (`turnOnSpot`): on their feet and still, not walked
+   * in, inside a thing, up on one, getting up or climbing down, nor holding or lifting a baby or in an embrace or a
+   * fight (those place the body themselves); a baby never.
+   */
+  private standsFree(rig: SimRig, i: number, pose: number, moving: boolean, social: number, useObj: PlacedObject | null | undefined, appeared: boolean): boolean {
+    if (pose !== Pose.Stand || moving || appeared || this.force || rig.body.stage === 'baby' || this.heldBy[i] >= 0) return false;
+    if (rig.walkT >= 0 || rig.inside || rig.outT >= 0 || useObj?.stand || rig.rising || rig.fromBed || rig.riseK < 1) return false;
+    if (rig.cuddleT >= 0 || rig.liftW > 0 || !Number.isNaN(rig.faceX)) return false;
+    if (social === Anim.Hug || social === Anim.Kiss || social === Anim.Fight) return false;
+    // (Getting up, or down the bunk's ladder, until its clip is done: `choose` keeps it.)
+    if (rig.lastPose !== Pose.Stand || RISING.has(rig.cur.key) || rig.cur.key.startsWith('bunk')) return false;
+    return true;
+  }
+
   /** A gait clip's ground speed at rate 1 on the reference legs (`gaitFor`), undefined for one the set doesn't have. */
   private readonly gaitSpeed = (key: string): number | undefined => this.set?.clips.get(key)?.speed;
 
   private clip(key: string): Clip {
     const set = this.set!;
-    return set.clips.get(key) ?? set.clips.get('idle')!;
+    // (Turns on the spot are baked the first time they're played: `turnClipIn`.)
+    return set.clips.get(key) ?? turnClipIn(set, key) ?? set.clips.get('idle')!;
   }
 
   /** Length (s) of the clip played for `key` (0 before the set has loaded). */
@@ -3275,7 +3313,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private stance(rig: SimRig, pose: number, moving: boolean, dt: number): void {
     const B = this.set!.bone;
     const standing = pose === Pose.Stand && !moving && (!this.force || this.forceStance);
-    const arms = standing && rig.skirt && RELAX_ARMS.has(rig.cur.key) && !(rig.upperW > 0.05) && rig.cuddleT < 0 ? 1 : 0;
+    const arms = standing && rig.skirt && (RELAX_ARMS.has(rig.cur.key) || isTurn(rig.cur.key)) && !(rig.upperW > 0.05) && rig.cuddleT < 0 ? 1 : 0;
     rig.relaxArms += (arms - rig.relaxArms) * (rig.dir?.still ? 1 : Math.min(1, dt * 5));
     const a = smooth(clamp(rig.relaxArms, 0, 1));
     if (a > 1e-3) {

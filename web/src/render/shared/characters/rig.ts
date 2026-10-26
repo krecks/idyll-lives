@@ -173,6 +173,15 @@ export interface SimRig {
   feetUp: boolean;
   feet: Float32Array;
   /**
+   * Turning on the spot (`turns.ts`): the turn clip playing ('' none), its size (deg), the yaw it started from and
+   * the turn it makes (rad), and whether `choose` has started its clip.
+   */
+  turnKey: string;
+  turnDeg: number;
+  turnFrom: number;
+  turnBy: number;
+  turnStarted: boolean;
+  /**
    * A cuddle (`CUDDLE`): seconds since it began (-1: not cuddling) and since laying the baby back
    * down began (-1: not yet), game minutes so far, the pace of picking up / putting back, and the
    * baby's row (-1: none).
