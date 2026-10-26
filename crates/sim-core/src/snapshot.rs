@@ -9,7 +9,7 @@ use crate::{TICKS_PER_SECOND, clock};
 
 pub const HEADER_LEN: usize = 9;
 /// Floats per Sim (all 31 used).
-pub const SIM_STRIDE: usize = 31;
+pub const SIM_STRIDE: usize = 32;
 pub const CAPACITY: usize = HEADER_LEN + MAX_SIMS * SIM_STRIDE;
 
 pub mod header {
@@ -105,6 +105,10 @@ pub mod sim {
     /// What they eat while eating, on the table in front of them or in their hands: index into
     /// `Content::items` + 1, else 0. The renderer puts cutlery in the hands for a plate that wants it.
     pub const PLATE: usize = 30;
+    /// 1 while the room they're in is kept shut on their account (a bathroom they're in, the
+    /// bedroom they try for a baby in; `privacy.rs`), else 0: the renderer keeps its doors shut
+    /// to anyone but whoever goes through them (nobody else goes in).
+    pub const SHUTS: usize = 31;
 }
 
 /// How far ahead along their way `sim::AHEAD_X` looks, in metres.
@@ -112,7 +116,7 @@ pub const AHEAD: f32 = 1.5;
 
 // Every field fits in a Sim's row.
 const _: () = assert!(
-    sim::HEIGHT < SIM_STRIDE && sim::INTERACTION < SIM_STRIDE && sim::RECIPE < SIM_STRIDE && sim::CALL < SIM_STRIDE && sim::AHEAD_Z < SIM_STRIDE && sim::PROGRESS < SIM_STRIDE && sim::CARRY < SIM_STRIDE && sim::PLATE < SIM_STRIDE
+    sim::HEIGHT < SIM_STRIDE && sim::INTERACTION < SIM_STRIDE && sim::RECIPE < SIM_STRIDE && sim::CALL < SIM_STRIDE && sim::AHEAD_Z < SIM_STRIDE && sim::PROGRESS < SIM_STRIDE && sim::CARRY < SIM_STRIDE && sim::PLATE < SIM_STRIDE && sim::SHUTS < SIM_STRIDE
 );
 const _: () = assert!(header::ITEMS_VERSION < HEADER_LEN);
 
@@ -288,11 +292,15 @@ fn progress(world: &World, s: &Sim) -> f32 {
 }
 
 /// The waypoint a Sim walks to and where their way is `AHEAD` metres on (`sim::WAY_X`,
-/// `sim::AHEAD_X`), both where they stand when they aren't walking.
+/// `sim::AHEAD_X`), both where they stand when they aren't walking (waiting outside a room kept
+/// shut too: its door doesn't open for them).
 fn way_ahead(world: &World, s: &Sim) -> ([f32; 2], [f32; 2]) {
     let Some(Activity { phase: Phase::Routing { waypoints, next }, .. }) = s.current() else {
         return (s.pos, s.pos);
     };
+    if s.kept_out() {
+        return (s.pos, s.pos);
+    }
     let storey = world.storey_of(s.pos[1].floor() as i32);
     let Some(&way) = waypoints.get(*next).filter(|wp| world.storey_of(wp[1].floor() as i32) == storey) else {
         return (s.pos, s.pos);
@@ -384,6 +392,7 @@ pub fn write(world: &World, out: &mut [f32]) {
         o[sim::CARRY] = crate::carry::carrying(s).map_or(0.0, |b| b as f32 + 1.0);
         o[sim::PROGRESS] = progress(world, s);
         o[sim::PLATE] = eating(world, s).map_or(0.0, |d| d as f32 + 1.0);
+        o[sim::SHUTS] = crate::privacy::keeps_shut(world, s.id) as u8 as f32;
     }
     // Conversations: write the shared state into every participant's row.
     for (i, s) in world.sims.iter().enumerate() {
@@ -444,6 +453,7 @@ pub fn layout_json(content: &Content) -> String {
             "wayX": sim::WAY_X, "wayZ": sim::WAY_Z, "aheadX": sim::AHEAD_X, "aheadZ": sim::AHEAD_Z,
             "carry": sim::CARRY,
             "progress": sim::PROGRESS, "plate": sim::PLATE,
+            "shuts": sim::SHUTS,
         },
         "actions": content.animations,
         "items": content.items.iter().map(|i| &i.id).collect::<Vec<_>>(),

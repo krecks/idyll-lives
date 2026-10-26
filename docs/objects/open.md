@@ -130,8 +130,6 @@ it left is here, with its id; §9 of the review says what each would take.
   empty.
 
 ### Content and sim
-- **No privacy** (G-72): a bathroom in use opens for anyone walking in (else they'd walk through its shut door), and
-  "Try for a baby" is a 30-minute standing kiss wherever the two are (I-systems-05, I-social-05). New behaviour.
 - **Nobody serves in town** (I-community-09): the carts, the stall, the bakery case and the café are self-serve, and
   their labels say so; vendors are later (Q-17).
 - **One-use machines:** the dishwasher and the neat pack's laundry centre are still loaded and run in one use; a
@@ -218,6 +216,13 @@ it left is here, with its id; §9 of the review says what each would take.
   on the spot (G-71, A-residents-08); children's feet at game speed 3 (11–14 % slide, now none: the run's beat
   quickens on shorter legs, `gait.ts`; A-residents-03 in part); getting out of bed before the lie has faded in (PR
   #31's held pose, 7 cm in a frame, now none).
+
+### Fixed in 0.5.0
+- **Privacy** (G-72: I-systems-05, I-social-05): a bathroom someone is in is kept shut (`privacy.rs`): others wait
+  outside its door (an hour at most) and go in after, its door stays shut to them in the drawing, and kept out with
+  the bladder empty the accident comes. Visitors leave the household's own things alone (`private`: wardrobes,
+  dressers, the bath cabinet). *Try for a baby* is a short ask, then the two in a double bed under the covers for
+  half an hour behind the bedroom's shut door (Q-21).
 
 ## Notes on the sim
 

@@ -162,7 +162,7 @@ pub(crate) fn free_now(content: &Content, s: &Sim, tick: u64) -> bool {
 /// Whether resident `j` is free to play `inter` at an object on `plot` with `a` now (`free_now`,
 /// there, its age for them, allowed to use it, not on bad terms), able to get to it (`front`:
 /// the tile it's used from; while the walkable regions are known).
-fn free_for(world: &World, j: usize, a: usize, plot: Option<u32>, at: [f32; 2], front: (i32, i32), inter: &Interaction) -> bool {
+fn free_for(world: &World, j: usize, a: usize, plot: Option<u32>, at: [f32; 2], front: (i32, i32), def: &ObjectDef, inter: &Interaction) -> bool {
     let content = &world.content;
     let s = &world.sims[j];
     if j == a || !free_now(content, s, world.tick) {
@@ -176,7 +176,7 @@ fn free_for(world: &World, j: usize, a: usize, plot: Option<u32>, at: [f32; 2], 
     let access = crate::world::access_in(&world.households, &world.plots, s, plot);
     here
         && crate::world::unfit(content, s.age, inter).is_none()
-        && (access == Access::Full || (access == Access::Guest && crate::world::guest_may(content, inter)))
+        && (access == Access::Full || (access == Access::Guest && crate::world::guest_may(content, def, inter)))
         && crate::social::friend_level(world.relationships.get(a, j).friendship) > LEVEL_DISLIKED
         && (world.reach_version != world.nav_version || world.reach.reaches(&world.nav(), (x, z), front))
 }
@@ -206,7 +206,7 @@ pub(crate) fn partner_for(world: &World, a: usize, object: u32, interaction: usi
             let p = world.sims[j].pos;
             (p[0] - at[0]).hypot(p[1] - at[1])
         };
-        (0..world.sims.len()).filter(|&j| free_for(world, j, a, plot, at, front, inter)).min_by(|&x, &y| far(x).total_cmp(&far(y)))
+        (0..world.sims.len()).filter(|&j| free_for(world, j, a, plot, at, front, &content.objects[obj.def], inter)).min_by(|&x, &y| far(x).total_cmp(&far(y)))
     })
 }
 
@@ -235,7 +235,9 @@ pub(crate) fn update(world: &mut World) {
             continue;
         }
         let range = def.slots_for(interaction);
-        let room = world.objects[object as usize].users[range].iter().any(Option::is_none);
+        // (Trying for a baby is with the one it was asked of, sent along with them
+        // (`privacy::to_bed`): nobody else is fetched.)
+        let room = world.objects[object as usize].users[range].iter().any(Option::is_none) && !def.interactions[interaction].conceive;
         match room.then(|| partner_for(world, a, object, interaction)).flatten() {
             Some(b) => fetch(world, b, a, object, interaction),
             None => alone(world, a, object, interaction, directed),

@@ -139,6 +139,7 @@
     {
       "id": "loner.soloSauna",
       "name": "Cedar sauna for one",
+      "private": true,
       "model": "model.loner.soloSauna",
       "footprint": [1, 2],
       "price": 3400,

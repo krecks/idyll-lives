@@ -231,6 +231,14 @@ pub struct Interaction {
     /// Held in the hands while it's done (content `holds`, an item): a shirt being folded.
     /// Only shown, as `brings`.
     pub holds: Option<usize>,
+    /// Done behind a shut door (content `private`; see `privacy.rs`): while it lasts the room
+    /// it's done in is kept shut, and others wait outside it or go elsewhere.
+    pub private: bool,
+    /// Where partners try for a baby (content `conceive`: a double bed's *Try for a baby*): a
+    /// game for two (`partner`) done behind a shut door (`private`), started only by the social
+    /// whose success has the `conceive` effect, with the one it was with. A baby may come of it
+    /// once it has run its time (`lifecycle::conceive`).
+    pub conceive: bool,
 }
 
 /// Something a use works on (content `workOn`), which must be there for it to start.
@@ -370,6 +378,9 @@ pub struct ObjectDef {
     pub places: Vec<SlotPlace>,
     /// Can only be placed outdoors (trees, flower beds, ponds).
     pub outdoors: bool,
+    /// The household's own (content `private`: a wardrobe, a dresser, a bath): a visitor uses none
+    /// of it, chosen or told (`world::guest_may`).
+    pub private: bool,
     /// A flight of stairs up to the storey above (one tile wide, climbed from the front; see
     /// `path::Stair`). Residents walk on it instead of around it.
     pub stairs: bool,
@@ -906,6 +917,9 @@ pub struct RoomKind {
     /// Else (no kind's tags offered in it), a room is of this kind if people pass through it:
     /// two doors or more, or stairs (a hallway).
     pub passage: bool,
+    /// Kept shut while someone is in it (content `private`: a bathroom; see `privacy.rs`):
+    /// others wait outside or go elsewhere, and its doors stay shut to them.
+    pub private: bool,
 }
 
 /// How rooms are scored (content `roomRules`; see `rooms.rs`).
@@ -1600,6 +1614,9 @@ pub struct Content {
     pub cuddle_anim: Option<usize>,
     /// Whether any feeling has `effects` (Sims then fold them into their modifiers).
     pub buff_feelings: bool,
+    /// Whether any object has a use for trying for a baby (`Interaction::conceive`): then the
+    /// social of the `conceive` effect goes on in bed, and needs one (`privacy.rs`).
+    pub conceive_beds: bool,
     /// What routine blocks can be for, how plans steer residents, and life goals.
     pub activities: Vec<crate::planner::ActivityDef>,
     pub planner: crate::planner::PlannerRules,
@@ -2072,6 +2089,8 @@ struct RoomKindRaw {
     exclusive: bool,
     #[serde(default)]
     passage: bool,
+    #[serde(default)]
+    private: bool,
 }
 
 #[derive(Deserialize, Default)]
@@ -2301,6 +2320,9 @@ struct ObjectRaw {
     places: Vec<PlaceRaw>,
     #[serde(default)]
     outdoors: bool,
+    /// The household's own (see `ObjectDef::private`).
+    #[serde(default)]
+    private: bool,
     #[serde(default)]
     stairs: bool,
     /// Buy catalog category (decides free rotation, see `objectRules.freeRotation`).
@@ -2555,6 +2577,12 @@ struct InteractionRaw {
     /// An item held while it's done (see `Interaction::holds`).
     #[serde(default)]
     holds: Option<String>,
+    /// Done behind a shut door (see `Interaction::private`).
+    #[serde(default)]
+    private: bool,
+    /// Where partners try for a baby (see `Interaction::conceive`).
+    #[serde(default)]
+    conceive: bool,
 }
 
 /// Content `laundry` (see `LaundryRules`).
@@ -3169,6 +3197,8 @@ impl Content {
                     makes: it.makes,
                     brings: shown_item(&it.brings, "brings")?,
                     holds: shown_item(&it.holds, "holds")?,
+                    private: it.private || it.conceive,
+                    conceive: it.conceive,
                 });
                 // A game for two: at an object with two places, one each, used there as any use.
                 if it.partner
@@ -3185,6 +3215,12 @@ impl Content {
                 {
                     return Err(Error::new(format!(
                         "{ctx}: a game for two (`partner`) is played at an object with two places (`slots`: 2), one each (no whole, inside, seatNear, recipe, eat, yields, carried or needsTable)"
+                    )));
+                }
+                // Trying for a baby: two in a bed, started by the social, nothing else.
+                if it.conceive && (!it.partner || it.autonomous || it.pose != Pose::Lie || it.alone.is_some()) {
+                    return Err(Error::new(format!(
+                        "{ctx}: `conceive` is a use for two lying down (`partner`, `\"pose\": \"lie\"`), not chosen on its own (`\"autonomous\": false`), with no `alone`"
                     )));
                 }
                 if it.alone.is_some() && !it.partner {
@@ -3411,6 +3447,7 @@ impl Content {
                 slots: obj.slots,
                 places: obj.places.iter().map(|p| SlotPlace { at: p.at, facing: p.facing.to_radians() }).collect(),
                 outdoors: obj.outdoors,
+                private: obj.private,
                 stairs: obj.stairs,
                 turns,
                 decor: obj
@@ -3959,6 +3996,7 @@ impl Content {
                     size: k.size.unwrap_or([4.0, 9.0]),
                     exclusive: k.exclusive,
                     passage: k.passage,
+                    private: k.private,
                 })
             })
             .collect::<Result<_, Error>>()?;
@@ -4160,6 +4198,7 @@ impl Content {
             .collect();
 
         let buff_feelings = feelings.iter().any(|m| m.effects.is_some());
+        let conceive_beds = objects.iter().any(|o: &ObjectDef| o.interactions.iter().any(|i| i.conceive));
         let talk_anim = anim_index(TALK_ANIM);
         let cuddle_anim = anim_index("cuddle");
         let (activities, planner, goals) =
@@ -4206,6 +4245,7 @@ impl Content {
             talk_anim,
             cuddle_anim,
             buff_feelings,
+            conceive_beds,
             activities,
             planner,
             goals,

@@ -202,6 +202,8 @@ mod tests {
             makes: None,
             brings: None,
             holds: None,
+            private: false,
+            conceive: false,
         }
     }
 

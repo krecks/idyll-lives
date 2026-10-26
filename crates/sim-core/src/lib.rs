@@ -30,6 +30,7 @@ pub mod phone;
 pub mod partners;
 pub mod path;
 pub mod planner;
+pub mod privacy;
 pub mod rng;
 pub mod rooms;
 pub mod save;

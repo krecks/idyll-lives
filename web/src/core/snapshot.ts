@@ -72,6 +72,12 @@ export interface SnapshotLayout {
     progress?: number;
     /** What they eat while eating (on the table in front of them or in their hands): index into `items` + 1, 0 = nothing (missing in older layouts). */
     plate?: number;
+    /**
+     * 1 while the room they're in is kept shut on their account (a bathroom they're in, the bedroom
+     * they try for a baby in; sim-core `privacy.rs`), else 0: its doors stay shut to anyone but
+     * whoever goes through them (missing in older layouts).
+     */
+    shuts?: number;
   };
   /** Animation tags from content (`animations` in base.json), named by `sim.action`. */
   actions: string[];

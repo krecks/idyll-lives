@@ -223,6 +223,7 @@
     {
       "id": "bathCabinetTall",
       "name": "Tall bathroom cabinet",
+      "private": true,
       "model": "model.bathCabinetTall",
       "footprint": [
         1,
