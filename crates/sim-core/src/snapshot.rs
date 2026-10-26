@@ -8,8 +8,8 @@ use crate::world::{Activity, MAX_SIMS, Phase, Sim, Task, TaskKind, World};
 use crate::{TICKS_PER_SECOND, clock};
 
 pub const HEADER_LEN: usize = 9;
-/// Floats per Sim (all 30 used).
-pub const SIM_STRIDE: usize = 30;
+/// Floats per Sim (all 31 used).
+pub const SIM_STRIDE: usize = 31;
 pub const CAPACITY: usize = HEADER_LEN + MAX_SIMS * SIM_STRIDE;
 
 pub mod header {
@@ -102,6 +102,9 @@ pub mod sim {
     /// recipe step's), while at it; else -1. The renderer plays a clip along with it (the washing
     /// hung out piece by piece, a crop picked).
     pub const PROGRESS: usize = 29;
+    /// What they eat while eating, on the table in front of them or in their hands: index into
+    /// `Content::items` + 1, else 0. The renderer puts cutlery in the hands for a plate that wants it.
+    pub const PLATE: usize = 30;
 }
 
 /// How far ahead along their way `sim::AHEAD_X` looks, in metres.
@@ -109,7 +112,7 @@ pub const AHEAD: f32 = 1.5;
 
 // Every field fits in a Sim's row.
 const _: () = assert!(
-    sim::HEIGHT < SIM_STRIDE && sim::INTERACTION < SIM_STRIDE && sim::RECIPE < SIM_STRIDE && sim::CALL < SIM_STRIDE && sim::AHEAD_Z < SIM_STRIDE && sim::PROGRESS < SIM_STRIDE && sim::CARRY < SIM_STRIDE
+    sim::HEIGHT < SIM_STRIDE && sim::INTERACTION < SIM_STRIDE && sim::RECIPE < SIM_STRIDE && sim::CALL < SIM_STRIDE && sim::AHEAD_Z < SIM_STRIDE && sim::PROGRESS < SIM_STRIDE && sim::CARRY < SIM_STRIDE && sim::PLATE < SIM_STRIDE
 );
 const _: () = assert!(header::ITEMS_VERSION < HEADER_LEN);
 
@@ -131,6 +134,14 @@ impl Doing {
         let object = object.and_then(|o| world.stable_of(o)).map_or(-1.0, |s| s as f32);
         Doing { object, action: anim.map_or(-1.0, |a| a as f32), ..Doing::NOTHING }
     }
+}
+
+/// What `s` eats while at it (`sim::PLATE`): the plate on the table in front of them, else what they hold.
+fn eating(world: &World, s: &Sim) -> Option<usize> {
+    let Some(Activity { task: Task { kind: TaskKind::Eat { plate, .. }, .. }, phase: Phase::Using { .. }, .. }) = s.current() else {
+        return None;
+    };
+    plate.and_then(|p| world.items.get(p)).map(|it| it.def).or(s.held.map(|h| h.def))
 }
 
 fn doing(world: &World, s: &Sim) -> Doing {
@@ -357,6 +368,7 @@ pub fn write(world: &World, out: &mut [f32]) {
         [o[sim::AHEAD_X], o[sim::AHEAD_Z]] = ahead;
         o[sim::CARRY] = crate::carry::carrying(s).map_or(0.0, |b| b as f32 + 1.0);
         o[sim::PROGRESS] = progress(world, s);
+        o[sim::PLATE] = eating(world, s).map_or(0.0, |d| d as f32 + 1.0);
     }
     // Conversations: write the shared state into every participant's row.
     for (i, s) in world.sims.iter().enumerate() {
@@ -416,7 +428,7 @@ pub fn layout_json(content: &Content) -> String {
             "held": sim::HELD, "recipe": sim::RECIPE, "call": sim::CALL,
             "wayX": sim::WAY_X, "wayZ": sim::WAY_Z, "aheadX": sim::AHEAD_X, "aheadZ": sim::AHEAD_Z,
             "carry": sim::CARRY,
-            "progress": sim::PROGRESS,
+            "progress": sim::PROGRESS, "plate": sim::PLATE,
         },
         "actions": content.animations,
         "items": content.items.iter().map(|i| &i.id).collect::<Vec<_>>(),
