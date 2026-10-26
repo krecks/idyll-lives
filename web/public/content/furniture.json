@@ -503,7 +503,7 @@
             "elder"
           ],
           "anim": "buy",
-          "minutes": 4,
+          "minutes": 5,
           "autonomous": false,
           "tags": [
             "food"

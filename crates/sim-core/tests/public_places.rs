@@ -577,3 +577,21 @@ fn a_cart_at_home_is_self_serve() {
     }
     assert!(helped, "she took one from the freezer herself");
 }
+
+/// States to look at the vendors with (`DUMP_STATES=1`; tools/bench/README.md): each town place beside an empty
+/// house at 11:30, everyone serving there at work, Ada and Bo at the house's front, free will off; and
+/// `vendors-<place>-night`, the same at 21:30, everyone gone home.
+#[test]
+fn vendor_states_for_play() {
+    for id in ["park", "market", "cafe", "grocer", "bakery"] {
+        let (mut w, _) = town_beside_with(id, 2);
+        w.autonomy = false;
+        until(&mut w, 11.5);
+        assert!(!w.staff.servers.is_empty() && w.staff.servers.iter().all(|s| s.present), "{id}: everyone at work at 11:30");
+        common::dump_state(&w, &format!("vendors-{id}"));
+        // And at 21:30, everything closed but the hot dog stand (till 21:00: closed too) and the machines.
+        until(&mut w, 21.5);
+        assert!(w.staff.servers.iter().all(|s| !s.present), "{id}: everyone gone home at 21:30");
+        common::dump_state(&w, &format!("vendors-{id}-night"));
+    }
+}

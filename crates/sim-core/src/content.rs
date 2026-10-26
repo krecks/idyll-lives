@@ -4556,6 +4556,11 @@ mod tests {
         refused(&|c| c["objects"][0]["interactions"][0]["hours"] = json!([20, 25]), "fridge.snack: `hours`");
         refused(&|c| c["objects"][0]["interactions"][0]["workOn"] = json!("laundry"), "fridge.snack: `workOn` laundry needs content `laundry`");
         refused(&|c| c["laundry"] = json!({"perDay": 0, "most": 4}), "laundry: `perDay` above 0");
+        // Sold by someone: at an object someone serves at, standing near it (`staff.rs`).
+        refused(&|c| c["objects"][0]["interactions"][0]["selfServe"] = json!({"label": "Take one"}), "`selfServe` is for something sold, at an object with `staff`");
+        refused(&|c| c["objects"][0]["staff"] = json!({"at": [0, -3], "hours": [8, 18]}), "object 'fridge': `staff.at` is more than 1.5 m off its footprint");
+        refused(&|c| c["objects"][0]["staff"] = json!({"at": [0, -0.8], "hours": [8, 8]}), "object 'fridge': `staff.hours`");
+        refused(&|c| c["service"] = json!({"waitMinutes": 0}), "service: `share` at least 0 and `waitMinutes` above 0");
         // A game for two: two places, and its use for one another of the object's, alike.
         refused(&|c| c["objects"][1]["interactions"][0]["partner"] = json!(true), "tv.watch: a game for two (`partner`) is played at an object with two places");
         refused(&|c| c["objects"][1]["interactions"][0]["alone"] = json!("watch"), "tv.watch: `alone` is what's done with nobody to play: it needs `partner`");

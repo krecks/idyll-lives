@@ -868,7 +868,7 @@
           "label": "Buy a piece of fruit",
           "selfServe": { "label": "Pick a piece of fruit", "anim": "fetch" },
           "anim": "buy",
-          "minutes": 4,
+          "minutes": 5,
           "eat": {
             "item": "fruit",
             "minutes": 9
@@ -959,7 +959,7 @@
           "label": "Buy a slice of cake to take to a table",
           "selfServe": { "label": "Take a slice of cake to a table", "anim": "fetch" },
           "anim": "buy",
-          "minutes": 4,
+          "minutes": 5,
           "autonomous": false,
           "tags": [
             "food"

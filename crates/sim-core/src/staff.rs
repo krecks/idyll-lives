@@ -36,6 +36,8 @@ use crate::world::{Activity, Ctx, ObjectInstance, Phase, Task, TaskKind, WALK_SP
 
 /// Most servers in a town (snapshot rows after the residents'). Posts past them stay self-serve.
 pub const MAX_STAFF: usize = 32;
+/// How far (radians) a server turns from the way their post faces to look at the customer they serve.
+const FACE_TURN: f32 = 1.0;
 
 /// Where a post's server stands and when it's open (content `staff`).
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -351,6 +353,11 @@ pub(crate) fn update(w: &mut World) {
         }
         if let Some(c) = server.serving.filter(|_| !server.moving) {
             sims[c as usize].being_served = true;
+            // Turned to them, over the post (the one at a two-wide stall's end), not round past its side.
+            let to = sims[c as usize].pos;
+            let at = (to[0] - server.pos[0]).atan2(to[1] - server.pos[1]);
+            let off = crate::world::wrap_angle(at - yaw);
+            server.yaw = crate::world::wrap_angle(yaw + off.clamp(-FACE_TURN, FACE_TURN));
         }
     }
 }
