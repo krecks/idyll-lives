@@ -302,6 +302,21 @@ fn way_ahead(world: &World, s: &Sim) -> ([f32; 2], [f32; 2]) {
     (way, at)
 }
 
+/// What a resident carries for a use without having it (content `brings`, `holds`; an item
+/// index): the basket of washing in the arms on the way to the dryer, a shirt in the hands while
+/// folding. Only shown.
+fn shown_held(world: &World, s: &crate::world::Sim) -> Option<usize> {
+    let a = s.current()?;
+    let TaskKind::Use { object, interaction } = a.task.kind else { return None };
+    let o = world.objects.get(object as usize)?;
+    let inter = world.content.objects[o.def].interactions.get(interaction)?;
+    match a.phase {
+        Phase::Routing { .. } => inter.brings,
+        Phase::Using { .. } => inter.holds,
+        _ => None,
+    }
+}
+
 /// Writes the snapshot into `out`, which must hold at least `CAPACITY` floats.
 pub fn write(world: &World, out: &mut [f32]) {
     out[header::TICK] = (world.tick % (1 << 24)) as f32;
@@ -343,7 +358,7 @@ pub fn write(world: &World, out: &mut [f32]) {
         o[sim::THOUGHT] = thought.map_or(0.0, |t| t.kind as u8 as f32);
         o[sim::THOUGHT_SUBJECT] = thought.map_or(0.0, |t| t.subject as f32);
         o[sim::HEIGHT] = world.sim_height(s);
-        o[sim::HELD] = s.held.map_or(0.0, |h| h.def as f32 + 1.0);
+        o[sim::HELD] = s.held.map(|h| h.def).or_else(|| shown_held(world, s)).map_or(0.0, |d| d as f32 + 1.0);
         o[sim::RECIPE] = match s.current().map(|a| a.task.kind) {
             Some(TaskKind::Cook { recipe, .. }) => recipe as f32 + 1.0,
             _ => 0.0,

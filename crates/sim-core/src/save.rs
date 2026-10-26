@@ -48,7 +48,10 @@
 //! piles up (`households[].laundry`: loads dirty and washed; absent: one of each); 31 = the
 //! outfit a resident changed into (`sims[].outfit`; older files: 0, the creator's); 32 = the
 //! day a pupil last went to school or missed it (`sims[].schoolDay`; older files: today once
-//! school has begun, so a load never costs a missed day). Older files load. Saves
+//! school has begun, so a load never costs a missed day); 33 = machines run on their own
+//! (`objects[].run`: game minutes left, 0 done with the load in it; absent: empty; in an older
+//! file the washing out on a line is done, dry) and dried washing waits to be folded (a third
+//! number in `households[].laundry`; absent: none). Older files load. Saves
 //! written before feelings were renamed from "moodlets" store them under `moodlets`; a serde
 //! alias still reads it.
 
@@ -66,7 +69,7 @@ use crate::planner::{BlockResult, Goal, HomeWish, Outcome, Planner, Reason, Rout
 use crate::world::{GameMode, Household, Plot, Task, TaskKind, World};
 use crate::{Error, MINUTES_PER_TICK, clock::MAX_SPEED};
 
-pub const SAVE_VERSION: u32 = 32;
+pub const SAVE_VERSION: u32 = 33;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -293,6 +296,10 @@ pub struct ObjectSave {
     /// A lamp switched off (absent before v28, or on).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub off: bool,
+    /// A machine's run (see `ObjectInstance::run`): game minutes left while it runs, 0 done
+    /// with its load in it (absent before v33, or empty).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run: Option<f32>,
 }
 
 fn is_level(tall: &i16) -> bool {
@@ -608,10 +615,11 @@ pub struct HouseholdSave {
     /// The day a babysitter was booked for (absent: none).
     #[serde(default, rename = "sitterDay", skip_serializing_if = "Option::is_none")]
     pub sitter_day: Option<u32>,
-    /// Loads of washing waiting: dirty, and washed to dry (see `Household::laundry`; absent
-    /// before v30: one of each).
+    /// Loads of washing waiting: dirty, washed to dry, and dried to fold (see
+    /// `Household::laundry`; absent before v30: one dirty and one washed; before v33 without
+    /// the dried).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub laundry: Option<[f32; 2]>,
+    pub laundry: Option<Vec<f32>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -664,6 +672,7 @@ impl World {
                 open: o.open,
                 growth: content.objects[o.def].grows.is_some().then_some(o.growth),
                 off: o.off && content.objects[o.def].switch,
+                run: o.run.filter(|_| content.objects[o.def].runs.is_some()),
             })
             .collect();
         let sims = self
@@ -822,7 +831,7 @@ impl World {
                     routines: h.routines.iter().map(|r| routine_save(content, r)).collect(),
                     expecting: h.expecting,
                     sitter_day: h.sitter_day,
-                    laundry: Some(h.laundry),
+                    laundry: Some(h.laundry.to_vec()),
                 })
                 .collect(),
             plots: self
@@ -978,7 +987,7 @@ impl World {
                 routines: Vec::new(),
                 expecting: None,
                 sitter_day: None,
-                laundry: [crate::world::LAUNDRY_AT_START; 2],
+                laundry: crate::world::LAUNDRY_START,
             }]
         } else {
             save.households
@@ -1000,7 +1009,9 @@ impl World {
                         .collect(),
                     expecting: h.expecting,
                     sitter_day: h.sitter_day,
-                    laundry: h.laundry.map_or([crate::world::LAUNDRY_AT_START; 2], |l| l.map(|v| finite(v, 0.0).max(0.0))),
+                    laundry: h.laundry.as_ref().map_or(crate::world::LAUNDRY_START, |l| {
+                        std::array::from_fn(|k| finite(l.get(k).copied().unwrap_or(0.0), 0.0).max(0.0))
+                    }),
                 })
                 .collect()
         };
@@ -1050,6 +1061,14 @@ impl World {
                 obj.open = o.open;
                 obj.off = o.off && world.content.objects[obj.def].switch;
                 obj.growth = finite(o.growth.unwrap_or(1.0), 1.0).clamp(-1.0, 1.0);
+                let runs = world.content.objects[obj.def].runs;
+                obj.run = match o.run {
+                    Some(m) => runs.map(|full| finite(m, 0.0).clamp(0.0, full)),
+                    // Before v33 nothing ran on its own: washing left out on the line (open) is
+                    // dry by now, ready to take in.
+                    None if save.version < 33 && obj.open => runs.map(|_| 0.0),
+                    None => None,
+                };
                 used.extend(keep);
                 object_ids.insert(i as u32, id);
             }

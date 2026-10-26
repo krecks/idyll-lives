@@ -213,6 +213,24 @@ pub struct Interaction {
     /// same object, by id; index into its `interactions`): trick shots at the pool table, a
     /// chess problem. Without one the order is refused.
     pub alone: Option<usize>,
+    /// Puts a load in the object, which then runs on its own (content `loads`, on an object that
+    /// `runs`: the washing put in the washer): only while it's empty, and it runs once the use
+    /// ends (see `machines.rs`).
+    pub loads: bool,
+    /// Takes the load out once the run is done (content `unloads`): only then, and it's empty
+    /// again as the use ends.
+    pub unloads: bool,
+    /// Leaves the household a load to work on next (content `makes`: the wet washing taken out
+    /// of the washer, to dry; the dry washing off the line, to fold), as the use ends; then on
+    /// with it to the nearest thing that works on it (`machines::carry_on`).
+    pub makes: Option<WorkOn>,
+    /// Carried in the arms on the way to it (content `brings`, an item; index into
+    /// `Content::items`): the basket of wet washing to the dryer. Only shown (the snapshot's
+    /// `held`): nothing is put down.
+    pub brings: Option<usize>,
+    /// Held in the hands while it's done (content `holds`, an item): a shirt being folded.
+    /// Only shown, as `brings`.
+    pub holds: Option<usize>,
 }
 
 /// Something a use works on (content `workOn`), which must be there for it to start.
@@ -224,12 +242,15 @@ pub enum WorkOn {
     /// A load of the household's dirty washing (`Household::laundry`, content `laundry`): the
     /// use washes it, and it waits to be dried (`Washed`).
     Laundry,
-    /// A load the household washed (`Household::washed`): the use dries and folds it.
+    /// A load the household washed, wet (`Household::laundry[1]`): the use dries it (a dryer, a
+    /// washing line).
     Washed,
+    /// A load dried (`Household::laundry[2]`): the use folds it.
+    Dried,
 }
 
 impl WorkOn {
-    pub const ALL: [WorkOn; 3] = [WorkOn::Dishes, WorkOn::Laundry, WorkOn::Washed];
+    pub const ALL: [WorkOn; 4] = [WorkOn::Dishes, WorkOn::Laundry, WorkOn::Washed, WorkOn::Dried];
 
     /// Its bit in a mask of what there is to work on (`world::work_waiting`).
     pub fn bit(self) -> u8 {
@@ -242,6 +263,18 @@ impl WorkOn {
             WorkOn::Dishes => "there are no dishes to wash",
             WorkOn::Laundry => "there's no washing to do",
             WorkOn::Washed => "there's no washed laundry to dry",
+            WorkOn::Dried => "there's no dry laundry to fold",
+        }
+    }
+
+    /// Which of a household's loads of washing it is (`Household::laundry`): dirty, washed,
+    /// dried. None for the dishes.
+    pub fn load(self) -> Option<usize> {
+        match self {
+            WorkOn::Dishes => None,
+            WorkOn::Laundry => Some(0),
+            WorkOn::Washed => Some(1),
+            WorkOn::Dried => Some(2),
         }
     }
 }
@@ -258,7 +291,8 @@ pub fn in_hours(window: [f32; 2], hour: f32) -> bool {
 pub struct LaundryRules {
     /// Loads of washing each resident at home makes a day.
     pub per_day: f32,
-    /// Most loads that pile up (dirty, and washed waiting to dry, each).
+    /// Most loads that pile up (dirty, washed waiting to dry, and dried waiting to be folded,
+    /// each).
     pub most: f32,
 }
 
@@ -396,6 +430,10 @@ pub struct ObjectDef {
     /// file), picked by interactions that leave it "picked", then fallow, planted again and
     /// growing (see `ObjectInstance::growth`).
     pub grows: Option<Growth>,
+    /// A machine that runs on its own (content `runs`: `{"minutes": 60}`): loaded by a use that
+    /// `loads`, it runs this many game minutes with nobody at it, then waits, done, for a use
+    /// that `unloads` it (see `machines.rs`, `ObjectInstance::run`).
+    pub runs: Option<f32>,
     /// Things on a wall: it belongs over a window (content `overWindow`: curtains, blinds), so
     /// its back may be on a window as well as on a plain wall. Everything else on a wall needs
     /// plain wall behind it.
@@ -2307,6 +2345,9 @@ struct ObjectRaw {
     /// A crop that grows (see `ObjectDef::grows`).
     #[serde(default)]
     grows: Option<GrowsRaw>,
+    /// A machine that runs on its own (see `ObjectDef::runs`).
+    #[serde(default)]
+    runs: Option<RunsRaw>,
     #[serde(default, rename = "overWindow")]
     over_window: bool,
     #[serde(default, rename = "fillsWall")]
@@ -2346,6 +2387,12 @@ struct GrowsRaw {
     days: f32,
     #[serde(default = "half_a_day")]
     fallow: f32,
+}
+
+/// An object's `runs`: `{"minutes": 60}` (and, for the renderer, the `sound` it makes running).
+#[derive(Deserialize)]
+struct RunsRaw {
+    minutes: f32,
 }
 
 fn half_a_day() -> f32 {
@@ -2493,6 +2540,21 @@ struct InteractionRaw {
     /// The use done instead with nobody to play (see `Interaction::alone`).
     #[serde(default)]
     alone: Option<String>,
+    /// Loads the machine (see `Interaction::loads`).
+    #[serde(default)]
+    loads: bool,
+    /// Empties the machine once it's done (see `Interaction::unloads`).
+    #[serde(default)]
+    unloads: bool,
+    /// A load it leaves to work on next (see `Interaction::makes`).
+    #[serde(default)]
+    makes: Option<WorkOn>,
+    /// An item carried to it (see `Interaction::brings`).
+    #[serde(default)]
+    brings: Option<String>,
+    /// An item held while it's done (see `Interaction::holds`).
+    #[serde(default)]
+    holds: Option<String>,
 }
 
 /// Content `laundry` (see `LaundryRules`).
@@ -2972,6 +3034,12 @@ impl Content {
                 if it.carried && (it.care.values().all(|&g| g <= 0.0) || !obj.interactions.iter().any(|i| i.baby)) {
                     return Err(Error::new(format!("{ctx}: `carried` is for a baby's care (`care`) where a baby has a place (`baby`)")));
                 }
+                // An item only shown in the arms (`brings`, `holds`).
+                let shown_item = |id: &Option<String>, key: &str| -> Result<Option<usize>, Error> {
+                    id.as_ref()
+                        .map(|id| items.iter().position(|i| &i.id == id).ok_or_else(|| Error::new(format!("{ctx}: {key}: unknown item '{id}'"))))
+                        .transpose()
+                };
                 let after = match it.after.as_deref() {
                     Some(t) => 1 << lookup(&tag_index, t, &ctx, "tag")?,
                     None => 0,
@@ -3096,6 +3164,11 @@ impl Content {
                     work_on: it.work_on,
                     partner: it.partner,
                     alone: None,
+                    loads: it.loads,
+                    unloads: it.unloads,
+                    makes: it.makes,
+                    brings: shown_item(&it.brings, "brings")?,
+                    holds: shown_item(&it.holds, "holds")?,
                 });
                 // A game for two: at an object with two places, one each, used there as any use.
                 if it.partner
@@ -3128,8 +3201,21 @@ impl Content {
                 {
                     return Err(Error::new(format!("{ctx}: `hours` is [from, to], two different hours of the day (0 to 24)")));
                 }
-                if matches!(it.work_on, Some(WorkOn::Laundry | WorkOn::Washed)) && raw.laundry.is_none() {
+                if matches!(it.work_on, Some(WorkOn::Laundry | WorkOn::Washed | WorkOn::Dried)) && raw.laundry.is_none() {
                     return Err(Error::new(format!("{ctx}: `workOn` laundry needs content `laundry` (how the washing piles up)")));
+                }
+                match it.makes {
+                    Some(WorkOn::Dishes) => return Err(Error::new(format!("{ctx}: `makes` is a load of washing: laundry, washed or dried"))),
+                    Some(_) if raw.laundry.is_none() => {
+                        return Err(Error::new(format!("{ctx}: `makes` needs content `laundry` (how the washing piles up)")));
+                    }
+                    _ => {}
+                }
+                if (it.loads || it.unloads) && obj.runs.is_none() {
+                    return Err(Error::new(format!("{ctx}: `loads` and `unloads` are a machine's: give the object `runs`")));
+                }
+                if it.loads && it.unloads {
+                    return Err(Error::new(format!("{ctx}: a use `loads` the machine or `unloads` it, not both")));
                 }
                 if it.close_after
                     && (it.leaves != Some(OpenState::Open)
@@ -3359,6 +3445,11 @@ impl Content {
                 stations,
                 stores: obj.stores,
                 group: obj.group.clone().unwrap_or_default(),
+                runs: match &obj.runs {
+                    Some(r) if r.minutes > 0.0 && r.minutes.is_finite() => Some(r.minutes),
+                    Some(_) => return Err(Error::new(format!("object '{}': `runs` needs minutes > 0", obj.id))),
+                    None => None,
+                },
                 grows: match &obj.grows {
                     Some(g) if g.days > 0.0 && g.fallow >= 0.0 => Some(Growth { days: g.days, fallow_days: g.fallow }),
                     Some(_) => {

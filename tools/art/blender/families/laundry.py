@@ -1,12 +1,13 @@
 # The laundry: the washing machine (`model.laundryWasher`), the tumble dryer (`model.laundryDryer`), the towel
 # rail (`model.towelRail`), the towel ladder (`model.towelLadder`), the laundry basket (`model.laundryBasket`)
-# and the bath mat (`model.bathMat`). Notes: laundry.md.
+# and the bath mat (`model.bathMat`); and what residents carry doing the laundry (content `items`): the basket of
+# washing (`item.washingBasket`) and a piece of washing held up to fold (`item.washingPiece`). Notes: laundry.md.
 #
 # The washer and the dryer stand against the wall where the game places them, built in place (`F`, game
 # axes). Each has two moving parts: the round door, hinged on its left, which swings open while a resident
-# loads or empties it (`door_open`, held 2.5 s), and the drum's face behind the glass, which on the washer
-# turns once the door has shut, for the rest of the wash (`drum_spin`, `every` its turn); the dryer's stays
-# still while its washing is taken out to fold. The rail hangs on the wall at its real height; the rest are still.
+# loads or empties it (`door_open`, held 2.5 s), and the drum's face behind the glass, which turns while the
+# machine runs on its own after it's loaded (`drum_spin`, the `running` loop: content `runs`). The rail hangs on
+# the wall at its real height; the rest are still.
 #
 # Run:  cargo art laundry [--only laundryWasher] [--preview]
 import math
@@ -191,8 +192,8 @@ def _machine(dryer):
     door = _door(F, ring)
     G.settle(centre=False)
     G.swing(door, 'door_open', 110, seconds=1.0)
-    if not dryer:
-        G.spin(drum, 'drum_spin', turns=1, seconds=1.2, axis='Y')
+    # (The dryer tumbles slower than the washer turns.)
+    G.spin(drum, 'drum_spin', turns=1, seconds=1.8 if dryer else 1.2, axis='Y')
     return G.meshes()
 
 
@@ -315,6 +316,48 @@ def laundryBasket():
     return G.meshes()
 
 
+# --- what's carried: the basket of washing, a piece held up to fold ------------------------------------------
+def washingBasket():
+    """An oval wicker basket carried in both arms, heaped with washing: a tub widening to its rim, woven bands round
+    it, a hand hole at each end and the washing crumpled above the rim. Its base is where it rests on the palms."""
+    F = G.GameFrame()
+    with G.new_parts():
+        G.revolve('basket', [(0, 0), (0.165, 0), (0.2, 0.17), (0.19, 0.175), (0.158, 0.012), (0, 0.012)],
+                  at=F.at(0, 0, 0), material=M.wicker_plain, segments=24, scale=(1, 0.7, 1))
+        for k, (y, r) in enumerate(((0.05, 0.177), (0.1, 0.187), (0.15, 0.197))):
+            loop = [(r * math.cos(math.tau * i / 24), y, 0.7 * r * math.sin(math.tau * i / 24)) for i in range(24)]
+            F.sweep(f'band{k}', loop, 0.004, M.wicker_band, verts=4, closed=True)
+        rim = [(0.2 * math.cos(math.tau * i / 28), 0.172, 0.7 * 0.2 * math.sin(math.tau * i / 28)) for i in range(28)]
+        F.sweep('rim', rim, 0.01, M.wicker_band, verts=5, closed=True)
+        for s in (-1, 1):
+            # the hand hole: a dark slot under the rim at each end
+            F.box(f'hole{s}', 0.004, 0.026, 0.07, (s * 0.193, 0.135, 0), M.dark, rot=(0, 0, s * 9))
+        # the washing heaped in it
+        G.sphere('heap', 0.17, at=F.at(0, 0.17, 0), material=M.wash_c, scale=(1, 0.66, 0.42), segments=14, rings=7)
+        for k, (m, x, z, r) in enumerate(((M.wash_a, -0.07, 0.03, 0.08), (M.wash_b, 0.08, -0.02, 0.07),
+                                          (M.wash_a, 0.03, 0.05, 0.06), (M.wash_b, -0.1, -0.05, 0.05))):
+            _lump(F, f'wash{k}', x, 0.2 + 0.012 * k, z, r, m, scale=(1.1, 0.8, 0.5), seed=11 + k, turn=40 * k)
+    G.join_all('washingBasket')
+    G.settle(centre=False)
+    return G.meshes()
+
+
+def washingPiece():
+    """A towel being folded in the hands: its near half lying across the palms, the far half lifted up and over
+    towards them, a woven band across its end. Its base is where it rests on the palms."""
+    F = G.GameFrame()
+    w, t = 0.4, 0.01
+    # the towel's middle, from the near edge back under the palms and up round the fold to the lifted end
+    pts = [(0, t / 2, 0.12), (0, t / 2, -0.06), (0, 0.012, -0.1), (0, 0.04, -0.125), (0, 0.085, -0.12),
+           (0, 0.13, -0.085), (0, 0.16, -0.035)]
+    with G.new_parts():
+        F.sweep('towel', pts, None, M.towel, profile=G.rounded_rect(w, t, t * 0.45, corner=2), up=(1, 0, 0), angle=60)
+        F.box('hem', w + 0.002, t + 0.002, 0.03, (0, t / 2, 0.095), M.towel_hem)
+    G.join_all('washingPiece')
+    G.settle(centre=False)
+    return G.meshes()
+
+
 # --- the bath mat: a soft rounded mat with a raised pile -----------------------------------------------------
 def bathMat():
     with G.new_parts() as parts:
@@ -332,19 +375,17 @@ def bathMat():
     return G.meshes()
 
 
-# The washer's door opens for the washing to go in and shuts (`hold`; `door_open` takes 1.0 s each way), and
-# only then its drum goes round, a turn each 1.2 s (`every` a hair under it, so no pause between turns) till the
-# wash ends. Folding at the dryer opens its
-# door to take the washing out: the drum stays still.
-WASH = {'uses': {'laundry': ['door_open', {'clip': 'drum_spin', 'delay': 3.5, 'every': 1.1}]}, 'hold': 2.5}
-FOLD = {'uses': {'laundry': 'door_open'}, 'hold': 2.5}
+# Loading a machine and taking the washing out open its door, which shuts again (`hold`; `door_open` takes 1.0 s
+# each way); once loaded it runs on its own (content `runs`), the drum going round, a turn each 1.2 s on the
+# washer and 1.8 s on the dryer, till it's done (`running`, from rest to rest).
+MACHINE = {'uses': {'laundry': 'door_open', 'unload': 'door_open'}, 'hold': 2.5, 'running': 'drum_spin'}
 
 FAMILY = G.Family(
     'laundry', M,
     [G.Model('laundryWasher', laundryWasher, size=(0.6, 0.98, 0.65), key='model.laundryWasher', centre=(0, -0.105),
-             motions=WASH, paint=[('body', 'Body'), ('door', 'Door'), ('panel', 'Panel')]),
+             motions=MACHINE, paint=[('body', 'Body'), ('door', 'Door'), ('panel', 'Panel')]),
      G.Model('laundryDryer', laundryDryer, size=(0.6, 1.08, 0.65), key='model.laundryDryer', centre=(0, -0.105),
-             motions=FOLD, paint=[('body', 'Body'), ('door_dryer', 'Door'), ('panel', 'Panel')]),
+             motions=MACHINE, paint=[('body', 'Body'), ('door_dryer', 'Door'), ('panel', 'Panel')]),
      G.Model('towelRail', towelRail, size=(0.73, 0.595, 0.098), key='model.towelRail', centre=(0, -0.381), floor=False,
              paint=[('chrome', 'Rail'), ('towel', 'Towels'), ('towel2', 'Hand towel')]),
      G.Model('towelLadder', towelLadder, size=(0.52, 1.707, 0.359), key='model.towelLadder', centre=(0, -0.25),
@@ -352,11 +393,14 @@ FAMILY = G.Family(
      G.Model('laundryBasket', laundryBasket, size=(0.54, 0.39, 0.421), key='model.laundryBasket', centre=(0, -0.2),
              paint=[('wicker', 'Basket'), ('wicker_rim', 'Rim & weave')]),
      G.Model('bathMat', bathMat, size=(0.76, 0.025, 0.5), key='model.bathMat',
-             paint=[('mat', 'Mat'), ('mat_pile', 'Pile')])],
+             paint=[('mat', 'Mat'), ('mat_pile', 'Pile')]),
+     G.Model('washingBasket', washingBasket, size=(0.42, 0.284, 0.3), key='item.washingBasket'),
+     G.Model('washingPiece', washingPiece, size=(0.402, 0.165, 0.25), key='item.washingPiece', centre=(0, -0.005))],
     comment='Blender-built laundry models (tools/art/blender/families/laundry.py). Listed in the base '
             'manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw call '
             'per finish group. The washer and the dryer open their door (`door_open`) while a resident loads '
-            'or empties them, and the washer turns its drum (`drum_spin`) once the door has shut.',
+            'or empties them, and turn their drum (`drum_spin`) while they run on their own (`running`). The '
+            'basket of washing and the piece held up to fold are carried (content `items`).',
 )
 
 if __name__ == '__main__':

@@ -338,8 +338,25 @@
       "price": 30,
       "category": "bathroom",
       "group": "laundry",
-      "description": "A wicker basket of clean washing waiting to be folded.",
-      "interactions": []
+      "description": "A wicker basket for the clean washing: the dry laundry is folded here.",
+      "interactions": [
+        {
+          "id": "fold",
+          "label": "Fold the laundry",
+          "workOn": "dried",
+          "holds": "washingPiece",
+          "anim": "clean",
+          "minutes": 15,
+          "effects": {
+            "comfort": 0.05,
+            "fun": 0.03
+          },
+          "tags": [
+            "chores",
+            "cleaning"
+          ]
+        }
+      ]
     }
   ]
 }

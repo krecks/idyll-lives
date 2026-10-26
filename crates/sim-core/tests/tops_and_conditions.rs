@@ -29,7 +29,7 @@ const CONTENT: &str = r#"{
       {"id":"sink","name":"Sink","price":200,
        "interactions":[{"id":"washUp","label":"Wash the dishes","minutes":15,"workOn":"dishes","autonomous":false,"effects":{"comfort":0.06},"tags":["chores"]}]},
       {"id":"washer","name":"Washing machine","price":500,
-       "interactions":[{"id":"laundry","label":"Do the laundry","minutes":30,"workOn":"laundry","effects":{"comfort":0.1},"tags":["chores"]}]},
+       "interactions":[{"id":"laundry","label":"Do the laundry","minutes":30,"workOn":"laundry","makes":"washed","effects":{"comfort":0.1},"tags":["chores"]}]},
       {"id":"dryer","name":"Tumble dryer","price":400,
        "interactions":[{"id":"laundry","label":"Fold the laundry","minutes":20,"workOn":"washed","effects":{"comfort":0.1},"tags":["chores"]}]}],
     "items":[{"id":"plateDirty","label":"Dirty plate","dirty":true}],
@@ -298,7 +298,7 @@ fn washing_up_needs_dishes_to_wash() {
 #[test]
 fn the_laundry_is_washed_then_dried_and_piles_up_again() {
     let mut w = world();
-    assert_eq!(w.households[0].laundry, [1.0, 1.0], "a load of each to start with");
+    assert_eq!(w.households[0].laundry, [1.0, 1.0, 0.0], "a load dirty and one washed to start with");
     // Fold the washed load...
     order(&mut w, "dryer", 0).unwrap();
     assert!(until_using(&mut w, "dryer", 30.0));
@@ -313,9 +313,13 @@ fn the_laundry_is_washed_then_dried_and_piles_up_again() {
     order(&mut w, "washer", 0).unwrap();
     assert!(until_using(&mut w, "washer", 30.0));
     w.tick_once();
-    let [dirty, washed] = w.households[0].laundry;
-    assert!(dirty < 0.1 && washed == 1.0, "washed: {dirty}, {washed}");
-    for _ in 0..(35.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    assert!(w.households[0].laundry[0] < 0.1, "taken up to wash: {:?}", w.households[0].laundry);
+    // Washed once the use is done (content `makes`), and carried on to the dryer.
+    assert!(until_using(&mut w, "dryer", 35.0), "on to the dryer with it");
+    w.tick_once();
+    let [dirty, washed, _] = w.households[0].laundry;
+    assert!(dirty < 0.1 && washed == 0.0, "washed and taken up to dry: {dirty}, {washed}");
+    for _ in 0..(25.0 / sim_core::MINUTES_PER_TICK) as u32 {
         w.tick_once();
     }
     let err = order(&mut w, "washer", 0).unwrap_err();
@@ -334,14 +338,14 @@ fn the_laundry_is_washed_then_dried_and_piles_up_again() {
     old["version"] = 29.into();
     old["households"][0].as_object_mut().unwrap().remove("laundry");
     let loaded = World::from_save_json(CONTENT, &old.to_string()).unwrap();
-    assert_eq!(loaded.households[0].laundry, [1.0, 1.0]);
+    assert_eq!(loaded.households[0].laundry, [1.0, 1.0, 0.0]);
 }
 
 #[test]
 fn free_will_does_no_chore_with_nothing_to_work_on() {
     let mut w = world();
     w.autonomy = true;
-    w.households[0].laundry = [0.0, 0.0];
+    w.households[0].laundry = [0.0, 0.0, 0.0];
     w.sims[0].needs[..3].copy_from_slice(&[1.0, 1.0, 0.3]);
     for _ in 0..(240.0 / sim_core::MINUTES_PER_TICK) as u32 {
         w.sims[0].needs[2] = w.sims[0].needs[2].min(0.3);
@@ -350,7 +354,7 @@ fn free_will_does_no_chore_with_nothing_to_work_on() {
         assert!(u.as_deref() != Some("washer") && u.as_deref() != Some("dryer"), "nothing to wash: {u:?}");
     }
     // With washing to do, she does it.
-    w.households[0].laundry = [2.0, 0.0];
+    w.households[0].laundry = [2.0, 0.0, 0.0];
     let mut washed = false;
     for _ in 0..(240.0 / sim_core::MINUTES_PER_TICK) as u32 {
         w.sims[0].needs[2] = w.sims[0].needs[2].min(0.3);
@@ -376,3 +380,4 @@ fn coffee_is_for_teens_and_up() {
     }
     assert!(coffees >= 20, "{coffees} coffees");
 }
+
