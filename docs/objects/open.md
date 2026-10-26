@@ -125,9 +125,9 @@ it left is here, with its id; §9 of the review says what each would take.
   face a thing, without steps (A-residents-07, A-residents-08). New behaviour, planned separately.
 - **A child can't reach the fruit it picks** (I-garden-11): the picked apple hangs at 1.84 m, the lemon at 1.62 m.
   The owner's decision (the review recommends low fruit, built with I-garden-12's crown).
-- **Feet slide at game speeds 4 and 5** (56–78 % of the way: 45 and 90 m/s, faster than any gait steps without
-  strobing); at speed 3 the run (`runAlong`) keeps grown-ups' and teens' feet on the ground, children slide 11–14 %
-  (A-residents-03, G-25). The clip check's baseline (`tools/characters/clip-baseline.json`) is empty.
+- **Feet slide at game speeds 4 and 5** (48–81 % of the way: 45 and 90 m/s, faster than any gait steps without
+  strobing; A-residents-03, G-25): won't fix. The clip check's baseline (`tools/characters/clip-baseline.json`) is
+  empty.
 
 ### Rendering
 - **The town map's backdrop** blocks the world like the old pie menu's did (left as a panel).
@@ -197,6 +197,11 @@ it left is here, with its id; §9 of the review says what each would take.
   chair is used (I-kids-01).
 - **Models:** the entry console's and the spritz station's mirrors on back boards (M-packs-01, M-packs-02); the party
   bar's back bar (M-packs-03); bathers' shins in the heart tub (A-packs-01); the power blender's blades (A-packs-02).
+
+### Fixed in 0.5.0
+- **Residents:** children's feet at game speed 3 (11–14 % slide, now none: the run's beat quickens on shorter legs,
+  `gait.ts`; A-residents-03 in part); getting out of bed before the lie has faded in (PR #31's held pose, 7 cm in a
+  frame, now none).
 
 ## Notes on the sim
 

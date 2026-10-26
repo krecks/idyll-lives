@@ -411,7 +411,7 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | walk | yes | 1.1 (1.1 m/s) | moving (played at the ground speed) |
 | jog | yes | 0.7 | running on the spot, treadmills, exercise |
 | jogAlong | yes | 0.7 (2.5 m/s) | moving fast: the jog's pose given a stride, the hips 6 cm lower (the knees bent through the stance), played at the ground speed when the walk would need more than 3× its own pace (`GAIT_MAX_RATE`); back to walking below 0.8 of that (`JOG_BACK`) |
-| runAlong | yes | 0.6 (5.8 m/s) | moving faster still (game speed 3 and up, children from 2): a run with a 3.5 m stride, each foot down a sixth of the time, played at the ground speed when the jog would need more than 3×, up to 4× (`RUN_MAX_RATE`); back to the jog below 0.8 of the switch |
+| runAlong | yes | 0.6 (5.8 m/s) | moving faster still (game speed 3 and up, children from 2): a run with a 3.5 m stride, each foot down a sixth of the time, played at the ground speed when the jog would need more than 3×, up to 4× (`RUN_MAX_RATE`) on a grown-up's legs and quicker on shorter ones, as the square root of their length (`gait.ts` `runMaxRate`: 5.3–5.4× on a child's, so no stage's feet slide at speed 3); back to the jog below 0.8 of the switch |
 | sit | yes | 1.67 | seated |
 | sitTalk | yes | 2.93 | seated in a conversation |
 | sitDown | no | 1.33 | sitting down, and onto the edge of a bed before lying down |
