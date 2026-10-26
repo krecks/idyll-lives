@@ -70,6 +70,12 @@ export interface SnapshotLayout {
     carry?: number;
     /** How far through what they do at `object` they are, 0..1 (a use's minutes, a recipe step's), while at it; else -1 (missing in older layouts). */
     progress?: number;
+    /**
+     * 1 while the room they're in is kept shut on their account (a bathroom they're in, the bedroom
+     * they try for a baby in; sim-core `privacy.rs`), else 0: its doors stay shut to anyone but
+     * whoever goes through them (missing in older layouts).
+     */
+    shuts?: number;
   };
   /** Animation tags from content (`animations` in base.json), named by `sim.action`. */
   actions: string[];

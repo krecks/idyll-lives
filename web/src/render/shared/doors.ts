@@ -1,7 +1,9 @@
 /**
  * Doors and gates that swing for residents going through them, engine-neutral (the renderers
- * turn the leaves): whether a resident's way crosses a doorway.
+ * turn the leaves): whether a resident's way crosses a doorway, and which rooms' doors can be
+ * kept shut.
  */
+import type { ObjectDef, RoomKindDef } from '../../content/content';
 
 /**
  * Seconds a door or a gate takes to swing open or shut at speed 1 (quicker as the game runs
@@ -57,4 +59,15 @@ export function goingThrough(movers: readonly number[], axis: 'h' | 'v', centre:
 function crosses(sa: number, sn: number, ea: number, en: number): number {
   if (sn * en > 0 || sn === en) return 0;
   return Math.abs(sa + ((ea - sa) * sn) / (sn - en)) <= 0.5 ? Math.sign(en - sn) : 0;
+}
+
+/**
+ * Object kinds whose room the simulation may keep shut (sim-core `privacy.rs`): what makes a room
+ * of a private kind (a toilet's `bathroom` tag: the bathroom), and a use done behind a shut door
+ * (a double bed's *Try for a baby*). Their rooms' doors swing (`HouseLooks.shuts`).
+ */
+export function shutDefs(content: { readonly objectList: readonly ObjectDef[]; readonly roomKinds: readonly RoomKindDef[] }): Set<string> {
+  const tags = new Set(content.roomKinds.filter((k) => k.private).flatMap((k) => k.tags));
+  const shuts = (def: ObjectDef) => def.interactions.some((i) => i.private || i.conceive || (i.tags ?? []).some((t) => tags.has(t)));
+  return new Set(content.objectList.filter(shuts).map((d) => d.id));
 }

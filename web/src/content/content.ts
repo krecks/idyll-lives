@@ -96,6 +96,10 @@ export interface InteractionDef {
   partner?: boolean;
   /** With `partner`: the use (an id of the same object's) the player's order does instead with nobody free to play. */
   alone?: string;
+  /** Done behind a shut door: the room it's done in is kept shut while it lasts (sim-core `privacy.rs`). */
+  private?: boolean;
+  /** Where partners try for a baby (a double bed's): started only by the social, never from the object's menu. */
+  conceive?: boolean;
   /**
    * What it sounds like while it lasts: a world sound by key (`audio/world.ts` `LOOPS`: `chop` for
    * a cheese board), or `none`; absent: by the object's `sounds`, else by `anim`. Not for a
@@ -234,6 +238,8 @@ export interface ObjectDef {
   provides?: string[];
   /** Can only be placed outdoors (trees, flower beds, ponds). */
   outdoors?: boolean;
+  /** The household's own (a wardrobe, a dresser): visitors don't use it (sim-core `world::guest_may`). */
+  private?: boolean;
   /** A flight of stairs to the storey above (sim-core `storeys.rs`). */
   stairs?: boolean;
   /**
@@ -398,6 +404,8 @@ export interface RoomKindDef {
   exclusive?: boolean;
   /** A room no kind's tags are offered in is of this kind if people pass through it (two doors or more, or stairs): a hallway. */
   passage?: boolean;
+  /** Kept shut while someone is in it (a bathroom): others wait outside (sim-core `privacy.rs`). */
+  private?: boolean;
 }
 
 /** A roof style (Build mode's Roof tool): the shape and, for pitched roofs, the pitch in degrees. */

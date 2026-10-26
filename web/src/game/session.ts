@@ -1181,6 +1181,7 @@ export async function startSession(
     const stage = game.sims.find((s) => s.id === game.selected)?.stage;
     // Paid interactions show their price; the pie menu greys them out when funds run short.
     // Dining at a table only at a chair pulled up to one; folding down only what's folded up.
+    // (Trying for a baby is asked of a partner, not offered by the bed.)
     const atTable = def.interactions.some((it) => it.needsTable) && buildBuy.atTable(objectId);
     const state = placement.open ? 'open' : 'closed';
     // A crop is harvested only ripe (growth stage 2).
@@ -1196,7 +1197,7 @@ export async function startSession(
     }
     const supplied = (requires: string[] | undefined) => !requires?.length || requires.every((r) => provided.has(r));
     const items: { label: string; index: number; disabled?: boolean; cost?: number }[] = def.interactions.flatMap((it, index) =>
-      (it.needsTable && !atTable) || !supplied(it.requires) || !offered(it.when)
+      (it.needsTable && !atTable) || !supplied(it.requires) || !offered(it.when) || it.conceive
         ? []
         : [{ label: it.label, index, ...(it.cost ? { cost: it.cost } : {}), ...(content.mayUse(def, it, stage) ? {} : { disabled: true }) }],
     );

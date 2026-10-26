@@ -64,7 +64,7 @@ import { benchDiag } from '../../debug/benchFlags';
 import { LOOK } from '../look';
 import type { RenderQuality } from '../quality';
 import { GameCameraRig } from '../shared/cameraRig';
-import { DOOR_SWING, ease, goingThrough } from '../shared/doors';
+import { DOOR_SWING, ease, goingThrough, shutDefs } from '../shared/doors';
 import { createLighting, lightingAt, type RGB } from '../shared/environment';
 import { GAME_RATE } from '../shared/gameSpeed';
 import { Geo } from '../shared/geometry';
@@ -356,6 +356,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private readonly darkRooms = new Set<number>();
   private readonly awakeRooms = new Set<number>();
   private readonly occupiedRooms = new Set<number>();
+  /** Rooms the simulation keeps shut this frame (someone in the bathroom: snapshot `shuts`). */
+  private readonly shutRooms = new Set<number>();
+  /** Object kinds that make a room one that can be kept shut (`shutDefs`). */
+  private shutDefs: ReadonlySet<string> = new Set();
   private readonly movers: number[] = [];
   /** Per neighbour's house (`Street.houses`): someone is up in there (scratch). */
   private readonly neighboursUp: boolean[] = [];
@@ -511,7 +515,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // The viewed lot's house and the street round it (`house.ts`, `street.ts`).
     this.house = new HouseBuilder(this.app);
     const c = this.deps.content;
-    this.house.setLooks({ coverings: c.wallCoverings, floors: c.floorCoverings, doors: c.doorStyles, windows: c.windowStyles, roofs: c.roofStyles, roofColors: c.roofColors });
+    this.shutDefs = shutDefs(c);
+    this.house.setLooks({ coverings: c.wallCoverings, floors: c.floorCoverings, doors: c.doorStyles, windows: c.windowStyles, roofs: c.roofStyles, roofColors: c.roofColors, shuts: this.shutDefs });
     // Public places seen from another lot show their things in the open (as the overview does).
     this.street = new Street(this.app, this.root, this.deps.assets, this.house, {
       lived: true,
@@ -889,7 +894,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.lotParts.key,
       world.plots.map((p) => [p.house, p.roof]),
       world.households.find((h) => h.player)?.plot,
-      houseObjectKey(world, view, (def) => !!this.deps.content.object(def)?.stairs),
+      houseObjectKey(world, view, (def) => !!this.deps.content.object(def)?.stairs, this.shutDefs),
     ]);
   }
 
@@ -1301,6 +1306,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.darkRooms.clear();
     this.awakeRooms.clear();
     this.occupiedRooms.clear();
+    this.shutRooms.clear();
   }
 
   /** Takes down the lot layer (it's built again for the next lot). */
@@ -1384,10 +1390,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const dark = this.darkRooms;
     const awake = this.awakeRooms;
     const occupied = this.occupiedRooms;
+    const shut = this.shutRooms;
     const movers = this.movers;
     dark.clear();
     awake.clear();
     occupied.clear();
+    shut.clear();
     movers.length = 0;
     const world = this.lastWorld;
     if (!world) return;
@@ -1428,6 +1436,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const room = x >= 0 && z >= 0 && x < W && z < world.depth ? world.rooms[z * W + x] : 0;
       if (room) {
         occupied.add(room);
+        // (An older layout without `shuts`: a bathroom with anyone in it, as before.)
+        if (k.shuts === undefined || curr[o + k.shuts] !== 0) shut.add(room);
         if (asleep) dark.add(room);
         else if (!baby) awake.add(room);
       }
@@ -1454,9 +1464,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
 
   /**
-   * Front doors and gates stand shut, and a bathroom's door while someone is in there; each opens
-   * only for someone going through it (`goingThrough`: not for someone walking past), and swings
-   * back once they're through. `rate`: how fast the game runs (`GAME_RATE`).
+   * Front doors and gates stand shut, and the doors of a room the simulation keeps shut (someone
+   * in the bathroom: nobody else goes in, they wait outside); each opens only for someone going
+   * through it (`goingThrough`: not for someone walking past, nor someone waiting outside), and
+   * swings back once they're through. `rate`: how fast the game runs (`GAME_RATE`).
    */
   private swingDoors(rate: number): void {
     if (!this.doors.length && !this.gates.length) return;
@@ -1478,7 +1489,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const { leaf } = door;
       // (Both in lot rows: the storey is in the row.)
       const going = goingThrough(movers, leaf.axis, leaf.centre, door.open === 1) !== 0;
-      const engaged = leaf.bath !== 0 && this.occupiedRooms.has(leaf.bath);
+      const engaged = leaf.shuts.some((r) => this.shutRooms.has(r));
       const target = going || !(leaf.front || engaged) ? 1 : 0;
       const open = door.open < 0 ? target : target > door.open ? Math.min(target, door.open + step) : Math.max(target, door.open - step);
       if (open === door.open) continue;
