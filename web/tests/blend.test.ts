@@ -1,7 +1,8 @@
 // Crossfade continuity: the residents' blending (`residents.ts` `start`, `choose`, the per-frame blend; `pose.ts`
 // `blendInto`) driven through a recording `ResidentView`, with six Sims scripted to churn — a chair sat on and
 // stood up from, a walk cut short by a dance, a two-handed load carried and then eaten, a two-handed load swapped
-// for a one-handed one (now and then, and every 0.1 s), in and out of bed. Every frame, every bone's rotation and
+// for a one-handed one (now and then, and every 0.1 s), in and out of bed (and out of it before the lie has faded in).
+// Every frame, every bone's rotation and
 // the pelvis's position are read out of the pose texture (the skinning matrices, what the viewer sees) and compared
 // with the frame before: a crossfade must move the body smoothly, so a single frame turning a bone further than a
 // real fade does, or moving the body further than a Sim can, is a pop, not motion. `bun test`.
@@ -13,7 +14,8 @@
 // which is the fade itself: the widest handoff the clips have is 175° over a quarter second. Later: an upper-layer
 // fade cut short by the next swap dropped the clip it was fading from, 61° of a hand; and a rise off a seat cut
 // short by a walk put the body on the tile in one frame, 43 cm; and, hidden before it had caught up, came back into
-// view on its way off the seat it had left, 62 cm from its place.)
+// view on its way off the seat it had left, 62 cm from its place. Then: getting out of bed before the lie had faded in
+// moved the held pose to the lie's own root, 7 cm in a frame, and 1 cm more turned the way they get up to.)
 import { afterAll, describe, expect, test } from 'bun:test';
 import { readFileSync, existsSync } from 'node:fs';
 
@@ -50,6 +52,7 @@ describe('residents crossfade continuity', async () => {
   const { Pose, simFields } = await import('../src/core/snapshot');
   const { slotPlace } = await import('../src/render/shared/objectMotion');
   const rig = await import('../src/render/shared/characters/rig');
+  const { LYING } = await import('../src/render/shared/characters/actions');
   type View = import('../src/render/shared/characters/view').ResidentView<
     object,
     object,
@@ -143,8 +146,9 @@ describe('residents crossfade continuity', async () => {
     /** The activities in a cycle, each `seconds` long (a fade is 0.25–0.3 s, so these interrupt each other). */
     script: Step[];
     /** 'cycle': round the script; 'carry': standing with a load, then sat at the counter eating it (for good);
-     *  'swap': a two-handed load for a one-handed one, over and over. */
-    kind: 'cycle' | 'carry' | 'swap';
+     *  'swap': a two-handed load for a one-handed one, over and over; 'bed': round the script, lying at the bed's
+     *  slot (`x`, `z`) and standing on the tile in front of it, as sim-core places a sleeper. */
+    kind: 'cycle' | 'carry' | 'swap' | 'bed';
     object: number;
     x: number;
     z: number;
@@ -195,7 +199,17 @@ describe('residents crossfade continuity', async () => {
       object: bed.id,
       ...onBed,
     },
+    // Lying down long enough to be lying (the sit on the edge done, the lie fading in), and up before the lie has
+    // faded in: the rise starts from a held pose that `choose`'s bed override reaches (`fromBed`).
+    {
+      kind: 'bed',
+      script: [{ seconds: 1.4, pose: P.Lie, tag: 'sleep' }, { seconds: 1.6 }],
+      object: bed.id,
+      ...onBed,
+    },
   ];
+  /** The actor whose rise from bed starts from a held pose. */
+  const RISER = actors.length - 1;
   // One Sim per actor, alike in everything but their name: the actors script the snapshot, not them.
   const sims = Array.from({ length: actors.length }, (_, i): SimInfo => ({
     id: i,
@@ -289,6 +303,10 @@ describe('residents crossfade continuity', async () => {
         // ever a jump — only the activity's. A walker's `object` is -1: it has no tile in front of anything.)
         const base = a.object >= 0 ? front(objects[a.object]) : a;
         [x, z] = [base.x, base.z + 0.5 * Math.sin(t * 1.3)];
+      } else if (a.kind === 'bed') {
+        const s = stepAt(a, t);
+        [pose, tag] = [s.pose ?? P.Stand, s.tag ?? ''];
+        [x, z] = pose === P.Lie ? [a.x, a.z] : [front(objects[a.object]).x, front(objects[a.object]).z];
       } else if (a.kind === 'carry') {
         // Standing with a load, then sat at the counter eating it.
         const sat = t > a.script[0].seconds;
@@ -302,7 +320,8 @@ describe('residents crossfade continuity', async () => {
       snap[o + k.id] = i;
       snap[o + k.x] = x;
       snap[o + k.z] = z;
-      snap[o + k.yaw] = 0;
+      // (Out of bed turned to the side, as sim-core turns a sleeper getting up.)
+      snap[o + k.yaw] = a.kind === 'bed' && pose === P.Stand ? 1.2 : 0;
       snap[o + k.pose] = pose;
       snap[o + k.moving] = moving;
       snap[o + k.social] = 0;
@@ -381,6 +400,11 @@ describe('residents crossfade continuity', async () => {
       const HIDDEN = [2.37, 3] as const;
       let wasHidden = false;
       let reappeared = NaN;
+      // The bed's riser (its rig: `Characters` keeps them to itself): the clip it played the frame before, and how far
+      // (cm) its pelvis moved on each frame a rise from bed started, and whether that was from a held pose.
+      const riser = (characters as unknown as { sims: { cur: { key: string }; prev: { frozen: unknown; key: string } }[] }).sims[RISER];
+      let riserKey = '';
+      const rises: { cm: number; held: boolean }[] = [];
       // The worst turns seen, for the failure's message.
       const worst: { deg: number; sim: number; bone: string; at: number }[] = [];
       const note = (deg: number, sim: number, bone: string, at: number) => {
@@ -436,9 +460,11 @@ describe('residents crossfade continuity', async () => {
             }
             const cm = Math.hypot(hip[0] - hips[i][0], hip[1] - hips[i][1], hip[2] - hips[i][2]) * 100;
             if (cm > farthest.cm) farthest = { cm, sim: i, at: t };
+            if (i === RISER && riser.cur.key === 'standUp' && riserKey !== 'standUp' && LYING.has(riser.prev.key)) rises.push({ cm, held: !!riser.prev.frozen });
           }
           before[i].set(after);
           hips[i] = hip;
+          if (i === RISER) riserKey = riser.cur.key;
         }
       }
       // The widest handoff there is (175°, `blend_analysis`) faded over 0.25 s moves 175° * 1.5 / 4 / 60 = 17.5° a
@@ -453,6 +479,11 @@ describe('residents crossfade continuity', async () => {
       expect(farthest.cm, `single-frame pelvis move: ${hipsAt}`).toBeLessThan(20);
       // (Standing, the pelvis is within a few cm of the Sim's place; the seat they rose from is 43 cm away.)
       expect(reappeared, 'pelvis from its place on coming back into view (cm)').toBeLessThan(15);
+      // Getting out of bed, the lying body fading out stays where it lay (`lieFwd`): the first frame of the rise moves
+      // the pelvis by the fade's first step alone, from a lie that had faded in and from one held part way (7 cm when
+      // the held pose was moved to the lie's own root; 1 cm more when the Sim turned that frame before the rise began).
+      expect(rises.some((r) => r.held), 'a rise from a held pose').toBe(true);
+      expect(Math.max(...rises.map((r) => r.cm)), 'pelvis on the first frame out of bed (cm)').toBeLessThan(0.2);
     } finally {
       performance.now = realNow;
     }

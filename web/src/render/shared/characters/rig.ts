@@ -237,6 +237,11 @@ export interface SimRig {
   fromBed: boolean;
   lieX: number;
   lieZ: number;
+  /**
+   * Getting out of bed: the root the lying body fading out had there (forward of `lieX`, `lieZ`), the lie's or, a lie
+   * still fading in cut short, that of the pose held where the fade had got to (`hold`).
+   */
+  lieFwd: number;
   /** The way they lay (kept while lying), for turning out of bed to the side sim-core turned them (`outOfBed`). */
   lieYaw: number;
   /**

@@ -588,6 +588,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         fromBed: false,
         lieX: 0,
         lieZ: 0,
+        lieFwd: 0,
         lieYaw: 0,
         sideYaw: NaN,
         sideOut: 0,
@@ -1472,6 +1473,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       if (edge) faceYaw = rig.sideYaw;
       else if (pose === Pose.Lie && !Number.isNaN(rig.sideYaw) && rig.cur.key === 'lie' && rig.prev.key === 'sitDown' && rig.w < 1) turned = lerpAngle(rig.sideYaw, tyaw, smooth(rig.w));
       else if (pose === Pose.Stand && rig.fromBed && rig.cur.key === 'standUp' && rig.w < 1) turned = lerpAngle(rig.lieYaw, tyaw, smooth(rig.w));
+      // (And on the frame they get up, before `choose` starts it: turned already, the lying body would swing round by
+      // that frame's turn and back.)
+      else if (pose === Pose.Stand && rig.lastPose === Pose.Lie && rig.bed && !rig.upperBunk && !moving && !appeared) turned = rig.lieYaw;
       // A bed lain on across (`BEDS` `across`): turned a quarter, feet to its right.
       rig.lieAcross = pose === Pose.Lie && !!BEDS[(useObj ?? this.objectAt(rig.x, rig.z))?.def ?? '']?.across;
       if (rig.lieAcross) faceYaw = wrapAngle(tyaw + Math.PI / 2);
@@ -2057,12 +2061,15 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       upper = '';
       frame = this.bedFrame(rig.bed!);
     } else if (down) rig.upperBunk = false;
+    // (Getting up out of bed this frame: `lieFwd`.)
+    let outOfBed = false;
     if (climbDown) {
       // (Not standing up as from another bed.)
     } else if (!moving && pose === Pose.Stand && (rig.lastPose === Pose.Sit || rig.lastPose === Pose.Lie) && rig.cur.key !== up && !this.force) {
       // Rising from a seat (or sitting up out of bed: the crossfade from lying leans the Sim up).
       key = up;
       rig.fromBed = rig.lastPose === Pose.Lie && !!rig.bed;
+      outOfBed = rig.fromBed;
       if (rig.fromBed) fade = 0.9;
       // (Off a seat: rising where it is, then stepping off to the tile: `riseX`.)
       rig.rising = rig.lastPose === Pose.Sit;
@@ -2137,7 +2144,13 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     // (Down the bunk's ladder from lying: the lying body fading out lies where it lay, in the bed's frame.)
     if (frame && LYING.has(rig.prev.key) && rig.lastPose === Pose.Lie) rig.prev.frame = frame;
 
-    if (rig.fromBed && LYING.has(rig.prev.key)) rig.prev.rootFwd = (rig.lieX - rig.x) * fx + (rig.lieZ - rig.z) * fz + lieCentre(rig) + rig.bedFwd;
+    // The lying body fading out lies where it lay as the Sim moves off the bed: its root as it was when they got up
+    // (`lieFwd`: the lie's, or a held pose's where a lie still fading in was cut short; the lie's alone would move
+    // that one 7 cm in a frame, `blend.test.ts`).
+    if (rig.fromBed && LYING.has(rig.prev.key)) {
+      if (outOfBed) rig.lieFwd = rig.prev.rootFwd;
+      rig.prev.rootFwd = (rig.lieX - rig.x) * fx + (rig.lieZ - rig.z) * fz + rig.lieFwd;
+    }
 
     // Upper-body layer.
     if (upper) {
