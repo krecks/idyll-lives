@@ -411,5 +411,37 @@ What each part costs, one left out at a time (`diag=`, and on the dev server the
 - **Nature** (`nonature`): −0.75 ms in the wide view (4.76 → 4.01), −0.06 ms in orbit-day. The only part whose cost stands out, and the view with the largest gap.
 - **Within the noise** (under 0.3 ms either way): the FXAA (`noaa`, −0.1 ms: not the suspect it was), the sun's shadows (`noshadows`) and its map's size (1024 or 2048), the lamps (`nolamps`; clustered or forward, `lights=forward`), anisotropy (4 or 1), merged shadow casters, the soft look against classic shading, the night grade and glass.
 
-Left for later: nature has no switches of its own yet (the woods, the lawn's tufts, the terrain), so which of them costs more than on Babylon isn't known. The Babylon reference checkout is gone, so Babylon can't be measured again beside it; the comparison is with the recorded runs.
+Left for later (done for 0.5.0, below): nature has no switches of its own yet (the woods, the lawn's tufts, the terrain), so which of them costs more than on Babylon isn't known. The Babylon reference checkout is gone, so Babylon can't be measured again beside it; the comparison is with the recorded runs.
 
+### Low on WebGL2, the woods (0.5.0)
+
+2026-10-26, the same machine, with up to ten agents sharing it (`bench-results/0.5.0/`). Under that load the method above stopped measuring: with vsync, one cell's GPU time came out at about 3 ms in some runs and about 6 ms in others (Low, WebGL2, the wide view: 5.99, 3.07, 6.54 ms), flipping between rounds, the Apple GPU's clocks following how busy the machine was rather than what was drawn. So the numbers here are from runs without vsync (`--throughput`, the GPU always busy, about ±0.2 ms), each change against its base in the same round and the rounds interleaved, and from an in-page A/B (one bench page, the variants switched every 2 s along the camera path, each window's GPU time against the base window next to it, 30–40 rounds), which cancels the slow drift altogether. Triangles and draws don't depend on the load.
+
+Nature's parts, one left out at a time (the new `diag=nowoods,nofarwoods,noflowers,nograss`; Low, WebGL2, the wide view):
+
+| left out | triangles (M) | draws | GPU ms, without vsync (median of 3) |
+|---|---|---|---|
+| nothing | 1.80 | 316 | 3.3 |
+| all nature (`nonature`) | 0.77 | 270 | 2.5 |
+| the far woods (`nofarwoods`) | 1.00 | 280 | 2.8 |
+| the woods near the town (`nowoods`) | 1.62 | 306 | 2.9 (6 rounds later: within the noise) |
+| the lawn's flowers (`noflowers`) | 1.74 | 315 | not timed apart (with vsync, within the noise) |
+| the grass (`nograss`) | 1.80 | 316 | nothing: none is in reach of the wide view's eye |
+
+So the far woods (the far versions of the trees from 28 m past the town's edge to the horizon) are nearly all of nature's cost. What a far tree costs, from the in-page A/B against the far woods as they were (GPU ms, median of the paired differences): thinning them to 60 % −0.15 and to 40 % −0.26, leaving them out −0.40 to −0.42; without their normal and ARM maps −0.02, without the wind −0.10, without receiving the sun's shadows 0.00, against a copy of their materials +0.08 (the copy itself, a control). So the cost goes with the number of trees drawn, not with how each is shaded.
+
+And most of the trees drawn weren't on screen. The game drew the woods in eight sectors round the town, each from the town's edge to the horizon, and a sector with one tree in view draws all of its trees. Counted along the wide view's path (nine moments, each far tree's foot and crown projected to the screen): about 50 of the 2291 far trees on screen, about 700 drawn (fourteen times as many). Drawn in squares they would be: 100 m, about 180 (3.6×); 80 m, about 155; 60 m, about 115.
+
+**The change:** Low draws the woods in 100 m squares (`QualitySettings.woodsCell`; `?woodscell=<m>` sets it, 0 the sectors). The same trees in the same places: Low's 18 benchmark shots on both backends with sectors and with squares are the same to the pixel, but for a car on the far road in the two wide night shots (at most 0.018 % of the pixels). Medium and High keep the sectors (`woodsCell: 0`), so nothing about them changes. Tried and not kept: the woods near the town in their far versions (no gain to be seen), the far woods without the sun's shadows (none), and thinning the far woods (−0.26 ms at 40 %, but a visibly thinner forest; the squares save as much and change nothing on screen).
+
+Low on WebGL2, the production build, before (sectors) and after (squares), and with `fix/rendering-open` (each lamp kept to its room on Low too) merged in, 4 interleaved rounds without vsync, GPU ms (median; the change against the base in the same round, median):
+
+| scenario | base | squares | room mask | both | triangles (M) | draws |
+|---|---|---|---|---|---|---|
+| orbit-day | 3.03 | −0.11 | +0.09 | −0.25 | 1.30 → 1.04 | 275 → 266 |
+| orbit-night | 3.07 | −0.13 | +0.12 | 0.00 | 1.31 → 1.05 | 281 → 272 |
+| wide | 2.86 | −0.33 | +0.03 | −0.27 | 1.79 → 1.21 | 315 → 311 |
+
+The room mask's cost on Low with WebGL2 is within the noise (0.0–0.1 ms here; the 5.2 → 4.4 ms seen at its merge was most likely the clocks flipping, as above). The squares' cost is on the main thread: 446 more meshes (the far woods' 72 group draws become 518), each culled every frame, +0.17–0.20 ms of main-thread time in every round of a separate vsync check (orbit-day, 5 rounds: 1.44 → 1.62 ms without the room mask, 1.44 → 1.63 ms with it; the room mask itself +0.00–0.03). Low is the preset for older laptops' integrated graphics, which wait on the GPU, so the trade is worth it there; Medium and High, whose main thread is the busier one on WebGPU, keep the sectors.
+
+Against Babylon: its runs were with vsync, at whatever clocks the GPU chose then, so they can't be set beside these. The 0.4.1 gap (wide view +0.6–0.7 ms) was about nature's cost then (−0.75 ms); the squares take about 40 % of nature's cost away (−0.33 of −0.8 ms without vsync), so the wide view may now be within the plan's +10 %, but that can only be checked on a quiet machine with the 0.4.1 method.
