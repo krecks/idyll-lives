@@ -494,7 +494,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/public/assets/packs/dining/manifest.json:853` (`barCart` motions: `mix → shake`, the shaker part rising 10 cm and tipping 30°); `web/public/content/catalog2/dining.json:845` (`mix`: `anim: drink`)
 - **Evidence:** `kitchen/play/c4/barCart-mix-01.png`, `kitchen/clips/clips-barCart-all-t99.png`: the resident stands half a metre off, sipping at nothing with the drink clip, while the shaker rises off the cart's top and tips towards them on its own. Shaking a cocktail is both hands on the shaker. The game already draws an object's part in the hands (`held`: the barbell); a shaking clip and the shaker held would fix it. Props in hand are new behaviour (§9 decision 3): `code`. Related: I-held-01 (held ledger).
-- **Status:** later (G-70, props in hand: new behaviour, owner decision 3)
+- **Status:** fixed (b98bc6af, 8f2996de)
+- **After:** the cart's shaker is squashed away for `mix` (0.2 s, the whole use; no `hold`) and the resident shakes the same shaker (`tool.shaker`) in both hands before the chest, eight hard shakes a loop (`shake` clip, `PROPS.shaker` `line` grip); the mocktail cart's the same. `fixes/props/pairs2.png` (`shake-t1`), in play `pairs3.png` (`after-play/after-barCart-mix-01.png` against `before-play/before-barCart-mix-01.png`).
 - **Source:** wave: kitchen
 
 ### I-kitchen-14 — Counter and bar stools take both heights

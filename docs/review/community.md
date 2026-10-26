@@ -325,7 +325,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Where:** `web/src/render/babylon/characters.ts:477` (`ACTIONS.play`: `spell`); `tools/art/blender/families/playground.py:455-459` (the two bats are still parts of the table)
 - **Evidence:** `sheets/obj-pingPongTable.png` (`play/pingPongTable-pingPong-01.png`), `sheets/age-pingPongTable.png`: the player stands at the table's side by the net and works the hands at waist height for 30 minutes; both bats lie on the table and the ball sits still. Table tennis is a quick forehand and backhand with a bat in the hand. A swing clip and a bat prop (as the weights bench lifts its bar, `held`) are needed; where the players stand is I-community-02.
 - **Status:** fixed (4366ec55, 83d53185)
-- **After:** a rally of forehands (the chest turning back, through and up across) and backhands, in the ready stance, knees bent (`pingPong`, `ACTIONS.play` by object; closed hand on the bat's line): `bench-results/review/fixes/clips-games/after-pingPongTable-pingPong-0*.png`. The bats in hand are G-70, the players at the ends G-62, a partner G-65.
+- **After:** a rally of forehands (the chest turning back, through and up across) and backhands, in the ready stance, knees bent (`pingPong`, `ACTIONS.play` by object; closed hand on the bat's line): `bench-results/review/fixes/clips-games/after-pingPongTable-pingPong-0*.png`. The bats in hand are G-70, the players at the ends G-62, a partner G-65. Since 2026-10-26 (8b5dc1b0, G-70) a bat in each player's closed right hand (`tool.bat`), none left on the top: `fixes/props/pairs2.png` (`pong-t1.5`).
 - **Source:** community wave (play)
 
 ### I-community-07 — The notice board and the bus timetable are read like a book in the hands
@@ -370,7 +370,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/public/content/community.json:280` (`fountainTown` `wish`: `anim: look`), `:37` (`parkBench` `feedBirds`: `anim: sit`); `web/src/render/babylon/characters.ts:523` (`ACTIONS.look`: `idle`, `foldArms`)
 - **Evidence:** `sheets/obj-fountainTown.png` (`play/shops-town/fountainTown-wish-01.png`): the wisher stands at the rim, arms folded, for 5 minutes; no throw. `sheets/obj-parkBench.png` (`play/shops-town/parkBench-feedBirds-01.png`): "Feed the pigeons" is the bench's sit, hands in the lap, no birds on the ground. A toss (an `interact` throw toward the basin) is a table change; the coin and the crumbs are I-held-01, the birds new behaviour.
-- **Status:** later (G-70, props in hand: new behaviour, owner decision 3; the coin toss alone is a clip and table change that could go first)
+- **Status:** fixed in part (b98bc6af): the coin toss and the seed; the pigeons themselves are new behaviour, later
+- **After:** a wish is a coin looked at in the palm, held to the chest and tossed underarm over the rim (`toss`, `ACTIONS.look` at `fountainTown`, `tool.coin` in the hand until it goes), then standing at the rim; *Feed the pigeons* is the `feed` animation: a bag of seed on the left palm over the lap and a pinch flung ahead every three seconds (`scatter`, the seated upper layer, `tool.seedBag`). No birds come down to it. `fixes/props/pairs2.png` (`wish-t1`, `feed-t1.5`), in play `pairs4.png` (`parkBench-feedBirds-s0-2`).
 - **Source:** community wave (play)
 
 ### I-community-12 — The hay stack's promised seat and the coop's eggs: two farm things with a clear use and none
