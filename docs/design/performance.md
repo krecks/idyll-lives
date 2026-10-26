@@ -445,3 +445,47 @@ Low on WebGL2, the production build, before (sectors) and after (squares), and w
 The room mask's cost on Low with WebGL2 is within the noise (0.0–0.1 ms here; the 5.2 → 4.4 ms seen at its merge was most likely the clocks flipping, as above). The squares' cost is on the main thread: 446 more meshes (the far woods' 72 group draws become 518), each culled every frame, +0.17–0.20 ms of main-thread time in every round of a separate vsync check (orbit-day, 5 rounds: 1.44 → 1.62 ms without the room mask, 1.44 → 1.63 ms with it; the room mask itself +0.00–0.03). Low is the preset for older laptops' integrated graphics, which wait on the GPU, so the trade is worth it there; Medium and High, whose main thread is the busier one on WebGPU, keep the sectors.
 
 Against Babylon: its runs were with vsync, at whatever clocks the GPU chose then, so they can't be set beside these. The 0.4.1 gap (wide view +0.6–0.7 ms) was about nature's cost then (−0.75 ms); the squares take about 40 % of nature's cost away (−0.33 of −0.8 ms without vsync), so the wide view may now be within the plan's +10 %, but that can only be checked on a quiet machine with the 0.4.1 method.
+
+### The production build again (0.5.0)
+
+2026-10-26, the Stage 11 matrix again on the production build as it stands for 0.5.0 (its objects from the authenticity review, `fix/rendering-open` and the woods' squares on Low): `render.mjs` against `vite preview`, the village with its 41 residents, 1920×1080 at DPR 1, vsync at 120 Hz, 20 s after a 5 s warm-up, one run per cell (`bench-results/0.5.0/production`). The machine was shared, so the GPU column is the clocks' as much as the frame's (see above: one cell's GPU time can be 3 or 6 ms from one run to the next); the main thread, draws and frames are the comparison.
+
+| preset | backend | scenario | main thread ms, Stage 11 → now | GPU ms, Stage 11 → now | draws, Stage 11 → now | p99 ms, Stage 11 → now |
+|---|---|---|---|---|---|---|
+| low | WebGPU | orbit-day | 1.50 → 1.90 | 3.72 → 2.22 | 274 → 266 | 10.3 → 9.3 |
+| low | WebGPU | orbit-night | 1.53 → 1.91 | 3.63 → 2.39 | 280 → 272 | 10.3 → 9.3 |
+| low | WebGPU | dusk | 1.84 → 2.00 | 3.37 → 2.02 | 276 → 268 | 10.3 → 9.3 |
+| low | WebGPU | build | 1.46 → 1.78 | 3.81 → 2.44 | 273 → 265 | 10.3 → 9.3 |
+| low | WebGPU | wide | 1.53 → 1.77 | 3.78 → 3.77 | 320 → 311 | 10.3 → 9.3 |
+| medium | WebGPU | orbit-day | 1.59 → 1.85 | 3.54 → 4.25 | 334 → 336 | 10.3 → 9.3 |
+| medium | WebGPU | orbit-night | 1.56 → 2.26 | 3.88 → 4.50 | 339 → 342 | 10.2 → 9.3 |
+| medium | WebGPU | dusk | 2.06 → 2.41 | 3.50 → 3.15 | 352 → 352 | 10.2 → 9.3 |
+| medium | WebGPU | build | 1.51 → 1.71 | 3.81 → 2.90 | 282 → 284 | 10.3 → 9.3 |
+| medium | WebGPU | wide | 1.58 → 2.00 | 3.92 → 2.76 | 379 → 377 | 10.3 → 9.3 |
+| high | WebGPU | orbit-day | 1.61 → 2.90 | 3.69 → 3.30 | 342 → 344 | 10.3 → 9.3 |
+| high | WebGPU | orbit-night | 1.57 → 3.10 | 3.97 → 3.75 | 348 → 351 | 10.3 → 9.3 |
+| high | WebGPU | dusk | 2.13 → 2.52 | 4.28 → 3.10 | 361 → 364 | 10.3 → 9.3 |
+| high | WebGPU | build | 1.47 → 1.66 | 3.95 → 2.96 | 282 → 284 | 10.2 → 9.3 |
+| high | WebGPU | wide | 1.58 → 1.86 | 4.05 → 2.92 | 379 → 379 | 10.3 → 9.3 |
+| low | WebGL2 | orbit-day | 1.25 → 1.56 | 4.42 → 3.24 | 274 → 266 | 10.3 → 9.3 |
+| low | WebGL2 | orbit-night | 1.23 → 1.72 | 4.34 → 3.63 | 280 → 272 | 10.3 → 9.3 |
+| low | WebGL2 | dusk | 1.55 → 2.36 | 4.23 → 5.52 | 276 → 268 | 10.2 → 9.3 |
+| low | WebGL2 | build | 1.21 → 1.69 | 3.88 → 4.70 | 273 → 265 | 10.3 → 9.3 |
+| low | WebGL2 | wide | 1.21 → 1.91 | 4.34 → 4.36 | 320 → 311 | 10.3 → 9.3 |
+| medium | WebGL2 | orbit-day | 1.29 → 1.81 | 4.77 → 5.09 | 333 → 336 | 10.3 → 9.3 |
+| medium | WebGL2 | orbit-night | 1.08 → 2.11 | 4.77 → 5.66 | 339 → 341 | 10.3 → 9.3 |
+| medium | WebGL2 | dusk | 1.95 → 2.42 | 4.49 → 5.09 | 350 → 353 | 10.3 → 9.3 |
+| medium | WebGL2 | build | 1.01 → 1.45 | 4.27 → 5.00 | 282 → 284 | 10.3 → 9.3 |
+| medium | WebGL2 | wide | 1.13 → 1.61 | 4.88 → 4.33 | 379 → 377 | 10.2 → 9.3 |
+| high | WebGL2 | orbit-day | 1.34 → 1.74 | 5.24 → 5.16 | 342 → 344 | 10.3 → 9.3 |
+| high | WebGL2 | orbit-night | 1.12 → 1.94 | 4.94 → 6.07 | 348 → 350 | 10.2 → 9.2 |
+| high | WebGL2 | dusk | 1.92 → 2.46 | 4.70 → 5.38 | 361 → 365 | 10.2 → 9.2 |
+| high | WebGL2 | build | 1.07 → 1.44 | 4.44 → 4.89 | 282 → 284 | 10.2 → 9.3 |
+| high | WebGL2 | wide | 1.30 → 1.68 | 5.44 → 4.63 | 379 → 378 | 10.3 → 9.3 |
+
+- **Frames:** 120 fps in every cell, p99 9.2–9.3 ms (Stage 11: 10.2–10.3), no long tasks.
+- **Main thread:** more than Stage 11 in every cell, mostly by 0.2–0.5 ms and by up to 1.0 ms (Medium WebGL2 orbit-night 1.08 → 2.11 ms; Low WebGPU orbit-day 1.50 → 1.90). Low's squares are 0.2 ms of it (above), and Low on WebGL2 measured 1.44 ms in orbit-day before them against Stage 11's 1.25; the rest is the shared machine (a busy machine moves the main thread too) or what was added since, which only a Stage 11 build measured beside this one on a quiet machine can tell apart. Still below Babylon's in every cell. High on WebGPU's orbits (2.90 and 3.10 ms in this run) were noise: three runs each again beside Medium, both 1.7–1.9 ms.
+- **Draws:** Low 8–9 fewer (the woods' squares), Medium and High from 2 fewer to 4 more.
+
+The town overview behind the menus, not looked at before at full night or close up (`__renderer.setTownShot` with `minute` 23:00 and 02:00 under `?debug`, on the production build, Medium on WebGPU and Low on WebGL2): at night the streetlights, porch lamps and windows glow and the rest goes dark as in the game; close to a lot, the gardens' and street's far versions (trees, benches, cars, the fire pit, lamp posts, fences) stand whole, in their places and colours, with no gaps or boxes. Nothing to fix.
+
