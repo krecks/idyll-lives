@@ -8,7 +8,8 @@
 //! it has an outside wall), every room can be walked into, and nothing stands just inside a
 //! door. A good share of houses on medium and large lots have a basement: under the house, no
 //! windows, its rooms lit and reached by stairs down that come up inside a living room, an
-//! entrance hall, a dining room or a kitchen.
+//! entrance hall, a dining room or a kitchen. A home with a washer has somewhere to dry the
+//! washing: a dryer, or a washing line in the garden that can be reached.
 //!
 //! With `DUMP_STATES=1`, the first house with a basement is written to `debug-states/` as
 //! `generated-basement` (with a resident at the door), to open in the game with
@@ -20,7 +21,7 @@
 mod common;
 
 use sim_core::World;
-use sim_core::content::{Layer, SurfaceKind};
+use sim_core::content::{Layer, SurfaceKind, WorkOn};
 use sim_core::lot::{Edge, OUTDOORS};
 use sim_core::path::NavGrid;
 use sim_core::surface;
@@ -49,6 +50,7 @@ fn generated_houses_are_livable() {
     let mut curtains = 0;
     let (mut bigger, mut basements, mut below) = (0, 0, 0);
     let mut dumped = false;
+    let (mut washers, mut dryers, mut lines) = (0, 0, 0);
     for h in &houses {
         let label = format!("{} {} ({})", h["size"], h["seed"], h["description"]);
         let w = match World::from_json(&content, &h["town"].to_string(), 1) {
@@ -268,11 +270,24 @@ fn generated_houses_are_livable() {
             islands += usize::from(at.values().any(|&n| n >= 2));
         }
         tops += usize::from(w.objects.iter().any(|o| w.content.objects[o.def].layer == Layer::Surface));
+        // Washing washed has somewhere to dry: something that works on a washed load (a dryer, a
+        // washing line outdoors; reached, as everything is, above).
+        let uses = |o: &sim_core::world::ObjectInstance| w.content.objects[o.def].interactions.iter();
+        if w.objects.iter().any(|o| uses(o).any(|i| i.makes == Some(WorkOn::Washed))) {
+            washers += 1;
+            let dries: Vec<_> = w.objects.iter().filter(|o| uses(o).any(|i| i.work_on == Some(WorkOn::Washed))).collect();
+            dryers += usize::from(dries.iter().any(|o| !w.content.objects[o.def].outdoors));
+            lines += usize::from(dries.iter().any(|o| w.content.objects[o.def].outdoors));
+            if dries.is_empty() {
+                failures.push(format!("{label}: a washer and nowhere to dry the washing"));
+            }
+        }
     }
     eprintln!("{} houses checked, {} problems", houses.len(), failures.len());
     eprintln!("  {dining} with two chairs at a table or more, {tops} with things on tops, {islands} of {large} on large lots with an island and two stools");
     eprintln!("  {bright} of {rooms} rooms lit well, {:.1} lamps a room, at most {most_lights} from one room's ceiling", lights as f32 / rooms.max(1) as f32);
     eprintln!("  {curtains} curtains");
+    eprintln!("  {washers} with a washer: {dryers} with a dryer, {lines} with a washing line");
     eprintln!("  {basements} of {bigger} houses on medium and large lots with a basement, {below} rooms down there (lit by lamps alone)");
     for f in failures.iter().take(30) {
         eprintln!("  {f}");

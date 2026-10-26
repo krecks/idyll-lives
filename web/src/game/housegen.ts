@@ -44,7 +44,8 @@ export interface HouseGenConfig {
   /** `daylight`: the share of each room's floor its windows should light by day (`windowTiles` each). */
   windows: { spacing: [number, number]; daylight?: number };
   stairs: string;
-  garden: { objects: string[]; count: [number, number]; sets?: TableSet[] };
+  /** `washingLine`: put in the garden of a home that washes with nowhere to dry the washing (`washesWithoutDrying`). */
+  garden: { objects: string[]; count: [number, number]; sets?: TableSet[]; washingLine?: string };
   /** Ceiling lights for rooms whose own `ceiling` slots have none (the upstairs hall, the basement's). */
   lights?: string[];
   basement?: BasementSpec;
@@ -479,7 +480,7 @@ function attemptHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: numb
   // A stairwell that leaves the ground floor without room for what must be there: try the house without a basement.
   if (!furnish(cfg, info, rng, g, has, lampTiles, fit)) return basement ? 'basement' : null;
   if (up && !furnish(cfg, info, rng, up, has, lampTiles, fit)) return null;
-  garden(cfg, info, rng, g, house, lot);
+  garden(cfg, info, rng, g, house, lot, washesWithoutDrying(info, [g, up, basement]));
 
   // Spawns in front of the front door.
   const door = [...g.edges].find(([k, v]) => v === 'door' && k === `h:${k.split(':')[1]}:${house.z}`);
@@ -1794,7 +1795,21 @@ function reachable(f: Floor, r: Room): boolean {
   return true;
 }
 
-function garden(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, g: Floor, house: Rect, lot: { width: number; depth: number }): void {
+/**
+ * Whether a home washes with nowhere to dry the washing: something on its floors leaves a washed load
+ * (content `makes`: the washer's *Take out the washing*) and nothing works on one (`workOn`: a dryer).
+ */
+function washesWithoutDrying(info: ObjectInfos, floors: (Floor | null)[]): boolean {
+  const uses = floors.flatMap((f) => f?.objects ?? []).flatMap((o) => info(o.def)?.interactions ?? []);
+  return uses.some((i) => i.makes === 'washed') && !uses.some((i) => i.workOn === 'washed');
+}
+
+/**
+ * Things outside the house: the washing line first, for a home that washes with nowhere to dry
+ * (`line`: behind the house or to its sides, out on the lawn with a clear tile all round, by the
+ * garden door if it fits), then tables with chairs round them, then a few things.
+ */
+function garden(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, g: Floor, house: Rect, lot: { width: number; depth: number }, line = false): void {
   const clear = (x: number, z: number) => x >= 0 && z >= 0 && x < lot.width && z < lot.depth && (x < house.x - 1 || x > house.x + house.w || z < house.z - 1 || z > house.z + house.d) && !g.taken.has(key(x, z));
   // Behind the house or to its sides (the front garden is left for the path and drive).
   const spot = (w: number, d: number): [number, number] => [Math.floor(rng() * (lot.width - w)), house.z + Math.floor(rng() * (lot.depth - house.z - d))];
@@ -1803,6 +1818,21 @@ function garden(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, g: Fl
   const gardenDoor = [...g.edges].find(([e, v]) => v === 'door' && e.startsWith('h:') && Number(e.split(':')[2]) === back)?.[0];
   const doorX = gardenDoor ? Number(gardenDoor.split(':')[1]) : null;
   const near = (w: number, d: number): [number, number] => (doorX === null ? spot(w, d) : [doorX - Math.floor(w / 2) + Math.floor(rng() * 5) - 2, back + 1 + Math.floor(rng() * 2)]);
+  const washingLine = line ? cfg.garden.washingLine : undefined;
+  const lineSize = washingLine ? info(washingLine)?.footprint : undefined;
+  if (washingLine && lineSize) {
+    // Along the lot (its front to the back or to the house), a clear tile all round it.
+    const [w, d] = lineSize;
+    for (let tries = 0; tries < 60; tries++) {
+      const [x, z] = tries < 20 ? near(w + 2, d + 2) : spot(w + 2, d + 2);
+      const tiles = tilesOf(x, z, w + 2, d + 2);
+      if (!tiles.every((t) => clear(...(t.split(':').map(Number) as [number, number])))) continue;
+      for (const t of tiles) g.taken.add(t);
+      g.objects.push({ def: washingLine, x: x + 1, z: z + 1, rot: rng() < 0.5 ? 0 : 2 });
+      g.fronts.push(null);
+      break;
+    }
+  }
   // A table with chairs round it, with a clear tile round the chairs (by the garden door if it fits).
   for (const set of cfg.garden.sets ?? []) {
     if (rng() >= (set.chance ?? 1)) continue;
