@@ -197,6 +197,8 @@ mod tests {
             work_on: None,
             partner: false,
             alone: None,
+            private: false,
+            conceive: false,
         }
     }
 

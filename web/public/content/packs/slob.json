@@ -77,6 +77,7 @@
     {
       "id": "slob.snackNightstand",
       "name": "Snack-stash nightstand",
+      "private": true,
       "model": "model.slob.snackNightstand",
       "footprint": [1, 1],
       "price": 150,

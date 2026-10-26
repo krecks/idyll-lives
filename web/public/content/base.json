@@ -1687,7 +1687,7 @@
         "feeling": "awkward"
       }
     },
-    {"id": "tryForBaby", "label": "Try for a baby", "category": "romantic", "icon": "icon.bubble.love", "minutes": 30, "animation": "kiss",
+    {"id": "tryForBaby", "label": "Try for a baby", "category": "romantic", "icon": "icon.bubble.love", "minutes": 3, "animation": "kiss",
      "tags": ["social", "romantic", "touch"], "distance": 0.5, "prefer": "romance", "autonomyWeight": 1.5,
      "requires": {"partners": true, "minRomance": 50}, "acceptance": {"base": 0.4, "romance": 0.006, "mood": 0.2},
      "needs": {"social": 0.2, "fun": 0.1}, "targetNeeds": {"social": 0.2, "fun": 0.1},
@@ -1742,7 +1742,8 @@
       "sleep",
       "bathroom",
       "hygiene",
-      "nap"
+      "nap",
+      "intimate"
     ],
     "guestTags": [
       "bathroom"
@@ -2561,7 +2562,8 @@
             "rest",
             "nap"
           ]
-        }
+        },
+        {"id": "tryForBaby", "label": "Try for a baby", "anim": "nap", "minutes": 30, "pose": "lie", "partner": true, "conceive": true, "autonomous": false, "stages": ["youngAdult", "adult"], "effects": {"social": 0.05, "comfort": 0.1}, "tags": ["romantic", "intimate"]}
       ],
       "price": 750,
       "category": "bedroom",
@@ -3805,7 +3807,7 @@
     {"id": "grubby", "need": "hygiene", "feeling": "grubby", "cooldownHours": 3, "graceMinutes": 60}
   ],
   "roomKinds": [
-    {"id": "bathroom", "icon": "icon.category.bathroom", "label": "Bathroom", "tags": ["bathroom"], "essentials": [["bathroom"], ["hygiene"]], "size": [3, 6], "exclusive": true},
+    {"id": "bathroom", "icon": "icon.category.bathroom", "label": "Bathroom", "tags": ["bathroom"], "essentials": [["bathroom"], ["hygiene"]], "size": [3, 6], "exclusive": true, "private": true},
     {"id": "kitchen", "icon": "icon.category.kitchen", "label": "Kitchen", "tags": ["cooking"], "essentials": [["cooking"]], "size": [6, 12], "exclusive": true},
     {"id": "bedroom", "icon": "icon.category.bedroom", "label": "Bedroom", "tags": ["sleep"], "essentials": [["sleep"]], "size": [6, 12], "exclusive": true},
     {"id": "living", "icon": "icon.category.living", "label": "Living room", "tags": ["lounge", "entertainment", "screen"], "size": [9, 20]},

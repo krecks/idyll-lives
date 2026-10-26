@@ -65,7 +65,8 @@
           "pose": "lie",
           "effects": { "energy": 0.16, "comfort": 0.18 },
           "tags": ["rest", "nap", "cozy"]
-        }
+        },
+        {"id": "tryForBaby", "label": "Try for a baby", "anim": "nap", "minutes": 30, "pose": "lie", "partner": true, "conceive": true, "autonomous": false, "stages": ["youngAdult", "adult"], "effects": {"social": 0.05, "comfort": 0.1}, "tags": ["romantic", "intimate"]}
       ]
     },
     {

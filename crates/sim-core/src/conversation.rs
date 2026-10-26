@@ -962,9 +962,10 @@ pub(crate) fn outcome(
 
     match o.effect {
         Effect::None => {}
+        // (Off to bed together, where the content has beds for it: `privacy::after_step`.)
         Effect::Conceive => {
             if success {
-                sims[a].conceived = Some(t as u32);
+                sims[a].to_bed = Some(t as u32);
             }
         }
         Effect::Kiss => {

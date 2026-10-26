@@ -156,6 +156,7 @@
     {
       "id": "bookworm.bedsideStack",
       "name": "Bedside book stack",
+      "private": true,
       "model": "model.bookworm.bedsideStack",
       "footprint": [1, 1],
       "price": 90,
