@@ -3,7 +3,7 @@
  * its appearance and face morph texels: `shared/characters/layout.ts`), sampled texel by texel by the
  * character shader (`shaders/character.ts`).
  *
- * Each frame only the band of rows that changed goes to the GPU (`uploadRows`): a few of the 64
+ * Each frame only the band of rows that changed goes to the GPU (`uploadRows`): a few of the 96
  * rows most frames, none while the game is paused. PlayCanvas's own `lock`/`unlock` (and `upload`)
  * sends the whole level, and its `write` exists only on WebGL2, makes a pixel buffer each call and
  * waits on a fence. So, per backend:

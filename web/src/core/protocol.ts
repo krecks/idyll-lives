@@ -505,6 +505,19 @@ export interface WorldStructure {
   /** Presentation data carried by the simulation unchanged (see `game/town.ts`). */
   meta: WorldMeta | null;
   meshes: { walls: MeshArrays; wallsLow: MeshArrays; floors: MeshArrays };
+  /**
+   * The town's vendors and shopkeepers (sim-core `staff.rs`), in their snapshot rows' order (after the
+   * residents'): what each looks like (`seed`) and the posts they serve at (stable object ids). Absent: none.
+   */
+  staff?: StaffInfo[];
+  /** The servers as residents for the renderer (rows `sims.length + k`), given their looks by the session (`game/staff.ts`). */
+  staffSims?: SimInfo[];
+}
+
+/** One of the town's servers (`WorldStructure.staff`). */
+export interface StaffInfo {
+  seed: number;
+  posts: number[];
 }
 
 export interface ActionView {

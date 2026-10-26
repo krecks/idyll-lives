@@ -497,6 +497,10 @@ export const ACTIONS: Record<string, ActionAnim> = {
   // A dish put in the oven or the microwave, then watched, bending to look in now and then: down to
   // a cooker's oven, at chest height to an oven tower's, a pizza oven's mouth or a microwave.
   bake: { stand: (def) => (LOW_OVENS.has(def) ? ['pickUp', 'idle', 'foldArms', 'idle'] : ['interact', 'idle', 'foldArms', 'idle']), hands: HANDS.relaxed },
+  // Bought from a vendor at a cart, a stall or a counter, and served from behind it (`clips/serve.ts`, sim-core
+  // `staff.rs`): once each, then standing by.
+  buy: { stand: ['buy', 'idle'], hands: HANDS.hold },
+  sell: { stand: ['sell', 'idle'], hands: HANDS.hold },
 };
 /** The prop drawn on a station's top while a Sim works there (by action tag; `tool.*` models). Nothing for a bake: the dish is in the oven. */
 export const STATION_PROPS: Record<string, string> = { chop: 'tool.board', stir: 'tool.pan', flip: 'tool.grillFood', mix: 'tool.mixingBowl' };
