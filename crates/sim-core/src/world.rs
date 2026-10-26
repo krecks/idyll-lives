@@ -1023,6 +1023,13 @@ impl Sim {
         social::dominant_emotion(&self.feelings, &content.feelings)
     }
 
+    /// How fast they walk, as a share of `WALK_SPEED`: their traits' and life stage's (`mods`)
+    /// times their emotion's (content `emotions` `walkSpeed`: slower sad, quicker angry or
+    /// energised; the renderer's body language shows the rest).
+    pub fn walk_speed(&self, content: &Content) -> f32 {
+        self.mods.walk_speed * self.emotion(content).map_or(1.0, |e| content.emotions[e].mods.walk_speed)
+    }
+
     /// Recomputes `mods` when the set of active feelings with effects has changed.
     pub(crate) fn refresh_buffs(&mut self, content: &Content) {
         let defs = &content.feelings;
@@ -4298,7 +4305,7 @@ fn pick_autonomous(
     // home has something for; and all needs home has something for (what they look ahead to).
     let low = content.autonomy.urgent_below;
     let short: u32 = (0..content.needs.len()).filter(|&n| !content.needs[n].room && needs[n] < low).fold(0, |m, n| m | 1 << n);
-    let walk_per_minute = WALK_SPEED * sim.mods.walk_speed / MINUTES_PER_TICK;
+    let walk_per_minute = WALK_SPEED * sim.walk_speed(content) / MINUTES_PER_TICK;
     let urgent = urgent_needs(sim, ctx, objects);
     let fillable = home_needs(sim, ctx, objects, (0..content.needs.len()).filter(|&n| !content.needs[n].room).fold(0, |m, n| m | 1 << n), false);
     // How far away the nearest thing for each need is, and how long until they leave for work
@@ -5262,6 +5269,8 @@ pub(crate) fn route(
 
 fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut crate::items::Items, rng: &mut Rng, ticks: u32) {
     let content = ctx.content;
+    // (Before `current` is borrowed: how fast they walk, `walk_speed`.)
+    let walk = sim.walk_speed(content);
     let minutes = MINUTES_PER_TICK * ticks as f32;
     let Some(act) = sim.current.as_mut() else {
         return;
@@ -5281,7 +5290,7 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
             return crate::cooking::queued(sim, ctx, objects, items, waited);
         }
         Phase::Routing { waypoints, next } => {
-            let per_tick = WALK_SPEED * sim.mods.walk_speed;
+            let per_tick = WALK_SPEED * walk;
             let mut budget = per_tick * ticks as f32;
             while budget > 0.0 && *next < waypoints.len() {
                 let wp = waypoints[*next];

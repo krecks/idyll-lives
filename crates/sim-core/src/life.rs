@@ -1033,7 +1033,7 @@ pub(crate) fn farewell(w: &World, i: usize, plot: u32) -> Option<(usize, usize)>
         return None;
     }
     let household = w.households.iter().position(|h| h.plot == Some(plot))?;
-    let reach = crate::world::WALK_SPEED * guest.mods.walk_speed / MINUTES_PER_TICK * rules.farewell_minutes;
+    let reach = crate::world::WALK_SPEED * guest.walk_speed(content) / MINUTES_PER_TICK * rules.farewell_minutes;
     w.sims
         .iter()
         .enumerate()

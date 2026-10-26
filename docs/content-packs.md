@@ -603,7 +603,9 @@ id) and `last` (household names).
   `gardening`.
 - **Emotions:** `happy`, `flirty`, `angry`, `sad`, `embarrassed`, `focused` (likes
   `training`), `inspired` (likes `creative`), `energized` (likes `fitness`), `relaxed`
-  (likes `rest`, `lounge`, `spa`). Icons are `icon.emotion.<id>`.
+  (likes `rest`, `lounge`, `spa`). Icons are `icon.emotion.<id>`. An emotion's `walkSpeed` multiplies its
+  residents' pace while it is theirs (sad 0.88, embarrassed and relaxed 0.95, inspired 1.03, happy 1.05, angry
+  and energized 1.08); its body language is the renderer's, by id (`bodyLanguage.ts` `BEARINGS`).
 - **Buy categories** (groups in brackets): `kitchen` (`appliances`, `counters`, `islands`,
   `dining`, `cabinets`), `bathroom` (`toilets`, `bathing`, `sinks`, `laundry`), `bedroom`
   (`beds`, `nightstands`, `storage`, `dressing`), `kids`, `living` (`seating`, `sectionals`,
