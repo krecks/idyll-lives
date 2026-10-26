@@ -58,6 +58,24 @@ pub(crate) fn carry_on(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], object:
     crate::world::nearest(sim, ctx, objects, plot, Some(object), |i| i.work_on == Some(made) && !i.baby && i.recipe.is_none())
 }
 
+/// How keen a resident at home is on a laundry chore, besides what it does for their needs (as
+/// tidying up is keener the dirtier the spot): emptying a machine that's done, `DONE_PULL`; a use
+/// that works on a load of washing, `PILE_PULL` with the pile full (content `laundry`'s `most`),
+/// less with less waiting. 0 for anything else.
+pub(crate) fn pull(laundry: [f32; 3], content: &Content, o: &ObjectInstance, inter: &Interaction) -> f32 {
+    if inter.unloads && o.done() {
+        return DONE_PULL;
+    }
+    let Some(k) = inter.work_on.and_then(WorkOn::load) else { return 0.0 };
+    let most = content.laundry.map_or(1.0, |l| l.most);
+    PILE_PULL * (laundry[k] / most).clamp(0.0, 1.0)
+}
+
+/// How keen they are on emptying a machine that's done (`pull`): about as on tidying a spot half dirty.
+pub const DONE_PULL: f32 = 0.3;
+/// How keen on a load of washing with the pile full (`pull`).
+pub const PILE_PULL: f32 = 0.3;
+
 /// Settles what a resident took up and left this tick with their household's loads of washing:
 /// one taken from its pile, one put on the next (up to content `laundry`'s `most`).
 pub(crate) fn settle(laundry: &mut [f32; 3], worked: u8, made: u8, most: f32) {

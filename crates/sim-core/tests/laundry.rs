@@ -207,8 +207,9 @@ fn free_will_takes_the_washing_out_once_its_done() {
     w.objects[WASHER as usize].run = Some(0.0);
     w.objects[DRYER as usize].run = Some(0.0);
     w.households[0].laundry = [0.0, 0.0, 0.0];
-    let unloaded = until(&mut w, 12 * 60, |w| w.objects[WASHER as usize].run.is_none() && w.objects[DRYER as usize].run.is_none());
-    assert!(unloaded, "both still full after half a day: washer {:?}, dryer {:?}", w.objects[WASHER as usize].run, w.objects[DRYER as usize].run);
+    // (Her needs full: what draws her is the washing waiting, `machines::pull`.)
+    let unloaded = until(&mut w, 3 * 60, |w| w.objects[WASHER as usize].run.is_none() && w.objects[DRYER as usize].run.is_none());
+    assert!(unloaded, "both still full after 3 hours: washer {:?}, dryer {:?}", w.objects[WASHER as usize].run, w.objects[DRYER as usize].run);
 }
 
 #[test]

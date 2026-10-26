@@ -4474,6 +4474,10 @@ fn pick_autonomous(
             if inter.trains_skills() && allowed == Access::Full {
                 s += training_interest(sim, content, inter) * boost / (1.0 + distance * 0.08);
             }
+            // The washing waiting at home, the more the keener; a machine done, to be emptied.
+            if allowed == Access::Full {
+                s += crate::machines::pull(ctx.households[sim.household as usize].laundry, content, obj, inter) / (1.0 + distance * 0.08);
+            }
             // The plan: a block's activity is the favourite (even with full needs); goals.
             let (plan, floor) = crate::planner::object_factor(content, sim, inter, night);
             let mut s = s.max(floor) * feel(inter.tags) * plan * place;
