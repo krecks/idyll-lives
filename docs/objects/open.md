@@ -123,8 +123,6 @@ it left is here, with its id; §9 of the review says what each would take.
   I-community-11). New behaviour, planned separately.
 - **No body language, no turning on the spot** (G-71): only the face shows feelings, and residents turn in place to
   face a thing, without steps (A-residents-07, A-residents-08). New behaviour, planned separately.
-- **A child can't reach the fruit it picks** (I-garden-11): the picked apple hangs at 1.84 m, the lemon at 1.62 m.
-  The owner's decision (the review recommends low fruit, built with I-garden-12's crown).
 - **Feet slide at game speeds 4 and 5** (56–78 % of the way: 45 and 90 m/s, faster than any gait steps without
   strobing); at speed 3 the run (`runAlong`) keeps grown-ups' and teens' feet on the ground, children slide 11–14 %
   (A-residents-03, G-25). The clip check's baseline (`tools/characters/clip-baseline.json`) is empty.
@@ -148,9 +146,6 @@ it left is here, with its id; §9 of the review says what each would take.
   their labels say so; vendors are later (Q-17).
 - **Laundry:** the resident stands at the washer for its whole wash and folds at the dryer with empty hands; the
   basket plays no part (I-bathroom-07: a timed machine is new behaviour).
-- **Worked from the edge:** the bonsai bench, the rose arbour's roses, the cookbook lectern and the streetball hoop
-  are used from the object's edge, not at the part (I-packs-12; `places` can fix it now, and the lectern wants a
-  reading hand pose).
 - **Sounds still to make** (I-bathroom-04): the treadmill and bikes, the workbench, the ball games and darts, the
   arcade, the sewing machine, the pottery wheel, the coffee machines, the blender's motor, the microwave, the
   toaster, an oven's fan, the pizza oven, the fridge door, the bin lid, the vending machines, the phone box, the
@@ -163,10 +158,6 @@ it left is here, with its id; §9 of the review says what each would take.
 - **Uses end once every need they raise is full**, by design (I-systems-02); it makes clips easy to miss in checks.
 
 ### Models
-- **The home chess table seats one**, so chess at home stays *Practise chess*: it needs a 1 × 2 table with a chair at
-  each end, `places` facing each other and a *Play chess* use with `partner` (M-hobbies-11).
-- **The apple tree's crown is out of reach:** only its front apple hangs within reach, so *Pick the apples* reaches
-  into the air; the crown down to about 2.6 m or low apples at 1.4–1.9 m (I-garden-12, `trees.md`).
 - **Food from town on a plate:** crisps, the stall's fruit and the pastry use the treat plate; a cone or paper cup,
   a hot dog in its bun, a crisp packet, an apple and a bagged pastry are to be made (M-held-03, `held.md`).
 - **The arc lamp's arc stops at its own tile:** the sim allows a shade over the next tile (`overhang`) once the model
@@ -197,6 +188,18 @@ it left is here, with its id; §9 of the review says what each would take.
   chair is used (I-kids-01).
 - **Models:** the entry console's and the spritz station's mirrors on back boards (M-packs-01, M-packs-02); the party
   bar's back bar (M-packs-03); bathers' shins in the heart tub (A-packs-01); the power blender's blades (A-packs-02).
+
+### Fixed in 0.5.0
+- **Fruit within reach** (I-garden-11, I-garden-12, the owner's decision): the apple tree's crown came down to 2.6 m
+  and four low boughs carry eight apples from 1.12 to 1.75 m; the one picked to eat hangs at 1.13 m, where a child
+  on tiptoe takes it, and "Pick the apples" reaches one per size. The lemon tree has a lemon at 1.62, 1.42 and 1.1 m
+  for a grown-up, a teen and a child. Placed apple trees aren't turned at random any more (`trees.md`).
+- **The home chess table seats two** (M-hobbies-11, Q-16): a chair at each end of 2 × 1 tiles, `places` facing each
+  other, and *Play chess* with a partner, *Practise chess* alone or with nobody free (`hobbies.md`).
+- **Worked at the part** (I-packs-12): the bonsai bench from 0.6 m out, at the tree; the lectern's book read with the
+  hands on it from 0.52 m out (`readLectern*`); the streetball hoop shot from 2.2 m out with a jump shot fitted to
+  its rim (`streetShot*`); the arbour's roses cut at a front post (`cutRose*`, `STEP_IN`: the swing's seats can't take
+  `places` for it).
 
 ## Notes on the sim
 

@@ -43,8 +43,11 @@ Each is built where the game places it (`F`, game axes; `G.settle(centre=False)`
 ## Games (H2)
 
 - **Chess table**: a 0.64 × 0.48 m top, room beside the board for the taken pieces (2026-10-21, review M-hobbies-02:
-  0.46 × 0.40, the board filling it); still one chair (a partner across the board needs a second place: G-65). A black
-  pawn is its own part and slides one square (`move`) for `chess`. Its chair is coloured on
+  0.46 × 0.40, the board filling it). For two since 0.5.0 (M-hobbies-11): the table is built as before, white to the
+  front, then turned a quarter so the top runs 0.64 m between the players and white faces the left-hand chair; a
+  chair at each end (`CHESS_CHAIR`, 0.66 m out, the content's `places`), built facing the front and turned to face
+  the board, on 2 × 1 tiles. At 0.55 m two grown-ups' feet met under the table. A black pawn is its own part and
+  slides one square towards white (`move`) for `chess` and `play`. Its chair is coloured on
   its own ("Chair"); the board's rim is the table's wood.
 - **Pool table**: the cloth at 0.75 m, the rails' top at 0.785 (a table is 0.74–0.79 to the rail; 2026-10-21, review
   M-hobbies-06: the rails were at 0.82; `clips/games.ts` `BED` follows). The triangle is lifted off the fifteen racked balls, carried over the foot rail and hung up by its
@@ -103,7 +106,7 @@ round), since a loop can't wait.
 | `model.keyboardDigital` | 1.39 × 1.05 × 0.77 m | 4,630 | 2 | Body, Trim |
 | `model.drumKit` | 1.73 × 1.24 × 1.17 m | 7,990 | 3 | Shells, Hardware |
 | `model.guitarAcoustic` | 0.40 × 1.16 × 0.40 m | 4,320 | 3 | Body, Top, Stand |
-| `model.chessTable` | 0.64 × 0.92 × 0.89 m | 3,972 | 3 | Table, Chair |
+| `model.chessTable` | 1.70 × 0.92 × 0.48 m | 4,608 | 3 | Table, Chair |
 | `model.poolTable` | 2.50 × 0.81 × 1.40 m | 5,492 | 3 | Frame, Cloth |
 | `model.foosball` | 1.42 × 0.95 × 0.93 m | 5,892 | 3 | Table, Trim |
 | `model.dartboard` | 0.62 × 0.62 × 0.07 m | 2,228 | 2 | Board, Cabinet |
