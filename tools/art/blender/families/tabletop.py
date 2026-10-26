@@ -9,11 +9,12 @@
 #   TT5 bath, desk and toys: soapSet, towelStack, perfumeTray, deskOrganiser, laptopClosed, monitor,
 #       stuffedToy, toyBlocks
 #
-# Each stands on its base, centred (the renderer lifts it to its host's top), at the old part's size. They
-# have no uses, so no clips, and every finish is a plain one (wood, fabric and leaves drawn satin or matte),
+# Each stands on its base, centred (the renderer lifts it to its host's top), at the old part's size. Most
+# have no clips, and every finish is a plain one (wood, fabric and leaves drawn satin or matte),
 # so each costs one draw call. The exceptions: the cookie jar, the wine glasses and the snow globe are
 # see-through `glass` (two); the kettle's lid, the bread bin's roll-top and the laptop's lid are parts of
-# their own, hinged where they would open, for a use to come (two); the candlesticks' flames rise out of the candles
+# their own, hinged where they open, and open for their uses (two: `lid_open` for tea, `roll_open` for a
+# sandwich, the laptop's `lid_open` while it is used); the candlesticks' flames rise out of the candles
 # at night and glow (`motions.night`; two); the alarm clock's hour and minute hands tell the game's time
 # (`motions.clock`; three).
 #
@@ -154,6 +155,7 @@ M = G.Palette(
     pen_yellow=('#F2C14E', 'gloss'),
     laptop=('#B9BCBF', 'metal'),
     logo=('#E7E7E5', 'gloss'),
+    laptop_screen=('#1F2A36', 'gloss', {'glow': '#A9C8E8'}),   # the laptop's screen, lit at night (seen while the lid is open)
     monitor=('#1E1F22', 'satin'),
     screen=('#16202B', 'gloss'),
     keys=('#3A3D41', 'satin'),
@@ -270,7 +272,8 @@ def slab(name, outline, depth, at, material, plane='XZ', rot=(0, 0, 0), bevel=0.
 # --- TT1 kitchenware ------------------------------------------------------------------------------------------
 def kettle():
     """A cordless jug kettle on its power base: a body swelling to its shoulder, a beak spout, a D handle in one
-    piece with its switch, a water window; the lid a part of its own, hinged at its back edge, for a use to come."""
+    piece with its switch, a water window; the lid a part of its own, hinged on the handle's side: it flips up while
+    the kettle is filled for tea (`lid_open`)."""
     with G.new_parts() as body:
         turned('base', [(0.083, 0.0), (0.086, 0.004), (0.086, 0.013), (0.08, 0.018)], M.dark, verts=16)
         turned('body', [(0.074, 0.016), (0.079, 0.026), (0.077, 0.1), (0.068, 0.178), (0.054, 0.203),
@@ -287,10 +290,12 @@ def kettle():
     G.join(body, 'kettle', origin=(0, 0, 0))
     with G.new_parts() as lid:
         turned('lid', [(0.049, 0.209), (0.05, 0.214), (0.046, 0.221), (0.03, 0.225), (0.0, 0.226)], M.dark, verts=14)
-        turned('lid_knob', [(0.009, 0.224), (0.011, 0.231), (0.009, 0.236), (0.0, 0.238)], M.dark, at=(0, -0.012, 0),
+        turned('lid_knob', [(0.009, 0.224), (0.011, 0.231), (0.009, 0.236), (0.0, 0.238)], M.dark, at=(-0.014, 0, 0),
                verts=8)
-    G.hinged(G.join(lid, 'lid'), (0, 0.044, 0.223))
-    return G.settle()
+    lid = G.hinged(G.join(lid, 'lid'), (0.046, 0, 0.223))
+    G.settle()
+    G.swing(lid, 'lid_open', 80, seconds=0.4, axis='Y')   # its spout side up, about the hinge by the handle
+    return G.meshes()
 
 
 def _slice(name, at, material, inner, w=0.13, h=0.075):
@@ -511,7 +516,8 @@ def cuttingBoard():
 
 def breadBin():
     """A roll-top bread bin: a painted body between two D-shaped wooden ends (their edges eased); the roll-top is a
-    part of its own, turning about the bin's axis, for a use to come (it rolls open), a wooden bar pull on it."""
+    part of its own, turning about the bin's axis, a wooden bar pull on it: it rolls back into the bin for a sandwich
+    (`roll_open`), showing a loaf on the bin's floor."""
     AXIS, R = 0.105, 0.095
     with G.new_parts() as body:
         box('base', (0.31, 0.19, AXIS), (0, 0, AXIS / 2), M.bread_bin, bevel=0.008, segs=1)
@@ -520,6 +526,9 @@ def breadBin():
         for s in (-1, 1):
             slab(f'end{s}', [(-u, v) for u, v in end], 0.014, (s * 0.163, 0, 0), M.wood, plane='YZ', bevel=0.003)
         box('toe', (0.31, 0.012, 0.012), (0, -0.092, 0.006), M.wood, bevel=0.003)
+        # a loaf on the bin's floor (the base's top), under the roll-top: seen only when it is rolled back
+        G.soft_box('loaf', (0.2, 0.1, 0.07), at=(-0.02, 0.0, AXIS + 0.035), material=M.bread, round=0.028, flat=1,
+                   round_segments=1)
     G.join(body, 'bread_bin', origin=(0, 0, 0))
     with G.new_parts() as top:
         arc_shell('roll_top', R, R - 0.008, 0.312, 0, 180, (0, 0, AXIS), M.bread_bin, segments=14)
@@ -527,8 +536,11 @@ def breadBin():
         a = math.radians(35)
         G.kit.pull(F, 'roll_handle', 0.0, AXIS + R * math.sin(a), R * math.cos(a) - 0.004, 0.1, M.wood, r=0.0065,
                    out=0.02, verts=6)
-    G.hinged(G.join(top, 'roll_top'), (0, 0, AXIS))
-    return G.settle()
+    top = G.hinged(G.join(top, 'roll_top'), (0, 0, AXIS))
+    G.settle()
+    # rolled back over the top and down behind it, inside the bin (Blender -X lifts the front)
+    G.swing(top, 'roll_open', -100, seconds=0.6, axis='X')
+    return G.meshes()
 
 
 def spiceJars():
@@ -1279,8 +1291,8 @@ def deskOrganiser():
 
 def laptopClosed():
     """A closed laptop: an aluminium base with eased edges, a thumb notch at the front, ports on its side and a hinge
-    barrel at the back; the lid a part of its own, hinged at its back edge, for a use to come (it opens), the logo
-    on it."""
+    barrel at the back, a keyboard and a touchpad on its top; the lid a part of its own, hinged at its back edge, the
+    logo on it and the screen under it: it opens while the laptop is used (`lid_open`)."""
     with G.new_parts() as body:
         slab('base', G.rounded_rect(0.32, 0.22, 0.012, corner=2), 0.011, (0, 0, 0.0055), M.laptop, plane='XY',
              bevel=0.0025)
@@ -1288,13 +1300,19 @@ def laptopClosed():
         box('notch', (0.05, 0.003, 0.003), (0, -0.1095, 0.0115), M.dark)
         for i, (y, w) in enumerate(((-0.03, 0.012), (-0.005, 0.009), (0.02, 0.009))):
             box(f'port{i}', (0.002, w, 0.004), (0.1601, y, 0.006), M.dark)
+        # the keyboard's well and the touchpad, hidden under the lid until it opens
+        box('keyboard', (0.27, 0.105, 0.0006), (0, 0.025, 0.0109), M.dark)
+        box('touchpad', (0.1, 0.06, 0.0004), (0, -0.068, 0.0109), M.charcoal)
     G.join(body, 'laptop', origin=(0, 0, 0))
     with G.new_parts() as lid:
         slab('lid', G.rounded_rect(0.318, 0.218, 0.012, corner=2), 0.008, (0, 0, 0.0155), M.laptop, plane='XY',
              bevel=0.002)
         turned('logo', [(0.015, 0.0195), (0.015, 0.0201)], M.logo, at=(0, 0.01, 0), verts=12)
-    G.hinged(G.join(lid, 'lid'), (0, 0.109, 0.0115))
-    return G.settle()
+        box('screen', (0.29, 0.18, 0.0005), (0, 0.006, 0.01175), M.laptop_screen)   # under the lid, facing the keyboard
+    lid = G.hinged(G.join(lid, 'lid'), (0, 0.109, 0.0115))
+    G.settle()
+    G.swing(lid, 'lid_open', -105, seconds=0.8, axis='X')   # its front up and over, the screen to the front
+    return G.meshes()
 
 
 def monitor():
@@ -1396,7 +1414,8 @@ BODY = 'Body'
 FAMILY = G.Family(
     'tabletop', M,
     [  # TT1 kitchenware
-        T('kettle', kettle, (0.228, 0.238, 0.172), [('kettle', BODY), ('dark', 'Base, handle & lid')]),
+        T('kettle', kettle, (0.228, 0.238, 0.172), [('kettle', BODY), ('dark', 'Base, handle & lid')],
+          motions={'uses': {'tea': {'clip': 'lid_open', 'hold': 1.6}}}),
         T('toaster', toaster, (0.28, 0.23, 0.15), [('toaster', BODY)]),
         T('blender', blender, (0.18, 0.356, 0.146), [('blender_base', BODY), ('smoothie', 'Smoothie')]),
         T('standMixer', standMixer, (0.3, 0.356, 0.17), [('mixer', BODY)]),
@@ -1404,7 +1423,8 @@ FAMILY = G.Family(
         T('knifeBlock', knifeBlock, (0.12, 0.297, 0.232), [('knife_block', BODY), ('dark', 'Handles')]),
         T('utensilCrock', utensilCrock, (0.132, 0.316, 0.124), [('crock', BODY)]),
         T('cuttingBoard', cuttingBoard, (0.34, 0.106, 0.23), [('board', BODY)]),
-        T('breadBin', breadBin, (0.34, 0.206, 0.202), [('bread_bin', BODY), ('wood', 'Ends & handle')]),
+        T('breadBin', breadBin, (0.34, 0.206, 0.202), [('bread_bin', BODY), ('wood', 'Ends & handle')],
+          motions={'uses': {'sandwich': {'clip': 'roll_open', 'hold': 2.4}}}),
         T('spiceJars', spiceJars, (0.3, 0.112, 0.12), [('rack', BODY)]),
         T('cookieJar', cookieJar, (0.16, 0.248, 0.158), [('jar_lid', 'Lid')]),
         # TT2 tableware
@@ -1442,7 +1462,8 @@ FAMILY = G.Family(
                                                        ('towel_c', 'Towel 3')]),
         T('perfumeTray', perfumeTray, (0.276, 0.143, 0.176), [('perfume_tray', BODY)]),
         T('deskOrganiser', deskOrganiser, (0.265, 0.16, 0.2), [('organiser', BODY)]),
-        T('laptopClosed', laptopClosed, (0.32, 0.0205, 0.223), [('laptop', BODY)]),
+        T('laptopClosed', laptopClosed, (0.32, 0.0205, 0.223), [('laptop', BODY)],
+          motions={'uses': {'type': 'lid_open'}}),   # open while it is used (browse, code, write, homework)
         T('monitor', monitor, (0.542, 0.46, 0.335), [('monitor', BODY)]),
         T('stuffedToy', stuffedToy, (0.197, 0.282, 0.192), [('bear', BODY)]),
         T('toyBlocks', toyBlocks, (0.222, 0.2, 0.171), [('block_a', 'Block 1'), ('block_b', 'Block 2'),

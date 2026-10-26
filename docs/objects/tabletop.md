@@ -14,13 +14,13 @@ tea set, mugs, wine, blocks) takes a chair pulled up to that top if one is free,
 it is done standing (sat on a chair pulled up to the top, the chair is shuffled in as for a meal: the thing on the top
 isn't taken for the seat, I-tabletop-06); at a top with chairs all round, any use is done from one of its chairs. The other nineteen are decor (the chopping board, the alarm clock, the globe and the
 ornaments, towels, soap and the like). Food, drink, books, plants and toys don't wear (`wearPerUse: 0`); the
-appliances and screens do. No use has a clip yet: one draw call where it can (wood `satin`, towels and the teddy
+appliances and screens do. Three uses have a clip (below); otherwise one draw call where it can (wood `satin`, towels and the teddy
 `matte`), a second only for glass that is seen through (the cookie jar, the wine glasses, the snow globe), and the
 smallest triangle budget (`docs/design/objects.md`: 0.35 m, 1.5k/3k; built at 226–1,496). The player colours the
 main part, labelled `Body` (the cookie jar: its `Lid`); sets of like things (mugs, books, towels, blocks) list each
-one. The kettle's lid, the bread bin's roll-top and the laptop's lid are parts of their own, hinged where they would
-turn, for a clip later (the laptop is used closed until then). The alarm clock is the one thing that moves: its
-hands tell the game's time.
+one. The kettle's lid, the bread bin's roll-top and the laptop's lid are parts of their own (two draws), and open for
+their uses (2026-10-26, review I-tabletop-01): the kettle's lid flips up while it is filled for tea, the roll-top rolls
+back for a sandwich, the laptop's lid opens while it is used. The alarm clock's hands tell the game's time.
 
 Each was checked in play bought on a square table (`tableSquare2`, top at 0.75 m) standing free in the living room,
 looked at close up from its front three-quarter and level from its side: in all four facings by day, every paint
@@ -33,7 +33,7 @@ sits on the top, turns with its facing and lights right at night.
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `kettle` Electric kettle | 1x1 · surface | tea:drink | tabletop / kitchenware | Body, "Base, handle & lid" | Static | Static. (+use) the lid lifts. |
+| `kettle` Electric kettle | 1x1 · surface | tea:drink | tabletop / kitchenware | Body, "Base, handle & lid" | Use | `lid_open`: the lid flips up 80° on its hinge by the handle for tea, held 1.6 s, then shut. |
 | `toaster` Toaster | 1x1 · surface | toast:cook | tabletop / kitchenware | Body | Static | Static. |
 | `blender` Blender | 1x1 · surface | smoothie:cook | tabletop / kitchenware | Body, Smoothie | Static | Static. |
 | `standMixer` Stand mixer | 1x1 · surface | bake:cook | tabletop / kitchenware | Body | Static | Static. |
@@ -41,7 +41,7 @@ sits on the top, turns with its facing and lights right at night.
 | `knifeBlock` Knife block | 1x1 · surface | — | tabletop / kitchenware | Body, Handles | Static | Static. |
 | `utensilCrock` Utensil pot | 1x1 · surface | — | tabletop / kitchenware | Body | Static | Static. |
 | `cuttingBoard` Chopping board | 1x1 · surface | — | tabletop / kitchenware | Body | Static | Static. |
-| `breadBin` Bread bin | 1x1 · surface | sandwich:chop | tabletop / kitchenware | Body, Ends & handle | Static | Static. (+use) the roll-top opens. |
+| `breadBin` Bread bin | 1x1 · surface | sandwich:chop | tabletop / kitchenware | Body, Ends & handle | Use | `roll_open`: the roll-top rolls back into the bin for a sandwich, a loaf inside, held 2.4 s, then shut. |
 | `spiceJars` Spice jars | 1x1 · surface | — | tabletop / kitchenware | Body | Static | Static. |
 | `cookieJar` Cookie jar | 1x1 · surface | biscuit:fetch | tabletop / kitchenware | Lid | Static | Static. |
 
@@ -120,7 +120,7 @@ sits on the top, turns with its facing and lights right at night.
 | `towelStack` Folded towels | 1x1 · surface | — | tabletop / bath | Towel 1, Towel 2, Towel 3 | Static | Static. |
 | `perfumeTray` Perfume tray | 1x1 · surface | — | tabletop / bath | Body | Static | Static. |
 | `deskOrganiser` Desk organiser | 1x1 · surface | — | tabletop / desk | Body | Static | Static. |
-| `laptopClosed` Laptop | 1x1 · surface | browse:type code:type write:type homework:type | tabletop / desk | Body | Static | Static. (+use) the lid opens. |
+| `laptopClosed` Laptop | 1x1 · surface | browse:type code:type write:type homework:type | tabletop / desk | Body | Use | `lid_open`: the lid opens 105° (its screen glows at night) for the whole use. |
 | `monitor` Monitor and keyboard | 1x1 · surface | browse:type code:type homework:type | tabletop / desk | Body | Static | Static. Takes a 0.23 m disc (half its 0.46 m depth with the keyboard): it fits on counters, islands and the simple, executive, corner and standing desks, not on the 0.38–0.44 m deep computer, writing, laptop and kids' desks. |
 | `stuffedToy` Teddy | 1x1 · surface | play:play | tabletop / toys | Body | Static | Static. |
 | `toyBlocks` Toy blocks | 1x1 · surface | blocks:tend | tabletop / toys | Block 1, Block 2, Block 3 | Static | Static. |

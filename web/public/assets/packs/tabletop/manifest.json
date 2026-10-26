@@ -19,6 +19,14 @@
           "finish": "material.finish.gloss"
         }
       },
+      "motions": {
+        "uses": {
+          "tea": {
+            "clip": "lid_open",
+            "hold": 1.6
+          }
+        }
+      },
       "paint": [
         {
           "material": "kettle",
@@ -246,11 +254,22 @@
       "type": "model",
       "url": "../../models/tabletop/breadBin.glb",
       "materials": {
+        "bread": {
+          "finish": "material.finish.matte"
+        },
         "bread_bin": {
           "finish": "material.finish.gloss"
         },
         "wood": {
           "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sandwich": {
+            "clip": "roll_open",
+            "hold": 2.4
+          }
         }
       },
       "paint": [
@@ -1092,14 +1111,26 @@
       "type": "model",
       "url": "../../models/tabletop/laptopClosed.glb",
       "materials": {
+        "charcoal": {
+          "finish": "material.finish.satin"
+        },
         "dark": {
           "finish": "material.finish.satin"
         },
         "laptop": {
           "finish": "material.finish.metal"
         },
+        "laptop_screen": {
+          "finish": "material.finish.gloss",
+          "glow": "#A9C8E8"
+        },
         "logo": {
           "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "uses": {
+          "type": "lid_open"
         }
       },
       "paint": [

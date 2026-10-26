@@ -32,7 +32,7 @@ drink's surface), the plants' leaves and flowers plants.py's. Sixteen were over 
 
 | Model | Size (w × h × d) | Triangles (before) | Draws | What it has |
 |---|---|---|---|---|
-| `kettle` | 0.23 × 0.24 × 0.17 m | 724 (696) | 1 (+lid) | jug body swelling to the shoulder on a power base, beak spout, D handle in one piece, red switch, water window; the lid and knob turned |
+| `kettle` | 0.23 × 0.24 × 0.17 m | 724 (696) | 2 | jug body swelling to the shoulder on a power base, beak spout, D handle in one piece, red switch, water window; the lid and knob turned, the lid flipping up (`lid_open`) |
 | `toaster` | 0.28 × 0.23 × 0.15 m | 710 (584) | 1 | rounded body on a plinth, two slots with toast (crust round the crumb), lever in its guide, browning dial and pointer, cancel button, chrome trim |
 | `blender` | 0.18 × 0.36 × 0.15 m | 736 (648) | 1 | tapering base with a dial and two buttons, collar, soft-square jug (smoothie its lower half), handle in one piece, lid and filler cap |
 | `standMixer` | 0.30 × 0.36 × 0.17 m | 708 (1,180) | 1 | rounded base, column, lofted tilt head swelling to its nose with a chrome band and hub, speed lever, steel bowl with batter, beater (a cut-out paddle) |
@@ -40,7 +40,7 @@ drink's surface), the plants' leaves and flowers plants.py's. Sixteen were over 
 | `knifeBlock` | 0.12 × 0.30 × 0.23 m | 584 (352) | 1 | leaning block with eased edges on its foot, six knives (a steel bolster under each riveted handle, sized to its blade) |
 | `utensilCrock` | 0.13 × 0.32 × 0.12 m | 708 (668) | 1 | glazed crock with a rolled lip and a blue band; wooden spoon (one swept piece), slotted spatula, balloon whisk (two wire loops), ladle with its bowl |
 | `cuttingBoard` | 0.34 × 0.10 × 0.23 m | 724 (792) | 1 | board with a hand hole, a lofted bloomer with three scores, two tomatoes with calyxes, two slices with their cut faces, a cook's knife (blade, bolster, handle) |
-| `breadBin` | 0.34 × 0.21 × 0.20 m | 536 (380) | 1 (+roll-top) | body between D-shaped wooden ends (eased), a toe rail; the roll-top's wooden bar pull (`kit.pull`) |
+| `breadBin` | 0.34 × 0.21 × 0.20 m | 644 (380) | 2 | body between D-shaped wooden ends (eased), a toe rail, a loaf inside; the roll-top's wooden bar pull (`kit.pull`), rolling back (`roll_open`) |
 | `spiceJars` | 0.30 × 0.11 × 0.12 m | 700 (792) | 1 | rack with shaped ends, back board and round front rail; five shouldered jars with paper labels and screw lids |
 | `cookieJar` | 0.16 × 0.25 × 0.16 m | 604 (696) | 2 | glass jar with shoulder and neck, four cookies, glazed lid with a turned knob |
 | `fruitBowl` | 0.28 × 0.19 × 0.28 m | 726 (1,088) | 1 | bowl on a foot ring; red and green apples (shaped, stalks), two oranges with navels, two bananas (five-sided, dark tips) |
@@ -67,20 +67,31 @@ drink's surface), the plants' leaves and flowers plants.py's. Sixteen were over 
 | `towelStack` | 0.27 × 0.15 × 0.20 m | 684 (456) | 1 | three folded towels, each two soft layers, a woven band across the front |
 | `perfumeTray` | 0.28 × 0.14 × 0.18 m | 684 (688) | 1 | mirrored tray in a mitred brass gallery; faceted bottle with a brass stopper, a round flacon on its edge with an atomizer tube and bulb, a tall bottle with a cap |
 | `deskOrganiser` | 0.27 × 0.16 × 0.20 m | 524 (344) | 1 | two-tier letter tray (scooped sides, back, posts), paper and a loose sheet in each; pen pot with two capped, clipped pens and a sharpened pencil |
-| `laptopClosed` | 0.32 × 0.02 × 0.22 m | 336 (324) | 1 (+lid) | base and lid with rounded corners and eased edges, hinge barrel, thumb notch, ports, logo |
+| `laptopClosed` | 0.32 × 0.02 × 0.22 m | 372 (324) | 2 | base and lid with rounded corners and eased edges, hinge barrel, thumb notch, ports, logo; a keyboard, touchpad and screen under the lid, which opens (`lid_open`) |
 | `monitor` | 0.54 × 0.46 × 0.34 m | 1,486 (404) | 1 | rounded foot, curved neck, puffed back housing, slim bezel round the screen, logo and power light; keyboard of 57 separate keys; lofted mouse with a wheel |
 | `stuffedToy` | 0.19 × 0.28 × 0.19 m | 722 (1,300) | 1 | pear-shaped body and round head (lofted), tummy and muzzle, nose, eyes, cupped ears with pale insides, arms and legs swept, paws, foot pads, a bow and knot |
 | `toyBlocks` | 0.22 × 0.20 × 0.17 m | 692 (226) | 1 | five blocks with rounded edges, a raised letter (A, L, T, H, O: outlines with holes) on two faces each, a prism roof |
 
-## Parts left decorative for 0.3.0
+## The lids and the roll-top (2026-10-26)
 
-These are built with that part on its own node, its origin where it would turn, so a clip can be added without
-remodelling (two draw calls until then). Content rules forbid uses on things on a top, so 0.3.0 leaves them
-decorative:
+Things on tops have uses since G-63 (review I-tabletop-01); three of them open for theirs (review §9.2, F2), each a
+part of its own (two draws):
 
-- `kettle`: the `lid`, hinged at its back edge (a lid lifts about Blender X).
-- `breadBin`: the `roll_top`, a half-tube shell round the bin's axis (it rolls back about Blender X).
-- `laptopClosed`: the `lid`, hinged at its back edge.
+- `kettle`: the `lid` is hinged on the handle's side (it was at its back edge), as a jug kettle's is, the knob
+  moved to its free side; `lid_open` flips it up 80° in 0.4 s while the kettle is filled for *Make a cup of tea*
+  (`tea`, held 1.6 s, then shut).
+- `breadBin`: the `roll_top`, a half-tube shell round the bin's axis, rolls back 100° in 0.6 s (`roll_open`, about
+  Blender X) for *Make a sandwich* (`sandwich`, held 2.4 s): over the top and down behind, inside the base, showing
+  a loaf on the bin's floor (a soft box, 108 triangles, hidden at rest).
+- `laptopClosed`: the `lid`, hinged at its back edge, opens 105° in 0.8 s (`lid_open`) and stays open while the
+  laptop is used (by its uses' animation, `type`: browse, code, write, homework). Under it, hidden at rest, the
+  screen (`laptop_screen`, dark glass that glows a cool white at night with the room's lights, `#A9C8E8`) and on the
+  base a keyboard and a touchpad.
+
+In play (`check.mjs play --state review-stage --objects kettle,breadBin,laptopClosed --use all`, headless WebGPU) each
+clip played with its use at the counter. The play runner sets the laptop down at rot 0 whatever way the counter
+faces, so its screen faced along the counter there; set down facing the one using it (as the house generator does,
+about the way its host faces) the screen faces them.
 
 ## The alarm clock
 
