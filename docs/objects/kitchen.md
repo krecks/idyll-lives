@@ -281,7 +281,7 @@ for when there's nothing else to do, and a cook on the way to the fridge still h
 | `sideboard` Walnut sideboard | 2x1 · floor | — | kitchen / cabinets | Body, Top, Handles | Use | `door_open`: the second fluted door swings open 100° in 0.9 s onto shelved plates and bowls while clean things are put away (a `cupboard` station, `fetch`, `hold` 1.5 s). |
 | `buffet` Painted buffet | 2x1 · floor | — | kitchen / cabinets | Body, Top, Handles | Use | `door_open`: the wide middle door swings open, as the sideboard's. |
 | `chinaCabinet` China cabinet | 1x1 · floor | — | kitchen / cabinets | Body, Top, Handles | Use | Glass doors. `door_open`: the left glazed door swings open onto its plates, as the sideboard's. |
-| `barCart` Bar cart | 1x1 · floor | mix:drink | kitchen / cabinets | Frame, Trays | Use | `shake`: the cocktail shaker lifts 10 cm and tips 30° for mix. |
+| `barCart` Bar cart | 1x1 · floor | mix:drink | kitchen / cabinets | Frame, Trays | Use | `shake`: the cocktail shaker is taken off the cart for mix and shaken in both hands (`shake` clip, held.py `tool.shaker`; G-70, I-kitchen-13: it lifted 10 cm and tipped 30° on its own). |
 
 **In play** (signed off 2026-10-16):
 - The sideboard's, buffet's and china cabinet's door opens when clean dishes are put away in them (a snack's plate

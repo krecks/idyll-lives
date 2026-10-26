@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built cheerful pack models (tools/art/blender/families/pack_cheerful.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Each has one moving part: the record swings up, the microphone rises, the shaker tips, the hammock sways (a loop its sleeper rides), the sun rises (its sky glowing at night) and the curtain is drawn.",
+  "$comment": "Blender-built cheerful pack models (tools/art/blender/families/pack_cheerful.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Each has one moving part: the record swings up, the microphone rises, the shaker is taken off the cart, the hammock sways (a loop its sleeper rides), the sun rises (its sky glowing at night) and the curtain is drawn.",
   "version": 1,
   "entries": {
     "model.cheerful.jukebox": {
