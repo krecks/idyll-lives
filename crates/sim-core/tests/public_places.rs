@@ -563,7 +563,7 @@ fn two_customers_are_served_in_turn() {
 }
 
 /// A cart in a garden of their own has nobody behind it: they help themselves at any hour, as its
-/// `selfServe` says.
+/// `selfServe` says, in its own minutes (two, not the sold five: nobody's ordering or paying).
 #[test]
 fn a_cart_at_home_is_self_serve() {
     let (mut w, _) = town_beside("park");
@@ -574,15 +574,24 @@ fn a_cart_at_home_is_self_serve() {
     let cart = w.objects.iter().find(|o| w.content.objects[o.def].id == "iceCreamCart" && w.plot_at(o.x, o.z) == Some(0)).unwrap().id;
     until(&mut w, 22.0);
     assert!(w.staff.server_of(cart).is_none(), "nobody serves at home");
-    w.apply(Command::Use { sim: 0, object: cart, interaction: interaction(&w, cart, "iceCream") }).expect("open all hours at home");
+    let take = interaction(&w, cart, "iceCream");
+    w.apply(Command::Use { sim: 0, object: cart, interaction: take }).expect("open all hours at home");
     let fetch = anim(&w, "fetch");
-    let mut helped = false;
+    let (mut helped, mut longest) = (false, 0.0f32);
     for _ in 0..20 * TICKS_PER_MINUTE {
         w.tick_once();
         let row = sim_row(&w, 0);
         helped |= row[sim::OBJECT] == w.objects[cart as usize].stable as f32 && row[sim::ACTION] == fetch;
+        if let Some(a) = w.sims[0].current()
+            && let (TaskKind::Use { object, interaction }, Phase::Using { elapsed }) = (a.task.kind, &a.phase)
+            && object == cart
+            && interaction == take
+        {
+            longest = longest.max(*elapsed);
+        }
     }
     assert!(helped, "she took one from the freezer herself");
+    assert!(longest > 1.5 && longest < 3.0, "helped herself in its own two minutes, not the sold five ({longest})");
 }
 
 /// States to look at the vendors with (`DUMP_STATES=1`; tools/bench/README.md): each town place beside an empty

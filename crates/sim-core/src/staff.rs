@@ -60,6 +60,10 @@ pub struct SelfServe {
     pub label: String,
     /// The animation (index into `Content::animations`): as `Interaction::anim`.
     pub anim: Option<usize>,
+    /// How long it takes helping oneself (game minutes): the interaction's own `minutes` where
+    /// none is given. A sale's five minutes are the ordering, the hand-over and the paying; a
+    /// household's own cart or coffee machine is quicker (`Interaction::minutes_where`).
+    pub minutes: Option<f32>,
 }
 
 /// Content `service`.
@@ -90,6 +94,8 @@ pub(crate) struct SelfServeRaw {
     label: String,
     #[serde(default)]
     anim: Option<String>,
+    #[serde(default)]
+    minutes: Option<f32>,
 }
 
 #[derive(Deserialize)]
@@ -121,7 +127,10 @@ pub(crate) fn self_serve(raw: &SelfServeRaw, anim_index: &dyn Fn(&str) -> Option
         Some(a) => Some(anim_index(a).ok_or_else(|| Error::new(format!("{ctx}: selfServe: unknown anim '{a}' (declare it in \"animations\")")))?),
         None => None,
     };
-    Ok(SelfServe { label: raw.label.clone(), anim })
+    if raw.minutes.is_some_and(|m| !(m.is_finite() && m > 0.0)) {
+        return Err(Error::new(format!("{ctx}: selfServe: `minutes` must be above 0")));
+    }
+    Ok(SelfServe { label: raw.label.clone(), anim, minutes: raw.minutes })
 }
 
 /// Content `service`, checked.

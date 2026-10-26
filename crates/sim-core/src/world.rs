@@ -1542,6 +1542,12 @@ pub(crate) struct Ctx<'a> {
 }
 
 impl Ctx<'_> {
+    /// Whether someone serves at object `object`: a sold use's minutes are then the ordering, the
+    /// hand-over and the paying (`Interaction::minutes_where`).
+    pub(crate) fn served(&self, object: u32) -> bool {
+        self.staff.server_of(object).is_some()
+    }
+
     /// Score of the room or garden at a point (`roomRules.away` off the plots and off the lot).
     pub(crate) fn room_at(&self, pos: [f32; 2]) -> f32 {
         let (x, z) = (pos[0].floor() as i32, pos[1].floor() as i32);
@@ -4546,7 +4552,7 @@ fn pick_autonomous(
             let sleep = inter.tags & rhythm.sleep_tags != 0;
             let fills = inter.fills();
             let there = distance / walk_per_minute;
-            let minutes = inter.minutes + there;
+            let minutes = inter.minutes_where(ctx.served(obj.id)) + there;
             // A chosen use that would stop at once for an urgent need (`use_object`), then get
             // chosen again: don't choose it at all.
             if !sleep && breaks_off(sim, content, urgent, fills, minutes, inter, low) && !crate::planner::planned_now(content, sim, inter) {
@@ -5534,7 +5540,8 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                     if done && !over && content.objects[objects[object as usize].def].interactions.get(interaction).is_some_and(|i| i.conceive && elapsed >= i.minutes) {
                         sim.conceived = objects[object as usize].users().find(|&u| u != sim.id && ctx.briefs.get(u as usize).is_some_and(|b| b.game.is_some_and(|g| g.0 == object && g.1 == interaction)));
                     }
-                    given_up = done && first && content.objects[objects[object as usize].def].interactions.get(interaction).is_some_and(|i| elapsed < i.minutes);
+                    let taken = content.objects[objects[object as usize].def].interactions.get(interaction).map_or(0.0, |i| i.minutes_where(ctx.served(object)));
+                    given_up = done && first && elapsed < taken;
                     // Every finished use wears it a little, by how much of a full use it was (a
                     // nap cut short when they're rested is a fraction); better quality wears slower.
                     if done {
@@ -5542,7 +5549,7 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                         let def = &content.objects[o.def];
                         let rules = &content.object_rules;
                         let was = o.broken();
-                        let share = def.interactions.get(interaction).map_or(1.0, |it| (elapsed / it.minutes.max(1.0)).min(1.0));
+                        let share = def.interactions.get(interaction).map_or(1.0, |it| (elapsed / it.minutes_where(ctx.served(object)).max(1.0)).min(1.0));
                         let wear = def.wear_per_use * share * (1.0 - rules.wear_per_quality * f32::from(o.quality));
                         o.wear = (o.wear + wear.max(0.0)).min(1.0);
                         // Weeded and watered: the crop comes on (only while it grows).
@@ -5697,6 +5704,8 @@ fn use_object(
 ) -> bool {
     let content = ctx.content;
     let inter = &content.objects[obj.def].interactions[interaction];
+    // Helping oneself where nobody serves is quicker than being served (`minutes_where`).
+    let total = inter.minutes_where(ctx.served(obj.id));
     // Quality and skill scale what the Sim gets out of it (not what it costs).
     let boost = quality_boost(content, inter, obj.quality) * inter.skill_factor(&content.skill_rules, &sim.skills);
     let rhythm = &content.day_rhythm;
@@ -5707,7 +5716,7 @@ fn use_object(
     if inter.cares()
         && let Some(baby) = obj.users().find(|&u| u != sim.id)
     {
-        let per_tick = inter.care.map(|g| g / inter.minutes * minutes);
+        let per_tick = inter.care.map(|g| g / total * minutes);
         sim.care_out = Some((baby, per_tick));
     }
     let (mut any_gain, mut satisfied, mut urgent, mut wakes) = (false, true, false, false);
@@ -5766,7 +5775,7 @@ fn use_object(
         // toilet halfway through a film, not off the toilet for a bite to eat).
         let planned = crate::planner::planned_now(content, sim, inter);
         let chosen = sim.current.as_ref().is_some_and(|a| !a.task.directed && !a.task.routine);
-        let left = inter.minutes - elapsed;
+        let left = total - elapsed;
         let drained = emptying
             || (urgent && planned)
             || (chosen && breaks_off(sim, content, pressing, fills, left, inter, low));
@@ -5783,7 +5792,7 @@ fn use_object(
         // loading a machine or emptying it, or anything that leaves a load to work on next.
         // So does a game for two: one stopping would end it for the other.
         let job = inter.gradual || inter.picks || inter.changes_outfit || inter.partner || inter.loads || inter.unloads || inter.makes.is_some();
-        elapsed >= inter.minutes || (any_gain && satisfied && !planned && !routine && !practising && !job) || drained
+        elapsed >= total || (any_gain && satisfied && !planned && !routine && !practising && !job) || drained
     };
     // Halfway through changing: in the next outfit, which views draw (a change of looks).
     let half = inter.minutes * 0.5;
@@ -5801,7 +5810,7 @@ fn use_object(
         let (fx, fz) = ctx.index.links.approach_of(obj.id).unwrap_or_else(|| obj.front_tile(content));
         sim.mess = Some((fx, fz, inter.dirt));
     }
-    if done && let Some(m) = inter.earns_feeling(elapsed, &sim.skills) {
+    if done && let Some(m) = inter.earns_feeling_over(total, elapsed, &sim.skills) {
         social::add_feeling(&mut sim.feelings, m, &content.feelings, ctx.tick);
     }
     done

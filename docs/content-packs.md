@@ -208,7 +208,7 @@ fields) load unchanged: both mergers rename the keys first (`LEGACY_KEYS` in `pa
 | `dirt` | Mess each use leaves on the tiles around the object (0..1). Default: by tag, `roomRules.dirt` (cooking 0.12, food 0.06, bathroom 0.05, hygiene 0.04). |
 | `sound` | What it sounds like while it lasts (looks only): a world sound key (as for the object's `sounds`), `"chop"` for a cheese board, `"toaster"`, or `"none"` (silence). A key played once plays as it starts: `"vendCan"` (a can from the machine, then drunk in silence). Default: the object's `sounds` for its `anim`, else by `anim`. Not for a `recipe`: its steps sound by the station they're done at (and a step's own `sound`). |
 | `endSound` | A sound played once as it ends: `"flush"` (toilets), `"ping"` (a microwave), `"toastPop"`, `"hangUp"` (the phone box). |
-| `selfServe` | Sold by the object's server (`staff`): `{"label": "Take an ice cream from the freezer", "anim": "fetch"}`, the label and animation where nobody serves (a household's own cart). Where someone serves, the interaction's own `label` and `anim` (`buy`) are used, it waits for the server and is closed outside the post's hours. Its `minutes` are the order, the hand-over and the paying (5: the `buy` and `sell` clips' five seconds at speed 1); with `eat`, the food is what's handed over. An error on an object without `staff`. Default: not sold by anyone. |
+| `selfServe` | Sold by the object's server (`staff`): `{"label": "Take an ice cream from the freezer", "anim": "fetch", "minutes": 2}`, the label, animation and time where nobody serves (a household's own cart). Where someone serves, the interaction's own `label` and `anim` (`buy`) are used, it waits for the server, is closed outside the post's hours and takes the interaction's `minutes` (the order, the hand-over and the paying: 5, the `buy` and `sell` clips' five seconds at speed 1). Where nobody serves it takes `selfServe.minutes` instead, the helping oneself (2: no order, nobody to pay), else the interaction's own `minutes`; with `eat`, the food is what's handed over. An error on an object without `staff`, or with `minutes` not above 0. Default: not sold by anyone. |
 
 ### How the multipliers stack
 
@@ -1034,7 +1034,7 @@ keys share these objects. The rules:
 | Interactions of things on the `surface` layer | not `lie`, `inside`, `whole`, `baby`, `care`, `needsTable` or a `recipe` | a thing on a top is used standing or sitting at its top |
 | `laundry` | `perDay` above 0, `most` at least 1 | no washing would ever pile up to a load |
 | An object's `staff` | `at` within 1.5 m of the footprint, `hours` two different hours of the day | a server off in the street; an empty window |
-| An interaction's `selfServe` | on an object with `staff`, an `anim` the content has | nobody could sell it |
+| An interaction's `selfServe` | on an object with `staff`, an `anim` the content has, `minutes` above 0 | nobody could sell it; a use that takes no time |
 | `service` | `share` 0 or more, `waitMinutes` above 0, an `anim` the content has | |
 | Ids of an object's interactions, and of needs, emotions and feelings | unique | two with one id are ambiguous: a save reloaded the first of two interactions |
 | Friendship and romance in `bondPresets` | −100 to 100 | relationships are kept in that range |

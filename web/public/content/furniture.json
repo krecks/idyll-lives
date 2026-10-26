@@ -528,7 +528,7 @@
         {
           "id": "pour",
           "label": "Order a coffee to take to a table",
-          "selfServe": { "label": "Pour a coffee to take to a table", "anim": "fetch" },
+          "selfServe": { "label": "Pour a coffee to take to a table", "anim": "fetch", "minutes": 2 },
           "stages": [
             "teen",
             "youngAdult",

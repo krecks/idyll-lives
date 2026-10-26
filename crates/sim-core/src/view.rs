@@ -993,7 +993,8 @@ fn task_view(world: &World, task: &Task, phase: Option<&Phase>, held: Option<cra
     let (label, object, target, minutes) = match task.kind {
         TaskKind::Use { object, interaction } => {
             let inter = &content.objects[world.objects[object as usize].def].interactions[interaction];
-            (inter.label.clone(), world.stable_of(object), None, inter.minutes)
+            let served = world.staff.server_of(object).is_some();
+            (inter.label.clone(), world.stable_of(object), None, inter.minutes_where(served))
         }
         TaskKind::MoveTo { .. } => ("Go here".to_owned(), None, None, 1.0),
         TaskKind::Social { target, social } => {

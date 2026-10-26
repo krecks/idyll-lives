@@ -109,7 +109,7 @@ rides.
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `iceCreamCart` Ice cream cart | 2x1 · floor | iceCream:buy | community / food | Body, Parasol, Bands | Use | `lid_open`: the freezer lid slides open a second into the sale, as the seller reaches in, for 1.4 s. On a public lot the ice cream seller stands behind it from 10:00 to 20:00 (`staff`) and serves *Buy an ice cream* (5 minutes: ordered, scooped, handed over, paid for); closed outside those hours. In a garden of a household's own it is self-serve, *Take an ice cream from the freezer* (`selfServe`). Then eaten sitting on a bench or at a café table nearby (else standing). Drawn as two scoops in a paper cup with a wooden spoon (`item.iceCreamCup`, M-held-03). |
+| `iceCreamCart` Ice cream cart | 2x1 · floor | iceCream:buy | community / food | Body, Parasol, Bands | Use | `lid_open`: the freezer lid slides open a second into the sale, as the seller reaches in, for 1.4 s. On a public lot the ice cream seller stands behind it from 10:00 to 20:00 (`staff`) and serves *Buy an ice cream* (5 minutes: ordered, scooped, handed over, paid for); closed outside those hours. In a garden of a household's own it is self-serve, *Take an ice cream from the freezer* (`selfServe`, 2 minutes: nobody to order from or pay). Then eaten sitting on a bench or at a café table nearby (else standing). Drawn as two scoops in a paper cup with a wooden spoon (`item.iceCreamCup`, M-held-03). |
 | `hotDogStand` Hot dog stand | 2x1 · floor | hotDog:buy | community / food | Body, Awning | Use | `lid_open`: the hot-plate lid lifts a second into the sale for 1.4 s. Its vendor serves from behind it from 11:00 to 21:00 on a public lot, *Buy a hot dog*; self-serve elsewhere (*Help yourself to a hot dog*). Then eaten sitting on a bench or at a café table nearby (else standing). Carried in the kraft takeaway box (`item.takeout`, M-held-03; a hot dog in its bun is still to be made). Drawn as a hot dog in its bun on a paper boat, mustard and ketchup on it (`item.hotDog`, M-held-03). |
 | `vendingSnack` Snack machine | 1x1 · floor | snack:fetch | community / food | Body | Use | `drop`: a snack slides down to the tray for snack, then eaten sitting on a bench or at a table nearby (G-67). Drawn as a packet of crisps (`item.crisps`, M-held-03). |
 | `vendingDrink` Drinks machine | 1x1 · floor | drink:drink | community / food | Body | Use | `drop`: a can drops to the tray for drink, drunk from in the hand (held.py `tool.can`, G-70). |
@@ -122,7 +122,8 @@ rides.
 - With vendors (0.5.0, I-community-09; `vendors-park`, `vendors-market`): the seller listens to the order, turns to
   the freezer as its lid slides open and scoops, holds the ice cream out over the cart and hands it over, and takes
   the money (`buy` and `sell`, `characters/clips/serve.ts`); the same at the hot dog stand and the stall. The machines
-  stay self-serve.
+  stay self-serve. On a household's own lot the carts, the stall and the counters are helped from in their own time
+  (content `selfServe.minutes`, 1 to 2 minutes), not the sold five (`public_places.rs` `a_cart_at_home_is_self_serve`).
 - Each clip plays its full length and shuts in every run. Nothing needed fixing.
 - Since the authenticity review (G-43): two at a stall stand one in front of each half, facing it, not one inside the
   other (`stand_spot`); one alone at a 2-wide stall or cart at its middle, not its left end (I-community-08).

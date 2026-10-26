@@ -714,7 +714,7 @@
         {
           "id": "iceCream",
           "label": "Buy an ice cream",
-          "selfServe": { "label": "Take an ice cream from the freezer", "anim": "fetch" },
+          "selfServe": { "label": "Take an ice cream from the freezer", "anim": "fetch", "minutes": 2 },
           "anim": "buy",
           "minutes": 5,
           "eat": {
@@ -753,7 +753,7 @@
         {
           "id": "hotDog",
           "label": "Buy a hot dog",
-          "selfServe": { "label": "Help yourself to a hot dog", "anim": "fetch" },
+          "selfServe": { "label": "Help yourself to a hot dog", "anim": "fetch", "minutes": 2 },
           "anim": "buy",
           "minutes": 5,
           "eat": {
@@ -872,7 +872,7 @@
         {
           "id": "fruit",
           "label": "Buy a piece of fruit",
-          "selfServe": { "label": "Pick a piece of fruit", "anim": "fetch" },
+          "selfServe": { "label": "Pick a piece of fruit", "anim": "fetch", "minutes": 1 },
           "anim": "buy",
           "minutes": 5,
           "eat": {
@@ -944,7 +944,7 @@
         {
           "id": "pastry",
           "label": "Buy a pastry",
-          "selfServe": { "label": "Take a pastry from the case", "anim": "fetch" },
+          "selfServe": { "label": "Take a pastry from the case", "anim": "fetch", "minutes": 2 },
           "anim": "buy",
           "minutes": 5,
           "eat": {
@@ -963,7 +963,7 @@
         {
           "id": "takeCake",
           "label": "Buy a slice of cake to take to a table",
-          "selfServe": { "label": "Take a slice of cake to a table", "anim": "fetch" },
+          "selfServe": { "label": "Take a slice of cake to a table", "anim": "fetch", "minutes": 2 },
           "anim": "buy",
           "minutes": 5,
           "autonomous": false,

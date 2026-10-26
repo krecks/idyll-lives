@@ -351,11 +351,26 @@ impl Interaction {
 
     /// Whether finishing after `elapsed` minutes earns the feeling.
     pub fn earns_feeling(&self, elapsed: f32, skills: &[f32; MAX_SKILLS]) -> Option<usize> {
+        self.earns_feeling_over(self.minutes, elapsed, skills)
+    }
+
+    /// Whether finishing after `elapsed` of `minutes` earns the feeling.
+    pub fn earns_feeling_over(&self, minutes: f32, elapsed: f32, skills: &[f32; MAX_SKILLS]) -> Option<usize> {
         let skilled = self
             .skill
             .is_none_or(|s| skills[s].floor() >= self.feeling_min_skill);
         self.feeling
-            .filter(|_| skilled && elapsed >= self.minutes * 0.5)
+            .filter(|_| skilled && elapsed >= minutes * 0.5)
+    }
+
+    /// How long this takes at an object where `served` (someone serves at it), or where nobody
+    /// does: a sold use's own `minutes` are the ordering, the hand-over and the paying; helping
+    /// oneself where there's nobody to serve is `selfServe.minutes` (a coffee poured at home).
+    pub fn minutes_where(&self, served: bool) -> f32 {
+        if served {
+            return self.minutes;
+        }
+        self.served.as_ref().and_then(|s| s.minutes).unwrap_or(self.minutes)
     }
 }
 

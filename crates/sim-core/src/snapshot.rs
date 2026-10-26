@@ -297,7 +297,7 @@ fn progress(world: &World, s: &Sim) -> f32 {
             .objects
             .get(object as usize)
             .and_then(|o| world.content.objects[o.def].interactions.get(interaction))
-            .map_or(0.0, |i| i.minutes),
+            .map_or(0.0, |i| i.minutes_where(world.staff.server_of(object).is_some())),
         TaskKind::Cook { minutes, .. } => f32::from(minutes),
         _ => return -1.0,
     };
