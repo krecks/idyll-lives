@@ -423,6 +423,7 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | sitHandsFar | yes | 1.67 | the same reaching further out, leaning in more: at a desk or table a chair can't be pulled in to far enough (drawer pedestals where the knees go: `TUCK`) |
 | interact | no | 2.0 | reaching to use something |
 | pickUp | no | 0.87 | lifting, serving, fetching |
+| buy, sell | no | 5.0 | at a vendor's (`clips/serve.ts`, sim-core `staff.rs`): the customer orders pointing at it, waits, takes it in the right hand and pays with the left; the vendor behind listens and nods, turns and reaches down into the goods, holds it out over the top and hands it over, takes the money and puts it away. Played together from the moment the vendor serves; what changes hands is drawn on the vendor's right palm between picking it up and handing it over (0.42–0.62 of the clip), on the customer's from then on (`HANDED`) |
 | spell | yes | 2.1 | hands busy at a counter (cook, wash, paint, tinker) |
 | chop, stir, flip | yes | 1.6, 2.0, 2.0 | the cooking steps of those names |
 | eat, drink | no | 1.33, 2.0 | eating and sips (standing, and now and then as the seated upper body) |

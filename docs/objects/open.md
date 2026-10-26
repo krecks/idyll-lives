@@ -144,8 +144,6 @@ it left is here, with its id; §9 of the review says what each would take.
 ### Content and sim
 - **No privacy** (G-72): a bathroom in use opens for anyone walking in (else they'd walk through its shut door), and
   "Try for a baby" is a 30-minute standing kiss wherever the two are (I-systems-05, I-social-05). New behaviour.
-- **Nobody serves in town** (I-community-09): the carts, the stall, the bakery case and the café are self-serve, and
-  their labels say so; vendors are later (Q-17).
 - **Laundry:** the resident stands at the washer for its whole wash and folds at the dryer with empty hands; the
   basket plays no part (I-bathroom-07: a timed machine is new behaviour).
 - **Worked from the edge:** the bonsai bench, the rose arbour's roses, the cookbook lectern and the streetball hoop
@@ -175,7 +173,7 @@ it left is here, with its id; §9 of the review says what each would take.
   squashed part, not two halves (A-outdoor-01); the washing comes down onto the line all together (A-outdoor-02);
   the grandfather clock's trunk door stays shut (A-decor-01).
 - **Parts with a use but no clip:** the high chair's tray (babies sit in it since G-66), the kettle's lid, the bread
-  bin's roll-top and the laptop's lid (used at their top since G-63); the bakery case's door is on the baker's side.
+  bin's roll-top and the laptop's lid (used at their top since G-63).
 
 ### Tools
 - The lamp build (`_bulb`) checks only the light's height, not `at`.
@@ -197,6 +195,13 @@ it left is here, with its id; §9 of the review says what each would take.
   chair is used (I-kids-01).
 - **Models:** the entry console's and the spritz station's mirrors on back boards (M-packs-01, M-packs-02); the party
   bar's back bar (M-packs-03); bathers' shins in the heart tub (A-packs-01); the power blender's blades (A-packs-02).
+
+### Fixed in 0.5.0
+- **Someone serves in town** (I-community-09, Q-17): staff stand behind the carts, the market stalls, the shop
+  counters, the bakery cases and the café's coffee machine on public lots during their hours, and sell what they used
+  to leave to an honesty box: ordered, handed over, paid for (`staff.rs`, the `buy` and `sell` clips). Closed outside
+  their hours; self-serve, under the old labels, on a household's own lot. The bakery case's back door is the baker's
+  and opens as they reach in; the shop counter's till is turned to the shopkeeper.
 
 ## Notes on the sim
 

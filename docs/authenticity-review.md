@@ -906,7 +906,7 @@ Planned separately, after this review (§11.1).
 | A-outdoor-02 (in part) | S3 | The washing comes down onto the line all together, not piece by piece. | A part per line takes the model to five draws: a rebuild that keeps the still body to one finish. M. |
 | A-decor-01 (in part) | S3 | The grandfather clock's trunk door never opens. | A fifth draw call; the clock is wound at its dial, so it can stay shut. |
 | I-kids-01 (fixed) | — | The high chair's tray doesn't slide out for the baby. | A tray clip in `kids.py`. S. |
-| I-community-09 (in part) | — | The bakery case's sliding door is on the baker's side. | With vendors (§9.3). |
+| I-community-09 (fixed, 0.5.0) | — | The bakery case's sliding door is on the baker's side. | The baker uses it (`feat/vendors`). |
 | I-tabletop-01 (fixed) | — | The kettle's lid, the bread bin's roll-top and the laptop's lid have uses since G-63 but no clip. | A clip each in `tabletop.py`. S. |
 
 ### 9.3 Small leftovers
@@ -916,7 +916,7 @@ Planned separately, after this review (§11.1).
 | I-packs-12 (open) | S3 | The bonsai, the roses on the arbour, the lectern and the streetball hoop are worked from the object's edge. | Possible now with G-62: `places` on each; a reading hand pose at the lectern (a clip). S–M. |
 | I-garden-11 (open) | S3 | A child can't reach the fruit it picks. | The owner's decision (§11.3 c). |
 | I-bathroom-07 (in part) | S3 | The resident stands at the washer for its 30 minutes and folds at the dryer with empty hands. | A timed machine (load it, it runs on its own, unload it) and a fold at the basket: new behaviour. M. |
-| I-community-09 (in part) | S2 | Nobody serves in town: the food is self-serve. | Vendors and shopkeepers (Q-17, later). L. |
+| I-community-09 (fixed, 0.5.0) | S2 | Nobody serves in town: the food is self-serve. | Vendors and shopkeepers serve during their hours (`staff.rs`, `feat/vendors`); self-serve stays on a household's own lot. |
 | I-bathroom-04 (in part) | S3 | About thirty uses still have no sound: the treadmill and bikes, the workbench, the ball games and darts, the arcade, the sewing machine, the pottery wheel, the coffee machines, the blender's motor, the microwave, the toaster, an oven's fan, the pizza oven, the fridge door, the bin lid, the vending machines, the phone box, the basketball, singing, a bowed cello, the punch bag and the smash bin. | New synthesised sounds (art), keyed by `sound`; the headed listening check G-53 left. M. |
 | A-residents-03 (in part) | S3 | Feet slide 56–78 % of the way at speeds 4 and 5. | Won't fix: no gait steps at 45–90 m/s without strobing. |
 | M-lighting-08 (fixed) | S3 | On Low the four forward lamps aren't kept to their room, nor are tiles split by a diagonal wall. | The same room mask in the forward lights' shader (§11.3 e). M. |
@@ -1169,7 +1169,7 @@ Balance after the last fix (`sweep-sim`, 180 days): median weekly savings $407, 
 - **Brushing teeth gives less hygiene** (`content`): at 0.05 the busy soak's town had no birth in 120 hours; 0.03 (under washing hands' rate) passes. *Recommendation:* accept; the soak's threshold is the real question, with (b)'s baby chance.
 - **Feet slide at speeds 4 and 5** (A-residents-03): won't fix, as no gait steps at 45–90 m/s without strobing. *Recommendation:* accept.
 - **The draw budget over moving parts:** the hot tub's cover folds as one squashed part, the washing comes down in one piece, the grandfather clock's trunk door stays shut, all to stay within four draws (§9.2). *Recommendation:* accept now; allow a fourth draw for the hot tub's cover with its next rebuild, as for the shower (Q-05).
-- **Town food is self-serve:** nobody serves, so the labels and descriptions say tin, honesty box, tongs or self-service till (G-67, Q-17). *Recommendation:* accept until vendors.
+- **Town food is self-serve:** nobody serves, so the labels and descriptions say tin, honesty box, tongs or self-service till (G-67, Q-17). *Recommendation:* accept until vendors. *Since 0.5.0:* vendors and shopkeepers serve (I-community-09); the self-serve labels stay for a household's own cart.
 - **Games for two without a partner:** the seesaw, ping-pong and park chess are refused with nobody free; pool and foosball are practised alone; the home chess table stays a game for one (M-hobbies-11). *Recommendation:* accept.
 - **Harvests go to the fridge** (G-68 read with Q-18): crops still replant themselves; "Pick an apple" and the nature lover's veggie bed stay nibbles eaten on the spot, as does a harvest with no fridge. *Recommendation:* accept.
 - **The high chair by day only:** night feeds stay at the crib, in the arms. *Recommendation:* accept.

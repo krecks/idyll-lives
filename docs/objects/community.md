@@ -109,16 +109,20 @@ rides.
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `iceCreamCart` Ice cream cart | 2x1 · floor | iceCream:fetch | community / food | Body, Parasol, Bands | Use | `lid_open`: the freezer lid slides open for iceCream (*Take an ice cream from the freezer*); `hold` 2 s. Nobody sells: it is self-serve (G-67), fetched and paid for here, then eaten sitting on a bench or at a café table nearby (else standing). Drawn as three scoops in a dessert bowl (`item.iceCream`, M-held-03; a cone or a paper cup is still to be made). |
-| `hotDogStand` Hot dog stand | 2x1 · floor | hotDog:fetch | community / food | Body, Awning | Use | `lid_open`: the hot-plate lid lifts for hotDog (*Help yourself to a hot dog*). Nobody sells: it is self-serve (G-67), fetched and paid for here, then eaten sitting on a bench or at a café table nearby (else standing). Carried in the kraft takeaway box (`item.takeout`, M-held-03; a hot dog in its bun is still to be made). |
+| `iceCreamCart` Ice cream cart | 2x1 · floor | iceCream:buy | community / food | Body, Parasol, Bands | Use | `lid_open`: the freezer lid slides open a second into the sale, as the seller reaches in, for 1.4 s. On a public lot the ice cream seller stands behind it from 10:00 to 20:00 (`staff`) and serves *Buy an ice cream* (5 minutes: ordered, scooped, handed over, paid for); closed outside those hours. In a garden of a household's own it is self-serve, *Take an ice cream from the freezer* (`selfServe`). Then eaten sitting on a bench or at a café table nearby (else standing). Drawn as three scoops in a dessert bowl (`item.iceCream`, M-held-03; a cone or a paper cup is still to be made). |
+| `hotDogStand` Hot dog stand | 2x1 · floor | hotDog:buy | community / food | Body, Awning | Use | `lid_open`: the hot-plate lid lifts a second into the sale for 1.4 s. Its vendor serves from behind it from 11:00 to 21:00 on a public lot, *Buy a hot dog*; self-serve elsewhere (*Help yourself to a hot dog*). Then eaten sitting on a bench or at a café table nearby (else standing). Carried in the kraft takeaway box (`item.takeout`, M-held-03; a hot dog in its bun is still to be made). |
 | `vendingSnack` Snack machine | 1x1 · floor | snack:fetch | community / food | Body | Use | `drop`: a snack slides down to the tray for snack, then eaten sitting on a bench or at a table nearby (G-67). |
 | `vendingDrink` Drinks machine | 1x1 · floor | drink:drink | community / food | Body | Use | `drop`: a can drops to the tray for drink. |
-| `marketStall` Market stall | 2x1 · floor | browse:look fruit:fetch | community / food | Body, Awning | Static | Static. *Pick a piece of fruit* (was "a bag of fruit"), paid into an honesty box. Nobody sells: it is self-serve (G-67), fetched and paid for here, then eaten sitting on a bench or at a café table nearby (else standing). |
+| `marketStall` Market stall | 2x1 · floor | browse:look fruit:buy | community / food | Body, Awning | Static | Static. A stallholder behind each stall from 8:00 to 18:00 on a public lot sells *Buy a piece of fruit* (was "a bag of fruit"); browsing needs nobody. Self-serve elsewhere (*Pick a piece of fruit*). Then eaten sitting on a bench or at a café table nearby (else standing). |
 
 **In play** (signed off 2026-10-16):
 - Checked with the carts and market stall outdoors, the machines indoors: the ice cream cart's lid for an ice cream
   (held 2 s), the hot dog stand's lid, a snack and a can dropping in the machines, the market stall browsed and
   fruit bought.
+- With vendors (0.5.0, I-community-09; `vendors-park`, `vendors-market`): the seller listens to the order, turns to
+  the freezer as its lid slides open and scoops, holds the ice cream out over the cart and hands it over, and takes
+  the money (`buy` and `sell`, `characters/clips/serve.ts`); the same at the hot dog stand and the stall. The machines
+  stay self-serve.
 - Each clip plays its full length and shuts in every run. Nothing needed fixing.
 - Since the authenticity review (G-43): two at a stall stand one in front of each half, facing it, not one inside the
   other (`stand_spot`); one alone at a 2-wide stall or cart at its middle, not its left end (I-community-08).
@@ -129,11 +133,11 @@ rides.
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `shopCounter` Shop counter | 2x1 · floor | treat:idle | community / shops | Counter, Trim | Use | `till`: the cash drawer slides out for treat (`hold` 1.5 s): *Pick a little something and pay at the till*, a self-service till (G-67: nobody serves). |
-| `bakeryCase` Bakery case | 2x1 · floor | pastry:fetch takeCake:fetch | community / shops | Counter, Trim | Use | `door`: the back glass door slides aside for pastry (`hold` 2 s; the door is still the baker's side's). Provides `cake`: the café chair's slice of cake is taken from it first (`takeCake`, not chosen on its own). Nobody sells: it is self-serve (G-67), fetched and paid for here, then eaten sitting on a bench or at a café table nearby (else standing). |
-| `groceryShelf` Grocery shelves | 2x1 · floor | browse:look sandwich:fetch | community / shops | Shelves, Trim | Static | Static. Nobody sells: it is self-serve (G-67), fetched and paid for here, then eaten sitting on a bench or at a café table nearby (else standing). |
+| `shopCounter` Shop counter | 2x1 · floor | treat:buy | community / shops | Counter, Trim | Use | The till faces the shopkeeper behind it (keypad and drawer; the customer's display at its front, 0.5.0). `till`: the cash drawer pops 10 cm out to the back as the shopkeeper takes the money (3.9 s into the sale, for 1.1 s). On a public lot the shopkeeper serves from 8:00 to 20:00, *Buy a little something* (6 minutes); elsewhere it's a self-service till (*Pick a little something and pay at the till*). |
+| `bakeryCase` Bakery case | 2x1 · floor | pastry:buy takeCake:buy | community / shops | Counter, Trim | Use | `door`: the back glass door, on the baker's side, slides aside as the baker reaches in (a second into the sale, for 1.4 s). On a public lot the baker serves from 7:00 to 18:00, *Buy a pastry* (5 minutes) and *Buy a slice of cake to take to a table*; self-serve elsewhere (tongs). Provides `cake`: the café chair's slice of cake is bought here first (`takeCake`, not chosen on its own). The pastry is eaten sitting on a bench or at a café table nearby (else standing). |
+| `groceryShelf` Grocery shelves | 2x1 · floor | browse:look sandwich:fetch | community / shops | Shelves, Trim | Static | Static. Self-serve, as shelves are: the sandwich is taken and paid for here (the till isn't visited), then eaten sitting on a bench or at a café table nearby (else standing). |
 | `cafeTable` Café table | 1x1 · floor | — | community / shops | Top, Frame | Static | Static. |
-| `cafeChair` Café chair | 1x1 · floor | sit:sit coffee:drink cake:eat | community / shops | Frame, Seat | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. The coffee is poured at the lot's coffee machine first and the cake taken from its bakery case (content `fetch`, G-67); a cake needs a bakery case on the lot. |
+| `cafeChair` Café chair | 1x1 · floor | sit:sit coffee:drink cake:eat | community / shops | Frame, Seat | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. The coffee is fetched from the lot's coffee machine first and the cake from its bakery case (content `fetch`, G-67): at the café the barista makes the coffee and the baker serves the cake while they're open (the coffee 7:00–19:00, the cake 7:00–18:00), and *Have a coffee* is refused once the machine's post is shut; a cake needs a bakery case on the lot. |
 
 **In play** (signed off 2026-10-16):
 - Checked indoors: the till drawer (held 1.5 s) and the bakery case's back door (held 2 s) for their uses, the
@@ -147,6 +151,12 @@ rides.
 - The shop counter's "Counter" colours its front panels, "Trim" the walnut top and frame.
 - Since the authenticity review (G-43): two at the shop counter, the bakery case or the grocery shelves stand one in
   front of each half, facing it; one alone at its middle (I-community-08).
+- With vendors (0.5.0, I-community-09; `vendors-cafe`, `vendors-bakery`, `vendors-grocer`): the café's and the
+  bakery's counters, cases and coffee machines stand a tile in from the back wall so their staff stand behind them;
+  the café's barista keeps the counter and the coffee machine (they're 1.5 m apart: `service.share`) and steps over
+  to the machine for a coffee; the bakery has two (its first case and the coffee machine, its second case and the
+  counter); the grocer's shopkeeper stands between the counter and the front window. The baker reaches in through the
+  case's back door and hands the pastry over the top; the shopkeeper's till drawer pops as they take the money.
 
 ## CM5. Farm (8)
 
