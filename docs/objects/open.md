@@ -115,8 +115,8 @@ a single object does is on its category page ([README.md](README.md)); this page
 ## Still open
 
 The authenticity review (2026-10-21 to 22, [docs/authenticity-review.md](../authenticity-review.md)) fixed most of
-what this list held; those items are under "Fixed by the authenticity review" below, with their finding ids. What
-it left is here, with its id; §9 of the review says what each would take.
+what this list held, and 0.5.0 most of what it left, the new behaviour included; both are under "Fixed" below, with
+their finding ids. What is still open is here, with its id; §9 of the review says what each would take.
 
 ### Residents
 - **Props still mimed** (the rest of G-70): the tools (the watering can, the shears, the easel's brush, the chalk,
@@ -130,6 +130,10 @@ it left is here, with its id; §9 of the review says what each would take.
 ### Content and sim
 - **One-use machines:** the dishwasher and the neat pack's laundry centre are still loaded and run in one use; a
   machine that runs on its own (content `runs`) would fit them.
+- **Vendors in older towns:** a café's or bakery's counter saved before 0.5.0 stands against its back wall, with no
+  room behind it for a server, so it stays self-serve (new towns have the tile). Servers wear no apron and appear at
+  their post at opening time rather than walking in. A sold use takes its 5 minutes even where nobody serves: a
+  coffee poured at home takes 5 minutes, not 2.
 - **The sounds want a listen by ear** (G-53): each was rendered and checked by its spectrum, timing and level, not
   heard (`bench-results/review/fixes/sounds/wav/`).
 - **Later, as polish:** the range hood's light while the hob below is in use (its hum is in; Q-19); flowers cut for
@@ -140,69 +144,15 @@ it left is here, with its id; §9 of the review says what each would take.
   (A-decor-01, won't fix): it would be a fifth draw, over what the gate passes, and the clock is wound at its dial.
 - **Uses end once every need they raise is full**, by design (I-systems-02); it makes clips easy to miss in checks.
 
-### Models
-
 ### Tools
 - The review's tooling leftovers (`cargo review sizes`' measuring, `check.mjs play` with one resident, the debug
   states) are in [docs/authenticity-review.md](../authenticity-review.md) §7.
 
 ### Not looked at
+- Low on WebGL2 against Babylon's figures since the woods went into squares: the machine was too busy for the 0.4.1
+  method (`performance.md`, 0.5.0), and the squares' +0.2 ms of main thread wants a look.
 - The held things that no recipe in the test house makes (the tasting board, pizza, pie, slices, sandwich, grill
   platter); a meal from the fridge eaten at a pulled-in chair (eating was checked with the café's cake).
-
-### Fixed for 0.5.0
-- **Rendering:** each lamp lights only its own room on Low too, and on each half of a tile split by a diagonal wall,
-  on every preset (M-lighting-08); the town map leaves the world its clicks and camera drags, as the pie menu does;
-  with a wall thing in hand the walls stand, so nothing hangs over a lowered wall (M-houses-01); `partBox` is the box
-  of the part's own mesh. Checked on PlayCanvas and found right: the stairs seen from the basement are whole to the
-  top (M-living-02, fixed on Babylon by 5b1e7152, carried over by the port). The mirrors' `glGetProgramiv` log (a
-  Babylon one) no longer shows: 6 runs on High on WebGL2, each in a new browser (the bench's mirror camera for 20 s,
-  then the game in front of a mirror), without a single WebGL message. What the check found instead is fixed: the mirrors' warm-up drew each glass
-  into its own reflection (WebGPU dropped that frame's commands, once a load), and a quilt drawn before its first
-  update had no instance buffer (WebGL2 errors until Chrome stopped reporting any, a dropped frame on WebGPU).
-- **Props in hand** (G-70): a book, a mug, a tumbler, a wine glass or a can, a fork, a spoon or chopsticks, a phone
-  at the ear and in both hands, a coin tossed into the town fountain, a bag of bird seed on the park bench, a dart,
-  each player's ping-pong bat and pool cue, and the bar carts' shaker shaken in both hands (I-held-01 in part,
-  I-social-01 in part, I-hobbies-05, I-kitchen-13, I-community-11 in part); the pool table's balls break at the
-  first shot (I-hobbies-05).
-- **The food from town in its own wrapping:** a paper cup of ice cream, a hot dog in its bun, a packet of crisps, an
-  apple and a pastry in a paper bag (M-held-03).
-- **Performance:** Low draws the woods in 100 m squares rather than eight sectors to the horizon, so far trees off
-  screen are left out: on WebGL2, the wide view, 1.79 → 1.21 M triangles and −0.3 ms of GPU time, for +0.2 ms of
-  main thread; the same picture to the pixel. Nature has switches of its own (`diag=nowoods,nofarwoods,noflowers,
-  nograss`). Looked at, as they hadn't been: the production build's frame time (120 fps in every cell, p99 9.3 ms;
-  the main thread 0.2–1.0 ms over Stage 11's on a shared machine), the town overview at full night and its far
-  versions close up (right as they are). All in [performance.md](../design/performance.md) (0.5.0). 22 of the 30
-  `as unknown as` in `web/src` are gone; the 8 left are where PlayCanvas's types say `private` or are wrong.
-
-### Fixed by the authenticity review
-- **Residents:** the weight bench's feet-down bench press (A-fitness-01); a kiss between different heights
-  (A-social-01); the tuck at the standing desk, the kids' chair at a coffee table and a chair facing a desk with its
-  own (A-office-01, A-kids-01, I-office-01); getting up from a chair at the seat (A-residents-01, A-residents-14).
-- **Rendering:** night glow through other parts, the grill's coals (M-outdoor-01); cooking props at a station's
-  middle (I-systems-01).
-- **Content and sim:** small things on tops are used where they stand (I-tabletop-01, I-tabletop-04); the high
-  chair is used (I-kids-01).
-- **Models:** the entry console's and the spritz station's mirrors on back boards (M-packs-01, M-packs-02); the party
-  bar's back bar (M-packs-03); bathers' shins in the heart tub (A-packs-01); the power blender's blades (A-packs-02);
-  the arc lamp reaching over the next tile, placed so by build mode and the house generator (M-lighting-06); the hot
-  tub's cover folding back in two halves (A-outdoor-01, a fourth draw).
-- **Moving parts with a use:** the kettle's lid, the bread bin's roll-top and the laptop's lid open for their uses
-  (I-tabletop-01); the high chair's tray slides out as the baby is put in (I-kids-01).
-- **Tools:** the lamp build checks the light's `at`, not only its height (M-lighting-06).
-- **Sounds** (I-bathroom-04, G-53): the uses that were silent sound like their things, synthesised
-  (`web/src/audio/things.ts`): the treadmill and bikes, the workbench and the bike stand, pool, foosball, ping-pong,
-  darts, the arcade cabinets, the sewing machine, the chemistry set, the pottery wheel, the coffee machines, the
-  blenders and the stand mixer, the microwaves (a hum, then a ping), toast (then the pop), an oven's fan, the pizza
-  oven's fire (and the fireplace's and the fire pit's), the phone box, the vending machines, basketball, karaoke
-  singing, a bowed cello, the punch bag and the smash bin; a fridge door and the pedal bin's lid, once as they're
-  used. The cooker hood hums while the hob under it is in use (I-kitchen-09, Q-19).
-- **Laundry (0.5.0):** the washer and the dryer are loaded in 5 minutes and run on their own (60 and 45 minutes, the
-  drum turning and their sound with nobody there), then someone takes the washing out and carries it on in the
-  basket to the dryer or the line; the dry washing is folded at the laundry basket, a towel in the hands
-  (I-bathroom-07). The washing line dries the washing in 3 hours and takes it down a line at a time, as it is
-  hung out (A-outdoor-02). A generated home with a washer and no dryer gets a washing line in its garden (40 of 180
-  sample houses; none is left with nowhere to dry), and a load cut short goes back on its pile.
 
 ### Fixed in 0.5.0
 - **Residents:** body language per emotion, the posture, the arms and the walk's swing over every clip as far as
@@ -210,15 +160,13 @@ it left is here, with its id; §9 of the review says what each would take.
   on the spot (G-71, A-residents-08); children's feet at game speed 3 (11–14 % slide, now none: the run's beat
   quickens on shorter legs, `gait.ts`; A-residents-03 in part); getting out of bed before the lie has faded in (PR
   #31's held pose, 7 cm in a frame, now none).
-
-### Fixed in 0.5.0
-- **Privacy** (G-72: I-systems-05, I-social-05): a bathroom someone is in is kept shut (`privacy.rs`): others wait
-  outside its door (an hour at most) and go in after, its door stays shut to them in the drawing, and kept out with
-  the bladder empty the accident comes. Visitors leave the household's own things alone (`private`: wardrobes,
-  dressers, the bath cabinet). *Try for a baby* is a short ask, then the two in a double bed under the covers for
-  half an hour behind the bedroom's shut door (Q-21).
-
-### Fixed in 0.5.0
+- **Props in hand** (G-70): a book, a mug, a tumbler, a wine glass or a can, a fork, a spoon or chopsticks, a phone
+  at the ear and in both hands, a coin tossed into the town fountain, a bag of bird seed on the park bench, a dart,
+  each player's ping-pong bat and pool cue, and the bar carts' shaker shaken in both hands (I-held-01 in part,
+  I-social-01 in part, I-hobbies-05, I-kitchen-13, I-community-11 in part); the pool table's balls break at the
+  first shot (I-hobbies-05).
+- **The food from town in its own wrapping:** a paper cup of ice cream, a hot dog in its bun, a packet of crisps, an
+  apple and a pastry in a paper bag (M-held-03).
 - **Fruit within reach** (I-garden-11, I-garden-12, the owner's decision): the apple tree's crown came down to 2.6 m
   and four low boughs carry eight apples from 1.12 to 1.75 m; the one picked to eat hangs at 1.13 m, where a child
   on tiptoe takes it, and "Pick the apples" reaches one per size. The lemon tree has a lemon at 1.62, 1.42 and 1.1 m
@@ -230,13 +178,61 @@ it left is here, with its id; §9 of the review says what each would take.
   hands on it from 0.52 m out (`readLectern*`); the streetball hoop shot from 2.2 m out with a jump shot fitted to
   its rim (`streetShot*`); the arbour's roses cut at a front post (`cutRose*`, `STEP_IN`: the swing's seats can't take
   `places` for it).
-
-### Fixed in 0.5.0
+- **Privacy** (G-72: I-systems-05, I-social-05): a bathroom someone is in is kept shut (`privacy.rs`): others wait
+  outside its door (an hour at most) and go in after, its door stays shut to them in the drawing, and kept out with
+  the bladder empty the accident comes. Visitors leave the household's own things alone (`private`: wardrobes,
+  dressers, the bath cabinet). *Try for a baby* is a short ask, then the two in a double bed under the covers for
+  half an hour behind the bedroom's shut door (Q-21).
 - **Someone serves in town** (I-community-09, Q-17): staff stand behind the carts, the market stalls, the shop
   counters, the bakery cases and the café's coffee machine on public lots during their hours, and sell what they used
   to leave to an honesty box: ordered, handed over, paid for (`staff.rs`, the `buy` and `sell` clips). Closed outside
   their hours; self-serve, under the old labels, on a household's own lot. The bakery case's back door is the baker's
   and opens as they reach in; the shop counter's till is turned to the shopkeeper.
+- **Laundry:** the washer and the dryer are loaded in 5 minutes and run on their own (60 and 45 minutes, the
+  drum turning and their sound with nobody there), then someone takes the washing out and carries it on in the
+  basket to the dryer or the line; the dry washing is folded at the laundry basket, a towel in the hands
+  (I-bathroom-07). The washing line dries the washing in 3 hours and takes it down a line at a time, as it is
+  hung out (A-outdoor-02). A generated home with a washer and no dryer gets a washing line in its garden (40 of 180
+  sample houses; none is left with nowhere to dry), and a load cut short goes back on its pile.
+- **Models:** the arc lamp reaching over the next tile, placed so by build mode and the house generator
+  (M-lighting-06); the hot tub's cover folding back in two halves (A-outdoor-01, a fourth draw).
+- **Moving parts with a use:** the kettle's lid, the bread bin's roll-top and the laptop's lid open for their uses
+  (I-tabletop-01); the high chair's tray slides out as the baby is put in (I-kids-01).
+- **Sounds** (I-bathroom-04, G-53): the uses that were silent sound like their things, synthesised
+  (`web/src/audio/things.ts`): the treadmill and bikes, the workbench and the bike stand, pool, foosball, ping-pong,
+  darts, the arcade cabinets, the sewing machine, the chemistry set, the pottery wheel, the coffee machines, the
+  blenders and the stand mixer, the microwaves (a hum, then a ping), toast (then the pop), an oven's fan, the pizza
+  oven's fire (and the fireplace's and the fire pit's), the phone box, the vending machines, basketball, karaoke
+  singing, a bowed cello, the punch bag and the smash bin; a fridge door and the pedal bin's lid, once as they're
+  used. The cooker hood hums while the hob under it is in use (I-kitchen-09, Q-19).
+- **Rendering:** each lamp lights only its own room on Low too, and on each half of a tile split by a diagonal wall,
+  on every preset (M-lighting-08); the town map leaves the world its clicks and camera drags, as the pie menu does;
+  with a wall thing in hand the walls stand, so nothing hangs over a lowered wall (M-houses-01); `partBox` is the box
+  of the part's own mesh. Checked on PlayCanvas and found right: the stairs seen from the basement are whole to the
+  top (M-living-02, fixed on Babylon by 5b1e7152, carried over by the port). The mirrors' `glGetProgramiv` log (a
+  Babylon one) no longer shows: 6 runs on High on WebGL2, each in a new browser (the bench's mirror camera for 20 s,
+  then the game in front of a mirror), without a single WebGL message. What the check found instead is fixed: the mirrors' warm-up drew each glass
+  into its own reflection (WebGPU dropped that frame's commands, once a load), and a quilt drawn before its first
+  update had no instance buffer (WebGL2 errors until Chrome stopped reporting any, a dropped frame on WebGPU).
+- **Performance:** Low draws the woods in 100 m squares rather than eight sectors to the horizon, so far trees off
+  screen are left out: on WebGL2, the wide view, 1.79 → 1.21 M triangles and −0.3 ms of GPU time, for +0.2 ms of
+  main thread; the same picture to the pixel. Nature has switches of its own (`diag=nowoods,nofarwoods,noflowers,
+  nograss`). Looked at, as they hadn't been: the production build's frame time (120 fps in every cell, p99 9.3 ms;
+  the main thread 0.2–1.0 ms over Stage 11's on a shared machine), the town overview at full night and its far
+  versions close up (right as they are). All in [performance.md](../design/performance.md) (0.5.0). 22 of the 30
+  `as unknown as` in `web/src` are gone; the 8 left are where PlayCanvas's types say `private` or are wrong.
+- **Tools:** the lamp build checks the light's `at`, not only its height (M-lighting-06).
+
+### Fixed by the authenticity review
+- **Residents:** the weight bench's feet-down bench press (A-fitness-01); a kiss between different heights
+  (A-social-01); the tuck at the standing desk, the kids' chair at a coffee table and a chair facing a desk with its
+  own (A-office-01, A-kids-01, I-office-01); getting up from a chair at the seat (A-residents-01, A-residents-14).
+- **Rendering:** night glow through other parts, the grill's coals (M-outdoor-01); cooking props at a station's
+  middle (I-systems-01).
+- **Content and sim:** small things on tops are used where they stand (I-tabletop-01, I-tabletop-04); the high
+  chair is used (I-kids-01).
+- **Models:** the entry console's and the spritz station's mirrors on back boards (M-packs-01, M-packs-02); the party
+  bar's back bar (M-packs-03); bathers' shins in the heart tub (A-packs-01); the power blender's blades (A-packs-02).
 
 ## Notes on the sim
 
