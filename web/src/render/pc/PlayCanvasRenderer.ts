@@ -956,7 +956,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    */
   private async buildSims(world: WorldStructure): Promise<void> {
     this.characters.setTables(this.lot.tables);
-    await this.characters.build(world, 'residents');
+    // (The town's vendors and shopkeepers after the residents: `game/staff.ts`.)
+    await this.characters.build(world.staffSims?.length ? { ...world, sims: [...world.sims, ...world.staffSims] } : world, 'residents');
     const v = this.view;
     const key = v ? `${v.x},${v.z},${v.w},${v.d}` : '';
     const framing = !!v && key !== this.framedView;
@@ -1560,7 +1561,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    */
   private updateSims(frame: FrameState): void {
     const { curr, layout } = frame;
-    const count = (this.simCount = Math.min(curr[layout.header.simCount], MAX_CHARACTERS));
+    this.simCount = Math.min(curr[layout.header.simCount], MAX_CHARACTERS);
+    // (With the vendors and shopkeepers drawn after them.)
+    const count = Math.min(this.simCount + (layout.header.staffCount === undefined ? 0 : curr[layout.header.staffCount]), MAX_CHARACTERS);
     const shadows = this.simShadowMatrices;
     this.characters.update(frame, this.simInView, shadows, this.storey);
     this.lot.pullChairs(this.characters.pulled, this.placing.held); // (not the one in hand.)

@@ -57,6 +57,7 @@ import { type TableRoom, furthestAhead, nearestAhead } from '../tableTuck';
 import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_PER_TICK, WALK_SLACK, WALK_WAIT } from './actions';
 import { LOW_TOP, SIT_LOW } from './clips/low';
 import { FLOOR_SITS } from './clips/seated';
+import { HANDED } from './clips/serve';
 import { type BodyData, type CharacterSet, type Clip, loadCharacterSet, loadStage } from './data';
 import { BEARING_FLOATS, bearing } from './bodyLanguage';
 import { gaitFor } from './gait';
@@ -91,6 +92,18 @@ const UPPER_FADE_RATE = 4;
 /** How fast a rise cut short (`SimRig.riseK`) finishes its step off the seat (per second: a quarter of a second, less
  * when the action runs fast). */
 const RISE_CATCH_UP = 4;
+
+/**
+ * Whether what changes hands at a vendor's (`clips/serve.ts`) is in this one's hands now: the vendor's (serving, `sell`)
+ * between picking it up and handing it over, the customer's (`buy`) once it's handed over; anything else always.
+ */
+function handedYet(rig: SimRig, tag: string): boolean {
+  const cur = rig.cur;
+  const window = HANDED[cur.key];
+  if (!window || !cur.clip) return tag !== 'sell';
+  const at = cur.time / cur.clip.duration;
+  return at >= window[0] && at < window[1];
+}
 
 /** `q` / `p` = the player's pose: its clip sampled at its time, or the pose it holds (`Player.frozen`). A player
  * with neither (a rig that has not been given a clip yet) leaves `q` / `p` as they were. */
@@ -1372,7 +1385,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     if (gameSpeed === 0 && this.debugRate === null) dt = 0;
     this.clock += dt;
     const time = this.clock;
-    const count = Math.min(curr[layout.header.simCount], MAX_CHARACTERS);
+    // The residents, then the town's vendors and shopkeepers (sim-core `staff.rs`), in rows of the same layout.
+    const count = Math.min(curr[layout.header.simCount] + (layout.header.staffCount === undefined ? 0 : curr[layout.header.staffCount]), MAX_CHARACTERS);
     const H = layout.headerLen;
     const S = layout.simStride;
     const k = layout.sim;
@@ -1743,7 +1757,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       // (A plate held while eating it with a fork: on the left palm, the fork in the right hand.)
       const inHand = this.handPropOf(rig, pose, moving || !!social, tag, plate);
       if (setDown) this.writeSetDown(rig, i, setDown === 'top' ? item : undefined, tag, useObj);
-      else this.writeCarried(rig, i, item, inHand?.grip === 'bite' && inHand.hand !== 'l' ? -1 : 1);
+      else this.writeCarried(rig, i, handedYet(rig, tag) ? item : undefined, inHand?.grip === 'bite' && inHand.hand !== 'l' ? -1 : 1);
       this.writeHeld(rig, i, pose, moving);
       this.writeTool(rig, i, moving ? '' : tag, useObj);
       this.writeHand(rig, i, inHand);

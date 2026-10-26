@@ -56,6 +56,14 @@ export interface InteractionDef {
   needsTable?: boolean;
   /** Things a working object on the same plot must provide (`ObjectDef.provides`): coffee needs a coffee machine. */
   requires?: string[];
+  /**
+   * Sold by someone at the object (sim-core `staff.rs`): on a public lot whose post has a server, under `label`
+   * and `anim` (ordered, handed over, paid for; greyed out outside the post's `staff.hours`); where nobody serves
+   * (a household's own cart), helping themselves under this label and animation.
+   */
+  selfServe?: { label: string; anim?: string };
+  /** What it `requires` is fetched first, with this interaction (by id) of what provides it on the plot: a coffee poured at the machine. */
+  fetch?: string;
   /** Takes every slot of the object: only started with nobody else on it, and nobody else gets on while it lasts. */
   whole?: boolean;
   /**
@@ -247,6 +255,11 @@ export interface ObjectDef {
   places?: { at: [number, number]; facing?: number }[];
   /** Things it provides while it works (interactions `requires`): a coffee machine provides coffee. */
   provides?: string[];
+  /**
+   * Someone serves here on a public lot (sim-core `staff.rs`, `game/staff.ts`): where they stand, metres off the
+   * footprint's middle to its right and front (behind it: a negative front), and the hours it's open.
+   */
+  staff?: { at: [number, number]; hours: [number, number] };
   /** Can only be placed outdoors (trees, flower beds, ponds). */
   outdoors?: boolean;
   /** The household's own (a wardrobe, a dresser): visitors don't use it (sim-core `world::guest_may`). */

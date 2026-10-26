@@ -708,13 +708,15 @@
       "group": "food",
       "outdoors": true,
       "decor": 0.4,
-      "description": "A striped parasol over a self-serve freezer full of cones: lift the lid, take one and leave four dollars in the tin.",
+      "description": "A striped parasol over a freezer full of cones. In town the ice cream seller stands behind it from 10:00 to 20:00 and scoops one for four dollars; in a garden of your own you lift the lid and help yourself.",
+      "staff": { "at": [0, -0.85], "hours": [10, 20] },
       "interactions": [
         {
           "id": "iceCream",
-          "label": "Take an ice cream from the freezer",
-          "anim": "fetch",
-          "minutes": 2,
+          "label": "Buy an ice cream",
+          "selfServe": { "label": "Take an ice cream from the freezer", "anim": "fetch" },
+          "anim": "buy",
+          "minutes": 5,
           "eat": {
             "item": "iceCreamCone",
             "minutes": 8
@@ -745,13 +747,15 @@
       "group": "food",
       "outdoors": true,
       "decor": 0.3,
-      "description": "A steaming self-serve cart under an awning: hot dogs kept warm under the lid, six dollars in the honesty box.",
+      "description": "A steaming cart under an awning, hot dogs kept warm under the lid. In town its vendor serves them from 11:00 to 21:00, six dollars each; in a garden of your own you help yourself.",
+      "staff": { "at": [0, -0.85], "hours": [11, 21] },
       "interactions": [
         {
           "id": "hotDog",
-          "label": "Help yourself to a hot dog",
-          "anim": "fetch",
-          "minutes": 2,
+          "label": "Buy a hot dog",
+          "selfServe": { "label": "Help yourself to a hot dog", "anim": "fetch" },
+          "anim": "buy",
+          "minutes": 5,
           "eat": {
             "item": "hotDog",
             "minutes": 13
@@ -849,7 +853,8 @@
       "slots": 2,
       "outdoors": true,
       "decor": 0.4,
-      "description": "A striped awning over crates of fresh fruit and vegetables, and an honesty box: pick what you like and pay as you go.",
+      "description": "A striped awning over crates of fresh fruit and vegetables. In town the stallholder sells from behind it from 8:00 to 18:00; in a garden of your own you pick what you like.",
+      "staff": { "at": [0, -0.85], "hours": [8, 18] },
       "interactions": [
         {
           "id": "browse",
@@ -866,9 +871,10 @@
         },
         {
           "id": "fruit",
-          "label": "Pick a piece of fruit",
-          "anim": "fetch",
-          "minutes": 1,
+          "label": "Buy a piece of fruit",
+          "selfServe": { "label": "Pick a piece of fruit", "anim": "fetch" },
+          "anim": "buy",
+          "minutes": 5,
           "eat": {
             "item": "fruit",
             "minutes": 9
@@ -898,12 +904,14 @@
       "group": "shops",
       "slots": 2,
       "decor": 0.3,
-      "description": "A wooden counter with a self-service till, a jar of sweets and a rack of magazines.",
+      "description": "A wooden counter with a till, a jar of sweets and a rack of magazines. In town the shopkeeper serves behind it from 8:00 to 20:00; at home it's a self-service till.",
+      "staff": { "at": [0, -0.85], "hours": [8, 20] },
       "interactions": [
         {
           "id": "treat",
-          "label": "Pick a little something and pay at the till",
-          "anim": "idle",
+          "label": "Buy a little something",
+          "selfServe": { "label": "Pick a little something and pay at the till", "anim": "idle" },
+          "anim": "buy",
           "minutes": 6,
           "effects": {
             "fun": 0.15,
@@ -929,14 +937,16 @@
       "group": "shops",
       "slots": 2,
       "decor": 0.4,
-      "description": "A glass case of buns, tarts, cakes and loaves, still warm: help yourself with the tongs and pay at the till. A slice of cake had at a café table is taken from here.",
+      "description": "A glass case of buns, tarts, cakes and loaves, still warm. In town the baker serves from behind it, through its sliding back door, from 7:00 to 18:00; at home you help yourself with the tongs. A slice of cake had at a café table comes from here.",
+      "staff": { "at": [0, -0.85], "hours": [7, 18] },
       "provides": ["cake"],
       "interactions": [
         {
           "id": "pastry",
-          "label": "Take a pastry from the case",
-          "anim": "fetch",
-          "minutes": 2,
+          "label": "Buy a pastry",
+          "selfServe": { "label": "Take a pastry from the case", "anim": "fetch" },
+          "anim": "buy",
+          "minutes": 5,
           "eat": {
             "item": "pastry",
             "minutes": 8
@@ -952,9 +962,10 @@
         },
         {
           "id": "takeCake",
-          "label": "Take a slice of cake to a table",
-          "anim": "fetch",
-          "minutes": 2,
+          "label": "Buy a slice of cake to take to a table",
+          "selfServe": { "label": "Take a slice of cake to a table", "anim": "fetch" },
+          "anim": "buy",
+          "minutes": 5,
           "autonomous": false,
           "tags": [
             "food"
@@ -1052,7 +1063,7 @@
         "height": 0.47,
         "forward": 0.02
       },
-      "description": "A bentwood chair. Pulled up to a café table, it's for a coffee from the café's machine and a slice of cake from its case.",
+      "description": "A bentwood chair. Pulled up to a café table, it's for a coffee from the café's machine and a slice of cake from its case (in town, bought at the counter while the café is open).",
       "interactions": [
         {
           "id": "sit",

@@ -239,6 +239,11 @@ pub struct Interaction {
     /// whose success has the `conceive` effect, with the one it was with. A baby may come of it
     /// once it has run its time (`lifecycle::conceive`).
     pub conceive: bool,
+    /// Sold by someone at the object (content `selfServe`, the label and anim for where nobody
+    /// serves): on a public lot whose `staff` has a server, they order, are handed it and pay,
+    /// and it's closed outside the post's hours; elsewhere (a household's own cart) they help
+    /// themselves, as the `selfServe` label says (`staff.rs`).
+    pub served: Option<crate::staff::SelfServe>,
 }
 
 /// Something a use works on (content `workOn`), which must be there for it to start.
@@ -476,6 +481,9 @@ pub struct ObjectDef {
     /// a lamp at head height (`head_height`), furniture may stand there and nobody walks there
     /// (`ObjectInstance::overhang_tiles`).
     pub overhang: Vec<(i32, i32)>,
+    /// Someone serves here on a public lot (content `staff`): where they stand behind it and the
+    /// hours it's open (`staff.rs`).
+    pub staff: Option<crate::staff::Post>,
 }
 
 impl ObjectDef {
@@ -1629,6 +1637,8 @@ pub struct Content {
     /// Everyone's smartphone: who has one and what they do with it (content `phone`; see
     /// `phone.rs`).
     pub phone: crate::phone::PhoneRules,
+    /// How the town's vendors serve (content `service`; see `staff.rs`).
+    pub service: crate::staff::ServiceRules,
     /// How dirty washing piles up (content `laundry`; None: it never does, and nothing works
     /// on it).
     pub laundry: Option<LaundryRules>,
@@ -1729,6 +1739,8 @@ struct ContentFile {
     recipes: Vec<crate::cooking::RecipeRaw>,
     #[serde(default)]
     phone: crate::phone::PhoneRaw,
+    #[serde(default)]
+    service: Option<crate::staff::ServiceRaw>,
     #[serde(default)]
     laundry: Option<LaundryRaw>,
 }
@@ -2392,6 +2404,9 @@ struct ObjectRaw {
     footstool: bool,
     #[serde(default)]
     overhang: Vec<[i32; 2]>,
+    /// Someone serves here on a public lot (see `ObjectDef::staff`).
+    #[serde(default)]
+    staff: Option<crate::staff::PostRaw>,
 }
 
 /// A slot's place: `{"at": [-0.3, 0.7], "facing": 180}` (m off the middle, to its right and front;
@@ -2583,6 +2598,10 @@ struct InteractionRaw {
     /// Where partners try for a baby (see `Interaction::conceive`).
     #[serde(default)]
     conceive: bool,
+    /// Sold by someone at the object, and how it's done where nobody serves (see
+    /// `Interaction::served`).
+    #[serde(default)]
+    self_serve: Option<crate::staff::SelfServeRaw>,
 }
 
 /// Content `laundry` (see `LaundryRules`).
@@ -3199,6 +3218,7 @@ impl Content {
                     holds: shown_item(&it.holds, "holds")?,
                     private: it.private || it.conceive,
                     conceive: it.conceive,
+                    served: it.self_serve.as_ref().map(|r| crate::staff::self_serve(r, &anim_index, &ctx)).transpose()?,
                 });
                 // A game for two: at an object with two places, one each, used there as any use.
                 if it.partner
@@ -3505,6 +3525,7 @@ impl Content {
                 reach: obj.reach.max(0.0),
                 footstool: obj.footstool,
                 overhang: obj.overhang.iter().map(|&[r, f]| (r, f)).collect(),
+                staff: obj.staff.as_ref().map(|r| crate::staff::post(r, obj.footprint, &obj.id)).transpose()?,
             });
         }
 
@@ -4204,6 +4225,8 @@ impl Content {
         let (activities, planner, goals) =
             crate::planner::parse(&raw.activities, &raw.planner, &raw.goals, &tag_index, &feelings)?;
         let phone = crate::phone::parse(&raw.phone, &ix, &animations, &life.stages)?;
+        let service = crate::staff::rules(raw.service.as_ref(), &anim_index)?;
+        crate::staff::validate(&objects)?;
         let laundry = match &raw.laundry {
             Some(l) if l.per_day > 0.0 && l.per_day.is_finite() && l.most >= 1.0 && l.most.is_finite() => Some(LaundryRules { per_day: l.per_day, most: l.most }),
             Some(_) => return Err(Error::new("laundry: `perDay` above 0 and `most` at least 1 (loads)")),
@@ -4253,6 +4276,7 @@ impl Content {
             items,
             recipes,
             phone,
+            service,
             laundry,
             object_index,
         })
@@ -4666,6 +4690,11 @@ mod tests {
         refused(&|c| c["objects"][0]["interactions"][0]["hours"] = json!([20, 25]), "fridge.snack: `hours`");
         refused(&|c| c["objects"][0]["interactions"][0]["workOn"] = json!("laundry"), "fridge.snack: `workOn` laundry needs content `laundry`");
         refused(&|c| c["laundry"] = json!({"perDay": 0, "most": 4}), "laundry: `perDay` above 0");
+        // Sold by someone: at an object someone serves at, standing near it (`staff.rs`).
+        refused(&|c| c["objects"][0]["interactions"][0]["selfServe"] = json!({"label": "Take one"}), "`selfServe` is for something sold, at an object with `staff`");
+        refused(&|c| c["objects"][0]["staff"] = json!({"at": [0, -3], "hours": [8, 18]}), "object 'fridge': `staff.at` is more than 1.5 m off its footprint");
+        refused(&|c| c["objects"][0]["staff"] = json!({"at": [0, -0.8], "hours": [8, 8]}), "object 'fridge': `staff.hours`");
+        refused(&|c| c["service"] = json!({"waitMinutes": 0}), "service: `share` at least 0 and `waitMinutes` above 0");
         // A game for two: two places, and its use for one another of the object's, alike.
         refused(&|c| c["objects"][1]["interactions"][0]["partner"] = json!(true), "tv.watch: a game for two (`partner`) is played at an object with two places");
         refused(&|c| c["objects"][1]["interactions"][0]["alone"] = json!("watch"), "tv.watch: `alone` is what's done with nobody to play: it needs `partner`");

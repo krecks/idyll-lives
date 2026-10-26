@@ -49,7 +49,7 @@ export const RESIDENT_VERTEX = {
   tone: pc.SEMANTIC_ATTR9,
 } as const;
 
-/** The resident's row of the pose texture (0..63, a float), per copy beside its matrix. */
+/** The resident's row of the pose texture (0..95: residents, then servers; a float), per copy beside its matrix. */
 export const RESIDENT_ROW: InstanceStream = { semantic: pc.SEMANTIC_ATTR10, components: 1 };
 /** Every one of 16 rows (a component of `residentRowFilter`'s). */
 export const RESIDENT_ROWS_ALL = 0xffff;

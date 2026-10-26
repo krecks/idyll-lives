@@ -18,8 +18,8 @@ import type { Placement } from './pose';
 import { type Bed, LIE_BACK, LIE_CENTRE, type PlacedObject } from './seats';
 import { EMBRACE } from './socials';
 
-/** Rows in the pose texture (= Sim capacity). */
-export const MAX_CHARACTERS = 64;
+/** Rows in the pose texture: the town's residents (sim-core `MAX_SIMS`, 64), then its vendors and shopkeepers (`staff::MAX_STAFF`, 32). */
+export const MAX_CHARACTERS = 96;
 /** How far the feet reach past the slot centre for a lying Sim, and their back's height above the feet line: babies (much smaller) lie centred in the crib, on the mattress. */
 export function lieCentre(rig: SimRig): number {
   // (A smaller body than its family's base body, a child's, lies with its head where a grown-up's would be, on the pillow.)

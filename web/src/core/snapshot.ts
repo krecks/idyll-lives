@@ -8,6 +8,8 @@ export interface SnapshotLayout {
   headerLen: number;
   simStride: number;
   maxSims: number;
+  /** Most servers' rows after the residents' (missing in older layouts). */
+  maxStaff?: number;
   ticksPerSecond: number;
   header: {
     tick: number;
@@ -22,6 +24,11 @@ export interface SnapshotLayout {
     majorEvent?: number;
     /** Food and dishes changed (`Items::version` modulo 2^24; missing in older layouts). */
     itemsVersion?: number;
+    /**
+     * The town's vendors and shopkeepers (sim-core `staff.rs`): as many rows as this right after the residents',
+     * each laid out as a resident's, `away` while off work (missing in older layouts: none).
+     */
+    staffCount?: number;
   };
   sim: {
     id: number;

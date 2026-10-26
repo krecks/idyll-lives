@@ -1268,6 +1268,17 @@ struct StructureView<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     floors: Option<Vec<[u16; 3]>>,
     meta: &'a serde_json::Value,
+    /// The town's servers (`staff.rs`), in their snapshot rows' order (after the residents').
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    staff: Vec<StaffView>,
+}
+
+/// One of the town's servers: what they look like (`seed`, the renderer makes the look) and the
+/// posts they serve at (stable object ids).
+#[derive(Serialize)]
+struct StaffView {
+    seed: u32,
+    posts: Vec<u32>,
 }
 
 /// A diagonal wall across tile `(x, z)`: `dp` (`/`) from `(x, z)` to `(x + 1, z + 1)`, `dn`
@@ -1794,6 +1805,12 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
                 .collect()
         }),
         meta: &world.meta,
+        staff: crate::staff::plan(world)
+            .servers
+            .iter()
+            .take(crate::staff::MAX_STAFF)
+            .map(|s| StaffView { seed: s.seed, posts: s.posts.iter().map(|&o| world.objects[o as usize].stable).collect() })
+            .collect(),
     })
     .expect("structure serializes")
 }

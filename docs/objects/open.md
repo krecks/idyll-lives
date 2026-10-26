@@ -128,8 +128,6 @@ it left is here, with its id; §9 of the review says what each would take.
   empty.
 
 ### Content and sim
-- **Nobody serves in town** (I-community-09): the carts, the stall, the bakery case and the café are self-serve, and
-  their labels say so; vendors are later (Q-17).
 - **One-use machines:** the dishwasher and the neat pack's laundry centre are still loaded and run in one use; a
   machine that runs on its own (content `runs`) would fit them.
 - **The sounds want a listen by ear** (G-53): each was rendered and checked by its spectrum, timing and level, not
@@ -143,7 +141,6 @@ it left is here, with its id; §9 of the review says what each would take.
 - **Uses end once every need they raise is full**, by design (I-systems-02); it makes clips easy to miss in checks.
 
 ### Models
-- **The bakery case's sliding door is on the baker's side** (I-community-09, with vendors).
 
 ### Tools
 - The review's tooling leftovers (`cargo review sizes`' measuring, `check.mjs play` with one resident, the debug
@@ -227,6 +224,13 @@ it left is here, with its id; §9 of the review says what each would take.
   hands on it from 0.52 m out (`readLectern*`); the streetball hoop shot from 2.2 m out with a jump shot fitted to
   its rim (`streetShot*`); the arbour's roses cut at a front post (`cutRose*`, `STEP_IN`: the swing's seats can't take
   `places` for it).
+
+### Fixed in 0.5.0
+- **Someone serves in town** (I-community-09, Q-17): staff stand behind the carts, the market stalls, the shop
+  counters, the bakery cases and the café's coffee machine on public lots during their hours, and sell what they used
+  to leave to an honesty box: ordered, handed over, paid for (`staff.rs`, the `buy` and `sell` clips). Closed outside
+  their hours; self-serve, under the old labels, on a household's own lot. The bakery case's back door is the baker's
+  and opens as they reach in; the shop counter's till is turned to the shopkeeper.
 
 ## Notes on the sim
 

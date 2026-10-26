@@ -8,7 +8,7 @@
  * up to things at fixed heights (`reach.ts`), the hoop shot (`shot.ts`) and the hands on low tops (`low.ts`); the slide's round,
  * the bunk's ladder and the rides theirs (`rides.ts`), in sizes; the socials' gestures and reactions and the phone held in front
  * theirs (`social.ts`); brushing the hair and a curled side lie are in `self.ts`; a coin tossed, seed scattered and a cocktail shaken, with the
- * prop in the hand, in `props.ts`. Arm and leg placement uses the IK helpers in
+ * prop in the hand, in `props.ts`; buying from a vendor and serving in `serve.ts`. Arm and leg placement uses the IK helpers in
  * `ik.ts` (on the reference skeleton, while the clips bake).
  *
  * In dev, editing a clip file re-bakes the clips of every loaded set in place (Vite HMR), so the
@@ -32,6 +32,7 @@ import { socialClips } from './social';
 import { playClips } from './play';
 import { propClips } from './props';
 import { selfClips } from './self';
+import { serveClips } from './serve';
 import { shotClips } from './shot';
 import { streetClips } from './street';
 import { useClips } from './uses';
@@ -39,7 +40,7 @@ import { workClips } from './work';
 
 /** Every clip definition. */
 export function clipDefs(): ClipDef[] {
-  return [...idleClips(), ...locomotionClips(), ...seatedClips(), ...workClips(), ...gardenClips(), ...actionClips(), ...lieClips(), ...babyClips(), ...streetClips(), ...gameClips(), ...useClips(), ...socialClips(), ...playClips(), ...rideClips(), ...reachClips(), ...shotClips(), ...lowClips(), ...selfClips(), ...propClips()];
+  return [...idleClips(), ...locomotionClips(), ...seatedClips(), ...workClips(), ...gardenClips(), ...actionClips(), ...lieClips(), ...babyClips(), ...streetClips(), ...gameClips(), ...useClips(), ...socialClips(), ...playClips(), ...rideClips(), ...reachClips(), ...shotClips(), ...lowClips(), ...selfClips(), ...propClips(), ...serveClips()];
 }
 
 const live = new Set<CharacterSet>();

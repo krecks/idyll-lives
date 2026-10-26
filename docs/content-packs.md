@@ -127,6 +127,7 @@ fields) load unchanged: both mergers rename the keys first (`LEGACY_KEYS` in `pa
 | `reach` | How high a hand goes to use it as a station, in metres: a wall cabinet's bottom shelf (`1.47`). Someone whose hand doesn't reach that high (a child: a life stage's `scale` × 2.1 m) goes to another station: the clean plates go on the counter, not up in the wall cupboard. Default `0`, within anyone's reach. |
 | `footstool` | A footstool (a pouf, an ottoman): the feet go up on it from a seat in front, and someone sitting down alone on a sofa takes the seat with one 0.3–1.2 m in front of it. Default `false`. |
 | `provides` | Things it provides while it works, for interactions elsewhere on the same lot that list them in `requires`: `["coffee"]` for a coffee machine. A broken object provides nothing. |
+| `staff` | Someone serves here on a public lot (a vendor, a shopkeeper, the baker, a barista): `{"at": [0, -0.85], "hours": [10, 20]}`. `at`: where they stand, metres off the footprint's middle to its right and front before turning, as `places` (behind it: a negative front; within 1.5 m of the footprint); `hours`: when it's open, `[from, to]` (0 to 24, past midnight when `from` is later). Its uses with `selfServe` are then sold: the customer comes to the front and waits for the server, who serves one at a time, first come first served (`service.waitMinutes` at most, then they give up); while they're served the use runs, drawn as ordering, being handed it and paying (`buy`, the server's `sell`), and outside the hours it's closed (last orders: someone who set off while it was open and gets there within half an hour of closing is still served; otherwise residents don't choose it, the order fails with "the ice cream cart is closed: it opens at 10:00", the pie menu greys it out and says when). Posts on one lot within `service.share` metres of each other, with a straight walk between, share a server who steps over (the café's counter and coffee machine). Nobody serves where there's no room for them (`at` on a wall, another thing or off the lot) nor on a household's own lot: there the uses are self-serve, as `selfServe` says. The staff aren't residents: they need no slot, have no needs and aren't saved (a town has at most 32). Code: `crates/sim-core/src/staff.rs`. Default: nobody. |
 | `stores` | Fridges: keeps leftovers. Food served where no surface is free goes in, and keeps longer there (`cooking.storedSpoilHours`). Default `false`. |
 | `grows` | A crop (or a fruit tree's fruit: the apple and lemon trees, `"fallow": 0`, picked bare and fruiting again over `days`): `{"days": 2, "fallow": 0.5}`. Bought, it is just planted and ripens over `days`; one in a lot's or a house's file comes ripe. An interaction with `"leaves": "picked"` (the harvest) picks it as the use starts, and one with `"when": "ripe"` is offered only while it's ripe (the order fails with "the … isn't ripe yet"; residents don't choose it). Picked, it lies fallow for `fallow` game days (default 0.5), is planted again by itself and ripens over `days` (sooner for uses with `tends`), showing as just planted for the first third, then growing. Saved. Its model's `motions.growth` clip shows the stage (docs/design/objects.md, "Moving parts"). |
 | `freeRotation` | `true` lets the player turn it to any angle in 15° steps, only for looks. (Anything but stairs stands anywhere on its tiles, in quarter tiles or to the centimetre with Shift, as long as no wall, straight or diagonal, runs through its body: see `offset` in a town's `objects`.) Default: 1×1 objects not on a wall whose category is listed in `objectRules.freeRotation` (base game: `decor`, `garden`, `outdoor`, `lighting`, `kids`, `community`). |
@@ -207,6 +208,7 @@ fields) load unchanged: both mergers rename the keys first (`LEGACY_KEYS` in `pa
 | `dirt` | Mess each use leaves on the tiles around the object (0..1). Default: by tag, `roomRules.dirt` (cooking 0.12, food 0.06, bathroom 0.05, hygiene 0.04). |
 | `sound` | What it sounds like while it lasts (looks only): a world sound key (as for the object's `sounds`), `"chop"` for a cheese board, `"toaster"`, or `"none"` (silence). A key played once plays as it starts: `"vendCan"` (a can from the machine, then drunk in silence). Default: the object's `sounds` for its `anim`, else by `anim`. Not for a `recipe`: its steps sound by the station they're done at (and a step's own `sound`). |
 | `endSound` | A sound played once as it ends: `"flush"` (toilets), `"ping"` (a microwave), `"toastPop"`, `"hangUp"` (the phone box). |
+| `selfServe` | Sold by the object's server (`staff`): `{"label": "Take an ice cream from the freezer", "anim": "fetch"}`, the label and animation where nobody serves (a household's own cart). Where someone serves, the interaction's own `label` and `anim` (`buy`) are used, it waits for the server and is closed outside the post's hours. Its `minutes` are the order, the hand-over and the paying (5: the `buy` and `sell` clips' five seconds at speed 1); with `eat`, the food is what's handed over. An error on an object without `staff`. Default: not sold by anyone. |
 
 ### How the multipliers stack
 
@@ -352,6 +354,8 @@ voices pick their lines by them.
 | `serve` | putting a dish down |
 | `mix` | mixing batter or making pastry on a counter (a mixing bowl is drawn on its top) |
 | `bake` | putting a dish in the oven or the microwave and watching it (nothing drawn: it's inside) |
+| `buy` | being served at a cart, a stall or a counter (`selfServe`): ordering, taking it, paying |
+| `sell` | the server behind it (`service.anim`, not for interactions): listening, reaching for it, handing it over, taking the money |
 
 **Adding an animation:** reuse a tag whenever one is close enough; the characters need a
 clip for every tag. If you must add one, append it to a top-level `"animations"` list in
@@ -982,6 +986,15 @@ along z = 0; plots across the street are the same layout turned round 180°.
 | `entry` | Where visitors arrive (default: the middle of the street front, 1.5 m in). |
 | `objects` | Placements: `def`, `x`, `z` (the footprint's corner), `rot` (0 = facing +z, away from the street; 2 = facing the street), for things that turn freely (`freeRotation`) `turn` (degrees past `rot`, 0..89), and for anything but stairs `offset` (`[x, z]` off the middle of its tiles in hundredths of a tile, up to ±50, things on a wall only along it; turned round with the plot it points the other way), `size` (`[across, deep]` in centimetres before turning, 10 to 600 each; it takes its tiles rounded up and stands in their middle; things on a wall keep their depth, things on a top their footprint) and `tall` (centimetres taller, −100 to 200). |
 
+A thing someone serves at (`staff`) needs room behind it for its server: the café's and the bakery's
+counters stand a tile in from the back wall (`every_post_in_town_has_someone_behind_it`).
+
+**Service** (`service`: `{"share": 2.0, "waitMinutes": 20, "anim": "sell"}`): how the town's vendors and
+shopkeepers serve (`staff` on objects, `selfServe` on what they sell). Posts whose servers stand within
+`share` metres of each other on one lot, with a straight walk between, share a server; a customer
+waits `waitMinutes` for the server at most, then gives up; `anim` (an `animations` tag) is what the
+server is shown doing while serving. Without it: no sharing, 20 minutes, the server stands.
+
 Every town has the first entry (the Town Park) in the middle of one row and gets more public
 places round it by size (small 1, medium 2, large 3), picked at random from the rest. Everyone in
 town may use what stands on a public place; residents walk there on their own when it's worth
@@ -1020,6 +1033,9 @@ keys share these objects. The rules:
 | An interaction's `brings`, `holds` | an `items` id | there'd be nothing to show |
 | Interactions of things on the `surface` layer | not `lie`, `inside`, `whole`, `baby`, `care`, `needsTable` or a `recipe` | a thing on a top is used standing or sitting at its top |
 | `laundry` | `perDay` above 0, `most` at least 1 | no washing would ever pile up to a load |
+| An object's `staff` | `at` within 1.5 m of the footprint, `hours` two different hours of the day | a server off in the street; an empty window |
+| An interaction's `selfServe` | on an object with `staff`, an `anim` the content has | nobody could sell it |
+| `service` | `share` 0 or more, `waitMinutes` above 0, an `anim` the content has | |
 | Ids of an object's interactions, and of needs, emotions and feelings | unique | two with one id are ambiguous: a save reloaded the first of two interactions |
 | Friendship and romance in `bondPresets` | −100 to 100 | relationships are kept in that range |
 | Tags, animations and skills named in the day rhythm (`sleepTags`, `napTags`, …), room kinds, room dirt, cleaning, repairs (`objectRules.repair` skill and tags), accidents (`anim`, `tags`), social rules (`busyTags`, `guestTags`), cooking tag lists and activities | ones the content has | a typo used to be dropped silently and turn the feature off (nobody counted as asleep; repairs trained nothing) |

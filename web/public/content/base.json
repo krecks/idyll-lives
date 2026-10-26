@@ -2385,8 +2385,16 @@
     "mix",
     "phoneScreen",
     "feed",
-    "change"
+    "change",
+    "buy",
+    "sell"
   ],
+  "service": {
+    "$comment": "The town's vendors and shopkeepers (sim-core staff.rs): posts whose servers stand within `share` metres of each other share one, a customer waits `waitMinutes` for the server at most, and the server is shown doing `anim` while serving.",
+    "share": 2.0,
+    "waitMinutes": 20,
+    "anim": "sell"
+  },
   "objects": [
     {
       "id": "fridge",

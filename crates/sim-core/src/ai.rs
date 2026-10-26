@@ -204,6 +204,7 @@ mod tests {
             holds: None,
             private: false,
             conceive: false,
+            served: None,
         }
     }
 

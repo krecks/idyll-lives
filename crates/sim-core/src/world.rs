@@ -871,6 +871,11 @@ pub struct Sim {
     /// Ticks they've waited at their place for the one they play with to get to theirs (see
     /// `partners::hold`; 0: not waiting). Not saved.
     pub(crate) partner_wait: u32,
+    /// At a post's front, being served by its server now (set as each tick starts,
+    /// `staff::update`). Not saved.
+    pub(crate) being_served: bool,
+    /// Ticks they've waited at a post for its server (`staff::hold`). Not saved.
+    pub(crate) serve_wait: u32,
     /// Found nobody to play a game for two with they chose: none chosen again until this tick
     /// (`partners::alone`). Not saved.
     pub(crate) alone_until: u64,
@@ -1495,6 +1500,8 @@ pub struct World {
     pub(crate) lights_version: u32,
     /// What residents switching lights saw last (see `lights::update`).
     pub(crate) light_watch: crate::lights::Watch,
+    /// Who serves at the town's stalls and counters (see `staff.rs`); not saved.
+    pub staff: crate::staff::Staff,
 }
 
 /// Read-only context for one Sim's update.
@@ -1530,6 +1537,8 @@ pub(crate) struct Ctx<'a> {
     pub shut: &'a [crate::privacy::Shut],
     /// Every room and garden with its scores (`World::rooms`).
     pub rooms: &'a [crate::rooms::RoomInfo],
+    /// Who serves at the town's stalls and counters (`World::staff`).
+    pub staff: &'a crate::staff::Staff,
 }
 
 impl Ctx<'_> {
@@ -1731,6 +1740,7 @@ impl World {
             watched: Vec::new(),
             lights_version: 0,
             light_watch: Default::default(),
+            staff: Default::default(),
         }
     }
 
@@ -2194,6 +2204,8 @@ impl World {
             wants_partner: false,
             joins: None,
             partner_wait: 0,
+            being_served: false,
+            serve_wait: 0,
             alone_until: 0,
             household: spawn.household,
             job,
@@ -2864,6 +2876,7 @@ impl World {
         let tick = self.tick;
 
         crate::partners::refresh(self);
+        crate::staff::update(self);
         let mut briefs = std::mem::take(&mut self.briefs);
         briefs.clear();
         for s in &self.sims {
@@ -2934,6 +2947,7 @@ impl World {
                 nav_version,
                 shut,
                 rooms,
+                staff,
                 ..
             } = self;
             let ctx = Ctx {
@@ -2959,6 +2973,7 @@ impl World {
                 work: &work,
                 shut,
                 rooms,
+                staff,
             };
             // (In lots nobody watches, only those whose turn it is; see `lod.rs`.)
             for sim in sims.iter_mut().filter(|s| s.here() && s.steps > 0) {
@@ -3388,6 +3403,8 @@ impl World {
                 object,
                 interaction,
             } => {
+                // (Who serves where, as the objects are now: `staff::closed`.)
+                crate::staff::refresh(self);
                 let obj = &self.objects[object as usize];
                 let Some(inter) = self.content.objects[obj.def].interactions.get(interaction)
                 else {
@@ -3481,6 +3498,13 @@ impl World {
                         Unmet::Sky => format!("{} can only {label} under open sky: the {thing} has to stand outside", s.name),
                         Unmet::Nothing(w) => format!("{}: {}", inter.label, w.none()),
                     }));
+                }
+                // Sold at a post outside its hours (or a coffee from a café that's shut): closed.
+                let on: Vec<u32> = self.objects.iter().filter(|o| self.object_plot.get(o.id as usize) == self.object_plot.get(object as usize)).map(|o| o.id).collect();
+                if let Some(post) = crate::staff::closed(&self.content, &self.staff, &self.objects, &on, object, inter, crate::clock::hour(self.tick)) {
+                    let name = self.content.objects[self.objects[post as usize].def].name.to_lowercase();
+                    let opens = crate::staff::opens(&self.content, &self.objects, post).map_or(String::new(), |h| format!(": it opens at {}", clock_time(h)));
+                    return Err(Error::new(format!("the {name} is closed{opens}")));
                 }
                 // A game for two: its places free (or one taken by someone there for the same
                 // game, to play along with), and someone free to play, or a use for one to do
@@ -4337,6 +4361,19 @@ fn missing_requirement<'a>(
 fn requirements_met(ctx: &Ctx, sim: &Sim, objects: &[ObjectInstance], object: u32, inter: &crate::content::Interaction) -> bool {
     missing_requirement(ctx.content, ctx.object_plot, Some(ctx.index), objects, object, inter).is_none()
         && conditions_met(ctx, sim, &objects[object as usize], inter)
+        && !closed_now(ctx, objects, object, inter)
+}
+
+/// Whether it's sold at a post that's closed now, or needs fetching from one (`staff::closed`).
+fn closed_now(ctx: &Ctx, objects: &[ObjectInstance], object: u32, inter: &crate::content::Interaction) -> bool {
+    closed_at(ctx, objects, object, inter, ctx.hour)
+}
+
+/// `closed_now` at `hour` of the day.
+fn closed_at(ctx: &Ctx, objects: &[ObjectInstance], object: u32, inter: &crate::content::Interaction, hour: f32) -> bool {
+    let plot = ctx.object_plot.get(object as usize).copied().flatten();
+    let on = plot.map_or(&[][..], |p| ctx.index.on(p));
+    crate::staff::closed(ctx.content, ctx.staff, objects, on, object, inter, hour).is_some()
 }
 
 /// What a Sim chooses to do on their own. `from_seat`: sitting, only a word with someone sitting
@@ -4912,7 +4949,7 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
     // on, however it was chosen (`unfit`, `unmet`; an order was refused already).
     if let TaskKind::Use { object, interaction } = task.kind
         && let Some(o) = objects.get(object as usize)
-        && content.objects[o.def].interactions.get(interaction).is_some_and(|i| unfit(content, sim.age, i).is_some() || !conditions_met(ctx, sim, o, i))
+        && content.objects[o.def].interactions.get(interaction).is_some_and(|i| unfit(content, sim.age, i).is_some() || !conditions_met(ctx, sim, o, i) || closed_now(ctx, objects, object, i))
     {
         return;
     }
@@ -5203,6 +5240,7 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
         sim.wants_partner = joins.is_none();
         sim.partner_wait = 0;
     }
+    sim.serve_wait = 0;
     sim.pose = Pose::Stand;
     sim.current = Some(Activity {
         task,
@@ -5444,6 +5482,20 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                 && crate::privacy::overlooked(ctx, objects, sim.id, (object, interaction))
             {
                 return end_activity(sim, content, objects);
+            }
+            // Sold at a post: not begun until its server serves them (`staff::hold`).
+            if let TaskKind::Use { object, interaction } = act.task.kind
+                && let Some(inter) = content.objects[objects[object as usize].def].interactions.get(interaction)
+            {
+                match crate::staff::hold(ctx, sim.being_served, &mut sim.serve_wait, object, inter, ticks) {
+                    None | Some(crate::staff::Hold::Serve) => {}
+                    Some(crate::staff::Hold::Wait) => return,
+                    // (Not served: the money paid on arrival back.)
+                    Some(crate::staff::Hold::GiveUp) => {
+                        sim.pending_spend -= inter.cost.max(0);
+                        return end_activity(sim, content, objects);
+                    }
+                }
             }
             // A game for two: not begun until the one they play with is at their place too, and
             // over once they've stopped (`partners::hold`).
@@ -5766,8 +5818,13 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
     {
         // Nor is something opened that someone opened on the way, or closed on someone in it.
         let inter = &content.objects[objects[object as usize].def].interactions[interaction];
+        // (Sold at a post that closed since they set off: served still at last orders, `staff::LAST_ORDERS`.)
+        let late = (ctx.hour - crate::staff::LAST_ORDERS).rem_euclid(24.0);
+        let met = missing_requirement(content, ctx.object_plot, Some(ctx.index), objects, object, inter).is_none()
+            && conditions_met(ctx, sim, &objects[object as usize], inter)
+            && (!closed_at(ctx, objects, object, inter, ctx.hour) || !closed_at(ctx, objects, object, inter, late));
         if objects[object as usize].broken()
-            || !requirements_met(ctx, sim, objects, object, inter)
+            || !met
             || !objects[object as usize].allows(inter, sim.id)
         {
             // (An order to close it on someone who got there first: the player is told.)

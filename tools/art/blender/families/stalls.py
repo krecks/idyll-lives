@@ -4,8 +4,9 @@
 #
 # Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
 # `Model`): the carts and the stall across their 2 x 1 tiles, the machines against the back of their tile.
-# The moving parts: the cart's freezer lid slides across (`lid_open`, held 2 s), the stand's hot-plate lid
-# lifts (`lid_open`), a snack slides down to the machine's tray and a can drops to it (`drop`). The
+# The moving parts: the cart's freezer lid slides across (`lid_open`), the stand's hot-plate lid lifts
+# (`lid_open`), each a second into the sale as the vendor behind reaches in, for 1.4 s; a snack slides
+# down to the machine's tray and a can drops to it (`drop`). The
 # machines' lit signs (and the drinks machine's front) glow at night. They are placed on town lots and seen
 # from far, so each has a far version (`_far`: a quarter of the triangles).
 #
@@ -652,10 +653,12 @@ def _far(build, ratio=FAR):
 FAMILY = G.Family(
     'stalls', M,
     [G.Model('iceCreamCart', iceCreamCart, size=(1.729, 2.355, 0.966), key='model.iceCreamCart', centre=(-0.0235, 0.0023),
-             motions={'uses': {'iceCream': 'lid_open'}, 'hold': 2}, far=_far(iceCreamCart),
+             # the seller slides the freezer's lid open to scoop (the game's `sell` clip: 1.5-2.1 s in)
+             motions={'uses': {'iceCream': {'clip': 'lid_open', 'delay': 1.0, 'hold': 1.4}}}, far=_far(iceCreamCart),
              paint=[('cart', 'Body'), ('parasol', 'Parasol'), ('stripe', 'Bands')]),
      G.Model('hotDogStand', hotDogStand, size=(1.577, 2.387, 0.981), key='model.hotDogStand', centre=(-0.0915, 0.0033),
-             motions={'uses': {'hotDog': 'lid_open'}}, far=_far(hotDogStand),
+             # the vendor lifts the hot plate's lid for a sausage
+             motions={'uses': {'hotDog': {'clip': 'lid_open', 'delay': 1.0, 'hold': 1.4}}}, far=_far(hotDogStand),
              paint=[('stand', 'Body'), ('awning', 'Awning')]),
      G.Model('vendingSnack', vendingSnack, size=(0.9, 1.88, 0.748), key='model.vendingSnack', centre=(0, -0.056),
              motions={'uses': {'snack': 'drop'}}, far=_far(vendingSnack),

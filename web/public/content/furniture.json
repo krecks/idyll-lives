@@ -522,20 +522,22 @@
       "price": 260,
       "category": "kitchen",
       "group": "appliances",
-      "description": "A counter with a bean-to-cup machine. A fresh coffee perks residents up and slows their tiredness for a few hours. A coffee had at a table nearby is poured here first.",
+      "description": "A counter with a bean-to-cup machine. A fresh coffee perks residents up and slows their tiredness for a few hours. A coffee had at a table nearby is poured here first; at a café in town the barista makes it, from 7:00 to 19:00.",
+      "staff": { "at": [0, -0.85], "hours": [7, 19] },
       "interactions": [
         {
           "id": "pour",
-          "label": "Pour a coffee to take to a table",
+          "label": "Order a coffee to take to a table",
+          "selfServe": { "label": "Pour a coffee to take to a table", "anim": "fetch" },
           "stages": [
             "teen",
             "youngAdult",
             "adult",
             "elder"
           ],
-          "anim": "fetch",
+          "anim": "buy",
           "sound": "pour",
-          "minutes": 2,
+          "minutes": 5,
           "autonomous": false,
           "tags": [
             "food"
