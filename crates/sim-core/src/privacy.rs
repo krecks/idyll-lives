@@ -19,7 +19,8 @@
 //! for it at home (the accident comes after its `graceMinutes`), and a toilet in a room kept
 //! shut counts as taken (a second bathroom is wished for, `rooms::opinions`). The renderer holds
 //! such a room's doors shut (snapshot `sim::SHUTS`). Nobody waits on their way out to work, home,
-//! a visit or the front door, nor on their way to someone to talk to: they go through.
+//! a visit or the front door, nor on their way to someone to talk to or to meet someone who
+//! called them: they go through.
 //!
 //! **The household's own things.** An object kind marked `private` (a wardrobe, a dresser, the
 //! bath cabinet) is used by nobody visiting: free will doesn't choose it and an order is refused
@@ -166,7 +167,7 @@ pub(crate) fn shut_away(ctx: &Ctx, sim: &Sim, at: (i32, i32)) -> bool {
 
 /// Whether `sim`, walking, is about to step into a room kept shut to them: within `LOOK` metres
 /// along their way, into another room than the one they're in. Not on the way to someone to
-/// talk to (`conversation.rs` walks them), nor on their way out to work, home, a visit or the
+/// talk to or to meet someone who called them (`conversation.rs` walks them), nor on their way out to work, home, a visit or the
 /// door (a house whose only way out is through the bathroom: they go through rather than miss
 /// the shift).
 pub(crate) fn shut_ahead(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> bool {
@@ -175,7 +176,8 @@ pub(crate) fn shut_ahead(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> bo
     }
     let Some(act) = sim.current() else { return false };
     let Phase::Routing { waypoints, next } = &act.phase else { return false };
-    if matches!(act.task.kind, TaskKind::Social { .. } | TaskKind::Join { .. } | TaskKind::Work | TaskKind::GoHome | TaskKind::Visit { .. } | TaskKind::Answer { .. }) {
+    // (Nor someone called over, on their way to meet the one who called: `Sim::heeding`.)
+    if sim.heeding.is_some() || matches!(act.task.kind, TaskKind::Social { .. } | TaskKind::Join { .. } | TaskKind::Work | TaskKind::GoHome | TaskKind::Visit { .. } | TaskKind::Answer { .. }) {
         return false;
     }
     let lot = ctx.nav.lot;
