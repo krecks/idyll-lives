@@ -1228,6 +1228,7 @@ export async function startSession(
       if (game.pauseMenu) return;
       game.menu = null;
       game.socialMenu = null;
+      game.townOpen = false;
       if (game.mode === 'create') return;
       if (game.mode === 'build') {
         const hit = renderer.pick(x, y);
