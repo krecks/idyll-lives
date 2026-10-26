@@ -457,42 +457,88 @@ def _fruiting(name, still, crown_mid, fruit, picked=None, at=None):
     return [still, hung, front]
 
 
+# The apple tree's low fruit (I-garden-11, I-garden-12): a garden apple (a semi-dwarf) carries its fruit from about
+# 1.1 m up, so its crown's middle stands at 2.6 m (its leaves from 1.6 m up) and laden boughs hang out of it in front,
+# under the crown's edge, apples on spurs along them. Each apple is (to the right of a picker facing the tree, out in front of the
+# trunk, its bottom), in metres. `PICKED` is the one a resident picks to eat (its own part: it shrinks away), low
+# enough for every size of picker, a child on tiptoe too (`FRUIT.apple` and `pickApple*` in characters/clips/uses.ts).
+# The harvest's reaches (`pickHigh*` in the same file, from the tile in front, 1 m out) close on `HARVEST`'s: a
+# grown-up's, a teen's and a child's. Placed, the tree isn't turned or sized at random (no `vary` in the base
+# manifest), so the boughs face the tile in front at these heights.
+PICKED = (-0.06, 0.62, 1.13)
+HARVEST = {'177': (0.16, 0.62, 1.75), '147': (0.3, 0.62, 1.45), '112': (0.24, 0.78, 1.12)}
+OVER = 0.27      # a bough passes this far over the bottom of each apple it carries (an apple 0.2 m, its stalk)
+# The boughs: from the trunk out over their apples (named) to a tip, through points (r, out, h) as above, leaves near
+# the trunk and at the tip. They end within 0.85 m of the trunk, short of where a picker stands (1 m out).
+LOW_BOUGHS = [
+    # straight out in front over the picked apple, dipping
+    [(-0.02, 0.1, 1.48), (-0.07, 0.36, 1.62), 'picked', (-0.12, 0.74, 1.38)],
+    # to the right, up under the crown: the grown-up's apple and another
+    [(0.06, 0.1, 1.74), (0.12, 0.34, 1.98), '177', 'a', (0.4, 0.84, 1.9)],
+    # to the right and low, bowed down by its fruit: the teen's and the child's
+    [(0.08, 0.1, 1.44), (0.27, 0.32, 1.64), '147', '112', (0.2, 0.84, 1.36)],
+    # to the left, two more
+    [(-0.06, 0.1, 1.6), (-0.34, 0.28, 1.84), 'b', 'c', (-0.68, 0.58, 1.6)],
+]
+LOW_APPLES = {'a': (0.34, 0.78, 1.66), 'b': (-0.45, 0.4, 1.55), 'c': (-0.6, 0.5, 1.42)}
+
+
+def _low_boughs(P, cols):
+    """The laden boughs out of the apple tree's crown in front (`LOW_BOUGHS`): each a bark sweep from the trunk over
+    its apples, with leaves where it leaves the crown and a sprig at its tip."""
+    named = {'picked': PICKED, **HARVEST, **LOW_APPLES}
+    for i, path in enumerate(LOW_BOUGHS):
+        pts = []
+        for p in path:
+            r, out, h = (named[p][0], named[p][1], named[p][2] + OVER) if isinstance(p, str) else p
+            pts.append((-r, -out, h))
+        _bough(f'low_bough{i}', pts, 0.034, 0.012, P, verts=4, res=2)
+        near, tip = pts[1], pts[-1]
+        lump(f'low_leaves{i}', 0.2, (near[0], near[1], near[2] - 0.08), cols[1 + i % 2], scale=(1.15, 1.0, 0.75), noise=0.3,
+             seed=4.2 + i, segments=6, rings=5)
+        lump(f'low_tip{i}', 0.1, (tip[0], tip[1], tip[2] - 0.06), cols[2 + i % 2], scale=(1.2, 1.0, 0.7), noise=0.3,
+             seed=7.7 + i, segments=5, rings=3)
+
+
+def _low_apple(name, at, material, r=0.1, segments=6, rings=4):
+    """An apple (radius `r`) hanging from a bough on its stalk, its bottom at `at` (r, out, h as `LOW_BOUGHS`)."""
+    x, y, z = -at[0], -at[1], at[2]
+    lump(name, r, (x, y, z), material, segments=segments, rings=rings, noise=0.05)
+    tube(f'{name}_stalk', [(x, y, z + 2 * r - 0.02), (x + 0.004, y - 0.004, z + OVER + 0.01)], 0.011, 0.008, M.stalk, verts=4)
+
+
 def apple():
-    """Apple tree: a short, crooked trunk, gnarled limbs and a round crown hung with red and yellow apples (set where
-    lines in meet its leaves, `_hang`); one at the front, on a twig under the
-    crown's front within reach of a grown-up and of a teen on tiptoe (1.84 m up), which a resident picks (it shrinks
-    away); picked bare, no apples until it fruits again (`ripen`)."""
+    """Apple tree: a garden apple, a semi-dwarf: a short, crooked trunk, gnarled limbs and a round crown, its middle
+    2.6 m up, hung with red and yellow apples (set where lines in meet its leaves, `_hang`), and laden boughs
+    out of it in front with apples on them from 1.12 to 1.75 m up (`LOW_BOUGHS`): one a resident picks (it shrinks
+    away), low enough for a child on tiptoe, and those the harvest's reaches close on. Picked bare, no apples until it
+    fruits again (`ripen`)."""
     P = palette(['#52803A', '#629040', '#74A048', '#86AE52', '#98BC5E'])
     cols = shades(P)
     rng = random.Random(15)
     # a short, crooked trunk opening low into gnarled limbs that spread wide, a round crown on them
-    _trunk(P, [(0, 0, 0), (0, 0, 0.3), (0.08, 0.04, 1.0), (0.02, 0.1, 1.6), (0.06, 0.06, 2.0)], 0.2,
+    _trunk(P, [(0, 0, 0), (0, 0, 0.25), (0.07, 0.04, 0.75), (0.02, 0.08, 1.15), (0.05, 0.05, 1.5)], 0.2,
            [1.4, 1.05, 1.0, 0.92, 0.85], seed=7.0, wobble=0.04)
     _roots(P, rng, 4, 0.28, 0.4, 0.5)
-    centre, radii = (0, 0, 3.75), (1.5, 1.5, 1.4)
-    clumps, _ = _branches(P, rng, cols, centre, radii, 15, 5, (1.65, 2.05), leader_z=2.0, bottom=-0.6, spread=0.95,
+    centre, radii = (0, 0, 2.6), (1.5, 1.5, 1.15)
+    clumps, _ = _branches(P, rng, cols, centre, radii, 13, 5, (1.2, 1.5), leader_z=1.5, bottom=-0.4, spread=0.95,
                           limb_r=(0.1, 0.045), bough_r=(0.042, 0.015), fork=(0.5, 0.62), lift=0.22, wander=0.45, rise=0.15,
-                          mass=dict(k=3, size=(0.5, 0.62), ring=0.4, drop=(-0.3, 0.05), squash=(0.78, 0.9), noise=0.32))
-    _hearts(rng, cols, 3, centre, radii, 0.85, out=0.35)
-    at = (-0.05, -0.7, 1.84)
-    # the twig the front apple hangs from, out of the crown's underside, and the leaves round its end
-    _bough('twig', [(0.03, -0.12, 2.55), (0.0, -0.45, 2.3), (at[0] + 0.01, at[1] + 0.02, at[2] + 0.34)], 0.03, 0.012, P,
-           verts=4, res=2)
-    lump('twig_leaves', 0.2, (at[0] + 0.02, at[1] + 0.06, 2.16), cols[1], scale=(1.1, 1.0, 0.7), noise=0.3, seed=4.2,
-         segments=6, rings=5)
+                          mass=dict(k=3, size=(0.5, 0.62), ring=0.4, drop=(-0.15, 0.05), squash=(0.78, 0.9), noise=0.32))
+    _hearts(rng, cols, 3, centre, radii, 0.75, out=0.35)
+    _low_boughs(P, cols)
     still = G.join_all('apple')
     G.perch.find(20, clump_aims(clumps, random.Random(115), per=3))                  # (on the leaves, before the fruit)
 
     def fruit():
-        _hang(rng, low(18, 8), centre, radii, 0.2, [P.fruit, P.fruit2, P.fruit3, P.fruit4], 'apple', band=(-0.7, 0.45),
+        _hang(rng, low(9, 6), centre, radii, 0.2, [P.fruit, P.fruit2, P.fruit3, P.fruit4], 'apple', band=(-0.7, 0.45),
               segments=low(6, 5), rings=low(4, 3))
+        for i, at in enumerate([*HARVEST.values(), *LOW_APPLES.values()]):
+            _low_apple(f'low_apple{i}', at, [P.fruit, P.fruit2, P.fruit4][i % 3], segments=low(6, 5), rings=low(4, 3))
 
     def picked():
-        lump('picked_apple', 0.11, at, P.fruit, segments=8, rings=5, noise=0.05)
-        # On its stalk, hanging from its twig out of the crown's underside (a stalk 0.3 m long).
-        tube('picked_stalk', [(at[0], at[1], at[2] + 0.09), (at[0] + 0.01, at[1] + 0.02, at[2] + 0.36)], 0.012, 0.009, P.stalk,
-             verts=4)
-    return _fruiting('apple', still, centre, fruit, picked, (at[0], at[1], at[2] + 0.1))
+        _low_apple('picked_apple', PICKED, P.fruit, r=0.11, segments=8, rings=5)
+    x, out, h = PICKED
+    return _fruiting('apple', still, centre, fruit, picked, (-x, -out, h + 0.11))
 
 
 def _hang(rng, n, centre, radii, size, materials, name, band=(-0.6, 0.5), flat=1.0, segments=6, rings=4, sink=-0.1):
@@ -840,8 +886,8 @@ def cypress():
 
 def lemon_tree():
     """Potted lemon tree: a banded terracotta pot, a slim stem forking into a round, clipped crown of small masses hung
-    with lemons, two metres tall in all (the
-    picked one at the front 1.62 m up), all picked at once (they shrink away, `ripen`); picked bare, no lemons until it fruits again."""
+    with lemons, two metres tall in all (the ones picked at the front 1.62 m up for a grown-up, 1.42 for a teen and
+    1.1 for a child), all picked at once (they shrink away, `ripen`); picked bare, no lemons until it fruits again."""
     P = palette(['#3A6A30', '#467838', '#548640', '#62944A'], fruit='#F2D23C', fruit2='#F5DC50', fruit3='#E8C42E')
     cols = shades(P, 4)
     rng = random.Random(86)
@@ -861,11 +907,18 @@ def lemon_tree():
     still = G.join_all('lemonTree')
     G.perch.find(12, clump_aims(clumps, random.Random(122), per=2), inset=0.02, gap=0.2)   # (on the leaves, before the lemons)
     at = (0.1, -0.6, 1.62)
+    # a teen's and a child's (I-garden-11): lower on the crown's front, where they reach (`FRUIT.lemon`)
+    # (each 0.03 m in front of where a line in from the front meets the leaves: at 1.51 m up for the teen's, at 1.29 m,
+    # the crown's underside, for the child's, which hangs under it)
+    teen_at = (0.15, -0.566, 1.42)
+    low_at = (-0.12, -0.4, 1.1)
 
     def fruit():
         _hang(rng, 12, centre, radii, 0.13, [P.fruit, P.fruit2, P.fruit3], 'lemon', band=(-0.6, 0.6), flat=1.25,
               segments=low(6, 5), rings=low(4, 3))
         lump('picked_lemon', 0.07, at, P.fruit, scale=(1, 1, 1.3), segments=8, rings=5, noise=0.05)
+        lump('teen_lemon', 0.07, teen_at, P.fruit3, scale=(1, 1, 1.3), segments=8, rings=5, noise=0.05)
+        lump('low_lemon', 0.07, low_at, P.fruit2, scale=(1, 1, 1.3), segments=8, rings=5, noise=0.05)
     return _fruiting('lemon', still, centre, fruit)
 
 
@@ -878,7 +931,7 @@ FAMILY = G.Family(
      G.Model('maple', maple, size=(4.983, 7.312, 5.335), key='model.tree.maple', tolerance=TOLERANCE, far=far_of(maple), habitat='tree'),
      G.Model('birch', birch, size=(3.446, 8.184, 3.293), key='model.tree.birch', tolerance=TOLERANCE, far=far_of(birch), habitat='tree'),
      G.Model('cherry', cherry, size=(5.251, 5.454, 5.14), key='model.tree.blossom', tolerance=TOLERANCE, far=far_of(cherry), habitat='tree'),
-     G.Model('apple', apple, size=(4.467, 5.569, 4.378), key='model.tree.fruit', tolerance=TOLERANCE, far=far_of(apple), habitat='tree',
+     G.Model('apple', apple, size=(4.29, 4.106, 4.642), key='model.tree.fruit', tolerance=TOLERANCE, far=far_of(apple), habitat='tree',
              motions={'uses': {'pick': {'clip': 'pick', 'delay': PICK_DELAY}, 'harvest': {'clip': 'pick', 'delay': PICK_DELAY}},
                       'growth': 'ripen'}),
      G.Model('japaneseMaple', japanese_maple, size=(3.723, 4.153, 3.828), key='model.tree.japaneseMaple', tolerance=TOLERANCE,
