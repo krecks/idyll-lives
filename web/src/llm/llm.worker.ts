@@ -11,7 +11,7 @@ import { Tokenizer } from '@huggingface/tokenizers';
 import { fetchOnce, forget, openCache, prune } from '../ml/assets';
 import { configureOrt, importOrt, ORT_WASM, sessionOptions } from '../ml/ort';
 import { formatChat, type ChatMessage } from './chat';
-import { generate, PrefixCache, type GenParams, type LlmEngine, type LlmSession, type TensorCtor } from './generate';
+import { generate, PrefixCache, type GenParams, type LlmEngine } from './generate';
 import type { ModelSpec } from './models';
 import type { FromLlmWorker, ToLlmWorker } from './protocol';
 
@@ -116,8 +116,8 @@ async function load(base: string, model: ModelSpec): Promise<void> {
   forget(dir + graph[0]);
   const stopIds = new Set(model.stop.map((t) => tokenizer.token_to_id(t)).filter((id): id is number => id !== undefined));
   engine = {
-    ort: ort as unknown as { Tensor: TensorCtor },
-    session: session as unknown as LlmSession,
+    ort,
+    session,
     tokenizer,
     stopIds,
     prefixes: new PrefixCache(8),

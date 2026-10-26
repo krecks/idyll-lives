@@ -42,10 +42,12 @@ let done = false;
 export function steadyShaderKeys(): void {
   if (done) return;
   done = true;
-  const material = pc.StandardMaterial.prototype as unknown as { getShaderVariant(this: pc.StandardMaterial, params: unknown): pc.Shader };
+  const material = pc.StandardMaterial.prototype;
   const variant = material.getShaderVariant;
-  material.getShaderVariant = function (params) {
+  material.getShaderVariant = function (this: pc.StandardMaterial, params: unknown) {
     if (this.useLighting) return variant.call(this, params);
+    // SAFETY: PlayCanvas 2.23 types `litOptions.lightMaskDynamic` as a number but sets a boolean (the
+    // options builder's `!!(mask & MASK_AFFECT_DYNAMIC)`); the hook sets it as the builder would.
     const m = this as unknown as { onUpdateShader: Hook };
     const own = m.onUpdateShader;
     m.onUpdateShader = (options) => {

@@ -188,19 +188,13 @@ function oneOf<T extends string>(value: unknown, options: readonly T[], fallback
 }
 
 /**
- * The settings as a plain record: they are a flat map of primitives, and the loops below go by key
- * (a key `Settings` does not name is dropped by the `in DEFAULT_SETTINGS` test, not by the type).
- */
-const asRecord = (s: Settings): Record<string, unknown> => s as unknown as Record<string, unknown>;
-
-/**
  * Makes what the merge produced safe to use: numbers within the ranges the interface offers,
  * switches really on or off, and choices one of the ones there are. (A stored file may be from
  * another version, hand-edited, or truncated.)
  */
 function sanitize(s: Settings): Settings {
   for (const k of BOOLEAN_KEYS) {
-    if (typeof s[k] !== 'boolean') asRecord(s)[k] = DEFAULT_SETTINGS[k];
+    if (typeof s[k] !== 'boolean') s[k] = DEFAULT_SETTINGS[k];
   }
   // 0 is "no cap", so it isn't below the smallest cap the interface offers.
   s.fpsCap = s.fpsCap === 0 ? 0 : Math.round(clampNumber(s.fpsCap, 10, 500, DEFAULT_SETTINGS.fpsCap));
@@ -235,10 +229,9 @@ function load(): Settings {
       MIGRATIONS[from]?.(stored);
     }
     delete stored.settingsVersion;
-    const merged = { ...DEFAULT_SETTINGS, ...stored } as Settings;
     // Settings that are gone (bloom, tilt-shift, the quality preset and its parts, the visual style) aren't kept.
-    for (const k of Object.keys(merged)) if (!(k in DEFAULT_SETTINGS)) delete asRecord(merged)[k];
-    return sanitize(merged);
+    const known = Object.fromEntries(Object.entries(stored).filter(([k]) => k in DEFAULT_SETTINGS));
+    return sanitize({ ...DEFAULT_SETTINGS, ...known } as Settings);
   } catch {
     // (`tipsSeen` by value: the copy must not share the defaults' array.)
     return { ...DEFAULT_SETTINGS, tipsSeen: [] };
@@ -281,7 +274,11 @@ $effect.root(() => {
 /** Back to the defaults: every setting, or just `keys` (one page of Settings). */
 export function resetSettings(keys?: readonly (keyof Settings)[]): void {
   if (!keys) return void Object.assign(settings, DEFAULT_SETTINGS, { tipsSeen: [] });
-  for (const k of keys) asRecord(settings)[k] = structuredClone(DEFAULT_SETTINGS[k]);
+  for (const k of keys) resetSetting(k);
+}
+
+function resetSetting<K extends keyof Settings>(k: K): void {
+  settings[k] = structuredClone(DEFAULT_SETTINGS[k]);
 }
 
 /** Renderer quality: the graphics preset's (`render/quality.ts`); `?quality=low|medium|high` overrides it for testing, `?snapshot=0` turns snapshot rendering off, `?shadowrate=<Hz>` sets the shadow rate. */

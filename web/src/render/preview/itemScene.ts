@@ -183,10 +183,9 @@ export const IDENTITY: readonly number[] = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 
  * draws: one-off passes (the sky's lighting, made before) would be lost.
  */
 function asyncShaders(device: pc.GraphicsDevice): void {
-  if (device.isWebGPU) return;
-  const gl = device as unknown as { setShader(shader: pc.Shader, asyncCompile?: boolean): void };
-  const set = gl.setShader.bind(gl);
-  gl.setShader = (shader) => set(shader, true);
+  if (!(device instanceof pc.WebglGraphicsDevice)) return;
+  const set = device.setShader.bind(device);
+  device.setShader = (shader) => set(shader, true);
 }
 
 /** Whether a shader of `device` is still compiling (WebGL2; draws with it are left out, `asyncShaders`). */

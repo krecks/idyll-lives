@@ -35,14 +35,8 @@ export interface PassTime {
   frames: number;
 }
 
-/** PlayCanvas 2.23's GPU profiler, as far as it's read here. */
-interface Profiler {
-  enabled: boolean;
-  pastFrameAllocations: Map<number, string[]>;
-  _frameTime: number;
-  _passTimings: Map<string, number>;
-  report(renderVersion: number, timings: number[] | null, frameTime?: number): void;
-}
+/** PlayCanvas 2.23's GPU profiler (not exported by name). */
+type Profiler = pc.GraphicsDevice['gpuProfiler'];
 
 /** Frames in `GpuTiming.recentMs`'s average (about a second). */
 const RECENT = 60;
@@ -61,26 +55,24 @@ export class GpuTiming {
     private readonly device: pc.GraphicsDevice,
     label: (target: pc.RenderTarget | null) => string,
   ) {
-    // SAFETY: `gpuProfiler` is a GraphicsDevice field of PlayCanvas 2.23 (null on the null device); its
-    // `report` gets each frame's pass timings as they come back, a few frames late.
-    const profiler = (this.profiler = (device as unknown as { gpuProfiler?: Profiler }).gpuProfiler ?? null);
+    // `gpuProfiler` is a GraphicsDevice field of PlayCanvas 2.23 (none on the null device, whatever its
+    // type says); its `report` gets each frame's pass timings as they come back, a few frames late.
+    const profiler: Profiler | null = (this.profiler = device.gpuProfiler ?? null);
     if (!profiler) return;
     const report = profiler.report;
-    profiler.report = (version, timings, frameTime) => {
+    profiler.report = (version: number, timings: number[] | null, frameTime?: number) => {
       const known = profiler.pastFrameAllocations.has(version);
       report.call(profiler, version, timings, frameTime);
       if (known && timings?.length) this.reported(profiler);
     };
     this.undo.push(() => delete (profiler as { report?: unknown }).report);
-    if (device.isWebGPU) {
-      // SAFETY: WebgpuGraphicsDevice's `setupTimeStampWrites(desc, name)` names each pass's two stamps
-      // while the profiler is on (`_enabled`; `startRenderPass` has set `renderTarget` by then; compute
-      // passes come without a descriptor).
-      const gpu = device as unknown as { setupTimeStampWrites(desc: unknown, name: string): unknown; renderTarget: pc.RenderTarget | null; backBuffer: pc.RenderTarget | null };
-      const stamp = gpu.setupTimeStampWrites;
-      const timed = profiler as unknown as { _enabled: boolean };
-      gpu.setupTimeStampWrites = (desc, name) => stamp.call(gpu, desc, desc && timed._enabled ? label(gpu.renderTarget === gpu.backBuffer ? null : gpu.renderTarget) : name);
-      this.undo.push(() => delete (gpu as { setupTimeStampWrites?: unknown }).setupTimeStampWrites);
+    if (device instanceof pc.WebgpuGraphicsDevice) {
+      // WebgpuGraphicsDevice's `setupTimeStampWrites(desc, name)` names each pass's two stamps while the
+      // profiler is on (`startRenderPass` has set `renderTarget` by then; compute passes come without a
+      // descriptor).
+      const stamp = device.setupTimeStampWrites;
+      device.setupTimeStampWrites = (desc: object | undefined, name: string): unknown => stamp.call(device, desc, desc && profiler.enabled ? label(device.renderTarget === device.backBuffer ? null : device.renderTarget) : name);
+      this.undo.push(() => delete (device as { setupTimeStampWrites?: unknown }).setupTimeStampWrites);
     }
   }
 
@@ -117,12 +109,13 @@ export class GpuTiming {
   }
 
   private reported(profiler: Profiler): void {
-    const ms = profiler._frameTime;
+    const ms = profiler.frameTime;
+    if (ms === undefined) return;
     this.recent[this.frames % RECENT] = ms;
     this.frames++;
     this.ms = ms;
     if (!this.device.isWebGPU) return;
-    for (const [name, t] of profiler._passTimings) {
+    for (const [name, t] of profiler.passTimings) {
       const s = this.sums.get(name);
       if (s) {
         s.ms += t;
@@ -153,15 +146,10 @@ export class DrawCounts {
   /** Counts from now on (`kind`: what a pass into `target` draws). */
   install(kind: (target: pc.RenderTarget | null) => PassKind): void {
     if (this.undo.length) return;
-    // SAFETY: both of PlayCanvas 2.23's devices draw through `draw(primitive, indexBuffer, numInstances, …)`
+    // Both of PlayCanvas 2.23's devices draw through `draw(primitive, indexBuffer, numInstances, …)`
     // between `startRenderPass(renderPass)` and `endRenderPass(renderPass)`; `_drawCallsPerFrame` counts
     // the draws made.
-    const device = this.device as unknown as {
-      draw(primitive: { type: number; count: number }, indexBuffer: unknown, instances?: number, commands?: unknown, first?: boolean, last?: boolean, firstInstance?: number): void;
-      startRenderPass(pass: { renderTarget: pc.RenderTarget | null }): void;
-      endRenderPass(pass: unknown): void;
-      _drawCallsPerFrame: number;
-    };
+    const device = this.device;
     const { draw, startRenderPass, endRenderPass } = device;
     device.draw = (primitive, indexBuffer, instances, commands, first, last, firstInstance) => {
       const p = primitive.type;
@@ -170,12 +158,12 @@ export class DrawCounts {
       // (The devices' own defaults for what isn't given.)
       draw.call(device, primitive, indexBuffer, instances, commands, first ?? true, last ?? true, firstInstance ?? 0);
     };
-    device.startRenderPass = (pass) => {
+    device.startRenderPass = (pass: pc.RenderPass) => {
       startRenderPass.call(device, pass);
       this.kind = kind(pass.renderTarget ?? null);
       this.drawsAtStart = device._drawCallsPerFrame;
     };
-    device.endRenderPass = (pass) => {
+    device.endRenderPass = (pass: pc.RenderPass) => {
       endRenderPass.call(device, pass);
       this.draws[this.kind] += device._drawCallsPerFrame - this.drawsAtStart;
       this.kind = 0;
@@ -251,7 +239,7 @@ export class ShaderWatch {
       // The material and pass a shader is made for: its classes' `getShaderVariant` (on the prototypes, so
       // every app's materials while this watch lives; only with `?diag=shaders`).
       for (const type of [pc.StandardMaterial, pc.ShaderMaterial]) {
-        const proto = type.prototype as unknown as { getShaderVariant(this: pc.Material, params: { pass: number }): pc.Shader };
+        const proto: { getShaderVariant(this: pc.Material, params: { pass: number }): pc.Shader } = type.prototype;
         const own = Object.prototype.hasOwnProperty.call(proto, 'getShaderVariant');
         const variant = proto.getShaderVariant;
         const watch = this;

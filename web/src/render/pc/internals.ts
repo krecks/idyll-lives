@@ -1,7 +1,8 @@
 /**
  * The PlayCanvas 2.23 internals this code reaches into from more than one place. They are private API, pinned
- * by `check:chunks` (which fails if a name moves), so the shapes are named once here and each cast is
- * documented once here rather than at every site.
+ * by `check:chunks` (which fails if a name moves), so the shapes are named once here. Most are declared in
+ * the engine's own per-file types (`engine.ts` imports those), marked `@ignore` in its docs; the one that is
+ * `private` there (WebGPU's adapter) is cast to, once, here.
  */
 
 import * as pc from './engine';
@@ -14,8 +15,8 @@ export interface DirectionalShadows {
 
 /** `app`'s directional shadow renderer, or `undefined` on a renderer that has none. */
 export function directionalShadows(app: pc.AppBase): DirectionalShadows | undefined {
-  // SAFETY: the forward renderer keeps it in `_shadowRendererDirectional` (PlayCanvas 2.23, pinned).
-  return (app.renderer as unknown as { _shadowRendererDirectional?: DirectionalShadows })._shadowRendererDirectional;
+  // (The forward renderer keeps it in `_shadowRendererDirectional`, PlayCanvas 2.23, pinned.)
+  return app.renderer?._shadowRendererDirectional;
 }
 
 /** A shader the device made, as far as `shadersCompiling` and `pcmaterials` read it. */
@@ -27,8 +28,8 @@ export interface CompiledShader extends pc.Shader {
 
 /** The device's live shaders (`GraphicsDevice.shaders`; WebGPU has none of its own). */
 export function deviceShaders(device: pc.GraphicsDevice): CompiledShader[] {
-  // SAFETY: `GraphicsDevice` keeps them in `shaders` (PlayCanvas 2.23, pinned).
-  return (device as unknown as { shaders?: CompiledShader[] }).shaders ?? [];
+  // (`GraphicsDevice` keeps them in `shaders`, PlayCanvas 2.23, pinned.)
+  return device.shaders ?? [];
 }
 
 /**
@@ -54,7 +55,7 @@ export interface DriverInfo {
 
 /** `device`'s driver names, for the FXAA's `MALI` variant and the debug report. */
 export function deviceDriverInfo(device: pc.GraphicsDevice): DriverInfo {
-  // SAFETY: WebGPU keeps the adapter in `gpuAdapter`, WebGL2 the unmasked names on the device itself
-  // (PlayCanvas 2.23, pinned).
-  return device as unknown as DriverInfo;
+  if (device instanceof pc.WebglGraphicsDevice) return { unmaskedRenderer: device.unmaskedRenderer, unmaskedVendor: device.unmaskedVendor };
+  // SAFETY: WebGPU keeps the adapter in `gpuAdapter`, private in the engine's types (PlayCanvas 2.23, pinned).
+  return { gpuAdapter: (device as unknown as { gpuAdapter?: { info?: AdapterInfo } }).gpuAdapter };
 }
