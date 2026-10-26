@@ -366,7 +366,7 @@ impl ObjectInstance {
     }
 
     /// Takes on the state `old`, this object before it was lifted out and placed again, had: its
-    /// stable id, turn, wear, open or closed, on or off, and crop.
+    /// stable id, turn, wear, open or closed, on or off, crop, and a machine's run.
     pub(crate) fn carry_state(&mut self, old: &ObjectInstance) {
         (self.stable, self.turn, self.wear, self.open, self.off, self.growth, self.run) = (old.stable, old.turn, old.wear, old.open, old.off, old.growth, old.run);
     }
@@ -5816,7 +5816,7 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
 
 /// A use done that changed the object as the hands went (`Interaction::gradual`, a crop's
 /// `picks`): now it is so. The washing is out on the line (or in); the crop is picked, and lies
-/// fallow, then grows again.
+/// fallow, then grows again; a machine loaded runs, one emptied is empty (`machines::use_done`).
 fn leaves_at_end(sim: &mut Sim, content: &Content, o: &mut ObjectInstance, interaction: usize) {
     let Some(inter) = content.objects[o.def].interactions.get(interaction) else {
         return;
