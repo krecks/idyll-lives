@@ -287,7 +287,7 @@ The play and yard things (`models/yard/sandbox.glb`, `bikeRack.glb`, `raisedBed.
 `.far.glb`, override pack `packs/yard/manifest.json`) are built in Blender by `tools/art/blender/families/yard.py`
 on `gamekit` and exported as `.glb` (glTF, original, CC0). A sand castle grows in the sandpit, the bike lifts and
 turns its back wheel, the raised bed's crop grows and is picked, the shed's and the greenhouse's doors open, the
-compost bin's lid lifts and the washing goes out on the line.
+compost bin's lid lifts and the washing goes out on the line a line at a time.
 
 The grills and the fire pit (`models/outdoor/grill.glb`, `grillStation.glb`, `firePit.glb`, same pack and family)
 are built the same way (glTF, original, CC0). The grill's lid and the station's hood swing up while residents cook,

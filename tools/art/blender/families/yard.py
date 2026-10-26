@@ -6,8 +6,8 @@
 # while tended and is picked away for the harvest; the garden shed (`model.shedSmall`) and its door (`door_open`);
 # the greenhouse (`model.greenhouse`), whose door and roof vent open (`door_open`); the compost bin
 # (`model.compostBin`) and its lid (`lid_open`); the rain barrel (`model.rainBarrel`); the washing line
-# (`model.clothesline`), whose washing is pegged out (`washing`) and stays out until taken in (`open`); the log
-# store (`model.firewoodStack`).
+# (`model.clothesline`), whose washing is pegged out line by line (`washing`) and stays out until taken in
+# (`open`); the log store (`model.firewoodStack`).
 #
 # Each is built in place where the game places it (`F`, game axes), and each has a far version for the town
 # overview (`far=`).
@@ -87,10 +87,13 @@ M = G.Palette(
     barrel_dark=('#35603F', 'satin'),
     brass=('#B8925A', 'metal'),
     can=('#9EA7AD', 'metal'),            # a galvanised watering can
-    # the washing line
-    posts=('#B9BCBE', 'metal'),
+    # the washing line: its still body all satin, one draw (the washing takes a draw a line)
+    posts=('#B9BCBE', 'satin'),
     line=('#F2F2F0', 'satin'),
-    basket=('#C9A979', 'fabric'),        # wicker
+    basket=('#C9A979', 'satin'),         # wicker
+    folded=('#F2F0EA', 'satin'),         # the washing folded in the basket
+    folded_pink=('#E4B8AE', 'satin'),
+    folded_sage=('#9FB59A', 'satin'),
     washing=('#9DB7C9', 'fabric'),       # the sheet; the washing's main colour
     towel=('#9DC6CF', 'fabric'),
     white=('#F2F0EA', 'fabric'),
@@ -1110,27 +1113,32 @@ def clothesline():
             if not G.is_low():
                 G.torus(_name('basket_handle'), 0.035, 0.009, at=F.at(bx + s * 0.262, 0.23, bz), material=M.basket,
                         rot=(90, 0, 90), major_segments=8, minor_segments=4)
-        for k, (m, y) in enumerate(((M.white, 0.25), (M.pink, 0.278), (M.sage, 0.302))):
+        for k, (m, y) in enumerate(((M.folded, 0.25), (M.folded_pink, 0.278), (M.folded_sage, 0.302))):
             F.soft(_name('folded'), 0.34 - 0.04 * k, 0.026, 0.22 - 0.02 * k, (bx + 0.01 * k, y, bz), m, round=0.012,
                    puff=0.004, flat=1, round_segments=1)
     if G.is_low():                                          # from afar: at rest, the washing in
         return G.settle([G.join_all('clothesline')], centre=False)
     G.join(G.meshes(), 'posts', origin=(0, 0, 0))
-    # The washing, pegged on the lines: its origin is on the line, so at rest it is flattened into it, and
-    # `washing` lets it down.
-    with G.new_parts() as washing:
-        hung = (('towel', -0.9, 0, 0.5, 0.6, M.towel), ('pillowcase', -0.3, 0, 0.42, 0.5, M.white),
-                ('shirt', 0.42, 0, 0.62, 0.48, M.pink),
-                ('trousers', -0.62, 1, 0.38, 0.74, M.denim), ('shirt', 0.18, 1, 0.5, 0.4, M.yellow),
-                ('towel', 0.92, 1, 0.32, 0.56, M.white),
-                ('socks', -1.0, 2, 0.26, 0.3, M.red), ('sheet', 0.0, 2, 0.9, 0.66, M.washing),
-                ('towel', 0.86, 2, 0.4, 0.46, M.sage))
-        for kind, x, row, w, h, m in hung:
-            _garment(kind, x, LINES[row], w, h, m)
-    washing = G.join(washing, 'washing', origin=F.at(0, LINE_Y, 0))
-    washing.scale[2] = 0.001
+    # The washing, pegged on the lines, a part a line: each line's origin is on it, so at rest its washing is
+    # flattened into it, and `washing` lets it down, the front line first, then the middle, then the back (a third
+    # of the clip each: played along with the use, a line at a time).
+    hung = (('towel', -0.9, 0, 0.5, 0.6, M.towel), ('pillowcase', -0.3, 0, 0.42, 0.5, M.white),
+            ('shirt', 0.42, 0, 0.62, 0.48, M.pink),
+            ('trousers', -0.62, 1, 0.38, 0.74, M.denim), ('shirt', 0.18, 1, 0.5, 0.4, M.yellow),
+            ('towel', 0.92, 1, 0.32, 0.56, M.white),
+            ('socks', -1.0, 2, 0.26, 0.3, M.red), ('sheet', 0.0, 2, 0.9, 0.66, M.washing),
+            ('towel', 0.86, 2, 0.4, 0.46, M.sage))
+    lines = []
+    for row in (2, 1, 0):                                  # LINES runs back to front; the front line goes first
+        with G.new_parts() as washing:
+            for kind, x, r, w, h, m in hung:
+                if r == row:
+                    _garment(kind, x, LINES[r], w, h, m)
+        line = G.join(washing, f'washing_{"abc"[len(lines)]}', origin=F.at(0, LINE_Y, LINES[row]))
+        line.scale[2] = 0.001
+        lines.append(line)
     objs = G.settle(centre=False)
-    G.grow(washing, 'washing', seconds=1.5)
+    G.grow_in_turn(lines, 'washing', seconds=1.5)
     return objs
 
 
@@ -1234,8 +1242,8 @@ FAMILY = G.Family(
             'manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw call '
             'per finish group. A sand castle grows in the sandpit, the bike lifts its back wheel and '
             'turns it, the raised bed\'s crop grows and is picked, the shed\'s and the greenhouse\'s doors '
-            'open (and the vent), the compost bin\'s lid lifts and the washing goes out on the line and '
-            'stays out.',
+            'open (and the vent), the compost bin\'s lid lifts and the washing goes out on the line a line '
+            'at a time and stays out.',
 )
 
 if __name__ == '__main__':

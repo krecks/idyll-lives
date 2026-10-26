@@ -9,7 +9,7 @@ from .family import Family, Model
 from .far import far_of, is_low, low
 from .forms import circle, cut, extrude, jitter, loft, mirrored, ring, rounded_rect, smooth_outline, soft_box, sweep
 from .materials import FINISHES, Palette, mat
-from .motion import attach, clips, grow, path, rock, scroll, slide, spin, squash, stages, swing, turns
+from .motion import attach, clips, grow, grow_in_turn, path, rock, scroll, slide, spin, squash, stages, swing, turns
 from . import kit, perch
 from .parts import check_size, fit, game_size, hinged, join, join_all, measure, new_parts, set_origin, settle, turn
 from .place import GameFrame
@@ -19,7 +19,7 @@ from .shapes import boulder, cone, cube, cylinder, revolve, rod, sphere, torus
 
 __all__ = [
     'ASSETS', 'FINISHES', 'PREVIEWS', 'TAU', 'Family', 'GameFrame', 'Model', 'Palette', 'attach', 'boulder', 'check_size', 'clips',
-    'circle', 'cone', 'cosd', 'cut', 'extrude', 'cube', 'cylinder', 'export_glb', 'far_of', 'fit', 'game_size', 'grow', 'hinged', 'is_low', 'jitter', 'join',
+    'circle', 'cone', 'cosd', 'cut', 'extrude', 'cube', 'cylinder', 'export_glb', 'far_of', 'fit', 'game_size', 'grow', 'grow_in_turn', 'hinged', 'is_low', 'jitter', 'join',
     'join_all', 'kit', 'loft', 'low', 'mat', 'materials_used', 'measure', 'meshes', 'mirrored', 'new_parts', 'path', 'perch', 'preview', 'preview_clips', 'preview_perches', 'reset', 'revolve', 'ring', 'rock', 'rounded_rect',
     'rod', 'scroll', 'set_origin', 'settle', 'sind', 'slide', 'smooth_outline', 'soft_box', 'sphere', 'spin', 'squash', 'stages', 'stats', 'sweep', 'swing', 'torus', 'turn', 'turns',
     'write_pack',
