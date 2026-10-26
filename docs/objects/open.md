@@ -146,9 +146,8 @@ it left is here, with its id; §9 of the review says what each would take.
   "Try for a baby" is a 30-minute standing kiss wherever the two are (I-systems-05, I-social-05). New behaviour.
 - **Nobody serves in town** (I-community-09): the carts, the stall, the bakery case and the café are self-serve, and
   their labels say so; vendors are later (Q-17).
-- **Washing with nowhere to dry:** 40 of the 64 sample houses with a washer have no dryer, and no generated yard has
-  a washing line, so there the washed loads wait once washed (as before 0.5.0). The dishwasher and the neat pack's
-  laundry centre are still loaded and run in one use; a machine that runs on its own (content `runs`) would fit them.
+- **One-use machines:** the dishwasher and the neat pack's laundry centre are still loaded and run in one use; a
+  machine that runs on its own (content `runs`) would fit them.
 - **Worked from the edge:** the bonsai bench, the rose arbour's roses, the cookbook lectern and the streetball hoop
   are used from the object's edge, not at the part (I-packs-12; `places` can fix it now, and the lectern wants a
   reading hand pose).
@@ -201,7 +200,8 @@ it left is here, with its id; §9 of the review says what each would take.
   drum turning and their sound with nobody there), then someone takes the washing out and carries it on in the
   basket to the dryer or the line; the dry washing is folded at the laundry basket, a towel in the hands
   (I-bathroom-07). The washing line dries the washing in 3 hours and takes it down a line at a time, as it is
-  hung out (A-outdoor-02).
+  hung out (A-outdoor-02). A generated home with a washer and no dryer gets a washing line in its garden (40 of 180
+  sample houses; none is left with nowhere to dry), and a load cut short goes back on its pile.
 
 ## Notes on the sim
 
