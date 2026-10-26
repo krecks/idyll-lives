@@ -58,7 +58,7 @@ none.
 | `hammock` Hammock | 1x3 · floor | swing:relax doze:nap | outdoor / seating | Frame, Fabric, Stripes | Loop (E1) | `sway`: swings ±8° while lain in (E1). A 2.8 m stand, a 1.96 m bed: lain in at full length. |
 | `porchSwing` Porch swing | 2x1 · floor | swing:relax | outdoor / seating | Seat, Frame, Chains, Cushion | Loop (E1) | `swing`: the seat swings ±10° while sat in (E1). Its cushion's top at 0.52 m. |
 | `swingSet` Swing set | 2x2 · floor | swing:play | outdoor / play | Frame, Seats | Loop (E1) | `swing`: the seat swings while played (E1). Both hands on the chains, the legs pumping in time with it (`rideSwing172`/`147`/`112`). |
-| `hotTubCedar` Cedar hot tub | 2x2 · floor | soak:bath coverOn:fetch | outdoor / seating | Cedar, Cover | Use + Loop | `cover_off`: the cover folds back on its seam and hangs behind the tub, as on a lifter, for soak and stays off (C1) until "Put the cover on" (`coverOn`); `bubbles`: the water bubbles while soaking (E1). |
+| `hotTubCedar` Cedar hot tub | 2x2 · floor | soak:bath coverOn:fetch | outdoor / seating | Cedar, Cover | Use + Loop | `cover_off`: the cover's front half folds back over its back half on the seam and the two hang behind the tub, as on a lifter (4 draws), for soak and stays off (C1) until "Put the cover on" (`coverOn`); `bubbles`: the water bubbles while soaking (E1). |
 
 **In play** (signed off 2026-10-17):
 - Each checked in four facings: the lounger's back lowers for sunbathe and doze and comes up after; the hammock's
