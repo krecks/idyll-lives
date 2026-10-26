@@ -10,10 +10,9 @@
  *   day (and in the menus' town) dark: a light of no intensity is left out of the clusters, and
  *   switching lights never compiles a shader. `?lights=forward` (WebGL2 only) draws them as forward
  *   lights instead (all of them points, so their shaders never change).
- * - Lamps light their own room (`shaders/roomLights.ts`): the rooms of the lot in view, a texel per
- *   tile on every storey shown (`markRooms`, `RoomLightState`); `?roomlights=0` turns it off to
- *   compare. With four lights (the low preset) they aren't kept in (`many`): so few light the
- *   house anyway.
+ * - Lamps light their own room (`shaders/roomLights.ts`), on every preset: the rooms of the lot in
+ *   view, a texel per tile on every storey shown, a room per half of a tile split by a diagonal wall
+ *   (`markRooms`, `RoomLightState`); `?roomlights=0` turns it off to compare.
  * - Light units: in the look's units a lamp of strength `I` lights a surface to `albedo / π · I /
  *   d²` (the physical falloff; a shade's cone as a spherical Gaussian), PlayCanvas to `albedo · I ·
  *   falloff`, and the game's materials take the physical falloff (`roomLights.ts`): the look's
@@ -35,7 +34,7 @@
 import * as pc from './engine';
 import type { HouseBuilder } from './house';
 import type { GlowLight, LotContents } from './lotContents';
-import { MaterialLibrary, type RoomMask } from './materials';
+import { MaterialLibrary, ROOM_SPLIT, ROOM_SPLIT_DN, type RoomMask } from './materials';
 import { benchDiag } from '../../debug/benchFlags';
 import type { WorldStructure } from '../../core/protocol';
 import { LOOK } from '../look';
@@ -106,9 +105,8 @@ export class Lamps {
   /** Whether the lights are clustered (else forward lights: `?lights=forward` on WebGL2). */
   readonly clustered: boolean;
   /**
-   * Every lamp lights, each in its own room (the preset's `clusteredLamps`); else the four lights
-   * the biggest rooms get first light past their rooms' walls and to their range (a few lamps light
-   * the house anyway).
+   * Every lamp lights (the preset's `clusteredLamps`); else only four, the biggest rooms' first, which
+   * light to their range. Either way each lights only its own room.
    */
   private readonly many: boolean;
   private readonly lib: MaterialLibrary;
@@ -192,8 +190,8 @@ export class Lamps {
       this.lamps.push({ entity, light: entity.light!, use: null, on: 1 });
       this.components.push(entity.light!);
     }
-    // Each clustered lamp lights only its own room (`?roomlights=0` turns it off to compare).
-    this.lib.rooms.enabled = this.many && params.get('roomlights') !== '0';
+    // Each lamp lights only its own room (`?roomlights=0` turns it off to compare).
+    this.lib.rooms.enabled = params.get('roomlights') !== '0';
     this.glow = {
       level: 0,
       lampOn: (id) => this.lampOn(id),
@@ -255,7 +253,8 @@ export class Lamps {
 
   /**
    * The rooms of the lot in view on every storey shown, for keeping each lamp's light in its room
-   * (`RoomLightState`): 1 outdoors, 2 and up a room, 0 a tile split by a diagonal wall (lit by all).
+   * (`RoomLightState`): 1 outdoors, 2 and up a room; a tile split by a diagonal wall has a room per
+   * half (`RoomMask.halves`).
    */
   markRooms(world: WorldStructure, view: ViewRect | null): void {
     const rooms = this.lib.rooms;
@@ -267,22 +266,35 @@ export class Lamps {
     const storey = this.view.storey();
     const [k0, n] = storey < 0 ? [storey, 1] : [0, storey + 1];
     const tiles = new Uint16Array(view.w * view.d * n);
+    const halves = new Uint16Array(view.w * view.d * n);
     const ids = new Map<number, number>();
-    const diagonals = new Set((world.diagonals ?? []).map((d) => d.z * W + d.x));
+    // (Past `ROOM_SPLIT_DN` rooms in view, the rest are unknown: lit by every lamp.)
+    const idOf = (r: number) => {
+      let id = ids.get(r);
+      if (id === undefined) ids.set(r, (id = r === 0 ? 1 : ids.size + 2));
+      return id < ROOM_SPLIT_DN ? id : 0;
+    };
+    const diagonals = new Map((world.diagonals ?? []).map((d) => [d.z * W + d.x, d]));
     for (let k = 0; k < n; k++) {
       const row = this.view.rowOf(k0 + k);
       for (let z = 0; z < view.d; z++) {
         for (let x = 0; x < view.w; x++) {
           const i = (z + view.z + row) * W + x + view.x;
-          if (z + view.z + row >= world.depth || diagonals.has(i)) continue;
-          const r = world.rooms[i] ?? 0;
-          let id = ids.get(r);
-          if (id === undefined) ids.set(r, (id = r === 0 ? 1 : ids.size + 2));
-          tiles[(k * view.d + z) * view.w + x] = id;
+          if (z + view.z + row >= world.depth) continue;
+          const at = (k * view.d + z) * view.w + x;
+          const d = diagonals.get(i);
+          if (!d) {
+            tiles[at] = idOf(world.rooms[i] ?? 0);
+            continue;
+          }
+          const [a, b] = [idOf(d.rooms[0]), idOf(d.rooms[1])];
+          if (!a || !b) continue;
+          tiles[at] = a;
+          halves[at] = b | ROOM_SPLIT | (d.axis === 'dn' ? ROOM_SPLIT_DN : 0);
         }
       }
     }
-    const mask: RoomMask = { x0: view.x, z0: view.z, w: view.w, d: view.d, storey: k0, storeys: n, tiles };
+    const mask: RoomMask = { x0: view.x, z0: view.z, w: view.w, d: view.d, storey: k0, storeys: n, tiles, halves };
     rooms.show(mask);
   }
 
