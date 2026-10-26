@@ -4270,9 +4270,14 @@ fn requirements_met(ctx: &Ctx, sim: &Sim, objects: &[ObjectInstance], object: u3
 
 /// Whether it's sold at a post that's closed now, or needs fetching from one (`staff::closed`).
 fn closed_now(ctx: &Ctx, objects: &[ObjectInstance], object: u32, inter: &crate::content::Interaction) -> bool {
+    closed_at(ctx, objects, object, inter, ctx.hour)
+}
+
+/// `closed_now` at `hour` of the day.
+fn closed_at(ctx: &Ctx, objects: &[ObjectInstance], object: u32, inter: &crate::content::Interaction, hour: f32) -> bool {
     let plot = ctx.object_plot.get(object as usize).copied().flatten();
     let on = plot.map_or(&[][..], |p| ctx.index.on(p));
-    crate::staff::closed(ctx.content, ctx.staff, objects, on, object, inter, ctx.hour).is_some()
+    crate::staff::closed(ctx.content, ctx.staff, objects, on, object, inter, hour).is_some()
 }
 
 /// What a Sim chooses to do on their own. `from_seat`: sitting, only a word with someone sitting
@@ -5681,8 +5686,13 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
     {
         // Nor is something opened that someone opened on the way, or closed on someone in it.
         let inter = &content.objects[objects[object as usize].def].interactions[interaction];
+        // (Sold at a post that closed since they set off: served still at last orders, `staff::LAST_ORDERS`.)
+        let late = (ctx.hour - crate::staff::LAST_ORDERS).rem_euclid(24.0);
+        let met = missing_requirement(content, ctx.object_plot, Some(ctx.index), objects, object, inter).is_none()
+            && conditions_met(ctx, sim, &objects[object as usize], inter)
+            && (!closed_at(ctx, objects, object, inter, ctx.hour) || !closed_at(ctx, objects, object, inter, late));
         if objects[object as usize].broken()
-            || !requirements_met(ctx, sim, objects, object, inter)
+            || !met
             || !objects[object as usize].allows(inter, sim.id)
         {
             // (An order to close it on someone who got there first: the player is told.)

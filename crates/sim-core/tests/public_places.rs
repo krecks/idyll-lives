@@ -661,3 +661,23 @@ fn a_customer_who_waits_too_long_gives_up_and_is_paid_back() {
     assert_eq!(ate.iter().filter(|&&a| a).count(), 1, "one of them was served ({ate:?})");
     assert_eq!(w.households[0].funds, funds - 5, "the other paid nothing in the end");
 }
+
+/// Last orders: Ada sets off for the ice cream cart a minute before it closes (20:00) and gets there
+/// after; the seller waits for her and serves her, then goes home.
+#[test]
+fn last_orders_at_closing_time() {
+    let (mut w, _) = town_beside("park");
+    w.autonomy = false;
+    until(&mut w, 19.0 + 59.0 / 60.0);
+    let cart = object(&w, "iceCreamCart");
+    let k = w.staff.server_of(cart).unwrap();
+    w.apply(Command::Use { sim: 0, object: cart, interaction: interaction(&w, cart, "iceCream") }).unwrap();
+    let (mut served_after, mut ate) = (false, false);
+    for _ in 0..30 * TICKS_PER_MINUTE {
+        w.tick_once();
+        served_after |= sim_core::clock::hour(w.tick) >= 20.0 && w.staff.servers[k].serving == Some(0);
+        ate |= w.sims[0].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Eat { .. }));
+    }
+    assert!(served_after && ate, "served after 20:00 ({served_after}) and ate it ({ate})");
+    assert!(!w.staff.servers[k].present, "and the seller went home");
+}

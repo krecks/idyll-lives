@@ -36,6 +36,11 @@ use crate::world::{Activity, Ctx, ObjectInstance, Phase, Task, TaskKind, WALK_SP
 
 /// Most servers in a town (snapshot rows after the residents'). Posts past them stay self-serve.
 pub const MAX_STAFF: usize = 32;
+/// Last orders (hours): someone who set off for a post while it was open and gets there this long
+/// after it closed is still served (the server waits for them), as no shop turns away the one
+/// coming through the door at closing time.
+pub const LAST_ORDERS: f32 = 0.5;
+
 /// How far (radians) a server turns from the way their post faces to look at the customer they serve.
 const FACE_TURN: f32 = 1.0;
 
@@ -292,22 +297,41 @@ fn at_post(content: &Content, staff: &Staff, objects: &[ObjectInstance], a: &Act
     staff.server_of(*object).map(|k| (*object, k))
 }
 
+/// The server of the post a resident is on their way to buy at, if that's what they're doing.
+fn heading_to(content: &Content, staff: &Staff, objects: &[ObjectInstance], a: &Activity) -> Option<usize> {
+    let Activity { task: Task { kind: TaskKind::Use { object, interaction }, .. }, phase: Phase::Routing { .. }, .. } = a else {
+        return None;
+    };
+    let o = objects.get(*object as usize)?;
+    content.objects[o.def].interactions.get(*interaction)?.served.as_ref()?;
+    staff.server_of(*object)
+}
+
+/// Whether any of `posts` is open at `hour`.
+fn staff_open(content: &Content, objects: &[ObjectInstance], posts: &[u32], hour: f32) -> bool {
+    posts.iter().any(|&o| post_open(content, &objects[o as usize], hour))
+}
+
 /// As a tick starts, before residents step: who's at work, who they serve next, and their steps
 /// over to them. Sets `Sim::being_served` for the one each serves once they're at that post.
 pub(crate) fn update(w: &mut World) {
     refresh(w);
     let hour = crate::clock::hour(w.tick);
     let World { content, objects, sims, staff, .. } = w;
-    // Those at a post's front, waiting or being served, by server.
+    // Those at a post's front, waiting or being served, by server; and servers someone is on their
+    // way to (last orders).
     let mut waiting: Vec<(usize, u32)> = Vec::new();
+    let mut coming = vec![false; staff.servers.len()];
     for s in sims.iter_mut() {
         s.being_served = false;
-        if let Some(a) = s.current.as_ref().filter(|_| s.here())
-            && let Some((_, k)) = at_post(content, staff, objects, a)
-        {
+        let Some(a) = s.current.as_ref().filter(|_| s.here()) else { continue };
+        if let Some((_, k)) = at_post(content, staff, objects, a) {
             waiting.push((k, s.id));
+        } else if let Some(k) = heading_to(content, staff, objects, a) {
+            coming[k] = true;
         }
     }
+    let late = (hour - LAST_ORDERS).rem_euclid(24.0);
     let open: Vec<bool> = (0..staff.servers.len()).map(|k| staff.open(content, objects, k, hour)).collect();
     for (k, server) in staff.servers.iter_mut().enumerate() {
         let here = |c: u32| waiting.contains(&(k, c));
@@ -318,7 +342,7 @@ pub(crate) fn update(w: &mut World) {
                 server.queue.push(c);
             }
         }
-        let present = open[k] || server.serving.is_some() || !server.queue.is_empty();
+        let present = open[k] || server.serving.is_some() || !server.queue.is_empty() || (coming[k] && staff_open(content, objects, &server.posts, late));
         if !present {
             // Gone home: back at the first post when they come in again.
             if server.present {
