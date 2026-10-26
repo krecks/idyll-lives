@@ -90,8 +90,8 @@ export interface QualitySettings {
    * The side (m) of the squares the game draws the woods in, each left out when out of view; 0: eight
    * sectors round the town, each reaching to the horizon (`shared/nature.ts`). The same trees drawn
    * either way, but 100 m squares leave out most of those off screen: Low on WebGL2, the wide view,
-   * 1.79 → 1.22 M triangles and about −0.4 ms of GPU time; the orbit 1.31 → 1.05 M. More meshes to
-   * cull on the main thread (about 450 more on the village).
+   * 1.79 → 1.21 M triangles and −0.3 ms of GPU time; the orbit 1.30 → 1.04 M and −0.1 ms. The cost:
+   * 446 more meshes to cull on the village, +0.2 ms of main-thread time (performance.md, 0.5.0).
    */
   woodsCell: number;
   /**
