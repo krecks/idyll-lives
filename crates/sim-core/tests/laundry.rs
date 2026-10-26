@@ -131,7 +131,8 @@ fn the_washing_is_loaded_washes_on_its_own_and_goes_on_to_the_dryer_and_the_bask
     let dried = w.households[0].laundry[2];
     order(&mut w, DRYER, "unload").unwrap();
     assert!(until(&mut w, 10, |w| using(w, DRYER, "unload")));
-    assert!(until(&mut w, 10, |w| doing(w).is_some_and(|(o, _, _)| o == BASKET)), "on to the basket: {:?}", w.sims[0].current());
+    assert!(until(&mut w, 10, |w| doing(w).is_some_and(|(o, _, at)| o == BASKET && !at)), "on to the basket: {:?}", w.sims[0].current());
+    assert_eq!(shown_held(&w).as_deref(), Some("washingArmful"), "the dry washing in the arms");
     assert!(until(&mut w, 10, |w| using(w, BASKET, "fold")), "folding");
     assert_eq!(shown_held(&w).as_deref(), Some("washingPiece"), "the washing in the hands");
     w.tick_once();

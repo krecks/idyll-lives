@@ -245,7 +245,7 @@ it is used: the bed's head section rises, the pod's hood swings over, the quilt'
 plate's deck shakes and the tablet tilts up.
 
 The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `towelRail.glb`, `towelLadder.glb`,
-`laundryBasket.glb`, `bathMat.glb`, and the things carried doing the laundry, `washingBasket.glb` and
+`laundryBasket.glb`, `bathMat.glb`, and the things carried doing the laundry, `washingBasket.glb`, `washingArmful.glb` and
 `washingPiece.glb`, override pack `packs/laundry/manifest.json`) are built in Blender by
 `tools/art/blender/families/laundry.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The washer and
 the dryer open their door while a resident loads or empties them and turn their drum while they run; the rail,

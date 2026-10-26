@@ -12,6 +12,13 @@
       "radius": 0.25
     },
     {
+      "id": "washingArmful",
+      "label": "Armful of dry washing",
+      "model": "item.washingArmful",
+      "hold": "both",
+      "radius": 0.2
+    },
+    {
       "id": "washingPiece",
       "label": "Washing to fold",
       "model": "item.washingPiece",

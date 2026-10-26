@@ -295,6 +295,21 @@
           "finish": "material.finish.fabric"
         }
       }
+    },
+    "item.washingArmful": {
+      "type": "model",
+      "url": "../../models/laundry/washingArmful.glb",
+      "materials": {
+        "wash_a": {
+          "finish": "material.finish.satin"
+        },
+        "wash_b": {
+          "finish": "material.finish.satin"
+        },
+        "wash_c": {
+          "finish": "material.finish.satin"
+        }
+      }
     }
   }
 }

@@ -344,6 +344,7 @@
           "id": "fold",
           "label": "Fold the laundry",
           "workOn": "dried",
+          "brings": "washingArmful",
           "holds": "washingPiece",
           "anim": "clean",
           "minutes": 15,

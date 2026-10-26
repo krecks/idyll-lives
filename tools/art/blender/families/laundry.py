@@ -1,7 +1,8 @@
 # The laundry: the washing machine (`model.laundryWasher`), the tumble dryer (`model.laundryDryer`), the towel
 # rail (`model.towelRail`), the towel ladder (`model.towelLadder`), the laundry basket (`model.laundryBasket`)
 # and the bath mat (`model.bathMat`); and what residents carry doing the laundry (content `items`): the basket of
-# washing (`item.washingBasket`) and a piece of washing held up to fold (`item.washingPiece`). Notes: laundry.md.
+# washing (`item.washingBasket`), an armful of it dry (`item.washingArmful`) and a towel being folded
+# (`item.washingPiece`). Notes: laundry.md.
 #
 # The washer and the dryer stand against the wall where the game places them, built in place (`F`, game
 # axes). Each has two moving parts: the round door, hinged on its left, which swings open while a resident
@@ -342,6 +343,22 @@ def washingBasket():
     return G.meshes()
 
 
+def washingArmful():
+    """An armful of dry washing carried to be folded: towels folded loosely on top of each other, a crumpled shirt
+    on them and a sock. Its base is where it rests on the palms."""
+    F = G.GameFrame()
+    with G.new_parts():
+        for k, (m, x, y, z, w, d, h) in enumerate(((M.wash_c, 0.0, 0.025, 0.0, 0.34, 0.24, 0.05),
+                                                   (M.wash_a, 0.01, 0.072, -0.01, 0.3, 0.22, 0.045),
+                                                   (M.wash_b, -0.015, 0.114, 0.01, 0.28, 0.2, 0.04))):
+            F.soft(f'fold{k}', w, h, d, (x, y, z), m, round=0.018, puff=0.006, flat=1, round_segments=2)
+        _lump(F, 'shirt', 0.02, 0.15, 0.0, 0.1, M.wash_c, scale=(1.3, 0.9, 0.45), seed=21)
+        _lump(F, 'sock', -0.11, 0.15, 0.06, 0.035, M.wash_b, scale=(1.4, 0.6, 0.5), seed=22, turn=30)
+    G.join_all('washingArmful')
+    G.settle(centre=False)
+    return G.meshes()
+
+
 def washingPiece():
     """A towel being folded in the hands: its near half lying across the palms, the far half lifted up and over
     towards them, a woven band across its end. Its base is where it rests on the palms."""
@@ -395,6 +412,7 @@ FAMILY = G.Family(
      G.Model('bathMat', bathMat, size=(0.76, 0.025, 0.5), key='model.bathMat',
              paint=[('mat', 'Mat'), ('mat_pile', 'Pile')]),
      G.Model('washingBasket', washingBasket, size=(0.42, 0.284, 0.3), key='item.washingBasket'),
+     G.Model('washingArmful', washingArmful, size=(0.34, 0.193, 0.24), key='item.washingArmful'),
      G.Model('washingPiece', washingPiece, size=(0.402, 0.165, 0.25), key='item.washingPiece', centre=(0, -0.005))],
     comment='Blender-built laundry models (tools/art/blender/families/laundry.py). Listed in the base '
             'manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw call '
