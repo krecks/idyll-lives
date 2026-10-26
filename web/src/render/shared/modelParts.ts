@@ -719,57 +719,12 @@ export function partData(p: PrimitivePart, lod: 0 | 1, index: number, alpha: num
 }
 
 /**
- * A part's exact bounds in model space (`lo`, `hi`: along x, y, z), turned as `partData` turns it:
- * a box by its corners, a cylinder or cone by its rings' corners, a round shape by its own extent (the
- * gate, crates/tools/src/checkglb.rs `bounds`, measures a file's boxes by their corners, turned the same
- * way). And which of its own axes lies along each model axis (-1: none; it's turned off the axes).
+ * A part's bounds in model space (`lo`, `hi`: along x, y, z) as it is drawn: the box of the mesh
+ * `partData` makes for it at `lod` 0 (`index` seeds a blob's lumps), so a round or turned part is
+ * bounded by its own vertices, never bigger or smaller than its mesh.
  */
-export function partBox(p: PrimitivePart): { lo: number[]; hi: number[]; along: number[] } {
-  const m = compose(1, 1, 1, partTurn(p), 0, 0, 0, new Float32Array(16));
-  // R[j][k]: model axis k of local axis j (row j: where local axis j goes).
-  const r = (j: number, k: number) => m[j * 4 + k];
-  const along = [0, 1, 2].map((k) => [0, 1, 2].find((j) => Math.abs(r(j, k)) > 0.999) ?? -1);
-  const [sx, sy, sz] = p.size;
-  const ellipsoid = (k: number, ax: number, ay: number, az: number) => Math.hypot(r(0, k) * ax, r(1, k) * ay, r(2, k) * az);
-  const shape = p.shape as PrimitivePart['shape'] | 'torus' | 'lathe';
-  let lo: number[];
-  let hi: number[];
-  if (shape === 'cylinder' || shape === 'cone') {
-    // The cylinder's rings: `segments` corners from angle 0, scaled in x and z.
-    const n = p.segments ?? (shape === 'cone' ? 16 : 20);
-    const top = shape === 'cone' ? (p.taper ?? 0) : (p.taper ?? 1);
-    const points: number[][] = [];
-    for (const [d, y] of [
-      [1, -sy / 2],
-      [top, sy / 2],
-    ]) {
-      for (let j = 0; j < n; j++) points.push([(d / 2) * sx * Math.cos((2 * Math.PI * j) / n), y, (d / 2) * sz * Math.sin((2 * Math.PI * j) / n)]);
-    }
-    const dot = (q: number[], k: number) => q[0] * r(0, k) + q[1] * r(1, k) + q[2] * r(2, k);
-    lo = [0, 1, 2].map((k) => Math.min(...points.map((q) => dot(q, k))));
-    hi = [0, 1, 2].map((k) => Math.max(...points.map((q) => dot(q, k))));
-  } else if (shape === 'lathe') {
-    // Each profile point (radius, y) is a ring, scaled by the size.
-    const profile = (p as PrimitivePart & ExtraShapes).profile ?? [[0, -0.5], [0.5, -0.5], [0.5, 0.5], [0, 0.5]];
-    lo = [0, 1, 2].map((k) => Math.min(...profile.map(([d, y]) => r(1, k) * y * sy - d * Math.hypot(r(0, k) * sx, r(2, k) * sz))));
-    hi = [0, 1, 2].map((k) => Math.max(...profile.map(([d, y]) => r(1, k) * y * sy + d * Math.hypot(r(0, k) * sx, r(2, k) * sz))));
-  } else {
-    const half = [0, 1, 2].map((k) => {
-      if (shape === 'sphere' || shape === 'blob') return ellipsoid(k, sx / 2, sy / 2, sz / 2);
-      // `sy` tall overall, radius sx/2, then scaled to sz in z.
-      if (shape === 'capsule') return Math.abs(r(1, k)) * Math.max(0, sy / 2 - sx / 2) + ellipsoid(k, sx / 2, sx / 2, sz / 2);
-      if (shape === 'torus') {
-        // A ring (sx - sy across) swept by a tube sy thick, then scaled to sz in z.
-        const [q, ring, tube] = [sz / sx, (sx - sy) / 2, sy / 2];
-        return Math.hypot(r(0, k) * ring, r(2, k) * ring * q) + ellipsoid(k, tube, tube, tube * q);
-      }
-      // A box: model axis k gathers |R[j][k]| * size[j] from each local axis j.
-      return [0, 1, 2].reduce((sum, j) => sum + Math.abs(r(j, k)) * p.size[j], 0) / 2;
-    });
-    lo = half.map((h) => -h);
-    hi = half;
-  }
-  return { lo: p.at.map((c, k) => c + lo[k]), hi: p.at.map((c, k) => c + hi[k]), along };
+export function partBox(p: PrimitivePart, index = 0): { lo: number[]; hi: number[] } {
+  return dataBox(partData(p, 0, index, 1).positions);
 }
 
 /**
