@@ -383,8 +383,20 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
   tips on the palm, the thumb across them); the runtime opens the hands towards the rest (open) pose
   per activity.
 - Clips start from the relaxed stance (feet under the hips, upright, arms hanging loose); the
-  runtime adds no stance corrections of its own (only the arms a little out over a skirt and an
-  elder's stoop), so a clip looks in game as it was authored.
+  runtime adds no stance corrections of its own (only the arms a little out over a skirt, an
+  elder's stoop and the body language below), so a clip looks in game as it was authored.
+- Body language (`characters/bodyLanguage.ts`): a layer over every clip for the emotion the face shows, by emotion
+  id (`BEARINGS`): the back bent or held up, the head bowed or raised, the shoulders dropped or drawn up, the arms
+  held in or loose, the elbows bent, the walk's arm swing smaller or larger (sad: the head 12° down, the back 8°, a
+  swing under half the clip's; happy: up straight, the swing 30 % larger; angry: upright, the arms in and the elbows
+  bent 16°). Standing free or walking it takes all of it (but the arms while carrying); using a thing standing,
+  inside one, in a hug, kiss, fight or cuddle only the head; seated the head and, sat plainly, a third of the back;
+  lying, a baby or under stage directions (the creator, portraits) none. It eases in over about a second. The pace
+  is sim-core's: an emotion's `walkSpeed` (content `emotions`), the walk matched to it as to any.
+- Turning on the spot (`characters/turns.ts`): standing free, a turn of 35° or more steps round with a turn clip
+  (`turnR90`, `turnL180Child`, …: below), the Sim's yaw following the clip's steps (`turnShare`) so a planted foot
+  stays put; smaller turns pivot on the feet. Not while walked in, inside or up on a thing, getting up, holding or
+  lifting a baby, or in a hug, kiss or fight.
 - Seated clips share `sit`'s pelvis. The runtime fits it to each body and seat: the pelvis joint
   goes `seatDrop` above the seat's surface and at the seat's forward offset (`SEATS`, from
   characters/furniture.json, or the content's `seat`). It fits the legs too (`characters/seatFit.ts`, shared with
@@ -475,6 +487,7 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | plateHold177, 147, 112 | yes | 3 | stood on the vibration plate (`GRIPPED`): both hands on its grips (fore-and-aft bars 0.26 m either side, 0.96 m over the deck, 0.12 m ahead), the weight shifting a little; the plate's buzz on top (`activityPose`); a size per height |
 | lieCurl | yes | 2.4 | dozing on a bed too short to lie on flat (`CURLED_BEDS`: the window seat): curled up on the left side facing the room, the knees drawn up, the head on the pillow on the left forearm; turned flat like `lie` |
 | lieSide | yes | 2.4 | lying at full length on the right side (`SIDE_BEDS`: the daybed): the back to the object's back rail, the legs along the mattress, the right one straight and the left a little over it, the right forearm under the cheek on the pillow, the left hand in front of the chest; turned flat like `lie` |
+| turnR30 … turnR180, turnL30 … turnL180 (every 5°), and each `…Child` | no | 0.8 (up to 90°), 1.1 (to 150°), 1.4 | turning on the spot (`turns.ts`), made in the turning body's frame: the foot on the side of the turn steps out on a low arc and the other follows (two steps, three, four for an about-turn), each planted foot turned back against the body's turn so it stays put on the floor, the hips midway between the ways the feet face, the head ahead into the turn. The feet are placed for hips a little wider for their legs than the reference's, a child's size for theirs (`TURN_HIPS`). Baked the first time a resident turns that far (`turnDef`, about a millisecond); the runtime plays the nearest size and turns by the turn itself |
 
 ### Checking clips
 
@@ -482,7 +495,8 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 [--update-baseline]` bakes the clips as the runtime does and checks loop flags, NaNs, loop seams,
 lengths, sliding feet, the seated pelvis and feet (with the runtime's leg fit, `seatFit.ts`: on a 0.45 m seat, a
 child's on the kids' chair, and the knees clear of every deep seat's `front`), the floor sits' knees and ankles
-against the floor, `lie` and the baby's clips (the list is in its header). The default is the reference: `male` at
+against the floor, `lie` and the baby's clips, and the turns on the spot, every size each way, a foot on the floor
+staying put as the clip's share of the turn turns the body (the list is in its header). The default is the reference: `male` at
 `youngAdult`, plus `baby` for the baby's clips.
 Each body and stage plays the clips on its own skeleton (`restT`, the pelvis motion and ground
 speed scaled by `pelvisScale`, `walk`'s hip roll), the sized clips at the size its height picks,

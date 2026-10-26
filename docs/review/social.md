@@ -24,9 +24,9 @@ Label, animation and minutes from content.
 | `sweetTalk` Sweet talk (flirt, 20 min) | n/a | I-social-03 | OK | I-social-03 S3 clip | `social/sheets/romance.png` |
 | `kiss` Kiss (kiss, 4 min) | n/a | A-social-01 | I-social-02 | A-social-01 S2 code (confirmed and widened: the arms hang at the sides); I-social-02 S2 code (a refused kiss: nothing happens) | `social/sheets/romance.png`, `social/pairs/fail-kiss-ya-adult-01.png` |
 | `askPartner` Ask to be partners (talk, 10 min) | n/a | OK | I-social-03 | I-social-03 S3 clip | `social/sheets/romance.png` |
-| `breakUp` Break up (argue, 10 min) | n/a | A-residents-07 | I-social-03 | I-social-03 S3 clip; A-residents-07 S2 code (residents ledger: no body language) | `social/pairs/breakUp-adult-ya-01.png` |
-| `insult` Insult (argue, 5 min) | n/a | A-residents-07 | I-social-03 | I-social-03 S3 clip; A-residents-07 S2 code (residents ledger) | `social/sheets/talks.png` |
-| `argue` Argue (argue, 20 min) | n/a | A-residents-07 | OK | A-residents-07 S2 code (residents ledger: a faster talk, head shakes and a slight lean; no anger in the body) | `social/sheets/talks.png` |
+| `breakUp` Break up (argue, 10 min) | n/a | OK | I-social-03 | I-social-03 S3 clip; A-residents-07 S2 code (residents ledger: no body language; fixed 240be09b) | `social/pairs/breakUp-adult-ya-01.png` |
+| `insult` Insult (argue, 5 min) | n/a | OK | I-social-03 | I-social-03 S3 clip; A-residents-07 S2 code (residents ledger; fixed 240be09b) | `social/sheets/talks.png` |
+| `argue` Argue (argue, 20 min) | n/a | OK | OK | A-residents-07 S2 code (residents ledger: a faster talk, head shakes and a slight lean; no anger in the body; fixed 240be09b: an angry resident's body, upright, the arms in, the elbows bent) | `social/sheets/talks.png` |
 | `prank` Prank (laugh, 8 min) | n/a | OK | I-social-03 | I-social-03 S3 clip (the joke's laugh; no prank is played) | `social/sheets/fights.png` |
 | `fight` Start a fight (fight, 8 min) | n/a | A-social-03 | A-social-03 | A-social-03 S2 clip (punches at the attacker's own height, over a child's head); I-systems-04 S2 code (systems ledger, widened: anyone may fight a child) | `social/sheets/fights.png` |
 | `apologize` Apologize (talk, 10 min) | n/a | OK | I-social-03 | I-social-03 S3 clip | `social/pairs/apologize-teen-ya-01.png` |
