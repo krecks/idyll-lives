@@ -3111,14 +3111,18 @@
       "name": "Chess table",
       "model": "model.chessTable",
       "footprint": [
-        1,
+        2,
         1
       ],
-      "approach": "behind",
+      "slots": 2,
+      "places": [
+        { "at": [-0.66, 0], "facing": 90 },
+        { "at": [0.66, 0], "facing": -90 }
+      ],
       "price": 350,
       "category": "hobbies",
       "group": "games",
-      "description": "Builds Intelligence and Perception.",
+      "description": "A game laid out between two chairs: play someone at home, or practise alone. Builds Intelligence and Perception.",
       "interactions": [
         {
           "id": "chess",
@@ -3136,6 +3140,27 @@
           "skills": {
             "intelligence": 0.18,
             "perception": 0.06
+          }
+        },
+        {
+          "id": "play",
+          "label": "Play chess",
+          "anim": "play",
+          "minutes": 45,
+          "pose": "sit",
+          "partner": true,
+          "alone": "chess",
+          "effects": {
+            "fun": 0.35,
+            "social": 0.08
+          },
+          "tags": [
+            "training",
+            "entertainment"
+          ],
+          "skills": {
+            "intelligence": 0.12,
+            "perception": 0.04
           }
         }
       ]

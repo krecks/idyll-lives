@@ -8,7 +8,7 @@
 # `G.settle(centre=False)`, so a seat stays where the game seats residents. The moving parts and their clips:
 #   piano          the fallboard lifts off the keys and the music desk swings out (`fallboard`)
 #   drumKit        the crash and ride cymbals wobble while drummed (`cymbals`, a loop)
-#   chessTable     a black pawn slides one square (`move`)
+#   chessTable     a black pawn slides one square towards white (`move`)
 #   poolTable      the triangle lifts off the racked balls (`rack_off`)
 #   foosball       the two outer rods kick back and forth (`rods`, a loop)
 #   dartboard      three darts grow in the board (`darts`)
@@ -989,8 +989,11 @@ def drumKit():
 
 
 # --- H2. Games ---------------------------------------------------------------------------------------------
-# The chess table: a pedestal table to the front with a board and a game in play, a chair behind it. A black
-# pawn is its own part and slides one square while a resident plays (`move`).
+# The chess table, for two (M-hobbies-11): a pedestal table in the middle of its 2 x 1 tiles with a board and a game
+# in play, and a chair at each end facing over it, where the content's two `places` seat the players (x = -0.66 and
+# 0.66 m, their knees under the top): white plays from the left. A black pawn is its own part and slides one square
+# towards white while they play (`move`).
+CHESS_CHAIR = 0.66     # the chairs' middles, either side (the content's `places`)
 SQUARE = 0.043
 BOARD_Y = 0.744    # the board's top
 
@@ -1029,11 +1032,15 @@ def _piece(F, name, kind, col, row, material, at=None):
 
 
 def chessTable():
-    F = G.GameFrame()
+    """The table built as it was, white to the front (its middle at depth 0.25), then turned a quarter so white faces
+    the left-hand chair; the chairs built facing the front, turned to face it and moved out to their places."""
+    F = G.GameFrame(shift=-0.25)        # the table's middle on the footprint's
+    turn = Matrix.Rotation(math.radians(90), 4, 'Z')
     with G.new_parts() as still:
-        # the top 0.64 × 0.48 m, room either side of the board for the taken pieces and the players' elbows (review
-        # M-hobbies-02: it was 0.46 × 0.40, the board filling it); the board inlaid, framed in the table's wood
-        F.extrude('top', _rr(0.64, 0.48, 0.03, 3), 0.03, (0, 0.725, 0.25), M.table_wood, plane='top', bevel=0.006,
+        # the top 0.48 × 0.64 m (0.64 between the players once turned), room at each player's end of the board for
+        # the pieces they have taken and their hands (review M-hobbies-02: it was 0.46 × 0.40, the board filling it);
+        # the board inlaid, framed in the table's wood
+        F.extrude('top', _rr(0.48, 0.64, 0.03, 3), 0.03, (0, 0.725, 0.25), M.table_wood, plane='top', bevel=0.006,
                   bevel_segments=1)
         F.box('board', 0.37, 0.004, 0.37, (0, 0.742, 0.2505), M.table_wood, bevel=0.002, bevel_segments=1)
         F.box('board_dark', 0.344, 0.0005, 0.344, (0, 0.74425, 0.2505), M.square_dark)
@@ -1044,7 +1051,7 @@ def chessTable():
                     x, z = _square_at(col, row)
                     quads.append((x - SQUARE / 2, x + SQUARE / 2, z - SQUARE / 2, z + SQUARE / 2, 0.7448))
         _flat_quads(F, 'squares', quads, M.square_light)
-        F.box('apron', 0.56, 0.05, 0.4, (0, 0.685, 0.25), M.table_wood, bevel=0.004, bevel_segments=1)
+        F.box('apron', 0.4, 0.05, 0.56, (0, 0.685, 0.25), M.table_wood, bevel=0.004, bevel_segments=1)
         # a turned pedestal on three swept snake feet
         _turned(F, 'pedestal', 0, 0.04, 0.25, [(0, 0), (0.05, 0), (0.05, 0.03), (0.036, 0.05), (0.03, 0.1), (0.044, 0.16),
                                                (0.048, 0.2), (0.034, 0.26), (0.025, 0.42), (0.03, 0.55), (0.042, 0.6),
@@ -1056,8 +1063,7 @@ def chessTable():
                    (0.2 * c, 0.016, 0.25 + 0.2 * s), (0.22 * c, 0.012, 0.25 + 0.22 * s)]
             F.sweep(f'foot{k}', pts, None, M.table_wood, profile=_rr(0.05, 0.032, 0.012, 1),
                     scale=[1.0, 0.95, 0.75, 0.5, 0.48])
-        _chair(F, -0.21, M.chair_wood, M.seat_pad)
-        # the game: the white side to the front
+        # the game: the white side to the front (to the left once turned)
         for kind, col, row in (('rook', 0, 7), ('knight', 6, 7), ('bishop', 3, 6), ('king', 4, 7)):
             _piece(F, f'w_{kind}', kind, col, row, M.piece_light)
         for k, (col, row) in enumerate(((1, 6), (2, 5), (4, 4), (6, 6))):
@@ -1066,17 +1072,30 @@ def chessTable():
             _piece(F, f'b_{kind}', kind, col, row, M.piece_dark)
         for k, (col, row) in enumerate(((2, 1), (3, 3), (6, 2))):
             _piece(F, f'b_pawn{k}', 'pawn', col, row, M.piece_dark)
-        # the taken pieces beside the board
-        for k, (kind, x, z) in enumerate((('pawn', -0.25, 0.14), ('pawn', -0.27, 0.19))):
+        # the taken pieces beside the board, at the end of the one who took them
+        for k, (kind, x, z) in enumerate((('pawn', 0.14, -0.03), ('pawn', 0.19, -0.05))):
             _piece(F, f'taken_w{k}', kind, 0, 0, M.piece_light, at=(x, 0.74, z))
-        for k, (kind, x, z) in enumerate((('pawn', 0.25, 0.34), ('pawn', 0.27, 0.39))):
+        for k, (kind, x, z) in enumerate((('pawn', -0.14, 0.53), ('pawn', -0.19, 0.55))):
             _piece(F, f'taken_b{k}', kind, 0, 0, M.piece_dark, at=(x, 0.74, z))
-    G.join(still, 'body', origin=(0, 0, 0))
+    table = G.join(still, 'table', origin=(0, 0, 0))
+    table.data.transform(turn)
+    parts = [table]
+    for s in (-1, 1):
+        with G.new_parts() as chair:
+            _chair(G.GameFrame(), 0.0, M.chair_wood, M.seat_pad)
+        c = G.join(chair, f'chair{s}', origin=(0, 0, 0))
+        # facing the table: the left one (game x -0.66) turned to face right, the right one left
+        c.data.transform(Matrix.Translation((-s * CHESS_CHAIR, 0, 0)) @ Matrix.Rotation(math.radians(90 * s), 4, 'Z'))
+        parts.append(c)
+    G.join(parts, 'body', origin=(0, 0, 0))
     with G.new_parts() as p:
         _piece(F, 'pawn', 'pawn', 5, 1, M.piece_dark)
-    pawn = G.join(p, 'pawn')
+    pawn = G.join(p, 'pawn', origin=(0, 0, 0))
+    pawn.data.transform(turn)
+    x, z = _square_at(5, 1)
+    G.hinged(pawn, turn @ Vector(F.at(x, BOARD_Y, z)))
     G.settle(centre=False)
-    G.slide(pawn, 'move', (0, -SQUARE, 0), seconds=0.8)
+    G.slide(pawn, 'move', (SQUARE, 0, 0), seconds=0.8)   # one square on, towards white (game -x)
     return G.meshes()
 
 
@@ -2336,8 +2355,9 @@ FAMILY = G.Family(
              paint=[('shell', 'Shells'), ('chrome', 'Hardware')]),
      G.Model('guitarAcoustic', guitarAcoustic, size=(0.4, 1.161, 0.405), key='model.guitarAcoustic',
              centre=(0, -0.0217), motions={'uses': {'music': 'off_stand'}}, paint=[('acoustic', 'Body'), ('spruce', 'Top'), ('stand', 'Stand')]),
-     G.Model('chessTable', chessTable, size=(0.64, 0.92, 0.89), key='model.chessTable', centre=(0, 0.045),
-             motions={'uses': {'chess': _after_sitting('move')}}, paint=[('table_wood', 'Table'), ('chair_wood', 'Chair')]),
+     G.Model('chessTable', chessTable, size=(1.7, 0.92, 0.48), key='model.chessTable',
+             motions={'uses': {'chess': _after_sitting('move'), 'play': _after_sitting('move')}},
+             paint=[('table_wood', 'Table'), ('chair_wood', 'Chair')]),
      G.Model('poolTable', poolTable, size=(2.5, 0.807, 1.4), key='model.poolTable',
              motions={'uses': {'pool': 'rack_off', 'trickShots': 'rack_off'}},
              paint=[('pool_frame', 'Frame'), ('cloth', 'Cloth')]),
