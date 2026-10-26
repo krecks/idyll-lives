@@ -168,7 +168,7 @@ These six have no group code of their own.
 - Checked in the north yard in four facings with their uses: pat the gnome, watch the birds, listen to the water and
   make a wish, water and smell the planter. The lantern and boulders are still; nothing floats or sinks.
 - Since 2026-10-21 (review A-outdoor-03) the fountain's water moves (`flow`, ambient:
-  `fixes/motions/g1718/views/fountain-t0.6.png`); it still makes no sound (G-53).
+  `fixes/motions/g1718/views/fountain-t0.6.png`); its water is heard by itself (`ambient: fountain`, G-53).
 - Colours checked by day in two facings with test colours far from the defaults, at night on WebGPU and on Low
   WebGL2, and in the colour studio. Every colour lands on the part its label names.
 - The gnome's Tunic takes in its sleeves; its boots sit wholly inside the tunic bell, so only the belt is named.

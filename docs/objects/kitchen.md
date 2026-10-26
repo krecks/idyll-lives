@@ -158,7 +158,7 @@ for when there's nothing else to do, and a cook on the way to the fridge still h
 | `wallCabinet` Wall cabinets | 1x1 · wall | — | kitchen / counters | Cabinet, Handles | Use | `doors_open`: both doors swing open 100° in 0.8 s onto plates, bowls and mugs while clean things are put away (a `cupboard` station, `fetch`, `hold` 1.5 s). |
 | `wallCabinetGlass` Glazed wall cabinet | 1x1 · wall | — | kitchen / counters | Cabinet, Handles | Use | Glass doors (`glass` finish). `door_open`: the right door opens as the wall cabinet's (each glazed door costs two draws). |
 | `wallCabinetCorner` Wall cabinet with end shelves | 1x1 · wall | — | kitchen / counters | Cabinet, Handles | Use | `door_open`: the door opens as the wall cabinet's. |
-| `rangeHood` Cooker hood | 1x1 · wall | — | kitchen / counters | Hood, Trim | Static | Static. |
+| `rangeHood` Cooker hood | 1x1 · wall | — | kitchen / counters | Hood, Trim | Static | Static. Its fan hums while the hob under it is in use (`ambientWhile`, Q-19). |
 | `spiceRack` Spice rack | 1x1 · wall | — | kitchen / counters | Rack | Static | Static. Decor by decision (Q-19: kind marked decor). |
 | `potRail` Pot rail | 1x1 · wall | — | kitchen / counters | Rail, Pots | Static | Static. Decor by decision (Q-19: kind marked decor). |
 | `kitchenShelfWall` Kitchen wall shelves | 1x1 · wall | — | kitchen / counters | Shelves, Brackets | Static | Static. Decor by decision (Q-19: kind marked decor). |

@@ -151,12 +151,10 @@ it left is here, with its id; §9 of the review says what each would take.
 - **Worked from the edge:** the bonsai bench, the rose arbour's roses, the cookbook lectern and the streetball hoop
   are used from the object's edge, not at the part (I-packs-12; `places` can fix it now, and the lectern wants a
   reading hand pose).
-- **Sounds still to make** (I-bathroom-04): the treadmill and bikes, the workbench, the ball games and darts, the
-  arcade, the sewing machine, the pottery wheel, the coffee machines, the blender's motor, the microwave, the
-  toaster, an oven's fan, the pizza oven, the fridge door, the bin lid, the vending machines, the phone box, the
-  basketball, singing, a bowed cello, the punch bag and the smash bin. The new sounds still want a headed listen.
-- **Later, as polish:** the range hood's light and hum while the hob below is in use (Q-19); flowers cut for a vase
-  (Q-18).
+- **The sounds want a listen by ear** (G-53): each was rendered and checked by its spectrum, timing and level, not
+  heard (`bench-results/review/fixes/sounds/wav/`).
+- **Later, as polish:** the range hood's light while the hob below is in use (its hum is in; Q-19); flowers cut for
+  a vase (Q-18).
 - **Parts with no use, left decorative:** the executive desk's drawer (I-office-02, won't fix); the nesting tables'
   small table and the display cabinet's door (decor, decision 4); the laundry basket's lid (not built). These are
   modelled parts without a clip, so no clip is orphaned.
@@ -197,6 +195,13 @@ it left is here, with its id; §9 of the review says what each would take.
   chair is used (I-kids-01).
 - **Models:** the entry console's and the spritz station's mirrors on back boards (M-packs-01, M-packs-02); the party
   bar's back bar (M-packs-03); bathers' shins in the heart tub (A-packs-01); the power blender's blades (A-packs-02).
+- **Sounds** (I-bathroom-04, G-53): the uses that were silent sound like their things, synthesised
+  (`web/src/audio/things.ts`): the treadmill and bikes, the workbench and the bike stand, pool, foosball, ping-pong,
+  darts, the arcade cabinets, the sewing machine, the chemistry set, the pottery wheel, the coffee machines, the
+  blenders and the stand mixer, the microwaves (a hum, then a ping), toast (then the pop), an oven's fan, the pizza
+  oven's fire (and the fireplace's and the fire pit's), the phone box, the vending machines, basketball, karaoke
+  singing, a bowed cello, the punch bag and the smash bin; a fridge door and the pedal bin's lid, once as they're
+  used. The cooker hood hums while the hob under it is in use (I-kitchen-09, Q-19).
 
 ## Notes on the sim
 

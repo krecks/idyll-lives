@@ -449,8 +449,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** decision
 - **Where:** `web/public/content/furniture.json:768` (`rangeHood`), `web/public/content/catalog2/kitchen.json:967` (`spiceRack`), `:983` (`potRail`), `:999` (`kitchenShelfWall`): no use, no station; not `decor` kinds in `docs/review/reference.json`
 - **Evidence:** `kitchen/sheets/obj-rangeHood.png`, `obj-spiceRack.png`, `obj-potRail.png`, `obj-kitchenShelfWall.png`. The hood has a light strip and a filter but stays dark and silent while someone cooks on the hob under it; the spice rack, the pot rail's pans and the shelves' jars are never reached for, though the recipes take a pan and the cook stirs one. Owner default: decor stays decor. Decide whether the hood comes on (its light and a fan's hum) while the hob below is in use, and whether the rack, rail and shelves become optional recipe stations (a spice taken during the Cook step), or stay decor (then mark their kinds `decor` in `reference.json`).
-- **Status:** fixed (198e90d9) for the spice rack, pot rail and shelves (decor, Q-19); the hood's light and hum later
-- **After:** Their kinds are `decor` in `reference.json`: `cargo review uses` no longer flags them. The range hood keeps its flag until its light and hum come with the hob (polish, code).
+- **Status:** fixed (198e90d9) for the spice rack, pot rail and shelves (decor, Q-19); the hood's hum (2df2d432, c3c6a5b1); its light later
+- **After:** Their kinds are `decor` in `reference.json`: `cargo review uses` no longer flags them. The range hood hums while the hob under it is in use (`ambient: hood`, `ambientWhile: sizzle`: a fan's rush, its blades' whine and a 100 Hz motor hum), heard with the pan on `review-stage` from the first stir to the last (`bench-results/review/fixes/sounds/sounds.log`). Its light doesn't come on yet, and it keeps its flag (no use).
 - **Source:** wave: kitchen (I1)
 
 ### I-kitchen-10 — Breakfast and dinner at a dining set come from nowhere
