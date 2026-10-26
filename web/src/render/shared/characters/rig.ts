@@ -257,6 +257,8 @@ export interface SimRig {
   rising: boolean;
   riseX: number;
   riseZ: number;
+  /** How far along that step the rise had got (0..1): one cut short goes the rest of the way after it, not in a frame. */
+  riseK: number;
   /** Rising off a built-in chair to a tile behind it: the corner beside the chair the step goes round (`cornerOf`; NaN: straight). */
   riseViaX: number;
   riseViaZ: number;

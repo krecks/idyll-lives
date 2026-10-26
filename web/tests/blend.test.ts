@@ -1,15 +1,19 @@
 // Crossfade continuity: the residents' blending (`residents.ts` `start`, `choose`, the per-frame blend; `pose.ts`
-// `blendInto`) driven through a recording `ResidentView`, with five Sims scripted to churn — a chair sat on and
+// `blendInto`) driven through a recording `ResidentView`, with six Sims scripted to churn — a chair sat on and
 // stood up from, a walk cut short by a dance, a two-handed load carried and then eaten, a two-handed load swapped
-// for a one-handed one, in and out of bed. Every frame, every bone's rotation is read out of the pose texture (the
-// skinning matrix's rotation, what the viewer sees) and compared with the frame before: a crossfade must move each
-// bone smoothly, so a single frame turning a bone further than a real fade does is a pop, not motion. `bun test`.
+// for a one-handed one (now and then, and every 0.1 s), in and out of bed. Every frame, every bone's rotation and
+// the pelvis's position are read out of the pose texture (the skinning matrices, what the viewer sees) and compared
+// with the frame before: a crossfade must move the body smoothly, so a single frame turning a bone further than a
+// real fade does, or moving the body further than a Sim can, is a pop, not motion. `bun test`.
 //
 // (What this caught when written: `start` kept the old fading-out player only under `rig.w < 0.5`, so interrupting
 // a fade jumped up to half the fade's whole delta — 83° of a hand here, 57° where lying meets standing; and the
 // upper-body layer swapped clips at full weight — 79° of a hand for a two-handed load becoming one-handed. With
 // `freezePlayer` and the upper layer's own fade, no bone turns more than 19° in a frame anywhere in the script,
-// which is the fade itself: the widest handoff the clips have is 175° over a quarter second.)
+// which is the fade itself: the widest handoff the clips have is 175° over a quarter second. Later: an upper-layer
+// fade cut short by the next swap dropped the clip it was fading from, 61° of a hand; and a rise off a seat cut
+// short by a walk put the body on the tile in one frame, 43 cm; and, hidden before it had caught up, came back into
+// view on its way off the seat it had left, 62 cm from its place.)
 import { afterAll, describe, expect, test } from 'bun:test';
 import { readFileSync, existsSync } from 'node:fs';
 
@@ -181,6 +185,8 @@ describe('residents crossfade continuity', async () => {
     },
     // A two-handed load for a one-handed one and back (`carry` <-> `carryOne` at full weight).
     { kind: 'swap', script: [{ seconds: 0.9 }], object: -1, x: 12.5, z: 0 },
+    // The same, every 0.1 s: each upper-layer fade cut short by the next swap.
+    { kind: 'swap', script: [{ seconds: 0.1 }], object: -1, x: 14.5, z: 0 },
     // Tucking in and out of bed every 0.45 s (lying takes a second to fade): the widest pair there is, cut short
     // at half its weight.
     {
@@ -341,8 +347,11 @@ describe('residents crossfade continuity', async () => {
         ),
       );
       characters.setSun(() => ({ x: -0.45, z: -0.35 }));
-      const bones = (JSON.parse(readFileSync(`${WEB}public/assets/characters/rig.json`, 'utf8')) as { bones: string[] })
-        .bones;
+      const { bones, sourcePelvis } = JSON.parse(readFileSync(`${WEB}public/assets/characters/rig.json`, 'utf8')) as {
+        bones: string[];
+        sourcePelvis: [number, number, number];
+      };
+      const pelvis = bones.indexOf('pelvis');
       const prev = new Float32Array(layout.capacity);
       const curr = new Float32Array(layout.capacity);
       const frame: FrameState = {
@@ -363,6 +372,15 @@ describe('residents crossfade continuity', async () => {
       const before = actors.map(() => new Float32Array(bones.length * 4));
       const after = new Float32Array(bones.length * 4);
       const q = { qx: 0, qy: 0, qz: 0, qw: 1 };
+      // Every Sim's pelvis the frame before (world, m): where the root's placement puts the body. And the farthest
+      // one moved in a frame, for the failure's message.
+      const hips = actors.map(() => [NaN, NaN, NaN]);
+      let farthest = { cm: 0, sim: -1, at: 0 };
+      // When the chair's Sim is out of view (s), whether it has been since it was last drawn, and how far (cm) its
+      // pelvis was from where the snapshot put it on the frame it came back.
+      const HIDDEN = [2.37, 3] as const;
+      let wasHidden = false;
+      let reappeared = NaN;
       // The worst turns seen, for the failure's message.
       const worst: { deg: number; sim: number; bone: string; at: number }[] = [];
       const note = (deg: number, sim: number, bone: string, at: number) => {
@@ -384,22 +402,43 @@ describe('residents crossfade continuity', async () => {
         frame.alpha = (t - tick * 0.05) / 0.05;
         now = 1000 + t * 1000;
         frame.now = now;
-        characters.update(frame, () => true, shadows);
+        // The chair's Sim out of view just after a walk cut its rise short (`hidden`), and back in view later.
+        const hiding = t >= HIDDEN[0] && t < HIDDEN[1];
+        characters.update(frame, (x) => !(hiding && x < 2), shadows);
         for (let i = 0; i < actors.length; i++) {
+          if (hiding && i === 0) {
+            wasHidden = true;
+            continue;
+          }
           // The skinning matrix of each bone, its rotation read out: what the viewer draws.
           const row = i * width * 4;
           for (let b = 0; b < bones.length; b++) {
             rig.rotationOf(poses.subarray(row + b * 16, row + b * 16 + 16), q);
             [after[b * 4], after[b * 4 + 1], after[b * 4 + 2], after[b * 4 + 3]] = [q.qx, q.qy, q.qz, q.qw];
           }
+          // The pelvis: its rest position (the clips' `sourcePelvis`, near enough on any body) through its skinning
+          // matrix, so a root offset that jumps (`rootY` / `rootFwd`, a `frame`) moves it, as it moves the body.
+          const m = poses.subarray(row + pelvis * 16, row + pelvis * 16 + 16);
+          const [sx, sy, sz] = sourcePelvis;
+          const hip = [0, 1, 2].map((k) => m[k] * sx + m[4 + k] * sy + m[8 + k] * sz + m[12 + k]);
           // (The first half second is the build settling, not a fade.)
-          if (t >= 0.5) {
+          if (i === 0 && wasHidden) {
+            // Back in view: drawn where the snapshot puts them, not on the way off the seat they left before.
+            wasHidden = false;
+            const o = layout.headerLen;
+            const k = layout.sim as Record<(typeof FIELDS)[number], number>;
+            const at = (f: number) => prev[o + f] + (curr[o + f] - prev[o + f]) * frame.alpha;
+            reappeared = Math.hypot(hip[0] - at(k.x), hip[2] - at(k.z)) * 100;
+          } else if (t >= 0.5) {
             const prevQ = before[i];
             for (let b = 0; b < bones.length; b++) {
               note(quatAngle(prevQ, b * 4, after, b * 4), i, bones[b], t);
             }
+            const cm = Math.hypot(hip[0] - hips[i][0], hip[1] - hips[i][1], hip[2] - hips[i][2]) * 100;
+            if (cm > farthest.cm) farthest = { cm, sim: i, at: t };
           }
           before[i].set(after);
+          hips[i] = hip;
         }
       }
       // The widest handoff there is (175°, `blend_analysis`) faded over 0.25 s moves 175° * 1.5 / 4 / 60 = 17.5° a
@@ -408,6 +447,12 @@ describe('residents crossfade continuity', async () => {
       worst.sort((x, y) => y.deg - x.deg);
       const top = worst.slice(0, 6).map((w) => `sim${w.sim} ${w.bone} ${w.deg.toFixed(0)}° at ${w.at.toFixed(2)} s`);
       expect(worst[0]?.deg ?? 0, `single-frame turns: ${top.join('; ') || 'none'}`).toBeLessThan(26);
+      // And the body as a whole: 20 cm a frame is 12 m/s, faster than any Sim moves (a run is a third of that, the
+      // widest settle here 12 cm), and well under a placement that jumps (43 cm for a rise cut short by a walk).
+      const hipsAt = `sim${farthest.sim} ${farthest.cm.toFixed(0)} cm at ${farthest.at.toFixed(2)} s`;
+      expect(farthest.cm, `single-frame pelvis move: ${hipsAt}`).toBeLessThan(20);
+      // (Standing, the pelvis is within a few cm of the Sim's place; the seat they rose from is 43 cm away.)
+      expect(reappeared, 'pelvis from its place on coming back into view (cm)').toBeLessThan(15);
     } finally {
       performance.now = realNow;
     }

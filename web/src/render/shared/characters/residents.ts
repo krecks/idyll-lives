@@ -85,6 +85,10 @@ export type { Face } from './face';
  * action runs fast: scaled by `animRate` like the lower fade). */
 const UPPER_FADE_RATE = 4;
 
+/** How fast a rise cut short (`SimRig.riseK`) finishes its step off the seat (per second: a quarter of a second, less
+ * when the action runs fast). */
+const RISE_CATCH_UP = 4;
+
 /** `q` / `p` = the player's pose: its clip sampled at its time, or the pose it holds (`Player.frozen`). A player
  * with neither (a rig that has not been given a clip yet) leaves `q` / `p` as they were. */
 function samplePlayer(set: CharacterSet, p: Player, q: Float32Array, t: Float32Array): void {
@@ -592,6 +596,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         rising: false,
         riseX: 0,
         riseZ: 0,
+        riseK: 1,
         riseViaX: NaN,
         riseViaZ: NaN,
         walkT: -1,
@@ -1424,6 +1429,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         rig.yaw = tyaw;
         rig.speed = 0;
         rig.lastPose = pose;
+        // (Nor on the way off a seat they left before: `riseK`.)
+        rig.riseK = 1;
       }
       // Sitting or lying down: where they stood, and getting into bed, whether from its side (`sideIn`).
       if ((pose === Pose.Sit || pose === Pose.Lie) && rig.lastPose === Pose.Stand && !appeared) {
@@ -1631,12 +1638,19 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       pl.z = at.z + Math.cos(at.yaw) * rootFwd;
       this.stepPlace(rig, pl, step);
       if (rig.walkT >= 0) this.walkPlace(rig, pl, at.x + Math.sin(rig.walkYaw) * rootFwd, at.z + Math.cos(rig.walkYaw) * rootFwd, step);
-      if (pose === Pose.Sit) [rig.sitX, rig.sitZ] = [pl.x, pl.z];
-      else if (rig.rising && rig.cur.key.startsWith('standUp')) {
+      if (pose === Pose.Sit) {
+        [rig.sitX, rig.sitZ] = [pl.x, pl.z];
+        rig.riseK = 1;
+      } else if (rig.rising && rig.cur.key.startsWith('standUp')) {
         // Rising off a seat where it is, then stepping off to the tile sim-core put them on (`rising`), round a
         // built-in chair's side to a tile behind it (`riseViaX`).
-        const k = smooth(clamp((rig.cur.time / rig.cur.clip!.duration - 0.25) / 0.5, 0, 1));
-        alongWay(pl, rig.riseX, rig.riseZ, rig.riseViaX, rig.riseViaZ, pl.x, pl.z, k);
+        rig.riseK = smooth(clamp((rig.cur.time / rig.cur.clip!.duration - 0.25) / 0.5, 0, 1));
+        alongWay(pl, rig.riseX, rig.riseZ, rig.riseViaX, rig.riseViaZ, pl.x, pl.z, rig.riseK);
+      } else if (rig.riseK < 1) {
+        // A rise cut short (walking off before it was done): the rest of the way to the tile from where it had got,
+        // or the body would cross it in one frame (`blend.test.ts`).
+        rig.riseK = Math.min(1, rig.riseK + dt * RISE_CATCH_UP * Math.max(1, animRate));
+        alongWay(pl, rig.riseX, rig.riseZ, rig.riseViaX, rig.riseViaZ, pl.x, pl.z, rig.riseK);
       }
       pl.scale = rig.scale;
       pl.head = rig.head;
@@ -1670,8 +1684,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       shadows[m] = r;
       shadows[m + 5] = 1;
       shadows[m + 10] = r;
-      // (Under them inside a thing they use from inside, and on its floor: `STEP_IN`; rising off a seat.)
-      const stepped = !!rig.inside || rig.outT >= 0 || rig.walkT >= 0 || (rig.rising && rig.cur.key.startsWith('standUp'));
+      // (Under them inside a thing they use from inside, and on its floor: `STEP_IN`; rising off a seat, and the rest
+      // of a rise cut short: `riseK`.)
+      const stepped = !!rig.inside || rig.outT >= 0 || rig.walkT >= 0 || (rig.rising && rig.cur.key.startsWith('standUp')) || rig.riseK < 1;
       shadows[m + 12] = stepped ? pl.x : rig.x;
       shadows[m + 13] = 0.02 + (stepped ? pl.y : rig.floorY);
       shadows[m + 14] = stepped ? pl.z : rig.z;
@@ -2127,8 +2142,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     // Upper-body layer.
     if (upper) {
       if (rig.upper.key !== upper) {
-        // (The clip it replaces keeps playing under the new one, faded out as `upperFade` rises.)
-        copyPlayer(rig.upper, rig.upperPrev);
+        // The clip it replaces keeps playing under the new one, faded out as `upperFade` rises; a fade cut short
+        // holds the pose it had reached, as the lower pair's does (`start`).
+        if (rig.upperFade < 1 && rig.upperPrev.clip && rig.upper.clip) this.hold(rig.upperPrev, rig.upper, smooth(rig.upperFade));
+        else copyPlayer(rig.upper, rig.upperPrev);
         rig.upperFade = 0;
         rig.upper.key = upper;
         rig.upper.clip = this.clip(upper);
@@ -2521,27 +2538,22 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
 
   private start(rig: SimRig, key: string, fade: number, rate: number, repeat: boolean, rootY: number, rootFwd: number, pitch: number): void {
     const clip = this.clip(key);
-    const set = this.set!;
     const { prev, cur } = rig;
     if (rig.w < 1 && prev.clip) {
       // A fade cut short. Neither end of it is where the pose had got to, so the fading-out player holds the pose
-      // the blend had reached (`freezePlayer`) and fades out of that: dropping to either end would jump by the
-      // blend's remaining distance, up to half the whole fade (`blend.test.ts`).
+      // the blend had reached (`hold`) and fades out of that: dropping to either end would jump by the blend's
+      // remaining distance, up to half the whole fade (`blend.test.ts`).
       const w = smooth(rig.w);
       const heldY = lerp(prev.rootY, cur.rootY, w);
       const heldFwd = lerp(prev.rootFwd, cur.rootFwd, w);
       const heldPitch = lerp(prev.rootPitch, cur.rootPitch, w);
       const at = prev.frame || cur.frame ? this.framed(rig, w) : null;
-      samplePlayer(set, prev, this.qB, this.pB);
-      samplePlayer(set, cur, this.qC, this.pC);
-      blendInto(this.qB, this.pB, this.qC, this.pC, w, null);
-      copyPlayer(cur, prev);
-      // (`copyPlayer` takes the incoming clip's root: put back the one the held pose was blended at.)
+      this.hold(prev, cur, w);
+      // (`copyPlayer` took the incoming clip's root: put back the one the held pose was blended at.)
       prev.rootY = heldY;
       prev.rootFwd = heldFwd;
       prev.rootPitch = heldPitch;
       if (at) prev.frame = at;
-      freezePlayer(prev, this.qB, this.pB);
     } else {
       copyPlayer(cur, prev);
     }
@@ -2560,6 +2572,16 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     if (!prev.clip) copyPlayer(cur, prev);
     rig.w = 0;
     rig.fadeRate = 1 / Math.max(0.05, fade);
+  }
+
+  /** `prev` takes over from `cur` (`copyPlayer`) holding the pose their blend at `w` (smoothed) had reached. */
+  private hold(prev: Player, cur: Player, w: number): void {
+    const set = this.set!;
+    samplePlayer(set, prev, this.qB, this.pB);
+    samplePlayer(set, cur, this.qC, this.pC);
+    blendInto(this.qB, this.pB, this.qC, this.pC, w, null);
+    copyPlayer(cur, prev);
+    freezePlayer(prev, this.qB, this.pB);
   }
 
   /** Look-at, flirting, kissing and hugging at the partner's height, punches aimed at theirs, on top of the clips. */
