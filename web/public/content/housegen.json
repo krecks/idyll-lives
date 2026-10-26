@@ -222,7 +222,7 @@
       "furniture": [
         { "one": ["laundryWasher"] },
         { "one": ["laundryDryer"], "chance": 0.4 },
-        { "one": ["laundryBasket"] },
+        { "one": ["laundryBasket"], "chance": 0.95 },
         { "one": ["laundryHamper", "bathCabinetTall"], "chance": 0.3 }
       ],
       "wall": [{ "one": ["wallCabinet", "kitchenShelfWall"], "chance": 0.5 }],
