@@ -1429,6 +1429,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         rig.yaw = tyaw;
         rig.speed = 0;
         rig.lastPose = pose;
+        // (Nor on the way off a seat they left before: `riseK`.)
+        rig.riseK = 1;
       }
       // Sitting or lying down: where they stood, and getting into bed, whether from its side (`sideIn`).
       if ((pose === Pose.Sit || pose === Pose.Lie) && rig.lastPose === Pose.Stand && !appeared) {
@@ -1682,8 +1684,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       shadows[m] = r;
       shadows[m + 5] = 1;
       shadows[m + 10] = r;
-      // (Under them inside a thing they use from inside, and on its floor: `STEP_IN`; rising off a seat.)
-      const stepped = !!rig.inside || rig.outT >= 0 || rig.walkT >= 0 || (rig.rising && rig.cur.key.startsWith('standUp'));
+      // (Under them inside a thing they use from inside, and on its floor: `STEP_IN`; rising off a seat, and the rest
+      // of a rise cut short: `riseK`.)
+      const stepped = !!rig.inside || rig.outT >= 0 || rig.walkT >= 0 || (rig.rising && rig.cur.key.startsWith('standUp')) || rig.riseK < 1;
       shadows[m + 12] = stepped ? pl.x : rig.x;
       shadows[m + 13] = 0.02 + (stepped ? pl.y : rig.floorY);
       shadows[m + 14] = stepped ? pl.z : rig.z;
