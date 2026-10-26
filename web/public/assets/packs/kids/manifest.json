@@ -172,6 +172,18 @@
         },
         "toy_yellow": {
           "finish": "material.finish.satin"
+        },
+        "tray_mat": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sit": {
+            "clip": "tray_out",
+            "hold": 1.0,
+            "out": 1.2
+          }
         }
       },
       "paint": [
