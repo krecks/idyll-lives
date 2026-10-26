@@ -26,7 +26,7 @@ import { colorsKey, groundDepth, storeyOfRow, storeyRow, type StoreyLayout, MAX_
 import type { BuildEffect, ObjectResize, Renderer, ResizeHandle } from '../render/types';
 import type { Sound } from '../ui/sfx';
 import { game, type BuildTool } from '../ui/state.svelte';
-import { approachTile, covers, facedTable, fitOnTop, frontTile, ownSize, spotAt, topOf, type Top } from './surfaces';
+import { approachTile, covers, facedTable, fitOnTop, frontTile, overhangEdges, overhangTiles, ownSize, spotAt, topOf, type Top } from './surfaces';
 
 type Point = { x: number; z: number };
 /** A wall face to paint; `half` for a half wall (the preview's height). */
@@ -602,6 +602,24 @@ export class BuildBuyInput {
     if (layer === 'ceiling' && def.hangsLow && over((o) => on(o, 'floor'))) return 'Hangs too low over the furniture there';
     if (layer === 'floor' && def.fillsWall && over((o) => on(o, 'wall', 'ceiling'))) return 'Too tall for what hangs there';
     if (layer === 'floor' && over((o) => !!o.hangsLow)) return 'Something hangs too low there';
+    // Nor under (or into) a shade reaching over from beside (content `overhang`: an arc lamp's).
+    if (def.fillsWall || def.hangsLow || def.headHeight) {
+      for (let tz = z; tz < z + d; tz++) {
+        for (let tx = x; tx < x + w; tx++) {
+          const shade = this.shadeOver(tx, tz, moving);
+          if (shade) return layer === 'floor' ? `Too tall for the ${shade} hanging there` : `Would hang into the ${shade}`;
+        }
+      }
+    }
+    // Where it reaches over itself (an arc lamp's shade): on the plot, off the stairs, nothing tall or hanging
+    // there to run into (furniture may stand under it), no wall in the way from its own tile.
+    const reach = overhangTiles(def.overhang, x, z, rot);
+    for (const [tx, tz] of reach) {
+      if (!onPlot(tx, tz) || this.diagonals.has(`${tx}:${tz}`) || this.takenBy(tx, tz, moving, (o) => !!o.stairs)) return 'Would hang over the edge';
+      const into = this.thingAt(tx, tz, moving, (o) => !!o.fillsWall || !!o.hangsLow || !!o.headHeight) ?? this.shadeOver(tx, tz, moving);
+      if (into) return `Would hang into the ${into}`;
+    }
+    if (overhangEdges(reach, x, z).some(([[ax, az], [bx, bz]]) => this.wallBetween(ax, az, bx, bz))) return 'Blocked by a wall';
     // On a wall, or built to stand against one (`againstWall`): its back all along a wall.
     if (layer === 'wall' || (layer === 'floor' && def.againstWall)) {
       const backs: { axis: Axis; x: number; z: number }[] = [];
@@ -666,16 +684,34 @@ export class BuildBuyInput {
     });
   }
 
+  /** The name (lower case) of a thing (other than `moving`) of a kind that passes `test` standing on or hanging over a tile. */
+  private thingAt(tx: number, tz: number, moving: number | null, test: (def: ObjectDef) => boolean): string | undefined {
+    for (const o of game.objects) {
+      const def = o.id !== moving && tx >= o.x && tz >= o.z && tx < o.x + o.w && tz < o.z + o.d ? this.content.object(o.def) : undefined;
+      if (def && test(def)) return def.name.toLowerCase();
+    }
+    return undefined;
+  }
+
+  /** The name (lower case) of a thing (other than `moving`) whose shade reaches over a tile from beside it (content `overhang`). */
+  private shadeOver(tx: number, tz: number, moving: number | null): string | undefined {
+    for (const o of game.objects) {
+      const def = o.id !== moving ? this.content.object(o.def) : undefined;
+      if (def?.overhang && overhangTiles(def.overhang, o.x, o.z, o.rot).some(([ox, oz]) => ox === tx && oz === tz)) return def.name.toLowerCase();
+    }
+    return undefined;
+  }
+
   /**
    * Whether a resident can stand on a tile beside a thing to use it, as the simulation has it
-   * (`approach_tiles`): on the home plot, nothing on its floor (bar `moving`), no diagonal wall
-   * through it and no wall between it and the thing's own tile next to it.
+   * (`approach_tiles`): on the home plot, nothing on its floor (bar `moving`) or hanging over it at
+   * head height, no diagonal wall through it and no wall between it and the thing's own tile next to it.
    */
   private standable(moving: number | null): (c: { tile: [number, number]; inner: [number, number] }) => boolean {
     const home = this.home();
     return ({ tile: [tx, tz], inner: [ix, iz] }) =>
       !!home && tx >= home.x && tz >= home.z && tx < home.x + home.w && tz < home.z + home.d &&
-      !this.taken('floor', tx, tz, moving) && !this.takenBy(tx, tz, moving, (o) => !!o.hangsLow || !!o.headHeight) && !this.diagonals.has(`${tx}:${tz}`) && !this.wallBetween(ix, iz, tx, tz);
+      !this.taken('floor', tx, tz, moving) && !this.takenBy(tx, tz, moving, (o) => !!o.hangsLow || !!o.headHeight) && !this.shadeOver(tx, tz, moving) && !this.diagonals.has(`${tx}:${tz}`) && !this.wallBetween(ix, iz, tx, tz);
   }
 
   /** Whether a wall (with or without a door or window) stands between two neighbouring tiles. */

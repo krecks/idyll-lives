@@ -3305,6 +3305,17 @@ impl Content {
                     return Err(Error::new(format!("object '{}': a place is more than {PLACE_REACH} m off its footprint", obj.id)));
                 }
             }
+            // Things on a wall hang square to it; things on a surface always turn.
+            let turns = obj.free_rotation.unwrap_or_else(|| {
+                layer == Layer::Surface
+                    || layer != Layer::Wall
+                        && obj.footprint == [1, 1]
+                        && obj.category.as_ref().is_some_and(|c| raw.object_rules.free_rotation.iter().flatten().any(|f| f == c))
+            });
+            // (Its shade's tiles turn with it in quarter turns: turned between, it would hang over one not kept for it.)
+            if turns && !obj.overhang.is_empty() {
+                return Err(Error::new(format!("object '{}': `overhang` turns in quarter turns only (`freeRotation`: false)", obj.id)));
+            }
             objects.push(ObjectDef {
                 id: obj.id.clone(),
                 name: obj.name.clone(),
@@ -3315,15 +3326,7 @@ impl Content {
                 places: obj.places.iter().map(|p| SlotPlace { at: p.at, facing: p.facing.to_radians() }).collect(),
                 outdoors: obj.outdoors,
                 stairs: obj.stairs,
-                // Things on a wall hang square to it; things on a surface always turn.
-                turns: obj.free_rotation.unwrap_or_else(|| {
-                    layer == Layer::Surface
-                        || layer != Layer::Wall
-                        && obj.footprint == [1, 1]
-                        && obj.category.as_ref().is_some_and(|c| {
-                            raw.object_rules.free_rotation.iter().flatten().any(|f| f == c)
-                        })
-                }),
+                turns,
                 decor: obj
                     .decor
                     .or_else(|| {

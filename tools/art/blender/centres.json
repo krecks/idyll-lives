@@ -327,7 +327,7 @@
   "model.ladderShelf": [0.0, -0.252],
   "model.lamp": [0.0, 0.0],
   "model.lampBanker": [0.0, 0.0],
-  "model.lampFloorArc": [0.0, -0.025],
+  "model.lampFloorArc": [-0.1245, 0.3755],
   "model.lampFloorTripod": [0.0, 0.0],
   "model.lampLantern": [0.0, 0.0],
   "model.lampMushroom": [0.0, 0.0],

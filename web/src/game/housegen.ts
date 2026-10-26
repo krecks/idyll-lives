@@ -29,7 +29,7 @@
  */
 
 import type { ObjectDef, SurfaceKind } from '../content/content';
-import { approachCandidates, covers, freeSpots, frontTile, middleOf, topOf, type Shape, type Shapes, type Top } from './surfaces';
+import { approachCandidates, covers, freeSpots, frontTile, middleOf, overhangTiles, topOf, type Shape, type Shapes, type Top } from './surfaces';
 import type { Door, HouseTemplate, Placement, PlannedRoom, Wall } from './town';
 
 export interface HouseGenConfig {
@@ -218,6 +218,14 @@ export interface ObjectInfo extends Shape {
   againstWall?: boolean;
   /** Hangs from the ceiling at head height (content `headHeight`): nobody walks under it (its tiles are taken from the floor's way through). */
   headHeight?: boolean;
+  /** Hangs from the ceiling low enough to walk into (content `hangsLow`). */
+  hangsLow?: boolean;
+  /** Tiles beside its own it reaches over at head height (content `overhang`: an arc lamp's shade over the next tile). */
+  overhang?: [number, number][];
+  /** A staircase. */
+  stairs?: boolean;
+  /** Sat or lain on (an interaction with pose `sit` or `lie`): a sofa, a chair, a bed. */
+  seated?: boolean;
   /** A hob or a grill (stations `stove`, `grill`) or a sink (`dishes`, where hands are washed): no small things on its top. */
   keepClear: boolean;
   /** Content category and group (`residents.kidsOnly`: things only for a home with children). */
@@ -241,7 +249,7 @@ export function objectInfos(content: { object(id: string): ObjectDef | undefined
   return (def) => {
     if (!known.has(def)) {
       const o = content.object(def);
-      known.set(def, o && { ...o, footprint: o.footprint ?? [1, 1], radius: content.radius(o), used: (o.interactions ?? []).length > 0 || (o.stations ?? []).length > 0, lamp: !!o.light, lightTiles: o.light?.tiles, keepClear: cooksOrWashes(o) });
+      known.set(def, o && { ...o, footprint: o.footprint ?? [1, 1], radius: content.radius(o), used: (o.interactions ?? []).length > 0 || (o.stations ?? []).length > 0, lamp: !!o.light, lightTiles: o.light?.tiles, keepClear: cooksOrWashes(o), seated: (o.interactions ?? []).some((i) => i.pose === 'sit' || i.pose === 'lie') });
     }
     return known.get(def);
   };
@@ -279,6 +287,8 @@ interface Floor {
   layers?: Set<string>;
   /** Tiles open to the stairs down to the basement (the stairwell): nothing hangs or lies there either. */
   well?: Set<string>;
+  /** Tiles a shade reaches over from beside (content `overhang`, an arc lamp's): nothing hangs low or at head height there. */
+  shaded?: Set<string>;
 }
 
 const key = (x: number, z: number) => `${x}:${z}`;
@@ -1221,7 +1231,7 @@ function furnishRoom(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, 
         // Things nobody uses (a floor lamp, a vase on a stand) keep out of the way in doorways;
         // one that must come goes wherever it fits if it has to.
         const aside = !info(def)!.used;
-        const side = place(f, r, def, info(def)!, rng, prefer, aside) ?? (aside && required(slot) ? place(f, r, def, info(def)!, rng, prefer) : null);
+        const side = place(f, r, def, info(def)!, rng, prefer, aside, info) ?? (aside && required(slot) ? place(f, r, def, info(def)!, rng, prefer, false, info) : null);
         if (side !== null) {
           sideOf.set(def, side);
           for (const o of slot.one) sideOf.set(o, side);
@@ -1601,6 +1611,8 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
       for (let dx = 0; dx < w; dx++) {
         const t = key(x + dx, z + dz);
         if (!inside(r, x + dx, z + dz) || stairs.has(t) || layers.has(`${layer}:${t}`) || (low && f.keep.has(t))) return false;
+        // (Nor into an arc lamp's shade reaching over from beside.)
+        if ((low || (layer === 'ceiling' && info(def)?.hangsLow)) && f.shaded?.has(t)) return false;
       }
     }
     const [frx, frz] = frontTile(x, z, w, d, rot);
@@ -1698,9 +1710,12 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
  * One piece against a wall of room `r`, facing into it (`prefer`: a side first, 0 the side
  * towards the street, then clockwise). Returns the side, or null if there's no place for it.
  * `aside` (things nobody uses: a floor lamp): in a corner if it can be, and never next to the
- * tile inside a door (it would make the way in a squeeze).
+ * tile inside a door (it would make the way in a squeeze). One that reaches over the tiles beside
+ * it (content `overhang`: an arc lamp) hangs its shade over a seat there if it can (`info`: a sofa
+ * or a chair), else over free floor, which it takes from walking; never over a doorway, the
+ * stairwell, another shade or another room.
  */
-function place(f: Floor, r: Room, def: string, { footprint: [fw, fd], againstWall }: ObjectInfo, rng: () => number, prefer?: number, aside = false): number | null {
+function place(f: Floor, r: Room, def: string, { footprint: [fw, fd], againstWall, overhang }: ObjectInfo, rng: () => number, prefer?: number, aside = false, info?: ObjectInfos): number | null {
   // Tiles round the tiles inside the room's doors.
   const doorway = new Set<string>();
   if (aside) {
@@ -1732,7 +1747,24 @@ function place(f: Floor, r: Room, def: string, { footprint: [fw, fd], againstWal
   }
   // Out of the way: corners first, whichever side they're on.
   const corner = (s: Spot) => Number((s.x === r.x || s.x + s.w === r.x + r.w) && (s.z === r.z || s.z + s.d === r.z + r.d));
-  const spots = aside ? [...walls()].sort((a, b) => corner(b) - corner(a)) : walls();
+  // What is on a tile a shade would reach over: 'free' floor, 'under' (a seat it hangs over), or null (it can't).
+  const beneath = (t: [number, number]): 'free' | 'under' | null => {
+    const k = key(t[0], t[1]);
+    if (!inside(r, t[0], t[1]) || f.keep.has(k) || f.well?.has(k) || f.shaded?.has(k) || (aside && doorway.has(k))) return null;
+    if (!f.taken.has(k)) return 'free';
+    const o = info && f.objects.find((p) => {
+      if ((info(p.def)?.layer ?? 'floor') !== 'floor') return false;
+      const [pw, pd] = info(p.def)?.footprint ?? [1, 1];
+      const [w, d] = p.rot % 2 === 0 ? [pw, pd] : [pd, pw];
+      return inside({ x: p.x, z: p.z, w, d }, t[0], t[1]);
+    });
+    const thing = o && info?.(o.def);
+    return thing?.seated && !thing.fillsWall && !thing.stairs ? 'under' : null;
+  };
+  const reach = (s: Spot) => overhangTiles(overhang, s.x, s.z, s.rot);
+  // An arc lamp's shade over a sofa or a chair first.
+  const over = (s: Spot) => Number(overhang !== undefined && reach(s).every((t) => beneath(t) === 'under'));
+  const spots = aside || overhang ? [...walls()].sort((a, b) => over(b) - over(a) || corner(b) - corner(a)) : walls();
   // What's built to stand against a wall (content `againstWall`) has plain wall all along its back.
   const walled = (side: number, x: number, z: number, w: number, d: number) =>
     (side === 0 || side === 2 ? Array.from({ length: w }, (_, i) => `h:${x + i}:${side === 0 ? z : z + d}`) : Array.from({ length: d }, (_, i) => `v:${side === 3 ? x : x + w}:${z + i}`)).every((e) => f.edges.get(e) === 'wall');
@@ -1742,16 +1774,23 @@ function place(f: Floor, r: Room, def: string, { footprint: [fw, fd], againstWal
     if (!inside(r, front[0], front[1])) continue;
     if (againstWall && !walled(side, x, z, w, d)) continue;
     if (aside && tiles.some((t) => doorway.has(t))) continue;
-    if (tiles.some((t) => f.taken.has(t) || f.keep.has(t)) || f.taken.has(key(front[0], front[1]))) continue;
+    // A shade over the tiles beside: nobody needs its front, which may be the furniture under it.
+    const shade = overhang ? reach({ side, rot, w, d, x, z }) : [];
+    const kinds = shade.map(beneath);
+    if (kinds.some((k) => k === null)) continue;
+    if (tiles.some((t) => f.taken.has(t) || f.keep.has(t)) || (!overhang && f.taken.has(key(front[0], front[1])))) continue;
     const n = f.objects.length;
-    for (const t of tiles) f.taken.add(t);
+    // (The free floor under its shade is taken from walking, as under a lamp at head height.)
+    const under = shade.filter((_, i) => kinds[i] === 'free').map(([tx, tz]) => key(tx, tz));
+    for (const t of [...tiles, ...under]) f.taken.add(t);
     f.objects.push({ def, x, z, rot });
-    f.fronts.push([front]);
+    f.fronts.push(overhang ? null : [front]);
     if (reachable(f, r)) {
-      f.keep.add(key(front[0], front[1]));
+      if (overhang) for (const [tx, tz] of shade) (f.shaded ??= new Set()).add(key(tx, tz));
+      else f.keep.add(key(front[0], front[1]));
       return side;
     }
-    undo(f, n, tiles);
+    undo(f, n, [...tiles, ...under]);
   }
   return null;
 }

@@ -297,6 +297,11 @@ fn the_flags_are_for_their_own_layers() {
         let err = World::from_json(&content, WINDOWS, 1).err().map(|e| e.to_string()).unwrap_or_default();
         assert!(err.contains(flag), "{flag} on the {layer}: {err}");
     }
+    // A shade over the next tile turns with its thing in quarter turns only: turned between, it would hang over a
+    // tile not kept for it.
+    let content = r#"{"needs":[{"id":"energy","label":"Energy"}],"objects":[{"id":"x","name":"X","overhang":[[0,1]],"freeRotation":true,"interactions":[]}]}"#;
+    let err = World::from_json(content, WINDOWS, 1).err().map(|e| e.to_string()).unwrap_or_default();
+    assert!(err.contains("quarter turns"), "overhang turning freely: {err}");
 }
 
 #[test]

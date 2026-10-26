@@ -405,7 +405,7 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   middle, or the `centre` it gives; `tools/art/blender/centres.json`, which the build writes for the gate
   only) by over 2 cm at rest (not its far version), one that reaches over 1 cm into the wall, one
   indoors (on the floor, a wall or the ceiling, without `vary`) that reaches over 2 cm past its
-  footprint at rest, or whose part that goes round (a loop or ambient spin: a fan's blades) sweeps
+  footprint at rest (and the tiles it reaches over, content `overhang`: the arc lamp's shade), or whose part that goes round (a loop or ambient spin: a fan's blades) sweeps
   over 1 cm past it, a thing on a top that reaches more than 10 % past its content `radius` from its
   origin (its farthest vertex, as it shows), and a floor model or moving part lower than the floor
   drawn over it; each against every content object that draws the model. Functional heights (warnings
