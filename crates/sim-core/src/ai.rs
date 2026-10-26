@@ -197,6 +197,7 @@ mod tests {
             work_on: None,
             partner: false,
             alone: None,
+            served: None,
         }
     }
 
