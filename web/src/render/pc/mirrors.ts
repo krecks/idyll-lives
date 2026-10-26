@@ -223,7 +223,7 @@ export class Mirrors {
   private residentCount = 0;
   /** Reflections drawn so far (the benchmark's count). */
   draws = 0;
-  /** The warm-up's frame (`warm`): the reflections draw everything, unculled. */
+  /** The warm-up's frame (`warm`): the reflections draw everything but the glasses and helpers, unculled. */
   private warming = false;
 
   /**
@@ -532,9 +532,11 @@ export class Mirrors {
 
   /**
    * Draws the reflections once in this frame with everything the world draws (no culling, every
-   * resident, the glasses and the build helpers too), and the glasses with them, so the pipelines a
-   * reflection needs (its target's, its turned faces') are made behind the loading veil, not in the
-   * frame a mirror first shows (a pipeline first used in play costs that frame tens of milliseconds;
+   * resident; not the glasses and the build helpers, which a reflection never draws: a glass drawn
+   * into its own target would read the texture it is drawn into, which WebGPU refuses, dropping the
+   * frame's commands, and WebGL2 takes as a feedback loop), and the glasses with them in the game
+   * camera, so the pipelines a reflection needs (its target's, its turned faces') are made behind
+   * the loading veil, not in the frame a mirror first shows (a pipeline first used in play costs that frame tens of milliseconds;
    * `warmGame` calls it). If no mirror reflects yet, the first ones take the slots. From the game
    * camera's pose (what it sees doesn't matter: nothing is culled). Returns the undo, to run once
    * the frame has drawn. None in a world without mirrors.
@@ -896,14 +898,15 @@ export class Mirrors {
    */
   private precull(camera: pc.CameraComponent | null): void {
     const r = this.reflectionOf(camera);
-    if (!r || !this.worldLayer || this.warming) return;
+    if (!r || !this.worldLayer) return;
     const list = this.worldLayer.meshInstances;
     for (let i = 0; i < list.length; i++) {
       const mi = list[i];
       if (!mi.visible) continue;
       let helper = this.helpers.get(mi);
       if (helper === undefined) this.helpers.set(mi, (helper = HELPER.test(mi.node.name)));
-      const out = helper || (!mi.cull && !(this.drawsRows(mi, r.shows) ?? r.showsAnyone));
+      // (The warm-up draws every resident: `warm`.)
+      const out = helper || (!this.warming && !mi.cull && !(this.drawsRows(mi, r.shows) ?? r.showsAnyone));
       if (out) {
         mi.visible = false;
         this.hiddenNow.push(mi);
