@@ -14,7 +14,7 @@ import { fetchOnce, forget, gunzipText, openCache, prune } from '../ml/assets';
 import { configureOrt, hasWebGpu, importOrt, ORT_WASM, sessionOptions } from '../ml/ort';
 import init, { Voice } from './wasm-pkg/voice_wasm.js';
 import wasmUrl from './wasm-pkg/voice_wasm_bg.wasm?url';
-import { parseStyle, STYLE_IDS, synthesizeLine, type Config, type Engine, type Phonemizer, type Session, type StyleFile } from './supertonic';
+import { parseStyle, STYLE_IDS, synthesizeLine, type Config, type Engine, type Session, type StyleFile } from './supertonic';
 import type { FromVoiceWorker, ToVoiceWorker, VoiceDevice } from './protocol';
 import type { VoiceParams } from './voices';
 
@@ -154,18 +154,15 @@ async function load(base: string, device: VoiceDevice): Promise<void> {
   // between its passes and goes straight into the vocoder, and the other graphs hand back the few
   // numbers we need on the CPU; on the processor everything comes back as CPU tensors.
   for (const [i, k] of names.entries()) {
-    sessions[k] = (await ort.InferenceSession.create(
-      new Uint8Array(models[i]),
-      sessionOptions(device, k === 'vector' ? 'gpu-buffer' : undefined),
-    )) as unknown as Session;
+    sessions[k] = await ort.InferenceSession.create(new Uint8Array(models[i]), sessionOptions(device, k === 'vector' ? 'gpu-buffer' : undefined));
   }
   engine = {
-    ort: ort as unknown as Engine['ort'],
+    ort,
     sessions,
     config: json<Config>(config),
     indexer: json<number[]>(indexer),
     styles: new Map(STYLE_IDS.map((id, i) => [id, parseStyle(json<StyleFile>(styles[i]))])),
-    phonemizer: new Voice(await gunzipText(lexicon)) as unknown as Phonemizer,
+    phonemizer: new Voice(await gunzipText(lexicon)),
   };
   // The sessions and the engine have their own copies.
   for (const f of files) forget(f.url);

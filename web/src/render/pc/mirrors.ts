@@ -267,9 +267,9 @@ export class Mirrors {
     // directional shadow renderer (`_shadowRendererDirectional.getLightRenderPass`) are PlayCanvas
     // 2.23's (pinned); `check:chunks` checks both are still there. Own properties on the instances
     // shadow the methods, and are deleted again on `destroy`.
-    const light = sun.light as unknown as { getRenderData(camera: pc.Camera | null, face: number): unknown };
+    const light = sun.light;
     const own = light.getRenderData;
-    light.getRenderData = (camera, face) => own.call(light, camera && this.cameras.has(camera) ? this.game.camera : camera, face);
+    light.getRenderData = (camera: pc.Camera | null, face: number) => own.call(light, camera && this.cameras.has(camera) ? this.game.camera : camera, face);
     this.unpatch.push(() => delete (light as { getRenderData?: unknown }).getRenderData);
     const sr = directionalShadows(this.app);
     if (!sr) return;

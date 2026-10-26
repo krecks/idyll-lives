@@ -2127,8 +2127,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** The sun's shadow map's target (null: none made, or the sun casts none). */
   private shadowTarget(): pc.RenderTarget | null {
     const light = this.sun?.light;
-    // SAFETY: a light component's scene light (`LightComponent.light`) and its `shadowMap` are PlayCanvas 2.23's.
-    const map = light?.castShadows ? (light as unknown as { light?: { shadowMap?: { renderTargets: pc.RenderTarget[] } | null } }).light?.shadowMap : null;
+    // (PlayCanvas types the scene light's `shadowMap` as any: a `ShadowMap`, null before the first shadow pass.)
+    const map: { renderTargets: pc.RenderTarget[] } | null = light?.castShadows ? light.light.shadowMap : null;
     return map?.renderTargets[0] ?? null;
   }
 
@@ -2194,7 +2194,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       passes,
       scene: {
         ...scene,
-        textures: (d as unknown as { textures?: Set<unknown> }).textures?.size ?? 0,
+        textures: d.textures.size,
         lights: scene.lights,
         residents: this.simCount,
         residentsDrawn: this.residentsDrawn(),

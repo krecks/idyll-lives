@@ -147,7 +147,6 @@ it left is here, with its id; §9 of the review says what each would take.
   states) are in [docs/authenticity-review.md](../authenticity-review.md) §7.
 
 ### Not looked at
-- The production build's frame time; the town overview at full night; far versions in the town overview.
 - The held things that no recipe in the test house makes (the tasting board, pizza, pie, slices, sandwich, grill
   platter); a meal from the fridge eaten at a pulled-in chair (eating was checked with the café's cake).
 
@@ -168,6 +167,13 @@ it left is here, with its id; §9 of the review says what each would take.
   first shot (I-hobbies-05).
 - **The food from town in its own wrapping:** a paper cup of ice cream, a hot dog in its bun, a packet of crisps, an
   apple and a pastry in a paper bag (M-held-03).
+- **Performance:** Low draws the woods in 100 m squares rather than eight sectors to the horizon, so far trees off
+  screen are left out: on WebGL2, the wide view, 1.79 → 1.21 M triangles and −0.3 ms of GPU time, for +0.2 ms of
+  main thread; the same picture to the pixel. Nature has switches of its own (`diag=nowoods,nofarwoods,noflowers,
+  nograss`). Looked at, as they hadn't been: the production build's frame time (120 fps in every cell, p99 9.3 ms;
+  the main thread 0.2–1.0 ms over Stage 11's on a shared machine), the town overview at full night and its far
+  versions close up (right as they are). All in [performance.md](../design/performance.md) (0.5.0). 22 of the 30
+  `as unknown as` in `web/src` are gone; the 8 left are where PlayCanvas's types say `private` or are wrong.
 
 ### Fixed by the authenticity review
 - **Residents:** the weight bench's feet-down bench press (A-fitness-01); a kiss between different heights
