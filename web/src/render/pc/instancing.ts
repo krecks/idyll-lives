@@ -138,6 +138,8 @@ export class Instances {
     const buffer = new pc.VertexBuffer(this.device, this.format, capacity, { usage: pc.BUFFER_DYNAMIC });
     const data = new Float32Array(buffer.lock() as ArrayBuffer);
     data.set(this.data.subarray(0, Math.min(this.data.length, data.length)));
+    // Made on the GPU now, whole: a draw before the first `update` (the warm-up's) has its buffer.
+    buffer.unlock();
     this.buffer?.destroy();
     this.buffer = buffer;
     this.data = data;

@@ -106,15 +106,15 @@ After the pilot (2026-10-21) the owner approved: M14's head ratios based on the 
 Known tool problems, kept here rather than in a ledger:
 
 - **The lamp build checks only the light's height, not `at`** (`_bulb`, `tools/art/blender/families/lighting.py:94`). From `docs/objects/open.md` L158.
-- **`partBox` bounds spheres and tori up to 5 % / 2.5 % bigger than Babylon draws them** (never smaller; `web/src/render/babylon/models.ts:377`). It matters when measuring the code-built fallback models. From `docs/objects/open.md` L137.
+- ~~**`partBox` bounds spheres and tori up to 5 % / 2.5 % bigger than Babylon draws them**~~ Fixed for 0.5.0: `partBox` (`web/src/render/shared/modelParts.ts`) is the box of the part's own mesh, exact for every shape (before, on PlayCanvas: a turned box 1.7 % too big, a blob 8 % too big one way and too small another).
 - **Previews overwrite each other:** ids used in two families (bench, flowers, hedge, arcadeCabinet, puzzleTable, recliner) write the same preview file (`previews/` under `tools/art/blender`, made by `cargo art --preview` and ignored by git), and 161 models have no preview. From `plan/authenticity-review.md` §5.2 (E1).
 
 ## Known issues not in a ledger
 
 Listed in the seed sources but not about models, animation or interactions:
 
-- The town map's backdrop blocks the world (a UI panel; `docs/objects/open.md` L130).
-- Mirrors on High log an occasional `GL_INVALID_VALUE: glGetProgramiv` (no visible fault, not reproduced; `docs/objects/open.md` L135).
+- ~~The town map's backdrop blocks the world~~ Fixed for 0.5.0: no backdrop, as the pie menu (`web/src/ui/kit/popup.ts`).
+- ~~Mirrors on High log an occasional `GL_INVALID_VALUE: glGetProgramiv`~~ No longer shows on PlayCanvas (6 runs on High, WebGL2, no WebGL message at all); the mirrors' warm-up drawing each glass into its own reflection, found on the way, is fixed (`docs/objects/open.md`, Fixed for 0.5.0).
 - The production build's frame time (performance; `docs/objects/open.md` L163).
 - Fridges and cookers count as one kind for wants (balance; `docs/release-0.2.0-review.md` §4, F9).
 - Residents choose things 57–115 game minutes' walk away (autonomy balance; R3-17).

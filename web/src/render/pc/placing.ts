@@ -2,8 +2,9 @@
  * Placing things in build and buy mode on PlayCanvas (the renderer's `setPlacementGhost`,
  * `setHeldObject`, `buildEffect` and what they drive), for `PlayCanvasRenderer.ts`:
  *
- * - The thing in hand (`placementGhost.ts`), and, while it's something for a wall, the things on
- *   walls shown even with their walls down (`cutWallItems`: what's in its way shows).
+ * - The thing in hand (`placementGhost.ts`), and, while it's something for a wall, the walls
+ *   standing whatever the wall mode (`raiseWalls`), so it and the things already hung (what may be
+ *   in its way) hang on walls, never over a lowered one.
  * - A placed object picked up (`setHeldObject`): hidden where it stands, with what stands on its
  *   top, until it's put down (moved: until the next world shows it in its new place, or briefly
  *   if the move is refused). The chairs residents pull up leave it be (`held`).
@@ -32,12 +33,14 @@ export interface PlacingView {
   town(): boolean;
   /** The sun's shadows draw again. */
   shadowsMoved(): void;
+  /** Something for a wall is in hand (`on`) or no longer: the walls stand meanwhile. */
+  raiseWalls(on: boolean): void;
 }
 
 export class Placing {
   private readonly ghost: PlacementGhostView;
   private readonly fx: BuildEffects;
-  /** The thing for a wall in hand: the things on walls show. */
+  /** The thing for a wall in hand: the walls stand. */
   private ghostOnWall = false;
   /** The cutaway as last given (`cutWallItems`). */
   private cutBits = 0;
@@ -76,18 +79,18 @@ export class Placing {
   }
 
   setPlacementGhost(ghost: PlacementGhost | null): void {
-    // Something for a wall in hand: the things on walls show, so what's in its way does.
+    // Something for a wall in hand: the walls stand, so it and what's in its way hang on them.
     const onWall = !!ghost?.wall;
     if (onWall !== this.ghostOnWall) {
       this.ghostOnWall = onWall;
-      this.applyWallItems();
+      this.view.raiseWalls(onWall);
     }
     this.ghost.set(ghost);
   }
 
   /**
-   * Things on a wall go with their wall (`LotContents.cutWallItems`), but the one in hand, and none
-   * while something for a wall is held: then they show, as what may be in its way.
+   * Things on a wall go with their wall (`LotContents.cutWallItems`), but the one in hand (while
+   * something for a wall is held the walls stand: `raiseWalls`).
    */
   cutWallItems(bits: number, down: boolean): void {
     this.cutBits = bits;
@@ -165,10 +168,9 @@ export class Placing {
     this.fx.dispose();
   }
 
-  /** The things on walls as the cutaway, the thing in hand and the ghost have them. */
+  /** The things on walls as the cutaway and the thing in hand have them. */
   private applyWallItems(): void {
-    const show = this.ghostOnWall;
-    this.lot.cutWallItems(show ? 0 : this.cutBits, !show && this.wallsDown, this.hidden?.id ?? null);
+    this.lot.cutWallItems(this.cutBits, this.wallsDown, this.hidden?.id ?? null);
   }
 
   /** Hides the object in hand where it stands, with what stands on its top (and their contact shadows). */

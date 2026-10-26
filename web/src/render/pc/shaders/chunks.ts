@@ -33,7 +33,8 @@
  * (`patchEngineChunks`, once per device) put the game's light where no per-material chunk reaches:
  * the sky's hemispheric fill and the split of the ambient from the direct light
  * (`litForwardBackendPS`), the sun kept out of basements (`lightFunctionLightPS`), and the lamps
- * kept in their rooms (`clusteredLightPS`, `roomLights.ts`). They only act under the game's
+ * kept in their rooms (`clusteredLightPS`, and `lightFunctionLightPS` for forward lights;
+ * `roomLights.ts`). They only act under the game's
  * defines, so other materials draw as PlayCanvas has them. The lamps' falloff
  * (`falloffInvSquaredPS`, `spotPS`) is the game's own in its materials (`roomLights.ts` too).
  *
@@ -49,7 +50,7 @@ import { gameNormalMap } from './bump';
 import { gameFresnel, gameReflection } from './envBrdf';
 import { gameFog } from './fog';
 import { SOFT_LOOK } from './softLook';
-import { ROOM_LIGHT_CODE } from './roomLights';
+import { ROOM_LIGHT_CODE, ROOM_LIGHTS } from './roomLights';
 import { PATTERN, PLAIN_FINISH, VERTEX_TWEAKS } from './surface';
 import { UNDERGROUND } from './underground';
 
@@ -124,7 +125,7 @@ fn gamePos(p: vec3f) -> vec3f { return vec3f(p.x, p.y, -p.z); }
   },
 };
 
-const features: ShaderFeature[] = [COMMON, VERTEX_TWEAKS, PATTERN, CUTAWAY, UNDERGROUND, PLAIN_FINISH, SOFT_LOOK, DIAG_VIEW].sort((a, b) => a.priority - b.priority);
+const features: ShaderFeature[] = [COMMON, VERTEX_TWEAKS, PATTERN, ROOM_LIGHTS, CUTAWAY, UNDERGROUND, PLAIN_FINISH, SOFT_LOOK, DIAG_VIEW].sort((a, b) => a.priority - b.priority);
 
 /**
  * Adds a feature (wind, blankets). Before the first material is made: the chunks
@@ -391,7 +392,8 @@ export function patchEngineChunks(device: pc.GraphicsDevice): void {
     const light = engineChunk(device, lang, 'lightFunctionLightPS');
     if (!light.includes(PATCHED)) {
       const anchor = ANCHORS[lang].lightFunctionLightPS;
-      chunks.set('lightFunctionLightPS', `${PATCHED}\n${replaceOnce(light, 'lightFunctionLightPS', anchor, `${anchor}${ENGINE_PATCHES[lang].sun}`)}`);
+      // The sun kept out of basements; a forward lamp kept in its room (`roomLights.ts`).
+      chunks.set('lightFunctionLightPS', `${PATCHED}\n${replaceOnce(light, 'lightFunctionLightPS', anchor, `${anchor}${ENGINE_PATCHES[lang].sun}${ROOM_LIGHT_CODE[lang].forward}`)}`);
     }
     // The lamps kept in their rooms, and out of the meshes they don't light (`roomLights.ts`).
     const clustered = engineChunk(device, lang, 'clusteredLightPS');
@@ -400,7 +402,7 @@ export function patchEngineChunks(device: pc.GraphicsDevice): void {
       const decode = ANCHORS[lang].clusteredLightDecode;
       const start = ANCHORS[lang].clusteredLightStart;
       const skipped = replaceOnce(clustered, 'clusteredLightPS', decode, `${decode}${room.skip}`);
-      chunks.set('clusteredLightPS', `${PATCHED}\n${room.decl}\n${replaceOnce(skipped, 'clusteredLightPS', start, `${room.noLamps}${start}`)}`);
+      chunks.set('clusteredLightPS', `${PATCHED}\n${replaceOnce(skipped, 'clusteredLightPS', start, `${room.noLamps}${start}`)}`);
     }
   }
 }

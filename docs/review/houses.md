@@ -20,7 +20,7 @@ What it covers: the house parts built in code: walls, doors and windows, coverin
 | Wall height and storeys | OK | n/a | n/a | 2.8 m a storey: inside the storey range (2.6–3.1 m) and at the top of the ceiling range (2.4–2.7 new, 2.7–3.0 older houses); 0.7 m of wall over a 2.1 m door | `houses/extra/door-panel.white.png`, `houses/extra/stairs.png` |
 | Plinth and foundation | OK | n/a | n/a | 0.32 m stone band (`PLINTH`); the floor is at ground level, no step at the door (Sims walk in level) | `houses/extra/sheet-doors.png` |
 | Basement walls (stone-faced earth) | OK | n/a | n/a | Faced in stone all the way up (`house.ts:251`, `:542`); code only, no basement in the states driven | none (code only) |
-| Wall cut-away (lowered walls) | M-houses-01 | n/a | n/a | M-houses-01 S3 code (closed: by design). The cut-away itself lowers the walls towards the camera cleanly (`houses/extra/bath-occupied-shut.png`) | `houses/extra/sheet-bath.png` |
+| Wall cut-away (lowered walls) | M-houses-01 | n/a | n/a | M-houses-01 S3 code (fixed for 0.5.0: the walls stand while a wall thing is in hand). The cut-away itself lowers the walls towards the camera cleanly (`houses/extra/bath-occupied-shut.png`) | `houses/extra/sheet-bath.png` |
 
 ## Doors (11)
 
@@ -172,8 +172,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/game/buildmode.ts`
 - **Evidence:** While the player holds a wall thing, the ones already hung show at full height over walls the cut-away has lowered, pictures on outside walls too.
-- **Status:** closed (by design: `cutWallItems`, BabylonRenderer.ts: "Things on a wall go with their wall: all of them with walls down, and in cutaway those on the walls that drop … Not while something for a wall is held: then they show, as what may be in its way." Seen as described: the hung ones stand at full height over the lowered walls, as the held one's ghost does)
-- **After:** `bench-results/review/followup/M-houses-01/walls-down-nothing-held.png`, `walls-down-held.png`
+- **Status:** fixed for 0.5.0 (`fix/rendering-open`). Closed by design on Babylon (`cutWallItems`: "Not while something for a wall is held: then they show, as what may be in its way"); seen again on PlayCanvas as described: with a photo print in hand, generated-basement's prints, clocks, corkboard, shelves and mirror cabinet stood at full height over walls down and cut away.
+- **After:** while something for a wall is in hand the walls stand (drawn up, without the roof, whatever the wall mode; `raiseWalls` in `web/src/render/pc/placing.ts` and `PlayCanvasRenderer.ts`), and go back as they were once it is put down or back; the things already hung follow their walls as at any other time, the held one too. generated-basement, Build, a photo print in hand, walls down and cut away, from two sides: before, everything hung floats over the stubs; after, every wall thing is on a standing wall. Babylon's shots: `bench-results/review/followup/M-houses-01/walls-down-nothing-held.png`, `walls-down-held.png`; PlayCanvas: `bench-results/review/fixes/rendering-open/M-houses-01/before-*.png`, `after-*.png`, `sheet-before.png`, `sheet-after.png`
 - **Source:** `docs/objects/open.md` Still open › Rendering
 
 ### A-houses-01 — moved to systems.md

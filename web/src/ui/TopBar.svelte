@@ -103,7 +103,7 @@
       <button class="tool" class:active={game.journalOpen} title="Journal (J)" aria-label="Journal" aria-pressed={game.journalOpen} onclick={() => services.controls.toggleJournal()}>
         <Icon name="icon.ui.journal" />
       </button>
-      <button class="tool" class:active={game.townOpen} title="Town map (M)" aria-label="Town map" aria-pressed={game.townOpen} onclick={toggleTown}>
+      <button class="tool" class:active={game.townOpen} title="Town map (M)" aria-label="Town map" aria-pressed={game.townOpen} aria-controls="town-map" onclick={toggleTown}>
         <Icon name="icon.ui.town" />
       </button>
       <span class="divider" aria-hidden="true"></span>

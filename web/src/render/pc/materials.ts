@@ -185,7 +185,11 @@ export class DigState {
   }
 }
 
-/** The rooms of the lot in view, a value per tile: 0 unknown (lit by every lamp), 1 outdoors, 2 and up a room. */
+/**
+ * The rooms of the lot in view, a value per tile: 0 unknown (lit by every lamp), 1 outdoors, 2 and up
+ * a room (below `ROOM_SPLIT_DN`); a tile split by a diagonal wall has its half 0's in `tiles` and its
+ * half 1's in `halves`, with `ROOM_SPLIT` (and `ROOM_SPLIT_DN` for a 'dn' wall).
+ */
 export interface RoomMask {
   /** The lot's corner (m) and size (tiles). */
   x0: number;
@@ -196,7 +200,12 @@ export interface RoomMask {
   storey: number;
   storeys: number;
   tiles: Uint16Array;
+  halves: Uint16Array;
 }
+
+/** A tile of a room mask split by a diagonal wall (`RoomMask.halves`), and split by a 'dn' wall. */
+export const ROOM_SPLIT = 0x8000;
+export const ROOM_SPLIT_DN = 0x4000;
 
 /** The room mask's size in texels: a lot is at most 256 tiles each way, and up to four storeys are shown. */
 const ROOM_MASK_W = 256;
@@ -204,18 +213,18 @@ const ROOM_MASK_H = 256 * 4;
 
 /**
  * Which room each tile of the lot in view is in, so lamps light only their own (the test is in the
- * clustered lights' loop, `shaders/roomLights.ts`): `mask` has two bytes per tile (low, high) in its
- * corner, `area` the lot (x0, z0 in metres, then w, d in tiles), `band` its storeys (the lowest, how
- * many, the storey height, and 1 while masking: nothing is masked at 0). Uniforms only: masking
- * costs no shader of its own.
+ * lights' code, `shaders/roomLights.ts`): `mask` has four bytes per tile in its corner (the room,
+ * low and high byte, and a split tile's half 1's, `RoomMask`), `area` the lot (x0, z0 in metres,
+ * then w, d in tiles), `band` its storeys (the lowest, how many, the storey height, and 1 while
+ * masking: nothing is masked at 0). Uniforms only: masking costs no shader of its own.
  */
 export class RoomLightState {
-  /** Masking is on (every lamp lights, clustered: `lamps.ts`; the low preset's four don't keep to their rooms). */
+  /** Masking is on (`lamps.ts`; `?roomlights=0` turns it off). */
   enabled = false;
   readonly mask: pc.Texture;
   readonly area = new pc.Vec4(0, 0, 0, 0);
   readonly band = new pc.Vec4(0, 0, WALL_HEIGHT, 0);
-  private readonly bytes = new Uint8Array(ROOM_MASK_W * ROOM_MASK_H * 2);
+  private readonly bytes = new Uint8Array(ROOM_MASK_W * ROOM_MASK_H * 4);
   private shown: RoomMask | null = null;
 
   constructor(device: pc.GraphicsDevice) {
@@ -223,7 +232,7 @@ export class RoomLightState {
       name: 'roomLightMask',
       width: ROOM_MASK_W,
       height: ROOM_MASK_H,
-      format: pc.PIXELFORMAT_RG8,
+      format: pc.PIXELFORMAT_RGBA8,
       mipmaps: false,
       minFilter: pc.FILTER_NEAREST,
       magFilter: pc.FILTER_NEAREST,
@@ -238,7 +247,7 @@ export class RoomLightState {
     if (!this.enabled) rooms = null;
     const was = this.shown;
     if (was === rooms) return false;
-    if (rooms && was && was.x0 === rooms.x0 && was.z0 === rooms.z0 && was.w === rooms.w && was.d === rooms.d && was.storey === rooms.storey && was.storeys === rooms.storeys && was.tiles.every((t, i) => t === rooms.tiles[i])) {
+    if (rooms && was && was.x0 === rooms.x0 && was.z0 === rooms.z0 && was.w === rooms.w && was.d === rooms.d && was.storey === rooms.storey && was.storeys === rooms.storeys && was.tiles.every((t, i) => t === rooms.tiles[i]) && was.halves.every((t, i) => t === rooms.halves[i])) {
       this.shown = rooms;
       return false;
     }
@@ -254,9 +263,12 @@ export class RoomLightState {
     for (let z = 0; z < rows; z++) {
       for (let x = 0; x < w; x++) {
         const v = rooms.tiles[z * rooms.w + x];
-        const at = (z * ROOM_MASK_W + x) * 2;
+        const h = rooms.halves[z * rooms.w + x];
+        const at = (z * ROOM_MASK_W + x) * 4;
         bytes[at] = v & 255;
         bytes[at + 1] = v >> 8;
+        bytes[at + 2] = h & 255;
+        bytes[at + 3] = h >> 8;
       }
     }
     const level = this.mask.lock();

@@ -23,8 +23,9 @@ a single object does is on its category page ([README.md](README.md)); this page
   picture. **Tall floor things** (`fillsWall`, 35 of them: fridges, wardrobes, showers, the fireplace…) keep the wall
   and ceiling above them clear; the hanging plant (`hangsLow`) blocks the floor under it.
 - **Wall things and cut walls:** a wall thing hides whenever the cutaway drops its wall, from either side; hidden, a
-  lamp still lights and a dartboard or mirror can still be used. While one is in hand, wall things show (walls down
-  or cut away), and a taken spot names what hangs there.
+  lamp still lights and a dartboard or mirror can still be used. While one is in hand the walls stand (drawn up,
+  without the roof, whatever the wall mode) and go back as they were once it is put down or back, so it and the
+  things already hung hang on walls, never over a lowered one (M-houses-01); a taken spot names what hangs there.
 - **No offset through a diagonal wall**, in the sim and build mode (straight walls already refused it).
 - **A bought crop starts planted** (growth 0); crops already on a lot or in a house file start ripe.
 - **The hot tub:** the last one out puts the cover back on (`closeAfter` on Soak). An order to close something
@@ -129,18 +130,6 @@ it left is here, with its id; §9 of the review says what each would take.
   strobing); at speed 3 the run (`runAlong`) keeps grown-ups' and teens' feet on the ground, children slide 11–14 %
   (A-residents-03, G-25). The clip check's baseline (`tools/characters/clip-baseline.json`) is empty.
 
-### Rendering
-- **The town map's backdrop** blocks the world like the old pie menu's did (left as a panel).
-- **Light through walls on Low:** on Medium and High a clustered lamp lights only its own room (M-lighting-08);
-  Low's four forward lamps aren't masked, and tiles split by a diagonal wall aren't on any preset.
-- **Stairs seen from some basement views** lose part of their top end (a renderer cut-away, not the model; M-living-02,
-  not checked).
-- **Wall things shown while one is held** float over lowered walls (pictures on outside walls too; M-houses-01, not
-  checked).
-- **Mirrors on High** log an occasional `GL_INVALID_VALUE: glGetProgramiv`; not reproduced in 5 runs, probably
-  Babylon's parallel shader compile.
-- **`partBox`** draws spheres and tori up to 5 % / 2.5 % bigger than Babylon's meshes (never smaller).
-
 ### Content and sim
 - **No privacy** (G-72): a bathroom in use opens for anyone walking in (else they'd walk through its shut door), and
   "Try for a baby" is a 30-minute standing kiss wherever the two are (I-systems-05, I-social-05). New behaviour.
@@ -186,6 +175,17 @@ it left is here, with its id; §9 of the review says what each would take.
 - The production build's frame time; the town overview at full night; far versions in the town overview.
 - The held things that no recipe in the test house makes (the tasting board, pizza, pie, slices, sandwich, grill
   platter); a meal from the fridge eaten at a pulled-in chair (eating was checked with the café's cake).
+
+### Fixed for 0.5.0
+- **Rendering:** each lamp lights only its own room on Low too, and on each half of a tile split by a diagonal wall,
+  on every preset (M-lighting-08); the town map leaves the world its clicks and camera drags, as the pie menu does;
+  with a wall thing in hand the walls stand, so nothing hangs over a lowered wall (M-houses-01); `partBox` is the box
+  of the part's own mesh. Checked on PlayCanvas and found right: the stairs seen from the basement are whole to the
+  top (M-living-02, fixed on Babylon by 5b1e7152, carried over by the port). The mirrors' `glGetProgramiv` log (a
+  Babylon one) no longer shows: 6 runs on High on WebGL2, each in a new browser (the bench's mirror camera for 20 s,
+  then the game in front of a mirror), without a single WebGL message. What the check found instead is fixed: the mirrors' warm-up drew each glass
+  into its own reflection (WebGPU dropped that frame's commands, once a load), and a quilt drawn before its first
+  update had no instance buffer (WebGL2 errors until Chrome stopped reporting any, a dropped frame on WebGPU).
 
 ### Fixed by the authenticity review
 - **Residents:** the weight bench's feet-down bench press (A-fitness-01); a kiss between different heights
