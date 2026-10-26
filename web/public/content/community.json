@@ -264,6 +264,8 @@
           "id": "call",
           "label": "Call a friend",
           "anim": "phone",
+          "sound": "phoneBox",
+          "endSound": "hangUp",
           "minutes": 20,
           "effects": {
             "social": 0.35,
@@ -584,6 +586,7 @@
           "id": "shoot",
           "label": "Shoot some hoops",
           "anim": "exercise",
+          "sound": "basketball",
           "minutes": 40,
           "effects": {
             "fun": 0.4,
@@ -626,6 +629,7 @@
           "id": "pingPong",
           "label": "Play ping-pong",
           "anim": "play",
+          "sound": "pingPong",
           "minutes": 30,
           "partner": true,
           "effects": {
@@ -782,6 +786,7 @@
           "id": "snack",
           "label": "Buy a snack",
           "anim": "fetch",
+          "sound": "vendSnack",
           "minutes": 1,
           "eat": {
             "item": "crisps",
@@ -816,6 +821,7 @@
           "id": "drink",
           "label": "Buy a cold drink",
           "anim": "drink",
+          "sound": "vendCan",
           "minutes": 8,
           "effects": {
             "energy": 0.06,

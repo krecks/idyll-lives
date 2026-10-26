@@ -159,6 +159,9 @@
       "category": "kitchen",
       "group": "appliances",
       "description": "A small fridge for a small kitchen (or a bedroom corner): snacks and simple meals, but no room for a gourmet spread.",
+      "sounds": {
+        "fetch": "fridgeDoor"
+      },
       "interactions": [
         {
           "id": "snack",
@@ -196,6 +199,7 @@
           "id": "coldDrink",
           "label": "Get a cold drink",
           "anim": "drink",
+          "sound": "fridgeDoor",
           "minutes": 5,
           "effects": {
             "comfort": 0.05,
@@ -224,6 +228,9 @@
       "fillsWall": true,
       "group": "appliances",
       "description": "A tall counter-depth fridge-freezer, the freezer below and a water dispenser in the door. Plenty of fresh food: bigger snacks, fuller meals and a cold drink.",
+      "sounds": {
+        "fetch": "fridgeDoor"
+      },
       "interactions": [
         {
           "id": "snack",
@@ -297,6 +304,7 @@
           "id": "coldDrink",
           "label": "Pour a cold drink",
           "anim": "drink",
+          "sound": "fridgeDoor",
           "minutes": 5,
           "effects": {
             "comfort": 0.05,
@@ -455,14 +463,16 @@
       "group": "appliances",
       "description": "A counter with a microwave on top: hot leftovers in a few minutes, no skill needed.",
       "sounds": {
-        "stir": "none"
+        "stir": "none",
+        "bake": "microwave"
       },
       "interactions": [
         {
           "id": "reheat",
           "label": "Heat up leftovers",
           "anim": "cook",
-          "sound": "none",
+          "sound": "microwave",
+          "endSound": "ping",
           "minutes": 4,
           "eat": {
             "item": "leftovers",
@@ -501,6 +511,7 @@
             "elder"
           ],
           "anim": "fetch",
+          "sound": "pour",
           "minutes": 2,
           "autonomous": false,
           "tags": [
@@ -517,6 +528,7 @@
             "elder"
           ],
           "anim": "drink",
+          "sound": "espresso",
           "minutes": 10,
           "effects": {
             "energy": 0.1,
@@ -562,7 +574,8 @@
           "id": "toast",
           "label": "Make toast",
           "anim": "cook",
-          "sound": "none",
+          "sound": "toaster",
+          "endSound": "toastPop",
           "minutes": 4,
           "eat": {
             "item": "toast",
@@ -579,7 +592,7 @@
           "id": "smoothie",
           "label": "Blend a smoothie",
           "anim": "cook",
-          "sound": "none",
+          "sound": "blender",
           "minutes": 3,
           "eat": {
             "item": "smoothie",
@@ -826,6 +839,8 @@
       "layer": "wall",
       "decor": 0.15,
       "description": "A chimney hood for the wall above the stove.",
+      "ambient": "hood",
+      "ambientWhile": "sizzle",
       "interactions": []
     },
     {
@@ -3603,6 +3618,7 @@
           "id": "pool",
           "label": "Shoot pool",
           "anim": "play",
+          "sound": "pool",
           "minutes": 30,
           "partner": true,
           "alone": "trickShots",
@@ -3623,6 +3639,7 @@
           "id": "trickShots",
           "label": "Practise trick shots",
           "anim": "play",
+          "sound": "pool",
           "minutes": 60,
           "effects": {
             "fun": 0.15
@@ -3660,6 +3677,7 @@
           "id": "foosball",
           "label": "Play foosball",
           "anim": "play",
+          "sound": "foosball",
           "minutes": 20,
           "partner": true,
           "alone": "practise",
@@ -3680,6 +3698,7 @@
           "id": "practise",
           "label": "Practise foosball",
           "anim": "play",
+          "sound": "foosball",
           "minutes": 15,
           "autonomous": false,
           "effects": {
@@ -3714,6 +3733,7 @@
           "id": "darts",
           "label": "Throw darts",
           "anim": "play",
+          "sound": "darts",
           "minutes": 15,
           "effects": {
             "fun": 0.3
@@ -3747,6 +3767,7 @@
           "id": "sew",
           "label": "Sew",
           "anim": "tinker",
+          "sound": "sewing",
           "minutes": 60,
           "pose": "sit",
           "effects": {
@@ -3765,6 +3786,7 @@
           "id": "mend",
           "label": "Mend clothes",
           "anim": "tinker",
+          "sound": "sewing",
           "minutes": 30,
           "pose": "sit",
           "effects": {
@@ -3796,6 +3818,7 @@
           "id": "experiment",
           "label": "Do experiments",
           "anim": "tinker",
+          "sound": "bubbling",
           "minutes": 60,
           "effects": {
             "fun": 0.2
@@ -3836,6 +3859,7 @@
           "id": "cycle",
           "label": "Cycle",
           "anim": "exercise",
+          "sound": "bike",
           "minutes": 45,
           "pose": "sit",
           "effects": {
@@ -4411,6 +4435,7 @@
           "id": "relax",
           "label": "Warm up by the fire",
           "anim": "relax",
+          "sound": "fire",
           "minutes": 30,
           "pose": "sit",
           "effects": {
@@ -4805,6 +4830,7 @@
           "id": "relax",
           "label": "Warm up by the fire",
           "anim": "relax",
+          "sound": "fire",
           "minutes": 30,
           "seatNear": 3,
           "seatFacing": "around",
@@ -5216,6 +5242,7 @@
           "id": "tuneUp",
           "label": "Tune up the bike",
           "anim": "tinker",
+          "sound": "bikeTools",
           "minutes": 30,
           "effects": {
             "fun": 0.08

@@ -98,11 +98,12 @@ export interface InteractionDef {
   alone?: string;
   /**
    * What it sounds like while it lasts: a world sound by key (`audio/world.ts` `LOOPS`: `chop` for
-   * a cheese board), or `none`; absent: by the object's `sounds`, else by `anim`. Not for a
-   * `recipe`, whose steps sound by the station they're done at.
+   * a cheese board), or `none`; absent: by the object's `sounds`, else by `anim`. A sound played
+   * once (`audio/things.ts` `ONCE_THINGS`: `vendCan`) plays as it starts. Not for a `recipe`, whose
+   * steps sound by the station they're done at.
    */
   sound?: string;
-  /** A sound played once as it ends (`audio/water.ts` `ONCE`: a toilet's `flush`). */
+  /** A sound played once as it ends (`audio/water.ts` `ONCE`, `audio/things.ts` `ONCE_THINGS`: a toilet's `flush`, a microwave's `ping`). */
   endSound?: string;
 }
 
@@ -255,6 +256,8 @@ export interface ObjectDef {
   sounds?: Record<string, string>;
   /** A world sound it makes by itself, used or not, while its lot is looked at (a fountain's water). */
   ambient?: string;
+  /** With `ambient`: it sounds only while a use on its tiles sounds like this (a world sound key: a cooker hood's fan over a hob's `sizzle`). */
+  ambientWhile?: string;
   /** Turns freely (at any angle, for looks); default: 1×1 objects of `objectRules.freeRotation` categories. */
   freeRotation?: boolean;
   /**
