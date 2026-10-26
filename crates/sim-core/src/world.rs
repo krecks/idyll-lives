@@ -881,7 +881,7 @@ pub struct Sim {
     /// Conceived with this partner this tick (the life cycle decides; see `lifecycle::conceive`).
     pub(crate) conceived: Option<u32>,
     /// Their *Try for a baby* with this partner went well this tick: the two go to bed
-    /// (`privacy::to_bed`, after the step). Not saved.
+    /// (`privacy::after_step`). Not saved.
     pub(crate) to_bed: Option<u32>,
     /// Ticks they've stood outside a room kept shut by someone in it, on their way in (a
     /// bathroom in use; `privacy.rs`), 0 while not. Not saved: after a load they set off again.

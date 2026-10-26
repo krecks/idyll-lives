@@ -142,8 +142,6 @@ it left is here, with its id; §9 of the review says what each would take.
 - **`partBox`** draws spheres and tori up to 5 % / 2.5 % bigger than Babylon's meshes (never smaller).
 
 ### Content and sim
-- **No privacy** (G-72): a bathroom in use opens for anyone walking in (else they'd walk through its shut door), and
-  "Try for a baby" is a 30-minute standing kiss wherever the two are (I-systems-05, I-social-05). New behaviour.
 - **Nobody serves in town** (I-community-09): the carts, the stall, the bakery case and the café are self-serve, and
   their labels say so; vendors are later (Q-17).
 - **Laundry:** the resident stands at the washer for its whole wash and folds at the dryer with empty hands; the
@@ -197,6 +195,13 @@ it left is here, with its id; §9 of the review says what each would take.
   chair is used (I-kids-01).
 - **Models:** the entry console's and the spritz station's mirrors on back boards (M-packs-01, M-packs-02); the party
   bar's back bar (M-packs-03); bathers' shins in the heart tub (A-packs-01); the power blender's blades (A-packs-02).
+
+### Fixed in 0.5.0
+- **Privacy** (G-72: I-systems-05, I-social-05): a bathroom someone is in is kept shut (`privacy.rs`): others wait
+  outside its door (an hour at most) and go in after, its door stays shut to them in the drawing, and kept out with
+  the bladder empty the accident comes. Visitors leave the household's own things alone (`private`: wardrobes,
+  dressers, the bath cabinet). *Try for a baby* is a short ask, then the two in a double bed under the covers for
+  half an hour behind the bedroom's shut door (Q-21).
 
 ## Notes on the sim
 

@@ -30,7 +30,7 @@ Label, animation and minutes from content.
 | `prank` Prank (laugh, 8 min) | n/a | OK | I-social-03 | I-social-03 S3 clip (the joke's laugh; no prank is played) | `social/sheets/fights.png` |
 | `fight` Start a fight (fight, 8 min) | n/a | A-social-03 | A-social-03 | A-social-03 S2 clip (punches at the attacker's own height, over a child's head); I-systems-04 S2 code (systems ledger, widened: anyone may fight a child) | `social/sheets/fights.png` |
 | `apologize` Apologize (talk, 10 min) | n/a | OK | I-social-03 | I-social-03 S3 clip | `social/pairs/apologize-teen-ya-01.png` |
-| `tryForBaby` Try for a baby (kiss, 30 min) | n/a | A-social-01 | I-social-05 | A-social-01 S2 code (confirmed); I-social-05 S3 decision (a 30-minute standing kiss wherever the two meet) | `social/pairs/tryForBaby-adult-ya-01.png` |
+| `tryForBaby` Try for a baby (kiss, 30 min) | n/a | A-social-01 | I-social-05 | A-social-01 S2 code (confirmed); I-social-05 S3 decision (fixed 33a9ded1, 9987714b: a 3-minute ask, then 30 minutes in a double bed behind a shut door) | `social/pairs/tryForBaby-adult-ya-01.png`; after `fixes/privacy/3-bed-inside.png` |
 | `goodbyeHug` Hug goodbye (hug, 3 min) | n/a | OK | OK | A-social-02 S3 code (seeded; not seen: the housemate stays 1.2 m off) | `social/sheets/goodbye.png`, `social/pairs/goodbyeHug-adult-child-01.png` |
 | `goodbye` Say goodbye (wave, 3 min) | n/a | OK | OK | | `social/sheets/goodbye.png`, `social/pairs/goodbye-adult-elder-01.png` |
 
@@ -152,7 +152,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** decision
 - **Where:** `web/public/content/base.json:1678` (`tryForBaby`: `animation: kiss`, 30 minutes, no place)
 - **Evidence:** `social/pairs/tryForBaby-adult-ya-01.png`: Ada and Ben stand kissing in the front garden for half an hour, the children a few metres off. Trying for a baby needs a place and privacy (a bed, a closed door). For the owner: keep it a kiss (the game's tone), or make it a use of a double bed behind a door, which is new behaviour (`code`).
-- **Status:** later (G-72; Q-21: kept as it is until the privacy flag, then moved to a bed)
+- **Status:** fixed (33a9ded1, 9987714b, 87d003ec; G-72, Q-21: moved to a bed with the privacy flag)
+- **After:** *Try for a baby* is a 3-minute ask (the kiss); when it goes well the two go to a double bed at home that nobody else is on, in a room with a door and nobody else in it, and lie under the covers for 30 minutes (someone else in the room as they get there: they don't) (the double beds' *Try for a baby*, content `conceive`: a game for two done behind a shut door), the bedroom kept shut meanwhile: anyone else on their way in waits outside. A baby may come of it once they've lain there their time. Without such a bed free the social isn't chosen, and the player's ask is refused ("Ada and Ben have nowhere private to try for a baby: a double bed in a room of its own"); it isn't in the bed's menu. Tests: `tests/privacy.rs` (`trying_for_a_baby_is_in_a_double_bed_behind_a_shut_door`, `no_trying_for_a_baby_without_a_bed_behind_a_door`, `with_free_will_partners_try_for_a_baby_in_bed`, `not_with_someone_else_in_the_bedroom`). In play on `privacy-check` (headless): the two under the quilt with the bedroom door shut, Gus waiting outside it (`bench-results/review/fixes/privacy/3-bed-inside.png`, `4-gus-*.png`).
 - **Source:** wave: cross-cutting
 
 ### I-social-06 — Nobody ever talks seated: a social stands both of them up

@@ -45,7 +45,7 @@ What it covers: the house parts built in code: walls, doors and windows, coverin
 | Item | Real uses | Content's | Verdict |
 |---|---|---|---|
 | Front door | open it and walk through; shut it behind you; lock it; visitors knock or ring | swings open as anyone comes near (or walks past) and shuts behind them; visitors knock at it (`base.json` `visits`, judged in the systems ledger); no lock, no bell | A-houses-01 |
-| Bathroom door | shut it for privacy while in there | shut in the drawing only while the room is occupied (privacy in the sim: I-systems-05, systems ledger); opens for passers-by | A-houses-01 |
+| Bathroom door | shut it for privacy while in there | shut while someone is in there, the sim keeping others outside it (I-systems-05, fixed G-72); opens only for the one going through | A-houses-01 |
 | Inside doors | open, shut | stand open against the wall for good (`swingDoors`: only front and bathroom doors shut) | OK (a common way to live) |
 
 ## Windows (8)

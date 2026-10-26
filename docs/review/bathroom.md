@@ -8,7 +8,7 @@ What it covers: the 26 objects of [docs/objects/bathroom.md](../objects/bathroom
 - **Rubric:** [plan/authenticity-review.md §3](../../plan/authenticity-review.md#3-rubrics); real-world ranges in [reference.md](reference.md). Finding format and severities: [README.md](README.md#writing-a-finding).
 - **Columns:** M, A and I take `OK`, a finding id or `n/a`; `—` is pending. Findings lists the ids filed against the row, with severity and fix class; Shots names the evidence files.
 - **Seeded findings** (`Status: seeded`) are known issues copied in from earlier docs. Confirm or close them; don't file them again.
-- **Shared, filed elsewhere:** a use ends once its needs are full (I-systems-02, systems ledger: why the toilet sits in the evidence last 0.3–3.9 s, the bladder at 0.34–0.96 when each run began); no privacy for toilets, showers and baths (I-systems-05, systems ledger); no prop in hand (I-held-01, held ledger: the toothbrush, the towel, the washing).
+- **Shared, filed elsewhere:** a use ends once its needs are full (I-systems-02, systems ledger: why the toilet sits in the evidence last 0.3–3.9 s, the bladder at 0.34–0.96 when each run began); no privacy for toilets, showers and baths (I-systems-05, systems ledger; fixed, G-72); no prop in hand (I-held-01, held ledger: the toothbrush, the towel, the washing).
 
 ## Sinks (5)
 
