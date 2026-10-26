@@ -5,7 +5,7 @@
  */
 
 import { clip, cycle, type ClipDef, type PoseSpec, type Vec } from './dsl';
-import { armIK, elbow, footIK, hang, ramp, smooth, wrist } from './ik';
+import { armIK, elbow, footIK, hang, pointOn, ramp, smooth, wrist } from './ik';
 
 export const TAU = Math.PI * 2;
 
@@ -128,16 +128,23 @@ function foldPose(p: number): PoseSpec {
   };
 }
 
-/** Phone to the right ear, the left arm across the waist holding the right elbow; small nods and shifts. */
+/**
+ * Phone to the right ear (the palm over it, the fingers up the side of the head, the phone between: actions.ts
+ * `PROPS.phoneEar`), the left arm across the waist holding the right elbow; small nods and shifts.
+ */
 function phonePose(p: number): PoseSpec {
   const talk = Math.max(0, Math.sin(p * TAU * 2));
   const body = stand({ shift: 0.5 + 0.15 * Math.sin(p * TAU), breath: p, twist: -4, head: [4 + 3 * talk * Math.sin(p * TAU * 8), -6 + 4 * Math.sin(p * TAU), -9] });
   return {
     ...body,
-    ...armIK('r', [0.12, 1.52, 0.01], body, { pole: [0.5, -1, 0.5], pronate: 60, hand: wrist('r', -10, 10) }),
+    ...armIK('r', pointOn(body, 'Head', PHONE_AT), body, { palm: true, pole: [0.5, -1, 0.5], pronate: 60, hand: wrist('r', -10, PHONE_DEV) }),
     ...armIK('l', [0.12, 1.06, 0.13], body, { pole: [-0.3, -1, 0], pronate: 70, hand: wrist('l', 30, 0) }),
   };
 }
+
+/** The palm on the phone at the right ear, from the head joint (m, the head's frame), and the wrist turned to the little finger so the fingers go up. */
+const PHONE_AT: Vec = [0.11, 0.04, 0.03];
+const PHONE_DEV = -30;
 
 /** Reading: an open book held in both hands at the chest, the head bowed over it; a page turns. */
 function readPose(p: number): PoseSpec {

@@ -496,8 +496,11 @@ The things residents carry and cook with (`models/held/*.glb`: the bag of shoppi
 the dirty pot, the tasting board, the grill platter and the dirty platter, the pizza, the baking tray and the dirty
 tray, the pie and the dirty pie dish, the plates of stew, pizza, treats, pie, a sandwich and toast, the dirty plate, the
 dirty tasting board and pizza board, the bowl of ice cream and the dirty bowl, the smoothie, the noodle pail and the
-takeaway box, and the chopping board, the
-pan, the mixing bowl and the food on the grill that stand on a station while a resident cooks; override pack
+takeaway box, the food bought in town (a paper cup of ice cream, a hot dog on its paper boat, a packet of crisps, an
+apple, a pastry in a paper bag), the chopping board, the
+pan, the mixing bowl and the food on the grill that stand on a station while a resident cooks, and what residents hold
+while they use a thing (a book, a mug, a tumbler, a wine glass, a can, a fork, a spoon, chopsticks, a phone, a coin,
+a bag of bird seed, a dart, a pool cue, a ping-pong bat and a cocktail shaker); override pack
 `packs/held/manifest.json`, over the `item.*` and `tool.*` keys) are built in Blender by
 `tools/art/blender/families/held.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). They are still.
 

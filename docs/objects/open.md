@@ -119,9 +119,10 @@ what this list held; those items are under "Fixed by the authenticity review" be
 it left is here, with its id; §9 of the review says what each would take.
 
 ### Residents
-- **No props in hand** (G-70): books, cups, cutlery, the phone, the cue, the bats and the bar cart's shaker are
-  mimed, and the coin isn't tossed into the fountain (I-held-01, I-social-01, I-hobbies-05, I-kitchen-13,
-  I-community-11). New behaviour, planned separately.
+- **Props still mimed** (the rest of G-70): the tools (the watering can, the shears, the easel's brush, the chalk,
+  the baby's bottle), the post box's card, the café's cake and the basketball (I-held-01); the phone box's receiver
+  stays on its hook, its fourth draw call taken (I-social-01); no pigeons come down to the seed (I-community-11, new
+  behaviour). A fork is 2 mm thick: from the game camera it is hardly seen.
 - **A child can't reach the fruit it picks** (I-garden-11): the picked apple hangs at 1.84 m, the lemon at 1.62 m.
   The owner's decision (the review recommends low fruit, built with I-garden-12's crown).
 - **Feet slide at game speeds 4 and 5** (48–81 % of the way: 45 and 90 m/s, faster than any gait steps without
@@ -153,8 +154,6 @@ it left is here, with its id; §9 of the review says what each would take.
   each end, `places` facing each other and a *Play chess* use with `partner` (M-hobbies-11).
 - **The apple tree's crown is out of reach:** only its front apple hangs within reach, so *Pick the apples* reaches
   into the air; the crown down to about 2.6 m or low apples at 1.4–1.9 m (I-garden-12, `trees.md`).
-- **Food from town on a plate:** crisps, the stall's fruit and the pastry use the treat plate; a cone or paper cup,
-  a hot dog in its bun, a crisp packet, an apple and a bagged pastry are to be made (M-held-03, `held.md`).
 - **The bakery case's sliding door is on the baker's side** (I-community-09, with vendors).
 
 ### Tools
@@ -176,6 +175,13 @@ it left is here, with its id; §9 of the review says what each would take.
   then the game in front of a mirror), without a single WebGL message. What the check found instead is fixed: the mirrors' warm-up drew each glass
   into its own reflection (WebGPU dropped that frame's commands, once a load), and a quilt drawn before its first
   update had no instance buffer (WebGL2 errors until Chrome stopped reporting any, a dropped frame on WebGPU).
+- **Props in hand** (G-70): a book, a mug, a tumbler, a wine glass or a can, a fork, a spoon or chopsticks, a phone
+  at the ear and in both hands, a coin tossed into the town fountain, a bag of bird seed on the park bench, a dart,
+  each player's ping-pong bat and pool cue, and the bar carts' shaker shaken in both hands (I-held-01 in part,
+  I-social-01 in part, I-hobbies-05, I-kitchen-13, I-community-11 in part); the pool table's balls break at the
+  first shot (I-hobbies-05).
+- **The food from town in its own wrapping:** a paper cup of ice cream, a hot dog in its bun, a packet of crisps, an
+  apple and a pastry in a paper bag (M-held-03).
 
 ### Fixed by the authenticity review
 - **Residents:** the weight bench's feet-down bench press (A-fitness-01); a kiss between different heights

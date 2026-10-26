@@ -1,7 +1,7 @@
 # Held (`families/held.py`)
 
-The 30 things residents carry and cook with. One pack, `packs/held/manifest.json`, models in
-`models/held/`. Built 2026-10-16. They aren't buyable: no content entry, no Validate group, no paint.
+The 50 things residents carry, cook with and hold while they use a thing. One pack, `packs/held/manifest.json`, models
+in `models/held/`. Built 2026-10-16. They aren't buyable: no content entry, no Validate group, no paint.
 
 - **Items** (`item.*`, content `items[].model`): drawn on the palms while carried (characters.ts `writeCarried`:
   one hand or both, content `hold`, level and facing the way the resident faces, base 2 cm under the palms), and set
@@ -9,6 +9,16 @@ The 30 things residents carry and cook with. One pack, `packs/held/manifest.json
 - **Tools** (`tool.*`, characters.ts `STATION_PROPS`): the chopping board (`chop`), the pan (`stir`), the mixing bowl (`mix`, 2026-10-21) and the food on
   the grill (`flip`), on the station's top while a resident works there, 15 cm towards the cook, turned to face the
   way they face.
+- **Props in hand** (`tool.*`, 2026-10-26, review G-70; actions.ts `PROPS`, residents.ts `writeHand`): what a resident
+  holds while they use a thing, chosen by the use's animation tag and the object (`ACTIONS[tag].prop`) and placed by
+  the hands as posed, by its grip (props.ts `placeHand`): a book open across both palms, its pages to the eyes
+  (`read`); a phone at the ear (`phone`) or in both hands before the chest (`phoneScreen`); a mug, a tumbler, a wine
+  glass or a can upright beside the palm, tipped to the lips as the hand comes to the mouth (`drink`); a fork, a spoon
+  or chopsticks from the palm to the mouth while a plate that wants them is eaten at the table (`eat`); the shaker
+  between both hands (`shake`); a dart, a ping-pong bat and a pool cue (`play`); a coin for the fountain or the giving
+  jar; a bag of bird seed on the left palm (`feed` on the park bench). Each is built as it lies or stands on a table,
+  its origin where the hand holds it: the middle of its base for the cups and the bags, the butt of the cue, the
+  middle of a grip for the rest; what is held along its length points to the front (+depth).
 
 So each keeps the old part's frame: origin at the middle of its base, front +depth (away from the one holding it).
 Each is built in place in the game's axes (`F`, as its parts were), stood on the floor without moving it
@@ -46,6 +56,26 @@ sideways; the pan and the grill food, which stand off their middle, take their m
 | `item.boardDirty` | the tasting board cleared: a cheese rind, a bare branching stalk, half a cracker, crumbs, smears of grease and jam | 2 | 640 |
 | `item.pizzaBoardDirty` | the pizza's round board after it: bent crust ends, a grease smear, sauce, crumbs, the pizza wheel | 2 | 712 |
 | `item.pieDishDirty` | the fluted pie dish emptied: a smear of filling, pastry crumbs, the pie server | 1 | 456 |
+| `item.iceCreamCup` | a pink-striped paper cup 9 cm across, two ragged-lipped scoops (vanilla, strawberry), a flat wooden spoon | 1 | 360 |
+| `item.hotDog` | a hot dog on a paper boat: a bun split along its top in two lathed halves, a bent sausage longer than it, a mustard zigzag and a line of ketchup | 1 | 624 |
+| `item.crisps` | a packet of crisps lying on its back, puffed, blue with a yellow band, crimped seals, its top torn open on the silvered inside, five crisps spilt | 1 | 616 |
+| `item.apple` | an apple 7.5 cm across, lobed a little, red with a yellow blush at the stalk and the eye, a stalk and a leaf | 1 | 250 |
+| `item.pastryBag` | a white paper bag 12 cm wide, its top folded open, a croissant of five lobes standing out of it | 1 | 176 |
+| `tool.book` | an open cloth-bound book, 30 x 22 cm: the boards, two page blocks rising from the spine and curving down to the fore-edges, a sheet over each with seven grey bands of type | 1 | 496 |
+| `tool.phone` | a smartphone 7.2 x 14.8 cm, a rounded dark body, the glass and a lit screen, a camera bump | 1 | 288 |
+| `tool.mug` | a glazed mug 8 cm across with a blue band, its handle to the right, coffee and crema | 1 | 480 |
+| `tool.glass` | a tumbler 7 x 11 cm of an orange drink (seen through the glass), two ice cubes | 1 | 340 |
+| `tool.wineGlass` | a stemmed glass 19 cm high, red wine to the bowl's widest | 1 | 468 |
+| `tool.can` | a 330 ml can, red with a white band, its ends pressed in, a ring pull | 1 | 392 |
+| `tool.fork` | a steel fork 17 cm long, an outline extruded: a handle widening to its end, four tines | 1 | 92 |
+| `tool.spoon` | a steel dessert spoon 17 cm long, an oval bowl | 1 | 124 |
+| `tool.chopsticks` | a pair of tapering wooden chopsticks 23 cm long | 1 | 24 |
+| `tool.coin` | a brass coin 2.3 cm across, a milled rim | 1 | 140 |
+| `tool.seedBag` | a small kraft bag of bird seed, its top rolled open over the seed | 1 | 116 |
+| `tool.dart` | a steel dart 15 cm long: a knurled barrel, a black shaft, three blue flights | 1 | 180 |
+| `tool.cue` | a pool cue 1.47 m (the pool table's was on its cloth): a wrapped butt, a joint, a tapering shaft, a ferrule and a chalked tip | 1 | 188 |
+| `tool.bat` | a ping-pong bat: a wooden blade 15 x 16 cm, red rubber over black, a flared handle (the ping-pong table's two were on its top) | 1 | 296 |
+| `tool.shaker` | the bar cart's cocktail shaker, 22 cm, chrome (the cart's own is hidden while it is in the hands) | 1 | 320 |
 
 - **Detail pass** (2026-10-22): rebuilt with the forms (sweeps, lofts, outlines extruded) at the same sizes, centres,
   origins and draws: crusts, rims, handles, straws, beans and piped icing are sweeps (the rods-and-spheres crusts
@@ -60,11 +90,14 @@ sideways; the pan and the grill food, which stand off their middle, take their m
   `boardDirty`, the pizza to its own round board (`pizzaBoardDirty`), the pie to its dish (`pieDishDirty`), the ice
   cream to its bowl (`bowlDirty`), not to the grill's oval platter or the baking tray. Each is a content `items` entry
   (`dirty`, washed as the others are).
-- **Bought in town** (2026-10-22, review M-held-03): the hot dog stand's hot dog is carried in the takeaway box
-  (`item.takeout`) and the ice cream cart's in the dessert bowl (`item.iceCream`), not on the treat plate or as a
-  sandwich. Still to be made (nothing here fits): a cone or paper cup of ice cream, a hot dog in its bun, a packet of
-  crisps (the snack machine's `crisps`), an apple (the market's `fruit`) and a pastry in a paper bag (the bakery
-  case's `pastry`); those three keep the treat plate meanwhile, the grocery's `shopSandwich` the sandwich.
+- **Bought in town** (2026-10-22, review M-held-03; made 2026-10-26): each in what it is sold in. The ice cream cart's
+  ice cream in a paper cup (`item.iceCreamCup`, radius 0.05), the hot dog stand's hot dog in its bun on a paper boat
+  (`item.hotDog`, 0.1), the snack machine's crisps in their packet (`item.crisps`, 0.11, the item's label *Crisps*),
+  the market stall's fruit as an apple (`item.apple`, 0.045) and the bakery case's pastry in a paper bag
+  (`item.pastryBag`, 0.07); the grocery's `shopSandwich` keeps the sandwich, which fits. Carried on the right palm and
+  eaten from it on a bench or a café chair (the eat clip takes it to the mouth), or set down on a table.
+- **Thin in the gate:** the fork, the spoon, the chopsticks, the coin and the phone are under the 1.2 cm the gate wants
+  of a thing on a floor (a house's floor is drawn 1 cm up): they are only ever in a hand, so its warning stands.
 - **Finishes.** Dishes glazed `gloss`, pans and trays `metal` (the pan's handle `satin`), food `satin` or `matte`.
   The wooden boards (chopping, tasting, pizza) take `wood` as the old parts did: their second draw call.
 - **The plate** (`plate()`) is shared: a foot, a rim up to 1.7 cm and a paler well at 0.9 cm (`WELL`), where the food

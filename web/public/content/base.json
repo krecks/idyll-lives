@@ -4243,37 +4243,37 @@
     {
       "id": "iceCreamCone",
       "label": "Ice cream",
-      "model": "item.iceCream",
+      "model": "item.iceCreamCup",
       "hold": "hand",
-      "radius": 0.08
+      "radius": 0.05
     },
     {
       "id": "hotDog",
       "label": "Hot dog",
-      "model": "item.takeout",
+      "model": "item.hotDog",
       "hold": "hand",
-      "radius": 0.13
+      "radius": 0.1
     },
     {
       "id": "crisps",
-      "label": "Snack",
-      "model": "item.treatPlate",
+      "label": "Crisps",
+      "model": "item.crisps",
       "hold": "hand",
-      "radius": 0.1
+      "radius": 0.11
     },
     {
       "id": "fruit",
       "label": "Piece of fruit",
-      "model": "item.treatPlate",
+      "model": "item.apple",
       "hold": "hand",
-      "radius": 0.1
+      "radius": 0.045
     },
     {
       "id": "pastry",
       "label": "Pastry",
-      "model": "item.treatPlate",
+      "model": "item.pastryBag",
       "hold": "hand",
-      "radius": 0.1
+      "radius": 0.07
     },
     {
       "id": "shopSandwich",

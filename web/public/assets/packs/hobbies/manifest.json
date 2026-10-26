@@ -412,13 +412,7 @@
           "finish": "material.finish.gloss"
         },
         "cloth": {
-          "finish": "material.finish.fabric"
-        },
-        "cue": {
-          "finish": "material.finish.satin"
-        },
-        "cue_butt": {
-          "finish": "material.finish.satin"
+          "finish": "material.finish.matte"
         },
         "pearl": {
           "finish": "material.finish.gloss"
@@ -435,8 +429,28 @@
       },
       "motions": {
         "uses": {
-          "pool": "rack_off",
-          "trickShots": "rack_off"
+          "pool": [
+            "rack_off",
+            {
+              "clip": "racked_off",
+              "delay": 4.6
+            },
+            {
+              "clip": "spread",
+              "delay": 4.6
+            }
+          ],
+          "trickShots": [
+            "rack_off",
+            {
+              "clip": "racked_off",
+              "delay": 4.6
+            },
+            {
+              "clip": "spread",
+              "delay": 4.6
+            }
+          ]
         }
       },
       "paint": [

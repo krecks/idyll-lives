@@ -7,7 +7,7 @@
  * share `s` of the reference skeleton's size, standing `to` m from the object's middle; the object's numbers
  * in metres divided by `s` give the clip's. The darts, the rally and the yoga are body-relative: one size.
  *
- * The cue and the bats aren't in the hands yet (props in hand, a later item): the hands mime them, closed.
+ * The cue, the bat and the darts are drawn in the hands (actions.ts `PROPS`, G-70): the hands close on them.
  */
 
 import { cycle, type ClipDef, type PoseSpec, type Rot, type Vec } from './dsl';
@@ -145,6 +145,15 @@ for (const [i, t0] of THROWS.entries()) {
   }
 }
 DART_HAND.push([5.0, LOW], [6.75, LOW], [DART_S, AIM]);
+/**
+ * When a dart is in the throwing hand (shares of the clip; actions.ts `PROPS.dart`): from taking the next from the
+ * left hand (1.2 s after a throw) to letting it go (0.4 s into the throw), and back in hand for the first once the
+ * score is read.
+ */
+export const DART_IN_HAND: readonly (readonly [number, number])[] = [
+  ...THROWS.map((t0, i): readonly [number, number] => [i ? (THROWS[i - 1] + 1.2) / DART_S : 0, (t0 + 0.4) / DART_S]),
+  [6.8 / DART_S, 1],
+];
 DART_FLEX.push([5.0, 10], [6.75, 10], [DART_S, -35]);
 /** The feet: the right on the line, back a step to read the score, and in again. */
 const ON_LINE: Vec = [-0.02, 0, 0.14];
@@ -295,7 +304,7 @@ function foosPose(fit: FoosFit, lane: number): (p: number) => PoseSpec {
 /**
  * A table-tennis rally (`pingPongTable`): the ready stance (knees bent, leant in, the bat hand in front), a
  * forehand (the chest turning back to the right, through and up across) and a backhand (the bat in front of
- * the belly, out to the right), the weight going with each. The bat is mimed in a closed hand.
+ * the belly, out to the right), the weight going with each, the bat in the closed right hand.
  */
 const PONG_S = 1.8;
 const READY: Vec = [0.16, 1.0, 0.38];

@@ -70,6 +70,8 @@ export interface SnapshotLayout {
     carry?: number;
     /** How far through what they do at `object` they are, 0..1 (a use's minutes, a recipe step's), while at it; else -1 (missing in older layouts). */
     progress?: number;
+    /** What they eat while eating (on the table in front of them or in their hands): index into `items` + 1, 0 = nothing (missing in older layouts). */
+    plate?: number;
   };
   /** Animation tags from content (`animations` in base.json), named by `sim.action`. */
   actions: string[];

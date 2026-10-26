@@ -98,7 +98,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters.ts:530` (`ACTIONS.phone`), `web/src/render/shared/characters/clips/idle.ts:132` (`phonePose`)
 - **Evidence:** The rubric records that no phone, book, cup or cutlery prop exists today. Props in hand are new behaviour: filed as `code` only, planned separately (§9, decision 3). Cross-cutting wave: every phone action, at every stage that may use one, holds an empty hand to the ear (`social/sheets/phone.png`, `social/scenes/phone-text-01.png`, `social/scenes/phone-call-01.png`); the same at the objects that use `phone` (the video-call nook, the shortwave radio, `systems/sheets/act-phone-meditate-idle.png`). The phone booth is the one place a receiver is there (its model).
-- **Status:** later (G-70, props in hand: new behaviour, owner decision 3); was confirmed
+- **Status:** fixed in part (b98bc6af): a mobile in the hand for every call and text; the phone box's receiver stays on its hook (a part of its own would be its fifth draw call), so the caller there still holds the mime; was confirmed
+- **After:** the phone at the ear (`PROPS.phoneEar`; the `phone` clip's palm now over the ear, the fingers up the side of the head) and in both hands before the chest for texting (`PROPS.phoneHeld`, its screen to the eyes), standing and seated; none at the video-call nook, the party booth, the shortwave radio or the phone box: `fixes/props/pairs1.png` (`call-t1.5`, `text-t1.5`), every stage `stages/*.png`. Calls from the phone menu weren't played in a house (the check house's residents have nobody in their phones); the pose bench plays the same clips and props.
 - **Source:** `plan/authenticity-review.md` §3.3 (I7) and §9 (decision 3); wave: cross-cutting
 
 ### I-social-02 — Success and failure look the same: a refused hug or kiss is two people standing still, and a bad joke is laughed at

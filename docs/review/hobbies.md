@@ -289,7 +289,8 @@ Durations are judged by §9 decision 2: none here is more than 3× from its tag'
 - **Fix class:** code
 - **Where:** `tools/art/blender/families/hobbies.py:781-783` (the cue, part of the still body), `:776-779` (the racked balls, still); the `held` grips (`web/src/render/babylon/characters.ts:371`: `bar`, `pair`, `guitar`, `pole`) have nothing for a cue
 - **Evidence:** `hobbies/extra/two.png` (top view): the cue lies across the cloth and the fifteen balls stay racked under the floating triangle through "Shoot pool" (30) and "Practise trick shots" (60). The model has the cue, and the game already draws an object's own part in the hands (`held`: the bar, the dumbbells, the guitars, the mop), but a cue held along the forearms is a new grip, and the balls breaking and spreading a new clip. Related to I-held-01 (held ledger: props the models don't have).
-- **Status:** later (G-70, props in hand: new behaviour, owner decision 3)
+- **Status:** fixed (b98bc6af, c245c5ba)
+- **After:** each player holds a cue (`tool.cue`, `placeHand` `cue`): from the right hand out through the bridge while bent over the rail, upright in the left hand, its butt on the floor, while it is chalked; none lies on the cloth. At the first shot (4.6 s in) the racked balls go and the fifteen come up spread over the cloth (`racked_off`, `spread`), back when the game ends. The cloth is `matte` now (the two ball parts take the fabric's draw call: four in all), 7,104 triangles. `fixes/props/pairs2.png` (`pool-t6`), in play with two players `pairs3.png` (`after-play/after-poolTable-pool-02.png`), every stage `stages/*.png`.
 - **Source:** wave: hobbies
 
 ### I-hobbies-06 — Darts are thrown from 1.4 m, not from the oche at 2.37

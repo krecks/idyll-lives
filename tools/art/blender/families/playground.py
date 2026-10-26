@@ -59,9 +59,6 @@ M = G.Palette(
     table_top=('#2F6B4F', 'satin'),    # the ping-pong table's top
     lines=('#F2F2F0', 'satin'),        # its white lines
     concrete=('#A9ADB0', 'matte'),     # its legs
-    bat=('#C8322A', 'gloss'),
-    bat_blue=('#2E4E8F', 'gloss'),
-    bat_handle=('#C9A06A', 'satin'),
     ping=('#F7F5EE', 'gloss'),         # the ping-pong ball
     stone=('#C9C2B4', 'matte'),        # the chess table's top
     stool=('#8E8C88', 'matte'),        # its pedestal and stools
@@ -602,20 +599,9 @@ def basketballHoop():
 # --- the ping-pong table ---------------------------------------------------------------------------------------
 # A weatherproof table at the ITTF's size (2.74 x 1.525 m, its top 0.76 m up) on 3 x 2 tiles, the players at its two
 # ends (content `places`): a green top on two concrete legs, a steel net 15.25 cm high reaching 15.25 cm past each
-# side, two bats and a ball. Still. (It was 1.9 x 0.94 m, its top at 0.78.)
+# side, and a ball. Still. The bats are in the players' hands (held.py `tool.bat`; review I-community-06: they lay on
+# the top while it was played). (It was 1.9 x 0.94 m, its top at 0.78.)
 PONG = (2.74, 0.76, 1.525)   # the top's length, height and width
-
-
-def _bat(x, z, a, rubber):
-    """A bat lying on the table at (x, z), its handle pointing `a` degrees round: a wooden blade, the rubber face, a
-    flared handle."""
-    top = PONG[1]
-    F.cyl(f'bat_blade{x}', 0.076, 0.006, (x, top + 0.003, z), M.bat_handle, verts=20)
-    F.cyl(f'bat{x}', 0.074, 0.004, (x, top + 0.008, z), rubber, verts=20, bevel=0.0015, bevel_segments=1)
-    dx, dz = math.sin(math.radians(a)), math.cos(math.radians(a))
-    F.sweep(f'bat_handle{x}', [(x + 0.06 * dx, top + 0.012, z + 0.06 * dz), (x + 0.1 * dx, top + 0.014, z + 0.1 * dz),
-                               (x + 0.165 * dx, top + 0.014, z + 0.165 * dz)], None, M.bat_handle,
-            profile=G.rounded_rect(0.024, 0.016, 0.007, corner=2), up=(0, 0, 1), scale=[1.4, 1.0, 1.15])
 
 
 def pingPongTable():
@@ -652,9 +638,7 @@ def pingPongTable():
                   bevel_segments=1)
             F.box(f'net_arm{z}', 0.03, 0.02, abs(z) - hw + 0.03, (0, top + 0.005, math.copysign((abs(z) + hw) / 2, z)),
                   M.steel)
-        # two bats and the ball
-        _bat(-0.8, 0.3, 20, M.bat)
-        _bat(0.85, -0.32, 200, M.bat_blue)
+        # the ball
         F.sphere('ball', 0.02, (0.5, top + 0.02, -0.15), M.ping, segments=10, rings=6)
     G.join_all('pingPongTable')
     G.settle(centre=False)
