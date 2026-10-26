@@ -71,7 +71,7 @@
         {
           "id": "feedBirds",
           "label": "Feed the pigeons",
-          "anim": "sit",
+          "anim": "feed",
           "minutes": 20,
           "pose": "sit",
           "effects": {

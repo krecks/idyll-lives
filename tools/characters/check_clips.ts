@@ -132,6 +132,8 @@ const RUNTIME: Record<string, boolean> = {
   // The clips made in sizes (`SIZED`); brushing the hair seated and lying curled up on the side.
   ...Object.fromEntries(SIZED_CLIPS.map(({ clip, loop }) => [clip, loop])),
   brushHair: true, lieCurl: true,
+  // With a prop in the hand (clips/props.ts): the cup held between sips, a coin tossed, seed scattered, a cocktail shaken.
+  holdCup: true, toss: false, scatter: true, shake: true,
 };
 /** Phase-2 clips (the runtime picks them up later) and whether they loop. */
 const PHASE2: Record<string, boolean> = { lie: true, chop: true, stir: true, flip: true, drink: false, carry: true, carryOne: true, wave: false };
@@ -145,13 +147,14 @@ const LENGTH: Record<string, number> = {
   ...SOCIAL,
   ...Object.fromEntries(SIZED_CLIPS.map(({ clip, seconds }) => [clip, seconds])),
   brushHair: 5, lieCurl: 2.4,
+  holdCup: 2.5, toss: 3.2, scatter: 3, shake: 2,
 };
 /** The baby lying in the crib: how far out to the side a joint may reach (m, reference skeleton: about 0.23 m on a baby, whose crib's bars are about 0.4 m from its middle). */
 const BABY_REACH = 0.6;
 /** The baby's own clips (characters.ts `BABY_LIE`): the only ones a baby plays. */
 const BABY = new Set(['babyLieAsleep', 'babyLieAwake']);
 /** One-shots whose feet stay planted (sitting down and standing up move them on purpose). */
-const PLANTED = new Set(['interact', 'pickUp', 'eat', 'yes', 'punchJab', 'punchCross', 'hit', 'plant', 'drink', 'wave', ...[...PICK_APPLE, ...PICK_LEMON].map(({ clip }: any) => clip)]);
+const PLANTED = new Set(['interact', 'pickUp', 'eat', 'yes', 'punchJab', 'punchCross', 'hit', 'plant', 'drink', 'wave', 'toss', ...[...PICK_APPLE, ...PICK_LEMON].map(({ clip }: any) => clip)]);
 /** The seat `sit` is checked on (m): a chair's, a child's the kids' chair (content `kidsChair`). */
 const SEAT: Record<string, number> = { child: 0.31 };
 const SEAT_HEIGHT = 0.45;
@@ -397,6 +400,7 @@ function checkSeatedAndLying(sk: Skeleton, restAnkle: number): void {
     const seatedAt: [string, number][] = [
       ['sitTalk', 0],
       ['sitHands', 0],
+      ['scatter', 0],
       ...SIT_LOW.map(({ clip }: any): [string, number] => [clip, 0]),
       ['sitDown', -1],
       ['standUp', 0],

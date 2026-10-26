@@ -277,8 +277,11 @@ function floorClips(f: FloorSit): ClipDef[] {
   ];
 }
 
-/** Hand to mouth (eating; the seated upper-body layer too): the left hand holds the food low in front. */
-function eatPose(t: number, at: Vec, head: Vec, lean: number): PoseSpec {
+/**
+ * Hand to mouth (eating, a sip from a cup; the seated upper-body layer too): the left hand holds the food low in front.
+ * Also the cup held between sips (`holdCup`, clips/props.ts, at `CUP_HELD`).
+ */
+export function eatPose(t: number, at: Vec, head: Vec, lean: number): PoseSpec {
   const body = stand({ shift: 0.25, breath: t * 0.5, lean, head });
   return {
     ...body,
@@ -286,6 +289,9 @@ function eatPose(t: number, at: Vec, head: Vec, lean: number): PoseSpec {
     ...armIK('r', at, body, { palm: true, pole: [0.5, -1, 0.1], pronate: -30, hand: wrist('r', 20, 10) }),
   };
 }
+
+/** Where the cup is held between sips (the palm, m, reference skeleton standing; the seated upper layer the same about the shoulder). */
+export const CUP_HELD: Vec = [0.12, 1.15, 0.27];
 
 export function seatedClips(): ClipDef[] {
   const low: Vec = [0.11, 1.03, 0.27];
@@ -325,14 +331,14 @@ export function seatedClips(): ClipDef[] {
       [0.82, () => eatPose(0.82, [0.1, 1.08, 0.27], [4, 0, 0], 1), 'smooth'],
       [1, () => eatPose(1, low, [0, 0, 0], 0), 'smooth'],
     ]),
-    // A sip from a cup (phase 2): cup up from the chest, the head tips back for the sip, back down.
+    // A sip from a cup (actions.ts `PROPS.mug`): cup up from the chest, the head tips back for the sip, back down.
     clip('drink', { seconds: 2, loop: false }, [
-      [0, () => eatPose(0, [0.12, 1.15, 0.27], [0, 0, 0], 0)],
+      [0, () => eatPose(0, CUP_HELD, [0, 0, 0], 0)],
       [0.3, () => eatPose(0.3, [0.05, 1.49, 0.17], [-4, 0, 0], 2), 'smooth'],
       [0.42, () => eatPose(0.42, [0.05, 1.53, 0.15], [-14, 0, 0], -3), 'smooth'],
       [0.6, () => eatPose(0.6, [0.05, 1.53, 0.15], [-16, 0, 0], -4), 'smooth'],
       [0.75, () => eatPose(0.75, [0.08, 1.3, 0.25], [3, 0, 0], 1), 'smooth'],
-      [1, () => eatPose(1, [0.12, 1.15, 0.27], [0, 0, 0], 0), 'smooth'],
+      [1, () => eatPose(1, CUP_HELD, [0, 0, 0], 0), 'smooth'],
     ]),
   ];
 }

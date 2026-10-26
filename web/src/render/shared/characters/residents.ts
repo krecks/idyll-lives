@@ -54,7 +54,7 @@ import { ENERGY_RATE, type VisemeTrack } from '../../../voice/visemes';
 import { GAME_RATE, QUIET_SPEED } from '../gameSpeed';
 import { paintColors } from '../modelEntry';
 import { type TableRoom, furthestAhead, nearestAhead } from '../tableTuck';
-import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOG_BACK, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PUSH_ONLY, RIDES, RUN_MAX_RATE, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, STRADDLED, STRUM, STRUM_SHORT, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_PER_TICK, WALK_SLACK, WALK_WAIT } from './actions';
+import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOG_BACK, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PUSH_ONLY, RIDES, RUN_MAX_RATE, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_PER_TICK, WALK_SLACK, WALK_WAIT } from './actions';
 import { LOW_TOP, SIT_LOW } from './clips/low';
 import { FLOOR_SITS } from './clips/seated';
 import { type BodyData, type CharacterSet, type Clip, loadCharacterSet, loadStage } from './data';
@@ -63,7 +63,7 @@ import { FACE_KEYS, type Face, FaceMixer, NEUTRAL } from './face';
 import { type OutfitParams, SHELL_BITS, WEARS, type Wear, outfitFor, writeOutfit } from './outfit';
 import { cradled, cuddlePose, onPad, writeCradle } from './cuddles';
 import { lyingPose, measureLegs, measureSit, outfitFit, type PoseKit } from './measure';
-import { palmAt, placeFrame, placeProp } from './props';
+import { type Hands, palmAt, placeFrame, placeHand, placeProp } from './props';
 import { DETAIL_PX, FACE_PARTS, LOD_FAR_PX, LOD_NEAR_PX, MORPH_PX, type PartMesh, Range, YOUNG_STAGES, shellBit, skinChunks } from './parts';
 import { type Additive, type Placement, PoseScratch, addLocal, addRotation, blendInto, makeAdditive, resetAdditive, sampleClip, skin } from './pose';
 import { BABBLE, compose, type Frame, type Player, HEAD_MARGIN, MAX_CHARACTERS, type SimRig, UNIT, advance, alongWay, clamp, clampBuild, clampHeight, copyPlayer, embraceStep, eyesBelowTop, freezePlayer, gettingIn, hash, lerp, lerpAngle, lieBack, lieCentre, multiply, player, ramp, rotationOf, setFrame, shoulderDrop, smooth, speaking, splitKey, unit, wrapAngle } from './rig';
@@ -195,6 +195,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /** Per Sim row: what it holds of the object it uses (content `held`), in the left and the right hand (or both). */
   private readonly leftProp: (string | null)[] = new Array(MAX_CHARACTERS).fill(null);
   private readonly rightProp: (string | null)[] = new Array(MAX_CHARACTERS).fill(null);
+  /** Per Sim row: the prop in their hand for what they do (`ACTIONS[tag].prop`: a book, a cup, a phone). */
+  private readonly handProp: (string | null)[] = new Array(MAX_CHARACTERS).fill(null);
+  /** Scratch for `writeHand`: the hands as just posed. */
+  private readonly hands: Hands = { palms: new Float32Array(6), quats: new Float32Array(8), head: new Float32Array(3), yaw: 0, floorY: 0, scale: 1, size: 1 };
   /** Scratch for `writeHeld`: a frame's axes and origin (x, y, z each). */
   private readonly frame3 = new Float32Array(12);
   /**
@@ -847,6 +851,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       this.writeProp(this.toolProp, i, null);
       this.writeProp(this.leftProp, i, null);
       this.writeProp(this.rightProp, i, null);
+      this.writeProp(this.handProp, i, null);
     }
     // Props built without their files are built (and their files tried) afresh in the next session.
     this.props.dropFailed();
@@ -869,7 +874,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /** Per frame: a prop nobody holds or works with isn't drawn (no draw call for its empty instances). */
   private readonly showProp = (p: P | null, key: string): void => {
     if (!p) return;
-    const used = this.heldProp.includes(key) || this.toolProp.includes(key) || this.leftProp.includes(key) || this.rightProp.includes(key);
+    const used = this.heldProp.includes(key) || this.toolProp.includes(key) || this.leftProp.includes(key) || this.rightProp.includes(key) || this.handProp.includes(key);
     // (The `stress` ghosts' rigs are in `sims` already, in the rows after the residents'.)
     this.view.showProp(p, used ? Math.min(this.sims.length, MAX_CHARACTERS) : 0);
   };
@@ -975,6 +980,52 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     return top ? clamp((top[1] * Math.min(1, rig.scale) / rig.scale - GUITAR.short) / (GUITAR.long - GUITAR.short), 0, 1) : 1;
   }
 
+  /**
+   * The prop in a Sim's hand for what they do (`ACTIONS[tag].prop`: a book, a cup, a phone, a cue; `plate`: what they
+   * eat); none while walking, talking (`busy`), lying, sitting down or getting up.
+   */
+  private handPropOf(rig: SimRig, pose: number, busy: boolean, tag: string, plate: string): HandProp | null {
+    const act = ACTIONS[tag]?.prop;
+    const still = !busy && rig.tagKnown && rig.walkT < 0 && pose !== Pose.Lie && !RISING.has(rig.cur.key);
+    return still && act ? (typeof act === 'function' ? act(rig.useDef, plate, pose === Pose.Sit) : act) : null;
+  }
+
+  /** Prop `p` (`handPropOf`) in Sim row `i`'s hand, placed by the hands as just posed; not outside the clips it is held in. */
+  private writeHand(rig: SimRig, i: number, p: HandProp | null): void {
+    const shown = p && this.handShown(rig, p) ? p : null;
+    const m = this.writeProp(this.handProp, i, shown?.key ?? null);
+    if (!m || !shown || !this.set) return;
+    const B = this.set.bone;
+    const h = this.hands;
+    const q = this.scratch.worldQ;
+    const t = this.scratch.worldT;
+    palmAt(this.scratch, rig, B.hand_r, 1, this.palm);
+    h.palms.set(this.palm, 0);
+    palmAt(this.scratch, rig, B.hand_l, -1, this.palm);
+    h.palms.set(this.palm, 3);
+    for (let k = 0; k < 4; k++) {
+      h.quats[k] = q[B.hand_r * 4 + k];
+      h.quats[4 + k] = q[B.hand_l * 4 + k];
+    }
+    for (let k = 0; k < 3; k++) h.head[k] = t[B.Head * 3 + k];
+    h.yaw = rig.yaw;
+    h.floorY = rig.floorY;
+    h.scale = rig.scale;
+    h.size = Math.min(1, rig.scale);
+    placeHand(m, i, shown, h);
+  }
+
+  /** Whether prop `p` is in the hand now: while one of its clips plays (or, seated, its upper layer), in its `during`. */
+  private handShown(rig: SimRig, p: HandProp): boolean {
+    if (!p.clips) return true;
+    const on = p.clips.includes(rig.cur.key) ? rig.cur : rig.upperW > 0.5 && p.clips.includes(rig.upper.key) ? rig.upper : null;
+    if (!on?.clip) return false;
+    if (!p.during) return true;
+    const d = on.clip.duration;
+    const f = on.clip.loop ? (((on.time % d) + d) % d) / d : on.time / d;
+    return p.during.some(([a, b]) => f >= a && f <= b);
+  }
+
   /** Sim row `i` draws prop `key` (null: none) in `slot`; the old one's matrix is cleared. */
   private writeProp(slot: (string | null)[], i: number, key: string | null): Float32Array | null {
     const old = slot[i];
@@ -984,16 +1035,16 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   }
 
   /**
-   * What Sim row `i` carries (`item`, from the snapshot's `held`): on the right palm, or held in
-   * front between both palms (content `hold`), level and facing the way they face.
+   * What Sim row `i` carries (`item`, from the snapshot's `held`): on the right palm (`side` -1: the left, a plate
+   * eaten from with a fork), or held in front between both palms (content `hold`), level and facing the way they face.
    */
-  private writeCarried(rig: SimRig, i: number, item: ItemDef | undefined): void {
+  private writeCarried(rig: SimRig, i: number, item: ItemDef | undefined, side: 1 | -1 = 1): void {
     const key = item ? (item.model ?? `item.${item.id}`) : null;
     const m = this.writeProp(this.heldProp, i, key);
     if (!m || !item || !this.set) return;
     const B = this.set.bone;
     const palm = this.palm;
-    palmAt(this.scratch, rig, B.hand_r, 1, palm);
+    palmAt(this.scratch, rig, side > 0 || item.hold === 'both' ? B.hand_r : B.hand_l, side > 0 || item.hold === 'both' ? 1 : -1, palm);
     let x = palm[0];
     let y = palm[1];
     let z = palm[2];
@@ -1393,6 +1444,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         this.writeProp(this.toolProp, i, null);
         this.writeProp(this.leftProp, i, null);
         this.writeProp(this.rightProp, i, null);
+        this.writeProp(this.handProp, i, null);
         continue;
       }
       const dir = (rig.dir = this.directions[i] ?? null);
@@ -1537,6 +1589,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       // (Working at a station, what they carry is put down: `SET_DOWN`.)
       const setDown = item && !moving && useObj && k.recipe !== undefined && curr[o + k.recipe] > 0 ? SET_DOWN[tag] : undefined;
       const carry = item && !setDown ? (item.hold === 'both' ? 'carry' : 'carryOne') : '';
+      // What they eat (`items` index + 1): a plate on the table wants a fork (`ACTIONS.eat`).
+      const plateAt = k.plate !== undefined ? curr[o + k.plate] | 0 : 0;
+      const plate = plateAt > 0 && layout.items ? (layout.items[plateAt - 1] ?? '') : '';
 
       // Activity → clip.
       rig.useId = usingId;
@@ -1665,10 +1720,13 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       this.writeSit(rig, i);
       if (rig.cuddleBaby >= 0 && rig.liftW > 0) writeCradle(set.bone, this.scratch.worldT, this.cradle, i, rig);
       this.writeBlanket(rig, i, pose, dt, appeared);
+      // (A plate held while eating it with a fork: on the left palm, the fork in the right hand.)
+      const inHand = this.handPropOf(rig, pose, moving || !!social, tag, plate);
       if (setDown) this.writeSetDown(rig, i, setDown === 'top' ? item : undefined, tag, useObj);
-      else this.writeCarried(rig, i, item);
+      else this.writeCarried(rig, i, item, inHand?.grip === 'bite' && inHand.hand !== 'l' ? -1 : 1);
       this.writeHeld(rig, i, pose, moving);
       this.writeTool(rig, i, moving ? '' : tag, useObj);
+      this.writeHand(rig, i, inHand);
 
       // Head top (speech bubbles, selection marker): a little above the head joint.
       const hs = rig.scale * rig.head;
@@ -1872,8 +1930,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       }
       if (!social) {
         const up = known ? (typeof act?.upper === 'function' ? act.upper(rig.useDef) : act?.upper) : obj?.def === 'diningTable' ? 'eat' : undefined;
-        // Eating / drinking now and then; holding a book or phone throughout.
-        if (up === 'eat' || up === 'drink') upper = Math.floor((rig.actTime + rig.seed * 9) / 4) % 3 === 0 ? up : '';
+        // Eating / drinking now and then (between sips the cup held: `between`); holding a book or phone throughout.
+        if (up === 'eat' || up === 'drink') upper = Math.floor((rig.actTime + rig.seed * 9) / 4) % 3 === 0 ? up : known ? (act?.between ?? '') : '';
         else if (up) upper = up;
       }
     } else if (moving) {
