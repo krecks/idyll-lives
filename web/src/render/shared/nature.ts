@@ -42,8 +42,10 @@ const BEACH = 8;
  * town. A model part with fewer triangles in all than `SPLIT_TRIANGLES` (bark, flowers) stays
  * one mesh: the draw calls more would cost the main thread more than the triangles they save. Each
  * group is a mesh of its own, and every mesh costs the main thread a little each frame whether
- * drawn or not, so the sectors are wide. The menus' town, which
- * has the whole landscape in view, draws each part whole.
+ * drawn or not, so the sectors are wide. A sector reaches from the town to the horizon, though, and
+ * one in view draws all of it: in the wide view about fourteen times the far trees on screen. Low draws
+ * the woods in 100 m squares instead (`QualitySettings.woodsCell`), more meshes that leave out more
+ * trees. The menus' town, which has the whole landscape in view, draws each part whole.
  */
 const FOREST_SECTORS = 8;
 export const SPLIT_TRIANGLES = 36_000;
@@ -191,7 +193,7 @@ function scatter(x: number, z: number, rand: () => number, scale: number, y = 0)
 export interface Woods {
   near: Map<string, Float32Array[]>;
   far: Map<string, Float32Array[]>;
-  /** Which of the `FOREST_SECTORS` round the town a point is in (the game draws the woods in groups by it). */
+  /** Which group a point is in, the game drawing the woods by group: one of the `FOREST_SECTORS` round the town, or a square (`woodsCell`). */
   sector: (x: number, z: number) => string;
 }
 
@@ -343,13 +345,16 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
 
   /**
    * `lawnDensity`: the share of the lawn's flowers drawn (Low: half); `lawnLod` 1 draws
-   * them in their far versions (Low, as the street's models: `QualitySettings.streetLod`).
+   * them in their far versions (Low, as the street's models: `QualitySettings.streetLod`); `woodsCell`:
+   * the side (m) of the squares the game draws the woods in (0: the `FOREST_SECTORS`;
+   * `QualitySettings.woodsCell`).
    */
   constructor(
     world: WorldStructure,
     makeRoads: (land: RoadLand, world: WorldStructure, name: string) => R,
     protected readonly lawnDensity = 1,
     protected readonly lawnLod: 0 | 1 = 0,
+    protected readonly woodsCell = 0,
   ) {
     this.seed = world.meta?.seed ?? 1;
     this.w = world.width;
@@ -590,7 +595,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   /**
    * Woods outside the town: mixed deciduous / birch / conifer stands with bushes and rocks. Trees
    * near the town are the full models and cast shadows; further ones use the low level of detail
-   * (a file's own far version), which don't.
+   * (a file's own far version), which don't. The game draws them in groups by sector round the town,
+   * or by square (`woodsCell`).
    */
   protected async woods(pace?: () => Promise<void>): Promise<Woods> {
     const rand = mulberry32(this.seed ^ 0x5eed);
@@ -648,7 +654,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
       }
     }
     const [cx, cz] = [this.w / 2, this.d / 2];
-    const sector = (x: number, z: number) => `${Math.floor((Math.atan2(z - cz, x - cx) / (Math.PI * 2) + 1) * FOREST_SECTORS) % FOREST_SECTORS}`;
+    const cell = this.woodsCell;
+    const sector = cell > 0 ? (x: number, z: number) => `${Math.floor(x / cell)}:${Math.floor(z / cell)}` : (x: number, z: number) => `${Math.floor((Math.atan2(z - cz, x - cx) / (Math.PI * 2) + 1) * FOREST_SECTORS) % FOREST_SECTORS}`;
     return { near, far, sector };
   }
 

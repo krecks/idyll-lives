@@ -30,7 +30,7 @@ import { shadowOnlyLayer } from './layers';
 import { MaterialLibrary } from './materials';
 import { buildModel, disposeTemplate, glowByInstance, type MirrorSurface, type ModelTemplate } from './models';
 import type { GrassPusher } from './grass';
-import { installNature, Landscape, setWind, Sky, windStill, type RoadBuilder } from './nature';
+import { installNature, Landscape, NATURE_DIAGS, setWind, Sky, windStill, type RoadBuilder } from './nature';
 import { ObjectMotion, writeInstance, type MovingObject, type PopTarget } from './objectMotion';
 import { ObjectShadows, type ShadowSource } from './objectShadows';
 import { toGame } from './space';
@@ -257,7 +257,7 @@ export class LotContents {
     const ticket = ++this.natureTicket[layer];
     let set = this.natures.get(key);
     if (!set) {
-      const landscape = new Landscape(world, this.quality.lawnDensity, this.quality.streetLod, this.quality.grass);
+      const landscape = new Landscape(world, this.quality.lawnDensity, this.quality.streetLod, this.quality.woodsCell, this.quality.grass);
       const created: NatureSet = { key, landscape, draws: [], casters: [], only: new Map(), users: new Set(), pending: 0, ready: Promise.resolve(), refreshing: Promise.resolve() };
       created.ready = landscape.build(this.app, this.root, this.deps.assets, world, () => this.hooks.pace(), buildRoads).then((nature) => {
         perfTime('nature: meshes', () => {
@@ -319,8 +319,11 @@ export class LotContents {
     const town = n.users.has('town');
     const townLayer = this.townLayer ?? pc.LAYERID_WORLD;
     const casters = new Set(this.quality.landscapeShadows ? n.casters : []);
-    // `?diag=nonature`: without the woods, rocks and lawn (the terrain, water and roads stay).
+    // `?diag=nonature`: without the woods, rocks and lawn (the terrain, water and roads stay); `nowoods`,
+    // `nofarwoods`, `noflowers` and `nograss` leave out one part of them (`NaturePart`).
     const plantsOff = this.diag.has('nonature');
+    const partsOff = new Set(NATURE_DIAGS.filter(([diag]) => this.diag.has(diag)).map(([, part]) => part));
+    const parts = partsOff.size ? n.landscape.parts() : null;
     for (const e of n.draws) {
       const render = e.render;
       const plant = !!render?.meshInstances[0]?.instancingData;
@@ -345,7 +348,8 @@ export class LotContents {
         on = world && casts;
         first = this.shadowLayer.id;
       }
-      e.enabled = on && !(plant && plantsOff);
+      const part = parts?.get(e);
+      e.enabled = on && !(plant && plantsOff) && !(part && partsOff.has(part));
       if (render) {
         const layers = render.layers;
         if (layers.length !== (second < 0 ? 1 : 2) || layers[0] !== first || (second >= 0 && layers[1] !== second)) render.layers = second < 0 ? [first] : [first, second];
