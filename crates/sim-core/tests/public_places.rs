@@ -175,7 +175,14 @@ fn town_beside(id: &str) -> (World, u32) {
 
 /// `town_beside` with `n` residents (Ada, Bo, ...).
 fn town_beside_with(id: &str, n: usize) -> (World, u32) {
-    let merged = common::content();
+    town_beside_edited(id, n, |_| {})
+}
+
+/// `town_beside_with` on content changed by `edit`.
+fn town_beside_edited(id: &str, n: usize, edit: impl Fn(&mut Value)) -> (World, u32) {
+    let mut edited: Value = serde_json::from_str(&common::content()).unwrap();
+    edit(&mut edited);
+    let merged = edited.to_string();
     let content: Value = serde_json::from_str(&merged).unwrap();
     let houses = houses();
     let (w, d) = plot_size(&houses);
@@ -594,4 +601,63 @@ fn vendor_states_for_play() {
         assert!(w.staff.servers.iter().all(|s| !s.present), "{id}: everyone gone home at 21:30");
         common::dump_state(&w, &format!("vendors-{id}-night"));
     }
+}
+
+/// The town's staff are nobody: a day at the market with free will on adds no resident, household or
+/// career, and the household pays for what Ada and Bo buy and nothing more (the staff's wages are no one's
+/// in town).
+#[test]
+fn staff_are_not_residents_and_cost_nothing_but_what_is_bought() {
+    let (mut w, _) = town_beside_with("market", 2);
+    let careers = w.content.careers.len();
+    let (mut bought, mut paid) = (0, 0);
+    let mut was: [Option<(u32, usize)>; 2] = [None; 2];
+    for _ in 0..24 * 60 * TICKS_PER_MINUTE {
+        let funds = w.households[0].funds;
+        w.tick_once();
+        paid += funds - w.households[0].funds;
+        for s in 0..2 {
+            // A use paid for as it starts (on arrival).
+            let now = w.sims[s].current().and_then(|a| match (a.task.kind, &a.phase) {
+                (TaskKind::Use { object, interaction }, Phase::Using { .. }) => Some((object, interaction)),
+                _ => None,
+            });
+            if let Some((o, i)) = now
+                && was[s] != now
+            {
+                bought += w.content.objects[w.objects[o as usize].def].interactions[i].cost;
+            }
+            was[s] = now;
+        }
+    }
+    assert_eq!(w.sims.len(), 2, "nobody moved in");
+    assert_eq!(w.households.len(), 1);
+    assert_eq!(w.content.careers.len(), careers, "no vendor's career");
+    assert!(!w.staff.servers.is_empty());
+    eprintln!("bought {bought}, paid {paid}");
+    assert!(bought > 0, "they bought something in a day");
+    assert!(paid > 0 && paid <= bought, "they paid for what they bought (less any given up), and nothing for the staff");
+}
+
+/// Bo, waiting behind Ada at the stall longer than `service.waitMinutes` (here a few seconds), gives up
+/// and gets his money back; Ada is served and pays.
+#[test]
+fn a_customer_who_waits_too_long_gives_up_and_is_paid_back() {
+    let (mut w, market) = town_beside_edited("market", 2, |c| c["service"]["waitMinutes"] = json!(0.2));
+    w.autonomy = false;
+    let stall = w.objects.iter().find(|o| w.content.objects[o.def].id == "marketStall" && w.plot_at(o.x, o.z) == Some(market)).unwrap().id;
+    let fruit = interaction(&w, stall, "fruit");
+    let funds = w.households[0].funds;
+    for s in [0, 1] {
+        w.apply(Command::Use { sim: s, object: stall, interaction: fruit }).unwrap();
+    }
+    let mut ate = [false; 2];
+    for _ in 0..40 * TICKS_PER_MINUTE {
+        w.tick_once();
+        for s in 0..2 {
+            ate[s] |= w.sims[s].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Eat { .. }));
+        }
+    }
+    assert_eq!(ate.iter().filter(|&&a| a).count(), 1, "one of them was served ({ate:?})");
+    assert_eq!(w.households[0].funds, funds - 5, "the other paid nothing in the end");
 }

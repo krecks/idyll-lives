@@ -5361,7 +5361,11 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                 match crate::staff::hold(ctx, sim.being_served, &mut sim.serve_wait, object, inter, ticks) {
                     None | Some(crate::staff::Hold::Serve) => {}
                     Some(crate::staff::Hold::Wait) => return,
-                    Some(crate::staff::Hold::GiveUp) => return end_activity(sim, content, objects),
+                    // (Not served: the money paid on arrival back.)
+                    Some(crate::staff::Hold::GiveUp) => {
+                        sim.pending_spend -= inter.cost.max(0);
+                        return end_activity(sim, content, objects);
+                    }
                 }
             }
             // A game for two: not begun until the one they play with is at their place too, and
