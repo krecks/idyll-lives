@@ -11,7 +11,7 @@ import { TOSS_LET_GO } from './clips/props';
 import { BALL_PIT, PLAY_TENT } from './clips/play';
 import { BOARD, CLOCK, CUPBOARD_OF, FEEDER, PUT_AWAY } from './clips/reach';
 import { BUNK_DOWN, BUNK_UP, RIDE_HORSE, RIDE_ROUND, RIDE_SEESAW, RIDE_SPRING, RIDE_SWING, SLIDE } from './clips/rides';
-import { BALL_IN_HANDS, SHOT, STREET_SHOT } from './clips/shot';
+import { SHOT, STREET_SHOT } from './clips/shot';
 import { CLIMB, CLIMB_LANES, FOUNTAIN, type Size, climbClip } from './clips/street';
 import { CUT_ROSE, EYEPIECE, LECTERN, PICK_APPLE, PICK_HIGH, PICK_LEMON, PLATE_HOLD, SHOWER_CHILD } from './clips/uses';
 
@@ -386,19 +386,23 @@ export interface ActionAnim {
  * - `bite`: its front (+depth) from the palm to the mouth, its face up, moved `at` along its own axes (cutlery);
  * - `cue`: its front (+depth) from the right palm out through the left (the bridge), the right palm `at[2]` m from the
  *   butt; upright in the left hand, its butt to the floor, when the right is above it (chalking).
+ * - `ball`: the basketball through a round at a hoop (clips/shot.ts `ballAt`): bounced on the dribbles, in both hands
+ *   from the gather, in an arc to the rim, down through the net and back to the hand.
  * `hand`: the hand that holds it, `r` (the default) or `l`. `clips`: only while one of these plays (the clip, or the
  * upper layer seated), and only in `during` of it (shares of its length). Drawn the size of the hands (children's
  * smaller), never while walking, talking, sitting down or getting up.
  */
 export interface HandProp {
   key: string;
-  grip: 'level' | 'hand' | 'face' | 'line' | 'bite' | 'cue';
+  grip: 'level' | 'hand' | 'face' | 'line' | 'bite' | 'cue' | 'ball';
   hand?: 'r' | 'l';
   at?: readonly [number, number, number];
   turn?: readonly [number, number, number];
   sip?: boolean;
   clips?: readonly string[];
   during?: readonly (readonly [number, number])[];
+  /** Taken from the object, where it is drawn at rest (`REST_PROPS`): gone from there while it is in the hand. */
+  rest?: boolean;
 }
 /** The props in hand, by what they are (`ACTIONS[tag].prop` picks one). */
 export const PROPS = {
@@ -425,8 +429,12 @@ export const PROPS = {
   paintbrush: { key: 'tool.paintbrush', grip: 'hand', at: [0, 0, 0], turn: [90, 0, 0] },
   chalk: { key: 'tool.chalk', grip: 'hand', at: [0, 0, 0], turn: [90, 0, 0] },
   postcard: { key: 'tool.postcard', grip: 'hand', at: [0, 0, 0], turn: [90, 0, 0] },
+  receiver: { key: 'tool.receiver', grip: 'hand', at: [-0.012, 0.0, -0.02], turn: [90, -90, 0], clips: ['phone'], rest: true },
+  pen: { key: 'tool.pen', grip: 'hand', at: [0, 0, 0], turn: [90, 0, 0] },
+  pencil: { key: 'tool.pencil', grip: 'hand', at: [0, 0, 0], turn: [90, 0, 0] },
+  marker: { key: 'tool.marker', grip: 'hand', at: [0, 0, 0], turn: [90, 0, 0] },
   babyBottle: { key: 'tool.babyBottle', grip: 'hand', at: [0, 0, 0.07], turn: [-90, 0, 0] },
-  basketball: { key: 'tool.basketball', grip: 'face', at: [0, 0, 0], clips: [...SHOT, ...STREET_SHOT].map(({ clip }) => clip), during: BALL_IN_HANDS },
+  basketball: { key: 'tool.basketball', grip: 'ball', clips: [...SHOT, ...STREET_SHOT].map(({ clip }) => clip) },
 } as const satisfies Record<string, HandProp>;
 /**
  * Items a use holds (content `holds`, the snapshot's `held` and `plate`) that are drawn as the prop in the hand
@@ -435,8 +443,10 @@ export const PROPS = {
 export const PROP_ITEMS = new Set(['babyBottle']);
 /** Watered from a can (`ACTIONS.water`, the house plant's `garden`): not what is misted (the terrarium, the bonsai's leaves). */
 const MISTED = new Set(['natureLover.mossTerrarium', 'loner.bonsaiBench']);
-/** Painted with a brush (`ACTIONS.paint`); the chalkboard with chalk; the whiteboard's marker isn't made. */
+/** Painted with a brush (`ACTIONS.paint`); the chalkboard with chalk, the whiteboard with a marker. */
 const BRUSHED = new Set(['easel', 'kidsEasel']);
+/** Children's desks and their little table: written and drawn at with a pencil (`ACTIONS.write`). */
+const KIDS_DESKS = new Set(['kidsDesk', 'kidsChair']);
 /** Basketball hoops, played with the ball in the hands (`ACTIONS.exercise`). */
 const HOOPS = new Set(['basketballHoop', 'energetic.streetballHoop']);
 /** What is drunk from what (`drinkProp`): wine from a glass, a cold drink from the can, at a bar a tumbler; else a mug (coffee, tea). */
@@ -445,8 +455,16 @@ const CANS = new Set(['fridge', 'fridgeFrenchDoor', 'fridgeRetro', 'fridgeMiniRe
 const GLASSES = new Set(['stoolCounter', 'stoolBarHigh', 'barStool', 'outgoing.partyBar']);
 /** Drinks mixed in a shaker (the `shake` clip). */
 export const SHAKERS = new Set(['barCart', 'cheerful.mocktailCart']);
-/** Calls made without a mobile (`ACTIONS.phone`): at the shortwave radio and in the phone box. */
+/** Calls made without a mobile (`ACTIONS.phone`): at the shortwave radio, and in the phone box with its receiver. */
 const NO_MOBILE = new Set(['loner.shortwaveRadio', 'phoneBooth']);
+/**
+ * Props drawn on an object at rest by code, not in its model, that a resident takes in hand while using it (`HandProp.rest`):
+ * the phone box's receiver on its hook (its model is at the gate's four draws, so the receiver can't be a part of its own).
+ * `at` is where its origin is in the model (game axes, m), `turn` how it is turned there (degrees about x, then y, then z).
+ */
+export const REST_PROPS: Record<string, { key: string; at: readonly [number, number, number]; turn: readonly [number, number, number] }> = {
+  phoneBooth: { key: 'tool.receiver', at: [-0.1, 1.42, -0.31], turn: [-90, 0, 0] },
+};
 /** Drunk from without a cup: the drinking fountain. */
 const NO_CUP = new Set(['drinkingFountain']);
 /** What a plate is eaten with at the table (`ACTIONS.eat`; content `items`): the rest by hand. */
@@ -512,8 +530,8 @@ export const ACTIONS: Record<string, ActionAnim> = {
     stand: ['interact', 'spell'],
     sit: (def) => (NEAR_DESKS.has(def) ? 'sitHandsNear' : 'sitHands'),
     hands: HANDS.hold,
-    // (A card posted at the post box; writing at a desk has no pen yet.)
-    prop: (def) => (def === 'postBox' ? PROPS.postcard : null),
+    // (A card posted at the post box; at a desk a pen, a pencil at the children's.)
+    prop: (def) => (def === 'postBox' ? PROPS.postcard : KIDS_DESKS.has(def) ? PROPS.pencil : PROPS.pen),
   },
   // (A notice board or a timetable is read looking at it, not at a book in the hands.)
   // (The book in the hands; at the cookbook lectern the book is the lectern's.)
@@ -539,7 +557,7 @@ export const ACTIONS: Record<string, ActionAnim> = {
   paint: {
     stand: ['spell', 'interact', 'spell'],
     hands: HANDS.hold,
-    prop: (def) => (def === 'kidsChalkboard' ? PROPS.chalk : BRUSHED.has(def) ? PROPS.paintbrush : null),
+    prop: (def) => (def === 'kidsChalkboard' ? PROPS.chalk : def === 'whiteboard' ? PROPS.marker : BRUSHED.has(def) ? PROPS.paintbrush : null),
   },
   // (The plate-smash bin, the bouldering wall and the yoga mat have their clips in `STEP_IN`.)
   exercise: {
@@ -628,7 +646,7 @@ export const ACTIONS: Record<string, ActionAnim> = {
     hands: HANDS.hold,
     // (A mobile at the ear; not at a screen, nor at the shortwave radio's microphone, nor in the phone box, whose
     // receiver is part of its still body: a part of its own would be a fifth draw call.)
-    prop: (def) => (VIDEO_CALLS.has(def) || NO_MOBILE.has(def) ? null : PROPS.phoneEar),
+    prop: (def) => (def === 'phoneBooth' ? PROPS.receiver : VIDEO_CALLS.has(def) || NO_MOBILE.has(def) ? null : PROPS.phoneEar),
   },
   // Texting and scrolling (content `phone.actions[].anim`): the phone held in front, the head bowed over it, the thumbs moving.
   phoneScreen: { stand: ['phoneText'], sit: 'sit', upper: 'phoneText', hands: HANDS.hold, prop: PROPS.phoneHeld },

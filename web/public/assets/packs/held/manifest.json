@@ -1213,6 +1213,54 @@
           "finish": "material.finish.matte"
         }
       }
+    },
+    "tool.pen": {
+      "type": "model",
+      "url": "../../models/held/pen.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "pen": {
+          "finish": "material.finish.gloss"
+        }
+      }
+    },
+    "tool.pencil": {
+      "type": "model",
+      "url": "../../models/held/pencil.glb",
+      "materials": {
+        "graphite": {
+          "finish": "material.finish.satin"
+        },
+        "pencil": {
+          "finish": "material.finish.satin"
+        },
+        "pencil_wood": {
+          "finish": "material.finish.matte"
+        }
+      }
+    },
+    "tool.marker": {
+      "type": "model",
+      "url": "../../models/held/marker.glb",
+      "materials": {
+        "marker": {
+          "finish": "material.finish.satin"
+        },
+        "marker_cap": {
+          "finish": "material.finish.satin"
+        }
+      }
+    },
+    "tool.receiver": {
+      "type": "model",
+      "url": "../../models/held/receiver.glb",
+      "materials": {
+        "handset": {
+          "finish": "material.finish.satin"
+        }
+      }
     }
   }
 }

@@ -4,6 +4,7 @@
  */
 
 import { DEFAULT_GRIP, type HandProp } from './actions';
+import { BALL_R, ballAt } from './clips/shot';
 import type { PoseScratch } from './pose';
 import type { SimRig } from './rig';
 
@@ -75,6 +76,8 @@ export interface Hands {
   /** The body's scale (m per m of the reference), and the props' (the hands' size: `min(1, scale)`). */
   scale: number;
   size: number;
+  /** For the basketball (`ball`): the round's clip and how far into it (s), the rim's middle and the shooter's feet (x, z). */
+  ball?: { clip: string; t: number; rim: Float32Array; feet: Float32Array };
 }
 
 const D = Math.PI / 180;
@@ -245,6 +248,17 @@ export function placeHand(m: Float32Array, i: number, p: HandProp, h: Hands): vo
       // The butt `at[2]` back from the right palm along it; or, upright, on the floor under the left hand.
       const reach = (P[4] - h.floorY) / Math.max(0.3, F[7]);
       for (let c = 0; c < 3; c++) F[9 + c] = (P[c] - F[6 + c] * V[2]) * (1 - up) + (P[3 + c] - F[6 + c] * reach) * up;
+      break;
+    }
+    case 'ball': {
+      // Upright, its middle where the round has it; its origin is at its foot.
+      const b = h.ball;
+      if (!b || !ballAt(b.clip, b.t, P, b.rim, b.feet, h.yaw, h.floorY, h.scale, k, A)) return;
+      F.fill(0, 0, 9);
+      F[0] = F[4] = F[8] = 1;
+      F[9] = A[0];
+      F[10] = A[1] - BALL_R * k;
+      F[11] = A[2];
       break;
     }
   }

@@ -194,6 +194,13 @@ M = G.Palette(
     cake_icing=('#FBF4EA', 'satin'),
     cake_jam=('#B8283A', 'satin'),
     cake_berry=('#C42A30', 'gloss'),
+    pen=('#1F3F7A', 'gloss'),          # a ballpoint's barrel
+    pencil=('#E8B830', 'satin'),       # a pencil's yellow paint
+    pencil_wood=('#D9B488', 'matte'),
+    graphite=('#3A3A3A', 'satin'),
+    marker=('#F2F0EA', 'satin'),       # a whiteboard marker's body
+    marker_cap=('#2A5FB8', 'satin'),
+    handset=('#1E2120', 'satin'),      # the phone box's receiver (street_furniture.py `phoneBooth`'s `dark`)
 )
 
 # Built in the game's axes (x, height, depth; front +depth), as the old parts are.
@@ -1590,6 +1597,53 @@ def postcard():
     return done('postcard')
 
 
+def receiver():
+    """The phone box's receiver, 21 cm, lying on its cups: a black bar along the depth, the earpiece's cup at the front
+    (+depth) and the mouthpiece's at the back, both turned down; held at the middle of its bar. Drawn on the box's hook
+    at rest by code (actions.ts `REST_PROPS`), in the caller's hand while they call."""
+    F.sweep('handset_bar', [(0, 0.04, -0.075), (0, 0.048, 0.0), (0, 0.04, 0.075)], None, M.handset,
+            profile=G.rounded_rect(0.036, 0.022, 0.008, corner=1), up=(0, 0, 1), resolution=2)
+    for name, z in (('earpiece', 0.08), ('mouthpiece', -0.08)):
+        lathe(name, [(0, 0), (0.024, 0), (0.026, 0.006), (0.022, 0.03), (0.012, 0.042), (0, 0.044)], M.handset,
+              at=(0, 0, z), segments=12)
+    return done('receiver')
+
+
+def pen():
+    """A ballpoint pen, 14 cm, lying along the depth, its point to the front (+depth), held at the origin 3.5 cm behind
+    the point: a navy barrel, a chrome cone and point, a clip at its back end."""
+    lathe('pen', [(0, -0.105), (0.0042, -0.104), (0.0045, -0.09), (0.0045, 0.0), (0.0040, 0.012), (0, 0.013)],
+          M.pen, at=(0, 0.0045, 0), segments=8, rot=(90, 0, 0))
+    lathe('pen_tip', [(0, 0.012), (0.004, 0.012), (0.0012, 0.032), (0.0004, 0.035), (0, 0.0352)], M.chrome,
+          at=(0, 0.0045, 0), segments=8, rot=(90, 0, 0))
+    F.box('pen_clip', 0.0018, 0.002, 0.045, (0, 0.0095, -0.08), M.chrome)
+    return done('pen')
+
+
+def pencil():
+    """A yellow pencil, 17 cm, six-sided, lying along the depth, sharpened to the front (+depth), held at the origin
+    3.5 cm behind the point: the painted shaft, the bare wood cone, the lead."""
+    lathe('pencil', [(0, -0.135), (0.0038, -0.135), (0.0038, 0.0), (0, 0.0)], M.pencil, at=(0, 0.0038, 0), segments=6,
+          rot=(90, 0, 0))
+    lathe('pencil_cone', [(0, 0.0), (0.0038, 0.0), (0.0012, 0.026), (0, 0.026)], M.pencil_wood, at=(0, 0.0038, 0),
+          segments=6, rot=(90, 0, 0))
+    lathe('pencil_lead', [(0, 0.026), (0.0012, 0.026), (0, 0.035)], M.graphite, at=(0, 0.0038, 0), segments=6,
+          rot=(90, 0, 0))
+    return done('pencil')
+
+
+def marker():
+    """A whiteboard marker, 13.5 cm and 1.8 cm across, lying along the depth, its felt tip to the front (+depth),
+    held at the origin 4 cm behind it, its blue cap pushed onto the back end."""
+    lathe('marker', [(0, -0.1), (0.009, -0.1), (0.009, 0.0), (0.006, 0.012), (0, 0.012)], M.marker, at=(0, 0.009, 0),
+          segments=10, rot=(90, 0, 0))
+    lathe('marker_cap', [(0, -0.12), (0.0095, -0.12), (0.0095, -0.072), (0, -0.072)], M.marker_cap, at=(0, 0.009, 0),
+          segments=10, rot=(90, 0, 0))
+    lathe('marker_tip', [(0, 0.012), (0.0032, 0.012), (0.0032, 0.028), (0.002, 0.034), (0, 0.035)], M.marker_cap,
+          at=(0, 0.009, 0), segments=8, rot=(90, 0, 0))
+    return done('marker')
+
+
 def basketball():
     """A basketball, 24 cm across, standing on the table: pebbled orange leather and the black seams, one round its
     middle, one over the top and two curving either side."""
@@ -1694,9 +1748,10 @@ def pastryBag():
     return done('pastryBag')
 
 
-def I(id, build, size, key, centre=(0.0, 0.0), code=False):
+def I(id, build, size, key, centre=(0.0, 0.0), code=False, tolerance=0.02):
+    # (`tolerance`: a thing a centimetre across measures to the millimetre, not the 2 %.)
     return G.Model(id, build, size=size, key=key, centre=centre, code=code,
-                   tolerance=3 if os.environ.get('HELD_MEASURE') else 0.02)
+                   tolerance=3 if os.environ.get('HELD_MEASURE') else tolerance)
 
 
 FAMILY = G.Family(
@@ -1756,6 +1811,10 @@ FAMILY = G.Family(
         I('chalk', chalk, (0.01, 0.01, 0.084), 'tool.chalk', code=True),
         I('babyBottle', babyBottle, (0.059, 0.171, 0.058), 'tool.babyBottle', code=True),
         I('postcard', postcard, (0.148, 0.0012, 0.105), 'tool.postcard', centre=(0.0, 0.0525), code=True),
+        I('receiver', receiver, (0.052, 0.066, 0.212), 'tool.receiver', code=True),
+        I('pen', pen, (0.009, 0.010, 0.14), 'tool.pen', centre=(0.0, -0.0349), code=True, tolerance=0.1),
+        I('pencil', pencil, (0.008, 0.007, 0.17), 'tool.pencil', centre=(0.0, -0.05), code=True, tolerance=0.1),
+        I('marker', marker, (0.019, 0.018, 0.155), 'tool.marker', centre=(0.0, -0.0425), code=True, tolerance=0.1),
         I('basketball', basketball, (0.252, 0.251, 0.252), 'tool.basketball', code=True),
         # the food from town (review M-held-03)
         I('iceCreamCup', iceCreamCup, (0.093, 0.128, 0.092), 'item.iceCreamCup'),

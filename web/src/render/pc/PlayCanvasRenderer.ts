@@ -1567,6 +1567,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const shadows = this.simShadowMatrices;
     this.characters.update(frame, this.simInView, shadows, this.storey);
     this.lot.pullChairs(this.characters.pulled, this.placing.held); // (not the one in hand.)
+    this.lot.takeRestProps(this.characters.restTaken);
     if (this.characters.posed && this.quality.characterShadows) this.sunShadows.moved(false);
     const blobs = this.simShadow;
     blobs.setCount(count);

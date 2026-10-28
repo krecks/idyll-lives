@@ -83,7 +83,11 @@ sideways; the pan and the grill food, which stand off their middle, take their m
 | `tool.chalk` | a stick of white chalk, 8 cm, its tip worn down | 1 | 36 |
 | `tool.babyBottle` | a baby's bottle, 17 cm: a clear body two thirds full of milk, a blue screw ring, a teat | 1 | 380 |
 | `tool.postcard` | a postcard, 14.8 x 10.5 cm, a seaside view in bands | 1 | 48 |
-| `tool.basketball` | a basketball, 25 cm with its seams, orange leather and black seams (the hoops' own is hidden while it is in the hands) | 1 | 672 |
+| `tool.basketball` | a basketball, 25 cm with its seams, orange leather and black seams (the hoops' own is hidden while it is in play: bounced, held, shot and back) | 1 | 672 |
+| `tool.pen` | a ballpoint, 14 cm: a navy barrel, a chrome cone and point, a clip | 1 | 124 |
+| `tool.pencil` | a yellow pencil, 17 cm, six-sided, sharpened: the bare wood cone and the lead | 1 | 60 |
+| `tool.marker` | a whiteboard marker, 15.5 cm with its cap on its back end: a white body, a blue cap and felt tip | 1 | 148 |
+| `tool.receiver` | the phone box's receiver, 21 cm: a black bar, the earpiece's and the mouthpiece's cups (drawn on the box's hook by code, `REST_PROPS`, and in the caller's hand) | 1 | 268 |
 
 - **Detail pass** (2026-10-22): rebuilt with the forms (sweeps, lofts, outlines extruded) at the same sizes, centres,
   origins and draws: crusts, rims, handles, straws, beans and piped icing are sweeps (the rods-and-spheres crusts

@@ -68,6 +68,7 @@ import { type OutfitParams, SHELL_BITS, WEARS, type Wear, outfitFor, writeOutfit
 import { cradled, cuddlePose, onPad, writeCradle } from './cuddles';
 import { lyingPose, measureLegs, measureSit, outfitFit, type PoseKit } from './measure';
 import { type Hands, palmAt, placeFrame, placeHand, placeProp } from './props';
+import { rimOf } from './clips/shot';
 import { DETAIL_PX, FACE_PARTS, LOD_FAR_PX, LOD_NEAR_PX, MORPH_PX, type PartMesh, Range, YOUNG_STAGES, shellBit, skinChunks } from './parts';
 import { type Additive, type Placement, PoseScratch, addLocal, addRotation, blendInto, makeAdditive, resetAdditive, sampleClip, skin } from './pose';
 import { BABBLE, compose, type Frame, type Player, HEAD_MARGIN, MAX_CHARACTERS, type SimRig, UNIT, advance, alongWay, clamp, clampBuild, clampHeight, copyPlayer, embraceStep, eyesBelowTop, freezePlayer, gettingIn, hash, lerp, lerpAngle, lieBack, lieCentre, multiply, player, ramp, rotationOf, setFrame, shoulderDrop, smooth, speaking, splitKey, unit, wrapAngle } from './rig';
@@ -1019,6 +1020,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /** Prop `p` (`handPropOf`) in Sim row `i`'s hand, placed by the hands as just posed; not outside the clips it is held in. */
   private writeHand(rig: SimRig, i: number, p: HandProp | null): void {
     const shown = p && this.handShown(rig, p) ? p : null;
+    if (shown?.rest && rig.useId >= 0) this.restTaken.add(rig.useId);
     const m = this.writeProp(this.handProp, i, shown?.key ?? null);
     if (!m || !shown || !this.set) return;
     const B = this.set.bone;
@@ -1038,8 +1040,31 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     h.floorY = rig.floorY;
     h.scale = rig.scale;
     h.size = Math.min(1, rig.scale);
+    h.ball = shown.grip === 'ball' ? this.ballRound(rig) : undefined;
     placeHand(m, i, shown, h);
   }
+
+  /**
+   * The basketball's round (props.ts `Hands.ball`): the shot clip playing and how far into it, the rim of the hoop they
+   * shoot at (its middle, out in front of the hoop's), and where they stand.
+   */
+  private ballRound(rig: SimRig): Hands['ball'] {
+    const rim = rimOf(rig.cur.key);
+    const obj = rig.useObj;
+    if (!rim || !obj || !rig.cur.clip) return undefined;
+    const d = rig.cur.clip.duration;
+    const f = (obj.rot * Math.PI) / 2;
+    const b = this.ballScratch;
+    b.rim[0] = obj.cx + Math.sin(f) * rim.z;
+    b.rim[1] = rig.floorY + rim.y;
+    b.rim[2] = obj.cz + Math.cos(f) * rim.z;
+    b.feet[0] = rig.x;
+    b.feet[1] = rig.z;
+    b.clip = rig.cur.key;
+    b.t = ((rig.cur.time % d) + d) % d;
+    return b;
+  }
+  private readonly ballScratch = { clip: '', t: 0, rim: new Float32Array(3), feet: new Float32Array(2) };
 
   /** Whether prop `p` is in the hand now: while one of its clips plays (or, seated, its upper layer), in its `during`. */
   private handShown(rig: SimRig, p: HandProp): boolean {
@@ -1362,6 +1387,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
    */
   /** `storey`: the storey in view; residents above it (or, viewing the basement, not in it) aren't drawn. */
   update(frame: FrameState, inView: (x: number, z: number) => boolean, shadows: Float32Array, storey = Infinity): void {
+    this.restTaken.clear();
     const set = this.set;
     if (!set) return;
     const started = performance.now();
@@ -2635,6 +2661,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
 
   /** How far each chair pulled up to a table is drawn pulled in now (m, along its facing), by seat id (`TUCK`). */
   readonly pulled = new Map<number, number>();
+  /** The objects whose prop drawn at rest is in someone's hand now (`REST_PROPS`, `HandProp.rest`): the phone box's receiver. */
+  readonly restTaken = new Set<number>();
 
   /**
    * Seated on a chair that faces a table (`tables`): how far it is pulled in now (m), easing in once they

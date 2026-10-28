@@ -501,7 +501,8 @@ apple, a pastry in a paper bag), the chopping board, the
 pan, the mixing bowl and the food on the grill that stand on a station while a resident cooks, and what residents hold
 while they use a thing (a book, a mug, a tumbler, a wine glass, a can, a fork, a spoon, chopsticks, a phone, a coin,
 a bag of bird seed, a dart, a pool cue, a ping-pong bat, a cocktail shaker, a watering can, secateurs, a paintbrush,
-chalk, a baby's bottle, a postcard and a basketball); override pack
+chalk, a baby's bottle, a postcard, a basketball, a pen, a pencil, a whiteboard marker and the phone box's receiver);
+override pack
 `packs/held/manifest.json`, over the `item.*` and `tool.*` keys) are built in Blender by
 `tools/art/blender/families/held.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). They are still.
 
