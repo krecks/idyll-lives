@@ -13,7 +13,14 @@
 //! `content::WorkOn`): loading the washer takes a dirty load (`workOn`, as the use starts), taking
 //! it out leaves a washed one (`makes`, as the use ends), which the one who took it out carries on
 //! to the nearest dryer or line (`carry_on`, the basket in the arms: content `brings`), and the
-//! dried washing goes on to be folded at the basket. Saved: `objects[].run`.
+//! dried washing goes on to be folded at the basket.
+//!
+//! A dishwasher is filled another way: what's washed up at it goes in its rack (content `rack`,
+//! `ObjectInstance::rack`) instead of being washed there and then and put away, and it runs once
+//! the rack is full, or once the washing up is done with it a third full (`rack_in`). While it
+//! runs, or waits done, nothing more goes in: the washing up goes to a sink, or waits. Emptying
+//! it (a use that `unloads` it) puts the clean things away. Saved: `objects[].run`,
+//! `objects[].rack`.
 
 use crate::content::{Content, Interaction, WorkOn};
 use crate::world::{Ctx, ObjectInstance, Sim, Task, World};
@@ -45,10 +52,26 @@ pub(crate) fn use_done(sim: &mut Sim, content: &Content, o: &mut ObjectInstance,
         sim.reshaped = true;
     } else if inter.unloads && o.done() {
         o.run = None;
+        o.rack = 0;
         sim.reshaped = true;
     }
     if let Some(made) = inter.makes {
         sim.made |= made.bit();
+    }
+}
+
+/// `n` dirty things washed up at `o`, a machine with a `rack`, go in it; it starts once full, or
+/// with the washing up done (`more` false: nothing else of the household's waits to be cleared)
+/// and it at least a third full. Started, it runs on its own as a loaded machine does.
+pub(crate) fn rack_in(sim: &mut Sim, content: &Content, o: &mut ObjectInstance, n: u8, more: bool) {
+    let def = &content.objects[o.def];
+    if def.rack == 0 || o.run.is_some() {
+        return;
+    }
+    o.rack = o.rack.saturating_add(n.max(1)).min(def.rack);
+    if o.rack >= def.rack || (!more && o.rack * 3 >= def.rack) {
+        o.run = def.runs;
+        sim.reshaped = true;
     }
 }
 

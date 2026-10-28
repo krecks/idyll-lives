@@ -1,8 +1,8 @@
 /**
  * Water for the sounds of the world (`world.ts`), synthesised (no sound files): a shower, a tap
  * running into a basin, washing up, a bath filling and someone soaking in it, a washing machine,
- * a fountain and a toilet's flush; and, made from the same parts, a tumble dryer and a dishwasher
- * being loaded.
+ * a fountain and a toilet's flush; and, made from the same parts, a tumble dryer and a dishwasher,
+ * running and being loaded.
  *
  * Each is a stereo loop several seconds long, made once and played on repeat, so it costs nothing
  * while playing. Running water is mostly two things, and both are built here:
@@ -32,6 +32,7 @@ export const WATER = {
   bathSoak: bathSoakSound,
   washer: washerSound,
   dryer: dryerSound,
+  dishwasher: dishwasherSound,
   crockery: crockerySound,
   fountain: fountainSound,
   flush: flushSound,
@@ -236,6 +237,45 @@ export function dryerSound(rate: number): Stereo {
     room(ch, rate, c ? [3.7, 6.1, 8.3, 10.9] : [4.1, 5.9, 8.9, 10.3], 0.55, 0.3, 0.2);
   }
   return finish(out, 0.14);
+}
+
+/** A dishwasher running: the spray arm going round, its jets sweeping over the racks and the door (a hiss that swells as they pass, about once a second), the pump's hum, the water gurgling in the sump. */
+export function dishwasherSound(rate: number): Stereo {
+  const r = random(21);
+  const out = track(rate, 12);
+  const n = out.left.length;
+  const hum = new Biquad(rate).set('lowpass', 400, 0.7);
+  const wobble = wander(r, n, rate, 0.3);
+  let phase = 0;
+  let arm = r() * 2 * Math.PI;
+  const shared = new Pink(r);
+  for (const [c, ch] of [out.left, out.right].entries()) {
+    const own = new Pink(r);
+    const spray = new Biquad(rate).set('bandpass', 1900, 0.5);
+    const sprayHp = new Biquad(rate).set('highpass', 500, 0.6);
+    const gurgle = new Biquad(rate).set('bandpass', 260, 1.2);
+    for (let i = 0; i < n; i++) {
+      if (c === 0) {
+        phase += (2 * Math.PI * 100 * (1 + 0.006 * wobble[i])) / rate;
+        arm += (2 * Math.PI * 0.95) / rate;
+      }
+      const saw = Math.sin(phase) + 0.5 * Math.sin(2 * phase) + 0.25 * Math.sin(3 * phase);
+      // The jets nearer one side as the arm turns.
+      const pass = 0.55 + 0.45 * Math.sin(arm + (c ? 0.6 : 0));
+      const noise = 0.7 * shared.next() + 0.3 * own.next();
+      ch[i] = hum.run(saw) * 0.02 + sprayHp.run(spray.run(noise)) * 0.6 * pass + gurgle.run(noise) * 0.25 * (0.6 + 0.4 * wobble[i]);
+    }
+  }
+  // Now and then a jet catches a plate's edge or a cup: a short splash.
+  for (let t = 0.5 + r(); t < out.seconds - 0.4; t += 0.9 + r() * 1.6) slosh(out, rate, r, t, 0.2 + r() * 0.15, 0.4 + 0.3 * r(), (r() - 0.5) * 0.3, 1400 + r() * 900);
+  // Shut in, behind the door and the worktop: the highs muffled.
+  for (const [c, ch] of [out.left, out.right].entries()) {
+    const lp = new Biquad(rate).set('lowpass', 2600, 0.7);
+    const hp = new Biquad(rate).set('highpass', 90, 0.7);
+    for (let i = 0; i < ch.length; i++) ch[i] = hp.run(lp.run(ch[i]));
+    room(ch, rate, c ? [3.7, 6.1, 8.3, 10.9] : [4.1, 5.9, 8.9, 10.3], 0.55, 0.3, 0.2);
+  }
+  return finish(out, 0.13);
 }
 
 /** Loading a dishwasher: plates and mugs set into the rack, a handful of cutlery dropped in the basket, a rack rolled out or in; no water. */

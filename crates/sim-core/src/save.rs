@@ -51,7 +51,8 @@
 //! school has begun, so a load never costs a missed day); 33 = machines run on their own
 //! (`objects[].run`: game minutes left, 0 done with the load in it; absent: empty; in an older
 //! file the washing out on a line is done, dry) and dried washing waits to be folded (a third
-//! number in `households[].laundry`; absent: none); and the home chess table is 2 × 1 (it
+//! number in `households[].laundry`; absent: none), the dirty things in a dishwasher's rack waiting
+//! for it to run (`objects[].rack`; absent: none); and the home chess table is 2 × 1 (it
 //! was 1 × 1): an older file's goes over the tile it stood on where it fits, else at a free spot
 //! at home, else it is sold back (`migrate_32_grown`). Older files load. Saves
 //! written before feelings were renamed from "moodlets" store them under `moodlets`; a serde
@@ -302,6 +303,10 @@ pub struct ObjectSave {
     /// with its load in it (absent before v33, or empty).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub run: Option<f32>,
+    /// The dirty things in a dishwasher's rack (see `ObjectInstance::rack`; absent before v33,
+    /// or none).
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub rack: u8,
 }
 
 fn is_level(tall: &i16) -> bool {
@@ -675,6 +680,7 @@ impl World {
                 growth: content.objects[o.def].grows.is_some().then_some(o.growth),
                 off: o.off && content.objects[o.def].switch,
                 run: o.run.filter(|_| content.objects[o.def].runs.is_some()),
+                rack: o.rack.min(content.objects[o.def].rack),
             })
             .collect();
         let sims = self
@@ -1079,6 +1085,7 @@ impl World {
                     None if save.version < 33 && obj.open => runs.map(|_| 0.0),
                     None => None,
                 };
+                obj.rack = o.rack.min(world.content.objects[obj.def].rack);
                 used.extend(keep);
                 object_ids.insert(i as u32, id);
             }

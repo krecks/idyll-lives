@@ -138,6 +138,9 @@ pub struct ObjectInstance {
     /// A machine's run (its kind `runs`; see `machines.rs`): None empty, the game minutes left
     /// while it runs on its own, 0 done with the load still in it.
     pub run: Option<f32>,
+    /// The dirty things washed up at it that wait in it to be washed (its kind's `rack`, a
+    /// dishwasher; `machines::rack_in`): they're washed when it runs, put away when it's emptied.
+    pub rack: u8,
     /// Residents whose current use needs it closed (bits by sim id), so opening it under them is
     /// refused (`allows`). Derived from their tasks: set when the use reserves a slot, cleared
     /// when it ends; not saved (a reloaded use starts again and sets it).
@@ -183,6 +186,7 @@ impl ObjectInstance {
         self.fits(inter)
             && (!inter.ripe || self.ripe())
             && (!inter.loads || self.run.is_none())
+            && (inter.work_on != Some(crate::content::WorkOn::Dishes) || self.run.is_none())
             && (!inter.unloads || self.done())
             && (inter.leaves != Some(false) || self.users().all(|u| u == me))
             && (inter.leaves != Some(true) || self.closed_users & !(1 << me) == 0)
@@ -1859,6 +1863,7 @@ impl World {
             growth: 1.0,
             off: false,
             run: None,
+            rack: 0,
         };
         let d = &self.content.objects[def];
         let name = &d.id;
@@ -3440,7 +3445,10 @@ impl World {
                         Some(w) if w != obj.open && obj.open => format!("the {name} is already open"),
                         Some(w) if w != obj.open => format!("the {name} is closed"),
                         _ if inter.ripe && !obj.ripe() => format!("the {name} isn't ripe yet"),
-                        _ if (inter.loads || inter.unloads) && obj.running() => format!("the {name} is still running"),
+                        _ if (inter.loads || inter.unloads || inter.work_on == Some(crate::content::WorkOn::Dishes)) && obj.running() => {
+                            format!("the {name} is still running")
+                        }
+                        _ if inter.work_on == Some(crate::content::WorkOn::Dishes) && obj.done() => format!("the {name} is done: empty it first"),
                         _ if inter.loads && obj.done() => format!("the {name} is done: take the washing out first"),
                         _ if inter.unloads && obj.run.is_none() => format!("there's nothing in the {name}"),
                         _ => format!("someone is using the {name}"),

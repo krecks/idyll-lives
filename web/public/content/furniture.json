@@ -647,11 +647,16 @@
       "price": 480,
       "category": "kitchen",
       "group": "appliances",
-      "description": "Built in under the worktop. Loading it is a quick, satisfying chore (the tidy love it).",
+      "description": "Built in under the worktop. The washing up goes in and waits; once it's full, or the washing up is done, it washes by itself, and someone puts the clean things away. Loading it is a quick, satisfying chore (the tidy love it).",
       "sounds": {
         "clean": "crockery",
         "wash": "crockery"
       },
+      "runs": {
+        "minutes": 90,
+        "sound": "dishwasher"
+      },
+      "rack": 12,
       "interactions": [
         {
           "id": "dishes",
@@ -668,6 +673,20 @@
             "cleaning"
           ],
           "autonomous": false
+        },
+        {
+          "id": "unload",
+          "label": "Empty the dishwasher",
+          "unloads": true,
+          "anim": "clean",
+          "minutes": 5,
+          "effects": {
+            "comfort": 0.04
+          },
+          "tags": [
+            "chores",
+            "cleaning"
+          ]
         }
       ]
     },

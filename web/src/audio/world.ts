@@ -83,6 +83,7 @@ const LOOPS: Record<LoopKind, LoopDef> = {
   bathSoak: { made: 'bathSoak', level: 0.35, drift: 0.03 },
   washer: { made: 'washer', level: 0.2, drift: 0.02 },
   dryer: { made: 'dryer', level: 0.18, drift: 0.02 },
+  dishwasher: { made: 'dishwasher', level: 0.16, drift: 0.02 },
   crockery: { made: 'crockery', level: 0.35 },
   fountain: { made: 'fountain', level: 0.2, drift: 0.03 },
   tv: { make: murmurBuffer, filter: { type: 'bandpass', frequency: 700, q: 1.1 }, level: 0.35 },

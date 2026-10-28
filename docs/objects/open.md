@@ -128,12 +128,6 @@ their finding ids. What is still open is here, with its id; §9 of the review sa
   empty.
 
 ### Content and sim
-- **One-use machines:** the dishwasher is still loaded and run in one use. The neat pack's laundry centre is a
-  machine that runs on its own since 2026-10-26 (load 5 minutes, 90 alone, unload 5, then the basket's fold). The
-  dishwasher can't follow yet: it works on `dishes`, and `WorkOn::Dishes.load()` is `None` (there is no load to
-  run), `content.rs` refuses `makes: "Dishes"`, and `cooking.rs` `dishes_next` looks for a free `dishes` station
-  without checking `o.run`, so a converted dishwasher would be washed at while it ran. It wants a load for dishes
-  in the sim first.
 - **Vendors in older towns:** a café's or bakery's counter saved before 0.5.0 stands against its back wall, with no
   room behind it for a server, so it stays self-serve (new towns have the tile). Servers wear no apron and appear at
   their post at opening time rather than walking in.
@@ -198,6 +192,11 @@ their finding ids. What is still open is here, with its id; §9 of the review sa
   (I-bathroom-07). The washing line dries the washing in 3 hours and takes it down a line at a time, as it is
   hung out (A-outdoor-02). A generated home with a washer and no dryer gets a washing line in its garden (40 of 180
   sample houses; none is left with nowhere to dry), and a load cut short goes back on its pile.
+- **The dishwasher:** what's washed up at it goes in its rack and waits, instead of being washed there and then and
+  put away; it runs on its own once the rack is full (12; the slimline one 8), or once the washing up is done with it
+  a third full, 90 minutes (75) with its own sound, and someone empties it, the clean things away (content `rack`,
+  `machines::rack_in`). While it runs, or waits done, the washing up goes to the sink, or waits. The neat pack's
+  laundry centre runs on its own too (load 5 minutes, 90 alone, unload 5, then the basket's fold).
 - **Models:** the arc lamp reaching over the next tile, placed so by build mode and the house generator
   (M-lighting-06); the hot tub's cover folding back in two halves (A-outdoor-01, a fourth draw).
 - **Moving parts with a use:** the kettle's lid, the bread bin's roll-top and the laptop's lid open for their uses

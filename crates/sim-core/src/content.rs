@@ -465,6 +465,11 @@ pub struct ObjectDef {
     /// `loads`, it runs this many game minutes with nobody at it, then waits, done, for a use
     /// that `unloads` it (see `machines.rs`, `ObjectInstance::run`).
     pub runs: Option<f32>,
+    /// A machine filled a dirty thing at a time (content `rack`: how many fill it; a
+    /// dishwasher): what's washed up at it goes in and waits (`ObjectInstance::rack`), and it runs
+    /// once full, or once the washing up is done with it a third full (`machines::rack_in`). 0:
+    /// none (a sink washes up there and then).
+    pub rack: u8,
     /// Things on a wall: it belongs over a window (content `overWindow`: curtains, blinds), so
     /// its back may be on a window as well as on a plain wall. Everything else on a wall needs
     /// plain wall behind it.
@@ -2397,6 +2402,9 @@ struct ObjectRaw {
     /// A machine that runs on its own (see `ObjectDef::runs`).
     #[serde(default)]
     runs: Option<RunsRaw>,
+    /// How many dirty things fill it (see `ObjectDef::rack`).
+    #[serde(default)]
+    rack: u8,
     #[serde(default, rename = "overWindow")]
     over_window: bool,
     #[serde(default, rename = "fillsWall")]
@@ -3282,6 +3290,9 @@ impl Content {
                     }
                     _ => {}
                 }
+                if obj.rack > 0 && it.loads {
+                    return Err(Error::new(format!("{ctx}: a machine with a `rack` is filled by washing up at it, not by a use that `loads`")));
+                }
                 if (it.loads || it.unloads) && obj.runs.is_none() {
                     return Err(Error::new(format!("{ctx}: `loads` and `unloads` are a machine's: give the object `runs`")));
                 }
@@ -3524,6 +3535,13 @@ impl Content {
                     Some(r) if r.minutes > 0.0 && r.minutes.is_finite() => Some(r.minutes),
                     Some(_) => return Err(Error::new(format!("object '{}': `runs` needs minutes > 0", obj.id))),
                     None => None,
+                },
+                rack: match obj.rack {
+                    0 => 0,
+                    _ if obj.runs.is_none() || !obj.stations.iter().any(|s| s == "dishes") => {
+                        return Err(Error::new(format!("object '{}': a `rack` is a machine's that is washed up at: give it `runs` and the `dishes` station", obj.id)));
+                    }
+                    n => n,
                 },
                 grows: match &obj.grows {
                     Some(g) if g.days > 0.0 && g.fallow >= 0.0 => Some(Growth { days: g.days, fallow_days: g.fallow }),

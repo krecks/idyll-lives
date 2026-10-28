@@ -974,15 +974,20 @@
       "stations": [
         "dishes"
       ],
-      "description": "A dishwasher with a stainless door, under a worktop.",
+      "description": "A slimline dishwasher with a stainless door, under a worktop: the washing up goes in and waits, and it washes by itself once it's full or the washing up is done.",
       "sounds": {
         "clean": "crockery",
         "wash": "crockery"
       },
+      "runs": {
+        "minutes": 75,
+        "sound": "dishwasher"
+      },
+      "rack": 8,
       "interactions": [
         {
           "id": "dishes",
-          "label": "Run the dishwasher",
+          "label": "Load the dishwasher",
           "workOn": "dishes",
           "anim": "clean",
           "minutes": 10,
@@ -994,6 +999,20 @@
             "cleaning"
           ],
           "autonomous": false
+        },
+        {
+          "id": "unload",
+          "label": "Empty the dishwasher",
+          "unloads": true,
+          "anim": "clean",
+          "minutes": 5,
+          "effects": {
+            "comfort": 0.03
+          },
+          "tags": [
+            "chores",
+            "cleaning"
+          ]
         }
       ]
     },
