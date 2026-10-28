@@ -583,16 +583,20 @@ def basketballHoop():
             x, z = 0.215 * math.cos(a), RIM[1] + 0.215 * math.sin(a)
             F.sweep(f'net_hook{k}', [(x, RIM[0] - 0.005, z), (x * 0.97, RIM[0] - 0.022, z - 0.0), (x * 0.95, RIM[0] - 0.014, z)],
                     0.0025, M.rim, verts=3)
-        # the ball, at rest on the ground in front: its seams
+    G.join(still, 'hoop', origin=(0, 0, 0))
+    # the ball, at rest on the ground in front: its seams. A part of its own, gone while someone plays (it is in
+    # their hands: actions.ts `PROPS.basketball`).
+    with G.new_parts() as ball_parts:
         F.sphere('ball', 0.12, (0.3, 0.12, 0.32), M.ball, segments=16, rings=10)
         for i, rot in enumerate(((90, 0, 30), (0, 0, 0), (90, 0, 120))):
             G.torus(f'seam{i}', 0.1205, 0.0035, at=F.at(0.3, 0.12, 0.32), material=M.rubber, rot=rot,
                     major_segments=20, minor_segments=3)
-    G.join(still, 'hoop', origin=(0, 0, 0))
+    ball = G.hinged(G.join(ball_parts, 'ball'), F.at(0.3, 0.12, 0.32))
     net = G.hinged(_net('net'), F.at(0, RIM[0], RIM[1]))
     G.settle(centre=False)
     G.rock(net, 'swish', 9, seconds=0.6, axis='X')
     G.squash(net, 'swish', (0.92, 0.92, 1.18), seconds=0.6, back=True)
+    G.squash(ball, 'ball_taken', 0.001, seconds=0.2)
     return G.meshes()
 
 
@@ -771,7 +775,7 @@ SEESAW = {'loops': {'seesaw': 'seesaw'}, 'ride': 'seesaw'}
 SPRING = {'loops': {'ride': 'rock'}, 'ride': 'rock'}
 MERRY = {'loops': {'spin': 'spin'}, 'ride': 'spin'}
 # The net swishes after each shot: the first 1.4 s into the use, then every 3.2 s while it lasts.
-HOOP = {'uses': {'shoot': {'clip': 'swish', 'delay': 1.4, 'every': 3.2}}}
+HOOP = {'uses': {'shoot': [{'clip': 'swish', 'delay': 1.4, 'every': 3.2}, 'ball_taken']}}
 CHESS = {'uses': {'chess': 'move'}}
 
 FAMILY = G.Family(

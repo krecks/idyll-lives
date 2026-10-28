@@ -246,11 +246,14 @@
       },
       "motions": {
         "uses": {
-          "shoot": {
-            "clip": "swish",
-            "delay": 1.4,
-            "every": 3.2
-          }
+          "shoot": [
+            {
+              "clip": "swish",
+              "delay": 1.4,
+              "every": 3.2
+            },
+            "ball_taken"
+          ]
         }
       },
       "paint": [

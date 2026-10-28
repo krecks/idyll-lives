@@ -119,10 +119,11 @@ what this list held, and 0.5.0 most of what it left, the new behaviour included;
 their finding ids. What is still open is here, with its id; §9 of the review says what each would take.
 
 ### Residents
-- **Props still mimed** (the rest of G-70): the tools (the watering can, the shears, the easel's brush, the chalk,
-  the baby's bottle), the post box's card, the café's cake and the basketball (I-held-01); the phone box's receiver
-  stays on its hook, its fourth draw call taken (I-social-01); no pigeons come down to the seed (I-community-11, new
-  behaviour). A fork is 2 mm thick: from the game camera it is hardly seen.
+- **Props still mimed:** the phone box's receiver stays on its hook, its fourth draw call taken (I-social-01); no
+  pigeons come down to the seed (I-community-11, new behaviour); the whiteboard has no marker and a desk no pen; the
+  basketball's dribbles and its flight are mimed (it is in the hands from the gather to the release). A fork is 2 mm
+  thick: from the game camera it is hardly seen. The bottle is held over the baby, its teat towards their head, not
+  quite at the mouth (the arms are posed, not reached).
 - **Feet slide at game speeds 4 and 5** (48–81 % of the way: 45 and 90 m/s, faster than any gait steps without
   strobing; A-residents-03, G-25): won't fix. The clip check's baseline (`tools/characters/clip-baseline.json`) is
   empty.
@@ -162,6 +163,12 @@ their finding ids. What is still open is here, with its id; §9 of the review sa
   first shot (I-hobbies-05).
 - **The food from town in its own wrapping:** a paper cup of ice cream, a hot dog in its bun, a packet of crisps, an
   apple and a pastry in a paper bag (M-held-03).
+- **The rest of the props in hand** (I-held-01): a watering can at the plants and flowers (not what is misted),
+  secateurs at the shrub and the arbour's roses, a brush at the easels and chalk at the chalkboard, a postcard at the
+  post box, the basketball between both hands from the gather to the release at both hoops (the hoop's own ball, a
+  part of its own now, is gone while someone plays), a slice of cake on its plate at the café, eaten with a fork
+  (content `holds`), and a bottle while the baby is fed at the crib, the right hand up off their legs (`PROP_ITEMS`,
+  `cuddles.ts`).
 - **Fruit within reach** (I-garden-11, I-garden-12, the owner's decision): the apple tree's crown came down to 2.6 m
   and four low boughs carry eight apples from 1.12 to 1.75 m; the one picked to eat hangs at 1.13 m, where a child
   on tiptoe takes it, and "Pick the apples" reaches one per size. The lemon tree has a lemon at 1.62, 1.42 and 1.1 m

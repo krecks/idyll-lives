@@ -1109,6 +1109,7 @@
           "fetch": "takeCake",
           "label": "Have a slice of cake",
           "anim": "eat",
+          "holds": "cakeSlice",
           "minutes": 15,
           "pose": "sit",
           "effects": {

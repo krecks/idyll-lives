@@ -41,6 +41,7 @@ sideways; the pan and the grill food, which stand off their middle, take their m
 | `item.pizzaSlice` | a plate with a slice: base, tomato at the cut sides, cheese browned in a spot, pepperoni, basil, a swept puffed crust | 1 | 548 |
 | `item.treatPlate` | chocolate-chip cookies, one leaning on the others, a cupcake in a pleated case, icing piped in a swirl, a cherry with its stalk (also the snack) | 1 | 740 |
 | `item.pieSlice` | a slice of the cherry pie with a crimped swept edge, filling run out at its tip, a piped rosette of cream with mint | 1 | 688 |
+| `item.cakeSlice` | a slice of the café's layer cake on a plate: two sponges, jam and cream between, white icing, a strawberry | 1 | 348 |
 | `item.sandwich` | a sandwich cut corner to corner, loaf corners rounded: crumb on top and at the cut, crusts round, lettuce frilled out, cheese, tomato | 1 | 500 |
 | `item.plateDirty` | a plate with a smear of gravy, a streak of sauce, crumbs, a pea, the knife and fork laid side by side (outlines) | 1 | 548 |
 | `tool.board` | the chopping board: rounded, a juice groove, a hanging slot; a tapering carrot, carrot coins, parsley, a chef's knife (outlined blade, bolster, riveted handle) | 2 | 720 |
@@ -76,6 +77,13 @@ sideways; the pan and the grill food, which stand off their middle, take their m
 | `tool.cue` | a pool cue 1.47 m (the pool table's was on its cloth): a wrapped butt, a joint, a tapering shaft, a ferrule and a chalked tip | 1 | 188 |
 | `tool.bat` | a ping-pong bat: a wooden blade 15 x 16 cm, red rubber over black, a flared handle (the ping-pong table's two were on its top) | 1 | 296 |
 | `tool.shaker` | the bar cart's cocktail shaker, 22 cm, chrome (the cart's own is hidden while it is in the hands) | 1 | 320 |
+| `tool.wateringCan` | a green plastic watering can, 5 litres: a round body, a hoop handle over it (held at its middle, 26 cm up), a spout to a rose 35 cm out | 1 | 336 |
+| `tool.secateurs` | bypass secateurs, 17.5 cm, closed: red grips, a steel blade over an iron anvil, the pivot bolt | 1 | 220 |
+| `tool.paintbrush` | an artist's brush, 25 cm: a lacquered wooden handle, a steel ferrule, bristles dipped in blue | 1 | 192 |
+| `tool.chalk` | a stick of white chalk, 8 cm, its tip worn down | 1 | 36 |
+| `tool.babyBottle` | a baby's bottle, 17 cm: a clear body two thirds full of milk, a blue screw ring, a teat | 1 | 380 |
+| `tool.postcard` | a postcard, 14.8 x 10.5 cm, a seaside view in bands | 1 | 48 |
+| `tool.basketball` | a basketball, 25 cm with its seams, orange leather and black seams (the hoops' own is hidden while it is in the hands) | 1 | 672 |
 
 - **Detail pass** (2026-10-22): rebuilt with the forms (sweeps, lofts, outlines extruded) at the same sizes, centres,
   origins and draws: crusts, rims, handles, straws, beans and piped icing are sweeps (the rods-and-spheres crusts

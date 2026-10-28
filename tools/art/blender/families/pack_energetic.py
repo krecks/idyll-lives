@@ -403,11 +403,15 @@ def streetballHoop():
         F.extrude('rim_bracket', [(-0.06, 0.0), (0.06, 0.0), (0.04, 0.06), (-0.04, 0.06)], 0.022, (0, ry - 0.011, 0.0),
                   M.rim, plane='top', bevel=0.004, bevel_segments=1)
         F.box('rim_plate', 0.14, 0.12, 0.012, (0, ry - 0.04, 0.0), M.rim, bevel=0.004, bevel_segments=1)
+    G.join(still, 'body', origin=(0, 0, 0))
+    # The ball at rest by the stand: a part of its own, gone while someone plays (in their hands: actions.ts
+    # `PROPS.basketball`).
+    with G.new_parts() as ball_parts:
         F.sphere('ball', 0.12, (0.28, 0.12, 0.3), M.ball, segments=16, rings=10)
         for r in ((90, 0, 0), (0, 90, 0), (0, 0, 0)):
             G.torus(_name('ball_seam'), 0.12, 0.003, at=F.at(0.28, 0.12, 0.3), material=M.ball_seam, rot=r,
                     major_segments=20, minor_segments=3)
-    G.join(still, 'body', origin=(0, 0, 0))
+    ball = G.hinged(G.join(ball_parts, 'ball'), F.at(0.28, 0.12, 0.3))
     # The net: strands spiralling down from the rim each way, crossing into diamonds, drawn in at its foot by two
     # rings; `swish` sways it under the rim.
     with G.new_parts() as net:
@@ -422,6 +426,7 @@ def streetballHoop():
     net = G.hinged(G.join(net, 'net'), F.at(0, ry, rz))
     objs = G.settle(centre=False)
     G.rock(net, 'swish', 9, seconds=1.0, axis='X')
+    G.squash(ball, 'ball_taken', 0.001, seconds=0.2)
     return objs
 
 
@@ -715,7 +720,7 @@ FAMILY = G.Family(
              centre=(0, 0.022), motions={'loops': {'bounce': 'bounce'}},
              paint=[('tramp_frame', 'Frame'), ('tramp_pad', 'Pads'), ('tramp_mat', 'Mat')]),
      G.Model('streetballHoop', streetballHoop, size=(0.86, 2.833, 0.886), key='model.energetic.streetballHoop',
-             centre=(0, 0.013), motions={'uses': {'shoot': {'clip': 'swish', 'delay': 1.4, 'every': 3.2}}},
+             centre=(0, 0.013), motions={'uses': {'shoot': [{'clip': 'swish', 'delay': 1.4, 'every': 3.2}, 'ball_taken']}},
              paint=[('hoop_pole', 'Frame'), ('pad_red', 'Pads'), ('hoop_base', 'Base')]),
      G.Model('powerBlender', powerBlender, size=(0.82, 1.32, 0.63), key='model.energetic.powerBlender',
              # the lid comes off for the fruit and goes back on (`hold`), then it blends: the smoothie swirls, a

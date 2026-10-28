@@ -407,7 +407,8 @@ pub fn write(world: &World, out: &mut [f32]) {
         [o[sim::AHEAD_X], o[sim::AHEAD_Z]] = ahead;
         o[sim::CARRY] = crate::carry::carrying(s).map_or(0.0, |b| b as f32 + 1.0);
         o[sim::PROGRESS] = progress(world, s);
-        o[sim::PLATE] = eating(world, s).map_or(0.0, |d| d as f32 + 1.0);
+        // (Or what a use holds in the hands, a slice of cake at the café: eaten with a fork.)
+        o[sim::PLATE] = eating(world, s).or_else(|| shown_held(world, s)).map_or(0.0, |d| d as f32 + 1.0);
         o[sim::SHUTS] = crate::privacy::keeps_shut(world, s.id) as u8 as f32;
     }
     // Conversations: write the shared state into every participant's row.

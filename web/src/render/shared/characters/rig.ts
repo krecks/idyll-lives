@@ -197,6 +197,8 @@ export interface SimRig {
   reachW: number;
   holdW: number;
   liftW: number;
+  /** Feeding the baby from a bottle (what the use holds, `PROP_ITEMS`): the right hand off their legs, the bottle at their mouth. */
+  feeding: boolean;
   /** Where the feet step in towards the crib (m, along the facing). */
   cuddleStep: number;
   /**

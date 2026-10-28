@@ -3569,7 +3569,7 @@
       "interactions": [
         {"id": "lie", "label": "Lie in the crib", "anim": "sleep", "minutes": 720, "pose": "lie", "baby": true, "autonomous": false,
          "effects": {"energy": 1.0, "comfort": 0.75}, "tags": ["rest"]},
-        {"id": "feed", "label": "Feed the baby", "anim": "cuddle", "minutes": 15, "care": {"hunger": 0.8, "social": 0.1}, "tags": ["care"]},
+        {"id": "feed", "label": "Feed the baby", "anim": "cuddle", "holds": "babyBottle", "minutes": 15, "care": {"hunger": 0.8, "social": 0.1}, "tags": ["care"]},
         {"id": "change", "label": "Change the baby", "anim": "change", "minutes": 10, "care": {"bladder": 1.0, "hygiene": 0.7}, "tags": ["care", "chores"], "atSlot": true},
         {"id": "play", "label": "Play with the baby", "anim": "play", "minutes": 20, "effects": {"fun": 0.2, "social": 0.15}, "care": {"fun": 0.6, "social": 0.5}, "tags": ["care", "social"]},
         {"id": "cuddle", "label": "Cuddle the baby", "anim": "cuddle", "minutes": 15, "effects": {"social": 0.1}, "care": {"comfort": 0.5, "social": 0.15}, "tags": ["care", "social"]}
@@ -4202,6 +4202,21 @@
       "id": "pieSlice",
       "label": "Slice of pie",
       "model": "item.pieSlice",
+      "hold": "hand",
+      "emptyAs": "plateDirty",
+      "radius": 0.13
+    },
+    {
+      "id": "babyBottle",
+      "label": "Baby's bottle",
+      "model": "tool.babyBottle",
+      "hold": "hand",
+      "radius": 0.03
+    },
+    {
+      "id": "cakeSlice",
+      "label": "Slice of cake",
+      "model": "item.cakeSlice",
       "hold": "hand",
       "emptyAs": "plateDirty",
       "radius": 0.13

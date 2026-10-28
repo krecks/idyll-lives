@@ -191,6 +191,16 @@ const STATIONS: Station[] = [
   { label: 'shake a cocktail', def: 'barCart', tag: 'drink', female: true },
   { label: 'wish at the fountain', def: 'fountainTown', tag: 'look' },
   { label: 'feed the birds', def: 'parkBench', tag: 'feed', pose: P.Sit, female: true },
+  // The rest of G-70: the tools, the post box's card, the basketball, the café's cake, the baby's bottle
+  { label: 'water the plant', def: 'plant', tag: 'water', female: true },
+  { label: 'water the flowers', def: 'planterBox', tag: 'water' },
+  { label: 'trim the shrub', def: 'bush', tag: 'prune' },
+  { label: 'paint with a brush', def: 'kidsEasel', tag: 'paint', stage: 'child' },
+  { label: 'draw with chalk', def: 'kidsChalkboard', tag: 'paint', stage: 'child', female: true },
+  { label: 'post a card', def: 'postBox', tag: 'write', female: true },
+  { label: 'shoot hoops', def: 'basketballHoop', tag: 'exercise' },
+  { label: 'cake at the café', def: 'cafeChair', tag: 'eat', pose: P.Sit, held: 'cakeSlice', plate: 'cakeSlice', female: true },
+  { label: 'bottle feed', def: 'crib', script: CUDDLING, baby: true, plate: 'babyBottle' },
   // Seated
   { label: 'relax recliner', def: 'couchPotato.recliner', tag: 'relax', pose: P.Sit },
   { label: 'bath', def: 'whirlpoolTub', tag: 'bath', pose: P.Sit, female: true },

@@ -1084,6 +1084,135 @@
           "finish": "material.finish.matte"
         }
       }
+    },
+    "item.cakeSlice": {
+      "type": "model",
+      "url": "../../models/held/cakeSlice.glb",
+      "materials": {
+        "cake_berry": {
+          "finish": "material.finish.gloss"
+        },
+        "cake_icing": {
+          "finish": "material.finish.satin"
+        },
+        "cake_jam": {
+          "finish": "material.finish.satin"
+        },
+        "china": {
+          "finish": "material.finish.gloss"
+        },
+        "china_well": {
+          "finish": "material.finish.gloss"
+        },
+        "sponge": {
+          "finish": "material.finish.matte"
+        },
+        "sponge_crumb": {
+          "finish": "material.finish.matte"
+        }
+      }
+    },
+    "tool.wateringCan": {
+      "type": "model",
+      "url": "../../models/held/wateringCan.glb",
+      "materials": {
+        "can_green": {
+          "finish": "material.finish.satin"
+        },
+        "rose": {
+          "finish": "material.finish.satin"
+        }
+      }
+    },
+    "tool.secateurs": {
+      "type": "model",
+      "url": "../../models/held/secateurs.glb",
+      "materials": {
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "pruner": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      }
+    },
+    "tool.paintbrush": {
+      "type": "model",
+      "url": "../../models/held/paintbrush.glb",
+      "materials": {
+        "bristle": {
+          "finish": "material.finish.matte"
+        },
+        "handle_wood": {
+          "finish": "material.finish.satin"
+        },
+        "paint_blue": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      }
+    },
+    "tool.chalk": {
+      "type": "model",
+      "url": "../../models/held/chalk.glb",
+      "materials": {
+        "chalk": {
+          "finish": "material.finish.matte"
+        }
+      }
+    },
+    "tool.babyBottle": {
+      "type": "model",
+      "url": "../../models/held/babyBottle.glb",
+      "materials": {
+        "bottle": {
+          "finish": "material.finish.gloss"
+        },
+        "bottle_ring": {
+          "finish": "material.finish.satin"
+        },
+        "milk": {
+          "finish": "material.finish.satin"
+        },
+        "teat": {
+          "finish": "material.finish.satin"
+        }
+      }
+    },
+    "tool.postcard": {
+      "type": "model",
+      "url": "../../models/held/postcard.glb",
+      "materials": {
+        "card": {
+          "finish": "material.finish.matte"
+        },
+        "card_sand": {
+          "finish": "material.finish.matte"
+        },
+        "card_sea": {
+          "finish": "material.finish.matte"
+        },
+        "card_sky": {
+          "finish": "material.finish.matte"
+        }
+      }
+    },
+    "tool.basketball": {
+      "type": "model",
+      "url": "../../models/held/basketball.glb",
+      "materials": {
+        "ball": {
+          "finish": "material.finish.matte"
+        },
+        "ball_seam": {
+          "finish": "material.finish.matte"
+        }
+      }
     }
   }
 }

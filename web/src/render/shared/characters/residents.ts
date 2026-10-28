@@ -54,7 +54,7 @@ import { ENERGY_RATE, type VisemeTrack } from '../../../voice/visemes';
 import { GAME_RATE, QUIET_SPEED } from '../gameSpeed';
 import { paintColors } from '../modelEntry';
 import { type TableRoom, furthestAhead, nearestAhead } from '../tableTuck';
-import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_PER_TICK, WALK_SLACK, WALK_WAIT } from './actions';
+import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PROP_ITEMS, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_PER_TICK, WALK_SLACK, WALK_WAIT } from './actions';
 import { LOW_TOP, SIT_LOW } from './clips/low';
 import { FLOOR_SITS } from './clips/seated';
 import { HANDED } from './clips/serve';
@@ -589,6 +589,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         cuddleBaby: -1,
         reachW: 0,
         holdW: 0,
+        feeding: false,
         liftW: 0,
         cuddleStep: 0,
         carryT: -1,
@@ -1618,13 +1619,16 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
 
       // What it carries (`items` index + 1), and the arms that carry it.
       const held = k.held !== undefined ? curr[o + k.held] | 0 : 0;
-      const item = held > 0 && layout.items ? this.content?.item(layout.items[held - 1] ?? '') : undefined;
+      // (Not an item drawn as the prop in the hand: `PROP_ITEMS`.)
+      const heldId = held > 0 && layout.items ? (layout.items[held - 1] ?? '') : '';
+      const item = heldId && !PROP_ITEMS.has(heldId) ? this.content?.item(heldId) : undefined;
       // (Working at a station, what they carry is put down: `SET_DOWN`.)
       const setDown = item && !moving && useObj && k.recipe !== undefined && curr[o + k.recipe] > 0 ? SET_DOWN[tag] : undefined;
       const carry = item && !setDown ? (item.hold === 'both' ? 'carry' : 'carryOne') : '';
       // What they eat (`items` index + 1): a plate on the table wants a fork (`ACTIONS.eat`).
       const plateAt = k.plate !== undefined ? curr[o + k.plate] | 0 : 0;
       const plate = plateAt > 0 && layout.items ? (layout.items[plateAt - 1] ?? '') : '';
+      rig.feeding = plate === 'babyBottle';
 
       // Activity → clip.
       rig.useId = usingId;

@@ -494,13 +494,14 @@ cassette door tips open, and the electric fire's flames grow while a resident wa
 
 The things residents carry and cook with (`models/held/*.glb`: the bag of shopping, the prep bowl, the stew pot and
 the dirty pot, the tasting board, the grill platter and the dirty platter, the pizza, the baking tray and the dirty
-tray, the pie and the dirty pie dish, the plates of stew, pizza, treats, pie, a sandwich and toast, the dirty plate, the
+tray, the pie and the dirty pie dish, the plates of stew, pizza, treats, pie, cake, a sandwich and toast, the dirty plate, the
 dirty tasting board and pizza board, the bowl of ice cream and the dirty bowl, the smoothie, the noodle pail and the
 takeaway box, the food bought in town (a paper cup of ice cream, a hot dog on its paper boat, a packet of crisps, an
 apple, a pastry in a paper bag), the chopping board, the
 pan, the mixing bowl and the food on the grill that stand on a station while a resident cooks, and what residents hold
 while they use a thing (a book, a mug, a tumbler, a wine glass, a can, a fork, a spoon, chopsticks, a phone, a coin,
-a bag of bird seed, a dart, a pool cue, a ping-pong bat and a cocktail shaker); override pack
+a bag of bird seed, a dart, a pool cue, a ping-pong bat, a cocktail shaker, a watering can, secateurs, a paintbrush,
+chalk, a baby's bottle, a postcard and a basketball); override pack
 `packs/held/manifest.json`, over the `item.*` and `tool.*` keys) are built in Blender by
 `tools/art/blender/families/held.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). They are still.
 

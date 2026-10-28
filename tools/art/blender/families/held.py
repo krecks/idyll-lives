@@ -171,6 +171,29 @@ M = G.Palette(
     apple_blush=('#D8A23A', 'gloss'),
     stalk=('#5A3A22', 'matte'),
     bag_white=('#F2EEE4', 'matte'),
+    # props in hand, the rest of G-70
+    can_green=('#3F8A4A', 'satin'),    # a plastic watering can
+    rose=('#2E6A38', 'satin'),
+    pruner=('#C8322A', 'satin'),       # secateurs' red grips
+    bristle=('#2A2420', 'matte'),
+    paint_blue=('#3A6EB8', 'satin'),
+    handle_wood=('#B8874E', 'satin'),
+    chalk=('#F4F2EA', 'matte'),
+    bottle=('#CFE3EC', 'gloss'),       # a baby's bottle, the milk seen through it
+    milk=('#F7F4EC', 'satin'),
+    bottle_ring=('#7FB2D8', 'satin'),
+    teat=('#E2B88A', 'satin'),
+    card=('#F6F3EA', 'matte'),
+    card_sky=('#6EA7D8', 'matte'),
+    card_sea=('#2F6E9E', 'matte'),
+    card_sand=('#E2C68A', 'matte'),
+    ball=('#D2652A', 'matte'),         # a basketball's pebbled leather
+    ball_seam=('#2A1E18', 'matte'),
+    sponge=('#E8C88A', 'matte'),       # a slice of layer cake
+    sponge_crumb=('#D9B272', 'matte'),
+    cake_icing=('#FBF4EA', 'satin'),
+    cake_jam=('#B8283A', 'satin'),
+    cake_berry=('#C42A30', 'gloss'),
 )
 
 # Built in the game's axes (x, height, depth; front +depth), as the old parts are.
@@ -939,6 +962,25 @@ def _knife(name, at, yaw, pitch=0.0):
     return F.extrude(name, o, 0.0022, (at[0], at[1] + 0.0011, at[2]), M.steel, plane='top', rot=(0, pitch, yaw))
 
 
+def cakeSlice():
+    """A plate with a slice of the café's layer cake: two sponge layers with jam and cream between, white icing over
+    the top and its round back, a strawberry on it."""
+    plate()
+    apex, R, A = (-0.012, 0.055), 0.115, 20
+    wedge = [apex] + arc(R, A, apex, 3)
+    y = WELL
+    for name, h, top, side in (('sponge0', 0.03, M.sponge, M.sponge_crumb), ('jam', 0.004, M.cake_jam, M.cake_jam),
+                               ('cream', 0.006, M.cake_icing, M.cake_icing), ('sponge1', 0.03, M.sponge, M.sponge_crumb)):
+        prism(name, wedge, y, y + h, top, side)
+        y += h
+    prism('icing', wedge, y, y + 0.005, M.cake_icing, M.cake_icing, sides=[M.sponge_crumb] + [M.cake_icing] * (len(wedge) - 2)
+          + [M.sponge_crumb])
+    back = arc(R, A, apex, 3)
+    lathe('berry', [(0, 0), (0.011, 0.002), (0.013, 0.012), (0.009, 0.022), (0, 0.026)], M.cake_berry,
+          at=(back[1][0] * 0.45 + apex[0] * 0.55, y + 0.005, back[1][1] * 0.45 + apex[1] * 0.55), segments=8)
+    return done('cakeSlice')
+
+
 def plateDirty():
     """A plate after the meal: a smear of gravy, a streak of sauce, crumbs, a pea left over, and the knife and
     fork laid side by side."""
@@ -1473,6 +1515,101 @@ def shaker():
     return done('shaker')
 
 
+def wateringCan():
+    """A plastic watering can, 5 litres: a round body 15 cm across and 19 cm high, a hoop handle over the top from
+    back to front, held at its middle 26 cm up, and a spout rising forward (+depth) to a rose 30 cm out."""
+    lathe('can_body', [(0, 0), (0.07, 0), (0.075, 0.008), (0.076, 0.16), (0.07, 0.185), (0.045, 0.192), (0, 0.192)],
+          M.can_green, segments=14)
+    F.sweep('can_handle', [(0, 0.17, -0.06), (0, 0.24, -0.045), (0, 0.262, 0.0), (0, 0.24, 0.045), (0, 0.18, 0.06)],
+            0.011, M.can_green, verts=6, resolution=2)
+    F.sweep('can_spout', [(0, 0.03, 0.065), (0, 0.11, 0.17), (0, 0.2, 0.27)], 0.011, M.can_green, verts=6,
+            scale=[1.2, 1.0, 0.85])
+    lathe('can_rose', [(0, 0), (0.012, 0), (0.028, 0.03), (0.028, 0.036), (0, 0.036)], M.rose, at=(0, 0.2, 0.27),
+          segments=10, rot=(-55, 0, 0))
+    return done('wateringCan')
+
+
+def secateurs():
+    """A pair of bypass secateurs, 21 cm long, lying flat, closed, the blades to the front (+depth) and held at the
+    origin, the middle of the red grips: the curved cutting blade over the hooked anvil, the pivot bolt, the spring
+    between the grips."""
+    for side in (-1, 1):
+        F.sweep(f'grip{side}', [(side * 0.004, 0.009, -0.075), (side * 0.016, 0.009, -0.02),
+                                (side * 0.009, 0.009, 0.03)], None, M.pruner,
+                profile=G.rounded_rect(0.016, 0.012, 0.005, corner=1), up=(0, 1, 0), resolution=2)
+    F.extrude('blade', [(-0.009, 0.03), (0.006, 0.03), (0.01, 0.06), (0.004, 0.095), (-0.002, 0.098),
+                        (-0.004, 0.07)], 0.0028, (0, 0.0135, 0), M.steel, plane='top')
+    F.extrude('anvil', [(0.009, 0.03), (-0.004, 0.03), (-0.01, 0.06), (-0.006, 0.085), (0.0, 0.08),
+                        (0.004, 0.06)], 0.004, (0, 0.007, 0), M.iron, plane='top')
+    disc('bolt', 0.012, 0.016, (0, 0.003, 0.034), M.steel, verts=8)
+    return done('secateurs')
+
+
+def paintbrush():
+    """An artist's brush, 24 cm long, lying along the depth, its bristles to the front (+depth), held at the origin
+    6 cm behind the ferrule: a lacquered wooden handle swelling and tapering, a steel ferrule, bristles dipped in
+    blue."""
+    lathe('brush_handle', [(0, -0.17), (0.0025, -0.168), (0.0042, -0.1), (0.0048, -0.04), (0.004, 0.0),
+                           (0.0036, 0.04), (0, 0.042)], M.handle_wood, at=(0, 0.005, 0), segments=8, rot=(90, 0, 0))
+    lathe('brush_ferrule', [(0, 0.04), (0.0037, 0.04), (0.0042, 0.058), (0.0036, 0.062), (0, 0.062)], M.steel,
+          at=(0, 0.005, 0), segments=8, rot=(90, 0, 0))
+    lathe('brush_tip', [(0, 0.062), (0.0036, 0.062), (0.0042, 0.07), (0.0028, 0.078), (0.0002, 0.084), (0, 0.084)],
+          [M.bristle, M.bristle, M.paint_blue, M.paint_blue, M.paint_blue], at=(0, 0.005, 0), segments=8,
+          rot=(90, 0, 0))
+    return done('paintbrush')
+
+
+def chalk():
+    """A stick of white chalk, 8 cm long and 1 cm across, lying along the depth, held at its middle, its tip
+    worn down at the front."""
+    F.sweep('chalk', [(0, 0.005, -0.042), (0, 0.005, 0.03), (0, 0.005, 0.042)], 0.005, M.chalk, verts=8,
+            scale=[1.0, 1.0, 0.55])
+    return done('chalk')
+
+
+def babyBottle():
+    """A baby's bottle, 17 cm with its teat, standing: a clear body two thirds full of milk, a blue screw ring, a
+    honey-coloured teat."""
+    lathe('bottle', [(0, 0), (0.027, 0), (0.029, 0.006), (0.029, 0.08), (0.029, 0.11), (0.026, 0.118),
+                     (0.026, 0.122), (0, 0.122)],
+          [M.milk, M.milk, M.milk, M.bottle, M.bottle, M.bottle, M.bottle], segments=14)
+    lathe('ring', [(0, 0.118), (0.0285, 0.118), (0.0295, 0.124), (0.0285, 0.138), (0.012, 0.139), (0, 0.139)],
+          M.bottle_ring, segments=14)
+    lathe('teat', [(0, 0.138), (0.012, 0.138), (0.011, 0.148), (0.006, 0.155), (0.0045, 0.165), (0.003, 0.17),
+                   (0, 0.171)], M.teat, segments=10)
+    return done('babyBottle')
+
+
+def postcard():
+    """A postcard, 14.8 by 10.5 cm, lying flat, picture up and its long side across, held at the middle of its back
+    (near) edge at the origin, the card reaching to the front: a seaside view in bands (sky, sea, sand)."""
+    box('card', 0.148, 0.0008, 0.105, (0, 0.0004, 0.0525), M.card)
+    for name, z, d, m in (('sky', 0.078, 0.045, M.card_sky), ('sea', 0.047, 0.017, M.card_sea),
+                          ('sand', 0.026, 0.026, M.card_sand)):
+        box(name, 0.136, 0.0004, d, (0, 0.001, z), m)
+    return done('postcard')
+
+
+def basketball():
+    """A basketball, 24 cm across, standing on the table: pebbled orange leather and the black seams, one round its
+    middle, one over the top and two curving either side."""
+    ball('ball', 0.12, (0, 0.1254, 0), M.ball, seg=16, rings=10)
+    F.sweep('seam_round', [(0.1232 * math.cos(math.radians(a)), 0.1254, 0.1232 * math.sin(math.radians(a)))
+                           for a in range(0, 360, 30)], 0.0026, M.ball_seam, verts=4, closed=True)
+    F.sweep('seam_over', [(0.0, 0.1254 + 0.1232 * math.sin(math.radians(a)), 0.1232 * math.cos(math.radians(a)))
+                          for a in range(0, 360, 30)], 0.0026, M.ball_seam, verts=4, closed=True)
+    for side in (-1, 1):
+        pts = []
+        for a in range(0, 360, 30):
+            r = math.radians(a)
+            # a ring cut 7 cm in from the side, bowed in the middle (the ball's curved seams)
+            x, y, z = side * 0.085, 0.085 * math.sin(r), 0.085 * math.cos(r)
+            n = math.sqrt(x * x + y * y + z * z)
+            pts.append((x / n * 0.1232, 0.1254 + y / n * 0.1232, z / n * 0.1232))
+        F.sweep(f'seam_side{side}', pts, 0.0026, M.ball_seam, verts=4, closed=True)
+    return done('basketball')
+
+
 # --- the food from town (review M-held-03): each in what it is sold in ------------------------------------------------
 def iceCreamCup():
     """A paper cup of ice cream from the cart, 9 cm across at its top: pink-striped card, two scoops (strawberry on
@@ -1580,6 +1717,7 @@ FAMILY = G.Family(
         I('pizzaSlice', pizzaSlice, (0.288, 0.031, 0.288), 'item.pizzaSlice'),
         I('treatPlate', treatPlate, (0.288, 0.072, 0.288), 'item.treatPlate'),
         I('pieSlice', pieSlice, (0.288, 0.059, 0.288), 'item.pieSlice'),
+        I('cakeSlice', cakeSlice, (0.288, 0.11, 0.285), 'item.cakeSlice'),
         I('sandwich', sandwich, (0.288, 0.064, 0.288), 'item.sandwich'),
         I('plateDirty', plateDirty, (0.288, 0.017, 0.288), 'item.plateDirty'),
         I('iceCream', iceCream, (0.176, 0.101, 0.124), 'item.iceCream', centre=(0.0258, 0.0)),
@@ -1612,6 +1750,13 @@ FAMILY = G.Family(
         I('cue', cue, (0.028, 0.028, 1.472), 'tool.cue', centre=(0.0, 0.736), code=True),
         I('bat', bat, (0.15, 0.029, 0.249), 'tool.bat', centre=(0.0, 0.0765), code=True),
         I('shaker', shaker, (0.084, 0.22, 0.084), 'tool.shaker', code=True),
+        I('wateringCan', wateringCan, (0.152, 0.273, 0.351), 'tool.wateringCan', centre=(0.0, 0.1012), code=True),
+        I('secateurs', secateurs, (0.048, 0.016, 0.175), 'tool.secateurs', centre=(0.0, 0.0105), code=True),
+        I('paintbrush', paintbrush, (0.0096, 0.0096, 0.254), 'tool.paintbrush', centre=(0.0, -0.043), code=True),
+        I('chalk', chalk, (0.01, 0.01, 0.084), 'tool.chalk', code=True),
+        I('babyBottle', babyBottle, (0.059, 0.171, 0.058), 'tool.babyBottle', code=True),
+        I('postcard', postcard, (0.148, 0.0012, 0.105), 'tool.postcard', centre=(0.0, 0.0525), code=True),
+        I('basketball', basketball, (0.252, 0.251, 0.252), 'tool.basketball', code=True),
         # the food from town (review M-held-03)
         I('iceCreamCup', iceCreamCup, (0.093, 0.128, 0.092), 'item.iceCreamCup'),
         I('hotDog', hotDog, (0.2, 0.05, 0.098), 'item.hotDog'),

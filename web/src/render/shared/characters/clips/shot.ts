@@ -7,8 +7,8 @@
  * left at its side, let go at the top with the wrist flicked through, a landing on bent knees and the follow-through
  * held while the ball drops in, a look up at it. A child heaves it up two-handed from the chest instead, with
  * a little hop. In sizes like the street's (`street.ts`): the rim's height and distance divided by the size give
- * the clip's, which set where the arms point and where the head looks. The ball is mimed (props in hand are a
- * later item); its net swishes 1.4 s into the use and every 3.2 s after (`HOOP` in `playground.py`), the
+ * the clip's, which set where the arms point and where the head looks. The ball is in both hands from the gather to
+ * the release (`BALL_IN_HANDS`; the dribbles and its flight are mimed); its net swishes 1.4 s into the use and every 3.2 s after (`HOOP` in `playground.py`), the
  * round's length.
  */
 
@@ -28,6 +28,8 @@ export const STREET_SHOT: Size<ShotFit>[] = sizes('streetShot', SHARES_177, (s) 
 const SHOT_S = 3.2;
 /** When (s into the round) the ball is gathered, the dip, the jump, the release and the landing. */
 const T = { gather: 1.05, dip: 1.35, jump: 1.55, release: 1.72, land: 1.95, settle: 2.3 };
+/** The share of a round the ball is in both hands (`actions.ts` `PROPS.basketball`): gathered to the chest till it is let go. */
+export const BALL_IN_HANDS: readonly (readonly [number, number])[] = [[T.gather / SHOT_S, T.release / SHOT_S]];
 
 /**
  * A round at the hoop: three dribbles at the right hip, the ball gathered to the chest, the knees dipping,
