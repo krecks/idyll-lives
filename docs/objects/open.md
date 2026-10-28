@@ -128,9 +128,7 @@ their finding ids. What is still open is here, with its id; §9 of the review sa
   empty.
 
 ### Content and sim
-- **Vendors in older towns:** a café's or bakery's counter saved before 0.5.0 stands against its back wall, with no
-  room behind it for a server, so it stays self-serve (new towns have the tile). Servers wear no apron and appear at
-  their post at opening time rather than walking in.
+- **Servers** wear no apron and appear at their post at opening time rather than walking in.
 - **The sounds want a listen by ear** (G-53): each was rendered and checked by its spectrum, timing and level, not
   heard (`bench-results/review/fixes/sounds/wav/`).
 - **Later, as polish:** the range hood's light while the hob below is in use (its hum is in; Q-19); flowers cut for
@@ -185,7 +183,10 @@ their finding ids. What is still open is here, with its id; §9 of the review sa
   to leave to an honesty box: ordered, handed over, paid for (`staff.rs`, the `buy` and `sell` clips). Closed outside
   their hours; self-serve, under the old labels, on a household's own lot, in the use's own time rather than the
   sold five minutes (a coffee poured at home takes 2 minutes; `selfServe.minutes`). The bakery case's back door is
-  the baker's and opens as they reach in; the shop counter's till is turned to the shopkeeper.
+  the baker's and opens as they reach in; the shop counter's till is turned to the shopkeeper. In a town saved
+  before 0.5.0 the café's and the bakery's counters, cases and coffee machine, which stood against the back wall
+  with no room behind them, move a tile out from it as the town is loaded, as the lots are laid out now
+  (`World::nudge_post`), where they fit and block nothing.
 - **Laundry:** the washer and the dryer are loaded in 5 minutes and run on their own (60 and 45 minutes, the
   drum turning and their sound with nobody there), then someone takes the washing out and carries it on in the
   basket to the dryer or the line; the dry washing is folded at the laundry basket, a towel in the hands

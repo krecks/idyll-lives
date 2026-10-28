@@ -245,17 +245,7 @@ pub fn plan(w: &World) -> Staff {
     let mut posts: Vec<(u32, u32, [f32; 2])> = Vec::new();
     for o in &w.objects {
         let Some(plot) = w.object_plot.get(o.id as usize).copied().flatten() else { continue };
-        if !w.plots[plot as usize].public {
-            continue;
-        }
-        let Some((at, _)) = place(content, o) else { continue };
-        let (x, z) = (at[0].floor() as i32, at[1].floor() as i32);
-        if !nav.tile_free(x, z) || w.plot_at(x, z) != Some(plot) {
-            continue;
-        }
-        // (Beside one of its tiles, across an edge with no wall.)
-        let beside = o.tiles(content).any(|(tx, tz)| (tx - x).abs() + (tz - z).abs() == 1 && nav.lot.edge_walkable(tx, tz, x, z));
-        if beside {
+        if let Some(at) = room_behind(w, &nav, o, plot) {
             posts.push((o.id, plot, at));
         }
     }
@@ -293,6 +283,22 @@ pub fn plan(w: &World) -> Staff {
         of[o as usize] = Some(k as u16);
     }
     Staff { built: Some(w.nav_version), servers, of }
+}
+
+/// Where the server of `o`, a post on `plot`, stands, if there's room for them: a public lot, their
+/// place on a free tile of that lot, beside one of its tiles across an edge with no wall. None:
+/// nobody serves at it (against a wall, or a household's own).
+pub(crate) fn room_behind(w: &World, nav: &crate::path::NavGrid, o: &ObjectInstance, plot: u32) -> Option<[f32; 2]> {
+    if !w.plots[plot as usize].public {
+        return None;
+    }
+    let (at, _) = place(&w.content, o)?;
+    let (x, z) = (at[0].floor() as i32, at[1].floor() as i32);
+    if !nav.tile_free(x, z) || w.plot_at(x, z) != Some(plot) {
+        return None;
+    }
+    let beside = o.tiles(&w.content).any(|(tx, tz)| (tx - x).abs() + (tz - z).abs() == 1 && nav.lot.edge_walkable(tx, tz, x, z));
+    beside.then_some(at)
 }
 
 /// The served use a resident is at (object, interaction), standing at the front of a post with a

@@ -54,7 +54,9 @@
 //! number in `households[].laundry`; absent: none), the dirty things in a dishwasher's rack waiting
 //! for it to run (`objects[].rack`; absent: none); and the home chess table is 2 × 1 (it
 //! was 1 × 1): an older file's goes over the tile it stood on where it fits, else at a free spot
-//! at home, else it is sold back (`migrate_32_grown`). Older files load. Saves
+//! at home, else it is sold back (`migrate_32_grown`); and an older file's posts in town (content
+//! `staff`) with their back to a wall move a tile out from it, where there's room, for their server
+//! (`World::nudge_post`). Older files load. Saves
 //! written before feelings were renamed from "moodlets" store them under `moodlets`; a serde
 //! alias still reads it.
 
@@ -1039,8 +1041,12 @@ impl World {
         let tops: Vec<bool> = save.objects.iter().map(on_top).collect();
         // (v33: kinds that grew go in once everything else stands, where they now fit: `migrate_32_grown`.)
         let grown: Vec<bool> = save.objects.iter().map(|o| grown_since_32(save.version, o)).collect();
+        // (v33: the town's posts go in after the rest, so one with its back to a wall can move out
+        // from it where there's room: `migrate_32_post`.)
+        let posts: Vec<bool> = (0..tops.len()).map(|i| !tops[i] && !grown[i] && post_since_32(&world.content, save, i, &tops)).collect();
         let order: Vec<usize> = (0..tops.len())
-            .filter(|&i| !tops[i] && !grown[i])
+            .filter(|&i| !tops[i] && !grown[i] && !posts[i])
+            .chain((0..tops.len()).filter(|&i| posts[i]))
             .chain((0..tops.len()).filter(|&i| grown[i]))
             .chain((0..tops.len()).filter(|&i| tops[i]))
             .collect();
@@ -1086,6 +1092,7 @@ impl World {
                     None => None,
                 };
                 obj.rack = o.rack.min(world.content.objects[obj.def].rack);
+                let id = if posts[i] { world.nudge_post(id) } else { id };
                 used.extend(keep);
                 object_ids.insert(i as u32, id);
             }
@@ -1922,6 +1929,22 @@ const GROWN_IN_33: [&str; 1] = ["chessTable"];
 /// resized one keeps its own size and loads as any).
 fn grown_since_32(version: u32, o: &ObjectSave) -> bool {
     version < 33 && o.size.is_none() && GROWN_IN_33.contains(&o.def.as_str())
+}
+
+/// Whether saved object `i` is one of the town's posts (content `staff`) from a file older than
+/// v33, with nothing standing on it: placed after the rest, it may move out from a wall
+/// (`World::nudge_post`).
+fn post_since_32(content: &Content, save: &SaveFile, i: usize, tops: &[bool]) -> bool {
+    let o = &save.objects[i];
+    let Some(def) = content.object_index(&o.def) else { return false };
+    let d = &content.objects[def];
+    if save.version >= 33 || d.staff.is_none() {
+        return false;
+    }
+    // (Anything on its top stays where it was saved: so does the post.)
+    let (w, dd) = if o.rot.is_multiple_of(2) { (d.footprint[0], d.footprint[1]) } else { (d.footprint[1], d.footprint[0]) };
+    let under = |t: &ObjectSave| t.x >= o.x && t.x < o.x + w as i32 && t.z >= o.z && t.z < o.z + dd as i32;
+    !save.objects.iter().enumerate().any(|(j, t)| tops[j] && under(t))
 }
 
 /// v32 to v33: a thing whose kind grew (`grown_since_32`) goes over the tile it stood on where it

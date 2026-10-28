@@ -372,7 +372,8 @@ impl ObjectInstance {
     /// Takes on the state `old`, this object before it was lifted out and placed again, had: its
     /// stable id, turn, wear, open or closed, on or off, crop, and a machine's run.
     pub(crate) fn carry_state(&mut self, old: &ObjectInstance) {
-        (self.stable, self.turn, self.wear, self.open, self.off, self.growth, self.run) = (old.stable, old.turn, old.wear, old.open, old.off, old.growth, old.run);
+        (self.stable, self.turn, self.wear, self.open, self.off, self.growth, self.run, self.rack) =
+            (old.stable, old.turn, old.wear, old.open, old.off, old.growth, old.run, old.rack);
     }
 
     pub(crate) fn release(&mut self, sim: u32) {

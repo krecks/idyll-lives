@@ -562,6 +562,37 @@ impl World {
         tries.into_iter().find_map(|(cx, cz, r)| self.place_at_home(plot, def, cx, cz, r, Layout::default(), colors.clone(), quality, value).ok())
     }
 
+    /// v32 to v33: `id`, a post of the town's (content `staff`) on a public lot just placed as it was
+    /// saved, the last object, with no room behind it for its server (its back to a wall, as the
+    /// café's and the bakery's counters stood before 0.5.0): moved one tile to its front, as the
+    /// town's lots have it now, where it fits there, blocks nothing and then has its server's room.
+    /// Else it stays (and is self-serve, as it was). Returns its id.
+    pub(crate) fn nudge_post(&mut self, id: u32) -> u32 {
+        let o = &self.objects[id as usize];
+        let Some(plot) = self.plot_at(o.x, o.z) else { return id };
+        if id as usize + 1 != self.objects.len()
+            || self.content.objects[o.def].staff.is_none()
+            || !self.plots[plot as usize].public
+            || crate::staff::room_behind(self, &self.nav(), o, plot).is_some()
+        {
+            return id;
+        }
+        let a = o.angle();
+        let (dx, dz) = (a.sin().round() as i32, a.cos().round() as i32);
+        let old = self.remove_object(id);
+        if let Ok(moved) = self.replace_at_home(plot, &old, old.x + dx, old.z + dz, old.rot, Layout::of(&old)) {
+            if crate::staff::room_behind(self, &self.nav(), &self.objects[moved as usize], plot).is_some() {
+                return moved;
+            }
+            self.remove_object(moved);
+        }
+        // (Where it was: it stood there a moment ago.)
+        let back = self.place(old.def, old.x, old.z, old.rot, Layout::of(&old), old.colors.clone(), old.quality, old.value, None);
+        let back = back.expect("it stood there");
+        self.objects[back as usize].carry_state(&old);
+        back
+    }
+
     /// Places `old`, lifted out, back on the home plot at `x`, `z` (see `place_at_home`), keeping
     /// what it was (`ObjectInstance::carry_state`).
     pub(crate) fn replace_at_home(&mut self, plot: u32, old: &ObjectInstance, x: i32, z: i32, rot: u8, layout: Layout) -> Result<u32, Error> {

@@ -690,3 +690,58 @@ fn last_orders_at_closing_time() {
     assert!(served_after && ate, "served after 20:00 ({served_after}) and ate it ({ate})");
     assert!(!w.staff.servers[k].present, "and the seller went home");
 }
+
+#[test]
+fn an_older_towns_counters_move_out_from_the_wall_for_their_server() {
+    // Before 0.5.0 the café's and the bakery's counters, cases and coffee machine stood against
+    // the back wall (a tile further back than now), with no room behind them for a server. A
+    // save from then (v32) moves each out to where it is now; one from v33 is left as saved.
+    let merged = common::content();
+    let content: Value = serde_json::from_str(&merged).unwrap();
+    let houses = houses();
+    let (w, d) = plot_size(&houses);
+    let mut moved = 0;
+    for place in houses["parks"].as_array().unwrap() {
+        let mut old = place.clone();
+        let mut back = 0;
+        for o in old["objects"].as_array_mut().unwrap() {
+            let id = o["def"].as_str().unwrap();
+            if ["shopCounter", "coffeeMachine", "bakeryCase"].contains(&id) && o["rot"] == 2 && o["z"] == 11 {
+                o["z"] = json!(12);
+                back += 1;
+            }
+        }
+        if back == 0 {
+            continue;
+        }
+        for rotated in [false, true] {
+            let id = format!("{}{}", place["id"], if rotated { " (turned)" } else { "" });
+            let (walls, doors, windows, objects, entry) = stamp(&content, &old, (w, d), 0, rotated);
+            let lot = json!({
+                "width": w, "depth": d, "walls": walls, "doors": doors, "windows": windows, "objects": objects,
+                "plots": [{"name": place["name"], "x": 0, "z": 0, "w": w, "d": d, "public": true, "entry": entry}],
+            });
+            let world = World::from_json(&merged, &lot.to_string(), 1).unwrap();
+            let posts = |w: &World| w.objects.iter().filter(|o| w.content.objects[o.def].staff.is_some()).count();
+            let served = |w: &World| {
+                let staff = sim_core::staff::plan(w);
+                w.objects.iter().filter(|o| w.content.objects[o.def].staff.is_some() && staff.server_of(o.id).is_some()).count()
+            };
+            assert!(served(&world) < posts(&world), "{id}: the old layout leaves a post with nobody behind it");
+            let mut save: Value = serde_json::from_str(&world.save_json()).unwrap();
+            // As saved by 0.4.2.
+            save["version"] = json!(32);
+            let loaded = World::from_save_json(&merged, &save.to_string()).unwrap();
+            assert_eq!(loaded.objects.len(), world.objects.len(), "{id}: nothing left out");
+            assert_eq!(served(&loaded), posts(&loaded), "{id}: every post has its server");
+            let stables = |w: &World| w.objects.iter().map(|o| o.stable).collect::<BTreeSet<_>>();
+            assert_eq!(stables(&loaded), stables(&world), "{id}: the same things, by id");
+            moved += back;
+            // Saved since: left as it is.
+            save["version"] = json!(33);
+            let kept = World::from_save_json(&merged, &save.to_string()).unwrap();
+            assert_eq!(served(&kept), served(&world), "{id}: a v33 save is left as it was");
+        }
+    }
+    assert!(moved >= 6, "the café's and the bakery's (both sides of the street): {moved}");
+}
