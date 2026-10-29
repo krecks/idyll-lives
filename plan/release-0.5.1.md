@@ -2,7 +2,7 @@
 
 - **Branch:** `fix/0.5.1`, merged into `main` by pull request; tag `v0.5.1` on the merge
 - **Base:** v0.5.0 at `efd47428`
-- **Status:** releasing 2026-10-29.
+- **Status:** **Released 2026-10-29**: https://github.com/krecks/idyll-lives/releases/tag/v0.5.1 (PR #34 merged as 7aa616f9; CI 40896648736; dry run 40897960646 on main; the tag's deploy 40900084711; live checks passed).
 - **Release type:** fixes: three things the owner found in 0.5.0 (none new in it: 0.4.2 did the same)
 
 ## 1. What ships
@@ -49,6 +49,8 @@ Commits: c7376d96 (the near plane and the menus' cap), 8f947339 (next door by th
 | `bun run build` | pass |
 
 ## 5. Release steps
+
+All done 2026-10-29. Live: the menu says v0.5.1, the bundle's build is 7aa616f (the release merge); cross-origin isolated; the village benchmark reports 0.5.1 on WebGPU and WebGL2 at 60 fps with no page errors.
 
 1. Pull request `fix/0.5.1` → `main`; CI passes on it; merge (a merge commit).
 2. Dry run: `gh workflow run pages.yml --ref main -f deploy=false`, watched to the end.
