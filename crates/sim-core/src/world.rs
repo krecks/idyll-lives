@@ -5436,7 +5436,7 @@ pub(crate) fn grounds<'a>(
     sim: &Sim,
     goal: (i32, i32),
 ) -> Grounds<'a> {
-    let mut grounds = Grounds { tile_plot, open: plots.iter().map(|p| p.public).collect() };
+    let mut grounds = Grounds { tile_plot, open: plots.iter().map(|p| p.public).collect(), fenced: plots.iter().map(|p| !p.public).collect() };
     let here = sim.tile();
     let ends = [here, goal].map(|(x, z)| grounds.plot(nav, x, z));
     let home = households.get(sim.household as usize).and_then(|h| h.plot);

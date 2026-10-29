@@ -93,7 +93,7 @@ Babylon's own cap (`engine.maxFPS`) drew once enough time had piled up since the
 - **Rounding rule:** N is the smallest divisor whose rate isn't more than a quarter above the cap (with 2 % leeway for a measured rate a little off the nominal one): `N = max(1, ceil(Hz / (cap × 1.25 × 1.02)))`. So a cap the refresh rate doesn't divide becomes a rate it does, rounded up when that's within a quarter, and down otherwise.
 - **No cap** draws every refresh.
 - **The game's clocks** run on the timestamp of the refresh a frame is drawn for, not the moment its code runs. The residents' interpolation, the step counter and the director get that timestamp, and the renderer's frame time (camera glides and inertia, clouds, wind) is measured between those timestamps, so motion advances in the same even steps the frames are shown in. The frame time is clamped to 100 ms.
-- **The menus' town** is paced at about 30 fps (`MENU_FPS` through the same rule, as in the Cap 30 column below: 36 on a 144 Hz display, 37.5 on 75 Hz), and the flight into a game at the game's cap.
+- **The menus' town** is paced by the same rule at the player's cap (see above).
 
 Frame rates the pacer gives:
 

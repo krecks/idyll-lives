@@ -125,13 +125,9 @@ declare global {
 const RADIUS_LIMITS = [6, 95] as const;
 const BETA_LIMITS = [0.3, 1.35] as const;
 /** Its lens: vertical field of view (a slightly long lens flattens the perspective: the dollhouse look), near and far (m). */
-const LENS = { fov: 0.7, near: 0.3, far: 1600 };
-/**
- * The near plane moves out with the camera, to this share of its distance (never under `LENS.near`): the depth
- * buffer's precision goes on the first metres past it, and from the town overview's 200–300 m at 0.3 m the
- * roads, 1.2 cm over the ground, fought it in green patches. Close up nothing changes (0.3 m to 15 m out).
- */
-const NEAR_SHARE = 1 / 50;
+// (The near plane a fiftieth of the camera's distance, never under 0.3 m: from the town overview's 200–300 m at 0.3 m
+// the roads, 1.2 cm over the ground, fought it in green patches. Close up nothing changes: 0.3 m to 15 m out.)
+const LENS = { fov: 0.7, near: 0.3, far: 1600, nearShare: 1 / 50 };
 /** Light is recomputed when the game's clock moved this many minutes (fast: the preset's `lightingStep`), at most every `LIGHT_MIN_MS`. */
 const LIGHT_STEP = 0.5;
 const LIGHT_MIN_MS = 100;
@@ -248,6 +244,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private failedFrames = 0;
 
   private townMode = false;
+  /** The camera glides down into the game: the town isn't held meanwhile. */
   private flyingIn = false;
   private townMinute = 12 * 60;
   private townMinuteGoal = 12 * 60;
@@ -709,19 +706,13 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   /** Puts the camera where the game (or the overview) has it this frame. */
   private applyCamera(): void {
-    let radius: number;
     if (this.townMode) {
       const p = this.townPose;
       this.camera.setPose(p.alpha, p.beta, p.radius, p.target.x, p.target.y, p.target.z, p.targetScreenOffset.x, p.targetScreenOffset.y);
-      radius = p.radius;
     } else {
       const o = this.orbit;
       this.camera.setPose(o.alpha, o.beta, o.radius, o.target.x, o.target.y, o.target.z);
-      radius = o.radius;
     }
-    const near = Math.max(LENS.near, radius * NEAR_SHARE);
-    const c = this.camera.camera;
-    if (c.nearClip !== near) c.nearClip = near;
   }
 
   cameraPose(): CameraPose {
@@ -1874,7 +1865,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     await this.townQueue;
     if (!this.townMode) return;
     if (glide > 0 && this.active) {
-      // The camera glides from the town down to the game's pose (kept by the orbit meanwhile), drawn at the game's frame rate.
+      // The camera glides from the town down to the game's pose (kept by the orbit meanwhile).
       const o = this.orbit;
       this.flyingIn = true;
       await new Promise<void>((resolve) => {

@@ -12,6 +12,11 @@ export interface Lens {
   fov: number;
   near: number;
   far: number;
+  /**
+   * With it, the near plane moves out with the camera's distance, to this share of it (never under `near`): the
+   * depth buffer's precision goes on the first metres past the near plane.
+   */
+  nearShare?: number;
 }
 
 export class GameCamera {
@@ -22,6 +27,7 @@ export class GameCamera {
   private readonly viewProj = new pc.Mat4();
   private readonly clip = new pc.Vec4();
   private readonly rayPoint = new pc.Vec3();
+  private lens!: Lens;
 
   constructor(parent: pc.Entity, lens: Lens, name = 'camera') {
     this.entity = new pc.Entity(name);
@@ -35,6 +41,7 @@ export class GameCamera {
   }
 
   setLens(lens: Lens): void {
+    this.lens = lens;
     const c = this.camera;
     c.fov = (lens.fov * 180) / Math.PI;
     c.nearClip = lens.near;
@@ -79,6 +86,12 @@ export class GameCamera {
     toEngine(tx, ty, tz, this.aim);
     this.entity.setPosition(this.eye);
     this.entity.lookAt(this.aim, pc.Vec3.UP);
+    const { near, nearShare } = this.lens;
+    if (nearShare) {
+      const at = Math.max(near, radius * nearShare);
+      // (The component's setter tells its listeners every time, changed or not.)
+      if (this.camera.nearClip !== at) this.camera.nearClip = at;
+    }
   }
 
   /** The camera's eye in game space. */
