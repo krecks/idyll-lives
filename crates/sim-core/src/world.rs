@@ -3249,6 +3249,8 @@ impl World {
                 | Command::SetPlayerMoves { .. }
                 | Command::AddFunds { .. }
                 | Command::SetSkill { .. }
+                | Command::SetNeed { .. }
+                | Command::SetBond { .. }
                 | Command::SetAutonomy { .. }
                 | Command::SetAutoFast { .. }
                 | Command::SetRoutines { .. }
@@ -3379,6 +3381,60 @@ impl World {
             Command::AddFunds { household, amount } => {
                 let h = self.households.get_mut(household as usize).ok_or_else(|| Error::new(format!("unknown household {household}")))?;
                 h.funds = (h.funds + amount).max(0);
+            }
+            Command::SetNeed { sim, need, value } => {
+                self.sim(sim)?;
+                let n = self.content.needs.len();
+                let which: Vec<usize> = if need == "all" {
+                    (0..n).collect()
+                } else {
+                    vec![self.content.needs.iter().position(|d| d.id == need).ok_or_else(|| Error::new(format!("unknown need '{need}'")))?]
+                };
+                let value = if value.is_finite() { value.clamp(0.0, 1.0) } else { 0.5 };
+                let sim = &mut self.sims[sim as usize];
+                for k in which {
+                    sim.needs[k] = value;
+                }
+                sim.planner.recheck = true;
+            }
+            Command::SetBond { a, b, friendship, romance, chemistry, partners } => {
+                self.sim(a)?;
+                self.sim(b)?;
+                if a == b {
+                    return Err(Error::new("a bond is between two residents"));
+                }
+                let (a, b) = (a as usize, b as usize);
+                // (Family never court: the game can't get there, so a check can't either.)
+                if !self.relationships.get(a, b).kin.is_none() && (romance.is_some_and(|f| f > 0.0) || partners == Some(true)) {
+                    return Err(Error::new("family can't be partners or in love"));
+                }
+                let r = &mut self.relationships;
+                for (x, y) in [(a, b), (b, a)] {
+                    let rel = r.get_mut(x, y);
+                    rel.met = true;
+                    if let Some(f) = friendship.filter(|f| f.is_finite()) {
+                        rel.friendship = f.clamp(-100.0, 100.0);
+                    }
+                    if let Some(f) = romance.filter(|f| f.is_finite()) {
+                        rel.romance = f.clamp(-100.0, 100.0);
+                    }
+                }
+                if let Some(c) = chemistry.filter(|c| c.is_finite()) {
+                    r.set_chemistry(a, b, c);
+                }
+                if let Some(p) = partners {
+                    // (One partner each: a new one ends what either had.)
+                    if p {
+                        for x in [a, b] {
+                            if let Some(old) = r.partner_of(x).filter(|&o| o != a && o != b) {
+                                r.set_partners(x, old, false);
+                            }
+                        }
+                    }
+                    r.set_partners(a, b, p);
+                }
+                self.sims[a].planner.recheck = true;
+                self.sims[b].planner.recheck = true;
             }
             Command::SetSkill { sim, skill, level } => {
                 self.sim(sim)?;

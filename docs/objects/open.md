@@ -140,8 +140,9 @@ their finding ids. What is still open is here, with its id; §9 of the review sa
 - **Uses end once every need they raise is full**, by design (I-systems-02); it makes clips easy to miss in checks.
 
 ### Tools
-- The review's tooling leftovers (`cargo review sizes`' measuring, `check.mjs play` with one resident, the debug
-  states) are in [docs/authenticity-review.md](../authenticity-review.md) §7.
+- The review's tooling leftovers (`cargo review sizes`' measuring, `check.mjs play`'s camera and log, `poses.html`)
+  are in [docs/authenticity-review.md](../authenticity-review.md) §7. `play` takes several residents, socials and
+  the phone, and the debug states' gaps are closed (tools/bench/README.md).
 
 ### Not looked at
 - Low on WebGL2 against Babylon's figures since the woods went into squares: the machine was too busy for the 0.4.1

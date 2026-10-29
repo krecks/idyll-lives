@@ -376,8 +376,12 @@ export async function startSession(
   let autosaveMinutes = -1;
   /** The performance overlay setting last applied (F3 opens and closes the overlay in between). */
   let showFps: boolean | null = null;
-  /** The free will setting last sent: sent again only when it changes, not with every other setting (a debug `setAutonomy` holds). */
-  let autonomy: boolean | null = null;
+  /**
+   * The free will setting last sent: sent again only when it changes, not with every other setting (a debug `setAutonomy`
+   * holds). A state the tests wrote (`?state=`) keeps its own free will as it opens (`check_states.rs`: off, so nobody
+   * goes off on their own before a check turns it off); the setting is sent once it's changed.
+   */
+  let autonomy: boolean | null = params.has('state') ? settings.autonomy : null;
 
   const controls: GameControls = {
     setSpeed(speed) {
@@ -816,16 +820,19 @@ export async function startSession(
   };
   services.controls = controls;
   // `?debug`: drive the game from the console / test harness (and look at any lot: `__showPlot(i)`, `__world().plots`;
-  // `__send(command)` sends any simulation command, `__items()` the food and dishes about).
+  // `__send(command)` sends any simulation command, `__items()` the food and dishes about). `__world().objects` carry
+  // a lamp's (or a fire's) `off`, which the world itself doesn't (the snapshot has it: `bridge.lampOff`).
   if (params.has('debug')) {
-    Object.assign(window, { __controls: controls, __showPlot: showPlot, __world: () => world, __send: (cmd: Command) => bridge.send(cmd), __items: () => itemsSeen });
+    const withLamps = (w: WorldStructure | null) =>
+      w && { ...w, objects: w.objects.map((o) => (content.object(o.def)?.light ? { ...o, off: bridge.lampOff(o.id) } : o)) };
+    Object.assign(window, { __controls: controls, __showPlot: showPlot, __world: () => withLamps(world), __send: (cmd: Command) => bridge.send(cmd), __items: () => itemsSeen });
     // `__sims()`: every resident as the newest snapshot shows them (where, pose, the object and use,
     // needs; `debug/sims.ts`), to wait on; `__content` the game's content (`__content.object(id)`).
     // `__addFunds(amount)`: money for the player's household. `__customise(id)`: the colour studio
     // of the object `id` at home (null: closed).
     // `__camera(pose?)`: the camera's pose, and with a (partial) pose, puts it there and stops the
     // camera watching on its own. `__controls.follow(id, view?)` also sets the radius, beta, alpha
-    // or target height (`y`) it follows with.
+    // or target height (`y`) it follows with; `follow(null)` stops following and stays on the lot in view.
     const placeCamera = (pose: Partial<CameraPose> & { y?: number }) => {
       takeBack();
       const now = renderer.cameraPose();
@@ -845,8 +852,13 @@ export async function startSession(
         return renderer.cameraPose();
       },
       __controls: Object.assign(Object.create(controls) as GameControls, {
+        // (Stopping, the view stays on the lot it shows: the game's own goes back home, which a check looking at
+        // another lot doesn't want.)
         follow(id: number | null, view?: Partial<Omit<CameraPose, 'target'>> & { y?: number }) {
-          controls.follow(id);
+          if (id === null) {
+            game.follow = null;
+            renderer.followSim(null);
+          } else controls.follow(id);
           if (view) placeCamera(view);
         },
       }),

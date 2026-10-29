@@ -687,7 +687,6 @@ From the coordinator's notes and each wave's `review-log.md`, deduplicated; the 
 - A flag for an odd sound for the kind (a sizzle away from a hob) would have found I-packs-19 at once.
 
 **`tools/bench/check.mjs play`**
-- One resident per object. Wanted: `--sims a,b` for pairs (the seesaw, ping-pong, the climbing frame, two at a pool table), and a social and phone mode (the cross-cutting wave wrote its own scenes).
 - `--use ripe`, for every `when: ripe` use (the veggie bed's is `pickSnack`), and the growth stage in the record.
 - It records clips only on the object used, not on the helpers a recipe walks to; it can't follow a whole recipe.
 - Picture names leave out the helper, so one chair tried at several desks overwrites itself.
@@ -714,15 +713,6 @@ From the coordinator's notes and each wave's `review-log.md`, deduplicated; the 
 **The gallery and previews**
 - The gallery stands tabletop things on the ground and draws the range hood on the floor.
 - Previews draw glass opaque, and ids used in two families overwrite each other's (E1).
-
-**Debug states and commands**
-- No command sets a relationship or a need; the cross-cutting wave hand-edited states with a scratch Python script, which the project's rules want in Rust (`DUMP_STATES` tests).
-- Free will runs for a moment as a page opens.
-- No state has the street (`world.meta` is null; only `?bench=village` shows it), and there is no night state of a town lot.
-- `__world().objects` doesn't carry a lamp's `off`.
-- `__controls.follow(null)` sends the view back to the home lot.
-- `hud=0` doesn't hide the top bar.
-- The roof hides when the camera is close.
 
 **Known before the review** ([docs/review/README.md](review/README.md) "Tooling")
 - The lamp build checks only the light's height, not `at` (`lighting.py:94`).

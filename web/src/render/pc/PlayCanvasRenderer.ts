@@ -325,6 +325,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private lotEntities: { entity: pc.Entity; storey?: number }[] = [];
   private roofs: pc.Entity[] = [];
   private roofShown = false;
+  /** A check keeps the roof on close up (`keepRoof`). */
+  private roofKept = false;
   /** The simulation's plain walls, when the house builder can't read the layout (walls up, and the low ones). */
   private walls: pc.Entity | null = null;
   private wallsLow: pc.Entity | null = null;
@@ -1363,9 +1365,13 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.updateCutaway();
   }
 
-  /** The viewed lot's roof: only with walls up, and not when zoomed in (it would fill the view). */
+  /** The viewed lot's roof: only with walls up, and not when zoomed in (it would fill the view), unless a check keeps it (`keepRoof`). */
   private roofVisible(): boolean {
-    return this.wallMode === 'up' && this.orbit.radius > ROOF_MIN_DISTANCE;
+    return this.wallMode === 'up' && (this.roofKept || this.orbit.radius > ROOF_MIN_DISTANCE);
+  }
+
+  keepRoof(on: boolean): void {
+    this.roofKept = on;
   }
 
   /**

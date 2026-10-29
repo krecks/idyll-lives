@@ -105,6 +105,30 @@ pub enum Command {
         skill: String,
         level: f32,
     },
+    /// Sets a resident's need (content `needs` id) to `value`, within 0 and 1, or every need with
+    /// `need` "all". For tests and checks in the browser (`check.mjs play --needs`, through
+    /// `?debug`'s `__send`); no menu sends it.
+    SetNeed {
+        sim: u32,
+        need: String,
+        value: f32,
+    },
+    /// Sets how residents `a` and `b` stand with each other, both ways: friendship and romance
+    /// (-100..100), chemistry (-1..1), partners; what's left out stays. They've met. Family can't be
+    /// set in love or partners. For tests and checks in the browser (`check.mjs play --bond`); no menu
+    /// sends it.
+    SetBond {
+        a: u32,
+        b: u32,
+        #[serde(default)]
+        friendship: Option<f32>,
+        #[serde(default)]
+        romance: Option<f32>,
+        #[serde(default)]
+        chemistry: Option<f32>,
+        #[serde(default)]
+        partners: Option<bool>,
+    },
     /// Queue an interaction on an object for a Sim.
     Use {
         sim: u32,

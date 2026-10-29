@@ -110,6 +110,14 @@ declare global {
   }
 }
 
+/** The game's interface hidden (`hud=0`): the top bar and the household strip, what's over the world, the toasts. */
+const HUD_HIDDEN = '.hud-root, .world-overlay, .toast-layer { display: none !important; }';
+
+/** `hud=0` on a page that isn't the benchmark's (`?state=…&debug&hud=0`: pictures of the world for checks): the interface hidden. */
+export function hideHud(): void {
+  document.head.append(Object.assign(document.createElement('style'), { textContent: HUD_HIDDEN }));
+}
+
 /** Before start-up reads them: the benchmark's settings, for this page only. */
 export function prepareBench(): void {
   const b = BENCH!;
@@ -119,7 +127,7 @@ export function prepareBench(): void {
   if (b.res !== 'auto') settings.resolution = b.res;
   Object.assign(settings, { directorDelay: 0, autosaveMinutes: 0, fpsCap: b.cap, autoSlow: false, voices: false, showFps: false, reducedMotion: false });
   const css: string[] = [];
-  if (!b.hud) css.push('.hud-root, .world-overlay, .toast-layer { display: none !important; }');
+  if (!b.hud) css.push(HUD_HIDDEN);
   if (b.diag.has('noglass')) css.push('* { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }');
   if (css.length) document.head.append(Object.assign(document.createElement('style'), { textContent: css.join('\n') }));
 }

@@ -14,6 +14,8 @@ export type Command =
   | { type: 'addFunds'; household: number; amount: number }
   /** Tests and `?debug` only (`check.mjs play --skills`): a resident's skill set to a level. */
   | { type: 'setSkill'; sim: number; skill: string; level: number }
+  | { type: 'setNeed'; sim: number; need: string; value: number }
+  | { type: 'setBond'; a: number; b: number; friendship?: number; romance?: number; chemistry?: number; partners?: boolean }
   | { type: 'adopt'; household: number; child: boolean }
   /** "Skip quiet hours": time-lapse while the player's household sleeps or is at work. */
   | { type: 'setAutoFast'; enabled: boolean }

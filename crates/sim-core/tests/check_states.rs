@@ -2,15 +2,15 @@
 //! `DUMP_STATES=1 cargo test -p sim-core --test check_states` each test writes one to
 //! `debug-states/<name>.json` (gitignored), opened with `?state=<name>&debug` on the dev server.
 //! Each test also checks that its state is still what the checks need. (`tools/bench/README.md`
-//! lists them and how to use them.)
+//! lists them and how to use them.) A state keeps its own free will as the page opens (the game's
+//! Free will setting is sent once it's changed); needs and relationships can be set from the page
+//! with `__send({type: 'setNeed', …})` and `{type: 'setBond', …}` (`tests/debug_commands.rs`).
 //!
 //! - `bathroom-check`: the house of the town `wants.rs` makes (seed 21), with one resident (0) at
 //!   home at 10:00 on day 1, doing nothing, with no job, free will off and every need at 0.8:
 //!   nothing pulls them away from a `use`, and a use that fills a need still lasts a while (a full
 //!   need ends it at once). Plenty of money. Free wall to buy against in the living room at
-//!   `[23, 14, rot]` and `[24, 17, rot]`. (The game's own Free will setting, on by default, is
-//!   applied to the player's household as the page opens: turn it off there, or send
-//!   `setAutonomy`; `tools/bench/check.mjs` does.)
+//!   `[23, 14, rot]` and `[24, 17, rot]`.
 //! - `needy-check`: the same, with free will on and low needs (bladder 0.05, hunger 0.2, energy
 //!   0.25, hygiene 0.3, the rest 0.5): they go to the toilet, then eat, wash and sleep on their own.
 //! - `office-night`: `bathroom-check` at 21:30, after dark (lamps, screens, night lighting).
@@ -18,6 +18,9 @@
 //!   (`community.json`: street, play, food, farm and shops, in rows by group facing the
 //!   street, the shops against a wall at the back), beside a home plot with a small house. The
 //!   resident stands at the lot's front, free will off, needs at 0.8. Look with `__showPlot(1)`.
+//! - `town-street`: `town-things` with a street in front of its two lots (`world.meta.streets`, as a
+//!   generated town's: the road, the pavements and their props drawn), the lots 6 tiles further back;
+//!   `town-street-night` the same at 22:00, the town's lamps and windows lit.
 //! - `review-stage`: an empty home lot with one walled room of 12 × 12 tiles (a door, two
 //!   windows, a crib and a counter, the rest free floor and wall) and a garden behind it, for
 //!   buying one thing after another to look at in use (`check.mjs play --objects`). One resident
@@ -181,12 +184,40 @@ fn town_things(content: &Value) -> Vec<(String, String, i64, i64)> {
 
 #[test]
 fn town_things_lot() {
+    let world = town_things_world(0, 10.0);
+    assert!(world.meta.is_null(), "no street");
+    common::dump_state(&world, "town-things");
+}
+
+#[test]
+fn town_street() {
+    let world = town_things_world(STREET, 10.0);
+    assert_eq!(world.meta["streets"][0]["d"], STREET, "the street in front: {}", world.meta);
+    common::dump_state(&world, "town-street");
+}
+
+#[test]
+fn town_street_night() {
+    let world = town_things_world(STREET, 22.0);
+    let hour = clock::hour(world.tick);
+    assert!(sim_core::lights::dark_at(hour * 60.0) && hour >= 22.0, "after dark: {hour}");
+    common::dump_state(&world, "town-street-night");
+}
+
+/// A street's depth in tiles, as the game's towns lay them (`STREET` in web/src/game/town.ts).
+const STREET: i64 = 6;
+
+/// `town-things` (see the module's docs), its lots `street` tiles back from the top edge with a
+/// street drawn along there (world `meta.streets`, as a generated town's; none with 0), on day 1 at
+/// `hour`.
+fn town_things_world(street: i64, hour: f32) -> World {
     let merged = common::content();
     let content: Value = serde_json::from_str(&merged).unwrap();
     let things = town_things(&content);
     assert!(things.len() >= 36, "every community thing: {}", things.len());
-    // Home plot (empty) on the left, the town lot on the right; the street along z = 0.
+    // Home plot (empty) on the left, the town lot on the right; the street along their front.
     let (hw, w, d) = (12, 54, 32);
+    let z = |v: i64| v + street;
     // Rows by group, front to back; each row starts a tile in, things two tiles apart. The
     // shops' row stands at the back against a wall, as in a shop.
     let rows = [("street", 3), ("play", 8), ("food", 13), ("farm", 18), ("shops", d - 3)];
@@ -195,32 +226,34 @@ fn town_things_lot() {
         let mut x = hw + 2;
         for (id, _, fw, fd) in things.iter().filter(|t| t.1 == group) {
             // Facing the street (rot 2); a row's things line up at its back.
-            let z = if group == "shops" { z0 + 1 - fd } else { z0 };
-            objects.push(json!({"def": id, "x": x, "z": z, "rot": 2}));
+            let at = if group == "shops" { z0 + 1 - fd } else { z0 };
+            objects.push(json!({"def": id, "x": x, "z": z(at), "rot": 2}));
             x += fw + 2;
         }
         assert!(x <= hw + w, "the {group} row fits: {x}");
     }
     let placed = objects.len();
     assert_eq!(placed, things.len(), "every thing in a row by its group: {:?}", things.iter().map(|t| &t.1).collect::<Vec<_>>());
+    let front = z(0) as f64 + 1.5;
     let lot = json!({
-        "width": hw + w, "depth": d,
+        "width": hw + w, "depth": d + street,
         // A small house at home (an empty lot opens in Build mode); the shops' wall on the town lot.
-        "walls": [[2, 4, 8, 4], [8, 4, 8, 10], [8, 10, 2, 10], [2, 10, 2, 4], [hw + 1, d - 2, hw + 21, d - 2]],
-        "doors": [{"x": 4, "z": 4, "axis": "x"}],
+        "walls": [[2, z(4), 8, z(4)], [8, z(4), 8, z(10)], [8, z(10), 2, z(10)], [2, z(10), 2, z(4)], [hw + 1, z(d - 2), hw + 21, z(d - 2)]],
+        "doors": [{"x": 4, "z": z(4), "axis": "x"}],
         "objects": objects,
-        "plots": [{"name": "Home", "x": 0, "z": 0, "w": hw, "d": d, "entry": [hw as f64 / 2.0, 1.5]},
-                  {"name": "Town things", "x": hw, "z": 0, "w": w, "d": d, "public": true, "entry": [hw as f64 + w as f64 / 2.0, 1.5]}],
+        "plots": [{"name": "Home", "x": 0, "z": z(0), "w": hw, "d": d, "entry": [hw as f64 / 2.0, front]},
+                  {"name": "Town things", "x": hw, "z": z(0), "w": w, "d": d, "public": true, "entry": [hw as f64 + w as f64 / 2.0, front]}],
         "households": [{"name": "Ada's", "plot": 0, "player": true, "funds": FUNDS}],
-        "sims": [{"name": "Ada", "traits": ["cheerful"], "x": hw as f64 + 3.5, "z": 1.5}],
+        "sims": [{"name": "Ada", "traits": ["cheerful"], "x": hw as f64 + 3.5, "z": front}],
+        "meta": if street > 0 { json!({"streets": [{"x": 0, "z": 0, "w": hw + w, "d": street}]}) } else { Value::Null },
     });
     let mut world = World::from_json(&merged, &lot.to_string(), 7).unwrap();
     assert_eq!(world.objects.len(), placed, "every thing loads where it was put");
     world.households[0].free_will = false;
-    until(&mut world, 1, 10.0);
+    until(&mut world, 1, hour);
     free_up(&mut world);
     set_needs(&mut world, 0, 0.8, &[]);
-    common::dump_state(&world, "town-things");
+    world
 }
 
 /// `review-stage`'s room: walls from `(x0, z0)` to `(x1, z1)`, a door in the front wall (low z,
