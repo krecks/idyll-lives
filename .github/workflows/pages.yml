@@ -36,7 +36,7 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The version pinned in rust-toolchain.toml, with clippy and the wasm32 target.
       - name: Rust toolchain
@@ -85,7 +85,7 @@ jobs:
 
       # Compressed asset copies (tools/assets/optimize.mjs, run by the build), cached by content
       # hash so only changed files are encoded again.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: web/.assets/cache
           key: assets-${{ hashFiles('tools/assets/optimize.mjs', 'web/public/assets/**') }}
@@ -94,7 +94,7 @@ jobs:
       # wasm-opt's results (each entry keyed by its input's SHA-256, binaryen's version and the
       # flags), so a release doesn't spend a minute optimising the same wasm again; the named
       # artifact below keeps its own entries in the same folder.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           # (The two folders only: entries from before they existed stay behind.)
           path: |
@@ -109,12 +109,12 @@ jobs:
       # float16) and the language model (about 260 MB), kept between runs so a release doesn't
       # depend on those sites. The fetch tools (cargo fetch-voice, cargo fetch-llm) check every
       # file's SHA-256 and fetch again what doesn't match, so an old cache can't slip through.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: web/public/voice
           key: voice-${{ hashFiles('crates/tools/src/voicefetch.rs', 'crates/tools/src/fp16.rs', 'crates/tools/src/download.rs') }}
           restore-keys: voice-
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: web/public/llm
           key: llm-${{ hashFiles('crates/tools/src/llmfetch.rs', 'crates/tools/src/download.rs') }}
@@ -171,14 +171,14 @@ jobs:
           cp src/voice/wasm-pkg/voice_wasm_bg.wasm .assets/wasm-names/voice_wasm_bg.wasm
           cargo wasm-opt --names .assets/wasm-names/sim_wasm_bg.wasm .assets/wasm-names/voice_wasm_bg.wasm
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wasm-with-names-${{ github.sha }}
           path: web/.assets/wasm-names/*.wasm
           retention-days: 90
 
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: web/dist
 
@@ -193,4 +193,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

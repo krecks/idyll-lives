@@ -389,6 +389,12 @@ export default defineConfig({
   // The voice and language model workers' imports: Vite's start-up scan doesn't reach worker
   // imports, so it would find them only when the first line is spoken, re-bundle and reload the page.
   optimizeDeps: { include: ['onnxruntime-web/wasm', 'onnxruntime-web/webgpu', '@huggingface/tokenizers'] },
-  // The main chunk is about 2.5 MB (PlayCanvas's release build and the game): warn if it grows.
-  build: { target: 'es2022', chunkSizeWarningLimit: 2600 },
+  // PlayCanvas's release build in a chunk of its own (it changes far less often than the game, so
+  // a returning player keeps it cached across updates). Every chunk is then well under 2 MB: warn
+  // if one grows past that.
+  build: {
+    target: 'es2022',
+    chunkSizeWarningLimit: 2000,
+    rolldownOptions: { output: { codeSplitting: { groups: [{ name: 'playcanvas', test: /[\\/]node_modules[\\/]playcanvas[\\/]/ }] } } },
+  },
 });
