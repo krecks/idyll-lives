@@ -591,11 +591,18 @@ pub struct Relationships {
     /// Each one's partner, kept with `rel` (asked every tick for everyone; a row scan each
     /// time was a tenth of a big town's tick). Partners change through `set_partners`.
     partner: Vec<Option<u32>>,
+    /// Bumped when a family link or a partnership changes (`World::claimants_cache` reads it).
+    version: u64,
 }
 
 impl Relationships {
     pub fn len(&self) -> usize {
         self.n
+    }
+
+    /// Bumped when a family link or a partnership changes.
+    pub fn version(&self) -> u64 {
+        self.version
     }
 
     pub fn is_empty(&self) -> bool {
@@ -617,7 +624,8 @@ impl Relationships {
         }
         let mut partner = std::mem::take(&mut self.partner);
         partner.resize(n, None);
-        *self = Self { n, rel, chemistry, partner };
+        let version = self.version.wrapping_add(1);
+        *self = Self { n, rel, chemistry, partner, version };
     }
 
     /// Forgets everything between `a` and everyone (they're gone, or someone new took the slot).
@@ -633,6 +641,7 @@ impl Relationships {
                 self.recount(b);
             }
         }
+        self.version = self.version.wrapping_add(1);
     }
 
     pub fn get(&self, a: usize, b: usize) -> &Relationship {
@@ -648,6 +657,7 @@ impl Relationships {
     pub fn set(&mut self, a: usize, b: usize, rel: Relationship) {
         *self.get_mut(a, b) = rel;
         self.recount(a);
+        self.version = self.version.wrapping_add(1);
     }
 
     /// Makes `a` and `b` partners, or not, both ways.
@@ -656,6 +666,7 @@ impl Relationships {
         self.get_mut(b, a).partners = partners;
         self.recount(a);
         self.recount(b);
+        self.version = self.version.wrapping_add(1);
     }
 
     /// Looks up `a`'s partner again after a change.
@@ -688,6 +699,7 @@ impl Relationships {
         }
         self.recount(a);
         self.recount(b);
+        self.version = self.version.wrapping_add(1);
     }
 
     /// What `b` is to `a` in the family.

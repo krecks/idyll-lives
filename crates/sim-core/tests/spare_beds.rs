@@ -86,8 +86,11 @@ fn whoever_has_no_bed_sleeps_the_night_on_the_sofa_bed() {
 
 #[test]
 fn nobody_takes_the_sofa_bed_with_a_bed_free() {
-    // Two single beds in the bedroom: the sofa bed stays a sofa.
-    let town = TOWN.replace(r#"{"def":"bedSingle","x":12,"z":2}"#, r#"{"def":"bedSingle","x":12,"z":2},{"def":"bedSingle","x":14,"z":2}"#);
+    // Two single beds in the bedroom, for two sisters (only those who belong together share a
+    // bedroom): the sofa bed stays a sofa.
+    let town = TOWN
+        .replace(r#"{"def":"bedSingle","x":12,"z":2}"#, r#"{"def":"bedSingle","x":12,"z":2},{"def":"bedSingle","x":14,"z":2}"#)
+        .replace(r#""x":7.5,"z":5.5}]}"#, r#""x":7.5,"z":5.5}],"relationships":[{"a":0,"b":1,"preset":"siblings"}]}"#);
     let mut w = bedtime(&town);
     let night = clock::tick_at(2, 2.0 * 60.0).unwrap();
     while w.tick < night {

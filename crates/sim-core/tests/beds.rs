@@ -2,6 +2,8 @@
 //! a household in town buys one (the cheapest); the player's household is told, once, and buys
 //! its own.
 
+mod common;
+
 use sim_core::social::EventKind;
 use sim_core::{Command, World, clock};
 
@@ -121,4 +123,28 @@ fn neighbours_short_of_money_dont_buy_into_debt() {
     assert!(!w.content.life.baby(w.sims[3].age), "Dot is a child now");
     assert_eq!(beds(&w, 12), 1, "no bed they can't pay for");
     assert_eq!(w.households[1].funds, 300);
+}
+
+/// The shipped double bed is a couple's bed (somewhere to try for a baby): a place for two
+/// partners, but for one of two who aren't (only a partner shares the other half). A bunk bed is
+/// a place for each.
+#[test]
+fn a_double_bed_is_a_bed_for_two_only_for_a_couple() {
+    let told = |bed: &str, relationships: &str| {
+        let lot = format!(
+            r#"{{"width":12,"depth":12,
+            "plots":[{{"name":"Home","x":0,"z":0,"w":12,"d":12,"entry":[5.5,11.5]}}],
+            "households":[{{"name":"Player","plot":0,"player":true}}],
+            "objects":[{{"def":"{bed}","x":2,"z":2}}],
+            "sims":[{{"name":"Ada","x":5.5,"z":5.5,"age":30,"traits":["cheerful"]}},{{"name":"Ben","x":6.5,"z":5.5,"age":30,"traits":["cheerful"]}}],
+            "relationships":[{relationships}]}}"#
+        );
+        let mut w = World::from_json(&common::content(), &lot, 1).unwrap();
+        w.tick_once();
+        w.events.iter().filter(|e| e.kind == EventKind::NoBed).map(|e| e.a as usize).collect::<Vec<_>>()
+    };
+    assert_eq!(told("bed", ""), [1], "two who aren't a couple: one has no bed");
+    assert_eq!(told("bed", r#"{"a":0,"b":1,"preset":"siblings"}"#), [1], "nor do a brother and sister share one");
+    assert!(told("bed", r#"{"a":0,"b":1,"preset":"partners"}"#).is_empty(), "a couple shares it");
+    assert!(told("bedBunk", r#"{"a":0,"b":1,"preset":"siblings"}"#).is_empty(), "a bunk each");
 }

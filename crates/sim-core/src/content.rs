@@ -955,6 +955,11 @@ pub struct RoomKind {
     /// Kept shut while someone is in it (content `private`: a bathroom; see `privacy.rs`):
     /// others wait outside or go elsewhere, and its doors stay shut to them.
     pub private: bool,
+    /// A private room of this kind is its people's own (content `claimed`: a bedroom): whoever has
+    /// a place in it — somewhere to lie, or a baby's place and the care of it, with their partner
+    /// and children — comes and goes, and its door keeps everyone else out (`privacy.rs`). Only
+    /// with `private`, which is what keeps the door shut at all, and never a passage.
+    pub claimed: bool,
 }
 
 /// How rooms are scored (content `roomRules`; see `rooms.rs`).
@@ -2149,6 +2154,8 @@ struct RoomKindRaw {
     passage: bool,
     #[serde(default)]
     private: bool,
+    #[serde(default)]
+    claimed: bool,
 }
 
 #[derive(Deserialize, Default)]
@@ -4096,6 +4103,16 @@ impl Content {
             .iter()
             .map(|k| {
                 let ctx = format!("room kind '{}'", k.id);
+                if k.claimed && k.passage {
+                    return Err(Error::new(format!(
+                        "{ctx}: a 'claimed' room is somebody's own: it can't be a passage (see privacy.rs)"
+                    )));
+                }
+                if k.claimed && !k.private {
+                    return Err(Error::new(format!(
+                        "{ctx}: a 'claimed' room is one kept shut: it needs 'private' too (see privacy.rs)"
+                    )));
+                }
                 Ok(RoomKind {
                     id: k.id.clone(),
                     label: k.label.clone().unwrap_or_else(|| k.id.clone()),
@@ -4105,6 +4122,7 @@ impl Content {
                     exclusive: k.exclusive,
                     passage: k.passage,
                     private: k.private,
+                    claimed: k.claimed,
                 })
             })
             .collect::<Result<_, Error>>()?;

@@ -1452,6 +1452,16 @@ pub struct World {
     /// The rooms kept shut while anyone is in them (`privacy::private_room`), sorted; found
     /// with the rooms (`refresh_rooms`).
     pub(crate) private_rooms: Vec<u16>,
+    /// Among those, the rooms of a claimed kind (`roomKinds[].claimed`: bedrooms), whose door its
+    /// own people (`privacy::Shut::claimants`) have the run of, sorted; found with the rooms.
+    pub(crate) claimed_rooms: Vec<u16>,
+    /// The objects that can offer a place in each of those rooms (`privacy::claimed_places`),
+    /// broken ones included, found with them, so a tick needn't look through every object in the
+    /// home.
+    pub(crate) claimed_places: Vec<(u16, Vec<u32>)>,
+    /// The people who have a place in each claimed room, with the fingerprint they were found
+    /// for (`privacy::refresh`), so a tick needn't look for them again while nothing changes.
+    pub(crate) claimants_cache: Vec<(u16, u64, Vec<u32>)>,
     /// What each household has to work on as the tick's step started (`work_waiting`), kept
     /// from tick to tick like `briefs`.
     work: Vec<u8>,
@@ -1728,6 +1738,9 @@ impl World {
             briefs: Vec::new(),
             shut: Vec::new(),
             private_rooms: Vec::new(),
+            claimed_rooms: Vec::new(),
+            claimed_places: Vec::new(),
+            claimants_cache: Vec::new(),
             work: Vec::new(),
             exits: Vec::new(),
             meta: serde_json::Value::Null,
@@ -2824,7 +2837,11 @@ impl World {
         self.map_plots();
         let (rooms, cells) = crate::rooms::compute(self);
         self.rooms = rooms;
-        self.private_rooms = crate::privacy::private_rooms(&self.content, &self.plots, &self.rooms, &self.lot);
+        let (private, claimed) = crate::privacy::private_rooms(&self.content, &self.plots, &self.rooms, &self.lot);
+        self.private_rooms = private;
+        self.claimed_rooms = claimed;
+        self.claimed_places = crate::privacy::claimed_places(&self.content, &self.lot, &self.claimed_rooms, &self.objects);
+        self.claimants_cache.clear();
         self.rooms_version = self.room_layout_version;
         self.rooms_dirty = false;
         self.rooms_rescore = false;

@@ -33,6 +33,9 @@ fn starter_with_household() -> String {
         { "name": "Ada", "traits": ["foodie", "lazy"], "perks": ["ironBladder"], "x": spawns[0][0], "z": spawns[0][1] },
         { "name": "Bo", "traits": ["neat", "cheerful", "bookworm"], "perks": ["speedWalker", "sunnyDisposition"], "x": spawns[1][0], "z": spawns[1][1] },
     ]);
+    // The starter house has one double bed: a couple shares it (a bedroom is its sleepers' own,
+    // so two unrelated adults would each need a bed of their own).
+    lot["relationships"] = serde_json::json!([{ "a": 0, "b": 1, "preset": "partners" }]);
     lot.to_string()
 }
 
@@ -234,6 +237,16 @@ fn every_personality_lives_well_with_all_packs() {
                 .map(|(i, t)| serde_json::json!({ "name": t, "traits": [t], "x": spawns[i % spawns.len()][0], "z": spawns[i % spawns.len()][1] }))
                 .collect::<Vec<_>>()
         );
+        // A bed for each in the starter house's one bedroom, and siblings: only those who belong
+        // together share a bedroom, and the other half of a double bed is only a partner's.
+        let objects = lot["objects"].as_array_mut().unwrap();
+        objects.push(serde_json::json!({ "def": "bedSingle", "x": 14, "z": 11 }));
+        objects.push(serde_json::json!({ "def": "bedSingle", "x": 16, "z": 14, "rot": 2 }));
+        lot["relationships"] = serde_json::json!([
+            { "a": 0, "b": 1, "preset": "siblings" },
+            { "a": 0, "b": 2, "preset": "siblings" },
+            { "a": 1, "b": 2, "preset": "siblings" },
+        ]);
         // The whole starter lot is the household's home plot (buying needs one).
         let (w, d) = (lot["width"].clone(), lot["depth"].clone());
         lot["plots"] = serde_json::json!([{ "name": "Home", "x": 0, "z": 0, "w": w, "d": d, "entry": spawns[0] }]);
