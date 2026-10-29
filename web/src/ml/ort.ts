@@ -9,7 +9,7 @@ import wasmUrl from 'onnxruntime-web/ort-wasm-simd-threaded.asyncify.wasm?url';
 export type OrtModule = typeof import('onnxruntime-web/webgpu');
 
 /** The runtime's WASM binary, and its size in bytes (for progress bars). */
-export const ORT_WASM = { url: wasmUrl, bytes: 26_781_914 };
+export const ORT_WASM = { url: wasmUrl, bytes: 28_747_738 };
 
 /** The runtime's WebGPU build. */
 export function importOrt(): Promise<OrtModule> {

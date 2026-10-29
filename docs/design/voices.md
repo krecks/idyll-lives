@@ -26,7 +26,7 @@ missing or too slow. Measurements and research behind the choices are at the end
   duration predictor (how long a line lasts), text encoder, vector estimator (flow matching: 8
   passes turn noise into the line's latents) and vocoder (44.1 kHz). A whole line in a few large passes, which suits the GPU. The loop is
   ported from Supertone's reference code (`web/helper.js`). It runs in the voice worker on
-  **ONNX Runtime Web** 1.30.0, on WebGPU (the graphics card) or WASM (the processor, Auto's
+  **ONNX Runtime Web** 1.31.1, on WebGPU (the graphics card) or WASM (the processor, Auto's
   fallback). Lines are made one at a time; the Node checks run the same `supertonic.ts` (on the
   CPU).
 - **Deterministic:** the starting noise is ours, a hash of the voice, speed and text, so the
@@ -61,7 +61,7 @@ missing or too slow. Measurements and research behind the choices are at the end
   WebGPU is much slower for both models here (speech 0.7 s against 0.18 s), so the test turns the
   language model off there and the settings say why; voices still run. Not the computer: the
   same Mac is fast in the other browsers.
-- **Download:** 216.7 MB once (the model 185.2, the runtime's WebGPU build 26.8, voices and text
+- **Download:** 218.7 MB once (the model 185.2, the runtime's WebGPU build 28.7, voices and text
   files 3.2, dictionary 1.3, our WASM 0.16), kept in the browser's cache (packed).
 - **Lines of 1–5 sentences (the language model's):** each line is asked for a length picked by
   its seed (1: 20 %, 2: 25 %, 3: 25 %, 4: 15 %, 5: 15 %; `lineSentences` in `talk/writer.ts`),
@@ -586,7 +586,7 @@ times slower (many small passes). Replaced by Supertonic 3 on the GPU. What was 
   the transformer (`flow_lm_main`, one 80 ms frame per run, with its attention caches as state),
   the flow network (one Euler step from noise to the frame's latent) and the Mimi decoder (latents
   to 24 kHz). The loop around them is ported from the export's reference code. It runs in the
-  voice worker on **ONNX Runtime Web** 1.30.0 (WASM with SIMD; two threads when the page is
+  voice worker on **ONNX Runtime Web** 1.31.1 (WASM with SIMD; two threads when the page is
   cross-origin isolated and the computer has six cores or more). Lines are made one at a time;
   the Node checks run the same `pocket.ts`.
 - **Deterministic:** the flow's noise is ours, a hash of the voice, the text and the frame
