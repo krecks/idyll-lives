@@ -1,6 +1,7 @@
 //! Saves written by released builds load and play on with the shipped content: day 5 of a town
 //! saved by v0.1.0 (save version 17), and by the build that was live on the site after it (d7c506e,
-//! version 19). Add one for each release (`tests/saves/`).
+//! version 19); the benchmark's village played two days by v0.4.2 (version 32, the last before 33's
+//! migration). Add one for each release (`tests/saves/`).
 
 mod common;
 
@@ -39,4 +40,19 @@ fn a_town_saved_by_v0_1_0_plays_on() {
 #[test]
 fn a_town_saved_by_the_live_build_after_v0_1_0_plays_on() {
     play_a_day("live_day5.json");
+}
+
+#[test]
+fn a_village_saved_by_v0_4_2_plays_on() {
+    play_a_day("v042_village.json");
+}
+
+#[test]
+fn v0_4_2s_chess_tables_come_through_at_their_new_size() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/saves/v042_village.json");
+    let content = common::content();
+    let w = World::from_save_json(&content, &std::fs::read_to_string(path).unwrap()).unwrap();
+    let def = w.content.objects.iter().position(|d| d.id == "chessTable").unwrap();
+    // (Both had room to grow to 2 x 1: none was sold back.)
+    assert_eq!(w.objects.iter().filter(|o| o.def == def).count(), 2);
 }
