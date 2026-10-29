@@ -109,8 +109,9 @@ function job(e: SocialEvent): string {
 
 export function storyText(e: SocialEvent): string {
   // A promotion saved before promotions paid a bonus names neither the job nor the bonus.
+  const texts = services.content.eventTexts;
   const kind = e.kind === 'promoted' && e.pay === undefined ? 'promotedEarlier' : e.kind;
-  const template = services.content.eventTexts[kind] ?? services.content.eventTexts[e.kind] ?? '{a} and {b}';
+  const template = texts[kind] ?? texts[e.kind] ?? '{a} and {b}';
   return template
     .replace('{a}', name(e.a))
     .replace('{b}', name(e.b))

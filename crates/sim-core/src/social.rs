@@ -987,9 +987,8 @@ impl EventLog {
 
     /// A promotion: `a` now works at `level` in `career`, with a one-off `bonus`.
     pub fn push_promotion(&mut self, tick: u64, a: usize, career: usize, level: usize, bonus: i64) {
-        let mut event = Self::career_event(tick, EventKind::Promoted, a, career, Some(level as i64));
-        event.pay = Some(bonus);
-        self.add(event);
+        let event = Self::career_event(tick, EventKind::Promoted, a, career, Some(level as i64));
+        self.add(SocialEvent { pay: Some(bonus), ..event });
     }
 
     /// A goal event about one Sim.
