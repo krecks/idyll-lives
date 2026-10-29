@@ -1845,10 +1845,15 @@ struct CategoryRaw {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct TrackRaw {
     id: String,
     label: String,
     skills: HashMap<String, f32>,
+    /// Pay at the top of this track relative to the category's `payFactor` (1 = the
+    /// category's rate). Entry grades all pay the category's rate.
+    #[serde(default = "one")]
+    pay_factor: f32,
     #[serde(default)]
     shift: Option<ShiftRaw>,
     titles: Vec<String>,
@@ -3781,6 +3786,8 @@ impl Content {
                     return Err(Error::new(format!("track '{}': invalid shift", track.id)));
                 }
                 let skills = skill_list(&track.skills, &track.id)?;
+                let pay_factor = track.pay_factor.clamp(0.25, 3.0);
+                let top = (track.titles.len() - 1).max(1) as f32;
                 let levels = track
                     .titles
                     .iter()
@@ -3789,7 +3796,13 @@ impl Content {
                     .map(|(gi, (title, grade))| CareerLevel {
                         title: title.clone(),
                         grade: Some(gi),
-                        pay: (grade.pay_per_hour * cat.pay_factor * shift.hours).round() as i64,
+                        // Entry grades pay the field's base rate; the track's factor only
+                        // separates the top of one track from another (senior pay differs).
+                        pay: (grade.pay_per_hour
+                            * cat.pay_factor
+                            * (1.0 + (pay_factor - 1.0) * gi as f32 / top)
+                            * shift.hours)
+                            .round() as i64,
                         start_hour: shift.start,
                         hours: shift.hours,
                         days: shift.days.0,
@@ -3840,7 +3853,8 @@ impl Content {
             performance_per_shift: cr.performance_per_shift.unwrap_or(12.0),
             performance_per_fit: cr.performance_per_fit.unwrap_or(0.0),
             performance_per_mood: cr.performance_per_mood.unwrap_or(15.0),
-            probation_levels: cr.probation_levels.unwrap_or(0.0),
+            // A shortfall of more than one level is never close enough to hire on probation.
+            probation_levels: cr.probation_levels.unwrap_or(0.0).clamp(0.0, 1.0),
             workweek,
             promotion_feeling: feeling(&cr.promotion_feeling, "careerRules")?,
             missed_feeling: feeling(&cr.missed_feeling, "careerRules")?,
@@ -4516,6 +4530,36 @@ mod tests {
         assert_eq!(c.feelings[0].emotion, Some(0));
         assert_eq!(c.social_rules.busy_tags, 1);
         assert_eq!(c.social_rules.default_bond.unwrap().friendship, 25.0);
+    }
+
+    #[test]
+    fn track_pay_separates_the_top_and_probation_stops_at_one_level() {
+        let c = Content::from_json(
+            r#"{
+            "needs":[{"id":"fun","label":"Fun","decayPerHour":0.06}],
+            "objects":[],
+            "skills":[{"id":"writing","label":"Writing"}],
+            "grades":[{"id":"A","label":"Entry","payPerHour":10,"skillLevel":0},
+                      {"id":"B","label":"Junior","payPerHour":20,"skillLevel":2}],
+            "careerCategories":[{"id":"words","label":"Words","payFactor":1.0,
+              "shift":{"start":9,"hours":8,"days":[0]},
+              "tracks":[
+                {"id":"words.low","label":"Low","skills":{"writing":1},"payFactor":0.5,
+                 "titles":["Low A","Low B"]},
+                {"id":"words.high","label":"High","skills":{"writing":1},"payFactor":1.5,
+                 "titles":["High A","High B"]}]}],
+            "careerRules":{"probationLevels":2}
+        }"#,
+        )
+        .unwrap();
+        // More than one level short is never "close enough to hire on probation".
+        assert_eq!(c.career_rules.probation_levels, 1.0);
+        let low = &c.careers[c.career_index("words.low").unwrap()];
+        let high = &c.careers[c.career_index("words.high").unwrap()];
+        // Entry pay is the field's rate whatever the track.
+        assert_eq!((low.levels[0].pay, high.levels[0].pay), (80, 80));
+        // The track factor only separates the top of the field.
+        assert_eq!((low.levels[1].pay, high.levels[1].pay), (80, 240));
     }
 
     #[test]

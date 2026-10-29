@@ -124,7 +124,7 @@ export function storyText(e: SocialEvent): string {
       return `${l === 'A' || l === 'F' ? 'an' : 'a'} ${l}`;
     })())
     .replace('{n}', String(e.n ?? ''))
-    .replace('{money}', money(e.n ?? 0))
+    .replace('{money}', money(e.pay ?? e.n ?? 0))
     .replace('{skill}', services.content.skills[e.skill ?? -1]?.label ?? '');
 }
 

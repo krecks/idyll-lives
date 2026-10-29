@@ -880,7 +880,7 @@ walks to it on their own any more.
 Money: households start with $2,500 (`economy.startingFunds`), plus $10,000 to build with when
 they start on an empty lot in a Living game (`economy.emptyLotFunds`; a ready-made house is worth
 about $7,500–12,000); rent is about $200 a week on a house plot; an
-entry-level job pays roughly $70–150 a shift (grades run from $12/h to $52/h). Running costs
+entry-level job pays roughly $70–150 a shift (grades run from $12/h to $60/h, with the track's `payFactor` separating senior pay within a field: entry grades all pay the field's rate, and grade J pays `payFactor` × that rate, 0.5–1.8 in the base game. Running costs
 come as weekly **bills**, paid with the rent: `economy.rent.billsBase` ($25) plus `billsRate`
 (1.5%) of what the household's objects are worth (price plus upgrades) plus `perResident`
 ($150 per resident). A $2,000 luxury item adds about $30 a week. A working household saves

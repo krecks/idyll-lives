@@ -777,6 +777,8 @@ export interface SocialEvent {
   c?: number;
   /** A level or an amount of money. */
   n?: number;
+  /** A one-off payment that came with the event (a promotion bonus). */
+  pay?: number;
   /** Skill index. */
   skill?: number;
   /** Career index (catalog `careers`), for job events; `n` is then the level. Goal events: career category index. */

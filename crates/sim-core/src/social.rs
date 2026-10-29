@@ -892,6 +892,9 @@ pub struct SocialEvent {
     /// A number for the story (a level, an amount of money).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub n: Option<i64>,
+    /// A one-off payment that came with the event (a promotion bonus).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pay: Option<i64>,
     /// Skill index, for skill events.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub skill: Option<u32>,
@@ -925,6 +928,7 @@ impl EventLog {
             b: b as u32,
             c: c.map(|c| c as u32),
             n: None,
+            pay: None,
             skill: None,
             career: None,
             goal: None,
@@ -949,6 +953,32 @@ impl EventLog {
             b: a as u32,
             c: None,
             n,
+            pay: None,
+            skill: None,
+            career: Some(career as u32),
+            goal: None,
+            object: None,
+        });
+    }
+
+    /// A promotion: `a` now works at `level` in `career`, with a one-off `bonus`.
+    pub fn push_promotion(
+        &mut self,
+        tick: u64,
+        a: usize,
+        career: usize,
+        level: usize,
+        bonus: i64,
+    ) {
+        self.add(SocialEvent {
+            id: 0,
+            tick,
+            kind: EventKind::Promoted,
+            a: a as u32,
+            b: a as u32,
+            c: None,
+            n: Some(level as i64),
+            pay: Some(bonus),
             skill: None,
             career: Some(career as u32),
             goal: None,
@@ -966,6 +996,7 @@ impl EventLog {
             b: a as u32,
             c: None,
             n: Some(goal.target.round() as i64),
+            pay: None,
             skill: goal.skill.map(|s| s as u32),
             career: goal.category.map(|c| c as u32),
             goal: Some(goal.def as u32),
@@ -990,6 +1021,7 @@ impl EventLog {
             b: a as u32,
             c: None,
             n,
+            pay: None,
             skill: skill.map(|s| s as u32),
             career: None,
             goal: None,
@@ -1007,6 +1039,7 @@ impl EventLog {
             b: b as u32,
             c: None,
             n: Some(n),
+            pay: None,
             skill: None,
             career: None,
             goal: None,
@@ -1024,6 +1057,7 @@ impl EventLog {
             b: a as u32,
             c: None,
             n,
+            pay: None,
             skill: None,
             career: None,
             goal: None,
