@@ -519,7 +519,7 @@ if (what === 'play') {
   const pairs = (name, key, value, what) =>
     items(flag(name, '')).map((p) => {
       const [k, v] = p.split('=');
-      if (!k || !Number.isFinite(Number(v))) fail(`'${p}' in --${name} isn't <${key}>=<${what}>`);
+      if (!k || !v?.trim() || !Number.isFinite(Number(v))) fail(`'${p}' in --${name} isn't <${key}>=<${what}>`);
       return { [key]: k, [value]: Number(v) };
     });
   /** `--skills cooking=5,creativity=3`: the resident's, set each time the state opens. */
@@ -553,7 +553,7 @@ if (what === 'play') {
   if (talks.some((t) => t.kind === 'social') && sims.length < 2) fail('--social needs two residents: --sims <who>,<with whom>');
   const which = flag('use', batch ? 'all' : '0');
   /** The camera following the resident: `--radius` (else `radius`), `--beta`, `--alpha`, `--y`, the ones given. */
-  const view = (radius) => Object.fromEntries(Object.entries({ radius: num('radius', radius), beta: num('beta'), alpha: num('alpha'), y: num('y') }).filter(([, v]) => v));
+  const view = (radius) => Object.fromEntries(Object.entries({ radius: num('radius', radius), beta: num('beta'), alpha: num('alpha'), y: num('y') }).filter(([, v]) => Number.isFinite(v)));
   const shots = num('shots', batch ? 3 : 6);
   const every = num('every', batch ? 1000 : 500);
   const cap = num('wait', 60) * 1000;

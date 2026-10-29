@@ -1221,7 +1221,11 @@ export async function startSession(
         const d = content.object(o.def);
         return o.id !== objectId && o.x >= plot.x && o.z >= plot.z && o.x < plot.x + plot.w && o.z < plot.z + plot.d && (o.wear ?? 0) < 1 && (it.requires ?? []).every((r) => d?.provides?.includes(r)) && d?.interactions.some((i) => i.id === it.fetch);
       });
-      const shut = sources.filter((o) => staffed(world, o.id) && !openAt(content.object(o.def)!, game.minute));
+      // (As `staff::closed`: only a sold use at a post someone serves at is ever shut.)
+      const shut = sources.filter((o) => {
+        const d = content.object(o.def)!;
+        return !!d.interactions.find((i) => i.id === it.fetch)?.selfServe && staffed(world, o.id) && !openAt(d, game.minute);
+      });
       return sources.length && shut.length === sources.length ? (content.object(shut[0].def)?.staff?.hours[0] ?? null) : null;
     };
     const items: { label: string; index: number; disabled?: boolean; cost?: number }[] = def.interactions.flatMap((it, index) => {

@@ -3572,7 +3572,12 @@ impl World {
                     }));
                 }
                 // Sold at a post outside its hours (or a coffee from a café that's shut): closed.
-                let on: Vec<u32> = self.objects.iter().filter(|o| self.object_plot.get(o.id as usize) == self.object_plot.get(object as usize)).map(|o| o.id).collect();
+                // (As `closed_at`: the objects on its plot, none off the plots.)
+                let plot = self.object_plot.get(object as usize).copied().flatten();
+                let on: Vec<u32> = match plot {
+                    Some(p) => self.objects.iter().filter(|o| self.object_plot.get(o.id as usize).copied().flatten() == Some(p)).map(|o| o.id).collect(),
+                    None => Vec::new(),
+                };
                 if let Some(post) = crate::staff::closed(&self.content, &self.staff, &self.objects, &on, object, inter, crate::clock::hour(self.tick)) {
                     let name = self.content.objects[self.objects[post as usize].def].name.to_lowercase();
                     let opens = crate::staff::opens(&self.content, &self.objects, post).map_or(String::new(), |h| format!(": it opens at {}", clock_time(h)));

@@ -236,7 +236,7 @@ pub(crate) fn update(world: &mut World) {
         }
         let range = def.slots_for(interaction);
         // (Trying for a baby is with the one it was asked of, sent along with them
-        // (`privacy::to_bed`): nobody else is fetched.)
+        // (`Sim::to_bed`, `privacy::after_step`): nobody else is fetched.)
         let room = world.objects[object as usize].users[range].iter().any(Option::is_none) && !def.interactions[interaction].conceive;
         match room.then(|| partner_for(world, a, object, interaction)).flatten() {
             Some(b) => fetch(world, b, a, object, interaction),
