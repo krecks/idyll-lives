@@ -1,5 +1,10 @@
 # Idyll Lives 0.5.0 — the open points
 
+- **Branch:** `release/0.5.0` (the ten streams below, merged in turn, then the follow-ups, the version and notes), merged into `main` by pull request; tag `v0.5.0` on the merge.
+- **Base:** v0.4.2 at `c9066c66`, with `main`'s PRs #29–#32 merged in.
+- **Status:** releasing 2026-10-29.
+- **Release type:** features: everything left open after 0.4.2.
+
 What was left open after 0.4.2 (`docs/objects/open.md` "Still open", `docs/authenticity-review.md` §9, PR #31's
 "Checked and left as it is", `docs/design/performance.md` "Low on WebGL2"), done now. The owner asked for all of it
 (2026-10-26), including the new behaviour that decision 3 had put off.
@@ -39,3 +44,45 @@ bumps into one at the merge.
 
 G2, G1, H, F2, F1, A, B, E, C, D — the contained ones first, the sim's new behaviour last, so each conflicts with
 as little as possible.
+
+## Release
+
+### What ships
+
+Player notes: the `## 0.5.0` section of [CHANGELOG.md](../CHANGELOG.md), also in [release-0.5.0-notes.md](release-0.5.0-notes.md). What each stream did and what it left: [docs/objects/open.md](../docs/objects/open.md) and the review ledgers.
+
+After the streams: the props still mimed (a pen, the marker, the receiver, the ball in play), the birds at the seed, the camera keeping up at speeds 3–5, the play tool for several residents, socials and the phone, the debug states' gaps (authenticity review §7), the street's flower beds with no door, and the instanced draws' cached world box (Low's main thread, `docs/design/performance.md`).
+
+- **Saves:** format 33 (the home chess table's 2 × 1 footprint, `migrate_32_grown`). 0.4.2's saves load; 0.4.2 can't open 0.5.0's (it keeps and skips them), so going back to 0.4.2 hides saves made since until 0.5.0 is back.
+- **Dependencies:** PlayCanvas 2.23.3, ONNX Runtime Web 1.31.1 (PR #32).
+
+### Version
+
+`cargo release-version 0.5.0`; CHANGELOG `## 0.5.0 — 2026-10-29`; README 0.5.0 and the saves; PLAN.md's status line points here.
+
+### Release gates (local, 2026-10-29)
+
+| Gate | Result |
+|---|---|
+| `cargo clippy --workspace --all-targets --locked -- -D warnings` | pass |
+| `cargo test -p sim-core --locked` | pass (684, 21 ignored) |
+| generated houses and worlds (`--ignored`, as CI) | pass |
+| `cargo test -p ll-tools --release --locked` | pass (101) |
+| `cargo test -p voice --release --locked` | pass (32) |
+| `cargo release-version` | 0.5.0 everywhere |
+| `bun run check` | 0 errors, 0 warnings |
+| `bun run lint` | clean |
+| `bun run test` | pass (122) |
+| `bun run check:chunks` | 195 anchors and names found in PlayCanvas 2.23.3 |
+| `bun run check:clips` | 311 clips, 0 new, 0 known |
+| `bun run check:voice`, `check:llm` | pass |
+| `bun run build` | pass |
+
+### Release steps
+
+1. Pull request `release/0.5.0` → `main`; CI passes on it; review; merge (a merge commit).
+2. Dry run: `gh workflow run pages.yml --ref main -f deploy=false`, watched to the end.
+3. Tag and push: `git tag -a v0.5.0 -m "Idyll Lives 0.5.0: the open points"`, `git push origin v0.5.0`; watch the tag's run.
+4. Live checks: the bundle's version and build, cross-origin isolated, the benchmark game on WebGPU and WebGL2 with no page errors.
+5. `gh release create v0.5.0 --verify-tag --title "Idyll Lives 0.5.0" --notes-file plan/release-0.5.0-notes.md`.
+6. Clean up the merged stream branches and `release/0.5.0`.
