@@ -145,8 +145,9 @@ their finding ids. What is still open is here, with its id; §9 of the review sa
   the phone, and the debug states' gaps are closed (tools/bench/README.md).
 
 ### Not looked at
-- Low on WebGL2 against Babylon's figures since the woods went into squares: the machine was too busy for the 0.4.1
-  method (`performance.md`, 0.5.0), and the squares' +0.2 ms of main thread wants a look.
+- Low on WebGL2's orbits are 11–16 % over Babylon's GPU time (0.4–0.6 ms; the plan allows 10 %), on a quiet machine
+  with the 0.4.1 method; not the woods, and about the size of the noise (`performance.md`, 0.5.0). The wide view
+  is +5 %, Dusk and Build at Babylon's.
 - The held things that no recipe in the test house makes (the tasting board, pizza, pie, slices, sandwich, grill
   platter); a meal from the fridge eaten at a pulled-in chair (eating was checked with the café's cake).
 

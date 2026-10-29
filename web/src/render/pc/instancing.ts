@@ -75,6 +75,10 @@ export class Instances {
   private capacity = 0;
   private readonly cull: boolean;
   private readonly box = new pc.BoundingBox();
+  /** `box`'s version, and the box's and the entity's (`_aabbVer`) the world box was last worked out at. */
+  private boxVer = 0;
+  private worldBoxVer = -1;
+  private worldNodeVer = -1;
   private readonly lo = new pc.Vec3();
   private readonly hi = new pc.Vec3();
 
@@ -234,7 +238,22 @@ export class Instances {
       hi.set(0, 0, 0);
     }
     this.box.setMinMax(lo, hi);
-    this.meshInstance.setCustomAabb(this.box);
+    this.boxVer++;
+    // The world box is worked out again only when the box or the entity's place changes: for a custom box
+    // PlayCanvas does it every frame, 0.08 ms a frame on Low and 0.19 ms with its woods in squares (518 draws).
+    // SAFETY: a mesh instance asks `_updateAabbFunc` for its world box, and a node's `_aabbVer` moves
+    // whenever its world transform does (tools/render/check_chunks.ts).
+    const mi = this.meshInstance as unknown as { _updateAabbFunc: ((out: pc.BoundingBox) => pc.BoundingBox) | null };
+    mi._updateAabbFunc ??= (out) => {
+      const world = this.entity.getWorldTransform();
+      const nodeVer = (this.entity as unknown as { _aabbVer: number })._aabbVer;
+      if (nodeVer !== this.worldNodeVer || this.boxVer !== this.worldBoxVer) {
+        out.setFromTransformedAabb(this.box, world);
+        this.worldNodeVer = nodeVer;
+        this.worldBoxVer = this.boxVer;
+      }
+      return out;
+    };
   }
 
   /** Stops drawing and lets go of the buffer (the mesh and material are the template's). */

@@ -446,6 +446,36 @@ The room mask's cost on Low with WebGL2 is within the noise (0.0–0.1 ms here; 
 
 Against Babylon: its runs were with vsync, at whatever clocks the GPU chose then, so they can't be set beside these. The 0.4.1 gap (wide view +0.6–0.7 ms) was about nature's cost then (−0.75 ms); the squares take about 40 % of nature's cost away (−0.33 of −0.8 ms without vsync), so the wide view may now be within the plan's +10 %, but that can only be checked on a quiet machine with the 0.4.1 method.
 
+### Low on WebGL2 on a quiet machine, and the world boxes (0.5.0)
+
+2026-10-29, the same machine with nothing else running (no process but the window server above 10 % of a core), PlayCanvas 2.23.3, the 0.4.1 method: the production build, windows at 120 Hz with vsync, 20 s after a 5 s warm-up, three rounds, each the squares and then the sectors (`?woodscell=0`) beside them. A first set as the branch stood (`bench-results/0.5.0/quiet-*`), a second with the world boxes below (`boxes-*`).
+
+Even on a quiet machine the GPU time with vsync still spreads: the wide view with squares came out at 5.39, 4.55 and 3.89 ms in the first set's three rounds, 4.32, 4.22 and 4.17 in the second's. Low on WebGL2 against Babylon's single run, GPU ms (median of 3):
+
+| scenario | Babylon | 0.4.1 | first set: squares / sectors | second set: squares / sectors |
+|---|---|---|---|---|
+| orbit-day | 3.83 | 4.07–4.24 | 4.42 (+15 %) / 4.39 | 4.32 (+13 %) / 4.36 |
+| orbit-night | 3.96 | 4.22 | 4.59 (+16 %) / 5.32 | 4.39 (+11 %) / 4.79 |
+| dusk | 4.16 | 4.25 | 4.11 (−1 %) / 4.54 | 4.24 (+2 %) / 4.29 |
+| build | 3.69 | 3.77 | 3.60 (−3 %) / 3.87 | 3.77 (+2 %) / 3.85 |
+| wide | 4.03 | 4.67–4.76 | 4.55 (+13 %) / 4.27 | 4.22 (+5 %) / 4.22 |
+
+So the wide view, +16–18 % in 0.4.1 and the one gap clear of the noise then, is +5 % in the steadier second set. Dusk and Build are at Babylon's. The orbits stay 11–16 % over in both sets, 0.4–0.6 ms; that is past the plan's +10 %, but it isn't the woods (squares and sectors alike: 4.32 and 4.36 ms), and with three rounds spreading by up to 0.5 ms it is about the size of the noise. What else costs more there isn't known yet. Under vsync the squares' own GPU saving (−0.11 to −0.33 ms without vsync, above) doesn't show past the noise.
+
+**The world boxes.** A CPU profile of the bench page (Low, WebGL2, orbit-day, 12 s, twice each way) put most of the squares' main-thread cost in one function: PlayCanvas works out a draw's world box again every frame when it has a box of its own (`setCustomAabb`, which every culled `Instances` draw sets), and the woods' 518 draws took that from 0.08 to 0.19 ms a frame. The woods, the street's things and the flowers never move. `Instances` now keeps the world box until the box or the entity's place changes (`_updateAabbFunc`, against the node's `_aabbVer`; both in `check:chunks`), and the function's share fell to under 0.001 ms. Test: `tests/instancesBox.test.ts`, on the engine's null device. Low and Medium's 36 benchmark shots on both backends are the same to the pixel before and after, but for the car on the far road in the wide night shots (at most 0.032 %).
+
+Main thread, ms (median of 3; the squares' cost is against the sectors of the same set):
+
+| scenario | first set: squares / sectors (cost) | second set: squares / sectors (cost) |
+|---|---|---|
+| orbit-day | 1.43 / 1.27 (+0.16) | 1.29 / 1.17 (+0.12) |
+| orbit-night | 1.47 / 1.35 (+0.12) | 1.29 / 1.23 (+0.06) |
+| dusk | 1.79 / 1.61 (+0.18) | 1.68 / 1.57 (+0.12) |
+| build | 1.44 / 1.21 (+0.23) | 1.31 / 1.22 (+0.09) |
+| wide | 1.55 / 1.23 (+0.31) | 1.31 / 1.19 (+0.13) |
+
+The squares now cost the main thread about half what they did, and Low with squares is 0.06–0.24 ms lighter than before. Every preset gains a little, since all culled instanced draws keep their box (the sectors here 0.04–0.12 ms). What is left of the squares' cost is the 446 more entities walked each frame (`syncHierarchy`, about +0.02 ms) and the GL state of the draws (texture binds and uniforms).
+
 ### The production build again (0.5.0)
 
 2026-10-26, the Stage 11 matrix again on the production build as it stands for 0.5.0 (its objects from the authenticity review, `fix/rendering-open` and the woods' squares on Low): `render.mjs` against `vite preview`, the village with its 41 residents, 1920×1080 at DPR 1, vsync at 120 Hz, 20 s after a 5 s warm-up, one run per cell (`bench-results/0.5.0/production`). The machine was shared, so the GPU column is the clocks' as much as the frame's (see above: one cell's GPU time can be 3 or 6 ms from one run to the next); the main thread, draws and frames are the comparison.

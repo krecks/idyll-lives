@@ -42,6 +42,9 @@ const NEEDED: { file: string; text: string; who: string }[] = [
   { file: 'framework/app-base.js', text: 'setApplication(this);', who: 'device.ts: createSideApp (the constructor makes the newest app current)' },
   { file: 'framework/globals.js', text: 'function setApplication(app) {', who: 'engine.ts: getApplication and setApplication, by path' },
   { file: 'framework/entity.js', text: 'constructor(name, app = getApplication()) {', who: 'instancing.ts: an entity on its parent\'s app (`_app`), not the current one' },
+  // render/pc/instancing.ts: a draw's world box kept until its box or its entity's place changes.
+  { file: 'scene/mesh-instance.js', text: 'return this._updateAabbFunc(this._aabb);', who: 'instancing.ts: the world box asked of `_updateAabbFunc`' },
+  { file: 'scene/graph-node.js', text: 'this._aabbVer++;', who: 'instancing.ts: `_aabbVer` moves with the world transform' },
   // render/preview/portraits.ts: a read sent at once (otherwise its buffer is mapped before the copy is submitted).
   { file: 'platform/graphics/webgpu/webgpu-graphics-device.js', text: 'async readBuffer(stagingBuffer, size, data = null, immediate = false) {', who: 'preview/portraits.ts: the portraits read back with `immediate`' },
   // render/pc/shaders/*, materials.ts, env.ts (and crates/tools/src/envconv.rs): the chunks the game's
