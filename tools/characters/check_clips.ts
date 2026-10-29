@@ -136,7 +136,7 @@ const RUNTIME: Record<string, boolean> = {
   // On the floor (clips/seated.ts FLOOR_SITS): cross-legged on a cushion, on the ground against a trunk.
   ...Object.fromEntries(FLOOR_SITS.flatMap(({ name }: any) => [[`sit${name}`, true], [`sitDown${name}`, false], [`standUp${name}`, false]])),
   interact: false, pickUp: false, dance: true, punchJab: false, punchCross: false, hit: false, kneel: true, crouch: true,
-  eat: false, water: true, harvest: true, pick: true, foldArms: true, no: true, yes: false, phone: true, rail: true, spell: true,
+  eat: false, eatFork: false, water: true, harvest: true, pick: true, foldArms: true, no: true, yes: false, phone: true, rail: true, spell: true,
   push: true, plant: false, lantern: true, babyLieAsleep: true, babyLieAwake: true,
   // Games and sport at things (characters.ts ACTIONS; clips/games.ts), those in one size.
   dartThrow: true, pingPong: true, yoga: true,
@@ -156,7 +156,7 @@ const PHASE2: Record<string, boolean> = { lie: true, chop: true, stir: true, fli
 const LENGTH: Record<string, number> = {
   idle: 2.5, talk: 2.9, walk: 1.1, jog: 0.7, jogAlong: 0.7, runAlong: 0.6, sit: 1.7, sitTalk: 2.9, sitDown: 1.33, standUp: 1.07, sitHands: 1.7, sitHandsNear: 1.7, sitHandsFar: 1.7, interact: 2.0, pickUp: 0.87,
   ...Object.fromEntries(FLOOR_SITS.flatMap(({ name }: any) => [[`sit${name}`, 1.7], [`sitDown${name}`, 1.6], [`standUp${name}`, 1.47]])),
-  dance: 1.0, punchJab: 0.87, punchCross: 1.0, hit: 0.33, kneel: 5.2, crouch: 2.9, eat: 1.33, water: 3.8, harvest: 2.5, pick: 3, plant: 2.8, foldArms: 2.5,
+  dance: 1.0, punchJab: 0.87, punchCross: 1.0, hit: 0.33, kneel: 5.2, crouch: 2.9, eat: 1.33, eatFork: 1.33, water: 3.8, harvest: 2.5, pick: 3, plant: 2.8, foldArms: 2.5,
   yes: 2.5, no: 2.5, phone: 2.9, lantern: 2.5, rail: 2.5, spell: 2.1, push: 2.7, babyLieAsleep: 9, babyLieAwake: 6,
   dartThrow: 7.2, pingPong: 1.8, yoga: 48,
   ...SOCIAL,
@@ -170,7 +170,7 @@ const BABY_REACH = 0.6;
 /** The baby's own clips (characters.ts `BABY_LIE`): the only ones a baby plays. */
 const BABY = new Set(['babyLieAsleep', 'babyLieAwake']);
 /** One-shots whose feet stay planted (sitting down and standing up move them on purpose). */
-const PLANTED = new Set(['interact', 'pickUp', 'eat', 'yes', 'punchJab', 'punchCross', 'hit', 'plant', 'drink', 'wave', 'toss', ...[...PICK_APPLE, ...PICK_LEMON].map(({ clip }: any) => clip)]);
+const PLANTED = new Set(['interact', 'pickUp', 'eat', 'eatFork', 'yes', 'punchJab', 'punchCross', 'hit', 'plant', 'drink', 'wave', 'toss', ...[...PICK_APPLE, ...PICK_LEMON].map(({ clip }: any) => clip)]);
 /** The seat `sit` is checked on (m): a chair's, a child's the kids' chair (content `kidsChair`). */
 const SEAT: Record<string, number> = { child: 0.31 };
 /** The turns on the spot by clip name. */
