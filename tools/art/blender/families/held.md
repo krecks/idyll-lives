@@ -68,7 +68,7 @@ sideways; the pan and the grill food, which stand off their middle, take their m
 | `tool.glass` | a tumbler 7 x 11 cm of an orange drink (seen through the glass), two ice cubes | 1 | 340 |
 | `tool.wineGlass` | a stemmed glass 19 cm high, red wine to the bowl's widest | 1 | 468 |
 | `tool.can` | a 330 ml can, red with a white band, its ends pressed in, a ring pull | 1 | 392 |
-| `tool.fork` | a steel fork 17 cm long, an outline extruded: a handle widening to its end, four tines | 1 | 92 |
+| `tool.fork` | a polished dinner fork 20 cm long, 3 mm thick, an outline extruded: a handle widening to 1.5 cm at its end, four tines 2.6 cm across (chrome, to catch the light from the game camera) | 1 | 92 |
 | `tool.spoon` | a steel dessert spoon 17 cm long, an oval bowl | 1 | 124 |
 | `tool.chopsticks` | a pair of tapering wooden chopsticks 23 cm long | 1 | 24 |
 | `tool.coin` | a brass coin 2.3 cm across, a milled rim | 1 | 140 |

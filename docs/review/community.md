@@ -371,7 +371,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/public/content/community.json:280` (`fountainTown` `wish`: `anim: look`), `:37` (`parkBench` `feedBirds`: `anim: sit`); `web/src/render/babylon/characters.ts:523` (`ACTIONS.look`: `idle`, `foldArms`)
 - **Evidence:** `sheets/obj-fountainTown.png` (`play/shops-town/fountainTown-wish-01.png`): the wisher stands at the rim, arms folded, for 5 minutes; no throw. `sheets/obj-parkBench.png` (`play/shops-town/parkBench-feedBirds-01.png`): "Feed the pigeons" is the bench's sit, hands in the lap, no birds on the ground. A toss (an `interact` throw toward the basin) is a table change; the coin and the crumbs are I-held-01, the birds new behaviour.
-- **Status:** fixed in part (b98bc6af): the coin toss and the seed; the pigeons themselves are new behaviour, later
+- **Status:** fixed (the coin and the seed bag b98bc6af; the birds coming down to the seed 2026-10-29: birds.ts, `Residents.seed`)
 - **After:** a wish is a coin looked at in the palm, held to the chest and tossed underarm over the rim (`toss`, `ACTIONS.look` at `fountainTown`, `tool.coin` in the hand until it goes), then standing at the rim; *Feed the pigeons* is the `feed` animation: a bag of seed on the left palm over the lap and a pinch flung ahead every three seconds (`scatter`, the seated upper layer, `tool.seedBag`). No birds come down to it. `fixes/props/pairs2.png` (`wish-t1`, `feed-t1.5`), in play `pairs4.png` (`parkBench-feedBirds-s0-2`).
 - **Source:** community wave (play)
 

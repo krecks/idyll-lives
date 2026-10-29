@@ -606,7 +606,7 @@
   "tool.coin": [0.0, 0.0],
   "tool.cue": [0.0, 0.736],
   "tool.dart": [-0.0038, -0.013],
-  "tool.fork": [0.0, 0.0255],
+  "tool.fork": [0.0, 0.023],
   "tool.glass": [0.0, 0.0],
   "tool.grillFood": [-0.015, -0.005],
   "tool.marker": [0.0, -0.0425],

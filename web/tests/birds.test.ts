@@ -150,7 +150,7 @@ describe('garden birds', async () => {
       const camera = { x: 26, y: 12, z: 8 };
       const heads = new Float32Array(12);
       const visible = new Uint8Array(4);
-      const frame = { dt: 0, speed: 1, hour: 0, camera, residents: heads, residentCount: 4, visible, calm: false, roof: true };
+      const frame = { dt: 0, speed: 1, hour: 0, camera, residents: heads, residentCount: 4, visible, seed: new Float32Array(0), seedCount: 0, calm: false, roof: true };
       const habitat = (plants: readonly (readonly PlantPlacement[])[], hour: number) => ({ world, view: lot, plants, ridge: roof.ridge, roofTop: roof.top, houseTop, hour });
       birds.setQuality({ count: 40, range: 50 });
       await birds.setHabitat(habitat([garden, outdoor, street, woods], 4.5));
@@ -261,6 +261,52 @@ describe('garden birds', async () => {
     } finally {
       for (const undo of restore) undo();
       birds.dispose();
+      random = realRandom;
+    }
+  });
+
+  test('seed thrown on the lawn brings the ground birds down round it, and they stay by the one throwing it', async () => {
+    const realNow = performance.now;
+    let now = 0;
+    performance.now = () => now;
+    random = numbers(3);
+    try {
+      const birds = new Birds(view, assets, true);
+      const camera = { x: 26, y: 14, z: 6 };
+      // One resident on the lawn by the garden's trees, sitting, throwing seed a metre in front of them.
+      const heads = Float32Array.from([18, 1.1, 24.9]);
+      const visible = Uint8Array.from([1]);
+      const seed = Float32Array.from([18, 26, 0]);
+      const frame = { dt: 1 / 60, speed: 1, hour: 9, camera, residents: heads, residentCount: 1, visible, seed, seedCount: 1, calm: false, roof: true };
+      birds.setQuality({ count: 40, range: 50 });
+      await birds.setHabitat({ world, view: lot, plants: [garden, outdoor, street, woods], ridge: roof.ridge, roofTop: roof.top, houseTop, hour: 9 });
+      const near = () => birds.debug().birds.filter((b) => b.state === 'ground' && Math.hypot(b.x - 18, b.z - 26) < 1.6);
+      let most = 0;
+      let flew = 0;
+      const was = new Map<number, string>();
+      for (let f = 0; f < 60 * 120; f++) {
+        now += 16.7;
+        birds.update(frame);
+        most = Math.max(most, near().length);
+        // Nobody by the seed flies up from the one throwing it (only when their time's up, away from it).
+        for (const b of birds.debug().birds) {
+          if (was.get(b.id) === 'ground' && b.state === 'fly' && Math.hypot(b.x - 18, b.z - 26) < 1.6) flew++;
+          was.set(b.id, b.state);
+        }
+      }
+      expect(most).toBeGreaterThanOrEqual(3);
+      expect(flew).toBe(0);
+      expect(birds.debug().stats.scaredBy ?? 0).toBe(0);
+      // The seed gone, they go back to their trees in time.
+      frame.seedCount = 0;
+      for (let f = 0; f < 60 * 90; f++) {
+        now += 16.7;
+        birds.update(frame);
+      }
+      expect(near().length).toBeLessThan(most);
+      birds.dispose();
+    } finally {
+      performance.now = realNow;
       random = realRandom;
     }
   });

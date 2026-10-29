@@ -290,6 +290,9 @@ export function eatPose(t: number, at: Vec, head: Vec, lean: number): PoseSpec {
   };
 }
 
+/** Where the hand comes up to with cutlery (`eatFork`): a fork's length out in front of and below the mouth (m, reference skeleton standing). */
+export const FORK_BITE: Vec = [0.07, 1.4, 0.3];
+
 /** Where the cup is held between sips (the palm, m, reference skeleton standing; the seated upper layer the same about the shoulder). */
 export const CUP_HELD: Vec = [0.12, 1.15, 0.27];
 
@@ -329,6 +332,16 @@ export function seatedClips(): ClipDef[] {
       [0.4, () => eatPose(0.4, [mouth[0], mouth[1] + 0.01, mouth[2] - 0.01], [-6, 0, 0], 5), 'out'],
       [0.6, () => eatPose(0.6, [0.06, 1.4, 0.2], [6, 0, 2], 3), 'smooth'],
       [0.82, () => eatPose(0.82, [0.1, 1.08, 0.27], [4, 0, 0], 1), 'smooth'],
+      [1, () => eatPose(1, low, [0, 0, 0], 0), 'smooth'],
+    ]),
+    // A bite from a fork (actions.ts `PROPS.fork`, the spoon, the chopsticks): the hand up to a fork's length in front
+    // of the mouth, the head leaning in to meet it, back down; the cutlery then shows between hand and mouth.
+    clip('eatFork', { seconds: 40 / 30, loop: false }, [
+      [0, () => eatPose(0, low, [0, 0, 0], 0)],
+      [0.32, () => eatPose(0.32, FORK_BITE, [10, 0, 0], 9), 'smooth'],
+      [0.42, () => eatPose(0.42, [FORK_BITE[0], FORK_BITE[1] + 0.01, FORK_BITE[2] - 0.01], [8, 0, 0], 8), 'out'],
+      [0.62, () => eatPose(0.62, [0.08, 1.3, 0.3], [5, 0, 1], 4), 'smooth'],
+      [0.82, () => eatPose(0.82, [0.1, 1.08, 0.28], [3, 0, 0], 1), 'smooth'],
       [1, () => eatPose(1, low, [0, 0, 0], 0), 'smooth'],
     ]),
     // A sip from a cup (actions.ts `PROPS.mug`): cup up from the chest, the head tips back for the sip, back down.

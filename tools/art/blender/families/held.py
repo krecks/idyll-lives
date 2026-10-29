@@ -194,6 +194,7 @@ M = G.Palette(
     cake_icing=('#FBF4EA', 'satin'),
     cake_jam=('#B8283A', 'satin'),
     cake_berry=('#C42A30', 'gloss'),
+    fork=('#E4E8EC', 'chrome'),        # a polished fork, bright to be seen in a hand
     pen=('#1F3F7A', 'gloss'),          # a ballpoint's barrel
     pencil=('#E8B830', 'satin'),       # a pencil's yellow paint
     pencil_wood=('#D9B488', 'matte'),
@@ -1392,12 +1393,13 @@ def _along(name, outline, t, y, shift, material):
 
 
 def fork():
-    """A steel table fork, 18 cm long, lying flat, its tines to the front (+depth) and held at the origin, 6 cm
-    from the handle's end: a handle widening to its end, a neck, four tines."""
-    handle = [(-0.125, 0.0), (-0.12, -0.0058), (-0.04, -0.0042), (0.0, -0.0026), (0.0, 0.0026), (-0.04, 0.0042),
-              (-0.12, 0.0058)]
-    _along('handle', handle, 0.0024, 0.0, 0.065, M.steel)
-    _along('head', _tines(4, 0.0115, 0.046, 0.026, 0.0026), 0.0022, 0.0002, 0.065, M.steel)
+    """A polished dinner fork, 20 cm long, lying flat, its tines to the front (+depth) and held at the origin, 7.7 cm
+    from the handle's end: a handle widening to 1.5 cm at its end, 3 mm thick, a neck, four tines 2.6 cm across. A
+    dinner fork's size, not a dessert fork's, and polished: it is seen from the game camera."""
+    handle = [(-0.15, 0.0), (-0.145, -0.0075), (-0.05, -0.0048), (0.0, -0.003), (0.0, 0.003), (-0.05, 0.0048),
+              (-0.145, 0.0075)]
+    _along('handle', handle, 0.003, 0.0, 0.073, M.fork)
+    _along('head', _tines(4, 0.013, 0.05, 0.028, 0.003), 0.0026, 0.0002, 0.073, M.fork)
     return done('fork')
 
 
@@ -1794,7 +1796,7 @@ FAMILY = G.Family(
         I('glass', glass, (0.071, 0.111, 0.07), 'tool.glass', code=True),
         I('wineGlass', wineGlass, (0.083, 0.19, 0.082), 'tool.wineGlass', code=True),
         I('can', can, (0.066, 0.12, 0.065), 'tool.can', code=True),
-        I('fork', fork, (0.023, 0.0024, 0.171), 'tool.fork', centre=(0.0, 0.0255), code=True),
+        I('fork', fork, (0.026, 0.003, 0.2), 'tool.fork', centre=(0.0, 0.023), code=True, tolerance=0.1),
         I('spoon', spoon, (0.032, 0.011, 0.167), 'tool.spoon', centre=(0.0, 0.0235), code=True),
         I('chopsticks', chopsticks, (0.026, 0.007, 0.23), 'tool.chopsticks', centre=(0.0, 0.055), code=True),
         I('phone', phone, (0.072, 0.0099, 0.148), 'tool.phone', code=True),

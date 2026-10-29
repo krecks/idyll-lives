@@ -54,7 +54,7 @@ import { ENERGY_RATE, type VisemeTrack } from '../../../voice/visemes';
 import { GAME_RATE, QUIET_SPEED } from '../gameSpeed';
 import { paintColors } from '../modelEntry';
 import { type TableRoom, furthestAhead, nearestAhead } from '../tableTuck';
-import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PROP_ITEMS, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_PER_TICK, WALK_SLACK, WALK_WAIT } from './actions';
+import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PROP_ITEMS, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_PER_TICK, WALK_SLACK, WALK_WAIT, withCutlery } from './actions';
 import { LOW_TOP, SIT_LOW } from './clips/low';
 import { FLOOR_SITS } from './clips/seated';
 import { HANDED } from './clips/serve';
@@ -591,6 +591,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         reachW: 0,
         holdW: 0,
         feeding: false,
+        plate: '',
         liftW: 0,
         cuddleStep: 0,
         carryT: -1,
@@ -1021,6 +1022,13 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private writeHand(rig: SimRig, i: number, p: HandProp | null): void {
     const shown = p && this.handShown(rig, p) ? p : null;
     if (shown?.rest && rig.useId >= 0) this.restTaken.add(rig.useId);
+    if (shown?.feeds) {
+      // (Thrown out a metre or so in front of them.)
+      const k = this.seedCount++ * 3;
+      this.seed[k] = rig.x + Math.sin(rig.yaw) * 1.1;
+      this.seed[k + 1] = rig.z + Math.cos(rig.yaw) * 1.1;
+      this.seed[k + 2] = i;
+    }
     const m = this.writeProp(this.handProp, i, shown?.key ?? null);
     if (!m || !shown || !this.set) return;
     const B = this.set.bone;
@@ -1041,6 +1049,15 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     h.scale = rig.scale;
     h.size = Math.min(1, rig.scale);
     h.ball = shown.grip === 'ball' ? this.ballRound(rig) : undefined;
+    h.headQ = this.headQ;
+    for (let k = 0; k < 4; k++) this.headQ[k] = q[B.Head * 4 + k];
+    // (The baby fed: their mouth, a little up from the head joint as last posed; they're posed after the one holding them.)
+    const baby = shown.grip === 'aim' ? rig.cuddleBaby : -1;
+    if (baby >= 0 && this.headJoints[baby * 3 + 1] !== 0) {
+      for (let k = 0; k < 3; k++) this.aimAt[k] = this.headJoints[baby * 3 + k];
+      this.aimAt[1] += 0.03 * (this.sims[baby]?.scale ?? 1);
+      h.aim = this.aimAt;
+    } else h.aim = undefined;
     placeHand(m, i, shown, h);
   }
 
@@ -1065,6 +1082,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     return b;
   }
   private readonly ballScratch = { clip: '', t: 0, rim: new Float32Array(3), feet: new Float32Array(2) };
+  private readonly headQ = new Float32Array(4);
+  private readonly aimAt = new Float32Array(3);
+  /** Each row's head joint as last posed (x, y, z): where a baby fed from a bottle has their mouth. */
+  private readonly headJoints = new Float32Array(MAX_CHARACTERS * 3);
 
   /** Whether prop `p` is in the hand now: while one of its clips plays (or, seated, its upper layer), in its `during`. */
   private handShown(rig: SimRig, p: HandProp): boolean {
@@ -1388,6 +1409,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /** `storey`: the storey in view; residents above it (or, viewing the basement, not in it) aren't drawn. */
   update(frame: FrameState, inView: (x: number, z: number) => boolean, shadows: Float32Array, storey = Infinity): void {
     this.restTaken.clear();
+    this.seedCount = 0;
     const set = this.set;
     if (!set) return;
     const started = performance.now();
@@ -1655,6 +1677,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const plateAt = k.plate !== undefined ? curr[o + k.plate] | 0 : 0;
       const plate = plateAt > 0 && layout.items ? (layout.items[plateAt - 1] ?? '') : '';
       rig.feeding = plate === 'babyBottle';
+      rig.plate = plate;
 
       // Activity → clip.
       rig.useId = usingId;
@@ -1794,6 +1817,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
 
       // Head top (speech bubbles, selection marker): a little above the head joint.
       const hs = rig.scale * rig.head;
+      this.headJoints.set(this.headTmp, i * 3);
       this.heads[i * 3] = this.headTmp[0];
       this.heads[i * 3 + 1] = this.headTmp[1] + (rig.body.headAbove + HEAD_MARGIN) * hs;
       this.heads[i * 3 + 2] = this.headTmp[2];
@@ -1994,7 +2018,11 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       if (!social) {
         const up = known ? (typeof act?.upper === 'function' ? act.upper(rig.useDef) : act?.upper) : obj?.def === 'diningTable' ? 'eat' : undefined;
         // Eating / drinking now and then (between sips the cup held: `between`); holding a book or phone throughout.
-        if (up === 'eat' || up === 'drink') upper = Math.floor((rig.actTime + rig.seed * 9) / 4) % 3 === 0 ? up : known ? (act?.between ?? '') : '';
+        if (up === 'eat' || up === 'drink') {
+          // (With cutlery, the bite stops a fork's length off the mouth: `eatFork`.)
+          const bite = up === 'eat' && withCutlery(rig.plate) ? 'eatFork' : up;
+          upper = Math.floor((rig.actTime + rig.seed * 9) / 4) % 3 === 0 ? bite : known ? (act?.between ?? '') : '';
+        }
         else if (up) upper = up;
       }
     } else if (moving) {
@@ -2663,6 +2691,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   readonly pulled = new Map<number, number>();
   /** The objects whose prop drawn at rest is in someone's hand now (`REST_PROPS`, `HandProp.rest`): the phone box's receiver. */
   readonly restTaken = new Set<number>();
+  /**
+   * Where seed is being scattered now (`HandProp.feeds`: a bag of seed on the park bench), for the birds (birds.ts): the
+   * ground in front of each feeder (x, z) and the feeder's row, `seedCount` of them.
+   */
+  readonly seed = new Float32Array(MAX_CHARACTERS * 3);
+  seedCount = 0;
 
   /**
    * Seated on a chair that faces a table (`tables`): how far it is pulled in now (m), easing in once they

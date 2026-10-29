@@ -386,6 +386,11 @@ export interface ActionAnim {
  * - `bite`: its front (+depth) from the palm to the mouth, its face up, moved `at` along its own axes (cutlery);
  * - `cue`: its front (+depth) from the right palm out through the left (the bridge), the right palm `at[2]` m from the
  *   butt; upright in the left hand, its butt to the floor, when the right is above it (chalking).
+ * - `aim`: its up (+y) from the palm to a point it reaches to, its front the way they face, its tip (`reach` from its
+ *   foot) at the point, the foot kept in the hand (a baby's bottle, its teat at the baby's mouth: `Hands.aim`); upright in
+ *   the hand with no point;
+ * - `span`: from the mouth to the ear on the side of the hand, its front (+depth) at the ear, its underside (-y) to the
+ *   cheek (the phone box's receiver), whatever the hand does;
  * - `ball`: the basketball through a round at a hoop (clips/shot.ts `ballAt`): bounced on the dribbles, in both hands
  *   from the gather, in an arc to the rim, down through the net and back to the hand.
  * `hand`: the hand that holds it, `r` (the default) or `l`. `clips`: only while one of these plays (the clip, or the
@@ -394,7 +399,7 @@ export interface ActionAnim {
  */
 export interface HandProp {
   key: string;
-  grip: 'level' | 'hand' | 'face' | 'line' | 'bite' | 'cue' | 'ball';
+  grip: 'level' | 'hand' | 'face' | 'line' | 'bite' | 'cue' | 'ball' | 'aim' | 'span';
   hand?: 'r' | 'l';
   at?: readonly [number, number, number];
   turn?: readonly [number, number, number];
@@ -403,6 +408,10 @@ export interface HandProp {
   during?: readonly (readonly [number, number])[];
   /** Taken from the object, where it is drawn at rest (`REST_PROPS`): gone from there while it is in the hand. */
   rest?: boolean;
+  /** With `aim`: how far its tip is from its foot (m: a bottle's teat), which it reaches to the point with. */
+  reach?: number;
+  /** Seed scattered from it (`Residents.seed`): the ground birds come down to it (birds.ts). */
+  feeds?: boolean;
 }
 /** The props in hand, by what they are (`ACTIONS[tag].prop` picks one). */
 export const PROPS = {
@@ -414,12 +423,12 @@ export const PROPS = {
   wine: { key: 'tool.wineGlass', grip: 'level', at: [-0.03, -0.1, 0.01], sip: true },
   can: { key: 'tool.can', grip: 'level', at: [-0.035, -0.055, 0.01], sip: true },
   shaker: { key: 'tool.shaker', grip: 'line', at: [0, -0.08, 0.035], clips: ['shake'] },
-  fork: { key: 'tool.fork', grip: 'bite', at: [0, 0.004, 0], clips: ['eat'] },
-  spoon: { key: 'tool.spoon', grip: 'bite', at: [0, 0.004, 0], clips: ['eat'] },
-  chopsticks: { key: 'tool.chopsticks', grip: 'bite', at: [0, 0.004, -0.02], clips: ['eat'] },
+  fork: { key: 'tool.fork', grip: 'bite', at: [0, 0.004, 0], clips: ['eatFork'] },
+  spoon: { key: 'tool.spoon', grip: 'bite', at: [0, 0.004, 0], clips: ['eatFork'] },
+  chopsticks: { key: 'tool.chopsticks', grip: 'bite', at: [0, 0.004, -0.02], clips: ['eatFork'] },
   coin: { key: 'tool.coin', grip: 'hand', at: [-0.01, -0.02, 0.0], turn: [0, 0, 90], clips: ['toss'], during: [[0, TOSS_LET_GO]] },
   jarCoin: { key: 'tool.coin', grip: 'hand', at: [-0.01, -0.02, 0.0], turn: [0, 0, 90], clips: ['interact'], during: [[0, 0.45]] },
-  seed: { key: 'tool.seedBag', grip: 'level', hand: 'l', at: [0, 0.01, 0] },
+  seed: { key: 'tool.seedBag', grip: 'level', hand: 'l', at: [0, 0.01, 0], feeds: true },
   dart: { key: 'tool.dart', grip: 'hand', at: [0, 0, 0], turn: [0, 180, 0], clips: ['dartThrow'], during: DART_IN_HAND },
   bat: { key: 'tool.bat', grip: 'hand', at: [0, 0, 0], turn: [0, 0, 90], clips: ['pingPong'] },
   cue: { key: 'tool.cue', grip: 'cue', at: [0, 0, 0.32], clips: POOL.map(({ clip }) => clip) },
@@ -429,11 +438,11 @@ export const PROPS = {
   paintbrush: { key: 'tool.paintbrush', grip: 'hand', at: [0, 0, 0], turn: [90, 0, 0] },
   chalk: { key: 'tool.chalk', grip: 'hand', at: [0, 0, 0], turn: [90, 0, 0] },
   postcard: { key: 'tool.postcard', grip: 'hand', at: [0, 0, 0], turn: [90, 0, 0] },
-  receiver: { key: 'tool.receiver', grip: 'hand', at: [-0.012, 0.0, -0.02], turn: [90, -90, 0], clips: ['phone'], rest: true },
+  receiver: { key: 'tool.receiver', grip: 'span', at: [0, 0.02, 0], clips: ['phone'], rest: true },
   pen: { key: 'tool.pen', grip: 'hand', at: [0, 0, 0], turn: [90, 0, 0] },
   pencil: { key: 'tool.pencil', grip: 'hand', at: [0, 0, 0], turn: [90, 0, 0] },
   marker: { key: 'tool.marker', grip: 'hand', at: [0, 0, 0], turn: [90, 0, 0] },
-  babyBottle: { key: 'tool.babyBottle', grip: 'hand', at: [0, 0, 0.07], turn: [-90, 0, 0] },
+  babyBottle: { key: 'tool.babyBottle', grip: 'aim', reach: 0.171 },
   basketball: { key: 'tool.basketball', grip: 'ball', clips: [...SHOT, ...STREET_SHOT].map(({ clip }) => clip) },
 } as const satisfies Record<string, HandProp>;
 /**
@@ -477,6 +486,10 @@ const EATEN_WITH: Record<string, HandProp> = {
   iceCream: PROPS.spoon,
   noodles: PROPS.chopsticks,
 };
+/** Whether `plate` (content `items` id) is eaten with cutlery (`EATEN_WITH`): then the bite is `eatFork`, the hand a fork's length off the mouth. */
+export function withCutlery(plate: string): boolean {
+  return plate in EATEN_WITH;
+}
 /** The cup for a drink at `def` (`ACTIONS.drink`; none at the drinking fountain; the shaker where a cocktail is mixed). */
 export function drinkProp(def: string): HandProp | null {
   if (NO_CUP.has(def)) return null;

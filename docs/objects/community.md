@@ -76,7 +76,7 @@ rides.
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `streetLamp` Street lamp | 1x1 · floor | — | community / street | Lamp post | Static | Static. The lantern lights at night (E8); far version (E7). |
-| `parkBench` Long park bench | 3x1 · floor | sit:sit feedBirds:feed | community / street | Frame | Static | Static. 2.5 m long. *Feed the pigeons*: a bag of seed held on the left palm over the lap, a pinch scattered ahead every three seconds (`scatter`, the seated upper layer; held.py `tool.seedBag`, G-70); no birds come down to it yet (new behaviour). |
+| `parkBench` Long park bench | 3x1 · floor | sit:sit feedBirds:feed | community / street | Frame | Static | Static. 2.5 m long. *Feed the pigeons*: a bag of seed held on the left palm over the lap, a pinch scattered ahead every three seconds (`scatter`, the seated upper layer; held.py `tool.seedBag`, G-70). The garden birds that feed on the ground (blackbirds, chaffinches, doves) within 25 m come down round the seed a few at a time, work towards it and peck, and stay while it's thrown; the one throwing it doesn't scare them (birds.ts, `Residents.seed`). |
 | `drinkingFountain` Drinking fountain | 1x1 · floor | drink:drink | community / street | Pillar | Use | `water_on`: the water arc grows for drink; the drinker steps up and bends over the spout (`fountainDrink<cm>` by height). |
 | `litterBin` Litter bin | 1x1 · floor | — | community / street | Bin | Static | Static. |
 | `busStop` Bus shelter | 3x1 · floor | wait:sit timetable:read | community / street | Frame | Static | Static. 1.2 m deep, the bench at the back. |

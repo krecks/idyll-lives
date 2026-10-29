@@ -119,9 +119,6 @@ what this list held, and 0.5.0 most of what it left, the new behaviour included;
 their finding ids. What is still open is here, with its id; §9 of the review says what each would take.
 
 ### Residents
-- **Props:** no pigeons come down to the seed (I-community-11, new behaviour). A fork is 2 mm thick: from the game
-  camera it is hardly seen. The bottle is held over the baby, its teat towards their head, not quite at the mouth, and
-  the phone box's receiver from the ear down the cheek (the arms are posed, not reached).
 - **Feet slide at game speeds 4 and 5** (48–81 % of the way: 45 and 90 m/s, faster than any gait steps without
   strobing; A-residents-03, G-25): won't fix. The clip check's baseline (`tools/characters/clip-baseline.json`) is
   empty.
@@ -172,6 +169,13 @@ their finding ids. What is still open is here, with its id; §9 of the review sa
   in `actions.ts`, `lotContents.ts`): a part of its own would be the box's fifth draw call. The basketball goes with
   the whole round (clips/shot.ts `ballAt`): bounced on the dribbles, in both hands from the gather, in an arc to the
   rim, down through the net and back to the hand.
+- **The birds come down to the seed** (I-community-11): someone feeding the pigeons from a bench brings the ground birds
+  within 25 m down round where the seed lands, a few at a time; they work towards it, peck more and stay while it's
+  thrown, and the one throwing it doesn't scare them (`birds.ts`, `Residents.seed`; `tests/birds.test.ts`).
+- **Props that reach:** the baby's bottle reaches its teat to the baby's mouth from the feeding hand (`aim`), the phone
+  box's receiver spans from the ear to the mouth however the hand is posed (`span`), and a bite with cutlery stops a
+  fork's length off the mouth, the head leaning in (`eatFork`), so the fork, the spoon and the chopsticks show between
+  the hand and the mouth. The fork is a 20 cm dinner fork, polished, to be seen from the game camera.
 - **Fruit within reach** (I-garden-11, I-garden-12, the owner's decision): the apple tree's crown came down to 2.6 m
   and four low boughs carry eight apples from 1.12 to 1.75 m; the one picked to eat hangs at 1.13 m, where a child
   on tiptoe takes it, and "Pick the apples" reaches one per size. The lemon tree has a lemon at 1.62, 1.42 and 1.1 m

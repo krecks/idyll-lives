@@ -150,7 +150,7 @@ export class GameBirds {
   ) {
     this.life = new Birds(app, root, assets, debug);
     this.life.setQuality(quality);
-    this.frame = { dt: 0, speed: 0, hour: 0, camera: this.eye, residents: new Float32Array(0), residentCount: 0, visible: new Uint8Array(0), calm: false, roof: false };
+    this.frame = { dt: 0, speed: 0, hour: 0, camera: this.eye, residents: new Float32Array(0), residentCount: 0, visible: new Uint8Array(0), seed: new Float32Array(0), seedCount: 0, calm: false, roof: false };
     // `?debug`: `__birds()` lists them (species, state, place) with what they did and the cost of a
     // frame; `__birdFly(id, where)` sends one off; `__birdTime(scale)` slows their clock.
     if (debug) Object.assign(window, { __birds: () => this.life.debug(), __birdFly: (id: number, where: 'plant' | 'ground' | 'roof' | 'home' = 'plant') => this.life.debugFly(id, where), __birdTime: (scale: number) => (this.life.timeScale = scale) });
@@ -175,9 +175,9 @@ export class GameBirds {
 
   /**
    * The birds a frame on, with the game's clock (`dt` ms; calm hours at speed 4), the hour of `minute`,
-   * the camera and the residents' heads (`count` of them, the ones drawn as `visible` says).
+   * the camera and the residents' heads (`count` of them, the ones drawn as `visible` says), and the seed they scatter.
    */
-  update(state: FrameState, minute: number, dt: number, residents: { heads: Float32Array; visible: Uint8Array }, count: number): boolean {
+  update(state: FrameState, minute: number, dt: number, residents: { heads: Float32Array; visible: Uint8Array; seed: Float32Array; seedCount: number }, count: number): boolean {
     // (Behind the overview they wait, hidden: `setTown`.)
     if (this.town) return false;
     const { curr, layout } = state;
@@ -193,6 +193,8 @@ export class GameBirds {
     f.residents = residents.heads;
     f.residentCount = count;
     f.visible = residents.visible;
+    f.seed = residents.seed;
+    f.seedCount = residents.seedCount;
     f.calm = this.host.calm();
     f.roof = this.host.roofShown() && this.storey >= 0;
     return this.life.update(f);

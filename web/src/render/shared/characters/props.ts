@@ -78,6 +78,10 @@ export interface Hands {
   size: number;
   /** For the basketball (`ball`): the round's clip and how far into it (s), the rim's middle and the shooter's feet (x, z). */
   ball?: { clip: string; t: number; rim: Float32Array; feet: Float32Array };
+  /** For `aim`: the point the prop reaches to from the palm (a baby's mouth), or none. */
+  aim?: Float32Array;
+  /** The head joint's world rotation (quaternion x, y, z, w; at rest +x their right, +y up, +z ahead): for `span`. */
+  headQ?: Float32Array;
 }
 
 const D = Math.PI / 180;
@@ -248,6 +252,55 @@ export function placeHand(m: Float32Array, i: number, p: HandProp, h: Hands): vo
       // The butt `at[2]` back from the right palm along it; or, upright, on the floor under the left hand.
       const reach = (P[4] - h.floorY) / Math.max(0.3, F[7]);
       for (let c = 0; c < 3; c++) F[9 + c] = (P[c] - F[6 + c] * V[2]) * (1 - up) + (P[3 + c] - F[6 + c] * reach) * up;
+      break;
+    }
+    case 'aim': {
+      // Its up (+y) from this palm to the point it reaches to (a bottle's teat to the baby's mouth), its front the way
+      // they face; its foot `at` along its own axes from the palm. With no point, upright in the hand (`level`).
+      const t = h.aim;
+      if (!t) {
+        F[0] = fz;
+        F[1] = 0;
+        F[2] = -fx;
+        F[3] = 0;
+        F[4] = 1;
+        F[5] = 0;
+        third();
+        along(P[b], P[b + 1], P[b + 2], V);
+        break;
+      }
+      unitInto(F, 3, t[0] - P[b], t[1] - P[b + 1], t[2] - P[b + 2]);
+      const d = fx * F[3] + fz * F[5];
+      unitInto(F, 6, fx - d * F[3], -d * F[4], fz - d * F[5]);
+      F[0] = F[4] * F[8] - F[5] * F[7];
+      F[1] = F[5] * F[6] - F[3] * F[8];
+      F[2] = F[3] * F[7] - F[4] * F[6];
+      // Its tip (`reach` m up from its foot) at the point: the foot that far short of it, kept in the hand (8 cm below
+      // the palm to 5 cm above it).
+      const far = Math.hypot(t[0] - P[b], t[1] - P[b + 1], t[2] - P[b + 2]);
+      V[1] = Math.min(0.05, Math.max(-0.08, far - (p.reach ?? 0) * k));
+      along(P[b], P[b + 1], P[b + 2], V);
+      break;
+    }
+    case 'span': {
+      // From the mouth to the ear on the side of this hand (a receiver: its front, +depth, the earpiece, at the ear; its
+      // cups, -y, to the cheek), the ear and the mouth by the head joint as it is turned (`headQ`); `at` along its own axes.
+      const q = h.headQ;
+      if (!q) return;
+      const s = h.scale;
+      const side = left ? -1 : 1;
+      turn(q, 0, side * 0.09 * s, 0.045 * s, 0.0, A, 0);
+      turn(q, 0, side * 0.035 * s, 0.0, 0.11 * s, A, 3);
+      // A: the ear (0..2) and the mouth (3..5) from the head joint.
+      unitInto(F, 6, A[0] - A[3], A[1] - A[4], A[2] - A[5]);
+      // Its up (+y) away from the cheek: out from the head's middle, square to its length.
+      turn(q, 0, side, 0, 0, A, 6);
+      const d = A[6] * F[6] + A[7] * F[7] + A[8] * F[8];
+      unitInto(F, 3, A[6] - d * F[6], A[7] - d * F[7], A[8] - d * F[8]);
+      F[0] = F[4] * F[8] - F[5] * F[7];
+      F[1] = F[5] * F[6] - F[3] * F[8];
+      F[2] = F[3] * F[7] - F[4] * F[6];
+      along(h.head[0] + (A[0] + A[3]) / 2, h.head[1] + (A[1] + A[4]) / 2, h.head[2] + (A[2] + A[5]) / 2, V);
       break;
     }
     case 'ball': {
