@@ -2038,6 +2038,7 @@
     "fight": "{a} won a fight against {b}",
     "jealous": "{a} saw {b} flirting with {c}",
     "promoted": "{a} got promoted to {job} — {money} bonus!",
+    "promotedEarlier": "{a} got promoted!",
     "missedWork": "{a} missed work",
     "visited": "{a} is visiting {b}",
     "skillUp": "{a} reached {skill} level {n}",

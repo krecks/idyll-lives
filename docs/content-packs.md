@@ -533,6 +533,9 @@ woken. They do the crib's care interactions for each of those needs under `tendB
 calls nobody again for `cooldownMinutes` (default 90). The base game wakes for hunger, bladder
 and hygiene.
 **Jobs:** `careerRules.market` turns on residents finding, quitting and losing jobs on their own.
+**Story texts** (`events`): `promoted` (`{job}`: the new title, `{money}`: the bonus of half a
+week at the new grade); `promotedEarlier` for promotions in saves from before the bonus, which
+name neither.
 
 **Needs and autonomy:** a need's `comfortable` (0..1, default 0) is the level residents like to
 keep it at: below it the need weighs `autonomy.comfortBoost` times more (eased in over the tenth

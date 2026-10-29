@@ -135,7 +135,7 @@ pub fn shift_pay(content: &Content, job: &Job, skills: &[f32; MAX_SKILLS]) -> i6
     let standard = level.days.count_ones().max(1) as i64;
     let actual = work_days(content, job, skills).count_ones().max(1) as i64;
     // Saturating like the promotion bonus: content's pay must not panic the week's sum.
-    (level.pay.saturating_mul(standard) + actual / 2) / actual
+    level.pay.saturating_mul(standard).saturating_add(actual / 2) / actual
 }
 
 /// Whether a Sim with `skills` may take `level` (probation allows a small shortfall).
