@@ -38,7 +38,8 @@ The same on every preset:
 - **The sun's shadow map is depth only** (PlayCanvas's `SHADOW_PCF3_32F`; on Babylon it was an R16F colour target, not the RGBA16F that nothing read, P1-05).
 - **Auto resolution** with a budget of 1920×1080 (below).
 - **The FramePacer** for the frame rate cap (below).
-- **The menus' town** is drawn at about 30 fps (the cap's rounding rule for 30, below).
+- **The menus' town** is drawn at the player's frame rate cap, as the game is: standing still it is held (`holdStillFrames`, above), so it costs nothing then; it had a 30 fps cap of its own until 0.5.0, which saved nothing while held and made the camera judder whenever it moved (four refreshes a frame on a 120 Hz screen).
+- **The camera's near plane** moves out with its distance, to a fiftieth of it (0.3 m up to 15 m out, 1.9 m at the game's farthest, about 6 m from the town overview's 300 m): with it at 0.3 m from that far, the depth buffer couldn't tell the roads, 1.2 cm over the ground, from the ground, and the ground showed through them in green patches.
 - **Dark lamps leave the cluster:** a lamp that is off gets a range of 1 cm, so it covers next to no tiles (P1-02).
 - **Lamps are spot lights** (2026-10-21, G-60): a lamp lighting all round has a cone of a whole turn, which the cluster takes as a point light and the forward lights' glTF falloff (an inner cone as wide) as no cone; a shade's (`light.aim` down, up or out) half a turn, full along it, about half 30–45° off it and next to none side-on (the cluster's physical falloff is a little narrower than Low's glTF one). An uplighter's (`ceiling`) is all round from 30 cm under the ceiling. Village orbit at 21:00 against point lights, medians of 3 (M3 Pro, a loaded machine): GPU within noise on every preset and backend (Medium WebGPU 6.96 → 5.97 ms, WebGL2 6.53 → 6.57; Low 3.12 → 3.32 and 3.49 → 3.49), the same draws.
 - **The landscape is never lit by the lamps**, the lawn included: lit by the cluster, the ground alone cost 1.1–1.5 ms of GPU a frame at night on Medium (WebGPU 5.97 → 7.44 ms, WebGL2 6.57 → 7.71). The garden's lamps (a lamp post, a street lamp, a fire pit, a bulkhead aimed out from its wall) cast pools of light on the lawn instead, as the street's lamps do: discs added to the ground, as bright in the middle as `intensity / height²` and as wide as twice the height, one draw at night for all of them, on Low too (`gardenPools.ts`).
@@ -92,7 +93,7 @@ Babylon's own cap (`engine.maxFPS`) drew once enough time had piled up since the
 - **Rounding rule:** N is the smallest divisor whose rate isn't more than a quarter above the cap (with 2 % leeway for a measured rate a little off the nominal one): `N = max(1, ceil(Hz / (cap × 1.25 × 1.02)))`. So a cap the refresh rate doesn't divide becomes a rate it does, rounded up when that's within a quarter, and down otherwise.
 - **No cap** draws every refresh.
 - **The game's clocks** run on the timestamp of the refresh a frame is drawn for, not the moment its code runs. The residents' interpolation, the step counter and the director get that timestamp, and the renderer's frame time (camera glides and inertia, clouds, wind) is measured between those timestamps, so motion advances in the same even steps the frames are shown in. The frame time is clamped to 100 ms.
-- **The menus' town** is paced at about 30 fps (`MENU_FPS` through the same rule, as in the Cap 30 column below: 36 on a 144 Hz display, 37.5 on 75 Hz), and the flight into a game at the game's cap.
+- **The menus' town** is paced by the same rule at the player's cap (see above).
 
 Frame rates the pacer gives:
 

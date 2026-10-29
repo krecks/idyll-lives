@@ -2,7 +2,7 @@
 
 - **Branch:** `release/0.5.0` (the ten streams below, merged in turn, then the follow-ups, the version and notes), merged into `main` by pull request; tag `v0.5.0` on the merge.
 - **Base:** v0.4.2 at `c9066c66`, with `main`'s PRs #29–#32 merged in.
-- **Status:** releasing 2026-10-29.
+- **Status:** **Released 2026-10-29**: https://github.com/krecks/idyll-lives/releases/tag/v0.5.0 (PR #33 merged as efd47428; CI 40874670234; dry run 40876187654 on main; the tag's deploy 40879327894; live checks passed). Fixes after it: [release-0.5.1.md](release-0.5.1.md).
 - **Release type:** features: everything left open after 0.4.2.
 
 What was left open after 0.4.2 (`docs/objects/open.md` "Still open", `docs/authenticity-review.md` §9, PR #31's
@@ -79,6 +79,8 @@ After the streams: the props still mimed (a pen, the marker, the receiver, the b
 | `bun run build` | pass |
 
 ### Release steps
+
+All done 2026-10-29. Live: the bundle's build is efd4742 (the release merge); cross-origin isolated; the village benchmark reports 0.5.0 on WebGPU and WebGL2 at 60 fps with no page errors. In review the PR gained the clippy fixes and a save written by v0.4.2 (`tests/saves/v042_village.json`); the merged stream branches and the agents' worktree branches were deleted.
 
 1. Pull request `release/0.5.0` → `main`; CI passes on it; review; merge (a merge commit).
 2. Dry run: `gh workflow run pages.yml --ref main -f deploy=false`, watched to the end.
