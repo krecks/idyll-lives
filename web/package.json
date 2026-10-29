@@ -2,7 +2,7 @@
   "name": "idyll-lives",
   "private": true,
   "license": "GPL-3.0-or-later",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "type": "module",
   "scripts": {
     "wasm": "cd .. && cargo build -p sim-wasm --target wasm32-unknown-unknown --release --locked && wasm-bindgen target/wasm32-unknown-unknown/release/sim_wasm.wasm --target web --out-dir web/src/core/wasm-pkg",
