@@ -133,6 +133,10 @@ const ORTHO: u32 = 10;
 const DIAG: u32 = 14;
 /// Extra cost of stepping onto a tile of someone else's plot: twenty tiles of walking.
 const TRESPASS: u32 = ORTHO * 20;
+/// Extra cost of stepping straight from one plot into another, over the fence or hedge between
+/// gardens (the renderer's, `shared/street.ts`): three hundred tiles, so a plot is entered from
+/// the street at its front wherever there is one, and only crossed into where there isn't.
+const OVER_THE_FENCE: u32 = ORTHO * 300;
 
 /// Which plots one resident may walk across (their home, public places, where they're going);
 /// the rest are other people's gardens, kept off unless there's no other way.
@@ -156,6 +160,11 @@ impl Grounds<'_> {
     /// The plot a tile is on, if it's one this resident shouldn't walk across.
     fn foreign(&self, nav: &NavGrid, x: i32, z: i32) -> Option<u32> {
         self.plot(nav, x, z).filter(|&p| !self.open.get(p as usize).copied().unwrap_or(true))
+    }
+
+    /// A step from one plot straight into another (over the fence between them), open or not.
+    fn over_the_fence(&self, nav: &NavGrid, (x, z): (i32, i32), (nx, nz): (i32, i32)) -> bool {
+        matches!((self.plot(nav, x, z), self.plot(nav, nx, nz)), (Some(a), Some(b)) if a != b)
     }
 }
 
@@ -274,8 +283,13 @@ impl NavGrid<'_> {
                     }
                     let ni = lot.tile_index(nx, nz);
                     let mut cost = g[i] + if dx != 0 && dz != 0 && !linked { DIAG } else { ORTHO };
-                    if grounds.is_some_and(|gr| gr.foreign(self, nx, nz).is_some()) {
-                        cost += TRESPASS;
+                    if let Some(gr) = grounds {
+                        if gr.foreign(self, nx, nz).is_some() {
+                            cost += TRESPASS;
+                        }
+                        if !linked && gr.over_the_fence(self, (x, z), (nx, nz)) {
+                            cost += OVER_THE_FENCE;
+                        }
                     }
                     if cost < cost_to(g, stamp, ni) {
                         (g[ni], came[ni], stamp[ni]) = (cost, i as u32, search);
@@ -336,7 +350,8 @@ impl NavGrid<'_> {
     }
 
     /// `line_walkable`, and with `grounds`, the line keeps off other people's plots, except
-    /// the one either end is on (someone already in a garden walks straight out of it).
+    /// the one either end is on (someone already in a garden walks straight out of it), and
+    /// never goes straight from one plot into another (a path that had to keeps that step).
     pub fn line_walkable_with(&self, a: [f32; 2], b: [f32; 2], grounds: Option<&Grounds>) -> bool {
         let (dx, dz) = (b[0] - a[0], b[1] - a[1]);
         let steps = ((dx.abs().max(dz.abs())) / 0.1).ceil().max(1.0) as i32;
@@ -354,8 +369,7 @@ impl NavGrid<'_> {
                     return false;
                 }
                 if let (Some(g), Some(ends)) = (grounds, ends)
-                    && let Some(p) = g.foreign(self, nx, nz)
-                    && !ends.contains(&Some(p))
+                    && (g.over_the_fence(self, (tx, tz), (nx, nz)) || g.foreign(self, nx, nz).is_some_and(|p| !ends.contains(&Some(p))))
                 {
                     return false;
                 }
@@ -794,6 +808,25 @@ mod tests {
         }
         assert!(!nav.line_walkable_with([5.5, 8.5], [25.5, 8.5], Some(&grounds)));
         assert!(nav.line_walkable([5.5, 8.5], [25.5, 8.5]), "only the plots stand in the way");
+    }
+
+    #[test]
+    fn into_the_garden_next_door_by_the_street_not_over_the_hedge() {
+        let (lot, tile_plot) = three_gardens("");
+        let blocked = nav_of(&lot);
+        let nav = NavGrid { lot: &lot, blocked: &blocked, stairs: &NO_STAIRS };
+        // From their own garden to the neighbours' (both open to them: they're going there), the
+        // two side by side: out at the front, along the street and in at the neighbours' front.
+        let grounds = Grounds { tile_plot: &tile_plot, open: vec![true, true, false] };
+        let path = nav.find_path_with((8, 3), (12, 3), Some(&grounds)).unwrap();
+        assert_walkable(&nav, &path);
+        assert!(path.windows(2).all(|w| (w[0].0 < 10) == (w[1].0 < 10) || w[0].1 >= 10), "over the boundary between the gardens: {path:?}");
+        assert!(path.iter().any(|&(_, z)| z >= 10), "by the street: {path:?}");
+        let smooth = nav.smooth_with(&path, Some(&grounds));
+        for w in smooth.windows(2) {
+            assert!(nav.line_walkable_with(w[0], w[1], Some(&grounds)), "{w:?}");
+        }
+        assert!(!nav.line_walkable_with([8.5, 3.5], [12.5, 3.5], Some(&grounds)), "no straight line over it");
     }
 
     #[test]
