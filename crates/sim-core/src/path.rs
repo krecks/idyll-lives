@@ -133,9 +133,11 @@ const ORTHO: u32 = 10;
 const DIAG: u32 = 14;
 /// Extra cost of stepping onto a tile of someone else's plot: twenty tiles of walking.
 const TRESPASS: u32 = ORTHO * 20;
-/// Extra cost of stepping straight from one plot into another, over the fence or hedge between
-/// gardens (the renderer's, `shared/street.ts`): three hundred tiles, so a plot is entered from
-/// the street at its front wherever there is one, and only crossed into where there isn't.
+/// Extra cost of stepping straight from one plot into another beside a garden (`Grounds::fenced`):
+/// three hundred tiles, so a garden is entered from the street at its front wherever there is one,
+/// and only crossed into where there isn't. Gardens are kept apart all round, though the renderer
+/// draws their fences and hedges (`shared/street.ts`) only from the house's front back, and none
+/// round some: next door is by the street, as a visitor would go.
 const OVER_THE_FENCE: u32 = ORTHO * 300;
 
 /// Which plots one resident may walk across (their home, public places, where they're going);
@@ -364,8 +366,8 @@ impl NavGrid<'_> {
         let steps = ((dx.abs().max(dz.abs())) / 0.1).ceil().max(1.0) as i32;
         let (mut tx, mut tz) = (a[0].floor() as i32, a[1].floor() as i32);
         let tile = |p: [f32; 2]| (p[0].floor() as i32, p[1].floor() as i32);
-        // (The plots the ends are on that this resident shouldn't walk across.)
-        let ends = grounds.map(|g| [tile(a), tile(b)].map(|(x, z)| g.plot(self, x, z).filter(|&p| g.foreign(Some(p)))));
+        // (The plots the ends are on: crossing them is never trespassing.)
+        let ends = grounds.map(|g| [tile(a), tile(b)].map(|(x, z)| g.plot(self, x, z)));
         for s in 1..=steps {
             let t = s as f32 / steps as f32;
             let (nx, nz) = (
