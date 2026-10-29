@@ -32,7 +32,9 @@ pub const STEP_MINUTES: u64 = 5;
 pub(crate) fn run(w: &mut World, minutes: f32) {
     let mut changed = false;
     for o in &mut w.objects {
-        let Some(left) = o.run.filter(|&m| m > 0.0) else { continue };
+        let Some(left) = o.run.filter(|&m| m > 0.0) else {
+            continue;
+        };
         let left = (left - minutes).max(0.0);
         o.run = Some(left);
         changed |= left == 0.0;
@@ -44,7 +46,12 @@ pub(crate) fn run(w: &mut World, minutes: f32) {
 
 /// A use of `o` done (not given up the moment it began): a load put in starts the machine; one
 /// taken out empties it; and what it `makes` is the household's to work on next.
-pub(crate) fn use_done(sim: &mut Sim, content: &Content, o: &mut ObjectInstance, inter: &Interaction) {
+pub(crate) fn use_done(
+    sim: &mut Sim,
+    content: &Content,
+    o: &mut ObjectInstance,
+    inter: &Interaction,
+) {
     // (The load taken up for it is used: not given back.)
     sim.taken = 0;
     if inter.loads && o.run.is_none() {
@@ -78,20 +85,35 @@ pub(crate) fn rack_in(sim: &mut Sim, content: &Content, o: &mut ObjectInstance, 
 /// After taking out a load that's `made` (the wet washing, the dry): on with it to the nearest
 /// thing on the same plot that works on it, free, that they may use (the dryer or the line; the
 /// basket to fold it at). None: nowhere to take it, and it waits for one.
-pub(crate) fn carry_on(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], object: u32, made: WorkOn) -> Option<Task> {
+pub(crate) fn carry_on(
+    sim: &Sim,
+    ctx: &Ctx,
+    objects: &[ObjectInstance],
+    object: u32,
+    made: WorkOn,
+) -> Option<Task> {
     let plot = ctx.object_plot.get(object as usize).copied().flatten();
-    crate::world::nearest(sim, ctx, objects, plot, Some(object), |i| i.work_on == Some(made) && !i.baby && i.recipe.is_none())
+    crate::world::nearest(sim, ctx, objects, plot, Some(object), |i| {
+        i.work_on == Some(made) && !i.baby && i.recipe.is_none()
+    })
 }
 
 /// How keen a resident at home is on a laundry chore, besides what it does for their needs (as
 /// tidying up is keener the dirtier the spot): emptying a machine that's done, `DONE_PULL`; a use
 /// that works on a load of washing, `PILE_PULL` with the pile full (content `laundry`'s `most`),
 /// less with less waiting. 0 for anything else.
-pub(crate) fn pull(laundry: [f32; 3], content: &Content, o: &ObjectInstance, inter: &Interaction) -> f32 {
+pub(crate) fn pull(
+    laundry: [f32; 3],
+    content: &Content,
+    o: &ObjectInstance,
+    inter: &Interaction,
+) -> f32 {
     if inter.unloads && o.done() {
         return DONE_PULL;
     }
-    let Some(k) = inter.work_on.and_then(WorkOn::load) else { return 0.0 };
+    let Some(k) = inter.work_on.and_then(WorkOn::load) else {
+        return 0.0;
+    };
     let most = content.laundry.map_or(1.0, |l| l.most);
     PILE_PULL * (laundry[k] / most).clamp(0.0, 1.0)
 }
@@ -117,7 +139,11 @@ pub(crate) fn settle(laundry: &mut [f32; 3], worked: u8, made: u8, most: f32) {
 
 /// A household's piles of washing with the loads its residents took up for uses under way given
 /// back (`Sim::taken`, `WorkOn` bits each), as a save keeps them: those uses start again on load.
-pub(crate) fn with_taken(mut laundry: [f32; 3], taken: impl Iterator<Item = u8>, most: f32) -> [f32; 3] {
+pub(crate) fn with_taken(
+    mut laundry: [f32; 3],
+    taken: impl Iterator<Item = u8>,
+    most: f32,
+) -> [f32; 3] {
     for t in taken {
         settle(&mut laundry, 0, t, most);
     }

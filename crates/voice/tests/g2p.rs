@@ -10,12 +10,21 @@ fn g2p() -> Option<G2p> {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../web/public/voice/en-us.lexz");
     let Ok(file) = std::fs::File::open(&path) else {
         // CI must test the phonemizer: there a missing dictionary fails instead of skipping.
-        assert!(std::env::var_os("CI").is_none(), "{} missing in CI (run `node tools/voice/fetch.mjs` first)", path.display());
-        eprintln!("skipped: {} missing (run `node tools/voice/fetch.mjs`)", path.display());
+        assert!(
+            std::env::var_os("CI").is_none(),
+            "{} missing in CI (run `node tools/voice/fetch.mjs` first)",
+            path.display()
+        );
+        eprintln!(
+            "skipped: {} missing (run `node tools/voice/fetch.mjs`)",
+            path.display()
+        );
         return None;
     };
     let mut tsv = String::new();
-    flate2::read::GzDecoder::new(file).read_to_string(&mut tsv).unwrap();
+    flate2::read::GzDecoder::new(file)
+        .read_to_string(&mut tsv)
+        .unwrap();
     Some(G2p::new(Lexicon::parse(&tsv)))
 }
 
@@ -31,14 +40,26 @@ fn matches_misaki() {
             wrong.push(format!("{text}\n  misaki: {expected}\n  ours:   {got}"));
         }
     }
-    assert!(wrong.is_empty(), "{} of {} lines differ:\n{}", wrong.len(), golden.lines().count(), wrong.join("\n"));
+    assert!(
+        wrong.is_empty(),
+        "{} of {} lines differ:\n{}",
+        wrong.len(),
+        golden.lines().count(),
+        wrong.join("\n")
+    );
 }
 
 #[test]
 fn unknown_words_are_guessed() {
     let Some(g2p) = g2p() else { return };
-    assert_eq!(g2p.unknown_words("Hello Kokoro, nice to meet you."), ["Kokoro"]);
-    assert_eq!(g2p.phonemize("[Kokoro](/kˈOkəɹˌO/) runs on the CPU."), "kˈOkəɹˌO ɹˈʌnz ˌɔn ðə sˌipˌijˈu.");
+    assert_eq!(
+        g2p.unknown_words("Hello Kokoro, nice to meet you."),
+        ["Kokoro"]
+    );
+    assert_eq!(
+        g2p.phonemize("[Kokoro](/kˈOkəɹˌO/) runs on the CPU."),
+        "kˈOkəɹˌO ɹˈʌnz ˌɔn ðə sˌipˌijˈu."
+    );
     assert!(!g2p.phonemize("Kokoro").is_empty());
 }
 

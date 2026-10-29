@@ -26,15 +26,26 @@ pub fn main_with(_args: &[String]) -> i32 {
 fn run() -> Result<(), String> {
     let web = crate::characters::repo_root().join("web");
     let out = web.join("public").join("decoders");
-    let pkg: serde_json::Value = serde_json::from_slice(&std::fs::read(web.join("package.json")).map_err(|e| format!("web/package.json: {e}"))?).map_err(|e| format!("web/package.json: {e}"))?;
+    let pkg: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(web.join("package.json")).map_err(|e| format!("web/package.json: {e}"))?,
+    )
+    .map_err(|e| format!("web/package.json: {e}"))?;
     let agent = agent();
-    let pc = pkg["dependencies"]["playcanvas"].as_str().or(pkg["devDependencies"]["playcanvas"].as_str()).ok_or("web/package.json: no playcanvas")?;
+    let pc = pkg["dependencies"]["playcanvas"]
+        .as_str()
+        .or(pkg["devDependencies"]["playcanvas"].as_str())
+        .ok_or("web/package.json: no playcanvas")?;
     let pc_version = pc.trim_start_matches(|c: char| !c.is_ascii_digit());
     for file in FROM_PLAYCANVAS {
-        let url = format!("https://raw.githubusercontent.com/playcanvas/engine/v{pc_version}/examples/assets/wasm/basis/{file}");
+        let url = format!(
+            "https://raw.githubusercontent.com/playcanvas/engine/v{pc_version}/examples/assets/wasm/basis/{file}"
+        );
         let bytes = download::download_unhashed(&agent, &url)?;
         download::write(&out.join("basis").join(file), &bytes)?;
-        println!("basis/{file} ({:.0} KB, PlayCanvas {pc_version})", bytes.len() as f64 / 1024.0);
+        println!(
+            "basis/{file} ({:.0} KB, PlayCanvas {pc_version})",
+            bytes.len() as f64 / 1024.0
+        );
     }
     Ok(())
 }

@@ -54,7 +54,11 @@ fn fill(w: &mut World) {
 }
 
 fn table(w: &World) -> u32 {
-    w.objects.iter().find(|o| w.content.objects[o.def].id == "tableDining4").unwrap().id
+    w.objects
+        .iter()
+        .find(|o| w.content.objects[o.def].id == "tableDining4")
+        .unwrap()
+        .id
 }
 
 /// `n` dirty plates on the table.
@@ -66,9 +70,28 @@ fn plates(w: &mut World, n: usize) -> Vec<u32> {
         .map(|_| {
             let occupied = w.items.occupancy(&w.content);
             let centre = w.objects[table as usize].centre(&w.content);
-            let spot = sim_core::surface::free_surface_spot_near(&w.content, &w.objects, &[table], centre, 3.0, 0, radius, &occupied)
-                .expect("room on the table");
-            w.items.add(ItemInstance { id: 0, def, at: ItemAt::on(&spot), servings: 0, quality: 1.0, made_at: 0, household: 0, spoiled: false, recipe: None })
+            let spot = sim_core::surface::free_surface_spot_near(
+                &w.content,
+                &w.objects,
+                &[table],
+                centre,
+                3.0,
+                0,
+                radius,
+                &occupied,
+            )
+            .expect("room on the table");
+            w.items.add(ItemInstance {
+                id: 0,
+                def,
+                at: ItemAt::on(&spot),
+                servings: 0,
+                quality: 1.0,
+                made_at: 0,
+                household: 0,
+                spoiled: false,
+                recipe: None,
+            })
         })
         .collect()
 }
@@ -89,11 +112,23 @@ fn until(w: &mut World, minutes: f32, mut f: impl FnMut(&World) -> bool) -> bool
 /// away at (stage, object), in order.
 fn clear(w: &mut World, item: u32) -> Vec<(u8, u32)> {
     fill(w);
-    w.apply(Command::UseItem { sim: 0, item, action: ItemAction::Clear }).unwrap();
+    w.apply(Command::UseItem {
+        sim: 0,
+        item,
+        action: ItemAction::Clear,
+    })
+    .unwrap();
     let mut steps: Vec<(u8, u32)> = Vec::new();
     let done = until(w, 120.0, |w| match w.sims[0].current() {
         Some(a) => {
-            if let (TaskKind::Dishes { stage, station: Some(o), .. }, Phase::Using { .. }) = (a.task.kind, &a.phase)
+            if let (
+                TaskKind::Dishes {
+                    stage,
+                    station: Some(o),
+                    ..
+                },
+                Phase::Using { .. },
+            ) = (a.task.kind, &a.phase)
                 && steps.last() != Some(&(stage, o))
             {
                 steps.push((stage, o));
@@ -102,15 +137,28 @@ fn clear(w: &mut World, item: u32) -> Vec<(u8, u32)> {
         }
         None => w.sims[0].queue().next().is_none(),
     });
-    assert!(done, "still clearing away: {:?}", w.sims[0].current().map(|a| a.task.kind));
+    assert!(
+        done,
+        "still clearing away: {:?}",
+        w.sims[0].current().map(|a| a.task.kind)
+    );
     steps
 }
 
 fn empty_it(w: &mut World) -> Result<(), String> {
     let def = w.objects[DISHWASHER as usize].def;
-    let interaction = w.content.objects[def].interactions.iter().position(|i| i.id == "unload").unwrap();
+    let interaction = w.content.objects[def]
+        .interactions
+        .iter()
+        .position(|i| i.id == "unload")
+        .unwrap();
     let object = w.objects[DISHWASHER as usize].stable;
-    w.apply(Command::Use { sim: 0, object, interaction }).map_err(|e| e.to_string())
+    w.apply(Command::Use {
+        sim: 0,
+        object,
+        interaction,
+    })
+    .map_err(|e| e.to_string())
 }
 
 #[test]
@@ -129,28 +177,67 @@ fn the_washing_up_goes_in_the_rack_and_it_runs_once_its_done_then_someone_emptie
         let o = &w.objects[DISHWASHER as usize];
         let left = plates.iter().filter(|&&p| w.items.get(p).is_some()).count();
         assert_eq!(o.rack as usize, plates.len() - left, "in the rack");
-        assert_eq!(o.running(), left == 0, "runs once the washing up is done ({left} left)");
+        assert_eq!(
+            o.running(),
+            left == 0,
+            "runs once the washing up is done ({left} left)"
+        );
     }
     assert!(trips > 1, "more than one trip, so it waited partly full");
     // Running, nothing more goes in, and nobody is asked to load it.
     let more = self::plates(&mut w, 1)[0];
     fill(&mut w);
-    w.apply(Command::UseItem { sim: 0, item: more, action: ItemAction::Clear }).unwrap();
+    w.apply(Command::UseItem {
+        sim: 0,
+        item: more,
+        action: ItemAction::Clear,
+    })
+    .unwrap();
     assert!(
-        !until(&mut w, 60.0, |w| w.sims[0].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Dishes { station: Some(DISHWASHER), .. }))),
+        !until(&mut w, 60.0, |w| w.sims[0].current().is_some_and(
+            |a| matches!(
+                a.task.kind,
+                TaskKind::Dishes {
+                    station: Some(DISHWASHER),
+                    ..
+                }
+            )
+        )),
         "nothing goes in a dishwasher that's running"
     );
     let def = w.objects[DISHWASHER as usize].def;
-    let load = w.content.objects[def].interactions.iter().position(|i| i.id == "dishes").unwrap();
+    let load = w.content.objects[def]
+        .interactions
+        .iter()
+        .position(|i| i.id == "dishes")
+        .unwrap();
     let stable = w.objects[DISHWASHER as usize].stable;
-    let refused = w.apply(Command::Use { sim: 0, object: stable, interaction: load }).unwrap_err().to_string();
+    let refused = w
+        .apply(Command::Use {
+            sim: 0,
+            object: stable,
+            interaction: load,
+        })
+        .unwrap_err()
+        .to_string();
     assert!(refused.contains("still running"), "{refused}");
     assert!(empty_it(&mut w).unwrap_err().contains("still running"));
     // It washes for its minutes with nobody at it, then waits, done.
-    assert!(until(&mut w, 100.0, |w| w.objects[DISHWASHER as usize].done()), "done after its run");
+    assert!(
+        until(&mut w, 100.0, |w| w.objects[DISHWASHER as usize].done()),
+        "done after its run"
+    );
     assert!(empty_it(&mut w).is_ok());
-    assert!(until(&mut w, 30.0, |w| w.objects[DISHWASHER as usize].run.is_none()), "emptied");
-    assert_eq!(w.objects[DISHWASHER as usize].rack, 0, "the clean things put away");
+    assert!(
+        until(&mut w, 30.0, |w| w.objects[DISHWASHER as usize]
+            .run
+            .is_none()),
+        "emptied"
+    );
+    assert_eq!(
+        w.objects[DISHWASHER as usize].rack, 0,
+        "the clean things put away"
+    );
 }
 
 #[test]
@@ -162,12 +249,21 @@ fn a_full_rack_runs_at_once_and_the_washing_up_goes_on_at_the_sink() {
     let plates = plates(&mut w, 5);
     // Washed up wherever is nearest: the dishwasher, two tiles nearer the table.
     assert_eq!(clear(&mut w, plates[0]), [(2, DISHWASHER)]);
-    assert!(w.objects[DISHWASHER as usize].running(), "full: it runs with more washing up to come");
+    assert!(
+        w.objects[DISHWASHER as usize].running(),
+        "full: it runs with more washing up to come"
+    );
     // Running: the rest is washed at the sink and put away there and then.
-    let rest = *plates.iter().find(|&&p| w.items.get(p).is_some()).expect("plates left for the sink");
+    let rest = *plates
+        .iter()
+        .find(|&&p| w.items.get(p).is_some())
+        .expect("plates left for the sink");
     let steps = clear(&mut w, rest);
     assert_eq!(steps.first(), Some(&(2, SINK)), "{steps:?}");
-    assert!(steps.iter().any(|&(stage, _)| stage == 3), "put away: {steps:?}");
+    assert!(
+        steps.iter().any(|&(stage, _)| stage == 3),
+        "put away: {steps:?}"
+    );
 }
 
 #[test]
@@ -183,7 +279,11 @@ fn a_dishwasher_is_saved_and_loaded_as_it_was() {
     assert!(w.objects[DISHWASHER as usize].running());
     let left = w.objects[DISHWASHER as usize].run.unwrap();
     let w2 = World::from_save_json(&common::content(), &w.save_json()).unwrap();
-    assert_eq!(w2.objects[DISHWASHER as usize].run, Some(left), "still running");
+    assert_eq!(
+        w2.objects[DISHWASHER as usize].run,
+        Some(left),
+        "still running"
+    );
     assert_eq!(w2.objects[DISHWASHER as usize].rack, 12, "full");
 }
 
@@ -193,6 +293,11 @@ fn free_will_empties_a_dishwasher_once_its_done() {
     w.objects[DISHWASHER as usize].rack = 12;
     w.objects[DISHWASHER as usize].run = Some(0.0);
     w.autonomy = true;
-    assert!(until(&mut w, 8.0 * 60.0, |w| w.objects[DISHWASHER as usize].run.is_none()), "nobody emptied it");
+    assert!(
+        until(&mut w, 8.0 * 60.0, |w| w.objects[DISHWASHER as usize]
+            .run
+            .is_none()),
+        "nobody emptied it"
+    );
     assert_eq!(w.objects[DISHWASHER as usize].rack, 0);
 }

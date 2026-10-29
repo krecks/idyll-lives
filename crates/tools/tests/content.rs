@@ -37,16 +37,27 @@ fn files(dir: &Path, out: &mut Vec<PathBuf>) {
 #[test]
 fn same_as_the_python_script() {
     let fx = fixtures();
-    let cases: Vec<serde_json::Value> = serde_json::from_str(&std::fs::read_to_string(fx.join("cases.json")).unwrap()).unwrap();
+    let cases: Vec<serde_json::Value> =
+        serde_json::from_str(&std::fs::read_to_string(fx.join("cases.json")).unwrap()).unwrap();
     let mut failed = Vec::new();
     for case in &cases {
         let name = case["name"].as_str().unwrap();
-        let args: Vec<&str> = case["args"].as_array().unwrap().iter().map(|a| a.as_str().unwrap()).collect();
-        let dir = std::env::temp_dir().join(format!("ll-content-test-{}-{name}", std::process::id()));
+        let args: Vec<&str> = case["args"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|a| a.as_str().unwrap())
+            .collect();
+        let dir =
+            std::env::temp_dir().join(format!("ll-content-test-{}-{name}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         copy_dir(&fx.join("content"), &dir.join("content"));
         copy_dir(&fx.join("plan"), &dir.join("plan"));
-        let out = Command::new(env!("CARGO_BIN_EXE_content")).args(&args).current_dir(&dir).output().unwrap();
+        let out = Command::new(env!("CARGO_BIN_EXE_content"))
+            .args(&args)
+            .current_dir(&dir)
+            .output()
+            .unwrap();
         let exp = fx.join("expected").join(name);
         let read = |f: &str| std::fs::read(exp.join(f)).unwrap();
         let mut why = Vec::new();
@@ -56,7 +67,11 @@ fn same_as_the_python_script() {
         if out.stderr != read("stderr") {
             why.push(format!("stderr:\n{}", String::from_utf8_lossy(&out.stderr)));
         }
-        let code: i32 = String::from_utf8(read("code")).unwrap().trim().parse().unwrap();
+        let code: i32 = String::from_utf8(read("code"))
+            .unwrap()
+            .trim()
+            .parse()
+            .unwrap();
         if out.status.code() != Some(code) {
             why.push(format!("exit {:?}, not {code}", out.status.code()));
         }
@@ -75,7 +90,13 @@ fn same_as_the_python_script() {
             failed.push(format!("{name}: {}", why.join("; ")));
         }
     }
-    assert!(failed.is_empty(), "{} of {} cases differ:\n{}", failed.len(), cases.len(), failed.join("\n"));
+    assert!(
+        failed.is_empty(),
+        "{} of {} cases differ:\n{}",
+        failed.len(),
+        cases.len(),
+        failed.join("\n")
+    );
 }
 
 /// The Python script failed on an empty `groups` (the state docs/objects/README.md says to start from); the port
@@ -91,10 +112,36 @@ fn first_group_into_an_empty_validate() {
     let text = text.replace("\"groups\": [\n        {\"id\": \"seed\", \"label\": \"Seed\"},\n        {\"id\": \"late\", \"label\": \"Late\"}\n      ]", "\"groups\": []");
     let text = text.replace("\"category\": \"validate\"", "\"category\": \"decor\"");
     std::fs::write(&base, text).unwrap();
-    std::fs::write(dir.join("content/catalog/one.json"), std::fs::read_to_string(fx.join("content/catalog/one.json")).unwrap().replace("\"category\": \"validate\"", "\"category\": \"decor\"")).unwrap();
-    let out = Command::new(env!("CARGO_BIN_EXE_content")).args(["in", "sofa", "--group", "seats", "--content", "content", "--plan", "nowhere"]).current_dir(&dir).output().unwrap();
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    std::fs::write(
+        dir.join("content/catalog/one.json"),
+        std::fs::read_to_string(fx.join("content/catalog/one.json"))
+            .unwrap()
+            .replace("\"category\": \"validate\"", "\"category\": \"decor\""),
+    )
+    .unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_content"))
+        .args([
+            "in",
+            "sofa",
+            "--group",
+            "seats",
+            "--content",
+            "content",
+            "--plan",
+            "nowhere",
+        ])
+        .current_dir(&dir)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let text = std::fs::read_to_string(&base).unwrap();
     let _ = std::fs::remove_dir_all(&dir);
-    assert!(text.contains("\"groups\": [{\"id\": \"seats\", \"label\": \"Seats\"}]"), "{text}");
+    assert!(
+        text.contains("\"groups\": [{\"id\": \"seats\", \"label\": \"Seats\"}]"),
+        "{text}"
+    );
 }

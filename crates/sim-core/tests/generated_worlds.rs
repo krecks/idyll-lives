@@ -22,7 +22,8 @@ const TICKS_PER_HOUR: u64 = (60.0 / MINUTES_PER_TICK) as u64;
 #[ignore]
 fn generated_worlds_are_livable() {
     let path = std::env::var("WORLDS").expect("set WORLDS to a file made by `node --experimental-transform-types tools/worlds/sample.ts worlds.json`");
-    let worlds: Vec<serde_json::Value> = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let worlds: Vec<serde_json::Value> =
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
     let content = common::content();
     let mut failures = Vec::new();
     for (i, world) in worlds.iter().enumerate() {
@@ -35,14 +36,21 @@ fn generated_worlds_are_livable() {
             }
         };
         if w.sims.len() > MAX_SIMS {
-            failures.push(format!("{label}: {} residents, more than {MAX_SIMS}", w.sims.len()));
+            failures.push(format!(
+                "{label}: {} residents, more than {MAX_SIMS}",
+                w.sims.len()
+            ));
         }
         if w.exits.is_empty() {
             failures.push(format!("{label}: no way out of town"));
         }
         let mut cellars = 0;
         {
-            let nav = NavGrid { lot: &w.lot, blocked: w.blocked(), stairs: w.stair_map() };
+            let nav = NavGrid {
+                lot: &w.lot,
+                blocked: w.blocked(),
+                stairs: w.stair_map(),
+            };
             let tile = |p: [f32; 2]| (p[0].floor() as i32, p[1].floor() as i32);
             let exits: Vec<_> = w.exits.iter().map(|&e| tile(e)).collect();
             // Every lot from every way into town.
@@ -50,7 +58,10 @@ fn generated_worlds_are_livable() {
                 let entry = tile(plot.arrival_point());
                 for &exit in &exits {
                     if nav.find_path(exit, entry).is_none() {
-                        failures.push(format!("{label}: {} can't be reached from {exit:?}", plot.name));
+                        failures.push(format!(
+                            "{label}: {} can't be reached from {exit:?}",
+                            plot.name
+                        ));
                     }
                 }
             }
@@ -61,13 +72,22 @@ fn generated_worlds_are_livable() {
                 if def.interactions.is_empty() || w.lot.room_at(o.x, o.z) != OUTDOORS {
                     continue;
                 }
-                if !surface::use_tiles(&w.content, &w.objects, &nav, o).into_iter().any(|t| nav.find_path(start, t).is_some()) {
-                    failures.push(format!("{label}: can't reach the {} at {},{}", def.id, o.x, o.z));
+                if !surface::use_tiles(&w.content, &w.objects, &nav, o)
+                    .into_iter()
+                    .any(|t| nav.find_path(start, t).is_some())
+                {
+                    failures.push(format!(
+                        "{label}: can't reach the {} at {},{}",
+                        def.id, o.x, o.z
+                    ));
                 }
             }
             // Every room in the basements, from the front door of its house; and everything residents
             // use in the houses (upstairs, downstairs and in the basement), on lots facing either way.
-            let door = |x: i32, z: i32| w.plot_at(x, z).map(|p| tile(w.plots[p as usize].arrival_point()));
+            let door = |x: i32, z: i32| {
+                w.plot_at(x, z)
+                    .map(|p| tile(w.plots[p as usize].arrival_point()))
+            };
             let down = w.storey_row(-1);
             let mut seen = std::collections::HashSet::new();
             for z in down..down + w.storey_depth() {
@@ -78,21 +98,37 @@ fn generated_worlds_are_livable() {
                     }
                     let Some(from) = door(x, z) else { continue };
                     cellars += 1;
-                    let walked = (z..down + w.storey_depth()).flat_map(|tz| (0..w.lot.width as i32).map(move |tx| (tx, tz)));
-                    if !walked.filter(|&(tx, tz)| w.lot.room_at(tx, tz) == room && nav.tile_free(tx, tz)).take(8).any(|t| nav.find_path(from, t).is_some()) {
-                        failures.push(format!("{label}: can't get into the basement room at {x},{z}"));
+                    let walked = (z..down + w.storey_depth())
+                        .flat_map(|tz| (0..w.lot.width as i32).map(move |tx| (tx, tz)));
+                    if !walked
+                        .filter(|&(tx, tz)| w.lot.room_at(tx, tz) == room && nav.tile_free(tx, tz))
+                        .take(8)
+                        .any(|t| nav.find_path(from, t).is_some())
+                    {
+                        failures.push(format!(
+                            "{label}: can't get into the basement room at {x},{z}"
+                        ));
                     }
                 }
             }
-            for o in w.objects.iter().filter(|o| !w.content.objects[o.def].interactions.is_empty() && w.lot.room_at(o.x, o.z) != OUTDOORS) {
+            for o in w.objects.iter().filter(|o| {
+                !w.content.objects[o.def].interactions.is_empty()
+                    && w.lot.room_at(o.x, o.z) != OUTDOORS
+            }) {
                 let Some(from) = door(o.x, o.z) else { continue };
-                if !surface::use_tiles(&w.content, &w.objects, &nav, o).into_iter().any(|t| nav.find_path(from, t).is_some()) {
+                if !surface::use_tiles(&w.content, &w.objects, &nav, o)
+                    .into_iter()
+                    .any(|t| nav.find_path(from, t).is_some())
+                {
                     let at = match w.storey_of(o.z) {
                         -1 => "in the basement",
                         0 => "downstairs",
                         _ => "upstairs",
                     };
-                    failures.push(format!("{label}: can't reach the {} {at} at {},{}", w.content.objects[o.def].id, o.x, o.z));
+                    failures.push(format!(
+                        "{label}: can't reach the {} {at} at {},{}",
+                        w.content.objects[o.def].id, o.x, o.z
+                    ));
                 }
             }
         }
@@ -106,9 +142,19 @@ fn generated_worlds_are_livable() {
                 common::check(&w);
             }
         }
-        eprintln!("  {label}: {}×{}, {} residents, {} things, {cellars} rooms in basements", w.lot.width, w.lot.depth, w.sims.len(), w.objects.len());
+        eprintln!(
+            "  {label}: {}×{}, {} residents, {} things, {cellars} rooms in basements",
+            w.lot.width,
+            w.lot.depth,
+            w.sims.len(),
+            w.objects.len()
+        );
     }
-    eprintln!("{} worlds checked, {} problems", worlds.len(), failures.len());
+    eprintln!(
+        "{} worlds checked, {} problems",
+        worlds.len(),
+        failures.len()
+    );
     for f in failures.iter().take(30) {
         eprintln!("  {f}");
     }

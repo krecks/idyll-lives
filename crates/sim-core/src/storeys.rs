@@ -24,7 +24,11 @@ use crate::world::{ObjectInstance, Sim, World};
 impl World {
     /// Rows per storey (the town's own depth).
     pub fn storey_depth(&self) -> i32 {
-        if self.stairs.depth > 0 { self.stairs.depth } else { self.lot.depth as i32 }
+        if self.stairs.depth > 0 {
+            self.stairs.depth
+        } else {
+            self.lot.depth as i32
+        }
     }
 
     /// The storey a row is on (0: the ground, -1: the basement).
@@ -87,7 +91,11 @@ impl World {
 
     /// Rebuilds the stairs list from the stair objects (after objects come or go).
     pub(crate) fn refresh_stairs(&mut self) {
-        let stairs: Vec<Stair> = self.objects.iter().filter_map(|o| stair_of(&self.content, o, &self.stairs)).collect();
+        let stairs: Vec<Stair> = self
+            .objects
+            .iter()
+            .filter_map(|o| stair_of(&self.content, o, &self.stairs))
+            .collect();
         self.stairs.stairs = stairs;
     }
 
@@ -104,10 +112,19 @@ impl World {
                 return Vec::new();
             }
             let d = self.stairs.rise(self.storey_of(obj.z));
-            return obj.tiles(&self.content).map(|(x, z)| (x, z + d)).filter(|&(x, z)| self.lot.in_bounds(x, z)).collect();
+            return obj
+                .tiles(&self.content)
+                .map(|(x, z)| (x, z + d))
+                .filter(|&(x, z)| self.lot.in_bounds(x, z))
+                .collect();
         }
         // (And where it reaches over at head height: an arc lamp's shade.)
-        obj.tiles(&self.content).chain(obj.overhang_tiles(&self.content).filter(|&(x, z)| self.lot.in_bounds(x, z))).collect()
+        obj.tiles(&self.content)
+            .chain(
+                obj.overhang_tiles(&self.content)
+                    .filter(|&(x, z)| self.lot.in_bounds(x, z)),
+            )
+            .collect()
     }
 
     /// Storey rules for an object about to be placed: nothing on stairs; off the ground only on
@@ -120,26 +137,48 @@ impl World {
             return Err(Error::new("nothing can stand on the stairs"));
         }
         let storey = self.storey_of(obj.z);
-        if storey != 0 && tiles.iter().any(|&(x, z)| self.lot.room_at(x, z) == OUTDOORS) {
-            return Err(Error::new(if storey > 0 { "upstairs, things go inside rooms" } else { "in the basement, things go inside rooms" }));
+        if storey != 0
+            && tiles
+                .iter()
+                .any(|&(x, z)| self.lot.room_at(x, z) == OUTDOORS)
+        {
+            return Err(Error::new(if storey > 0 {
+                "upstairs, things go inside rooms"
+            } else {
+                "in the basement, things go inside rooms"
+            }));
         }
         if def.stairs {
             if self.stairs.depth == 0 || storey + 1 >= self.storeys as i32 {
                 return Err(Error::new("there's no storey above for stairs to lead to"));
             }
             let d = self.stairs.rise(storey);
-            if tiles.iter().any(|&(x, z)| self.blocked[self.lot.tile_index(x, z + d)]) {
+            if tiles
+                .iter()
+                .any(|&(x, z)| self.blocked[self.lot.tile_index(x, z + d)])
+            {
                 return Err(Error::new("something stands where the stairs come up"));
             }
-            if storey < 0 && tiles.iter().any(|&(x, z)| self.lot.room_at(x, z + d) == OUTDOORS) {
-                return Err(Error::new("stairs down to the basement start inside the house"));
+            if storey < 0
+                && tiles
+                    .iter()
+                    .any(|&(x, z)| self.lot.room_at(x, z + d) == OUTDOORS)
+            {
+                return Err(Error::new(
+                    "stairs down to the basement start inside the house",
+                ));
             }
             // Stepping off the top: onto a free tile, with no wall in the way.
             if let Some(s) = stair_of(&self.content, obj, &self.stairs) {
                 let (tx, tz) = s.top();
                 let (lx, lz) = s.landing;
-                if !self.lot.in_bounds(lx, lz) || self.blocked[self.lot.tile_index(lx, lz)] || !self.lot.edge_walkable(tx, tz + d, lx, lz) {
-                    return Err(Error::new("the top of the stairs needs a clear way off them"));
+                if !self.lot.in_bounds(lx, lz)
+                    || self.blocked[self.lot.tile_index(lx, lz)]
+                    || !self.lot.edge_walkable(tx, tz + d, lx, lz)
+                {
+                    return Err(Error::new(
+                        "the top of the stairs needs a clear way off them",
+                    ));
                 }
             }
         }
@@ -154,8 +193,10 @@ impl World {
             None => storey,
             Some((s, _)) => {
                 // Along the flight, from the foot of the bottom step to the top of the last.
-                let along = (sim.pos[0] - (s.bottom.0 as f32 + 0.5 - s.dir.0 as f32 * 0.5)) * s.dir.0 as f32
-                    + (sim.pos[1] - (s.bottom.1 as f32 + 0.5 - s.dir.1 as f32 * 0.5)) * s.dir.1 as f32;
+                let along = (sim.pos[0] - (s.bottom.0 as f32 + 0.5 - s.dir.0 as f32 * 0.5))
+                    * s.dir.0 as f32
+                    + (sim.pos[1] - (s.bottom.1 as f32 + 0.5 - s.dir.1 as f32 * 0.5))
+                        * s.dir.1 as f32;
                 storey + (along / s.len as f32).clamp(0.0, 1.0)
             }
         }
@@ -180,5 +221,11 @@ pub(crate) fn stair_of(content: &Content, o: &ObjectInstance, map: &StairMap) ->
     };
     let top = (bottom.0 + dir.0 * (len - 1), bottom.1 + dir.1 * (len - 1));
     let landing = (top.0 + dir.0, top.1 + dir.1 + depth);
-    Some(Stair { foot, bottom, dir, len, landing })
+    Some(Stair {
+        foot,
+        bottom,
+        dir,
+        len,
+        landing,
+    })
 }

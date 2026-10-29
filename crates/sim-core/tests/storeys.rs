@@ -27,7 +27,11 @@ const UP: i32 = 16;
 
 fn world(storeys: u8) -> World {
     let mut w = World::from_json(&content(storeys), TOWN, 1).unwrap();
-    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
     w
 }
 
@@ -36,7 +40,11 @@ fn room(x: i32, z: i32, w: i32, d: i32, door: bool) -> Vec<EdgeEdit> {
     let mut edits = Vec::new();
     for i in 0..w {
         edits.push(EdgeEdit::new(EdgeAxis::H, x + i, z, EdgeKind::Wall));
-        let kind = if door && i == 1 { EdgeKind::Door } else { EdgeKind::Wall };
+        let kind = if door && i == 1 {
+            EdgeKind::Door
+        } else {
+            EdgeKind::Wall
+        };
         edits.push(EdgeEdit::new(EdgeAxis::H, x + i, z + d, kind));
     }
     for i in 0..d {
@@ -47,11 +55,23 @@ fn room(x: i32, z: i32, w: i32, d: i32, door: bool) -> Vec<EdgeEdit> {
 }
 
 fn build(w: &mut World, edits: Vec<EdgeEdit>) -> Result<(), sim_core::Error> {
-    w.apply(Command::Build { household: 0, edits })
+    w.apply(Command::Build {
+        household: 0,
+        edits,
+    })
 }
 
 fn buy(w: &mut World, def: &str, x: i32, z: i32, rot: i32) -> Result<u32, sim_core::Error> {
-    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, rot]), colors: Default::default(), turn: None, offset: None, size: None, tall: None })?;
+    w.apply(Command::Buy {
+        household: 0,
+        object: def.into(),
+        at: Some([x, z, rot]),
+        colors: Default::default(),
+        turn: None,
+        offset: None,
+        size: None,
+        tall: None,
+    })?;
     Ok(w.objects.last().unwrap().stable)
 }
 
@@ -81,7 +101,13 @@ fn a_room_upstairs_needs_one_below() {
     build(&mut w, room(4, 2 + UP, 6, 6, false)).unwrap();
     assert_ne!(w.lot.room_at(6, 4 + UP), OUTDOORS);
     // Taking the room below down would leave it hanging.
-    let down: Vec<EdgeEdit> = room(4, 2, 6, 6, true).into_iter().map(|e| EdgeEdit { kind: EdgeKind::Open, ..e }).collect();
+    let down: Vec<EdgeEdit> = room(4, 2, 6, 6, true)
+        .into_iter()
+        .map(|e| EdgeEdit {
+            kind: EdgeKind::Open,
+            ..e
+        })
+        .collect();
     assert!(build(&mut w, down).is_err());
     // Nothing stands upstairs outside a room.
     assert!(buy(&mut w, "chair", 12, 4 + UP, 0).is_err());
@@ -96,8 +122,16 @@ fn a_room_upstairs_needs_one_below() {
 fn residents_climb_the_stairs_to_use_things_upstairs() {
     let mut w = house();
     let chair = buy(&mut w, "chair", 5, 3 + UP, 0).unwrap();
-    assert!(buy(&mut w, "chair", 9, 4 + UP, 0).is_err(), "the stairwell is open");
-    w.apply(Command::Use { sim: 0, object: chair, interaction: 0 }).unwrap();
+    assert!(
+        buy(&mut w, "chair", 9, 4 + UP, 0).is_err(),
+        "the stairwell is open"
+    );
+    w.apply(Command::Use {
+        sim: 0,
+        object: chair,
+        interaction: 0,
+    })
+    .unwrap();
     let mut climbing = false;
     for _ in 0..20 * 60 * 5 {
         w.tick_once();
@@ -108,10 +142,18 @@ fn residents_climb_the_stairs_to_use_things_upstairs() {
         }
     }
     assert!(climbing, "went up step by step");
-    assert_eq!(w.sims[0].pose, sim_core::content::Pose::Sit, "sat down upstairs");
+    assert_eq!(
+        w.sims[0].pose,
+        sim_core::content::Pose::Sit,
+        "sat down upstairs"
+    );
     assert_eq!(w.storey_of(w.sims[0].tile().1), 1);
     assert_eq!(height(&w, 0), 1.0);
-    assert_eq!(w.plot_at(w.sims[0].tile().0, w.sims[0].tile().1), Some(0), "still at home");
+    assert_eq!(
+        w.plot_at(w.sims[0].tile().0, w.sims[0].tile().1),
+        Some(0),
+        "still at home"
+    );
 }
 
 #[test]
@@ -136,7 +178,11 @@ fn a_two_storey_house_goes_through_a_blueprint() {
         "households":[{"name":"Player","plot":0,"player":true},{"name":"Other","plot":1}],
         "sims":[{"name":"Ada","household":0,"x":9.5,"z":11.5}]}"#;
     let mut w = World::from_json(&content(2), two_lots, 1).unwrap();
-    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
     build(&mut w, room(4, 2, 6, 6, true)).unwrap();
     build(&mut w, room(4, 2 + UP, 6, 6, false)).unwrap();
     buy(&mut w, "stairs", 9, 3, 0).unwrap();
@@ -144,9 +190,22 @@ fn a_two_storey_house_goes_through_a_blueprint() {
     let bp = w.blueprint(0).unwrap();
     assert!(bp.edges.iter().any(|e| e.storey == 1));
     assert!(bp.objects.iter().any(|o| o.storey == 1));
-    w.apply(Command::BuildBlueprint { household: 1, blueprint: bp }).unwrap();
-    assert_ne!(w.lot.room_at(26, 4 + UP), OUTDOORS, "the room upstairs next door");
-    assert!(w.objects.iter().any(|o| o.def == 1 && o.x >= 22 && w.storey_of(o.z) == 1), "with its chair");
+    w.apply(Command::BuildBlueprint {
+        household: 1,
+        blueprint: bp,
+    })
+    .unwrap();
+    assert_ne!(
+        w.lot.room_at(26, 4 + UP),
+        OUTDOORS,
+        "the room upstairs next door"
+    );
+    assert!(
+        w.objects
+            .iter()
+            .any(|o| o.def == 1 && o.x >= 22 && w.storey_of(o.z) == 1),
+        "with its chair"
+    );
     assert_eq!(w.stair_map().stairs.len(), 2);
 }
 
@@ -177,18 +236,42 @@ fn a_neighbour_climbs_the_stairs_at_lower_detail() {
     let mut w = World::from_json(&content(2), two_lots, 1).unwrap();
     w.autonomy = false;
     for edits in [room(24, 2, 6, 6, true), room(24, 2 + UP, 6, 6, false)] {
-        w.apply(Command::Build { household: 1, edits }).unwrap();
+        w.apply(Command::Build {
+            household: 1,
+            edits,
+        })
+        .unwrap();
     }
     let buy = |w: &mut World, def: &str, x: i32, z: i32| {
-        w.apply(Command::Buy { household: 1, object: def.into(), at: Some([x, z, 0]), colors: Default::default(), turn: None, offset: None, size: None, tall: None }).unwrap();
+        w.apply(Command::Buy {
+            household: 1,
+            object: def.into(),
+            at: Some([x, z, 0]),
+            colors: Default::default(),
+            turn: None,
+            offset: None,
+            size: None,
+            tall: None,
+        })
+        .unwrap();
         w.objects.last().unwrap().stable
     };
     buy(&mut w, "stairs", 29, 3);
     let chair = buy(&mut w, "chair", 25, 3 + UP);
     w.set_view(Some([2, 1, 18, 13]));
-    w.apply(Command::Use { sim: 1, object: chair, interaction: 0 }).unwrap();
+    w.apply(Command::Use {
+        sim: 1,
+        object: chair,
+        interaction: 0,
+    })
+    .unwrap();
     let free = |w: &World, (x, z): (i32, i32)| {
-        sim_core::path::NavGrid { lot: &w.lot, blocked: w.blocked(), stairs: w.stair_map() }.tile_free(x, z)
+        sim_core::path::NavGrid {
+            lot: &w.lot,
+            blocked: w.blocked(),
+            stairs: w.stair_map(),
+        }
+        .tile_free(x, z)
     };
     let sitting = |w: &World| w.sims[1].pose == sim_core::content::Pose::Sit;
     let mut lower = 0;
@@ -198,7 +281,11 @@ fn a_neighbour_climbs_the_stairs_at_lower_detail() {
         if sitting(&w) {
             break;
         }
-        assert!(free(&w, w.sims[1].tile()), "Ben at {:?} on tick {t}", w.sims[1].tile());
+        assert!(
+            free(&w, w.sims[1].tile()),
+            "Ben at {:?} on tick {t}",
+            w.sims[1].tile()
+        );
     }
     assert!(lower > 100, "next door was at lower detail");
     assert!(sitting(&w), "sat down upstairs");

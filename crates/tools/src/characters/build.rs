@@ -26,8 +26,14 @@ use super::json::{OMap, to_string_py};
 use super::kdtree::KdTree;
 use super::meshops::OnMesh;
 use super::np::py_round;
-use super::rig::{BASE_STAGE, BONES, CLIP_BONES, FACE_BONES, FAMILIES, NB, STAGES, head, leg_lengths, parents, skeleton, source_pelvis};
-use super::write::{FIELD_SCALE, MORPH_SCALE, NORMAL_SCALE, PartEntry, STAGE_SCALE, StagePart, TONE_SCALE, pack_morph, r4, write_parts, write_stage};
+use super::rig::{
+    BASE_STAGE, BONES, CLIP_BONES, FACE_BONES, FAMILIES, NB, STAGES, head, leg_lengths, parents,
+    skeleton, source_pelvis,
+};
+use super::write::{
+    FIELD_SCALE, MORPH_SCALE, NORMAL_SCALE, PartEntry, STAGE_SCALE, StagePart, TONE_SCALE,
+    pack_morph, r4, write_parts, write_stage,
+};
 use super::{Mesh, V3, merge};
 
 /// Every part of a family at a stage (no fields / tone / morphs yet), with the body's metadata.
@@ -47,11 +53,19 @@ struct Assembled {
 }
 
 fn part<'a>(parts: &'a mut [(String, Mesh)], name: &str) -> &'a mut Mesh {
-    &mut parts.iter_mut().find(|e| e.0 == name).unwrap_or_else(|| panic!("no part {name}")).1
+    &mut parts
+        .iter_mut()
+        .find(|e| e.0 == name)
+        .unwrap_or_else(|| panic!("no part {name}"))
+        .1
 }
 
 fn get<'a>(parts: &'a [(String, Mesh)], name: &str) -> &'a Mesh {
-    &parts.iter().find(|e| e.0 == name).unwrap_or_else(|| panic!("no part {name}")).1
+    &parts
+        .iter()
+        .find(|e| e.0 == name)
+        .unwrap_or_else(|| panic!("no part {name}"))
+        .1
 }
 
 fn assemble(family: &str, stage: &str, cuts: Option<&Cuts>) -> Assembled {
@@ -61,19 +75,45 @@ fn assemble(family: &str, stage: &str, cuts: Option<&Cuts>) -> Assembled {
     let f = build_face(family, stage, head.clone());
     let n_skin = bd.body.pos.len();
     let n_lod = bd.lod.pos.len();
-    let extras: Vec<Mesh> = f.body.iter().map(|m| Mesh { arm: vec![0.0; m.pos.len()], ..m.clone() }).collect();
-    let strip = |m: &Mesh| Mesh { pos: m.pos.clone(), nor: m.nor.clone(), dense: m.dense.clone(), arm: m.arm.clone(), idx: m.idx.clone(), ..Mesh::default() };
+    let extras: Vec<Mesh> = f
+        .body
+        .iter()
+        .map(|m| Mesh {
+            arm: vec![0.0; m.pos.len()],
+            ..m.clone()
+        })
+        .collect();
+    let strip = |m: &Mesh| Mesh {
+        pos: m.pos.clone(),
+        nor: m.nor.clone(),
+        dense: m.dense.clone(),
+        arm: m.arm.clone(),
+        idx: m.idx.clone(),
+        ..Mesh::default()
+    };
     let mut body_list: Vec<Mesh> = vec![strip(&bd.body)];
     body_list.extend(extras.iter().map(strip));
     // The low-detail body has the eyelids too (they come first among the face's skin pieces).
     let mut lod_list: Vec<Mesh> = vec![strip(&bd.lod)];
     lod_list.extend(extras.iter().filter(|m| m.skin_tone).map(strip));
-    let mut parts = vec![("body".to_string(), merge(&body_list.iter().collect::<Vec<_>>())), ("lod.body".to_string(), merge(&lod_list.iter().collect::<Vec<_>>()))];
+    let mut parts = vec![
+        (
+            "body".to_string(),
+            merge(&body_list.iter().collect::<Vec<_>>()),
+        ),
+        (
+            "lod.body".to_string(),
+            merge(&lod_list.iter().collect::<Vec<_>>()),
+        ),
+    ];
     let n_lids: usize = extras.iter().filter(|m| m.skin_tone).map(Mesh::len).sum();
     let skin = OnMesh::new(&bd.unsocketed, &parts[0].1.idx, n_skin);
     let lids: Vec<V3> = {
         let shade = lid_shading(&skin, &parts[0].1.nor);
-        parts[0].1.pos[n_skin..n_skin + n_lids].iter().map(|&q| shade(q)).collect()
+        parts[0].1.pos[n_skin..n_skin + n_lids]
+            .iter()
+            .map(|&q| shade(q))
+            .collect()
     };
     parts[0].1.nor[n_skin..n_skin + n_lids].copy_from_slice(&lids);
     parts.extend(f.parts.iter().cloned());
@@ -83,7 +123,18 @@ fn assemble(family: &str, stage: &str, cuts: Option<&Cuts>) -> Assembled {
         None => garment_cuts(family, &p),
     };
     parts.extend(build_clothes(family, stage, &cuts));
-    Assembled { parts, meta: bd.meta, p, head, face: f, n_skin, n_lod, cuts, unsocketed: bd.unsocketed, skin }
+    Assembled {
+        parts,
+        meta: bd.meta,
+        p,
+        head,
+        face: f,
+        n_skin,
+        n_lod,
+        cuts,
+        unsocketed: bd.unsocketed,
+        skin,
+    }
 }
 
 /// A lid's normal at a point: the face's it lies on, the skin as it would be without the eye sockets
@@ -113,14 +164,21 @@ fn bake_ao(parts: &mut [(String, Mesh)], spread: (usize, &dyn Fn(V3) -> bool)) {
             vec![teeth, tongue]
         } else if name.starts_with("lod.") {
             vec![&lod]
-        } else if ["top.", "bottom.", "shoes."].iter().any(|p| name.starts_with(p)) {
+        } else if ["top.", "bottom.", "shoes."]
+            .iter()
+            .any(|p| name.starts_with(p))
+        {
             vec![&body]
         } else if name.starts_with("hair.") {
             vec![&body, eyes]
         } else {
             continue;
         };
-        let occ = if name == "body" { ao::occlusion_spread(m, &around, ao::REACH, spread.0, spread.1) } else { ao::occlusion(m, &around, ao::REACH) };
+        let occ = if name == "body" {
+            ao::occlusion_spread(m, &around, ao::REACH, spread.0, spread.1)
+        } else {
+            ao::occlusion(m, &around, ao::REACH)
+        };
         ao::bake(m, occ);
     }
 }
@@ -187,7 +245,10 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
     // over them (face.rs), so the skin round a lid and the lid take the shade the face has there.
     let socketed = part(&mut base.parts, "body").pos[..base.n_skin].to_vec();
     part(&mut base.parts, "body").pos[..base.n_skin].copy_from_slice(&base.unsocketed);
-    bake_ao(&mut base.parts, (base.n_skin, &|p: V3| p.y > head.chin_y - 0.1 * head.hh));
+    bake_ao(
+        &mut base.parts,
+        (base.n_skin, &|p: V3| p.y > head.chin_y - 0.1 * head.hh),
+    );
     part(&mut base.parts, "body").pos[..base.n_skin].copy_from_slice(&socketed);
     // The face's skin pieces: the lids take the tone of the face they lie on (its shade too; the low-detail
     // body's the mean of the skin round them), the upper lid's crease its own; the lips keep theirs.
@@ -229,11 +290,26 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
     }
     // Face morphs: the face's own parts, the body's lids (after its skin), the beard.
     let mut morphs: Vec<(String, Deltas)> = base.face.morphs.clone();
-    if let Some(face_d) = base.face.morphs.iter().find(|e| e.0 == "body").map(|e| e.1.clone()) {
-        let n_lids: usize = base.face.body.iter().filter(|m| m.skin_tone).map(|m| m.pos.len()).sum();
+    if let Some(face_d) = base
+        .face
+        .morphs
+        .iter()
+        .find(|e| e.0 == "body")
+        .map(|e| e.1.clone())
+    {
+        let n_lids: usize = base
+            .face
+            .body
+            .iter()
+            .filter(|m| m.skin_tone)
+            .map(|m| m.pos.len())
+            .sum();
         let body = get(&base.parts, "body");
         let shade = lid_shading(&base.skin, &body.nor);
-        for (name, k, count) in [("body", base.n_skin, None), ("lod.body", base.n_lod, Some(n_lids))] {
+        for (name, k, count) in [
+            ("body", base.n_skin, None),
+            ("lod.body", base.n_lod, Some(n_lids)),
+        ] {
             let n = get(&base.parts, name).pos.len();
             let mut d = Deltas::new();
             for (c, (dp, dn)) in &face_d {
@@ -287,7 +363,14 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
         assert_eq!(a, b, "{family} {stage}: parts differ");
         let mesh = format!("{family}.{stage}.bin");
         let t = write_stage(&out.join(&mesh), &base.parts, &st.parts)?;
-        stages.insert(stage, StageEntry { mesh, sk: skeleton_json(family, stage, &st.meta), parts: t });
+        stages.insert(
+            stage,
+            StageEntry {
+                mesh,
+                sk: skeleton_json(family, stage, &st.meta),
+                parts: t,
+            },
+        );
     }
     let mut chunks = OMap::new();
     chunks.insert("body", []);
@@ -362,11 +445,19 @@ pub fn build(out: &Path) -> io::Result<()> {
         fps: 30,
         source_pelvis: r4(&[sp.x, sp.y, sp.z]),
         source_rest_q: (0..NB).flat_map(|_| [0, 0, 0, 1]).collect(),
-        reference: Reference { body: "male", thigh: py_round(thigh, 5), shin: py_round(shin, 5) },
+        reference: Reference {
+            body: "male",
+            thigh: py_round(thigh, 5),
+            shin: py_round(shin, 5),
+        },
         field_scale: FIELD_SCALE,
         tone_scale: TONE_SCALE,
         stage_scale: STAGE_SCALE,
-        morphs: Morphs { channels: channels(), scale: MORPH_SCALE, normal_scale: NORMAL_SCALE },
+        morphs: Morphs {
+            channels: channels(),
+            scale: MORPH_SCALE,
+            normal_scale: NORMAL_SCALE,
+        },
         bodies,
     };
     std::fs::write(out.join("rig.json"), to_string_py(&rig))?;

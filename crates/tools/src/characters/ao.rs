@@ -54,8 +54,20 @@ struct Bvh {
 impl Bvh {
     /// Over `mesh` and `around`.
     fn new(mesh: &Mesh, around: &[&Mesh]) -> Self {
-        let tris: Vec<[V3; 3]> = [mesh].iter().chain(around).flat_map(|m| m.idx.chunks(3).map(|t| [m.pos[t[0]], m.pos[t[1]], m.pos[t[2]]])).collect();
-        let mut b = Bvh { order: (0..tris.len()).collect(), tris, nodes: Vec::new() };
+        let tris: Vec<[V3; 3]> = [mesh]
+            .iter()
+            .chain(around)
+            .flat_map(|m| {
+                m.idx
+                    .chunks(3)
+                    .map(|t| [m.pos[t[0]], m.pos[t[1]], m.pos[t[2]]])
+            })
+            .collect();
+        let mut b = Bvh {
+            order: (0..tris.len()).collect(),
+            tris,
+            nodes: Vec::new(),
+        };
         if !b.tris.is_empty() {
             b.build(0, b.tris.len());
         }
@@ -76,7 +88,13 @@ impl Bvh {
     fn build(&mut self, start: usize, end: usize) -> usize {
         let (lo, hi) = self.bounds(&self.order[start..end]);
         let at = self.nodes.len();
-        self.nodes.push(Node { lo, hi, start, end, leaf: true });
+        self.nodes.push(Node {
+            lo,
+            hi,
+            start,
+            end,
+            leaf: true,
+        });
         if end - start <= LEAF {
             return at;
         }
@@ -87,7 +105,13 @@ impl Bvh {
         let mid = (start + end) / 2;
         let l = self.build(start, mid);
         let r = self.build(mid, end);
-        self.nodes[at] = Node { lo, hi, start: l, end: r, leaf: false };
+        self.nodes[at] = Node {
+            lo,
+            hi,
+            start: l,
+            end: r,
+            leaf: false,
+        };
         at
     }
 
@@ -138,7 +162,9 @@ impl Bvh {
 pub fn occlusion(mesh: &Mesh, around: &[&Mesh], reach: f64) -> Vec<f64> {
     let bvh = Bvh::new(mesh, around);
     let dirs = directions(SAMPLES);
-    (0..mesh.len()).map(|i| vertex(&bvh, &dirs, mesh, i, reach)).collect()
+    (0..mesh.len())
+        .map(|i| vertex(&bvh, &dirs, mesh, i, reach))
+        .collect()
 }
 
 /// `occlusion` at vertex `i`, rounded to `LEVELS`.
@@ -152,7 +178,8 @@ fn enclosed(bvh: &Bvh, dirs: &[V3], p: V3, n: V3, i: usize, reach: f64) -> f64 {
     let z = Unit::new_normalize(v3(0.0, 0.0, 1.0));
     let n = n.try_normalize(1e-12).unwrap_or(*z);
     // A turn taking +z onto the normal, twisted by the vertex's index so neighbours don't band.
-    let onto = Rotation3::rotation_between(&z, &n).unwrap_or_else(|| Rotation3::from_axis_angle(&V3::x_axis(), std::f64::consts::PI));
+    let onto = Rotation3::rotation_between(&z, &n)
+        .unwrap_or_else(|| Rotation3::from_axis_angle(&V3::x_axis(), std::f64::consts::PI));
     let turn = onto * Rotation3::from_axis_angle(&z, i as f64 * 2.399963);
     let start = p + n * LIFT;
     let (mut blocked, mut inside) = (0.0, 0);
@@ -163,7 +190,11 @@ fn enclosed(bvh: &Bvh, dirs: &[V3], p: V3, n: V3, i: usize, reach: f64) -> f64 {
             None => {}
         }
     }
-    if inside > SAMPLES / 2 { 0.0 } else { blocked / SAMPLES as f64 }
+    if inside > SAMPLES / 2 {
+        0.0
+    } else {
+        blocked / SAMPLES as f64
+    }
 }
 
 /// `occlusion`, but for the vertices `over` picks (among the first `n`, on the triangles among them) the
@@ -171,15 +202,34 @@ fn enclosed(bvh: &Bvh, dirs: &[V3], p: V3, n: V3, i: usize, reach: f64) -> f64 {
 /// weight; four points a triangle) rather than at the vertex alone: where a crease's shade is narrower
 /// than the triangles (the skin against the lips, beside the nose) the vertices alone catch it at a few
 /// of them, and the triangles spread it in spikes.
-pub fn occlusion_spread(mesh: &Mesh, around: &[&Mesh], reach: f64, n: usize, over: &dyn Fn(V3) -> bool) -> Vec<f64> {
+pub fn occlusion_spread(
+    mesh: &Mesh,
+    around: &[&Mesh],
+    reach: f64,
+    n: usize,
+    over: &dyn Fn(V3) -> bool,
+) -> Vec<f64> {
     let bvh = Bvh::new(mesh, around);
     let dirs = directions(SAMPLES);
     let (mut num, mut den) = (vec![0.0; n], vec![0.0; n]);
     let mut k = 0;
-    for t in mesh.idx.chunks(3).filter(|t| t.iter().all(|&i| i < n && over(mesh.pos[i]))) {
-        let area = (mesh.pos[t[1]] - mesh.pos[t[0]]).cross(&(mesh.pos[t[2]] - mesh.pos[t[0]])).norm();
+    for t in mesh
+        .idx
+        .chunks(3)
+        .filter(|t| t.iter().all(|&i| i < n && over(mesh.pos[i])))
+    {
+        let area = (mesh.pos[t[1]] - mesh.pos[t[0]])
+            .cross(&(mesh.pos[t[2]] - mesh.pos[t[0]]))
+            .norm();
         // The centres of the triangle's four equal parts.
-        for w in [[2.0, 2.0, 8.0], [2.0, 8.0, 2.0], [8.0, 2.0, 2.0], [4.0, 4.0, 4.0]].map(|w| w.map(|v| v / 12.0)) {
+        for w in [
+            [2.0, 2.0, 8.0],
+            [2.0, 8.0, 2.0],
+            [8.0, 2.0, 2.0],
+            [4.0, 4.0, 4.0],
+        ]
+        .map(|w| w.map(|v| v / 12.0))
+        {
             let p: V3 = (0..3).map(|j| mesh.pos[t[j]] * w[j]).sum();
             let nor: V3 = (0..3).map(|j| mesh.nor[t[j]] * w[j]).sum();
             let a = enclosed(&bvh, &dirs, p, nor, k, reach);
@@ -191,7 +241,13 @@ pub fn occlusion_spread(mesh: &Mesh, around: &[&Mesh], reach: f64, n: usize, ove
         }
     }
     (0..mesh.len())
-        .map(|i| if i < n && den[i] > 0.0 { (num[i] / den[i] * LEVELS).round() / LEVELS } else { vertex(&bvh, &dirs, mesh, i, reach) })
+        .map(|i| {
+            if i < n && den[i] > 0.0 {
+                (num[i] / den[i] * LEVELS).round() / LEVELS
+            } else {
+                vertex(&bvh, &dirs, mesh, i, reach)
+            }
+        })
         .collect()
 }
 
@@ -209,10 +265,24 @@ mod tests {
 
     /// A 2 m square in the xy plane at `z`, facing +z (or -z: `flip`).
     fn quad(z: f64, flip: bool) -> Mesh {
-        let pos = vec![v3(-1.0, -1.0, z), v3(1.0, -1.0, z), v3(1.0, 1.0, z), v3(-1.0, 1.0, z)];
-        let idx = if flip { vec![0, 2, 1, 0, 3, 2] } else { vec![0, 1, 2, 0, 2, 3] };
+        let pos = vec![
+            v3(-1.0, -1.0, z),
+            v3(1.0, -1.0, z),
+            v3(1.0, 1.0, z),
+            v3(-1.0, 1.0, z),
+        ];
+        let idx = if flip {
+            vec![0, 2, 1, 0, 3, 2]
+        } else {
+            vec![0, 1, 2, 0, 2, 3]
+        };
         let s = if flip { -1.0 } else { 1.0 };
-        Mesh { nor: vec![v3(0.0, 0.0, s); 4], pos, idx, ..Mesh::default() }
+        Mesh {
+            nor: vec![v3(0.0, 0.0, s); 4],
+            pos,
+            idx,
+            ..Mesh::default()
+        }
     }
 
     #[test]
@@ -221,12 +291,27 @@ mod tests {
         // Nothing above: open.
         assert!(occlusion(&floor, &[], 0.5).iter().all(|&a| a == 0.0));
         // A ceiling facing down 5 cm above the middle: enclosed (its front faces the floor).
-        let ceiling = Mesh { pos: vec![v3(-0.3, -0.3, 0.05), v3(0.3, -0.3, 0.05), v3(0.3, 0.3, 0.05), v3(-0.3, 0.3, 0.05)], ..quad(0.05, true) };
-        let mid = Mesh { pos: vec![v3(0.0, 0.0, 0.0)], nor: vec![v3(0.0, 0.0, 1.0)], ..Mesh::default() };
+        let ceiling = Mesh {
+            pos: vec![
+                v3(-0.3, -0.3, 0.05),
+                v3(0.3, -0.3, 0.05),
+                v3(0.3, 0.3, 0.05),
+                v3(-0.3, 0.3, 0.05),
+            ],
+            ..quad(0.05, true)
+        };
+        let mid = Mesh {
+            pos: vec![v3(0.0, 0.0, 0.0)],
+            nor: vec![v3(0.0, 0.0, 1.0)],
+            ..Mesh::default()
+        };
         let a = occlusion(&mid, &[&ceiling], 0.5)[0];
         assert!(a > 0.8, "{a}");
         // The same seen from its back: buried, so open.
-        let back = Mesh { idx: vec![0, 1, 2, 0, 2, 3], ..ceiling };
+        let back = Mesh {
+            idx: vec![0, 1, 2, 0, 2, 3],
+            ..ceiling
+        };
         assert_eq!(occlusion(&mid, &[&back], 0.5)[0], 0.0);
     }
 }

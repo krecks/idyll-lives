@@ -33,15 +33,28 @@ const LOWISH: f32 = 0.1;
 /// What a resident is doing this tick, as far as the diagnostic cares.
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Doing {
-    Sleep { object: Option<u32> },
-    Nap { object: Option<u32> },
+    Sleep {
+        object: Option<u32>,
+    },
+    Nap {
+        object: Option<u32>,
+    },
     Toilet,
     Wash,
     /// A cooked serving (an `Eat` task), at a seat or standing.
-    Eat { seated: bool },
+    Eat {
+        seated: bool,
+    },
     /// A plain food interaction (a snack at the fridge), sitting or not.
-    Food { object: u32, seated: bool },
-    Cook { recipe: usize, step: u8, minutes: u16 },
+    Food {
+        object: u32,
+        seated: bool,
+    },
+    Cook {
+        recipe: usize,
+        step: u8,
+        minutes: u16,
+    },
     Other,
 }
 
@@ -58,7 +71,13 @@ struct Lookup {
 
 impl Lookup {
     fn new(w: &World) -> Self {
-        let tag = |name: &str| w.content.tags.iter().position(|t| t == name).map_or(0, |i| 1 << i);
+        let tag = |name: &str| {
+            w.content
+                .tags
+                .iter()
+                .position(|t| t == name)
+                .map_or(0, |i| 1 << i)
+        };
         let need = |name: &str| w.content.needs.iter().position(|n| n.id == name);
         Self {
             sleep: tag("sleep"),
@@ -89,19 +108,39 @@ impl Lookup {
             return Doing::Nap { object };
         }
         match a.task.kind {
-            TaskKind::Eat { seat, stage: 1, .. } => Doing::Eat { seated: seat.is_some() },
-            TaskKind::Cook { recipe, step, minutes, .. } => Doing::Cook { recipe, step, minutes },
-            TaskKind::Use { object, interaction } => {
-                let i = &w.content.objects[w.objects[object as usize].def].interactions[interaction];
+            TaskKind::Eat { seat, stage: 1, .. } => Doing::Eat {
+                seated: seat.is_some(),
+            },
+            TaskKind::Cook {
+                recipe,
+                step,
+                minutes,
+                ..
+            } => Doing::Cook {
+                recipe,
+                step,
+                minutes,
+            },
+            TaskKind::Use {
+                object,
+                interaction,
+            } => {
+                let i =
+                    &w.content.objects[w.objects[object as usize].def].interactions[interaction];
                 let gains = |n: Option<usize>| n.is_some_and(|n| i.total_gain[n] > 0.0);
                 if gains(self.bladder) {
                     Doing::Toilet
-                } else if i.tags & self.handwash != 0 || (self.handwash == 0 && i.tags & self.hygiene != 0 && i.minutes <= 10.0) {
+                } else if i.tags & self.handwash != 0
+                    || (self.handwash == 0 && i.tags & self.hygiene != 0 && i.minutes <= 10.0)
+                {
                     // Without a `handwash` tag: a short hygiene interaction (a sink, not a shower).
                     Doing::Wash
                 } else if i.tags & self.food != 0 && gains(self.hunger) && i.eats.is_none() {
                     // (Fetching food to eat sitting down counts when they eat it, as a serving.)
-                    Doing::Food { object, seated: s.pose == Pose::Sit }
+                    Doing::Food {
+                        object,
+                        seated: s.pose == Pose::Sit,
+                    }
                 } else {
                     Doing::Other
                 }
@@ -174,7 +213,9 @@ fn clock_time(tick: u64) -> String {
 }
 
 fn object_name(w: &World, object: Option<u32>) -> String {
-    object.map_or("-".into(), |o| w.content.objects[w.objects[o as usize].def].id.clone())
+    object.map_or("-".into(), |o| {
+        w.content.objects[w.objects[o as usize].def].id.clone()
+    })
 }
 
 impl Record {
@@ -193,14 +234,29 @@ impl Record {
         let minutes = (tick - start) as f32 * MINUTES_PER_TICK;
         let d = routine_day(start);
         match doing {
-            Doing::Sleep { object } => self.day(d, needs).sleeps.push(Rest { start, minutes, object: object_name(w, object) }),
-            Doing::Nap { object } => self.day(d, needs).naps.push(Rest { start, minutes, object: object_name(w, object) }),
+            Doing::Sleep { object } => self.day(d, needs).sleeps.push(Rest {
+                start,
+                minutes,
+                object: object_name(w, object),
+            }),
+            Doing::Nap { object } => self.day(d, needs).naps.push(Rest {
+                start,
+                minutes,
+                object: object_name(w, object),
+            }),
             Doing::Toilet => {
                 self.day(d, needs).toilets += 1;
                 self.toilet_end = Some((tick, d, false));
             }
-            Doing::Cook { recipe, step, minutes: planned } => {
-                let label = w.content.recipes[recipe].steps.get(step as usize).map_or("?".into(), |s| s.label.clone());
+            Doing::Cook {
+                recipe,
+                step,
+                minutes: planned,
+            } => {
+                let label = w.content.recipes[recipe]
+                    .steps
+                    .get(step as usize)
+                    .map_or("?".into(), |s| s.label.clone());
                 let e = self.day(d, needs).cook.entry(label).or_default();
                 *e = (e.0 + f32::from(planned), e.1 + minutes, e.2 + 1);
             }
@@ -224,11 +280,19 @@ impl Record {
             }
             Doing::Eat { seated } => {
                 let day = self.day(d, needs);
-                if seated { day.eat_seated += 1 } else { day.eat_standing += 1 }
+                if seated {
+                    day.eat_seated += 1
+                } else {
+                    day.eat_standing += 1
+                }
             }
             Doing::Food { seated, .. } => {
                 let day = self.day(d, needs);
-                if seated { day.food_seated += 1 } else { day.food_standing += 1 }
+                if seated {
+                    day.food_seated += 1
+                } else {
+                    day.food_standing += 1
+                }
             }
             _ => {}
         }
@@ -239,13 +303,24 @@ impl Record {
 /// toilet, sitting at the computer...
 fn what(w: &World, s: &Sim) -> String {
     if s.away_until.is_some() {
-        return if s.job.is_some() { "at work".into() } else { "at school".into() };
+        return if s.job.is_some() {
+            "at work".into()
+        } else {
+            "at school".into()
+        };
     }
     let Some(a) = s.current() else {
-        return if s.engaged_with.is_some() { "talked to".into() } else { "nothing".into() };
+        return if s.engaged_with.is_some() {
+            "talked to".into()
+        } else {
+            "nothing".into()
+        };
     };
     let task = match a.task.kind {
-        TaskKind::Use { object, interaction } => {
+        TaskKind::Use {
+            object,
+            interaction,
+        } => {
             let o = &w.content.objects[w.objects[object as usize].def];
             format!("{} ({})", o.interactions[interaction].label, o.id)
         }
@@ -254,9 +329,17 @@ fn what(w: &World, s: &Sim) -> String {
         TaskKind::GoHome => "home".into(),
         TaskKind::Spot { accident } => format!("accident {}", w.content.accidents[accident].id),
         // (Cook, eat, dishes, clean, repair, visit...)
-        other => format!("{other:?}").split([' ', '{']).next().unwrap_or("?").to_lowercase(),
+        other => format!("{other:?}")
+            .split([' ', '{'])
+            .next()
+            .unwrap_or("?")
+            .to_lowercase(),
     };
-    let task = if a.task.directed { format!("{task} [directed]") } else { task };
+    let task = if a.task.directed {
+        format!("{task} [directed]")
+    } else {
+        task
+    };
     match a.phase {
         Phase::Routing { .. } => format!("walking: {task}"),
         Phase::Queued { .. } => format!("queued: {task}"),
@@ -267,12 +350,17 @@ fn what(w: &World, s: &Sim) -> String {
 
 /// Whether their home has nothing that fills need `n`.
 fn home_lacks(w: &World, s: &Sim, n: usize) -> bool {
-    let Some(home) = w.households[s.household as usize].plot else { return true };
+    let Some(home) = w.households[s.household as usize].plot else {
+        return true;
+    };
     !w.objects.iter().any(|o| {
         let (x, z) = o.front_tile(&w.content);
         w.plot_at(x, z) == Some(home)
             && !o.broken()
-            && w.content.objects[o.def].interactions.iter().any(|i| i.autonomous && i.total_gain[n] > 0.0)
+            && w.content.objects[o.def]
+                .interactions
+                .iter()
+                .any(|i| i.autonomous && i.total_gain[n] > 0.0)
     })
 }
 
@@ -280,9 +368,13 @@ fn run(seed: u64, player_size: usize) -> (World, Vec<Record>, Lows, BTreeMap<Str
     let content = common::content();
     let town = match std::env::var("WORLDS") {
         Ok(path) => {
-            let worlds: Vec<serde_json::Value> = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+            let worlds: Vec<serde_json::Value> =
+                serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
             let kind = std::env::var("WORLD").ok();
-            let world = worlds.iter().find(|w| kind.as_ref().is_none_or(|k| w["kind"] == k.as_str())).expect("a world of that kind");
+            let world = worlds
+                .iter()
+                .find(|w| kind.as_ref().is_none_or(|k| w["kind"] == k.as_str()))
+                .expect("a world of that kind");
             eprintln!("{} {} ({})", world["kind"], world["seed"], world["name"]);
             world["town"].to_string()
         }
@@ -320,7 +412,9 @@ fn run(seed: u64, player_size: usize) -> (World, Vec<Record>, Lows, BTreeMap<Str
                     r.started(&w, doing, tick);
                     if let (Doing::Toilet, Some(b)) = (doing, look.bladder) {
                         let habit = s.current().is_some_and(|a| a.task.routine);
-                        r.day(routine_day(tick), needs).toilet_at.push((s.needs[b], habit));
+                        r.day(routine_day(tick), needs)
+                            .toilet_at
+                            .push((s.needs[b], habit));
                     }
                     r.last = Some((doing, tick));
                 }
@@ -339,7 +433,9 @@ fn run(seed: u64, player_size: usize) -> (World, Vec<Record>, Lows, BTreeMap<Str
                     "at work" | "at school" => "away",
                     "nothing" => "nothing",
                     _ if now.starts_with("walking") => "walking",
-                    _ if matches!(look.doing(&w, s), Doing::Sleep { .. } | Doing::Nap { .. }) => "asleep",
+                    _ if matches!(look.doing(&w, s), Doing::Sleep { .. } | Doing::Nap { .. }) => {
+                        "asleep"
+                    }
                     _ if now.starts_with("social") || now == "talked to" => "talking",
                     "cook" | "eat" => "meals",
                     "dishes" | "clean" | "repair" => "chores",
@@ -357,7 +453,11 @@ fn run(seed: u64, player_size: usize) -> (World, Vec<Record>, Lows, BTreeMap<Str
                         for (edge, label) in [(LOW, "low"), (1e-4, "out")] {
                             if before >= edge && after < edge {
                                 let (doing, since, at) = r.what.as_ref().expect("set above");
-                                let doing = if home_lacks(&w, s, n) { format!("{doing} (none at home)") } else { doing.clone() };
+                                let doing = if home_lacks(&w, s, n) {
+                                    format!("{doing} (none at home)")
+                                } else {
+                                    doing.clone()
+                                };
                                 let e = lows.entry((n, label, doing)).or_default();
                                 e.0 += 1;
                                 e.1 += (tick - since) as f32 * MINUTES_PER_TICK;
@@ -369,10 +469,23 @@ fn run(seed: u64, player_size: usize) -> (World, Vec<Record>, Lows, BTreeMap<Str
                 r.needs = s.needs[..needs].to_vec();
             }
         }
-        for e in w.events.iter().filter(|e| e.id > seen && e.kind == EventKind::Accident) {
-            let id = e.n.and_then(|a| w.content.accidents.get(a as usize)).map_or("?".into(), |a| a.id.clone());
+        for e in w
+            .events
+            .iter()
+            .filter(|e| e.id > seen && e.kind == EventKind::Accident)
+        {
+            let id =
+                e.n.and_then(|a| w.content.accidents.get(a as usize))
+                    .map_or("?".into(), |a| a.id.clone());
             let s = &w.sims[e.a as usize];
-            eprintln!("accident: {} {} (h{}) at {}, day {}", id, s.name, s.household, clock_time(e.tick), clock::day(e.tick));
+            eprintln!(
+                "accident: {} {} (h{}) at {}, day {}",
+                id,
+                s.name,
+                s.household,
+                clock_time(e.tick),
+                clock::day(e.tick)
+            );
             *accidents.entry(id).or_default() += 1;
         }
         seen = w.events.last_id();
@@ -383,34 +496,71 @@ fn run(seed: u64, player_size: usize) -> (World, Vec<Record>, Lows, BTreeMap<Str
             r.ended(&w, prev, since, w.tick);
         }
     }
-    eprintln!("{} residents, {DAYS} days in {:.1} s", w.sims.len(), started.elapsed().as_secs_f64());
+    eprintln!(
+        "{} residents, {DAYS} days in {:.1} s",
+        w.sims.len(),
+        started.elapsed().as_secs_f64()
+    );
     (w, records, lows, accidents)
 }
 
 fn rests(list: &[Rest]) -> String {
     let all: Vec<String> = list
         .iter()
-        .map(|r| format!("{} {:.1}h {}", clock_time(r.start), r.minutes / 60.0, r.object))
+        .map(|r| {
+            format!(
+                "{} {:.1}h {}",
+                clock_time(r.start),
+                r.minutes / 60.0,
+                r.object
+            )
+        })
         .collect();
-    if all.is_empty() { "-".into() } else { all.join(", ") }
+    if all.is_empty() {
+        "-".into()
+    } else {
+        all.join(", ")
+    }
 }
 
 fn report(w: &World, records: &[Record], lows: &Lows, accidents: &BTreeMap<String, u32>) {
     let needs = w.content.needs.len();
-    let short: Vec<String> = w.content.needs.iter().map(|n| n.id.chars().take(4).collect()).collect();
+    let short: Vec<String> = w
+        .content
+        .needs
+        .iter()
+        .map(|n| n.id.chars().take(4).collect())
+        .collect();
     eprintln!("Routine days run 06:00 to 06:00; needs are min/avg.");
     for (i, s) in w.sims.iter().enumerate() {
         let r = &records[i];
         if r.days.is_empty() {
             continue;
         }
-        let stage = w.content.life.stage_at(s.age).map_or("-", |st| st.id.as_str());
-        let job = s.job.as_ref().map_or("-".to_string(), |j| w.content.careers[j.career].levels[j.level].title.clone());
+        let stage = w
+            .content
+            .life
+            .stage_at(s.age)
+            .map_or("-", |st| st.id.as_str());
+        let job = s.job.as_ref().map_or("-".to_string(), |j| {
+            w.content.careers[j.career].levels[j.level].title.clone()
+        });
         eprintln!("\n{} (h{}, {stage}, {job})", s.name, s.household);
         for (d, day) in r.days.iter().filter(|(d, _)| (1..=DAYS).contains(*d)) {
-            let cook: Vec<String> = day.cook.iter().map(|(l, (p, a, n))| format!("{l} {:.0}/{:.0}", p / *n as f32, a / *n as f32)).collect();
+            let cook: Vec<String> = day
+                .cook
+                .iter()
+                .map(|(l, (p, a, n))| format!("{l} {:.0}/{:.0}", p / *n as f32, a / *n as f32))
+                .collect();
             let need: Vec<String> = (0..needs)
-                .map(|n| format!("{} {:.2}/{:.2}", short[n], day.need_min[n], day.need_sum[n] / f64::from(day.samples.max(1))))
+                .map(|n| {
+                    format!(
+                        "{} {:.2}/{:.2}",
+                        short[n],
+                        day.need_min[n],
+                        day.need_sum[n] / f64::from(day.samples.max(1))
+                    )
+                })
                 .collect();
             eprintln!(
                 "  d{d} sleep {} | naps {}: {} | toilet {} washed {} (sink {}) | eat seated {} standing {} · food sitting {} standing {}{}",
@@ -424,7 +574,11 @@ fn report(w: &World, records: &[Record], lows: &Lows, accidents: &BTreeMap<Strin
                 day.eat_standing,
                 day.food_seated,
                 day.food_standing,
-                if cook.is_empty() { String::new() } else { format!(" | cook (planned/actual min) {}", cook.join(", ")) },
+                if cook.is_empty() {
+                    String::new()
+                } else {
+                    format!(" | cook (planned/actual min) {}", cook.join(", "))
+                },
             );
             eprintln!("      {}", need.join("  "));
         }
@@ -434,9 +588,23 @@ fn report(w: &World, records: &[Record], lows: &Lows, accidents: &BTreeMap<Strin
 
 fn summary(w: &World, records: &[Record], lows: &Lows, accidents: &BTreeMap<String, u32>) {
     let needs = w.content.needs.len();
-    let days: Vec<&Day> = records.iter().flat_map(|r| r.days.iter().filter(|(d, _)| (1..=DAYS).contains(*d)).map(|(_, day)| day)).collect();
+    let days: Vec<&Day> = records
+        .iter()
+        .flat_map(|r| {
+            r.days
+                .iter()
+                .filter(|(d, _)| (1..=DAYS).contains(*d))
+                .map(|(_, day)| day)
+        })
+        .collect();
     let n = days.len().max(1) as f32;
-    let pct = |a: usize, b: usize| if b == 0 { 0.0 } else { a as f32 * 100.0 / b as f32 };
+    let pct = |a: usize, b: usize| {
+        if b == 0 {
+            0.0
+        } else {
+            a as f32 * 100.0 / b as f32
+        }
+    };
     eprintln!("\n=== Summary: {} resident-days ===", days.len());
     // Sleep: blocks a night, the longest block's length and start.
     let mut blocks = [0usize; 4];
@@ -455,10 +623,14 @@ fn summary(w: &World, records: &[Record], lows: &Lows, accidents: &BTreeMap<Stri
         }
     }
     starts.sort_by(f32::total_cmp);
-    let at = |q: f32| starts.get(((starts.len() as f32 - 1.0) * q).round() as usize).map_or("-".into(), |h| {
-        let h = h % 24.0;
-        format!("{:02}:{:02}", h as u32, (h.fract() * 60.0) as u32)
-    });
+    let at = |q: f32| {
+        starts
+            .get(((starts.len() as f32 - 1.0) * q).round() as usize)
+            .map_or("-".into(), |h| {
+                let h = h % 24.0;
+                format!("{:02}:{:02}", h as u32, (h.fract() * 60.0) as u32)
+            })
+    };
     eprintln!(
         "sleep blocks (>=30 min) a night: 0: {}  1: {}  2: {}  3+: {}  ({:.0}% exactly one)",
         blocks[0],
@@ -476,11 +648,17 @@ fn summary(w: &World, records: &[Record], lows: &Lows, accidents: &BTreeMap<Stri
         at(0.9),
         pct(start_ok, mains)
     );
-    let short_sleeps: usize = days.iter().map(|d| d.sleeps.iter().filter(|r| r.minutes < 30.0).count()).sum();
+    let short_sleeps: usize = days
+        .iter()
+        .map(|d| d.sleeps.iter().filter(|r| r.minutes < 30.0).count())
+        .sum();
     eprintln!("sleeps under 30 min (woken / interrupted): {short_sleeps}");
     // Naps.
     let naps: usize = days.iter().map(|d| d.naps.len()).sum();
-    let nap_minutes: f32 = days.iter().flat_map(|d| d.naps.iter().map(|r| r.minutes)).sum();
+    let nap_minutes: f32 = days
+        .iter()
+        .flat_map(|d| d.naps.iter().map(|r| r.minutes))
+        .sum();
     let most = days.iter().map(|d| d.naps.len()).max().unwrap_or(0);
     let few = days.iter().filter(|d| d.naps.len() <= 1).count();
     eprintln!(
@@ -499,12 +677,23 @@ fn summary(w: &World, records: &[Record], lows: &Lows, accidents: &BTreeMap<Stri
         pct(washed as usize, toilets as usize),
         washes as f32 / n
     );
-    let at: Vec<(f32, bool)> = days.iter().flat_map(|d| d.toilet_at.iter().copied()).collect();
+    let at: Vec<(f32, bool)> = days
+        .iter()
+        .flat_map(|d| d.toilet_at.iter().copied())
+        .collect();
     let habits = at.iter().filter(|a| a.1).count();
     let chosen: Vec<f32> = at.iter().filter(|a| !a.1).map(|a| a.0).collect();
     let mut bands = [0usize; 4];
     for &b in &chosen {
-        bands[if b < 0.2 { 0 } else if b < 0.4 { 1 } else if b < 0.6 { 2 } else { 3 }] += 1;
+        bands[if b < 0.2 {
+            0
+        } else if b < 0.4 {
+            1
+        } else if b < 0.6 {
+            2
+        } else {
+            3
+        }] += 1;
     }
     eprintln!(
         "toilet visits: {:.1} a day out of habit (getting up, bed, leaving, home, meals), {:.1} chosen, at bladder avg {:.2} (<0.2: {}, 0.2-0.4: {}, 0.4-0.6: {}, >=0.6: {})",
@@ -536,27 +725,52 @@ fn summary(w: &World, records: &[Record], lows: &Lows, accidents: &BTreeMap<Stri
             *e = (e.0 + p, e.1 + a, e.2 + c);
         }
     }
-    let line: Vec<String> = cook.iter().map(|(l, (p, a, c))| format!("{l} {:.1}/{:.1} (x{c})", p / *c as f32, a / *c as f32)).collect();
-    eprintln!("cooking steps, planned/actual min: {}", if line.is_empty() { "-".into() } else { line.join(", ") });
+    let line: Vec<String> = cook
+        .iter()
+        .map(|(l, (p, a, c))| format!("{l} {:.1}/{:.1} (x{c})", p / *c as f32, a / *c as f32))
+        .collect();
+    eprintln!(
+        "cooking steps, planned/actual min: {}",
+        if line.is_empty() {
+            "-".into()
+        } else {
+            line.join(", ")
+        }
+    );
     // Needs.
     let line: Vec<String> = (0..needs)
         .map(|k| {
             let low = days.iter().map(|d| d.need_min[k]).fold(1.0f32, f32::min);
             let mins = days.iter().map(|d| d.need_min[k]).sum::<f32>() / n;
-            let avg = days.iter().map(|d| d.need_sum[k] / f64::from(d.samples.max(1))).sum::<f64>() / f64::from(n);
-            format!("{} {:.2}/{:.2}/{:.2}", w.content.needs[k].id, low, mins, avg)
+            let avg = days
+                .iter()
+                .map(|d| d.need_sum[k] / f64::from(d.samples.max(1)))
+                .sum::<f64>()
+                / f64::from(n);
+            format!(
+                "{} {:.2}/{:.2}/{:.2}",
+                w.content.needs[k].id, low, mins, avg
+            )
         })
         .collect();
     eprintln!("needs lowest/avg daily min/avg: {}", line.join("  "));
     // Running low: how often, how long, doing what.
     let real: Vec<usize> = (0..needs).filter(|&k| !w.content.needs[k].room).collect();
-    let any = days.iter().filter(|d| real.iter().any(|&k| d.need_min[k] < LOW)).count();
+    let any = days
+        .iter()
+        .filter(|d| real.iter().any(|&k| d.need_min[k] < LOW))
+        .count();
     let line: Vec<String> = real
         .iter()
         .map(|&k| {
             let under = days.iter().filter(|d| d.need_min[k] < LOW).count();
             let minutes = days.iter().map(|d| d.need_lowish[k]).sum::<u32>() as f32 / n;
-            format!("{} {:.0}%/{:.0}", w.content.needs[k].id, pct(under, days.len()), minutes)
+            format!(
+                "{} {:.0}%/{:.0}",
+                w.content.needs[k].id,
+                pct(under, days.len()),
+                minutes
+            )
         })
         .collect();
     eprintln!(
@@ -570,12 +784,18 @@ fn summary(w: &World, records: &[Record], lows: &Lows, accidents: &BTreeMap<Stri
             *time.entry(k).or_default() += m;
         }
     }
-    let line: Vec<String> = time.iter().map(|(k, m)| format!("{k} {:.1}", *m as f32 / 60.0 / n)).collect();
+    let line: Vec<String> = time
+        .iter()
+        .map(|(k, m)| format!("{k} {:.1}", *m as f32 / 60.0 / n))
+        .collect();
     eprintln!("hours a day: {}", line.join("  "));
     let by_day: Vec<String> = (1..=DAYS)
         .map(|d| {
             let list: Vec<&Day> = records.iter().filter_map(|r| r.days.get(&d)).collect();
-            let low = list.iter().filter(|day| real.iter().any(|&k| day.need_min[k] < LOW)).count();
+            let low = list
+                .iter()
+                .filter(|day| real.iter().any(|&k| day.need_min[k] < LOW))
+                .count();
             format!("d{d} {:.0}%", pct(low, list.len()))
         })
         .collect();
@@ -586,24 +806,50 @@ fn summary(w: &World, records: &[Record], lows: &Lows, accidents: &BTreeMap<Stri
             let avg: Vec<String> = real
                 .iter()
                 .map(|&k| {
-                    let a = list.iter().map(|day| day.need_sum[k] / f64::from(day.samples.max(1))).sum::<f64>() / list.len().max(1) as f64;
+                    let a = list
+                        .iter()
+                        .map(|day| day.need_sum[k] / f64::from(day.samples.max(1)))
+                        .sum::<f64>()
+                        / list.len().max(1) as f64;
                     let low = list.iter().filter(|day| day.need_min[k] < LOW).count();
-                    format!("{} {a:.2}/{:.0}%", w.content.needs[k].id.chars().take(4).collect::<String>(), pct(low, list.len()))
+                    format!(
+                        "{} {a:.2}/{:.0}%",
+                        w.content.needs[k].id.chars().take(4).collect::<String>(),
+                        pct(low, list.len())
+                    )
                 })
                 .collect();
             eprintln!("  d{d} avg/low: {}", avg.join("  "));
         }
     }
-    let line: Vec<String> = accidents.iter().map(|(id, c)| format!("{id} {c}")).collect();
-    eprintln!("accidents: {}", if line.is_empty() { "none".into() } else { line.join(", ") });
+    let line: Vec<String> = accidents
+        .iter()
+        .map(|(id, c)| format!("{id} {c}"))
+        .collect();
+    eprintln!(
+        "accidents: {}",
+        if line.is_empty() {
+            "none".into()
+        } else {
+            line.join(", ")
+        }
+    );
     for (label, edge) in [("low", LOW), ("out", 0.0)] {
         let mut list: Vec<_> = lows.iter().filter(|(k, _)| k.1 == label).collect();
         list.sort_by_key(|e| std::cmp::Reverse(e.1.0));
         let total: u32 = list.iter().map(|(_, v)| v.0).sum();
-        eprintln!("needs under {edge}: {total} times, doing (count, avg minutes at it, avg need when it started):");
+        eprintln!(
+            "needs under {edge}: {total} times, doing (count, avg minutes at it, avg need when it started):"
+        );
         for ((k, _, doing), (c, minutes, at)) in list.iter().take(25) {
             let c = *c as f32;
-            eprintln!("  {:<8} x{:<4} {doing}: {:.0} min, from {:.2}", w.content.needs[*k].id, c, minutes / c, at / c);
+            eprintln!(
+                "  {:<8} x{:<4} {doing}: {:.0} min, from {:.2}",
+                w.content.needs[*k].id,
+                c,
+                minutes / c,
+                at / c
+            );
         }
     }
 }
@@ -611,7 +857,10 @@ fn summary(w: &World, records: &[Record], lows: &Lows, accidents: &BTreeMap<Stri
 #[test]
 #[ignore]
 fn a_week_of_routines() {
-    let seed = std::env::var("SEED").ok().and_then(|s| s.parse().ok()).unwrap_or(7);
+    let seed = std::env::var("SEED")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(7);
     let (w, records, lows, accidents) = run(seed, 2);
     report(&w, &records, &lows, &accidents);
 }

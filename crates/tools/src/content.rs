@@ -58,13 +58,24 @@ options:
 
 /// The repo root (the Python script's `ROOT`).
 pub fn root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).parent().and_then(Path::parent).expect("crates/tools sits two below the root").to_path_buf()
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .expect("crates/tools sits two below the root")
+        .to_path_buf()
 }
 
 /// A path as Python's `Path(s)` spells it: no `.` components, no doubled or trailing slashes.
 pub fn py_path(s: &str) -> PathBuf {
-    let out: PathBuf = Path::new(s).components().filter(|c| *c != std::path::Component::CurDir).collect();
-    if out.as_os_str().is_empty() { PathBuf::from(".") } else { out }
+    let out: PathBuf = Path::new(s)
+        .components()
+        .filter(|c| *c != std::path::Component::CurDir)
+        .collect();
+    if out.as_os_str().is_empty() {
+        PathBuf::from(".")
+    } else {
+        out
+    }
 }
 
 /// Python's `str.isspace` (what `\s` and `strip()` match): Unicode White_Space plus U+001C..U+001F.
@@ -82,7 +93,18 @@ fn py_splitlines(s: &str) -> Vec<&str> {
     let mut start = 0;
     let mut it = s.char_indices().peekable();
     while let Some((i, c)) = it.next() {
-        let brk = matches!(c, '\n' | '\r' | '\x0b' | '\x0c' | '\x1c' | '\x1d' | '\x1e' | '\u{85}' | '\u{2028}' | '\u{2029}');
+        let brk = matches!(
+            c,
+            '\n' | '\r'
+                | '\x0b'
+                | '\x0c'
+                | '\x1c'
+                | '\x1d'
+                | '\x1e'
+                | '\u{85}'
+                | '\u{2028}'
+                | '\u{2029}'
+        );
         if brk {
             out.push(&s[start..i]);
             let mut next = i + c.len_utf8();
@@ -102,7 +124,11 @@ fn py_splitlines(s: &str) -> Vec<&str> {
 /// `Path.read_text()`: UTF-8 with universal newlines (`\r\n` and `\r` read as `\n`).
 fn read_text(path: &Path) -> Result<String, String> {
     let raw = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
-    Ok(if raw.contains('\r') { raw.replace("\r\n", "\n").replace('\r', "\n") } else { raw })
+    Ok(if raw.contains('\r') {
+        raw.replace("\r\n", "\n").replace('\r', "\n")
+    } else {
+        raw
+    })
 }
 
 /// `json.dumps(s)` for a string: `ensure_ascii`, so non-ASCII as `\uXXXX` (surrogate pairs above the BMP).
@@ -178,7 +204,13 @@ pub struct Node {
 
 impl Node {
     fn leaf(start: usize, end: usize, value: Val) -> Node {
-        Node { start, end, value, members: Vec::new(), items: Vec::new() }
+        Node {
+            start,
+            end,
+            value,
+            members: Vec::new(),
+            items: Vec::new(),
+        }
     }
 
     pub fn get(&self, key: &str) -> Option<&Node> {
@@ -187,7 +219,11 @@ impl Node {
 
     /// `(index, key start, value)` of member `key`.
     pub fn member(&self, key: &str) -> Option<(usize, usize, &Node)> {
-        self.members.iter().enumerate().find(|(_, m)| m.0 == key).map(|(i, m)| (i, m.1, &m.2))
+        self.members
+            .iter()
+            .enumerate()
+            .find(|(_, m)| m.0 == key)
+            .map(|(i, m)| (i, m.1, &m.2))
     }
 
     /// The value of member `key` as Python's `node.get(key).value` printed (`None` when missing or null).
@@ -217,7 +253,11 @@ impl Parser<'_> {
     }
 
     fn at(&self, i: usize) -> Result<u8, String> {
-        self.t.as_bytes().get(i).copied().ok_or_else(|| "string index out of range".to_string())
+        self.t
+            .as_bytes()
+            .get(i)
+            .copied()
+            .ok_or_else(|| "string index out of range".to_string())
     }
 
     /// The end of the string literal at `i` (`"(?:[^"\\]|\\.)*"`), if there is one.
@@ -241,7 +281,8 @@ impl Parser<'_> {
     }
 
     fn decode(&self, a: usize, b: usize) -> Result<String, String> {
-        serde_json::from_str::<String>(&self.t[a..b]).map_err(|e| format!("bad string at {}: {e}", self.cp(a)))
+        serde_json::from_str::<String>(&self.t[a..b])
+            .map_err(|e| format!("bad string at {}: {e}", self.cp(a)))
     }
 
     fn value(&self, i: usize) -> Result<Node, String> {
@@ -251,11 +292,19 @@ impl Parser<'_> {
             let mut members = Vec::new();
             let mut j = self.ws(i + 1);
             if self.at(j)? == b'}' {
-                return Ok(Node { start: i, end: j + 1, value: Val::Object, members, items: Vec::new() });
+                return Ok(Node {
+                    start: i,
+                    end: j + 1,
+                    value: Val::Object,
+                    members,
+                    items: Vec::new(),
+                });
             }
             loop {
                 j = self.ws(j);
-                let m = self.string_end(j).ok_or_else(|| format!("a key expected at {}", self.cp(j)))?;
+                let m = self
+                    .string_end(j)
+                    .ok_or_else(|| format!("a key expected at {}", self.cp(j)))?;
                 let key = self.decode(j, m)?;
                 let ks = j;
                 j = self.ws(m);
@@ -272,14 +321,26 @@ impl Parser<'_> {
                 if self.at(j)? != b'}' {
                     return Err(format!("\"}}\" expected at {}", self.cp(j)));
                 }
-                return Ok(Node { start: i, end: j + 1, value: Val::Object, members, items: Vec::new() });
+                return Ok(Node {
+                    start: i,
+                    end: j + 1,
+                    value: Val::Object,
+                    members,
+                    items: Vec::new(),
+                });
             }
         }
         if c == b'[' {
             let mut items = Vec::new();
             let mut j = self.ws(i + 1);
             if self.at(j)? == b']' {
-                return Ok(Node { start: i, end: j + 1, value: Val::Array, members: Vec::new(), items });
+                return Ok(Node {
+                    start: i,
+                    end: j + 1,
+                    value: Val::Array,
+                    members: Vec::new(),
+                    items,
+                });
             }
             loop {
                 let v = self.value(j)?;
@@ -292,19 +353,33 @@ impl Parser<'_> {
                 if self.at(j)? != b']' {
                     return Err(format!("\"]\" expected at {}", self.cp(j)));
                 }
-                return Ok(Node { start: i, end: j + 1, value: Val::Array, members: Vec::new(), items });
+                return Ok(Node {
+                    start: i,
+                    end: j + 1,
+                    value: Val::Array,
+                    members: Vec::new(),
+                    items,
+                });
             }
         }
         if c == b'"' {
-            let m = self.string_end(i).ok_or_else(|| format!("a string expected at {}", self.cp(i)))?;
+            let m = self
+                .string_end(i)
+                .ok_or_else(|| format!("a string expected at {}", self.cp(i)))?;
             return Ok(Node::leaf(i, m, Val::Str(self.decode(i, m)?)));
         }
-        for (word, v) in [("true", Val::Bool(true)), ("false", Val::Bool(false)), ("null", Val::Null)] {
+        for (word, v) in [
+            ("true", Val::Bool(true)),
+            ("false", Val::Bool(false)),
+            ("null", Val::Null),
+        ] {
             if self.t[i..].starts_with(word) {
                 return Ok(Node::leaf(i, i + word.len(), v));
             }
         }
-        let end = self.number_end(i).ok_or_else(|| format!("a value expected at {}", self.cp(i)))?;
+        let end = self
+            .number_end(i)
+            .ok_or_else(|| format!("a value expected at {}", self.cp(i)))?;
         Ok(Node::leaf(i, end, Val::Num(self.t[i..end].to_string())))
     }
 
@@ -387,7 +462,10 @@ pub struct Editor<'a> {
 
 impl<'a> Editor<'a> {
     pub fn new(text: &'a str) -> Self {
-        Editor { text, edits: Vec::new() }
+        Editor {
+            text,
+            edits: Vec::new(),
+        }
     }
 
     pub fn replace(&mut self, node: &Node, text: &str) {
@@ -408,15 +486,23 @@ impl<'a> Editor<'a> {
                 (last.1, &last.2)
             }
         };
-        let sep = if self.text[obj.start..obj.end].contains('\n') { format!(",\n{}", indent_at(self.text, ks)) } else { ", ".to_string() };
-        self.edits.push((v.end, v.end, format!("{sep}\"{key}\": {value}")));
+        let sep = if self.text[obj.start..obj.end].contains('\n') {
+            format!(",\n{}", indent_at(self.text, ks))
+        } else {
+            ", ".to_string()
+        };
+        self.edits
+            .push((v.end, v.end, format!("{sep}\"{key}\": {value}")));
     }
 
     pub fn remove_member(&mut self, obj: &Node, key: &str) {
-        let Some((i, ks, v)) = obj.member(key) else { return };
+        let Some((i, ks, v)) = obj.member(key) else {
+            return;
+        };
         if i > 0 {
             // From the end of the member before, through this one.
-            self.edits.push((obj.members[i - 1].2.end, v.end, String::new()));
+            self.edits
+                .push((obj.members[i - 1].2.end, v.end, String::new()));
         } else if obj.members.len() > 1 {
             // The first: through to the next one's key.
             self.edits.push((ks, obj.members[1].1, String::new()));
@@ -429,22 +515,34 @@ impl<'a> Editor<'a> {
     /// Python script failed, gets the one-line form between its brackets.)
     pub fn append_item(&mut self, arr: &Node, one_line: &str, lines: impl Fn(&str) -> String) {
         let Some(last) = arr.items.last() else {
-            self.edits.push((arr.start + 1, arr.end - 1, one_line.to_string()));
+            self.edits
+                .push((arr.start + 1, arr.end - 1, one_line.to_string()));
             return;
         };
         let multi = self.text[last.start..last.end].contains('\n');
         let ind = indent_at(self.text, last.start);
-        let body = if multi { lines(ind) } else { one_line.to_string() };
-        let sep = if self.text[arr.start..arr.end].contains('\n') { format!(",\n{ind}") } else { ", ".to_string() };
-        self.edits.push((last.end, last.end, format!("{sep}{body}")));
+        let body = if multi {
+            lines(ind)
+        } else {
+            one_line.to_string()
+        };
+        let sep = if self.text[arr.start..arr.end].contains('\n') {
+            format!(",\n{ind}")
+        } else {
+            ", ".to_string()
+        };
+        self.edits
+            .push((last.end, last.end, format!("{sep}{body}")));
     }
 
     pub fn remove_item(&mut self, arr: &Node, i: usize) {
         let node = &arr.items[i];
         if i > 0 {
-            self.edits.push((arr.items[i - 1].end, node.end, String::new()));
+            self.edits
+                .push((arr.items[i - 1].end, node.end, String::new()));
         } else if arr.items.len() > 1 {
-            self.edits.push((node.start, arr.items[1].start, String::new()));
+            self.edits
+                .push((node.start, arr.items[1].start, String::new()));
         } else {
             self.edits.push((arr.start + 1, arr.end - 1, String::new()));
         }
@@ -482,14 +580,19 @@ pub fn load(content: &Path) -> Result<Vec<File>, String> {
 
 /// Item id -> (category, group or None) from the category tables' "Home" (or "Back to") column.
 pub fn back_to_table(plan: &Path) -> Result<HashMap<String, (String, Option<String>)>, String> {
-    let listed_re = regex::Regex::new(r"^- ((?:`[^`]+`(?:, )?)+): ([\w ]+) / ([^;.]+)[;.]?$").unwrap();
+    let listed_re =
+        regex::Regex::new(r"^- ((?:`[^`]+`(?:, )?)+): ([\w ]+) / ([^;.]+)[;.]?$").unwrap();
     let tick_re = regex::Regex::new(r"`([^`]+)`").unwrap();
     let no_group = |g: &str| matches!(g, "—" | "-");
     let mut mds: Vec<PathBuf> = std::fs::read_dir(plan)
         .map_err(|e| format!("{}: {e}", plan.display()))?
         .filter_map(|e| e.ok())
         .map(|e| e.path())
-        .filter(|p| p.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.ends_with(".md")))
+        .filter(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.ends_with(".md"))
+        })
         .collect();
     mds.sort();
     let mut homes = HashMap::new();
@@ -501,24 +604,41 @@ pub fn back_to_table(plan: &Path) -> Result<HashMap<String, (String, Option<Stri
             if let Some(m) = listed_re.captures(line) {
                 let group = py_strip(&m[3]);
                 for id in tick_re.captures_iter(&m[1]) {
-                    homes.entry(id[1].to_string()).or_insert_with(|| (py_strip(&m[2]).to_string(), (!no_group(group)).then(|| group.to_string())));
+                    homes.entry(id[1].to_string()).or_insert_with(|| {
+                        (
+                            py_strip(&m[2]).to_string(),
+                            (!no_group(group)).then(|| group.to_string()),
+                        )
+                    });
                 }
             }
             if !line.starts_with('|') {
                 column = None;
                 continue;
             }
-            let cells: Vec<&str> = py_strip(line).trim_matches('|').split('|').map(py_strip).collect();
+            let cells: Vec<&str> = py_strip(line)
+                .trim_matches('|')
+                .split('|')
+                .map(py_strip)
+                .collect();
             if let Some(heading) = ["Home", "Back to"].into_iter().find(|h| cells.contains(h)) {
                 column = cells.iter().position(|c| *c == heading);
                 continue;
             }
-            let Some(col) = column.filter(|&c| c < cells.len()) else { continue };
+            let Some(col) = column.filter(|&c| c < cells.len()) else {
+                continue;
+            };
             let id = tick_re.captures(cells[0]);
             let home: Vec<&str> = cells[col].split('/').collect();
             if let (Some(id), 2) = (id, home.len()) {
                 let (cat, group) = (py_strip(home[0]), py_strip(home[1]));
-                homes.insert(id[1].to_string(), (cat.to_string(), (!(no_group(group) || group.is_empty())).then(|| group.to_string())));
+                homes.insert(
+                    id[1].to_string(),
+                    (
+                        cat.to_string(),
+                        (!(no_group(group) || group.is_empty())).then(|| group.to_string()),
+                    ),
+                );
             }
         }
     }
@@ -576,11 +696,17 @@ pub struct Exit {
 
 fn usage_error(msg: &str) -> Exit {
     let usage = HELP.split("\n\n").next().unwrap();
-    Exit { code: 2, msg: format!("{usage}\ncontent: error: {msg}") }
+    Exit {
+        code: 2,
+        msg: format!("{usage}\ncontent: error: {msg}"),
+    }
 }
 
 fn fail(msg: impl Into<String>) -> Exit {
-    Exit { code: 1, msg: msg.into() }
+    Exit {
+        code: 1,
+        msg: msg.into(),
+    }
 }
 
 enum Arg {
@@ -592,7 +718,16 @@ enum Arg {
 
 /// argparse's `_parse_optional`: exact name, `name=value`, unique prefix, negative number, space.
 fn classify(s: &str) -> Result<Arg, Exit> {
-    const OPTS: [&str; 8] = ["-h", "--help", "--group", "--label", "--to", "--dry-run", "--content", "--plan"];
+    const OPTS: [&str; 8] = [
+        "-h",
+        "--help",
+        "--group",
+        "--label",
+        "--to",
+        "--dry-run",
+        "--content",
+        "--plan",
+    ];
     if !s.starts_with('-') || s == "-" {
         return Ok(Arg::Positional);
     }
@@ -608,17 +743,29 @@ fn classify(s: &str) -> Result<Arg, Exit> {
         return Ok(Arg::Opt(full(o), explicit));
     }
     if name.starts_with("--") {
-        let hits: Vec<&'static str> = OPTS.iter().copied().filter(|o| o.starts_with(name)).collect();
+        let hits: Vec<&'static str> = OPTS
+            .iter()
+            .copied()
+            .filter(|o| o.starts_with(name))
+            .collect();
         match hits.len() {
             0 => {}
             1 => return Ok(Arg::Opt(hits[0], explicit)),
-            _ => return Err(usage_error(&format!("ambiguous option: {name} could match {}", hits.join(", ")))),
+            _ => {
+                return Err(usage_error(&format!(
+                    "ambiguous option: {name} could match {}",
+                    hits.join(", ")
+                )));
+            }
         }
     }
     // `^-\d+$|^-\d*\.\d+$`
     let num = &s[1..];
     let digits = |t: &str| !t.is_empty() && t.bytes().all(|b| b.is_ascii_digit());
-    let negative = digits(num) || num.split_once('.').is_some_and(|(a, b)| (a.is_empty() || digits(a)) && digits(b));
+    let negative = digits(num)
+        || num
+            .split_once('.')
+            .is_some_and(|(a, b)| (a.is_empty() || digits(a)) && digits(b));
     if negative || s.contains(' ') {
         return Ok(Arg::Positional);
     }
@@ -635,7 +782,11 @@ pub fn parse_args(argv: &[String]) -> Result<Args, Exit> {
     while i < argv.len() {
         let s = &argv[i];
         i += 1;
-        let kind = if rest || s == "--" { Arg::Positional } else { classify(s)? };
+        let kind = if rest || s == "--" {
+            Arg::Positional
+        } else {
+            classify(s)?
+        };
         if s == "--" && !rest {
             rest = true;
             in_chunk = false;
@@ -664,10 +815,16 @@ pub fn parse_args(argv: &[String]) -> Result<Args, Exit> {
         match opt {
             "--help" | "--dry-run" => {
                 if let Some(v) = explicit {
-                    return Err(usage_error(&format!("argument {}: ignored explicit argument '{v}'", if opt == "--help" { "-h/--help" } else { opt })));
+                    return Err(usage_error(&format!(
+                        "argument {}: ignored explicit argument '{v}'",
+                        if opt == "--help" { "-h/--help" } else { opt }
+                    )));
                 }
                 if opt == "--help" {
-                    return Err(Exit { code: 0, msg: String::new() });
+                    return Err(Exit {
+                        code: 0,
+                        msg: String::new(),
+                    });
                 }
                 a.dry_run = true;
             }
@@ -675,11 +832,17 @@ pub fn parse_args(argv: &[String]) -> Result<Args, Exit> {
                 let v = match explicit {
                     Some(v) => v,
                     None => match argv.get(i) {
-                        Some(v) if !rest && v != "--" && matches!(classify(v)?, Arg::Positional) => {
+                        Some(v)
+                            if !rest && v != "--" && matches!(classify(v)?, Arg::Positional) =>
+                        {
                             i += 1;
                             v.clone()
                         }
-                        _ => return Err(usage_error(&format!("argument {opt}: expected one argument"))),
+                        _ => {
+                            return Err(usage_error(&format!(
+                                "argument {opt}: expected one argument"
+                            )));
+                        }
                     },
                 };
                 let slot = match opt {
@@ -699,7 +862,9 @@ pub fn parse_args(argv: &[String]) -> Result<Args, Exit> {
         if k == 0 {
             let what = &chunk[0];
             if !["list", "in", "out"].contains(&what.as_str()) {
-                return Err(usage_error(&format!("argument what: invalid choice: '{what}' (choose from list, in, out)")));
+                return Err(usage_error(&format!(
+                    "argument what: invalid choice: '{what}' (choose from list, in, out)"
+                )));
             }
             a.what = what.clone();
             if chunk.len() > 1 {
@@ -717,7 +882,10 @@ pub fn parse_args(argv: &[String]) -> Result<Args, Exit> {
         return Err(usage_error("the following arguments are required: what"));
     }
     if !extras.is_empty() {
-        return Err(usage_error(&format!("unrecognized arguments: {}", extras.join(" "))));
+        return Err(usage_error(&format!(
+            "unrecognized arguments: {}",
+            extras.join(" ")
+        )));
     }
     Ok(a)
 }
@@ -730,7 +898,10 @@ struct Ordered<V> {
 
 impl<V> Ordered<V> {
     fn new() -> Self {
-        Ordered { keys: Vec::new(), map: HashMap::new() }
+        Ordered {
+            keys: Vec::new(),
+            map: HashMap::new(),
+        }
     }
 
     fn insert(&mut self, k: String, v: V) {
@@ -755,8 +926,14 @@ fn dash(s: &Option<String>) -> String {
 /// Runs the tool; stdout goes to `out`.
 pub fn run(a: &Args, out: &mut dyn std::io::Write) -> Result<(), Exit> {
     let root = root();
-    let content = a.content.as_deref().map_or_else(|| root.join("web/public/content"), py_path);
-    let plan = a.plan.as_deref().map_or_else(|| root.join("docs/objects"), py_path);
+    let content = a
+        .content
+        .as_deref()
+        .map_or_else(|| root.join("web/public/content"), py_path);
+    let plan = a
+        .plan
+        .as_deref()
+        .map_or_else(|| root.join("docs/objects"), py_path);
     let files = load(&content).map_err(fail)?;
     let mut eds: Vec<Editor> = files.iter().map(|f| Editor::new(&f.text)).collect();
     let mut by_id: Ordered<(usize, &Node)> = Ordered::new();
@@ -774,21 +951,40 @@ pub fn run(a: &Args, out: &mut dyn std::io::Write) -> Result<(), Exit> {
         }
     }
     let Some(&(vfile, vcat)) = cats.map.get("validate") else {
-        return Err(fail("validate: there is no Validate category in the content"));
+        return Err(fail(
+            "validate: there is no Validate category in the content",
+        ));
     };
     let vgroups = vcat.get("groups");
     let vitems: &[Node] = vgroups.map_or(&[], |g| &g.items);
     let where_ = |o: &Node| (o.val("category"), o.val("group"));
     let groups_of = |cat: &str| -> Vec<(String, &Node)> {
-        cats.map.get(cat).and_then(|(_, c)| c.get("groups")).map_or(Vec::new(), |arr| arr.items.iter().map(|g| (g.val("id").unwrap_or_else(|| "None".into()), g)).collect())
+        cats.map
+            .get(cat)
+            .and_then(|(_, c)| c.get("groups"))
+            .map_or(Vec::new(), |arr| {
+                arr.items
+                    .iter()
+                    .map(|g| (g.val("id").unwrap_or_else(|| "None".into()), g))
+                    .collect()
+            })
     };
-    let homes = if plan.is_dir() { back_to_table(&plan).map_err(fail)? } else { HashMap::new() };
-    let base_data: serde_json::Value = serde_json::from_str(&files[0].text).map_err(|e| fail(e.to_string()))?;
+    let homes = if plan.is_dir() {
+        back_to_table(&plan).map_err(fail)?
+    } else {
+        HashMap::new()
+    };
+    let base_data: serde_json::Value =
+        serde_json::from_str(&files[0].text).map_err(|e| fail(e.to_string()))?;
     let free_cats: HashSet<String> = base_data
         .get("objectRules")
         .and_then(|r| r.get("freeRotation"))
         .and_then(|f| f.as_array())
-        .map_or(HashSet::new(), |a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect());
+        .map_or(HashSet::new(), |a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        });
     let w = |out: &mut dyn std::io::Write, s: String| {
         let _ = writeln!(out, "{s}");
     };
@@ -819,7 +1015,10 @@ pub fn run(a: &Args, out: &mut dyn std::io::Write) -> Result<(), Exit> {
             }
         }
         for (gid, items) in in_validate.iter() {
-            w(out, format!("{gid} (not a Validate group!): {}", items.join(", ")));
+            w(
+                out,
+                format!("{gid} (not a Validate group!): {}", items.join(", ")),
+            );
         }
         return Ok(());
     }
@@ -837,44 +1036,91 @@ pub fn run(a: &Args, out: &mut dyn std::io::Write) -> Result<(), Exit> {
     if ids.is_empty() {
         return Err(fail("validate: which items? (ids, or --group with out)"));
     }
-    let missing: Vec<&str> = ids.iter().filter(|i| !by_id.map.contains_key(*i)).map(|s| s.as_str()).collect();
+    let missing: Vec<&str> = ids
+        .iter()
+        .filter(|i| !by_id.map.contains_key(*i))
+        .map(|s| s.as_str())
+        .collect();
     if !missing.is_empty() {
-        return Err(fail(format!("validate: no such item: {}", missing.join(", "))));
+        return Err(fail(format!(
+            "validate: no such item: {}",
+            missing.join(", ")
+        )));
     }
 
     let mut expect: HashMap<String, (String, Option<String>)> = HashMap::new();
     if a.what == "in" {
-        let Some(group) = &a.group else { return Err(fail("validate: in needs --group <validate group>")) };
+        let Some(group) = &a.group else {
+            return Err(fail("validate: in needs --group <validate group>"));
+        };
         let existing: Vec<String> = groups_of("validate").into_iter().map(|(k, _)| k).collect();
         let mut outside = false;
         for id in &ids {
             let (fi, o) = by_id.map[id];
             let (cat, g) = where_(o);
             if cat.as_deref() == Some("validate") {
-                return Err(fail(format!("validate: {id} is in Validate already ({})", opt(&g))));
+                return Err(fail(format!(
+                    "validate: {id} is in Validate already ({})",
+                    opt(&g)
+                )));
             }
             let Some(cat) = cat.clone().filter(|c| cats.map.contains_key(c)) else {
-                return Err(fail(format!("validate: {id} has no known category ({})", opt(&cat))));
+                return Err(fail(format!(
+                    "validate: {id} has no known category ({})",
+                    opt(&cat)
+                )));
             };
-            let home_group = g.as_ref().and_then(|g| groups_of(&cat).into_iter().find(|(k, _)| k == g).map(|(_, n)| n));
-            outside |= home_group.and_then(|h| h.get("outside")).is_some_and(|n| n.value.truthy());
+            let home_group = g.as_ref().and_then(|g| {
+                groups_of(&cat)
+                    .into_iter()
+                    .find(|(k, _)| k == g)
+                    .map(|(_, n)| n)
+            });
+            outside |= home_group
+                .and_then(|h| h.get("outside"))
+                .is_some_and(|n| n.value.truthy());
             let ed = &mut eds[fi];
             ed.replace(o.get("category").unwrap(), "\"validate\"");
             ed.set_member(o, "group", &json_str(group), Some("category"));
-            if o.get("freeRotation").is_none() && free_cats.contains(&cat) && !free_cats.contains("validate") {
+            if o.get("freeRotation").is_none()
+                && free_cats.contains(&cat)
+                && !free_cats.contains("validate")
+            {
                 ed.set_member(o, "freeRotation", "true", Some("category"));
             }
-            w(out, format!("{id}: {cat} / {} -> validate / {group}", dash(&g)));
+            w(
+                out,
+                format!("{id}: {cat} / {} -> validate / {group}", dash(&g)),
+            );
         }
         if !existing.contains(group) {
             let label = json_str(&a.label.clone().unwrap_or_else(|| label_of(group)));
             let gid = json_str(group);
             let extra = if outside { ", \"outside\": true" } else { "" };
-            let Some(vgroups) = vgroups else { return Err(fail("validate: the Validate category has no \"groups\"")) };
-            eds[vfile].append_item(vgroups, &format!("{{\"id\": {gid}, \"label\": {label}{extra}}}"), |ind| {
-                format!("{{\n{ind}  \"id\": {gid},\n{ind}  \"label\": {label}{}\n{ind}}}", if outside { format!(",\n{ind}  \"outside\": true") } else { String::new() })
-            });
-            w(out, format!("new Validate group: {group}{}", if outside { " (outside)" } else { "" }));
+            let Some(vgroups) = vgroups else {
+                return Err(fail("validate: the Validate category has no \"groups\""));
+            };
+            eds[vfile].append_item(
+                vgroups,
+                &format!("{{\"id\": {gid}, \"label\": {label}{extra}}}"),
+                |ind| {
+                    format!(
+                        "{{\n{ind}  \"id\": {gid},\n{ind}  \"label\": {label}{}\n{ind}}}",
+                        if outside {
+                            format!(",\n{ind}  \"outside\": true")
+                        } else {
+                            String::new()
+                        }
+                    )
+                },
+            );
+            w(
+                out,
+                format!(
+                    "new Validate group: {group}{}",
+                    if outside { " (outside)" } else { "" }
+                ),
+            );
         }
         for id in &ids {
             expect.insert(id.clone(), ("validate".into(), Some(group.clone())));
@@ -886,16 +1132,25 @@ pub fn run(a: &Args, out: &mut dyn std::io::Write) -> Result<(), Exit> {
             let (fi, o) = by_id.map[id];
             let (cat, group) = where_(o);
             if cat.as_deref() != Some("validate") {
-                return Err(fail(format!("validate: {id} is not in Validate ({} / {})", opt(&cat), opt(&group))));
+                return Err(fail(format!(
+                    "validate: {id} is not in Validate ({} / {})",
+                    opt(&cat),
+                    opt(&group)
+                )));
             }
             let home = if let Some(to) = &a.to {
                 let (c, g) = to.split_once('/').unwrap_or((to, ""));
                 let g = py_strip(g);
-                (py_strip(c).to_string(), (!g.is_empty()).then(|| g.to_string()))
+                (
+                    py_strip(c).to_string(),
+                    (!g.is_empty()).then(|| g.to_string()),
+                )
             } else if let Some(h) = homes.get(id) {
                 h.clone()
             } else {
-                return Err(fail(format!("validate: no \"Home\" for {id} in {plan_s}: give --to <category>/<group>")));
+                return Err(fail(format!(
+                    "validate: no \"Home\" for {id} in {plan_s}: give --to <category>/<group>"
+                )));
             };
             if !cats.map.contains_key(&home.0) {
                 return Err(fail(format!("validate: {id}: no category \"{}\"", home.0)));
@@ -904,7 +1159,11 @@ pub fn run(a: &Args, out: &mut dyn std::io::Write) -> Result<(), Exit> {
                 let groups = groups_of(&home.0);
                 if !groups.iter().any(|(k, _)| k == hg) {
                     let names: Vec<&str> = groups.iter().map(|(k, _)| k.as_str()).collect();
-                    return Err(fail(format!("validate: {id}: category \"{}\" has no group \"{hg}\" ({})", home.0, names.join(", "))));
+                    return Err(fail(format!(
+                        "validate: {id}: category \"{}\" has no group \"{hg}\" ({})",
+                        home.0,
+                        names.join(", ")
+                    )));
                 }
             }
             let ed = &mut eds[fi];
@@ -916,18 +1175,40 @@ pub fn run(a: &Args, out: &mut dyn std::io::Write) -> Result<(), Exit> {
             if !emptied.contains(&group) {
                 emptied.push(group.clone());
             }
-            w(out, format!("{id}: validate / {} -> {} / {}", opt(&group), home.0, dash(&home.1)));
+            w(
+                out,
+                format!(
+                    "{id}: validate / {} -> {} / {}",
+                    opt(&group),
+                    home.0,
+                    dash(&home.1)
+                ),
+            );
             expect.insert(id.clone(), home);
         }
         // Validate groups nothing is left in.
-        let still: HashSet<Option<String>> = by_id.iter().filter(|(i, (_, o))| !expect.contains_key(*i) && where_(o).0.as_deref() == Some("validate")).map(|(_, (_, o))| where_(o).1).collect();
-        let dropped: Vec<usize> = (0..vitems.len()).filter(|&k| {
-            let gid = vitems[k].val("id");
-            emptied.contains(&gid) && !still.contains(&gid)
-        }).collect();
+        let still: HashSet<Option<String>> = by_id
+            .iter()
+            .filter(|(i, (_, o))| {
+                !expect.contains_key(*i) && where_(o).0.as_deref() == Some("validate")
+            })
+            .map(|(_, (_, o))| where_(o).1)
+            .collect();
+        let dropped: Vec<usize> = (0..vitems.len())
+            .filter(|&k| {
+                let gid = vitems[k].val("id");
+                emptied.contains(&gid) && !still.contains(&gid)
+            })
+            .collect();
         for &k in &dropped {
             eds[vfile].remove_item(vgroups.unwrap(), k);
-            w(out, format!("dropped the empty Validate group: {}", opt(&vitems[k].val("id"))));
+            w(
+                out,
+                format!(
+                    "dropped the empty Validate group: {}",
+                    opt(&vitems[k].val("id"))
+                ),
+            );
         }
         if dropped.len() == vitems.len() {
             w(out, "Validate is empty now: remove the category and its icon (docs/objects/README.md, \"Validate\").".into());
@@ -941,13 +1222,27 @@ pub fn run(a: &Args, out: &mut dyn std::io::Write) -> Result<(), Exit> {
             continue;
         }
         let text = eds[fi].new_text(&f.path).map_err(fail)?;
-        let data: serde_json::Value = serde_json::from_str(&text).map_err(|e| fail(format!("{}: {e}", f.path.display())))?;
-        for o in data.get("objects").and_then(|v| v.as_array()).map_or(&[][..], |v| v) {
-            let Some(id) = o.get("id").and_then(|v| v.as_str()) else { continue };
+        let data: serde_json::Value =
+            serde_json::from_str(&text).map_err(|e| fail(format!("{}: {e}", f.path.display())))?;
+        for o in data
+            .get("objects")
+            .and_then(|v| v.as_array())
+            .map_or(&[][..], |v| v)
+        {
+            let Some(id) = o.get("id").and_then(|v| v.as_str()) else {
+                continue;
+            };
             if let Some((cat, group)) = expect.get(id) {
-                let got = (o.get("category").and_then(|v| v.as_str()), o.get("group").and_then(|v| v.as_str()));
+                let got = (
+                    o.get("category").and_then(|v| v.as_str()),
+                    o.get("group").and_then(|v| v.as_str()),
+                );
                 if got != (Some(cat.as_str()), group.as_deref()) {
-                    return Err(fail(format!("{id}: {} / {}", got.0.unwrap_or("None"), got.1.unwrap_or("None"))));
+                    return Err(fail(format!(
+                        "{id}: {} / {}",
+                        got.0.unwrap_or("None"),
+                        got.1.unwrap_or("None")
+                    )));
                 }
             }
         }
@@ -957,15 +1252,32 @@ pub fn run(a: &Args, out: &mut dyn std::io::Write) -> Result<(), Exit> {
         let f = &files[fi];
         let (rel, header) = match f.path.strip_prefix(&root) {
             Ok(r) => (r.display().to_string(), format!("a/{}", r.display())),
-            Err(_) if f.path.is_relative() => (f.path.display().to_string(), format!("a/{}", f.path.display())),
+            Err(_) if f.path.is_relative() => (
+                f.path.display().to_string(),
+                format!("a/{}", f.path.display()),
+            ),
             Err(_) => (f.path.display().to_string(), f.path.display().to_string()),
         };
         if a.dry_run {
-            let header_b = if header.starts_with("a/") { format!("b/{rel}") } else { header.clone() };
-            let diff = similar::TextDiff::configure().algorithm(similar::Algorithm::Myers).diff_lines(f.text.as_str(), text.as_str());
-            let _ = write!(out, "{}", diff.unified_diff().context_radius(3).missing_newline_hint(false).header(&header, &header_b));
+            let header_b = if header.starts_with("a/") {
+                format!("b/{rel}")
+            } else {
+                header.clone()
+            };
+            let diff = similar::TextDiff::configure()
+                .algorithm(similar::Algorithm::Myers)
+                .diff_lines(f.text.as_str(), text.as_str());
+            let _ = write!(
+                out,
+                "{}",
+                diff.unified_diff()
+                    .context_radius(3)
+                    .missing_newline_hint(false)
+                    .header(&header, &header_b)
+            );
         } else {
-            std::fs::write(&f.path, &text).map_err(|e| fail(format!("{}: {e}", f.path.display())))?;
+            std::fs::write(&f.path, &text)
+                .map_err(|e| fail(format!("{}: {e}", f.path.display())))?;
             w(out, format!("wrote {rel}"));
         }
     }
@@ -997,7 +1309,10 @@ mod tests {
     #[test]
     fn dumps_like_python() {
         let u = "\\u";
-        assert_eq!(json_str("Caf\u{e9} \u{2615} \u{1f600} \"q\" \\ \n\x7f"), format!("\"Caf{u}00e9 {u}2615 {u}d83d{u}de00 \\\"q\\\" \\\\ \\n{u}007f\""));
+        assert_eq!(
+            json_str("Caf\u{e9} \u{2615} \u{1f600} \"q\" \\ \n\x7f"),
+            format!("\"Caf{u}00e9 {u}2615 {u}d83d{u}de00 \\\"q\\\" \\\\ \\n{u}007f\"")
+        );
     }
 
     #[test]
@@ -1024,7 +1339,10 @@ mod tests {
         ed.set_member(&n, "c", "3", Some("a"));
         ed.set_member(&n, "d", "4", Some("a"));
         ed.remove_member(&n, "b");
-        assert_eq!(ed.new_text(Path::new("x")).unwrap(), "{\"a\": 1, \"d\": 4, \"c\": 3}");
+        assert_eq!(
+            ed.new_text(Path::new("x")).unwrap(),
+            "{\"a\": 1, \"d\": 4, \"c\": 3}"
+        );
         ed.replace(n.get("a").unwrap(), "9");
         ed.replace(n.get("a").unwrap(), "8");
         assert!(ed.new_text(Path::new("x")).is_err());

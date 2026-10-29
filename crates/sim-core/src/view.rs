@@ -11,8 +11,8 @@ use crate::clock;
 use crate::content::Content;
 use crate::life;
 use crate::lot::Edge;
-use crate::social::SocialEvent;
 use crate::planner::{Goal, GoalKind, Outcome, Reason, Routine};
+use crate::social::SocialEvent;
 use crate::world::{Phase, Sim, Task, TaskKind, World};
 use crate::{MINUTES_PER_TICK, conversation};
 
@@ -128,7 +128,11 @@ fn reason_view(content: &Content, r: Reason) -> ReasonView<'_> {
         Reason::Away => ("away", None, None),
         Reason::NoPlace => ("noPlace", None, None),
     };
-    ReasonView { code, trait_id, need }
+    ReasonView {
+        code,
+        trait_id,
+        need,
+    }
 }
 
 /// A block that's running or over: `status` is `active`, `kept`, `cut`, `skipped` or `noPlace`.
@@ -194,12 +198,22 @@ fn goal_view<'a>(world: &'a World, s: &Sim, g: &Goal) -> GoalView<'a> {
     match def.kind {
         GoalKind::Promoted => {
             if let Some(j) = &s.job {
-                steps.push(GoalStepView { kind: "performance", skill: None, have: j.performance.round(), need: 100.0 });
+                steps.push(GoalStepView {
+                    kind: "performance",
+                    skill: None,
+                    have: j.performance.round(),
+                    need: 100.0,
+                });
             }
         }
         GoalKind::Own => {
             let funds = world.households[s.household as usize].funds;
-            steps.push(GoalStepView { kind: "funds", skill: None, have: funds as f32, need: g.target });
+            steps.push(GoalStepView {
+                kind: "funds",
+                skill: None,
+                have: funds as f32,
+                need: g.target,
+            });
         }
         _ => {}
     }
@@ -254,7 +268,16 @@ fn plan_view<'a>(world: &'a World, s: &'a Sim) -> PlanView<'a> {
     let content = &world.content;
     let p = &s.planner;
     let today = clock::day(world.tick);
-    let block = |routine, household, activity: usize, skill: Option<usize>, day, start, minutes, status, reason: Option<Reason>, done| BlockView {
+    let block = |routine,
+                 household,
+                 activity: usize,
+                 skill: Option<usize>,
+                 day,
+                 start,
+                 minutes,
+                 status,
+                 reason: Option<Reason>,
+                 done| BlockView {
         routine,
         household,
         activity: &content.activities[activity].id,
@@ -268,7 +291,11 @@ fn plan_view<'a>(world: &'a World, s: &'a Sim) -> PlanView<'a> {
         done: round_to(done, 0.1),
     };
     PlanView {
-        routines: p.routines.iter().map(|r| routine_view(content, r)).collect(),
+        routines: p
+            .routines
+            .iter()
+            .map(|r| routine_view(content, r))
+            .collect(),
         skip_household: &p.skip_household,
         current: p.run.as_ref().map(|r| {
             let status = if r.no_place {
@@ -278,8 +305,23 @@ fn plan_view<'a>(world: &'a World, s: &'a Sim) -> PlanView<'a> {
             } else {
                 "active"
             };
-            let reason = if r.no_place { Some(Reason::NoPlace) } else { r.skipped };
-            block(r.routine, r.household, r.activity, r.skill, r.day, r.start, r.minutes, status, reason, r.done)
+            let reason = if r.no_place {
+                Some(Reason::NoPlace)
+            } else {
+                r.skipped
+            };
+            block(
+                r.routine,
+                r.household,
+                r.activity,
+                r.skill,
+                r.day,
+                r.start,
+                r.minutes,
+                status,
+                reason,
+                r.done,
+            )
         }),
         history: p
             .history
@@ -292,11 +334,26 @@ fn plan_view<'a>(world: &'a World, s: &'a Sim) -> PlanView<'a> {
                     Outcome::Skipped => "skipped",
                     Outcome::NoPlace => "noPlace",
                 };
-                block(b.routine, b.household, b.activity, b.skill, b.day, b.start, b.minutes, status, b.reason, b.done)
+                block(
+                    b.routine,
+                    b.household,
+                    b.activity,
+                    b.skill,
+                    b.day,
+                    b.start,
+                    b.minutes,
+                    status,
+                    b.reason,
+                    b.done,
+                )
             })
             .collect(),
         goals: p.goals.iter().map(|g| goal_view(world, s, g)).collect(),
-        suggestions: p.suggestions.iter().map(|g| goal_view(world, s, g)).collect(),
+        suggestions: p
+            .suggestions
+            .iter()
+            .map(|g| goal_view(world, s, g))
+            .collect(),
         purchase: p.purchase.filter(|r| r.open).map(|r| PurchaseView {
             object: &content.objects[r.object].id,
             price: content.objects[r.object].price.unwrap_or(0),
@@ -305,9 +362,18 @@ fn plan_view<'a>(world: &'a World, s: &'a Sim) -> PlanView<'a> {
         wishes: p
             .wishes
             .iter()
-            .map(|&(a, k)| (content.activities[a].id.as_str(), k.map(|k| content.skills[k].id.as_str())))
+            .map(|&(a, k)| {
+                (
+                    content.activities[a].id.as_str(),
+                    k.map(|k| content.skills[k].id.as_str()),
+                )
+            })
             .collect(),
-        home_wishes: p.home_wishes.iter().map(|w| crate::save::home_wish_save(content, w)).collect(),
+        home_wishes: p
+            .home_wishes
+            .iter()
+            .map(|w| crate::save::home_wish_save(content, w))
+            .collect(),
         // It follows the mood; the UI words it at 0.65, 0.9 and 1.15 (rounding down keeps those).
         adherence: floor_to(crate::planner::adherence(content, s), 20.0),
     }
@@ -692,7 +758,11 @@ impl UiSync {
         let detailed: Vec<bool> = world
             .sims
             .iter()
-            .map(|s| s.here() && (world.households[s.household as usize].player || self.inspected == Some(s.id)))
+            .map(|s| {
+                s.here()
+                    && (world.households[s.household as usize].player
+                        || self.inspected == Some(s.id))
+            })
             .collect();
 
         let (mut sims, mut gone) = (List::default(), List::default());
@@ -728,7 +798,12 @@ impl UiSync {
                 bills: costs.map(|c| c.1),
                 undo: world.undo_steps(i),
                 redo: world.redo_steps(i),
-                routines: h.player.then(|| h.routines.iter().map(|r| routine_view(content, r)).collect()),
+                routines: h.player.then(|| {
+                    h.routines
+                        .iter()
+                        .map(|r| routine_view(content, r))
+                        .collect()
+                }),
                 expecting: h.expecting,
             };
             households.push_changed(&view, &mut self.households[i]);
@@ -745,7 +820,13 @@ impl UiSync {
             }
             let chemistry = rels.chemistry(a, b);
             let mut h = DefaultHasher::new();
-            for bits in [r.friendship.to_bits(), r.romance.to_bits(), chemistry.to_bits(), u32::from(r.partners), r.kin as u32] {
+            for bits in [
+                r.friendship.to_bits(),
+                r.romance.to_bits(),
+                chemistry.to_bits(),
+                u32::from(r.partners),
+                r.kin as u32,
+            ] {
                 h.write_u32(bits);
             }
             let print = h.finish() | 1;
@@ -794,7 +875,12 @@ impl UiSync {
             let skip = world.events.iter().count().saturating_sub(UI_EVENTS);
             world.events.iter().skip(skip).collect()
         } else {
-            let mut fresh: Vec<_> = world.events.iter().rev().take_while(|e| newest.is_none_or(|n| e.id > n)).collect();
+            let mut fresh: Vec<_> = world
+                .events
+                .iter()
+                .rev()
+                .take_while(|e| newest.is_none_or(|n| e.id > n))
+                .collect();
             fresh.reverse();
             fresh
         };
@@ -804,8 +890,16 @@ impl UiSync {
         self.last_event = world.events.iter().next_back().map(|e| e.id).or(newest);
 
         let (mut rooms, mut rooms_gone) = (List::default(), List::default());
-        let home = world.households.iter().find(|h| h.player).and_then(|h| h.plot);
-        for r in world.rooms().iter().filter(|r| home.is_some() && r.plot == home) {
+        let home = world
+            .households
+            .iter()
+            .find(|h| h.player)
+            .and_then(|h| h.plot);
+        for r in world
+            .rooms()
+            .iter()
+            .filter(|r| home.is_some() && r.plot == home)
+        {
             let s = r.scores;
             let view = RoomView {
                 id: r.id,
@@ -819,7 +913,8 @@ impl UiSync {
                 lamps: r.lamps,
                 dirt: round_to(r.dirt, PERCENT),
                 centre: r.centre,
-                scores: [s.size, s.light, s.decor, s.clean, s.function, s.overall].map(|v| round_to(v, PERCENT)),
+                scores: [s.size, s.light, s.decor, s.clean, s.function, s.overall]
+                    .map(|v| round_to(v, PERCENT)),
             };
             let (sent, seen) = self.rooms.entry(r.id).or_insert((0, updates));
             *seen = updates;
@@ -834,7 +929,8 @@ impl UiSync {
         });
 
         let day = clock::day(world.tick);
-        let mut out = Vec::with_capacity(256 + sims.out.len() + relationships.out.len() + events.out.len());
+        let mut out =
+            Vec::with_capacity(256 + sims.out.len() + relationships.out.len() + events.out.len());
         let mut o = Obj::open(&mut out);
         o.field("full", &full);
         o.field("day", &day);
@@ -877,15 +973,31 @@ fn sim_patch(world: &World, s: &Sim, detail: bool, sent: &mut SimSent, o: &mut O
     o.changed("perks", &s.perks, &mut sent.perks);
     // Age in whole years, and the life stage (content `life.stages` id).
     o.changed("age", &(s.age.floor() as u32), &mut sent.age);
-    let stage = content.life.stages.get(content.life.stage(s.age)).map(|st| st.id.as_str());
+    let stage = content
+        .life
+        .stages
+        .get(content.life.stage(s.age))
+        .map(|st| st.id.as_str());
     o.changed("stage", &stage, &mut sent.stage);
     // Retired, with this weekly pension.
-    o.changed_opt("pension", s.retired.then_some(&s.pension), &mut sent.pension);
+    o.changed_opt(
+        "pension",
+        s.retired.then_some(&s.pension),
+        &mut sent.pension,
+    );
     // Plot the Sim is on (None on the street or at work); minute of day they're back from work.
     let (x, z) = s.tile();
-    let plot = if s.away_until.is_some() { None } else { world.plot_at(x, z) };
+    let plot = if s.away_until.is_some() {
+        None
+    } else {
+        world.plot_at(x, z)
+    };
     o.changed("plot", &plot, &mut sent.plot);
-    o.changed("awayUntil", &s.away_until.map(clock::minute_of_day), &mut sent.away_until);
+    o.changed(
+        "awayUntil",
+        &s.away_until.map(clock::minute_of_day),
+        &mut sent.away_until,
+    );
     o.changed("visiting", &s.visiting.map(|v| v.plot), &mut sent.visiting);
     o.changed("job", &job_view(content, s), &mut sent.job);
     if !detail {
@@ -900,18 +1012,32 @@ fn sim_patch(world: &World, s: &Sim, detail: bool, sent: &mut SimSent, o: &mut O
         .filter(|st| st.school && content.life.school.is_some())
         .map(|_| round_to(s.grade, 10.0));
     o.changed_opt("grade", grade.as_ref(), &mut d.grade);
-    let needs: Vec<f32> = s.needs[..content.needs.len()].iter().map(|&v| round_to(v, PERCENT)).collect();
+    let needs: Vec<f32> = s.needs[..content.needs.len()]
+        .iter()
+        .map(|&v| round_to(v, PERCENT))
+        .collect();
     o.changed("needs", &needs, &mut d.needs);
     o.changed("mood", &round_to(s.mood(content), PERCENT), &mut d.mood);
-    o.changed("emotion", &s.emotion(content).map(|e| content.emotions[e].id.as_str()), &mut d.emotion);
+    o.changed(
+        "emotion",
+        &s.emotion(content).map(|e| content.emotions[e].id.as_str()),
+        &mut d.emotion,
+    );
     o.changed("feelings", &feelings(world, s), &mut d.feelings);
     o.changed("actions", &actions(world, s), &mut d.actions);
     // Skill levels in content order (rounded down: the whole number is the level).
-    let skills: Vec<f32> = s.skills[..content.skills.len()].iter().map(|&v| floor_to(v, PERCENT)).collect();
+    let skills: Vec<f32> = s.skills[..content.skills.len()]
+        .iter()
+        .map(|&v| floor_to(v, PERCENT))
+        .collect();
     o.changed("skills", &skills, &mut d.skills);
     o.changed_opt("phone", phone_view(world, s).as_ref(), &mut d.phone);
     // Why they can't be sent out (visiting) right now, as the command handler decides.
-    o.changed_opt("homebound", crate::life::homebound(world, s.id as usize).as_ref(), &mut d.homebound);
+    o.changed_opt(
+        "homebound",
+        crate::life::homebound(world, s.id as usize).as_ref(),
+        &mut d.homebound,
+    );
 
     // Routines, goals and wishes (the player's household only), part by part.
     if !world.households[s.household as usize].player {
@@ -952,7 +1078,9 @@ fn phone_view(world: &World, s: &Sim) -> Option<PhoneView> {
     let contacts = world
         .sims
         .iter()
-        .filter(|t| off.is_none() && t.id != s.id && t.here() && crate::phone::has_phone(content, t.age))
+        .filter(|t| {
+            off.is_none() && t.id != s.id && t.here() && crate::phone::has_phone(content, t.age)
+        })
         .filter(|t| world.relationships.get(me, t.id as usize).met)
         .map(|t| {
             let c = t.id as usize;
@@ -960,7 +1088,9 @@ fn phone_view(world: &World, s: &Sim) -> Option<PhoneView> {
                 id: t.id,
                 status: crate::phone::status_for(world, me, c),
                 // (As the command handler decides: `phone::refusal`.)
-                why: (0..content.phone.actions.len()).map(|a| crate::phone::refusal(world, me, a, Some(c))).collect(),
+                why: (0..content.phone.actions.len())
+                    .map(|a| crate::phone::refusal(world, me, a, Some(c)))
+                    .collect(),
             }
         })
         .collect();
@@ -973,12 +1103,20 @@ fn host_name(world: &World, plot: u32) -> String {
         .households
         .iter()
         .find(|h| h.plot == Some(plot))
-        .map_or_else(|| world.plots[plot as usize].name.clone(), |h| format!("the {}s", h.name))
+        .map_or_else(
+            || world.plots[plot as usize].name.clone(),
+            |h| format!("the {}s", h.name),
+        )
 }
 
 /// The recipe of what's being eaten (the dish's name is the pot's, not the plate's: "Eat
 /// Home-cooked meal").
-fn dish(world: &World, held: Option<crate::items::Held>, item: Option<u32>, plate: Option<u32>) -> Option<usize> {
+fn dish(
+    world: &World,
+    held: Option<crate::items::Held>,
+    item: Option<u32>,
+    plate: Option<u32>,
+) -> Option<usize> {
     [plate, item]
         .into_iter()
         .flatten()
@@ -987,14 +1125,28 @@ fn dish(world: &World, held: Option<crate::items::Held>, item: Option<u32>, plat
 }
 
 /// One of a resident's actions (`held`: what they carry, for the current one).
-fn task_view(world: &World, task: &Task, phase: Option<&Phase>, held: Option<crate::items::Held>) -> ActionView {
+fn task_view(
+    world: &World,
+    task: &Task,
+    phase: Option<&Phase>,
+    held: Option<crate::items::Held>,
+) -> ActionView {
     let content = &world.content;
     // The view names objects by stable id.
     let (label, object, target, minutes) = match task.kind {
-        TaskKind::Use { object, interaction } => {
-            let inter = &content.objects[world.objects[object as usize].def].interactions[interaction];
+        TaskKind::Use {
+            object,
+            interaction,
+        } => {
+            let inter =
+                &content.objects[world.objects[object as usize].def].interactions[interaction];
             let served = world.staff.server_of(object).is_some();
-            (inter.label.clone(), world.stable_of(object), None, inter.minutes_where(served))
+            (
+                inter.label.clone(),
+                world.stable_of(object),
+                None,
+                inter.minutes_where(served),
+            )
         }
         TaskKind::MoveTo { .. } => ("Go here".to_owned(), None, None, 1.0),
         TaskKind::Social { target, social } => {
@@ -1007,8 +1159,15 @@ fn task_view(world: &World, task: &Task, phase: Option<&Phase>, held: Option<cra
         }
         // Listening in: the conversation's label and progress ("Chat · Bo", the one who started it).
         TaskKind::Join { leader } => {
-            let talk = world.sims.get(leader as usize).and_then(|l| l.conversation(content)).filter(|_| matches!(phase, Some(Phase::Conversing { .. })));
-            let label = talk.map_or_else(|| "Join in".to_owned(), |(_, social, ..)| content.socials[social].label.clone());
+            let talk = world
+                .sims
+                .get(leader as usize)
+                .and_then(|l| l.conversation(content))
+                .filter(|_| matches!(phase, Some(Phase::Conversing { .. })));
+            let label = talk.map_or_else(
+                || "Join in".to_owned(),
+                |(_, social, ..)| content.socials[social].label.clone(),
+            );
             return ActionView {
                 label,
                 object: None,
@@ -1028,30 +1187,59 @@ fn task_view(world: &World, task: &Task, phase: Option<&Phase>, held: Option<cra
         }
         TaskKind::Spot { accident } => {
             let rest = content.accidents[accident].rest.as_ref();
-            (rest.map_or_else(String::new, |r| r.label.clone()), None, None, rest.map_or(1.0, |r| r.minutes))
+            (
+                rest.map_or_else(String::new, |r| r.label.clone()),
+                None,
+                None,
+                rest.map_or(1.0, |r| r.minutes),
+            )
         }
         TaskKind::Repair { object } => {
             let rules = &content.object_rules.repair;
             let name = &content.objects[world.objects[object as usize].def].name;
-            (format!("{} the {}", rules.label, name.to_lowercase()), world.stable_of(object), None, rules.minutes)
+            (
+                format!("{} the {}", rules.label, name.to_lowercase()),
+                world.stable_of(object),
+                None,
+                rules.minutes,
+            )
         }
         // "Make a meal · Prep (2/3)": the whole recipe's progress.
-        TaskKind::Cook { recipe, step, station, origin, minutes, .. } => {
+        TaskKind::Cook {
+            recipe,
+            step,
+            station,
+            origin,
+            minutes,
+            ..
+        } => {
             let r = &content.recipes[recipe];
-            let label = crate::cooking::origin_interaction(content, &world.objects, origin, recipe).map_or(&r.label, |i| &i.label);
+            let label = crate::cooking::origin_interaction(content, &world.objects, origin, recipe)
+                .map_or(&r.label, |i| &i.label);
             let i = (step as usize).min(r.steps.len() - 1);
             // (Past the last step: the dish carried to the table, all but done.)
             let serving = step as usize >= r.steps.len();
             let label = match serving {
                 true => format!("{label} · {}", content.cooking.serve_label),
-                false => format!("{label} · {} ({}/{})", r.steps[i].label, i + 1, r.steps.len()),
+                false => format!(
+                    "{label} · {} ({}/{})",
+                    r.steps[i].label,
+                    i + 1,
+                    r.steps.len()
+                ),
             };
             let done: f32 = r.steps[..i].iter().map(|s| s.minutes).sum();
             let elapsed = match phase {
-                Some(Phase::Using { elapsed }) => elapsed.min(f32::from(minutes)) / f32::from(minutes.max(1)) * r.steps[i].minutes,
+                Some(Phase::Using { elapsed }) => {
+                    elapsed.min(f32::from(minutes)) / f32::from(minutes.max(1)) * r.steps[i].minutes
+                }
                 _ => 0.0,
             };
-            let progress = if serving { 1.0 } else { ((done + elapsed) / r.minutes).min(1.0) };
+            let progress = if serving {
+                1.0
+            } else {
+                ((done + elapsed) / r.minutes).min(1.0)
+            };
             return ActionView {
                 label,
                 object: station.or(origin).and_then(|o| world.stable_of(o)),
@@ -1065,34 +1253,70 @@ fn task_view(world: &World, task: &Task, phase: Option<&Phase>, held: Option<cra
             let rules = &content.cooking;
             let r = dish(world, held, item, plate).map(|r| &content.recipes[r]);
             let food = r.map_or("something", |r| &content.items[r.item].label);
-            (format!("{} {food}", rules.eat_label), None, None, r.map_or(rules.eat_minutes, |r| r.eat_minutes))
+            (
+                format!("{} {food}", rules.eat_label),
+                None,
+                None,
+                r.map_or(rules.eat_minutes, |r| r.eat_minutes),
+            )
         }
         TaskKind::Dishes { stage, scraps, .. } => {
             let rules = &content.cooking;
-            (rules.dishes_label.clone(), None, None, crate::cooking::clearing_minutes(rules, stage, scraps, held).max(1.0))
+            (
+                rules.dishes_label.clone(),
+                None,
+                None,
+                crate::cooking::clearing_minutes(rules, stage, scraps, held).max(1.0),
+            )
         }
         // "Call · Bo" (the UI adds who).
-        TaskKind::Phone { action, contact, answer, .. } => {
-            let label = content.phone.actions.get(action).map_or_else(String::new, |a| a.label.clone());
-            (label, None, contact, crate::phone::length(content, action, answer))
+        TaskKind::Phone {
+            action,
+            contact,
+            answer,
+            ..
+        } => {
+            let label = content
+                .phone
+                .actions
+                .get(action)
+                .map_or_else(String::new, |a| a.label.clone());
+            (
+                label,
+                None,
+                contact,
+                crate::phone::length(content, action, answer),
+            )
         }
         // "Carry the baby to the high chair" (the UI adds who), "Put the garden vegetables in the
         // fridge".
         TaskKind::Carry { baby, to, .. } => {
-            let name = world.objects.get(to as usize).map_or_else(String::new, |o| content.objects[o.def].name.to_lowercase());
+            let name = world
+                .objects
+                .get(to as usize)
+                .map_or_else(String::new, |o| content.objects[o.def].name.to_lowercase());
             let label = match baby {
                 Some(_) => format!("Carry the baby to the {name}"),
                 None => {
-                    let what = held.map_or_else(|| "harvest".to_owned(), |h| content.items[h.def].label.to_lowercase());
+                    let what = held.map_or_else(
+                        || "harvest".to_owned(),
+                        |h| content.items[h.def].label.to_lowercase(),
+                    );
                     format!("Put the {what} in the {name}")
                 }
             };
-            let minutes = if baby.is_some() { crate::carry::LIFT_MINUTES } else { crate::carry::STOW_MINUTES };
+            let minutes = if baby.is_some() {
+                crate::carry::LIFT_MINUTES
+            } else {
+                crate::carry::STOW_MINUTES
+            };
             (label, world.stable_of(to), baby, minutes)
         }
     };
     let progress = match phase {
-        Some(Phase::Using { elapsed }) | Some(Phase::Conversing { elapsed, .. }) => (elapsed / minutes).min(1.0),
+        Some(Phase::Using { elapsed }) | Some(Phase::Conversing { elapsed, .. }) => {
+            (elapsed / minutes).min(1.0)
+        }
         _ => 0.0,
     };
     ActionView {
@@ -1112,11 +1336,19 @@ fn actions(world: &World, s: &Sim) -> Vec<ActionView> {
     if let Some(until) = s.away_until {
         let left = until.saturating_sub(world.tick) as f32 * MINUTES_PER_TICK;
         let school = content.life.school.as_ref().filter(|_| s.job.is_none());
-        let total = s.job.as_ref().map_or(school.map_or(1.0, |sc| sc.hours * 60.0), |j| {
-            content.careers[j.career].levels[j.level].hours * 60.0
-        });
+        let total = s
+            .job
+            .as_ref()
+            .map_or(school.map_or(1.0, |sc| sc.hours * 60.0), |j| {
+                content.careers[j.career].levels[j.level].hours * 60.0
+            });
         actions.push(ActionView {
-            label: if school.is_some() { "At school" } else { "At work" }.to_owned(),
+            label: if school.is_some() {
+                "At school"
+            } else {
+                "At work"
+            }
+            .to_owned(),
             object: None,
             target: None,
             progress: round_to((1.0 - left / total).clamp(0.0, 1.0), PERCENT),
@@ -1126,7 +1358,14 @@ fn actions(world: &World, s: &Sim) -> Vec<ActionView> {
     }
     // A baby in someone's arms ("In the arms · Ada", the UI adds who; `carry.rs`).
     if let Some(c) = s.carried_by {
-        actions.push(ActionView { label: "In the arms".to_owned(), object: None, target: Some(c), progress: 0.0, directed: false, active: true });
+        actions.push(ActionView {
+            label: "In the arms".to_owned(),
+            object: None,
+            target: Some(c),
+            progress: 0.0,
+            directed: false,
+            active: true,
+        });
     }
     // Being talked to shows up as the current action.
     if let Some(a) = s.engaged_with
@@ -1143,10 +1382,13 @@ fn actions(world: &World, s: &Sim) -> Vec<ActionView> {
     }
     // Called over: on their way to the one who called (or waiting there) for what they called
     // them for, not a walk of their own.
-    let called = s.heeding.and_then(|a| match world.sims[a as usize].current().map(|c| c.task.kind) {
-        Some(TaskKind::Social { target, social }) if target == s.id => Some((a, social)),
-        _ => None,
-    });
+    let called =
+        s.heeding.and_then(
+            |a| match world.sims[a as usize].current().map(|c| c.task.kind) {
+                Some(TaskKind::Social { target, social }) if target == s.id => Some((a, social)),
+                _ => None,
+            },
+        );
     if let Some((a, social)) = called {
         actions.push(ActionView {
             label: content.socials[social].label.clone(),
@@ -1161,7 +1403,11 @@ fn actions(world: &World, s: &Sim) -> Vec<ActionView> {
             let mut view = task_view(world, &a.task, Some(&a.phase), s.held);
             // A game for two: who with ("Shoot pool · Bo"; `partners.rs`).
             if let Some((o, i, _)) = s.game {
-                view.target = world.sims.iter().find(|p| p.id != s.id && p.game.is_some_and(|g| (g.0, g.1) == (o, i))).map(|p| p.id);
+                view.target = world
+                    .sims
+                    .iter()
+                    .find(|p| p.id != s.id && p.game.is_some_and(|g| (g.0, g.1) == (o, i)))
+                    .map(|p| p.id);
             }
             view
         }));
@@ -1198,7 +1444,9 @@ fn job_view<'a>(content: &'a Content, s: &Sim) -> Option<JobView<'a>> {
         index: j.career,
         career: &career.id,
         career_label: &career.label,
-        category: career.category.map(|c| content.career_categories[c].id.as_str()),
+        category: career
+            .category
+            .map(|c| content.career_categories[c].id.as_str()),
         title: &level.title,
         level: j.level,
         levels: career.levels.len(),
@@ -1409,7 +1657,13 @@ fn wall_edges(lot: &crate::lot::Lot) -> (Vec<EdgeView>, Vec<OpeningView>, Vec<Fe
         if e.is_fence() {
             let kind = if e == Edge::Gate { "gate" } else { "fence" };
             let style = lot.look(at).style;
-            fences.push(FenceView { axis, x, z, kind, style });
+            fences.push(FenceView {
+                axis,
+                x,
+                z,
+                kind,
+                style,
+            });
             return;
         }
         if !e.is_wall() {
@@ -1591,7 +1845,9 @@ fn house_bounds(world: &World, x0: i32, z0: i32, x1: i32, z1: i32) -> Option<[i3
 /// rest, or on a top at floor level).
 fn surface_lifts(world: &World) -> Vec<Option<f32>> {
     let content = &world.content;
-    let on_top = |o: &crate::world::ObjectInstance| content.objects[o.def].layer == crate::content::Layer::Surface;
+    let on_top = |o: &crate::world::ObjectInstance| {
+        content.objects[o.def].layer == crate::content::Layer::Surface
+    };
     if !world.objects.iter().any(on_top) {
         return Vec::new();
     }
@@ -1599,7 +1855,11 @@ fn surface_lifts(world: &World) -> Vec<Option<f32>> {
     // middle is; a thing over the edge of its tile's top looks through them all.
     let lot = &world.lot;
     let mut tops = vec![u32::MAX; lot.width * lot.depth];
-    for o in world.objects.iter().filter(|o| content.objects[o.def].surface.is_some()) {
+    for o in world
+        .objects
+        .iter()
+        .filter(|o| content.objects[o.def].surface.is_some())
+    {
         for (x, z) in o.tiles(content).filter(|&(x, z)| lot.in_bounds(x, z)) {
             tops[lot.tile_index(x, z)] = o.id;
         }
@@ -1613,11 +1873,17 @@ fn surface_lifts(world: &World) -> Vec<Option<f32>> {
             }
             let p = crate::surface::middle(content, o);
             let (x, z) = (p[0].floor() as i32, p[1].floor() as i32);
-            let near = lot.in_bounds(x, z).then(|| tops[lot.tile_index(x, z)]).filter(|&h| h != u32::MAX);
+            let near = lot
+                .in_bounds(x, z)
+                .then(|| tops[lot.tile_index(x, z)])
+                .filter(|&h| h != u32::MAX);
             let top = near
                 .and_then(|h| crate::surface::Top::of(content, &world.objects[h as usize]))
                 .filter(|t| t.covers(p))
-                .or_else(|| crate::surface::host_of(content, &world.objects, o).and_then(|h| crate::surface::Top::of(content, &world.objects[h as usize])))?;
+                .or_else(|| {
+                    crate::surface::host_of(content, &world.objects, o)
+                        .and_then(|h| crate::surface::Top::of(content, &world.objects[h as usize]))
+                })?;
             Some(top.surface.height).filter(|&h| h > 0.0)
         })
         .collect()
@@ -1655,7 +1921,8 @@ pub fn items_json(world: &World) -> String {
         .iter()
         .map(|it| {
             let [x, z] = it.at.centre();
-            let holder = crate::items::holder(content, &world.objects, &it.at).map(|o| &world.objects[o as usize]);
+            let holder = crate::items::holder(content, &world.objects, &it.at)
+                .map(|o| &world.objects[o as usize]);
             let y = match it.at {
                 crate::items::ItemAt::Surface { .. } => holder
                     .and_then(|o| content.objects[o.def].surface)
@@ -1674,7 +1941,9 @@ pub fn items_json(world: &World) -> String {
                 x: round_to(x, 100.0),
                 z: round_to(z, 100.0),
                 y: round_to(y, 100.0),
-                yaw: holder.map_or(0.0, |o| round_to(o.yaw() + f32::from(o.turn).to_radians(), 1000.0)),
+                yaw: holder.map_or(0.0, |o| {
+                    round_to(o.yaw() + f32::from(o.turn).to_radians(), 1000.0)
+                }),
                 servings: it.servings,
                 state,
                 household: it.household,
@@ -1702,12 +1971,16 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
                 rot: o.rot,
                 turn: o.turn,
                 offset: o.offset,
-                size: (o.extent != crate::world::kind_size(content.objects[o.def].footprint)).then_some(o.extent),
+                size: (o.extent != crate::world::kind_size(content.objects[o.def].footprint))
+                    .then_some(o.extent),
                 tall: o.tall,
                 lift: lifts.get(o.id as usize).copied().flatten(),
                 wear: o.wear,
                 open: o.open,
-                growth: world.content.objects[o.def].grows.is_some().then(|| o.growth_stage() as u8),
+                growth: world.content.objects[o.def]
+                    .grows
+                    .is_some()
+                    .then(|| o.growth_stage() as u8),
                 running: o.running(),
                 w,
                 d,
@@ -1735,7 +2008,11 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
             perks: &s.perks,
             gone: s.gone,
             generation: world.generations.get(s.id as usize).copied().unwrap_or(0),
-            stage: content.life.stages.get(content.life.stage(s.age)).map(|st| st.id.as_str()),
+            stage: content
+                .life
+                .stages
+                .get(content.life.stage(s.age))
+                .map(|st| st.id.as_str()),
             outfit: s.outfit,
         })
         .collect();
@@ -1763,12 +2040,13 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
             entry: p.entry,
             house: house_bounds(world, p.x, p.z, p.x + p.w, p.z + p.d),
             roof: p.roof.map(|r| [r.style, r.color]),
-            storeys: 1 + (1..world.storeys as i32)
-                .filter(|k| {
-                    let up = world.storey_row(*k);
-                    house_bounds(world, p.x, p.z + up, p.x + p.w, p.z + p.d + up).is_some()
-                })
-                .count() as u8,
+            storeys: 1
+                + (1..world.storeys as i32)
+                    .filter(|k| {
+                        let up = world.storey_row(*k);
+                        house_bounds(world, p.x, p.z + up, p.x + p.w, p.z + p.d + up).is_some()
+                    })
+                    .count() as u8,
         })
         .collect();
     let (walls, openings, fences) = if lot {
@@ -1810,7 +2088,14 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
             .servers
             .iter()
             .take(crate::staff::MAX_STAFF)
-            .map(|s| StaffView { seed: s.seed, posts: s.posts.iter().map(|&o| world.objects[o as usize].stable).collect() })
+            .map(|s| StaffView {
+                seed: s.seed,
+                posts: s
+                    .posts
+                    .iter()
+                    .map(|&o| world.objects[o as usize].stable)
+                    .collect(),
+            })
             .collect(),
     })
     .expect("structure serializes")

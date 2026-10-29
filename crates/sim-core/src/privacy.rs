@@ -81,18 +81,29 @@ pub struct Shut {
 /// Whether a room is kept shut while anyone is in it: of a private kind, not mixed with another
 /// (a toilet by the bed with no wall between), with no door to the outside (a cabin with its
 /// toilet in the open: the front door isn't a bathroom door), not on a public place.
-fn private_room(content: &Content, plots: &[crate::world::Plot], r: &crate::rooms::RoomInfo, outside: &[u16]) -> bool {
+fn private_room(
+    content: &Content,
+    plots: &[crate::world::Plot],
+    r: &crate::rooms::RoomInfo,
+    outside: &[u16],
+) -> bool {
     !r.garden
         && r.id != OUTDOORS
         && !r.mixed
         && r.kind.is_some_and(|k| content.room_kinds[k].private)
         && !outside.contains(&r.id)
-        && r.plot.is_none_or(|p| plots.get(p as usize).is_none_or(|p| !p.public))
+        && r.plot
+            .is_none_or(|p| plots.get(p as usize).is_none_or(|p| !p.public))
 }
 
 /// The rooms of `rooms` kept shut while anyone is in them (`private_room`), sorted, and the claimed
 /// (`roomKinds[].claimed`: bedrooms, `Shut::claimants`) ones among them, sorted.
-pub(crate) fn private_rooms(content: &Content, plots: &[crate::world::Plot], rooms: &[crate::rooms::RoomInfo], lot: &Lot) -> (Vec<u16>, Vec<u16>) {
+pub(crate) fn private_rooms(
+    content: &Content,
+    plots: &[crate::world::Plot],
+    rooms: &[crate::rooms::RoomInfo],
+    lot: &Lot,
+) -> (Vec<u16>, Vec<u16>) {
     if !content.room_kinds.iter().any(|k| k.private) {
         return (Vec::new(), Vec::new());
     }
@@ -123,7 +134,10 @@ pub(crate) fn private_rooms(content: &Content, plots: &[crate::world::Plot], roo
     }
     let mut ids = Vec::new();
     let mut claimed = Vec::new();
-    for r in rooms.iter().filter(|r| private_room(content, plots, r, &outside)) {
+    for r in rooms
+        .iter()
+        .filter(|r| private_room(content, plots, r, &outside))
+    {
         ids.push(r.id);
         if r.kind.is_some_and(|k| content.room_kinds[k].claimed) {
             claimed.push(r.id);
@@ -135,9 +149,16 @@ pub(crate) fn private_rooms(content: &Content, plots: &[crate::world::Plot], roo
 }
 
 /// The private use `s` is at or on their way to (`Interaction::private`), if any.
-pub(crate) fn private_use(content: &Content, objects: &[ObjectInstance], s: &Sim) -> Option<(u32, usize)> {
+pub(crate) fn private_use(
+    content: &Content,
+    objects: &[ObjectInstance],
+    s: &Sim,
+) -> Option<(u32, usize)> {
     match s.current()?.task.kind {
-        TaskKind::Use { object, interaction } => objects
+        TaskKind::Use {
+            object,
+            interaction,
+        } => objects
             .get(object as usize)
             .and_then(|o| content.objects[o.def].interactions.get(interaction))
             .filter(|i| i.private)
@@ -159,7 +180,9 @@ pub(crate) fn room_of_object(content: &Content, lot: &Lot, o: &ObjectInstance) -
 /// Whether `inter` offers a place in a claimed room: somewhere to lie (sleeping or napping,
 /// `dayRhythm`), or a baby's place and the grown-up care of it.
 fn offers_place(content: &Content, inter: &Interaction) -> bool {
-    inter.baby || inter.cares() || inter.tags & (content.day_rhythm.sleep_tags | content.day_rhythm.nap_tags) != 0
+    inter.baby
+        || inter.cares()
+        || inter.tags & (content.day_rhythm.sleep_tags | content.day_rhythm.nap_tags) != 0
 }
 
 /// Whether `s` lives on the plot `plot` (their own home: not a guest, and not someone from another
@@ -171,7 +194,10 @@ fn lives_on(w: &World, s: &Sim, plot: Option<u32>) -> bool {
     }
     match plot {
         None => true,
-        Some(p) => w.households.get(s.household as usize).is_some_and(|h| h.plot == Some(p)),
+        Some(p) => w
+            .households
+            .get(s.household as usize)
+            .is_some_and(|h| h.plot == Some(p)),
     }
 }
 
@@ -183,8 +209,12 @@ fn goes_to(w: &World, o: &ObjectInstance, sim: u32, plot: Option<u32>, i: usize)
         Some(s) if s.here() && s.carried_by.is_none() => s,
         _ => return false,
     };
-    let Some(def) = w.content.objects.get(o.def) else { return false };
-    let Some(inter) = def.interactions.get(i) else { return false };
+    let Some(def) = w.content.objects.get(o.def) else {
+        return false;
+    };
+    let Some(inter) = def.interactions.get(i) else {
+        return false;
+    };
     lives_on(w, s, plot)
         && o.can_use_for(sim, def, i)
         && o.allows(inter, sim)
@@ -216,7 +246,12 @@ pub(crate) fn couples_bed(def: &crate::content::ObjectDef) -> bool {
 /// Broken ones are listed too (skipped while broken, `room_claimants`), so a repair needn't wait
 /// for the rooms to be found again. Found with the rooms, so the tick needn't look through every
 /// object in the home.
-pub(crate) fn claimed_places(content: &Content, lot: &Lot, claimed: &[u16], objects: &[ObjectInstance]) -> Vec<(u16, Vec<u32>)> {
+pub(crate) fn claimed_places(
+    content: &Content,
+    lot: &Lot,
+    claimed: &[u16],
+    objects: &[ObjectInstance],
+) -> Vec<(u16, Vec<u32>)> {
     let mut out: Vec<(u16, Vec<u32>)> = claimed.iter().map(|&r| (r, Vec::new())).collect();
     for (i, o) in objects.iter().enumerate() {
         // Broken ones are listed too: `room_claimants` skips them while they're broken, and a
@@ -256,7 +291,8 @@ fn room_claimants(w: &World, room: u16) -> Vec<u32> {
     let Ok(k) = w.claimed_places.binary_search_by_key(&room, |(r, _)| *r) else {
         return out;
     };
-    let places: Vec<(&ObjectInstance, &crate::content::ObjectDef, Option<u32>)> = w.claimed_places[k]
+    let places: Vec<(&ObjectInstance, &crate::content::ObjectDef, Option<u32>)> = w.claimed_places
+        [k]
         .1
         .iter()
         .filter_map(|&oi| w.objects.get(oi as usize))
@@ -265,10 +301,17 @@ fn room_claimants(w: &World, room: u16) -> Vec<u32> {
         .collect();
     let lying_in = |o: &ObjectInstance, plot: Option<u32>| -> Vec<u32> {
         o.users()
-            .filter(|&u| w.sims.get(u as usize).is_some_and(|s| lives_on(w, s, plot) && room_of(&w.lot, s.pos) == room))
+            .filter(|&u| {
+                w.sims
+                    .get(u as usize)
+                    .is_some_and(|s| lives_on(w, s, plot) && room_of(&w.lot, s.pos) == room)
+            })
             .collect()
     };
-    let lying: Vec<u32> = places.iter().flat_map(|&(o, _, plot)| lying_in(o, plot)).collect();
+    let lying: Vec<u32> = places
+        .iter()
+        .flat_map(|&(o, _, plot)| lying_in(o, plot))
+        .collect();
     out.extend_from_slice(&lying);
     for &(o, def, plot) in &places {
         let here = lying_in(o, plot);
@@ -285,7 +328,10 @@ fn room_claimants(w: &World, room: u16) -> Vec<u32> {
                     || (lying.iter().any(|&l| connected(w, l, s.id))
                         && (here.is_empty()
                             || !couples_bed(def)
-                            || here.iter().any(|&l| w.relationships.partner_of(l as usize) == Some(s.id as usize) || is_child_of(w, l, s.id))));
+                            || here.iter().any(|&l| {
+                                w.relationships.partner_of(l as usize) == Some(s.id as usize)
+                                    || is_child_of(w, l, s.id)
+                            })));
                 if own {
                     out.push(s.id);
                 }
@@ -315,7 +361,11 @@ fn presence_hash(w: &World) -> u64 {
         mix(&mut h, s.visiting.is_some() as u64);
         mix(&mut h, s.carried_by.map_or(0, |c| c as u64 + 1));
         mix(&mut h, s.household as u64);
-        let plot = w.households.get(s.household as usize).and_then(|h| h.plot).map_or(u64::MAX, |p| p as u64);
+        let plot = w
+            .households
+            .get(s.household as usize)
+            .and_then(|h| h.plot)
+            .map_or(u64::MAX, |p| p as u64);
         mix(&mut h, plot);
     }
     h
@@ -343,7 +393,12 @@ fn room_hash(w: &World, room: u16, presence: u64) -> u64 {
         for u in o.users() {
             mix(&mut h, u as u64);
             // In the room, or still on their way to it (`room_claimants`).
-            mix(&mut h, w.sims.get(u as usize).is_some_and(|s| room_of(&w.lot, s.pos) == room) as u64);
+            mix(
+                &mut h,
+                w.sims
+                    .get(u as usize)
+                    .is_some_and(|s| room_of(&w.lot, s.pos) == room) as u64,
+            );
             n += 1;
         }
         mix(&mut h, n);
@@ -360,14 +415,19 @@ pub(crate) fn refresh(w: &mut World) {
     let presence = presence_hash(w);
     shut.clear();
     for s in &w.sims {
-        if !s.here() || s.away_until.is_some() || s.carried_by.is_some() || w.content.life.baby(s.age) {
+        if !s.here()
+            || s.away_until.is_some()
+            || s.carried_by.is_some()
+            || w.content.life.baby(s.age)
+        {
             continue;
         }
         let room = room_of(&w.lot, s.pos);
         if room == OUTDOORS {
             continue;
         }
-        let doing = private_use(&w.content, &w.objects, s).filter(|&(o, _)| room_of_object(&w.content, &w.lot, &w.objects[o as usize]) == room);
+        let doing = private_use(&w.content, &w.objects, s)
+            .filter(|&(o, _)| room_of_object(&w.content, &w.lot, &w.objects[o as usize]) == room);
         if doing.is_some() || w.private_rooms.binary_search(&room).is_ok() {
             // Whoever is at a use behind a shut door (two trying for a baby) keeps the household
             // out, claimants included: only while the room is shut by itself being used do its
@@ -391,7 +451,13 @@ pub(crate) fn refresh(w: &mut World) {
             } else {
                 Vec::new()
             };
-            shut.push(Shut { room, by: s.id, doing, claimants, claimed });
+            shut.push(Shut {
+                room,
+                by: s.id,
+                doing,
+                claimants,
+                claimed,
+            });
         }
     }
     w.shut = shut;
@@ -404,14 +470,19 @@ pub(crate) fn refresh(w: &mut World) {
 pub(crate) fn shut_to(shut: &[Shut], me: u32, mine: Option<(u32, usize)>, room: u16) -> bool {
     room != OUTDOORS
         && shut.iter().any(|s| {
-            s.room == room && s.by != me && (s.doing.is_none() || s.doing != mine) && !s.claimants.contains(&me)
+            s.room == room
+                && s.by != me
+                && (s.doing.is_none() || s.doing != mine)
+                && !s.claimants.contains(&me)
         })
 }
 
 /// Whether `room`, kept shut, may be walked through to a room beyond: a bedroom (claimed), unless
 /// someone in it is at a use behind its door (trying for a baby).
 fn passable(shut: &[Shut], room: u16) -> bool {
-    shut.iter().filter(|s| s.room == room).all(|s| s.claimed && s.doing.is_none())
+    shut.iter()
+        .filter(|s| s.room == room)
+        .all(|s| s.claimed && s.doing.is_none())
 }
 
 /// Whether `sim` keeps a room shut now.
@@ -439,10 +510,24 @@ pub(crate) fn shut_ahead(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> bo
     if ctx.shut.is_empty() {
         return false;
     }
-    let Some(act) = sim.current() else { return false };
-    let Phase::Routing { waypoints, next } = &act.phase else { return false };
+    let Some(act) = sim.current() else {
+        return false;
+    };
+    let Phase::Routing { waypoints, next } = &act.phase else {
+        return false;
+    };
     // (Nor someone called over, on their way to meet the one who called: `Sim::heeding`.)
-    if sim.heeding.is_some() || matches!(act.task.kind, TaskKind::Social { .. } | TaskKind::Join { .. } | TaskKind::Work | TaskKind::GoHome | TaskKind::Visit { .. } | TaskKind::Answer { .. }) {
+    if sim.heeding.is_some()
+        || matches!(
+            act.task.kind,
+            TaskKind::Social { .. }
+                | TaskKind::Join { .. }
+                | TaskKind::Work
+                | TaskKind::GoHome
+                | TaskKind::Visit { .. }
+                | TaskKind::Answer { .. }
+        )
+    {
         return false;
     }
     let lot = ctx.nav.lot;
@@ -462,10 +547,17 @@ pub(crate) fn shut_ahead(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> bo
         // (Every quarter metre: no doorway is passed between two looks.)
         let steps = (along / 0.25).ceil().max(1.0) as u32;
         for k in 1..=steps {
-            let t = if d > 1e-4 { (along * k as f32 / steps as f32) / d } else { 1.0 };
+            let t = if d > 1e-4 {
+                (along * k as f32 / steps as f32) / d
+            } else {
+                1.0
+            };
             let p = [at[0] + (wp[0] - at[0]) * t, at[1] + (wp[1] - at[1]) * t];
             let room = room_of(lot, p);
-            if room != here && shut_to(ctx.shut, sim.id, mine, room) && (room == to || !passable(ctx.shut, room)) {
+            if room != here
+                && shut_to(ctx.shut, sim.id, mine, room)
+                && (room == to || !passable(ctx.shut, room))
+            {
                 return true;
             }
         }
@@ -481,7 +573,12 @@ pub(crate) fn shut_ahead(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> bo
 /// A walker's step outside a room kept shut (`world::progress`, before they move): true while
 /// they wait there (`ticks` more), false to walk on. After `WAIT_MINUTES` they give up what
 /// they were on their way to.
-pub(crate) fn wait_outside(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], ticks: u32) -> bool {
+pub(crate) fn wait_outside(
+    sim: &mut Sim,
+    ctx: &Ctx,
+    objects: &mut [ObjectInstance],
+    ticks: u32,
+) -> bool {
     if !shut_ahead(sim, ctx, objects) {
         sim.kept_out = 0;
         return false;
@@ -491,7 +588,9 @@ pub(crate) fn wait_outside(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstan
         return true;
     }
     sim.kept_out = 0;
-    let Some(task) = sim.current().map(|a| a.task) else { return true };
+    let Some(task) = sim.current().map(|a| a.task) else {
+        return true;
+    };
     crate::world::end_activity(sim, ctx.content, objects);
     if !task.directed {
         let retry = crate::social::minutes_to_ticks(ctx.content.autonomy.retry_minutes);
@@ -502,13 +601,25 @@ pub(crate) fn wait_outside(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstan
 
 /// Whether someone else is in the room of private use `doing` (`(object, interaction)`) besides
 /// `me`: not whoever does it with them, nor a baby. Then it isn't done (`world::progress`).
-pub(crate) fn overlooked(ctx: &Ctx, objects: &[ObjectInstance], me: u32, doing: (u32, usize)) -> bool {
-    let Some(o) = objects.get(doing.0 as usize) else { return false };
+pub(crate) fn overlooked(
+    ctx: &Ctx,
+    objects: &[ObjectInstance],
+    me: u32,
+    doing: (u32, usize),
+) -> bool {
+    let Some(o) = objects.get(doing.0 as usize) else {
+        return false;
+    };
     let lot = ctx.nav.lot;
     let room = room_of_object(ctx.content, lot, o);
     room != OUTDOORS
         && ctx.briefs.iter().enumerate().any(|(j, b)| {
-            j as u32 != me && b.here && !b.away && !b.baby && room_of(lot, b.pos) == room && b.game.is_none_or(|g| (g.0, g.1) != doing)
+            j as u32 != me
+                && b.here
+                && !b.away
+                && !b.baby
+                && room_of(lot, b.pos) == room
+                && b.game.is_none_or(|g| (g.0, g.1) != doing)
         })
 }
 
@@ -537,12 +648,31 @@ pub(crate) fn bed_for(
     let mut best: Option<(f32, u32, usize)> = None;
     for &id in on_home {
         // (Free, or lain on by one of the two: a nap they got up from to be asked.)
-        let Some(o) = objects.get(id as usize).filter(|o| !o.broken() && o.users().all(|u| u == a || u == b)) else { continue };
+        let Some(o) = objects
+            .get(id as usize)
+            .filter(|o| !o.broken() && o.users().all(|u| u == a || u == b))
+        else {
+            continue;
+        };
         let def = &content.objects[o.def];
-        let Some(i) = def.interactions.iter().position(|i: &Interaction| i.conceive && o.allows(i, a)) else { continue };
+        let Some(i) = def
+            .interactions
+            .iter()
+            .position(|i: &Interaction| i.conceive && o.allows(i, a))
+        else {
+            continue;
+        };
         let room = room_of_object(content, lot, o);
-        let walled = room != OUTDOORS && rooms.iter().any(|r| !r.garden && r.id == room && r.doors > 0);
-        if !walled || shut.iter().any(|s| s.room == room && s.by != a && s.by != b) || others_in(room) {
+        let walled = room != OUTDOORS
+            && rooms
+                .iter()
+                .any(|r| !r.garden && r.id == room && r.doors > 0);
+        if !walled
+            || shut
+                .iter()
+                .any(|s| s.room == room && s.by != a && s.by != b)
+            || others_in(room)
+        {
             continue;
         }
         let c = o.centre(content);
@@ -555,11 +685,30 @@ pub(crate) fn bed_for(
 }
 
 /// `bed_for` partners `a` and `b` as a tick's step sees them (free will choosing the social).
-pub(crate) fn bed_in_step(ctx: &Ctx, objects: &[ObjectInstance], a: usize, b: usize) -> Option<(u32, usize)> {
+pub(crate) fn bed_in_step(
+    ctx: &Ctx,
+    objects: &[ObjectInstance],
+    a: usize,
+    b: usize,
+) -> Option<(u32, usize)> {
     let home = ctx.households[ctx.briefs[a].household as usize].plot?;
     let lot = ctx.nav.lot;
-    let others_in = |room: u16| ctx.briefs.iter().enumerate().any(|(j, s)| j != a && j != b && s.here && !s.away && !s.baby && room_of(lot, s.pos) == room);
-    bed_for(ctx.content, lot, ctx.rooms, objects, ctx.index.on(home), ctx.shut, (a as u32, b as u32), ctx.briefs[a].pos, others_in)
+    let others_in = |room: u16| {
+        ctx.briefs.iter().enumerate().any(|(j, s)| {
+            j != a && j != b && s.here && !s.away && !s.baby && room_of(lot, s.pos) == room
+        })
+    };
+    bed_for(
+        ctx.content,
+        lot,
+        ctx.rooms,
+        objects,
+        ctx.index.on(home),
+        ctx.shut,
+        (a as u32, b as u32),
+        ctx.briefs[a].pos,
+        others_in,
+    )
 }
 
 /// `bed_for` partners `a` and `b` in `world` as it is now.
@@ -567,11 +716,28 @@ pub(crate) fn bed_in_world(w: &World, a: usize, b: usize) -> Option<(u32, usize)
     let home = w.households[w.sims[a].household as usize].plot?;
     let others_in = |room: u16| {
         w.sims.iter().enumerate().any(|(j, s)| {
-            j != a && j != b && s.here() && s.away_until.is_none() && !w.content.life.baby(s.age) && room_of(&w.lot, s.pos) == room
+            j != a
+                && j != b
+                && s.here()
+                && s.away_until.is_none()
+                && !w.content.life.baby(s.age)
+                && room_of(&w.lot, s.pos) == room
         })
     };
-    let on: Vec<u32> = (0..w.objects.len() as u32).filter(|&o| w.object_plot.get(o as usize).copied().flatten() == Some(home)).collect();
-    bed_for(&w.content, &w.lot, &w.rooms, &w.objects, &on, &w.shut, (a as u32, b as u32), w.sims[a].pos, others_in)
+    let on: Vec<u32> = (0..w.objects.len() as u32)
+        .filter(|&o| w.object_plot.get(o as usize).copied().flatten() == Some(home))
+        .collect();
+    bed_for(
+        &w.content,
+        &w.lot,
+        &w.rooms,
+        &w.objects,
+        &on,
+        &w.shut,
+        (a as u32, b as u32),
+        w.sims[a].pos,
+        others_in,
+    )
 }
 
 /// After the step: partners whose *Try for a baby* went well (`Sim::to_bed`) go to bed together
@@ -579,21 +745,37 @@ pub(crate) fn bed_in_world(w: &World, a: usize, b: usize) -> Option<(u32, usize)
 /// before beds had a use for it). With no bed free for them now, nothing comes of it.
 pub(crate) fn after_step(w: &mut World) {
     for a in 0..w.sims.len() {
-        let Some(b) = w.sims[a].to_bed.take() else { continue };
+        let Some(b) = w.sims[a].to_bed.take() else {
+            continue;
+        };
         let b = b as usize;
         if !beds_in_content(&w.content) {
             w.sims[a].conceived = Some(b as u32);
             continue;
         }
-        let Some((object, interaction)) = bed_in_world(w, a, b) else { continue };
-        let World { content, objects, sims, .. } = w;
+        let Some((object, interaction)) = bed_in_world(w, a, b) else {
+            continue;
+        };
+        let World {
+            content,
+            objects,
+            sims,
+            ..
+        } = w;
         for s in [a, b] {
             let sim = &mut sims[s];
             if sim.current().is_some() {
                 crate::world::end_activity(sim, content, objects);
             }
             sim.follow_up = None;
-            sim.queue.push_front(Task { kind: TaskKind::Use { object, interaction }, directed: false, routine: false });
+            sim.queue.push_front(Task {
+                kind: TaskKind::Use {
+                    object,
+                    interaction,
+                },
+                directed: false,
+                routine: false,
+            });
             sim.game = Some((object, interaction, false));
         }
     }

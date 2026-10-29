@@ -32,7 +32,16 @@ pub const MAX_STATIONS: usize = 16;
 /// Bitmask of indices into `CookingRules::stations`.
 pub type StationMask = u16;
 /// Stations when content names none.
-const DEFAULT_STATIONS: [&str; 8] = ["ingredients", "prep", "stove", "oven", "grill", "microwave", "dishes", "bin"];
+const DEFAULT_STATIONS: [&str; 8] = [
+    "ingredients",
+    "prep",
+    "stove",
+    "oven",
+    "grill",
+    "microwave",
+    "dishes",
+    "bin",
+];
 
 /// How cooking, eating and washing up go (content `cooking`).
 #[derive(Debug, Clone)]
@@ -149,7 +158,8 @@ impl RecipeStep {
     /// step's stations (`at`, in order) it is (a cooker is a stove before an oven), else the step's own.
     pub fn anim_for(&self, mask: StationMask) -> Option<usize> {
         let at = self.at.iter().find(|&&i| mask & (1 << i) != 0);
-        at.and_then(|i| self.anim_at.iter().find(|(s, _)| s == i)).map_or(self.anim, |&(_, a)| a)
+        at.and_then(|i| self.anim_at.iter().find(|(s, _)| s == i))
+            .map_or(self.anim, |&(_, a)| a)
     }
 }
 
@@ -188,7 +198,11 @@ impl RecipeDef {
 
     /// Minutes of the steps a home with stations `mask` does.
     pub fn minutes_with(&self, mask: StationMask) -> f32 {
-        self.steps.iter().filter(|s| s.mask & mask != 0).map(|s| s.minutes).sum()
+        self.steps
+            .iter()
+            .filter(|s| s.mask & mask != 0)
+            .map(|s| s.minutes)
+            .sum()
     }
 
     /// What `servings` servings cost.
@@ -235,7 +249,6 @@ pub(crate) struct CookingRaw {
     put_away_anim: Option<String>,
     put_away_at: Option<Vec<String>>,
 }
-
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -320,22 +333,41 @@ pub(crate) fn parse(
         .clone()
         .unwrap_or_else(|| DEFAULT_STATIONS.iter().map(|s| (*s).to_owned()).collect());
     if stations.len() > MAX_STATIONS {
-        return Err(Error::new(format!("cooking: at most {MAX_STATIONS} stations")));
+        return Err(Error::new(format!(
+            "cooking: at most {MAX_STATIONS} stations"
+        )));
     }
-    if stations.iter().enumerate().any(|(i, s)| stations[..i].contains(s)) {
+    if stations
+        .iter()
+        .enumerate()
+        .any(|(i, s)| stations[..i].contains(s))
+    {
         return Err(Error::new("cooking: duplicate station"));
     }
     // Tags content gives must exist; of the defaults, those content has (eating then may have none).
-    let tag_mask = |tags: &Option<Vec<String>>, default: &[&str], ctx: &str| -> Result<TagMask, Error> {
-        match tags {
-            Some(tags) => tags.iter().try_fold(0, |m: TagMask, t| {
-                let i = ix.tags.get(t.as_str()).ok_or_else(|| Error::new(format!("{ctx}: unknown tag '{t}'")))?;
-                Ok(m | (1 << i))
-            }),
-            None => Ok(default.iter().filter_map(|t| ix.tags.get(t)).fold(0, |m: TagMask, i| m | (1 << i))),
+    let tag_mask =
+        |tags: &Option<Vec<String>>, default: &[&str], ctx: &str| -> Result<TagMask, Error> {
+            match tags {
+                Some(tags) => tags.iter().try_fold(0, |m: TagMask, t| {
+                    let i = ix
+                        .tags
+                        .get(t.as_str())
+                        .ok_or_else(|| Error::new(format!("{ctx}: unknown tag '{t}'")))?;
+                    Ok(m | (1 << i))
+                }),
+                None => Ok(default
+                    .iter()
+                    .filter_map(|t| ix.tags.get(t))
+                    .fold(0, |m: TagMask, i| m | (1 << i))),
+            }
+        };
+    let finite = |v: f32, ctx: &str| {
+        if v.is_finite() {
+            Ok(v)
+        } else {
+            Err(Error::new(format!("{ctx} must be a number")))
         }
     };
-    let finite = |v: f32, ctx: &str| if v.is_finite() { Ok(v) } else { Err(Error::new(format!("{ctx} must be a number"))) };
     let anim = |a: &Option<String>, fallback: &str, ctx: &str| -> Result<Option<usize>, Error> {
         match a {
             Some(a) => ix
@@ -343,16 +375,32 @@ pub(crate) fn parse(
                 .iter()
                 .position(|x| x == a)
                 .map(Some)
-                .ok_or_else(|| Error::new(format!("{ctx}: unknown anim '{a}' (declare it in \"animations\")"))),
+                .ok_or_else(|| {
+                    Error::new(format!(
+                        "{ctx}: unknown anim '{a}' (declare it in \"animations\")"
+                    ))
+                }),
             None => Ok(ix.animations.iter().position(|x| x == fallback)),
         }
     };
-    let station_bit = |name: &str| stations.iter().position(|s| s == name).map(|i| 1 << i).unwrap_or(0);
+    let station_bit = |name: &str| {
+        stations
+            .iter()
+            .position(|s| s == name)
+            .map(|i| 1 << i)
+            .unwrap_or(0)
+    };
     let mut put_away = 0;
     let mut put_away_order = Vec::new();
-    for name in raw.put_away_at.clone().unwrap_or_else(|| vec!["prep".into()]) {
+    for name in raw
+        .put_away_at
+        .clone()
+        .unwrap_or_else(|| vec!["prep".into()])
+    {
         let Some(i) = stations.iter().position(|s| *s == name) else {
-            return Err(Error::new(format!("cooking.putAwayAt: unknown station '{name}'")));
+            return Err(Error::new(format!(
+                "cooking.putAwayAt: unknown station '{name}'"
+            )));
         };
         put_away |= station_bit(&name);
         put_away_order.push(i as u8);
@@ -367,23 +415,40 @@ pub(crate) fn parse(
         feed_family: raw.feed_family.unwrap_or(0.15).max(0.0),
         hungry_below: raw.hungry_below.unwrap_or(0.5),
         invited_boost: raw.invited_boost.unwrap_or(2.5).max(0.0),
-        invite_minutes: finite(raw.invite_minutes.unwrap_or(60.0), "cooking.inviteMinutes")?.max(0.0),
-        station_wait_minutes: finite(raw.station_wait_minutes.unwrap_or(10.0), "cooking.stationWaitMinutes")?.max(0.0),
+        invite_minutes: finite(raw.invite_minutes.unwrap_or(60.0), "cooking.inviteMinutes")?
+            .max(0.0),
+        station_wait_minutes: finite(
+            raw.station_wait_minutes.unwrap_or(10.0),
+            "cooking.stationWaitMinutes",
+        )?
+        .max(0.0),
         dirty_dirt_per_hour: raw.dirty_dirt_per_hour.unwrap_or(0.02).max(0.0),
         skip_penalty: raw.skip_penalty.unwrap_or(0.05).clamp(0.0, 0.5),
         seat_tags: tag_mask(&raw.seat_tags, &["lounge", "food"], "cooking.seatTags")?,
-        seat_avoid: tag_mask(&raw.seat_avoid, &["spa", "hygiene", "bathroom"], "cooking.seatAvoid")?,
+        seat_avoid: tag_mask(
+            &raw.seat_avoid,
+            &["spa", "hygiene", "bathroom"],
+            "cooking.seatAvoid",
+        )?,
         default_surface_height: raw.default_surface_height.unwrap_or(0.9).max(0.0),
         serve_range: raw.serve_range.unwrap_or(6.0).max(1.0),
         table_range: finite(raw.table_range.unwrap_or(12.0), "cooking.tableRange")?.max(0.0),
-        serve_minutes: finite(raw.serve_minutes.unwrap_or(1.0), "cooking.serveMinutes")?.clamp(1.0, 30.0),
+        serve_minutes: finite(raw.serve_minutes.unwrap_or(1.0), "cooking.serveMinutes")?
+            .clamp(1.0, 30.0),
         serve_anim: anim(&raw.serve_anim, "serve", "cooking.serveAnim")?,
         serve_label: raw.serve_label.clone().unwrap_or_else(|| "Serve it".into()),
         eat_label: raw.eat_label.clone().unwrap_or_else(|| "Eat".into()),
         eat_tags: tag_mask(&raw.eat_tags, &["food"], "cooking.eatTags")?,
         eat_anim: anim(&raw.eat_anim, "eat", "cooking.eatAnim")?,
-        dishes_label: raw.dishes_label.clone().unwrap_or_else(|| "Wash the dishes".into()),
-        dishes_tags: tag_mask(&raw.dishes_tags, &["chores", "cleaning"], "cooking.dishesTags")?,
+        dishes_label: raw
+            .dishes_label
+            .clone()
+            .unwrap_or_else(|| "Wash the dishes".into()),
+        dishes_tags: tag_mask(
+            &raw.dishes_tags,
+            &["chores", "cleaning"],
+            "cooking.dishesTags",
+        )?,
         dishes_anim: anim(&raw.dishes_anim, "wash", "cooking.dishesAnim")?,
         dishes_interest: raw.dishes_interest.unwrap_or(0.6).max(0.0),
         dishes: station_bit("dishes"),
@@ -397,12 +462,19 @@ pub(crate) fn parse(
         stations: stations.clone(),
     };
 
-    let item_index: HashMap<&str, usize> = items.iter().enumerate().map(|(i, it)| (it.id.as_str(), i)).collect();
+    let item_index: HashMap<&str, usize> = items
+        .iter()
+        .enumerate()
+        .map(|(i, it)| (it.id.as_str(), i))
+        .collect();
     if item_index.len() != items.len() {
         return Err(Error::new("duplicate item id"));
     }
     let item = |id: &str, ctx: &str| {
-        item_index.get(id).copied().ok_or_else(|| Error::new(format!("{ctx}: unknown item '{id}'")))
+        item_index
+            .get(id)
+            .copied()
+            .ok_or_else(|| Error::new(format!("{ctx}: unknown item '{id}'")))
     };
     let mut item_defs = Vec::with_capacity(items.len());
     for it in items {
@@ -413,7 +485,10 @@ pub(crate) fn parse(
             serving: it.serving.as_deref().map(|s| item(s, &ctx)).transpose()?,
             empty_as: it.empty_as.as_deref().map(|s| item(s, &ctx)).transpose()?,
             dirty: it.dirty,
-            radius: it.radius.unwrap_or(crate::content::DEFAULT_RADIUS).clamp(0.02, 0.45),
+            radius: it
+                .radius
+                .unwrap_or(crate::content::DEFAULT_RADIUS)
+                .clamp(0.02, 0.45),
         });
     }
 
@@ -429,20 +504,27 @@ pub(crate) fn parse(
         }
         let [lo, hi] = r.servings;
         if lo == 0 || hi < lo {
-            return Err(Error::new(format!("{ctx}: servings are [fewest, most], at least 1")));
+            return Err(Error::new(format!(
+                "{ctx}: servings are [fewest, most], at least 1"
+            )));
         }
         if r.cost_per_serving < 0 {
             return Err(Error::new(format!("{ctx}: negative cost")));
         }
         let mut effects = [0.0; MAX_NEEDS];
         for (need, g) in &r.effects {
-            effects[*ix.needs.get(need.as_str()).ok_or_else(|| Error::new(format!("{ctx}: unknown need '{need}'")))?] = *g;
+            effects[*ix
+                .needs
+                .get(need.as_str())
+                .ok_or_else(|| Error::new(format!("{ctx}: unknown need '{need}'")))?] = *g;
         }
         let mut steps = Vec::with_capacity(r.steps.len());
         for (k, s) in r.steps.iter().enumerate() {
             let sctx = format!("{ctx} step {}", k + 1);
             if s.at.is_empty() || s.minutes <= 0.0 {
-                return Err(Error::new(format!("{sctx}: needs a station (`at`) and minutes > 0")));
+                return Err(Error::new(format!(
+                    "{sctx}: needs a station (`at`) and minutes > 0"
+                )));
             }
             let mut at = Vec::with_capacity(s.at.len());
             for name in &s.at {
@@ -458,7 +540,11 @@ pub(crate) fn parse(
                     .iter()
                     .position(|x| x == name)
                     .filter(|&i| at.contains(&(i as u8)))
-                    .ok_or_else(|| Error::new(format!("{sctx}: animAt names '{name}', not one of its stations")))?;
+                    .ok_or_else(|| {
+                        Error::new(format!(
+                            "{sctx}: animAt names '{name}', not one of its stations"
+                        ))
+                    })?;
                 anim_at.push((i as u8, anim(&Some(a.clone()), "cook", &sctx)?));
             }
             steps.push(RecipeStep {
@@ -483,7 +569,12 @@ pub(crate) fn parse(
             eat_feeling: r
                 .eat_feeling
                 .as_deref()
-                .map(|f| ix.feelings.get(f).copied().ok_or_else(|| Error::new(format!("{ctx}: unknown feeling '{f}'"))))
+                .map(|f| {
+                    ix.feelings
+                        .get(f)
+                        .copied()
+                        .ok_or_else(|| Error::new(format!("{ctx}: unknown feeling '{f}'")))
+                })
                 .transpose()?,
             eat_now: r.eat_now,
             eat_minutes: r.eat_minutes.unwrap_or(rules.eat_minutes).max(1.0),
@@ -533,7 +624,8 @@ pub(crate) fn eat_recipe(
 
 fn capitalised(s: &str) -> String {
     let mut c = s.chars();
-    c.next().map_or_else(String::new, |f| f.to_uppercase().chain(c).collect())
+    c.next()
+        .map_or_else(String::new, |f| f.to_uppercase().chain(c).collect())
 }
 
 // ---- Cooking, eating, washing up (a resident's step) --------------------------------------
@@ -541,16 +633,24 @@ fn capitalised(s: &str) -> String {
 use crate::content::{Content, Interaction, Pose};
 use crate::items::Items;
 use crate::surface::{self, SurfaceSpot};
-use crate::world::{Access, Activity, Ctx, Sim, Task, access, affordable, end_activity, walk_route};
+use crate::world::{
+    Access, Activity, Ctx, Sim, Task, access, affordable, end_activity, walk_route,
+};
 
 /// The tile a resident uses `obj` from (`surface::Links`, cached for the tick).
 fn approach(ctx: &Ctx, obj: &ObjectInstance) -> (i32, i32) {
-    ctx.index.links.approach_of(obj.id).unwrap_or_else(|| obj.front_tile(ctx.content))
+    ctx.index
+        .links
+        .approach_of(obj.id)
+        .unwrap_or_else(|| obj.front_tile(ctx.content))
 }
 
 /// Whether a task is one of the cooking chain's (they go on from one step to the next).
 pub(crate) fn chain(kind: &TaskKind) -> bool {
-    matches!(kind, TaskKind::Cook { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. })
+    matches!(
+        kind,
+        TaskKind::Cook { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. }
+    )
 }
 
 /// The interaction a recipe was started with (its skills, feeling and own effects count).
@@ -561,7 +661,10 @@ pub(crate) fn origin_interaction<'a>(
     recipe: usize,
 ) -> Option<&'a Interaction> {
     let o = objects.get(origin? as usize)?;
-    content.objects[o.def].interactions.iter().find(|i| i.recipe == Some(recipe))
+    content.objects[o.def]
+        .interactions
+        .iter()
+        .find(|i| i.recipe == Some(recipe))
 }
 
 /// The stations a resident has at home: working objects there. (A grill in the park is a
@@ -587,7 +690,13 @@ fn at_home<'a>(sim: &Sim, ctx: &'a Ctx) -> impl Iterator<Item = usize> + 'a {
     let home = ctx.households[sim.household as usize].plot;
     let household = sim.household;
     ctx.briefs.iter().enumerate().filter_map(move |(j, b)| {
-        (b.here && !b.away && !b.baby && b.household == household && home.is_some() && b.plot == home).then_some(j)
+        (b.here
+            && !b.away
+            && !b.baby
+            && b.household == household
+            && home.is_some()
+            && b.plot == home)
+            .then_some(j)
     })
 }
 
@@ -655,7 +764,11 @@ fn find_station(
     for &o in home_objects(ctx, sim.household).iter().chain(origin.iter()) {
         let obj = &objects[o as usize];
         let def = &content.objects[obj.def];
-        if def.stations & mask == 0 || def.reach > reach || obj.broken() || access(ctx, sim, ctx.object_plot[o as usize]) != Access::Full {
+        if def.stations & mask == 0
+            || def.reach > reach
+            || obj.broken()
+            || access(ctx, sim, ctx.object_plot[o as usize]) != Access::Full
+        {
             continue;
         }
         // (A machine running, or done with its load still in it: not till it's emptied.)
@@ -668,11 +781,19 @@ fn find_station(
             continue;
         }
         let outside = lot.in_bounds(fx, fz) && lot.room_at(fx, fz) == crate::lot::OUTDOORS;
-        let rank = order.iter().position(|&i| def.stations & (1 << i) != 0).unwrap_or(order.len());
+        let rank = order
+            .iter()
+            .position(|&i| def.stations & (1 << i) != 0)
+            .unwrap_or(order.len());
         let (rank, tie) = if nearest { (0, rank) } else { (rank, 0) };
         let key = ((origin != Some(o)) as u8, (outside != outdoor) as u8, rank);
-        let distance = ctx.nav.stairs.distance([fx as f32 + 0.5, fz as f32 + 0.5], sim.pos);
-        if best.is_none_or(|(k, d, t, _)| key < k || (key == k && (distance < d || (distance == d && tie < t)))) {
+        let distance = ctx
+            .nav
+            .stairs
+            .distance([fx as f32 + 0.5, fz as f32 + 0.5], sim.pos);
+        if best.is_none_or(|(k, d, t, _)| {
+            key < k || (key == k && (distance < d || (distance == d && tie < t)))
+        }) {
             best = Some((key, distance, tie, o));
         }
     }
@@ -684,7 +805,13 @@ fn find_station(
 }
 
 /// Starts (or carries on with) a cooking, eating or washing-up task.
-pub(crate) fn start(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut Items) {
+pub(crate) fn start(
+    sim: &mut Sim,
+    task: Task,
+    ctx: &Ctx,
+    objects: &mut [ObjectInstance],
+    items: &mut Items,
+) {
     match task.kind {
         TaskKind::Cook { recipe, step, .. } => {
             // A dish being served goes on only with the dish in hand (a save made on the way to
@@ -695,7 +822,11 @@ pub(crate) fn start(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectI
             // Back to it after a crying baby (`called_away`): what the last step left is picked
             // up again.
             if sim.held.is_none() && step > 0 {
-                sim.held = ctx.content.recipes[recipe].steps.get(step as usize - 1).and_then(|s| s.holds).map(Held::of);
+                sim.held = ctx.content.recipes[recipe]
+                    .steps
+                    .get(step as usize - 1)
+                    .and_then(|s| s.holds)
+                    .map(Held::of);
             }
             cook_next(sim, task, ctx, objects, items, None, None)
         }
@@ -706,7 +837,14 @@ pub(crate) fn start(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectI
 }
 
 /// Heads for `obj` (reserving a slot) for `task`; false if it can't be reached or is taken.
-fn go_to(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], obj: u32, tags: TagMask) -> bool {
+fn go_to(
+    sim: &mut Sim,
+    task: Task,
+    ctx: &Ctx,
+    objects: &mut [ObjectInstance],
+    obj: u32,
+    tags: TagMask,
+) -> bool {
     let content = ctx.content;
     let o = &objects[obj as usize];
     // (A seat of its own: round to it, `seat_approach`; at a station, their own spot along it,
@@ -714,10 +852,15 @@ fn go_to(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], o
     let def = &content.objects[o.def];
     let slot = o.pick_slot(sim.id, 0..def.slots as usize, Some((def, sim.pos)), 0);
     let seat = matches!(task.kind, TaskKind::Eat { .. });
-    let spot = slot.filter(|_| !seat).and_then(|k| surface::stand_spot(content, &ctx.nav, o, k, false));
+    let spot = slot
+        .filter(|_| !seat)
+        .and_then(|k| surface::stand_spot(content, &ctx.nav, o, k, false));
     let (fx, fz) = match spot {
         Some((t, ..)) => t,
-        None => slot.filter(|_| seat).and_then(|k| surface::seat_approach(content, &ctx.nav, o, k, sim.pos)).unwrap_or_else(|| approach(ctx, o)),
+        None => slot
+            .filter(|_| seat)
+            .and_then(|k| surface::seat_approach(content, &ctx.nav, o, k, sim.pos))
+            .unwrap_or_else(|| approach(ctx, o)),
     };
     let target = spot.map_or([fx as f32 + 0.5, fz as f32 + 0.5], |(_, p, _)| p);
     let Some(waypoints) = walk_route(ctx, sim, (fx, fz), target) else {
@@ -728,7 +871,11 @@ fn go_to(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], o
         return false;
     }
     sim.pose = Pose::Stand;
-    sim.current = Some(Activity { task, phase: Phase::Routing { waypoints, next: 0 }, tags });
+    sim.current = Some(Activity {
+        task,
+        phase: Phase::Routing { waypoints, next: 0 },
+        tags,
+    });
     true
 }
 
@@ -739,7 +886,11 @@ fn walk_to(sim: &mut Sim, task: Task, ctx: &Ctx, goal: (i32, i32), tags: TagMask
         return false;
     };
     sim.pose = Pose::Stand;
-    sim.current = Some(Activity { task, phase: Phase::Routing { waypoints, next: 0 }, tags });
+    sim.current = Some(Activity {
+        task,
+        phase: Phase::Routing { waypoints, next: 0 },
+        tags,
+    });
     true
 }
 
@@ -751,7 +902,10 @@ fn item_access(ctx: &Ctx, objects: &[ObjectInstance], at: &ItemAt) -> Vec<(i32, 
     let free = |(x, z): (i32, i32)| nav.tile_free(x, z) && nav.stairs.step(x, z).is_none();
     let Some(o) = crate::items::holder(ctx.content, objects, at) else {
         let (x, z) = at.tile();
-        return [(x, z), (x, z + 1), (x + 1, z), (x, z - 1), (x - 1, z)].into_iter().filter(|&t| free(t)).collect();
+        return [(x, z), (x, z + 1), (x + 1, z), (x, z - 1), (x - 1, z)]
+            .into_iter()
+            .filter(|&t| free(t))
+            .collect();
     };
     let obj = &objects[o as usize];
     let front = approach(ctx, obj);
@@ -761,8 +915,15 @@ fn item_access(ctx: &Ctx, objects: &[ObjectInstance], at: &ItemAt) -> Vec<(i32, 
     let mut round = Vec::new();
     for &(x, z) in &footprint {
         for t in [(x, z + 1), (x + 1, z), (x, z - 1), (x - 1, z)] {
-            let open = nav.lot.in_bounds(t.0, t.1) && nav.lot.edge_between(x, z, t.0, t.1) == crate::lot::Edge::Open;
-            if open && free(t) && nav.stairs.storey(t.1) == storey && !footprint.contains(&t) && t != front && !round.contains(&t) {
+            let open = nav.lot.in_bounds(t.0, t.1)
+                && nav.lot.edge_between(x, z, t.0, t.1) == crate::lot::Edge::Open;
+            if open
+                && free(t)
+                && nav.stairs.storey(t.1) == storey
+                && !footprint.contains(&t)
+                && t != front
+                && !round.contains(&t)
+            {
                 round.push(t);
             }
         }
@@ -780,7 +941,13 @@ fn queue(sim: &mut Sim, task: Task, ctx: &Ctx, tags: TagMask, waited: Option<u32
     if waited.is_none() && aside(sim, ctx).is_some_and(|t| walk_to(sim, task, ctx, t, tags)) {
         return;
     }
-    sim.current = Some(Activity { task, phase: Phase::Queued { ticks: waited.unwrap_or(0) }, tags });
+    sim.current = Some(Activity {
+        task,
+        phase: Phase::Queued {
+            ticks: waited.unwrap_or(0),
+        },
+        tags,
+    });
 }
 
 /// The tile beside `sim` to wait on: free, on their storey, nothing used from it (no object's
@@ -793,24 +960,50 @@ fn aside(sim: &Sim, ctx: &Ctx) -> Option<(i32, i32)> {
     if !used((x, z)) {
         return None;
     }
-    let taken = |t: (i32, i32)| ctx.briefs.iter().enumerate().any(|(i, b)| i as u32 != sim.id && !b.away && (b.pos[0].floor() as i32, b.pos[1].floor() as i32) == t);
-    let storey = nav.stairs.storey(z);
-    [(0, 1), (1, 0), (0, -1), (-1, 0), (1, 1), (-1, 1), (1, -1), (-1, -1)]
-        .into_iter()
-        .map(|(dx, dz)| (x + dx, z + dz))
-        .find(|&t| {
-            nav.tile_free(t.0, t.1) && nav.stairs.storey(t.1) == storey && nav.stairs.step(t.0, t.1).is_none() && !used(t) && !taken(t)
-                && ((t.0 - x).abs() + (t.1 - z).abs() == 2 || nav.lot.edge_between(x, z, t.0, t.1) == crate::lot::Edge::Open)
+    let taken = |t: (i32, i32)| {
+        ctx.briefs.iter().enumerate().any(|(i, b)| {
+            i as u32 != sim.id && !b.away && (b.pos[0].floor() as i32, b.pos[1].floor() as i32) == t
         })
+    };
+    let storey = nav.stairs.storey(z);
+    [
+        (0, 1),
+        (1, 0),
+        (0, -1),
+        (-1, 0),
+        (1, 1),
+        (-1, 1),
+        (1, -1),
+        (-1, -1),
+    ]
+    .into_iter()
+    .map(|(dx, dz)| (x + dx, z + dz))
+    .find(|&t| {
+        nav.tile_free(t.0, t.1)
+            && nav.stairs.storey(t.1) == storey
+            && nav.stairs.step(t.0, t.1).is_none()
+            && !used(t)
+            && !taken(t)
+            && ((t.0 - x).abs() + (t.1 - z).abs() == 2
+                || nav.lot.edge_between(x, z, t.0, t.1) == crate::lot::Edge::Open)
+    })
 }
 
 /// Walks for `task` to the first of `goals` (a few at most) there's a way to.
 fn walk_to_any(sim: &mut Sim, task: Task, ctx: &Ctx, goals: &[(i32, i32)], tags: TagMask) -> bool {
-    goals.iter().take(4).any(|&goal| walk_to(sim, task, ctx, goal, tags))
+    goals
+        .iter()
+        .take(4)
+        .any(|&goal| walk_to(sim, task, ctx, goal, tags))
 }
 
 /// Tags of a recipe being made (its interaction's, for "busy" checks and plans).
-fn cook_tags(content: &Content, objects: &[ObjectInstance], origin: Option<u32>, recipe: usize) -> TagMask {
+fn cook_tags(
+    content: &Content,
+    objects: &[ObjectInstance],
+    origin: Option<u32>,
+    recipe: usize,
+) -> TagMask {
     origin_interaction(content, objects, origin, recipe).map_or(0, |i| i.tags)
 }
 
@@ -829,23 +1022,55 @@ fn cook_next(
 ) {
     let content = ctx.content;
     sim.current = None;
-    let TaskKind::Cook { recipe, step, origin, servings, skipped, minutes: carried, .. } = task.kind else {
+    let TaskKind::Cook {
+        recipe,
+        step,
+        origin,
+        servings,
+        skipped,
+        minutes: carried,
+        ..
+    } = task.kind
+    else {
         return;
     };
     let r = &content.recipes[recipe];
     let tags = cook_tags(content, objects, origin, recipe);
     // Before anything is bought: the home has to have every station the recipe needs.
-    let at_origin = origin.and_then(|o| objects.get(o as usize)).map_or(0, |o| content.objects[o.def].stations);
+    let at_origin = origin
+        .and_then(|o| objects.get(o as usize))
+        .map_or(0, |o| content.objects[o.def].stations);
     if step == 0 && servings == 0 && !r.possible(station_mask(sim, ctx, objects) | at_origin) {
         return cannot_cook(sim, ctx, tags);
     }
-    let give_up = waited.is_some_and(|w| w as f32 * crate::MINUTES_PER_TICK >= content.cooking.station_wait_minutes);
+    let give_up = waited.is_some_and(|w| {
+        w as f32 * crate::MINUTES_PER_TICK >= content.cooking.station_wait_minutes
+    });
     let (mut step, mut skipped, mut carried) = (step, skipped, carried);
     while let Some(s) = r.steps.get(step as usize) {
-        task.kind = TaskKind::Cook { recipe, step, station: None, origin, servings, skipped, minutes: carried };
+        task.kind = TaskKind::Cook {
+            recipe,
+            step,
+            station: None,
+            origin,
+            servings,
+            skipped,
+            minutes: carried,
+        };
         match find_station(sim, ctx, objects, s.mask, &s.at, origin, r.outdoor, false) {
             Found::At(o) => {
-                let at = Task { kind: TaskKind::Cook { recipe, step, station: Some(o), origin, servings, skipped, minutes: carried }, ..task };
+                let at = Task {
+                    kind: TaskKind::Cook {
+                        recipe,
+                        step,
+                        station: Some(o),
+                        origin,
+                        servings,
+                        skipped,
+                        minutes: carried,
+                    },
+                    ..task
+                };
                 if go_to(sim, at, ctx, objects, o, tags) {
                     return;
                 }
@@ -868,7 +1093,15 @@ fn cook_next(
         step += 1;
         skipped += 1;
     }
-    task.kind = TaskKind::Cook { recipe, step, station: None, origin, servings, skipped, minutes: 0 };
+    task.kind = TaskKind::Cook {
+        recipe,
+        step,
+        station: None,
+        origin,
+        servings,
+        skipped,
+        minutes: 0,
+    };
     serve(sim, task, ctx, objects, items, last);
 }
 
@@ -890,8 +1123,16 @@ pub(crate) fn step_left(sim: &Sim) -> Option<f32> {
 /// through a step, they finish it first (true: `step_done` sees the baby waiting); on their way
 /// to a station or waiting for one, they leave off now (false), and the recipe waits at the
 /// front of the queue to go on from that step (the care goes in front of it).
-pub(crate) fn called_away(sim: &mut Sim, content: &Content, objects: &mut [ObjectInstance]) -> bool {
-    let Some(act) = sim.current.as_ref().filter(|a| matches!(a.task.kind, TaskKind::Cook { .. })) else {
+pub(crate) fn called_away(
+    sim: &mut Sim,
+    content: &Content,
+    objects: &mut [ObjectInstance],
+) -> bool {
+    let Some(act) = sim
+        .current
+        .as_ref()
+        .filter(|a| matches!(a.task.kind, TaskKind::Cook { .. }))
+    else {
         return false;
     };
     if matches!(act.phase, Phase::Using { .. }) {
@@ -908,15 +1149,39 @@ pub(crate) fn called_away(sim: &mut Sim, content: &Content, objects: &mut [Objec
 
 /// A recipe left off before its step: to go on later from there, finding a station again.
 fn left_off(task: Task) -> Task {
-    let TaskKind::Cook { recipe, step, origin, servings, skipped, minutes, .. } = task.kind else {
+    let TaskKind::Cook {
+        recipe,
+        step,
+        origin,
+        servings,
+        skipped,
+        minutes,
+        ..
+    } = task.kind
+    else {
         return task;
     };
-    Task { kind: TaskKind::Cook { recipe, step, station: None, origin, servings, skipped, minutes }, ..task }
+    Task {
+        kind: TaskKind::Cook {
+            recipe,
+            step,
+            station: None,
+            origin,
+            servings,
+            skipped,
+            minutes,
+        },
+        ..task
+    }
 }
 
 /// Whether `task` is care for a crying baby they were called away to (not the player's).
 fn baby_care(task: &Task, content: &Content, objects: &[ObjectInstance]) -> bool {
-    let TaskKind::Use { object, interaction } = task.kind else {
+    let TaskKind::Use {
+        object,
+        interaction,
+    } = task.kind
+    else {
         return false;
     };
     !task.directed
@@ -930,7 +1195,11 @@ fn baby_care(task: &Task, content: &Content, objects: &[ObjectInstance]) -> bool
 /// waits in the queue after the baby; a dish just served stays where it was put (they don't
 /// sit down to it now: a plate in hand is put down, `settle`).
 fn leave_for_baby(sim: &mut Sim, content: &Content, objects: &mut [ObjectInstance]) {
-    if !sim.queue.front().is_some_and(|t| baby_care(t, content, objects)) {
+    if !sim
+        .queue
+        .front()
+        .is_some_and(|t| baby_care(t, content, objects))
+    {
         return;
     }
     let Some(task) = sim.current.as_ref().map(|a| a.task) else {
@@ -938,7 +1207,11 @@ fn leave_for_baby(sim: &mut Sim, content: &Content, objects: &mut [ObjectInstanc
     };
     end_activity(sim, content, objects);
     if matches!(task.kind, TaskKind::Cook { .. }) && !serving(content, &task) {
-        let at = sim.queue.iter().take_while(|t| baby_care(t, content, objects)).count();
+        let at = sim
+            .queue
+            .iter()
+            .take_while(|t| baby_care(t, content, objects))
+            .count();
         sim.queue.insert(at, left_off(task));
     }
 }
@@ -948,7 +1221,8 @@ fn cannot_cook(sim: &mut Sim, ctx: &Ctx, tags: TagMask) {
     let content = ctx.content;
     sim.current = None;
     let eat = content.cooking.eat_tags;
-    let fits = |a: &crate::planner::ActivityDef, t: TagMask| a.tags & t != 0 && !a.social && !a.visit;
+    let fits =
+        |a: &crate::planner::ActivityDef, t: TagMask| a.tags & t != 0 && !a.social && !a.visit;
     let activity = content
         .activities
         .iter()
@@ -978,7 +1252,9 @@ fn buy_ingredients(sim: &mut Sim, ctx: &Ctx, r: &RecipeDef) -> Option<u8> {
 
 /// The household's objects that things can be put on or in.
 fn home_objects<'a>(ctx: &Ctx<'a>, household: u32) -> &'a [u32] {
-    ctx.households[household as usize].plot.map_or(&[], |p| ctx.index.on(p))
+    ctx.households[household as usize]
+        .plot
+        .map_or(&[], |p| ctx.index.on(p))
 }
 
 /// Somewhere to put things: the objects that may carry them.
@@ -1004,12 +1280,34 @@ impl Place<'_> {
     /// A free spot for something of `radius` near `near` (within `range`), on what stands in
     /// `room` (None: anywhere): on an outdoor surface first if `outdoor`, then on a table, bar or
     /// counter, else any.
-    fn spot(&self, items: &Items, near: [f32; 2], range: f32, radius: f32, outdoor: bool, room: Option<u16>) -> Option<SurfaceSpot> {
+    fn spot(
+        &self,
+        items: &Items,
+        near: [f32; 2],
+        range: f32,
+        radius: f32,
+        outdoor: bool,
+        room: Option<u16>,
+    ) -> Option<SurfaceSpot> {
         use crate::content::SurfaceKind;
         let occupied = items.occupancy(self.content);
-        let candidates: Vec<u32> = self.candidates.iter().copied().filter(|&o| self.in_room(&self.objects[o as usize], room)).collect();
+        let candidates: Vec<u32> = self
+            .candidates
+            .iter()
+            .copied()
+            .filter(|&o| self.in_room(&self.objects[o as usize], room))
+            .collect();
         let near_on = |candidates: &[u32], kinds: u8| {
-            surface::free_surface_spot_near(self.content, self.objects, candidates, near, range, kinds, radius, &occupied)
+            surface::free_surface_spot_near(
+                self.content,
+                self.objects,
+                candidates,
+                near,
+                range,
+                kinds,
+                radius,
+                &occupied,
+            )
         };
         if outdoor {
             let outside: Vec<u32> = candidates
@@ -1077,12 +1375,23 @@ impl Place<'_> {
                 .map(|spot| ItemAt::on(&spot))
                 .or_else(|| {
                     rooms.iter().find_map(|&room| {
-                        self.spot(items, near, range, def.radius, outdoor, room).map(|spot| ItemAt::on(&spot)).or_else(|| {
-                            self.store(near, room).filter(|_| food).map(|o| ItemAt::Stored { x: o.x, z: o.z })
-                        })
+                        self.spot(items, near, range, def.radius, outdoor, room)
+                            .map(|spot| ItemAt::on(&spot))
+                            .or_else(|| {
+                                self.store(near, room)
+                                    .filter(|_| food)
+                                    .map(|o| ItemAt::Stored { x: o.x, z: o.z })
+                            })
                     })
                 })
-                .unwrap_or_else(|| ItemAt::Floor { x: 0, z: 0, offset: [0, 0] }.moved_to(near));
+                .unwrap_or_else(|| {
+                    ItemAt::Floor {
+                        x: 0,
+                        z: 0,
+                        offset: [0, 0],
+                    }
+                    .moved_to(near)
+                });
             let id = items.add(ItemInstance {
                 id: 0,
                 def: held.def,
@@ -1101,20 +1410,42 @@ impl Place<'_> {
 }
 
 fn place<'a>(ctx: &Ctx<'a>, objects: &'a [ObjectInstance], household: u32) -> Place<'a> {
-    Place { content: ctx.content, objects, lot: ctx.nav.lot, candidates: home_objects(ctx, household) }
+    Place {
+        content: ctx.content,
+        objects,
+        lot: ctx.nav.lot,
+        candidates: home_objects(ctx, household),
+    }
 }
 
 /// The last step is done: the dish is carried to the dining table and served there (else served
 /// near the cook), or, made to eat at once, they keep the plate and sit down with it. Called again
 /// with the dish in hand (the table broke on the way), they carry on with it.
-fn serve(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut Items, last: Option<u32>) {
+fn serve(
+    sim: &mut Sim,
+    task: Task,
+    ctx: &Ctx,
+    objects: &mut [ObjectInstance],
+    items: &mut Items,
+    last: Option<u32>,
+) {
     let content = ctx.content;
-    let TaskKind::Cook { recipe, origin, servings, skipped, .. } = task.kind else {
+    let TaskKind::Cook {
+        recipe,
+        origin,
+        servings,
+        skipped,
+        ..
+    } = task.kind
+    else {
         return;
     };
     sim.current = None;
     let r = &content.recipes[recipe];
-    if let Some(dish) = sim.held.filter(|h| h.recipe == Some(recipe) && h.def == r.item && h.servings > 0) {
+    if let Some(dish) = sim
+        .held
+        .filter(|h| h.recipe == Some(recipe) && h.def == r.item && h.servings > 0)
+    {
         return carry_dish(sim, task, ctx, objects, items, dish);
     }
     // (Every step done without its station: the ingredients are bought now.)
@@ -1127,13 +1458,19 @@ fn serve(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], i
     };
     let inter = origin_interaction(content, objects, origin, recipe);
     let skill = inter.map_or(1.0, |i| i.skill_factor(&content.skill_rules, &sim.skills));
-    let tools = last.and_then(|o| objects.get(o as usize)).map_or(1.0, |o| content.object_rules.quality_factor(o.quality));
-    let quality = (skill * tools * (1.0 - content.cooking.skip_penalty * f32::from(skipped))).max(0.3);
+    let tools = last
+        .and_then(|o| objects.get(o as usize))
+        .map_or(1.0, |o| content.object_rules.quality_factor(o.quality));
+    let quality =
+        (skill * tools * (1.0 - content.cooking.skip_penalty * f32::from(skipped))).max(0.3);
     if let Some(i) = inter {
         if let Some(f) = i.earns_feeling(i.minutes, &sim.skills) {
             crate::social::add_feeling(&mut sim.feelings, f, &content.feelings, ctx.tick);
         }
-        if let Some(o) = last.and_then(|o| objects.get(o as usize)).filter(|_| i.dirt > 0.0) {
+        if let Some(o) = last
+            .and_then(|o| objects.get(o as usize))
+            .filter(|_| i.dirt > 0.0)
+        {
             let (fx, fz) = approach(ctx, o);
             sim.mess = Some((fx, fz, i.dirt));
         }
@@ -1141,8 +1478,25 @@ fn serve(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], i
     if r.eat_now {
         return eat_now(sim, task, recipe, quality, ctx, objects, items);
     }
-    let made = Held { def: r.item, servings, quality, made_at: ctx.tick, recipe: Some(recipe) };
-    let task = Task { kind: TaskKind::Cook { recipe, step: r.steps.len() as u8, station: None, origin, servings, skipped, minutes: 0 }, ..task };
+    let made = Held {
+        def: r.item,
+        servings,
+        quality,
+        made_at: ctx.tick,
+        recipe: Some(recipe),
+    };
+    let task = Task {
+        kind: TaskKind::Cook {
+            recipe,
+            step: r.steps.len() as u8,
+            station: None,
+            origin,
+            servings,
+            skipped,
+            minutes: 0,
+        },
+        ..task
+    };
     carry_dish(sim, task, ctx, objects, items, made);
 }
 
@@ -1153,24 +1507,72 @@ pub(crate) fn serving(content: &Content, task: &Task) -> bool {
 
 /// With `dish` made: in hand to the dining table, if there is one near, to be put down there
 /// (`step_done`); else put down near the cook straight away.
-fn carry_dish(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut Items, dish: Held) {
+fn carry_dish(
+    sim: &mut Sim,
+    task: Task,
+    ctx: &Ctx,
+    objects: &mut [ObjectInstance],
+    items: &mut Items,
+    dish: Held,
+) {
     let content = ctx.content;
-    let TaskKind::Cook { recipe, step, origin, servings, skipped, .. } = task.kind else {
+    let TaskKind::Cook {
+        recipe,
+        step,
+        origin,
+        servings,
+        skipped,
+        ..
+    } = task.kind
+    else {
         return;
     };
     let r = &content.recipes[recipe];
     let tags = cook_tags(content, objects, origin, recipe);
     sim.held = Some(dish);
-    if let Some(spot) = serving_table(sim, ctx, objects, items, content.items[dish.def].radius, r.outdoor) {
+    if let Some(spot) = serving_table(
+        sim,
+        ctx,
+        objects,
+        items,
+        content.items[dish.def].radius,
+        r.outdoor,
+    ) {
         let minutes = content.cooking.serve_minutes.round() as u16;
-        let to = Task { kind: TaskKind::Cook { recipe, step, station: Some(spot.host), origin, servings, skipped, minutes }, ..task };
-        if walk_to_any(sim, to, ctx, &item_access(ctx, objects, &ItemAt::on(&spot)), tags) {
+        let to = Task {
+            kind: TaskKind::Cook {
+                recipe,
+                step,
+                station: Some(spot.host),
+                origin,
+                servings,
+                skipped,
+                minutes,
+            },
+            ..task
+        };
+        if walk_to_any(
+            sim,
+            to,
+            ctx,
+            &item_access(ctx, objects, &ItemAt::on(&spot)),
+            tags,
+        ) {
             return;
         }
     }
     sim.held = None;
     let at = place(ctx, objects, sim.household);
-    if let Some(id) = at.put_down(items, dish, sim.household, sim.pos, content.cooking.serve_range, r.outdoor, None, ctx.tick) {
+    if let Some(id) = at.put_down(
+        items,
+        dish,
+        sim.household,
+        sim.pos,
+        content.cooking.serve_range,
+        r.outdoor,
+        None,
+        ctx.tick,
+    ) {
         served(sim, task, ctx, objects, items, id);
     }
 }
@@ -1180,7 +1582,14 @@ fn carry_dish(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
 /// will sit down to it), the nearest within `cooking.tableRange` on this storey, an outdoor one
 /// first for a dish cooked `outdoor` (a barbecue on the picnic table), an indoor one first
 /// otherwise; a table before a counter or bar with stools.
-fn serving_table(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], items: &Items, radius: f32, outdoor: bool) -> Option<SurfaceSpot> {
+fn serving_table(
+    sim: &Sim,
+    ctx: &Ctx,
+    objects: &[ObjectInstance],
+    items: &Items,
+    radius: f32,
+    outdoor: bool,
+) -> Option<SurfaceSpot> {
     let content = ctx.content;
     let rules = &content.cooking;
     if sim.visiting.is_some() || rules.table_range <= 0.0 {
@@ -1205,12 +1614,17 @@ fn serving_table(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], items: &Items
         }
         let table = match ctx.index.links.table_of(o) {
             Some(t) if def.seat_at != 0 => t,
-            _ if def.surface.is_some() && obj.sits(def, stage, rules.eat_tags, rules.seat_avoid) => o,
+            _ if def.surface.is_some()
+                && obj.sits(def, stage, rules.eat_tags, rules.seat_avoid) =>
+            {
+                o
+            }
             _ => continue,
         };
         let t = &objects[table as usize];
         let kind = content.objects[t.def].surface.as_ref().map(|s| s.kind);
-        let rank = u8::from(outside(t) != outdoor) * 2 + u8::from(kind != Some(crate::content::SurfaceKind::Table));
+        let rank = u8::from(outside(t) != outdoor) * 2
+            + u8::from(kind != Some(crate::content::SurfaceKind::Table));
         if !t.broken() && stairs.storey(t.z) == storey && !tables.iter().any(|&(_, x)| x == table) {
             tables.push((rank, table));
         }
@@ -1218,42 +1632,108 @@ fn serving_table(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], items: &Items
     let occupied = items.occupancy(content);
     let middle = |t: u32| surface::middle(content, &objects[t as usize]);
     (0..4).find_map(|rank| {
-        let here: Vec<u32> = tables.iter().filter(|&&(r, _)| r == rank).map(|&(_, t)| t).collect();
+        let here: Vec<u32> = tables
+            .iter()
+            .filter(|&&(r, _)| r == rank)
+            .map(|&(_, t)| t)
+            .collect();
         // The nearest with room for it, then its spot nearest its middle.
-        let near = surface::free_surface_spot_near(content, objects, &here, sim.pos, rules.table_range, 0, radius, &occupied)?;
-        surface::free_surface_spot_near(content, objects, &[near.host], middle(near.host), rules.table_range, 0, radius, &occupied).or(Some(near))
+        let near = surface::free_surface_spot_near(
+            content,
+            objects,
+            &here,
+            sim.pos,
+            rules.table_range,
+            0,
+            radius,
+            &occupied,
+        )?;
+        surface::free_surface_spot_near(
+            content,
+            objects,
+            &[near.host],
+            middle(near.host),
+            rules.table_range,
+            0,
+            radius,
+            &occupied,
+        )
+        .or(Some(near))
     })
 }
 
 /// The dish is on the table (or wherever it went): "dinner's ready", and hungry themselves, they
 /// have some too.
-fn served(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut Items, id: u32) {
+fn served(
+    sim: &mut Sim,
+    task: Task,
+    ctx: &Ctx,
+    objects: &mut [ObjectInstance],
+    items: &mut Items,
+    id: u32,
+) {
     sim.served = Some(id);
     let Some(recipe) = items.get(id).and_then(|it| it.recipe) else {
         return;
     };
     if hungry_for(sim, ctx.content, &ctx.content.recipes[recipe]) {
-        let eat = Task { kind: TaskKind::Eat { item: Some(id), seat: None, plate: None, stage: 0 }, ..task };
+        let eat = Task {
+            kind: TaskKind::Eat {
+                item: Some(id),
+                seat: None,
+                plate: None,
+                stage: 0,
+            },
+            ..task
+        };
         eat_next(sim, eat, ctx, objects, items);
     }
 }
 
 /// At the table with the dish (`serving`): it goes down on a free spot of it, near its middle
 /// (else wherever there's room near), and is served.
-fn put_dish_down(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut Items, table: Option<u32>) {
+fn put_dish_down(
+    sim: &mut Sim,
+    task: Task,
+    ctx: &Ctx,
+    objects: &mut [ObjectInstance],
+    items: &mut Items,
+    table: Option<u32>,
+) {
     let content = ctx.content;
     let Some(dish) = sim.held.take() else {
         return;
     };
-    let outdoor = matches!(task.kind, TaskKind::Cook { recipe, .. } if content.recipes[recipe].outdoor);
+    let outdoor =
+        matches!(task.kind, TaskKind::Cook { recipe, .. } if content.recipes[recipe].outdoor);
     let occupied = items.occupancy(content);
     let radius = content.items[dish.def].radius;
-    let spot = table.filter(|&t| !objects[t as usize].broken()).and_then(|t| {
-        let middle = surface::middle(content, &objects[t as usize]);
-        surface::free_surface_spot_near(content, objects, &[t], middle, content.cooking.table_range.max(2.0), 0, radius, &occupied)
-    });
+    let spot = table
+        .filter(|&t| !objects[t as usize].broken())
+        .and_then(|t| {
+            let middle = surface::middle(content, &objects[t as usize]);
+            surface::free_surface_spot_near(
+                content,
+                objects,
+                &[t],
+                middle,
+                content.cooking.table_range.max(2.0),
+                0,
+                radius,
+                &occupied,
+            )
+        });
     let at = place(ctx, objects, sim.household);
-    if let Some(id) = at.put_down(items, dish, sim.household, sim.pos, content.cooking.serve_range, outdoor, spot, ctx.tick) {
+    if let Some(id) = at.put_down(
+        items,
+        dish,
+        sim.household,
+        sim.pos,
+        content.cooking.serve_range,
+        outdoor,
+        spot,
+        ctx.tick,
+    ) {
         served(sim, task, ctx, objects, items, id);
     }
 }
@@ -1272,8 +1752,22 @@ pub(crate) fn eat_now(
     let content = ctx.content;
     let r = &content.recipes[recipe];
     let plate = content.items[r.item].serving.unwrap_or(r.item);
-    sim.held = Some(Held { def: plate, servings: 1, quality, made_at: ctx.tick, recipe: Some(recipe) });
-    let eat = Task { kind: TaskKind::Eat { item: None, seat: None, plate: None, stage: 1 }, ..task };
+    sim.held = Some(Held {
+        def: plate,
+        servings: 1,
+        quality,
+        made_at: ctx.tick,
+        recipe: Some(recipe),
+    });
+    let eat = Task {
+        kind: TaskKind::Eat {
+            item: None,
+            seat: None,
+            plate: None,
+            stage: 1,
+        },
+        ..task
+    };
     eat_next(sim, eat, ctx, objects, items);
 }
 
@@ -1288,7 +1782,13 @@ fn dining<'a>(sim: &Sim, ctx: &Ctx<'a>) -> (&'a [u32], Option<u32>) {
     if home == Some(here) {
         return (ctx.index.on(here), Some(sim.household));
     }
-    (ctx.index.on(here), ctx.households.iter().position(|h| h.plot == Some(here)).map(|h| h as u32))
+    (
+        ctx.index.on(here),
+        ctx.households
+            .iter()
+            .position(|h| h.plot == Some(here))
+            .map(|h| h as u32),
+    )
 }
 
 /// The best free place to sit and eat: a chair at a table (`surface::dining_seat`), else a
@@ -1306,7 +1806,14 @@ fn eat_seat(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<u32> {
         })
         .collect();
     let stage = content.life.stage(sim.age);
-    if let Some(d) = surface::dining_seat(content, objects, &ctx.index.links, &candidates, sim.pos, stage) {
+    if let Some(d) = surface::dining_seat(
+        content,
+        objects,
+        &ctx.index.links,
+        &candidates,
+        sim.pos,
+        stage,
+    ) {
         return Some(d.object);
     }
     let sits = |o: u32, tags: TagMask| {
@@ -1315,29 +1822,68 @@ fn eat_seat(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<u32> {
     };
     let distance = |o: u32| {
         let (fx, fz) = approach(ctx, &objects[o as usize]);
-        ctx.nav.stairs.distance([fx as f32 + 0.5, fz as f32 + 0.5], sim.pos)
+        ctx.nav
+            .stairs
+            .distance([fx as f32 + 0.5, fz as f32 + 0.5], sim.pos)
     };
     let nearest = |pick: &dyn Fn(u32) -> bool| {
-        candidates.iter().copied().filter(|&o| pick(o)).min_by(|&a, &b| distance(a).total_cmp(&distance(b)))
+        candidates
+            .iter()
+            .copied()
+            .filter(|&o| pick(o))
+            .min_by(|&a, &b| distance(a).total_cmp(&distance(b)))
     };
-    nearest(&|o| content.objects[objects[o as usize].def].surface.is_some() && sits(o, rules.eat_tags))
-        .or_else(|| nearest(&|o| sits(o, rules.seat_tags)))
+    nearest(&|o| {
+        content.objects[objects[o as usize].def].surface.is_some() && sits(o, rules.eat_tags)
+    })
+    .or_else(|| nearest(&|o| sits(o, rules.seat_tags)))
 }
 
 /// Where the plate goes for someone sitting at `seat`: on the table in front of them, or on
 /// the seat's own table.
-fn plate_spot(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], items: &Items, seat: u32, radius: f32) -> Option<SurfaceSpot> {
+fn plate_spot(
+    sim: &Sim,
+    ctx: &Ctx,
+    objects: &[ObjectInstance],
+    items: &Items,
+    seat: u32,
+    radius: f32,
+) -> Option<SurfaceSpot> {
     let content = ctx.content;
     let occupied = items.occupancy(content);
     let slot = objects[seat as usize].slot_of(sim.id).unwrap_or(0);
-    surface::spot_for_seat(content, objects, &ctx.index.links, seat, slot, radius, &occupied).or_else(|| {
+    surface::spot_for_seat(
+        content,
+        objects,
+        &ctx.index.links,
+        seat,
+        slot,
+        radius,
+        &occupied,
+    )
+    .or_else(|| {
         content.objects[objects[seat as usize].def].surface?;
-        surface::free_surface_spot_near(content, objects, &[seat], sim.pos, 2.5, 0, radius, &occupied)
+        surface::free_surface_spot_near(
+            content,
+            objects,
+            &[seat],
+            sim.pos,
+            2.5,
+            0,
+            radius,
+            &occupied,
+        )
     })
 }
 
 /// Eating, step by step: fetch a serving, then sit down with it (or eat standing).
-fn eat_next(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut Items) {
+fn eat_next(
+    sim: &mut Sim,
+    task: Task,
+    ctx: &Ctx,
+    objects: &mut [ObjectInstance],
+    items: &mut Items,
+) {
     let content = ctx.content;
     let tags = content.cooking.eat_tags;
     let TaskKind::Eat { item, stage, .. } = task.kind else {
@@ -1345,7 +1891,10 @@ fn eat_next(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance]
     };
     sim.current = None;
     if stage == 0 {
-        let Some(it) = item.and_then(|i| items.get(i)).filter(|it| it.edible() && it.household == sim.household) else {
+        let Some(it) = item
+            .and_then(|i| items.get(i))
+            .filter(|it| it.edible() && it.household == sim.household)
+        else {
             return;
         };
         walk_to_any(sim, task, ctx, &item_access(ctx, objects, &it.at), tags);
@@ -1355,7 +1904,15 @@ fn eat_next(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance]
         return;
     }
     if let Some(seat) = eat_seat(sim, ctx, objects) {
-        let at = Task { kind: TaskKind::Eat { item, seat: Some(seat), plate: None, stage: 1 }, ..task };
+        let at = Task {
+            kind: TaskKind::Eat {
+                item,
+                seat: Some(seat),
+                plate: None,
+                stage: 1,
+            },
+            ..task
+        };
         if go_to(sim, at, ctx, objects, seat, tags) {
             return;
         }
@@ -1363,7 +1920,15 @@ fn eat_next(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance]
     // Nowhere to sit: standing up.
     sim.pose = Pose::Stand;
     sim.current = Some(Activity {
-        task: Task { kind: TaskKind::Eat { item, seat: None, plate: None, stage: 1 }, ..task },
+        task: Task {
+            kind: TaskKind::Eat {
+                item,
+                seat: None,
+                plate: None,
+                stage: 1,
+            },
+            ..task
+        },
         phase: Phase::Using { elapsed: 0.0 },
         tags,
     });
@@ -1372,7 +1937,10 @@ fn eat_next(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance]
 /// Takes a serving of `id` into their hands (false: it's gone or spoilt).
 fn take_serving(sim: &mut Sim, content: &Content, items: &mut Items, id: u32) -> bool {
     let household = sim.household;
-    let Some(it) = items.get_mut(id).filter(|it| it.edible() && it.household == household) else {
+    let Some(it) = items
+        .get_mut(id)
+        .filter(|it| it.edible() && it.household == household)
+    else {
         return false;
     };
     let def = &content.items[it.def];
@@ -1403,15 +1971,36 @@ fn take_serving(sim: &mut Sim, content: &Content, items: &mut Items, id: u32) ->
 /// Clearing away, step by step: fetch what's to be cleared (stage 0); scrape the food off
 /// into a bin (1; with none, it's done at the sink); wash up (2; `waited`: ticks waited for a
 /// busy sink); put the clean things away at a counter (3; with none, from the sink).
-fn dishes_next(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut Items, waited: Option<u32>) {
+fn dishes_next(
+    sim: &mut Sim,
+    task: Task,
+    ctx: &Ctx,
+    objects: &mut [ObjectInstance],
+    items: &mut Items,
+    waited: Option<u32>,
+) {
     let content = ctx.content;
     let rules = &content.cooking;
     let tags = rules.dishes_tags;
-    let TaskKind::Dishes { item, stage, scraps, .. } = task.kind else {
+    let TaskKind::Dishes {
+        item,
+        stage,
+        scraps,
+        ..
+    } = task.kind
+    else {
         return;
     };
     sim.current = None;
-    let at = |o: u32, stage: u8| Task { kind: TaskKind::Dishes { item, station: Some(o), stage, scraps }, ..task };
+    let at = |o: u32, stage: u8| Task {
+        kind: TaskKind::Dishes {
+            item,
+            station: Some(o),
+            stage,
+            scraps,
+        },
+        ..task
+    };
     match stage {
         0 => {
             let Some(it) = items.get(item).filter(|it| it.household == sim.household) else {
@@ -1422,20 +2011,49 @@ fn dishes_next(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstan
         1 => {
             // (With nowhere to wash up, what they carry goes in the bin too: see `step_done`.)
             let no_sink = station_mask(sim, ctx, objects) & rules.dishes == 0;
-            let scraps = if no_sink && sim.held.is_some() { scraps.max(1) } else { scraps };
+            let scraps = if no_sink && sim.held.is_some() {
+                scraps.max(1)
+            } else {
+                scraps
+            };
             if scraps > 0
-                && let Found::At(o) = find_station(sim, ctx, objects, rules.bin, &[], None, false, false)
-                && go_to(sim, Task { kind: TaskKind::Dishes { item, station: Some(o), stage: 1, scraps }, ..task }, ctx, objects, o, tags)
+                && let Found::At(o) =
+                    find_station(sim, ctx, objects, rules.bin, &[], None, false, false)
+                && go_to(
+                    sim,
+                    Task {
+                        kind: TaskKind::Dishes {
+                            item,
+                            station: Some(o),
+                            stage: 1,
+                            scraps,
+                        },
+                        ..task
+                    },
+                    ctx,
+                    objects,
+                    o,
+                    tags,
+                )
             {
                 return;
             }
-            let sink = Task { kind: TaskKind::Dishes { item, station: None, stage: 2, scraps }, ..task };
+            let sink = Task {
+                kind: TaskKind::Dishes {
+                    item,
+                    station: None,
+                    stage: 2,
+                    scraps,
+                },
+                ..task
+            };
             dishes_next(sim, sink, ctx, objects, items, None);
         }
         // Everything was thrown away: nothing to wash.
         2 if sim.held.is_none() && scraps == 0 => {}
         2 => {
-            let give_up = waited.is_some_and(|w| w as f32 * crate::MINUTES_PER_TICK >= rules.station_wait_minutes);
+            let give_up = waited
+                .is_some_and(|w| w as f32 * crate::MINUTES_PER_TICK >= rules.station_wait_minutes);
             match find_station(sim, ctx, objects, rules.dishes, &[], None, false, false) {
                 Found::At(o) => {
                     go_to(sim, at(o, 2), ctx, objects, o, tags);
@@ -1449,7 +2067,16 @@ fn dishes_next(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstan
         }
         _ => {
             // The nearest cupboard or counter; a cupboard over a counter first.
-            if let Found::At(o) = find_station(sim, ctx, objects, rules.put_away, &rules.put_away_order, None, false, true) {
+            if let Found::At(o) = find_station(
+                sim,
+                ctx,
+                objects,
+                rules.put_away,
+                &rules.put_away_order,
+                None,
+                false,
+                true,
+            ) {
                 go_to(sim, at(o, 3), ctx, objects, o, tags);
             }
         }
@@ -1465,7 +2092,12 @@ fn washed(content: &Content, def: usize) -> Option<usize> {
 
 /// How long a step of clearing away takes: scraping the food off `scraps` things (at the sink
 /// too, if there was no bin), washing what they carry, or putting it away.
-pub(crate) fn clearing_minutes(rules: &CookingRules, stage: u8, scraps: u8, held: Option<Held>) -> f32 {
+pub(crate) fn clearing_minutes(
+    rules: &CookingRules,
+    stage: u8,
+    scraps: u8,
+    held: Option<Held>,
+) -> f32 {
     let scraping = rules.scrape_minutes * f32::from(scraps);
     match stage {
         1 => scraping,
@@ -1475,7 +2107,13 @@ pub(crate) fn clearing_minutes(rules: &CookingRules, stage: u8, scraps: u8, held
 }
 
 /// Waiting for a busy station: try again (or, after a while, do without).
-pub(crate) fn queued(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut Items, waited: u32) {
+pub(crate) fn queued(
+    sim: &mut Sim,
+    ctx: &Ctx,
+    objects: &mut [ObjectInstance],
+    items: &mut Items,
+    waited: u32,
+) {
     let Some(task) = sim.current.as_ref().map(|a| a.task) else {
         return;
     };
@@ -1492,7 +2130,11 @@ pub(crate) fn queued(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], i
 /// the fridge).
 fn extra_minutes(r: &RecipeDef, step: usize, mask: StationMask, carried: u16) -> f32 {
     let later = &r.steps[(step + 1).min(r.steps.len())..];
-    let trailing = if later.iter().all(|s| s.optional && s.mask & mask == 0) { later.iter().map(|s| s.minutes).sum() } else { 0.0 };
+    let trailing = if later.iter().all(|s| s.optional && s.mask & mask == 0) {
+        later.iter().map(|s| s.minutes).sum()
+    } else {
+        0.0
+    };
     f32::from(carried) + trailing
 }
 
@@ -1500,7 +2142,10 @@ fn extra_minutes(r: &RecipeDef, step: usize, mask: StationMask, carried: u16) ->
 fn face(sim: &mut Sim, ctx: &Ctx, o: &ObjectInstance) {
     let content = ctx.content;
     let c = o.centre(content);
-    sim.yaw = match o.slot_of(sim.id).and_then(|k| surface::at_stand_spot(content, &ctx.nav, o, k, false, sim.pos)) {
+    sim.yaw = match o
+        .slot_of(sim.id)
+        .and_then(|k| surface::at_stand_spot(content, &ctx.nav, o, k, false, sim.pos))
+    {
         Some((_, yaw)) => yaw,
         None => (c[0] - sim.pos[0]).atan2(c[1] - sim.pos[1]),
     };
@@ -1522,23 +2167,67 @@ pub(crate) fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], i
     if spot.is_some_and(|o| objects[o as usize].broken()) {
         end_activity(sim, content, objects);
         return match task.kind {
-            TaskKind::Cook { .. } => cook_next(sim, left_off(task), ctx, objects, items, None, None),
-            TaskKind::Dishes { item, stage, scraps, .. } => {
-                dishes_next(sim, Task { kind: TaskKind::Dishes { item, station: None, stage, scraps }, ..task }, ctx, objects, items, None)
+            TaskKind::Cook { .. } => {
+                cook_next(sim, left_off(task), ctx, objects, items, None, None)
             }
-            TaskKind::Eat { item, .. } => eat_next(sim, Task { kind: TaskKind::Eat { item, seat: None, plate: None, stage: 1 }, ..task }, ctx, objects, items),
+            TaskKind::Dishes {
+                item,
+                stage,
+                scraps,
+                ..
+            } => dishes_next(
+                sim,
+                Task {
+                    kind: TaskKind::Dishes {
+                        item,
+                        station: None,
+                        stage,
+                        scraps,
+                    },
+                    ..task
+                },
+                ctx,
+                objects,
+                items,
+                None,
+            ),
+            TaskKind::Eat { item, .. } => eat_next(
+                sim,
+                Task {
+                    kind: TaskKind::Eat {
+                        item,
+                        seat: None,
+                        plate: None,
+                        stage: 1,
+                    },
+                    ..task
+                },
+                ctx,
+                objects,
+                items,
+            ),
             _ => {}
         };
     }
     match task.kind {
         // At the table with the dish: putting it down (`step_done`).
-        TaskKind::Cook { station: Some(o), .. } if serving(content, &task) => {
+        TaskKind::Cook {
+            station: Some(o), ..
+        } if serving(content, &task) => {
             face(sim, ctx, &objects[o as usize]);
             if let Some(act) = sim.current.as_mut() {
                 act.phase = Phase::Using { elapsed: 0.0 };
             }
         }
-        TaskKind::Cook { recipe, step, station: Some(o), origin, servings, skipped, minutes: carried } => {
+        TaskKind::Cook {
+            recipe,
+            step,
+            station: Some(o),
+            origin,
+            servings,
+            skipped,
+            minutes: carried,
+        } => {
             let r = &content.recipes[recipe];
             // The ingredients are paid for at the first step; if the money ran out, never mind.
             let servings = match servings {
@@ -1548,9 +2237,12 @@ pub(crate) fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], i
                 },
                 n => n,
             };
-            let at_origin = origin.and_then(|o| objects.get(o as usize)).map_or(0, |o| content.objects[o.def].stations);
+            let at_origin = origin
+                .and_then(|o| objects.get(o as usize))
+                .map_or(0, |o| content.objects[o.def].stations);
             let mask = station_mask(sim, ctx, objects) | at_origin;
-            let minutes = r.steps[step as usize].minutes + extra_minutes(r, step as usize, mask, carried);
+            let minutes =
+                r.steps[step as usize].minutes + extra_minutes(r, step as usize, mask, carried);
             face(sim, ctx, &objects[o as usize]);
             let act = sim.current.as_mut().expect("checked above");
             act.task.kind = TaskKind::Cook {
@@ -1564,23 +2256,54 @@ pub(crate) fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], i
             };
             act.phase = Phase::Using { elapsed: 0.0 };
         }
-        TaskKind::Eat { item: Some(id), stage: 0, .. } => {
+        TaskKind::Eat {
+            item: Some(id),
+            stage: 0,
+            ..
+        } => {
             if !take_serving(sim, content, items, id) {
                 sim.current = None;
                 return;
             }
             // The last of it from the fridge: the empty pot comes out too, to be washed up.
-            if items.get(id).is_some_and(|it| matches!(it.at, ItemAt::Stored { .. }) && it.to_clear(content))
+            if items
+                .get(id)
+                .is_some_and(|it| matches!(it.at, ItemAt::Stored { .. }) && it.to_clear(content))
                 && let Some(empty) = items.remove(id)
             {
-                let dirty = Held { servings: 1, ..Held::of(empty.def) };
+                let dirty = Held {
+                    servings: 1,
+                    ..Held::of(empty.def)
+                };
                 let at = place(ctx, objects, empty.household);
-                at.put_down(items, dirty, empty.household, sim.pos, content.cooking.serve_range, false, None, ctx.tick);
+                at.put_down(
+                    items,
+                    dirty,
+                    empty.household,
+                    sim.pos,
+                    content.cooking.serve_range,
+                    false,
+                    None,
+                    ctx.tick,
+                );
             }
-            let next = Task { kind: TaskKind::Eat { item: Some(id), seat: None, plate: None, stage: 1 }, ..task };
+            let next = Task {
+                kind: TaskKind::Eat {
+                    item: Some(id),
+                    seat: None,
+                    plate: None,
+                    stage: 1,
+                },
+                ..task
+            };
             eat_next(sim, next, ctx, objects, items);
         }
-        TaskKind::Eat { item, seat: Some(seat), stage: 1, .. } => {
+        TaskKind::Eat {
+            item,
+            seat: Some(seat),
+            stage: 1,
+            ..
+        } => {
             let o = &objects[seat as usize];
             // They stand back up where they came from (see `end_activity`).
             sim.seated_from = Some(sim.tile());
@@ -1591,20 +2314,50 @@ pub(crate) fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], i
             // The plate goes on the table in front of them.
             let mut plate = None;
             if let Some(held) = sim.held
-                && let Some(spot) = plate_spot(sim, ctx, objects, items, seat, content.items[held.def].radius)
+                && let Some(spot) = plate_spot(
+                    sim,
+                    ctx,
+                    objects,
+                    items,
+                    seat,
+                    content.items[held.def].radius,
+                )
             {
                 let (candidates, household) = dining(sim, ctx);
-                let at = Place { content, objects, lot: ctx.nav.lot, candidates };
-                plate = at.put_down(items, held, household.unwrap_or(sim.household), sim.pos, 1.0, false, Some(spot), ctx.tick);
+                let at = Place {
+                    content,
+                    objects,
+                    lot: ctx.nav.lot,
+                    candidates,
+                };
+                plate = at.put_down(
+                    items,
+                    held,
+                    household.unwrap_or(sim.household),
+                    sim.pos,
+                    1.0,
+                    false,
+                    Some(spot),
+                    ctx.tick,
+                );
                 sim.held = None;
             }
             let act = sim.current.as_mut().expect("checked above");
-            act.task.kind = TaskKind::Eat { item, seat: Some(seat), plate, stage: 1 };
+            act.task.kind = TaskKind::Eat {
+                item,
+                seat: Some(seat),
+                plate,
+                stage: 1,
+            };
             act.phase = Phase::Using { elapsed: 0.0 };
         }
         TaskKind::Dishes { item, stage: 0, .. } => {
             // Everything to clear from the same place, up to an armful.
-            let Some(target) = items.get(item).filter(|it| it.household == sim.household).cloned() else {
+            let Some(target) = items
+                .get(item)
+                .filter(|it| it.household == sim.household)
+                .cloned()
+            else {
                 sim.current = None;
                 return;
             };
@@ -1618,7 +2371,11 @@ pub(crate) fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], i
                 if picked.len() >= usize::from(content.cooking.carry_dishes) {
                     break;
                 }
-                if it.id != item && it.household == sim.household && it.to_clear(content) && same(it) {
+                if it.id != item
+                    && it.household == sim.household
+                    && it.to_clear(content)
+                    && same(it)
+                {
                     picked.push(it.id);
                 }
             }
@@ -1633,18 +2390,36 @@ pub(crate) fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], i
                     carried.get_or_insert(def);
                 }
             }
-            sim.held = carried.map(|def| Held { servings: dirty, ..Held::of(def) });
-            let next = Task { kind: TaskKind::Dishes { item, station: None, stage: 1, scraps }, ..task };
+            sim.held = carried.map(|def| Held {
+                servings: dirty,
+                ..Held::of(def)
+            });
+            let next = Task {
+                kind: TaskKind::Dishes {
+                    item,
+                    station: None,
+                    stage: 1,
+                    scraps,
+                },
+                ..task
+            };
             dishes_next(sim, next, ctx, objects, items, None);
         }
-        TaskKind::Dishes { station: Some(o), .. } => {
+        TaskKind::Dishes {
+            station: Some(o), ..
+        } => {
             face(sim, ctx, &objects[o as usize]);
             if let Some(act) = sim.current.as_mut() {
                 act.phase = Phase::Using { elapsed: 0.0 };
             }
         }
         // Stepped aside to wait for a busy station (`queue`).
-        TaskKind::Cook { station: None, .. } | TaskKind::Dishes { station: None, stage: 2, .. } => {
+        TaskKind::Cook { station: None, .. }
+        | TaskKind::Dishes {
+            station: None,
+            stage: 2,
+            ..
+        } => {
             if let Some(act) = sim.current.as_mut() {
                 act.phase = Phase::Queued { ticks: 0 };
             }
@@ -1654,54 +2429,94 @@ pub(crate) fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], i
 }
 
 /// A tick of cooking, eating or washing up (`minutes` long). Returns whether the step is done.
-pub(crate) fn using(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut Items, elapsed: f32, minutes: f32) -> bool {
+pub(crate) fn using(
+    sim: &mut Sim,
+    ctx: &Ctx,
+    objects: &mut [ObjectInstance],
+    items: &mut Items,
+    elapsed: f32,
+    minutes: f32,
+) -> bool {
     let content = ctx.content;
     let Some(task) = sim.current.as_ref().map(|a| a.task) else {
         return true;
     };
     match task.kind {
-        TaskKind::Cook { recipe, station, origin, minutes: total, .. } => {
+        TaskKind::Cook {
+            recipe,
+            station,
+            origin,
+            minutes: total,
+            ..
+        } => {
             // What cooking does for the cook (fun, a skill), better with good tools (not serving).
-            if let Some(inter) = origin_interaction(content, objects, origin, recipe).filter(|_| !serving(content, &task)) {
-                let tools = station.and_then(|o| objects.get(o as usize)).map_or(1.0, |o| content.object_rules.quality_factor(o.quality));
+            if let Some(inter) = origin_interaction(content, objects, origin, recipe)
+                .filter(|_| !serving(content, &task))
+            {
+                let tools = station
+                    .and_then(|o| objects.get(o as usize))
+                    .map_or(1.0, |o| content.object_rules.quality_factor(o.quality));
                 let boost = tools * inter.skill_factor(&content.skill_rules, &sim.skills);
                 for n in 0..content.needs.len() {
                     let g = inter.gain_per_minute[n];
-                    let g = if g > 0.0 { g * sim.mods.need_gain[n] * boost } else { g };
+                    let g = if g > 0.0 {
+                        g * sim.mods.need_gain[n] * boost
+                    } else {
+                        g
+                    };
                     sim.needs[n] = (sim.needs[n] + g * minutes).clamp(0.0, 1.0);
                 }
                 for s in 0..content.skills.len() {
                     if inter.skill_gain[s] > 0.0 {
-                        crate::world::practise(sim, content, s, inter.skill_gain[s] * boost, minutes);
+                        crate::world::practise(
+                            sim,
+                            content,
+                            s,
+                            inter.skill_gain[s] * boost,
+                            minutes,
+                        );
                     }
                 }
             }
             elapsed >= f32::from(total)
         }
         TaskKind::Eat { plate, .. } => {
-            let food = sim.held.map(|h| (h.recipe, h.quality)).or_else(|| plate.and_then(|p| items.get(p)).map(|it| (it.recipe, it.quality)));
+            let food = sim.held.map(|h| (h.recipe, h.quality)).or_else(|| {
+                plate
+                    .and_then(|p| items.get(p))
+                    .map(|it| (it.recipe, it.quality))
+            });
             let Some((Some(r), quality)) = food else {
                 return true;
             };
             let r = &content.recipes[r];
             for n in 0..content.needs.len() {
                 let g = r.effects[n] * quality / r.eat_minutes;
-                let g = if g > 0.0 { g * sim.mods.need_gain[n] } else { g };
+                let g = if g > 0.0 {
+                    g * sim.mods.need_gain[n]
+                } else {
+                    g
+                };
                 sim.needs[n] = (sim.needs[n] + g * minutes).clamp(0.0, 1.0);
             }
             elapsed >= r.eat_minutes
         }
-        TaskKind::Dishes { stage, scraps, .. } => elapsed >= clearing_minutes(&content.cooking, stage, scraps, sim.held),
+        TaskKind::Dishes { stage, scraps, .. } => {
+            elapsed >= clearing_minutes(&content.cooking, stage, scraps, sim.held)
+        }
         _ => true,
     }
 }
 
 /// Wears a station a little for a finished step (as a finished use does).
 fn wear(sim: &mut Sim, content: &Content, objects: &mut [ObjectInstance], o: u32) {
-    let Some(obj) = objects.get_mut(o as usize) else { return };
+    let Some(obj) = objects.get_mut(o as usize) else {
+        return;
+    };
     let def = &content.objects[obj.def];
     let was = obj.broken();
-    let w = def.wear_per_use * (1.0 - content.object_rules.wear_per_quality * f32::from(obj.quality));
+    let w =
+        def.wear_per_use * (1.0 - content.object_rules.wear_per_quality * f32::from(obj.quality));
     obj.wear = (obj.wear + w.max(0.0)).min(1.0);
     if !was && obj.broken() {
         sim.news = Some(crate::world::News::Broke(o));
@@ -1709,7 +2524,12 @@ fn wear(sim: &mut Sim, content: &Content, objects: &mut [ObjectInstance], o: u32
 }
 
 /// A step is done: on to the next one (another station, sitting down, the sink) or finished.
-pub(crate) fn step_done(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut Items) {
+pub(crate) fn step_done(
+    sim: &mut Sim,
+    ctx: &Ctx,
+    objects: &mut [ObjectInstance],
+    items: &mut Items,
+) {
     let content = ctx.content;
     let Some(task) = sim.current.as_ref().map(|a| a.task) else {
         return;
@@ -1720,18 +2540,48 @@ pub(crate) fn step_done(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance]
             put_dish_down(sim, task, ctx, objects, items, station);
             leave_for_baby(sim, content, objects);
         }
-        TaskKind::Cook { recipe, step, station, origin, servings, skipped, .. } => {
+        TaskKind::Cook {
+            recipe,
+            step,
+            station,
+            origin,
+            servings,
+            skipped,
+            ..
+        } => {
             if let Some(o) = station {
                 objects[o as usize].release(sim.id);
                 wear(sim, content, objects, o);
             }
-            sim.held = content.recipes[recipe].steps[step as usize].holds.map(Held::of);
-            let next = TaskKind::Cook { recipe, step: step + 1, station: None, origin, servings, skipped, minutes: 0 };
-            cook_next(sim, Task { kind: next, ..task }, ctx, objects, items, None, station);
+            sim.held = content.recipes[recipe].steps[step as usize]
+                .holds
+                .map(Held::of);
+            let next = TaskKind::Cook {
+                recipe,
+                step: step + 1,
+                station: None,
+                origin,
+                servings,
+                skipped,
+                minutes: 0,
+            };
+            cook_next(
+                sim,
+                Task { kind: next, ..task },
+                ctx,
+                objects,
+                items,
+                None,
+                station,
+            );
             leave_for_baby(sim, content, objects);
         }
         TaskKind::Eat { seat, plate, .. } => {
-            let food = sim.held.map(|h| (h.recipe, h.quality)).or_else(|| plate.and_then(|p| items.get(p)).map(|it| (it.recipe, it.quality)));
+            let food = sim.held.map(|h| (h.recipe, h.quality)).or_else(|| {
+                plate
+                    .and_then(|p| items.get(p))
+                    .map(|it| (it.recipe, it.quality))
+            });
             if let Some((Some(r), quality)) = food
                 && quality >= 1.0
                 && let Some(f) = content.recipes[r].eat_feeling
@@ -1757,20 +2607,39 @@ pub(crate) fn step_done(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance]
             let held = sim.held.take();
             let spot = held
                 .and_then(|h| content.items[h.def].empty_as)
-                .and_then(|e| seat.and_then(|s| plate_spot(sim, ctx, objects, items, s, content.items[e].radius)));
+                .and_then(|e| {
+                    seat.and_then(|s| {
+                        plate_spot(sim, ctx, objects, items, s, content.items[e].radius)
+                    })
+                });
             // (Standing up first: a plate left on the floor goes where they stand.)
             end_activity(sim, content, objects);
             let (candidates, household) = dining(sim, ctx);
             if let Some(e) = held.and_then(|h| content.items[h.def].empty_as)
                 && let Some(household) = household
             {
-                let dirty = Held { servings: 1, ..Held::of(e) };
+                let dirty = Held {
+                    servings: 1,
+                    ..Held::of(e)
+                };
                 let range = content.cooking.serve_range;
-                let at = Place { content, objects, lot: ctx.nav.lot, candidates };
-                at.put_down(items, dirty, household, sim.pos, range, false, spot, ctx.tick);
+                let at = Place {
+                    content,
+                    objects,
+                    lot: ctx.nav.lot,
+                    candidates,
+                };
+                at.put_down(
+                    items, dirty, household, sim.pos, range, false, spot, ctx.tick,
+                );
             }
         }
-        TaskKind::Dishes { item, station, stage, .. } => {
+        TaskKind::Dishes {
+            item,
+            station,
+            stage,
+            ..
+        } => {
             if stage >= 3 {
                 return end_activity(sim, content, objects);
             }
@@ -1789,13 +2658,25 @@ pub(crate) fn step_done(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance]
                     wear(sim, content, objects, o);
                     // Into a dishwasher's rack: put away when it's emptied, not now.
                     if content.objects[objects[o as usize].def].rack > 0 {
-                        let more = items.list.iter().any(|it| it.household == sim.household && it.to_clear(content) && washed(content, it.def).is_some());
+                        let more = items.list.iter().any(|it| {
+                            it.household == sim.household
+                                && it.to_clear(content)
+                                && washed(content, it.def).is_some()
+                        });
                         crate::machines::rack_in(sim, content, &mut objects[o as usize], n, more);
                         return end_activity(sim, content, objects);
                     }
                 }
             }
-            let next = Task { kind: TaskKind::Dishes { item, station: None, stage: stage + 1, scraps: 0 }, ..task };
+            let next = Task {
+                kind: TaskKind::Dishes {
+                    item,
+                    station: None,
+                    stage: stage + 1,
+                    scraps: 0,
+                },
+                ..task
+            };
             dishes_next(sim, next, ctx, objects, items, None);
         }
         _ => end_activity(sim, content, objects),
@@ -1809,7 +2690,10 @@ pub(crate) fn step_done(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance]
 /// `ROOM_REFRESH_TICKS`) food goes off, dirty things dirty their room and things whose place
 /// is gone go too.
 pub(crate) fn after_step(w: &mut World) {
-    if w.sims.iter().any(|s| s.served.is_some() || s.held.is_some()) {
+    if w.sims
+        .iter()
+        .any(|s| s.served.is_some() || s.held.is_some())
+    {
         w.refresh_index();
         invite(w);
         settle(w);
@@ -1824,11 +2708,24 @@ pub(crate) fn after_step(w: &mut World) {
 fn invite(w: &mut World) {
     let tick = w.tick;
     for i in 0..w.sims.len() {
-        let Some(item) = w.sims[i].served.take() else { continue };
-        let Some(recipe) = w.items.get(item).and_then(|it| it.recipe) else { continue };
+        let Some(item) = w.sims[i].served.take() else {
+            continue;
+        };
+        let Some(recipe) = w.items.get(item).and_then(|it| it.recipe) else {
+            continue;
+        };
         let household = w.sims[i].household;
-        let Some(home) = w.households[household as usize].plot else { continue };
-        let World { sims, objects, content, plots, stairs, .. } = &mut *w;
+        let Some(home) = w.households[household as usize].plot else {
+            continue;
+        };
+        let World {
+            sims,
+            objects,
+            content,
+            plots,
+            stairs,
+            ..
+        } = &mut *w;
         let until = tick + crate::social::minutes_to_ticks(content.cooking.invite_minutes);
         let r = &content.recipes[recipe];
         for (j, s) in sims.iter_mut().enumerate() {
@@ -1850,8 +2747,10 @@ fn invite(w: &mut World) {
             crate::planner::think(s, crate::planner::ThoughtKind::DinnerReady, recipe, tick);
             // Hungry, and only doing something they picked themselves: they come at once.
             let picked = s.current.as_ref().is_some_and(|a| {
-                matches!(a.task.kind, TaskKind::Use { .. } | TaskKind::MoveTo { .. } | TaskKind::Clean { .. })
-                    && a.tags & content.day_rhythm.sleep_tags == 0
+                matches!(
+                    a.task.kind,
+                    TaskKind::Use { .. } | TaskKind::MoveTo { .. } | TaskKind::Clean { .. }
+                ) && a.tags & content.day_rhythm.sleep_tags == 0
             });
             if picked && hungry_for(s, content, r) {
                 end_activity(s, content, objects);
@@ -1869,8 +2768,13 @@ pub(crate) fn settle(w: &mut World) {
         let Some(held) = s.held else { continue };
         let going_on = match &s.current {
             // (A harvest on its way to the fridge too, `carry.rs`.)
-            Some(a) => chain(&a.task.kind) || matches!(a.task.kind, TaskKind::Carry { baby: None, .. }),
-            None => s.queue.front().is_some_and(|t| matches!(t.kind, TaskKind::Cook { .. })),
+            Some(a) => {
+                chain(&a.task.kind) || matches!(a.task.kind, TaskKind::Carry { baby: None, .. })
+            }
+            None => s
+                .queue
+                .front()
+                .is_some_and(|t| matches!(t.kind, TaskKind::Cook { .. })),
         };
         if s.here() && going_on {
             continue;
@@ -1880,8 +2784,15 @@ pub(crate) fn settle(w: &mut World) {
             continue;
         }
         let (household, pos) = (w.sims[i].household, w.sims[i].pos);
-        let candidates = w.households[household as usize].plot.map_or(&[][..], |p| w.object_index.on(p));
-        let at = Place { content: &w.content, objects: &w.objects, lot: &w.lot, candidates };
+        let candidates = w.households[household as usize]
+            .plot
+            .map_or(&[][..], |p| w.object_index.on(p));
+        let at = Place {
+            content: &w.content,
+            objects: &w.objects,
+            lot: &w.lot,
+            candidates,
+        };
         at.put_down(&mut w.items, held, household, pos, 4.0, false, None, w.tick);
     }
 }
@@ -1913,20 +2824,28 @@ fn update(w: &mut World) {
             ItemAt::Floor { .. } => w.lot.in_bounds(x, z),
             _ => crate::items::holder(content, &w.objects, &it.at).is_some(),
         };
-        let lives_here = w.sims.iter().any(|s| s.here() && s.household == it.household);
+        let lives_here = w
+            .sims
+            .iter()
+            .any(|s| s.here() && s.household == it.household);
         let on_home = home.is_some_and(|p| w.plots[p as usize].contains(x, w.stairs.ground_z(z)));
         if !placed || !lives_here || (!on_home && !eaten.contains(&it.id)) {
             changed = true;
             continue;
         }
         if it.edible() {
-            let limit = if matches!(it.at, ItemAt::Stored { .. }) { rules.stored_spoil_minutes } else { rules.spoil_minutes };
+            let limit = if matches!(it.at, ItemAt::Stored { .. }) {
+                rules.stored_spoil_minutes
+            } else {
+                rules.spoil_minutes
+            };
             if (tick.saturating_sub(it.made_at)) as f32 * crate::MINUTES_PER_TICK >= limit {
                 it.spoiled = true;
                 changed = true;
             }
         }
-        if it.to_clear(content) && !matches!(it.at, ItemAt::Stored { .. }) && w.lot.in_bounds(x, z) {
+        if it.to_clear(content) && !matches!(it.at, ItemAt::Stored { .. }) && w.lot.in_bounds(x, z)
+        {
             let t = w.lot.tile_index(x, z);
             w.dirt[t] = (w.dirt[t] + rules.dirty_dirt_per_hour * minutes / 60.0).min(1.0);
             w.room_tiles.touch(t);
@@ -1956,7 +2875,12 @@ impl World {
 
     /// Items `items` (on or in `old`) follow it to where it stands now (`new`, the same object
     /// moved or turned), turning with it.
-    pub(crate) fn carry_items(&mut self, old: &ObjectInstance, new: &ObjectInstance, items: &[u32]) {
+    pub(crate) fn carry_items(
+        &mut self,
+        old: &ObjectInstance,
+        new: &ObjectInstance,
+        items: &[u32],
+    ) {
         let content = &self.content;
         let (from, to) = (old.centre(content), new.centre(content));
         let turn = (i32::from(new.rot) - i32::from(old.rot)).rem_euclid(4);
@@ -1967,7 +2891,10 @@ impl World {
             }
             let c = it.at.centre();
             // Where it stood on the old top, on the new one (as things standing on it move).
-            let p = match (surface::Top::of(content, old), surface::Top::of(content, new)) {
+            let p = match (
+                surface::Top::of(content, old),
+                surface::Top::of(content, new),
+            ) {
                 (Some(a), Some(b)) => b.world(a.local(c)),
                 _ => {
                     let (dx, dz) = (c[0] - from[0], c[1] - from[1]);

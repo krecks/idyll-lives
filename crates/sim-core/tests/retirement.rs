@@ -24,7 +24,11 @@ const CONTENT: &str = r#"{
 
 /// One home with a resident for each of `sims` (their JSON keys besides a name and a place).
 fn town(sims: &[&str]) -> String {
-    let sims: Vec<String> = sims.iter().enumerate().map(|(i, s)| format!(r#"{{"name":"R{i}","x":{}.5,"z":3.5,{s}}}"#, 2 + i)).collect();
+    let sims: Vec<String> = sims
+        .iter()
+        .enumerate()
+        .map(|(i, s)| format!(r#"{{"name":"R{i}","x":{}.5,"z":3.5,{s}}}"#, 2 + i))
+        .collect();
     format!(
         r#"{{"width":12,"depth":10,
         "plots":[{{"name":"Home","x":0,"z":0,"w":12,"d":10,"entry":[6.5,9.5]}}],
@@ -36,7 +40,11 @@ fn town(sims: &[&str]) -> String {
 
 fn world(sims: &[&str]) -> World {
     let mut w = World::from_json(CONTENT, &town(sims), 1).unwrap();
-    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
     w
 }
 
@@ -54,11 +62,16 @@ fn until(w: &mut World, day: u32, hour: f32) {
 }
 
 fn feels_retired(w: &World, i: usize) -> bool {
-    w.sims[i].feelings.iter().any(|f| w.content.feelings[f.def].id == "retired")
+    w.sims[i]
+        .feelings
+        .iter()
+        .any(|f| w.content.feelings[f.def].id == "retired")
 }
 
 fn retired_from_work(w: &World, i: u32) -> bool {
-    w.events.iter().any(|e| e.kind == EventKind::Retired && e.a == i)
+    w.events
+        .iter()
+        .any(|e| e.kind == EventKind::Retired && e.a == i)
 }
 
 #[test]
@@ -66,7 +79,10 @@ fn an_entry_level_worker_retires_with_at_least_the_basic_pension() {
     let mut w = world(&[r#""age":64.5,"job":{"career":"shop","level":0}"#]);
     days(&mut w, 1);
     assert!(w.sims[0].retired && w.sims[0].job.is_none(), "65: retired");
-    assert_eq!(w.sims[0].pension, 150, "the basic pension: 40 % of 100 is less");
+    assert_eq!(
+        w.sims[0].pension, 150,
+        "the basic pension: 40 % of 100 is less"
+    );
     assert!(retired_from_work(&w, 0));
 }
 
@@ -75,28 +91,47 @@ fn a_high_earner_retires_with_their_share_of_their_pay() {
     let mut w = world(&[r#""age":64.5,"job":{"career":"shop","level":1}"#]);
     days(&mut w, 1);
     assert!(w.sims[0].retired && w.sims[0].job.is_none(), "65: retired");
-    assert_eq!(w.sims[0].pension, 400, "40 % of 1,000, more than the basic pension");
+    assert_eq!(
+        w.sims[0].pension, 400,
+        "40 % of 1,000, more than the basic pension"
+    );
 }
 
 #[test]
 fn elders_start_out_retired() {
     // Made at 70 in the household creator (no job), placed at 70 in a job, and 40.
-    let mut w = world(&[r#""age":70"#, r#""age":70,"job":{"career":"shop","level":1}"#, r#""age":40"#]);
+    let mut w = world(&[
+        r#""age":70"#,
+        r#""age":70,"job":{"career":"shop","level":1}"#,
+        r#""age":40"#,
+    ]);
     assert!(w.sims[0].retired && w.sims[0].job.is_none());
-    assert_eq!(w.sims[0].pension, 150, "the basic pension: no job to have a share of");
+    assert_eq!(
+        w.sims[0].pension, 150,
+        "the basic pension: no job to have a share of"
+    );
     assert!(w.sims[1].retired && w.sims[1].job.is_none());
     assert_eq!(w.sims[1].pension, 400, "40 % of the job they were given");
     assert_eq!((w.sims[2].retired, w.sims[2].pension), (false, 0));
     // Moving in at 68 too.
     let spawn = serde_json::from_str(r#"{"name":"Mo","x":8.5,"z":3.5,"age":68}"#).unwrap();
-    w.apply(Command::MoveIn { household: 0, name: None, sims: vec![spawn], bonds: vec![] }).unwrap();
+    w.apply(Command::MoveIn {
+        household: 0,
+        name: None,
+        sims: vec![spawn],
+        bonds: vec![],
+    })
+    .unwrap();
     assert_eq!((w.sims[3].retired, w.sims[3].pension), (true, 150));
     // Nothing to tell: they were retired already. Saved and loaded with their pensions.
     days(&mut w, 2);
     assert!(!w.events.iter().any(|e| e.kind == EventKind::Retired));
     let loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();
     let pensions: Vec<_> = loaded.sims.iter().map(|s| (s.retired, s.pension)).collect();
-    assert_eq!(pensions, [(true, 150), (true, 400), (false, 0), (true, 150)]);
+    assert_eq!(
+        pensions,
+        [(true, 150), (true, 400), (false, 0), (true, 150)]
+    );
 }
 
 #[test]
@@ -107,7 +142,10 @@ fn an_unemployed_resident_retires_at_the_age() {
     assert!(w.sims[0].retired && w.sims[0].age >= 65.0, "65: retired");
     assert_eq!(w.sims[0].pension, 150, "the basic pension");
     assert!(feels_retired(&w, 0));
-    assert!(!retired_from_work(&w, 0), "the story tells of leaving a job; there was none");
+    assert!(
+        !retired_from_work(&w, 0),
+        "the story tells of leaving a job; there was none"
+    );
 }
 
 #[test]
@@ -116,7 +154,12 @@ fn the_job_market_doesnt_hire_from_the_retirement_age() {
     // Short of money: they'd look twice as hard.
     w.households[0].funds = 0;
     // Back to work and out again before the job market opens: 70, out of work, not retired.
-    w.apply(Command::JoinCareer { sim: 0, career: 0, level: 0 }).unwrap();
+    w.apply(Command::JoinCareer {
+        sim: 0,
+        career: 0,
+        level: 0,
+    })
+    .unwrap();
     w.apply(Command::QuitCareer { sim: 0 }).unwrap();
     assert!(!w.sims[0].retired && w.sims[0].job.is_none());
     until(&mut w, 1, 11.0);
@@ -127,16 +170,32 @@ fn the_job_market_doesnt_hire_from_the_retirement_age() {
     assert_eq!((w.sims[0].retired, w.sims[0].pension), (true, 150));
     until(&mut w, 8, 0.5);
     assert!(w.sims[0].job.is_none() && w.sims[0].retired);
-    assert!(!w.events.iter().any(|e| e.kind == EventKind::JobFound && e.a == 0));
+    assert!(
+        !w.events
+            .iter()
+            .any(|e| e.kind == EventKind::JobFound && e.a == 0)
+    );
 }
 
 #[test]
 fn a_job_the_player_gives_a_retiree_sticks() {
     let mut w = world(&[r#""age":70"#]);
-    w.apply(Command::JoinCareer { sim: 0, career: 0, level: 0 }).unwrap();
-    assert_eq!((w.sims[0].retired, w.sims[0].pension), (false, 0), "back to work: no pension");
+    w.apply(Command::JoinCareer {
+        sim: 0,
+        career: 0,
+        level: 0,
+    })
+    .unwrap();
+    assert_eq!(
+        (w.sims[0].retired, w.sims[0].pension),
+        (false, 0),
+        "back to work: no pension"
+    );
     days(&mut w, 4);
-    assert!(w.sims[0].job.is_some(), "still working four midnights later");
+    assert!(
+        w.sims[0].job.is_some(),
+        "still working four midnights later"
+    );
     assert_eq!((w.sims[0].retired, w.sims[0].pension), (false, 0));
     assert!(!retired_from_work(&w, 0));
     // Quitting: retired again at midnight, on the basic pension (40 % of the job is less).
@@ -156,18 +215,28 @@ fn the_basic_pension_pays_for_a_home_of_one() {
     let content = content.to_string();
     let mut town: serde_json::Value = serde_json::from_str(&common::town(&content, 7, 1)).unwrap();
     // Just the player's household in town (faster), alone and 70.
-    town["sims"].as_array_mut().unwrap().retain(|s| s["household"] == 0);
+    town["sims"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|s| s["household"] == 0);
     town["relationships"] = serde_json::json!([]);
     assert_eq!(town["sims"].as_array().unwrap().len(), 1);
     town["sims"][0]["age"] = 70.into();
     let mut w = World::from_json(&content, &town.to_string(), 7).unwrap();
     // (Nobody spends on anything else.)
-    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
     assert!(w.sims[0].retired);
     common::dump_state(&w, "retired-alone");
     let pension = w.sims[0].pension;
     let (rent, bills) = sim_core::life::weekly_costs(&w, 0).unwrap();
-    eprintln!("basic pension {pension} a week; rent {rent} + bills {bills} = {}", rent + bills);
+    eprintln!(
+        "basic pension {pension} a week; rent {rent} + bills {bills} = {}",
+        rent + bills
+    );
     assert_eq!(pension, w.content.life.basic_pension);
     assert!(pension >= rent + bills);
     let funds = w.households[0].funds;
@@ -176,8 +245,17 @@ fn the_basic_pension_pays_for_a_home_of_one() {
     let mut paid = std::collections::HashSet::new();
     for day in [8, 15, 22, 29] {
         until(&mut w, day, 0.0);
-        paid.extend(w.events.iter().filter(|e| e.kind == EventKind::PaidRent).map(|e| e.id));
+        paid.extend(
+            w.events
+                .iter()
+                .filter(|e| e.kind == EventKind::PaidRent)
+                .map(|e| e.id),
+        );
     }
     assert_eq!(paid.len(), 4, "four weeks of rent and bills, all paid");
-    assert!(w.households[0].funds >= funds, "{} after four weeks, from {funds}", w.households[0].funds);
+    assert!(
+        w.households[0].funds >= funds,
+        "{} after four weeks, from {funds}",
+        w.households[0].funds
+    );
 }

@@ -9,7 +9,7 @@
 //! (clockwise front faces).
 
 use super::meshops::smooth_normals;
-use super::np::{gradient, linspace, linspace_open, pairwise_sum, sign, PI, TAU};
+use super::np::{PI, TAU, gradient, linspace, linspace_open, pairwise_sum, sign};
 use super::{M3, V3, v3};
 
 /// A primitive: positions, normals, flat indices and its parameter `t` per vertex.
@@ -25,7 +25,11 @@ pub struct Prim {
 pub fn frame(t: V3, hint: V3) -> (V3, V3) {
     let mut u = hint - t * hint.dot(&t);
     if u.norm() < 1e-6 {
-        u = t.cross(&if t[0].abs() < 0.9 { v3(1.0, 0.0, 0.0) } else { v3(0.0, 1.0, 0.0) });
+        u = t.cross(&if t[0].abs() < 0.9 {
+            v3(1.0, 0.0, 0.0)
+        } else {
+            v3(0.0, 1.0, 0.0)
+        });
     }
     u /= u.norm();
     (u, t.cross(&u))
@@ -33,11 +37,17 @@ pub fn frame(t: V3, hint: V3) -> (V3, V3) {
 
 /// Stacked rings (k rings of `s`), ordered along the axis, closed around; `start` / `end` add a
 /// pole vertex fanned to the first / last ring. Returns pos, idx and the ring index of each vertex.
-pub fn rings_mesh(rings: &[Vec<V3>], start: Option<V3>, end: Option<V3>) -> (Vec<V3>, Vec<usize>, Vec<f64>) {
+pub fn rings_mesh(
+    rings: &[Vec<V3>],
+    start: Option<V3>,
+    end: Option<V3>,
+) -> (Vec<V3>, Vec<usize>, Vec<f64>) {
     let k = rings.len();
     let s = rings[0].len();
     let mut pos: Vec<V3> = rings.iter().flatten().copied().collect();
-    let mut ring: Vec<f64> = (0..k).flat_map(|i| std::iter::repeat_n(i as f64, s)).collect();
+    let mut ring: Vec<f64> = (0..k)
+        .flat_map(|i| std::iter::repeat_n(i as f64, s))
+        .collect();
     let mut idx = Vec::new();
     for i in 0..k - 1 {
         for j in 0..s {
@@ -75,10 +85,18 @@ pub struct Caps {
     pub end: bool,
 }
 
-pub const OPEN: Caps = Caps { rings: 0, start: true, end: true };
+pub const OPEN: Caps = Caps {
+    rings: 0,
+    start: true,
+    end: true,
+};
 
 pub const fn caps(rings: usize) -> Caps {
-    Caps { rings, start: true, end: true }
+    Caps {
+        rings,
+        start: true,
+        end: true,
+    }
 }
 
 /// A tube along `points` with elliptic cross-sections of semi-axes `rx` (along the side vector,
@@ -88,8 +106,16 @@ pub const fn caps(rings: usize) -> Caps {
 pub fn loft(points: &[V3], rx: &[f64], rz: &[f64], segs: usize, hint: V3, cp: Caps) -> Prim {
     let p = points;
     let k = p.len();
-    let rx: Vec<f64> = if rx.len() == 1 { vec![rx[0]; k] } else { rx.to_vec() };
-    let rz: Vec<f64> = if rz.len() == 1 { vec![rz[0]; k] } else { rz.to_vec() };
+    let rx: Vec<f64> = if rx.len() == 1 {
+        vec![rx[0]; k]
+    } else {
+        rx.to_vec()
+    };
+    let rz: Vec<f64> = if rz.len() == 1 {
+        vec![rz[0]; k]
+    } else {
+        rz.to_vec()
+    };
     let tg: Vec<V3> = gradient(p).iter().map(|t| t / t.norm()).collect();
     let seg: Vec<f64> = (0..k - 1).map(|i| (p[i + 1] - p[i]).norm()).collect();
     let l = pairwise_sum(&seg).max(1e-9);
@@ -101,11 +127,16 @@ pub fn loft(points: &[V3], rx: &[f64], rz: &[f64], segs: usize, hint: V3, cp: Ca
     }
     let tt: Vec<f64> = tt.iter().map(|v| v / l).collect();
     let th = linspace_open(0.0, TAU, segs);
-    let (cs, ss): (Vec<f64>, Vec<f64>) = th.iter().map(|&a| (sign(a.cos()) * a.cos().abs(), sign(a.sin()) * a.sin().abs())).unzip();
+    let (cs, ss): (Vec<f64>, Vec<f64>) = th
+        .iter()
+        .map(|&a| (sign(a.cos()) * a.cos().abs(), sign(a.sin()) * a.sin().abs()))
+        .unzip();
     let frames: Vec<(V3, V3)> = (0..k).map(|i| frame(tg[i], hint)).collect();
     let ring = |i: usize, scale: f64, shift: f64| -> Vec<V3> {
         let (u, v) = frames[i];
-        (0..segs).map(|j| p[i] + tg[i] * shift + (u * cs[j] * rx[i] + v * ss[j] * rz[i]) * scale).collect()
+        (0..segs)
+            .map(|j| p[i] + tg[i] * shift + (u * cs[j] * rx[i] + v * ss[j] * rz[i]) * scale)
+            .collect()
     };
     let (mut rings, mut params) = (Vec::new(), Vec::new());
     let caps = cp.rings;
@@ -135,7 +166,15 @@ pub fn loft(points: &[V3], rx: &[f64], rz: &[f64], segs: usize, hint: V3, cp: Ca
     let np_ = params.len();
     let t = ri
         .iter()
-        .map(|&r| if r < 0.0 { params[0] - 0.02 } else if r >= np_ as f64 { params[np_ - 1] + 0.02 } else { params[r as usize] })
+        .map(|&r| {
+            if r < 0.0 {
+                params[0] - 0.02
+            } else if r >= np_ as f64 {
+                params[np_ - 1] + 0.02
+            } else {
+                params[r as usize]
+            }
+        })
         .collect();
     let nor = smooth_normals(&pos, &idx);
     Prim { pos, nor, idx, t }
@@ -151,10 +190,27 @@ pub fn ellipsoid(c: V3, r: V3, lat: usize, lon: usize) -> Prim {
     let th = linspace_open(0.0, TAU, lon);
     let rings: Vec<Vec<V3>> = phi
         .iter()
-        .map(|&p| th.iter().map(|&t| c + v3(p.sin() * t.sin() * r[0], p.cos() * r[1], p.sin() * t.cos() * r[2])).collect())
+        .map(|&p| {
+            th.iter()
+                .map(|&t| {
+                    c + v3(
+                        p.sin() * t.sin() * r[0],
+                        p.cos() * r[1],
+                        p.sin() * t.cos() * r[2],
+                    )
+                })
+                .collect()
+        })
         .collect();
-    let (pos, idx, _) = rings_mesh(&rings, Some(c - v3(0.0, r[1], 0.0)), Some(c + v3(0.0, r[1], 0.0)));
-    let t = pos.iter().map(|p| 1.0 - (p.y - (c.y - r[1])) / (2.0 * r[1])).collect();
+    let (pos, idx, _) = rings_mesh(
+        &rings,
+        Some(c - v3(0.0, r[1], 0.0)),
+        Some(c + v3(0.0, r[1], 0.0)),
+    );
+    let t = pos
+        .iter()
+        .map(|p| 1.0 - (p.y - (c.y - r[1])) / (2.0 * r[1]))
+        .collect();
     let nor = smooth_normals(&pos, &idx);
     Prim { pos, nor, idx, t }
 }
@@ -166,7 +222,11 @@ pub fn rot_x(a: f64) -> M3 {
 
 /// `p @ R.T` of one point.
 pub fn rot(r: &M3, p: V3) -> V3 {
-    v3(p.x * r[(0, 0)] + p.y * r[(0, 1)] + p.z * r[(0, 2)], p.x * r[(1, 0)] + p.y * r[(1, 1)] + p.z * r[(1, 2)], p.x * r[(2, 0)] + p.y * r[(2, 1)] + p.z * r[(2, 2)])
+    v3(
+        p.x * r[(0, 0)] + p.y * r[(0, 1)] + p.z * r[(0, 2)],
+        p.x * r[(1, 0)] + p.y * r[(1, 1)] + p.z * r[(1, 2)],
+        p.x * r[(2, 0)] + p.y * r[(2, 1)] + p.z * r[(2, 2)],
+    )
 }
 
 /// Faces of a sheet through a grid of points (rows, cols): counter-clockwise seen from the side
@@ -192,7 +252,11 @@ pub fn orient(pos: &[V3], idx: Vec<usize>, out: &[V3]) -> Vec<usize> {
         let o = out[t[0]] + out[t[1]] + out[t[2]];
         prods.extend([f.x * o.x, f.y * o.y, f.z * o.z]);
     }
-    if pairwise_sum(&prods) >= 0.0 { idx } else { idx.chunks(3).flat_map(|t| [t[0], t[2], t[1]]).collect() }
+    if pairwise_sum(&prods) >= 0.0 {
+        idx
+    } else {
+        idx.chunks(3).flat_map(|t| [t[0], t[2], t[1]]).collect()
+    }
 }
 
 /// `n` points along a Catmull-Rom curve through `points`, evenly spaced in parameter.
@@ -207,7 +271,11 @@ pub fn spline(points: &[V3], n: usize) -> Vec<V3> {
             let i = (u as usize).min(k - 2);
             let t = u - i as f64;
             let (p0, p1, p2, p3) = (q[i], q[i + 1], q[i + 2], q[i + 3]);
-            ((p1 * 2.0) + (p2 - p0) * t + (p0 * 2.0 - p1 * 5.0 + p2 * 4.0 - p3) * t * t + (p1 * 3.0 - p0 - p2 * 3.0 + p3) * t.powf(3.0)) * 0.5
+            ((p1 * 2.0)
+                + (p2 - p0) * t
+                + (p0 * 2.0 - p1 * 5.0 + p2 * 4.0 - p3) * t * t
+                + (p1 * 3.0 - p0 - p2 * 3.0 + p3) * t.powf(3.0))
+                * 0.5
         })
         .collect()
 }
@@ -215,12 +283,26 @@ pub fn spline(points: &[V3], n: usize) -> Vec<V3> {
 /// A torus round `axis` through `c`: ring radius `big`, tube radius `r`.
 pub fn torus(c: V3, big: f64, r: f64, segs: usize, sides: usize, axis: V3) -> Prim {
     let ax = axis / axis.norm();
-    let (u, v) = frame(ax, if ax[2].abs() < 0.9 { v3(0.0, 0.0, 1.0) } else { v3(1.0, 0.0, 0.0) });
+    let (u, v) = frame(
+        ax,
+        if ax[2].abs() < 0.9 {
+            v3(0.0, 0.0, 1.0)
+        } else {
+            v3(1.0, 0.0, 0.0)
+        },
+    );
     let a = linspace_open(0.0, TAU, segs);
     let bb = linspace_open(0.0, TAU, sides);
     let rz = r;
     let d: Vec<V3> = a.iter().map(|&a| u * a.cos() + v * a.sin()).collect();
-    let p: Vec<Vec<V3>> = d.iter().map(|di| bb.iter().map(|&b| c + di * (big + b.cos() * r) + ax * b.sin() * rz).collect()).collect();
+    let p: Vec<Vec<V3>> = d
+        .iter()
+        .map(|di| {
+            bb.iter()
+                .map(|&b| c + di * (big + b.cos() * r) + ax * b.sin() * rz)
+                .collect()
+        })
+        .collect();
     let (pos, mut idx) = grid(&p, true);
     // Close the ring of tubes too.
     for l in 0..sides {
@@ -228,11 +310,20 @@ pub fn torus(c: V3, big: f64, r: f64, segs: usize, sides: usize, axis: V3) -> Pr
         let (a_, b_, c_, d_) = ((segs - 1) * sides + l, (segs - 1) * sides + j1, j1, l);
         idx.extend([a_, b_, c_, a_, c_, d_]);
     }
-    let out: Vec<V3> = pos.iter().enumerate().map(|(i, q)| q - (c + d[i / sides] * big)).collect();
+    let out: Vec<V3> = pos
+        .iter()
+        .enumerate()
+        .map(|(i, q)| q - (c + d[i / sides] * big))
+        .collect();
     let idx = orient(&pos, idx, &out);
     assert_eq!(pos.len(), segs * sides);
     let nor = smooth_normals(&pos, &idx);
-    Prim { pos, nor, idx, t: Vec::new() }
+    Prim {
+        pos,
+        nor,
+        idx,
+        t: Vec::new(),
+    }
 }
 
 /// Seeded smooth value noise (-1..1) at `p`, features about 1 / `scale` apart (int64 hashing,
@@ -243,7 +334,10 @@ pub fn noise3(p: V3, seed: i64, scale: f64) -> f64 {
     let f = v3(q.x - i.x as f64, q.y - i.y as f64, q.z - i.z as f64);
     let f = f.map(|f| f * f * (3.0 - 2.0 * f));
     let h = |x: i64, y: i64, z: i64| -> f64 {
-        let v = x.wrapping_mul(73856093) ^ y.wrapping_mul(19349663) ^ z.wrapping_mul(83492791) ^ seed.wrapping_mul(2654435761);
+        let v = x.wrapping_mul(73856093)
+            ^ y.wrapping_mul(19349663)
+            ^ z.wrapping_mul(83492791)
+            ^ seed.wrapping_mul(2654435761);
         let v = (v ^ (v >> 13)).wrapping_mul(1274126177);
         ((v ^ (v >> 16)) & 0xFFFF) as f64 / 32767.5 - 1.0
     };
@@ -251,7 +345,9 @@ pub fn noise3(p: V3, seed: i64, scale: f64) -> f64 {
     for dx in 0..2 {
         for dy in 0..2 {
             for dz in 0..2 {
-                let w = (if dx == 1 { f.x } else { 1.0 - f.x }) * (if dy == 1 { f.y } else { 1.0 - f.y }) * (if dz == 1 { f.z } else { 1.0 - f.z });
+                let w = (if dx == 1 { f.x } else { 1.0 - f.x })
+                    * (if dy == 1 { f.y } else { 1.0 - f.y })
+                    * (if dz == 1 { f.z } else { 1.0 - f.z });
                 out += w * h(i.x + dx, i.y + dy, i.z + dz);
             }
         }

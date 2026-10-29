@@ -49,7 +49,11 @@ fn world_at(hour: f32) -> World {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
     set_hour(&mut w, hour);
     for lamp in [A[0], A[1], B, GARDEN] {
-        w.apply(Command::SwitchLamp { object: lamp, on: false }).unwrap();
+        w.apply(Command::SwitchLamp {
+            object: lamp,
+            on: false,
+        })
+        .unwrap();
     }
     w.sims[0].needs[0] = 1.0;
     tick(&mut w, 1);
@@ -80,45 +84,113 @@ fn the_player_switches_a_lamp() {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
     assert!(w.objects.iter().all(|o| !o.off), "bought on");
     let (structure, lights) = (w.structure_version(), w.lights_version());
-    w.apply(Command::SwitchLamp { object: B, on: false }).unwrap();
+    w.apply(Command::SwitchLamp {
+        object: B,
+        on: false,
+    })
+    .unwrap();
     assert!(!on(&w, B));
     assert_eq!(lights::lamps_off(&w), vec![B]);
     assert_ne!(w.lights_version(), lights, "the renderer is told");
-    assert_eq!(w.structure_version(), structure, "without rebuilding the house");
+    assert_eq!(
+        w.structure_version(),
+        structure,
+        "without rebuilding the house"
+    );
 
     let w2 = common::reload(&w, CONTENT);
     assert!(!on(&w2, B), "still off after loading");
     assert!(on(&w2, A[0]));
 
-    w.apply(Command::SwitchLamp { object: B, on: true }).unwrap();
+    w.apply(Command::SwitchLamp {
+        object: B,
+        on: true,
+    })
+    .unwrap();
     assert!(on(&w, B));
-    let fire = w.apply(Command::SwitchLamp { object: FIRE, on: false });
-    assert!(fire.is_err_and(|e| e.to_string().contains("no switch")), "a light with no switch isn't a lamp");
-    assert!(w.apply(Command::SwitchLamp { object: BED, on: false }).is_err(), "nor is a bed");
+    let fire = w.apply(Command::SwitchLamp {
+        object: FIRE,
+        on: false,
+    });
+    assert!(
+        fire.is_err_and(|e| e.to_string().contains("no switch")),
+        "a light with no switch isn't a lamp"
+    );
+    assert!(
+        w.apply(Command::SwitchLamp {
+            object: BED,
+            on: false
+        })
+        .is_err(),
+        "nor is a bed"
+    );
 }
 
 #[test]
 fn a_lamp_switched_off_stays_off_moved_undone_and_redone() {
     let mut w = world_at(12.0);
-    let moved = |w: &World| w.objects.iter().find(|o| o.def == w.objects[GARDEN as usize].def && (o.x, o.z) == (11, 9)).map(|o| o.id);
-    w.apply(Command::MoveObject { household: 0, object: GARDEN, x: 11, z: 9, rot: 0, turn: None, offset: None, size: None, tall: None }).unwrap();
+    let moved = |w: &World| {
+        w.objects
+            .iter()
+            .find(|o| o.def == w.objects[GARDEN as usize].def && (o.x, o.z) == (11, 9))
+            .map(|o| o.id)
+    };
+    w.apply(Command::MoveObject {
+        household: 0,
+        object: GARDEN,
+        x: 11,
+        z: 9,
+        rot: 0,
+        turn: None,
+        offset: None,
+        size: None,
+        tall: None,
+    })
+    .unwrap();
     let lamp = moved(&w).expect("moved");
     assert!(!on(&w, lamp), "moving it doesn't turn it on");
     assert!(lights::lamps_off(&w).contains(&lamp));
     w.apply(Command::Undo { household: 0 }).unwrap();
-    assert!(moved(&w).is_none() && !on(&w, GARDEN), "back where it was, off");
+    assert!(
+        moved(&w).is_none() && !on(&w, GARDEN),
+        "back where it was, off"
+    );
     w.apply(Command::Redo { household: 0 }).unwrap();
-    assert!(!on(&w, moved(&w).expect("moved again")), "moved again, still off");
+    assert!(
+        !on(&w, moved(&w).expect("moved again")),
+        "moved again, still off"
+    );
 
     // A room moved with its lamps: they stay as they were.
-    w.apply(Command::SwitchLamp { object: A[1], on: true }).unwrap();
-    w.apply(Command::MoveRoom { household: 0, x: 6, z: 3, dx: 0, dz: 5 }).unwrap_or_else(|e| panic!("{e}"));
-    let b = w.objects.iter().find(|o| (o.x, o.z) == (8, 6)).expect("B's lamp moved with its room");
+    w.apply(Command::SwitchLamp {
+        object: A[1],
+        on: true,
+    })
+    .unwrap();
+    w.apply(Command::MoveRoom {
+        household: 0,
+        x: 6,
+        z: 3,
+        dx: 0,
+        dz: 5,
+    })
+    .unwrap_or_else(|e| panic!("{e}"));
+    let b = w
+        .objects
+        .iter()
+        .find(|o| (o.x, o.z) == (8, 6))
+        .expect("B's lamp moved with its room");
     assert!(b.off, "B's lamp is still off");
     assert!(on(&w, A[1]) && !on(&w, A[0]), "A's are as they were");
     w.apply(Command::Undo { household: 0 }).unwrap();
     w.apply(Command::Redo { household: 0 }).unwrap();
-    assert!(w.objects.iter().find(|o| (o.x, o.z) == (8, 6)).is_some_and(|o| o.off), "and after undo and redo");
+    assert!(
+        w.objects
+            .iter()
+            .find(|o| (o.x, o.z) == (8, 6))
+            .is_some_and(|o| o.off),
+        "and after undo and redo"
+    );
 }
 
 #[test]
@@ -128,7 +200,10 @@ fn coming_in_after_dark_turns_the_room_on_and_leaving_turns_it_off() {
     assert!(!on(&w, GARDEN), "the garden is the player's");
 
     go(&mut w, IN_A);
-    assert!(A.iter().all(|&l| on(&w, l)), "both of room A's lamps go on as Ada comes in");
+    assert!(
+        A.iter().all(|&l| on(&w, l)),
+        "both of room A's lamps go on as Ada comes in"
+    );
     assert!(!on(&w, B), "not the next room's");
 
     go(&mut w, IN_B);
@@ -136,22 +211,43 @@ fn coming_in_after_dark_turns_the_room_on_and_leaving_turns_it_off() {
     assert!(on(&w, B), "on in B");
 
     // The player turns B's lamp off with Ada in there: it stays off while she stays.
-    w.apply(Command::SwitchLamp { object: B, on: false }).unwrap();
+    w.apply(Command::SwitchLamp {
+        object: B,
+        on: false,
+    })
+    .unwrap();
     tick(&mut w, 10);
-    assert!(!on(&w, B), "what the player set stays until someone comes or goes");
-    w.apply(Command::SwitchLamp { object: B, on: true }).unwrap();
+    assert!(
+        !on(&w, B),
+        "what the player set stays until someone comes or goes"
+    );
+    w.apply(Command::SwitchLamp {
+        object: B,
+        on: true,
+    })
+    .unwrap();
 
     go(&mut w, OUTSIDE);
     assert!(!on(&w, B), "off as she goes out");
-    assert!(!on(&w, GARDEN), "the garden lamp stays as the player left it");
+    assert!(
+        !on(&w, GARDEN),
+        "the garden lamp stays as the player left it"
+    );
 }
 
 #[test]
 fn a_room_with_a_lamp_on_is_left_as_it_is() {
     let mut w = world_at(21.0);
-    w.apply(Command::SwitchLamp { object: A[0], on: true }).unwrap();
+    w.apply(Command::SwitchLamp {
+        object: A[0],
+        on: true,
+    })
+    .unwrap();
     go(&mut w, IN_A);
-    assert!(on(&w, A[0]) && !on(&w, A[1]), "it isn't dark: the other lamp stays off");
+    assert!(
+        on(&w, A[0]) && !on(&w, A[1]),
+        "it isn't dark: the other lamp stays off"
+    );
 }
 
 #[test]
@@ -161,19 +257,27 @@ fn by_day_nothing_goes_on_until_it_gets_dark() {
     assert!(A.iter().all(|&l| !on(&w, l)), "no lamps by day");
     set_hour(&mut w, 18.9);
     tick(&mut w, 10);
-    assert!(A.iter().all(|&l| on(&w, l)), "on as night falls, Ada in the room");
+    assert!(
+        A.iter().all(|&l| on(&w, l)),
+        "on as night falls, Ada in the room"
+    );
     assert!(!on(&w, B), "not in the empty room");
 }
 
 #[test]
 fn a_room_without_windows_is_dark_by_day() {
     let mut w = world_at(12.0);
-    assert!(lights::windowless(&w, w.lot.room_at(6, 3)) && !lights::windowless(&w, w.lot.room_at(3, 3)));
+    assert!(
+        lights::windowless(&w, w.lot.room_at(6, 3)) && !lights::windowless(&w, w.lot.room_at(3, 3))
+    );
     go(&mut w, IN_B);
     assert!(on(&w, B), "on as Ada comes into B by day");
     go(&mut w, IN_A);
     assert!(!on(&w, B), "off as she leaves");
-    assert!(A.iter().all(|&l| !on(&w, l)), "A has a window: no lamps by day");
+    assert!(
+        A.iter().all(|&l| !on(&w, l)),
+        "A has a window: no lamps by day"
+    );
 }
 
 #[test]
@@ -182,7 +286,12 @@ fn going_to_sleep_turns_the_room_off_and_waking_on_again() {
     go(&mut w, IN_B);
     assert!(on(&w, B));
     w.sims[0].needs[0] = 0.0;
-    w.apply(Command::Use { sim: 0, object: BED, interaction: 0 }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: BED,
+        interaction: 0,
+    })
+    .unwrap();
     let mut slept = false;
     for _ in 0..30 * TICKS_PER_MINUTE {
         w.tick_once();
@@ -198,16 +307,27 @@ fn going_to_sleep_turns_the_room_off_and_waking_on_again() {
     w.apply(Command::Cancel { sim: 0, index: 0 }).unwrap();
     w.sims[0].needs[0] = 1.0;
     tick(&mut w, 1);
-    assert!(!w.sims[0].asleep(&w.content) && on(&w, B), "and the light is on again: it's still night");
+    assert!(
+        !w.sims[0].asleep(&w.content) && on(&w, B),
+        "and the light is on again: it's still night"
+    );
 }
 
 #[test]
 fn without_free_will_the_lights_stay_as_they_were() {
     let mut w = world_at(21.0);
-    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
     go(&mut w, IN_A);
     assert!(A.iter().all(|&l| !on(&w, l)), "nobody switches them on");
-    w.apply(Command::SwitchLamp { object: A[0], on: true }).unwrap();
+    w.apply(Command::SwitchLamp {
+        object: A[0],
+        on: true,
+    })
+    .unwrap();
     go(&mut w, OUTSIDE);
     assert!(on(&w, A[0]), "nor off");
 }
@@ -228,15 +348,36 @@ fn shipped_lamps_at_night() {
                    {"def":"fireplace","x":4,"z":1}],
         "sims":[{"name":"Ada","x":3.5,"z":4.5,"traits":["neat"]}]}"#;
     let mut w = World::from_json(&content, town, 1).unwrap();
-    let fire = w.objects.iter().position(|o| w.content.objects[o.def].id == "fireplace").unwrap();
-    assert!(lights::switchable(&w, w.objects[fire].def) && w.content.objects[w.objects[fire].def].fire, "a fire is lit and put out");
-    for id in ["lamp", "wallSconce", "ceilingPendant", "lampFloorArc", "lampTableRound", "nightstandLamp", "lampPost", "firePit", "fireplaceElectric"] {
+    let fire = w
+        .objects
+        .iter()
+        .position(|o| w.content.objects[o.def].id == "fireplace")
+        .unwrap();
+    assert!(
+        lights::switchable(&w, w.objects[fire].def) && w.content.objects[w.objects[fire].def].fire,
+        "a fire is lit and put out"
+    );
+    for id in [
+        "lamp",
+        "wallSconce",
+        "ceilingPendant",
+        "lampFloorArc",
+        "lampTableRound",
+        "nightstandLamp",
+        "lampPost",
+        "firePit",
+        "fireplaceElectric",
+    ] {
         let def = w.content.object_index(id).unwrap();
         assert!(lights::switchable(&w, def), "{id} switches");
     }
     set_hour(&mut w, 21.0);
     for lamp in 3..6 {
-        w.apply(Command::SwitchLamp { object: lamp, on: false }).unwrap();
+        w.apply(Command::SwitchLamp {
+            object: lamp,
+            on: false,
+        })
+        .unwrap();
     }
     tick(&mut w, 1);
     assert!((0..3).all(|l| on(&w, l)) && (3..6).all(|l| !on(&w, l)));
@@ -254,20 +395,31 @@ fn a_lamp_bought_is_off_until_someone_comes_in() {
     let mut w = world_at(21.0);
     let version = w.lights_version();
     let lamp = buy(&mut w, "lamp", 3, 3);
-    assert!(!on(&w, lamp), "a new lamp comes switched off, even at night");
+    assert!(
+        !on(&w, lamp),
+        "a new lamp comes switched off, even at night"
+    );
     assert!(lights::lamps_off(&w).contains(&w.objects[lamp as usize].stable));
     assert_ne!(w.lights_version(), version, "the renderer is told");
     tick(&mut w, 10);
     assert!(!on(&w, lamp), "nobody came in: it stays off");
     go(&mut w, IN_A);
-    assert!(on(&w, lamp) && A.iter().all(|&l| on(&w, l)), "on with the rest as Ada comes in");
+    assert!(
+        on(&w, lamp) && A.iter().all(|&l| on(&w, l)),
+        "on with the rest as Ada comes in"
+    );
     let w2 = common::reload(&w, CONTENT);
     assert!(on(&w2, lamp), "saved on");
 }
 
 /// Ada goes and sits down by `fire` (and stays there a minute).
 fn warm_up(w: &mut World, fire: u32) {
-    w.apply(Command::Use { sim: 0, object: fire, interaction: 0 }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: fire,
+        interaction: 0,
+    })
+    .unwrap();
     let [x, z] = w.objects[fire as usize].centre(&w.content);
     let at = |w: &World| (w.sims[0].pos[0] - x).hypot(w.sims[0].pos[1] - z) < 1.2;
     for _ in 0..20 {
@@ -285,18 +437,30 @@ fn a_fire_is_lit_to_sit_by_and_burns_down_by_morning() {
     let mut w = world_at(21.0);
     let hearth = buy(&mut w, "hearth", 3, 1);
     assert!(!on(&w, hearth), "bought unlit");
-    assert!(lights::switchable(&w, w.objects[hearth as usize].def), "the player can light it and put it out");
+    assert!(
+        lights::switchable(&w, w.objects[hearth as usize].def),
+        "the player can light it and put it out"
+    );
     go(&mut w, IN_A);
-    assert!(A.iter().all(|&l| on(&w, l)), "the lamps go on as Ada comes in");
+    assert!(
+        A.iter().all(|&l| on(&w, l)),
+        "the lamps go on as Ada comes in"
+    );
     assert!(!on(&w, hearth), "nobody lights a fire just for coming in");
 
     let version = w.lights_version();
     warm_up(&mut w, hearth);
-    assert!(on(&w, hearth), "sitting down by it in the dark, she lights it");
+    assert!(
+        on(&w, hearth),
+        "sitting down by it in the dark, she lights it"
+    );
     assert_ne!(w.lights_version(), version, "the renderer is told");
     w.apply(Command::Cancel { sim: 0, index: 0 }).unwrap();
     go(&mut w, OUTSIDE);
-    assert!(!on(&w, hearth) && A.iter().all(|&l| !on(&w, l)), "put out with the lamps as she leaves the room");
+    assert!(
+        !on(&w, hearth) && A.iter().all(|&l| !on(&w, l)),
+        "put out with the lamps as she leaves the room"
+    );
 
     // Lit again and left burning with Ada in the room: by morning it has burnt down.
     warm_up(&mut w, hearth);
@@ -315,6 +479,10 @@ fn a_fire_sat_by_in_daylight_isnt_lit() {
     let hearth = buy(&mut w, "hearth", 3, 1);
     warm_up(&mut w, hearth);
     assert!(!on(&w, hearth), "no fire wanted by day");
-    w.apply(Command::SwitchLamp { object: hearth, on: true }).unwrap();
+    w.apply(Command::SwitchLamp {
+        object: hearth,
+        on: true,
+    })
+    .unwrap();
     assert!(on(&w, hearth), "unless the player lights it");
 }

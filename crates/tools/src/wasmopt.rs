@@ -35,7 +35,11 @@ const FEATURES: [&str; 9] = [
 fn flags(names: bool) -> Vec<String> {
     let mut out: Vec<String> = FEATURES.iter().map(|s| s.to_string()).collect();
     out.push("-O3".into());
-    out.push(if names { "-g".into() } else { "--strip-debug".into() });
+    out.push(if names {
+        "-g".into()
+    } else {
+        "--strip-debug".into()
+    });
     out.push("--strip-producers".into());
     out
 }
@@ -59,8 +63,10 @@ fn binaryen() -> Result<PathBuf, String> {
 }
 
 fn binaryen_version(dir: &Path) -> Result<String, String> {
-    let text = std::fs::read_to_string(dir.join("package.json")).map_err(|e| format!("binaryen/package.json: {e}"))?;
-    let meta: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("binaryen/package.json: {e}"))?;
+    let text = std::fs::read_to_string(dir.join("package.json"))
+        .map_err(|e| format!("binaryen/package.json: {e}"))?;
+    let meta: serde_json::Value =
+        serde_json::from_str(&text).map_err(|e| format!("binaryen/package.json: {e}"))?;
     Ok(meta["version"].as_str().unwrap_or("?").to_string())
 }
 
@@ -78,7 +84,10 @@ pub fn optimize(path: &Path, names: bool) -> Result<Optimized, String> {
     let version = binaryen_version(&binaryen)?;
     let flags = flags(names);
     let name = strip_hash(path);
-    let dir = web().join(".assets").join("wasm-opt").join(if names { "names" } else { "release" });
+    let dir = web()
+        .join(".assets")
+        .join("wasm-opt")
+        .join(if names { "names" } else { "release" });
     let input = std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let mut hash = Sha256::new();
     hash.update(&input);
@@ -91,9 +100,17 @@ pub fn optimize(path: &Path, names: bool) -> Result<Optimized, String> {
         // Exactly `name-<key>`: another file's name may start with this one's.
         for entry in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
             let file = entry.file_name().to_string_lossy().into_owned();
-            let Some(rest) = file.strip_prefix(&format!("{name}-")) else { continue };
-            let stem = rest.strip_suffix(".wasm").or_else(|| rest.strip_suffix(".wasm.part"));
-            if stem.is_some_and(|s| s.len() == 16 && s.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())) {
+            let Some(rest) = file.strip_prefix(&format!("{name}-")) else {
+                continue;
+            };
+            let stem = rest
+                .strip_suffix(".wasm")
+                .or_else(|| rest.strip_suffix(".wasm.part"));
+            if stem.is_some_and(|s| {
+                s.len() == 16
+                    && s.chars()
+                        .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+            }) {
                 crate::download::remove(&entry.path());
             }
         }
@@ -104,8 +121,14 @@ pub fn optimize(path: &Path, names: bool) -> Result<Optimized, String> {
     let part = with_suffix(path, ".part");
     std::fs::copy(&cached, &part).map_err(|e| format!("{}: {e}", part.display()))?;
     std::fs::rename(&part, path).map_err(|e| format!("{}: {e}", path.display()))?;
-    let after = std::fs::metadata(path).map_err(|e| format!("{}: {e}", path.display()))?.len();
-    Ok(Optimized { before: input.len() as u64, after, cached: hit })
+    let after = std::fs::metadata(path)
+        .map_err(|e| format!("{}: {e}", path.display()))?
+        .len();
+    Ok(Optimized {
+        before: input.len() as u64,
+        after,
+        cached: hit,
+    })
 }
 
 /// binaryen's `bin/wasm-opt` is a Node script: run it as one, or as the shell would (its shebang),
@@ -124,7 +147,11 @@ fn run_wasm_opt(script: &Path, flags: &[String], input: &Path, out: &Path) -> Re
         let result = cmd.args(flags).arg(input).arg("-o").arg(out).output();
         match result {
             Ok(o) if o.status.success() => return Ok(()),
-            Ok(o) => errors.push(format!("{}: {}", runner.unwrap_or("wasm-opt"), String::from_utf8_lossy(&o.stderr).trim())),
+            Ok(o) => errors.push(format!(
+                "{}: {}",
+                runner.unwrap_or("wasm-opt"),
+                String::from_utf8_lossy(&o.stderr).trim()
+            )),
             Err(e) => errors.push(format!("{}: {e}", runner.unwrap_or("wasm-opt"))),
         }
         let _ = std::fs::remove_file(out);
@@ -140,17 +167,29 @@ fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
 
 /// `sim_wasm_bg-1a2b3c4d.wasm` and `sim_wasm_bg.wasm` are both `sim_wasm_bg`.
 fn strip_hash(path: &Path) -> String {
-    let file = path.file_name().unwrap_or_default().to_string_lossy().into_owned();
+    let file = path
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .into_owned();
     let stem = file.strip_suffix(".wasm").unwrap_or(&file);
     match stem.rsplit_once('-') {
-        Some((base, hash)) if hash.len() == 8 && hash.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') => base.to_string(),
+        Some((base, hash))
+            if hash.len() == 8 && hash.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') =>
+        {
+            base.to_string()
+        }
         _ => stem.to_string(),
     }
 }
 
 pub fn main_with(args: &[String]) -> i32 {
     let names = args.first().is_some_and(|a| a == "--names");
-    let files: Vec<&String> = if names { args[1..].iter().collect() } else { args.iter().collect() };
+    let files: Vec<&String> = if names {
+        args[1..].iter().collect()
+    } else {
+        args.iter().collect()
+    };
     if files.is_empty() {
         eprintln!("usage: cargo wasm-opt [--names] <file.wasm>...");
         return 2;
@@ -163,18 +202,25 @@ pub fn main_with(args: &[String]) -> i32 {
                 scope.spawn(move || {
                     let start = std::time::Instant::now();
                     let path = Path::new(file.as_str());
-                    optimize(path, names).map(|o| ((*file).clone(), o, start.elapsed().as_secs_f64()))
+                    optimize(path, names)
+                        .map(|o| ((*file).clone(), o, start.elapsed().as_secs_f64()))
                 })
             })
             .collect();
-        handles.into_iter().map(|h| h.join().unwrap_or_else(|_| Err("wasm-opt panicked".into()))).collect()
+        handles
+            .into_iter()
+            .map(|h| h.join().unwrap_or_else(|_| Err("wasm-opt panicked".into())))
+            .collect()
     });
     let mut failed = false;
     for result in results {
         match result {
             Ok((file, o, secs)) => {
                 let cached = if o.cached { " (cached)" } else { "" };
-                println!("wasm-opt {file}: {} -> {} bytes{cached}, {secs:.1} s", o.before, o.after);
+                println!(
+                    "wasm-opt {file}: {} -> {} bytes{cached}, {secs:.1} s",
+                    o.before, o.after
+                );
             }
             Err(e) => {
                 eprintln!("{e}");
@@ -191,9 +237,15 @@ mod tests {
 
     #[test]
     fn the_cache_name_drops_the_hash() {
-        assert_eq!(strip_hash(Path::new("dist/assets/sim_wasm_bg-1a2b3c4d.wasm")), "sim_wasm_bg");
+        assert_eq!(
+            strip_hash(Path::new("dist/assets/sim_wasm_bg-1a2b3c4d.wasm")),
+            "sim_wasm_bg"
+        );
         assert_eq!(strip_hash(Path::new("sim_wasm_bg.wasm")), "sim_wasm_bg");
-        assert_eq!(strip_hash(Path::new("voice_wasm_bg-deadbeef.wasm")), "voice_wasm_bg");
+        assert_eq!(
+            strip_hash(Path::new("voice_wasm_bg-deadbeef.wasm")),
+            "voice_wasm_bg"
+        );
     }
 
     #[test]

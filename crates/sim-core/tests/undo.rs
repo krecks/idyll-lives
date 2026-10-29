@@ -28,7 +28,11 @@ const TOWN: &str = r#"{"width":12,"depth":12,
 
 fn world() -> World {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
-    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
     w.apply(Command::SetSpeed { speed: 0 }).unwrap();
     w
 }
@@ -67,10 +71,18 @@ fn undoing_a_sale_puts_the_object_back_in_its_place_and_takes_the_money_back() {
     buy(&mut w, "lamp", 3, 1);
     buy(&mut w, "chair", 5, 1);
     let before = (objects(&w), funds(&w));
-    w.apply(Command::Sell { household: 0, object: 1 }).unwrap();
+    w.apply(Command::Sell {
+        household: 0,
+        object: 1,
+    })
+    .unwrap();
     assert_eq!(w.objects.len(), 2);
     undo(&mut w);
-    assert_eq!((objects(&w), funds(&w)), before, "same objects, same ids, same money");
+    assert_eq!(
+        (objects(&w), funds(&w)),
+        before,
+        "same objects, same ids, same money"
+    );
     let version = w.structure_version();
     // Undo again: the second chair goes, then the lamp, then the first chair.
     undo(&mut w);
@@ -106,7 +118,11 @@ fn undo_reverses_moves_walls_and_floors_one_step_at_a_time() {
         edits.push(EdgeEdit::new(EdgeAxis::V, 1, z, EdgeKind::Wall));
         edits.push(EdgeEdit::new(EdgeAxis::V, 4, z, EdgeKind::Wall));
     }
-    w.apply(Command::Build { household: 0, edits }).unwrap();
+    w.apply(Command::Build {
+        household: 0,
+        edits,
+    })
+    .unwrap();
     w.apply(Command::PaintFloor {
         household: 0,
         tiles: vec![FloorPaint {
@@ -135,8 +151,8 @@ fn edits_that_change_nothing_or_fail_leave_no_step() {
     let mut w = world();
     buy(&mut w, "chair", 1, 1);
     // Painting a floor outdoors fails; selling something unknown fails.
-    assert!(w
-        .apply(Command::PaintFloor {
+    assert!(
+        w.apply(Command::PaintFloor {
             household: 0,
             tiles: vec![FloorPaint {
                 x: 6,
@@ -144,8 +160,15 @@ fn edits_that_change_nothing_or_fail_leave_no_step() {
                 covering: 1
             }]
         })
-        .is_err());
-    assert!(w.apply(Command::Sell { household: 0, object: 9 }).is_err());
+        .is_err()
+    );
+    assert!(
+        w.apply(Command::Sell {
+            household: 0,
+            object: 9
+        })
+        .is_err()
+    );
     // Building nothing changes nothing.
     w.apply(Command::Build {
         household: 0,
@@ -248,18 +271,32 @@ fn the_lot_version_moves_only_with_the_lot() {
     let v = w.lot_version();
     buy(&mut w, "chair", 1, 1);
     assert_eq!(w.lot_version(), v, "furniture leaves the lot as it is");
-    w.apply(Command::Build { household: 0, edits: vec![EdgeEdit::new(EdgeAxis::H, 6, 6, EdgeKind::Wall)] }).unwrap();
+    w.apply(Command::Build {
+        household: 0,
+        edits: vec![EdgeEdit::new(EdgeAxis::H, 6, 6, EdgeKind::Wall)],
+    })
+    .unwrap();
     let built = w.lot_version();
     assert!(built > v);
-    w.apply(Command::PaintFloor { household: 0, tiles: vec![] }).unwrap();
+    w.apply(Command::PaintFloor {
+        household: 0,
+        tiles: vec![],
+    })
+    .unwrap();
     assert_eq!(w.lot_version(), built, "an edit that changes nothing");
     undo(&mut w);
-    assert!(w.lot_version() > built, "undoing the wall changes the lot again");
+    assert!(
+        w.lot_version() > built,
+        "undoing the wall changes the lot again"
+    );
     let undone = w.lot_version();
     undo(&mut w);
     assert_eq!(w.lot_version(), undone, "undoing the chair doesn't");
-    let lean: serde_json::Value = serde_json::from_str(&sim_core::view::structure_json_with(&w, false)).unwrap();
-    assert!(lean.get("walls").is_none() && lean.get("rooms").is_none() && lean["objects"].is_array());
+    let lean: serde_json::Value =
+        serde_json::from_str(&sim_core::view::structure_json_with(&w, false)).unwrap();
+    assert!(
+        lean.get("walls").is_none() && lean.get("rooms").is_none() && lean["objects"].is_array()
+    );
     assert_eq!(lean["lotVersion"], undone);
 }
 
@@ -275,7 +312,8 @@ fn shipped() -> World {
 }
 
 fn order(w: &mut World, cmd: serde_json::Value) {
-    w.apply(Command::from_json(&cmd.to_string()).unwrap()).unwrap();
+    w.apply(Command::from_json(&cmd.to_string()).unwrap())
+        .unwrap();
 }
 
 /// Goals, routines and free will set after an edit aren't taken back with it, by undo or redo
@@ -285,15 +323,35 @@ fn undo_and_redo_keep_the_orders_given_since() {
     let mut w = shipped();
     let paid = funds(&w);
     buy(&mut w, "sofa", 4, 4);
-    order(&mut w, json!({"type": "addGoal", "sim": 0, "goal": {"def": "skill", "skill": "cooking", "target": 4}}));
-    order(&mut w, json!({"type": "setRoutines", "sim": 0, "routines": [{"activity": "read", "days": 0x7f, "start": 18 * 60, "minutes": 60}]}));
-    w.apply(Command::SetAutonomy { enabled: false, household: Some(0) }).unwrap();
-    let orders = |w: &World| (w.sims[0].planner.goals.len(), w.sims[0].planner.routines.len(), w.households[0].free_will);
+    order(
+        &mut w,
+        json!({"type": "addGoal", "sim": 0, "goal": {"def": "skill", "skill": "cooking", "target": 4}}),
+    );
+    order(
+        &mut w,
+        json!({"type": "setRoutines", "sim": 0, "routines": [{"activity": "read", "days": 0x7f, "start": 18 * 60, "minutes": 60}]}),
+    );
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: Some(0),
+    })
+    .unwrap();
+    let orders = |w: &World| {
+        (
+            w.sims[0].planner.goals.len(),
+            w.sims[0].planner.routines.len(),
+            w.households[0].free_will,
+        )
+    };
     assert_eq!(orders(&w), (1, 1, false));
     undo(&mut w);
     assert!(w.objects.is_empty(), "the sofa went back");
     assert_eq!(funds(&w), paid, "and the money came back");
-    assert_eq!(orders(&w), (1, 1, false), "the goal, the routine and free will stay as set");
+    assert_eq!(
+        orders(&w),
+        (1, 1, false),
+        "the goal, the routine and free will stay as set"
+    );
     redo(&mut w);
     assert_eq!(w.objects.len(), 1);
     assert_eq!(orders(&w), (1, 1, false));
@@ -304,11 +362,24 @@ fn undo_and_redo_keep_the_orders_given_since() {
 fn undoing_an_upgrade_takes_back_its_story() {
     let mut w = shipped();
     buy(&mut w, "sofa", 4, 4);
-    let upgraded = |w: &World| w.events.iter().filter(|e| e.kind == sim_core::social::EventKind::Upgraded).count();
-    w.apply(Command::Upgrade { household: 0, object: 0 }).unwrap();
+    let upgraded = |w: &World| {
+        w.events
+            .iter()
+            .filter(|e| e.kind == sim_core::social::EventKind::Upgraded)
+            .count()
+    };
+    w.apply(Command::Upgrade {
+        household: 0,
+        object: 0,
+    })
+    .unwrap();
     assert_eq!(upgraded(&w), 1);
     undo(&mut w);
-    assert_eq!((w.objects[0].quality, upgraded(&w)), (0, 0), "no upgrade, no story of one");
+    assert_eq!(
+        (w.objects[0].quality, upgraded(&w)),
+        (0, 0),
+        "no upgrade, no story of one"
+    );
     redo(&mut w);
     assert_eq!((w.objects[0].quality, upgraded(&w)), (1, 1));
     undo(&mut w);
@@ -321,28 +392,104 @@ fn a_colour_is_an_edit_and_goes_where_its_object_goes() {
     buy(&mut w, "chair", 1, 1);
     let chair = w.objects.last().unwrap().stable;
     let red: Colors = [("body".into(), 0xD9483B)].into();
-    w.apply(Command::Recolor { household: 0, object: chair, colors: red.clone() }).unwrap();
+    w.apply(Command::Recolor {
+        household: 0,
+        object: chair,
+        colors: red.clone(),
+    })
+    .unwrap();
     assert_eq!(w.objects[chair as usize].colors, red);
     // Several parts at once are one edit.
-    let three: Colors = [("body".into(), 0x4E9C9A), ("trim".into(), 0xF2EFE8), ("chrome".into(), 0xC9A227)].into();
-    w.apply(Command::Recolor { household: 0, object: chair, colors: three.clone() }).unwrap();
+    let three: Colors = [
+        ("body".into(), 0x4E9C9A),
+        ("trim".into(), 0xF2EFE8),
+        ("chrome".into(), 0xC9A227),
+    ]
+    .into();
+    w.apply(Command::Recolor {
+        household: 0,
+        object: chair,
+        colors: three.clone(),
+    })
+    .unwrap();
     assert_eq!(w.objects[chair as usize].colors, three);
     w.apply(Command::Undo { household: 0 }).unwrap();
     assert_eq!(w.objects[chair as usize].colors, red, "undone in one step");
     w.apply(Command::Undo { household: 0 }).unwrap();
-    assert!(w.objects[chair as usize].colors.is_empty(), "undone: as made");
+    assert!(
+        w.objects[chair as usize].colors.is_empty(),
+        "undone: as made"
+    );
     w.apply(Command::Redo { household: 0 }).unwrap();
     assert_eq!(w.objects[chair as usize].colors, red, "and done again");
-    w.apply(Command::MoveObject { household: 0, object: chair, x: 3, z: 3, rot: 1, turn: None, offset: None, size: None, tall: None }).unwrap();
+    w.apply(Command::MoveObject {
+        household: 0,
+        object: chair,
+        x: 3,
+        z: 3,
+        rot: 1,
+        turn: None,
+        offset: None,
+        size: None,
+        tall: None,
+    })
+    .unwrap();
     let moved = w.objects.iter().find(|o| o.def == 0).unwrap();
-    assert_eq!((moved.x, &moved.colors), (3, &red), "moved, it keeps its colour");
-    assert!(w.blueprint_json(0).unwrap().contains("\"#d9483b\""), "a blueprint carries it");
+    assert_eq!(
+        (moved.x, &moved.colors),
+        (3, &red),
+        "moved, it keeps its colour"
+    );
+    assert!(
+        w.blueprint_json(0).unwrap().contains("\"#d9483b\""),
+        "a blueprint carries it"
+    );
     let colors = |part: &str, c: u32| -> Colors { [(part.into(), c)].into() };
-    assert!(w.apply(Command::Recolor { household: 0, object: chair, colors: colors("body", 0x100_0000) }).is_err(), "no such colour");
-    assert!(w.apply(Command::Recolor { household: 0, object: chair, colors: colors("Body Top", 0xD9483B) }).is_err(), "no such part");
-    assert!(w.apply(Command::Recolor { household: 0, object: chair, colors: colors(&"a".repeat(33), 0xD9483B) }).is_err(), "too long a name");
+    assert!(
+        w.apply(Command::Recolor {
+            household: 0,
+            object: chair,
+            colors: colors("body", 0x100_0000)
+        })
+        .is_err(),
+        "no such colour"
+    );
+    assert!(
+        w.apply(Command::Recolor {
+            household: 0,
+            object: chair,
+            colors: colors("Body Top", 0xD9483B)
+        })
+        .is_err(),
+        "no such part"
+    );
+    assert!(
+        w.apply(Command::Recolor {
+            household: 0,
+            object: chair,
+            colors: colors(&"a".repeat(33), 0xD9483B)
+        })
+        .is_err(),
+        "too long a name"
+    );
     let many: Colors = (0..17).map(|i| (format!("part{i}"), 0)).collect();
-    assert!(w.apply(Command::Recolor { household: 0, object: chair, colors: many }).is_err(), "too many parts");
-    w.apply(Command::Recolor { household: 0, object: chair, colors: Colors::new() }).unwrap();
-    assert!(w.objects[chair as usize].colors.is_empty(), "back to as made");
+    assert!(
+        w.apply(Command::Recolor {
+            household: 0,
+            object: chair,
+            colors: many
+        })
+        .is_err(),
+        "too many parts"
+    );
+    w.apply(Command::Recolor {
+        household: 0,
+        object: chair,
+        colors: Colors::new(),
+    })
+    .unwrap();
+    assert!(
+        w.objects[chair as usize].colors.is_empty(),
+        "back to as made"
+    );
 }

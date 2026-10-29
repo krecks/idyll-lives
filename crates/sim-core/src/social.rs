@@ -13,7 +13,9 @@ use crate::content::{MAX_NEEDS, Modifiers, ModifiersRaw, StageMask, TagMask};
 use crate::{Error, MINUTES_PER_TICK};
 
 /// Animation names the renderer understands, in snapshot code order (code = index + 1).
-pub const ANIMATIONS: [&str; 8] = ["talk", "laugh", "flirt", "argue", "fight", "hug", "kiss", "wave"];
+pub const ANIMATIONS: [&str; 8] = [
+    "talk", "laugh", "flirt", "argue", "fight", "hug", "kiss", "wave",
+];
 
 /// Friendship levels used for statuses and milestone events.
 pub const LEVEL_ENEMY: i8 = -2;
@@ -450,7 +452,11 @@ pub(crate) fn parse_outcome(raw: &OutcomeRaw, ix: &Indices, ctx: &str) -> Result
     })
 }
 
-pub(crate) fn parse_social(raw: &SocialRaw, ix: &Indices, stage_ids: &[&str]) -> Result<SocialDef, Error> {
+pub(crate) fn parse_social(
+    raw: &SocialRaw,
+    ix: &Indices,
+    stage_ids: &[&str],
+) -> Result<SocialDef, Error> {
     let ctx = raw.id.as_str();
     if !(raw.minutes > 0.0 && raw.minutes.is_finite()) {
         return Err(Error::new(format!("{ctx}: minutes must be > 0")));
@@ -476,7 +482,8 @@ pub(crate) fn parse_social(raw: &SocialRaw, ix: &Indices, stage_ids: &[&str]) ->
         tags: tag_mask(&raw.tags, ix, ctx)?,
         requires: raw.requires,
         stages: crate::content::stage_mask(stage_ids, &raw.stages, ctx)?.unwrap_or(StageMask::MAX),
-        target_stages: crate::content::stage_mask(stage_ids, &raw.target_stages, ctx)?.unwrap_or(StageMask::MAX),
+        target_stages: crate::content::stage_mask(stage_ids, &raw.target_stages, ctx)?
+            .unwrap_or(StageMask::MAX),
         acceptance: raw.acceptance,
         prefer: raw.prefer,
         actor_gain: need_array(&raw.needs, ix, ctx)?,
@@ -625,7 +632,13 @@ impl Relationships {
         let mut partner = std::mem::take(&mut self.partner);
         partner.resize(n, None);
         let version = self.version.wrapping_add(1);
-        *self = Self { n, rel, chemistry, partner, version };
+        *self = Self {
+            n,
+            rel,
+            chemistry,
+            partner,
+            version,
+        };
     }
 
     /// Forgets everything between `a` and everyone (they're gone, or someone new took the slot).
@@ -671,7 +684,9 @@ impl Relationships {
 
     /// Looks up `a`'s partner again after a change.
     fn recount(&mut self, a: usize) {
-        self.partner[a] = (0..self.n).find(|&b| b != a && self.get(a, b).partners).map(|b| b as u32);
+        self.partner[a] = (0..self.n)
+            .find(|&b| b != a && self.get(a, b).partners)
+            .map(|b| b as u32);
     }
 
     pub fn chemistry(&self, a: usize, b: usize) -> f32 {
@@ -880,13 +895,13 @@ impl EventKind {
         use EventKind::*;
         match self {
             FirstKiss | StartedDating | BrokeUp | BecameBestFriends | Promoted | JobFound
-            | Fired | GoalReached | MovedIn | GrewOlder | Retired | Died | MovedInWith | MovedOut
-            | MovedAway | Expecting | Born | Adopted | Graduated => 2,
+            | Fired | GoalReached | MovedIn | GrewOlder | Retired | Died | MovedInWith
+            | MovedOut | MovedAway | Expecting | Born | Adopted | Graduated => 2,
             BecameFriends | BecameGoodFriends | BecameEnemies | Crush | ProposalRejected
-            | Fight | Jealous | QuitJob | RentDebt | Broke | Accident | TurnedAway | WantsToBuy | Bought
-            | DeniedAgain | StayedHome | NoBed | NotClosed | PlayedAlone | NoPartner => 1,
-            Met | MissedWork | SkillUp | PaidRent | Upgraded | Visited | GoalSuggested | Repaired | NobodyHome | Invited
-            | Declined | Babysitter => 0,
+            | Fight | Jealous | QuitJob | RentDebt | Broke | Accident | TurnedAway | WantsToBuy
+            | Bought | DeniedAgain | StayedHome | NoBed | NotClosed | PlayedAlone | NoPartner => 1,
+            Met | MissedWork | SkillUp | PaidRent | Upgraded | Visited | GoalSuggested
+            | Repaired | NobodyHome | Invited | Declined | Babysitter => 0,
         }
     }
 }
@@ -988,7 +1003,10 @@ impl EventLog {
     /// A promotion: `a` now works at `level` in `career`, with a one-off `bonus`.
     pub fn push_promotion(&mut self, tick: u64, a: usize, career: usize, level: usize, bonus: i64) {
         let event = Self::career_event(tick, EventKind::Promoted, a, career, Some(level as i64));
-        self.add(SocialEvent { pay: Some(bonus), ..event });
+        self.add(SocialEvent {
+            pay: Some(bonus),
+            ..event
+        });
     }
 
     /// A goal event about one Sim.
@@ -1053,7 +1071,14 @@ impl EventLog {
     }
 
     /// An event about one Sim and a kind of object (something they want), with a number.
-    pub fn push_object(&mut self, tick: u64, kind: EventKind, a: usize, object: usize, n: Option<i64>) {
+    pub fn push_object(
+        &mut self,
+        tick: u64,
+        kind: EventKind,
+        a: usize,
+        object: usize,
+        n: Option<i64>,
+    ) {
         self.add(SocialEvent {
             id: 0,
             tick,
@@ -1070,7 +1095,7 @@ impl EventLog {
         });
     }
 
-        /// Changes the residents events name (`f` gets each `a`, `b` and `c`).
+    /// Changes the residents events name (`f` gets each `a`, `b` and `c`).
     pub(crate) fn rewrite_refs(&mut self, mut f: impl FnMut(&mut u32)) {
         for e in &mut self.events {
             f(&mut e.a);
@@ -1087,7 +1112,12 @@ impl EventLog {
         if self.events.len() >= EVENT_LOG_CAPACITY {
             // Everyday events go first, so milestones are remembered longer.
             let old = self.events.len() / 2;
-            match self.events.iter().take(old).position(|e| e.kind.importance() == 0) {
+            match self
+                .events
+                .iter()
+                .take(old)
+                .position(|e| e.kind.importance() == 0)
+            {
                 Some(i) => {
                     self.events.remove(i);
                 }

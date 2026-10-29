@@ -37,7 +37,11 @@ const TOWN: &str = r#"{"width":12,"depth":10,
 
 fn world() -> World {
     let mut w = World::from_json(CONTENT, TOWN, 3).unwrap();
-    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
     w.sims[0].needs[0] = 1.0;
     w.sims[1].needs[0] = 1.0;
     w
@@ -65,13 +69,28 @@ fn a_bare_room_is_disliked_until_it_gets_better() {
     let mut disliked = false;
     for _ in 0..8 {
         hours(&mut w, 1.0);
-        disliked |= w.sims[0].planner.thought.is_some_and(|t| t.kind == ThoughtKind::RoomDisliked);
+        disliked |= w.sims[0]
+            .planner
+            .thought
+            .is_some_and(|t| t.kind == ThoughtKind::RoomDisliked);
     }
     assert!(disliked, "a thought about it");
-    let wish = HomeWish::Room { kind, garden: false, factor: 2 };
+    let wish = HomeWish::Room {
+        kind,
+        garden: false,
+        factor: 2,
+    };
     assert_eq!(w.sims[0].planner.home_wishes, [wish]);
-    assert!(w.sims[0].feelings.iter().any(|f| w.content.feelings[f.def].id == "dislikesRoom"));
-    assert!(w.sims[1].planner.home_wishes.is_empty(), "Bo was out in the garden");
+    assert!(
+        w.sims[0]
+            .feelings
+            .iter()
+            .any(|f| w.content.feelings[f.def].id == "dislikesRoom")
+    );
+    assert!(
+        w.sims[1].planner.home_wishes.is_empty(),
+        "Bo was out in the garden"
+    );
 
     // Kept in saves.
     let loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();
@@ -80,7 +99,17 @@ fn a_bare_room_is_disliked_until_it_gets_better() {
     // A vase: the wish came true.
     let spots = [(8, 1), (8, 3), (5, 1), (5, 3)];
     let bought = spots.iter().any(|&(x, z)| {
-        w.apply(Command::Buy { household: 0, object: "vase".into(), at: Some([x, z, 0]), colors: Default::default(), turn: None, offset: None, size: None, tall: None }).is_ok()
+        w.apply(Command::Buy {
+            household: 0,
+            object: "vase".into(),
+            at: Some([x, z, 0]),
+            colors: Default::default(),
+            turn: None,
+            offset: None,
+            size: None,
+            tall: None,
+        })
+        .is_ok()
     });
     assert!(bought, "somewhere for a vase");
     assert!(living(&w).scores.decor >= 0.6, "{:?}", living(&w).scores);
@@ -96,39 +125,79 @@ fn broken_things_are_wished_fixed() {
     w.refresh_rooms();
     hours(&mut w, 1.0);
     let sofa = w.content.object_index("sofa").unwrap();
-    assert!(w.sims[0].planner.home_wishes.contains(&HomeWish::Fix { def: sofa }));
+    assert!(
+        w.sims[0]
+            .planner
+            .home_wishes
+            .contains(&HomeWish::Fix { def: sofa })
+    );
     let thought = w.sims[0].planner.thought.unwrap();
     assert_eq!((thought.kind, thought.subject), (ThoughtKind::Broken, sofa));
 
     w.objects[1].wear = 0.0;
     hours(&mut w, 1.0);
-    assert!(!w.sims[0].planner.home_wishes.contains(&HomeWish::Fix { def: sofa }));
+    assert!(
+        !w.sims[0]
+            .planner
+            .home_wishes
+            .contains(&HomeWish::Fix { def: sofa })
+    );
 }
 
 #[test]
 fn a_bathroom_always_taken_brings_a_wish_for_another() {
     let mut w = world();
     w.sims[1].needs[0] = 0.3;
-    w.apply(Command::Use { sim: 1, object: 0, interaction: 0 }).unwrap();
+    w.apply(Command::Use {
+        sim: 1,
+        object: 0,
+        interaction: 0,
+    })
+    .unwrap();
     hours(&mut w, 0.5);
     w.sims[0].needs[0] = 0.1;
     hours(&mut w, 1.0);
-    let bathroom = w.content.room_kinds.iter().position(|k| k.id == "bathroom").unwrap();
-    assert!(!w.sims[0].planner.home_wishes.contains(&HomeWish::Another { kind: bathroom }), "once is bad luck");
+    let bathroom = w
+        .content
+        .room_kinds
+        .iter()
+        .position(|k| k.id == "bathroom")
+        .unwrap();
+    assert!(
+        !w.sims[0]
+            .planner
+            .home_wishes
+            .contains(&HomeWish::Another { kind: bathroom }),
+        "once is bad luck"
+    );
     // The next day, again.
     let start = w.tick;
     while w.tick < start + 24 * 60 * 20 {
         w.tick_once();
         if !w.objects[0].in_use() {
-            w.apply(Command::Use { sim: 1, object: 0, interaction: 0 }).unwrap();
+            w.apply(Command::Use {
+                sim: 1,
+                object: 0,
+                interaction: 0,
+            })
+            .unwrap();
         }
         w.sims[0].needs[0] = 0.1;
         w.sims[1].needs[0] = 0.3;
     }
     assert!(
-        w.sims[0].planner.home_wishes.contains(&HomeWish::Another { kind: bathroom }),
+        w.sims[0]
+            .planner
+            .home_wishes
+            .contains(&HomeWish::Another { kind: bathroom }),
         "{:?}",
         w.sims[0].planner.home_wishes
     );
-    assert!(!w.sims[1].planner.home_wishes.contains(&HomeWish::Another { kind: bathroom }), "Bo has it");
+    assert!(
+        !w.sims[1]
+            .planner
+            .home_wishes
+            .contains(&HomeWish::Another { kind: bathroom }),
+        "Bo has it"
+    );
 }

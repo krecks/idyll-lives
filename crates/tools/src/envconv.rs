@@ -48,7 +48,8 @@ use std::path::{Path, PathBuf};
 
 pub const PCENV_MAGIC: &[u8; 8] = b"IDLLENV1";
 /// The HDRI, as Poly Haven serves it, and what it must be.
-pub const HDRI_URL: &str = "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/belfast_open_field_1k.hdr";
+pub const HDRI_URL: &str =
+    "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/belfast_open_field_1k.hdr";
 pub const HDRI_SHA256: &str = "8acb87e692dc0176f22047a5a12859a83277e183bc91ffaaec5b7837331534b8";
 /// Its size: a longer answer is refused as it comes.
 pub const HDRI_BYTES: u64 = 1_647_689;
@@ -88,7 +89,12 @@ fn run(args: &[String]) -> Result<(), String> {
     };
     let output = args.get(1).map(PathBuf::from).unwrap_or_else(pcenv_path);
     let bytes = convert_file(&input, &output)?;
-    println!("envconv: {} -> {} ({:.0} KB)", input.display(), output.display(), bytes as f64 / 1024.0);
+    println!(
+        "envconv: {} -> {} ({:.0} KB)",
+        input.display(),
+        output.display(),
+        bytes as f64 / 1024.0
+    );
     Ok(())
 }
 
@@ -98,7 +104,13 @@ pub fn fetch_hdri() -> Result<PathBuf, String> {
     if download::file_sha256(&path, false).as_deref() == Some(HDRI_SHA256) {
         return Ok(path);
     }
-    download::download_to(&download::agent(), HDRI_URL, &path, HDRI_SHA256, Some(HDRI_BYTES))?;
+    download::download_to(
+        &download::agent(),
+        HDRI_URL,
+        &path,
+        HDRI_SHA256,
+        Some(HDRI_BYTES),
+    )?;
     println!("envconv: downloaded {HDRI_URL} to {}", path.display());
     Ok(path)
 }
@@ -107,7 +119,10 @@ pub fn fetch_hdri() -> Result<PathBuf, String> {
 pub fn convert_file(input: &Path, output: &Path) -> Result<usize, String> {
     let bytes = std::fs::read(input).map_err(|e| format!("{}: {e}", input.display()))?;
     let pano = read_hdr(&bytes).map_err(|e| format!("{}: {e}", input.display()))?;
-    let name = input.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let name = input
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
     let out = write_pcenv(&convert(&babylon_sky(&pano), OUT_SIZE), &name)?;
     std::fs::write(output, &out).map_err(|e| format!("{}: {e}", output.display()))?;
     Ok(out.len())
@@ -147,18 +162,34 @@ pub fn read_hdr(bytes: &[u8]) -> Result<Panorama, String> {
     use image::ImageDecoder;
     let decoder = image::codecs::hdr::HdrDecoder::new(bytes).map_err(|e| format!(".hdr: {e}"))?;
     // `image` rejects any other FORMAT but takes a header with none; Babylon's reader didn't.
-    if !decoder.metadata().custom_attributes.iter().any(|(k, _)| k == "FORMAT") {
+    if !decoder
+        .metadata()
+        .custom_attributes
+        .iter()
+        .any(|(k, _)| k == "FORMAT")
+    {
         return Err(".hdr: no FORMAT=32-bit_rle_rgbe".into());
     }
     let (width, height) = decoder.dimensions();
     let (width, height) = (width as usize, height as usize);
-    if width == 0 || height == 0 || width > MAX_SIDE || height > MAX_SIDE || width * height > MAX_TEXELS {
+    if width == 0
+        || height == 0
+        || width > MAX_SIDE
+        || height > MAX_SIDE
+        || width * height > MAX_TEXELS
+    {
         return Err(format!(".hdr: unsupported size {width}x{height}"));
     }
     // Decoded straight into the texels: no second copy of a panorama that may be gigabytes.
     let mut texels = vec![[0.0f32; 3]; width * height];
-    decoder.read_image(bytemuck::cast_slice_mut(&mut texels)).map_err(|e| format!(".hdr: {e}"))?;
-    Ok(Panorama { width, height, texels })
+    decoder
+        .read_image(bytemuck::cast_slice_mut(&mut texels))
+        .map_err(|e| format!(".hdr: {e}"))?;
+    Ok(Panorama {
+        width,
+        height,
+        texels,
+    })
 }
 
 /// PlayCanvas's RGBE (`encodeRGBE`), as bytes.
@@ -202,7 +233,11 @@ fn scale(a: V3, s: f64) -> V3 {
 /// Babylon's `Vector3.normalize` (by the length's reciprocal).
 fn normalize(v: V3) -> V3 {
     let l = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
-    if l == 0.0 || l == 1.0 { v } else { scale(v, 1.0 / l) }
+    if l == 0.0 || l == 1.0 {
+        v
+    } else {
+        scale(v, 1.0 / l)
+    }
 }
 /// JavaScript's `Math.round`.
 fn js_round(x: f64) -> f64 {
@@ -215,12 +250,42 @@ fn js_round(x: f64) -> f64 {
 /// back`.
 pub fn panorama_to_cube(pano: &Panorama, size: usize) -> Cube {
     const CORNERS: [[V3; 4]; 6] = [
-        [[1.0, -1.0, 1.0], [-1.0, -1.0, 1.0], [1.0, 1.0, 1.0], [-1.0, 1.0, 1.0]],         // right
-        [[-1.0, -1.0, -1.0], [1.0, -1.0, -1.0], [-1.0, 1.0, -1.0], [1.0, 1.0, -1.0]],     // left
-        [[-1.0, -1.0, -1.0], [-1.0, -1.0, 1.0], [1.0, -1.0, -1.0], [1.0, -1.0, 1.0]],     // up
-        [[1.0, 1.0, -1.0], [1.0, 1.0, 1.0], [-1.0, 1.0, -1.0], [-1.0, 1.0, 1.0]],         // down
-        [[1.0, -1.0, -1.0], [1.0, -1.0, 1.0], [1.0, 1.0, -1.0], [1.0, 1.0, 1.0]],         // front
-        [[-1.0, -1.0, 1.0], [-1.0, -1.0, -1.0], [-1.0, 1.0, 1.0], [-1.0, 1.0, -1.0]],     // back
+        [
+            [1.0, -1.0, 1.0],
+            [-1.0, -1.0, 1.0],
+            [1.0, 1.0, 1.0],
+            [-1.0, 1.0, 1.0],
+        ], // right
+        [
+            [-1.0, -1.0, -1.0],
+            [1.0, -1.0, -1.0],
+            [-1.0, 1.0, -1.0],
+            [1.0, 1.0, -1.0],
+        ], // left
+        [
+            [-1.0, -1.0, -1.0],
+            [-1.0, -1.0, 1.0],
+            [1.0, -1.0, -1.0],
+            [1.0, -1.0, 1.0],
+        ], // up
+        [
+            [1.0, 1.0, -1.0],
+            [1.0, 1.0, 1.0],
+            [-1.0, 1.0, -1.0],
+            [-1.0, 1.0, 1.0],
+        ], // down
+        [
+            [1.0, -1.0, -1.0],
+            [1.0, -1.0, 1.0],
+            [1.0, 1.0, -1.0],
+            [1.0, 1.0, 1.0],
+        ], // front
+        [
+            [-1.0, -1.0, 1.0],
+            [-1.0, -1.0, -1.0],
+            [-1.0, 1.0, 1.0],
+            [-1.0, 1.0, -1.0],
+        ], // back
     ];
     let (w, h) = (pano.width, pano.height);
     let at = |v: V3| {
@@ -301,7 +366,10 @@ pub fn cube_polynomial(cube: &Cube) -> [[f64; 3]; 9] {
     for _ in 0..n {
         let mut u = min_uv;
         for _ in 0..n {
-            solids.push(area(u - half, v - half) - area(u - half, v + half) - area(u + half, v - half) + area(u + half, v + half));
+            solids.push(
+                area(u - half, v - half) - area(u - half, v + half) - area(u + half, v - half)
+                    + area(u + half, v + half),
+            );
             u += du;
         }
         v += du;
@@ -315,8 +383,24 @@ pub fn cube_polynomial(cube: &Cube) -> [[f64; 3]; 9] {
             for x in 0..n {
                 let d = normalize(add(add(scale(*ax, u), scale(*ay, v)), *normal));
                 let solid = solids[y * n + x];
-                let c = cube.faces[f][y * n + x].map(|c| if c.is_nan() { 0.0 } else { (c as f64).clamp(0.0, 4096.0) });
-                let basis = [1.0, d[1], d[2], d[0], d[0] * d[1], d[1] * d[2], 3.0 * d[2] * d[2] - 1.0, d[0] * d[2], d[0] * d[0] - d[1] * d[1]];
+                let c = cube.faces[f][y * n + x].map(|c| {
+                    if c.is_nan() {
+                        0.0
+                    } else {
+                        (c as f64).clamp(0.0, 4096.0)
+                    }
+                });
+                let basis = [
+                    1.0,
+                    d[1],
+                    d[2],
+                    d[0],
+                    d[0] * d[1],
+                    d[1] * d[2],
+                    3.0 * d[2] * d[2] - 1.0,
+                    d[0] * d[2],
+                    d[0] * d[0] - d[1] * d[1],
+                ];
                 for i in 0..9 {
                     for ch in 0..3 {
                         l[i][ch] += c[ch] * solid * (k[i] * basis[i]);
@@ -331,7 +415,17 @@ pub fn cube_polynomial(cube: &Cube) -> [[f64; 3]; 9] {
     // The sphere's solid angle over the texels' sum; then the cosine lobe's convolution
     // (`SHCosKernelConvolution`), and 1/π.
     let correction = 4.0 * PI / total;
-    let kernel = [PI, 2.0 * PI / 3.0, 2.0 * PI / 3.0, 2.0 * PI / 3.0, PI / 4.0, PI / 4.0, PI / 4.0, PI / 4.0, PI / 4.0];
+    let kernel = [
+        PI,
+        2.0 * PI / 3.0,
+        2.0 * PI / 3.0,
+        2.0 * PI / 3.0,
+        PI / 4.0,
+        PI / 4.0,
+        PI / 4.0,
+        PI / 4.0,
+        PI / 4.0,
+    ];
     for i in 0..9 {
         for ch in 0..3 {
             l[i][ch] = l[i][ch] * correction * kernel[i] * (1.0 / PI);
@@ -340,7 +434,8 @@ pub fn cube_polynomial(cube: &Cube) -> [[f64; 3]; 9] {
     // `FromHarmonics`.
     let mut p = [[0.0; 3]; 9];
     for ch in 0..3 {
-        let [l00, l1m1, l10, l11, l2m2, l2m1, l20, l21, l22] = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(|i| l[i][ch]);
+        let [l00, l1m1, l10, l11, l2m2, l2m1, l20, l21, l22] =
+            [0, 1, 2, 3, 4, 5, 6, 7, 8].map(|i| l[i][ch]);
         let poly = [
             -(l11 * 1.02333),
             -(l1m1 * 1.02333),
@@ -377,9 +472,17 @@ pub fn dir_face(d: [f64; 3]) -> (usize, f64, f64) {
     let [x, y, z] = d;
     let (ax, ay, az) = (x.abs(), y.abs(), z.abs());
     if ax >= ay && ax >= az {
-        if x > 0.0 { (0, -z / ax, -y / ax) } else { (1, z / ax, -y / ax) }
+        if x > 0.0 {
+            (0, -z / ax, -y / ax)
+        } else {
+            (1, z / ax, -y / ax)
+        }
     } else if ay >= az {
-        if y > 0.0 { (2, x / ay, z / ay) } else { (3, x / ay, -z / ay) }
+        if y > 0.0 {
+            (2, x / ay, z / ay)
+        } else {
+            (3, x / ay, -z / ay)
+        }
     } else if z > 0.0 {
         (4, x / az, -y / az)
     } else {
@@ -444,11 +547,18 @@ pub fn convert(sky: &BabylonSky, size: usize) -> PcEnv {
                     }
                 }
                 let k = 1.0 / (sub * sub) as f64;
-                face.push([(acc[0] * k) as f32, (acc[1] * k) as f32, (acc[2] * k) as f32]);
+                face.push([
+                    (acc[0] * k) as f32,
+                    (acc[1] * k) as f32,
+                    (acc[2] * k) as f32,
+                ]);
             }
         }
     }
-    PcEnv { cube: Cube { size, faces }, sh: sh_from_polynomial(&babylon_irradiance(&sky.polynomial)) }
+    PcEnv {
+        cube: Cube { size, faces },
+        sh: sh_from_polynomial(&babylon_irradiance(&sky.polynomial)),
+    }
 }
 
 /// The irradiance Babylon's PBR lit with, as a polynomial of the same form as `cube_polynomial`'s:
@@ -494,13 +604,29 @@ pub fn babylon_irradiance(p: &[[f64; 3]; 9]) -> [[f64; 3]; 9] {
 /// Babylon's irradiance polynomial at `m` (`computeEnvironmentIrradiance`).
 pub fn eval_polynomial(p: &[[f64; 3]; 9], m: [f64; 3], ch: usize) -> f64 {
     let [x, y, z] = m;
-    p[0][ch] * x + p[1][ch] * y + p[2][ch] * z + p[3][ch] * x * x + p[4][ch] * y * y + p[5][ch] * z * z + p[6][ch] * y * z + p[7][ch] * z * x + p[8][ch] * x * y
+    p[0][ch] * x
+        + p[1][ch] * y
+        + p[2][ch] * z
+        + p[3][ch] * x * x
+        + p[4][ch] * y * y
+        + p[5][ch] * z * z
+        + p[6][ch] * y * z
+        + p[7][ch] * z * x
+        + p[8][ch] * x * y
 }
 
 /// PlayCanvas's ambient harmonics at `n` (`addAmbient`, `AMBIENTSH`).
 pub fn eval_sh(sh: &[[f64; 3]; 9], n: [f64; 3], ch: usize) -> f64 {
     let [x, y, z] = n;
-    sh[0][ch] + sh[1][ch] * x + sh[2][ch] * y + sh[3][ch] * z + sh[4][ch] * x * z + sh[5][ch] * z * y + sh[6][ch] * y * x + sh[7][ch] * (3.0 * z * z - 1.0) + sh[8][ch] * (x * x - y * y)
+    sh[0][ch]
+        + sh[1][ch] * x
+        + sh[2][ch] * y
+        + sh[3][ch] * z
+        + sh[4][ch] * x * z
+        + sh[5][ch] * z * y
+        + sh[6][ch] * y * x
+        + sh[7][ch] * (3.0 * z * z - 1.0)
+        + sh[8][ch] * (x * x - y * y)
 }
 
 /// The polynomial, evaluated at `babylon_dir_for_normal(n)`, as PlayCanvas's harmonics of `n`.
@@ -511,12 +637,20 @@ pub fn eval_sh(sh: &[[f64; 3]; 9], n: [f64; 3], ch: usize) -> f64 {
 #[allow(clippy::needless_range_loop)] // (Matrix arithmetic by index.)
 pub fn sh_from_polynomial(p: &[[f64; 3]; 9]) -> [[f64; 3]; 9] {
     // M's columns: where the axes go.
-    let cols = [babylon_dir_for_normal([1.0, 0.0, 0.0]), babylon_dir_for_normal([0.0, 1.0, 0.0]), babylon_dir_for_normal([0.0, 0.0, 1.0])];
+    let cols = [
+        babylon_dir_for_normal([1.0, 0.0, 0.0]),
+        babylon_dir_for_normal([0.0, 1.0, 0.0]),
+        babylon_dir_for_normal([0.0, 0.0, 1.0]),
+    ];
     let m = |r: usize, c: usize| cols[c][r];
     let mut sh = [[0.0; 3]; 9];
     for ch in 0..3 {
         let b = [p[0][ch], p[1][ch], p[2][ch]];
-        let a = [[p[3][ch], p[8][ch] / 2.0, p[7][ch] / 2.0], [p[8][ch] / 2.0, p[4][ch], p[6][ch] / 2.0], [p[7][ch] / 2.0, p[6][ch] / 2.0, p[5][ch]]];
+        let a = [
+            [p[3][ch], p[8][ch] / 2.0, p[7][ch] / 2.0],
+            [p[8][ch] / 2.0, p[4][ch], p[6][ch] / 2.0],
+            [p[7][ch] / 2.0, p[6][ch] / 2.0, p[5][ch]],
+        ];
         let mut lin = [0.0; 3];
         let mut q = [[0.0; 3]; 3];
         for i in 0..3 {
@@ -548,7 +682,12 @@ pub fn sh_from_polynomial(p: &[[f64; 3]; 9]) -> [[f64; 3]; 9] {
 }
 
 pub fn write_pcenv(env: &PcEnv, source: &str) -> Result<Vec<u8>, String> {
-    let sh: Vec<f64> = env.sh.iter().flatten().map(|v| (v * 1e7).round() / 1e7).collect();
+    let sh: Vec<f64> = env
+        .sh
+        .iter()
+        .flatten()
+        .map(|v| (v * 1e7).round() / 1e7)
+        .collect();
     let header = serde_json::json!({ "version": 1, "size": env.cube.size, "encoding": "rgbe", "sh": sh, "source": source });
     let header = serde_json::to_vec(&header).map_err(|e| e.to_string())?;
     let mut raw = Vec::with_capacity(16 + header.len() + 6 * env.cube.size * env.cube.size * 4);
@@ -568,12 +707,15 @@ pub fn write_pcenv(env: &PcEnv, source: &str) -> Result<Vec<u8>, String> {
 /// Reads a `.pcenv` back: its cube (decoded) and harmonics.
 pub fn read_pcenv(bytes: &[u8]) -> Result<PcEnv, String> {
     let mut raw = Vec::new();
-    std::io::Read::read_to_end(&mut flate2::read::GzDecoder::new(bytes), &mut raw).map_err(|e| format!(".pcenv: {e}"))?;
+    std::io::Read::read_to_end(&mut flate2::read::GzDecoder::new(bytes), &mut raw)
+        .map_err(|e| format!(".pcenv: {e}"))?;
     if raw.len() < 12 || &raw[..8] != PCENV_MAGIC {
         return Err(".pcenv: magic".into());
     }
     let len = u32::from_le_bytes([raw[8], raw[9], raw[10], raw[11]]) as usize;
-    let header: serde_json::Value = serde_json::from_slice(raw.get(12..12 + len).ok_or(".pcenv: header")?).map_err(|e| e.to_string())?;
+    let header: serde_json::Value =
+        serde_json::from_slice(raw.get(12..12 + len).ok_or(".pcenv: header")?)
+            .map_err(|e| e.to_string())?;
     let size = header["size"].as_u64().ok_or(".pcenv: size")? as usize;
     let shv = header["sh"].as_array().ok_or(".pcenv: sh")?;
     let mut sh = [[0.0; 3]; 9];
@@ -586,9 +728,15 @@ pub fn read_pcenv(bytes: &[u8]) -> Result<PcEnv, String> {
     }
     let mut faces: [Vec<[f32; 3]>; 6] = Default::default();
     for (f, face) in faces.iter_mut().enumerate() {
-        *face = texels[f * size * size * 4..(f + 1) * size * size * 4].chunks(4).map(|p| from_rgbe([p[0], p[1], p[2], p[3]])).collect();
+        *face = texels[f * size * size * 4..(f + 1) * size * size * 4]
+            .chunks(4)
+            .map(|p| from_rgbe([p[0], p[1], p[2], p[3]]))
+            .collect();
     }
-    Ok(PcEnv { cube: Cube { size, faces }, sh })
+    Ok(PcEnv {
+        cube: Cube { size, faces },
+        sh,
+    })
 }
 
 #[cfg(test)]
@@ -630,12 +778,18 @@ mod tests {
                 // Runs of equal bytes as runs, the rest as literals (at most 127 each).
                 let mut x = 0;
                 while x < w {
-                    let run = row[x..].iter().take(127).take_while(|&&b| b == row[x]).count();
+                    let run = row[x..]
+                        .iter()
+                        .take(127)
+                        .take_while(|&&b| b == row[x])
+                        .count();
                     if run >= 3 {
                         out.extend_from_slice(&[128 + run as u8, row[x]]);
                         x += run;
                     } else {
-                        let n = (w - x).min(127).min(if run == 1 { usize::MAX } else { run });
+                        let n = (w - x)
+                            .min(127)
+                            .min(if run == 1 { usize::MAX } else { run });
                         out.push(n as u8);
                         out.extend_from_slice(&row[x..x + n]);
                         x += n;
@@ -670,20 +824,33 @@ mod tests {
         assert_eq!(flat.texels, rle.texels);
         // rgb · 2^(e − 136): 100 · 2^-7 for the sky.
         assert_eq!(rle.texels[0], [100.0 / 128.0, 140.0 / 128.0, 200.0 / 128.0]);
-        assert_eq!(rle.texels[(h - 1) * w], [60.0 / 512.0, 90.0 / 512.0, 40.0 / 512.0]);
+        assert_eq!(
+            rle.texels[(h - 1) * w],
+            [60.0 / 512.0, 90.0 / 512.0, 40.0 / 512.0]
+        );
 
         let good = hdr_file(w, h, true, &px);
         let header_end = good.windows(2).position(|p| p == b"\n\n").unwrap() + 2;
-        let line_end = header_end + good[header_end..].iter().position(|&b| b == b'\n').unwrap() + 1;
+        let line_end =
+            header_end + good[header_end..].iter().position(|&b| b == b'\n').unwrap() + 1;
         let mut bad_run = good.clone();
         bad_run[line_end + 4] = 255; // a run of 127 in a 64-texel scanline
         let cases: [(&str, Vec<u8>); 8] = [
             ("empty", Vec::new()),
             ("not radiance", b"P6\n1 1\n255\n".to_vec()),
             ("no format", b"#?RADIANCE\n\n-Y 2 +X 2\n".to_vec()),
-            ("xyze", b"#?RADIANCE\nFORMAT=32-bit_rle_xyze\n\n-Y 2 +X 2\n".to_vec()),
-            ("flipped", b"#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n+Y 2 +X 2\n".to_vec()),
-            ("huge", b"#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y 40000 +X 40000\n".to_vec()),
+            (
+                "xyze",
+                b"#?RADIANCE\nFORMAT=32-bit_rle_xyze\n\n-Y 2 +X 2\n".to_vec(),
+            ),
+            (
+                "flipped",
+                b"#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n+Y 2 +X 2\n".to_vec(),
+            ),
+            (
+                "huge",
+                b"#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y 40000 +X 40000\n".to_vec(),
+            ),
             ("cut short", good[..good.len() - 7].to_vec()),
             ("long run", bad_run),
         ];
@@ -702,10 +869,19 @@ mod tests {
         let pano = read_hdr(&hdr_file(w, h, true, test_pano(w, h))).unwrap();
         let sky = babylon_sky(&pano);
         assert_eq!(sky.cube.size, BABYLON_SIZE);
-        let share = |f: usize, c: [f32; 3]| sky.cube.faces[f].iter().filter(|&&t| t == c).count() as f64 / sky.cube.faces[f].len() as f64;
-        assert!(share(2, [100.0 / 128.0, 140.0 / 128.0, 200.0 / 128.0]) > 0.99 && share(3, [60.0 / 512.0, 90.0 / 512.0, 40.0 / 512.0]) == 1.0);
+        let share = |f: usize, c: [f32; 3]| {
+            sky.cube.faces[f].iter().filter(|&&t| t == c).count() as f64
+                / sky.cube.faces[f].len() as f64
+        };
+        assert!(
+            share(2, [100.0 / 128.0, 140.0 / 128.0, 200.0 / 128.0]) > 0.99
+                && share(3, [60.0 / 512.0, 90.0 / 512.0, 40.0 / 512.0]) == 1.0
+        );
         let p = sky.polynomial;
-        assert!(p[1][2] > 0.3 && p[0][2].abs() < 0.01 && p[2][2].abs() < 0.01, "{p:?}");
+        assert!(
+            p[1][2] > 0.3 && p[0][2].abs() < 0.01 && p[2][2].abs() < 0.01,
+            "{p:?}"
+        );
         // The bright texel: in the panorama at u = 9/16, a quarter down. Babylon's
         // `CalcProjectionSpherical` reads the image upside down (`invertY`), so it is at
         // θ = atan2(z, x) = π/8 and φ = acos(y) ≈ 3π/4 of the faces' corner vectors, and the faces
@@ -722,20 +898,41 @@ mod tests {
                     best = c[0] as f64;
                     // (Babylon samples a texel at its corner.)
                     let (x, y) = (i % BABYLON_SIZE, i / BABYLON_SIZE);
-                    at = face_dir(f, x as f64 / BABYLON_SIZE as f64 * 2.0 - 1.0, y as f64 / BABYLON_SIZE as f64 * 2.0 - 1.0);
+                    at = face_dir(
+                        f,
+                        x as f64 / BABYLON_SIZE as f64 * 2.0 - 1.0,
+                        y as f64 / BABYLON_SIZE as f64 * 2.0 - 1.0,
+                    );
                 }
             }
         }
-        assert!(best == 16.0 && cos(at, want) > 0.999, "{best} at {at:?}, want {want:?}");
+        assert!(
+            best == 16.0 && cos(at, want) > 0.999,
+            "{best} at {at:?}, want {want:?}"
+        );
 
-        let one = Panorama { width: 64, height: 32, texels: vec![[0.5, 1.0, 2.0]; 64 * 32] };
+        let one = Panorama {
+            width: 64,
+            height: 32,
+            texels: vec![[0.5, 1.0, 2.0]; 64 * 32],
+        };
         let flat = babylon_sky(&one);
-        assert!(flat.cube.faces.iter().flatten().all(|c| *c == [0.5, 1.0, 2.0]));
+        assert!(
+            flat.cube
+                .faces
+                .iter()
+                .flatten()
+                .all(|c| *c == [0.5, 1.0, 2.0])
+        );
         for ch in 0..3 {
             let v = [0.5, 1.0, 2.0][ch];
             for i in 0..9 {
                 let want = if (3..6).contains(&i) { v } else { 0.0 };
-                assert!((flat.polynomial[i][ch] - want).abs() < 1e-4 * v, "{i} {ch}: {:?}", flat.polynomial);
+                assert!(
+                    (flat.polynomial[i][ch] - want).abs() < 1e-4 * v,
+                    "{i} {ch}: {:?}",
+                    flat.polynomial
+                );
             }
         }
     }
@@ -747,18 +944,38 @@ mod tests {
             assert!(close(face_dir(f, s, t), d, 1e-12), "{d:?}");
         }
         // The GPU's convention: +x's s runs along -z, +y's t along +z, +z's s along +x.
-        assert!(close(face_dir(0, 1.0, 0.0), normalize([1.0, 0.0, -1.0]), 1e-12));
-        assert!(close(face_dir(2, 0.0, 1.0), normalize([0.0, 1.0, 1.0]), 1e-12));
-        assert!(close(face_dir(4, 1.0, 0.0), normalize([1.0, 0.0, 1.0]), 1e-12));
+        assert!(close(
+            face_dir(0, 1.0, 0.0),
+            normalize([1.0, 0.0, -1.0]),
+            1e-12
+        ));
+        assert!(close(
+            face_dir(2, 0.0, 1.0),
+            normalize([0.0, 1.0, 1.0]),
+            1e-12
+        ));
+        assert!(close(
+            face_dir(4, 1.0, 0.0),
+            normalize([1.0, 0.0, 1.0]),
+            1e-12
+        ));
     }
 
     #[test]
     fn rgbe_codec() {
-        for c in [[0.01f32, 0.02, 0.03], [1.0, 0.5, 0.25], [40.0, 3.0, 0.1], [250.0, 250.0, 240.0]] {
+        for c in [
+            [0.01f32, 0.02, 0.03],
+            [1.0, 0.5, 0.25],
+            [40.0, 3.0, 0.1],
+            [250.0, 250.0, 240.0],
+        ] {
             let back = from_rgbe(to_rgbe(c));
             let max = c[0].max(c[1]).max(c[2]);
             for i in 0..3 {
-                assert!((back[i] - c[i]).abs() <= max / 255.0 + 1e-6, "{c:?} -> {back:?}");
+                assert!(
+                    (back[i] - c[i]).abs() <= max / 255.0 + 1e-6,
+                    "{c:?} -> {back:?}"
+                );
             }
         }
         assert_eq!(from_rgbe(to_rgbe([0.0; 3])), [0.0; 3]);
@@ -766,7 +983,17 @@ mod tests {
 
     #[test]
     fn harmonics_are_the_polynomial_seen_from_playcanvas() {
-        let p = [[0.06, 0.07, 0.08], [0.37, 0.4, 0.5], [0.03, -0.02, 0.04], [0.63, 0.6, 0.66], [0.67, 0.7, 0.71], [0.64, 0.65, 0.68], [0.01, 0.03, -0.02], [0.02, -0.01, 0.009], [0.05, 0.04, -0.03]];
+        let p = [
+            [0.06, 0.07, 0.08],
+            [0.37, 0.4, 0.5],
+            [0.03, -0.02, 0.04],
+            [0.63, 0.6, 0.66],
+            [0.67, 0.7, 0.71],
+            [0.64, 0.65, 0.68],
+            [0.01, 0.03, -0.02],
+            [0.02, -0.01, 0.009],
+            [0.05, 0.04, -0.03],
+        ];
         let sh = sh_from_polynomial(&p);
         for n in dirs() {
             for ch in 0..3 {
@@ -781,18 +1008,37 @@ mod tests {
     #[test]
     #[allow(clippy::needless_range_loop)]
     fn babylon_irradiance_is_its_harmonics() {
-        let p = [[0.06, 0.07, 0.08], [0.37, 0.4, 0.5], [0.03, -0.02, 0.04], [0.63, 0.6, 0.66], [0.67, 0.7, 0.71], [0.64, 0.65, 0.68], [0.01, 0.03, -0.02], [0.02, -0.01, 0.009], [0.05, 0.04, -0.03]];
+        let p = [
+            [0.06, 0.07, 0.08],
+            [0.37, 0.4, 0.5],
+            [0.03, -0.02, 0.04],
+            [0.63, 0.6, 0.66],
+            [0.67, 0.7, 0.71],
+            [0.64, 0.65, 0.68],
+            [0.01, 0.03, -0.02],
+            [0.02, -0.01, 0.009],
+            [0.05, 0.04, -0.03],
+        ];
         let q = babylon_irradiance(&p);
-        let (c0, c1, c2) = ((1.0 / (4.0 * PI)).sqrt(), (3.0 / (4.0 * PI)).sqrt(), (5.0 / (16.0 * PI)).sqrt());
+        let (c0, c1, c2) = (
+            (1.0 / (4.0 * PI)).sqrt(),
+            (3.0 / (4.0 * PI)).sqrt(),
+            (5.0 / (16.0 * PI)).sqrt(),
+        );
         for ch in 0..3 {
             let [x, y, _, xx, yy, zz, ..] = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(|i| p[i][ch]);
             let l00 = (xx + yy) * 0.376127 + zz * 0.376126;
             let l20 = zz * 1.34567 - (xx + yy) * 0.672834;
             // Straight up: l00 + l1-1 − l20 − l22 (each times π and its constant).
-            let up = PI * (l00 * c0 + y * 0.977204 * c1 - l20 * c2 - (xx - yy) * 1.16538 * (15.0 / (16.0 * PI)).sqrt());
+            let up = PI
+                * (l00 * c0 + y * 0.977204 * c1
+                    - l20 * c2
+                    - (xx - yy) * 1.16538 * (15.0 / (16.0 * PI)).sqrt());
             assert!((eval_polynomial(&q, [0.0, 1.0, 0.0], ch) - up).abs() < 1e-12);
             // Along +x: l00 + l11 − l20 + l22.
-            let east = PI * (l00 * c0 + x * 0.977204 * c1 - l20 * c2 + (xx - yy) * 1.16538 * (15.0 / (16.0 * PI)).sqrt());
+            let east = PI
+                * (l00 * c0 + x * 0.977204 * c1 - l20 * c2
+                    + (xx - yy) * 1.16538 * (15.0 / (16.0 * PI)).sqrt());
             assert!((eval_polynomial(&q, [1.0, 0.0, 0.0], ch) - east).abs() < 1e-12);
         }
     }
@@ -804,7 +1050,11 @@ mod tests {
         let sun = normalize([0.6, 0.5, -0.62]);
         let sky = |d: [f64; 3]| {
             let k = cos(d, sun).max(0.0).powi(8);
-            [(1.0 + d[1] + 4.0 * k) as f32, (1.0 + 0.5 * d[0] + 3.0 * k) as f32, (1.0 + 0.5 * d[2] + 2.0 * k) as f32]
+            [
+                (1.0 + d[1] + 4.0 * k) as f32,
+                (1.0 + 0.5 * d[0] + 3.0 * k) as f32,
+                (1.0 + 0.5 * d[2] + 2.0 * k) as f32,
+            ]
         };
         let size = 64;
         let mut faces: [Vec<[f32; 3]>; 6] = Default::default();
@@ -817,14 +1067,20 @@ mod tests {
                 }
             }
         }
-        let env = BabylonSky { cube: Cube { size, faces }, polynomial: [[0.0; 3]; 9] };
+        let env = BabylonSky {
+            cube: Cube { size, faces },
+            polynomial: [[0.0; 3]; 9],
+        };
         let pc = convert(&env, 32);
         let back = read_pcenv(&write_pcenv(&pc, "test").unwrap()).unwrap();
         for e in dirs() {
             let want = sky(babylon_dir_for_cube(e));
             let got = back.cube.sample(e);
             for i in 0..3 {
-                assert!((got[i] - want[i] as f64).abs() < 0.12 * want[i] as f64 + 0.05, "{e:?}: {got:?} vs {want:?}");
+                assert!(
+                    (got[i] - want[i] as f64).abs() < 0.12 * want[i] as f64 + 0.05,
+                    "{e:?}: {got:?} vs {want:?}"
+                );
             }
         }
     }
@@ -841,7 +1097,8 @@ mod tests {
                     let t = (y as f64 + 0.5) / n as f64 * 2.0 - 1.0;
                     let w = (1.0 + s * s + t * t).powf(-1.5);
                     let c = cube.faces[f][y * n + x];
-                    let l = w * (0.2126 * c[0] as f64 + 0.7152 * c[1] as f64 + 0.0722 * c[2] as f64);
+                    let l =
+                        w * (0.2126 * c[0] as f64 + 0.7152 * c[1] as f64 + 0.0722 * c[2] as f64);
                     let d = world(face_dir(f, s, t));
                     for i in 0..3 {
                         m[i] += d[i] * l;
@@ -854,7 +1111,11 @@ mod tests {
 
     /// The direction of three linear terms (x, y, z), each RGB weighted by luminance.
     fn light_dir(xyz: [[f64; 3]; 3]) -> [f64; 3] {
-        normalize(xyz.map(|c| (0..3).map(|ch| c[ch] * [0.2126, 0.7152, 0.0722][ch]).sum::<f64>()))
+        normalize(xyz.map(|c| {
+            (0..3)
+                .map(|ch| c[ch] * [0.2126, 0.7152, 0.0722][ch])
+                .sum::<f64>()
+        }))
     }
 
     fn horizontal(v: [f64; 3]) -> [f64; 3] {
@@ -865,14 +1126,18 @@ mod tests {
     /// PlayCanvas reads them.
     #[test]
     fn committed_sky_faces_and_harmonics_agree() {
-        let pc = read_pcenv(&std::fs::read(pcenv_path()).expect("the .pcenv (cargo envconv)")).unwrap();
+        let pc =
+            read_pcenv(&std::fs::read(pcenv_path()).expect("the .pcenv (cargo envconv)")).unwrap();
         assert_eq!(pc.cube.size, OUT_SIZE);
         // PlayCanvas's environment lookup for world direction d reads its cube at (-d.x, d.y, d.z),
         // so cube direction e is world direction (-e.x, e.y, e.z).
         let atlas = mean_light(&pc.cube, &|e| [-e[0], e[1], e[2]]);
         let sh = light_dir([pc.sh[1], pc.sh[2], pc.sh[3]]);
         assert!(cos(atlas, sh) > 0.99, "cube {atlas:?} vs harmonics {sh:?}");
-        assert!(cos(horizontal(atlas), horizontal(sh)) > 0.95, "cube {atlas:?} vs harmonics {sh:?}");
+        assert!(
+            cos(horizontal(atlas), horizontal(sh)) > 0.95,
+            "cube {atlas:?} vs harmonics {sh:?}"
+        );
     }
 
     /// The committed `.pcenv` is what the HDRI converts to now (when `cargo envconv` has downloaded
@@ -881,27 +1146,48 @@ mod tests {
     #[test]
     fn committed_sky_is_the_hdri() {
         let Ok(bytes) = std::fs::read(hdri_path()) else {
-            eprintln!("committed_sky_is_the_hdri: skipped, no {} (cargo envconv downloads it)", hdri_path().display());
+            eprintln!(
+                "committed_sky_is_the_hdri: skipped, no {} (cargo envconv downloads it)",
+                hdri_path().display()
+            );
             return;
         };
-        assert_eq!(download::sha256_hex(&bytes), HDRI_SHA256, "{} isn't the pinned HDRI", hdri_path().display());
+        assert_eq!(
+            download::sha256_hex(&bytes),
+            HDRI_SHA256,
+            "{} isn't the pinned HDRI",
+            hdri_path().display()
+        );
         let sky = babylon_sky(&read_hdr(&bytes).unwrap());
         let faces = mean_light(&sky.cube, &|d| d);
         let poly = light_dir([sky.polynomial[0], sky.polynomial[1], sky.polynomial[2]]);
-        assert!(cos(faces, poly) > 0.99, "faces {faces:?} vs polynomial {poly:?}");
-        assert!(cos(horizontal(faces), horizontal(poly)) > 0.95, "faces {faces:?} vs polynomial {poly:?}");
+        assert!(
+            cos(faces, poly) > 0.99,
+            "faces {faces:?} vs polynomial {poly:?}"
+        );
+        assert!(
+            cos(horizontal(faces), horizontal(poly)) > 0.95,
+            "faces {faces:?} vs polynomial {poly:?}"
+        );
 
-        let pc = read_pcenv(&std::fs::read(pcenv_path()).expect("the .pcenv (cargo envconv)")).unwrap();
+        let pc =
+            read_pcenv(&std::fs::read(pcenv_path()).expect("the .pcenv (cargo envconv)")).unwrap();
         let fresh = convert(&sky, OUT_SIZE);
         for ch in 0..3 {
             for i in 0..9 {
-                assert!((fresh.sh[i][ch] - pc.sh[i][ch]).abs() < 1e-6, "the .pcenv is stale: run cargo envconv");
+                assert!(
+                    (fresh.sh[i][ch] - pc.sh[i][ch]).abs() < 1e-6,
+                    "the .pcenv is stale: run cargo envconv"
+                );
             }
         }
         for f in 0..6 {
             for (a, b) in fresh.cube.faces[f].iter().zip(&pc.cube.faces[f]) {
                 let max = a[0].max(a[1]).max(a[2]);
-                assert!((0..3).all(|i| (a[i] - b[i]).abs() <= max / 128.0 + 1e-6), "the .pcenv is stale: run cargo envconv");
+                assert!(
+                    (0..3).all(|i| (a[i] - b[i]).abs() <= max / 128.0 + 1e-6),
+                    "the .pcenv is stale: run cargo envconv"
+                );
             }
         }
     }

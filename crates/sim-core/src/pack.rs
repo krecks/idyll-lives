@@ -279,7 +279,10 @@ mod tests {
         assert_eq!(v["tags"][0], "spa");
         assert!(v.get("include").is_none() && v.get("$comment").is_none());
         assert!(v.get("voice").is_none(), "spoken lines are the web side's");
-        assert!(v.get("talk").is_none(), "the language model's words are the web side's");
+        assert!(
+            v.get("talk").is_none(),
+            "the language model's words are the web side's"
+        );
     }
 
     #[test]

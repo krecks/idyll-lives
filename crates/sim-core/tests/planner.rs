@@ -64,10 +64,18 @@ fn a_planned_workout_happens_most_days() {
     let (mut real, mut kept, mut total) = (0, 0, 0);
     let mut strength = Vec::new();
     for w in &weeks {
-        let blocks: Vec<_> = w.sims[0].planner.history.iter().filter(|b| b.day >= 2).collect();
+        let blocks: Vec<_> = w.sims[0]
+            .planner
+            .history
+            .iter()
+            .filter(|b| b.day >= 2)
+            .collect();
         total += blocks.len();
         kept += blocks.iter().filter(|b| b.outcome == Outcome::Kept).count();
-        real += blocks.iter().filter(|b| matches!(b.outcome, Outcome::Kept | Outcome::Cut)).count();
+        real += blocks
+            .iter()
+            .filter(|b| matches!(b.outcome, Outcome::Kept | Outcome::Cut))
+            .count();
         let skipped_without_reason = w.sims[0]
             .planner
             .history
@@ -76,7 +84,10 @@ fn a_planned_workout_happens_most_days() {
         assert!(!skipped_without_reason, "every miss has a reason");
         strength.push(w.sims[0].skills[w.content.skill_index("strength").unwrap()]);
     }
-    assert!(kept >= 1 && real * 2 >= total, "{kept} kept, {real} of {total} with real time");
+    assert!(
+        kept >= 1 && real * 2 >= total,
+        "{kept} kept, {real} of {total} with real time"
+    );
     let mean = strength.iter().sum::<f32>() / strength.len() as f32;
     // (Some weeks hardly train at all: a bench out of the way, a busy week. On average they do.)
     assert!(mean > 0.15, "strength {strength:?}");
@@ -107,7 +118,8 @@ fn nowhere_to_do_it_becomes_a_wish_until_it_is_bought() {
         .position(|a| a.id == "train")
         .unwrap();
     assert!(w.sims[0].planner.wishes.contains(&(train, Some(piano))));
-    w.buy(0, "piano", None, Default::default()).expect("room for a piano");
+    w.buy(0, "piano", None, Default::default())
+        .expect("room for a piano");
     w.tick_once();
     assert!(w.sims[0].planner.wishes.is_empty(), "the wish came true");
 }
@@ -143,8 +155,20 @@ fn urgent_needs_still_come_first() {
 #[test]
 fn disciplined_residents_skip_less_than_lazy_ones() {
     let mut w = town(10);
-    let read = w.content.activities.iter().find(|a| a.id == "read").unwrap().clone();
-    let relax = w.content.activities.iter().find(|a| a.id == "relax").unwrap().clone();
+    let read = w
+        .content
+        .activities
+        .iter()
+        .find(|a| a.id == "read")
+        .unwrap()
+        .clone();
+    let relax = w
+        .content
+        .activities
+        .iter()
+        .find(|a| a.id == "relax")
+        .unwrap()
+        .clone();
     let mut chance = |traits: &[&str], activity| {
         let s = &mut w.sims[0];
         s.traits = traits.iter().map(|t| t.to_string()).collect();
@@ -158,7 +182,10 @@ fn disciplined_residents_skip_less_than_lazy_ones() {
     // Traits that dislike an activity skip it more: an energetic resident and lounging around.
     let energetic_relax = chance(&["energetic"], &relax);
     let energetic_read = chance(&["energetic"], &read);
-    assert!(energetic_relax > energetic_read, "{energetic_relax} vs {energetic_read}");
+    assert!(
+        energetic_relax > energetic_read,
+        "{energetic_relax} vs {energetic_read}"
+    );
 }
 
 #[test]
@@ -278,10 +305,24 @@ fn add_goal(w: &mut World, goal: serde_json::Value) -> Result<(), sim_core::Erro
 fn goals_can_be_reordered_and_are_not_doubled() {
     let mut w = town(3);
     add_goal(&mut w, json!({"def": "friends", "target": 23})).unwrap();
-    add_goal(&mut w, json!({"def": "skill", "skill": "cooking", "target": 9})).unwrap();
+    add_goal(
+        &mut w,
+        json!({"def": "skill", "skill": "cooking", "target": 9}),
+    )
+    .unwrap();
     add_goal(&mut w, json!({"def": "friends", "target": 25})).unwrap();
-    assert!(add_goal(&mut w, json!({"def": "friends", "target": 23})).is_err(), "the same goal twice");
-    let order = |w: &World| w.sims[0].planner.goals.iter().map(|g| g.target).collect::<Vec<_>>();
+    assert!(
+        add_goal(&mut w, json!({"def": "friends", "target": 23})).is_err(),
+        "the same goal twice"
+    );
+    let order = |w: &World| {
+        w.sims[0]
+            .planner
+            .goals
+            .iter()
+            .map(|g| g.target)
+            .collect::<Vec<_>>()
+    };
     let cmd = json!({"type": "moveGoal", "sim": 0, "index": 2, "to": 0}).to_string();
     w.apply(Command::from_json(&cmd).unwrap()).unwrap();
     assert_eq!(order(&w), [25.0, 23.0, 9.0]);
@@ -308,10 +349,19 @@ fn up_to_ten_goals_and_lower_ones_steer_less() {
 fn a_save_with_the_same_goal_twice_loads_it_once() {
     let mut w = town(3);
     add_goal(&mut w, json!({"def": "friends", "target": 23})).unwrap();
-    add_goal(&mut w, json!({"def": "skill", "skill": "cooking", "target": 9})).unwrap();
+    add_goal(
+        &mut w,
+        json!({"def": "skill", "skill": "cooking", "target": 9}),
+    )
+    .unwrap();
     let twice = w.sims[0].planner.goals[0];
     w.sims[0].planner.goals.push(twice);
     let loaded = World::from_save_json(&common::content(), &w.save_json()).unwrap();
-    let targets: Vec<f32> = loaded.sims[0].planner.goals.iter().map(|g| g.target).collect();
+    let targets: Vec<f32> = loaded.sims[0]
+        .planner
+        .goals
+        .iter()
+        .map(|g| g.target)
+        .collect();
     assert_eq!(targets, [23.0, 9.0]);
 }

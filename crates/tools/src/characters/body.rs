@@ -39,7 +39,9 @@ use super::meshops::smooth_normals;
 use super::np::{clip, lstsq, mean, mean_rows, radians, sign, smoothstep, unique};
 use super::rig::{BASE_STAGE, NB, b, joints, proportions};
 use super::sparse::Csr;
-use super::subdiv::{Subdivision, check_closed, limit_matrix, orient, polygon_triangles, subdivision, triangles};
+use super::subdiv::{
+    Subdivision, check_closed, limit_matrix, orient, polygon_triangles, subdivision, triangles,
+};
 use super::{Cache, Dense, M3, Mesh, V3, key, v3};
 
 const SPINE: [&str; 4] = ["pelvis", "spine_01", "spine_02", "spine_03"];
@@ -81,7 +83,11 @@ fn bone(name: String) -> &'static str {
 
 /// Bone weights along the spine by height (hat functions between the segments' middles).
 fn spine_weights(p: &[V3; NB]) -> impl Fn(f64) -> Weights {
-    let ys: Vec<f64> = SPINE.iter().chain(["neck_01"].iter()).map(|n| p[b(n)].y).collect();
+    let ys: Vec<f64> = SPINE
+        .iter()
+        .chain(["neck_01"].iter())
+        .map(|n| p[b(n)].y)
+        .collect();
     let mids: Vec<f64> = (0..4).map(|i| (ys[i] + ys[i + 1]) / 2.0).collect();
     move |y: f64| {
         if y <= mids[0] {
@@ -160,8 +166,22 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
         let jsh = pj(&format!("upperarm_{sd}"));
         let o = v3(sx, 0.0, 0.0);
         // (chi: 135 180 225 | 270 | 315 0 45 | 90): bottom front .. round the loop.
-        let spec = [(-0.75, -1.5, 0.75), (-0.82, -1.95, 0.0), (-0.75, -1.5, -0.72), (-0.6, -0.75, -1.0), (-0.4, 0.05, -0.78), (-0.2, 0.25, 0.0), (-0.4, 0.05, 0.8), (-0.6, -0.75, 1.02)];
-        roots.insert(sd, spec.iter().map(|&(dx, dy, dz)| jsh + (o * dx + y * dy + z * dz) * r_a).collect());
+        let spec = [
+            (-0.75, -1.5, 0.75),
+            (-0.82, -1.95, 0.0),
+            (-0.75, -1.5, -0.72),
+            (-0.6, -0.75, -1.0),
+            (-0.4, 0.05, -0.78),
+            (-0.2, 0.25, 0.0),
+            (-0.4, 0.05, 0.8),
+            (-0.6, -0.75, 1.02),
+        ];
+        roots.insert(
+            sd,
+            spec.iter()
+                .map(|&(dx, dy, dz)| jsh + (o * dx + y * dy + z * dz) * r_a)
+                .collect(),
+        );
     }
 
     // Torso rings T1 (hips) .. T7 (shoulders); (y, half width, front depth, back depth, z,
@@ -169,16 +189,68 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
     let hw = hip_x + r_th * 0.85;
     let f = |a: f64, m: f64| if female { a } else { m };
     let rows = [
-        (y_hip + 0.012 * h, hw, 0.064 * h + bel * 0.3, f(0.084, 0.078) * h, -0.006 * h, 2.3),
-        (y_hip + 0.55 * (y_s1 - y_hip), f(0.106, 0.095) * h * (1.0 + 0.1 * yg), 0.062 * h + bel * 0.7, f(0.075, 0.07) * h, 0.0, 2.3),
-        ((y_s1 + y_s2) / 2.0, f(0.068, 0.08) * h * s.waist * (1.0 + 0.25 * yg), 0.062 * h + bel, 0.056 * h, 0.003 * h, 2.3),
-        (y_s2 + 0.45 * (y_s3 - y_s2), f(0.085, 0.098) * h * (1.0 + 0.12 * yg), 0.068 * h + bel * 0.6, 0.060 * h, 0.002 * h, 2.2),
-        (sh[1] - 1.95 * r_a, f(0.092, 0.108) * h, f(0.07, 0.074) * h + bel * 0.2, 0.064 * h, 0.0, 2.2),
-        (sh[1] - 0.75 * r_a, f(0.096, 0.112) * h, 0.07 * h, 0.064 * h, -0.002 * h, 2.2),
-        (sh[1] + 0.25 * r_a, f(0.09, 0.1) * h, 0.05 * h, 0.055 * h, -0.006 * h, 2.2),
+        (
+            y_hip + 0.012 * h,
+            hw,
+            0.064 * h + bel * 0.3,
+            f(0.084, 0.078) * h,
+            -0.006 * h,
+            2.3,
+        ),
+        (
+            y_hip + 0.55 * (y_s1 - y_hip),
+            f(0.106, 0.095) * h * (1.0 + 0.1 * yg),
+            0.062 * h + bel * 0.7,
+            f(0.075, 0.07) * h,
+            0.0,
+            2.3,
+        ),
+        (
+            (y_s1 + y_s2) / 2.0,
+            f(0.068, 0.08) * h * s.waist * (1.0 + 0.25 * yg),
+            0.062 * h + bel,
+            0.056 * h,
+            0.003 * h,
+            2.3,
+        ),
+        (
+            y_s2 + 0.45 * (y_s3 - y_s2),
+            f(0.085, 0.098) * h * (1.0 + 0.12 * yg),
+            0.068 * h + bel * 0.6,
+            0.060 * h,
+            0.002 * h,
+            2.2,
+        ),
+        (
+            sh[1] - 1.95 * r_a,
+            f(0.092, 0.108) * h,
+            f(0.07, 0.074) * h + bel * 0.2,
+            0.064 * h,
+            0.0,
+            2.2,
+        ),
+        (
+            sh[1] - 0.75 * r_a,
+            f(0.096, 0.112) * h,
+            0.07 * h,
+            0.064 * h,
+            -0.002 * h,
+            2.2,
+        ),
+        (
+            sh[1] + 0.25 * r_a,
+            f(0.09, 0.1) * h,
+            0.05 * h,
+            0.055 * h,
+            -0.006 * h,
+            2.2,
+        ),
     ];
     let th12: Vec<f64> = (0..12).map(|i| radians(i as f64 * 30.0)).collect();
-    let mut t: Vec<Vec<V3>> = rows.iter().map(|&(yy, a, bf, bb, zc, pw)| ring_pts(v3(0.0, yy, zc), x, z, a, bf, bb, &th12, pw)).collect();
+    let mut t: Vec<Vec<V3>> = rows
+        .iter()
+        .map(|&(yy, a, bf, bb, zc, pw)| ring_pts(v3(0.0, yy, zc), x, z, a, bf, bb, &th12, pw))
+        .collect();
     // Bust (female, gentle), shoulder blades, buttocks, belly.
     if female {
         for k in [1, 11] {
@@ -228,10 +300,18 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
         let side = if xx > 0.0 { "r" } else { "l" };
         let thigh = one(bone(format!("thigh_{side}")));
         if r == 0 {
-            return if xx.abs() > 0.3 * hw { mix(&[(0.62, &w), (0.38, &thigh)]) } else { mix(&[(0.76, &w), (0.12, &one("thigh_l")), (0.12, &one("thigh_r"))]) };
+            return if xx.abs() > 0.3 * hw {
+                mix(&[(0.62, &w), (0.38, &thigh)])
+            } else {
+                mix(&[(0.76, &w), (0.12, &one("thigh_l")), (0.12, &one("thigh_r"))])
+            };
         }
         if r == 1 {
-            return if xx.abs() > 0.3 * hw { mix(&[(0.9, &w), (0.1, &thigh)]) } else { w };
+            return if xx.abs() > 0.3 * hw {
+                mix(&[(0.9, &w), (0.1, &thigh)])
+            } else {
+                w
+            };
         }
         let clav = bone(format!("clavicle_{side}"));
         if r == 6 {
@@ -249,7 +329,10 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
     };
 
     let arm_w = |chi_index: usize, side: &str| -> Weights {
-        let (cl, ua) = (bone(format!("clavicle_{side}")), bone(format!("upperarm_{side}")));
+        let (cl, ua) = (
+            bone(format!("clavicle_{side}")),
+            bone(format!("upperarm_{side}")),
+        );
         // Root loop entries: 0-2 bottom (armpit), 3 back, 4-6 top, 7 front.
         if chi_index <= 2 {
             return vec![("spine_03", 0.5), (cl, 0.15), (ua, 0.35)];
@@ -263,7 +346,19 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
     let mut root_index: HashMap<(usize, usize), (usize, &str)> = HashMap::new();
     for sd in ["l", "r"] {
         let (k0, k1, k2) = arm_k(sd);
-        for (i, rk) in [(4, k0), (4, k1), (4, k2), (5, k2), (6, k2), (6, k1), (6, k0), (5, k0)].into_iter().enumerate() {
+        for (i, rk) in [
+            (4, k0),
+            (4, k1),
+            (4, k2),
+            (5, k2),
+            (6, k2),
+            (6, k1),
+            (6, k0),
+            (5, k0),
+        ]
+        .into_iter()
+        .enumerate()
+        {
             root_index.insert(rk, (i, sd));
         }
     }
@@ -276,7 +371,16 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
                 continue;
             }
             if let Some(&(i, sd)) = root_index.get(&(r, k)) {
-                ids.push(c.add(q, arm_w(i, sd), "torso", None, Tags { arm: 0.5, blush: 0.0 }));
+                ids.push(c.add(
+                    q,
+                    arm_w(i, sd),
+                    "torso",
+                    None,
+                    Tags {
+                        arm: 0.5,
+                        blush: 0.0,
+                    },
+                ));
             } else {
                 ids.push(c.add(q, tw(r, k), "torso", None, Tags::default()));
             }
@@ -295,7 +399,11 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
     for (sd, sx) in [("r", 1.0), ("l", -1.0)] {
         let id = c.add(
             v3(sx * r_n * 1.3, y_neck + 0.012 * h, zn - 0.1 * r_n),
-            vec![("spine_03", 0.35), ("neck_01", 0.3), (bone(format!("clavicle_{sd}")), 0.35)],
+            vec![
+                ("spine_03", 0.35),
+                ("neck_01", 0.3),
+                (bone(format!("clavicle_{sd}")), 0.35),
+            ],
             "torso",
             None,
             Tags::default(),
@@ -318,13 +426,24 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
     c.face(&[cap["l"], t7[9], t7[8], t7[7]]);
 
     // Neck: the shoulder cap's loop up to a ring under the jaw, then the head.
-    let n0 = vec![t7[0], t7[1], cap["r"], t7[5], t7[6], t7[7], cap["l"], t7[11]];
+    let n0 = vec![
+        t7[0], t7[1], cap["r"], t7[5], t7[6], t7[7], cap["l"], t7[11],
+    ];
     c.neck_loop = n0.clone();
     let pr_head = pr.hh * h;
     let chin = h - pr_head;
     let y_n = chin - 0.01 * h + 0.005 * h * yg;
     let psi: Vec<f64> = (0..8).map(|i| radians(i as f64 * 45.0)).collect();
-    let mut nh = ring_pts(v3(0.0, y_n, zn - 0.2 * r_n), x, z, r_n, r_n * 0.95, r_n * 1.0, &psi, 2.0);
+    let mut nh = ring_pts(
+        v3(0.0, y_n, zn - 0.2 * r_n),
+        x,
+        z,
+        r_n,
+        r_n * 0.95,
+        r_n * 1.0,
+        &psi,
+        2.0,
+    );
     for k in [3, 4, 5] {
         // The nape is higher than the throat.
         nh[k][1] += 0.012 * h;
@@ -338,8 +457,13 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
     // Arms and hands.
     for sd in ["r", "l"] {
         let (k0, k1, k2) = arm_k(sd);
-        let lp = vec![tid[4][k0], tid[4][k1], tid[4][k2], tid[5][k2], tid[6][k2], tid[6][k1], tid[6][k0], tid[5][k0]];
-        let chi: Vec<f64> = [135.0, 180.0, 225.0, 270.0, 315.0, 0.0, 45.0, 90.0].map(radians).to_vec();
+        let lp = vec![
+            tid[4][k0], tid[4][k1], tid[4][k2], tid[5][k2], tid[6][k2], tid[6][k1], tid[6][k0],
+            tid[5][k0],
+        ];
+        let chi: Vec<f64> = [135.0, 180.0, 225.0, 270.0, 315.0, 0.0, 45.0, 90.0]
+            .map(radians)
+            .to_vec();
         let nm = |n: &str| bone(format!("{n}_{sd}"));
         let (jsh, jel, jwr) = (pj(nm("upperarm")), pj(nm("lowerarm")), pj(nm("hand")));
         let d = unit(jwr - jsh);
@@ -347,15 +471,49 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
         let upper = (jel - jsh).norm();
         let lower = (jwr - jel).norm();
         let rings: [(V3, f64, f64, Weights); 4] = [
-            (jsh + d * (0.32 * upper), 1.0, 0.98, vec![(nm("upperarm"), 0.9), (nm("clavicle"), 0.1)]),
-            (jel, 0.84, 0.84, vec![(nm("upperarm"), 0.5), (nm("lowerarm"), 0.5)]),
-            (jel + d * (0.45 * lower), 0.80, 0.86, vec![(nm("lowerarm"), 1.0)]),
-            (jwr - d * (0.02 * lower), 0.5, 0.68, vec![(nm("lowerarm"), 0.45), (nm("hand"), 0.55)]),
+            (
+                jsh + d * (0.32 * upper),
+                1.0,
+                0.98,
+                vec![(nm("upperarm"), 0.9), (nm("clavicle"), 0.1)],
+            ),
+            (
+                jel,
+                0.84,
+                0.84,
+                vec![(nm("upperarm"), 0.5), (nm("lowerarm"), 0.5)],
+            ),
+            (
+                jel + d * (0.45 * lower),
+                0.80,
+                0.86,
+                vec![(nm("lowerarm"), 1.0)],
+            ),
+            (
+                jwr - d * (0.02 * lower),
+                0.5,
+                0.68,
+                vec![(nm("lowerarm"), 0.45), (nm("hand"), 0.55)],
+            ),
         ];
         let mut prev = lp;
         for (cc, ru, rf, w) in &rings {
-            let pts: Vec<V3> = chi.iter().map(|&a| cc + u * (r_a * ru * se(a.cos(), 2.2)) + z * (r_a * rf * se(a.sin(), 2.2))).collect();
-            let cur = c.ring(&pts, Per::All(w), "arm", None, RingTags { arm: Per::All(1.0), ..Default::default() });
+            let pts: Vec<V3> = chi
+                .iter()
+                .map(|&a| {
+                    cc + u * (r_a * ru * se(a.cos(), 2.2)) + z * (r_a * rf * se(a.sin(), 2.2))
+                })
+                .collect();
+            let cur = c.ring(
+                &pts,
+                Per::All(w),
+                "arm",
+                None,
+                RingTags {
+                    arm: Per::All(1.0),
+                    ..Default::default()
+                },
+            );
             c.band(&prev, &cur, &[]);
             prev = cur;
         }
@@ -367,24 +525,59 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
         let lpm = (k1j - jwr).norm();
         // (A small child's hand is a little wider, its fingers plumper and shorter.)
         let (wp, tp) = ((0.80 + 0.12 * yg) * lpm, 0.30 * lpm);
-        let zs: Vec<f64> = [-0.5, -0.25, 0.0, 0.25, 0.5].iter().zip([0.9, 1.0, 1.0, 1.0, 0.92]).map(|(&a, m)| a * wp * m).collect();
-        let order: [(usize, f64); 10] = [(3, -1.0), (2, -1.0), (1, -1.0), (0, -1.0), (0, 1.0), (1, 1.0), (2, 1.0), (3, 1.0), (4, 1.0), (4, -1.0)];
+        let zs: Vec<f64> = [-0.5, -0.25, 0.0, 0.25, 0.5]
+            .iter()
+            .zip([0.9, 1.0, 1.0, 1.0, 0.92])
+            .map(|(&a, m)| a * wp * m)
+            .collect();
+        let order: [(usize, f64); 10] = [
+            (3, -1.0),
+            (2, -1.0),
+            (1, -1.0),
+            (0, -1.0),
+            (0, 1.0),
+            (1, 1.0),
+            (2, 1.0),
+            (3, 1.0),
+            (4, 1.0),
+            (4, -1.0),
+        ];
         // (The thumb's ball: palm-side offsets (towards the palm, forward) of columns 3 and 4.)
         let palm_ring = |tt: f64, scale: f64, ball: f64| -> Vec<V3> {
             let cc = jwr + d * (tt * lpm) - u * 0.06 * tp;
             order
                 .iter()
                 .map(|&(k, v)| {
-                    let swell = if v < 0.0 && k >= 3 { ball * [0.0, 0.0, 0.0, 0.6, 1.0][k] * lpm } else { 0.0 };
-                    cc + z * (zs[k] * scale + 0.5 * swell) + u * ((tp / 2.0) * v * (if k == 0 || k == 4 { 0.85 } else { 1.0 }) - swell)
+                    let swell = if v < 0.0 && k >= 3 {
+                        ball * [0.0, 0.0, 0.0, 0.6, 1.0][k] * lpm
+                    } else {
+                        0.0
+                    };
+                    cc + z * (zs[k] * scale + 0.5 * swell)
+                        + u * ((tp / 2.0) * v * (if k == 0 || k == 4 { 0.85 } else { 1.0 }) - swell)
                 })
                 .collect()
         };
-        let arm1 = || RingTags { arm: Per::All(1.0), ..Default::default() };
+        let arm1 = || RingTags {
+            arm: Per::All(1.0),
+            ..Default::default()
+        };
         let hand_w = one(nm("hand"));
-        let p1 = c.ring(&palm_ring(0.32, 0.92, 0.05), Per::All(&hand_w), "hand", None, arm1());
+        let p1 = c.ring(
+            &palm_ring(0.32, 0.92, 0.05),
+            Per::All(&hand_w),
+            "hand",
+            None,
+            arm1(),
+        );
         c.join(&wrist, &p1, &[0, 1, 2, 3, 5, 6, 7, 8]);
-        let p2 = c.ring(&palm_ring(0.64, 1.0, 0.04), Per::All(&hand_w), "hand", None, arm1());
+        let p2 = c.ring(
+            &palm_ring(0.64, 1.0, 0.04),
+            Per::All(&hand_w),
+            "hand",
+            None,
+            arm1(),
+        );
         c.band(&p1, &p2, &[8, 9]);
         // The knuckle ring: the back over the knuckles (about half hand, half fingers_01), the
         // palm's pads a little further out (more the fingers'), so the knuckles bend there;
@@ -397,20 +590,44 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
                 .map(|&(k, v)| {
                     let edge = if k == 0 || k == 4 { 0.85 } else { 1.0 };
                     if v > 0.0 {
-                        cc + d * (1.0 * lpm) + z * (zs[k] * 0.98) + u * (top * edge - if k == 0 || k == 4 { 0.0 } else { 0.012 * lpm })
+                        cc + d * (1.0 * lpm)
+                            + z * (zs[k] * 0.98)
+                            + u * (top * edge - if k == 0 || k == 4 { 0.0 } else { 0.012 * lpm })
                     } else {
                         cc + d * (1.08 * lpm) + z * (zs[k] * 0.98) - u * (pad * edge)
                     }
                 })
                 .collect();
             // Order: palm side 3 .. 0, the pinky's side, back 0 .. 4, the index's side, palm side 4.
-            out.insert(4, cc + d * (1.04 * lpm) + z * (zs[0] * 0.98 - 0.02 * lpm) - u * (0.01 * lpm));
-            out.insert(10, cc + d * (1.04 * lpm) + z * (zs[4] * 0.98 + 0.02 * lpm) - u * (0.01 * lpm));
+            out.insert(
+                4,
+                cc + d * (1.04 * lpm) + z * (zs[0] * 0.98 - 0.02 * lpm) - u * (0.01 * lpm),
+            );
+            out.insert(
+                10,
+                cc + d * (1.04 * lpm) + z * (zs[4] * 0.98 + 0.02 * lpm) - u * (0.01 * lpm),
+            );
             out
         };
         let wk = |f: f64| -> Weights { vec![(nm("hand"), 1.0 - f), (nm("fingers_01"), f)] };
-        let wks: Vec<Weights> = (0..12).map(|i| wk(if (5..10).contains(&i) { 0.45 } else if i == 4 || i == 10 { 0.6 } else { 0.7 })).collect();
-        let p3 = c.ring(&kn, Per::Each(&wks.iter().collect::<Vec<_>>()), "hand", None, arm1());
+        let wks: Vec<Weights> = (0..12)
+            .map(|i| {
+                wk(if (5..10).contains(&i) {
+                    0.45
+                } else if i == 4 || i == 10 {
+                    0.6
+                } else {
+                    0.7
+                })
+            })
+            .collect();
+        let p3 = c.ring(
+            &kn,
+            Per::Each(&wks.iter().collect::<Vec<_>>()),
+            "hand",
+            None,
+            arm1(),
+        );
         c.join(&p2, &p3, &[0, 1, 2, 3, 5, 6, 7, 8, 9, 11]);
         // Fingers, pinky (-z) to index: each leaves the knuckle ring between two of its columns,
         // a 6-ring (back two, the side towards the thumb, palm two, the other side) whose sides
@@ -432,33 +649,85 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
         let chub = 1.0 + 0.15 * yg;
         let wc = wk(0.9);
         let crotch: Vec<usize> = (1..4)
-            .map(|k| c.add(jwr + d * (1.2 * lpm) + z * (zs[k] * 0.98) - u * (0.045 * lpm), wc.clone(), "hand", None, Tags { arm: 1.0, blush: 0.0 }))
+            .map(|k| {
+                c.add(
+                    jwr + d * (1.2 * lpm) + z * (zs[k] * 0.98) - u * (0.045 * lpm),
+                    wc.clone(),
+                    "hand",
+                    None,
+                    Tags {
+                        arm: 1.0,
+                        blush: 0.0,
+                    },
+                )
+            })
             .collect();
         let w01 = one(nm("fingers_01"));
         let w02 = one(nm("fingers_02"));
         for fi in 0..4 {
-            let side = |k: isize| if k < 0 { p3[4] } else if k > 2 { p3[10] } else { crotch[k as usize] };
-            let loop_f = vec![p3[ki(fi, 1.0)], p3[ki(fi + 1, 1.0)], side(fi as isize), p3[ki(fi + 1, -1.0)], p3[ki(fi, -1.0)], side(fi as isize - 1)];
+            let side = |k: isize| {
+                if k < 0 {
+                    p3[4]
+                } else if k > 2 {
+                    p3[10]
+                } else {
+                    crotch[k as usize]
+                }
+            };
+            let loop_f = vec![
+                p3[ki(fi, 1.0)],
+                p3[ki(fi + 1, 1.0)],
+                side(fi as isize),
+                p3[ki(fi + 1, -1.0)],
+                p3[ki(fi, -1.0)],
+                side(fi as isize - 1),
+            ];
             // (Half width, half depth; distal length past the joint, in palm lengths. The palm side is fuller.)
-            let (hw, hd) = ([0.088, 0.098, 0.1, 0.098][fi] * chub, [0.095, 0.105, 0.107, 0.105][fi] * chub);
+            let (hw, hd) = (
+                [0.088, 0.098, 0.1, 0.098][fi] * chub,
+                [0.095, 0.105, 0.107, 0.105][fi] * chub,
+            );
             let tip = [0.25, 0.29, 0.31, 0.29][fi] * (1.0 - 0.3 * yg);
             let zf = (zs[fi] + zs[fi + 1]) / 2.0 * 0.98;
             let spread = (fi as f64 - 1.5) * 0.05;
             // (A 6-ring round cc facing ax: half width, half depth on the back and on the palm side.)
             let hex = |cc: V3, ax: V3, up: V3, hw: f64, back: f64, palm: f64| -> Vec<V3> {
                 let sd = unit(up.cross(&ax)) * sign(up.cross(&ax).dot(&z));
-                [(-0.5, 0.87), (0.5, 0.87), (1.0, 0.0), (0.5, -0.87), (-0.5, -0.87), (-1.0, 0.0)]
-                    .iter()
-                    .map(|&(a, b): &(f64, f64)| cc + sd * (a * hw * lpm) + up * (b * if b > 0.0 { back } else { palm } * lpm))
-                    .collect()
+                [
+                    (-0.5, 0.87),
+                    (0.5, 0.87),
+                    (1.0, 0.0),
+                    (0.5, -0.87),
+                    (-0.5, -0.87),
+                    (-1.0, 0.0),
+                ]
+                .iter()
+                .map(|&(a, b): &(f64, f64)| {
+                    cc + sd * (a * hw * lpm) + up * (b * if b > 0.0 { back } else { palm } * lpm)
+                })
+                .collect()
             };
             let pivot = jwr + d * pivot_d + u * pivot_u + z * (zf + spread * (pivot_d - lpm));
-            let a = hex(pivot - d * (0.04 * lpm), d, u, hw * 1.1, hd * 1.05, hd * 1.5);
+            let a = hex(
+                pivot - d * (0.04 * lpm),
+                d,
+                u,
+                hw * 1.1,
+                hd * 1.05,
+                hd * 1.5,
+            );
             let ra = c.ring(&a, Per::All(&w01), "hand", None, arm1());
             c.band(&loop_f, &ra, &[]);
             let rho: f64 = 0.2;
             let (ad, au) = (d * rho.cos() - u * rho.sin(), u * rho.cos() + d * rho.sin());
-            let b = hex(pivot + ad * (tip * lpm) + z * (spread * tip * lpm), ad, au, hw * 0.95, hd * 0.85, hd * 1.15);
+            let b = hex(
+                pivot + ad * (tip * lpm) + z * (spread * tip * lpm),
+                ad,
+                au,
+                hw * 0.95,
+                hd * 0.85,
+                hd * 1.15,
+            );
             let rb = c.ring(&b, Per::All(&w02), "hand", None, arm1());
             c.band(&ra, &rb, &[]);
             c.cap(&rb);
@@ -478,13 +747,35 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
         let tip = unit(d * 0.85 - u * 0.45 + z * 0.22);
         let mut prev_t = tl;
         let thumb: [(V3, V3, f64, f64, Weights); 2] = [
-            (t2, unit(unit(t2 - m) + tip), 0.15, 0.135, vec![(nm("thumb_01"), 0.5), (nm("thumb_02"), 0.5)]),
-            (t2 + tip * (0.42 * lpm), tip, 0.11, 0.1, vec![(nm("thumb_02"), 1.0)]),
+            (
+                t2,
+                unit(unit(t2 - m) + tip),
+                0.15,
+                0.135,
+                vec![(nm("thumb_01"), 0.5), (nm("thumb_02"), 0.5)],
+            ),
+            (
+                t2 + tip * (0.42 * lpm),
+                tip,
+                0.11,
+                0.1,
+                vec![(nm("thumb_02"), 1.0)],
+            ),
         ];
         for (cc, ax, thw, tht, w) in &thumb {
             let r = turn(out, *ax);
             let (rd, ru) = (r * d, r * up);
-            let pts: Vec<V3> = [(-0.5, 0.87), (-1.0, 0.0), (-0.5, -0.87), (0.5, -0.87), (1.0, 0.0), (0.5, 0.87)].iter().map(|&(a, b)| cc + (rd * (a * thw) + ru * (b * tht)) * lpm).collect();
+            let pts: Vec<V3> = [
+                (-0.5, 0.87),
+                (-1.0, 0.0),
+                (-0.5, -0.87),
+                (0.5, -0.87),
+                (1.0, 0.0),
+                (0.5, 0.87),
+            ]
+            .iter()
+            .map(|&(a, b)| cc + (rd * (a * thw) + ru * (b * tht)) * lpm)
+            .collect();
             let cur = c.ring(&pts, Per::All(w), "hand", None, arm1());
             c.band(&prev_t, &cur, &[]);
             prev_t = cur;
@@ -497,19 +788,53 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
         let (lp, psi): (Vec<usize>, Vec<f64>) = if sd == "r" {
             let mut l = tid[0][0..7].to_vec();
             l.push(crotch);
-            (l, [-45.0, 0.0, 45.0, 90.0, 135.0, 180.0, -135.0, -90.0].map(radians).to_vec())
+            (
+                l,
+                [-45.0, 0.0, 45.0, 90.0, 135.0, 180.0, -135.0, -90.0]
+                    .map(radians)
+                    .to_vec(),
+            )
         } else {
             let mut l = tid[0][6..12].to_vec();
             l.extend([tid[0][0], crotch]);
-            (l, [135.0, 180.0, -135.0, -90.0, -45.0, 0.0, 45.0, 90.0].map(radians).to_vec())
+            (
+                l,
+                [135.0, 180.0, -135.0, -90.0, -45.0, 0.0, 45.0, 90.0]
+                    .map(radians)
+                    .to_vec(),
+            )
         };
         let nm = |n: &str| bone(format!("{n}_{sd}"));
         let (jt, jk, ja) = (pj(nm("thigh")), pj(nm("calf")), pj(nm("foot")));
         let rings: [(V3, f64, f64, f64, Weights); 4] = [
-            (jt + (jk - jt) * 0.24, 1.0, 0.98, 1.06, vec![(nm("thigh"), 0.92), ("pelvis", 0.08)]),
-            (jt + (jk - jt) * 0.86, 0.68, 0.70, 0.64, vec![(nm("thigh"), 0.75), (nm("calf"), 0.25)]),
-            (jk + (ja - jk) * 0.22, 0.64, 0.64, 0.74, vec![(nm("calf"), 0.85), (nm("thigh"), 0.15)]),
-            (ja + (jk - ja) * 0.1, 0.42, 0.42, 0.44, vec![(nm("calf"), 0.5), (nm("foot"), 0.5)]),
+            (
+                jt + (jk - jt) * 0.24,
+                1.0,
+                0.98,
+                1.06,
+                vec![(nm("thigh"), 0.92), ("pelvis", 0.08)],
+            ),
+            (
+                jt + (jk - jt) * 0.86,
+                0.68,
+                0.70,
+                0.64,
+                vec![(nm("thigh"), 0.75), (nm("calf"), 0.25)],
+            ),
+            (
+                jk + (ja - jk) * 0.22,
+                0.64,
+                0.64,
+                0.74,
+                vec![(nm("calf"), 0.85), (nm("thigh"), 0.15)],
+            ),
+            (
+                ja + (jk - ja) * 0.1,
+                0.42,
+                0.42,
+                0.44,
+                vec![(nm("calf"), 0.5), (nm("foot"), 0.5)],
+            ),
         ];
         let mut prev = lp;
         let sx = if sd == "r" { 1.0 } else { -1.0 };
@@ -532,8 +857,22 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
         let fw = 0.33 * fl * (if female { 0.94 } else { 1.0 });
         let fx = ja[0];
         let feet: [(V3, f64, f64, f64, f64, Weights); 2] = [
-            (v3(fx, 0.5 * ja[1], ja[2] - 0.02 * fl), 45.0, fw * 0.92, 0.38 * fl, 0.38 * fl, one(nm("foot"))),
-            (v3(fx, 0.42 * ja[1], jb[2] - 0.2 * fl), 86.0, fw * 1.0, 0.29 * fl, 0.30 * fl, vec![(nm("ball"), 0.5), (nm("foot"), 0.5)]),
+            (
+                v3(fx, 0.5 * ja[1], ja[2] - 0.02 * fl),
+                45.0,
+                fw * 0.92,
+                0.38 * fl,
+                0.38 * fl,
+                one(nm("foot")),
+            ),
+            (
+                v3(fx, 0.42 * ja[1], jb[2] - 0.2 * fl),
+                86.0,
+                fw * 1.0,
+                0.29 * fl,
+                0.30 * fl,
+                vec![(nm("ball"), 0.5), (nm("foot"), 0.5)],
+            ),
         ];
         for (cc, al, a, bt, bb, w) in &feet {
             let al = radians(*al);
@@ -546,7 +885,13 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
             c.band(&prev, &cur, &[]);
             prev = cur;
         }
-        let tip = c.add(v3(fx, 0.4 * ja[1], jb[2] + 0.04 * fl), one(nm("ball")), "foot", None, Tags::default());
+        let tip = c.add(
+            v3(fx, 0.4 * ja[1], jb[2] + 0.04 * fl),
+            one(nm("ball")),
+            "foot",
+            None,
+            Tags::default(),
+        );
         for i in [1, 3, 5, 7] {
             c.face(&[prev[i], prev[(i + 1) % 8], prev[(i + 2) % 8], tip]);
         }
@@ -607,14 +952,31 @@ impl Topology {
                     if row.iter().any(|&(c, _)| cage.region[c] == "ear") {
                         return 0.0;
                     }
-                    let head: f64 = row.iter().filter(|&&(c, _)| cage.region[c] == "head").map(|&(_, v)| v).sum();
+                    let head: f64 = row
+                        .iter()
+                        .filter(|&&(c, _)| cage.region[c] == "head")
+                        .map(|&(_, v)| v)
+                        .sum();
                     smoothstep(0.8, 1.0, head)
                 })
                 .collect()
         };
         let (snap1, snap2) = (share(&body), share(&fine));
         let lod_tris = polygon_triangles(&lod_faces);
-        Topology { faces, n, s, body, a, lu, snap1, snap2, lod_tris, s2, fine, fine_m }
+        Topology {
+            faces,
+            n,
+            s,
+            body,
+            a,
+            lu,
+            snap1,
+            snap2,
+            lod_tris,
+            s2,
+            fine,
+            fine_m,
+        }
     }
 
     /// Cage positions whose limit points are `t` (splu's solve, here a dense LU).
@@ -636,9 +998,25 @@ impl Topology {
     /// between them the face grid's uneven spacing and the ends of its partial lines (3-valent vertices,
     /// pentagons) dent it by up to 4 mm and turn its normals by up to 17 degrees, which showed as patches
     /// on the cheeks; snapped, the head is the smooth one plus the features.
-    fn snapped(&self, fine: bool, base: &[V3], ctrl: &[V3], onto: &impl Fn(V3) -> V3, sockets: &impl Fn(V3) -> V3) -> Vec<V3> {
-        let (m, w) = if fine { (&self.fine, &self.snap2) } else { (&self.body, &self.snap1) };
-        m.apply(base).iter().zip(m.apply(ctrl)).zip(w).map(|((b, p), &w)| sockets(if w > 0.0 { p + (onto(*b) - b) * w } else { p })).collect()
+    fn snapped(
+        &self,
+        fine: bool,
+        base: &[V3],
+        ctrl: &[V3],
+        onto: &impl Fn(V3) -> V3,
+        sockets: &impl Fn(V3) -> V3,
+    ) -> Vec<V3> {
+        let (m, w) = if fine {
+            (&self.fine, &self.snap2)
+        } else {
+            (&self.body, &self.snap1)
+        };
+        m.apply(base)
+            .iter()
+            .zip(m.apply(ctrl))
+            .zip(w)
+            .map(|((b, p), &w)| sockets(if w > 0.0 { p + (onto(*b) - b) * w } else { p }))
+            .collect()
     }
 }
 
@@ -656,11 +1034,17 @@ pub struct TagArrays {
 
 impl TagArrays {
     fn of(t: &[Tags]) -> Self {
-        TagArrays { arm: t.iter().map(|t| t.arm).collect(), blush: t.iter().map(|t| t.blush).collect() }
+        TagArrays {
+            arm: t.iter().map(|t| t.arm).collect(),
+            blush: t.iter().map(|t| t.blush).collect(),
+        }
     }
 
     fn subdivided(&self, m: &Csr) -> Self {
-        TagArrays { arm: m.apply1(&self.arm), blush: m.apply1(&self.blush) }
+        TagArrays {
+            arm: m.apply1(&self.arm),
+            blush: m.apply1(&self.blush),
+        }
     }
 }
 
@@ -718,7 +1102,12 @@ fn make_surface(family: &str, stage: &str) -> Surface {
             v
         })
         .collect();
-    let lod_pos: Vec<V3> = topo.a.apply(&ctrl).into_iter().map(sockets(family, stage, true)).collect();
+    let lod_pos: Vec<V3> = topo
+        .a
+        .apply(&ctrl)
+        .into_iter()
+        .map(sockets(family, stage, true))
+        .collect();
     let tags = TagArrays::of(&arr.tags);
     let dense1 = rigid_fingertips(s.m.apply_n(&arr.dense), &pos, &p);
     let tags1 = tags.subdivided(&s.m);
@@ -734,19 +1123,42 @@ fn make_surface(family: &str, stage: &str) -> Surface {
     let lod_nor = bare_nor[..topo.n].to_vec();
     let unsocketed = bare[..pos.len()].to_vec();
     let freg = topo.fine_m.apply_n(&region);
-    let (ri_head, ri_ear, ri_neck) = (super::body::region("head"), super::body::region("ear"), super::body::region("neck"));
+    let (ri_head, ri_ear, ri_neck) = (
+        super::body::region("head"),
+        super::body::region("ear"),
+        super::body::region("neck"),
+    );
     let mut ears = [[V3::zeros(); 2]; 2];
     for (e, sx) in [-1.0, 1.0].into_iter().enumerate() {
-        let q: Vec<&V3> = fpos.iter().zip(&freg).filter(|(p, r)| r[ri_ear] > 0.3 && sign(p.x) == sx).map(|(p, _)| p).collect();
-        let mx = q.iter().fold(V3::repeat(f64::NEG_INFINITY), |a, p| a.sup(p));
+        let q: Vec<&V3> = fpos
+            .iter()
+            .zip(&freg)
+            .filter(|(p, r)| r[ri_ear] > 0.3 && sign(p.x) == sx)
+            .map(|(p, _)| p)
+            .collect();
+        let mx = q
+            .iter()
+            .fold(V3::repeat(f64::NEG_INFINITY), |a, p| a.sup(p));
         let mn = q.iter().fold(V3::repeat(f64::INFINITY), |a, p| a.inf(p));
         ears[e] = [(mx + mn) / 2.0, (mx - mn) / 2.0];
     }
-    let flat_ctrl: Vec<V3> = ctrl.iter().zip(&arr.d).zip(&cage.region).map(|((c, d), r)| if *r == "ear" { c - d } else { c - d * 0.0 }).collect();
+    let flat_ctrl: Vec<V3> = ctrl
+        .iter()
+        .zip(&arr.d)
+        .zip(&cage.region)
+        .map(|((c, d), r)| if *r == "ear" { c - d } else { c - d * 0.0 })
+        .collect();
     let fpos = topo.snapped(true, &base, &flat_ctrl, &onto, &holes);
-    let hmask: Vec<bool> = freg.iter().map(|r| (r[ri_head] + r[ri_ear]) + r[ri_neck] > 0.5).collect();
+    let hmask: Vec<bool> = freg
+        .iter()
+        .map(|r| (r[ri_head] + r[ri_ear]) + r[ri_neck] > 0.5)
+        .collect();
     let q = &topo.s2.quads;
-    let qm: Vec<[usize; 4]> = q.iter().filter(|q| q.iter().all(|&v| hmask[v])).copied().collect();
+    let qm: Vec<[usize; 4]> = q
+        .iter()
+        .filter(|q| q.iter().all(|&v| hmask[v]))
+        .copied()
+        .collect();
     let tri = triangles(&qm, &fpos);
     let nor2 = smooth_normals(&fpos, &triangles(q, &fpos).concat());
     let used = unique(&tri.concat());
@@ -758,12 +1170,23 @@ fn make_surface(family: &str, stage: &str) -> Surface {
         head_normals.push(cn / cn.norm());
         head_samples.push((fpos[t[0]] + fpos[t[1]] + fpos[t[2]]) / 3.0);
     }
-    let head_tris = tri.iter().map(|t| [fpos[t[0]], fpos[t[1]], fpos[t[2]]]).collect();
+    let head_tris = tri
+        .iter()
+        .map(|t| [fpos[t[0]], fpos[t[1]], fpos[t[2]]])
+        .collect();
     let fbare = topo.snapped(true, &base, &flat_ctrl, &onto, &|p| p);
-    let bare_tris = tri.iter().map(|t| [fbare[t[0]], fbare[t[1]], fbare[t[2]]]).collect();
+    let bare_tris = tri
+        .iter()
+        .map(|t| [fbare[t[0]], fbare[t[1]], fbare[t[2]]])
+        .collect();
     let pr = proportions(family, stage);
     let hh = pr.hh * pr.h;
-    let cranium = fpos.iter().zip(&freg).filter(|(p, r)| r[ri_head] > 0.99 && p.y > pr.h - hh + 0.6 * hh).map(|(p, _)| *p).collect();
+    let cranium = fpos
+        .iter()
+        .zip(&freg)
+        .filter(|(p, r)| r[ri_head] > 0.99 && p.y > pr.h - hh + 0.6 * hh)
+        .map(|(p, _)| *p)
+        .collect();
     Surface {
         p,
         cage,
@@ -792,7 +1215,9 @@ static TRIS: Cache<String, Vec<usize>> = Cache::new();
 
 /// Level-1 triangles: quads split along their shorter diagonal on the family's base body.
 pub fn tris(family: &str) -> Arc<Vec<usize>> {
-    TRIS.get(family.to_string(), || triangles(&topology().s.quads, &surface(family, BASE_STAGE).pos).concat())
+    TRIS.get(family.to_string(), || {
+        triangles(&topology().s.quads, &surface(family, BASE_STAGE).pos).concat()
+    })
 }
 
 /// The seat drop, eye height and grip of a body.
@@ -816,10 +1241,34 @@ pub struct Body {
 pub fn build_body(family: &str, stage: &str) -> Body {
     let s = surface(family, stage);
     let topo = topology();
-    let body = Mesh { pos: s.pos.clone(), idx: tris(family).to_vec(), dense: s.dense.clone(), arm: s.tags.arm.clone(), nor: s.nor.clone(), ..Mesh::default() };
-    let lod = Mesh { pos: s.lod_pos.clone(), idx: topo.lod_tris.concat(), dense: s.lod_dense.clone(), arm: s.lod_tags.arm.clone(), nor: s.lod_nor.clone(), ..Mesh::default() };
-    let meta = Meta { seat_drop: seat_drop(&body, &s.p), eye_y: s.p[b("eye_l")].y, grip: grip(family, stage) };
-    Body { body, lod, meta, joints: s.p, unsocketed: s.unsocketed.clone() }
+    let body = Mesh {
+        pos: s.pos.clone(),
+        idx: tris(family).to_vec(),
+        dense: s.dense.clone(),
+        arm: s.tags.arm.clone(),
+        nor: s.nor.clone(),
+        ..Mesh::default()
+    };
+    let lod = Mesh {
+        pos: s.lod_pos.clone(),
+        idx: topo.lod_tris.concat(),
+        dense: s.lod_dense.clone(),
+        arm: s.lod_tags.arm.clone(),
+        nor: s.lod_nor.clone(),
+        ..Mesh::default()
+    };
+    let meta = Meta {
+        seat_drop: seat_drop(&body, &s.p),
+        eye_y: s.p[b("eye_l")].y,
+        grip: grip(family, stage),
+    };
+    Body {
+        body,
+        lod,
+        meta,
+        joints: s.p,
+        unsocketed: s.unsocketed.clone(),
+    }
 }
 
 fn rx(a: f64) -> M3 {
@@ -885,7 +1334,11 @@ fn grip(family: &str, stage: &str) -> [f64; 3] {
 /// split follows the distance past the joint, all `fingers_02` from 0.06 palm lengths on.
 fn rigid_fingertips(mut dense: Vec<Dense>, pos: &[V3], p: &[V3; NB]) -> Vec<Dense> {
     for sd in ["l", "r"] {
-        let (wr, i1, i2) = (p[b(&format!("hand_{sd}"))], b(&format!("fingers_01_{sd}")), b(&format!("fingers_02_{sd}")));
+        let (wr, i1, i2) = (
+            p[b(&format!("hand_{sd}"))],
+            b(&format!("fingers_01_{sd}")),
+            b(&format!("fingers_02_{sd}")),
+        );
         let lp = (p[i1] - wr).norm();
         let d = unit(p[i1] - wr);
         for (w, q) in dense.iter_mut().zip(pos) {
@@ -909,7 +1362,14 @@ fn fourier(theta: &[f64], y: &[f64], n: usize) -> impl Fn(f64) -> f64 {
 }
 
 /// Body fields (n, 4) of positions on the base body (see the module docs).
-pub fn fields_of(family: &str, pos: &[V3], arm: &[f64], region: &[[f64; NR]], p: &[V3; NB], head: &HeadFrame) -> Vec<[f64; 4]> {
+pub fn fields_of(
+    family: &str,
+    pos: &[V3],
+    arm: &[f64],
+    region: &[[f64; NR]],
+    p: &[V3; NB],
+    head: &HeadFrame,
+) -> Vec<[f64; 4]> {
     let female = family == "female";
     let sh = p[b("upperarm_r")];
     let wr = p[b("hand_r")];
@@ -924,8 +1384,16 @@ pub fn fields_of(family: &str, pos: &[V3], arm: &[f64], region: &[[f64; NR]], p:
     let rho_l: Vec<f64> = lp.iter().map(|q| q.x.hypot(q.z - zn)).collect();
     let th_l: Vec<f64> = lp.iter().map(|q| q.x.atan2(q.z - zn)).collect();
     let rho0 = mean(&rho_l);
-    let ys: Vec<f64> = lp.iter().zip(&rho_l).map(|(q, r)| q.y - (r - rho0)).collect();
-    let thetas: Vec<f64> = th_l.iter().copied().chain(th_l.iter().map(|t| -t)).collect();
+    let ys: Vec<f64> = lp
+        .iter()
+        .zip(&rho_l)
+        .map(|(q, r)| q.y - (r - rho0))
+        .collect();
+    let thetas: Vec<f64> = th_l
+        .iter()
+        .copied()
+        .chain(th_l.iter().map(|t| -t))
+        .collect();
     let yy: Vec<f64> = ys.iter().chain(ys.iter()).copied().collect();
     let refc = fourier(&thetas, &yy, 3);
     let (ri_head, ri_ear) = (region_ix("head"), region_ix("ear"));
@@ -979,7 +1447,10 @@ fn folds(pos: &[V3], idx: &[usize], head: &HeadFrame) -> Vec<f64> {
                     if !ok {
                         continue;
                     }
-                    let (u, v) = ((i as f64 + di / 3.0) / N as f64, (j as f64 + dj / 3.0) / N as f64);
+                    let (u, v) = (
+                        (i as f64 + di / 3.0) / N as f64,
+                        (j as f64 + dj / 3.0) / N as f64,
+                    );
                     let w = [1.0 - u - v, u, v];
                     let f = head.fold(a * w[0] + b * w[1] + c * w[2]);
                     for (&vi, wk) in t.iter().zip(w) {
@@ -990,27 +1461,59 @@ fn folds(pos: &[V3], idx: &[usize], head: &HeadFrame) -> Vec<f64> {
             }
         }
     }
-    num.iter().zip(&den).map(|(n, d)| if *d > 0.0 { n / d } else { 0.0 }).collect()
+    num.iter()
+        .zip(&den)
+        .map(|(n, d)| if *d > 0.0 { n / d } else { 0.0 })
+        .collect()
 }
 
 /// Clothes fields and tone of the (base stage) body or its LOD; the face's pieces after the skin.
-pub fn body_fields_and_tone(family: &str, mesh: &Mesh, p: &[V3; NB], head: &HeadFrame) -> (Vec<[f64; 4]>, Vec<[f64; 4]>) {
+pub fn body_fields_and_tone(
+    family: &str,
+    mesh: &Mesh,
+    p: &[V3; NB],
+    head: &HeadFrame,
+) -> (Vec<[f64; 4]>, Vec<[f64; 4]>) {
     let s = surface(family, BASE_STAGE);
     let n = mesh.pos.len();
     let lod = n < s.pos.len();
-    let (pos, tags, region) = if lod { (&s.lod_pos, &s.lod_tags, &s.lod_region) } else { (&s.pos, &s.tags, &s.region) };
+    let (pos, tags, region) = if lod {
+        (&s.lod_pos, &s.lod_tags, &s.lod_region)
+    } else {
+        (&s.pos, &s.tags, &s.region)
+    };
     let k = pos.len();
     let mut f = fields_of(family, pos, &tags.arm, region, p, head);
     // Blush (x) and, on the face, the age folds (z; the shader deepens them with age).
     let ri_head = region_ix("head");
     let fold = folds(pos, &mesh.idx, head);
-    let mut tone: Vec<[f64; 4]> = (0..k).map(|i| [clip(tags.blush[i], 0.0, 1.0), 0.0, if region[i][ri_head] > 0.5 { fold[i] } else { 0.0 }, 0.0]).collect();
+    let mut tone: Vec<[f64; 4]> = (0..k)
+        .map(|i| {
+            [
+                clip(tags.blush[i], 0.0, 1.0),
+                0.0,
+                if region[i][ri_head] > 0.5 {
+                    fold[i]
+                } else {
+                    0.0
+                },
+                0.0,
+            ]
+        })
+        .collect();
     if n > k {
         // The face's pieces (lids, lips) inside the body: head fields; the nearest skin's tone.
         let extra = &mesh.pos[k..];
         let mut onehead = [0.0; NR];
         onehead[region_ix("head")] = 1.0;
-        f.extend(fields_of(family, extra, &vec![0.0; n - k], &vec![onehead; n - k], p, head));
+        f.extend(fields_of(
+            family,
+            extra,
+            &vec![0.0; n - k],
+            &vec![onehead; n - k],
+            p,
+            head,
+        ));
         let tree = KdTree::new(pos);
         for q in extra {
             let t = tone[tree.nearest(q)];

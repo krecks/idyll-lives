@@ -197,7 +197,10 @@ fn sims_sleep_at_night_and_are_up_by_day() {
         asleep_at_night * 10 >= samples * 9,
         "only {asleep_at_night}/{samples} night samples asleep"
     );
-    assert!(awake_by_day * 3 >= samples * 2, "only {awake_by_day}/{samples} day samples awake");
+    assert!(
+        awake_by_day * 3 >= samples * 2,
+        "only {awake_by_day}/{samples} day samples awake"
+    );
 }
 
 #[test]
@@ -357,7 +360,8 @@ fn gardening_feeds_the_household_and_trains_its_skill() {
     // The starter lot as the household's own plot.
     let mut lot: serde_json::Value = serde_json::from_str(&starter_with_household()).unwrap();
     lot["plots"] = serde_json::json!([{ "name": "Home", "x": 0, "z": 0, "w": 26, "d": 22, "entry": [8.5, 1.5] }]);
-    lot["households"] = serde_json::json!([{ "name": "Player", "plot": 0, "player": true, "funds": 10000 }]);
+    lot["households"] =
+        serde_json::json!([{ "name": "Player", "plot": 0, "player": true, "funds": 10000 }]);
     let mut world = World::from_json(&content(), &lot.to_string(), 1).unwrap();
     world.autonomy = false;
     world.households[0].funds = 10_000;
@@ -372,8 +376,17 @@ fn gardening_feeds_the_household_and_trains_its_skill() {
     world.objects[patch as usize].growth = 1.0;
     let o = &world.objects[patch as usize];
     let def = &world.content.objects[o.def];
-    let harvest = def.interactions.iter().position(|i| i.id == "harvest").unwrap();
-    let hunger = world.content.needs.iter().position(|n| n.id == "hunger").unwrap();
+    let harvest = def
+        .interactions
+        .iter()
+        .position(|i| i.id == "harvest")
+        .unwrap();
+    let hunger = world
+        .content
+        .needs
+        .iter()
+        .position(|n| n.id == "hunger")
+        .unwrap();
     let gardening = world.content.skill_index("gardening").unwrap();
     world.sims[0].needs[hunger] = 0.2;
     world
@@ -387,8 +400,14 @@ fn gardening_feeds_the_household_and_trains_its_skill() {
     for _ in 0..90 * sim_core::TICKS_PER_SECOND {
         world.tick_once();
     }
-    assert!(world.sims[0].needs[hunger] > 0.4, "a fresh harvest fed them");
-    assert!(world.sims[0].skills[gardening] > 0.0, "and taught some Gardening");
+    assert!(
+        world.sims[0].needs[hunger] > 0.4,
+        "a fresh harvest fed them"
+    );
+    assert!(
+        world.sims[0].skills[gardening] > 0.0,
+        "and taught some Gardening"
+    );
 }
 
 /// Every house template's bathroom has walls: the room with the toilet is a bathroom of its
@@ -407,8 +426,16 @@ fn house_templates_have_closed_bathrooms() {
             "walls": h["walls"], "doors": h["doors"], "windows": h["windows"], "objects": h["objects"],
         });
         let world = World::from_json(&content, &lot.to_string(), 1).unwrap();
-        let bathroom = world.content.room_kinds.iter().position(|k| k.id == "bathroom");
-        for o in world.objects.iter().filter(|o| world.content.objects[o.def].id == "toilet") {
+        let bathroom = world
+            .content
+            .room_kinds
+            .iter()
+            .position(|k| k.id == "bathroom");
+        for o in world
+            .objects
+            .iter()
+            .filter(|o| world.content.objects[o.def].id == "toilet")
+        {
             let room = world.room_at_tile(o.x, o.z).expect("the toilet is indoors");
             assert!(
                 room.kind == bathroom && !room.mixed,
@@ -440,23 +467,47 @@ fn house_templates_light_every_room_and_keep_doorways_clear() {
         });
         let world = World::from_json(&content, &lot.to_string(), 1).unwrap();
         for room in world.rooms().iter().filter(|r| !r.garden) {
-            assert!(room.lit >= room.tiles, "{}: the room at {:?} has lights for {} of its {} tiles", h["id"], room.centre, room.lit, room.tiles);
+            assert!(
+                room.lit >= room.tiles,
+                "{}: the room at {:?} has lights for {} of its {} tiles",
+                h["id"],
+                room.centre,
+                room.lit,
+                room.tiles
+            );
             let hanging = world.objects.iter().filter(|o| {
                 let d = &world.content.objects[o.def];
-                d.lamp > 0.0 && d.layer == sim_core::content::Layer::Ceiling && world.lot.room_at(o.x, o.z) == room.id
+                d.lamp > 0.0
+                    && d.layer == sim_core::content::Layer::Ceiling
+                    && world.lot.room_at(o.x, o.z) == room.id
             });
             let hanging = hanging.count();
-            assert!(hanging <= 4, "{}: the room at {:?} has {hanging} ceiling lights, not a few bigger ones", h["id"], room.centre);
+            assert!(
+                hanging <= 4,
+                "{}: the room at {:?} has {hanging} ceiling lights, not a few bigger ones",
+                h["id"],
+                room.centre
+            );
         }
         let blocked = world.blocked();
         let lot = &world.lot;
         let clear = |x: i32, z: i32| !lot.in_bounds(x, z) || !blocked[lot.tile_index(x, z)];
         for z in 0..=lot.depth as i32 {
             for x in 0..=lot.width as i32 {
-                let h_door = x < lot.width as i32 && lot.h_edge(x as usize, z as usize) == Edge::Door;
-                let v_door = z < lot.depth as i32 && lot.v_edge(x as usize, z as usize) == Edge::Door;
-                assert!(!h_door || (clear(x, z - 1) && clear(x, z)), "{}: something stands in the doorway at {x},{z}", h["id"]);
-                assert!(!v_door || (clear(x - 1, z) && clear(x, z)), "{}: something stands in the doorway at {x},{z}", h["id"]);
+                let h_door =
+                    x < lot.width as i32 && lot.h_edge(x as usize, z as usize) == Edge::Door;
+                let v_door =
+                    z < lot.depth as i32 && lot.v_edge(x as usize, z as usize) == Edge::Door;
+                assert!(
+                    !h_door || (clear(x, z - 1) && clear(x, z)),
+                    "{}: something stands in the doorway at {x},{z}",
+                    h["id"]
+                );
+                assert!(
+                    !v_door || (clear(x - 1, z) && clear(x, z)),
+                    "{}: something stands in the doorway at {x},{z}",
+                    h["id"]
+                );
             }
         }
     }
@@ -469,7 +520,11 @@ fn raw_objects() -> Vec<serde_json::Value> {
 }
 
 fn numbers(v: &serde_json::Value) -> Vec<f64> {
-    v.as_array().unwrap().iter().map(|n| n.as_f64().unwrap()).collect()
+    v.as_array()
+        .unwrap()
+        .iter()
+        .map(|n| n.as_f64().unwrap())
+        .collect()
 }
 
 /// Asset entries by key, each with the folder of the manifest that gave it (its `url` is relative to it).
@@ -486,7 +541,9 @@ fn asset_entries() -> AssetEntries {
         // A manifest without `entries` has none (as the gate, crates/tools/src/checkglb.rs, reads it).
         let entries = match &m["entries"] {
             serde_json::Value::Null => &serde_json::Map::new(),
-            e => e.as_object().unwrap_or_else(|| panic!("{path:?}: `entries` is {e}, not an object")),
+            e => e
+                .as_object()
+                .unwrap_or_else(|| panic!("{path:?}: `entries` is {e}, not an object")),
         };
         for (key, entry) in entries {
             out.insert(key.clone(), (entry.clone(), dir.clone()));
@@ -515,15 +572,25 @@ fn every_object_and_item_has_a_model_file() {
     let merged: serde_json::Value = serde_json::from_str(&content()).unwrap();
     let objects = merged["objects"].as_array().unwrap().iter();
     let items = merged["items"].as_array().into_iter().flatten();
-    let defs = objects.map(|o| ("object", o, "model")).chain(items.map(|i| ("item", i, "item")));
+    let defs = objects
+        .map(|o| ("object", o, "model"))
+        .chain(items.map(|i| ("item", i, "item")));
     for (what, def, prefix) in defs {
         let id = def["id"].as_str().unwrap();
-        let key = def["model"].as_str().map_or_else(|| format!("{prefix}.{id}"), str::to_owned);
-        assert!(!key.is_empty(), "{what} {id}: its `model` is empty (leave it out to draw {prefix}.{id})");
+        let key = def["model"]
+            .as_str()
+            .map_or_else(|| format!("{prefix}.{id}"), str::to_owned);
+        assert!(
+            !key.is_empty(),
+            "{what} {id}: its `model` is empty (leave it out to draw {prefix}.{id})"
+        );
         let Some((entry, dir)) = entries.get(&key) else {
             panic!("{what} {id}: its model {key} is in no manifest");
         };
-        assert_eq!(entry["type"], "model", "{what} {id}: {key} is no model entry");
+        assert_eq!(
+            entry["type"], "model",
+            "{what} {id}: {key} is no model entry"
+        );
         let url = entry["url"].as_str().unwrap_or("");
         assert!(
             !url.is_empty(),
@@ -587,13 +654,25 @@ fn surfaces_seats_and_tabletop_things_are_consistent() {
             assert!(r > 0.0 && r <= 0.45, "{id}: radius {r}");
             // Used at their top, standing or sitting (`surface::rider_tiles`).
             for it in obj["interactions"].as_array().into_iter().flatten() {
-                assert!(it["pose"] != "lie" && it["inside"] != true, "{id}.{}: used standing or sitting at its top", it["id"]);
+                assert!(
+                    it["pose"] != "lie" && it["inside"] != true,
+                    "{id}.{}: used standing or sitting at its top",
+                    it["id"]
+                );
             }
         }
         if obj["surface"].is_object() {
             let s = &obj["surface"];
-            let size = if s["size"].is_array() { numbers(&s["size"]) } else { fp.clone() };
-            let at = if s["at"].is_array() { numbers(&s["at"]) } else { vec![0.0, 0.0] };
+            let size = if s["size"].is_array() {
+                numbers(&s["size"])
+            } else {
+                fp.clone()
+            };
+            let at = if s["at"].is_array() {
+                numbers(&s["at"])
+            } else {
+                vec![0.0, 0.0]
+            };
             for k in 0..2 {
                 assert!(
                     size[k] > 0.0 && at[k].abs() + size[k] / 2.0 <= fp[k] / 2.0 + 0.02,
@@ -626,14 +705,33 @@ fn recipes_are_cookable_and_every_home_can_make_a_meal() {
     let all = content.objects.iter().fold(0, |m, o| m | o.stations);
     // (Food fetched to eat at a table has a hidden recipe of its own: nothing to cook.)
     for r in content.recipes.iter().filter(|r| !r.hidden) {
-        assert!(r.possible(all), "nothing in the catalogue can make {}", r.id);
-        assert!(r.steps.iter().all(|s| s.anim.is_some()), "{}: a step without an animation", r.id);
+        assert!(
+            r.possible(all),
+            "nothing in the catalogue can make {}",
+            r.id
+        );
+        assert!(
+            r.steps.iter().all(|s| s.anim.is_some()),
+            "{}: a step without an animation",
+            r.id
+        );
         let dish = &content.items[r.item];
         if !r.eat_now {
-            assert!(dish.empty_as.is_some_and(|e| content.items[e].dirty), "{}: the empty {} isn't washed up", r.id, dish.id);
+            assert!(
+                dish.empty_as.is_some_and(|e| content.items[e].dirty),
+                "{}: the empty {} isn't washed up",
+                r.id,
+                dish.id
+            );
         }
         let plate = dish.serving.unwrap_or(r.item);
-        assert!(content.items[plate].empty_as.is_some_and(|e| content.items[e].dirty), "{}: no dirty plate", r.id);
+        assert!(
+            content.items[plate]
+                .empty_as
+                .is_some_and(|e| content.items[e].dirty),
+            "{}: no dirty plate",
+            r.id
+        );
     }
     // Interactions with a recipe keep their tags (kitchen rooms, plans and traits go by them).
     for o in &content.objects {
@@ -646,14 +744,25 @@ fn recipes_are_cookable_and_every_home_can_make_a_meal() {
     let houses: serde_json::Value =
         serde_json::from_str(include_str!("../../../web/public/content/houses.json")).unwrap();
     let defs = |list: &serde_json::Value| -> Vec<String> {
-        list.as_array().unwrap().iter().map(|o| o["def"].as_str().unwrap().to_owned()).collect()
+        list.as_array()
+            .unwrap()
+            .iter()
+            .map(|o| o["def"].as_str().unwrap().to_owned())
+            .collect()
     };
-    let mut homes: Vec<(String, Vec<String>)> =
-        houses["houses"].as_array().unwrap().iter().map(|h| (h["id"].to_string(), defs(&h["objects"]))).collect();
+    let mut homes: Vec<(String, Vec<String>)> = houses["houses"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|h| (h["id"].to_string(), defs(&h["objects"])))
+        .collect();
     let starter: serde_json::Value = serde_json::from_str(STARTER_LOT).unwrap();
     homes.push(("starter".into(), defs(&starter["objects"])));
     for (name, defs) in homes {
-        let mask = defs.iter().filter_map(|d| content.object_index(d)).fold(0, |m, d| m | content.objects[d].stations);
+        let mask = defs
+            .iter()
+            .filter_map(|d| content.object_index(d))
+            .fold(0, |m, d| m | content.objects[d].stations);
         assert!(meal.possible(mask), "{name} can't make a meal");
     }
 }

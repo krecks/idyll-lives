@@ -9,12 +9,18 @@ use sim_core::World;
 use sim_core::world::TICKS_PER_DAY;
 
 fn play_a_day(file: &str) {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/saves").join(file);
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/saves")
+        .join(file);
     let json = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{file}: {e}"));
     let version = serde_json::from_str::<serde_json::Value>(&json).unwrap()["version"].as_u64();
     let content = common::content();
-    let mut w = World::from_save_json(&content, &json).unwrap_or_else(|e| panic!("{file} (v{version:?}): {e}"));
-    assert!(w.sims.iter().filter(|s| s.here()).count() > 10, "{file}: the town's residents are there");
+    let mut w = World::from_save_json(&content, &json)
+        .unwrap_or_else(|e| panic!("{file} (v{version:?}): {e}"));
+    assert!(
+        w.sims.iter().filter(|s| s.here()).count() > 10,
+        "{file}: the town's residents are there"
+    );
     assert_eq!(w.seed, 0, "{file}: older saves don't know their seed");
     common::check(&w);
     // (Everyone in full detail.)
@@ -27,9 +33,18 @@ fn play_a_day(file: &str) {
         }
     }
     common::check(&w);
-    let again = World::from_save_json(&content, &w.save_json()).unwrap_or_else(|e| panic!("{file}, saved again: {e}"));
+    let again = World::from_save_json(&content, &w.save_json())
+        .unwrap_or_else(|e| panic!("{file}, saved again: {e}"));
     common::check(&again);
-    assert_eq!((again.tick, again.sims.len(), again.objects.len(), again.households.len()), (w.tick, w.sims.len(), w.objects.len(), w.households.len()));
+    assert_eq!(
+        (
+            again.tick,
+            again.sims.len(),
+            again.objects.len(),
+            again.households.len()
+        ),
+        (w.tick, w.sims.len(), w.objects.len(), w.households.len())
+    );
 }
 
 #[test]
@@ -49,10 +64,16 @@ fn a_village_saved_by_v0_4_2_plays_on() {
 
 #[test]
 fn v0_4_2s_chess_tables_come_through_at_their_new_size() {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/saves/v042_village.json");
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/saves/v042_village.json");
     let content = common::content();
     let w = World::from_save_json(&content, &std::fs::read_to_string(path).unwrap()).unwrap();
-    let def = w.content.objects.iter().position(|d| d.id == "chessTable").unwrap();
+    let def = w
+        .content
+        .objects
+        .iter()
+        .position(|d| d.id == "chessTable")
+        .unwrap();
     // (Both had room to grow to 2 x 1: none was sold back.)
     assert_eq!(w.objects.iter().filter(|o| o.def == def).count(), 2);
 }
