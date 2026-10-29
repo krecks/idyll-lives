@@ -1455,11 +1455,12 @@ pub struct World {
     /// Among those, the rooms of a claimed kind (`roomKinds[].claimed`: bedrooms), whose door its
     /// own people (`privacy::Shut::claimants`) have the run of, sorted; found with the rooms.
     pub(crate) claimed_rooms: Vec<u16>,
-    /// The objects that offer a place in each of those rooms (`privacy::claimed_places`), found
-    /// with them, so a tick needn't look through every object in the home.
+    /// The objects that can offer a place in each of those rooms (`privacy::claimed_places`),
+    /// broken ones included, found with them, so a tick needn't look through every object in the
+    /// home.
     pub(crate) claimed_places: Vec<(u16, Vec<u32>)>,
-    /// The people each claimed room is the own of, with the fingerprint they were found for
-    /// (`privacy::refresh`), so a tick needn't look for them again while nothing changes.
+    /// The people who have a place in each claimed room, with the fingerprint they were found
+    /// for (`privacy::refresh`), so a tick needn't look for them again while nothing changes.
     pub(crate) claimants_cache: Vec<(u16, u64, Vec<u32>)>,
     /// What each household has to work on as the tick's step started (`work_waiting`), kept
     /// from tick to tick like `briefs`.

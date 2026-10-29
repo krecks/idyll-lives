@@ -696,10 +696,10 @@ after its `graceMinutes` and the toilet counts as taken (`anotherRoom`). Not a r
 (`mixed`), one with a door to the outside, or one on a public place. The renderer keeps its
 doors shut (snapshot `shuts`). Code: `crates/sim-core/src/privacy.rs`.
 
-`claimed`: the room is its sleepers' own (a bedroom; an error unless `private` too). Whoever has
-a place in it comes and goes: whoever lies in one of its beds (or got up and wants back in), their
-partner, their children if a bed here is free, and whoever minds a crib in it. Its door keeps the
-rest of the household, and guests, out while someone is in it; the bathroom is never claimed.
+`claimed`: the room is its sleepers' own (a bedroom; an error unless `private` too). Its door is
+open to whoever has a place in it — whoever lies in one of its beds (or got up and wants back in),
+their partner, their children if a bed here is free, and whoever minds a crib in it — and keeps
+everyone else, guests included, out while someone is in it. The bathroom is never claimed.
 
 **Scoring** (`roomRules`, an object, so a pack can change single keys): `weights` of size, light,
 decor, cleanliness and function; `windowTiles` and `lampTiles` (tiles one window or lamp lights

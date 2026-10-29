@@ -4,7 +4,7 @@ All notable changes to Idyll Lives. Versions follow [semantic versioning](https:
 
 ## Unreleased
 
-- **Bedrooms are their sleepers' own:** a bedroom's door is open to whoever has a place in it — the people whose bed it is, their partner, their children if a bed is free, and whoever minds a crib in there — and keeps the rest of the household, and guests, out while someone is in it. A lodger with no bed of their own in the room waits outside like anyone else.
+- **Bedrooms are their sleepers' own:** a bedroom's door is open to whoever has a place in it — whoever lies in one of its beds (or got up and wants back in), their partner, their children if a bed is free, and whoever minds a crib in there — and keeps everyone else, guests included, out while someone is in it. A lodger with no bed of their own there waits outside like anyone else.
 
 ### Also
 - **Saves:** unchanged (format 33).

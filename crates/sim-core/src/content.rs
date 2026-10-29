@@ -950,8 +950,8 @@ pub struct RoomKind {
     pub private: bool,
     /// A private room of this kind is its people's own (content `claimed`: a bedroom): whoever has
     /// a place in it — somewhere to lie, or a baby's place and the care of it — comes and goes,
-    /// and its door keeps the rest of the household out (`privacy.rs`). Only with `private`, which
-    /// is what keeps the door shut at all.
+    /// and its door keeps everyone else out (`privacy.rs`). Only with `private`, which is what
+    /// keeps the door shut at all.
     pub claimed: bool,
 }
 

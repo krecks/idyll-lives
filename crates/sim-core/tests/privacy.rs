@@ -18,14 +18,26 @@ use sim_core::{Command, MINUTES_PER_TICK, World, snapshot};
 /// sink, a sofa and a TV. Ada and Ben are partners, Gus their lodger; all three in the hall, no
 /// jobs, free will off.
 fn home(bed_in_bedroom: bool) -> World {
-    home_with(bed_in_bedroom, true)
+    home_full(bed_in_bedroom, true, false)
 }
 
 /// `home`, or without the house's outside walls (`walled` false): the bathroom and the bedroom
 /// open onto the garden.
 fn home_with(bed_in_bedroom: bool, walled: bool) -> World {
+    home_full(bed_in_bedroom, walled, false)
+}
+
+/// `home_with`, and with a baby in a crib in the bedroom (`baby`).
+fn home_full(bed_in_bedroom: bool, walled: bool, baby: bool) -> World {
     let (house, front) = if walled { ("[1,1,20,1],[20,1,20,13],[20,13,1,13],[1,13,1,1],", r#"{"x":11,"z":13,"axis":"x"},"#) } else { ("", "") };
     let bed = if bed_in_bedroom { r#"{"def":"bed","x":10,"z":3}"# } else { r#"{"def":"bed","x":16,"z":14}"# };
+    let crib = if baby { r#",{"def":"crib","x":12,"z":5}"# } else { "" };
+    let baby_sim = if baby {
+        r#",{"name":"Cleo","gender":"female","age":0.5,"x":7.5,"z":10.5,"traits":["cheerful"]}"#
+    } else {
+        ""
+    };
+    let baby_kin = if baby { r#",{"a":3,"b":0,"preset":"parent"},{"a":3,"b":1,"preset":"parent"}"# } else { "" };
     let lot = format!(
         r#"{{"width":21,"depth":17,
         "plots":[{{"name":"Home","x":0,"z":0,"w":21,"d":17,"entry":[11.5,16.5]}}],
@@ -34,13 +46,13 @@ fn home_with(bed_in_bedroom: bool, walled: bool) -> World {
                  [2,2,5,2],[5,2,5,5],[5,5,2,5],[2,5,2,2],
                  [9,2,14,2],[14,2,14,7],[14,7,9,7],[9,7,9,2]],
         "doors":[{front}{{"x":3,"z":5,"axis":"x"}},{{"x":11,"z":7,"axis":"x"}}],
-        "objects":[{{"def":"toilet","x":2,"z":2}},{{"def":"shower","x":4,"z":2}},{bed},
+        "objects":[{{"def":"toilet","x":2,"z":2}},{{"def":"shower","x":4,"z":2}},{bed}{crib},
                    {{"def":"fridge","x":17,"z":2}},{{"def":"sink","x":16,"z":2}},
                    {{"def":"sofa","x":16,"z":7}},{{"def":"tv","x":16,"z":10,"rot":2}}],
         "sims":[{{"name":"Ada","gender":"female","age":30,"x":6.5,"z":10.5,"traits":["cheerful"]}},
                 {{"name":"Ben","gender":"male","age":31,"x":7.5,"z":10.5,"traits":["cheerful"]}},
-                {{"name":"Gus","gender":"male","age":45,"x":8.5,"z":10.5,"traits":["cheerful"]}}],
-        "relationships":[{{"a":0,"b":1,"preset":"partners"}},{{"a":2,"b":0,"preset":"friends"}},{{"a":2,"b":1,"preset":"friends"}}]}}"#
+                {{"name":"Gus","gender":"male","age":45,"x":8.5,"z":10.5,"traits":["cheerful"]}}{baby_sim}],
+        "relationships":[{{"a":0,"b":1,"preset":"partners"}},{{"a":2,"b":0,"preset":"friends"}},{{"a":2,"b":1,"preset":"friends"}}{baby_kin}]}}"#
     );
     // (A baby every time they try, for the test.)
     let mut content: serde_json::Value = serde_json::from_str(&common::content()).unwrap();
@@ -440,7 +452,7 @@ fn their_bedroom_is_theirs_and_its_door_shuts_the_others_out() {
 }
 
 /// The crib in their room is the baby's place, and the grown-ups' to mind it at: whoever could go
-/// to the crib has the run of the room, whoever of the two sleeps there.
+/// to the crib has the run of the room, whichever of the two is asleep.
 #[test]
 fn the_crib_in_a_bedroom_opens_its_door_to_whoever_minds_the_baby() {
     let mut w = home(true);
@@ -473,7 +485,45 @@ fn the_crib_in_a_bedroom_opens_its_door_to_whoever_minds_the_baby() {
     common::check(&w);
 }
 
-/// Puts resident `i` (who starts in the bedroom) down in the living room, and says so.
+/// With the baby in the crib, the crib's grown-up minders still have a place in the room, not
+/// just when the crib is empty.
+#[test]
+fn a_minder_goes_in_to_the_baby_in_the_crib() {
+    let mut w = home_full(true, true, true);
+    let (_, bedroom) = rooms(&w);
+    let crib = w.objects.iter().position(|o| w.content.objects[o.def].id == "crib").expect("the crib");
+    for _ in 0..ticks(60.0) {
+        w.tick_once();
+        if w.objects[crib].users().any(|u| u == 3) {
+            break;
+        }
+    }
+    assert!(w.objects[crib].users().any(|u| u == 3), "the baby lies in the crib");
+    let bed = 2;
+    w.apply(Command::Use { sim: 0, object: bed, interaction: interaction(&w, bed, "sleep") }).unwrap();
+    for _ in 0..ticks(60.0) {
+        if using(&w, 0).is_some() {
+            break;
+        }
+        w.tick_once();
+    }
+    assert_eq!(using(&w, 0).map(|u| u.0), Some(bed), "Ada sleeps in their bed");
+    send_down(&mut w, 2);
+    w.apply(Command::MoveTo { sim: 2, x: 12.5, z: 6.5 }).unwrap();
+    let mut gus_in = false;
+    for _ in 0..ticks(30.0) {
+        w.tick_once();
+        if room_of(&w, 2) == bedroom {
+            gus_in = true;
+            break;
+        }
+    }
+    assert!(gus_in, "the baby's minder goes in to the crib");
+    common::check(&w);
+}
+
+/// Puts resident `i` (who starts in the bedroom) down in the living room; panics if they never
+/// get there.
 fn send_down(w: &mut World, i: usize) {
     let living = w.lot.room_at(5, 2);
     w.apply(Command::MoveTo { sim: i as u32, x: 5.5, z: 2.5 }).unwrap();
@@ -508,9 +558,11 @@ fn a_shipped_bedroom_is_claimed_and_a_bathroom_never_is() {
         "households": [{"name": "Player", "plot": 0, "player": true}],
         "sims": [{"name": "Ada", "household": 0, "x": 3.5, "z": 5.5}],
     });
-    let wrong =
-        World::from_json(&content.to_string(), &lot.to_string(), 1).map(|_| ()).map_err(|e| e.to_string()).unwrap_err();
-    assert!(wrong.contains("claimed"), "{wrong}");
+    let err = World::from_json(&content.to_string(), &lot.to_string(), 1)
+        .err()
+        .expect("a claimed room must be private")
+        .to_string();
+    assert!(err.contains("claimed"), "{err}");
 }
 
 /// The other half of the bed has the run of the room they slept in, whether they're in it or not:

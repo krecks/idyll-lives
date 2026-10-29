@@ -624,8 +624,8 @@ impl Relationships {
         }
         let mut partner = std::mem::take(&mut self.partner);
         partner.resize(n, None);
-        self.version = self.version.wrapping_add(1);
-        *self = Self { n, rel, chemistry, partner, version: self.version };
+        let version = self.version.wrapping_add(1);
+        *self = Self { n, rel, chemistry, partner, version };
     }
 
     /// Forgets everything between `a` and everyone (they're gone, or someone new took the slot).

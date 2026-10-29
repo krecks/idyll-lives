@@ -66,7 +66,7 @@ pub struct Shut {
     pub doing: Option<(u32, usize)>,
     /// A claimed room (`roomKinds[].claimed`: a bedroom) is its people's own: the residents who
     /// have a place in it (`refresh`: whose bed or crib it offers, and whoever lies in one now)
-    /// come in whatever anyone else is doing in there. Empty for a private room that isn't claimed
+    /// come in even while someone else is in the room. Empty for a private room that isn't claimed
     /// (the bathroom), and while someone is at a use behind the door (`doing`).
     pub claimants: Vec<u32>,
 }
@@ -114,13 +114,16 @@ pub(crate) fn private_rooms(content: &Content, plots: &[crate::world::Plot], roo
             }
         }
     }
-    let mut ids: Vec<u16> = rooms.iter().filter(|r| private_room(content, plots, r, &outside)).map(|r| r.id).collect();
+    let mut ids = Vec::new();
+    let mut claimed = Vec::new();
+    for r in rooms.iter().filter(|r| private_room(content, plots, r, &outside)) {
+        ids.push(r.id);
+        if r.kind.is_some_and(|k| content.room_kinds[k].claimed) {
+            claimed.push(r.id);
+        }
+    }
     ids.sort_unstable();
-    let claimed: Vec<u16> = ids
-        .iter()
-        .copied()
-        .filter(|&id| rooms.iter().any(|r| r.id == id && r.kind.is_some_and(|k| content.room_kinds[k].claimed)))
-        .collect();
+    claimed.sort_unstable();
     (ids, claimed)
 }
 
@@ -146,9 +149,9 @@ pub(crate) fn room_of_object(content: &Content, lot: &Lot, o: &ObjectInstance) -
     room_of(lot, o.centre(content))
 }
 
-/// Whether `inter` is a place in a room for whoever it's theirs to sleep in: somewhere to lie
-/// (sleeping or napping, `dayRhythm`), or a baby's place in it and the grown-up care of it.
-fn own_place(content: &Content, inter: &Interaction) -> bool {
+/// Whether `inter` offers a place in a claimed room: somewhere to lie (sleeping or napping,
+/// `dayRhythm`), or a baby's place and the grown-up care of it.
+fn offers_place(content: &Content, inter: &Interaction) -> bool {
     inter.baby || inter.cares() || inter.tags & (content.day_rhythm.sleep_tags | content.day_rhythm.nap_tags) != 0
 }
 
@@ -172,7 +175,9 @@ fn goes_to(w: &World, o: &ObjectInstance, sim: u32, plot: Option<u32>, i: usize)
         Some(s) if s.here() && s.carried_by.is_none() => s,
         _ => return false,
     };
-    lives_on(w, s, plot) && o.can_use_in(sim, w.content.objects[o.def].slots_for(i)) && o.can_use_for(sim, &w.content.objects[o.def], i)
+    let Some(def) = w.content.objects.get(o.def) else { return false };
+    let Some(inter) = def.interactions.get(i) else { return false };
+    lives_on(w, s, plot) && o.can_use_for(sim, def, i) && crate::world::unfit(&w.content, s.age, inter).is_none()
 }
 
 /// Whether `b` is a child of `a` (a little one sleeps in their parents' room, not a box of their own).
@@ -180,40 +185,42 @@ fn is_child_of(w: &World, a: u32, b: u32) -> bool {
     w.relationships.kin(a as usize, b as usize) == crate::social::Kin::Child
 }
 
-/// The objects that offer a place in a claimed room (`roomKinds[].claimed`), per claimed room
-/// (`World::claimed_places`): the beds and sofas to lie in, and the cribs and their care. Found
-/// with the rooms, so the tick needn't look through every object in the home.
+/// The objects that can offer a place in a claimed room (`roomKinds[].claimed`), per claimed
+/// room (`World::claimed_places`): the beds and sofas to lie in, and the cribs and their care.
+/// Broken ones are listed too (skipped while broken, `room_claimants`), so a repair needn't wait
+/// for the rooms to be found again. Found with the rooms, so the tick needn't look through every
+/// object in the home.
 pub(crate) fn claimed_places(content: &Content, lot: &Lot, claimed: &[u16], objects: &[ObjectInstance]) -> Vec<(u16, Vec<u32>)> {
     let mut out: Vec<(u16, Vec<u32>)> = claimed.iter().map(|&r| (r, Vec::new())).collect();
     for (i, o) in objects.iter().enumerate() {
-        if o.broken() {
-            continue;
-        }
+        // Broken ones are listed too: `room_claimants` skips them while they're broken, and a
+        // repair shouldn't need the rooms rebuilt.
         let room = room_of_object(content, lot, o);
         let Ok(k) = claimed.binary_search(&room) else {
             continue;
         };
-        if content.objects[o.def].interactions.iter().any(|i| own_place(content, i)) {
+        if content.objects[o.def].interactions.iter().any(|i| offers_place(content, i)) {
             out[k].1.push(i as u32);
         }
     }
     out
 }
 
-/// The people claimed room `room` is the own of: over the places in it (`World::claimed_places`),
-/// for each of them
+/// The people who have a place in claimed room `room`: over the places in it
+/// (`World::claimed_places`), for each of them
 ///
 /// - whoever lies in one of its beds now, or on their way to one (they got up in the night, and want
 ///   back in), and the partner who shares it with them: their bed is here, so the room is theirs
 ///   too, even while they're out of it;
-/// - the children of whoever lies here, if a bed here is free for them; and
-/// - when nobody lies here yet (nobody's to bed, or the crib's empty), whoever of this home the
-///   place itself allows: for a crib, whoever can mind the baby in it.
+/// - the children of whoever lies here, if a bed here is free for them;
+/// - whoever can mind a crib here, whether or not the baby is in it; and
+/// - when nobody lies here yet (nobody has gone to bed, or the crib's empty), whoever of this
+///   home the place itself allows.
 ///
 /// No free-slot strangers: a bed here with a slot free is not a room of their own. Guests, and
 /// anyone from another house, are nobody's own. As each tick starts, before anyone's free will has
 /// chosen anything.
-fn places_in_room(w: &World, room: u16) -> Vec<u32> {
+fn room_claimants(w: &World, room: u16) -> Vec<u32> {
     let mut out = Vec::new();
     let Ok(k) = w.claimed_places.binary_search_by_key(&room, |(r, _)| *r) else {
         return out;
@@ -225,15 +232,15 @@ fn places_in_room(w: &World, room: u16) -> Vec<u32> {
         }
         let def = &w.content.objects[o.def];
         let plot = w.plot_at(o.x, o.z);
-        // Whoever lies on it now has a place here, slot or no slot (they got up, and want back in).
-        let livers: Vec<u32> = o.users().collect();
-        for u in &livers {
-            if !out.contains(u) {
-                out.push(*u);
-            }
-        }
+        // Whoever of this home lies on it now has a place here, slot or no slot (they got up, and
+        // want back in).
+        let livers: Vec<u32> = o
+            .users()
+            .filter(|&u| w.sims.get(u as usize).is_some_and(|s| lives_on(w, s, plot)))
+            .collect();
+        out.extend_from_slice(&livers);
         for (i, inter) in def.interactions.iter().enumerate() {
-            if !own_place(&w.content, inter) {
+            if !offers_place(&w.content, inter) {
                 continue;
             }
             if !livers.is_empty() {
@@ -241,12 +248,19 @@ fn places_in_room(w: &World, room: u16) -> Vec<u32> {
                 for u in &livers {
                     if let Some(p) = w.relationships.partner_of(*u as usize) {
                         let p = p as u32;
-                        if !out.contains(&p) && goes_to(w, o, p, plot, i) {
+                        if goes_to(w, o, p, plot, i) {
                             out.push(p);
                         }
                     }
                     for s in w.sims.iter().filter(|s| s.here() && s.carried_by.is_none()) {
-                        if is_child_of(w, *u, s.id) && !out.contains(&s.id) && goes_to(w, o, s.id, plot, i) {
+                        if is_child_of(w, *u, s.id) && goes_to(w, o, s.id, plot, i) {
+                            out.push(s.id);
+                        }
+                    }
+                }
+                if inter.cares() {
+                    for s in w.sims.iter().filter(|s| s.here() && s.carried_by.is_none()) {
+                        if goes_to(w, o, s.id, plot, i) {
                             out.push(s.id);
                         }
                     }
@@ -257,12 +271,14 @@ fn places_in_room(w: &World, room: u16) -> Vec<u32> {
             // home allows to that place has their own place in this room, and its door keeps the
             // rest out.
             for s in w.sims.iter().filter(|s| s.here() && s.carried_by.is_none()) {
-                if !out.contains(&s.id) && lives_on(w, s, plot) && o.can_use_for(s.id, def, i) {
+                if goes_to(w, o, s.id, plot, i) {
                     out.push(s.id);
                 }
             }
         }
     }
+    out.sort_unstable();
+    out.dedup();
     out
 }
 
@@ -272,12 +288,14 @@ fn mix(h: &mut u64, v: u64) {
 }
 
 /// Everything the people of a claimed room can depend on, apart from the room's own beds: who is
-/// here and where they live, and the family links and partnerships (`places_in_room`).
+/// here and where they live, how old they are, and the family links and partnerships
+/// (`room_claimants`).
 fn presence_hash(w: &World) -> u64 {
     let mut h = 0xcbf2_9ce4_8422_2325;
     mix(&mut h, w.relationships.version() as u64);
     for s in &w.sims {
         mix(&mut h, s.id as u64);
+        mix(&mut h, s.age.to_bits() as u64);
         mix(&mut h, s.gone.is_none() as u64);
         mix(&mut h, s.visiting.is_some() as u64);
         mix(&mut h, s.carried_by.map_or(0, |c| c as u64 + 1));
@@ -313,7 +331,7 @@ fn room_hash(w: &World, room: u16, presence: u64) -> u64 {
 /// Finds the rooms kept shut as a tick starts (`World::shut`).
 pub(crate) fn refresh(w: &mut World) {
     let mut shut = std::mem::take(&mut w.shut);
-    // The claimed rooms and the people each is the own of (`places_in_room`), kept from tick to
+    // The people who have a place in each claimed room (`room_claimants`), kept from tick to
     // tick while nothing they depend on changes (`presence_hash`, `room_hash`).
     let mut cache = std::mem::take(&mut w.claimants_cache);
     let presence = presence_hash(w);
@@ -329,22 +347,21 @@ pub(crate) fn refresh(w: &mut World) {
         let doing = private_use(&w.content, &w.objects, s).filter(|&(o, _)| room_of_object(&w.content, &w.lot, &w.objects[o as usize]) == room);
         if doing.is_some() || w.private_rooms.binary_search(&room).is_ok() {
             // Whoever is at a use behind a shut door (two trying for a baby) keeps the household
-            // out, claimants included: only while the room is shut by itself being used does its
+            // out, claimants included: only while the room is shut by itself being used do its
             // own people have the run of it.
             let claimants = if doing.is_none() && w.claimed_rooms.binary_search(&room).is_ok() {
                 let hash = room_hash(w, room, presence);
-                match cache.iter().position(|(r, _, _)| *r == room) {
-                    Some(k) if cache[k].1 == hash => cache[k].2.clone(),
-                    Some(k) => {
-                        let v = places_in_room(w, room);
-                        cache[k].1 = hash;
-                        cache[k].2 = v.clone();
-                        v
+                match cache.iter_mut().find(|(r, _, _)| *r == room) {
+                    Some((_, cached, people)) if *cached == hash => people.clone(),
+                    Some((_, cached, people)) => {
+                        *cached = hash;
+                        *people = room_claimants(w, room);
+                        people.clone()
                     }
                     None => {
-                        let v = places_in_room(w, room);
-                        cache.push((room, hash, v.clone()));
-                        v
+                        let people = room_claimants(w, room);
+                        cache.push((room, hash, people.clone()));
+                        people
                     }
                 }
             } else {

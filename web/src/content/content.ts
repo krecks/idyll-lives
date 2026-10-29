@@ -445,7 +445,7 @@ export interface RoomKindDef {
   /** Kept shut while someone is in it (a bathroom): others wait outside (sim-core `privacy.rs`). */
   private?: boolean;
   /** A private room that's its people's own (a bedroom): whoever has a place in it comes and goes,
-   * its door keeps the rest of the household out (sim-core `privacy.rs`). */
+   * its door keeps everyone else out (sim-core `privacy.rs`). */
   claimed?: boolean;
 }
 
