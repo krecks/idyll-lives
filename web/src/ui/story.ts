@@ -108,7 +108,9 @@ function job(e: SocialEvent): string {
 }
 
 export function storyText(e: SocialEvent): string {
-  const template = services.content.eventTexts[e.kind] ?? '{a} and {b}';
+  // A promotion saved before promotions paid a bonus names neither the job nor the bonus.
+  const kind = e.kind === 'promoted' && e.pay === undefined ? 'promotedEarlier' : e.kind;
+  const template = services.content.eventTexts[kind] ?? services.content.eventTexts[e.kind] ?? '{a} and {b}';
   return template
     .replace('{a}', name(e.a))
     .replace('{b}', name(e.b))
@@ -124,7 +126,7 @@ export function storyText(e: SocialEvent): string {
       return `${l === 'A' || l === 'F' ? 'an' : 'a'} ${l}`;
     })())
     .replace('{n}', String(e.n ?? ''))
-    .replace('{money}', money(e.n ?? 0))
+    .replace('{money}', money(e.pay ?? e.n ?? 0))
     .replace('{skill}', services.content.skills[e.skill ?? -1]?.label ?? '');
 }
 

@@ -51,6 +51,7 @@ The game is **English only for now; other languages will follow, for text and fo
 `crates/sim-core/tests/balance.rs` states what Living mode should feel like: a working household saves about a room's worth or less per week (median $100 to two rooms, about $2,000), nobody holds more than $30k after 60 days, residents climb at most 4 grades (2 on average) in 60 days (`cargo test --release --test balance -- --ignored --nocapture`, 180 game days).
 - Before the rebalance: median weekly savings $8,025, richest household $190k, 6.3 grades on average, up to 9.
 - After: median $1,099, richest $28.8k, 1.7–1.8 grades on average, at most 3 (also on other town seeds). Pay grades $12–52/h (were $15–300/h); promotions about a third as fast (`performancePerShift` 2.5, `performancePerFit` 1, new `performancePerMood` 4, was a fixed 15); rent base $60 + $0.25 per tile; new living costs of $150 per resident in the weekly bills.
+- Pay by track (after 0.5.1): grades $12–60/h, each track's `payFactor` (0.5–1.83) bending pay up to grade J, and a promotion bonus of half a week at the new grade: median $621, richest $14.8k, 1.2 grades on average, at most 3 (seeds 7, 11 and 19).
 - Slower careers left the player's household with little news in a quiet week; goal ideas nobody answers are now taken on after two days (`planner.suggestionDays`), so an idle household still has something to work toward.
 
 ### Findings from the town soak test (0.7)

@@ -4,6 +4,7 @@
 //! ignores them; they are resolved by the asset registry on the web side.
 
 use std::collections::{HashMap, HashSet};
+use std::ops::RangeInclusive;
 
 use serde::Deserialize;
 
@@ -21,6 +22,12 @@ pub const MAX_TAGS: usize = 64;
 pub const MAX_GENDERS: usize = 32;
 /// Fastest a trait, perk, feeling or anything else may make someone walk (times the normal pace).
 pub const MAX_WALK_SPEED: f32 = 10.0;
+/// The most a grade may pay per hour: pay becomes shift pay and promotion bonuses, so a pack's
+/// figure must stay a number the game can add up (the base game's top grade pays $60).
+const MAX_PAY_PER_HOUR: f32 = 10_000.0;
+/// How far a `payFactor` may bend pay: within this a track's pay still resembles its field (the
+/// base game keeps to 0.5–1.83), and a pack beyond it would make pay meaningless.
+const PAY_FACTOR: RangeInclusive<f32> = 0.25..=3.0;
 /// Bitmask of indices into `Content::tags`.
 pub type TagMask = u64;
 /// Bitmask of indices into `LifeRules::stages` (content `stages` rules: who may use what).
@@ -1806,6 +1813,18 @@ struct GradeRaw {
     skill_level: f32,
 }
 
+/// A `payFactor` from content, refused rather than clamped when it is out of range.
+fn checked_pay_factor(value: f32, what: &str) -> Result<f32, Error> {
+    if !PAY_FACTOR.contains(&value) {
+        return Err(Error::new(format!(
+            "{what}: payFactor {value} must be {}..{}",
+            PAY_FACTOR.start(),
+            PAY_FACTOR.end()
+        )));
+    }
+    Ok(value)
+}
+
 #[derive(Deserialize, Clone, Copy)]
 struct ShiftRaw {
     start: f32,
@@ -1836,6 +1855,7 @@ impl<'de> Deserialize<'de> for Days {
 struct CategoryRaw {
     id: String,
     label: String,
+    /// Pay for the whole field relative to the grades' own rates (1 = the grades' rates).
     #[serde(default = "one")]
     pay_factor: f32,
     shift: ShiftRaw,
@@ -1845,10 +1865,16 @@ struct CategoryRaw {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct TrackRaw {
     id: String,
     label: String,
     skills: HashMap<String, f32>,
+    /// Pay at the top of this track relative to the category's `payFactor` (1 = the
+    /// category's rate). Pay rises in a straight line from the entry grade, which pays the
+    /// category's rate.
+    #[serde(default = "one")]
+    pay_factor: f32,
     #[serde(default)]
     shift: Option<ShiftRaw>,
     titles: Vec<String>,
@@ -3755,6 +3781,14 @@ impl Content {
         }
 
         // Career categories: every track becomes a career with one level per grade.
+        for g in &raw.grades {
+            if !(0.0..=MAX_PAY_PER_HOUR).contains(&g.pay_per_hour) {
+                return Err(Error::new(format!(
+                    "grade '{}': payPerHour {} must be 0..{MAX_PAY_PER_HOUR}",
+                    g.id, g.pay_per_hour
+                )));
+            }
+        }
         let grades: Vec<GradeDef> = raw
             .grades
             .iter()
@@ -3767,6 +3801,8 @@ impl Content {
             .collect();
         let mut career_categories = Vec::with_capacity(raw.career_categories.len());
         for (ci, cat) in raw.career_categories.iter().enumerate() {
+            let field_pay =
+                checked_pay_factor(cat.pay_factor, &format!("career category '{}'", cat.id))?;
             let work_effects = need_array(&cat.work_effects, &cat.id)?;
             for track in &cat.tracks {
                 if track.titles.is_empty() || track.titles.len() > grades.len() {
@@ -3781,22 +3817,32 @@ impl Content {
                     return Err(Error::new(format!("track '{}': invalid shift", track.id)));
                 }
                 let skills = skill_list(&track.skills, &track.id)?;
+                let track_pay =
+                    checked_pay_factor(track.pay_factor, &format!("track '{}'", track.id))?;
+                // Grade 0 pays the field's rate; the factor only scales the top grade.
+                let top_grade = track.titles.len().saturating_sub(1).max(1) as f32;
                 let levels = track
                     .titles
                     .iter()
                     .zip(&grades)
                     .enumerate()
-                    .map(|(gi, (title, grade))| CareerLevel {
-                        title: title.clone(),
-                        grade: Some(gi),
-                        pay: (grade.pay_per_hour * cat.pay_factor * shift.hours).round() as i64,
-                        start_hour: shift.start,
-                        hours: shift.hours,
-                        days: shift.days.0,
-                        requires: skills
-                            .iter()
-                            .map(|&(s, w)| (s, (grade.skill_level * w).round()))
-                            .collect(),
+                    .map(|(gi, (title, grade))| {
+                        // Straight line from the field's rate at the entry grade to `track_pay`
+                        // at the top one: senior pay differs between tracks, entry pay does not.
+                        let step = (track_pay - 1.0) * gi as f32 / top_grade;
+                        CareerLevel {
+                            title: title.clone(),
+                            grade: Some(gi),
+                            pay: (grade.pay_per_hour * field_pay * (1.0 + step) * shift.hours)
+                                .round() as i64,
+                            start_hour: shift.start,
+                            hours: shift.hours,
+                            days: shift.days.0,
+                            requires: skills
+                                .iter()
+                                .map(|&(s, w)| (s, (grade.skill_level * w).round()))
+                                .collect(),
+                        }
                     })
                     .collect();
                 careers.push(CareerDef {
@@ -3833,6 +3879,14 @@ impl Content {
             })
             .collect();
         workweek.sort_by(|a, b| a.fit.total_cmp(&b.fit));
+        // A shortfall of more than one level is never close enough to hire on probation, and a
+        // negative one would ask for skills above the job's own.
+        let probation_levels = cr.probation_levels.unwrap_or(0.0);
+        if !(0.0..=1.0).contains(&probation_levels) {
+            return Err(Error::new(format!(
+                "careerRules.probationLevels {probation_levels} must be 0..1"
+            )));
+        }
         let career_rules = CareerRules {
             commute_minutes: time(cr.commute_minutes.unwrap_or(30.0), "careerRules.commuteMinutes")?,
             late_minutes: cr.late_minutes.unwrap_or(60.0),
@@ -3840,7 +3894,7 @@ impl Content {
             performance_per_shift: cr.performance_per_shift.unwrap_or(12.0),
             performance_per_fit: cr.performance_per_fit.unwrap_or(0.0),
             performance_per_mood: cr.performance_per_mood.unwrap_or(15.0),
-            probation_levels: cr.probation_levels.unwrap_or(0.0),
+            probation_levels,
             workweek,
             promotion_feeling: feeling(&cr.promotion_feeling, "careerRules")?,
             missed_feeling: feeling(&cr.missed_feeling, "careerRules")?,
@@ -4519,6 +4573,43 @@ mod tests {
     }
 
     #[test]
+    fn track_pay_rises_to_the_top_and_probation_stops_at_one_level() {
+        let c = Content::from_json(
+            r#"{
+            "needs":[{"id":"fun","label":"Fun","decayPerHour":0.06}],
+            "objects":[],
+            "skills":[{"id":"writing","label":"Writing"}],
+            "grades":[{"id":"A","label":"Entry","payPerHour":10,"skillLevel":0},
+                      {"id":"B","label":"Junior","payPerHour":20,"skillLevel":2},
+                      {"id":"C","label":"Senior","payPerHour":30,"skillLevel":4}],
+            "careerCategories":[{"id":"words","label":"Words","payFactor":1.0,
+              "shift":{"start":9,"hours":8,"days":[0]},
+              "tracks":[
+                {"id":"words.low","label":"Low","skills":{"writing":1},"payFactor":0.5,
+                 "titles":["Low A","Low B","Low C"]},
+                {"id":"words.high","label":"High","skills":{"writing":1},"payFactor":1.5,
+                 "titles":["High A","High B","High C"]},
+                {"id":"words.one","label":"One","skills":{"writing":1},"payFactor":2.0,
+                 "titles":["One A"]}]}],
+            "careerRules":{"probationLevels":1}
+        }"#,
+        )
+        .unwrap();
+        let pay = |id: &str| -> Vec<i64> {
+            let career = &c.careers[c.career_index(id).unwrap()];
+            career.levels.iter().map(|l| l.pay).collect()
+        };
+        // Entry pay is the field's rate whatever the track.
+        assert_eq!((pay("words.low")[0], pay("words.high")[0]), (80, 80));
+        // Pay rises in a line to the top of the track, where its factor applies (8h × rate).
+        assert_eq!(pay("words.low"), [80, 120, 120]);
+        assert_eq!(pay("words.high"), [80, 200, 360]);
+        // A track with one grade has no top to reach: it pays the field's rate.
+        assert_eq!(pay("words.one"), [80]);
+        assert_eq!(c.career_rules.probation_levels, 1.0);
+    }
+
+    #[test]
     fn content_with_moodlet_keys_still_loads() {
         // Every key as written before the moodlet → feeling rename (serde aliases).
         let old = r#"{
@@ -4716,6 +4807,51 @@ mod tests {
         refused(&|c| c["objects"][0]["interactions"][0]["minutes"] = inf(), "fridge.snack: minutes must be > 0");
         refused(&|c| c["socials"][0]["minutes"] = inf(), "chat: minutes must be > 0");
         refused(&|c| c["careerRules"] = json!({"commuteMinutes": 1e39}), "careerRules.commuteMinutes: times must be numbers");
+        // Careers: pay and probation stay within what the game can pay out.
+        let career = |c: &mut serde_json::Value| {
+            c["skills"] = json!([{"id": "writing", "label": "Writing"}]);
+            c["grades"] = json!([{"id": "A", "label": "Entry", "payPerHour": 10, "skillLevel": 0}]);
+            c["careerCategories"] = json!([{
+                "id": "words", "label": "Words",
+                "shift": {"start": 9, "hours": 8, "days": [0]},
+                "tracks": [{"id": "words.low", "label": "Low", "skills": {"writing": 1},
+                            "titles": ["Low A"]}]}]);
+        };
+        refused(
+            &|c| {
+                career(c);
+                c["grades"][0]["payPerHour"] = json!(-1);
+            },
+            "grade 'A': payPerHour -1 must be 0..10000",
+        );
+        refused(
+            &|c| {
+                career(c);
+                c["grades"][0]["payPerHour"] = inf();
+            },
+            "grade 'A': payPerHour inf must be 0..10000",
+        );
+        refused(
+            &|c| {
+                career(c);
+                c["careerCategories"][0]["payFactor"] = json!(0.1);
+            },
+            "career category 'words': payFactor 0.1 must be 0.25..3",
+        );
+        refused(
+            &|c| {
+                career(c);
+                c["careerCategories"][0]["tracks"][0]["payFactor"] = json!(4);
+            },
+            "track 'words.low': payFactor 4 must be 0.25..3",
+        );
+        refused(
+            &|c| {
+                career(c);
+                c["careerRules"] = json!({"probationLevels": 2});
+            },
+            "careerRules.probationLevels 2 must be 0..1",
+        );
         refused(&|c| c["accidents"] = json!([{"id": "doze", "need": "fun", "cooldownHours": 1e39}]), "accident 'doze': times must be numbers");
         refused(&|c| c["dayRhythm"] = json!({"babyWakes": {"cooldownMinutes": 1e39}}), "dayRhythm.babyWakes.cooldownMinutes");
         refused(&|c| c["cooking"] = json!({"inviteMinutes": 1e39}), "cooking.inviteMinutes must be a number");
@@ -4759,6 +4895,7 @@ mod tests {
         );
         // (Each of these on its own is fine.)
         let mut c: serde_json::Value = serde_json::from_str(CONTENT).unwrap();
+        career(&mut c);
         c["objectRules"] = json!({"resale": 1.0, "upgradeCost": 0.0});
         c["bondPresets"]["roommates"]["friendship"] = json!(-100);
         c["perks"][1]["effects"]["walkSpeed"] = json!(10);

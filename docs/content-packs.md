@@ -533,6 +533,9 @@ woken. They do the crib's care interactions for each of those needs under `tendB
 calls nobody again for `cooldownMinutes` (default 90). The base game wakes for hunger, bladder
 and hygiene.
 **Jobs:** `careerRules.market` turns on residents finding, quitting and losing jobs on their own.
+**Story texts** (`events`): `promoted` (`{job}`: the new title, `{money}`: the bonus of half a
+week at the new grade); `promotedEarlier` for promotions in saves from before the bonus, which
+name neither.
 
 **Needs and autonomy:** a need's `comfortable` (0..1, default 0) is the level residents like to
 keep it at: below it the need weighs `autonomy.comfortBoost` times more (eased in over the tenth
@@ -880,7 +883,11 @@ walks to it on their own any more.
 Money: households start with $2,500 (`economy.startingFunds`), plus $10,000 to build with when
 they start on an empty lot in a Living game (`economy.emptyLotFunds`; a ready-made house is worth
 about $7,500–12,000); rent is about $200 a week on a house plot; an
-entry-level job pays roughly $70–150 a shift (grades run from $12/h to $52/h). Running costs
+entry-level job pays roughly $70–150 a shift (grades run from $12/h to $60/h). A track's
+`payFactor` sets its pay at the top of the field: entry grades all pay the field's rate, and pay
+rises in a straight line from there to the last grade, which pays `payFactor` × that rate
+(0.5–1.83 in the base game). A field's own `payFactor` scales all of its tracks alike (1 = the
+grades' rates). Running costs
 come as weekly **bills**, paid with the rent: `economy.rent.billsBase` ($25) plus `billsRate`
 (1.5%) of what the household's objects are worth (price plus upgrades) plus `perResident`
 ($150 per resident). A $2,000 luxury item adds about $30 a week. A working household saves
@@ -1041,6 +1048,9 @@ keys share these objects. The rules:
 | Friendship and romance in `bondPresets` | −100 to 100 | relationships are kept in that range |
 | Tags, animations and skills named in the day rhythm (`sleepTags`, `napTags`, …), room kinds, room dirt, cleaning, repairs (`objectRules.repair` skill and tags), accidents (`anim`, `tags`), social rules (`busyTags`, `guestTags`), cooking tag lists and activities | ones the content has | a typo used to be dropped silently and turn the feature off (nobody counted as asleep; repairs trained nothing) |
 | Times that become ticks: feelings' `hours`, interaction and social `minutes`, the commute, accident cooldowns and grace, the baby's quiet spell, cooking invitations and station waits | numbers (a value too large for a float, such as `1e39`, reads as infinity and is refused) | an infinite time overflowed the tick count |
+| A grade's `payPerHour` | 0 to 10000 | pay becomes shift pay and promotion bonuses; a huge one overflowed the sum |
+| `payFactor` (a career category's, a track's) | 0.25 to 3 | past that a track's pay no longer resembles its field |
+| `careerRules.probationLevels` | 0 to 1 | a shortfall of more than a level is never close enough to hire on probation |
 
 At run time the game also keeps needs between 0 and 1, and friendship and romance within ±100,
 whatever the content says; a score that isn't a number is never chosen. The hours of the

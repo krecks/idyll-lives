@@ -892,17 +892,21 @@ pub struct SocialEvent {
     /// A number for the story (a level, an amount of money).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub n: Option<i64>,
+    /// A one-off payment that came with the event (a promotion bonus). Where an event has both,
+    /// `{money}` in its text is this and `{n}` is `n`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pay: Option<i64>,
     /// Skill index, for skill events.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub skill: Option<u32>,
     /// Career index, for job events (career category for goal events).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub career: Option<u32>,
     /// Goal definition, for goal events.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub goal: Option<u32>,
     /// Object type, for things residents want (`Broke` and the like name theirs in `n`).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub object: Option<u32>,
 }
 
@@ -925,11 +929,36 @@ impl EventLog {
             b: b as u32,
             c: c.map(|c| c as u32),
             n: None,
+            pay: None,
             skill: None,
             career: None,
             goal: None,
             object: None,
         });
+    }
+
+    /// The event for a job: one Sim, `n` being the level they hold.
+    fn career_event(
+        tick: u64,
+        kind: EventKind,
+        a: usize,
+        career: usize,
+        n: Option<i64>,
+    ) -> SocialEvent {
+        SocialEvent {
+            id: 0,
+            tick,
+            kind,
+            a: a as u32,
+            b: a as u32,
+            c: None,
+            n,
+            pay: None,
+            skill: None,
+            career: Some(career as u32),
+            goal: None,
+            object: None,
+        }
     }
 
     /// A job event about one Sim.
@@ -941,19 +970,14 @@ impl EventLog {
         career: usize,
         n: Option<i64>,
     ) {
-        self.add(SocialEvent {
-            id: 0,
-            tick,
-            kind,
-            a: a as u32,
-            b: a as u32,
-            c: None,
-            n,
-            skill: None,
-            career: Some(career as u32),
-            goal: None,
-            object: None,
-        });
+        self.add(Self::career_event(tick, kind, a, career, n));
+    }
+
+    /// A promotion: `a` now works at `level` in `career`, with a one-off `bonus`.
+    pub fn push_promotion(&mut self, tick: u64, a: usize, career: usize, level: usize, bonus: i64) {
+        let mut event = Self::career_event(tick, EventKind::Promoted, a, career, Some(level as i64));
+        event.pay = Some(bonus);
+        self.add(event);
     }
 
     /// A goal event about one Sim.
@@ -966,6 +990,7 @@ impl EventLog {
             b: a as u32,
             c: None,
             n: Some(goal.target.round() as i64),
+            pay: None,
             skill: goal.skill.map(|s| s as u32),
             career: goal.category.map(|c| c as u32),
             goal: Some(goal.def as u32),
@@ -990,6 +1015,7 @@ impl EventLog {
             b: a as u32,
             c: None,
             n,
+            pay: None,
             skill: skill.map(|s| s as u32),
             career: None,
             goal: None,
@@ -1007,6 +1033,7 @@ impl EventLog {
             b: b as u32,
             c: None,
             n: Some(n),
+            pay: None,
             skill: None,
             career: None,
             goal: None,
@@ -1024,6 +1051,7 @@ impl EventLog {
             b: a as u32,
             c: None,
             n,
+            pay: None,
             skill: None,
             career: None,
             goal: None,
