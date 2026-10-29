@@ -29,7 +29,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 45
     # No RUSTFLAGS here: it would replace .cargo/config.toml's SIMD flag (the wasm crates then
     # stop with a compile error), so a flag added here must repeat `-C target-feature=+simd128`.
@@ -186,7 +186,7 @@ jobs:
     needs: build
     # Release tags publish; a run by hand only with deploy checked.
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     environment:
       name: github-pages
