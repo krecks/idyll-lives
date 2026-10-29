@@ -126,8 +126,12 @@ const RADIUS_LIMITS = [6, 95] as const;
 const BETA_LIMITS = [0.3, 1.35] as const;
 /** Its lens: vertical field of view (a slightly long lens flattens the perspective: the dollhouse look), near and far (m). */
 const LENS = { fov: 0.7, near: 0.3, far: 1600 };
-/** Frames per second at most in the menus. */
-const MENU_FPS = 30;
+/**
+ * The near plane moves out with the camera, to this share of its distance (never under `LENS.near`): the depth
+ * buffer's precision goes on the first metres past it, and from the town overview's 200–300 m at 0.3 m the
+ * roads, 1.2 cm over the ground, fought it in green patches. Close up nothing changes (0.3 m to 15 m out).
+ */
+const NEAR_SHARE = 1 / 50;
 /** Light is recomputed when the game's clock moved this many minutes (fast: the preset's `lightingStep`), at most every `LIGHT_MIN_MS`. */
 const LIGHT_STEP = 0.5;
 const LIGHT_MIN_MS = 100;
@@ -705,13 +709,19 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   /** Puts the camera where the game (or the overview) has it this frame. */
   private applyCamera(): void {
+    let radius: number;
     if (this.townMode) {
       const p = this.townPose;
       this.camera.setPose(p.alpha, p.beta, p.radius, p.target.x, p.target.y, p.target.z, p.targetScreenOffset.x, p.targetScreenOffset.y);
+      radius = p.radius;
     } else {
       const o = this.orbit;
       this.camera.setPose(o.alpha, o.beta, o.radius, o.target.x, o.target.y, o.target.z);
+      radius = o.radius;
     }
+    const near = Math.max(LENS.near, radius * NEAR_SHARE);
+    const c = this.camera.camera;
+    if (c.nearClip !== near) c.nearClip = near;
   }
 
   cameraPose(): CameraPose {
@@ -1867,7 +1877,6 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       // The camera glides from the town down to the game's pose (kept by the orbit meanwhile), drawn at the game's frame rate.
       const o = this.orbit;
       this.flyingIn = true;
-      this.applyPacing();
       await new Promise<void>((resolve) => {
         const timer = setTimeout(resolve, glide * 1000 + 600);
         this.townRig.glideTo({ alpha: o.alpha, beta: o.beta, radius: o.radius, x: o.target.x, z: o.target.z }, glide, () => {
@@ -1878,7 +1887,6 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.flyingIn = false;
     }
     if (this.townMode) this.leaveTown();
-    this.applyPacing();
   }
 
   setTownShot(shot: TownShot, cut = false): void {
@@ -1908,7 +1916,6 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.townMode = true;
     this.shaderWatch.phase = 'town';
     this.birdLife.setTown(true);
-    this.applyPacing();
     this.applyDig(); // (no basement or windowless rooms kept dark in the town.)
     const o = this.orbit;
     const p = this.townPose;
@@ -2077,15 +2084,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lot.setReducedMotion(!!options.reducedMotion); // (the wind, the clouds.)
     this.characters.reducedMotion = !!options.reducedMotion;
     this.placing.reducedMotion = !!options.reducedMotion;
-    this.applyPacing();
+    // The player's frame rate cap, in the menus too: their town, standing still, is held (`heldFrames.ts`), so a cap
+    // of their own saved nothing then, and while its camera moved it judders (30 fps: four refreshes a frame at 120 Hz).
+    this.pacer.setCap(this.options.fpsCap);
     this.applyResolution();
-  }
-
-  /** The frame rate cap, and in the menus at most `MENU_FPS` (not while the camera flies into the game). */
-  private applyPacing(): void {
-    const cap = this.options.fpsCap;
-    const menu = this.townMode && !this.flyingIn;
-    this.pacer.setCap(menu ? (cap > 0 ? Math.min(cap, MENU_FPS) : MENU_FPS) : cap);
   }
 
   private readonly onResize = () => this.applyResolution();
