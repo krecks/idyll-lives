@@ -120,8 +120,12 @@ their finding ids. What is still open is here, with its id; §9 of the review sa
 
 ### Residents
 - **Feet slide at game speeds 4 and 5** (48–81 % of the way: 45 and 90 m/s, faster than any gait steps without
-  strobing; A-residents-03, G-25): won't fix. The clip check's baseline (`tools/characters/clip-baseline.json`) is
-  empty.
+  strobing; A-residents-03, G-25): won't fix, looked at again on 2026-10-29. At 60 frames a second a resident moves
+  0.75 m a frame at speed 4 and 1.5 m at speed 5 (the renderer snaps past 1.6 m); a running step is about 1 m and the
+  quickest a leg can alternate without flickering is every other frame. The longest walk on a lot, 31 m across the
+  review garden, lasts 0.85 s at speed 4, and the following camera keeps the walker in frame for only part of it, so
+  the feet can't be read. Speed 4 is also what quiet hours skip at, with the household asleep or out. The clip
+  check's baseline (`tools/characters/clip-baseline.json`) is empty: it reports nothing to keep.
 
 ### Content and sim
 - **Servers** wear no apron and appear at their post at opening time rather than walking in.
